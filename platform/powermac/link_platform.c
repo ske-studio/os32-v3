@@ -1,5 +1,5 @@
 /* PowerMac link boundary: DEC and FG1 idle_work_run points drive the shared NIC/link
- * (waits, syscall entry, after net_tx; foreground at most once/ms). */
+ * (waits, syscall entry, after net_tx; foreground link progress at most once/ms, RX-active poll every pass). */
 #include "net/link_platform.h"
 #include "kernel_tick.h"
 #include "kernel/idle_work.h"
@@ -20,8 +20,7 @@ void link_platform_idle(void)
 {
     if (idle_running) return;
     idle_running = 1;
-    idle_work_run();
-    _idle();
+    idle_wait_step();
     idle_running = 0;
 }
 

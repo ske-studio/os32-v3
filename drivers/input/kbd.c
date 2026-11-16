@@ -421,8 +421,7 @@ static void kbd_legacy_park_kbd(int interruptible)
 }
 static void kbd_legacy_wait_step(void)
 {
-    idle_work_run();
-    _halt();
+    idle_wait_step();
 }
 static const struct InputLegacyProvider kbd_legacy_provider = {
     .terminal_try = serial_trygetchar, .terminal_peek = serial_peekchar,

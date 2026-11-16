@@ -66,7 +66,7 @@ def run(ctx):
                 ('return tick_register(PM_TICK_LINK, fn);', 'return tick_register(0, fn);'),
                 ('ppc_irq_restore(saved);', '(void)saved;'),
                 ('idle_running = 1;', 'idle_running = 0;'),
-                ('    idle_work_run();', '    /* omitted work */')]:
+                ('    idle_wait_step();', '    /* omitted work */')]:
                 assert original.count(anchor) == 1
                 exercise(original.replace(anchor, replacement), False)
                 print('RED runtime: ' + anchor, flush=True)

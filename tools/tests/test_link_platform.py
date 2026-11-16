@@ -46,7 +46,7 @@ def run(ctx):
         (work / 'idt.h').write_text('#include "types.h"\nextern volatile u32 tick_count;\n')
         (work / 'io.h').write_text('unsigned int irq_save(void);\n'
             'void irq_restore(unsigned int); void _idle(void);\n')
-        (work / 'kernel/idle_work.h').write_text('void idle_work_run(void);\n')
+        (work / 'kernel/idle_work.h').write_text('void idle_wait_step(void);\n')
         probe = r'''#include "net/link_platform.h"
 #ifdef TEST_PC98_INLINE
 #include "platform/pc98/link_platform_inline.h"
@@ -62,7 +62,8 @@ volatile u32 tick_count;
 static u32 flags = 0x202, stage;
 unsigned int irq_save(void) { u32 f = flags; flags = 0; return f; }
 void irq_restore(unsigned int f) { flags = f; }
-void idle_work_run(void) { stage = stage == 0 ? 1 : 99; }
+void _idle(void);
+void idle_wait_step(void) { stage = stage == 0 ? 1 : 99; _idle(); }
 void _idle(void) { stage = stage == 1 ? 2 : 99; }
 void _start(void) {
     int rc = 0;
@@ -93,8 +94,7 @@ void _start(void) {
             ('return tick_count;', 'return 0;', 'clock'),
             ('return irq_save();', 'return 0;', 'lock'),
             ('irq_restore(saved);', '(void)saved;', 'unlock'),
-            ('idle_work_run();', '', 'idle work'),
-            ('    _idle();', '', 'idle wait')]
+            ('idle_wait_step();', '', 'idle work/wait')]
         for inline, product in enumerate(products):
             variants = [(product, 'control')] + ([(product.replace(a, b), label)
                         for a, b, label in mutations] if ctx.mutate else [])

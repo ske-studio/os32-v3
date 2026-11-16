@@ -271,7 +271,7 @@ def run(ctx):
                                 idle=idle.replace(anchor_nap, '    /* mutation: spin */'))
             print('RED runtime: idle does not nap', flush=True)
             provider = (ctx.root / 'platform/powermac/link_platform.c').read_text()
-            anchor_work = '    idle_work_run();'
+            anchor_work = '    idle_wait_step();'
             assert provider.count(anchor_work) == 1
             assert not exercise(ctx.root, work, vectors,
                                 provider_text=provider.replace(anchor_work, ''))

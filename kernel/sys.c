@@ -39,8 +39,7 @@ void sys_reboot(void)
 void sys_halt(void)
 {
     geforce_foreground_poll();
-    idle_work_run();
-    _halt();
+    idle_wait_step();
 }
 
 void buz_on(void)

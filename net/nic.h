@@ -21,6 +21,9 @@ int net_bind(const struct NetNicOps *ops);
 struct rx_work_budget;
 void net_rx_schedule(void);
 int net_rx_service(void);
+/* Keep foreground RX active for this long after a successful NIC receive. */
+#define NET_RX_ACTIVE_MS 5u
+int net_rx_recent(u32 window_ms);
 void net_rx_batch_begin(void);
 void net_rx_batch_end(void);
 /* Queue reset is deferred while demux owns a reserved tail. */

@@ -27,6 +27,7 @@
 #include "serial.h"
 #include "serial_plan.h"      /* SER_TX_OK */
 #include "io.h"
+#include "kernel/idle_work.h"
 #include "kprintf.h"
 #include "kstring.h"
 #include "appslot.h"            /* APP_ID_SHELL */
@@ -86,7 +87,7 @@ static void sio_idle(void *ctx)
 {
     (void)ctx;
     /* can_wait (IF=1) を確かめてからしか呼ばれない。IF=0 の hlt は起きない */
-    _halt();
+    idle_wait_step();
 }
 
 static int sio_can_wait(void *ctx)

@@ -2,8 +2,8 @@
 #define NE2K_BH_TEST
 static void bh_wait_check(void);
 #include "ne2000_dma_host.c"
-#include "../../kernel/idle_work.c"
 static void _idle(void) {}
+#include "../../kernel/idle_work.c"
 #define pending nic_pending
 #include "../../net/nic.c"
 #undef pending

@@ -7,8 +7,8 @@ CHECK = dict(name='ppc-terminal-work', env=['ppc-cross'], tier=1, needs=[], budg
             'platform/powermac/terminal_input.c',
             'platform/powermac/lan_boot.h', 'platform/powermac/usb_boot.h',
             'platform/powermac/usb_boot.c', 'platform/powermac/lan_service.c',
-            'init/ppc_kernel.c', 'build/ppc-kboot.mk', 'net/nic.c', 'kernel/idle_work.c',
-            'kernel/idle_work.h', 'kernel/cli/resident_cli.h', 'include/types.h',
+            'init/ppc_kernel.c', 'build/ppc-kboot.mk', 'net/nic.c', 'net/link.c', 'kernel/idle_work.c',
+            'kernel/idle_work.h', 'net/nic.h', 'kernel/cli/resident_cli.h', 'include/types.h',
             'include/callconv.h', 'sdk/include/os32/os32_kapi_shared.h',
             'arch/ppc/kernel_boot.h', 'arch/ppc/exec_kapi.c', 'arch/ppc/exec_kapi.h',
             'platform/powermac/kapi_table.h', 'exec/exec_syscall.inc'], basis=['AC-CTX-1'])
@@ -31,7 +31,7 @@ def exercise(tmp, mutation=None):
         assert terminal.count(anchor) == 1, anchor
         terminal = terminal.replace(anchor, replacement)
     # Compile the actual idle-work implementation against observable IRQ state.
-    (tmp / 'io.h').write_text('extern int enabled;\n#define _irq_enabled() (enabled)\n')
+    (tmp / 'io.h').write_text('extern int enabled; void _idle(void);\n#define _irq_enabled() (enabled)\n')
     (tmp / 'irq.h').write_text('extern unsigned int kctx_irq_depth;\n')
     idle = (ROOT / 'kernel/idle_work.c').read_text()
     (tmp / 'idle.c').write_text(idle)
@@ -49,6 +49,8 @@ def exercise(tmp, mutation=None):
     harness = r'''
 #include "lan_boot.h"
 #include "idle_work.h"
+int net_rx_recent(unsigned int ms) { (void)ms; return 0; }
+void _idle(void) {}
 int enabled = 1;
 unsigned int kctx_irq_depth;
 static int usb_calls, usb_steps, lan_steps, irq_errors, nested;
@@ -138,7 +140,8 @@ def main():
         manifest = subprocess.check_output(['make', '-s', '-f', 'build/ppc-kboot.mk', image,
             '--eval=work-manifest:;@echo $(KB_C)', 'work-manifest'], cwd=ROOT, text=True).split()
         assert ('platform/powermac/terminal_input.c' in manifest) == expected
-        assert ('net/nic.c' in manifest) != expected
+        assert 'net/nic.c' in manifest  # idle_wait_step uses the common RX predicate.
+        assert ('net/link.c' in manifest) != expected
         assert ('platform/powermac/usb_boot.c' in manifest) == expected
     boot = (ROOT / 'init/ppc_kernel.c').read_text()
     # Select the PLN1 branch, then match the complete ordered startup block.

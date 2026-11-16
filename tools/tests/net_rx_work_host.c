@@ -189,6 +189,7 @@ static void tier_requests(void)
     CHECK(net_bind(&device) == 0);
     fg_ms_override = 1; fg_ms = tick_count * 10u;
     frames = 0;
+    fg_ms += NET_RX_ACTIVE_MS; /* Prior RX has expired. */
     for (u32 i = 0; i < 3; ++i) (void)io_dispatch(500);
     CHECK(io_dispatch(500) == 1); /* Bound poll-only NICs stay requested. */
     u32 old_polls = polls, old_links = links, old_jiffy = tick_count;
@@ -200,6 +201,21 @@ static void tier_requests(void)
     CHECK(io_dispatch(500) == 1 && frames < 2 && reads > before);
     /* The Tier fairness reservation can grant just one unit in a pass. */
     CHECK(io_dispatch(500) == 1 && frames == 0);
+    CHECK(net_rx_recent(5) && !net_rx_recent(0));
+    old_polls = polls; old_links = links;
+    CHECK(io_dispatch(500) == 1 && polls == old_polls + 1 && links == old_links);
+    fg_ms += 4;
+    CHECK(net_rx_recent(5));
+    (void)io_dispatch(500); old_polls = polls; old_links = links;
+    CHECK(io_dispatch(500) == 1 && polls == old_polls + 1 && links == old_links);
+    ++fg_ms;
+    CHECK(!net_rx_recent(5));
+    (void)io_dispatch(500); old_polls = polls; old_links = links;
+    CHECK(io_dispatch(500) == 1 && polls == old_polls && links == old_links);
+    fg_ms = 0xfffffffeu; frames = 1;
+    CHECK(io_dispatch(500) == 1 && !frames && net_rx_recent(5));
+    fg_ms = 2; CHECK(net_rx_recent(5));
+    fg_ms = 3; CHECK(!net_rx_recent(5));
     u32 marks = requests;
     net_rx_schedule(); CHECK(requests == marks + 1);
     CHECK(io_dispatch(500) == 1 && frames == 0);
@@ -271,7 +287,7 @@ static void run_tests(void)
     CHECK(io_unregister(IO_SVC_NET_RX) == 0);
     CHECK(idle_work_register(idle_other) == 0);
     CHECK(net_start(NET_NIC_E82557, 0) == 0 && callback == net_jiffy);
-    CHECK(work_count == 1);
+    CHECK(work_count == 1 && !net_rx_recent(5));
     test_deferred_poll(); polls = 0;
     frames = 9;
     CHECK(net_rx_service() == 8 && frames == 1 && pending);
@@ -336,8 +352,8 @@ static void run_tests(void)
     CHECK(net_start(NET_NIC_E82557, 0) == 0);
     frames = 1; before = reads; rescue = 1; now = 0;
     tick_count = 0; irq_tick(); CHECK(reads == before);
-    tick_count = 1; irq_tick(); CHECK(!frames);
-    rescue = 0; net_unbind();
+    tick_count = 1; irq_tick(); CHECK(!frames && net_rx_recent(5));
+    rescue = 0; net_unbind(); CHECK(!net_rx_recent(5));
     CHECK(net_start(NET_NIC_LGY98, 0) == 0);
     test_deferred_poll();
     tick_count += 2; frames = 1; before = reads;

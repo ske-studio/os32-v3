@@ -7,7 +7,7 @@ CHECK = dict(env=['ppc-cross'], name='arch-ctx-host', tier=2, budget=15, needs=[
     'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'build/config.mk',
     'arch/ppc/kernel_trap.c', 'arch/ppc/*.h',
     'arch/x86/kernel/syscall_entry.c', 'arch/x86/arch_exec_storage.h',
-    'exec/exec_syscall.inc', 'kernel/idle_work.[ch]', 'kernel/irq/irq.h',
+    'exec/exec_syscall.inc', 'kernel/idle_work.[ch]', 'net/nic.h', 'kernel/irq/irq.h',
     'init/ppc_kernel.c', 'platform/powermac/lan_monitor.c', 'platform/powermac/platform_irq_limits.h',
     'include/**', 'sdk/include/os32/**'],
     # W4c landed: the PPC vectors now assert the contract, so nothing here is pinned any more.
@@ -59,7 +59,7 @@ def run(ctx):
     monitor = (root / 'platform/powermac/lan_monitor.c').read_text()
     with tempfile.TemporaryDirectory(prefix='arch-ctx-') as td:
         work = Path(td)
-        (work / 'io.h').write_text('int _irq_enabled(void);\n')
+        (work / 'io.h').write_text('int _irq_enabled(void); void _idle(void);\n')
         # Execute the actual entry work and actual guarded onfault owner.
         start = common.index('    ring3_gui_pump();')
         (work / 'ctx_entry.inc').write_text(common[start:common.index('    arch_kapi_source(', start)])

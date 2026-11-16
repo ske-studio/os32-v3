@@ -16,6 +16,7 @@ static void finish(int rc) {
     for (;;) {}
 }
 #define CHECK(x) do { if (!(x)) finish(__LINE__); } while (0)
+void idle_wait_step(void) { if (!(msr & EE)) return; idle_work_run(); _idle(); }
 void idle_work_run(void) {
     CHECK(waits == work);
     ++work;
@@ -38,6 +39,8 @@ void _start(void) {
     link_platform_unlock(outer); CHECK(msr == (EE | 6));
     msr = 2; outer = link_platform_lock();
     link_platform_unlock(outer); CHECK(msr == 2);
+    link_platform_idle(); CHECK(work == 0 && waits == 0 && msr == 2);
+    msr |= EE;
     link_platform_idle(); CHECK(work == 1 && waits == 1 && ticks == 0 && (msr & EE));
     link_platform_idle(); CHECK(work == 2 && waits == 2);
     registration_rc = TICK_ERR_BUSY;

@@ -49,6 +49,7 @@ u32 net_rx_demux_budget(const struct NetNicOps *ops, const u8 local[6],
         }
         u32 len = 0;
         if (ops->rx(rx_frame, sizeof(rx_frame), &len)) break;
+        net_rx_note();
         count++;
         if (len < ETH_HLEN || len > sizeof(rx_frame)) continue;
         if (rx_frame[ETH_TYPE_OFF] != (OS32_ETHERTYPE >> 8) ||

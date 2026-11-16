@@ -82,14 +82,14 @@ KB_PLATFORM := platform/powermac/rh_observe.c platform/powermac/ofw.c platform/p
 # Common kernel code, compiled unmodified.
 KB_COMMON := init/ppc_kernel.c mm/memory_boot.c mm/paging.c mm/physmem.c \
  mm/pgalloc.c mm/kmalloc.c mm/shm.c kernel/irq/tick.c kernel/irq/tick_budget.c kernel/time/tick.c \
- lib/kprintf.c lib/kstring_c.c lib/divdi3.c kernel/sys.c kernel/idle_work.c kernel/io_work.c kernel/io_policy.c fs/fd_redirect.c
+ lib/kprintf.c lib/kstring_c.c lib/divdi3.c kernel/sys.c kernel/idle_work.c kernel/io_work.c kernel/io_policy.c net/nic.c fs/fd_redirect.c
 KB_GEM := drivers/net/gem/gem_reset.c drivers/net/gem/gem_phy.c \
  drivers/net/gem/gem_ring.c drivers/net/gem/gem_mac.c \
  drivers/net/gem/gem_tx.c drivers/net/gem/gem_rx.c
 ifeq ($(KBOOT_LINK),1)
 KB_PLATFORM := $(filter-out platform/powermac/lan_wire.c platform/powermac/lan_terminal.c platform/powermac/terminal_input.c,$(KB_PLATFORM))
 KB_PLATFORM += platform/powermac/device_host.c platform/powermac/link_platform.c platform/powermac/nic_gem.c platform/powermac/link_log.c platform/powermac/link_diag.c
-KB_COMMON += net/link.c net/link_notify.c net/nic.c net/nic_rx.c net/rx_work.c net/host_mailbox.c
+KB_COMMON += net/link.c net/link_notify.c net/nic_rx.c net/rx_work.c net/host_mailbox.c
 KB_INC_EXTRA += -Inet
 else
 KB_PLATFORM += platform/powermac/host_unavailable.c

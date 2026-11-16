@@ -56,6 +56,7 @@ int con_sink_capture_active(void) { return 1; }
 int ring3_wait_pending(void) { return 0; }
 void idle_work_run(void) {}
 void arch_cpu_idle(void) {}
+void idle_wait_step(void) { idle_work_run(); arch_cpu_idle(); }
 void _start(void) {
     pm_input_boot(); CHECK(registered && registered_ops);
     CHECK(!registered->terminal_try && !registered->terminal_peek && !registered->terminal_enabled);
@@ -83,6 +84,7 @@ int exec_run(const char *cmd) {
 /* Review F1: exit and fault restart; any other result (sh.bin unloadable) stops in idle work. */
 int exec_last_result(int *kind,int *code) { CHECK(calls==result+1); result++; *kind=calls==2 ? EXEC_KIND_FAULT : calls==3 ? 0 : EXEC_KIND_EXITED; *code=3; return 0; }
 void idle_work_run(void) { CHECK(calls==3 && reports==3); finish(0); }
+void idle_wait_step(void) { idle_work_run(); }
 void arch_cpu_idle(void) { finish(1); } /* _idle (arch_io.h) is never reached */
 void kprintf(u8 color,const char *fmt,...) { (void)color;(void)fmt; CHECK(result==calls); reports++; }
 int kutoa_dec(u32 v,char *s,int n) { (void)v;(void)n; *s='3'; return 1; }
