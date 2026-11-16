@@ -366,6 +366,7 @@ OS の肥大化したコードを削る段 (表を詰める・カーネル常駐
 | [tasks/network/TASK_NET_HOSTSVC.md](tasks/network/TASK_NET_HOSTSVC.md) | ネットワーク越しの Host Services — 実機の /host・ネットワーク越しの CD (os32.iso9660)・知らせのメールボックス・サービスの一覧と os32. の名前 (設計中 2026-11-05) |
 | [tasks/network/TASK_LAN_OPERATOR.md](tasks/network/TASK_LAN_OPERATOR.md) | 操作口 (rshell・gshell) を LAN が既定・serial が退避先に、PowerPC の PLN1 を link に統合 (設計確定 2026-11-14) |
 | [tasks/network/TASK_LAN_BULK.md](tasks/network/TASK_LAN_BULK.md) | LAN の一括転送 (link の新しい op、/host の LAN 経路を link へ一本化) **設計中 (2026-11-14)** — 設計は確定、実装は未着手 |
+| [tasks/network/TASK_HSYNC_MANIFEST.md](tasks/network/TASK_HSYNC_MANIFEST.md) | hsync の往復を減らす (ホストの木の一覧と CRC で比べる) **実装中 (2026-11-16)** |
 | `docs/archive/network/TASK_N0.md` / `docs/archive/network/TASK_N1.md` / `docs/archive/network/TASK_N2.md` / `docs/archive/network/TASK_N3.md` / `docs/archive/network/TASK_N4.md` | 票 N0〜N4 (受入完了、2026-09-14〜15) — 設計 v5、KAPI v51 + libos32host、PRINT/CLIP、wget/lpr、ファイラ印刷と端末の貼り付け |
 
 ### 移植性
