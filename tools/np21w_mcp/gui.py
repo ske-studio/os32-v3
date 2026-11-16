@@ -24,6 +24,19 @@ ROOT = Path(__file__).resolve().parents[2]
 NO_DESCRIPTOR = object()  # Explicit v1 observation, without importing gui_desc.
 
 
+
+def _app_constants():
+    """exec/appslot.h plus the ID numbers it includes from include/app_ids.h."""
+    slot = c_constants(ROOT / 'exec/appslot.h')
+    ids = c_constants(ROOT / 'include/app_ids.h')
+
+    def app(name):
+        try:
+            return slot(name)
+        except KeyError:
+            return ids(name)
+    return app
+
 class Transport:
     def __init__(self, post=None, get=None, clock=time):
         self.post = post or self._post
@@ -434,7 +447,7 @@ class Gui:
         """
         kernel, shell = self.symbols()
         mem = c_constants(ROOT / 'include/memmap.h', {name: kernel[name][0] for name in ('__bss_end', '__kernel_resident_end')})
-        app = c_constants(ROOT / 'exec/appslot.h')
+        app = _app_constants()
         count = app('APP_SLOT_COUNT')
         address, size = kernel['g_slot']
         if not size or size % count:
@@ -561,7 +574,7 @@ class Gui:
             return warning
         before = self.wm_state()
         before_windows = {w['id'] for w in before.get('windows', [])}
-        app = c_constants(ROOT / 'exec/appslot.h')
+        app = _app_constants()
         free = {item['owner'] for item in before['kernel']
                 if item['owner'] >= app('APP_ID_MIN') and item['state'] == app('APP_STATE_FREE')}
         since = self.consink()['since']  # Before any input, for wait_text(since=...).
