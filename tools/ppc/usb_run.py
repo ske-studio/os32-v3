@@ -345,7 +345,10 @@ def product_accept(elf, cpu, out, mode, late=False):
     argv += USB_QEMU_CLOCK
     (out/'argv.json').write_text(json.dumps(argv, indent=2))
     # The live FB renders the full editing/hotplug transcript as well as ESCC.
-    deadline = time.monotonic()+(180 if os.environ.get('PPC_FB') == '1' else 60)
+    started = time.monotonic()
+    # Each key now waits for the guest to see the press before releasing it, so
+    # a loaded CI runner needs ~55 s for the transcript (local 1-CPU: 46 s).
+    deadline = started+(180 if os.environ.get('PPC_FB') == '1' else 120)
     q = None
     with (out/'qemu.stderr').open('w') as err:
         p = subprocess.Popen(argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=err, bufsize=0)
@@ -360,6 +363,10 @@ def product_accept(elf, cpu, out, mode, late=False):
                 while time.monotonic() < deadline:
                     if predicate(): return
                     time.sleep(.01)
+                # CI keeps no evidence directory: print where the guest stopped.
+                tail = serial(a)[-1500:]
+                print('product USB timeout '+label+' after %.1fs; serial tail:\n' % (time.monotonic()-started) +
+                      tail, flush=True)
                 raise RuntimeError('product USB timeout: '+label+' evidence='+str(out))
             def key(code, mods=(), hold=100):
                 # Hold is measured in guest time. QEMU's send-key hold-time runs on the
@@ -464,7 +471,8 @@ def product_accept(elf, cpu, out, mode, late=False):
             (out/'stream.txt').write_text(output())
             q.call('quit'); p.wait(timeout=2); require(p.returncode==0, 'product QEMU rc=0')
             print(('GREEN' if mode=='normal' else 'RED')+' product-sh '+('mouse-wait ' if late else '')+mode+' '+cpu+
-                  ': reached HID/command boundary, exact stream verdict, QEMU rc=0', flush=True)
+                  ': reached HID/command boundary, exact stream verdict, QEMU rc=0 elapsed=%.1fs'
+                  % (time.monotonic()-started), flush=True)
         finally:
             if q: q.close()
             if p.poll() is None:
