@@ -276,3 +276,13 @@
 - Q4: PowerPC担当PMが対象OS Xの版/Terminal設定/bashを固定し、プロンプトと実行中、IME有無、Ctrl+C/Cmd+./D/L/U/K/ESCを実機で照合 (現行Apple資料だけで旧版を断定しない)。
 - Q5: PC98担当PMが対象Windows 9x/2000の版・標準アプリとメーカーHelpでCtrl-X/C/V/Z/Y/A、GRPH+Tab/F4を確認。アプリ差は表の差分として残す。
 - Q6: PowerPC担当PMが対象Apple USB鍵盤の型番/メーカー配置図/HID descriptorとusageログでCommand左右・Break/Pause不在を確認。専用Break非依存の方針は維持。
+
+## M5 の小段の割り方 (実装者の案)
+
+|小段|責務と内部受入|
+|---|---|
+|M5[1]|単一実行単位の文脈値の初期化・明示設定。既定 RUNNING+ISIG、設定は command_gen を変えない。未結線|
+|M5[2]|command_begin/end の世代発行と文脈復帰、旧中断印の破棄順序を M6 と接続|
+|M5[3]|owner/exec_gen ごとの登録・親への復帰と、前景宛先の IRQ snapshot。GUI 宛先は WM が決定|
+
+各小段は内部試験のみ。実像への登録 B と A0z 後の各呼出し元の結線は別段とする。世代の幅・周回と owner 登録容量は後段の設計で確定する。
