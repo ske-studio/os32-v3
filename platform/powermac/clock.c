@@ -3,6 +3,7 @@
  * BSD references: macppc/clock.c (OpenBSD) 119-129,251-261;
  * powerpc/clock.c (NetBSD) 108-116,139-159. DEC programming belongs to F2. */
 #include "clock_source.h"
+#include "kernel/io_clock.h"
 #include "kernel/irq/tick_budget.h"
 #include "platform_timer.h"
 #include "kboot_info.h"
@@ -11,6 +12,13 @@
 static struct clock_info clock_state;
 static u32 bound_hz;
 static unsigned long long origin;
+/* IO_TIER_DESIGN §5/P5: published together at boot, before readers run. */
+#define PM_IO_CLOCK_SOURCE 1u
+static struct {
+    u32 mul, shift, source, generation;
+} io_clock;
+static u32 io_generation;
+
 
 #ifndef PM_CLOCK_FAKE
 static inline u32 tb_upper(void)
@@ -42,6 +50,7 @@ static unsigned long long read_tb(void)
 void pm_clock_bind(const struct pm_kboot_info *info)
 {
     clock_state = (struct clock_info){0};
+    io_clock = (typeof(io_clock)){0};
     bound_hz = info ? info->tb_hz : 0;
 }
 
@@ -51,6 +60,7 @@ u32 pm_tick_hz(void) { return PM_DEC_HZ; }
 int platform_clock_init(u32 tick_hz)
 {
     clock_state = (struct clock_info){0};
+    io_clock = (typeof(io_clock)){0};
     /* Admission policy, not a core-clock estimate: 1MHz..1GHz covers
      * PowerMac bus-derived TB rates, with >=1 count/us and bounded
      * remainder*1000000 below 10^15. OF CPU timebase-frequency is required. */
@@ -59,6 +69,15 @@ int platform_clock_init(u32 tick_hz)
     origin = read_tb();
     clock_state.tick_hz = tick_hz;
     clock_state.counter_hz = bound_hz;
+    u32 shift = 32;
+    unsigned long long mul;
+    do {
+        mul = ((unsigned long long)bound_hz << shift) / 1000000;
+        if (mul < (1ULL << 32)) break;
+        shift--;
+    } while (1);
+    if (++io_generation == 0) io_generation = 1;
+    io_clock = (typeof(io_clock)){(u32)mul, shift, PM_IO_CLOCK_SOURCE, io_generation};
     clock_state.ready = 1;
     tick_budget_config();
     return 0;
@@ -84,4 +103,35 @@ int platform_clock_read_us(u32 *lo, u32 *hi)
     *lo = (u32)us;
     *hi = (u32)(us >> 32);
     return 0;
+}
+
+static int pm_io_clock_read(u32 *count, u32 *source, u32 *generation)
+{
+    if (!io_clock.source) return OS32_ERR_NOSYS;
+    *count = (u32)read_tb();
+    *source = io_clock.source;
+    *generation = io_clock.generation;
+    return 0;
+}
+
+static int pm_io_clock_us_to_count(u32 us, u32 source, u32 generation, u32 *count)
+{
+    if (!io_clock.source) return OS32_ERR_NOSYS;
+    if (source != io_clock.source || generation != io_clock.generation)
+        return OS32_ERR_AGAIN;
+    unsigned long long value = ((unsigned long long)us * io_clock.mul) >> io_clock.shift;
+    if (value >= (1ULL << 31)) return OS32_ERR_AGAIN;
+    *count = (u32)value;
+    return 0;
+}
+
+const struct io_clock_ops pm_io_clock_ops = {
+    .read = pm_io_clock_read,
+    .us_to_count = pm_io_clock_us_to_count,
+    .read_us = platform_clock_read_us,
+};
+
+void pm_io_clock_install(void)
+{
+    if (io_clock.source) io_clock_set_ops(&pm_io_clock_ops);
 }

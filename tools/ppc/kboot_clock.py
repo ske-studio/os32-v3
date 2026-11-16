@@ -10,14 +10,28 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tools/tests'))
 import host32
 CHECK = dict(name='ppc-kboot-clock', tier=2, budget=60,
+             basis=['IO_TIER_DESIGN §5/P5 (PM 2026-11-16)'],
              covers=['init/ppc_kernel.c', 'platform/powermac/clock.c', 'platform/powermac/kboot_info.h',
                      'tools/ppc/kboot_clock*', 'lib/divdi3.c'],
-             inputs=['include/types.h', 'include/callconv.h', 'include/clock_source.h',
+             inputs=['kernel/io_clock.h', 'include/types.h', 'include/callconv.h', 'include/clock_source.h',
                      'include/platform_timer.h', 'platform/powermac/ofw.h',
                      'platform/powermac/ppc_layout.h', 'arch/ppc/ppc_boot.h',
                      'arch/ppc/ppc_pmap.h', 'arch/ppc/ppc_oea.h',
                      'sdk/include/os32/os32_kapi_shared.h', 'tools/tests/host32.py'])
 MUTATIONS = [
+    # IO_TIER_DESIGN §5・P5 (本線 PM 決定 2026-11-16).
+    ('mul-rounded-up', '((unsigned long long)bound_hz << shift) / 1000000',
+     '(((unsigned long long)bound_hz << shift) + 999999) / 1000000', 21),
+    ('shift-fixed', 'u32 shift = 32;', 'u32 shift = 22;', 21),
+    ('hotpath-division', '((unsigned long long)us * io_clock.mul) >> io_clock.shift',
+     '(unsigned long long)us * bound_hz / 1000000', 23),
+    ('generation-ignored', 'generation != io_clock.generation', '((void)generation, 0)', 25),
+    ('half-wrap-removed', 'if (value >= (1ULL << 31))', 'if (0)', 24),
+    ('raw-unready', 'if (!io_clock.source) return OS32_ERR_NOSYS;\n    *count',
+     'if (0) return OS32_ERR_NOSYS;\n    *count', 20),
+    ('convert-unready', 'if (!io_clock.source) return OS32_ERR_NOSYS;\n    if (source',
+     'if (0) return OS32_ERR_NOSYS;\n    if (source', 20),
+    ('install-unready', 'if (io_clock.source) io_clock_set_ops', 'if (1) io_clock_set_ops', 26),
     ('retry-removed', 'while (upper != again)', 'while (0 && upper != again)', 6),
     ('upper-comparison', 'while (upper != again)', 'while (upper == again)', 3),
     ('rounding', '(delta / hz) * 1000000', '(delta / hz) * 1000000 + 1', 6),
