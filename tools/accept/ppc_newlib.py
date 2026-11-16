@@ -18,7 +18,9 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT/'tools'), str(ROOT/'tools/ppc'), str(ROOT/'sdk/allocator')]
 MUTATIONS = (
     ('init', 'sdk/crt/ppc/start.c', '    _init();', ''),
-    ('sbss', 'sdk/link/ppc/app.ld', '        *(.sbss .sbss.* .sbss2 .sbss2.*)', ''),
+    # sbss: ld places an orphan .sbss next to .bss inside the loader's BSS range,
+    # so the guest cannot observe its removal. The host test (test_ppc_newlib,
+    # nano.sentinel) keeps that mutant RED instead.
     ('float', 'build/ppc-user.mk', 'PPC_USER_FLOAT ?= -u _printf_float', 'PPC_USER_FLOAT ?='),
     ('adapter', 'sdk/allocator/nano_adapter.c',
      'void *malloc(size_t size) { return _malloc_r(_impure_ptr, size); }',
