@@ -198,3 +198,9 @@ def assess_real_link(events, evidence):
 - N2 (P1): U は製品の link-SH と局所の rsh_command。差し替え口 3 つは変異だけに使い、USB の echo hi は FB の証跡だけで見る。
 - N3 (P2): 呼び出し元の表に tools/accept/arch_ctx.py:128 を P11 として足した (0 を明示して PLN1 に残す)。
 - N4 (P3): 準備段 P1〜P11 は並列可。D の前に全部が揃うこと。
+
+## R の実装で決めたこと (2026-11-16、PM 決定、実装者の停止 2 回を受けて)
+- R1: link の capture の合格は HELLO/ALIVE の成立と LOG の完全さ (seq が 0 から連番、drop の報告、KBOOT の段階印の順)。PDIAG の診断は求めない (link-SH の製品の像に PDIAG が無い、platform/powermac/lan_service.c:313。5 つの診断は K が診断像で確かめる)。
+- R2: link の nest・shell・exact は旧の check_shell を使わず RSH の結果の本文で判定する。nest の期待は sc_run.LINK_NEST_EXPECTED と `echo $?` の 5。shell は決まった短い台本で、終了と再起動の証跡は求めない (link の APP shell は exit N で終わらない、userland/shell/rshell_lan.c:402-407)。
+- R3: agent の API は足さない。client からは probe (世代・peer・hello)・LOG・RSH を取り、HELLO・ALIVE (ゲストの電文が 2 秒より長く途切れない)・session (不変)・SFS の CALL と応答は受け身の pcap の 0x88B5 の電文から読む。
+
