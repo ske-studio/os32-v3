@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""W[2] row validation, compiled directly without libc."""
+"""W[2] validation and completion through the actual set path, without libc."""
 CHECK = dict(name='input-w2', tier=1, budget=20, needs=[], covers=[
     'input/hal/input_policy.c', 'input/hal/input_policy.h', 'input/hal/keymap.h', 'include/io.h', 'include/app_ids.h',
     'tools/tests/input_w2_host.c', 'tools/tests/test_input_w2.py',
@@ -15,12 +15,16 @@ import tempfile
 import host32
 ROOT = Path(__file__).resolve().parents[2]
 
-MUTATIONS = [('row->context == context && context != 0', '0'),
-                             ('row->context == 0) common = row;', '0) common = row;'),
-                             ('|| r->flags)', ')'),
-                             ('(check->bits[key / 8] & (1u << (key % 8)))', '0'),
-                             ('+ r->index) * 16 + slot', '+ r->index) * 16'),
-                             ('r->kind == 5 && (check->term_bytes[group * 32 + r->value / 8] & (1u << (r->value % 8)))', '0')]
+MUTATIONS = [
+    ('|| r->flags)', ')'),
+    ('+ r->index) * 16 + slot', '+ r->index) * 16'),
+    ('&& a == b)', '&& a == b && i == j)'),
+    ('r->context = 0;', 'r->context = 4;'),
+    ('if (active && (active->ext_profiles & (1u << profile))) return 0;',
+     'if (active && (active->ext_profiles & (1u << profile)) && !active) return 0;'),
+    ('if (active && (active->ext_profiles & (1u << profile))) return OS32_ERR_NOTFOUND;',
+     'if (active && (active->ext_profiles & (1u << profile)) && !active) return OS32_ERR_NOTFOUND;'),
+]
 
 def run(ctx):
     source = (ctx.root/'input/hal/input_policy.c').read_text()

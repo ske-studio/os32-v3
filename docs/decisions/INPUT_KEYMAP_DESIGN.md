@@ -689,3 +689,10 @@ KEYSYM/EXACTのkeysymはNetBSDのu16値を維持し、独自の列挙を足さ�
 
 - PM決定 (2026-11-17): 同じ打鍵にkind6 EXTとkind8 KEY_ACTIONが一致したらkind8を優先し、kind8のNONEはEXTを打ち消す。setは両方の行を受理する。
 - W実装 (2026-11-17): 重複は編成面への整列挿入で隣接キーと比較し、別の約22KiB作業域を置かない。既定const共有・差分delta圧縮で1面22,796B（上限24KiB内、既定目標20KiBは超過）、3面68,388B＋管理96B＋接続8B＝追加BSS68,492B。既存state/registry/evaluator/mergeと将来の意味ring1,536Bも含め79,700B（上限88KiB内）。getは既定から補完可能な明示行のsnapshotをLEで返す。
+
+- 大きさのPM了承 (2026-11-17): 3面68,388Bは§6の既定の目標60KiBを超え、合計79,700Bは既定の目標76KiBを超える。どちらも上限（72KiB・88KiB）の内側なので了承する。
+- 結線の段（A0zとその前の段）へ送る項目:
+  - 表を差し替えたときに、機械式のlockを物理の位置から導き直し、意味の変わったUSBのlockのbitを戻す（INPUT_BIND_DESIGN §2）。
+  - `ikm_policy_owner_exit`をアプリの終了・killの共通の回収から呼ぶ。今は呼ぶ所が無く、保存したownerがBUSYを握ったまま残る。
+  - 8192行のsetの時間を実測する（insertが1行ごとに表を頭から読む）。遅ければ、整列済みのwireに末尾追記する速い経路を足す。
+  - 表を入れた後の`km_eval`の割込み停止中のlookup（最大22回×64行）の時間を測る。

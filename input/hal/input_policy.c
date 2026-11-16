@@ -44,15 +44,6 @@ int ikm_wire_row(const u8 *wire, u32 length, u32 index, IkmRow *row)
     return 0;
 }
 
-void ikm_check_init(IkmCheck *check)
-{
-    u32 i;
-    if (!check) return;
-    for (i = 0; i < IKM_SEEN_BYTES; i++) check->bits[i] = 0;
-    for (i = 0; i < sizeof(check->term_bytes); i++) check->term_bytes[i] = 0;
-    check->term_ext_count = 0;
-}
-
 static int valid_map(u8 platform, u16 map)
 {
     return map == 2 || (map == 1 && platform == IKM_PLATFORM_PC98);
@@ -124,46 +115,6 @@ static int row_key(u8 platform, const IkmRow *r, u32 *out)
         }
     }
     *out = key;
-    return 0;
-}
-
-int ikm_check_row(IkmCheck *check, u8 platform, const IkmRow *r)
-{
-    u32 key, group;
-    if (!check || row_key(platform, r, &key)) return OS32_ERR_INVAL;
-    group = r->profile ? (r->profile - 1) * 5 + r->context : 0;
-    if ((r->kind == 5 || r->kind == 6) && check->term_ext_count >= 128)
-        return OS32_ERR_INVAL;
-    if (key >= IKM_SEEN_BITS || (check->bits[key / 8] & (1u << (key % 8))))
-        return OS32_ERR_INVAL;
-    if (r->kind == 5 && (check->term_bytes[group * 32 + r->value / 8] & (1u << (r->value % 8))))
-        return OS32_ERR_INVAL;
-    check->bits[key / 8] |= (u8)(1u << (key % 8));
-    if (r->kind == 5) check->term_bytes[group * 32 + r->value / 8] |= (u8)(1u << (r->value % 8));
-    if (r->kind == 5 || r->kind == 6) check->term_ext_count++;
-    return 0;
-}
-
-/* Rows include defaults and explicit overrides. A failed lookup leaves out alone. */
-int ikm_term_lookup(const IkmRow *rows, u32 count, u8 profile, u8 context,
-                    u16 index, u8 *value)
-{
-    const IkmRow *common = 0;
-    if ((!rows && count) || !value || profile < 1 || profile > 4 ||
-        context > 4 || index < 1 || index > 8 || count > IKM_MAX_ROWS)
-        return OS32_ERR_INVAL;
-    for (u32 i = 0; i < count; ++i) {
-        const IkmRow *row = &rows[i];
-        if (row->kind != 5 || row->profile != profile || row->index != index)
-            continue;
-        if (row->context == context && context != 0) {
-            *value = (u8)row->value;
-            return 0;
-        }
-        if (row->context == 0) common = row;
-    }
-    if (!common) return OS32_ERR_NOTFOUND;
-    *value = (u8)common->value;
     return 0;
 }
 
