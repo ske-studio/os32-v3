@@ -8,8 +8,8 @@ static unsigned int bh_now, bh_pio_cost, bh_demux_cost, bh_requests;
 #undef io_request
 void io_request(u32 id);
 void bh_request(u32 id) { if (id == IO_SVC_NE2K_BH) bh_requests++; io_request(id); }
-#include "../../kernel/idle_work.c"
 static void _idle(void) {}
+#include "../../kernel/idle_work.c"
 #define pending nic_pending
 #include "../../net/nic.c"
 #undef pending

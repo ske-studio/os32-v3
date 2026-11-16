@@ -36,8 +36,8 @@ MUTATIONS = [
     # Review F1: the SFS CALL declaration must equal the frame length.
     ('declared length', 'u32 n = tx_len, count = 0, pos = 9;', 'u32 n = tx_len - 1, count = 0, pos = 9;'),
     # The FG1 wait must sleep until an interrupt, not spin (PM/mainline 2026-11-15).
-    ('wait spins', '    idle_work_run();\n    _idle();\n}', '    idle_work_run();\n}'),
-    ('sleep without guard', '    if (!pm_hfs_can_wait(ctx)) return;\n    idle_work_run();', '    if (!pm_hfs_can_wait(ctx)) { _idle(); return; }\n    idle_work_run();'),
+    ('wait spins', '    idle_wait_step();\n}', '    idle_work_run();\n}'),
+    ('sleep without guard', '    if (!pm_hfs_can_wait(ctx)) return;\n    idle_wait_step();', '    if (!pm_hfs_can_wait(ctx)) { _idle(); return; }\n    idle_wait_step();'),
 ]
 def exercise(folder, source, extra=None):
     folder.mkdir()

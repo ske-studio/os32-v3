@@ -1,3 +1,5 @@
+#include "net/nic.h"
+
 /* Cooperative park, resume and parked-application termination. Included by exec.c. */
 #include "exec_gfx_poll.h"
 /* ======================================================================== */
@@ -149,20 +151,30 @@ i32 exec_sys_yield(void)
     exec_gfx_poll();
     idle_work_run();
 
-    /* CUI 中は協調型の相手 (WM) が居ない。従来どおり 1 回 hlt して戻る。 */
-    if (!con_sink_is_enabled()) { _halt(); return 0; }
+    /* Work already ran once above. Preserve IF and keep recent RX active
+     * at each non-park return, using the same decision as idle_wait_step. */
+    if (!con_sink_is_enabled()) {
+        if (_irq_enabled() && !net_rx_recent(NET_RX_ACTIVE_MS)) _halt();
+        return 0;
+    }
 
     /* R1 (exec_park_kbd / exec_park_poll と同じ): CPL=3 のアプリが syscall の
      * 中に居るときだけ。CPL=0 の呼び手はここで落ちる。 */
-    if (!g_cur_app || !g_cur_app->cpl3 || g_cur_frame == 0) { _halt(); return 0; }
+    if (!g_cur_app || !g_cur_app->cpl3 || g_cur_frame == 0) {
+        if (_irq_enabled() && !net_rx_recent(NET_RX_ACTIVE_MS)) _halt();
+        return 0;
+    }
 
     id = appslot_cur();
-    if (appslot_park_yield_check() < 0) { _halt(); return 0; }
+    if (appslot_park_yield_check() < 0) {
+        if (_irq_enabled() && !net_rx_recent(NET_RX_ACTIVE_MS)) _halt();
+        return 0;
+    }
 
     a = appslot_get(id);
     if (!a || g_cur_app != a) {
         ring3_park_reject_count++;
-        _halt();
+        if (_irq_enabled() && !net_rx_recent(NET_RX_ACTIVE_MS)) _halt();
         return 0;
     }
 

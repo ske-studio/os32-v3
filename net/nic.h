@@ -21,6 +21,9 @@ int net_bind(const struct NetNicOps *ops);
 struct rx_work_budget;
 void net_rx_schedule(void);
 int net_rx_service(void);
+/* Keep foreground RX active for this long after an accepted OS32 frame. */
+#define NET_RX_ACTIVE_MS 5u
+int net_rx_recent(u32 window_ms);
 void net_rx_batch_begin(void);
 /* Returns zero if another batch already owns the receive budget. */
 struct io_slice;

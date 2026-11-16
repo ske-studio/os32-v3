@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Compile the standalone link platform contract for host and PowerPC."""
 CHECK = dict(env=['ppc-cross'], name='link-platform-host', tier=2, budget=10, needs=[], covers=[
-    'platform/pc98/link_platform_inline.h', 'platform/pc98/link_platform.c', 'net/link_platform.h', 'include/types.h', 'include/callconv.h',
+    'platform/pc98/link_platform_inline.h', 'platform/pc98/link_platform.c', 'net/link_platform.h', 'net/link_selftest.inc', 'include/types.h', 'include/callconv.h',
     'tools/tests/test_link_platform.py', 'tools/tests/host32.py',
     'kernel/idle_work.h', 'arch/x86/kernel/idt.h', 'include/io.h'],
     basis=['LAN_OPERATOR_DESIGN §5', 'ARCH_COMPAT_CONTRACT §4.1'],
@@ -45,8 +45,8 @@ def run(ctx):
         (work / 'kernel').mkdir()
         (work / 'idt.h').write_text('#include "types.h"\nextern volatile u32 tick_count;\n')
         (work / 'io.h').write_text('unsigned int irq_save(void);\n'
-            'void irq_restore(unsigned int); void _idle(void);\n')
-        (work / 'kernel/idle_work.h').write_text('void idle_work_run(void);\n')
+            'void irq_restore(unsigned int); void _idle(void); int _irq_enabled(void);\n')
+        (work / 'kernel/idle_work.h').write_text('void idle_wait_step(void);\n')
         probe = r'''#include "net/link_platform.h"
 #ifdef TEST_PC98_INLINE
 #include "platform/pc98/link_platform_inline.h"
@@ -59,11 +59,27 @@ int tick_register(unsigned int slot, tick_fn fn) {
     registered_slot = slot; registered_fn = fn; return TICK_ERR_BUSY;
 }
 volatile u32 tick_count;
-static u32 flags = 0x202, stage;
+static u32 flags = 0x202, stage, boot_steps, boot_waits;
+static int boot_wait, link_state;
+enum { LINK_S_UP = 1 };
+static void finish(int rc) { __asm__ volatile("int $0x80" : : "a"(1), "b"(rc)); __builtin_unreachable(); }
+int _irq_enabled(void) { return flags != 0; }
 unsigned int irq_save(void) { u32 f = flags; flags = 0; return f; }
 void irq_restore(unsigned int f) { flags = f; }
-void idle_work_run(void) { stage = stage == 0 ? 1 : 99; }
-void _idle(void) { stage = stage == 1 ? 2 : 99; }
+void _idle(void);
+void idle_wait_step(void) {
+    if (boot_wait) {
+        if (!_irq_enabled()) return;
+    } else stage = stage == 0 ? 1 : 99;
+    _idle();
+}
+void _idle(void) {
+    flags = 0x202;
+    if (boot_wait) { ++boot_waits; ++tick_count; }
+    else stage = stage == 1 ? 2 : 99;
+}
+#define LINK_IDLE() do { if (++boot_steps > 8) finish(1); link_platform_idle(); } while (0)
+/* BOOT_WAIT */
 void _start(void) {
     int rc = 0;
     if (link_platform_tick_register(jiffy) != TICK_ERR_BUSY ||
@@ -80,10 +96,16 @@ void _start(void) {
     if (flags != 0x202) rc = 1;
     link_platform_idle();
     if (stage != 2) rc = 1;
+    boot_wait = 1; flags = 0; tick_count = 0;
+    if (link_wait_up(3) != 0 || tick_count != 3 || boot_waits != 3 || !flags) rc = 1;
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc));
     __builtin_unreachable();
 }
 '''
+        selftest = (ctx.root / 'net/link_selftest.inc').read_text()
+        start = selftest.index('static int link_wait_up(')
+        end = selftest.index('\n}', start) + 2
+        probe = probe.replace('/* BOOT_WAIT */', selftest[start:end])
         (work / 'runtime.c').write_text(probe)
         products = [(ctx.root / 'platform/pc98/link_platform.c').read_text(),
                     (ctx.root / 'platform/pc98/link_platform_inline.h').read_text()]
@@ -93,8 +115,8 @@ void _start(void) {
             ('return tick_count;', 'return 0;', 'clock'),
             ('return irq_save();', 'return 0;', 'lock'),
             ('irq_restore(saved);', '(void)saved;', 'unlock'),
-            ('idle_work_run();', '', 'idle work'),
-            ('    _idle();', '', 'idle wait')]
+            ('idle_wait_step();', '', 'idle work/wait'),
+            ('if (!_irq_enabled()) {', 'if (0) {', 'boot IF=0 enable')]
         for inline, product in enumerate(products):
             variants = [(product, 'control')] + ([(product.replace(a, b), label)
                         for a, b, label in mutations] if ctx.mutate else [])

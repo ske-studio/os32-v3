@@ -1,6 +1,9 @@
 #define IO_H
 #include "types.h"
-static int host_if;
+static int host_if, receive_in_work;
+static unsigned int sleeps, recent_ms = 5;
+static void _idle(void) { ++sleeps; }
+int net_rx_recent(u32 window_ms) { return recent_ms < window_ms; }
 static int _irq_enabled(void) { return host_if; }
 #ifndef IDLE_WORK_SOURCE
 #define IDLE_WORK_SOURCE "../../kernel/idle_work.c"
@@ -20,7 +23,7 @@ static void fail(int line) {
 }
 #define CHECK(x) do { if (!(x)) fail(__LINE__); } while (0)
 static void record(unsigned int n) { CHECK(count < 16); log_items[count++] = n; }
-static void first(void) { record(1); idle_work_run(); }
+static void first(void) { record(1); if (receive_in_work) recent_ms = 0; idle_work_run(); }
 static void second(void) { record(2); }
 static void third(void) { record(3); }
 static void fourth(void) { record(4); }
@@ -30,6 +33,12 @@ void _start(void) {
     io_clock_set_ops(&ops);
     idle_work_run(); CHECK(clock_reads == 0);
     io_clock_set_ops(0);
+    recent_ms = 0; idle_wait_step(); CHECK(sleeps == 0);
+    recent_ms = 4; idle_wait_step(); CHECK(sleeps == 0);
+    recent_ms = 5; idle_wait_step(); CHECK(sleeps == 1);
+    host_if = 0; idle_wait_step(); CHECK(sleeps == 1 && !host_if);
+    host_if = 1; kctx_irq_depth = 1; idle_wait_step(); CHECK(sleeps == 1);
+    kctx_irq_depth = 0;
     CHECK(idle_work_register(0) == OS32_ERR_INVAL);
     CHECK(idle_work_register(first) == 0);
     CHECK(idle_work_register(second) == 0);
@@ -44,6 +53,10 @@ void _start(void) {
     for (unsigned int i = 0; i < 4; ++i) CHECK(log_items[i] == i + 1);
     idle_work_run(); CHECK(count == 8);
     for (unsigned int i = 0; i < 4; ++i) CHECK(log_items[i + 4] == i + 1);
+    recent_ms = 5; receive_in_work = 1;
+    idle_wait_step(); CHECK(count == 12 && sleeps == 1);
+    receive_in_work = 0; recent_ms = 5;
+    idle_wait_step(); CHECK(count == 16 && sleeps == 2);
     __asm__ volatile("int $0x80" : : "a"(1), "b"(0));
     for (;;) {}
 }

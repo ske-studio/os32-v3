@@ -848,3 +848,5 @@ int main(int argc, char **argv)
 /* C1 communication is a separate unit; the scope test above never does I/O. */
 int sfs_ensure_session(u32 deadline) { (void)deadline; return OS32_ERR_HOSTDOWN; }
 void sfs_persistent_stale(void) { }
+
+void idle_wait_step(void) { _halt(); }

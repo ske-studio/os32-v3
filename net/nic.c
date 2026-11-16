@@ -29,6 +29,8 @@ static int fixed_peer, ticking, tick_registered;
 static int pending, idle_registered, unbind_due, link_due, poll_due;
 static u32 reset_due, last_idle_jiffy, batch_depth;
 static struct rx_work_budget batch_budget;
+static u32 last_rx_ms;
+static int rx_ms_valid;
 static u32 last_idle_ms;
 static int idle_ms_valid;
 static int net_rx_idle(void *state, struct io_slice *slice);
@@ -84,6 +86,7 @@ int net_bind(const struct NetNicOps *ops)
             link_init(local_mac);
             pending = link_due = poll_due = unbind_due = 0;
             idle_ms_valid = 0;
+            rx_ms_valid = 0;
             last_idle_jiffy = link_platform_now();
             bound = ops;
             io_request(IO_SVC_NET_RX); /* bind */
@@ -149,6 +152,7 @@ void net_unbind(void)
     io_request(IO_SVC_NET_RX); /* unbind */
     unbind_due = pending = link_due = poll_due = 0;
     bound = 0; /* Gates the permanently registered tick before releasing ops. */
+    rx_ms_valid = 0;
     owner = 0;
     fixed_peer = 0;
     net_rx_reset(NET_RX_SFS);
@@ -251,6 +255,21 @@ static void rx_finish(void)
     if (resets & (1u << NET_RX_LINK)) net_rx_reset(NET_RX_LINK);
 }
 
+int net_rx_recent(u32 window_ms)
+{
+    unsigned int flags = irq_save();
+    int recent = rx_ms_valid && (u32)(tick_clock_ms() - last_rx_ms) < window_ms;
+    irq_restore(flags);
+    return recent;
+}
+
+/* Called by the common demux after accepting an OS32 link/SFS frame. */
+void net_rx_note(void)
+{
+    last_rx_ms = tick_clock_ms();
+    rx_ms_valid = 1;
+}
+
 static int rx_service(int idle, struct io_slice *slice)
 {
     struct rx_work_budget local;
@@ -278,6 +297,8 @@ static int rx_service(int idle, struct io_slice *slice)
             idle_ms_valid = 1;
             bound->poll();
             link_due = 1; /* Foreground progress, consumed by rx_finish. */
+        } else if (net_rx_recent(NET_RX_ACTIVE_MS)) {
+            bound->poll();
         }
     }
     link_platform_unlock(flags);
@@ -307,7 +328,7 @@ static int net_rx_idle(void *state, struct io_slice *slice)
     if (io_slice_limit(slice, NET_RX_WORK_LIMIT_US, NET_RX_SCAN_MAX) < 0)
         return IO_MORE;
     rx_service(1, slice);
-    /* Poll-only NICs need every FG pass; rx_service gates poll/link at 1ms. */
+    /* Poll-only NICs need every FG pass; rx_service gates link at 1ms, poll stays active after RX. */
     return bound ? IO_MORE : IO_DONE;
 }
 

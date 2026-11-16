@@ -153,3 +153,5 @@ void idle_work_run(void) { }
 
 int serial_peekchar(void) { return serial_byte; }
 int kbd_inject_peek(u8 *out) { if (injected < 0) return 0; *out = (u8)injected; return 1; }
+
+void idle_wait_step(void) { idle_work_run(); host_halt(); }

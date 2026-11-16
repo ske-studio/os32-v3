@@ -23,9 +23,12 @@ void link_platform_unlock(u32 saved)
 
 void link_platform_idle(void)
 {
-    idle_work_run();
-    /* IRQ enable and wait must remain indivisible (see io.h). */
-    _idle();
+    /* Boot-time link selftests may enter with interrupts disabled. */
+    if (!_irq_enabled()) {
+        _idle();
+        return;
+    }
+    idle_wait_step();
 }
 
 int link_platform_tick_register(void (*fn)(void))

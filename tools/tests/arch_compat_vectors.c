@@ -47,6 +47,9 @@ static u32 fake_time;
 static int capture;
 int con_sink_capture_active(void) { return capture; }
 int ring3_wait_pending(void) { return cancelled; }
+void idle_work_run(void);
+void _idle(void);
+void idle_wait_step(void) { idle_work_run(); _idle(); }
 void idle_work_run(void) {}
 void _idle(void) { fake_time += 1000000; }
 int pm_input_usb_take(void) { return take(); }
@@ -150,12 +153,16 @@ void _enable(void) { irq_state = 1; }
 void _halt(void) {}
 void ppc_enable(void) { irq_state = 1; }
 int ppc_irq_enabled(void) { return irq_state; }
+int _irq_enabled(void) { return irq_state; }
 volatile u32 kctx_irq_depth;
 static unsigned int naps;
 void ppc_cpu_nap(void) { ++naps; }
 #include IDLE_SOURCE
 void _idle(void) { arch_cpu_idle(); }
 static unsigned int work_calls;
+void idle_work_run(void);
+void _idle(void);
+void idle_wait_step(void) { if (!ppc_irq_enabled()) return; idle_work_run(); _idle(); }
 void idle_work_run(void) { ++work_calls; }
 int tick_register(unsigned int slot, tick_fn fn) { (void)slot; (void)fn; return 0; }
 #include PROVIDER_SOURCE
@@ -233,6 +240,9 @@ static int sync2(void)
     _idle();
     if (!irq_state || naps != 1) return 5;
     irq_state = 0;
+    link_platform_idle();
+    if (!irq_state || work_calls != 0 || naps != 1) return 3;
+    irq_state = 1;
     link_platform_idle();
     if (!irq_state || work_calls != 1) return 3;
     link_platform_idle();

@@ -25,9 +25,12 @@ static inline void pc98_link_platform_unlock(u32 saved)
 
 static inline void pc98_link_platform_idle(void)
 {
-    idle_work_run();
-    /* IRQ enable and wait must remain indivisible (see io.h). */
-    _idle();
+    /* Boot-time link selftests may enter with interrupts disabled. */
+    if (!_irq_enabled()) {
+        _idle();
+        return;
+    }
+    idle_wait_step();
 }
 
 static inline int pc98_link_platform_tick_register(void (*fn)(void))

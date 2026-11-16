@@ -55,7 +55,7 @@ void pm_shell_boot(void)
 #endif
     }
 #if KBOOT_LINK
-    for (;;) { idle_work_run(); _idle(); }
+    for (;;) { idle_wait_step(); }
 #endif
 #if !KBOOT_LINK
     for (;;) pm_terminal_poll();
