@@ -30,3 +30,5 @@ void _start(void) {
 #else
 int fixture(void) { return probe(); }
 #endif
+
+void km_registry_source_released(u8 src, u16 gen) { (void)src; (void)gen; }

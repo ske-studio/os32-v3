@@ -761,3 +761,5 @@ void _start(void)
 }
 
 void idle_wait_step(void) { idle_work_run(); _halt(); }
+
+void bootlog_push(const char *s, u32 n) { (void)s; (void)n; }
