@@ -207,6 +207,14 @@ void net_rx_batch_begin(void)
 {
     if (!batch_depth++) rx_work_begin(&batch_budget);
 }
+int net_rx_batch_begin_slice(struct io_slice *slice)
+{
+    if (batch_depth) return 0;
+    batch_depth = 1;
+    rx_work_from_slice_capped(&batch_budget, slice);
+    return 1;
+}
+
 void net_rx_batch_end(void)
 {
     if (batch_depth) batch_depth--;

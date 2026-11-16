@@ -26,6 +26,8 @@ from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
+    ('net/rx_work.c', 'b->max_units = NET_RX_SCAN_MAX;', 'b->max_units = NET_RX_SCAN_MAX + 1;'),
+    ('net/rx_work.c', 'if (b->used >= b->max_units) return 0;', 'if (0) return 0;'),
     ('kernel/io_work.c', 'if (idle_work_compat_count() == 0 && !any_pending()) return 0;',
      'if (idle_work_compat_count() == 0 && !any_pending()) { int i = find(IO_SVC_NET_RX); if (i < 0) return 0; io_request(IO_SVC_NET_RX); }'),
     ('net/nic.c', 'io_request(IO_SVC_NET_RX); /* bind */', '(void)0; /* bind */'),

@@ -1,7 +1,13 @@
 /* Real NE2K + net_tx + idle_work, fake device; no libc or privileged opcodes. */
 #define NE2K_BH_TEST
 static void bh_wait_check(void);
+static unsigned int bh_now, bh_pio_cost, bh_demux_cost, bh_requests;
+#define io_request bh_request
+
 #include "ne2000_dma_host.c"
+#undef io_request
+void io_request(u32 id);
+void bh_request(u32 id) { if (id == IO_SVC_NE2K_BH) bh_requests++; io_request(id); }
 #include "../../kernel/idle_work.c"
 static void _idle(void) {}
 #define pending nic_pending
@@ -9,7 +15,7 @@ static void _idle(void) {}
 #undef pending
 #include "../../net/rx_work.c"
 #include "rx_io_clock.h"
-int platform_clock_read_us(u32 *lo, u32 *hi) { *lo = *hi = 0; return 0; }
+int platform_clock_read_us(u32 *lo, u32 *hi) { *lo = bh_now; *hi = 0; return 0; }
 
 static unsigned int waits;
 static void bh_wait_check(void)
@@ -62,7 +68,9 @@ static void run_entry(unsigned int entry, int reset_fault)
     CHECK(ne2k_init(&config) == NE2K_OK);
     CHECK(ne2k_send(buffer, 61) == NE2K_OK);
     idle_work_run();
-    CHECK(nic.state == NE2K_STATE_RUNNING && nic.tx_busy && nic.txq_count == 0);
+    CHECK(nic.state == NE2K_STATE_RUNNING);
+    CHECK(nic.tx_busy);
+    CHECK(nic.txq_count == 0);
 }
 
 static void queue_capacity(void)
@@ -76,8 +84,10 @@ static void queue_capacity(void)
     }
     CHECK(ne2k_send(buffer, 60) == NE2K_ERR_BUSY && device_pios == before);
     host_if_mask = EFLAGS_IF;
+    /* Exact FIFO progress uses a full provider slice; dispatcher fairness may
+     * supply only one unit (completion and the next PIO are separate units). */
     for (unsigned int i = 0; i < NE2K_TXQ_SLOTS; i++) {
-        idle_work_run();
+        ne2k_bh();
         CHECK(nic.tx_busy && ram[(unsigned int)nic.tx_page << 8] == i);
         txp = 0;
         tx_status = NE2K_TSR_PTX;
@@ -88,7 +98,7 @@ static void queue_capacity(void)
         kctx_irq_depth = 0;
         host_if_mask = EFLAGS_IF;
     }
-    idle_work_run();
+    ne2k_bh();
     CHECK(nic.st.tx_ok == NE2K_TXQ_SLOTS && !nic.txq_count && !nic.tx_busy);
 }
 
@@ -203,6 +213,7 @@ static void transmit_rounds(void)
 }
 
 static void same_bh_demux(void);
+static void tier_work(void);
 void _start(void)
 {
     test_rx_clock_install();
@@ -226,6 +237,7 @@ void _start(void)
     pending_causes();
     ovw_recovery_sends();
     same_bh_demux();
+    tier_work();
     finish(0);
 }
 
@@ -243,6 +255,7 @@ u32 net_rx_demux_budget(const struct NetNicOps *ops, const u8 local[6],
         if (ops->rx(frame, sizeof(frame), &len)) return count;
         CHECK(len == 60 && frame[0] == 0x5a);
         count++; demux_frames++;
+        bh_now += bh_demux_cost;
     }
     net_rx_schedule();
     return count;
@@ -279,3 +292,161 @@ void link_tick(void) {}
 int tick_budget_peek(u32 share, u32 tail) { (void)share; (void)tail; return 1; }
 
 u32 tick_clock_ms(void) { return tick_count * 10u; }
+
+/* Each entry's requests are counted independently of later dispatcher work. */
+static void request_origins(void)
+{
+    device_init();
+    bound = &bh_ops;
+    bh_requests = 0;
+    nic.busy = 1;
+    CHECK(ne2k_irq_shared(5, 0) == IRQ_DEFERRED);
+    CHECK(bh_requests == 1);
+    bh_requests = 0;
+    ne2k_poll(4);
+    CHECK(bh_requests == 1);
+    nic.busy = 0;
+    nic.irq_pending = 0;
+    bh_requests = 0;
+    ne2k_timer_tick();
+    CHECK(bh_requests == 1);
+    bh_requests = 0;
+    CHECK(ne2k_send(buffer, 60) == 0);
+    CHECK(bh_requests == 1);
+    bh_requests = 0;
+    host_if_mask = 0;
+    CHECK(!wait_allowed());
+    host_if_mask = EFLAGS_IF;
+    CHECK(bh_requests == 1);
+    nic.need_reinit = nic.need_tx = nic.txq_count = 0;
+    queue_frames(1);
+    bh_requests = 0;
+    CHECK(ne2k_irq_shared(5, 0) == IRQ_HANDLED);
+    CHECK(bh_requests == 3); /* IRQ, mark, leave mark */
+    bh_requests = 0;
+    mark_work();
+    CHECK(bh_requests == 1);
+    struct ne2k_config config = nic.cfg;
+    bh_requests = 0;
+    CHECK(ne2k_init(&config) == 0);
+    CHECK(bh_requests == 1);
+    struct io_slice s;
+    CHECK(io_slice_begin(&s, 120, 0) == 0);
+    bh_requests = 0;
+    reinit_budget(&s);
+    CHECK(bh_requests == 1 && nic.need_reinit);
+    nic.need_reinit = 0;
+    CHECK(ne2k_send(buffer, 60) == 0);
+    dma_fails = 1; dma_fail_countdown = NE2K_RDMA_ATTEMPTS;
+    bh_requests = 0;
+    tx_dequeue();
+    CHECK(bh_requests == 1 && nic.need_reinit);
+    device_init();
+    queue_frames(1); ne2k_poll(4);
+    CHECK(io_slice_begin(&s, 120, 1) == 0);
+    bh_requests = 0;
+    CHECK(service(4, &s));
+    CHECK(bh_requests == 1 && nic.rx_backlog);
+    CHECK(io_slice_begin(&s, 120, ~0u) == 0);
+    CHECK(service(4, &s) == 0 && nic.rxq_count == 1);
+    nic.rx_backlog = 1;
+    bh_requests = 0;
+    unsigned int len;
+    CHECK(ne2k_recv(buffer, sizeof(buffer), &len) == 0);
+    CHECK(bh_requests == 1);
+    queue_frames(1);
+    bh_requests = 0;
+    ovw_begin(NE2K_ISR_OVW);
+    CHECK(bh_requests == 1);
+    tick_count += NE2K_OVW_WAIT_TICKS;
+    CHECK(io_slice_begin(&s, 120, 0) == 0);
+    bh_requests = 0;
+    ovw_continue(&s);
+    CHECK(bh_requests == 1 && nic.state == NE2K_STATE_OVW_WAIT);
+}
+
+static int provider_slice(u32 us, u32 units)
+{
+    struct io_slice slice;
+    CHECK(io_slice_begin(&slice, us, units) == 0);
+    return ne2k_desc.step(0, &slice);
+}
+
+static void tier_work(void)
+{
+    request_origins();
+    /* Registration uses the real io_policy.c, not a permissive stub. */
+    CHECK(io_unregister(IO_SVC_NE2K_BH) == 0);
+    CHECK(io_register(&ne2k_desc) == 0);
+    device_init(); bound = &receive_ops;
+    bh_now = 0; bh_pio_cost = 30; demux_frames = 0;
+    queue_frames(9); ne2k_poll(4);
+    CHECK(provider_slice(500, ~0u) == IO_MORE);
+    CHECK(nic.st.rx_frames == 2 && demux_frames == 1 && bh_now == 120);
+    /* Time is shared by PIO and every enqueue-triggered demux call. */
+    bh_pio_cost = 20; bh_demux_cost = 20; bh_now = 0;
+    device_init(); bh_now = 0; queue_frames(9); ne2k_poll(4); demux_frames = 0;
+    CHECK(provider_slice(500, ~0u) == IO_MORE);
+    CHECK(nic.st.rx_frames == 2 && demux_frames == 2 && bh_now == 120);
+    /* Remaining caller time is narrower than the 120us provider cap. */
+    bh_demux_cost = 0; bh_pio_cost = 10; bh_now = 0;
+    device_init(); bh_now = 0; queue_frames(9); ne2k_poll(4);
+    CHECK(provider_slice(40, ~0u) == IO_MORE);
+    CHECK(nic.st.rx_frames == 2 && bh_now == 40);
+    /* Exhausted units cannot start RX, TX, counters, or recovery. */
+    bh_pio_cost = 0; bh_now = 0;
+    device_init(); bound = &bh_ops;
+    queue_frames(1); ne2k_poll(4);
+    CHECK(ne2k_send(buffer, 60) == 0);
+    unsigned int pios = device_pios, resets = reset_count;
+    CHECK(provider_slice(120, 0) == IO_MORE);
+    CHECK(device_pios == pios && !nic.st.rx_frames && !tx_starts);
+    nic.need_reinit = 1;
+    CHECK(provider_slice(120, 0) == IO_MORE);
+    CHECK(reset_count == resets && nic.need_reinit);
+    CHECK(provider_slice(120, 1) == IO_MORE);
+    CHECK(reset_count > resets && !nic.need_reinit);
+    device_init();
+    nic.need_tx = nic.tx_busy = 1;
+    txp = 0; tx_status = NE2K_TSR_PTX;
+    CHECK(provider_slice(120, 0) == IO_MORE);
+    CHECK(nic.tx_busy && !nic.st.tx_ok);
+    device_init();
+    ovw_begin(NE2K_ISR_OVW);
+    tick_count += NE2K_OVW_WAIT_TICKS;
+    CHECK(provider_slice(120, 0) == IO_MORE);
+    CHECK(nic.state == NE2K_STATE_OVW_WAIT && regs[0][NE2K_P0_TCR] == NE2K_TCR_NORMAL);
+    /* Fresh dispatcher registration removes earlier pending requests. Start
+     * work after the first empty pass solely through the provider's MORE. */
+    CHECK(io_unregister(IO_SVC_NE2K_BH) == 0);
+    CHECK(io_register(&ne2k_desc) == 0);
+    device_init();
+    idle_work_run();
+    queue_frames(1); /* lost IRQ: no explicit request after the empty pass */
+    nic.need_rx = NE2K_ISR_PRX;
+    for (unsigned int i = 0; i < 2; i++) idle_work_run();
+    CHECK(nic.st.rx_frames == 1);
+    /* Reentry, a preexisting batch, and terminal states leave the slice alone. */
+    struct io_slice slice;
+    CHECK(io_slice_begin(&slice, 120, 2) == 0);
+    nic.busy = 1;
+    CHECK(ne2k_desc.step(0, &slice) == IO_MORE && !slice.units);
+    nic.busy = 0;
+    net_rx_batch_begin();
+    nic.need_tx = 1;
+    CHECK(ne2k_desc.step(0, &slice) == IO_MORE && !slice.units);
+    net_rx_batch_end();
+    ne2k_stop();
+    CHECK(ne2k_desc.step(0, &slice) == IO_DONE);
+    /* OVW drain yields in loopback, retaining the old TX completion state. */
+    device_init(); bound = &bh_ops;
+    queue_frames(3); regs[0][NE2K_P0_ISR] |= NE2K_ISR_OVW;
+    ne2k_poll(4); ne2k_bh();
+    tick_count += NE2K_OVW_WAIT_TICKS;
+    bh_pio_cost = 30; bh_now = 0;
+    CHECK(provider_slice(120, ~0u) == IO_MORE);
+    CHECK(nic.state == NE2K_STATE_OVW_WAIT && nic.st.rx_frames == 2);
+    bh_pio_cost = 0; bh_now = 0;
+    CHECK(provider_slice(120, ~0u) == IO_MORE);
+    CHECK(nic.state == NE2K_STATE_RUNNING && nic.st.rx_frames == 3);
+}

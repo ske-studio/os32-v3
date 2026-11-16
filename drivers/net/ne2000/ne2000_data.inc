@@ -1,3 +1,12 @@
+static void reinit_budget(struct io_slice *slice)
+{
+    nic.need_reinit = 1;
+    io_request(IO_SVC_NE2K_BH); /* recovery */
+    if (!io_slice_take(slice)) return;
+    nic.need_reinit = 0;
+    reinit_or_fail();
+}
+
 /* 受信リング・送受信・エラー復旧。ne2000.c と同じ翻訳単位で使用する。 */
 /* ====================================================================== */
 /*  受信リングの回収 (DP8390D §7)                                           */
@@ -95,11 +104,14 @@ static int rx_one(u8 curr)
 }
 #endif
 
-/* budget フレームまで回収。戻り値 -1 = 再初期化要、1 = 予算を使い切り未回収が残る、2 = キュー満杯、0 = 空 */
-static int rx_drain(unsigned int budget)
+/* budget フレームまで回収。-1 = 再初期化要、1 = 回収上限、2 = キュー満杯、
+ * 3 = slice の予算切れ (OVW は loopback のまま次巡へ)、0 = 空。 */
+static int rx_drain(unsigned int budget, struct io_slice *slice)
 {
     while (budget > 0) {
         u8 curr = read_curr();
+        if (curr != nic.rx_next && nic.rxq_count < NE2K_RXQ_SLOTS &&
+            !io_slice_take(slice)) return 3; /* slice exhausted, ring retained */
         int r = rx_one(curr);
         if (r < 0) return -1;
         if (r == 0 || r == 2) return r;
@@ -123,10 +135,11 @@ static void ovw_begin(u8 isr)
     ne2k_imr_sync(0);                           /* 復旧完了まで NIC 割り込みは止める */
     nic.ovw_tick = tick_count;
     nic.state = NE2K_STATE_OVW_WAIT;
+    io_request(IO_SVC_NE2K_BH); /* OVW start */
 }
 
 /* Recovery advances on later cooperative passes, never a disabled-IF delay. */
-static void ovw_continue(void)
+static void ovw_continue(struct io_slice *slice)
 {
     int resend, r;
     u8 isr;
@@ -139,9 +152,15 @@ static void ovw_continue(void)
     wr(NE2K_P0_TCR, NE2K_TCR_LOOP_INT);
     nic.state = NE2K_STATE_RUNNING;
     cr_page0_idle();                                    /* STA, loopback 中 */
-    r = rx_drain(NE2K_OVW_DRAIN_BUDGET);
+    r = rx_drain(NE2K_OVW_DRAIN_BUDGET, slice);
+    if (r == 3) {
+        nic.rx_backlog = 1;
+        nic.state = NE2K_STATE_OVW_WAIT;
+        io_request(IO_SVC_NE2K_BH); /* OVW continuation */
+        return;
+    }
     if (r < 0) {
-        reinit_or_fail();
+        reinit_budget(slice);
         return;
     }
     nic.rx_backlog = (u8)(r > 0);
@@ -193,7 +212,7 @@ static void read_counters(void)
 
 /* 送信タイムアウト: tick は IF=1 の文脈で進む。IF=0 の診断ループでは
  * TXP が消えないことを poll 回数ではなく呼び出し側の期限で扱う。 */
-static void tx_check_timeout(void)
+static void tx_check_timeout(struct io_slice *slice)
 {
     if (!nic.tx_busy) return;
     if (!(rd(NE2K_CR) & NE2K_CR_TXP)) {
@@ -204,22 +223,24 @@ static void tx_check_timeout(void)
     if (!eflags_if() || kctx_irq_depth != 0) return;
     if ((u32)(tick_count - nic.tx_start_tick) >= NE2K_TX_TIMEOUT_TICKS) {
         nic.st.tx_timeouts++;
-        reinit_or_fail();
+        reinit_budget(slice);
     }
 }
 
 /* NIC を触る共通の 1 サイクル。呼び出し側が busy を握っていること。 */
-static int service(unsigned int budget)
+static int service(unsigned int budget, struct io_slice *slice)
 {
     u8 isr;
 
     if (nic.state == NE2K_STATE_OVW_WAIT) {
-        ovw_continue();
+        if (!io_slice_take(slice)) return 1;
+        ovw_continue(slice);
         return 0;
     }
     if (nic.state != NE2K_STATE_RUNNING) return 0;
 
     isr = rd(NE2K_P0_ISR) | nic.need_rx;
+    if (isr && !io_slice_take(slice)) return 1;
     nic.need_rx = 0;
     if (isr & NE2K_ISR_OVW) {
         nic.need_rx |= isr & (NE2K_ISR_PTX | NE2K_ISR_TXE);
@@ -236,15 +257,16 @@ static int service(unsigned int budget)
 
     /* リングは ISR に関係なく CURR で判定する (ACK 前後の到着を取りこぼさない) */
     {
-        int r = rx_drain(budget);
+        int r = rx_drain(budget, slice);
         if (r < 0) {
-            reinit_or_fail();
+            reinit_budget(slice);
             return 0;
         }
         if (r > 0 && !nic.rx_backlog) nic.st.rx_backlog_events++;
         nic.rx_backlog = (u8)(r > 0);
-        tx_check_timeout();
-        return r == 2;
+        if (nic.rx_backlog) io_request(IO_SVC_NE2K_BH); /* RX backlog */
+        if (nic.tx_busy && io_slice_take(slice)) tx_check_timeout(slice);
+        return r == 2 || r == 3;
     }
 }
 
@@ -273,6 +295,7 @@ int ne2k_send(const void *frame, unsigned int length)
     nic.txq_tail = (u8)((nic.txq_tail + 1) % NE2K_TXQ_SLOTS);
     nic.txq_count++;
     nic.need_tx = 1;
+    io_request(IO_SVC_NE2K_BH); /* send */
     nic.st.tx_accepted++;
     nic.st.tx_bytes += length;
     irq_restore(f);
@@ -292,6 +315,7 @@ static void tx_dequeue(void)
     }
     if (dma_write((u16)nic.tx_page << 8, nic.tx_buf, padded)) {
         nic.need_reinit = 1;
+        io_request(IO_SVC_NE2K_BH); /* TX DMA failure */
         return;
     }
     wr(NE2K_P0_TPSR, nic.tx_page);
@@ -333,6 +357,7 @@ int ne2k_recv(void *frame, unsigned int capacity, unsigned int *length)
     f = irq_save();
     nic.rxq_head = (u8)((nic.rxq_head + 1) % NE2K_RXQ_SLOTS);
     nic.rxq_count--;
+    if (nic.rx_backlog) io_request(IO_SVC_NE2K_BH); /* RX space */
     irq_restore(f);
     return NE2K_OK;
 }

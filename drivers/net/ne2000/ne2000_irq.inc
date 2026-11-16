@@ -5,7 +5,10 @@ void ne2k_poll(unsigned int budget)
         nic.state == NE2K_STATE_FAILED) return;
     unsigned int f = irq_save();
     (void)budget;
-    if (nic.busy) nic.irq_pending = 1;
+    if (nic.busy) {
+        nic.irq_pending = 1;
+        io_request(IO_SVC_NE2K_BH); /* poll busy */
+    }
     else {
         ne2k_enter();
         mark_work();
@@ -37,6 +40,7 @@ int ne2k_irq_shared(unsigned int irq, void *arg)
         /* busy 中の入口は NIC レジスタを変更しない (foreground のページ切替・
          * remote DMA と衝突する)。leave() が irq_pending を見て処理する。 */
         nic.irq_pending = 1;
+        io_request(IO_SVC_NE2K_BH); /* IRQ busy */
         nic.st.irq_deferred++;
         return IRQ_DEFERRED;
     }
@@ -51,6 +55,7 @@ int ne2k_irq_shared(unsigned int irq, void *arg)
     /* (b) ISR に要因が無く、リングにも未回収が無ければ自分ではない。 */
     if (!(rd(NE2K_P0_ISR) & NE2K_IMR_MASK) && !nic.rx_backlog) return IRQ_NONE;
 
+    io_request(IO_SVC_NE2K_BH); /* IRQ */
     ne2k_enter();
     mark_work();
     ne2k_leave();
@@ -74,6 +79,7 @@ void ne2k_irq_enable(void)
 void ne2k_timer_tick(void)
 {
     if (nic.state != NE2K_STATE_RUNNING && nic.state != NE2K_STATE_OVW_WAIT) return;
+    io_request(IO_SVC_NE2K_BH); /* timer */
     ne2k_poll(NE2K_WATCHDOG_BUDGET);
     if (nic.need_rx & (NE2K_ISR_PRX | NE2K_ISR_RXE) || nic.rx_backlog)
         nic.need_rx |= NE2K_WORK_WATCHDOG;

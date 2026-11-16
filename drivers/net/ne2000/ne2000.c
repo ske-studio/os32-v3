@@ -34,7 +34,9 @@ _Static_assert(PC98_TICK_COUNT <= TICK_SLOT_COUNT, "PC98 tick slots exceed table
 #include "kstring.h"
 #include "cpu_calibrate.h"
 #include "cpu.h"
-#include "kernel/idle_work.h"
+#include "kernel/io_work.h"
+#include "kernel/io_policy.h"
+#include "net/rx_work.h"
 #include "os32_kapi_shared.h"
 
 /* ====================================================================== */
@@ -197,10 +199,15 @@ static void ne2k_enter(void)
     irq_restore(f);
 }
 
-static int service(unsigned int budget);
+static int service(unsigned int budget, struct io_slice *slice);
 static u8 read_curr(void);
 
-static void ne2k_bh(void);
+static int ne2k_bh(void *state, struct io_slice *slice);
+static const struct io_desc ne2k_desc = {
+    .id = IO_SVC_NE2K_BH, .default_budget_us = NET_RX_WORK_LIMIT_US,
+    .budget_min_us = 1, .budget_max_us = IO_PASS_US,
+    .max_unit_us = NET_RX_WORK_LIMIT_US, .default_tier = 2, .step = ne2k_bh
+};
 
 /* Only latch/ACK here: leave holds IF=0, including when called by bh. */
 static void mark_work(void)
@@ -210,6 +217,9 @@ static void mark_work(void)
     if (isr) wr(NE2K_P0_ISR, isr);
     if (read_curr() != nic.rx_next) nic.need_rx |= NE2K_ISR_PRX;
     if (nic.tx_busy || nic.txq_count) nic.need_tx = 1;
+    if (nic.need_rx || nic.need_tx || nic.need_reinit || nic.rx_backlog ||
+        nic.state == NE2K_STATE_OVW_WAIT)
+        io_request(IO_SVC_NE2K_BH); /* mark_work */
 }
 
 static void ne2k_leave(void)
@@ -235,6 +245,7 @@ static int wait_allowed(void)
 {
     if (!eflags_if() || kctx_irq_depth != 0) {
         nic.need_reinit = 1;
+        io_request(IO_SVC_NE2K_BH); /* wait guard */
         return 0;
     }
     return 1;
@@ -507,34 +518,38 @@ static void diag_dma_test(void)
 
 #include "ne2000_irq.inc"
 
-static void ne2k_bh(void)
+static int ne2k_bh(void *state, struct io_slice *slice)
 {
+    static int running;
     u32 before;
     unsigned int round;
     int watchdog;
-    if (!wait_allowed()) return;
-    if (nic.busy || nic.state == NE2K_STATE_OFF ||
-        nic.state == NE2K_STATE_STOPPED || nic.state == NE2K_STATE_FAILED) return;
+    (void)state;
+    if (running || nic.busy) return IO_MORE;
+    if (!wait_allowed()) return IO_MORE;
+    if (nic.state == NE2K_STATE_OFF || nic.state == NE2K_STATE_STOPPED ||
+        nic.state == NE2K_STATE_FAILED) return IO_DONE;
+    if (io_slice_limit(slice, NET_RX_WORK_LIMIT_US, ~0u) < 0) return IO_MORE;
     if (!nic.need_rx && !nic.need_tx && !nic.need_reinit &&
-        !nic.rx_backlog && nic.state != NE2K_STATE_OVW_WAIT) return;
+        !nic.rx_backlog && nic.state != NE2K_STATE_OVW_WAIT) return IO_MORE;
     if (!nic.need_rx && !nic.need_tx && !nic.need_reinit &&
         nic.rx_backlog && nic.rxq_count >= NE2K_RXQ_SLOTS &&
-        nic.state != NE2K_STATE_OVW_WAIT) return;
-    net_rx_batch_begin();
+        nic.state != NE2K_STATE_OVW_WAIT) return IO_MORE;
+    if (!net_rx_batch_begin_slice(slice)) return IO_MORE;
+    running = 1;
     net_rx_service();
     ne2k_enter();
     before = nic.st.rx_frames + nic.st.rx_dropped;
     watchdog = (nic.need_rx & NE2K_WORK_WATCHDOG) != 0;
     if (nic.need_reinit) {
-        nic.need_reinit = 0;
-        reinit_or_fail();
+        reinit_budget(slice);
     } else {
         for (round = 0; round < NE2K_BH_ROUNDS; round++) {
             u32 rx_before = nic.st.rx_frames + nic.st.rx_dropped;
             int sent = 0;
-            int blocked = service(NE2K_IRQ_BUDGET);
+            int blocked = service(NE2K_IRQ_BUDGET, slice);
             if (nic.state != NE2K_STATE_RUNNING || nic.need_reinit) break;
-            if (!nic.tx_busy && nic.txq_count) {
+            if (!nic.tx_busy && nic.txq_count && io_slice_take(slice)) {
                 tx_dequeue();
                 sent = 1;
             }
@@ -551,6 +566,10 @@ static void ne2k_bh(void)
     }
     ne2k_leave();
     net_rx_batch_end();
+    running = 0;
+    /* P10: backlog, OVW wait and TX can outlive the IRQ that marked them. */
+    return (nic.state == NE2K_STATE_RUNNING || nic.state == NE2K_STATE_OVW_WAIT)
+        ? IO_MORE : IO_DONE;
 }
 
 /* ---- リンク層が Credit を作るための空き容量 (LINK_PLAN.md §2-2)。
