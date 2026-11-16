@@ -1,6 +1,6 @@
 # TASK_IO_TIER — I/O の Tier 制御 (協調点の Tier・予算・設定表・pump)
 
-> 状態: **設計中 (2026-11-14)** — 設計は確定して実装を待つ。詳細設計は [IO_TIER_DESIGN](../../decisions/IO_TIER_DESIGN.md)。
+> 状態: **実装中 (2026-11-16)** — 設計は確定、A0・A1・A3・A4 が済み。詳細設計は [IO_TIER_DESIGN](../../decisions/IO_TIER_DESIGN.md)。
 > 関係: 最初の利用者は票 TASK_LAN_BULK (docs/tasks/network/)。時計は票 TASK_TICK_1KHZ の T1。
 
 ## 0. ユーザー決定 (2026-11-14)
@@ -20,4 +20,6 @@
 ## 2. 段の状態
 | 段 | 状態 |
 |---|---|
-| 全段 (§7) | 未着手 |
+| A0・A1 (契約の行・`kernel/io_work.h`) | 済 (2026-11-15) |
+| A3 (`kernel/io_work.c`)・A4 (`kernel/io_policy.c`) | 済 (2026-11-16、独立レビューの直し 1 回)。ビルドへの登録は A5。共有の口 `kernel/io_clock.h`・`kernel/io_policy.h` と PM の決定 P1〜P4 は設計の末尾 |
+| A5・T1・T2・E 系・D 系・C 系・P1・L1 | 未着手 (順は設計 §7) |
