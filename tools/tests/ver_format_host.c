@@ -6,6 +6,11 @@ u32 input_irq(void) { return 1; }
 #include "ver_format_source.c"
 #include "ver_state_source.c"
 
+#ifdef OS32_X87_EMU_LINKED
+#define FPU_ABSENT "none(emu)"
+#else
+#define FPU_ABSENT "none"
+#endif
 #define DEV (OS32_VER_DEVICE | OS32_VER_INDENT)
 #define ID (OS32_VER_IDENTITY | OS32_VER_INDENT)
 #define DBG OS32_VER_DEBUG
@@ -14,7 +19,7 @@ u32 input_irq(void) { return 1; }
  * Every row has a bound, including unknowns and both continuation forms. */
 #define FIT(text) STATIC_ASSERT(sizeof(text)-1 <= OS32_VER_COLS, line_fits_##__LINE__)
 FIT("PC-9821 OS32 v" "VVVVVVVVVVVVVVVVVVVV" " (Ring3 Native)");
-FIT("CPU: x86 32-bit; calib=measured; FPU=none(emu)");
+FIT("CPU: x86 32-bit; calib=measured; FPU=" FPU_ABSENT);
 FIT("PIC: 8259A x2; vectors=ffh/ffh (configured)");
 FIT("PIT: 8254 tick=4294967295Hz input=4294967295Hz");
 FIT("KBD: 8251-compatible; IRQ4294967295 (configured)");
@@ -40,7 +45,7 @@ STATIC_ASSERT(BOOT_IMAGE_COMMIT_MAX-1 == 23, commit_width);
 STATIC_ASSERT(SERVICES_VER_STATE_TEXT-1 == 23, services_width);
 static const OS32_VerLine expected[] = {
     {OS32_VER_HEAD, "PC-9821 OS32 v3.0-dev (Ring3 Native)"},
-    {DEV, "CPU: x86 32-bit; calib=measured; FPU=none(emu)"},
+    {DEV, "CPU: x86 32-bit; calib=measured; FPU=" FPU_ABSENT},
     {DEV, "PIC: 8259A x2; vectors=20h/28h (configured)"},
     {DEV, "PIT: 8254 tick=100Hz input=1996800Hz"},
     {DEV, "KBD: 8251-compatible; IRQ1 (configured)"},
@@ -172,7 +177,7 @@ void _start(void)
     CHECK(report.lines[12].kind == (DBG | OS32_VER_INDENT));
     s.cpu_measured = s.pit_valid = s.ser_ready = s.pcm_present = 0;
     s.gfx_kind = 0; s.gfx_active = 0; formatted(13);
-    line(1, "CPU: x86 32-bit; calib=default; FPU=none(emu)");
+    line(1, "CPU: x86 32-bit; calib=default; FPU=" FPU_ABSENT);
     s.fpu_present = 1;
     formatted(13);
     line(1, "CPU: x86 32-bit; calib=default; FPU=hw");

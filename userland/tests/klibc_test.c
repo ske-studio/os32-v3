@@ -218,6 +218,19 @@ static void test_fabs(void)
     check("fabs(-0.0)",         my_fabs(-0.0) == 0.0);
 }
 
+/* Exercise newlib conversion and nano's optional floating formatter at runtime. */
+static void test_float_libc(void)
+{
+    char *end;
+    char text[48];
+    double value = strtod("-2.75tail", &end);
+    check("strtod value/end", value == -2.75 && strcmp(end, "tail") == 0);
+    int length = snprintf(text, sizeof(text), "%.2f %.2f", value, value * -2.0);
+    check("snprintf floats", length == 10 && strcmp(text, "-2.75 5.50") == 0);
+    int printed = printf("float libc: %.2f %.2f\n", value, value * -2.0);
+    check("printf floats length", printed == 23);
+}
+
 /* ======================================================================== */
 /*  64bit除算テスト (libgcc __divdi3 等)                                     */
 /* ======================================================================== */
@@ -262,6 +275,7 @@ int main(int argc, char **argv, KernelAPI *api)
     test_strspn();
     test_malloc();
     test_fabs();
+    test_float_libc();
     test_div64();
 
     return os32_test_summary(api, "klibc_test",

@@ -1,4 +1,5 @@
-/* Manual x87 isolation fixture; check is also usable by guest_tests. */
+/* Hardware x87 and #NM emulation share exactly the same PASS 3/3 contract.
+ * loop -> CTRL+STOP -> check also checks that the next owner starts clean. */
 #include "os32api.h"
 
 #define DEFAULT_CW 0x037fu
@@ -24,6 +25,9 @@ int main(int argc, char **argv, KernelAPI *api)
     __asm__ volatile ("fnstcw %0; fnstsw %1; fnstenv %2; fldenv %2"
                       : "=m" (cw), "=m" (sw), "=m" (env) : : "memory");
     if (argc != 2) return 1;
+    /* FNSTENV masks exceptions; FLDENV must restore the original CW. */
+    unsigned short restored_cw;
+    __asm__ volatile ("fnstcw %0" : "=m" (restored_cw));
     if (equal(argv[1], "loop")) {
         unsigned short trunc_cw = (cw & ~ROUND_MASK) | ROUND_TRUNCATE;
         volatile double x = 1.25;
@@ -42,7 +46,7 @@ int main(int argc, char **argv, KernelAPI *api)
         unsigned int passed = 0;
         volatile double x = 1.0, two = 2.0;
         double diff;
-        passed += cw == DEFAULT_CW;
+        passed += cw == DEFAULT_CW && restored_cw == cw;
         passed += (sw & TOP_MASK) == 0 && (env.word[2] & 0xffffu) == EMPTY_TAG;
         for (int i = 0; i < 20; i++) x = (x + two / x) * 0.5;
         diff = x - SQRT2_EXPECTED;
