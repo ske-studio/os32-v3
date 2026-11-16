@@ -399,3 +399,5 @@ int kstrcmp(const char *a, const char *b) { while (*a && *a == *b) { a++; b++; }
 int kstrncmp(const char *a, const char *b, u32 n) { while (n && *a && *a == *b) { a++; b++; n--; } return n ? (u8)*a - (u8)*b : 0; }
 char *kstrncpy(char *d, const char *s, u32 n) { u32 i = 0; if (n) { for (; i + 1 < n && s[i]; i++) d[i] = s[i]; d[i] = 0; } return d; }
 char *kstrncat(char *d, const char *s, u32 n) { u32 count = kstrlen(d); if (count < n) kstrncpy(d + count, s, n - count); return d; }
+
+#include "sqlite_bits_host.h"

@@ -1,6 +1,9 @@
 /* Typed outer calls. VFS callbacks keep the active engine and stack. */
 #ifndef OS32_SQLITE_OUTER_H
 #define OS32_SQLITE_OUTER_H
+#include "types.h"
+/* Private facade wire type; the public SDK payload remains i32. */
+typedef unsigned long long u64;
 #include "sqlite3.h"
 #include "os32_sqlite_vfs.h"
 typedef int (*SqliteExecCallback)(void *, int, char **, char **);
@@ -18,7 +21,7 @@ int os32_sqlite_bind_blob(sqlite3_stmt *stmt, int index, const void *value, int 
 int os32_sqlite_bind_parameter_count(sqlite3_stmt *stmt);
 int os32_sqlite_column_count(sqlite3_stmt *stmt);
 int os32_sqlite_column_int(sqlite3_stmt *stmt, int column);
-double os32_sqlite_column_double(sqlite3_stmt *stmt, int column);
+u64 os32_sqlite_column_f64_bits(sqlite3_stmt *stmt, int column);
 const unsigned char * os32_sqlite_column_text(sqlite3_stmt *stmt, int column);
 const void * os32_sqlite_column_blob(sqlite3_stmt *stmt, int column);
 int os32_sqlite_column_bytes(sqlite3_stmt *stmt, int column);
@@ -82,7 +85,7 @@ int sqlite_engine_available(int io);
 #define sqlite3_bind_parameter_count os32_sqlite_bind_parameter_count
 #define sqlite3_column_count os32_sqlite_column_count
 #define sqlite3_column_int os32_sqlite_column_int
-#define sqlite3_column_double os32_sqlite_column_double
+#define sqlite3_column_f64_bits os32_sqlite_column_f64_bits
 #define sqlite3_column_text os32_sqlite_column_text
 #define sqlite3_column_blob os32_sqlite_column_blob
 #define sqlite3_column_bytes os32_sqlite_column_bytes

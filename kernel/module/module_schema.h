@@ -115,7 +115,7 @@ enum module_field {
         .required_flags = 1U, \
         .allowed_flags = 1U, \
         .stop_allowed = 0U, \
-        .ops_version = 2U, \
+        .ops_version = 3U, \
         .ops_slots = 1U, \
         .image_max = 524288U, \
         .mem_max = 524288U, \
