@@ -137,9 +137,15 @@ static int probe(void)
     step(KEY_CAPS); step(KEY_CAPS | 128); step(KEY_KANA); step(KEY_KANA | 128);
     guest = 0;
     T(!input_key_mods());
+    kbd_set_gui_mode(0);
+    step(0x1d); step(0x1d); step(0x9d);
+    guest = 1; step(KEY_CAPS); step(KEY_KANA); guest = 0;
+    step(0x1d); step(0x1d); step(0x9d);
+    step(KEY_CAPS | 128); step(KEY_KANA | 128);
+    step(0x1d); step(0x9d);
 #ifndef S2X_OLD
     T(!bad_route);
-    if (config[1]) T(sc_calls && !key_calls && !eval_calls);
+    if (config[1]) T(sc_calls && !key_calls && eval_calls);
     else T(!sc_calls && key_calls && eval_calls == key_calls * 2);
 #endif
     flush();

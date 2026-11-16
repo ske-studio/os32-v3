@@ -1,6 +1,6 @@
 """F2/F2i: real keyboard CUI foreground calls, ILP32 runtime mutants."""
 CHECK = dict(name='kbd-fgpoll-host', tier=1, needs=[], budget=3.4,
-             covers=['drivers/input/kbd_hal.c', 'input/hal/in2_dev.c', 'input/hal/in2_state.c', 'input/hal/kbd_merge.c', 'tools/tests/kbd_capture_fixture_host.h', 'input/hal/keymap_registry.c', 'input/hal/keymap_eval.c', 'input/hal/keymap_state.c', 'input/hal/keymap.h', 'kernel/idle_work.h', 'tools/tests/test_kbd_fgpoll.py', 'tools/tests/kbd_fgpoll_host.c',
+             covers=['input/hal/legacy_keymap.c', 'input/keymaps/pc98_jp.c', 'drivers/input/kbd_hal.c', 'input/hal/in2_dev.c', 'input/hal/in2_state.c', 'input/hal/kbd_merge.c', 'tools/tests/kbd_capture_fixture_host.h', 'input/hal/keymap_registry.c', 'input/hal/keymap_eval.c', 'input/hal/keymap_state.c', 'input/hal/keymap.h', 'kernel/idle_work.h', 'tools/tests/test_kbd_fgpoll.py', 'tools/tests/kbd_fgpoll_host.c',
                      'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'tools/tests/test_remote_x8a.py',
                      'tools/tests/host_arch/**', 'build/config.mk',
                      'drivers/input/kbd.c', 'input/hal/legacy_ring.c', 'input/hal/legacy_mode.c', 'kernel/input_legacy.c', 'kernel/input_wait.c', 'input/hal/in2_int.h', 'drivers/input/kbd_fgpoll.inc',

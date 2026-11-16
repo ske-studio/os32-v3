@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """T_merge: source transitions, shared locks and V86 (freestanding ILP32)."""
-CHECK = dict(name='input-merge-host', tier=1, budget=10, needs=[], covers=['input/hal/keymap_registry.c', 'input/hal/keymap_eval.c', 'input/hal/keymap_state.c',
+CHECK = dict(name='input-merge-host', tier=1, budget=10, needs=[], covers=['input/hal/legacy_keymap.c', 'input/keymaps/pc98_jp.c', 'input/hal/keymap_registry.c', 'input/hal/keymap_eval.c', 'input/hal/keymap_state.c',
     'input/hal/in2_int.h', 'input/hal/in2_dev.c', 'input/hal/keymap.h', 'input/hal/in2_state.c', 'input/hal/mouse_ext.c', 'input/hal/pointer_state.c', 'input/hal/kbd_merge.c', 'input/hal/in2_ring.c',
     'include/types.h', 'include/io.h', 'include/kbd.h', 'include/legacy_guest.h',
     'sdk/include/os32/os32_kapi_shared.h', 'tools/tests/input_merge_host.c',
@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def run(ctx):
     names = ['in2_dev.c', 'in2_state.c', 'kbd_merge.c', 'in2_ring.c', 'mouse_ext.c', 'pointer_state.c']
-    names += ['keymap_registry.c', 'keymap_eval.c', 'keymap_state.c']
+    names += ['legacy_keymap.c', 'keymap_registry.c', 'keymap_eval.c', 'keymap_state.c']
     sources = [(ctx.root / 'input/hal' / name).read_text() for name in names]
     with tempfile.TemporaryDirectory(prefix='input-merge-') as td:
         tmp = Path(td)

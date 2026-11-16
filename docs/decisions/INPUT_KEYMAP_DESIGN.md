@@ -538,3 +538,5 @@ PM決定 (2026-11-17): S0aは`km_source_release`の空inlineを維持し、別�
 - 登録の失敗のログは /var/log/boot.log の 1 行だけで、画面には出さない。設計の「klog」はこの意味とする (PM 決定 2026-11-17)。
 - 試験: V86 の中で CAPS・KANA を押してから抜けた後の文字を、旧経路と比べる 1 件を、S3 の段の試験に足す。
 - kbd_hal_init を 2 回呼ぶと旧経路になり bindings[] が残る。呼ぶのは boot.c:53 の 1 回だけなので、今は起きない。2 回呼ぶ道を作るときに直す。
+
+- PM決定 (2026-11-17、S3/S3d): 登録失敗時の未bind sourceの旧sc経路も旧文字表を使わず、静的なpc98_jp_backendと経路内の局所KmStateでkm_evalを呼び、通常経路と同じBSD byteを返す。S2xの登録失敗試験も通常経路と同じkeydataを期待する。

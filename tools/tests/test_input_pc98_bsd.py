@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""M0-2 fixture contract only; the M2 product evaluator does not exist yet."""
+"""M0 fixture/ledger contract and pinned historical column characterization."""
 CHECK = dict(name='input-pc98-bsd-host', tier=1, budget=5, needs=[], kind='contract',
     basis=['INPUT_BIND_DESIGN §1', 'INPUT_BIND_DESIGN §2a', 'INPUT_BIND_DESIGN §6 M0'],
     covers=['tools/tests/test_input_pc98_bsd.py', 'tools/tests/input_pc98_bsd_fixture.kbd',
@@ -149,9 +149,9 @@ def pc98_bsd_verify(root, fixture):
 def pc98_bsd_check_legacy_columns(root, tmp, mutate):
     import host32
     from kernel_includes import include_flags
-    # Compile the pinned legacy implementation and the current path against the
+    # Compile two pinned legacy implementations against the
     # same literal oracle. Mutants change one expected column, never product code.
-    source = (root/'input/hal/kbd_merge.c').read_text()
+    source = subprocess.check_output(['git', 'show', '1b0fa106:input/hal/kbd_merge.c'], cwd=root, text=True)
     host = (root/'tools/tests/input_pc98_compat_host.c').read_text()
     old = subprocess.check_output(['git', 'show', '1b0fa106:input/hal/kbd_merge.c'], cwd=root, text=True)
     old = old[old.index('static const u8 scancode_to_ascii['):old.index('void input_emit_legacy_repeat')]
@@ -163,7 +163,7 @@ def pc98_bsd_check_legacy_columns(root, tmp, mutate):
         cmd = ['gcc', '-m32', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-ffreestanding',
                '-fno-pie', '-fno-stack-protector', '-ffunction-sections', '-fdata-sections',
                '-nostdinc', '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
-               '-I'+str(root/'tools/tests'), '-I'+str(root/'tools/tests/host_arch'),
+               '-DPC98_HISTORIC_ONLY', '-I'+str(root/'tools/tests'), '-I'+str(root/'tools/tests/host_arch'),
                '-I'+str(root/'input/hal'), *include_flags(root)]
         subprocess.run(cmd+[str(tmp/'current.c'), str(tmp/'old.c'), str(tmp/'host.c'),
                             '-o', str(tmp/'legacy-test')], check=True)

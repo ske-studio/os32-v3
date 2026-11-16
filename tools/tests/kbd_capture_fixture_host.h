@@ -5,6 +5,11 @@
 #define KBD_MERGE_SOURCE "../../input/hal/kbd_merge.c"
 #endif
 #include KBD_MERGE_SOURCE
+#ifndef LEGACY_KEYMAP_SOURCE
+#define LEGACY_KEYMAP_SOURCE "../../input/hal/legacy_keymap.c"
+#endif
+#include LEGACY_KEYMAP_SOURCE
+#include "../../input/keymaps/pc98_jp.c"
 #include "../../drivers/input/kbd_hal.c"
 void input_emit_in2(const InputEvent *e) { (void)e; }
 u32 in2_time_ms(void) { return 0; }

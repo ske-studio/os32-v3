@@ -119,6 +119,13 @@ int km_source_bind(u8 src, u16 generation, u16 map_id);
 /* Validate generation and range; discard input from unregistered sources. */
 int input_capture_key(const KmKey *key);
 
+/* S3: COMPAT annotates DOS bytes before any policy/legacy projection. */
+void km_legacy_compat(KmEvalResult *result);
+void input_emit_keymap(const KmEvalResult *result, u8 down, u8 raw_due,
+                       u8 physical_mods, u8 consumed);
+/* Static fallback descriptor; independent of registry/source bindings. */
+void input_legacy_keymap_set(const KmBackend *map);
+
 /* Only these keypad symbols can be converted to bytes with sym & 0x7f. */
 static inline int is_keypad(keysym_t sym)
 {
