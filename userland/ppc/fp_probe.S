@@ -158,6 +158,25 @@ ppc_fp_zero:
     .zero 264
 .text
 #endif
+#ifndef PPC_FP_CONTEXT_TEST
+/* fadd precedes every syscall in F1; startup FPRs are zero. */
+.globl ppc_fp_first
+.type ppc_fp_first,@function
+ppc_fp_first:
+    fadd 0,0,0
+    lis 4,.Lone@ha
+    addi 4,4,.Lone@l
+    lfd 0,0(4)
+    fadd 0,0,0
+    stfd 0,0(3)
+    blr
+.size ppc_fp_first,.-ppc_fp_first
+.section .rodata
+.balign 8
+.Lone:
+    .long 0x3ff00000,0
+.text
+#endif
 /* SysV variadic receiver: CR1 EQ says that floating arguments were passed.
  * Capture f1..f8 for a fixture to bit-compare multiple double arguments. */
 .globl ppc_fp_varargs_snapshot
