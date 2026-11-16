@@ -135,9 +135,20 @@ int input_context_owner_release(u32 owner, u32 exec_gen)
         return -1;
     }
     ContextOwner *entry = &context_owners[owner];
+    /* Splice every live child before this slot can be reused. */
+    for (u32 child = APP_ID_SHELL; child < APP_SLOT_COUNT; ++child) {
+        ContextOwner *next = &context_owners[child];
+        if (next->exec_gen && next->parent == owner && next->parent_gen == exec_gen) {
+            next->parent = entry->parent;
+            next->parent_gen = entry->parent_gen;
+        }
+    }
     if (foreground_owner == owner) {
         foreground_owner = context_owner_valid(entry->parent, entry->parent_gen)
                          ? entry->parent : 0;
+        if (!foreground_owner && owner != APP_ID_SHELL &&
+            context_owners[APP_ID_SHELL].exec_gen)
+            foreground_owner = APP_ID_SHELL;
     }
     entry->exec_gen = 0;
     irq_restore(irq);

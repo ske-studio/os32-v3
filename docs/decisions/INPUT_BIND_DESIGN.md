@@ -283,6 +283,7 @@
 |---|---|
 |M5[1]|単一実行単位の文脈値の初期化・明示設定。既定 RUNNING+ISIG、設定は command_gen を変えない。未結線|
 |M5[2]|新しい世代の公開と文脈の復帰。M6 が登録する破棄の口を、世代の公開より先に呼ぶ。印の破棄そのものは M6 (§3 N4)|
+|M6 exec境界|command 実行中を含む exec 終了時の中断 pending 消去は M6 の exec 境界の段が担う (§3 N4)|
 |M5[3] ≤350|owner/exec_gen ごとの登録・親への復帰。起動経路が最初の shell に LINE_EDIT+ISIG/ICANON を渡す内部の口 (U2-x0・U2-p0)。IRQ から副作用なしに読める snapshot {owner, exec_gen, command_gen, context} (M6・L)。GUI 宛先は WM が決定|
 
 各小段は内部試験のみ。実像への登録 B と A0z 後の各呼出し元の結線は別段とする。
