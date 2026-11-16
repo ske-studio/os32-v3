@@ -377,4 +377,4 @@ exec 終了 hook は `exec/exec_abort.inc` に内部 adapter として定義し�
 - 追従の表に `tools/tests/test_gf_cui.py:48-59` を足す。`appslot_gfx_owner_exit` の本体を文字列で切り出して組む試験なので、回収の予約と組の静的変数を使う形になったら、切り出す範囲を広げるか stub を足す。
 - 段の順: input/hal/input_context.c・input_interrupt.c を x86 の feature の mk と build/ppc-kboot.mk に登録する段 (B) を、exec_finish.inc・gfx_core_init.inc に新しい呼び出しを足す段より先にする (exec.c と gfx_core.c は PPC の像にも入るので、登録が無いと両方の arch でリンクが落ちる)。受入に PPC の像 2 つのリンクを入れる。
 - `exec_reclaim_resources` の入口で exec_gen が得られない (CPL=0 の子で a->as が無い) ときは、中断の印を消さず、表示の印にも触れない (NULL を読まない)。
-- 診断の enter の途中 (入口の drain の後、gfx_init の acquire の前) の STOP は、enter の失敗とする。受入 (6) に、この区間への IRQ の挿入を 1 件足す。
+- 診断の enter の途中 (入口の drain の後、gfx_init の acquire の前) の STOP は、特別に扱わない。gfx_init の中の drain で入りかけの診断が畳まれて ESTATE で戻る今の振る舞いのままとする (PM 決定 2026-11-17、識別のための印や口は足さない)。受入 (6) に、この区間への IRQ の挿入を 1 件足し、ESTATE で戻り印が残らないことを確かめる。
