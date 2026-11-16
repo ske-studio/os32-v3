@@ -11,7 +11,7 @@ static u32 pg, lookups, trace[128], traced, cost[18], units[18], mode[18];
 static u8 tiers[18];
 static u32 budgets[18], observed[18], taken[18];
 static int results[18];
-enum { REQUEST = 1, NEST = 2, CHANGE = 4, FAIL_TAKE = 8, FAIL_POST = 16, POLICY = 32, LIMIT = 64 };
+enum { REQUEST = 1, NEST = 2, CHANGE = 4, FAIL_TAKE = 8, FAIL_POST = 16, POLICY = 32, LIMIT = 64, REGISTER = 128 };
 static void finish(int rc) { __asm__ volatile("int $0x80" : : "a"(1), "b"(rc) : "memory"); __builtin_unreachable(); }
 static void fail(unsigned int line)
 {
@@ -46,6 +46,7 @@ int io_policy_limits(u32 id, u8 *t, u32 *b, u32 *low, u32 *high)
 }
 int io_policy_lookup(u32 id, u8 *t, u32 *b) { ++lookups; *t = tiers[id]; *b = budgets[id]; return 0; }
 u32 io_policy_generation(void) { return pg; }
+static struct io_desc desc(u32 id);
 static int step(void *state, struct io_slice *s)
 {
     u32 id = (u32)state, flags = mode[id];
@@ -66,6 +67,7 @@ static int step(void *state, struct io_slice *s)
     for (u32 n = 0; n < units[id] && io_slice_take(s); ++n) { ++taken[id]; ticks += cost[id]; }
     if (flags & FAIL_POST) fail_read = reads + 1;
     if (flags & POLICY) { tiers[3] = 1; budgets[3] = 10; ++pg; }
+    if (flags & REGISTER) { mode[id] &= ~REGISTER; struct io_desc late = desc(9); CHECK(io_register(&late) == 0); io_request(9); }
     return results[id];
 }
 static struct io_desc desc(u32 id)
@@ -105,6 +107,11 @@ static void registration(void)
     CHECK(io_unregister(8) == 0 && io_unregister(8) == OS32_ERR_NOTFOUND);
     add(17); traced = 0; CHECK(io_dispatch(500) == 16);
     CHECK(trace[14] == 17 && trace[15] == 3); /* Tier 2 registration order survives holes. */
+    /* A provider may register from inside dispatch (PPC binds the NIC from a
+     * compat callback): it is appended, skipped this round, run the next. */
+    reset(); add(2); mode[2] = REGISTER; results[2] = IO_DONE; traced = 0;
+    CHECK(io_dispatch(500) == 1 && traced == 1 && trace[0] == 2);
+    traced = 0; CHECK(io_dispatch(500) == 1 && trace[0] == 9);
 }
 static void slices(void)
 {

@@ -126,7 +126,9 @@ static int find(u32 id)
 int io_register(const struct io_desc *d)
 {
     u8 tier; u32 budget, low, high;
-    if (running) return OS32_ERR_BUSY;
+    /* Allowed while io_dispatch runs (a provider may bind from a compat
+     * callback, e.g. PPC net_start): the slot is only appended, its budget
+     * count stays 0 until the next round's refresh, so this round skips it. */
     if (!d || !d->step || io_policy_limits(d->id, &tier, &budget, &low, &high) < 0)
         return OS32_ERR_INVAL;
     if (d->default_tier < 1 || d->default_tier > 3 || d->default_tier != tier ||
@@ -137,6 +139,8 @@ int io_register(const struct io_desc *d)
     if (count == IO_SLOTS) return OS32_ERR_FULL;
     if (io_policy_lookup(d->id, &tier, &budget) < 0) return OS32_ERR_INVAL;
     unsigned int flags = irq_save();
+    slots[count].budget_count = slots[count].unit_count = 0; /* skipped until refresh */
+    slots[count].limit.valid = 0;
     slots[count].desc = *d;
     slots[count].tier = tier;
     slots[count++].budget_us = budget;
