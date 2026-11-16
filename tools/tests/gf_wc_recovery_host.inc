@@ -120,6 +120,7 @@ static void con_sink_push_exit(int id) { (void)id;CHECK(0); }
 static int launch_child(int id) { (void)id;return 0; }
 static void kbd_inject_discard(void) {}
 static void launch_owner_exit(int id) { (void)id; }
+static u32 io_syscall_suspend(int owner) { (void)owner; return 0; }
 static void host_owner_exit(int id) { (void)id; }
 static void con_sink_owner_exit(int id) { (void)id; }
 void appslot_gfx_owner_exit(int id) { (void)id; }

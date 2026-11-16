@@ -107,6 +107,8 @@ void exec_longjmp(k_jmpbuf buf) {
     kctx_exc_depth=kctx_irq_depth=0; /* setjmp.asm restores the trusted depths. */
     __builtin_longjmp(jump,1);
 }
+static u32 io_syscall_suspend(int owner) { (void)owner; return 0; }
+static void io_syscall_end(int owner) { (void)owner; }
 static void exec_restore_context(int id) {
     AppSlot *a=appslot_at(id);
     g_cur_app=a->cpl3 ? a : 0;

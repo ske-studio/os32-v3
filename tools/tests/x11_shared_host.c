@@ -41,6 +41,7 @@ static void say(const char *s)
 #define CHECK(c, msg) do { if (!(c)) { say("FAIL " msg "\n"); return 1; } } while (0)
 int res_owner_get(void) { return owner; }
 void res_owner_set(int id) { owner = id; }
+static u32 io_syscall_suspend(int owner) { (void)owner; return 0; }
 int appslot_cur(void) { return owner; }
 AppSlot *appslot_get(int id) { return &slots[id]; }
 int appslot_gfx_owner(void) { return 0; }

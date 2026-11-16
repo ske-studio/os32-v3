@@ -1,4 +1,5 @@
 /* No device callbacks are registered in this boundary fixture. */
+void io_syscall_end(int owner) { (void)owner; }
 void idle_work_run(void) { }
 #include "host_exec_context.h"
 /* U6: production service -> resident poll -> backend stop -> recovery.

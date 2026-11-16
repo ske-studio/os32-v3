@@ -95,7 +95,7 @@ void __cdecl kprintf(u8 attr, const char *fmt, ...) {
     parts.append('static void host_resume_tail(int app_id) { AppSlot *a = appslot_get(app_id); int restart_stdin = 0;\n' + tail + '\n}')
     dispatch = function(exe, 'void exec_syscall_dispatch(')
     tail = dispatch[dispatch.index('syscall_complete:') + len('syscall_complete:'):dispatch.rfind('}')]
-    parts.append('static void host_syscall_tail(struct arch_user_context *frame) { int prev_caller=0, prev_in_syscall=0; struct arch_syscall *prev_frame=0; struct arch_syscall call = { frame->opaque }; u32 result = HOST_FRAME(*frame)[7];\n' + tail + '\n}')
+    parts.append('static void host_syscall_tail(struct arch_user_context *frame) { int io_owner = appslot_cur(); int prev_caller=0, prev_in_syscall=0; struct arch_syscall *prev_frame=0; struct arch_syscall call = { frame->opaque }; u32 result = HOST_FRAME(*frame)[7];\n' + tail + '\n}')
     (tmp / 'exec_source.c').write_text(exec_fixture_preamble() + '\n'.join(parts))
     (tmp / 'abort_clear_source.c').write_text(function(slot, 'int appslot_abort_clear('))
     lease = read('exec/lease.c')
