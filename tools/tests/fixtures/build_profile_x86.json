@@ -100,6 +100,8 @@
     "kernel/kbd_inject.c",
     "kernel/sys.c",
     "kernel/idle_work.c",
+    "kernel/io_work.c",
+    "kernel/io_policy.c",
     "kernel/irq/tick_budget.c",
     "platform/pc98/link_platform.c",
     "platform/pc98/system.c",

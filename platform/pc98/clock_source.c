@@ -13,6 +13,7 @@
 STATIC_ASSERT(OS32_TICK_HZ == PIT_HZ, logical_tick_hz_match);
 
 static int clock_config_rc = OS32_ERR_NOSYS;
+void pc98_io_clock_install(void); /* IO_TIER P6; also in clock_source.h */
 enum { IO_PC98_PIT = 1, IO_PC98_TSC = 2 };
 static u32 io_source, io_generation, io_tsc_generation, io_mul, io_shift;
 

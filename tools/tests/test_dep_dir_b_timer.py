@@ -103,7 +103,8 @@ def verify(mutation=None):
         baseline = list(expected['traces'][str(byte)])
         # D: invalid setup is checked inside the saved-IF provider contract.
         # Only these three NOSYS calls gain a balanced save/restore pair.
-        for at in (11, 10, 0):
+        # 6: IO_TIER P6 pc98_io_clock_install after a successful init.
+        for at in (11, 10, 6, 0):
             baseline[at:at] = [['S', 0, 0, 0], ['F', 0, 0, 0]]
         assert actual == baseline, (byte, actual)
         with tempfile.TemporaryDirectory(prefix='dep-dir-b-retry-') as td:
