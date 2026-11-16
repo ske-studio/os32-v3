@@ -1,6 +1,6 @@
 # TASK_PPC_SEP — PowerPC 移植とアーキテクチャ分離の計画
 
-> 状態: **実装中 (2026-11-10)** — 案 D を採用、MMU の外の 33 件を順に直す。計画の段 (第 1〜5 段) は Z まで main (b98087e8、2026-11-10)。残るのは PPC で組めない 8 TU と第 5 段で見送った 3 点 (下の「実測 (第 5 段 Z)」) で、② の後の段の中で解く。確定設計は [PPC_SEP1_DESIGN](../../decisions/ppc/PPC_SEP1_DESIGN.md)・[PPC_SEP2_DESIGN](../../decisions/ppc/PPC_SEP2_DESIGN.md)・[PPC_SEP3_DESIGN](../../decisions/ppc/PPC_SEP3_DESIGN.md)・[PPC_SEP4_DESIGN](../../decisions/ppc/PPC_SEP4_DESIGN.md)・[PPC_SEP5_DESIGN](../../decisions/ppc/PPC_SEP5_DESIGN.md)。実装と取り込みの決まりは [PPC_IMPL_RULES](../../decisions/ppc/PPC_IMPL_RULES.md)。2026-11-10 から到達点 ② (票 TASK_PPC_KBOOT) を優先し、分離の残り (下表の「未着手」) は ② の後か、本線の受入の待ちが減った時点で再開する。調査の全文は ~/os32-tmp/run/ppc-arch-survey/SURVEY.md。
+> 状態: **設計中 (2026-11-17)** — ユーザー指示「アーキテクチャの依存部分と OS としての機能の分離統合を先に」で、x86 と PPC の両方の分離統合の設計を起草中 (末尾の「続き」)。新しい機能の段は止めている。 以下はこれまでの状態: 案 D を採用、MMU の外の 33 件を順に直す。計画の段 (第 1〜5 段) は Z まで main (b98087e8、2026-11-10)。残るのは PPC で組めない 8 TU と第 5 段で見送った 3 点 (下の「実測 (第 5 段 Z)」) で、② の後の段の中で解く。確定設計は [PPC_SEP1_DESIGN](../../decisions/ppc/PPC_SEP1_DESIGN.md)・[PPC_SEP2_DESIGN](../../decisions/ppc/PPC_SEP2_DESIGN.md)・[PPC_SEP3_DESIGN](../../decisions/ppc/PPC_SEP3_DESIGN.md)・[PPC_SEP4_DESIGN](../../decisions/ppc/PPC_SEP4_DESIGN.md)・[PPC_SEP5_DESIGN](../../decisions/ppc/PPC_SEP5_DESIGN.md)。実装と取り込みの決まりは [PPC_IMPL_RULES](../../decisions/ppc/PPC_IMPL_RULES.md)。2026-11-10 から到達点 ② (票 TASK_PPC_KBOOT) を優先し、分離の残り (下表の「未着手」) は ② の後か、本線の受入の待ちが減った時点で再開する。調査の全文は ~/os32-tmp/run/ppc-arch-survey/SURVEY.md。
 
 ## 段の状態 (2026-11-10)
 
@@ -142,3 +142,20 @@ GeForce の WC（x86 の PAT・MTRR）は PowerPC では別の口になる。D �
 
 根拠：`ppc-mmu/DESIGN.final.md` §2＋`REVIEW.r2.md`（修正を優先）、`ppc-mm-boundary/DESIGN.r1.md` §5・§6＋`REVIEW.r1.md`、`ppc-arch-survey/SURVEY.md`、読取元 `/home/hight/wt/os32-v3/ppc-env` の上記実物。今回ビルド・実走はしていない。
 根拠の弱い数字は **8件の概算幅**（B/C/D の3件と順(1)〜(5)の5件）。実物の行数・検索一致行数と、資料の33件集計はこの数に含めない。
+
+## 続き: 分離統合 (2026-11-17)
+- ユーザー指示 (原文):
+  - 「ディレクトリ構造が x86 と違わないか？」
+  - 「この状態で開発を進めても本質的な実装にならないのでアーキテクチャの依存部分と OS としての機能の分離統合を先に」
+  - 「別アーキテクチャ実装時に開発のディレクトリ構造を壊さないように守らせてください。ディレクトリ構造のマップを渡してないのが原因と思います。ドキュメント化」
+- 置き場の規則の正典は docs/08_build.md §8-3 (本線の wt/docs-layout)。目標の木は、この表を正とする。
+- 設計の往復の版は ~/os32-tmp/run/ppc-archsep/ にある (リポジトリに入れない)。
+  - DESIGN.r1.md: PPC の側。sol の起草。
+  - DESIGN.r2.md: 本線の x86 の洗い出し X86_SURVEY.md を足して、両方を 1 枚にした物。346 行、未決 1 件。
+  - r2 はまだレビューしていない。目標の木を §8-3 の表に照らしていない (r2 の起草は §8-3 の前)。
+- 分担: 設計は PPC が起草し、本線がレビューする。x86 の移動の段は本線、PPC の段は PPC。移動の段の間は、動かすディレクトリに触る他の段を出さない。
+- 再開の手順:
+  1. r2 を §8-3 に照らして直す。
+  2. Opus と本線のレビューに出す。
+  3. 確定したら docs/decisions に写す。
+- 止めている機能の段: INPUT_KEYMAP の S2m・S3m・S3b、カーネルの SQLite、IME の準備、機種の設定ファイル (本線の astra が設計を起草中。分離の設計の機種の層と合わせる)。

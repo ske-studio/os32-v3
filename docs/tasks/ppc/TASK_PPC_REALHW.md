@@ -2,7 +2,7 @@
 
 > 上位: [TASK_PPC_SHELL](TASK_PPC_SHELL.md)
 
-> 状態: **受入完了 (2026-11-13)** — 実機で受入。G4 PowerMac3,5 (OF 4.2.1f2) で TFTP 起動 → 切り離し → LAN → S-B・S-C・S-D と内蔵 USB のキーボード → sh まで到達 (§2)。残りは持越し台帳 PPC-BOOT-RH・PPC-MMU-RH の絞った分と RH4 のカード。計画と詳細設計は [PPC_REALHW_G4_DESIGN](../../decisions/ppc/PPC_REALHW_G4_DESIGN.md)。
+> 状態: **受入完了 (2026-11-13)** — 11-17 に今の main の link の像で確かめ、RSH は通ったが /host で止まった (§2 の 2026-11-17、原因の最有力は 7450 Quicksilver の NAP)。 以下はこれまでの状態: 実機で受入。G4 PowerMac3,5 (OF 4.2.1f2) で TFTP 起動 → 切り離し → LAN → S-B・S-C・S-D と内蔵 USB のキーボード → sh まで到達 (§2)。残りは持越し台帳 PPC-BOOT-RH・PPC-MMU-RH の絞った分と RH4 のカード。計画と詳細設計は [PPC_REALHW_G4_DESIGN](../../decisions/ppc/PPC_REALHW_G4_DESIGN.md)。
 
 ## 0. ユーザー決定 (2026-11-13)
 - 次の段は「G4 実機の受入」(USB の段 1 の後の選択)。
@@ -50,3 +50,20 @@ PowerPC に固有の注意事項 (起動の行・BOOTP/BSDP・画面・メモリ
 見つけたもの (未修正):
 - FB の画面で、入力の行の写しから日本語が欠ける (`sh> echo 日本語の表示` が `sh> echo` と出る。結果の行と LAN 端末は正しい)。
 - ノートの `ppc_lan_host.py` を途中から付けたときの 1 回目は「waiting for beacon」のまま要求を出せず、`--boot-id` を渡すと通った。原因は未調査。
+
+### 2026-11-17: link の像 (main 5e197b8d) の実機確認、途中で止めた
+- 起動: NVRAM の os32-sh.elf を、電源だけで TFTP 起動した (BSDP の返事役 bootp_g4.py が要る。PPC_NOTES §2)。FB の文字端末、PHY、LAN state=5、link の HELLO まで進んだ。
+- RSH: `echo x > /tmp/t`・`cat /tmp/t`・`cat /tmp/none` は正しく返った (state=done、drop=0)。
+- /host: `cat /host/f` で、ゲストが止まった。
+  - ゲストは SFS CALL の REQUEST を送った後、WDATA を送らず、以後 link の電文を 1 本も出さなかった。
+  - ホストは 1.0s の期限で 503 を返した。画面は `> cat /host/f` のまま。
+  - QEMU では通る。
+- 原因の最有力: 7450 の NAP で CPU が固まる。
+  - NetBSD は、7450 だけ NAP を立てない (sys/arch/powerpc/oea/cpu_subr.c:691-695 の「XXX my quicksilver hangs if nap is enabled」)。
+  - GEM は poll だけなので、NAP から起こせるのは DEC だけ。ホストに再送も来なかった。
+  - 受信の直後 5ms は休まないので、短い RSH は NAP に入る前に終わっていた。
+- 見分けの像: HID0 の NAP だけを外した像 (sha256 4c0f7ef4、commit なし) を、ノートの /srv/tftp/os32-sh.elf に置いてある。
+  - main の像は os32-sh.link-5e197b8d.elf で残している。
+  - 次に電源を入れて /host が通れば、原因で確定する。
+- 直しの方向: 機種の設定ファイル (本線が設計中、ユーザー指示「機種の固有の設定はコンフィグファイルで」) で NAP を切り替える。それまでの暫定は 7450 で NAP を立てない。リファクタリング計画 (PERF_PROFILE_PLAN の「機種の固有の設定」) に改修項目として入れる。
+- LOG の受入 (seq 0 から) は、agent を起動の後に付けたので未確認。次は agent と採取を起動の前に立てる。
