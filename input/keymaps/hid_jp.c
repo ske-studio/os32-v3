@@ -358,13 +358,6 @@ const u8 hid_jp_order[64] = {
     0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0x00, 0x00, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa,
 };
 
-typedef struct {
-    const u8 *order; /* packed 2-bit groups, usage-low bits first */
-    const u8 (*actions)[2]; /* {usage, action}: 1 IME_ON, 2 IME_OFF */
-    u8 action_count;
-    const u8 *no_keydata; /* 256 bits */
-} KmHidExtensions;
-
 const u8 hid_jp_actions[2][2] = {{0x90, 1}, {0x91, 2}};
 
 const u8 hid_jp_no_keydata[32] = {

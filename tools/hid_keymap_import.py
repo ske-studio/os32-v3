@@ -144,13 +144,7 @@ def generate(directory):
     array('hid_jp_compat_sc', compat)
     array('hid_jp_norepeat', bits)
     array('hid_jp_order', packed)
-    # Typed extension proposal: action bytes are policy IDs, never keysyms.
-    lines += ['typedef struct {',
-              '    const u8 *order; /* packed 2-bit groups, usage-low bits first */',
-              '    const u8 (*actions)[2]; /* {usage, action}: 1 IME_ON, 2 IME_OFF */',
-              '    u8 action_count;',
-              '    const u8 *no_keydata; /* 256 bits */',
-              '} KmHidExtensions;', '']
+    # KmHidExtensions is shared through input/hal/keymap.h.
     lines += ['const u8 hid_jp_actions[2][2] = {{0x90, 1}, {0x91, 2}};', '']
     array('hid_jp_no_keydata', [8 if b == 0x50 else 0 for b in range(0, 256, 8)])
     lines += ['const KmHidExtensions hid_jp_extensions = {',

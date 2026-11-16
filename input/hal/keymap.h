@@ -50,11 +50,19 @@ typedef struct {
     u8 accent_count;              /* 0..15 */
 } KmPc98Extensions;
 
+/* Shared by registry/evaluator and the generated HID descriptor. */
+typedef struct {
+    const u8 *order; /* packed 2-bit groups, usage-low bits first */
+    const u8 (*actions)[2]; /* {usage, action}: 1 IME_ON, 2 IME_OFF */
+    u8 action_count;
+    const u8 *no_keydata; /* 256 bits */
+} KmHidExtensions;
+
 /* S1pt/S1ht define these; S1x registers both, S1m registers HID only. */
 extern const KmBackend pc98_jp_backend;
 extern const KmBackend hid_jp_backend;
 
-/* Low bits: held modifiers; high bits: lock actions. May be combined. */
+/* Held modifiers, lock actions and SHIFTA tag; see H0b for valid pairs. */
 typedef u16 KmEffect;
 enum {
     KM_MOD_SHIFT = 0x0001, KM_MOD_CTRL = 0x0002,
@@ -62,7 +70,8 @@ enum {
     KM_MOD_COMMAND = 0x0010, KM_MOD_META = 0x0020,
     KM_LOCK_CAPS = 0x0100, KM_LOCK_NUM = 0x0200,
     KM_LOCK_KANA = 0x0400, KM_LOCK_SCROLL = 0x0800,
-    KM_LOCK_ALT = 0x1000
+    KM_LOCK_ALT = 0x1000,
+    KM_EFFECT_SHIFTA = 0x2000 /* tap-release AltLock, not a lock bit */
 };
 typedef struct {
     u16 mods, locks;              /* KM_MOD_* / KM_LOCK_*; not SHIFT_* */
@@ -89,6 +98,8 @@ int km_eval(const KmBackend *map, u16 keycode, const KmState *state,
 int km_state_apply(const KmKey *key, u8 old_down, u8 origin, KmEffect effect);
 void km_state_snapshot(KmState *out);
 void km_state_release(u8 src, u16 generation);
+/* S0d calls this before synthetic breaks, so unplug cannot toggle AltLock. */
+void km_state_cancel_tap(u8 src, u16 generation);
 /* S0d: release held keys/projection while binding is still available. */
 void km_release_keys(u8 src, u16 generation);
 

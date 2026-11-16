@@ -26,6 +26,16 @@ TYPE(&km_eval, int (*)(const KmBackend *, u16, const KmState *, KmEvalResult *))
 TYPE(&km_state_apply, int (*)(const KmKey *, u8, u8, KmEffect));
 TYPE(&km_state_snapshot, void (*)(KmState *));
 TYPE(&km_state_release, void (*)(u8, u16));
+TYPE(&km_state_cancel_tap, void (*)(u8, u16));
+TYPE(((KmHidExtensions *)0)->order, const u8 *);
+TYPE(((KmHidExtensions *)0)->actions, const u8 (*)[2]);
+TYPE(((KmHidExtensions *)0)->action_count, u8);
+TYPE(((KmHidExtensions *)0)->no_keydata, const u8 *);
+_Static_assert(sizeof(KmHidExtensions) == 16, "HID descriptor size");
+_Static_assert(__builtin_offsetof(KmHidExtensions, order) == 0, "order offset");
+_Static_assert(__builtin_offsetof(KmHidExtensions, actions) == 4, "actions offset");
+_Static_assert(__builtin_offsetof(KmHidExtensions, action_count) == 8, "count offset");
+_Static_assert(__builtin_offsetof(KmHidExtensions, no_keydata) == 12, "bitmap offset");
 TYPE(&km_release_keys, void (*)(u8, u16));
 TYPE(((KmPc98Extensions *)0)->bank0, const KmExactCell (*)[8]);
 TYPE(((KmPc98Extensions *)0)->bank1, const KmExactCell (*)[8]);
@@ -64,7 +74,7 @@ int check(void) {
     int src = input_src_register(INPUT_KIND_KBD, INPUT_ORIGIN_NATIVE, &gen);
     if (KM_CHAR != 0 || KM_BSD_SPECIAL != 1 || KM_LEGACY_CONTROL != 2 ||
         KM_CELL_INHERIT != 255 || KM_MOD_COMMAND != 0x10 || KM_MOD_META != 0x20 ||
-        KM_LOCK_ALT != 0x1000 || KM_MAP_PC98 != 1 || KM_MAP_HID != 2) return 1;
+        KM_EFFECT_SHIFTA != 0x2000 || KM_LOCK_ALT != 0x1000 || KM_MAP_PC98 != 1 || KM_MAP_HID != 2) return 1;
     input_src_release(0, gen);
     input_src_release(src, gen + 1);
     if (seen) return 2;
@@ -121,6 +131,10 @@ def run(ctx):
             assert header.count(old) == 1
             assert build(header.replace(old, 'KM_CELL_INHERIT = 254')) == 1
             print('RED runtime: bank1 inherit kind', flush=True)
+            old = 'KM_EFFECT_SHIFTA = 0x2000'
+            assert header.count(old) == 1
+            assert build(header.replace(old, 'KM_EFFECT_SHIFTA = 0x1000')) == 1
+            print('RED runtime: SHIFTA tag collides with AltLock', flush=True)
             call = '        km_source_release(src, generation);'
             assert product.count(call) == 1
             (tmp / 'in2_dev.c').write_text(product.replace(call, ''))
