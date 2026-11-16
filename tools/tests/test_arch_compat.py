@@ -264,6 +264,12 @@ def run(ctx):
                 assert not exercise(ctx.root, work, vectors,
                                     idle=idle.replace(anchor_idle, replacement))
                 print('RED runtime: idle ' + replacement, flush=True)
+            # f6980232 AC-SYNC-2: an EE=1 _idle must rest, not spin.
+            anchor_nap = '    ppc_cpu_nap();'
+            assert idle.count(anchor_nap) == 1
+            assert not exercise(ctx.root, work, vectors,
+                                idle=idle.replace(anchor_nap, '    /* mutation: spin */'))
+            print('RED runtime: idle does not nap', flush=True)
             provider = (ctx.root / 'platform/powermac/link_platform.c').read_text()
             anchor_work = '    idle_work_run();'
             assert provider.count(anchor_work) == 1

@@ -151,7 +151,8 @@ void _halt(void) {}
 void ppc_enable(void) { irq_state = 1; }
 int ppc_irq_enabled(void) { return irq_state; }
 volatile u32 kctx_irq_depth;
-void ppc_cpu_nap(void) { }
+static unsigned int naps;
+void ppc_cpu_nap(void) { ++naps; }
 #include IDLE_SOURCE
 void _idle(void) { arch_cpu_idle(); }
 static unsigned int work_calls;
@@ -226,7 +227,11 @@ static int sync2(void)
 {
     irq_state = 0;
     _idle();
-    if (!irq_state) return 2;
+    if (!irq_state || naps != 0) return 2;
+    /* Expectation origin: contract f6980232 (AC-SYNC-2) — an EE=1 _idle rests
+     * the CPU until the next interrupt: PPC calls the nap primitive once. */
+    _idle();
+    if (!irq_state || naps != 1) return 5;
     irq_state = 0;
     link_platform_idle();
     if (!irq_state || work_calls != 1) return 3;
