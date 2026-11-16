@@ -238,6 +238,15 @@ SIMPLE ppc_read_pvr,"mfpvr 3"
 ppc_read_hid0:
     mfspr 3,PPC_SPR_HID0
     blr
+/* NetBSD powerpc/oea/cpu_subr.c:432-440; caller has EE=1. */
+.globl ppc_cpu_nap
+ppc_cpu_nap:
+    sync
+    mfmsr 3
+    oris 3,3,PPC_MSR_POW@h
+    mtmsr 3
+    isync
+    blr
 .globl ppc_write_hid0
 ppc_write_hid0:
     mtspr PPC_SPR_HID0,3

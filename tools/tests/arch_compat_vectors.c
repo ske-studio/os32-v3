@@ -149,6 +149,9 @@ void ppc_irq_restore(u32 old) { irq_restore(old); }
 void _enable(void) { irq_state = 1; }
 void _halt(void) {}
 void ppc_enable(void) { irq_state = 1; }
+int ppc_irq_enabled(void) { return irq_state; }
+volatile u32 kctx_irq_depth;
+void ppc_cpu_nap(void) { }
 #include IDLE_SOURCE
 void _idle(void) { arch_cpu_idle(); }
 static unsigned int work_calls;

@@ -216,7 +216,7 @@ def run(ctx):
             return 1
         check_input_kapi(ctx.root, work, vectors, ctx.mutate)
         print('PASS AC-SYNC-2/return-enabled-no-lost-wakeup powermac '
-              '(host real idle C, fake EE; nop wait)', flush=True)
+              '(host real idle C, fake EE/nap)', flush=True)
         for name in IDS:
             if not name.startswith(('AC-SYNC-2/', 'AC-KAPI-', 'AC-INPUT-')):
                 print(('PASS ' if name.startswith('AC-IRQ-1') else 'UNIMPL ') + name +

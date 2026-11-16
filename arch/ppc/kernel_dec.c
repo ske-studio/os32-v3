@@ -61,9 +61,16 @@ void ppc_decrementer_interrupt(struct ppc_frame *frame)
 
 void arch_cpu_idle(void)
 {
-    /* Foreground only: permit IRQ progress and return with EE enabled. */
-    ppc_enable();
-    __asm__ volatile("nop" ::: "memory");
+    /* FG1 only (EE=1, not in IRQ): nap until the next interrupt (DEC is 1 kHz).
+     * EE=0 callers keep the old contract: enable and return without sleeping.
+     * A wake-up marked between the caller's work check and the nap is
+     * picked up by the next DEC, within 1 ms. */
+    if (!ppc_irq_enabled() || kctx_irq_depth != 0) {
+        ppc_enable();
+        __asm__ volatile("nop" ::: "memory");
+        return;
+    }
+    ppc_cpu_nap();
 }
 
 void arch_cpu_halt(void)
