@@ -3,7 +3,7 @@
 CHECK = dict(name='io-policy-host', tier=1, budget=20, needs=[], covers=[
     'kernel/io_policy.c', 'kernel/io_policy.h', 'tools/tests/io_policy_host.c',
     'tools/tests/test_io_policy.py', 'tools/tests/host32.py', 'include/types.h',
-    'include/callconv.h', 'sdk/include/os32/os32_kapi_shared.h', 'exec/appslot.h'],
+    'include/callconv.h', 'sdk/include/os32/os32_kapi_shared.h', 'include/app_ids.h'],
     basis=['IO_TIER_DESIGN §4', '§8', 'AC-IO-2'],
     env_limit='PPC byte-order runtime needs powerpc-elf-gcc and qemu-ppc user mode')
 
