@@ -35,3 +35,6 @@ C_ORDER_LEGACY += arch/ppc/video_wc.c
 
 # Resident integer bit boundary and its measured SoftFloat closure.
 C_ORDER_LEGACY += lib/softfloat_bits.c $(SOFTFLOAT_RESIDENT_SOURCES)
+
+# x87 owns the emulator; SoftFloat already owned by the bit API stays first.
+C_ORDER_LEGACY += $(X87_EMU_SOURCES) $(filter-out $(SOFTFLOAT_RESIDENT_SOURCES),$(SOFTFLOAT_X87_SOURCES))

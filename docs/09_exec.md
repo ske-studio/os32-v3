@@ -170,7 +170,12 @@ WM 側も STOP を消費する OP_WAIT / top-level に届かない。この場�
   `parked_from_stop` の張本人を引き、居ればその ID を `exec_kill` する。居なければ今までどおり前景の窓 (全画面中は画面の所有者) の連鎖の末尾。
 - 既知の制約: 協調切替なので KAPI-loop 中は時計も止まる。
 - GUI アプリからの exec_run はカーネルが拒否する。
-- x87 の状態はアプリ切替で保存・復元する。KAPI の出入りでは呼出し境界でスタックが空なので保存しない。
+- x86 は起動時に FPU を判定する。有る機体は hardware x87、無い機体は CR0.EM/MP/TS と #NM で x87 をエミュレートする。
+  CPL3・非 VM・現在の owner の命令だけが対象で、成功時は次の EIP へ IRET する。未対応命令・不正メモリ・pending の非 mask 例外は既存のアプリ fault 処理へ渡す。CPL0 は限定した probe 復帰以外エミュレートしない。
+- アプリ切替・親子起動・park/resume では両系とも既存の `arch_fp_*` と 108 byte の保存域を使う。software state の物理 R0〜R7 は codec で FNSAVE の論理 ST0〜ST7 順に変換する。保存は環境を初期化して値を保持し、新規 owner だけ全域を初期化する。
+- 通常 KAPI の出入りには x87 保存を追加しない。カーネルの SQLite は FPU 有無によらず SoftFloat で動き、アプリの stack/CW を触らない。SoftFloat の mode は各演算の scope で保存復元し、IRQ・再入・協調切替をまたがない。
+- `fp_stop check` の期待は両系とも `PASS 3/3`。`fp_stop loop` → CTRL+STOP → `fp_stop check` で次の owner の CW・空 stack・ENV 往復と Newton 演算を確認する。
+- NP21/W の受入用 `make kernel-testnofpu` は `build/out/testnofpu/` に像と CRC 対の部品を作る。FPU の有る構成で EM=MP=TS=1 にし全 x87/WAIT を捕まえる試験専用の版で、製品は検出結果だけで経路を選ぶ。
 
 ### ヒープの大塊と副 arena
 

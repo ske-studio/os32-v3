@@ -147,7 +147,7 @@ CFLAGS_COMMON = $(C_STD) $(C_DIALECT_ERRORS) $(CFLAGS_MACHINE)
 KERNEL_CFLAGS = -include sdk/include/os32/os32_unit_stamp.h $(CFLAGS_COMMON) -O2 -Wall -D__KERNEL_BUILD__
 # 計測やデバッグ用の一時フラグをコマンドラインから足す口。
 #   例: make kernel KERNEL_CFLAGS_EXTRA=-DKAPI_PROFILE
-KERNEL_CFLAGS += $(KERNEL_CFLAGS_EXTRA)
+KERNEL_CFLAGS += $(KERNEL_CFLAGS_EXTRA) $(X87_KERNEL_FLAGS)
 
 # LAN (LGY-98)。**既定で有効** (Host Services を製品機能に、ユーザー決裁 2026-09-14)。
 #   既定 (stamp 無し) = 有効・FLAGS 0 (driver + リンク層のみ、DIAG/REFLECT/LINKTEST 無し)。
