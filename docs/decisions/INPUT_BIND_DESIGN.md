@@ -282,7 +282,10 @@
 |小段|責務と内部受入|
 |---|---|
 |M5[1]|単一実行単位の文脈値の初期化・明示設定。既定 RUNNING+ISIG、設定は command_gen を変えない。未結線|
-|M5[2]|command_begin/end の世代発行と文脈復帰、旧中断印の破棄順序を M6 と接続|
-|M5[3]|owner/exec_gen ごとの登録・親への復帰と、前景宛先の IRQ snapshot。GUI 宛先は WM が決定|
+|M5[2]|新しい世代の公開と文脈の復帰。M6 が登録する破棄の口を、世代の公開より先に呼ぶ。印の破棄そのものは M6 (§3 N4)|
+|M5[3] ≤350|owner/exec_gen ごとの登録・親への復帰。起動経路が最初の shell に LINE_EDIT+ISIG/ICANON を渡す内部の口 (U2-x0・U2-p0)。IRQ から副作用なしに読める snapshot {owner, exec_gen, command_gen, context} (M6・L)。GUI 宛先は WM が決定|
 
-各小段は内部試験のみ。実像への登録 B と A0z 後の各呼出し元の結線は別段とする。世代の幅・周回と owner 登録容量は後段の設計で確定する。
+各小段は内部試験のみ。実像への登録 B と A0z 後の各呼出し元の結線は別段とする。
+
+- command の世代は u32。0 は「無し」に予約し、周回したら 0 を飛ばす。比べ方は一致だけ (io_kapi.c:17 の owner_generation と同じ扱い)。
+- owner の登録容量は独自の上限を作らず、既存 APP_SLOT_COUNT (include/app_ids.h:13) を添字にした配列とする。exec_gen は既存の AS の世代と shell の世代 (io_kapi.c:17-28) を使う。

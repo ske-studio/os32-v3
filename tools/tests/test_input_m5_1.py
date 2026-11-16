@@ -19,14 +19,16 @@ def run(ctx):
             (tmp / 'context.c').write_text(code)
             subprocess.run(['gcc', '-m32', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
                 '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdinc', '-nostdlib',
-                '-static', '-no-pie', '-I'+str(ctx.root/'input/hal'), *include_flags(ctx.root),
-                str(tmp/'context.c'), str(ctx.root/'tools/tests/input_m5_1_host.c'), '-o', str(tmp/'test')], check=True)
+                '-static', '-no-pie', '-I'+str(tmp), '-I'+str(ctx.root/'tools/tests/host_arch'), '-I'+str(ctx.root/'input/hal'), *include_flags(ctx.root),
+                str(ctx.root/'tools/tests/input_m5_1_host.c'), '-o', str(tmp/'test')], check=True)
             return host32.run([str(tmp/'test')], runner='qemu', timeout=10).returncode
         assert execute(source) == 0
         if ctx.mutate:
-            for old, new in [('state->flags = INPUT_CONTEXT_ISIG;', 'state->flags = 0;'),
+            for old, new in [('state->flags = INPUT_CONTEXT_ISIG;\n    state->command_gen = 0;', 'state->flags = 0;\n    state->command_gen = 0;'),
                              ('state->context = context;', 'state->context = INPUT_CONTEXT_RUNNING;'),
-                             ('(flags & ~(INPUT_CONTEXT_ISIG | INPUT_CONTEXT_ICANON))', '0')]:
+                             ('(flags & ~(INPUT_CONTEXT_ISIG | INPUT_CONTEXT_ICANON))', '0'),
+                             ('state->context = context;\n    state->flags = flags;', 'state->command_gen = 0;\n    state->context = context;\n    state->flags = flags;'),
+                             ('context > INPUT_CONTEXT_GUI', '0')]:
                 assert source.count(old) == 1
                 assert execute(source.replace(old, new, 1)) == 1
                 print('RED runtime: ' + old, flush=True)

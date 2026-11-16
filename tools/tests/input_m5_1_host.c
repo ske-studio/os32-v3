@@ -1,7 +1,8 @@
-#include "input_context.h"
+#include "context.c"
+
 static int probe(void)
 {
-    InputContext s;
+    KbdPolicyContext s;
     input_context_init(&s);
     if (s.context != INPUT_CONTEXT_RUNNING || s.flags != INPUT_CONTEXT_ISIG || s.command_gen != 0) return 1;
     s.command_gen = 42;
