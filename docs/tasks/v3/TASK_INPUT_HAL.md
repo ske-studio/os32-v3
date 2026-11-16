@@ -20,8 +20,9 @@
 ## 2. 段の状態
 | 段 | 状態 |
 |---|---|
-| 1p・1a・1b (bridge) | main (b27213d2・73c8664b・d8d529fb) |
-| 4c-pre・4c | 実装中 (4c は 4b より先、PowerPC P3 ③b のため。順は 4c → P3 ③b → 4b) |
-| 4b-map | 追補 INPUT_BIND_DESIGN §6 の段の後 |
-| keymap2 | 追補 2 [INPUT_KEYMAP_DESIGN](../../decisions/INPUT_KEYMAP_DESIGN.md) §7 の段 (os32powerpc: H-usb・H-hid・H-usbp・S1m・S2h・S2u・S2a・S2m・S3m・S3b、本線: そのほか。x86 の USB 鍵盤は本線の 1E で S2a につなぐ) |
-| その他 | 未着手 |
+| 1p・1a・1b・2a〜2c・3a[n]・3c[n]・3d・4c-pre・4c・4d[n]・5a〜5d | main |
+| 3b・M1・M2 | 追補 2 の S1p・S1h・S0b・S3 に置き換えて main |
+| M0[n] | main |
+| keymap2 | 追補 2 [INPUT_KEYMAP_DESIGN](../../decisions/INPUT_KEYMAP_DESIGN.md) §7。H0〜S3d・S1h・S1ht・S2h は main。本線の S3x・W[1]・M5[1] が実装中 (2026-11-17)。os32powerpc の H-usbp・S2u は実装中、S2a・S1m・S2m・S3m・S3b が続く (4a・4b の後継) |
+| S4・S4i | M7 (M5→M6→M7) の後 |
+| G[n]・A0z・6a・6b・7a〜7d・U1〜U3g・5e | 未着手 (G は A0z の後、5e は 4b の後継の後) |

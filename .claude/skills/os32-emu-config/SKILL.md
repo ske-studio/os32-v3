@@ -19,4 +19,5 @@ ini を変更できるのは PM のみ。原本を残す経路を既定とし、
 
 trial は HDD1FILE・FDD の取り外し・`e_resume=false` のみ扱う。baseline は以前の active ini の証明ではない。試験の計画と終了確認は `tools/np21w_trial.py` に従う。
 派生 ini は `NP21W_DIR` を明示し、既存名を上書きしない。対応する操作・キーと例は `tools/np21w_ini.py --help`、live の復元は `tools/np21w_ini_live.py --help` を参照する。未知・欠落・重複キーは推測して追記しない。
+派生操作 `cpu-386` / `cpu-486sx` は FPU なしの CPU 構成を選ぶ。
 停止・起動は `np21w_ctl.py` を使う (trial と live-apply は道具自身が停止)。強制終了に落ちた場合は記録する。元の GFX と実 backend を復帰後に確認する。

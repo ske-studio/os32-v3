@@ -4,13 +4,15 @@ import importlib.util
 import io
 import json
 import os
+import subprocess
+import sys
 from pathlib import Path
 import tempfile
 import types
 import unittest
 from unittest import mock
 
-SCRIPT = Path(__file__).resolve().parents[1] / 'np21w_ini.py'
+SCRIPT = Path(os.environ.get('OS32_INI_TEST_SCRIPT', Path(__file__).resolve().parents[1] / 'np21w_ini.py'))
 if SCRIPT.exists():
     spec = importlib.util.spec_from_file_location('np21w_ini', SCRIPT)
     ini = importlib.util.module_from_spec(spec)
@@ -128,6 +130,39 @@ class Derivation(unittest.TestCase):
             self.assertNotEqual(self.cli('race.ini', 'ram-64mb')[0], 0)
         self.assertEqual((self.root / 'race.ini').read_bytes(), b'other operator')
         self.assertEqual(self.source.read_bytes(), self.RAW)
+
+
+class CpuDerivation(unittest.TestCase):
+    setUp = Derivation.setUp
+    cli = Derivation.cli
+    RAW = (b'[NekoProject21]\r\n cpu_fami = 6 ; family\r\n'
+           b'cpu_mode=5\ncpu_step=1\ncpu_feat=0083F9FF\nopaque=\xff\n'
+           b'[other]\ncpu_fami=untouched\n')
+
+    def test_cpu_profiles_and_order(self):
+        for operation, values in (('cpu-386', (b'3', b'0', b'8', b'0')),
+                                  ('cpu-486sx', (b'4', b'2', b'3', b'0'))):
+            expected = self.RAW
+            for old, new in zip((b'6 ; family', b'cpu_mode=5', b'cpu_step=1',
+                                 b'cpu_feat=0083F9FF'),
+                                (values[0] + b' ; family', b'cpu_mode=' + values[1],
+                                 b'cpu_step=' + values[2], b'cpu_feat=' + values[3])):
+                expected = expected.replace(old, new)
+            self.assertEqual(self.cli(operation + '.ini', operation)[0], 0)
+            self.assertEqual((self.root / (operation + '.ini')).read_bytes(), expected)
+        self.assertEqual(self.cli('ordered.ini', 'cpu-386', 'cpu-486sx')[0], 0)
+        self.assertEqual((self.root / 'ordered.ini').read_bytes(),
+                         (self.root / 'cpu-486sx.ini').read_bytes())
+        self.assertEqual(self.source.read_bytes(), self.RAW)
+
+    def test_cpu_fields_missing_duplicate_and_invalid_rejected(self):
+        for field in (b'cpu_fami = 6 ; family', b'cpu_mode=5',
+                      b'cpu_step=1', b'cpu_feat=0083F9FF'):
+            for replacement in (b'', field + b'\n' + field, field.split(b'=')[0] + b'=xyz'):
+                self.source.write_bytes(self.RAW.replace(field, replacement))
+                for op in ('cpu-386', 'cpu-486sx'):
+                    self.assertNotEqual(self.cli('bad.ini', op)[0], 0)
+                    self.assertFalse((self.root / 'bad.ini').exists())
 
 
 class Crt31k(unittest.TestCase):
@@ -683,4 +718,24 @@ class PathFields(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    unittest.main()
+    mutate = '--mutate' in sys.argv
+    result = unittest.main(argv=[arg for arg in sys.argv if arg != '--mutate'], exit=False)
+    failed = not result.result.wasSuccessful()
+    if mutate:
+        original = SCRIPT.read_text()
+        anchor = "'CPU_STEP': '8', 'CPU_FEAT': '0'"
+        if original.count(anchor) != 1:
+            print('MUTATE cpu-386-step ambiguous anchor')
+            failed = True
+        else:
+            with tempfile.TemporaryDirectory() as tmp:
+                copy = Path(tmp) / 'np21w_ini.py'
+                copy.write_text(original.replace(anchor, "'CPU_STEP': '7', 'CPU_FEAT': '0'", 1))
+                env = dict(os.environ, OS32_INI_TEST_SCRIPT=str(copy))
+                run = subprocess.run([sys.executable, '-B', __file__,
+                                      'CpuDerivation.test_cpu_profiles_and_order'],
+                                     env=env, capture_output=True, text=True, timeout=60)
+                red = run.returncode != 0 and 'AssertionError' in run.stderr
+                print('MUTATE cpu-386-step ' + ('RED' if red else 'FAILED'))
+                failed = failed or not red
+    sys.exit(1 if failed else 0)

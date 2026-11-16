@@ -41,6 +41,8 @@ tools/gen_build_id.py:45–55 の短縮 commit・追跡ファイルの dirty・�
 
 ### np21w_ini
 
+`cpu-386` / `cpu-486sx` は派生 ini の CPU_FAMI・CPU_MODE・CPU_STEP・CPU_FEAT をそれぞれ 3/0/8/0・4/2/3/0 に設定する (NP21/W `src/i386c/ia32/cpu.h:519-525,647-648`、`src/win9x/ini.cpp:685-688`)。4 鍵の欠落・重複・不正値は拒否する。
+
 | 共通変換 | EXTRAにCRT31K、_extra_valueにtrue/false検証を追加。ALLOWEDには入れず既存操作・receiptを維持。 |
 
 ### gfinit_source
