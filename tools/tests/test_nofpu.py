@@ -39,7 +39,8 @@ def build_flags(forced=False):
     for key in ('MAKEFLAGS', 'MFLAGS', 'MAKEOVERRIDES', 'GNUMAKEFLAGS'):
         env.pop(key, None)
     return subprocess.check_output(
-        ['make', '-rsf', '-', 'flags', 'TEST_NOFPU_BUILD=' + str(int(forced)), 'KERNEL_CFLAGS_EXTRA=-DKAPI_PROFILE'],
+        ['make', '-rsf', '-', 'flags', 'TEST_NOFPU_BUILD=' + str(int(forced)), 'KERNEL_CFLAGS_EXTRA=-DKAPI_PROFILE']
+        + (['BUILD_OUT=build/out/testnofpu'] if forced else []),
         input='include build/config.mk\nflags:\n\t@$(info $(CFLAGS_BASE)):\n',
         cwd=ROOT, env=env, text=True)
 
@@ -61,6 +62,9 @@ def main():
         # Module ELF files live in their own build subdirectories.
         for module in sorted(directory.glob('*/*.elf')):
             if module.parent.name in ('r1', 'testnofpu'):
+                continue
+            # PowerPC images (build/out/ppc-*) share build/out; audit only i386 ELF.
+            if module.read_bytes()[18:20] != b'\x03\x00':
                 continue
             audit(module)
         size = (directory/'vmkernel.lz4').stat().st_size
