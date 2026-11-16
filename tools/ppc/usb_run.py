@@ -587,7 +587,18 @@ def rsh_command(s, line, expected=None, during=None):
     return payload
 
 
-def link_lan_accept(elf, cpu, out):
+def link_usb_verdict(reason, text, log_alive, rsh_alive):
+    """U-c1: only USB enumeration failure with live LOG/RSH kills no-service."""
+    if not log_alive or not rsh_alive or 'usb: HC dead' in text:
+        return 'wrong-reason'
+    missing = (reason == 'mouse enumeration' and 'protocol=02' not in text or
+               reason == 'keyboard enumeration' and 'protocol=01' not in text)
+    if missing and 'USB KEY src=1' not in text and 'USB MOUSE' not in text:
+        return 'RED'
+    return 'SURVIVED' if reason is None else 'wrong-reason'
+
+
+def link_lan_accept(elf, cpu, out, mode='normal'):
     import link_sh_run as link
     from host_agent import HostAgent, hdr_unpack, LINK_HDR, OP_RELEASE
 
@@ -656,6 +667,34 @@ def link_lan_accept(elf, cpu, out):
     a, b = s.out/'serial-a.log', s.out/'serial-b.log'
     try:
         s.start()
+        if mode == 'no-service':
+            reason = None
+            for protocol, label, seconds in [('02', 'mouse enumeration', 60),
+                                              ('01', 'keyboard enumeration', 30)]:
+                if protocol == '01':
+                    s.q.call('device_add', {'driver':'usb-kbd', 'id':'kbd'})
+                try:
+                    s.wait(lambda: 'protocol='+protocol in serial(a), label, seconds)
+                except RuntimeError as exc:
+                    if not str(exc).startswith('deadline '+label+' evidence='):
+                        raise
+                    reason = label
+                    break
+            s.wait(s.ready, 'RSH READY', 60)
+            rsh_command(s, 'echo alive', b'alive\n')
+            evidence = serial(a)
+            validate(evidence, serial(b), True)
+            log_alive = any(e['parts'][:1] == ['LOG'] and e['body'] for e in s.events)
+            verdict = link_usb_verdict(reason, evidence, log_alive, True)
+            (s.out/'mutation.json').write_text(json.dumps(dict(
+                mode=mode, reason=reason, log_alive=bool(log_alive),
+                rsh_alive=True, verdict=verdict), indent=2))
+            require(verdict == 'RED', verdict+' no-service: '+str(reason))
+            s.q.call('quit'); s.p.wait(timeout=5)
+            require(s.p.returncode == 0, 'wrong-reason no-service: QEMU rc')
+            print('RED link LAN no-service '+cpu+
+                  ': no-tick exact missing enumeration/input verdict; LOG/RSH echo alive', flush=True)
+            return
         s.wait(lambda: 'protocol=02' in serial(a), 'mouse enumeration', 60)
         s.q.call('device_add', {'driver':'usb-kbd', 'id':'kbd'})
         s.wait(lambda: 'protocol=01' in serial(a), 'keyboard enumeration', 30)
@@ -718,6 +757,10 @@ def link_lan_accept(elf, cpu, out):
         s.q.call('quit'); s.p.wait(timeout=5)
         require(s.p.returncode == 0, 'USB link QEMU rc=0')
         print('GREEN link LAN '+cpu+': SFS deadline, USB FB, cat recovery, echo alive', flush=True)
+    except Exception as exc:
+        if mode == 'no-service' and not str(exc).startswith('SURVIVED no-service:'):
+            raise RuntimeError('wrong-reason no-service: '+str(exc)) from exc
+        raise
     finally:
         s.close()
 
@@ -734,9 +777,6 @@ def main():
         parser.error('--link requires --lan and excludes --legacy')
     if args.lan and not (args.link or args.legacy):
         parser.error('--lan requires --link or explicit --legacy')
-    if args.link and args.mutate:
-        print('未実装: --link --lan --mutate (U-c)')
-        return 1
     require(stream_payload('log hi~USBSTREAM:00000001:hUSB KEY break\n~USBSTREAM:00000002:i\n') == 'hi\n',
             'framed stream reconstruction across Enter break log')
     cross = Path(os.environ.get('USB_PPC_CROSS_DIR', os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc')))
@@ -758,8 +798,14 @@ def main():
     print('evidence='+str(work), flush=True)
     cpus = ['7450', '7455'] if args.cpu == 'both' else [args.cpu]
     if args.link:
-        elf = build(work/'link-lan', 'KBOOT_SH=1', 'KBOOT_LINK=1', 'PPC_CROSS_DIR='+str(cross))
-        for cpu in cpus: link_lan_accept(elf, cpu, work/('link-lan-'+cpu))
+        for mode in ['normal'] + (['no-service'] if args.mutate else []):
+            opts = ['KBOOT_SH=1', 'KBOOT_LINK=1', 'PPC_CROSS_DIR='+str(cross)]
+            if mode == 'no-service':
+                src, dest = mutation(work, mode)
+                opts += ['KB_MUT_SRC='+src, 'KB_MUT_FILE='+str(dest)]
+            elf = build(work/('link-lan-'+mode), *opts)
+            for cpu in cpus if mode == 'normal' else cpus[:1]:
+                link_lan_accept(elf, cpu, work/('link-lan-'+mode+'-'+cpu), mode)
         return 0
     if args.lan:
         for mode in ['normal']:
