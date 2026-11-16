@@ -10,7 +10,8 @@
 #define ARCH_PRIV_ALIGN 4
 #define ARCH_ENTRY_BYTES 24
 #define ARCH_ENTRY_ALIGN 4
-/* USER has no floating-point or vector state. */
-#define ARCH_FP_BYTES 1
-#define ARCH_FP_ALIGN 1
+/* 32 FPR bit images followed by the 8-byte mffs image; no vector state. */
+#define PPC_FP_FPSCR_OFFSET 256
+#define ARCH_FP_BYTES 264
+#define ARCH_FP_ALIGN 8
 #endif

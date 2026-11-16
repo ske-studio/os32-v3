@@ -4,13 +4,14 @@ volatile u32 kctx_irq_depth;
 #include "exec_arch.h"
 static void *escape[5];
 static int seen;
+static u32 diagnostic;
 static u32 trap_msr = 0x30;
 void ppc_enable(void) { trap_msr |= PPC_MSR_EE; }
 u32 ppc_irq_save(void) { u32 old = trap_msr; trap_msr &= ~PPC_MSR_EE; return old; }
 u32 ppc_trap_msr(void) { return trap_msr; }
-u32 ppc_root_current(void) { return 0; }
+u32 ppc_root_current(void) { return 0x1000; }
 void ppc_trap_stop(void) { seen = 3; __builtin_longjmp(escape, 1); }
-void ppc_trap_fatal_sink(const struct ppc_frame *f, u32 reason) { (void)f; (void)reason; }
+void ppc_trap_fatal_sink(const struct ppc_frame *f, u32 reason) { (void)f; diagnostic = reason; }
 void exec_syscall_dispatch(struct arch_syscall *call)
 {
     struct ppc_frame *f = call->native;
@@ -36,6 +37,14 @@ int main(void)
     if (seen != 3) return 12;
     seen = 0; f.srr1 = PPC_MSR_PR; f.vector = PPC_VECTOR_DEC;
     ppc_trap_set_handler(PPC_VECTOR_DEC, irq); ppc_trap_dispatch(&f);
-    return seen == 4 ? 0 : 13;
+    if (seen != 4) return 13;
+    ppc_trap_set_fatal_ready(1);
+    seen = 0; f.vector = 0x800; f.srr1 = PPC_MSR_PR;
+    if (!__builtin_setjmp(escape)) ppc_trap_dispatch(&f);
+    if (seen != 2 || diagnostic != PPC_TRAP_FP_UNAVAILABLE) return 14;
+    seen = 0; diagnostic = 0; f.srr1 = 0;
+    if (!__builtin_setjmp(escape)) ppc_trap_dispatch(&f);
+    if (seen != 3 || diagnostic != PPC_TRAP_FP_UNAVAILABLE) return 15;
+    return 0;
 }
 void _start(void) { int rc = main(); __asm__ volatile("int $0x80" : : "a"(1), "b"(rc)); __builtin_unreachable(); }

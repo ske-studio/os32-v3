@@ -71,7 +71,7 @@ int main(void)
     }
     const u32 vectors[]={0x400,0x600,0x700,0xc00,0x500,0x900,0x800};
     const u32 other[]={PPC_TRAP_ISI,PPC_TRAP_ALIGNMENT,0x100|PPC_TRAP_UNKNOWN,
-        0x100|PPC_TRAP_SC,PPC_TRAP_UNREGISTERED,PPC_TRAP_UNREGISTERED,PPC_TRAP_UNKNOWN};
+        0x100|PPC_TRAP_SC,PPC_TRAP_UNREGISTERED,PPC_TRAP_UNREGISTERED,PPC_TRAP_FP_UNAVAILABLE};
     for(u32 i=0;i<7;++i) {
         f.vector=vectors[i]; f.srr1=i==0?PPC_ISI_MISS:0; fatal(&f,other[i]);
     }

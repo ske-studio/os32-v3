@@ -10,3 +10,6 @@ CFLAGS_MACHINE = -mcpu=7450 -m32 -mbig-endian -msoft-float -mno-altivec -msdata=
 MODULE_LD = $(LD)
 MODULE_LDFLAGS = -m elf32ppc
 ELF_EMULATION = elf32ppc
+# USER uses a separate hard-float ABI; kernel/boot retain 7450 soft-float.
+PPC_USER_ABI = -mcpu=750 -mhard-float -mcall-sysv -mno-eabi
+PPC_USER_MACHINE = $(filter-out -mcpu=7450 -msoft-float,$(CFLAGS_MACHINE)) $(PPC_USER_ABI)

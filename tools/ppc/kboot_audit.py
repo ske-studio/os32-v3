@@ -2,8 +2,8 @@
 """Link-time audits of the PowerPC core-ready kernel (PPC_KBOOT_DESIGN H3, R7).
 
   1. no undefined symbol;
-  2. integer-only: every decoded instruction of the ELF is checked against the
-     floating-point and AltiVec mnemonic families of the 7450/7455;
+  2. integer-only outside the dedicated FP save/restore leaves: check decoded
+     instructions in the ELF and objects against FP/AltiVec families;
   3. no translation unit *uses* PIT_HZ, directly or through another macro
      (e.g. TICK_MS): PIT_HZ is a PC-98 name; common code uses OS32_TICK_HZ.
 
@@ -35,11 +35,46 @@ def run(args):
     return result.stdout
 
 
-def instructions(objdump, elf):
+def decoded(objdump, elf):
+    function, start = '', 0
     for line in run([objdump, '-d', '--no-show-raw-insn', elf]).splitlines():
-        match = re.match(r'^\s*[0-9a-f]+:\s+([a-z][a-z0-9.+-]*)', line)
+        label = re.match(r'^([0-9a-f]+) <([^>]+)>:', line)
+        if label:
+            function, start = label[2], int(label[1], 16)
+        match = re.match(r'^\s*([0-9a-f]+):\s+([a-z][a-z0-9.+-]*)', line)
         if match:
-            yield match[1], line.strip()
+            yield function, int(match[1], 16) - start, match[2], line.strip()
+
+
+def instructions(objdump, elf):
+    # Preserve the existing public iterator used by acceptance scripts.
+    for _, _, mnemonic, line in decoded(objdump, elf):
+        yield mnemonic, line
+
+
+def fp_permissions(objdump, obj):
+    # Only the dedicated file's two leaf bodies may contain these G3 opcodes.
+    allowed = set()
+    for function, offset, mnemonic, _ in decoded(objdump, obj):
+        if FLOAT.match(mnemonic):
+            if function not in ('arch_fp_save', 'arch_fp_restore') or mnemonic not in (
+                    'stfd', 'lfd', 'mffs', 'mtfsf'):
+                raise SystemExit('invalid FP context object: ' + function + ' ' + mnemonic)
+            allowed.add((function, offset, mnemonic))
+    return allowed
+
+
+def forbidden(objdump, elf, fp_object=None):
+    allowed = fp_permissions(objdump, fp_object) if fp_object else set()
+    count, problems = 0, []
+    for function, offset, mnemonic, line in decoded(objdump, elf):
+        count += 1
+        if mnemonic in ALLOWED:
+            continue
+        if ALTIVEC.match(mnemonic) or (FLOAT.match(mnemonic) and
+                (function, offset, mnemonic) not in allowed):
+            problems.append('floating-point/AltiVec instruction: ' + line)
+    return count, problems
 
 
 def main():
@@ -47,6 +82,9 @@ def main():
     parser.add_argument('--elf', required=True)
     parser.add_argument('--nm', required=True)
     parser.add_argument('--objdump', required=True)
+    parser.add_argument('--objects', nargs='*', default=[], help='audit unused object code too')
+    parser.add_argument('--map', help='link map must not contain libc/libgcc')
+    parser.add_argument('--fp-object', help='dedicated arch/ppc/fp_context.o only')
     parser.add_argument('--sources', nargs='+', required=True)
     parser.add_argument('--mutant', nargs=2, action='append', metavar=('SOURCE', 'FILE'),
                         help='audit FILE in place of product SOURCE (mutation builds)')
@@ -60,11 +98,16 @@ def main():
     undefined = run([args.nm, '-u', args.elf]).split()
     if undefined:
         problems.append('undefined symbols: '+' '.join(undefined))
-    count = 0
-    for mnemonic, line in instructions(args.objdump, args.elf):
-        count += 1
-        if mnemonic not in ALLOWED and (FLOAT.match(mnemonic) or ALTIVEC.match(mnemonic)):
-            problems.append('floating-point/AltiVec instruction: '+line)
+    count, bad = forbidden(args.objdump, args.elf, args.fp_object)
+    problems.extend(bad)
+    for obj in args.objects:
+        permitted = args.fp_object if args.fp_object and os.path.realpath(obj) == os.path.realpath(args.fp_object) else None
+        _, bad = forbidden(args.objdump, obj, permitted)
+        problems.extend(obj + ': ' + problem for problem in bad)
+    if args.map:
+        with open(args.map) as stream:
+            if re.search(r'\b(?:libgcc|libc)\.a\b', stream.read()):
+                problems.append('libc/libgcc in kernel link map')
     if count < 1000:
         problems.append(f'disassembly too small to be the kernel ({count} instructions)')
     # -dU prints a #define only for macros that were expanded or tested, so a use

@@ -111,8 +111,14 @@ void ppc_trap_dispatch(struct ppc_frame *f)
             (void)ppc_irq_save();
             return;
         }
+        if (f->vector == 0x800) {
+            reason = PPC_TRAP_FP_UNAVAILABLE;
+            if (fatal_ready && ppc_root_current())
+                ppc_trap_fatal_sink(f, reason);
+        }
         ring3_fault_kill();
-        reason = PPC_TRAP_USER | PPC_TRAP_UNSUPPORTED;
+        reason = f->vector == 0x800 ? PPC_TRAP_FP_UNAVAILABLE :
+                 PPC_TRAP_USER | PPC_TRAP_UNSUPPORTED;
     } else if (f->vector == PPC_VECTOR_DSI || f->vector == PPC_VECTOR_ISI) {
         reason = fault_reason(f);
         if (probe.active && f->srr0 == probe.pc &&
@@ -132,6 +138,8 @@ void ppc_trap_dispatch(struct ppc_frame *f)
         if (cause == 0x00080000) reason = PPC_TRAP_PROGRAM_ILLEGAL | PPC_TRAP_UNSUPPORTED;
         if (cause == 0x00040000) reason = PPC_TRAP_PROGRAM_PRIVILEGED | PPC_TRAP_UNSUPPORTED;
         if (cause == 0x00020000) reason = PPC_TRAP_PROGRAM_TRAP | PPC_TRAP_UNSUPPORTED;
+    } else if (f->vector == 0x800) {
+        reason = PPC_TRAP_FP_UNAVAILABLE;
     } else if (f->vector == 0x600) {
         reason = PPC_TRAP_ALIGNMENT;
     } else if (f->vector == 0xc00) {

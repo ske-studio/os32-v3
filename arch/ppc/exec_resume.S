@@ -33,6 +33,9 @@ arch_user_resume:
     mtsprg2 0
     lwz 31,PPC_FRAME_SRR0(30)
     lwz 0,PPC_FRAME_SRR1(30)
+    li 4,PPC_MSR_FE
+    andc 0,0,4
+    ori 0,0,PPC_MSR_FP
     mtsprg3 0
     lwz 0,0(30)
     lwz 1,4(30)

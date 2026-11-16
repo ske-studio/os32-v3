@@ -16,7 +16,9 @@ struct arch_entry_context {
     unsigned char opaque[ARCH_ENTRY_BYTES];
 } __attribute__((aligned(ARCH_ENTRY_ALIGN)));
 /* Floating-point (and vector) state of one USER context; opaque outside arch.
- * The kernel itself is integer-only: this is saved/restored only around USER. */
+ * General kernel code is integer-only. An arch may also preserve this state
+ * around an explicitly guarded kernel FP interval. Restore/init callers must
+ * use the arch integer ABI; no floating-point arguments cross this boundary. */
 struct arch_fp_context {
     unsigned char opaque[ARCH_FP_BYTES];
 } __attribute__((aligned(ARCH_FP_ALIGN)));

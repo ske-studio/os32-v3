@@ -63,10 +63,10 @@ include build/ram-root.mk
 # Entry objects first (kernel.ld keeps .text.entry at the image start).
 KB_ASM := arch/ppc/kernel_entry.S arch/ppc/entry.S arch/ppc/kernel_takeover.S \
  arch/ppc/kernel_vectors.S arch/ppc/kernel_mmu.S arch/ppc/kernel_probe.S \
- arch/ppc/mmu.S arch/ppc/cache_copy.S
+ arch/ppc/mmu.S arch/ppc/cache_copy.S arch/ppc/fp_context.S
 KB_ARCH := arch/ppc/kernel_boot.c arch/ppc/kernel_cpu.c arch/ppc/kernel_hpt.c \
  arch/ppc/kernel_trap.c arch/ppc/kernel_dec.c arch/ppc/pd_walk.c \
- arch/ppc/kboot_unavailable.c arch/ppc/dma_cache.c
+ arch/ppc/kboot_unavailable.c arch/ppc/dma_cache.c arch/ppc/kernel_fp.c
 KB_PLATFORM := platform/powermac/rh_observe.c platform/powermac/ofw.c platform/powermac/escc.c \
  platform/powermac/escc_tree.c platform/powermac/kboot_capture.c \
  kernel/boot_token.c platform/powermac/boot_token_powermac.c platform/powermac/gmac_tree.c platform/powermac/gmac_clock.c \
@@ -231,7 +231,7 @@ $(KB_ELF): $(KB_OBJ) $(KB_EXTRA) $(KB_OUT)/kernel.ld
 # inside the PPC closure: common code uses OS32_TICK_HZ (design R7). Mutated sources are audited too.
 # ISO media tick-rate debt is documented in PPC_SHELL_DESIGN §8; RAM media is fixed.
 audit: $(KB_ELF)
-	@python3 -B tools/ppc/kboot_audit.py --elf $(KB_ELF) --nm $(KB_NM) --objdump $(KB_OBJDUMP) \
+	@python3 -B tools/ppc/kboot_audit.py --elf $(KB_ELF) --map $(KB_ELF:.ELF=.map) --objects $(KB_OBJ) $(KB_EXTRA) --fp-object $(KB_OUT)/arch/ppc/fp_context.o --nm $(KB_NM) --objdump $(KB_OBJDUMP) \
 	 --sources $(filter-out fs/isofs/iso9660.c,$(KB_C)) $(KB_ASM) $(if $(KB_MUT_SRC),--mutant $(KB_MUT_SRC) $(KB_MUT_FILE)) $(if $(KB_MUT_EXTRA_SRC),--mutant $(KB_MUT_EXTRA_SRC) $(KB_MUT_EXTRA_FILE)) $(if $(KB_MUT_THIRD_SRC),--mutant $(KB_MUT_THIRD_SRC) $(KB_MUT_THIRD_FILE)) \
 	 -- $(KB_CC) $(KB_FLAGS)
 
