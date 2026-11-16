@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Exercise LAN acceptance with synthetic evidence and product mutations."""
 import argparse
+import os
 from pathlib import Path
 import struct
 import sys
@@ -70,7 +71,9 @@ def main():
             mutant = types.ModuleType('mutant')
             exec(compile(source.replace(before, '        return 0\n    for cpu in (['), meter.__file__, 'exec'), mutant.__dict__)
             (Path(tmp)/'lan-skip').touch()
-            with patch.object(sys, 'argv', ['meter', '--elf', str(elf), '--cpu', '7450']), patch.object(mutant, 'accept', return_value=Path(tmp)):
+            # main() reads TMPDIR before calling accept; CI's ppc-compile job has none.
+            with patch.object(sys, 'argv', ['meter', '--elf', str(elf), '--cpu', '7450']), patch.object(mutant, 'accept', return_value=Path(tmp)), \
+                 patch.dict(os.environ, {'TMPDIR': tmp}):
                 assert mutant.main() == 0
             print('RED H:A12 skip-as-pass')
     print('PASS H29')
