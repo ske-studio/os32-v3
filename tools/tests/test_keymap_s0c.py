@@ -32,7 +32,7 @@ def run(ctx):
         if ctx.mutate:
             for old, new in [
                 ('key->down && !old_down', 'key->down'),
-                ('mods |= effect & MOD_MASK;', 'mods = effect & MOD_MASK;'),
+                ('mods |= saved[i].mods;', 'mods = saved[i].mods;'),
                 ('shared_locks ^= KM_LOCK_ALT;', 'shared_locks |= KM_LOCK_ALT;')]:
                 assert product.count(old) == 1
                 assert build(product.replace(old, new)) != 0

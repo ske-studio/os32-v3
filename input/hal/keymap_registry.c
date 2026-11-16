@@ -111,5 +111,7 @@ void km_source_unbind(u8 src, u16 generation)
 
 void km_registry_source_released(u8 src, u16 generation)
 {
+    km_release_keys(src, generation);
+    km_state_release(src, generation);
     km_source_unbind(src, generation);
 }

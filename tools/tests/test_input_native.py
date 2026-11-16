@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Native capture against the pinned pre-HAL keyboard; freestanding ILP32."""
 CHECK = dict(name='input-native-host', tier=1, budget=10, needs=[], kind='characterization',
-    covers=['drivers/input/kbd.c', 'drivers/input/kbd_hal.c', 'drivers/input/*.h',
+    covers=['input/hal/keymap_registry.c', 'input/hal/keymap_eval.c', 'input/hal/keymap_state.c', 'drivers/input/kbd.c', 'drivers/input/kbd_hal.c', 'drivers/input/*.h',
             'input/hal/in2_int.h', 'input/hal/in2_dev.c', 'input/hal/keymap.h', 'input/hal/in2_state.c',
             'input/hal/kbd_merge.c', 'input/hal/in2_ring.c', 'input/hal/legacy_ring.c',
             'input/hal/legacy_mode.c', 'input/hal/mouse_ext.c', 'input/hal/pointer_state.c',
@@ -57,6 +57,7 @@ int oracle_cooked(void) { return legacy_cooked_take(); }
 u32 oracle_dropped(void) { return legacy_raw_dropped() + legacy_cooked_dropped(); }
 '''
     paths = ['input/hal/'+n for n in ('in2_dev.c','in2_state.c','kbd_merge.c','in2_ring.c','mouse_ext.c','pointer_state.c','legacy_ring.c','legacy_mode.c')]
+    paths += ['input/hal/keymap_registry.c', 'input/hal/keymap_eval.c', 'input/hal/keymap_state.c']
     paths += ['drivers/input/kbd_hal.c','drivers/input/kbd.c']
     sources = {p:(root/p).read_text() for p in paths}
     with tempfile.TemporaryDirectory(prefix='input-native-') as directory:

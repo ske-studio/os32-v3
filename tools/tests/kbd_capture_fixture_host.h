@@ -12,3 +12,6 @@ int pointer_button(InputEvent *e) { (void)e; __builtin_trap(); }
 u8 pointer_source_buttons(u8 src) { (void)src; return 0; }
 void pointer_absolute(i16 x, i16 y) { (void)x; (void)y; __builtin_trap(); }
 void mouse_ext_move(i16 x, i16 y, int m) { (void)x; (void)y; (void)m; __builtin_trap(); }
+#include "../../input/hal/keymap_registry.c"
+#include "../../input/hal/keymap_eval.c"
+#include "../../input/hal/keymap_state.c"

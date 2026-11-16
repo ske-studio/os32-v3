@@ -10,6 +10,8 @@
 static struct {
     KmEffect effect[KM_KEY_COUNT];
     u16 generation;
+    u16 refs[13]; /* per-effect references, not a second held array */
+    u16 mods, locks;
     u8 active, origin;
 } saved[IN2_MAX_DEV];
 static u16 shared_locks;
@@ -28,6 +30,20 @@ static int valid_effect(KmEffect effect)
             return 0;
     }
     return 1;
+}
+
+/* Update source aggregates only when a saved action changes. */
+static void replace_effect(unsigned index, KmEffect previous, KmEffect next)
+{
+    for (unsigned bit = 0; bit < 13; ++bit) {
+        u16 mask = 1u << bit;
+        if ((previous & mask) == (next & mask)) continue;
+        if (next & mask) ++saved[index].refs[bit];
+        else --saved[index].refs[bit];
+        u16 *aggregate = bit < 8 ? &saved[index].mods : &saved[index].locks;
+        if (saved[index].refs[bit]) *aggregate |= mask;
+        else *aggregate &= ~mask;
+    }
 }
 
 int km_state_apply(const KmKey *key, u8 old_down, u8 origin, KmEffect effect)
@@ -55,6 +71,7 @@ int km_state_apply(const KmKey *key, u8 old_down, u8 origin, KmEffect effect)
                tap.generation == key->generation && tap.keycode == key->keycode;
     if (tap.armed && !same_tap && (key->down || old_down)) tap.armed = 0;
     if (key->down && !old_down) {
+        replace_effect(index, previous, effect);
         saved[index].effect[key->keycode] = effect;
         if (origin == INPUT_ORIGIN_USB) shared_locks ^= effect & LOCK_MASK;
         if (effect & KM_EFFECT_SHIFTA) {
@@ -66,6 +83,7 @@ int km_state_apply(const KmKey *key, u8 old_down, u8 origin, KmEffect effect)
     } else if (!key->down && old_down) {
         if (same_tap && (previous & KM_EFFECT_SHIFTA)) shared_locks ^= KM_LOCK_ALT;
         if (same_tap) tap.armed = 0;
+        replace_effect(index, previous, 0);
         saved[index].effect[key->keycode] = 0;
     }
     return 0;
@@ -77,11 +95,8 @@ void km_state_snapshot(KmState *out)
     if (!out) return;
     for (unsigned int i = 0; i < IN2_MAX_DEV; ++i) {
         if (!saved[i].active) continue;
-        for (unsigned int k = 0; k < KM_KEY_COUNT; ++k) {
-            KmEffect effect = saved[i].effect[k];
-            mods |= effect & MOD_MASK;
-            if (saved[i].origin == INPUT_ORIGIN_NATIVE) locks |= effect & LOCK_MASK;
-        }
+        mods |= saved[i].mods;
+        if (saved[i].origin == INPUT_ORIGIN_NATIVE) locks |= saved[i].locks;
     }
     out->mods = mods;
     out->locks = locks;
@@ -98,5 +113,7 @@ void km_state_release(u8 src, u16 generation)
         saved[src - 1].generation != generation) return;
     km_state_cancel_tap(src, generation);
     for (unsigned int k = 0; k < KM_KEY_COUNT; ++k) saved[src - 1].effect[k] = 0;
+    for (unsigned bit = 0; bit < 13; ++bit) saved[src - 1].refs[bit] = 0;
+    saved[src - 1].mods = saved[src - 1].locks = 0;
     saved[src - 1].active = 0;
 }

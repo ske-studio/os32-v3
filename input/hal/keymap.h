@@ -103,16 +103,15 @@ void km_state_cancel_tap(u8 src, u16 generation);
 /* S0d: release held keys/projection while binding is still available. */
 void km_release_keys(u8 src, u16 generation);
 
-/* H0b reservation. S0a replaces this with an external declaration and body;
- * S0c/S0d extend that body before capture is enabled. No weak fallback. */
+/* Release projection and effects before invalidating the binding. */
+void km_registry_source_released(u8 src, u16 generation);
 static inline void km_source_release(u8 src, u16 generation)
 {
-    (void)src;
-    (void)generation;
+    km_registry_source_released(src, generation);
 }
 
-/* S0a release hook; S0d connects the reservation above. */
-void km_registry_source_released(u8 src, u16 generation);
+/* S1x: register both backends, then allocate/bind the native source. */
+int pc98_input_keymap_register(u16 *generation);
 
 /* Descriptors have static lifetime. Duplicate IDs are rejected. */
 int km_backend_register(const KmBackend *map);

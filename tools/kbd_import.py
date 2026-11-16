@@ -91,11 +91,15 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument('source', type=Path)
     p.add_argument('output', type=Path)
+    p.add_argument('--product', action='store_true', help='export pc98_jp_backend for S1pt')
     args = p.parse_args()
     data = args.source.read_bytes()
     if hashlib.sha256(data).hexdigest() != SHA256:
         p.error('source SHA256 mismatch')
-    args.output.write_text(render(parse(data.decode('ascii'))))
+    text = render(parse(data.decode('ascii')))
+    if args.product:
+        text = text.replace('s1p_pc98_backend', 'pc98_jp_backend')
+    args.output.write_text(text)
 
 
 if __name__ == '__main__':

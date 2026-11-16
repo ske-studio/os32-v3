@@ -58,7 +58,7 @@ _Static_assert(sizeof(KmExactCell) == 4, "exact cell");
 _Static_assert(__builtin_offsetof(KmExactCell, kind) == 2, "kind offset");
 _Static_assert(__builtin_offsetof(KmExactCell, op) == 3, "op offset");
 static unsigned seen, bad;
-void test_release(u8 src, u16 gen) {
+void km_registry_source_released(u8 src, u16 gen) {
     u8 kind, origin;
     if (!input_src_info(src, gen, &kind, &origin) || seen) bad = 1;
     seen = 1;
@@ -102,11 +102,8 @@ def run(ctx):
         product = (ctx.root / 'input/hal/in2_dev.c').read_text()
         (tmp / 'in2_dev.c').write_text(product)
         def build(h):
-            # Instrument only the empty reservation, to observe the product call order.
-            anchor = '    (void)src;\n    (void)generation;'
-            assert h.count(anchor) == 1
-            (tmp / 'keymap.h').write_text(h.replace(anchor,
-                '    extern void test_release(u8, u16);\n    test_release(src, generation);'))
+            assert h.count('    km_registry_source_released(src, generation);') == 1
+            (tmp / 'keymap.h').write_text(h)
             subprocess.run(['gcc', '-m32', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
                             '-ffreestanding', '-fno-pie', '-fno-stack-protector',
                             '-nostdlib', '-static', '-no-pie', '-I'+str(tmp),

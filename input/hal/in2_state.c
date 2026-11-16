@@ -3,8 +3,6 @@
 #include "legacy_guest.h"
 #include "os32_kapi_shared.h"
 
-static u8 held[IN2_MAX_DEV][128];
-
 int input_capture(const InputEvent *event)
 {
     unsigned int flags = irq_save();
@@ -18,8 +16,7 @@ int input_capture(const InputEvent *event)
     if (e.type == INPUT_EVENT_KEY) {
         if (kind != INPUT_KIND_KBD || e.sc >= 128 || e.down > 1 ||
             e.x || e.y || e.buttons) goto out;
-        u8 old = held[e.src - 1][e.sc];
-        held[e.src - 1][e.sc] = e.down;
+        u8 old = input_held_key(e.src, e.sc);
         input_merge_key(&e, old, origin);
     } else {
         if (kind != INPUT_KIND_MOUSE || e.down) goto out;
@@ -54,7 +51,7 @@ void input_repeat(u8 src, u16 generation, u8 sc)
     unsigned int flags = irq_save();
     u8 kind, origin;
     if (sc < 128 && input_src_info(src, generation, &kind, &origin) &&
-        kind == INPUT_KIND_KBD && held[src - 1][sc]) {
+        kind == INPUT_KIND_KBD && input_held_key(src, sc)) {
         InputEvent e = { .src = src, .generation = generation, .sc = sc, .down = 1 };
         input_merge_key(&e, 1, origin);
     }
@@ -68,7 +65,7 @@ void input_state_release(u8 src, u16 generation)
     InputEvent e = { .src = src, .generation = generation, .type = INPUT_EVENT_KEY,
                      .time_ms = in2_time_ms() };
     for (unsigned int sc = 0; sc < 128; ++sc) {
-        if (!held[src - 1][sc]) continue;
+        if (!input_held_key(src, sc)) continue;
         e.sc = sc;
         input_capture(&e);
     }

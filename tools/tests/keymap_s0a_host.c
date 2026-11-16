@@ -57,3 +57,6 @@ int check(void)
 #ifndef PPC_COMPILE
 void _start(void) { int rc = check(); __asm__ volatile ("int $0x80" : : "a"(1), "b"(rc)); __builtin_unreachable(); }
 #endif
+
+void km_release_keys(u8 src, u16 gen) { (void)src; (void)gen; }
+void km_state_release(u8 src, u16 gen) { (void)src; (void)gen; }
