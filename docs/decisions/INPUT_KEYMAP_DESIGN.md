@@ -547,3 +547,9 @@ PM決定 (2026-11-17): S0aは`km_source_release`の空inlineを維持し、別�
 - no_keydata の判定と、kbd_merge.c の capture_state の boot_locks の上乗せを消す変異を 1 本ずつ足す。
 - legacy_keymap.c:65: 静的な表が不正 (km_eval の INVAL) なら予備の経路も全キーを捨てる。今の表では起きない。S3x の段で、起動時に km_eval を 1 回試して boot.log に残すかを決める。
 - userland/gshell/src/input.rs:99,120 の旧い表の写しは G 段で更新する。
+
+## S3x の実装判断 (2026-11-17)
+
+- X-cooked は S2x/S3d で既に `kbd_deliver → kbd_hal_capture → input_capture_key → input_emit_keymap → legacy_cooked_take` へ接続済み。S3x は物理 CTRL+STOP の救済判定を `input_key_pressed(KEY_CTRL)` に統一する。
+- 起動時の `km_eval` 1 回と boot.log 追加は行わない。登録時は descriptor の全セルを検証し、静的表の全キー/修飾は host 試験で照合する。1 セルの試行では表全体の健全性を保証できず、登録失敗は既存の boot.log で報告する。予備経路の INVAL 時の入力抑止を維持する。
+- 未決なし。NP21/W の Caps/Kana/CTRL+STOP/IME 取消と Ctrl+数字の実利用側は PM の統合受入へ渡す (本段では操作しない)。
