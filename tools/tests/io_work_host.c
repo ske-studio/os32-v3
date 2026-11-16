@@ -145,6 +145,14 @@ static void scheduling(void)
     for (unsigned int n = 0; n < 8; ++n) CHECK(io_dispatch(10) == 1);
     for (unsigned int n = 0; n < 7; ++n) CHECK(io_dispatch(5) == 1);
     CHECK(io_dispatch(10) == 1 && trace[15] == 3); /* Both mature again: other Tier first. */
+    reset(); add(1); add(2); add(3);
+    for (unsigned int n = 0; n < 7; ++n) CHECK(io_dispatch(10) == 1);
+    traced = 0; read_cost = 1; cost[1] = 9;
+    /* Tier 3 fits at selection, but its pre-read leaves only 9 counts. */
+    CHECK(io_dispatch(22) == 2 && trace[0] == 2 && trace[1] == 1);
+    CHECK(observed[1] == 9 && rounds[1] == IO_FAIR_ROUNDS && cursor[1] == 0);
+    read_cost = 0;
+    CHECK(io_dispatch(10) == 1 && trace[2] == 3); /* Unserved right survives. */
 }
 static void requests_and_failures(void)
 {
@@ -156,10 +164,21 @@ static void requests_and_failures(void)
     CHECK(io_dispatch(500) == 1 && stats.last_error == -99 && pending[0]);
     mode[1] = 0; CHECK(io_dispatch(500) == 1 && !pending[0]);
     for (u32 flag = CHANGE; flag <= FAIL_POST; flag <<= 1) {
-        reset(); add(1); add(2); mode[1] = flag; results[1] = IO_DONE;
+        reset(); add(1); add(2); mode[1] = flag; results[1] = IO_MORE;
         CHECK(io_dispatch(500) == 1 && traced == 1 && pending[0] && pending[1]);
         CHECK(stats.clock_failures && !running);
         mode[1] = 0; fail_read = 0; CHECK(io_dispatch(500) == 2);
+    }
+    const int terminal[] = { -99, IO_DONE, IO_WAIT };
+    for (unsigned int n = 0; n < 3; ++n) for (unsigned int requested = 0; requested < 2; ++requested) {
+        reset(); add(1); add(2); results[1] = terminal[n];
+        mode[1] = FAIL_POST | (requested ? REQUEST : 0);
+        CHECK(io_dispatch(500) == 1 && traced == 1 && !!pending[0] == requested);
+        CHECK(pending[1] && stats.clock_failures == 1 && !running);
+        CHECK(stats.last_error == (terminal[n] < 0 ? terminal[n] : 0));
+        mode[1] = 0; fail_read = 0;
+        CHECK(io_dispatch(500) == (requested ? 2 : 1));
+        CHECK(trace[1] == (requested ? 1u : 2u));
     }
     reset(); add(1); fail_read = 1; CHECK(io_dispatch(500) == 0 && pending[0]);
     fail_read = 0; fail_convert = 1; CHECK(io_dispatch(500) == 0 && pending[0]);

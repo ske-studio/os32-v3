@@ -178,6 +178,13 @@ static int refresh_counts(const struct io_slice *pass, u32 us)
     return 1;
 }
 static int first(u32 mask) { return mask ? __builtin_ctz(mask) : -1; }
+static int tier_pick(u32 visited)
+{
+    int i = -1;
+    for (unsigned int t = 0; t < 3 && i < 0; ++t)
+        i = first(pending[t] & ~visited);
+    return i;
+}
 static int fair_pick(u32 mask, unsigned int start)
 {
     int i = first(mask & (0xffffu << start));
@@ -215,8 +222,7 @@ int io_dispatch(u32 budget_us)
                     slots[candidate].unit_count <= remaining) { i = candidate; fair = (int)t; break; }
             }
         }
-        if (i < 0) for (unsigned int t = 0; t < 3 && i < 0; ++t)
-            i = first(pending[t] & ~visited);
+        if (i < 0) i = tier_pick(visited);
         if (i < 0) break;
         if (!slots[i].budget_count) { visited |= 1u << i; continue; }
         /* Entry doubles as the first pre-read; a final expired pre-read then
@@ -225,7 +231,11 @@ int io_dispatch(u32 budget_us)
         elapsed = now - pass.start_count;
         if (elapsed >= pass.limit_count) break;
         remaining = pass.limit_count - elapsed;
-        if (fair >= 0 && slots[i].unit_count > remaining) break;
+        if (fair >= 0 && slots[i].unit_count > remaining) {
+            fair = -1; /* Preserve the unserved right; use ordinary Tier order. */
+            i = tier_pick(visited);
+            if (i < 0) break;
+        }
         struct io_slice slice = { now, minimum(slots[i].budget_count, remaining),
                                   fair >= 0 ? 1u : ~0u, 0, pass.clock_source, pass.clock_generation };
         if (!slice.limit_count) { visited |= 1u << i; continue; }
@@ -248,7 +258,7 @@ int io_dispatch(u32 budget_us)
             elapsed = now - pass.start_count;
             if (now - slice.start_count > slice.limit_count) ++stats.overruns;
         }
-        if (result == IO_MORE || clock_failed) io_request(slots[i].desc.id);
+        if (result == IO_MORE) io_request(slots[i].desc.id);
         if (!valid || clock_failed) break;
     }
 finish:

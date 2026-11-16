@@ -28,6 +28,13 @@ MUTANTS = [
     ('new request', 'if (result < 0) stats.last_error = result;',
      'pending[0] = pending[1] = pending[2] = 0; if (result < 0) stats.last_error = result;'),
     ('visited', 'visited |= 1u << i;\n        int result', 'visited |= 0;\n        int result'),
+    ('terminal clock failure', 'if (result == IO_MORE) io_request(slots[i].desc.id);',
+     'if (result == IO_MORE || clock_failed) io_request(slots[i].desc.id);'),
+    ('fair fallback', 'fair = -1; /* Preserve the unserved right; use ordinary Tier order. */',
+     'break; /* Incorrectly discard the remaining round. */'),
+    ('start reset', 'now - s->start_count >= s->limit_count',
+     'now - (s->start_count = now) >= s->limit_count'),
+    ('unit limit', 's->units >= s->max_units', '0'),
     ('clock failure', 'if (!valid || clock_failed) break;', 'clock_failed = 0;'),
 ]
 
