@@ -48,7 +48,8 @@ u8 link_peer_mac[6];
 static u32 now, step, clock_cost, frames, reads, polls, links, released;
 static int clock_fail, allowance = 1, hook, rescue, idle_error, recv_reentry, valid_frame, copy_action;
 static u32 irq_elapsed, link_received;
-static int pump_link, quiet;
+static int pump_link, quiet, fg_ms_override;
+static u32 fg_ms;
 static tick_fn callback;
 static const u8 hw_mac[6] = {2,3,4,5,6,7};
 static int tx(const void *p, u32 n) { (void)p; (void)n; return 0; }
@@ -182,23 +183,33 @@ static void test_deferred_poll(void)
 static void tier_requests(void)
 {
     quiet = 1;
-    CHECK(net_bind(&device) == 0);
     work_count = 0;
+    (void)io_dispatch(500); /* Consume the preceding unbind request. */
+    CHECK(io_dispatch(500) == 0); /* Unbound DONE sleeps without a request. */
+    CHECK(net_bind(&device) == 0);
+    fg_ms_override = 1; fg_ms = tick_count * 10u;
     frames = 0;
     for (u32 i = 0; i < 3; ++i) (void)io_dispatch(500);
-    CHECK(io_dispatch(500) == 0); /* WAIT sleeps without a new request. */
+    CHECK(io_dispatch(500) == 1); /* Bound poll-only NICs stay requested. */
+    u32 old_polls = polls, old_links = links, old_jiffy = tick_count;
+    CHECK(io_dispatch(500) == 1 && polls == old_polls && links == old_links);
+    ++fg_ms;
+    CHECK(io_dispatch(500) == 1 && polls == old_polls + 1 && links == old_links + 1);
+    CHECK(tick_count == old_jiffy); /* 1ms progress, before the next 10ms jiffy. */
     frames = 2; u32 before = reads;
-    CHECK(io_dispatch(500) == 0 && frames == 2 && reads == before);
+    CHECK(io_dispatch(500) == 1 && frames < 2 && reads > before);
+    /* The Tier fairness reservation can grant just one unit in a pass. */
+    CHECK(io_dispatch(500) == 1 && frames == 0);
     u32 marks = requests;
     net_rx_schedule(); CHECK(requests == marks + 1);
     CHECK(io_dispatch(500) == 1 && frames == 0);
-    CHECK(io_dispatch(500) == 0);
+    CHECK(io_dispatch(500) == 1);
     /* Binding and both forms of unbinding are explicit wakeup sources. */
     marks = requests; net_unbind(); CHECK(requests == marks + 1);
     CHECK(io_dispatch(500) == 1 && io_dispatch(500) == 0); /* DONE unbound. */
     marks = requests; CHECK(net_bind(&device) == 0 && requests == marks + 1);
     frames = 1; CHECK(io_dispatch(500) == 1 && frames == 0);
-    CHECK(io_dispatch(500) == 0);
+    CHECK(io_dispatch(500) == 1);
     marks = requests; ticking = 1; net_unbind(); ticking = 0;
     CHECK(requests == marks + 1 && unbind_due);
     CHECK(io_dispatch(500) == 1 && !bound);
@@ -207,19 +218,19 @@ static void tier_requests(void)
     ticking = 1; marks = requests; net_tick(); ticking = 0;
     CHECK(requests == marks + 1 && poll_due);
     frames = 1; CHECK(io_dispatch(500) == 1 && frames == 0 && !poll_due);
-    (void)io_dispatch(500); CHECK(io_dispatch(500) == 0);
+    (void)io_dispatch(500); CHECK(io_dispatch(500) == 1);
     marks = requests; net_jiffy(); CHECK(requests == marks + 3);
     CHECK(io_dispatch(500) == 1);
-    (void)io_dispatch(500); CHECK(io_dispatch(500) == 0);
+    (void)io_dispatch(500); CHECK(io_dispatch(500) == 1);
     marks = requests; frames = 1; net_tx(hw_mac, 6);
     CHECK(requests == marks + 1 && frames == 0);
-    CHECK(io_dispatch(500) == 0);
+    CHECK(io_dispatch(500) == 1);
     /* Narrow the dispatcher pass below 120us; MORE resumes next pass. */
     frames = 3; step = 20; net_rx_schedule();
     CHECK(io_dispatch(10) == 1 && frames == 2);
     CHECK(io_dispatch(10) == 1 && frames == 1);
     step = 0; CHECK(io_dispatch(500) == 1 && frames == 0);
-    CHECK(io_dispatch(500) == 0);
+    CHECK(io_dispatch(500) == 1);
     /* Failure before dispatch and failure at the next frame both start none. */
     frames = 1; net_rx_schedule(); clock_fail = 1; before = reads;
     CHECK(io_dispatch(500) == 0 && reads == before && frames == 1);
@@ -235,12 +246,14 @@ static void tier_requests(void)
     CHECK(io_slice_begin(&slice, 120, 8) == 0);
     CHECK(net_rx_idle(0, &slice) == IO_MORE && frames == 1);
     CHECK(io_dispatch(500) == 1 && frames == 0);
-    CHECK(io_dispatch(500) == 0);
+    CHECK(io_dispatch(500) == 1);
     ticking = 1; io_request(IO_SVC_NET_RX);
     CHECK(io_dispatch(500) == 1);
     ticking = 0; frames = 1;
     CHECK(io_dispatch(500) == 1 && frames == 0); /* MORE re-requests a busy provider. */
     net_unbind(); (void)io_dispatch(500);
+    CHECK(io_dispatch(500) == 0);
+    fg_ms_override = 0;
 }
 static void run_tests(void)
 {
@@ -353,4 +366,4 @@ static void run_tests(void)
 }
 void _start(void) { test_rx_clock_install(); run_tests(); finish(0); }
 
-u32 tick_clock_ms(void) { return tick_count * 10u; }
+u32 tick_clock_ms(void) { return fg_ms_override ? fg_ms : tick_count * 10u; }

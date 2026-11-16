@@ -35,7 +35,7 @@ MUTATIONS = (
     ('net/nic.c', 'io_request(IO_SVC_NET_RX); /* IRQ mark or exhausted receive scan */', '(void)0;'),
     ('net/nic.c', 'if (bound) io_request(IO_SVC_NET_RX); /* net_tick, including deferred poll */', '(void)0;'),
     ('net/nic.c', 'if (bound) io_request(IO_SVC_NET_RX); /* net_jiffy, including link_due */', '(void)0;'),
-    ('net/nic.c', 'return pending || link_due || poll_due || unbind_due ? IO_MORE : IO_WAIT;', 'return IO_WAIT;'),
+    ('net/nic.c', 'return bound ? IO_MORE : IO_DONE;', 'return bound ? IO_WAIT : IO_DONE;'),
     ('net/nic.c', 'if (ticking || batch_depth) return IO_MORE;', 'if (ticking || batch_depth) return IO_WAIT;'),
 
     ('net/rx_work.c', '!b->slice || !io_slice_take(b->slice)', '!b->slice'),

@@ -299,7 +299,8 @@ static int net_rx_idle(void *state, struct io_slice *slice)
     if (io_slice_limit(slice, NET_RX_WORK_LIMIT_US, NET_RX_SCAN_MAX) < 0)
         return IO_MORE;
     rx_service(1, slice);
-    return pending || link_due || poll_due || unbind_due ? IO_MORE : IO_WAIT;
+    /* Poll-only NICs need every FG pass; rx_service gates poll/link at 1ms. */
+    return bound ? IO_MORE : IO_DONE;
 }
 
 void net_tick(void)

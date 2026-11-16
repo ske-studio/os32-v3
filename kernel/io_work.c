@@ -307,7 +307,6 @@ int io_dispatch(u32 budget_us)
         if (!valid || clock_failed) break;
     }
 finish:
-    /* Even without a clock, the finite calibration adapter gets one pass. */
     if (idle_work_compat_count()) {
         int timed = !clock_failed && token_read(&pass, &now);
         compat_run();
