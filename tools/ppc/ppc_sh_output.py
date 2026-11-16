@@ -2,6 +2,8 @@
 """Check USER fd1 routing against the independent LAN terminal and log."""
 import argparse
 import io
+import json
+import json
 import os
 from pathlib import Path
 import select
@@ -19,7 +21,11 @@ CHECK = dict(name='ppc-sh-output', tier=2, budget=900, needs=[],
              inputs=['build/ppc-kboot.mk', 'build/ppc-user.mk',
                      'platform/powermac/kboot_console.c', 'platform/powermac/console_stream.c',
                      'fs/vfs_fd.c', 'tools/ppc/kboot_accept.py', 'tools/ppc/kboot_run.py',
-                     'tools/ppc/sc_run.py', 'tools/ppc_lan_host.py'])
+                     'tools/ppc/sc_run.py', 'tools/ppc_lan_host.py',
+                     'tools/ppc/link_sh_run.py', 'tools/ppc/link_run.py',
+                     'tools/host_agent.py',
+                     'tools/host_operator_socket.py', 'tools/host_rshell.py',
+                     'tools/ppc/usb_run.py', 'userland/ppc/hello.c'])
 
 def lan_accept(elf, cpu, out, mutant=False):
     """Observe terminal and diagnostic log on separate transports."""
@@ -92,14 +98,148 @@ def lan_accept(elf, cpu, out, mutant=False):
         if transport: transport.sock.close()
 
 
+def rsh_command(session, line):
+    """Use only the product operator result, within one agent generation."""
+    op = session.agent.operator
+    generation = (session.agent.host_generation, session.agent.sess, session.agent.epoch)
+    start = len(session.events)
+    ident = op.submit('cui', line, 'accept', timeout_ms=20000)
+    session.wait(lambda: ident in op.results or (op.pending is not None and
+                 op.pending['state'] in ('done', 'truncated')), 'RSH result '+line, 25)
+    result = op.results.get(ident) or op.take_result()
+    require(generation == (session.agent.host_generation, session.agent.sess,
+                           session.agent.epoch), 'RSH generation changed')
+    events = [e for e in session.events[start:]
+              if e['parts'][:2] == ['RSH', 'OUT'] and e['parts'][3] == ident]
+    require(len(events) == 1, 'one RSH OUT')
+    body = bytes.fromhex(events[0]['body'])
+    require(result['state'] == 'done' and result['drop'] == 0 and
+            result['result'] == body, 'complete RSH OUT')
+    prefix = b'> '+line.encode()+b'\n'
+    require(body.startswith(prefix) and body.endswith(b'\x04'), 'RSH framing')
+    return body[len(prefix):-1]
+
+
+def link_accept(elf, cpu, out, mutant=False):
+    import link_sh_run as link
+
+    class OutputSession(link.Session):
+        def new_agent(self):
+            super().new_agent()
+            self.logs = []
+            # Install the in-process LOG observer before QEMU starts. Retain the
+            # original logger and operator publisher, including raw payloads.
+            publish = self.operator.publish_log
+            def observed(record):
+                self.logs.append(dict(record))
+                publish(record)
+            self.operator.publish_log = observed
+
+        def start(self):
+            cd = self.out/'cd'; cd.mkdir()
+            shutil.copyfile(self.elf, cd/'PPCKERN.ELF')
+            iso = self.out/'boot.iso'
+            command(['genisoimage', '-quiet', '-hfs', '-r', '-part', '-no-desktop', '-o', iso, cd])
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as reservation:
+                reservation.bind(('127.0.0.1', 0)); port = reservation.getsockname()[1]
+                self.io = lan.UDP(f'127.0.0.1:0,127.0.0.1:{port}')
+            args = ['qemu-system-ppc', '-M', 'mac99', '-cpu', self.cpu, '-m', '128M',
+                '-smp', '1', '-accel', 'tcg', '-bios', str(ROM), '-cdrom', str(iso),
+                '-boot', 'd', '-prom-env', 'boot-device=cd:,\\PPCKERN.ELF',
+                '-prom-env', 'auto-boot?=true', '-nographic',
+                '-serial', 'file:'+str(self.out/'serial-a.log'),
+                '-serial', 'file:'+str(self.out/'serial-b.log'), '-monitor', 'none',
+                '-qmp', 'stdio', '-no-reboot', '-nic', 'none',
+                '-device', 'sungem,netdev=n0,mac=52:54:00:12:34:56', '-netdev',
+                f'socket,id=n0,udp=127.0.0.1:{self.io.sock.getsockname()[1]},localaddr=127.0.0.1:{port}']
+            (self.out/'command.json').write_text(json.dumps(args, indent=2))
+            self.err = (self.out/'qemu.stderr').open('w')
+            self.frames = (self.out/'frames.log').open('w')
+            self.p = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                      stderr=self.err, bufsize=0)
+            self.q = link.PumpQMP(self.p, self.deadline, self.pump)
+
+    s = OutputSession(elf, cpu, out, 120)
+    try:
+        s.start(); s.wait(s.ready, 'RSH READY', 60)
+        actual = rsh_command(s, '/bin/outprobe.bin')
+        # sh prints one '\n' after an external program exits with success
+        # (userland/shell/sh_exec.inc run_cmd_report), as on x86.
+        expected = b'hello ok\nH\n'+(b'' if mutant else b'FD1 PROBE\n')+b'\n'
+        require(actual == expected, 'fd1 OUT routing: '+repr(actual))
+        alive = rsh_command(s, 'echo alive')
+        if mutant:
+            # The fd1-log mutant also routes the built-in echo to LOG.
+            require(alive == b'', 'subsequent command (mutant): '+repr(alive))
+            s.wait(lambda: b'alive\n' in b''.join(r['text'] for r in s.logs), 'alive LOG')
+        else:
+            require(alive == b'alive\n', 'subsequent command: '+repr(alive))
+        s.wait(lambda: b'KBOOT READY stage=pre-user' in
+               b''.join(r['text'] for r in s.logs), 'kernel LOG READY')
+        if mutant:
+            s.wait(lambda: b'FD1 PROBE\n' in b''.join(r['text'] for r in s.logs), 'probe LOG')
+        s.settle(1)
+        logs = b''.join(r['text'] for r in s.logs)
+        require([r['seq'] for r in s.logs] == list(range(len(s.logs))), 'LOG sequence')
+        require(len({r['boot'] for r in s.logs}) == 1 and
+                all(r['drop_records'] == r['drop_bytes'] == 0 for r in s.logs), 'LOG loss/generation')
+        require((b'FD1 PROBE\n' in logs) == mutant, 'fd1 LOG routing')
+        require(b'KBOOT READY' not in actual, 'kernel READY in OUT')
+        s.wait(lambda: validate(serial(out/'serial-a.log'), serial(out/'serial-b.log')),
+               'serial ALIVE', 10)
+        s.q.call('quit'); s.p.wait(timeout=5)
+        require(s.p.returncode == 0, 'QEMU exit')
+    finally:
+        (out/'log.json').write_text(json.dumps([
+            dict(r, text=r['text'].hex()) for r in s.logs], indent=2))
+        s.close()
+
+
+def link_main(work, mutate):
+    bins = 'KB_ROOT_BINS=build/out/ppc-user/link-sh/hello.bin build/out/ppc-user/link-sh/fault.bin build/out/ppc-user/link-sh/outprobe.bin'
+    settings = ['KBOOT_SH=1', 'KBOOT_LINK=1', bins]
+    elf = build(work/'link-normal', *settings)
+    link_accept(elf, '7450', work/'link-normal-guest')
+    if mutate:
+        mutation = mutant_settings(work, 'link-fd1-log', 'platform/powermac/console_stream.c',
+            '    console_write(buf, size, color);', '    (void)color; pm_log_write(buf, size);')
+        elf = build(work/'link-fd1-log', *settings, *mutation)
+        link_accept(elf, '7450', work/'link-fd1-log-guest', True)
+        print('RED fd1-log: OUT missing probe, LOG contains probe; subsequent echo alive')
+    print('PASS link fd1 routing evidence='+str(work))
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--mutate', action='store_true')
     parser.add_argument('--serial', action='store_true')
+    parser.add_argument('--link', action='store_true')
     args = parser.parse_args()
+    require(not (args.link and args.serial), '--link and --serial are exclusive')
+    import link_sh_run as link
+    required = [link.cross(t) for t in ('gcc', 'nm', 'objdump', 'ld', 'objcopy')]
+    required += ['qemu-system-ppc', 'genisoimage']
+    missing = [p for p in required if not shutil.which(p)]
+    if not ROM.is_file(): missing.append(str(ROM))
+    if missing:
+        print(('FAIL' if os.environ.get('OS32_REQUIRE_PPC') == '1' else 'SKIP')+
+              ' ppc-sh-output: unavailable '+', '.join(missing))
+        return int(os.environ.get('OS32_REQUIRE_PPC') == '1')
+    if args.link:
+        try:
+            for kind in (socket.SOCK_DGRAM, socket.SOCK_STREAM):
+                with socket.socket(socket.AF_INET, kind) as probe:
+                    probe.bind(('127.0.0.1', 0))
+        except OSError as exc:
+            print(('FAIL' if os.environ.get('OS32_REQUIRE_PPC') == '1' else 'SKIP')+
+                  ' ppc-sh-output: socket unavailable '+str(exc))
+            return int(os.environ.get('OS32_REQUIRE_PPC') == '1')
     base = Path(os.environ['TMPDIR']) / 'sh-output'
     base.mkdir(exist_ok=True)
     work = Path(tempfile.mkdtemp(prefix='run-', dir=base))
+    if args.link:
+        return link_main(work, args.mutate)
     # Serial is normally a mirror of the terminal; remove only that mirror so
     # serial observes the log while LAN observes the actual terminal stream.
     src = 'platform/powermac/console_stream.c'
