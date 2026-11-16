@@ -63,7 +63,7 @@ u32 oracle_dropped(void) { return legacy_raw_dropped() + legacy_cooked_dropped()
     with tempfile.TemporaryDirectory(prefix='input-native-') as directory:
         work = Path(directory)
         def adapt(source):
-            return source.replace('../../drivers/input/kbd.h',str(root/'drivers/input/kbd.h')).replace('../../input/hal/in2_int.h',str(root/'input/hal/in2_int.h'))
+            return source.replace('../../drivers/input/kbd.h',str(root/'drivers/input/kbd.h')).replace('../../input/hal/in2_int.h',str(root/'input/hal/in2_int.h')).replace('../../input/hal/keymap.h',str(root/'input/hal/keymap.h'))
         (work/'oracle.c').write_text(adapt(oracle))
         def execute(texts):
             for path,source in texts.items(): (work/Path(path).name).write_text(adapt(source))
@@ -76,7 +76,7 @@ u32 oracle_dropped(void) { return legacy_raw_dropped() + legacy_cooked_dropped()
         if ctx.mutate:
             for path,old_text,new in [
                 ('drivers/input/kbd_hal.c','(void)input_capture(&event);','(void)input_capture(&event); (void)input_capture(&event);'),
-                ('drivers/input/kbd_hal.c','.down = !(scancode & SCANCODE_BREAK)','.down = !!(scancode & SCANCODE_BREAK)'),
+                ('drivers/input/kbd_hal.c','.sc = scancode & SCANCODE_KEY, .down = !(scancode & SCANCODE_BREAK)', '.sc = scancode & SCANCODE_KEY, .down = !!(scancode & SCANCODE_BREAK)'),
                 ('drivers/input/kbd_hal.c','INPUT_ORIGIN_NATIVE','INPUT_ORIGIN_USB'),
                 ('drivers/input/kbd.c','kbd_hal_capture(scancode);','(void)scancode;'),
                 ('input/hal/kbd_merge.c','input_emit_legacy_key(sc, 1, mods);','(void)sc; (void)mods;')]:

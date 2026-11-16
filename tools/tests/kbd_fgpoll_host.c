@@ -155,3 +155,5 @@ int serial_peekchar(void) { return serial_byte; }
 int kbd_inject_peek(u8 *out) { if (injected < 0) return 0; *out = (u8)injected; return 1; }
 
 void idle_wait_step(void) { idle_work_run(); host_halt(); }
+
+void bootlog_push(const char *s, u32 n) { (void)s; (void)n; }

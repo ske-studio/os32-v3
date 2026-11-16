@@ -597,3 +597,5 @@ int pc98_serial_gate_active(void) { return 0; }
 int con_sink_capture_active(void) { return 0; }
 
 void idle_wait_step(void) { idle_work_run(); }
+
+void bootlog_push(const char *s, u32 n) { (void)s; (void)n; }

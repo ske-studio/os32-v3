@@ -15,3 +15,7 @@ void mouse_ext_move(i16 x, i16 y, int m) { (void)x; (void)y; (void)m; __builtin_
 #include "../../input/hal/keymap_registry.c"
 #include "../../input/hal/keymap_eval.c"
 #include "../../input/hal/keymap_state.c"
+
+/* Keep legacy merge mutations exercised; S2x tests the real registration. */
+int pc98_input_keymap_register(u16 *generation)
+{ (void)generation; return OS32_ERR_INVAL; }
