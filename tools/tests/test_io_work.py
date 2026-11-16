@@ -14,6 +14,17 @@ import tempfile
 import host32
 
 MUTANTS = [
+    ('limit entry cache', 'slots[i].limit.us = slots[i].desc.default_budget_us;', 'slots[i].limit.us = 0;'),
+    ('failed unit read', 'if (raw_read(now, &source, &gen) < 0) return 0;',
+     'if (raw_read(now, &source, &gen) < 0) { *now = s->start_count; return 1; }'),
+    ('limit time', 's->limit_count = minimum(remaining, bound_count);', 's->limit_count = bound_count; (void)remaining;'),
+    ('limit units', 's->max_units = minimum(units_left, max_units);', 's->max_units = max_units; (void)units_left;'),
+    ('limit elapsed', 'elapsed < s->limit_count ? s->limit_count - elapsed : 0', 's->limit_count + (elapsed & 0u)'),
+    ('limit token', 'if (!token_read(s, &now)) return OS32_ERR_AGAIN;', 'if (!token_read(s, &now)) now = s->start_count;'),
+    ('limit conversion failure', 'if (rc < 0) return rc;\n        i = next++', 'if (rc < 0) bound_count = 0;\n        i = next++'),
+    ('limit policy cache', 'slots[i].limit.policy == policy', '1'),
+    ('limit cache reuse', 'if (i < IO_SLOTS) bound_count = slots[i].limit.count;', 'if (i < IO_SLOTS) { if (convert(budget_us, s->clock_source, s->clock_generation, &bound_count) < 0) return OS32_ERR_AGAIN; }'),
+
     ('Tier order', 'i = first(pending[t] & ~visited);', 'i = first(pending[2 - t] & ~visited);'),
     ('fair cursor', 'cursor[fair] = ((unsigned int)i + 1) % IO_SLOTS;', 'cursor[fair] = 0;'),
     ('Tier fair cursor', 'fair_next = (unsigned int)fair ^ 1u;', 'fair_next = 0;'),
@@ -34,7 +45,8 @@ MUTANTS = [
      'break; /* Incorrectly discard the remaining round. */'),
     ('start reset', 'now - s->start_count >= s->limit_count',
      'now - (s->start_count = now) >= s->limit_count'),
-    ('unit limit', 's->units >= s->max_units', '0'),
+    ('unit limit', 's->units >= s->max_units', 's->units > s->max_units'),
+    ('time boundary', 'now - s->start_count >= s->limit_count', 'now - s->start_count > s->limit_count'),
     ('clock failure', 'if (!valid || clock_failed) break;', 'clock_failed = 0;'),
 ]
 

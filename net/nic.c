@@ -1,4 +1,6 @@
 #include "kernel/idle_work.h"
+#include "kernel/io_work.h"
+#include "kernel/io_policy.h"
 #ifdef TICK_PROBE
 #include "kernel/time/tick_probe.h"
 #endif
@@ -29,7 +31,12 @@ static u32 reset_due, last_idle_jiffy, batch_depth;
 static struct rx_work_budget batch_budget;
 static u32 last_idle_ms;
 static int idle_ms_valid;
-static void net_rx_idle(void);
+static int net_rx_idle(void *state, struct io_slice *slice);
+static const struct io_desc rx_desc = {
+    .id = IO_SVC_NET_RX, .default_budget_us = NET_RX_WORK_LIMIT_US,
+    .budget_min_us = 1, .budget_max_us = IO_PASS_US,
+    .max_unit_us = NET_RX_WORK_LIMIT_US, .default_tier = 2, .step = net_rx_idle
+};
 #ifdef TICK_PROBE
 u32 net_link_deferred, net_link_deferred_max_us;
 static u32 link_due_start;
@@ -58,7 +65,7 @@ int net_bind(const struct NetNicOps *ops)
              !ops->poll || !ops->rx_credit_bytes) rc = OS32_ERR_INVAL;
     else {
         if (!idle_registered) {
-            rc = idle_work_register(net_rx_idle);
+            rc = io_register(&rx_desc);
             if (!rc) idle_registered = 1;
         }
         /* Register once; unbind leaves the resident callback gated by bound. */
@@ -79,6 +86,7 @@ int net_bind(const struct NetNicOps *ops)
             idle_ms_valid = 0;
             last_idle_jiffy = link_platform_now();
             bound = ops;
+            io_request(IO_SVC_NET_RX); /* bind */
         }
     }
     link_platform_unlock(flags);
@@ -134,9 +142,11 @@ void net_unbind(void)
     const struct NetAdapter *adapter = owner;
     if (ticking) {
         unbind_due = 1;
+        io_request(IO_SVC_NET_RX); /* deferred unbind */
         link_platform_unlock(flags);
         return;
     }
+    io_request(IO_SVC_NET_RX); /* unbind */
     unbind_due = pending = link_due = poll_due = 0;
     bound = 0; /* Gates the permanently registered tick before releasing ops. */
     owner = 0;
@@ -152,6 +162,7 @@ int net_tx(const void *frame, u32 len)
     unsigned int flags = link_platform_lock();
     int rc = bound ? bound->tx(frame, len) : OS32_ERR_HOSTDOWN;
     link_platform_unlock(flags);
+    io_request(IO_SVC_NET_RX); /* TX completion/cooperative point */
     if (kctx_irq_depth == 0) idle_work_run();
     return rc;
 }
@@ -181,6 +192,7 @@ void net_rx_schedule(void)
 {
     unsigned int flags = link_platform_lock();
     pending = 1;
+    io_request(IO_SVC_NET_RX); /* IRQ mark or exhausted receive scan */
     link_platform_unlock(flags);
 }
 
@@ -231,7 +243,7 @@ static void rx_finish(void)
     if (resets & (1u << NET_RX_LINK)) net_rx_reset(NET_RX_LINK);
 }
 
-static int rx_service(int idle)
+static int rx_service(int idle, struct io_slice *slice)
 {
     struct rx_work_budget local;
     struct rx_work_budget *b;
@@ -262,7 +274,10 @@ static int rx_service(int idle)
     }
     link_platform_unlock(flags);
     b = batch_depth ? &batch_budget : &local;
-    if (!batch_depth) rx_work_begin(b);
+    if (!batch_depth) {
+        if (slice) rx_work_from_slice(b, slice);
+        else rx_work_begin(b);
+    }
     count = (int)net_rx_demux_budget(bound, local_mac, fixed_peer ? peer_mac : 0, b);
     flags = link_platform_lock();
     rx_finish();
@@ -271,19 +286,26 @@ static int rx_service(int idle)
     return count;
 }
 
-int net_rx_service(void) { return rx_service(0); }
+int net_rx_service(void) { return rx_service(0, 0); }
 int net_nic_poll_once(void) { return net_rx_service(); }
 
-static void net_rx_idle(void)
+static int net_rx_idle(void *state, struct io_slice *slice)
 {
-    /* Permanent: even without a new need_* mark, resume an exhausted scan. */
+    (void)state;
+    /* ticking owns NIC reentry: nested providers must not alter the slice. */
+    if (ticking || batch_depth) return IO_MORE;
     if (unbind_due) net_unbind();
-    if (bound) rx_service(1);
+    if (!bound) return IO_DONE;
+    if (io_slice_limit(slice, NET_RX_WORK_LIMIT_US, NET_RX_SCAN_MAX) < 0)
+        return IO_MORE;
+    rx_service(1, slice);
+    return pending || link_due || poll_due || unbind_due ? IO_MORE : IO_WAIT;
 }
 
 void net_tick(void)
 {
     unsigned int flags = link_platform_lock();
+    if (bound) io_request(IO_SVC_NET_RX); /* net_tick, including deferred poll */
     if (bound && ticking) poll_due = 1;
     if (bound && !ticking) {
         ticking = 1;
@@ -305,6 +327,7 @@ void net_jiffy(void)
     }
 #endif
     net_tick();
+    if (bound) io_request(IO_SVC_NET_RX); /* net_jiffy, including link_due */
     if (bound) {
         if (ticking) {
 #ifdef TICK_PROBE

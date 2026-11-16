@@ -1,3 +1,4 @@
+#include "rx_io_clock.h"
 /* A3 real queues/demux, fake NIC boundary. Limits: design §2 and 82557 RFD ring. */
 #include "hostsvc_fixture.h"
 #include "net/nic_rx.h"
@@ -182,6 +183,7 @@ static int suite(void)
 }
 void _start(void)
 {
+    test_rx_clock_install();
     int rc = suite();
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc ? rc % 250 + 1 : 0));
     __builtin_unreachable();

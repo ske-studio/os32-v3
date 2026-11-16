@@ -12,6 +12,11 @@ static struct {
     struct io_desc desc;
     u32 budget_us, budget_count, unit_count;
     u8 tier;
+    struct {
+        u32 us, count, source, gen, policy;
+        const struct io_clock_ops *ops;
+        int valid;
+    } limit; /* P8 conversions share P1's fixed service table. */
 } slots[IO_SLOTS];
 static unsigned int count, running;
 static volatile u32 pending[3];
@@ -71,6 +76,36 @@ int io_slice_begin(struct io_slice *s, u32 budget_us, u32 max_units)
     rc = convert(budget_us, next.clock_source, next.clock_generation, &next.limit_count);
     if (rc < 0) return rc;
     *s = next;
+    return 0;
+}
+int io_slice_limit(struct io_slice *s, u32 budget_us, u32 max_units)
+{
+    /* P8: retain conversions by token/policy, like the dispatch budget table.
+     * Sixteen entries match the maximum number of resident providers. */
+    static unsigned int next;
+    u32 now, bound_count, policy = io_policy_generation();
+    if (!token_read(s, &now)) return OS32_ERR_AGAIN;
+    unsigned int i;
+    for (i = 0; i < IO_SLOTS; ++i)
+        if (slots[i].limit.valid && slots[i].limit.ops == clock_ops && slots[i].limit.us == budget_us &&
+            slots[i].limit.source == s->clock_source && slots[i].limit.gen == s->clock_generation &&
+            slots[i].limit.policy == policy) break;
+    if (i < IO_SLOTS) bound_count = slots[i].limit.count;
+    else {
+        int rc = convert(budget_us, s->clock_source, s->clock_generation, &bound_count);
+        if (rc < 0) return rc;
+        i = next++ % IO_SLOTS;
+        slots[i].limit.us = budget_us; slots[i].limit.count = bound_count;
+        slots[i].limit.source = s->clock_source; slots[i].limit.gen = s->clock_generation;
+        slots[i].limit.policy = policy; slots[i].limit.ops = clock_ops; slots[i].limit.valid = 1;
+    }
+    u32 elapsed = now - s->start_count;
+    u32 remaining = elapsed < s->limit_count ? s->limit_count - elapsed : 0;
+    u32 units_left = s->units < s->max_units ? s->max_units - s->units : 0;
+    s->start_count = now;
+    s->limit_count = minimum(remaining, bound_count);
+    s->max_units = minimum(units_left, max_units);
+    s->units = 0;
     return 0;
 }
 int io_slice_take(struct io_slice *s)
@@ -164,7 +199,17 @@ static int refresh_counts(const struct io_slice *pass, u32 us)
             if (convert(slots[i].budget_us, pass->clock_source, pass->clock_generation,
                         &slots[i].budget_count) < 0 ||
                 convert(slots[i].desc.max_unit_us, pass->clock_source, pass->clock_generation,
-                        &slots[i].unit_count) < 0) return 0;
+                        &slots[i].unit_count) < 0 ||
+                convert(slots[i].desc.default_budget_us, pass->clock_source, pass->clock_generation,
+                        &slots[i].limit.count) < 0) return 0;
+            /* P8 limits use the default NIC ceiling even when policy raises
+             * its active budget. Prepare it at the P1 round-entry boundary. */
+            slots[i].limit.us = slots[i].desc.default_budget_us;
+            slots[i].limit.source = pass->clock_source;
+            slots[i].limit.gen = pass->clock_generation;
+            slots[i].limit.policy = policy_gen;
+            slots[i].limit.ops = clock_ops;
+            slots[i].limit.valid = 1;
         }
     }
     if (!same || cache_us != us) {

@@ -1,3 +1,4 @@
+#include "rx_io_clock.h"
 /* A10: real LAN transport/protocol and A3 queues; fake hardware/clock only. */
 #include "fs/serialfs/sfs_lan.h"
 #include "net/nic_rx.h"
@@ -121,6 +122,7 @@ static int suite(void)
 }
 void _start(void)
 {
+    test_rx_clock_install();
     int rc = suite();
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc) : "memory");
     __builtin_unreachable();

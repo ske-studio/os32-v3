@@ -21,6 +21,7 @@ TYPE(&io_unregister, int (*)(u32));
 TYPE(&io_request, void (*)(u32));
 TYPE(&io_clock_us, int (*)(u32 *, u32 *));
 TYPE(&io_slice_begin, int (*)(struct io_slice *, u32, u32));
+TYPE(&io_slice_limit, int (*)(struct io_slice *, u32, u32));
 TYPE(&io_slice_take, int (*)(struct io_slice *));
 TYPE(&io_dispatch, int (*)(u32));
 TYPE(((struct io_desc *)0)->step, int (*)(void *, struct io_slice *));

@@ -9,17 +9,38 @@ static unsigned int irq_save(void) { unsigned int f = enabled; enabled = 0; retu
 static void irq_restore(unsigned int f) { enabled = f; }
 static int _irq_enabled(void) { return enabled != 0; }
 static void _idle(void) {}
+#include "kernel/io_work.h"
+static void nic_request(u32 id);
+#define io_request nic_request
 #include "net/nic.c"
+#undef io_request
+static u32 requests;
+static void nic_request(u32 id) { ++requests; io_request(id); }
 #include "net/nic_rx.c"
 #include "net/rx_work.c"
 #include "kernel/idle_work.c"
 #include "kernel/irq/tick_budget.c"
+#define TEST_RX_CLOCK_LOCK irq_save
+#define TEST_RX_CLOCK_UNLOCK irq_restore
+#include "rx_io_clock.h"
 
-#define CHECK(e) do { if (!(e)) finish(1); } while (0)
+static void fail(u32 line);
+#define CHECK(e) do { if (!(e)) fail(__LINE__); } while (0)
 static void finish(int rc)
 {
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc) : "memory");
     __builtin_unreachable();
+}
+static void fail(u32 line)
+{
+    char buf[16]; u32 n = 0;
+    buf[n++] = '\n';
+    do { buf[n++] = '0' + line % 10; line /= 10; } while (line);
+    for (u32 i = 0; i < n / 2; ++i) {
+        char c = buf[i]; buf[i] = buf[n - i - 1]; buf[n - i - 1] = c;
+    }
+    __asm__ volatile("int $0x80" : : "a"(4), "b"(2), "c"(buf), "d"(n) : "memory");
+    finish(1);
 }
 volatile u32 tick_count, kctx_irq_depth;
 u32 link_hello_ok;
@@ -27,7 +48,7 @@ u8 link_peer_mac[6];
 static u32 now, step, clock_cost, frames, reads, polls, links, released;
 static int clock_fail, allowance = 1, hook, rescue, idle_error, recv_reentry, valid_frame, copy_action;
 static u32 irq_elapsed, link_received;
-static int pump_link;
+static int pump_link, quiet;
 static tick_fn callback;
 static const u8 hw_mac[6] = {2,3,4,5,6,7};
 static int tx(const void *p, u32 n) { (void)p; (void)n; return 0; }
@@ -61,7 +82,7 @@ static void device_poll(void)
 {
     CHECK(!enabled && ticking);
     u32 before = reads;
-    CHECK(net_rx_service() == 0 && reads == before);
+    if (!quiet) CHECK(net_rx_service() == 0 && reads == before);
     polls++;
 }
 static u32 device_credit(void) { return 100; }
@@ -102,7 +123,7 @@ void link_tick(void)
         }
     }
     u32 before = reads;
-    CHECK(net_nic_poll_once() == 0 && reads == before);
+    if (!quiet) CHECK(net_nic_poll_once() == 0 && reads == before);
 }
 void *kmemcpy(void *d, const void *s, u32 n)
 {
@@ -131,7 +152,7 @@ int platform_clock_read_us(u32 *lo, u32 *hi)
         CHECK(net_rx_service() == 0 && reads == before);
         if (action == 2) net_rx_reset(NET_RX_LINK);
         if (action == 3) net_unbind();
-        if (action == 4) { u32 age = last_idle_jiffy; net_rx_idle(); CHECK(last_idle_jiffy == age); }
+        if (action == 4) { u32 age = last_idle_jiffy; net_rx_idle(0, &batch_budget.local); CHECK(last_idle_jiffy == age); }
     }
     if (clock_fail) return OS32_ERR_AGAIN;
     *lo = now; *hi = 0;
@@ -158,19 +179,86 @@ static void test_deferred_poll(void)
     irq_tick(); CHECK(polls == old_polls + 2 && !poll_due);
     rescue = 0;
 }
+static void tier_requests(void)
+{
+    quiet = 1;
+    CHECK(net_bind(&device) == 0);
+    work_count = 0;
+    frames = 0;
+    for (u32 i = 0; i < 3; ++i) (void)io_dispatch(500);
+    CHECK(io_dispatch(500) == 0); /* WAIT sleeps without a new request. */
+    frames = 2; u32 before = reads;
+    CHECK(io_dispatch(500) == 0 && frames == 2 && reads == before);
+    u32 marks = requests;
+    net_rx_schedule(); CHECK(requests == marks + 1);
+    CHECK(io_dispatch(500) == 1 && frames == 0);
+    CHECK(io_dispatch(500) == 0);
+    /* Binding and both forms of unbinding are explicit wakeup sources. */
+    marks = requests; net_unbind(); CHECK(requests == marks + 1);
+    CHECK(io_dispatch(500) == 1 && io_dispatch(500) == 0); /* DONE unbound. */
+    marks = requests; CHECK(net_bind(&device) == 0 && requests == marks + 1);
+    frames = 1; CHECK(io_dispatch(500) == 1 && frames == 0);
+    CHECK(io_dispatch(500) == 0);
+    marks = requests; ticking = 1; net_unbind(); ticking = 0;
+    CHECK(requests == marks + 1 && unbind_due);
+    CHECK(io_dispatch(500) == 1 && !bound);
+    CHECK(net_bind(&device) == 0); (void)io_dispatch(500);
+    /* Tick while busy can only defer poll; it must still wake the provider. */
+    ticking = 1; marks = requests; net_tick(); ticking = 0;
+    CHECK(requests == marks + 1 && poll_due);
+    frames = 1; CHECK(io_dispatch(500) == 1 && frames == 0 && !poll_due);
+    (void)io_dispatch(500); CHECK(io_dispatch(500) == 0);
+    marks = requests; net_jiffy(); CHECK(requests == marks + 3);
+    CHECK(io_dispatch(500) == 1);
+    (void)io_dispatch(500); CHECK(io_dispatch(500) == 0);
+    marks = requests; frames = 1; net_tx(hw_mac, 6);
+    CHECK(requests == marks + 1 && frames == 0);
+    CHECK(io_dispatch(500) == 0);
+    /* Narrow the dispatcher pass below 120us; MORE resumes next pass. */
+    frames = 3; step = 20; net_rx_schedule();
+    CHECK(io_dispatch(10) == 1 && frames == 2);
+    CHECK(io_dispatch(10) == 1 && frames == 1);
+    step = 0; CHECK(io_dispatch(500) == 1 && frames == 0);
+    CHECK(io_dispatch(500) == 0);
+    /* Failure before dispatch and failure at the next frame both start none. */
+    frames = 1; net_rx_schedule(); clock_fail = 1; before = reads;
+    CHECK(io_dispatch(500) == 0 && reads == before && frames == 1);
+    clock_fail = 0; CHECK(io_dispatch(500) == 1 && frames == 0);
+    /* Provider reentry returns MORE without reading or consuming the slice. */
+    struct io_slice slice;
+    CHECK(io_slice_begin(&slice, 120, 8) == 0);
+    ticking = 1; before = reads;
+    CHECK(net_rx_idle(0, &slice) == IO_MORE && reads == before);
+    ticking = 0;
+    CHECK(io_slice_take(&slice));
+    frames = 9;
+    CHECK(io_slice_begin(&slice, 120, 8) == 0);
+    CHECK(net_rx_idle(0, &slice) == IO_MORE && frames == 1);
+    CHECK(io_dispatch(500) == 1 && frames == 0);
+    CHECK(io_dispatch(500) == 0);
+    ticking = 1; io_request(IO_SVC_NET_RX);
+    CHECK(io_dispatch(500) == 1);
+    ticking = 0; frames = 1;
+    CHECK(io_dispatch(500) == 1 && frames == 0); /* MORE re-requests a busy provider. */
+    net_unbind(); (void)io_dispatch(500);
+}
 static void run_tests(void)
 {
     tick_budget_config();
     CHECK(net_adapter_register(NET_NIC_E82557, &e_adapter) == 0);
     CHECK(net_adapter_register(NET_NIC_LGY98, &n_adapter) == 0);
-    /* No bound NIC may be published without its permanent idle slot. */
-    work_count = 4;
-    CHECK(net_start(NET_NIC_E82557, 0) == OS32_ERR_FULL && !bound);
+    /* No bound NIC may be published if its resident Tier registration fails. */
+    struct io_desc filler = rx_desc;
+    filler.id = IO_SVC_NE2K_BH;
+    CHECK(io_register(&filler) == 0);
+    CHECK(io_register(&rx_desc) == 0);
+    CHECK(net_start(NET_NIC_E82557, 0) == OS32_ERR_EXIST && !bound);
     CHECK(released == 1);
-    work_count = 0;
+    CHECK(io_unregister(IO_SVC_NE2K_BH) == 0);
+    CHECK(io_unregister(IO_SVC_NET_RX) == 0);
     CHECK(idle_work_register(idle_other) == 0);
     CHECK(net_start(NET_NIC_E82557, 0) == 0 && callback == net_jiffy);
-    CHECK(work_count == 2);
+    CHECK(work_count == 1);
     test_deferred_poll(); polls = 0;
     frames = 9;
     CHECK(net_rx_service() == 8 && frames == 1 && pending);
@@ -192,7 +280,7 @@ static void run_tests(void)
     enabled = 0; u32 before = reads;
     CHECK(net_rx_service() == 0 && reads == before && !enabled);
     enabled = 1; kctx_irq_depth = 1;
-    CHECK(net_nic_poll_once() == 0 && reads == before);
+    if (!quiet) CHECK(net_nic_poll_once() == 0 && reads == before);
     kctx_irq_depth = 0; idle_work_run(); CHECK(!frames);
     recv_reentry = 1; frames = 1; CHECK(net_rx_service() == 1);
     hook = 1; before = links; frames = 1;
@@ -246,9 +334,9 @@ static void run_tests(void)
     irq_tick(); CHECK(reads == before);
 #endif
     idle_work_run(); CHECK(!frames);
-    /* Failed clock uses frame cap, including low-word time wrap. */
+    /* P8: a failed raw clock starts no unit; low-word wrap still works. */
     now = 0xfffffff0u; clock_fail = 1; frames = 9;
-    CHECK(net_rx_service() == 8 && frames == 1 && net_rx_clock_failures);
+    CHECK(net_rx_service() == 0 && frames == 9 && net_rx_clock_failures);
     clock_fail = 0; step = 120; frames = 9;
     CHECK(net_rx_service() == 1 && frames == 8);
     step = 0; frames = 0;
@@ -261,7 +349,8 @@ static void run_tests(void)
     hook = 3; before = released;
     net_rx_service(); CHECK(!bound && released == before + 1);
     CHECK(enabled && !kctx_irq_depth && !idle_error);
+    tier_requests();
 }
-void _start(void) { run_tests(); finish(0); }
+void _start(void) { test_rx_clock_install(); run_tests(); finish(0); }
 
 u32 tick_clock_ms(void) { return tick_count * 10u; }
