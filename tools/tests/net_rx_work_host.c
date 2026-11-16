@@ -362,6 +362,14 @@ static void run_tests(void)
     hook = 3; before = released;
     net_rx_service(); CHECK(!bound && released == before + 1);
     CHECK(enabled && !kctx_irq_depth && !idle_error);
+    /* P10: device units consume the shared slice, not the demux's eight. */
+    struct io_slice shared;
+    struct rx_work_budget capped;
+    CHECK(io_slice_begin(&shared, 120, 30) == 0);
+    CHECK(io_slice_take(&shared) && io_slice_take(&shared));
+    rx_work_from_slice_capped(&capped, &shared);
+    for (unsigned int i = 0; i < NET_RX_SCAN_MAX; i++) CHECK(rx_work_take(&capped));
+    CHECK(!rx_work_take(&capped) && shared.units == NET_RX_SCAN_MAX + 2);
     tier_requests();
 }
 void _start(void) { test_rx_clock_install(); run_tests(); finish(0); }
