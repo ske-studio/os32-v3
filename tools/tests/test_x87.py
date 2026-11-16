@@ -15,7 +15,7 @@ MUTATIONS = (
 )
 
 
-def run(source, software=False):
+def run(source, software=False, dispatch=None):
     with tempfile.TemporaryDirectory(prefix='x87-') as name:
         tmp = Path(name)
         (tmp / 'x87.c').write_text(source)
@@ -26,10 +26,14 @@ def run(source, software=False):
                *include_flags(ROOT), str(tmp / 'x87.c'),
                str(ROOT / 'tools/tests/x87_host.c'), '-o', str(exe)]
         if software:
-            cmd += ['-DOS32_TEST_NOFPU', '-DOS32_X87_EMU_LINKED', '-DX87_EMU_HOST_TEST',
+            cmd += ['-DOS32_TEST_NOFPU', '-DOS32_X87_EMU_LINKED',
                     '-msoft-float', '-mno-fp-ret-in-387', '-Os', '-fno-builtin']
             cmd += [str(ROOT / ('arch/x86/kernel/x87_emu_' + n + '.c'))
-                    for n in ('decode', 'state', 'ops', 'esc03', 'esc47', 'exception', 'memory', 'dispatch')]
+                    for n in ('decode', 'state', 'ops', 'esc03', 'esc47', 'exception', 'memory')]
+            dispatch_file = tmp / 'dispatch.c'
+            dispatch_file.write_text(dispatch if dispatch is not None else
+                (ROOT / 'arch/x86/kernel/x87_emu_dispatch.c').read_text())
+            cmd += [str(dispatch_file)]
             # Vendor sources retain their own warning policy, as in the build.
             for n in json.loads((ROOT/'lib/softfloat/UPSTREAM.json').read_text())['selected_sources']:
                 obj = tmp / (n + '.o')
@@ -69,6 +73,13 @@ def main():
         assert run(source, software) == 0, ('control failed', software)
         print('x87 nesting and park: GREEN ' + ('emu' if software else 'hw'))
     if '--mutate' in sys.argv:
+        dispatch = (ROOT / 'arch/x86/kernel/x87_emu_dispatch.c').read_text()
+        anchor = 'res_owner_get() == appslot_cur() &&'
+        assert dispatch.count(anchor) == 1
+        rc = run(source, True, dispatch.replace(anchor,
+            '(u32)res_owner_get() == as->owner && ' + anchor))
+        assert rc != 0, 'ledger-owner-as-appslot survived'
+        print('ledger-owner-as-appslot: runtime RED rc=' + str(rc))
         for name, before, after in MUTATIONS:
             assert source.count(before) == 1
             rc = run(source.replace(before, after, 1))

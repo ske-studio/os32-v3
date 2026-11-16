@@ -10,17 +10,26 @@
 static bool eligible(const struct addrspace *as)
 {
     u32 cr0;
+#ifdef X87_HOST_TEST
+    extern u32 x87_test_cr0_read(void);
+    cr0 = x87_test_cr0_read();
+#else
     __asm__ volatile("mov %%cr0, %0" : "=r"(cr0));
+#endif
     AppSlot *slot = appslot_get(appslot_cur());
     return !arch_fp_present() && (cr0 & 4) && slot && slot->cpl3 &&
         slot->as && slot->as == as && as->generation && as->pd_phys &&
         slot->state != APP_STATE_ABORT_PENDING && slot->state != APP_STATE_FAULT_PENDING &&
-        (u32)res_owner_get() == as->owner && res_owner_get() == appslot_cur() &&
+        /* as->owner is a ledger ID; resource owners are appslot IDs.
+         * slot->as above establishes the current application's AS identity. */
+        res_owner_get() == appslot_cur() &&
         paging_current_cr3() == as->pd_phys;
 }
 #else
 extern bool x87_emu_test_eligible(const struct addrspace *as);
 #define eligible x87_emu_test_eligible
+#endif
+#if defined(X87_EMU_HOST_TEST) || defined(X87_HOST_TEST)
 #define irq_save() 0u
 #define irq_restore(flags) ((void)(flags))
 #endif
