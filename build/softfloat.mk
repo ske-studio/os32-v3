@@ -44,6 +44,7 @@ SOFTFLOAT_SQLITE_SOURCES := lib/softfloat/f32_to_f64.c \
 SOFTFLOAT_RESIDENT_SOURCES := lib/softfloat/f64_to_i32.c lib/softfloat/s_roundToI32.c lib/softfloat/softfloat_raiseFlags.c lib/softfloat/softfloat_state.c
 ifeq ($(ARCH),x86)
 # flags/config are also available to standalone host make queries.
+# kmath.o is built soft here; the kernel has no softfloat_abi, so calling fabs from the kernel would fail to link (__ltdf2). Callers must stay in SQLite.
 C_ARCH += lib/softfloat_bits.c $(SOFTFLOAT_RESIDENT_SOURCES)
 $(addprefix $(KERNEL_OBJ_PREFIX),lib/kmath.o lib/softfloat_bits.o $(SOFTFLOAT_RESIDENT_SOURCES:.c=.o)) $(addprefix $(BUILD_OUT)/r1/obj/,lib/kmath.o lib/softfloat_bits.o $(SOFTFLOAT_RESIDENT_SOURCES:.c=.o)): private KERNEL_CFLAGS += $(SOFTFLOAT_FLAGS)
 endif
