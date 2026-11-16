@@ -30,6 +30,10 @@ void arch_kapi_source(struct kapi_arg_source *src, const struct arch_syscall *ca
 int arch_kapi_read_block(struct kapi_arg_source *src, unsigned first,
                          unsigned count, struct kapi_values *out)
 {
+    if (!src->caller_valid) {
+        if (!caller_access_get_user(&src->caller)) return 0;
+        src->caller_valid = 1;
+    }
     const struct ppc_frame *frame = src->call->native;
     if (first > 8 || count > 8 - first || count > KAPI_FIXED_MAX) return 0;
     for (unsigned i = 0; i < count; i++)
@@ -41,8 +45,26 @@ int arch_kapi_read_block(struct kapi_arg_source *src, unsigned first,
 int arch_kapi_va_next(struct kapi_arg_source *src, enum kapi_value_kind kind,
                       u32 *value)
 {
-    (void)src; (void)kind; (void)value;
-    return 0;
+    const struct ppc_frame *frame = src->call->native;
+    u32 word;
+    /* Two fixed plus fourteen variable words, as in the public print window.
+     * Integers and pointers both occupy one SysV word. */
+    (void)kind;
+    if (src->next >= 16u || !src->caller_valid) return 0;
+    if (src->next < 8u) {
+        word = frame->gpr[3 + src->next];
+    } else {
+        /* SysV overflow arguments follow the 8-byte linkage area. The
+         * syscall_code.c stub leaves r1 unchanged, so use the saved user SP. */
+        u32 offset = 8u + (src->next - 8u) * sizeof(u32);
+        if (frame->gpr[1] > U32_MAX - offset - sizeof(u32)) return 0;
+        u32 address = frame->gpr[1] + offset;
+        if (!copy_caller_bytes(&src->caller, (const void *)(uptr)address,
+                               &word, sizeof(word))) return 0;
+    }
+    *value = word;
+    src->next++;
+    return 1;
 }
 
 u32 arch_kapi_invoke(void *wrapper, const struct kapi_values *values, unsigned count)

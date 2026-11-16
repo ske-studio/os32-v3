@@ -37,7 +37,7 @@ def main():
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
         shutil.copy(ROOT / 'Makefile', root)
-        for name in ('build', 'sdk', 'userland', 'include', 'drivers', 'lib', 'kdebug', 'hwdev'):
+        for name in ('build', 'sdk', 'userland', 'include', 'drivers', 'lib', 'kdebug', 'hwdev', 'tools'):
             shutil.copytree(ROOT / name, root / name,
                             ignore=shutil.ignore_patterns('out', '*.o', '*.d', '*.bin', '*.elf', '*.raw', 'target'))
         (root / 'net').mkdir()
@@ -47,7 +47,7 @@ def main():
         if '--mutate' in sys.argv:
             rule = root / 'build/ppc-user.mk'
             source = rule.read_text()
-            old = 'python3 sdk/link_guard.py --target ppc-powermac $(LD)'
+            old = 'python3 sdk/link_guard.py --target $(SDK_TARGET) $(LD)'
             assert source.count(old) == 1
             rule.write_text(source.replace(old, '$(LD)'))
             shutil.rmtree(root / 'build/out/ppc-user')

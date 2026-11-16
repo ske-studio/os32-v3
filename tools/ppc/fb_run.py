@@ -213,7 +213,7 @@ def accept(elf, cpu, out, mode):
 
 
 MUTATIONS = [
-    ('utf8-bytewise', 'userland/ppc/sh/runtime.c',
+    ('utf8-bytewise', 'userland/ppc/sh/newlib_runtime.c',
      '    /* Keep the kernel UTF-8 endpoint: bytewise putchar cannot decode glyphs. */',
      '    runtime_api.shell_print_utf8 = runtime_print_utf8;'),
     ('trace-screen', 'platform/powermac/console_log.c',
