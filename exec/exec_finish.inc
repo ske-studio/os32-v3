@@ -325,7 +325,7 @@ static void exec_finish(int id, int status, int kind)
         exec_restore_context(parent);
         exec_notify_owned(id, kind);
     }
-    io_syscall_end(id); /* IO_SYSCALL_EXIT */
+    (void)io_syscall_suspend(id); /* IO_SYSCALL_EXIT */
 }
 
 void exec_exit(int status, int kind)

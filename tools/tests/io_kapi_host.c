@@ -78,6 +78,7 @@ static int launch_chain(int id, int *chain, int cap)
 }
 #include "reclaim.inc"
 #include "park.inc"
+#include "child.inc"
 static int exercise(void)
 {
     unsigned int needed = 0;
@@ -114,6 +115,7 @@ static int exercise(void)
         start(2, 100 + kind, 1); owner = 2;
         io_syscall_max_count = 0; total_count = 0;
         if (kind < 2) io_syscall_begin(2);
+        if (kind == 1) io_syscall_begin(2); /* fault abandons both entries */
         total_count = 17 + kind;
         CHECK(set_budget(42) == 0 && budget() == 42);
         io_policy_owner_exit(2, 99 + kind);
@@ -143,16 +145,41 @@ static int exercise(void)
     start(2, 0, 1); owner = 2; CHECK(set_budget(42) == OS32_ERR_INVAL);
     io_syscall_max_count = 0; total_count = 0; owner = 2; fixture_enter();
     total_count = 13; io_syscall_end(2); CHECK(io_syscall_max_count == 13);
-    /* N5/P2: wrap, inactive end, and parent accounting across a child. */
+    /* N5/P2: wrap, inactive end, and a longer subsequent interval. */
     io_syscall_max_count = 0; total_count = 0xfffffff0u; io_syscall_begin(2);
     total_count = 32; io_syscall_end(2); CHECK(io_syscall_max_count == 48);
     total_count = 80; io_syscall_end(2); CHECK(io_syscall_max_count == 48);
     total_count = 100; io_syscall_begin(2);
-    total_count = 110; io_syscall_begin(3);
-    total_count = 140; io_syscall_end(3); CHECK(io_syscall_max_count == 48);
     total_count = 190; io_syscall_end(2); CHECK(io_syscall_max_count == 90);
     io_syscall_max_count = 0; total_count = 0; io_syscall_begin(2);
+    io_syscall_begin(2); /* park also abandons both entries */
     total_count = 29; fixture_park(2); CHECK(io_syscall_max_count == 29);
+    /* Reentrant WM callbacks share the outer owner's accounting interval. */
+    io_syscall_max_count = 0; total_count = 200; io_syscall_begin(2);
+    total_count = 250; io_syscall_begin(2);
+    total_count = 270; io_syscall_end(2); CHECK(io_syscall_max_count == 0);
+    total_count = 300; io_syscall_end(2); CHECK(io_syscall_max_count == 100);
+    /* exec_run's child may issue many syscalls; none belong to the parent. */
+    for (unsigned int nested = 0; nested < 2; ++nested) {
+        io_syscall_max_count = 0; total_count = 0; io_syscall_begin(2);
+        if (nested) io_syscall_begin(2);
+        total_count = 10;
+        u32 depth = fixture_child_commit(2);
+        CHECK(io_syscall_max_count == 10);
+        for (unsigned int i = 0; i < 6; ++i) {
+            io_syscall_begin(3); total_count += 10; io_syscall_end(3);
+        }
+        CHECK(io_syscall_max_count == 10);
+        fixture_parent_return(2, depth);
+        total_count += 15;
+        if (nested) { io_syscall_end(2); CHECK(io_syscall_max_count == 10); }
+        total_count += 5; io_syscall_end(2);
+        CHECK(io_syscall_max_count == 20);
+    }
+    /* A trusted launcher with no active syscall must remain inactive. */
+    u32 depth = fixture_child_commit(1);
+    CHECK(depth == 0); fixture_parent_return(1, depth);
+    total_count += 100; io_syscall_end(1); CHECK(io_syscall_max_count == 20);
     return 0;
 }
 void _start(void)

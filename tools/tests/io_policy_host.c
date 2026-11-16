@@ -169,6 +169,41 @@ static int exercise(void)
         CHECK(io_policy_generation() == gen + 1);
     }
     CHECK(get(after) && equal(before, after, 80));
+    /* GUI siblings can finish in either order: no dead owner's resurrection. */
+    for (unsigned int reverse = 0; reverse < 2; ++reverse) {
+        CHECK(io_policy_reset(0, 0) == 0);
+        row(p, 0, 1, 1, 201); CHECK(io_policy_set(p, 32, 2, 202) == 0);
+        row(p, 0, 1, 1, 303); CHECK(io_policy_set(p, 32, 3, 203) == 0);
+        gen = io_policy_generation();
+        io_policy_owner_exit(reverse ? 3 : 2, reverse ? 203 : 202);
+        CHECK(io_policy_lookup(1, &tier, &budget) == 0);
+        CHECK(budget == (reverse ? 201u : 303u));
+        CHECK(io_policy_generation() == gen + reverse);
+        io_policy_owner_exit(reverse ? 2 : 3, reverse ? 202 : 203);
+        CHECK(get(after) && equal(standard, after, 80));
+    }
+    /* Unlink the oldest beneath two survivors; patch its immediate successor. */
+    row(p, 0, 1, 1, 201); CHECK(io_policy_set(p, 32, 2, 302) == 0);
+    row(p, 0, 1, 1, 303); CHECK(io_policy_set(p, 32, 3, 303) == 0);
+    row(p, 0, 1, 1, 404); CHECK(io_policy_set(p, 32, 4, 304) == 0);
+    io_policy_owner_exit(2, 302);
+    CHECK(io_policy_lookup(1, &tier, &budget) == 0 && budget == 404);
+    io_policy_owner_exit(4, 304);
+    CHECK(io_policy_lookup(1, &tier, &budget) == 0 && budget == 303);
+    io_policy_owner_exit(3, 303);
+    CHECK(get(after) && equal(standard, after, 80));
+    /* Reused ID bypasses its old lifetime without reviving its policy later. */
+    row(p, 0, 1, 1, 201); CHECK(io_policy_set(p, 32, 2, 402) == 0);
+    row(p, 0, 1, 1, 303); CHECK(io_policy_set(p, 32, 3, 403) == 0);
+    row(p, 0, 1, 1, 202); CHECK(io_policy_set(p, 32, 2, 502) == 0);
+    io_policy_owner_exit(2, 402);
+    CHECK(io_policy_lookup(1, &tier, &budget) == 0 && budget == 202);
+    io_policy_owner_exit(2, 502);
+    CHECK(io_policy_lookup(1, &tier, &budget) == 0 && budget == 303);
+    io_policy_owner_exit(3, 403);
+    CHECK(get(after) && equal(standard, after, 80));
+    /* Restore the permanent test baseline for the existing reset checks. */
+    row(p, 0, 1, 1, 308); CHECK(io_policy_set(p, 32, 0, 0) == 0);
     /* First reset saves; repeated set/reset must preserve that source. */
     for (u32 incarnation = 0; incarnation < 3; ++incarnation) {
         gen = io_policy_generation();

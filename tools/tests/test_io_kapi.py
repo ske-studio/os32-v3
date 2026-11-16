@@ -2,7 +2,7 @@
 """C2/L1: actual public boundary, policy and extracted exec finish/kill bodies."""
 CHECK = dict(name='io-kapi-host', tier=1, budget=30, needs=[], covers=[
     'sdk/kapi.json', 'sdk/kapi_rust_gen.py', 'kernel/io_kapi.c', 'kernel/io_kapi.h', 'kernel/io_policy.c', 'kernel/io_policy.h',
-    'kernel/io_work.h', 'exec/exec_syscall.inc', 'exec/exec_finish.inc', 'exec/exec_schedule.inc',
+    'kernel/io_work.h', 'exec/exec_syscall.inc', 'exec/exec_finish.inc', 'exec/exec_schedule.inc', 'exec/exec_launch.inc',
     'exec/appslot.h', 'exec/shell_service.h', 'include/app_ids.h',
     'tools/tests/io_kapi_host.c', 'tools/tests/test_io_kapi.py', 'tools/tests/host32.py',
     'include/types.h', 'include/callconv.h', 'sdk/include/os32/os32_kapi_shared.h'],
@@ -21,11 +21,19 @@ import tempfile
 import host32
 
 MUTANTS = [
+    ('child interval close', 'io_parent_depth = io_syscall_suspend(launcher_id); /* IO_SYSCALL_CHILD */',
+     'io_parent_depth = 0; /* IO_SYSCALL_CHILD */'),
+    ('parent interval reopen', 'io_syscall_resume(launcher_id, io_parent_depth); /* IO_SYSCALL_PARENT */',
+     '(void)launcher_id; (void)io_parent_depth; /* IO_SYSCALL_PARENT */'),
+    ('same owner begin', 'if (syscall_depth[owner]++ != 0) return; /* IO_SYSCALL_NEST_BEGIN */',
+     '++syscall_depth[owner]; /* IO_SYSCALL_NEST_BEGIN */'),
+    ('same owner end', 'if (--syscall_depth[owner] != 0) return; /* IO_SYSCALL_NEST_END */',
+     '--syscall_depth[owner]; /* IO_SYSCALL_NEST_END */'),
     ('syscall entry', 'io_syscall_begin(io_owner);', '(void)io_owner;'),
     ('syscall maximum', 'io_syscall_max_count = elapsed; /* IO_SYSCALL_MAX */', '(void)elapsed; /* IO_SYSCALL_MAX */'),
     ('syscall active', 'syscall_active &= ~(1u << owner);', '(void)owner;'),
-    ('syscall exit', 'io_syscall_end(id); /* IO_SYSCALL_EXIT */', '(void)id; /* IO_SYSCALL_EXIT */'),
-    ('syscall park', 'io_syscall_end(id); /* IO_SYSCALL_PARK */', '(void)id; /* IO_SYSCALL_PARK */'),
+    ('syscall exit', '(void)io_syscall_suspend(id); /* IO_SYSCALL_EXIT */', '(void)id; /* IO_SYSCALL_EXIT */'),
+    ('syscall park', '(void)io_syscall_suspend(id); /* IO_SYSCALL_PARK */', '(void)id; /* IO_SYSCALL_PARK */'),
     ('Rust unsigned int', '"unsigned int":    "u32"', '"unsigned int":    "u16"'),
     ('Rust unsigned int pointer', '"unsigned int *":  "*mut u32"', '"unsigned int *":  "*mut u8"'),
     ('irq context', ' && !kctx_irq_depth', ''),
@@ -100,6 +108,13 @@ def exercise(root, work, sources, ppc):
     enter = enter[start:enter.index('    u32 result;', start)]
     (work/'park.inc').write_text('static void fixture_park(int id) {' + prefix + '}\n' +
                                'static void fixture_enter(void) {\n' + enter + '}\n')
+    launch = sources['exec_launch.inc']
+    close = next(line for line in launch.splitlines() if '/* IO_SYSCALL_CHILD */' in line)
+    reopen = next(line for line in launch.splitlines() if '/* IO_SYSCALL_PARENT */' in line)
+    (work/'child.inc').write_text(
+        'static u32 fixture_child_commit(int launcher_id) {\n'
+        '(void)launcher_id; volatile u32 io_parent_depth = 0;\n' + close + '\nreturn io_parent_depth;\n}\n'
+        'static void fixture_parent_return(int launcher_id, u32 io_parent_depth) {\n' + reopen + '\n}\n')
     cc = '/home/hight/opt/cross-ppc/bin/powerpc-elf-gcc' if ppc else 'gcc'
     machine = ['-mcpu=7450', '-mbig-endian', '-msoft-float', '-mno-altivec',
                '-msdata=none', '-mcall-sysv', '-mno-eabi'] if ppc else ['-no-pie']
@@ -116,7 +131,7 @@ def exercise(root, work, sources, ppc):
 def run(ctx):
     sources = {name: (ctx.root / prefix / name).read_text() for prefix, name in [
         ('sdk','kapi_rust_gen.py'), ('kernel','io_kapi.c'), ('kernel','io_policy.c'),
-        ('exec','exec_finish.inc'), ('exec','exec_schedule.inc'), ('exec','exec_syscall.inc')]}
+        ('exec','exec_finish.inc'), ('exec','exec_schedule.inc'), ('exec','exec_syscall.inc'), ('exec','exec_launch.inc')]}
     arches = [False]
     if Path('/home/hight/opt/cross-ppc/bin/powerpc-elf-gcc').is_file() and shutil.which('qemu-ppc'):
         arches.append(True)

@@ -7,7 +7,7 @@ STATIC_ASSERT(KAPI_PRINT_ARG_LIMIT == (RING3_ARG_WINDOW - KAPI_PRINT_FIXED_WORDS
 /* Each park origin checks admission before saving its selected frame here. */
 static void exec_park_transfer(int id, AppSlot *a, const struct arch_syscall *frame, void (*commit)(void))
 {
-    io_syscall_end(id); /* IO_SYSCALL_PARK */
+    (void)io_syscall_suspend(id); /* IO_SYSCALL_PARK */
     arch_user_save(&a->frame, frame);
     arch_fp_save(&a->fp_state);
     exec_heap_save_state(&a->exec_heap_used);

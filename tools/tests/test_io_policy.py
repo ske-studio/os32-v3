@@ -18,6 +18,8 @@ import host32
 # The local io.h replaces privileged instructions, not policy declarations.
 IRQ_HEADER = 'unsigned int irq_save(void);\nvoid irq_restore(unsigned int state);\n'
 MUTATIONS = [
+    ('remove-splice', 'saved[successor].table = saved[owner].table; /* POLICY_SPLICE */',
+     '(void)successor; /* no splice */'),
     ('commit-before-validation', 'defaults(&next); /* POLICY_BEFORE_VALIDATION */',
      'defaults(&next); (void)commit(&next, owner, gen);'),
     ('native-endian', 'value |= (u32)p[i] << (8 * i); /* POLICY_LE_READ */',

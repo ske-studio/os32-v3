@@ -72,13 +72,15 @@ void io_kapi_owner_exit(int owner)
         io_policy_owner_exit((u32)owner, gen); /* IO_KAPI_RECLAIM */
 }
 
-/* A parent's entry remains active while a nested child syscall runs.
- * Completion uses an explicit ID, even after exec restored the parent. */
+/* Count only the outermost same-owner entry. Child execution suspends the
+ * parent's interval, retaining its depth for the return to its own syscall. */
 static u32 syscall_start[APP_SLOT_COUNT], syscall_active;
+static u32 syscall_depth[APP_SLOT_COUNT];
 u32 io_syscall_max_count;
 void io_syscall_begin(int owner)
 {
     if (owner < APP_ID_SHELL || owner > APP_ID_MAX) return;
+    if (syscall_depth[owner]++ != 0) return; /* IO_SYSCALL_NEST_BEGIN */
     syscall_start[owner] = io_dispatch_total_count();
     syscall_active |= 1u << owner;
 }
@@ -86,7 +88,26 @@ void io_syscall_end(int owner)
 {
     if (owner < APP_ID_SHELL || owner > APP_ID_MAX ||
         !(syscall_active & (1u << owner))) return;
+    if (--syscall_depth[owner] != 0) return; /* IO_SYSCALL_NEST_END */
     u32 elapsed = io_dispatch_total_count() - syscall_start[owner];
     if (elapsed > io_syscall_max_count) io_syscall_max_count = elapsed; /* IO_SYSCALL_MAX */
     syscall_active &= ~(1u << owner);
+}
+
+/* Internal exec token: zero means the launcher was outside a syscall. */
+u32 io_syscall_suspend(int owner)
+{
+    if (owner < APP_ID_SHELL || owner > APP_ID_MAX) return 0;
+    u32 depth = syscall_depth[owner];
+    if (depth) {
+        syscall_depth[owner] = 1;
+        io_syscall_end(owner);
+    }
+    return depth;
+}
+void io_syscall_resume(int owner, u32 depth)
+{
+    if (!depth || owner < APP_ID_SHELL || owner > APP_ID_MAX) return;
+    io_syscall_begin(owner);
+    syscall_depth[owner] = depth;
 }
