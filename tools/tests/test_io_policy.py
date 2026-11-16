@@ -3,7 +3,7 @@
 CHECK = dict(name='io-policy-host', tier=1, budget=20, needs=[], covers=[
     'kernel/io_policy.c', 'kernel/io_policy.h', 'tools/tests/io_policy_host.c',
     'tools/tests/test_io_policy.py', 'tools/tests/host32.py', 'include/types.h',
-    'include/callconv.h', 'sdk/include/os32/os32_kapi_shared.h'],
+    'include/callconv.h', 'sdk/include/os32/os32_kapi_shared.h', 'exec/appslot.h'],
     basis=['IO_TIER_DESIGN §4', '§8', 'AC-IO-2'],
     env_limit='PPC byte-order runtime needs powerpc-elf-gcc and qemu-ppc user mode')
 
@@ -42,12 +42,14 @@ def exercise(root, work, source, ppc=False):
                 'bin/powerpc-elf-gcc') if ppc else 'gcc'
     machine = ['-mcpu=7450', '-mbig-endian', '-msoft-float', '-mno-altivec',
                '-msdata=none', '-mcall-sysv', '-mno-eabi'] if ppc else ['-no-pie']
+    arch_include = root / 'arch/ppc' if ppc else root / 'arch/x86'
     subprocess.run([str(compiler), '-m32', '-std=gnu11', '-O2', '-Wall', '-Wextra',
         '-Werror', '-Werror=vla', '-Werror=implicit-int',
         '-Werror=implicit-function-declaration', '-ffreestanding', '-fno-pie',
         '-fno-stack-protector', '-nostdlib', '-static', *machine,
         '-I' + str(work), '-I' + str(root / 'include'),
         '-I' + str(root / 'kernel'), '-I' + str(root / 'sdk/include/os32'),
+        '-I' + str(root / 'exec'), '-I' + str(root / 'mm'), '-I' + str(arch_include),
         str(root / 'tools/tests/io_policy_host.c'), str(work / 'io_policy.c'),
         '-o', str(exe)], check=True)
     args = ['qemu-ppc', str(exe)] if ppc else [str(exe)]

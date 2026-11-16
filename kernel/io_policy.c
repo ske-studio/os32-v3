@@ -2,9 +2,10 @@
 #include "io_policy.h"
 #include "io.h"
 #include "os32_kapi_shared.h"
+#include "appslot.h"
 
 #define POLICY_SERVICES 4
-#define POLICY_OWNER_COUNT 6 /* docs/09_exec: kernel 0, shell 1, apps 2..5. */
+#define POLICY_OWNER_COUNT (APP_ID_MAX + 1)
 #define POLICY_HEADER_SIZE 16u
 #define POLICY_ENTRY_SIZE 16u
 #define POLICY_WIRE_MAX 16u
