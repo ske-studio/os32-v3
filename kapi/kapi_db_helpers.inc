@@ -346,8 +346,8 @@ static int shm_write_row(DbSlot *slot)
         }
         case SQLITE_FLOAT: {
             /* float は i32 に切り捨て (簡易対応) */
-            double dval = sqlite3_column_double(slot->active_stmt, i);
-            i32 ival = (i32)dval;
+            i32 ival = softfp_f64_to_i32_trunc(
+                os32_sqlite_column_f64_bits(slot->active_stmt, i));
             cols[i].type = DB_TYPE_FLOAT;
             cols[i].length = sizeof(i32);
             if (remaining >= (i32)sizeof(i32)) {

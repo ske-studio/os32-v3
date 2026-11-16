@@ -16,6 +16,7 @@
 #include "os32_sqlite_outer.h"
 #include "kstring.h"
 #include "utf8.h"
+#include "softfloat_bits.h"
 #include "kprintf.h"
 #include "os32_sqlite_vfs.h"
 #include "memmap.h"

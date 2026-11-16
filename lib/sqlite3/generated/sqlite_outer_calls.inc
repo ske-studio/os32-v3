@@ -11,7 +11,7 @@ static int stub_bind_blob(sqlite3_stmt *stmt, int index, const void *value, int 
 static int stub_bind_parameter_count(sqlite3_stmt *stmt) { (void)stmt; return 0; }
 static int stub_column_count(sqlite3_stmt *stmt) { (void)stmt; return 0; }
 static int stub_column_int(sqlite3_stmt *stmt, int column) { (void)stmt; (void)column; return 0; }
-static double stub_column_double(sqlite3_stmt *stmt, int column) { (void)stmt; (void)column; return 0; }
+static u64 stub_column_f64_bits(sqlite3_stmt *stmt, int column) { (void)stmt; (void)column; return 0; }
 static const unsigned char * stub_column_text(sqlite3_stmt *stmt, int column) { (void)stmt; (void)column; return 0; }
 static const void * stub_column_blob(sqlite3_stmt *stmt, int column) { (void)stmt; (void)column; return 0; }
 static int stub_column_bytes(sqlite3_stmt *stmt, int column) { (void)stmt; (void)column; return 0; }
@@ -51,7 +51,7 @@ const SqliteModuleApi sqlite_stub_api = {
     .bind_parameter_count = stub_bind_parameter_count,
     .column_count = stub_column_count,
     .column_int = stub_column_int,
-    .column_double = stub_column_double,
+    .column_f64_bits = stub_column_f64_bits,
     .column_text = stub_column_text,
     .column_blob = stub_column_blob,
     .column_bytes = stub_column_bytes,
@@ -247,17 +247,17 @@ int os32_sqlite_column_int(sqlite3_stmt *stmt, int column)
     sqlite_engine_run(call_column_int, &f, 0);
     return f.result;
 }
-typedef struct { sqlite3_stmt *stmt; int column; double result; } Call_column_double;
-static void call_column_double(void *arg) {
-    Call_column_double *f = arg;
+typedef struct { sqlite3_stmt *stmt; int column; u64 result; } Call_column_f64_bits;
+static void call_column_f64_bits(void *arg) {
+    Call_column_f64_bits *f = arg;
     (void)f;
-    f->result = sqlite_module_api->column_double(f->stmt, f->column);
+    f->result = sqlite_module_api->column_f64_bits(f->stmt, f->column);
 }
-double os32_sqlite_column_double(sqlite3_stmt *stmt, int column)
+u64 os32_sqlite_column_f64_bits(sqlite3_stmt *stmt, int column)
 {
-    Call_column_double f = {stmt, column, 0};
-    if (!sqlite_module_ready()) return sqlite_module_api->column_double(stmt, column);
-    sqlite_engine_run(call_column_double, &f, 0);
+    Call_column_f64_bits f = {stmt, column, 0};
+    if (!sqlite_module_ready()) return sqlite_module_api->column_f64_bits(stmt, column);
+    sqlite_engine_run(call_column_f64_bits, &f, 0);
     return f.result;
 }
 typedef struct { sqlite3_stmt *stmt; int column; const unsigned char * result; } Call_column_text;

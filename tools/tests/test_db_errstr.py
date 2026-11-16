@@ -30,7 +30,7 @@ TT2: 旧 db-v50 の API 25 ケース・回収順の番人・変異 3 本と、
 """
 import sqlite_cc
 CHECK = dict(name='db-errstr-host', tier=1,
-    covers=['tools/tests/sqlite_cc.py', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'fs/vfs_fd.c', 'fs/vfs_fd_stdin.inc', 'fs/vfs_stdin.h', 'exec/exec.h', 'kapi/kapi_db.c', 'lib/sqlite3/os32_sqlite_outer.h', 'lib/sqlite3/os32_sqlite_vfs.c', 'lib/sqlite3/sqlite3.c', 'tools/tests/db_errstr_host.c', 'tools/tests/vfs_fd_sqlite_host.c', 'tools/tests/mutpar.py', 'exec/exec.c', 'exec/appslot.h', 'include/memmap.h', 'include/appmem_types.h', 'include/ksetjmp.h', 'mm/paging.h', 'mm/physmem.h', 'kdebug/kselftest.c', 'kdebug/kselftest/**', 'mm/paging.c', 'tools/tests/kapi_db_v50_host.c', 'kernel/ime/ime_dict.c', 'kernel/ime/ime_conn.c', 'kernel/ime/ime_user_store.c', 'kernel/ime/ime_store.h', 'tools/tests/fep_store_host.h', 'lib/kstring.h', 'kernel/ime/ime.h', 'tools/tests/kapi_db_owned_host.c', 'tools/tests/db_group_shim.h', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h', 'tools/tests/serial_emergency_host.h', 'kernel/serial_diag.c', 'include/console_output.h', 'lib/serial_diag.h', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'kapi/kapi_db_*.inc', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h'],
+    covers=['include/app_ids.h', 'tools/tests/sqlite_bits_host.h', 'lib/softfloat/**', 'lib/softfloat_bits.c', 'lib/softfloat_bits.h', 'tools/tests/sqlite_cc.py', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'fs/vfs_fd.c', 'fs/vfs_fd_stdin.inc', 'fs/vfs_stdin.h', 'exec/exec.h', 'kapi/kapi_db.c', 'lib/sqlite3/os32_sqlite_outer.h', 'lib/sqlite3/os32_sqlite_vfs.c', 'lib/sqlite3/sqlite3.c', 'tools/tests/db_errstr_host.c', 'tools/tests/vfs_fd_sqlite_host.c', 'tools/tests/mutpar.py', 'exec/exec.c', 'exec/appslot.h', 'include/memmap.h', 'include/appmem_types.h', 'include/ksetjmp.h', 'mm/paging.h', 'mm/physmem.h', 'kdebug/kselftest.c', 'kdebug/kselftest/**', 'mm/paging.c', 'tools/tests/kapi_db_v50_host.c', 'kernel/ime/ime_dict.c', 'kernel/ime/ime_conn.c', 'kernel/ime/ime_user_store.c', 'kernel/ime/ime_store.h', 'tools/tests/fep_store_host.h', 'lib/kstring.h', 'kernel/ime/ime.h', 'tools/tests/kapi_db_owned_host.c', 'tools/tests/db_group_shim.h', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h', 'tools/tests/serial_emergency_host.h', 'kernel/serial_diag.c', 'include/console_output.h', 'lib/serial_diag.h', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'kapi/kapi_db_*.inc', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h'],
     needs=[], budget=9.6,
     kind='characterization',
 )
@@ -236,11 +236,11 @@ def run_api_mutations(tmp, sqlite_obj, exe):
              "        !sql_copy_buf[0]) return -1;")
     assert original.count(guard) == 3
     vfs_original = (ROOT / "lib/sqlite3/os32_sqlite_vfs.c").read_text()
-    appslot = (ROOT / "exec/appslot.h").read_text()
+    appslot = (ROOT / "include/app_ids.h").read_text()
     pool = "#define APP_MAX_APPS     4"
     assert appslot.count(pool) == 1
     mutations = [
-        ("DB diagnostics must cover app ID pool", "exec/appslot.h",
+        ("DB diagnostics must cover app ID pool", "include/app_ids.h",
          appslot.replace(pool, "#define APP_MAX_APPS     5"), "v50_selftest"),
         ("finalize before copy refusal", "kapi/kapi_db.c", original.replace(guard, "    if (slot->active_stmt) { sqlite3_finalize(slot->active_stmt); slot->active_stmt = 0; }\n" + guard), "prepare_replaces"),
         ("SQL truncation", "kapi/kapi_db.c", original.replace(guard, "    if (!sql) return -1;\n    kstrncpy(sql_copy_buf, sql, SQL_COPY_BUF_SIZE);\n    if (!sql_copy_buf[0]) return -1;"), "prepare_replaces"),
@@ -250,6 +250,8 @@ def run_api_mutations(tmp, sqlite_obj, exe):
         mutant = tmp / pathlib.Path(path).name
         mutant.write_text(changed)
         fixture = (ROOT / "tools/tests/kapi_db_v50_host.c").read_text()
+        if path == 'include/app_ids.h':
+            fixture = '#include "' + str(mutant) + '"\n' + fixture
         fixture = fixture.replace('../../' + path, str(mutant))
         fixture = fixture.replace('"../../', '"' + str(ROOT) + '/')
         host = tmp / "mutant.c"
