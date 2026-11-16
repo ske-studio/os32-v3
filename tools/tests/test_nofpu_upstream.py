@@ -141,6 +141,8 @@ def main():
                 print('truncated-function-range: integrity RED')
             else:
                 raise AssertionError('truncated range survived')
+        else:
+            print('SKIP truncated-function-range: source absent')
 
 
 def run(ctx):

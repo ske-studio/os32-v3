@@ -527,3 +527,9 @@ A3 の宣言 (`arch/x86/kernel/x87.h` に追加):
 int arch_fp_present(void);
 int x87_probe_nm(u32 saved_cs, u32 saved_eflags, u32 *saved_eip);
 ```
+
+## 波 A の取り込みで後の段へ送る項目 (2026-11-16、Opus レビュー)
+
+- B16・B17: `VerSnapshot.fpu_present` は 0 が none(emu)。B17 (表示) だけ先に入ると FPU の有る機体でも none(emu) と出るので、B16 (収集) と B17 は同じ統合の枝で入れる。
+- B4: `x87_emu_state` は FNSAVE と同じ 108 byte だが reg は物理順 (R0..R7)。arch_fp_context との受け渡しは必ず codec を通し、memcpy しない (依頼に 1 行書く)。
+- B12: 依頼に §3.3 の wire (`column_f64_bits`、u64) を明記する。
