@@ -7,10 +7,51 @@
 #include "../../kernel/time/ktime.h"
 #include "tick_clock.h"
 #include "tsc_clock.h"
+#include "kernel/io_clock.h"
+#include "io.h"
 
 STATIC_ASSERT(OS32_TICK_HZ == PIT_HZ, logical_tick_hz_match);
 
 static int clock_config_rc = OS32_ERR_NOSYS;
+enum { IO_PC98_PIT = 1, IO_PC98_TSC = 2 };
+static u32 io_source, io_generation, io_tsc_generation, io_mul, io_shift;
+
+/* P5/P7: numerator/denominator counts per us. Start at shift 31 so
+ * even the reciprocal of a TSC shift=32 fits u64; extend by one bit
+ * from the remainder, then reduce until mul fits u32. Preparation only. */
+static void io_rate_config(unsigned long long numerator, u32 denominator)
+{
+    unsigned long long n = numerator << 31;
+    unsigned long long m = n / denominator; /* IO_MUL_FLOOR */
+    io_shift = 31;
+    if (m < 0x80000000ULL) {
+        m = m * 2 + ((n % denominator) * 2) / denominator;
+        ++io_shift;
+    }
+    while (m > 0xffffffffULL) { m >>= 1; --io_shift; }
+    io_mul = (u32)m;
+}
+
+/* Caller holds IF=0. Only a source/calibration change rebuilds the rate. */
+static int io_clock_refresh(void)
+{
+    u32 mult, shift, generation;
+    const struct pit_setup *ps = pit_get_setup();
+    if (pc98_tsc_rate(&mult, &shift, &generation) == 0) {
+        if (io_source == IO_PC98_TSC && io_tsc_generation == generation) return 0;
+        io_rate_config(1ULL << shift, mult);
+        io_tsc_generation = generation;
+        io_source = IO_PC98_TSC;
+    } else {
+        if (clock_config_rc || !ps->valid || ps->mode != PIT_MODE_TIMER0 || !ps->reload)
+            return OS32_ERR_NOSYS;
+        if (io_source == IO_PC98_PIT) return 0;
+        io_rate_config(ps->clk_hz, 1000000u);
+        io_source = IO_PC98_PIT;
+    }
+    ++io_generation; /* IO_SOURCE_GENERATION */
+    return 0;
+}
 
 int platform_clock_init(u32 tick_hz)
 {
@@ -19,6 +60,11 @@ int platform_clock_init(u32 tick_hz)
     clock_config_rc = OS32_ERR_NOSYS;
     if (ps->valid) {
         clock_config_rc = tick_clock_config(ps->reload, ps->clk_hz);
+        if (clock_config_rc == 0) {
+            io_rate_config(ps->clk_hz, 1000000u);
+            io_source = IO_PC98_PIT;
+            ++io_generation;
+        }
         tick_budget_config();
         if (clock_config_rc == 0) (void)pc98_tsc_init();
     }
@@ -94,4 +140,66 @@ int platform_clock_read_us(u32 *lo, u32 *hi)
     last = us; was_tsc = ready;
     *lo = (u32)us; *hi = (u32)(us >> 32);
     return 0;
+}
+
+/* Physical PIT periods plus the current phase, never a us round trip. */
+static int io_pit_count(u32 *out)
+{
+    const struct pit_setup *ps = pit_get_setup();
+    for (int tries = 0; tries < TIME_RETRY_MAX; ++tries) {
+        struct platform_timer_sample sample;
+        struct time_snapshot decision;
+        u32 low, high;
+        platform_timer_sample(&sample);
+        tick_clock_raw(&low, &high);
+        if (time_decide(sample.p1, sample.p2, 0, sample.count, &decision) == TIME_DECIDE_OK) {
+            *out = (low + decision.tick) * ps->reload +
+                   (decision.count <= ps->reload ? ps->reload - decision.count : 0);
+            return 0;
+        }
+    }
+    return OS32_ERR_AGAIN;
+}
+static int io_read(u32 *count, u32 *source, u32 *generation)
+{
+    unsigned int flags = irq_save();
+    u32 value, high;
+    int rc = io_clock_refresh();
+    if (!rc) {
+        if (io_source == IO_PC98_TSC)
+            __asm__ volatile("rdtsc" : "=a"(value), "=d"(high) : : "memory");
+        else rc = io_pit_count(&value);
+        if (!rc) { *count = value; *source = io_source; *generation = io_generation; }
+    }
+    irq_restore(flags);
+    return rc;
+}
+static int io_us_to_count(u32 us, u32 source, u32 generation, u32 *count)
+{
+    unsigned int flags = irq_save();
+    int rc = io_clock_refresh();
+    if (!rc && (source != io_source || generation != io_generation)) rc = OS32_ERR_AGAIN;
+    if (!rc) {
+        unsigned long long value = ((unsigned long long)us * io_mul) >> io_shift;
+        if (value >= 0x80000000ULL) rc = OS32_ERR_AGAIN;
+        else *count = (u32)value;
+    }
+    irq_restore(flags);
+    return rc;
+}
+static int io_read_us(u32 *lo, u32 *hi)
+{
+    unsigned int flags = irq_save();
+    int rc = platform_clock_read_us(lo, hi);
+    irq_restore(flags);
+    return rc;
+}
+const struct io_clock_ops pc98_io_clock_ops = {io_read, io_us_to_count, io_read_us};
+/* P6: let --gc-sections discard the uncalled installer until A5 is linked. */
+__attribute__((section(".text.pc98_io_clock_install")))
+void pc98_io_clock_install(void)
+{
+    unsigned int flags = irq_save();
+    if (io_clock_refresh() == 0) io_clock_set_ops(&pc98_io_clock_ops);
+    irq_restore(flags);
 }

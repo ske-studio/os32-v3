@@ -8,6 +8,8 @@ int pc98_tsc_init(void);
 void pc98_tsc_calibrate_work(void);
 int pc98_tsc_read_us(u32 *lo, u32 *hi); /* Preserves IF and failed outputs. */
 int pc98_tsc_ready(void);
+/* Consistent cycles -> microseconds coefficient and calibration generation. */
+int pc98_tsc_rate(u32 *mult, u32 *shift, u32 *generation);
 /* Pure fixed point operations; fractional remainder belongs to the epoch. */
 unsigned long long tsc_scale(unsigned long long delta, u32 mult, u32 shift,
                              u32 fraction, u32 *remainder);

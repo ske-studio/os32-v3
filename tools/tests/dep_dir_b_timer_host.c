@@ -60,6 +60,10 @@ void io_wait_n(int n) { event('T', 0, (unsigned int)n); }
 #include "clock_source.inc"
 #include "pit_source.inc"
 int pc98_tsc_init(void) { return -1; }
+int pc98_tsc_rate(u32 *m, u32 *s, u32 *g)
+{ (void)m; (void)s; (void)g; return OS32_ERR_NOSYS; }
+struct io_clock_ops;
+void io_clock_set_ops(const struct io_clock_ops *ops) { (void)ops; }
 int pc98_tsc_ready(void) { return 0; }
 int pc98_tsc_read_us(u32 *lo, u32 *hi) { (void)lo; (void)hi; return -1; }
 #include "ktime_source.inc"
