@@ -587,3 +587,16 @@ C1 照合に使い、FISTTP opcode は従来どおり公開しない。B10/C3/C4
 - 試験版の段: `arch/x86/kernel/x87.c` の `OS32_TEST_NOFPU` を隔離試験ビルド専用とする。`OS32_X87_EMU_LINKED` 必須 (無ければコンパイルエラー)、probe 後にソフト経路を選び EM/MP/TS=1 を要求する。通常の build 設定には追加しない。
 - B17: CPU 行は 52 桁の制約内に収めるため `x86 32-bit; calib=...; FPU=...` とする。PPC の収集は hw 固定。
 - P3: FLDCW の予約 CW bit を codec と同じ `(cw & 0x1f3f) | 0x0040` に正規化する。
+
+## 判定と #NM の段の取り込みで後の段へ送る項目 (2026-11-17、Opus レビュー)
+
+- 結線の段 (エミュレータを像にリンクする段):
+  - ver_format.c:104 の表示をリンクの旗で分ける。エミュレータを組んでいない像で FPU の無い機体は「none」と出す。組んだ像は「none(emu)」と出す。
+  - 変異を 3〜4 本足す。対象は次のとおり。
+    - ハンドラの順 (probe より先に emulate する)
+    - asm で元の segment を pop しない
+    - VM の分岐
+    - 試験の旗の #error
+- 受入: FPU の有る機体で 486DX 以上に NE=1 を立てた後、アプリが例外の mask を外したときの #MF (CPL3 は kill) を確かめる。
+  - NP21/W の受入は NOFPU-1 の範囲で行う。
+  - 実機の Celeron (Ra266) での確認は、台帳の T4T7-RH と同じ次の実機の回に載せる (DEFERRED_TESTS の NOFPU-1 の行に追記)。
