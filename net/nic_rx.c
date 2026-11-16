@@ -39,6 +39,10 @@ u32 net_rx_demux_budget(const struct NetNicOps *ops, const u8 local[6],
     static const u8 broadcast[ETH_ALEN] = {255, 255, 255, 255, 255, 255};
     u32 count = 0;
     for (;;) {
+        /* Keep frames in the NIC while the link queue is full: link_tick drains
+         * it every tick, so ACK/RESP bursts wait instead of being dropped. The
+         * SFS queue may stay full with no reader, so it still drops newest. */
+        if (link_queue.count == RX_SLOTS) { net_rx_schedule(); break; }
         /* Include clock costs, preserving the guarantee if rescue cannot run. */
         if (!rx_work_take(b)) { net_rx_schedule(); break; }
         if (!(tick_budget_peek(tick_budget_cnt(IRQ0_SLOT_BUDGET_US / 2),
