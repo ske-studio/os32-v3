@@ -40,6 +40,27 @@ PINS = {
 ENTRIES_SHA256 = '6cee0078089816c0722d58f691b84279a758cf3ab06fdc7212d592154cd9f58d'
 
 
+# Fixed expectations: 撤去の前の hid_kbd_map.c (9e78dc73).
+LEGACY_SC = bytes.fromhex(
+    "ffffffff1d2d2b1f1220212217232425"
+    "2f2e181910131e14162c112a15290102"
+    "030405060708090a1c000e0f340b0c1a"
+    "1b28282627ff30313271626364656667"
+    "68696a6b525361ff60383e36393f373c"
+    "3b3d3aff414540491c4a4b4c46474842"
+    "43444e50ffffff4dffffffffffffffff"
+    "ffffffffffffffffffffffffffffffff"
+    "ffffffffff4fff33720d3551ffffffff"
+    "ffffffffffffffffffffffffffffffff"
+    "ffffffffffffffffffffffffffffffff"
+    "ffffffffffffffffffffffffffffffff"
+    "ffffffffffffffffffffffffffffffff"
+    "ffffffffffffffffffffffffffffffff"
+    "747073ff747073ffffffffffffffffff"
+    "ffffffffffffffffffffffffffffffff"
+)
+
+
 def array(text, name, count):
     match = re.search(r'const u8 '+name+r'\['+str(count)+r'\] = \{(.*?)\};', text, re.S)
     assert match, name
@@ -90,11 +111,8 @@ def validate(text):
     data = b''.join(v.to_bytes(2, 'big') for row in entries for v in row)
     assert hashlib.sha256(data).hexdigest() == ENTRIES_SHA256, 'all-usage entries'
     compat = array(text, 'hid_jp_compat_sc', 256)
-    legacy = (ROOT/'drivers/usb/hid_kbd_map.c').read_text()
-    cases = {int(u, 16): int(sc, 16) for u, sc in re.findall(
-        r'case 0x([0-9a-f]+): return 0x([0-9a-f]+);', legacy)}
     for u in range(256):
-        assert compat[u] == {0x90: 0x72, 0x91: 0x51}.get(u, cases.get(u, 0xff)), hex(u)
+        assert compat[u] == {0x90: 0x72, 0x91: 0x51}.get(u, LEGACY_SC[u]), hex(u)
     assert compat[0xe3] == compat[0xe7] == 0xff
     bits = array(text, 'hid_jp_norepeat', 32)
     order = array(text, 'hid_jp_order', 64)

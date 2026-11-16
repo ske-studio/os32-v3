@@ -16,8 +16,9 @@ import test_usb_core
 ROOT = Path(__file__).resolve().parents[2]
 SOURCES = test_usb_ohci.SOURCES + [s + '.c' for s in test_usb_core.SOURCES] + [
     'hid_kbd.c', 'hid_kbd_map.c', 'hid_mouse.c']
+SOURCES = ['drivers/usb/' + s for s in SOURCES] + ['input/keymaps/hid_jp.c']
 CHECK = dict(env=['ppc-cross'], name='usb-stack', tier=1, needs=[], budget=60, covers=[
-    'drivers/usb/*.[ch]', 'include/usb_platform.h', 'include/types.h',
+    'drivers/usb/*.[ch]', 'input/keymaps/hid_jp.c', 'input/hal/keymap.h', 'include/usb_platform.h', 'include/types.h',
     'include/callconv.h', 'include/endian_le.h', 'include/endian_dma.h',
     'arch/*/arch_endian_dma.h', 'lib/kstring.h',
     'tools/tests/test_usb_stack.py', 'tools/tests/usb_stack_host.c',
@@ -57,7 +58,7 @@ def build(tmp, tree, swap):
              '-I' + str(tmp / 'fake-arch'), '-I' + str(tree / 'include'),
              '-I' + str(tree), *(['-DUSB_TEST_SWAP'] if swap else []),
              str(tree / 'tools/tests/usb_stack_host.c'),
-             *[str(tree / 'drivers/usb' / s) for s in SOURCES], '-o', str(exe)])
+             *[str(tree / s) for s in SOURCES], '-o', str(exe)])
     return exe
 
 
@@ -84,7 +85,10 @@ def cross_compile(tmp, tree):
              'powerpc-elf-gcc', 'ppc')]:
         compiler = Path(os.environ.get(env, default)) / 'bin' / name
         if not compiler.is_file():
-            print('SKIP cross compile:', compiler, flush=True)
+            label = 'FAIL' if arch == 'ppc' and os.environ.get('OS32_REQUIRE_PPC') == '1' else 'SKIP'
+            print(label + ' cross compile:', compiler, flush=True)
+            if label == 'FAIL':
+                raise RuntimeError('required PowerPC compiler missing')
             continue
         for rel in ['tools/tests/usb_stack_host.c', 'drivers/usb/usb_hc_dead.c']:
             command([str(compiler), *FLAGS, '-I' + str(tmp / 'fake-arch'),
@@ -98,7 +102,7 @@ def check(mutate):
     with tempfile.TemporaryDirectory(prefix='usb-stack-') as directory:
         tmp = Path(directory)
         tree = tmp / 'tree'
-        for rel in ['drivers/usb', 'include', 'arch/x86', 'arch/ppc']:
+        for rel in ['drivers/usb', 'include', 'arch/x86', 'arch/ppc', 'input/hal', 'input/keymaps']:
             shutil.copytree(ROOT / rel, tree / rel)
         (tree / 'lib').mkdir()
         shutil.copyfile(ROOT / 'lib/kstring.h', tree / 'lib/kstring.h')
