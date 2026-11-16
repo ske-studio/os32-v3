@@ -1,6 +1,6 @@
 """Finite cooperative RX and bounded e82557 IRQ rescue, without libc."""
 CHECK = dict(name='net-rx-work-host', tier=4, needs=[], budget=8,
-    covers=['net/link_platform.h', 'platform/pc98/link_platform_inline.h', 'net/nic.c', 'net/nic.h', 'net/nic_rx.c', 'net/nic_rx.h',
+    covers=['kernel/time/tick_clock.h', 'net/link_platform.h', 'platform/pc98/link_platform_inline.h', 'net/nic.c', 'net/nic.h', 'net/nic_rx.c', 'net/nic_rx.h',
             'net/rx_work.c', 'net/rx_work.h', 'net/link.h',
             'kernel/idle_work.c', 'kernel/idle_work.h', 'kernel/irq/tick.h',
             'kernel/irq/tick_budget.h', 'kernel/irq/tick_budget.c',

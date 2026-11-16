@@ -8,6 +8,7 @@
 #include "link_platform.h"
 #include "link_platform_inline.h"
 #include "clock_source.h"
+#include "kernel/time/tick_clock.h"
 #include "kernel/irq/tick_budget.h"
 #include "irq.h"
 #include "nic_rx.h"
@@ -26,6 +27,8 @@ static int fixed_peer, ticking, tick_registered;
 static int pending, idle_registered, unbind_due, link_due, poll_due;
 static u32 reset_due, last_idle_jiffy, batch_depth;
 static struct rx_work_budget batch_budget;
+static u32 last_idle_ms;
+static int idle_ms_valid;
 static void net_rx_idle(void);
 #ifdef TICK_PROBE
 u32 net_link_deferred, net_link_deferred_max_us;
@@ -73,6 +76,7 @@ int net_bind(const struct NetNicOps *ops)
             fixed_peer = 0;
             link_init(local_mac);
             pending = link_due = poll_due = unbind_due = 0;
+            idle_ms_valid = 0;
             last_idle_jiffy = link_platform_now();
             bound = ops;
         }
@@ -245,6 +249,17 @@ static int rx_service(int idle)
     ticking = 1;
     if (idle) last_idle_jiffy = link_platform_now();
     pending = 0;
+    /* FG1 only; keep poll and deferred link progress under the NIC guard.
+     * This clock gates foreground work only: RTO still uses jiffies. */
+    if (idle) {
+        u32 ms = tick_clock_ms();
+        if (!idle_ms_valid || ms != last_idle_ms) {
+            last_idle_ms = ms;
+            idle_ms_valid = 1;
+            bound->poll();
+            link_due = 1; /* Foreground progress, consumed by rx_finish. */
+        }
+    }
     link_platform_unlock(flags);
     b = batch_depth ? &batch_budget : &local;
     if (!batch_depth) rx_work_begin(b);

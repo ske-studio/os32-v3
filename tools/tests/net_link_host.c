@@ -188,6 +188,7 @@ u32 net_rx_credit_bytes(void)
 volatile u32 kctx_irq_depth;
 volatile u32 tick_count = 0;
 u32 link_platform_now(void) { return tick_count; }
+u32 tick_clock_ms(void) { return tick_count * 10u; }
 static int  irq_depth = 0;              /* IF=0 のネスト段数 */
 static u32  timer_deferred = 0;         /* IF=0 中に延期した tick 数 */
 static u32  timer_ran = 0;

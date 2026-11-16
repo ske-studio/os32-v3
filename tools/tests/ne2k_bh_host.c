@@ -17,7 +17,8 @@ static void bh_wait_check(void)
     waits++;
 }
 static int queued_tx(const void *frame, u32 len) { return ne2k_send(frame, len); }
-static const struct NetNicOps bh_ops = { .tx = queued_tx };
+static void bh_poll(void) {} /* Driver BH is exercised directly by this fixture. */
+static const struct NetNicOps bh_ops = { .tx = queued_tx, .poll = bh_poll };
 
 static void run_entry(unsigned int entry, int reset_fault)
 {
@@ -251,7 +252,7 @@ static int bh_recv(void *out, u32 cap, u32 *len)
     *len = n;
     return rc;
 }
-static const struct NetNicOps receive_ops = { .tx = queued_tx, .rx = bh_recv };
+static const struct NetNicOps receive_ops = { .tx = queued_tx, .rx = bh_recv, .poll = bh_poll };
 static void same_bh_demux(void)
 {
     device_init();
@@ -273,3 +274,5 @@ void net_rx_reset(u16 protocol) { (void)protocol; }
 void link_tick(void) {}
 
 int tick_budget_peek(u32 share, u32 tail) { (void)share; (void)tail; return 1; }
+
+u32 tick_clock_ms(void) { return tick_count * 10u; }

@@ -3,6 +3,9 @@
 volatile u32 kctx_irq_depth;
 volatile u32 tick_count;
 u32 link_platform_now(void) { return tick_count; }
+static u32 foreground_ms;
+static int fine_clock;
+u32 tick_clock_ms(void) { return fine_clock ? foreground_ms : tick_count * 10u; }
 static unsigned int test_if;
 static int tx_result, tx_calls;
 static u32 credit_bytes, tx_length;
@@ -344,9 +347,74 @@ static int verify_rx(void)
     CHECK(rx_calls > 0 && test_if == 0);
     return 0;
 }
+/* Foreground services advertise once per ms; repeated calls in that ms coalesce. */
+static int verify_window_cadence(void)
+{
+    const u8 mac[6] = {2, 3, 4, 5, 6, 7};
+    u8 response[LINK_RESP_LEN];
+    link_init(mac); link_state = LINK_S_UP; link_hs_due = 0;
+    link_hello_ok = 1; link_epoch = 3; link_sess = 9;
+    tx_result = 0; tick_count = U32_MAX;
+    fine_clock = 1; foreground_ms = U32_MAX;
+    credit_bytes = (LINK_CREDIT_MARGIN + 6) * LINK_PAGE_BYTES;
+    int h = link_host_open("GET /pattern/4096", 16, 1);
+    CHECK(h == 0);
+    le_write16(response, 200); le_write32(response + 2, 4096);
+    receive(LINK_OP_RESPONSE, 0, 0, 0, link_h[h].rid, response, sizeof(response));
+    link_tick();
+    const u8 *body;
+    CHECK(link_host_read_stage(h, 1, &body, 1) == OS32_ERR_AGAIN);
+    u32 windows = link_l1_windows;
+    for (u32 ms = 0; ms < 30; ms++) {
+        foreground_ms = U32_MAX + ms; /* Cross the ms wrap independently of RTO. */
+        tick_count = U32_MAX + ms / 10;
+        link_tick();
+        CHECK(link_l1_windows == windows + 1 + ms);
+        link_tick(); CHECK(link_l1_windows == windows + 1 + ms);
+    }
+    CHECK(tx_frame[LINK_ETH_HDR_LEN + LINK_OFF_OP] == LINK_OP_WINDOW);
+    CHECK(le_read16(tx_frame + LINK_ETH_HDR_LEN + LINK_HDR_LEN) == 6);
+    /* PC-98 advances ms by 10 per PIT: still one advertisement per PIT. */
+    windows = link_l1_windows;
+    for (u32 pit = 0; pit < 3; pit++) {
+        foreground_ms += 10; tick_count++;
+        link_tick(); CHECK(link_l1_windows == windows + pit + 1);
+        link_tick(); CHECK(link_l1_windows == windows + pit + 1);
+    }
+    /* Credit growth, exhaustion and recovery are visible in the same ms. */
+    const u16 credits[] = {7, 0, 6};
+    windows = link_l1_windows;
+    for (u32 i = 0; i < sizeof(credits) / sizeof(credits[0]); i++) {
+        credit_bytes = (LINK_CREDIT_MARGIN + credits[i]) * LINK_PAGE_BYTES;
+        link_tick();
+        CHECK(link_l1_windows == windows + i + 1);
+        CHECK(le_read16(tx_frame + LINK_ETH_HDR_LEN + LINK_HDR_LEN) == credits[i]);
+        link_tick(); CHECK(link_l1_windows == windows + i + 1);
+    }
+    /* NIC refusal keeps the advertisement pending until accepted. */
+    windows = link_l1_windows; foreground_ms++;
+    tx_result = OS32_ERR_AGAIN; link_tick();
+    CHECK(link_l1_windows == windows && link_h[h].want_window);
+    tx_result = 0; link_tick();
+    CHECK(link_l1_windows == windows + 1 && !link_h[h].want_window);
+    link_tick(); CHECK(link_l1_windows == windows + 1);
+    /* Reusing the slot in this ms must advertise the new stream at once. */
+    u32 old_rid = link_h[h].rid;
+    CHECK(link_host_close(h, 1) == 0);
+    link_tick();
+    receive(LINK_OP_ACK, LINK_F_RELACK, 0, 0, old_rid, 0, 0);
+    link_tick();
+    CHECK(link_host_open("GET /pattern/4096", 16, 1) == h);
+    receive(LINK_OP_RESPONSE, 0, 0, 0, link_h[h].rid, response, sizeof(response));
+    link_tick();
+    CHECK(link_host_read_stage(h, 1, &body, 1) == OS32_ERR_AGAIN);
+    link_tick(); CHECK(link_l1_windows == windows + 2);
+    return 0;
+}
 void _start(void)
 {
     int rc = verify();
+    if (!rc) rc = verify_window_cadence();
     if (rc) {
         char message[] = "FAIL line 0000\n";
         int line = rc;

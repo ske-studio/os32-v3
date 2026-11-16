@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """A2 real NIC lifetime/selection with fake adapters, link and A3 seams (ILP32)."""
 CHECK = dict(name='hostsvc-nic', tier=1, needs=[], budget=3.8, covers=['net/rx_work.c', 'net/rx_work.h', 'include/clock_source.h', 'kernel/irq/tick_budget.h', 'kernel/idle_work.h',
-    'net/rx_work.c', 'net/rx_work.h', 'include/clock_source.h', 'include/kernel_tick.h', 'kernel/irq/irq.h', 'kernel/irq/tick_budget.h', 'net/link_platform.h', 'platform/pc98/link_platform_inline.h', 'net/nic.c', 'net/nic.h', 'net/nic_rx.h', 'net/link.h', 'include/net_eth.h',
+    'kernel/time/tick_clock.h', 'net/rx_work.c', 'net/rx_work.h', 'include/clock_source.h', 'include/kernel_tick.h', 'kernel/irq/irq.h', 'kernel/irq/tick_budget.h', 'net/link_platform.h', 'platform/pc98/link_platform_inline.h', 'net/nic.c', 'net/nic.h', 'net/nic_rx.h', 'net/link.h', 'include/net_eth.h',
     'kernel/irq/tick.h', 'platform/pc98/tick_order.h',
     'include/kprintf.h',
     'drivers/net/e82557/e82557_regs.h',
@@ -29,6 +29,14 @@ FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra',
 # A2 portion of §11 nic: selection, lifetime, dispatch and TX facade.
 # MARK/EOF mutation belongs to the A3 demux stage, not this fake boundary.
 MUTATIONS = (
+    ('fg-bind-reset', '            idle_ms_valid = 0;', '            /* reset omitted */'),
+    ('fg-link-before-demux',
+     '    count = (int)net_rx_demux_budget(bound, local_mac, fixed_peer ? peer_mac : 0, b);\n    flags = link_platform_lock();\n    rx_finish();',
+     '    flags = link_platform_lock();\n    rx_finish();\n    link_platform_unlock(flags);\n    count = (int)net_rx_demux_budget(bound, local_mac, fixed_peer ? peer_mac : 0, b);\n    flags = link_platform_lock();'),
+    ('fg-unthrottled', 'if (!idle_ms_valid || ms != last_idle_ms)', 'if (1)'),
+    ('fg-no-link', 'link_due = 1; /* Foreground progress, consumed by rx_finish. */',
+     'link_due = 0; /* Foreground progress, consumed by rx_finish. */'),
+    ('fg-in-irq', '!_irq_enabled() || kctx_irq_depth != 0', '!_irq_enabled()'),
     ('restart-same-peer', 'return 0; /* Same NIC/peer: preserve the handshake and its nonce. */',
      'return OS32_ERR_BUSY;'),
     ('auto-preference', 'choice = adapters[NET_NIC_E82557] ? NET_NIC_E82557 : NET_NIC_LGY98;',

@@ -1,4 +1,5 @@
 #include "kernel/irq/tick_budget.h"
+#include "kernel/time/tick_clock.h"
 #ifdef TICK_PROBE
 #include "kernel/time/tick_probe.h"
 #endif
@@ -9,7 +10,7 @@
 /*  NIC 共用層が駆動・送信・credit を所有する。                               */
 /*                                                                          */
 /*  設計の 3 本柱:                                                           */
-/*   (1) **RX・期限処理は `link_tick()` だけ** (100Hz、IRQ0 文脈)。      */
+/*   (1) RX・期限処理は link_tick() (tick と FG1 の協調点、期限は jiffy)。   */
 /*       KAPI は待たず、前景の open/write は TX だけを直ちに試す。      */
 /*   (2) KAPI と `link_tick` の排他は **IF 保存復元の短い cli 区間**          */
 /*       (link_platform_lock / link_platform_unlock)。区間内では待たない。       */
@@ -111,6 +112,9 @@ struct link_handle {
     u8  want_ack;
     u8  want_window;
     u8  want_status;
+    u8  window_sent;
+    u16 window_credit;
+    u32 window_ms;
     u32 ack_seq;                    /* 累積 ACK (受けた最終 in-order DATA seq) */
     u8  ctrl_cursor;                /* 制御の種類を巡回する位置 */
     u8  req_copy[LINK_MAX_PAYLOAD];
@@ -379,8 +383,11 @@ static void link_timers(void)
                 e->last_rx_tick = link_platform_now();
             }
         }
-        /* WINDOW は本文を待っている間ずっと (制御枠で 1 周回 1 本に集約される) */
-        if (e->ring_owner && e->state == LINK_H_RESP && e->recv_bytes < e->length)
+        /* Repeat waiting WINDOW once per ms; changed credit is immediate.
+         * Record only NIC acceptance, so a refused advertisement stays due. */
+        if (e->ring_owner && e->state == LINK_H_RESP && e->recv_bytes < e->length &&
+            (!e->window_sent || e->window_ms != tick_clock_ms() ||
+             e->window_credit != link_credit_pages()))
             e->want_window = 1;
     }
 }
@@ -441,6 +448,9 @@ static int link_tx_control(void)
                 if (!link_send(LINK_OP_WINDOW, 0, 0, e->ack_seq, e->rid,
                                pl, LINK_WINDOW_LEN)) return -1;
                 e->want_window = 0;
+                e->window_sent = 1;
+                e->window_ms = tick_clock_ms();
+                e->window_credit = credit;
                 link_l1_windows++;
                 if (credit > link_l1_max_credit) link_l1_max_credit = credit;
                 if (credit && (link_l1_min_credit == 0 || credit < link_l1_min_credit))
@@ -528,7 +538,7 @@ static void link_tx_kick(void)
 }
 
 /* ======================================================================== */
-/*  link_tick — RX・期限処理と TX を駆動 (100Hz、IRQ0 文脈)。                */
+/*  link_tick — RX・期限処理と TX を駆動 (tick と FG1 の待ち、期限は jiffy)。                */
 /*  前景の open・write は TX だけを直ちに試す。                             */
 /* ======================================================================== */
 void link_tick(void)
