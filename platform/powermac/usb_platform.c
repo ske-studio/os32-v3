@@ -13,11 +13,16 @@
 #include "kboot_log.h"
 #include <stdarg.h>
 
+/* hid_boot.h also defines class-private static callbacks. */
+u8 hid_kbd_sc(u8 usage);
+
 struct pm_pci pm_usb_pci;
 const struct pm_usb_root *pm_usb_root;
 static u8 pool[PM_USB_DMA_BYTES] __attribute__((aligned(PM_USB_DMA_BYTES)));
 static u8 used[PM_USB_DMA_BYTES / PM_USB_PAGE];
 static u8 sources[2];
+static u8 usage_held[4][256];
+static u16 usage_refs[4][128];
 static u32 tb_frequency;
 static struct { u32 bdf, va; int used; } maps[PM_USB_CONTROLLERS];
 void ppc_dcbf_line(void *);
@@ -163,11 +168,39 @@ void usbp_input_key_repeat(u8 src, u8 sc)
 {
     pm_input_usb_repeat(src, sc);
     usbp_log("USB REPEAT src=%u sc=%02x", src, sc); }
+/* INPUT_KEYMAP_DESIGN §7 H-usbp: temporary projection to the old sc port. */
+void usbp_input_usage(u8 src, u8 usage, int down)
+{
+    if (src < 1 || src > 4) return;
+    u8 *held = usage_held[src - 1];
+    u16 *refs = usage_refs[src - 1];
+    u8 sc = hid_kbd_sc(usage);
+    if (!!held[usage] == !!down) return;
+    held[usage] = !!down;
+    if (sc >= 128) return;
+    if (down) {
+        if (refs[sc]++ == 0) usbp_input_key(src, sc, 1);
+    } else {
+        if (--refs[sc] == 0) usbp_input_key(src, sc, 0);
+    }
+}
+void usbp_input_usage_repeat(u8 src, u8 usage)
+{
+    if (src < 1 || src > 4 || !usage_held[src - 1][usage]) return;
+    u8 sc = hid_kbd_sc(usage);
+    if (sc < 128) usbp_input_key_repeat(src, sc);
+}
 void usbp_input_mouse(u8 src, i16 dx, i16 dy, u8 buttons)
 { usbp_log("USB MOUSE src=%u dx=%d dy=%d b=%x", src, dx, dy, buttons); }
 void usbp_input_release(int kind, u8 src)
 {
-    if (kind == 0) pm_input_usb_release(src);
+    if (kind == 0) {
+        pm_input_usb_release(src);
+        if (src >= 1 && src <= 4) {
+            for (unsigned i = 0; i < 256; ++i) usage_held[src - 1][i] = 0;
+            for (unsigned i = 0; i < 128; ++i) usage_refs[src - 1][i] = 0;
+        }
+    }
     usbp_log("USB RELEASE kind=%d src=%u", kind, src);
     if ((unsigned)kind < 2 && src >= 1 && src <= 4) sources[kind] &= ~(1u << (src - 1));
 }

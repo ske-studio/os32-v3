@@ -51,8 +51,8 @@ static void record(int kind, int src, int a, int b, int c)
 void *usbp_mem_alloc(u32 n) { return calloc(1, n); }
 void usbp_mem_free(void *p) { ++frees; free(p); }
 int usbp_input_src_alloc(int kind) { return kind + 1; }
-void usbp_input_key(u8 src, u8 sc, int down) { record(0, src, sc, down, 0); }
-void usbp_input_key_repeat(u8 src, u8 sc) { record(1, src, sc, 0, 0); }
+void usbp_input_usage(u8 src, u8 sc, int down) { record(0, src, sc, down, 0); }
+void usbp_input_usage_repeat(u8 src, u8 sc) { record(1, src, sc, 0, 0); }
 void usbp_input_mouse(u8 src, i16 dx, i16 dy, u8 b) { record(2, src, dx, dy, b); }
 void usbp_input_release(int kind, u8 src) { record(3, src, kind, 0, 0); }
 u32 usbp_ms(void) { return clock_ms; }
@@ -159,11 +159,12 @@ static int run(void)
     rc=attach(&d,1,&hid_mouse_class); REQUIRE(!rc);
     REQUIRE(starts==2 && xf[0]->len==8 && xf[1]->len==3);
     r[0]=0x22; report(0,r,8,USB_X_OK);
-    REQUIRE(ne==1 && events[0].a==0x70 && events[0].b==1);
-    r[0]=0x20; report(0,r,8,USB_X_OK); REQUIRE(ne==1);
-    r[0]=0; report(0,r,8,USB_X_OK); REQUIRE(ne==2 && events[1].b==0);
+    REQUIRE(ne==2 && events[0].a==0xe1 && events[1].a==0xe5);
+    r[0]=0x20; report(0,r,8,USB_X_OK); REQUIRE(ne==3 && events[2].a==0xe1);
+    r[0]=0; report(0,r,8,USB_X_OK); REQUIRE(ne==4 && events[3].a==0xe5);
+    ne=2;
     r[2]=4; clock_ms=100; report(0,r,8,USB_X_OK);
-    REQUIRE(ne==3 && events[2].a==0x1d && events[2].b==1);
+    REQUIRE(ne==3 && events[2].a==4 && events[2].b==1);
     report(0,r,8,USB_X_OK); REQUIRE(ne==3);
     hid_kbd_class.tick(&d,k,599); REQUIRE(ne==3);
     hid_kbd_class.tick(&d,k,600); REQUIRE(ne==4 && events[3].kind==1);
@@ -181,13 +182,26 @@ static int run(void)
             events[6].a==-128 && events[6].b==127 && events[6].c==5);
     n=ne;
     r[0]=2; r[2]=4; report(0,r,8,USB_X_OK);
-    REQUIRE(ne==n+2 && events[n].a==0x70 && events[n].b==1 &&
-            events[n+1].a==0x1d && events[n+1].b==1);
+    REQUIRE(ne==n+2 && events[n].a==0xe1 && events[n].b==1 &&
+            events[n+1].a==4 && events[n+1].b==1);
     n=ne;
     r[0]=0; r[2]=5; report(0,r,8,USB_X_OK);
-    REQUIRE(ne==n+3 && events[n].a==0x70 && events[n].b==0 &&
-            events[n+1].a==0x1d && events[n+1].b==0 &&
-            events[n+2].a==0x2d && events[n+2].b==1);
+    REQUIRE(ne==n+3 && events[n].a==0xe1 && events[n].b==0 &&
+            events[n+1].a==4 && events[n+1].b==0 &&
+            events[n+2].a==5 && events[n+2].b==1);
+    /* Caps precedes A even though its usage is larger; Caps cannot steal repeat. */
+    r[2]=0; report(0,r,8,USB_X_OK);
+    n=ne; r[2]=4; r[3]=0x39; report(0,r,8,USB_X_OK);
+    REQUIRE(ne==n+2 && events[n].a==0x39 && events[n+1].a==4);
+    r[3]=0; report(0,r,8,USB_X_OK);
+    r[3]=0x39; report(0,r,8,USB_X_OK);
+    n=ne; hid_kbd_class.tick(&d,k,clock_ms+500);
+    REQUIRE(ne==n+1 && events[n].kind==1 && events[n].a==4);
+    /* Duplicate slots compare presence; unmapped usage ff remains repeatable. */
+    r[4]=4; n=ne; report(0,r,8,USB_X_OK); REQUIRE(ne==n);
+    r[2]=0xff; r[3]=r[4]=0; report(0,r,8,USB_X_OK);
+    n=ne; hid_kbd_class.tick(&d,k,clock_ms+500);
+    REQUIRE(ne==n+1 && events[n].a==0xff && events[n].kind==1);
     n=ne;
     hid_kbd_class.detach(&d,k); hid_kbd_class.detach(&d,k);
     REQUIRE(ne==n+1 && events[n].kind==3 && events[n].a==USBP_INPUT_KBD);

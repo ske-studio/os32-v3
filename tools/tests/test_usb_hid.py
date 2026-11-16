@@ -17,8 +17,9 @@ CHECK = dict(env=['ppc-cross'], name='usb-hid', tier=1, needs=[], budget=10, cov
     'drivers/usb/hid_boot.h', 'drivers/usb/usb_core.h',
     'drivers/usb/usb_desc.h', 'include/usb_platform.h', 'include/types.h',
     'include/callconv.h', 'include/endian_le.h', 'tools/tests/usb_hid_host.c',
+    'platform/powermac/usb_platform.c', 'tools/tests/usb_usage_adapter_host.c',
     'tools/tests/test_usb_hid.py', 'tools/tests/host32.py', 'tools/tests/cc_cache.py'],
-    basis=['USB_DESIGN §5', 'USB_DESIGN §7'],
+    basis=['INPUT_KEYMAP_DESIGN §7 S2u・注 :214-217', 'USB_DESIGN §5', 'USB_DESIGN §7'],
 )
 
 
@@ -46,9 +47,29 @@ def check(mutate):
             result = host32.run([str(exe)], runner='qemu')
             assert result.returncode == 0, result.returncode
             print('HID runtime OK', swap)
+        platform = (ROOT/'platform/powermac/usb_platform.c').read_text()
+        adapter = platform[platform.index('void usbp_input_usage('):
+                           platform.index('void usbp_input_mouse(')]
+        adapter += platform[platform.index('void usbp_input_release('):
+                            platform.index('void usbp_log(')]
+        variants = [('GREEN', adapter)]
+        if mutate:
+            anchor = 'if (--refs[sc] == 0)'
+            assert adapter.count(anchor) == 1
+            variants.append(('alias premature break', adapter.replace(anchor, 'if (--refs[sc] < 256)')))
+        for name, content in variants:
+            (tmp/'adapter.inc').write_text(content)
+            subprocess.run(['gcc', '-m32', *bare, *flags, '-I'+str(tmp),
+                            'tools/tests/usb_usage_adapter_host.c',
+                            'drivers/usb/hid_kbd_map.c', 'input/keymaps/hid_jp.c',
+                            '-o', str(tmp/'adapter')], cwd=ROOT, check=True)
+            result = host32.run([str(tmp/'adapter')], runner='qemu')
+            assert (result.returncode == 0) == (name == 'GREEN'), (name, result.returncode)
+            print(name, 'adapter runtime rc=', result.returncode)
         if mutate:
             mutations = [
-                ('drivers/usb/hid_kbd.c', 'i = (order + 0x70) & 127;', 'i = order;'),
+                ('drivers/usb/hid_kbd.c', 'now[i] && !hid_kbd_norepeat(i)', 'now[i]'),
+                ('drivers/usb/hid_kbd.c', 'if (hid_kbd_order(i) != order) continue;', 'if (order != 0) continue;'),
                 ('drivers/usb/hid_boot.h', 'b->x.short_ok = 1;', 'b->x.short_ok = 0;'),
                 ('drivers/usb/hid_kbd_map.c', 'return hid_jp_backend.compat_sc[usage];',
                  'return usage == 0x47 ? 0x46 : hid_jp_backend.compat_sc[usage];'),
@@ -60,7 +81,7 @@ def check(mutate):
                 ('drivers/usb/hid_kbd.c', '!!s->prev[i] != !!now[i]', 's->prev[i] != now[i]'),
                 ('drivers/usb/hid_boot.h', 'usbp_input_release(b->kind, b->iface->src);', '(void)b;'),
                 ('drivers/usb/hid_boot.h', 'usbp_input_release(b->kind, f->src);', '(void)b;'),
-                ('drivers/usb/hid_kbd.c', 'usbp_input_key_repeat(f->src, s->repeat);', '(void)f;'),
+                ('drivers/usb/hid_kbd.c', 'usbp_input_usage_repeat(f->src, s->repeat);', '(void)f;'),
                 ('drivers/usb/hid_mouse.c', '(i8)r[1], (i8)r[2]', 'r[1], r[2]')]
             for rel, anchor, replacement in mutations:
                 original = (ROOT/rel).read_text()
