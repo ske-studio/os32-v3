@@ -15,7 +15,7 @@
 
 # --- 第 1 陣 (TASK_TEST_RESULT.md §4 の 16 本。2026-09-17 にゲストで実測済み) ---
 
-klibc_test              # PASS 49/49  kstring / kprintf などの基本
+klibc_test              # expected PASS 52/52 (newlib strtod / %f を含む)
 fp_stop check           # hw / no-FPU emu: PASS 3/3 (initial state, ENV roundtrip, Newton)
 math_test               # PASS 110/110
 mgx_test                # PASS 76/76

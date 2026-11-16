@@ -22,6 +22,9 @@ userland/tests/trim_back.elf userland/tests/trim_front.elf: sdk/allocator/nano_a
 
 userland/tests/pcm_play.elf: userland/tests/pcm_wav.h
 
+# nano libc keeps %f optional; the compatibility test exercises it explicitly.
+userland/tests/klibc_test.elf: PROGRAM_LDFLAGS += -u _printf_float
+
 # === CRT0 ビルドルール ===
 sdk/crt/crt0.o: sdk/crt/crt0.asm
 	$(AS) -f elf32 $< -o $@
