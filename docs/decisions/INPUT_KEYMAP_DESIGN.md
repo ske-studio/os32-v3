@@ -308,3 +308,216 @@ os32powerpc のレビュー (PPC の Opus が PPC の実物と照合、K1・K3�
 - KS の群に独自の番号は足さない (NetBSD の値だけ)。is_keypad は 0xf220〜0xf27f で固定。
 - 大きさ (32bit の nm で実測): entries 2560B、compat 256B、norepeat 32B、order 64B、actions 4B、no_keydata 32B、descriptor 16B、backend 20B。補助と descriptor の合計は 424B (os32powerpc の報告の値。compat 256B を含む)。
 - 生成器は tools/hid_keymap_import.py。原本は NetBSD 8a12c4d95f03 で、取得は tools/keymap/fetch_netbsd_wscons.sh、sha256 は netbsd_wscons_sources.json。生成物 input/keymaps/hid_jp.c は commit する。CI は自己照合だけを行い、原本から作り直して照らすのは原本がある機械だけ。
+
+## H0b: 本線の S0・S1p の内部契約 (設計者が決めたこと)
+
+2026-11-17。H0 の不足を補う内部契約。本文・ユーザー決定・K1〜K10 と
+KmHidExtensions は変更しない。以下は `input/hal/keymap.h` の宣言と一対一で対応する。
+公開48Bイベントや IKM1 を native struct として扱う宣言ではない。
+
+### 表と評価結果 (S1p → S0b)
+
+```c
+enum { KM_MAP_PC98 = 1, KM_MAP_HID = 2 };
+enum { KM_CHAR = 0, KM_BSD_SPECIAL = 1, KM_LEGACY_CONTROL = 2,
+       KM_CELL_INHERIT = 255 };
+typedef struct { keysym_t sym; u8 kind, op; } KmExactCell; /* 4B */
+typedef struct { u8 accchar, count; u8 pairs[52][2]; } KmAccent;
+typedef struct {
+    const KmExactCell (*bank0)[8], (*bank1)[8];
+    const u8 *flags;
+    const KmAccent *accents;
+    u8 accent_count;
+} KmPc98Extensions;
+typedef u16 KmEffect;
+typedef struct { u16 mods, locks; } KmState;
+typedef struct {
+    keysym_t sym, command;
+    KmEffect effect;
+    u8 kind, op, compat_sc, is_modifier, no_keydata, action;
+} KmEvalResult;
+extern const KmBackend pc98_jp_backend; /* S1pt */
+extern const KmBackend hid_jp_backend;  /* S1ht、既存名 */
+int km_eval(const KmBackend *map, u16 keycode, const KmState *state,
+            KmEvalResult *out);
+```
+
+- `extensions` は map id 1 なら `const KmPc98Extensions *`、id 2 なら既定の
+  `const KmHidExtensions *`。タグを先頭に追加しない。HID の型は下記の配置を保ち
+  keymap.h に移す。生成器はこのヘッダをincludeし、typedefを生成しない。
+  S0a/S0bも同じ型を参照する。PC98 の count は128、HIDは256。
+  全ポインタは読み取り専用、登録から利用終了まで有効。既定生成物は静的寿命。
+- bank0 は128×8セル必須、flags は128バイト必須 (O=0/C=1/N=2/B=3)。
+  bank1 はNULLなら全体がbank0を参照、存在するなら128×8セル。
+  bank1 の未指定セルだけ `{0, KM_CELL_INHERIT, 0}` にする。
+  bank0 の INHERIT は拒否。CHAR の NUL と BSD_SPECIAL の NOP は明示セルであり継承しない。
+  wire kind3 の aux に255を受理しない。W は欠落行を編成時にこの表現へ変換する。
+- CHAR は keysym、op=0。対応する NetBSD keysym があるBSD特殊語はそのkeysymへ写す。
+  対応しない語は sym=KS_voidSymbol、kind=BSD_SPECIAL、op=元のBSD ID。
+  LEGACY_CONTROL は評価結果/出口用で、EXACT の入力セルには受理しない。
+  §3のDOS差分はCHARとして生成、S3のCOMPAT処理がLEGACY_CONTROLとbyteを付ける。
+  accent_count は0..15、0ならaccents=NULL、それ以外は同数のKmAccent。
+  count は0..52、pairs は入力byte/出力byteの対、未使用対は0。accentの元IDを失わない。
+- bank は `!!(mods & KM_MOD_MODE) ^ !!(locks & KM_LOCK_ALT)` (両方ONなら0)。
+  column はShift=1/Ctrl=2/Alt=4。flagsとCaps/Numの該当をORして一度だけxor 1。
+  そのbank/columnを選んだ後にINHERITだけbank0の同じcolumnへ戻す。
+  exactのCHARへ一般Ctrl/Caps処理を重ねない。HIDのNum常時ONは評価器がmap2に適用し、
+  stateの共有Num bit自体は変えない。group2の省略はimport時に展開済みとする。
+- km_eval は状態を変えない。成功0、NULL引数・範囲外・不正descriptorはOS32_ERR_INVAL、
+  失敗時out不変。成功時全フィールドを初期化、commandはcommandセル、compat_scは表の値。
+  kind/opは由来を保持、effectは選択された修飾作用、actionはHIDの0/1/2。
+  no_keydata/is_modifierは§4の条件。repeat/down/消費/raw_dueと物理modsはS0d/出口の責務。
+  accent/deadの保留合成はWとS3まで延期する (PM決定、REVIEW 3)。
+  それまでは登録/交換の検証で、command/group1/group2/両exact bankの全セルについて
+  NetBSD Dead群 (0x0300..0x036f) とBSD_SPECIAL op=0x89..0x97を拒否し、
+  accent_count非0もOS32_ERR_INVALにする。active/保存表を変えず全体失敗とする。
+  既定jp.pc98.kbdにaccentはなく、この制限が届くのは利用者の表だけ。
+  KmAccentは将来のデータ形式だけを予約し、S0cに合成待ち状態を暗黙に持たせない。
+  W/S3で待ち状態の持ち手・source/owner世代・flush条件・試験を確定してから拒否を解除する。
+  KS_Multi_keyはdead群とは別。既定HID表の値を保ち、当面effect=0・合成開始なしとする。
+
+### 修飾作用と合成状態 (S0b → S0c → S0d)
+
+```c
+enum {
+    KM_MOD_SHIFT=0x0001, KM_MOD_CTRL=0x0002, KM_MOD_ALT=0x0004,
+    KM_MOD_MODE=0x0008, KM_MOD_COMMAND=0x0010, KM_MOD_META=0x0020,
+    KM_LOCK_CAPS=0x0100, KM_LOCK_NUM=0x0200, KM_LOCK_KANA=0x0400,
+    KM_LOCK_SCROLL=0x0800, KM_LOCK_ALT=0x1000, KM_EFFECT_SHIFTA=0x2000
+};
+int km_state_apply(const KmKey *key, u8 old_down, u8 origin, KmEffect effect);
+void km_state_snapshot(KmState *out);
+void km_state_release(u8 src, u16 generation);
+void km_state_cancel_tap(u8 src, u16 generation);
+```
+
+- effectはu16の上記bit集合 (0は無作用)。左右は別keycodeに保存し、合成時だけOR。
+  BSDのLSHA等は該当MODとKM_EFFECT_SHIFTAの組合せで、LOCK_ALTとは合成しない。
+  下表でmap/keysym/BSD IDから作用を一意に選ぶ。いずれも文字の上位bitを足さない。
+  内部bitと旧SHIFT_*は別の名前空間。SHIFTAタグはsnapshot.mods/locksに含めない。
+- S0d が唯一の held[src][keycode] を所有する。S0cは同じ配列を複製せず、作用u16とsource世代を保存。
+  applyへ渡すold_downは更新前held (0/1)、originはINPUT_ORIGIN_NATIVE/USB。
+  新makeだけeffectを保存し、momentaryを加え、USB lockを反転する。
+  native lockはmake/set・break/clear。Kana物理派生はS0dがnative keycode 0x72の
+  作用へLOCK_KANAをORする (再配置で選んだ別作用も保持)。USBの0x90はこれを行わない。
+  repeat/二重makeではeffectを無視して保存作用を維持、lockを反転しない (SHIFTA候補は下記)。
+  breakは渡されたeffectを無視し保存した作用だけ解放、未押下breakは無作用。
+- applyは成功0、不正src/世代/未bind/keycode/down/repeat/old_down/origin/effect予約bitは
+  OS32_ERR_INVALで状態不変。repeatはdown=1かつold_down=1だけ許可する。
+  snapshotは非NULL outに全源のmods ORとUSB共有lock/native位置ORを返す (void)。
+  releaseは一致世代の全保存作用/native位置を消す。USB共有lockは抜去で反転も消去もしない。
+  stale/二度releaseは無作用、最大256キー。state APIは配送をしない。
+
+```c
+typedef struct {
+    const u8 *order;
+    const u8 (*actions)[2];
+    u8 action_count;
+    const u8 *no_keydata;
+} KmHidExtensions; /* 32bit: offsets 0/4/8/12, sizeof 16 */
+```
+
+作用表の出典は固定NetBSD `wsksymdef.h` のGroup 1と、B§1のFreeBSD `kbio.h`。
+KS名は選択文字セルに対して照合する。commandセルのKS_Cmd1/2を物理修飾と解釈しない。
+表のKM_接頭辞は省略しない。BSD_SPECIALの値をCHARの同値byteとして照合しない。
+
+|選択したkeysym / BSD_SPECIAL op|map1 のeffect|map2 のeffect|
+|---|---|---|
+|KS_Shift_L/R (0xf101/02)、LSH/RSH (0x02/03)|KM_MOD_SHIFT|KM_MOD_SHIFT|
+|KS_Control_L/R (0xf103/04)、LCTR/RCTR (0x09/80)|KM_MOD_CTRL|KM_MOD_CTRL|
+|KS_Alt_L/R (0xf107/08)、LALT/RALT (0x07/81)|KM_MOD_ALT|KM_MOD_ALT|
+|KS_Meta_L/R (0xf110/11)|KM_MOD_META|KM_MOD_COMMAND|
+|BSD META (0x84)|KM_MOD_META|KM_MOD_META (HID拡張にBSD opセルなし)|
+|KS_Mode_switch (0xf10a)、ASH (0x83)|KM_MOD_MODE|KM_MOD_MODE|
+|KS_Caps_Lock (0xf105)、CLK (0x04)|KM_LOCK_CAPS|KM_LOCK_CAPS|
+|KS_Num_Lock (0xf10b)、NLK (0x05)|KM_LOCK_NUM|0 (Num常時ON)|
+|KS_Hold_Screen (0xf10c)、SLK (0x06)|KM_LOCK_SCROLL|KM_LOCK_SCROLL|
+|Mode_Lock相当のALK (0x82)|KM_LOCK_ALT|KM_LOCK_ALT (HID拡張にBSD opセルなし)|
+|LSHA/RSHA (0x9b/9c)|KM_MOD_SHIFT \| KM_EFFECT_SHIFTA|同左 (HID拡張にBSD opセルなし)|
+|LCTRA/RCTRA (0x9d/9e)|KM_MOD_CTRL \| KM_EFFECT_SHIFTA|同左 (HID拡張にBSD opセルなし)|
+|LALTA/RALTA (0x9f/a0)|KM_MOD_ALT \| KM_EFFECT_SHIFTA|同左 (HID拡張にBSD opセルなし)|
+|その他の受理済みセル (NOP、文字、操作等)|0|0|
+
+- 固定版NetBSDにKS_Mode_Lockはない。新しいkeysym値を作らず、PC98のALKは
+  BSD_SPECIAL/op=0x82で保持する。map2のMetaはusage番号でなく選択されたkeysymで
+  COMMANDへ写すため、再配置後も同じ。BSD METAをmap2のMeta keysymと取り違えない。
+- SHIFTAON相当はS0cに全源で一つの候補 `(src, generation, keycode, armed)` を持つ。
+  新makeの保存effectがSHIFTAなら該当momentaryを押し、候補を立てる。makeではAltLockを反転しない。
+  他キーの有効なmake/break/repeatは候補を消す (別源も含む)。別のSHIFTA makeなら旧候補を消して
+  新候補に置換する。同じキーのrepeat/二重makeは保存作用を使い、候補を再武装しない。
+  対象キーの実breakで候補が一致しarmedなら共有AltLockを一度だけ反転してから
+  momentaryと候補を解放する。候補が消えていればmomentaryの解放だけ。
+  タグはSHIFT/CTRL/ALTのどれか一つとの組合せだけ有効とし、LOCK_*との組合せは拒否。
+  抜去の合成breakはtap扱いにしない。km_release_keysは掃除の前にkm_state_cancel_tapを呼び
+  当該source/世代の候補だけを消す (bindingと保存作用はまだ有効)。戻り値void、
+  不一致は無作用。後段のstate_releaseも候補を消す冪等な掃除。
+  stale releaseは候補を変えない。通常breakとsource抜去を同じ操作と見なさない。
+  S0cの受入: 単独make→breakで反転、他キー介在で不変、repeatで再武装なし、
+  別源の介在・別SHIFTAへの候補交代・抜去でも意図しない反転なし。
+  FreeBSD `kbd.c:1245-1247,1258-1374,1390-1438` のXOR/SHIFTAONを基に、
+  本票の保存作用・repeat抑止・共通source契約へ接続する。
+
+### 登録、採取、解放の順 (S0a/S0c/S0d/S1x)
+
+```c
+typedef struct { const KmBackend *map; u32 map_generation; } KmSource;
+int km_source_lookup(u8 src, u16 generation, KmSource *out);
+void km_source_unbind(u8 src, u16 generation);
+void km_release_keys(u8 src, u16 generation);
+/* H0bだけ: 現行の像に実行コードを追加しない予約 */
+static inline void km_source_release(u8 src, u16 generation)
+{ (void)src; (void)generation; }
+```
+
+- register/bind/lookupは成功0、失敗OS32_ERR_INVAL。重複idは同じpointerでも拒否。
+  bindは生存する鍵盤source/一致世代/登録mapだけ、二重bindは同じmapでも拒否。
+  idは1/2のみ、表サイズ/必須pointer/拡張値を登録時に検証する。
+  lookupは生存世代とbindingの両方を検査し、成功時だけoutを書き、未bind/stale/NULLは失敗。
+  active表の世代はu32、初期1、Wの成功した交換/復元で増分 (0を飛ばす)。sourceのu16世代と混同しない。
+  S0aの初期実装は静的既定表と世代1を返す。Wはlookupの実体をactiveへ接続する。
+  out.mapは短い排他区間中だけ借用し、queueにpointerを残さない。
+- S1xはPC98/HID backendを順に登録して戻り値を確認、本体sourceをregister→bind(map1)。
+  bind失敗ならsourceをreleaseして入力を有効化しない。既登録mapは取り消さない。
+  USBはK5どおり別sourceをregister→bind(map2)、非搭載でもmap2登録は行う。
+- S0dのcaptureはirq_save→lookup→keycode/down/repeat検査→old_down取得→
+  snapshot→km_eval (新makeの作用を選ぶ)→km_state_apply→held/物理/互換cnt更新→
+  snapshot→km_eval (合成後の文字)→配送→irq_restore。
+  break/repeatの作用には必ず保存値を使う。評価は二度でも作用更新は一度だけ。
+  新makeのis_modifierは最初の評価もORし、自己作用でセルが変わっても文字を漏らさない。
+  評価/状態更新に必要な検証は変更前に済ませる。captureは成功0/不正入力OS32_ERR_INVAL。
+  V86でも状態は更新、配送だけ抑止。raw_due等とtime_ms/source/map_generationはS0dが添える。
+- input_src_releaseは既存のsrc/世代検査内、IRQ停止中に次の順で呼ぶ。
+
+```c
+km_source_release(src, generation); /* 今回ここだけ予約を挿入 */
+input_state_release(src, generation); /* 旧キーとpointerの掃除を維持 */
+sources[src - 1].used = 0;
+/* S0a: inlineを外部宣言へ置換し、keymap_registry.cに実体を置く。
+ * 初めはkm_source_unbindだけ。S0c/S0dの結線完了時の実体は: */
+/* km_release_keys(src, generation);  S0d: mapが有効な間にheld/旧投影を解放
+ * km_state_release(src, generation); S0c: 残る作用/native位置を掃除
+ * km_source_unbind(src, generation); S0a: 最後にbindingを失効 */
+```
+
+- unbindは一致世代のみ失効、他は無作用。通常の呼び手はreleaseだけ。
+  新経路有効化時に旧heldへ新キーを重複保存しない。release_keysは最大256キーのbreak処理、
+  操作/cookedのmakeを作らず、最後の互換aliasのbreakだけ出す。
+  sourceが生存中に掃除するので既存のinput_src_info検査を通せる。
+- 空inlineを選ぶ理由はH0bにリンク依存や機能実装を持ち込まず、最適化後の両像を保持するため。
+  weak stubは使わない。S0aがinlineを外部実体へ替える際、既存のin2_dev.c直接リンク試験にも
+  stubまたはregistryを足す。`tools/tests/test_input_keymap_h0b.py` もS0aの追従ファイルとし、
+  空inlineを置換するanchor/assertを外部実体の試験へ同時に切り替える。
+  S0c/S0dのrelease結線前は新captureを有効化しない。
+
+|渡す段|受ける段|確定する受け渡し|
+|---|---|---|
+|S1p|S0b・S1pt|KmExactCell/PC98 descriptor、bank/INHERIT/flags/accentの上記表現|
+|S1pt・S1ht|S1x|静的KmBackend (1/128、2/256)、extensionsはidで型を判定|
+|S1x|S0a|backend_register→source register→source_bind、失敗を確認|
+|S0a|S0d|source_lookupのmapとu32表世代、release時のbinding失効|
+|S0b|S0c・S0d|km_evalのKmEvalResult、選択したu16 effectと文字/操作の由来|
+|S0c|S0b・S0d|km_state_snapshotのmods/locks、apply/releaseの保存作用管理|
+|S0d|S0c・S0a|S0aとS0cの取り込み後に直列。唯一のheldからold_down、release_keys→state_release→unbindの順 (release_keys冒頭で候補を無効化)|
+
+H0bの試験は宣言の型/配置・数値とrelease予約の呼出位置を検査する。
+評価/登録/状態の実装の正否はS0a〜dの試験で検査し、宣言試験の合格を代用にしない。

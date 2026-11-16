@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """T_merge: source transitions, shared locks and V86 (freestanding ILP32)."""
 CHECK = dict(name='input-merge-host', tier=1, budget=10, needs=[], covers=[
-    'input/hal/in2_int.h', 'input/hal/in2_dev.c', 'input/hal/in2_state.c', 'input/hal/mouse_ext.c', 'input/hal/pointer_state.c', 'input/hal/kbd_merge.c', 'input/hal/in2_ring.c',
+    'input/hal/in2_int.h', 'input/hal/in2_dev.c', 'input/hal/keymap.h', 'input/hal/in2_state.c', 'input/hal/mouse_ext.c', 'input/hal/pointer_state.c', 'input/hal/kbd_merge.c', 'input/hal/in2_ring.c',
     'include/types.h', 'include/io.h', 'include/kbd.h', 'include/legacy_guest.h',
     'sdk/include/os32/os32_kapi_shared.h', 'tools/tests/input_merge_host.c',
     'tools/tests/test_input_merge.py', 'tools/tests/host32.py'],
@@ -20,6 +20,7 @@ def run(ctx):
     sources = [(ctx.root / 'input/hal' / name).read_text() for name in names]
     with tempfile.TemporaryDirectory(prefix='input-merge-') as td:
         tmp = Path(td)
+        (tmp / "keymap.h").write_text((ctx.root / "input/hal/keymap.h").read_text())
         (tmp / 'in2_int.h').write_text((ctx.root / 'input/hal/in2_int.h').read_text())
         (tmp / 'io.h').write_text('extern unsigned test_irq;\nstatic inline unsigned irq_save(void) { unsigned f=test_irq; test_irq=0; return f; }\nstatic inline void irq_restore(unsigned f) { test_irq=f; }\n')
         files = [str(tmp / name) for name in names] + [str(ctx.root / 'tools/tests/input_merge_host.c')]
