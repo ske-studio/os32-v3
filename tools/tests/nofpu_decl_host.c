@@ -21,12 +21,8 @@ TYPE(x87_emu_write, enum x87_emu_result (*)(const struct x87_emu_access *,
 TYPE(x87_emu_state_init, void (*)(struct x87_emu_state *, bool));
 TYPE(x87_emu_state_encode, void (*)(const struct x87_emu_state *, u8 *, bool, bool));
 TYPE(x87_emu_state_decode, void (*)(struct x87_emu_state *, const u8 *, bool, bool));
-#define GROUP(fn) TYPE(fn, enum x87_emu_result (*)( \
-    const struct x87_emu_decoded *, const u8 *, struct x87_emu_effect *))
-GROUP(x87_emu_arith);
-GROUP(x87_emu_compare);
-GROUP(x87_emu_convert);
-GROUP(x87_emu_state_op);
+TYPE(x87_emu_execute, enum x87_emu_result (*)(const struct x87_emu_trap *,
+    const struct x87_emu_access *, struct x87_emu_decoded *, struct x87_emu_effect *));
 TYPE(x87_emu_scope_begin, void (*)(u16, struct x87_emu_softfloat_scope *));
 TYPE(x87_emu_scope_end, void (*)(const struct x87_emu_softfloat_scope *, struct x87_emu_effect *));
 TYPE(x87_emu_exception, enum x87_emu_result (*)(const struct x87_emu_state *,

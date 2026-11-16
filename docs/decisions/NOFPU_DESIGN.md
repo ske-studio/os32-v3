@@ -533,3 +533,33 @@ int x87_probe_nm(u32 saved_cs, u32 saved_eflags, u32 *saved_eip);
 - B16・B17: `VerSnapshot.fpu_present` は 0 が none(emu)。B17 (表示) だけ先に入ると FPU の有る機体でも none(emu) と出るので、B16 (収集) と B17 は同じ統合の枝で入れる。
 - B4: `x87_emu_state` は FNSAVE と同じ 108 byte だが reg は物理順 (R0..R7)。arch_fp_context との受け渡しは必ず codec を通し、memcpy しない (依頼に 1 行書く)。
 - B12: 依頼に §3.3 の wire (`column_f64_bits`、u64) を明記する。
+
+## エミュレータの本体の段の分け方 (PM 方針で改める)
+
+PACK.md の PM 方針により、§7 の純粋 decode と演算種類別の分割を次の表に置き換える。
+ESC ごとの関数が ModRM の命令選択と実行を兼ねる手本の構造を保持する。
+CPU、メモリ、例外の接続だけを OS32 の trap、作業 state、検証バッファ、result に替える。
+§4.3 の対象外命令、例外別 commit、ユーザー ESP/SS、保存形式の契約は維持する。
+
+| 元の段 | 新しいファイル割りと責任 |
+|---|---|
+| B3 | `x87_emu_decode.c` は prefix/ModRM/SIB/EA/長さだけ。EA_TREE と SF_ESC0〜7 の命令選択・実行は `x87_emu_esc03.c` / `x87_emu_esc47.c` にまとめる |
+| B4 | `x87_emu_state.c` に physical stack/TW、定数、FINIT、14/28/94/108 byte codec。環境命令の選択は ESC 関数 |
+| B5・B6 | ESC ファイルの命令分岐から `x87_emu_ops.c` の手本由来の演算・比較 helper を呼ぶ。別の命令分類段を作らない |
+| B7 | `x87_emu_ops.c` に整数 bit 列と ext80 の変換。native FP は使わない |
+| B8 | `x87_emu_memory.c` に既存 flat user selector と owner/USER/page/lease の検証、全域検証後の copy |
+| B9 | `x87_emu_exception.c` に SoftFloat scope、sticky/pending と命令別 commit 判定 |
+| C1 | `x87_emu_dispatch.c` が入口 guard、fetch、ESC 呼出し、memory→state/GPR→EIP の commit を所有 |
+
+宣言差分: `x87_emu_decoded` は命令の byte/EA 情報のまま、実行手順を追加しない。
+未実装の `x87_emu_arith/compare/convert/state_op` の四つの分類入口を
+`x87_emu_execute(trap, access, insn, effect)` に置換する。内部 helper は
+`x87_emu_internal.h` だけに宣言し、公開 SDK / AppSlot / #NM frame は変えない。
+この依頼では二時間の区切りを ESC0〜3 とし、ESC4〜7 の移植と全命令の受入は次段に残す。
+像への結線、B10、C3/C4 は後段のまま。
+
+この区切りの照合は libc なしの ELF64 で実 x87 の bit/status を採取し、
+同じ入力を ILP32 の製品コード (qemu runner) に与える。host32 の native runner は使用しない。
+§4.3 の補完として、C1 の丸め方向、DE/NaN の優先、非 mask O/U の指数折り返し、
+メモリ宛て O/U の store/pop 抑止を実 x87 に照合する。SAVE/RESTORE は共通 codec までで、
+DD の命令接続と #NM・像への結線は未完。延期の正典は `docs/tasks/DEFERRED_TESTS.md` の NOFPU-EMU-REST。
