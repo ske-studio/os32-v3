@@ -25,6 +25,7 @@ enum tsc_state { TSC_OFF, TSC_CALIBRATING, TSC_READY, TSC_FAILED };
 enum tsc_reject { REJECT_READ, REJECT_ORDER, REJECT_LENGTH, REJECT_COST,
                   REJECT_MISSING, REJECT_SPREAD, REJECT_SLOTS, REJECT_LIMIT };
 static enum tsc_state state;
+static u32 tsc_generation;
 static struct tsc_epoch epoch;
 static u32 epoch_fraction;
 static unsigned long long last_us;
@@ -52,10 +53,23 @@ static void reject(enum tsc_reject reason)
     diag.degraded = 1;
     diag.abnormal = 0;
     if (reason != REJECT_MISSING) diag.missing = 0;
-    if (state == TSC_READY && ++consecutive_rejects >= TSC_REJECT_LIMIT)
+    if (state == TSC_READY && ++consecutive_rejects >= TSC_REJECT_LIMIT) {
+        ++tsc_generation;
         state = TSC_FAILED;
+    }
 }
 int pc98_tsc_ready(void) { return state == TSC_READY; }
+int pc98_tsc_rate(u32 *mult, u32 *shift, u32 *generation)
+{
+    unsigned int flags = irq_save();
+    int rc = OS32_ERR_NOSYS;
+    if (state == TSC_READY) {
+        *mult = epoch.mult; *shift = epoch.shift; *generation = tsc_generation;
+        rc = 0;
+    }
+    irq_restore(flags);
+    return rc;
+}
 
 int pc98_tsc_read_us(u32 *lo, u32 *hi)
 {
@@ -152,6 +166,7 @@ static int calibrate(void)
     epoch = (struct tsc_epoch){(u32)start.tsc, (u32)(start.tsc >> 32),
                                (u32)start.pit, (u32)(start.pit >> 32), m, s};
     epoch_fraction = 0; last_us = start.pit;
+    ++tsc_generation; /* IO_TSC_READY_GENERATION */
     state = TSC_READY;
     irq_restore(flags);
     next_monitor = start.pit + TSC_MONITOR_US;
@@ -173,7 +188,9 @@ static void monitor(const struct window *w)
         else diag.abnormal = 0;
     }
     consecutive_rejects = 0;
-    if (diag.abnormal >= 2) { diag.degraded = 1; state = TSC_FAILED; }
+    if (diag.abnormal >= 2) {
+        diag.degraded = 1; ++tsc_generation; state = TSC_FAILED;
+    }
 }
 void pc98_tsc_calibrate_work(void)
 {
@@ -198,7 +215,7 @@ void pc98_tsc_calibrate_work(void)
     }
     if (end.tsc <= start.tsc) {
         reject(REJECT_ORDER); have_start = 0;
-        if (state == TSC_READY) state = TSC_FAILED;
+        if (state == TSC_READY) { ++tsc_generation; state = TSC_FAILED; }
         return;
     }
     if (end.pit < start.pit) { reject(REJECT_ORDER); have_start = 0; return; }
@@ -227,6 +244,7 @@ void pc98_tsc_calibrate_work(void)
 }
 int pc98_tsc_init(void)
 {
+    if (state == TSC_READY) ++tsc_generation;
     state = TSC_OFF;
     collected = attempts = have_start = work_started = 0; boot_start = 0;
     diag.abnormal = diag.missing = consecutive_rejects = 0;

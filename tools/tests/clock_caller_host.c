@@ -47,6 +47,10 @@ void platform_timer_sample(struct platform_timer_sample *out)
 static int tsc_ready, tsc_rc;
 static unsigned long long fake_tsc_us = (0x10000000ULL << 32) | 123;
 int pc98_tsc_init(void) { return -1; }
+int pc98_tsc_rate(u32 *m, u32 *s, u32 *g)
+{ (void)m; (void)s; (void)g; return OS32_ERR_NOSYS; }
+struct io_clock_ops;
+void io_clock_set_ops(const struct io_clock_ops *ops) { (void)ops; }
 int pc98_tsc_ready(void) { return tsc_ready; }
 int pc98_tsc_read_us(u32 *lo, u32 *hi)
 { if (tsc_rc) return tsc_rc; *lo = (u32)fake_tsc_us; *hi = (u32)(fake_tsc_us >> 32); return 0; }

@@ -4,7 +4,7 @@ CHECK = dict(name='clock-caller-host', tier=4,
             'kernel/time/ktime.c', 'kernel/time/ktime.h', 'kernel/time/time_math.c',
             'kernel/time/time_math.h', 'platform/pc98/clock_source.c',
             'platform/pc98/pit_time.c', 'platform/pc98/pit_time.h',
-            'platform/pc98/pit.h', 'platform/pc98/pit_math.h', 'platform/pc98/tsc_clock.h',
+            'platform/pc98/pit.h', 'platform/pc98/pit_math.h', 'platform/pc98/tsc_clock.h', 'platform/pc98/clock_source.h', 'kernel/io_clock.h',
             'kernel/time/tick_clock.h', 'kernel/irq/tick_budget.h', 'include/clock_source.h', 'include/kernel_tick.h', 'include/platform_timer.h',
             'tools/tests/dep_dir_b_io_shim.h', 'tools/tests/kernel_includes.py', 'tools/tests/host32.py'],
     needs=[], budget=2.9,
@@ -40,7 +40,8 @@ MUTATIONS = (
 
 
 def verify(work, mutation=None):
-    for rel in ('platform/pc98/clock_source.c', 'kernel/time/ktime.c'):
+    for rel in ('platform/pc98/clock_source.c', 'kernel/time/ktime.c',
+                'platform/pc98/clock_source.h', 'include/clock_source.h', 'kernel/io_clock.h'):
         text = (ROOT / rel).read_text()
         if mutation and rel == mutation[0]:
             assert text.count(mutation[1]) == 1
