@@ -123,6 +123,9 @@ CONTROL_SKIP_ALLOW = {
         'Returns after compiling and running every normal case; only mutations follow.',
     ('tools/checks/' + 'run.py', 'not ctx.mutate and elapsed > check.budget', 1):
         'Reports elapsed normal-control time after run(ctx) has finished; skips no controls.',
+    ('tools/ppc/' + 'ppc_sh_output.py', 'mutant', 1):
+        'Selects the fd1-log expectation inside link_accept; link_main always runs the '
+        'link-normal guest before the mutant build.',
 
     ('tools/tests/' + 'test_double_fault.py', 'mutant', 1):
         'Checks one fixture result; main runs run(folder) before descriptor mutants.',
