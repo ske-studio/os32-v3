@@ -68,6 +68,7 @@ int platform_clock_init(u32 tick_hz)
         tick_budget_config();
         if (clock_config_rc == 0) (void)pc98_tsc_init();
     }
+    if (clock_config_rc == 0) pc98_io_clock_install(); /* IO_TIER P6 */
     return rc;
 }
 void platform_clock_info(struct clock_info *out)
@@ -195,8 +196,6 @@ static int io_read_us(u32 *lo, u32 *hi)
     return rc;
 }
 const struct io_clock_ops pc98_io_clock_ops = {io_read, io_us_to_count, io_read_us};
-/* P6: let --gc-sections discard the uncalled installer until A5 is linked. */
-__attribute__((section(".text.pc98_io_clock_install")))
 void pc98_io_clock_install(void)
 {
     unsigned int flags = irq_save();
