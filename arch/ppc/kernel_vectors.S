@@ -522,6 +522,9 @@ ppc_kernel_vector_return:
 .Lrestore_user:
     lwz 0,PPC_CALL_SIZE+PPC_FRAME_SRR0(1)
     lwz 3,PPC_CALL_SIZE+PPC_FRAME_SRR1(1)
+    li 4,PPC_MSR_FE
+    andc 3,3,4
+    ori 3,3,PPC_MSR_FP
     mtsprg3 3
     lwz 3,PPC_CALL_SIZE+PPC_FRAME_LR(1)
     mtlr 3

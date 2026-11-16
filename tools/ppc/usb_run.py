@@ -636,13 +636,14 @@ def link_lan_accept(elf, cpu, out, mode='normal'):
                 if len(frame) >= 14+LINK_HDR and hdr_unpack(frame[14:])[0] == OP_RELEASE:
                     self.releases.append(hdr_unpack(frame[14:])[6])
                 result = handle(frame, sink)
-                if self.drop:
-                    # Admission arms a wall-clock 1.0s (host_agent tick answers 503);
-                    # under -icount the guest may send WDATA after it, so a
-                    # suppressed CALL must not be answered before the guest deadline.
-                    for ent in self.agent.ledger.values():
-                        if ent.get('resp') is None and 'sfs_deadline' in ent:
-                            ent['sfs_deadline'] = float('inf')
+                # Admission arms a wall-clock 1.0s (host_agent tick answers 503).
+                # Under -icount the guest clock freezes for 0.5-0.75s of wall
+                # time, so the guest may send WDATA after it: a suppressed CALL
+                # must not be answered early, and a served CALL (warm/recovery
+                # cat) must not fail spuriously. The guest deadline governs.
+                for ent in self.agent.ledger.values():
+                    if ent.get('resp') is None and 'sfs_deadline' in ent:
+                        ent['sfs_deadline'] = float('inf')
                 return result
             self.agent.handle = released
 

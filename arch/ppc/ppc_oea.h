@@ -6,7 +6,11 @@
 #define PPC_MSR_POW 0x00040000u
 #define PPC_MSR_EE 0x8000
 #define PPC_MSR_PR 0x4000
+#define PPC_MSR_FP 0x2000
 #define PPC_MSR_ME 0x1000
+#define PPC_MSR_FE0 0x800
+#define PPC_MSR_FE1 0x100
+#define PPC_MSR_FE (PPC_MSR_FE0|PPC_MSR_FE1)
 #define PPC_MSR_BE 0x200
 #define PPC_MSR_IP 0x40
 #define PPC_MSR_IR 0x20

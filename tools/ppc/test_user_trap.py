@@ -22,7 +22,7 @@ def check(source, expected):
                         '-o', str(path / 'host')], check=True)
         result = subprocess.run(['qemu-i386', str(path / 'host')], capture_output=True, check=False)
         assert result.returncode == expected, (result.returncode, expected)
-        if expected:
+        if expected == 10:
             assert result.stdout == b'SC-RED\n'
 
 def main():

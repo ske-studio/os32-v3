@@ -47,7 +47,3 @@ void arch_user_restart(struct arch_user_context *saved)
     pc -= 4;
     __builtin_memcpy(saved->opaque + PPC_FRAME_SRR0, &pc, sizeof(pc));
 }
-
-void arch_fp_save(struct arch_fp_context *saved) { (void)saved; }
-void arch_fp_restore(const struct arch_fp_context *saved) { (void)saved; }
-void arch_fp_init(void) { }

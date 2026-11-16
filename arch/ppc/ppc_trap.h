@@ -11,6 +11,7 @@ enum ppc_trap_reason {
     PPC_TRAP_ISI_PROTECT, PPC_TRAP_ISI_NOEXEC,
     PPC_TRAP_PROGRAM_FP, PPC_TRAP_PROGRAM_ILLEGAL,
     PPC_TRAP_PROGRAM_PRIVILEGED, PPC_TRAP_PROGRAM_TRAP,
+    PPC_TRAP_FP_UNAVAILABLE,
     PPC_TRAP_UNSUPPORTED = 0x100
 };
 void ppc_trap_set_handler(u32 vector, void (*handler)(struct ppc_frame *));

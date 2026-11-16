@@ -22,7 +22,7 @@ arch_entry_enter:
     lwz 5,16(30)
     lwz 6,20(30)
     li 8,0
-    ori 8,8,(PPC_MSR_EE|PPC_MSR_PR|PPC_MSR_ME|PPC_MSR_IR|PPC_MSR_DR|PPC_MSR_RI)
+    ori 8,8,(PPC_MSR_EE|PPC_MSR_PR|PPC_MSR_ME|PPC_MSR_FP|PPC_MSR_IR|PPC_MSR_DR|PPC_MSR_RI)
     mtsrr0 7
     mtsrr1 8
     rfi
