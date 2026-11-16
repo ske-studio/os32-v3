@@ -18,6 +18,7 @@ static u32 tree_size, entries, cursor, clock_tick;
 static int new_calls, source_ls, source_stat, source_reads, local_reads;
 static int initial_error, job_error, short_data, busy, local_error, allocations, fail_alloc;
 static int fep_closes, fep_opens;
+static char overflow_parent[256], overflow_name[64];
 static void put16(u8 *p, u32 v) { p[0] = v; p[1] = v >> 8; }
 static void put32(u8 *p, u32 v) { put16(p, v); put16(p + 2, v >> 16); }
 static u32 tick(void) { return clock_tick++; }
@@ -71,7 +72,13 @@ static int inv_read(int fd, void *out, u32 want)
 static int inv_ls(const char *path, void *cb, void *ctx)
 {
     if (!strncmp(path, "/host", 5)) source_ls++;
-    return fk_sys_ls(path, cb, ctx);
+    int rc = fk_sys_ls(path, cb, ctx);
+    if (overflow_parent[0] && !strcmp(path, overflow_parent)) {
+        DirEntry_Ext e = {0};
+        strcpy(e.name, overflow_name); e.type = OS32_FILE_TYPE_FILE;
+        ((DirCallback)cb)(&e, ctx);
+    }
+    return rc;
 }
 static void record(const char *relative, const char *path, int kind)
 {
@@ -102,6 +109,7 @@ static void prepare(u32 src_seed, u32 dst_seed, u32 sm, u32 dm)
     g_fake.get_tick = tick; g_fake.ime_dict_suspend = suspend_dict;
     g_fake.boot_image_info = fk_boot_image_info; fk_boot_valid = 0;
     g_fake.mem_alloc = alloc_mem;
+    overflow_parent[0] = 0;
     initial_error = job_error = short_data = busy = local_error = allocations = fail_alloc = 0;
     new_calls = source_ls = source_stat = source_reads = local_reads = 0;
     fk_mkdir_calls = 0;
@@ -109,6 +117,58 @@ static void prepare(u32 src_seed, u32 dst_seed, u32 sm, u32 dm)
     tree_size = 24; entries = 0; memset(tree, 0, sizeof(tree));
     record("a.bin", SRC_PATH, 1); seal();
 }
+/* Include one copyable sibling and compare each limit to the old-host run. */
+static void prepare_limit(int which)
+{
+    char relative[512], path[512], name[65];
+    prepare(1, 2, 200, 100);
+    if (which == 0) {
+        memset(name, 'b', 64); name[64] = 0;
+        strcpy(path, "/host/bin/"); strcpy(path + strlen(path), name);
+        fs_add_file(path, (const u8 *)"x", 1); record(name, path, 1);
+    } else if (which == 1) {
+        for (int i = 0; i < 128; i++) {
+            name[0] = 'b'; name[1] = '0' + i / 100;
+            name[2] = '0' + i / 10 % 10; name[3] = '0' + i % 10; name[4] = 0;
+            strcpy(path, "/host/bin/"); strcpy(path + strlen(path), name);
+            fs_add_dir(path); record(name, path, 2);
+        }
+    } else {
+        relative[0] = 0;
+        for (int i = 0; i < (which == 2 ? 10 : 4); i++) {
+            if (i) strcpy(relative + strlen(relative), "/");
+            memset(name, 'b', which == 2 ? 1 : 50); name[which == 2 ? 1 : 50] = 0;
+            strcpy(relative + strlen(relative), name);
+            strcpy(path, "/host/bin/"); strcpy(path + strlen(path), relative);
+            fs_add_dir(path); record(relative, path, 2);
+        }
+        if (which == 3) {
+            strcpy(overflow_parent, path);
+            memset(overflow_name, 'z', 45); overflow_name[45] = 0;
+            strcpy(relative + strlen(relative), "/"); strcpy(relative + strlen(relative), overflow_name);
+            record(relative, "/absent", 3);
+        }
+    }
+    seal();
+}
+static void test_limits(void)
+{
+    static char legacy_log[131072];
+    for (int which = 0; which < 4; which++) {
+        prepare_limit(which); initial_error = OS32_ERR_NOTFOUND;
+        int legacy_rc = run1("bin"), errors = g_errors, copied = g_copied;
+        strcpy(legacy_log, fk_log);
+        check(legacy_rc && errors && copied == 1, "limit legacy FAIL with sibling copied");
+        prepare_limit(which);
+        int rc = run1("bin");
+        check(rc == legacy_rc && g_errors == errors && g_copied == copied &&
+              new_calls == 1 && source_ls > 0 && !g_inventory_active &&
+              !strcmp(legacy_log, fk_log) &&
+              node_equal_bytes(DST_PATH, fs_nodes[fs_find(SRC_PATH)].data, 32),
+              "inventory limit matches legacy failures, log and copied sibling");
+    }
+}
+
 int main(void)
 {
     int rc;
@@ -157,7 +217,7 @@ int main(void)
     prepare(1, 2, 200, 100); tree_size = 24; entries = 0;
     record("a.bin", SRC_PATH, 3); seal(); rc = run1("bin");
     check(rc && !local_reads && !source_reads && !fk_write_calls &&
-          log_has("reason=type_conflict"), "other type never read as regular file");
+          log_has("reason=type_unknown"), "other type never read as regular file");
     prepare(1, 2, 200, 100); desc[0] = 'X'; rc = run1("bin");
     check(!rc && source_ls == 1 && g_copied == 1, "real name collision fallback");
     prepare(1, 2, 200, 100); job_error = OS32_ERR_FULL; rc = run1("bin");
@@ -224,6 +284,7 @@ int main(void)
     check(!rc && new_calls == 1 && !source_ls && g_excluded == 1 &&
           !g_local_crc_files && g_unchanged == 1 && !g_copied &&
           node_of("/sys") < 0, "whole tree one job default sys exclusion");
+    test_limits();
     printf("%d checks, %d failures\n", checks, failures);
     return failures ? 1 : 0;
 }

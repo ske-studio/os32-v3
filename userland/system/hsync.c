@@ -462,7 +462,7 @@ static int inventory_prepare(const char *src, const char *dst)
             (u32)hsp_depth(src) + depth > HS_MAX_PATH_DEPTH ||
             (u32)hsp_depth(dst) + depth > HS_MAX_PATH_DEPTH) {
             hsi_release(&g_inventory);
-            return OS32_ERR_NAMETOOLONG;
+            return 0; /* Use legacy per-entry path failures. */
         }
     }
     (void)str_ncpy(g_inventory_root, src, sizeof(g_inventory_root));
@@ -2044,7 +2044,7 @@ static void sync_file(const char *src_path, const char *dst_path, const u8 *entr
         rc = api->sys_stat(src_path, &ss);
     }
     if (rc != 0) { fail_file(dst_path, HR_IO, rc); return; }
-    if (entry && entry[0] == 3) { fail_file(dst_path, HR_TYPE, 0); return; }
+    if (entry && entry[0] == 3) { fail_file(dst_path, HR_TYPE_UNKNOWN, 0); return; }
     if ((ss.st_mode & OS_S_IFMT) == 0) {
         /* 種別が取れない。特殊ファイルを通常ファイルとして読まない */
         fail_file(dst_path, HR_TYPE_UNKNOWN, 0);

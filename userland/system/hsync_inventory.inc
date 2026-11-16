@@ -49,7 +49,7 @@ static int hsi_magic(const u8 *p, const char *s)
 static int hsi_descriptor(const u8 *p, u32 len, HsDescriptor *d)
 {
     u32 i;
-    if (len < 4) return OS32_ERR_IO;
+    if (len < 4) return HSI_FALLBACK;
     if (!hsi_magic(p, "HMD1")) return HSI_FALLBACK;
     if (len != HSI_DESC_SIZE || hsi_get16(p + 4) != 1) return OS32_ERR_IO;
     d->state = hsi_get16(p + 6);
@@ -101,7 +101,7 @@ static int hsi_decode(HsInventory *inv)
         hsi_get16(p + 4) != 1 || hsi_get16(p + 6) != HSI_HEADER_SIZE ||
         hsi_get32(p + 8) != inv->bytes) return OS32_ERR_IO;
     count = hsi_get32(p + 12);
-    if (count > HSI_MAX_ENTRIES || inv->bytes > HSI_MAX_BYTES) return OS32_ERR_FULL;
+    if (count > HSI_MAX_ENTRIES || inv->bytes > HSI_MAX_BYTES) return OS32_ERR_IO;
     crc = crc32_core_final(crc32_core_update(CRC32_INIT, p + HSI_HEADER_SIZE,
                                               inv->bytes - HSI_HEADER_SIZE));
     if (crc != hsi_get32(p + 16)) return OS32_ERR_IO;
@@ -119,13 +119,15 @@ static int hsi_decode(HsInventory *inv)
         for (j = 0; j < n; j++) {
             if (!path[j] || path[j] == '\\') return OS32_ERR_IO;
             if (path[j] == '/') {
-                if (!component || component >= NAME_CAP || depth >= MAX_DEPTH) return OS32_ERR_IO;
+                if (!component) return OS32_ERR_IO;
+                if (component >= NAME_CAP || depth >= MAX_DEPTH) return HSI_FALLBACK;
                 if ((component == 1 && path[j-1] == '.') ||
                     (component == 2 && path[j-1] == '.' && path[j-2] == '.')) return OS32_ERR_IO;
                 depth++; parentlen = j; component = 0;
             } else component++;
         }
-        if (!component || component >= NAME_CAP || n >= OS32_MAX_PATH ||
+        if (component >= NAME_CAP || n >= OS32_MAX_PATH) return HSI_FALLBACK;
+        if (!component ||
             (component == 1 && path[n-1] == '.') ||
             (component == 2 && path[n-1] == '.' && path[n-2] == '.')) return OS32_ERR_IO;
         if (prev && hsi_path_order(prev, prevlen, path, n) >= 0) return OS32_ERR_IO;
@@ -137,7 +139,7 @@ static int hsi_decode(HsInventory *inv)
             if (plen != parentlen) return OS32_ERR_IO;
             for (j = 0; j < plen; j++) if (p[off + HSI_RECORD_SIZE + j] != path[j]) return OS32_ERR_IO;
         }
-        if (++children[depth] > MAX_FILES) return OS32_ERR_IO;
+        if (++children[depth] > MAX_FILES) return HSI_FALLBACK;
         parents[depth] = pos;
         if (depth + 1 < MAX_DEPTH + 2) children[depth + 1] = 0;
         inv->offsets[i] = pos;
@@ -234,7 +236,7 @@ static int hsi_acquire(const char *root, HsInventory *inv)
     }
     api->sys_close(fd);
     rc = hsi_decode(inv);
-    if (rc) { hsi_release(inv); return rc == OS32_ERR_FULL ? HSI_FALLBACK : rc; }
+    if (rc) { hsi_release(inv); return rc; }
     return 0;
 }
 static int hsi_local_crc(const char *path, u32 expected_size, u32 *out_crc, u32 *out_bytes)

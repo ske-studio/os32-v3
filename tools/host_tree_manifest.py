@@ -7,6 +7,7 @@ are left intact outside generation. SFS replay caching belongs to the caller.
 Only the six M3 HostFS helpers are used; no transport module is imported.
 """
 import os
+import stat
 import struct
 import time
 import zlib
@@ -26,7 +27,7 @@ class ManifestError(Exception):
 
 
 def _identity(st):
-    return (st.st_dev, st.st_ino, st.st_mode, st.st_size,
+    return (st.st_dev, st.st_ino, stat.S_IFMT(st.st_mode), st.st_size,
             st.st_mtime_ns, st.st_ctime_ns)
 
 

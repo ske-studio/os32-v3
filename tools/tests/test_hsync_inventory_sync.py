@@ -19,6 +19,10 @@ import host32
 ROOT = Path(__file__).resolve().parents[2]
 PRODUCT = 'userland/system/hsync.c'
 MUTANTS = [
+    ('joined-path-fatal', 'return 0; /* Use legacy per-entry path failures. */',
+     'return OS32_ERR_NAMETOOLONG;'),
+    ('other-reason', 'if (entry && entry[0] == 3) { fail_file(dst_path, HR_TYPE_UNKNOWN, 0);',
+     'if (entry && entry[0] == 3) { fail_file(dst_path, HR_TYPE, 0);'),
     ('verify-mtime', 'if (!g_verify && mtime_same) {', 'if (mtime_same) {'),
     ('mtime-reads', '/* サイズも日時も同じ。**1 バイトも読まない** — ここが速さの源 */',
      'u32 c, b; (void)hsi_local_crc(dst_path, size, &c, &b);'),
@@ -65,6 +69,7 @@ def main():
         for header in ('stdio.h', 'stdlib.h', 'string.h'):
             (work / header).write_text('#include "fep_boundary_runtime.h"\n')
         fixture = (ROOT / 'tools/tests/hsync_h2_host.c').read_text()
+        fixture = fixture.replace('#define FS_MAX_NODES 96', '#define FS_MAX_NODES 384')
         fixture = fixture.replace('int main(void)', 'int hsync_h2_fixture_main(void)')
         fixture = fixture.replace('../../userland/system/hsync.c', str(work / 'hsync.c'))
         fixture = fixture.replace('    u8 *p = (u8 *)realloc(nd->data, newcap);',
@@ -75,7 +80,7 @@ def main():
         (work / 'test.c').write_text((ROOT / 'tools/tests/hsync_inventory_sync_host.c').read_text())
         for inc in (ROOT / 'userland/system').glob('hsync_*.inc'):
             (work / inc.name).write_text(inc.read_text())
-        # The mutated translation unit sees the exact, unchanged stage A include.
+        # Include mutations also run through production main and the legacy fixture.
         subprocess.run(['grep', '-nF', '#include "hsync_inventory.inc"', str(ROOT / PRODUCT)], check=True)
         subprocess.run(['grep', '-nF', 'static int hsi_acquire(', str(work / 'hsync_inventory.inc')], check=True)
         def run(source):
@@ -103,6 +108,23 @@ def main():
                 assert rc > 0, (name, 'runtime RED required', rc)
                 assert run(original) == 0, (name, 'restored control failed')
                 print('MUTATE', name, 'runtime RED; restored GREEN', flush=True)
+            inc_path = work / 'hsync_inventory.inc'
+            inc = inc_path.read_text()
+            for old, new in [
+                ('if (component >= NAME_CAP || depth >= MAX_DEPTH) return HSI_FALLBACK;',
+                 'if (component >= NAME_CAP || depth >= MAX_DEPTH) return OS32_ERR_IO;'),
+                ('if (component >= NAME_CAP || n >= OS32_MAX_PATH) return HSI_FALLBACK;',
+                 'if (component >= NAME_CAP || n >= OS32_MAX_PATH) return OS32_ERR_IO;'),
+                ('if (++children[depth] > MAX_FILES) return HSI_FALLBACK;',
+                 'if (++children[depth] > MAX_FILES) return OS32_ERR_IO;'),
+            ]:
+                assert inc.count(old) == 1, old
+                inc_path.write_text(inc.replace(old, new))
+                rc = run(original)
+                assert rc > 0, (old, 'runtime RED required', rc)
+                inc_path.write_text(inc)
+                assert run(original) == 0, 'restored include failed'
+                print('MUTATE', old, 'runtime RED; restored GREEN', flush=True)
             assert run(original) == 0, 'restored control failed'
             print('RESTORED GREEN', flush=True)
 

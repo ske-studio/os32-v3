@@ -13,6 +13,7 @@ import subprocess
 import sys
 import tempfile
 from types import SimpleNamespace
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tools'))
@@ -57,6 +58,17 @@ def check(mod):
                 found.add(name)
             assert found == {b'file', b'dir', b'other'}
             assert fs.read(b'/file', 2, 3) == (3, b'345')
+            # Linux lacks O_BINARY: inject a flag and strip it before the OS call.
+            real_open = os.open
+            binary = 0x40000000
+            def binary_open(path, flags, **kwargs):
+                if path == b'file' or os.fsencode(path).endswith(b'/file'):
+                    assert flags & binary, 'open_read_fd must request O_BINARY'
+                return real_open(path, flags & ~binary, **kwargs)
+            with patch.object(mod.os, 'O_BINARY', binary, create=True), \
+                 patch.object(mod.os, 'open', binary_open):
+                assert fs.read(b'/file', 0, 9) == (9, b'123456789')
+
             for name in (b'/', b'/dir'):
                 try:
                     fs.open_read_fd(fs._comps(name))
@@ -90,6 +102,9 @@ def main():
         return
     source = PRODUCT.read_text()
     mutants = [
+        ('os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_BINARY", 0), dir_fd=pfd)',
+         'os.O_RDONLY | os.O_NOFOLLOW, dir_fd=pfd)'),
+        ('os.O_RDONLY | getattr(os, "O_BINARY", 0))', 'os.O_RDONLY)'),
         ('m = int(st.st_mtime)', 'm = st.st_mtime_ns // 10**9'),
         ('virtual = self.manifest.stat(wire)', 'virtual = None'),
         ('virtual = self.manifest.read(wire, offset, count)', 'virtual = None'),

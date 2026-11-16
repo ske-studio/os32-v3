@@ -79,7 +79,7 @@ static int read_file(int fd, void *out, u32 n) {
         put32(desc+28, (u32)state_error);
         if (busy && fd == 2 && mode != 5) { busy--; if (!busy) { put16(desc+6, 1); put32(desc+28, 0); } }
         if (fd == 2 && mode == 6) desc[8] ^= 1;
-        src=desc; len=32;
+        src=desc; len=mode == 7 ? 3 : 32;
     } else if (fd == 3) { src=wire; len=wirelen; reads++; }
     else { src=local; len=local_len; }
     if (n > len-cursor) n=len-cursor;
@@ -132,7 +132,7 @@ static int test_crc(void) {
     return 0;
 }
 static int test_acquire(void) {
-    HsInventory inv; int rc;
+    HsInventory inv; HsDescriptor d; int rc;
     fixture(); busy=1; rc=hsi_acquire("/host",&inv);
     CHECK(rc==0 && inv.count==3 && inv.skipped==3,10);
     CHECK(contains(lastpath,"/data/ab0102030405060708090a0b0c0d0e0f"),11);
@@ -148,6 +148,12 @@ static int test_acquire(void) {
     fixture(); mode=3; CHECK(hsi_acquire("/host",&inv)==HSI_FALLBACK,32);
     fixture(); mode=5; busy=1; CHECK(hsi_acquire("/host",&inv)==OS32_ERR_TIMEOUT,33);
     fixture(); mode=6; busy=1; CHECK(hsi_acquire("/host",&inv)==OS32_ERR_IO,34);
+    fixture();
+    for (u32 len=0; len<4; len++) CHECK(hsi_descriptor(desc,len,&d)==HSI_FALLBACK,37);
+    CHECK(hsi_descriptor(desc,4,&d)==OS32_ERR_IO,38);
+    mode=7; CHECK(hsi_read_descriptor("/status/test",0,&d)==OS32_ERR_IO,39);
+    fixture(); mode=7; CHECK(hsi_acquire("/host",&inv)==HSI_FALLBACK,35);
+    fixture(); put32(wire+12,8193); CHECK(hsi_acquire("/host",&inv)==OS32_ERR_IO,36);
     return 0;
 }
 static int test_decode(void) {
@@ -239,7 +245,9 @@ def main():
         assert rc == 0, f'normal rc={rc}'
         if args.mutate:
             mutants = [
-                ('CRC final XOR', 'crc', 'return state ^ CRC32_XOROUT;', 'return state;'),
+                ('short descriptor', 'inc', 'if (len < 4) return HSI_FALLBACK;', 'if (len < 4) return OS32_ERR_IO;'),
+                ('oversized header', 'inc', 'count > HSI_MAX_ENTRIES || inv->bytes > HSI_MAX_BYTES) return OS32_ERR_IO;', 'count > HSI_MAX_ENTRIES || inv->bytes > HSI_MAX_BYTES) return HSI_FALLBACK;'),
+                ('CRC final XOR' , 'crc', 'return state ^ CRC32_XOROUT;', 'return state;'),
                 ('data offset', 'inc', 'pos += (u32)rc;', 'pos += (u32)rc + 1;'),
                 ('structure flags', 'inc', 'p[pos] > 3 || p[pos + 1] ||', 'p[pos] > 3 || 0 ||'),
             ]

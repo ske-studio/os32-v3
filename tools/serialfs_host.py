@@ -464,11 +464,11 @@ class HostFS(object):
                 raise SfsError(ERR_ISDIR)
             pfd = self._open_dir(comps[:-1])
             try:
-                fd = os.open(comps[-1], os.O_RDONLY | os.O_NOFOLLOW, dir_fd=pfd)
+                fd = os.open(comps[-1], os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_BINARY", 0), dir_fd=pfd)
             finally:
                 os.close(pfd)
         else:
-            fd = os.open(self.resolve(b"/" + b"/".join(comps)), os.O_RDONLY)
+            fd = os.open(self.resolve(b"/" + b"/".join(comps)), os.O_RDONLY | getattr(os, "O_BINARY", 0))
         try:
             if statmod.S_ISDIR(os.fstat(fd).st_mode):
                 raise SfsError(ERR_ISDIR)

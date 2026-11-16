@@ -354,8 +354,37 @@ def bounds_test(mod):
         m.close()
 
 
-CASES = dict(tree=tree_test, lifecycle=lifecycle_test, stale=stale_test, bounds=bounds_test)
+def windows_mode_test(mod):
+    for secure in (False, True):
+        with tempfile.TemporaryDirectory() as tmp:
+            fs = FS(tmp, secure)
+            for ext in ('exe', 'bat', 'cmd', 'com'):
+                Path(tmp, 'app.' + ext).write_bytes(b'\r\n\x1a\xff')
+            real_stat = fs._stat_raw
+            def windows_stat(comps):
+                st = real_stat(comps)
+                fields = {key: getattr(st, key) for key in (
+                    'st_dev', 'st_ino', 'st_mode', 'st_size', 'st_mtime',
+                    'st_mtime_ns', 'st_ctime_ns')}
+                if comps:
+                    fields['st_mode'] ^= stat.S_IXUSR
+                return SimpleNamespace(**fields)
+            with patch.object(fs, '_stat_raw', windows_stat):
+                m = mod.TreeManifest(fs)
+                rows = records(data(m, ready(m, start(m))))[0]
+                assert len(rows) == 4 and all(r[4] == zlib.crc32(b'\r\n\x1a\xff') for r in rows)
+                m.close()
+            original = real_stat([b'app.exe'])
+            fields = {key: getattr(original, key) for key in (
+                'st_dev', 'st_ino', 'st_mode', 'st_size', 'st_mtime_ns', 'st_ctime_ns')}
+            fields['st_mode'] = stat.S_IFDIR | stat.S_IMODE(original.st_mode)
+            assert mod._identity(original) != mod._identity(SimpleNamespace(**fields)), 'type changes remain STALE'
+            closed(fs)
+
+
+CASES = dict(windows=windows_mode_test, tree=tree_test, lifecycle=lifecycle_test, stale=stale_test, bounds=bounds_test)
 MUTANTS = [
+    ('stat.S_IFMT(st.st_mode)', 'st.st_mode', 'windows'),
     ('return crc & 0xffffffff', 'return (crc ^ 1) & 0xffffffff', 'tree'),
     ('                crc = 0\n', '                if kind == 2 and not self.fs._entries(child):\n                    continue\n                crc = 0\n', 'tree'),
     ("job['skipped_names'] += 1", "job['skipped_names'] += 0", 'tree'),
