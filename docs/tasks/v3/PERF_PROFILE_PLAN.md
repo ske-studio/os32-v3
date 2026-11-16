@@ -83,6 +83,15 @@ LAN と I/O の上限の多くは、いちばん遅い経路に合わせた 1 �
 | P5 | Ra266 の値を入れて実機で計測し、P0 と比べる | P2〜P4 |
 | (P6) | 返事を待たずに何本も出す (LAN_BULK の pipelining) を Ra266 基準モードだけで使う | ユーザーの判断 (HAL 中心期は着手しない) |
 
+## 4-1. 機種の固有の設定 (ユーザー指示 2026-11-17)
+
+「機種の固有の設定はコンフィグファイルで設定出来るように」「既存ファイルというとより独立させた設定ファイルのほうが良いと思う。既に作ってあるものはリファクタリング計画での改修項目として記録」(2026-11-17)。きっかけは PowerMac G4 Quicksilver (7450) の NAP で固まる件 (NetBSD cpu_subr.c:691-695 は 7450 で NAP を立てない)。
+- 仕組み: 機種の設定専用の独立したファイル (案 `/etc/machine.conf`、行ごとに `<機種の鍵> <名前>=<値>`、root の mount の直後に読む、既定はコードに持ち BSD に合わせる、ファイルは上書きだけ)。既存の `/etc/system.cfg`・設定レジストリ・hwdev に混ぜない。x86 と PowerPC で 1 つの仕組み。設計は astra の r2 (`~/os32-tmp/run/machine-conf/DESIGN.r2.md`、未レビュー)。置き場は [08_build](../../08_build.md) §8-3 の置き場の規則と、分離統合の設計 (os32powerpc が起草中) に合わせる。
+- 改修項目 (今コードに決め打ちしてある物。すぐには移さない):
+  - PowerPC: HID0 の NAP (arch/ppc/kernel_cpu.c:71。設定ファイルができるまでは NetBSD どおり 7450 で NAP を立てない暫定)、LAN を立てた直後の送信止め 2 秒 (platform/powermac/lan_service.c:284-286)、GMAC の clock gate (gmac_tree.c・gmac_clock.c)、PHY の対応表と待ち (gem_phy.c)、許す機種の一覧、許す bpp、OF の claim の余白、QEMU 用の回避。CPU の判定・BAT・HID0 の初期化・番地・RAM の量・DEC は FS より前に決まるので設定ファイルで変えない。
+  - x86: np2_detect() の分岐 5 か所 (mouse.c:46・lgy98.c:100・backend_cirrus.c:226・backend_pegc.c:419・device_host.c:8) を機種の鍵 1 つに、LGY-98 の番地・IRQ (ビルド時の -D)、PCM の IRQ・DMA、画面の backend の自動の順と 24k/31k、シリアルの速さ、82557 の PHY の待ち、Trident の消すまでの時間、ATAPI・FDC の待ち、ループの回数で数える待ち (時間に直すのが先)。`/etc/system.cfg` の機種の性格の物 (GFX・E82557_PHYVENDOR)。番地の地図・RAM の上限・DMA の帯・PIT の周期・GeForce の回復の道は設定ファイルで変えない。
+  - 別に確かめる: ローダの RAM の数え上げの上限 MEM_BOOT_PROBE_END 16MB (include/memmap.h:91) が 64MB の Ra266 で RAM を 16MB で打ち切っていないか (設定ではなく直す話)。
+
 ## 5. 決めていただくこと (着手の前に)
 1. Ra266 基準モードを作ることと、互換モードを残すことの確認。
    - これまでの目標は「P100/32MB で超快適」で、それ以上の性能は提案しない方針でした。互換モードがその目標を受け持ち、Ra266 基準モードは上に足す形でよいか。
