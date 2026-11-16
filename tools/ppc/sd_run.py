@@ -453,7 +453,7 @@ def main():
     base = Path(os.environ['TMPDIR'])/'sd-run'; base.mkdir(parents=True, exist_ok=True)
     work = Path(tempfile.mkdtemp(prefix='run-', dir=base))
     print('evidence='+str(work), flush=True)
-    elf = build(work/'product', 'KBOOT_SH=1')
+    elf = build(work/'product', 'KBOOT_SH=1', 'KBOOT_LINK=0')
     cpus = ['7450', '7455'] if args.cpu == 'both' else [args.cpu]
     for cpu in cpus: accept(elf, cpu, work/cpu)
     if args.mutate:
@@ -462,7 +462,7 @@ def main():
         # both: the host keeps boot1 FS state (accept) and this private product
         # copy restarts the nonce at 1 every boot, as before 41728e43.
         follow = work/'no-boot-follow'; follow.mkdir()
-        fixed_nonce = build(follow/'kernel', 'KBOOT_SH=1', *mutant_settings(
+        fixed_nonce = build(follow/'kernel', 'KBOOT_SH=1', 'KBOOT_LINK=0', *mutant_settings(
             follow, 'fixed-nonce', 'fs/serialfs/serialfs_persistent.c',
             'nonce = sfs_crc32(token, sizeof(token));',
             'nonce = 0; (void)token;'))
