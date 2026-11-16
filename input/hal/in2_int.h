@@ -81,6 +81,7 @@ void pointer_legacy_buttons(u8 buttons, u8 changed);
 /* Internal helpers: caller holds irq_save across validation and state update. */
 int input_src_info(u8 src, u16 generation, u8 *kind, u8 *origin);
 void input_state_release(u8 src, u16 generation);
+u8 input_held_key(u8 src, u16 keycode); /* caller validates source/range */
 void input_merge_key(InputEvent *event, u8 old, u8 origin);
 void input_emit_in2(const InputEvent *event);
 /* Native boot locks seed the existing mechanical bits with IRQs masked.

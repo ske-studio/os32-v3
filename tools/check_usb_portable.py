@@ -8,6 +8,8 @@ ROOT = Path(__file__).resolve().parents[1]
 PREFIXES = ('usb_', 'ohci_', 'ehci_', 'hid_', 'umass_', 'scsi_')
 SHELLS = {'usb_module.c', 'usb_resident.c', 'usb_early_quiesce.c'}  # early_quiesce: resident, no usbp_* (1E)
 ALLOWED = {'usb_platform.h', 'endian_dma.h', 'endian_le.h', 'lib/kstring.h'}
+# S2h reads the portable generated HID backend through the common keymap ABI.
+FILE_ALLOWED = {'drivers/usb/hid_kbd_map.c': {'input/hal/keymap.h'}}
 
 
 def uncomment(text):
@@ -38,7 +40,7 @@ def check(root):
                 name = header[1] if header else ''
                 local = (name.startswith('drivers/usb/') and name.endswith('.h')
                          and '..' not in name.split('/') and '//' not in name)
-                if name not in ALLOWED and not local:
+                if name not in ALLOWED and name not in FILE_ALLOWED.get(rel, ()) and not local:
                     errors.append(f'{rel}: forbidden include {operand}')
         # USB hardware words are opaque, including in platform shells/headers.
         # Strings/comments mentioning .raw are documentation, not accesses.

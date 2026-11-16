@@ -1,9 +1,11 @@
-"""Run the real x87 instructions without libc, including two nesting levels."""
+"""Run the shared hardware/software x87 lifecycle without libc."""
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import host32
+import json
+from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / 'arch/x86/kernel/x87.c'
@@ -13,7 +15,7 @@ MUTATIONS = (
 )
 
 
-def run(source):
+def run(source, software=False, dispatch=None):
     with tempfile.TemporaryDirectory(prefix='x87-') as name:
         tmp = Path(name)
         (tmp / 'x87.c').write_text(source)
@@ -21,8 +23,26 @@ def run(source):
         cmd = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
                '-DX87_HOST_TEST', '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib', '-static', '-no-pie',
                '-I' + str(ROOT / 'arch/x86/kernel'), '-I' + str(ROOT / 'include'),
-               '-I' + str(ROOT / 'arch/x86'), str(tmp / 'x87.c'),
+               *include_flags(ROOT), str(tmp / 'x87.c'),
                str(ROOT / 'tools/tests/x87_host.c'), '-o', str(exe)]
+        if software:
+            cmd += ['-DOS32_TEST_NOFPU', '-DOS32_X87_EMU_LINKED',
+                    '-msoft-float', '-mno-fp-ret-in-387', '-Os', '-fno-builtin']
+            cmd += [str(ROOT / ('arch/x86/kernel/x87_emu_' + n + '.c'))
+                    for n in ('decode', 'state', 'ops', 'esc03', 'esc47', 'exception', 'memory')]
+            dispatch_file = tmp / 'dispatch.c'
+            dispatch_file.write_text(dispatch if dispatch is not None else
+                (ROOT / 'arch/x86/kernel/x87_emu_dispatch.c').read_text())
+            cmd += [str(dispatch_file)]
+            # Vendor sources retain their own warning policy, as in the build.
+            for n in json.loads((ROOT/'lib/softfloat/UPSTREAM.json').read_text())['selected_sources']:
+                obj = tmp / (n + '.o')
+                subprocess.run(['gcc', '-m32', '-march=i386', '-std=gnu11', '-Os',
+                    '-ffreestanding', '-fno-pie', '-fno-stack-protector',
+                    '-msoft-float', '-mno-fp-ret-in-387', '-c',
+                    str(ROOT/'lib/softfloat'/n), '-o', str(obj)], check=True)
+                cmd += [str(obj)]
+            cmd += [str(ROOT/'lib/divdi3.c')]
         build = subprocess.run(cmd, capture_output=True, text=True)
         if build.returncode:
             raise RuntimeError(build.stderr)
@@ -49,12 +69,27 @@ def boundary():
 def main():
     source = SOURCE.read_text()
     boundary()
-    assert run(source) == 0, 'control failed'
-    print('x87 nesting and park: GREEN')
+    for software in (False, True):
+        assert run(source, software) == 0, ('control failed', software)
+        print('x87 nesting and park: GREEN ' + ('emu' if software else 'hw'))
     if '--mutate' in sys.argv:
+        dispatch = (ROOT / 'arch/x86/kernel/x87_emu_dispatch.c').read_text()
+        anchor = 'res_owner_get() == appslot_cur() &&'
+        assert dispatch.count(anchor) == 1
+        rc = run(source, True, dispatch.replace(anchor,
+            '(u32)res_owner_get() == as->owner && ' + anchor))
+        assert rc != 0, 'ledger-owner-as-appslot survived'
+        print('ledger-owner-as-appslot: runtime RED rc=' + str(rc))
         for name, before, after in MUTATIONS:
             assert source.count(before) == 1
             rc = run(source.replace(before, after, 1))
+            assert rc != 0, name + ' survived'
+            print(name + ': runtime RED rc=' + str(rc))
+        for name, before, after in (
+            ('software-save-omitted', 'x87_emu_state_encode(&x87_active, (u8 *)state, false, false);', '(void)state;'),
+            ('software-restore-omitted', 'else x87_emu_state_decode(&x87_active, (const u8 *)state, false, false);', 'else (void)state;')):
+            assert source.count(before) == 1
+            rc = run(source.replace(before, after, 1), True)
             assert rc != 0, name + ' survived'
             print(name + ': runtime RED rc=' + str(rc))
 

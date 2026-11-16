@@ -12,7 +12,7 @@ def run(ctx) -> int:
     import subprocess
     base_env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
     env = dict(base_env)
-    argv = ['python3', '-B', '-m', 'unittest', 'discover', '-s', 'tools/tests', '-p', 'test_np21w_ini.py']
+    argv = ['python3', '-B', 'tools/tests/test_np21w_ini.py', *shlex.split(('--mutate' if ctx.mutate else ''))]
     rc = subprocess.call(argv, cwd=ctx.root, env=env, close_fds=False)
     if rc:
         return rc

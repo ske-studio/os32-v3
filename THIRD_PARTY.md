@@ -11,6 +11,8 @@ OS32 本体は MIT ([LICENSE](LICENSE))。ここに挙げるのはリポジト�
 | SQLite | 3.53.0 | Public Domain (blessing) | `lib/sqlite3/sqlite3.{c,h}` (amalgamation) + OS32 の設定・VFS (`os32_sqlite_config.h`、`os32_sqlite_vfs.c`) | amalgamation 本体は無改変。設定と VFS は OS32 の自作 | `sqlite3.c` 冒頭の blessing |
 | zlib (inflate のみ) | 1.2.11 | zlib License | `lib/zlib/` (inflate.c inffast.c inftrees.c adler32.c zutil.c と対応ヘッダ) | **無改変** (条項 2 の「改変版の明示」は不要)。deflate / gzip / crc32 は取り込んでいない | `lib/zlib/zlib.h` 冒頭、経緯は `lib/zlib/README.OS32` |
 | microtar (rxi) | 0.1.0 (master 27076e1、2017) | MIT | `lib/microtar/microtar.{c,h}` | `microtar.c` に 4 点 (`MTAR_NO_STDIO`、octal 読み、フィールド長の上限、512B 単位の書き込み)。`microtar.h` は無改変。詳細は `lib/microtar/README.OS32` | `lib/microtar/LICENSE` |
+| NP21/W x87 エミュレータ | a535090400660e8b37350d91aa959a9a2442b7ba | BSD-2-Clause | `arch/x86/kernel/x87_emu_*.c` | C へ分割、CPU・メモリ・例外を OS32 に接続、対象命令を限定。関数ごとの由来は `x87_emu_vendor/UPSTREAM.json` | `arch/x86/kernel/x87_emu_vendor/LICENSE-I386C-FPU.TXT`、各派生ファイル冒頭 |
+| Berkeley SoftFloat (NP21/W 同梱) | Release 3e、同上の NP21/W HEAD | BSD-3-Clause | `lib/softfloat/` | NP21 の型・i16 拡張を保持、OS32 port と固定閉包。差分・原本 hash は `lib/softfloat/UPSTREAM.json` | `lib/softfloat/COPYING.txt`、各原本冒頭 |
 | microui (rxi) | 2.x 系 (Copyright 2024 rxi) | MIT | `userland/lib/ui/microui.{c,h}` | OS32 移植版 (C89 化、整数演算のみ、メモリ縮小、`OS32:` コメントの箇所) | `userland/lib/ui/microui.c` 冒頭 |
 | FatFs (ChaN) | R0.15 | FatFs License (BSD 風、1 条項) | `fs/fat/fatfs/ff.{c,h}` `diskio.h` | `ff.c` `ff.h` `diskio.h` は**無改変** (改行コードを LF に揃えたのみ。2026-09-30 に上流 ff15.zip と照合)。`ffconf.h` は OS32 向け設定、`diskio.c` `diskio_os32.h` `string.h` は OS32 の自作 | `fs/fat/fatfs/ff.h` 冒頭 |
 | LZ4 ブロック展開 | — (仕様 lz4_Block_format.md 準拠) | MIT (本リポジトリ) | `lib/lz4.c`、`boot/lz4_mini.c`、`lib/os32_lz4/` (Rust) | **自作**。公式 LZ4 のコードは使っていない (ホスト側の圧縮は Python `lz4` パッケージ) | — |
@@ -41,3 +43,5 @@ T2f f1b の単体接続は、上記 newlib nano の検証済み member 6 個を�
 [`nano.LICENSE`](sdk/allocator/nano.LICENSE) (変更なし)。
 SDK adapter 自体は OS32 の MIT。公開 SDK のアプリへのリンク経路には結線済み
 (`sdk/example/hello/Makefile:53` の `-los32nano -lc -lgcc`)。
+
+SoftFloat と x87 の許諾全文は配布媒体・インストール先にも `/sys/sfloat.txt` と `/sys/x87emu.txt` として同梱する (`build/core.yaml`)。整数 ABI helper と命令 decoder・OS 接続は OS32 の自作部分。

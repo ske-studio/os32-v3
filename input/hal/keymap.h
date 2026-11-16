@@ -103,19 +103,28 @@ void km_state_cancel_tap(u8 src, u16 generation);
 /* S0d: release held keys/projection while binding is still available. */
 void km_release_keys(u8 src, u16 generation);
 
-/* H0b reservation. S0a replaces this with an external declaration and body;
- * S0c/S0d extend that body before capture is enabled. No weak fallback. */
+/* Release projection and effects before invalidating the binding. */
+void km_registry_source_released(u8 src, u16 generation);
 static inline void km_source_release(u8 src, u16 generation)
 {
-    (void)src;
-    (void)generation;
+    km_registry_source_released(src, generation);
 }
+
+/* S1x: register both backends, then allocate/bind the native source. */
+int pc98_input_keymap_register(u16 *generation);
 
 /* Descriptors have static lifetime. Duplicate IDs are rejected. */
 int km_backend_register(const KmBackend *map);
 int km_source_bind(u8 src, u16 generation, u16 map_id);
 /* Validate generation and range; discard input from unregistered sources. */
 int input_capture_key(const KmKey *key);
+
+/* S3: COMPAT annotates DOS bytes before any policy/legacy projection. */
+void km_legacy_compat(KmEvalResult *result);
+void input_emit_keymap(const KmEvalResult *result, u8 down, u8 raw_due,
+                       u8 physical_mods, u8 consumed);
+/* Static fallback descriptor; independent of registry/source bindings. */
+void input_legacy_keymap_set(const KmBackend *map);
 
 /* Only these keypad symbols can be converted to bytes with sym & 0x7f. */
 static inline int is_keypad(keysym_t sym)

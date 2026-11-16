@@ -36,6 +36,13 @@ filesystem:
 
   # ファイルデプロイ定義
   files:
+    # BSD notices accompany kernel/module binaries on CD, both FDs and HDD.
+    - host: lib/softfloat/COPYING.txt
+      guest: /sys/sfloat.txt
+      tags: [core]
+    - host: arch/x86/kernel/x87_emu_vendor/LICENSE-I386C-FPU.TXT
+      guest: /sys/x87emu.txt
+      tags: [core]
     - host: assets/gfx/sync.cfg
       guest: /etc/gfx/sync.cfg
       tags: [gui]

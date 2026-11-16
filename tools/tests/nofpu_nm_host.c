@@ -19,7 +19,8 @@ int x87_test_has_ac(void) { CHECK(!(flags & 512), 3); return ac; }
 #include "x87_source.c"
 
 static int emu_calls, faults, emulate_ok;
-extern void asm_nm_test(void);
+extern void asm_nm_test(void), asm_nm_vm_test(void);
+static int probe_seen;
 static u8 instruction[] = {0xdd, 0x1c, 0x24}; /* fstpl (%esp) */
 static enum x87_emu_result fetch(void *ctx, u32 at, u8 *v) {
     (void)ctx;
@@ -28,6 +29,7 @@ static enum x87_emu_result fetch(void *ctx, u32 at, u8 *v) {
 }
 static int fixture_emulate(struct x87_emu_trap *t) {
     struct x87_emu_decoded d;
+    CHECK(probe_seen, 42);
     emu_calls++;
     CHECK(t->gpr[X87_ESP]==0x2000 && t->segment[X87_SS]==0x2b, 20);
     CHECK(t->segment[X87_DS]==0 && t->segment[X87_FS]==0x23 && t->segment[X87_GS]==0, 21);
@@ -39,9 +41,15 @@ static void exception_handler(u32 error, u32 vector, u32 eip, u32 *r) {
     CHECK(error==0 && vector==7 && eip==r[10] && r[11]!=0, 23);
     faults++;
 }
+static int fixture_probe(u32 cs, u32 eflags, u32 *eip) {
+    probe_seen=1;
+    return x87_probe_nm(cs,eflags,eip);
+}
+#define x87_probe_nm fixture_probe
 #define x87_emulate_nm fixture_emulate
 #include "nm_handler.inc"
 #undef x87_emulate_nm
+#undef x87_probe_nm
 
 static void probe_cases(void) {
     for (ac=0; ac<2; ++ac) for (unsigned ne=0;ne<2;++ne)
@@ -76,7 +84,7 @@ static void frame_cases(void) {
     u32 raw[]={0,0x23,0x2b,0, 7,6,5,0xdead0000,3,2,1,0,
                7,0,0x1000,0x23,0x602,0x2000,0x2b};
     struct x87_nm_frame *f=(void *)raw;
-    emulate_ok=1; nm_handler(f);
+    emulate_ok=1; probe_seen=0; nm_handler(f);
     CHECK(emu_calls==1 && !faults && raw[14]==0x1003 && raw[11]==0x1234,24);
     CHECK(raw[7]==0xdead0000 && raw[17]==0x2000 && raw[18]==0x2b,25);
     CHECK(raw[0]==0 && raw[1]==0x23 && raw[2]==0x2b && raw[3]==0,26);
@@ -89,6 +97,7 @@ static void frame_cases(void) {
     nm_handler(f); CHECK(raw[14]==(u32)x87_probe_absent && faults==3 && emu_calls==2,30);
     probe_active=0;
     emulate_ok=1;
+    asm_nm_vm_test();
     asm_nm_test();
     CHECK(emu_calls==3 && faults==3,40);
 }

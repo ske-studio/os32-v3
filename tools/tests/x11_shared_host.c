@@ -1,3 +1,4 @@
+#define LEGACY_KEYMAP_SOURCE "legacy_keymap_source.inc"
 #define KBD_MERGE_SOURCE "kbd_merge_source.inc"
 #include "kbd_capture_fixture_host.h"
 #include "../../input/hal/legacy_ring.c"
@@ -761,3 +762,5 @@ void _start(void)
 }
 
 void idle_wait_step(void) { idle_work_run(); _halt(); }
+
+void bootlog_push(const char *s, u32 n) { (void)s; (void)n; }

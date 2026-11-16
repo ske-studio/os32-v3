@@ -10,9 +10,10 @@ import tempfile
 import host32
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCES = ['drivers/usb/hid_kbd.c', 'drivers/usb/hid_kbd_map.c', 'drivers/usb/hid_mouse.c']
+SOURCES = ['input/keymaps/hid_jp.c', 'drivers/usb/hid_kbd.c', 'drivers/usb/hid_kbd_map.c', 'drivers/usb/hid_mouse.c']
 CHECK = dict(env=['ppc-cross'], name='usb-hid', tier=1, needs=[], budget=10, covers=[
     'drivers/usb/hid_kbd.c', 'drivers/usb/hid_kbd_map.c', 'drivers/usb/hid_mouse.c',
+    'input/keymaps/hid_jp.c', 'input/hal/keymap.h',
     'drivers/usb/hid_boot.h', 'drivers/usb/usb_core.h',
     'drivers/usb/usb_desc.h', 'include/usb_platform.h', 'include/types.h',
     'include/callconv.h', 'include/endian_le.h', 'tools/tests/usb_hid_host.c',
@@ -32,6 +33,8 @@ def check(mutate):
             compiler = shutil.which(str(Path(cross)/'bin'/target) if cross else target)
             if not compiler:
                 print('SKIP cross compile:', target)
+                if env == 'PPC_CROSS_DIR' and os.environ.get('OS32_REQUIRE_PPC') == '1':
+                    raise RuntimeError('FAIL required PowerPC compiler missing')
                 continue
             for src in SOURCES:
                 subprocess.run([compiler, *flags, '-ffreestanding', '-c', src,
@@ -47,7 +50,13 @@ def check(mutate):
             mutations = [
                 ('drivers/usb/hid_kbd.c', 'i = (order + 0x70) & 127;', 'i = order;'),
                 ('drivers/usb/hid_boot.h', 'b->x.short_ok = 1;', 'b->x.short_ok = 0;'),
-                ('drivers/usb/hid_kbd_map.c', 'case 0x47: return 0xff;', 'case 0x47: return 0x46;'),
+                ('drivers/usb/hid_kbd_map.c', 'return hid_jp_backend.compat_sc[usage];',
+                 'return usage == 0x47 ? 0x46 : hid_jp_backend.compat_sc[usage];'),
+                ('drivers/usb/hid_kbd_map.c',
+                 'return (bits[usage >> 3] >> (usage & 7)) & 1;', 'return 0 & bits[usage >> 3];'),
+                ('drivers/usb/hid_kbd_map.c',
+                 'return (ext->order[usage >> 2] >> ((usage & 3) * 2)) & 3;',
+                 'return 0 & ext->order[usage >> 2];'),
                 ('drivers/usb/hid_kbd.c', '!!s->prev[i] != !!now[i]', 's->prev[i] != now[i]'),
                 ('drivers/usb/hid_boot.h', 'usbp_input_release(b->kind, b->iface->src);', '(void)b;'),
                 ('drivers/usb/hid_boot.h', 'usbp_input_release(b->kind, f->src);', '(void)b;'),

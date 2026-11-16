@@ -196,3 +196,10 @@ $(BUILD_OUT)/tickprobe.bin: $(BUILD_OUT)/tickprobe.raw $(BUILD_OUT)/tickprobe.el
 	python3 sdk/mkos32x.py $< $@ --elf $(BUILD_OUT)/tickprobe.elf --api 78 --cui-only
 
 $(C_KERNEL_OBJ) $(filter %.o,$(R1_OBJECTS)): include/kapi_call_generated.h
+
+# Acceptance path (b): hardware FPU, all user x87/WAIT routed through #NM.
+# Keep objects, maps, compressed image and CRC-paired modules together.
+.PHONY: kernel-testnofpu testnofpu-image
+kernel-testnofpu:
+	$(MAKE) BUILD_OUT=$(BUILD_OUT)/testnofpu SQLITE_PROTO_OUT=$(BUILD_OUT)/testnofpu/sqlite-proto TEST_NOFPU_BUILD=1 testnofpu-image
+testnofpu-image: $(BUILD_OUT)/vmkernel.lz4 $(KERNEL_PAIRED_MODULES)

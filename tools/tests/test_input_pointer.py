@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """T_pointer: source state, independent deltas and absolute coordinates."""
-CHECK = dict(name='input-pointer-host', tier=1, budget=10, needs=[], covers=['tools/tests/input_unused_key_host.h',
+CHECK = dict(name='input-pointer-host', tier=1, budget=10, needs=[], covers=['input/hal/legacy_keymap.c', 'input/keymaps/pc98_jp.c', 'input/hal/keymap_registry.c', 'input/hal/keymap_eval.c', 'input/hal/keymap_state.c', 'tools/tests/input_unused_key_host.h',
     'input/hal/in2_int.h', 'input/hal/in2_dev.c', 'input/hal/keymap.h', 'input/hal/in2_state.c',
     'input/hal/kbd_merge.c', 'input/hal/mouse_ext.c', 'input/hal/pointer_state.c',
     'drivers/input/mouse.c', 'drivers/input/kbd.h', 'tools/tests/input_poll_host.c',
@@ -21,6 +21,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def run(ctx):
     names = ['in2_dev.c', 'in2_state.c', 'kbd_merge.c', 'mouse_ext.c', 'pointer_state.c']
+    names += ['legacy_keymap.c', 'keymap_registry.c', 'keymap_eval.c', 'keymap_state.c']
     sources = [(ctx.root / 'input/hal' / n).read_text() for n in names]
     with tempfile.TemporaryDirectory(prefix='input-pointer-') as td:
         tmp = Path(td)

@@ -10,7 +10,7 @@ CHECK = dict(name='nofpu-nm', tier=1, needs=[], budget=15,
             'arch/x86/x86_flags.h', 'include/cpu.h', 'include/abi.h',
             'include/callconv.h', 'include/exec_arch.h', 'include/types.h',
             'tools/tests/nofpu_nm_host.c', 'tools/tests/test_nofpu_nm.py',
-            'tools/tests/ver_test_utils.py', 'tools/tests/kernel_includes.py', 'tools/tests/host32.py', 'build/config.mk'],
+            'tools/tests/ver_test_utils.py', 'tools/tests/kernel_includes.py', 'tools/tests/host32.py', 'build/config.mk', 'build/features/x87.mk'],
     kind='contract')
 from pathlib import Path
 import subprocess
@@ -28,12 +28,17 @@ MUTATIONS=[
     ('TS-retained','x87.c','final &= ~(u32)(CR0_EM | CR0_TS)', 'final &= ~(u32)CR0_EM'),
     ('memory-probe-before-status','x87.c','testw %%ax, %%ax; jnz 1f', 'testw %%ax, %%ax; nop'),
     ('unrestricted-probe-EIP','x87.c','if (*saved_eip != (u32)x87_probe_init &&', 'if (0 && *saved_eip != (u32)x87_probe_init &&'),
+    ('probe-after-emulation','handler','    if (x87_probe_nm(frame->cs, frame->eflags, &frame->eip)) return;\n', ''),
+    ('segments-not-restored','asm','        pop     gs', '        add     esp, 4'),
+    ('DS-not-restored','asm','        pop     es\n        pop     ds',
+     '        pop     es\n        add     esp, 4'),
+    ('VM-branch-removed','asm','isr_stub_7:\n        cli\n        test    dword [esp + IRET_EFLAGS_OFF], EFLAGS_VM\n        jnz     .from_v86', 'isr_stub_7:\n        cli\n        test    dword [esp + IRET_EFLAGS_OFF], EFLAGS_VM\n        nop'),
     ('kernel-ESP-as-user','x87_nm.h','t->gpr[X87_ESP] = f->user_esp;', 't->gpr[X87_ESP] = f->pushad_esp;'),
 ]
-def asm_fixture():
-    source=(ROOT/'arch/x86/kernel/isr_stub.asm').read_text()
+def asm_fixture(source):
     body=source.split('isr_stub_7:\n',1)[1].split('.from_v86:',1)[0]
     body=body.replace('        cli','        nop')
+    vm_body=body.replace('        jnz     .from_v86', '        jnz vm_finish').replace('        iretd', '        jmp bad')
     body=body.replace('        jnz     .from_v86','        jnz     bad')
     body=body.replace('        iretd', '        jmp finish')
     return r'''bits 32
@@ -99,6 +104,16 @@ bad:
     mov eax,1
     mov ebx,41
     int 0x80
+''' + r'''
+global asm_nm_vm_test
+asm_nm_vm_test:
+    push dword 0x20002
+    push dword 0x23
+    push dword 0x1000
+''' + vm_body + r'''
+vm_finish:
+    add esp,12
+    ret
 '''
 
 def execute(base, status, control, linked=False, forced=False):
@@ -113,7 +128,7 @@ def execute(base, status, control, linked=False, forced=False):
         (tmp/'x87_source.c').write_text(source)
         (tmp/'x87_nm.h').write_text(base['x87_nm.h'])
         (tmp/'nm_handler.inc').write_text(base['handler'])
-        (tmp/'entry.asm').write_text(asm_fixture())
+        (tmp/'entry.asm').write_text(asm_fixture(base['asm']))
         subprocess.run(['nasm','-f','elf32',str(tmp/'entry.asm'),'-o',str(tmp/'entry.o')],cwd=ROOT,check=True)
         exe=tmp/'fixture'
         cmd=['gcc','-m32','-march=i386','-std=gnu11','-Os','-Wall','-Wextra','-Werror',
@@ -128,17 +143,46 @@ def execute(base, status, control, linked=False, forced=False):
         return host32.run([str(exe)],timeout=30).returncode
 
 def main():
+    feature=(ROOT/'build/features/x87.mk').read_text()
+    for out in ('out', 'out/testnofpu-extra', 'testnofpu',
+                'out/testnofpu', '/tmp/os32/testnofpu'):
+        result=subprocess.run(['make','--no-print-directory','-f','-',
+            'TEST_NOFPU_BUILD=1',f'BUILD_OUT={out}','probe'],
+            input=feature+'\n.PHONY: probe\nprobe:;@:\n',
+            cwd=ROOT,capture_output=True,text=True)
+        valid=out.endswith('/testnofpu')
+        assert (result.returncode == 0) == valid, (out,result.stderr)
+        if not valid:
+            assert 'requires BUILD_OUT ending in /testnofpu' in result.stderr
+    print('GREEN test-only build output isolation')
     base={n:(ROOT/'arch/x86/kernel'/n).read_text() for n in ('x87.c','x87_nm.h')}
+    base['asm']=(ROOT/'arch/x86/kernel/isr_stub.asm').read_text()
     base['handler']=function((ROOT/'arch/x86/kernel/isr_handlers.c').read_text(),'void nm_handler(')
     cases=[(0,0x37f),(0xffff,0xffff),(1,0x37f),(0,0xffff)]
     for status,control in cases: assert execute(base,status,control)==0,(status,control)
     assert execute(base,0xffff,0xffff,linked=True)==0
     assert execute(base,0,0x37f,linked=True,forced=True)==0
+    with tempfile.TemporaryDirectory(prefix='nofpu-guard-') as d:
+        source=Path(d)/'x87.c'; obj=Path(d)/'x87.o'
+        cmd=['gcc','-m32','-std=gnu11','-DX87_HOST_TEST','-DOS32_TEST_NOFPU',
+             *include_flags(ROOT),'-c',str(source),'-o',str(obj)]
+        source.write_text(base['x87.c'])
+        rejected=subprocess.run(cmd,capture_output=True,text=True)
+        assert rejected.returncode and 'requires the linked software emulator' in rejected.stderr
+        if '--mutate' in sys.argv:
+            anchor='#error OS32_TEST_NOFPU requires the linked software emulator'
+            assert base['x87.c'].count(anchor)==1
+            source.write_text(base['x87.c'].replace(anchor,''))
+            assert subprocess.run(cmd,capture_output=True).returncode==0
+            print('test-flag-guard-removed: compile guard RED (invalid combination accepted)')
     print('GREEN CR0 four states, AX-first probe, restricted recovery, user ESP/SS and handler ordering')
     if '--mutate' in sys.argv:
         for name,file,old,new in MUTATIONS:
             assert base[file].count(old)==1,name
             changed=dict(base);changed[file]=base[file].replace(old,new)
+            if name == 'probe-after-emulation':
+                # Move the removed probe statement below the user emulation block.
+                changed[file] = changed[file].replace('    exception_handler(', old + '    exception_handler(')
             results=[execute(changed,*case) for case in cases]
             assert any(results),(name,results)
             print(f'{name}: runtime RED rc={results}')

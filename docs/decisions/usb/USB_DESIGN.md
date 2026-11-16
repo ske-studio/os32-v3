@@ -190,6 +190,7 @@ r5 は、失敗・取り外し・番地・再試行の扱いを**独自の状態
 
 - 置き場の 3 区分:
   - **共通** (`drivers/usb/` の HCD・中核・class): `usb_platform.h`・`endian_dma.h`・`endian_le.h`・`lib/kstring.h`・`drivers/usb/*.h` だけを include。
+    S2h の `hid_kbd_map.c` だけは、共通の生成 HID backend を読むため `input/hal/keymap.h` も許す。
   - **常駐の踏み台** (vmkernel、pc98): `drivers/usb/usb_resident.c` — IRQ ×3・tick ×1 の踏み台、module 参照 (`MODULE_REF_IRQ/TICK/DMA`)、`lan_module.c:98-107` と同じ形で最大 3 登録・arg あり。
   - **部品の殻** (`usb.mod`、pc98): `drivers/usb/usb_module.c` (PCI 表・lifecycle)・`platform/pc98/usb_platform.c` (usbp_* の実装、kernel の関数を import で呼ぶ)。
 - 番人 `tools/check_usb_portable.py`: 対象は共通の `drivers/usb/{usb_,ohci_,ehci_,hid_,umass_,scsi_}*.c` だけ (`usb_module.c`・`usb_resident.c` は除く)。`le32_t.raw` は `include/endian_dma.h`・`arch/*/arch_endian_dma.h` でだけ許す。

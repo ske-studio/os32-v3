@@ -23,7 +23,9 @@ import build_nano_target as builder
 import build_nano as xbuilder
 import check_link_target as gate
 
-CHECK = dict(name='nano-targets', env=['ppc-cross'], tier=2, budget=60, needs=['make:all'],
+# Fixtures build their own objects; only the generated SDK headers are needed.
+CHECK = dict(name='nano-targets', env=['ppc-cross'], tier=2, budget=60,
+    needs=['make:sdk/include/os32/os32_unit_stamp.h'],
     covers=['tools/tests/test_nano_targets.py', 'tools/check_nano_inputs*.py',
             'tools/ci/build_cross_ppc.sh', 'tools/ci/build_cross.sh', 'sdk/allocator/**',
             'sdk/crt/**', 'sdk/link/ppc/app.ld', 'sdk/include/**',
@@ -140,13 +142,15 @@ def cases(prefix, work, mutate):
     ledger = inputs.select(json.loads(inputs.LEDGER.read_text()))
     inputs.check(prefix, ledger)
     inputs.sdk_inputs(ledger)
-    bad = copy.deepcopy(ledger)
-    bad['toolchain']['local']['members']['libc_a-mallocr.o'] = '0' * 64
-    rejected(lambda: inputs.check(prefix, bad))
     receipt = work / 'receipt.json'
     trusted = dict(inputs.inventory(prefix, ledger), target=inputs.TARGET, abi=inputs.ABI,
         upstream=ledger['toolchain']['upstream'], configure=ledger['toolchain']['configure'],
         builder_sha256=inputs.digest(inputs.BUILDER.read_bytes()))
+    # CI has a build receipt, which takes precedence over ledger local hashes.
+    bad = copy.deepcopy(trusted)
+    bad['members']['libc_a-mallocr.o'] = '0' * 64
+    receipt.write_text(json.dumps(bad))
+    rejected(lambda: inputs.check(prefix, ledger, receipt))
     receipt.write_text(json.dumps(trusted))
     inputs.check(prefix, ledger, receipt)
     archive = closure(prefix, work, ledger, receipt)

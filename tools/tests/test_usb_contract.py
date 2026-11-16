@@ -70,6 +70,14 @@ def check(mutate):
             print('runtime:', arch, 'OK')
         guard(tmp, '#include "usb_platform.h"\n#include "drivers/usb/ohci_regs.h"\n', 0)
         guard(tmp, '/* #include "bad.h" .raw */\nconst char *s = ".raw";\n', 0)
+        # S2h permits the common keymap ABI only in its HID table adapter.
+        adapter = tmp / 'drivers/usb/hid_kbd_map.c'
+        adapter.write_text('#include "input/hal/keymap.h"\n')
+        guard(tmp, '', 0)
+        guard(tmp, '#include "input/hal/keymap.h"\n', 1)
+        adapter.write_text('#include "mm/dma_pool.h"\n')
+        guard(tmp, '', 1)
+        adapter.unlink()
         # Shells are excluded from the include rule, but not raw access.
         shell = tmp / 'drivers/usb/usb_module.c'
         shell.write_text('#include "mm/dma_pool.h"\n')
