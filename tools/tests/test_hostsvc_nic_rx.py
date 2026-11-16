@@ -31,7 +31,7 @@ MUTATIONS = (
     ('mark-byte0', 'n >= 3 && p[0] == 0x05 && p[1] == 0x53 && p[2] == 0x46', 'n >= 1 && p[0] == 0x05'),
     ('stop-on-full', '            continue;\n        }\n        u32 tail', '            break;\n        }\n        u32 tail'),
     ('drop-count', 'net_rx_sfs_dropped++;', 'net_rx_sfs_dropped += 2;'),
-    ('link-drop-count', 'net_rx_link_dropped++;', 'net_rx_link_dropped += 2;'),
+    ('link-full-keeps', 'if (link_queue.count == RX_SLOTS) { net_rx_schedule(); break; }', 'if (0) { net_rx_schedule(); break; }'),
     ('sender', 'peer && !mac_equal(rx_frame + ETH_ALEN, peer)', '0 && peer && !mac_equal(rx_frame + ETH_ALEN, peer)'),
     ('broadcast', 'if (!own && (sfs || n == 0 || p[0] != LINK_OP_HELLO))', 'if (0 && !own && (sfs || n == 0 || p[0] != LINK_OP_HELLO))'),
     ('consume-nospace', 'if (cap >= *len)', 'if (cap + 1 >= *len)'),

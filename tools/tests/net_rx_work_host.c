@@ -229,6 +229,7 @@ static void tier_requests(void)
     CHECK(net_rx_service() == 1 && !net_rx_recent(5));
     wrong_destination = 0; frames = 1;
     CHECK(net_rx_service() == 1 && net_rx_recent(5));
+    net_rx_reset(NET_RX_LINK); /* full link queue keeps frames in the NIC */
     fg_ms = 14; unrelated_type = 1; frames = 1;
     CHECK(net_rx_service() == 1 && net_rx_recent(5));
     fg_ms = 15; CHECK(!net_rx_recent(5));
@@ -329,6 +330,8 @@ static void run_tests(void)
     if (!quiet) CHECK(net_nic_poll_once() == 0 && reads == before);
     kctx_irq_depth = 0; idle_work_run(); CHECK(!frames);
     recv_reentry = 1; frames = 1; CHECK(net_rx_service() == 1);
+    /* A full link queue now keeps frames in the NIC; drain it first. */
+    net_rx_reset(NET_RX_LINK);
     hook = 1; before = links; frames = 1;
     CHECK(net_rx_service() == 1 && links == before + 1 && enabled);
     hook = 2; net_rx_service(); CHECK(!reset_due);
