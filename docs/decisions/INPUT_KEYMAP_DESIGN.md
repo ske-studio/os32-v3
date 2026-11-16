@@ -290,3 +290,21 @@ os32powerpc のレビュー (PPC の Opus が PPC の実物と照合、K1・K3�
 |本線の S1x|生成表|S1h・S1ht (os32powerpc の生成器を本線と共有、担当は §7 のとおり)|
 |本線の 1E (x86 の USB 鍵盤)|usage からの capture|S2a (os32powerpc)|
 |両方|K4 の 3 段の同時の取り込み|S2m・S3m・S3b (os32powerpc)|
+
+## S1h の実装で生成器の側が決めたこと (os32powerpc、2026-11-16、PM 承認)
+
+- `KmBackend.extensions` の HID 用の descriptor は `KmHidExtensions`。持つものは次の 4 つ。
+  - packed order へのポインタ
+  - `const u8 (*actions)[2]`
+  - `u8 action_count`
+  - no_keydata の 256 bit の bitmap へのポインタ
+- actions は {usage, action} の疎な表 (今は 2 件)。action の値は 0=なし・1=IME_ON・2=IME_OFF。keysym は NetBSD の数値のままにし、command のセルに独自の番号は入れない。
+- no_keydata は 0x53 (NumLock・Apple の Clear) だけが 1。元の keysym は残し、出口で抑える。
+- order は usage ごとに 2 bit (下位の usage を下位の bit に入れる)。
+  - 群 0: 0xe0〜0xe7
+  - 群 1: 0x39・0x47・0x53・0x88・0x90・0x91
+  - 群 2: 残り
+  - norepeat は群 0 と群 1 の全部で 1。
+- KS の群に独自の番号は足さない (NetBSD の値だけ)。is_keypad は 0xf220〜0xf27f で固定。
+- 大きさ (32bit の nm で実測): entries 2560B、compat 256B、norepeat 32B、order 64B、actions 4B、no_keydata 32B、descriptor 16B、backend 20B。entries と compat を除いた合計 (norepeat・order・actions・no_keydata・descriptor・backend) は 168B。
+- 生成器は tools/hid_keymap_import.py。原本は NetBSD 8a12c4d95f03 で、取得は tools/keymap/fetch_netbsd_wscons.sh、sha256 は netbsd_wscons_sources.json。生成物 input/keymaps/hid_jp.c は commit する。CI は自己照合だけを行い、原本から作り直して照らすのは原本がある機械だけ。
