@@ -17,7 +17,7 @@ CASES = [
     ('shutdown', 'gfx/gfx_core.c', '    gfx_policy_reeval();\n    gfx_reinit_surfaces(0);'),
     ('gui-enter', 'kernel/console/console.c', '    gfx_policy_reeval();\n    if (legacy_active()) return;'),
     ('gui-exit', 'kernel/console/console.c', '    gfx_policy_reeval();\n    /* 票 K7'),
-    ('owner-exit', 'exec/appslot.c', '        exec_surface_policy_reeval();'),
+    ('owner-exit', 'exec/appslot.c', '    if (returned) exec_surface_policy_reeval();'),
 ]
 
 def function(source, signature):
@@ -31,6 +31,11 @@ def function(source, signature):
     return source[start:end]
 
 PRELUDE = r'''
+static unsigned int irq_save(void) { return 0; }
+static void irq_restore(unsigned int f) { (void)f; }
+static void gfx_resource_reserve(int id) { (void)id; }
+int input_display_restore_drain(void) { return 0; }
+
 #define ATTR_RED 1
 #define GFX_OWNER_WM 1
 #define GFX_HEIGHT 400
@@ -99,6 +104,7 @@ def run_case(runner, mutation):
         function(sources['gfx/gfx_core.c'], 'void gfx_shutdown(void)'),
         function(sources['kernel/console/console.c'], 'void console_text_gdc_stop(void)'),
         function(sources['kernel/console/console.c'], 'void console_text_gdc_start(void)'),
+        function(sources['exec/appslot.c'], 'static void gfx_owner_cleanup(int id)'),
         function(sources['exec/appslot.c'], 'void appslot_gfx_owner_exit(int id)'),
     ]) + POSTLUDE
     with tempfile.TemporaryDirectory(prefix='gfx-policy-triggers-') as td:

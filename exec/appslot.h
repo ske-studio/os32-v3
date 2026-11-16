@@ -394,6 +394,9 @@ int appslot_gfx_owner(void);
 
 /* 回収 (exec_reclaim_owned から)。所有者がこの ID なら WM へ戻す。 */
 void appslot_gfx_owner_exit(int id);
+void appslot_gfx_resource_acquire(int owner);
+int appslot_gfx_resource_snapshot(int owner, u32 *resource_gen);
+int appslot_gfx_owner_exit_if(int owner, u32 resource_gen);
 
 /* 退役した私有 import の互換口。状態を変更せず 0 を返す。 */
 u32 appslot_resume_mark_selftest(void);

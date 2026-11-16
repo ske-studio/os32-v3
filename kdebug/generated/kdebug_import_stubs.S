@@ -1626,4 +1626,9 @@ v86_bios_real_lowmem:
 pci_bar_get:
     jmp *kdebug_import_slots+1296
 .size pci_bar_get, .-pci_bar_get
+.globl input_display_restore_drain
+.type input_display_restore_drain, @function
+input_display_restore_drain:
+    jmp *kdebug_import_slots+1300
+.size input_display_restore_drain, .-input_display_restore_drain
 .section .note.GNU-stack,"",@progbits

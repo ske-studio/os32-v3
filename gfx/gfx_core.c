@@ -1,4 +1,5 @@
 #include "geforce_module.h"
+#include "input/hal/input_context.h"
 #include "serial_diag.h"
 #include "memmap.h"
 #include "gfx_internal.h"
@@ -27,6 +28,7 @@
  * ホストで試験できるため)。gfx/ は -Iexec を持たないので、kernel/console/con_sink.c
  * が res_owner_get を引くのと同じ流儀で extern 宣言する。 */
 extern int ring3_call_from_user(void);
+extern int res_owner_get(void);
 extern int appslot_gfx_claim(int gui_mode);
 extern int appslot_gfx_owner(void);
 
@@ -328,6 +330,7 @@ static int gfx_kapi_claim(void)
         kapi_sys_exit(1);
         return -1;
     }
+    if (input_display_restore_drain() < 0) return -1;
     if (appslot_gfx_claim(con_sink_is_enabled()) >= 0) {
         gfx_policy_reeval();
         return 0;

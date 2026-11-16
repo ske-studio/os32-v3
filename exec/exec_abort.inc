@@ -1,19 +1,33 @@
 /* Abort requests, safe-point checks and GUI input pumping. Included by exec.c. */
 #include "exec_hwb.h"
+#include "input/hal/input_context.h"
 
 /* HW_BASIC_DESIGN §3/F: IRQ1 sets this only for the CUI shell. */
 static volatile u32 g_hwb_abort_pending = 0;
-/* CUI shell STOP does not kill the shell. Defer display return until the
- * syscall has finished or reached a public wait; IRQ/device code only records. */
-static volatile u32 g_cui_display_abort_pending;
+/* IRQ records the ownership interval; only FG1 may reclaim it. */
 static void exec_cui_display_abort(void)
 {
-    if (!g_cui_display_abort_pending || kctx_irq_depth || kctx_exc_depth) return;
-    unsigned int display_flags = irq_save();
-    u32 pending = g_cui_display_abort_pending;
-    g_cui_display_abort_pending = 0;
-    irq_restore(display_flags);
-    if (pending) appslot_gfx_owner_exit(APP_ID_SHELL);
+    (void)input_display_restore_drain();
+}
+
+/* Called before AS/slot teardown, never for an uncommitted launch. */
+static void exec_input_owner_exit(int id)
+{
+    AppSlot *a = appslot_get(id);
+    u32 gen = 0;
+    if (a) {
+        if (id == APP_ID_SHELL) gen = g_shell_service.generation;
+        else if (a->cpl3 && a->as) gen = a->as->generation;
+    }
+    if (gen) {
+        input_interrupt_exec_exit((u32)id, gen);
+        (void)input_context_owner_release((u32)id, gen);
+    }
+    if (id == APP_ID_SHELL) {
+        unsigned int irq = irq_save();
+        g_hwb_abort_pending = 0;
+        irq_restore(irq);
+    }
 }
 
 u32 exec_hwb_abort_take(void)
@@ -66,7 +80,7 @@ void ring3_abort_request(void)
 {
     if (!con_sink_is_enabled() && appslot_cur() == APP_ID_SHELL) {
         g_hwb_abort_pending = 1;
-        g_cui_display_abort_pending = 1;
+        (void)input_display_restore_capture(APP_ID_SHELL);
         return;
     }
 

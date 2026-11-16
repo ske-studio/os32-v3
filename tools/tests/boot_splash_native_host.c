@@ -1,3 +1,6 @@
+#include "app_ids.h"
+int input_display_restore_drain(void);
+void appslot_gfx_resource_acquire(int owner);
 #include "gfx2_core_fake.h"
 /* Policy transitions are exercised separately by test_gfx_policy_triggers. */
 void gfx_policy_reeval(void) {}
@@ -443,3 +446,8 @@ int lease_acquire(struct addrspace *as, const struct lease_authority *a,
 { (void)as; (void)a; (void)r; (void)n; (void)p; (void)v; abort(); }
 int appslot_cur(void) { abort(); }
 AppSlot *appslot_get(int id) { (void)id; abort(); }
+
+int input_display_restore_drain(void) { return 0; }
+void appslot_gfx_resource_acquire(int owner) { (void)owner; }
+
+int res_owner_get(void) { return 0; }

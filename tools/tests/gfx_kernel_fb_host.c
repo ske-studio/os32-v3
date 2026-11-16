@@ -1,3 +1,6 @@
+#include "app_ids.h"
+int input_display_restore_drain(void);
+void appslot_gfx_resource_acquire(int owner);
 #include "gfx2_core_fake.h"
 /* P1 is covered by pegc-mode-host; v1 lifecycle tests fake C1/Y4 and the table. */
 const GfxBackendV2 pegc_backend_v2 = {.abi = GFX_HAL2_ABI};
@@ -970,3 +973,6 @@ const u8 *v86_bios_real_lowmem(void)
     };
     return bios;
 }
+
+int input_display_restore_drain(void) { return 0; }
+void appslot_gfx_resource_acquire(int owner) { (void)owner; }

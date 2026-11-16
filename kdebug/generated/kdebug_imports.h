@@ -45,6 +45,7 @@
 #include "include/redir_access.h"
 #include "include/sys.h"
 #include "include/tvram.h"
+#include "input/hal/input_context.h"
 #include "kapi/kapi_db.h"
 #include "kdebug/gf5_test.h"
 #include "kdebug/gf_display_test.h"
@@ -149,8 +150,8 @@ void kdi_set_kbd_inject_drop_count(u32 value);
 const u8 *kdi_ptr_ring3_ls_start(void);
 const u8 *kdi_ptr_ring3_ls_end(void);
 u32 *kdi_ptr___kernel_resident_end(void);
-#define KDEBUG_IMPORT_COUNT 325
-#define KDEBUG_ABI_GEN 0xf8e3bb83u
+#define KDEBUG_IMPORT_COUNT 326
+#define KDEBUG_ABI_GEN 0x982e5da4u
 #include "kernel/module/module_image.h"
 extern void (*const kdebug_kexports[])(void);
 extern const struct module_symbol_contract kdebug_import_contracts[];

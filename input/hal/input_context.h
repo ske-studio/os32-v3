@@ -42,4 +42,8 @@ int input_interrupt_capture(const KbdPolicySnapshot *destination, u32 reason);
 int input_interrupt_take(const KbdPolicySnapshot *current, u32 *reason);
 u32 input_interrupt_coalesced_count(void);
 
+int input_display_restore_capture(u32 owner);
+int input_display_restore_drain(void);
+void input_interrupt_exec_exit(u32 owner, u32 exec_gen);
+
 #endif

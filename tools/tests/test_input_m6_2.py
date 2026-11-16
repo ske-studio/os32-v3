@@ -5,7 +5,8 @@ CHECK = dict(name='input-m6-2-host', tier=1, budget=3, needs=[],
     covers=['input/hal/input_interrupt.c', 'input/hal/input_context.c',
             'input/hal/input_context.h', 'tools/tests/input_m6_2_host.c',
             'tools/tests/test_input_m6_2.py', 'tools/tests/host32.py',
-            'tools/tests/kernel_includes.py', 'include/**'])
+            'tools/tests/kernel_includes.py', 'include/**', 'exec/appslot.h', 'mm/pgalloc.h',
+            'tools/tests/input_display_stubs.h', 'tools/tests/host_arch/**'])
 from pathlib import Path
 import subprocess, sys, tempfile
 from types import SimpleNamespace
