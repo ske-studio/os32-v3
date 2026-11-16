@@ -59,6 +59,10 @@ kapi_host_write
 kapi_host_close
 kapi_host_notice_read
 kapi_host_notice_serial
+kapi_io_policy_set
+kapi_io_policy_get
+kapi_io_policy_reset
+kapi_io_pump
 rshell_active
 boot_serial_mirror
 fd_is_redirected

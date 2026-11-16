@@ -28,10 +28,10 @@ static const struct policy_rule rules[POLICY_SERVICES] = {
 static struct policy_table tables[2];
 /* NULL denotes the OS standard; no lazy initialization or extra generation. */
 static const struct policy_table *active;
-static u32 generation;
+static u32 generation, newest_owner;
 static struct {
     struct policy_table table;
-    u32 gen;
+    u32 gen, previous;
     int valid;
 } saved[POLICY_OWNER_COUNT];
 
@@ -103,9 +103,15 @@ static int commit(const struct policy_table *table, u32 owner, u32 gen)
         irq_restore(flags);
         return OS32_ERR_BUSY;
     }
+    /* A reused ID or returning writer first leaves its old saved position. */
+    if (owner && saved[owner].valid &&
+        (saved[owner].gen != gen || newest_owner != owner)) /* POLICY_REAPPLY */
+        io_policy_owner_exit(owner, saved[owner].gen);
     if (owner && (!saved[owner].valid || saved[owner].gen != gen)) { /* POLICY_SAVE_ONCE */
         snapshot(&saved[owner].table);
         saved[owner].gen = gen;
+        saved[owner].previous = newest_owner;
+        newest_owner = owner;
         saved[owner].valid = 1;
     }
     if (table) {
@@ -180,11 +186,21 @@ void io_policy_owner_exit(u32 owner, u32 gen)
     if (!owner || owner >= POLICY_OWNER_COUNT) return;
     unsigned int flags = irq_save();
     if (saved[owner].valid && saved[owner].gen == gen) {
-        struct policy_table *next = active == &tables[0] ? &tables[1] : &tables[0];
-        *next = saved[owner].table;
-        active = next; /* POLICY_RESTORE */
+        u32 successor;
+        for (successor = 1; successor < POLICY_OWNER_COUNT; ++successor)
+            if (saved[successor].valid && saved[successor].previous == owner) break;
+        if (successor < POLICY_OWNER_COUNT) {
+            /* A later owner still supplies active: bypass this saved layer. */
+            saved[successor].table = saved[owner].table; /* POLICY_SPLICE */
+            saved[successor].previous = saved[owner].previous;
+        } else {
+            struct policy_table *next = active == &tables[0] ? &tables[1] : &tables[0];
+            *next = saved[owner].table;
+            active = next; /* POLICY_RESTORE */
+            newest_owner = saved[owner].previous;
+            ++generation;
+        }
         saved[owner].valid = 0;
-        ++generation;
     }
     /* P3: restore even during dispatch; its snapshot lasts until round end. */
     irq_restore(flags);

@@ -61,9 +61,10 @@ from gen_kdebug_imports import declaration
 # GFX_ACCEL_HAL H1 appends INDEX8 direct hooks and GFX_Cmd (32B); P0b appends enum GF6_PRIM=12.
 # HAL v2 A0: public value records, GfxBackend.v2/v2_mod, gf3_ctx range
 # callback, gf3_surface.dma and gf3_pattern; import declarations unchanged.
-REVIEWED_LAYOUT_CRC = 0x423a13d3
+# v87: four I/O slots replace the first four reserved pointers; data offsets fixed.
+REVIEWED_LAYOUT_CRC = 0x4d4feffa
 REVIEWED_IMPORT_DECLARATIONS_SHA = '5572aaf2bc03507e123861472774838a7008894449792789780696b346ccbc9d'
-REVIEWED_INVENTORY_SHA = 'bd1c1feed353e0cf2e3c95cd34d1bab16a98e9229c6e0fd7d6a3b9d4a5f25c37'
+REVIEWED_INVENTORY_SHA = 'e946872d0df1cc69ec81bbcbdeb5fb3f79b69fbe39770cfd2b05b77c4cdef792'
 
 
 def import_declarations(root):

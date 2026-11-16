@@ -1,21 +1,21 @@
 {
   "base": "b400acb6",
   "public_sha256_recipe": "Review sdk/kapi.json append-only ABI and generated diffs; load the spec, pop includes, remove target/body from every api entry, then SHA256(json.dumps(spec, sort_keys=True).encode()).hexdigest(). For each generated key use SHA256(Path(key).read_bytes()).hexdigest() after sdk/gen_kapi.py --check. Preserve base, wrappers, offsets and constants. Shared by L06/L08/L09/L10.",
-  "public_sha256": "fb8cee57bce872c9e8ea23804ef9e50ba4d89cce72d6976fedcc9a84992c58cd",
+  "public_sha256": "0dd51746521fee4fee1bb1feaa73e047659b4cada6626723694072e312dfda9b",
   "wrappers": {
     "ide_init": "void __cdecl wrap_ide_init(void)\n{\n    KAPI_HIT(49);\n    ide_init();\n}\n",
     "ide_drive_present": "int __cdecl wrap_ide_drive_present(int drv)\n{\n    KAPI_HIT(50);\n    return ide_drive_present(drv);\n}\n",
-    "ide_identify": "int __cdecl wrap_ide_identify(int drv, void *info)\n{\n    KAPI_HIT(51);\n    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */\n    if (!ring3_user_ranges_writable((u32)info, KAPI_OUT_LEN(info, sizeof(IdeInfo)),\n                                    (u32)0, 0u)) {\n        ring3_fault_kill();   /* 戻らない */\n    }\n    return ide_identify(drv, (IdeInfo *)info);\n}\n",
-    "ide_read_sector": "int __cdecl wrap_ide_read_sector(int drv, u32 lba, void *buf)\n{\n    KAPI_HIT(52);\n    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */\n    if (!ring3_user_ranges_writable((u32)buf, KAPI_OUT_LEN(buf, 512u),\n                                    (u32)0, 0u)) {\n        ring3_fault_kill();   /* 戻らない */\n    }\n    return ide_read_sector(drv, lba, buf);\n}\n",
+    "ide_identify": "int __cdecl wrap_ide_identify(int drv, void *info)\n{\n    KAPI_HIT(51);\n    /* \u51fa\u529b\u7bc4\u56f2\u304c\u66f8\u3051\u308b\u304b (\u7968 TASK_KAPI_OUTPUT_GUARD) */\n    if (!ring3_user_ranges_writable((u32)info, KAPI_OUT_LEN(info, sizeof(IdeInfo)),\n                                    (u32)0, 0u)) {\n        ring3_fault_kill();   /* \u623b\u3089\u306a\u3044 */\n    }\n    return ide_identify(drv, (IdeInfo *)info);\n}\n",
+    "ide_read_sector": "int __cdecl wrap_ide_read_sector(int drv, u32 lba, void *buf)\n{\n    KAPI_HIT(52);\n    /* \u51fa\u529b\u7bc4\u56f2\u304c\u66f8\u3051\u308b\u304b (\u7968 TASK_KAPI_OUTPUT_GUARD) */\n    if (!ring3_user_ranges_writable((u32)buf, KAPI_OUT_LEN(buf, 512u),\n                                    (u32)0, 0u)) {\n        ring3_fault_kill();   /* \u623b\u3089\u306a\u3044 */\n    }\n    return ide_read_sector(drv, lba, buf);\n}\n",
     "ide_write_sector": "int __cdecl wrap_ide_write_sector(int drv, u32 lba, const void *buf)\n{\n    KAPI_HIT(64);\n    if (!exec_disk_write_allowed()) return -1;\n    if (!kapi_in_range((u32)buf, 512u)) ring3_fault_kill();\n    return ide_write_sector(drv, lba, buf);\n}\n",
     "ide_write_sectors": "int __cdecl wrap_ide_write_sectors(int drv, u32 lba, u32 cnt, const void *buf)\n{\n    KAPI_HIT(65);\n    if (!exec_disk_write_allowed()) return -1;\n    if (cnt == 0) return 0;\n    if (!kapi_in_range((u32)buf, kapi_out_mul((u32)cnt, 512u))) ring3_fault_kill();\n    return ide_write_sectors(drv, lba, cnt, buf);\n}\n",
-    "ide_get_info": "int __cdecl wrap_ide_get_info(int drv, void *info)\n{\n    KAPI_HIT(151);\n    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */\n    if (!ring3_user_ranges_writable((u32)info, KAPI_OUT_LEN(info, sizeof(IdeInfo)),\n                                    (u32)0, 0u)) {\n        ring3_fault_kill();   /* 戻らない */\n    }\n    return ide_get_info(drv, (IdeInfo *)info);\n}\n"
+    "ide_get_info": "int __cdecl wrap_ide_get_info(int drv, void *info)\n{\n    KAPI_HIT(151);\n    /* \u51fa\u529b\u7bc4\u56f2\u304c\u66f8\u3051\u308b\u304b (\u7968 TASK_KAPI_OUTPUT_GUARD) */\n    if (!ring3_user_ranges_writable((u32)info, KAPI_OUT_LEN(info, sizeof(IdeInfo)),\n                                    (u32)0, 0u)) {\n        ring3_fault_kill();   /* \u623b\u3089\u306a\u3044 */\n    }\n    return ide_get_info(drv, (IdeInfo *)info);\n}\n"
   },
   "generated": {
-    "sdk/include/os32/os32_kapi_generated.h": "13c801047a5da68bbc4489f6f8062b31881e4814942557b7cccb693e0e6ffed2",
-    "sdk/include/os32/os32_kapi_slots.h": "0c4b516d25aaf80edb75f7c7d14a0df868cc03488c2e49355c9095dccdfebfc4",
-    "exec/exec_kapi_init.inc": "58c8301066360e14354170e725e84bf7cf7649dbb4240edec445bf438a395a77",
-    "sdk/rust/os32api/src/kapi_generated.rs": "b3dd042993443415905cad5b0d3b181fa9f33f595e709d2e0178019c091c8c2b"
+    "sdk/include/os32/os32_kapi_generated.h": "a457de553c389432d2d871a42d52c53fef1fe69c78adc9378ea19e2a88b829ce",
+    "sdk/include/os32/os32_kapi_slots.h": "9b4d7f393720f2d9129be226b4299cd75e768a7f0acb21cb1c6de2ab83890ab2",
+    "exec/exec_kapi_init.inc": "4f527c30332a359c4eecf1bf8ded91a4792d000b1750f5f7e5f3e44383ec9222",
+    "sdk/rust/os32api/src/kapi_generated.rs": "6a168d7f3013d0edc4f841c2d8673cd51fd3346135edca4a08bf7e0890218776"
   },
   "offsets": {
     "total_sectors": 0,

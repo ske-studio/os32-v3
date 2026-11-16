@@ -28,5 +28,8 @@ int io_slice_limit(struct io_slice *s, u32 budget_us, u32 max_units);
 int io_slice_take(struct io_slice *s); /* Check raw count/units before a unit. */
 int io_dispatch(u32 budget_us); /* FG1 only; nested calls return 0. */
 
+/* P2: cumulative raw dispatch counts (wrap permitted), no clock read. */
+u32 io_dispatch_total_count(void);
+
 /* Providers guard step reentry themselves; nested calls return IO_MORE. */
 #endif

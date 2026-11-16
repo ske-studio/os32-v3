@@ -66,6 +66,31 @@ static int rejected(const u8 *p, unsigned int len)
     CHECK(io_policy_generation() == generation && saves == calls);
     return 0;
 }
+/* Isolated runtime oracle for both restoration-chain link mutations. */
+static int three_owner_splice(void)
+{
+    u8 p[272];
+    u32 budget;
+    CHECK(io_policy_reset(0, 0) == 0);
+    header(p, 1);
+    row(p, 0, 1, 1, 201); CHECK(io_policy_set(p, 32, 2, 602) == 0);
+    row(p, 0, 1, 1, 303); CHECK(io_policy_set(p, 32, 3, 603) == 0);
+    row(p, 0, 1, 1, 404); CHECK(io_policy_set(p, 32, 4, 604) == 0);
+    io_policy_owner_exit(3, 603); /* Remove the middle of three live layers. */
+    CHECK(io_policy_lookup(1, 0, &budget) == 0 && budget == 404);
+    io_policy_owner_exit(4, 604);
+    CHECK(io_policy_lookup(1, 0, &budget) == 0 && budget == 201);
+    /* Reuse the popped top, then remove the oldest under that new writer. */
+    row(p, 0, 1, 1, 405); CHECK(io_policy_set(p, 32, 4, 704) == 0);
+    io_policy_owner_exit(2, 602);
+    CHECK(io_policy_lookup(1, 0, &budget) == 0 && budget == 405);
+    io_policy_owner_exit(4, 704);
+    CHECK(io_policy_lookup(1, 0, &budget) == 0 && budget == 120);
+    return 0;
+}
+#ifndef POLICY_SPLICE_ONLY
+#define POLICY_SPLICE_ONLY 0
+#endif
 static int exercise(void)
 {
     u8 store[274], *p = store + 1; /* Deliberately alignment 1. */
@@ -169,6 +194,56 @@ static int exercise(void)
         CHECK(io_policy_generation() == gen + 1);
     }
     CHECK(get(after) && equal(before, after, 80));
+    /* GUI siblings can finish in either order: no dead owner's resurrection. */
+    for (unsigned int reverse = 0; reverse < 2; ++reverse) {
+        CHECK(io_policy_reset(0, 0) == 0);
+        row(p, 0, 1, 1, 201); CHECK(io_policy_set(p, 32, 2, 202) == 0);
+        row(p, 0, 1, 1, 303); CHECK(io_policy_set(p, 32, 3, 203) == 0);
+        gen = io_policy_generation();
+        io_policy_owner_exit(reverse ? 3 : 2, reverse ? 203 : 202);
+        CHECK(io_policy_lookup(1, &tier, &budget) == 0);
+        CHECK(budget == (reverse ? 201u : 303u));
+        CHECK(io_policy_generation() == gen + reverse);
+        io_policy_owner_exit(reverse ? 2 : 3, reverse ? 202 : 203);
+        CHECK(get(after) && equal(standard, after, 80));
+    }
+    /* A -> B -> A: the returning writer must become the newest saved layer. */
+    for (unsigned int reset = 0; reset < 2; ++reset) {
+        for (unsigned int reverse = 0; reverse < 2; ++reverse) {
+            CHECK(io_policy_reset(0, 0) == 0);
+            row(p, 0, 1, 1, 201); CHECK(io_policy_set(p, 32, 2, 202) == 0);
+            row(p, 0, 1, 1, 303); CHECK(io_policy_set(p, 32, 3, 203) == 0);
+            row(p, 0, 1, 1, 202);
+            CHECK((reset ? io_policy_reset(2, 202) : io_policy_set(p, 32, 2, 202)) == 0);
+            io_policy_owner_exit(reverse ? 3 : 2, reverse ? 203 : 202);
+            CHECK(io_policy_lookup(1, &tier, &budget) == 0);
+            CHECK(budget == (reverse ? (reset ? 120u : 202u) : 303u));
+            io_policy_owner_exit(reverse ? 2 : 3, reverse ? 202 : 203);
+            CHECK(get(after) && equal(standard, after, 80));
+        }
+    }
+    /* Unlink the oldest beneath two survivors; patch its immediate successor. */
+    row(p, 0, 1, 1, 201); CHECK(io_policy_set(p, 32, 2, 302) == 0);
+    row(p, 0, 1, 1, 303); CHECK(io_policy_set(p, 32, 3, 303) == 0);
+    row(p, 0, 1, 1, 404); CHECK(io_policy_set(p, 32, 4, 304) == 0);
+    io_policy_owner_exit(2, 302);
+    CHECK(io_policy_lookup(1, &tier, &budget) == 0 && budget == 404);
+    io_policy_owner_exit(4, 304);
+    CHECK(io_policy_lookup(1, &tier, &budget) == 0 && budget == 303);
+    io_policy_owner_exit(3, 303);
+    CHECK(get(after) && equal(standard, after, 80));
+    /* Reused ID bypasses its old lifetime without reviving its policy later. */
+    row(p, 0, 1, 1, 201); CHECK(io_policy_set(p, 32, 2, 402) == 0);
+    row(p, 0, 1, 1, 303); CHECK(io_policy_set(p, 32, 3, 403) == 0);
+    row(p, 0, 1, 1, 202); CHECK(io_policy_set(p, 32, 2, 502) == 0);
+    io_policy_owner_exit(2, 402);
+    CHECK(io_policy_lookup(1, &tier, &budget) == 0 && budget == 202);
+    io_policy_owner_exit(2, 502);
+    CHECK(io_policy_lookup(1, &tier, &budget) == 0 && budget == 303);
+    io_policy_owner_exit(3, 403);
+    CHECK(get(after) && equal(standard, after, 80));
+    /* Restore the permanent test baseline for the existing reset checks. */
+    row(p, 0, 1, 1, 308); CHECK(io_policy_set(p, 32, 0, 0) == 0);
     /* First reset saves; repeated set/reset must preserve that source. */
     for (u32 incarnation = 0; incarnation < 3; ++incarnation) {
         gen = io_policy_generation();
@@ -192,7 +267,8 @@ static int exercise(void)
 }
 void _start(void)
 {
-    int rc = exercise();
+    int rc = POLICY_SPLICE_ONLY ? three_owner_splice() : exercise();
+    if (!POLICY_SPLICE_ONLY && !rc) rc = three_owner_splice();
 #if defined(__PPC__)
     register int code __asm__("r3") = rc;
     register int syscall __asm__("r0") = 1;
