@@ -5,6 +5,9 @@ from pathlib import Path
 import shutil
 import subprocess
 
+IMAGES = (['KBOOT_SH=0', 'KBOOT_LINK=0'], ['KBOOT_SH=0', 'KBOOT_LINK=1'],
+          ['KBOOT_SH=1', 'KBOOT_LINK=0'], ['KBOOT_SH=1', 'KBOOT_LINK=1'])
+
 
 def run(root, env=None):
     env = dict(os.environ if env is None else env)
@@ -16,10 +19,11 @@ def run(root, env=None):
     for key in ('BUILD_OUT', 'KERNEL_CFLAGS', 'INC_KERNEL', 'C_STD',
                 'SQLITE_PROTO_OUT', 'MAKEFLAGS', 'MFLAGS', 'MAKELEVEL'):
         env.pop(key, None)
-    for link in ('0', '1'):
+    # Every image the PPC acceptance uses, with KBOOT_LINK explicit: the core
+    # (kboot_accept/kboot_run), the link diagnostic, PLN1 SH and link-SH.
+    for flags in IMAGES:
         result = subprocess.call(
-            ['make', '-f', 'build/ppc-kboot.mk', 'KBOOT_SH=1',
-             'KBOOT_LINK=' + link, 'PPC_CROSS_DIR=' + str(cross)],
+            ['make', '-f', 'build/ppc-kboot.mk', *flags, 'PPC_CROSS_DIR=' + str(cross)],
             cwd=root, env=env)
         if result:
             return result
