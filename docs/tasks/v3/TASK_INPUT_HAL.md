@@ -23,4 +23,5 @@
 | 1p・1a・1b (bridge) | main (b27213d2・73c8664b・d8d529fb) |
 | 4c-pre・4c | 実装中 (4c は 4b より先、PowerPC P3 ③b のため。順は 4c → P3 ③b → 4b) |
 | 4b-map | 追補 INPUT_BIND_DESIGN §6 の段の後 |
+| keymap2 | 追補 2 [INPUT_KEYMAP_DESIGN](../../decisions/INPUT_KEYMAP_DESIGN.md) §7 の段 (os32powerpc: H-usb・H-hid・H-usbp・S1m・S2h・S2u・S2a・S2m・S3m・S3b、本線: そのほか。x86 の USB 鍵盤は本線の 1E で S2a につなぐ) |
 | その他 | 未着手 |
