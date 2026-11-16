@@ -204,3 +204,8 @@ def assess_real_link(events, evidence):
 - R2: link の nest・shell・exact は旧の check_shell を使わず RSH の結果の本文で判定する。nest の期待は sc_run.LINK_NEST_EXPECTED と `echo $?` の 5。shell は決まった短い台本で、終了と再起動の証跡は求めない (link の APP shell は exit N で終わらない、userland/shell/rshell_lan.c:402-407)。
 - R3: agent の API は足さない。client からは probe (世代・peer・hello)・LOG・RSH を取り、HELLO・ALIVE (ゲストの電文が 2 秒より長く途切れない)・session (不変)・SFS の CALL と応答は受け身の pcap の 0x88B5 の電文から読む。
 
+## U の実装で決めたこと (2026-11-16、PM 決定)
+- U-c1: link の `--link --lan --mutate` の変異は no-service だけ。RED は「USB の列挙か打鍵が進まない」と「link の LOG・RSH が生きている」の両方を要し、片方は wrong-reason。syscall-ee は従来の `--cpu both --mutate` (PROBE の私用の写しで USB STALL ticks=0 を観測) に残す。製品の link-SH の像には syscall の入口の EE を観測する口が無く、差し込みは N2 に反するため。
+- U-b の直し: 抑止した SFS CALL では、host_agent の壁時計 1.0s (受付と本文の後の両方、tools/host_agent.py:820・1082-1084) を止める。-icount のゲスト時計は壁時計と食い違う (先走りと凍結) ので、区間はゲストの期限で終わらせる。期限切れの文は `Host is down` (fs/serialfs/sfs_client.c:237-253)。
+- 受入の揺れのうち、受信が 1 件目で断られる誤りは共通の net/rx_work.c で本線が直した (main 44f2a83f)。
+
