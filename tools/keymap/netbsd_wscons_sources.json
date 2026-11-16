@@ -1,0 +1,10 @@
+{
+  "commit": "8a12c4d95f032e12f64013d7269443256fd26341",
+  "files": {
+    "sys/dev/hid/hidkbdmap.c": "4384c3d6960ab74b461a19eecc6a1aad4dd97f468119a6499aff1e975f404190",
+    "sys/dev/wscons/wskbd.c": "0960b012054ae9e1158f9005b1cebbd99071630a10fde8ea404c1d052e1a3cce",
+    "sys/dev/wscons/wskbdutil.c": "25ce0b4116566a91909f84a59f26fc07583fecc1ce6265618a6d34cecac3bb5a",
+    "sys/dev/wscons/wsksymdef.h": "02fa0df610a3db3209bcb790455d57d07d1f9f210f627f953c88270ee804f9bc",
+    "sys/dev/wscons/wsksymvar.h": "6784532dba2c048602adc3e480d6a78c98229d4da3ec9659c8d0361eb3e641e2"
+  }
+}
