@@ -1,10 +1,10 @@
 #include "io_work.h"
+#include "idle_work.h"
 #include "io_clock.h"
 #include "io_policy.h"
 #include "io.h"
 #include "os32_kapi_shared.h"
 
-#define IO_PASS_US 500u
 #define IO_FAIR_ROUNDS 8u
 #define IO_SLOTS 16u
 
@@ -13,7 +13,7 @@ static struct {
     u32 budget_us, budget_count, unit_count;
     u8 tier;
 } slots[IO_SLOTS];
-static unsigned int count, running, compat_count;
+static unsigned int count, running;
 static volatile u32 pending[3];
 static u32 policy_gen, cache_source, cache_generation, cache_us, pass_count;
 static unsigned int cache_valid, policy_valid, clock_failed;
@@ -190,15 +190,15 @@ static int fair_pick(u32 mask, unsigned int start)
     int i = first(mask & (0xffffu << start));
     return i >= 0 ? i : first(mask);
 }
-/* A5 supplies the idle_work adapter here; no public compatibility API yet. */
+/* Compatibility callbacks remain independent of clock readiness. */
 static void compat_run(void)
 {
-    /* A5_COMPAT_BODY */
+    idle_work_compat_run();
 }
 int io_dispatch(u32 budget_us)
 {
     if (running) return 0;
-    if (compat_count == 0 && !any_pending()) return 0;
+    if (idle_work_compat_count() == 0 && !any_pending()) return 0;
     if (!budget_us) return OS32_ERR_INVAL;
     running = 1;
     clock_failed = 0;
@@ -263,11 +263,11 @@ int io_dispatch(u32 budget_us)
     }
 finish:
     /* Even without a clock, the finite calibration adapter gets one pass. */
-    if (compat_count) {
+    if (idle_work_compat_count()) {
         int timed = !clock_failed && token_read(&pass, &now);
         compat_run();
-        calls += (int)compat_count;
-        stats.callbacks += compat_count;
+        calls += (int)idle_work_compat_count();
+        stats.callbacks += idle_work_compat_count();
         if (timed && token_read(&pass, &now)) elapsed = now - pass.start_count;
     }
     if (!clock_failed) for (unsigned int t = 0; t < 2; ++t) {

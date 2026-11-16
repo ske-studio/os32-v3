@@ -6,6 +6,12 @@ static int _irq_enabled(void) { return host_if; }
 #define IDLE_WORK_SOURCE "../../kernel/idle_work.c"
 #endif
 #include IDLE_WORK_SOURCE
+#include "io_clock.h"
+static unsigned int clock_reads;
+static int read_clock(u32 *a, u32 *b, u32 *c) {
+    (void)a; (void)b; (void)c; ++clock_reads; return OS32_ERR_NOSYS;
+}
+static const struct io_clock_ops ops = { .read = read_clock };
 volatile u32 kctx_irq_depth;
 static unsigned int log_items[16], count;
 static void fail(int line) {
@@ -20,13 +26,17 @@ static void third(void) { record(3); }
 static void fourth(void) { record(4); }
 static void fifth(void) { record(5); }
 void _start(void) {
-    CHECK(idle_work_register(0) < 0);
+    host_if = 1;
+    io_clock_set_ops(&ops);
+    idle_work_run(); CHECK(clock_reads == 0);
+    io_clock_set_ops(0);
+    CHECK(idle_work_register(0) == OS32_ERR_INVAL);
     CHECK(idle_work_register(first) == 0);
     CHECK(idle_work_register(second) == 0);
-    CHECK(idle_work_register(first) < 0);
+    CHECK(idle_work_register(first) == OS32_ERR_EXIST);
     CHECK(idle_work_register(third) == 0);
     CHECK(idle_work_register(fourth) == 0);
-    CHECK(idle_work_register(fifth) < 0);
+    CHECK(idle_work_register(fifth) == OS32_ERR_FULL);
     host_if = 0; idle_work_run(); CHECK(count == 0);
     host_if = 1; kctx_irq_depth = 1; idle_work_run(); CHECK(count == 0);
     kctx_irq_depth = 0; idle_work_run();

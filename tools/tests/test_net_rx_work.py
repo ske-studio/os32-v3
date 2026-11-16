@@ -1,6 +1,8 @@
 """Finite cooperative RX and bounded e82557 IRQ rescue, without libc."""
 CHECK = dict(name='net-rx-work-host', tier=4, needs=[], budget=8,
-    covers=['kernel/time/tick_clock.h', 'net/link_platform.h', 'platform/pc98/link_platform_inline.h', 'net/nic.c', 'net/nic.h', 'net/nic_rx.c', 'net/nic_rx.h',
+    covers=['tools/tests/idle_io_sources.py', 'kernel/io_work.[ch]',
+            'kernel/io_clock.h', 'kernel/io_policy.[ch]', 'exec/appslot.h',
+            'kernel/time/tick_clock.h', 'net/link_platform.h', 'platform/pc98/link_platform_inline.h', 'net/nic.c', 'net/nic.h', 'net/nic_rx.c', 'net/nic_rx.h',
             'net/rx_work.c', 'net/rx_work.h', 'net/link.h',
             'kernel/idle_work.c', 'kernel/idle_work.h', 'kernel/irq/tick.h',
             'kernel/irq/tick_budget.h', 'kernel/irq/tick_budget.c',
@@ -14,6 +16,7 @@ CHECK = dict(name='net-rx-work-host', tier=4, needs=[], budget=8,
     pins=['LAN_BULK_DESIGN'],
 )
 from pathlib import Path
+from idle_io_sources import idle_io_sources
 import os
 import subprocess
 import sys
@@ -68,7 +71,7 @@ def verify(work, mutation=None, link=False):
                     '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-pie',
                     '-fno-stack-protector', '-nostdinc', '-nostdlib', '-static', '-no-pie',
                     '-D__cdecl=', '-I' + str(work), *include_flags(ROOT),
-                    str(ROOT / 'tools/tests/net_rx_work_host.c'), '-o', str(exe)], check=True)
+                    str(ROOT / 'tools/tests/net_rx_work_host.c'), *idle_io_sources(ROOT, work), '-o', str(exe)], check=True)
     return host_run([str(exe)], cwd=work, timeout=5).returncode
 
 

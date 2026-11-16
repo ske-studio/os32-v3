@@ -3,6 +3,8 @@
 
 #include "types.h"
 
+#define IO_PASS_US 500u
+
 /* Internal raw-count state: callers use begin/take, never access members. */
 struct io_slice {
     u32 start_count, limit_count, max_units, units;

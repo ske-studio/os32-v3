@@ -1,8 +1,10 @@
 #include "types.h"
-static unsigned int irq_depth, irq_calls, compat_hits;
+static unsigned int irq_depth, irq_calls, compat_hits, compat_count;
 static unsigned int irq_save(void) { unsigned int old = irq_depth; ++irq_depth; ++irq_calls; return old; }
 static void irq_restore(unsigned int old) { irq_depth = old; }
 #include "io_work.c"
+unsigned int idle_work_compat_count(void) { return compat_count; }
+void idle_work_compat_run(void) { ++compat_hits; }
 
 static u32 ticks, read_cost, source, generation, factor, reads, conversions, fail_read, fail_convert;
 static u32 pg, lookups, trace[128], traced, cost[18], units[18], mode[18];

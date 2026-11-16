@@ -82,7 +82,7 @@ KB_PLATFORM := platform/powermac/rh_observe.c platform/powermac/ofw.c platform/p
 # Common kernel code, compiled unmodified.
 KB_COMMON := init/ppc_kernel.c mm/memory_boot.c mm/paging.c mm/physmem.c \
  mm/pgalloc.c mm/kmalloc.c mm/shm.c kernel/irq/tick.c kernel/irq/tick_budget.c kernel/time/tick.c \
- lib/kprintf.c lib/kstring_c.c lib/divdi3.c kernel/sys.c kernel/idle_work.c fs/fd_redirect.c
+ lib/kprintf.c lib/kstring_c.c lib/divdi3.c kernel/sys.c kernel/idle_work.c kernel/io_work.c kernel/io_policy.c fs/fd_redirect.c
 KB_GEM := drivers/net/gem/gem_reset.c drivers/net/gem/gem_phy.c \
  drivers/net/gem/gem_ring.c drivers/net/gem/gem_mac.c \
  drivers/net/gem/gem_tx.c drivers/net/gem/gem_rx.c

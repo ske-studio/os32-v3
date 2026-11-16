@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """W4b C evidence; no ID is closed by these partial host vectors."""
-CHECK = dict(env=['ppc-cross'], name='arch-ctx-host', tier=2, budget=15, needs=[], covers=[
+CHECK = dict(env=['ppc-cross'], name='arch-ctx-host', tier=2, budget=15, needs=[], covers=['tools/tests/idle_io_sources.py', 'kernel/io_work.[ch]',
+            'kernel/io_clock.h', 'kernel/io_policy.[ch]', 'exec/appslot.h',
+
     'tools/tests/test_arch_ctx.py', 'tools/tests/arch_ctx_host.c',
     'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'build/config.mk',
     'arch/ppc/kernel_trap.c', 'arch/ppc/*.h',
@@ -11,6 +13,7 @@ CHECK = dict(env=['ppc-cross'], name='arch-ctx-host', tier=2, budget=15, needs=[
     # W4c landed: the PPC vectors now assert the contract, so nothing here is pinned any more.
     basis=['AC-CTX-1', 'AC-CTX-5', 'AC-CTX-7'],
 )
+from idle_io_sources import idle_io_sources
 import os
 from pathlib import Path
 import subprocess
@@ -31,7 +34,7 @@ def replace_once(source, old, new):
     return source.replace(old, new, 1)
 
 
-def exercise(root, work, provider, vector, trap, idle):
+def exercise(root, work, provider, vector, trap, idle, product=None):
     (work / 'trap.c').write_text(trap)
     (work / 'idle.c').write_text(idle)
     exe = work / 'host'
@@ -43,7 +46,7 @@ def exercise(root, work, provider, vector, trap, idle):
         *(['-DCTX_PPC'] if provider == 'ppc' else []),
         '-DCTX_VECTOR=' + str(vector), '-DCTX_IDLE_SOURCE="' + str(work / 'idle.c') + '"',
         '-DCTX_TRAP_SOURCE="' + str(work / 'trap.c') + '"',
-        str(root / 'tools/tests/arch_ctx_host.c'), '-o', str(exe)], check=True)
+        str(root / 'tools/tests/arch_ctx_host.c'), *idle_io_sources(root, work, product), '-o', str(exe)], check=True)
     return host32.run([str(exe)], runner='qemu').returncode
 
 
@@ -119,11 +122,15 @@ def run(ctx):
                 print('RED runtime: IRQ dispatch depth ' + anchor.strip(), flush=True)
             for anchor, label in [
                 ('    if (!_irq_enabled()) return;', 'idle state'),
-                ('    if (kctx_irq_depth != 0) return;', 'idle depth'),
-                ('    if (running) return;', 'idle running')]:
+                ('    if (kctx_irq_depth != 0) return;', 'idle depth')]:
                 mutant = replace_once(idle, anchor, '')
                 assert exercise(root, work, 'ppc', 1, ppc, mutant) == 1
                 print('RED runtime: ' + label, flush=True)
+            product = (root / 'kernel/io_work.c').read_text()
+            mutant = replace_once(product, 'if (running) return 0;', 'if (0) return 0;')
+            assert exercise(root, work, 'ppc', 1, ppc, idle, mutant) == 1
+            print('RED runtime: idle running (dispatcher)', flush=True)
+
         for contract in (1, 2, 4, 5, 7):
             print(f'UNIMPL AC-CTX-{contract}/full acceptance requires W4e guest evidence', flush=True)
     return 0

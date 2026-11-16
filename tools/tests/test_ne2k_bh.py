@@ -1,5 +1,6 @@
 """A2-t2: deferred NE2K device work across every disabled-IF entry."""
 import argparse
+from idle_io_sources import idle_io_sources
 import os
 from pathlib import Path
 import subprocess
@@ -10,7 +11,9 @@ from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
 CHECK = dict(name='ne2k-bh-host', tier=4, needs=[], budget=4,
-    covers=['kernel/time/tick_clock.h', 'net/nic.h', 'net/rx_work.h', 'net/rx_work.c', 'include/clock_source.h', 'include/kernel_tick.h', 'kernel/irq/tick_budget.h', 'drivers/net/ne2000/ne2000.c', 'drivers/net/ne2000/ne2000_control.inc', 'drivers/net/ne2000/ne2000_data.inc', 'drivers/net/ne2000/ne2000_irq.inc', 'drivers/net/ne2000/ne2000.h', 'drivers/net/ne2000/ne2000_regs.h', 'drivers/net/ne2000/ne2000_ring.h', 'drivers/net/ne2000/ne2000_ring.c', 'arch/x86/x86_flags.h', 'include/types.h', 'include/net_eth.h', 'kernel/irq/tick.h', 'platform/pc98/tick_order.h', 'arch/x86/kernel/idt.h', 'kernel/irq/irq.h', 'include/kprintf.h', 'lib/kstring.h', 'kernel/time/cpu_calibrate.h', 'include/io.h', 'platform/pc98/platform_io.h', 'include/cpu.h', 'arch/x86/arch_cpu.h', 'kernel/idle_work.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_generations.h', 'tools/tests/ne2000_dma_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'tools/tests/ne2k_bh_host.c', 'tools/tests/test_ne2k_bh.py', 'kernel/idle_work.c', 'net/link_platform.h', 'platform/pc98/link_platform_inline.h', 'net/nic.c', 'net/nic_rx.h', 'net/link.h'],
+    covers=['tools/tests/idle_io_sources.py', 'kernel/io_work.[ch]',
+            'kernel/io_clock.h', 'kernel/io_policy.[ch]', 'exec/appslot.h',
+            'kernel/time/tick_clock.h', 'net/nic.h', 'net/rx_work.h', 'net/rx_work.c', 'include/clock_source.h', 'include/kernel_tick.h', 'kernel/irq/tick_budget.h', 'drivers/net/ne2000/ne2000.c', 'drivers/net/ne2000/ne2000_control.inc', 'drivers/net/ne2000/ne2000_data.inc', 'drivers/net/ne2000/ne2000_irq.inc', 'drivers/net/ne2000/ne2000.h', 'drivers/net/ne2000/ne2000_regs.h', 'drivers/net/ne2000/ne2000_ring.h', 'drivers/net/ne2000/ne2000_ring.c', 'arch/x86/x86_flags.h', 'include/types.h', 'include/net_eth.h', 'kernel/irq/tick.h', 'platform/pc98/tick_order.h', 'arch/x86/kernel/idt.h', 'kernel/irq/irq.h', 'include/kprintf.h', 'lib/kstring.h', 'kernel/time/cpu_calibrate.h', 'include/io.h', 'platform/pc98/platform_io.h', 'include/cpu.h', 'arch/x86/arch_cpu.h', 'kernel/idle_work.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_generations.h', 'tools/tests/ne2000_dma_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'tools/tests/ne2k_bh_host.c', 'tools/tests/test_ne2k_bh.py', 'kernel/idle_work.c', 'net/link_platform.h', 'platform/pc98/link_platform_inline.h', 'net/nic.c', 'net/nic_rx.h', 'net/link.h'],
     basis=['TICK_1KHZ_NEXT_DESIGN §2-4', 'IO_TIER_DESIGN §2'],
 )
 
@@ -39,7 +42,7 @@ def main():
                             '-Wl,--gc-sections', *include_flags(ROOT), '-I' + str(directory),
                             '-DNE2000_SOURCE="' + str(work / 'ne2000.c') + '"',
                             str(ROOT / 'tools/tests/ne2k_bh_host.c'),
-                            str(directory / 'ne2000_ring.c'), '-o', str(exe)], check=True)
+                            str(directory / 'ne2000_ring.c'), *idle_io_sources(ROOT, work), '-o', str(exe)], check=True)
         build()
         for runner in os.environ.get('HOST32_RUNNERS', 'qemu').split():
             rc = host32.run([str(exe)], runner=runner).returncode

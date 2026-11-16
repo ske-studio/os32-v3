@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """期待の出所: AC-CTX-1 と P3 確定設計 v2 §2 の PLN1 work・入口/endpoint の別計数。"""
 CHECK = dict(name='ppc-terminal-work', env=['ppc-cross'], tier=1, needs=[], budget=30,
-    covers=['tools/tests/test_ppc_terminal_work.py', 'tools/tests/host32.py',
+    covers=['tools/tests/idle_io_sources.py', 'kernel/io_work.[ch]',
+            'kernel/io_clock.h', 'kernel/io_policy.[ch]', 'exec/appslot.h',
+            'tools/tests/test_ppc_terminal_work.py', 'tools/tests/host32.py',
             'platform/powermac/terminal_input.c',
             'platform/powermac/lan_boot.h', 'platform/powermac/usb_boot.h',
             'platform/powermac/usb_boot.c', 'platform/powermac/lan_service.c',
@@ -10,6 +12,7 @@ CHECK = dict(name='ppc-terminal-work', env=['ppc-cross'], tier=1, needs=[], budg
             'include/callconv.h', 'sdk/include/os32/os32_kapi_shared.h',
             'arch/ppc/kernel_boot.h', 'arch/ppc/exec_kapi.c', 'arch/ppc/exec_kapi.h',
             'platform/powermac/kapi_table.h', 'exec/exec_syscall.inc'], basis=['AC-CTX-1'])
+from idle_io_sources import idle_io_sources
 import os
 from pathlib import Path
 import shutil
@@ -118,7 +121,7 @@ void _start(void) { int rc = run(); __asm__ volatile("int $0x80" : : "a"(1), "b"
              '-ffreestanding', '-fno-builtin', '-fno-pie', '-no-pie', '-nostdlib', '-static']
     includes = ['.', 'include', 'kernel', 'platform/powermac', 'arch/ppc', 'sdk/include/os32']
     subprocess.run(['gcc', *flags, *['-I' + str(ROOT / p) for p in includes],
-                    str(tmp / 'test.c'), str(tmp / 'idle.c'), '-o', str(tmp / 'test')], check=True)
+                    str(tmp / 'test.c'), str(tmp / 'idle.c'), *idle_io_sources(ROOT, tmp), '-o', str(tmp / 'test')], check=True)
     return host32.run([str(tmp / 'test')], runner='qemu', timeout=10).returncode
 
 
