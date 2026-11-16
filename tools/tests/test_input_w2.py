@@ -43,7 +43,9 @@ def run(ctx):
             if os.environ.get('OS32_REQUIRE_PPC') == '1': return 1
         if ctx.mutate:
             for old, new in [('|| r->flags)', ')'),
-                             ('(check->bits[key / 8] & (1u << (key % 8)))', '0')]:
+                             ('(check->bits[key / 8] & (1u << (key % 8)))', '0'),
+                             ('+ r->index) * 16 + slot', '+ r->index) * 16'),
+                             ('r->kind == 5 && (check->term_bytes[group * 32 + r->value / 8] & (1u << (r->value % 8)))', '0')]:
                 assert source.count(old) == 1
                 assert build(source.replace(old, new)) != 0
                 print('RED runtime:', old, flush=True)

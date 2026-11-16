@@ -47,6 +47,7 @@ void ikm_check_init(IkmCheck *check)
     u32 i;
     if (!check) return;
     for (i = 0; i < IKM_SEEN_BYTES; i++) check->bits[i] = 0;
+    for (i = 0; i < sizeof(check->term_bytes); i++) check->term_bytes[i] = 0;
     check->term_ext_count = 0;
 }
 
@@ -116,14 +117,18 @@ int ikm_check_row(IkmCheck *check, u8 platform, const IkmRow *r)
             if (!valid_map(platform, r->selector) ||
                 r->index >= (r->selector == 1 ? 128 : 256) || r->value > 18 || (r->aux & ~0x17u))
                 return OS32_ERR_INVAL;
-            key = 47780 + group * 384 + (r->selector == 1 ? 0 : 128) + r->index;
+            slot = (r->aux & 7) | ((r->aux & 0x10) >> 1);
+            key = 47780 + (group * 384 + (r->selector == 1 ? 0 : 128) + r->index) * 16 + slot;
         }
         if ((r->kind == 5 || r->kind == 6) && check->term_ext_count >= 128)
             return OS32_ERR_INVAL;
     }
     if (key >= IKM_SEEN_BITS || (check->bits[key / 8] & (1u << (key % 8))))
         return OS32_ERR_INVAL;
+    if (r->kind == 5 && (check->term_bytes[group * 32 + r->value / 8] & (1u << (r->value % 8))))
+        return OS32_ERR_INVAL;
     check->bits[key / 8] |= (u8)(1u << (key % 8));
+    if (r->kind == 5) check->term_bytes[group * 32 + r->value / 8] |= (u8)(1u << (r->value % 8));
     if (r->kind == 5 || r->kind == 6) check->term_ext_count++;
     return 0;
 }

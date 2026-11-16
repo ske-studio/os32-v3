@@ -26,7 +26,14 @@ static int test(void)
     if (ikm_check_row(&check, 1, &r)) return 14;
     r.kind=8; r.profile=4; r.context=4; r.index=255; r.selector=2; r.value=18; r.aux=0x17;
     if (ikm_check_row(&check, 2, &r)) return 15;
-    r.aux=0; if (!ikm_check_row(&check, 2, &r)) return 16;
+    r.aux=0; if (ikm_check_row(&check, 2, &r)) return 16;
+    if (!ikm_check_row(&check, 2, &r)) return 26;
+    ikm_check_init(&check);
+    r.kind=5; r.profile=1; r.context=0; r.index=1; r.selector=0; r.value=3; r.aux=0;
+    if (ikm_check_row(&check, 1, &r)) return 27;
+    r.index=2; if (!ikm_check_row(&check, 1, &r)) return 28;
+    r.context=1; if (ikm_check_row(&check, 1, &r)) return 29;
+    r.profile=2; if (ikm_check_row(&check, 1, &r)) return 30;
     ikm_check_init(&check); r.kind=6; r.profile=1; r.context=1; r.selector=0; r.value=0; r.aux=0;
     for (r.index=0; r.index<128; r.index++) if (ikm_check_row(&check, 1, &r)) return 17;
     r.context=2; r.index=0; if (!ikm_check_row(&check, 1, &r)) return 18;
