@@ -14,6 +14,15 @@
 
 - 起動の行は `boot enet:192.168.2.12,os32-sh.elf,192.168.2.201,192.168.2.12`。この OF は `;` も区切りに数え、4 つ目がゲートウェイ、5 つ目が bootp-retries (`;mask,;gw` は通らない)。
 - 引数を付けても OF は先にサーバへユニキャストの DHCPDISCOVER (送り元 0.0.0.0) と BSDP (LIST/SELECT) を出す。Linux の dnsmasq は martian として捨てるので、ノートでは AF_PACKET の返事役 (G4 の MAC だけに答える) を使う。返事役の期限切れに注意。
+- **起動の像の名前は `os32-sh.elf` に固定する** (ユーザー 2026-11-17「ブートのイメージ名は固定するという話」)。
+  - NVRAM は 11-14 に設定した。`boot-device` = `enet:192.168.2.12,os32-sh.elf,192.168.2.201,192.168.2.12`、`auto-boot?` = true。
+  - 電源を入れるだけで TFTP から起動する。新しい版を試す時も、OF で別名の boot の行を打たせない。
+  - 新しい版は、ノートの `/srv/tftp/os32-sh.elf` の中身を置き換えて渡す。前の版は `os32-sh.<中身>-<日付>.elf` の名前で残す。どちらも読み取り専用にする。
+  - 例 (11-17): 11-14 の PLN1 の像は `os32-sh.pln1-20261114.elf` で残し、`os32-sh.elf` を main 5e197b8d の link の像にした。
+- **電源だけで起動するには、ノートで BSDP の返事役 `bootp_g4.py` が動いている必要がある。**
+  - 動かし方: `~/os32-r7/py-raw -u bootp_g4.py enp1s0 <秒> <log>`。期限付きなので、実機の日に立て直す。
+  - dnsmasq と tftpd は常駐している。
+  - 返事役が止まっていると、OF は起動の元を見つけられず、灰色の画面にフォルダの印で止まる (11-17)。
 - OF の画面は 8bpp・640x480・linebytes 768 (Apple の CLUT、0 白・0xff 黒)。load-base は 0x800000。
 - `/memory` の reg は空の DIMM を size 0 で並べる (飛ばす)。OF は読み込んだ像の直後の 32KiB を available に戻さない (64KiB までの隙間を許す)。RAM 1.5GiB、TB 33.29MHz、MPIC 64 本、PHY は BCM5411 (ID 0x0020/0x6071)。
 - リンク確立の直後に送ったフレームは届かない。lan_service は RUNNING の後 2 秒は送らない。
