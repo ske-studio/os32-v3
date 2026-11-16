@@ -25,7 +25,16 @@ CHECK = dict(name='ppc-sc', tier=2, budget=900, needs=[],
                      'arch/ppc/kapi_call.c', 'platform/powermac/shell_boot.c',
                      'platform/powermac/input_boot.c', 'platform/powermac/input_decode.c',
                      'platform/powermac/console_stream.c', 'platform/powermac/kboot_console.c',
-                     'userland/ppc/hello.c'])
+                     'userland/ppc/hello.c', 'tools/ppc/link_sh_run.py',
+                     'tools/ppc/link_run.py', 'tools/ppc/usb_run.py',
+                     'tools/host_agent.py', 'tools/host_operator_socket.py',
+                     'tools/host_rshell.py', 'tools/ppc_link_transport.py',
+                     'kernel/console/con_sink.c', 'mm/kmalloc.c',
+                     'userland/shell/rshell_lan.c', 'userland/ppc/sh/link_profile.h',
+                     'fs/serialfs/serialfs_persistent.c', 'kernel/console/console.c',
+                     'platform/powermac/usb_boot.c', 'platform/powermac/usb_platform.c',
+                     'tools/host_linux.py', 'tools/host_notify.py', 'tools/host_services.py',
+                     'tools/host_sfs_link.py', 'tools/ppc/sd_run.py'])
 
 EXPECTED = ('/bin/nest.bin\n' +
             'hello ok\nnest kind=1 code=7 parent=12345\n' * 2 +
@@ -342,19 +351,106 @@ static int sc_connected(void)
                         except subprocess.TimeoutExpired: p.kill(); p.wait()
 
 
+def link_main(args):
+    """PPC_P5_REST_DESIGN §2・§5: RSH nesting and shell output contracts."""
+    from link_sh_run import Session, settings, accept, check_map
+    from usb_run import USB_QEMU_CLOCK
+
+    class ScLink(Session):
+        # Keep link_sh's -g 800x600x8, USB keyboard and guest clock together.
+        qemu_clock = USB_QEMU_CLOCK
+
+        def start(self):
+            super().start()
+
+    base = Path(os.environ['TMPDIR'])/'sc-run'
+    base.mkdir(exist_ok=True)
+    work = Path(tempfile.mkdtemp(prefix='link-', dir=base))
+    print('evidence='+str(work), flush=True)
+    for kind in (socket.SOCK_DGRAM, socket.SOCK_STREAM):
+        try:
+            with socket.socket(socket.AF_INET, kind) as probe:
+                probe.bind(('127.0.0.1', 0))
+        except OSError as exc:
+            print('SKIP ppc-sc link socket: '+str(exc))
+            return 1 if os.environ.get('OS32_REQUIRE_PPC') == '1' else 3
+    cpus = ['7450', '7455'] if args.cpu == 'both' else [args.cpu]
+    for name in ['normal'] + (['parent-result'] if args.mutate else []):
+        folder = work/name; folder.mkdir()
+        opts = settings(folder)
+        bins = ' '.join(str(folder/'user'/(n+'.bin')) for n in ('hello', 'fault', 'nest'))
+        opts = [o if not o.startswith('KB_ROOT_BINS=') else 'KB_ROOT_BINS='+bins for o in opts]
+        if name == 'parent-result':
+            extra = mutant_settings(folder, name, 'arch/ppc/kapi_call.c',
+                'return ppc_kapi_invoke(&api, current_slot, values);',
+                'static unsigned reads;\n'
+                '    if (current_slot == (__builtin_offsetof(KernelAPI, exec_last_result) - 8) / 4 && ++reads == 2) return (u32)-1;\n'
+                '    return ppc_kapi_invoke(&api, current_slot, values);')
+            opts += [o.replace('KB_MUT_', 'KB_MUT_THIRD_') for o in extra]
+        elf = build(folder/'kernel', *opts)
+        check_map(elf.with_suffix('.map'))
+        for cpu in cpus if name == 'normal' else cpus[:1]:
+            session = ScLink(elf, cpu, folder/cpu, 180)
+            try:
+                session.start()
+                session.wait(session.ready, 'HELLO to cui READY', 60)
+                require(session.agent.operator.ready['mode'] == 'cui', 'link sh mode')
+                normal = b'hello ok\nnest kind=1 code=7 parent=12345\n' * 2
+                expected = normal
+                # Only the second result is corrupted, keeping both children alive.
+                if name != 'normal':
+                    expected = (b'hello ok\nnest kind=1 code=7 parent=12345\n'
+                                b'hello ok\nnest kind=0 code=0 parent=12345\n')
+                result = session.cmd('/bin/nest.bin')
+                # F5: no intervening shell command may overwrite this status.
+                session.cmd('echo $?', b'5\n')
+                session.cmd('echo after-nest', b'after-nest\n')
+                from link_sh_run import check_body
+                check_body('/bin/nest.bin', result['result'], expected)
+                if name == 'normal':
+                    for line, output in (
+                        ('echo sc-ok > /tmp/sc', b''), ('cat /tmp/sc', b'sc-ok\n'),
+                        ('cat /nofile > /tmp/e', b'cat: /nofile: No such file or directory\n'),
+                        ('cat /tmp/e', b''), ('echo pipe-ok | cat', b'pipe-ok\n'),
+                        ('/bin/hello.bin ok', b'hello ok\n'), ('echo $?', b'7\n')):
+                        session.cmd(line, output)
+                else:
+                    require(result['result'] != b'> /bin/nest.bin\n'+normal+b'\x04',
+                            'parent-result survived')
+                    print('RED link parent-result: second result only; status=5 and echo alive', flush=True)
+                session.q.call('quit'); session.p.wait(timeout=5)
+                require(session.p.returncode == 0, 'QEMU exit')
+            finally:
+                session.close()
+        if name == 'normal':
+            # READY, IDs, END, Ctrl-C/line recovery remain P3's acceptance.
+            for cpu in cpus:
+                accept(elf, cpu, folder/(cpu+'-p3'), 900)
+    # Retain the independent old serial nest and fd1-log/no-restart regressions.
+    args.serial = True
+    rc = nest_main(args)
+    serial_work = work/'serial-shell'; serial_work.mkdir()
+    shell_serial(serial_work, cpus, args.mutate)
+    return rc
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--cpu', choices=['7450', '7455', 'both'], default='both')
     parser.add_argument('--serial', action='store_true')
+    parser.add_argument('--link', action='store_true')
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    if args.mutate and not args.serial:
-        parser.error('--mutate requires --serial')
+    if args.mutate and not (args.serial or args.link):
+        parser.error('--mutate requires --serial or --link')
     cross = Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc'))
     if not (cross/'bin/powerpc-elf-gcc').is_file() or any(
             shutil.which(t) is None for t in ('qemu-system-ppc', 'genisoimage')) or not ROM.is_file():
-        print('SKIP ppc-sc: PPC toolchain/QEMU/OpenBIOS unavailable')
+        print(('FAIL' if os.environ.get('OS32_REQUIRE_PPC') == '1' else 'SKIP')+
+              ' ppc-sc: PPC toolchain/QEMU/OpenBIOS unavailable')
         return int(os.environ.get('OS32_REQUIRE_PPC') == '1')
+    if args.link:
+        return link_main(args)
     rc = nest_main(args)
     cpus = ['7450', '7455'] if args.cpu == 'both' else [args.cpu]
     work = Path(tempfile.mkdtemp(prefix='shell-', dir=Path(os.environ['TMPDIR'])/'sc-run'))
