@@ -65,7 +65,7 @@ def main():
     base.mkdir(parents=True, exist_ok=True)
     work = Path(tempfile.mkdtemp(prefix='run-', dir=base))
     cpus = ['7450', '7455'] if args.cpu == 'both' else [args.cpu]
-    elf = build(work/'kernel')
+    elf = build(work/'kernel', 'KBOOT_LINK=0')
     skipped = False
     for cpu in cpus:
         evidence = meter.accept(elf, cpu, 60, work/('normal-'+cpu))
@@ -76,14 +76,14 @@ def main():
         meter.accept(elf, cpu, 60, work/('lan-off-'+cpu), lan_off=True)
         print('GREEN LAN OFF '+cpu, flush=True)
     for name, number in KERNEL_NEGATIVES.items():
-        negative = build(work/name, 'NEGATIVE='+str(number))
+        negative = build(work/name, 'KBOOT_LINK=0', 'NEGATIVE='+str(number))
         for cpu in cpus:
             meter.accept(negative, cpu, 30, work/(name+'-'+cpu), name)
             print('GREEN negative '+name+' '+cpu, flush=True)
     red = 0
     if args.mutate:
         for name, source, before, after, expected, evidence_line in KERNEL_MUTATIONS:
-            mutant = build(work/('mutant-'+name),
+            mutant = build(work/('mutant-'+name), 'KBOOT_LINK=0',
                            *mutant_settings(work, name, source, before, after))
             guest = work/('mutant-'+name+'-guest')
             try:
@@ -102,7 +102,7 @@ def main():
             else:
                 raise RuntimeError('SURVIVED '+name)
         for name, source, before, after, finding in AUDIT_MUTATIONS:
-            result = make(work/('audit-'+name),
+            result = make(work/('audit-'+name), 'KBOOT_LINK=0',
                           *mutant_settings(work, name, source, before, after))
             output = result.stdout+result.stderr
             # The image must link; only the audit may reject it, for this reason.
