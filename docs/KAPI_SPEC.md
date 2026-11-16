@@ -1,4 +1,4 @@
-# KernelAPI v86 仕様書
+# KernelAPI v87 仕様書
 
 外部プログラム (OS32X) がカーネル機能を利用するためのAPIテーブル仕様。
 
@@ -16,7 +16,7 @@
 | 最大プログラムサイズ | 仮想配置で決まる: image・BSS・libc の初期域は 0x80100000 から、exec_heap の予約起点 0x88000000 の手前まで (配置と検査は [09_exec.md](09_exec.md)「Ring3 の USER 写像」) |
 | プログラム専用ヒープ | exec_heap 0x88000000〜 (既定 64KB だけ map、`mem_map` で伸長) と libc の sbrk |
 | プログラム専用スタック | 0x90000000 の直下に可変量 (既定 256KiB、OS32X ヘッダの `stack_size`)、その下に guard 1 ページ |
-| 現在のバージョン | **86** |
+| 現在のバージョン | **87** |
 | 合計エントリ数 | **304** (ヘッダ 2 + 関数表の容量 300 (うち実装 294・予約 6) + データフィールド 2)。データ欄は **0x4B8 に固定** (§4-0) |
 
 ---
@@ -1756,7 +1756,7 @@ B5 (gshell) と SDK の利用側は別段。今回、新 API を呼ぶ既存ア�
 
 ### 予約スロット (v63〜)
 
-0x4A0〜0x4B4 (slot 294〜299、6 本、v86 時点) は `kapi_reserved[]`。関数を足すと先頭から使う
+0x4B0〜0x4B4 (slot 298〜299、2 本、v87 時点) は `kapi_reserved[]`。関数を足すと先頭から使う
 (§4-0)。カーネルの表は `kapi_reserved_nosys` (`OS32_ERR_NOSYS`)、トランポリンは
 int 0x80 のスタブで、CPL=3 からの呼び出しはアプリを kill する。
 
@@ -2166,6 +2166,10 @@ private import 表は `kernel/module/kdebug_imports.def` が正で、317 件
 | 0x494 | gfx2_present | `int(u32 a, u32 head, i16 x, i16 y, u16 w, u16 h)` |
 | 0x498 | con_sink_capture | `int(u32 op)` |
 | 0x49C | boot_token_get | `void(u8 *out)` |
+| 0x4A0 | io_policy_set | `int(const void *bytes, unsigned int len)` |
+| 0x4A4 | io_policy_get | `int(void *bytes, unsigned int cap, unsigned int *needed)` |
+| 0x4A8 | io_policy_reset | `int(void)` |
+| 0x4AC | io_pump | `int(unsigned int budget_us)` |
 
 slot 253。kdebug 部品 (`/boot/kdebug.bin`、`KDEBUG=1` のときだけ読む) の ops slot 19
 `dbg_call` へそのまま渡す受け口 (`kernel/module/kdebug_call.c`)。部品が動いていない・slot 19 が
@@ -2173,3 +2177,13 @@ slot 253。kdebug 部品 (`/boot/kdebug.bin`、`KDEBUG=1` のときだけ読む)
 op は `KDEBUG_OP_*` (`os32_kapi_shared.h`)、peek の要求は `KdebugPeek` (1064 バイト、
 LAN の欄 flags / tag / dst を含む最終形)。以後の kdebug コマンドはこの 1 本に載せる。
 peek のゲスト側の構文は [07_shell.md](07_shell.md)、ホスト側の採取と照合は [rshell_peek.py](../tools/rshell_peek.py) 冒頭(設計の記録は `docs/archive/v3/TASK_KPEEK.md`)。
+
+### I/O policy と pump (v87)
+
+slot 294〜297。設定は IOT1 の LE byte 列で、公開構造体への cast はしない。
+`io_policy_get` は必要長を返し、容量不足は FULL、部分コピーなし。
+4 口とも FG1 限定、IRQ・例外・排他中は BUSY。pump は予算 0 で INVAL、
+上限 500µs に丸めて 1 巡回し callback 数を返す。時計未提供は NOSYS。
+owner は資源 owner のアプリ ID。通常アプリは AS 生存世代、常駐シェルは
+shell 登録世代を既存の寿命 token として使い、AS 破棄前の共通回収で復元する。
+公開引数は既存 C89 基本型、エラーは既存 OS32_ERR_* を共用する。

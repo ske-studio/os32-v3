@@ -292,10 +292,14 @@ extern int __cdecl wrap_gfx2_dpms(u32 a, u32 head, u32 state);
 extern int __cdecl wrap_gfx2_present(u32 a, u32 head, i16 x, i16 y, u16 w, u16 h);
 extern int __cdecl wrap_con_sink_capture(u32 op);
 extern void __cdecl wrap_boot_token_get(u8 *out);
+extern int __cdecl wrap_io_policy_set(const void *bytes, unsigned int len);
+extern int __cdecl wrap_io_policy_get(void *bytes, unsigned int cap, unsigned int *needed);
+extern int __cdecl wrap_io_policy_reset(void);
+extern int __cdecl wrap_io_pump(unsigned int budget_us);
 extern i32 __cdecl kapi_reserved_nosys(void);
 
 kapi->magic = 0x4B415049UL;
-kapi->version = 86;
+kapi->version = 87;
 
     kapi->gfx_init = wrap_gfx_init;
     kapi->gfx_init_200 = wrap_gfx_init_200;
@@ -591,6 +595,10 @@ kapi->version = 86;
     kapi->gfx2_present = wrap_gfx2_present;
     kapi->con_sink_capture = wrap_con_sink_capture;
     kapi->boot_token_get = wrap_boot_token_get;
+    kapi->io_policy_set = wrap_io_policy_set;
+    kapi->io_policy_get = wrap_io_policy_get;
+    kapi->io_policy_reset = wrap_io_policy_reset;
+    kapi->io_pump = wrap_io_pump;
     {
         u32 _kr;
         for (_kr = 0; _kr < (u32)KAPI_FUNC_RESERVED; _kr++)

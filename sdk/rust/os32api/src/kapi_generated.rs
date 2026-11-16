@@ -303,17 +303,21 @@ pub struct KernelAPI {
     /* idx 293 */ pub gfx2_present: unsafe extern "C" fn(a: u32, head: u32, x: i16, y: i16, w: u16, h: u16) -> i32,
     /* idx 294 */ pub con_sink_capture: unsafe extern "C" fn(op: u32) -> i32,
     /* idx 295 */ pub boot_token_get: unsafe extern "C" fn(out: *mut u8),
-    /* idx 296..301 予約 (C の kapi_reserved[]) */ pub kapi_reserved: [u32; 6],
+    /* idx 296 */ pub io_policy_set: unsafe extern "C" fn(bytes: *const u8, len: u32) -> i32,
+    /* idx 297 */ pub io_policy_get: unsafe extern "C" fn(bytes: *mut u8, cap: u32, needed: *mut u32) -> i32,
+    /* idx 298 */ pub io_policy_reset: unsafe extern "C" fn() -> i32,
+    /* idx 299 */ pub io_pump: unsafe extern "C" fn(budget_us: u32) -> i32,
+    /* idx 300..301 予約 (C の kapi_reserved[]) */ pub kapi_reserved: [u32; 2],
     pub sbrk_heap_limit: u32,  /* newlib _sbrk用ヒープ上限アドレス (exec_runでセットされる) */
     pub shm_base: u32,  /* 共有メモリ (MEM_SHM_BASE) の先頭アドレス。DB結果受け渡しに使用 (exec_initでセット) */
 }
 
 /* KernelAPI マジックナンバー */
 pub const KAPI_MAGIC: u32 = 0x4B415049;  /* "KAPI" */
-pub const KAPI_VERSION: u32 = 86;
+pub const KAPI_VERSION: u32 = 87;
 
 /* 関数表の容量とデータ欄の固定配置 (票 TASK_KAPI_DATA_FIELDS、v63) */
-pub const KAPI_FUNC_COUNT: u32 = 294;
+pub const KAPI_FUNC_COUNT: u32 = 298;
 pub const KAPI_FUNC_CAPACITY: u32 = 300;
 pub const KAPI_DATA_FIELDS_OFF: u32 = 0x4B8;
 /// データ欄が固定になった KAPI 版 (= C の OS32X_HDR_V3_MIN_API)。これ未満の

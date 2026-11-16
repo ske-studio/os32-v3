@@ -1,16 +1,16 @@
 {
   "base": "b400acb6",
   "api_sha256_recipe": "Review sdk/kapi.json append-only ABI and generated diffs; load the spec, pop includes, remove target from loop_attach/loop_detach/loop_status, then SHA256(json.dumps(spec, sort_keys=True).encode()).hexdigest(). For each generated key use SHA256(Path(key).read_bytes()).hexdigest() after sdk/gen_kapi.py --check. Preserve base and V86 snapshots.",
-  "api_sha256": "5db4fef3e9804615fb04910ed1005f15cec6b295480c46e856724b6928c6b282",
+  "api_sha256": "eda673ad77ad29b1d9219803cafac345a19e5793a3fcc276592d05aecdba2102",
   "v86_functions": {
     "v86_disk_test": "89de7da75c882ac36ff9e3c92dccd4e249eeda5ee06e6b28f5d08258c9f27c4c",
     "v86_boot2": "b3bf579fce6d3393be6a4f1931cf1e16271913243020d607d6276458d79df8a8"
   },
   "generated": {
-    "sdk/include/os32/os32_kapi_generated.h": "13c801047a5da68bbc4489f6f8062b31881e4814942557b7cccb693e0e6ffed2",
-    "sdk/include/os32/os32_kapi_slots.h": "0c4b516d25aaf80edb75f7c7d14a0df868cc03488c2e49355c9095dccdfebfc4",
-    "exec/exec_kapi_init.inc": "58c8301066360e14354170e725e84bf7cf7649dbb4240edec445bf438a395a77",
-    "sdk/rust/os32api/src/kapi_generated.rs": "b3dd042993443415905cad5b0d3b181fa9f33f595e709d2e0178019c091c8c2b"
+    "sdk/include/os32/os32_kapi_generated.h": "a457de553c389432d2d871a42d52c53fef1fe69c78adc9378ea19e2a88b829ce",
+    "sdk/include/os32/os32_kapi_slots.h": "9b4d7f393720f2d9129be226b4299cd75e768a7f0acb21cb1c6de2ab83890ab2",
+    "exec/exec_kapi_init.inc": "4f527c30332a359c4eecf1bf8ded91a4792d000b1750f5f7e5f3e44383ec9222",
+    "sdk/rust/os32api/src/kapi_generated.rs": "6a168d7f3013d0edc4f841c2d8673cd51fd3346135edca4a08bf7e0890218776"
   },
   "v86_detach_sha256": "38d0f72795d2b8e37afc7331b88f39cd1dd4701139730a1d2d81931a818409df"
 }

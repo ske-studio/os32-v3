@@ -21,6 +21,7 @@ u32 exec_as_leftover_pages;
 u32 exec_entry_calls; /* D35: rejected images leave this counter unchanged. */
 
 #include "owner_diag.h"
+#include "io_kapi.h"
 
 static void exec_teardown_app(AppSlot *a)
 {
@@ -126,6 +127,7 @@ static void exec_restore_context(int id)
 /* ======================================================================== */
 static void exec_reclaim_resources(int id)
 {
+    io_kapi_owner_exit(id); /* IO_KAPI_RECLAIM_COMMON */
     kapi_strings_cleanup_owned(id);
     /* (1) SQLite DB リソース (P5: cleanup_all → cleanup_owned)。
      * **FD 回収より先** (票 S0-K §1c / F2 の順序修正)。close は未 commit の
@@ -323,6 +325,7 @@ static void exec_finish(int id, int status, int kind)
         exec_restore_context(parent);
         exec_notify_owned(id, kind);
     }
+    io_syscall_end(id); /* IO_SYSCALL_EXIT */
 }
 
 void exec_exit(int status, int kind)

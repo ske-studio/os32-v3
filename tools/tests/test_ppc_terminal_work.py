@@ -44,10 +44,12 @@ def exercise(tmp, mutation=None):
     lan = lan[lan.index('void pm_lan_poll(u64 now)'):]
     lan = lan[:lan.index('    switch (s.state)')] + '    ++lan_steps;\n}\n'
     entry = (ROOT / 'exec/exec_syscall.inc').read_text()
-    assert entry.count('    idle_work_run();') == 1
-    entry = next(line for line in entry.splitlines() if line.strip() == 'idle_work_run();')
+    anchor = '    if (slot != KAPI_SLOT_IO_PUMP) idle_work_run(); /* IO_PUMP_ONCE */'
+    assert entry.count(anchor) == 1
+    entry = anchor
     harness = r'''
 #include "lan_boot.h"
+#include "os32_kapi_slots.h"
 #include "idle_work.h"
 int net_rx_recent(unsigned int ms) { (void)ms; return 0; }
 void _idle(void) {}
@@ -82,6 +84,7 @@ static int register_work(void) {
     return rc;
 }
 static void syscall_entry(void) {
+    unsigned int slot = 0;
 ENTRY
 }
 static int run(void) {

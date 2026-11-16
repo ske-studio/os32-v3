@@ -23,5 +23,8 @@ def syscall_providers(root, read=None):
                     for n in ('source', 'read_block', 'invoke', 'va_next')) +
             '#define ring3_syscall_dispatch host_ring3_syscall_dispatch\n'
             '#endif\n#include "kapi_call.h"\n#include "exec_legacy.h"\n#include "exec_gfx_poll.h"\n' +
+            'void io_syscall_begin(int owner) { (void)owner; }\n'
+            'void io_syscall_end(int owner) { (void)owner; }\n'
+            'void io_kapi_owner_exit(int owner) { (void)owner; }\n' +
             read('arch/x86/kernel/kapi_call.c') + '\n' +
             read('arch/x86/kernel/syscall_entry.c') + '\n' + special)

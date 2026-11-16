@@ -248,9 +248,9 @@ static void requests_and_failures(void)
     fail_convert = 0; CHECK(io_dispatch(500) == 1);
     reset(); add(4); units[4] = 4; cost[4] = 110;
     CHECK(io_dispatch(500) == 1 && ticks == 440 && reads <= 7 && observed[4] == 440);
-    CHECK(stats.total_count == 440 && stats.max_count == 440);
+    CHECK(io_dispatch_total_count() == 440 && stats.max_count == 440);
     CHECK(io_dispatch(120) == 1 && ticks == 660 && observed[4] == 120 && stats.overruns == 1);
-    CHECK(stats.total_count == 660 && stats.max_count == 440);
+    CHECK(io_dispatch_total_count() == 660 && stats.max_count == 440);
     fail_convert = 2; CHECK(io_dispatch(100) == 0); fail_convert = 0;
     CHECK(io_dispatch(120) == 1 && observed[4] == 120);
     reset(); add(1); add(4); cost[1] = 80; units[4] = 4; cost[4] = 110;
