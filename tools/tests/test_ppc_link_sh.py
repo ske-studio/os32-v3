@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """期待の出所: PPC_P3_DESIGN v2 §2/§3, appendix A-1 E5/E6/E7, A-3/A-4.
+INPUT_KEYMAP_DESIGN §7 S1m・S2a、K5: map2 failure preserves provider.
 LAN_OPERATOR_DESIGN §5/§8 P4c restores HostFS over link.
 Build manifests prove TU selection; freestanding host execution proves boot,
 provider, foreground reentry and capture routing without a hardware oracle.
@@ -26,7 +27,7 @@ CHECK = dict(name='ppc-link-sh', env=['ppc-cross'], tier=1, needs=[], budget=60,
             'platform/powermac/*.h', 'include/*.h', 'kernel/console/*.h',
             'lib/kstring_c.c', 'input/hal/in2_int.h', 'exec/exec.h', 'kernel/idle_work.h',
             'arch/ppc/*.h', 'sdk/include/os32/*.h', 'net/link_platform.h'],
-    basis=['LAN_OPERATOR_DESIGN §5/§8 P4c', 'PPC_P3_DESIGN v2 §2/§3; appendix A-1 E5/E6/E7, A-3/A-4'])
+    basis=['INPUT_KEYMAP_DESIGN §7 S1m・S2a、K5', 'LAN_OPERATOR_DESIGN §5/§8 P4c', 'PPC_P3_DESIGN v2 §2/§3; appendix A-1 E5/E6/E7, A-3/A-4'])
 
 PREFIX = r'''
 #include "types.h"
@@ -41,6 +42,8 @@ void pm_lan_poll(u64 now) { CHECK(now == 0x100000002ULL); lan++; }
 void _start(void) { pm_link_service_once(); CHECK(usb==1 && lan==1); pm_link_service_once(); CHECK(usb==2 && lan==2); finish(0); }
 '''
 PROVIDER = r'''
+static int map_calls;
+int pm_input_keymap_register(void) { return map_calls++ ? -1 : 0; }
 static const struct InputLegacyProvider *registered;
 static const InputOps *registered_ops;
 void input_legacy_register(const struct InputLegacyProvider *p) { registered=p; }
@@ -58,7 +61,9 @@ void idle_work_run(void) {}
 void arch_cpu_idle(void) {}
 void idle_wait_step(void) { idle_work_run(); arch_cpu_idle(); }
 void _start(void) {
-    pm_input_boot(); CHECK(registered && registered_ops);
+    pm_input_boot(); CHECK(map_calls == 1 && registered && registered_ops);
+    registered = 0; registered_ops = 0;
+    pm_input_boot(); CHECK(map_calls == 2 && registered && registered_ops);
     CHECK(!registered->terminal_try && !registered->terminal_peek && !registered->terminal_enabled);
     CHECK(!registered->inject_try && !registered->inject_peek);
     CHECK(registered->try_key == pm_input_usb_take && registered->peek_key == pm_input_usb_peek);

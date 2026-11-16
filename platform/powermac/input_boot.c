@@ -104,6 +104,7 @@ void pm_input_boot(void)
     decoder = (PmInputDecoder){ .pending = -1 };
     lan_lookahead = -1;
 #endif
+    (void)pm_input_keymap_register();
     input_legacy_register(&provider);
     input_register(&ops);
 }

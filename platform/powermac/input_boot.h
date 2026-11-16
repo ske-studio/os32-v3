@@ -8,5 +8,6 @@ typedef struct {
 } PmInputDecoder;
 
 int pm_input_decode(PmInputDecoder *d, int byte, u32 now);
+int pm_input_keymap_register(void);
 void pm_input_boot(void);
 #endif

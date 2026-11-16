@@ -52,6 +52,7 @@ void _idle(void);
 void idle_wait_step(void) { idle_work_run(); _idle(); }
 void idle_work_run(void) {}
 void _idle(void) { fake_time += 1000000; }
+int pm_input_keymap_register(void) { return 0; }
 int pm_input_usb_take(void) { return take(); }
 int pm_input_usb_peek(void) { return queued; }
 u32 pm_input_usb_dropped(void) { return 0; }
