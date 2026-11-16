@@ -1,6 +1,6 @@
 """A8 real link.c TX/credit/tick deadline integration, libc-free ILP32."""
 CHECK = dict(name='hostsvc-link-core', tier=1, needs=[], budget=3.7,
-    covers=['kernel/irq/irq.h', 'kernel/irq/irq_math.h',
+    covers=['kernel/time/tick_clock.h', 'kernel/irq/irq.h', 'kernel/irq/irq_math.h',
             'include/platform_irq.h', 'platform/pc98/platform_irq_limits.h', 'tools/tests/link_platform_fake/link_platform_inline.h', 'net/link_notify.c', 'net/link_notify.h', 'net/host_mailbox.h',
             'sdk/include/os32/os32_host_notice.h', 'net/link_platform.h', 'platform/pc98/link_platform_inline.h', 'platform/pc98/link_platform.c', 'net/link.c', 'net/nic.h', 'net/link.h', 'net/link_host_api.inc',
             'net/link_rx.inc', 'net/link_selftest.inc', 'lib/le_internal.h',
@@ -23,7 +23,8 @@ ANCHOR = '    link_host_deadlines();'
 
 
 MUTATIONS = (
-    ('net/link.c', '(!e->window_sent || e->window_tick != link_platform_now() ||\n             e->window_credit != link_credit_pages())', '1'),
+    ('net/link.c', 'e->window_ms != tick_clock_ms()', 'e->window_ms != link_platform_now()'),
+    ('net/link.c', '(!e->window_sent || e->window_ms != tick_clock_ms() ||\n             e->window_credit != link_credit_pages())', '1'),
     ('net/link.c', 'e->window_credit != link_credit_pages()', '0'),
     ('net/link_host_api.inc', '        e->window_sent = 0;', '        e->window_sent = 1;'),
     ('net/link_host_api.inc', '            e->rel_tick = e->last_tx_tick;',

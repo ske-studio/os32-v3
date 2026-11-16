@@ -1,4 +1,5 @@
 #include "kernel/irq/tick_budget.h"
+#include "kernel/time/tick_clock.h"
 #ifdef TICK_PROBE
 #include "kernel/time/tick_probe.h"
 #endif
@@ -113,7 +114,7 @@ struct link_handle {
     u8  want_status;
     u8  window_sent;
     u16 window_credit;
-    u32 window_tick;
+    u32 window_ms;
     u32 ack_seq;                    /* 累積 ACK (受けた最終 in-order DATA seq) */
     u8  ctrl_cursor;                /* 制御の種類を巡回する位置 */
     u8  req_copy[LINK_MAX_PAYLOAD];
@@ -382,10 +383,10 @@ static void link_timers(void)
                 e->last_rx_tick = link_platform_now();
             }
         }
-        /* Repeat waiting WINDOW once per jiffy; changed credit is immediate.
+        /* Repeat waiting WINDOW once per ms; changed credit is immediate.
          * Record only NIC acceptance, so a refused advertisement stays due. */
         if (e->ring_owner && e->state == LINK_H_RESP && e->recv_bytes < e->length &&
-            (!e->window_sent || e->window_tick != link_platform_now() ||
+            (!e->window_sent || e->window_ms != tick_clock_ms() ||
              e->window_credit != link_credit_pages()))
             e->want_window = 1;
     }
@@ -448,7 +449,7 @@ static int link_tx_control(void)
                                pl, LINK_WINDOW_LEN)) return -1;
                 e->want_window = 0;
                 e->window_sent = 1;
-                e->window_tick = link_platform_now();
+                e->window_ms = tick_clock_ms();
                 e->window_credit = credit;
                 link_l1_windows++;
                 if (credit > link_l1_max_credit) link_l1_max_credit = credit;
