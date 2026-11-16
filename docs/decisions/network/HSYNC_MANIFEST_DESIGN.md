@@ -231,3 +231,11 @@
 - R1〜R9: r2 で全部直った (第 2 回)。R2 はユーザー決定「今どおり飛ばす」。
 - 注 1 (実装の依頼に書く): 生成の予算は 64KiB を読む単位の前後でしか見ないので、冷えた drvfs では 1 回の os.read が 500ms を越え得る。host_agent は期限を CALL の前に見るので応答は返る。受入で BUSY の回数を記録する。
 - 注 2: 取得の ERR_FULL には、ゲストが 1MiB を確保できない場合も含め、今の経路に戻す。
+
+## 波 1 の依頼で PM が決めたこと (2026-11-16)
+- M1 (token のパスの符号化): token[16] は、token[0] から順に 1 バイトを 2 桁の小文字の hex にした 32 文字でパスに入れる (例 token[0]=0xAB → "ab")。A (ゲスト) と B (ホスト) は同じ符号化をし、試験で同じ token の往復を確かめる。
+- M2 (ERR_FULL・BUSY の伝え方): SerialFS の sfs_status は応答の status の ERR_FULL を IO に変えるので、一覧の取得の結果 (BUSY・ERR_FULL・STALE など) は SFS の応答の status では返さない。ホストは STAT・READ を成功 (status 0) で返し、HMD1 の記述子の状態の欄で伝える。ゲストは記述子の状態の欄だけを見て、ERR_FULL なら今の経路へ戻る (書き込む前に 1 回)。カーネルは変えない。
+- M3 (HostFS の helper の契約、B が呼び、C が serialfs_host.py に足す):
+  - 既にある物: `HostFS._comps(wire) -> list[bytes]`、`HostFS._stat_raw(comps) -> os.stat_result`、`HostFS._kind(st) -> (kind, size)` (静的)、`HostFS._entries(comps)` (list() と同じ飛ばし方の列挙)。
+  - C が足す物: `HostFS.wire_mtime(st) -> int` (`m = int(st.st_mtime); return m if 0 <= m <= 0xFFFFFFFF else 0`、stat() もこれを使う)、`HostFS.open_read_fd(comps) -> int` (読み専用の fd。secure は今の read() と同じ dir_fd と O_NOFOLLOW、非 secure は resolve() の道。ディレクトリなら SfsError(ERR_ISDIR)。閉じるのは呼んだ側の os.close。read() もこれを使う)。
+  - B は serialfs_host を import せず、渡された fs の上の 6 つの名前だけを呼ぶ。B の単体の試験は、同じ 6 つの名前を持つ試験用の FS で行う。
