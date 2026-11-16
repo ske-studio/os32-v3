@@ -1,7 +1,7 @@
 # Fixed i386 symbol closures measured from the wave-A vendor subset.
 # SQLite and the later x87 integration share these port flags, not mode globals.
 SOFTFLOAT_FLAGS = -msoft-float -mno-fp-ret-in-387
-SOFTFLOAT_CFLAGS = $(C_STD) $(CFLAGS_MACHINE) -Os -ffunction-sections -fdata-sections $(SOFTFLOAT_FLAGS)
+SOFTFLOAT_CFLAGS = $(C_STD) $(C_DIALECT_ERRORS) $(CFLAGS_MACHINE) -Os -ffunction-sections -fdata-sections $(SOFTFLOAT_FLAGS)
 SOFTFLOAT_SQLITE_SOURCES := lib/softfloat/f32_to_f64.c \
     lib/softfloat/f64_add.c \
     lib/softfloat/f64_div.c \

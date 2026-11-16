@@ -28,15 +28,14 @@ extern int x87_test_has_ac(void);
 #define fp_cr0_write x87_test_cr0_write
 #define fp_has_ac x87_test_has_ac
 #else
+#include "io.h"
 static u32 fp_irq_save(void)
 {
-    u32 flags;
-    __asm__ volatile("pushfl; popl %0; cli" : "=r"(flags) : : "memory");
-    return flags;
+    return irq_save();
 }
 static void fp_irq_restore(u32 flags)
 {
-    __asm__ volatile("pushl %0; popfl" : : "r"(flags) : "memory", "cc");
+    irq_restore(flags);
 }
 static u32 fp_cr0_read(void)
 {

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 CHECK = dict(name='softfloat-sql-host', tier=1,
     covers=['build/out/sqlite-proto/*.o', 'build/out/sqlite-proto/softfloat/*.o', 'tools/tests/test_softfloat_sql.py', 'tools/tests/softfloat_sql_host.c',
-            'tools/tests/host32.py', 'lib/softfloat/**', 'lib/softfloat_abi.c',
+            'tools/tests/host32.py', 'tools/tests/softfloat_x87_reference.c', 'lib/softfloat/**', 'lib/softfloat_abi.c',
             'lib/softfloat_bits.c', 'lib/softfloat_bits.h', 'build/softfloat.mk',
             'build/sqlite-proto.mk', 'build/config.mk', 'lib/sqlite3/**',
             'lib/kstring.c', 'lib/kstring_c.c', 'lib/kmath.c', 'lib/divdi3.c',

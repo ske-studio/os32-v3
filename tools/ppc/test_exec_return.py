@@ -82,6 +82,11 @@ def resume_check(source):
     regs = [0] * 32
     regs[30] = 0x1000
     frame = [0x2000 + i for i in range(44)]
+    # MSR[FP]=1, MSR[FE0/FE1]=0 is the PPC user-return contract.
+    # Seed both exception bits and clear FP so every change is observable.
+    frame[37] = 0x10900
+    expected_special = frame[32:38]
+    expected_special[5] = (frame[37] & ~0x900) | 0x2000
     spr = {}
     special = {}
     started = False
@@ -103,6 +108,15 @@ def resume_check(source):
                        'PPC_FRAME_SRR0': 144, 'PPC_FRAME_SRR1': 148}
             offset = offsets[off] if off in offsets else int(off)
             regs[int(dst)] = frame[(regs[int(base[:-1])] + offset - 0x1000) // 4]
+        elif op == 'li':
+            constants = {'PPC_MSR_FE': 0x900, 'PPC_MSR_FP': 0x2000}
+            regs[int(args[0])] = constants[args[1]] if args[1] in constants else int(args[1], 0)
+        elif op == 'andc':
+            dst, left, right = map(int, args)
+            regs[dst] = regs[left] & ~regs[right]
+        elif op == 'ori':
+            dst, left, value = args
+            regs[int(dst)] = regs[int(left)] | (0x2000 if value == 'PPC_MSR_FP' else int(value, 0))
         elif op.startswith('mtsprg'):
             spr[op[-1]] = regs[int(args[0])]
         elif op.startswith('mfsprg'):
@@ -113,7 +127,7 @@ def resume_check(source):
                 srr_started = True
         elif op == 'rfi':
             return (regs == frame[:32] and
-                    [special.get(k) for k in ('mtlr', 'mtcr', 'mtctr', 'mtxer', 'mtsrr0', 'mtsrr1')] == frame[32:38])
+                    [special.get(k) for k in ('mtlr', 'mtcr', 'mtctr', 'mtxer', 'mtsrr0', 'mtsrr1')] == expected_special)
         else:
             return False
     return False
@@ -155,6 +169,15 @@ def main():
             print('resume mutation survived')
             return 1
         print('resume r3: RED (1)')
+        for name, old, new in [
+                ('FP', '    ori 0,0,PPC_MSR_FP', '    ori 0,0,0'),
+                ('FE0', '    li 4,PPC_MSR_FE', '    li 4,0x100'),
+                ('FE1', '    li 4,PPC_MSR_FE', '    li 4,0x800')]:
+            assert asm.count(old) == 1
+            if resume_check(asm.replace(old, new)):
+                print('resume ' + name + ' mutation survived')
+                return 1
+            print('resume ' + name + ': RED (1)')
     return 0
 
 
