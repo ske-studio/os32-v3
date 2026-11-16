@@ -126,7 +126,8 @@ if (sc == 0 && byte == 0) return;
 legacy_cooked_push(((u16)sc << 8) | byte);
 ```
 
-- is_modifierは `KS_GROUP_Mod` または互換sc70〜74。no_keydataはHID usage53のClear/NumLockで真、再配置後もkeydataを積まない（PM決定）。IME_ON/OFFの操作配送はこの文字抑止より先に行う。
+- is_modifier の定義 (PM 決定 2026-11-17): effect!=0、または CHAR で 0xf101〜0xf111、または互換 sc 70〜74。日本語キー 0xf112〜0xf116 は修飾ではない。
+- no_keydataはHID usage53のClear/NumLockで真、再配置後もkeydataを積まない（PM決定）。IME_ON/OFFの操作配送はこの文字抑止より先に行う。
 - compat_sc=ffは出口直前に0へ置換。scもbyteも0なら積まない（F13 usage68等）。非修飾nop/NULは有効な非0 scがあればentryを残す。 raw_dueは互換scのmake/最後のbreak/repeatの既存集計規則。GUIのSTOP filterをraw/意味イベントの前に適用し、二重配送しない。
 - `drivers/input/kbd.c:227` の救済判定も `kbd_shift_state & SHIFT_CTRL` から `input_key_pressed(KEY_CTRL)` へ変更。物理Ctrl+STOPはcookedへ積まない。
 - 日本語/機能keysymの基本出口はbyte0+互換sc。Plain>=80は無文字（非byte確定列は既存IME/UTF-8配送経路）。 B§2aで確定済みの矢印等DOS byteはLEGACY_CONTROL例外として維持。RLDN=03をCHAR_ETXとして再解釈しない。
