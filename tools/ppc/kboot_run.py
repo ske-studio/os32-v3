@@ -217,6 +217,27 @@ def check_image(names, link, negative=None):
             (negative and NEGATIVES[negative].stop in names), 'unknown ELF image')
 
 
+def link_tx0(path):
+    """Count guest PLN1 TX in link_run's complete directional Ethernet log."""
+    text = path.read_text(encoding='ascii')
+    require(bool(text) and text.endswith('\n'), 'TX0 empty/incomplete capture')
+    guest, host, pln1 = 0, 0, 0
+    for line in text.splitlines():
+        outgoing = line.startswith('> ')
+        raw = line[2:] if outgoing else line
+        require(re.fullmatch(r'(?:[0-9a-f]{2}){14,}', raw) is not None,
+                'TX0 malformed/short frame')
+        frame = bytes.fromhex(raw)
+        if outgoing:
+            host += 1
+        else:
+            guest += 1
+            pln1 += frame[12:14] == b'\x88\xb6'
+    require(guest > 0, 'TX0 no guest frames')
+    require(pln1 == 0, 'TX0 guest PLN1 transmission')
+    return dict(guest_frames=guest, host_frames=host, guest_pln1_tx=pln1)
+
+
 def link_accept(elf, cpu, timeout, out):
     import link_run
     link_run.PREFIX = PREFIX
@@ -237,6 +258,7 @@ def link_accept(elf, cpu, timeout, out):
     link_judge((run/'serial-a.log').read_bytes(), (run/'serial-b.log').read_bytes(),
                logs, files[0].with_suffix('.log').read_bytes(), diagnostic.raw, elf,
                elf.with_suffix('.map').read_text(), json.loads((run/'result.json').read_text()))
+    (run/'tx0.json').write_text(json.dumps(link_tx0(run/'frames.log'), indent=2)+'\n')
     return run
 
 

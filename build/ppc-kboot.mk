@@ -2,8 +2,8 @@
 # Independent of the x86 graph: explicit source manifest = the closure reached
 # from init/ppc_kernel.c plus the takeover/vector/CPU entry objects. No libc,
 # no libgcc; undefined symbols are a build failure. x86 objects are untouched.
-#   make -f build/ppc-kboot.mk            -> build/out/ppc-kboot/PPCKERN.ELF
-#   make -f build/ppc-kboot.mk NEGATIVE=1 -> build/out/ppc-kboot/neg1/PPCKERN.ELF
+#   make -f build/ppc-kboot.mk -> build/out/ppc-kboot/link/PPCKERN.ELF
+#   make -f build/ppc-kboot.mk KBOOT_LINK=0 NEGATIVE=1 -> build/out/ppc-kboot/neg1/PPCKERN.ELF
 PPC_CROSS_DIR ?= /home/hight/opt/cross-ppc
 KB_CC := $(PPC_CROSS_DIR)/bin/powerpc-elf-gcc
 KB_OBJCOPY := $(PPC_CROSS_DIR)/bin/powerpc-elf-objcopy
@@ -12,7 +12,7 @@ KB_OBJDUMP := $(PPC_CROSS_DIR)/bin/powerpc-elf-objdump
 NEGATIVE ?= 0
 KBOOT_SHELL ?= 0
 KBOOT_SH ?= 0
-KBOOT_LINK ?= 0
+KBOOT_LINK ?= 1
 ifeq ($(KBOOT_LINK),1)
 ifeq ($(KBOOT_SHELL),1)
 $(error KBOOT_LINK requires the diagnostic image)
