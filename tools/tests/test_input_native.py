@@ -2,7 +2,7 @@
 """Native capture against the pinned pre-HAL keyboard; freestanding ILP32."""
 CHECK = dict(name='input-native-host', tier=1, budget=10, needs=[], kind='characterization',
     covers=['drivers/input/kbd.c', 'drivers/input/kbd_hal.c', 'drivers/input/*.h',
-            'input/hal/in2_int.h', 'input/hal/in2_dev.c', 'input/hal/in2_state.c',
+            'input/hal/in2_int.h', 'input/hal/in2_dev.c', 'input/hal/keymap.h', 'input/hal/in2_state.c',
             'input/hal/kbd_merge.c', 'input/hal/in2_ring.c', 'input/hal/legacy_ring.c',
             'input/hal/legacy_mode.c', 'input/hal/mouse_ext.c', 'input/hal/pointer_state.c',
             'include/**', 'sdk/include/os32/**', 'tools/tests/host_arch/**',
