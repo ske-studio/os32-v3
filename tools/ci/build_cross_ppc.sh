@@ -16,6 +16,7 @@
 # このスクリプトの内容が変わると CI のキャッシュキー (--cache-key) も変わり、
 # ツールチェーンが作り直される (約 30 分)。
 set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 TARGET=powerpc-elf
 BINUTILS_VER=2.41
@@ -184,6 +185,12 @@ fi
 "$PREFIX/bin/$TARGET-gcc" --version | sed -n 1p
 echo "prefix: $PREFIX ($(du -sh "$PREFIX" | cut -f1))"
 echo "newlib: nano-formatted-io + nano-malloc を確認"
+
+# Record verified source/configure inputs before the temporary build disappears.
+python3 "$SCRIPT_DIR/../check_nano_inputs_target.py" \
+    --cross-dir "$PREFIX" --record-built \
+    --source "$WORK/newlib-$NEWLIB_VER" --tarball "$SRC_DIR/$NEWLIB_TAR" \
+    --config "$WORK/build-newlib/config.log"
 
 if [ "$REMOVE_WORK" = 1 ]; then
     cd /
