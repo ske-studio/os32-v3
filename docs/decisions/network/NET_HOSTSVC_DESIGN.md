@@ -537,3 +537,8 @@ hs_failは次の該当一回だけ（nic.tx/nic.rx/heap/copyout/sfs.reply）、P
 
 ## D の統合で決めたこと (2026-11-07、PM 決定)
 DEV_BUS_ATAPI は世代変更で cache を捨て、同じ操作内で 1 回だけ読み直し、FD は失効させない (reset/UNIT ATTENTION の従来動作)。netcd とその他の媒体は #10 の STALE・永久失効を維持する。
+
+## 追記 (2026-11-16): hsync の一覧の仮想ファイル
+- /host の HostFS は、決まったパスの仮想ファイルとして木全体の一覧 (先頭 magic `HMD1`、件の形 `HMT1`、LE) を返す。SFS の操作・ペイロードの上限・KAPI は変えない。詳細は [HSYNC_MANIFEST_DESIGN](HSYNC_MANIFEST_DESIGN.md)。
+- 一覧の生成は 1 回 500ms ずつ進め、待ち (BUSY)・大きすぎる (ERR_FULL)・途中で変わった (STALE) は SFS の応答の status ではなく記述子の状態の欄で返す (sfs_status が ERR_FULL を IO に変えるため)。
+- 3 つの経路 (LanServer・rshell の --serve-host・HostAgent の SfsLink) は同じ HostFS を通るので、一覧は 1 か所の実装で全部に効く。host_agent の SFS の受付の 1.0s の期限 (壁時計) は変えない。

@@ -1,6 +1,6 @@
 # TASK_HSYNC_MANIFEST — hsync の往復を減らす
 
-> 状態: **実装中 (2026-11-16)** — 設計は確定。詳細設計は [HSYNC_MANIFEST_DESIGN](../../decisions/network/HSYNC_MANIFEST_DESIGN.md)。
+> 状態: **実装中 (2026-11-16)** — 設計は確定、A〜H は統合の枝。詳細設計は [HSYNC_MANIFEST_DESIGN](../../decisions/network/HSYNC_MANIFEST_DESIGN.md)。
 
 ## 0. ユーザー決定 (2026-11-16)
 | 項目 | 決定 |
@@ -14,4 +14,5 @@
 |---|---|
 | A+E (hsync_inventory.inc と試験)・B+F (host_tree_manifest.py と試験) | 済 (2026-11-16、wt/hsm-base に統合) |
 | C (serialfs_host.py)・D (hsync.c) | 済 (2026-11-16、wt/hsm-base に統合) |
-| G (三つの経路の統合試験)・H (NET_HOSTSVC_DESIGN の追記) | 未着手 (波 3) |
+| G (三つの経路の統合試験)・H (NET_HOSTSVC_DESIGN の追記) | 済 (2026-11-16)。60 ファイルで差分なしの往復が 362/2/140〜260 → 6/0/3〜4 (STAT/LIST/READ) |
+| NP21/W での実測 (計測の 34 秒・67 分との比較) | 未 |
