@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Real-hardware evidence fixtures; no physical sockets or guest execution."""
+"""Real-hardware evidence fixtures; no physical sockets or guest execution.
+
+期待の出所: 設計 ID (PPC_P5_REST_DESIGN §2 realhw_run・§5 の R の行、PM 決定 R1〜R3 2026-11-16)。
+"""
 CHECK = dict(name='ppc-realhw-link', tier=1, budget=10, needs=['make:all'],
              covers=['tools/ppc/realhw_run.py', 'tools/tests/test_ppc_realhw_link.py',
                      'tools/ppc/sc_run.py', 'tools/ppc/sd_run.py',
