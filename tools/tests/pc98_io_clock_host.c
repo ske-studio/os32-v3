@@ -3,6 +3,7 @@
 #include "pit.h"
 #include "platform_timer.h"
 #include "kernel/io_clock.h"
+#include "kernel/io_work.h"
 #include "os32_kapi_shared.h"
 static void finish(int rc) __attribute__((noreturn));
 static void finish(int rc)
@@ -31,7 +32,8 @@ void tick_budget_config(void) {}
 void tick_clock_raw(u32 *lo, u32 *hi)
 { CHECK(!enabled); *lo = raw_low; *hi = raw_high; }
 u32 tick_clock_ms(void) { return fake_ms; }
-int idle_work_register(void (*fn)(void)) { (void)fn; return 0; }
+int io_register(const struct io_desc *d) { (void)d; return 0; }
+void io_request(u32 id) { (void)id; }
 void platform_timer_sample(struct platform_timer_sample *out)
 {
     CHECK(!enabled); ++samples;

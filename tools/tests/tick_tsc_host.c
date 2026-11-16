@@ -2,6 +2,8 @@
 #include "types.h"
 #include "pit.h"
 #include "os32_kapi_shared.h"
+#include "kernel/io_work.h"
+#include "kernel/io_policy.h"
 static u32 fake_flags, mutable_id, max_leaf, features, cpuid_calls;
 static u32 fake_ms, rdtsc_calls, endpoint_cycles = 100;
 static unsigned long long counter, pit_us;
@@ -30,9 +32,19 @@ int pc98_pit_read_us(u32 *lo, u32 *hi)
     if (pit_rc) return pit_rc;
     *lo = (u32)pit_us; *hi = (u32)(pit_us >> 32); return 0;
 }
-int idle_work_register(void (*fn)(void))
+static const struct io_desc *provider;
+static int requested;
+int io_register(const struct io_desc *d)
 {
-    (void)fn; ++registrations; return slots_rc;
+    ++registrations; if (slots_rc) return slots_rc;
+    provider = d; return 0;
+}
+void io_request(u32 id) { CHECK(id == IO_SVC_TSC_CALIBRATE); requested = 1; }
+static void dispatch(void)
+{
+    if (!requested) return;
+    requested = 0;
+    if (provider->step(provider->state, 0) == IO_MORE) io_request(provider->id);
 }
 #include "platform/pc98/tsc_math.c"
 #include "platform/pc98/tsc_clock.c"
@@ -42,7 +54,7 @@ static void reset(void)
     fake_flags = 0x202; mutable_id = 1; max_leaf = 1; features = 1u << 4;
     enabled = 1; kctx_irq_depth = 0; counter = 1000; pit_us = 10;
     fake_ms = 0; pit_rc = 0; endpoint_cycles = 100;
-    registered = 0; slots_rc = 0; registrations = 0;
+    registered = 0; slots_rc = 0; registrations = 0; requested = 0; provider = 0;
     diag = (__typeof__(diag)){0};
     CHECK(pc98_tsc_init() == 0);
 }
@@ -72,6 +84,18 @@ static void monitor_pair(long difference)
 }
 static void tests(void)
 {
+    /* P9: no request means no work; the initial request and MORE drive windows. */
+    reset(); rdtsc_calls = 0; CHECK(provider && requested && provider->default_tier == 3);
+    requested = 0; dispatch(); CHECK(!have_start && !rdtsc_calls);
+    tsc_busy = 1; CHECK(provider->step(0, 0) == IO_MORE && !have_start); tsc_busy = 0;
+    io_request(IO_SVC_TSC_CALIBRATE); dispatch(); CHECK(have_start && requested);
+    u32 calls = rdtsc_calls; dispatch(); CHECK(rdtsc_calls == calls && requested);
+    u32 generation = tsc_generation;
+    for (u32 i = 0; i < 5; ++i) {
+        fake_ms += 200; pit_us += 200000; counter += 20000000; dispatch();
+    }
+    CHECK(state == TSC_READY && tsc_generation == generation + 1 && requested);
+    state = TSC_OFF; dispatch(); CHECK(!requested);
     /* Real capability control flow, fake immutable ID / CPUID leaves. */
     reset(); mutable_id = 0; cpuid_calls = 0; rdtsc_calls = 0;
     CHECK(pc98_tsc_init() == OS32_ERR_NOSYS && !cpuid_calls && !rdtsc_calls);

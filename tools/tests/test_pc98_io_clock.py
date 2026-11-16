@@ -6,7 +6,7 @@ CHECK = dict(name='pc98-io-clock-host', tier=3, budget=15, needs=[], covers=[
     'platform/pc98/pit.h', 'platform/pc98/pit_math.h', 'include/pc98.h',
     'include/clock_source.h', 'include/platform_timer.h', 'include/kernel_tick.h',
     'kernel/io_clock.h', 'kernel/time/ktime.h', 'kernel/time/tick_clock.h',
-    'kernel/irq/tick_budget.h', 'kernel/irq/irq.h', 'kernel/idle_work.h',
+    'kernel/irq/tick_budget.h', 'kernel/irq/irq.h', 'kernel/io_work.h', 'kernel/io_policy.h',
     'include/types.h', 'include/callconv.h', 'lib/divdi3.c',
     'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_generations.h',
     'tools/tests/pc98_io_clock_host.c', 'tools/tests/test_pc98_io_clock.py',
