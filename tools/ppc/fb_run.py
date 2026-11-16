@@ -251,7 +251,7 @@ def main():
         manifest = json.loads((ROOT/'build/ppc-ram-root.json').read_text())
         manifest['/fb.sh'] = str(script)
         manifest_path = work/'root.json'; manifest_path.write_text(json.dumps(manifest))
-        opts = product_settings(work, mode) + ['ROOT_MANIFEST='+str(manifest_path),
+        opts = product_settings(work, mode) + ['KBOOT_LINK=0', 'ROOT_MANIFEST='+str(manifest_path),
             'ROOT_DEPS=assets/fonts/shino16.kcgfont assets/fonts/JF-Dot-Shinonome16-LICENSE.txt build/out/unicode.bin '+str(script)]
         # Every mode feeds the fixed UTF-8 line at the LAN terminal decoder on USB 'z'.
         src = 'platform/powermac/input_boot.c'

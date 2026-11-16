@@ -125,7 +125,7 @@ def image(work, mutation):
     shell = work/'boot.c'; shell.write_text('#include "'+str(ROOT/'tools/accept/arch_ctx_probe.c')+'"\n')
     t = work/'trap.c'; t.write_text(trap)
     vectors_file = work/'vectors.S'; vectors_file.write_text(vectors)
-    opts = ['KBOOT_SH=1',
+    opts = ['KBOOT_SH=1', 'KBOOT_LINK=0',
                  'KB_ROOT_BINS='+str(work/'ctx.bin')+' build/out/ppc-user/fault.bin',
                  'KB_MUT_SRC=platform/powermac/shell_boot.c', 'KB_MUT_FILE='+str(shell),
                  'KB_MUT_EXTRA_SRC=arch/ppc/kernel_trap.c', 'KB_MUT_EXTRA_FILE='+str(t),

@@ -121,7 +121,7 @@ def main():
     else:
         injected.write_text(text.replace(before, '    (void)serial;'))
     bins = 'KB_ROOT_BINS=build/out/ppc-user/hello.bin build/out/ppc-user/fault.bin build/out/ppc-user/outprobe.bin'
-    settings = ['KBOOT_SHELL=1', 'KB_FD1_STREAM=1', bins,
+    settings = ['KBOOT_SHELL=1', 'KBOOT_LINK=0', 'KB_FD1_STREAM=1', bins,
                 'KB_MUT_EXTRA_SRC='+src, 'KB_MUT_EXTRA_FILE='+str(injected)]
     if args.serial:
         settings += ['KB_MUT_THIRD_SRC='+cli, 'KB_MUT_THIRD_FILE='+str(cli_file)]
@@ -136,7 +136,7 @@ def main():
         mutation = mutant_settings(work, 'fd1-log', 'platform/powermac/console_stream.c',
                                    '    console_write(buf, size, color);',
                                    '    (void)color; pm_log_write(buf, size);')
-        elf = build(work / 'fd1-log', *settings, *mutation)
+        elf = build(work / 'fd1-log', 'KBOOT_LINK=0', *settings, *mutation)
         if args.serial:
             serial_accept(elf, '7450', work / 'fd1-log-guest', expected.replace('STREAM FD1 PROBE', 'FD1 PROBE'))
         else:

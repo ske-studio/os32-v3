@@ -131,7 +131,7 @@ def main():
     injected = work/'cli_boot.c'
     injected.write_text(text.replace('enum { CLI_CAT_BYTES', INPUT+'\nenum { CLI_CAT_BYTES')
                         .replace('.getkey = pm_terminal_getkey', '.getkey = sb_getkey'))
-    settings = ['KBOOT_SHELL=1', 'KB_MUT_SRC='+source, 'KB_MUT_FILE='+str(injected)]
+    settings = ['KBOOT_SHELL=1', 'KBOOT_LINK=0', 'KB_MUT_SRC='+source, 'KB_MUT_FILE='+str(injected)]
     elf = build(work/'normal', *settings)
     expected = HELLO+HELLO+FAULT+HELLO
     for cpu in cpus:
@@ -151,7 +151,7 @@ def main():
         for name, src, before, after, transcript in mutations:
             extra = mutant_settings(work, name, src, before, after)
             extra = [s.replace('KB_MUT_', 'KB_MUT_EXTRA_') for s in extra]
-            mutant = build(work/name, *settings, *extra)
+            mutant = build(work/name, 'KBOOT_LINK=0', *settings, *extra)
             serial_accept(mutant, cpus[0], work/(name+'-guest'), transcript)
             require(transcript != expected, 'mutation did not change verdict')
             print('RED '+name+': exact transcript and sb_stop (QEMU rc=0)', flush=True)
