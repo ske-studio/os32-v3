@@ -1,6 +1,13 @@
 #include "keymap.h"
 #include "os32_kapi_shared.h"
 
+static void (*policy_read)(const KmBackend *, u16, KmPolicyKey *);
+
+void km_policy_read_install(void (*read)(const KmBackend *, u16, KmPolicyKey *))
+{
+    policy_read = read;
+}
+
 /* NetBSD wscons keysyms; the selected character cell owns the effect. */
 static KmEffect cell_effect(keysym_t sym, u8 kind, u8 op, u16 map_id)
 {
@@ -49,11 +56,26 @@ int km_eval(const KmBackend *map, u16 keycode, const KmState *state,
 {
     KmEvalResult result = {0};
     const KmEntry *entry;
+    KmPolicyKey policy;
     if (!map || !state || !out || !map->entries || !map->compat_sc ||
         !map->extensions || keycode >= map->count ||
         !((map->id == KM_MAP_PC98 && map->count == 128) ||
           (map->id == KM_MAP_HID && map->count == 256))) return OS32_ERR_INVAL;
     entry = &map->entries[keycode];
+    policy.entry = *entry;
+    if (map->id == KM_MAP_PC98) {
+        const KmPc98Extensions *ext = map->extensions;
+        if (!ext->bank0 || !ext->flags) return OS32_ERR_INVAL;
+        policy.flags = ext->flags[keycode];
+        policy.bank1 = ext->bank1 != 0;
+        for (unsigned i = 0; i < 8; ++i) {
+            policy.bank[0][i] = ext->bank0[keycode][i];
+            policy.bank[1][i] = ext->bank1 ? ext->bank1[keycode][i] :
+                (KmExactCell){0, KM_CELL_INHERIT, 0};
+        }
+    }
+    if (policy_read) policy_read(map, keycode, &policy);
+    entry = &policy.entry;
     result.command = entry->command;
     result.compat_sc = map->compat_sc[keycode];
     if (map->id == KM_MAP_PC98) {
@@ -63,13 +85,13 @@ int km_eval(const KmBackend *map, u16 keycode, const KmState *state,
                        (!!(state->mods & KM_MOD_CTRL) << 1) |
                        (!!(state->mods & KM_MOD_ALT) << 2);
         unsigned bank = !!(state->mods & KM_MOD_MODE) ^ !!(state->locks & KM_LOCK_ALT);
-        if (!ext->bank0 || !ext->flags || ext->flags[keycode] > 3 ||
+        if (!ext->bank0 || !ext->flags || policy.flags > 3 ||
             ext->accent_count || ext->accents) return OS32_ERR_INVAL;
-        if (((ext->flags[keycode] & 1) && (state->locks & KM_LOCK_CAPS)) ||
-            ((ext->flags[keycode] & 2) && (state->locks & KM_LOCK_NUM))) col ^= 1;
-        cell = bank && ext->bank1 ? &ext->bank1[keycode][col] : &ext->bank0[keycode][col];
-        if (cell->kind == KM_CELL_INHERIT && bank && ext->bank1)
-            cell = &ext->bank0[keycode][col];
+        if (((policy.flags & 1) && (state->locks & KM_LOCK_CAPS)) ||
+            ((policy.flags & 2) && (state->locks & KM_LOCK_NUM))) col ^= 1;
+        cell = bank && policy.bank1 ? &policy.bank[1][col] : &policy.bank[0][col];
+        if (cell->kind == KM_CELL_INHERIT && bank && policy.bank1)
+            cell = &policy.bank[0][col];
         if ((cell->kind != KM_CHAR && cell->kind != KM_BSD_SPECIAL) ||
             (cell->kind == KM_CHAR && cell->op)) return OS32_ERR_INVAL;
         result.sym = cell->sym;

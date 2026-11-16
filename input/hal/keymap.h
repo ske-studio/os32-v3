@@ -91,6 +91,16 @@ typedef struct {
 int km_source_lookup(u8 src, u16 generation, KmSource *out);
 /* S0a: invalidate binding only, exact generation match, otherwise no-op. */
 void km_source_unbind(u8 src, u16 generation);
+/* W: optional internal providers, installed only by policy initialization.
+ * Static fallback descriptors keep using the generated defaults. */
+typedef struct {
+    KmEntry entry;
+    KmExactCell bank[2][8];
+    u8 flags, bank1;
+} KmPolicyKey;
+int input_policy_pressed(void);
+void km_policy_lookup_install(void (*lookup)(const KmBackend *, KmSource *));
+void km_policy_read_install(void (*read)(const KmBackend *, u16, KmPolicyKey *));
 /* S0b: pure selection; no held/lock changes, allocation or delivery. */
 int km_eval(const KmBackend *map, u16 keycode, const KmState *state,
             KmEvalResult *out);

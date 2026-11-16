@@ -686,3 +686,6 @@ KEYSYM/EXACTのkeysymはNetBSDのu16値を維持し、独自の列挙を足さ�
 
 - kind8 の重複の判定の組は (kind, profile, context, index, selector, aux) とする (aux を入れる)。Mac の GUI の Cmd+Z (UNDO) と Shift+Cmd+Z (REDO) を両立させるため。kind6 は mask を selector に持つので今のまま。ほかの kind の重複の組は B§4 のまま。
 - TERM の編集制御の byte の重複は、同じ profile と context の中では拒否する (INVAL)。同じ index を共通の context 0 と具体の context 1..4 の両方に置いたときは、具体の context が勝つ。
+
+- PM決定 (2026-11-17): 同じ打鍵にkind6 EXTとkind8 KEY_ACTIONが一致したらkind8を優先し、kind8のNONEはEXTを打ち消す。setは両方の行を受理する。
+- W実装 (2026-11-17): 重複は編成面への整列挿入で隣接キーと比較し、別の約22KiB作業域を置かない。既定const共有・差分delta圧縮で1面22,796B（上限24KiB内、既定目標20KiBは超過）、3面68,388B＋管理96B＋接続8B＝追加BSS68,492B。既存state/registry/evaluator/mergeと将来の意味ring1,536Bも含め79,700B（上限88KiB内）。getは既定から補完可能な明示行のsnapshotをLEで返す。
