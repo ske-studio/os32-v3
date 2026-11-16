@@ -17,7 +17,7 @@ struct io_desc {
     void *state;
 };
 enum { IO_DONE = 0, IO_MORE = 1, IO_WAIT = 2 }; /* Negative values: errors. */
-int io_register(const struct io_desc *d); /* Resident provider; boot FG0/FG1. */
+int io_register(const struct io_desc *d); /* Resident provider; FG0/FG1, also inside io_dispatch (runs from the next round). */
 int io_unregister(u32 id); /* FG1; BUSY while running; no references on success. */
 void io_request(u32 id); /* IRQ/FG0/FG1: mark only, never call the provider. */
 int io_clock_us(u32 *lo, u32 *hi);

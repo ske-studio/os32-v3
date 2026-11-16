@@ -47,15 +47,27 @@ static unsigned int reset_count, device_pios, tx_starts, overwrite_writes, ovw_d
 volatile u32 tick_count;
 volatile u32 kctx_irq_depth;
 #ifndef NE2K_BH_TEST
-int idle_work_register(void (*fn)(void)) { return fn == ne2k_bh ? 0 : -1; }
+#include "rx_io_clock.h"
+int platform_clock_read_us(u32 *lo, u32 *hi) { *lo = *hi = 0; return 0; }
 #endif
 
 #ifndef NE2K_BH_TEST
 void net_rx_schedule(void) {}
 int net_rx_service(void) { return 0; }
-void net_rx_batch_begin(void) {}
+int net_rx_batch_begin_slice(struct io_slice *slice) { (void)slice; return 1; }
 void net_rx_batch_end(void) {}
 #endif
+/* Direct callers construct a real slice; providers use the dispatcher slice. */
+static void bh_once(void)
+{
+    struct io_slice slice;
+#ifndef NE2K_BH_TEST
+    test_rx_clock_install();
+#endif
+    if (io_slice_begin(&slice, NET_RX_WORK_LIMIT_US, ~0u) < 0) __builtin_trap();
+    (void)ne2k_bh(0, &slice);
+}
+#define ne2k_bh() bh_once()
 #ifndef TEST_GROUP
 #define TEST_GROUP 0
 #endif
@@ -83,7 +95,16 @@ static void finish(unsigned int rc)
     for (;;) {}
 }
 #ifdef NE2K_BH_TEST
-#define CHECK(x) do { if (!(x)) finish(1); } while (0)
+static void fail_line(unsigned int line)
+{
+    char text[12];
+    unsigned int n = sizeof(text);
+    text[--n] = '\n';
+    do { text[--n] = '0' + line % 10; line /= 10; } while (line);
+    __asm__ volatile("int $0x80" : : "a"(4), "b"(2), "c"(text + n), "d"(sizeof(text) - n) : "memory");
+    finish(1);
+}
+#define CHECK(x) do { if (!(x)) fail_line(__LINE__); } while (0)
 #else
 #define CHECK(x) do { if (!(x)) finish(__LINE__ % 200 + 1); } while (0)
 #endif
@@ -186,6 +207,9 @@ static void device_pio(unsigned int port, void *buf, unsigned int len, int write
     unsigned int count = regs[0][NE2K_P0_RBCR0] | (regs[0][NE2K_P0_RBCR1] << 8);
     CHECK(count == len + (len & 1) && addr + count <= sizeof(ram));
     device_pios++;
+#ifdef NE2K_BH_TEST
+    bh_now += bh_pio_cost;
+#endif
     if (write && txp && addr == ((unsigned int)nic.tx_page << 8)) overwrite_writes++;
     if (write) {
         kmemcpy(ram + addr, buf, len);
@@ -364,7 +388,9 @@ static void run_ovw_completion(u8 completion, unsigned int frames)
     nic.rx_backlog = 0;
     /* Observe OVW recovery before a later BH round drains its backlog. */
     ne2k_enter();
-    service(NE2K_IRQ_BUDGET);
+    struct io_slice slice;
+    CHECK(io_slice_begin(&slice, NET_RX_WORK_LIMIT_US, ~0u) == 0);
+    service(NE2K_IRQ_BUDGET, &slice);
     ne2k_leave();
     CHECK(nic.state == NE2K_STATE_RUNNING);
     u8 recovered_backlog = nic.rx_backlog;

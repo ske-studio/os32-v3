@@ -25,6 +25,9 @@ int net_rx_service(void);
 #define NET_RX_ACTIVE_MS 5u
 int net_rx_recent(u32 window_ms);
 void net_rx_batch_begin(void);
+/* Returns zero if another batch already owns the receive budget. */
+struct io_slice;
+int net_rx_batch_begin_slice(struct io_slice *slice);
 void net_rx_batch_end(void);
 /* Queue reset is deferred while demux owns a reserved tail. */
 int net_rx_defer_reset(u16 protocol);

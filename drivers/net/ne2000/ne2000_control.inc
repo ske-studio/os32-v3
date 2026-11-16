@@ -93,7 +93,7 @@ int ne2k_init(const struct ne2k_config *config)
 
     if (tick_register(PC98_TICK_NE2K, ne2k_timer_tick) != 0) return NE2K_ERR_IO;
 
-    rc = idle_work_register(ne2k_bh);
+    rc = io_register(&ne2k_desc);
     if (rc && rc != OS32_ERR_EXIST) return NE2K_ERR_IO;
 
     kmemset(&nic, 0, sizeof(nic));
@@ -107,6 +107,7 @@ int ne2k_init(const struct ne2k_config *config)
         ne2k_imr_sync(0);
         return rc;
     }
+    io_request(IO_SVC_NE2K_BH); /* init */
     return NE2K_OK;
 }
 

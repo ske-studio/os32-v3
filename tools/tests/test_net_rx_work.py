@@ -37,6 +37,8 @@ MUTATIONS = (
     ('net/nic.c', 'last_rx_ms = tick_clock_ms();', 'last_rx_ms = 0;'),
     ('net/nic.c', 'rx_ms_valid = 1;', 'rx_ms_valid = 0;'),
     ('net/nic.c', 'else if (net_rx_recent(NET_RX_ACTIVE_MS))', 'else if (0)'),
+    ('net/rx_work.c', 'b->max_units = NET_RX_SCAN_MAX;', 'b->max_units = NET_RX_SCAN_MAX + 1;'),
+    ('net/rx_work.c', 'if (b->used >= b->max_units) return 0;', 'if (0) return 0;'),
     ('kernel/io_work.c', 'if (idle_work_compat_count() == 0 && !any_pending()) return 0;',
      'if (idle_work_compat_count() == 0 && !any_pending()) { int i = find(IO_SVC_NET_RX); if (i < 0) return 0; io_request(IO_SVC_NET_RX); }'),
     ('net/nic.c', 'io_request(IO_SVC_NET_RX); /* bind */', '(void)0; /* bind */'),
@@ -49,7 +51,8 @@ MUTATIONS = (
     ('net/nic.c', 'return bound ? IO_MORE : IO_DONE;', 'return bound ? IO_WAIT : IO_DONE;'),
     ('net/nic.c', 'if (ticking || batch_depth) return IO_MORE;', 'if (ticking || batch_depth) return IO_WAIT;'),
 
-    ('net/rx_work.c', '!b->slice || !io_slice_take(b->slice)', '!b->slice'),
+    ('net/rx_work.c', 'if (!io_slice_take(b->slice) && b->used) return 0;', 'if (0) return 0;'),
+    ('net/rx_work.c', 'if (!io_slice_take(b->slice) && b->used) return 0;', 'if (!io_slice_take(b->slice)) return 0;'),
     ('net/nic.c', '!_irq_enabled() || kctx_irq_depth != 0', 'kctx_irq_depth != 0'),
     ('net/nic.c', '!_irq_enabled() || kctx_irq_depth != 0', '!_irq_enabled()'),
     ('net/nic.c', '!bound || ticking || unbind_due', '!bound || unbind_due'),
