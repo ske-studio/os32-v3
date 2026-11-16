@@ -70,6 +70,9 @@ def main():
         profile = require_target(target, 'link_guard')
         ar = ar or profile['ar']
         linker, *args = args
+        # CI puts only the linker on an absolute path; resolve the archiver beside it.
+        if os.sep not in ar and shutil.which(ar) is None and os.sep in linker:
+            ar = os.path.join(os.path.dirname(linker), ar)
     except ValueError as error:
         print('link_guard: ' + str(error), file=sys.stderr)
         return 1
