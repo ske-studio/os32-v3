@@ -378,3 +378,9 @@ exec 終了 hook は `exec/exec_abort.inc` に内部 adapter として定義し�
 - 段の順: input/hal/input_context.c・input_interrupt.c を x86 の feature の mk と build/ppc-kboot.mk に登録する段 (B) を、exec_finish.inc・gfx_core_init.inc に新しい呼び出しを足す段より先にする (exec.c と gfx_core.c は PPC の像にも入るので、登録が無いと両方の arch でリンクが落ちる)。受入に PPC の像 2 つのリンクを入れる。
 - `exec_reclaim_resources` の入口で exec_gen が得られない (CPL=0 の子で a->as が無い) ときは、中断の印を消さず、表示の印にも触れない (NULL を読まない)。
 - 診断の enter の途中 (入口の drain の後、gfx_init の acquire の前) の STOP は、特別に扱わない。gfx_init の中の drain で入りかけの診断が畳まれて ESTATE で戻る今の振る舞いのままとする (PM 決定 2026-11-17、識別のための印や口は足さない)。受入 (6) に、この区間への IRQ の挿入を 1 件足し、ESTATE で戻り印が残らないことを確かめる。
+
+### M6[3] の取り込みで後の段へ送る項目 (2026-11-17、Opus レビュー、どれも P3)
+
+- exec/exec_abort.inc:83・exec/appslot.c:539-546: CUI で診断の enter のあと、CPL3 の CUI 描画アプリが claim して世代が子へ移り、その子が終わって組が 0 になってから shell で STOP を押すと、以前は診断を畳んでいたが今は capture が空振りして診断が残る (leave では戻れる)。設計の帰結として記録する。直すなら claim の取得時に display_cui_owner が別の owner なら先に gf_display_owner_exit を呼ぶ。NP21/W の受入で診断と STOP を回すときに確かめる。
+- gfx/gfx_core.c:333: KAPI の gfx_init で drain が -1 (IF=0) を返すと黙って戻る。今の入口は int80 の後に sti するので届かない。直すなら -1 のとき appslot_abort_request() を呼ぶ。
+- 試験: drain の IF の検査と、drain の後に印を消す処理への変異を足す。test_kstop は capture と drain を空の stub にしているので、STOP の表示の扱いは exec_hwb_abort だけで見ている。
