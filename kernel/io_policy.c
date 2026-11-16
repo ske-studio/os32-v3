@@ -103,8 +103,9 @@ static int commit(const struct policy_table *table, u32 owner, u32 gen)
         irq_restore(flags);
         return OS32_ERR_BUSY;
     }
-    /* A reused ID must first leave the old lifetime's restoration chain. */
-    if (owner && saved[owner].valid && saved[owner].gen != gen)
+    /* A reused ID or returning writer first leaves its old saved position. */
+    if (owner && saved[owner].valid &&
+        (saved[owner].gen != gen || newest_owner != owner)) /* POLICY_REAPPLY */
         io_policy_owner_exit(owner, saved[owner].gen);
     if (owner && (!saved[owner].valid || saved[owner].gen != gen)) { /* POLICY_SAVE_ONCE */
         snapshot(&saved[owner].table);
@@ -189,7 +190,7 @@ void io_policy_owner_exit(u32 owner, u32 gen)
         for (successor = 1; successor < POLICY_OWNER_COUNT; ++successor)
             if (saved[successor].valid && saved[successor].previous == owner) break;
         if (successor < POLICY_OWNER_COUNT) {
-            /* A later owner still supplies active: bypass this dead lifetime. */
+            /* A later owner still supplies active: bypass this saved layer. */
             saved[successor].table = saved[owner].table; /* POLICY_SPLICE */
             saved[successor].previous = saved[owner].previous;
         } else {

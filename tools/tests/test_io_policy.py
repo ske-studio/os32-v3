@@ -18,6 +18,11 @@ import host32
 # The local io.h replaces privileged instructions, not policy declarations.
 IRQ_HEADER = 'unsigned int irq_save(void);\nvoid irq_restore(unsigned int state);\n'
 MUTATIONS = [
+    ('skip-owner-promotion',
+     '(saved[owner].gen != gen || newest_owner != owner)) /* POLICY_REAPPLY */',
+     'saved[owner].gen != gen) /* POLICY_REAPPLY */'),
+    ('remove-newest-owner', 'newest_owner = saved[owner].previous;', '(void)owner;'),
+    ('remove-splice-link', 'saved[successor].previous = saved[owner].previous;', '(void)successor;'),
     ('remove-splice', 'saved[successor].table = saved[owner].table; /* POLICY_SPLICE */',
      '(void)successor; /* no splice */'),
     ('commit-before-validation', 'defaults(&next); /* POLICY_BEFORE_VALIDATION */',
@@ -36,7 +41,7 @@ MUTATIONS = [
 ]
 
 
-def exercise(root, work, source, ppc=False):
+def exercise(root, work, source, ppc=False, splice_only=False):
     (work / 'io_policy.c').write_text(source)
     (work / 'io.h').write_text(IRQ_HEADER)
     exe = work / ('host-ppc' if ppc else 'host-x86')
@@ -49,6 +54,7 @@ def exercise(root, work, source, ppc=False):
         '-Werror', '-Werror=vla', '-Werror=implicit-int',
         '-Werror=implicit-function-declaration', '-ffreestanding', '-fno-pie',
         '-fno-stack-protector', '-nostdlib', '-static', *machine,
+        '-DPOLICY_SPLICE_ONLY=' + str(int(splice_only)),
         '-I' + str(work), '-I' + str(root / 'include'),
         '-I' + str(root / 'kernel'), '-I' + str(root / 'sdk/include/os32'),
         '-I' + str(root / 'exec'), '-I' + str(root / 'mm'), '-I' + str(arch_include),
@@ -71,6 +77,7 @@ def run(ctx):
         for ppc in architectures:
             rc = exercise(ctx.root, work, source, ppc)
             assert rc == 0, ('control', 'ppc' if ppc else 'x86', rc)
+            assert exercise(ctx.root, work, source, ppc, splice_only=True) == 0, ('3-owner control', ppc)
             print('PASS policy bytes/owners/validation ' + ('ppc BE' if ppc else
                   'x86 LE runner=' + host32.selected_runner()), flush=True)
         if ctx.mutate:
@@ -79,11 +86,13 @@ def run(ctx):
                 if name == 'native-endian' and True not in architectures:
                     print('SKIP native-endian mutation: needs PPC BE runtime', flush=True)
                     continue
-                results = [exercise(ctx.root, work, source.replace(old, new, 1), ppc)
-                           for ppc in architectures]
+                splice_only = name in ('remove-newest-owner', 'remove-splice-link')
+                results = [exercise(ctx.root, work, source.replace(old, new, 1), ppc,
+                                    splice_only=splice_only) for ppc in architectures]
                 assert all(rc >= 0 for rc in results), (name, results)
                 assert any(rc > 0 for rc in results), (name, results)
-                print('RED runtime: ' + name + ' rc=' + str(results), flush=True)
+                print('RED runtime: ' + name + ' rc=' + str(results) +
+                      (' case=3-owner-only' if splice_only else ''), flush=True)
     return 0
 
 
