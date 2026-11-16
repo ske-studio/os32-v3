@@ -19,6 +19,7 @@ int input_context_set(KbdPolicyContext *state, u32 context, u32 flags);
 
 /* The registered M6 callback runs with interrupts disabled. */
 void input_context_discard_register(void (*discard)(void));
+void input_interrupt_init(void);
 int input_context_command_begin(KbdPolicyContext *state);
 int input_context_command_end(KbdPolicyContext *state);
 

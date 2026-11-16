@@ -289,3 +289,16 @@
 
 - command の世代は u32。0 は「無し」に予約し、周回したら 0 を飛ばす。比べ方は一致だけ (io_kapi.c:17 の owner_generation と同じ扱い)。
 - owner の登録容量は独自の上限を作らず、既存 APP_SLOT_COUNT (include/app_ids.h:13) を添字にした配列とする。exec_gen は既存の AS の世代と shell の世代 (io_kapi.c:17-28) を使う。
+
+## M6 の小段の割り方 (実装者の案)
+
+各段は製品機能を 1 ファイルずつ、追加・削除合計 350 行以内に収め、ABI 前は内部試験で受け入れる。実像登録 B は別段。
+
+|小段|担当と受入|
+|---|---|
+|M6[1]|input/hal/input_interrupt.c: 実行中断の印と M5 の破棄口への登録。begin/end で印を消し、表示復帰の印を消さないことを内部試験|
+|M6[2]|input/hal/input_interrupt.c: 中断の採取・世代照合・一回消費。owner、exec_gen、command_gen の不一致と二度 take を内部試験|
+|M6[3]|input/hal/input_interrupt.c: 独立した表示復帰の印と安全点の後始末。資源世代と冪等性を内部試験|
+|M6[4]|exec/exec_abort.inc: exec 終了・待機解除の境界を接続し、旧印を次の実行へ持ち越さないことを試験|
+
+IRQ・WM・arch adapter の入力接続と新中断の有効化は §6 の後続段で行う。
