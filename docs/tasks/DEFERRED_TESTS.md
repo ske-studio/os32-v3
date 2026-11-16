@@ -30,7 +30,6 @@
 
 | ID | 何を残したか | 理由 | 渡し先 |
 |---|---|---|---|
-| PPC-CI-STAGE2 | `arch-ctx-guest`・`ppc-fb`・`ppc-usb`・`ppc-sc`・`ppc-sd`・`ppc-sh-output`・`ppc-rh-fb`・`ppc-mmu` の full-check (MUTATE=1、full_only の 3 本を含む) | routine の 5 本は CI の ppc-qemu の job で回る (int-1115h で通過)。full-check の ppc-qemu は CI の QEMU 10.2.1 でまだ走っていない (手元の 8.2 では全部通過) | full-check の ppc-qemu の job が通ったら行を削除する |
 | PPC-USB-RH | PowerMac 実機の USB キーボードから製品 sh への入力・修飾・行編集・抜去 | 実装段は QEMU mac99 と host のみ | PowerMac USB 入力の実機受入時に検証する。QEMU の合格を実機の合格に数えない |
 | PPC-P3-QEMU | link-SH の 7450/7455・後起動 agent・USB/LAN・USER fault・heap の QEMU 受入と製品変異 | 実装 sandbox は AF_INET を使用不可 | PM が取り込み前に `python3 -B tools/ppc/link_sh_run.py --out "$TMPDIR/p3-accept" --mutate` を実行し、証拠を `/home/hight/os32-tmp/run/ppc-p3-6/RESULT.md` に記録する |
 | PPC-USB-LAN | PowerMac USB と LAN の併用・RPC stall 後の製品 sh 入力、後付け USB・抜去後 LAN 入力・USB 行の OPEN 取消 | 実装 sandbox は AF_INET を使用不可 | PM が sandbox 外で `tools/ppc/usb_run.py --lan --cpu both --mutate` と `tools/ppc/sc_run.py --cpu both` を取り込み前に実行する |
