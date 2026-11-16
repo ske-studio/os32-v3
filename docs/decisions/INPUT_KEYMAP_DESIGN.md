@@ -1,6 +1,6 @@
 # 入力 HAL 追補 2 確定版 — keysym の共通口と arch の backend
 
-> 状態: **確定 (2026-11-16)** — astra 起草 r1〜r3、Opus 5.5 の独立レビュー 2 回 (r1 要修正 P1 2 件・P2 8 件、r2 要修正 P2 3 件)、PM 決定を反映。親は [INPUT_BIND_DESIGN](INPUT_BIND_DESIGN.md) と [INPUT_HAL_DESIGN](INPUT_HAL_DESIGN.md)。票は [TASK_INPUT_HAL](../tasks/v3/TASK_INPUT_HAL.md)。PowerPC PM のレビューは後で追記する。
+> 状態: **確定 (2026-11-16)** — astra 起草 r1〜r3、Opus 5.5 の独立レビュー 2 回 (r1 要修正 P1 2 件・P2 8 件、r2 要修正 P2 3 件)、PM 決定を反映。親は INPUT_BIND_DESIGN と INPUT_HAL_DESIGN。票は TASK_INPUT_HAL。PowerPC PM のレビューは後で追記する。
 > ユーザー決定 (2026-11-16): 表の型は NetBSD wscons の keysym・x86 の USB 鍵盤は PowerMac と HID の表を共有・Apple JIS の英数で IME を切りかなで入れる (Mac OS X と同じ)。番号は FreeBSD ukbd.c で 0x90 = かな・0x91 = 英数 (決定時の文の番号が逆だったので意図どおりに訂正)。
 > PM 決定 (2026-11-16): Apple の判定・variant は作らず、全 HID の基底表に LANG1 (0x90) = かな・LANG2 (0x91) = 英数。Clear・NumLock は keydata を積まない。exact-cell で FreeBSD の 8 列を保つ。評価器はカーネルの 1 本 (WM は評価しない)。IKM1 は v2 だけで定義し版上げは A0z で 1 回。
 
