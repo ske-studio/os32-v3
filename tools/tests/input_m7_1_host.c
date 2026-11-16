@@ -1,4 +1,10 @@
 #include "input_display_stubs.h"
+#include "input_context.h"
+int input_context_snapshot(KbdPolicySnapshot *out)
+{
+    *out = (KbdPolicySnapshot){7, 8, 9, 0, 0};
+    return 0;
+}
 #include "ime_gate.c"
 
 static int probe(void)

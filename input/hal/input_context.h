@@ -47,9 +47,13 @@ int input_display_restore_drain(void);
 void input_interrupt_exec_exit(u32 owner, u32 exec_gen);
 
 typedef struct {
-    u32 active, owner, command_gen;
+    u32 active, owner, exec_gen, command_gen;
 } KbdPolicyImeSnapshot;
 void kbd_policy_ime_state(u32 active, u32 owner, u32 command_gen);
 void input_ime_snapshot(KbdPolicyImeSnapshot *out);
+int input_ime_cancel_capture(const KbdPolicyImeSnapshot *destination);
+int input_ime_cancel_take(const KbdPolicySnapshot *current);
+u32 input_ime_cancel_coalesced_count(void);
+u32 input_ime_cancel_replaced_count(void);
 
 #endif
