@@ -21,6 +21,7 @@ void link_platform_unlock(u32 saved);
  * 共通 NIC の poll・link 進行は tick と idle_work_run の FG1 の地点
  * (待ち・syscall 入口・net_tx の後)。link 進行は1msに1回まで、
  * RX 直後 NET_RX_ACTIVE_MS 未満の poll は毎周。
+ * IF/EE=0 の起動時は従来の _idle() で割り込みを許可する。
  * idle_wait_step() は IF=1 の前景で work 後、RX が静かなら _idle()。 */
 void link_platform_idle(void);
 

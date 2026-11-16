@@ -3,7 +3,7 @@
 #define OS32_NET_NIC_RX_H
 #include "nic.h"
 
-/* Internal receive timestamp, shared by foreground and IRQ rescue. */
+/* Internal OS32 receive timestamp, shared by foreground and IRQ rescue. */
 void net_rx_note(void);
 
 /* A2 -> A3, IF=0; borrowed ops. Scan at most NET_RX_SCAN_MAX frames.

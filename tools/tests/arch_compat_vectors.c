@@ -153,6 +153,7 @@ void _enable(void) { irq_state = 1; }
 void _halt(void) {}
 void ppc_enable(void) { irq_state = 1; }
 int ppc_irq_enabled(void) { return irq_state; }
+int _irq_enabled(void) { return irq_state; }
 volatile u32 kctx_irq_depth;
 static unsigned int naps;
 void ppc_cpu_nap(void) { ++naps; }
@@ -240,7 +241,7 @@ static int sync2(void)
     if (!irq_state || naps != 1) return 5;
     irq_state = 0;
     link_platform_idle();
-    if (irq_state || work_calls != 0) return 3;
+    if (!irq_state || work_calls != 0 || naps != 1) return 3;
     irq_state = 1;
     link_platform_idle();
     if (!irq_state || work_calls != 1) return 3;

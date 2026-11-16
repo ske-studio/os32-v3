@@ -166,9 +166,9 @@ def exercise(root, work, vectors, mpic=None, idle=None, provider_text=None):
     end = product.index('void arch_cpu_halt(void)', start)
     (work / 'idle.c').write_text(idle if idle is not None else product[start:end])
     (work / 'io.h').write_text('u32 irq_save(void);\n'
-        'void irq_restore(u32); void _idle(void);\n')
+        'void irq_restore(u32); void _idle(void); int _irq_enabled(void);\n')
     (work / 'arch_io.h').write_text('u32 ppc_irq_save(void);\n'
-        'void ppc_irq_restore(u32); void _enable(void); void _halt(void); void _idle(void);\n')
+        'void ppc_irq_restore(u32); void _enable(void); void _halt(void); void _idle(void); int _irq_enabled(void);\n')
     (work / 'idt.h').write_text('#include "types.h"\nextern volatile u32 tick_count;\n')
     src = work / 'vectors.c'
     src.write_text(vectors)

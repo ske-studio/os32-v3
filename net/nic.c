@@ -255,7 +255,7 @@ int net_rx_recent(u32 window_ms)
     return recent;
 }
 
-/* Called by the common demux after every successful NIC receive. */
+/* Called by the common demux after accepting an OS32 link/SFS frame. */
 void net_rx_note(void)
 {
     last_rx_ms = tick_clock_ms();

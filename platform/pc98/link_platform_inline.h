@@ -25,6 +25,11 @@ static inline void pc98_link_platform_unlock(u32 saved)
 
 static inline void pc98_link_platform_idle(void)
 {
+    /* Boot-time link selftests may enter with interrupts disabled. */
+    if (!_irq_enabled()) {
+        _idle();
+        return;
+    }
     idle_wait_step();
 }
 

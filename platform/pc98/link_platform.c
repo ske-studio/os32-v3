@@ -23,6 +23,11 @@ void link_platform_unlock(u32 saved)
 
 void link_platform_idle(void)
 {
+    /* Boot-time link selftests may enter with interrupts disabled. */
+    if (!_irq_enabled()) {
+        _idle();
+        return;
+    }
     idle_wait_step();
 }
 
