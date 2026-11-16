@@ -105,8 +105,8 @@ static int suite(void)
         REQUIRE(net_rx_take(NET_RX_LINK, output, sizeof(output), &n) == 0);
         REQUIRE(output[n-1] == round+1 && polls == prior+1 && equal(output, eof, n));
     }
-    /* Exact production queue capacity, both directions; full drops newest. */
-    for (u32 proto = NET_RX_SFS; proto <= NET_RX_LINK; proto++) {
+    /* Exact production queue capacity. A full SFS queue drops newest. */
+    for (u32 proto = NET_RX_SFS; proto <= NET_RX_SFS; proto++) {
         reset();
         u8 op = proto == NET_RX_SFS ? 0x05 : LINK_OP_DATA;
         u16 other = proto == NET_RX_SFS ? NET_RX_LINK : NET_RX_SFS;
@@ -125,8 +125,25 @@ static int suite(void)
         }
         REQUIRE(net_rx_take(proto, output, sizeof(output), &n) == OS32_ERR_AGAIN);
     }
+    /* A full link queue leaves frames in the NIC; nothing is dropped and the
+     * waiting frame arrives once link_tick has taken one. */
     reset();
-    for (u32 i = 0; i < NET_RX_SCAN_MAX; i++) frame(LINK_OP_DATA, ETH_ZLEN, 0);
+    {
+        u32 before = net_rx_link_dropped;
+        for (u32 i = 0; i < EXPECT_SLOTS; i++) frame(LINK_OP_DATA, FRAME_BYTES, (u8)i);
+        REQUIRE(net_nic_poll_once() == EXPECT_SLOTS);
+        frame(LINK_OP_DATA, FRAME_BYTES, 99);
+        REQUIRE(net_nic_poll_once() == 0 && net_rx_link_dropped == before);
+        REQUIRE(net_rx_take(NET_RX_LINK, output, sizeof(output), &n) == 0 && output[n-1] == 0);
+        REQUIRE(net_nic_poll_once() == 1 && net_rx_link_dropped == before);
+        for (u32 i = 1; i < EXPECT_SLOTS; i++)
+            REQUIRE(net_rx_take(NET_RX_LINK, output, sizeof(output), &n) == 0 && output[n-1] == i);
+        REQUIRE(net_rx_take(NET_RX_LINK, output, sizeof(output), &n) == 0 && output[n-1] == 99);
+    }
+    reset();
+    /* One poll scans at most NET_RX_SCAN_MAX frames (foreign ethertype, so the
+     * link queue never fills and the scan limit alone ends the batch). */
+    for (u32 i = 0; i < NET_RX_SCAN_MAX; i++) frame(LINK_OP_DATA, ETH_ZLEN, 0)[ETH_TYPE_OFF] = 0;
     REQUIRE(net_nic_poll_once() == NET_RX_SCAN_MAX);
     REQUIRE(calls == NET_RX_SCAN_MAX && count == 0);
     reset();
