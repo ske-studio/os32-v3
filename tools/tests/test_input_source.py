@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Input source allocation and native event layout contract."""
 CHECK = dict(name='input-source-host', tier=1, budget=5, needs=[], covers=[
-    'input/hal/in2_int.h', 'input/hal/in2_dev.c', 'include/types.h',
+    'input/hal/in2_int.h', 'input/hal/in2_dev.c', 'input/hal/keymap.h', 'include/types.h',
     'include/io.h', 'sdk/include/os32/os32_kapi_shared.h',
     'tools/tests/input_source_host.c', 'tools/tests/test_input_source.py',
     'tools/tests/host32.py'], basis=['INPUT_HAL_DESIGN §3'], kind='contract')
@@ -20,6 +20,7 @@ def run(ctx):
     source = (ctx.root / 'input/hal/in2_dev.c').read_text()
     with tempfile.TemporaryDirectory(prefix='input-source-') as td:
         tmp = Path(td)
+        (tmp / "keymap.h").write_text((ctx.root / "input/hal/keymap.h").read_text())
         (tmp / 'io.h').write_text('static inline unsigned irq_save(void) { return 0; }\nstatic inline void irq_restore(unsigned x) { (void)x; }\n')
         def build(h, s):
             (tmp / 'in2_int.h').write_text(h)

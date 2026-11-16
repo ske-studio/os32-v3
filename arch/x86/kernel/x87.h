@@ -6,5 +6,14 @@
 #include "exec_arch.h"
 
 void x87_probe(void);
+/* Internal boot result, valid after x87_probe; never a public KAPI. */
+int arch_fp_present(void);
+/* #NM only. Return 1 and replace *saved_eip only for CPL0, VM=0,
+ * active boot probe and one of its three exact fault labels. Otherwise return
+ * 0 without modifying *saved_eip. Active/labels stay private to x87.c. */
+int x87_probe_nm(u32 saved_cs, u32 saved_eflags, u32 *saved_eip);
+
+struct x87_emu_trap;
+int x87_emulate_nm(struct x87_emu_trap *trap);
 
 #endif

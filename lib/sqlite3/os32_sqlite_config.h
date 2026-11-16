@@ -56,8 +56,9 @@
 #define SQLITE_OMIT_SCHEMA_VERSION_PRAGMAS 1  /* PRAGMA schema_version */
 #define SQLITE_OMIT_UTF16          1     /* UTF-16 サポート (OS32 は UTF-8) */
 #define SQLITE_OMIT_XFER_OPT      1     /* INSERT INTO ... SELECT 最適化 */
-/* SQLITE_OMIT_FLOATING_POINT は sqlite3AtoF のバグにより使用不可。
- * 代わりに -msoft-float でソフトウェア浮動小数点を使用する */
+/* Keep REAL and date/time functions. The kernel module uses SoftFloat 3e
+ * (8086 specialize), nearest-even, with -msoft-float -mno-fp-ret-in-387
+ * on every FP translation unit and GCC adapter. No libgcc or host libm. */
 
 /* ======== メモリ管理 ======== */
 #define SQLITE_MEMSYS5_SIZE        (512u * 1024u) /* owner allocation, canaries included */

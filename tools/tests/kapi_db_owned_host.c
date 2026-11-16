@@ -356,3 +356,5 @@ int main(void)
     puts("PASS owned, teardown order, finalize/rollback faults, BUSY isolation, open faults");
     return 0;
 }
+
+#include "sqlite_bits_host.h"

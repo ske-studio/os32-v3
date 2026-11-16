@@ -3782,3 +3782,5 @@ int main(int argc, char **argv)
     if (strcmp(argv[1], "tsv")) printf("PASS %s\n", argv[1]);
     return 0;
 }
+
+#include "sqlite_bits_host.h"

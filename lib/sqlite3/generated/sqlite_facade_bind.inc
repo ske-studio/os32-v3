@@ -50,9 +50,11 @@ static int module_column_int(sqlite3_stmt *stmt, int column) {
     os32_sqlite_allocation_context((stmt ? sqlite3_db_handle(stmt) : 0), 0);
     return sqlite3_column_int(stmt, column);
 }
-static double module_column_double(sqlite3_stmt *stmt, int column) {
+static u64 module_column_f64_bits(sqlite3_stmt *stmt, int column) {
+    union { double value; u64 bits; } codec;
     os32_sqlite_allocation_context((stmt ? sqlite3_db_handle(stmt) : 0), 0);
-    return sqlite3_column_double(stmt, column);
+    codec.value = sqlite3_column_double(stmt, column);
+    return codec.bits;
 }
 static const unsigned char * module_column_text(sqlite3_stmt *stmt, int column) {
     os32_sqlite_allocation_context((stmt ? sqlite3_db_handle(stmt) : 0), 0);
@@ -168,7 +170,7 @@ static const SqliteModuleApi api = {
     .bind_parameter_count = module_bind_parameter_count,
     .column_count = module_column_count,
     .column_int = module_column_int,
-    .column_double = module_column_double,
+    .column_f64_bits = module_column_f64_bits,
     .column_text = module_column_text,
     .column_blob = module_column_blob,
     .column_bytes = module_column_bytes,

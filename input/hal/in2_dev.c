@@ -1,4 +1,5 @@
 #include "in2_int.h"
+#include "keymap.h"
 #include "io.h"
 #include "os32_kapi_shared.h"
 
@@ -30,6 +31,7 @@ void input_src_release(u8 src, u16 generation)
     unsigned int flags = irq_save();
     if (src >= 1 && src <= IN2_MAX_DEV && sources[src - 1].used &&
         sources[src - 1].generation == generation) {
+        km_source_release(src, generation);
         input_state_release(src, generation);
         sources[src - 1].used = 0;
     }

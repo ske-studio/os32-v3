@@ -32,3 +32,6 @@ MODULE_ORDER_LEGACY = kdebug hwdev sqlite fep cd kcg fm pcm v86 lan cirrus gefor
 
 C_ORDER_LEGACY += arch/x86/kernel/syscall_code.c
 C_ORDER_LEGACY += arch/ppc/video_wc.c
+
+# Resident integer bit boundary and its measured SoftFloat closure.
+C_ORDER_LEGACY += lib/softfloat_bits.c $(SOFTFLOAT_RESIDENT_SOURCES)

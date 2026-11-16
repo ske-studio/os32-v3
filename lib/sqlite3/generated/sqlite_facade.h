@@ -4,7 +4,7 @@
 #include "os32_sqlite_config.h"
 #include "os32_sqlite_outer.h"
 #include <stdarg.h>
-#define SQLITE_MODULE_OPS_VERSION 2u
+#define SQLITE_MODULE_OPS_VERSION 3u
 #define SQLITE_MODULE_POOL_SIZE SQLITE_MEMSYS5_SIZE
 typedef struct {
     int (*close)(sqlite3 *db);
@@ -20,7 +20,7 @@ typedef struct {
     int (*bind_parameter_count)(sqlite3_stmt *stmt);
     int (*column_count)(sqlite3_stmt *stmt);
     int (*column_int)(sqlite3_stmt *stmt, int column);
-    double (*column_double)(sqlite3_stmt *stmt, int column);
+    u64 (*column_f64_bits)(sqlite3_stmt *stmt, int column);
     const unsigned char * (*column_text)(sqlite3_stmt *stmt, int column);
     const void * (*column_blob)(sqlite3_stmt *stmt, int column);
     int (*column_bytes)(sqlite3_stmt *stmt, int column);
@@ -64,7 +64,7 @@ int os32_sqlite_bind_blob(sqlite3_stmt *stmt, int index, const void *value, int 
 int os32_sqlite_bind_parameter_count(sqlite3_stmt *stmt);
 int os32_sqlite_column_count(sqlite3_stmt *stmt);
 int os32_sqlite_column_int(sqlite3_stmt *stmt, int column);
-double os32_sqlite_column_double(sqlite3_stmt *stmt, int column);
+u64 os32_sqlite_column_f64_bits(sqlite3_stmt *stmt, int column);
 const unsigned char * os32_sqlite_column_text(sqlite3_stmt *stmt, int column);
 const void * os32_sqlite_column_blob(sqlite3_stmt *stmt, int column);
 int os32_sqlite_column_bytes(sqlite3_stmt *stmt, int column);
