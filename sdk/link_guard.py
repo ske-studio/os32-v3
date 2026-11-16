@@ -75,13 +75,6 @@ def main():
         return 1
     if not any('app.ld' in a or 'app_sys.ld' in a or 'shlib.ld' in a or 'os32.ld' in a for a in args):
         return subprocess.call([linker, *args])
-    if target == 'ppc-powermac':
-        libs = [args[i + 1] for i, arg in enumerate(args[:-1]) if arg == '-l']
-        libs += [arg[2:] for arg in args if arg.startswith('-l') and arg != '-l']
-        if any(lib in ('c', 'm', 'gcc') for lib in libs) or any(
-                pathlib.Path(arg).name in ('libc.a', 'libm.a', 'libgcc.a') for arg in args):
-            print('link_guard: PPC USER does not support libc, libm or libgcc', file=sys.stderr)
-            return 1
     out = pathlib.Path(args[args.index('-o') + 1])
     # The exact vendor inputs are recorded; a basename alone is not an exemption.
     exempt = set()
@@ -98,12 +91,15 @@ def main():
             return r.returncode
         try:
             nano_vendor = set()
-            if target == 'x86-pc98' and any(pathlib.Path(a).name == 'app.ld' for a in args):
-                module = pathlib.Path(__file__).parent / 'allocator/check_link.py'
+            if target in ('x86-pc98', 'ppc-powermac') and any(pathlib.Path(a).name == 'app.ld' for a in args):
+                module = pathlib.Path(__file__).parent / ('allocator/check_link_target.py'
+                    if target == 'ppc-powermac' else 'allocator/check_link.py')
                 if not module.exists():
                     module = pathlib.Path(__file__).parent / 'nano_check_link.py'
                 spec = importlib.util.spec_from_file_location('nano_check_link', module)
                 gate = importlib.util.module_from_spec(spec)
+                if target == 'ppc-powermac':
+                    sys.path.insert(0, str(module.parent))
                 spec.loader.exec_module(gate)
                 # Resolve the receipt from the actual selected archive, never a
                 # guessed object basename. SDK staging keeps it beside the lib.
@@ -111,7 +107,7 @@ def main():
                             if n.startswith('LOAD ') and pathlib.Path(n[5:]).name == 'libos32nano.a']
                 if len(archives) > 1:
                     raise H.HeaderError('USER link has duplicate libos32nano.a inputs')
-                cross = pathlib.Path(os.environ.get('CROSS_DIR') or pathlib.Path(shutil.which(linker)).resolve().parent.parent)
+                cross = pathlib.Path(os.environ.get('PPC_CROSS_DIR' if target == 'ppc-powermac' else 'CROSS_DIR') or pathlib.Path(shutil.which(linker)).resolve().parent.parent)
                 nano_vendor = gate.validate_output(cross, mapfile, out, archives[0].with_suffix('.json') if archives else None)
             source = mapfile.read_text()
             selected = set(re.findall(r'(?m)^LOAD (.+)$', source))

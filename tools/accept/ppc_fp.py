@@ -2,7 +2,8 @@
 """Expectation origin: PPC_FP_NEWLIB_DESIGN §8 F1〜F5・B1.
 
 link-SH USER acceptance. F3 is outside this runner (test_ppc_fp covers the
-kernel guard); B1 is enforced by the existing build audit. No libc is linked.
+kernel guard); B1 is enforced by the existing build audit. The FP probe uses
+raw KAPI output; USER startup links the shared newlib closure.
 """
 import argparse
 import json

@@ -42,6 +42,9 @@ def main():
         shutil.copy(ROOT / 'Makefile', root)
         shutil.copytree(ROOT / 'build', root / 'build', ignore=shutil.ignore_patterns('out'))
         shutil.copytree(ROOT / 'sdk', root / 'sdk')
+        shutil.copytree(ROOT / 'tools', root / 'tools', ignore=shutil.ignore_patterns('__pycache__'))
+        (root / 'userland/lib/rt').mkdir(parents=True)
+        shutil.copy(ROOT / 'userland/lib/rt/ls.c', root / 'userland/lib/rt')
         (root / 'userland/ppc').mkdir(parents=True)
         for app in ('hello', 'fault'):
             shutil.copy(ROOT / f'userland/ppc/{app}.c', root / 'userland/ppc')
