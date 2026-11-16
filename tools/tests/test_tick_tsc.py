@@ -2,7 +2,7 @@
 CHECK = dict(name='tick-tsc-host', tier=4, needs=[], budget=5.0,
     covers=['platform/pc98/tsc_clock.[ch]', 'platform/pc98/tsc_math.c',
             'platform/pc98/pit.h', 'platform/pc98/pit_math.h',
-            'arch/x86/arch_cpu.h', 'kernel/idle_work.h', 'kernel/irq/irq.h',
+            'arch/x86/arch_cpu.h', 'kernel/io_work.h', 'kernel/io_policy.h', 'kernel/irq/irq.h',
             'kernel/time/tick_clock.h', 'include/types.h', 'lib/divdi3.c',
             'tools/tests/tick_tsc_host.c', 'tools/tests/test_tick_tsc.py',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
@@ -17,6 +17,11 @@ from host32 import run as host_run
 from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
+    ('platform/pc98/tsc_clock.c', 'if (tsc_busy) return IO_MORE;', 'if (0) return IO_MORE;'),
+    ('platform/pc98/tsc_clock.c', 'io_request(IO_SVC_TSC_CALIBRATE);', '(void)0;'),
+    ('platform/pc98/tsc_clock.c', 'state == TSC_CALIBRATING || state == TSC_READY ? IO_MORE : IO_DONE',
+     'state == TSC_CALIBRATING || state == TSC_READY ? IO_DONE : IO_DONE'),
+    ('platform/pc98/tsc_clock.c', 'if ((int)(ms - next_work_ms) < 0) return;', 'if (0) return;'),
     ('platform/pc98/tsc_clock.c', '++consecutive_rejects >= TSC_REJECT_LIMIT',
      'consecutive_rejects >= TSC_REJECT_LIMIT'),
     ('platform/pc98/tsc_math.c', '(delta >> 32) * mult', '0ULL * mult'),

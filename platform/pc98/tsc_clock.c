@@ -3,7 +3,8 @@
 #include "cpu.h"
 #include "io.h"
 #include "irq.h"
-#include "idle_work.h"
+#include "io_work.h"
+#include "io_policy.h"
 #include "tick_clock.h"
 #include "os32_kapi_shared.h"
 
@@ -242,6 +243,21 @@ void pc98_tsc_calibrate_work(void)
     if (collected == TSC_WINDOWS) collected = 0;
     if (attempts >= TSC_ATTEMPTS) { reject(REJECT_LIMIT); state = TSC_OFF; }
 }
+static int tsc_busy;
+static int tsc_step(void *unused, struct io_slice *slice)
+{
+    (void)unused; (void)slice;
+    if (tsc_busy) return IO_MORE;
+    tsc_busy = 1;
+    pc98_tsc_calibrate_work();
+    tsc_busy = 0;
+    return state == TSC_CALIBRATING || state == TSC_READY ? IO_MORE : IO_DONE;
+}
+static const struct io_desc tsc_desc = {
+    .id = IO_SVC_TSC_CALIBRATE, .default_budget_us = 120,
+    .budget_min_us = 1, .budget_max_us = 500, .max_unit_us = 120,
+    .default_tier = 3, .step = tsc_step,
+};
 int pc98_tsc_init(void)
 {
     if (state == TSC_READY) ++tsc_generation;
@@ -256,11 +272,12 @@ int pc98_tsc_init(void)
         2ULL * TSC_MAX_L_US * ps->clk_hz >= (unsigned long long)ps->reload * 1000000u)
         return OS32_ERR_NOSYS;
     if (!registered) {
-        if (idle_work_register(pc98_tsc_calibrate_work) != 0) {
+        if (io_register(&tsc_desc) != 0) {
             reject(REJECT_SLOTS); return OS32_ERR_FULL;
         }
         registered = 1;
     }
     state = TSC_CALIBRATING;
+    io_request(IO_SVC_TSC_CALIBRATE);
     return 0;
 }
