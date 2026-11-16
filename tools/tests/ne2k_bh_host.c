@@ -8,6 +8,7 @@ static void _idle(void) {}
 #include "../../net/nic.c"
 #undef pending
 #include "../../net/rx_work.c"
+#include "rx_io_clock.h"
 int platform_clock_read_us(u32 *lo, u32 *hi) { *lo = *hi = 0; return 0; }
 
 static unsigned int waits;
@@ -204,6 +205,7 @@ static void transmit_rounds(void)
 static void same_bh_demux(void);
 void _start(void)
 {
+    test_rx_clock_install();
     for (unsigned int entry = 0; entry < 5; entry++)
         for (int reset_fault = 0; reset_fault < 2; reset_fault++)
             run_entry(entry, reset_fault);
@@ -265,7 +267,8 @@ static void same_bh_demux(void)
     CHECK(nic.rxq_count && nic.st.rx_frames == 9);
     /* No new driver marks: its early return must not strand software RX. */
     nic.need_rx = nic.need_tx = nic.need_reinit = nic.rx_backlog = 0;
-    CHECK(idle_work_register(net_rx_idle) == 0);
+    CHECK(io_register(&rx_desc) == 0);
+    io_request(IO_SVC_NET_RX);
     idle_work_run();
     CHECK(demux_frames == 9 && !nic.rxq_count);
     bound = &bh_ops;

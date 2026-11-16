@@ -9,9 +9,9 @@ void idle_work_compat_run(void) { ++compat_hits; }
 static u32 ticks, read_cost, source, generation, factor, reads, conversions, fail_read, fail_convert;
 static u32 pg, lookups, trace[128], traced, cost[18], units[18], mode[18];
 static u8 tiers[18];
-static u32 budgets[18], observed[18];
+static u32 budgets[18], observed[18], taken[18];
 static int results[18];
-enum { REQUEST = 1, NEST = 2, CHANGE = 4, FAIL_TAKE = 8, FAIL_POST = 16, POLICY = 32 };
+enum { REQUEST = 1, NEST = 2, CHANGE = 4, FAIL_TAKE = 8, FAIL_POST = 16, POLICY = 32, LIMIT = 64 };
 static void finish(int rc) { __asm__ volatile("int $0x80" : : "a"(1), "b"(rc) : "memory"); __builtin_unreachable(); }
 static void fail(unsigned int line)
 {
@@ -51,6 +51,11 @@ static int step(void *state, struct io_slice *s)
     u32 id = (u32)state, flags = mode[id];
     CHECK(!irq_depth && traced < 128); trace[traced++] = id; observed[id] = s->limit_count;
     CHECK(io_unregister(id) == OS32_ERR_BUSY);
+    if (flags & LIMIT) {
+        u32 converted = conversions;
+        CHECK(io_slice_limit(s, 120, 8) == 0 && conversions == converted);
+        CHECK(s->limit_count <= 120 * factor);
+    }
     if (flags & REQUEST) io_request(id);
     if (flags & NEST) {
         mode[id] &= ~NEST;
@@ -58,7 +63,7 @@ static int step(void *state, struct io_slice *s)
     }
     if (flags & CHANGE) ++generation;
     if (flags & FAIL_TAKE) fail_read = reads + 1;
-    for (u32 n = 0; n < units[id] && io_slice_take(s); ++n) ticks += cost[id];
+    for (u32 n = 0; n < units[id] && io_slice_take(s); ++n) { ++taken[id]; ticks += cost[id]; }
     if (flags & FAIL_POST) fail_read = reads + 1;
     if (flags & POLICY) { tiers[3] = 1; budgets[3] = 10; ++pg; }
     return results[id];
@@ -80,7 +85,7 @@ static void reset(void)
     source = generation = factor = pg = 1;
     for (u32 id = 1; id <= 17; ++id) {
         u32 low, high; io_policy_limits(id, &tiers[id], &budgets[id], &low, &high);
-        cost[id] = 10; units[id] = 1; mode[id] = 0; results[id] = IO_MORE;
+        taken[id] = 0; cost[id] = 10; units[id] = 1; mode[id] = 0; results[id] = IO_MORE;
     }
     io_clock_set_ops(&ops);
 }
@@ -123,8 +128,56 @@ static void slices(void)
     CHECK(io_dispatch(500) == 1 && compat_hits == 1 && !running);
     io_clock_set_ops(&ops); CHECK(io_dispatch(500) == 1 && compat_hits == 2);
 }
+static void slice_limits(void)
+{
+    reset(); struct io_slice s, before;
+    ++generation; factor = 3;
+    CHECK(io_slice_begin(&s, 500, 20) == 0);
+    CHECK(io_slice_take(&s)); ticks += 30;
+    CHECK(io_slice_limit(&s, 120, 8) == 0);
+    CHECK(s.limit_count == 360 && s.max_units == 8 && s.units == 0);
+    u32 converted = conversions;
+    CHECK(io_slice_limit(&s, 120, 8) == 0 && conversions == converted);
+    CHECK(io_slice_limit(&s, 500, 99) == 0);
+    CHECK(s.limit_count == 360 && s.max_units == 8);
+    ticks += 359; CHECK(io_slice_take(&s)); ticks++;
+    CHECK(!io_slice_take(&s));
+    CHECK(io_slice_limit(&s, 500, 99) == 0 && s.limit_count == 0);
+    CHECK(!io_slice_take(&s));
+    CHECK(io_slice_begin(&s, 20, 2) == 0); ticks += 15;
+    CHECK(io_slice_take(&s));
+    CHECK(io_slice_limit(&s, 120, 8) == 0 && s.limit_count == 45 && s.max_units == 1);
+    CHECK(io_slice_take(&s) && !io_slice_take(&s));
+    CHECK(io_slice_limit(&s, 500, 8) == 0 && s.max_units == 0);
+    CHECK(!io_slice_take(&s));
+    CHECK(io_slice_begin(&s, 20, 2) == 0); before = s; ++generation;
+    CHECK(io_slice_limit(&s, 120, 8) == OS32_ERR_AGAIN);
+    CHECK(s.start_count == before.start_count && s.limit_count == before.limit_count);
+    CHECK(io_slice_begin(&s, 20, 2) == 0); ++source;
+    CHECK(io_slice_limit(&s, 120, 8) == OS32_ERR_AGAIN);
+    CHECK(io_slice_begin(&s, 20, 2) == 0); fail_read = reads + 1;
+    CHECK(io_slice_limit(&s, 120, 8) == OS32_ERR_AGAIN);
+    fail_read = 0; fail_convert = 1;
+    CHECK(io_slice_limit(&s, 17, 8) == OS32_ERR_AGAIN);
+    fail_convert = 0; ticks = ~0u - 5;
+    CHECK(io_slice_begin(&s, 20, 2) == 0); ticks += 15;
+    CHECK(io_slice_limit(&s, 120, 8) == 0 && s.limit_count == 45);
+    converted = conversions; ++pg;
+    CHECK(io_slice_limit(&s, 120, 8) == 0 && conversions == converted + 1);
+    /* Unit limit and exact time boundary, formerly RX work's local checks. */
+    reset(); CHECK(io_slice_begin(&s, 120, 8) == 0);
+    for (u32 n = 0; n < 8; ++n) CHECK(io_slice_take(&s));
+    CHECK(!io_slice_take(&s));
+    CHECK(io_slice_begin(&s, 120, 8) == 0); ticks += 120;
+    CHECK(!io_slice_take(&s));
+}
 static void scheduling(void)
 {
+    reset(); add(2); budgets[2] = 500; ++pg; mode[2] = LIMIT;
+    CHECK(io_dispatch(500) == 1);
+    CHECK(io_dispatch(500) == 1);
+    ++generation; CHECK(io_dispatch(500) == 1);
+    ++pg; CHECK(io_dispatch(500) == 1);
     reset(); add(3); add(2); add(4); add(1);
     CHECK(io_dispatch(500) == 4);
     CHECK(trace[0] == 1 && trace[1] == 2 && trace[2] == 4 && trace[3] == 3);
@@ -169,6 +222,7 @@ static void requests_and_failures(void)
         reset(); add(1); add(2); mode[1] = flag; results[1] = IO_MORE;
         CHECK(io_dispatch(500) == 1 && traced == 1 && pending[0] && pending[1]);
         CHECK(stats.clock_failures && !running);
+        if (flag == FAIL_TAKE) CHECK(taken[1] == 0);
         mode[1] = 0; fail_read = 0; CHECK(io_dispatch(500) == 2);
     }
     const int terminal[] = { -99, IO_DONE, IO_WAIT };
@@ -202,4 +256,4 @@ static void requests_and_failures(void)
     CHECK(io_dispatch(35) == 1 && traced == 1 && reads <= 1 + 2 + 1);
     CHECK(pending[1] && stats.reads == reads);
 }
-void _start(void) { registration(); slices(); scheduling(); requests_and_failures(); finish(0); }
+void _start(void) { registration(); slices(); slice_limits(); scheduling(); requests_and_failures(); finish(0); }

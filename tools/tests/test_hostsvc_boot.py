@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Production boot assembly starts exactly one shared NIC (ILP32/qemu)."""
-CHECK = dict(name='hostsvc-boot', tier=1, needs=['make:all'], budget=5.2, covers=['kernel/time/tick_clock.h', 'tools/tests/link_platform_fake/link_platform_inline.h', 'kernel/idle_work.h', 'platform/pc98/boot_capture.c', 'platform/pc98/bootinfo_wire.h', 'platform/pc98/bootinfo_native.h',
+CHECK = dict(name='hostsvc-boot', tier=1, needs=['make:all'], budget=5.2, covers=['tools/tests/rx_io_clock.h', 'tools/tests/idle_io_sources.py',
+    'kernel/io_work.[ch]', 'kernel/io_clock.h', 'kernel/io_policy.[ch]', 'kernel/idle_work.h', 'exec/appslot.h',
+    'net/rx_work.[ch]', 'kernel/time/tick_clock.h', 'tools/tests/link_platform_fake/link_platform_inline.h', 'kernel/idle_work.h', 'platform/pc98/boot_capture.c', 'platform/pc98/bootinfo_wire.h', 'platform/pc98/bootinfo_native.h',
     'drivers/net/e82557/lan_body.c',
     'drivers/block/netcd.h',
     'drivers/base/dev.h',
@@ -74,6 +76,7 @@ import tempfile
 import host32
 from kernel_includes import include_flags
 from kernel_boot_source import kernel_source
+from idle_io_sources import idle_io_sources
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCES = ['drivers/net/e82557/lan_body.c', 'drivers/net/e82557/lan_module.c',
@@ -105,7 +108,7 @@ def build_run(work, sources):
                     str(ROOT / 'tools/tests/hostsvc_boot_host.c'), str(paths[2]),
                     str(paths[3]), str(ROOT / 'net/nic_e82557.c'),
                     str(ROOT / 'net/nic_lgy98.c'), str(ROOT / 'tools/tests/hostsvc_fixture.c'),
-                    '-o', str(exe)], check=True)
+                    str(ROOT / 'net/rx_work.c'), *idle_io_sources(ROOT, work, compat=False), '-o', str(exe)], check=True)
     return [host32.run([str(exe)], input=bytes([mode]), capture_output=True).returncode
             for mode in (1, 2, 3, 4, 5, 6, 7)]
 

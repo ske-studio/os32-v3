@@ -23,6 +23,8 @@ void io_request(u32 id); /* IRQ/FG0/FG1: mark only, never call the provider. */
 int io_clock_us(u32 *lo, u32 *hi);
 /* Initialize raw budget/token/units; 0 on success, negative on failure. */
 int io_slice_begin(struct io_slice *s, u32 budget_us, u32 max_units);
+/* Narrow remaining time/units, preserving the clock token; never widen. */
+int io_slice_limit(struct io_slice *s, u32 budget_us, u32 max_units);
 int io_slice_take(struct io_slice *s); /* Check raw count/units before a unit. */
 int io_dispatch(u32 budget_us); /* FG1 only; nested calls return 0. */
 

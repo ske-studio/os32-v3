@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """A2 real NIC lifetime/selection with fake adapters, link and A3 seams (ILP32)."""
-CHECK = dict(name='hostsvc-nic', tier=1, needs=[], budget=3.8, covers=['net/rx_work.c', 'net/rx_work.h', 'include/clock_source.h', 'kernel/irq/tick_budget.h', 'kernel/idle_work.h',
+CHECK = dict(name='hostsvc-nic', tier=1, needs=[], budget=3.8, covers=['tools/tests/rx_io_clock.h', 'tools/tests/idle_io_sources.py',
+    'kernel/io_work.[ch]', 'kernel/io_clock.h', 'kernel/io_policy.[ch]', 'kernel/idle_work.h', 'exec/appslot.h', 'net/rx_work.c', 'net/rx_work.h', 'include/clock_source.h', 'kernel/irq/tick_budget.h', 'kernel/idle_work.h',
     'kernel/time/tick_clock.h', 'net/rx_work.c', 'net/rx_work.h', 'include/clock_source.h', 'include/kernel_tick.h', 'kernel/irq/irq.h', 'kernel/irq/tick_budget.h', 'net/link_platform.h', 'platform/pc98/link_platform_inline.h', 'net/nic.c', 'net/nic.h', 'net/nic_rx.h', 'net/link.h', 'include/net_eth.h',
     'kernel/irq/tick.h', 'platform/pc98/tick_order.h',
     'include/kprintf.h',
@@ -22,6 +23,7 @@ import tempfile
 
 import host32
 from kernel_includes import include_flags
+from idle_io_sources import idle_io_sources
 
 ROOT = Path(__file__).resolve().parents[2]
 FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra',
@@ -75,7 +77,7 @@ def build_run(work, source):
                     '-I' + str(ROOT / 'tools/tests'), *include_flags(ROOT),
                     '-nostdlib', '-static', '-no-pie', str(src), str(ROOT / 'net/rx_work.c'),
                     str(ROOT / 'tools/tests/hostsvc_fixture.c'),
-                    str(ROOT / 'tools/tests/hostsvc_nic_host.c'), '-o', str(exe)],
+                    str(ROOT / 'tools/tests/hostsvc_nic_host.c'), *idle_io_sources(ROOT, work, compat=False), '-o', str(exe)],
                    check=True, cwd=ROOT)
     return host32.run([str(exe)], cwd=ROOT).returncode
 

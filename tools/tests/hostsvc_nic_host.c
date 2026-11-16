@@ -1,3 +1,6 @@
+#include "kernel/io_policy.h"
+#include "kernel/io_work.h"
+#include "rx_io_clock.h"
 /* A2 NIC unit: real nic.c, fake adapter and A3/link boundaries.
  * No A3 filtering/queues or hardware behavior is claimed by this unit. */
 #include "hostsvc_fixture.h"
@@ -18,7 +21,7 @@ static int polls, demuxes, links, inits, resets[3], bad_if, order, recurse;
 static int tick_rc, registrations;
 static int tick_logs, logged_tick_rc, poll_reentry, poll_reentry_rc;
 static tick_fn callback;
-static void (*rx_idle)(void);
+static void rx_idle(void) { io_request(IO_SVC_NET_RX); (void)io_dispatch(IO_PASS_US); }
 static u32 fake_ms;
 u32 tick_clock_ms(void) { return fake_ms; }
 static u8 seen_peer[6], seen_local[6];
@@ -327,6 +330,7 @@ static int test(void)
 }
 void _start(void)
 {
+    test_rx_clock_install();
     int rc = test();
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc) : "memory");
     __builtin_unreachable();
@@ -336,7 +340,6 @@ int platform_clock_read_us(u32 *lo, u32 *hi) { *lo = *hi = 0; return 0; }
 u32 tick_budget_cnt(u32 us) { return us; }
 int tick_budget_take(u32 share, u32 tail) { (void)share; (void)tail; return 1; }
 volatile u32 tick_count;
-int idle_work_register(void (*fn)(void)) { rx_idle = fn; return 0; }
 int nic_test_irq_enabled(void) { return hs_if(); }
 
 int tick_budget_peek(u32 share, u32 tail) { (void)share; (void)tail; return 1; }

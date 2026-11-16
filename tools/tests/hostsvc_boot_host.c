@@ -1,3 +1,4 @@
+#include "rx_io_clock.h"
 /* Boot composition: production load/init, LGY attach, both adapters and NIC.
  * Module relocation and device I/O are seams; no seam registers or binds NICs. */
 #define net_lgy98_adapter attach_unit_adapter
@@ -151,10 +152,6 @@ void net_rx_demux(const struct NetNicOps *ops, const u8 *mac, const u8 *peer)
 u32 net_rx_demux_budget(const struct NetNicOps *ops, const u8 mac[6],
                         const u8 peer[6], struct rx_work_budget *budget)
 { (void)budget; net_rx_demux(ops, mac, peer); return 0; }
-void rx_work_begin(struct rx_work_budget *budget)
-{ budget->start = budget->used = budget->limit_us = 0; budget->max_frames = NET_RX_SCAN_MAX; }
-static void (*rx_idle)(void);
-int idle_work_register(void (*fn)(void)) { rx_idle = fn; return 0; }
 int tick_budget_peek(u32 share, u32 tail) { (void)share; (void)tail; return 1; }
 unsigned int ne2k_rx_ring_free_pages(void) { return 8; }
 unsigned int ne2k_rx_queue_free(void) { return 4; }
@@ -191,8 +188,7 @@ static int boot_run(int mode)
     } else if (rc) return 28;
     net_jiffy();
     if (mode != 7 && (link_inits != 1 || syns + tx_calls != 1)) return 29;
-    if (!rx_idle) return 33;
-    rx_idle();
+    if (io_dispatch(IO_PASS_US) != 1) return 33;
     if (saw_fixed_peer != (mode >= 5)) return 32;
     net_unbind();
     if (record.active_refs || net_mac(mac) != OS32_ERR_HOSTDOWN) return 27;
@@ -200,6 +196,7 @@ static int boot_run(int mode)
 }
 void _start(void)
 {
+    test_rx_clock_install();
     u8 mode;
     int n;
     __asm__ volatile("int $0x80" : "=a"(n) : "0"(3), "b"(0), "c"(&mode), "d"(1) : "memory");
@@ -218,3 +215,5 @@ const struct boot_common *boot_common_get(void) {
 /* Foreground link fixture: IRQ0 budgeting is exercised by tick_budget_host. */
 u32 tick_budget_cnt(u32 us) { return us; }
 int tick_budget_take(u32 share, u32 tail) { (void)share; (void)tail; return 1; }
+
+int platform_clock_read_us(u32 *lo, u32 *hi) { *lo = *hi = 0; return 0; }
