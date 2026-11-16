@@ -42,7 +42,9 @@ def run(ctx):
             print('SKIP PowerPC runtime: compiler or qemu-ppc unavailable', flush=True)
             if os.environ.get('OS32_REQUIRE_PPC') == '1': return 1
         if ctx.mutate:
-            for old, new in [('|| r->flags)', ')'),
+            for old, new in [('row->context == context && context != 0', '0'),
+                             ('row->context == 0) common = row;', '0) common = row;'),
+                             ('|| r->flags)', ')'),
                              ('(check->bits[key / 8] & (1u << (key % 8)))', '0'),
                              ('+ r->index) * 16 + slot', '+ r->index) * 16'),
                              ('r->kind == 5 && (check->term_bytes[group * 32 + r->value / 8] & (1u << (r->value % 8)))', '0')]:

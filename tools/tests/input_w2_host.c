@@ -48,6 +48,19 @@ static int test(void)
     r.kind=8; r.profile=1; r.context=0; r.index=0; r.selector=2; r.value=19;
     if (!ikm_check_row(&check, 1, &r)) return 24;
     r.value=0; r.aux=8; if (!ikm_check_row(&check, 1, &r)) return 25;
+    {
+        static const IkmRow terms[] = {
+            {5, 1, 1, 0, 1, 0, 4, 0},
+            {5, 1, 0, 0, 1, 0, 3, 0},
+            {5, 2, 1, 0, 1, 0, 5, 0}
+        };
+        u8 byte = 99;
+        if (ikm_term_lookup(terms, 3, 1, 1, 1, &byte) || byte != 4) return 31;
+        if (ikm_term_lookup(terms, 3, 1, 2, 1, &byte) || byte != 3) return 32;
+        if (ikm_term_lookup(terms, 3, 2, 1, 1, &byte) || byte != 5) return 33;
+        byte = 99;
+        if (!ikm_term_lookup(terms, 3, 1, 1, 2, &byte) || byte != 99) return 34;
+    }
     return 0;
 }
 void _start(void) {

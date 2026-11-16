@@ -132,3 +132,26 @@ int ikm_check_row(IkmCheck *check, u8 platform, const IkmRow *r)
     if (r->kind == 5 || r->kind == 6) check->term_ext_count++;
     return 0;
 }
+
+/* Rows include defaults and explicit overrides. A failed lookup leaves out alone. */
+int ikm_term_lookup(const IkmRow *rows, u32 count, u8 profile, u8 context,
+                    u16 index, u8 *value)
+{
+    const IkmRow *common = 0;
+    if ((!rows && count) || !value || profile < 1 || profile > 4 ||
+        context > 4 || index < 1 || index > 8 || count > IKM_MAX_ROWS)
+        return OS32_ERR_INVAL;
+    for (u32 i = 0; i < count; ++i) {
+        const IkmRow *row = &rows[i];
+        if (row->kind != 5 || row->profile != profile || row->index != index)
+            continue;
+        if (row->context == context && context != 0) {
+            *value = (u8)row->value;
+            return 0;
+        }
+        if (row->context == 0) common = row;
+    }
+    if (!common) return OS32_ERR_NOTFOUND;
+    *value = (u8)common->value;
+    return 0;
+}
