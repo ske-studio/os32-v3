@@ -46,7 +46,10 @@ CHECK = dict(name='ppc-usb', tier=2, budget=900, needs=['make:kernel'],
                      'tools/ppc_hostfs.py',
                      'tools/ppc_lan_host.py',
                      'tools/serialfs_host.py'],
-             inputs=['tools/ppc/sd_run.py', 'arch/ppc/kernel_boot.h'])
+             inputs=['tools/ppc/sd_run.py', 'arch/ppc/kernel_boot.h',
+                     'tools/ppc/link_sh_run.py', 'tools/host_agent.py',
+                     'tools/host_rshell.py', 'tools/host_operator_socket.py',
+                     'tools/ppc_lan_host.py', 'tools/ppc/link_run.py'])
 
 PROBE = r"""
 #include "clock_source.h"
@@ -325,6 +328,38 @@ def product_settings(work, mode, late=False):
     return opts
 
 
+def keyboard_actions(q, read_serial, wait_for):
+    """Share guest-observed press/repeat/release and text entry steps."""
+    def key(code, mods=(), hold=100):
+        # Hold is measured in guest time. QEMU's send-key hold-time runs on the
+        # virtual clock, which under -icount drifts from real time while the
+        # guest naps (PPC_NOTES §3); release after the guest has seen every
+        # press, and for a long hold after its first typematic repeat.
+        releases = len(re.findall(r'USB KEY src=1 sc=[0-9a-f]+ down=0', read_serial()))
+        presses = len(re.findall(r'USB KEY src=1 sc=[0-9a-f]+ down=1', read_serial()))
+        keys = [*mods, code]
+        q.call('input-send-event', {'events': [
+            {'type': 'key', 'data': {'down': True, 'key': {'type': 'qcode', 'data': c}}} for c in keys]})
+        wait_for(lambda: len(re.findall(r'USB KEY src=1 sc=[0-9a-f]+ down=1', read_serial()))
+                 >= presses+len(keys), 'key press '+code)
+        if hold > 100:
+            repeats = len(re.findall(r'USB REPEAT src=1 sc=', read_serial()))
+            wait_for(lambda: len(re.findall(r'USB REPEAT src=1 sc=', read_serial())) > repeats,
+                     'key repeat '+code)
+        q.call('input-send-event', {'events': [
+            {'type': 'key', 'data': {'down': False, 'key': {'type': 'qcode', 'data': c}}} for c in reversed(keys)]})
+        wait_for(lambda: len(re.findall(r'USB KEY src=1 sc=[0-9a-f]+ down=0', read_serial()))
+                 >= releases+len(mods)+1, 'key release '+code)
+        time.sleep(.03)
+    def text_keys(text):
+        for c in text:
+            if c == ' ': key('spc')
+            elif c == '!': key('1', ('shift',))
+            elif c.isupper(): key(c.lower(), ('shift',))
+            else: key(c)
+    return key, text_keys
+
+
 def product_accept(elf, cpu, out, mode, late=False):
     """Real sh/input; late observes three seconds inside the startup wait."""
     while os.getloadavg()[0] >= 4: time.sleep(5)
@@ -368,33 +403,7 @@ def product_accept(elf, cpu, out, mode, late=False):
                 print('product USB timeout '+label+' after %.1fs; serial tail:\n' % (time.monotonic()-started) +
                       tail, flush=True)
                 raise RuntimeError('product USB timeout: '+label+' evidence='+str(out))
-            def key(code, mods=(), hold=100):
-                # Hold is measured in guest time. QEMU's send-key hold-time runs on the
-                # virtual clock, which under -icount drifts from real time while the
-                # guest naps (PPC_NOTES §3); release after the guest has seen every
-                # press, and for a long hold after its first typematic repeat.
-                releases = len(re.findall(r'USB KEY src=1 sc=[0-9a-f]+ down=0', serial(a)))
-                presses = len(re.findall(r'USB KEY src=1 sc=[0-9a-f]+ down=1', serial(a)))
-                keys = [*mods, code]
-                q.call('input-send-event', {'events': [
-                    {'type': 'key', 'data': {'down': True, 'key': {'type': 'qcode', 'data': c}}} for c in keys]})
-                wait_for(lambda: len(re.findall(r'USB KEY src=1 sc=[0-9a-f]+ down=1', serial(a)))
-                         >= presses+len(keys), 'key press '+code)
-                if hold > 100:
-                    repeats = len(re.findall(r'USB REPEAT src=1 sc=', serial(a)))
-                    wait_for(lambda: len(re.findall(r'USB REPEAT src=1 sc=', serial(a))) > repeats,
-                             'key repeat '+code)
-                q.call('input-send-event', {'events': [
-                    {'type': 'key', 'data': {'down': False, 'key': {'type': 'qcode', 'data': c}}} for c in reversed(keys)]})
-                wait_for(lambda: len(re.findall(r'USB KEY src=1 sc=[0-9a-f]+ down=0', serial(a)))
-                         >= releases+len(mods)+1, 'key release '+code)
-                time.sleep(.03)
-            def text_keys(text):
-                for c in text:
-                    if c == ' ': key('spc')
-                    elif c == '!': key('1', ('shift',))
-                    elif c.isupper(): key(c.lower(), ('shift',))
-                    else: key(c)
+            key, text_keys = keyboard_actions(q, lambda: serial(a), wait_for)
             def execute(text, expected):
                 previous = output().count('sh> ')
                 start = len(output())
@@ -553,19 +562,229 @@ def lan_accept(elf, cpu, out, mode):
         s.close()
 
 
+def rsh_command(s, line, expected=None, during=None):
+    """Product RSH only: one complete OUT in the submitted generation/ID."""
+    op = s.agent.operator
+    generation, session = op.generation, op.session
+    start = len(s.events)
+    ident = op.submit('cui', line, 'usb-accept', timeout_ms=20000)
+    if during: during()
+    s.wait(lambda: ident in op.results or (op.pending is not None and
+           op.pending['id'] == ident and op.pending['state'] in ('done', 'truncated')),
+           'RSH result '+line, 20)
+    result = op.results.get(ident) or op.take_result()
+    require((op.generation, op.session) == (generation, session) and
+            result['generation'] == generation and result['state'] == 'done' and
+            result['drop'] == 0, 'RSH generation/completion '+line)
+    events = [e for e in s.events[start:] if e['parts'][:2] == ['RSH', 'OUT'] and
+              e['parts'][3] == ident]
+    body = result['result']
+    prefix = b'> '+line.encode()+b'\n'
+    require(len(events) == 1 and bytes.fromhex(events[0]['body']) == body and
+            body.startswith(prefix) and body.endswith(b'\x04'), 'RSH OUT '+line)
+    payload = body[len(prefix):-1]
+    if expected is not None: require(payload == expected, 'RSH output '+line)
+    return payload
+
+
+def link_usb_verdict(reason, text, log_alive, rsh_alive):
+    """U-c1: only USB enumeration failure with live LOG/RSH kills no-service."""
+    if not log_alive or not rsh_alive or 'usb: HC dead' in text:
+        return 'wrong-reason'
+    missing = (reason == 'mouse enumeration' and 'protocol=02' not in text or
+               reason == 'keyboard enumeration' and 'protocol=01' not in text)
+    if missing and 'USB KEY src=1' not in text and 'USB MOUSE' not in text:
+        return 'RED'
+    return 'SURVIVED' if reason is None else 'wrong-reason'
+
+
+def link_lan_accept(elf, cpu, out, mode='normal'):
+    import link_sh_run as link
+    from host_agent import HostAgent, hdr_unpack, LINK_HDR, OP_RELEASE
+
+    class UsbLink(link.Session):
+        def new_agent(self):
+            if self.operator: self.operator.close()
+            directory = self.out/'agent'; directory.mkdir()
+            self.agent = HostAgent(bytes.fromhex('02005e000001'), state_dir=str(directory),
+                quiet=True, allow_net=False, clip='none', file_root=self.root,
+                allow_write=[], peer=bytes.fromhex('525400123456'))
+            self.operator = link.OperatorSocket(('127.0.0.1', 0), self.agent.operator, lambda: {})
+            self.agent.operator_socket = self.operator
+            service = self.agent._service_rshell
+            def observed(rid, ent, parts, sink):
+                self.events.append(dict(rid=rid, parts=list(parts), body=bytes(ent['got']).hex(), at=time.monotonic()))
+                return service(rid, ent, parts, sink)
+            self.agent._service_rshell = observed
+            service_log = self.agent._service_log
+            def logged(rid, ent, parts, sink):
+                self.events.append(dict(rid=rid, parts=list(parts), body=bytes(ent['got']).hex(), at=time.monotonic()))
+                return service_log(rid, ent, parts, sink)
+            self.agent._service_log = logged
+            service_sfs = self.agent._service_sfs
+            def gated(rid, ent, sink):
+                self.calls.append(dict(rid=rid, body=bytes(ent['got']).hex(), dropped=self.drop))
+                if not self.drop: return service_sfs(rid, ent, sink)
+                # Truly silent: the agent's wall-clock 1.0s (host_agent tick) would
+                # otherwise answer 503 and end the interval before the guest's
+                # deadline, since -icount guest time drifts from wall time.
+                ent['sfs_deadline'] = float('inf')
+            self.agent._service_sfs = gated
+            handle = self.agent.handle
+            def released(frame, sink):
+                # The guest RELEASEs a CALL rid when its own deadline ends the CALL.
+                if len(frame) >= 14+LINK_HDR and hdr_unpack(frame[14:])[0] == OP_RELEASE:
+                    self.releases.append(hdr_unpack(frame[14:])[6])
+                result = handle(frame, sink)
+                if self.drop:
+                    # Admission arms a wall-clock 1.0s (host_agent tick answers 503);
+                    # under -icount the guest may send WDATA after it, so a
+                    # suppressed CALL must not be answered before the guest deadline.
+                    for ent in self.agent.ledger.values():
+                        if ent.get('resp') is None and 'sfs_deadline' in ent:
+                            ent['sfs_deadline'] = float('inf')
+                return result
+            self.agent.handle = released
+
+        def start(self):
+            original = subprocess.Popen
+            def launch(argv, *args, **kwargs):
+                argv = list(argv)
+                # Only the QEMU launch carries the keyboard; genisoimage etc. pass through.
+                if 'usb-kbd,id=kbd' in argv:
+                    argv[argv.index('usb-kbd,id=kbd')] = 'usb-mouse,id=mouse'
+                    (self.out/'argv.json').write_text(json.dumps(argv, indent=2))
+                return original(argv, *args, **kwargs)
+            subprocess.Popen = launch
+            try: super().start()
+            finally: subprocess.Popen = original
+
+    out.mkdir()
+    root = out/'saved'; root.mkdir(); (root/'f').write_bytes(b'usb-rpc\n')
+    s = UsbLink.__new__(UsbLink)
+    s.root, s.drop, s.calls, s.releases = root, False, [], []
+    UsbLink.__init__(s, elf, cpu, out/'guest', 180)
+    a, b = s.out/'serial-a.log', s.out/'serial-b.log'
+    try:
+        s.start()
+        if mode == 'no-service':
+            reason = None
+            for protocol, label, seconds in [('02', 'mouse enumeration', 60),
+                                              ('01', 'keyboard enumeration', 30)]:
+                if protocol == '01':
+                    s.q.call('device_add', {'driver':'usb-kbd', 'id':'kbd'})
+                try:
+                    s.wait(lambda: 'protocol='+protocol in serial(a), label, seconds)
+                except RuntimeError as exc:
+                    if not str(exc).startswith('deadline '+label+' evidence='):
+                        raise
+                    reason = label
+                    break
+            s.wait(s.ready, 'RSH READY', 60)
+            rsh_command(s, 'echo alive', b'alive\n')
+            evidence = serial(a)
+            validate(evidence, serial(b), True)
+            log_alive = any(e['parts'][:1] == ['LOG'] and e['body'] for e in s.events)
+            verdict = link_usb_verdict(reason, evidence, log_alive, True)
+            (s.out/'mutation.json').write_text(json.dumps(dict(
+                mode=mode, reason=reason, log_alive=bool(log_alive),
+                rsh_alive=True, verdict=verdict), indent=2))
+            require(verdict == 'RED', verdict+' no-service: '+str(reason))
+            s.q.call('quit'); s.p.wait(timeout=5)
+            require(s.p.returncode == 0, 'wrong-reason no-service: QEMU rc')
+            print('RED link LAN no-service '+cpu+
+                  ': no-tick exact missing enumeration/input verdict; LOG/RSH echo alive', flush=True)
+            return
+        s.wait(lambda: 'protocol=02' in serial(a), 'mouse enumeration', 60)
+        s.q.call('device_add', {'driver':'usb-kbd', 'id':'kbd'})
+        s.wait(lambda: 'protocol=01' in serial(a), 'keyboard enumeration', 30)
+        s.wait(s.ready, 'RSH READY', 60)
+        key, text_keys = keyboard_actions(s.q, lambda: serial(a),
+                                         lambda predicate, label: s.wait(predicate, label, 30))
+        rsh_command(s, 'echo warm', b'warm\n')
+        # Warm /host too (as sd_run.link_accept does): the SFS session starts on
+        # first use, so a suppressed first CALL would only report Host is down.
+        rsh_command(s, 'cat /host/f', b'usb-rpc\n')
+        s.drop = True
+        first = s.word('tick_count')
+        window = {}
+        def during():
+            # The suppressed CALL must reach the host (WDATA received, gated);
+            # the guest-tick window then spans that CALL until the guest's RELEASE.
+            # A host 503 before WDATA (tools/host_agent.py tick) is not suppression.
+            s.wait(lambda: any(c['dropped'] for c in s.calls), 'suppressed SFS CALL', 10)
+            rid = next(c['rid'] for c in s.calls if c['dropped'])
+            window['start'] = s.word('tick_count')
+            key('shift')
+            s.wait(lambda: rid in s.releases, 'guest RELEASE of suppressed CALL', 10)
+            window['end'] = s.word('tick_count')
+        failed = rsh_command(s, 'cat /host/f', during=during)
+        ticks = (window['end']-window['start']) & 0xffffffff
+        # An expired CALL ends as OS32_ERR_HOSTDOWN (fs/serialfs/sfs_client.c:237-253).
+        require(failed == b'cat: /host/f: Host is down\n' and
+                80 <= ticks <= 200, 'guest SFS deadline near 1000ms: '+repr((failed, ticks)))
+        text_keys('echo hi'); key('ret')
+        def usb_seen():
+            screen = s.screen('screen')
+            (s.out/'screen.txt').write_text(screen)
+            return '> echo hi' in screen and re.search(r'(?m)^hi *$', screen)
+        s.wait(usb_seen, 'USB echo hi FB evidence', 30)
+        require(s.word('tick_count') != first and 'USB KEY src=1' in serial(a),
+                'tick and USB progress after SFS suppression')
+        require('usb: HC dead' not in serial(a), 'healthy HC after SFS suppression')
+        s.drop = False
+        rsh_command(s, 'cat /host/f', b'usb-rpc\n')
+        text_keys('echo half')
+        def finish_half():
+            s.settle(1)
+            require(s.agent.operator.pending['result'] is None, 'RSH deferred by USB half-line')
+            key('ret')
+        rsh_command(s, 'echo resumed', b'resumed\n', during=finish_half)
+        screen = s.screen('resumed')
+        require('> echo half' in screen and '> echo resumed' in screen and
+                screen.index('> echo half') < screen.index('> echo resumed'), 'USB before RSH')
+        key('shift')
+        s.q.call('device_del', {'id':'kbd'})
+        s.wait(lambda: 'USB RELEASE kind=0 src=1' in serial(a), 'USB unplug release', 10)
+        s.q.call('device_add', {'driver':'usb-kbd', 'id':'kbd2'})
+        s.wait(lambda: serial(a).count('protocol=01') >= 2, 'USB re-enumeration', 30)
+        text_keys('echo alive'); key('ret')
+        s.wait(lambda: re.search(r'(?m)^alive *$', s.screen('replug')), 'USB replug FB', 30)
+        rsh_command(s, 'echo alive', b'alive\n')
+        validate(serial(a), serial(b), True)
+        (s.out/'sfs-calls.json').write_text(json.dumps(s.calls, indent=2))
+        (s.out/'deadline.json').write_text(json.dumps(dict(ticks=ticks, milliseconds=ticks*10)))
+        s.q.call('quit'); s.p.wait(timeout=5)
+        require(s.p.returncode == 0, 'USB link QEMU rc=0')
+        print('GREEN link LAN '+cpu+': SFS deadline, USB FB, cat recovery, echo alive', flush=True)
+    except Exception as exc:
+        if mode == 'no-service' and not str(exc).startswith('SURVIVED no-service:'):
+            raise RuntimeError('wrong-reason no-service: '+str(exc)) from exc
+        raise
+    finally:
+        s.close()
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--cpu', choices=['7450', '7455', 'both'], default='both')
     parser.add_argument('--mutate', action='store_true')
     parser.add_argument('--lan', action='store_true', help='real hostfs RPC absence in FG1')
+    parser.add_argument('--link', action='store_true', help='product link-SH USB/SFS acceptance')
+    parser.add_argument('--legacy', action='store_true', help='explicit PLN1 --lan acceptance')
     args = parser.parse_args()
+    if args.link and (not args.lan or args.legacy):
+        parser.error('--link requires --lan and excludes --legacy')
+    if args.lan and not (args.link or args.legacy):
+        parser.error('--lan requires --link or explicit --legacy')
     require(stream_payload('log hi~USBSTREAM:00000001:hUSB KEY break\n~USBSTREAM:00000002:i\n') == 'hi\n',
             'framed stream reconstruction across Enter break log')
     cross = Path(os.environ.get('USB_PPC_CROSS_DIR', os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc')))
     if not (cross/'bin/powerpc-elf-gcc').is_file() or any(
             shutil.which(t) is None for t in ('qemu-system-ppc', 'genisoimage')) or not ROM.is_file():
         missing = 'PPC toolchain' if not (cross/'bin/powerpc-elf-gcc').is_file() else 'QEMU/OpenBIOS/genisoimage'
-        print('SKIP ppc-usb: ' + missing + ' unavailable')
+        print(('FAIL' if os.environ.get('OS32_REQUIRE_PPC') == '1' else 'SKIP')+
+              ' ppc-usb: ' + missing + ' unavailable')
         return 1 if os.environ.get('OS32_REQUIRE_PPC') == '1' else 0
     if args.lan:
         try:
@@ -578,9 +797,19 @@ def main():
     work = Path(tempfile.mkdtemp(prefix='run-', dir=base))
     print('evidence='+str(work), flush=True)
     cpus = ['7450', '7455'] if args.cpu == 'both' else [args.cpu]
+    if args.link:
+        for mode in ['normal'] + (['no-service'] if args.mutate else []):
+            opts = ['KBOOT_SH=1', 'KBOOT_LINK=1', 'PPC_CROSS_DIR='+str(cross)]
+            if mode == 'no-service':
+                src, dest = mutation(work, mode)
+                opts += ['KB_MUT_SRC='+src, 'KB_MUT_FILE='+str(dest)]
+            elf = build(work/('link-lan-'+mode), *opts)
+            for cpu in cpus if mode == 'normal' else cpus[:1]:
+                link_lan_accept(elf, cpu, work/('link-lan-'+mode+'-'+cpu), mode)
+        return 0
     if args.lan:
         for mode in ['normal']:
-            opts = ['KBOOT_SH=1', 'PPC_CROSS_DIR='+str(cross)]
+            opts = ['KBOOT_SH=1', 'KBOOT_LINK=0', 'PPC_CROSS_DIR='+str(cross)]
             elf = build(work/('lan-'+mode), *opts)
             for cpu in cpus if mode == 'normal' else cpus[:1]:
                 lan_accept(elf, cpu, work/('lan-'+mode+'-'+cpu), mode)
