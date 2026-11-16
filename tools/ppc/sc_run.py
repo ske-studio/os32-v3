@@ -36,6 +36,7 @@ CHECK = dict(name='ppc-sc', tier=2, budget=900, needs=[],
                      'tools/host_linux.py', 'tools/host_notify.py', 'tools/host_services.py',
                      'tools/host_sfs_link.py', 'tools/ppc/sd_run.py'])
 
+LINK_NEST_EXPECTED = b'hello ok\nnest kind=1 code=7 parent=12345\n' * 2
 EXPECTED = ('/bin/nest.bin\n' +
             'hello ok\nnest kind=1 code=7 parent=12345\n' * 2 +
             'exit=5\nos32> ')
@@ -395,7 +396,7 @@ def link_main(args):
                 session.start()
                 session.wait(session.ready, 'HELLO to cui READY', 60)
                 require(session.agent.operator.ready['mode'] == 'cui', 'link sh mode')
-                normal = b'hello ok\nnest kind=1 code=7 parent=12345\n' * 2
+                normal = LINK_NEST_EXPECTED
                 expected = normal
                 # Only the second result is corrupted, keeping both children alive.
                 if name != 'normal':
