@@ -2,7 +2,7 @@
 #include "io_policy.h"
 #include "io.h"
 #include "os32_kapi_shared.h"
-#include "appslot.h"
+#include "app_ids.h"
 
 #define POLICY_SERVICES 4
 #define POLICY_OWNER_COUNT (APP_ID_MAX + 1)

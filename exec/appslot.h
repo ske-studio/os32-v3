@@ -29,13 +29,7 @@
 #include "../fs/vfs_stdin.h"
 
 /* ---- ID の池 (D3) ---------------------------------------------------- */
-/* 1 = シェル帯 (CUI シェル / gshell)。kernel/gui.h の GUI_SHELL_OWNER と同値。
- * 一致は exec/appslot.c の STATIC_ASSERT が固定する。 */
-#define APP_ID_SHELL     1
-#define APP_MAX_APPS     4                       /* 同時に生きる非シェル ID */
-#define APP_ID_MIN       2
-#define APP_ID_MAX       (APP_ID_MIN + APP_MAX_APPS - 1)   /* 5 */
-#define APP_SLOT_COUNT   (APP_ID_MAX + 1)        /* 添字 = ID。0 は使わない */
+#include "app_ids.h"      /* APP_ID_SHELL・APP_MAX_APPS・APP_ID_MIN/MAX・APP_SLOT_COUNT */
 
 /* ---- 状態 ------------------------------------------------------------ */
 #define APP_STATE_FREE     0
