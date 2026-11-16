@@ -164,7 +164,7 @@ void sqlite_call_on_alt_stack(void (*call)(void *), u32 top, void *frame);
 |newlib/adapter/CRT|各 USER bin、root image 経由で kboot にも|小 app 20〜60KiB、%f 使用 app 40〜100KiB、shell 30〜100KiB (旧部品の減少を差引)|同梱 bin 数 × 増分が支配的|
 |SQLite 本体/別 stack|IME 段の kernel/module|今回0、本体は次段で実測|今回の余裕を本体込みと誤認しない|
 
-- `arch/ppc/kernel.ld:37,54-59` の file/resident/chain end を個別に記録し、常駐像サイズ (__kernel_resident_end - __kernel_image_start) の上限 `0x275000` と照合する。root_image_blob.o は build/ppc-kboot.mk:127 の KB_EXTRA に常時入り、その増分も算入する。別に heap 等を含む最終 chain を PM_KERNEL_CHAIN_LIMIT と照合する (同じ上限と取り違えない)。
+- `arch/ppc/kernel.ld:37,54-59` の file/resident/chain end を個別に記録し、常駐像サイズ (__kernel_resident_end - __kernel_image_start) の上限 `0x275000` と照合する。root_image_blob.o は、KB_EXEC が有効な像 (KBOOT_SH=1 か KBOOT_SHELL=1、build/ppc-kboot.mk:36・98-136) では build/ppc-kboot.mk:127 の KB_EXTRA に常に入り、その増分も算入する。KBOOT_SH=0 の診断像には入らない。別に heap 等を含む最終 chain を PM_KERNEL_CHAIN_LIMIT と照合する (同じ上限と取り違えない)。
 - 上限は正典の layout 定数を使い、設計の値を build に複写しない。上限直前の予算だけで合格にせず linker ASSERT と iso/ELF の実サイズを通す。
 - N3 の全 USER を詰めた像で再測定し、超過なら test apps を外部試験媒体に置く。製品 shell の機能を削ったり窓を拡大して通さない。
 
@@ -246,4 +246,4 @@ S guard結線は IME まで製品リンクしないが専用試験で組む。�
 - S2 (P2): import してよい関数を target に依らない物に限り、モジュールの大域変数を差し替えない、と §4 N1 に書いた。
 - S3 (P2): 今ある cross-ppc を記録する経路を置き、再構築は記録と合わないときだけ、と §4 N1 に書いた。build_cross_ppc.sh に足すのは記録の出力だけで、configure は変えない。
 - S4 (P3): x86 の bytes の確かめを「x86 の節の JSON の正規化した値と cache_key の一致」に直した。
-
+- (実装の段 ppc-fp-b の停止を受けて PM が直した) §6 の root_image_blob.o は、KB_EXEC が有効な像に限ると書き直した。
