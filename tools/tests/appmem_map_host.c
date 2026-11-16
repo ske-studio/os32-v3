@@ -707,6 +707,7 @@ void appslot_mark_scheduled(int id, u32 ticks) { (void)id; (void)ticks; }
 static void exec_restore_context(int id) { (void)id; entered_user++; }
 void ring3_resume(const u32 *frame, u32 pd, void *tss) { (void)frame; (void)pd; (void)tss; entered_user++; }
 static void host_caller_access_leave(int *prev) { (void)prev; }
+static void io_syscall_end(int owner) { (void)owner; }
 static void exec_park_stop(struct arch_syscall *frame) { (void)frame; entered_user++; }
 #define caller_access_leave host_caller_access_leave
 #include "shell_service_stub_host.h"   /* T7b-b2 S3b: exec.c の結線の弱い贋物 */

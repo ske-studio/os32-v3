@@ -31,6 +31,7 @@ u32 paging_kernel_pd_phys(void) { return 1; }
 void paging_load_cr3(u32 p) { if (p != 1) bad++; }
 int paging_set_page(u32 a, u32 b, u32 c) { (void)a; (void)b; (void)c; bad++; return 0; }
 static void exec_reclaim_owned(int id, int kind) { (void)id; (void)kind; bad++; }
+static u32 io_syscall_suspend(int id) { (void)id; return 0; }
 void ring3_abort_request(void);
 
 static void inject(int phase)

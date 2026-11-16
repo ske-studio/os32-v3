@@ -29,6 +29,8 @@ static struct {
     int last_error;
 } stats;
 
+u32 io_dispatch_total_count(void) { return stats.total_count; }
+
 static u32 minimum(u32 a, u32 b) { return a < b ? a : b; }
 static u32 any_pending(void) { return pending[0] | pending[1] | pending[2]; }
 static int clock_error(int rc)

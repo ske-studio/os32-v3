@@ -26,8 +26,10 @@ u32 io_policy_generation(void);
 int io_policy_set(const void *bytes, unsigned int len, u32 owner, u32 gen);
 int io_policy_get(void *bytes, unsigned int cap, unsigned int *needed);
 int io_policy_reset(u32 owner, u32 gen);
-/* Common reclaim (normal exit, fault, kill): restore the table active
- * before this owner first set/reset. Stale gen is ignored. */
+/* Common reclaim (normal exit, fault, kill): restore or relink the table
+ * saved when this owner most recently became the newest writer.
+ * Reapplying below a newer owner refreshes that saved source.
+ * Stale gen is ignored. */
 void io_policy_owner_exit(u32 owner, u32 gen);
 
 /* Provided by the dispatcher (io_work.c): nonzero while io_dispatch runs,

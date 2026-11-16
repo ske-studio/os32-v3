@@ -35,6 +35,7 @@ volatile u32 ring3_park_reject_count;
 static void *jump[5];
 static u32 fault_vector, fault_address, fault_pc;
 static int fault_seen;
+static u32 io_syscall_suspend(int owner) { (void)owner; return 0; }
 int appslot_cur(void) { return 2; }
 AppSlot *appslot_get(int id) { (void)id; return &app; }
 int appslot_stop_pending(void) { return stop_pending; }

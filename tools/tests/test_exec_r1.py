@@ -30,8 +30,8 @@ def landing(s, start, buf, name):
     jump = s.index('    if (exec_setjmp(' + buf + ') != 0)', a)
     b = s.index('\n    }', jump) + len('\n    }')
     return ('static int ' + name + '_body(void) {\n'
-            '    AppSlot *a = &slots[2], *ctx = a; int gui = host_gui;\n'
-            '    (void)ctx; (void)gui;\n'
+            '    AppSlot *a = &slots[2], *ctx = a; int gui = host_gui, launcher_id = 1;\n'
+            '    (void)ctx; (void)gui; (void)launcher_id;\n'
             + s[a:b] + '\n'
             '    simulate(); return 99;\n}\n'
             'static int ' + name + '(void) {\n'
@@ -675,8 +675,8 @@ class ExecR1(unittest.TestCase):
 MUTATIONS = (
     ('x87-kill-restore', '    exec_reclaim_resources(id);\n    exec_teardown_app(a);\n    appslot_reclaim(id);\n    exec_notify_owned(id, EXEC_KIND_ABORTED);',
      '    arch_fp_restore(&a->fp_state);\n    exec_reclaim_resources(id);\n    exec_teardown_app(a);\n    appslot_reclaim(id);\n    exec_notify_owned(id, EXEC_KIND_ABORTED);'),
-    ('x87-launch-landing', '        exec_pending_finish();\n        arch_fp_restore(&fp_parent[fp_depth]);\n        ring3_context_restore(&caller_context);\n        _enable();\n        /* 畳み',
-     '        exec_pending_finish();\n        (void)fp_depth;\n        ring3_context_restore(&caller_context);\n        _enable();\n        /* 畳み'),
+    ('x87-launch-landing', '        exec_pending_finish();\n        arch_fp_restore(&fp_parent[fp_depth]);\n        ring3_context_restore(&caller_context);\n        _enable();\n        io_syscall_resume(launcher_id, io_parent_depth); /* IO_SYSCALL_PARENT */\n        /* 畳み',
+     '        exec_pending_finish();\n        (void)fp_depth;\n        ring3_context_restore(&caller_context);\n        _enable();\n        io_syscall_resume(launcher_id, io_parent_depth); /* IO_SYSCALL_PARENT */\n        /* 畳み'),
     ('x87-resume-landing', '        exec_pending_finish();\n        arch_fp_restore(&fp_parent[fp_depth]);\n        ring3_context_restore(&caller_context);\n        _enable();\n        if (g_longjmp_reason',
      '        exec_pending_finish();\n        (void)fp_depth;\n        ring3_context_restore(&caller_context);\n        _enable();\n        if (g_longjmp_reason'),
     ('stdin-wrong-call', '        arch_syscall_slot(g_cur_frame) != KAPI_SLOT_SYS_READ ||', ''),
@@ -726,8 +726,8 @@ MUTATIONS = (
      '    g_pending_id = id;            /* callback'),
     ('resume-landing-missing', '        exec_pending_finish();\n        arch_fp_restore(&fp_parent[fp_depth]);\n        ring3_context_restore(&caller_context);\n        _enable();\n        if (g_longjmp_reason',
      '        arch_fp_restore(&fp_parent[fp_depth]);\n        _enable();\n        if (g_longjmp_reason'),
-    ('launch-landing-missing', '        exec_pending_finish();\n        arch_fp_restore(&fp_parent[fp_depth]);\n        ring3_context_restore(&caller_context);\n        _enable();\n        /* 畳み',
-     '        arch_fp_restore(&fp_parent[fp_depth]);\n        _enable();\n        /* 畳み'),
+    ('launch-landing-missing', '        exec_pending_finish();\n        arch_fp_restore(&fp_parent[fp_depth]);\n        ring3_context_restore(&caller_context);\n        _enable();\n        io_syscall_resume(launcher_id, io_parent_depth); /* IO_SYSCALL_PARENT */\n        /* 畳み',
+     '        arch_fp_restore(&fp_parent[fp_depth]);\n        _enable();\n        io_syscall_resume(launcher_id, io_parent_depth); /* IO_SYSCALL_PARENT */\n        /* 畳み'),
 )
 
 if __name__ == '__main__':

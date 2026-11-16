@@ -265,6 +265,9 @@ volatile u32 kctx_irq_depth, kctx_exc_depth;
 void exec_heap_restore_state(u32 base, u32 size, u32 used) { (void)base; (void)size; (void)used; }
 int paging_set_not_present(u32 b, u32 e) { (void)b; (void)e; return 0; }
 
+u32 io_syscall_suspend(int owner) { (void)owner; return 0; }
+void io_syscall_resume(int owner, u32 depth) { (void)owner; (void)depth; }
+
 /* exec_reclaim_resources and friends are unreachable from exec_launch, so
  * gcc 15 drops them with --gc-sections, but gcc 13 keeps them and needs their
  * callees at link time. Define the callees as never-called asm stubs (no

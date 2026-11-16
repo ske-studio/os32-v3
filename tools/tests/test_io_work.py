@@ -14,6 +14,7 @@ import tempfile
 import host32
 
 MUTANTS = [
+    ('syscall count snapshot', 'return stats.total_count;', 'return stats.max_count;'),
     ('register while running', '    /* Allowed while io_dispatch runs', '    if (running) return OS32_ERR_BUSY;\n    /* Allowed while io_dispatch runs'),
     ('limit entry cache', 'slots[i].limit.us = slots[i].desc.default_budget_us;', 'slots[i].limit.us = 0;'),
     ('failed unit read', 'if (raw_read(now, &source, &gen) < 0) return 0;',

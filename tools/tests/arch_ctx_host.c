@@ -1,5 +1,6 @@
 /* Real C boundaries only: fake IF/MSR cannot certify iret/rfi or nested asm. */
 #include "types.h"
+#include "os32_kapi_slots.h"
 #include "exec_arch.h"
 #include "arch/ppc/ppc_trap.h"
 static u32 msr;
@@ -32,6 +33,7 @@ static void ring3_gui_pump(void) { ++pumps; }
 void exec_syscall_dispatch(struct arch_syscall *call)
 {
     VERIFY(call && call->native && !kctx_irq_depth);
+    u32 slot = 0;
     ++common_calls;
     bad_enable = !_irq_enabled();
 #include "ctx_entry.inc"

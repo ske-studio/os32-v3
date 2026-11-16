@@ -1,6 +1,6 @@
 {
   "generations": {"os32x_format": 5, "kapi_abi": 1, "memory_layout": 4, "shlib_protocol": 2},
-  "version": 86,
+  "version": 87,
   "func_capacity": 300,
   "crt_kapi_symbol": "os32_kapi_v63",
   "data_fields": [
@@ -16,6 +16,7 @@
     }
   ],
   "includes": [
+    "io_kapi.h",
     "boot_token.h",
     "gfx_hal.h",
     "gfx.h",
@@ -2037,6 +2038,10 @@
     {"name": "gfx2_dpms", "target": "gfx2_dpms", "ret": "int", "args": ["u32 a", "u32 head", "u32 state"]},
     {"name": "gfx2_present", "target": "gfx2_present", "ret": "int", "args": ["u32 a", "u32 head", "i16 x", "i16 y", "u16 w", "u16 h"]},
     {"name": "con_sink_capture", "ret": "int", "args": ["u32 op"]},
-    {"name": "boot_token_get", "ret": "void", "args": ["u8 *out"], "out": [{"arg": "out", "size": 16}]}
+    {"name": "boot_token_get", "ret": "void", "args": ["u8 *out"], "out": [{"arg": "out", "size": 16}]},
+    {"name": "io_policy_set", "target": "kapi_io_policy_set", "ret": "int", "args": ["const void *bytes", "unsigned int len"], "in": [{"arg": "bytes", "len": "len"}]},
+    {"name": "io_policy_get", "target": "kapi_io_policy_get", "ret": "int", "args": ["void *bytes", "unsigned int cap", "unsigned int *needed"], "out": [{"arg": "bytes", "len": "cap"}, {"arg": "needed", "size": "sizeof(unsigned int)"}]},
+    {"name": "io_policy_reset", "target": "kapi_io_policy_reset", "ret": "int", "args": []},
+    {"name": "io_pump", "target": "kapi_io_pump", "ret": "int", "args": ["unsigned int budget_us"]}
   ]
 }

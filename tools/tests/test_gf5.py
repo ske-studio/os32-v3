@@ -375,7 +375,7 @@ def foreground_header(tree):
     source = (tree / 'exec/exec_syscall.inc').read_text()
     tail = source.split('syscall_complete:', 1)[1]
     pieces.append('#include "exec_gfx_poll.h"\nstatic void u6_syscall_tail(u32 *frame) {\n    struct arch_syscall call = { frame }; u32 result = frame[7];\n'
-                  'int prev_caller=0, prev_in_syscall=0;\nstruct arch_syscall *prev_frame=0;\n' + tail)
+                  'int io_owner=appslot_cur(), prev_caller=0, prev_in_syscall=0;\nstruct arch_syscall *prev_frame=0;\n' + tail)
     (tree / 'tools/tests/gf5_foreground_entries.h').write_text(
         '\n'.join(pieces).replace('_halt();', 'u6_halt();'))
 

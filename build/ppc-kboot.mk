@@ -107,7 +107,7 @@ else
 KB_C += platform/powermac/shell_boot.c platform/powermac/input_boot.c \
  platform/powermac/input_decode.c
 endif
-KB_C += $(wildcard exec/*.c) $(wildcard arch/ppc/exec_*.c) \
+KB_C += kernel/io_kapi.c $(wildcard exec/*.c) $(wildcard arch/ppc/exec_*.c) \
  arch/ppc/syscall_code.c arch/ppc/kapi_call.c platform/powermac/exec_boot.c \
  input/hal/in2_dev.c input/hal/in2_state.c input/hal/mouse_ext.c input/hal/pointer_state.c input/hal/kbd_merge.c input/hal/legacy_ring.c input/hal/legacy_mode.c input/hal/in2_ring.c input/hal/in2_time.c kernel/input_legacy.c kernel/input_wait.c kernel/input_service.c kernel/kbd_inject.c kernel/console/con_sink.c \
  kapi/kapi_host.c kapi/kapi_host_notice.c \

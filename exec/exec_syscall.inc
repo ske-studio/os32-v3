@@ -1,4 +1,5 @@
 #include "exec_gfx_poll.h"
+#include "io_kapi.h"
 /* Ring3 syscall dispatch and completed-syscall STOP parking. Included by exec.c. */
 #define RING3_ARG_WINDOW  64u
 STATIC_ASSERT(KAPI_PRINT_ARG_LIMIT == (RING3_ARG_WINDOW - KAPI_PRINT_FIXED_WORDS * sizeof(u32)) / sizeof(u32), print_arg_window);
@@ -6,6 +7,7 @@ STATIC_ASSERT(KAPI_PRINT_ARG_LIMIT == (RING3_ARG_WINDOW - KAPI_PRINT_FIXED_WORDS
 /* Each park origin checks admission before saving its selected frame here. */
 static void exec_park_transfer(int id, AppSlot *a, const struct arch_syscall *frame, void (*commit)(void))
 {
+    (void)io_syscall_suspend(id); /* IO_SYSCALL_PARK */
     arch_user_save(&a->frame, frame);
     arch_fp_save(&a->fp_state);
     exec_heap_save_state(&a->exec_heap_used);
@@ -53,6 +55,8 @@ static __attribute__((noinline)) int exec_kapi_special(u32 slot, void *wrapper,
 void exec_syscall_dispatch(struct arch_syscall *view)
 {
     struct arch_syscall call = *view;
+    int io_owner = appslot_cur();
+    io_syscall_begin(io_owner);
     u32 result;
     u32 slot = arch_syscall_slot(&call);
     u32 wrapptr;
@@ -92,7 +96,7 @@ void exec_syscall_dispatch(struct arch_syscall *view)
      * IRQ は保存状態を復元し、深さを 0 に戻して本体へ復帰する。
      * idle_work_run 自身も許可状態・深さ・再入を検査する。
      * 短い排他区間の所有者は、終了時に元の許可状態を復元する。 */
-    idle_work_run();
+    if (slot != KAPI_SLOT_IO_PUMP) idle_work_run(); /* IO_PUMP_ONCE */
 
     arch_kapi_source(&src, &call);
 
@@ -174,4 +178,5 @@ syscall_complete:
     /* --- 出口でも CTRL+STOP を見る (契約 T6、v1.2 G2 で実測した隙間) --- */
     ring3_abort_check();
     exec_park_stop(&call);
+    io_syscall_end(io_owner); /* IO_SYSCALL_RETURN */
 }

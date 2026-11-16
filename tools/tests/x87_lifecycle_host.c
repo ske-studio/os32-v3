@@ -132,6 +132,9 @@ NOTICE(ime_owner_exit)
 NOTICE(kbd_inject_owner_exit)
 NOTICE(launch_owner_exit)
 NOTICE(host_owner_exit)
+NOTICE(io_kapi_owner_exit)
+u32 io_syscall_suspend(int owner) { (void)owner; return 0; }
+void io_syscall_resume(int owner, u32 depth) { (void)owner; (void)depth; }
 NOTICE(con_sink_owner_exit)
 NOTICE(appslot_gfx_owner_exit)
 #undef NOTICE

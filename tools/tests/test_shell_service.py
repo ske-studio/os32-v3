@@ -129,7 +129,7 @@ WIRE = [
     ("wire_ctx.inc", "typedef struct {\n    CallerAccessFrame caller;",
      "\nvolatile u32 ring3_caller_reject_count", False),
     ("wire_commit.inc", "            appslot_shell_commit();\n",
-     "        } else {\n            appslot_start_commit(", False),
+     "        } else {\n            io_parent_depth = io_syscall_suspend(", False),
     ("wire_finish.inc", "        res_owner_set(0);\n        exec_reclaim_owned(id, kind);\n",
      "    } else {\n#ifdef OS32_R1_FIXTURE", False),
 ]

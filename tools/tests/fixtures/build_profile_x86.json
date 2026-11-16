@@ -102,6 +102,7 @@
     "kernel/idle_work.c",
     "kernel/io_work.c",
     "kernel/io_policy.c",
+    "kernel/io_kapi.c",
     "kernel/irq/tick_budget.c",
     "platform/pc98/link_platform.c",
     "platform/pc98/system.c",

@@ -99,13 +99,22 @@ FG0/FG1 は割り込みの状態であり、ユーザー/カーネルという�
 
 ### 4.1.1 I/O の時計・協調進行・設定表
 
-IO_TIER §3 の契約を追加する。AC-TIME-4・AC-IO-1・AC-IO-2 の適合は両アーキとも **未**。実装と受入は IO_TIER の担当段で行う。
+IO_TIER §3 の契約を追加する。AC-TIME-4 の適合は両アーキとも **未**。AC-IO の検証範囲は下表。guest の受入は未実施。
 
 |ID|契約（IO_TIER §3）|正にする口 / 担当設計|
 |---|---|---|
 |AC-TIME-4|io_clock_usはIRQ/FG0/FG1から読める単調µs時計。成功時のみ出力有効、未準備NOSYS・一時失敗AGAIN。短いirq_save/restoreを内包し、源・分解能・停止中進行をAC-TIME-2と揃える。|`io_clock_us` (`kernel/io_work.h`) / IO_TIER §3・§4|
 |AC-IO-1|FG1の協調進行・再入無動作・欠如NOSYS。|`io_dispatch` (`kernel/io_work.h`)・`io_pump` / IO_TIER §3・§4、文脈は AC-CTX-1・4|
-|AC-IO-2|設定の検証・原子的置換・LE形式・owner終了時復元。|`io_policy_set/get/reset` / IO_TIER §3・§4（公開口は後続の KAPI 段）|
+|AC-IO-2|設定の検証・原子的置換・LE形式・owner終了時復元。|`io_policy_set/get/reset` / IO_TIER §3・§4（公開口 `kernel/io_kapi.c`、KAPI v87）|
+
+|ID|x86 の適合範囲|PowerPC の適合範囲|
+|---|---|---|
+|AC-IO-1|host: 公開4口の FG1 制限、pump の予算/INVAL/NOSYS、共通 syscall の自動/明示二重巡回防止・累計差。入口からの guest 復帰は **未**|host BE: 同じ公開境界と pump。EE/DEC を含む guest 復帰は **未**|
+|AC-IO-2|host LE: 境界 INVAL/BUSY/FULL、owner/世代、実 exec_finish/kill の共通回収と親子逆順復元。guest は **未**|host BE: 同じ bytes と境界・回収を user-mode 実行。guest は **未**|
+
+試験: `io-kapi-host`・`io-policy-host`・`io-work-host`・`exec-syscall-fgpoll-host`。
+C4/P1: x86 `int80_stub` と PPC `ppc_trap_dispatch` は許可後に共通 dispatch へ渡す。
+N4 に従い I/O 専用 adapter は追加しない。上表は arch 入口全体の適合を宣言するものではない。
 
 ### 4.2 KAPI・入力・メモリ・起動
 

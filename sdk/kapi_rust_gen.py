@@ -21,6 +21,8 @@ import os
 TYPE_MAP = {
     "void":            "()",
     "int":             "i32",
+    "unsigned int":    "u32",
+    "unsigned int *":  "*mut u32",
     "u8":              "u8",
     "u16":             "u16",
     "u32":             "u32",
