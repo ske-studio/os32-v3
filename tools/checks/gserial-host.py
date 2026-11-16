@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 CHECK = dict(name='gserial-host', tier=1,
-    covers=['tools/remote_transport.py', 'tools/host_agent_config.py', 'tools/lanfs_host.py', 'tools/lan_bridge.py', 'tools/host_image.py', 'tools/gserial.py', 'tools/rshell_serial.py', 'tools/rshell_peek.py', 'tools/rshell_hwb.py', 'tools/serialfs_host.py', 'tools/tests/test_gserial_host.py'],
+    covers=['tools/remote_transport.py', 'tools/host_agent_config.py', 'tools/lanfs_host.py', 'tools/lan_bridge.py', 'tools/host_image.py', 'tools/gserial.py', 'tools/rshell_serial.py', 'tools/rshell_peek.py', 'tools/rshell_hwb.py', 'tools/serialfs_host.py', 'tools/host_tree_manifest.py', 'tools/tests/test_gserial_host.py'],
     needs=[], budget=2.8,
     basis=['LAN_OPERATOR_DESIGN §4'],
     full_only=True,

@@ -23,7 +23,7 @@ CHECK = dict(name='remote-x13', tier=1, needs=[], budget=10,
                      'tools/tests/test_remote_x13.py', 'tools/host_rshell.py', 'tools/rshell.py', 'tools/gserial.py',
                      'tools/host_image.py', 'tools/lan_bridge.py', 'tools/lanfs_host.py',
                      'tools/rshell_hwb.py', 'tools/rshell_peek.py', 'tools/rshell_serial.py',
-                     'tools/serialfs_host.py'],
+                     'tools/serialfs_host.py', 'tools/host_tree_manifest.py'],
     basis=['LAN_OPERATOR_DESIGN §2'],
     full_only=True,
 )

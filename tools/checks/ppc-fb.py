@@ -16,7 +16,7 @@ CHECK = dict(env=['ppc-cross', 'qemu-ppc'], name='ppc-fb', tier=2, budget=900, n
     'tools/ppc/usb_run.py', 'tools/ppc/sd_run.py', 'tools/ppc/kboot_accept.py',
     'tools/ppc/kboot_run.py', 'tools/ppc/kboot_mutations.py', 'tools/ppc/run.py',
     'tools/ppc_lan_host.py', 'tools/ppc_hostfs.py', 'tools/lanfs_host.py',
-    'tools/serialfs_host.py', 'tools/host_image.py', 'tools/lan_bridge.py',
+    'tools/serialfs_host.py', 'tools/host_tree_manifest.py', 'tools/host_image.py', 'tools/lan_bridge.py',
     'tools/gen_memmap.py', 'sdk/gen_kapi.py', 'tools/gen_font16.py',
     'tools/gen_g16.py', 'tools/gen_unicode.py', 'tools/mkroot_image.py',
     'build/ppc-kboot.mk', 'build/ppc-user.mk', 'build/ppc-ram-root.json',

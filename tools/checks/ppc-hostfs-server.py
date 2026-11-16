@@ -2,7 +2,7 @@
 import subprocess
 
 CHECK = dict(name='ppc-hostfs-server', tier=1, budget=30, needs=[],
-             covers=['tools/ppc_link_transport.py', 'tools/remote_transport.py', 'tools/host_agent_config.py','tools/ppc_hostfs.py', 'tools/lanfs_host.py', 'tools/serialfs_host.py', 'tools/lan_bridge.py', 'tools/host_image.py', 'tools/ppc_hostfs.py', 'tools/ppc_lan_host.py', 'tools/tests/ppc_hostfs_server.py'],
+             covers=['tools/host_tree_manifest.py', 'tools/ppc_link_transport.py', 'tools/remote_transport.py', 'tools/host_agent_config.py','tools/ppc_hostfs.py', 'tools/lanfs_host.py', 'tools/serialfs_host.py', 'tools/lan_bridge.py', 'tools/host_image.py', 'tools/ppc_hostfs.py', 'tools/ppc_lan_host.py', 'tools/tests/ppc_hostfs_server.py'],
     basis=['PPC_SHELL_W8_DESIGN §3'],
     pins=['LAN_OPERATOR_DESIGN', 'LAN_BULK_DESIGN'],
 )

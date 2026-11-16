@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[2]
 CHECK = dict(name='remote-x11', tier=1, needs=[], budget=15,
     covers=[
         'tools/host_image.py', 'tools/host_sfs_link.py', 'tools/lan_bridge.py',
-        'tools/lanfs_host.py', 'tools/serialfs_host.py',
+        'tools/lanfs_host.py', 'tools/serialfs_host.py', 'tools/host_tree_manifest.py',
         'userland/shell/rshell_lan.c',
         'userland/shell/shell.h',
         'include/remote_control.h',

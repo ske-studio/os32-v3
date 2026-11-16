@@ -16,7 +16,7 @@ import serialfs_host as sfs
 
 CHECK = dict(name='remote-p4b', tier=1, needs=[], budget=5, kind='contract',
     covers=['tools/host_agent_config.py', 'tools/host_image.py', 'tools/host_linux.py', 'tools/host_notify.py', 'tools/host_operator_socket.py', 'tools/host_rshell.py', 'tools/host_services.py', 'tools/lan_bridge.py', 'tools/host_agent.py', 'tools/host_sfs_link.py', 'tools/lanfs_host.py',
-            'tools/serialfs_host.py', 'tools/tests/test_remote_p4b.py'],
+            'tools/serialfs_host.py', 'tools/host_tree_manifest.py', 'tools/tests/test_remote_p4b.py'],
     basis=['LAN_OPERATOR_DESIGN §2', 'LAN_OPERATOR_DESIGN §5',
            'LAN_OPERATOR_DESIGN §6'])
 PEER = b'peer!!'

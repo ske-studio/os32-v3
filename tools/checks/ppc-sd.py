@@ -1,6 +1,6 @@
 """Register S-D LAN acceptance; sandbox without AF_INET explicitly skips."""
 CHECK = dict(env=['ppc-cross', 'qemu-ppc'], name='ppc-sd', tier=2, budget=900, needs=['make:ppc-ci-image'],
-             covers=[
+             covers=['tools/host_tree_manifest.py', 
         'kernel/console/con_sink.c',
         'kernel/console/console.c',
         'mm/kmalloc.c',

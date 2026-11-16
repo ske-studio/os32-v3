@@ -15,7 +15,7 @@
   python3 -B tools/tests/test_rshell_peek.py --mutate   # 否定側
 """
 CHECK = dict(name='rshell-peek-host', tier=1,
-    covers=['tools/lanfs_host.py', 'tools/lan_bridge.py', 'tools/host_image.py', 'tools/rshell_peek.py', 'tools/rshell_hwb.py', 'tools/rshell_serial.py', 'tools/serialfs_host.py', 'kdebug/kpeek.c', 'kdebug/kdebug_window.c', 'kdebug/kdebug_window.h'],
+    covers=['tools/lanfs_host.py', 'tools/lan_bridge.py', 'tools/host_image.py', 'tools/rshell_peek.py', 'tools/rshell_hwb.py', 'tools/rshell_serial.py', 'tools/serialfs_host.py', 'tools/host_tree_manifest.py', 'kdebug/kpeek.c', 'kdebug/kdebug_window.c', 'kdebug/kdebug_window.h'],
     needs=[], budget=3.1,
     kind='characterization',
 )

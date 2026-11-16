@@ -36,7 +36,7 @@
 壊れていないこと) も見る。
 """
 CHECK = dict(name='serialfs-host', tier=1,
-    covers=['fs/serialfs/serialfs.h', 'net/nic.h', 'lib/le_internal.h', 'include/time_units.h', 'tools/lanfs_host.py', 'tools/lan_bridge.py', 'tools/host_image.py', 'tools/tests/mutpar.py', 'drivers/char/serial.c', 'drivers/char/serial_plan.c', 'fs/serialfs/serialfs.c', 'fs/serialfs/serialfs_session.c', 'fs/serialfs/sfs_lan.c', 'fs/serialfs/sfs_lan.h', 'drivers/net/e82557/e82557.h', 'init/sysconfig.h', 'drivers/net/e82557/lan_module.h', 'fs/serialfs/sfs_client.c', 'fs/serialfs/sfs_proto.c', 'kernel/sys.c', 'lib/crc32.c', 'lib/kstring.h', 'tools/rshell_serial.py', 'tools/rshell_peek.py', 'tools/rshell_hwb.py', 'tools/serialfs_host.py', 'tools/tests/serial_gate_host.c', 'tools/tests/serial_portc_host.c', 'tools/tests/serialfs_host.c', 'tools/tests/serialfs_session_host.c', 'tools/tests/test_serial_portc.py', 'userland/shell/serial_watchdog.c', 'tools/tests/serial_emergency_host.h', 'kernel/serial_diag.c', 'include/console_output.h', 'lib/serial_diag.h', 'include/platform_sys.h', 'platform/pc98/system.c', 'include/pci_dev_contract.h', 'include/pci_bind_contract.h', 'tools/tests/kernel_includes.py'],
+    covers=['fs/serialfs/serialfs.h', 'net/nic.h', 'lib/le_internal.h', 'include/time_units.h', 'tools/lanfs_host.py', 'tools/lan_bridge.py', 'tools/host_image.py', 'tools/tests/mutpar.py', 'drivers/char/serial.c', 'drivers/char/serial_plan.c', 'fs/serialfs/serialfs.c', 'fs/serialfs/serialfs_session.c', 'fs/serialfs/sfs_lan.c', 'fs/serialfs/sfs_lan.h', 'drivers/net/e82557/e82557.h', 'init/sysconfig.h', 'drivers/net/e82557/lan_module.h', 'fs/serialfs/sfs_client.c', 'fs/serialfs/sfs_proto.c', 'kernel/sys.c', 'lib/crc32.c', 'lib/kstring.h', 'tools/rshell_serial.py', 'tools/rshell_peek.py', 'tools/rshell_hwb.py', 'tools/serialfs_host.py', 'tools/host_tree_manifest.py', 'tools/tests/serial_gate_host.c', 'tools/tests/serial_portc_host.c', 'tools/tests/serialfs_host.c', 'tools/tests/serialfs_session_host.c', 'tools/tests/test_serial_portc.py', 'userland/shell/serial_watchdog.c', 'tools/tests/serial_emergency_host.h', 'kernel/serial_diag.c', 'include/console_output.h', 'lib/serial_diag.h', 'include/platform_sys.h', 'platform/pc98/system.c', 'include/pci_dev_contract.h', 'include/pci_bind_contract.h', 'tools/tests/kernel_includes.py'],
     needs=[], budget=11.8,
     basis=['AC-SFS-1', 'NET_HOSTSVC_DESIGN §3'],
 )
@@ -97,6 +97,7 @@ def flags_for(mutated):
     return [f for f in FLAGS if f != "-Werror"]
 
 
+sys.path.insert(0, str(ROOT / "tools"))
 sys.path.insert(0, str(ROOT / "tools/tests"))
 from test_serial_portc import FAKE_ARCH_IO, FAKE_PLATFORM_IO  # noqa: E402
 import mutpar  # noqa: E402  (tools/tests/mutpar.py)
@@ -1714,6 +1715,7 @@ def _mutate_py_one(item):
     mdir.mkdir(parents=True, exist_ok=True)
     files = {"tools/serialfs_host.py": mdir / "serialfs_host.py",
              "tools/rshell_serial.py": mdir / "rshell_serial.py"}
+    shutil.copy(ROOT / "tools/host_tree_manifest.py", mdir / "host_tree_manifest.py")
     for src, dst in files.items():
         shutil.copy(ROOT / src, dst)
     original = (ROOT / rel).read_text(encoding="utf-8")

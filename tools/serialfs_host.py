@@ -41,6 +41,8 @@ import struct
 import time
 import zlib
 
+from host_tree_manifest import TreeManifest, ManifestError
+
 # ---- fs/serialfs/sfs_proto.h の写し --------------------------------------------------
 ENQ = 0x05
 EOT = 0x04
@@ -295,6 +297,7 @@ class HostFS(object):
                       and os.stat in os.supports_dir_fd)
         self.secure = bool(secure)
         self.root_fd = -1
+        self.manifest = TreeManifest(self)
         if self.secure:
             # 起点は 1 回だけ開いて保持する。根がその後で symlink に差し替えられ
             # ても、この fd は元のディレクトリを指し続ける
@@ -313,6 +316,7 @@ class HostFS(object):
                                  "no . / .. / backslash)" % (raw_a,))
 
     def close(self):
+        self.manifest.close()
         if self.root_fd >= 0:
             os.close(self.root_fd)
             self.root_fd = -1
@@ -449,15 +453,43 @@ class HostFS(object):
                 os.close(pfd)
         return os.stat(self.resolve(b"/" + b"/".join(comps)))
 
+    @staticmethod
+    def wire_mtime(st):
+        m = int(st.st_mtime)
+        return m if 0 <= m <= 0xFFFFFFFF else 0
+
+    def open_read_fd(self, comps):
+        if self.secure:
+            if not comps:
+                raise SfsError(ERR_ISDIR)
+            pfd = self._open_dir(comps[:-1])
+            try:
+                fd = os.open(comps[-1], os.O_RDONLY | os.O_NOFOLLOW, dir_fd=pfd)
+            finally:
+                os.close(pfd)
+        else:
+            fd = os.open(self.resolve(b"/" + b"/".join(comps)), os.O_RDONLY)
+        try:
+            if statmod.S_ISDIR(os.fstat(fd).st_mode):
+                raise SfsError(ERR_ISDIR)
+        except BaseException:
+            os.close(fd)
+            raise
+        return fd
+
     # ---- 操作 (戻り値は (status, 応答の status の後ろ)、または例外) ----
     def stat(self, wire):
+        try:
+            virtual = self.manifest.stat(wire)
+        except ManifestError as exc:
+            raise SfsError(exc.code) from exc
+        if virtual is not None:
+            return virtual
         st = self._stat_raw(self._comps(wire))
         kind, size = self._kind(st)
         if size > 0xFFFFFFFF:
             raise SfsError(ERR_IO)
-        mtime = int(st.st_mtime)
-        if mtime < 0 or mtime > 0xFFFFFFFF:
-            mtime = 0
+        mtime = self.wire_mtime(st)
         return 0, struct.pack("<BII", kind, size, mtime)
 
     def _entries(self, comps):
@@ -506,23 +538,14 @@ class HostFS(object):
 
     def read(self, wire, offset, count, max_payload=MAX_PAYLOAD):
         count = min(count, max_payload - 4)
-        comps = self._comps(wire)
-        if self.secure:
-            if not comps:
-                raise SfsError(ERR_ISDIR)
-            pfd = self._open_dir(comps[:-1])
-            try:
-                fd = os.open(comps[-1], os.O_RDONLY | os.O_NOFOLLOW, dir_fd=pfd)
-            finally:
-                os.close(pfd)
-            try:
-                if statmod.S_ISDIR(os.fstat(fd).st_mode):
-                    raise SfsError(ERR_ISDIR)
-                data = os.pread(fd, count, offset)
-            finally:
-                os.close(fd)
-            return len(data), data
-        with open(self.resolve(wire), "rb") as f:
+        try:
+            virtual = self.manifest.read(wire, offset, count)
+        except ManifestError as exc:
+            raise SfsError(exc.code) from exc
+        if virtual is not None:
+            return len(virtual[1]), virtual[1]
+        fd = self.open_read_fd(self._comps(wire))
+        with os.fdopen(fd, "rb") as f:
             f.seek(offset)
             data = f.read(count)
         return len(data), data

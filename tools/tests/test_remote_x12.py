@@ -14,7 +14,7 @@ sys.path.insert(0, str(ROOT / 'tools'))
 CHECK = dict(name='remote-x12', tier=1, needs=[], budget=10,
              covers=['tools/rshell.py', 'tools/remote_transport.py', 'tools/host_agent_config.py',
                      'tools/rshell_serial.py', 'tools/rshell_peek.py',
-                     'tools/rshell_hwb.py', 'tools/serialfs_host.py',
+                     'tools/rshell_hwb.py', 'tools/serialfs_host.py', 'tools/host_tree_manifest.py',
                      'tools/lanfs_host.py', 'tools/lan_bridge.py',
                      'tools/host_image.py', 'tools/tests/test_remote_x12.py'],
     basis=['LAN_OPERATOR_DESIGN §2', 'LAN_OPERATOR_DESIGN §3'],

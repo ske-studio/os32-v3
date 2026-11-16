@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Fake serial/time tests of the actual recover host; --mutate kills guards."""
 CHECK = dict(name='rshell-recover-host', tier=1,
-    covers=['tools/rshell_recover.py', 'tools/rshell_serial.py', 'tools/tests/mutpar.py', 'tools/lan_bridge.py', 'tools/host_image.py', 'tools/lanfs_host.py', 'tools/rshell_peek.py', 'tools/rshell_hwb.py', 'tools/serialfs_host.py'],
+    covers=['tools/rshell_recover.py', 'tools/rshell_serial.py', 'tools/tests/mutpar.py', 'tools/lan_bridge.py', 'tools/host_image.py', 'tools/lanfs_host.py', 'tools/rshell_peek.py', 'tools/rshell_hwb.py', 'tools/serialfs_host.py', 'tools/host_tree_manifest.py'],
     needs=[], budget=2.9,
     basis=['REALHW_RECOVER_DESIGN §4', 'REALHW_RECOVER_DESIGN §5', 'REALHW_RECOVER_DESIGN §6', 'REALHW_RECOVER_DESIGN §7'],
 )

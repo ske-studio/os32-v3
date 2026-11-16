@@ -5,7 +5,7 @@ Direct calls model fresh link rids around the same sid/seq; no socket used.
 """
 CHECK = dict(name='host-sfs-link', tier=1, needs=[], budget=5,
     covers=['tools/host_sfs_link.py', 'tools/tests/test_host_sfs_link.py',
-    'tools/lanfs_host.py', 'tools/serialfs_host.py', 'tools/lan_bridge.py', 'tools/host_image.py'],
+    'tools/lanfs_host.py', 'tools/serialfs_host.py', 'tools/host_tree_manifest.py', 'tools/lan_bridge.py', 'tools/host_image.py'],
     basis=['LAN_OPERATOR_DESIGN §5', 'LAN_OPERATOR_DESIGN §7'])
 
 import importlib.util

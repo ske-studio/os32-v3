@@ -10,7 +10,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tools'))
 CHECK = dict(name='remote-p2h', tier=1, needs=[], budget=5,
-             covers=['tools/host_image.py', 'tools/host_sfs_link.py', 'tools/lan_bridge.py', 'tools/lanfs_host.py', 'tools/serialfs_host.py', 'tools/host_agent.py', 'tools/host_rshell.py',
+             covers=['tools/host_image.py', 'tools/host_sfs_link.py', 'tools/lan_bridge.py', 'tools/lanfs_host.py', 'tools/serialfs_host.py', 'tools/host_tree_manifest.py', 'tools/host_agent.py', 'tools/host_rshell.py',
                      'tools/host_agent_config.py', 'tools/host_linux.py',
                      'tools/host_notify.py', 'tools/host_services.py',
                      'tools/remote_transport.py',
