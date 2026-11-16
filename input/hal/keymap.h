@@ -111,6 +111,9 @@ static inline void km_source_release(u8 src, u16 generation)
     (void)generation;
 }
 
+/* S0a release hook; S0d connects the reservation above. */
+void km_registry_source_released(u8 src, u16 generation);
+
 /* Descriptors have static lifetime. Duplicate IDs are rejected. */
 int km_backend_register(const KmBackend *map);
 int km_source_bind(u8 src, u16 generation, u16 map_id);

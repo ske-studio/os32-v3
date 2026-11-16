@@ -521,3 +521,5 @@ sources[src - 1].used = 0;
 
 H0bの試験は宣言の型/配置・数値とrelease予約の呼出位置を検査する。
 評価/登録/状態の実装の正否はS0a〜dの試験で検査し、宣言試験の合格を代用にしない。
+
+PM決定 (2026-11-17): S0aは`km_source_release`の空inlineを維持し、別名`km_registry_source_released`に失効処理を実装してhostで試験する。inlineからの呼出しと像への結線はS0dで行う。
