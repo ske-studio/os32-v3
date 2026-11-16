@@ -268,6 +268,17 @@ static void rear_oracle(void)
         else __asm__ volatile("frstor %1; fnsave %0":"=m"(hw):"m"(saved):"memory");
         emit(hw,108);
     }
+    /* Reserved CW bits and deliberately inconsistent nonempty tags. */
+    seed_image(seed,0,0xffff);
+    u16 cw;
+    __asm__ volatile("frstor %1; fnstcw %0; fninit":"=m"(cw):"m"(seed):"memory");
+    emit(&cw,2);
+    seed_image(seed,0,0x37f);
+    for(unsigned i=28;i<38;++i)seed[i]=0; /* tag=00, payload=zero */
+    __asm__ volatile("frstor %1; fnstenv %0":"=m"(hw):"m"(seed):"memory");
+    emit(hw,28);
+    __asm__ volatile("fldenv %1; fnstenv %0; fninit":"=m"(hw):"m"(seed):"memory");
+    emit(hw,28);
 }
 void _start(void)
 {
@@ -714,6 +725,18 @@ static void rear_images(void)
         /* Restore image EA must not overwrite saved data/instruction pointers. */
         CHECK(state.fdp==0 && state.fip==0,115);
     }
+    const u8 *ref=reference_rear_image+offset;
+    reset();seed_image(seed,0,0xffff);
+    for(unsigned i=0;i<108;++i)ram[4096+i]=seed[i];
+    CHECK(image_op(4,false,0x2000)==X87_EMU_OK,110);
+    CHECK(mem(0xd9,7,0x2100)==X87_EMU_OK && same(ram+4352,ref,2),111);
+    reset();seed_image(seed,0,0x37f);
+    for(unsigned i=28;i<38;++i)seed[i]=0;
+    for(unsigned i=0;i<108;++i)ram[4096+i]=seed[i];
+    CHECK(image_op(4,false,0x2000)==X87_EMU_OK,110);
+    CHECK(mem(0xd9,6,0x2100)==X87_EMU_OK && same(ram+4360,ref+10,2),112);
+    CHECK(mem(0xd9,4,0x2000)==X87_EMU_OK,113);
+    CHECK(mem(0xd9,6,0x2100)==X87_EMU_OK && same(ram+4360,ref+38,2),114);
     reset();seed_image(seed,3,0x37f);x87_emu_state_decode(&state,seed,false,false);
     struct x87_emu_state saved=state;
     for(unsigned i=8180;i<8288;++i)ram[i]=0x55;

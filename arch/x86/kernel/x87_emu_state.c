@@ -123,6 +123,11 @@ void x87_emu_state_decode(struct x87_emu_state *s, const u8 *p,
     if (!env) for (unsigned i = 0; i < 8; ++i)
         for (unsigned j = 0; j < 10; ++j)
             s->reg[x87_st(s, i)].bytes[j] = p[start + i * 10 + j];
+    /* Native FRSTOR/FNSTCW fixes reserved CW bits; nonempty tags are
+     * classified from the restored (FRSTOR) or retained (FLDENV) payload. */
+    s->cw = (s->cw & 0x1f3f) | 0x0040;
+    for (unsigned i = 0; i < 8; ++i)
+        if (x87_tag(s, i) != 3) x87_put(s, i, x87_unpack(&s->reg[i]));
 }
 /* FPU_prepush / FPU_push / FPU_pop, using physical tags and staged TOP. */
 void x87_push(struct x87_emu_effect *e, sw_extFloat80_t v)

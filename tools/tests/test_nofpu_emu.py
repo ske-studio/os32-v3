@@ -76,6 +76,15 @@ MUTATIONS = [
      'x87_emu_state_encode(&e->state, e->output, c->d->operand16, false);',
      'x87_emu_state_encode(&e->state, e->output, c->d->operand16, true);'),
     ('fnstsw-clobbers-eax', 'esc47', '(e->gpr[X87_EAX] & 0xffff0000u)', '0'),
+    ('unmasked-store-committed', 'exception',
+     'e->commit &= ~(X87_COMMIT_REGS | X87_COMMIT_MEMORY);',
+     'e->commit &= ~X87_COMMIT_REGS;'),
+    ('ss-default-lost', 'decode',
+     'if (rm == 2 || rm == 3 || rm == 6) d.segment = X87_SS;',
+     'if (rm == 2 || rm == 3 || rm == 6) d.segment = X87_DS;'),
+    ('precision-control-ignored', 'exception',
+     '((cw >> 8) & 3) == 0 ? 32 :', '((cw >> 8) & 3) == 0 ? 80 :'),
+
 
 ]
 
@@ -88,7 +97,7 @@ def main():
                         str(ROOT/'tools/tests/x87_emu_core_host.c'),'-o',str(oracle)],check=True)
         # ELF64 with direct syscall, no i386 int80 runner or binfmt fallback.
         capture=subprocess.run([str(oracle)],check=True,capture_output=True).stdout
-        sections=[('arith',768*108),('convert',20*6),('unary',32*108),('extended',14*108),('store',6*112),('env',4*108),('rear_reg',27*8*4*3*112),('rear_edge',18*27*112),('rear_mem',16*108),('rear_store',4*4*12*7*116),('rear_load',24*108),('rear_image',16*324)]
+        sections=[('arith',768*108),('convert',20*6),('unary',32*108),('extended',14*108),('store',6*112),('env',4*108),('rear_reg',27*8*4*3*112),('rear_edge',18*27*112),('rear_mem',16*108),('rear_store',4*4*12*7*116),('rear_load',24*108),('rear_image',16*324+58)]
         assert len(capture)==sum(size for _,size in sections),len(capture)
         offset=0; header=[]
         for name,size in sections:
@@ -96,7 +105,7 @@ def main():
             header.append('static const unsigned char reference_'+name+'[]={' +
                           ','.join(str(b) for b in data)+'};\n')
         (tmp/'x87_emu_reference.h').write_text(''.join(header))
-        print('Oracle: native ELF64 x87, 5322 cases, libc=none',flush=True)
+        print('Oracle: native ELF64 x87, 5325 cases, libc=none',flush=True)
         flags = ['-I'+str(tmp), '-m32', '-march=i386', '-std=gnu11', '-Os', '-ffreestanding',
                  '-fno-pie', '-fno-stack-protector', '-msoft-float', '-mno-fp-ret-in-387',
                  '-DX87_EMU_HOST_TEST', '-I'+str(ROOT/'arch/x86/kernel'), *include_flags(ROOT)]
