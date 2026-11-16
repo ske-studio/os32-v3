@@ -30,6 +30,7 @@
 #include "fd_redirect.h"
 #include "redir_access.h"
 #include "io.h"
+#include "input/hal/input_context.h"
 extern int ring3_call_from_user(void);
 extern void ring3_abort_check(void);
 
@@ -58,12 +59,42 @@ static int g_ime_reader_owner;
 static int g_ime_cui_redraw;
 static void ime_cancel_input(void);
 
+/* Publish only composition, not the ON mode or an unread committed tail. */
+static void ime_policy_publish(void)
+{
+    KbdPolicySnapshot current;
+    if (input_context_snapshot(&current)) {
+        kbd_policy_ime_state(0, 0, 0);
+        return;
+    }
+    u32 active = g_ime.mode != IME_MODE_OFF &&
+                 (g_ime.kana_len || g_ime.rk.preedit[0] || g_ime.converting);
+    kbd_policy_ime_state(active, current.owner, current.command_gen);
+}
+
+/* Called only from foreground readers; preserve pending at unsafe IF=0. */
+static void ime_policy_cancel(void)
+{
+    KbdPolicySnapshot current;
+    if (!_irq_enabled() || input_context_snapshot(&current)) return;
+    if (!input_ime_cancel_take(&current)) ime_cancel_input();
+}
+
 #include "ime_render.inc"
 
 #include "ime_commit_take.inc"
 #include "ime_convert.inc"
 #include "ime_delivery.inc"
+#define ime_cui_process ime_cui_process_inner
 #include "ime_cui_process.inc"
+#undef ime_cui_process
+
+static int ime_cui_process(int keydata)
+{
+    int result = ime_cui_process_inner(keydata);
+    ime_policy_publish();
+    return result;
+}
 
 /* ======================================================================== */
 /*  公開API                                                                  */
@@ -79,6 +110,7 @@ void ime_init(void)
     g_ime.per_page = IME_CAND_COLS * IME_CANDLIST_SAVE_ROWS;
     g_ime.render = IME_DEFAULT_RENDER;
     ime_rk_init(&g_ime.rk);
+    ime_policy_publish();
 
 }
 
@@ -111,6 +143,7 @@ int ime_dict_boot(void)
 int ime_boot_abort(void)
 {
     g_ime.mode = IME_MODE_OFF;
+    ime_policy_publish();
     if (fep_store_close(&g_ime.store)) return -1;
     g_ime.dict_loaded = 0;
     ime_display_abort();
@@ -149,6 +182,7 @@ void ime_toggle(void)
         candlist_clear();              /* 候補リスト領域を消去 */
         preedit_clear();
     }
+    ime_policy_publish();
 }
 
 int ime_is_active(void)
@@ -185,6 +219,7 @@ void ime_set_mode(int mode)
         candlist_clear();              /* 候補リスト領域を消去 */
         preedit_clear();
     }
+    ime_policy_publish();
 }
 
 int ime_get_mode(void)
@@ -197,6 +232,7 @@ int ime_get_mode(void)
  * when CUI starts waiting, before consuming its first key. */
 static void ime_prepare_cui_input(void)
 {
+    ime_policy_cancel();
     if (!g_ime_cui_redraw) return;
     g_ime_cui_redraw = 0;
     if (ime_is_active()) preedit_draw();
@@ -212,6 +248,7 @@ static int ime_getchar_wait(int interruptible)
     ime_prepare_cui_input();
 
     for (;;) {
+        ime_policy_cancel();
         keydata = ime_delivery_take();
         if (keydata >= 0) {
             u8 a = (u8)(keydata & 0xFF);
@@ -220,6 +257,7 @@ static int ime_getchar_wait(int interruptible)
         }
 
         keydata = kbd_getkey_wait(interruptible);
+        ime_policy_cancel();
         if (keydata < 0) return -1;
 
         result = ime_cui_process(keydata);
@@ -279,7 +317,7 @@ int ime_trygetchar(void)
 /*  分類が一意なのは、確定文字列 (UTF-8) に 0x1B が現れないため。            */
 /*  SHIFT+SPACE の on/off は WM が ime_toggle で行うので、ここでは見ない。      */
 /* ======================================================================== */
-int ime_feed_key(int keydata)
+static int ime_feed_key_inner(int keydata)
 {
     if (!services_public) return keydata;
     int result;
@@ -309,6 +347,14 @@ int ime_feed_key(int keydata)
         return keydata;      /* FEP が関与しないキー: 素通り */
     }
     return -1;               /* 消費 (未確定の更新など) */
+}
+
+int ime_feed_key(int keydata)
+{
+    ime_policy_cancel();
+    int result = ime_feed_key_inner(keydata);
+    ime_policy_publish();
+    return result;
 }
 
 /* ======================================================================== */
@@ -344,12 +390,14 @@ static int ime_getkey_wait(int interruptible)
     ime_prepare_cui_input();
 
     for (;;) {
+        ime_policy_cancel();
         keydata = ime_delivery_take();
         if (keydata >= 0) {
             return keydata;
         }
 
         keydata = kbd_getkey_wait(interruptible);
+        ime_policy_cancel();
         if (keydata < 0) return -1; /* key wait interrupted */
 
         result = ime_cui_process(keydata);
@@ -400,6 +448,7 @@ static void ime_cancel_input(void)
     tvram_set_scroll_reserve(g_ime.mode != IME_MODE_OFF ? 1 : 0);
     /* OFF leaves the last console row to the app; ON keeps the mode visible. */
     if (g_ime.mode != IME_MODE_OFF) preedit_draw();
+    ime_policy_publish();
 }
 int ime_getchar(void) { return ime_getchar_wait(0); }
 int ime_getkey(void) { return ime_getkey_wait(0); }

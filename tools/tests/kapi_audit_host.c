@@ -96,6 +96,7 @@ void appslot_poll_yield_reset(void) {}
 #include "input_wait_source.inc"
 #include "kbd_source.inc"
 #include "../../platform/pc98/ime_display.c"
+#include "tools/tests/ime_policy_host.h"
 #include "ime_source.inc"
 #include "../../kernel/input_service.c"
 #include "../../kernel/port_service.c"
@@ -369,8 +370,14 @@ static int test_input(void)
           "owner exit cancels ready input and preedit");
     return 0;
 }
+#ifdef INPUT_M7_3
+#include "input_m7_3_host.c"
+#endif
 static int test(void)
 {
+#ifdef INPUT_M7_3
+    return input_m7_3_test();
+#endif
     wait_slot.gui=wait_slot.cpl3=1;
     const int extremes[] = {-1, 3, (-0x7fffffff-1), 0x7fffffff};
     unsigned i;

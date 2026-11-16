@@ -2,7 +2,7 @@
 """C2: real FEP generator contracts and unsupported display provider."""
 CHECK = dict(name='ime-display-boundary-host', tier=1, needs=['make:all'], budget=2,
     covers=['init/kernel.c', 'include/ime_boot.h', 'kernel/ime/ime.h', 'tools/tests/kernel_includes.py', 'tools/tests/test_ime_display_boundary.py', 'kernel/ime/ime_display_private.h',
-            'include/ime_control.h', 'platform/*/ime_default_render.h',
+            'include/ime_control.h', 'input/hal/input_context.h', 'platform/*/ime_default_render.h',
             'platform/powermac/ime_display.c', 'kernel/ime/ime_render.h',
             'tools/prototypes/fep_imports.def', 'tools/gen_sqlite_imports.py',
             'tools/gen_kdebug_imports.py', 'tools/tests/host32.py',
@@ -44,7 +44,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def verify(directory):
     header = (directory / 'fep_imports.h').read_text()
-    assert '#define FEP_MODULE_ABI_GEN 0x70d4aac2u' in header, 'FEP contract fingerprint'
+    assert '#define FEP_MODULE_ABI_GEN 0xf72b0cdfu' in header, 'FEP contract fingerprint'
 
 
 def main():

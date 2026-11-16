@@ -121,7 +121,7 @@ def source():
     checks += [('FEP_MODULE_API_SLOTS', '23'), ('sizeof(FepModuleApi)', '92'),
                ('__builtin_offsetof(FepModuleApi, dict_suspend)', '84'),
                ('__builtin_offsetof(FepModuleApi, boot_connections)', '88'),
-               ('FEP_MODULE_OPS_VERSION', '4')]
+               ('FEP_MODULE_OPS_VERSION', '5')]
     for name, sig in SIGNATURES.items():
         body += (f'_Static_assert(__builtin_types_compatible_p(__typeof__(&{name}), '
                  f'{sig}), "{name}");\n')

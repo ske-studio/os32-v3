@@ -141,6 +141,7 @@ int copy_to_caller(const struct caller_access *c, void *p, const void *s, u32 n)
     return 1;
 }
 #include "platform/pc98/ime_display.c"
+#include "tools/tests/ime_policy_host.h"
 #include "ime_source.inc"
 
 /* Boot imports copy the core snapshot; keep actual store/SQLite/VFS opens. */

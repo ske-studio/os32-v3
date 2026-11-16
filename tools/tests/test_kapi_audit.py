@@ -65,7 +65,7 @@ for old, new in (('port_putchar_kapi', 'serial_putchar'),
                  ('fm_play_mml_kapi', 'fm_play_mml')):
     MUTATIONS.append((old + ' public target', 3, old + '(', new + '('))
 
-def run(runner, mutation=None, case=0, expected=None):
+def run(runner, mutation=None, case=0, expected=None, input_m7=False):
     sources = [read_text(ROOT / p) for p in SOURCES]
     names = ('rshell_set_active', 'serial_putchar', 'serial_puts', 'serial_getchar',
              'kbd_getchar', 'kbd_getkey', 'ime_getchar', 'ime_getkey', 'fm_play_mml')
@@ -117,6 +117,8 @@ def run(runner, mutation=None, case=0, expected=None):
                '-fno-pie', '-fno-stack-protector', '-ffunction-sections', '-fdata-sections',
                '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections', '-D__KERNEL_BUILD__',
                '-DOS32_RAW_WAIT_LOG_TICKS=32', '-DAUDIT_CASE=' + str(case), '-I' + str(work)]
+        if input_m7:
+            cmd += ['-DINPUT_M7_3']
         cmd += ['-I' + str(ROOT / 'tools/tests/host_arch'), *include_flags(ROOT)]
         p = subprocess.run(cmd + [str(ROOT / 'tools/tests/kapi_audit_host.c'), '-o', str(exe)], capture_output=True, text=True)
         assert p.returncode == 0, p.stderr

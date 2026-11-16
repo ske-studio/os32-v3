@@ -76,6 +76,7 @@
     "input/hal/kbd_merge.c",
     "input/hal/input_context.c",
     "input/hal/input_interrupt.c",
+    "input/hal/input_ime_gate.c",
     "input/hal/legacy_keymap.c",
     "input/hal/keymap_registry.c",
     "input/hal/keymap_eval.c",

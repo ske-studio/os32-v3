@@ -14,6 +14,12 @@
 #include "ime.h"
 #include "fep_module.h"
 #include "ime_store.h"
+#include "input/hal/input_context.h"
+/* Boot fixture has no registered foreground; M7 readers are tested separately. */
+int input_context_snapshot(KbdPolicySnapshot *out) { (void)out; return -1; }
+int input_ime_cancel_take(const KbdPolicySnapshot *current) { (void)current; return -1; }
+void kbd_policy_ime_state(u32 active, u32 owner, u32 command_gen)
+{ (void)active; (void)owner; (void)command_gen; }
 #include "fep_host_offsets.h"
 #include "kbd.h"
 #include "kmalloc.h"
