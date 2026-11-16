@@ -98,33 +98,32 @@ def main():
         return
     check(load(PRODUCT))
     print('integration GREEN')
-    if '--mutate' not in sys.argv:
-        return
-    source = PRODUCT.read_text()
-    mutants = [
-        ('os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_BINARY", 0), dir_fd=pfd)',
-         'os.O_RDONLY | os.O_NOFOLLOW, dir_fd=pfd)'),
-        ('os.O_RDONLY | getattr(os, "O_BINARY", 0))', 'os.O_RDONLY)'),
-        ('m = int(st.st_mtime)', 'm = st.st_mtime_ns // 10**9'),
-        ('virtual = self.manifest.stat(wire)', 'virtual = None'),
-        ('virtual = self.manifest.read(wire, offset, count)', 'virtual = None'),
-        ('return len(virtual[1]), virtual[1]', 'return 0, virtual[1]'),
-        ('self.manifest.close()', 'pass  # no close'),
-        ('raise SfsError(exc.code) from exc', 'raise SfsError(ERR_IO) from exc'),
-    ]
-    with tempfile.TemporaryDirectory() as tmp:
-        path = Path(tmp, 'mutant.py')
-        for i, (old, new) in enumerate(mutants, 1):
-            # Exception translation occurs in both entry points; mutate stat only.
-            assert source.count(old) == (2 if old.startswith('raise SfsError(exc.code)') else 1)
-            path.write_text(source.replace(old, new, 1))
-            cmd = [sys.executable, '-B', __file__, '--case']
-            subprocess.run(cmd + [str(PRODUCT)], check=True, capture_output=True)
-            result = subprocess.run(cmd + [str(path)], capture_output=True, text=True)
-            assert result.returncode and 'AssertionError' in result.stderr, result.stderr
-            subprocess.run(cmd + [str(PRODUCT)], check=True, capture_output=True)
-            print('mutation', i, 'runtime RED')
-    print(len(mutants), 'runtime RED; restored controls GREEN')
+    if '--mutate' in sys.argv:
+        source = PRODUCT.read_text()
+        mutants = [
+            ('os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_BINARY", 0), dir_fd=pfd)',
+             'os.O_RDONLY | os.O_NOFOLLOW, dir_fd=pfd)'),
+            ('os.O_RDONLY | getattr(os, "O_BINARY", 0))', 'os.O_RDONLY)'),
+            ('m = int(st.st_mtime)', 'm = st.st_mtime_ns // 10**9'),
+            ('virtual = self.manifest.stat(wire)', 'virtual = None'),
+            ('virtual = self.manifest.read(wire, offset, count)', 'virtual = None'),
+            ('return len(virtual[1]), virtual[1]', 'return 0, virtual[1]'),
+            ('self.manifest.close()', 'pass  # no close'),
+            ('raise SfsError(exc.code) from exc', 'raise SfsError(ERR_IO) from exc'),
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp, 'mutant.py')
+            for i, (old, new) in enumerate(mutants, 1):
+                # Exception translation occurs in both entry points; mutate stat only.
+                assert source.count(old) == (2 if old.startswith('raise SfsError(exc.code)') else 1)
+                path.write_text(source.replace(old, new, 1))
+                cmd = [sys.executable, '-B', __file__, '--case']
+                subprocess.run(cmd + [str(PRODUCT)], check=True, capture_output=True)
+                result = subprocess.run(cmd + [str(path)], capture_output=True, text=True)
+                assert result.returncode and 'AssertionError' in result.stderr, result.stderr
+                subprocess.run(cmd + [str(PRODUCT)], check=True, capture_output=True)
+                print('mutation', i, 'runtime RED')
+        print(len(mutants), 'runtime RED; restored controls GREEN')
 
 
 def run(ctx):

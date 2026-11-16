@@ -416,22 +416,21 @@ def main():
     for name, case in CASES.items():
         case(module)
         print(name, 'GREEN')
-    if '--mutate' not in sys.argv:
-        return
-    source = PRODUCT.read_text()
-    with tempfile.TemporaryDirectory() as tmp:
-        mutant = Path(tmp, 'mutant.py')
-        for index, (old, new, case) in enumerate(MUTANTS, 1):
-            assert source.count(old) == 1, old
-            mutant.write_text(source.replace(old, new))
-            cmd = [sys.executable, '-B', __file__, '--case', case, '--module']
-            subprocess.run(cmd + [str(PRODUCT)], check=True, capture_output=True)
-            result = subprocess.run(cmd + [str(mutant)], capture_output=True, text=True)
-            assert result.returncode != 0 and 'AssertionError' in result.stderr, result.stderr
-            assert 'SyntaxError' not in result.stderr and 'ImportError' not in result.stderr
-            print('mutation', index, case, 'runtime RED')
-            subprocess.run(cmd + [str(PRODUCT)], check=True, capture_output=True)
-    print(len(MUTANTS), 'runtime RED; restored controls GREEN')
+    if '--mutate' in sys.argv:
+        source = PRODUCT.read_text()
+        with tempfile.TemporaryDirectory() as tmp:
+            mutant = Path(tmp, 'mutant.py')
+            for index, (old, new, case) in enumerate(MUTANTS, 1):
+                assert source.count(old) == 1, old
+                mutant.write_text(source.replace(old, new))
+                cmd = [sys.executable, '-B', __file__, '--case', case, '--module']
+                subprocess.run(cmd + [str(PRODUCT)], check=True, capture_output=True)
+                result = subprocess.run(cmd + [str(mutant)], capture_output=True, text=True)
+                assert result.returncode != 0 and 'AssertionError' in result.stderr, result.stderr
+                assert 'SyntaxError' not in result.stderr and 'ImportError' not in result.stderr
+                print('mutation', index, case, 'runtime RED')
+                subprocess.run(cmd + [str(PRODUCT)], check=True, capture_output=True)
+        print(len(MUTANTS), 'runtime RED; restored controls GREEN')
 
 
 def run(ctx):
