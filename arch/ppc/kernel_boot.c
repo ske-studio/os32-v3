@@ -229,6 +229,7 @@ void ppc_kernel_real_start(const struct pm_kboot_info *info)
     boot_info = info;
     if (!ppc_cpu_identify(&pvr)) ppc_stop();
     ppc_cpu_disable_bats(pvr);
+    ppc_cpu_power_init(pvr);
     /* IP was cleared by takeover; copy/synchronize the D1 low-vector image. */
     ppc_cache_copy((void *)0, ppc_kernel_vectors.src, ppc_kernel_vectors.size);
     ppc_cpu_load_segments();

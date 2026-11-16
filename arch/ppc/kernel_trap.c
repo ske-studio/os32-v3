@@ -92,6 +92,8 @@ void ppc_trap_dispatch(struct ppc_frame *f)
                      (PPC_MSR_IR | PPC_MSR_DR);
     if (!f || !translated) goto fatal;
     if (f->vector == 0x500 || f->vector == PPC_VECTOR_DEC) {
+        /* Extra defensive clearing on entry, beyond the BSD idle examples. */
+        f->srr1 &= ~PPC_MSR_POW;
         void (*handler)(struct ppc_frame *) =
             f->vector == 0x500 ? external_handler : dec_handler;
         if (handler) {

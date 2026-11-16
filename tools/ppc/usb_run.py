@@ -55,11 +55,16 @@ PROBE = r"""
 #include "kprintf.h"
 static int usb_probe_input(void)
 {
-    static u32 start, stalled, returned;
+    static u32 start, stalled, returned, fresh;
     u32 now, hi;
     platform_clock_read_us(&now, &hi);
     if (!start) start = now;
-    if (!stalled && (u32)(now - start) >= 3000000) {
+    /* The first call after a returned key is the next getkey syscall's first
+     * try, before any wait_step: no _idle in this syscall has enabled EE yet,
+     * so MSR[EE] is exactly what the syscall entry set (syscall-ee). */
+    u32 first = fresh;
+    fresh = 0;
+    if (!stalled && first && (u32)(now - start) >= 3000000) {
         stalled = 1;
         /* AC-CTX-1/6: a real USER syscall stays FG1 during this one-second
          * input poll; DEC delivery must continue before syscall return. */
@@ -77,6 +82,7 @@ static int usb_probe_input(void)
     }
     if (!stalled && (u32)(now - returned) >= 10000) {
         returned = now;
+        fresh = 1;
         return '\n';
     }
     return -1;
@@ -280,8 +286,13 @@ def product_settings(work, mode, late=False):
     char frame[] = "~USBSTREAM:00000000:";
     static const char hex[] = "0123456789abcdef";
     for (unsigned i = 0; i < 8; i++) frame[11+i] = hex[(len >> (28-4*i)) & 15];
+    /* One observation frame must not interleave with IRQ-context USB logs:
+     * a split header hides its payload from stream_payload (seen with NAP). */
+    extern u32 ppc_irq_save(void); extern void ppc_irq_restore(u32);
+    u32 frame_irq = ppc_irq_save();
     (void)pm_escc_write(&serial, frame, sizeof(frame)-1);
-    (void)pm_escc_write(&serial, bytes, len);'''
+    (void)pm_escc_write(&serial, bytes, len);
+    ppc_irq_restore(frame_irq);'''
     text = text.replace(anchor, mirror)
     file = work/(mode+'-stream.c'); file.write_text(text)
     opts = ['KBOOT_SH=1', 'KB_MUT_SRC='+src, 'KB_MUT_FILE='+str(file)]
@@ -334,7 +345,10 @@ def product_accept(elf, cpu, out, mode, late=False):
     argv += USB_QEMU_CLOCK
     (out/'argv.json').write_text(json.dumps(argv, indent=2))
     # The live FB renders the full editing/hotplug transcript as well as ESCC.
-    deadline = time.monotonic()+(180 if os.environ.get('PPC_FB') == '1' else 60)
+    started = time.monotonic()
+    # Each key now waits for the guest to see the press before releasing it, so
+    # a loaded CI runner needs ~55 s for the transcript (local 1-CPU: 46 s).
+    deadline = started+(180 if os.environ.get('PPC_FB') == '1' else 120)
     q = None
     with (out/'qemu.stderr').open('w') as err:
         p = subprocess.Popen(argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=err, bufsize=0)
@@ -349,10 +363,29 @@ def product_accept(elf, cpu, out, mode, late=False):
                 while time.monotonic() < deadline:
                     if predicate(): return
                     time.sleep(.01)
+                # CI keeps no evidence directory: print where the guest stopped.
+                tail = serial(a)[-1500:]
+                print('product USB timeout '+label+' after %.1fs; serial tail:\n' % (time.monotonic()-started) +
+                      tail, flush=True)
                 raise RuntimeError('product USB timeout: '+label+' evidence='+str(out))
             def key(code, mods=(), hold=100):
+                # Hold is measured in guest time. QEMU's send-key hold-time runs on the
+                # virtual clock, which under -icount drifts from real time while the
+                # guest naps (PPC_NOTES §3); release after the guest has seen every
+                # press, and for a long hold after its first typematic repeat.
                 releases = len(re.findall(r'USB KEY src=1 sc=[0-9a-f]+ down=0', serial(a)))
-                q.call('send-key', {'keys':[{'type':'qcode','data':c} for c in [*mods,code]], 'hold-time':hold})
+                presses = len(re.findall(r'USB KEY src=1 sc=[0-9a-f]+ down=1', serial(a)))
+                keys = [*mods, code]
+                q.call('input-send-event', {'events': [
+                    {'type': 'key', 'data': {'down': True, 'key': {'type': 'qcode', 'data': c}}} for c in keys]})
+                wait_for(lambda: len(re.findall(r'USB KEY src=1 sc=[0-9a-f]+ down=1', serial(a)))
+                         >= presses+len(keys), 'key press '+code)
+                if hold > 100:
+                    repeats = len(re.findall(r'USB REPEAT src=1 sc=', serial(a)))
+                    wait_for(lambda: len(re.findall(r'USB REPEAT src=1 sc=', serial(a))) > repeats,
+                             'key repeat '+code)
+                q.call('input-send-event', {'events': [
+                    {'type': 'key', 'data': {'down': False, 'key': {'type': 'qcode', 'data': c}}} for c in reversed(keys)]})
                 wait_for(lambda: len(re.findall(r'USB KEY src=1 sc=[0-9a-f]+ down=0', serial(a)))
                          >= releases+len(mods)+1, 'key release '+code)
                 time.sleep(.03)
@@ -438,7 +471,8 @@ def product_accept(elf, cpu, out, mode, late=False):
             (out/'stream.txt').write_text(output())
             q.call('quit'); p.wait(timeout=2); require(p.returncode==0, 'product QEMU rc=0')
             print(('GREEN' if mode=='normal' else 'RED')+' product-sh '+('mouse-wait ' if late else '')+mode+' '+cpu+
-                  ': reached HID/command boundary, exact stream verdict, QEMU rc=0', flush=True)
+                  ': reached HID/command boundary, exact stream verdict, QEMU rc=0 elapsed=%.1fs'
+                  % (time.monotonic()-started), flush=True)
         finally:
             if q: q.close()
             if p.poll() is None:

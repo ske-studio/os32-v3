@@ -216,7 +216,7 @@ def run(ctx):
             return 1
         check_input_kapi(ctx.root, work, vectors, ctx.mutate)
         print('PASS AC-SYNC-2/return-enabled-no-lost-wakeup powermac '
-              '(host real idle C, fake EE; nop wait)', flush=True)
+              '(host real idle C, fake EE/nap)', flush=True)
         for name in IDS:
             if not name.startswith(('AC-SYNC-2/', 'AC-KAPI-', 'AC-INPUT-')):
                 print(('PASS ' if name.startswith('AC-IRQ-1') else 'UNIMPL ') + name +
@@ -264,6 +264,12 @@ def run(ctx):
                 assert not exercise(ctx.root, work, vectors,
                                     idle=idle.replace(anchor_idle, replacement))
                 print('RED runtime: idle ' + replacement, flush=True)
+            # f6980232 AC-SYNC-2: an EE=1 _idle must rest, not spin.
+            anchor_nap = '    ppc_cpu_nap();'
+            assert idle.count(anchor_nap) == 1
+            assert not exercise(ctx.root, work, vectors,
+                                idle=idle.replace(anchor_nap, '    /* mutation: spin */'))
+            print('RED runtime: idle does not nap', flush=True)
             provider = (ctx.root / 'platform/powermac/link_platform.c').read_text()
             anchor_work = '    idle_work_run();'
             assert provider.count(anchor_work) == 1

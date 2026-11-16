@@ -31,6 +31,7 @@ static void finish(int code)
     __builtin_unreachable();
 }
 static void check(int ok, u32 stage) { mark=stage; if (!ok) finish(stage); }
+void ppc_cpu_nap(void) { }
 int ppc_irq_enabled(void) { return enabled; }
 void ppc_enable(void) {
     enabled=1;
