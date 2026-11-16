@@ -16,8 +16,14 @@ def run(root, env=None):
     for key in ('BUILD_OUT', 'KERNEL_CFLAGS', 'INC_KERNEL', 'C_STD',
                 'SQLITE_PROTO_OUT', 'MAKEFLAGS', 'MFLAGS', 'MAKELEVEL'):
         env.pop(key, None)
-    return subprocess.call(['make', '-f', 'build/ppc-kboot.mk', 'KBOOT_SH=1',
-                            'PPC_CROSS_DIR=' + str(cross)], cwd=root, env=env)
+    for link in ('0', '1'):
+        result = subprocess.call(
+            ['make', '-f', 'build/ppc-kboot.mk', 'KBOOT_SH=1',
+             'KBOOT_LINK=' + link, 'PPC_CROSS_DIR=' + str(cross)],
+            cwd=root, env=env)
+        if result:
+            return result
+    return 0
 
 
 if __name__ == '__main__':
