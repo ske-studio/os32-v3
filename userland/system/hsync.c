@@ -334,6 +334,13 @@ static const char *hs_rel(const char *dst)
  * 無闇に広げられない。収まらない名前は**切り詰めずにエラー**にする (下記)。 */
 #define NAME_CAP 64
 
+#include "hsync_inventory.inc"
+
+static HsInventory g_inventory;
+static int g_inventory_active;
+static char g_inventory_root[OS32_MAX_PATH];
+static u32 g_local_crc_files, g_local_crc_bytes, g_local_crc_ticks;
+
 typedef struct {
     const char *src_dir;  /* 列挙中のコピー元ディレクトリ (表示用。FS には触らない) */
     char names[MAX_FILES][NAME_CAP];
@@ -397,6 +404,72 @@ static void ls_cb(const DirEntry_Ext *entry, void *ctx)
     fl->names[fl->count][i] = '\0';
     fl->types[fl->count] = entry->type;
     fl->count++;
+}
+
+/* The validated tree owns these records until the command finishes. */
+static const u8 *inventory_entry(const char *src)
+{
+    u32 i, j, rootlen = (u32)str_len(g_inventory_root);
+    if (!g_inventory_active || !str_has_prefix(src, g_inventory_root) ||
+        src[rootlen] != '/') return 0;
+    src += rootlen + 1;
+    for (i = 0; i < g_inventory.count; i++) {
+        const u8 *r = g_inventory.data + g_inventory.offsets[i];
+        u32 n = hsi_get16(r + 2);
+        if ((u32)str_len(src) != n) continue;
+        for (j = 0; j < n && (u8)src[j] == r[HSI_RECORD_SIZE + j]; j++) {}
+        if (j == n) return r;
+    }
+    return 0;
+}
+
+static int inventory_list(const char *src, FileList *fl)
+{
+    u32 i, j, prefix = (u32)str_len(src) - (u32)str_len(g_inventory_root);
+    const char *relative = src + str_len(g_inventory_root);
+    if (prefix) { relative++; prefix--; }
+    for (i = 0; i < g_inventory.count; i++) {
+        const u8 *r = g_inventory.data + g_inventory.offsets[i];
+        const u8 *path = r + HSI_RECORD_SIZE;
+        u32 n = hsi_get16(r + 2), start = prefix ? prefix + 1 : 0;
+        DirEntry_Ext entry = {0};
+        if (n <= start) continue;
+        for (j = 0; j < prefix && path[j] == (u8)relative[j]; j++) {}
+        if (j != prefix || (prefix && path[prefix] != '/')) continue;
+        for (j = start; j < n && path[j] != '/'; j++) {}
+        if (j != n) continue; /* Only immediate children, including empty dirs. */
+        for (j = start; j < n; j++) entry.name[j - start] = (char)path[j];
+        entry.name[n - start] = 0;
+        entry.type = r[0] == 2 ? OS32_FILE_TYPE_DIR : OS32_FILE_TYPE_FILE;
+        ls_cb(&entry, fl);
+    }
+    return 0;
+}
+
+/* Validate full paths too, before mkdir, temporary cleanup or FEP close. */
+static int inventory_prepare(const char *src, const char *dst)
+{
+    u32 i;
+    int rc = hsi_acquire(src, &g_inventory);
+    if (rc == HSI_FALLBACK) return 0;
+    if (rc != 0) return rc;
+    for (i = 0; i < g_inventory.count; i++) {
+        const u8 *r = g_inventory.data + g_inventory.offsets[i];
+        u32 j, n = hsi_get16(r + 2), depth = 1;
+        for (j = 0; j < n; j++) if (r[HSI_RECORD_SIZE + j] == '/') depth++;
+        if ((u32)str_len(src) + 1 + n >= OS32_MAX_PATH ||
+            (u32)str_len(dst) + 1 + n >= OS32_MAX_PATH ||
+            (u32)hsp_depth(src) + depth > HS_MAX_PATH_DEPTH ||
+            (u32)hsp_depth(dst) + depth > HS_MAX_PATH_DEPTH) {
+            hsi_release(&g_inventory);
+            return OS32_ERR_NAMETOOLONG;
+        }
+    }
+    (void)str_ncpy(g_inventory_root, src, sizeof(g_inventory_root));
+    g_inventory_active = 1;
+    api->kprintf(ATTR_WHITE, "inventory_entries=%u skipped_names=%u\n",
+                 g_inventory.count, g_inventory.skipped);
+    return 0;
 }
 
 /* ======== 票 H4: 配備の名札 (manifest) ======== */
@@ -1133,6 +1206,15 @@ static int copy_body(const char *src, int fd, u32 *out_crc, u32 *out_total,
                 }
                 break;
             }
+        }
+    }
+    /* Keep the deployment label check above first; backup copies have no record. */
+    {
+        const u8 *entry = inventory_entry(src);
+        if (entry && (total != hsi_get32(entry + 4) ||
+                      crc32_core_final(crc) != hsi_get32(entry + 12))) {
+            *reason = HR_SOURCE;
+            return -1;
         }
     }
     return 0;
@@ -1935,7 +2017,7 @@ static int kernel_backup(const char *dst_path, const OS32_Stat *ds)
     return 0;
 }
 
-static void sync_file(const char *src_path, const char *dst_path)
+static void sync_file(const char *src_path, const char *dst_path, const u8 *entry)
 {
     OS32_Stat ss;
     OS32_Stat ds;
@@ -1950,10 +2032,19 @@ static void sync_file(const char *src_path, const char *dst_path)
     int dst_exists = 0;      /* 判定時に宛先が在ったか (票 H2 手順 5 / 8) */
     int published = 0;       /* 置換が媒体に載ったか (票 H2 手順 8 / 9) */
 
-    /* コピー元: 列挙結果を信用せず**直前に取り直す** (設計書 §3.1)。
-     * 列挙とコピーの間にホスト側が差し替えているかもしれない。 */
-    rc = api->sys_stat(src_path, &ss);
+    /* Inventory metadata replaces the per-file source STAT. Copies still
+     * recheck source metadata and the inventory CRC before publication. */
+    if (entry) {
+        ss = (OS32_Stat){0};
+        ss.st_mode = entry[0] == 1 ? OS_S_IFREG : 0;
+        ss.st_size = hsi_get32(entry + 4);
+        ss.st_mtime = hsi_get32(entry + 8);
+        rc = 0;
+    } else {
+        rc = api->sys_stat(src_path, &ss);
+    }
     if (rc != 0) { fail_file(dst_path, HR_IO, rc); return; }
+    if (entry && entry[0] == 3) { fail_file(dst_path, HR_TYPE, 0); return; }
     if ((ss.st_mode & OS_S_IFMT) == 0) {
         /* 種別が取れない。特殊ファイルを通常ファイルとして読まない */
         fail_file(dst_path, HR_TYPE_UNKNOWN, 0);
@@ -2013,7 +2104,17 @@ static void sync_file(const char *src_path, const char *dst_path)
             return;
         }
 
-        cmp = compare_files(src_path, dst_path, size);
+        if (entry) {
+            u32 crc = 0, bytes = 0, start = api->get_tick();
+            rc = hsi_local_crc(dst_path, size, &crc, &bytes);
+            g_local_crc_ticks += (u32)(api->get_tick() - start);
+            if (rc != 0) { fail_file(dst_path, HR_IO, rc); return; }
+            g_local_crc_files++;
+            g_local_crc_bytes += bytes;
+            cmp = crc != hsi_get32(entry + 12);
+        } else {
+            cmp = compare_files(src_path, dst_path, size);
+        }
         if (cmp < 0) { fail_file(dst_path, HR_IO, 0); return; }
         if (cmp > 0) {
             reason = HR_CONTENT;
@@ -2320,7 +2421,7 @@ static void sync_directory(const char *src_dir, const char *dst_dir, int depth)
     fl.dropped = 0;
     fl.truncated = 0;
     fl.bad_name = 0;
-    rc = os32_ls(src_dir, ls_cb, &fl);
+    rc = g_inventory_active ? inventory_list(src_dir, &fl) : os32_ls(src_dir, ls_cb, &fl);
     if (rc != 0) {
         api->kprintf(ATTR_RED, "  FAIL: ls %s (err=%d%s)\n", src_dir, rc,
                      err_tag(rc));
@@ -2484,7 +2585,7 @@ static void sync_directory(const char *src_dir, const char *dst_dir, int depth)
             }
             sync_directory(src_path, dst_path, depth + 1);
         } else {
-            sync_file(src_path, dst_path);
+            sync_file(src_path, dst_path, inventory_entry(src_path));
         }
     }
 }
@@ -2735,6 +2836,9 @@ int __cdecl main(int argc, char **argv, KernelAPI *_api)
     g_man_extra = 0;
     g_man_lookups = 0;
     g_content_compares = 0;
+    g_inventory = (HsInventory){0};
+    g_inventory_active = 0;
+    g_local_crc_files = g_local_crc_bytes = g_local_crc_ticks = 0;
 
     /* 引数パース。未知オプションと複数 dir は**エラー**にする。
      * 以前は「最後の引数で上書き」だったので `hsync bin sys` が黙って
@@ -3049,7 +3153,23 @@ int __cdecl main(int argc, char **argv, KernelAPI *_api)
                      "  (dry-run: 読み取りと比較だけ。mkdir・書き込み・sync・mtime はしない)\n");
     }
 
+    /* A single-file start keeps the legacy type/error path and never asks
+     * for a tree. Whole-tree sync needs no extra root STAT. */
+    if (subdir) {
+        OS32_Stat st;
+        rc = api->sys_stat(src, &st);
+        if (rc == 0 && (st.st_mode & OS_S_IFMT) == OS_S_IFDIR)
+            rc = inventory_prepare(src, dst);
+        else rc = 0;
+    } else rc = inventory_prepare(src, dst);
+    if (rc != 0) {
+        fail_file(src, HR_IO, rc);
+        api->mem_free(file_buf);
+        return 1;
+    }
+
     if (hsync_fep_begin() != 0) {
+        hsi_release(&g_inventory);
         api->mem_free(file_buf);
         return 1;
     }
@@ -3064,6 +3184,7 @@ int __cdecl main(int argc, char **argv, KernelAPI *_api)
 
     if (g_abort) {
         hsync_fep_end();
+        hsi_release(&g_inventory);
         api->kprintf(ATTR_RED,
                      "\nAborted: 保護判定に必要な stat が失敗した\n");
         api->mem_free(file_buf);
@@ -3096,6 +3217,10 @@ int __cdecl main(int argc, char **argv, KernelAPI *_api)
         api->kprintf(g_man_extra ? ATTR_YELLOW : ATTR_WHITE,
                      "manifest_extra=%d%s\n", g_man_extra,
                      g_dry_run ? " (dry-run: 予定件数)" : "");
+    api->kprintf(ATTR_WHITE,
+                 "compare=%s local_crc_files=%u local_crc_bytes=%u local_crc_ms=%u\n",
+                 g_inventory_active ? "crc" : "legacy", g_local_crc_files,
+                 g_local_crc_bytes, g_local_crc_ticks * (1000u / OS32_TICK_HZ));
     if (g_verbose)
         api->kprintf(ATTR_WHITE, "content_compares=%d\n", g_content_compares);
     if (g_direct_overwrite)
@@ -3154,6 +3279,7 @@ int __cdecl main(int argc, char **argv, KernelAPI *_api)
     }
 
     api->mem_free(file_buf);
+    hsi_release(&g_inventory);
     /* 失敗は終了コードに載せる (crt0_c が main の戻り値を sys_exit へ渡す) */
     return g_errors ? 1 : 0;
 }

@@ -88,8 +88,12 @@ static int fixture_db_finalize(int h)
 { (void)h; return fixture_settings_fault == 5 ? -1 : 0; }
 static int fixture_db_close(int h)
 { (void)h; return fixture_settings_fault == 6 ? -1 : 0; }
+static u32 fixture_tick(void) { return 1; }
+static i32 fixture_yield(void) { return 0; }
 static void fixture_settings_init(KernelAPI *table)
 {
+    table->get_tick = fixture_tick;
+    table->sys_yield = fixture_yield;
     fixture_user_path = 0; fixture_settings_fault = 0;
     table->db_open_existing = fixture_db_open;
     table->db_prepare_only = fixture_db_prepare;
