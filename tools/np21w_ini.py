@@ -52,13 +52,17 @@ ALLOWED = {'USEGD5430': ('true', 'false'), 'GD5430TYPE': ('91',),
 
 # Additional fields are required only when selected, keeping old receipts and
 # the original four-field backend contract valid. SNDboard is saved as hex.
-EXTRA = {'SNDBOARD', 'NP2NETSOCK', 'E_RESUME', 'CRT31K'}
+EXTRA = {'SNDBOARD', 'NP2NETSOCK', 'E_RESUME', 'CRT31K',
+         'CPU_FAMI', 'CPU_MODE', 'CPU_STEP', 'CPU_FEAT'}
 DERIVE_OPERATIONS = {
     'cirrus-on': {'USEGD5430': 'true', 'GD5430TYPE': '91'},
     'cirrus-off': {'USEGD5430': 'false', 'GD5430TYPE': '91'},
     'pegc-on': {'USEPEGCP': 'true'}, 'pegc-off': {'USEPEGCP': 'false'},
     'ram-8mb': {'EXMEMORY': '7'}, 'ram-64mb': {'EXMEMORY': '65'},
     'snd118-on': {'SNDBOARD': '64'}, 'e_resume=false': {'E_RESUME': 'false'},
+    # NP21/W i386c/ia32/cpu.h:519-525,647-648; win9x/ini.cpp:685-688.
+    'cpu-386': {'CPU_FAMI': '3', 'CPU_MODE': '0', 'CPU_STEP': '8', 'CPU_FEAT': '0'},
+    'cpu-486sx': {'CPU_FAMI': '4', 'CPU_MODE': '2', 'CPU_STEP': '3', 'CPU_FEAT': '0'},
     'crt31k-on': {'CRT31K': 'true'}, 'crt31k-off': {'CRT31K': 'false'},
 }
 
@@ -198,6 +202,10 @@ def _extra_value(key, value):
         raise IniError('unsupported additional field value')
     if key == 'SNDBOARD':
         valid = re.fullmatch(r'[0-9A-Fa-f]{1,2}', value)
+    elif key in ('CPU_FAMI', 'CPU_MODE', 'CPU_STEP', 'CPU_FEAT'):
+        base = 16 if key == 'CPU_FEAT' else 10
+        pattern = r'[0-9A-Fa-f]{1,8}' if base == 16 else r'[0-9]{1,10}'
+        valid = re.fullmatch(pattern, value) and int(value, base) <= 0xffffffff
     elif key in ('E_RESUME', 'CRT31K'):
         valid = value in ('true', 'false')
     else:
@@ -288,7 +296,8 @@ def transform(raw, changes):
         if old == new:
             continue
         parts[i] = parts[i][:start] + new + parts[i][end:]
-        if key in ALLOWED or key in ('SNDBOARD', 'E_RESUME', 'CRT31K'):
+        if key in ALLOWED or key in ('SNDBOARD', 'E_RESUME', 'CRT31K',
+                                      'CPU_FAMI', 'CPU_MODE', 'CPU_STEP', 'CPU_FEAT'):
             diff.append(f"{key}: {old.decode('ascii')} -> {resolved[key]}")
         else:
             # Never print the previous opaque path/spec; new is operator-chosen.
