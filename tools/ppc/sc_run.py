@@ -130,7 +130,7 @@ def nest_main(args):
     cpus = ['7450', '7455'] if args.cpu == 'both' else [args.cpu]
     base = Path(os.environ['TMPDIR'])/'sc-run'; base.mkdir(exist_ok=True)
     work = Path(tempfile.mkdtemp(prefix='run-', dir=base))
-    settings = ['KBOOT_SHELL=1', BINS]
+    settings = ['KBOOT_SHELL=1', 'KBOOT_LINK=0', BINS]
     if args.serial:
         source = 'platform/powermac/cli_boot.c'
         text = (ROOT/source).read_text()
@@ -265,7 +265,7 @@ static int sc_connected(void)
     (void)pm_escc_write(&serial, frame, sizeof(frame)-1);
     (void)pm_escc_write(&serial, bytes, len);''')
     for name in ['normal'] + (['fd1-log', 'no-restart'] if mutate else []):
-        settings = ['KBOOT_SH=1']
+        settings = ['KBOOT_SH=1', 'KBOOT_LINK=0']
         for slot, src, text in [('', boot_src, boot), ('EXTRA_', input_src, inp),
                                 ('THIRD_', stream_src, stream)]:
             if name == 'fd1-log' and src == stream_src:
@@ -361,7 +361,7 @@ def main():
     shell_serial(work, cpus, args.mutate)
     print('PASS S-C serial evidence='+str(work), flush=True)
     if not args.serial:
-        elf = build(work/'product', 'KBOOT_SH=1')
+        elf = build(work/'product', 'KBOOT_SH=1', 'KBOOT_LINK=0')
         symbols = command([str(cross/'bin/powerpc-elf-nm'), elf])
         require('resident_cli_run' not in symbols and 'pm_cli_boot' not in symbols, 'CLI in product')
         for cpu in cpus:
