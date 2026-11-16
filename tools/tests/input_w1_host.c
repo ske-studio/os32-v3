@@ -24,6 +24,10 @@ static int check(void)
     if (ikm_wire_header(wire, sizeof(wire), &count) || count != 8192) return 6;
     wire[8]=1;
     if (!ikm_wire_header(wire, sizeof(wire), &count)) return 7;
+    wire[8]=1; wire[9]=0; wire[11]=0x10;
+    if (!ikm_wire_header(wire, 32, &count)) return 8;
+    wire[11]=0; wire[3]=2; if (!ikm_wire_header(wire, 32, &count)) return 9;
+    wire[3]='1'; wire[6]=8; if (!ikm_wire_header(wire, 32, &count)) return 10;
     return 0;
 }
 void _start(void) {

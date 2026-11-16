@@ -43,7 +43,8 @@ def run(ctx):
             if os.environ.get('OS32_REQUIRE_PPC') == '1': return 1
         if ctx.mutate:
             for old, new in [('read16(wire + 4) != 2', 'read16(wire + 4) != 1'),
-                             ('n > IKM_MAX_ROWS', 'n >= IKM_MAX_ROWS')]:
+                             ('n > IKM_MAX_ROWS', 'n >= IKM_MAX_ROWS'),
+                             ('n > IKM_MAX_ROWS || ', '')]:
                 assert source.count(old) == 1
                 assert build(source.replace(old, new)) != 0
                 print('RED runtime:', old, flush=True)
