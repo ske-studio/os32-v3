@@ -31,7 +31,8 @@ int io_policy_reset(u32 owner, u32 gen);
 void io_policy_owner_exit(u32 owner, u32 gen);
 
 /* Provided by the dispatcher (io_work.c): nonzero while io_dispatch runs,
- * so set/reset/restore return OS32_ERR_BUSY instead of swapping. */
+ * so set/reset return OS32_ERR_BUSY instead of swapping. owner_exit swaps
+ * anyway: the dispatcher re-reads tiers only at round entry (design P3). */
 int io_dispatch_running(void);
 
 #endif

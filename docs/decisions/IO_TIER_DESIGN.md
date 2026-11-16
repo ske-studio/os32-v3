@@ -233,3 +233,9 @@ int io_pump(unsigned int budget_us); /* callback数、負=失敗 */
 - N4: AC-CTX-1に適合した入口から共通のFG1実行器へ。ppc_syscall_fg_runによる許可/復元は不要。
 - N5: syscall 1回あたりのdispatch最大時間を計測する。
 - LAN-N3: link_tickはFGへ移し、FGが10 jiffy回していなければIRQ0で1回回す救済をLAN側が残す。
+
+## A3・A4 の依頼で PM が決めたこと (2026-11-16)
+- P1 (予算の換算): service ごとの予算の count は、時計の token (source・generation) と policy の generation の組ごとに 16 枠の表に持ち、組が変わった巡の入口でだけ us_to_count で取り直す。巡の上限も同じ。毎巡の入口の換算は表の参照だけで、時計の読みの回数 (§5 の 1+2K+M) は変えない。
+- P2 (N5 の syscall あたりの合算): A3 は 1 回の io_dispatch の最大時間 (count) と、dispatch の時間の累計 (u32 の count、wrap 可) を持つ。syscall の入口と出口で累計の差を取って最大を記録するのは、syscall の入口に結ぶ段 (C2・C4・P1) へ送る。
+- P3 (owner の終了時の復元): io_policy_owner_exit は io_dispatch_running に関わらず表を差し替える (void のまま)。dispatcher は Tier と予算を巡の入口で policy の generation を見て取り直すだけなので、巡の途中の差し替えは次の巡から効く。BUSY を返すのはアプリが呼ぶ set・reset だけ。
+- P4 (試験の実行): host の試験は tools/tests/host32.py の runner (native と qemu-i386 の user 実行) で回してよい。依頼の「QEMU に触らない」は PowerPC の QEMU の system emulation の意味。preflight の build/out の像が無い NG は、この段では make all をしないので無視してよい。
