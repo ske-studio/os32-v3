@@ -578,3 +578,12 @@ DD の命令接続と #NM・像への結線は未完。延期の正典は `docs/
 binary64・16/64 bit 整数変換を接続する。ST(i) 宛ての演算は宛先を helper に渡し、
 非 mask 例外による pop/store 抑止は共通 policy に残す。minMag の整数変換 helper は
 C1 照合に使い、FISTTP opcode は従来どおり公開しない。B10/C3/C4/build は引き続き別段。
+
+## 判定と #NM の段で設計者が決めたこと (2026-11-17)
+
+- B10/C4: 別段の像への結線まで `OS32_X87_EMU_LINKED` を未定義とし、software codec/dispatch の呼出しだけを条件付きで実装する。未結線の #NM は既存 fault へ流し、ビルド側でこの旗とエミュレータ全体を同時に有効にする。
+- B10: software の active state は x87.c が一つ所有し、108 byte の保存・復元は codec を通す。save は FNSAVE 同様環境を初期化し payload を保持、新規 owner の init は全域を初期化する。
+- C3/C4: #NM は元の GS/FS/ES/DS を common frame の手前に各 4 byte 保存する。VM は既存 V86 fault へ、CPL3 のみ user ESP/SS を読む。成功時だけ GPR/EIP/EFLAGS を書き戻し、segment は元値を pop、専用 IRETD で戻る。
+- 試験版の段: `arch/x86/kernel/x87.c` の `OS32_TEST_NOFPU` を隔離試験ビルド専用とする。`OS32_X87_EMU_LINKED` 必須 (無ければコンパイルエラー)、probe 後にソフト経路を選び EM/MP/TS=1 を要求する。通常の build 設定には追加しない。
+- B17: CPU 行は 52 桁の制約内に収めるため `x86 32-bit; calib=...; FPU=...` とする。PPC の収集は hw 固定。
+- P3: FLDCW の予約 CW bit を codec と同じ `(cw & 0x1f3f) | 0x0040` に正規化する。

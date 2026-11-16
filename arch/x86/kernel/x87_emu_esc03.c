@@ -88,7 +88,7 @@ static enum x87_emu_result SF_ESC1(struct esc *c)
             MEMORY(c->d->operand16 ? 14 : 28, false);
             x87_emu_state_decode(&e->state, c->input, c->d->operand16, true); break;
         case 5:
-            MEMORY(2, false); e->state.cw = x87_get_le(c->input, 2) & 0x7fff; break;
+            MEMORY(2, false); e->state.cw = (x87_get_le(c->input, 2) & 0x1f3f) | 0x0040; break;
         case 6:
             MEMORY(c->d->operand16 ? 14 : 28, true);
             x87_emu_state_encode(&e->state, e->output, c->d->operand16, true);

@@ -1,5 +1,12 @@
 #include "x87.h"
 
+/* Only CR0/IF/AC are privileged hooks; probe and saves use actual x87. */
+u32 x87_test_irq_save(void) { return 0x200; }
+void x87_test_irq_restore(u32 f) { (void)f; }
+u32 x87_test_cr0_read(void) { return 0; }
+void x87_test_cr0_write(u32 f) { (void)f; }
+int x87_test_has_ac(void) { return 1; }
+
 static struct arch_fp_context parent[3], parked;
 static unsigned int value[2];
 static void control(unsigned short c) { __asm__ volatile("fldcw %0" : : "m"(c)); }

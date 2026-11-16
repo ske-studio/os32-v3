@@ -60,6 +60,8 @@ from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 SOURCES = ['decode', 'state', 'ops', 'esc03', 'esc47', 'exception', 'memory', 'dispatch']
 MUTATIONS = [
+    ('fldcw-reserved-bits', 'esc03', '(x87_get_le(c->input, 2) & 0x1f3f) | 0x0040',
+     'x87_get_le(c->input, 2) & 0x7fff'),
     ('arithmetic-sub-for-add', 'ops', 'case 0: return extF80_add(a, b);',
      'case 0: return extF80_sub(a, b);'),
     ('rounding-map-reversed', 'exception', 'softfloat_round_max, softfloat_round_minMag',
@@ -97,7 +99,7 @@ def main():
                         str(ROOT/'tools/tests/x87_emu_core_host.c'),'-o',str(oracle)],check=True)
         # ELF64 with direct syscall, no i386 int80 runner or binfmt fallback.
         capture=subprocess.run([str(oracle)],check=True,capture_output=True).stdout
-        sections=[('arith',768*108),('convert',20*6),('unary',32*108),('extended',14*108),('store',6*112),('env',4*108),('rear_reg',27*8*4*3*112),('rear_edge',18*27*112),('rear_mem',16*108),('rear_store',4*4*12*7*116),('rear_load',24*108),('rear_image',16*324+58)]
+        sections=[('arith',768*108),('convert',20*6),('unary',32*108),('extended',14*108),('store',6*112),('env',4*108),('rear_reg',27*8*4*3*112),('rear_edge',18*27*112),('rear_mem',16*108),('rear_store',4*4*12*7*116),('rear_load',24*108),('rear_image',16*324+60)]
         assert len(capture)==sum(size for _,size in sections),len(capture)
         offset=0; header=[]
         for name,size in sections:
@@ -105,7 +107,7 @@ def main():
             header.append('static const unsigned char reference_'+name+'[]={' +
                           ','.join(str(b) for b in data)+'};\n')
         (tmp/'x87_emu_reference.h').write_text(''.join(header))
-        print('Oracle: native ELF64 x87, 5325 cases, libc=none',flush=True)
+        print('Oracle: native ELF64 x87, 5326 cases, libc=none',flush=True)
         flags = ['-I'+str(tmp), '-m32', '-march=i386', '-std=gnu11', '-Os', '-ffreestanding',
                  '-fno-pie', '-fno-stack-protector', '-msoft-float', '-mno-fp-ret-in-387',
                  '-DX87_EMU_HOST_TEST', '-I'+str(ROOT/'arch/x86/kernel'), *include_flags(ROOT)]

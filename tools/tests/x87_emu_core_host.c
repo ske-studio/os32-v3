@@ -273,6 +273,9 @@ static void rear_oracle(void)
     u16 cw;
     __asm__ volatile("frstor %1; fnstcw %0; fninit":"=m"(cw):"m"(seed):"memory");
     emit(&cw,2);
+    u16 all_cw = 0xffff;
+    __asm__ volatile("fldcw %1; fnstcw %0; fninit":"=m"(cw):"m"(all_cw):"memory");
+    emit(&cw,2);
     seed_image(seed,0,0x37f);
     for(unsigned i=28;i<38;++i)seed[i]=0; /* tag=00, payload=zero */
     __asm__ volatile("frstor %1; fnstenv %0":"=m"(hw):"m"(seed):"memory");
@@ -730,6 +733,10 @@ static void rear_images(void)
     for(unsigned i=0;i<108;++i)ram[4096+i]=seed[i];
     CHECK(image_op(4,false,0x2000)==X87_EMU_OK,110);
     CHECK(mem(0xd9,7,0x2100)==X87_EMU_OK && same(ram+4352,ref,2),111);
+    ram[4096] = ram[4097] = 0xff;
+    CHECK(mem(0xd9,5,0x2000)==X87_EMU_OK,126);
+    CHECK(mem(0xd9,7,0x2100)==X87_EMU_OK && same(ram+4352,ref+2,2),127);
+    ref += 2;
     reset();seed_image(seed,0,0x37f);
     for(unsigned i=28;i<38;++i)seed[i]=0;
     for(unsigned i=0;i<108;++i)ram[4096+i]=seed[i];

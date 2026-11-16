@@ -242,7 +242,51 @@ ISR_NOERR_V86 3                ;; #BP ブレークポイント
 ISR_NOERR_V86 4                ;; #OF オーバーフロー
 ISR_NOERR_V86 5                ;; #BR BOUND範囲外
 ISR_NOERR_V86 6                ;; #UD 未定義命令
-ISR_NOERR_V86 7                ;; #NM コプロセッサ不在
+;; #NM alone can resume after emulation. Keep the original segments, including
+;; null selectors, instead of IRETD_USER's replacement with USER_DS.
+extern nm_handler
+global isr_stub_7
+isr_stub_7:
+        cli
+        test    dword [esp + IRET_EFLAGS_OFF], EFLAGS_VM
+        jnz     .from_v86
+        push    0
+        push    7
+        EXC_ENTER
+        pushad
+        push    ds
+        push    es
+        push    fs
+        push    gs
+        RESTORE_KSEG
+        cld
+        push    esp
+        call    nm_handler
+        add     esp, ABI_WORD_BYTES
+        EXC_LEAVE
+        pop     gs
+        pop     fs
+        pop     es
+        pop     ds
+        popad
+        add     esp, ISR_COMMON_SKIP_BYTES
+        iretd
+.from_v86:
+        EXC_ENTER
+        push    0
+        pushad
+        RESTORE_KSEG
+        cld
+        mov     eax, esp
+        push    7
+        push    eax
+        call    v86_fault_handler
+        add     esp, 2 * ABI_WORD_BYTES
+        call    v86_exit_to_kernel
+.hang:
+        cli
+        hlt
+        jmp     .hang
 ISR_ERR   8                    ;; #DF ダブルフォルト
 ISR_NOERR_V86 9                ;; コプロセッサセグメントオーバーラン
 ISR_ERR_V86   10               ;; #TS 無効TSS
