@@ -1,0 +1,10 @@
+{
+  "source": "FreeBSD releng/10.4 share/syscons/keymaps/jp.pc98.kbd",
+  "revision": "d869f4ade283f4691dc249e435376a5883824be2",
+  "sha256": "354468f80d0ec869f28d867bcb819e0c04c78eb1e001232303c81e9684007433",
+  "url": "https://raw.githubusercontent.com/freebsd/freebsd-src/d869f4ade283f4691dc249e435376a5883824be2/share/syscons/keymaps/jp.pc98.kbd",
+  "license": "The keymap and sys/sys/kbio.h carry only the FreeBSD identifier and no individual license clause; FreeBSD kbdtables.h carries BSD-2-Clause.",
+  "differences": "INPUT_BIND_DESIGN section 2a, option B; INPUT_KEYMAP_DESIGN sections 3 and H0b",
+  "overrides": {"0":"ESC", "15":"TAB", "28":"CR", "53":"Henkan", "54":"12", "55":"03", "56":"16", "57":"7f", "58":"1e", "59":"1d", "60":"1c", "61":"1f", "62":"01", "63":"05", "81":"Muhenkan", "82-84":"00", "96":"NOP", "97-107":"00", "114":"NOP"},
+  "notes": "DOS control characters are CHAR; S3 supplies LEGACY_CONTROL by key origin. Kana is a physical modifier outside the table. No AltGr bank or accents in the source."
+}
