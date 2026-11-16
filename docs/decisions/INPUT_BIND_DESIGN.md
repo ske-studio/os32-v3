@@ -371,3 +371,10 @@ exec 終了 hook は `exec/exec_abort.inc` に内部 adapter として定義し�
 製品の追従ファイルは `exec/appslot.c`・`exec/appslot.h` (世代と条件付き回収)、`gfx/gfx_core.c`・`gfx/gfx_core_init.inc` (取得前安全点/CUI shell 発行)、`input/hal/input_interrupt.c`・`input/hal/input_context.h` (印と内部宣言)、`exec/exec_abort.inc`・`exec/exec_finish.inc` (境界)、後続の `exec/exec_launch.inc` (登録/開始順) とする。`exec/appslot_selftest.inc` も保存対象追加が必要。診断 enter の前処理は `kdebug/gf_display_test.c` を追従し、モジュールから drain を呼ぶための内部 import は `kernel/module/kdebug_imports.def` とその生成器の出力を追従する (公開 KAPI への追加ではない。生成物は手編集しない)。1 小段の製品ファイル制限を守って直列に分け、B の像登録は別段とする。新呼出しを足す各段で tools/tests の #include 型・Python 切出し型を再検索し、appslot/gfx/exec の兄弟 stub と変異 anchor を追従する (特に `multiapp_impl_host.c`、`gfx_kernel_fb_host.c`、`gfx2_i2_core_host.h`、`exec_hwb_abort_host.c`、`test_exec_hwb_abort.py`、`test_exec_r1.py`)。
 
 受入は (1) 同 owner 再取得で旧世代は回収不可、(2) 別 owner/同 ID 再利用も不可、(3) 0 と周回、(4) exit/kill が先・drain が先の両順と二度 drain、(5) snapshot/予約境界への IRQ 挿入、(6) shell の診断 leave→enter と描画組込 STOP→end の復帰、(7) command_active のまま exec 終了→次の hwb で中断印ゼロ、(8) 他 owner の終了で印を消さない、(9) GUI WM の所有 ID と claim 拒否の既存対照を固定する。比較を owner だけにする・発行を止める・exit の印消去を外す変異は runtime RED を求める。本追補だけの段ではコード・ビルド・変異/実機試験を実行せず、文書検査を完了条件とする。
+
+### M6[3] の表示の資源の世代のレビューで足したこと (2026-11-17、Opus レビュー、PM)
+
+- 追従の表に `tools/tests/test_gf_cui.py:48-59` を足す。`appslot_gfx_owner_exit` の本体を文字列で切り出して組む試験なので、回収の予約と組の静的変数を使う形になったら、切り出す範囲を広げるか stub を足す。
+- 段の順: input/hal/input_context.c・input_interrupt.c を x86 の feature の mk と build/ppc-kboot.mk に登録する段 (B) を、exec_finish.inc・gfx_core_init.inc に新しい呼び出しを足す段より先にする (exec.c と gfx_core.c は PPC の像にも入るので、登録が無いと両方の arch でリンクが落ちる)。受入に PPC の像 2 つのリンクを入れる。
+- `exec_reclaim_resources` の入口で exec_gen が得られない (CPL=0 の子で a->as が無い) ときは、中断の印を消さず、表示の印にも触れない (NULL を読まない)。
+- 診断の enter の途中 (入口の drain の後、gfx_init の acquire の前) の STOP は、enter の失敗とする。受入 (6) に、この区間への IRQ の挿入を 1 件足す。
