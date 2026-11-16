@@ -681,3 +681,8 @@ KEYSYM/EXACTのkeysymはNetBSDのu16値を維持し、独自の列挙を足さ�
 重複キーはB§4どおり **(kind, profile, context, index, selector)**。kind8でもauxを重複キーに追加しない (同じキーの修飾違い2行も重複)。完全一致の行を後勝ちにせず全体拒否する。COMPATとEXTはselectorが異なる別指定で、COMPAT同士の重複も拒否。kind5+kind6は合計128行以下、wire全体は8192行以下・長さは16+16×count (最大131088B)。kind8を既存の128行枠へ暗黙に足さない。欠落補完・kind6のprofile単位全置換・他arch拒否・失敗時にactive/保存表不変は§5/B§4を維持する。
 
 本追記は採番と値域の明文化だけで、accent/deadの待ち状態・Command互換scの監査・A0z公開の保留を解除しない。通常のBSD操作と救済キーの意味、IME優先、既定割当、シングルタスク・協調切替も変えない。
+
+### 列挙の数値のレビューの PM 決定 (2026-11-17、Opus レビューの P2 2 件)
+
+- kind8 の重複の判定の組は (kind, profile, context, index, selector, aux) とする (aux を入れる)。Mac の GUI の Cmd+Z (UNDO) と Shift+Cmd+Z (REDO) を両立させるため。kind6 は mask を selector に持つので今のまま。ほかの kind の重複の組は B§4 のまま。
+- TERM の編集制御の byte の重複は、同じ profile と context の中では拒否する (INVAL)。同じ index を共通の context 0 と具体の context 1..4 の両方に置いたときは、具体の context が勝つ。
