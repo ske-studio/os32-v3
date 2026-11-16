@@ -136,8 +136,8 @@ def main():
         print(('FAIL' if required else 'SKIP') + ' ppc-terminal-work: unavailable: ' + ', '.join(missing))
         return int(required)
     # Read the actual image selection without building prerequisites.
-    for image, expected in [('KBOOT_SH=1', True), ('KBOOT_LINK=1', False)]:
-        manifest = subprocess.check_output(['make', '-s', '-f', 'build/ppc-kboot.mk', image,
+    for image, expected in [(['KBOOT_SH=1', 'KBOOT_LINK=0'], True), (['KBOOT_LINK=1'], False)]:
+        manifest = subprocess.check_output(['make', '-s', '-f', 'build/ppc-kboot.mk', *image,
             '--eval=work-manifest:;@echo $(KB_C)', 'work-manifest'], cwd=ROOT, text=True).split()
         assert ('platform/powermac/terminal_input.c' in manifest) == expected
         assert 'net/nic.c' in manifest  # idle_wait_step uses the common RX predicate.
