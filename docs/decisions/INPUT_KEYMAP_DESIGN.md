@@ -306,5 +306,5 @@ os32powerpc のレビュー (PPC の Opus が PPC の実物と照合、K1・K3�
   - 群 2: 残り
   - norepeat は群 0 と群 1 の全部で 1。
 - KS の群に独自の番号は足さない (NetBSD の値だけ)。is_keypad は 0xf220〜0xf27f で固定。
-- 大きさ (32bit の nm で実測): entries 2560B、compat 256B、norepeat 32B、order 64B、actions 4B、no_keydata 32B、descriptor 16B、backend 20B。entries と compat を除いた合計 (norepeat・order・actions・no_keydata・descriptor・backend) は 168B。
+- 大きさ (32bit の nm で実測): entries 2560B、compat 256B、norepeat 32B、order 64B、actions 4B、no_keydata 32B、descriptor 16B、backend 20B。補助と descriptor の合計は 424B (os32powerpc の報告の値。compat 256B を含む)。
 - 生成器は tools/hid_keymap_import.py。原本は NetBSD 8a12c4d95f03 で、取得は tools/keymap/fetch_netbsd_wscons.sh、sha256 は netbsd_wscons_sources.json。生成物 input/keymaps/hid_jp.c は commit する。CI は自己照合だけを行い、原本から作り直して照らすのは原本がある機械だけ。
