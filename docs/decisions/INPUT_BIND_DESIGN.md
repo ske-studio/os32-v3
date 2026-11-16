@@ -304,3 +304,70 @@
 |M6[4]|exec/exec_abort.inc: exec 終了・待機解除の境界を接続し、旧印を次の実行へ持ち越さないことを試験|
 
 IRQ・WM・arch adapter の入力接続と新中断の有効化は §6 の後続段で行う。
+
+## M6[3] の表示の資源の世代 (設計者が決めたこと)
+
+本追補は 2026-11-17、基点 `561968f8cf78400fafbee029ac1dcc70ea69c0e8` の内部設計。§3 N4 の資源世代を具体化する。本文の入力配送・ユーザー決定・公開 ABI は変えない。以下の署名は追加する内部口であり、実装済みを意味しない。file:line はこの基点での目安。
+
+### 発行元・採取・照合
+
+- 世代の正は `exec/appslot.c:91,519-555` の画面所有管理に置く。既存 `g_gfx_owner` と別に、表示資源の組 `{u32 owner, resource_gen}` と発行カウンタ `u32 next_resource_gen` を持つ。0 は無し、発行時は加算して周回の 0 を飛ばし、一致だけで比べる (M5 の PM 決定と同じ)。解放で現在の組を 0 にしても発行カウンタは戻さない。初期化時だけ両方を 0 にする。AS・command・gfx_policy_gen (u16)・gfx2 adapter の世代を代用しない。
+- `appslot_gfx_claim(int gui_mode)` は従来の判定・戻り値を保持し、`r > 0` の所有取得時に owner 更新と新世代発行を同じ `irq_save` 区間で行う。同じ owner の再 claim でも進める。拒否・素通しでは進めない。
+- shell は `GFX_OWNER_WM == APP_ID_SHELL` であり、ID だけでは CUI の描画と通常 WM を分けられない。`gfx/gfx_core_init.inc:2` の `gfx_init_mode(int legacy200)` で、CUI (`!con_sink_is_enabled()`) かつ `res_owner_get() == APP_ID_SHELL` の初期化開始時に下記 acquire を呼ぶ。これで `kdebug/gf_display_test.c:1034-1037` の診断 enter → `gfx_init()` と描画組込も同じ世代を得る。診断 enter は `kdebug/gf_display_test.c:1022` の入口で、`display_cui_owner` や session を変更するより前に drain を完了させる (gfx_init 内だけでは新しい診断状態を旧印で回収しかねない)。GUI の WM 復帰・ブートの owner 0・CPL=0 子の素通しには発行しない。初期化が途中失敗しても取得試行の世代は巻き戻さず、後始末まで保持する。既存の画面所有 ID と取得許可を変更しない。
+
+```c
+/* exec/appslot.h: 内部専用。acquire は上記の取得経路だけが呼ぶ。 */
+void appslot_gfx_resource_acquire(int owner);
+int appslot_gfx_resource_snapshot(int owner, u32 *resource_gen);
+int appslot_gfx_owner_exit_if(int owner, u32 resource_gen);
+/* input/hal/input_context.h: M6 の内部口。 */
+int input_display_restore_capture(u32 owner);
+int input_display_restore_drain(void);
+void input_interrupt_exec_exit(u32 owner, u32 exec_gen);
+```
+
+- acquire は新しい組を発行するだけで、`g_gfx_owner` を変更しない。通常アプリの claim はこの共通処理を割り込み禁止のまま使用する。snapshot は owner が現在の組と一致し、世代が非 0 なら出力して 0、そうでなければ -1。内部で `irq_save/irq_restore` を使い、呼出し前の割り込み状態を維持する。
+- M6 capture は一つの `irq_save` 区間内で snapshot と `display_restore_pending = {owner, resource_gen}` の記録を行う。IRQ/WM は配送先 owner を渡すだけで、回収しない。組が無ければ成功扱いで何も積まない。同じ組の重複は一つにまとめる。異なる組が既に pending なら上書きせず -1 (BUSY) を返す。通常の取得経路は後述の安全点で旧 pending を先に完了させるため、この BUSY を放置して次の取得を進めない。command_gen/exec_gen は表示の印に入れない。
+- drain は FG1 のみ。IRQ/例外中または呼出し時 IF/EE=0 なら -1 を返し、印を維持する。pending を短い `irq_save` で控え、`appslot_gfx_owner_exit_if(owner, resource_gen)` を呼ぶ。戻り値 1 は一致して回収、0 は既に回収済みまたは別資源へ交代済み (どちらも完了)、-1 は安全点でないため未処理。1/0 の後だけ、再び `irq_save` して控えと同じ pending を消す。空なら 0。二度 drain は無作用。中断印の take/discard は表示印を消さない。
+
+### 原子性と回収の範囲
+
+`appslot_gfx_owner_exit_if` は **比較だけの口ではなく比較と回収予約を一体にした口** とする。FG1 で次の順に行う。
+
+1. `irq_save` → owner/非 0 resource_gen の一致を確認 → 一致した資源の組を 0 にして回収予約 → `irq_restore`。不一致なら何も触らず 0 を返す。IRQ は予約後の資源を新たに採取できない。
+2. FG1 で既存 `appslot_gfx_owner_exit` 相当の後始末 (`gf_display_owner_exit(id)` と所有 ID の WM への返却、`exec_surface_policy_reeval()`) を行う。この途中は協調切替・WM pump・別 owner の実行・表示再取得を行わない。シングルタスクなので IRQ を再開しても別の取得/exit は走らず、IRQ は印の採取だけを行う。所有 ID の比較と更新も短い `irq_save` 内に置き、policy 再評価はその外に出す。
+3. 戻り値 1。これは論理的な所有回収の完了であり、ドライバの解放エラーが無いという意味ではない。既存の診断表示のエラー報告・cleanup_pending による再試行は保持する。
+
+重い `gf_display_owner_exit` (restore/shutdown/cleanup、`kdebug/gf_display_test.c:1063`) や surface 再評価を割り込み禁止区間に入れない。予約から後始末終了までの「協調切替なし」は実装の受入条件とする。待ちが必要な backend でも IRQ の進行と協調的な他アプリへの切替を混同しない。
+
+既存 `void appslot_gfx_owner_exit(int id)` は終了・kill 用の無条件口として残し、同じ回収予約の内部処理を使う。表示資源の組が id と一致するなら先に無効化し、その後に従来の診断終了と所有返却を行う。別 owner の組を無効化しない。世代付き口の不一致時にはこの無条件口も診断終了も呼ばない。終了・kill の通常の `exec_notify_owned` が先に回収した場合、遅れた表示印は drain で 0 を得て消える。
+
+`gfx_shutdown()` は従来どおり画面所有 ID を返さない。表示資源の世代もここでは終えず、所有回収または次の取得で失効させる。診断 leave 後の同世代 cleanup は既存の冪等な後始末となり、次の enter は新世代なので古い印で解放されない。世代は個々の surface の寿命ではなく、所有取得から後始末までの区間を識別する。
+
+### exec 境界と安全点 (N4)
+
+|位置 (目安)|接続する処理と順序|
+|---|---|
+|`exec/exec_finish.inc:129` `exec_reclaim_resources(int id)` の入口|AS/slot が残る間に `kernel/io_kapi.c:17-28` と同じ選択で shell は `g_shell_service.generation`、他は `a->as->generation` を控え、`input_interrupt_exec_exit(id, exec_gen)` を呼ぶ。command_active に関係なく、同 owner/exec_gen の中断 pending を irq_save 内で消す。他 owner/世代は触らず、表示印は保持する。続く M5 の `input_context_owner_release(id, exec_gen)` より前に行う (M5 release 自体は discard を呼ばない)|
+|`exec/exec_finish.inc:274` `exec_finish` と `exec/exec_schedule.inc:296` `exec_kill_one`|両者は上記共通回収入口を通る。正常終了・fault・STOP・停止中の kill を覆う。`exec_teardown_app` / `appslot_reclaim` 後の `exec_notify_owned` から exec_gen を取り直さない。shell の retire 前にも入口を通る|
+|`exec/exec_finish.inc:223` `exec_notify_owned`|既存の emergency return と無条件 `appslot_gfx_owner_exit(id)` を維持し、その後 `input_display_restore_drain()`。回収済みの組は無作用で完了する|
+|`exec/exec_abort.inc:9` `exec_cui_display_abort`|旧 CUI 表示 bool を owner/資源世代の capture/drain に置き換える接続点。`:67` `ring3_abort_request` の CUI 分岐で capture、ここでは drain。`ring3_wait_pending` (`:101`) と syscall の安全点 (`exec/exec_syscall.inc:88,172`) から来る既存経路を使う。旧 hwb 印も shell の exec 終了時には同じ境界 adapter で消す|
+|command_end と次の command_begin の FG1 adapter|end で中断印を消した後に drain、次の begin では drain 完了後に M5 の begin を呼ぶ。M5 discard callback は IF=0 なので drain を登録しない。描画取得の FG1 adapter も acquire/claim の前に drain を完了させる。新 command_gen の公開より表示後始末を先にする|
+|`exec/exec_launch.inc:389-405` commit 周辺|子の文脈登録/選択より前に親の command 境界の破棄と drain を済ませる。shell は publish 後の世代で登録する。失敗しうるロード中に親の実行文脈を壊さず、未 commit の `exec_launch_abort` (`exec/exec_finish.inc:244`) は登録済み実行単位の exit として扱わない|
+
+exec 終了 hook は `exec/exec_abort.inc` に内部 adapter として定義し、共通回収入口から呼ぶ。旧 hwb bool の消去は shell 終了だけに限定し、無関係な GUI 子の終了で消さない。M6[4] を abort.inc の編集だけで完了とせず、finish.inc の接続を別小段にする。IRQ/WM への入力結線と新中断有効化は、既定どおり後続 E-x/E-p 等まで待つ。
+
+### 既存利用者の調査と実装時の追従
+
+`rg -n 'g_gfx_owner|appslot_gfx_(claim|owner|owner_exit)|gfx_screen_owner|gfx_fullscreen_owner'` を製品・SDK・userland・tools/tests に対して実施した。既存の生成物の署名は変更しない (診断用内部 import の追加は下記)。
+
+|既存口/利用者|扱い|
+|---|---|
+|claim: `gfx/gfx_core.c:325-354`、`exec/appslot_selftest.inc`、`tools/tests/multiapp_impl_host.c`|署名・許可・戻り値を維持。claim 前の drain と取得ごとの世代を試験。selftest が `g_gfx_owner` を直接保存/復元する箇所は新しい組とカウンタも保存/復元する|
+|owner_exit: `exec/exec_finish.inc`、`exec/exec_abort.inc`、`exec/appslot_selftest.inc`|終了は無条件口のまま、表示 pending の回収だけ世代付き口へ。終了と遅延回収の順序を両方試験|
+|owner 読取: `gfx/gfx_core.c`、`gfx/gfx_policy.c`、`gfx/gfx_emergency.c`、`gfx/gfx_osri_view.c`、`exec/surface_query.c`、`kernel/kbd_inject.c`、`drivers/video/trident/trident_module.c`、`kdebug/selftest_kbd_inject.c`|ID の意味を保持し呼出し変更なし。shell 資源の世代を持っても GUI の fullscreen 判定を変えない|
+|公開読取: `gfx/v2/display.c`・`modeset.c`・`surface.c`、`userland/gshell/src/{fullscreen,lib,multiapp,input}.rs`、`userland/tests/shutdown_probe.c`|`gfx_screen_owner()` の ABI と返す ID は不変。SDK/KAPI の再生成なし。既存 import の署名は維持。host mocks の既存 ID 契約も不変|
+
+製品の追従ファイルは `exec/appslot.c`・`exec/appslot.h` (世代と条件付き回収)、`gfx/gfx_core.c`・`gfx/gfx_core_init.inc` (取得前安全点/CUI shell 発行)、`input/hal/input_interrupt.c`・`input/hal/input_context.h` (印と内部宣言)、`exec/exec_abort.inc`・`exec/exec_finish.inc` (境界)、後続の `exec/exec_launch.inc` (登録/開始順) とする。`exec/appslot_selftest.inc` も保存対象追加が必要。診断 enter の前処理は `kdebug/gf_display_test.c` を追従し、モジュールから drain を呼ぶための内部 import は `kernel/module/kdebug_imports.def` とその生成器の出力を追従する (公開 KAPI への追加ではない。生成物は手編集しない)。1 小段の製品ファイル制限を守って直列に分け、B の像登録は別段とする。新呼出しを足す各段で tools/tests の #include 型・Python 切出し型を再検索し、appslot/gfx/exec の兄弟 stub と変異 anchor を追従する (特に `multiapp_impl_host.c`、`gfx_kernel_fb_host.c`、`gfx2_i2_core_host.h`、`exec_hwb_abort_host.c`、`test_exec_hwb_abort.py`、`test_exec_r1.py`)。
+
+受入は (1) 同 owner 再取得で旧世代は回収不可、(2) 別 owner/同 ID 再利用も不可、(3) 0 と周回、(4) exit/kill が先・drain が先の両順と二度 drain、(5) snapshot/予約境界への IRQ 挿入、(6) shell の診断 leave→enter と描画組込 STOP→end の復帰、(7) command_active のまま exec 終了→次の hwb で中断印ゼロ、(8) 他 owner の終了で印を消さない、(9) GUI WM の所有 ID と claim 拒否の既存対照を固定する。比較を owner だけにする・発行を止める・exit の印消去を外す変異は runtime RED を求める。本追補だけの段ではコード・ビルド・変異/実機試験を実行せず、文書検査を完了条件とする。
