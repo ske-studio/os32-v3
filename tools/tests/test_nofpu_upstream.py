@@ -1,7 +1,7 @@
 """Verify byte provenance, planned function ranges and the selected SF closure."""
 CHECK = dict(name='nofpu-upstream', tier=1, needs=[], budget=10,
     covers=['tools/tests/test_nofpu_upstream.py', 'lib/softfloat/**',
-            'arch/x86/kernel/x87_emu_vendor/**'], kind='contract')
+            'arch/x86/kernel/x87_emu_vendor/**', 'arch/x86/kernel/x87_emu*.c'], kind='contract')
 
 from pathlib import Path
 import copy
@@ -89,7 +89,14 @@ def verify_x87(manifest):
             assert entry['function'] not in names
             names.add(entry['function'])
             assert (entry['function'] + '(').encode() in piece
-            assert entry['status'] == ('planned B/C port' if entry['destination'] else 'excluded')
+            if entry['destination']:
+                assert entry['status'] in ('planned B/C port', 'ported ESC0-3', 'ported ESC4-7', 'partial port')
+                if entry['status'] != 'planned B/C port':
+                    installed = ROOT / entry['destination']
+                    assert installed.is_file(), installed
+                    assert 'Redistribution and use in source and binary forms' in installed.read_text()
+            else:
+                assert entry['status'] == 'excluded'
     assert {f'SF_ESC{i}' for i in range(8)} <= names
     print(f'x87 file/license and {len(names)} function hashes: GREEN')
 

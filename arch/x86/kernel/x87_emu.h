@@ -92,16 +92,11 @@ void x87_emu_state_encode(const struct x87_emu_state *state, u8 *image,
                          bool operand16, bool environment_only);
 void x87_emu_state_decode(struct x87_emu_state *state, const u8 *image,
                          bool operand16, bool environment_only);
-/* Caller supplies validated input, at most memory_bytes. Each group changes
- * only effect; no store, owner lookup, EIP writeback or nested #NM here. */
-enum x87_emu_result x87_emu_arith(const struct x87_emu_decoded *insn,
-    const u8 *input, struct x87_emu_effect *effect);
-enum x87_emu_result x87_emu_compare(const struct x87_emu_decoded *insn,
-    const u8 *input, struct x87_emu_effect *effect);
-enum x87_emu_result x87_emu_convert(const struct x87_emu_decoded *insn,
-    const u8 *input, struct x87_emu_effect *effect);
-enum x87_emu_result x87_emu_state_op(const struct x87_emu_decoded *insn,
-    const u8 *input, struct x87_emu_effect *effect);
+/* ESC handlers select and execute together, using only speculative effects.
+ * Memory is fetched through access; stores remain staged until dispatch. */
+enum x87_emu_result x87_emu_execute(const struct x87_emu_trap *trap,
+    const struct x87_emu_access *access, struct x87_emu_decoded *insn,
+    struct x87_emu_effect *effect);
 void x87_emu_scope_begin(u16 cw, struct x87_emu_softfloat_scope *saved);
 void x87_emu_scope_end(const struct x87_emu_softfloat_scope *saved,
                        struct x87_emu_effect *effect);

@@ -21,6 +21,8 @@
 /* x86 制御レジスタのビット。CPU の持ち物なので機種ヘッダ (pc98.h) ではなく
  * ここに置く (順序 5 で include/pc98.h から移した)。 */
 #define CR0_PE              0x00000001UL  /* プロテクトモード有効 */
+#define CR0_MP              0x00000002UL  /* WAIT trap with TS */
+#define CR0_NE              0x00000020UL  /* 486+ native x87 exceptions */
 #define CR0_EM              0x00000004UL  /* x87 エミュレーション */
 #define CR0_TS              0x00000008UL  /* タスク切替済み */
 #define CR0_PG              0x80000000UL  /* ページング有効 */

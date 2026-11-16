@@ -62,7 +62,7 @@ static void tvram_print(int x,int y,const char *s,int attr) { (void)x;(void)y;(v
 static void boot_platform_run(int stage,struct boot_context *b) { (void)b; event(stage==BOOT_DMA ? 'D' : 'N'); }
 static void paging_init(unsigned kb) { (void)kb; event('p'); }
 static void paging_reclaim_conventional(void) { event('r'); }
-static void x87_probe(void) { CHECK(cr0==(original & ~12u)); event('X'); }
+static void x87_probe(void) { CHECK(cr0==original); event('X'); }
 '''
 
 
@@ -70,12 +70,6 @@ def probe(parts):
     source = PRELUDE
     for path in PATHS[2:]:
         body = re.sub(r'^#include[^\n]*\n', '', parts[path], flags=re.M)
-        if path.endswith('boot_after_paging.c'):
-            for old, new in [
-                ('__asm__ volatile("mov %%cr0, %0" : "=r"(cr0_val));', 'cr0_val = cr0;'),
-                ('__asm__ volatile("mov %0, %%cr0" : : "r"(cr0_val) : "memory");', 'cr0 = cr0_val;')]:
-                assert body.count(old)==1
-                body=body.replace(old,new)
         source += body
     source += parts[PATHS[0]]
     memory = 'static void kernel_boot_memory' + parts[PATHS[1]].split('static void kernel_boot_memory', 1)[1]
@@ -94,12 +88,12 @@ int main(void) {
         count=0;
         original=cr0=0x8001003fu;
         kernel_boot_memory(16384,&boot);
-        CHECK(!strcmp(trace,"prNX") && flags==state && cr0==(original & ~12u));
+        CHECK(!strcmp(trace,"prNX") && flags==state && cr0==original);
         count=0;
         arch_boot_after_paging();
-        CHECK(flags==state && cr0==(original & ~12u));
+        CHECK(flags==state && cr0==original);
     }
-    puts("PASS boot order, PC98 cascade, IF preservation and CR0 mask");
+    puts("PASS boot order, PC98 cascade, IF preservation and centralized FP initialization");
 }
 '''
     with tempfile.TemporaryDirectory(prefix='boot-order-') as td:
@@ -115,8 +109,7 @@ def main():
         for name,path,old,new in [
             ('TSS/IDT reversal',PATHS[0],'arch_boot_exception_stack();','arch_boot_vectors();'),
             ('topology check omitted',PATHS[4],' irq_topology_check();',''),
-            ('EM retained',PATHS[3],'CR0_EM | CR0_TS','CR0_TS'),
-            ('TS retained',PATHS[3],'CR0_EM | CR0_TS','CR0_EM'),
+            ('FP init omitted',PATHS[3],'    x87_probe();','    (void)x87_probe;'),
             ('IF inverted',PATHS[0],'    _enable();','    _enable(); flags ^= 1;'),
         ]:
             assert parts[path].count(old)==1

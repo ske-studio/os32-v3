@@ -1,3 +1,5 @@
+#include "x87.h"
+#include "x87_nm.h"
 #include "../../../kernel/sqlite_engine.h"
 #include "../../../kernel/console/font_guard.h"
 #include "../../../kernel/module/module_runtime.h"
@@ -547,4 +549,18 @@ void timer_handler(void)
     r1_fixture_timer();
 #endif
     tick_dispatch();
+}
+
+void nm_handler(struct x87_nm_frame *frame)
+{
+    if (x87_probe_nm(frame->cs, frame->eflags, &frame->eip)) return;
+    if ((frame->cs & 3u) == 3u && !(frame->eflags & (1u << 17))) {
+        struct x87_emu_trap trap;
+        x87_nm_read(frame, &trap);
+        if (x87_emulate_nm(&trap)) {
+            x87_nm_write(frame, &trap);
+            return;
+        }
+    }
+    exception_handler(frame->error, frame->vector, frame->eip, &frame->edi);
 }

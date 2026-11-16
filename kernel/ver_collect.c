@@ -1,5 +1,8 @@
 /* Read saved device/diagnostic state only; no probing, output or yield. */
 #include "ver_info.h"
+#ifndef __powerpc__
+#include "x87.h"
+#endif
 #include "time/cpu_calibrate.h"
 #include "boot_diag.h"
 #include "port_service.h"
@@ -16,6 +19,11 @@ void ver_collect(VerSnapshot *s)
     struct boot_diag diag;
 
     kmemset(s, 0, sizeof(*s));
+#ifdef __powerpc__
+    s->fpu_present = 1;
+#else
+    s->fpu_present = arch_fp_present();
+#endif
     s->cpu_measured = !cpu_calibrate_used_fallback();
     platform_boot_diag(&diag);
     s->timer_kind = diag.timer_kind;

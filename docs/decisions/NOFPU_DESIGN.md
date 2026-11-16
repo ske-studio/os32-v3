@@ -200,6 +200,16 @@
 
 ### 4.3 移さない物とOS32固有の入口
 
+手本と違う所は、実 x87 の対照で手本が実機と食い違う所に限り、その違いを補完する (PM 決定 2026-11-17)。
+実 x87 の対照で手本どおりのほうが合う所が見つかったら、手本どおりに戻す。
+
+- 非 mask O/U の `scale_operand`: 実 x87 が返す指数の折り返しを、SoftFloat の通常の範囲外結果だけでは再現できないため補う。
+- minMag による C1 再計算: 丸め後の絶対値が増えたかを実 x87 と一致させるため、切捨て結果と比較する。
+- DE・unsupported の検出: SoftFloat の例外フラグだけでは x87 の非正規化入力・非対応 ext80 と例外優先順位を表せないため補う。
+- 満杯への push の indefinite: mask された stack overflow 時に実 x87 が格納する値と TOP/tag を再現するため補う。
+- 命令ごとの commit 規則: 非 mask 例外でのメモリ書込み・pop の抑止と、比較の CC 更新などの完了範囲を実 x87 に合わせる。
+- FLDENV/FRSTOR の CW・tag: 実 x87 対照で CW=0xFFFF は FNSTCW=0x1F7F、tag=00 で値が 0 のレジスタは両命令後の FNSTENV で tag=01 となったため、予約ビットの正規化と非空 tag の再分類を行う。
+
 | 手本・機能 | 移さない理由 / 代替 |
 |---|---|
 | E:745 FPREM_partial、:773 FPREM、:793 FPREM1、:926 FSCALE、:1098 FXTRACT | r2棚卸しの対象外。将来必要なら別試験とともに移植 |
@@ -533,3 +543,60 @@ int x87_probe_nm(u32 saved_cs, u32 saved_eflags, u32 *saved_eip);
 - B16・B17: `VerSnapshot.fpu_present` は 0 が none(emu)。B17 (表示) だけ先に入ると FPU の有る機体でも none(emu) と出るので、B16 (収集) と B17 は同じ統合の枝で入れる。
 - B4: `x87_emu_state` は FNSAVE と同じ 108 byte だが reg は物理順 (R0..R7)。arch_fp_context との受け渡しは必ず codec を通し、memcpy しない (依頼に 1 行書く)。
 - B12: 依頼に §3.3 の wire (`column_f64_bits`、u64) を明記する。
+
+## エミュレータの本体の段の分け方 (PM 方針で改める)
+
+PACK.md の PM 方針により、§7 の純粋 decode と演算種類別の分割を次の表に置き換える。
+ESC ごとの関数が ModRM の命令選択と実行を兼ねる手本の構造を保持する。
+CPU、メモリ、例外の接続だけを OS32 の trap、作業 state、検証バッファ、result に替える。
+§4.3 の対象外命令、例外別 commit、ユーザー ESP/SS、保存形式の契約は維持する。
+
+| 元の段 | 新しいファイル割りと責任 |
+|---|---|
+| B3 | `x87_emu_decode.c` は prefix/ModRM/SIB/EA/長さだけ。EA_TREE と SF_ESC0〜7 の命令選択・実行は `x87_emu_esc03.c` / `x87_emu_esc47.c` にまとめる |
+| B4 | `x87_emu_state.c` に physical stack/TW、定数、FINIT、14/28/94/108 byte codec。環境命令の選択は ESC 関数 |
+| B5・B6 | ESC ファイルの命令分岐から `x87_emu_ops.c` の手本由来の演算・比較 helper を呼ぶ。別の命令分類段を作らない |
+| B7 | `x87_emu_ops.c` に整数 bit 列と ext80 の変換。native FP は使わない |
+| B8 | `x87_emu_memory.c` に既存 flat user selector と owner/USER/page/lease の検証、全域検証後の copy |
+| B9 | `x87_emu_exception.c` に SoftFloat scope、sticky/pending と命令別 commit 判定 |
+| C1 | `x87_emu_dispatch.c` が入口 guard、fetch、ESC 呼出し、memory→state/GPR→EIP の commit を所有 |
+
+宣言差分: `x87_emu_decoded` は命令の byte/EA 情報のまま、実行手順を追加しない。
+未実装の `x87_emu_arith/compare/convert/state_op` の四つの分類入口を
+`x87_emu_execute(trap, access, insn, effect)` に置換する。内部 helper は
+`x87_emu_internal.h` だけに宣言し、公開 SDK / AppSlot / #NM frame は変えない。
+この依頼では二時間の区切りを ESC0〜3 とし、ESC4〜7 の移植と全命令の受入は次段に残す。
+像への結線、B10、C3/C4 は後段のまま。
+
+この区切りの照合は libc なしの ELF64 で実 x87 の bit/status を採取し、
+同じ入力を ILP32 の製品コード (qemu runner) に与える。host32 の native runner は使用しない。
+§4.3 の補完として、C1 の丸め方向、DE/NaN の優先、非 mask O/U の指数折り返し、
+メモリ宛て O/U の store/pop 抑止を実 x87 に照合する。SAVE/RESTORE は共通 codec までで、
+DD の命令接続と #NM・像への結線は未完。延期の正典は `docs/tasks/DEFERRED_TESTS.md` の NOFPU-EMU-REST。
+
+後半の接続 (2026-11-17): 同じファイル割りで ESC4〜7、DD の94/108 byte SAVE/RESTORE、
+binary64・16/64 bit 整数変換を接続する。ST(i) 宛ての演算は宛先を helper に渡し、
+非 mask 例外による pop/store 抑止は共通 policy に残す。minMag の整数変換 helper は
+C1 照合に使い、FISTTP opcode は従来どおり公開しない。B10/C3/C4/build は引き続き別段。
+
+## 判定と #NM の段で設計者が決めたこと (2026-11-17)
+
+- B10/C4: 別段の像への結線まで `OS32_X87_EMU_LINKED` を未定義とし、software codec/dispatch の呼出しだけを条件付きで実装する。未結線の #NM は既存 fault へ流し、ビルド側でこの旗とエミュレータ全体を同時に有効にする。
+- B10: software の active state は x87.c が一つ所有し、108 byte の保存・復元は codec を通す。save は FNSAVE 同様環境を初期化し payload を保持、新規 owner の init は全域を初期化する。
+- C3/C4: #NM は元の GS/FS/ES/DS を common frame の手前に各 4 byte 保存する。VM は既存 V86 fault へ、CPL3 のみ user ESP/SS を読む。成功時だけ GPR/EIP/EFLAGS を書き戻し、segment は元値を pop、専用 IRETD で戻る。
+- 試験版の段: `arch/x86/kernel/x87.c` の `OS32_TEST_NOFPU` を隔離試験ビルド専用とする。`OS32_X87_EMU_LINKED` 必須 (無ければコンパイルエラー)、probe 後にソフト経路を選び EM/MP/TS=1 を要求する。通常の build 設定には追加しない。
+- B17: CPU 行は 52 桁の制約内に収めるため `x86 32-bit; calib=...; FPU=...` とする。PPC の収集は hw 固定。
+- P3: FLDCW の予約 CW bit を codec と同じ `(cw & 0x1f3f) | 0x0040` に正規化する。
+
+## 判定と #NM の段の取り込みで後の段へ送る項目 (2026-11-17、Opus レビュー)
+
+- 結線の段 (エミュレータを像にリンクする段):
+  - ver_format.c:104 の表示をリンクの旗で分ける。エミュレータを組んでいない像で FPU の無い機体は「none」と出す。組んだ像は「none(emu)」と出す。
+  - 変異を 3〜4 本足す。対象は次のとおり。
+    - ハンドラの順 (probe より先に emulate する)
+    - asm で元の segment を pop しない
+    - VM の分岐
+    - 試験の旗の #error
+- 受入: FPU の有る機体で 486DX 以上に NE=1 を立てた後、アプリが例外の mask を外したときの #MF (CPL3 は kill) を確かめる。
+  - NP21/W の受入は NOFPU-1 の範囲で行う。
+  - 実機の Celeron (Ra266) での確認は、台帳の T4T7-RH と同じ次の実機の回に載せる (DEFERRED_TESTS の NOFPU-1 の行に追記)。

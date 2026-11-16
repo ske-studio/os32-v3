@@ -13,4 +13,7 @@ int arch_fp_present(void);
  * 0 without modifying *saved_eip. Active/labels stay private to x87.c. */
 int x87_probe_nm(u32 saved_cs, u32 saved_eflags, u32 *saved_eip);
 
+struct x87_emu_trap;
+int x87_emulate_nm(struct x87_emu_trap *trap);
+
 #endif

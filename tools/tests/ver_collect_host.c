@@ -14,6 +14,8 @@
 
 static struct pit_setup saved_pit;
 static u32 calls[8];
+static int fp;
+int arch_fp_present(void) { return fp; }
 static int fallback, serial_rc, pcm, gfx_rc, boot_rc, debug_rc;
 static u32 mode, baud, fifo, active, kind;
 static GFX_ScreenInfo saved_gfx;
@@ -80,6 +82,7 @@ static void snapshot(void)
     ver_collect(s);
     CHECK(guarded.before == 0x12345678 && guarded.after == 0x87654321);
     for (u32 i = 0; i < sizeof(calls) / sizeof(calls[0]); i++) CHECK(calls[i] == 1);
+    CHECK(s->fpu_present == (u32)fp);
     CHECK(s->cpu_measured == (u32)!fallback);
     CHECK(s->irq_master_vector == 0x20 && s->irq_slave_vector == 0x28);
     CHECK(s->timer_kind == BOOT_TIMER_8254);
@@ -127,7 +130,9 @@ void _start(void)
     debug_rc = sizeof(MemStat);
     saved_services = (ServicesVerState){.stack_used=1024, .stack_size=32768,
         .public=1, .state="SERVICES_READY"};
+    fp = 1;
     snapshot(); /* GUI target */
+    fp = 0;
     active = 1; kind = GFX_VER_PC98;
     saved_gfx.height = 400; saved_gfx.bpp = 4;
     snapshot(); /* Active mode, not a GUI target. */

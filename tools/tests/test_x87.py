@@ -19,7 +19,7 @@ def run(source):
         (tmp / 'x87.c').write_text(source)
         exe = tmp / 'test'
         cmd = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
-               '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib', '-static', '-no-pie',
+               '-DX87_HOST_TEST', '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib', '-static', '-no-pie',
                '-I' + str(ROOT / 'arch/x86/kernel'), '-I' + str(ROOT / 'include'),
                '-I' + str(ROOT / 'arch/x86'), str(tmp / 'x87.c'),
                str(ROOT / 'tools/tests/x87_host.c'), '-o', str(exe)]
