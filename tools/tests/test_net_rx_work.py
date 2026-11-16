@@ -40,7 +40,8 @@ MUTATIONS = (
     ('net/nic.c', 'return bound ? IO_MORE : IO_DONE;', 'return bound ? IO_WAIT : IO_DONE;'),
     ('net/nic.c', 'if (ticking || batch_depth) return IO_MORE;', 'if (ticking || batch_depth) return IO_WAIT;'),
 
-    ('net/rx_work.c', '!b->slice || !io_slice_take(b->slice)', '!b->slice'),
+    ('net/rx_work.c', 'if (!io_slice_take(b->slice) && b->used) return 0;', 'if (0) return 0;'),
+    ('net/rx_work.c', 'if (!io_slice_take(b->slice) && b->used) return 0;', 'if (!io_slice_take(b->slice)) return 0;'),
     ('net/nic.c', '!_irq_enabled() || kctx_irq_depth != 0', 'kctx_irq_depth != 0'),
     ('net/nic.c', '!_irq_enabled() || kctx_irq_depth != 0', '!_irq_enabled()'),
     ('net/nic.c', '!bound || ticking || unbind_due', '!bound || unbind_due'),

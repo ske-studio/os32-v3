@@ -28,7 +28,10 @@ void rx_work_from_slice_capped(struct rx_work_budget *b, struct io_slice *slice)
 int rx_work_take(struct rx_work_budget *b)
 {
     if (b->used >= b->max_units) return 0;
-    if (!b->slice || !io_slice_take(b->slice)) return 0;
+    if (!b->slice) return 0;
+    /* The first unit always runs: the window may already have elapsed before
+     * the first take, and PPC GEM has no tick rescue, so 0 would stall RX. */
+    if (!io_slice_take(b->slice) && b->used) return 0;
     b->used++;
     return 1;
 }
