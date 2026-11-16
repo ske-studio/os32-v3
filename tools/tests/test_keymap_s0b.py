@@ -33,6 +33,11 @@ def run(ctx):
             for old, new in [
                 ('result.sym = cell->sym;', 'result.sym = ctrl_char(cell->sym);'),
                 ("(result.sym >= 'A' && result.sym <= 'Z')", "(result.sym >= '!' && result.sym <= 'Z')"),
+                ('!!(state->mods & KM_MOD_MODE) ^ !!(state->locks & KM_LOCK_ALT)',
+                 '!!(state->mods & KM_MOD_MODE) | !!(state->locks & KM_LOCK_ALT)'),
+                ('col ^= 1;', 'col ^= 0;'),
+                ('result.effect != 0 ||', '0 ||'),
+                ('result.sym <= 0xf111', 'result.sym <= 0xf1ff'),
             ]:
                 assert source.count(old) == 1
                 assert build(source.replace(old, new)) != 0

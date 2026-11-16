@@ -96,7 +96,8 @@ int km_eval(const KmBackend *map, u16 keycode, const KmState *state,
         }
     }
     result.effect = cell_effect(result.sym, result.kind, result.op, map->id);
-    result.is_modifier = (result.kind == KM_CHAR && (result.sym & 0xff00) == 0xf100) ||
+    result.is_modifier = result.effect != 0 ||
+                         (result.kind == KM_CHAR && result.sym >= 0xf101 && result.sym <= 0xf111) ||
                          (result.compat_sc >= 0x70 && result.compat_sc <= 0x74);
     *out = result;
     return 0;
