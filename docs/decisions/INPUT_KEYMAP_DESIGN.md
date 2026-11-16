@@ -547,3 +547,14 @@ PM決定 (2026-11-17): S0aは`km_source_release`の空inlineを維持し、別�
 - no_keydata の判定と、kbd_merge.c の capture_state の boot_locks の上乗せを消す変異を 1 本ずつ足す。
 - legacy_keymap.c:65: 静的な表が不正 (km_eval の INVAL) なら予備の経路も全キーを捨てる。今の表では起きない。S3x の段で、起動時に km_eval を 1 回試して boot.log に残すかを決める。
 - userland/gshell/src/input.rs:99,120 の旧い表の写しは G 段で更新する。
+
+## W の小段の割り方 (実装者の案)
+
+|小段|責務・受入|
+|---|---|
+|W[1]|v2 header と row の LE デコード、長さ・版・行数・header 予約の検査。未結線|
+|W[2]|各 kind の値域・予約・platform と重複の検査、既定を基にした編成|
+|W[3]|押下中 BUSY、owner ごとの保存・交換・reset・終了復元、世代更新|
+|W[4]|get の LE 出力と短い buffer、残る統合試験。公開と像への登録は別段|
+
+各段は必要に応じさらに分割する。accent/dead の拒否解除には H0b に指定された待ち状態の設計が先に必要。
