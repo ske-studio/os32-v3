@@ -80,6 +80,7 @@ int platform_clock_init(u32 tick_hz)
     io_clock = (typeof(io_clock)){(u32)mul, shift, PM_IO_CLOCK_SOURCE, io_generation};
     clock_state.ready = 1;
     tick_budget_config();
+    pm_io_clock_install(); /* IO_TIER P6 */
     return 0;
 }
 
