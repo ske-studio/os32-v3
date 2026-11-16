@@ -1737,6 +1737,24 @@ def length_based_credit():
     assert HA.HostAgent._frame_pages({"plen": 222, "total": 222}, 1) == 2
 
 
+def window_cadence_contract():
+    # Guest cadence changes only arrival frequency: absolute credit and the
+    # eight unchanged-ACK WINDOW recovery threshold remain host contracts.
+    a, o = up()
+    o.send(HA.OP_REQUEST, rid=1, payload=b"GET /pattern/4096")
+    def window(credit, ack=0):
+        return [p["seq"] for p in o.send(HA.OP_WINDOW, rid=1, ack=ack,
+                payload=struct.pack("<H", credit)) if p["op"] == HA.OP_DATA]
+    assert window(6) == [1]
+    # The first WINDOW already counts as an unchanged ACK (ack=0).
+    for _ in range(6):
+        assert window(6) == []
+    assert window(6) == [1]  # Eighth advertisement: retransmit the missing DATA.
+    assert window(9) == [2]  # Changed absolute credit permits one more frame.
+    assert window(0) == []
+    assert window(6, ack=2) == [3]  # Cumulative ACK frees in-flight credit.
+
+
 def h5_mutations():
     global HA
     original = HA
@@ -1862,6 +1880,7 @@ CASES = [
     hello_paylen_per_stage,
     wdata_dedup_by_sess_rid_seq,
     window_gates_delivery,
+    window_cadence_contract,
     time_format_is_19_bytes,
 ]
 

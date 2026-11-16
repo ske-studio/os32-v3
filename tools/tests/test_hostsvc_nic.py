@@ -29,6 +29,10 @@ FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra',
 # A2 portion of §11 nic: selection, lifetime, dispatch and TX facade.
 # MARK/EOF mutation belongs to the A3 demux stage, not this fake boundary.
 MUTATIONS = (
+    ('fg-bind-reset', '            idle_ms_valid = 0;', '            /* reset omitted */'),
+    ('fg-link-before-demux',
+     '    count = (int)net_rx_demux_budget(bound, local_mac, fixed_peer ? peer_mac : 0, b);\n    flags = link_platform_lock();\n    rx_finish();',
+     '    flags = link_platform_lock();\n    rx_finish();\n    link_platform_unlock(flags);\n    count = (int)net_rx_demux_budget(bound, local_mac, fixed_peer ? peer_mac : 0, b);\n    flags = link_platform_lock();'),
     ('fg-unthrottled', 'if (!idle_ms_valid || ms != last_idle_ms)', 'if (1)'),
     ('fg-no-link', 'link_due = 1; /* Foreground progress, consumed by rx_finish. */',
      'link_due = 0; /* Foreground progress, consumed by rx_finish. */'),

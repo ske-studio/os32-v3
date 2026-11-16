@@ -23,6 +23,9 @@ ANCHOR = '    link_host_deadlines();'
 
 
 MUTATIONS = (
+    ('net/link.c', '(!e->window_sent || e->window_tick != link_platform_now() ||\n             e->window_credit != link_credit_pages())', '1'),
+    ('net/link.c', 'e->window_credit != link_credit_pages()', '0'),
+    ('net/link_host_api.inc', '        e->window_sent = 0;', '        e->window_sent = 1;'),
     ('net/link_host_api.inc', '            e->rel_tick = e->last_tx_tick;',
      '            e->rel_tick = link_platform_now();'),
     ('net/link_host_api.inc', '        e->rel_pending = 1;\n        e->rel_rid = e->rid;',
@@ -57,7 +60,7 @@ def build(folder, mutant=None):
         core.write_text(source.replace(anchor, replacement))
     exe = folder / 'probe'
     subprocess.run(['gcc', '-std=gnu11', '-m32', '-march=i386', '-O2',
-        '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-nostdlib', '-static',
+        '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-nostdinc', '-nostdlib', '-static',
         '-fno-pie', '-no-pie', '-fno-stack-protector', '-ffunction-sections',
         '-fdata-sections', '-Wl,--gc-sections', '-I' + str(folder),
         '-I' + str(ROOT / 'tools/tests/link_platform_fake'), *include_flags(ROOT), str(ROOT / 'tools/tests/hostsvc_link_core_host.c'),

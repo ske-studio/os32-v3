@@ -175,7 +175,9 @@ static void run_tests(void)
     frames = 9;
     CHECK(net_rx_service() == 8 && frames == 1 && pending);
     CHECK(!polls);
-    idle_work_run(); CHECK(frames == 0 && polls == 1);
+    /* link_tick's rejected recursive RX request schedules pending again;
+     * draining the last frame therefore need not leave pending clear. */
+    idle_work_run(); CHECK(frames == 0 && polls == 1 && pending);
     frames = 9; step = 120;
     CHECK(net_rx_service() == 1 && frames == 8 && pending);
     step = 0; idle_work_run(); CHECK(!frames);

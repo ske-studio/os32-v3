@@ -226,6 +226,7 @@ i32 link_host_open(const char *req, u32 len, int owner)
         e->retries = 0;
         e->probes = 0;
         e->ack_seq = 0;
+        e->window_sent = 0;
         e->want_ack = e->want_window = e->want_status = 0;
         e->ctrl_cursor = 0;
     }

@@ -18,7 +18,8 @@ u32 link_platform_lock(void);
 void link_platform_unlock(u32 saved);
 
 /* 前景専用、再入禁止。IRQ 内や送信内から呼ばない。
- * 共通 NIC の poll・link 進行は tick と FG1 の待ち (1ms に 1 回まで)。
+ * 共通 NIC の poll・link 進行は tick と idle_work_run の FG1 の地点
+ * (待ち・syscall 入口・net_tx の後、前景は1msに1回まで)。
  * x86 は idle_work_run() 後に _idle() (不可分の IRQ 許可・待機)。 */
 void link_platform_idle(void);
 

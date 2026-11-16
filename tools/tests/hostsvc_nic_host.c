@@ -22,7 +22,7 @@ static void (*rx_idle)(void);
 static u32 fake_ms;
 u32 tick_clock_ms(void) { return fake_ms; }
 static u8 seen_peer[6], seen_local[6];
-static int saw_peer;
+static int saw_peer, fg_order;
 u32 link_hello_ok;
 u8 link_peer_mac[ETH_ALEN];
 static u32 pending, rx_calls, rx_head;
@@ -98,7 +98,11 @@ static void mac(u8 *out)
     check_cli();
     for (u32 i = 0; i < 6; i++) out[i] = mac_addr[i];
 }
-static void poll(void) { check_cli(); polls++; order = 1; }
+static void poll(void)
+{
+    check_cli(); polls++; order = 1;
+    if (fg_order) { if (fg_order != 1) bad_if++; fg_order = 2; }
+}
 static u32 credit(void) { check_cli(); return 4096; }
 static const struct NetNicOps ops = {tx, rx, mac, poll, credit};
 static const struct NetNicOps broken_ops = {tx, rx, mac, 0, credit};
@@ -153,6 +157,7 @@ u32 net_rx_demux_budget(const struct NetNicOps *nic, const u8 local[6],
     u32 count = 0;
     if (!hs_if() && !kctx_irq_depth) bad_if++;
     demuxes++;
+    if (fg_order) { if (fg_order != 2) bad_if++; fg_order = 3; }
     if (poll_reentry == 2) {
         poll_reentry = 0;
         int before = demuxes;
@@ -180,6 +185,7 @@ void link_init(const u8 local[6])
 void link_tick(void)
 {
     check_cli(); links++;
+    if (fg_order) { if (fg_order != 3) bad_if++; fg_order = 0; }
     if (order != 1 && order != 2) bad_if++;
     order = 3;
     if (poll_reentry) {
@@ -278,7 +284,8 @@ static int test(void)
     REQUIRE(net_nic_poll_once() == 0 && !hs_if()); hs_set_if(1);
     poll_reentry = 2; net_rx_service();
     old_links = links; old_polls = polls;
-    rx_idle();
+    fg_order = 1; rx_idle();
+    REQUIRE(!fg_order && !bad_if);
     REQUIRE(links == old_links + 1 && polls == old_polls + 1);
     rx_idle();
     REQUIRE(links == old_links + 1 && polls == old_polls + 1);
@@ -308,6 +315,11 @@ static int test(void)
     net_unbind(); REQUIRE(released == 7);
     /* Direct binding borrows ops and must not release a module reference. */
     REQUIRE(net_bind(&ops) == 0);
+    /* Same ms as the previous binding: a fresh NIC still gets one service. */
+    old_links = links; old_polls = polls;
+    fg_order = 1; rx_idle();
+    REQUIRE(!fg_order && !bad_if && links == old_links + 1 && polls == old_polls + 1);
+    rx_idle(); REQUIRE(links == old_links + 1 && polls == old_polls + 1);
     net_unbind(); REQUIRE(released == 7);
     REQUIRE(inits == 4 && acquired == 8 && registrations == 4);
     REQUIRE(rx_calls && demuxes && !bad_if && hs_if());
