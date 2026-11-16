@@ -51,3 +51,5 @@ void _start(void)
     sys_reboot();
     finish(9); /* reboot must keep halting if reset and the first halt return. */
 }
+
+void idle_wait_step(void) { if (enabled) { idle_work_run(); _halt(); } }

@@ -567,3 +567,5 @@ void _start(void)
 }
 
 int con_sink_capture_active(void) { return 0; }
+
+void idle_wait_step(void) { idle_work_run(); _halt(); }

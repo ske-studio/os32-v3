@@ -2,7 +2,7 @@
 CHECK = dict(name='idle-work-host', tier=1,
     covers=['tools/tests/idle_io_sources.py', 'kernel/io_work.[ch]',
             'kernel/io_clock.h', 'kernel/io_policy.[ch]', 'exec/appslot.h',
-            'kernel/idle_work.[ch]', 'kernel/irq/irq.h', 'include/io.h',
+            'kernel/idle_work.[ch]', 'net/nic.h', 'kernel/irq/irq.h', 'include/io.h',
             'build/sources/common.mk', 'build/sources/order.mk',
             'tools/tests/idle_work_host.c', 'tools/tests/test_idle_work.py',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
@@ -41,6 +41,10 @@ def main():
             print('PASS idle work (' + runner + ')', flush=True)
         if os.environ.get('MUTATE') == '1' or '--mutate' in sys.argv:
             mutants = [
+                ('    idle_work_run();\n    if (!net_rx_recent(NET_RX_ACTIVE_MS)) _idle();', '    if (!net_rx_recent(NET_RX_ACTIVE_MS)) _idle();\n    idle_work_run();', 'wait order'),
+                ('if (!net_rx_recent(NET_RX_ACTIVE_MS)) _idle();', '_idle();', 'RX sleep condition'),
+                ('!_irq_enabled() || kctx_irq_depth != 0', 'kctx_irq_depth != 0', 'wait IF'),
+                ('!_irq_enabled() || kctx_irq_depth != 0', '!_irq_enabled()', 'wait IRQ'),
                 ('    if (!_irq_enabled()) return;', '    (void)_irq_enabled();', 'IF'),
                 ('    if (kctx_irq_depth != 0) return;', '    (void)kctx_irq_depth;', 'depth'),
                 ('work_count < IDLE_WORK_LIMIT', 'work_count <= IDLE_WORK_LIMIT', 'limit'),

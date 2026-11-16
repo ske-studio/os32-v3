@@ -54,13 +54,13 @@ def build(work, enabled, mutation=None, baseline=None):
         dest.write_text(text)
     (work / 'io.h').write_text((ROOT / 'tools/tests/dep_dir_b_io_shim.h').read_text())
     source = baseline if baseline is not None else (work / 'kernel/sys.c').read_text()
-    includes = '' if baseline is not None else '#include "platform_sys.h"\n'
+    includes = '' if baseline is not None else '#include "platform_sys.h"\n#include "kernel/idle_work.h"\n'
     (work / 'sys_control.inc').write_text(includes + control_functions(source))
     exe = work / 'io-test'
     cmd = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
            '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib',
            '-static', '-no-pie', f'-DTEST_IF={enabled}', '-include', 'pc98.h',
-           '-I' + str(work), *include_flags(work), '-I' + str(ROOT / 'include'),
+           '-I' + str(work), '-I' + str(ROOT), *include_flags(work), '-I' + str(ROOT / 'include'),
            str(ROOT / 'tools/tests/dep_dir_b_io_host.c')]
     if baseline is None:
         cmd.append(str(work / 'platform/pc98/system.c'))
@@ -85,6 +85,9 @@ def verify(mutation=None):
         # foreground dispatch before the waking sys_halt, never in reboot.
         rows = list(expected['traces'][str(enabled)])
         first_halt = next(i for i, row in enumerate(rows) if row[0] == 'H')
+        # RX wait keeps IF=0 awake; all other hardware operations stay fixed.
+        if not enabled:
+            rows.pop(first_halt)
         rows.insert(first_halt, ['P', 0, 0, enabled])
         assert actual == rows, (enabled, actual)
     print('PASS L11 reset/beep/halt order and F3 poll before halt, IF=0/1', flush=True)

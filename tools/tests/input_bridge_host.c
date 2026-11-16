@@ -27,6 +27,8 @@ static void _halt(void) {
     if (++halts > 1) __builtin_trap();
     kbd_buf[0]=0x1d61; kbd_head=0; kbd_count=1; injected=0xe3;
 }
+/* kbd waits through the common idle_wait_step (rx-recent); same order as before. */
+static __attribute__((unused)) void idle_wait_step(void) { idle_work_run(); _halt(); }
 #ifdef CURRENT
 int legacy_cooked_take(void) {
     u16 entry;

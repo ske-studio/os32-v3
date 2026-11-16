@@ -60,6 +60,7 @@ u32 net_rx_demux_budget(const struct NetNicOps *ops, const u8 local[6],
         u32 n = len - ETH_HLEN;
         int sfs = n >= 3 && p[0] == 0x05 && p[1] == 0x53 && p[2] == 0x46;
         if (!own && (sfs || n == 0 || p[0] != LINK_OP_HELLO)) continue;
+        net_rx_note();
         struct RxQueue *q = sfs ? &sfs_queue : &link_queue;
         unsigned int flags = irq_save();
         if (q->count == RX_SLOTS) {

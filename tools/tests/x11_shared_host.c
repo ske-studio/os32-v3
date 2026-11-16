@@ -758,3 +758,5 @@ void _start(void)
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc) : "memory");
     for (;;) {}
 }
+
+void idle_wait_step(void) { idle_work_run(); _halt(); }

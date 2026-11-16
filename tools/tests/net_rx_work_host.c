@@ -50,6 +50,7 @@ static int clock_fail, allowance = 1, hook, rescue, idle_error, recv_reentry, va
 static u32 irq_elapsed, link_received;
 static int pump_link, quiet, fg_ms_override;
 static u32 fg_ms;
+static int unrelated_type, wrong_destination;
 static tick_fn callback;
 static const u8 hw_mac[6] = {2,3,4,5,6,7};
 static int tx(const void *p, u32 n) { (void)p; (void)n; return 0; }
@@ -74,6 +75,8 @@ static int recv_frame(void *p, u32 cap, u32 *n)
         for (u32 i = 0; i < 6; i++) f[i] = hw_mac[i];
         f[12] = OS32_ETHERTYPE >> 8; f[13] = OS32_ETHERTYPE & 255;
         f[14] = LINK_OP_HELLO;
+        if (unrelated_type) { f[12] = 0x08; f[13] = 0x06; } /* ARP */
+        if (wrong_destination) f[0] ^= 0x10;
         *n = 60;
     }
     return 0;
@@ -186,9 +189,11 @@ static void tier_requests(void)
     work_count = 0;
     (void)io_dispatch(500); /* Consume the preceding unbind request. */
     CHECK(io_dispatch(500) == 0); /* Unbound DONE sleeps without a request. */
-    CHECK(net_bind(&device) == 0);
+    net_rx_note(); CHECK(net_rx_recent(5));
+    CHECK(net_bind(&device) == 0 && !net_rx_recent(5));
     fg_ms_override = 1; fg_ms = tick_count * 10u;
     frames = 0;
+    fg_ms += NET_RX_ACTIVE_MS; /* Prior RX has expired. */
     for (u32 i = 0; i < 3; ++i) (void)io_dispatch(500);
     CHECK(io_dispatch(500) == 1); /* Bound poll-only NICs stay requested. */
     u32 old_polls = polls, old_links = links, old_jiffy = tick_count;
@@ -196,10 +201,38 @@ static void tier_requests(void)
     ++fg_ms;
     CHECK(io_dispatch(500) == 1 && polls == old_polls + 1 && links == old_links + 1);
     CHECK(tick_count == old_jiffy); /* 1ms progress, before the next 10ms jiffy. */
+    valid_frame = 1;
     frames = 2; u32 before = reads;
     CHECK(io_dispatch(500) == 1 && frames < 2 && reads > before);
     /* The Tier fairness reservation can grant just one unit in a pass. */
     CHECK(io_dispatch(500) == 1 && frames == 0);
+    CHECK(net_rx_recent(5) && !net_rx_recent(0));
+    old_polls = polls; old_links = links;
+    CHECK(io_dispatch(500) == 1 && polls == old_polls + 1 && links == old_links);
+    fg_ms += 4;
+    CHECK(net_rx_recent(5));
+    (void)io_dispatch(500); old_polls = polls; old_links = links;
+    CHECK(io_dispatch(500) == 1 && polls == old_polls + 1 && links == old_links);
+    ++fg_ms;
+    CHECK(!net_rx_recent(5));
+    (void)io_dispatch(500); old_polls = polls; old_links = links;
+    CHECK(io_dispatch(500) == 1 && polls == old_polls && links == old_links);
+    fg_ms = 0xfffffffeu; frames = 1;
+    CHECK(io_dispatch(500) == 1 && !frames && net_rx_recent(5));
+    fg_ms = 2; CHECK(net_rx_recent(5));
+    fg_ms = 3; CHECK(!net_rx_recent(5));
+    fg_ms = 0x7ffffffeu; CHECK(!net_rx_recent(5)); /* Age 0x80000000 is not recent. */
+    /* Unrelated EtherTypes and destinations never start or extend activity. */
+    fg_ms = 10; unrelated_type = 1; frames = 1;
+    CHECK(net_rx_service() == 1 && !net_rx_recent(5));
+    unrelated_type = 0; wrong_destination = 1; frames = 1;
+    CHECK(net_rx_service() == 1 && !net_rx_recent(5));
+    wrong_destination = 0; frames = 1;
+    CHECK(net_rx_service() == 1 && net_rx_recent(5));
+    fg_ms = 14; unrelated_type = 1; frames = 1;
+    CHECK(net_rx_service() == 1 && net_rx_recent(5));
+    fg_ms = 15; CHECK(!net_rx_recent(5));
+    unrelated_type = valid_frame = 0;
     u32 marks = requests;
     net_rx_schedule(); CHECK(requests == marks + 1);
     CHECK(io_dispatch(500) == 1 && frames == 0);
@@ -271,7 +304,7 @@ static void run_tests(void)
     CHECK(io_unregister(IO_SVC_NET_RX) == 0);
     CHECK(idle_work_register(idle_other) == 0);
     CHECK(net_start(NET_NIC_E82557, 0) == 0 && callback == net_jiffy);
-    CHECK(work_count == 1);
+    CHECK(work_count == 1 && !net_rx_recent(5));
     test_deferred_poll(); polls = 0;
     frames = 9;
     CHECK(net_rx_service() == 8 && frames == 1 && pending);
@@ -336,8 +369,10 @@ static void run_tests(void)
     CHECK(net_start(NET_NIC_E82557, 0) == 0);
     frames = 1; before = reads; rescue = 1; now = 0;
     tick_count = 0; irq_tick(); CHECK(reads == before);
-    tick_count = 1; irq_tick(); CHECK(!frames);
-    rescue = 0; net_unbind();
+    valid_frame = 1;
+    tick_count = 1; irq_tick(); CHECK(!frames && net_rx_recent(5));
+    valid_frame = 0;
+    rescue = 0; net_unbind(); CHECK(!net_rx_recent(5));
     CHECK(net_start(NET_NIC_LGY98, 0) == 0);
     test_deferred_poll();
     tick_count += 2; frames = 1; before = reads;

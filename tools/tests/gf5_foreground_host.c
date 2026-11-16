@@ -121,6 +121,9 @@ void ring3_wm_leave(void) { assert(u6_wm); u6_wm=false; }
  * gui_display_failed and appslot_abort_request bodies, extracted verbatim.
  * CPU halt alone is substituted by the driver. */
 #include "exec_gfx_poll.h"
+#include "net/nic.h"
+int net_rx_recent(u32 ms) { (void)ms; return 0; }
+void idle_wait_step(void) { idle_work_run(); u6_halt(); }
 #include "gf5_foreground_entries.h"
 
 static i32 u6_session_request(u32 op,u32 action,int owner)

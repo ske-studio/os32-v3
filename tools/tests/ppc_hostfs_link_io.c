@@ -26,6 +26,7 @@ static u8 reply[SFS_BUFFER_FRAME], body[SFS_BUFFER_FRAME];
 #include "io_source.inc"
 #define CHECK(x) do { if (!(x)) return __LINE__; } while (0)
 u32 link_platform_now(void) { return clock; }
+void idle_wait_step(void) { idle_work_run(); _idle(); }
 void idle_work_run(void) { ++polls; ++clock; if (registered_work) registered_work(); else pm_hfs_link_poll(); }
 i32 platform_host_open(const char *req, u32 n, int owner)
 {

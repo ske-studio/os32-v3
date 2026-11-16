@@ -37,6 +37,7 @@ int con_sink_capture_active(void) { return 0; }
 int ring3_wait_pending(void) { return 0; }
 void idle_work_run(void) {}
 void arch_cpu_idle(void) {}
+void idle_wait_step(void) { idle_work_run(); arch_cpu_idle(); }
 u64 pm_terminal_tb(void) { return 0; }
 void pm_lan_poll(u64 now) { (void)now; }
 static void feed(const char *s, u32 n) { pm_terminal_feed((const u8 *)s, n); }

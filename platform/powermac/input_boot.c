@@ -50,7 +50,7 @@ static int try_key(void)
 #endif
 static u32 wait_ticks(void) { u32 lo = 0, hi; platform_clock_read_us(&lo, &hi); return lo; }
 static u32 wait_timeout(void) { return 30000000u; }
-static void wait_step(void) { idle_work_run(); _idle(); }
+static void wait_step(void) { idle_wait_step(); }
 static const struct InputLegacyProvider provider = {
 #if KBOOT_LINK
     .try_key = pm_input_usb_take, .peek_key = pm_input_usb_peek,

@@ -26,6 +26,17 @@ from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
+    ('net/nic_rx.c', 'if (len < ETH_HLEN || len > sizeof(rx_frame)) continue;',
+     'net_rx_note(); if (len < ETH_HLEN || len > sizeof(rx_frame)) continue;'),
+    ('net/nic.c', '(u32)(tick_clock_ms() - last_rx_ms) < window_ms', '(u32)(tick_clock_ms() - last_rx_ms) <= window_ms'),
+    ('net/nic.c', '(u32)(tick_clock_ms() - last_rx_ms) < window_ms', '(i32)(tick_clock_ms() - last_rx_ms) < (i32)window_ms'),
+    ('net/nic.c', 'idle_ms_valid = 0;\n            rx_ms_valid = 0;', 'idle_ms_valid = 0;'),
+    ('net/nic.c', '    rx_ms_valid = 0;\n    owner = 0;', '    owner = 0;'),
+    ('net/nic_rx.c', '        net_rx_note();', '        (void)0;'),
+    ('net/nic.c', '(u32)(tick_clock_ms() - last_rx_ms) < window_ms', '(u32)(tick_clock_ms() - last_rx_ms) >= window_ms'),
+    ('net/nic.c', 'last_rx_ms = tick_clock_ms();', 'last_rx_ms = 0;'),
+    ('net/nic.c', 'rx_ms_valid = 1;', 'rx_ms_valid = 0;'),
+    ('net/nic.c', 'else if (net_rx_recent(NET_RX_ACTIVE_MS))', 'else if (0)'),
     ('net/rx_work.c', 'b->max_units = NET_RX_SCAN_MAX;', 'b->max_units = NET_RX_SCAN_MAX + 1;'),
     ('net/rx_work.c', 'if (b->used >= b->max_units) return 0;', 'if (0) return 0;'),
     ('kernel/io_work.c', 'if (idle_work_compat_count() == 0 && !any_pending()) return 0;',

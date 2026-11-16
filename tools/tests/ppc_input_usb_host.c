@@ -123,3 +123,5 @@ static void test(void)
     write_text("PROVIDER\n");
 }
 void _start(void) { test(); finish(0); }
+
+void idle_wait_step(void) { idle_work_run(); arch_cpu_idle(); }

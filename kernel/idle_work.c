@@ -2,6 +2,7 @@
 #include "io.h"
 #include "io_work.h"
 #include "irq.h"
+#include "net/nic.h"
 #include "os32_kapi_shared.h"
 
 #define IDLE_WORK_LIMIT 4
@@ -36,4 +37,11 @@ void idle_work_run(void)
     if (!_irq_enabled()) return;
     if (kctx_irq_depth != 0) return;
     (void)io_dispatch(IO_PASS_US);
+}
+
+void idle_wait_step(void)
+{
+    if (!_irq_enabled() || kctx_irq_depth != 0) return;
+    idle_work_run();
+    if (!net_rx_recent(NET_RX_ACTIVE_MS)) _idle();
 }

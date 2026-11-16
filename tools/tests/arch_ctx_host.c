@@ -18,6 +18,8 @@ void ppc_enable(void) { msr |= PPC_MSR_EE; }
 #ifndef CTX_PPC
 u32 ppc_irq_save(void) { u32 old = msr; msr &= ~PPC_MSR_EE; return old; }
 #endif
+void _idle(void) {}
+int net_rx_recent(u32 ms) { (void)ms; return 0; }
 #include CTX_IDLE_SOURCE
 static void callback(void)
 {

@@ -3,6 +3,9 @@
 #define OS32_NET_NIC_RX_H
 #include "nic.h"
 
+/* Internal OS32 receive timestamp, shared by foreground and IRQ rescue. */
+void net_rx_note(void);
+
 /* A2 -> A3, IF=0; borrowed ops. Scan at most NET_RX_SCAN_MAX frames.
  * Check Ethernet length/type/destination before the three payload bytes:
  * n>=3 && p[0]==0x05 && p[1]==0x53 && p[2]==0x46 selects SFS; else link.

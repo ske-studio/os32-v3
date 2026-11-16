@@ -43,6 +43,8 @@ static int serial_trygetchar(void) { return serial(); }
 static int ring3_wait_pending(void) { mark(4); return pending; }
 static void idle_work_run(void) { mark(5); }
 static void _halt(void) { mark(6); step(); }
+/* kbd waits through the common idle_wait_step (rx-recent); same order as before. */
+static void idle_wait_step(void) { idle_work_run(); _halt(); }
 static int kbd_gui_trygetbyte(void) { return inject(); }
 static int exec_park_kbd(void) { mark(8); return 0; }
 static int old_gui(int interruptible);

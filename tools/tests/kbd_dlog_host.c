@@ -595,3 +595,5 @@ int pc98_serial_gate_active(void) { return 0; }
 #include "serial_emergency_host.h"
 
 int con_sink_capture_active(void) { return 0; }
+
+void idle_wait_step(void) { idle_work_run(); }
