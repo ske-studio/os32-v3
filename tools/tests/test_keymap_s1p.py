@@ -94,6 +94,7 @@ def run(ctx):
                 lines[matches[0]] = lines[matches[0]].replace(old, new, 1)
                 assert build(''.join(lines)) != 0
                 print('RED runtime: key', key, old, '->', new)
+            # These mutations exercise the test selector, not product code; S0b tests the evaluator.
             for old, new in [('!!mode ^ !!altlock', '!!mode | !!altlock'),
                              ('column ^= 1;', 'column ^= 0;')]:
                 assert host.count(old) == 1
