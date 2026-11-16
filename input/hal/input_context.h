@@ -37,4 +37,9 @@ int input_context_owner_begin(u32 owner, u32 exec_gen);
 int input_context_owner_end(u32 owner, u32 exec_gen);
 int input_context_snapshot(KbdPolicySnapshot *out);
 
+/* Caller supplies the destination captured by IRQ or the WM. */
+int input_interrupt_capture(const KbdPolicySnapshot *destination, u32 reason);
+int input_interrupt_take(const KbdPolicySnapshot *current, u32 *reason);
+u32 input_interrupt_coalesced_count(void);
+
 #endif

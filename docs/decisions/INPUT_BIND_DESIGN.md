@@ -180,6 +180,7 @@
 - **F3 PM 推奨 (ユーザーに提示済み、反論なし)**: PC98 RUNNINGはCtrl+C/裸STOPで実行中アプリを止める。ただしIME変換中は両方ともIMEへ先に渡し、取消の一打を中断へ再投入しない。MacはOS X TerminalのCtrl+C/Cmd+.をSIGINT相当へ。F3代案:裸STOPをIME専用の現行挙動に残す (DOS標準から外れるため非推奨)。
 - IME本体が変換開始/終了時に内部 `kbd_policy_ime_state(active,owner,command_gen)` を公開し、IRQはそのsnapshotを読むだけ。PC98 profileでactive時のSTOP/ETXは取消pendingを専用保持し、FG1のIMEが消費。MacのVINTRは通常の中断経路を使い、旧OS XのIME条件の実証はQ4で記録する。辞書/学習処理をIRQから呼ばず、満杯でも取消を失わない。`kernel/ime/ime.c:289-291`のSTOP取消から接続する。
 - 中断pendingは `{owner,exec_gen,command_gen,reason}`。CUIはIRQ採取時、GUIはWMが焦点宛先を決定した時に固定し、ring3/PPC協調口/待機解除で消費直前に一致確認。要求した文字は次のシェルへ残さず、一度だけ消費、repeatから再要求しない。
+- **M6 の段で PM が決めたこと (2026-11-17)**: 中断 pending がある間の新要求は既存の印を上書きせず一つにまとめ、まとめた数を試験から参照できるよう数える。新 command では M5 の破棄で印を消す。
 - N4は2種の印を分ける: (1) hwb/実行中断pendingはowner/exec_gen/command_gen不一致で捨て、command_beginで旧印破棄→新世代公開、end/exec終了で消去する。(2) display_restore_pendingは中断世代とは別の冪等な後始末。表示ownerと資源の世代を保持し、FG1のcommand_end/exec終了/STOP回収で `appslot_gfx_owner_exit` 相当を実行してから消す (`exec/exec_abort.inc:8-16`)。
 - 表示復帰はcommand_gen不一致だけで捨てない。表示ownerの資源が既に回収済みなら完了扱い、新ownerの表示を解放しない。IRQでは実行せずpendingを保持し、次コマンド開始前の安全点で後始末完了を保証する。ls中断を次のhwbへ持ち越さず、描画中の組込STOPではテキスト画面へ戻す。
 - 物理CTRL+STOPの既存救済とGUI STOP抑制は維持。V86中はOS側表の操作を配送せず状態追跡のみ、`drivers/input/kbd.c:389-394`の退出経路を保持。PPC非協調コードに中断期限は約束しない。
