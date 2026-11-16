@@ -440,7 +440,12 @@ def fixture(root, changes=()):
     stamp = root / 'output/config/target'
     stamp.parent.mkdir(parents=True)
     stamp.write_text('ppc-powermac\n')
-    (root / 'spy').write_text('#!/bin/sh\necho called >> calls\ntouch product\nexit 0\n')
+    # Compiler queries only supply metadata; actual tool work remains observable.
+    (root / 'spy').write_text(
+        '#!/bin/sh\ncase "$*" in\n'
+        '  "-mcpu=750 -mhard-float -mcall-sysv -mno-eabi -print-file-name=libc.a") echo libc.a; exit 0;;\n'
+        '  "-mcpu=750 -mhard-float -mcall-sysv -mno-eabi -print-libgcc-file-name") echo libgcc.a; exit 0;;\n'
+        'esac\necho called >> calls\ntouch product\nexit 0\n')
     (root / 'spy').chmod(0o755)
     tools = root / 'cross/bin'
     tools.mkdir(parents=True)
