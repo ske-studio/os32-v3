@@ -563,3 +563,8 @@ CPU、メモリ、例外の接続だけを OS32 の trap、作業 state、検証
 §4.3 の補完として、C1 の丸め方向、DE/NaN の優先、非 mask O/U の指数折り返し、
 メモリ宛て O/U の store/pop 抑止を実 x87 に照合する。SAVE/RESTORE は共通 codec までで、
 DD の命令接続と #NM・像への結線は未完。延期の正典は `docs/tasks/DEFERRED_TESTS.md` の NOFPU-EMU-REST。
+
+後半の接続 (2026-11-17): 同じファイル割りで ESC4〜7、DD の94/108 byte SAVE/RESTORE、
+binary64・16/64 bit 整数変換を接続する。ST(i) 宛ての演算は宛先を helper に渡し、
+非 mask 例外による pop/store 抑止は共通 policy に残す。minMag の整数変換 helper は
+C1 照合に使い、FISTTP opcode は従来どおり公開しない。B10/C3/C4/build は引き続き別段。

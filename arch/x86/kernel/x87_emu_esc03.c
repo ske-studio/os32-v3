@@ -31,23 +31,15 @@
 /* NP21/W port; source ranges are recorded in x87_emu_vendor/UPSTREAM.json. */
 #include "x87_emu_internal.h"
 
-struct esc {
-    const struct x87_emu_trap *trap;
-    const struct x87_emu_access *access;
-    struct x87_emu_decoded *d;
-    struct x87_emu_effect *e;
-    u8 input[X87_EMU_MEMORY_BYTES];
-};
 /* CPU/operand boundary: select width before read, stage all writes. */
-static enum x87_emu_result memory(struct esc *c, unsigned bytes, bool write)
+enum x87_emu_result x87_operand_memory(struct esc *c, unsigned bytes, bool write)
 {
     c->d->memory_bytes = bytes;
     c->d->write = write;
     if (write) return X87_EMU_OK;
     return x87_emu_read(c->access, c->d, c->input);
 }
-#define MEMORY(bytes, write) do { enum x87_emu_result r = memory(c, bytes, write); if (r) return r; } while (0)
-static void record(struct esc *c)
+void x87_record(struct esc *c)
 {
     c->e->state.fip = c->trap->eip;
     c->e->state.fcs = c->trap->segment[X87_CS];
@@ -58,7 +50,7 @@ static void record(struct esc *c)
     }
 }
 /* EA_TREE: original /0..7 arithmetic and comparison selection. */
-static void EA_TREE(struct esc *c, sw_extFloat80_t rhs)
+void x87_ea_tree(struct esc *c, sw_extFloat80_t rhs)
 {
     unsigned idx = (c->d->modrm >> 3) & 7;
     sw_extFloat80_t lhs = x87_get(c->e, x87_top(&c->e->state));
@@ -73,8 +65,8 @@ static enum x87_emu_result SF_ESC0(struct esc *c)
         MEMORY(4, false);
         rhs = x87_load32(c->e, c->input, false);
     } else rhs = x87_get(c->e, x87_st(&c->e->state, c->d->modrm & 7));
-    record(c);
-    EA_TREE(c, rhs);
+    x87_record(c);
+    x87_ea_tree(c, rhs);
     return X87_EMU_OK;
 }
 /* SF_ESC1: D9 retains the upstream memory/register and idx/sub branches. */
@@ -86,10 +78,10 @@ static enum x87_emu_result SF_ESC1(struct esc *c)
     if (c->d->memory) {
         switch (idx) {
         case 0:
-            MEMORY(4, false); record(c);
+            MEMORY(4, false); x87_record(c);
             x87_push(e, x87_load32(e, c->input, false)); break;
         case 2: case 3:
-            MEMORY(4, true); record(c); x87_store32(e, false);
+            MEMORY(4, true); x87_record(c); x87_store32(e, false);
             if (idx == 3) x87_pop(e);
             break;
         case 4:
@@ -107,7 +99,7 @@ static enum x87_emu_result SF_ESC1(struct esc *c)
         }
         return X87_EMU_OK;
     }
-    record(c);
+    x87_record(c);
     switch (idx) {
     case 0: x87_push(e, x87_get(e, other)); break;
     case 1: {
@@ -154,11 +146,11 @@ static enum x87_emu_result SF_ESC1(struct esc *c)
 static enum x87_emu_result SF_ESC2(struct esc *c)
 {
     if (c->d->memory) {
-        MEMORY(4, false); record(c);
-        EA_TREE(c, x87_load32(c->e, c->input, true));
+        MEMORY(4, false); x87_record(c);
+        x87_ea_tree(c, x87_load32(c->e, c->input, true));
     } else {
         if (c->d->modrm != 0xe9) return X87_EMU_UNSUPPORTED;
-        record(c);
+        x87_record(c);
         sw_extFloat80_t a = x87_get(c->e, x87_top(&c->e->state));
         sw_extFloat80_t b = x87_get(c->e, x87_st(&c->e->state, 1));
         x87_compare_values(c->e, a, b, false);
@@ -179,21 +171,21 @@ static enum x87_emu_result SF_ESC3(struct esc *c)
     }
     switch (idx) {
     case 0:
-        MEMORY(4, false); record(c);
+        MEMORY(4, false); x87_record(c);
         x87_push(e, x87_load32(e, c->input, true)); break;
     case 2: case 3:
-        MEMORY(4, true); record(c); x87_store32(e, true);
+        MEMORY(4, true); x87_record(c); x87_store32(e, true);
         if (idx == 3) x87_pop(e);
         break;
     case 5: {
         struct x87_emu_ext80 r;
-        MEMORY(10, false); record(c);
+        MEMORY(10, false); x87_record(c);
         for (unsigned i = 0; i < 10; ++i) r.bytes[i] = c->input[i];
         x87_push(e, x87_unpack(&r)); break;
     }
     case 7: {
         struct x87_emu_ext80 r;
-        MEMORY(10, true); record(c);
+        MEMORY(10, true); x87_record(c);
         x87_pack(&r, x87_get(e, x87_top(&e->state)));
         for (unsigned i = 0; i < 10; ++i) e->output[i] = r.bytes[i];
         e->state.sw &= ~X87_C1;
@@ -210,7 +202,9 @@ enum x87_emu_result x87_emu_execute(const struct x87_emu_trap *trap,
     struct esc c = {.trap = trap, .access = access, .d = d, .e = e};
     unsigned idx = (d->modrm >> 3) & 7;
     d->waiting = !(d->opcode == 0xd9 && d->memory && (idx == 6 || idx == 7)) &&
-        !(d->opcode == 0xdb && !d->memory && (d->modrm == 0xe2 || d->modrm == 0xe3));
+        !(d->opcode == 0xdb && !d->memory && (d->modrm == 0xe2 || d->modrm == 0xe3)) &&
+        !(d->opcode == 0xdd && d->memory && (idx == 6 || idx == 7)) &&
+        !(d->opcode == 0xdf && d->modrm == 0xe0);
     if (d->waiting && (e->state.sw & ~e->state.cw & 0x3f)) return X87_EMU_PENDING_MF;
     struct x87_emu_softfloat_scope scope;
     x87_emu_scope_begin(e->state.cw, &scope);
@@ -221,6 +215,10 @@ enum x87_emu_result x87_emu_execute(const struct x87_emu_trap *trap,
     case 0xd9: r = SF_ESC1(&c); break;
     case 0xda: r = SF_ESC2(&c); break;
     case 0xdb: r = SF_ESC3(&c); break;
+    case 0xdc: r = x87_esc4(&c); break;
+    case 0xdd: r = x87_esc5(&c); break;
+    case 0xde: r = x87_esc6(&c); break;
+    case 0xdf: r = x87_esc7(&c); break;
     default: r = X87_EMU_UNSUPPORTED; break;
     }
     x87_emu_scope_end(&scope, e);

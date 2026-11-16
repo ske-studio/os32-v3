@@ -90,7 +90,7 @@ def verify_x87(manifest):
             names.add(entry['function'])
             assert (entry['function'] + '(').encode() in piece
             if entry['destination']:
-                assert entry['status'] in ('planned B/C port', 'ported ESC0-3', 'partial port')
+                assert entry['status'] in ('planned B/C port', 'ported ESC0-3', 'ported ESC4-7', 'partial port')
                 if entry['status'] != 'planned B/C port':
                     installed = ROOT / entry['destination']
                     assert installed.is_file(), installed

@@ -104,7 +104,8 @@ static sw_extFloat80_t scale_operand(sw_extFloat80_t v, int shift)
 }
 /* FPU_FADD/FMUL/FSUB/FSUBR/FDIV/FDIVR: SoftFloat operation and PC unchanged.
  * Repeat with truncation only to recover x87 C1 (magnitude rounded upward). */
-void x87_binary(struct x87_emu_effect *e, unsigned op, sw_extFloat80_t a, sw_extFloat80_t b)
+void x87_binary_to(struct x87_emu_effect *e, unsigned destination, unsigned op,
+                   sw_extFloat80_t a, sw_extFloat80_t b)
 {
     a = operand(e, a); b = operand(e, b);
     if (nan80(a) || nan80(b)) e->raised &= ~X87_DE;
@@ -136,7 +137,11 @@ void x87_binary(struct x87_emu_effect *e, unsigned op, sw_extFloat80_t a, sw_ext
         ((v.signExp & 0x7fff) > (truncated.signExp & 0x7fff) ||
          ((v.signExp & 0x7fff) == (truncated.signExp & 0x7fff) && v.signif > truncated.signif)))
         e->state.sw |= X87_C1;
-    x87_put(&e->state, x87_top(&e->state), v);
+    x87_put(&e->state, destination, v);
+}
+void x87_binary(struct x87_emu_effect *e, unsigned op, sw_extFloat80_t a, sw_extFloat80_t b)
+{
+    x87_binary_to(e, x87_top(&e->state), op, a, b);
 }
 /* FPU_FSQRT / FPU_FRNDINT. */
 void x87_unary(struct x87_emu_effect *e, bool square_root)
@@ -168,14 +173,15 @@ sw_extFloat80_t x87_load32(struct x87_emu_effect *e, const u8 *p, bool integer)
 /* FPU_FST_F32 / FPU_FST_I32, buffer replaces direct memory store. */
 void x87_store32(struct x87_emu_effect *e, bool integer)
 {
+    if (integer) { x87_store_integer(e, 4); return; }
     sw_extFloat80_t a = x87_get(e, x87_top(&e->state));
     if (unsupported(a)) { e->raised |= X87_IE; a = x87_indefinite(); }
-    u32 bits = integer ? (u32)extF80_to_i32(a, softfloat_roundingMode, true) : extF80_to_f32(a).v;
-    if (!integer && !(e->state.cw & X87_UE) && a.signif &&
+    u32 bits = extF80_to_f32(a).v;
+    if (!(e->state.cw & X87_UE) && a.signif &&
         (a.signExp & 0x7fff) < 0x3f81) softfloat_exceptionFlags |= softfloat_flag_underflow;
     u8 flags = softfloat_exceptionFlags, mode = softfloat_roundingMode;
     softfloat_roundingMode = softfloat_round_minMag;
-    u32 trunc = integer ? (u32)extF80_to_i32(a, softfloat_round_minMag, true) : extF80_to_f32(a).v;
+    u32 trunc = extF80_to_f32(a).v;
     softfloat_roundingMode = mode;
     softfloat_exceptionFlags = flags;
     e->state.sw &= ~X87_C1;
@@ -194,4 +200,64 @@ void x87_fxam(struct x87_emu_effect *e)
     else if ((v.signExp & 0x7fff) == 0x7fff) e->state.sw |= X87_C2 | X87_C0;
     else if (!(v.signExp & 0x7fff)) e->state.sw |= v.signif ? X87_C3 | X87_C2 : X87_C3;
     else e->state.sw |= X87_C2;
+}
+
+/* FPU_FLD_F64[_EA] / c_double_to_floatx80: integer bit wire, no native FP. */
+sw_extFloat80_t x87_load64(struct x87_emu_effect *e, const u8 *p)
+{
+    sw_float64_t v = {x87_get_le(p, 8)};
+    if (!(v.v & 0x7ff0000000000000ULL) && (v.v & 0xfffffffffffffULL)) e->raised |= X87_DE;
+    return f64_to_extF80(v);
+}
+/* int16/int64_to_floatx80 and FPU_FLD_I16[_EA]/I64. */
+sw_extFloat80_t x87_load_integer(const u8 *p, unsigned bytes)
+{
+    if (bytes == 2) return i32_to_extF80((i16)x87_get_le(p, 2));
+    if (bytes == 4) return i32_to_extF80((i32)x87_get_le(p, 4));
+    return i64_to_extF80((long long)x87_get_le(p, 8));
+}
+/* The NP2/plain and round_to_zero wrappers share these width/mode branches.
+ * minMag is used to recover C1; no FISTTP opcode is exposed. */
+static unsigned long long integer_bits(sw_extFloat80_t a, unsigned bytes, u8 mode)
+{
+    if (bytes == 2) return (u16)extF80_to_i16(a, mode, true);
+    if (bytes == 4) return (u32)extF80_to_i32(a, mode, true);
+    return (unsigned long long)extF80_to_i64(a, mode, true);
+}
+/* FPU_FST_I16/I32/I64: retain invalid/RC/exact semantics, stage the store. */
+void x87_store_integer(struct x87_emu_effect *e, unsigned bytes)
+{
+    sw_extFloat80_t a = x87_get(e, x87_top(&e->state));
+    if (unsupported(a)) { e->raised |= X87_IE; a = x87_indefinite(); }
+    unsigned long long bits = integer_bits(a, bytes, softfloat_roundingMode);
+    u8 flags = softfloat_exceptionFlags;
+    unsigned long long trunc = integer_bits(a, bytes, softfloat_round_minMag);
+    softfloat_exceptionFlags = flags;
+    e->state.sw &= ~X87_C1;
+    if ((flags & softfloat_flag_inexact) && bits != trunc) e->state.sw |= X87_C1;
+    x87_put_le(e->output, bits, bytes);
+}
+/* FPU_FST_F64 / floatx80_to_c_double. */
+void x87_store64(struct x87_emu_effect *e)
+{
+    sw_extFloat80_t a = x87_get(e, x87_top(&e->state));
+    if (unsupported(a)) { e->raised |= X87_IE; a = x87_indefinite(); }
+    unsigned long long bits = extF80_to_f64(a).v;
+    if (!(e->state.cw & X87_UE) && a.signif && (a.signExp & 0x7fff) < 0x3c01)
+        softfloat_exceptionFlags |= softfloat_flag_underflow;
+    u8 flags = softfloat_exceptionFlags, mode = softfloat_roundingMode;
+    softfloat_roundingMode = softfloat_round_minMag;
+    unsigned long long trunc = extF80_to_f64(a).v;
+    softfloat_roundingMode = mode;
+    softfloat_exceptionFlags = flags;
+    e->state.sw &= ~X87_C1;
+    if ((flags & softfloat_flag_inexact) && bits != trunc) e->state.sw |= X87_C1;
+    x87_put_le(e->output, bits, 8);
+}
+/* FPU_FST: source checked before destination/pop, including ST(0) itself. */
+void x87_copy_register(struct x87_emu_effect *e, unsigned destination)
+{
+    sw_extFloat80_t v = x87_get(e, x87_top(&e->state));
+    e->state.sw &= ~X87_C1;
+    x87_put(&e->state, destination, v);
 }

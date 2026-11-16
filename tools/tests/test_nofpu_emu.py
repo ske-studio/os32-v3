@@ -1,4 +1,4 @@
-"""ESC0..3 libc-free x87 oracle and transactional memory regressions."""
+"""ESC0..7 libc-free x87 oracle and transactional memory regressions."""
 CHECK = dict(name='nofpu-emu', tier=1, needs=[], budget=40,
     covers=['arch/x86/arch_exec_storage.h',
  'arch/x86/arch_io.h',
@@ -9,6 +9,7 @@ CHECK = dict(name='nofpu-emu', tier=1, needs=[], budget=40,
  'arch/x86/kernel/x87_emu_decode.c',
  'arch/x86/kernel/x87_emu_dispatch.c',
  'arch/x86/kernel/x87_emu_esc03.c',
+ 'arch/x86/kernel/x87_emu_esc47.c',
  'arch/x86/kernel/x87_emu_exception.c',
  'arch/x86/kernel/x87_emu_internal.h',
  'arch/x86/kernel/x87_emu_memory.c',
@@ -57,7 +58,7 @@ import host32
 from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCES = ['decode', 'state', 'ops', 'esc03', 'exception', 'memory', 'dispatch']
+SOURCES = ['decode', 'state', 'ops', 'esc03', 'esc47', 'exception', 'memory', 'dispatch']
 MUTATIONS = [
     ('arithmetic-sub-for-add', 'ops', 'case 0: return extF80_add(a, b);',
      'case 0: return extF80_sub(a, b);'),
@@ -67,25 +68,35 @@ MUTATIONS = [
     ('second-page-unchecked', 'memory', 'if (!as_access_page(a->as, va, write, &pa[count]))',
      'if (count == 1) return X87_EMU_OK;\n        if (!as_access_page(a->as, va, write, &pa[count]))'),
     ('fnstenv-mask-removed', 'esc03', 'e->state.cw |= 0x3f;', 'e->state.cw |= 0;'),
+    ('sti-reverse-order', 'esc47', 'idx >= 4 ? (idx ^ 1) : idx',
+     'idx'),
+    ('save-clears-register-payload', 'esc47', 'x87_emu_state_init(&e->state, false);',
+     'x87_emu_state_init(&e->state, true);'),
+    ('save-environment-only', 'esc47',
+     'x87_emu_state_encode(&e->state, e->output, c->d->operand16, false);',
+     'x87_emu_state_encode(&e->state, e->output, c->d->operand16, true);'),
+    ('fnstsw-clobbers-eax', 'esc47', '(e->gpr[X87_EAX] & 0xffff0000u)', '0'),
+
 ]
 
 def main():
     with tempfile.TemporaryDirectory(prefix='nofpu-emu-') as directory:
         tmp = Path(directory)
         oracle = tmp/'oracle'
-        subprocess.run(['gcc','-m64','-DX87_ORACLE_BUILD','-Os','-ffreestanding',
+        subprocess.run(['gcc','-m64','-mno-sse','-mno-sse2','-DX87_ORACLE_BUILD','-Os','-ffreestanding',
                         '-fno-stack-protector','-nostdlib','-static','-no-pie',
                         str(ROOT/'tools/tests/x87_emu_core_host.c'),'-o',str(oracle)],check=True)
         # ELF64 with direct syscall, no i386 int80 runner or binfmt fallback.
         capture=subprocess.run([str(oracle)],check=True,capture_output=True).stdout
-        assert len(capture)==768*108+20*6+32*108+14*108+6*112+4*108, len(capture)
+        sections=[('arith',768*108),('convert',20*6),('unary',32*108),('extended',14*108),('store',6*112),('env',4*108),('rear_reg',27*8*4*3*112),('rear_edge',18*27*112),('rear_mem',16*108),('rear_store',4*4*12*7*116),('rear_load',24*108),('rear_image',16*324)]
+        assert len(capture)==sum(size for _,size in sections),len(capture)
         offset=0; header=[]
-        for name,size in [('arith',768*108),('convert',20*6),('unary',32*108),('extended',14*108),('store',6*112),('env',4*108)]:
+        for name,size in sections:
             data=capture[offset:offset+size];offset+=size
             header.append('static const unsigned char reference_'+name+'[]={' +
                           ','.join(str(b) for b in data)+'};\n')
         (tmp/'x87_emu_reference.h').write_text(''.join(header))
-        print('Oracle: native ELF64 x87, 844 cases, libc=none',flush=True)
+        print('Oracle: native ELF64 x87, 5322 cases, libc=none',flush=True)
         flags = ['-I'+str(tmp), '-m32', '-march=i386', '-std=gnu11', '-Os', '-ffreestanding',
                  '-fno-pie', '-fno-stack-protector', '-msoft-float', '-mno-fp-ret-in-387',
                  '-DX87_EMU_HOST_TEST', '-I'+str(ROOT/'arch/x86/kernel'), *include_flags(ROOT)]
@@ -123,7 +134,7 @@ def main():
             return host32.run([str(exe)],timeout=30).returncode
         rc=execute()
         assert rc == 0, ('baseline',rc)
-        print(f'ESC0..3 core/oracle: GREEN runner={host32.selected_runner()} libc=none',flush=True)
+        print(f'ESC0..7 core/oracle: GREEN runner={host32.selected_runner()} libc=none',flush=True)
         if '--mutate' in sys.argv:
             for change in MUTATIONS:
                 rc=execute(change)

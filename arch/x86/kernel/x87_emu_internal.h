@@ -23,6 +23,28 @@ static inline unsigned x87_st(const struct x87_emu_state *s, unsigned n) { retur
 static inline unsigned x87_tag(const struct x87_emu_state *s, unsigned n) { return (s->tw >> (n * 2)) & 3; }
 static inline void x87_set_tag(struct x87_emu_state *s, unsigned n, unsigned tag) { s->tw = (s->tw & ~(3u << (n * 2))) | (tag << (n * 2)); }
 static inline void x87_set_top(struct x87_emu_state *s, unsigned n) { s->sw = (s->sw & ~X87_TOP) | ((n & 7) << 11); }
+struct esc {
+    const struct x87_emu_trap *trap;
+    const struct x87_emu_access *access;
+    struct x87_emu_decoded *d;
+    struct x87_emu_effect *e;
+    u8 input[X87_EMU_MEMORY_BYTES];
+};
+enum x87_emu_result x87_operand_memory(struct esc *c, unsigned bytes, bool write);
+void x87_record(struct esc *c);
+void x87_ea_tree(struct esc *c, sw_extFloat80_t rhs);
+#define MEMORY(bytes, write) do { enum x87_emu_result r = x87_operand_memory(c, bytes, write); if (r) return r; } while (0)
+enum x87_emu_result x87_esc4(struct esc *c);
+enum x87_emu_result x87_esc5(struct esc *c);
+enum x87_emu_result x87_esc6(struct esc *c);
+enum x87_emu_result x87_esc7(struct esc *c);
+void x87_binary_to(struct x87_emu_effect *e, unsigned destination, unsigned operation,
+                   sw_extFloat80_t a, sw_extFloat80_t b);
+sw_extFloat80_t x87_load64(struct x87_emu_effect *e, const u8 *p);
+sw_extFloat80_t x87_load_integer(const u8 *p, unsigned bytes);
+void x87_store64(struct x87_emu_effect *e);
+void x87_store_integer(struct x87_emu_effect *e, unsigned bytes);
+void x87_copy_register(struct x87_emu_effect *e, unsigned destination);
 unsigned long long x87_get_le(const u8 *p, unsigned n);
 void x87_put_le(u8 *p, unsigned long long v, unsigned n);
 sw_extFloat80_t x87_unpack(const struct x87_emu_ext80 *r);

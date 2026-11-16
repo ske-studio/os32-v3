@@ -114,9 +114,9 @@
       "line_end": 198,
       "raw_sha256": "7a345608498ef5f9df4fb4d1ebda7ebac952562350636e1ce7072c21fae9ca1f",
       "encoding": "CP932",
-      "destination": "arch/x86/kernel/x87_emu_convert.c",
-      "status": "planned B/C port",
-      "change_summary": "Use integer bit API and validated operand bytes, no native FP/pointer punning/direct store; stage conversion before commit."
+      "destination": "arch/x86/kernel/x87_emu_ops.c",
+      "status": "ported ESC4-7",
+      "change_summary": "ESC4-7 port: preserve upstream ESC selection and operand order; use staged state/LE memory, shared width/mode conversion helpers (including minMag for C1), full SAVE/RESTORE codec. FISTTP/BCD/FCOMI remain excluded by design. BSD notice retained."
     },
     {
       "function": "int16_to_floatx80",
@@ -125,9 +125,9 @@
       "line_end": 201,
       "raw_sha256": "8c1f7a24703f56951bb09c0405c4b4598f9aec3e51fa46a54b2776f6fbca29cc",
       "encoding": "CP932",
-      "destination": "arch/x86/kernel/x87_emu_convert.c",
-      "status": "planned B/C port",
-      "change_summary": "Use integer bit API and validated operand bytes, no native FP/pointer punning/direct store; stage conversion before commit."
+      "destination": "arch/x86/kernel/x87_emu_ops.c",
+      "status": "ported ESC4-7",
+      "change_summary": "ESC4-7 port: preserve upstream ESC selection and operand order; use staged state/LE memory, shared width/mode conversion helpers (including minMag for C1), full SAVE/RESTORE codec. FISTTP/BCD/FCOMI remain excluded by design. BSD notice retained."
     },
     {
       "function": "int32_to_floatx80",
@@ -147,9 +147,9 @@
       "line_end": 207,
       "raw_sha256": "a968ef1fc5e9920f99c0f417adeeae194fdd6491440824895fed7e9675eb2bfd",
       "encoding": "CP932",
-      "destination": "arch/x86/kernel/x87_emu_convert.c",
-      "status": "planned B/C port",
-      "change_summary": "Use integer bit API and validated operand bytes, no native FP/pointer punning/direct store; stage conversion before commit."
+      "destination": "arch/x86/kernel/x87_emu_ops.c",
+      "status": "ported ESC4-7",
+      "change_summary": "ESC4-7 port: preserve upstream ESC selection and operand order; use staged state/LE memory, shared width/mode conversion helpers (including minMag for C1), full SAVE/RESTORE codec. FISTTP/BCD/FCOMI remain excluded by design. BSD notice retained."
     },
     {
       "function": "floatx80_to_c_float",
@@ -169,9 +169,9 @@
       "line_end": 216,
       "raw_sha256": "0ebb3628a3fcd98b15bc2f589d45711335c380c85141c70f4b553ef8dbc23c94",
       "encoding": "CP932",
-      "destination": "arch/x86/kernel/x87_emu_convert.c",
-      "status": "planned B/C port",
-      "change_summary": "Use integer bit API and validated operand bytes, no native FP/pointer punning/direct store; stage conversion before commit."
+      "destination": "arch/x86/kernel/x87_emu_ops.c",
+      "status": "ported ESC4-7",
+      "change_summary": "ESC4-7 port: preserve upstream ESC selection and operand order; use staged state/LE memory, shared width/mode conversion helpers (including minMag for C1), full SAVE/RESTORE codec. FISTTP/BCD/FCOMI remain excluded by design. BSD notice retained."
     },
     {
       "function": "floatx80_to_int16_np2",
@@ -180,9 +180,9 @@
       "line_end": 219,
       "raw_sha256": "7f62c4674895f8060dbbbc260558ed15950673d4c46c94ab5c7a82dedf25e753",
       "encoding": "CP932",
-      "destination": "arch/x86/kernel/x87_emu_convert.c",
-      "status": "planned B/C port",
-      "change_summary": "Use integer bit API and validated operand bytes, no native FP/pointer punning/direct store; stage conversion before commit."
+      "destination": "arch/x86/kernel/x87_emu_ops.c",
+      "status": "ported ESC4-7",
+      "change_summary": "ESC4-7 port: preserve upstream ESC selection and operand order; use staged state/LE memory, shared width/mode conversion helpers (including minMag for C1), full SAVE/RESTORE codec. FISTTP/BCD/FCOMI remain excluded by design. BSD notice retained."
     },
     {
       "function": "floatx80_to_int32_np2",
@@ -202,9 +202,9 @@
       "line_end": 225,
       "raw_sha256": "4a1f60b3c8ed53242b3c0311a02be57f35f24e5f0d277ae351a1f7309850a45b",
       "encoding": "CP932",
-      "destination": "arch/x86/kernel/x87_emu_convert.c",
-      "status": "planned B/C port",
-      "change_summary": "Use integer bit API and validated operand bytes, no native FP/pointer punning/direct store; stage conversion before commit."
+      "destination": "arch/x86/kernel/x87_emu_ops.c",
+      "status": "ported ESC4-7",
+      "change_summary": "ESC4-7 port: preserve upstream ESC selection and operand order; use staged state/LE memory, shared width/mode conversion helpers (including minMag for C1), full SAVE/RESTORE codec. FISTTP/BCD/FCOMI remain excluded by design. BSD notice retained."
     },
     {
       "function": "floatx80_to_int16",
@@ -213,9 +213,9 @@
       "line_end": 228,
       "raw_sha256": "1e9d60e0ef7e98af5ce1f6eaec395db83285c07ed2547eda7cf4dbf533709758",
       "encoding": "CP932",
-      "destination": "arch/x86/kernel/x87_emu_convert.c",
-      "status": "planned B/C port",
-      "change_summary": "Use integer bit API and validated operand bytes, no native FP/pointer punning/direct store; stage conversion before commit."
+      "destination": "arch/x86/kernel/x87_emu_ops.c",
+      "status": "ported ESC4-7",
+      "change_summary": "ESC4-7 port: preserve upstream ESC selection and operand order; use staged state/LE memory, shared width/mode conversion helpers (including minMag for C1), full SAVE/RESTORE codec. FISTTP/BCD/FCOMI remain excluded by design. BSD notice retained."
     },
     {
       "function": "floatx80_to_int32",
@@ -235,9 +235,9 @@
       "line_end": 234,
       "raw_sha256": "acbf1ec298c7fa9f9584911dc4bac719f7396aaa0aaf64085f3842e701bbd40d",
       "encoding": "CP932",
-      "destination": "arch/x86/kernel/x87_emu_convert.c",
-      "status": "planned B/C port",
-      "change_summary": "Use integer bit API and validated operand bytes, no native FP/pointer punning/direct store; stage conversion before commit."
+      "destination": "arch/x86/kernel/x87_emu_ops.c",
+      "status": "ported ESC4-7",
+      "change_summary": "ESC4-7 port: preserve upstream ESC selection and operand order; use staged state/LE memory, shared width/mode conversion helpers (including minMag for C1), full SAVE/RESTORE codec. FISTTP/BCD/FCOMI remain excluded by design. BSD notice retained."
     },
     {
       "function": "floatx80_to_int16_round_to_zero",
@@ -246,9 +246,9 @@
       "line_end": 237,
       "raw_sha256": "f6d558d137791da91bf1ef3c5623ac88973766dd73553cacc694b904812e3d8b",
       "encoding": "CP932",
-      "destination": "arch/x86/kernel/x87_emu_convert.c",
-      "status": "planned B/C port",
-      "change_summary": "Use integer bit API and validated operand bytes, no native FP/pointer punning/direct store; stage conversion before commit."
+      "destination": "arch/x86/kernel/x87_emu_ops.c",
+      "status": "ported ESC4-7",
+      "change_summary": "ESC4-7 port: preserve upstream ESC selection and operand order; use staged state/LE memory, shared width/mode conversion helpers (including minMag for C1), full SAVE/RESTORE codec. FISTTP/BCD/FCOMI remain excluded by design. BSD notice retained."
     },
     {
       "function": "floatx80_to_int32_round_to_zero",
@@ -257,9 +257,9 @@
       "line_end": 240,
       "raw_sha256": "abe5c99749ecccbf81d5b6af10ca6caf4b1e828672f88d58c850abfc71cbfd25",
       "encoding": "CP932",
-      "destination": "arch/x86/kernel/x87_emu_convert.c",
-      "status": "planned B/C port",
-      "change_summary": "Use integer bit API and validated operand bytes, no native FP/pointer punning/direct store; stage conversion before commit."
+      "destination": "arch/x86/kernel/x87_emu_ops.c",
+      "status": "ported ESC4-7",
+      "change_summary": "ESC4-7 port: preserve upstream ESC selection and operand order; use staged state/LE memory, shared width/mode conversion helpers (including minMag for C1), full SAVE/RESTORE codec. FISTTP/BCD/FCOMI remain excluded by design. BSD notice retained."
     },
     {
       "function": "floatx80_to_int64_round_to_zero",
@@ -268,9 +268,9 @@
       "line_end": 243,
       "raw_sha256": "2a59d0158cb679628191f5c065cf4c1bb78527dece46aef4bc43643c81bc1f28",
       "encoding": "CP932",
-      "destination": "arch/x86/kernel/x87_emu_convert.c",
-      "status": "planned B/C port",
-      "change_summary": "Use integer bit API and validated operand bytes, no native FP/pointer punning/direct store; stage conversion before commit."
+      "destination": "arch/x86/kernel/x87_emu_ops.c",
+      "status": "ported ESC4-7",
+      "change_summary": "ESC4-7 port: preserve upstream ESC selection and operand order; use staged state/LE memory, shared width/mode conversion helpers (including minMag for C1), full SAVE/RESTORE codec. FISTTP/BCD/FCOMI remain excluded by design. BSD notice retained."
     },
     {
       "function": "floatx80_round_to_int",
@@ -444,9 +444,9 @@
       "line_end": 324,
       "raw_sha256": "13ebfee5e45fbfa7ad56d8bf1c4a3231822ac0bd427ceafa645649f9c43efd9e",
       "encoding": "CP932",
-      "destination": "arch/x86/kernel/x87_emu_convert.c",
-      "status": "planned B/C port",
-      "change_summary": "Use integer bit API and validated operand bytes, no native FP/pointer punning/direct store; stage conversion before commit."
+      "destination": "arch/x86/kernel/x87_emu_ops.c",
+      "status": "ported ESC4-7",
+      "change_summary": "ESC4-7 port: preserve upstream ESC selection and operand order; use staged state/LE memory, shared width/mode conversion helpers (including minMag for C1), full SAVE/RESTORE codec. FISTTP/BCD/FCOMI remain excluded by design. BSD notice retained."
     },
     {
       "function": "FPU_FLD_F80",
@@ -466,9 +466,9 @@
       "line_end": 332,
       "raw_sha256": "e07e8c6d06082b60efeb9430c1482de2855144835cafe4dd8bdc0d22956ba357",
       "encoding": "CP932",
-      "destination": "arch/x86/kernel/x87_emu_convert.c",
-      "status": "planned B/C port",
-      "change_summary": "Use integer bit API and validated operand bytes, no native FP/pointer punning/direct store; stage conversion before commit."
+      "destination": "arch/x86/kernel/x87_emu_ops.c",
+      "status": "ported ESC4-7",
+      "change_summary": "ESC4-7 port: preserve upstream ESC selection and operand order; use staged state/LE memory, shared width/mode conversion helpers (including minMag for C1), full SAVE/RESTORE codec. FISTTP/BCD/FCOMI remain excluded by design. BSD notice retained."
     },
     {
       "function": "FPU_FLD_I32",
@@ -488,9 +488,9 @@
       "line_end": 340,
       "raw_sha256": "399ccc52ffc0d464b894663a673d6ea6bf11368ae970758224d741ed3904a5a5",
       "encoding": "CP932",
-      "destination": "arch/x86/kernel/x87_emu_convert.c",
-      "status": "planned B/C port",
-      "change_summary": "Use integer bit API and validated operand bytes, no native FP/pointer punning/direct store; stage conversion before commit."
+      "destination": "arch/x86/kernel/x87_emu_ops.c",
+      "status": "ported ESC4-7",
+      "change_summary": "ESC4-7 port: preserve upstream ESC selection and operand order; use staged state/LE memory, shared width/mode conversion helpers (including minMag for C1), full SAVE/RESTORE codec. FISTTP/BCD/FCOMI remain excluded by design. BSD notice retained."
     },
     {
       "function": "FPU_FBLD",
@@ -521,9 +521,9 @@
       "line_end": 374,
       "raw_sha256": "a5c4cb13a800a793f4a246a80272ff381fde97a9b22f4418bd197cd9a6dce450",
       "encoding": "CP932",
-      "destination": "arch/x86/kernel/x87_emu_convert.c",
-      "status": "planned B/C port",
-      "change_summary": "Use integer bit API and validated operand bytes, no native FP/pointer punning/direct store; stage conversion before commit."
+      "destination": "arch/x86/kernel/x87_emu_ops.c",
+      "status": "ported ESC4-7",
+      "change_summary": "ESC4-7 port: preserve upstream ESC selection and operand order; use staged state/LE memory, shared width/mode conversion helpers (including minMag for C1), full SAVE/RESTORE codec. FISTTP/BCD/FCOMI remain excluded by design. BSD notice retained."
     },
     {
       "function": "FPU_FLD_I32_EA",
@@ -543,9 +543,9 @@
       "line_end": 380,
       "raw_sha256": "1c942d1ceea5b0e9a78c16a039806b70fa2f27c9941c568e143687430e7296e9",
       "encoding": "CP932",
-      "destination": "arch/x86/kernel/x87_emu_convert.c",
-      "status": "planned B/C port",
-      "change_summary": "Use integer bit API and validated operand bytes, no native FP/pointer punning/direct store; stage conversion before commit."
+      "destination": "arch/x86/kernel/x87_emu_ops.c",
+      "status": "ported ESC4-7",
+      "change_summary": "ESC4-7 port: preserve upstream ESC selection and operand order; use staged state/LE memory, shared width/mode conversion helpers (including minMag for C1), full SAVE/RESTORE codec. FISTTP/BCD/FCOMI remain excluded by design. BSD notice retained."
     },
     {
       "function": "FPU_ST80",
@@ -576,9 +576,9 @@
       "line_end": 394,
       "raw_sha256": "096f166976289f9a73a466ed28f9fb58e67b108f9dbfe1652a49bc6992a62582",
       "encoding": "CP932",
-      "destination": "arch/x86/kernel/x87_emu_convert.c",
-      "status": "planned B/C port",
-      "change_summary": "Use integer bit API and validated operand bytes, no native FP/pointer punning/direct store; stage conversion before commit."
+      "destination": "arch/x86/kernel/x87_emu_ops.c",
+      "status": "ported ESC4-7",
+      "change_summary": "ESC4-7 port: preserve upstream ESC selection and operand order; use staged state/LE memory, shared width/mode conversion helpers (including minMag for C1), full SAVE/RESTORE codec. FISTTP/BCD/FCOMI remain excluded by design. BSD notice retained."
     },
     {
       "function": "FPU_FST_F80",
@@ -598,9 +598,9 @@
       "line_end": 404,
       "raw_sha256": "52718050f2e0aaa93c7772d72bf6bec94ff5d5085aa4ac0be0d166ed14b021c8",
       "encoding": "CP932",
-      "destination": "arch/x86/kernel/x87_emu_convert.c",
-      "status": "planned B/C port",
-      "change_summary": "Use integer bit API and validated operand bytes, no native FP/pointer punning/direct store; stage conversion before commit."
+      "destination": "arch/x86/kernel/x87_emu_ops.c",
+      "status": "ported ESC4-7",
+      "change_summary": "ESC4-7 port: preserve upstream ESC selection and operand order; use staged state/LE memory, shared width/mode conversion helpers (including minMag for C1), full SAVE/RESTORE codec. FISTTP/BCD/FCOMI remain excluded by design. BSD notice retained."
     },
     {
       "function": "FPU_FST_I32",
@@ -620,9 +620,9 @@
       "line_end": 416,
       "raw_sha256": "450f58b49dc400c14ed5bb20e897b36b1440bfddc933586e8c9fcc8099320620",
       "encoding": "CP932",
-      "destination": "arch/x86/kernel/x87_emu_convert.c",
-      "status": "planned B/C port",
-      "change_summary": "Use integer bit API and validated operand bytes, no native FP/pointer punning/direct store; stage conversion before commit."
+      "destination": "arch/x86/kernel/x87_emu_ops.c",
+      "status": "ported ESC4-7",
+      "change_summary": "ESC4-7 port: preserve upstream ESC selection and operand order; use staged state/LE memory, shared width/mode conversion helpers (including minMag for C1), full SAVE/RESTORE codec. FISTTP/BCD/FCOMI remain excluded by design. BSD notice retained."
     },
     {
       "function": "FPU_FBST",
@@ -884,9 +884,9 @@
       "line_end": 629,
       "raw_sha256": "40a80ed8385cd284dd4a40a909083b30e2e329a23c7a8f41e9d6901ff3f85b8c",
       "encoding": "CP932",
-      "destination": "arch/x86/kernel/x87_emu_esc03.c",
-      "status": "partial port",
-      "change_summary": "Preserve constants, CW/tag/stack/ENV semantics; explicit LE codec, physical/logical ordering; new-owner zeroing distinct from FINIT. Replace CPU globals with speculative OS32 state. ESC0-3: CPU state -> speculative physical-register state; LE buffers replace memory/native FP; grouped helper wrappers share C implementations. Codec/copy support present; ESC4-7 instruction wiring remains."
+      "destination": "arch/x86/kernel/x87_emu_ops.c",
+      "status": "ported ESC4-7",
+      "change_summary": "ESC4-7 port: preserve upstream ESC selection and operand order; use staged state/LE memory, shared width/mode conversion helpers (including minMag for C1), full SAVE/RESTORE codec. FISTTP/BCD/FCOMI remain excluded by design. BSD notice retained."
     },
     {
       "function": "FPU_FXCH",
@@ -1500,9 +1500,9 @@
       "line_end": 1245,
       "raw_sha256": "ef16d0faa5d3c3ba7780844a9701800223606f825b1a647443354a19d239a47e",
       "encoding": "CP932",
-      "destination": "arch/x86/kernel/x87_emu_state.c",
-      "status": "partial port",
-      "change_summary": "Preserve constants, CW/tag/stack/ENV semantics; explicit LE codec, physical/logical ordering; new-owner zeroing distinct from FINIT. Replace CPU globals with speculative OS32 state. ESC0-3: CPU state -> speculative physical-register state; LE buffers replace memory/native FP; grouped helper wrappers share C implementations. Codec/copy support present; ESC4-7 instruction wiring remains."
+      "destination": "arch/x86/kernel/x87_emu_esc47.c",
+      "status": "ported ESC4-7",
+      "change_summary": "ESC4-7 port: preserve upstream ESC selection and operand order; use staged state/LE memory, shared width/mode conversion helpers (including minMag for C1), full SAVE/RESTORE codec. FISTTP/BCD/FCOMI remain excluded by design. BSD notice retained."
     },
     {
       "function": "FPU_FRSTOR",
@@ -1511,9 +1511,9 @@
       "line_end": 1269,
       "raw_sha256": "743b671247be2474fac9011d2c4e6f4e1b69ddb4dffd1ad3dec734a282073316",
       "encoding": "CP932",
-      "destination": "arch/x86/kernel/x87_emu_state.c",
-      "status": "partial port",
-      "change_summary": "Preserve constants, CW/tag/stack/ENV semantics; explicit LE codec, physical/logical ordering; new-owner zeroing distinct from FINIT. Replace CPU globals with speculative OS32 state. ESC0-3: CPU state -> speculative physical-register state; LE buffers replace memory/native FP; grouped helper wrappers share C implementations. Codec/copy support present; ESC4-7 instruction wiring remains."
+      "destination": "arch/x86/kernel/x87_emu_esc47.c",
+      "status": "ported ESC4-7",
+      "change_summary": "ESC4-7 port: preserve upstream ESC selection and operand order; use staged state/LE memory, shared width/mode conversion helpers (including minMag for C1), full SAVE/RESTORE codec. FISTTP/BCD/FCOMI remain excluded by design. BSD notice retained."
     },
     {
       "function": "FPU_FXSAVE",
@@ -1611,8 +1611,8 @@
       "raw_sha256": "fb36e9a991907a095f891665ee611a3b0e8aa3a375725a5b4787b7402a83bc73",
       "encoding": "CP932",
       "destination": "arch/x86/kernel/x87_emu_esc47.c",
-      "status": "planned B/C port",
-      "change_summary": "Retain supported opcode cases; replace EA/CPU macros with OS32 decoder and normalized trap; reject excluded operations."
+      "status": "ported ESC4-7",
+      "change_summary": "ESC4-7 port: preserve upstream ESC selection and operand order; use staged state/LE memory, shared width/mode conversion helpers (including minMag for C1), full SAVE/RESTORE codec. FISTTP/BCD/FCOMI remain excluded by design. BSD notice retained."
     },
     {
       "function": "SF_ESC5",
@@ -1622,8 +1622,8 @@
       "raw_sha256": "2a3703c6bfc05d5eee577af44d140b0dcb8a869ec2e5a6e19e2a4d653b81c105",
       "encoding": "CP932",
       "destination": "arch/x86/kernel/x87_emu_esc47.c",
-      "status": "planned B/C port",
-      "change_summary": "Retain supported opcode cases; replace EA/CPU macros with OS32 decoder and normalized trap; reject excluded operations."
+      "status": "ported ESC4-7",
+      "change_summary": "ESC4-7 port: preserve upstream ESC selection and operand order; use staged state/LE memory, shared width/mode conversion helpers (including minMag for C1), full SAVE/RESTORE codec. FISTTP/BCD/FCOMI remain excluded by design. BSD notice retained."
     },
     {
       "function": "SF_ESC6",
@@ -1633,8 +1633,8 @@
       "raw_sha256": "32a63eea46af24b6af4f875603caa4abd8100610105f0772a76bfcc64df749c3",
       "encoding": "CP932",
       "destination": "arch/x86/kernel/x87_emu_esc47.c",
-      "status": "planned B/C port",
-      "change_summary": "Retain supported opcode cases; replace EA/CPU macros with OS32 decoder and normalized trap; reject excluded operations."
+      "status": "ported ESC4-7",
+      "change_summary": "ESC4-7 port: preserve upstream ESC selection and operand order; use staged state/LE memory, shared width/mode conversion helpers (including minMag for C1), full SAVE/RESTORE codec. FISTTP/BCD/FCOMI remain excluded by design. BSD notice retained."
     },
     {
       "function": "SF_ESC7",
@@ -1644,10 +1644,10 @@
       "raw_sha256": "066f3c5b148d6043f39340e87dbe2ca170f3b0c3336b723ae4d72e78522f40de",
       "encoding": "CP932",
       "destination": "arch/x86/kernel/x87_emu_esc47.c",
-      "status": "planned B/C port",
-      "change_summary": "Retain supported opcode cases; replace EA/CPU macros with OS32 decoder and normalized trap; reject excluded operations."
+      "status": "ported ESC4-7",
+      "change_summary": "ESC4-7 port: preserve upstream ESC selection and operand order; use staged state/LE memory, shared width/mode conversion helpers (including minMag for C1), full SAVE/RESTORE codec. FISTTP/BCD/FCOMI remain excluded by design. BSD notice retained."
     }
   ],
   "note": "LICENSE lists .c while this fixed revision uses .cpp. Read via iconv CP932->UTF-8; original files/notices stored byte-exact. No GPL fpemul_dosbox sources read.",
-  "port_note": "ESC0-3 port with shared state/codec/ops/exception boundaries; ESC4-7 remain planned. No image wiring. State codec includes SAVE/RESTORE support, but DD opcodes remain next stage. C1/DE, stack faults, wrapped unmasked exponents and exception commit supplement the upstream per NOFPU_DESIGN section 4.3."
+  "port_note": "ESC0-7 complete: 114 selected functions ported, 33 excluded. Native x87 oracle covers rear register, memory, conversion, save/restore and exception paths. OS32 CPU/validated memory/exception boundaries replace NP21 globals; no native FP in product. No #NM/x87.c/image wiring in this stage."
 }

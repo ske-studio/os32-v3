@@ -70,17 +70,19 @@ enum x87_emu_result x87_emu_exception(const struct x87_emu_state *before,
     u16 unmasked = e->raised & ~before->cw & 0x3f;
     if (unmasked & (X87_IE | X87_DE | X87_ZE)) {
         /* Operand faults suppress destination, TOP (invalid comparisons report unordered). */
-        u16 c1 = e->state.sw & X87_C1;
+        u16 c1 = (unmasked & X87_DE) ? 0 : (e->state.sw & X87_C1);
         struct x87_emu_state current = e->state;
         e->state = *before;
         e->state.fip = current.fip; e->state.fcs = current.fcs; e->state.fop = current.fop;
         e->state.fdp = current.fdp; e->state.fds = current.fds;
         e->state.sw = (before->sw & ~X87_C1) | c1;
         unsigned idx = (d->modrm >> 3) & 7;
-        bool compare = (d->opcode == 0xd8 && (idx == 2 || idx == 3)) ||
+        bool compare = ((d->opcode == 0xd8 || d->opcode == 0xdc || d->opcode == 0xde) &&
+                        (idx == 2 || idx == 3)) ||
             (d->opcode == 0xda && (d->memory ? (idx == 2 || idx == 3) : d->modrm == 0xe9)) ||
-            (d->opcode == 0xd9 && !d->memory && d->modrm == 0xe4);
-        if (compare && (e->raised & X87_IE))
+            (d->opcode == 0xd9 && !d->memory && d->modrm == 0xe4) ||
+            (d->opcode == 0xdd && !d->memory && (idx == 4 || idx == 5));
+        if (compare && (e->raised & (X87_IE | X87_DE)))
             e->state.sw = (e->state.sw & ~X87_CC) | (current.sw & X87_CC);
         e->commit &= ~(X87_COMMIT_REGS | X87_COMMIT_MEMORY | X87_COMMIT_GPR);
         if (unmasked & X87_IE) e->raised &= ~(X87_DE | X87_ZE | X87_OE | X87_UE | X87_PE);

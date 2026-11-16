@@ -31,11 +31,39 @@
 #define EXT_COUNT 14
 #define EXT_TYPES struct raw80 { unsigned long long sig; u16 exp; }; \
  struct ext_case { unsigned op; u16 cw; struct raw80 a,b; }
+
+#define REAR_OPS {{220,193},{220,201},{220,209},{220,217},{220,225},{220,233},{220,241},{220,249},{221,195},{221,203},{221,211},{221,219},{221,227},{221,235},{222,193},{222,201},{222,209},{222,217},{222,225},{222,233},{222,241},{222,249},{223,195},{223,203},{223,211},{223,219},{223,224}}
+#define REAR_REG_COUNT 27
+#define REAR_VALUES {{0xc000000000000000ULL,0x3fff},{0xc000000000000000ULL,0xbfff},\
+ {0xffff000000000000ULL,0x400d},{0x8000000000000000ULL,0x400e},\
+ {0x8000000000000000ULL,0x403e},{0x8000000000000000ULL,0xc03e},\
+ {0xc000000000000001ULL,0x7fff},{0x8000000000000001ULL,0x7fff},\
+ {0x8000000000000000ULL,0x7fff},{0x8000000000000000ULL,0x3c00},\
+ {0x8000000000000000ULL,0x43ff},{0x8000000000000400ULL,0x3fff}}
+#define REAR_VALUE_COUNT 12
+
+#define REAR_EDGE_COUNT (EXT_COUNT + 4)
 #ifdef X87_ORACLE_BUILD
 typedef unsigned int u32;
 typedef unsigned short u16;
 typedef unsigned char u8;
 static u8 hw[108];
+
+static void seed_image(u8 *p, unsigned top, u16 cw)
+{
+    static const unsigned long long sig[8]={0xc000000000000000ULL,0xd000000000000000ULL,
+        0xe400000000000000ULL,0xa000000000000000ULL,0x9800000000000000ULL,
+        0xd000000000000000ULL,0x8200000000000000ULL,0x9c00000000000000ULL};
+    static const u16 exp[8]={0x3fff,0xc000,0x4001,0xc000,0x4001,0x4001,0xc002,0x4002};
+    for(unsigned i=0;i<108;++i)p[i]=0;
+    p[0]=cw;p[1]=cw>>8;p[2]=p[3]=p[6]=p[7]=p[10]=p[11]=p[26]=p[27]=255;
+    p[5]=top<<3;
+    for(unsigned i=0;i<8;++i) {
+        for(unsigned j=0;j<8;++j)p[28+i*10+j]=sig[i]>>(8*j);
+        p[36+i*10]=exp[i];p[37+i*10]=exp[i]>>8;
+    }
+}
+
 static void emit(const void *p, unsigned long n)
 {
     while(n) {
@@ -61,6 +89,31 @@ static void oracle(unsigned op, u32 a, u32 b, u16 cw)
 }
 
 EXT_TYPES;
+
+static void edge_seed(u8 *seed, unsigned n)
+{
+    const struct ext_case cases[]=EXT_CASES;
+    if(n<EXT_COUNT) {
+        seed_image(seed,3,cases[n].cw);
+        const struct raw80 values[2]={cases[n].a,cases[n].b};
+        u16 tw=0;
+        for(unsigned k=0;k<2;++k) {
+            for(unsigned j=0;j<8;++j)seed[28+k*10+j]=values[k].sig>>(8*j);
+            seed[36+k*10]=values[k].exp;seed[37+k*10]=values[k].exp>>8;
+            unsigned exp=values[k].exp&0x7fff;
+            unsigned tag= !exp&&!values[k].sig?1:
+                (!exp||exp==0x7fff||!(values[k].sig>>63)?2:0);
+            tw|=tag<<((3+k)*2);
+        }
+        seed[8]=tw;seed[9]=tw>>8;
+    } else {
+        unsigned variant=n-EXT_COUNT;
+        seed_image(seed,3,variant<2?0x37f:0x37e);
+        unsigned tw=3u<<((3+(variant&1))*2);
+        seed[8]=tw;seed[9]=tw>>8;
+    }
+}
+
 static void oracle_ext(unsigned op, struct raw80 a, struct raw80 b, u16 cw)
 {
 #define EXT_ORACLE(code) __asm__ volatile("fninit; fldt %2; fldt %1; fldcw %3; " code "; fnsave %0" : "=m"(hw) : "m"(a), "m"(b), "m"(cw) : "memory")
@@ -69,6 +122,151 @@ static void oracle_ext(unsigned op, struct raw80 a, struct raw80 b, u16 cw)
     case 1: EXT_ORACLE("fmul %%st(1), %%st"); break;
     case 2: EXT_ORACLE("fcom %%st(1)"); break;
     case 6: EXT_ORACLE("fdiv %%st(1), %%st"); break;
+    }
+}
+
+static void rear_oracle(void)
+{
+    u8 seed[108];
+    static const unsigned pcs[]={0,2,3};
+    for(unsigned top=0;top<8;++top) for(unsigned rc=0;rc<4;++rc)
+        for(unsigned pc=0;pc<3;++pc) for(unsigned op=0;op<REAR_REG_COUNT;++op) {
+            seed_image(seed,top,0x7f|(rc<<10)|(pcs[pc]<<8));
+            u32 eax=0xabcd1234;
+#define REAR_REG(code) __asm__ volatile("frstor %2; " code "; fnsave %0" :"=m"(hw),"+a"(eax):"m"(seed):"memory")
+            switch(op) {
+            case 0: REAR_REG(".byte 220,193"); break;
+            case 1: REAR_REG(".byte 220,201"); break;
+            case 2: REAR_REG(".byte 220,209"); break;
+            case 3: REAR_REG(".byte 220,217"); break;
+            case 4: REAR_REG(".byte 220,225"); break;
+            case 5: REAR_REG(".byte 220,233"); break;
+            case 6: REAR_REG(".byte 220,241"); break;
+            case 7: REAR_REG(".byte 220,249"); break;
+            case 8: REAR_REG(".byte 221,195"); break;
+            case 9: REAR_REG(".byte 221,203"); break;
+            case 10: REAR_REG(".byte 221,211"); break;
+            case 11: REAR_REG(".byte 221,219"); break;
+            case 12: REAR_REG(".byte 221,227"); break;
+            case 13: REAR_REG(".byte 221,235"); break;
+            case 14: REAR_REG(".byte 222,193"); break;
+            case 15: REAR_REG(".byte 222,201"); break;
+            case 16: REAR_REG(".byte 222,209"); break;
+            case 17: REAR_REG(".byte 222,217"); break;
+            case 18: REAR_REG(".byte 222,225"); break;
+            case 19: REAR_REG(".byte 222,233"); break;
+            case 20: REAR_REG(".byte 222,241"); break;
+            case 21: REAR_REG(".byte 222,249"); break;
+            case 22: REAR_REG(".byte 223,195"); break;
+            case 23: REAR_REG(".byte 223,203"); break;
+            case 24: REAR_REG(".byte 223,211"); break;
+            case 25: REAR_REG(".byte 223,219"); break;
+            case 26: REAR_REG(".byte 223,224"); break;
+            }
+            emit(hw,108);emit(&eax,4);
+        }
+    for(unsigned v=0;v<REAR_EDGE_COUNT;++v) for(unsigned op=0;op<REAR_REG_COUNT;++op) {
+        edge_seed(seed,v);u32 eax=0xabcd1234;
+            switch(op) {
+            case 0: REAR_REG(".byte 220,193"); break;
+            case 1: REAR_REG(".byte 220,201"); break;
+            case 2: REAR_REG(".byte 220,209"); break;
+            case 3: REAR_REG(".byte 220,217"); break;
+            case 4: REAR_REG(".byte 220,225"); break;
+            case 5: REAR_REG(".byte 220,233"); break;
+            case 6: REAR_REG(".byte 220,241"); break;
+            case 7: REAR_REG(".byte 220,249"); break;
+            case 8: REAR_REG(".byte 221,195"); break;
+            case 9: REAR_REG(".byte 221,203"); break;
+            case 10: REAR_REG(".byte 221,211"); break;
+            case 11: REAR_REG(".byte 221,219"); break;
+            case 12: REAR_REG(".byte 221,227"); break;
+            case 13: REAR_REG(".byte 221,235"); break;
+            case 14: REAR_REG(".byte 222,193"); break;
+            case 15: REAR_REG(".byte 222,201"); break;
+            case 16: REAR_REG(".byte 222,209"); break;
+            case 17: REAR_REG(".byte 222,217"); break;
+            case 18: REAR_REG(".byte 222,225"); break;
+            case 19: REAR_REG(".byte 222,233"); break;
+            case 20: REAR_REG(".byte 222,241"); break;
+            case 21: REAR_REG(".byte 222,249"); break;
+            case 22: REAR_REG(".byte 223,195"); break;
+            case 23: REAR_REG(".byte 223,203"); break;
+            case 24: REAR_REG(".byte 223,211"); break;
+            case 25: REAR_REG(".byte 223,219"); break;
+            case 26: REAR_REG(".byte 223,224"); break;
+            }
+        emit(hw,108);emit(&eax,4);
+    }
+    for(unsigned kind=0;kind<2;++kind) for(unsigned op=0;op<8;++op) {
+        seed_image(seed,5,0x37f);
+        unsigned long long rhs=kind?0xfff9:0xc00a000000000000ULL;
+#define REAR_MEM(code) __asm__ volatile("frstor %2; " code "; fnsave %0":"=m"(hw):"m"(rhs),"m"(seed):"memory")
+        switch(kind*8+op) {
+        case 0: REAR_MEM("faddl %1"); break;
+        case 1: REAR_MEM("fmull %1"); break;
+        case 2: REAR_MEM("fcoml %1"); break;
+        case 3: REAR_MEM("fcompl %1"); break;
+        case 4: REAR_MEM("fsubl %1"); break;
+        case 5: REAR_MEM("fsubrl %1"); break;
+        case 6: REAR_MEM("fdivl %1"); break;
+        case 7: REAR_MEM("fdivrl %1"); break;
+        case 8: REAR_MEM("fiadds %1"); break;
+        case 9: REAR_MEM("fimuls %1"); break;
+        case 10: REAR_MEM("ficoms %1"); break;
+        case 11: REAR_MEM("ficomps %1"); break;
+        case 12: REAR_MEM("fisubs %1"); break;
+        case 13: REAR_MEM("fisubrs %1"); break;
+        case 14: REAR_MEM("fidivs %1"); break;
+        case 15: REAR_MEM("fidivrs %1"); break;
+        }
+        emit(hw,108);
+    }
+    const struct raw80 values[]=REAR_VALUES;
+    static const u16 masks[]={0x37f,0x37e,0x35f,0x367};
+    for(unsigned rc=0;rc<4;++rc) for(unsigned m=0;m<4;++m)
+        for(unsigned v=0;v<REAR_VALUE_COUNT;++v) for(unsigned kind=0;kind<7;++kind) {
+            seed_image(seed,7,masks[m]|(rc<<10));
+            for(unsigned j=0;j<8;++j) seed[28+j]=values[v].sig>>(8*j);
+            seed[36]=values[v].exp;seed[37]=values[v].exp>>8;
+            /* FRSTOR's tag word describes the loaded operand class. */
+            if((values[v].exp&0x7fff)==0x7fff)seed[9]=0x80;
+            unsigned long long out=0x12345678abcdef01ULL;
+#define REAR_STORE(code) __asm__ volatile("frstor %2; " code "; fnsave %1":"+m"(out),"=m"(hw):"m"(seed):"memory")
+            switch(kind) {
+            case 0: REAR_STORE("fstl %0"); break;
+            case 1: REAR_STORE("fstpl %0"); break;
+            case 2: REAR_STORE("fists %0"); break;
+            case 3: REAR_STORE("fistps %0"); break;
+            case 4: REAR_STORE("fistpll %0"); break;
+            case 5: REAR_STORE("fistl %0"); break;
+            case 6: REAR_STORE("fistpl %0"); break;
+            }
+            emit(hw,108);emit(&out,8);
+        }
+    static const unsigned long long loads[]={0,1,0xffffffffffffffffULL,0x8000000000000000ULL,
+        0x7fffffffffffffffULL,0x3ff8000000000000ULL,0x7ff0000000000000ULL,0x7ff0000000000001ULL};
+    for(unsigned kind=0;kind<3;++kind) for(unsigned v=0;v<8;++v) {
+        unsigned long long in=loads[v];
+#define REAR_LOAD(code) __asm__ volatile("fninit; " code "; fnsave %0":"=m"(hw):"m"(in):"memory")
+        switch(kind) {
+        case 0: REAR_LOAD("fldl %1"); break;
+        case 1: REAR_LOAD("filds %1"); break;
+        case 2: REAR_LOAD("fildll %1"); break;
+        }
+        emit(hw,108);
+    }
+    for(unsigned op16=0;op16<2;++op16) for(unsigned top=0;top<8;++top) {
+        seed_image(seed,top,0x77f);
+        /* Empty tags retain payload in FNSAVE, including holes in the stack. */
+        seed[8]=0xc3;seed[9]=0x30;
+        u8 saved[108]; for(unsigned i=0;i<108;++i)saved[i]=0x55;
+        if(op16) __asm__ volatile("frstor %2; .byte 0x66; fnsave %0; fnsave %1":"=m"(saved),"=m"(hw):"m"(seed):"memory");
+        else __asm__ volatile("frstor %2; fnsave %0; fnsave %1":"=m"(saved),"=m"(hw):"m"(seed):"memory");
+        emit(saved,108);emit(hw,108);
+        if(op16) __asm__ volatile(".byte 0x66; frstor %1; fnsave %0":"=m"(hw):"m"(saved):"memory");
+        else __asm__ volatile("frstor %1; fnsave %0":"=m"(hw):"m"(saved):"memory");
+        emit(hw,108);
     }
 }
 void _start(void)
@@ -108,6 +306,7 @@ void _start(void)
         __asm__ volatile("fninit; fldcw %1; fld1; fldpi; fnsave %0":"=m"(hw):"m"(cw):"memory");
         emit(hw,108);
     }
+    rear_oracle();
     __asm__ volatile("syscall"::"a"(60),"D"(0):"rcx","r11","memory");
     __builtin_unreachable();
 }
@@ -124,6 +323,22 @@ static int reject_page = -1, reject_write, eligible_owner = 1, calls;
 static struct x87_emu_trap trap;
 static struct x87_emu_state state;
 static u8 hw[108];
+
+static void seed_image(u8 *p, unsigned top, u16 cw)
+{
+    static const unsigned long long sig[8]={0xc000000000000000ULL,0xd000000000000000ULL,
+        0xe400000000000000ULL,0xa000000000000000ULL,0x9800000000000000ULL,
+        0xd000000000000000ULL,0x8200000000000000ULL,0x9c00000000000000ULL};
+    static const u16 exp[8]={0x3fff,0xc000,0x4001,0xc000,0x4001,0x4001,0xc002,0x4002};
+    for(unsigned i=0;i<108;++i)p[i]=0;
+    p[0]=cw;p[1]=cw>>8;p[2]=p[3]=p[6]=p[7]=p[10]=p[11]=p[26]=p[27]=255;
+    p[5]=top<<3;
+    for(unsigned i=0;i<8;++i) {
+        for(unsigned j=0;j<8;++j)p[28+i*10+j]=sig[i]>>(8*j);
+        p[36+i*10]=exp[i];p[37+i*10]=exp[i]>>8;
+    }
+}
+
 static int fail, reenter, nested_result;
 static void diagnostic(u32 a, u32 b, u32 c, u32 d)
 {
@@ -206,6 +421,31 @@ static void arithmetic(void)
             }
 }
 EXT_TYPES;
+
+static void edge_seed(u8 *seed, unsigned n)
+{
+    const struct ext_case cases[]=EXT_CASES;
+    if(n<EXT_COUNT) {
+        seed_image(seed,3,cases[n].cw);
+        const struct raw80 values[2]={cases[n].a,cases[n].b};
+        u16 tw=0;
+        for(unsigned k=0;k<2;++k) {
+            for(unsigned j=0;j<8;++j)seed[28+k*10+j]=values[k].sig>>(8*j);
+            seed[36+k*10]=values[k].exp;seed[37+k*10]=values[k].exp>>8;
+            unsigned exp=values[k].exp&0x7fff;
+            unsigned tag= !exp&&!values[k].sig?1:
+                (!exp||exp==0x7fff||!(values[k].sig>>63)?2:0);
+            tw|=tag<<((3+k)*2);
+        }
+        seed[8]=tw;seed[9]=tw>>8;
+    } else {
+        unsigned variant=n-EXT_COUNT;
+        seed_image(seed,3,variant<2?0x37f:0x37e);
+        unsigned tw=3u<<((3+(variant&1))*2);
+        seed[8]=tw;seed[9]=tw>>8;
+    }
+}
+
 static void extended(void)
 {
     const struct ext_case cases[]=EXT_CASES;
@@ -377,10 +617,132 @@ static void addressing(void)
     trap.eip=0x1000;calls=0;
     CHECK(x87_emu_dispatch(&trap,&owner,&state)==X87_EMU_UNSUPPORTED && calls==15,83);
 }
+
+static int equal_env_regs(const u8 *image, const u8 *ref, unsigned bytes)
+{
+    return same(image,ref,12) && same(image+28,ref+28,bytes);
+}
+static void rear_registers(void)
+{
+    static const u8 ops[][2]=REAR_OPS;
+    static const unsigned pcs[]={0,2,3};
+    u8 seed[108],image[108];unsigned offset=0;
+    for(unsigned top=0;top<8;++top) for(unsigned rc=0;rc<4;++rc)
+        for(unsigned pc=0;pc<3;++pc) for(unsigned op=0;op<REAR_REG_COUNT;++op) {
+            reset();seed_image(seed,top,0x7f|(rc<<10)|(pcs[pc]<<8));
+            x87_emu_state_decode(&state,seed,false,false);trap.gpr[X87_EAX]=0xabcd1234;
+            CHECK(run(ops[op][0],ops[op][1])==X87_EMU_OK,101);
+            x87_emu_state_encode(&state,image,false,false);
+            const u8 *ref=reference_rear_reg+offset;offset+=112;
+            if(!equal_env_regs(image,ref,80))diagnostic(op,state.sw,x87_get_le(ref+4,2),top);
+            CHECK(equal_env_regs(image,ref,80),102);
+            CHECK(trap.gpr[X87_EAX]==x87_get_le(ref+108,4),103);
+        }
+    offset=0;
+    for(unsigned v=0;v<REAR_EDGE_COUNT;++v) for(unsigned op=0;op<REAR_REG_COUNT;++op) {
+        reset();edge_seed(seed,v);x87_emu_state_decode(&state,seed,false,false);
+        trap.gpr[X87_EAX]=0xabcd1234;
+        CHECK(run(ops[op][0],ops[op][1])==X87_EMU_OK,101);
+        x87_emu_state_encode(&state,image,false,false);
+        const u8 *ref=reference_rear_edge+offset;offset+=112;
+        if(!equal_env_regs(image,ref,80))diagnostic(op,state.sw,x87_get_le(ref+4,2),v|0x100);
+        CHECK(equal_env_regs(image,ref,80),102);
+        CHECK(trap.gpr[X87_EAX]==x87_get_le(ref+108,4),103);
+    }
+    offset=0;
+    for(unsigned kind=0;kind<2;++kind) for(unsigned op=0;op<8;++op) {
+        reset();seed_image(seed,5,0x37f);x87_emu_state_decode(&state,seed,false,false);
+        x87_put_le(ram+4096,kind?0xfff9:0xc00a000000000000ULL,8);
+        CHECK(mem(kind?0xde:0xdc,op,0x2000)==X87_EMU_OK,104);
+        x87_emu_state_encode(&state,image,false,false);
+        CHECK(equal_env_regs(image,reference_rear_mem+offset,80),105);offset+=108;
+    }
+}
+static void rear_conversions(void)
+{
+    const struct raw80 values[]=REAR_VALUES;
+    static const u16 masks[]={0x37f,0x37e,0x35f,0x367};
+    static const u8 ops[][2]={{0xdd,2},{0xdd,3},{0xdf,2},{0xdf,3},{0xdf,7},{0xdb,2},{0xdb,3}};
+    unsigned offset=0;u8 seed[108],image[108];
+    for(unsigned rc=0;rc<4;++rc) for(unsigned m=0;m<4;++m)
+        for(unsigned v=0;v<REAR_VALUE_COUNT;++v) for(unsigned kind=0;kind<7;++kind) {
+            reset();seed_image(seed,7,masks[m]|(rc<<10));
+            for(unsigned j=0;j<8;++j)seed[28+j]=values[v].sig>>(8*j);
+            seed[36]=values[v].exp;seed[37]=values[v].exp>>8;
+            if((values[v].exp&0x7fff)==0x7fff)seed[9]=0x80;
+            x87_emu_state_decode(&state,seed,false,false);
+            x87_put_le(ram+4096,0x12345678abcdef01ULL,8);
+            CHECK(mem(ops[kind][0],ops[kind][1],0x2000)==X87_EMU_OK,106);
+            x87_emu_state_encode(&state,image,false,false);
+            const u8 *ref=reference_rear_store+offset;offset+=116;
+            if(!equal_env_regs(image,ref,80)||!same(ram+4096,ref+108,8))diagnostic((rc<<24)|(m<<16)|(v<<8)|kind,state.sw,x87_get_le(ref+4,2),2);
+            CHECK(equal_env_regs(image,ref,80) && same(ram+4096,ref+108,8),107);
+        }
+    static const unsigned long long loads[]={0,1,0xffffffffffffffffULL,0x8000000000000000ULL,
+        0x7fffffffffffffffULL,0x3ff8000000000000ULL,0x7ff0000000000000ULL,0x7ff0000000000001ULL};
+    offset=0;
+    for(unsigned kind=0;kind<3;++kind) for(unsigned v=0;v<8;++v) {
+        reset();x87_put_le(ram+4096,loads[v],8);
+        CHECK(mem(kind?0xdf:0xdd,kind==2?5:0,0x2000)==X87_EMU_OK,108);
+        x87_emu_state_encode(&state,image,false,false);
+        CHECK(equal_env_regs(image,reference_rear_load+offset,10),109);offset+=108;
+    }
+}
+static enum x87_emu_result image_op(unsigned idx, bool op16, u32 address)
+{
+    trap.eip=0x1000;
+    unsigned start=op16?1:0;
+    ram[0]=0x66;ram[start]=0xdd;ram[start+1]=(idx<<3)|5;
+    x87_put_le(ram+start+2,address,4);
+    return x87_emu_dispatch(&trap,&owner,&state);
+}
+static void rear_images(void)
+{
+    u8 seed[108],image[108];unsigned offset=0;
+    for(unsigned op16=0;op16<2;++op16) for(unsigned top=0;top<8;++top) {
+        reset();seed_image(seed,top,0x77f);seed[8]=0xc3;seed[9]=0x30;
+        x87_emu_state_decode(&state,seed,false,false);
+        for(unsigned i=0;i<108;++i)ram[4096+i]=0x55;
+        CHECK(image_op(6,op16,0x2000)==X87_EMU_OK,110);
+        const u8 *ref=reference_rear_image+offset;offset+=324;
+        CHECK(same(ram+4096,ref,108),111);
+        x87_emu_state_encode(&state,image,false,false);
+        CHECK(equal_env_regs(image,ref+108,80),112);
+        CHECK(image_op(4,op16,0x2000)==X87_EMU_OK,113);
+        x87_emu_state_encode(&state,image,false,false);
+        CHECK(equal_env_regs(image,ref+216,80),114);
+        /* Restore image EA must not overwrite saved data/instruction pointers. */
+        CHECK(state.fdp==0 && state.fip==0,115);
+    }
+    reset();seed_image(seed,3,0x37f);x87_emu_state_decode(&state,seed,false,false);
+    struct x87_emu_state saved=state;
+    for(unsigned i=8180;i<8288;++i)ram[i]=0x55;
+    reject_page=3;
+    CHECK(image_op(6,false,0x2ff4)==X87_EMU_MEMORY_FAULT,116);
+    CHECK(same((u8 *)&state,(u8 *)&saved,sizeof(state)),117);
+    for(unsigned i=8180;i<8288;++i) CHECK(ram[i]==0x55,118);
+    CHECK(image_op(4,false,0x2ff4)==X87_EMU_MEMORY_FAULT,119);
+    CHECK(same((u8 *)&state,(u8 *)&saved,sizeof(state)),120);
+    reject_page=-1;
+    state.cw &= ~X87_IE;state.sw |= X87_IE|X87_ESB;
+    saved=state;
+    CHECK(image_op(4,false,0x2000)==X87_EMU_PENDING_MF,121);
+    CHECK(same((u8 *)&state,(u8 *)&saved,sizeof(state)),122);
+    trap.gpr[X87_EAX]=0xcafe1234;
+    CHECK(run(0xdf,0xe0)==X87_EMU_OK && trap.gpr[X87_EAX]==(0xcafe0000|state.sw),123);
+    CHECK(mem(0xdd,7,0x2000)==X87_EMU_OK && x87_get_le(ram+4096,2)==state.sw,124);
+    CHECK(image_op(6,false,0x2000)==X87_EMU_OK && state.cw==0x37f && state.sw==0 && state.tw==0xffff,125);
+    /* Excluded FISTTP/BCD/FCOMI remain rejected without changing state. */
+    saved=state;
+    CHECK(mem(0xdd,1,0x2000)==X87_EMU_UNSUPPORTED && mem(0xdf,1,0x2000)==X87_EMU_UNSUPPORTED,126);
+    CHECK(mem(0xdf,4,0x2000)==X87_EMU_UNSUPPORTED && mem(0xdf,6,0x2000)==X87_EMU_UNSUPPORTED && run(0xdf,0xe8)==X87_EMU_UNSUPPORTED,126);
+    CHECK(same((u8 *)&state,(u8 *)&saved,sizeof(state)),127);
+}
 void _start(void)
 {
     arithmetic(); if(!fail) extended(); if(!fail) stores(); if(!fail) conversion(); if(!fail) unary();
     if(!fail) environment(); if(!fail) faults(); if(!fail) exceptions(); if(!fail) addressing();
+    if(!fail) rear_registers();if(!fail) rear_conversions();if(!fail) rear_images();
     __asm__ volatile("int $0x80"::"a"(1),"b"(fail):"memory");
     __builtin_unreachable();
 }
