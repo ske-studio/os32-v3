@@ -12,6 +12,6 @@
 ## 1. 段の状態
 | 段 (設計 §7) | 状態 |
 |---|---|
-| A+E (hsync_inventory.inc と試験)・B+F (host_tree_manifest.py と試験) | 実装中 |
-| C (serialfs_host.py)・D (hsync.c) | 未着手 (波 2) |
+| A+E (hsync_inventory.inc と試験)・B+F (host_tree_manifest.py と試験) | 済 (2026-11-16、wt/hsm-base に統合) |
+| C (serialfs_host.py)・D (hsync.c) | 済 (2026-11-16、wt/hsm-base に統合) |
 | G (三つの経路の統合試験)・H (NET_HOSTSVC_DESIGN の追記) | 未着手 (波 3) |
