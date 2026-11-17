@@ -298,7 +298,7 @@ make deploy                                                # HostDrv 同期 → 
 > 状態ではコピーが失敗またはサイレントに無効化される。**必ず
 > `tools/np21w_ctl.py stop` → `make deploy-kernel` → `tools/np21w_ctl.py start --ini np21x64w.ini`
 > の順で実行**し、デプロイ後は `ver` の Build タイムスタンプで反映を確認すること
-> ([反映確認](POLICY_DEBUG.md#2-バイナリ反映の確認-最優先) / [HostDrv の共有状態](design/fs/hostdrv/hostdrvfs.md#落とし穴))。
+> ([反映確認](POLICY_DEBUG.md#2-バイナリ反映の確認-最優先) / [HostDrv の共有状態](design/drivers/hostdrv/hostdrvfs.md#落とし穴))。
 
 <a id="ビルドターゲット"></a>
 Makefile ターゲットとの対応 (`build/deploy.mk`)。**このリポジトリで

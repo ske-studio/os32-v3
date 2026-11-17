@@ -6,7 +6,7 @@ product arithmetic. Compile headers separately with host/cross compilers, then
 execute ILP32 layout checks. Mutations must compile and fail at runtime.
 """
 INITIALIZER_UNITS = ('fs/ext2/ext2_vfs.c', 'fs/fat/fatfs_vfs.c',
-                     'fs/hostdrv/hostdrvfs.c', 'fs/isofs/iso9660.c',
+                     'drivers/hostdrv/hostdrvfs.c', 'fs/isofs/iso9660.c',
                      'fs/serialfs/serialfs.c', 'drivers/base/dev.c',
                      'drivers/ata/cd_body.c', 'drivers/net/e82557/lan_body.c')
 
@@ -30,7 +30,7 @@ CHECK = dict(name='hostsvc-contracts', tier=1, needs=[],
             'tools/tests/hostsvc_fixture.c', 'tools/tests/hostsvc_fixture.py',
             'tools/hostsvc_contracts.pyi',
             'fs/ext2/ext2_vfs.c', 'fs/fat/fatfs_vfs.c',
-            'fs/hostdrv/hostdrvfs.c', 'fs/isofs/iso9660.c',
+            'drivers/hostdrv/hostdrvfs.c', 'fs/isofs/iso9660.c',
             'fs/serialfs/serialfs.c', 'drivers/base/dev.c',
             'drivers/ata/cd_body.c', 'drivers/net/e82557/lan_body.c'], budget=5.7,
     basis=['NET_HOSTSVC_DESIGN §2', 'NET_HOSTSVC_DESIGN §3', 'NET_HOSTSVC_DESIGN §4', 'NET_HOSTSVC_DESIGN §5'],

@@ -17,7 +17,7 @@
 |番号|計画と実物の食い違い・制約|実物と処置|
 |---|---|---|
 |D1|N1のhost_*はFSの口ではない|HOST_SERVICES_PLAN.md:64、net/link_host_api.inc:157。W8はVFS→SerialFSを使う|
-|D2|HostDrvFSは一般的なHost Services FSではない|fs/hostdrv/hostdrvfs.c:81はNP21/W専用I/O。PowerPCには組まない|
+|D2|HostDrvFSは一般的なHost Services FSではない|drivers/hostdrv/hostdrvfs.c:81はNP21/W専用I/O。PowerPCには組まない|
 |D3|ops登録・mountだけでは動かない|serialfs.c:118のSERIAL型・permitと、persistent所有者・SfsIoが必要|
 |D4|PowerPC端末はゲストのUDP protocolではない|ppc_lan_host.py:70のUDPはEthernet搬送、lan_service.c:105はEtherType判定|
 |D5|現行PLN1は型8まで・payload256B|lan_boot.h:94、lan_wire.c:82。FS最大1044Bを通常messageへコピーしない|

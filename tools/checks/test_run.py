@@ -451,7 +451,7 @@ class RunnerTest(unittest.TestCase):
             'privileged': ['lib/kstring_asm.asm', 'lib/kstring_c.c', 'lib/kstring.h',
                            'lib/utf8.h', 'lib/lz4.h', 'lib/microtar/microtar.h',
                            'lib/sqlite3/sqlite3.c', 'lib/crc32_core.inc'],
-            'docs-links': ['fs/hostdrv/hostdrvfs_proto.h'],
+            'docs-links': ['drivers/hostdrv/hostdrvfs_proto.h'],
         }
         cases['privileged'] += ['drivers/pci/pci_decode.c', 'drivers/pci/pci_decode.h',
                                 'fs/pc98pt.c', 'fs/pc98pt.h',

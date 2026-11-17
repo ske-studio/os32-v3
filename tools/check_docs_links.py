@@ -91,8 +91,8 @@ EXCLUDE_PATHS = ["docs/hw"]
 ARCHIVE_SOURCE_MOVES = {
     'fs/ext2_dir.c': 'fs/ext2/ext2_dir.c',
     'fs/ext2_vfs.c': 'fs/ext2/ext2_vfs.c',
-    'fs/hostdrvfs.c': 'fs/hostdrv/hostdrvfs.c',
-    'fs/hostdrvfs_proto.h': 'fs/hostdrv/hostdrvfs_proto.h',
+    'fs/hostdrvfs.c': 'drivers/hostdrv/hostdrvfs.c',
+    'fs/hostdrvfs_proto.h': 'drivers/hostdrv/hostdrvfs_proto.h',
     'kernel/paging_app.c': 'mm/paging_app.c',
     'kernel/paging_app.h': 'mm/paging_app.h',
     'kernel/v86_io.c': 'platform/pc98/legacy/v86_io.c',

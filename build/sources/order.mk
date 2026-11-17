@@ -16,7 +16,7 @@ C_ORDER_LEGACY = kernel/boot_token.c platform/pc98/boot_token_pc98.c arch/x86/ke
     gfx/gfx_core.c gfx/gfx_hw_submit.c gfx/v2/a0_weak.c gfx/sync/a0_weak.c $(filter-out gfx/v2/a0_weak.c gfx/sync/a0_weak.c,$(wildcard gfx/v2/*.c gfx/sync/*.c)) gfx/gfx_policy.c gfx/gfx_hw_mono_cpu.c gfx/gfx_osri.c gfx/gfx_osri_view.c drivers/video/pc98/gfx_vram.c gfx/gfx_scroll.c gfx/palette.c drivers/video/pc98/backend_pc98.c drivers/video/pc98/backend_pc98_osri.c drivers/video/pc98/backend_pegc.c drivers/video/pc98/pegc_v2.c \
     gfx/gfx_emergency.c \
     fs/fat/fatfs/ff.c drivers/block/fat_diskio.c fs/fat/fatfs_vfs.c \
-    fs/ext2/ext2_super.c fs/ext2/ext2_inode.c fs/ext2/ext2_dir.c fs/ext2/ext2_file.c fs/ext2/ext2_fmt.c fs/ext2/ext2_layout.c fs/ext2/ext2_vfs.c fs/vfs.c fs/vfs_fd.c fs/fd_redirect.c fs/pipe_buffer.c fs/hostdrv/hostdrvfs.c fs/serialfs/sfs_proto.c fs/serialfs/sfs_client.c fs/serialfs/serialfs.c fs/serialfs/serialfs_session.c fs/serialfs/serialfs_persistent.c \
+    fs/ext2/ext2_super.c fs/ext2/ext2_inode.c fs/ext2/ext2_dir.c fs/ext2/ext2_file.c fs/ext2/ext2_fmt.c fs/ext2/ext2_layout.c fs/ext2/ext2_vfs.c fs/vfs.c fs/vfs_fd.c fs/fd_redirect.c fs/pipe_buffer.c drivers/hostdrv/hostdrvfs.c fs/serialfs/sfs_proto.c fs/serialfs/sfs_client.c fs/serialfs/serialfs.c fs/serialfs/serialfs_session.c fs/serialfs/serialfs_persistent.c \
     exec/exec.c exec/shell_service.c platform/pc98/legacy/v86_call.c platform/pc98/legacy/guest.c platform/pc98/legacy/lowmap.c platform/none/legacy_guest.c exec/appmem.c exec/appmem_map.c exec/appmem_unmap.c exec/ring3_ls.c exec/redir_access.c exec/access_walk.c exec/surface_query.c exec/system_surface.c exec/lease.c exec/exec_heap.c exec/appslot.c exec/launch.c exec/ring3_str.c exec/os32x_hdr.c \
     kapi/kapi_print.c kapi/kapi_strings.c kapi/kapi_generated.c kapi/kapi_db.c kapi/kapi_sys.c kapi/kapi_osri.c kapi/kapi_host.c kapi/kapi_host_notice.c \
     lib/path.c lib/utf8.c lib/kprintf.c lib/kprintf_attr.c platform/pc98/console_attr.c lib/os_time.c lib/kstring.c lib/kutf16.c lib/kmath.c lib/crc32.c \
@@ -27,7 +27,7 @@ C_ORDER_LEGACY = kernel/boot_token.c platform/pc98/boot_token_pc98.c arch/x86/ke
     drivers/video/pc98/splash_raster_play.c drivers/video/pc98/splash_raster_run.c
 
 ASM_ORDER_LEGACY = arch/x86/kernel/kentry.asm arch/x86/kernel/isr_stub.asm platform/pc98/legacy/v86_entry.asm arch/x86/kernel/ring3_entry.asm arch/x86/kernel/setjmp.asm lib/kstring_asm.asm lib/sqlite3/sqlite_stack.asm drivers/net/ne2000/ne2000_io.asm
-INCLUDE_ORDER_LEGACY = kernel arch/x86/kernel include init kernel/console kernel/ime kernel/irq kernel/module kernel/time platform/pc98/legacy mm drivers/ata kernel/dev drivers/block drivers/char drivers/dma drivers/input drivers/net/e82557 drivers/net/ne2000 drivers/pci drivers/sound/cs4231 drivers/sound/fm drivers/video/cirrus drivers/video/geforce drivers/video/kcg drivers/video/pc98 fs/ext2 fs/fat fs/hostdrv fs/isofs fs/serialfs
+INCLUDE_ORDER_LEGACY = kernel arch/x86/kernel include init kernel/console kernel/ime kernel/irq kernel/module kernel/time platform/pc98/legacy mm drivers/ata kernel/dev drivers/block drivers/char drivers/dma drivers/input drivers/net/e82557 drivers/net/ne2000 drivers/pci drivers/sound/cs4231 drivers/sound/fm drivers/video/cirrus drivers/video/geforce drivers/video/kcg drivers/video/pc98 fs/ext2 fs/fat drivers/hostdrv fs/isofs fs/serialfs
 MODULE_ORDER_LEGACY = kdebug hwdev sqlite fep cd kcg fm pcm v86 lan cirrus geforce trident
 
 C_ORDER_LEGACY += arch/x86/kernel/syscall_code.c

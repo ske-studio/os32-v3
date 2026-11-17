@@ -100,7 +100,7 @@
 - [fs/ext2/ext2_super.md](fs/ext2/ext2_super.md)
 - [drivers/block/fat_diskio.md](drivers/block/fat_diskio.md)
 - [fs/fat/fatfs_vfs.md](fs/fat/fatfs_vfs.md)
-- [fs/hostdrv/hostdrvfs.md](fs/hostdrv/hostdrvfs.md)
+- [drivers/hostdrv/hostdrvfs.md](drivers/hostdrv/hostdrvfs.md)
 - [gfx/gfx_core.md](gfx/gfx_core.md)
 - [hwdev/gf_load_state.md](hwdev/gf_load_state.md)
 - [hwdev/gfinit_mode.md](hwdev/gfinit_mode.md)

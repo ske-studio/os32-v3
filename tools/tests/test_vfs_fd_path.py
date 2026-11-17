@@ -38,7 +38,7 @@ userland/lib/rt/pkg.c を取り込み、RAM 上の 8MB の ext2 で
   fatwp … 実物の diskio + FatFs + fatfs_vfs で NW の後も既存ファイルが読める。
           後続の書込みは FDC を呼ばず断り、再初期化後の作成・追記・削除は通る。
   utf8  … Win32 の名前の規則と lib/kutf16.c の変換が同じ集合を通し 1 対 1 (ラリー 3 B2)
-  hostwire … fs/hostdrv/hostdrvfs.c の入口検査の配線 (本文の検査。ホストで組めないため)
+  hostwire … drivers/hostdrv/hostdrvfs.c の入口検査の配線 (本文の検査。ホストで組めないため)
 
   python3 -B tools/tests/test_vfs_fd_path.py [--target] [--mutants] [case]
 
@@ -53,7 +53,7 @@ userland/lib/rt/pkg.c を取り込み、RAM 上の 8MB の ext2 で
 """
 import sqlite_cc
 CHECK = dict(name='vfs-fd-path-host', tier=1,
-    covers=['tools/tests/sqlite_cc.py', 'fs/**', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'build/core.yaml', 'fs/pc98pt.c', 'fs/ext2/ext2_file.c', 'fs/ext2/ext2_vfs.c', 'fs/fat/fatfs/ff.c', 'drivers/block/fat_diskio.c', 'fs/fat/fatfs/diskio_os32.h', 'drivers/block/fdc.h', 'drivers/block/fdc_track.c', 'drivers/block/fdc_track.h', 'drivers/char/rtc.h', 'fs/fat/fatfs_vfs.c', 'fs/hostdrv/hostdrvfs.c', 'fs/isofs/iso9660.c', 'fs/vfs.c', 'fs/vfs_fd.c', 'fs/vfs_fd_stdin.inc', 'fs/vfs_stdin.h', 'exec/exec.h', 'kernel/ime/ime_dict.c', 'kernel/ime/ime_conn.c', 'kernel/ime/ime_user_store.c', 'kernel/ime/ime_store.h', 'tools/tests/fep_store_host.h', 'lib/kstring.h', 'lib/kutf16.c', 'lib/sqlite3/os32_sqlite_vfs.c', 'lib/sqlite3/sqlite3.c', 'sdk/crt/syscalls.c', 'tools/deploy_manifests.py', 'tools/mkpkg.py', 'tools/tests/ime_dict_host.c', 'tools/tests/newlib_errno_host.c', 'tools/tests/vfs_fd_path_host.c', 'tools/tests/vfs_fd_sqlite_host.c', 'userland/deploy.yaml', 'userland/shell/hdprep_plan.c', 'userland/system/cdinst.c', 'fs/ext2/ext2_dir.c', 'fs/ext2/ext2_fmt.c', 'fs/ext2/ext2_inode.c', 'fs/ext2/ext2_layout.c', 'fs/ext2/ext2_super.c', 'userland/system/inst_disk.c', 'userland/system/inst_hdd.c', 'userland/lib/rt/ls.c', 'sdk/include/os32/ls.h', 'sdk/allocator/nano_adapter.c', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h', 'include/clock_service.h', 'kernel/time/clock_service.c', 'tools/tests/serial_emergency_host.h', 'kernel/serial_diag.c', 'include/console_output.h', 'lib/serial_diag.h', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'include/platform_device.h', 'include/ide_contract.h', 'tools/tests/kernel_includes.py'],
+    covers=['tools/tests/sqlite_cc.py', 'fs/**', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'build/core.yaml', 'fs/pc98pt.c', 'fs/ext2/ext2_file.c', 'fs/ext2/ext2_vfs.c', 'fs/fat/fatfs/ff.c', 'drivers/block/fat_diskio.c', 'fs/fat/fatfs/diskio_os32.h', 'drivers/block/fdc.h', 'drivers/block/fdc_track.c', 'drivers/block/fdc_track.h', 'drivers/char/rtc.h', 'fs/fat/fatfs_vfs.c', 'drivers/hostdrv/hostdrvfs.c', 'fs/isofs/iso9660.c', 'fs/vfs.c', 'fs/vfs_fd.c', 'fs/vfs_fd_stdin.inc', 'fs/vfs_stdin.h', 'exec/exec.h', 'kernel/ime/ime_dict.c', 'kernel/ime/ime_conn.c', 'kernel/ime/ime_user_store.c', 'kernel/ime/ime_store.h', 'tools/tests/fep_store_host.h', 'lib/kstring.h', 'lib/kutf16.c', 'lib/sqlite3/os32_sqlite_vfs.c', 'lib/sqlite3/sqlite3.c', 'sdk/crt/syscalls.c', 'tools/deploy_manifests.py', 'tools/mkpkg.py', 'tools/tests/ime_dict_host.c', 'tools/tests/newlib_errno_host.c', 'tools/tests/vfs_fd_path_host.c', 'tools/tests/vfs_fd_sqlite_host.c', 'userland/deploy.yaml', 'userland/shell/hdprep_plan.c', 'userland/system/cdinst.c', 'fs/ext2/ext2_dir.c', 'fs/ext2/ext2_fmt.c', 'fs/ext2/ext2_inode.c', 'fs/ext2/ext2_layout.c', 'fs/ext2/ext2_super.c', 'userland/system/inst_disk.c', 'userland/system/inst_hdd.c', 'userland/lib/rt/ls.c', 'sdk/include/os32/ls.h', 'sdk/allocator/nano_adapter.c', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h', 'include/clock_service.h', 'kernel/time/clock_service.c', 'tools/tests/serial_emergency_host.h', 'kernel/serial_diag.c', 'include/console_output.h', 'lib/serial_diag.h', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'include/platform_device.h', 'include/ide_contract.h', 'tools/tests/kernel_includes.py'],
     needs=['make:all'], budget=14.6,
     kind='characterization',
 )
@@ -84,7 +84,7 @@ SRC = ROOT / "tools/tests/vfs_fd_path_host.c"
 ERRNO_SRC = ROOT / "tools/tests/newlib_errno_host.c"
 SYSCALLS_SRC = ROOT / "sdk/crt/syscalls.c"
 TARGET_SRCS = ["fs/vfs.c", "fs/vfs_fd.c", "fs/ext2/ext2_vfs.c", "fs/ext2/ext2_file.c",
-               "fs/fat/fatfs_vfs.c", "fs/hostdrv/hostdrvfs.c", "fs/isofs/iso9660.c", "lib/kutf16.c"]
+               "fs/fat/fatfs_vfs.c", "drivers/hostdrv/hostdrvfs.c", "fs/isofs/iso9660.c", "lib/kutf16.c"]
 TARGET_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
                 "-fno-pie", "-fno-stack-protector", "-nostdlib",
                 "-mno-red-zone", "-fcommon", "-O2",
@@ -592,7 +592,7 @@ def check_fatfold():
 
 
 def check_hostwire(text=None):
-    """fs/hostdrv/hostdrvfs.c の名前の入口検査の配線 (実物はハイパーコールを叩くので
+    """drivers/hostdrv/hostdrvfs.c の名前の入口検査の配線 (実物はハイパーコールを叩くので
     ホストで組めない。規則そのものは段 namerule / hostname が回す)。
       - 名前をホストへ渡す口は setup_create → session_set_path だけで、
         setup_create を呼ぶのは hostdrv_create だけ
@@ -601,7 +601,7 @@ def check_hostwire(text=None):
       - パスを受け取る VfsOps の口は全部 hostdrv_create(path, …) を通る
         (rmdir/unlink は属性付きの hdrv_delete 経由)"""
     import re
-    src = text if text is not None else (ROOT / "fs/hostdrv/hostdrvfs.c").read_text(encoding="utf-8")
+    src = text if text is not None else (ROOT / "drivers/hostdrv/hostdrvfs.c").read_text(encoding="utf-8")
     bad = []
 
     def body(name):
@@ -650,7 +650,7 @@ def check_hostwire(text=None):
         bad.append("hdrv_rename が hostdrv_create(old_path, …) を通らない")
     for m in bad:
         print("  FAIL hostwire: " + m)
-    print(f"case hostwire (fs/hostdrv/hostdrvfs.c の入口検査の配線, {len(ops)} 口): "
+    print(f"case hostwire (drivers/hostdrv/hostdrvfs.c の入口検査の配線, {len(ops)} 口): "
           f"{'PASS' if not bad else 'FAIL'}")
     return not bad
 

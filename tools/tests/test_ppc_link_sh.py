@@ -138,9 +138,9 @@ def selection(tmp, mutate):
         for flags,out in [(['KBOOT_SH=1','KBOOT_LINK=0'],'sh'),(['KBOOT_LINK=1'],'link'),(['KBOOT_SHELL=1','KBOOT_LINK=0'],'shell')]:
             assert manifest(path,flags,['KB_OUT'])[0]=='build/out/ppc-kboot/'+out
         # Review F2: the link-SH user build selects the SHELL_REMOTE_APP profile.
-        recipe=subprocess.run(['make','-n','-f',str(path),'KBOOT_SH=1','KBOOT_LINK=1','kb-user'],cwd=ROOT,capture_output=True,text=True).stdout
+        recipe=subprocess.run(['make','--no-print-directory','-n','-f',str(path),'KBOOT_SH=1','KBOOT_LINK=1','kb-user'],cwd=ROOT,capture_output=True,text=True).stdout
         assert 'PPC_SH_PROFILE=userland/ppc/sh/link_profile.h' in recipe.splitlines()[0]
-        plain=subprocess.run(['make','-n','-f',str(path),'KBOOT_SH=1','KBOOT_LINK=0','kb-user'],cwd=ROOT,capture_output=True,text=True).stdout
+        plain=subprocess.run(['make','--no-print-directory','-n','-f',str(path),'KBOOT_SH=1','KBOOT_LINK=0','kb-user'],cwd=ROOT,capture_output=True,text=True).stdout
         assert 'link_profile.h' not in plain.splitlines()[0]
         rejected=subprocess.run(['make','-s','-f',str(path),'KBOOT_SHELL=1','KBOOT_LINK=1','-n'],cwd=ROOT,capture_output=True)
         assert rejected.returncode!=0

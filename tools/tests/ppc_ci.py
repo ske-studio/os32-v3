@@ -25,11 +25,11 @@ def matrix(source):
                  patch.object(module.subprocess, 'call', return_value=0) as build:
                 rc = module.run(ROOT, env)
                 assert rc == int(required and not present), (required, present, rc)
-                assert build.call_count == (len(module.IMAGES) if present else 0)
+                assert build.call_count == (len(module.IMAGES) + 1 if present else 0)
                 if present:
                     # Expectation origin: PPC_P5_REST_DESIGN §3 P6 (all four images explicit).
                     built = [c.args[0][3:-1] for c in build.call_args_list]
-                    assert built == [list(f) for f in module.IMAGES], built
+                    assert built == [list(f) for f in module.IMAGES] + [module.COMMON_COMPILE], built
             if present:
                 with patch.object(module.shutil, 'which', return_value='/compiler'), \
                      patch.object(module.subprocess, 'call', return_value=7):

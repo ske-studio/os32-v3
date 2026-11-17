@@ -100,7 +100,7 @@ OFF の起動は `ver` の Image CRC と `boot.log` で到達を確認する。
 - ext2 の端数読取、callback 再入、名前と像の検査。
   → [ext2_file](design/fs/ext2/ext2_file.md#落とし穴)、[ext2_dir](design/fs/ext2/ext2_dir.md#落とし穴)
 - FAT 名のフィールド、HostDrv の共有状態。
-  → [fatfs_vfs](design/fs/fat/fatfs_vfs.md#落とし穴)、[hostdrvfs](design/fs/hostdrv/hostdrvfs.md#落とし穴)
+  → [fatfs_vfs](design/fs/fat/fatfs_vfs.md#落とし穴)、[hostdrvfs](design/drivers/hostdrv/hostdrvfs.md#落とし穴)
 - デバイス窓は RAM 上端でなく物理地図で判定する。
   → [pgalloc](design/mm/pgalloc.md#落とし穴)、[backend_cirrus](design/drivers/video/cirrus/backend_cirrus.md#落とし穴)
 - SQLite の共有プールと接続寿命・エラー取得。

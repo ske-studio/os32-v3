@@ -115,7 +115,7 @@ SUMMARY 4/4 PASS
 `userland/rust/filer/src/lib.rs` の同一ファイル判定は
 `sst.st_ino != 0 && sst.st_dev == stbuf.st_dev && sst.st_ino == stbuf.st_ino`。
 ところが `st_dev` を埋める FS ドライバが 1 つも無い — `fs/ext2/ext2_vfs.c` と
-`fs/isofs/iso9660.c` は `st_dev = 0` 固定、`fs/hostdrv/hostdrvfs.c` と `fs/fat/fatfs_vfs.c` は
+`fs/isofs/iso9660.c` は `st_dev = 0` 固定、`drivers/hostdrv/hostdrvfs.c` と `fs/fat/fatfs_vfs.c` は
 `kmemset` のまま。よって **hd0 と hd1 で inode 番号が一致すると、別ディスクの
 別ファイルが「同じファイル」になり、正当な上書きコピーまで拒まれる**。
 ext2 の inode 番号は FS 内でしか一意でないので、12 (lost+found の次) のような

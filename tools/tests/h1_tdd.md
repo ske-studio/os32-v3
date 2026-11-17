@@ -15,8 +15,8 @@ make check-hsync-host        # 同じもの (--target 付き)
   0 進捗 write / 書き込み時のビット反転 (破損) / stat のエラー・種別ゼロ・サイズ偽装**
   を注入できる。`vfs_sync` の失敗は大域スイッチ。`kprintf` は全文をログへ溜め、
   検査は**固定文字列の理由コード**で行う (文言の雰囲気で判定しない)。
-- `fs/hostdrv/hostdrv_stat_rules.inc` (HostDrv の stat 失敗の是正) は純関数なので同じ翻訳単位で
-  直接叩く。`fs/hostdrv/hostdrvfs.c` の `hdrv_stat()` はこの `.inc` を `#include` して呼ぶだけで、
+- `drivers/hostdrv/hostdrv_stat_rules.inc` (HostDrv の stat 失敗の是正) は純関数なので同じ翻訳単位で
+  直接叩く。`drivers/hostdrv/hostdrvfs.c` の `hdrv_stat()` はこの `.inc` を `#include` して呼ぶだけで、
   判定の写しをどこにも作っていない。
 - CRC は `lib/crc32.c` (既存の一括版 `crc32_calc`) を同じ実行ファイルへリンクし、
   ストリーム核 (`lib/crc32_core.inc`) との一致を既知ベクトルと実データで見る。
@@ -61,7 +61,7 @@ HOST GNU89 -Werror COMPILE PASS [CRC stub] (real hsync.c)
 EXIT hsync_h1_host_crcstub=0
 TARGET i386-elf -Werror COMPILE PASS (hsync.c)
 TARGET i386-elf -Werror COMPILE PASS (lib/crc32.c)
-TARGET i386-elf -Werror COMPILE PASS (fs/hostdrv/hostdrvfs.c)
+TARGET i386-elf -Werror COMPILE PASS (drivers/hostdrv/hostdrvfs.c)
 ```
 
 RED は**実装を 1 か所ずつ「直す前」へ戻した変異**で取った ([V4]: 時系列で先に
@@ -186,7 +186,7 @@ dry-run も force も同じ検査を通る (書き込みは一切しない)。
 コピー元の型検査も足した。
 
 - 直す前の実際の動き: `sync_directory` が `sys_ls(src_dir)` を呼び、
-  `fs/hostdrv/hostdrvfs.c` の `hdrv_list_dir` は `NP2_FILE_DIRECTORY_FILE` で開くので
+  `drivers/hostdrv/hostdrvfs.c` の `hdrv_list_dir` は `NP2_FILE_DIRECTORY_FILE` で開くので
   通常ファイルなら `hostdrv_create` が失敗し **`VFS_ERR_NOTFOUND`** を返す。
   結果 `FAIL: ls /host/usr/file.txt (err=-2)` となり `errors=1` / 非ゼロ終了。
   **落ちること自体は落ちていた。**
@@ -199,7 +199,7 @@ dry-run も force も同じ検査を通る (書き込みは一切しない)。
   stat 自体が失敗すれば `reason=io_error` で落とすようにした。
 
 **別件として PM へ**: `hdrv_list_dir` は列挙の途中で `hostdrv_query_dir` が
-負値を返しても `break` して **`VFS_OK` を返す** (`fs/hostdrv/hostdrvfs.c:525`)。
+負値を返しても `break` して **`VFS_OK` を返す** (`drivers/hostdrv/hostdrvfs.c:525`)。
 途中で切れた列挙が「全部読めた」ことになるので、B3 と同じ形の穴が
 カーネル FS 側に残っている。この票の範囲外なので触っていない。
 
@@ -230,7 +230,7 @@ B3c で `コピー元が通常ファイル: 非ゼロ終了` **だけは通っ�
 到達可能**と判定。H1 の完了条件「I/O 失敗を成功にしない」と対象「HostDrv の
 エラー処理」に入るのでこの票で直した。
 
-`fs/hostdrv/hostdrvfs.c` の `hdrv_list_dir` は列挙ループを 2 通りで抜け、どちらも
+`drivers/hostdrv/hostdrvfs.c` の `hdrv_list_dir` は列挙ループを 2 通りで抜け、どちらも
 末尾で無条件に `return VFS_OK` していた。
 
 - `if (rc < 0) break;` — `hostdrv_query_dir` の失敗。200 件のうち 50 件目で
@@ -241,9 +241,9 @@ B3c で `コピー元が通常ファイル: 非ゼロ終了` **だけは通っ�
 
 ### 直した内容
 
-列挙ループを `fs/hostdrv/hostdrv_list_rules.inc` の純関数 `hdrv_list_run()` に切り出し、
+列挙ループを `drivers/hostdrv/hostdrv_list_rules.inc` の純関数 `hdrv_list_run()` に切り出し、
 1 件取得 (`hostdrv_query_dir`) と 1 件の組み立てを関数ポインタで受ける形にした
-(`fs/hostdrv/hostdrv_stat_rules.inc` と同じ作法)。`hdrv_list_dir` は step / emit を渡して
+(`drivers/hostdrv/hostdrv_stat_rules.inc` と同じ作法)。`hdrv_list_dir` は step / emit を渡して
 呼ぶだけになり、判定の写しはどこにも無い。`hostdrv_cleanup_close()` は
 **戻り値にかかわらず必ず通す**。
 
@@ -259,7 +259,7 @@ B3c で `コピー元が通常ファイル: 非ゼロ終了` **だけは通っ�
 
 ### 修正 2 は挙動の変更 — 切り離せる形
 
-`fs/hostdrv/hostdrv_list_rules.inc` の `hdrv_list_run()` にある
+`drivers/hostdrv/hostdrv_list_rules.inc` の `hdrv_list_run()` にある
 
 ```c
         if (count++ >= max_entries) {
@@ -318,7 +318,7 @@ ext2 と iso9660 は自前の `list_dir` を持つので影響を受けない
 - `tools/tests/hostdrv_list_host.c` + `tools/tests/test_hostdrv_list.py` (新設、
   `build/sdk.mk` に `check-hostdrv-list-host` を登録し `check:` の列に追加)。
   **23 件 / 0 failures**。正常系 7 / (a) 途中で負値 5 / (b) 件数上限 5 /
-  引数の防御 3 / 2 つのエラーが別物 2。`--target` で `fs/hostdrv/hostdrvfs.c` の
+  引数の防御 3 / 2 つのエラーが別物 2。`--target` で `drivers/hostdrv/hostdrvfs.c` の
   クロスコンパイルも見る。上限定数が 1 か所にしか無いことの検査つき ([C4])。
 - `hsync_h1_host.c` に `case_b4` **8 件** (211 → **219 checks / 0 failures**)。
   贋 `sys_ls` に「N 件流してから I/O エラー」を注入し、**呼び手側の意味** —

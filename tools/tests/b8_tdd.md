@@ -32,7 +32,7 @@ Codex 実装レビュー 往復 4 で**実際に取り逃している**。だか
 |---|---|---|
 | A | **実物の ext2** (`fs/ext2/ext2_super.c` / `ext2_inode.c` / `ext2_dir.c` / `ext2_file.c` / `ext2_fmt.c` / `ext2_vfs.c`) + **実物の `fs/vfs.c` / `fs/vfs_fd.c`**。贋物は Device API と IDE だけ。RAM 上の 8MB を実物の `ext2_format()` で作る | **間接ブロックを使う大きなディレクトリ**の読み出しを**一度だけ**落とし、`ext2_bmap` → `find_entry` → `lookup` → `stat` → `vfs_open` の全段で「未割当 = 検索終了」に化けないこと |
 | B | 合成 `VfsOps` (`tools/tests/vfs_kind_host.c` と同じ作法) | `stat` と `get_file_size` の戻り値を 1 つずつ指定し、**`write_file` の呼び出し回数**で「作成へ進んでいない」ことを 0 件で押さえる |
-| C | `fs/hostdrv/hostdrv_stat_rules.inc` の純関数 | HostDrv の `get_file_size` がディレクトリに答えないこと (`hdrv_size_result`)。ハイパーコールを叩く `fs/hostdrv/hostdrvfs.c` 本体はホストで組めないので、判定だけを純関数へ切り出した (票 H1 の `hdrv_stat_fill` と同じ作法) |
+| C | `drivers/hostdrv/hostdrv_stat_rules.inc` の純関数 | HostDrv の `get_file_size` がディレクトリに答えないこと (`hdrv_size_result`)。ハイパーコールを叩く `drivers/hostdrv/hostdrvfs.c` 本体はホストで組めないので、判定だけを純関数へ切り出した (票 H1 の `hdrv_stat_fill` と同じ作法) |
 
 **一度だけ**の失敗にするのが肝。恒久的な故障なら誰が見ても異常だが、B8 が起きるのは
 「一度読めなかっただけで次は読める」ときである。注入器は
@@ -202,7 +202,7 @@ stat は成功 → サイズ取得の OPEN だけ失敗 → NOTFOUND → `vfs_op
 が `hdrv_write_file` へ → `NP2_FILE_OVERWRITE_IF` が既存ファイルを切り詰める。
 
 **直し方**: `hostdrv_create()` が NTSTATUS を純関数
-`hdrv_create_status_to_vfs()` (`fs/hostdrv/hostdrv_stat_rules.inc`) で VFS エラーへ写し、
+`hdrv_create_status_to_vfs()` (`drivers/hostdrv/hostdrv_stat_rules.inc`) で VFS エラーへ写し、
 **呼び手 11 か所すべてがそのまま返す**。応答が無いとき (番兵) は IO。
 
 **NP21/W 側の根拠** (`~/np21w-src/src/generic/hostdrvnt.c` の
@@ -219,7 +219,7 @@ stat は成功 → サイズ取得の OPEN だけ失敗 → NOTFOUND → `vfs_op
 | `SHARING_VIOLATION` / `ACCESS_DENIED` / `MEDIA_WRITE_PROTECTED` / `TOO_MANY_OPENED_FILES` / `CANNOT_DELETE` / `INVALID_PARAMETER` | いずれも「在るが開けない」系 | **IO (既定)** |
 
 **既定を IO にしてあることが安全性の要** — 知らない状態を「無い」と言わない。
-足りなかった 6 つの状態値は `fs/hostdrv/hostdrvfs_proto.h` に NP21/W の
+足りなかった 6 つの状態値は `drivers/hostdrv/hostdrvfs_proto.h` に NP21/W の
 `hostdrvntdef.h` と同じ値で足した。
 
 **同じ畳み込みの洗い出し**: `hdrv_list_dir` / `hdrv_read_file` /
@@ -229,7 +229,7 @@ stat は成功 → サイズ取得の OPEN だけ失敗 → NOTFOUND → `vfs_op
 **11 か所すべて**を `return rc` にした。
 
 **受入の形**: 純関数だけの試験では足りない (1 巡目がそれで取り逃した) ので、
-**実物の `fs/hostdrv/hostdrvfs.c` をホストで動かす**試験
+**実物の `drivers/hostdrv/hostdrvfs.c` をホストで動かす**試験
 `tools/tests/b8_hostdrv_host.c` を作った。`include/io.h` の `inp`/`outp` は
 特権命令のインライン asm なので `tools/tests/hostdrv_hostshim/io.h` を `-I` で
 先に置いて差し替え、コマンド列 `HDR9801` が揃った時点で**贋の NP21/W** が
@@ -316,7 +316,7 @@ stat は成功 → サイズ取得の OPEN だけ失敗 → NOTFOUND → `vfs_op
 | `case_rmdir_keeps_inode` | 間接ブロックを持つ空ディレクトリを作り、空判定の読み出しは通して下見だけ落とす → 同上 |
 | `case_trailing_sync_failure` | スーパーブロックの読み出しを落として create / write / mkdir / 追記 / rename が IO を返すこと。回帰で全部通る |
 
-**`test_b8_hostdrv.py`: 新規 61 checks, 0 failures** — 実物の `fs/hostdrv/hostdrvfs.c`
+**`test_b8_hostdrv.py`: 新規 61 checks, 0 failures** — 実物の `drivers/hostdrv/hostdrvfs.c`
 
 | 名前 | 中身 |
 |---|---|
@@ -358,7 +358,7 @@ M14 1 / M15 1 / M16 1 / M17 2 / M18 4)。件数が §4 より増えているの�
 ### 7-6. 触ったファイル (2 巡目)
 
 `fs/ext2/ext2_dir.c` `fs/ext2/ext2_file.c` `fs/ext2/ext2_inode.c` `fs/ext2/ext2_priv.h`
-`fs/hostdrv/hostdrvfs.c` `fs/hostdrv/hostdrvfs_proto.h` `fs/hostdrv/hostdrv_stat_rules.inc`、
+`drivers/hostdrv/hostdrvfs.c` `drivers/hostdrv/hostdrvfs_proto.h` `drivers/hostdrv/hostdrv_stat_rules.inc`、
 `build/sdk.mk`、`tools/tests/b8_open_host.c` `tools/tests/ext2_read_bound_host.c`
 (スタブの型を `int` に)、新規 `tools/tests/b8_hostdrv_host.c`
 `tools/tests/test_b8_hostdrv.py` `tools/tests/hostdrv_hostshim/io.h`。

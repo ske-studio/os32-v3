@@ -130,21 +130,21 @@ void probe(void) {
     def test_hostdrv_linear_exceptions_remain_scoped(self):
         # Exercise the real 24 address casts: audited linear ABI exceptions
         # must cover only the 12 named functions, not a new unaudited caller.
-        source = (ROOT / 'fs/hostdrv/hostdrvfs.c').read_text()
+        source = (ROOT / 'drivers/hostdrv/hostdrvfs.c').read_text()
         entries = [line for line in (ROOT / 'tools/check_p2v_allow.txt').read_text().splitlines()
-                   if line.startswith('fs/hostdrv/hostdrvfs.c:')]
+                   if line.startswith('drivers/hostdrv/hostdrvfs.c:')]
         self.assertEqual(len(entries), 12)
         with tempfile.TemporaryDirectory(prefix='os32-hostdrv-p2v-') as tmp:
             root = mutant_tree(ROOT, pathlib.Path(tmp) / 'tree', {},
-                               real={'fs/hostdrv/hostdrvfs.c', 'tools/check_p2v_allow.txt'})
-            target = root / 'fs/hostdrv/hostdrvfs.c'
+                               real={'drivers/hostdrv/hostdrvfs.c', 'tools/check_p2v_allow.txt'})
+            target = root / 'drivers/hostdrv/hostdrvfs.c'
             target.write_text(source)
             allow = root / 'tools/check_p2v_allow.txt'
             allow.write_text('\n'.join(entries) + '\n')
             # Parse the real HostDrv TU with its build flags and headers.
             # Limit this focused audit to HostDrv; other units retain their
             # own allowances in the full-tree test.
-            unit = next(u for u in checker.ast.units(root) if u['src'] == 'fs/hostdrv/hostdrvfs.c')
+            unit = next(u for u in checker.ast.units(root) if u['src'] == 'drivers/hostdrv/hostdrvfs.c')
             def audit_hostdrv():
                 with patch.object(checker.ast, 'units', return_value=[unit]):
                     return checker.audit(root)

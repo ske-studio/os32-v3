@@ -92,7 +92,7 @@ KB_INC_EXTRA += -I$(KB_GEN)/include -I$(KB_GEN)/sdk/include/os32 \
  -Ikapi -Idrivers -Inet -Igfx -Iexec \
  -Idrivers/char -Idrivers/net -Idrivers/dma -Idrivers/input -Idrivers/pci \
  -Idrivers/sound -Idrivers/video -Ifs/fat -Ifs/ext2 -Ifs/ramfs \
- -Ifs/serialfs -Ifs/hostdrv -Ikernel/module -Ikernel/v86 -Ikernel/ime \
+ -Ifs/serialfs -Ikernel/module -Ikernel/v86 -Ikernel/ime \
  -Igfx/sync -Igfx/v2 -Idrivers/video/geforce -Idrivers/video/kcg
 KB_INC_EXTRA += -Idrivers/ata -Ikernel/dev -Ifs -Ifs/isofs -Idrivers/block -Ikernel/cli
 endif
@@ -116,6 +116,13 @@ KB_FLAGS := -std=gnu11 $(KB_MACHINE) -fno-builtin -fno-asynchronous-unwind-table
 
 .PHONY: all audit
 all: $(KB_ELF) audit
+# 共通の置き場のソースは、PowerPC の像にまだ入っていない物 (C_COMMON_PC98_PENDING) も PowerPC の
+# コンパイラを通す。機種の名前 (PC-98 の定数など) を間接に使っていれば、ここで未宣言になって止まる。
+# リンクはしない (像には入れない)。
+KB_PENDING_OBJ := $(addprefix $(KB_OUT)/,$(patsubst %.c,%.o,$(filter %.c,$(C_COMMON_PC98_PENDING))))
+$(KB_OUT)/kapi/kapi_db.o: KB_TU_FLAGS += -Ilib/sqlite3
+.PHONY: common-compile
+common-compile: $(KB_PENDING_OBJ)
 
 $(KB_OUT)/memmap_layout.h: include/memmap.h tools/gen_memmap.py
 	@mkdir -p $(dir $@)

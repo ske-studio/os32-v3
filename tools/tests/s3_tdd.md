@@ -518,7 +518,7 @@ SUMMARY 7/7 PASS
 - 実 FatFs (`fs/fat/fatfs/ff.c`) が 8.3 に収まらない名前で本当に `FR_INVALID_NAME` を返すことは
   **贋物で仮定している**。根拠は実機の `ls -l /etc/settings.db-journal` = `Invalid argument`
   (受入時の観測) と `ffconf.h` の `FF_USE_LFN 0` であって、この試験の中では確かめていない。
-- HostDrv (`fs/hostdrv/hostdrvfs.c`) と iso9660 の stat は見ていない。本件は FAT だけの写像。
+- HostDrv (`drivers/hostdrv/hostdrvfs.c`) と iso9660 の stat は見ていない。本件は FAT だけの写像。
 - `make all` / `make check` は未実行。`fs/fat/fatfs_vfs.c` の単体クロスコンパイル
   (`i386-elf-gcc -Wall -Wextra -Werror`) だけ通した。
 

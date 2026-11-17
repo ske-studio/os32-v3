@@ -144,7 +144,7 @@ spt=18 は 2 の冪ではないので、従来のシフト演算 (`and al,07h` /
 
 | 機能 | 無いときの挙動 | 根拠 |
 |---|---|---|
-| HostDrv (`/host`) | **静かに飛ばす**。`hostdrvfs_detect()` が I/O ポートを見て 0 を返し、`kernel.c` が `if (hostdrvfs_detect())` で囲っているのでマウントを試みない | `fs/hostdrv/hostdrvfs.c`、`platform/pc98/kernel.c` |
+| HostDrv (`/host`) | **静かに飛ばす**。`hostdrvfs_detect()` が I/O ポートを見て 0 を返し、`kernel.c` が `if (hostdrvfs_detect())` で囲っているのでマウントを試みない | `drivers/hostdrv/hostdrvfs.c`、`platform/pc98/kernel.c` |
 | サブマウント (hd0 / cd0 / lo*) | **失敗を無視**。ext2 → iso9660 → fat と試して全部落ちてもループが続く | `platform/pc98/kernel.c` |
 | SerialFS | 明示的な `serial` コマンドのときだけ。失敗は `SerialFS mount skipped (%d)` | `userland/shell/rshell.c` |
 | Host Services | アプリが呼んだときに `-100` (`HOST_ELINK`)。起動経路は呼ばない | F11 の実測 |

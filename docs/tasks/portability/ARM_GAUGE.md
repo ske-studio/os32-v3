@@ -156,7 +156,7 @@
 `drivers/ata/atapi.c` `drivers/block/fdc.c` `drivers/sound/fm/fm.c` `drivers/ata/ide.c` `drivers/input/kbd.c`
 `drivers/video/kcg/kcg.c` `drivers/net/ne2000/lgy98.c` `drivers/input/mouse.c` `drivers/input/mouse_bus.c`
 `drivers/input/mouse_seamless.c` `drivers/net/ne2000/ne2000.c` `drivers/char/np2sysp.c` `drivers/char/rtc.c`
-`drivers/char/serial.c` `drivers/video/cirrus/wab_glue_xe10.c` `fs/hostdrv/hostdrvfs.c` `drivers/video/pc98/backend_pc98.c`
+`drivers/char/serial.c` `drivers/video/cirrus/wab_glue_xe10.c` `drivers/hostdrv/hostdrvfs.c` `drivers/video/pc98/backend_pc98.c`
 `drivers/video/pc98/backend_pegc.c` `gfx/gfx_core.c` `gfx/gfx_scroll.c` `gfx/palette.c`
 `kernel/console/con_sink.c` `kernel/console/console.c` `arch/x86/kernel/idt.c` `arch/x86/kernel/isr_handlers.c`
 `kernel/kbd_inject.c` `platform/pc98/kernel.c` `mm/pgalloc.c` `drivers/sound/fm/snd_engine.c`
