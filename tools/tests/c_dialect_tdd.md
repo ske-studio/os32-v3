@@ -1,6 +1,6 @@
 # c_dialect (言語モードの検査、[C1]) — ホスト TDD の記録
 
-票: `docs/archive/v3/TASK_C11_MIGRATION.md` §6 段 4・段 5、受入 A1・A2・A5・A6
+契約: `docs/design/tools/check_c_dialect.md` (出所は票 TASK_C11_MIGRATION の §6 段 4・段 5、受入 A1・A2・A5・A6 と票 TASK_CLANG_CHECKS)
 実装: `tools/check_c_dialect.py` (`make check-c-dialect`)
 試験: `tools/tests/test_c_dialect.py` (`make check-c-dialect-host`、否定側は `--mutate`)
 
@@ -11,8 +11,8 @@
 **位置づけ**: 誤って持ち込むことを防ぐ guard であり、わざと作った入力への耐性は目標にしない (ユーザー決定 2026-09-30、Codex レビュー 3 回目の後)。既知の限界は末尾の「見ていないもの」。
 
 1. `make -n -B all` のコンパイル行 (`i386-elf-gcc … -c`) を読み、旗の組 (−I・依存生成・`-c`・`-o`・ソースを除いたもの) ごとに
-   `-E -dM` で `__STDC_VERSION__` / `__STRICT_ANSI__` を聞く。期待は SQLite 系 (`lib/sqlite3/{sqlite3,os32_sqlite_vfs,os32_sqlite_test}.c`、
-   `userland/tests/sqlite_standalone/`) が gnu89、それ以外が gnu11。SQLite 系・`platform/pc98/kernel.c`・`boot/boot_main.c` がコンパイル行に無ければ落ちる (空振りの番人)。
+   `-E -dM` で `__STDC_VERSION__` / `__STRICT_ANSI__` を聞く。期待は SQLite 系 (`lib/sqlite3/{sqlite3,os32_sqlite_vfs}.c` とビルドが作るその写し、
+   `userland/tests/sqlite_standalone/`) が gnu89、それ以外 (`lib/sqlite3/os32_sqlite_test.c` を含む) が gnu11。SQLite 系・`platform/pc98/kernel.c`・`boot/boot_main.c` がコンパイル行に無ければ落ちる (空振りの番人)。
 2. gnu11 の旗の組ごとに探りを 5 本コンパイルする: VLA・暗黙の関数宣言・暗黙 int・偽の `STATIC_ASSERT` は**期待する診断の文言つきで**拒否、
    真の `STATIC_ASSERT` は通る。`STATIC_ASSERT` は木の `include/types.h` の実物のマクロを使う。
 3. 公開 SDK ヘッダ (`sdk/include/os32/*.h`。`os32_kapi_shared.h` もここ) は `-std=gnu89 -Wc90-c99-compat -Wc99-c11-compat
@@ -44,7 +44,7 @@
 | 区分 | 何を固定したか |
 |---|---|
 | 1 字句 | 本物の前処理器の出力で: コメント・文字列・`__restrict` を数えない、文字定数 `'"'` で文字列に入らない、`#include /* … */ <x.h>`、複数行コメントの後ろの `#include` は `#` の行、行継続 (素・空白・タブ入り) で割った `restrict`、`# include`・`# include`、行継続で割った `#include` (行は指令の終わりの物理行)、マクロで隠した `_Atomic`、`#if 0` の中は数えない |
-| 2 コンパイル行 | `i386-elf-gcc -c` の行だけ拾う (`-o` が先でも)、旗の組から −I・依存生成・`-c`・`-o` を外し `-include` は残す、期待する言語モード (SQLite 系 4 種は gnu89、本体・ブート・userland は gnu11) |
+| 2 コンパイル行 | `i386-elf-gcc -c` の行だけ拾う (`-o` が先でも)、旗の組から −I・依存生成・`-c`・`-o` を外し `-include` は残す、期待する言語モード (SQLite 本体と VFS・userland の SQLite 単体は gnu89、`os32_sqlite_test.c`・本体・ブート・userland は gnu11) |
 | 3 実際の言語モード | `strip_jobserver`: `-j` / jobserver だけを除き、変数部分と `e` などはバイト列のまま。`-std=gnu11`/`gnu89`/`c11`、`-std` 2 つは後ろが効く、`-std` 無しはコンパイラの既定 (gnu17) で gnu11 とは読まない |
 | 4 拒否の探り | 旗が揃えば全部拒否、`-Werror=vla`・`-Werror=implicit-function-declaration`・`-Werror=implicit-int` をそれぞれ外すとその探りが通る、別の理由 (壊れた `-include`) の失敗を拒否と数えない、条件を捨てる `STATIC_ASSERT` を見逃さない、負サイズ配列の `STATIC_ASSERT` でも偽は拒否、マクロが無ければ真の探りが通らない |
 | 5 公開 SDK ヘッダ | C89 の書き方だけのヘッダは通る (文字列の `//` 含む)。行コメント・ブロック途中の宣言・`for` の中の宣言・`_Bool`・`<stdbool.h>`・指示付き初期化子・`_Static_assert`・`restrict`・`long long` をそれぞれ拒否。ヘッダが 1 本も無ければ落ちる  行継続で割った `//`、`#\f include <stdbool.h>` も拒否 (コンパイラと前処理後の出力で) |
@@ -195,4 +195,4 @@ MUTATIONS 27/27 RED; CONTROLS 5/5 GREEN
 行継続 include の報告は clang の物理開始行 (旧GCC行標識は終端行)。
 内部 `__restrict` も型として restrict と判定する。
 不正な C / ヘッダ不足は解析失敗として fail closed、変異の RED には数えない。
-具体的な件数・コマンド・差分は TASK_CLANG_CHECKS (アーカイブ: `docs/archive/v3/TASK_CLANG_CHECKS.md`) §6。
+具体的な件数・コマンド・差分は票 TASK_CLANG_CHECKS の §6 (経緯)。

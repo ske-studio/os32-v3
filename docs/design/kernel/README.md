@@ -60,3 +60,4 @@ kselftest_pass/fail等の観測シンボルはカーネルに残す。
 - [kernel/ver_collect.c](ver_collect.md)
 - [kernel/ver_format.c](ver_format.md)
 - [kernel/ver_info.h](ver_info.md)
+- [kbd_inject](kbd_inject.md)

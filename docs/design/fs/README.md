@@ -55,3 +55,5 @@ void vfs_device_names_register(const struct vfs_device_name *rows, unsigned n);
 - [vfs_fd_open](vfs_fd_open.md)
 - [vfs_path_kind](vfs_path_kind.md)
 - [vfs_set_mtime](vfs_set_mtime.md)
+- [vfs](vfs.md)
+- [vfs_fd_fstat](vfs_fd_fstat.md)

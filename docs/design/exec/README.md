@@ -84,3 +84,4 @@ BB は owner=boot → gshell (永続) の移譲 1 回だけで、GUI 終了 → 
 - [exec/ring3_str.c](ring3_str.md)
 - [surface_query.md](surface_query.md)
 - [appmem](appmem.md)
+- [appslot_transition](appslot_transition.md)

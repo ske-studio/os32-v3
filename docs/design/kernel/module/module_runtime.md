@@ -22,3 +22,15 @@ R7 (owner 単位の回収、装置状態は init が戻す) はそのまま。
 | 実物・根拠 (file:line) | 確認したこと |
 |---|---|
 | `kernel/module/module_runtime.c`、`module_abort()` | 依存 handle 世代、停止・参照数検査、失敗時隔離がある。依存は関数解決そのものではない。装置所有権の仲裁は別途必要 |
+
+## 読み込み・開始・巻き戻しの順序 (`module_load`・`module_start`・`module_abort`)
+
+> 出所: TASK_DBGREF (§3-4) の契約を今のソースと照らして要約 (2026-11-18)
+
+ソース: `kernel/module/module_runtime.c`。像の検査は `kernel/module/module_image.c` (`docs/design/kernel/module/module_image.md`)。
+
+1. `module_load`: 記録の空きを取る → ファイルを開く → 先頭の 144 B (`MODULE_HEADER_SIZE`) を読み、`module_image_header` でヘッダの全欄を検査 (ここまでページを取らない) → 動的な MODULE owner を作り、`load_span` 分のページを連続で取る → 残りを読み切る (短読は SHORT_READ) → `module_image_relocate` で全体を検査し BSS をゼロにして再配置 → import slot に本体の口を位置で書く → export を記録の表に写す。この時点では未公開 (RELOCATED)。
+2. `module_start`: 記録の表の写しを候補表として部品の開始関数 (KDEBUG なら `init`) に渡す。戻りが 0 でない、または候補表が記録の表と違えば `module_abort` して INIT_FAILED。成功したら表の手前 (prefix) のページを返し、残るのは body のページだけ。状態を RUNNING にする。
+3. `module_abort` (どの段の失敗でも): まず状態を ROLLING_BACK にして未公開にする → 依存する部品が残る・停止を確認できない・IRQ / tick / callback / DMA などの参照が残るなら QUARANTINED (資源を返さない) → そうでなければ owner のページを全部回収し、owner を retire して ABSENT。init を一度も呼ばない失敗では公開表は空のまま、FD は閉じ、ページは全部戻る。
+
+検査: `make check-kdebug-init-host` (`tools/tests/test_kdebug_init.py` のローダの段)。

@@ -1,6 +1,8 @@
 # N3 ホスト TDD の記録 (libos32host + wget / lpr / hclip / hdate)
 
-票 `docs/archive/network/TASK_N3.md` §4。C 側だけ
+契約: ライブラリは [`docs/design/userland/lib/host/host_call.md`](../../docs/design/userland/lib/host/host_call.md) の「用途別の関数」、
+コマンドの終了コードは [`docs/07_shell.md`](../../docs/07_shell.md) の外部コマンドの節
+(出所の票 TASK_N3。下の「票 §N」はその票の節)。C 側だけ
 (Agent = `host_agent.py` は別コーダー・別票)。実行:
 
 ```
@@ -8,11 +10,11 @@ python3 -B tools/tests/test_host_lib.py [--target]
 make check-host-lib-host        # 同じもの (--target 付き)
 ```
 
-- `tools/tests/host_lib_host.c` … 実物の `userland/lib/host/libos32host.c` を
+- `tools/tests/host_lib_host.c` … 実物の `userland/lib/host/host_call.c` と `libos32host.c` を
   `#include`、KAPI (`host_open`/`host_status`/`host_read`/`host_write`/`host_close`/
   `get_tick`/`sys_yield`) だけを台本式の贋物に。`sys_yield` が贋クロック `fk_now` を
-  進める。`HOST_LIB_TEST_SEAMS` で無進捗期限を絶対期限へ落とす変異点 (`host__np_absolute`)
-  を開く。**ライブラリは同時に 1 ハンドルしか開かない**ので、贋物は open ごとに 1 つの
+  進める。`--mutate` は `libos32host.c` の写しを変異させて (`stale-map` / `print-abort` /
+  `clip-limit`) 実行時に落ちることを見る。**ライブラリは同時に 1 ハンドルしか開かない**ので、贋物は open ごとに 1 つの
   `HScript` を消費する単純な形。
 - `tools/tests/host_cmd_host.c` … 実物の各コマンド (`-DHOST_TEST`、`main` を改名) を
   取り込み、`libos32host` の関数だけを贋物に。ローカル I/O は POSIX (実ファイル)。
@@ -42,18 +44,18 @@ python3 -B tools/tests/test_host_agent.py   → SUMMARY 81/81 PASS  # N3-fix で
 | `get_404_status_order` | 業務 404 を out で返す (エラーにしない)、**http_status は read ループの前に確定** |
 | `get_url_too_long` | url 1400B 超 → `HOST_EINVAL`、host_open は呼ばれない |
 | `get_sink_abort` | sink が非 0 → `HOST_EABORT`、ハンドルは閉じる |
-| `open_stale_up` | 最初の open が STALE を 200 tick (<3 秒) 返してから成功 |
-| `open_stale_timeout` | 最初の open が STALE を返し続け 3 秒で `HOST_ELINK` |
-| `second_stage_stale` | 1 段目成功 (link 確立) 後の STALE は 3 秒待たず即 `HOST_ELINK`、PRINT CLOSE を出さない |
-| `status_timeout` | status が AGAIN のみ → 30 秒で `HOST_ETIMEOUT` |
-| `noprogress_positive` | 20 秒間隔で進捗する 60 秒転送が成功 (read>0 で基準取り直し) |
-| `noprogress_absolute_mutant` | **変異 (絶対期限)** にすると同じ 60 秒転送が 30 秒で `HOST_ETIMEOUT` (回帰の否定側) |
+| `open_stale_up` | open が STALE を返したら**待たずに** `HOST_ELINK` (yield しない) |
+| `open_stale_timeout` | STALE が続いても同じく即 `HOST_ELINK` |
+| `second_stage_stale` | 1 段目成功後の STALE も即 `HOST_ELINK`、PRINT CLOSE を出さない |
+| `status_timeout` | status が AGAIN のみ → 30 秒 (`HOST_CALL_TIMEOUT_MS`) で `HOST_ETIMEOUT` |
+| `read_within_deadline` | 5 秒間隔で読める 15 秒の転送は全体の期限内なので成功 |
+| `read_whole_deadline` | 20 秒間隔の転送は進んでいても 30 秒の全体の期限で `HOST_ETIMEOUT` (進捗で期限を延ばさない) |
 | `nosys` | NOSYS → `HOST_ENODEV` |
 | `open_again_yield` | 両スロット rel_pending 相当: open が AGAIN → `sys_yield` → 成功 |
 | `open_full_yield` | **N3-fix(b)** open が FULL → `sys_yield` 待ち → 成功 (`open_full` 欄を初めて使う) |
 | `write_again_yield` | **N3-fix(a)** send_decl の write が AGAIN → `sys_yield` → 送り切る (REQUEST 転送 ACK まで必ず write AGAIN) |
-| `write_noprogress_positive` | **N3-fix(c)** write>0 が 20 秒間隔で進む 60 秒転送が成功 (write 経路の基準取り直し) |
-| `write_noprogress_absolute_mutant` | **N3-fix(c) 否定側** 絶対期限 (`host__np_absolute`) で同じ write 転送が 30 秒で `HOST_ETIMEOUT` |
+| `write_within_deadline` | write が 5 秒間隔で進む 15 秒の転送は成功 |
+| `write_whole_deadline` | write が 20 秒間隔の転送は 30 秒の全体の期限で `HOST_ETIMEOUT` |
 | `clip_put_ok` | `CLIP PUT 5` の宣言長、書き込み、status 200 |
 | `clip_put_empty` | 空 (0) と 4096 超は open せず `HOST_EINVAL` |
 | `clip_get_503` | 503 → `HOST_ESERVICE` + svc_status、閉じる |
@@ -77,6 +79,8 @@ python3 -B tools/tests/test_host_agent.py   → SUMMARY 81/81 PASS  # N3-fix で
 - **hdate**: 成功→時刻 1 行+0、ELINK/ENODEV→2。
 
 ## RED→GREEN
+
+(以下と N3-fix の節は当時の記録。無進捗期限 (`host__np_absolute`) は今は無く、期限は呼び出し全体の 30 秒。今の検査は上の表。)
 
 1. **http_status の確定位置** (`get_404_status_order`): `libos32host.c` の
    `if (http_status) *http_status = (int)st;` を `drain_sink` の**後ろ**へ動かす変異で

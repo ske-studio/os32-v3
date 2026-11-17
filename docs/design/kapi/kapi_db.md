@@ -75,6 +75,28 @@ SQLite 接続とステートメントをハンドルとして公開する。
 
 `tools/tests/test_db_errstr.py` (本体 `tools/tests/kapi_db_v50_host.c`、実 `kapi/kapi_db.c` + 実 SQLite + 実 `fs/vfs_fd.c` + RAM のバックエンド)。上の各規則がケース名 (`open_existing`・`prepare_only`・`binds`・`error_code`・`shm_bound`・`shm_exact`・`stat_faults`・`journal_mode`・`step_no_stmt`・`path_len`・`transient`・`sql_tail_sqlite`・`prepare_replaces`・`materialize_fail`・`resolve_len`・`resolve_truncate`・`resolve_depth`・`cpl3_paths`・`owner_isolation`・`order_new`・`order_old`) に対応する。回収の順序はソースの本文でも確かめる。CPL=3 の受入はゲストの `userland/tests/db_v50_test.c`。
 
+## 診断文と空文字列の置き場 (`db_last_error`・`db_column_text`)
+
+> 出所: TASK_DB_ERRSTR の契約を今のソースと照らして要約 (2026-11-18)
+
+ソース: `kapi/kapi_db.c` (`kapi_db_last_error`・`kapi_db_column_text`)・`kapi/kapi_db_helpers.inc` (`db_shm_diag`・`db_shm_empty`・`shm_write_error_text`・`shm_row_fits_n`・`shm_row_check`・`shm_write_row`)・`kapi/kapi_db_selftest.inc`。領域の定数は `sdk/include/os32/os32_kapi_shared.h` (`DB_SHM_DIAG_SIZE`・`DB_SHM_DIAG_OFFSET`・`DB_SHM_ERRSTR_MAX`・`DB_SHM_EMPTY_OFFSET`・`DB_SHM_RESULT_LIMIT`)。
+
+CPL=3 に返す文字列は、カーネルの番地 (`.rodata` の定数・slot の `.bss`・SQLite の帯) を指してはならない (アプリの PD から読めず #PF で落ちる)。**返す前に共有メモリのブロック 0 の末尾へ写し、その番地を返す。**
+
+    [0]                                                          [16KB]
+    | DB_ResultHeader | 列情報 | 結果データ |   診断文   | NUL |
+                                            ^DIAG_OFFSET   ^EMPTY_OFFSET
+
+- `DB_SHM_DIAG_SIZE` = 256。`DB_SHM_DIAG_OFFSET` = ブロック長 − 256 で、`DB_SHM_RESULT_LIMIT` (結果データが使える上限) と同じ値。診断文の器 `DB_SHM_ERRSTR_MAX` = 255 (NUL 込み)、最後の 1 バイト `DB_SHM_EMPTY_OFFSET` は常に NUL。
+- **結果データの上限は `DB_SHM_RESULT_LIMIT` からだけ引く。** 結果側の上限を見ている箇所 (`shm_write_error_text` の `max_len`、`shm_row_fits_n` の列数と payload の 2 本、`shm_row_check` の溢れ検査、`shm_write_row` の `remaining`) のどれか 1 つでもブロック長から引くと、結果データが診断文を踏み潰す。事前検査が先に断つため実行時には見えない箇所があるので、`kapi/kapi_db.c` (取り込む `.inc` を含む) に `DB_SHM_BLOCK_SIZE` の名前を出さないことを規則にしている。
+- `db_last_error` の全経路 (範囲外・空きの handle、`cleanup_message`、`sqlite3_errmsg`、モジュール・エンジンが無い) は `db_shm_diag` で写した先頭を返す。写した後に SQLite 側で別の SQL を流しても文字列は動かない。
+- 切り詰め: NUL を除いて 254 バイトを超えたら、印 `...` の 3 バイトを空け、UTF-8 の継続バイトの上で止まらないところまで戻してから写し、印と NUL を置く (写せなかった分を「写せた」ことにしない)。どの経路でも必ず NUL で終わる。
+- 空文字列は `db_shm_empty` が返すたびに NUL を置いた 1 バイトを指す (SHM の初期化順に依らない)。`db_column_text` のエラー経路も `""` ではなくここを返す。
+- `DB_ResultHeader.error_offset` と userland の `db_errmsg()` は 1 回の `db_exec` の結果に結びついた別の欄で、この領域とは別物。
+- 自己診断 `db_v50_selftest()` (ホスト試験が呼ぶ) は領域の取り決め (診断領域 = 結果の上限、診断文と空文字列が重ならない、空文字列が NUL、長い文が上限で切れる) を bit 5 で見る。
+
+検査: `tools/tests/test_db_errstr.py` (`make check-db-errstr-host`、本体 `tools/tests/db_errstr_host.c`、実 `kapi/kapi_db.c` + 実 SQLite)。範囲 (`IN_SHM`) は `errstr_range`・`coltext_range`、切り詰めと NUL は `errstr_truncate`、上限ちょうどと +1 は `result_bound`、取り決めは `diag_layout`。`DB_SHM_BLOCK_SIZE` を名指ししないことは静的な番人 `check_no_block_size`。
+
 ## `kapi_db_column_text` の範囲検査
 
 > 出所: TASK_T2D_T2H (T2e の KAPI の範囲検査の欠落の修正) の契約を今のソースと照らして要約 (2026-11-18)

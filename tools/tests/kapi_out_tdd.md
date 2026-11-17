@@ -1,6 +1,6 @@
 # kapi_out — RED → GREEN の記録
 
-票: `docs/archive/kernel_v21/TASK_KAPI_OUTPUT_GUARD.md` 受入 G1
+契約: `docs/KAPI_SPEC.md` §3-3 (`out` の書式と検査の中身)・`docs/design/sdk/gen_kapi.md` (生成器の申告の検査と生成する検査の形)。出所は票 TASK_KAPI_OUTPUT_GUARD の受入 G1
 対象: `sdk/gen_kapi.py` (`out` の解釈・検査・生成) / `sdk/kapi.json` (申告)
 試験: `tools/tests/test_kapi_out.py`
 実行: `make check-kapi-out` (`check-par` の列)。否定側は `--mutate` (手で回す)
@@ -59,5 +59,5 @@ MUTATION 3 RED (1 件): len と size の同時指定を見逃す
   ホストでは作れない。票 §3 の G2 / G3 (NP21/W + 試験バイナリ) が見る。
 - `"none"` が本当に「書かない」か — これは人の申告で、機械には確かめられない。
   `sys_ls` / `gui_register` の関数ポインタがコード帯にあることの確認は票 §3 の G3。
-- `dev_blk_read` の `unit` は**最小のセクタ長 512**。1024 (FD) / 2048 (CD) の装置では
-  後ろが未検査のまま残る (`dev->sect_size` は wrapper からは引けない)。
+- `dev_blk_read` / `dev_blk_write` は `"target"` で、body が装置の `sect_size` と count の積を
+  あふれの検査をしてから全域を確かめる (`docs/KAPI_SPEC.md` §3-3)。生成器の範囲の検査ではないので、この試験は見ない。

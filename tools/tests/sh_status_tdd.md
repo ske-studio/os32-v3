@@ -1,6 +1,6 @@
 # sh_status TDD — 終了コードの配線と `$?`
 
-票: `docs/archive/shell/TASK_EXIT_STATUS.md`
+契約: [`docs/design/userland/shell/exit_status.md`](../../docs/design/userland/shell/exit_status.md) (出所の票 TASK_EXIT_STATUS。下の S1〜S15・R1〜R2 はその票の受入の番号)
 基点: `feat/gui` = `a11ee98` (設計レビュー 5 往復で Approve、設計凍結)
 試験: `make check-sh-input-host MUTATE=1` (うち `python3 -B tools/tests/test_sh_status.py --mutate`)
     肯定側だけ: `python3 -B tools/tests/test_sh_status.py`

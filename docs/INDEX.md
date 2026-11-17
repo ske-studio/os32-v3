@@ -23,7 +23,7 @@ PC-9821シリーズ向け 32ビット ベアメタルOS
 | エージェント運用体制 (役割・起動・規約・統合の枝と一括の受入) | [tasks/agents/ROLES.md](tasks/agents/ROLES.md) (§0 が現行の 1 表、統合の枝と一括の受入は §4-2。経緯は持たない) | CLAUDE.md (体制 1 段落 + リンク)。経緯は `docs/archive/agents/ROLES_HISTORY_2026-10-06.md`、見直しの根拠は `docs/archive/agents/REVIEW_2026-10-06.md` |
 | 機能ごとのブランチで並列に実装する (触るファイルの一覧・共有の登録ファイルの持ち主・上限の予算・結線は直列) | [tasks/agents/PARALLEL_BRANCHES.md](tasks/agents/PARALLEL_BRANCHES.md) | ROLES §0 (案内のみ) |
 | 手本がある移植の進め方 (コンパイルを全部の実装の後に・設計の段の点検・依頼に必ず書くこと・踏んだこと) | [tasks/agents/PORT_FLOW.md](tasks/agents/PORT_FLOW.md) | ROLES §0 (1 行)、スキル `os32-delegate` (案内のみ) |
-| CI を作る時・改修する時の決まり (関門・全部回す・表とログ・登録から引く・用意は 1 か所・同じ入口・改修の順) | [POLICY_CI.md](POLICY_CI.md) | 欠点の実測と手本の形は [design/tools/ci/gate.md](design/tools/ci/gate.md)、08_build §8-6 (案内のみ) |
+| CI を作る時・改修する時の決まり (関門・全部回す・表とログ・登録から引く・用意は 1 か所・同じ入口・改修の順) | [POLICY_CI.md](POLICY_CI.md) | 欠点の実測と手本の形は [design/tools/ci/gate.md](design/tools/ci/gate.md)、既存の check・build を直す票は [tasks/v3/TASK_CI_REWORK.md](tasks/v3/TASK_CI_REWORK.md)、08_build §8-6 (案内のみ) |
 | PCI 装置の扱い (手本・不在・待ち・初期化・番地・PC-98・試験) | [POLICY_PCIDEV.md](POLICY_PCIDEV.md) | PORT_FLOW §4、WORK_GUIDE、POLICY_DEBUG §4、05_drivers (案内のみ) |
 | 実行形式 (`os32x_format`) が変わる版の実機への入れ方 | [REALHW_FORMAT_UPDATE.md](REALHW_FORMAT_UPDATE.md) | スキル os32-realhw-update の世代の表 (案内のみ) |
 | 延ばした試験・SKIP・ホストだけの合格・未結線 (持越し) | [tasks/DEFERRED_TESTS.md](tasks/DEFERRED_TESTS.md) (未完了だけを持つ。終わった行は消す) | 各票・引き継ぎは参照のみ。同じ延期を票や memory に写さない |

@@ -1,7 +1,8 @@
 # pegc_mode — PEGC 640x480 へ入る / 戻る OUT 列と GDC の FIFO 待ち (ホスト TDD の記録)
 
-票: `docs/archive/realhw/TASK_PEGC480_REALHW.md` (アーカイブ。今の仕様は [05_drivers §5-5](../../docs/05_drivers.md)) §2 (H2・H3・H5)、§4 /
-`docs/archive/realhw_v21/TASK_PEGC_RA266_TIMING.md` §4
+契約: [`docs/05_drivers.md`](../../docs/05_drivers.md) §5-5 の「PEGC の 480 ラインへの出入りは起動時の BIOS 状態に頼らず、実機 ROM の OUT 列に合わせる」の節
+(順序と中身・FIFO の待ち・09A8h・ROM の記録が期待値・除外表)。出所の票は TASK_PEGC480_REALHW (§2 の H2・H3・H5、§4) と
+TASK_PEGC_RA266_TIMING (§4)。下の「票 §N」は TASK_PEGC480_REALHW の節
 実装: `drivers/video/pc98/backend_pegc.c` の `pegc_apply_timing()` / `gdc_send()` / `pegc_boot_sync_record()` / `pegc_text_sync_400()`、
 値は `include/pegc.h` §10 (実機の記録で差し替える 1 か所)・§11・§12
 試験: `tools/tests/pegc_mode_host.c` + `tools/tests/test_pegc_mode.py` + `tools/tests/pegc_hostshim/io.h`

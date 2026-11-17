@@ -1,8 +1,9 @@
 # K7-K (入力統合、カーネル + KAPI v47) — ホスト TDD の記録
 
-票: `docs/archive/gui_v13/TASK_K7_input.md` §1 D1〜D7 / §5 (R1 / R2 / B / C / D)
+契約の正典: `docs/design/kernel/kbd_inject.md` (注入リング) と `docs/design/exec/appslot_transition.md`
+(kbd 待ちの park と resume)。出所は票 TASK_K7_input の §1 D1〜D7 / §5 (R1 / R2 / B / C / D)。
 実装: `kernel/kbd_inject.c` + `include/kbd_inject.h` / `drivers/input/kbd.c` / `exec/appslot.c` + `exec/appslot.h` /
-`exec/exec.c` (`exec_park_kbd` / `exec_resume` の kbd 分岐) / `kdebug/kselftest.c` / `sdk/kapi.json` (v47)
+`exec/exec.c` (`exec_park_kbd` / `exec_resume` の kbd 分岐。今の `exec_resume` は `exec/exec_schedule.inc`) / `kdebug/kselftest.c` / `sdk/kapi.json` (v47)
 試験: `tools/tests/kbd_inject_host.c` + `test_kbd_inject.py` (`make check-kbd-inject-host`) と
 `tools/tests/multiapp_impl_host.c` のケース 19 (`make check-multiapp-model-host`)
 
@@ -34,10 +35,13 @@ con_sink の排他は include パスで IRQ 状態模型へ差し替える。
 |---|---|
 | 1 permission | 読み手未確立 / 別の所有者 / 読み手の退場後 は `OS32_ERR_EXIST`、`NULL` は `OS32_ERR_INVAL`、`len 0` は 0。拒否はリングを 1 バイトも動かさない。端末が 2 本目 (busy 側) は読み手になれず注入もできない (票 §3 の 2) |
 | 2 byte order | 積んだ順に 1 バイトずつ。UTF-8 (「あ」= E3 81 82) の並びは変えない (D4)。取り出しの途中に割り込んだ注入は末尾に付く |
-| 3 pending | 注入で増え取り出しで減る。**所有権は要らない** — WM が `ready_to_run` に使う (§5 指摘 C)。覗けても注げはしない |
+| 3 pending | 注入で増え取り出しで減る。**所有権は要らない** — WM が起床のヒントに使う (§5 指摘 C)。覗けても注げはしない。今は宛先ごとに数え、WM には端末由来の件数をヒントとして見せる (WM は取れない) |
 | 4 discard | `kbd_inject_discard()` (CUI 復帰) で空になり、環は先頭から使える。`kbd_inject_owner_exit(読み手)` で捨て、別 ID の退場では捨てない (D5) |
 | 5 overflow | 容量内では 1 バイトも落とさない。あふれは **新しい方**を捨て (con_sink と逆)、積んだ数を戻り値で返す。`kbd_inject_drop_count` が超過分だけ進む。折り返しを跨いでも順序はそのまま |
 | 6 selftest | `kbd_inject_selftest()` (実機の kselftest がブート時に呼ぶもの) がホストでもビットマスク 0 |
+
+この記録の後に、宛先付きのリング (全画面の WM 例外・宛先ごとの FIFO・退場の選り分け、`case_fullscreen_destination`) と
+端末の打鍵を無関係な Run アプリに渡さない検査 (`case_guirunkey`) が足されている。今の契約は設計書のほう。
 
 ### `multiapp_impl_host.c` ケース 19 (33 チェック)
 

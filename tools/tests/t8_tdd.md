@@ -1,6 +1,10 @@
 # T8-K (full-screen GFX の画面所有者、カーネル + KAPI v48) — ホスト TDD の記録
 
-票: `docs/archive/gui_v13/TASK_T8_fullscreen_gfx.md` §2 の D1 / D1a / D3
+契約の正典: `docs/design/exec/appslot.md` の「画面の所有者」(出所は票 TASK_T8_fullscreen_gfx §2 の D1 / D1a / D3)。
+
+> 今のコードとの違い: (1) CUI 中 (con_sink 無効) の `gfx_init` も所有者を記録する (今の 20d は
+> 「CUI 中も記録する」で、下の表の 20d と逆)。(2) `--cpl0` の判定 (`appslot_cpl0_admit`) は撤去済みで、
+> 非シェルはローダが CPL=3 だけを許す (20A〜20G は今の試験に無い)。
 実装: `exec/appslot.c` + `exec/appslot.h` (所有者の表と判定) / `exec/exec.c` (`hdr_flags` の控え・
 `--cpl0` の GUI 拒否・回収の並び) / `gfx/gfx_core.c` + `gfx/gfx.h` (KAPI の門) /
 `kdebug/kselftest.c` / `sdk/kapi.json` (v48)
@@ -126,7 +130,8 @@ TARGET i386-elf GNU89 -Werror COMPILE PASS
 
 # T8-2 (CUI 専用の宣言 + 「拒否は畳む」、カーネル + ビルド系) — 追記 2026-09-12
 
-票: `docs/archive/gui_v13/TASK_T8_fullscreen_gfx.md` §6 の F5 / F1 後半
+契約の正典: `docs/design/exec/appslot.md` の「起動」(`appslot_cui_only_admit`) と「画面の所有者」
+(拒否で `abort_req`)。出所は票 TASK_T8_fullscreen_gfx §6 の F5 / F1 後半。
 実装: `sdk/include/os32/os32_kapi_shared.h` (`OS32X_FLAG_CUI_ONLY` = 0x0010) / `sdk/mkos32x.py`
 (`--cui-only`) / `build/programs.mk` + `build/app.conf` (4 列目 `gfx`|`cui`) /
 `tools/check_manifests.py` §2b / `exec/appslot.c` + `exec/appslot.h` (`appslot_cui_only_admit`、
@@ -214,7 +219,8 @@ TARGET i386-elf GNU89 -Werror COMPILE PASS
 
 # T8-3 K (ポーリング型の協調 yield、カーネル) — 追記 2026-09-12
 
-票: `docs/archive/gui_v13/TASK_T8_fullscreen_gfx.md` §7 D8 (受入 F8)
+契約の正典: `docs/design/exec/appslot_transition.md` (ポーリングの park と resume) と
+`docs/design/userland/gshell/src/multiapp.md` (ポーリング群)。出所は票 TASK_T8_fullscreen_gfx §7 D8 (受入 F8)。
 実装: `exec/appslot.c` + `exec/appslot.h` (状態 `APP_STATE_WAIT_POLL` = 4、印 `parked_from_poll`、
 `appslot_park_poll_check/commit`、`appslot_poll_yield_reset`、カウンタ `ring3_poll_yield_count`) /
 `exec/exec.c` + `exec/exec.h` (`exec_park_poll` と `exec_resume` の poll 分岐) /

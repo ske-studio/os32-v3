@@ -104,3 +104,4 @@ shlib は `trim_events / trim_done_sent`
 - [shlib.rs](shlib.md)
 - [widget.rs](widget.md)
 - [cfgro](cfgro.md)
+- [textcore](textcore.md)

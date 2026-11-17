@@ -1,10 +1,11 @@
 # ゲスト一括実行ランナー — ホスト試験の記録 (RED→GREEN)
 
-- 票: `docs/archive/test/TASK_TEST_RUNNER.md`
-  — 受入 **R7** (「生成と集計はホストだけで試験でき、そこが壊れていたらゲストで
+- 契約: [`docs/design/tools/guest_tests.md`](../../docs/design/tools/guest_tests.md)
+  (出所の票 TASK_TEST_RUNNER。下の R1〜R8・「票 §N」はその票の番号)。
+  受入 **R7** (「生成と集計はホストだけで試験でき、そこが壊れていたらゲストで
   回しても意味がない」)。R1〜R6 / R8 の**ホストで見える側**もここで踏む。
-- 前段: `docs/archive/test/TASK_TEST_RESULT.md`
-  §2 の約束事 (終了コード 0/1/2 と集計行 `<名前>: PASS n/m`)。
+- 前段: [`docs/design/userland/lib/rt/testresult.md`](../../docs/design/userland/lib/rt/testresult.md)
+  の約束事 (終了コード 0/1/2 と集計行 `<名前>: PASS n/m`)。
   その記録は [`result_conv_tdd.md`](result_conv_tdd.md)。
 - 実行: `python3 -B tools/tests/test_guest_tests.py [--mutate]`
   (`make check-guest-host` が同じものを `--mutate` 付きで回す)
@@ -147,4 +148,4 @@ MUTATE 10 全体の上限で結果を全部捨てる                   RED (1 �
 - `/api/key` での **rshell の開き直しが本当に効くか**は未確認。形は
   `tools/gui_gate.py` の実績 (ESC → `rshell` → `ver` で確かめる) を写した。
 - 一覧の 16 本が**今も**その集計行を出すかは見ていない。載っている値は
-  `TASK_TEST_RESULT.md` §9 (2026-09-17) の実測の写し。
+  票 TASK_TEST_RESULT §9 (2026-09-17) の実測の写し。

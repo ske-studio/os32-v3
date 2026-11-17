@@ -300,7 +300,7 @@ TARGET i386-elf GNU89 -Werror COMPILE PASS
 
 # A. 端末 (t5a_display) の要求表切り替え — ホスト TDD の記録
 
-票: `docs/archive/gui_v13/TASK_T9_sh.md` §1 D4 / D9、§1a の ABI 表。
+契約の正典: `docs/design/userland/rust/t5a_display/src/launch.md` (出所は票 TASK_T9_sh §1 D4 / D9、§1a の ABI 表)。
 実行: `make check-t5a-host` (= `cargo test --manifest-path
 userland/rust/t5a_display/host_tests/Cargo.toml --target x86_64-unknown-linux-gnu --offline`)。
 実機・エミュレータ・`make` は**未実施** ([V4])。
@@ -343,7 +343,7 @@ RED を確認し、戻して GREEN に戻した (K の §2 と同じやり方)�
 | `a_negative_poll_returns_to_the_prompt_instead_of_hanging` | `OS32_ERR_STALE` / 未知の status でも接続モードに居座らない |
 | `escape_cancels_once_and_waits_for_done` | ESC → `cancel` 0 → 接続モードのまま `DONE` を待つ。2 度目の ESC は出さない |
 | `again_retries_the_cancel_on_the_next_timer` | `AGAIN` → 次の poll で再試行 → `RUNNING` で通る → `DONE` |
-| `stale_cancel_returns_to_the_prompt` | `STALE` (もう `DONE` / `FAILED`) はそのままプロンプトへ |
+| `stale_cancel_returns_to_the_prompt` | `STALE` (もう `DONE` / `FAILED`) はそのままプロンプトへ (A-5 で逆になり、今は `stale_cancel_keeps_the_token_and_waits_for_the_poll`) |
 
 `prompt.rs` 側は `attached_row_names_the_child_and_offers_cancel` (最下行が
 `[running id=3] ESC=cancel` / `[cancelling id=3] wait`)、`message_rc_prints_the_
@@ -544,7 +544,10 @@ D5 の巡回と tick の間引きは **WM の領分** (D11-5: カーネルは順
 
 # T9-S ホスト TDD の記録 (sh.bin の起動待ち)
 
-票: `docs/archive/gui_v13/TASK_T9_sh.md` §1 D3a。
+契約の正典: `docs/design/userland/shell/sh_launch.md` (出所は票 TASK_T9_sh §1 D3a)。
+
+> 今のコードとの違い: GUI 外 (`launch_req` が `OS32_ERR_INVAL`) は次の PATH 候補へ回さず走査を止める
+> (票 TASK_EXIT_STATUS の R1b)。`launch_poll` が負のときは `EXEC_ERR_GENERAL` (-1) を返す。
 実行: `make check-sh-exec-host` (うち `python3 -B tools/tests/test_sh_launch.py`)。
 
 `tools/tests/sh_launch_host.c` が `userland/shell/sh_launch.inc` を**そのまま**
@@ -584,7 +587,9 @@ D5 の巡回と tick の間引きは **WM の領分** (D11-5: カーネルは順
 
 # T9-S ホスト TDD の記録 2 (行再描画と source 中の exit)
 
-票: `docs/archive/gui_v13/TASK_T9_sh.md` §1 D2(d) と
+契約の正典: `docs/design/userland/shell/sh_redraw.md` (行の再描画) と
+`docs/design/userland/shell/exit_status.md` の「4. `exit [N]` と終了要求」(source 中の exit)。
+出所は票 TASK_T9_sh §1 D2(d) と
 実装レビュー (往復 1/3) の blocker 1 / 2。
 実行: `make check-sh-exec-host` (うち `python3 -B tools/tests/test_sh_shell.py`)。
 

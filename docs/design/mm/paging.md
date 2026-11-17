@@ -38,6 +38,16 @@ static u32 native_cache_bits(u32 a)
 |---|---|---|
 | アプリの PD / PT | — | 1 枚ずつ (4KB 整列だけ) |
 
+## ブート窓 (`paging_init`)
+
+> 出所: TASK_K6_ram_ceiling の契約を今のソースと照らして要約 (2026-11-18)
+
+- `paging_init(mem_kb)` が恒等写像を張るのは min(検出量, `PAGING_BOOT_MAP_SIZE`) だけ。`PAGING_BOOT_MAP_SIZE` は静的な bootstrap PT (`PAGING_BOOT_PT_COUNT` 枚) が覆う範囲で、RAM の上限ではない (4MB の倍数であることを STATIC_ASSERT で守る)。
+- 実際に張った上端 (PFN) は `paging_boot_identity_end()` で公開する。16MB の申告なら 4096。15〜16MB のシステム空間と、上端より上は Not-Present。
+- ブート窓より上の RAM は `pgalloc_stage_online` が `paging_map_phys` で、boot workspace から取った PT で張る。
+
+検査: `tools/tests/test_paging_bounds.py` (`paging_bounds_host.c`)。
+
 ## アプリ帯の AS (`mm/paging_addrspace.inc`・`mm/paging_lease.inc`)
 
 > 出所: APP_BAND_PDE の契約を今のソースと照らして要約 (2026-11-18)
@@ -52,3 +62,33 @@ static u32 native_cache_bits(u32 a)
 - 自己診断 `paging_app_band_selftest` (kselftest に載る) は 64 枚の AS を作り、PT 0 枚・master の帯 PDE が 0 であること、stack の最上ページへの写像と解放、破棄後に空きが元へ戻ることを見る。
 
 検査は `tools/tests/test_app_band_pde.py` (実 `mm/paging.c` をホストで動かす)。
+
+## 地図の自己診断と、最悪配置の表明
+
+> 出所: TASK_KSTACK_USER (§4 の 2・3) の契約を今のソースと照らして要約 (2026-11-18)
+
+ソース: `mm/paging.c` (`paging_memmap_selftest`・`memmap_want_at`・`paging_set_not_present`・ファイル先頭の `STATIC_ASSERT` 群)・`mm/paging.h` (`paging_memmap_bad`・`paging_memmap_bad_count`・`MM_BAD_*`)・`build/os32.ld` の `ASSERT`。静的な地図の検査は `tools/gen_memmap.py` (`docs/design/tools/gen_memmap.md`)。
+
+### `paging_memmap_selftest(tramp_page)` — 実物のページ表と地図の照合
+
+- 0 から `MEM_DMA_POOL_END` までの全ページについて、`memmap.h` から導いた期待 (`memmap_want_at`: NP / RW / RO / RO+USER / RW+USER) と実物の PTE を比べる。`tramp_page` (KAPI の踏み台、RO+USER) も期待に入れる。
+- 同じ (期待, 実物) の組が続く区間を 1 本にまとめ、`paging_memmap_bad[]` に 3 語ずつ (先頭、末尾 (含む)、`(期待 << 4) | 実物`) 積む。積むのは `MM_BAD_MAX` 本までだが、本数は超えても数え続ける (`paging_memmap_bad_count`)。戻り値は本数 (0 = 一致)、ページングが無効などで照合できなければ -1。
+- **浮動番地の規則はカーネル帯 (`KERNEL_LOAD_ADDR`〜`MEM_KERNEL_BAND_END`) の中にだけ適用する。** 帯の境界は固定番地。境界を越えて育った SHM を期待に含めると、期待値が壊れた定数から作られて予算超過の配置が「一致」に見え、自己診断が穴を隠す。
+- `paging_set_not_present(start, end)` は `start > end` を -1 で断り、`paging_range_reject_count` を数える (呼び手が戻り値を見なくても空振りが残る)。
+
+### 最悪配置の表明
+
+`KHEAP_BASE` 以降は `__bss_end` から動く浮動番地なので定数式にならず、`STATIC_ASSERT` に混ぜると「variably modified at file scope」で落ちるか、黙って死ぬ。そこで上限をリンカに置く: `build/os32.ld` の `ASSERT` が常駐の鎖の終端 (`LAYOUT_MEM_SHM_RESV_START`) を固定ページ表の手前のガード (`LAYOUT_MEM_FIXED_PAGING_GUARD_BASE`) 以下に止める (カーネル本体の予算 `MEM_KERNEL_IMAGE_MAX` と同値)。上限が保証されるので、**予算いっぱいまで育った場合の配置** (`*_MAX` の定数) で重なりを表明できる。
+
+| 表明 (`mm/paging.c`) | 意味 |
+|---|---|
+| `shm_band_within_kernel_band` | 最悪配置でも SHM 帯 (前方ガード〜後方ガード) がカーネル帯に収まる |
+| `shm_resv_not_reversed` | 最悪配置でも SHM 後方の予約が逆転しない (空は許す) |
+| `shm_band_below_kstack_guard` | 最悪配置でも SHM 帯はスタックガードより下で終わる |
+| `kstack_outside_shm_band` | カーネルスタックの全体が SHM 帯の外 |
+| `kstack_outside_kernel_band` | スタックガードは浮動番地の帯 (カーネル帯) の外 |
+| `kheap_kapi_within_band` | 最悪配置でもヒープと KAPI がカーネル帯に収まる |
+
+**表明の条件に浮動番地を混ぜない。** 浮いた番地と固定番地を同じ帯で隣り合わせにしない (スタックはカーネル帯の外の固定番地に置く)。
+
+検査: `make check-memmap-host` の `tools/tests/test_memmap_boot.py` (本体 `tools/tests/memmap_boot_host.c`)。実物の `mm/paging.c` を `#include` し、起動順を再生してから自己診断を呼ぶ。`mm/shm.c` の `shm_init` は写しで再生し、写しが本物の本文とずれていないことを突き合わせる。`--mutate` の中心は `band-unbounded` (浮動番地の規則を帯の外へ広げる)。

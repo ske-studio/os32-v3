@@ -21,6 +21,30 @@ int os32_host_notice_read(const char *name, HostNotice *out); /* LIST で名前�
 - 用途別の関数 (`host_time`・`host_get`・`host_print_*`・`host_clip_*`、別名 `os32_host_*`) は `host_exchange` の上にあり、1 要求の期限は `HOST_CALL_TIMEOUT_MS` (30 秒)。戻りは `libos32host.h` の `HOST_E*` (リンクの失敗は `HOST_ELINK`、サービスの失敗は `HOST_ESERVICE` と `*svc_status`)。
 - Rust は `os32api` の `host.rs` (`host_call`・`notice_read`・`os32_host_*`) が同じ契約を包む。
 
+## 用途別の関数 (`libos32host.c`)
+
+`libos32host.h` の定数が管理元 (`HOST_REQ_MAX` 1400・`HOST_DECL_MAX` 65536・`HOST_STREAM_BUF` 16384・`HOST_CLIP_MAX` 4096・`HOST_CALL_TIMEOUT_MS` 30000)。
+どれも `host_exchange` (`host_call.c`) の上にある。
+
+| 関数 | 要求と手順 |
+|---|---|
+| `host_time(out)` | `TIME` → 19B (`YYYY-MM-DD HH:MM:SS`) を NUL 終端で返す |
+| `host_get(url, sink, ud, &http, &nbytes)` | `GET <url>`。本文を溜めずに `sink` へ流す (64KB を超えてもメモリ一定)。**`*http_status` は本文を `sink` に渡す前に確定する** (呼び手が非 200 を先に知る)。404 なども戻り値の失敗にしない |
+| `host_clip_get(sink, …)` / `host_clip_put(buf, len, …)` | `CLIP GET` / `CLIP PUT <len>` (1〜4096、外は open せず `HOST_EINVAL`) |
+| `host_print_text(name, buf, len, …)` | `PRINT OPEN <name> text` → `job <id>` → `PRINT DATA <id> <n>` (65536 ごとに分ける) → `PRINT CLOSE <id>` → `pages <n>` |
+| `host_print_stream(name, src, ud, …)` | 同じ手順。本文は `src` から 16KB のバッファへ **EOF か満杯まで詰めてから実長で宣言**し、宣言長ぶんを必ず書く。詰めた長さ 0 なら DATA を出さず CLOSE へ |
+
+- 要求行が `HOST_REQ_MAX` に収まらない (`GET` の URL が長い) なら open せず `HOST_EINVAL`。
+- 1 要求の期限は呼び出し全体で 30 秒。進んでも延びない。超えたら `HOST_ETIMEOUT`。
+- `host_open` の `AGAIN` / `FULL` (閉じた直後の RELEASE が未 ACK・枠が埋まっている) と、status・read・write の `AGAIN` は `sys_yield` して待つ
+  (REQUEST の転送 ACK まで write は必ず `AGAIN` になる)。
+- write が `INVAL` を返したら status を 1 回見る: 業務の値が来ていれば `HOST_ESERVICE` (値は `*svc_status`)、まだなら `HOST_EINVAL`、`STALE` なら `HOST_ELINK`。
+- 戻り値の写像 (`service_error`): `STALE`・`HOSTDOWN` → `HOST_ELINK` (**待たずにすぐ**)、`NOSYS` → `HOST_ENODEV`、`TIMEOUT` → `HOST_ETIMEOUT`、
+  `INVAL` → `HOST_EINVAL`、それ以外の負 → `HOST_EIO`。`sink` が非 0 / `src` が負 → `HOST_EABORT`。
+  print・clip の業務の失敗 (200 以外) は `HOST_ESERVICE` で、値は `*svc_status`。
+- PRINT の途中で失敗したら **`PRINT CLOSE` を送らない** (部分の文書を印刷しない)。開いたハンドルはどの経路でも close する。
+- コマンド (`wget`・`lpr`・`hclip`・`hdate`) の終了コードは `docs/07_shell.md` の外部コマンドの節。
+
 ## 名前の解決と通知
 
 - LIST の本文を世代ごとにまるごと cache する (件数の上限を持たない)。番号の固定表を持たない。

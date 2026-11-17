@@ -139,3 +139,8 @@ map の LOAD 一覧・各 .o の size・最終 ELF・KMOD header を照合する
 - [np21w_ini](np21w_ini.md)
 - [np21w_trial](np21w_trial.md)
 - [check_nano_inputs](check_nano_inputs.md)
+- [check_c_dialect](check_c_dialect.md)
+- [check_le_access](check_le_access.md)
+- [gen_memmap](gen_memmap.md)
+- [guest_tests](guest_tests.md)
+- [mkmod](mkmod.md)

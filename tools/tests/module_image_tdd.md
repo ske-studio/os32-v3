@@ -1,6 +1,6 @@
 # KMOD image validator host regression record
 
-票: `docs/archive/v3/TASK_DBGREF.md` §3-2・§4、依頼パック `~/os32-tmp/run/dbgref/PACK_s0.md`。
+契約: `docs/design/kernel/module/module_image.md`、拒否する条件の一覧は `docs/08_build.md` §8-2「起動時に読む部品の形式 (KMOD v1)」。出所は票 TASK_DBGREF の §3-2・§4。
 実行: `make check-module-image-host MUTATE=1 HOST32_RUNNERS=qemu`。
 
 The host harness calls the unconnected production validator with an independently
@@ -27,7 +27,8 @@ Emulator, real hardware, loader integration and product linkage are outside S0.
 `tools/module_schema.py` is consumed by mkmod and generates
 `kernel/module/module_schema.h` through `tools/gen_module_schema.py`. The independent
 wire fixture above keeps its explicit byte offsets. Caller-selected IDs must
-match the image and an admitted policy row; SQLite has no admitted row yet.
+match the image and an admitted policy row (`MODULE_COMPONENT_POLICIES`, generated
+from `COMPONENTS`; SQLITE and the later components have rows).
 KDEBUG still requires POST_ROOT, PAIR, no stop, ops v2 / 18 slots, and the existing
 image/body and table limits. Old ops also reject when the caller claims v1.
 

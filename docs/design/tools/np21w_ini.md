@@ -1,11 +1,31 @@
-# tools/np21w_ini.py — 設計 (パスの欄)
+# tools/np21w_ini.py — 設計
 
-> 状態: **現行 (2026-11-18)** — 出所: TASK_S3I2 (S3I2-T §2a) の契約を今のソースと照らして要約
-ソース: `tools/np21w_ini.py` (`ALLOWED_PATHS`・`resolve_image`・`image_name`・`windows_path`・`transform`)
+> 状態: **現行 (2026-11-18)** — 出所: TASK_S3I2 (S3I2-T §2a)・TASK_H3_cirrus (§0) の契約を今のソースと照らして要約
+ソース: `tools/np21w_ini.py` (`ALLOWED`・`ALLOWED_PATHS`・`resolve_image`・`image_name`・`windows_path`・`transform`)
 
-NP21/W の ini の書き換えのうち、ディスクの装着を変える欄の約束。固定値の欄 (`ALLOWED`) とは別の表 `ALLOWED_PATHS` で扱う。
+NP21/W の ini (`[NekoProject21]` の節) の書き換えの約束。固定値の欄 (`ALLOWED`)、ディスクの装着を変えるパスの欄 (`ALLOWED_PATHS`)、選んだ時だけ要る追加の欄 (`EXTRA`) の 3 つの表で扱う。
 
-## 欄
+## 固定値の欄 (`ALLOWED`)
+
+| 欄 | 通す値 |
+|---|---|
+| `USEGD5430` | `true`・`false` |
+| `GD5430TYPE` | `91` だけ (10 進。`0x5b`・`65535` は拒否) |
+| `USEPEGCP` | `true`・`false` |
+| `EXMEMORY` | `7`・`8`・`16`・`33`・`65`・`129` (MB 単位の拡張メモリ。`0x10`・前後の空白・空は拒否) |
+
+- 欄の名前は大文字で渡す (`usegd5430` は拒否)。ini の中の欄の名前は大文字小文字を区別しない。表に無い欄・表に無い値・空の変更は `IniError`。
+- 固定値の欄を 1 つでも変える時は、`ALLOWED` の 4 欄が節にちょうど 1 回ずつ在り、今の値も表の中であることを求める (欠け・重複・表の外の今の値は拒否)。`[NekoProject21]` の節も 1 つだけ。
+- 書き換えるのは値の字だけ。改行の種類 (CRLF・CR・LF の混在)、BOM、最終改行の有無、空白、注釈、ほかの節と欄のバイトは変えない。同じ値への変更は差分の行を出さない。UTF-16/32 と NUL を含む入力は拒否。
+- 追加の欄 (`EXTRA`: `SNDBOARD`・`NP2NETSOCK`・`E_RESUME`・`CRT31K`・`CPU_*`) は、変える欄だけが節に在ることを求める (固定値の 4 欄の在る無しに依らない)。
+- 差分の行は `欄: 旧 -> 新`。パスの欄と `NP2NETSOCK` は旧値を出さない (`set`/`empty`)。
+- `prepare --apply` は `--output` が無ければ入力を読む前に拒否する (停止を確かめる仕組みが無いため。エラー文に `verifier`)。`--output` があればオフラインの束だけを作る。`restore` は束の受領と照合し、途中で変わっていれば拒否、既定は dry-run。
+
+## パスの欄 (`ALLOWED_PATHS`)
+
+ディスクの装着を変える欄。固定値の欄とは別の表で扱う。
+
+### 欄
 
 | 欄 | 受ける値 |
 |---|---|
@@ -14,7 +34,7 @@ NP21/W の ini の書き換えのうち、ディスクの装着を変える欄�
 
 - `transform` の「変更する欄があれば全部の欄が ini に在ること」は `ALLOWED` と `ALLOWED_PATHS` で別々に掛ける (固定値の欄だけの操作がパスの欄の有無に依らない)。
 
-## 名前の解決 (`resolve_image`)
+### 名前の解決 (`resolve_image`)
 
 - 環境を読むのはここだけ。`NP21W_DIR` は環境変数だけから読み、`.env` は読まない。WSL の絶対パスであること。
 - `wslpath -w` で Windows の表記に直し、`wslpath -u` で戻して同じディレクトリになることを確かめる。`wslpath` の出力は終端の改行だけを取り、空白は残す。drive の絶対パスでなければ (UNC など) 拒否。

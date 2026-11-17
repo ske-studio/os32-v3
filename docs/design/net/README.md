@@ -53,3 +53,4 @@ cdinst ─ /cd0 ─ iso9660 ─ netcd ─ SFS block ─────┤ NIC 共�
 - [net/link_host_api.inc](link_host_api.md)
 - [net/link_notify.c](link_notify.md)
 - [net/host_mailbox.c](host_mailbox.md)
+- [link_wire](link_wire.md)

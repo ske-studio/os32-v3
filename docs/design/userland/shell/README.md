@@ -44,3 +44,7 @@ shellはstatus/now（op 3/4）のみ
 - [serial_watchdog](serial_watchdog.md)
 - [cmd_file](cmd_file.md)
 - [cmd_fs_shared](cmd_fs_shared.md)
+- [exit_status](exit_status.md)
+- [sh_launch](sh_launch.md)
+- [sh_redraw](sh_redraw.md)
+- [truncation](truncation.md)

@@ -1,8 +1,7 @@
 # 試験の合否を機械が読める形にする約束事 (ホスト試験の RED→GREEN の記録)
 
-- 票: `docs/archive/test/TASK_TEST_RESULT.md`
-  §2 (約束事の制定) / §4 (第 1 陣) / §5 (欠陥 2 件) / §6 の段取り 1〜4 /
-  **§11 (追補 — 集計行は fd 1 へ。下の §7)**
+- 契約: [`docs/design/userland/lib/rt/testresult.md`](../../docs/design/userland/lib/rt/testresult.md)
+  (出所の票 TASK_TEST_RESULT。下の「票 §N」はその票の節で、§11 = 集計行は fd 1 へ (下の §7))
 - 実行: `python3 -B tools/tests/test_result_conv.py [--target] [--mutate]`
   (`make check-result-conv-host` が `--target --mutate` 付きで回す)
 - 対象:
@@ -49,12 +48,10 @@
 持つ。`os32_test_summary()` は**行を書くのと終了コードを返すのを 1 回の呼び出しで
 行う**ので、片方だけ直すことが構造的にできない。
 
-    rc = os32_test_summary(line, sizeof(line), "math_test", g_passed, g_total);
-    api->kprintf(rc ? ATTR_RED : ATTR_GREEN, "%s", line);
-    return rc;
+    return os32_test_summary(api, "math_test", g_passed, g_total);
 
-出力先はヘッダで決めていない。`kprintf` を使う試験と newlib の `printf` を使う
-試験が混在しているので、**行を組み立てて終了コードを返すところまで**を持つ。
+出し口 (fd 1) もヘッダが持つ (§7 の追補で今の形になった。初版は行を組み立てて
+返すだけで、出力先は呼び手任せだった)。
 
 ### 2-2. 実行時 (ハーネス §1〜§5)
 

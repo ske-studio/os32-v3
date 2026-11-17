@@ -1,7 +1,9 @@
 # K5b-K TDD 記録 — アプリ 4 本の同時実行 (カーネル側、KAPI v44)
 
-対象票: `docs/archive/gui_v13/TASK_K5B_kernel.md`
-設計の正典: `docs/archive/gui_v13/TASK_K5_multiapp.md` §設計 D0〜D11 + 決裁 (2026-09-11)
+契約の正典: park・resume と印は `docs/design/exec/appslot_transition.md`、起動の入場・畳み・CTRL+STOP は
+`docs/design/exec/appslot.md` の「起動・畳み・CTRL+STOP・画面の所有者の判定」、アプリ帯の写像は
+`docs/design/mm/paging.md` の「アプリ帯の AS」、SHM の所有者ごとの回収は `docs/design/mm/shm.md`。
+出所は票 TASK_K5B_kernel と TASK_K5_multiapp (設計 D0〜D11 + 決裁)。
 
 新しい挙動ごとに **RED を先に見てから GREEN にした**。RED は「実装前の状態を
 再現したビルド」で実際に走らせて記録している (後付けの偽装ではない)。RED 用の
@@ -190,8 +192,13 @@ check-multiapp-impl-host:
 
 # 追記: 回 4 — sbrk 物理の二段構え (ユーザー決裁 2026-09-11)
 
-対象票: `docs/archive/gui_v13/TASK_K5B_kernel.md` 作業 8
-決裁: `docs/archive/gui_v13/TASK_K5_multiapp.md` 末尾の決裁表「sbrk は二段構え (2026-09-11)」
+票 TASK_K5B_kernel の作業 8、決裁は TASK_K5_multiapp 末尾の決裁表「sbrk は二段構え」。
+
+> **今のコードにこの二段構えは無い**。`exec_sbrk_pick_tier`・`exec_sbrk_tier_last` と
+> `tools/tests/test_sbrk_tier.py`・`sbrk_tier_host.c` は撤去済みで、今の `exec_launch`
+> (`exec/exec_launch.inc`) は sbrk の初期量を本体の BSS 端 + 1 ページに置き、
+> 要るページ数を `exec_ring3_pages` (`exec/exec_image_map.inc`) の 1 本の式で勘定する。
+> 以下 (回 4 と回 8) は当時の記録。
 
 | 回 | 対象 | RED | GREEN |
 |---|---|---|---|
@@ -296,7 +303,8 @@ python3 -B tools/tests/test_sbrk_tier.py    # 回 4 (新規)
 
 # 追記: 回 5 (節 R) — 実機初回起動の差し戻し「FATAL: shell.bin load failed」
 
-対象票: `docs/archive/gui_v13/TASK_K5B_kernel.md` (差し戻し 2026-09-11)
+票 TASK_K5B_kernel の差し戻し (2026-09-11)。`ext2_read_file` が `max_size` を越えて書かない契約は
+`docs/design/fs/ext2/ext2_file.md` の「落とし穴」。
 実機の観測 (PM、NP21/W、15MB 構成): `kselftest_pass=44 kselftest_fail=0` でカーネルは
 起動しているのに、text VRAM 1 行目が `FATAL: shell.bin load failed` + shlib のロード
 報告、EIP = `kernel_main+0xd4c` (`platform/pc98/kernel.c` の停止ループ)。
@@ -431,7 +439,11 @@ K5b-K で登録されていなかった `test_multiapp_impl.py` / `test_owner_re
 
 # 追記: 回 6 (ケース 19) — CPL=3 アプリ生存中は `--cpl0` の子を拒否 (申し送り A1)
 
-対象票: `docs/archive/gui_v13/TASK_K5B_kernel.md` 末尾「申し送り A1」/ **ユーザー決裁 2026-09-11**
+票 TASK_K5B_kernel の末尾「申し送り A1」/ **ユーザー決裁 2026-09-11**。
+
+> **今のコードに `appslot_cpl0_admit` は無い**。非シェルのプログラムはローダが CPL=3 だけを許し
+> (`exec_launch` の `want_ring3 = !is_shell`)、`--cpl0` の子がアプリ帯を丸ごと押さえる経路が無くなった。
+> 以下は当時の記録。
 
 | 回 | 対象 | RED | GREEN |
 |---|---|---|---|
@@ -551,8 +563,8 @@ python3 -B tools/check_constraints.py            # EXIT=0
 
 # 追記: 回 7 (ケース 20) — `exec_abort_clear` で CTRL+STOP の宛先を付け替える (KAPI v45)
 
-対象票: `docs/archive/gui_v13/TASK_K5B_gshell.md`
-「決裁が要る点 A1」/ **ユーザー決裁 2026-09-11 の A1**
+票 TASK_K5B_gshell の「決裁が要る点 A1」/ **ユーザー決裁 2026-09-11 の A1**。
+今の契約は `docs/design/exec/appslot.md` の「畳み・CTRL+STOP」(`appslot_abort_clear`)。
 
 | 回 | 対象 | RED | GREEN |
 |---|---|---|---|
@@ -659,7 +671,8 @@ make kernel                                       # EXIT=0、-Wall の警告 0
 
 # 追記: 回 8 (ケース 4) — 3 領域の外で取る付随ページを勘定に入れる (K7)
 
-票: `docs/archive/gui_v13/TASK_K5B_kernel.md` 「K7」
+票 TASK_K5B_kernel の「K7」。付随ページ (shlib の私有 data/BSS) を勘定に入れる形は今も
+`exec_ring3_extra_pages` に残っている。
 
 ## 何が壊れていたか
 

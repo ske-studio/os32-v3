@@ -84,3 +84,20 @@ ring3_wm_leave内に残す。
 未完了の sys_read は AppSlot の進捗を保持し、KBD 再開時に文字を残して syscall を再実行する。
 1文字を EAX に返す扱いは単独の getchar/getkey に適用する。
 状態の寿命とフレーム復帰の契約は [exec_stdin](exec_stdin.md) を参照。
+
+## WM の深さ `ring3_wm_depth` の寿命
+
+> 出所: TASK_KAPI_OUTPUT_GUARD (§6 の追補) の契約を今のソースと照らして要約 (2026-11-18)
+
+ソース: `exec/exec.c` (`ring3_wm_depth`・`ring3_wm_enter`・`ring3_wm_leave`・`ring3_context_save`・`ring3_context_clear`・`ring3_context_restore`)・`exec/exec_syscall.inc` (ディスパッチャの入口)・`exec/exec_fault.inc` (`ring3_kill_kind`)・`arch/x86/kernel/isr_handlers.c`。
+
+「カーネルが WM のコードへ入っている深さ」。判定の表は `docs/design/exec/ring3_str.md` の `ring3_guard_active` の節。
+
+- 増減は `ring3_wm_enter` / `ring3_wm_leave` の対だけ (呼び手は `kernel/gui.c` の `gui_call`・`gui_owner_exit` と syscall 境界のポンプ)。入れ子は 2、3 と数え、戻るたびに 1 ずつ減る。
+- 対になっていない `leave` は深さを 0 で止め (負にしない)、`ring3_wm_depth_underflow` を数える。
+- **不変条件: CPL=3 の syscall は必ず深さ 0 から始まる。** ディスパッチャの入口 (`exec/exec_syscall.inc`) が `ring3_wm_depth = 0` を書く。WM を longjmp で抜けて `leave` を通らなかった (park・kill・exit) 深さが残っても、次の syscall で 0 に戻る。残ると 3 つの門がアプリのポインタを素通しする穴になる。
+- longjmp をまたぐ起動・復帰は、`ring3_context_save` が深さを控え、子の文脈は `ring3_context_clear` で 0 から始め、親へ戻るときに `ring3_context_restore` で控えた深さを戻す。
+- WM の中の #PF/#GP や門の拒否はアプリの kill として畳まれる (例外画面は出ず `fault_kill_count` だけ増える)。`ring3_kill_kind` は種別が FAULT で深さが 1 以上なら `ring3_wm_fault_count` を +1 する。**深さを 0 に戻す前に数える** (後に置くと常に 0)。CTRL+STOP (ABORTED) は数えない。
+- ISR の 2 つの kill の行 (例外と #PF) は深さが 1 以上なら ` (in WM)` を足す。kill するかどうかの判定は変えない。
+
+検査: `make check-ring3-guard-host` (`tools/tests/test_ring3_guard.py`)。exec.c と ISR はホストで組めないので、`ring3_wm_fault_count` の位置と ` (in WM)` は本文の字面で見る。

@@ -29,3 +29,4 @@ kernel→既存dbg_call。
 
 - [kernel/module/kdebug_imports.def](kdebug_imports.md)
 - [kernel/module/module_runtime.c](module_runtime.md)
+- [module_image](module_image.md)

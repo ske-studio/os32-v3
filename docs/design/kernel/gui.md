@@ -59,3 +59,17 @@ OWNER_EXIT はカーネル内部専用で arg = EXEC_KIND_* (T4)。ABORTED は W
 イベントは 1 回で一括取り出し
 
 shell (owner 1) の異常終了は、通常文脈の所有者回収で WM 登録・入力モード・IME 描画先を解除した後に gfx_shutdown を呼ぶ。正常終了では gshell 自身の既存停止処理を使う。fault 回収から shell を再起動する前に、GF の WC 停止・98 route 復帰まで表示の寿命を閉じる。
+
+## WM の深さの印と、関数表を登録する門
+
+> 出所: TASK_KAPI_OUTPUT_GUARD (§6 の追補) の契約を今のソースと照らして要約 (2026-11-18)
+
+ソース: `kernel/gui.c` (`gui_call`・`gui_owner_exit`・`gui_register`・`gui_ime_set_render`)。深さの実体は `exec/exec.c` の `ring3_wm_depth`。
+
+- `gui_call` はハンドラの呼び出しを `ring3_wm_enter` / `ring3_wm_leave` で挟む。ハンドラの中の深さは 1、ハンドラの中から入れ子で `gui_call` すると 2、戻って 1、抜けて 0。
+- `gui_owner_exit` も WM のハンドラを呼ぶ間だけ印を立てる。WM が登録されていなければ (ハンドラが NULL) 印も立てない。
+- `gui_register` と `gui_ime_set_render` は同じ門: **owner 1 (シェル帯) かつ `ring3_call_from_user()` が偽** のときだけ受ける。登録した関数は以後ずっと CPL=0 で呼ばれるので、CPL=3 のアプリの syscall 由来 (WM の外) は owner 1 でも断る。正当な呼び手は gshell の top-level (ディスパッチの外) と WM の文脈 (深さ 1 以上)。
+  - `gui_register`: 門に落ちたら・handler が NULL なら `OS32_ERR_INVAL` で、登録済みのハンドラは変えない。
+  - `gui_ime_set_render`: 門に落ちたら表も NULL も黙って無視し (戻りは void)、`gui_ime_render_rejected` を数える。アプリの回収では描画先に触らず、gshell (owner 1) の終了で NULL (TVRAM 版) に戻る。
+
+検査: `make check-ring3-guard-host` (`tools/tests/test_ring3_guard.py`) と `kdebug/kselftest/ime_render_gate.inc`。

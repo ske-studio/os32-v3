@@ -1,6 +1,6 @@
 # vfs_fd_path TDD 記録 — FD は inode で動いて失効する / 長いパスは切り詰めずに断る
 
-対象票: `docs/archive/kernel_v21/TASK_VFS_FD_PATH.md` (方針 v2 の 8〜12、v3、ラリー 3 とユーザー決裁 ①)
+契約: `docs/06_filesystem.md` §6-1 の「FD の同一性と失効」「パスの長さと最終要素」「名前の規則 — FAT / HostDrv」、`docs/design/userland/lib/rt/pkg.md` (段 pkg)、`docs/design/tools/mkpkg.md` の「消費側の上限を作る側で守る」(段 mkpkg)、`docs/design/sdk/crt/syscalls.md` (段 errno)、`docs/design/kernel/ime/ime_dict.md` (段 ime の開き直し)。出所は票 TASK_VFS_FD_PATH (方針 v2 の 8〜12、v3、ラリー 3 とユーザー決裁 ①)
 試験: `tools/tests/vfs_fd_path_host.c` (実物の `fs/ext2/ext2_*.c` + `fs/vfs.c` + `fs/vfs_fd.c` + `userland/lib/rt/pkg.c` を `#include`)、
 `tools/tests/newlib_errno_host.c` (実物の `sdk/crt/syscalls.c` を newlib のヘッダで)、
 `tools/tests/ime_dict_host.c` (実物の `kernel/ime/ime_dict.c` + SQLite + `lib/sqlite3/os32_sqlite_vfs.c` + `fs/vfs_fd.c`)

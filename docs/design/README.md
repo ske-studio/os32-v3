@@ -183,3 +183,7 @@
 - [userland/system/install.md](userland/system/install.md)
 - [userland/system/install_recover.md](userland/system/install_recover.md)
 - [userland/tests/cfg_bench.md](userland/tests/cfg_bench.md)
+- [userland/lib/rt/pkg.md](userland/lib/rt/pkg.md)
+- [userland/lib/rt/testresult.md](userland/lib/rt/testresult.md)
+- [userland/rust/edit_gui/src/doc.md](userland/rust/edit_gui/src/doc.md)
+- [userland/rust/t5a_display/src/launch.md](userland/rust/t5a_display/src/launch.md)

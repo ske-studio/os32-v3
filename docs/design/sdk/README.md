@@ -60,3 +60,4 @@ C / Rust の生成物と**各コンパイル単位**に ABI 識別を結び付�
 - [sdk/rust/os32api/src/gui/README](rust/os32api/src/gui/README.md)
 
 - [sdk/rust/os32api/src/gui/types](rust/os32api/src/gui/types.md)
+- [gen_kapi](gen_kapi.md)

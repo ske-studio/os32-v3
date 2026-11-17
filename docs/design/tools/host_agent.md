@@ -15,9 +15,33 @@ EtherType 0x88B5 のリンクを介してクリップボードや印刷などを
 - `lan_bridge.py` は SFS (`05 53 46` で始まる payload) を link へ通さない。SFS は `lanfs_host.py` ([tools/lanfs_host](lanfs_host.md)) が受ける。
 - 確かめ: `tools/tests/test_hostsvc_linux.py` (Linux の CLIP・PRINT、依存の無い時の 503)・`test_hostsvc_services.py`。
 
+## リンクのセッションと rid 台帳
+
+フレームの形と OS32 側の状態機械は `docs/design/net/link_wire.md`。Agent 側の決まり (`HostAgent`):
+
+- **セッションの採番** (`SessCounter`): 新セッションごとに +1 (0 は使わない)。`--state-dir` があれば `sess.txt` に原子的に書いて
+  Agent の再起動をまたいでも再使用しない。`SESS_MAX` (65535) に達したら新セッションの SYN に応えず、枯渇をログに出して止まる
+  (運用者が全 OS32 を止めて `sess.txt` を消して再開する)。
+- **SYN** (`_on_syn`): 現行セッションは変えず、候補を 1 件だけ持つ (新しい SYN で差し替える)。`req_sess` が確立済みの現行 sess なら
+  同じ sess (セッション内の再同期)、未確認の候補と同じ MAC・同じ `req_sess` の SYN なら候補の sess を使い回す (SYN の再送で sess を減らさない)、
+  それ以外は新しく採番する。確認済みの候補は使い回さない (OS32 の再起動に旧い sess を渡さない)。
+- **CONFIRM** (`_on_confirm`): MAC・OS32 の nonce・Agent の nonce・sess・epoch が候補と全部一致した時だけ候補へ切り替えて ESTABLISHED を返す。
+  一致しない CONFIRM は無視、重複には ESTABLISHED を返し直す。`agent` は起動ごとの乱数の世代 (u16)。
+- **切り替え** (`_switch_to`): 実行中の子プロセスは捨てる。sess が変われば台帳を空にする。同じ sess の epoch 更新なら
+  ACTIVE を捨て、HOLE を RELEASED にし、RELEASED は保つ。
+- **rid 台帳**: rid ごとに ACTIVE (受付済み〜結果保持) / RELEASED (墓標) / HOLE (見たがその rid の REQUEST・RELEASE をまだ受けていない)。
+  `high_water` はどのフレームで見た rid でも上げ、間の rid を HOLE にする (一度に作るのは `HOLE_FILL_MAX` = 64 まで)。
+  1. `rid > high_water` の REQUEST = 新規。ACTIVE が `ACTIVE_MAX` (2) 件あれば制御 NO_SLOT を返し、その rid は HOLE で残す。
+  2. ACTIVE の rid の REQUEST・WDATA・STATUS = 重複。再実行せず ACK・結果を返し直す。HOLE の rid の REQUEST = 新規として受ける。
+  3. RELEASED、または台帳に無く `rid ≤ high_water` の REQUEST・STATUS = 制御 TOMBSTONE (再実行しない)。HOLE への STATUS も TOMBSTONE。
+  4. RELEASE は台帳に無い rid・HOLE にも RELEASED を作り (REQUEST より先着した場合も)、flags bit0 の ACK を返す。実行中の子は捨てる。
+  5. RELEASED は `rid ≤ high_water − TOMB_WINDOW` (8) で落としてよい。ACTIVE と HOLE は落とさない。
+- **STATUS** (`_on_status`): ACTIVE で結果があれば業務 RESPONSE を再提示、処理中なら制御 PROCESSING、それ以外は TOMBSTONE。
+- **WDATA**: ACTIVE の rid の WDATA は常に累積 ACK する。次の seq の時だけ本文に足す (宣言長まで)。宣言長に達したら要求を処理する。
+  宣言長の上限は `DECL_MAX_BYTES` (65536)。
+- **DATA の配送**: WINDOW を受けた rid だけ流し、credit (ページ数) を超えない。ACK が進まない WINDOW が続けば未 ACK の所から出し直す (Go-Back-N)。
+
 ## 落とし穴
 
-- **常駐不在と待ち時間**: エージェントがいないと Host Services の open は `HOST_ELINK` になる。
+- **常駐不在**: エージェントがいないと Host Services の open は `HOSTDOWN` (SDK の用途別の関数では `HOST_ELINK`) になる。
   `tools/host_agent.py` の `--listen` は既定で 127.0.0.1:8026。接続先とエミュレータの `/api/net` の実状態を照合する。
-  最初の open は最大 300 tick 待つ (`userland/lib/host/libos32host.h`) ため、途中の画面を完了結果と取り違えない。
-  `tools/tests/host_lib_host.c` の `case_open_stale_up()` が待ちとタイムアウトを検査する。

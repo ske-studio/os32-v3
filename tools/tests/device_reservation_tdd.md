@@ -1,10 +1,11 @@
 # Device reservation CORE — TDD / host evidence
 
 > **2026-10-01 (T1d) 以降、この記録は履歴。** 核は台帳の `ledger_reserve_set`
-> (検証済み資源レコード・区間の表、`mm/pgalloc.c`) に載せ直し、
-> `sys_device_reserve_core` / `pgalloc_device_reserve` は撤去した。今の試験と
-> 変異は `tools/tests/test_device_reservation.py` の docstring、結果は
-> `docs/archive/v3/TASK_T1_LEDGER.md` §4-4-R。
+> (検証済み資源レコード・区間の表、`mm/pgalloc_resource.inc`) に載せ直し、
+> `sys_device_reserve_core` / `pgalloc_device_reserve` は撤去した。今の契約は
+> `docs/design/mm/pgalloc.md` の「装置の予約 (`ledger_reserve_set`) と資源レコード」、
+> 今の試験と変異は `tools/tests/test_device_reservation.py` の docstring
+> (出所は票 TASK_T1_LEDGER の §4-4)。
 
 ## Scope
 

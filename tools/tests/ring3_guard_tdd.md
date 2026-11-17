@@ -1,6 +1,6 @@
 # ring3_guard — WM の文脈では KAPI の出力検査を効かせない (RED → GREEN の記録)
 
-票: `docs/archive/kernel_v21/TASK_KAPI_OUTPUT_GUARD.md` §6 (追補 2026-09-26)
+契約: `docs/design/exec/ring3_str.md` の「`ring3_guard_active`」・`docs/design/exec/exec.md` の「WM の深さ `ring3_wm_depth` の寿命」・`docs/design/kernel/gui.md` の「WM の深さの印と、関数表を登録する門」。出所は票 TASK_KAPI_OUTPUT_GUARD の §6 (追補 2026-09-26)
 対象: `exec/ring3_str.c` (`ring3_guard_active`) / `kernel/gui.c` (`gui_call` / `gui_owner_exit` の印) /
 `exec/exec.c` (`ring3_wm_depth`、3 つの門、ポンプ、longjmp 地点の立ち直し)
 試験: `tools/tests/test_ring3_guard.py` (ホスト、実物を `#include`) + `kdebug/kselftest.c` の `test_ring3_wm_guard` (ゲスト、実物の門)
@@ -32,8 +32,8 @@ gshell のスタックのポインタがアプリの PD で PTE を見られ、�
   前後で数え、3 つの門 (`ring3_user_ranges_writable` / `ring3_user_range_ok` / `tramp_copy`) の判定を
   `ring3_guard_active(ring3_in_syscall, ring3_wm_depth)` に寄せる (深さ 1 以上 = 常駐側の直呼び扱い)。
 - `ring3_in_syscall` の意味 (#PF/#GP の帰属、`arch/x86/kernel/isr_handlers.c`) は変えない。
-- WM を longjmp で抜ける地点 (`exec_park*` ×4 / `ring3_kill_kind` / `kapi_sys_exit`) と**ディスパッチャの入口**で深さを 0 に戻す
-  (不変条件: CPL=3 の syscall は必ず深さ 0 から始まる)。
+- **ディスパッチャの入口**で深さを 0 に戻す (不変条件: CPL=3 の syscall は必ず深さ 0 から始まる)。longjmp をまたぐ起動・復帰は
+  `ring3_context_save` / `ring3_context_clear` / `ring3_context_restore` が深さを控え・0 にし・戻す。
 - 書き側の拒否も `ring3_range_refuse` で数える (`RING3_RANGE_WR_TRIVIAL` / `WR_TABLE` / `WR_PDE` / `WR_PTE` = 7〜10)。
 
 ## RED → GREEN
@@ -117,7 +117,7 @@ MUTATIONS 17/17 RED
 ## この試験が見ていないもの
 
 - **実際に filer の窓が出ること** — NP21/W で PM が確かめる (`fault_kill_count` が増えない、`ring3_range_reject_count` が 0 のまま)。
-- `ring3_wm_depth` の longjmp 地点の立ち直し (`exec_park*` / `ring3_kill_kind`) — exec/exec.c はホストで組めない。
+- `ring3_wm_depth` の longjmp 地点の立ち直し (`ring3_context_clear` / `ring3_context_restore`) — exec/exec.c はホストで組めない。
   ディスパッチャの入口の `ring3_wm_depth = 0` が構造的に守る (深さが残っても次の syscall で 0)。
 - gshell の他の出力付き KAPI (`gfx_screen_info` / `gfx_stats` / `launch_take`) — 同じ門を通るので同じ直しで通る。
 - 登録時の歩きを `_always` から文脈つきの門へ戻す変異は**同値** (登録時に由来がアプリ = 深さ 0 + ディスパッチ中で、

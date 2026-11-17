@@ -85,7 +85,8 @@ CTL_NO_SLOT = 3
 SESS_MAX = 0xFFFF
 RID_MAX = 0xFFFFFFFF
 EPOCH_MAX = 0xFFFF
-ACTIVE_MAX = 2          # 同時受付 (OS32 のハンドル数と同じ)
+ACTIVE_MAX = 2          # 同時受付。OS32 のハンドルは 8 本 (net/link.h の LINK_HANDLES) で、
+                        # 3 本目からは NO_SLOT を返し、OS32 が枠が空くまで REQUEST を送り直す
 TOMB_WINDOW = 8         # 墓標を落としてよい高さ (high_water - 8)
 HOLE_FILL_MAX = 64      # 一度に作る HOLE の上限 (異常な rid 跳躍への歯止め)
 FRAME_PAGES = 6         # guest の 1 frame admission 閾値
