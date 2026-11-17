@@ -12,6 +12,8 @@ ifneq ($(ARCH)-$(PLATFORM),$(IMAGE_TARGET))
 $(error IMAGE $(IMAGE) is for $(IMAGE_TARGET), not $(ARCH)-$(PLATFORM))
 endif
 IMAGE_FEATURES = LINK EXEC USERSHELL USB CLI PC98_PENDING
+# 像の機能は像のファイルだけが決める。組み方を変える時は IMAGE を選ぶ。
+$(foreach f,$(IMAGE_FEATURES),$(if $(findstring command,$(origin FEATURE_$(f))),$(error FEATURE_$(f) is fixed by IMAGE $(IMAGE); choose another IMAGE)))
 $(foreach f,$(IMAGE_FEATURES),$(if $(filter-out 1,$(words $(filter 0 1,$(FEATURE_$(f))))),$(error invalid FEATURE_$(f))))
 $(foreach f,USERSHELL USB CLI,$(if $(filter 1,$(FEATURE_$(f))),$(if $(filter 1,$(FEATURE_EXEC)),,$(error FEATURE_$(f) requires FEATURE_EXEC))))
 ifeq ($(FEATURE_USERSHELL)$(FEATURE_CLI),11)
@@ -281,10 +283,11 @@ $(error tick probe requires x86-pc98 kdebug)
 endif
 DIAGNOSTIC_TICK_PROBE_BUILD = kernel/time/tick_probe.c
 endif
-LEGACY_FEATURE_VARIABLES = $(addprefix FEATURE_,$(shell echo $(FEATURES) | tr 'a-z-' 'A-Z_'))
-KNOWN_FEATURE_VARIABLES = $(LEGACY_FEATURE_VARIABLES) $(addprefix FEATURE_,$(IMAGE_FEATURES))
-ifneq ($(filter-out $(KNOWN_FEATURE_VARIABLES),$(filter FEATURE_%,$(.VARIABLES))),)
-$(error unknown feature variable $(filter-out $(KNOWN_FEATURE_VARIABLES),$(filter FEATURE_%,$(.VARIABLES))))
+# KNOWN_FEATURE_VARIABLES は今の 15 個のまま (build/targets/x86-pc98.mk の「0 があれば止める」が読む)。
+KNOWN_FEATURE_VARIABLES = $(addprefix FEATURE_,$(shell echo $(FEATURES) | tr 'a-z-' 'A-Z_'))
+IMAGE_FEATURE_VARIABLES = $(addprefix FEATURE_,$(IMAGE_FEATURES))
+ifneq ($(filter-out $(KNOWN_FEATURE_VARIABLES) $(IMAGE_FEATURE_VARIABLES),$(filter FEATURE_%,$(.VARIABLES))),)
+$(error unknown feature variable $(filter-out $(KNOWN_FEATURE_VARIABLES) $(IMAGE_FEATURE_VARIABLES),$(filter FEATURE_%,$(.VARIABLES))))
 endif
 
 ifeq ($(SPLASH_DIAG_BUILD)$(SPLASH_OBS_BUILD),11)

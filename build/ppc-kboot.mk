@@ -64,6 +64,9 @@ include build/ram-root.mk
 # The flags choose the image; this file keeps only the PowerPC product rules.
 ARCH := ppc
 PLATFORM := powermac
+ifneq ($(findstring command,$(origin IMAGE)),)
+$(error IMAGE is derived from the KBOOT_* flags here; pass KBOOT_LINK / KBOOT_SH / KBOOT_SHELL)
+endif
 IMAGE := $(if $(filter 1,$(KBOOT_SH)),$(if $(filter 1,$(KBOOT_LINK)),kboot-link-sh,kboot-sh),$(if $(filter 1,$(KBOOT_SHELL)),kboot-shell,$(if $(filter 1,$(KBOOT_LINK)),kboot-link,kboot-core)))
 include build/select.mk
 # Entry objects first (kernel.ld keeps .text.entry at the image start).
@@ -90,6 +93,10 @@ KB_INC_EXTRA += -I$(KB_GEN)/include -I$(KB_GEN)/sdk/include/os32 \
 KB_INC_EXTRA += -Idrivers/ata -Idrivers/base -Ifs -Ifs/isofs -Idrivers/block -Ikernel/cli
 endif
 KB_OBJ := $(addprefix $(KB_OUT)/,$(KB_ASM:.S=.o) $(KB_C:.c=.o))
+# The source lists and link order live in these files: a change there relinks the image.
+KB_SELECT_MK := build/select.mk build/sources/common.mk build/sources/order.mk \
+ build/arch/ppc-sources.mk build/platform/powermac.mk build/images/$(IMAGE).mk
+$(KB_OBJ) $(KB_ELF): $(KB_SELECT_MK)
 
 # Same machine flags as build/arch/ppc.mk:8 for every kernel TU (design section 4).
 KB_MACHINE := -mcpu=7450 -m32 -mbig-endian -msoft-float -mno-altivec -msdata=none \

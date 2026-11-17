@@ -47,19 +47,21 @@
 ```make
 # build/images/kboot-link-sh.mk
 IMAGE_ORDER = kboot
-FEATURE_LINK ?= 1
-FEATURE_EXEC ?= 1
-FEATURE_USERSHELL ?= 1
-FEATURE_USB ?= 1
-FEATURE_CLI ?= 0
-FEATURE_PC98_PENDING ?= 0
+FEATURE_LINK = 1
+FEATURE_EXEC = 1
+FEATURE_USERSHELL = 1
+FEATURE_USB = 1
+FEATURE_CLI = 0
+FEATURE_PC98_PENDING = 0
 ```
 
-- 像の機能は `IMAGE_FEATURES = LINK EXEC USERSHELL USB CLI PC98_PENDING` として、今の 15 個 (`FEATURES`) と別の一覧に持つ。値の検査 (0 か 1)・未知の `FEATURE_*` の検査は両方を見る。`build/targets/x86-pc98.mk:113` の「0 があれば止める」は今の 15 個だけを見る形に書き換える (`KNOWN_FEATURE_VARIABLES` を `LEGACY_FEATURE_VARIABLES` と `IMAGE_FEATURE_VARIABLES` に分ける)。
+像の機能の値は像のファイルだけが決める。コマンドラインで `FEATURE_LINK=0` のように上書きすると `select.mk` が止める (組み方を変える時は `IMAGE` を選ぶ)。`build/ppc-kboot.mk` は旗から `IMAGE` を決めるので、コマンドラインの `IMAGE=` も止める (出力の置き場と中身が食い違わないように)。
+
+- 像の機能は `IMAGE_FEATURES = LINK EXEC USERSHELL USB CLI PC98_PENDING` として、今の 15 個 (`FEATURES`) と別の一覧に持つ。値の検査 (0 か 1)・未知の `FEATURE_*` の検査は両方を見る。`build/targets/x86-pc98.mk:113` の「0 があれば止める」は今の 15 個だけを見る (下の `KNOWN_FEATURE_VARIABLES` の項)。
 - 依存: `USERSHELL`・`CLI` は `EXEC` が要る。`USERSHELL` と `CLI` は同時に 1 にできない。`select.mk` の今の依存の検査と同じ書き方で足す。
 - `ppc-selected` は今の計測の集合 (`C_KERNEL` 177 本) をそのまま再現するための一時の像 (今の最上位の ARCH=ppc の利用者を段 1a で 1 本も変えないため)。x86 の `pc98-devices` から共通の組へ移す 11 本 (`net/nic.c`・`link.c`・`link_notify.c`・`host_mailbox.c`・`nic_rx.c`・`rx_work.c`、`drivers/base/dev.c`、`input/hal/legacy_ring.c`・`legacy_mode.c`、`kernel/port_service.c`・`serial_diag.c`) は今の計測に入っていないので、この像のファイルが `IMAGE_EXCLUDE` に挙げ、`select.mk` が `C_COMMON` から `filter-out` する。段 1b で計測と一緒に消す。
 - `IMAGE` の既定は `select.mk` の冒頭で決める: `IMAGE ?= $(if $(filter powermac,$(PLATFORM)),ppc-selected,pc98)`。`build/images/$(IMAGE).mk` が無ければ `$(error unknown IMAGE ...)`。
-- `KNOWN_FEATURE_VARIABLES` は両方の一覧の和のまま残し (未知の `FEATURE_*` の検査と `kernel-objects.mk:153` の SELECTION_STAMP が使う)、`x86-pc98.mk:113` の止めだけ `LEGACY_FEATURE_VARIABLES` (今の 15 個) を見る。
+- `KNOWN_FEATURE_VARIABLES` は今の 15 個のまま変えない (`build/targets/x86-pc98.mk:113` の「0 があれば止める」が読む。このファイルは `tools/tests/test_sep5_boot.py` が基点 `3ebbd208` とバイト単位で固定しているので触らない)。像の機能は `IMAGE_FEATURE_VARIABLES` に持ち、未知の `FEATURE_*` の検査は両方を見る。`kernel-objects.mk` の SELECTION_STAMP には `IMAGE=<名>` を足す。
 
 ### 3-2. 持ち主
 
@@ -158,7 +160,7 @@ legacy の式は今の `select.mk:241-243` に末尾の一覧を足しただけ 
   - PowerPC: 6 像の `KB_ASM`・`KB_C` の並びを `tools/tests/fixtures/build_profile_ppc.json` に固定し、`test_build_selection.py` が `make -f build/ppc-kboot.mk` から引いて比べる (段の前の木で取った値を fixture にする)。手元で 6 像の `PPCKERN.ELF` の sha256 が前後で同じ。`ppc-selected` の `C_KERNEL` (177 本)・`GAS_KERNEL` が前後で同じ (段の前の値を同じ fixture に固定する。今の `test_build_selection.py:29-41`・`test_ppc_selection.py` がそのまま通る)。
   - `tools/tests/test_remote_x9.py:45` (`ppc-kboot.mk` の本文に `kernel/console/con_sink.c` があること) は、`select.mk` から引いた `kboot-link-sh` の `C_KERNEL` に在ることに書き換える。
   - CI: check (ppc-compile・ppc-qemu)・build。
-- 触るファイル: `build/images/*.mk` (7)、`build/sources/common.mk`・`order.mk`、`build/select.mk`、`build/features/pc98-devices.mk`、`build/platform/pc98.mk`・`powermac.mk`、`build/arch/ppc-sources.mk`、`build/kernel-objects.mk`、`build/targets/x86-pc98.mk`、`build/ppc-kboot.mk`、`tools/tests/test_build_selection.py`・`test_remote_x9.py`・`fixtures/build_profile_ppc.json`、`tools/check_arm_compile.py` (`KSTRING_C_SRC` の前提が変わらないことを確かめるだけ)。
+- 触るファイル: `build/images/*.mk` (7)、`build/sources/common.mk`・`order.mk`、`build/select.mk`、`build/features/pc98-devices.mk`、`build/platform/pc98.mk`・`powermac.mk`、`build/arch/ppc-sources.mk`、`build/kernel-objects.mk`、`build/ppc-kboot.mk`、`tools/tests/test_build_selection.py`・`test_remote_x9.py`・`fixtures/build_profile_ppc.json`、`tools/check_arm_compile.py` は触らない (`KSTRING_C_SRC` の前提は同じ。`config.mk` だけの問い合わせの対象集合には、`kernel-objects.mk` が後から足していた `tsc_math.c`・`tsc_clock.c`・`rx_work.c` の 3 本が増え、実際の `C_KERNEL` と同じになる)。`build/ppc-kboot.mk` の .o と `PPCKERN.ELF` は、一覧と順を持つ .mk (`KB_SELECT_MK`) を前提に持つ (一覧を変えたら組み直される)。
 
 ### 段 1b — compile だけの計測を消し、`make ARCH=ppc` を製品の入口にする
 

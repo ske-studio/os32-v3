@@ -110,7 +110,7 @@ clean-deps:
 .PHONY: all clean clean-deps
 
 
-ifneq ($(filter 0,$(foreach feature,$(LEGACY_FEATURE_VARIABLES),$($(feature)))),)
+ifneq ($(filter 0,$(foreach feature,$(KNOWN_FEATURE_VARIABLES),$($(feature)))),)
 ifneq ($(filter-out kernel-compile,$(MAKECMDGOALS)),)
 $(error 非搭載サービス未実装: use kernel-compile for feature-off configurations)
 endif

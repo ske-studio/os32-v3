@@ -143,7 +143,7 @@ $(file >$(TARGET_STAMP),$(ARCH)-$(PLATFORM))
 endif
 
 SELECTION_STAMP = $(BUILD_OUT)/config/selection.flags
-$(SELECTION_STAMP): private BUILD_OPTION = $(ARCH)-$(PLATFORM) $(CC) $(KERNEL_CFLAGS) $(foreach feature,$(KNOWN_FEATURE_VARIABLES),$(feature)=$($(feature)))
+$(SELECTION_STAMP): private BUILD_OPTION = $(ARCH)-$(PLATFORM) IMAGE=$(IMAGE) $(CC) $(KERNEL_CFLAGS) $(foreach feature,$(KNOWN_FEATURE_VARIABLES),$(feature)=$($(feature)))
 $(SELECTION_STAMP): .FORCE
 	@mkdir -p $(@D)
 	@printf '%s\n' '$(BUILD_OPTION)' > $@.tmp

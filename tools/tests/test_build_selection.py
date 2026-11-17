@@ -44,7 +44,8 @@ def check(root):
     assert not any(path in name for name in off['C_KERNEL'] for path in
                    ('kernel/v86/', 'arch/x86/legacy/', 'platform/pc98/legacy/'))
     assert not any('geforce/' in name for name in off['C_KERNEL'])
-    for assignments in (['FEATURE_UNKNOWN=1'], ['ARCH=ppc','PLATFORM=powermac','FEATURE_V86=1'], ['FEATURE_KDEBUG=0']):
+    for assignments in (['FEATURE_UNKNOWN=1'], ['ARCH=ppc','PLATFORM=powermac','FEATURE_V86=1'], ['FEATURE_KDEBUG=0'],
+                        ['FEATURE_LINK=0'], ['IMAGE=kboot-link'], ['IMAGE=unknown']):
         try:
             query(root, assignments, config_only=True)
         except subprocess.CalledProcessError:
@@ -145,7 +146,7 @@ if __name__ == '__main__':
                     ('build/sources/common.mk', 'C_COMMON_CLI = kernel/cli/resident_cli.c',
                      'C_COMMON_CLI = kernel/cli/resident_cli.c kernel/cli/unordered.c',
                      subprocess.CalledProcessError, 'kboot source without link order'),
-                    ('build/images/kboot-link.mk', 'FEATURE_LINK ?= 1', 'FEATURE_LINK ?= 0',
+                    ('build/images/kboot-link.mk', 'FEATURE_LINK = 1', 'FEATURE_LINK = 0',
                      AssertionError, 'kboot image feature value'),
                     ('build/images/ppc-selected.mk', ' net/nic.c', '',
                      AssertionError, 'gauge image exclusion')):

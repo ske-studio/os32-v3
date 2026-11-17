@@ -144,11 +144,14 @@ def selection(tmp, mutate):
         assert 'link_profile.h' not in plain.splitlines()[0]
         rejected=subprocess.run(['make','-s','-f',str(path),'KBOOT_SHELL=1','KBOOT_LINK=1','-n'],cwd=ROOT,capture_output=True)
         assert rejected.returncode!=0
+        # The flags are the only image selector here: command-line features or IMAGE must not disagree with KB_OUT.
+        for override in ('FEATURE_LINK=0','IMAGE=kboot-core'):
+            assert subprocess.run(['make','-s','-f',str(path),'KBOOT_SH=1',override,'-n'],cwd=ROOT,capture_output=True).returncode!=0
     check(original)
     # Explicit legacy selections must also survive the future link default.
     check(original.replace('KBOOT_LINK ?= 0', 'KBOOT_LINK ?= 1'))
     if mutate:
-        for old,new in [('link-sh,link','link,link'),('KB_SH_OUT := build/out/ppc-user$(if $(filter 1,$(KBOOT_LINK)),/link-sh)','KB_SH_OUT := build/out/ppc-user'),('ifeq ($(KBOOT_LINK),1)\nKB_C += platform/powermac/hostfs_link_io.c','ifneq ($(KBOOT_LINK),1)\nKB_C += platform/powermac/hostfs_link_io.c'),(' PPC_SH_PROFILE=userland/ppc/sh/link_profile.h',' ')]:
+        for old,new in [('link-sh,link','link,link'),('KB_SH_OUT := build/out/ppc-user$(if $(filter 1,$(KBOOT_LINK)),/link-sh)','KB_SH_OUT := build/out/ppc-user'),('KB_C := $(C_KERNEL)','KB_C := $(filter-out platform/powermac/hostfs_link_io.c,$(C_KERNEL)) platform/powermac/hostfs_io.c'),(' PPC_SH_PROFILE=userland/ppc/sh/link_profile.h',' ')]:
             assert original.count(old)==1
             try: check(original.replace(old,new))
             except AssertionError: print('RED selection',old)
