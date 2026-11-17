@@ -1,4 +1,5 @@
 #include "boot_token.h"
+#include "kernel_start.h"
 #include "legacy_guest.h"
 /* ============================================================
  * kernel.c — PC-9801 32ビットOS カーネル
@@ -124,9 +125,22 @@ static void kernel_boot_serial(void);
 static inline void kernel_shell_loop(void);
 static inline void kernel_mount_children(const char *root_dev);
 
+/* ローダからの受け渡し (kentry.asm が cdecl で渡す)。局面 1 が読む。 */
+static u32 handoff_mem_kb, handoff_boot_drive;
+
 void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
 {
-    struct boot_context boot;
+    handoff_mem_kb = mem_kb;
+    handoff_boot_drive = boot_drive;
+    kernel_start();
+}
+
+/* 局面 1 (割り込み禁止): 機器・CPU・メモリ・root のマウント・部品・exec。 */
+void platform_boot_machine(void)
+{
+    static struct boot_context boot;
+    u32 mem_kb = handoff_mem_kb;
+    u32 boot_drive = handoff_boot_drive;
 
     kstack_hw_init();
     pc98_boot_bind(&boot, boot_drive);
@@ -256,7 +270,11 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
 
     /* File-backed settings/FEP I/O needs IRQs; no application exists yet. */
     tvram_print(71, 2, "IRQ_EN", TATTR_YELLOW);
-    _enable();
+}
+
+/* 局面 2 (割り込み有効): サービス・スプラッシュ・表示の準備・共有ライブラリ・起動のログ。 */
+void platform_boot_services(void)
+{
     services_boot();
     double_fault_test();
 
@@ -297,13 +315,12 @@ void __cdecl kernel_main(u32 mem_kb, u32 boot_drive)
      * exec する直前。溜めるのはここまで (以後の出力は入らない)。ルートが
      * ext2 / FAT でなければ書かない。どこで失敗しても起動は続ける。 */
     bootlog_save();
+}
 
+/* 局面 3: 常駐シェルの起動ループ。戻らない (戻ったら kernel_start が停止する)。 */
+void platform_boot_run(void)
+{
     kernel_shell_loop();
-
-    /* 失敗時フォールバック */
-    for (;;) {
-        _halt();
-    }
 }
 
 #include "kernel_boot_cpu.inc"

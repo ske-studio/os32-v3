@@ -1,6 +1,7 @@
 /* D3 link-only H2/fatal providers; all boot/MMU/mm implementations are product. */
 #include "kernel_boot.h"
 #include "kboot_info.h"
+#include "kernel_start.h"
 #include "ppc_trap.h"
 #include "ppc_oea.h"
 #include "ofw.h"
@@ -29,7 +30,7 @@ void ppc_trap_fatal_sink(const struct ppc_frame *f, u32 reason)
     if (f->dar != (BOOT_NEGATIVE == 1 ? 0x80000U : 0x1000000U)) fixture_fail();
     say("FATAL:DSI\r\n"); fixture_done();
 }
-void ppc_kernel_main(void)
+void kernel_start(void)
 {
     u32 msr;
     __asm__ volatile("mfmsr %0" : "=r"(msr));

@@ -43,10 +43,8 @@ bootinfo_report は BIOS 行→IDENTIFY 行（BOOTINFO_NDRIVES=2）の順・書�
 
 ## 索引
 
-- [platform/pc98/boot_platform.c](boot_platform.md)
 - [bootlog.md](bootlog.md)
-- [platform/pc98/kernel.c](kernel.md)
-- [kernel_gfx_config.md](kernel_gfx_config.md)
+- [kernel_start.md](kernel_start.md)
 - [sysconfig.md](sysconfig.md)
 
 ### boot_splash

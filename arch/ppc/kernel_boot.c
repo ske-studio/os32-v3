@@ -3,6 +3,7 @@
  * Static MMIO slots belong to the platform, outside the device ledger. */
 #include "kernel_entry.h"
 #include "kernel_boot.h"
+#include "kernel_start.h"
 #include "ppc_trap.h"
 #include "ppc_hpt.h"
 #include "ppc_oea.h"
@@ -240,7 +241,7 @@ void ppc_kernel_real_start(const struct pm_kboot_info *info)
     if (memory_boot_detect(PPC_BOOT_MEM_KB) != PPC_BOOT_MEM_KB) ppc_stop();
     paging_init(PPC_BOOT_MEM_KB);
     arch_boot_after_paging();
-    ppc_kernel_main();
+    kernel_start();
 }
 
 static void plan_gmac(const struct pm_kboot_info *info)

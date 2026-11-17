@@ -54,5 +54,4 @@ enum pm_kboot_reserve_result {
 };
 int pm_kboot_reserve(struct pm_kboot_info *info);
 void pm_kernel_takeover(const struct pm_kboot_info *) __attribute__((noreturn));
-void ppc_kernel_main(void) __attribute__((noreturn));
 #endif

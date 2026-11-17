@@ -1,7 +1,8 @@
 #include "boot_token.h"
 /* PowerPC core-ready init (milestone 2, PPC_KBOOT_DESIGN sections 2 and 4).
  *
- * Entered from arch/ppc/kernel_boot.c with IR=DR=1, EE=0, plan-D paging live
+ * Entered through init/kernel_start.c (the common three-phase skeleton) from
+ * arch/ppc/kernel_boot.c with IR=DR=1, EE=0, plan-D paging live
  * and the ESCC/MPIC I/G aliases mapped. Brings the common mm online, proves
  * trap/guard/flush, MPIC delivery and the 1 kHz decrementer with real
  * operations, then idles with EE=1. The nine KBOOT lines are the acceptance
@@ -14,6 +15,7 @@
 #include "memmap.h"
 #include "kprintf.h"
 #include "kernel_boot.h"
+#include "kernel_start.h"
 #include "kernel_probe.h"
 #include "kboot_info.h"
 #include "kboot_log.h"
@@ -176,7 +178,13 @@ static void rh_phy_notify(const struct gem_phy_sample *p, int rc)
     pm_rh_phy(p->port, p->addr, p->id1, p->id2);
 }
 
-void ppc_kernel_main(void)
+static int lan_log_rc;
+#if KBOOT_SHELL || KBOOT_SH
+static int root_ready;
+#endif
+
+/* 局面 1 (EE=0): ログ・共通の mm・トラップの実証・時計・MPIC。 */
+void platform_boot_machine(void)
 {
     const struct ppc_boot_devices *dev = ppc_boot_devices();
     const struct pm_kboot_info *info = ppc_boot_info();
@@ -191,7 +199,7 @@ void ppc_kernel_main(void)
 #if KBOOT_SHELL || KBOOT_SH
     pm_console_stream_init();
 #endif
-    int lan_log_rc = pm_lan_log_register();
+    lan_log_rc = pm_lan_log_register();
 
     unsigned long long ram = 0;
     for (u32 i = 0; i < info->ram.count; i++) ram += info->ram.v[i].size;
@@ -278,7 +286,13 @@ void ppc_kernel_main(void)
     if (pm_mpic_init(dev->mpic_va, dev->mpic_bytes, dev->mpic_order) != PM_MPIC_INIT_OK)
         kboot_stop("mpic_init");
     pm_mpic_set_ipi_handler(ipi_handler);
-    ppc_enable();
+}
+
+/* 局面 2 (EE=1): MPIC の配送と時計の実証・LAN・root・コンソール・入力。 */
+void platform_boot_services(void)
+{
+    const struct ppc_boot_devices *dev = ppc_boot_devices();
+    const struct pm_kboot_info *info = ppc_boot_info();
     int delivered = pm_mpic_send_self_ipi(0) &&     /* 1 = sent */
                     wait_until(&ipi_seen, 1, info->tb_hz, 200) &&
                     pm_mpic_send_self_ipi(0) &&
@@ -402,6 +416,16 @@ void ppc_kernel_main(void)
         if (work_rc) kprintf(KBOOT_ATTR, "TERMINAL WORK error rc=%d\r\n", work_rc);
         pm_input_boot();
 #endif
+        root_ready = 1;
+    }
+#endif
+}
+
+/* 局面 3: exec の用意と常駐シェル。シェルが無い像・root が無い時は LAN の poll で居続ける。 */
+void platform_boot_run(void)
+{
+#if KBOOT_SHELL || KBOOT_SH
+    if (root_ready) {
         pm_exec_boot();
 #if KBOOT_SH
         pm_shell_boot();
