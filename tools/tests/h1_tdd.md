@@ -1,7 +1,9 @@
 # H1 ホスト TDD の記録 (hsync の同サイズ更新の検出)
 
-票 `docs/archive/shell/HSYNC_IMPROVEMENT_PLAN.md`
-§8 の H1 行 / §9 の A01〜A13。実行:
+契約: [hsync_compare](../../docs/design/userland/system/hsync_compare.md) (判定順・比較・検証・範囲と経路) /
+[hostdrv_stat_rules](../../docs/design/drivers/hostdrv/hostdrv_stat_rules.md) (HostDrv の stat) /
+[hostdrv_list_rules](../../docs/design/drivers/hostdrv/hostdrv_list_rules.md) (列挙) /
+[vfs_path_kind](../../docs/design/fs/vfs_path_kind.md)。出所は票 H1 (HSYNC_IMPROVEMENT_PLAN の受入 A01〜A13)。実行:
 
 ```
 python3 -B tools/tests/test_hsync_h1.py [--target]

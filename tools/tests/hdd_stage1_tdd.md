@@ -1,6 +1,8 @@
 # HDD の一時置き場 (段 1) — RED→GREEN の記録
 
-- 票: `docs/archive/realhw_v21/TASK_HDD_INSTALL.md` 段 1 / §1-v3 (N3〜N7、R3-1)
+- 契約: `docs/design/fs/pc98pt.md`・`docs/design/drivers/ata/ide_addr.md`・`docs/design/fs/ext2/ext2_layout.md`・
+  `docs/design/fs/ext2/ext2_fmt.md`・`docs/design/fs/ext2/ext2_super.md`「区画の探索とマウントの範囲」・
+  `docs/design/userland/shell/hdprep_plan.md`、migrate-pt は `docs/08_build.md` §8-4 の「v64 の区画表の移行」
 - 実行: `python3 -B tools/tests/test_hdd_stage1.py --target --mutate` (`make check-hdd-stage1-host`)
 - ハーネス: `tools/tests/hdd_stage1_host.c` (純粋関数、ホスト 64 ビット + libc)、
   `tools/tests/ext2_part_host.c` (ext2 の区画探索と format_at、ILP32 -nostdlib)
@@ -20,7 +22,7 @@
 
 ## 2. RED
 
-- 新しい純粋関数 (`pc98pt.c` / `ide_addr.c` / `ext2_layout.c` / `hdprep_plan.c`) はこの票で作った。
+- 新しい純粋関数 (`pc98pt.c` / `ide_addr.c` / `ext2_layout.c` / `hdprep_plan.c`) は TASK_HDD_INSTALL 段 1 で作った。
   **実装と試験は同じ作業の中で書いた (試験先行ではない)**。試験が実装の誤りを捕まえることは
   §3 の変異 (各判定を 1 つずつ外す・旧動作に戻す) で確かめた。
 - 旧動作は**変異で再現して RED を確かめた** (関数の形が変わったので HEAD のソースを

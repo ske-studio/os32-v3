@@ -32,3 +32,25 @@ VFS close から backend への通知は増やさない。
   名前と拡張子を別配列で扱うコードでは各配列を独立して参照する。
   現行の列挙は FatFs が返す `fno.fname` を VFS 名へ写す (`fs/fat/fatfs_vfs.c`)。
   過去の固定長構造を現行 FatFs の契約とみなさない。直接の配列境界回帰は未確認。
+
+## 「在るか」を問う入口の誤りの写像 (`ff_stat_to_vfs`)
+
+> 出所: TASK_S3 (S3-K) の契約を今のソースと照らして要約
+
+- `ffconf.h` は `FF_USE_LFN 0` なので、8.3 に収まらない名前 (例 `settings.db-journal`) は `f_stat` が `FR_INVALID_NAME` を返す。そのボリュームに存在しえない名前は stat の意味では「存在しない」。
+- `fatfs_vfs_stat`・`fatfs_vfs_get_size` (と `fatfs_vfs_rmdir` の種別の確認) だけが `ff_stat_to_vfs` を通し、`FR_INVALID_NAME` を `VFS_ERR_NOTFOUND` に写す。他は `ff_to_vfs` のまま (`FR_NO_FILE`・`FR_NO_PATH` は NOTFOUND、`FR_DISK_ERR`・`FR_NOT_READY`・`FR_NO_FILESYSTEM` は `VFS_ERR_IO`。I/O の障害を不存在にしない)。
+- open・read・write・stream・unlink・mkdir・rename・list の `FR_INVALID_NAME` は `VFS_ERR_INVAL` のまま (呼び手が不正な名前を渡した、という診断を潰さない)。
+- 理由: KAPI の `db_open_existing` は hot journal の有無を `vfs_stat("<db>-journal")` で見て NOTFOUND 以外を IOERR と断じる。INVAL のままだと FDD ブート (root = FAT) で `/etc/settings.db` を開けない。
+- stat の成功時は `st_size` と `st_mode` (通常 `0100644`・`AM_DIR` は `0040755`・`AM_RDO` は `0100444`) を埋める。`buf == NULL` は `VFS_ERR_INVAL`。
+
+## 列挙の誤りの伝播 (`fatfs_vfs_list`)
+
+> 出所: TASK_S3I2 (S3I2-K) の契約を今のソースと照らして要約
+
+- 列挙の途中で `f_readdir` が失敗したら、そこで打ち切って `ff_to_vfs` の **負** を返す。それまでに callback へ渡した項目は取り消さない (呼び手は負を見て全体を捨てる)。終端 (`fno.fname[0] == '\0'`) は成功で、空のディレクトリは 0 件で `VFS_OK`。
+- `f_closedir` は成功でも打ち切りでも 1 回呼ぶ。`f_opendir` の失敗は負を返し、開けていない物を閉じない。
+- `vfs_ls` は `list_dir` の戻りをそのまま返すので、`sys_ls` の呼び手 (`install` の `copy_directory` など) に負が届く。
+
+## 検査
+
+`vfs-mount-dev-host` の中の `tools/tests/test_fatfs_stat.py` (本体 `tools/tests/fatfs_stat_host.c`)。実物の `fs/fat/fatfs_vfs.c` を `#include` し、FatFs の関数だけを贋物にする (`f_stat` は次の `FRESULT` を返す、`f_readdir` は台本を 1 段ずつ返す)。stat の写像 7 件と列挙 4 件。実 FatFs が 8.3 に収まらない名前で `FR_INVALID_NAME` を返すことは贋物で仮定している。

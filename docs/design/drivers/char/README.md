@@ -17,3 +17,5 @@ static void pc98_read_date(ClockDate *d) {
 - RTCのBCD・ビット送受信・2桁年補正はdriver内。read_legacy=rtc_readで7Bの旧ABIを厳密維持。
 
 - `const ClockOps pc98_clock = { pc98_read_date, rtc_read };` はdrivers/char/rtc.cに置き、platformはexternの表を登録する（static adapterをファイル外から参照しない）。
+
+- [serial_plan](serial_plan.md)

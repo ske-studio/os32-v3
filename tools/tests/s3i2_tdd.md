@@ -1,6 +1,9 @@
 # S3I2 — FDD からの新規インストール (lz4 + `/boot`) と使い捨て NHD の道具のホスト TDD 記録
 
-票: `docs/archive/settings/TASK_S3I2.md`。
+票: TASK_S3I2。
+契約の正典は `docs/design/userland/system/install.md` (I)、`docs/design/tools/np21w_ini.md`・
+`docs/design/tools/np21w_trial.md`・`docs/design/tools/mk_blank_nhd.md` (T)、
+`docs/design/fs/fat/fatfs_vfs.md` の「列挙の誤りの伝播」(K)。
 
 3 票 (S3I2-I / S3I2-T / S3I2-K) が同じファイルに書くので、節を票ごとに分ける。
 **自分の節だけ**を書き、他の節には触れないこと。

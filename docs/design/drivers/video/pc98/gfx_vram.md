@@ -27,3 +27,12 @@ present_bytes は `_flush_dirty_queue` で実転送量を数える。
 同期失敗 / IF=0 / 予算違反・再初期化を確認する。各変更の省略と120µs復活は
 コンパイル成功後の実行時 RED で検出する。実測の行位置・3 秒間の commits 差は
 NP21/W、実機の位相と I/O 予算は PM の受入で確認する。
+
+## KAPI 引数の範囲
+
+> 出所: TASK_T2D_T2H (T2e の KAPI の範囲検査の欠落の修正) の契約を今のソースと照らして要約 (2026-11-18)
+
+- `gfx_add_dirty_rect` は登録の前に `gfx_clip_screen` で画面 (幅 640・現在の高さ) へ切り、画面の外なら登録しない。巨大な矩形も画面の中に収まる。
+- `gfx_present_raster` は表の `count` が 0 以下または `GFX_RASTER_MAX_ENTRIES` を超えれば転送も表の再生もせず、初回提示の診断だけ通って戻る (負の count で表の外を読まない)。
+
+検査は `tools/tests/test_kapi_bounds.py`。

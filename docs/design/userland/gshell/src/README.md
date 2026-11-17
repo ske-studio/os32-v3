@@ -134,3 +134,4 @@ PIT 10ms 粒度。
 - [ring.rs](ring.md)
 - [input.rs](input.md)
 - [fep.rs](fep.md)
+- [settings](settings.md)

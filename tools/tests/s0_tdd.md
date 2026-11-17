@@ -1,7 +1,10 @@
 # S0 — 設定レジストリ基盤のホスト TDD 記録
 
-票: `docs/archive/settings/TASK_S0.md`、
-契約の正典は `docs/archive/settings/S0_FOUNDATION.md`。
+票: TASK_S0。契約は設計書にある: 設定レジストリの全体の約束は
+`docs/design/userland/lib/cfg/libos32cfg.md` の「設定レジストリの全体の約束」、
+K は `docs/design/kapi/kapi_db.md` の「v50 の口」、D は `docs/design/tools/deploy_protect.md` と
+`docs/design/userland/system/hsync_protect.md` の「settings.db の保護」、T は
+`docs/design/tools/mk_settings_db.md` と `docs/design/tools/mkpkg.md`。
 
 3 票 (S0-K / S0-D / S0-T) が同じファイルに書くので、節を票ごとに分ける。
 **自分の節だけ**を書き、他の節には触れないこと。
@@ -218,7 +221,7 @@ non-blocker: `sync-from-hostdrv` は宛先の NHD だけでなく **source の H
 
 | # | 反例 | 試験 |
 |---|---|---|
-| 1 | `hsync` が `g_errors > 0` でも最終行を `Done: 1 copied, 0 skipped, 1 errors, 0 protected` と出していた。終了コードは 1 で正しいが、コードを見ない目には成功に読める (「失敗時に成功表示へ進めない」、FOUNDATION §5) | `hsync_protect_host.c` の「最終行のラベル」3 件。純関数 `hsp_final_label(errors)` に出し、`errors` があれば `FAILED:`、無ければ `Done:`。**件数はそのまま**出す。色も失敗時は赤 |
+| 1 | `hsync` が `g_errors > 0` でも最終行を `Done: 1 copied, 0 skipped, 1 errors, 0 protected` と出していた。終了コードは 1 で正しいが、コードを見ない目には成功に読める (「失敗時に成功表示へ進めない」、`docs/design/userland/system/hsync_protect.md` の「settings.db の保護」) | `hsync_protect_host.c` の「最終行のラベル」3 件。純関数 `hsp_final_label(errors)` に出し、`errors` があれば `FAILED:`、無ければ `Done:`。**件数はそのまま**出す。色も失敗時は赤 |
 
 ```
 RED  : hsync_protect_host.c がコンパイルできない (hsp_final_label が無い)。
@@ -272,7 +275,7 @@ symlink が無い」とは言えなくなった (§D.5 に同じ注記)。
 `assets/settings/defaults.tsv` (初期値の正典)、`tools/mk_settings_db.py` (tsv → DB)、
 `build/assets.mk` / `build/image.mk` / `build/core_packages.yaml` (ビルド統合と媒体添付)、
 `tools/mkpkg.py` (登録ファイルの欠損をエラーに) だけ。生成 DB は媒体 (FDD / CD) だけが持ち、
-既存システムには tsv を通常配備する (TASK_S0 §3)。カーネル・KAPI・配備スクリプトは触らない。
+既存システムには tsv を通常配備する (`docs/design/tools/mk_settings_db.md` の「初期値の正典と置き場」)。カーネル・KAPI・配備スクリプトは触らない。
 
 試験: `python3 -B tools/tests/test_mk_settings_db.py` (45 件)。ホストのみ。エミュレータ・配備・`make`
 (dry-run `-n` を除く) は実行していない。
@@ -348,7 +351,7 @@ type / int の字句 / text 255B / blob の hex) と境界値の受理、`RealDe
 - 新規インストールでの seed (FDD の `install.bin` が `/kernel.bin` を要求する既存不整合、B10) は
   S3 の受入。本票では「媒体に入っている」までしか言えない。
 
-票 `docs/archive/settings/TASK_S0.md`。
+票 TASK_S0。
 本書は **S0-K (KAPI v50 / `shm_write_row` の境界 / exec 回収順序)** 分。
 S0-D (配備保護) と S0-T (初期値 tsv) は別票が同じファイルに節を足す。
 
@@ -422,7 +425,6 @@ python3 -B tools/tests/test_db_errstr.py
 | # | blocker | ケース | RED |
 |---|---|---|---|
 | B1 | 末尾判定が SQLite のトークナイザと一致しない | `sql_tail_sqlite` | 往復 1 の自前判定に戻す → `FAIL sql_tail_sqlite:766: kapi_db_prepare_only(h, "SELECT 1; \v") == 0` |
-| B2 | 入力検証で拒否すると旧 stmt が bind 可能なまま残る | `prepare_replaces` | finalize を引数検証の後ろへ戻す → `FAIL prepare_replaces:829: kapi_db_column_int(h, 0) == 0` (拒否された prepare の後の step が前の INSERT を実行) |
 | B3 | 列値の実体化が失敗しても欠落 ROW を成功で返す | `materialize_fail` | 長さだけ見る形に戻す → `FAIL materialize_fail:879: kapi_db_step(h) == DB_STATUS_ERROR` |
 | B4 | journal 名の容量検査に cwd が含まれない | `resolve_len` | 解決をやめて入力名のまま検査する → `FAIL resolve_len:948: kapi_db_error_code(-1) == SQLITE_CANTOPEN` (251B の cwd で journal 名が切り詰められ本体に当たり `BUSY_RECOVERY`) |
 
@@ -609,7 +611,7 @@ NULL / `p + len` の overflow / **各ページが `ring3_ptr_ok` の許可帯**�
 許可帯の中の非 present ページ (guard / 未マップ sbrk) をカーネルが写すと
 #PF になるが、それは既存のフォールトガード (`ring3_in_syscall`) が呼び手を
 kill する — `kprintf` の可変長 `%s` など他の KAPI と同じ既定の扱いで、
-カーネルの整合は保たれる。契約 (FOUNDATION §2-6 の「untrusted pointer /
+カーネルの整合は保たれる。契約 (`docs/design/kapi/kapi_db.md` の「v50 の口」、当時の「untrusted pointer /
 長さ / 境界を CPL3 経路で検証」) は帯 + 長さで満たす。
 票 §1a と K2 の「guard をまたぐ範囲が -1」は **「kill される」** に改めた
 (同じプロセスでは踏めないので K2 からは外した)。
@@ -650,7 +652,7 @@ AS では、アプリ PT の物理番地がアプリ PD の下で**別の物理*
 | `path_len` | `<path>-journal` が `VFS_MAX_PATH` に収まる 247B は開ける、248B は本体があっても `CANTOPEN` |
 | `transient` | 同じスクラッチを 2 本目の bind で上書きしてから step しても 1 本目の値が残る (`SQLITE_TRANSIENT`) |
 | `sql_tail_sqlite` | SQLite が受理する末尾 (`; \v` / BOM / `-- c` / `/* c */` / `;;` / `\f\r\n\t`) は通り、読めない末尾 (`/*` 未閉じ、先頭 `\v`) と 2 本目の statement は拒否。拒否のあと stmt が残らない |
-| `prepare_replaces` | 空 SQL / 上限超過 / NULL / tail あり のどれで拒否しても旧 stmt は消えており、続く `db_step` は DONE で**何も実行しない** |
+| `prepare_replaces` | 空 SQL / NULL / 上限超過の入力を拒否した時は、slot と SHM を何も変えない (拒否の前後で一致)。旧 stmt と bind 済みの値は残り、続く `db_step` は前の文を実行して DONE (bind した 42 が入る)。上限ちょうどの入力は通る (`docs/design/kapi/kapi_db.md` の「`db_prepare_only`」) |
 | `materialize_fail` | (a) 収まる BLOB は取れる (b) accessor が値を返せないとき ERROR + `NOMEM` + 部分 ROW なし + stmt は生存 (c) MEMSYS5 を締めて step 側で落ちても同じく部分 ROW なし |
 | `resolve_len` | (a) cwd 251B で journal 名が切り詰められ本体に衝突する形でも `CANTOPEN` (b) 解決名 248B は `CANTOPEN` (c) 247B は開ける (d) SQLite には解決後の絶対名だけが渡る |
 | `resolve_truncate` | 模型が実物と同じ順序で `/tmp/b` に化けることを見せたうえで、その入力が `CANTOPEN` で断られる。絶対名の 255 文字 / 256 文字の境界、短い相対名は従来どおり通る |

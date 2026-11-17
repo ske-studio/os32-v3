@@ -131,3 +131,11 @@ map の LOAD 一覧・各 .o の size・最終 ELF・KMOD header を照合する
 - [tools/osri_enc2](osri_enc2.md)
 
 - [tools/raster_splash_asset](raster_splash_asset.md)
+- [deploy_protect](deploy_protect.md)
+- [gui_gate](gui_gate.md)
+- [mk_blank_nhd](mk_blank_nhd.md)
+- [mk_settings_db](mk_settings_db.md)
+- [mkpkg](mkpkg.md)
+- [np21w_ini](np21w_ini.md)
+- [np21w_trial](np21w_trial.md)
+- [check_nano_inputs](check_nano_inputs.md)

@@ -1,8 +1,9 @@
 # S3 — リカバリ (`install --recover-settings`) と `cfg import` のホスト TDD 記録
 
-票: `docs/archive/settings/TASK_S3.md`、
-契約の正典は `docs/archive/settings/S0_FOUNDATION.md` §6
-(明示リカバリ契約) と `docs/archive/settings/TASK_S0.md` §D (配備保護)。
+票: TASK_S3。
+契約の正典は `docs/design/userland/system/install_recover.md` (明示リカバリ契約)、
+`docs/design/userland/lib/cfg/cfg_import.md`・`docs/design/userland/lib/cfg/cfg_json.md` (`cfg import`)、
+`docs/design/tools/deploy_protect.md` (配備保護)、`docs/design/fs/fat/fatfs_vfs.md` (FAT の stat と列挙)。
 
 3 票 (S3-I / S3-C / S3-D) が同じファイルに書くので、節を票ごとに分ける。
 **自分の節だけ**を書き、他の節には触れないこと。
@@ -157,10 +158,11 @@ symlink / hardlink の別名は `S3RecoveryJudgement` の 3 件が判定その�
 
 # S3 — リカバリのホスト TDD 記録
 
-票: `docs/archive/settings/TASK_S3.md` 第 5 版。
-契約の正典は `docs/archive/settings/S0_FOUNDATION.md` §6
-(明示リカバリ契約)、`docs/archive/settings/TASK_S2.md` §1-1 (b) の meta 検査 SQL と
-§1-7 (f) の rename 両名検査、`docs/archive/settings/TASK_S0.md` (配備保護)。
+票: TASK_S3。
+契約の正典は `docs/design/userland/system/install_recover.md` (明示リカバリ契約)、
+`docs/design/userland/lib/cfg/libos32cfg.md` の「schema の検査」(meta 検査 SQL) と
+`docs/design/userland/lib/cfg/cfg_init.md` の「rename の後の両名検査」、
+`docs/design/tools/deploy_protect.md` (配備保護)。
 
 ---
 
@@ -628,7 +630,7 @@ jr.val_b64` と `ran("import", "/b64.json", "--scope", "gshell", NULL) == 0`)。
 
 ## K-4. `fatfs_vfs_list` の列挙エラー伝播 (票 S3I2-K) — 2026-09-14
 
-> 票 (`docs/archive/settings/TASK_S3I2.md` §0) が指した「§K-3」。この文書には S3-K の
+> 票 TASK_S3I2 が指した「§K-3」。この文書には S3-K の
 > `## K-3. この試験が言えないこと ([V4])` が既にあるので、既存節を消さずに番号をずらした。
 
 ### K-4.0 何を直したか、なぜ要るか

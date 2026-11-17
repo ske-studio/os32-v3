@@ -1,6 +1,7 @@
 # T2e e6 — C SDK checked attach と互換 void 橋
 
-票: `docs/archive/v3/TASK_T2D_T2H.md` §2 e6。
+契約: `docs/design/userland/lib/gfx/libos32gfx_core.md` の「checked attach と帰路の照合」・
+`docs/design/gfx/gfx_core_bridge.md` (出所は票 TASK_T2D_T2H §2 e6)。
 
 対象: `test_gfx_attach.py` / `gfx_attach_host.c`。正常対照は指定された全
 HOST32_RUNNERS、変異は先頭 runner。kernel/query/lease/ledger/paging/3 backend と

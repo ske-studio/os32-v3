@@ -1,7 +1,8 @@
 # S5-C — `cfg_bench` と `cfg status` の pool 表示のホスト TDD 記録
 
-票: `docs/archive/settings/TASK_S5.md` 第 1 版 §0 の **S5-C**。
-契約の正典は `docs/archive/settings/S0_FOUNDATION.md` §2、
+票: TASK_S5 第 1 版 §0 の **S5-C**。
+契約の正典は `docs/design/userland/tests/cfg_bench.md`、`docs/design/userland/cmds/cfg.md` の「`status` の pool」、
+`docs/design/userland/lib/cfg/libos32cfg.md` の「設定レジストリの全体の約束」、
 [`DESIGN.md`](../../docs/tasks/settings/DESIGN.md) §6 (実測項目)、
 API は `userland/lib/cfg/libos32cfg.h`。RED→GREEN はこの記録が正典。
 

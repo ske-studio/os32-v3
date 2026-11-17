@@ -1,7 +1,8 @@
 # 票 H3 — mtime の取得と保存、日時の前置判定 (ホスト TDD の記録)
 
-- 票: `docs/archive/shell/TASK_H3.md` (とくに §8 = ユーザー決裁 2026-09-15)
-- 設計: `docs/archive/shell/HSYNC_IMPROVEMENT_PLAN.md` §5 / §7.2 / §9
+- 契約: [hsync_compare](../../docs/design/userland/system/hsync_compare.md) (日時の前置判定・mtime の保存・集計) /
+  [hostdrv_stat_rules「時刻」](../../docs/design/drivers/hostdrv/hostdrv_stat_rules.md#時刻-hdrv_filetime_to_unixhdrv_stat_mtime) /
+  [vfs_set_mtime](../../docs/design/fs/vfs_set_mtime.md)。出所は票 TASK_H3 (§8 = 日時の前置判定のユーザー決裁) と HSYNC_IMPROVEMENT_PLAN
 - 基点: `feat/gui` の `d734f54`
 - 実行: `python3 -B tools/tests/test_hsync_h3.py --target --mutate`
   (`make check-hsync-host` が同じものを回す)

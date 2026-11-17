@@ -93,3 +93,13 @@ static int gfx_select_mode(GfxBackend *be, int legacy200);
 確定の B1 の高さの式 (`gfx_started ? gfx_current_height : gfx_backend_mode(be)->height`) は gfx_core.c の static な `gfx_started` を使う
 
 98 の 16 色のバックエンドは init の関数を持たない (gfx_core.c が init=NULL を見て GDC を初期化する)。
+
+## KAPI 引数の範囲 (`gfx/gfx_core_api.inc`・`gfx/gfx_internal.h`)
+
+> 出所: TASK_T2D_T2H (T2e の KAPI の範囲検査の欠落の修正) の契約を今のソースと照らして要約 (2026-11-18)
+
+- `gfx_lease_palette(first, count, rgb)`: `count <= 0`・`first < 0`・rgb が NULL は `OS32_ERR_INVAL`。256 色機 (lease の範囲がある) は `[lease_first, lease_first + lease_count)` の中だけ、16 色機は `first < 16` かつ `count <= 16 - first`。和 (`first + count`) を作ってから比べず、`count <= limit - first` の形で桁あふれを避ける。
+- 矩形のクリップは `gfx_clip_screen` に集める。PEGC・Cirrus の backend (`drivers/video/pc98/backend_pegc.c`・`drivers/video/cirrus/backend_cirrus.c`) と dirty の登録はこれを通し、画面の外の矩形は転送しない・巨大な幅と高さは最終画素へ切る。Cirrus のエンジンへ渡す引数は画面の中に収まる。
+- スクロール量は `gfx/gfx_scroll.c` で現在の高さの剰余にしてから足す (`INT_MIN`・`INT_MAX` でも表示の範囲に収まる)。
+
+検査は `tools/tests/test_kapi_bounds.py` と `tools/tests/test_gfx_bounds.py` (`test_gfx_kernel_fb.py` の 3 backend・台帳・paging の足場を再利用し、PEGC の面の後方 16 B の番兵が変わらないことまで見る)。

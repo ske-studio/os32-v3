@@ -1,6 +1,6 @@
 # cpu_calibrate — RED → GREEN の記録
 
-票: `docs/archive/realhw_v21/TASK_SERIAL_VFAST.md` (往復 3)
+契約: `docs/design/kernel/time/cpu_calibrate.md` (止め方・計算・フォールバック、出所は TASK_SERIAL_VFAST 往復 3)
 対象: `kernel/time/cpu_calibrate_math.c` (止め方と計算) / `kernel/time/cpu_calibrate.c` (計測)
 試験: `tools/tests/test_cpu_calibrate.py` + `tools/tests/cpu_calibrate_host.c`
 実行: `make check-cpu-calibrate-host` (`check-par` の列)
@@ -137,6 +137,6 @@ NP21/W 上の ne2000 / gfx の挙動 (特にスプラッシュ) は PM が見る
 - **実機での校正値そのもの。** 266MHz で `cpu_calib_rounds` ≒ 50 /
   `cpu_calib_ticks` = 5 / `loops_per_tick` が 100 万台後半〜200 万台になるはず、
   という見積もりでしかない。`kernel.map` から読んで確かめる。
-- **シリアルの実効速度が上がったか** (票 S5: 9600 で 900 B/s 以上、
+- **シリアルの実効速度が上がったか** (TASK_SERIAL_VFAST の受入 S5: 9600 で 900 B/s 以上、
   115200 で 8 KB/s 以上)。ここが本題で、実機でしか測れない。
 - **ne2000 / gfx_vram への影響。** 上の表は読みであって実測ではない。

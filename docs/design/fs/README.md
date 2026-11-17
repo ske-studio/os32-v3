@@ -51,3 +51,7 @@ void vfs_device_names_register(const struct vfs_device_name *rows, unsigned n);
 - [fs/isofs/iso9660_media.c](isofs/iso9660_media.md)
 - [fs/serialfs/serialfs_persistent.c](serialfs/serialfs_persistent.md)
 - [fs/serialfs/sfs_block.c](serialfs/sfs_block.md)
+- [pc98pt](pc98pt.md)
+- [vfs_fd_open](vfs_fd_open.md)
+- [vfs_path_kind](vfs_path_kind.md)
+- [vfs_set_mtime](vfs_set_mtime.md)

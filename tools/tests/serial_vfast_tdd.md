@@ -1,6 +1,7 @@
 # serial_vfast — RED → GREEN の記録
 
-票: `docs/archive/realhw_v21/TASK_SERIAL_VFAST.md`
+契約: `docs/design/drivers/char/serial_plan.md` (速度の決め方・FIFO 判定・ビット位置・送信予算)・
+`docs/design/userland/shell/serial_watchdog.md` (番犬と `serial ack`)
 対象: `drivers/char/serial_plan.c` (速度の決め事) / `userland/shell/serial_watchdog.c`
       (切替後の番犬) / `drivers/char/serial.c` `userland/shell/rshell.c` (I/O と配線)
 試験: `tools/tests/test_serial_vfast.py` + `tools/tests/serial_vfast_host.c`
@@ -16,7 +17,7 @@
 実機に出す前に押さえられるのは「決め事」だけなので、決め事を
 `drivers/char/serial_plan.c` に切り出してそこを試験する。I/O を伴う部分
 (`0138h` / `013Ah` を実際に叩く順番、IRQ ハンドラの汲み出し) は
-**実機での確認が要る** (票 §3 の S5 / S6)。ここで緑でも実機合格ではない ([V4])。
+**実機での確認が要る** (TASK_SERIAL_VFAST の受入 S5 / S6)。ここで緑でも実機合格ではない ([V4])。
 
 ## RED
 
@@ -60,12 +61,12 @@ MUTATION 1..9 すべて RED (どれも実行時。コンパイルエラーに逃
 | `vfast_table` | 速度 → `013Ah` bit3-0 の分周。表に無い速度は **0** | `io_rs.md` 352〜380 行 / NP21/W `speedtbl` |
 | `compat_exact` | 2.4576MHz なら 9600=16 / 19200=8 / **38400=count 4 ちょうど** | 実機 Ra266 (TASK_FDC_REALHW §9-1) |
 | `compat_inexact` | **1.9968MHz の 38400 は count 3 → 実効 41600 (+8.3%)**、`exact=0` | `drivers/char/serial.h` の表 |
-| `mode_choice` | V･FAST に入るのは **FIFO 搭載 × 明示指定 × 表にある速度** の 3 つ揃ったときだけ | 票 §2 の決裁 |
-| `tx_budget` | 予算 = 2 × 10 ビット ÷ baud (9600→2083µs / 115200→173µs)、**0 にしない** | 票 §2 |
+| `mode_choice` | V･FAST に入るのは **FIFO 搭載 × 明示指定 × 表にある速度** の 3 つ揃ったときだけ | `docs/design/drivers/char/serial_plan.md` |
+| `tx_budget` | 予算 = 2 × 10 ビット ÷ baud (9600→2083µs / 115200→173µs)、**0 にしない** | `docs/design/drivers/char/serial_plan.md` |
 | `tx_budget_ticks` | **予算は tick で測る**。標準速度は下限の 3 tick (保証 20ms ≥ FTDI の遅延タイマ 16ms)、遅い速度は切り上げ + 境界ずれで伸びる、1 にも 0 にもならない | 往復 3 |
 | `status_bits` | 互換 `0032h` は bit0 TxRDY / bit1 RxRDY、FIFO `0132h` は bit1 TxRDY / bit2 RxRDY | `io_rs.md` 0132h / NP21/W `rs232c_i132` |
 | `fifo_detect` | `0136h` を 2 回読んで bit6 が反転 + bit5 が 0。**0xFF も 0x00 も非搭載へ落ちる** | `io_rs.md` 304〜323 行 |
-| `real_hw_story` | 9600 起動 → `serial 115200` (`013Ah` に 0x81) → `serial 9600` で戻す | 票 §3 |
+| `real_hw_story` | 9600 起動 → `serial 115200` (`013Ah` に 0x81) → `serial 9600` で戻す | TASK_SERIAL_VFAST の受入 S3 / S5 |
 | `refuse_inexact` | **出せない速度を適用しない**: 1.9968MHz の 38400 は拒否、2.4576MHz の 38400 は count 4 で適用、FIFO 無しの 115200 は**どちらのクロックでも**拒否。起動時の 9600 は両クロックで exact = 拒否の分岐を通らない | Codex レビュー blocker 2a |
 | `watchdog` | 切替後 500 tick **`serial ack` が来なければ** REVERT、来れば LINKED、**ack は期限より先に見る**。仕掛かっていないときは印を立てない / 答えは 2 度返らない / arm が印を 0 に戻す / NULL で落ちない / tick の巻き戻りで壊れない | 往復 6 の設計変更 |
 | `watchdog_leave` | **rshell を抜けるとき**: 未確認なら期限前でも REVERT、確認済み・解除済み・仕掛けていない (ローカル CUI の切替) なら何もしない、2 度は戻さない | 往復 5 B3・B4 |
@@ -75,7 +76,7 @@ MUTATION 1..9 すべて RED (どれも実行時。コンパイルエラーに逃
 | 箇所 | 資料 (`io_rs.md`) | NP21/W | 採ったもの |
 |---|---|---|---|
 | `0132h` bit3〜7 | bit5 パリティ / bit4 オーバーラン / bit7 ブレーク / bit3 不明 | bit3 パリティ / bit4 オーバーラン / bit5 フレーミング / bit6 ブレーク (「Vol.2 の記載は誤り」と明記) | **どちらでも共通に立つ bit3〜5 (0x38) をエラーとして見る**。エラーの種別で分岐していないので、これで両方の解釈に耐える |
-| `0132h` への書き込み | 記述なし ([READ] のみ) | `0x132` の out を `0032h` と同じハンドラ `rs232c_o32` に繋ぐ (`rs232c_bind`) | **NP21/W に従う**。資料 `0138h` の関連欄も `0030h` / `0032h` を挙げている。実機で確かめる必要がある (票 S5) |
+| `0132h` への書き込み | 記述なし ([READ] のみ) | `0x132` の out を `0032h` と同じハンドラ `rs232c_o32` に繋ぐ (`rs232c_bind`) | **NP21/W に従う**。資料 `0138h` の関連欄も `0030h` / `0032h` を挙げている。実機で確かめる必要がある (TASK_SERIAL_VFAST の受入 S5) |
 | FIFO モードの割り込みマスク | 記述なし (`0136h` は「参照」で許可/禁止ではない) | `0035h` 以外でマスクしない | **両モードとも `0035h`** を使う |
 | `0136h` の読み | 「割り込み要因の取得」 | 読むと `irqflag` を畳んで `pic_resetirq(4)` | **FIFO モードの IRQ ハンドラの最後に 1 回読む**。読まないと同じ要因で割り込みが上がり続ける |
 | `013Ah` の速度表 | 7 段 (9600〜115200) | `speedtbl` が完全に一致 | 食い違いなし |
@@ -162,7 +163,7 @@ PM が設計を確定し、①〜⑥ を一度に閉じた。
 ## まだ試験していないこと
 
 - **`0138h` / `013Ah` を実際に叩く順番**と、そのあと 8251 のモード/コマンドが
-  `0132h` で効くこと。NP21/W では速度が変わらないので確かめられない (票 S3 / S5)。
+  `0132h` で効くこと。NP21/W では速度が変わらないので確かめられない (TASK_SERIAL_VFAST の受入 S3 / S5)。
 - **IRQ ハンドラの FIFO 汲み出し** (16 バイト / `0136h` の ack)。
   **16 バイトで抜けたあと残量があるときに再割り込みが来ることは資料で証明
   できない** (`0136h` は「割り込み要因の取得」としか書かれておらず、
@@ -179,12 +180,12 @@ PM が設計を確定し、①〜⑥ を一度に閉じた。
   実機で 8251 のモード/コマンドが `0132h` で効くかは確かめていない
   (Codex レビューの非 blocker 指摘 3)。
 - **送信ループの実効速度**。目標は 9600 で 900B/s 以上、115200 で 8KB/s 以上
-  (票 S5) — 実機でしか測れない。往復 3 で校正と予算の両方を直したが、
+  (TASK_SERIAL_VFAST の受入 S5) — 実機でしか測れない。往復 3 で校正と予算の両方を直したが、
   **2ms の固定費が本当に消えたかは未確認** ([V4])。
 - **切替区間の排他そのもの** (`irq_save` / `irq_disable(4)` / `s_mask_ien`)。
   競合は「ISR が特定の 2 命令の間に入る」ときだけ起きるので、ホストでは作れない。
   見るなら実機で `serial 115200` → `serial 9600` を繰り返して 1 バイトのずれが
-  出ないことを確かめる (票 S5 / S6)。
+  出ないことを確かめる (TASK_SERIAL_VFAST の受入 S5 / S6)。
 - **番犬が実際に戻すところ** (`ser_wd_poll` → `serial_init`)。判定と状態遷移は
   `watchdog` / `watchdog_leave` で押さえたが、rshell のループへの配線
   (`cmd_serial` の arm、`serial ack` の応答、抜け口の `ser_wd_leave`) と

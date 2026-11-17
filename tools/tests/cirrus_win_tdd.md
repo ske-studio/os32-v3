@@ -1,8 +1,8 @@
 # cirrus_win — Cirrus の窓の可否を物理地図で決める (ホスト TDD の記録)
 
 教訓: [pgalloc「落とし穴」](../../docs/design/mm/pgalloc.md#落とし穴) (デバイス窓は物理地図で判定、RAM の上端で判定しない)
-観測: `docs/archive/settings/TASK_S5.md` §6 R2 (Cirrus)
-実装: `drivers/video/cirrus/backend_cirrus.c` の `cirrus_win_usable()`
+契約: `docs/design/drivers/video/cirrus/cirrus_identify.md`、`docs/design/drivers/video/cirrus/backend_cirrus.md` 「probe の段」 (観測は TASK_S5 の R2)
+実装: `drivers/video/cirrus/cirrus_identify.c` の `cirrus_win_usable()`
 試験: `tools/tests/cirrus_win_host.c` + `tools/tests/test_cirrus_win.py` (`make check-cirrus-win-host`)
 
 ## 欠陥

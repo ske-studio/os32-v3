@@ -50,8 +50,8 @@ hardware initialization are **not** verified.
 
 ## Banked planar cleanup extension (2026-10-03)
 
-For the display cleanup fix in 票
-`docs/archive/v3/TASK_T2D_T2H.md`, the harness now includes
+For the display cleanup fix (contract: `docs/design/platform/pc98/gfx_init.md`
+and `docs/design/platform/pc98/display.md`), the harness now includes
 real `gfx_vram.c` in addition to splash/core/PC98 code. Raster presentation is
 no longer stubbed: A6h switches a two-page, four-plane host memory model, and
 A4h records that real raster transfers painted both pages. Timing, port I/O,

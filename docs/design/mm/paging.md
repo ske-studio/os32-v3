@@ -37,3 +37,18 @@ static u32 native_cache_bits(u32 a)
 | 何 | なぜ連続 | 対処 |
 |---|---|---|
 | アプリの PD / PT | — | 1 枚ずつ (4KB 整列だけ) |
+
+## アプリ帯の AS (`mm/paging_addrspace.inc`・`mm/paging_lease.inc`)
+
+> 出所: APP_BAND_PDE の契約を今のソースと照らして要約 (2026-11-18)
+
+アプリ帯は `MEM_APP_BAND_BASE` (0x80000000、`APP_BAND_PDE`) から連続 `MEM_APP_BAND_MAX_PDES` (64) 枚の PDE で、上端 `MEM_APP_BAND_MAX_TOP` が `MEM_APP_STACK_TOP`。帯は lease 窓の PDE (`LEASE_PDE`) より下に収まる (`mm/paging.c` の STATIC_ASSERT)。
+
+- `paging_addrspace_create_n(as, owner, pde_count)`: `pde_count` は 1〜`MEM_APP_BAND_MAX_PDES`、`as`・`owner` が 0 なら -1 で何も確保しない。確保するのは **PD 1 枚だけ**。master の PDE を写したうえで、`APP_BAND_PDE` から lease 窓の終わり (`MEM_LEASE_END`) までの PDE を 0 にする (高位の USER・装置の写像を継がない)。`app_pde_count` は引数によらず常に `MEM_APP_BAND_MAX_PDES`。`paging_addrspace_create` は `pde_count = 1` の呼び出し。
+- `paging_addrspace_create_lease` (起動用) は master の CR3 の上・IRQ/例外の外でだけ動き、加えて lease 窓の先頭 PT を 1 枚確保して `PT|RW|USER` で張る (PD + lease PT の 2 枚)。どちらの確保に失敗しても、確保済みを返して所有者のページ数 0 で -1。
+- アプリ帯の私有 PT は**写像するときに初めて** 1 枚ずつ確保する (疎)。`paging_addrspace_map_user*` は帯の外 (共有 PT) への写像を -1 で拒否する。USER は当該 AS の PD の PDE にだけ立て、master の PDE・PT は 1 ビットも変えない。
+- 範囲の写像 (`paging_addrspace_map_user_range*`) は PDE 境界をまたいでよい。足りない PT を全部確保してからページを書き、途中の PT 確保失敗では今回足した PT と PDE を全部戻して -1 (部分的な PT を残さない)。
+- `paging_addrspace_destroy` は lease が残っていれば何もしない。lease PT → アプリ PT → PD の順に所有者付きで返し、返却失敗なら AS を毒状態にして止める。active な PD は破棄しない。破棄後、所有者のページ数と池の空きは作成前に戻る。
+- 自己診断 `paging_app_band_selftest` (kselftest に載る) は 64 枚の AS を作り、PT 0 枚・master の帯 PDE が 0 であること、stack の最上ページへの写像と解放、破棄後に空きが元へ戻ることを見る。
+
+検査は `tools/tests/test_app_band_pde.py` (実 `mm/paging.c` をホストで動かす)。

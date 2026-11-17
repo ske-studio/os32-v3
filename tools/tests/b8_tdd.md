@@ -1,6 +1,9 @@
 # 票 B8 — 読み取り失敗を「不存在」として扱う処理の是正 (ホスト TDD の記録)
 
-- 票: `docs/archive/shell/TASK_FS_TYPE.md` §2
+- 契約: [ext2_lookup_errors](../../docs/design/fs/ext2/ext2_lookup_errors.md) (ext2 の各段) /
+  [vfs_fd_open](../../docs/design/fs/vfs_fd_open.md) (open の作成・切り詰め) /
+  [hostdrv_stat_rules](../../docs/design/drivers/hostdrv/hostdrv_stat_rules.md) (HostDrv のサイズ取得と open の失敗)。
+  出所は票 TASK_FS_TYPE §2
 - 基点: `feat/gui` の `3316fdb`
 - 実行: `python3 -B tools/tests/test_b8_open.py --target`
   (`make check-b8-open-host` が同じものを回す)
@@ -844,7 +847,6 @@ C を 2 セクタ目の先頭 (528) に置き、C を消して、その inode �
 `fs/ext2/ext2_dir.c` (`ext2_add_entry` / `ext2_delete_entry` / `ext2_mkdir` /
 `ext2_rmdir` / `ext2_rename`)、`fs/ext2/ext2_priv.h` (`EXT2_SECTOR_SIZE`)、
 `tools/tests/b8_open_host.c`、`tools/tests/b8_tdd.md`。
-`docs/archive/shell/TASK_FS_TYPE.md` §2-6 は PM が直すので触っていない。
 `sdk/kapi.json` 不変。
 
 ## 10. 往復 5 — ディレクトリの 2 名状態 (blocker) とユーザー決裁 1 / 2
@@ -852,7 +854,7 @@ C を 2 セクタ目の先頭 (528) に置き、C を消して、その inode �
 - 基点: `feat/gui` の `8409f51` (往復 4 の着地 `7116029` + 往復 5 レビューの記録)。
   作業開始時の未コミット差分は `7116029` と同一だったので mixed reset した (書きかけは無かった)
 - 出所: Fable 5.1 の往復 5 レビュー (Request changes、blocker 1 件) —
-  `docs/archive/shell/TASK_FS_TYPE.md` §2-7。レビュアーの再現器は 205 checks / 4 failures
+  票 TASK_FS_TYPE §2-7。レビュアーの再現器は 205 checks / 4 failures
 - ユーザー決裁 (2026-09-15):
   1. **ディレクトリの rename は旧名を先に消す** (失敗すると名前 0 個の孤児。e2fsck が回収)
   2. **メタデータの I/O エラーで以後の書き込みを止める** (Linux ext2 の `errors=remount-ro` 相当)
@@ -1111,7 +1113,6 @@ SDK / 文書: `sdk/include/os32/os32_kapi_shared.h` (`OS32_ERR_ROFS = -15` を�
 `tools/tests/ext2_read_bound_host.c` / `tools/tests/vfs_mount_dev_host.c` (新しい関数の贋物)、
 `tools/tests/b8_tdd.md`。`build/sdk.mk` は変えていない (`check-b8-open-host` が e2fsck 込みで回る)
 
-`docs/archive/shell/TASK_FS_TYPE.md` §2-7 と CLAUDE.md の gotcha は PM が直すので触っていない。
 
 ## 11. 往復 6 — rmdir のガード (ユーザー決裁)、複数グループの割り当て、非 blocker
 
@@ -1349,7 +1350,7 @@ rename_dir 段 6 とそのコメント、不変条件のコメントの訂正、
 
 ## 12. 段 H — 独立した 2 か所の失敗 (二重故障、2026-09-16)
 
-`docs/archive/shell/TASK_FS_TYPE.md` §2-6 が
+票 TASK_FS_TYPE §2-6 が
 「範囲外の未解消」として残していた 3 つのうちの最後の 1 つ。失敗注入の網羅は
 「N 番目を 1 回だけ (once)」「N 番目以降を全部 (sticky)」の 2 形式で、独立した
 2 か所の失敗の組み合わせは専用試験 1 件 (`[P1-C'']` `case_create_inode_write_ambiguous`) だけだった。
@@ -1433,8 +1434,8 @@ inode) と孤児・末尾の穴だけで、これは `e2fsck` 側でも「Block 
 
 ## 13. 段 X3 — 通常ファイル同士の置き換え rename (票 H2 §2-2)
 
-対象票: `docs/archive/shell/TASK_H2.md` §2-2 / §2-2-1 /
-§2-2-2 / §2-2-3 と §4-1 の **X3 / X3b / X3c / X3d**。基点 `feat/gui` = `15c5edf`。
+契約: [ext2_rename_replace](../../docs/design/fs/ext2/ext2_rename_replace.md) (不変条件・段・公開の 3 値・`ext2_unlink` の戻り値) の
+**X3 / X3b / X3c / X3d** (出所は票 TASK_H2 §2-2〜§2-2-3 と §4-1)。基点 `feat/gui` = `15c5edf`。
 
 ### 13-1. 何を足したか
 
