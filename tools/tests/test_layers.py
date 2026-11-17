@@ -36,7 +36,8 @@ def build(root, files, deps):
 
 
 def inc(*names):
-    return ''.join('#include "' + name + '"\n' for name in names)
+    return ''.join('#include ' + (name if name[0] == '<' else '"' + name + '"') + '\n'
+                   for name in names)
 
 
 def suite(tool):
@@ -101,6 +102,7 @@ def suite(tool):
                 'include/pc98.h': '', 'include/legacy_lowmap.h': '', 'arch/x86/arch_io.h': '',
                 'include/legacy_guest.h': '', 'include/kbd.h': '', 'platform/none/null_provider.c': '',
                 'gfx/only_shell.c': inc('pc98.h'), 'gfx/only_neg.c': inc('pc98.h'),
+                'gfx/only_fd1.c': inc('pc98.h'), OUT + '/ppc-kboot/gen/exports.c': inc('pc98.h'),
                 'gfx/old.h': inc('tvram.h'), 'include/tvram.h': '',
             }
             deps = {
@@ -109,6 +111,8 @@ def suite(tool):
                 'ppc-kboot/platform/none/l.d': ['platform/none/null_provider.c'],
                 'ppc-kboot/shell/gfx/s.d': ['gfx/only_shell.c', 'include/pc98.h'],
                 'ppc-kboot/neg1/gfx/n.d': ['gfx/only_neg.c', 'include/pc98.h'],
+                'ppc-kboot/link/fd1-stream/gfx/f.d': ['gfx/only_fd1.c', 'include/pc98.h'],
+                'ppc-kboot/gen/exports.d': [OUT + '/ppc-kboot/gen/exports.c', 'include/pc98.h'],
                 'ppc-kboot/gfx/gone.d': ['gfx/gone.c', 'gfx/old.h', 'include/tvram.h'],
                 'ppc-kboot/sh/gfx/h.d': ['gfx/h.c', 'gfx/g.h', 'include/pc98.h',
                                          'platform/none/stub.h'],
@@ -128,14 +132,20 @@ def suite(tool):
             files = {
                 'net/a.c': inc('clock.h', '../gfx/v2/deep.h', 'absent.h') + '/*\n' + inc('idt.h') + '*/\n'
                            '// ' + inc('idt.h'),
+                'net/b.c': inc('<render.h>', '<stdint.h>'), 'net/render.h': '',
+                'platform/pc98/render.h': '',
                 'net/clock.h': '', 'platform/pc98/clock.h': '', 'gfx/v2/deep.h': inc('clock.h'),
                 'arch/x86/kernel/idt.h': '', 'platform/pc98/absent.h': '',
                 'platform/pc98/sysclock.h': '',
             }
             words = ['net/a.c', 'net/clock.h', 'platform/pc98/clock.h', 'gfx/v2/deep.h',
                      'arch/x86/kernel/idt.h', 'platform/pc98/sysclock.h']
-            self.assertEqual(self.edges('x86-pc98', files, {'obj/net/a.d': words}), {
+            deps = {'obj/net/a.d': words,
+                    'sqlite-proto/b.d': ['net/b.c', 'net/render.h', 'platform/pc98/render.h',
+                                         '/usr/include/stdint.h']}
+            self.assertEqual(self.edges('x86-pc98', files, deps), {
                 ('R2', 'gfx/v2/deep.h', 'platform/pc98/clock.h'): 1,
+                ('R2', 'net/b.c', 'platform/pc98/render.h'): 1,
             })
 
         def test_generated_kapi_and_build_headers(self):
@@ -202,7 +212,7 @@ MUTANTS = [
     ("return 'R7'", "return None"),
     ("and parts[2].startswith(parts[0] + '_')", "and False"),
     ("not in (platform, 'none')", "!= platform"),
-    ("    if local in files:", "    if False:"),
+    ("if mark == '\"' and local in files:", "if False:"),
     ("path == tail or path.endswith('/' + tail)", "path.endswith(os.path.basename(tail))"),
     ("INCLUDE.findall(COMMENT.sub(' ', text))", "INCLUDE.findall(text)"),
     ("unit = 'kapi/kapi_generated.c'", "continue"),
@@ -212,7 +222,11 @@ MUTANTS = [
     ("sorted(observed - expected)", "[]"),
     ("sorted(expected - observed)", "[]"),
     ("empty.append(dep_root)", "pass"),
-    ("if not dep.relative_to(base).parts[0].startswith(skip)]", "]"),
+    ("if not dep.relative_to(base).parts[0].startswith(skip)", "if True"),
+    ("and SKIP_ANY not in dep.relative_to(base).parts]", "]"),
+    ("elif not inside(real) or real.startswith('build/'):", "elif not inside(real):"),
+    ("if mark == '\"' and local in files:", "if local in files:"),
+    ("'kdebug', 'lan', 'pcm', 'sqlite-proto', 'trident', 'v86'", "'kdebug', 'lan', 'pcm', 'trident', 'v86'"),
     ("if not words or not (root / words[0]).is_file():", "if not words:"),
     ("baseline[image] = [list(edge) for edge in sorted(edges)]",
      "baseline = {image: [list(edge) for edge in sorted(edges)]}"),

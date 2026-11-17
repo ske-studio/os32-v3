@@ -11,12 +11,14 @@ ROOT = Path(__file__).resolve().parents[1]
 BASELINE = 'tools/layers_baseline.json'
 # 像の名前 -> (arch, platform, build/out の下の .d の根)
 IMAGES = {
-    'x86-pc98': ('x86', 'pc98', ('obj', 'cd', 'cirrus', 'fep', 'fm', 'geforce', 'hwdev',
-                                 'kcg', 'kdebug', 'lan', 'pcm', 'trident', 'v86')),
+    'x86-pc98': ('x86', 'pc98', ('obj', 'cd', 'cirrus', 'fep', 'fm', 'geforce', 'hwdev', 'kcg',
+                                 'kdebug', 'lan', 'pcm', 'sqlite-proto', 'trident', 'v86')),
     'ppc-powermac': ('ppc', 'powermac', ('ppc-kboot',)),
 }
-# 根の直下のうち数えない場所: CI (tools/ppc/compile_ci.py の 4 像) が組まない像の置き場。
-SKIP_UNDER = {'ppc-kboot': ('shell', 'fd1-stream', 'neg')}
+# 数えない場所: CI (tools/ppc/compile_ci.py の 4 像) が組まない像の置き場。
+# 根の直下の shell・neg* と、どの段にあっても fd1-stream。
+SKIP_FIRST = {'ppc-kboot': ('shell', 'neg')}
+SKIP_ANY = 'fd1-stream'
 # include/ にある機種名のヘッダ -> (軸, 機種)。置き場を移したら行を消す。
 NAMED = {
     'pc98.h': ('platform', 'pc98'), 'pegc.h': ('platform', 'pc98'),
@@ -25,7 +27,7 @@ NAMED = {
 }
 DEVICE_ROOTS = ('drivers', 'hwdev', 'kdebug')
 GENERATED_KAPI = '/gen/kapi/kapi_generated.c'
-INCLUDE = re.compile(r'^[ \t]*#[ \t]*include[ \t]*"([^"]+)"', re.M)
+INCLUDE = re.compile(r'^[ \t]*#[ \t]*include[ \t]*(["<])([^">]+)[">]', re.M)
 COMMENT = re.compile(r'/\*.*?\*/', re.S)  # 行頭の # だけ拾うので // の行は元から当たらない
 
 
@@ -91,10 +93,13 @@ def inside(path):
     return not (path.startswith('/') or path == '..' or path.startswith('../'))
 
 
-def resolve(reader, name, files):
-    """#include "name" を、その TU が読んだファイルの集合の中で解決する。"""
+def resolve(reader, mark, name, files):
+    """#include の名前を、その TU が読んだファイルの集合の中で解決する。
+
+    "name" は読んだ側のディレクトリからの相対が先。<name> は -I で引くので末尾の一致だけ。
+    """
     local = os.path.normpath(os.path.join(os.path.dirname(reader), name))
-    if local in files:
+    if mark == '"' and local in files:
         return [local]
     tail = os.path.normpath(name)
     while tail.startswith('../'):
@@ -125,9 +130,10 @@ def measure(root, image):
     edges, units, empty = {}, set(), []
     for dep_root in dep_roots:
         base = root / 'build/out' / dep_root
-        skip = SKIP_UNDER.get(dep_root, ())
+        skip = SKIP_FIRST.get(dep_root, ())
         deps = [dep for dep in sorted(base.rglob('*.d'))
-                if not dep.relative_to(base).parts[0].startswith(skip)]
+                if not dep.relative_to(base).parts[0].startswith(skip)
+                and SKIP_ANY not in dep.relative_to(base).parts]
         if not deps:
             empty.append(dep_root)
         for dep in deps:
@@ -150,8 +156,8 @@ def measure(root, image):
                 if path.startswith('build/') and path != real:
                     continue
                 reader = unit if path == real else path
-                for name in tree.includes(path):
-                    for header in resolve(path, name, files):
+                for mark, name in tree.includes(path):
+                    for header in resolve(path, mark, name, files):
                         found = rule(image, reader, header)
                         if found:
                             edges.setdefault((found, reader, header), set()).add(unit)
