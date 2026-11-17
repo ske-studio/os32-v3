@@ -36,22 +36,21 @@ S0-D の配備保護は `/etc/settings.db` `-journal` `-wal` `-shm` `.bak` の 5
 
 足した先は 2 か所だけ (新しい判定は増やさない。S0-D の 2 段判定にそのまま乗る):
 
-- `tools/deploy_protect.py` の `PROTECTED_BASENAMES` (5 → **11 名**)。
+- `tools/deploy_protect.py` の `PROTECTED_BASENAMES` (**13 名**: 復旧が扱う 11 名 + `-wal`・`-shm`)。
   名前規則 (`name_is_protected`)、実体検査の収集対象 (`_protected_identities`)、
   試験側の `FakeRun.touched_protected` が同じ集合を参照しているので、
   nhd_deploy (manifest / HostDrv 丸写し / copy / copy-all / rm / remove_partial) /
   hostdrv_deploy (manifest / clean) / prune_stale (prune_nhd / prune_hostdrv) の
   **全経路**が 1 か所の変更で揃う。
-- `userland/system/hsync_protect.inc` の `hsp_protected_names` (5 → **11 名**)。
+- `userland/system/hsync_protect.inc` の `hsp_protected_names` (同じ **13 名**)。
   名前規則 (`hsp_name_protected` / `hsp_ancestor_protected`) と、hsync.c が
   `/etc` を `sys_ls` で列挙して実在名を拾うときの一致判定
   (`hsp_is_protected_basename` = 実体規則の入口) が同じ表を見る。
 
 付随して `userland/system/hsync.c` の `HS_MAX_PROT` を **16 → 24**。これは
 「`/etc` の実在名を何件まで集めるか」の上限で、越えると hsync は守れないとして
-**同期を拒否する**。表が 5 名のときは余裕 11 だったが、リカバリ途中の `/etc` は
-9 名 + `-wal` / `-shm` = 11 名になりうるので、16 のままだと大文字小文字違いの
-別名が 5 つあるだけで通常同期が止まる。余裕を元と同じだけ保つ。
+**同期を拒否する**。リカバリ途中の `/etc` は 11 名 + `-wal` / `-shm` = 13 名に
+なりうるので、大文字小文字違いの別名のぶんの余裕を 11 残してある。
 
 ### D.2 試験の範囲と遮断
 

@@ -27,7 +27,7 @@ hsync は HostDrv の中身を NHD へ写す。HostDrv に古い学習 DB が残
 ## 実在の名前の収集と上限
 
 `scan_protected_entities` は `/etc` を列挙し、保護の名前に当たる実在の名前を大文字小文字を無視して全部集め、inode で別名 (hardlink) も守る。
-集める枠 `HS_MAX_PROT` は 24。settings の 11 名、既定の学習 DB の本体・ジャーナル・一時名、別のカスタム名の同じ 3 名を足しても余る。
+集める枠 `HS_MAX_PROT` は 24。settings の 13 名、既定の学習 DB の本体・ジャーナル・一時名、別のカスタム名の同じ 3 名を足しても余る。
 25 件目が出たら同期を断る (黙って捨てない)。
 
 ## 使用中の辞書と `--fep-off`
@@ -48,7 +48,7 @@ hsync は HostDrv の中身を NHD へ写す。HostDrv に古い学習 DB が残
 
 ホストの配備の判定 (`tools/deploy_protect.py`、`docs/design/tools/deploy_protect.md`) と同じ名前の表を、ゲストの hsync も持つ。HostDrv に古い `etc/settings.db` が残っていても、ゲストが書いた DB を切り詰めない。
 
-- 名前の表 `hsp_protected_names`: `/etc` 直下の `settings.db`・`-journal`・`-wal`・`-shm`・`.bak`・`.bak-journal`・`.failed`・`.failed-journal`・`.new`・`.new-journal`・`.recover-state`。大文字小文字を区別しない完全一致 (FEP の名前は前方一致で別)。
+- 名前の表 `hsp_protected_names`: `/etc` 直下の `settings.db`・`-journal`・`-wal`・`-shm`・`.bak`・`.bak-journal`・`.failed`・`.failed-journal`・`.new`・`.new-journal`・`.recover-state`・`.master.new`・`.master.new-journal` の 13 名 (復旧が扱う 11 名 + `-wal`・`-shm`)。大文字小文字を区別しない完全一致 (FEP の名前は前方一致で別)。
 - 字句の正規化 (`hsp_normalize`): `.`・`..`・連続 `/` を畳む。相対・末尾 `/` (mkdir の経路)・`hsync -f etc` の subdir の連結も、正規化した後の文字列で判定する。`\` を含む・root を越える `..`・バッファや深さの上限を越える入力は失敗。
 - 判定 (`hsp_path_classify`): 1 = 自身か **祖先** が守る物 (`hsp_ancestor_protected`、`/etc/settings.db/sub` も守る)、0 = 対象外、-1 = 判定できない (正規化の失敗)。-1 も書かないが、「守った」とは数えずエラーに数える (何も同期していないのに errors 0 で終わらせない)。
 - 実体の規則 (hsync.c の `scan_protected_entities`): `/etc` を列挙して守る名前に当たる実在の名前を大文字小文字を無視して全部集め、stat の inode で別名 (hardlink) もコピーしない。stat が NOTFOUND 以外で失敗したら同期を中止。集める枠 `HS_MAX_PROT` を越えたら同期を断る (黙って捨てない)。

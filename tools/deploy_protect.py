@@ -43,11 +43,13 @@ import sys
 # WAL / SHM は OS32 が WAL を使う意味ではなく、安全側の巻き取り。
 #
 # `.bak` 以降はリカバリ (`install --recover-settings` / `--revert-settings`)
-# が /etc に作る 7 名 (票 TASK_S3 §1b の 9 名から本体と `-journal` を除いた
-# もの、S3-D / 往復 3 の B5)。`.bak` + `.bak-journal` は切替前の元の対の
-# **唯一の写し**、`.recover-state` は phase の印で、通常配備が 1 つでも
-# 掴むと「元へ戻す」経路そのものが消える。`.new*` / `.failed*` は他人の
-# 生成物なので、配備が作ることも消すこともしない。
+# が /etc に作る 9 名 (復旧が扱う 11 名 = userland/system/install_recover.inc の
+# rc_name から、本体と `-journal` を除いたもの)。`.bak` + `.bak-journal` は
+# 切替前の元の対の**唯一の写し**、`.recover-state` は phase の印で、通常配備が
+# 1 つでも掴むと「元へ戻す」経路そのものが消える。`.new*` / `.failed*` /
+# `.master.new*` (master を作り直す途中の作りかけ) は他人の生成物なので、
+# 配備が作ることも消すこともしない。ホストに同名の古いファイルがあっても
+# ゲストへ入れない (入ると次の復旧が「古い作りかけがある」と断る)。
 PROTECTED_BASENAMES = frozenset([
     'settings.db',
     'settings.db-journal',
@@ -60,6 +62,8 @@ PROTECTED_BASENAMES = frozenset([
     'settings.db.new',
     'settings.db.new-journal',
     'settings.db.recover-state',
+    'settings.db.master.new',
+    'settings.db.master.new-journal',
 ])
 
 # 保護対象ディレクトリ (ゲストの絶対パス、小文字)

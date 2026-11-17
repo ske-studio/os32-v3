@@ -1986,6 +1986,8 @@ RECOVERY_NAMES = (
     'settings.db.new',
     'settings.db.new-journal',
     'settings.db.recover-state',
+    'settings.db.master.new',
+    'settings.db.master.new-journal',
 )
 
 # ゲスト (配備の宛先) に居る「守るべき世代」
@@ -1998,6 +2000,8 @@ GUEST_GEN = {
     'settings.db.new-journal': b'GUEST-NEW-JOURNAL',
     'settings.db.recover-state':
         b'phase=backup orig=present journal=present size=1088\n',
+    'settings.db.master.new': b'GUEST-MASTER-NEW-' * 16,
+    'settings.db.master.new-journal': b'GUEST-MASTER-NEW-JOURNAL',
 }
 
 # HostDrv / ビルド成果物に残っている「別世代」(これで上書きさせない)
@@ -2064,7 +2068,7 @@ class S3RecoveryJudgement(RecoveryBase):
                          'PROTECTED_BASENAMES に足りない: %r' % (missing,))
         # 本体 2 + wal/shm 2 + リカバリ 7。件数を足すときは hsync.c の
         # HS_MAX_PROT (実在名の収集上限) の余裕も見直すこと。
-        self.assertEqual(len(protect.PROTECTED_BASENAMES), 11)
+        self.assertEqual(len(protect.PROTECTED_BASENAMES), 13)
 
     def test_name_rule_covers_each_recovery_name(self):
         for name in RECOVERY_NAMES:
@@ -2145,6 +2149,8 @@ class S3RecoveryJudgement(RecoveryBase):
                       '/etc/settings.db.recover', '/etc/settings.db.recover-st',
                       '/etc/settings.db.recover-state.old',
                       '/etc/settings.db.failed.old', '/etc/settings.dbbak',
+                      '/etc/settings.db.master', '/etc/settings.db.master.new2',
+                      '/etc/settings.db.master.new-journal2',
                       '/etc/settings.db.bak-journal2',
                       '/etc/sub/settings.db.bak', '/settings.db.bak'):
             dest = protect.resolve_dest(str(self.mount), guest)

@@ -12,7 +12,7 @@ DB は **ゲストが書く** 物でホストのビルド成果物ではない (
 
 - `settings.db`・`settings.db-journal`
 - `settings.db-wal`・`settings.db-shm` (WAL を使う意味ではなく安全側)
-- 復旧 (`install --recover-settings`・`--revert-settings`) が作る `settings.db.bak`・`.bak-journal`・`.failed`・`.failed-journal`・`.new`・`.new-journal`・`.recover-state`
+- 復旧 (`install --recover-settings`・`--revert-settings`) が作る `settings.db.bak`・`.bak-journal`・`.failed`・`.failed-journal`・`.new`・`.new-journal`・`.recover-state`・`.master.new`・`.master.new-journal` (復旧が扱う 11 名 = `userland/system/install_recover.inc` の `rc_name` から本体と `-journal` を除いた 9 名。ホストに同名の古いファイルがあってもゲストへ入れない)
 
 保護は除外であって失敗ではない。除外した物は `protected: <path> (skipped)` を標準出力に 1 行出し (`protect_log`)、配備の成否と件数には数えない。既存は内容も有無もそのまま、欠けている物は欠けたまま。`NO_PRUNE` に頼らない。
 

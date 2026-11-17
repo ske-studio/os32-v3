@@ -19,7 +19,7 @@
 ## 対象の名前 (`rc_path`)
 
 `/hd0/etc/` の 11 名: `settings.db`・`-journal`・`.bak`・`.bak-journal`・`.new`・`.new-journal`・`.failed`・`.failed-journal`・`.recover-state` (印)・`.master.new`・`.master.new-journal` (マスタの検査用の写し)。
-通常の配備・hsync はこのうち `.master.new*` 以外の 9 名に `-wal`・`-shm` を足した 11 名を作らない・消さない・上書きしない (`tools/deploy_protect.py` の `PROTECTED_BASENAMES`、`userland/system/hsync_protect.inc` の `hsp_protected_names`)。
+通常の配備・hsync は、この 11 名に `-wal`・`-shm` を足した 13 名を作らない・消さない・上書きしない (`tools/deploy_protect.py` の `PROTECTED_BASENAMES`、`userland/system/hsync_protect.inc` の `hsp_protected_names`)。
 
 ## 起動媒体と対象 (`rc_check_media`)
 
