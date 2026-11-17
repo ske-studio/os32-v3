@@ -57,10 +57,11 @@ SKIP の行は挙げるだけで落とさない: 試験が自分の出力とし�
 
 | ジョブ | 中身 |
 |---|---|
-| `checks` (シャード 0〜5、`fail-fast: false`) | `gate-setup` → `gate.py run --shard N/6` → 成果物 (`results.json`・`check_times.tsv`・`make.log`・`failed-logs/`) |
+| `checks` (シャード 0〜5、`fail-fast: false`、**手動で起動した時だけ**) | `gate-setup` → `gate.py run --shard N/6` → 成果物 (`results.json`・`check_times.tsv`・`make.log`・`failed-logs/`) |
 | `identity` | `gate-setup` → `tools/ci/sep_identity.py` (結果をジョブの要約へ) |
 
 ジョブのあいだに `needs` は無い。検査の名前は YAML に 1 つも無い。
+分離の作業のあいだは、push で回すのは `identity` だけにしている (ユーザーの指示 2026-11-17「今回の実装に必要な分だけ」)。`checks` は Actions の Run workflow か `gh workflow run sep.yml --ref <枝>` で起動する。POLICY_CI の G1 (変異込みを push ごとに) は既存の workflow を直す時の目標で、この workflow はまだ満たしていない。
 
 ### 3-4. 用意 `gate-setup`
 
@@ -85,7 +86,10 @@ SKIP の行は挙げるだけで落とさない: 試験が自分の出力とし�
 | 手元 (WSL、`gcc-13` を入れた後) で `gate.py run --shard 0/6 --no-mutate` | 108 本を回して全部通過、回っていない検査 0。検査の時間の和は 901 秒 (うち `check-c-dialect` が 388 秒)。SKIP の行がある検査は `check-ppc-realhw-link` の 1 本 (`SKIP AF_PACKET: [Errno 1] fixture` — 試験が飛ばす時の振る舞いを確かめるために自分で印字する行で、本物の SKIP ではない。§3-1 のとおり挙げるだけで落とさない)。画面に出たのは表の 25 行だけ、検査ごとのログは 108 本で計 480 KB |
 | 道具の無い環境 (`CROSS_DIR`・`PPC_CROSS_DIR` を渡さない) | 検査を始めずに、足りない 2 つを入れ方と一緒に挙げて終了コード 2 |
 
-`sep` の GitHub 上の初回の実行の後に、シャードごとの時間・見つかった赤・1 本わざと落とした実行 (G12) の結果をここに足す。
+| GitHub 上の初回 (`80183dbc0`、6 シャード・変異込み) | 計 701 本を回し、回っていない検査 0、失敗 15。シャードの所要は 14〜33 分 (検査の時間の和は 2,340〜5,576 秒)。`identity` は用意を含めて約 2 分半で、x86 は一致、PowerPC は 949 本の `.o` が一致 |
+| 失敗 15 本の内訳 | QEMU の検査 11 本 (用意に VGA の ROM が無く `QMP EOF` — `gate-setup` と事前確認を直した)、`check-docs-tree` (この段の文書の相互リンク)、`check-check-times-host` (この段の試験が `CHECK_LOG_DIR` を継いだ)、`check-target-toolchain-host` (既存の試験の期待値に手元のパスが直書き)、`check-np21w-ini-live-host` (main の元からの赤、変異の目印のずれ)。5 つとも直した |
+
+直した後の全シャードの緑と、1 本わざと落とした実行 (G12) は**未確認** (手動で `checks` を起動して確かめ、ここに足す)。
 
 ## 6. 範囲の外
 

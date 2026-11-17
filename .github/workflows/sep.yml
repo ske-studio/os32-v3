@@ -1,7 +1,9 @@
 # 機種依存の分離の枝 (wt/sep-*) の検査。既存の CI の欠点を直した手本として組んである
 # (欠点・決まり・既存の workflow への当て方は docs/design/tools/ci/gate.md)。
 #
-#   checks    全部の検査を変異込みで、6 シャードに分けて回す。検査の一覧は CHECK の登録からだけ取る
+#   checks    **手動で起動した時だけ** (Actions の Run workflow か `gh workflow run sep.yml --ref <枝>`)。
+#             分離の作業のあいだは push ごとには回さない (ユーザーの指示 2026-11-17「今回の実装に必要な分だけ」)。
+#             全部の検査を変異込みで、6 シャードに分けて回す。検査の一覧は CHECK の登録からだけ取る
 #             (この YAML に検査の名前を書かない)。どのシャードも同じ環境 (x86・PowerPC のコンパイラ、
 #             QEMU) なので、道具が無くて飛ばす検査が無い。1 本落ちても残りを回し、結果の表を
 #             ジョブの要約に、落ちた検査のログだけを成果物に残す。
@@ -28,6 +30,7 @@ permissions:
 
 jobs:
   checks:
+    if: github.event_name == 'workflow_dispatch'
     strategy:
       fail-fast: false
       matrix:
