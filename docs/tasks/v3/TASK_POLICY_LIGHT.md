@@ -61,7 +61,7 @@ r1 §A-1〜A-7 のまま (CONSTRAINTS 19 → 14 ID、POLICY_DEV 34 → 15 節、
 2. **そのファイルの v3 の「振る舞いを変えた」コミットが直近 1 か月で 2 件以下** (`beh.tsv`、件名から整理・移動・定数・文書・試験を除いた数)。
 3. **外からの境目が凍結** — KAPI の版・部品の契約 (`*_MODULE_ABI_GEN`)・配置の世代に次の票で触れない (ROADMAP・HANDOVER §2)。
 
-**検査を段 4 (tier 4) にできるのは、その検査の covers (§C-2) の .c/.asm/.inc の全部が 1〜3 を満たすとき**。1 本でも満たさないファイルを組む検査は段 4 にしない — これで cd-read (isofs/iso9660.c は 4 件)・dma-pool (mm/dma_pool_math.c は 2 件だが init/kernel.c・fdc.c を組む) は候補から外れる (R-1)。kbd.c 5・serial.c 4・fdc.c 3・pcm_cs4231.c 3・fm.c 3 を組む検査も外れる (R-3)。
+**検査を段 4 (tier 4) にできるのは、その検査の covers (§C-2) の .c/.asm/.inc の全部が 1〜3 を満たすとき**。1 本でも満たさないファイルを組む検査は段 4 にしない — これで cd-read (isofs/iso9660.c は 4 件)・dma-pool (mm/dma_pool_math.c は 2 件だが platform/pc98/kernel.c・fdc.c を組む) は候補から外れる (R-1)。kbd.c 5・serial.c 4・fdc.c 3・pcm_cs4231.c 3・fm.c 3 を組む検査も外れる (R-3)。
 
 ### B-2 候補の実測 (今の yaml を covers の代わりに使った近似)
 
@@ -75,7 +75,7 @@ r1 §A-1〜A-7 のまま (CONSTRAINTS 19 → 14 ID、POLICY_DEV 34 → 15 節、
 | ver-collect-host | platform/pc98/* (0) | 未計測 |
 
 合計 **約 7 秒**。r1 の「45 本・505 s」は (a) 領域ごとの扱い (R-3)、(b) 消えた kstr-bench 238 s (R-8)、(c) 共有試験 (R-1) の 3 つを含んでいた。**段 4 送りは待ちを減らす策ではなく、追従を減らす策**と位置づけ直す: 当たった検査 11 本は横断の整理 (DEP_DIR・SRC_LAYOUT の形) で毎回落ちて直される側で、段 4 なら節目にまとめて追従すればよい。
-今の yaml は include の連鎖 (init/kernel.c・kselftest/** など) を手で並べているので真の covers より広く、§C-2 で covers が「実際に組む .c」に狭まれば候補は増える [推、R2 の変換の後に数え直す]。候補の一覧は PM が R2 で書き、月 1 の棚卸し (§E-4) で見直す。
+今の yaml は include の連鎖 (platform/pc98/kernel.c・kselftest/** など) を手で並べているので真の covers より広く、§C-2 で covers が「実際に組む .c」に狭まれば候補は増える [推、R2 の変換の後に数え直す]。候補の一覧は PM が R2 で書き、月 1 の棚卸し (§E-4) で見直す。
 
 ### B-3 外し方の 3 択 (変更なし、当て先だけ直す)
 

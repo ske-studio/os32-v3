@@ -1,6 +1,6 @@
 # PowerPC core-ready kernel (milestone 2, docs/decisions/ppc/PPC_KBOOT_DESIGN.md).
 # Independent of the x86 graph: explicit source manifest = the closure reached
-# from init/ppc_kernel.c plus the takeover/vector/CPU entry objects. No libc,
+# from platform/powermac/ppc_kernel.c plus the takeover/vector/CPU entry objects. No libc,
 # no libgcc; undefined symbols are a build failure. x86 objects are untouched.
 #   make -f build/ppc-kboot.mk -> build/out/ppc-kboot/link/PPCKERN.ELF
 #   make -f build/ppc-kboot.mk KBOOT_LINK=0 NEGATIVE=1 -> build/out/ppc-kboot/neg1/PPCKERN.ELF
@@ -146,7 +146,7 @@ $(KB_OUT)/platform/powermac/usb_platform.o: KB_TU_FLAGS += -Dkvprintf=pm_log_kvp
 $(KB_OUT)/platform/powermac/cli_boot.o: KB_TU_FLAGS += -Dconsole_stream_write=pm_cli_write
 # Existing boot diagnostics retain their LAN LOG channel. Terminal kprintf
 # still uses lib/kprintf.o and the ordinary console mirror.
-$(addprefix $(KB_OUT)/,$(filter init/ppc_kernel.o arch/ppc/%.o platform/powermac/%.o drivers/%.o gfx/%.o mm/%.o fs/%.o kernel/%.o,$(KB_C:.c=.o))): KB_TU_FLAGS += -Dkprintf=pm_log_printf
+$(addprefix $(KB_OUT)/,$(filter platform/powermac/ppc_kernel.o arch/ppc/%.o platform/powermac/%.o drivers/%.o gfx/%.o mm/%.o fs/%.o kernel/%.o,$(KB_C:.c=.o))): KB_TU_FLAGS += -Dkprintf=pm_log_printf
 $(KB_OUT)/pm_log_printf.o: lib/kprintf.c build/ppc-kboot.mk $(KB_GEN)/stamp $(KB_OUT)/memmap_layout.h
 	$(KB_CC) $(KB_FLAGS) -Dkprintf=pm_log_printf -Dkvprintf=pm_log_kvprintf \
 	 -Dkutoa_dec=pm_log_dec -Dkutoa_hex=pm_log_hex -Dkprintf_spec=pm_log_spec \

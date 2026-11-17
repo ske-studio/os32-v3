@@ -36,7 +36,7 @@
 | `named:<機種>` | `include/` にある機種名のヘッダ。表は道具の定数に 1 か所: `pc98.h`・`pegc.h`・`tvram.h`・`wab_xe10.h` は `pc98`、`v86_call.h`・`legacy_lowmap.h` は `x86`。`include/kbd.h` (共通のキーの値) と `include/legacy_guest.h` (提供者を 1 つ link する契約、無い像は `platform/none`) は共通 |
 | `common` | 上のどれでもない作業木の中のファイル (`kernel` `init` `exec` `mm` `fs` `gfx` `net` `kapi` `input` `lib` `include` `sdk` ほか) |
 
-契約の実装の固定名 (`arch/<a>/arch_*.h`、`platform/<p>/platform_*.h`) は、その像の arch・platform の物である限り違反にしない (`arch/README.md` の決まり)。`arch_` で始まらない名前は、両方の arch に同じ名前で対になっていても固定名ではないので R1 に数える (例: `init/ppc_kernel.c → arch/ppc/kernel_boot.h`)。`platform/none` はどの像にとっても別の機種ではない。
+契約の実装の固定名 (`arch/<a>/arch_*.h`、`platform/<p>/platform_*.h`) は、その像の arch・platform の物である限り違反にしない (`arch/README.md` の決まり)。`arch_` で始まらない名前は、両方の arch に同じ名前で対になっていても固定名ではないので R1 に数える (例: `platform/powermac/ppc_kernel.c → arch/ppc/kernel_boot.h`)。`platform/none` はどの像にとっても別の機種ではない。
 
 ## 4. 違反の規則
 

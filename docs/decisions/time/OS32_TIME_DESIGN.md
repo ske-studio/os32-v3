@@ -182,7 +182,7 @@ int time_sync(void); /* 非待機受付、既に要求中はAGAIN、結果はtim
 | D2 tools/host_agent.py | サービス/LIST登録、D1へdispatch |
 | D3 新kernel/time/host_time.c | 非待機同期、世代/操作通番、gate、期限 |
 | D4 新kernel/time/time_config.c | system.cfg読込とoffset差分保存、既存KEY=VALUE規約 |
-| E1 init/kernel.c | 初期化・起動初回poll、設定読込順序 |
+| E1 platform/pc98/kernel.c | 初期化・起動初回poll、設定読込順序 |
 | E2 exec/exec_schedule.inc | park_kbd/park_poll/sys_yieldのCUI分岐より前でpoll、再入回避 |
 | E3 net/link_host_api.inc | 再OPENのgate、TIME自身は内部フラグで通す |
 | E4 drivers/block/netcd.c（確定票の新設先） | BOPEN前gate |

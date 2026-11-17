@@ -1,6 +1,6 @@
 """L20: pre-move planar bytes, boot lifecycle and isolated mutation preparation."""
 CHECK = dict(name='dep-dir-d-splash-host', tier=4,
-    covers=['include/callconv.h', 'arch/x86/arch_io.h', 'arch/x86/x86_flags.h', 'exec/surface_limits.h', 'gfx/gfx.h', 'gfx/gfx_internal.h', 'include/copy_units.h', 'arch/x86/arch_copy.h', 'gfx/palette.h', 'include/gfx_format.h', 'include/gfx_hal.h', 'include/gfx_mode.h', 'include/io.h', 'include/memmap.h', 'include/pc98.h', 'include/pegc.h', 'include/tvram.h', 'include/types.h', 'init/boot_splash.c', 'include/platform_splash.h', 'lib/kstring.h', 'platform/pc98/platform_io.h', 'platform/pc98/splash.c', 'drivers/video/pc98/splash_raster.h', 'include/sys.h', 'include/config.h', 'sdk/include/os32/os32_generations.h', 'sdk/include/os32/os32_kapi_generated.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_host_notice.h', 'sdk/include/os32/os32_gfx2.h', 'sdk/include/os32/os32_ls.h', 'sdk/include/os32/os32_surface.h', 'sdk/include/os32/os32_ver_info.h', 'tools/tests/dep_dir_d_splash_host.c', 'tools/tests/host32.py', 'tools/tests/fixtures/dep_dir_d/**', 'tools/tests/kernel_includes.py'],
+    covers=['include/callconv.h', 'arch/x86/arch_io.h', 'arch/x86/x86_flags.h', 'exec/surface_limits.h', 'gfx/gfx.h', 'gfx/gfx_internal.h', 'include/copy_units.h', 'arch/x86/arch_copy.h', 'gfx/palette.h', 'include/gfx_format.h', 'include/gfx_hal.h', 'include/gfx_mode.h', 'include/io.h', 'include/memmap.h', 'include/pc98.h', 'include/pegc.h', 'include/tvram.h', 'include/types.h', 'platform/pc98/boot_splash.c', 'include/platform_splash.h', 'lib/kstring.h', 'platform/pc98/platform_io.h', 'platform/pc98/splash.c', 'drivers/video/pc98/splash_raster.h', 'include/sys.h', 'include/config.h', 'sdk/include/os32/os32_generations.h', 'sdk/include/os32/os32_kapi_generated.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_host_notice.h', 'sdk/include/os32/os32_gfx2.h', 'sdk/include/os32/os32_ls.h', 'sdk/include/os32/os32_surface.h', 'sdk/include/os32/os32_ver_info.h', 'tools/tests/dep_dir_d_splash_host.c', 'tools/tests/host32.py', 'tools/tests/fixtures/dep_dir_d/**', 'tools/tests/kernel_includes.py'],
     needs=[], budget=3.6,
     basis=['AC-DISPLAY-1', '[HW1]'],
 )
@@ -26,7 +26,7 @@ FIXTURE = ROOT / 'tools/tests/fixtures/dep_dir_d'
 BACKEND = 'platform/pc98/splash.c'
 HEADER = 'include/platform_splash.h'
 HARNESS = 'tools/tests/dep_dir_d_splash_host.c'
-FILES = ('include/callconv.h', 'arch/x86/arch_io.h', 'arch/x86/x86_flags.h', 'exec/surface_limits.h', 'gfx/gfx.h', 'gfx/gfx_internal.h', 'include/copy_units.h', 'arch/x86/arch_copy.h', 'gfx/palette.h', 'include/gfx_format.h', 'include/gfx_hal.h', 'include/gfx_mode.h', 'include/io.h', 'include/memmap.h', 'include/pc98.h', 'include/pegc.h', 'include/tvram.h', 'include/types.h', 'init/boot_splash.c', 'include/platform_splash.h', 'lib/kstring.h', 'platform/pc98/platform_io.h', 'platform/pc98/splash.c', 'drivers/video/pc98/splash_raster.h', 'include/sys.h', 'include/config.h', 'sdk/include/os32/os32_generations.h', 'sdk/include/os32/os32_kapi_generated.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_host_notice.h', 'sdk/include/os32/os32_gfx2.h', 'sdk/include/os32/os32_ls.h', 'sdk/include/os32/os32_surface.h', 'sdk/include/os32/os32_ver_info.h', 'tools/tests/dep_dir_d_splash_host.c')
+FILES = ('include/callconv.h', 'arch/x86/arch_io.h', 'arch/x86/x86_flags.h', 'exec/surface_limits.h', 'gfx/gfx.h', 'gfx/gfx_internal.h', 'include/copy_units.h', 'arch/x86/arch_copy.h', 'gfx/palette.h', 'include/gfx_format.h', 'include/gfx_hal.h', 'include/gfx_mode.h', 'include/io.h', 'include/memmap.h', 'include/pc98.h', 'include/pegc.h', 'include/tvram.h', 'include/types.h', 'platform/pc98/boot_splash.c', 'include/platform_splash.h', 'lib/kstring.h', 'platform/pc98/platform_io.h', 'platform/pc98/splash.c', 'drivers/video/pc98/splash_raster.h', 'include/sys.h', 'include/config.h', 'sdk/include/os32/os32_generations.h', 'sdk/include/os32/os32_kapi_generated.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_host_notice.h', 'sdk/include/os32/os32_gfx2.h', 'sdk/include/os32/os32_ls.h', 'sdk/include/os32/os32_surface.h', 'sdk/include/os32/os32_ver_info.h', 'tools/tests/dep_dir_d_splash_host.c')
 MUTATIONS = (('mask_first = 0xFF >> (x1 % BITS_PER_BYTE);',
               'mask_first = 0xFF << (x1 % BITS_PER_BYTE);'),)
 
@@ -54,7 +54,7 @@ def build(work, source, omit_header=False):
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(ROOT/rel, dest)
     (work/'splash_source.inc').write_text(
-        source + '\n' + (work/'init/boot_splash.c').read_text())
+        source + '\n' + (work/'platform/pc98/boot_splash.c').read_text())
     if omit_header:
         (work/HEADER).unlink()
     subprocess.run(command(work), check=True)
@@ -107,7 +107,7 @@ def main():
         assert rel in CHECK['covers'], rel
     selected = 'C_KERNEL = ' + ' '.join(query(ROOT, config_only=True)['C_KERNEL'])
     resident(selected)
-    generic = (ROOT/'init/boot_splash.c').read_text()
+    generic = (ROOT/'platform/pc98/boot_splash.c').read_text()
     for token in ('splash_fb', 'GFX_BB_PLANAR4', 'GFX_PREF_PC98', 'GFX_PLANE_SZ',
                   'GFX_BPL', 'GVRAM_PLANES', 'bb_fill_rect', 'splash_gfx_init'):
         assert token not in generic, token

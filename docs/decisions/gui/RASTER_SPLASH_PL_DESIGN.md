@@ -39,7 +39,7 @@
 | `D:121` §4、`D:124`・`:132` | 動的既定を案B・band=1・N=5へ。`tools/img2osri.py:114`・`:130`・`:232`の旧探索とCLIの旧エンコード経路を新しいv2の変換に置き換える。 |
 | `D:141` §5、`D:165`・`:172` | 黒の間に検査・1回転送→新VBLANK→毎フレーム復元・差分。`platform/pc98/splash_image.c:31`の動的全拒否と`:53`の静止待ちを置換。 |
 | `D:174`・`:175`、末尾改訂`D:381` | 予定行に間に合わなければ残りをdrop、次フレームで初期色から再開。翌行繰越・同番号畳込は使わない。 |
-| `D:176`・`:182` 共通期限／終了 | `init/boot_splash.c:203`の入口期限を継承し転送後に再起算しない。`:272`の両ページ消去→shutdown→既定色→テキスト消去を維持。 |
+| `D:176`・`:182` 共通期限／終了 | `platform/pc98/boot_splash.c:203`の入口期限を継承し転送後に再起算しない。`:272`の両ページ消去→shutdown→既定色→テキスト消去を維持。 |
 
 - 旧候補の400/800件、1行1色／24k限定2色、7 OUT固定、固定色8個＋variance必須を新案Bへ読み替える。最新決定で消えた前提を受入条件に残さない。
 - 実測574f6c5b（ユーザー決定）: A0h bit6周期≈31.8µs、幅≈5.9µs、IN≈1.15µs、OUT平均≈0.65µs／観測上限≈0.78µs。
@@ -217,7 +217,7 @@ else if (armed) {
 | V7a | `tools/tests/splash_raster_diag_host.c` | 旧入口専用の 16 件の診断試験・呼出しの除去。公開tableの診断と連続測定は保持。I1後。 |
 | H3a | `drivers/video/pc98/splash_raster.h` | 旧入口の宣言・不要な前方宣言・説明の削除。R2後。 |
 | I1 | `platform/pc98/splash_image.c` | 所有・黒転送1回・フレーム反復・解放。F1/R1 と M2 の最終認定 (P2b・R1b 後の再測定) の後。 |
-| I2 | `init/boot_splash.c` | 入口からの共通期限・既存終了への結線。I1後。 |
+| I2 | `platform/pc98/boot_splash.c` | 入口からの共通期限・既存終了への結線。I1後。 |
 | B1 | `build/kernel.mk` | 新c登録。宣言段後、結合ビルド前。 |
 | V1 | `tools/tests/test_osri.py` | v1/v2・案B・独立復号・変異。F1/T1後。 |
 | V2 | `tools/tests/splash_raster_host.c` | 独立走査時計と画像再生模型。R1後。 |
@@ -301,7 +301,7 @@ STATIC_ASSERT(sizeof(struct OsriImage) == 9614, osri_image_size);
 - H1b/F1の組合せでv1/v2読込を受け入れ、R1/I1は既定の依存どおり後続する。旧型と新型をcastで接続せず、旧オブジェクトとの混在も認めない。
 
 公開KAPIは変更しない。型・200件定義は `sdk/include/os32/os32_kapi_shared.h:634`、世代は `sdk/kapi.json:2`。公開入口 `gfx/gfx_vram.c:311` と再生検査 `drivers/video/pc98/splash_raster.c:260`、`:267`、`:271` を維持する。
-公開型の利用者はロゴ `init/boot_splash.c:179`、`:205`、診断 `platform/pc98/splash_probe.c:66`、`:763`、アプリ `apps/raster/raster.c:297`、`:426`。1197件の画像RAM型へ切り替えず、公開の200件／2行制限を保持する。
+公開型の利用者はロゴ `platform/pc98/boot_splash.c:179`、`:205`、診断 `platform/pc98/splash_probe.c:66`、`:763`、アプリ `apps/raster/raster.c:297`、`:426`。1197件の画像RAM型へ切り替えず、公開の200件／2行制限を保持する。
 
 ## 宣言の段 (H1a・H2〜H6) の取り込みで後続の段へ送る項目 (2026-11-03、PM 決定)
 - 戻り値 (astra レビューの P3): `pl_prepare`・`time_splash_math`・`ktime_splash_sample`・`ktime_splash_settle`・`osri_load` は既存 (`gfx/gfx_osri.c`) と同じく **成功 0・失敗 -1**。`pl_frame` は宣言済みの `PL_FRAME_*`。実装の段 (F1・P1・P2・R1) で宣言のコメントに 1 行足す。
@@ -446,7 +446,7 @@ r1→r2 の変更：67Hを比の余裕を持つ固定70Hへ変更し、丸め込
 | 3 | `tools/img2osri.py:56`、`:118`、`:180`; `platform/pc98/splash_image.c:31` | T1は成分差分+追加番号のOUT予算5/6、現画像入口はevent有りを拒否。専用CLIと観測入口を追加し、既存I1の結線完了を前提にしない。 |
 - 現T1は `--hblank-outs → convert → palette_history → optimize_row(budget)`。この引数の意味やchoicesを変えず、別の `--obs-colors N`（1..16、band=1限定、明示hblank-outsとの併用拒否）を追加する。
 - `splash_raster_image.c:258`以降は先頭番号を先行、以後の色ごとに番号OUTを発行する。`splash_raster.c:206`〜`:209`も番号→G→R→Bの明示OUT。自動増加を利用するコードはなく、観測でも仮定しない。
-- `build/kernel.mk:52`でDIAGのprobeを登録、`:308`が別BUILD_OUTの入口。`init/boot_splash.c:203`の通常3秒経路はOBSから呼ばない。`init/kernel.c:176`のroot mountは`:242`のboot_splashより先。
+- `build/kernel.mk:52`でDIAGのprobeを登録、`:308`が別BUILD_OUTの入口。`platform/pc98/boot_splash.c:203`の通常3秒経路はOBSから呼ばない。`platform/pc98/kernel.c:176`のroot mountは`:242`のboot_splashより先。
 - `splash_raster.c:13`の既存POLL_LIMIT=1000000を観測の待機上限にも使う設計とし、同値の私有定数を置く場合は由来を明記。`include/memmap.h:433`のPITは100Hz（レビュー照合）。
 - 状態票 `docs/tasks/gui/TASK_RASTER_SPLASH.md:3` は案1の計測整理待ち。観測を別段として追記し、常用認定済みと書かない。ホストfloatは食い違いではない。
 
@@ -528,7 +528,7 @@ int pl_obs_frame(struct SplashRaster *, const struct OsriImage *,
 | OPH | `include/platform_splash.h` | observe宣言。 |
 | OP | 新`platform/pc98/splash_obs.c` | N順駆動・周回数・所有/解放・serial・TVRAM。OR/OPH後。 |
 | OB | `build/kernel.mk` | PM専有、別BUILD_OUT・登録・フラグ・DIAG排他。 |
-| OI | `init/boot_splash.c` | 通常表/関数のガード・OBS結線。部品統合後に直列。 |
+| OI | `platform/pc98/boot_splash.c` | 通常表/関数のガード・OBS結線。部品統合後に直列。 |
 | OTV | `tools/tests/test_osri.py` | OBS境界・独立復号・旧T1出力一致。 |
 | ORV | 新`tools/tests/splash_obs_host.c` | 実物CのI/O模型・IF・終了を検証。 |
 | OV | 新`tools/tests/test_splash_obs.py` | host試験/変異/.text照合を駆動。 |

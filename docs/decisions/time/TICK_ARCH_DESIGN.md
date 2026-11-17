@@ -22,17 +22,17 @@
 |---|---|---|---|
 | X1 | NEXT §3-2 は `tick_clock_config(reload, clk_hz)` で PIT だけを想定 | PowerPC の DEC は `tb_hz / hz` を整数の period と余りの fraction で配る (`arch/ppc/kernel_dec.c:13-22,31-33`)。reload・clk_hz の組が無い | 物理の周期を有理数 `num/den` 秒で渡す口にする (§2) |
 | X2 | NEXT §3-1「物理 IRQ を使ってよい所は tick.c・pit*.c・recover_profile.c・kselftest だけ」 | PowerPC は `kernel_dec.c:57-60` で `++tick_count; tick_dispatch();` を自前で行う。tick_count を進める所が 2 arch で別 | 進めるのは `kernel/time/tick.c` の `tick_clock_step` だけにする (§2-2) |
-| X3 | B29 (`7d288722`) は PowerPC の DEC を 100Hz にして tick 単位を合わせた | `kernel_dec.c:29` (`tick_hz != 100`)、`platform/powermac/clock.c:47` (`pm_tick_hz` = 100)、`init/ppc_kernel.c:232,241-242` (待ちは 1・+3 の論理 tick)、`ppc_trap.h:18` | DEC だけ 1kHz に戻し、論理 100Hz は tick_clock_step で作る。待ちの論理 tick の値は B29 のまま残す (§4) |
+| X3 | B29 (`7d288722`) は PowerPC の DEC を 100Hz にして tick 単位を合わせた | `kernel_dec.c:29` (`tick_hz != 100`)、`platform/powermac/clock.c:47` (`pm_tick_hz` = 100)、`platform/powermac/ppc_kernel.c:232,241-242` (待ちは 1・+3 の論理 tick)、`ppc_trap.h:18` | DEC だけ 1kHz に戻し、論理 100Hz は tick_clock_step で作る。待ちの論理 tick の値は B29 のまま残す (§4) |
 | X4 | NEXT B1・T1K §3 は SDK 共有ヘッダに `STATIC_ASSERT(OS32_TICK_HZ == PIT_HZ)` を置いた | `os32_kapi_shared.h:193-194` は `__KERNEL_BUILD__` で memmap.h を読み、PowerPC も `-D__KERNEL_BUILD__` (`build/ppc-kboot.mk:93`)。`tools/ppc/kboot_audit.py:28,71-82` は `-E -dU` で PIT_HZ を**検査しただけ**の TU も落とす | SDK ヘッダには `OS32_TICK_HZ` をリテラルの 100 で置くだけにする。assert は x86 だけの `platform/pc98/clock_source.c` に置く (既に `pit.h` と `os32_kapi_shared.h` を読んでいる、`:3`・`:6`) |
 | X5 | NEXT §3-3「`clock_source.c` は `tick_clock_raw` を読む」 | PowerPC の µs 時計は TB から直に出す (`platform/powermac/clock.c:72-84`)。tick に依らない | raw を µs に使うのは x86 の clock_source だけ。PowerPC は raw を起動の照合にだけ使う (§2-4) |
 | X6 | 「kernel/time/tick.c は PPC の像に入るか」 | 入る: `tools/ppc/selected_success.json:107,118` (kernel/irq/tick.c・kernel/time/tick.c)、`build/ppc-kboot.mk:50`。host 試験 `tools/ppc/kboot_dec.py:36` も tick.c を直に組む。`build/ppc.mk:55` の独立像 (`arch/ppc/decrementer.c`) は tick.c を組まない | tick_clock は tick.c に置けば 2 arch で共通になる |
-| X7 | B29 の理由「1ms の検査はシェル像で境目の読み違いにより揺らいだ」(PPC_SHELL_EXEC_DESIGN の B29) | 起動の検査は tick_count (論理) を数える (`init/ppc_kernel.c:232,241-242`)。QMP の観測 `kboot_tick` は `--defsym,kboot_tick=tick_count` (`build/ppc-kboot.mk:139`) | 論理 tick は 100Hz のままなので、検査の間隔 (3 tick)・`tools/ppc/kboot_run*.py`・`kboot_dec_fixture.inc` の 100Hz の期待値は**変えない** |
+| X7 | B29 の理由「1ms の検査はシェル像で境目の読み違いにより揺らいだ」(PPC_SHELL_EXEC_DESIGN の B29) | 起動の検査は tick_count (論理) を数える (`platform/powermac/ppc_kernel.c:232,241-242`)。QMP の観測 `kboot_tick` は `--defsym,kboot_tick=tick_count` (`build/ppc-kboot.mk:139`) | 論理 tick は 100Hz のままなので、検査の間隔 (3 tick)・`tools/ppc/kboot_run*.py`・`kboot_dec_fixture.inc` の 100Hz の期待値は**変えない** |
 
 ## 1. 今の tick の道 (横並び)
 
 | 項目 | x86 (PC-9821、main 170723d0) | PowerPC (PowerMac G4、B29 の後) | 本稿の後 (両 arch) |
 |---|---|---|---|
-| 物理の周期 | PIT #0 mode 2、`PIT_HZ`=100 (`include/memmap.h:437`)。reload = clk/100 = 19968 / 24576 (`platform/pc98/pit_math.c:49,61`)、`init/kernel_boot_cpu.inc:55` の `platform_clock_init(PIT_HZ)` | DEC、`pm_tick_hz()`=100 (`platform/powermac/clock.c:47`)。period = tb_hz/100 + fraction (`kernel_dec.c:13-22,31-33`) | x86: 段 L の最後まで 100、最後に 1000 (`PIT_IRQ_HZ`)。PowerPC: 1000 (`PM_DEC_HZ`、§3) |
+| 物理の周期 | PIT #0 mode 2、`PIT_HZ`=100 (`include/memmap.h:437`)。reload = clk/100 = 19968 / 24576 (`platform/pc98/pit_math.c:49,61`)、`platform/pc98/kernel_boot_cpu.inc:55` の `platform_clock_init(PIT_HZ)` | DEC、`pm_tick_hz()`=100 (`platform/powermac/clock.c:47`)。period = tb_hz/100 + fraction (`kernel_dec.c:13-22,31-33`) | x86: 段 L の最後まで 100、最後に 1000 (`PIT_IRQ_HZ`)。PowerPC: 1000 (`PM_DEC_HZ`、§3) |
 | 論理の周期 | 物理と同じ 100Hz | 物理と同じ 100Hz | 100Hz (`OS32_TICK_HZ`)。内部と公開の tick は 10ms。tick_clock_step の位相で作る |
 | tick_count を進める所 | `arch/x86/kernel/isr_stub.asm:493` `inc dword [tick_count]` (定義は `kernel/time/tick.c:3`) | `arch/ppc/kernel_dec.c:58` `++tick_count` (追いつきの loop の中) | `kernel/time/tick.c` の `tick_clock_step()` だけ |
 | callback (7 slot) | `isr_stub.asm:497` timer_handler → `isr_handlers.c:544` → `tick_dispatch` (`kernel/irq/tick.c:23`)、毎 IRQ | `kernel_dec.c:59` で `tick_dispatch`、経過 period ごと | 論理 tick の回だけ (step の bit0) |
@@ -141,8 +141,8 @@ B29 (`7d288722`、11 ファイル) のうち、**物理の周期に関わる所�
 | `arch/ppc/ppc_trap.h:17-18` | 「tick_hz must be 100 (10ms)」 | 「hz must be PM_DEC_HZ (1ms DEC)。論理 tick (10ms) は tick_clock_step が作る」 | ±2 |
 | `platform/powermac/clock.c:47` | `return 100;` | `return PM_DEC_HZ;` (物理 DEC の Hz と注記)。`platform_clock_init` の検査 `:55` はこのまま | ±2 |
 | `platform/powermac/kboot_info.h:42` | `u32 pm_tick_hz(void);` | `#define PM_DEC_HZ 1000u` を足し、宣言の注記を「物理 DEC の Hz」に | +2 |
-| `init/ppc_kernel.c:255` | `CLOCK hz=%u` に `pm_tick_hz()` | `OS32_TICK_HZ` を出す (行の書式・値 100 は変えない → `kboot_run.py` の `CLOCK hz=100` と一致) | ±1 |
-| `init/ppc_kernel.c:232-251` | 論理 tick 1 個 (`:232`)・+3 個 (`:241-242`) の待ち、TB と µs の照合 | 待ちはこのまま。tb0・tb1 を読む同じ EE=0 の区間で `tick_clock_raw` も読み、raw の増分を TB の区間 `want = (tb1-tb0)*PM_DEC_HZ/tb_hz` (64bit) と比べる。`|got-want| > want/50 + 2` (2% と ±2) なら `kboot_stop("dec_rate")` | +8 |
+| `platform/powermac/ppc_kernel.c:255` | `CLOCK hz=%u` に `pm_tick_hz()` | `OS32_TICK_HZ` を出す (行の書式・値 100 は変えない → `kboot_run.py` の `CLOCK hz=100` と一致) | ±1 |
+| `platform/powermac/ppc_kernel.c:232-251` | 論理 tick 1 個 (`:232`)・+3 個 (`:241-242`) の待ち、TB と µs の照合 | 待ちはこのまま。tb0・tb1 を読む同じ EE=0 の区間で `tick_clock_raw` も読み、raw の増分を TB の区間 `want = (tb1-tb0)*PM_DEC_HZ/tb_hz` (64bit) と比べる。`|got-want| > want/50 + 2` (2% と ±2) なら `kboot_stop("dec_rate")` | +8 |
 | 試験 `tools/ppc/kboot_dec_host.c:49-68` | 100Hz の期待値 (dec=250000 等) | B29 前の 1000Hz の期待値 (`25000000,1000` → dec=25000、`-75001` → 4 物理 step)。ジフィの期待を足す: 4 step では tick_count=0・calls=0、計 10 step で tick_count=1・calls=1、33333333 の 1000 回で sum=33333333 かつ tick_count が +100。2 回目の `ppc_dec_start` で config が断る値でも、動いている DEC と ready を変えない | +14 −9 |
 | 試験 `tools/ppc/kboot_dec.py:21-27` | `('100hz', 'tick_hz != 100', ...)` | `('1khz', 'tick_hz != PM_DEC_HZ', 'tick_hz != 100', 5)`、追加 `jiffy-gate` (step の bit0 を見ずに毎回 dispatch → calls の check で RED)、`step-call` (step を消すと tick_count が進まない) | +3 −1 |
 | 試験 `tools/ppc/kboot_clock_fake.c:55-88` | `platform_clock_init(100)`・`tick_hz==100` | B29 前に戻す (1000) | ±6 |
@@ -171,7 +171,7 @@ B29 (`7d288722`、11 ファイル) のうち、**物理の周期に関わる所�
 |---|---|---|---|---|
 | P1 | `arch/ppc/kernel_dec.c`・`arch/ppc/ppc_trap.h`・`tools/ppc/kboot_dec_host.c` (+ `kboot_dec.py` の変異・-I) | +8・±2・+14 (+4) | なし | kboot-dec の host と mac99 F2 (変異 1khz・jiffy-gate・step-call が RED) |
 | P2 | `platform/powermac/clock.c`・`platform/powermac/kboot_info.h`・`tools/ppc/kboot_clock_fake.c` | ±2・+2・±6 | なし | kboot-clock |
-| P3 | `init/ppc_kernel.c` (CLOCK の hz・`dec_rate` の照合)・`tools/ppc/kboot_mutations.py` (half-rate の期待と DEC 100Hz の変異)・注記 (`build/ppc-kboot.mk`・`kboot_audit.py`・`kboot_run.py`) | +9・+5・+4 | なし | kboot-run/accept (QMP の論理 rate)・kboot-audit。half-rate と DEC 100Hz の変異が `FATAL kboot dec_rate` で RED |
+| P3 | `platform/powermac/ppc_kernel.c` (CLOCK の hz・`dec_rate` の照合)・`tools/ppc/kboot_mutations.py` (half-rate の期待と DEC 100Hz の変異)・注記 (`build/ppc-kboot.mk`・`kboot_audit.py`・`kboot_run.py`) | +9・+5・+4 | なし | kboot-run/accept (QMP の論理 rate)・kboot-audit。half-rate と DEC 100Hz の変異が `FATAL kboot dec_rate` で RED |
 - P1〜P3 は 1 本の枝 (`[skip ci]` で os32powerpc が push、本線 PM が統合の枝で CI)。P1 だけだと `pm_tick_hz()`=100 を `ppc_dec_start` が断り起動が止まる。
 - 依存: C1 (tick_clock の口)。PowerPC の変更の受入は QEMU と NP21/W の x86 回帰だけ (実機の回に載せない)。
 

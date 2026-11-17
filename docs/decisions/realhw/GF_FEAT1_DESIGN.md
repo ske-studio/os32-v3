@@ -447,7 +447,7 @@ PM は宣言追補→C0/C1/C2/C4/C5→診断 owner 接続・C8→module dispatch
 
 > 出所: ~/os32-tmp/run/gf-c9/ADDENDUM.md (astra 起草 r1・r2、Opus レビュー r1 Request changes → r2 写してよい、P3 2 件を PM が反映)。
 対象: main 502be34e (GF 側の現物は 40fec057 から変化なし)。GF_FEAT1_DESIGN.md の本文・CW 末尾・ユーザー決定を維持する。
-C9 は試験 adapter のみ。既存経路（init/kernel.c:253）の module 登録・既存予約を使い、試験から load/reserve/GUI 起動をしない。
+C9 は試験 adapter のみ。既存経路（platform/pc98/kernel.c:253）の module 登録・既存予約を使い、試験から load/reserve/GUI 起動をしない。
 未公開なら `unavailable`。診断 owner を使える起動経路を新設せず、利用不能を合格に数えない。
 ### 像と入口
 `kdebug/gf_foundation_test.c` は **hwdev.mod** に組む。gfinit.c と同じ像なので control/lease を外へ渡さない。
@@ -499,7 +499,7 @@ cycle は RUN→表示stop→STOP→表示start→RUN の各区間1000ms。元�
 cycle 全体を trial_step で包まない。区間ごとの trial_step を終えて PAUSED に戻してから display(false/true) を呼ぶ。
 診断 STOP 区間は REC_VERIFIED のまま時計・ソフト snapshot・上記 PCI 読取りで測定する。初回 start の代わりに承認済み gfinit 手順を自動実行しない。
 CUI/rshell の要求は `gf1 status|instmem|vblank|cycle`（改行終端）、owner は自動選択。新しい汎用コマンドや承認方式は設けない。
-GUI RUN では shell.bin と gshell.bin は同時常駐せず（init/kernel.c:340）、GSERIAL open が rshell を切る（gshell/src/gserial.rs:84）；直接の gf1 行は実行されない。
+GUI RUN では shell.bin と gshell.bin は同時常駐せず（platform/pc98/kernel.c:340）、GSERIAL open が rshell を切る（gshell/src/gserial.rs:84）；直接の gf1 行は実行されない。
 本番は既存 GFX=geforce・GUI=0 起動→os32gui で RUN とし、利用者が GUI 端末 sh.bin を開いてフォーカスする。共通 gf1 を結線し、既存 GSERIAL の `SOH + 8桁hex ID + " type gf1 cycle" + LF`、次に同形式の `key 1c`（Enter）で実行する。同様に他caseも入力可、GF1応答は C9 が `serial_puts_polled` で直接 serial 出力 (GUI 中の kprintf は con_sink で GUI 端末へ流れ、GSERIAL は端末の文字をシリアルへ返さない — kernel/console/console.c:186・200、userland/gshell/src/gserial.rs。devinit.c は geforce.mod の部品で、hwdev.mod には serial_puts_polled の import を追加する。C9b で hwdev/hwdev_imports.def と docs/design/hwdev/hwdev_imports.md の表の末尾に serial_puts_polled (取得元は kdebug と同じ lib/serial_diag.h) を 1 本足し、契約と stub は PM がまとめビルドで再生成する。geforce.mod の import 31 本は変わらない)。
 根拠: gserial.rs の parse/enqueue/deliver、shell/main.c:112–118（共通表・rshellのみ除外）、userland/sh.inputs.json。GUI/GSERIAL は変更しない。CUI 復帰は gfx_shutdown 済み（gshell/src/lib.rs:678）なので STOP status のみ、cycle は上記 precheck で ng。
 応答は完了時 `GF1 case=<...> owner=production|diagnostic session=<n> phase=<...> ms=<実測> rc=<n> result=ok|ng|unavailable`。

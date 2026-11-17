@@ -64,7 +64,7 @@ void ime_set_render(void *table);
 - IME_Renderの字面・形・g_ime_render_tvramシンボルは維持。ime_render_tvram.cは同basenameのplatform/pc98/ime_render_tvram.cへ移し、FEP内のprivate backendとしてリンク。共通IMEは非契約ヘッダkernel/ime/ime_display_private.hの寸法/末行・保存復元・資源操作を呼ぶ。IME_Renderやkexports/importsへ追加しない。
 - private口はime_display_cols/preedit_row、ime_display_save/restore(top,rows)、ime_display_boot(fault)/bytes/abort。PC98 backendがbufferとTVRAM read/writeを所有、既存3行×80列の確保量・失敗注入・部分確保・解放順・bytes計上を保持。ime.c:86–98,120–123は委譲、ime_render.incから番地/BPR/COLS/固定24を除く。候補表示の論理状態と非TVRAM rendererのclear_row経路は共通に残し、TVRAM renderer時だけ保存復元する。
 - PC98のgeometryは従来の80列/末行24（GUI rendererも同じ論理寸法）、hostでは別寸法を注入。PPCは未対応providerで製品起動を拒否。defaultはplatform/{pc98,powermac}/ime_default_render.hで選ぶ。C2はC区分、通常/R1のFEPを組んでからC1でtvram.hのpc98.hを外す。
-- kernel/gui.cはime_control.hだけをinclude（ime_set_render(NULL)の所有者検証・復旧順不変）。init/kernel.cのIME boot呼出は別の狭いime_boot.h宣言にし、重いime.h/ime_store.h連鎖を外す。public SDKヘッダには触らない。
+- kernel/gui.cはime_control.hだけをinclude（ime_set_render(NULL)の所有者検証・復旧順不変）。platform/pc98/kernel.cのIME boot呼出は別の狭いime_boot.h宣言にし、重いime.h/ime_store.h連鎖を外す。public SDKヘッダには触らない。
 ### 2.2 コピー・WC・診断
 ```c
 /* include/copy_units.h -> 固定名arch_copy.h。既存名はgfx内inline alias */
@@ -129,7 +129,7 @@ MESSAGES['sdk'] = 'sdk'
 |B6 present/B5|gfx/gfx_vram.c 55、platform/pc98/display.c +65、gfx/gfx.h 5、gfx_internal.h 5、残る直接pc98定数読者のinclude各1–3|C、H1/H2/H3/N3。HAL present/dirtyと直列|
 |C2 IME/B1|kernel/ime/ime_render_tvram.c→platform/pc98/ime_render_tvram.c 移76＋保存復元/資源処理100、ime_render.inc 90、ime.c 35、ime_display_private.h +25、platform/{pc98,powermac}/ime_default_render.h 各+8、powermac/ime_display.c +25、include/ime_control.h +10、kernel/gui.c 1、build/fep-module.mk 15、tools/build_compare.py 5|C、H4/H9/N2、GUI known 3組。ime_render.hは0行|
 |C1 console/C2|kernel/console/console.c 45、console_backend.h +12、platform/pc98/console.c 15、include/tvram.h 5、platform/pc98/tvram_private.h +10、PC98 の FEP 部品 2 本 (C2 で移した platform/pc98/ime_render_tvram.c と PC98 の ime_display 実装) は pc98.h を直に include 各 1|C、H4/N1/N2。第3段D2のlegacy gate試験後|
-|C3 boot IME facade/C2|include/ime_boot.h +20、init/kernel.c 1、既存ime.hの宣言include整理5|I、H4/H9、init known 3組（§7）|
+|C3 boot IME facade/C2|include/ime_boot.h +20、platform/pc98/kernel.c 1、既存ime.hの宣言include整理5|I、H4/H9、init known 3組（§7）|
 |D1 WC/独立|drivers/video/geforce/gf_wc.c 130、arch/x86/kernel/video_wc.c 移150、include/video_wc.h +25、arch/ppc/video_wc.c +20|C、H5/N4。mtrr_wc.cは既存実体を使用|
 |D2 accept/D1|drivers/video/geforce/gf_accept.c 110、arch/x86/video/gf_accept_cpu.c 移130、arch/ppc/video/gf_accept_cpu.c +8、build/geforce-module.mk:89–96のGFA source/規則15|C、H5/N4。module ABI/exportsは不変|
 |E SQLite/独立|lib/sqlite3/sqlite3.c 9、include/diag_stack.h +8、arch/{x86,ppc}/arch_diag_stack.h 各+12|I(off)/C(on)、H6。第4段r2はtypesを変更せず競合なし|
@@ -155,7 +155,7 @@ MESSAGES['sdk'] = 'sdk'
 |B5/B6|core_surface/vram→gfx_surfaces/display、gfx.h/internal|T test_gfx_kernel_fb/attach/map_policy/transfer・test_gf_display・Trident present/lifecycle群; C gfx-host・gf-runner-host・gui-host|
 |C2|ime_render_tvram→同basenameのplatform実体、ime_render.inc/ime.c/private口、gui|T test_ime_display/unicode_surface/fep_core_boot/fep_budget/fep_boundary/fep_module/fep_generator_meta/hsync_fep/x11_shared・fep_host_build・ime_display_host; C x11-shared-host・sqlite-engine-host・fep-budget-host・fep-standard-host・fep-worst-load-host・gui-host、新sep5-console-host|
 |C1|console/backend、tvram.h→PC98 private定数|T test_dep_dir_d_console/con_sink/legacy_callers/ime_display・kernel_includes・console_grid.json; C con-sink-host・d2-services-host・gui-host・x11-shared-host|
-|C3|init/kernel.c・ime.h→ime_boot.h|T test_fep_core_boot/fep_boundary/sqlite_engine/hsync_fep・kernel_includes; C sqlite-engine-host・x11-shared-host・gui-host|
+|C3|platform/pc98/kernel.c・ime.h→ime_boot.h|T test_fep_core_boot/fep_boundary/sqlite_engine/hsync_fep・kernel_includes; C sqlite-engine-host・x11-shared-host・gui-host|
 |D1/D2|gf_wc/accept→arch video_wc/gf_accept_cpu|T test_geforce（wc_lifecycleのCPU範囲抽出/独自-I）・gf_wc_host/recovery・test_gf_production/gf_display; C gf-runner-host・gfinit-host、新sep5-wc-host|
 |E|sqlite3.c→diag_stack/arch_diag_stack|T test_sqlite_memsys5/sqlite_product_sql/sqlite_module_proto; C sqlite-memsys5-host・sqlite-engine-host、新sep5-trace-host|
 |F|boot資産/targetsは不変、拒否試験追加|T test_build_selection/ppc_selection/c_dialect:583/no_libgcc:22/hdd_stage1/2（MIRROR不変）; C hdd-stage1-host・hdd-stage2-host、新sep5-boot-host|
@@ -206,8 +206,8 @@ MESSAGES['sdk'] = 'sdk'
 - 現行固定値は90 TU/21組。check_compile.pyの`--source-profile selected --accept --json`と実.dで確認してからJSONを減らす。通過TUを選択から外して件数を良く見せない。移設元/先の同一性も別欄で記録する。
 - A/Bの新規通過候補は`gfx/gfx_vram.c`、`gfx/gfx_core.c`、C1は`kernel/console/console.c`、D1は`drivers/video/geforce/gf_wc.c`（GF配置の残る二次障害は実装時に別計測）。各TUの二次障害を実測し、通過数は未確定。gfx_scroll.c/palette.cは既に90本に含まれ、新規成功には加算しない。
 - `ime_render_tvram`はPC98選択へ移り、PPCのFB実装ではない。gf_acceptは受入module、SQLiteは専用buildのTRACE両構成、CRT/bootは専用製品なので、selectedの成功数と混ぜない。provider新規TUも共通TUの解消と別集計する。
-- C2で解く3組：`kernel/gui.c → kernel/ime/{ime.h,ime_render.h,ime_store.h}`。C3で解く3組：`init/kernel.c → kernel/ime/{ime.h,ime_render.h,ime_store.h}`。実.d消失を確認し21→15組を目標とする。新facadeは本当に必要な関数だけで重いincludeを持たない。
-- 残す15組：kernel/sys.c→geforce_module.h（pollが現役）、init/kernel.c→double_fault/gdt/idt（3）、cd/lan/pcm/fm/snd_engine（5）、cirrus/geforce/kcg/trident/trident_module（5）、platform/pc98/boot.h（1）。本票で空ヘッダ化/allowlist削除はしない。sys→GFの1組もWC移設だけでは解消しない。
+- C2で解く3組：`kernel/gui.c → kernel/ime/{ime.h,ime_render.h,ime_store.h}`。C3で解く3組：`platform/pc98/kernel.c → kernel/ime/{ime.h,ime_render.h,ime_store.h}`。実.d消失を確認し21→15組を目標とする。新facadeは本当に必要な関数だけで重いincludeを持たない。
+- 残す15組：kernel/sys.c→geforce_module.h（pollが現役）、platform/pc98/kernel.c→double_fault/gdt/idt（3）、cd/lan/pcm/fm/snd_engine（5）、cirrus/geforce/kcg/trident/trident_module（5）、platform/pc98/boot.h（1）。本票で空ヘッダ化/allowlist削除はしない。sys→GFの1組もWC移設だけでは解消しない。
 - selected成功は原始口/依存の検査でありbootinfo・surface endian・callback ABI・PPC全リンク/実走の代替ではない。未対応display/SDK providerを選んだ製品が実行可能扱いされないことをH7/H8/H9で検査する。
 ## 8. 容量予算・完了・未決
 |対象|上限の根拠・本段の見込み|実装時の必須記録|

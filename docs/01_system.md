@@ -139,7 +139,7 @@ loader_fat_new.asm (16bit → 32bit) — 第2段階
 
 #### カーネルコア (init/, kernel/, mm/, arch/x86/kernel/)
 *   **依存先:** `include/`, `drivers/` (serial, console用)
-*   **役割:** `init/kernel.c` (起動の順序), `arch/x86/kernel/idt.c`・`isr_handlers.c` (中断処理), `mm/paging.c`・`mm/kmalloc.c` (メモリ管理), `kernel/console/console.c`。`kernel/` の下は `irq/` `time/` `module/` `console/` `ime/` `v86/`
+*   **役割:** `platform/pc98/kernel.c` (起動の順序), `arch/x86/kernel/idt.c`・`isr_handlers.c` (中断処理), `mm/paging.c`・`mm/kmalloc.c` (メモリ管理), `kernel/console/console.c`。`kernel/` の下は `irq/` `time/` `module/` `console/` `ime/` `v86/`
 
 #### ファイルシステム (fs/)
 *   **依存先:** `include/`, `drivers/block/disk.h`, `drivers/ata/atapi.h`, `kernel/`

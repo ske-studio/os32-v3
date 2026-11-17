@@ -53,7 +53,7 @@
 ### 5. ブート順の固定 (`test_memory_boot.py::test_kernel_boot_order_and_failstop`)
 
 - `memory_boot_detect` → `paging_init` → `memory_boot_init` の順であることを
-  `init/kernel.c` のソース上で検査する行を追加。
+  `platform/pc98/kernel.c` のソース上で検査する行を追加。
 
 ## 実行結果 (2026-09-11)
 
@@ -72,7 +72,7 @@
 | `python3 tools/check_constraints.py` | EXIT=0 |
 | i386-elf-gcc `-Wall -Wextra` (kernel.c / paging.c / pgalloc.c / physmem.c / memory_boot.c / sys.c / backend_cirrus.c) | 新規警告ゼロ |
 
-`init/kernel.c` に残る 2 件 (`TVRAM_BPR` の再定義、`kprintf` の暗黙宣言) は
+`platform/pc98/kernel.c` に残る 2 件 (`TVRAM_BPR` の再定義、`kprintf` の暗黙宣言) は
 HEAD (`8d5ba3b`) でも同じく出る既存のもので、この票の変更とは無関係。
 
 ## ホスト試験で**証明していない**こと

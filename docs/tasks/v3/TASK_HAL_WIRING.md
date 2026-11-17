@@ -358,7 +358,7 @@ int pci_bind_all(const struct pci_driver *const *table, int n);   /* 1 件ずつ
   `[quarantined noisy irq N masked]` / `[... unmaskable]` を出す。W1/W3 に「線の保持でエッジが来ない」「共有者が
   HANDLED」の両反例を足す。
 - Command の更新は**下位 16 ビットだけ**書く (`pci_cfg_write16` を足す。上位の Status は W1C)。
-- 表は静的 (`init/kernel.c`、最初は 82557 の 1 行)。`pci_bind_all` は **pgalloc と DMA プールの初期化の後**。
+- 表は静的 (`platform/pc98/kernel.c`、最初は 82557 の 1 行)。`pci_bind_all` は **pgalloc と DMA プールの初期化の後**。
   §3 の動的読み込みが来たら `size` で版を確かめる。
 
 - **実装・受入**: ホスト合格 (`tools/tests/pci_bind_tdd.md`)。診断取得口も実装済み。

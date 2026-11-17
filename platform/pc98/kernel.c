@@ -12,44 +12,44 @@
 #include "serial_diag.h"
 #include "boot_cpu.h"
 #include "platform_boot.h"
-#include "../arch/x86/kernel/idt.h"
+#include "../../arch/x86/kernel/idt.h"
 #include "platform_boot.h"
 #include "io.h"
 #include "fatfs/diskio_os32.h"   /* diskio_print_fdd_cache */
 /* fs.h 削除 — レガシーFS廃止 */
-#include "../mm/kmalloc.h"
+#include "../../mm/kmalloc.h"
 #include "palette.h"
 #include "gfx.h"
 #include "gf_production.h"
 #include "gfx_hal.h"   /* H2b: GFX_PREF_* / gfx_set_backend_pref (GFX= の反映先) */
-#include "../drivers/video/kcg/kcg_module.h"
+#include "../../drivers/video/kcg/kcg_module.h"
 #include "boot_splash.h"
 #include "console.h"
-#include "../kernel/console/console_dual.h"
+#include "../../kernel/console/console_dual.h"
 #ifdef TICK_PROBE
 #include "tick_probe.h"
 #endif
-#include "../kernel/time/cpu_calibrate.h"
+#include "../../kernel/time/cpu_calibrate.h"
 #include "clock_source.h"
 #include "kernel_tick.h"
-#include "../kernel/time/sysclk.h"   /* 0000:0501h のクロック判定 (pit_init より前に呼ぶ) */
-#include "../mm/paging.h"
-#include "../mm/memory_boot.h"
-#include "../mm/pgalloc.h"     /* ledger_resource_import_pci (T1d ⑥-0) */
-#include "../mm/shlib.h"
-#include "../mm/shm.h"
+#include "../../kernel/time/sysclk.h"   /* 0000:0501h のクロック判定 (pit_init より前に呼ぶ) */
+#include "../../mm/paging.h"
+#include "../../mm/memory_boot.h"
+#include "../../mm/pgalloc.h"     /* ledger_resource_import_pci (T1d ⑥-0) */
+#include "../../mm/shlib.h"
+#include "../../mm/shm.h"
 #include "utf8.h"
-#include "../kernel/console/unicode_file.h"
+#include "../../kernel/console/unicode_file.h"
 #include "system_surface.h"
-#include "../kernel/kselftest.h"
-#include "../kernel/kstack_hw.h"
+#include "../../kernel/kselftest.h"
+#include "../../kernel/kstack_hw.h"
 #include "exec.h"
-#include "../kernel/irq/irq.h"        /* irq_line_quarantined / irq_storm_masked (§1-1、結線表の line_state に差す) */
-#include "../mm/dma_pool.h"   /* DMA プール (同 §1-3) */
+#include "../../kernel/irq/irq.h"        /* irq_line_quarantined / irq_storm_masked (§1-1、結線表の line_state に差す) */
+#include "../../mm/dma_pool.h"   /* DMA プール (同 §1-3) */
 #include "bootinfo.h"
-#include "../drivers/ata/cd_module.h"
+#include "../../drivers/ata/cd_module.h"
 #include "vfs.h"
-#include "../fs/serialfs/serialfs.h"
+#include "../../fs/serialfs/serialfs.h"
 
 
 #include "dev.h"
@@ -57,27 +57,27 @@
 #include "pc98.h"
 #include "memmap.h"
 #include "config.h"
-#include "sysconfig.h"
+#include "../../init/sysconfig.h"
 #include "kstring.h"
 #include "kprintf.h"   /* kutoa_dec / kutoa_hex (状態行の数値) */
 #include "sys.h"
 #include "ime_boot.h"
 #include "fd_redirect.h"
 #include "pipe_buffer.h"
-#include "../drivers/sound/fm/snd_engine.h"
-#include "../drivers/sound/fm/fm_module.h"
-#include "../drivers/sound/cs4231/pcm_module.h"
-#include "../drivers/net/e82557/lan_module.h"
-#include "../drivers/video/cirrus/cirrus_module.h"
-#include "../drivers/video/geforce/geforce_module.h"
-#include "../drivers/video/trident/trident_module.h"
+#include "../../drivers/sound/fm/snd_engine.h"
+#include "../../drivers/sound/fm/fm_module.h"
+#include "../../drivers/sound/cs4231/pcm_module.h"
+#include "../../drivers/net/e82557/lan_module.h"
+#include "../../drivers/video/cirrus/cirrus_module.h"
+#include "../../drivers/video/geforce/geforce_module.h"
+#include "../../drivers/video/trident/trident_module.h"
 #include "os32_sqlite_vfs.h"
 #include "os32_sqlite_outer.h"
-#include "../kernel/sqlite_engine.h"
-#include "../arch/x86/kernel/double_fault.h"
+#include "../../kernel/sqlite_engine.h"
+#include "../../arch/x86/kernel/double_fault.h"
 #include "kapi_db.h"
 #include "bootlog.h"
-#include "../kernel/module/module.h"
+#include "../../kernel/module/module.h"
 
 #define SHELL_RELOAD_DELAY 10
 
@@ -86,7 +86,7 @@ extern void console_hw_cursor_enable(void);   /* console.c */
 extern void console_text_gdc_stop(void);      /* console.c (K4): GUI 時にカーソルを消す */
 extern void console_text_gdc_start(void);     /* console.c (K4): CUI 復帰でカーソル再表示 */
 
-#include "../platform/pc98/boot.h"
+#include "boot.h"
 #include "boot_platform.h"
 #include "boot_display.h"
 

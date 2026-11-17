@@ -179,7 +179,7 @@ void __cdecl os32_libc_fini(void);              /* entry[1] */
 |B6|`exec/exec_launch.inc`|入口前の依存計画、attachとCRT起動情報|
 |B7|`exec/exec_image_map.inc`|必要data/PT予算・app帯境界・欠損診断|
 |B8|`exec/exec_finish.inc`|ASの依存集合を使ってdetach|
-|B9|`init/kernel_gui_shlib.inc`|GUI専用の失敗通知を枠別診断へ。kernel.cの既存shlib_init呼出し位置は維持|
+|B9|`platform/pc98/kernel_gui_shlib.inc`|GUI専用の失敗通知を枠別診断へ。kernel.cの既存shlib_init呼出し位置は維持|
 |C1|`sdk/libc/state.c`（新）|impure.o代替の固定公開data、reent/stdio初期化と終了|
 |C2|`sdk/crt/shared_start.c`（新）|LibcStartを組み、libc init前後の順を所有|
 |C3|`sdk/crt/crt0_c.c`|static/shared入口の結線、return/exit経路|

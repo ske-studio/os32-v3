@@ -543,7 +543,7 @@ int sndl_midi_long(u32 h, const void *p, u32 n);  int sndl_midi_reset(u32 h);  i
 | drivers/sound/fm/fm_module.c:158-160・185・190 | `candidate.tick` の取得と `tick_target` を外す。取り外しの静止 (:185 の `candidate.snd_set_master(0)`) は `candidate.fm_all_off(); candidate.ssg_all_off();` と `quiet` に。`tick_register(PC98_TICK_SND, snd_tick)` (:190) の登録を外す (番号の定義は残してよい) |
 | exec/exec_kapi_init.inc:43-44・119〜 | 廃止の口の `wrap_*` の extern はそのまま (wrap は R0a の生成の body として残る) |
 | drivers/sound/fm/fm.c:364・397-456、include/fm_contract.h:50-52 | `fm_startup_sound`・`fm_play_mml_wait`・`fm_play_mml(_kapi)` と宣言を削除 (`fm_all_off`:286・`ssg_all_off`:324 は残す) |
-| init/kernel.c:64・233-236 | include を外し、起動の記録の文言を「fm module」に |
+| platform/pc98/kernel.c:64・233-236 | include を外し、起動の記録の文言を「fm module」に |
 | exec/exec.c:37 | `#include "snd_engine.h"` を外す |
 | exec/exec_finish.inc:150 | (6) `snd_owner_exit` の行を削除 |
 | platform/pc98/legacy/v86_io.c:17・249-261 (`snd_state_for_guest`)・264-267 (`snd_state_for_os32`) | include を fm_contract.h に。往復の**両方**を `fm_all_off(); ssg_all_off();` に (ゲストに渡す前と戻った後の全キーオフ。BGM の機関は無いので master の 0→1 は要らない) |

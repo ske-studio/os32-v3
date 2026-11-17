@@ -50,7 +50,7 @@
 各版・各環境でウォームアップ30秒、各負荷60秒×5回、混合負荷30分。最悪値・p99・合計CPU占有・IRQ回数・観測漏れを保存。
 負荷: idle、FM BGM+SE/SSG減衰、PCM 44100/22050Hz連続再生とdrain/再同期、V86 BIOS/ROM/timeout/脱出、打鍵連打/CTRL+STOP、NIC+serial/host転送、FD/ISO、実行可能な混合。描画/splash はゲート対象から外して別ケースとする（通常描画の区間外測定はゲート対象）。
 PCM/V86で排他的な音源状態は別ケースにする。ゲストの協調処理は継続し、tickから新たな切替・待ち・確保を呼ばない。
-除外印は `init/kernel.c:242` の boot_splash() 呼出し直前で立て、復帰直後に必ず解除する（早期return・診断分岐を含む）。_enable()・services_boot()・NIC legacy 初期化は区間外であり、除外を起動全体へ広げない。区間中もIRQ0のlink_rx_pumpとserial受信は生きる。入口/復帰と外部時刻を記録し、境界をまたぐサンプルは別集計に含め、区間外窓の開始時にpendingと診断カウンタの基準を取り直す。除外区間中の時計の遅れを区間外の時刻差へ持ち越さず、外部基準と時計の差分を区間外窓ごとに測る。wt/splash-time 等の単体診断を boot_splash 区間と偽装しない。
+除外印は `platform/pc98/kernel.c:242` の boot_splash() 呼出し直前で立て、復帰直後に必ず解除する（早期return・診断分岐を含む）。_enable()・services_boot()・NIC legacy 初期化は区間外であり、除外を起動全体へ広げない。区間中もIRQ0のlink_rx_pumpとserial受信は生きる。入口/復帰と外部時刻を記録し、境界をまたぐサンプルは別集計に含め、区間外窓の開始時にpendingと診断カウンタの基準を取り直す。除外区間中の時計の遅れを区間外の時刻差へ持ち越さず、外部基準と時計の差分を区間外窓ごとに測る。wt/splash-time 等の単体診断を boot_splash 区間と偽装しない。
 CTRL+STOP の実物: `drivers/input/kbd.c:442-444` はIRQ1で ring3_abort_request() を呼び、cooked打鍵には配らない。`exec/exec_abort.inc:40-55` → `exec/appslot.c:370-377,404-412` の経路では、起動時のアプリ不在/CUIでは appslot_abort_request() が0を返し、abort_reqを立てず、スプラッシュも中断しない。これは100Hz像でも同じ効き目である。受信成功をkill数で代用せず、外部キー入力とIRQ1でのCTRL+STOP認識数を突合する。スプラッシュ中も取りこぼし0を受入とし、実測前に保証済みとは扱わない。
 NIC/serial は有限の既存バッファで受けられる分だけ受け、溜まる処理・要求は拒否し、溢れ・破棄を許す。無制限の保留やバッファ拡大で埋めない。8251は1バイトであり13〜16msのIF=0中の9600bps受信を無欠落とはしない。復帰後にNICのOVW回復・serialのOE後の受信再開と再送を確認し、正常な転送へ戻ることを合否とする。SerialDiag OE/受信リング溢れ増分0はスプラッシュ区間を除いた窓だけで判定する。
 短いIRQ経路は IRQ_ENTER〜EOI〜IRQ_LEAVE のうち timer_handler 全体を除いた区間と定義し、A1で入口/出口・EOIの区間和を別集計する。論理処理（反射/timeout等）は100Hz側へ分離計上し、timer_handlerのdispatch overheadも含む既存callback群と二重計上しない。B1の実際の短経路はB1で再測定する。
@@ -133,7 +133,7 @@ CPU校正は論理tick5回≒50msを維持。`CPU_DELAY_SCALE=100` の2段割り
 | ファイル | 新/変・概算差分行 | 役割・依存/並列 |
 |---|---|---|
 | docs/tasks/v3/TASK_TICK_1KHZ.md | 新100 | Aの票・証拠/判定、PM |
-| init/kernel.c | 変4 | A/B診断像のみ、boot_splash呼出し前後の除外印・境界記録、再生は変更しない |
+| platform/pc98/kernel.c | 変4 | A/B診断像のみ、boot_splash呼出し前後の除外印・境界記録、再生は変更しない |
 | kernel/time/tick_probe.h | 新30 | 計測境界型、A先行 |
 | kernel/time/tick_probe.c | 新150 | 固定集計・スプラッシュ区間の別集計、A・診断像のみ |
 | kdebug/tick_probe.c | 新150 | 読出しと結果出力、計測型後に並列 |

@@ -26,7 +26,7 @@
 
 - D1 §2: `tick_register`、6枠、IRQ0/IF=0、SND→PCM→NE2K→E82557→LINK→LGY98 を維持。`arch/x86/kernel/isr_handlers.c:540` の dispatch は変更しない。
 - D3 §3: `boot_platform_register(const struct boot_platform *)` と `step[BOOT_POINT_COUNT]` は既存のまま。
-  `init/kernel.c:117` の bind、`:176` PIC→`:182` sysclk→BOOT_DMA→`:187` PIT の呼出位置、IF、ログを固定する。
+  `platform/pc98/kernel.c:117` の bind、`:176` PIC→`:182` sysclk→BOOT_DMA→`:187` PIT の呼出位置、IF、ログを固定する。
 
 ## 2. 共通境界 — リンク時固定の小さい口
 

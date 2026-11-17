@@ -109,7 +109,7 @@ int net_tx(const void *frame, u32 len);  /* irq_restore の後、kctx_irq_depth=
 | 名前 | 中身 | 使ってよい所 |
 |---|---|---|
 | **ジフィ** | `tick_count`・`get_tick`・`PIT_HZ`=`OS32_TICK_HZ`=100・`TICK_MS`=10 | 既存のすべて。新しいコードの期限も原則これ |
-| 物理 IRQ | raw 64bit・`PIT_IRQ_HZ` (x86)・`PM_DEC_HZ` (PowerPC) | tick.c・pit*.c・clock_source.c・recover_profile.c・kselftest、PowerPC の `kernel_dec.c`・`platform/powermac/clock.c`・`init/ppc_kernel.c` の起動の照合だけ。時刻として数えない |
+| 物理 IRQ | raw 64bit・`PIT_IRQ_HZ` (x86)・`PM_DEC_HZ` (PowerPC) | tick.c・pit*.c・clock_source.c・recover_profile.c・kselftest、PowerPC の `kernel_dec.c`・`platform/powermac/clock.c`・`platform/powermac/ppc_kernel.c` の起動の照合だけ。時刻として数えない |
 | ms 時計 | `tick_clock_ms()`、u32 | 入力の時刻印・合成器の期限 |
 | µs 時計 | `sys_time_now` (公開) | 互換層・計測・WM の再開の印 |
 ### 3-2. 状態と関数 (両 arch 共通の kernel/time/tick.c、新しい kernel/time/tick_clock.h)

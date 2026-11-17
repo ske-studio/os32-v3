@@ -40,7 +40,7 @@ r1 で確認済みの食い違い5件は維持する。未実装の接続とは�
 |RAM block と root|`ram_ro.c` の範囲検査・write 拒否、`boot_root_mount()` の rd0 mount を再利用|
 |共通 ISO|既存 parser と `VFS_DEV_RAM=5` を使い、複製しない|
 |書込み先|`fs/ramfs/ramfs.c` の既存固定上限で `/tmp` を分離|
-|PC-98 初期化順|`init/kernel.c:187` の root mount が同:199 の `kernel_boot_memory()` より先|
+|PC-98 初期化順|`platform/pc98/kernel.c:187` の root mount が同:199 の `kernel_boot_memory()` より先|
 |FD 搬送|`boot/loader_fat_new.asm` は ELF でなく VK32 の VMKRNL.LZ4 を読む|
 |入力制限|同:446 の508KiB、物理 `0x10000〜0x8EFFF`、64KiB 境界でセグメント更新|
 |別置き候補|`include/memmap.h:396` の `0x600000`、1MiB の boot bundle 帯|

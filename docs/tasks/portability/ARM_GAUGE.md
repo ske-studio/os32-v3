@@ -61,7 +61,7 @@
 
 そこで `-g -S` で `.s` を出し直してアセンブルし、`.loc` / `.file` の表で元の
 ソース行に戻している。この処理のおかげで **7 本が「その他」から `io.h` 由来へ
-正しく移った** (`kernel/console/con_sink.c` `kernel/kbd_inject.c` `init/kernel.c`
+正しく移った** (`kernel/console/con_sink.c` `kernel/kbd_inject.c` `platform/pc98/kernel.c`
 `mm/pgalloc.c` `drivers/sound/fm/snd_engine.c` `arch/x86/legacy/v86.c` `net/link.c`)。
 `-g` はコード生成を変えないので、測っている対象は同じ。
 
@@ -159,7 +159,7 @@
 `drivers/char/serial.c` `drivers/video/cirrus/wab_glue_xe10.c` `fs/hostdrv/hostdrvfs.c` `drivers/video/pc98/backend_pc98.c`
 `drivers/video/pc98/backend_pegc.c` `gfx/gfx_core.c` `gfx/gfx_scroll.c` `gfx/palette.c`
 `kernel/console/con_sink.c` `kernel/console/console.c` `arch/x86/kernel/idt.c` `arch/x86/kernel/isr_handlers.c`
-`kernel/kbd_inject.c` `init/kernel.c` `mm/pgalloc.c` `drivers/sound/fm/snd_engine.c`
+`kernel/kbd_inject.c` `platform/pc98/kernel.c` `mm/pgalloc.c` `drivers/sound/fm/snd_engine.c`
 `kernel/sys.c` `arch/x86/legacy/v86.c` `platform/pc98/legacy/v86_io.c` `net/link.c`
 
 ---

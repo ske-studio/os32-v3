@@ -91,11 +91,11 @@ int ppc_dec_start(u32 tb_hz, u32 tick_hz)
      'milestone 5 order/format', TRAP % ('pass', 'pass', 'pass', 'bad')),
     # Not a guard-mapping mutation (D3's kboot_boot.py owns those): this proves
     # the guard word is computed, i.e. a load that does not fault reports bad.
-    ('guard-probe-nonfault', 'init/ppc_kernel.c',
+    ('guard-probe-nonfault', 'platform/powermac/ppc_kernel.c',
      '    int guard = probe_dsi(MEM_STACK_GUARD);',
      '    int guard = probe_dsi((u32)flush_a);',
      'milestone 5 order/format', TRAP % ('pass', 'pass', 'bad', 'pass')),
-    ('shm-no-shared-user', 'init/ppc_kernel.c',
+    ('shm-no-shared-user', 'platform/powermac/ppc_kernel.c',
      '    int shared_user = paging_boot_user_shared((u32)user_gate) == 0;',
      '    int shared_user = 1; (void)user_gate;',
      'milestone 4 order/format', r'^KBOOT MEMORY online=1 heap=1 shm=0$'),
@@ -116,9 +116,9 @@ int ppc_dec_start(u32 tb_hz, u32 tick_hz)
 
 # Audit mutations: the build itself must fail with exactly this audit finding.
 AUDIT_MUTATIONS = (
-    ('pit-direct', 'init/ppc_kernel.c', '#define KBOOT_ATTR 0x07',
+    ('pit-direct', 'platform/powermac/ppc_kernel.c', '#define KBOOT_ATTR 0x07',
      '#define KBOOT_ATTR (0x07 + 0 * PIT_HZ)', 'PIT_HZ user in the 1 kHz closure'),
-    ('pit-via-macro', 'init/ppc_kernel.c', '#define KBOOT_ATTR 0x07',
+    ('pit-via-macro', 'platform/powermac/ppc_kernel.c', '#define KBOOT_ATTR 0x07',
      '#define KBOOT_ATTR (0x07 + 0 * TICK_MS)', 'PIT_HZ user in the 1 kHz closure'),
     ('float-insn', 'arch/ppc/kernel_probe.S', 'ppc_probe_syscall:\n    sc\n',
      'ppc_probe_syscall:\n    sc\n    fneg 1,1\n', 'floating-point/AltiVec instruction'),

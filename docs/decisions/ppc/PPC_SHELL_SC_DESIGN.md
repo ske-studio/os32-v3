@@ -225,7 +225,7 @@ CLI像 ：RAM root → pm_exec_boot → pm_cli_boot
 |S01|`main.c`、`cmd_base.c`、`cmd_env.c`（userland/shell）|約120|P01/U01|共|なし|ver/hwb/about/mem、sh_shell、ver-shell-host|対象host試験、x86 programs、L|
 |S02|`userland/shell/sh_exec.inc`、`sh_launch.inc`|≤120|N01/P01|共|なし|sh_launch/status/truncation、X|対象host試験、x86 programs、L|
 |B01|`build/ppc-user.mk`|≤120|U01–03/S01–02|PPC専用|なし|R、既存ls/help、hello/fault|sh＋hello/fault build、R、L|
-|B02|`build/ppc-kboot.mk`、`init/ppc_kernel.c`|≤180|P02–04/B01|PPC専用|なし|三像・NEGATIVE・既存消費者|三像build、対象kboot/LAN試験、L|
+|B02|`build/ppc-kboot.mk`、`platform/powermac/ppc_kernel.c`|≤180|P02–04/B01|PPC専用|なし|三像・NEGATIVE・既存消費者|三像build、対象kboot/LAN試験、L|
 |T01|`tools/tests/ppc_sh_runtime.py`、`ppc_sh_input.py`|≤400|U/P|試験|なし|R/I の実ソース試験と変異|R/I --mutate、L|
 |T02|`test_ver_shell.py`、`test_hwb_shell.py`、`test_about_info.py`|≤200|S01|試験|なし|旧anchor・include・固定hash・dep-dir|各変更試験 --mutate、L|
 |T03|`test_mem_stat.py`、`sh_shell_host.c`、`tools/checks/ver-shell-host.py`|≤200|S01|試験|なし|同上、CHECK の入力追従|mem/sh-shell/ver-shell-host、L|

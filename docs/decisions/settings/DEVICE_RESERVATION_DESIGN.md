@@ -29,7 +29,7 @@
 |---|---|---|
 | 1 | 「owner・複数範囲 transaction なし」に対し `mm/pgalloc_resource.inc:52-144` に `ledger_reserve_set` が存在 | T1 完了部分を再利用。旧 `pgalloc_device_reserve` / `sys_device_reserve_core` は現行実体にない |
 | 2 | 固定配置 snapshot の追加要求に対し `mm/pgalloc_resource.inc:99-125` は区間台帳と L2 owner を照合済み | 別 broker 台帳を重複作成しない |
-| 3 | GUI で初回予約に対し `init/kernel.c:198-207` は `gfx_boot_reserve` → `exec_init` | 起動時予約を維持、残りは装置集合と公開の原子性 |
+| 3 | GUI で初回予約に対し `platform/pc98/kernel.c:198-207` は `gfx_boot_reserve` → `exec_init` | 起動時予約を維持、残りは装置集合と公開の原子性 |
 | 4 | 後発 PEGC BB 未解決に対し `gfx/gfx_core_surface.inc:191-227` は BOOT owner で上端から取得し freeze | BB を MMIO transaction に混ぜず既存 RAM/SURFACE 経路を使う |
 | 5 | GUI=0/希望値のみなら予約0に対し `gfx/gfx_core_surface.inc:135-173` は希望候補を起動時予約 | GUI=0 でも実在資源を予約、probe/enable は表示 activation 境界へ（CUI 単独は §9） |
 | 6 | PEGC と Xe10 を別 owner で拒否する旧案に対し `gfx/gfx_core_surface.inc:10-13,173` は共有 GFX owner の一括集合 | 固定表示の重なる窓は明示した同一予約グループ、利用権は排他 |
@@ -146,7 +146,7 @@ int gfx_device_activate(devres_handle h);
 - 起動: RAM地図確定→PCI読取り→検証済み資源 commit→必要PT/写像準備→BB/SURFACE記述→arena freeze→exec_init。
 - `paging_init/pgalloc_init` は PCI 取込み（`platform/pc98/pci_resources.c:82`）より先。予約時に使用中 RAM と衝突した候補は E_CONFLICT で外す。
 - GUI=0 も識別・予約・選択装置の BB 準備までは同じ。CUI 起動だけでは probe/enable しない。希望値は BB と activation の選択に使い、MMIO 収集から非選択装置を外さない。
-- `gfx_prepare_backend` の起動時 PEGC probe（`gfx/gfx_core.c:324-326`、`init/kernel.c:250`）は表示 activation gate へ移す。起動は表示同期を変更しない read-only prepare のみ。
+- `gfx_prepare_backend` の起動時 PEGC probe（`gfx/gfx_core.c:324-326`、`platform/pc98/kernel.c:250`）は表示 activation gate へ移す。起動は表示同期を変更しない read-only prepare のみ。
 - GUI=1 と CUI→GUI は同一 master/live AS=0・exec不在境界。CUI 描画アプリの既存直接 probe/init（`gfx/gfx_core.c:308`）は §9 の唯一の未決。推奨案では起動済み予約/map/BB を使い既存 gfx_init 境界で同じ表示 gate に入り、exec不在条件は GUI 経路にだけ課す。
 - exec arena 全域を禁止しない。実際の FIXED/STAGING/BB/live allocation を T1 で拒否。BB は既存 top-down、未公開失敗時だけ RAM を返す。
 - map は supervisor RW/UC を基本とし、GF の既存 WC 条件・同期は `gf_wc.c` に任せる。broker に新 WC 制御を作らない。
@@ -208,7 +208,7 @@ int gfx_device_activate(devres_handle h);
 | D3 | 変更 `drivers/video/geforce/gf_wc.c` | :157 owner helper 15 | D1後、G2と取込 | 0.25 |
 | D4 | 変更 `hwdev/gf/native.c` | :19 owner helperのみ 15 | C1後、G4と取込、claim結線なし | 0.25 |
 | D5 | 変更 `kdebug/kselftest/gfx_ledger.inc` | :21 rid/helper 20 | C1後 | 0.25 |
-| E1 | 変更 `init/kernel.c` | 起動・gate 35 | 部品完成後、直列 | 0.5 |
+| E1 | 変更 `platform/pc98/kernel.c` | 起動・gate 35 | 部品完成後、直列 | 0.5 |
 | F1 | 変更 `tools/tests/test_device_reservation.py` | 原子性・容量・変異 180 | A3と一括 | 0 |
 | F2 | 新 `tools/tests/test_device_activation.py` | C1/C3/D2のtrace・変異 260 | 同一担当が依存段ごと追記 | 0 |
 | G1 | 変更 `tools/tests/gfx_boot_host.c` | :194,568 owner/選択BB 35 | C2と一括 | 0 |

@@ -15,7 +15,7 @@ import host32
 ROOT = Path(__file__).resolve().parents[2]
 CHECK = dict(name='ppc-link-sh', env=['ppc-cross'], tier=1, needs=[], budget=60,
     covers=['tools/tests/test_ppc_link_sh.py', 'tools/tests/host32.py',
-            'build/ppc-kboot.mk', 'build/ppc-user.mk', 'init/ppc_kernel.c',
+            'build/ppc-kboot.mk', 'build/ppc-user.mk', 'platform/powermac/ppc_kernel.c',
             'platform/powermac/hostfs_boot.c', 'platform/powermac/hostfs_link_io.c',
             'platform/powermac/hostfs_link_peer.c',
             'net/host_mailbox.c', 'net/link.c', 'net/nic.c',
@@ -169,7 +169,7 @@ def main():
     work=work[work.index('#if KBOOT_SH'):]
     start=work.index('    do {'); end=work.index('    pm_lan_poll',start)
     work=work[:start]+'    hi=1; lo=2; again=hi; (void)again;\n'+work[end:]
-    boot=(ROOT/'init/ppc_kernel.c').read_text()
+    boot=(ROOT/'platform/powermac/ppc_kernel.c').read_text()
     registration=boot[boot.index('#if KBOOT_LINK\n        int work_rc'):]
     registration=registration[:registration.index('        if (work_rc)')]
     work += '\n#include "kernel/idle_work.h"\nint idle_work_register(void (*fn)(void)) { CHECK(fn==pm_link_service_once); return 0; }\nstatic void registration(void) {\n'+registration+'CHECK(work_rc==0); }\n'

@@ -7,7 +7,7 @@
  * operations, then idles with EE=1. The nine KBOOT lines are the acceptance
  * contract read by tools/ppc/kboot_run.py; every pass word below is computed.
  *
- * Not PC-98 init/kernel.c: no VFS, root mount, module load, exec_init or
+ * Not PC-98 platform/pc98/kernel.c: no VFS, root mount, module load, exec_init or
  * user entry (those are milestone 3). Nothing here claims those services. */
 #include "kernel/time/tick_clock.h"
 #include "types.h"

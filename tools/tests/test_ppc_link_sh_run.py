@@ -17,7 +17,7 @@ CHECK = dict(name='ppc-link-sh-meter', env=['ppc-cross'], tier=1, budget=20, nee
             'platform/powermac/shell_boot.c','kernel/console/console.c',
             'build/ppc-user.mk','build/ppc-kboot.mk','kernel/console/fbcon.h',
             'kernel/console/console_backend.h','tools/*.py','tools/ppc/**',
-            'platform/powermac/**','arch/ppc/**','init/ppc_kernel.c'],
+            'platform/powermac/**','arch/ppc/**','platform/powermac/ppc_kernel.c'],
     basis=['PPC_P3_DESIGN v2 §6 and appendix A-6 T2/T3/T4'])
 
 

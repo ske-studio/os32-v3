@@ -17,7 +17,7 @@ CHECK = dict(name='ppc-sd-meter', env=['ppc-cross'], tier=1, budget=10, needs=['
         'arch/ppc/kernel_probe.S',
         'arch/ppc/kernel_trap.c',
         'arch/ppc/ofw_note.S',
-        'init/ppc_kernel.c',
+        'platform/powermac/ppc_kernel.c',
         'kernel/console/console.c',
         'platform/powermac/boot.c',
         'platform/powermac/clock.c',

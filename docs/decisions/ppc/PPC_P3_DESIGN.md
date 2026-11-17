@@ -155,7 +155,7 @@ int input_legacy_wait(int mode, int interruptible);
 ## 確定の後に決めたこと (2026-11-15、PowerPC PM)
 - 段の順と HAL 4c: ③a は HAL 4c より先に出した (ユーザー決定 11-15、本線 PM の休止を受けて)。§5 の段の順を正とし、§3 と §7 の「HAL の 1p・1a・1b・4c は P3 ③ の厳密な前提」は、入力に触る ③b 以降の前提と読む。
 - ② (main 620c5237): PLN1 の像の host_mailbox_commit は、void の宣言のまま無処理にした (stage が NOSYS を返し、kapi_host_notice の本体が先に戻るので commit は呼ばれない)。
-- ③a (main 0ab4a885): pm_link_service_once (link-SH の前景の仕事) は段 ⑤ に移した。今の link 像は shell の無い診断像で、USB を組まない (build/ppc-kboot.mk の KBOOT_LINK と KBOOT_SH の排他)。⑤ で link-SH の像に USB を入れるときに、一緒に作って登録する。③a は、PLN1 の像 (KBOOT_SH=1) の terminal_service_once の登録 (init/ppc_kernel.c、再入防止つき) と、usb_boot.c の注釈だけを入れた。各像の idle_work の登録数は、PLN1 の像が 1/4 (terminal_service_once)、link の診断像が 1/4 (net_rx_idle)。
+- ③a (main 0ab4a885): pm_link_service_once (link-SH の前景の仕事) は段 ⑤ に移した。今の link 像は shell の無い診断像で、USB を組まない (build/ppc-kboot.mk の KBOOT_LINK と KBOOT_SH の排他)。⑤ で link-SH の像に USB を入れるときに、一緒に作って登録する。③a は、PLN1 の像 (KBOOT_SH=1) の terminal_service_once の登録 (platform/powermac/ppc_kernel.c、再入防止つき) と、usb_boot.c の注釈だけを入れた。各像の idle_work の登録数は、PLN1 の像が 1/4 (terminal_service_once)、link の診断像が 1/4 (net_rx_idle)。
 
 - **sys_yield の訂正 (2026-11-15):** §2 の「sys_halt は返値を捨て、sys_yield は返す」(両方を ppc_kapi_wait_once に結ぶ) は誤り。② でそのとおり結んだところ、arch-ctx-guest の lifecycle (exec_start の子が sys_yield で park して state 4 になる) が壊れた (② の a12d0ec8 から、CI の段 2 の準備で発見)。sys_yield は x86 と同じ exec_sys_yield (park の点、idle_work_run を自分で呼ぶ) に戻し、ppc_kapi_wait_once は sys_halt だけに結ぶ。
 - **HAL 4c の順の入れ替えで決めたこと (2026-11-15、本線 PM の依頼と Opus のレビュー F3・F4 を受けて PowerPC PM が反映):**

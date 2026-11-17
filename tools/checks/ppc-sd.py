@@ -32,7 +32,7 @@ CHECK = dict(env=['ppc-cross', 'qemu-ppc'], name='ppc-sd', tier=2, budget=900, n
                      'build/ppc-kboot.mk',
                      'build/ppc-user.mk',
                      'fs/serialfs/*.[ch]',
-                     'init/ppc_kernel.c',
+                     'platform/powermac/ppc_kernel.c',
                      'platform/powermac/boot.c',
                      'platform/powermac/cli_boot.c',
                      'platform/powermac/clock.c',

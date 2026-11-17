@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """C2: real FEP generator contracts and unsupported display provider."""
 CHECK = dict(name='ime-display-boundary-host', tier=1, needs=['make:all'], budget=2,
-    covers=['init/kernel.c', 'include/ime_boot.h', 'kernel/ime/ime.h', 'tools/tests/kernel_includes.py', 'tools/tests/test_ime_display_boundary.py', 'kernel/ime/ime_display_private.h',
+    covers=['platform/pc98/kernel.c', 'include/ime_boot.h', 'kernel/ime/ime.h', 'tools/tests/kernel_includes.py', 'tools/tests/test_ime_display_boundary.py', 'kernel/ime/ime_display_private.h',
             'include/ime_control.h', 'platform/*/ime_default_render.h',
             'platform/powermac/ime_display.c', 'kernel/ime/ime_render.h',
             'tools/prototypes/fep_imports.def', 'tools/gen_sqlite_imports.py',
@@ -79,7 +79,7 @@ def main():
                 print('RED runtime ime_render.h one-character comment: real generated fingerprint', flush=True)
             else:
                 raise AssertionError('contract mutation survived')
-        boot = (ROOT / 'init/kernel.c').read_text()
+        boot = (ROOT / 'platform/pc98/kernel.c').read_text()
         anchor = '#include "ime_boot.h"'
         assert boot.count(anchor) == 1
         boot_source = work / 'kernel.c'

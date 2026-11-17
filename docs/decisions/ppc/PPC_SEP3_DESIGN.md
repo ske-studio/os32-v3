@@ -193,7 +193,7 @@ void k_jmp_copy(k_jmpbuf dst, const k_jmpbuf src);
 - 製品ソースは概ね1,300〜1,800変更行（元の600〜1,400見積りより周辺adapter分が増える）。試験追従/新試験は計700〜1,300行別枠、生成物行数も別枠。必要以上の全テスト書換えはしない。
 - kernel常駐textは増分0〜4KiB、metadata/一時storageは0〜2KiBを予算とする（未計測）。opaque user/jmp/privはx86で現52/32/4Bを保持、追加entry/values stackは各128B以内を目安にframe sizeを測る。heap allocation/parkごとの割当は増やさない。
 - 通常/R1ともlink mapのresident end・BSS・SHM基点、圧縮kernelとFD空き量を段ごと比較。R1のimageも変わり、起動FDの内容/圧縮サイズに影響するがloader/FD配置の変更は設計しない。stub pageは既存1ページ・LS192Bを厳守。溢れたら黙って容量/ABIを変えず段を止める。
-- known21組：GUI→IME3、sys→geforce1、init/kernel→17。exec由来の組は現在ゼロ。init/kernel.c:14のidt（gdt間接）2組はinclude整理候補だが本段の契約切替には不要なので削減目標0、残21とする。double_fault/PC98boot/各module/IMEは後段。selected TUを除外して成功にしない。
+- known21組：GUI→IME3、sys→geforce1、init/kernel→17。exec由来の組は現在ゼロ。platform/pc98/kernel.c:14のidt（gdt間接）2組はinclude整理候補だが本段の契約切替には不要なので削減目標0、残21とする。double_fault/PC98boot/各module/IMEは後段。selected TUを除外して成功にしない。
 - Fで `tools/ppc/check_compile.py --source-profile selected --accept --json` と実.dを記録し、実際に消えた組だけknownから減らす。新たにコンパイル可能になったexecの依存も記録。PPC provider未実装の失敗を隠す空実装は作らない。本体build/起動/ユーザ実行の到達点は別管理。
 ## 6. 受入 → host/NP21/W → 変異（各項一行）
 |項目|観測/試験|代表変異（hostでruntime RED、guestは通常像で確認）|

@@ -82,7 +82,7 @@
 | GeForce | `hwdev/gf/irq.c:99` (0x3C の線、SHARED。解除は `:296`) | `:240-` PMC を読み、要因のある所だけ排出。tick は `:277` | 耐える (線・BDF とも見つけた値。線は `irq.c:93-101` で 0x3C を読み、BDF は `recover_gf_dev()`、`kdebug/recover.h:55-57`)。機器単位の口へは段 9 |
 | USB | 未実装。設計の `docs/decisions/usb/USB_DESIGN.md:215` は 0x3C の線を使い、`:234` の intr_collect が要因を返す | 設計上は耐える |
 | LGY-98 (C バス) | `drivers/net/ne2000/lgy98.c:145` (SHARED、IRQ はジャンパの 3・5・6 など) | `ne2000_irq.inc:25` で ISR の要因を確かめ、残件は `:88` の `ne2k_timer_tick` で定期回収 | 耐える。ただし **PCI の候補 3・5・6 と重なる**ので、振り直すと新しい共有の相手になり得る (§3-2 の reserved、§6) |
-| FDC | `drivers/block/fdc.c:278` (排他、IRQ11)。PCI の列挙より前に登録し、割込みも許可済み (`platform/pc98/boot.c:65`、`init/kernel.c:149・157`) | — | PCI の候補ではない。ただし §3-3 の「全部マスク済み」という前提を崩す |
+| FDC | `drivers/block/fdc.c:278` (排他、IRQ11)。PCI の列挙より前に登録し、割込みも許可済み (`platform/pc98/boot.c:65`、`platform/pc98/kernel.c:149・157`) | — | PCI の候補ではない。ただし §3-3 の「全部マスク済み」という前提を崩す |
 
 ## 3. 設計
 
@@ -158,7 +158,7 @@ int platform_pci_irq_route(u8 group, u16 line); /* 1 group ずつ。can_reroute=
 
 ### 3-3. いつ書くか・書き方 (PC-98 の backend)
 - 計画は `pci_init` (`drivers/pci/pci.c:273`) の列挙の直後に 1 回だけ立てる。書き込みは group ごとに、その group が「全機能が静止」になった時点で行う (多くはドライバの settle の中、§3-1)。
-- **前提にしないこと** (R1-05): 「どの登録より前」「動的な線は全部マスク済み」とはしない。FDC は PCI の列挙より前に IRQ11 を排他で登録し、割込みを許可している (`init/kernel.c:149・157`、`platform/pc98/boot.c:65`、`drivers/block/fdc.c:278`)。
+- **前提にしないこと** (R1-05): 「どの登録より前」「動的な線は全部マスク済み」とはしない。FDC は PCI の列挙より前に IRQ11 を排他で登録し、割込みを許可している (`platform/pc98/kernel.c:149・157`、`platform/pc98/boot.c:65`、`drivers/block/fdc.c:278`)。
 - **移してよい条件** (R2-01): その group の全機能が settle 済みで、**どの機能もまだ attach していない**こと。attach した機能は動き出している (割込みを出し得る) ので、その時点で group は「凍結」になり、以後は移さない (`[pci-irq] group <n> frozen: started`)。凍結した group は計画と違っても今の線のまま残る。結び直しはしない (r3 の手順 3・5 を削った)。
   - 例: A′ では LAN (82557) が先に attach すると、EHCI が後で settle しても PIRQ3 は凍結のまま。計画でも PIRQ3 は 3 なので、実害は無い。
 - 1 group の移し方 (`irq_save` の中で行う):
@@ -291,4 +291,4 @@ int platform_pci_irq_route(u8 group, u16 line); /* 1 group ずつ。can_reroute=
 - **GeForce の前提は着地済み**: `GF_IRQ_LINE 6U` は消え (b690586c・afe45f35)、`hwdev/gf/irq.c:93-101` で 0x3C の線を読んで `IRQ_F_SHARED` で登録、解除は `:296`。BDF は `recover_gf_dev()` (`kdebug/recover.h:55-57`)。§2 の判定を「耐える」に、§5 の前提の行を着地済みに書き換えた。
 - **段 9**: 起点は `irq.c:93-101`・`:290-300`。`irq.c:95` の `!irq_line || irq_line >= IRQ_LINE_MAX` (16) を GF1_EIRQ で断る検査は、追記 1 P2-1 (G4 は 32 以上の線) とぶつかるので、段 9 で外して共通の層の判定に任せる。
 - **§6 の受入のログ**: 今の形は `[gf1] PCI IRQ=5 register=0` (線の数字は括弧に入らない、不正な線は ` invalid=`。`hwdev/gf/irq.c:80-81・:101`)。受入の文字列を直した。
-- **段 10**: `kernel/irq/irq_math.c`・`irq.c`・`tick.c`・`init/kernel.c` は `tools/ppc/selected_success.json` (PPC の初回成功集合、減ると check が非 0) に入っている。段 10 と段 4 の `init/kernel.c` 側の呼びは、PPC のクロスコンパイルが通ることを完了条件にする (x86 の asm・pc98 のヘッダを足さない)。
+- **段 10**: `kernel/irq/irq_math.c`・`irq.c`・`tick.c`・`platform/pc98/kernel.c` は `tools/ppc/selected_success.json` (PPC の初回成功集合、減ると check が非 0) に入っている。段 10 と段 4 の `platform/pc98/kernel.c` 側の呼びは、PPC のクロスコンパイルが通ることを完了条件にする (x86 の asm・pc98 のヘッダを足さない)。

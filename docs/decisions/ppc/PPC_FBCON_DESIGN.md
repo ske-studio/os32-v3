@@ -36,7 +36,7 @@ PM: §7 のユーザー判断を段ごとの内容/build_compare と G4 受入�
 | KCG の既存口 | `drivers/video/kcg/kcg_module.h:11–16` の read_ank/read_kanji/stats/invalidate、x86 は `/boot/kcg.mod`。`userland/lib/gfx/text/lconsole.c:357–360`・`gfx_kcg.c:54–98` は KCG 字形で描く先例。fontmgr は実体なし、FEP は変換辞書で字形供給とは別 |
 | PPC 出力 | `build/ppc-kboot.mk:57,75–85` は kboot_console・console_stream・shell_putchar と con_sink をリンクし、共通 console/gfx core はリンクしていない。`kboot_console.c:27–30` は pm_log_write、`console_stream.c:7–12` は LAN/ESCC。`shell_putchar.c:5–9` は独自入口 |
 | PPC 表示 | `platform/powermac/display_provider.c:6–19,52–55` は空の後端と空の列挙、display.c は空の機種口。現状の RH 表示は HAL を通らない段印専用 |
-| root と入力 | `build/ram-root.mk:7–12` は motd と bin の ISO を kernel に埋める。`init/boot_root.c:13,28` は ISO root と /tmp ramfs。`init/ppc_kernel.c:314–324` は root→USB→sh。`input_boot.c:31–34` が LAN/USB 合流、`shell_boot.c:30–31` が接続/キー待ち |
+| root と入力 | `build/ram-root.mk:7–12` は motd と bin の ISO を kernel に埋める。`init/boot_root.c:13,28` は ISO root と /tmp ramfs。`platform/powermac/ppc_kernel.c:314–324` は root→USB→sh。`input_boot.c:31–34` が LAN/USB 合流、`shell_boot.c:30–31` が接続/キー待ち |
 
 依頼文・旧案との食い違いは **7件** (上表で訂正):
 1. GfxBackend/GfxMode の定義場所は gfx/gfx.h ではない。

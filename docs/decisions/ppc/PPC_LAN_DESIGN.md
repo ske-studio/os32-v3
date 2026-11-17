@@ -29,7 +29,7 @@
 - PM決定3: QEMU/試験はUDP、実機はAF_PACKET、codec共通を確定。
 - P0観測: QEMU 8.2.2の既定sungem・106b:0021・2MiB BAR・UDP設定成功を採用。OF後tree/BAR・PHY・DMAは未確認のまま。
 ## 1. 実物の確認・適用範囲
-- 基点 `b98087e8`（HEAD照合）。SURVEY.md を土台に、指定された製品・BSD の該当行を照合。r1の「食い違い0件」を撤回：callback粒度、RANDOM_SEED式、RX補充の引用元をF1/F16/F17で訂正。SURVEYの提案は既実装とは数えない。 `platform/powermac/log.c:15,23` は同期sink登録/直呼び、`init/ppc_kernel.c:132,137,234,240` は最初のKBOOT出力→2秒観測→idle。ここにenqueueとforeground pollを接続する。 `tools/lanfs_host.py:83` はLOGを破棄、`fs/serialfs/sfs_proto.h:16,167` は片道seq=0/10ms時計、`tools/ppc/kboot_run.py:38–46` はKBOOT行数を固定している。この3点を回避する接続を以下で確定する。 PPCKERN.ELFのみ。②の共通mm/MPIC/1kHzを維持、mount/module/exec/USERなし。GMAC coreはQEMU/QuickSilver共用、NIC IRQなし、再送なし。x86 LANの動作・公開ABIを変えない。 本作業は設計ファイル1本の作成だけ。preflight（修正を含む）・ビルド・試験・ゲスト起動は依頼に従い未実施。以下の受入は将来の実装条件。 引用略号：`O/`=/home/hight/os32-tmp/ref/openbsd/sys/dev/ic/、`OP/`=同openbsd/sys/dev/pci/、`N/`=同netbsd/sys/arch/macppc/pci/、`NG/`=同netbsd/sys/dev/ic/、`F/`=同freebsd/sys/dev/gem/。GPL・archiveは参照しない。 **[M1]** GEMレジスタ仕様、**[M2]** QuickSilver/UniNorthのclock・PCI/DMA仕様、**[M3]** 採取したPHYの仕様が未入手。印の付く値はBSDに沿う設計候補。**QEMUで確かめる段はBSDの値のまま実装して進めてよい**が、実機（QuickSilver）に載せる前に、印の付く書込みをメーカー資料と実機のtreeの採取で照合する（照合できない書込みは実機のprofileで無効のままにする。R1）。
+- 基点 `b98087e8`（HEAD照合）。SURVEY.md を土台に、指定された製品・BSD の該当行を照合。r1の「食い違い0件」を撤回：callback粒度、RANDOM_SEED式、RX補充の引用元をF1/F16/F17で訂正。SURVEYの提案は既実装とは数えない。 `platform/powermac/log.c:15,23` は同期sink登録/直呼び、`platform/powermac/ppc_kernel.c:132,137,234,240` は最初のKBOOT出力→2秒観測→idle。ここにenqueueとforeground pollを接続する。 `tools/lanfs_host.py:83` はLOGを破棄、`fs/serialfs/sfs_proto.h:16,167` は片道seq=0/10ms時計、`tools/ppc/kboot_run.py:38–46` はKBOOT行数を固定している。この3点を回避する接続を以下で確定する。 PPCKERN.ELFのみ。②の共通mm/MPIC/1kHzを維持、mount/module/exec/USERなし。GMAC coreはQEMU/QuickSilver共用、NIC IRQなし、再送なし。x86 LANの動作・公開ABIを変えない。 本作業は設計ファイル1本の作成だけ。preflight（修正を含む）・ビルド・試験・ゲスト起動は依頼に従い未実施。以下の受入は将来の実装条件。 引用略号：`O/`=/home/hight/os32-tmp/ref/openbsd/sys/dev/ic/、`OP/`=同openbsd/sys/dev/pci/、`N/`=同netbsd/sys/arch/macppc/pci/、`NG/`=同netbsd/sys/dev/ic/、`F/`=同freebsd/sys/dev/gem/。GPL・archiveは参照しない。 **[M1]** GEMレジスタ仕様、**[M2]** QuickSilver/UniNorthのclock・PCI/DMA仕様、**[M3]** 採取したPHYの仕様が未入手。印の付く値はBSDに沿う設計候補。**QEMUで確かめる段はBSDの値のまま実装して進めてよい**が、実機（QuickSilver）に載せる前に、印の付く書込みをメーカー資料と実機のtreeの採取で照合する（照合できない書込みは実機のprofileで無効のままにする。R1）。
 ## 2. 層・所有・像
 |層|唯一の所有者/ファイル（新規名は本設計）|寿命・接続|
 |---|---|---|
@@ -93,7 +93,7 @@ int ppc_probe_copy8(u32 va, u8 *out); /* kernel_probe.S: load成功0/onfault復�
 |poll: gem_phy_step（PHY交渉だけ）→成功後gem_mac_enable_step（10ms待ちは次poll）|RUNNING|
 |poll: gem_poll→RX→monitor→RSP→LOG→BEACON、link喪失/停止はreset列へ|RUNNING/RESETTING|
 ### (f) ログsink・poll
-- pm_log_escc_init成功後、最初のkprintf（init/ppc_kernel.c:137）より前にpm_lan_log_register。log.cの既存pm_log_add_sinkを使い、log.c自体は変更不要。takeover前のOF直出力は対象外、最初のKBOOT OF-CAPTUREから保存対象。
+- pm_log_escc_init成功後、最初のkprintf（platform/powermac/ppc_kernel.c:137）より前にpm_lan_log_register。log.cの既存pm_log_add_sinkを使い、log.c自体は変更不要。takeover前のOF直出力は対象外、最初のKBOOT OF-CAPTUREから保存対象。
 - FIFOは64slot×256B。callbackのbyteを開いた末尾slotに追記し、満256Bまたは送信時に閉じてu64 seqを振る。空callbackはslotを使わない。満杯では新着だけ捨て、連続するdrop区間を256Bごとの仮想chunkとして閉じseq/drop_recordsを進める（回復時の端数も1件）。drop_bytesは実捨てbyte数、両者u64飽和＋flag。再入dropも同規則、1callbackのコピーは容量16KiB以内。READY前全KBOOTと通常PHY待ちの印が16KiB内で保存されるfixtureをA8で確認。
 - sinkは短いIRQ禁止区間でFIFOを操作、再入guardが立っていれば全量drop。kprintf・MMIO・heap・待ち・pollを呼ばない。pollはslotを静的送信scratchへコピーしてIRQ復元後にgem_tx、AGAINならheadを維持。受理後はqueueから除き再送しない。
 - READY直前にpm_lan_start、2秒ALIVE観測ループ内と最後の`for (;;) pm_lan_poll(tb_now())`で実行。TBで最短1ms間隔を目標に、1回TX完了8/RX8/LOG4/応答1/状態step1、TB使用上限250usはkprintfを除く処理の予算。状態遷移時だけ印をpollの処理後に出す（同期ESCCでmsを要し得るので厳密な1ms周期は保証しない）。単一MMIOのハード停止は別リスク。無期限halt/napなし、EEは通常1。
@@ -211,7 +211,7 @@ int ppc_probe_copy8(u32 va, u8 *out); /* kernel_probe.S: load成功0/onfault復�
 |H23|＋tools/ppc/test_lan_p23.py 60–160|P23|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
 |P24|＋platform/powermac/lan_service.c 240|P8,P12–P23|L2往復/LOG/LOSS / A8–A11 / 再接続|
 |H24|＋tools/ppc/test_lan_p24.py 60–160|P24|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
-|P25|Δinit/ppc_kernel.c 30|P24|ALIVE/LAN BUDGET / A11 / tick継続|
+|P25|Δplatform/powermac/ppc_kernel.c 30|P24|ALIVE/LAN BUDGET / A11 / tick継続|
 |H25|＋tools/ppc/test_lan_p25.py 60–160|P25|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
 |P26|Δbuild/ppc-kboot.mk 30|P10,P25|IMAGE symbols/size / A12 / 配置|
 |H26|＋tools/ppc/test_lan_p26.py 60–160|P26|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
@@ -289,7 +289,7 @@ int ppc_probe_copy8(u32 va, u8 *out); /* kernel_probe.S: load成功0/onfault復�
 - tools/ppc/kboot_boot.py は x86 の build の生成物 build/out/memmap_layout.h を要する (新しい作業木では x86 の make を先に済ませる)。
 
 ## 実装で決めたこと (2026-11-11、段 P4・P5・P12・P20・P21 の取り込みで PM が決定)
-- boot_id は capture (kboot_capture.c、host で試験する) では作らない。TB と PVR を読んで `pm_gmac_boot_id` を呼ぶのは LAN の service を始める直前の段 P25 (init/ppc_kernel.c)。
+- boot_id は capture (kboot_capture.c、host で試験する) では作らない。TB と PVR を読んで `pm_gmac_boot_id` を呼ぶのは LAN の service を始める直前の段 P25 (platform/powermac/ppc_kernel.c)。
 - struct pm_kboot_info に `struct pm_gmac_boot gmac` と `int gmac_rc` を足し、kboot_capture.c は tree walk の後に pm_gmac_capture を 1 回呼ぶ。LAN の失敗で起動を止めない。kboot_capture.c が gmac_tree.c を要するので、像の段 P26 の一部 (build/ppc-kboot.mk の明示の TU に gmac_tree.c) と、kboot_capture.c を組む既存の試験 4 本の TU の追従を前倒しした。
 - ログの待ち行列の送信の側の口: `int pm_lan_log_peek(const u8 **data, u32 *len, u64 *seq, u64 *records, u64 *bytes, u32 *status)` (閉じた最古の slot を静的な scratch で見せる。status の bit0 = 飽和。開いた slot を閉じるのは、それが唯一の slot のときだけ) と `void pm_lan_log_complete(int result)` (受理で取り除き、AGAIN で残す)。宣言は lan_boot.h。
 - DMA の pool は BSS (image の予約の中)。実際の像での収容の確認は段 P26 の link map。

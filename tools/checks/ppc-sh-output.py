@@ -15,7 +15,7 @@ CHECK = dict(env=['ppc-cross', 'qemu-ppc'], name='ppc-sh-output', tier=2, budget
                      'arch/ppc/entry.S', 'arch/ppc/kernel_dec.c',
                      'arch/ppc/kernel_mmu.S', 'arch/ppc/kernel_probe.S',
                      'arch/ppc/kernel_trap.c', 'arch/ppc/ofw_note.S',
-                     'init/ppc_kernel.c', 'platform/powermac/boot.c',
+                     'platform/powermac/ppc_kernel.c', 'platform/powermac/boot.c',
                      'platform/powermac/clock.c', 'platform/powermac/escc.c',
                      'platform/powermac/escc_tree.c', 'platform/powermac/mpic.c',
                      'platform/powermac/ofw.c', 'tools/ppc/kboot_mutations.py',

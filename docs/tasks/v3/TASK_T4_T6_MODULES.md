@@ -47,7 +47,7 @@ T4 で共通runtime・SQLite部品・typed facade・services transactionは実�
 |---|---|
 | `kernel/module/module_runtime.c`・`tools/module_schema.py`・`tools/mkmod.py` | 既存のPOST_ROOT/PAIR検証・直接読込・prefix返却・隔離を拡張 |
 | `kernel/sqlite_engine.c` | ROOT_READY → Unicode → SQLITE_INTERNAL_READY → SETTINGS_CLOSED → FEP_INTERNAL_READY → SERVICES_READY。MINIMALと隔離を区別 |
-| `init/kernel.c`・`fs/vfs.c` | root順を維持。CD登録と自動mount/loop・hd上ISO試行だけをPOST_ROOTの後へ移す |
+| `platform/pc98/kernel.c`・`fs/vfs.c` | root順を維持。CD登録と自動mount/loop・hd上ISO試行だけをPOST_ROOTの後へ移す |
 | `kernel/ime/ime.c`・`kernel/ime/ime_dict.c` | T4の共有サービス・RESIDENTを保持し、残るB2文字列境界とFEP本体の分離を行う |
 
 T2dのB1とT4のB3/B4を維持し、FEP追加は既存module/import生成入力を拡張する。内部ABIは公開KAPI表に混ぜない。
@@ -274,7 +274,7 @@ T5の順は **T5-0a → T5-0b → T5a-1/2/3 → T5b-4 (縮小) → T5c-0 (前倒
 | T4a-2 (1日) | VA0 SQLite prototype・import生成・reloc量測定 | ①未解決/外部data/不支持relocを生成拒否 ②非整列正常relocは成功、末尾−2/BSS/重複/import交差は書込0 ③base加算overflow拒否 ④実画像/body/prefix/件数と上限を確定。境界緩和変異を検出。SQLite専用importを別生成し、KDEBUG S4正常像を対照にする (§2-1)。 |
 | T4a-3 (1日) | MEMSYS5 hook/タグ方式のhost prototype | ①HEAP→GETMALLOC→MALLOCの実allocatorを通る ②realloc失敗で旧block内容/勘定不変 ③別文脈freeと表満杯で漏れ0 ④heap+タグ総量≤512KiB。タグ/丸め勘定削除変異を検出 |
 | T4a-4 (1日) | 最大負荷S/M/Lの取り分測定fixture | ①app sort/prepareで上限到達後も各辞書1語変換/学習が通る ②全辞書切替で最大一時量を記録 ③予約超えは旧辞書保持＋再起動要求 ④共通予約・APP上限・最大連続要求を数値化。APP割当門削除で対照が崩れる。USER mallocとMEMSYS5を分け、既存sbrk/exec_heap採取を使う (§3-3)。 |
-| T4a-5 (1日) | module record・load/start/abort共通核 | ①全確保点失敗でowner/page/FDが開始前へ ②init完了前はexport未公開 ③prefix返却後もexport/dependencyが有効 ④満杯/二重abortで二重freeなし ⑤未停止参照は隔離。先行公開/無条件free変異を検出。KDEBUG OFFはload/owner0、ONはRUNNING・自己試験実行を確認 (`init/kernel.c:594,669,672`)。 |
+| T4a-5 (1日) | module record・load/start/abort共通核 | ①全確保点失敗でowner/page/FDが開始前へ ②init完了前はexport未公開 ③prefix返却後もexport/dependencyが有効 ④満杯/二重abortで二重freeなし ⑤未停止参照は隔離。先行公開/無条件free変異を検出。KDEBUG OFFはload/owner0、ONはRUNNING・自己試験実行を確認 (`platform/pc98/kernel.c:594,669,672`)。 |
 | T4b-1 (0.5日) | B3のcopy核・3入口の拒否時不変契約 (§9 決定済み) | ①1023B+NUL成功、1024B+NUL/未終端/guard跨ぎ失敗 ②copy拒否でengine進入0・ファイル不変 ③出力はleave後。finalize先行/切捨て変異を検出。stmt/slot/SHMは拒否時不変に固定し、3入口の拒否→stepと資源回収を対照試験する。核だけの合格を公開接続の受入にしない |
 | T4b-2 (1日) | engine guard・sqlite_stack.asm・例外/STOP接続 | ①全outerのESPが128KiB stack内で戻りregister/IF一致 ②再入/IRQ/IF=0 I/Oは副作用前拒否 ③engine中faultはfail-stop、app-kill/cleanup0 ④STOPはleave後に1回 ⑤通常VFS callbackのactive連続。guard迂回/早期STOP変異を検出。EXECNESTのcaller/TSS.ESP0保持とCPL0のESP切替を区別 (§3-1)。 |
 | T4b-3 (1日) | F2 group/lease・KAPI/IME/boot利用者 | ①RESIDENT2slotをsettings返却→FEPで再利用 ②所属無しopen拒否 ③遅延journalは同group ④別DB親子/同ownerのT01/T02/T07/T12で子だけ回収 ⑤close失敗は隔離・再利用なし。現ownerへの誤帰属変異を検出 |

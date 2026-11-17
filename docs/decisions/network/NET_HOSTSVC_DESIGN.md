@@ -113,7 +113,7 @@ int dev_media_check(Device *dev, u32 *generation); /* ATAPI/netcdを選び、cac
 - 30秒未使用後・seq閾値による再接続後・新着 ALIVE 後の最初のアクセスで HELLO+BOPEN+同一性比較を行う。カーネル公開のALIVE観測世代とalive_seenの差を検査予約としてcoalesceし、ネットワーク待ちはtick内で行わない。検査成功時に取得済みの観測世代をalive_seenへ保存し、その間の新着は次アクセスへ残す。
 - 同じ像なら媒体世代維持。違えば media_gen++、VFSの当該mount/FDを失効、ISOのPVD/パス/先読み/sector cache全破棄。その操作は STALE。次のパス操作で同じ `/cd0` を載せ直し、旧FDは永久にSTALE。
 - ISO の全 `atapi_media_gen()` 使用をデバイス毎の検査に置換。キャッシュ参照前と読み完了後に世代照合し、HOSTDOWN/STALEを IO に潰さない。媒体不在で古いcacheを成功として返さない。
-- `init/kernel_boot_memory.inc:51,60–66` は現在CD→PCI→LAN。NETCD有効時はPOST_ROOTでPCI資源確立→lan.modロード/NIC bind→netcdをcd0登録→cd.modロード→子mountに変更（PCI/LAN段は二重実行しない）。登録時にホスト応答を待たない。
+- `platform/pc98/kernel_boot_memory.inc:51,60–66` は現在CD→PCI→LAN。NETCD有効時はPOST_ROOTでPCI資源確立→lan.modロード/NIC bind→netcdをcd0登録→cd.modロード→子mountに変更（PCI/LAN段は二重実行しない）。登録時にホスト応答を待たない。
 - `drivers/ata/cd_body.c:14` の固定cd0を最初の空きcdNへ変更、`drivers/ata/cd_module.c` の登録契約も更新。cdinstの固定箇所は `userland/system/cdinst.c:33,37,115`。
 - 起動設定 `NETCD=install` で仮想デバイスを **cd0として先に登録**、物理CDは次の空き番号へ。未設定時は現状通り。VFSの `VFS_DEV_CD` と `iso9660_mount` の cdN 命名をそのまま満たす。
 - FD手順: ホストで新規 `tools/fd_netcd_config.py <入力FD像> --output <出力FD像> --netcd install --peer <MAC>` を実行し、起動前にFDの起動設定へ `NETCD=install`・peer・`SFS_LAN=1` を書く → lanfs_host(--image、必要なら--allow-write)とbridge/agent起動 → 出力FDで起動 → 上記POST_ROOT順でnetcd=cd0を確保 → `mount /cd0 cd0 iso9660` → 従来のcdinst。起動後の付け直しの口は作らない。cdinst自身のmountが既存mountを許すことも受入で確認。
@@ -279,7 +279,7 @@ int os32_host_notice_read(const char *name, HostNotice *out); /* LISTで名前�
 | I5 | 改 build/kernel.mk | 10 | A4をvmkernelへ登録する1行 (R2) | build | 不要 |
 | I | 統合登録は下記のように1ファイルずつ直列段へ分解 | 各10〜80 | sdk/kapi.json、shared header、イベント定義、Device宣言/登録、init起動設定、module輸出入定義、build登録、app.conf、仕様正典 | 各対象 | 不要（境界追加はIで宣言） |
 - Iの生成物は手編集しない。LAN_OBJSへA5/D2/D3を追加、kernel通常パスの自動収集から除外。sfs_clientは現状 `build/kernel.mk:43` ではvmkernelであり、lan.modのsfs_lanと区別してD2から輸入する。A4はvmkernelに置きlgy98.cと同じLGY98条件で登録し、lan.modのne2k輸入を不要にする。netcd/82557 adapter本体をkernelへ複製しない。
-- 追加段は各1ファイル: D7 `drivers/ata/cd_body.c`（cd.mod、40行、空きcdN）、D8 `drivers/ata/cd_module.c`（vmkernel、40行、登録）、I1 `init/kernel_boot_memory.inc`（vmkernel、30行、順序）、I2 `build/lan-module.mk`（build、30行）、I3 `tools/prototypes/lan_imports.def`（生成入力、80行、上表輸入）、A11 `net/link_host_api.inc`（vmkernel、60行、期限/8枠/エラー）。
+- 追加段は各1ファイル: D7 `drivers/ata/cd_body.c`（cd.mod、40行、空きcdN）、D8 `drivers/ata/cd_module.c`（vmkernel、40行、登録）、I1 `platform/pc98/kernel_boot_memory.inc`（vmkernel、30行、順序）、I2 `build/lan-module.mk`（build、30行）、I3 `tools/prototypes/lan_imports.def`（生成入力、80行、上表輸入）、A11 `net/link_host_api.inc`（vmkernel、60行、期限/8枠/エラー）。
 - I4は入力像を保持して別の出力像へNETCD/peer/SFS_LANを記録する。
 - SDK/hostの追加段も各1ファイル・半日〜1日: S1 新 `userland/lib/host/host_call.c`（SDK、180行）、S2 改 `userland/lib/host/libos32host.c`（SDK、80行）、S3 改 `userland/lib/host/libos32host.h`（SDK、40行）、S4 改 `sdk/rust/os32api/src/host.rs`（SDK、180行）、H7 新 `tools/host_services.py`（host、180行、LIST登録・sfs静的行・stub/501）。lan_imports不要、S1→S2/S4・H7→H5。
 - 各試験ファイルも次節の1行を1段で新設、CHECK.inputsを宣言。Iの正典更新はKAPI_SPEC、06_filesystem、HOST_SERVICES_PLAN、LINK_PLAN、TASK_LAN_82557、packagesの各ファイルを別段とする。

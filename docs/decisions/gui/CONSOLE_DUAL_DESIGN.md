@@ -132,7 +132,7 @@ int pc98_route_to_gf(void)
 | kdebug | kdebug_main.c:53 の display_restore_98 (safe=1 のまま 98 の文字画面) | 変更なし。kdebug.bin 0 バイト |
 
 ## 5. 設定
-- `/etc/system.cfg` の `CONSOLE_DUAL=0|1` (無い = 0)。init/kernel_gfx_config.inc の GFX= と同じ所 (⑥ より前): `con_dual_configure(sysconfig_get_int(SYS_SYSTEM_CFG, "CONSOLE_DUAL", 0));`
+- `/etc/system.cfg` の `CONSOLE_DUAL=0|1` (無い = 0)。platform/pc98/kernel_gfx_config.inc の GFX= と同じ所 (⑥ より前): `con_dual_configure(sysconfig_get_int(SYS_SYSTEM_CFG, "CONSOLE_DUAL", 0));`
 - 1 は「GF を直結した構成」の宣言 (自動の検出はしない)。説明の 1 行を system.cfg の説明の正典 (INDEX の表で決まる所) へ。
 
 
@@ -151,7 +151,7 @@ int pc98_route_to_gf(void)
 | D2 | platform/pc98/display_dual.c (新: gfx2 の列挙・key・text_on・診断) + pc98.mk・order.mk・build_profile_x86.json | D1 の .h・H0 | +110 |
 | D3 | kernel/console/console.c (門 4 か所 + console_session_clear) + host の stub 3 本 | D1 | ±20、各 +3 |
 | D4 | drivers/video/pc98/pc98_route.c | D1 | +4 |
-| D5 | init/kernel.c (423・484) + init/kernel_gfx_config.inc | D1・D3 | ±8 |
+| D5 | platform/pc98/kernel.c (423・484) + platform/pc98/kernel_gfx_config.inc | D1・D3 | ±8 |
 | D6 | tools/tests/console_dual_host.c + tools/checks/console-dual-host.py | H0・D1〜D5 | +240 / +20 (400 行を超えたら、判定と列挙 (A1・A1g・A2) と門・経路 (A3・A4) の 2 本に分ける) |
 | D7 | 設定の説明 1 行 (文書) | PM | +1 |
 - 実装者は全部 terra。H0・D1 の .h を先に固定し D2〜D5 を並列、**H0・D1〜D6 を 1 本の統合の枝 (wt/int-*) で CI 1 回**の取り込みの単位にする。
@@ -185,7 +185,7 @@ int pc98_route_to_gf(void)
 
 ## 確定の後の追記 (2026-11-10、今の main cfb9cec3 との前提の照らし直し、PM 決定)
 - **実装の時機 (os32powerpc の指摘)**: 本票が触るファイルは PowerPC 第 5 段 C1〜C3・B1〜B6 と同じ。cfb9cec3 の時点では第 5 段で入ったのは A (`gfx/gfx_internal.h`) と E・F だけで、§7 の 4 ファイル (`kernel/console/console.c`・`console_backend.h`・`platform/pc98/console.c`・`include/tvram.h`) は変化なし。実装は第 5 段 Z の後に出し、そのとき移った先の構成で §1 の F1〜F10 の file:line と §7 の置き場を照らし直してから依頼する。§7 の「D3 と C1 は先に入った方に載せ直す (推奨: D3 が先)」はこの順に書き換えた。
-- **D5 と PPC の選択集合**: `init/kernel.c` は `tools/ppc/selected_success.json` の PPC の初回成功集合に入っている (範囲の前から)。D5 は `console_dual.h` だけを include し、`drivers/`・`platform/pc98/` のヘッダを足さない (今の設計どおり)。足すなら `tools/ppc/known_header_dependencies.json` に組を足す。
+- **D5 と PPC の選択集合**: `platform/pc98/kernel.c` は `tools/ppc/selected_success.json` の PPC の初回成功集合に入っている (範囲の前から)。D5 は `console_dual.h` だけを include し、`drivers/`・`platform/pc98/` のヘッダを足さない (今の設計どおり)。足すなら `tools/ppc/known_header_dependencies.json` に組を足す。
 - **その他の前提は変化なし**: `tools/tests/legacy_callers_host.c` は D2 で `v86_call_dispatch` のスタブの型 (`src, count`) だけ変わり、console の偽の置き換え (`:83`・`:140-143`) は同じ。GF は 1 枚の前提も保たれる (`drivers/video/geforce/geforce_platform.c` が 2 枚目を `second ... ignored` と記録、`kdebug/recover.h:54-57`)。
 
 ## 確定の後の追記 (2026-11-12、main 15738b50 との照らし直し、PM 決定)
@@ -204,10 +204,10 @@ int pc98_route_to_gf(void)
 - **定数**: console_dual.h は gfx2_int.h を include せず、`#define CON_OUT_MAX 9  /* 1 + GFX2_MAX_ADAPTERS(4) × head[2] */` を置く。display_dual.c で `_Static_assert(CON_OUT_MAX >= 1 + GFX2_MAX_ADAPTERS * (sizeof gfx2_adapters[0].head / sizeof gfx2_adapters[0].head[0]))` を確かめる。§2-1 の CON_DUAL_MAX_* は使わない。
 - **text_on の手本**: platform/pc98/display.c:23-34 の display_text_start のうち 28-33 (GDC STOP・FF1 DISP ON・TEXT START) だけを写す。26-27 の gfx_current_height・gfx_flip_enabled は書かない (A2)。
 - **file:line の更新**:
-  - init/kernel.c の 412・473・435-436 は 423・484・446-447 に。
+  - platform/pc98/kernel.c の 412・473・435-436 は 423・484・446-447 に。
   - backend_geforce.c の 618・627・728・483 は 643・655・756・491 に。
   - gfx_shutdown は gfx/gfx_core.c:383-414、パニックの直書きは platform/pc98/emergency.c:20-24。
-  - 設定の読み込みは init/kernel_gfx_config.inc:17 の後に入れる。
+  - 設定の読み込みは platform/pc98/kernel_gfx_config.inc:17 の後に入れる。
   - console.c の門 (53-57・106・388・428-445) と pc98_route.c (22-25・39-42・44-57) はそのまま。
 - **D3 の付帯**: console.c を組む host 試験 3 本 (tools/tests/con_sink_host.c・sep5_console_host.c・legacy_callers_host.c) に con_dual_* の stub (0 を返す) を足す。test_sep5_console.py:44 の目印の行 (`    return con_backend_safe() &&`) は変えない。PowerPC 第 5 段 C1 は main にあり、console.c は `con_backend_safe()` 経由 (platform/pc98/console.c:32-35)。D3 はその上に載せる。
 - **§4 に足す**: GF の LOST (gfx/v2/fence.c:25-43) は 0FACh・safe に触らないので、TEXT の行は描き続け、DESK の行は state ≠ OK で NONE にする。

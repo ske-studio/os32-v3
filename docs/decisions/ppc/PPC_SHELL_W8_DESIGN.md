@@ -266,7 +266,7 @@ if reply is not None:
 |P06|platform/powermac/lan_service.c|FS直接RX・外部payload TX・状態gate、P04/05|150／不変|
 |P07|platform/powermac/root_boot.c|COM1追加・sizeofで登録個数算出|10／不変|
 |P08|platform/powermac/hostfs_boot.c 新規|FS登録・時計設定・persistent開始|50／不変|
-|P09|init/ppc_kernel.c|第3像のroot後・sh前にP08を呼ぶ|20／不変|
+|P09|platform/powermac/ppc_kernel.c|第3像のroot後・sh前にP08を呼ぶ|20／不変|
 |P10|build/ppc-kboot.mk|FS閉包・provider・既存除算helper確認、P09|65／不変|
 |P11|arch/ppc/kernel_trap.c|DEC/外部IRQの私有depth・照会関数|25／不変|
 |P12|arch/ppc/ppc_trap.h|P11の照会宣言、P04へ結線|5／不変|

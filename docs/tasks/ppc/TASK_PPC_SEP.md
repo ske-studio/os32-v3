@@ -80,7 +80,7 @@ x86 本線は止めず、小枝ごとに受入済みの変更だけを取り込�
 |領域（SURVEY の ID）|大|中|小|代表例・実物|
 |---|---:|---:|---:|---|
 |実行・文脈 E1〜E7|6|1|0|`exec/exec_schedule.inc:267` の EIP-=2、`exec_tramp_init.inc:57` の x86 機械語生成|
-|割込み・起動・時計 I1〜I5|3|2|0|`init/kernel_boot_cpu.inc:28` 以降の GDT/TSS/IDT/PIC/PIT 順、IRQ の16線前提|
+|割込み・起動・時計 I1〜I5|3|2|0|`platform/pc98/kernel_boot_cpu.inc:28` 以降の GDT/TSS/IDT/PIC/PIT 順、IRQ の16線前提|
 |引数・asm A1〜A7|1|5|1|`kapi/kapi_print.c` の可変引数、`gfx/gfx_internal.h` の rep 命令|
 |V86・描画・boot V1〜V5|1|4|0|共通 exec の V86 呼び手、`gfx/gfx_core.c:259` の TVRAM 直参照|
 |SDK・CRT・Rust K1〜K2|2|0|0|`sdk/crt/crt0.asm:5` の BITS 32、Rust target の x86/LE 固定|

@@ -242,7 +242,7 @@
 |M8[n]|drivers/usb/hid_kbd_map.c、内部sc宣言、T_usb /300|M1/M3、Command sc監査/追加、全usage照合の期待を同時更新|
 |A0準備/A0z|公開宣言/layout試験を各≤350、親§7のA0zへ合流。原子的kapi.json/生成/版/provider切替の400行例外は親U1と同じ|親A0zの既存依存にM2〜M8を追加、版上げは1回。新中断の有効化はまだしない|
 |U1[n]|userland/lib/input/kbd_policy.c/.h、T_user /380|A0z、既存input_bindと別の操作/文脈ラッパー|
-|U2-x0 / U2-p0|x86: init/kernel.c / PPC: platform/powermac/shell_boot.c、各T_shell /≤350|A0z/U1/M5後、各arch別小段で初期shellのLINE_EDIT接続を先行。起動箇所は下記file:lineで固定|
+|U2-x0 / U2-p0|x86: platform/pc98/kernel.c / PPC: platform/powermac/shell_boot.c、各T_shell /≤350|A0z/U1/M5後、各arch別小段で初期shellのLINE_EDIT接続を先行。起動箇所は下記file:lineで固定|
 |U2[n]|userland/shell/ui.c、T_shell、内部宣言1個 /350|U2-x0/U2-p0後、両archのLINE_EDIT/command_begin/end、EOF/ESC|
 |E-x[n]/E-p[n]|x86: arch/x86/input_interrupt.c (新) / PPC: arch/ppc/input_interrupt.c (新)、共通exec/exec_abort.inc、各T_exec /≤380|A0z/U2/M6/M7、archごとのadapterはこの1ファイルに固定し別段。shell宣言済みで通常中断を有効化|
 |U3g[n]|userland/gshell/src/input.rs、T_gui、ユーザー側結線1個 /380|U1/M3/M8/A0z、GUI操作・独占・make/break消費|
@@ -250,7 +250,7 @@
 |B[n]|§6完了条件のbuild/fixtureを1〜3ファイルずつ /≤350|order/selection/fixture/PPC一覧を全て追従してから当該部品を受入。B単独一段に4ファイルを詰めない|
 |4b-map[n]|platform/powermac/input_keymap.c、ppc_input_usb_host.c、ver-ppc-input-usb.py /350|下記依存全完了、27期待廃止/旧ファイル削除、build除去は直前B|
 
-- B6の現行起動経路 (int-1115k、main a822e11c): x86は `init/kernel.c:407-417` でGUI/CUIを決め、`:450-451`のexec_runでshellを起動するため、U2-x0の接続ファイルはinit/kernel.c。PowerPCは `platform/powermac/shell_boot.c:29-36` のpm_shell_bootからexec_run("/bin/sh.bin")を呼ぶため、U2-p0はplatform/powermac/shell_boot.c。各々、CUI初期shellのユーザーコードへ入る前にLINE_EDITを引き渡す。E-x/E-pは上表の新規adapterから共通exec/exec_abort.incの要求/待機解除へ結線する。
+- B6の現行起動経路 (int-1115k、main a822e11c): x86は `platform/pc98/kernel.c:407-417` でGUI/CUIを決め、`:450-451`のexec_runでshellを起動するため、U2-x0の接続ファイルはplatform/pc98/kernel.c。PowerPCは `platform/powermac/shell_boot.c:29-36` のpm_shell_bootからexec_run("/bin/sh.bin")を呼ぶため、U2-p0はplatform/powermac/shell_boot.c。各々、CUI初期shellのユーザーコードへ入る前にLINE_EDITを引き渡す。E-x/E-pは上表の新規adapterから共通exec/exec_abort.incの要求/待機解除へ結線する。
 
 |親の段|書き換える依存/責務|
 |---|---|

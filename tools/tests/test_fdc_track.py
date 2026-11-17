@@ -17,7 +17,7 @@
 ない変異) は SURVIVED でなければならない。
 """
 CHECK = dict(name='fdc-track-host', tier=1,
-    covers=['lib/dma_contract.c', 'include/dma_contract.h', 'drivers/block/fdc.c', 'drivers/block/fdc_io.inc', 'drivers/block/fdc_seek_reset.inc', 'drivers/block/fdc_transfer.inc', 'drivers/block/fdc_command.inc', 'drivers/block/fdc_sector_transfer.inc', 'drivers/block/fdc.h', 'kernel/irq/irq.c', 'kernel/irq/irq.h', 'kernel/irq/irq_math.c', 'kernel/irq/irq_math.h', 'arch/x86/kernel/idt.c', 'arch/x86/kernel/idt.h', 'arch/x86/kernel/isr_handlers.c', 'init/kernel.c', 'arch/x86/kernel/isr_stub.asm', 'arch/x86/kernel/iret_user.inc', 'tools/tests/fdc_hostshim/**', 'drivers/block/fdc_decide.c', 'drivers/block/fdc_track.c', 'fs/fat/fatfs/diskio.c', 'fs/fat/fatfs/ff.c', 'fs/fat/fatfs_vfs.c', 'tools/tests/fdc_track_host.c', 'drivers/dma/dma8237_math.c', 'tools/check_artifacts.py', 'include/clock_service.h', 'kernel/time/clock_service.c', 'include/platform_irq.h', 'platform/pc98/pic.c', 'include/platform_device.h', 'include/ide_contract.h', 'tools/tests/kernel_includes.py'],
+    covers=['lib/dma_contract.c', 'include/dma_contract.h', 'drivers/block/fdc.c', 'drivers/block/fdc_io.inc', 'drivers/block/fdc_seek_reset.inc', 'drivers/block/fdc_transfer.inc', 'drivers/block/fdc_command.inc', 'drivers/block/fdc_sector_transfer.inc', 'drivers/block/fdc.h', 'kernel/irq/irq.c', 'kernel/irq/irq.h', 'kernel/irq/irq_math.c', 'kernel/irq/irq_math.h', 'arch/x86/kernel/idt.c', 'arch/x86/kernel/idt.h', 'arch/x86/kernel/isr_handlers.c', 'platform/pc98/kernel.c', 'arch/x86/kernel/isr_stub.asm', 'arch/x86/kernel/iret_user.inc', 'tools/tests/fdc_hostshim/**', 'drivers/block/fdc_decide.c', 'drivers/block/fdc_track.c', 'fs/fat/fatfs/diskio.c', 'fs/fat/fatfs/ff.c', 'fs/fat/fatfs_vfs.c', 'tools/tests/fdc_track_host.c', 'drivers/dma/dma8237_math.c', 'tools/check_artifacts.py', 'include/clock_service.h', 'kernel/time/clock_service.c', 'include/platform_irq.h', 'platform/pc98/pic.c', 'include/platform_device.h', 'include/ide_contract.h', 'tools/tests/kernel_includes.py'],
     needs=['make:all'], budget=4.7,
     basis=['[HW2]'],
 )
@@ -233,7 +233,7 @@ def check_irq_entry():
     assert 'irq_stub_11' not in asm and 'fdc_irq_handler' not in asm
     idt = (ROOT / "arch/x86/kernel/idt.c").read_text()
     assert re.search(r'idt_set_gate\(IRQ_TO_INT\(11\), irq_stub_common_11,', idt)
-    assert 'irq_enable(FDC_IRQ)' not in (ROOT / "init/kernel.c").read_text()
+    assert 'irq_enable(FDC_IRQ)' not in (ROOT / "platform/pc98/kernel.c").read_text()
     assert 'fdc_irq' not in (ROOT / "arch/x86/kernel/isr_handlers.c").read_text()
     assert 'fdc_irq_fired' not in (ROOT / "drivers/block/fdc.h").read_text()
     print('IRQ11 common entry / no V86 reflection / single EOI owner PASS', flush=True)

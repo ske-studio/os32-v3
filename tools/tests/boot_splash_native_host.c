@@ -69,7 +69,7 @@ const u8 *v86_bios_real_lowmem(void)
 #include "../../drivers/video/pc98/splash_raster.c"
 #pragma GCC diagnostic pop
 #include "../../platform/pc98/splash.c"
-#include "../../init/boot_splash.c"
+#include "../../platform/pc98/boot_splash.c"
 
 GfxBackend gfx_backend_geforce = { .name = "geforce-unavailable" };
 void gui_display_failed(void) { abort(); }

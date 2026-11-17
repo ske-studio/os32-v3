@@ -677,7 +677,7 @@ python3 tools/mkpkg.py --list packages/NORMAL.PKG                # 中身の一�
 
 cdinst の展開は依存の順 BOOT → MINIMAL → GUI → NORMAL → DEBUG。Minimal だけの HDD で
 `/etc/system.cfg` が `GUI=1` でも、gshell が無いのでカーネルは `gshell load failed -> CUI shell`
-を出して CUI で上がる (`init/kernel.c` のシェル起動ループ。shlib が無いのは
+を出して CUI で上がる (`platform/pc98/kernel.c` のシェル起動ループ。shlib が無いのは
 `[shlib] ... not found (GUI shlib disabled)` で、拒否理由は立たない)。
 
 **MINIMAL =「起動して、HDD に入れて、壊れたときに直して、残りを取ってこられる」

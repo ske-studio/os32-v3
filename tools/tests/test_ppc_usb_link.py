@@ -13,7 +13,7 @@ CHECK = dict(name='ppc-usb-link-meter', tier=1, budget=10, needs=['make:ppc-ci-i
     covers=['tools/tests/test_ppc_usb_link.py', 'tools/ppc/usb_run.py',
             'tools/ppc/kboot_accept.py', 'tools/ppc/kboot_run.py',
             'tools/ppc/run.py', 'tools/ppc/kboot_mutations.py',
-            'platform/powermac/**', 'arch/ppc/**', 'init/ppc_kernel.c',
+            'platform/powermac/**', 'arch/ppc/**', 'platform/powermac/ppc_kernel.c',
             'tools/ppc/**', 'tools/*.py', 'fs/serialfs/serialfs_persistent.c',
             'kernel/console/con_sink.c', 'kernel/console/console.c',
             'mm/kmalloc.c', 'userland/shell/rshell_lan.c'],

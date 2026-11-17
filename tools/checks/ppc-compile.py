@@ -17,7 +17,7 @@ CHECK = dict(env=['ppc-cross'], name='ppc-compile', tier=1, budget=180, needs=['
                      'tools/deploy_manifests.py', 'tools/mkpkg.py', '.github/actions/ppc-setup/action.yml',
                      '.github/workflows/build.yml', '.github/workflows/check.yml',
                      'build/ppc*.mk', 'build/ppc-ram-root.json', 'build/ram-root.mk',
-                     'arch/ppc/**', 'platform/powermac/**', 'init/ppc_kernel.c',
+                     'arch/ppc/**', 'platform/powermac/**', 'platform/powermac/ppc_kernel.c',
                      'userland/ppc/**', 'lib/**', 'include/**', 'sdk/**',
                      'kernel/**', 'mm/**', 'fs/**', 'gfx/**', 'drivers/**',
                      'assets/fonts/**', 'tools/mkroot_image.py', 'tools/gen_unicode.c'],

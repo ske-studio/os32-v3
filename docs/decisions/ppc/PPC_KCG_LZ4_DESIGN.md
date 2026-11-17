@@ -38,7 +38,7 @@ console_route・段 I・PLANAR4・FD フォント収録・実行中切替コマ�
 - header検査→出力P確保→圧縮時のみ入力C確保→全量read→lease validate→decode→fetched検査→close成功→差替え。
 - flags=0 は出力に直読。入力Cは公開前に解放する。失敗時は新入力・新出力・leaseを回収し、旧residentを保持する。
 - 成功時だけ既存の kcg_file.c:48–50 と同じ順で旧resident解放→新resident代入→counter reset。再ロードを拒否しない。
-- bootの呼び手は init/ppc_kernel.c:345 の1か所。font成功後のunicode/target/FB準備順を維持する。
+- bootの呼び手は platform/powermac/ppc_kernel.c:345 の1か所。font成功後のunicode/target/FB準備順を維持する。
 - 初回loadの字形用最大同時確保はP+C=593,056B、再ロードは旧P込み888,996B＋管理分。他用途を含む1MiB arenaの高水位を測る。
 - 確保不能時はエラーで戻り、既存streamを継続する。公開kcg_load_fontのNOSYS、x86のROM/module選択は不変。
 
@@ -114,7 +114,7 @@ R系の完了は前提にしない。ppc-kboot.mkの他作業との順序・所�
 | ID・対象 | 訂正内容・確認 |
 |---|---|
 | D3: docs/decisions/gui/CONSOLE_DUAL_DESIGN.md:50 | PPCはplatform/powermac/display_dual.cに実体あり、と古い注記を更新する |
-| D1: PM事前確認の記述 | init/kernel_gfx_config.inc:18でconfigure済み、kernel.c:208,309で呼出し/include済み。本設計を訂正記録とし、PM管理の元記録も訂正する |
+| D1: PM事前確認の記述 | platform/pc98/kernel_gfx_config.inc:18でconfigure済み、kernel.c:208,309で呼出し/include済み。本設計を訂正記録とし、PM管理の元記録も訂正する |
 文書訂正はPowerPCから本線PMへ渡す。D1を製品の結線欠落と扱わず、cfg読込みの追加実装はしない。
 
 ## 5. 段 I へ送る

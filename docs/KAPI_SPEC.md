@@ -2065,7 +2065,7 @@ slot 249。ひらがな U+3041..3093 とカタカナ U+30A1..30F6 は算術変�
 (kernel owner の使用頁 +7、空き −7、`other` へ重複加算しない)。
 
 **読込順序と失敗** (`kernel/console/unicode_file.c` の `unicode_file_load`):
-- 呼出しは `init/kernel.c` の初期自己試験の終了直後。root mount・paging・memory_boot_init・初期試験に
+- 呼出しは `platform/pc98/kernel.c` の初期自己試験の終了直後。root mount・paging・memory_boot_init・初期試験に
   よる再初期化が済み、`kaudit_boot_pages`・KAPI 構築 `exec_init`・IME より前。ここまでの起動表示は
   ASCII とし、日本語の最初の描画・外部 KAPI 呼出しの前に成否を確定する。
 - `vfs_stat` で長さ 28,252 B を確認し、確保した頁へ `vfs_read`、返却長も一致することを確認する。

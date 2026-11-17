@@ -19,7 +19,7 @@ CHECK = dict(env=['ppc-cross', 'qemu-ppc'], name='ppc-rh-fb', tier=2, budget=600
     'tools/tests/test_owner_reclaim.py',
     'userland/rust/libos32gui/src/shlib.rs',
     'platform/powermac/rh_observe.[ch]', 'arch/ppc/**',
-    'init/ppc_kernel.c', 'platform/powermac/boot.c',
+    'platform/powermac/ppc_kernel.c', 'platform/powermac/boot.c',
     'platform/powermac/mmu_boot.c', 'platform/powermac/mmu_start.c',
     'platform/powermac/ppc_layout.h', 'platform/powermac/lan_boot.h',
     'build/ppc.mk', 'build/ppc-kboot.mk', 'tools/ppc/rh_fb.py',

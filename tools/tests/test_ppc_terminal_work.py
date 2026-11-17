@@ -7,7 +7,7 @@ CHECK = dict(name='ppc-terminal-work', env=['ppc-cross'], tier=1, needs=[], budg
             'platform/powermac/terminal_input.c',
             'platform/powermac/lan_boot.h', 'platform/powermac/usb_boot.h',
             'platform/powermac/usb_boot.c', 'platform/powermac/lan_service.c',
-            'init/ppc_kernel.c', 'build/ppc-kboot.mk', 'net/nic.c', 'net/link.c', 'kernel/idle_work.c',
+            'platform/powermac/ppc_kernel.c', 'build/ppc-kboot.mk', 'net/nic.c', 'net/link.c', 'kernel/idle_work.c',
             'kernel/idle_work.h', 'net/nic.h', 'kernel/cli/resident_cli.h', 'include/types.h',
             'include/callconv.h', 'sdk/include/os32/os32_kapi_shared.h',
             'arch/ppc/kernel_boot.h', 'arch/ppc/exec_kapi.c', 'arch/ppc/arch_exec_kapi.h',
@@ -146,7 +146,7 @@ def main():
         assert 'net/nic.c' in manifest  # idle_wait_step uses the common RX predicate.
         assert ('net/link.c' in manifest) != expected
         assert ('platform/powermac/usb_boot.c' in manifest) == expected
-    boot = (ROOT / 'init/ppc_kernel.c').read_text()
+    boot = (ROOT / 'platform/powermac/ppc_kernel.c').read_text()
     # Select the PLN1 branch, then match the complete ordered startup block.
     pln = boot.replace('#if !KBOOT_LINK\n', '#if 1\n')
     pln = pln.replace('#if KBOOT_LINK\n        int work_rc = idle_work_register(pm_link_service_once);\n#else\n', '')

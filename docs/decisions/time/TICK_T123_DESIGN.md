@@ -114,7 +114,7 @@ u32 net_rx_demux_budget(const struct NetNicOps *ops,
 - 二次列満杯では現行の drop 規約を維持し計数。rxq_full だけ下がって sfs/link_drop が増えた場合は不合格。プロトコル状態機械そのものを IF=1 へ移す変更はしない。
 
 ### PowerPC の道
-- **変更なし、既に前景で demux**。`init/ppc_kernel.c:330` の poll と `lan_service.c:261,267,269-272` の 1 poll 1 frame→返信送信を維持する。
+- **変更なし、既に前景で demux**。`platform/powermac/ppc_kernel.c:330` の poll と `lan_service.c:261,267,269-272` の 1 poll 1 frame→返信送信を維持する。
 - s.response は 1 枠で、送信前に複数 REQ を処理すると `lan_service.c:167` で drop するため 8 frame 化しない。GEM→PLN1 の道を維持し OS32 demux と共通化しない。
 - B7/B8 を削除し PPC の source/build 変更は 0。os32powerpc は既存 PPCKERN.ELF リンクと QEMU LAN／HFS／terminal の退行確認を担当する。
 

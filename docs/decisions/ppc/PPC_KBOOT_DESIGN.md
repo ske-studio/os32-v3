@@ -40,9 +40,9 @@
 - 食い違いは古い TASK の代表記述との2件。PACK の既存成果・未着段の前提との矛盾は0件。未実装の存在を「食い違い」に重複計上しない。
 
 ## 2. ②の製品範囲と合否
-- kboot profile は `init/ppc_kernel.c` から到達するsymbolの閉包＋明示した追加TU（takeover・vector・spill・CPU初期化のASM/C入口）と定義し、H3のsource manifest/link mapで列挙、未解決symbol無しでリンクする。単体 `PPCMMU.ELF` は残す。通常のselected全TU計測集合を減らして成功数を上げない。
-- kboot の init は新 `init/ppc_kernel.c` をsource選択する。実体は共通 paging/physmem/pgalloc/ledger/kmalloc/shm、kstring/kprintf、時刻、IRQ。VFS/root mount/exec_init/module読込みはcore-readyの外。閉包内の未対応依存はH1のkboot専用providerで閉じる。
-- PC98 の `init/kernel.c:123–286` を丸ごと呼ばない。盤面・入力・PCI探索・root mount・GUI/IME・module/shlib読込み・`exec_init()`のUSER trampoline生成は今回の起動経路に含めない。全リンクとはOS32全部のfeatureを有効にする意味ではない。
+- kboot profile は `platform/powermac/ppc_kernel.c` から到達するsymbolの閉包＋明示した追加TU（takeover・vector・spill・CPU初期化のASM/C入口）と定義し、H3のsource manifest/link mapで列挙、未解決symbol無しでリンクする。単体 `PPCMMU.ELF` は残す。通常のselected全TU計測集合を減らして成功数を上げない。
+- kboot の init は新 `platform/powermac/ppc_kernel.c` をsource選択する。実体は共通 paging/physmem/pgalloc/ledger/kmalloc/shm、kstring/kprintf、時刻、IRQ。VFS/root mount/exec_init/module読込みはcore-readyの外。閉包内の未対応依存はH1のkboot専用providerで閉じる。
+- PC98 の `platform/pc98/kernel.c:123–286` を丸ごと呼ばない。盤面・入力・PCI探索・root mount・GUI/IME・module/shlib読込み・`exec_init()`のUSER trampoline生成は今回の起動経路に含めない。全リンクとはOS32全部のfeatureを有効にする意味ではない。
 - 「ユーザーランドの手前」は、実ページ管理がonline、heap/shared領域が初期化済み、時刻と割込みが継続し、起動ログが流れ、次がユーザー実行準備となる **PPC core-ready 境界** と定義する。未提供サービスを成功に偽装した `services=READY` は出さない。
 - PM推奨：OF FBは②の条件にせず後段。終了はEE=1のbusy idle（POW/nap無し）を推奨。即停止より継続tickと外部割込み復帰を観測でき、G4省電力の設計を増やさない。
 ```sh
@@ -92,7 +92,7 @@ KBOOT ALIVE tick_delta=<n> tb_us=<n> of_calls_delta=0
 |G1 log|独立、bounded ESCC＋後続sink|platform/powermac/log.c ＋110、kboot_log.h ＋25|P|
 |G2 console provider|G1、console TUを除外し直接互換口を提供|platform/powermac/kboot_console.c ＋120|P|
 |H1 非対応provider|D3/E3/G2、閉包の未解決のみ分類・専用providerで充足|arch/ppc/kboot_unavailable.c ＋120、arch_exec_storage.h ＋25、arch_io.h Δ8|P|
-|H2 init|B3/D3/E3/F2/G2/H1、実mm初期化|init/ppc_kernel.c ＋150|P|
+|H2 init|B3/D3/E3/F2/G2/H1、実mm初期化|platform/powermac/ppc_kernel.c ＋150|P|
 |H3 本体graph|H2、段階link・未解決/PIT_HZ利用者監査|build/targets/ppc-powermac.mk Δ40、build/arch/ppc-sources.mk Δ20、build/platform/powermac.mk Δ20、build/ppc-kboot.mk ＋100|I|
 |T1 host|各部品着後、入力/更新列/順序|tools/ppc/kboot_host.c ＋280、kboot_model_host.c ＋180、kboot_host.py ＋100|I|
 |T2 guest|C〜H後、実fault・root・IRQ・tick|arch/ppc/kboot_probe.S ＋150、platform/powermac/kboot_probe.c ＋160|P|
@@ -122,7 +122,7 @@ void ppc_kernel_main(void) __attribute__((noreturn));
 - PPC geometryは `{15MiB,15MiB,16MiB,16MiB,16MiB}`、high probe=0。native_ucは空、system=[15MiB,16MiB)の1MiBを捨てる。bios_rom/low_deviceは互換固定予約 `[0xA0000,1MiB)`（実ROM/機器と報告しない）。B3受入はpaging_initの恒等写像からsystemが除外され、ledgerのBACKGROUND予約とphysmem除外が同区間で一致し、memory_boot_initが成功すること。image/arena/metadata等をsystemへ置かない。
 - HPTはavailable∩`[16MiB,32MiB)`から128KiB整列の128KiB、allocator外に置く。OF切離し後に初めて触るなら既存C同様snapshotからの予約でよい。切離し前に書く追加領域はOF claim/mapの成功・返却番地を検査、image PT_LOADの二重claimは禁止。
 - IEEE1275本体未入手のため新しい汎用claim規約を発明しない。最短経路は追加領域をOF中に触らず、最終snapshot後はdrain以外の確保/mapをしない方式。OF-PPC本文:338はvector領域をclaimしないこと、:357はOF管理中の一般確保にはclaimが必要と定める。
-- real takeover→全BAT無効/ベクタ導入→segments(no-op)/例外stack/ME・RI→`memory_boot_detect(16384)`→`paging_init(16384)`→`arch_boot_after_paging()`→ESCC sink→`memory_boot_init(16384)`→`shm_init()`→`kmalloc_init()`→MPIC→clock→EE→probe→READY→idle（kmalloc は mm/shm から呼ばれないので kmalloc_init の位置は任意。x86 は kmalloc_init を paging より前に呼ぶ: init/kernel.c:170・196）。
+- real takeover→全BAT無効/ベクタ導入→segments(no-op)/例外stack/ME・RI→`memory_boot_detect(16384)`→`paging_init(16384)`→`arch_boot_after_paging()`→ESCC sink→`memory_boot_init(16384)`→`shm_init()`→`kmalloc_init()`→MPIC→clock→EE→probe→READY→idle（kmalloc は mm/shm から呼ばれないので kmalloc_init の位置は任意。x86 は kmalloc_init を paging より前に呼ぶ: platform/pc98/kernel.c:170・196）。
 - `paging_init`内部 `arch_mmu_load_root` の初回のみ、ESCC/MPIC用I/G aliasを `MEM_DEVICE_APERTURE_BASE` の静的PTへ追加する。HPTの恒等PTEは作らず、その物理範囲の既存恒等PTEもNPにする（spill/flushはrealアクセス）。0..1MiBの不要mappingもNP、guard/system除外を維持。image/stack/PD/PTとMMIO aliasをwalkで検証してからIR/DRを上げる。S/mm/paging_boot.inc:103,189を使い、共通mmの表形式・free/owner規則を変えない。
 - alias固定割当：aperture先頭4MiB内のoffset `[0x300000,0x340000)` をESCC、`[0x340000,0x380000)` をMPICへ予約（VA 0xFE300000/0xFE340000）。PAのpage内offsetを保持し、丸めた窓長が各256KiB以内か検査、超過は停止。arch/platform所有の静的予約でledgerのdevice記録は経ない。後のgfxのpaging_map_physはこの予約帯を避け、platform側で重複を拒否してから呼ぶ契約とし、gfx接続の受入に衝突負試験を置く。PM_IO_ALIAS=0xF0000000はkbootでは使わない。
   | VA | 長さ上限 | 対象 |
@@ -279,10 +279,10 @@ void pm_log_write(const char *bytes, u32 n);
 - UniNorth PCI config data: `0xFE3C1000`、1 page、root PA + `0xC00000` の 8 byte を含む I/G (arch/ppc/kernel_boot.c:40,199)。
 - OF tree の BAR と ranges から CPU 側 PA を決め (platform/powermac/gmac_tree.c:137,166)、各窓は PA の page 内 offset を保持する (arch/ppc/kernel_boot.c:42)。
 - tree の取得成功・BAR 長・加算・3 窓の計画が成立すると `gmac_ready=1`、初回 root で RAM・既存 alias 等との衝突や恒等写像を検査して不安全なら 0 に戻し、安全なら静的 PT に張って walk で検証する (arch/ppc/kernel_boot.c:96,118,148,193)。
-- `memory_boot_init` より前に `gmac_ready` なら `pm_gmac_quiesce_setup` → `pm_gmac_early_quiesce` を呼ぶ (init/ppc_kernel.c:149)。
+- `memory_boot_init` より前に `gmac_ready` なら `pm_gmac_quiesce_setup` → `pm_gmac_early_quiesce` を呼ぶ (platform/powermac/ppc_kernel.c:149)。
 - 対象 ID を確認して PCI Master を解除し読み戻す。Master が 1 のままか読み戻しが失敗した場合は停止し、対象外や解除前のアクセス失敗は続行する (platform/powermac/pci_config.c:82,89)。
 - 像の予約内にある DMA pool は `0x30000` byte、その先頭 64KiB の descriptor 区画は cache を flush 後に I/G の恒等写像へ変更し、各 page を検査する (platform/powermac/gmac_dma.c:7,18,62)。
 - `pm_gmac_dma_sync` は descriptor 区画に `sync` だけを使い、buffer は `ppc_dma_sync` の cache 同期へ渡す (platform/powermac/gmac_dma.c:27)。
-- ESCC sink の直後、最初の起動ログの前に LAN log を登録する (init/ppc_kernel.c:134,137)。
-- CLOCK の後、GMAC と log が利用可能なら `pm_lan_start`、READY 以後は 2 秒の観測中もその後も `pm_lan_poll` を回す (init/ppc_kernel.c:238,240,251)。
-- 既存の 9 印と EE=1 の契約は維持する。UniNorth の clock の alias はまだ導入しておらず、実機の前の段に残す (arch/ppc/kernel_boot.c:193、init/ppc_kernel.c:251)。
+- ESCC sink の直後、最初の起動ログの前に LAN log を登録する (platform/powermac/ppc_kernel.c:134,137)。
+- CLOCK の後、GMAC と log が利用可能なら `pm_lan_start`、READY 以後は 2 秒の観測中もその後も `pm_lan_poll` を回す (platform/powermac/ppc_kernel.c:238,240,251)。
+- 既存の 9 印と EE=1 の契約は維持する。UniNorth の clock の alias はまだ導入しておらず、実機の前の段に残す (arch/ppc/kernel_boot.c:193、platform/powermac/ppc_kernel.c:251)。

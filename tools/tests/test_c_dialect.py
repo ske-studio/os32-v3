@@ -96,10 +96,10 @@ def case_lex(cd):
 
 DRY = """\
 nasm -f elf32 -o build/out/obj/kernel/entry.o kernel/entry.asm
-i386-elf-gcc -std=gnu11 -Werror=vla -m32 -MMD -MP -O2 -I. -Iinclude -c init/kernel.c -o build/out/obj/init/kernel.o
+i386-elf-gcc -std=gnu11 -Werror=vla -m32 -MMD -MP -O2 -I. -Iinclude -c platform/pc98/kernel.c -o build/out/obj/platform/pc98/kernel.o
 i386-elf-gcc -std=gnu89 -m32 -Os -include lib/sqlite3/os32_sqlite_config.h -Ilib/sqlite3 -c lib/sqlite3/sqlite3.c -o build/out/sqlite-proto/sqlite3.o
 i386-elf-gcc -std=gnu11 -m32 -Iboot -c -o boot/boot_main.o boot/boot_main.c
-i386-elf-ld -m elf_i386 -o build/kernel.elf build/out/obj/init/kernel.o
+i386-elf-ld -m elf_i386 -o build/kernel.elf build/out/obj/platform/pc98/kernel.o
 """
 
 
@@ -107,7 +107,7 @@ def case_parse(cd):
     print("== 2: コンパイル行の読み取り・期待する言語モード ==", flush=True)
     units = cd.parse_compile_lines(DRY)
     srcs = [u["src"] for u in units]
-    check(srcs == ["init/kernel.c", "lib/sqlite3/sqlite3.c", "boot/boot_main.c"],
+    check(srcs == ["platform/pc98/kernel.c", "lib/sqlite3/sqlite3.c", "boot/boot_main.c"],
           "i386-elf-gcc の -c の行だけを拾い、元のソースを読む (-o が先でも)")
     k = units[0]["sig"]
     check("-Iinclude" not in k and "-MMD" not in k and "-c" not in k and "-o" not in k,
@@ -124,12 +124,12 @@ def case_parse(cd):
           "lib/sqlite3/os32_sqlite_vfs.c", "生成した VFS を必須翻訳単位として数える")
     check(cd.expected_std("userland/tests/sqlite_standalone/sqlite_user_vfs.c") == "gnu89",
           "userland の SQLite 単体は gnu89")
-    check(cd.expected_std("init/kernel.c") == "gnu11", "本体は gnu11")
+    check(cd.expected_std("platform/pc98/kernel.c") == "gnu11", "本体は gnu11")
     check(cd.expected_std("boot/boot_main.c") == "gnu11", "ブートは gnu11")
     check(cd.expected_std("userland/lib/gfx/gfx.c") == "gnu11", "userland は gnu11")
     a = units[0]["argv"]
-    check("-Iinclude" in a and "init/kernel.c" in a and "-c" not in a and "-MMD" not in a
-          and "-o" not in a and "build/out/obj/init/kernel.o" not in a,
+    check("-Iinclude" in a and "platform/pc98/kernel.c" in a and "-c" not in a and "-MMD" not in a
+          and "-o" not in a and "build/out/obj/platform/pc98/kernel.o" not in a,
           "前処理用の引数は -I とソースを残し、依存生成・-c・-o を外す")
 
 
@@ -459,7 +459,7 @@ def run_checker(root):
 def case_build_coverage(cd):
     # Exercise the same flag pass used by the full checker, with a tiny dry run.
     from unittest import mock
-    lines = "i386-elf-gcc -std=gnu11 -c init/kernel.c -o build/out/obj/init/kernel.o\n"
+    lines = "i386-elf-gcc -std=gnu11 -c platform/pc98/kernel.c -o build/out/obj/platform/pc98/kernel.o\n"
     for sqlite, want_ok in [(False, False), (True, True)]:
         out = lines + ("i386-elf-gcc -std=gnu89 -c lib/sqlite3/sqlite3.c -o sqlite.o\n" if sqlite else "")
         with mock.patch.object(cd, 'dry_run', return_value=(0, out, '')), \
@@ -486,7 +486,7 @@ def case_non_dependency_inputs(cd):
         for checker in (cd.check_sdk_headers, cd.check_sdk_lib_headers):
             check(checker(root, files=['build/sdk.mk']) == checker(root),
                   checker.__name__ + ': build edit retains empty-header rejection')
-    lines = 'i386-elf-gcc -std=gnu89 -c init/kernel.c -o kernel.o\n'
+    lines = 'i386-elf-gcc -std=gnu89 -c platform/pc98/kernel.c -o kernel.o\n'
     with mock.patch.object(cd, 'dry_run', return_value=(0, lines, '')), \
             mock.patch.object(cd, 'probe_rejects', return_value=[]):
         full = cd.check_build_flags(ROOT)

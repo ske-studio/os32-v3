@@ -14,7 +14,7 @@
 #define SPLASH_COLOR_MAX      15
 #define SPLASH_GRAD_LINE_STEP 4
 #include "gfx.h"
-#include "../include/platform_splash.h"
+#include "../../include/platform_splash.h"
 #include "palette.h"
 #include "tvram.h"
 #include "types.h"

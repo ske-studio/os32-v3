@@ -18,7 +18,7 @@
 | `arch/x86/kernel/boot_after_paging.c:9` | EM/TS を無条件解除。probe 結果で確定する処理へ置換 |
 | `arch/x86/kernel/x87.c:12` | 初手のメモリ宛て FNSTSW を AX 宛てに変更、probe 中の限定 #NM 復帰を用意 |
 | `arch/x86/kernel/x87.c:19` | save/restore/init は現在 present guard 内。absent 側へ software state 操作を追加 |
-| `init/kernel_boot_memory.inc:97` | paging 後、SQLite より前に probe を完了させる |
+| `platform/pc98/kernel_boot_memory.inc:97` | paging 後、SQLite より前に probe を完了させる |
 | `lib/sqlite3/os32_sqlite_config.h:59` | soft-float 使用というコメントと実際の x86 flags が不一致。実装して一致させる |
 | `build/config.mk:191`、`build/sqlite-proto.mk:12` | SQLite の gnu89/機械 flags を維持し、soft 専用 flags を加える |
 | `build/sqlite-proto.mk:17` | module wrapper は CFLAGS_BASE。sqlite3.o だけ soft にしては ABI が壊れる |

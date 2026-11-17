@@ -1,6 +1,6 @@
 /* Shared boot status rendering, moved without changing layout. */
 #include "boot_display.h"
-#include "../include/platform_emergency.h"
+#include "../../include/platform_emergency.h"
 #include "kprintf.h"
 
 void tvram_print(int x, int y, const char *str, u8 color)

@@ -14,7 +14,7 @@ SOURCES = {
     'display_dual.c': 'platform/pc98/display_dual.c',
     'console.c': 'kernel/console/console.c',
     'route.c': 'drivers/video/pc98/pc98_route.c',
-    'kernel.c': 'init/kernel.c',
+    'kernel.c': 'platform/pc98/kernel.c',
     'gfx_core.c': 'gfx/gfx_core.c',
 }
 # Each anchor must occur exactly once in the real source. Compile failures do

@@ -867,7 +867,7 @@ static void capture_init(u32 baud) { if (baud == SYS_SERIAL_BAUD) boot_serial_in
 static const PortOps capture_port = { .init = capture_init };
 const char *bootlog_compose(const char *header, u32 *len)
 { (void)header; *len = 4; return "old\n"; }
-#include "../../init/boot_serial.inc"
+#include "../../platform/pc98/boot_serial.inc"
 
 static void case_boot_serial(void)
 {

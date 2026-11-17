@@ -85,7 +85,7 @@ MUTATIONS = (
      'FAIL SHM foreign USER range'),
     ('shm-user-missing', 'mm/paging.c', 'if (!(entry & PTE_USER))', 'if (0)', 'FAIL missing USER atomic reject'),
     ('v86-restore', 'mm/paging.c', '    page_directory[0] = s->master_pde;', '    page_directory[0] &= ~PTE_USER;', 'FAIL unexpected restore fail-stop'),
-    ('boot-order', 'init/kernel.c', '    if (kdebug.state == KDEBUG_RUNNING) kdebug.ops.selftest_run();',
+    ('boot-order', 'platform/pc98/kernel.c', '    if (kdebug.state == KDEBUG_RUNNING) kdebug.ops.selftest_run();',
      '    if (kdebug.state == KDEBUG_RUNNING) kdebug.ops.selftest_run();', 'FAIL boot before AS'),
     ('launch-TVRAM', 'exec/exec.c', '        /* --- K3:',
      '        paging_addrspace_map_user_range(ctx->as, TVRAM_CHAR_BASE, GVRAM_BRG_END, PAGE_RW | PTE_USER);\n        /* --- K3:',
@@ -124,7 +124,7 @@ def wiring(sources):
 
 
 def run(runner, mutation=None):
-    paths = ('mm/paging.c', 'mm/shm.c', 'arch/x86/legacy/v86_mem.c', 'init/kernel.c', 'exec/exec.c', 'arch/x86/legacy/v86.c', 'platform/pc98/bios_snapshot.c', 'drivers/video/pc98/backend_pegc.c', 'gfx/gfx_core.c', 'platform/pc98/gfx_surfaces.c')
+    paths = ('mm/paging.c', 'mm/shm.c', 'arch/x86/legacy/v86_mem.c', 'platform/pc98/kernel.c', 'exec/exec.c', 'arch/x86/legacy/v86.c', 'platform/pc98/bios_snapshot.c', 'drivers/video/pc98/backend_pegc.c', 'gfx/gfx_core.c', 'platform/pc98/gfx_surfaces.c')
     sources = {p: paging_source(ROOT/p) for p in paths}
     if mutation:
         name, path, old, new, expected = mutation

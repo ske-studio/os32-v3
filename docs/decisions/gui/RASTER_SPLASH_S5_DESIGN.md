@@ -10,7 +10,7 @@ M=`/home/hight/os32-v3`、レビュー照合基点 `9335e72a`。以下のリポ�
 ## 1. 現状と根拠
 | 実物の食い違い | 本設計での扱い |
 |---|---|
-| `platform/pc98/splash_image.c:31` がcount≠0を拒否、`init/boot_splash.c`がこの入口を呼ぶ | 動的画像の所有・準備・再生を結線する。旧再生器が常用で稼働中とはしない。 |
+| `platform/pc98/splash_image.c:31` がcount≠0を拒否、`platform/pc98/boot_splash.c`がこの入口を呼ぶ | 動的画像の所有・準備・再生を結線する。旧再生器が常用で稼働中とはしない。 |
 | `gfx/gfx_osri.h`・`.c`は通常1197件/行3番号/昇順、OBSだけ6384件/行16番号/任意順・同値可 | v2の形式検査・RAM型を共通化し、ビルドマクロで意味を変えない。 |
 | `drivers/video/pc98/splash_raster_image.*`の旧核は6 OUT/認定表依存、差分準備・可変フレームはOBS専用 | S4核を共通部品へ移し、旧核を削除。上限置換だけで済ませない。 |
 | `tools/img2osri.py`の旧既定は5 OUT、enc2部品・並列化は別作業木 | 受入済みenc2-mtを固定して取り込み、既定を結線する。 |
@@ -79,7 +79,7 @@ int pl_v2_frame(struct SplashRaster *s, const struct OsriImage *image,
 STATIC_ASSERT(sizeof(emit_table) / sizeof(emit_table[0]) == OSRI_DEFAULT_OUT_BUDGET + 1u, pl_emit_table_len);
 /* include/platform_splash.h: try_image_until宣言は削除 */
 int platform_splash_try_image(const char *path, u32 *end_tick);
-/* init/boot_splash.c: 既存cleanup/内蔵ロゴ分岐へ接続 */
+/* platform/pc98/boot_splash.c: 既存cleanup/内蔵ロゴ分岐へ接続 */
 int rc = platform_splash_try_image(SYS_SPLASH_IMAGE, &end_tick);
 ```
 1成分変更M番号の最小費用2M−1からB31では16番号・6384件となる。OsriEvent=8B、count=u16と添字幅も静的検査する。同値は0 OUTなのでBから一般のv2形式上限は導かず、形式検査は16/6384を維持する。将来Bを下げる場合は容量・同値互換を再設計する。
@@ -119,7 +119,7 @@ int rc = platform_splash_try_image(SYS_SPLASH_IMAGE, &end_tick);
 | +`gfx/osri_profile.h`、`gfx/gfx_osri.h`・`.c` | B正典・共通RAM型・v1維持/v2共通検査。宣言と本体は各ファイルで分担。 |
 | +`drivers/video/pc98/splash_raster_play.h`・`splash_raster_plan.c`・`splash_raster_play.c`（後二者も同ディレクトリ） | 型/API・追記前検査・S4走査/0..31手書き展開。 |
 | `drivers/video/pc98/splash_raster_image.*`、`kernel/time/ktime.*`・`time_splash_math.*` | 旧核/認定/専用時間処理削除、PlRow/preview保持、参照と登録を整理。 |
-| `platform/pc98/splash_image.c`・`splash_obs.c`、`include/platform_splash.h`、`init/boot_splash.c` | 常用所有・残時間・preview、OBS共通化、引数変更とtry_image_until削除、呼出結線。 |
+| `platform/pc98/splash_image.c`・`splash_obs.c`、`include/platform_splash.h`、`platform/pc98/boot_splash.c` | 常用所有・残時間・preview、OBS共通化、引数変更とtry_image_until削除、呼出結線。 |
 | +`tools/osri_profile.py`、enc2依存群、`tools/img2osri.py`、+`tools/raster_splash_asset.py` | 正典読取/比較47、受入済み並列入口、既定結線、1枚検査・manifest。 |
 | `build/kernel.mk`・`build/packages.yaml`、手元の資産 2 ファイル (.gitignore)、PL/ENC2正典・TASK_RASTER_SPLASH | PM直列で新.c/削除登録・/boot の配備の集合への splash.osri の追加・FD除外・契約/段状態を更新。emit生成規則は追加しない。 |
 | `tools/tests/test_osri.py`・`splash_obs_host.c`・`test_splash_obs.py`・+`test_splash_v2.py` | 形式・共通I/O模型・OBS駆動・通常所有/時間/CLIを検査。 |

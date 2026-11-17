@@ -41,9 +41,9 @@
   },
   "header_sha256": {
     "init/boot_disk.h": "78a56021f5c4efc2b54a48ff993df8959a74531e39b014439186daebcdd3634c",
-    "init/boot_display.h": "438642fcc6346d8cfdc8a669beef60bcda90e57ebd97b0a697ca731f3f74130f",
-    "init/boot_platform.h": "4b764d39bc450fdf7138642b599c18aa4037be6486f534a443cc6bc52a832a72",
-    "init/boot_splash.h": "d5a4201a17f843d9192775a3b856db11339b384b4a86bd19ce1a682c9d493e85",
+    "platform/pc98/boot_display.h": "438642fcc6346d8cfdc8a669beef60bcda90e57ebd97b0a697ca731f3f74130f",
+    "platform/pc98/boot_platform.h": "4b764d39bc450fdf7138642b599c18aa4037be6486f534a443cc6bc52a832a72",
+    "platform/pc98/boot_splash.h": "d5a4201a17f843d9192775a3b856db11339b384b4a86bd19ce1a682c9d493e85",
     "drivers/ata/cd_module.h": "9ad23330c99dcf5644805d05e898f0ef9d5da633728a511ca6c4a1849d8b2308",
     "drivers/video/cirrus/cirrus_module.h": "5a91f1740bce35070efdd97d8f3c3dfecb32108b54b6de4627b328b1173057e1",
     "kernel/time/cpu_calibrate.h": "5c97a3b29f15b529d2d0b6afa64ea97c0aa9fefad01e8a164088c66616dabef1",

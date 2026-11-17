@@ -211,7 +211,7 @@ SURVIVED でなければ試験が不安定。変異の一覧と結果は `test_c
   `ATAPI_READY_RETRIES` を 20 にして**待ちの合計は最大 20 × 250ms = 5.0 秒**。
   **tick_count で待たない理由**: tick は PIT の割り込み (IF=1) が前提で、呼ばれる文脈 (起動時の `atapi_init`、
   KAPI 経由の読み) で割り込みが開いていると決められない。`cpu_delay_us` は割り込み禁止でも待て、`atapi_init` は
-  `cpu_calibrate` の後 (`init/kernel.c`)
+  `cpu_calibrate` の後 (`platform/pc98/kernel.c`)
 - ホスト試験の贋物 `cpu_delay_us` を実物どおり `CPU_DELAY_US_MAX` で丸める形にした (以前は `g_delay_us += us`
   で丸めず、1 回 250ms の呼び方を見抜けなかった)
 - **P3** SRST を解いた直後、BSY の解除を待たずに DRV_HEAD を書いていた。→ `atapi_srst`: 解いて 2ms

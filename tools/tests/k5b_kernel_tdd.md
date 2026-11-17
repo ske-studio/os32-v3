@@ -299,7 +299,7 @@ python3 -B tools/tests/test_sbrk_tier.py    # 回 4 (新規)
 対象票: `docs/archive/gui_v13/TASK_K5B_kernel.md` (差し戻し 2026-09-11)
 実機の観測 (PM、NP21/W、15MB 構成): `kselftest_pass=44 kselftest_fail=0` でカーネルは
 起動しているのに、text VRAM 1 行目が `FATAL: shell.bin load failed` + shlib のロード
-報告、EIP = `kernel_main+0xd4c` (`init/kernel.c:582` の停止ループ)。
+報告、EIP = `kernel_main+0xd4c` (`platform/pc98/kernel.c:582` の停止ループ)。
 
 | 回 | 対象 | RED | GREEN |
 |---|---|---|---|
@@ -342,7 +342,7 @@ static u8 hdrbuf[OS32X_HDR_V2_SIZE + 64];   /* = 108 バイト、カーネル .b
 `vfs_read(resolved, file_buf, read_max)` (`exec/exec.c:1298`) がゴミのパスを
 引くので `sz <= 0` → **`EXEC_ERR_NOT_FOUND`**。`/sys/shell.bin` も FDD
 フォールバック (`SYS_SHELL_BIN_FDD` は同じ綴り) も同じところで落ちるため、
-`init/kernel.c:582` の `FATAL: shell.bin load failed` に落ちる。
+`platform/pc98/kernel.c:582` の `FATAL: shell.bin load failed` に落ちる。
 `EXEC_ERR_NOMEM` の経路 (`[DBG] NOMEM: ...`) は**通っていない** — 画面に
 その行が 1 つも出ていないことと符合する。
 

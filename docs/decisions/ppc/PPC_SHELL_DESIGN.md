@@ -17,7 +17,7 @@ S-A の詳細設計と S-B 以後の計画。ユーザー判断の未決は0件�
 |食い違い③|ISO mount は `VFS_DEV_CD` と `cdN` を使用。RAM Device 登録だけでは不足|`fs/isofs/iso9660.c:371–382`|
 |名前登録|名前表は差替え式。platform が cd・ram をまとめて登録する|`fs/vfs.c:373–399,427`|
 |既存方針との衝突|「S-A は③の USER 実装前、S-B は③」へ更新する|`docs/tasks/ppc/TASK_PPC_LAN.md:12–14`|
-|既存起動との衝突|x86 は root mount 後に外部常駐 shell を `exec_run()`。S-A は C 関数呼出し|`init/kernel.c:185,430`|
+|既存起動との衝突|x86 は root mount 後に外部常駐 shell を `exec_run()`。S-A は C 関数呼出し|`platform/pc98/kernel.c:185,430`|
 |既存 UI との衝突|座標 console とは別に stream の口を追加する|`userland/shell/ui.c:120,133`、`kernel/console/console_backend.h:22–27`|
 |SDK の現状|PPC は SDK/layout 無効。既存 shell は i386 CRT・libc・PC98 区画処理をリンク|`sdk/target_profile.py:18–20`、`build/programs.mk:99–108`|
 |入力の現状|InputOps は19関数で NULL 検査なし。S-A の専用 getkey では登録不要|`include/input_service.h:10–31`、`kernel/input_service.c:52–70`|
@@ -46,7 +46,7 @@ kernel に入るまでに kernel・root の全量を RAM に写す。後から�
 |W4|USER ABI・SDK・exec 詳細設計|S-A 後、別の往復で詳細設計|大|
 |W5|USER 最小実装→外部 hello→終了→呼び手 (開発用 CLI) へ復帰|W4 後、複数波へ再分解|大|
 |W6|PC-98 FD loader から共通 RAM root へ接続|全量読込み・容量・boot 情報を別設計|中〜大|
-|W7|既存 OS32 shell を PPC USER の sh.bin として組み、製品の起動は root を mount した後 kernel が sh.bin を直接起動 (x86 の `init/kernel.c:430` と同じ形、小さな CLI を挟まない)|S-B 後。`SHELL_AS_APP` と USER 入出力を接続。前提: InputOps の登録 (19 本すべて) と USER の stdout を stream へ|大、再分解|
+|W7|既存 OS32 shell を PPC USER の sh.bin として組み、製品の起動は root を mount した後 kernel が sh.bin を直接起動 (x86 の `platform/pc98/kernel.c:430` と同じ形、小さな CLI を挟まない)|S-B 後。`SHELL_AS_APP` と USER 入出力を接続。前提: InputOps の登録 (19 本すべて) と USER の stdout を stream へ|大、再分解|
 |W8|書ける媒体を後から mount して保存|PPC は Host Services の LAN 版 `/host`、PC-98 は既存 FD/HDD/Host Services|輪郭のみ|
 |W9|docs/tasks/agents/PORT_FLOW.md に新しいアーキテクチャの立ち上げの順 (起動 → RAM root → 開発用の小さな CLI (resident_cli_ops をつなぐ) → USER アプリ → 本物のシェル) を短く足す|W7 後|小 (文書)|
 
@@ -316,7 +316,7 @@ VfsOps ramfs_ops = {
 |A22a/W2|新規 platform/powermac/root_boot.c|名前の表の登録と mount の順 (root → /tmp)。常に組む|40〜70|
 |A22b/W2|新規 platform/powermac/cli_boot.c|resident_cli_ops の adapter (getkey・write・poll・cat・put)。KBOOT_SHELL=1 のときだけ組む|70〜110|
 |A23/W3|変更 build/ppc-kboot.mk|選択構成・blob・閉包リンク|50〜90|
-|A24/W3|変更 init/ppc_kernel.c|S-A 選択時の開始|10〜25|
+|A24/W3|変更 platform/powermac/ppc_kernel.c|S-A 選択時の開始|10〜25|
 |A25/W0 †|変更 fs/vfs.h|VFS_DEV_RAM 追加|1〜3|
 |A26/W0 †|新規 fs/ramfs/ramfs.h|上限・ops 宣言|20|
 |A27/W1 †|新規 fs/ramfs/ramfs.c|一階層ramfs、A25/A26|200〜300|
@@ -369,7 +369,7 @@ VfsOps ramfs_ops = {
 - **P1-1 cd0 を使わない**: PC-98 では root の mount が cd.mod より先で、RAM root が cd0 を取ると ATAPI が cd1 になり cdinst (userland/system/cdinst.c:33,37,115) と netcd (drivers/block/netcd.c:33,155) と kernel_mount_children が壊れる。→ PowerPC の S-A の暫定にも cd0 を使わない。RAM の装置は種別 `VFS_DEV_RAM` に揃え、名前の表の 1 行 `{"rd",VFS_NAME_DIGIT_PREFIX,VFS_DEV_RAM,0,2}` で `rd0` = RAM root (ISO9660)、`rd1` = /tmp の ramfs。ram_ro は `dev_register_cd` ではなく名前 `rd0` で dev_register する (§5 の P2-2 の形を置き換える)。iso9660_mount (fs/isofs/iso9660.c:377-381、今は VFS_DEV_CD と "cdN" の決め打ち) が `VFS_DEV_RAM` の `rdN` も受けるようにする段を足す (**★ x86 の生成物 (cd.mod) が変わる**、本線の受入が要る)。§8 の `{"ram",...}` の行と `ram0` は `rd1` に置き換える。
 - **P1-2 FS の登録は呼び手**: PC-98 では iso9660.o は cd.mod の中にしか無く (build/cd-module.mk:8-17)、root の mount の時点で "iso9660" は未登録。→ boot_root.h の前提条件に「呼び手が名前の表と FS (iso9660) を登録済み」を書く。§1 の食い違い② (静的リンクなら imports の分離は不要) は PowerPC だけの話。PC-98 で (a) ISO9660 を kernel に静的に入れ cd.mod は装置だけにするか (b) cd.mod が登録済みを受け入れるかは W6 で本線と決める。
 - **P2-1 FD ローダの上限 (W6)**: boot/loader_fat_new.asm:20-21 の MAX_IMAGE_SIZE は 508KiB (0x10000〜0x8EFFF、実モード)。今の vmkernel.lz4 は 293KiB で root の余りは約 215KiB。W6 の条件を「圧縮した kernel + root ≤ 508KiB、または実モードと PM を往復する bounce を設計 (64KB 境界の読み方は保つ、[HW2])」とする。
-- **P2-2 置き場 (W6)**: 低位は V86 が上書きする帯。選択肢は (A) kernel の ELF に同梱 (MEM_KERNEL_IMAGE_MAX の中、boot 情報の変更不要、P2-1 の制約を受ける) と (B) MEM_BOOT_BUNDLE (0x600000) を pgalloc の初期化直後に台帳で予約し P2V で 1 か所に集める (root の mount は init/kernel.c:185 で pgalloc の初期化より前なので順の変更を伴う)。
+- **P2-2 置き場 (W6)**: 低位は V86 が上書きする帯。選択肢は (A) kernel の ELF に同梱 (MEM_KERNEL_IMAGE_MAX の中、boot 情報の変更不要、P2-1 の制約を受ける) と (B) MEM_BOOT_BUNDLE (0x600000) を pgalloc の初期化直後に台帳で予約し P2V で 1 か所に集める (root の mount は platform/pc98/kernel.c:185 で pgalloc の初期化より前なので順の変更を伴う)。
 - **P2-3 boot 情報 (W6)**: wire は 0x40 で空きは 4B (platform/pc98/bootinfo_wire.h)、版は一致しか見ない。(B) を採るなら「kernel は v2 と v3 の両方を受ける」と W6 で決める ((A) なら不要)。
 - **P3-1**: fs/vfs.h の 1 行は x86 の生成物を変えない見込みだが、新しいヘッダは HWDEV_HEADERS の wildcard と CHECK の covers に当たる。確認は CI の kernel.elf と kernel.map の比較で。
 - **段 C1 の結果 (PPC の KB_FLAGS で 5 TU を試した)**: vfs.c と dev.c は通る (dev.c の fdc・ide への参照は dev_init・dev_register_hdd・fd/hd の関数からだけで、PPC はそれらを呼ばないので gc-sections で落ちる見込み、A23 のリンクで確かめる)。fs/vfs_fd.c:821 の `attr` の未使用 (-Werror=unused-parameter) と、fs/isofs/iso9660.h:17 の `#include "atapi.h"` (ISO_RA_SECTORS = ATAPI_READ_MAX_SECTORS = 16 のためだけ) で止まる。→ 共通ファイルの小さい段 C2: vfs_fd.c に `(void)attr;`、iso9660.h は atapi.h を include せず `#define ISO_RA_SECTORS 16` (ATAPI の READ(10) の分割数と同じ値、関係はコメントに 1 行) にする (x86 の生成物は不変の見込み)。

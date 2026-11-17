@@ -23,7 +23,7 @@ kapi/kapi_db_helpers.inc:db_shm_diag:MEM_SHM_BASE はリンカ由来の仮想。
 kapi/kapi_db_helpers.inc:shm_write_error_text:MEM_SHM_BASE はリンカ由来の仮想。DB_SHM_PTR のオフセットも仮想
 kapi/kapi_db_helpers.inc:shm_write_row:MEM_SHM_BASE はリンカ由来の仮想。DB_SHM_PTR のオフセットも仮想
 kapi/kapi_db.c:kapi_db_column_text:MEM_SHM_BASE はリンカ由来の仮想。DB_SHM_PTR のオフセットも仮想
-init/kernel.c:kernel_main:KHEAP_BASE は __bss_end 由来の仮想ポインタ
+platform/pc98/kernel.c:kernel_main:KHEAP_BASE は __bss_end 由来の仮想ポインタ
 arch/x86/kernel/isr_handlers.c:exc_dump_stack_trace:例外時の仮想スタック番地。物理への変換をしない
 arch/x86/kernel/isr_handlers.c:exc_dump_stack:例外時の仮想スタック番地。物理への変換をしない
 mm/kmalloc.c:kheap_init:ヒープ内の仮想ポインタ算術 (整数幅・整列)

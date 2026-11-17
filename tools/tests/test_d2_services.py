@@ -176,7 +176,7 @@ def run(runner, mutation=None):
 
 
 def contracts():
-    boot = (ROOT / 'init/kernel.c').read_text()
+    boot = (ROOT / 'platform/pc98/kernel.c').read_text()
     assert re.search(r'kstack_hw_init\(\);\s*pc98_boot_bind\(&boot, boot_drive\);', boot)
     platform = (ROOT / 'platform/pc98/boot.c').read_text()
     assert '    pc98_d2_bind();' in platform

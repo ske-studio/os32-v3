@@ -14,7 +14,7 @@
 
 全文は [PPC_KBOOT_DESIGN](../../decisions/ppc/PPC_KBOOT_DESIGN.md)。要点:
 
-- kboot profile = `init/ppc_kernel.c` から到達する symbol の閉包 + 明示した追加 TU。PC98 の `init/kernel.c` は呼ばない。console の TU は選ばず、G2 が console_write/shell_print を直に出す暫定経路 (分離の未着段を待たない)。
+- kboot profile = `platform/powermac/ppc_kernel.c` から到達する symbol の閉包 + 明示した追加 TU。PC98 の `platform/pc98/kernel.c` は呼ばない。console の TU は選ばず、G2 が console_write/shell_print を直に出す暫定経路 (分離の未着段を待たない)。
 - mm は案 D。管理 RAM は 16MiB に限定し geometry {15M,15M,16M,16M,16M}。HPT は 128KiB (allocator の外)。ESCC・MPIC の alias は device aperture の静的 PT の固定 offset。
 - trap は DR=0 で frame を作り、spill は real のまま。0x500 と fatal の MMIO は frame 完成後に DR=1 の I/G alias で触る。
 - MPIC は CPU0・TPR 0、配送試験は自己 IPI。decrementer は 1000Hz の周期加算型 (周期は platform が与える)。
@@ -54,7 +54,7 @@
 | G2 | 暫定の console kboot_console.c | b32818ee | host (lib/kprintf.c を組む) | 可 (2 回) |
 | T3 | 受入の台本 kboot_run.py と自己試験 | f9513c5f | 仮の像で自己試験 (14 RED・4 GREEN・台本の変異 5) | 可 (3 回) |
 | H1 | 閉包の未解決の provider arch/ppc/kboot_unavailable.c (ring3_call_from_user の 1 件) | (kbh) | 本体の link | 可 (H2・H3 と一緒に 3 回) |
-| H2 | 本体の初期化 init/ppc_kernel.c、probe arch/ppc/kernel_probe.S | (kbh) | QEMU 7450/7455 | 同上 |
+| H2 | 本体の初期化 platform/powermac/ppc_kernel.c、probe arch/ppc/kernel_probe.S | (kbh) | QEMU 7450/7455 | 同上 |
 | H3 | 本体の link build/ppc-kboot.mk、監査 tools/ppc/kboot_audit.py、受入 tools/ppc/kboot_accept.py | (kbh) | 負像 2・製品の変異 10・監査の変異 4 | 同上 |
 | T4 | 回帰の入口 tools/ppc/kboot_all.py | (kbh) | 20/20 | PM が読んで着地 |
 

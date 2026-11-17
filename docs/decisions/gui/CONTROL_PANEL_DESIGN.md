@@ -28,7 +28,7 @@
 |---|---|---|
 | D1 | 設定はCUI中心 → `userland/gshell/src/settings.rs:168`、`:256`、`:452` に既存Settings予約・保存、`modal.rs:652` にGUIがある | 既存の色・時計・font反映を再利用し、入口を新アプリへ置換する |
 | D2 | GUIからcfg_*で保存 → `userland/rust/libos32gui/src/cfgro.rs:431` の公開setterはapp scope限定、`:399` は1キー1トランザクション | gshell複数キー保存にはそのsetterを使わず、Cのlibos32cfgをアプリへ静的リンクする |
-| D3 | GFXは4値 → `userland/shell/cmd_sys.c:538` と `init/kernel_gfx_config.inc:27` はgeforceも扱う。GUI=1では別backendになる | 既存5値を表示し、保存値と稼働backendを同一視しない |
+| D3 | GFXは4値 → `userland/shell/cmd_sys.c:538` と `platform/pc98/kernel_gfx_config.inc:27` はgeforceも扱う。GUI=1では別backendになる | 既存5値を表示し、保存値と稼働backendを同一視しない |
 | D4 | 壁紙は既存設定候補 → `assets/settings/defaults.tsv:22` にキーがあるが、`userland/gshell/src/settings.rs:370` の取得・`:597` の適用にはない | 永続キーがあるだけでは編集項目にしない。初版は壁紙を見送る |
 | D5 | FEP予約名はfep.mem_reserve_kb → 実際はsystem/fep_mem_reserve_kb（`kernel/sqlite_engine.c:216`）。defaults.tsvにも行がない | 新しい綴りのキーを作らない。初版では編集を見送る（§2） |
 | D6 | 後続票はFEP再起動要求 → `kernel/ime/ime_dict_api.inc:4`、`ime_dict.c:460` はclose→openで即時切替、永続選択を保存しない | 現APIをGUI選択の実装に流用しない。辞書meta後続へ渡す |
@@ -56,7 +56,7 @@
 
 | 見送り案（ユーザー未決は§10） | 実物に基づく理由 / 後続境界 |
 |---|---|
-| 表示周波数 | system.cfgの起動読取（init/kernel_gfx_config.inc:15）とgfxmode（cmd_sys.c:520）に周波数設定がない。Hzキー・モード切替APIを新設しない |
+| 表示周波数 | system.cfgの起動読取（platform/pc98/kernel_gfx_config.inc:15）とgfxmode（cmd_sys.c:520）に周波数設定がない。Hzキー・モード切替APIを新設しない |
 | FEP辞書S/M/L | D6。再起動後の選択を保存・消費する契約がない。§10 U2の推奨案としてTASK_DICT_METAで永続選択と予約を整えてから追加 |
 | FEPメモリ予約 | 実在するが起動資源設定。99KiB最小・192KiB既定（lib/sqlite3/os32_sqlite_vfs.h:62）、512KiB全体から管理域とlive量を引く（os32_sqlite_vfs.c:278）。99..512を「安全範囲」と偽らない。予約検証と再起動要求は後続へ（§10 U2、未決） |
 | キーボード | input_config.c:54はアプリ別action binding保存であり全体リピートではない |

@@ -53,7 +53,7 @@ ROOT = L.ROOT
 SOURCES = ('mm/pgalloc.c',
            'tools/tests/pgalloc_host_fixture.h',
            'platform/pc98/pci_resources.c', 'drivers/pci/pci.c', 'mm/paging.c', 'kernel/sys.c',
-           'init/kernel.c')
+           'platform/pc98/kernel.c')
 
 
 def load(mutation=None):

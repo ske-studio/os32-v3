@@ -31,19 +31,19 @@
 
 | 草案の記述 | 実物・設計への反映 |
 |---|---|
-| §2: パレット1、4行、100件 | 一致。`init/boot_splash.c:15,29,44,177`。行は0,4,…,396。 |
+| §2: パレット1、4行、100件 | 一致。`platform/pc98/boot_splash.c:15,29,44,177`。行は0,4,…,396。 |
 | §2: 4プレーンへ描画 | 一致。`platform/pc98/splash.c:30,40`。借用 BB を使用する。 |
 | §2: 120µs待ちで再生 | 差異 D1: palette-only と flip 経路は `line` を読まず、各イベント後に120µs待つ。`gfx/gfx_vram.c:421,464`。不等間隔・同一行複数件を現APIへ渡すだけでは再生できない。 |
 | 同上、初回と継続の扱い | 差異 D2: non-flip の dirty 初回は400行各々で待つ（最低48ms）、以後は100件各々（最低12ms）。`gfx/gfx_vram.c:446,460,464`。I/O・転送・IRQ時間は別に加算される。 |
 | §2: 最大200件 | 一致。ただし SDK の1件は8B、コメントは2行単位推奨。`sdk/include/os32/os32_kapi_shared.h:623`。200は容量上限であり時間予算ではない。 |
 | §2: 標準 planar 強制 | 一致。希望値を保存→PC98選択→init→希望値復元。`platform/pc98/splash.c:13`。 |
-| §2: 終了時復帰 | 一致。両ページ消去→shutdown→既定パレット→テキスト消去。過去の任意パレットの保存復元ではない。`init/boot_splash.c:253`。 |
-| §6: ルートから画像を開く | 実現可能。mount は `init/kernel.c:176`、IRQ有効化・services は234、splash は242。呼出位置を動かさない。 |
+| §2: 終了時復帰 | 一致。両ページ消去→shutdown→既定パレット→テキスト消去。過去の任意パレットの保存復元ではない。`platform/pc98/boot_splash.c:253`。 |
+| §6: ルートから画像を開く | 実現可能。mount は `platform/pc98/kernel.c:176`、IRQ有効化・services は234、splash は242。呼出位置を動かさない。 |
 | §9: 標準出力モードが未決 | 差異 D3: 31kHz既定は決定済み。`docs/decisions/realhw/RA266.md:48` に09a8=81の観測。未確定なのは実行時判定と位相。 |
 
 - 差異は上表の3件（D1・D2は草案の現行説明への訂正、D3は前提更新）。未測定値は差異に数えない。
 - 現行はテキストGDCのVSYNC入りを待ってからグラフィックGDCの抜けを待つ（`gfx/gfx_vram.c:418,420`）。抜け＝可視行0とはまだ証明されていない。
-- `cpu_delay_us()` は校正済みループの整数待ちで、IRQ処理時間を補償しない（`kernel/time/cpu_calibrate.c:134`）。校正は起動初期に実施済み（`init/kernel_boot_cpu.inc:68`）。
+- `cpu_delay_us()` は校正済みループの整数待ちで、IRQ処理時間を補償しない（`kernel/time/cpu_calibrate.c:134`）。校正は起動初期に実施済み（`platform/pc98/kernel_boot_cpu.inc:68`）。
 
 ## 2. 段0: 計測の設計
 
@@ -142,7 +142,7 @@ struct OsriEvent {                    /* 8 bytes */
 
 | 部品 | 責任・状態の所有 |
 |---|---|
-| `init/boot_splash.c` | 全体の開始/終了、3秒期限、内蔵ロゴ。begin後に画像経路を試し、失敗時はロゴを描き直す。装置・プレーンの詳細を持ち込まない。 |
+| `platform/pc98/boot_splash.c` | 全体の開始/終了、3秒期限、内蔵ロゴ。begin後に画像経路を試し、失敗時はロゴを描き直す。装置・プレーンの詳細を持ち込まない。 |
 | `platform/pc98/splash_image.c`（新規） | 借用BBと共通再生状態を使い、画像記述だけを所有。読み込み→実行予算検査→commit→再生を制御し、戻る時にFD・画像記述を解放。共通状態はロゴへのfallbackまで保持。 |
 | `gfx/gfx_osri.c`（新規） | VFS読み込み・形式/CRC検査。受け取ったBBへ分割読み込み。ポートI/O・表示・時間待ちは行わない。 |
 | `drivers/video/pc98/splash_raster.c`（新規） | 24/31kHz判定・有理数周期・VSYNC/HBLANK待ち・パレット再生を画像と既存ロゴで共有。FS/VRAM転送は知らず、共通再生状態も本部品が所有する。各gfx_initで未判定に戻し、最初の利用時に8周期・位相を判定してそのgfx_initの寿命中保持、gfx_shutdownで失効する。splash外の公開gfx_present_rasterも同じ状態を使う。 |
@@ -214,7 +214,7 @@ void pc98_splash_raster_reset(void); /* gfx_initで未判定化、gfx_shutdown�
 | R1 / 0→2 | `drivers/video/pc98/splash_raster.c` 新規、状態所有/gfx_initごとの遅延判定→ロゴ/固定色→差分再生 | H1後、31k動的採用は段0測定後 |
 | L0 / 0→2 | `gfx/gfx_vram.c`、120µsと旧3再生経路を共通table呼出へ置換、gfx_init/shutdownの状態リセットを接続、VRAM/flip/dirtyの責任は維持 | R1後、B1と直列 |
 | P1 / 1 | `platform/pc98/splash_image.c` 新規、所有・表示制御 | F1/R1結合 |
-| B1 / 0,1 | `init/boot_splash.c`、probe→8周期判定・画像選択・共通期限・静止fallback、既存虹色を共通再生へ | R1/L0後、P1結合 |
+| B1 / 0,1 | `platform/pc98/boot_splash.c`、probe→8周期判定・画像選択・共通期限・静止fallback、既存虹色を共通再生へ | R1/L0後、P1結合 |
 | C1 / 1 | `include/config.h`、SYS_SPLASH_IMAGE定義 | パスを単一正典へ |
 | B2 / 0,1 | `build/kernel.mk`、各ソース登録/診断限定フックの定義 | PMが小段ごと直列化 |
 | T2 / 1,2 | `tools/tests/test_osri.py` 新規、形式/変換のCHECKと変異 | H0後、F1/T1と並列 |
@@ -226,7 +226,7 @@ void pc98_splash_raster_reset(void); /* gfx_initで未判定化、gfx_shutdown�
 | D2 / 3 | `userland/deploy.yaml`、dataで配布登録 | D1後、packages.yamlは変更不要 |
 
 - N5 段の依頼の注記: L0で `gfx/gfx_vram.c:362-382` の注記、SDKの「2ライン単位推奨」（`os32_kapi_shared.h:620`）、KAPI説明を新しい行位置・間隔・同期失敗時の契約に合わせる。型・番号は維持し、生成物の説明は正典から再生成する。
-- N6 段の依頼の注記: GF_ACCELと共有する `build/kernel.mk`・`gfx/gfx_vram.c`・`init/boot_splash.c`・`include/gfx_hal.h`・`tools/tests/test_src_layout.py`・`docs/design` はPMが直列化し、新規ファイルの `docs/design` と `test_src_layout` への登録もB2の一覧に含める。
+- N6 段の依頼の注記: GF_ACCELと共有する `build/kernel.mk`・`gfx/gfx_vram.c`・`platform/pc98/boot_splash.c`・`include/gfx_hal.h`・`tools/tests/test_src_layout.py`・`docs/design` はPMが直列化し、新規ファイルの `docs/design` と `test_src_layout` への登録もB2の一覧に含める。
 - Shared層のKAPI定義は維持。Subsystem層はpegc.hのポート/SYNC、再生ヘッダーの派生周期/位相/予算、OSRIヘッダーとconfig.h。Local層は計測回数等。[C4]に従い新旧ロゴ・画像で周期定数を複製しない。
 - GeForce加速と並行するが、gfx_vram.c・共通ヘッダー・build登録はPMが所有を調整し直列化。NP21/W操作は同時に1人。
 - 段3/4はT1とR1の後続票で、同じファイルの前段完了後に出す。メーカー資料不足・未実測の時間値はPM観測ゲートで管理する。
