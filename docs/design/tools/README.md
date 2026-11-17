@@ -87,6 +87,8 @@ map の LOAD 一覧・各 .o の size・最終 ELF・KMOD header を照合する
 
 - [tools/accept/README](accept/README.md)
 
+- [tools/check_layers](check_layers.md)
+
 - [tools/checks/README](checks/README.md)
 
 - [tools/gen_font16](gen_font16.md)

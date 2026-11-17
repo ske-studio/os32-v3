@@ -132,6 +132,7 @@
 - [lib/utf8.md](lib/utf8.md)
 - [mm/pgalloc.md](mm/pgalloc.md)
 - [sdk/include/os32/os32_surface.md](sdk/include/os32/os32_surface.md)
+- [tools/check_layers.md](tools/check_layers.md)
 - [tools/gen_font16.md](tools/gen_font16.md)
 - [tools/gfinit_mode_tables.md](tools/gfinit_mode_tables.md)
 - [tools/host_agent.md](tools/host_agent.md)

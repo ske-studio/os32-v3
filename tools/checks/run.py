@@ -441,6 +441,10 @@ PATH_AUDIT_ALLOW = {
         "fake guest replaces HTTP/time/screenshots; main's output directory is unused",
     ("check-key-inject-host", "tools/" + "gui_gate" + ".py"):
         "key expansion and mocked key sends only; main's output directory is unused",
+    ("check-layers-host", "tools/check_layers.py"):
+        "the host test passes a private root; main's default root is unused",
+    ("check-layers-host", "tools/tests/test_layers.py"):
+        "fake .d files live in TemporaryDirectory; repository artifacts are never read",
     ("check-access-host", "tools/" + "h3_park_resume" + ".py"):
         "identity observer uses synthetic memory; main's ELF/map defaults are unused",
 }
