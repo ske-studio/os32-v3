@@ -798,9 +798,12 @@ def build(tmp, fsdir, libdir, exe_name="fdpath", extra=(), ffo=None):
     """ffo を渡すとその ff.o を使い、FatFs を組み直さない (変異が FatFs に触らないとき)。"""
     inc = ["-I" + str(ROOT / "tools/tests/mtar_freestanding"), "-I" + str(fsdir),
            "-I" + str(libdir)]
+    # FatFs の装置層 (drivers/block/fat_diskio.c)。変異の写しは fsdir の隣の drivers/block に置く。
+    inc += ["-I" + str(fsdir.parent / "drivers/block")]
     inc += ["-I" + str(fsdir / d) for d in ("ext2", "fat", "hostdrv", "isofs", "serialfs")]
     inc += (['-I' + str(ROOT / p) for p in ('userland/lib',)] + include_flags(ROOT))
     inc += ["-I" + str(ROOT)]   # cdinst の共有部 (userland/shell/hdprep_plan.c 等)
+    inc += ["-I" + str(ROOT / "drivers/block")]   # 変異の写しの fat_diskio.c が読む fdc.h など
     exe = tmp / exe_name
     # 段 fatname は実物の FatFs (fs/fat/fatfs/ff.c) と組む。ff.c は別の翻訳単位で、
     # <string.h> を fs/fat/fatfs/string.h (= kstring.h) に向ける (カーネルと同じ)。
@@ -941,6 +944,8 @@ def _mutant_one(item):
     tmp, pkgdir, e2fsck, ffo, i, (name, fname, before, after) = item
     mdir = tmp / f"mut{i}"
     shutil.copytree(ROOT / "fs", mdir / "fs")
+    (mdir / "drivers/block").mkdir(parents=True)
+    shutil.copy(ROOT / "drivers/block/fat_diskio.c", mdir / "drivers/block/fat_diskio.c")
     shutil.copytree(ROOT / "userland/lib/rt", mdir / "lib/rt")
     (mdir / "system").mkdir()
     shutil.copy(ROOT / "userland/system/cdinst.c", mdir / "system/cdinst.c")
