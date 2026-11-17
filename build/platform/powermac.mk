@@ -1,6 +1,5 @@
 SUPPORTED_ARCH = ppc
 DEFAULT_FEATURE_VALUE = 0
-ifeq ($(IMAGE_ORDER),kboot)
 # kboot の像の持ち物 (像の機能ごと)。共通の場所の物のうち、今は PowerPC の像だけが組む物も持つ。
 C_PLATFORM_CORE = platform/powermac/rh_observe.c platform/powermac/ofw.c platform/powermac/escc.c platform/powermac/escc_tree.c platform/powermac/kboot_capture.c platform/powermac/boot_token_powermac.c platform/powermac/gmac_tree.c platform/powermac/gmac_clock.c platform/powermac/kboot_reserve.c platform/powermac/memory.c platform/powermac/mpic_tree.c platform/powermac/mpic.c platform/powermac/clock.c platform/powermac/tick_budget.c platform/powermac/log.c platform/powermac/pci_config.c platform/powermac/gmac_dma.c platform/powermac/lan_gem_io.c platform/powermac/lan_log.c platform/powermac/lan_monitor.c platform/powermac/lan_diag.c platform/powermac/lan_service.c lib/lz4.c init/ppc_kernel.c drivers/net/gem/gem_reset.c drivers/net/gem/gem_phy.c drivers/net/gem/gem_ring.c drivers/net/gem/gem_mac.c drivers/net/gem/gem_tx.c drivers/net/gem/gem_rx.c
 C_PLATFORM_LINK = platform/powermac/device_host.c platform/powermac/link_platform.c platform/powermac/nic_gem.c platform/powermac/link_log.c platform/powermac/link_diag.c
@@ -10,7 +9,3 @@ C_PLATFORM_NOEXEC = platform/powermac/kboot_console.c
 C_PLATFORM_USERSHELL = platform/powermac/shell_boot.c platform/powermac/input_boot.c platform/powermac/input_decode.c platform/powermac/hostfs_boot.c input/keymaps/hid_jp.c $(if $(filter 1,$(FEATURE_LINK)),platform/powermac/hostfs_link_io.c platform/powermac/hostfs_link_peer.c,platform/powermac/hostfs_io.c platform/powermac/hostfs_peer.c)
 C_PLATFORM_USB = platform/powermac/input_usb.c platform/powermac/input_keymap.c platform/powermac/usb_tree.c platform/powermac/usb_platform.c platform/powermac/usb_boot.c
 C_PLATFORM_CLI = platform/powermac/cli_boot.c
-else
-# compile だけの計測の集合 (像 ppc-selected)。計測と一緒に消す。
-C_PLATFORM_NEW = platform/powermac/memory.c platform/powermac/boot_capture.c platform/powermac/ofw.c platform/powermac/escc_tree.c platform/powermac/escc.c platform/powermac/boot.c platform/powermac/rh_observe.c platform/powermac/display.c platform/powermac/display_provider.c
-endif

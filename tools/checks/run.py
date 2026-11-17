@@ -401,12 +401,9 @@ PATH_AUDIT_ALLOW = {
         "recipe inventory and H5 artifacts use private TemporaryDirectory roots only",
     ("check-type-contract", "tools/build_compare.py"):
         "H5 calls compare on private fixture roots; snapshot/build main is never invoked",
-    ("check-ppc-selection-host", "tools/build_compare.py"):
-        "host test imports scanners only; snapshot/build entry point is never called",
     ("check-target-profile-host", "tools/gen_memmap.py"):
         "unsupported target is rejected before reading layout artifacts",
     "tools/tests/test_build_selection.py": "make fixture has a private build directory",
-    "tools/tests/test_ppc_selection.py": "private query/dry-run fixture; compiler is never executed",
     ("check-shell-service-host", "tools/tests/test_shell_service.py"):
         "build configuration is copied only for private query and host mutations",
 

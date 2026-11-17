@@ -1,6 +1,6 @@
 # build/select.mk — カーネルのビルドを 1 系統にし、像の構成の軸を作る (BUILD_UNIFY_DESIGN)
 
-> 状態: **現行 (2026-11-17)** — 出所: 機種依存の分離の作り直しの 2 段目 (ユーザー決定 2026-11-17「共通ソースが機種ヘッダを読む数 0・ビルド 1 系統・入口の骨格 1 本」)。Opus 5.5 のレビュー 2 回で確定。段 1a は実装済み、段 1b 以降は未着手。§1 の実物は段 1a の前 (origin/main `75c7c6f69`) の姿。
+> 状態: **現行 (2026-11-17)** — 出所: 機種依存の分離の作り直しの 2 段目 (ユーザー決定 2026-11-17「共通ソースが機種ヘッダを読む数 0・ビルド 1 系統・入口の骨格 1 本」)。Opus 5.5 のレビュー 2 回で確定。段 1a・1b は実装済み、段 2 以降は未着手。§1 の実物は段 1a の前 (origin/main `75c7c6f69`) の姿。
 ソース: `build/select.mk`、`build/images/`、`build/sources/`、`build/arch/`、`build/platform/`、`build/features/`、`build/ppc-kboot.mk`
 
 ## 1. 実物 (origin/main `75c7c6f69`)
@@ -37,9 +37,8 @@
 | `IMAGE` | 使う所 | `LINK` | `EXEC` | `USERSHELL` | `USB` | `CLI` | `PC98_PENDING` | 順の式 |
 |---|---|---|---|---|---|---|---|---|
 | `pc98` | x86-pc98 の既定 | 1 | 1 | 1 | 0 | 0 | 1 | legacy |
-| `ppc-selected` | 最上位の `make ARCH=ppc PLATFORM=powermac` の既定 (段 1b で削除) | 1 | 1 | 1 | 0 | 0 | 1 | legacy |
 | `kboot-core` | `KBOOT_LINK=0` | 0 | 0 | 0 | 0 | 0 | 0 | kboot |
-| `kboot-link` | 旗なし | 1 | 0 | 0 | 0 | 0 | 0 | kboot |
+| `kboot-link` | 旗なし (最上位の `make ARCH=ppc PLATFORM=powermac` の既定) | 1 | 0 | 0 | 0 | 0 | 0 | kboot |
 | `kboot-shell` | `KBOOT_SHELL=1 KBOOT_LINK=0` | 0 | 1 | 0 | 0 | 1 | 0 | kboot |
 | `kboot-sh` | `KBOOT_SH=1 KBOOT_LINK=0` | 0 | 1 | 1 | 1 | 0 | 0 | kboot |
 | `kboot-link-sh` | `KBOOT_SH=1` | 1 | 1 | 1 | 1 | 0 | 0 | kboot |
@@ -59,8 +58,7 @@ FEATURE_PC98_PENDING = 0
 
 - 像の機能は `IMAGE_FEATURES = LINK EXEC USERSHELL USB CLI PC98_PENDING` として、今の 15 個 (`FEATURES`) と別の一覧に持つ。値の検査 (0 か 1)・未知の `FEATURE_*` の検査は両方を見る。`build/targets/x86-pc98.mk:113` の「0 があれば止める」は今の 15 個だけを見る (下の `KNOWN_FEATURE_VARIABLES` の項)。
 - 依存: `USERSHELL`・`CLI` は `EXEC` が要る。`USERSHELL` と `CLI` は同時に 1 にできない。`select.mk` の今の依存の検査と同じ書き方で足す。
-- `ppc-selected` は今の計測の集合 (`C_KERNEL` 177 本) をそのまま再現するための一時の像 (今の最上位の ARCH=ppc の利用者を段 1a で 1 本も変えないため)。x86 の `pc98-devices` から共通の組へ移す 11 本 (`net/nic.c`・`link.c`・`link_notify.c`・`host_mailbox.c`・`nic_rx.c`・`rx_work.c`、`drivers/base/dev.c`、`input/hal/legacy_ring.c`・`legacy_mode.c`、`kernel/port_service.c`・`serial_diag.c`) は今の計測に入っていないので、この像のファイルが `IMAGE_EXCLUDE` に挙げ、`select.mk` が `C_COMMON` から `filter-out` する。段 1b で計測と一緒に消す。
-- `IMAGE` の既定は `select.mk` の冒頭で決める: `IMAGE ?= $(if $(filter powermac,$(PLATFORM)),ppc-selected,pc98)`。`build/images/$(IMAGE).mk` が無ければ `$(error unknown IMAGE ...)`。
+- `IMAGE` の既定は `select.mk` の冒頭で決める: `IMAGE ?= $(if $(filter powermac,$(PLATFORM)),kboot-link,pc98)`。`build/images/$(IMAGE).mk` が無ければ `$(error unknown IMAGE ...)`。
 - `KNOWN_FEATURE_VARIABLES` は今の 15 個のまま変えない (`build/targets/x86-pc98.mk:113` の「0 があれば止める」が読む。このファイルは `tools/tests/test_sep5_boot.py` が基点 `3ebbd208` とバイト単位で固定しているので触らない)。像の機能は `IMAGE_FEATURE_VARIABLES` に持ち、未知の `FEATURE_*` の検査は両方を見る。`kernel-objects.mk` の SELECTION_STAMP には `IMAGE=<名>` を足す。
 
 ### 3-2. 持ち主
@@ -136,7 +134,7 @@ C_KERNEL = $(filter $(C_SELECTED),$(C_ORDER)) $(C_PLATFORM_NEW) $(C_DIAGNOSTICS)
 endif
 ```
 
-legacy の式は今の `select.mk:241-243` に末尾の一覧を足しただけ (x86 の並びは `… C_PLATFORM_NEW C_DIAGNOSTICS tsc_math tsc_clock rx_work` で今と同じ)。「順に無いソースで止める」検査は kboot の像だけに入れる (x86 は `lib/kstring_c.c` が今も黙って落ちる)。`ppc-selected` の像は legacy の式で、今の計測の集合 (共通 164 本・`C_PLATFORM_NEW` の 9 本・`gf_wc.c`・`video_wc.c`・`platform/none/legacy_guest.c`、`GAS_KERNEL = entry.S ofw_note.S`) と並びを再現する — `powermac.mk`・`ppc-sources.mk` の今の行は `ifneq ($(IMAGE_ORDER),kboot)` の側に残す。
+legacy の式は今の `select.mk:241-243` に末尾の一覧を足しただけ (x86 の並びは `… C_PLATFORM_NEW C_DIAGNOSTICS tsc_math tsc_clock rx_work` で今と同じ)。「順に無いソースで止める」検査は kboot の像だけに入れる (x86 は `lib/kstring_c.c` が今も黙って落ちる)。
 
 ## 5. 段
 
@@ -154,19 +152,19 @@ legacy の式は今の `select.mk:241-243` に末尾の一覧を足しただけ 
   ```
 
   `KB_INC_EXTRA` の条件 (`-Inet` は LINK の時、exec の `-I` の群は EXEC の時)・`KB_EXTRA`・TU ごとの旗・KAPI の生成・`memmap_layout.h`・RAM root (`RAM_ROOT_C` は `build/ram-root.mk` が持つので、その分は `C_PLATFORM_EXEC` に `$(RAM_ROOT_C)` として載せる)・`kboot_audit`・`KB_MUT_*`・`kb-user` は今の規則のまま残す (条件は `KB_EXEC`・`KBOOT_*` のままでよい)。
-- 最上位の `make ARCH=ppc PLATFORM=powermac` は何も変えない (`IMAGE` の既定が `ppc-selected`、`select.mk` を読むのは `config.mk:68` の 1 回)。
 - 確かめ:
   - x86: `build_profile_x86.json` が不変 (`build-selection-host`)。手元で `tools/build_compare.py` で kernel.bin と部品が一致。
-  - PowerPC: 6 像の `KB_ASM`・`KB_C` の並びを `tools/tests/fixtures/build_profile_ppc.json` に固定し、`test_build_selection.py` が `make -f build/ppc-kboot.mk` から引いて比べる (段の前の木で取った値を fixture にする)。手元で 6 像の `PPCKERN.ELF` の sha256 が前後で同じ。`ppc-selected` の `C_KERNEL` (177 本)・`GAS_KERNEL` が前後で同じ (段の前の値を同じ fixture に固定する。今の `test_build_selection.py:29-41`・`test_ppc_selection.py` がそのまま通る)。
+  - PowerPC: 6 像の `KB_ASM`・`KB_C` の並びを `tools/tests/fixtures/build_profile_ppc.json` に固定し、`test_build_selection.py` が `make -f build/ppc-kboot.mk` から引いて比べる (段の前の木で取った値を fixture にする)。手元で 6 像の `PPCKERN.ELF` の sha256 が前後で同じ。今の `test_build_selection.py:29-41`・`test_ppc_selection.py` がそのまま通る)。
   - `tools/tests/test_remote_x9.py:45` (`ppc-kboot.mk` の本文に `kernel/console/con_sink.c` があること) は、`select.mk` から引いた `kboot-link-sh` の `C_KERNEL` に在ることに書き換える。
   - CI: check (ppc-compile・ppc-qemu)・build。
 - 触るファイル: `build/images/*.mk` (7)、`build/sources/common.mk`・`order.mk`、`build/select.mk`、`build/features/pc98-devices.mk`、`build/platform/pc98.mk`・`powermac.mk`、`build/arch/ppc-sources.mk`、`build/kernel-objects.mk`、`build/ppc-kboot.mk`、`tools/tests/test_build_selection.py`・`test_remote_x9.py`・`fixtures/build_profile_ppc.json`、`tools/check_arm_compile.py` は触らない (`KSTRING_C_SRC` の前提は同じ。`config.mk` だけの問い合わせの対象集合には、`kernel-objects.mk` が後から足していた `tsc_math.c`・`tsc_clock.c`・`rx_work.c` の 3 本が増え、実際の `C_KERNEL` と同じになる)。`build/ppc-kboot.mk` の .o と `PPCKERN.ELF` は、一覧と順を持つ .mk (`KB_SELECT_MK`) を前提に持つ (一覧を変えたら組み直される)。
 
 ### 段 1b — compile だけの計測を消し、`make ARCH=ppc` を製品の入口にする
 
-- 削除: `tools/ppc/check_compile.py`・`check_accept.py`・`selected_success.json`・`known_header_dependencies.json`・`tools/tests/test_ppc_selection.py`・`tools/checks/ppc-selection-host.py`、`build/images/ppc-selected.mk`、`powermac.mk`・`ppc-sources.mk` の計測の行 (`C_PLATFORM_NEW`・`gf_wc.c`・`video_wc.c` が計測だけの物かは実装で確かめる)、`build/targets/ppc-powermac.mk` の `kernel-compile`。
-- 追従: `tools/checks/run.py:404・409`・`tools/checks/weights.json:315・717` の項目、`tools/clang_ast/__init__.py:146-150` の `selected` (利用者を洗い、無ければ削除、在れば kboot の像の問い合わせに替える)、`tools/ppc/check_layout.py:113`、`tools/tests/test_build_selection.py:29-41`、`tools/tests/test_type_contract.py --ppc`、`tools/ppc/README.md`、`docs/decisions/ppc/PPC_IMPL_RULES.md`、`arch/README.md`、`docs/08_build.md`。
-- 入口: `build/targets/ppc-powermac.mk` の `kernel` と `all` は `$(MAKE) -f build/ppc-kboot.mk` へ sub-make で渡す (include しない — `select.mk` の二度読みと `kb-user` の再帰を避ける)。`IMAGE=kboot-*` を受けて `KBOOT_*` に直し、sub-make には `KBOOT_*` を渡して `IMAGE=` は空にする (`kb-user` の子の最上位の make に kboot の像の名が漏れないように)。`tools/tests/test_sep5_boot.py` の ENTRIES のうち `kernel` の期待を替える。
+- compile だけの計測 (`tools/ppc/check_compile.py`・`check_accept.py` と 2 つの一覧、`test_ppc_selection.py`、検査 `ppc-selection-host`) と、それを保つための一時の像を削除した。層の検査は `tools/check_layers.py` が持つ。
+- 最上位の `make ARCH=ppc PLATFORM=powermac [IMAGE=kboot-*]` の `kernel` と `all` は、`build/targets/ppc-powermac.mk` が `$(MAKE) -f build/ppc-kboot.mk KBOOT_LINK=… KBOOT_SH=… KBOOT_SHELL=…` へ sub-make で渡す (include しない — `select.mk` の二度読みと `kb-user` の再帰を避ける)。旗は像の機能の値から作る。
+- `build/ppc-kboot.mk` は旗から像を決め、コマンドラインの `IMAGE=` が食い違えば止める (最上位から同じ名前が届くのは通す)。
+- 確かめ: `test_build_selection.py` (最上位の ARCH=ppc の `C_KERNEL`・`GAS_KERNEL` が `kboot-link` の固定した並びと同じ、ARCH=ppc に `IMAGE=pc98` は拒否)、PowerPC の 6 像の `.o` が前と同じ、CI の ppc-compile・ppc-qemu。
 
 ### 段 2 以降
 
@@ -180,4 +178,4 @@ legacy の式は今の `select.mk:241-243` に末尾の一覧を足しただけ 
 
 ## 6. 未決
 
-ユーザー判断が要る物は無い。特務 PM が決めた物: 像の名前、USB を別の機能にすること、未移行の 49 本を 1 つの組で持つこと、段 1a で入口・出力・最上位の ARCH=ppc の振る舞いを保つこと、一時の像 `ppc-selected`。
+ユーザー判断が要る物は無い。特務 PM が決めた物: 像の名前、USB を別の機能にすること、未移行の 49 本を 1 つの組で持つこと、段 1a で入口・出力・最上位の ARCH=ppc の振る舞いを保つこと。

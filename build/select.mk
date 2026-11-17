@@ -3,7 +3,7 @@ ifeq ($(filter $(PLATFORM),pc98 powermac),)
 $(error unsupported PLATFORM $(PLATFORM))
 endif
 # 像の構成 (docs/design/build/select.md §3-1): 像が機能の値と順の式を決める。
-IMAGE ?= $(if $(filter powermac,$(PLATFORM)),ppc-selected,pc98)
+IMAGE ?= $(if $(filter powermac,$(PLATFORM)),kboot-link,pc98)
 ifeq ($(wildcard build/images/$(IMAGE).mk),)
 $(error unknown IMAGE $(IMAGE))
 endif

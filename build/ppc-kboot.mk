@@ -64,10 +64,14 @@ include build/ram-root.mk
 # The flags choose the image; this file keeps only the PowerPC product rules.
 ARCH := ppc
 PLATFORM := powermac
+KB_IMAGE := $(if $(filter 1,$(KBOOT_SH)),$(if $(filter 1,$(KBOOT_LINK)),kboot-link-sh,kboot-sh),$(if $(filter 1,$(KBOOT_SHELL)),kboot-shell,$(if $(filter 1,$(KBOOT_LINK)),kboot-link,kboot-core)))
+# make ARCH=ppc PLATFORM=powermac IMAGE=<name> arrives here with matching flags; anything else is a mistake.
 ifneq ($(findstring command,$(origin IMAGE)),)
-$(error IMAGE is derived from the KBOOT_* flags here; pass KBOOT_LINK / KBOOT_SH / KBOOT_SHELL)
+ifneq ($(IMAGE),$(KB_IMAGE))
+$(error IMAGE $(IMAGE) disagrees with the KBOOT_* flags, which select $(KB_IMAGE))
 endif
-IMAGE := $(if $(filter 1,$(KBOOT_SH)),$(if $(filter 1,$(KBOOT_LINK)),kboot-link-sh,kboot-sh),$(if $(filter 1,$(KBOOT_SHELL)),kboot-shell,$(if $(filter 1,$(KBOOT_LINK)),kboot-link,kboot-core)))
+endif
+override IMAGE := $(KB_IMAGE)
 include build/select.mk
 # Entry objects first (kernel.ld keeps .text.entry at the image start).
 KB_ASM := $(GAS_KERNEL)

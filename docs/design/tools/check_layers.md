@@ -97,4 +97,4 @@
 
 ## 8. 範囲の外
 
-既存の `tools/ppc/check_compile.py`・`check_accept.py`・`selected_success.json`・`known_header_dependencies.json` はこの段では触らない (ビルドを 1 系統にする段で削除)。ユーザーランドの依存は見ない。違反を直すことはしない。装置どうしの機種の区分 (`drivers/base/dev.c` が PowerPC の像で PC-98 の `drivers/block/fdc.h` を読む、など) は `drivers/` をまとめて `device` にしているので数えない — `drivers/` の置き場を機種で分ける段で R6 に入る。`include/memmap.h` の中身 (PC-98 の番地の地図) も、ヘッダの置き場の検査では数えない。`build/out/ppc-kboot` の下に CI が組まない像 (`KBOOT_SHELL=1`・`NEGATIVE`) を手元で組んであると、その像の辺も数える。
+ユーザーランドの依存は見ない。違反を直すことはしない。装置どうしの機種の区分 (`drivers/base/dev.c` が PowerPC の像で PC-98 の `drivers/block/fdc.h` を読む、など) は `drivers/` をまとめて `device` にしているので数えない — `drivers/` の置き場を機種で分ける段で R6 に入る。`include/memmap.h` の中身 (PC-98 の番地の地図) も、ヘッダの置き場の検査では数えない。`build/out/ppc-kboot` の下に CI が組まない像 (`KBOOT_SHELL=1`・`NEGATIVE`) を手元で組んであると、その像の辺も数える。

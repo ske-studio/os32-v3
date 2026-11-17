@@ -26,26 +26,19 @@ def check(root):
     c = query(root, ['KSTRING_C_SRC=lib/kstring_c.c'])['C_KERNEL']
     assert c.count('lib/kstring_c.c') == 1
     assert c.index('lib/kstring_c.c') == c.index('lib/divdi3.c') + 1
+    # Top-level ARCH=ppc selects the product default image (kboot-link) from the same owner sets.
     ppc = query(root, ['ARCH=ppc', 'PLATFORM=powermac'], config_only=True)
-    assert ppc['C_KERNEL'].count('lib/kstring_c.c') == 1
-    assert not ppc['ASM_KERNEL']
-    assert ppc['GAS_KERNEL'] == ['arch/ppc/entry.S', 'arch/ppc/ofw_note.S']
-    assert 'drivers/video/geforce/gf_wc.c' in ppc['C_KERNEL']
-    assert 'arch/ppc/video_wc.c' in ppc['C_KERNEL']
-    for name in ppc['C_KERNEL'] + ppc['KERNEL_SRC_DIRS']:
-        # D1 compiles GPU applicability with the no-WC PPC provider.
-        if name == 'drivers/video/geforce/gf_wc.c':
-            continue
-        assert not any(x in name for x in ('arch/x86', 'platform/pc98', 'kernel/v86', 'drivers/video/geforce')), name
-    assert 'drivers/base' in ppc['KERNEL_SRC_DIRS']
-    assert 'exec/ring3_ls.c' in ppc['C_KERNEL']
+    link = json.loads((ROOT / 'tools/tests/fixtures/build_profile_ppc.json').read_text())['link']
+    assert ppc['C_KERNEL'] == link['KB_C'] and ppc['GAS_KERNEL'] == link['KB_ASM'] and not ppc['ASM_KERNEL']
+    assert 'exec/ring3_ls.c' in actual['C_KERNEL']
     assert actual['C_KERNEL'].index('exec/ring3_ls.c') == expected['C_KERNEL'].index('exec/ring3_ls.c')
     off = query(root, ['FEATURE_' + name + '=0' for name in FEATURES], config_only=True)
     assert not any(path in name for name in off['C_KERNEL'] for path in
                    ('kernel/v86/', 'arch/x86/legacy/', 'platform/pc98/legacy/'))
     assert not any('geforce/' in name for name in off['C_KERNEL'])
     for assignments in (['FEATURE_UNKNOWN=1'], ['ARCH=ppc','PLATFORM=powermac','FEATURE_V86=1'], ['FEATURE_KDEBUG=0'],
-                        ['FEATURE_LINK=0'], ['IMAGE=kboot-link'], ['IMAGE=unknown']):
+                        ['FEATURE_LINK=0'], ['IMAGE=kboot-link'], ['IMAGE=unknown'],
+                        ['ARCH=ppc', 'PLATFORM=powermac', 'IMAGE=pc98']):
         try:
             query(root, assignments, config_only=True)
         except subprocess.CalledProcessError:
@@ -72,12 +65,6 @@ def check_kboot(root):
     expected = json.loads((ROOT / 'tools/tests/fixtures/build_profile_ppc.json').read_text())
     (root / 'kboot-query.mk').write_text(KBOOT_QUERY)
     for name, image in expected.items():
-        if name == 'ppc-selected':
-            # Top-level ARCH=ppc keeps the compile-only gauge set until the gauge is removed.
-            actual = query(root, ['ARCH=ppc', 'PLATFORM=powermac'], config_only=True)
-            for key, value in image.items():
-                assert actual[key] == value, (name, key)
-            continue
         out = subprocess.check_output(['make', '-s', '-f', 'build/ppc-kboot.mk', '-f', 'kboot-query.mk',
                                        *image['flags'], 'kboot-query'], cwd=root, text=True,
                                       stderr=subprocess.PIPE)
@@ -147,9 +134,7 @@ if __name__ == '__main__':
                      'C_COMMON_CLI = kernel/cli/resident_cli.c kernel/cli/unordered.c',
                      subprocess.CalledProcessError, 'kboot source without link order'),
                     ('build/images/kboot-link.mk', 'FEATURE_LINK = 1', 'FEATURE_LINK = 0',
-                     AssertionError, 'kboot image feature value'),
-                    ('build/images/ppc-selected.mk', ' net/nic.c', '',
-                     AssertionError, 'gauge image exclusion')):
+                     AssertionError, 'kboot image feature value')):
                 target = root / path
                 source = target.read_text()
                 assert source.count(anchor) == 1, (path, anchor)
