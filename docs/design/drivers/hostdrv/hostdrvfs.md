@@ -8,6 +8,6 @@ VFS のファイル操作を HostDrv の要求へ変換する。
 ## 落とし穴
 
 - **共有状態の観測**: エミュレータが書くステータスを通常の変数として読むと、最適化で古い値を見続けうる。
-  共有領域は `volatile` とする (`drivers/hostdrv/hostdrvfs.c:57`)。`outp` 自体は `memory` clobber を持たないため、非 volatile の共有データを追加する際は別途コンパイラ境界が必要 (`platform/pc98/platform_io.h:26`)。
-  初期同期ではアドレスをゼロにして識別列を送る (`drivers/hostdrv/hostdrvfs.c:85`)。
-  状態の番兵をセットして応答を判定する (`drivers/hostdrv/hostdrvfs.c:225`, `drivers/hostdrv/hostdrvfs.c:360`)。直接の最適化回帰は未確認。
+  共有領域は `volatile` とする (`drivers/hostdrv/hostdrvfs.c`)。`outp` 自体は `memory` clobber を持たないため、非 volatile の共有データを追加する際は別途コンパイラ境界が必要 (`platform/pc98/platform_io.h`)。
+  初期同期ではアドレスをゼロにして識別列を送る (`drivers/hostdrv/hostdrvfs.c` の `hostdrvfs_detect()`)。
+  状態の番兵をセットして応答を判定する (`drivers/hostdrv/hostdrvfs.c` の `setup_create()`, `drivers/hostdrv/hostdrvfs.c` の `hostdrv_create()`)。直接の最適化回帰は未確認。

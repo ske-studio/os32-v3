@@ -2,7 +2,7 @@
 > 状態: **現行 (2026-10-30)** — 出所: GF_DRIVER_DESIGN (2026-10-29 確定、D0 で移した)
 ソース: `mm/pgalloc.h`
 
-SURFACE の GF 識別定数は既存 ID の末尾へ追加し、`mm/pgalloc.h:283`・`sdk/include/os32/os32_surface.h:11`・`exec/surface_query.c:66–68,110` を追従する。
+SURFACE の GF 識別定数は既存 ID の末尾へ追加し、`mm/pgalloc.h`・`sdk/include/os32/os32_surface.h` の `OS32_SURFACE_CIRRUS`・`exec/surface_query.c` を追従する。
 
 ## 落とし穴
 
@@ -29,4 +29,4 @@ owner タグ: kernel / boot / shlib / gshell / AS ごと / モジュール名。
 - **R5 回収の検査 — 通常 AS の終了検査と永続資源を分ける。** (Codex 往復 6 P2)
   - 台帳の owner タグを 2 種に分ける: **AS owner** (アプリの ID。終了で `exec_reclaim_owned(id)` が全部回収) と **永続 owner** (kernel / boot / shlib / gshell / モジュール名。AS の終了経路は触らない)。
 
-シェル自身の終了経路 (`exec.c:1367` の `APP_ID_SHELL`、`res_owner 0` の回収) は永続 owner を回収しない。
+シェル自身の終了経路 (`exec.c` の `APP_ID_SHELL`、`res_owner 0` の回収) は永続 owner を回収しない。

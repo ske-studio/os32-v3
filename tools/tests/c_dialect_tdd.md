@@ -170,7 +170,7 @@ MUTATIONS 27/27 RED; CONTROLS 5/5 GREEN
 
 ## 旧版が見ていなかったもの (2026-10-01 の clang 版以前)
 
-- 非定数式の `STATIC_ASSERT` (旧 `tss.c:17` の形) は gnu11 の `_Static_assert` が GCC の畳み込みで通すことがあり、探りでは拒否を要求しない
+- 非定数式の `STATIC_ASSERT` (旧 `tss.c` の形) は gnu11 の `_Static_assert` が GCC の畳み込みで通すことがあり、探りでは拒否を要求しない
   (票 §5 の「`_Static_assert` の限界」— 実物は段 2 で `offsetof` にした)。
 - 匿名構造体・共用体 (T0 で新規導入しない) は字句では見分けにくいので検査していない。
 - 自作コードの旧式 (K&R) 関数定義の禁止は旗 (`-Werror=old-style-definition`) にしていない — `CFLAGS_COMMON` を継ぐ zlib (vendor) の 35 件が落ちるため。

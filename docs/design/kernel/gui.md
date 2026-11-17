@@ -9,7 +9,7 @@ GUI 操作を登録された WM ハンドラへ転送する。
 
 - アプリが後で CPL=0 から呼ばれる関数表を登録できると、終了後の解放済みコードへ
   飛ぶこともある。`gui_register` と `gui_ime_set_render` は owner 1 かつ
-  ユーザーからの呼出しでないことを要求する (`kernel/gui.c:103`, `kernel/gui.c:155`)。
+  ユーザーからの呼出しでないことを要求する (`kernel/gui.c` の `gui_register()`, `kernel/gui.c`)。
   関数ポインタの番地だけで呼出し元の信頼性を判断しない。
   `make check-ring3-guard-host` と `kdebug/kselftest/ime_render_gate.inc` が検査する。
 

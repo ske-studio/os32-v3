@@ -117,8 +117,8 @@ CI の静的ゲート (`.github/workflows/check.yml`、os32-v3 で 2026-09-30 �
 | 今も残る項目 | 現行コードで確認した状態 |
 |---|---|
 | b2 | `build/checks.d/check-privileged.mk:5` は `--strict` を付けず、findings があっても失敗しない。ゲート化の扱いは未決。 |
-| c3 / d1 | `tools/tests/test_hsync_protect.py:10` のとおり、`hsync` の inode 比較はコンパイル確認だけで、動作を検査しない。 |
-| R1 | `tools/tests/multiapp_model_host.c:6` の純粋な模型が残り、実物ソースの状態遷移を試験していない。 |
+| c3 / d1 | `tools/tests/test_hsync_protect.py` のとおり、`hsync` の inode 比較はコンパイル確認だけで、動作を検査しない。 |
+| R1 | `tools/tests/multiapp_model_host.c` の純粋な模型が残り、実物ソースの状態遷移を試験していない。 |
 
 2026-09-14 の分類・改善案 R1〜R12・未読記録の経緯: `docs/archive/TEST_INVENTORY_2026-09-14.md` §2〜§4。
 今も残る項目は上の表だけ。たとえば R8 の再構築試験は

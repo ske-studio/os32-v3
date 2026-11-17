@@ -26,16 +26,16 @@
 
 | # | 票の前提 → 実物（file:line） | 設計への反映 |
 |---|---|---|
-| D1 | 設定はCUI中心 → `userland/gshell/src/settings.rs:168`、`:256`、`:452` に既存Settings予約・保存、`modal.rs:652` にGUIがある | 既存の色・時計・font反映を再利用し、入口を新アプリへ置換する |
-| D2 | GUIからcfg_*で保存 → `userland/rust/libos32gui/src/cfgro.rs:431` の公開setterはapp scope限定、`:399` は1キー1トランザクション | gshell複数キー保存にはそのsetterを使わず、Cのlibos32cfgをアプリへ静的リンクする |
-| D3 | GFXは4値 → `userland/shell/cmd_sys.c:538` と `platform/pc98/kernel_gfx_config.inc:27` はgeforceも扱う。GUI=1では別backendになる | 既存5値を表示し、保存値と稼働backendを同一視しない |
-| D4 | 壁紙は既存設定候補 → `assets/settings/defaults.tsv:22` にキーがあるが、`userland/gshell/src/settings.rs:370` の取得・`:597` の適用にはない | 永続キーがあるだけでは編集項目にしない。初版は壁紙を見送る |
-| D5 | FEP予約名はfep.mem_reserve_kb → 実際はsystem/fep_mem_reserve_kb（`kernel/sqlite_engine.c:216`）。defaults.tsvにも行がない | 新しい綴りのキーを作らない。初版では編集を見送る（§2） |
-| D6 | 後続票はFEP再起動要求 → `kernel/ime/ime_dict_api.inc:4`、`ime_dict.c:460` はclose→openで即時切替、永続選択を保存しない | 現APIをGUI選択の実装に流用しない。辞書meta後続へ渡す |
-| D7 | 音は未整備 → `sdk/kapi.json:1684` にpcm_set_volume、`drivers/sound/cs4231/pcm_cs4231.c:638` に実装があるがPCM owner限定 | アプリ所有の再生音量を全体設定と扱わない。永続キーを増設しない |
+| D1 | 設定はCUI中心 → `userland/gshell/src/settings.rs`、`request_open()`・`consume()` に既存Settings予約・保存、`modal.rs:652` にGUIがある | 既存の色・時計・font反映を再利用し、入口を新アプリへ置換する |
+| D2 | GUIからcfg_*で保存 → `userland/rust/libos32gui/src/cfgro.rs` の公開setterはapp scope限定、同ファイル内 は1キー1トランザクション | gshell複数キー保存にはそのsetterを使わず、Cのlibos32cfgをアプリへ静的リンクする |
+| D3 | GFXは4値 → `userland/shell/cmd_sys.c` と `platform/pc98/kernel_gfx_config.inc` はgeforceも扱う。GUI=1では別backendになる | 既存5値を表示し、保存値と稼働backendを同一視しない |
+| D4 | 壁紙は既存設定候補 → `assets/settings/defaults.tsv` にキーがあるが、`userland/gshell/src/settings.rs` の取得・`apply()` の適用にはない | 永続キーがあるだけでは編集項目にしない。初版は壁紙を見送る |
+| D5 | FEP予約名はfep.mem_reserve_kb → 実際はsystem/fep_mem_reserve_kb（`kernel/sqlite_engine.c`）。defaults.tsvにも行がない | 新しい綴りのキーを作らない。初版では編集を見送る（§2） |
+| D6 | 後続票はFEP再起動要求 → `kernel/ime/ime_dict_api.inc` の `ime_switch_dict()`、`ime_dict.c` はclose→openで即時切替、永続選択を保存しない | 現APIをGUI選択の実装に流用しない。辞書meta後続へ渡す |
+| D7 | 音は未整備 → `sdk/kapi.json` にpcm_set_volume、`drivers/sound/cs4231/pcm_cs4231.c` に実装があるがPCM owner限定 | アプリ所有の再生音量を全体設定と扱わない。永続キーを増設しない |
 
-確認済みの共通基盤: `kapi/kapi_db.c:141` はEXEC group取得、`:154` はowner記録、`:458` は所有接続回収。接続をgshellへ渡す方式は採らない。
-`libos32cfg.h:32` の状態と`:105` のcfg_read_intを使う。cfg_get_intの既定値だけから「読めた」と判定しない。
+確認済みの共通基盤: `kapi/kapi_db.c` はEXEC group取得、`kapi_db_open()` はowner記録、`db_cleanup_owned()` は所有接続回収。接続をgshellへ渡す方式は採らない。
+`libos32cfg.h` の状態と のcfg_read_intを使う。cfg_get_intの既定値だけから「読めた」と判定しない。
 `about/src/lib.rs:38` の初期化・`:81` の画面内配置、filerのApp/Uiイベント処理、`libos32gui/src/widget.rs:157` 以降のrow/column/label/button/checkbox/textbox/listboxを手本とする。
 
 ## 2. 初版の設定と範囲
@@ -45,7 +45,7 @@
 
 | ページ / 項目 | 保存先・型・許容値 | 反映 |
 |---|---|---|
-| Desktop / 背景色 | settings.db、gshell/desktop/color、int 0..15（settings.rs:88） | commit後gshellへ再読込要求 |
+| Desktop / 背景色 | settings.db、gshell/desktop/color、int 0..15（settings.rs） | commit後gshellへ再読込要求 |
 | Desktop / 24時間時計 | 同、gshell/taskbar/clock_24h、int 0/1 | 同上 |
 | Desktop / フォント | 同、gshell/font_set、int 0=標準・1=KCGのみ | 同上。font/genを同一transactionで増分 |
 | Startup / backend | /etc/system.cfg、GFX、auto/pc98/pegc/cirrus/geforce | 次のOS起動。現在の描画装置は変えない |
@@ -56,10 +56,10 @@
 
 | 見送り案（ユーザー未決は§10） | 実物に基づく理由 / 後続境界 |
 |---|---|
-| 表示周波数 | system.cfgの起動読取（platform/pc98/kernel_gfx_config.inc:15）とgfxmode（cmd_sys.c:520）に周波数設定がない。Hzキー・モード切替APIを新設しない |
+| 表示周波数 | system.cfgの起動読取（platform/pc98/kernel_gfx_config.inc）とgfxmode（cmd_sys.c）に周波数設定がない。Hzキー・モード切替APIを新設しない |
 | FEP辞書S/M/L | D6。再起動後の選択を保存・消費する契約がない。§10 U2の推奨案としてTASK_DICT_METAで永続選択と予約を整えてから追加 |
-| FEPメモリ予約 | 実在するが起動資源設定。99KiB最小・192KiB既定（lib/sqlite3/os32_sqlite_vfs.h:62）、512KiB全体から管理域とlive量を引く（os32_sqlite_vfs.c:278）。99..512を「安全範囲」と偽らない。予約検証と再起動要求は後続へ（§10 U2、未決） |
-| キーボード | input_config.c:54はアプリ別action binding保存であり全体リピートではない |
+| FEPメモリ予約 | 実在するが起動資源設定。99KiB最小・192KiB既定（lib/sqlite3/os32_sqlite_vfs.h）、512KiB全体から管理域とlive量を引く（os32_sqlite_vfs.c）。99..512を「安全範囲」と偽らない。予約検証と再起動要求は後続へ（§10 U2、未決） |
+| キーボード | input_config.cはアプリ別action binding保存であり全体リピートではない |
 | MouseKeys、ダブルクリック | 現状は定数。「新しい設定を足さない」だけでは除外理由にならない。初版採否は§10 U1で未決 |
 | 音量・出力先 | D7。既存PCM再生のownerを奪わず、master volumeキーを作らない |
 | 壁紙・言語 | 壁紙はD4、言語はTASK_I18Nの後。locale/langを先に追加しない |
@@ -109,7 +109,7 @@ int bootcfg_save(const struct BootCfg *draft,
 
 cpanelは既存libos32cfgを静的リンクし、アプリのKernelAPIをcfg_backendへ渡す。libos32gui内の静的CfgDbとは別インスタンス。
 Apply の on_click 内で cfg_open→begin→set→commit→close を同期実行する。open〜close の間は GUI call/yield/別callback を挟まない。client.rs:356-368 の handler 制限は wait() に対するものであり、DB 操作を禁止するものではない。
-gshell 側では settings.rs:13-30 の契約どおり X4/handler で DB に触らず、§5の予約を top-level で消費する。アプリの通常 loop・AppVTable・stub・shlib の変更は不要。
+gshell 側では settings.rs の契約どおり X4/handler で DB に触らず、§5の予約を top-level で消費する。アプリの通常 loop・AppVTable・stub・shlib の変更は不要。
 
 App側のDB handleはアプリownerのままopen→closeする。SHMへCfgDbやSQLiteポインタを渡さない。kernel/kapi_dbの実装変更は不要。
 
@@ -144,12 +144,12 @@ StartupページApply時は「次回起動から有効」と変更差分を表�
 復旧案内: インストールFDDから起動 → mount /hd0 → edit /hd0/etc/system.cfg → 直前に記録したGFX/GUI値へ戻す。DBリカバリとは別手順。
 
 前置きの別段として、`cmd_sys.c`・gshell・cpanelが使うwriterをbootcfgへ統合する。機械的移動・接続のコミットと、短書込等のバグ・冗長修正のコミットを分ける。この整理の試験はcpanel受入から外し、先に独立して完了する。
-`cmd_sys.c:260` の読取上限・対象キー置換をbootcfg.cへ切り出す。既存実装`:333` のO_TRUNC直書きは短書込で原本を失うので、新GUIにはそのまま流用しない。
+`cmd_sys.c` の読取上限・対象キー置換をbootcfg.cへ切り出す。既存実装 のO_TRUNC直書きは短書込で原本を失うので、新GUIにはそのまま流用しない。
 1. 原文を最後まで読み（1023B＋余分1B検査）、未知行・コメントを保持する。変更したキーだけを書き換えるため、保存時の最新原文を使う。読取失敗や過長なら書込0回。
 2. 重複した対象キーを1行に統合し変更値を追記。未変更キー・未解釈値は保持。結果1023B超、NUL、不正値はINVAL/NOSPCで拒否する。
 3. bootcfg専用の固定一時名 `/etc/.system.cfg.bootcfg.tmp` を使う。作成前にunlinkし、NOTFOUND以外の失敗は中止する。O_CREAT|O_TRUNC|O_WRONLYで作成し、O_EXCLは使わない。rename前の電源断による残骸も次の保存で除去できる。writerは処理中yieldせず、協調実行下でこの一時名を共用する。短書込は残りを進め、0/負値なら中止。close後vfs_sync成功を確認する。
 4. sys_renameで原本へ置換、vfs_syncを再実行する。置換前失敗なら原本不変。置換後sync失敗ならDurabilityUnknownとし成功にしない。
-5. sys_closeはvoid（sdk/kapi.json:626）なので架空のcloseエラー判定はしない。既存rename/syncの返値を検査し、電源断原子性を保証したとは記載しない。
+5. sys_closeはvoid（sdk/kapi.json）なので架空のcloseエラー判定はしない。既存rename/syncの返値を検査し、電源断原子性を保証したとは記載しない。
 6. DurabilityUnknownでは再読込して現在見える内容を表示するが「永続化済み」とはしない。再同期の明示再試行を用意し、成功後RestartRequiredへ。
 
 O_EXCLを使わないため、ext2以外のFSにおける同フラグのNOSYS分岐や、§1への起動形態調査の追加は不要（A5の条件）。
@@ -280,6 +280,6 @@ run-os32実行結果に加え、試験wrapperは全目印とrshell読戻しの�
 反論: 0件。
 
 ## 確定 (2026-11-05、Opus 第 2 回 Approve、PM が反映)
-- B1 (P3): RELOAD の GUI op の番号は **67** (モーダル・セッションの予約帯 67〜79、sdk/include/os32/os32_gui_shared.h:86-88)。「番号末尾の未使用値」(80〜 は予備帯で OWNER_EXIT・TRIM_DONE はカーネルの内部 op、:93-96・kernel/gui.c:70-71) は使わない。
+- B1 (P3): RELOAD の GUI op の番号は **67** (モーダル・セッションの予約帯 67〜79、sdk/include/os32/os32_gui_shared.h)。「番号末尾の未使用値」(80〜 は予備帯で OWNER_EXIT・TRIM_DONE はカーネルの内部 op・kernel/gui.c) は使わない。
 - ユーザー判断として残るのは §10 の U1 (日付と時刻・システム情報・マウスキー・ダブルクリックを後続へ) と U2 (FEP の取り分と辞書を後続へ)。Opus 第 2 回は両方の推奨を妥当とした。
 - ユーザー決定 (2026-11-05、7 件とも推奨どおり): §10 の U1 (日付と時刻・システム情報・マウスキー・ダブルクリックは初版から外し後に回す) と U2 (FEP の取り分と辞書の設定も後に回す) は推奨どおりに決まった。§10 の未決はこれで決まった。

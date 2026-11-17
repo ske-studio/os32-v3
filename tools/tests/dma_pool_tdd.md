@@ -33,7 +33,7 @@
 
 ```
 $ python3 -B tools/tests/test_dma_pool.py
-tools/tests/dma_pool_host.c:17:10: fatal error: ../../mm/dma_pool_math.c: No such file or directory
+tools/tests/dma_pool_host.c: fatal error: ../../mm/dma_pool_math.c: No such file or directory
 ```
 
 ### RED 2 — またぐ候補で諦める (変異 2)

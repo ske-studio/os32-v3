@@ -8,59 +8,59 @@
 
 | 項目 | 現状と根拠 |
 |---|---|
-| SDK 版 | KAPI v79、関数枠300。`sdk/kapi.json:3`、共有定数は `sdk/include/os32/os32_kapi_shared.h:42`。 |
-| 起動契約 | `main(argc, argv, KernelAPI *api)`、OS32X v4・60B、最低 API 版・ヒープ指定。`sdk/README.md:39`。 |
-| 描画初期化 | `gfx_init` / `gfx_init_200` / `gfx_shutdown`。`sdk/kapi.json:73`。 |
-| 転送 | `gfx_present`、`gfx_present_rect`、dirty 登録/転送、nosync。`sdk/kapi.json:90,698,776`。 |
-| 注意 | ライブラリの `gfx_present()` は dirty 登録、実転送は `api->gfx_present_dirty()`。`sdk/README.md:63`。 |
-| 色 | `gfx_set_palette` / `gfx_get_palette`、`gfx_lease_palette`。`sdk/kapi.json:744,755,1357`。 |
-| BB・能力 | `gfx_get_framebuffer`、`gfx_screen_info`、`gfx_stats`。`sdk/kapi.json:768,1324,1351`。 |
-| 描画補助 | `gfx_hardware_scroll`、`gfx_hw_fill_rect`、`gfx_hw_blit`。`sdk/kapi.json:691,1330,1335`。 |
-| 所有・面 | `gfx_screen_owner`、`surface_query/lease/unlease`、`gfx_surface_lease`。`sdk/kapi.json:1465,1760,1775,1798,1822`。 |
-| ラスタ | `gfx_present_raster(void *table)` は公開済み。`sdk/kapi.json:796`。 |
-| ファイル | `sys_open` / `sys_close` / `sys_read` / `sys_stat`。`sdk/kapi.json:617,626,634,724`。 |
-| ファイル選択補助 | `sys_ls_window(path, skip, out)` あり。初版は一覧 UI を作らずパス引数を使う。`sdk/kapi.json:1830`。 |
-| 入力 | `kbd_trygetchar`、`kbd_trygetkey` 等。`sdk/kapi.json:95,245`。 |
+| SDK 版 | KAPI v79、関数枠300。`sdk/kapi.json`、共有定数は `sdk/include/os32/os32_kapi_shared.h`。 |
+| 起動契約 | `main(argc, argv, KernelAPI *api)`、OS32X v4・60B、最低 API 版・ヒープ指定。`sdk/README.md`。 |
+| 描画初期化 | `gfx_init` / `gfx_init_200` / `gfx_shutdown`。`sdk/kapi.json`。 |
+| 転送 | `gfx_present`、`gfx_present_rect`、dirty 登録/転送、nosync。`sdk/kapi.json`。 |
+| 注意 | ライブラリの `gfx_present()` は dirty 登録、実転送は `api->gfx_present_dirty()`。`sdk/README.md`。 |
+| 色 | `gfx_set_palette` / `gfx_get_palette`、`gfx_lease_palette`。`sdk/kapi.json`。 |
+| BB・能力 | `gfx_get_framebuffer`、`gfx_screen_info`、`gfx_stats`。`sdk/kapi.json`。 |
+| 描画補助 | `gfx_hardware_scroll`、`gfx_hw_fill_rect`、`gfx_hw_blit`。`sdk/kapi.json`。 |
+| 所有・面 | `gfx_screen_owner`、`surface_query/lease/unlease`、`gfx_surface_lease`。`sdk/kapi.json`。 |
+| ラスタ | `gfx_present_raster(void *table)` は公開済み。`sdk/kapi.json`。 |
+| ファイル | `sys_open` / `sys_close` / `sys_read` / `sys_stat`。`sdk/kapi.json`。 |
+| ファイル選択補助 | `sys_ls_window(path, skip, out)` あり。初版は一覧 UI を作らずパス引数を使う。`sdk/kapi.json`。 |
+| 入力 | `kbd_trygetchar`、`kbd_trygetkey` 等。`sdk/kapi.json`。 |
 | 無い入口 | `sdk/kapi.json` 全 API に OSRI 読込・v2 plan 作成・B31 再生・OSRI セッションの公開入口はない。 |
-| 型と画像ライブラリ | `GFX_Surface` は4面のオフスクリーン型で OSRI デコーダーではない。`sdk/include/os32/os32_kapi_shared.h:605`。 |
+| 型と画像ライブラリ | `GFX_Surface` は4面のオフスクリーン型で OSRI デコーダーではない。`sdk/include/os32/os32_kapi_shared.h`。 |
 
-- `os32api.h:14` は共有ヘッダを取り込む入口。生成 KAPI 定義を手編集して追加しない。
-- BB 公開型は幅・高さ・pitch・4面ポインタ。`sdk/include/os32/os32_kapi_shared.h:306`。面の公開型があっても、カーネル専用 `gfx_kernel_fb` と同一視して渡せない。
+- `os32api.h` は共有ヘッダを取り込む入口。生成 KAPI 定義を手編集して追加しない。
+- BB 公開型は幅・高さ・pitch・4面ポインタ。`sdk/include/os32/os32_kapi_shared.h`。面の公開型があっても、カーネル専用 `gfx_kernel_fb` と同一視して渡せない。
 - 公開ラスタ表は最大200件、各行1件、行間隔2以上、既定予算は4行1件。
 - IF=0・同期失敗・予算違反は静止提示。戻り値が void なので失敗理由は得られない。
-- 以上の契約は `sdk/include/os32/os32_kapi_shared.h:623`。v2 の6384件表とは別物。
-- wrapper は USER 入力表の全域を検査して既存描画へ渡す。`kapi/kapi_generated.c:1281`。
-- 既存利用例: `userland/lib/gfx/draw/gfx_raster.c:20,42,51` が表構築と KAPI 呼出を提供。
-- `userland/tests/gfx_demo200.c:47,102,150` は surface→sprite、初期化、dirty 転送の例。
+- 以上の契約は `sdk/include/os32/os32_kapi_shared.h`。v2 の6384件表とは別物。
+- wrapper は USER 入力表の全域を検査して既存描画へ渡す。`kapi/kapi_generated.c`。
+- 既存利用例: `userland/lib/gfx/draw/gfx_raster.c` が表構築と KAPI 呼出を提供。
+- `userland/tests/gfx_demo200.c` の `build_assets()` は surface→sprite、初期化、dirty 転送の例。
 - `userland/` の OSRI 検索ではデコーダー利用例は見つからず、画像用の実装を流用できるとはしない。
 
 ### OSRI と再生器の現在地
 
 | 部品 | 実装と到達性 |
 |---|---|
-| ファイル形式 | 64Bヘッダ、32B RGB444初期色、128000Bの4面、8Bイベント。`gfx/gfx_osri.h:7,29`。 |
-| 読込 | `osri_load(path, gfx_kernel_fb *, OsriImage *)`、VFSからBBへ読込。カーネル内部のみ。`gfx/gfx_osri.c:28,44,76`。 |
-| 検証 | 寸法・予約欄・正確な長さ・band・RGB444・順序・CRC・末尾余剰を検査。`gfx/gfx_osri.c:54,60,85,107`。 |
-| 現行通常 | v1≤200、v2≤1197・行3番号。行内番号昇順、同値拒否。`gfx/gfx_osri.h:15`、`gfx/gfx_osri.c:87`。 |
-| 現行OBS | v2≤6384・行16番号、行内任意順・同値可、番号重複拒否。`gfx/gfx_osri.c:9,55,89,97`。 |
-| 旧通常核 | `pl_prepare/pl_frame`、最大6 OUTの型・認定方式。`drivers/video/pc98/splash_raster_image.h:13,19`。 |
+| ファイル形式 | 64Bヘッダ、32B RGB444初期色、128000Bの4面、8Bイベント。`gfx/gfx_osri.h` の `OSRI_HEADER_BYTES`。 |
+| 読込 | `osri_load(path, gfx_kernel_fb *, OsriImage *)`、VFSからBBへ読込。カーネル内部のみ。`gfx/gfx_osri.c`。 |
+| 検証 | 寸法・予約欄・正確な長さ・band・RGB444・順序・CRC・末尾余剰を検査。`gfx/gfx_osri.c`。 |
+| 現行通常 | v1≤200、v2≤1197・行3番号。行内番号昇順、同値拒否。`gfx/gfx_osri.h` の `OSRI_V1_MAX_EVENTS`、`gfx/gfx_osri.c` の `osri_load()`。 |
+| 現行OBS | v2≤6384・行16番号、行内任意順・同値可、番号重複拒否。`gfx/gfx_osri.c`。 |
+| 旧通常核 | `pl_prepare/pl_frame`、最大6 OUTの型・認定方式。`drivers/video/pc98/splash_raster_image.h` の `PL_MAX_OUTS`。 |
 | OBS準備 | `pl_obs_prepare`、band1/v2専用、差分成分をG/R/B順に列化。`drivers/video/pc98/splash_raster_image.c`。 |
 | OBS制限 | 現物の上限47 OUT、格納64、plan52008B。`drivers/video/pc98/splash_raster_image.h`。 |
 | HBLANK核 | activeで先頭番号を選び、H立上りで列を実行、VSYNCならDROP。`drivers/video/pc98/splash_raster_image.c`（pl_obs_frame、919はobs_edge）。 |
 | IF区間 | VBLANK待ちはIF開放、その後CLI、初期色・可視行走査、全出口で復元。`drivers/video/pc98/splash_raster_image.c`。 |
-| 既存公開ラスタ | dirty転送/flip後 `pc98_splash_raster_table` へ。`drivers/video/pc98/gfx_vram.c:311,333`。OSRI核ではない。 |
+| 既存公開ラスタ | dirty転送/flip後 `pc98_splash_raster_table` へ。`drivers/video/pc98/gfx_vram.c`。OSRI核ではない。 |
 
-- `drivers/video/pc98/gfx_vram.c:305` は目標行直前〜HBLANKの4 OUTだけ保護し、保護間にIF開放を置く方式。
-- `RASTER_LINE_US` は実装から削除済みで、`tools/tests/cpu_calibrate_host.c:165` のコメントだけに残る。古い120µs待ちを現在の根拠にしない。
-- 読込失敗でもBBには部分画素が入り得る（`gfx/gfx_osri.c:76,107`）。検査完了前の転送は禁止する。
+- `drivers/video/pc98/gfx_vram.c` は目標行直前〜HBLANKの4 OUTだけ保護し、保護間にIF開放を置く方式。
+- `RASTER_LINE_US` は実装から削除済みで、`tools/tests/cpu_calibrate_host.c` のコメントだけに残る。古い120µs待ちを現在の根拠にしない。
+- 読込失敗でもBBには部分画素が入り得る（`gfx/gfx_osri.c` の `osri_load()`）。検査完了前の転送は禁止する。
 - B31は「HBLANK内に全OUTが収まる」保証ではない。enc2は可視域への色変更のはみ出しも評価する。
-- 根拠: `docs/decisions/gui/RASTER_SPLASH_ENC2_DESIGN.md:58,139`。生成時の探索はホスト専用（同:94）。
+- 根拠: `docs/decisions/gui/RASTER_SPLASH_ENC2_DESIGN.md`。生成時の探索はホスト専用（同:94）。
 
 ### S5 後との差分（未実装扱いの境界）
 
 | S5確定事項 | ビューアーへの影響と根拠 |
 |---|---|
-| v2検査の共通化 | 通常/OBSとも6384件・行16番号、任意順・同値、band1/2/4。`docs/decisions/gui/RASTER_SPLASH_S5_DESIGN.md:21`。 |
+| v2検査の共通化 | 通常/OBSとも6384件・行16番号、任意順・同値、band1/2/4。`docs/decisions/gui/RASTER_SPLASH_S5_DESIGN.md`。 |
 | B31共通核 | `pl_v2_prepare/frame`、64B行・25608B plan、旧核撤去。S5設計:30,63。 |
 | OUT再計算 | `C + max(M-1,0)`、先頭番号先行OUTを除き31以下。ファイルにBの欄はない。S5設計:26。 |
 | 常用所有 | load→prepare→転送→約1秒preview→再生→cleanup。S5設計:38。 |
@@ -68,8 +68,8 @@
 | 段 | S5a=形式/準備/核、S5b=常用所有/期限、S5c=生成、S5d=配布/実機。S5設計:137。 |
 
 - 上表の「S5設計」は `docs/decisions/gui/RASTER_SPLASH_S5_DESIGN.md` の略記。
-- 票 `docs/tasks/gui/TASK_RASTER_SPLASH.md:3,24` は実装中・固定画像経路実装済みを記載。S5a/bの完了証拠にはしない。
-- PL末尾はVSYNCによるDROPとenc2への参照を追記済み。`docs/decisions/gui/RASTER_SPLASH_PL_DESIGN.md:553,558`。
+- 票 `docs/tasks/gui/TASK_RASTER_SPLASH.md` は実装中・固定画像経路実装済みを記載。S5a/bの完了証拠にはしない。
+- PL末尾はVSYNCによるDROPとenc2への参照を追記済み。`docs/decisions/gui/RASTER_SPLASH_PL_DESIGN.md`。
 - ENC2本文の観測専用/47本とS5の常用/B31は段が異なる。後続仕様はS5を採る。
 - 実物との食い違いは3件として記録: D1=通常v2検査の旧制限、D2=旧核/OBS47とS5共通B31、D3=RASTER_LINE_US不在。
 - D1/D2は移行中の差であり不具合断定ではない。スプラッシュ結線先など未読箇所を追加の確認済み差として数えない。
@@ -115,13 +115,13 @@ int gfx_osri_show(const char *path, u32 duration_ms);
 
 - 専用の負値は追加しない。loaderの0/-1だけでは分類できないため、内部に理由を返す補助口を足し、既存boot呼出の契約は維持する。
 - USER不正アドレスは既存B1のfault/kill契約。pathはNULまで上限付きコピーし、保持するUSERポインタは0本。
-- G1確認: `sdk/gen_kapi.py:166,225,535,562` のinは範囲検査、target:trueはtargetへ委譲し、引数はそのまま渡す。文字列コピーは生成しない。
-- `kapi/kapi_strings.c:17,89` のコピー表も手登録。今回は登録せず手書きkapi_osri.cをtargetにし、in=[{arg:"path",target:true}]・out:"none"を指定する。
+- G1確認: `sdk/gen_kapi.py` のinは範囲検査、target:trueはtargetへ委譲し、引数はそのまま渡す。文字列コピーは生成しない。
+- `kapi/kapi_strings.c` のコピー表も手登録。今回は登録せず手書きkapi_osri.cをtargetにし、in=[{arg:"path",target:true}]・out:"none"を指定する。
 - 入口でcallerを捕捉しVFS_MAX_PATH内をcopy_caller_bytesでNULまでコピー。不正範囲/桁溢れはB1、正常範囲の非終端/空はINVAL、確保失敗はNOSPC。全域一括の先読みはしない。
-- 現在末尾 `sys_ver_info` の後へ1枠追加、他変更が先行しなければv80。`sdk/kapi.json:1949`。
+- 現在末尾 `sys_ver_info` の後へ1枠追加、他変更が先行しなければv80。`sdk/kapi.json`。
 - v79基準の追加slotは255。実装時に最新末尾・容量を再確認し、版衝突時は次の版を採る。
 - JSON/共有定数を同時版上げ、生成C/Rust/初期化を再生成、アプリ要求版も更新する。
-- ABI作業時はclean→全体再ビルドが必要。今回は行わない。`docs/KAPI_SPEC.md:44`。
+- ABI作業時はclean→全体再ビルドが必要。今回は行わない。`docs/KAPI_SPEC.md`。
 
 ### アプリとカーネルの境目
 

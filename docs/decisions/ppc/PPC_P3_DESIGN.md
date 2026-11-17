@@ -11,7 +11,7 @@
 - N5: ③を a〜d に分割し、各小段を 1〜3 ファイル・400 行以下に制限。
 - N6: capture 期限を wait 開始起点に統一し、通知・BEGIN 起点 profile を削除。
 - N7: 入口と endpoint の 2 周の根拠、poll 間引き、周別の計数を明記。
-- N8: syscall 入口の idle_work_run の参照を exec/exec_syscall.inc:95 に訂正。
+- N8: syscall 入口の idle_work_run の参照を exec/exec_syscall.inc に訂正。
 - N9: usb_boot.c の古い EE 注釈の修正と新規ソース一覧の追従を③の完了条件に追加。
 
 ## 1. 範囲と実物の確認
@@ -19,10 +19,10 @@
 - 材料は `in/P3_DESIGN.final.md` と `in/INPUT_HAL_DESIGN.r2.md`、同レビュー r1・r2 依頼。以下「final」「HAL r2」はこれらを指す。
 - 案 B、専用 link-SH、共通 rshell_lan.c/rshell.c、PLN1 退避像、HostFS 未提供、既定切替の条件、公開 ABI 不変更は final のとおり。
 - final §1 の E1〜E9、§2 の採用理由は維持。ただし EE=0 の syscall という根拠を本節で置換する。
-- `docs/decisions/ARCH_CTX_DESIGN.md:44`（AC-CTX-1）どおり、`arch/ppc/kernel_trap.c:104` の USER syscall 分岐は `:107` で許可、`:108` で dispatch、`:109` で出口処理のため禁止する。
+- `docs/decisions/ARCH_CTX_DESIGN.md`（AC-CTX-1）どおり、`arch/ppc/kernel_trap.c` の `ppc_trap_dispatch()` の USER syscall 分岐は 同ファイル内 で許可、同ファイル内 で dispatch、同ファイル内 で出口処理のため禁止する。
 - IRQ の深さは同 `:94–101` の外部/DEC handler だけで増減する。通常 syscall は IRQ 外、途中の IRQ は深さを戻して復帰する。
-- `kernel/idle_work.h:4` の「許可状態・IRQ 外」を満たす。実装 `kernel/idle_work.c:30–36` は許可・深さ・再入を確認して各登録を 1 回呼ぶ。既存のガードは変更しない。
-- `exec/exec_syscall.inc:95` の入口にも idle_work_run が既にある。W4 後は PPC でも有効であり、前景進行が halt/yield のみに限定されるとは扱わない。
+- `kernel/idle_work.h` の「許可状態・IRQ 外」を満たす。実装 `kernel/idle_work.c` の `idle_work_run()` は許可・深さ・再入を確認して各登録を 1 回呼ぶ。既存のガードは変更しない。
+- `exec/exec_syscall.inc` の入口にも idle_work_run が既にある。W4 後は PPC でも有効であり、前景進行が halt/yield のみに限定されるとは扱わない。
 
 ## 2. 前景 endpoint（final §3 の EE/N4 記述を全置換）
 ```c
@@ -40,7 +40,7 @@ i32 ppc_kapi_wait_once(void)
 |---|---|---|
 | link-SH | pm_link_service_once | USB と LAN/mailbox の進行 |
 | PLN1 sh.bin | pm_terminal_poll 相当の idle_work 用 wrapper | USB と pm_lan_poll の進行。文字端末 provider の読出しとは独立 |
-- endpoint 1 回につき登録処理 1 周。halt/yield syscall 全体には入口の 1 周もあり、通常は計 2 周になり得る。x86 も kernel/sys.c:41–42 の sys_halt と exec/exec_syscall.inc:95 の入口で 2 周回り、pm_usb_poll は 10ms、pm_lan_poll は 1ms で間引くため、受入では入口/endpoint の周ごとに呼出し数と実処理数を分ける。
+- endpoint 1 回につき登録処理 1 周。halt/yield syscall 全体には入口の 1 周もあり、通常は計 2 周になり得る。x86 も kernel/sys.c の sys_halt と exec/exec_syscall.inc の入口で 2 周回り、pm_usb_poll は 10ms、pm_lan_poll は 1ms で間引くため、受入では入口/endpoint の周ごとに呼出し数と実処理数を分ける。
 - host/notice/status/入力 provider 自体から pump は呼ばない。それらの syscall に共通入口の進行があることとは区別する。
 - net_rx_idle と helper の 2 枠は final のとおり。HAL の入力 work が登録済みなら総枠数と登録結果を再確認し、USB poll の実行所有者を一本化する。
 - HAL が USB 進行を既存 work に移した場合、helper はその登録を重複せず LAN のみ担当する。単なる入力読出しから USB を再 poll しない。
@@ -73,8 +73,8 @@ int input_legacy_wait(int mode, int interruptible);
 - provider 登録は起動時の常駐関数ポインタ。NULL は空/不在であり、共通部から PPC・serial・exec の装置固有 symbol を参照しない。
 - **link-SH では terminal_try/peek と inject_try/peek は NULL、terminal_enabled は常に偽**。LAN notice は host_mailbox → rsh_lan_poll へ渡す。PPC LAN だから terminal_try に結ぶ、という一律登録はしない。
 - PLN1 の旧文字端末を残す像だけ terminal provider に LAN byte stream を登録する。GUI 注入は別の宛先付きキューであり、LAN notice を inject_try へ載せない。
-- ~~旧 PLN1 に必要な交互選択・lookahead・escape decoder は共通 bridge の互換 profile に移す。~~ (2026-11-15 に改めた。末尾の「HAL 4c の順の入れ替えで決めたこと」と「③b-2 で決めたこと」) PLN1 は terminal=NULL とし、local を「LAN (escape decoder と完成 key 1 個の非消費の先読み、platform 側) が先、空なら USB」の 1 つの口にする。LAN と USB の交互選択はやめる。共通の wait(IL_KEY) は local だけを読むので (kernel/input_wait.c、x86 の kbd.c:789 と同じ)、LAN を terminal にすると PLN1 の LAN のキーの待ちが止まるため。link-SH には decoder を有効化しない。x86 の serial 優先は変えない。
-- 現行の状態は `platform/powermac/input_boot.c:8–12`、実際の交互選択は `:28–43`。terminal_input.c は byte ring と poll を持つ。移動元を取り違えない。
+- ~~旧 PLN1 に必要な交互選択・lookahead・escape decoder は共通 bridge の互換 profile に移す。~~ (2026-11-15 に改めた。末尾の「HAL 4c の順の入れ替えで決めたこと」と「③b-2 で決めたこと」) PLN1 は terminal=NULL とし、local を「LAN (escape decoder と完成 key 1 個の非消費の先読み、platform 側) が先、空なら USB」の 1 つの口にする。LAN と USB の交互選択はやめる。共通の wait(IL_KEY) は local だけを読むので (kernel/input_wait.c、x86 の kbd.c と同じ)、LAN を terminal にすると PLN1 の LAN のキーの待ちが止まるため。link-SH には decoder を有効化しない。x86 の serial 優先は変えない。
+- 現行の状態は `platform/powermac/input_boot.c`、実際の交互選択は `peek()`。terminal_input.c は byte ring と poll を持つ。移動元を取り違えない。
 - 共通 bridge が選択状態・decoder・peek の整合・capture 入力期限・GUI policy を所有、HAL が物理状態/ring/keymap を所有する。provider は装置の byte/cooked 読出し・GUI 状態照会・park の口だけ、SH が半行/ID/実行状態を所有する。
 - PLN1 の peek/has_key は有限の採取（byte→decoder→完成 key の lookahead）を進めてよい。完成 key の消費と交互選択の順の更新は禁止し、try 成功時だけ消費・選択更新する。採取は既存キューから行い、装置 pump は前景 work が担当する。
 - input_boot.c は HAL 4c の共通 bridge へ provider を登録し、InputOps は薄く委譲する。PPC 専用 bridge や HAL 未着時の最小実装は作らない。
@@ -87,14 +87,14 @@ int input_legacy_wait(int mode, int interruptible);
 | try(IL_CHAR/IL_KEY) | GUI は注入だけ、空なら park_poll を 1 回試して通常復帰時 -1。CUI は profile に従う。capture 中は terminal を閉じ、local STOP は残す |
 | peek | try と同じ選択対象/順番を非消費で見る。park・pump・deadline 合成文字の消費なし。有限採取可、完成 key の消費・交互選択更新なし。完成済み先頭は反復 peek で維持 |
 | wait(IL_CHAR) | CUI は local 優先。x86 の rshell serial 条件と非 capture の空白 timeout は維持。link-SH は USB と中断/期限を検査し FG1 で有限 idle_work→再検査 |
-| wait(IL_KEY) | x86 の現行どおり serial を読まない（kbd.c:789）。link-SH も local のみ。interruptible の中断は -1、捕捉期限は ESC |
+| wait(IL_KEY) | x86 の現行どおり serial を読まない（kbd.c）。link-SH も local のみ。interruptible の中断は -1、捕捉期限は ESC |
 | GUI wait | 注入を即返す、空なら park_kbd。成立時の再開値は注入 byte、try の park_poll は byte または -1。peek/has_key/local は park しない |
 - HAL r2 の mode は文字/キー/ローカルという口の区別。GUI 状態は provider.gui_active()、capture 状態は con_sink_capture_active() を共通側で読み、呼び手の任意指定にしない。wait を try の一律ループにしない。
 - rsh_lan_app_loop は **try(IL_LOCAL_CHAR)**（既存 KAPI 名 kbd_trygetchar_local）を 1 回先に呼ぶ。文字があれば rsh_line_feed、半行中は rsh_lan_poll を呼ばない。
 - 行頭で local が空のときだけ rsh_lan_poll を 1 回呼ぶ。半行の完了/取消後に行頭へ戻る。LAN を保留しても kernel の通信・ACK・mailbox 採取は止めない。
 - 調停に wait を使うと LAN 到着時に USB 待ちから戻れず、peek→別経路で consume すると由来が曖昧になるため、app_loop は local try に統一する。待受無入力は sys_halt、LAN AGAIN は sys_yield。
 - 半行・126B 制限・exit N・LAN EXIT・reset/flag 復元・後起動 READY は final のとおり。
-- capture 期限は x86 と同じ各 wait の開始起点（kbd.c:754,792）で 30 秒とする。bridge が待ちごとの開始時刻を持ち、ループ内で更新しない。BEGIN 起点の profile と input_legacy_capture_changed 通知は削除し、con_sink.c は変更しない。
+- capture 期限は x86 と同じ各 wait の開始起点（kbd.c）で 30 秒とする。bridge が待ちごとの開始時刻を持ち、ループ内で更新しない。BEGIN 起点の profile と input_legacy_capture_changed 通知は削除し、con_sink.c は変更しない。
 - capture の有効状態は con_sink_capture_active() だけを正とする。FREEZE 中も terminal を閉じたまま、END/owner 回収後はその照会結果に従って解除する。
 - 時計は共通単調時間で 30 秒を比較し、PPC は platform_clock_read_us の TB 由来値を使える。100Hz tick を ms と取り違えず、wrap 差を試験する。期限後の文字 wait は CR、キー wait は ESC、try/peek は非待機の既存結果を維持。
 - STOP/中断を期限より先に確認し、capture 終了・fault 回収後に次の session へ期限を持ち越さない。sink 本体の 8KiB/reader/flag/PRINT と出力の契約は final のとおり。
@@ -104,16 +104,16 @@ int input_legacy_wait(int mode, int interruptible);
 |---|---|---|
 | ① 文書・境界 | LAN_OPERATOR、ARCH_COMPAT、IO_TIER、HAL bridge 契約 | 案 B は維持、N4/EE 窓を削除。HAL と local/peek/wait/capture の担当・先行範囲を確定。公開 ABI は変えない |
 | ② host/KAPI provider | device_host、exec_reclaim、kapi_target_ppc.py、gen_kapi.py、exec_kapi.c/.h、PLN1 stub・リンクリスト | final の host/notice/flag/owner 結線と生成を一体化。wait endpoint は直接 idle_work_run。binding/remote_x9/T1 の provider/owner 変異と両 PPC 像ビルド |
-| ③a 前景・endpoint | link_platform、PLN1 work 登録の TU、usb_boot.c（各小段 1〜3 ファイル） | ②の endpoint 結線を使い、像別 work 登録と入口/endpoint の周別計数を検証。usb_boot.c:105 の「USER syscalls keep EE clear」を W4 後の FG1 契約へ訂正 |
+| ③a 前景・endpoint | link_platform、PLN1 work 登録の TU、usb_boot.c（各小段 1〜3 ファイル） | ②の endpoint 結線を使い、像別 work 登録と入口/endpoint の周別計数を検証。usb_boot.c の「USER syscalls keep EE clear」を W4 後の FG1 契約へ訂正 |
 | ③b-1 USB の非消費 peek | input_usb.c・input_usb.h・tools/checks/ver-ppc-input-usb.py（3 ファイル） | HAL 4c 完了後。USB のキューに非消費の peek を足す (§3 の「非消費 peek を USB キューに追加」)。ver-ppc-input-usb.py に「peek が消費する」変異を足す。input_boot.c は触らない |
 | ③b-2 provider の像別登録 | input_boot.c・tools/checks/ver-ppc-input-usb.py・(要れば) terminal_input.c（3 ファイル以下） | ③b-1 の後。input_boot.c の独自の状態 (lookahead・last_source・交互選択) を除き、PLN1 は terminal=NULL・local=「LAN (decoder 付き) が先、空なら USB (③b-1 の try/peek)」、link-SH は terminal=NULL・local=USB を登録する。ver-ppc-input-usb.py の anchor (peek-consumes・lan-first・no-usb) を新しい provider へ移す。lan-first は「terminal (LAN) が先、空なら local (USB)」の期待に書き換える (交互選択の期待は消す)。HAL 共同 fixture で有限採取と非消費を検証 |
-| ③c capture 期限 | HAL 4c に含める (本線に H7 として依頼)。HAL が入れない場合は、③c を kernel/input_wait.c (共通) の実装の段に替える (1〜3 ファイル) | bridge の wait 開始起点 (x86 と同じ kbd.c:754・:792)、FREEZE 閉鎖、期限後の文字の待ちは CR・キーの待ちは ESC、STOP、END/owner 回収を検証。con_sink 通知の段は設けない |
+| ③c capture 期限 | HAL 4c に含める (本線に H7 として依頼)。HAL が入れない場合は、③c を kernel/input_wait.c (共通) の実装の段に替える (1〜3 ファイル) | bridge の wait 開始起点 (x86 と同じ kbd.c・`kbd_getchar_wait()`)、FREEZE 閉鎖、期限後の文字の待ちは CR・キーの待ちは ESC、STOP、END/owner 回収を検証。con_sink 通知の段は設けない |
 | ③d 出力・shell 起動 | d1: console_stream・console_log、d2: shell_putchar・shell_boot（各 2 ファイル） | d1→d2 の順で出力・起動を結線。T1 変異、fault 再起動と既存像ビルド |
 | ④ 共通 shell（直列） | rshell.c/rshell_lan.c/shell.h、main.c、profile.h | final の APP 専用実体。local try の行頭優先・半行 LAN 保留・exit。共通 rshell/capture/owner 回帰、x86 build_compare MATCH を目標 |
 | ⑤ 像 | ppc_kernel.c、ppc-user.mk、build/targets/ppc-powermac.mk | final の専用 sh.bin/root・出力先・ROOT_BINS 依存、SH+LINK 許可、KBOOT_SHELL+LINK 拒否。旧 TU/HostFS 除外、bridge/provider のリンク閉包と map を確認 |
 | ⑥ QEMU | sc_run.py、ppc_sh_output.py、link_run.py | 7450/7455 で下表。新 agent/プロトコルなし。変更試験の --mutate と lint、HAL 共同試験を重複作成しない |
-- 段の順: ② → ③a → (HAL 4c、③c を含む) → ③b-1 → ③b-2 → (HAL 4b) → ④ → ⑤ (③d を含む) → ⑥。③d は link-SH の像にしか効かず、その像は ⑤ で作るので、⑤ にまとめた (2026-11-15、本線 PM 了承)。⑤ が大きければ ⑤a 像・⑤b 出力 (旧 ③d1)・⑤c 起動 (旧 ③d2) に分ける。HAL 4b は「③b の local を共通の cooked ring に結び替え、③b-1 の peek を消す」段。③d は ③a の後なら ③b・HAL 4b と並べてよい (4c が遅れたら ③d を先に進める)。③b は peek の pump (input_boot.c:31) を消すので、③a の像別の work の登録より先に入れない (PLN1 の LAN の入力が止まる)。③d は ③a の後なら ③b と並べてよい。
-- ③d: PLN1 の像の出力の側の直接の poll (console_stream.c:12・shell_putchar.c:9 の pm_terminal_poll) は残す。idle_work の登録と重なっても、LAN は lan_service.c:248-249 の poll_at を先に進めるので入れ子の 2 回目は何もしない。USB は 10ms の間引きと irq_save で守られる。この 2 つを受入の「二重登録なし」の根拠にする。link-SH の像では、旧端末の TU が外れるので、この直接の poll も無くなる。
+- 段の順: ② → ③a → (HAL 4c、③c を含む) → ③b-1 → ③b-2 → (HAL 4b) → ④ → ⑤ (③d を含む) → ⑥。③d は link-SH の像にしか効かず、その像は ⑤ で作るので、⑤ にまとめた (2026-11-15、本線 PM 了承)。⑤ が大きければ ⑤a 像・⑤b 出力 (旧 ③d1)・⑤c 起動 (旧 ③d2) に分ける。HAL 4b は「③b の local を共通の cooked ring に結び替え、③b-1 の peek を消す」段。③d は ③a の後なら ③b・HAL 4b と並べてよい (4c が遅れたら ③d を先に進める)。③b は peek の pump (input_boot.c) を消すので、③a の像別の work の登録より先に入れない (PLN1 の LAN の入力が止まる)。③d は ③a の後なら ③b と並べてよい。
+- ③d: PLN1 の像の出力の側の直接の poll (console_stream.c・shell_putchar.c の pm_terminal_poll) は残す。idle_work の登録と重なっても、LAN は lan_service.c の poll_at を先に進めるので入れ子の 2 回目は何もしない。USB は 10ms の間引きと irq_save で守られる。この 2 つを受入の「二重登録なし」の根拠にする。link-SH の像では、旧端末の TU が外れるので、この直接の poll も無くなる。
 - ③a〜d（d は d1/d2）の各小段は試験・ビルド一覧の変更も含め 1〜3 ファイル・400 行以下とし、超える場合は同じ段内でさらに分割する。各小段で組める状態を保つ。共通 shell は final のとおり直列。
 - ③の完了条件に、新規ソースの ROLES §4-3 追従（build/sources/order.mk、build/sources/common.mk または arch/platform 一覧、tools/tests/fixtures/build_profile_x86.json の C_KERNEL、PPC は build/targets/ppc-powermac.mk）と選択・リンク確認を含める。io_pump.c は追加しない。
 - host_notice 共通本体無変更、serial_* 不在、必要 flag だけ実体化、正常/異常の owner 回収、生成物手編集禁止は final のとおり。
@@ -192,16 +192,16 @@ int input_legacy_wait(int mode, int interruptible);
 |食い違い ID|前提・見込みと実物（根拠）|必要な修正|
 |---|---|---|
 |E1|確定設計 §5:147・§6:190–192 は resident CLI。`build/targets/ppc-powermac.mk` の KBOOT_SHELL と SH は別物|P3 の対象を SH に改訂|
-|E2|SH に全ソースは入る (`build/ppc-user.mk:39`) が `userland/ppc/sh/profile.h:4` は SHELL_AS_APP。`userland/shell/main.c:128` は rshell 登録を除外、`rshell.c:364,478,610` は LAN 実行・poll・コマンド入口を除外|単なる KAPI 結線では不可。共通 rshell のアプリ対応が必要|
-|E3|`exec/exec_kapi_init.inc:508,559` は代入だけ。PPC の host provider は `sdk/kapi_target_ppc.py:156,251` の absent、notice_serial は `:266` の ZERO_SLOTS、include は `sdk/gen_kapi.py:520` の除外対象|slot・ZERO_SLOTS・include とリンク対象を一緒に直す|
-|E4|`rshell.c:445,475,496` は serial 初期化・ser_wd・rsh_serial_follow に依存。sys_halt は `sdk/kapi_target_ppc.py:7` の void 無処理、sys_yield は `sdk/kapi.json:1513` から exec_sys_yield。`arch/ppc/exec_kapi.c:1–7` は表だけで待機 endpoint は無い|APP 入口を別に定義し、PPC halt/yield を同じ新 endpoint に結ぶ|
-|E5|SH+LINK は error (`build/targets/ppc-powermac.mk`)。出力先は LINK 優先で `/link` になり診断像と衝突 (`:37`)|組合せを許可し `/link/sh` を分離|
-|E6|SH は旧 HostFS も組む (`build/targets/ppc-powermac.mk`)。`hostfs_peer.c:14` は共通 mailbox と同名 host_alive_snapshot、`lan_service.c:98,108` の PLN1 FS 口は link で消える|P3 link-SH は旧 HostFS を組まない。SFS on link は P4|
-|E7|`shell_boot.c:33` は TERM_OPEN/USB 打鍵待ち。`input_boot.c:21,31` と `console_stream.c:11` は link 像から外される terminal TU に依存|起動待ち・poll・入力・出力を PLN1 から切り離す|
-|E8|`arch/ppc/exec_enter.S:25` は USER を EE=1 で起動し、USER 復帰ごとに DEC が進む。不足は `terminal_input.c:73–78` の USB poll と `lan_service.c:291–299` の bind/mailbox 初期化を含む前景処理|EE の窓は不要。前景処理だけを待機 endpoint から 1 回進める|
+|E2|SH に全ソースは入る (`build/ppc-user.mk`) が `userland/ppc/sh/profile.h` は SHELL_AS_APP。`userland/shell/main.c` は rshell 登録を除外、`rshell.c` は LAN 実行・poll・コマンド入口を除外|単なる KAPI 結線では不可。共通 rshell のアプリ対応が必要|
+|E3|`exec/exec_kapi_init.inc` は代入だけ。PPC の host provider は `sdk/kapi_target_ppc.py` の absent、notice_serial は 同ファイル内 の ZERO_SLOTS、include は `sdk/gen_kapi.py` の除外対象|slot・ZERO_SLOTS・include とリンク対象を一緒に直す|
+|E4|`rshell.c` は serial 初期化・ser_wd・rsh_serial_follow に依存。sys_halt は `sdk/kapi_target_ppc.py` の void 無処理、sys_yield は `sdk/kapi.json` から exec_sys_yield。`arch/ppc/exec_kapi.c` は表だけで待機 endpoint は無い|APP 入口を別に定義し、PPC halt/yield を同じ新 endpoint に結ぶ|
+|E5|SH+LINK は error (`build/targets/ppc-powermac.mk`)。出力先は LINK 優先で `/link` になり診断像と衝突 |組合せを許可し `/link/sh` を分離|
+|E6|SH は旧 HostFS も組む (`build/targets/ppc-powermac.mk`)。`hostfs_peer.c` は共通 mailbox と同名 host_alive_snapshot、`lan_service.c` の PLN1 FS 口は link で消える|P3 link-SH は旧 HostFS を組まない。SFS on link は P4|
+|E7|`shell_boot.c` は TERM_OPEN/USB 打鍵待ち。`input_boot.c` と `console_stream.c` は link 像から外される terminal TU に依存|起動待ち・poll・入力・出力を PLN1 から切り離す|
+|E8|`arch/ppc/exec_enter.S` は USER を EE=1 で起動し、USER 復帰ごとに DEC が進む。不足は `terminal_input.c` の USB poll と `lan_service.c` の bind/mailbox 初期化を含む前景処理|EE の窓は不要。前景処理だけを待機 endpoint から 1 回進める|
 |E9|`arch/ppc/exec_reclaim.c:4` の host owner 回収は空|owner 終了・異常終了で handle 回収を結線|
-- 食い違いは上表の **9 件**。capture/token は不足に数えない。両者は absent 群に含まれず、生成器の通常経路で実体を呼ぶ (`exec_kapi_init.inc:592`、`con_sink.c:151`、`sdk/kapi.json:2040`)。
-- POLICY_DEV §1 の判断①：本線に同じ役目がある。確定設計 §2・§3 と `rshell_lan.c:291` の READY/通知/実行/結果/END を共用する。
+- 食い違いは上表の **9 件**。capture/token は不足に数えない。両者は absent 群に含まれず、生成器の通常経路で実体を呼ぶ (`exec_kapi_init.inc`、`con_sink.c` の `con_sink_capture()`、`sdk/kapi.json`)。
+- POLICY_DEV §1 の判断①：本線に同じ役目がある。確定設計 §2・§3 と `rshell_lan.c` の READY/通知/実行/結果/END を共用する。
 - 判断②：**HAL で一実装にする**。wire・ID・世代・capture は共通、PPC は platform_host、有限の前景進行、USB だけを提供する。rshell_link.c は作らない。
 - 判断③：link v2・共通 100Hz・一 RX 所有者・共通 exec に合う。ただし「resident CLI を維持する」確定範囲とは異なるため、§7 の判断後に正典を更新して実装する。
 - 互換契約は AC-TIME-3、AC-SYNC-2、AC-NET-3、AC-INPUT-1。D03（進行）/D14（close 保留 ACK）の論点は AC-NET-3 に集約されている (`ARCH_COMPAT_CONTRACT.md:108,111`)。x86/PPC に同じ世代・ID・capture・owner 回収試験を当てる。
@@ -219,28 +219,28 @@ int input_legacy_wait(int mode, int interruptible);
 ### A-3. 部品の境目（断片は提案。生成物は手で編集しない）
 ### 共通 shell と起動
 - SHELL_AS_APP を維持し、link-SH 専用 profile だけ SHELL_REMOTE_APP を選ぶ。専用 sh.bin/root と `--rshell-lan` を既存 exec 引数経路で渡す。
-- `userland/shell/rshell_lan.c:291` の poll の後に `int rsh_lan_app_loop(void)`、`:66` の trace の側に `void rsh_lan_app_init(void)` を追加し、宣言は `shell.h:192–198` の側へ置く。後者は APP 専用 rshell/lantrace の登録、前者は待受全体を所有する。
-- `main.c:128–144` の APP 分岐は init と `--rshell-lan` 時の `return rsh_lan_app_loop()` の 2 呼出しに集約。`rshell.c:438–603` の resident ループは変えず、APP 用コマンド本体・登録も rshell_lan.c に置く。関数途中へ条件分岐を散らさず、APP 実装は機能ガードでまとまりを囲む。
-- `rshell_lan.c:331,356` の execute/handoff は APP 用の同名実体を同 TU に置く（resident の `rshell.c:397,432` は保持）。APP execute は UART・GUI/SFS 特別操作を未提供とし、通常 execute_command を呼び、handoff=0。APP の handoff は未提供を返す。wire・ID・世代・capture の処理は共用する。
-- app_loop は rsh_lan_reset（`:224`）後に USB local のみを読む。`kbd_trygetchar_local`（既存例 `rshell.c:72`）と `rsh_line_begin/feed`（`serial_watchdog.h:119–122`、from_serial=0）で 126B 制限の行を組む。ser_wd・rsh_serial_follow・serial 初期化には触れない。
+- `userland/shell/rshell_lan.c` の poll の後に `int rsh_lan_app_loop(void)`、`rsh_lan_trace_show()` の trace の側に `void rsh_lan_app_init(void)` を追加し、宣言は `shell.h` の側へ置く。後者は APP 専用 rshell/lantrace の登録、前者は待受全体を所有する。
+- `main.c:128–144` の APP 分岐は init と `--rshell-lan` 時の `return rsh_lan_app_loop()` の 2 呼出しに集約。`rshell.c` の resident ループは変えず、APP 用コマンド本体・登録も rshell_lan.c に置く。関数途中へ条件分岐を散らさず、APP 実装は機能ガードでまとまりを囲む。
+- `rshell_lan.c` の execute/handoff は APP 用の同名実体を同 TU に置く（resident の `rshell.c` は保持）。APP execute は UART・GUI/SFS 特別操作を未提供とし、通常 execute_command を呼び、handoff=0。APP の handoff は未提供を返す。wire・ID・世代・capture の処理は共用する。
+- app_loop は rsh_lan_reset（`:224`）後に USB local のみを読む。`kbd_trygetchar_local`（既存例 `rshell.c`）と `rsh_line_begin/feed`（`serial_watchdog.h`、from_serial=0）で 126B 制限の行を組む。ser_wd・rsh_serial_follow・serial 初期化には触れない。
 - 行頭は USB の文字を先に確認し、半行が無いときだけ rsh_lan_poll（`:291`）を 1 回呼ぶ。半行中は LAN を保留し、USB 完成行を execute_command へ渡す。無入力時は sys_halt、LAN 内の AGAIN 待ちは既存 wait_again（`:88–94`）の sys_yield を使い、毎回 USER へ戻る。
 - LAN の RSH_LAN_EXIT（`:371`、結果送信試行と capture END 後）なら app_loop は 0 を返す。USB の `exit N` は sh_exit_flag/code（`main.c:25–26`）を execute_command 復帰直後に確認して N を返す。行編集の EXIT は 0。退出時は reset と APP が保存した flag の復元を行う。通信失敗は成功した OUT とみなさない。
 - SH は link 接続・TERM_OPEN・USB 初回打鍵を待たず起動し、agent 後起動にも既存の 2 秒 READY 再試行で対応する。同ID/古ID拒否・世代更新・FREEZE→OUT→END・失敗後の `echo $?` を維持する。
-- `shell_boot.c:33–41` は link-SH だけ開始待ちを外し、正常終了・fault の両方で owner/capture 回収済みの exec 復帰後に結果を報告して再起動する。異常時の break と pm_terminal_poll の永久ループには入らない。PLN1 の挙動は保持する。
+- `shell_boot.c` は link-SH だけ開始待ちを外し、正常終了・fault の両方で owner/capture 回収済みの exec 復帰後に結果を報告して再起動する。異常時の break と pm_terminal_poll の永久ループには入らない。PLN1 の挙動は保持する。
 ### KAPI → platform → link/mailbox
 - 新 `platform/powermac/device_host.c` で platform_host の open/write/read_stage/status/close/owner_exit を同名 link_host_* へ委譲する。status は非待機で AGAIN を返す。これらの口では前景処理を行わない。
 - copy/owner は共通 kapi_host.c、notice の stage→copy→commit は共通 kapi_host_notice.c をそのまま使う。**kapi/kapi_host_notice.c は変更しない**。owner は res_owner_get、LOG/診断 owner=0 と SH owner を混ぜない。
 - 同じ TARGET の PLN1 SH では platform_host_* を NOSYS（void 回収は無処理）、host_mailbox_stage/commit を NOSYS、host_mailbox_latest_serial を 0 とする platform stub をリンクする。共通層へ KBOOT_LINK 判定を入れない。
 - exec_host_owner_exit は platform_host_owner_exit へ結ぶ。既存 con_sink_owner_exit の正常/異常終了で両 flag と reader を回収することを確認する。
-- `sdk/kapi_target_ppc.py:156,251,266` から host 5 本・notice_read/serial の absent と ZERO_SLOTS を外し、`sdk/gen_kapi.py:520` の host include 除外も解除する。halt/yield は同生成器の PPC 分岐で下記 endpoint を選択し、生成物は再生成する。
+- `sdk/kapi_target_ppc.py` から host 5 本・notice_read/serial の absent と ZERO_SLOTS を外し、`sdk/gen_kapi.py` の host include 除外も解除する。halt/yield は同生成器の PPC 分岐で下記 endpoint を選択し、生成物は再生成する。
 - ABI slot/署名は増やさない。serial_* は不在のまま、serial_is_initialized=0。rshell_set_active が必要な flag provider だけを個別に実体化し、port 群を一括で有効にしない。H5/H6/H7 と ESCC provider は削除する。
 ### EE を変えない単一の前景 endpoint
 - 新 `i32 ppc_kapi_wait_once(void)` を `arch/ppc/exec_kapi.c` に置く（宣言は同 .h）。PPC の sys_halt wrapper は返値を捨て、sys_yield wrapper は返値を返す。両 wrapper ともこの endpoint を 1 回呼ぶ。**endpoint は `idle_work_run()` を呼ぶだけ**で、前景の仕事を直接呼ばない (本線 PM 条件 3。x86 も sys_halt・syscall の入口で idle_work_run を呼ぶ。IO_TIER_DESIGN はこの idle_work を Tier の振り分けへ育てる)。
 - link-SH の前景の仕事 `pm_link_service_once()` (新 helper、link_platform.c/.h) は、起動の時に `idle_work_register` で登録する。中身は pm_usb_poll と pm_lan_poll(now) を各 1 回。bind・reset・PHY・LOG・診断は既存 pm_lan_poll の有限な分岐に任せる。EE の変更、完了待ち、busy、協調窓の TB 期限は設けない。
-- 登録の枠 (kernel/idle_work.h の 4 本): link-SH で使うのは、nic.c:58 の net_rx_idle と pm_link_service_once の 2 本。4 本で足りる。
-- **endpoint の窓 (確定、本線 PM の推奨 (b))。** `kernel/idle_work.c:30` は割り込みが禁止なら何もせずに戻る。PPC の syscall は EE=0 で走るので、そのまま呼んでも前景の仕事は走らない (Opus 第 2 回 N1)。そこで ppc_kapi_wait_once は、IO_TIER_DESIGN の N4 の口 (arch/ppc/io_pump.c の「PR=1 から入った syscall の中で EE を一時的に許可して戻す」1 つの口) を通して idle_work_run を呼ぶ。**P3 がこの口の最初の実装になる。** IO_TIER の段の「PPC の pump」は、P3 が作った口を使う。
+- 登録の枠 (kernel/idle_work.h の 4 本): link-SH で使うのは、nic.c の net_rx_idle と pm_link_service_once の 2 本。4 本で足りる。
+- **endpoint の窓 (確定、本線 PM の推奨 (b))。** `kernel/idle_work.c` は割り込みが禁止なら何もせずに戻る。PPC の syscall は EE=0 で走るので、そのまま呼んでも前景の仕事は走らない (Opus 第 2 回 N1)。そこで ppc_kapi_wait_once は、IO_TIER_DESIGN の N4 の口 (arch/ppc/io_pump.c の「PR=1 から入った syscall の中で EE を一時的に許可して戻す」1 つの口) を通して idle_work_run を呼ぶ。**P3 がこの口の最初の実装になる。** IO_TIER の段の「PPC の pump」は、P3 が作った口を使う。
   - 窓を開ける条件: 外側のフレームが PR=1、kctx_irq_depth==0、trap busy を持っていない、再入していない。条件を満たさなければ、窓を開けずに何もしない。
-  - 手順: EE を保存 → EE=1 → idle_work_run() → EE を戻す。idle_work_run と、その既存の呼び手 (x86・exec_syscall.inc:94) と、idle_work.h の約束は変えない。
+  - 手順: EE を保存 → EE=1 → idle_work_run() → EE を戻す。idle_work_run と、その既存の呼び手 (x86・exec_syscall.inc) と、idle_work.h の約束は変えない。
   - 入れ子の IRQ の安全 (PR=1 から入った syscall はフレームが exec_kernel_sp に積まれ、.Ltrap_busy=0) は、IO_TIER の Opus のレビューで確かめ済み。
   - pm_link_service_once は、自前の再入防止を 1 個持つ。
   - 窓の中では net_rx_idle も本来どおり rx_service を回す (x86 と同じ)。RX を持つのは net_jiffy と rx_service の協調のままとする。
@@ -250,19 +250,19 @@ int input_legacy_wait(int mode, int interruptible);
 
 ### capture・fd1・入力
 - fd1 → 共通 console → con_sink PRINT と FB を維持し、PRINT を二重投入しない。link-SH の console_stream は旧 pm_term_write と直接 clear の ESC 出力（`:49`）を使わない。ESCC の KAPI・出力経路を P3 のために追加しない。
-- capture は共通 sink 8KiB と BEGIN/FREEZE/END の owner・両 flag 復元を使う。診断 LOG は capture 中に画面へ再投入せず LOG 経路だけにする（console_log.c:11 の flag 保存だけでは sink push は止まらない）。
-- terminal_input.c:73–78 の USB poll と LAN 前景仕事を上記 helper へ移し、link-SH の input_boot は旧 LAN キーデコーダを使わない。USB 半行中は LAN 保留、LAN 通知を文字キューへ feed しない。
+- capture は共通 sink 8KiB と BEGIN/FREEZE/END の owner・両 flag 復元を使う。診断 LOG は capture 中に画面へ再投入せず LOG 経路だけにする（console_log.c (pm_diag_write()) の flag 保存だけでは sink push は止まらない）。
+- terminal_input.c の USB poll と LAN 前景仕事を上記 helper へ移し、link-SH の input_boot は旧 LAN キーデコーダを使わない。USB 半行中は LAN 保留、LAN 通知を文字キューへ feed しない。
 - LAN 実行中も USB STOP を残す。PPC input_boot の capture 起点 TB 30 秒期限で文字待ちは Enter、キー待ちは ESC を返す。FREEZE 中も閉鎖を維持し END で解除する。この入力期限は削除した EE 協調窓の期限とは別物。
 
 ### A-4. 大きさの見積もりと測定関門
 |項目|静的見積もり（KiB=1024B）|採否を決める測定|
 |---|---|---|
-|link ring / 8 handle payload / TX+RX|8 + 8×3×1400/1024 + 約3 = 約44KiB、管理欄別 (`net/link.c:61,80,117,124`)|SH PLN1 と link-SH の map の text/data/bss 差|
-|mailbox heap|64×sizeof(HostNotice)、約16KiB (`host_mailbox.c:9,24`)|実 sizeof と allocator overhead、失敗時 READY 不可の確認|
+|link ring / 8 handle payload / TX+RX|8 + 8×3×1400/1024 + 約3 = 約44KiB、管理欄別 (`net/link.c`)|SH PLN1 と link-SH の map の text/data/bss 差|
+|mailbox heap|64×sizeof(HostNotice)、約16KiB (`host_mailbox.c`)|実 sizeof と allocator overhead、失敗時 READY 不可の確認|
 |sink / shell 結果|既存 sink 8KiB 再利用。これまで GC された rshell 結果などが残るので約8KiB以上を追加計上|sh.elf の bss/静的 buf と root 埋込みサイズを分ける|
 |text/rodata・削除分|新 HAL/rshell 活性化は未測定。旧端末/PLN1/HostFS 削除分を差し引く|未測定の圧縮増分を保証しない|
 - 計画上の追加 RAM 枠は **64～96KiB 程度＋text 差**。44+16+8KiB を基点に管理領域を見込み、PLN1 削除益は実測前には使わない。正味増分の保証値ではない。
-- heap 1MiB の高水位は未測定。字体キャッシュ 295,940B（PPC_NOTES §5）に mailbox、VFS、exec の同時生存分を加える。kmalloc_peak_bytes (`mm/kmalloc.c:267`) を boot/READY/最大結果/再接続/終了反復で記録し、1MiB 未満・割当失敗なしを必須とする。bss と USER heap を kernel heap に二重計上しない。
+- heap 1MiB の高水位は未測定。字体キャッシュ 295,940B（PPC_NOTES §5）に mailbox、VFS、exec の同時生存分を加える。kmalloc_peak_bytes (`mm/kmalloc.c`) を boot/READY/最大結果/再接続/終了反復で記録し、1MiB 未満・割当失敗なしを必須とする。bss と USER heap を kernel heap に二重計上しない。
 - map とリンク入力リストで `lan_wire.o/lan_terminal.o/terminal_input.o/hostfs_io.o/hostfs_peer.o` が link-SH に存在しないことを検査。旧 service の PLN1 tx/rx 配列も不在、link_txbuf/link_rxbuf は存在すること。単に未使用 section になっただけを「TU 不在」としない。
 
 ### A-5. 実装の 6 段（各段で組める単位、共通 shell は直列）
@@ -300,7 +300,7 @@ int input_legacy_wait(int mode, int interruptible);
 
 ### A-確定 (2026-11-14、Opus 5.5 第 1・2 回、本線 PM の条件 1〜3、PM が反映)
 - 第 1 回 R1〜R9: r2 で直った (Opus 第 2 回で確認)。
-- 第 2 回 N1 (P1): idle_work_run は EE=0 では何もしない (idle_work.c:30)。endpoint の窓を N4 の口で開ける形に直した。
+- 第 2 回 N1 (P1): idle_work_run は EE=0 では何もしない (idle_work.c)。endpoint の窓を N4 の口で開ける形に直した。
 - 未決 (idle_work の約束と EE=0): Opus は (a') (IF を問わない別の入口 idle_work_run_coop) を推奨、本線 PM は (b) (N4 の口で窓を開ける) を推奨した。PM は (b) に決めた。理由: idle_work の前提 (IF/EE=1・IRQ の外) を x86 と PPC でそろえたまま Tier へ育てられる。EE=0 のまま仕事を回すと DEC が止まり tick を落とす。Opus が (b) を退けた理由は本線 PM の条件 1 (io_pump を使わない) だけで、その条件は本線 PM が改めた。Opus の (a') のうち、idle_work_run と既存の呼び手を変えないこと、pm_link_service_once の再入防止、N1 の変異は取り入れた。
 
 

@@ -433,8 +433,8 @@ int pci_bind_all(const struct pci_driver *const *table, int n);   /* 1 件ずつ
 ### 1-6. 実装の注意 (往復 5・6・12 の非 blocker、実装レビュー往復 1)
 
 - **ISR 文脈の登録・解除は全 IRQ の共通深さで拒否する**。固定 IRQ・tick を含む `IRQ_ENTER/LEAVE` が
-  `kctx_irq_depth` を更新し (`arch/x86/kernel/isr_stub.asm:61-66`)、`irq_register` / `irq_unregister` が判定へ渡す
-  (`kernel/irq/irq.c:55,81`)。
+  `kctx_irq_depth` を更新し (`arch/x86/kernel/isr_stub.asm`)、`irq_register` / `irq_unregister` が判定へ渡す
+  (`kernel/irq/irq.c` の `irq_register()`)。
 - W4 の「1000 回の所要時間」は平均であって IF=0 の最長時間ではない (IF=1 の区間と割り込みを含み、KAPI の CR3 往復も測って
   いない)。最長 IF=0 (`irq_off_max_us`) とハンドラの 1ms 超診断は未実装 (別に起こす)。
 
@@ -528,5 +528,5 @@ int pci_bind_all(const struct pci_driver *const *table, int n);   /* 1 件ずつ
 
 ## 6. この票の外で見つけた不整合
 
-- `tools/memmap_audit_live.py:25` は GUI 基点を `MEM_SHM_BASE + 0x30000` で決め打ちしている。正典 (`MEM_SHM_GUI_OFFSET`
+- `tools/memmap_audit_live.py` は GUI 基点を `MEM_SHM_BASE + 0x30000` で決め打ちしている。正典 (`MEM_SHM_GUI_OFFSET`
   = 0x28000) とずれている (2026-09-17 の末尾相対化の取り残し)。別の小票で直す。

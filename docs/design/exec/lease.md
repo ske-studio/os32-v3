@@ -2,9 +2,9 @@
 > 状態: **現行 (2026-10-31)** — 出所: MEMMAP_V3・SLIM_KERNEL_DESIGN・SLIM_KERNEL_IMPORTS・GFX_MODES_DESIGN (D1 で移した)
 ソース: `exec/lease.c`
 
-- **lease = 台帳の SURFACE (owner、物理範囲または VRAM 範囲、幅・高さ・ピッチ・形式) を 1 つの AS の lease 窓に USER (RW/RO、PCD は物理の属性を継承) で張ること。** `addrspace_map_user_page` の「共有 PT を書き換えて PDE に USER を立てる」経路 (`paging.c:796-812`) は**廃止**し、lease 窓の私有 PT にだけ書く。
+- **lease = 台帳の SURFACE (owner、物理範囲または VRAM 範囲、幅・高さ・ピッチ・形式) を 1 つの AS の lease 窓に USER (RW/RO、PCD は物理の属性を継承) で張ること。** `addrspace_map_user_page` の「共有 PT を書き換えて PDE に USER を立てる」経路 (`paging.c`) は**廃止**し、lease 窓の私有 PT にだけ書く。
 - 解放は「その AS の lease を外す」だけで他 AS に波及しない。物理の解放は全 lease が返り、かつ owner が返したとき。
-- 表示面 (planar の VRAM、PEGC のリニア窓 / バンク窓、Cirrus の表示面) は**全画面 lease だけ**に貸す (G4、D19)。通常 GUI アプリには VRAM の lease を与えない (`exec.c:1932` の常時 USER 写像を撤去)。CUI アプリの TVRAM 直書き (`lconsole` 等、U20) は TVRAM (0xA0000–0xA3FFF) だけの lease。
+- 表示面 (planar の VRAM、PEGC のリニア窓 / バンク窓、Cirrus の表示面) は**全画面 lease だけ**に貸す (G4、D19)。通常 GUI アプリには VRAM の lease を与えない (`exec.c` の常時 USER 写像を撤去)。CUI アプリの TVRAM 直書き (`lconsole` 等、U20) は TVRAM (0xA0000–0xA3FFF) だけの lease。
 
 - 検査 (§2-3 の ⑥ (b)(c)) は「共有種別なら可」ではなく **「その AS の台帳に lease があるページなら可」**。
 

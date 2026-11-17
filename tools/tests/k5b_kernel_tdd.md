@@ -308,7 +308,7 @@ python3 -B tools/tests/test_sbrk_tier.py    # 回 4 (新規)
 
 ## 原因 (推測ではなく実ソースと `kernel.map` で確定)
 
-`fs/ext2/ext2_file.c:34` (K5b-K 前からある行) —
+`fs/ext2/ext2_file.c` の `ext2_read_file()` (K5b-K 前からある行) —
 
 ```c
 ret = ext2_read_block(ctx, phys, &dst[total_read]);   /* 端数ブロックでも 1KB 書く */
@@ -459,7 +459,7 @@ per-app 物理も同じ pgalloc から取るので、GUI アプリが park 中�
    `paging_addrspace_create_n` / `exec_heap_save_state` / `ring3_band_set` の
    どれよりも手前。claim も alloc も 1 つも行わないので `exec_restore_band` も要らない。
 
-戻り値は `OS32_ERR_FULL` (`sdk/include/os32/os32_kapi_shared.h:311`、「スロット / 資源が満杯」)。
+戻り値は `OS32_ERR_FULL` (`sdk/include/os32/os32_kapi_shared.h`、「スロット / 資源が満杯」)。
 専用番号は増やしていない。`exec_launch` の既存の拒否と流儀を揃えてある —
 ID の池が尽きたときの `appslot_start_admit` も `OS32_ERR_FULL`、物理不足は
 `EXEC_ERR_NOMEM` (`exec_status_t`)、ヘッダ不正は `EXEC_ERR_INVALID`。`exec_run` は
@@ -537,11 +537,11 @@ python3 -B tools/check_constraints.py            # EXIT=0
 
 | 場所 | 内容 |
 |---|---|
-| `sdk/mkos32x.py:190` | `--cpl0` → `OS32X_FLAG_FORCE_CPL0` (0x0004) をヘッダの `flags` に立てる。**唯一の生成側** |
+| `sdk/mkos32x.py` | `--cpl0` → `OS32X_FLAG_FORCE_CPL0` (0x0004) をヘッダの `flags` に立てる。**唯一の生成側** |
 | `build/programs.mk` / `userland/*/Makefile` | `--cpl0` を渡している行は無い (`ring3_hello` / `ring3_fault` / `hello_r3` / `faultprobe_r3` はいずれも CPL=3 側の検証用) |
 | `apps/` (submodule) | `deploy.yaml` / `Makefile` / `app.conf` を含め `cpl0` の記述なし |
 | `game/` (submodule) | 同上、記述なし |
-| 消費側 | `exec/appslot.c:113` `appslot_launch_is_app()` (`want_ring3` を落とす) と `mm/shlib.c` (CPL=0 プログラムは shlib の master をそのまま共有) |
+| 消費側 | `exec/appslot.c` の `appslot_init()` `appslot_launch_is_app()` (`want_ring3` を落とす) と `mm/shlib.c` (CPL=0 プログラムは shlib の master をそのまま共有) |
 
 つまり `--cpl0` は現在「手で `sdk/mkos32x.py --cpl0` を叩いたときだけ立つエスケープ
 ハッチ」で、標準の配備物には 1 本も無い。gshell 配下でこの拒否に当たるのは、その手製
@@ -560,7 +560,7 @@ python3 -B tools/check_constraints.py            # EXIT=0
 
 ## 何が足りていなかったか
 
-CTRL+STOP は IRQ1 (`drivers/input/kbd.c:235` → `ring3_abort_request` → `appslot_abort_request`)
+CTRL+STOP は IRQ1 (`drivers/input/kbd.c` → `ring3_abort_request` → `appslot_abort_request`)
 の時点で **走っているアプリ** の `AppSlot.abort_req` を無条件に立てる。IRQ1 の時点で
 カーネルが知っているのはそれだけだからで、宛先は選べない。ところが契約 T6 の宛先は
 **フォーカス窓のアプリ**。4 本同時実行では両者が食い違い、WM (gshell) がフォーカス窓の

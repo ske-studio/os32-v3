@@ -26,10 +26,10 @@
 ## 1. 実物の確認
 | # | 票の前提と実コードの差 | 反映 |
 |---|---|---|
-| D1 | P8のPCMリングは未起票だが、`drivers/sound/cs4231/pcm_cs4231.h:120` 以降にDMA・ステージング各4096 frameが存在。`pcm_cs4231.c:515,594` は単一ownerのopen/write | リングを重複新設しない |
-| D2 | `pcm_cs4231.c:624` は4096 frameで自動開始、`:703` はcloseで短音を開始。writeだけでは短い操作音が始まらない | 明示startと破棄停止abortを追加し、既存closeのdrainを維持 |
+| D1 | P8のPCMリングは未起票だが、`drivers/sound/cs4231/pcm_cs4231.h` 以降にDMA・ステージング各4096 frameが存在。`pcm_cs4231.c` は単一ownerのopen/write | リングを重複新設しない |
+| D2 | `pcm_cs4231.c` は4096 frameで自動開始、`pcm_close()` はcloseで短音を開始。writeだけでは短い操作音が始まらない | 明示startと破棄停止abortを追加し、既存closeのdrainを維持 |
 | D3 | `V3_PLAN.md:41` でmicroUIは廃止。`gshell/src/kbdnav.rs:860` 以降のWMマウスキーは同周期にdown/upを発生 | WM宛ての同周期クリックを保持する。microUI接続は実装しない |
-| D4 | `docs/09_exec.md:102` の「OP_POLLはリングを読む」は概略。`userland/rust/libos32gui/src/client.rs:331` はOP_POLL後にclientがSHMをコピーしheadを進める | consumerはclient、WMはtailの所有者と明記 |
+| D4 | `docs/09_exec.md` の「OP_POLLはリングを読む」は概略。`userland/rust/libos32gui/src/client.rs` はOP_POLL後にclientがSHMをコピーしheadを進める | consumerはclient、WMはtailの所有者と明記 |
 | D5 | `gshell/src/ring.rs:1` は満杯をcallerが扱う契約だが、`input.rs:1085,1110,1122,1132` のPointer/Button/Focusはappend失敗を処理しない | 欠落通知・状態再同期を入力拡張より先に実装 |
 根拠は `V3_PLAN.md:41,61-71` と `TASK_T7_AND_FOLLOWUPS.md:232`。MEMMAP_V3 D19の8bppを維持する。
 `TASK_KBD_NAV.md` 冒頭と§4-1にはK2完了記述の差もある。P8では既存K2を推定合格せず再実施する（実コード差の数には含めない）。
@@ -92,7 +92,7 @@ producer停止で無音でもownerの利用権は有効。再writeで補充復�
 状態はCLOSED→OPEN→RUNNING→STOPPING→CLOSED。finishはOPEN/RUNNING→DRAINING→DONE、装置故障はFAULTED。既存sticky faultを維持。
 finishは短音も開始し、以後writeはINVAL。DONEは停止証明・DMA解放済み。完了snapshotは終了時ownerに限って照会でき、次のopenまたはowner終了で消す。装置は次のopenに貸与できる。
 abortは未再生分を破棄して停止。irq禁止区間で受付停止→既存abort列→停止証明→解放の順。
-`pcm_cs4231.c:746` のpcm_reclaimを内部停止関数へ抽出しs_claimed/証明/隔離を共有。別のI/O停止列を作らない。
+`pcm_cs4231.c` のpcm_reclaimを内部停止関数へ抽出しs_claimed/証明/隔離を共有。別のI/O停止列を作らない。
 停止証明成功で0、失敗でIO。失敗時DMAは既存fault隔離規則に従い再貸与しない。無期限待ちは追加しない。
 通常終了・fault・STOPはT2の通常文脈回収で同じ停止を一度だけ通す。IRQからfreeしない。
 gshell終了はgshellの音だけを回収。他ownerの音を奪わない。合成器のowner終了はsourceをdetachし、以後のpushを拒否する。

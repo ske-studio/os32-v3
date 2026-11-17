@@ -36,14 +36,14 @@ int serial_gate_active(void) { return emergency_output.gate_active(); }
 
 ### kselftest_report
 
-`kernel/kselftest_report.c:9`
+`kernel/kselftest_report.c` の `kselftest_count()`
 結果・監査を外へ移さない。KDEBUG=0でも必要。
 
 kselftest_pass/fail等の観測シンボルはカーネルに残す。
 
 ### kaudit
 
-`kernel/kaudit.c:17`
+`kernel/kaudit.c` の `kselftest_run_audit()`
 結果・監査を外へ移さない。KDEBUG=0でも必要。
 
 ## 索引

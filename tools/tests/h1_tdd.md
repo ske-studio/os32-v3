@@ -199,7 +199,7 @@ dry-run も force も同じ検査を通る (書き込みは一切しない)。
   stat 自体が失敗すれば `reason=io_error` で落とすようにした。
 
 **別件として PM へ**: `hdrv_list_dir` は列挙の途中で `hostdrv_query_dir` が
-負値を返しても `break` して **`VFS_OK` を返す** (`drivers/hostdrv/hostdrvfs.c:525`)。
+負値を返しても `break` して **`VFS_OK` を返す** (`drivers/hostdrv/hostdrvfs.c`)。
 途中で切れた列挙が「全部読めた」ことになるので、B3 と同じ形の穴が
 カーネル FS 側に残っている。この票の範囲外なので触っていない。
 
@@ -276,7 +276,7 @@ B3c で `コピー元が通常ファイル: 非ゼロ終了` **だけは通っ�
 
 まず範囲: `HOSTDRV_MAX_DIR_ENTRIES` は **HostDrv (`/host`) だけ**の上限。
 ext2 と iso9660 は自前の `list_dir` を持つので影響を受けない
-(`platform/pc98/kernel.c:320` で `vfs_mount("/host", "hostdrv", "hostdrv")`、
+(`platform/pc98/kernel.c` で `vfs_mount("/host", "hostdrv", "hostdrv")`、
 マウント点は 1 つ)。
 
 カーネル側の `vfs_ls` 呼び出しは `kapi/kapi_generated.c` の `wrap_sys_ls` の
@@ -345,7 +345,7 @@ B4a と B4b が互いの検査を落とさないことも、この 2 つが独�
 
 ### B5 — `cp -r` が宛先の階層を取り違えて上書きする
 
-`fs_is_dir()` が `sys_ls` の戻り値 0 だけを見ていた。`cmd_file.c:227` は
+`fs_is_dir()` が `sys_ls` の戻り値 0 だけを見ていた。`cmd_file.c` は
 その結果で分岐し、偽なら `do_copy_recursive(src, dst)` を呼ぶ。
 1001 件を持つ `/host/big` に `cp -r /src /host/big` すると、列挙が
 `OS32_ERR_FULL` → `fs_is_dir` 偽 → `/host/big/src/a.txt` ではなく
@@ -367,12 +367,12 @@ B4a と B4b が互いの検査を落とさないことも、この 2 つが独�
 
 | 呼び出し元 | 前 | 後 |
 |---|---|---|
-| `cmd_file.c:210` `cp` の宛先 | 列挙が通れば真 | **stat が DIR なら真** |
-| `cmd_file.c:221` `cp` のコピー元 | 同上 | 同上 |
-| `cmd_file.c:276` `mv` のコピー元 | 同上 | 同上 |
-| `cmd_file.c:302` `mv` の宛先 | 同上 | 同上 |
-| `cmd_file.c:334` `rm` の対象 | 同上 | 同上 |
-| `cmd_fs_shared.c:52` `fs_path_kind` の代替 | `fs_is_dir` を呼ぶ | `fs_ls_says_dir` を呼ぶ (再帰しない) |
+| `cmd_file.c` `cp` の宛先 | 列挙が通れば真 | **stat が DIR なら真** |
+| `cmd_file.c` の `do_copy_recursive()` `cp` のコピー元 | 同上 | 同上 |
+| `cmd_file.c` の `cmd_cp()` `mv` のコピー元 | 同上 | 同上 |
+| `cmd_file.c` の `cmd_cp()` `mv` の宛先 | 同上 | 同上 |
+| `cmd_file.c` の `do_move_one()` `rm` の対象 | 同上 | 同上 |
+| `cmd_fs_shared.c` `fs_path_kind` の代替 | `fs_is_dir` を呼ぶ | `fs_ls_says_dir` を呼ぶ (再帰しない) |
 
 **残る穴 (直していない、PM 判断へ)**: stat も列挙も失敗した場合、
 `fs_is_dir` は 0 を返すので `cp -r` は「宛先はディレクトリでない」側へ行く。
@@ -388,7 +388,7 @@ B4a と B4b が互いの検査を落とさないことも、この 2 つが独�
 `NP2_FILE_DIRECTORY_FILE` も `NON_DIRECTORY_FILE` も指定せずに開くので
 **ディレクトリでも成功する**。結果、stat が一時的に読めなかっただけの
 1001 件のディレクトリが `VFS_KIND_FILE` になり、`cd` は NOTDIR、
-`sys_open(..., O_RDONLY)` はディレクトリ拒否 (`fs/vfs_fd.c:87`) をすり抜けた。
+`sys_open(..., O_RDONLY)` はディレクトリ拒否 (`fs/vfs_fd.c`) をすり抜けた。
 
 **直した内容** (`fs/vfs.c`):
 
@@ -457,7 +457,7 @@ B4a と B4b が互いの検査を落とさないことも、この 2 つが独�
 
 ### B7 — 種別が不明なときに open を通してしまう
 
-`fs/vfs_fd.c:87` は `if (vfs_path_kind(resolved) == VFS_KIND_DIR) return
+`fs/vfs_fd.c` は `if (vfs_path_kind(resolved) == VFS_KIND_DIR) return
 VFS_ERR_ISDIR;` と、**DIR に一致したときだけ拒否**していた。B6 で
 「stat を持つドライバの失敗をそのまま返す」ようにしたので、**従来は列挙経由で
 DIR と判定されて拒否されていた経路が負値になり、拒否をすり抜ける**。その先の
@@ -468,7 +468,7 @@ Basic 問い合わせだけが IO、Standard と列挙は成功する状況。ex
 ディレクトリの stat 用 inode 読み出しだけが一時的に失敗して後続が成功すると
 同じで、**`cat /etc` がディレクトリの生データを読める**。
 
-`fs/vfs_fd.c:84-86` の註は、まさにこの不具合を過去に直したときの記録
+`fs/vfs_fd.c` の `vfs_open_probe()` の註は、まさにこの不具合を過去に直したときの記録
 (`cat /etc` が生のディレクトリブロックを吐き、`mv dir x` が生データを書いた)。
 **B6 でその一部を開け直してしまった。**自分が入れた退行で、B5 とまったく
 同じ形の誤り — 「エラー」を「ディレクトリではない」と読み替えていた。
@@ -495,20 +495,20 @@ Basic 問い合わせだけが IO、Standard と列挙は成功する状況。ex
 
 | 場所 | 消費のしかた | 判定 |
 |---|---|---|
-| `fs/vfs_fd.c:87` (`vfs_open_internal`) | DIR なら `ISDIR`、負値は**今回**そのまま返す | **B7 で直した** |
-| `fs/vfs.c:38` (`vfs_chdir`) | `if (kind < 0) return kind;` → `if (kind != VFS_KIND_DIR) return VFS_ERR_NOTDIR;` | **正しい**。負値をそのまま返し cwd を更新しない |
-| `tools/tests/vfs_fd_sqlite_host.c:90` | 試験の贋物 (常に `VFS_KIND_FILE`) | 実装ではない |
+| `fs/vfs_fd.c` (`vfs_open_internal`) | DIR なら `ISDIR`、負値は**今回**そのまま返す | **B7 で直した** |
+| `fs/vfs.c` (`vfs_chdir`) | `if (kind < 0) return kind;` → `if (kind != VFS_KIND_DIR) return VFS_ERR_NOTDIR;` | **正しい**。負値をそのまま返し cwd を更新しない |
+| `tools/tests/vfs_fd_sqlite_host.c` | 試験の贋物 (常に `VFS_KIND_FILE`) | 実装ではない |
 
 **他に種別の判定結果を消費する箇所は無い**ことも併せて確認した。
 
-- **open の入口は 1 本**。`vfs_open()` (KAPI `sys_open` = `kapi_generated.c:924`)
-  も `vfs_open_sqlite()` (SQLite VFS = `lib/sqlite3/os32_sqlite_vfs.c:359` は
+- **open の入口は 1 本**。`vfs_open()` (KAPI `sys_open` = `kapi_generated.c`)
+  も `vfs_open_sqlite()` (SQLite VFS = `lib/sqlite3/os32_sqlite_vfs.c` は
   `vfs_open` 経由) も、どちらも `vfs_open_internal()` を通る。したがって
   今回の 1 か所の修正で**カーネル・KAPI・SQLite VFS の全経路**が塞がる。
 - `vfs_rm` / `vfs_rename` / `vfs_rmdir` / `vfs_read` / `vfs_write` は
   `vfs_path_kind` を**呼んでいない**。ドライバの `unlink` / `rename` に委ね、
-  そちら側に独自の型検査がある (`fs/ext2/ext2_file.c:177` の `EXT2_ERR_ISDIR`、
-  `fs/ext2/ext2_dir.c:22` の `EXT2_ERR_NOTDIR`)。B6 / B7 の影響を受けない。
+  そちら側に独自の型検査がある (`fs/ext2/ext2_file.c` の `EXT2_ERR_ISDIR`、
+  `fs/ext2/ext2_dir.c` の `EXT2_ERR_NOTDIR`)。B6 / B7 の影響を受けない。
 - KAPI ラッパ (`kapi/kapi_generated.c`) は種別を自分で判定せず、
   `vfs_ls` / `vfs_stat` / `vfs_open` をそのまま呼ぶだけ。
 - `kapi/kapi_db.c` は `vfs_stat` を直接使う (種別ではなくサイズの確認)。

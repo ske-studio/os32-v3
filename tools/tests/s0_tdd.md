@@ -378,7 +378,7 @@ python3 -B tools/tests/test_db_errstr.py
 - `vfs_stat` / `vfs_rm` — RAM の fixture を見る試験側の実装。実物と同じく
   **中で `vfs_resolve_path` を呼ぶ**ので、相対名 + cwd の連結と切り詰めは再現する。
   障害注入の口 (`stat_fail_on` / `stat_fail_rc`) を持つ。
-- `vfs_resolve_path` — `vfs_fd_sqlite_host.c` に **fs/vfs.c:52-121 を移植**した
+- `vfs_resolve_path` — `vfs_fd_sqlite_host.c` に **fs/vfs.c を移植**した
   もの。連結 → `VFS_MAX_PATH` での切り詰め → `.` / `..` / 連続 `/` の正規化 →
   `VFS_MAX_PATH_DEPTH` (32) の成分表、という**順序と上限がそのまま**なので、
   「切り詰めた末尾が別の絶対名になる」も「溢れた成分が捨てられた後の `..` が
@@ -483,7 +483,7 @@ RO open の時点で成立していなければならない):
 
 | 候補 | 判定 |
 |---|---|
-| `writable` が 0 / 1 以外 (`kapi_db.c:873`) | **除外**。試験は 0 と 1 しか渡さない。2 引数の受け渡しは同じ試験内の `db_exec` / `sys_stat` が成立しているので壊れていない |
+| `writable` が 0 / 1 以外 (`kapi_db.c`) | **除外**。試験は 0 と 1 しか渡さない。2 引数の受け渡しは同じ試験内の `db_exec` / `sys_stat` が成立しているので壊れていない |
 | `vfs_stat` 失敗 (`:908`) | **除外**。CANTOPEN(14) か IOERR(10) にしかならない |
 | 0 バイト (`:912`) | **除外**。NOTADB(26) |
 | hot journal (`:923`) | **除外**。BUSY_RECOVERY(261) |

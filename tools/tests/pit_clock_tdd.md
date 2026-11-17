@@ -26,7 +26,7 @@ PC-98 の 8253 TCU に入るクロックは機種で 2 通りある (`0000:0501h
 **NP21/W は 1.9968MHz 設定なので、エミュレータでは一度も踏めない** — §4-49・
 §4-51・§4-53 と同じ型 (エミュレータが模擬しない機種差)。クロック判定そのものは
 `drivers/char/serial.c` の `serial_detect_clock()` に既にあったが、呼ばれるのは
-`kernel.c:228` = `pit_init` (194 行) の **34 行あと**で、PIT は見ていなかった。
+`kernel.c` = `pit_init` (194 行) の **34 行あと**で、PIT は見ていなかった。
 
 ## RED
 
@@ -37,7 +37,7 @@ PC-98 の 8253 TCU に入るクロックは機種で 2 通りある (`0000:0501h
 
 ```
 $ python3 -B tools/tests/test_pit_clock.py
-tools/tests/pit_clock_host.c:17:10: fatal error: ../../kernel/time/pit_math.c: No such file or directory
+tools/tests/pit_clock_host.c: fatal error: ../../kernel/time/pit_math.c: No such file or directory
    17 | #include "../../kernel/time/pit_math.c"
 compilation terminated.
 subprocess.CalledProcessError: Command '['gcc', '-std=gnu89', ... ]' returned non-zero exit status 1.

@@ -9,9 +9,9 @@ CPL=3 に返す文字列を写し、ページ権限とガードの判定を補�
 
 - WM はアプリの syscall の中でも動くため、syscall 中というだけで WM の出力先を
   ユーザーポインタ扱いすると、常駐シェルのスタックを拒否してアプリを落とす。
-  `exec/ring3_str.c:60` は WM 深さを見て現在の呼出し文脈を判定する。
+  `exec/ring3_str.c` の `ring3_guard_active()` は WM 深さを見て現在の呼出し文脈を判定する。
   一方、以前登録したバッファは登録時の由来を保持して検査する
-  (`fs/fd_redirect.c:99`, `exec/redir_access.c:162`)。
+  (`fs/fd_redirect.c`, `exec/redir_access.c`)。
   `make check-ring3-guard-host` と `make check-access-host` が各経路を検査する。
 
 ## 内部設計と契約 (D1)

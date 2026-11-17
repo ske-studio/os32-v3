@@ -31,19 +31,19 @@
 
 | 確定設計の箇所（file:line） | 本改訂で置き換える内容／実コードの所在 |
 |---|---|
-| `D:48` §2、`D:297`・`D:317` H予算 | A0h bit6の連続検出＋成分差分。1件4 OUTではなく行ごとのN OUT。`drivers/video/pc98/splash_raster.c:204`の全成分書込を画像専用経路で置換。 |
-| `D:61`、`D:340` IF契約 | 画像は可視区間IF=0、VBLANKで開放・PIT精算。公開table／内蔵ロゴの≤2H・開放≥1Hは維持。`drivers/video/pc98/splash_raster.h:14`を一律に緩めない。 |
-| `D:327` H辺番号 | E(y)=行y直前のH立上り、k=active0+yを維持。時刻発火でなく辺計数。`drivers/video/pc98/splash_raster.c:105`のIN直後の時計読出しを画像H待ちに持ち込まない。 |
-| `D:84` §3、`D:96`・`D:114` | v2、最大1197件、隣接行可、行内最大3件。64B/8B/画素配置維持。`gfx/gfx_osri.h:13`・`:27`、`gfx/gfx_osri.c:45`・`:48`を版別化。 |
-| `D:113` 空画像、`D:114` 間隔 | v2はn=0でもband=1可。ローダーは現時点でも隣接行を拒否していない（`gfx/gfx_osri.c:67`）。2行拒否は公開再生側（`splash_raster.c:271`）。 |
-| `D:121` §4、`D:124`・`:132` | 動的既定を案B・band=1・N=5へ。`tools/img2osri.py:114`・`:130`・`:232`の旧探索とCLIの旧エンコード経路を新しいv2の変換に置き換える。 |
-| `D:141` §5、`D:165`・`:172` | 黒の間に検査・1回転送→新VBLANK→毎フレーム復元・差分。`platform/pc98/splash_image.c:31`の動的全拒否と`:53`の静止待ちを置換。 |
+| `D:48` §2、`D:297`・`D:317` H予算 | A0h bit6の連続検出＋成分差分。1件4 OUTではなく行ごとのN OUT。`drivers/video/pc98/splash_raster.c` の `color()`の全成分書込を画像専用経路で置換。 |
+| `D:61`、`D:340` IF契約 | 画像は可視区間IF=0、VBLANKで開放・PIT精算。公開table／内蔵ロゴの≤2H・開放≥1Hは維持。`drivers/video/pc98/splash_raster.h`を一律に緩めない。 |
+| `D:327` H辺番号 | E(y)=行y直前のH立上り、k=active0+yを維持。時刻発火でなく辺計数。`drivers/video/pc98/splash_raster.c` の `wait_bit()`のIN直後の時計読出しを画像H待ちに持ち込まない。 |
+| `D:84` §3、`D:96`・`D:114` | v2、最大1197件、隣接行可、行内最大3件。64B/8B/画素配置維持。`gfx/gfx_osri.h` の `OSRI_MAX_EVENTS`、`gfx/gfx_osri.c` の `osri_load()`・を版別化。 |
+| `D:113` 空画像、`D:114` 間隔 | v2はn=0でもband=1可。ローダーは現時点でも隣接行を拒否していない（`gfx/gfx_osri.c`）。2行拒否は公開再生側（`splash_raster.c`）。 |
+| `D:121` §4、`D:124`・`:132` | 動的既定を案B・band=1・N=5へ。`tools/img2osri.py`・`palette_history()`・の旧探索とCLIの旧エンコード経路を新しいv2の変換に置き換える。 |
+| `D:141` §5、`D:165`・`:172` | 黒の間に検査・1回転送→新VBLANK→毎フレーム復元・差分。`platform/pc98/splash_image.c` の `platform_splash_try_image()`の動的全拒否との静止待ちを置換。 |
 | `D:174`・`:175`、末尾改訂`D:381` | 予定行に間に合わなければ残りをdrop、次フレームで初期色から再開。翌行繰越・同番号畳込は使わない。 |
-| `D:176`・`:182` 共通期限／終了 | `platform/pc98/boot_splash.c:203`の入口期限を継承し転送後に再起算しない。`:272`の両ページ消去→shutdown→既定色→テキスト消去を維持。 |
+| `D:176`・`:182` 共通期限／終了 | `platform/pc98/boot_splash.c` の `boot_splash()`の入口期限を継承し転送後に再起算しない。の両ページ消去→shutdown→既定色→テキスト消去を維持。 |
 
 - 旧候補の400/800件、1行1色／24k限定2色、7 OUT固定、固定色8個＋variance必須を新案Bへ読み替える。最新決定で消えた前提を受入条件に残さない。
 - 実測574f6c5b（ユーザー決定）: A0h bit6周期≈31.8µs、幅≈5.9µs、IN≈1.15µs、OUT平均≈0.65µs／観測上限≈0.78µs。
-- splr-realhw報告はb9c239d4時点。「H利用未確認」は最新実測で解消。h_reason=6はburst期限切れ（`platform/pc98/splash_probe.c:308`）であり、H信号不存在の判定に使わない。
+- splr-realhw報告はb9c239d4時点。「H利用未確認」は最新実測で解消。h_reason=6はburst期限切れ（`platform/pc98/splash_probe.c`）であり、H信号不存在の判定に使わない。
 
 ## 2. .osri v2 の形式
 
@@ -287,12 +287,12 @@ struct OsriImage {
 STATIC_ASSERT(sizeof(struct OsriImage) == 9614, osri_image_size);
 ```
 - H1b は `OSRI_MAX_EVENTS` (200) を残し、F1 で版別の上限に置き換える (H1b 単独でも組める)。
-- §5 の9614B検査は H1b の同ヘッダー、型定義直後に置く。既存の8Bイベント検査 (`gfx/gfx_osri.h:30`) も維持する。
-- H1a の実体は `gfx/gfx_osri.h:27`、旧イベント位置は36B。H1bで38Bへ移り、画像RAMは+7978Bとなる。
-- F1境界で H1b を取り込み、`gfx/gfx_osri.c:23` の `osri_load` は同名・同じ型名のまま最終RAM型へ切り替える。F1でversionを必ず格納し、版別上限・検査を実装する (`gfx/gfx_osri.c:45`、`:48`、`:61`、`:63`)。
-- この型切替で既存所有者も再コンパイルし、`platform/pc98/splash_image.c:17`、`:25`、`:28` の確保・引数が同時に9614Bへ追従する。確保サイズの変更をI1まで遅らせない。
+- §5 の9614B検査は H1b の同ヘッダー、型定義直後に置く。既存の8Bイベント検査 (`gfx/gfx_osri.h`) も維持する。
+- H1a の実体は `gfx/gfx_osri.h`、旧イベント位置は36B。H1bで38Bへ移り、画像RAMは+7978Bとなる。
+- F1境界で H1b を取り込み、`gfx/gfx_osri.c` の `osri_load` は同名・同じ型名のまま最終RAM型へ切り替える。F1でversionを必ず格納し、版別上限・検査を実装する (`gfx/gfx_osri.c`)。
+- この型切替で既存所有者も再コンパイルし、`platform/pc98/splash_image.c` の `platform_splash_try_image()`、同ファイル内 の確保・引数が同時に9614Bへ追従する。確保サイズの変更をI1まで遅らせない。
 - H2の前方宣言・画像APIはterra案どおり `struct OsriImage` のまま。R1はH1b/F1後の最終型だけを扱い、I1は同じ型の所有・転送・反復を実装する。
-- 既存画像入口 (`drivers/video/pc98/splash_raster.c:212`) はpal/countだけを読み、H1b後も有効。I1で新入口へ切り替えた後、R2で旧入口を削除する (末尾の追記「R2 の旧静止画像入口の終了」)。I1までは既存の動的画像拒否 (`platform/pc98/splash_image.c:31`) を維持する。
+- 既存画像入口 (`drivers/video/pc98/splash_raster.c`) はpal/countだけを読み、H1b後も有効。I1で新入口へ切り替えた後、R2で旧入口を削除する (末尾の追記「R2 の旧静止画像入口の終了」)。I1までは既存の動的画像拒否 (`platform/pc98/splash_image.c`) を維持する。
 
 ### 宣言段の条件と段の依存
 - 宣言段はH1aおよびH2〜H6。既存型・上限定数の値・関数宣言を変えず、未使用の定数／宣言だけを追加するため既存コード生成を変えない。terra報告の比較に続き、最終宣言差分で通常ELFの `.text` を基点とcmpして確認する。
@@ -300,8 +300,8 @@ STATIC_ASSERT(sizeof(struct OsriImage) == 9614, osri_image_size);
 - §6の依存変更あり: `宣言段受入 → H1b → F1`。H2/T1の「H1後」はH1a後と読み替え、他の依存は維持する。H1bとF1を同じ取り込み単位にし、各小段の1ファイル所有は維持する。
 - H1b/F1の組合せでv1/v2読込を受け入れ、R1/I1は既定の依存どおり後続する。旧型と新型をcastで接続せず、旧オブジェクトとの混在も認めない。
 
-公開KAPIは変更しない。型・200件定義は `sdk/include/os32/os32_kapi_shared.h:634`、世代は `sdk/kapi.json:2`。公開入口 `drivers/video/pc98/gfx_vram.c:311` と再生検査 `drivers/video/pc98/splash_raster.c:260`、`:267`、`:271` を維持する。
-公開型の利用者はロゴ `platform/pc98/boot_splash.c:179`、`:205`、診断 `platform/pc98/splash_probe.c:66`、`:763`、アプリ `apps/raster/raster.c:297`、`:426`。1197件の画像RAM型へ切り替えず、公開の200件／2行制限を保持する。
+公開KAPIは変更しない。型・200件定義は `sdk/include/os32/os32_kapi_shared.h`、世代は `sdk/kapi.json`。公開入口 `drivers/video/pc98/gfx_vram.c` と再生検査 `drivers/video/pc98/splash_raster.c`、`pc98_splash_raster_table()` を維持する。
+公開型の利用者はロゴ `platform/pc98/boot_splash.c` の `build_raster()`、診断 `platform/pc98/splash_probe.c`、`platform_splash_probe()`、アプリ `apps/raster/raster.c:297`、`:426`。1197件の画像RAM型へ切り替えず、公開の200件／2行制限を保持する。
 
 ## 宣言の段 (H1a・H2〜H6) の取り込みで後続の段へ送る項目 (2026-11-03、PM 決定)
 - 戻り値 (astra レビューの P3): `pl_prepare`・`time_splash_math`・`ktime_splash_sample`・`ktime_splash_settle`・`osri_load` は既存 (`gfx/gfx_osri.c`) と同じく **成功 0・失敗 -1**。`pl_frame` は宣言済みの `PL_FRAME_*`。実装の段 (F1・P1・P2・R1) で宣言のコメントに 1 行足す。
@@ -320,7 +320,7 @@ STATIC_ASSERT(sizeof(struct OsriImage) == 9614, osri_image_size);
 - 例：N5 の (GRB,G) は先行 (A8h,0)、H内 (AAh,v),(ACh,v),(AEh,v),(A8h,1),(AAh,v)；N6 の (GR,G,G) は先行同じ、H内 (AAh,v),(ACh,v),(A8h,1),(AAh,v),(A8h,2),(AAh,v)。
 - 理由：c+m−1=N・各番号1〜3成分・m≤3 を満たす全ポート配列を含み、2番号と最多3番号の双方を測る。どの番号OUT位置／成分配列が最遅かを事前に仮定しない。
 - 計測用内側は RAM の port/value を読む count 別展開とし、列・分岐先の選択と先行 (I,0) は H 前に完了。成分マスク判定・色展開を H 内に追加しない。
-- 各列は同じ列を隣接行で反復し、既定の連続64周期を採取。先行番号・再武装・次行準備も測る。W列・D列は既存の IF=0 のバッチ計測 (platform/pc98/splash_probe.c:162-251、probe_cost_batch・PROBE_W) を列ごとに使い、連続64周期は H/B と H 内に収まるかを見る。時計は前後のみ、結果は RAM に集計して IF 復元後に出力する。
+- 各列は同じ列を隣接行で反復し、既定の連続64周期を採取。先行番号・再武装・次行準備も測る。W列・D列は既存の IF=0 のバッチ計測 (platform/pc98/splash_probe.c、probe_cost_batch・PROBE_W) を列ごとに使い、連続64周期は H/B と H 内に収まるかを見る。時計は前後のみ、結果は RAM に集計して IF 復元後に出力する。
 - N ごとに全列・両 value の観測を集約し Q=max(Q列)、D=max(D列)、W_N=max(W列)、E は誤差上限、B_min は観測下限を用いる。平均や最良列で合格にしない。
 - 仮認定は §3 の Q+D+W_N+E<B_min と次行準備条件を満たすこと。先行番号は W_N に含めず準備費用へ入れ、各費用の境界を揃えて二重計上しない。反復窓も対象全列で成立させる。
 - 11-02 の OUT 平均≈0.65／観測上限≈0.78µs は見積りだけに用い、OUT数の掛算で列内処理・分岐費用の実測を代用しない。
@@ -397,7 +397,7 @@ STATIC_ASSERT(sizeof(struct OsriImage) == 9614, osri_image_size);
 
 対象は §6 V2。R1後・R1a前に小段 R1t（所有は `drivers/video/pc98/splash_raster_image.c` のみ）を追加する。製品変更は追加3行・置換1行。V2の所有は既定のホスト試験のみ。確定本文を覆す必要なし。
 R1tは既存 :77 の表宣言の直前へ `#ifndef PL_PROFILES_CONST`、`#define PL_PROFILES_CONST const`、`#endif` を順に挿入し、宣言を `static PL_PROFILES_CONST struct PlProfile pl_profiles[2][2][2] = {` に置換する。既存初期値は保持し、製品ビルドではマクロを外部定義しない。API・ヘッダー・選択処理・qualified検査は変更しない。
-V2は既存 `tools/tests/splash_raster_host.c:98` の splash_raster.c のinclude後に、`#define PL_PROFILES_CONST`、`#define now_us pl_host_now_us`、`#include "../../drivers/video/pc98/splash_raster_image.c"`、`#undef now_us`、`#undef PL_PROFILES_CONST` を各1行で順に置く。画像側の定義・呼出しだけを前処理で改名し、同一翻訳単位のnow_us衝突を解消する。
+V2は既存 `tools/tests/splash_raster_host.c` の splash_raster.c のinclude後に、`#define PL_PROFILES_CONST`、`#define now_us pl_host_now_us`、`#include "../../drivers/video/pc98/splash_raster_image.c"`、`#undef now_us`、`#undef PL_PROFILES_CONST` を各1行で順に置く。画像側の定義・呼出しだけを前処理で改名し、同一翻訳単位のnow_us衝突を解消する。
 include後、表を書き換える前に製品初期値の各表を実物の `qualified()` に通し、その設定状態に応じた受理・拒否を確認する（R1a/R1bの値も同じ初期化子から読む）。constへの書込みやキャストによるconst除去はしない。
 試験コードは `pl_profiles[mode][phase][nslot] = fixture;` で同じ私有型の全予算・費用・窓を設定し、その入力を独立模型にも渡す。各ケースのprepare前に設定を完了し、そのケースのframe終了まで固定する。未設定・不正値も実物の検査を通し、検査を迂回しない。
 常用の確認：R1t前後を同じ製品コンパイラ・フラグ・予算値（ホストdefineなし）でコンパイルし、各 `S=.text` と `S=.rodata` について `objcopy -O binary --only-section=$S before.o before.bin` と同様のafter抽出後、`cmp before.bin after.bin` が一致することを受入条件とする。
@@ -416,7 +416,7 @@ P3条件：積上げ66L+C+2q≤67L≤70Lが成り立つ条件はC+2q≤L（時�
 70Hは31kでceil(7000000/3147)=2225µs、24kでceil(7000000/2483)=2820µsで20ms未満；CLI〜保存IF復元を上限に含めて実測確認する。通常再生の402H_max+Cexit<20ms、公開table／ロゴの≤2Hは維持。
 PIT 24576/2457600秒=10msに対して採取は1tick未満；採取前の保留IRQ0処理、採取後の既存≥1H開放・IRQ再開を維持すれば保留は高々1回でtickを失わず、M1の新たなtick補正は不要。画像再生§3のPIT精算、§6の受信損失記録・受信欠落0を採否に追加しない方針・IRQ再開確認を維持し、実機で64周期・IF時間・tick／受信記録を再採取する。
 書換一覧（文書）：docs/decisions/gui/RASTER_SPLASH_PL_DESIGN.md §3の142行と末尾「M1の固定の計測列」の323行へ固定70H・上記式と条件を追記する；現行の両箇所には「66H」の文字列はない。
-書換一覧（現物）：platform/pc98/splash_probe.c:467のlimit=(PROBE_HPERIODS+2)*Lを(PROBE_HPERIODS+6)*Lへ、407行のunchanged 66Hと477行の66H固定拒否コメントを70Hへ整合；479行cap・482行excess・498〜499行事後検査は共通limitに追従。校正32H／64Hとcountは変更不要。
+書換一覧（現物）：platform/pc98/splash_probe.cのlimit=(PROBE_HPERIODS+2)*Lを(PROBE_HPERIODS+6)*Lへ、407行のunchanged 66Hと477行の66H固定拒否コメントを70Hへ整合；479行cap・482行excess・498〜499行事後検査は共通limitに追従。校正32H／64Hとcountは変更不要。
 r1→r2 の変更：67Hを比の余裕を持つ固定70Hへ変更し、丸め込みの比上限と反例の通過、P3のC+2q≤L条件を明記、書換一覧を70Hへ更新。
 
 ## 追記 (2026-11-04、N=1〜16 色の観測の像 — 計測を止めて観測に切り替える)
@@ -441,14 +441,14 @@ r1→r2 の変更：67Hを比の余裕を持つ固定70Hへ変更し、丸め込
 ### 実物の確認（常用の制約3件と観測用の分岐）
 | # | file:line | 確認と対応 |
 |---|---|---|
-| 1 | `drivers/video/pc98/splash_raster.h:28`、`:29`; `splash_raster_image.h:8`; `splash_raster_image.c:80`、`:120`、`:133` | IMAGE_OUTS=5、DIAG_OUTS=6、PL_MAX_OUTS=6、表[2][2][2]とprofile/qualifiedの拒否。既存値はOUT数のまま、観測Nとは別物。OBS APIを追加する。 |
-| 2 | `gfx/gfx_osri.h:16`、`:17`、`:35`; `gfx/gfx_osri.c:47`、`:75`、`:79` | v2は総1197件、行3件、同値イベント拒否。OBSのみ総6384件、行16件、同値書込み許容へ分岐し、RAM配列も合わせる。 |
-| 3 | `tools/img2osri.py:56`、`:118`、`:180`; `platform/pc98/splash_image.c:31` | T1は成分差分+追加番号のOUT予算5/6、現画像入口はevent有りを拒否。専用CLIと観測入口を追加し、既存I1の結線完了を前提にしない。 |
+| 1 | `drivers/video/pc98/splash_raster.h`、`SPLASH_RASTER_IMAGE_DIAG_OUTS`; `splash_raster_image.h`; `splash_raster_image.c` | IMAGE_OUTS=5、DIAG_OUTS=6、PL_MAX_OUTS=6、表[2][2][2]とprofile/qualifiedの拒否。既存値はOUT数のまま、観測Nとは別物。OBS APIを追加する。 |
+| 2 | `gfx/gfx_osri.h` の `OSRI_V2_MAX_EVENTS`、`OSRI_V2_MAX_EVENTS_PER_LINE`・`OsriImage()`; `gfx/gfx_osri.c` の `osri_load()` | v2は総1197件、行3件、同値イベント拒否。OBSのみ総6384件、行16件、同値書込み許容へ分岐し、RAM配列も合わせる。 |
+| 3 | `tools/img2osri.py` の `out_count()`、`palette_history()`・`main()`; `platform/pc98/splash_image.c` の `platform_splash_try_image()` | T1は成分差分+追加番号のOUT予算5/6、現画像入口はevent有りを拒否。専用CLIと観測入口を追加し、既存I1の結線完了を前提にしない。 |
 - 現T1は `--hblank-outs → convert → palette_history → optimize_row(budget)`。この引数の意味やchoicesを変えず、別の `--obs-colors N`（1..16、band=1限定、明示hblank-outsとの併用拒否）を追加する。
-- `splash_raster_image.c:258`以降は先頭番号を先行、以後の色ごとに番号OUTを発行する。`splash_raster.c:206`〜`:209`も番号→G→R→Bの明示OUT。自動増加を利用するコードはなく、観測でも仮定しない。
-- `build/kernel.mk:52`でDIAGのprobeを登録、`:308`が別BUILD_OUTの入口。`platform/pc98/boot_splash.c:203`の通常3秒経路はOBSから呼ばない。`platform/pc98/kernel.c:176`のroot mountは`:242`のboot_splashより先。
-- `splash_raster.c:13`の既存POLL_LIMIT=1000000を観測の待機上限にも使う設計とし、同値の私有定数を置く場合は由来を明記。`include/memmap.h:433`のPITは100Hz（レビュー照合）。
-- 状態票 `docs/tasks/gui/TASK_RASTER_SPLASH.md:3` は案1の計測整理待ち。観測を別段として追記し、常用認定済みと書かない。ホストfloatは食い違いではない。
+- `splash_raster_image.c`以降は先頭番号を先行、以後の色ごとに番号OUTを発行する。`splash_raster.c` の `color()`〜も番号→G→R→Bの明示OUT。自動増加を利用するコードはなく、観測でも仮定しない。
+- `build/kernel.mk`でDIAGのprobeを登録、が別BUILD_OUTの入口。`platform/pc98/boot_splash.c` の `boot_splash()`の通常3秒経路はOBSから呼ばない。`platform/pc98/kernel.c`のroot mountはのboot_splashより先。
+- `splash_raster.c`の既存POLL_LIMIT=1000000を観測の待機上限にも使う設計とし、同値の私有定数を置く場合は由来を明記。`include/memmap.h` の `PIT_HZ`のPITは100Hz（レビュー照合）。
+- 状態票 `docs/tasks/gui/TASK_RASTER_SPLASH.md` は案1の計測整理待ち。観測を別段として追記し、常用認定済みと書かない。ホストfloatは食い違いではない。
 
 ### ホスト：同じ人物原画から16枚
 - 原画の絶対パス・SHA256、T1のSHA、Pillow/NumPy版をmanifestへ固定。640×400への既存リサイズ・黒合成を共有し、各Nは原画から独立変換する。
@@ -493,7 +493,7 @@ int pl_obs_frame(struct SplashRaster *, const struct OsriImage *,
 - 空行を含めlow→highを連続計数し、`active0+y`で列を実行。列と分岐先は辺の前に選択、count別展開0..63を使用。RGB展開・探索・serial・TVRAM・時計読取は可視ループの外。
 - 列のHBLANKはみ出しで打ち切らず、列後にlowを再捕捉する。Hを飛ばすほど長い列の行ずれは観測結果に含む。予算未認定なのでH欠落の完全検出を約束しない。次のVBLANKで原点と初期色を取り直す。
 - 待機は既存由来の有限poll上限のみ。上限到達はno_syncとして脱出する。tick_countや時計による内側の期限検査は置かず、PIT精算もせず、tickの遅れは観測像だけの既知の副作用とする。
-- `SPLASH_OBS_SECONDS=5u`、`SPLASH_OBS_US_PER_SECOND=1000000u`を定義。既存状態のtotal_lines/line_num_us/line_den（`splash_raster.c:170`〜`:182`）から目標周回数=ceil(T×1000000×line_den/(total_lines×line_num_us))を64bit整数で算出し、ゼロ/無効状態は拒否。実時間の証拠はノート時計を用いる。
+- `SPLASH_OBS_SECONDS=5u`、`SPLASH_OBS_US_PER_SECOND=1000000u`を定義。既存状態のtotal_lines/line_num_us/line_den（`splash_raster.c`〜`pc98_splash_raster_begin()`）から目標周回数=ceil(T×1000000×line_den/(total_lines×line_num_us))を64bit整数で算出し、ゼロ/無効状態は拒否。実時間の証拠はノート時計を用いる。
 - 1周は新VBLANKを1回だけ数え、dropも期間に算入し、成功フレーム数は別集計。同期停止はpoll上限で脱出する。時計のずれやdropで無制限に表示を延長しない。
 - 駆動は1枚ずつload→prepare→全色黒→128000B転送1回→所定周回→黒→解放。TVRAM隅の `N=07` 等は `platform/pc98/splash_obs.c`が可視ループ外で更新する。
 - N=1..16を固定順で試す。ファイルなしはmissingで即skip、生成失敗理由はmanifestと突合する。同じ像で、置くファイルだけを選べば単独Nを試せる。単独選択のビルド定数は作らない。

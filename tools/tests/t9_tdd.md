@@ -365,7 +365,7 @@ $ python3 -B tools/check_constraints.py
 ```
 
 `cargo clippy -p t5a_display` は**この票より前から**落ちる
-(`storage.rs:22` の `clippy::mut_from_ref` が deny)。今回足した / 触った
+(`storage.rs` の `clippy::mut_from_ref` が deny)。今回足した / 触った
 `launch.rs` `prompt.rs` `guest.rs` には clippy の指摘は 1 件も無い。
 ## A-5. 実装レビュー往復 1/3 の blocker (A、2026-09-13)
 

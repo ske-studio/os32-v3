@@ -21,18 +21,18 @@
 ## 1. 実物の確認
 | 実物（基点からの file:line） | 確認と設計への反映 |
 |---|---|
-| userland/shell/cmd_sys.c:688、cmd_peek.c:188,208 | 前者は登録表、実装は後者。`-k/-p` は同じ RAM 経路、`-m` のみ MMIO。 |
-| kdebug/kpeek.c:87,108,222 | RAM は既存写像を読む。MMIO は許可表照合後に一時窓、最大要求単位は既存 CHUNK。書込み口なし。 |
+| userland/shell/cmd_sys.c (sys_cmds())、cmd_peek.c | 前者は登録表、実装は後者。`-k/-p` は同じ RAM 経路、`-m` のみ MMIO。 |
+| kdebug/kpeek.c | RAM は既存写像を読む。MMIO は許可表照合後に一時窓、最大要求単位は既存 CHUNK。書込み口なし。 |
 | kdebug/kpeek_allow.c:12,55 | 現行木には GeForce の許可行と照合が残る。HW-BASIC と peek -m では撤去する。 |
-| kdebug/kdebug_window.c:46,53,66,90 | 共用窓・元 PTE 保存・PCD・必要時 RW・IF 保存復元。単回 len≤4096、最大2ページ、失敗時 cleanup。 |
-| include/memmap.h:367 | 一時窓 VA は 0xFE000000。物理番地をそのままポインタへ変換しない。 |
-| sdk/kapi.json:1943、kdebug/kpeek.c:4 | KAPI slot 253 `kdebug_call` → ops slot 19 `dbg_call`。公開 KAPI の追加不要。 |
-| kdebug/kdebug_main.c:122,153,214 | recovery_call が振分け、未知の通常 op は kpeek_call へ。HW op を独立分岐として追加。 |
-| userland/shell/cmd_pci.c:175 | lspci は構成空間 read32 で復号、BAR サイズ測定なし。pcidump は既存観測に継続使用。 |
-| drivers/pci/pci.h:34–51 | config #1、CF8/CFC 対を IF 保存で保護。write16 は W1C 回避のため32bit RMWで代用不可。 |
-| kdebug/gfinit_decode.c:24、gfinit_exec.c:1、kdebug_main.c:126 | NV44A ROM 専用復号・recover 所有実行器。現在 hwdev に配送されるため移植せず、幅・期限・中止点の考えだけ採用。 |
-| tools/rshell_peek.py:177,189 | peek 専用の見出し・連番・CRC解析。HW ログをこの形式へ偽装しない。 |
-| docs/POLICY_DEBUG.md:203 | 書込みの読戻し一致を必須にしない。明示 read/poll だけを実行。 |
+| kdebug/kdebug_window.c (recover_window_hal_init()) | 共用窓・元 PTE 保存・PCD・必要時 RW・IF 保存復元。単回 len≤4096、最大2ページ、失敗時 cleanup。 |
+| include/memmap.h (MEM_DEVICE_APERTURE_BASE) | 一時窓 VA は 0xFE000000。物理番地をそのままポインタへ変換しない。 |
+| sdk/kapi.json、kdebug/kpeek.c | KAPI slot 253 `kdebug_call` → ops slot 19 `dbg_call`。公開 KAPI の追加不要。 |
+| kdebug/kdebug_main.c | recovery_call が振分け、未知の通常 op は kpeek_call へ。HW op を独立分岐として追加。 |
+| userland/shell/cmd_pci.c | lspci は構成空間 read32 で復号、BAR サイズ測定なし。pcidump は既存観測に継続使用。 |
+| drivers/pci/pci.h | config #1、CF8/CFC 対を IF 保存で保護。write16 は W1C 回避のため32bit RMWで代用不可。 |
+| kdebug/gfinit_decode.c、gfinit_exec.c、kdebug_main.c | NV44A ROM 専用復号・recover 所有実行器。現在 hwdev に配送されるため移植せず、幅・期限・中止点の考えだけ採用。 |
+| tools/rshell_peek.py | peek 専用の見出し・連番・CRC解析。HW ログをこの形式へ偽装しない。 |
+| docs/POLICY_DEBUG.md | 書込みの読戻し一致を必須にしない。明示 read/poll だけを実行。 |
 
 - 前提資料と実物の食い違いは **3件**: ①peek 本体の場所、②診断版では外した許可照合が現行木には残る、③GeForce 実行器の配置は現在 hwdev 側。上表で補正済み。
 - TASK_TRIDENT_DRIVER.md:48 の旧許可表案は今回のユーザー決定で取り消す。番地・装置・書込み値を許可表で拒否しない。
@@ -112,7 +112,7 @@ struct hw_req { u32 version, action, space, width, bdf, addr, value, status; };
 - PCI: 専用汎用アクセス関数でCF8保存→指定→CFC+laneへin/out幅どおり→CF8復元、IFを元へ。8/16書込みを32bit RMWにしない。
 - I/O: 単一in/out。複数のindex/data命令間はIF=1。既存割込み処理と同じ装置を触る場合はスクリプト前提に記載し、ドライバ所有権の拒否表を追加しない。
 - 待ちはshellでKAPI v59 `sys_time_now(&lo,&hi)`のµs時刻を64bit合成し、開始からの差で判定。wait/pollは最大10,000,000us。各反復でPOINT→時刻確認→`sys_yield()`、pollは読出し前にもPOINT。WAIT_SLICEは定義しない。POINTはCUIシェルの印を読んで消し、value=1ならshellはABORTで終了。毎命令（label/gotoも含む）とwait/poll反復で呼ぶ。run/load/対話実行の開始直前にPOINTを1回呼んで古い印だけ捨て、以後の要求は中止として扱う。
-- `exec/exec_abort.inc:40`のring3_abort_request先頭で`!con_sink_is_enabled() && appslot_cur()==APP_ID_SHELL`なら専用volatile印を立てreturn。それ以外の既存経路は保持。新内部関数`exec_hwb_abort_take()`はIRQ保存/停止→印の読出しと0化→IRQ復元で取りこぼしを防ぐ。KAPI追加なし、module importでPOINTから呼ぶ。
+- `exec/exec_abort.inc`のring3_abort_request先頭で`!con_sink_is_enabled() && appslot_cur()==APP_ID_SHELL`なら専用volatile印を立てreturn。それ以外の既存経路は保持。新内部関数`exec_hwb_abort_take()`はIRQ保存/停止→印の読出しと0化→IRQ復元で取りこぼしを防ぐ。KAPI追加なし、module importでPOINTから呼ぶ。
 - 時刻の精度は既存µs時計の契約（IRQ0を失わないこと）に従い、yield分だけ待ちは延び得る。要求usと実測elapsed_usをログへ出す。時計API失敗/逆行はIOで停止し、u32下位周回は64bit差で処理する。wait/pollは最大100万反復（poll読出しも最大100万）。時計停止でも上限でTIMEOUT。長いloopもPOINTを通り、ソフト停止応答は次のPOINTまでのaccess/yield/出力時間に依存する。
 - バスアクセス自体の停止・CPU fault後の帰還は保証しない（受容済み）。CTRL+STOPは「次の命令を止める」であり映像を戻す操作ではない。
 - undoの自動履歴は初版不要。write-only/read-clear/W1Cやindex付き装置を事前読出しする方が手順を変える。必要なら明示readで変数保存し、復元スクリプトを実行。
@@ -141,7 +141,7 @@ HW run=3 op=end rc=OK lines=10 writes=1
 | shell像 | parser+実行+記録 12〜20KiB text、常駐状態≤72KiB（配列64KiBを含む。load・対話実行で全状態をスタックに複製しない）、load時ソース64KiB＋索引≤12KiB（heap、終了時解放） |
 | kdebug.bin | 汎用アクセス/待ち/中止 3〜6KiB text、BSS≤256B、許可表削除分は相殺。GeForce部品はリンクしない |
 | カーネル | 内部中止問い合わせ・PCIアクセス・import接続で≤2KiB見込み。公開ABI・ops表のslot数は不変 |
-| 上限の実物 | tools/module_schema.py:51–60: image/mem各262144B、load_span524288B。既存build/out/kdebug.binは約125.7KiB（鮮度未確認）、新像の実測値ではない |
+| 上限の実物 | tools/module_schema.py: image/mem各262144B、load_span524288B。既存build/out/kdebug.binは約125.7KiB（鮮度未確認）、新像の実測値ではない |
 | 起動媒体 | /boot/kdebug.binはPOST_ROOT読込み。FDローダ/配置変更不要。kernel変更があれば実装時の通常のkernel再梱包・ペア再生成と媒体容量検査は必要 |
 - スクリプトは/test/hwに置くデータ。初回道具導入後は変更時に像を組直さない。公開KAPI再生成・clean全ビルドを要する設計にしない。
 
@@ -172,8 +172,8 @@ HW run=3 op=end rc=OK lines=10 writes=1
 | V tools/tests/hwb_test.py | 下表のhost/変異とCHECK登録 | A後並列可 |
 | W tools/tests/kpeek_test.py（既存試験の実名は参照検索で確定） | allow撤去に当たる試験・変異アンカー更新 | N後 |
 | X test/hw/trident.hwb | §8のデータ（ゲスト/test/hwへ配備） | 文法固定後独立 |
-| Y kdebug/gfinit.c | kpeek_allow.h の include を外すだけ (KPEEK_NV_PROM_LEN は kdebug/recover.h:37、GF_ROM_MAX は hwdev/gf/production.h:8 のまま通る) | N/O/Pと同時 |
-| AB tools/checks/run.py の CHECK の covers・tools/tests/test_kdebug_init.py:122 | kpeek_allow.{c,h} を外す: covers に残る 6 本 (test_kdebug_init・test_geforce・test_gf_display・test_gf_command・gf-runner-host・gfinit-host) と、test_kdebug_init.py:122 のコンパイルの一覧 | O/P と同時 (残すと run.py が missing input、:122 はファイルが無くて止まる) |
+| Y kdebug/gfinit.c | kpeek_allow.h の include を外すだけ (KPEEK_NV_PROM_LEN は kdebug/recover.h、GF_ROM_MAX は hwdev/gf/production.h のまま通る) | N/O/Pと同時 |
+| AB tools/checks/run.py の CHECK の covers・tools/tests/test_kdebug_init.py | kpeek_allow.{c,h} を外す: covers に残る 6 本 (test_kdebug_init・test_geforce・test_gf_display・test_gf_command・gf-runner-host・gfinit-host) と、test_kdebug_init.py のコンパイルの一覧 | O/P と同時 (残すと run.py が missing input、`main()` はファイルが無くて止まる) |
 | Z docs/tasks/realhw/TASK_TRIDENT_DRIVER.md | §0-1の「許可表で照合」「許可リストで縛る」を削除し、任意番地と引数検査のみの方針に書換え（注記で残さない） | N後独立 |
 | AA TASK_KPEEK（実装時に所在確定） | §2-5の許可表前提を削除し、peek -mの任意番地・窓・引数検査へ本文を書換え | N後独立 |
 
@@ -286,15 +286,15 @@ HW run=3 op=end rc=OK lines=10 writes=1
 反論: 0件。
 
 ## 確定 (2026-11-05、Opus 第 2 回「N1 の段を §6 に 1 行足せば確定してよい」、PM が反映)
-- N1 (P2): §6 に AB を足した (kpeek_allow を参照する CHECK の covers 6 本と test_kdebug_init.py:122 を O/P と同時に外す)。
+- N1 (P2): §6 に AB を足した (kpeek_allow を参照する CHECK の covers 6 本と test_kdebug_init.py を O/P と同時に外す)。
 - N2 (P3): Y を「include を外すだけ」に書き換えた。
 - N3 (P3、実装の段で直す): §7 の NP21/W の行は `device d = bdf 0:0.0` を置いてから `pciread32 d 0 -> x` と書く。
-- N4 (P3、実装の段で直す): F の段で exec/exec_abort.inc:46-47・appslot.c:408 の「CUI 中は 1 バイトも変えない (K2)」のコメントを新しい印に合わせて書き換え、CUI で印以外は変わらないことを host 試験で確かめる。
+- N4 (P3、実装の段で直す): F の段で exec/exec_abort.inc (ring3_abort_request())・appslot.c の「CUI 中は 1 バイトも変えない (K2)」のコメントを新しい印に合わせて書き換え、CUI で印以外は変わらないことを host 試験で確かめる。
 
 ## PM 決定 (2026-11-05、HW-BASIC の機能 PM、実装の前)
 - P1 (段の分け方): §6 の 1 ファイル = 1 段を、実装者の単位で次の 10 段にまとめる。a0 = A・I と段をまたぐ宣言 (drivers/pci/pci_hwb.h・exec/exec_hwb.h) と host 試験の土台 (tools/tests/hwb_fake.h・tools/tests/hwb_host.py)。parse = B、exec = C、log = G、rshell = T・U、kd = D・L、pci = E、abort = F、allow = N・O・P・Y・AB・W・Z・AA と build/kdebug.mk の kpeek_allow.o の撤去、trident = X、wire = H・J・K・R・M・Q (hwb_access.o の追加)・S と追従の試験・本番の組み立ての試験。
 - P2 (試験の置き方): §6 の V (tools/tests/hwb_test.py 1 本) は、段ごとの `tools/tests/test_hwb_<部品>.py` (各自の CHECK と MUTATIONS) に分ける。共有の登録の衝突を避けるため (run.py の lint は 0 件に当たる covers の glob を missing input にする)。共通の組み立て・実行・変異は a0 の tools/tests/hwb_host.py。
-- P3 (N4 の appslot.c:408): 書き換えない。新しい印は exec_abort.inc の中だけにあり、appslot の状態は CUI で今までどおり 1 バイトも変わらないので、あのコメントは正しいまま。exec_abort.inc のコメントだけを書き換え、CUI で印以外が変わらないことは abort の host 試験で確かめる (wt/p6-close の exec/appslot との重なりも避ける)。
+- P3 (N4 の appslot.c): 書き換えない。新しい印は exec_abort.inc の中だけにあり、appslot の状態は CUI で今までどおり 1 バイトも変わらないので、あのコメントは正しいまま。exec_abort.inc のコメントだけを書き換え、CUI で印以外が変わらないことは abort の host 試験で確かめる (wt/p6-close の exec/appslot との重なりも避ける)。
 - P4 (スクリプトの置き場): リポジトリの `userland/tests/hw/*.hwb` に置き、配備マニフェスト (userland/deploy.yaml、tags: [test]) でゲストの `/test/hw/` へ。§7 の NP21/W の試験のスクリプトも同じ所に置く。
 - P5 (vgaHWProtect の展開): 出典は X.Org xserver hw/xfree86/vgahw/vgaHW.c の vgaHWProtect (MIT、xorg-server-21.1.13、PM の手元 ~/os32-tmp/refs/xorg-vgahw/vgaHW.c:574)。trident の段で script 内の call に展開する。
 - P6 (検査): このブランチはメインストリームでない (PARALLEL_BRANCHES §3)。段の実装者は make all と自分の試験の直接の実行・--mutate・--lint だけ。check-changed は回さず、取り込みの検査は wt/hw-basic の GitHub の CI の緑で代える。

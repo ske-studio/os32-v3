@@ -41,6 +41,6 @@ kdi_selftest_exec_view(&view);
 
 - __kernel_resident_endはリンカ記号の番地が必要。GETTERでメモリ内容を読まない。既存生成形 `#define __kernel_resident_end (*kdi_ptr___kernel_resident_end())` と `&` の組合せを保持する。
 
-- FUNCのstub番地と実関数番地は異なる（gen_kdebug_imports.py:254）。kapi_reserved_nosysとの等値比較には生のimport slot値を使う。
+- FUNCのstub番地と実関数番地は異なる（gen_kdebug_imports.py）。kapi_reserved_nosysとの等値比較には生のimport slot値を使う。
 
 shlib_read_pageのcallback渡しにKDI_ADDRを使用。通常の関数呼出しは既存tail-jump stubのまま。

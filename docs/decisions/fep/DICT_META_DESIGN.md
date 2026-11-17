@@ -28,15 +28,15 @@
 ## 1. 実物の確認
 | # | 票の記述との差 | 現在の根拠と設計への反映 |
 |---|---|---|
-| 1 | FD を直接 protect する説明は旧方式 | `kernel/ime/ime_dict.c:106,114,167` は RESIDENT group の acquire/open。2 接続とも group を持つ |
-| 2 | 切替が ime.c:882 にあるという所在は古い | `kernel/ime/ime.c:376` が `ime_dict_api.inc` を include。結線担当がこの include 先を変更する |
-| 3 | kapi_db の接続は単なる sqlite3_open ではない | `kapi/kapi_db.c:141,155` は EXEC group の acquire/open。予約判定を KAPI 内へ二重実装しない |
-| 4 | FEP から SQLite を直接リンクする前提ではない | `tools/prototypes/fep_imports.def:160–277` は os32_sqlite_* outer facade を import。追加口も同じ境界へ |
-| 5 | RO 化だけでは学習不能時の変換を保証しない | `kernel/ime/ime_dict.c:70–85,125–154` は dict_user と dict を同じ UNION で prepare。学習表無しでは prepare 失敗 |
-| 6 | 指定された正典の参照先が欠落 | 現行 `docs/decisions/MEMMAP_V3.md:30,42–50` に D27 はあるが D28・§4-6 は無い。M1〜M6 は票 §0 を根拠とする |
-| 7 | hsync の「settings.db*」は実装上 wildcard ではない | `userland/system/hsync_protect.inc:34–46,163–198` は /etc の 11 名の完全一致。FEP 用は明示して prefix 判定を追加 |
+| 1 | FD を直接 protect する説明は旧方式 | `kernel/ime/ime_dict.c` は RESIDENT group の acquire/open。2 接続とも group を持つ |
+| 2 | 切替が ime.c:882 にあるという所在は古い | `kernel/ime/ime.c` が `ime_dict_api.inc` を include。結線担当がこの include 先を変更する |
+| 3 | kapi_db の接続は単なる sqlite3_open ではない | `kapi/kapi_db.c` は EXEC group の acquire/open。予約判定を KAPI 内へ二重実装しない |
+| 4 | FEP から SQLite を直接リンクする前提ではない | `tools/prototypes/fep_imports.def` は os32_sqlite_* outer facade を import。追加口も同じ境界へ |
+| 5 | RO 化だけでは学習不能時の変換を保証しない | `kernel/ime/ime_dict.c` は dict_user と dict を同じ UNION で prepare。学習表無しでは prepare 失敗 |
+| 6 | 指定された正典の参照先が欠落 | 現行 `docs/decisions/MEMMAP_V3.md` に D27 はあるが D28・§4-6 は無い。M1〜M6 は票 §0 を根拠とする |
+| 7 | hsync の「settings.db*」は実装上 wildcard ではない | `userland/system/hsync_protect.inc` は /etc の 11 名の完全一致。FEP 用は明示して prefix 判定を追加 |
 - 食い違いは上表の 7 件（同じ変更の行番号ずれを重複計上しない）。
-- 生成器はまだ meta を作らない (`tools/fep_to_sqlite.py:194–230`)。S/M/L の閾値 800/1500/無制限は維持 (:34–37)。
+- 生成器はまだ meta を作らない (`tools/fep_to_sqlite.py`)。S/M/L の閾値 800/1500/無制限は維持 。
 - 閾値は raw IPADIC cost ではなく正規化後 (:128–178,260–262)。この設計で尺度を変更しない。
 - 5,815,296B・97,514 語・38,784B は票の過去実測であり今回の実測ではない。COPYING 同梱済みは票 §2/§4 の記述を採用する。
 
@@ -122,7 +122,7 @@ int fep_user_open(FepStore *s); /* 不一致/ROFS は user_enabled=0 */
 - `os32_sqlite_group_acquire(OS32_SQLITE_RESIDENT,0,&conn.group)` → group_open(RO または RW|CREATE) を各接続に使用。
 - group_begin_close → finalize 全 stmt → sqlite close → group_finish の既存順序を実装確認して維持。失敗時は隔離した group を再利用しない。
 - 予算状態は core/SQLite 側が唯一の所有者。FEP の boot_reserve_kb は参照用の写し。kapi_db は引き続き EXEC group を取る。
-- 既存 class 課金・予約をそのまま使う（vfs.c:39,55–70,259–281）。アプリ確保時は APP+SYSTEM+今回分 ≤ BUDGET_CAPACITY−reserve。FEP専用の強制上限は追加せず、最大使用量≤予約を受入で測る。
+- 既存 class 課金・予約をそのまま使う（vfs.c (vfs_chdir())）。アプリ確保時は APP+SYSTEM+今回分 ≤ BUDGET_CAPACITY−reserve。FEP専用の強制上限は追加せず、最大使用量≤予約を受入で測る。
 - core は settings 指定の有無と値、probe結果、実効予約を保持。settings→meta→192KiB の優先順。下限99KiBへの丸めとログは既存どおり（**PM 決定 R3**）。KiB→byte変換前に桁あふれを検査。
 - FEP は初期化時に config_get の結果を FepStore へコピーする。core probeは切替でも利用でき、予約を更新しない。boot_checkをFEPへimportしない。
 - 初期化後の既存 boot_check(1,reserve) は system+user の実在 RESIDENT 数（通常2、学習無効なら1）へ変更。異常時の隔離・rollback順序は維持。
@@ -150,7 +150,7 @@ int hsp_set_fep_user_path(const char *absolute_path); /* 正規化済み設定�
 | 切替1 | header/metaを先にprobe。meta要求がboot予約を超えたら再起動案内、現辞書を維持。ここで予約を増やさない |
 | 切替2 | probeを閉じて旧systemを閉じ、新systemを開く。userは保持、ID/品詞不一致なら使用停止。3本を恒常保持しない |
 | 切替失敗 | 新systemを閉じ旧pathを再open。復旧失敗なら辞書使用不可を表示、userデータは保持。隔離中groupがあれば再起動を案内 |
-| hsync | ROでも使用中辞書の差替許可は追加しない（ime_dict.c:191–193）。非選択辞書を更新→切替→元辞書更新、または停止中配備 |
+| hsync | ROでも使用中辞書の差替許可は追加しない（ime_dict.c）。非選択辞書を更新→切替→元辞書更新、または停止中配備 |
 - 起動probeは予約確定前、切替probeは既存2接続と一時的に共存する。両方を測定対象に含める。FEP初期化・実在group数のboot_check完了までアプリdb_openは公開しない。
 - settingsの小さい値は既存下限99KiBへ丸めて記録。2接続で不足すれば既存の初期化/学習失敗処理で理由を表示する。
 
@@ -226,9 +226,9 @@ int hsp_set_fep_user_path(const char *absolute_path); /* 正規化済み設定�
 - なし（0件）。
 
 ## 確定 (2026-11-04、claude-opus-5-5 の第 2 回、PM が反映)
-- N1: PM 決定 — (a) 常駐の group の枠 `OS32_SQLITE_RESIDENT_GROUPS` (lib/sqlite3/os32_sqlite_vfs.h:15) を 2→3 に広げ、辞書の切替の probe が既存の 2 接続 (system・user) と一時的に共存できるようにする (ユーザー決定 2026-10-28「上限は物理の制約が無ければ広げてよい」)。§5・§6 の切替の手順はこの前提のまま。§7 に枠 1 つ分の常駐 RAM の増分を、O5 に「3 本目を取れる・4 本目は空きなしで失敗」の試験を足す。
-- N3: core が常駐の接続数 (`boot_check(live, …)` の第 1 引数、vfs.c:261-268 の完全一致) を受け取る口を FEP の ops (`boot_bytes` の隣) に 1 つ置く。学習が無効なら 1、有効なら 2 を返す。
-- R14: PM 決定 — 学習ファイルの custom path は /etc 直下に限る (票 §3 の「settings で上書き可」の範囲内の絞り込み、既存の列挙 hsync_protect.inc:163-198・hsync.c:1201-1261 をそのまま使う)。ユーザーへの未決は無し。
+- N1: PM 決定 — (a) 常駐の group の枠 `OS32_SQLITE_RESIDENT_GROUPS` (lib/sqlite3/os32_sqlite_vfs.h) を 2→3 に広げ、辞書の切替の probe が既存の 2 接続 (system・user) と一時的に共存できるようにする (ユーザー決定 2026-10-28「上限は物理の制約が無ければ広げてよい」)。§5・§6 の切替の手順はこの前提のまま。§7 に枠 1 つ分の常駐 RAM の増分を、O5 に「3 本目を取れる・4 本目は空きなしで失敗」の試験を足す。
+- N3: core が常駐の接続数 (`boot_check(live, …)` の第 1 引数、vfs.c (vfs_find_mount()) の完全一致) を受け取る口を FEP の ops (`boot_bytes` の隣) に 1 つ置く。学習が無効なら 1、有効なら 2 を返す。
+- R14: PM 決定 — 学習ファイルの custom path は /etc 直下に限る (票 §3 の「settings で上書き可」の範囲内の絞り込み、既存の列挙 hsync_protect.inc・hsync.c をそのまま使う)。ユーザーへの未決は無し。
 
 
 ## 追記 (2026-11-05、辞書のメタ情報を返す KAPI の口 — ユーザー「返す口だけでも設計させて」)
@@ -319,7 +319,7 @@ NP21/W：停止→NHD配備→再起動後、実CPL3から256B分割し原文と
 
 ### 確定 (2026-11-05、Opus 第 1 回の条件付き承認、PM が反映)
 - A1: **20 キー** (ユーザー決定 2026-11-05「20」)。確定設計 DICT_META_DESIGN §5 の 4 キー (license・attribution・entry_count・status) を §2 の全欄の 20 キーに広げる。同じ SQL でキー名を引くだけで、後で版を上げずに済む。
-- A2: SQL の後のコピー前の再検査と、それを狙う変異を削除。copy_to_caller は 1 回だけ。最初の検査で n+1 ≤ capacity が成り立つ (シングルタスクで途中に yield が無い、手本 kernel/ime/ime_dict_api.inc:30 も 1 回)。
+- A2: SQL の後のコピー前の再検査と、それを狙う変異を削除。copy_to_caller は 1 回だけ。最初の検査で n+1 ≤ capacity が成り立つ (シングルタスクで途中に yield が無い、手本 kernel/ime/ime_dict_api.inc も 1 回)。
 - A3 (PM 決定、2026-11-05 実装で書き換え): SQL では byte を切らない (製品の SQLite は `SQLITE_OMIT_CAST`、outer facade に bind_int64 が無い)。`SELECT value FROM meta WHERE key = ?` を 1 回 step し、`sqlite3_column_blob` と `sqlite3_column_bytes` で byte の長さ len を取り、`offset < len` のときだけ C の側で [offset, offset + min(len - offset, capacity - 1)) を staging に写してから finalize する。offset >= len (INT_MAX を含む) は EOF。§5 の substr の文はこれで置き換える。
 - A4 (PM 決定): この口は dict_ready を呼ばない。vfs_fd_is_stale だけで STALE を返し、STATUS キーも STALE を返す (既存の ime_user_* と違い、開き直さない)。
 - A5 (PM 決定): v80 で一緒に入る 3 本 (STOP の宛先・gfx_osri_show・この口) の slot の並びは PM が統合の段で決める。

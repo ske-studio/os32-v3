@@ -20,7 +20,7 @@
 
 ## GF6200_S7_SHELL
 
-- `kdebug/kdebug_main.c:105-123` はGFを一般PAUSED門より先にhwdevへ渡す。GF自身のsession・状態・main順序検査を維持する。
+- `kdebug/kdebug_main.c` はGFを一般PAUSED門より先にhwdevへ渡す。GF自身のsession・状態・main順序検査を維持する。
 
 ## HWDEV_CORE_API
 
@@ -34,7 +34,7 @@
 
 | 実物・根拠 (file:line) | 確認したこと |
 | --- | --- |
-| `kdebug/kdebug_main.c:100` | dbg_call が recover と gfinit を振り分け、外部 recover 後に GF 所有領域を解放 (:115)。単なる表の移動では済まない |
+| `kdebug/kdebug_main.c` | dbg_call が recover と gfinit を振り分け、外部 recover 後に GF 所有領域を解放 (`recovery_attach()`)。単なる表の移動では済まない |
 
 ## RECOVER_ROUTE_TEST
 
@@ -48,9 +48,9 @@
 
 | 実物 | 確認と今回埋める境界 |
 | --- | --- |
-| `kernel/module/kdebug_call.c:8`、`kdebug/kdebug_main.c:102,110`、`userland/shell/cmd_recover.c:9` | kernel→既存dbg_call。GF分岐後にPAUSED門、shellはstatus/now（op 3/4）のみ |
+| `kernel/module/kdebug_call.c`、`kdebug/kdebug_main.c`、`userland/shell/cmd_recover.c` | kernel→既存dbg_call。GF分岐後にPAUSED門、shellはstatus/now（op 3/4）のみ |
 
-- PAUSED 門は kdebug_main.c:110 の位置のまま。既存 now 例外に `op==11 && action∈{step,end} && 仮想owner` だけ追加（payload のサイズ・版を先に照合）。GF 5〜10 は従来どおり :105 で hwdev へ渡し、GF_OP_ABORT 等の許可表を kdebug に持ち込まない。
+- PAUSED 門は kdebug_main.c の位置のまま。既存 now 例外に `op==11 && action∈{step,end} && 仮想owner` だけ追加（payload のサイズ・版を先に照合）。GF 5〜10 は従来どおり `recovery_attach()` で hwdev へ渡し、GF_OP_ABORT 等の許可表を kdebug に持ち込まない。
 
 - GF_OP_ABORT は既存 GF 分岐・許可判定を維持し、ops->call の戻り直後に recover_virtual_detach を呼ぶ。仮想 trial が終端なら即座に借用を解除し、拒否・非終端なら借用を維持する。
 

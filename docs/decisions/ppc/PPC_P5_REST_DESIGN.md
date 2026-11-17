@@ -24,11 +24,11 @@ r1→r2 の変更
 
 |台本|現在 PLN1 で観測するもの / 根拠 (行番号)|link 化の留意点|
 |---|---|---|
-|kboot_run.py|:91–140 LAN STATE、serial と capture の一致、drop、status/clock/memory/read-diag/peek。:151–172 pm_lan_poll の有無で LAN を判定。:225–282 READY 後の TB/EE/100Hz|OF・READY は QMP/serial の独立観測として保持。PLN1 の文面を link に要求しない|
+|kboot_run.py|`lan_judge()` LAN STATE、serial と capture の一致、drop、status/clock/memory/read-diag/peek。`accept()` pm_lan_poll の有無で LAN を判定。`running_state()` READY 後の TB/EE/100Hz|OF・READY は QMP/serial の独立観測として保持。PLN1 の文面を link に要求しない|
 |realhw_run.py|:27–45 nest/shell/exact の端末記録、gap/timeout、boot beacon。:120–151 Packet→Host→Terminal、stdin OPEN|QEMU を起動せず実機記録を評価。画像 SHA・機種・カメラ・pcap を保存 (:152–164)|
-|sc_run.py|:37–117 OPEN 後の端末、N01 完全一致、遅延起動・再接続行取消。:129–162 KBOOT_SHELL の nest 二重結果。:345–366 USER sh/serial 回帰|入れ子検証と本番 sh の検証を分ける。旧 prompt/OPEN は RSH と同一ではない|
-|ppc_sh_output.py|:74–77 hello/H/fd1 が端末、kernel READY が serial。:104–128 stream mirror 除去の私用像、KBOOT_SHELL=1|RSH OUT と LOG を別々に採取する。serial だけで fd1 を合格にしない|
-|usb_run.py|:483–553 sd_run.Session の FS_REQ 応答抑止、RPC エラー後の USB、OPEN による行取消、抜去・復帰|:515–523 は実時間 hold、:583–587 は --lan で normal だけ。通常 product の key (:375–390) と違う|
+|sc_run.py|`lan_accept()` OPEN 後の端末、N01 完全一致、遅延起動・再接続行取消。`nest_main()` KBOOT_SHELL の nest 二重結果。`main()` USER sh/serial 回帰|入れ子検証と本番 sh の検証を分ける。旧 prompt/OPEN は RSH と同一ではない|
+|ppc_sh_output.py|`lan_accept()` hello/H/fd1 が端末、kernel READY が serial。`main()` stream mirror 除去の私用像、KBOOT_SHELL=1|RSH OUT と LOG を別々に採取する。serial だけで fd1 を合格にしない|
+|usb_run.py|`lan_accept()` sd_run.Session の FS_REQ 応答抑止、RPC エラー後の USB、OPEN による行取消、抜去・復帰|`USBSession()` は実時間 hold、`main()` は --lan で normal だけ。通常 product の key  と違う|
 
 設計表と現物の食い違いは次の **4 件** (移行済み部分そのものは不具合と数えない)。
 1. 設計 :217 の P5-k/r は host の差替えに見えるが、kboot は PLN1 固有の診断形式と像判定にも依存する。
@@ -101,7 +101,7 @@ def assess_real_link(events, evidence):
 - UsbLink.start は -g・USB_QEMU_CLOCK と QMP を使い、起動時には usb-mouse のみ付ける。mouse 列挙後に device_add usb-kbd,id=kbd を一度だけ送り、kbd 列挙確認後に RSH warm、SFS CALL 応答だけ抑止する。
 - 抑止した要求の到達を記録し、cat /host/f が約1000msのゲスト期限で診断終了、tick/USB が進行、HC dead が無いことを確認。
 - SFS 応答抑止は link/ALIVE/LOG 全体を止めない。解除後の cat 成功と echo alive を要求する。
-- USB の echo hi は FB の証跡だけで見る (link の console_stream には pm_escc_write の目印が無い、platform/powermac/console_stream.c:45-48)。非 capture 時の USB 出力を RSH OUT に期待しない。
+- USB の echo hi は FB の証跡だけで見る (link の console_stream には pm_escc_write の目印が無い、platform/powermac/console_stream.c)。非 capture 時の USB 出力を RSH OUT に期待しない。
 - key は product_accept 内の手順を小関数化し共用。押下/最初の REPEAT をゲスト記録で確認して離し、release まで待つ。壁時計 .16 秒を削除。
 - PLN1 OPEN の行取消は link に移植しない。半入力中の RSH の有界な扱い・Ctrl-C/行復帰は link_sh_run の契約に従い確認する。
 - 抜去 release、再列挙、再打鍵、screen.ppm を残す。--lan --mutate でも no-service/syscall-ee を実行し、生存だけの RED を認めない。
@@ -111,17 +111,17 @@ def assess_real_link(events, evidence):
 - F3 の確認済み呼出元と処置は下表で固定。関門は「KBOOT_SH=1 かつ KBOOT_LINK 未指定の呼出元が0件」および各試験の合格。SHELL/NEGATIVE/無指定の旧起動も明示0にする。共有 build 関数へ一律0を注入せず呼出側を直す。
 |ファイル:行|今渡しているフラグ|既定の切替の後の扱い (KBOOT_LINK=0 を明示して PLN1 に残す / link に移す)|どの準備段で直すか|
 |---|---|---|---|
-|tools/ppc/usb_run.py:123,298,583|settings/product_settings/--lan は SH=1、LINK未指定、観測用KB_MUT等|settings/product_settings は0を明示してPLN1、--lan は1を明示してlinkへ|P1 (旧経路の0)、U (--lanの1)|
-|tools/ppc/fb_run.py:23,254,281|product_settings由来 SH=1、ROOT_MANIFEST等|0を明示してPLN1、呼出側でも固定|P2|
-|tools/ppc/sd_run.py:456,465|SH=1、変異時KB_MUT等。:417,425はlink_settings|旧2箇所は0を明示してPLN1、既存--linkは1を維持|P3|
-|tools/tests/test_ppc_link_sh.py:129,136,139,141,143|SH=1のみ / LINK=1のみ / SHELL=1のみ / SH=1,LINK=1 / 禁止組合せ|旧sh/shellとplainに0明示、linkと禁止組合せは1維持。既定1の期待も追加|P4|
-|tools/tests/test_ppc_terminal_work.py:137–139|SH=1のみ / LINK=1のみ|SH側に0を明示してPLN1、LINK側は1維持|P5|
-|tools/ppc/compile_ci.py:19|SH=1、PPC_CROSS_DIR、LINK未指定|PLN1 (SH=1,LINK=0) とlink-SH (SH=1,LINK=1) を別出力で両方明示構築、どちらの失敗も非0|P6|
-|tools/ppc/kboot_accept.py:68,79,86,105|無指定 / NEGATIVE=N / KB_MUT等|全て0を明示してPLN1、build/make公開ヘルパーの既定は変更しない|P7|
-|tools/ppc/sb_run.py:134,154|SHELL=1、KB_MUT等|0を明示してPLN1|P8|
-|tools/ppc/sc_run.py:133,268,364|SHELL=1,BINS / SH=1,KB_MUT等 / SH=1|既存経路全て0を明示してPLN1、新--linkのみSH=1,LINK=1|P9 (旧経路)、C (link追加)|
-|tools/ppc/ppc_sh_output.py:124,139|SHELL=1、bins、KB_MUT等|既存経路0を明示してPLN1、新--linkはSH=1,LINK=1|P10 (旧経路)、O (link追加)|
-|tools/accept/arch_ctx.py:128|SH=1、LINK 未指定、KB_ROOT_BINS に build/out/ppc-user/fault.bin、KB_MUT|0 を明示して PLN1 に残す (CHECK は arch-ctx-guest)|P11 (PM 決定 N3)|
+|tools/ppc/usb_run.py|settings/product_settings/--lan は SH=1、LINK未指定、観測用KB_MUT等|settings/product_settings は0を明示してPLN1、--lan は1を明示してlinkへ|P1 (旧経路の0)、U (--lanの1)|
+|tools/ppc/fb_run.py|product_settings由来 SH=1、ROOT_MANIFEST等|0を明示してPLN1、呼出側でも固定|P2|
+|tools/ppc/sd_run.py|SH=1、変異時KB_MUT等。`link_main()`,425はlink_settings|旧2箇所は0を明示してPLN1、既存--linkは1を維持|P3|
+|tools/tests/test_ppc_link_sh.py|SH=1のみ / LINK=1のみ / SHELL=1のみ / SH=1,LINK=1 / 禁止組合せ|旧sh/shellとplainに0明示、linkと禁止組合せは1維持。既定1の期待も追加|P4|
+|tools/tests/test_ppc_terminal_work.py|SH=1のみ / LINK=1のみ|SH側に0を明示してPLN1、LINK側は1維持|P5|
+|tools/ppc/compile_ci.py|SH=1、PPC_CROSS_DIR、LINK未指定|PLN1 (SH=1,LINK=0) とlink-SH (SH=1,LINK=1) を別出力で両方明示構築、どちらの失敗も非0|P6|
+|tools/ppc/kboot_accept.py|無指定 / NEGATIVE=N / KB_MUT等|全て0を明示してPLN1、build/make公開ヘルパーの既定は変更しない|P7|
+|tools/ppc/sb_run.py (main())|SHELL=1、KB_MUT等|0を明示してPLN1|P8|
+|tools/ppc/sc_run.py|SHELL=1,BINS / SH=1,KB_MUT等 / SH=1|既存経路全て0を明示してPLN1、新--linkのみSH=1,LINK=1|P9 (旧経路)、C (link追加)|
+|tools/ppc/ppc_sh_output.py|SHELL=1、bins、KB_MUT等|既存経路0を明示してPLN1、新--linkはSH=1,LINK=1|P10 (旧経路)、O (link追加)|
+|tools/accept/arch_ctx.py|SH=1、LINK 未指定、KB_ROOT_BINS に build/out/ppc-user/fault.bin、KB_MUT|0 を明示して PLN1 に残す (CHECK は arch-ctx-guest)|P11 (PM 決定 N3)|
 - 表の SH/LINK/SHELL は KBOOT_SH/KBOOT_LINK/KBOOT_SHELL の略。fb は import 元も追跡し、各ファイルの build/settings 呼出を実物検索した。
 - :37/:47 の link/link-sh と USER 出力分離、:89 の旧 wire/terminal/input 除外、:141 の hostfs_link 選択を維持。旧 object の流用は禁止。
 - 廃止の意味は既定生成像から PLN1 wire を除去すること。明示0の旧像と旧試験は :232 の旧像回帰として保持し、新 link 像の必須合否に混ぜない。
@@ -196,16 +196,16 @@ def assess_real_link(events, evidence):
 ## 確定 (2026-11-16、Opus 第 2 回、PM が反映)
 - N1 (P1): K の正像は link_run.accept を丸ごと呼ぶ (案 a)。OF・serial の照合は accept の後に記録で行い、READY→2 秒の TB と EE は link_run の tick の採取で代える。link_run.py に QMP を渡す口を足す準備段 (案 b) は作らない。
 - N2 (P1): U は製品の link-SH と局所の rsh_command。差し替え口 3 つは変異だけに使い、USB の echo hi は FB の証跡だけで見る。
-- N3 (P2): 呼び出し元の表に tools/accept/arch_ctx.py:128 を P11 として足した (0 を明示して PLN1 に残す)。
+- N3 (P2): 呼び出し元の表に tools/accept/arch_ctx.py を P11 として足した (0 を明示して PLN1 に残す)。
 - N4 (P3): 準備段 P1〜P11 は並列可。D の前に全部が揃うこと。
 
 ## R の実装で決めたこと (2026-11-16、PM 決定、実装者の停止 2 回を受けて)
-- R1: link の capture の合格は HELLO/ALIVE の成立と LOG の完全さ (seq が 0 から連番、drop の報告、KBOOT の段階印の順)。PDIAG の診断は求めない (link-SH の製品の像に PDIAG が無い、platform/powermac/lan_service.c:313。5 つの診断は K が診断像で確かめる)。
-- R2: link の nest・shell・exact は旧の check_shell を使わず RSH の結果の本文で判定する。nest の期待は sc_run.LINK_NEST_EXPECTED と `echo $?` の 5。shell は決まった短い台本で、終了と再起動の証跡は求めない (link の APP shell は exit N で終わらない、userland/shell/rshell_lan.c:402-407)。
+- R1: link の capture の合格は HELLO/ALIVE の成立と LOG の完全さ (seq が 0 から連番、drop の報告、KBOOT の段階印の順)。PDIAG の診断は求めない (link-SH の製品の像に PDIAG が無い、platform/powermac/lan_service.c。5 つの診断は K が診断像で確かめる)。
+- R2: link の nest・shell・exact は旧の check_shell を使わず RSH の結果の本文で判定する。nest の期待は sc_run.LINK_NEST_EXPECTED と `echo $?` の 5。shell は決まった短い台本で、終了と再起動の証跡は求めない (link の APP shell は exit N で終わらない、userland/shell/rshell_lan.c)。
 - R3: agent の API は足さない。client からは probe (世代・peer・hello)・LOG・RSH を取り、HELLO・ALIVE (ゲストの電文が 2 秒より長く途切れない)・session (不変)・SFS の CALL と応答は受け身の pcap の 0x88B5 の電文から読む。
 
 ## U の実装で決めたこと (2026-11-16、PM 決定)
 - U-c1: link の `--link --lan --mutate` の変異は no-service だけ。RED は「USB の列挙か打鍵が進まない」と「link の LOG・RSH が生きている」の両方を要し、片方は wrong-reason。syscall-ee は従来の `--cpu both --mutate` (PROBE の私用の写しで USB STALL ticks=0 を観測) に残す。製品の link-SH の像には syscall の入口の EE を観測する口が無く、差し込みは N2 に反するため。
-- U-b の直し: 抑止した SFS CALL では、host_agent の壁時計 1.0s (受付と本文の後の両方、tools/host_agent.py:820・1082-1084) を止める。-icount のゲスト時計は壁時計と食い違う (先走りと凍結) ので、区間はゲストの期限で終わらせる。期限切れの文は `Host is down` (fs/serialfs/sfs_client.c:237-253)。
+- U-b の直し: 抑止した SFS CALL では、host_agent の壁時計 1.0s (受付と本文の後の両方、tools/host_agent.py) を止める。-icount のゲスト時計は壁時計と食い違う (先走りと凍結) ので、区間はゲストの期限で終わらせる。期限切れの文は `Host is down` (fs/serialfs/sfs_client.c (sfs_exchange_deadline()))。
 - 受入の揺れのうち、受信が 1 件目で断られる誤りは共通の net/rx_work.c で本線が直した (main 44f2a83f)。
 

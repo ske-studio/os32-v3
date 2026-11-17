@@ -10,7 +10,7 @@ M=`/home/hight/os32-v3`、レビュー照合基点 `9335e72a`。以下のリポ�
 ## 1. 現状と根拠
 | 実物の食い違い | 本設計での扱い |
 |---|---|
-| `platform/pc98/splash_image.c:31` がcount≠0を拒否、`platform/pc98/boot_splash.c`がこの入口を呼ぶ | 動的画像の所有・準備・再生を結線する。旧再生器が常用で稼働中とはしない。 |
+| `platform/pc98/splash_image.c` がcount≠0を拒否、`platform/pc98/boot_splash.c`がこの入口を呼ぶ | 動的画像の所有・準備・再生を結線する。旧再生器が常用で稼働中とはしない。 |
 | `gfx/gfx_osri.h`・`.c`は通常1197件/行3番号/昇順、OBSだけ6384件/行16番号/任意順・同値可 | v2の形式検査・RAM型を共通化し、ビルドマクロで意味を変えない。 |
 | `drivers/video/pc98/splash_raster_image.*`の旧核は6 OUT/認定表依存、差分準備・可変フレームはOBS専用 | S4核を共通部品へ移し、旧核を削除。上限置換だけで済ませない。 |
 | `tools/img2osri.py`の旧既定は5 OUT、enc2部品・並列化は別作業木 | 受入済みenc2-mtを固定して取り込み、既定を結線する。 |
@@ -155,8 +155,8 @@ enc2-mt完了コミット固定・容量/準備秒数実測・実機受入は作
 反論: 0件（F1〜F9をすべて採用）。
 
 ## 確定 (2026-11-04、Opus 第 2 回の条件付き Approve、PM が反映)
-- G1: libgcc の受入はこの段で足す・変える関数に限る (この段の関数に 64bit の割り算を足さない)。preview_rounds (splash_raster_image.c:502-507) は今も割り算をしているので、残すこの段で割り算を外す。platform/pc98/splash.c の `__divdi3`・`__udivdi3` はこの段の受入に入れない (libgcc を外す別の段)。§3 の該当の文はこれに読み替える。
-- G2: §4 の STATIC_ASSERT は実物のマクロ (include/types.h:57) の 2 引数の形に直した。
+- G1: libgcc の受入はこの段で足す・変える関数に限る (この段の関数に 64bit の割り算を足さない)。preview_rounds (splash_raster_image.c) は今も割り算をしているので、残すこの段で割り算を外す。platform/pc98/splash.c の `__divdi3`・`__udivdi3` はこの段の受入に入れない (libgcc を外す別の段)。§3 の該当の文はこれに読み替える。
+- G2: §4 の STATIC_ASSERT は実物のマクロ (include/types.h) の 2 引数の形に直した。
 - G3: time_splash_math を消すときに参照を直すのは tools/tests/test_time_splash_math.py、tools/tests/test_dep_dir_b_timer.py、tools/checks/test_run.py、check-select-host.py、build/kernel.mk の 5 つ (登録の整理は PM が直列で行う)。
 - G4: 残す pl_preview は、内部の preview・preview_vsync の引数から PlProfile と deadline を外し、有限の poll だけにする。
 - §8: U1 はユーザー決定で補正しない案だけにした。

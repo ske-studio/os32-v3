@@ -6,7 +6,7 @@
 
 | 定数の置き場 | 内容 |
 | --- | --- |
-| `kdebug/recover.h:46` | 既存 RECOVER_RANGE_MAX を利用。終端は既存 RECOVER_ADDRESS_END を利用 |
+| `kdebug/recover.h` | 既存 RECOVER_RANGE_MAX を利用。終端は既存 RECOVER_ADDRESS_END を利用 |
 
 - 他装置どうしの区間重複は本変更では判定しない。bridge窓とその子の重複・alias で誤拒否しない。
 
@@ -299,5 +299,5 @@ T5 の 1 回は、現在値が 00b でも 00h を書く経路・mask 読戻し�
 
 | 実物 | 確認と今回埋める境界 |
 | --- | --- |
-| `kdebug/recover.c:174,1087,1212,1240` | boot 寿命の owner、bind 済み plan 必須の begin、承認済み step、共通 end。FAILED を再開始で消せない |
+| `kdebug/recover.c` | boot 寿命の owner、bind 済み plan 必須の begin、承認済み step、共通 end。FAILED を再開始で消せない |
 | `kdebug/recover.c` | profile に target 必須。trial/opcode 期限、step poll 上限、独立 UART poll 上限がある |

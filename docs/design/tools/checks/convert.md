@@ -74,15 +74,15 @@ fast/docs/full/段の方針差は [run の試験節](run.md) の事例で確認�
 | R2 PM | tools/tests/test_*.py、tools/checks/<name>.py | 変換実行、tier確定、既存計時からbudget。共有スクリプトの所有を決めて入口単位に分ける |
 | R2 PM | 作業領域の snapshot・比較結果 | main/200 SHA/環境を固定して3集合比較。R1(a)(b) の結合後 |
 | R3 terra | build/sdk.mk | --list、静的パターン、CC値、親makeでCC_NEEDSを1回準備。check-changed は下限2。列外7入口を手書きで残す |
-| R3 terra | tools/gen_tests_inventory.py | --list --json の CHECK を読む。CI解析・記録抽出は維持し、旧importとmk登録照合を削除 (`:49,523`) |
-| R3 terra | tools/test_changes.py | TEST_PREFIXES の旧2ディレクトリを tools/checks/ へ置換 (`:11`) |
-| R3 terra | tools/tests/test_dep_dir_d_console.py:202 | yaml の GRID_FILES 照合を、その検査の `CHECK["covers"]` との照合に置換 |
-| R3 terra | tools/tests/test_dep_dir_d_display.py:97 | yaml の FILES 照合を、その検査の `CHECK["covers"]` との照合に置換 |
-| R3 terra | tools/tests/test_dep_dir_d_splash.py:83 | yaml の FILES 照合を、その検査の `CHECK["covers"]` との照合に置換 |
-| R3 terra | tools/tests/test_ci_stab.py:91,129 | checks.d glob を CHECK の run 入口からのスクリプト収集へ。既存 test_*.py の列と正常対照監査を保持し、方言の例外文字列も更新 |
-| R3 terra | tools/tests/test_c_dialect.py:716 | dialect_variants_needed の import を run へ。P1b と同じファイルの変更は直列にする |
-| R3 terra | tools/tests/test_check_times.py:36 | 新入口へ計時fixtureを変更し、既存の環境分離・rc確認を保つ |
-| R3 terra | tools/tests/test_harness_tools.py:30,168 | pack_case と check_select の CASES/MUTATIONS を削除。他の test_changes/docs-status の試験は保持 |
+| R3 terra | tools/gen_tests_inventory.py | --list --json の CHECK を読む。CI解析・記録抽出は維持し、旧importとmk登録照合を削除  |
+| R3 terra | tools/test_changes.py | TEST_PREFIXES の旧2ディレクトリを tools/checks/ へ置換  |
+| R3 terra | tools/tests/test_dep_dir_d_console.py | yaml の GRID_FILES 照合を、その検査の `CHECK["covers"]` との照合に置換 |
+| R3 terra | tools/tests/test_dep_dir_d_display.py | yaml の FILES 照合を、その検査の `CHECK["covers"]` との照合に置換 |
+| R3 terra | tools/tests/test_dep_dir_d_splash.py | yaml の FILES 照合を、その検査の `CHECK["covers"]` との照合に置換 |
+| R3 terra | tools/tests/test_ci_stab.py | checks.d glob を CHECK の run 入口からのスクリプト収集へ。既存 test_*.py の列と正常対照監査を保持し、方言の例外文字列も更新 |
+| R3 terra | tools/tests/test_c_dialect.py | dialect_variants_needed の import を run へ。P1b と同じファイルの変更は直列にする |
+| R3 terra | tools/tests/test_check_times.py (setUp()) | 新入口へ計時fixtureを変更し、既存の環境分離・rc確認を保つ |
+| R3 terra | tools/tests/test_harness_tools.py | pack_case と check_select の CASES/MUTATIONS を削除。他の test_changes/docs-status の試験は保持 |
 | R3 terra | .claude/skills/os32-delegate/SKILL.md、os32-land/SKILL.md、.agents/skills/os32-delegate/SKILL.md | 旧選択器呼出しを run へ替え、欠けた --select を補う。pack/inputs/suggest の代替入口は作らない |
 | R3 terra | docs/08_build.md、docs/tasks/agents/ROLES.md | 新操作と選択の説明へ切替。P2の全規約整理は分ける |
 | R3 terra | .github/workflows/check.yml、build.yml | 呼出し名は維持し、旧形式を指すコメントのみ必要なら修正 |

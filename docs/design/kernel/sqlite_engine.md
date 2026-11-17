@@ -8,8 +8,8 @@ SQLite モジュールを管理し、専用スタック上で呼出しを実行�
 ## 落とし穴
 
 - 複数の接続を開いたままにすると共有 MEMSYS5 プールが枯渇し、後の DB 処理が失敗する。
-  プールは `lib/sqlite3/os32_sqlite_vfs.c:21` で管理され、アプリ側の割当には
-  予約を残す制限もある (`lib/sqlite3/os32_sqlite_vfs.c:54`)。
+  プールは `lib/sqlite3/os32_sqlite_vfs.c` で管理され、アプリ側の割当には
+  予約を残す制限もある (`lib/sqlite3/os32_sqlite_vfs.c` の `budget_malloc()`)。
   利用を終えた接続とステートメントを閉じ、失敗時は DB の診断を確認する。
   `make check-sqlite-engine-host` がエンジンの実行契約を検査する。
 

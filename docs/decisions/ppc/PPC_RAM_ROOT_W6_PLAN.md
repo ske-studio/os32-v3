@@ -29,9 +29,9 @@ r1 で確認済みの食い違い5件は維持する。未実装の接続とは�
 
 |番号|設計・前提|実物と計画への反映|
 |---|---|---|
-|差1|設計:164,168 は RAM root を cd0 とする|`kernel/dev/ram_ro.c:32`、`init/boot_root.c:11` の rd0 を採用|
-|差2|設計:168 は boot_root 内で ISO 登録|現行登録は `platform/powermac/root_boot.c:14`。共通 init へ移す|
-|差3|設計:369 は rdN 対応を追加する段を記載|`fs/isofs/iso9660.c:377` は既に `VFS_DEV_RAM` を受ける|
+|差1|設計:164,168 は RAM root を cd0 とする|`kernel/dev/ram_ro.c` の `ram_ro_register()`、`init/boot_root.c` の rd0 を採用|
+|差2|設計:168 は boot_root 内で ISO 登録|現行登録は `platform/powermac/root_boot.c` の `pm_root_boot()`。共通 init へ移す|
+|差3|設計:369 は rdN 対応を追加する段を記載|`fs/isofs/iso9660.c` は既に `VFS_DEV_RAM` を受ける|
 |差4|設計:180 は S-B で hello.bin 追加までを記載|`build/targets/ppc-powermac.mk` は hello.bin と fault.bin を同梱済み|
 |差5|設計:371 の vmkernel.lz4 293KiB|過去値としてのみ使用。現在の容量合格を意味しない|
 
@@ -40,15 +40,15 @@ r1 で確認済みの食い違い5件は維持する。未実装の接続とは�
 |RAM block と root|`ram_ro.c` の範囲検査・write 拒否、`boot_root_mount()` の rd0 mount を再利用|
 |共通 ISO|既存 parser と `VFS_DEV_RAM=5` を使い、複製しない|
 |書込み先|`fs/ramfs/ramfs.c` の既存固定上限で `/tmp` を分離|
-|PC-98 初期化順|`platform/pc98/kernel.c:187` の root mount が同:199 の `kernel_boot_memory()` より先|
+|PC-98 初期化順|`platform/pc98/kernel.c` の root mount が同 の `kernel_boot_memory()` より先|
 |FD 搬送|`boot/loader_fat_new.asm` は ELF でなく VK32 の VMKRNL.LZ4 を読む|
 |入力制限|同:446 の508KiB、物理 `0x10000〜0x8EFFF`、64KiB 境界でセグメント更新|
-|別置き候補|`include/memmap.h:396` の `0x600000`、1MiB の boot bundle 帯|
-|boot wire|`platform/pc98/bootinfo_wire.h:6,37` は v2・64B、image 欄の予約は4B|
+|別置き候補|`include/memmap.h` の `0x600000`、1MiB の boot bundle 帯|
+|boot wire|`platform/pc98/bootinfo_wire.h` は v2・64B、image 欄の予約は4B|
 
-追加確認：`bootinfo_check.c:104` は単一版との一致判定で、現状のまま v3 は受理しない。
-`tools/mkmod.py:196–207,296` は VK32 全体の検証済み CRC を pair に使用する。
-`install.c:55` の kernel 読込み元の実名は `/VMKRNL.LZ4`、HDD 側は `/boot/vmkernel.lz4`。
+追加確認：`bootinfo_check.c` の `bootinfo_parse()` は単一版との一致判定で、現状のまま v3 は受理しない。
+`tools/mkmod.py` は VK32 全体の検証済み CRC を pair に使用する。
+`install.c` の kernel 読込み元の実名は `/VMKRNL.LZ4`、HDD 側は `/boot/vmkernel.lz4`。
 GPL の資料・コードおよび `docs/archive/` は参照していない。
 
 **2. 共通部品の段――PowerPC 側**
@@ -85,7 +85,7 @@ rd 名前登録と image の予約・写像は platform 側に残し、低水準
 C4：内容表は mkpkg の FD 選択・除外・名前写像を唯一の入力とする。
 ISO level 1 の8.3名に揃え、別の手書き rename 表を生成側に増やさない。
 既存の2048B整列検査を再利用し、必須ファイル・名前衝突・実際の読出しパスを検査する。
-`mkroot_image.py:24,29–30` の道具不在 rc=3 を PC-98 build の成功や SKIP に変換しない。
+`mkroot_image.py` の道具不在 rc=3 を PC-98 build の成功や SKIP に変換しない。
 PC-98 の `make all` と CI に genisoimage または xorriso を必須化し、不在なら明確に失敗させる。
 PPC の hello/fault 用 root の容量を PC-98 製品 root の見積もりへ流用しない。
 
@@ -108,7 +108,7 @@ A の pair 契約変更は本線の module ABI 設計で扱い、CRC の無条�
 
 **4. B の FD ローダ実現性と容量**
 
-`loader_fat_new.asm:218–244` は ES:BP の低位宛先へ1セクタずつ読み、64KiB ごとに更新する。
+`loader_fat_new.asm` の `loader_start` は ES:BP の低位宛先へ1セクタずつ読み、64KiB ごとに更新する。
 同:890–913 の `read_sect16` は INT 1Bh を使う。この経路で6MiBへ直接読む設計にはできない。
 同:291–329 に A20 有効化・GDT 設定・保護モード移行があり、高位アドレスを扱う土台はある。
 確認範囲では BIOS 読込みへ戻る往復経路はなく、既存の一方向移行をそのまま反復には使えない。
@@ -127,7 +127,7 @@ B の root 記述と、既存の kernel CRC/size による pair 情報は別物�
 pgalloc 初期化直後・一般割当て前に image 帯を予約し、root mount 前に P2V で写像する。
 `kernel_boot_memory()` 全体の単純前倒しは避け、root 後の module 読込みとメモリ初期化を分離する。
 
-容量の根拠は `docs/08_build.md:767` の sqlite.mod 除外後、2HD 空き約443KBとする。
+容量の根拠は `docs/08_build.md` の sqlite.mod 除外後、2HD 空き約443KBとする。
 媒体1232KiB−443KiB≒789KiBが管理領域を含む使用量の概算である。
 789−過去の kernel 293−loader 等で、従来 root 内容は約490KiB級という下限側の目安になる。
 これは個々のファイル長を集計した厳密な下限ではない。FAT 管理領域・割当丸めは分離して測る。
@@ -147,8 +147,8 @@ B で install 用 kernel を内包すると、外側全体は概ね789+293≒108
 
 **5. PC-98 接続と起動後の経路**
 
-P1：`cd_body.c:27` の `out->fs` と `CdModuleApi.fs` を除去し、装置側 API にする。
-`cd_module.c:29,33,58` の FS pointer 検査・登録・解除と対応する参照保持を削除する。
+P1：`cd_body.c` の `out->fs` と `CdModuleApi.fs` を除去し、装置側 API にする。
+`cd_module.c` の `cd_start()` の FS pointer 検査・登録・解除と対応する参照保持を削除する。
 装置 pointer の body 内検査、登録・解除・rollback と使用中の unload 拒否は維持する。
 `CD_MODULE_OPS_VERSION` と関連 module ABI 世代を更新し、旧組合せは明確に拒否する。
 `build/cd-module.mk` から ISO object を外し、kernel 側へ移す。重複登録エラーを握り潰さない。
@@ -165,10 +165,10 @@ B の外側 FAT は loader・VMKRNL.LZ4・root image、内側 ISO は利用内�
 |---|---|
 |root の shell・設定・module 読込み|rd0 に向ける。遅延読込みする必須ファイルも ISO に含める|
 |子 mount・FD 自動探索|起動 FD を対象外にする。抜去済みでも probe/read を発生させない|
-|hsync `hsync.c:194,2503`|同期元の root 読込みは rd0。rd0 への書込みは失敗のままにし、既存 FD 書込み拒否も維持|
-|filer `cmd_filer.c:78–98`|短名 fallback を今回の rd0 root に対応。`/etc` と `/` が同じ装置という条件を維持|
-|`drivers/base/dev.c:61,279` の fd0|装置登録は維持。登録と自動 mount を分け、明示利用だけを対象にする|
-|kcg の ROM/cache|`kcg.mod` は rd0 から読む。`kcg_body.c:16,68` の RAM cache と ROM glyph 読出しは FD I/O 対象外|
+|hsync `hsync.c`|同期元の root 読込みは rd0。rd0 への書込みは失敗のままにし、既存 FD 書込み拒否も維持|
+|filer `cmd_filer.c`|短名 fallback を今回の rd0 root に対応。`/etc` と `/` が同じ装置という条件を維持|
+|`drivers/base/dev.c` の fd0|装置登録は維持。登録と自動 mount を分け、明示利用だけを対象にする|
+|kcg の ROM/cache|`kcg.mod` は rd0 から読む。`kcg_body.c` の RAM cache と ROM glyph 読出しは FD I/O 対象外|
 |`pc98_boot_font()`|現行の KCG 初期化を維持し、cache を永続 FD storage として扱わない|
 |install|3入力とコピー対象を rd0 から読む。HDD への書込みは従来の承認手順を維持|
 |bootlog_save|ext2/FAT の保存先限定を維持し、ISO root は対象外。FD 自動 mount は復活させない|
@@ -223,8 +223,8 @@ r1→r2 の変更の数 / 反論の数：10 / 0
 
 ## 確定 (2026-11-12、Opus 5.5 の第 2 回の条件付き Approve を PM が反映)
 - N1 (P2): B の FD のローダの段 (PB) の詳細設計の最初の確認項目に、1MB より上への転送の候補として (a) PC-98 の BIOS の拡張メモリへのブロック転送 (INT 1Fh AH=90h とされる。[HW3] に沿ってメーカー資料で確かめる)、(b) unreal mode、(c) r2 §4 の PM への往復 (最大の見積もり) を並べ、資料で確かめられた手段で見積もり直す。
-- N2 (P2): B は kernel を 2 回持つ (外の FAT と ISO の中)。2HD は 789KB + 293KiB + ISO の丸めで使える 1168KiB にほぼ届くか超える見込み (推定)、1.44MB は収まる見込み。2 回持つのを避ける案として「v2 の img_size (platform/pc98/bootinfo_wire.h:34) を使い、V86 より前に kernel が低位の VK32 を写して install に渡す (ISO に kernel を入れない)」を候補に足す。ユーザーへの推奨は「まず今の中身のまま B。2HD の実測で超えたらこの案か中身の削減を、容量と失う機能を示してユーザーが決める」の条件付きにする。
-- N3 (P3): MEM_BOOT_BUNDLE (include/memmap.h:388-396) は「ブート必須モジュールの展開先」として T5b/T6b が使う予定の帯。W6 の root に使うなら、P2 で用途を「W6 の root」に書き換えるか STAGING (0x500000) と分けて使うかを決め、memmap.h の注釈と tools/tests/memory_boot_host.c:401-407 を追従させる。
+- N2 (P2): B は kernel を 2 回持つ (外の FAT と ISO の中)。2HD は 789KB + 293KiB + ISO の丸めで使える 1168KiB にほぼ届くか超える見込み (推定)、1.44MB は収まる見込み。2 回持つのを避ける案として「v2 の img_size (platform/pc98/bootinfo_wire.h) を使い、V86 より前に kernel が低位の VK32 を写して install に渡す (ISO に kernel を入れない)」を候補に足す。ユーザーへの推奨は「まず今の中身のまま B。2HD の実測で超えたらこの案か中身の削減を、容量と失う機能を示してユーザーが決める」の条件付きにする。
+- N3 (P3): MEM_BOOT_BUNDLE (include/memmap.h) は「ブート必須モジュールの展開先」として T5b/T6b が使う予定の帯。W6 の root に使うなら、P2 で用途を「W6 の root」に書き換えるか STAGING (0x500000) と分けて使うかを決め、memmap.h の注釈と tools/tests/memory_boot_host.c を追従させる。
 - 未決の振り分け: 本線 PM 3 件 (A か B か、pair の契約、CdModuleApi の版上げ。推奨は B・pair は今のまま・fs を外して版上げ)。B はローダと boot 情報 v3 で範囲が広がるので、本線 PM が B を採る時点でユーザーに知らせる (スコープの拡大)。ユーザー 1 件 (FD の中身を削るか、N2 の条件付き)。
 
 ## 本線のレビューと決定 (2026-11-12)
@@ -238,12 +238,12 @@ r1→r2 の変更の数 / 反論の数：10 / 0
 - (4) FD の中身: **今は削らない**。2HD の実測で 64KB の下限を割ったら、容量と失う機能を示してユーザーに諮る。
 
 **本線の独立レビュー (Approve 条件付き、P1 なし) の指摘で、段を出す前に計画に入れる物**:
-- R-1 (P2): 1MB より上への転送は **(c) PM の往復**を採る。boot/loader_hdd.asm:186-270 に実機で使っている往復 (pm16_trampoline・rm_trampoline、INT 1Bh) がある。(a) INT 1Fh AH=90h はミラーの Bible・UNDOCUMENTED で確かめられないので採らない ([HW3])。(b) unreal mode は推測に頼るので採らない。FD のローダを HDD と同じ形 (C を PM で動かし、INT 1Bh を往復で呼ぶ) に寄せる案も比べる。
-- R-2 (P2): 今の vmkernel.lz4 は約 330KiB で、2HD の空き約 443KB から 2 つ目の kernel を引くと 64KB の下限を割る見込み。**kernel を 2 回持たない形を前提**にする。候補: ローダが ROOT.ISO を高位へ運び、PM で ISO の root から VMKRNL.LZ4 の extent を探し、pm_vk32_boot の file 引数 (boot/loader_fat_new.asm:337) に高位の番地を渡す。
-- R-3 (P2): 今の bundle の予約 (mm/memory_boot.c:175・242) は中身を後で ledger_transfer で部品へ渡す契約 (:169・:349)。一生残る root の帯には専用の定数 (例 MEM_BOOT_ROOT_*) と owner を作り、LEDGER_RF_PERMANENT を付ける。申告は bootinfo v3 から渡す。T6b の同梱域とは別に置き、票 TASK_T4_T6_MODULES の 261 行目付近に依存を 1 行書く。(確定の N3 はこれに置き換える。)
+- R-1 (P2): 1MB より上への転送は **(c) PM の往復**を採る。boot/loader_hdd.asm に実機で使っている往復 (pm16_trampoline・rm_trampoline、INT 1Bh) がある。(a) INT 1Fh AH=90h はミラーの Bible・UNDOCUMENTED で確かめられないので採らない ([HW3])。(b) unreal mode は推測に頼るので採らない。FD のローダを HDD と同じ形 (C を PM で動かし、INT 1Bh を往復で呼ぶ) に寄せる案も比べる。
+- R-2 (P2): 今の vmkernel.lz4 は約 330KiB で、2HD の空き約 443KB から 2 つ目の kernel を引くと 64KB の下限を割る見込み。**kernel を 2 回持たない形を前提**にする。候補: ローダが ROOT.ISO を高位へ運び、PM で ISO の root から VMKRNL.LZ4 の extent を探し、pm_vk32_boot の file 引数 (boot/loader_fat_new.asm) に高位の番地を渡す。
+- R-3 (P2): 今の bundle の予約 (mm/memory_boot.c) は中身を後で ledger_transfer で部品へ渡す契約 (`memory_boot_count_pages()`)。一生残る root の帯には専用の定数 (例 MEM_BOOT_ROOT_*) と owner を作り、LEDGER_RF_PERMANENT を付ける。申告は bootinfo v3 から渡す。T6b の同梱域とは別に置き、票 TASK_T4_T6_MODULES の 261 行目付近に依存を 1 行書く。(確定の N3 はこれに置き換える。)
 - R-4 (P3): kernel が FAT から ROOT.ISO を 0x600000 へ読む案も比較表に 1 行足す (install 用の kernel が 2 回になるので落とす)。
 - R-5 (P3): HDD は bootinfo v2 のままで、配置の世代 (--layout-gen) も実機の HDD の配置も変わらない。
-- R-6 (P3): ramfs の上限 16 ファイル × 1KiB (fs/ramfs/ramfs.h:6-7) は FD 起動の /tmp (リダイレクト・エディタ) に足りない。PC-98 側の P3 で洗い出して上限を決め直す段を足す。
+- R-6 (P3): ramfs の上限 16 ファイル × 1KiB (fs/ramfs/ramfs.h) は FD 起動の /tmp (リダイレクト・エディタ) に足りない。PC-98 側の P3 で洗い出して上限を決め直す段を足す。
 - R-7 (P3): 実機の受入は「FD の作成と抜き差しはユーザー、シリアルでの判定はノートのセッション」。
 - R-8 (P3): ★は「x86 の vmkernel.lz4 や FD の像のバイト列が変わる段」だけに付ける。
 

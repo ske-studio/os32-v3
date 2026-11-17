@@ -21,7 +21,7 @@
 |D2|exec の深さ0は常駐・特権シェル扱い|kernel 親の深さ1を維持し、sh を USER として起動|
 |D3|`SHELL_AS_APP` は launch request・yield・poll を使う|拒否処理を残し、起動の核だけ同期 exec に選択|
 |D4|InputOps の初期値は空 provider|LAN 端末用の完全な InputOps を起動前に登録|
-|D5|端末 byte と sh のキー形式が異なる|platform で変換。ESC の処理箇所は `ui.c:770`|
+|D5|端末 byte と sh のキー形式が異なる|platform で変換。ESC の処理箇所は `ui.c` の `shell_run()`|
 |D6|`SHELL_AS_APP` だけでは PC-98 コマンドが残る|登録列と base 表を profile で選択|
 |D7|USER SDK だけでは stdio・可変引数出力が足りない|sh 専用 USER runtime と出力 adapter を組む|
 |D8|旧 SYS_LS callback は PPC USER で使えない|既存 `userland/lib/rt/ls.c` の window 列挙を流用|
@@ -114,7 +114,7 @@ CLI像 ：RAM root → pm_exec_boot → pm_cli_boot
 - `userland/ppc/nest.c` は USER から `exec_run("/bin/hello.bin")` を呼ぶ。
 - 直後に結果種別・コードを読み、stream に表示し、同じ子をもう一度起動する。
 - 親の局所値・USER の復帰位置が保たれ、2回とも子の結果が得られることを確認する。
-- `arch/ppc/exec_context.c:14–31` と `exec_launch.inc:324–336` の既存退避・復元を使う。
+- `arch/ppc/exec_context.c` の `arch_priv_save()` と `exec_launch.inc` の `exec_launch()` の既存退避・復元を使う。
 - arch の仕組みを新設する段ではなく、USER→USER の実動作を確かめる段とする。
 - 試験専用 root に nest を加え、既存 CLI 像の配布用 root は変更しない。
 - QEMU 受入の1行は「CLI → nest → hello → nest → hello → nest → CLI、2回とも EXITED/7」。
@@ -126,7 +126,7 @@ CLI像 ：RAM root → pm_exec_boot → pm_cli_boot
 - CPU 名を含まない `SH_LAUNCH_SYNC` 選択を設け、既定は現行の要求表経路とする。
 - `sh_launch.inc` の pipeline depth・redirect active と拒否表示を両経路で共有する。
 - 拒否を通過した後の核だけ、launch_req/poll または exec_run に分ける。
-- 同期経路の結果取得・分類は既存 `sh_exec.inc:89–113` の処理を共有する。
+- 同期経路の結果取得・分類は既存 `sh_exec.inc` の処理を共有する。
 - `exec_last_result` は exec_run 直後に読み、途中に別の KAPI 呼出しを挟まない。
 - 常駐版・要求表版・同期 USER 版で関数の二重定義が起きない選択にする。
 - WM、scheduler、要求表の新設は行わない。
@@ -156,7 +156,7 @@ CLI像 ：RAM root → pm_exec_boot → pm_cli_boot
 |kernel 自身の kprintf|既存の書式化 → ログ専用 provider → pm_log_write|
 
 - **P03 で fd1 の既定出力を接続する。console_write を stream とログへ二重投入しない。**
-- `kboot_console.c:18–22` の変更だけでは kernel kprintf も stream へ移るため、分離が必要。
+- `kboot_console.c` の変更だけでは kernel kprintf も stream へ移るため、分離が必要。
 - 第3像だけ `lib/kprintf.c` の TU 内の console_write 参照をログ専用関数へ結び替える。
 - その結び替えは make の当該 object 専用定義とし、共通 C ソースは変更しない。
 - kboot console の shell_print 系はログを維持し、kprintf の文字列・数値部分もログにそろえる。
@@ -182,7 +182,7 @@ CLI像 ：RAM root → pm_exec_boot → pm_cli_boot
 - 公開 KAPI の slot・型・世代は変更せず、不在群から戻す必須 slot は0本とする。
 - 共通 sh の登録列・runtime・clear・環境値は CPU 非依存の選択口にする。
 - 環境値は `SH_DEFAULT_PATH/HOME/SHELL` を使い、既定値を既存 `SYS_DEFAULT_*` にする。
-- `include/config.h:68–70` の無条件定義は再定義しない。PPC profile は SH 側だけ指定する。
+- `include/config.h` の無条件定義は再定義しない。PPC profile は SH 側だけ指定する。
 
 **6. 大きさの予算**
 
@@ -279,9 +279,9 @@ r1→r2 の変更の数 13 / 反論の数 0
 
 ## 確定 (2026-11-12、Opus 5.5 の第 2 回の条件付き確定を PM が反映)
 - N2 (P2): N01 のファイルに build/targets/ppc-powermac.mk (root に足す bin の変数と試験用の出力先) を加え、同じ mk を触る P03・B02 と直列にした (§7 の表)。
-- N3 (P3、PM 決定): fd1 の既定の出力を端末へ向ける結び替えは **fs/vfs_fd.c:528 の 1 か所 (fd1 の既定の出力) だけ**にする。console_write と kernel の kprintf はログのまま。PPC の第 3 像の build で fs/vfs_fd.o にだけ置き換えの名前を渡すか、platform の provider を介すかは P03 の実装で決める (kboot_accept の変異 build (build/targets/ppc-powermac.mk-104) でも同じ形で組まれること)。共通の C のソースは変えない。
+- N3 (P3、PM 決定): fd1 の既定の出力を端末へ向ける結び替えは **fs/vfs_fd.c (vfs_write_fd()) の 1 か所 (fd1 の既定の出力) だけ**にする。console_write と kernel の kprintf はログのまま。PPC の第 3 像の build で fs/vfs_fd.o にだけ置き換えの名前を渡すか、platform の provider を介すかは P03 の実装で決める (kboot_accept の変異 build (build/targets/ppc-powermac.mk-104) でも同じ形で組まれること)。共通の C のソースは変えない。
 - N4 (P3): N01 を前提にするのは S02・B01・B02 だけ。P01・P02・U01〜U03 は依存なしで並列に出せる (§7 の表を直した)。
-- N5 (P3): SH_LAUNCH_SYNC の選択は sh_exec.inc:89 の `#ifndef SHELL_AS_APP` と sh_launch.inc 末尾の sh_exec_result の 2 か所。既定値は userland/ppc/sh/profile.h (P01) が与え、shell.h には置かない (x86 は未定義 = 今の展開)。
+- N5 (P3): SH_LAUNCH_SYNC の選択は sh_exec.inc の `#ifndef SHELL_AS_APP` と sh_launch.inc 末尾の sh_exec_result の 2 か所。既定値は userland/ppc/sh/profile.h (P01) が与え、shell.h には置かない (x86 は未定義 = 今の展開)。
 - N6 (P3): 端末の接続の判定は、platform/powermac の中に「接続しているか」を返す小さな関数を置く (pm_term_state は STATE の message を組み立てる関数なので使わない)。P04 に含める。
 
 

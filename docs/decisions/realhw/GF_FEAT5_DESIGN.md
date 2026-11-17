@@ -27,14 +27,14 @@
 - Ra266 vmap確認: 指定refs・作業資料・OのROM decoder/host試験に実ROMのBIT P値を確認できるデータは見つからず、有無は未確認。`N/nvkm/subdev/bios/vmap.c:29–53`のBIT P v2+20hのLE32ポインタと版10/20hを実装時のinfoで出す（v1/ポインタ0は不在）。合成ROM試験を実機の根拠にしない。
 - 対象: OS32 / PC-9821 Ra266、PCI バス 0 の列挙で見つけた位置、10de:0221、chipset=4ah。実機を今回測定したという意味ではない。
 - O=`/home/hight/os32-v3/`、N=`/home/hight/os32-tmp/refs/geforce6200/nouveau/drivers/gpu/drm/nouveau/` (指定 c03c1a1)、E=`/home/hight/os32-tmp/refs/geforce6200/envytools/`。以下の file:line はこの取得物。
-- 票 `O/docs/tasks/realhw/TASK_GF_FEATURES.md`、比較 `O/docs/decisions/realhw/GF_FEATURE_COMPARE.md:52–55`、確定 F1=GF_FEAT1_DESIGN §2・3、F2=GF_FEAT2_DESIGN を前提とする。層3の窓/面台帳と層4の保存型を境界とし、容量は[共通合算表](GF_FEAT3_DESIGN.md#合算予算)に従う。
+- 票 `O/docs/tasks/realhw/TASK_GF_FEATURES.md`、比較 `O/docs/decisions/realhw/GF_FEATURE_COMPARE.md`、確定 F1=GF_FEAT1_DESIGN §2・3、F2=GF_FEAT2_DESIGN を前提とする。層3の窓/面台帳と層4の保存型を境界とし、容量は[共通合算表](GF_FEAT3_DESIGN.md#合算予算)に従う。
 - ユーザー決定: 「基本的にすべての機能が同じレベル（GUI以外）には用意されるべきです」「実際の動作確認は実装後のテストでもいいし実機でテストで動作チェックすればいい」。GUIから呼ばずカーネル試験入口まで作る。
 - GNU11、整数演算、kstring、番地/サイズの定数3層管理、P2V等の変換境界、[D1]〜[D4]を維持。MITのN/Eのみを実装資料としGPLのPCI/DRM/TTM実装を写さない。メーカーの詳細資料は指定資料内に無く、メーカー確認済みとはしない。
 
 | 実物との食い違い（4件、利用できると思い込みやすい境界） | 確認根拠と設計への反映 |
 |---|---|
-| D1 初期化PLLは動的変更関数ではない | `O/hwdev/gf/pll.c:6–15,27–51`、`kdebug/gfinit_pll/sequence.inc:25–51` はdevinit用。Nの動的列を§2・3に新設する。 |
-| D2 ROM decoderは汎用perf表/任意script実行器ではない | `O/kdebug/gfinit_decode.c:10–13,76–112`、`gfinit_decode/tables.inc:1–13` は登録済みspan。表解読を新設し、BIT Mのscriptは検証済みspanへ追加する。 |
+| D1 初期化PLLは動的変更関数ではない | `O/hwdev/gf/pll.c`、`kdebug/gfinit_pll/sequence.inc` の `gfinit_pll_sequence()` はdevinit用。Nの動的列を§2・3に新設する。 |
+| D2 ROM decoderは汎用perf表/任意script実行器ではない | `O/kdebug/gfinit_decode.c`、`gfinit_decode/tables.inc:1–13` は登録済みspan。表解読を新設し、BIT Mのscriptは検証済みspanへ追加する。 |
 | D3 refs欠落は解消（r1から訂正） | 追加された同じc03c1a1・MITのtherm/volt/gpioで§4・5を確定。clk上位の列も`N/nvkm/subdev/clk/base.c:159–215,266–305`に存在する。 |
 | D4 GFの終了/局所復元はOS suspendではない | 比較`:54`。Oのkernel・arch/x86/kernel・includeでsuspend/resume/ACPI/power_managementをgrepした結果はアプリ切替のみ。全ファイル名のACPI/APM/suspend/power/pm検索も該当なし。OS電源管理/サスペンド機構は確認範囲に無い。 |
 
@@ -73,7 +73,7 @@ int gf5_perf_select(struct gf5 *, u8 index); /* 表・fan・電圧・両clockを
 | read: 同`:39–94 read_pll_1/read_pll_2/read_clk`,`:97–114` | c040のcore[1:0]/shader[5:4]で3=4000の2段、2=4008の1段。memは4020。ref=27000kHz、段ごと整数除算後>>P、enable/M=0は0、未知muxは0と状態値を返す。 | 0を正常な計測周波数として報告しないESTATE |
 
 - PM決定: clockにはdrain_pauseを加えない。停止はram_prog区間だけ（tile/stateの固有の停止は別）。理由: OS32 の CPU と GPU の VRAM アクセスを self-refresh の区間から外すため。
-- `O/kdebug/gfinit_pll/parse.inc:1–43,solve.inc:8–60` を再用するが、devinit用`sequence`を呼ばない。mem用bias_p/max_pは既存`O/kdebug/gfinit_pll.h:73`に有り再用する。type04から既存parserのレジスタキーへの対応をadapterで行う。
+- `O/kdebug/gfinit_pll/parse.inc,solve.inc (gfinit_pll_solve())` を再用するが、devinit用`sequence`を呼ばない。mem用bias_p/max_pは既存`O/kdebug/gfinit_pll.h`に有り再用する。type04から既存parserのレジスタキーへの対応をadapterで行う。
 - 性能表: `N/nvkm/subdev/bios/perf.c:30–88 nvbios_perf_table/entry` のBIT P(v1/v2)+0、またはBMP>=25hの+94h。BIT系20h〜3fhはhdr=+1,cnt=+2,len=+3,snr=+4,ssz=+5、entry stride=len+snr*ssz。
 - 解読は同`:91–145 nvbios_perfEp`相当：12/13/14h、21/23/24h、25h、30/35hを版別に処理。NV4aの21/23/24hはshader=LE16(+6)*1000、core=shader+s8(+8)*1000、memory=LE16(+b)*2000、voltage=+5、fanspeed=+4（`bios/perf.c:111–125`）。25hはcore(+6),shader(+a),memory(+c)*1000。版をまたいで倍率を共通化しない。
 - APIのmem_khzはPLL実周波数。perf側の値とreadbackを同じ単位として照合し、DDR実効値を表示するなら別フィールドにする。表不在はENOTSUP、表長/範囲不正EBIOS、未知版ENOTSUP。境界検査はROM decoderと同じspan検査で行う。
@@ -266,14 +266,14 @@ void gf5_state_free(struct gf5 *, struct gf5_image *); /* 復旧/破棄後 */
 
 | 境目／持ち主 | 宣言段で凍結する追記 |
 |---|---|
-| ROM／A0・B0・B2・C1・C2 | `service.c:29`→`devinit.c:155–163`でROM/programは解放される。gf5の表viewをscratchへ残さない。production所有の必要ROM/spanとdecode済みBIT M programを動的確保し、devinit解放前に取得、F5停止・snapshot利用終了まで保持する。restoreのdevinit用一時programとは別寿命。新`hwdev/gf/feature5_rom.c`をC2から独立した段に割り当てる。 |
+| ROM／A0・B0・B2・C1・C2 | `service.c:29`→`devinit.c`でROM/programは解放される。gf5の表viewをscratchへ残さない。production所有の必要ROM/spanとdecode済みBIT M programを動的確保し、devinit解放前に取得、F5停止・snapshot利用終了まで保持する。restoreのdevinit用一時programとは別寿命。新`hwdev/gf/feature5_rom.c`をC2から独立した段に割り当てる。 |
 | 時計／A0・B3 | F2/F4はsys_time_nowの下位u32 µsで絶対期限、差はi32比較。F5 fan期限は同じsys_time_nowのhi/loからu64 µsを構成し、u32を単純拡張しない。5ms等は既存短waitを刻んで待つ。時計失敗は元rcを保存しEIO。 |
-| 前景fan／C2を分割 | `geforce_tick.c:14–16`・`foundation.c:106`はIRQ/tickのF1 polling口で、fanの前景入口ではない。新`hwdev/gf/feature5_service.c`がgf5_fan_tickを所有し、既存前景の協調地点・診断待機から型付きpollを呼ぶ結線を別段にする。**PM 決定（7）**: PMがF5 A0の宣言レビューで具体的呼出し箇所を決め、凍結するまでC2は出さない。IRQからfan処理・alloc・待ちを実行しない。 |
+| 前景fan／C2を分割 | `geforce_tick.c`・`foundation.c`はIRQ/tickのF1 polling口で、fanの前景入口ではない。新`hwdev/gf/feature5_service.c`がgf5_fan_tickを所有し、既存前景の協調地点・診断待機から型付きpollを呼ぶ結線を別段にする。**PM 決定（7）**: PMがF5 A0の宣言レビューで具体的呼出し箇所を決め、凍結するまでC2は出さない。IRQからfan処理・alloc・待ちを実行しない。 |
 | RAM/tile停止／A0・B2・B5 | drain_pauseは受付閉→dlでfence完了→F2独自2秒のFIFO pause→GR idle。unpauseは復帰失敗を返すint型としてF5 A0で凍結する。RAM区間だけCPU窓/present/描画/flipの受付を閉じる。clock単体にpauseを追加しない。現行referenceはMMIO読出し（fence.c:57）、IRQにはVRAM fence読出しが無いので存在しない処理への抑止hookは作らない。 |
 | save/restore／B6・C2 | snapshot所有者は呼出元、gf5は処理中借用し失敗時もfreeしない。停止前に全extent・metadataを確保。saveは受付閉→drain→表示保存/blank→CPU窓で退避→F3無効化→F2/F1停止。restoreはBM先行→必要devinit→F1/F2→F3 objects→性能/thermal/tile→同一offへ画像→F4論理状態→IRQ→受付公開。途中失敗はFAULT、未完了ticketは再送しない。 |
 | tileと309e／B5 | N/nvkm/subdev/fb/nv44.c:30–46とengine/gr/nv44.c:31–46のPFB→PGRAPH列を一停止区間で実施。309eは既にF2許可class（command.h）、PFB tileとは独立。層3設計に無いswizzled転送APIをB5の依存として増設しない。 |
 | 配置・試験環境 | B0 perf/B1 clock/B2 ramclock/B3 therm/B4 volt/B5 tile/B6 state・ROM/前景adapterはゲストgeforce.mod＋各libcなしhost試験。C0はB1の直列追記、C1 decoderは共有ゲスト部品＋既存host試験。A2/C4はゲストkdebug、A1はhost土台、A3はhost Python登録。新F5部品をhwdev.modに混入させない。 |
-| 予算 | mod text/rodata18＋BSS/alignment2＝20KiBに、C1共有decoder/tables.incの0〜4KiBを別加算（geforce-module.mk:18）。snapshot画像は動的RAM（例4.70MiB、tile例5.02MiB）でmod BSS外、固定上限は追加しない。常駐ROM/span・decode済みprogramの動的RAM量はC2報告で別記し、20KiBに含むと偽らない。 |
+| 予算 | mod text/rodata18＋BSS/alignment2＝20KiBに、C1共有decoder/tables.incの0〜4KiBを別加算（geforce-module.mk）。snapshot画像は動的RAM（例4.70MiB、tile例5.02MiB）でmod BSS外、固定上限は追加しない。常駐ROM/span・decode済みprogramの動的RAM量はC2報告で別記し、20KiBに含むと偽らない。 |
 
 共通の[合算予算](GF_FEAT3_DESIGN.md#合算予算)・[共有ファイルの衝突表と所有段](GF_FEAT3_DESIGN.md#共有ファイルの衝突表所有段)・[依存と並列発注](GF_FEAT3_DESIGN.md#依存と並列発注)はGF_FEAT3を正とする。
 
@@ -288,10 +288,10 @@ F5 A0はF2停止口とF4保存型の凍結後、A1/A2はF5 A0統合後に発注�
 本追記r2が競合する旧記述に優先する。ここでのD1〜D4は層4実物との再照合の番号で、本文§1の同名番号とは別。O=`/home/hight/os32-v3/`、D=`O/hwdev/gf/display/`、K=`O/drivers/video/geforce/`、F4=`O/docs/decisions/realhw/GF_FEAT4_DESIGN.md`。Nは本文§1の指定MIT取得物。以下の新署名・結線は実装済みという意味ではない。
 
 ### D1〜D4の訂正と従うカード
-- **D1** 旧「`hwdev/gf/service.c:29`起点でdevinit解放前にROMを取得」→ 正：F4通常startは`D/service.c:191,212,216`の`svc_rom`でacquire→run→release、restartの一時取得は`D/recover.c:286`、解放実体は`O/hwdev/gf/devinit.c:164` → **A0、C2-ROM、C2-display-service、B0/B2/B6**。初回svc_romでgf_display_baseline成功後・release前にC2-display-serviceがBIT M専用programをprepareし、完成品とROM全体をF5へ複製する。元main programは流用しない。F5側失敗は部分確保を解放し、元scratchのreleaseも実施する。
-- **D2** 旧「decode済みconst M programを既存単一script口に渡して実行」→ 正：`O/hwdev/gf/runner.c:202,214`はwork.count=0からBIT I参照で再decodeし即実行、`O/hwdev/gf/internal.h:117`のconst口はmain用run_oneのみ → **A0-init、C1-runner、C2-ROM、B2**。下記prepare/executeへ既存処理を共有分離し、RAM切替前の検証と切替後の実行を分ける。別interpreter・main全体の再実行は作らない。
-- **D3** 旧「video境界は既存0/-1」→ 正：`O/hwdev/gf/service.c:376`と`D/quiesce.c:89`は0/下位負rcを返す → **A0、C2-links、C2-backend、B6、C4**。既存videoの負rcを一律-1に潰さない。F5公開操作の出口は共通gf5_rc_mapで分類しlast_rcに、変換前の負rcをsource_rcに保持する。stop/restart adapter自体は下位負rcを保持し、OFFでも負rcを成功に丸めない。
-- **D4** 旧「owner初期化前のbindは必ずEINVAL」→ 正：`D/service.c:49`のgetter自身がNULL ownerを常駐ctxへ補い、`O/hwdev/gf/service.c:70`のbindは受入れ得る → **C2-body、C2-service、A1/C4結合試験**。`K/geforce_body.c:51`のgf3_service_bind→gf4_service_init→gf3_service_owner_bindを維持する理由は初期化済みctxへの結線であり、逆順EINVALを受入条件にしない。
+- **D1** 旧「`hwdev/gf/service.c`起点でdevinit解放前にROMを取得」→ 正：F4通常startは`D/service.c:191,212,216`の`svc_rom`でacquire→run→release、restartの一時取得は`D/recover.c:286`、解放実体は`O/hwdev/gf/devinit.c` → **A0、C2-ROM、C2-display-service、B0/B2/B6**。初回svc_romでgf_display_baseline成功後・release前にC2-display-serviceがBIT M専用programをprepareし、完成品とROM全体をF5へ複製する。元main programは流用しない。F5側失敗は部分確保を解放し、元scratchのreleaseも実施する。
+- **D2** 旧「decode済みconst M programを既存単一script口に渡して実行」→ 正：`O/hwdev/gf/runner.c`はwork.count=0からBIT I参照で再decodeし即実行、`O/hwdev/gf/internal.h`のconst口はmain用run_oneのみ → **A0-init、C1-runner、C2-ROM、B2**。下記prepare/executeへ既存処理を共有分離し、RAM切替前の検証と切替後の実行を分ける。別interpreter・main全体の再実行は作らない。
+- **D3** 旧「video境界は既存0/-1」→ 正：`O/hwdev/gf/service.c`と`D/quiesce.c:89`は0/下位負rcを返す → **A0、C2-links、C2-backend、B6、C4**。既存videoの負rcを一律-1に潰さない。F5公開操作の出口は共通gf5_rc_mapで分類しlast_rcに、変換前の負rcをsource_rcに保持する。stop/restart adapter自体は下位負rcを保持し、OFFでも負rcを成功に丸めない。
+- **D4** 旧「owner初期化前のbindは必ずEINVAL」→ 正：`D/service.c:49`のgetter自身がNULL ownerを常駐ctxへ補い、`O/hwdev/gf/service.c`のbindは受入れ得る → **C2-body、C2-service、A1/C4結合試験**。`K/geforce_body.c:51`のgf3_service_bind→gf4_service_init→gf3_service_owner_bindを維持する理由は初期化済みctxへの結線であり、逆順EINVALを受入条件にしない。
 
 ### GF_FEAT4_DESIGNへの訂正文（F4:729の括弧内を置換、反映済み）
 「owner表のgetterはowner未設定なら常駐ctxを補うため、逆順bindが必ずEINVALになるわけではない。gf3_service_bind→gf4_service_init→gf3_service_owner_bindの順は、初期化済みctx・links・execへの結線のため維持する。」linksは非const、execはconstの既存getterを使い、exec.owner→links.owner→ctxの所有を別コピーへ置換しない（`D/api.h:141`、`D/links.c:316`）。
@@ -356,7 +356,7 @@ i32 gf5_link_clock64(void *owner, u64 *us);
 | GF2_ETIME / GF4_ETIME / GF_SCRIPT_ETIME | GF5_ETIME |
 | GF1_EPCI / GF1_EMAP / GF1_EIRQ / GF1_ESTOP / GF1_EIO / GF2_EMAP / GF2_EIO / GF2_EFAULT / GF2_EEXIST / GF2_ECLASS / GF2_ESTOP / GF3_EFORMAT / GF4_EFORMAT / GF4_EPLL / GF4_EDDC / GF4_EEDID / GF_SCRIPT_EIO / 未知値 | GF5_EIO |
 - drain_pauseはadmission(false)→gf2_fence_emit/wait（元dl）→gf2_fifo_pause（既存独自2秒）→GR idle。GR idleはC2-links内の非公開helperが既存ioで00400700を読み、NV40のSYNC_STALL=00004000を除いたbitsの消滅を待つ（`N/nvkm/engine/gr/nv04.c:1211`、`gr/regs.h:160`）。手本の2秒と外側dlで打切り、架空の公開idle APIや追加lock/監視を作らない。既存F2の内側待ちが外側dl内に必ず収まるとは主張しない。
-- unpauseはold_rc退避→ch->last_rc=0→void gf2_fifo_resume→last_rc/state/fault照合。新失敗は保持して負rc、無ければold_rc復元・戻り0。失敗時はF5 FAULT・受付閉で、F2が必ずFAULT化するとは仮定しない（`O/hwdev/gf/fifo.c:207,232`）。clock/volt/fan単独には停止を広げない。
+- unpauseはold_rc退避→ch->last_rc=0→void gf2_fifo_resume→last_rc/state/fault照合。新失敗は保持して負rc、無ければold_rc復元・戻り0。失敗時はF5 FAULT・受付閉で、F2が必ずFAULT化するとは仮定しない（`O/hwdev/gf/fifo.c`）。clock/volt/fan単独には停止を広げない。
 - B6は全生存予約をgf_vram_nextで列挙し1予約1extent、node/owner/ID/generation/offを保持、restoreはmatchして再reserveしない。全確保後・破壊前にcallerへimageを渡しgf5は借用、失敗でも勝手にfreeしない。tripは深いコピー、image.displayはgf4_saved v2。metadata/trip/extent/画像はsizeofとu64合計で計上、固定snapshot上限なし（`D/api.h:13,21,33`、F4:376）。
 - saveは直接F4 saveの受付閉→fence→views_close→hide/blank/IRQ抑止後に退避窓を借りる。copy_extentはboot表示mapとV0の境界で分割し、書込み排出→unmap成功後にsuspendへ進む。失敗時は窓/予約/像を保持、F2 OFF確認前にinvalidateしない。OFF＋負rcもB6成功に読み替えない（`D/save.c:119,138,149`、`D/recover.c:204,211`）。
 - restoreは予約保持restart→性能/thermal/tile→画像→F4 restore/IRQ→全成功後だけsaved_closed解除→admission(true)。低水準restoreは非公開でholdを整理し旧frontへ戻す（`D/save.c:257,321,335`）。F2 startのepoch更新を二重加算せず旧ticketを再送しない。scan hookはhead0・形式別、INDEX8 hookを16/32bitへ無条件bindしない。
@@ -405,7 +405,7 @@ i32 gf5_link_clock64(void *owner, u64 *us);
 - **PM 決定（10）**：include/types.hには足さない。feature5.hに`typedef unsigned long long u64; typedef long long i64;`を置く。既存modes.c・gf4_display_fake.hと同形で、gnu11での同一typedef再宣言を用いる。
 - 前景pollは`gf5_service_poll(g)`がclock64→gf5_fan_tick、busy/非RUNなら無処理。clock64はsys_time_nowのhi/loを合成する。上表のHAL関数の操作前と診断待ちの協調点で呼ぶ。int入口は負rcを伝播、void presentは記録して既存geforce_fail経路、診断はstage/last_rc/source_rcを報告する。module内HALは両bindで渡されたproductionの同一gf5を借用（static productionを直接参照しない）、kernel診断はaccessor経由。IRQ/geforce_tick/idle hookには結線せず、呼出しが無い間AUTO停止を維持する（`K/backend_geforce.c:445,491`、`K/gf_hook.c:67,81`）。
 - gf5_test_opsはF4:369の全公開関数＋perf_count/get・tile_find・service_pollを同名欄の`__typeof__(&gf5_関数名)`で宣言し`i32 (*last_rc)(struct gf5 *)`を足す。SAVING/RESTORINGはslot=NULL、SAVEDはrestore/free/last_rcのみ、FAULTでも資源保持中は管理口を保持。freeは借用を外して画像/trip/metadataを解放し、FAULTを理由とする新しい拒否条件を作らない。F3/F4描画slotは最終RUNまで閉鎖する。
-- 予算：GEFORCEはimage/mem各160KiB・load_span208KiB、HWDEVは各256KiB・320KiB（`O/tools/module_schema.py:176,184`）。F5 20KiB＋共有decoder 0〜4KiB、ROM/program・snapshot動的RAMは別計上。実装後のKDEBUG両像/import数/sizeof、全extent/V0・BIT M結合、実ROM表と実機挙動は未検証。ownerless F3 fixtureや合成ROMをその証明にしない。
+- 予算：GEFORCEはimage/mem各160KiB・load_span208KiB、HWDEVは各256KiB・320KiB（`O/tools/module_schema.py`）。F5 20KiB＋共有decoder 0〜4KiB、ROM/program・snapshot動的RAMは別計上。実装後のKDEBUG両像/import数/sizeof、全extent/V0・BIT M結合、実ROM表と実機挙動は未検証。ownerless F3 fixtureや合成ROMをその証明にしない。
 - 設計の未決：0件。本追記は静的照合に基づく本文案で、ビルド・試験・実機受入の成功を主張しない。
 
 ## r1→r2
@@ -506,10 +506,10 @@ CRC 対象は診断所有の一定内容の領域とし、表示更新による�
 本追記ではビルド・試験・変異・実機は未実施。設計のみのため preflight（依頼にbase SHAなし）も未実施。
 
 ### 確定 (2026-11-07、Opus 第 1 回、PM が反映)
-- P2 §3: 復元の後の VRAM の CRC は extent の書き戻し (state.c:279-281) で B の save の時点の内容に上書きされるので、restore B の RAM の再設定の確かめにならない。RAM の判定は読みの周波数と、変更前→変更後の CRC (perf-select の RAM の再設定の確かめ) で行う。
-- P2 §2: boot_target の wrapper は service_state_restore (feature5_service.c:250) と同じく busy を立てず、service_check(g,true) の後に本体を呼ぶだけ。
+- P2 §3: 復元の後の VRAM の CRC は extent の書き戻し (state.c) で B の save の時点の内容に上書きされるので、restore B の RAM の再設定の確かめにならない。RAM の判定は読みの周波数と、変更前→変更後の CRC (perf-select の RAM の再設定の確かめ) で行う。
+- P2 §2: boot_target の wrapper は service_state_restore (feature5_service.c) と同じく busy を立てず、service_check(g,true) の後に本体を呼ぶだけ。
 - P2 §1: 「別の性能」は perf_count/perf_get を順に見て、clock が変更前の clock_read と違う最初の番号。無ければ「未検証」で止める。perf-select が上限 (thermal) で EBUSY のときも「未検証」として記録して止める。
 - P2 §4: gf5_test.c の像の枠を 2 個 (a[0]=0:A / 1:B)。SAVE・RESTORE・FREE は枠を引数に取る。GF5T_BOOT_TARGET を stage の末尾に足す。手順は台本が 1 段ずつ回す。
 - P3 §2: A.fan_available=false なら B.fan_available=false にするだけで、B.fan と trip には触れない。trip の数の照合は A.fan_available=true のときだけ。
 - P3 §2: complete と version は A と B の両方を見る。boot==dst は EINVAL。
-- P3 §2: feature5.h:300 の「SAVED: only restore/free/last_rc allowed」の注記に boot_target を加える (feature5.h の段で)。
+- P3 §2: feature5.h の「SAVED: only restore/free/last_rc allowed」の注記に boot_target を加える (feature5.h の段で)。

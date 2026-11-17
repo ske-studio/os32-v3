@@ -97,13 +97,13 @@ u32 kst_exec_tramp_user(void); u32 kst_exec_kapi_layout(void);
 
 実際のRECはBEGIN/END・内部MMIO・cleanupも含め、manifestの全分岐・反復展開と各フィールド最大桁数から最大送信バイト数Bを計算する。UARTの実設定bits/frameで`T_wire=ceil(B×bits/frame/9600)`を求め、有限の送信待ち余裕を加えたT_logをtrial_beginの予算に渡す。kdebug_call内だけを数える総時間上限=60秒+T_log（PAUSEDの承認待ちは除外）、実測送信時間だけを60秒の実行予算から除外し、T_log超過はLOG_FAIL。待ち5秒は実行予算内。事前に算定不能・桁溢れ・recoverが総予算を受理しない場合は書く前に拒否する。
 
-REC予算は転送/比較の計2組4行（480行ずつの処理は内部反復）・DAC768アクセス・全レジスタ操作/待ち/失敗分岐の最悪行数から開始前に算定し、既存gf_budgetのnode/arg式へ反復分を加える（`kdebug/gfinit.c:259–295`）。trial全体の送信除外60秒・PAUSED積算外は維持。
+REC予算は転送/比較の計2組4行（480行ずつの処理は内部反復）・DAC768アクセス・全レジスタ操作/待ち/失敗分岐の最悪行数から開始前に算定し、既存gf_budgetのnode/arg式へ反復分を加える（`kdebug/gfinit.c`）。trial全体の送信除外60秒・PAUSED積算外は維持。
 
 > [要確認] GF_STAGES の C 実行は定数期限へ移行している。この旧 C 送信予算式は現行の C-only には適用されない。
 
-5 回の読取りに新しい時間の上限は作らない。既存の verify の読取り (kdebug/recover.c・943-956) と同じく、送信の時間は tx_ticks、読取りの時間は試行の spent に数え (同:312-338・808-818)、期限の検査 (同:1168-1183) で超えたら REC_TIMEOUT。trial_limit (60 秒、recover_profile.c:86-88) は変えない。
+5 回の読取りに新しい時間の上限は作らない。既存の verify の読取り (kdebug/recover.c) と同じく、送信の時間は tx_ticks、読取りの時間は試行の spent に数え (同・808-818)、期限の検査 (同) で超えたら REC_TIMEOUT。trial_limit (60 秒、recover_profile.c) は変えない。
 
-- 予算: 増える 10 行・最大 3850B は RUNNING だけ。B'=B+3850 で log_limit と transport.max_polls を算出し直す (gfinit.c:273-288)。cleanup の restore_limit・P/S の予約・diag/final は変えない。
+- 予算: 増える 10 行・最大 3850B は RUNNING だけ。B'=B+3850 で log_limit と transport.max_polls を算出し直す (gfinit.c)。cleanup の restore_limit・P/S の予約・diag/final は変えない。
 
 - GFの送信枠は不変planの全node・READ引数と最大REC行長から両辺を含む上界をchecked算出し、実UARTの8N1速度でwire時間の2倍＋3秒を有限上限にする；送信中の実tickだけを60秒の実行枠から除外し、PAUSEDを双方から除外
 
@@ -130,7 +130,7 @@ struct rec_tx_diag {                  /* 全て32bit、48 B。共有 recover に
 
 - 展開関数はrecover_gf.cで定義し、新規recover_gf_expand.hに宣言する。このヘッダはgfinit*.hからincludeしない。
 
-- gen_hwdev_contract.py:97–101の傘はrecover.h/recover_gf.h/gfinit*.h。新ヘッダはgfinit.cとhost試験からのみ読む。
+- gen_hwdev_contract.pyの傘はrecover.h/recover_gf.h/gfinit*.h。新ヘッダはgfinit.cとhost試験からのみ読む。
 
 ```c
 /* recover_gf_expand.h：既存型の前方宣言だけ、契約の傘には入れない。 */

@@ -52,7 +52,7 @@
 | `mtar_finalize` → `write_null_bytes(1024)` | **1B × 1024** | 512B × 2 |
 | 合計 | **1523 回** | **5 回** |
 
-`write_null_bytes()` (microtar.c:111) は `for (i = 0; i < n; i++) twrite(tar, &nul, 1);`
+`write_null_bytes()` (microtar.c) は `for (i = 0; i < n; i++) twrite(tar, &nul, 1);`
 — 1 バイトずつ書く。後方 `lseek` は create 経路には出ない (`mtar_seek(last_header)` は
 read 側)。`lseek` 自体は `fs/vfs_fd.c` の `vfs_seek` が `VfsFile.offset` を
 書き換えるだけなので **0 セクタ** (ケース P4 で表明)。

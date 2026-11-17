@@ -9,12 +9,12 @@
 
 - 子の終了後に親ヒープを初期化し直すと、先頭のブロックヘッダが上書きされる。
   `exec/exec.c` は `exec_heap_restore_state` を使い、ヒープの中身を保つ
-  (`exec/exec_heap.c:237`)。復帰に `exec_heap_init_at` を使わない。
+  (`exec/exec_heap.c`)。復帰に `exec_heap_init_at` を使わない。
   親子の実行文脈は `tools/tests/test_exec_r1.py` で確認する。
 
 - newlib の sbrk と exec_heap が同じ領域から伸びると互いの割当を上書きする。
   常駐シェルは画像と sbrk の上限を exec_heap の開始位置で区切る
-  (`exec/exec.c`, `include/memmap.h:292`)。境界は定数を参照する。
+  (`exec/exec.c`, `include/memmap.h`)。境界は定数を参照する。
   メモリ配置の回帰は `make check-memory-host` で検査する。
 
 ## 内部設計と契約 (D1)

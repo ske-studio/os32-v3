@@ -599,7 +599,7 @@ FD 起動の辞書なしは `SQLITE_ONLY` とし、recover-settings のため `d
 - **1 group = 1 接続 = 1 回の open**。開くのは `os32_sqlite_group_open` だけで、URI (`SQLITE_OPEN_URI`・`file:`) による VFS の差し替えは SQLite に渡す前に断る。default VFS からの所属無しの file open は fail-closed (`SQLITE_CANTOPEN`)。main / journal / 一時ファイルなど、実際に開いた FD は全部その group に属し、open の途中 (OPENING) から所属する。
 - SQLITE の FD は通常の `vfs_close`・`vfs_close_owned`・`vfs_fd_set_protect` では閉じない・外さない。閉じるのは xClose の lease 経由だけ。
 - `db_*` (KAPI) は EXEC group を呼び手の owner で取り、`exec_cleanup_owned_resources` (`db_cleanup_owned`) はその owner の EXEC group だけを閉じる。FEP・settings など常駐側は RESIDENT group を使い、アプリの終了で触られない。
-- `os32_sqlite_group_finish` が FREE に戻すのは「`sqlite3_close` OK・その group の FD が 0・xClose / lease の sticky な失敗無し」のときだけで、どれかが外れたら QUARANTINED にして再起動まで残す。KAPI の `db_close` では未 commit の ROLLBACK の失敗も QUARANTINED にする。`sqlite3_finalize` が評価エラー (制約違反など) を返しても statement は消えているので、それだけでは隔離しない (エラーは `db_last_error` に残り、close と回収が済めば FREE、`kapi/kapi_db.c`・`kernel/ime/ime_dict.c:428`)。RESIDENT のいずれかが QUARANTINED の間は RESIDENT の新しい acquire を `SQLITE_BUSY` で断る (残る slot を借りて標準起動を続けない)。
+- `os32_sqlite_group_finish` が FREE に戻すのは「`sqlite3_close` OK・その group の FD が 0・xClose / lease の sticky な失敗無し」のときだけで、どれかが外れたら QUARANTINED にして再起動まで残す。KAPI の `db_close` では未 commit の ROLLBACK の失敗も QUARANTINED にする。`sqlite3_finalize` が評価エラー (制約違反など) を返しても statement は消えているので、それだけでは隔離しない (エラーは `db_last_error` に残り、close と回収が済めば FREE、`kapi/kapi_db.c`・`kernel/ime/ime_dict.c`)。RESIDENT のいずれかが QUARANTINED の間は RESIDENT の新しい acquire を `SQLITE_BUSY` で断る (残る slot を借りて標準起動を続けない)。
 - 起動時は settings が RESIDENT 1 本を acquire → open (RO) → close → finish で返してから FEP を始める。FEP は辞書 RO と学習 RW に RESIDENT 2 本を使う (学習無効時は辞書の 1 本)。3 本目は切り替え時の一時 probe に使う (`kernel/ime/ime_dict.c`)。
 
 | Offset | フィールド | プロトタイプ |
@@ -863,7 +863,7 @@ v46 はそれを**カーネル内の 8KB のリング (シンク)** に溜め、
   syscall 出口の `ring3_abort_check()` でアプリを畳む (`exec/appslot.c`)。
   `gfx_init` は `void` なので戻り値では知らせられない。CUI 中は宣言を要求しない。
 - 非シェルの外部プログラムは CPL=3 で動く。撤去済みの `OS32X_FLAG_FORCE_CPL0`
-  は既知フラグに含まれず、入口で拒否される (`exec/os32x_hdr.c:6`)。
+  は既知フラグに含まれず、入口で拒否される (`exec/os32x_hdr.c` の `os32x_layout_check()`)。
 - 低位 VRAM は supervisor 写像で、CPL=3 からの直接書き込みは保護違反になる。
   描画は KAPI または授権された lease 経由で行う
   ([09_exec.md](09_exec.md)「Ring3 の USER 写像」)。

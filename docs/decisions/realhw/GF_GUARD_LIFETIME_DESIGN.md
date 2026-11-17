@@ -29,12 +29,12 @@ r1→r2 の変更
 
 | # | 前提との食い違い（実コード） | この追記の処置 |
 |---|---|---|
-| 1 | F2 §4の部分extent所有に対し `mm/pgalloc.h:174` は単一区間。`instmem_map.c:15`（以下 hwdev/gf/）はPTEだけを開く。`mm/paging.c:550-560` は台帳外presentを拒否 | 静的区間＋厳密な動的区間集合を監査 |
-| 2 | F4 A3-case `GF_FEAT4_DESIGN.md:577` は成功復元後だけrelease。`kdebug/gf_display_test.c:843-865` は復元失敗後もshutdown、`display/service.c:467` はreadyを落とす。`display/save.c:72,377` は以後の復元を拒否 | 停止確認後の終端破棄を別経路化（§8決定）。-411の直接原因は `gf_display_test.c:845,866` の残存 `display_session.valid/display_cui_owner` |
-| 3 | A08: `tile.c:132-142` はpitch非ゼロだけ。X`nv_accel_common.c:94-100` のNV4x生成制約を満たさない値が通る | 生成範囲の境界検査 |
-| 4 | A09: `vram_view.c:62-77` は借用なしに予約解除。viewは`:144-159` で予約を見つけてもkeyを保存しない | 中央の借用記録を解除条件へ |
-| 5 | U09: `gr.c:78-92` は既存12slotを転記するが `tile.c:124-125` の空き判定はsoftwareだけ | devinit後・gf2_start前に全12枠ゼロprog |
-| 6 | `tile.c:99-117` は全成功時だけtile_liveを立てる。途中write/unpause失敗後、実際に有効かもしれないtileの借用が残らない | 書込み前に旧/新両借用、失敗はUNKNOWNで保持 |
+| 1 | F2 §4の部分extent所有に対し `mm/pgalloc.h` は単一区間。`instmem_map.c`（以下 hwdev/gf/）はPTEだけを開く。`mm/paging.c` は台帳外presentを拒否 | 静的区間＋厳密な動的区間集合を監査 |
+| 2 | F4 A3-case `GF_FEAT4_DESIGN.md:577` は成功復元後だけrelease。`kdebug/gf_display_test.c` は復元失敗後もshutdown、`display/service.c:467` はreadyを落とす。`display/save.c:72,377` は以後の復元を拒否 | 停止確認後の終端破棄を別経路化（§8決定）。-411の直接原因は `gf_display_test.c` の残存 `display_session.valid/display_cui_owner` |
+| 3 | A08: `tile.c` はpitch非ゼロだけ。X`nv_accel_common.c:94-100` のNV4x生成制約を満たさない値が通る | 生成範囲の境界検査 |
+| 4 | A09: `vram_view.c` は借用なしに予約解除。viewは で予約を見つけてもkeyを保存しない | 中央の借用記録を解除条件へ |
+| 5 | U09: `gr.c` は既存12slotを転記するが `tile.c` の空き判定はsoftwareだけ | devinit後・gf2_start前に全12枠ゼロprog |
+| 6 | `tile.c` は全成功時だけtile_liveを立てる。途中write/unpause失敗後、実際に有効かもしれないtileの借用が残らない | 書込み前に旧/新両借用、失敗はUNKNOWNで保持 |
 
 - 材料: `/home/hight/os32-tmp/run/gf-cui/report.md:25-40`、`/home/hight/os32-tmp/run/guard-gf/report.md:29-30,89,110-111`。
 - 欠け2（実機clock/-509の原因）は対象外。今回で解消したと扱わない。
@@ -53,12 +53,12 @@ int paging_device_unmap(u32 owner, u32 rid, u32 first, u32 end);
 
 | 手順 | 所有・検査・失敗 | 手本と差分 |
 |---|---|---|
-| 起動 | BAR0とDISPLAYは既存static区間。BAR2/tailは共有PT準備とdecode予約だけ。資源rid/ownerはkernel台帳が所有 | O`drivers/video/geforce/geforce_platform.c:56-77`。N`nvkm/subdev/instmem/nv40.c:238-253` のmapを起動予約と動的mapへ分割するOS32既存方式 |
+| 起動 | BAR0とDISPLAYは既存static区間。BAR2/tailは共有PT準備とdecode予約だけ。資源rid/ownerはkernel台帳が所有 | O`drivers/video/geforce/geforce_platform.c`。N`nvkm/subdev/instmem/nv40.c:238-253` のmapを起動予約と動的mapへ分割するOS32既存方式 |
 | 開く前 | kernel内固定配列64件（1024B）。空き・device owner・regionのres_mask・decode内・UC・全共有PT・全PTE NPを検査。静的/動的区間の重複拒否、隣接は別件。容量超過は変更なし | N`nouveau_bo.c:669-680` のBO単位map。差分: TTMを用いず有限台帳。64件は上限であり足りない時に監査を緩めない |
-| 開く | irq保存→全前提再確認→PTE全頁書込み→TLB flush→台帳登録→irq復帰。成功後だけout公開。commit区間に確保・callback・yield・失敗点を置かない | O`mm/paging_map.inc:107-120` の準備後commitを専用APIへ。差分: 共有PTの事前確保を必須化して全成否を保証 |
-| 監査 | static∪dynamic内だけpresent必須、その外はNP必須。従来の恒等物理・U/S・RW・cache検査を維持。map区間を広げない。surfaceの照会も同じhelperを使用 | O`mm/paging.c:550-560`、`mm/pgalloc_surface.inc:43-44`。OS32固有監査で手本に同等口なし |
+| 開く | irq保存→全前提再確認→PTE全頁書込み→TLB flush→台帳登録→irq復帰。成功後だけout公開。commit区間に確保・callback・yield・失敗点を置かない | O`mm/paging_map.inc` の準備後commitを専用APIへ。差分: 共有PTの事前確保を必須化して全成否を保証 |
+| 監査 | static∪dynamic内だけpresent必須、その外はNP必須。従来の恒等物理・U/S・RW・cache検査を維持。map区間を広げない。surfaceの照会も同じhelperを使用 | O`mm/paging.c`、`mm/pgalloc_surface.inc`。OS32固有監査で手本に同等口なし |
 | 閉じる | owner/rid/開始/末尾が完全一致する1件だけ。全頁と共有PTを先に照合→irq区間で全NP→TLB flush→登録削除。失敗はPTE・登録・呼出し側所有を全部保持 | N`nouveau_bo.c:683-689` の対称unmap。差分: 下位の部分成功を許さず再試行可能にする |
-| 呼出し側 | `instmem_map.c` がgeforce予約から一意のrid/ownerを解決して専用APIを呼ぶ。BAR2/push/各viewで同じ経路。失敗は既存GF1/GF2_EMAPへ変換、詳細段/元rc記録 | O`instmem_map.c:8-29`。既存map_ops署名は維持し、kernel固定配列で追跡するため借用nodeのABI追加不要 |
+| 呼出し側 | `instmem_map.c` がgeforce予約から一意のrid/ownerを解決して専用APIを呼ぶ。BAR2/push/各viewで同じ経路。失敗は既存GF1/GF2_EMAPへ変換、詳細段/元rc記録 | O`instmem_map.c`。既存map_ops署名は維持し、kernel固定配列で追跡するため借用nodeのABI追加不要 |
 
 - platformは `geforce_platform.c:48` の局所ids[]を予約成功後に固定保存し、有効フラグで公開する。`geforce_module.h`に `int geforce_resource_lookup(u32 base, u32 bytes, u32 *owner, u32 *rid);`（0成功/-1失敗）を追加。完全包含する予約済みBARを一意に照合し、overflow/未予約/複数候補は失敗・out不変。ownerはLEDGER_OWNER_GFX。instmem_map.cのmap/unmapはともにこの照会を使う。静的DISPLAY窓との重複はpaging側が拒否する。手本のresource解決 N`nvkm/subdev/instmem/nv40.c:238-253`をOS32台帳へ結ぶ内部口で、KAPI追加ではない。
 - `ledger_resource_set_map` は静的区間だけを扱う。動的窓生存中の静的区間変更・該当owner/資源の破棄は拒否。通常の旧利用者は不変。
@@ -118,7 +118,7 @@ i32 gf5_tiles_retire(struct gf5 *); /* 受付閉・窓閉・表示利用終了�
 | retire | 通常stopの `service.c:472-477`、窓close・GF2 OFF・quiesce成功後、release_allより前に全OWNED/UNKNOWNを処理。GR停止済みを前提にdrain_pauseを呼ばず、PFB limit,pitch,addr=0→flush→GR pitch,limit,addr=0を直接書く。各枠全成功だけ両借用put→FREE。失敗枠はUNKNOWN/借用を残しrelease_allへ進まない | N`nouveau_bo.c:75-103,121-145` のBO寿命に対応。停止済みなので稼働用drainを省き、OFFだけでdescriptor消失と扱わない |
 | 再入場/recover | OWNEDはleaveをまたがない。retire失敗はcleanup_pendingで再enterを拒否し停止状態で再試行。成功した次enterではdevinit後に全枠ゼロprog。稼働セッション内のF5 save/restart/restoreは同一予約matchと再program完了まで借用を保持し、node/ポインタをコピーしない | N`nouveau_bo.c:75-103`、O`state.c:181-219`。内部recoverと表示leaveを区別 |
 
-- F2確定設計 `docs/decisions/realhw/GF_FEAT2_DESIGN.md:150,153` はPFB維持の理由を「既存表示設定のsnapshot転記」としている。実機観測を理由とする記載はこの決定箇所にない。PM決定「手本どおり全部」によりこの既存表示維持の差分を撤回し、`gr.c:87` は初期化済みのゼロPFBをGRへ転記する。FOREIGN・除外区間・firmware衝突による起動拒否は追加しない。
+- F2確定設計 `docs/decisions/realhw/GF_FEAT2_DESIGN.md` はPFB維持の理由を「既存表示設定のsnapshot転記」としている。実機観測を理由とする記載はこの決定箇所にない。PM決定「手本どおり全部」によりこの既存表示維持の差分を撤回し、`gr.c:87` は初期化済みのゼロPFBをGRへ転記する。FOREIGN・除外区間・firmware衝突による起動拒否は追加しない。
 - gf5_service_initはbindingだけ。initは `display/service.c:381-384` のfoundation_start後かつgf2_start前へ結線する。生存する借用をゼロ初期化で消さない。
 - F5 saved imageにはslot状態/rawの値表を追加。UNKNOWNのsave拒否。保存値から終了済みの予約を復活させず、通常leaveでretireする前にF5保存処理を終了させる。
 - EINVAL=-501、EBUSY=-505、I/O=-507、状態=-509。timeout等の既存source_rcを失わない。
@@ -177,7 +177,7 @@ void gf4_service_cleanup_reset(struct gf4_ctx *); /* release_all成功・診断�
 | H3 | tools/tests/test_gf5.py | tile寿命/init/保存復元、変異登録。T2後 |
 | H4 | tools/tests/gf1_instmem_map_host.c | production adapterのrid照会・map/unmap結合。M5後 |
 | H5 | tools/tests/test_gf1_instmem_map.py | H4のCHECK入力/変異登録。H4後 |
-| I1 | tools/hwdev_layout.json | struct gf4_ctx (:1041)/struct gf5 (:1264)と保存値表を最終配置へ追随。D5/D6/T2/S2後、統合担当 |
+| I1 | tools/hwdev_layout.json | struct gf4_ctx /struct gf5 と保存値表を最終配置へ追随。D5/D6/T2/S2後、統合担当 |
 
 - 宣言段でfake APIも凍結: 第n回read/write/map/unmap失敗、書いた後のI/O失敗、全slot初期値、台帳/借用件数観測。既存試験登録にH5を含めて追随する。
 - 各試験fixtureの編集は対応H段の所有。CHECK入力、必要なstub/全欄走査/sizeof期待値をその段で追随し、試験番号を推測で追加しない。
@@ -211,6 +211,6 @@ void gf4_service_cleanup_reset(struct gf4_ctx *); /* release_all成功・診断�
 
 ## 確定 (2026-11-06、Opus の第 2 回で条件付き Approve、PM が反映)
 本文の §4 (112・115・117 行) と A10 は、下の 3 点で補う。
-- R2-1 (P2、§4 :112): retire の書き込みが届く前提の根拠。quiesce の中の foundation_stop は engine_stop.c:7-23 で FIFO・GR・MPEG を PMC で一度落として戻す (GR はリセット済み)。master.c:40-45 は PCI COMMAND を 0x0102 にして bus master だけ止め、メモリの decode は残す (BAR0 への書き込みは届く)。master_disable が decode まで止めるように変わったら retire が黙って消えるので、A10 の実機の項目に「retire の後に PFB 100600+i*10 を読み返して 0」を足す。
+- R2-1 (P2、§4 :112): retire の書き込みが届く前提の根拠。quiesce の中の foundation_stop は engine_stop.c で FIFO・GR・MPEG を PMC で一度落として戻す (GR はリセット済み)。master.c (gf_master_disable()) は PCI COMMAND を 0x0102 にして bus master だけ止め、メモリの decode は残す (BAR0 への書き込みは届く)。master_disable が decode まで止めるように変わったら retire が黙って消えるので、A10 の実機の項目に「retire の後に PFB 100600+i*10 を読み返して 0」を足す。
 - R2-2 (P3、§4 :117、PM 決定): F5 が保存中・SAVED のまま leave したときは、S2 の stop の冒頭で F5 の free を呼んでから retire する (EBUSY で断らない)。理由: leave は失敗の後でも必ず 98 に戻る (gf-cui 直し 5 の方針)、保存像は表示の寿命に結び付く (手本 dispnv04/disp.c:195-207 は無条件に破棄)。
-- R2-3 (P3、§4 :115): gr.c の PFB→GR の転記は残す。「ゼロの PFB を転記する」のは enter の初回だけで、gf2_recover (command.c:181-190) が GR を作り直すときに OWNED の値を PFB から GR へ戻すのもこの転記。
+- R2-3 (P3、§4 :115): gr.c の PFB→GR の転記は残す。「ゼロの PFB を転記する」のは enter の初回だけで、gf2_recover (command.c) が GR を作り直すときに OWNED の値を PFB から GR へ戻すのもこの転記。

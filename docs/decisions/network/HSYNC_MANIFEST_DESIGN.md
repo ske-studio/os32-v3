@@ -23,20 +23,20 @@
 ## 1. 実物の確認
 | 要約から補正すべき点（4 件） | 実コード・計測の根拠 | 設計への反映 |
 |---|---|---|
-| STAT 265 は差分なしの場合だけ。変更時は 790 | report.md:25、hsync.c:1960、:1052、:1091、:1622 | コピー元比較 STAT と open/コピー再確認を区別する |
-| READ 32,316 は比較専用の回数ではない | report.md:24、hsync.c:1043、:1091 | 固定 READ・比較 READ・コピー READ に分ける |
-| CRC は未導入ではなくコピー時に既に使う | hsync.c:97、:1115、:1130、:1166 | 共通 CRC 核とコピー後検証を再利用する |
-| ホスト 3 系統は独立した FS 実装ではない | lanfs_host.py:192、rshell_serial.py:695、host_sfs_link.py:29 | serialfs_host.HostFS への一度の結線で全経路に適用する |
+| STAT 265 は差分なしの場合だけ。変更時は 790 | report.md:25、hsync.c、`compare_files()`・`copy_body()`・`replace_file()` | コピー元比較 STAT と open/コピー再確認を区別する |
+| READ 32,316 は比較専用の回数ではない | report.md:24、hsync.c (compare_files())、`copy_body()` | 固定 READ・比較 READ・コピー READ に分ける |
+| CRC は未導入ではなくコピー時に既に使う | hsync.c、`copy_body()`・`verify_readback()` | 共通 CRC 核とコピー後検証を再利用する |
+| ホスト 3 系統は独立した FS 実装ではない | lanfs_host.py、rshell_serial.py、host_sfs_link.py | serialfs_host.HostFS への一度の結線で全経路に適用する |
 - 上表の hsync.c は userland/system/hsync.c、Python は tools/ 配下。
 - report.md は /home/hight/os32-tmp/run/hsync-measure-x86/report.md。実測値とコードの直接矛盾は認めない。
 - big_changed は 260 件中 same_content=255。全件の本文が変わった試験ではない（report.md:8–11）。
-- compare_files は 32 KiB 要求と末尾 1 B 確認。SFS はその内部で小分けする（hsync.c:1043）。
-- SerialFS READ は 508 B、LAN/link は 1024 B（fs/serialfs/serialfs.c:285）。
+- compare_files は 32 KiB 要求と末尾 1 B 確認。SFS はその内部で小分けする（hsync.c）。
+- SerialFS READ は 508 B、LAN/link は 1024 B（fs/serialfs/serialfs.c）。
 - open 用 get_file_size も STAT を呼ぶ（同:181）。明示的 sys_stat を消すだけでは STAT=0 にならない。
-- LIST の各項目には日時がない（fs/serialfs/sfs_proto.h:62）。既存 LIST の再利用だけでは不足。
-- lib/crc32.c:14 は共通核の公開窓口。hsync は既に同じ核を直接組み込む。
-- docs/decisions/network/NET_HOSTSVC_DESIGN.md:90 はパス+offset、遠隔 file handle なしを規定。
-- docs/decisions/network/LAN_OPERATOR_DESIGN.md:128–133 は共通 backend と CALL ごとの 1000 ms 期限を規定。
+- LIST の各項目には日時がない（fs/serialfs/sfs_proto.h）。既存 LIST の再利用だけでは不足。
+- lib/crc32.c (crc32_calc()) は共通核の公開窓口。hsync は既に同じ核を直接組み込む。
+- docs/decisions/network/NET_HOSTSVC_DESIGN.md はパス+offset、遠隔 file handle なしを規定。
+- docs/decisions/network/LAN_OPERATOR_DESIGN.md は共通 backend と CALL ごとの 1000 ms 期限を規定。
 
 ## 2. ゲストからの口
 | 候補 | 採否 | 理由 |
@@ -51,7 +51,7 @@
 - READY 後 data を open して全量取得。STAT のサイズと記述子の bytes が一致することを確認する。
 - 仮想パスが既存 SFS パス上限を越す深い開始点は、取得前に legacy を選ぶ（新しいパス上限を増やさない）。
 - 一覧生成は各 new/status READ 内で500 msを目安に進める iterator。1回64 KiB以下の読み単位の前後で予算判定し、続きの走査位置とCRC状態を保持する。
-- PPC-2: tools/host_agent.py:820 の1.0秒期限の約半分を生成予算とし、残りを受付/転送に残す。全木を1 CALL中に計算する必要はない。BUSY は正常記述子、ゲストの生成待機上限は合計60秒。
+- PPC-2: tools/host_agent.py の1.0秒期限の約半分を生成予算とし、残りを受付/転送に残す。全木を1 CALL中に計算する必要はない。BUSY は正常記述子、ゲストの生成待機上限は合計60秒。
 - 各 READ は短時間で返す。低速ホストの単一 OS read が期限を越える場合は IO/TIMEOUT で終了し、成功扱いしない。
 - READY 前は data の STAT/READ を ERR_IO。失敗ジョブは status=ERROR と OS32_ERR_* を記述子で返す。
 - token はホスト起動 nonce 64 bit + 単調番号 64 bit、32 桁 hex。認証の用途は持たせない。

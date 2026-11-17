@@ -10,7 +10,7 @@
 ## 1. 変換キー (XFER) 対応
 
 XFER の候補操作は実装済み。インライン候補中はリスト展開、リスト中は次候補となる
-(`kernel/ime/ime.c:367`)。入力中の変換開始は Space のみ (`kernel/ime/ime.c`) で、XFER 対応は残件。操作の表は P1 §3 (`01_UI_CANDIDATE.md`) を参照。
+(`kernel/ime/ime.c`)。入力中の変換開始は Space のみ (`kernel/ime/ime.c`) で、XFER 対応は残件。操作の表は P1 §3 (`01_UI_CANDIDATE.md`) を参照。
 `KEY_NFER` のかな直接確定への割当は将来の検討事項として残す。
 
 ---
@@ -65,4 +65,4 @@ MEMSYS5 プール枯渇説は 400KB 拡張テストで棄却 (200KB で動作確
 
 
 これは当時の検証記録である。現行も `kernel/ime/ime.c` の `ime_set_mode()` に遅延オープン、
-`kernel/ime/ime_dict.c:25` に辞書 FD の保護処理がある。
+`kernel/ime/ime_dict.c` に辞書 FD の保護処理がある。

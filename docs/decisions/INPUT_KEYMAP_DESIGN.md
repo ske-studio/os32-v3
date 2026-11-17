@@ -17,14 +17,14 @@
 |D2|H:184、B:234（M2）|PC-98/JIS 文字化1本・FreeBSD8列本体 → keysym 評価器1本と PC98/HID の別表|
 |D3|B:55-65|照合前の左右/Enter/記号の合流、AT→PC98照合 → usage を保って評価し、旧rawだけ合流|
 |D4|B:61,63、`drivers/usb/hid_kbd_map.c`|0x90/91 DROP、Command欠落 → 英数/かな操作と独立Command修飾|
-|D5|`input/hal/kbd_merge.c:66,94,128-143`|自前の2表と小文字だけCtrl化 → backend の keysym と共通評価|
-|D6|`platform/powermac/usb_platform.c:158-164`、`input_usb.c:23-38`|sc化後の独自押下/文字ring → usage のまま共通 capture|
-|D7|`platform/powermac/input_keymap.c:33-46`|Ctrl+C=27、通常文字の上位scなし → 03 と全キーの互換sc|
-|D8|`platform/powermac/input_boot.c:84-98`|raw/pressed/modifiers の空実装 → 共通状態のprovider|
+|D5|`input/hal/kbd_merge.c`|自前の2表と小文字だけCtrl化 → backend の keysym と共通評価|
+|D6|`platform/powermac/usb_platform.c`、`input_usb.c` の `enqueue()`|sc化後の独自押下/文字ring → usage のまま共通 capture|
+|D7|`platform/powermac/input_keymap.c` の `pm_input_keymap()`|Ctrl+C=27、通常文字の上位scなし → 03 と全キーの互換sc|
+|D8|`platform/powermac/input_boot.c`|raw/pressed/modifiers の空実装 → 共通状態のprovider|
 
-- 食い違いは上記8件（同じ原因の複数行は1件）。調査票の `ime.c:286` は現物では STOP 判定が289行。 x86 は `drivers/input/kbd.c:209,220-228` → `drivers/input/kbd_hal.c:18-23` → `input/hal/kbd_merge.c:34-55,118-147`。
+- 食い違いは上記8件（同じ原因の複数行は1件）。調査票の `ime.c:286` は現物では STOP 判定が289行。 x86 は `drivers/input/kbd.c` → `drivers/input/kbd_hal.c` の `kbd_hal_capture()` → `input/hal/kbd_merge.c` の `input_merge_key()`。
 - PACK の `input/hal/kbd_hal.c` は存在せず、実物は `drivers/input/kbd_hal.c`。これは参照パスの訂正で件数に含めない。
-- PPC の LAN先行・USB後続は `input_boot.c:40-48` に既にある。これを壊さず USB の読み先だけ替える。 x86 uPD720101 の入力経路は未実装（調査票）。今回その完成を前提にせず、同じ HID 表を登録できる口を先に作る。
+- PPC の LAN先行・USB後続は `input_boot.c` の `peek()` に既にある。これを壊さず USB の読み先だけ替える。 x86 uPD720101 の入力経路は未実装（調査票）。今回その完成を前提にせず、同じ HID 表を登録できる口を先に作る。
 
 ## 2. 共通の口
 
@@ -70,7 +70,7 @@ int input_capture_key(const KmKey *key);       /* validates generation/range */
 
 - command は wscons のコマンド欄として保持し、Command修飾そのものと混同しない。未提供コマンドは記録可能だが実行しない。 Ctrlの基本規則: `@.._` と `a..z` は `&0x1f`、Space/2→NUL、3..7→ESC..US、8→DEL。それ以外は元のPlain値。
 - Caps は選択した英字の大小だけ反転。Shift+Caps と Ctrl+Shift+C の fixture を独立に固定する。 HID Alt/Option（E2/E6）は文字を変えない（現行維持）。Metaの高位bit付加をしない。AltGr/Mode_switchとは区別する。Command（Meta、E3/E7）も文字不変・高位bit付加なし、操作用の独立修飾としてのみ扱う。
-- Keypad group（KS_KP_*）は数字側選択後に `sym & 0x7f` でbyte化。Apple Clear/NumLock（usage53）はkeydata entry自体を積まない・lock切替なし（常時ON）。 Plain 0x80〜0xffはbyteへ出さない（全backend共通）。shell ui.c:776のIME UTF-8誤認を防ぐ。dead/composeの高位byte結果にも同じ出口制限を掛ける。
+- Keypad group（KS_KP_*）は数字側選択後に `sym & 0x7f` でbyte化。Apple Clear/NumLock（usage53）はkeydata entry自体を積まない・lock切替なし（常時ON）。 Plain 0x80〜0xffはbyteへ出さない（全backend共通）。shell ui.cのIME UTF-8誤認を防ぐ。dead/composeの高位byte結果にも同じ出口制限を掛ける。
 - PC98変換の exact-cell 拡張は§3。一般Ctrl規則と衝突する Ctrl+2=SUB 等を保存するため、必要な明示差分である。 同一scへ写るHID左右キーも別々に評価する。旧raw/pressedだけ互換scの参照数を使い、最後の解放でbreakを出す。
 - sourceをまたぐShift+Aは合成modsで評価。同じscでも表の行同一性は要求しない。旧rawの情報量不足は§5の意味イベントで補う。
 - 物理Ctrl/GRPH/STOP/DELの緊急判定はlogical remapから独立。in2は従来の互換物理sc/mods契約を維持する。 V86中は状態だけ追跡、OSの文字/操作/in2配送を抑止。GUIではrawと意味イベントを出し、CUI cookedは出さない。
@@ -99,7 +99,7 @@ int input_capture_key(const KmKey *key);       /* validates generation/range */
 |---|---|
 |E0/E4、E1/E5、E2/E6|74、70、73。左右はheldでは別、旧raw breakだけ参照数集計|
 |E3/E7|Commandは独立logical bit。互換scは既存使用を監査して2個予約、監査完了まで新rawを有効化しない|
-|8A、8B、88|35 XFER、51 NFER、72 KANA（現 `hid_kbd_map.c:108-111`）|
+|8A、8B、88|35 XFER、51 NFER、72 KANA（現 `hid_kbd_map.c` の `hid_kbd_sc()`）|
 |90、91|72、51。意味イベントでIME_ON/OFFを区別、90を物理Kana lockへ誤認しない|
 |48 Pause、矢印等|60 STOP、3A/3B/3C/3D等。AppleにPauseの存在は要求しない|
 |写像のない有効キー|raw/in2互換投影なし、意味イベントあり。旧keydataだけが必要な文字はsc=0でbyteを返す|
@@ -129,10 +129,10 @@ legacy_cooked_push(((u16)sc << 8) | byte);
 - is_modifier の定義 (PM 決定 2026-11-17): effect!=0、または CHAR で 0xf101〜0xf111、または互換 sc 70〜74。日本語キー 0xf112〜0xf116 は修飾ではない。
 - no_keydataはHID usage53のClear/NumLockで真、再配置後もkeydataを積まない（PM決定）。IME_ON/OFFの操作配送はこの文字抑止より先に行う。
 - compat_sc=ffは出口直前に0へ置換。scもbyteも0なら積まない（F13 usage68等）。非修飾nop/NULは有効な非0 scがあればentryを残す。 raw_dueは互換scのmake/最後のbreak/repeatの既存集計規則。GUIのSTOP filterをraw/意味イベントの前に適用し、二重配送しない。
-- `drivers/input/kbd.c:227` の救済判定も `kbd_shift_state & SHIFT_CTRL` から `input_key_pressed(KEY_CTRL)` へ変更。物理Ctrl+STOPはcookedへ積まない。
+- `drivers/input/kbd.c` の救済判定も `kbd_shift_state & SHIFT_CTRL` から `input_key_pressed(KEY_CTRL)` へ変更。物理Ctrl+STOPはcookedへ積まない。
 - 日本語/機能keysymの基本出口はbyte0+互換sc。Plain>=80は無文字（非byte確定列は既存IME/UTF-8配送経路）。 B§2aで確定済みの矢印等DOS byteはLEGACY_CONTROL例外として維持。RLDN=03をCHAR_ETXとして再解釈しない。
-- x86/PPCともSTOP=6000、XFER=3500、NFER=5100。STOPは `ime.c:289`、XFERは調査票の `ime_convert.inc:117` と一致。
-- UPは上位3A、LEFTは3B、HOMEは3E、DELは39。`userland/shell/ui.c:686,710,735,748` の比較はPPCでも成立する。 Ctrl+Cは互換sc2B/byte03。英数/かなはFG1で消費する操作であり、XFERへ化けさせてIME切替を代用しない。
+- x86/PPCともSTOP=6000、XFER=3500、NFER=5100。STOPは `ime.c:289`、XFERは調査票の `ime_convert.inc` と一致。
+- UPは上位3A、LEFTは3B、HOMEは3E、DELは39。`userland/shell/ui.c` の比較はPPCでも成立する。 Ctrl+Cは互換sc2B/byte03。英数/かなはFG1で消費する操作であり、XFERへ化けさせてIME切替を代用しない。
 - 操作policy→IME優先→旧出口の順とし、PC98変換中のSTOP/ETX取消を通常中断へ二重投入しない（B§3）。 GUIはカーネル評価済みの意味イベントをWMが一度配送。従来rawのscから別表を再評価して文字を作る経路を残さない。 serial/LAN/GUI文字注入は従来のsc0経路で、物理source/usageを捏造しない。peekでは操作を実行しない。
 
 ## 5. IKM1・KAPI・profile
@@ -211,10 +211,10 @@ legacy_cooked_push(((u16)sc << 8) | byte);
 |D|`platform/powermac/input_keymap.c` 削除|全結線・policy受入後、旧4b-map。build除去は先行B|
 
 - T段は製品段ごとの `tools/tests/input_<段>_host.c` とCHECK実行器をそれぞれ1ファイルで準備、製品段受入時に実行する。 B段はorder.mk/commonまたはarch一覧/fixture/PPC一覧を各1ファイルずつ。対象製品段の受入前に全登録を完了する。
-- S2uの現物は `hid_kbd.c:16-36,70`。E0〜E7のmake/break→lock類（39/47/53/88等）→残り、各群内はusage昇順。Shift+AだけでなくCaps+Aも同一報告で大文字にする。生成orderの3群を使う。
+- S2uの現物は `hid_kbd.c`。E0〜E7のmake/break→lock類（39/47/53/88等）→残り、各群内はusage昇順。Shift+AだけでなくCaps+Aも同一報告で大文字にする。生成orderの3群を使う。
 - S1hのnorepeatはE0〜E7・lock/Clear・IME_ON/OFF等で1、S2hは `(bits[usage>>3]>>(usage&7))&1` を返すだけ。S2uは候補設定/発火の両方で参照し、A保持中Capsを押してもrepeat候補はAのまま。表交換後のlogical修飾/操作repeatはHALでも抑止する。
 - H-usbpの暫定adapterはusage別heldから互換sc参照数を作り、旧 `usbp_input_key` へscを渡す（04→1D）。最後のalias解放だけbreak、repeatも明示sc変換。未写像usageは旧出口に渡さず、releaseで暫定状態も消す。
-- S2uでは `usb_hid_host.c:52-53,132-158` を新usage口の記録とE1/04等の期待へ同時更新。S2u単独の像も旧PPCのaを維持し、S2m/S3m以後に共通cookedへ移す。 S2mの新経路有効化はS3m/S3b受入と同時。宣言整理は後続H-usb-clean（include/usb_platform.h、旧口削除）を独立段とし、新旧両方へ同じ入力を送らない。
+- S2uでは `usb_hid_host.c` を新usage口の記録とE1/04等の期待へ同時更新。S2u単独の像も旧PPCのaを維持し、S2m/S3m以後に共通cookedへ移す。 S2mの新経路有効化はS3m/S3b受入と同時。宣言整理は後続H-usb-clean（include/usb_platform.h、旧口削除）を独立段とし、新旧両方へ同じ入力を送らない。
 - prev/nowはusageごとの存在で比較、00は無入力、01〜03のrolloverは現行どおり報告全体を保留。repeat候補はu16/無効=0xffffとしusage ffと衝突させない。 互換scの唯一の実体はS1h生成のKmBackend.compat_sc（LANG1/2込み）。S2hに数値表を重複保持しない。本線1Eが後で同じS2aへx86 USBを接続。
 
 |旧段|置換先|
@@ -271,12 +271,12 @@ os32powerpc のレビュー (PPC の Opus が PPC の実物と照合、K1・K3�
 
 |ID|重さ・段|PM 決定 (段の完了条件に入れる)|
 |---|---|---|
-|K1|P1・S2u|試験の追従を 3 ファイルにする。usb_hid_host.c、tools/tests/usb_stack_host.c (:32-37 の usbp_input_key だけの用意と :231 の sc 0x70・0x1d の期待)、tools/tests/test_usb_hid.py:47 の変異の目印 `i = (order + 0x70) & 127;` の移設|
-|K2|P2・S2h|test_usb_hid.py:50 の目印 `case 0x47: return 0xff;` の移設、test_usb_hid.py:13,15 と test_usb_stack.py:17-18 の SOURCES・covers に生成表を足す。E3・E7 の互換 sc は監査が済むまで 0xff (usb_hid_host.c:124 の期待を保つ)|
+|K1|P1・S2u|試験の追従を 3 ファイルにする。usb_hid_host.c、tools/tests/usb_stack_host.c (同ファイル内 の usbp_input_key だけの用意と `topology()` の sc 0x70・0x1d の期待)、tools/tests/test_usb_hid.py の変異の目印 `i = (order + 0x70) & 127;` の移設|
+|K2|P2・S2h|test_usb_hid.py の目印 `case 0x47: return 0xff;` の移設、test_usb_hid.py と test_usb_stack.py の SOURCES・covers に生成表を足す。E3・E7 の互換 sc は監査が済むまで 0xff (usb_hid_host.c の期待を保つ)|
 |K3|P2・S2m|新しい usage の口も、serial に旧い口と同じ形の行 `USB KEY src=.. sc=.. down=` と `USB REPEAT` を出す (usage を添える)。tools/ppc/usb_run.py と test_ppc_usb_link.py の目印を保つ|
 |K4|P2・S2m・S3m・S3b|3 段は同じ統合の枝で 1 回に取り込む (S2m だけでは provider が input_usb.c の ring を読み続け、USB のキーが失われる)|
 |K5|P2・S2a・S2m|S2m で usbp_input_src_alloc → input_src_register と km_source_bind、release → input_src_release を加え、usbp の src から (in2 の src, 世代) への写しを持つ|
-|K6|P2・S3m・S3b|pm_input_usb_take・peek・has_key・dropped の名前は、共通の出口を包む薄い関数として保つ。dropped は共通の出口の取りこぼしの数を返す。ppc_input_usb_host.c は包みの試験に置き換える。使う所 (arch_compat_vectors.c:55-57、test_ppc_link_sh.py、ppc_sh_input.py、ppc_sh_boot.py、test_arch_compat.py:130-136) は名前を保つので変えない。ROLES §4-3 の追従表に写す|
+|K6|P2・S3m・S3b|pm_input_usb_take・peek・has_key・dropped の名前は、共通の出口を包む薄い関数として保つ。dropped は共通の出口の取りこぼしの数を返す。ppc_input_usb_host.c は包みの試験に置き換える。使う所 (arch_compat_vectors.c、test_ppc_link_sh.py、ppc_sh_input.py、ppc_sh_boot.py、test_arch_compat.py) は名前を保つので変えない。ROLES §4-3 の追従表に写す|
 |K7|P2・§6|PPC の常駐像 (MEM_KERNEL_IMAGE_MAX 0x275000) の行を §6 に足し、S1m と S2m で map を採って確かめる|
 |K8|P3・S4|PPC の kboot には kernel/ime が無い。S4 の PPC の受入は「操作として消費し、cooked を積まない」まで。IME の受入は x86 だけ|
 |K9|P3|0x90・0x91 の出典は freebsd-usb の ukbd.c:268-269 (注釈)・:290 (表)・:2271-2272。:308-310 は ukbd_boot_desc (値は同じ)|
@@ -534,7 +534,7 @@ PM決定 (2026-11-17): S0aは`km_source_release`の空inlineを維持し、別�
 
 ## S2x の取り込みで後の段へ送る項目 (2026-11-17、Opus レビュー、どれも P3)
 
-- platform/pc98/input_keymap.c:11: HID の backend の登録が失敗しても、先に登録した PC98 の backend は残す (解除の口は作らない、使う物も無い)。意図どおり。
+- platform/pc98/input_keymap.c (pc98_input_keymap_register()): HID の backend の登録が失敗しても、先に登録した PC98 の backend は残す (解除の口は作らない、使う物も無い)。意図どおり。
 - 登録の失敗のログは /var/log/boot.log の 1 行だけで、画面には出さない。設計の「klog」はこの意味とする (PM 決定 2026-11-17)。
 - 試験: V86 の中で CAPS・KANA を押してから抜けた後の文字を、旧経路と比べる 1 件を、S3 の段の試験に足す。
 - kbd_hal_init を 2 回呼ぶと旧経路になり bindings[] が残る。呼ぶのは boot.c:53 の 1 回だけなので、今は起きない。2 回呼ぶ道を作るときに直す。
@@ -543,7 +543,7 @@ PM決定 (2026-11-17): S0aは`km_source_release`の空inlineを維持し、別�
 
 ## S3・S3d の取り込みで後の段へ送る項目 (2026-11-17、Opus レビュー、どれも P3)
 
-- tools/tests/keymap_s3_oracle.py:31: 意図した差の一覧の new と M0 の fixture の oracle を、読み込みのときに直接 assert する (今は製品を介した推移だけ)。
+- tools/tests/keymap_s3_oracle.py: 意図した差の一覧の new と M0 の fixture の oracle を、読み込みのときに直接 assert する (今は製品を介した推移だけ)。
 - no_keydata の判定と、kbd_merge.c の capture_state の boot_locks の上乗せを消す変異を 1 本ずつ足す。
-- legacy_keymap.c:65: 静的な表が不正 (km_eval の INVAL) なら予備の経路も全キーを捨てる。今の表では起きない。S3x の段で、起動時に km_eval を 1 回試して boot.log に残すかを決める。
-- userland/gshell/src/input.rs:99,120 の旧い表の写しは G 段で更新する。
+- legacy_keymap.c: 静的な表が不正 (km_eval の INVAL) なら予備の経路も全キーを捨てる。今の表では起きない。S3x の段で、起動時に km_eval を 1 回試して boot.log に残すかを決める。
+- userland/gshell/src/input.rs の旧い表の写しは G 段で更新する。

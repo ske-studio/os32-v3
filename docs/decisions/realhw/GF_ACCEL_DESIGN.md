@@ -28,10 +28,10 @@
 資料の版・許諾は R/INDEX.md・LICENSES.md。以下の nouveau .c は MIT、頭書きなしのヘッダは写さない。
 | 経路・契約 | 実物と意味 |
 |---|---|
-| アプリ/gshell → RAM CLIENT | O/userland/rust/libos32gui/src/draw.rs:134,141,184、gshell/src/chrome.rs:64–69、O/gfx/gfx_core_framebuffer.inc:77 |
-| dirty → present → VRAM | O/userland/gshell/src/wm.rs:879–901 → O/gfx/gfx_vram.c:43–62,255 → backend_geforce.c:108–112 → gf_present.c:29–44 |
+| アプリ/gshell → RAM CLIENT | O/userland/rust/libos32gui/src/draw.rs、gshell/src/chrome.rs:64–69、O/gfx/gfx_core_framebuffer.inc |
+| dirty → present → VRAM | O/userland/gshell/src/wm.rs → O/gfx/gfx_vram.c:43–62,255 → backend_geforce.c → gf_present.c |
 | 現行の転送 | 1 byte ごとの volatile store、行ごとの point、最後に BAR0 read。既存 gf_present.o は text=277 B、内側は `mov %bl,(%ecx)` |
-| fill/blit | gfx_core_api.inc:65–76 は backend 委譲。調べた GUI 呼出側には HW 口の利用なし。RAM 描画・合成は段 0 後も CPU |
+| fill/blit | gfx_core_api.inc は backend 委譲。調べた GUI 呼出側には HW 口の利用なし。RAM 描画・合成は段 0 後も CPU |
 | 他表示との共存 | O/docs/decisions/realhw/RA266.md §1-1。98/Trident/Cirrus を保持、GF の BAR の再配置や legacy decode の変更を足さない |
 - 既存票の「加速なし」と実コードの食い違いは r1 同様 0 件。RAM CLIENT と VRAM CLIENT の契約差を隠して HW fill/blit を公開しない。
 - 全面は 307,200 B。段 0 は CPU→VRAM を改善するが、RAM 描画・窓合成・dirty 管理の時間は消えない。
@@ -42,7 +42,7 @@
 - P100 の参考値は `Tcpu266×266/100 + Tpci + Tgpu`。P100 には MTRR が無いので Ra266 の WC 値を P100 の保証にしない。実機未測定の帯域を合否に使わない。
 
 ## 2. 段 0a: dword present
-- 変更点は O/drivers/video/geforce/gf_present.c:36–37。クリップ、各行の point、pitch、計数、正常終了の BAR0 read の契約は維持。
+- 変更点は O/drivers/video/geforce/gf_present.c。クリップ、各行の point、pitch、計数、正常終了の BAR0 read の契約は維持。
 - 手本: R/xf86-video-nouveau/src/nouveau_exa.c:29–39 の NVAccelMemcpyRect、:375–386 の CPU fallback（MIT）。src/dst pitch を独立に進める線形コピーを採る。
 - 同手本は memcpy に委譲し、dword/byte の具体列は規定しない。以下の幅固定 store と端処理は OS32 独自。全行連結の最適化は行ごとの point を失うので採らない。
 - 8bpp は palette index の byte 列、変換しない。各行 `s=client+y*client_pitch+x`、`d=display+y*display_pitch+x`、`n=w` とする。
@@ -113,14 +113,14 @@ int (*wc_start)(void); int (*wc_stop)(void);
 - lease は最初の取得から起動中保持する。GeForce module/本番 context は起動中 pin され、通常停止・CUI・abort/回収では解放しない。再 GUI は active lease の前回結果 (復元未確認の負値を含む) を返し、再取得しない。identity 喪失時と再起動時に CPU 側で排出・復元する (BIOS WC は MSR を書かず借用解除)。受入版の明示的な wc_stop/wc_start は比較のため独立して行う。
 
 ## 5. 計測の口と進む条件
-- 受入用 gf_accept.c が実際の gf_present_rect を呼び、その直前/正常 drain 後を既存 sys_time_now(u32 lo,hi) で測る（hwdev/gf/native.c:66、部品 import 済み）。失敗 sample を成功群へ混ぜない。
+- 受入用 gf_accept.c が実際の gf_present_rect を呼び、その直前/正常 drain 後を既存 sys_time_now(u32 lo,hi) で測る（hwdev/gf/native.c、部品 import 済み）。失敗 sample を成功群へ混ぜない。
 - 同一ソース・同一最適化の受入 3 ビルド: byte UC / dword UC / dword WC。WC 不成立および BIOS WC のため UC を作れない比較は理由付き SKIP、実効型を確認してから比較。MTRR 切替時間は転送時間から除外する。
 - 固定 RAM パターン 0..255、全面640×480・320×200・640×16・32×32・16×16・(x=1,w=63)・1×480・端1px。ウォームアップ10回後100回×3、個々の経過 µs を RAM に保存する。
 - p50/p95 は昇順の nearest-rank（100個なら50/95番、合算300個なら150/285番）。中央値・p95・最大・転送 byte・point 回数・失敗数を出す。小矩形は時計の空測定も記録する。
 - gshell の既存 dirty/present 境界とイベント処理入口/更新完了に受入時だけ計時を入れ、RAM 描画/合成と present を分離する。同じ窓・移動幅・スクロール量・入力間隔で3方式を比べる。
 - PCI config 0x0c の cache-line size は dword 単位、0 は未設定として記録（CPU cache line と混同しない）。Command/latency/BAR raw、CPUID family/model/stepping、MTRRCAP/全組/DEF_TYPE、PAT有無、元/現 PTE も採る。
 - CPU cache line は対応 leaf4、なければ P6 の leaf2 descriptor を [SDM Vol.2 CPUID 表](https://cdrdv2-public.intel.com/868137/325462-089-sdm-vol-1-2abcd-3abcd-4.pdf)で解読（raw も保存）。CLFLUSH 非対応の P6 で leaf1 EBX の値を line size として使わない。不明なら不明と記す。
-- 受入用 platform.report callback を kernel 側 gf_wc.c に持たせ、計測完了後の record を serial_puts（O/drivers/char/serial.h:278）へ出す。計時中のシリアル出力を止め、常用版に sample 配列を含めない。
+- 受入用 platform.report callback を kernel 側 gf_wc.c に持たせ、計測完了後の record を serial_puts（O/drivers/char/serial.h）へ出す。計時中のシリアル出力を止め、常用版に sample 配列を含めない。
 - tools/accept/gf_accel.py は保存済みシリアルログから版/設定/個別時間を照合し集計。実機操作は PM→ノート側セッション、表示の判定は RA266.md §3-1 のカメラ、数字はシリアル。
 
 ### 5.1 受入版の作成と入替 (S14〜S16/T3)
@@ -235,7 +235,7 @@ WC不成立は理由付きSKIPで、比較の合格と数えない。レコー�
 - WC=[0,80000h)、ring=[80000h,88000h)、notify=[88000h,88020h)、試験面=[90000h,db000h)。BAR1先頭1MiB写像、ring等の実効型はUC、PRAMIN別予約。BIOSの広いWCがある場合もringの実効UCを確認する。
 - 32KiB連続・整列bounce、GPU視点ROのPCI snoop入力={2703dh,7fffh,phys,phys}。入力のROはflags0|4000h、flags2のRW bit2hを付けない（usernv04.c:119–127）。push DMA は H:1051–1053 の3語を維持し、flags0=3002h、limit=7fffh、flags2=80000h|2h とする。RO 7002h は今回は採らず、手本から外すなら理由を示して後続票でレビューする。宛先/notifierは書込み可能。
 - M2MFはE:399–427の0184/0188結線→030cから8word→notify/kick、GET==PUTかつPGRAPH idleまで待つ。bounce再利用・CPU fallbackの前にGPU停止を確認し、停止不能なら資源保持して既存失敗経路へ。
-- BM遷移0102→0106→0102はbus.c:29,109/devinitの期待値に加え kdebug/gf_stage_state.c:63・recover_profile.c:221–231 を扱う。recoverへ渡す前にGPU停止と0102 readbackを完了させる境界を固定し、0106のまま旧profileを走らせない。
+- BM遷移0102→0106→0102はbus.c:29,109/devinitの期待値に加え kdebug/gf_stage_state.c・recover_profile.c を扱う。recoverへ渡す前にGPU停止と0102 readbackを完了させる境界を固定し、0106のまま旧profileを走らせない。
 - fill/copyはgf_accept.c内の非表示面検査だけ（F:32–73）、HALの能力は公開しない。IFC/SIFM/カーソル/3D/Xv/複数モードは範囲外。GPU停止→WC復元の順に寿命を拡張する。
 - 未決のユーザー判断は0件。性能・WC可否・容量は観測事項。段0合格なら本節のファイル・DMA buffer・objectは作らない。
 

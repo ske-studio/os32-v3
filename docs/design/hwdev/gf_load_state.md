@@ -7,8 +7,8 @@
 | 機能・ファイル語幹 | 中身・初版の境界 | nouveau（`N/` 以下） | VBE 対応 |
 |---|---|---|---|
 | DPMS `dpms` | SR01→10ms→CR17→CR1A、modeset の OFF/ON は必須 | `dispnv04/crtc.c:175–234`、`dac.c:460` | 拡張 4F10、p.63 |
-B は `int gf_load_row(struct gf_display_context *, const struct gfinit_mode *, u32 ordinal)` を `gf_load_io.row` へ接続し、section/wait も既存型を使う（`hwdev/gf_load_state.h:36–41`）。
-分割/複製無し。唯一の生成元 `tools/gfinit_mode_tables.py:29` を維持。blank/DPMS の modeset 順序もここに保持。
+B は `int gf_load_row(struct gf_display_context *, const struct gfinit_mode *, u32 ordinal)` を `gf_load_io.row` へ接続し、section/wait も既存型を使う（`hwdev/gf_load_state.h`）。
+分割/複製無し。唯一の生成元 `tools/gfinit_mode_tables.py` の `initializers()` を維持。blank/DPMS の modeset 順序もここに保持。
 
 ## 移し替えた設計
 
@@ -27,6 +27,6 @@ B は `int gf_load_row(struct gf_display_context *, const struct gfinit_mode *, 
 
 初期化・A4・VPLL診断・virtual 等が使う計画実行器は維持する。新Cのための汎用実行器、予算解析、S0予約枠、全段hash固定は作らない。
 
-共有列はQ→P→S/D→PLL→拡張CR→palette/VGA→commit。値・順・FP条件・50/10ms待ちの正典を1本にし、C builderの列走査（`gfinit_plan_c.c:314`）をこの列の消費側にする。
+共有列はQ→P→S/D→PLL→拡張CR→palette/VGA→commit。値・順・FP条件・50/10ms待ちの正典を1本にし、C builderの列走査（`gfinit_plan_c.c`）をこの列の消費側にする。
 試験CはP後のVRAM模様、前後CHECK、98セル、route01、RECをbuilderで付加する。paletteはmode入力、8色は既存mode側に残す。共有列は試験模様・REC・route・98セルを要求しない。
 手本は `N/dispnv04/crtc.c:708` prepare、`:731` commit、`N/dispnv04/hw.c:827` load_state。新レジスタ列を推測で追加しない。

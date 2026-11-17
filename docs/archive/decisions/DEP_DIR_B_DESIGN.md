@@ -20,7 +20,7 @@
 - PM: Ra266 立会い枠を PM 決定に移し、ユーザー判断を0件とする。
 
 - 基点: `/home/hight/os32-v3` main `12b7e2fe`。2026-10-27、設計のみ。実装・host 実行・ゲスト・実機試験は未実施。
-- 正典: `docs/tasks/v3/TASK_DEP_DIR.md` §2、同梱 `PLAN.final.md` §2 L11–L13・§3、`SURVEY.md` #49–51。
+- 正典: `docs/archive/v3/TASK_DEP_DIR.md` §2、同梱 `PLAN.final.md` §2 L11–L13・§3、`SURVEY.md` #49–51。
 - PC-9821、単一利用者・単一タスク・協調切替。目的は固まらない・壊さない・戻せること。整数演算、既存 I/O と待ちを維持。
 - KAPI 番号・署名・呼出規約、部品 ABI、配置世代を変更しない。CLAUDE.md [C1]–[D4] を適用。新規ハード制御方式は導入しない。
 

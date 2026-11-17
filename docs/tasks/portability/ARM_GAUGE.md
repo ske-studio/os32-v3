@@ -37,7 +37,7 @@
 |---|---|
 | 対象集合 | `build/kernel.mk` の `C_KERNEL` (カーネルに実際にリンクされる C ソースの正典) |
 | フラグ | `build/config.mk` の `CFLAGS_COMMON` を**読んで**使い、x86 専用の `-m32` `-march=i386` `-mno-red-zone` だけを外す。`-O2 -D__KERNEL_BUILD__` を足してカーネル本番ビルドに揃える |
-| インクルード | `build/config.mk` の `INC_*` を読む。`build/kernel.mk` の個別ルールも写してある (`fs/fat/fatfs/` は `INC_FATFS`、`drivers/` の例外集合は `tools/check_arm_compile.py:97` の `DRIVERS_INC_KERNEL` を参照) |
+| インクルード | `build/config.mk` の `INC_*` を読む。`build/kernel.mk` の個別ルールも写してある (`fs/fat/fatfs/` は `INC_FATFS`、`drivers/` の例外集合は `tools/check_arm_compile.py` の `DRIVERS_INC_KERNEL` を参照) |
 | コンパイル | `-c -o /dev/null` (コード生成まで) |
 
 フラグとインクルードを `config.mk` から**読む**のは、ここに書き写すと二重管理に
@@ -53,7 +53,7 @@
 ### アセンブル段のエラーを元のソース行へ戻している
 
 `inb` のように**制約**が ARM に無いものはコンパイル段で落ちるので、エラー行が
-`include/io.h:14` と出て分類できる。ところが `pushfl` / `sti` / `mov %cr3` のように
+`include/io.h` と出て分類できる。ところが `pushfl` / `sti` / `mov %cr3` のように
 制約 (`"=r"`) だけは ARM でも通るものはコンパイル段を素通りし、gcc の中間 `.s` を
 指した `/tmp/ccXXXXXX.s:96: Error: bad instruction 'pushfl'` になる。これでは
 (1) どのヘッダ由来か分からず「io.h を分離したら何本通るか」が測れない、
@@ -130,15 +130,15 @@
 
 | ファイル | 最初のエラー |
 |---|---|
-| `exec/exec.c` | `exec/exec.c:13: error: unknown register name 'eax' in 'asm'` |
-| `drivers/video/pc98/gfx_vram.c` | `gfx/gfx_internal.h:52:5: error: impossible constraint in 'asm'` |
-| `arch/x86/kernel/gdt.c` | `arch/x86/kernel/gdt.c:40:5: error: unknown register name 'eax' in 'asm'` |
-| `mm/paging.c` | `mm/paging.c:545: Error: ARM register expected -- 'mov %cr3,r3'` |
-| `arch/x86/kernel/tss.c` | `arch/x86/kernel/tss.c:53:5: error: impossible constraint in 'asm'` |
+| `exec/exec.c` | `exec/exec.c: error: unknown register name 'eax' in 'asm'` |
+| `drivers/video/pc98/gfx_vram.c` | `gfx/gfx_internal.h (_memcpy_w()): error: impossible constraint in 'asm'` |
+| `arch/x86/kernel/gdt.c` | `arch/x86/kernel/gdt.c (gdt_set_gate()): error: unknown register name 'eax' in 'asm'` |
+| `mm/paging.c` | `mm/paging.c: Error: ARM register expected -- 'mov %cr3,r3'` |
+| `arch/x86/kernel/tss.c` | `arch/x86/kernel/tss.c (tss_init()): error: impossible constraint in 'asm'` |
 
 この 5 本は `io.h` を経由せず**その場に x86 asm を書いている**もの。`gdt` / `tss` /
 `cr3` は x86 の仕組みそのものなので、順序 3 で `arch/x86/` へ移す対象。
-`gfx/gfx_internal.h:52` と `exec/exec.c` は移設先の判断が要る。
+`gfx/gfx_internal.h` の `_memcpy_w()` と `exec/exec.c` は移設先の判断が要る。
 
 ### (b) `io.h` 経由 — 33 本
 
@@ -318,17 +318,17 @@ ABI の両側に同じ前提がかかる。
 
 | 順序 2 まで | 順序 3 以後 | 本数 |
 |---|---|---|
-| `include/io.h:14` (`inp`) | `platform/pc98/platform_io.h:20` | 9 |
-| `include/io.h:19` (`outp`) | `platform/pc98/platform_io.h:25` | 17 |
-| `include/io.h:58` (`_enable`) | `arch/x86/arch_io.h:17` | 1 |
-| `include/io.h:74` (`irq_save`) | `arch/x86/arch_io.h:27` | 6 |
+| `include/io.h` (`inp`) | `platform/pc98/platform_io.h` | 9 |
+| `include/io.h` (`outp`) | `platform/pc98/platform_io.h` | 17 |
+| `include/io.h` (`_enable`) | `arch/x86/arch_io.h` | 1 |
+| `include/io.h` (`irq_save`) | `arch/x86/arch_io.h` | 6 |
 
 (a) の 5 本 (`exec/exec.c` `drivers/video/pc98/gfx_vram.c` `arch/x86/kernel/gdt.c` `mm/paging.c`
 `arch/x86/kernel/tss.c`) はエラー行もそのまま。順序 1 の §3 が「`gdt` / `tss` / `cr3` は
 順序 3 で `arch/x86/` へ移す対象」と書いていたが、**この 5 本の移設は行って
 いない** — 順序 3 の承認範囲は `io.h` の分割と受け皿の導入までで、`gdt.c` /
 `tss.c` / `paging.c` の中身を `arch/` へ移すのは別の判断が要る (移すのは
-関数単位か、ファイルごとか、`gfx_internal.h:52` と `exec.c:1735` の
+関数単位か、ファイルごとか、`gfx_internal.h` の `_memcpy_w()` と `exec.c` の `exec_launch()` の
 移設先をどこにするか)。次の票の材料。
 
 ### 順序 4-a でも数字は動かない — この計測器が測っていないものだから
@@ -345,7 +345,7 @@ ABI の両側に同じ前提がかかる。
 * 実際、置き換えた 8 本のうち 7 本 (`fs/ext2/ext2_*.c` 5 本、`fs/isofs/iso9660.c`、
   `lib/utf8.c`) は**順序 1 の時点から ARM を通っていた** (`fs/` 14/15、
   `lib/` 8/8)。`drivers/video/kcg/kcg.c` だけは今も落ちるが、原因は
-  `platform/pc98/platform_io.h:25` のポート I/O で、エンディアンとは関係が無い。
+  `platform/pc98/platform_io.h` の `outp()` のポート I/O で、エンディアンとは関係が無い。
   基点 `ff4160c` の 55/93 は前後で 1 本も動かない (分類も 5 / 33 / 0 / 0 のまま)。
 
 つまり順序 4-a の効果は**この票の物差しでは測れない**。代わりの物差しとして、
@@ -419,11 +419,11 @@ x86 の既定は `lib/kstring_asm.asm` のまま (`build/kernel.mk` の `ARCH` �
 
 | 順序 4 まで | 順序 5 以後 | 本数 |
 |---|---|---|
-| `exec/exec.c` (リング降下) | `arch/x86/arch_cpu.h:69` | 1 |
-| `arch/x86/kernel/gdt.c:40` (lgdt + セグメント) | `arch/x86/x86_desc.h:25` | 1 |
-| `mm/paging.c:545` (`mov %cr3`) | `arch/x86/arch_cpu.h:29` | 1 |
-| `arch/x86/kernel/tss.c:53` (`ltr`) | `arch/x86/x86_desc.h:45` | 1 |
-| `drivers/video/pc98/gfx_vram.c` (`rep movsw` ほか) | 変わらず `gfx/gfx_internal.h:52` | 1 |
+| `exec/exec.c` (リング降下) | `arch/x86/arch_cpu.h` | 1 |
+| `arch/x86/kernel/gdt.c` (lgdt + セグメント) | `arch/x86/x86_desc.h` | 1 |
+| `mm/paging.c` (`mov %cr3`) | `arch/x86/arch_cpu.h` | 1 |
+| `arch/x86/kernel/tss.c` (`ltr`) | `arch/x86/x86_desc.h` | 1 |
+| `drivers/video/pc98/gfx_vram.c` (`rep movsw` ほか) | 変わらず `gfx/gfx_internal.h` の `_memcpy_w()` | 1 |
 
 分類 (a) の意味は「差し替え先がまだ決まっていない、その場の x86 asm」なので、
 `arch/` や `platform/` の下に入ったものは (b) 側に数えるよう

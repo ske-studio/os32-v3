@@ -1,6 +1,6 @@
 # TASK_PPC_SEP — PowerPC 移植とアーキテクチャ分離の計画
 
-> 状態: **受入完了 (2026-11-17)** — 機種依存の分離は 11-17 の作り直しで完了の基準 3 つ (ユーザー決定「共通ソースが機種ヘッダを読む数 0・ビルド 1 系統・入口の骨格 1 本」) を満たした。今の仕組みと決まりは下の「現在地」。第 1〜5 段 (Z まで main、b98087e8) の確定設計 (完了記録) は [PPC_SEP1_DESIGN](../../decisions/ppc/PPC_SEP1_DESIGN.md)・[PPC_SEP2_DESIGN](../../decisions/ppc/PPC_SEP2_DESIGN.md)・[PPC_SEP3_DESIGN](../../decisions/ppc/PPC_SEP3_DESIGN.md)・[PPC_SEP4_DESIGN](../../decisions/ppc/PPC_SEP4_DESIGN.md)・[PPC_SEP5_DESIGN](../../decisions/ppc/PPC_SEP5_DESIGN.md)。実装と取り込みの決まりは [PPC_IMPL_RULES](../../decisions/ppc/PPC_IMPL_RULES.md)。2026-11-10 から到達点 ② (票 TASK_PPC_KBOOT) を優先し、分離の残り (下表の「未着手」) は ② の後か、本線の受入の待ちが減った時点で再開する。調査の全文は ~/os32-tmp/run/ppc-arch-survey/SURVEY.md。
+> 状態: **受入完了 (2026-11-17)** — 機種依存の分離は 11-17 の作り直しで完了の基準 3 つ (ユーザー決定「共通ソースが機種ヘッダを読む数 0・ビルド 1 系統・入口の骨格 1 本」) を満たした。今の仕組みと決まりは下の「現在地」。第 1〜5 段 (Z まで main、b98087e8) の確定設計 (完了記録) は PPC_SEP1_DESIGN (アーカイブ: `docs/archive/decisions/PPC_SEP1_DESIGN.md`)・PPC_SEP2_DESIGN (アーカイブ: `docs/archive/decisions/PPC_SEP2_DESIGN.md`)・PPC_SEP3_DESIGN (アーカイブ: `docs/archive/decisions/PPC_SEP3_DESIGN.md`)・PPC_SEP4_DESIGN (アーカイブ: `docs/archive/decisions/PPC_SEP4_DESIGN.md`)・PPC_SEP5_DESIGN (アーカイブ: `docs/archive/decisions/PPC_SEP5_DESIGN.md`)。実装と取り込みの決まりは [PPC_IMPL_RULES](../../decisions/ppc/PPC_IMPL_RULES.md)。2026-11-10 から到達点 ② (票 TASK_PPC_KBOOT) を優先し、分離の残り (下表の「未着手」) は ② の後か、本線の受入の待ちが減った時点で再開する。調査の全文は ~/os32-tmp/run/ppc-arch-survey/SURVEY.md。
 
 ## 第 1〜5 段の状態 (2026-11-10 の記録)
 
@@ -69,16 +69,16 @@ x86 本線は止めず、小枝ごとに受入済みの変更だけを取り込�
 
 |領域（SURVEY の ID）|大|中|小|代表例・実物|
 |---|---:|---:|---:|---|
-|実行・文脈 E1〜E7|6|1|0|`exec/exec_schedule.inc:267` の EIP-=2、`exec_tramp_init.inc:57` の x86 機械語生成|
-|割込み・起動・時計 I1〜I5|3|2|0|`platform/pc98/kernel_boot_cpu.inc:28` 以降の GDT/TSS/IDT/PIC/PIT 順、IRQ の16線前提|
+|実行・文脈 E1〜E7|6|1|0|`exec/exec_schedule.inc` の `exec_resume()` の EIP-=2、`exec_tramp_init.inc` の x86 機械語生成|
+|割込み・起動・時計 I1〜I5|3|2|0|`platform/pc98/kernel_boot_cpu.inc` の `kernel_boot_cpu()` 以降の GDT/TSS/IDT/PIC/PIT 順、IRQ の16線前提|
 |引数・asm A1〜A7|1|5|1|`kapi/kapi_print.c` の可変引数、`gfx/gfx_internal.h` の rep 命令|
-|V86・描画・boot V1〜V5|1|4|0|共通 exec の V86 呼び手、`gfx/gfx_core.c:259` の TVRAM 直参照|
-|SDK・CRT・Rust K1〜K2|2|0|0|`sdk/crt/crt0.asm:5` の BITS 32、Rust target の x86/LE 固定|
+|V86・描画・boot V1〜V5|1|4|0|共通 exec の V86 呼び手、`gfx/gfx_core.c` の TVRAM 直参照|
+|SDK・CRT・Rust K1〜K2|2|0|0|`sdk/crt/crt0.asm` の BITS 32、Rust target の x86/LE 固定|
 |型幅・配置 D1〜D4|2|1|1|long を u32 とする契約、gf5 の配置アサート失敗、packed の未整列アクセス|
-|ビルド B1〜B2・生成器 T1|3|0|0|`build/kernel.mk:6` の固定 ASM 一覧、`tools/mkmod.py` の i386/LE 固定|
+|ビルド B1〜B2・生成器 T1|3|0|0|`build/kernel.mk` の固定 ASM 一覧、`tools/mkmod.py` の i386/LE 固定|
 |合計|18|13|2|33件。確定31件、推定2件（D3/D4）。大は設計・共有契約、中は境界移設、小は任意経路・文言|
 
-`arch/README.md:28-29` の「ディレクトリを 1 つ足すことで閉じる」は、MMU だけでなく、起動・実行 ABI・機種依存・生成器にも成り立っていない。
+`arch/README.md` の「ディレクトリを 1 つ足すことで閉じる」は、MMU だけでなく、起動・実行 ABI・機種依存・生成器にも成り立っていない。
 件数は原因群単位で、ファイル数ではない。PC-98 専用ドライバの配置は別集計。mm/paging と既知の `lib/kprintf.c` X1 は33件に含めない。
 調査は全実行経路・全ポート・外部 apps/game・全 KAPI ABI を網羅せず、gf5 の正確な配置差、packed の実害、PC-98 専用ドライバ総数、V86 呼び手の網羅性も未確認。元調査のコンパイル結果は再実行していない。
 
@@ -96,7 +96,7 @@ C/D の規模は設計§2の比較用の値で、33件の修正・SDK・全受�
 |OS32 案 D|x86 形の2段の PD/PT|全部遅延・HPT 1個・切替と flush で全消去。**この組合せは手本に無い**|
 
 ソフトの表から spill で詰める部分の型は同じ。ただし **x86 形の表を読むこと自体は手本に無い**。低 RAM を無条件 RW にする経路は guard を破るため、OS32 では PD/PT の保護を読む必要がある。
-正典は `arch/README.md:28-29` の「ディレクトリを 1 つ足すことで閉じる」の例外として「OS32 のソフトの表の形式は x86 の2段の表と同じ」と明記し、`docs/02_memory.md` はそこを参照して形式・属性・運用を説明する。
+正典は `arch/README.md` の「ディレクトリを 1 つ足すことで閉じる」の例外として「OS32 のソフトの表の形式は x86 の2段の表と同じ」と明記し、`docs/02_memory.md` はそこを参照して形式・属性・運用を説明する。
 B をやめると表形式の完全分離を失う。別 CPU・アドレス幅・大ページなどでこの形式が制約になる場合、または遅延挿入の改善でも受入性能を満たせない場合に再検討する。ページアウト導入時には A/D の扱いも再設計する。
 
 **D は実走未検証で、確認済みなのは試作ヘッダによるコンパイルだけ。リンク・配置互換・実 HPT の動作成功を意味しない。**

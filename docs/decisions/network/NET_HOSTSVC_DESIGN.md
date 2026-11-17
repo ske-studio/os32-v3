@@ -23,21 +23,21 @@
 以下の 12 件は、今回の前提と現在の実装との差分（既存実装の不具合との断定ではない）。
 | # | 前提／票 | 実物と必要な変更（基点での file:line） |
 |---|---|---|
-| 1 | 常時 /host | `fs/serialfs/serialfs_session.c:225,231,294` は shell owner・空き mount を要求、`:145` で終了時 unmount。常駐寿命を分離する。 |
-| 2 | ホスト側 --allow-write | `tools/lanfs_host.py:154` の引数は iface/root/peer のみ、`:169` は read only。オプション実装が必要。 |
-| 3 | cdinst には /cd | `userland/system/cdinst.c:33,37,115` は `/cd0` と `cd0` を使用。本設計の正式名は `/cd0`、cdinst は変更しない。 |
-| 4 | 一般の仮想 CD に ISO を載せるだけ | `fs/isofs/iso9660.c:42` は Device 読みだが `:73,406,457` は ATAPI 世代直結、`:56` は負値を IO に潰す。世代・エラーも一般化する。 |
-| 5 | L-C NIC 境界 | `serialfs_session.c:59` は e82557 固定、`net/link.c:241,305` は ne2k 送信・受信ページ数直結。`drivers/net/ne2000/lgy98.c:123` が link_init を所有。 |
-| 6 | 0.5〜1秒・down 状態なし | `fs/serialfs/sfs_proto.h:121–125` は初動 2秒・再送3回・連続失敗3回で DEAD。LAN に別の要求期限が必要。 |
-| 7 | Ubuntu の全サービス | `tools/host_agent.py:1134,1156,1200,1254` は win32/WSL。L-D2 (`TASK_LAN_82557.md:47`) はまだ必要。 |
-| 8 | NOTIFY とメールボックス | `net/link.h:31–40` の op は 1〜10 のみ。リンクの通知用系列と KAPI を追加する。 |
-| 9 | 張りっぱなしのSFS | `tools/lanfs_host.py:83` はseqの範囲を制限、`fs/serialfs/sfs_client.c:177–178` はDEAD_SEQ。閾値更新が必要。 |
-| 10 | ATAPIとnetcd共存 | `drivers/ata/cd_body.c:14` はcd0固定、Device登録の同名拒否（レビュー指摘2）と衝突するため空きcdNへ。 |
+| 1 | 常時 /host | `fs/serialfs/serialfs_session.c` は shell owner・空き mount を要求、`sfs_finish()` で終了時 unmount。常駐寿命を分離する。 |
+| 2 | ホスト側 --allow-write | `tools/lanfs_host.py` の引数は iface/root/peer のみ、`main()` は read only。オプション実装が必要。 |
+| 3 | cdinst には /cd | `userland/system/cdinst.c` の `CD_MOUNT` は `/cd0` と `cd0` を使用。本設計の正式名は `/cd0`、cdinst は変更しない。 |
+| 4 | 一般の仮想 CD に ISO を載せるだけ | `fs/isofs/iso9660.c` は Device 読みだが `iso_check_media()` は ATAPI 世代直結、`iso_dev_read()` は負値を IO に潰す。世代・エラーも一般化する。 |
+| 5 | L-C NIC 境界 | `serialfs_session.c` は e82557 固定、`net/link.c` は ne2k 送信・受信ページ数直結。`drivers/net/ne2000/lgy98.c` が link_init を所有。 |
+| 6 | 0.5〜1秒・down 状態なし | `fs/serialfs/sfs_proto.h` の `SFS_FIRST_BYTE_MS` は初動 2秒・再送3回・連続失敗3回で DEAD。LAN に別の要求期限が必要。 |
+| 7 | Ubuntu の全サービス | `tools/host_agent.py` は win32/WSL。L-D2 (`TASK_LAN_82557.md:47`) はまだ必要。 |
+| 8 | NOTIFY とメールボックス | `net/link.h` の op は 1〜10 のみ。リンクの通知用系列と KAPI を追加する。 |
+| 9 | 張りっぱなしのSFS | `tools/lanfs_host.py` の `handle()` はseqの範囲を制限、`fs/serialfs/sfs_client.c` の `sfs_client_call()` はDEAD_SEQ。閾値更新が必要。 |
+| 10 | ATAPIとnetcd共存 | `drivers/ata/cd_body.c` はcd0固定、Device登録の同名拒否（レビュー指摘2）と衝突するため空きcdNへ。 |
 | 11 | EtherType共用 | `net/link.h` のEOF=5とSFS ENQ=0x05が一致。MARKの3バイト全体で判定する。 |
-| 12 | HOSTDOWNへの整理 | `net/link_host_api.inc:92,96,117` は非UPでSTALE。§6の表へ変更する。 |
+| 12 | HOSTDOWNへの整理 | `net/link_host_api.inc` は非UPでSTALE。§6の表へ変更する。 |
 - `TASK_LAN_82557.md:5,10,45–48` の達成は LAN hsync、印刷/wget は後回し。今回この後回しを解除する。
 - `HOST_SERVICES_PLAN.md:19–74` の v51の非同期APIを維持、ハンドルは2→8へ。`LINK_PLAN.md:134–162` の20Bヘッダを使う。参照先の archive は未読。
-- `docs/06_filesystem.md:117,319–337` の HostDrv は hypercall。実機経路は SerialFS とし、HostDrv をネットワークへ改造しない。
+- `docs/06_filesystem.md` の HostDrv は hypercall。実機経路は SerialFS とし、HostDrv をネットワークへ改造しない。
 ## 2. 全体の形
 ```text
 アプリ ─ VFS /host ─ SerialFS常駐 ─ SFS client ─┐       ┌ lanfs_host ─ HostFS / ISO像
@@ -102,7 +102,7 @@ BREAD 0x31: handle u32, lba512 u32, count u16（1..2）
 BCLOSE 0x32: handle u32 → status i32
 ```
 - 全応答は `op|0x80`。handle は sid 内だけ有効。BOPEN は read-only FD を保持、BREAD はその FD を pread。範囲・乗算オーバーフローを検査、EOF 短読は IO。変更前後の fstat が違えば STALE。
-- 現行 LAN 最大 payload=1028B (`sfs_proto.h:43`) に2×512B+statusが収まる。Device は sector=512、ISO の2048B読みを2往復に割る。単一SFS clientで /host と netcd の sid 更新を共有し、handle は張り直し後 BOPEN で再取得。
+- 現行 LAN 最大 payload=1028B (`sfs_proto.h`) に2×512B+statusが収まる。Device は sector=512、ISO の2048B読みを2往復に割る。単一SFS clientで /host と netcd の sid 更新を共有し、handle は張り直し後 BOPEN で再取得。
 - 像の同一性は **size u64 + mtime_ns u64**。先頭ハッシュは採らない（ISOの先頭ゼロ域では交換検出が弱い）。同一size/mtimeに意図的に戻した変更は検出対象外。整数の上下32bitで運べる。
 - size は512B倍数、初版の上限は u32 セクタで表せる範囲。Device total_sects に正確に設定。CDは読み取り専用、write は ROFS。
 ```c
@@ -113,8 +113,8 @@ int dev_media_check(Device *dev, u32 *generation); /* ATAPI/netcdを選び、cac
 - 30秒未使用後・seq閾値による再接続後・新着 ALIVE 後の最初のアクセスで HELLO+BOPEN+同一性比較を行う。カーネル公開のALIVE観測世代とalive_seenの差を検査予約としてcoalesceし、ネットワーク待ちはtick内で行わない。検査成功時に取得済みの観測世代をalive_seenへ保存し、その間の新着は次アクセスへ残す。
 - 同じ像なら媒体世代維持。違えば media_gen++、VFSの当該mount/FDを失効、ISOのPVD/パス/先読み/sector cache全破棄。その操作は STALE。次のパス操作で同じ `/cd0` を載せ直し、旧FDは永久にSTALE。
 - ISO の全 `atapi_media_gen()` 使用をデバイス毎の検査に置換。キャッシュ参照前と読み完了後に世代照合し、HOSTDOWN/STALEを IO に潰さない。媒体不在で古いcacheを成功として返さない。
-- `platform/pc98/kernel_boot_memory.inc:51,60–66` は現在CD→PCI→LAN。NETCD有効時はPOST_ROOTでPCI資源確立→lan.modロード/NIC bind→netcdをcd0登録→cd.modロード→子mountに変更（PCI/LAN段は二重実行しない）。登録時にホスト応答を待たない。
-- `drivers/ata/cd_body.c:14` の固定cd0を最初の空きcdNへ変更、`drivers/ata/cd_module.c` の登録契約も更新。cdinstの固定箇所は `userland/system/cdinst.c:33,37,115`。
+- `platform/pc98/kernel_boot_memory.inc` は現在CD→PCI→LAN。NETCD有効時はPOST_ROOTでPCI資源確立→lan.modロード/NIC bind→netcdをcd0登録→cd.modロード→子mountに変更（PCI/LAN段は二重実行しない）。登録時にホスト応答を待たない。
+- `drivers/ata/cd_body.c` の固定cd0を最初の空きcdNへ変更、`drivers/ata/cd_module.c` の登録契約も更新。cdinstの固定箇所は `userland/system/cdinst.c` の `CD_MOUNT`。
 - 起動設定 `NETCD=install` で仮想デバイスを **cd0として先に登録**、物理CDは次の空き番号へ。未設定時は現状通り。VFSの `VFS_DEV_CD` と `iso9660_mount` の cdN 命名をそのまま満たす。
 - FD手順: ホストで新規 `tools/fd_netcd_config.py <入力FD像> --output <出力FD像> --netcd install --peer <MAC>` を実行し、起動前にFDの起動設定へ `NETCD=install`・peer・`SFS_LAN=1` を書く → lanfs_host(--image、必要なら--allow-write)とbridge/agent起動 → 出力FDで起動 → 上記POST_ROOT順でnetcd=cd0を確保 → `mount /cd0 cd0 iso9660` → 従来のcdinst。起動後の付け直しの口は作らない。cdinst自身のmountが既存mountを許すことも受入で確認。
 - netcd無指定の実ATAPI CD、HostDrv、シリアル sfs run、通常HDD起動は回帰対象。CD導入は任意選択で既存cd0を横取りしない。
@@ -155,18 +155,18 @@ u32 host_notice_serial(void); /* GUI向け非消費の投入通番 */
 - os32.aliveのホスト世代が変わった復帰時は、別設計のos32.timeへ最初の時刻合わせを渡す（IRQ0では実行しない）。観測通番だけの変化と区別し、具体的な時計/RTC処理と実行順の結線はos32.timeの設計で定める。
 - GUIはgshellがhost_notice_serialを非消費で確認し各ownerにpendingを立て、HOST_NOTICEを1件配送。消費後clear、イベントring満杯時はpending保持。アプリはSDKでAGAINまで取得。他アプリが先に取って空でも正常。
 - host_agentのnotify(name,kind,data)はLIST登録簿で番号化。起動/HELLO時と5秒毎にALIVE。起動世代は再起動で新しくし、番号再利用と区別する。
-- 永続sfs_generationとagent IPCは削除。不明sidのSTALE (`tools/serialfs_host.py:697–699`) でSFS単独再起動を検出しagent不在でも成立させる。
+- 永続sfs_generationとagent IPCは削除。不明sidのSTALE (`tools/serialfs_host.py` の `handle()`) でSFS単独再起動を検出しagent不在でも成立させる。
 - agent停止中は1秒毎のHELLO再同期だけを行い、復帰時は最新ALIVEを送る。通常サービス要求を勝手に再発行しない。
 ## 6. Host Services の実機化
 - L-C: 82557存在時優先、なければLGY。選択は起動設定で上書き可。`lan_module_session_acquire/release` を sfs run の寿命からNIC共用参照へ移し、link利用中もlan.modを保持。ドライバのIRQ/DMA初期化は変更しない。
 - L-D2: CLIP=auto は Wayland環境でwl-copy/wl-paste、X11でxclip、既存Windows/WSL経路も維持。コマンド無し/表示server無しは503。UTF-8、PUTの4KB制限は現行通り。
 - PRINT は非同期 `lp` stdin、ジョブIDは既存Agent管理、STATUSでqueued/done/error。rawは `lp -o raw`、textはUTF-8をCUPSへ。CUPS未導入は503。shell展開なしのargvで実行する。
-- TIME/GET(wget)は既存 `_service_now` (`host_agent.py:784`) を再利用。HTTP/TLS/DNSはホストのみ。既存のGETファイル設定以外に許可リストを追加しない。
+- TIME/GET(wget)は既存 `_service_now` (`host_agent.py`) を再利用。HTTP/TLS/DNSはホストのみ。既存のGETファイル設定以外に許可リストを追加しない。
 - link要求も **相手からの応答待ちが1000msを超えればHOSTDOWN**。長いHTTP/印刷はSTATUSへのPROCESSING応答が生存応答となる。本文転送中も進捗/STATUS応答で期限更新するが、無応答時は延長しない。
 - v51は待たない。非UPのopenは即HOSTDOWN、HELLOは背景再同期。確保済み要求は未完ならAGAIN、1000ms期限切れならHOSTDOWN。closeはローカル解放可能。
 | 場合 | 旧v51 | 新v51 |
 |---|---|---|
-| open時リンク非UP (`link_host_api.inc:92,96,117`) | STALE | HOSTDOWN |
+| open時リンク非UP (`link_host_api.inc`) | STALE | HOSTDOWN |
 | 応答なし/要求期限切れ | 再送/PROBE後に再同期・STALE | HOSTDOWN |
 | handleの旧session世代 | STALE | STALE（この用途に限定） |
 | 有効handleの未完 | AGAIN | AGAIN |
@@ -197,7 +197,7 @@ int os32_host_notice_read(const char *name, HostNotice *out); /* LISTで名前�
 - 要求行は `<service> <verb> [args]`。名前は小文字英数字・点、`os32.`だけOS標準予約。KAPI_SPEC/SDK説明に **「os32. は OS32 標準、ske-studio が定めた」** と明記。他の名前は自由、作者接頭辞は強制しない。
 - 標準名は次節の一覧に従う。LISTのoriginは提供元の分類で、接頭辞から推定しない。プラグインのos32.名乗りは拒否せず警告1行。重複名は後勝ちで警告し、LISTは有効な1件を返す。
 - 旧GET/TIME/CLIP/PRINTをos32.http/time/clip/printへ対応付け、移行中は旧行も受理。標準SDK関数はos32_host_*、libos32host/os32api host.rsの用途別APIはhost_call上へ。自作はhost_callで任意名を呼べる。
-- `net/link.h:93` のLINK_HANDLESを8へ。要求8枠、本文ringは各8KiBをヒープ確保（計64KiB、既存1本から+56KiB）。ridごとの空きとNIC共通余力を分配し、合計を超すcreditを広告しない。NOTIFYは独立予約、1本満杯で他の7本を止めない。
+- `net/link.h` のLINK_HANDLESを8へ。要求8枠、本文ringは各8KiBをヒープ確保（計64KiB、既存1本から+56KiB）。ridごとの空きとNIC共通余力を分配し、合計を超すcreditを広告しない。NOTIFYは独立予約、1本満杯で他の7本を止めない。
 - agentのLISTはSFS側のos32.file/os32.iso9660をorigin=sfsの静的行として登録（世代内idも割当）。IPCや稼働確認は足さず、掲載は接続成功を保証しない。ファイル/媒体の要求本体は既存VFS/SFS経路を使い、LISTへの掲載でagentへ転送する仕組みは追加しない。
 - os32.udf/mail/feed/chatはorigin=stubで掲載し、ホストへの要求は501。別設計の未提供名は予約のみで、今回のLISTに実装済みとして載せない。
 - Tridentの改訂は別の設計往復。
@@ -223,7 +223,7 @@ int os32_host_notice_read(const char *name, HostNotice *out); /* LISTで名前�
 | SDK/gshell | 旧成果物を統合時採取 | FD収録分だけ新旧FAT割当差 | LIST cache/pending |
 - r1の15〜28KBは根拠不足につき撤回。FD増分=Σ(新FAT割当−旧FAT割当)、空き=87KiB−増分。実測23KiB超過時だけ除外をユーザーへ尋ねる。新コードのKBは未測定。
 - lan.mod/cd.modは既存core/MINIMAL/FD収録。通知16KiB/本文ringはヒープでFDを増やさない。kdebug.binには新依存を置かない。
-- `build/packages.yaml:116–121` で kdebug.bin/hwdev.mod/geforce.mod は既にFD除外済み。これらを追加節約として数えない。kdebug機能・MINIMAL集合を削る案ではない。
+- `build/packages.yaml` で kdebug.bin/hwdev.mod/geforce.mod は既にFD除外済み。これらを追加節約として数えない。kdebug機能・MINIMAL集合を削る案ではない。
 - 超過時の候補（ユーザー決裁後だけ適用、実サイズで不足分を満たす順）:
 ```yaml
 # fd.exclude に追加する候補。CDのMINIMALには残す。
@@ -278,7 +278,7 @@ int os32_host_notice_read(const char *name, HostNotice *out); /* LISTで名前�
 | I4 | 新 tools/fd_netcd_config.py | 180 | 起動前FD像のFDにだけ置く /etc/netcd.cfg へNETCD/peer/SFS_LAN設定 (R1)、I1契約後、2HD/1.44MB読戻し | ホスト | 不要 |
 | I5 | 改 build/kernel.mk | 10 | A4をvmkernelへ登録する1行 (R2) | build | 不要 |
 | I | 統合登録は下記のように1ファイルずつ直列段へ分解 | 各10〜80 | sdk/kapi.json、shared header、イベント定義、Device宣言/登録、init起動設定、module輸出入定義、build登録、app.conf、仕様正典 | 各対象 | 不要（境界追加はIで宣言） |
-- Iの生成物は手編集しない。LAN_OBJSへA5/D2/D3を追加、kernel通常パスの自動収集から除外。sfs_clientは現状 `build/kernel.mk:43` ではvmkernelであり、lan.modのsfs_lanと区別してD2から輸入する。A4はvmkernelに置きlgy98.cと同じLGY98条件で登録し、lan.modのne2k輸入を不要にする。netcd/82557 adapter本体をkernelへ複製しない。
+- Iの生成物は手編集しない。LAN_OBJSへA5/D2/D3を追加、kernel通常パスの自動収集から除外。sfs_clientは現状 `build/kernel.mk` ではvmkernelであり、lan.modのsfs_lanと区別してD2から輸入する。A4はvmkernelに置きlgy98.cと同じLGY98条件で登録し、lan.modのne2k輸入を不要にする。netcd/82557 adapter本体をkernelへ複製しない。
 - 追加段は各1ファイル: D7 `drivers/ata/cd_body.c`（cd.mod、40行、空きcdN）、D8 `drivers/ata/cd_module.c`（vmkernel、40行、登録）、I1 `platform/pc98/kernel_boot_memory.inc`（vmkernel、30行、順序）、I2 `build/lan-module.mk`（build、30行）、I3 `tools/prototypes/lan_imports.def`（生成入力、80行、上表輸入）、A11 `net/link_host_api.inc`（vmkernel、60行、期限/8枠/エラー）。
 - I4は入力像を保持して別の出力像へNETCD/peer/SFS_LANを記録する。
 - SDK/hostの追加段も各1ファイル・半日〜1日: S1 新 `userland/lib/host/host_call.c`（SDK、180行）、S2 改 `userland/lib/host/libos32host.c`（SDK、80行）、S3 改 `userland/lib/host/libos32host.h`（SDK、40行）、S4 改 `sdk/rust/os32api/src/host.rs`（SDK、180行）、H7 新 `tools/host_services.py`（host、180行、LIST登録・sfs静的行・stub/501）。lan_imports不要、S1→S2/S4・H7→H5。
@@ -322,8 +322,8 @@ H=host単体、N=NP21/W、R=82557実機。各行は新規 `tools/tests/test_host
 反論: 0件。
 
 ## 確定 (2026-11-05、Opus 第 3 回、PM が反映)
-- R1 (P2): NETCD・SFS_LAN・peer は **FD にだけ置く設定ファイル /etc/netcd.cfg** に書く (/etc/system.cfg に書くと install.bin が /etc を HDD へ写し (install.c:485)、HDD 起動でも netcd が cd0 を取る)。/etc/netcd.cfg を install.c の fd_only と build/packages.yaml の fd.only の両方に足す (case 9 も合わせる)。§4 の手順・I4 はこれに従う — 追加段 I6 `build/packages.yaml`・I7 `userland/sbin/install.c` (各 1 ファイル、10〜20 行)。
-- R2 (P3): A4 は lgy98.c と同じく常にビルドし (build/kernel.mk:37、LGY98 は CFLAGS の定義だけ)、使うかは実行時に LGY が見つかったかで決める。I5 は登録の 1 行。§11 nic の「kernel-nolgy98 で…」は「LGY の無い機械で 82557 の lan.mod の輸入が解決する」と読む。
+- R1 (P2): NETCD・SFS_LAN・peer は **FD にだけ置く設定ファイル /etc/netcd.cfg** に書く (/etc/system.cfg に書くと install.bin が /etc を HDD へ写し (install.c)、HDD 起動でも netcd が cd0 を取る)。/etc/netcd.cfg を install.c の fd_only と build/packages.yaml の fd.only の両方に足す (case 9 も合わせる)。§4 の手順・I4 はこれに従う — 追加段 I6 `build/packages.yaml`・I7 `userland/sbin/install.c` (各 1 ファイル、10〜20 行)。
+- R2 (P3): A4 は lgy98.c と同じく常にビルドし (build/kernel.mk、LGY98 は CFLAGS の定義だけ)、使うかは実行時に LGY が見つかったかで決める。I5 は登録の 1 行。§11 nic の「kernel-nolgy98 で…」は「LGY の無い機械で 82557 の lan.mod の輸入が解決する」と読む。
 - R3 (P3): agent は origin=sfs の名前 (os32.file・os32.iso9660) への要求に 501 を返す (§アプリの口 191 行)。
 - 未決はユーザー 1 件のまま: FD から外す物 (実測で 23KB を超えたときだけ尋ねる、推奨 fm.mod → pcm.mod)。
 
@@ -514,9 +514,9 @@ hs_failは次の該当一回だけ（nic.tx/nic.rx/heap/copyout/sfs.reply）、P
 
 ## 確定 (2026-11-05、Opus のレビュー、PM が反映 — 本文と食い違う所はこの節を正とする)
 1. (P1) #1・#8: vmkernel はモジュールの記号とリンクできない (今の呼び方は LanModuleApi の関数の表だけ、drivers/net/e82557/lan_module.h、LAN_MODULE_API_SLOTS 20u)。宣言の段 2 のヘッダ一覧に drivers/net/e82557/lan_module.h を足し、LanModuleApi の末尾に `const struct NetAdapter *adapter` と `int (*netcd_register)(const char *)` の欄を足して LAN_MODULE_API_SLOTS と LAN_MODULE_OPS_VERSION を上げる。A7 (lan_module.c) と I1 (kernel_boot_memory.inc) はこの表を通して呼ぶ。本体を vmkernel へ複製しない。
-2. (P2) #4: カーネル側の実体は kapi_host_notice_read / kapi_host_notice_serial として B4 に置き、host_mailbox.h からは外す (kapi/kapi_host.c:30 の慣例)。
+2. (P2) #4: カーネル側の実体は kapi_host_notice_read / kapi_host_notice_serial として B4 に置き、host_mailbox.h からは外す (kapi/kapi_host.c (kapi_host_open()) の慣例)。
 3. (P2) #7: fs/serialfs/serialfs.h の sfs_request_deadline の out を `struct SfsReply *` に改め (sfs_client.h を include)、契約試験の関数の型も合わせる。
-4. (P2) #2・#1: peer が NULL なら demux は相手を見ず、各プロトコルが今の規則で確かめる (SFS は最初の HELLO の送り手に固定、自分宛てだけ — sfs_lan.c:42; link は agent の HELLO で相手を覚える)。broadcast を受けるのは link の HELLO だけ。
+4. (P2) #2・#1: peer が NULL なら demux は相手を見ず、各プロトコルが今の規則で確かめる (SFS は最初の HELLO の送り手に固定、自分宛てだけ — sfs_lan.c; link は agent の HELLO で相手を覚える)。broadcast を受けるのは link の HELLO だけ。
 5. (P3) #3: link_notify_tick(now) は link_tick の末尾で A8 が呼ぶ。
 6. (P3) #6: 「sfs_lan_set_peer」は存在しない — lan.mod の facade の lan_peer(SfsLan *, const char *) (lan_module.h) を通す。
 7. (P3) #12: 偽物の hs_reset に開始 tick を引数で渡せるようにし、周回の直前 (0xFFFFFF00) から始める試験を 1 行足す。

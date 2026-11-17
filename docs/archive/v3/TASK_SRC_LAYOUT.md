@@ -1,7 +1,7 @@
 # TASK_SRC_LAYOUT — カーネルのソース配置を機能ごとに整理する (Linux を手本に)
 
 > 状態: **受入完了 (2026-10-30)** — **L0〜L4 は main** (全体の検査 `make check` rc=0 at 0366fd9c)。L0 (比べる口・生成物をツリーの外へ・道具、sol)、L1 `kernel/` 128 本・L2 `drivers/` 107 本・L3 `fs/` 35 本 (terra、置き場だけ、成果物は大きさ同じで差は検算値の定数だけ、L3 は 28 本バイト一致)、各段の試験・検査の追従 (sol: 試験の -I を `tools/tests/kernel_includes.py` に、check_arm_compile を make 展開に)、L4 文書 (Opus サブエージェント + sol 調査・PM 計画・terra 修正の 51 件)。NP21/W で L0 の起動を確認。手順と踏んだことの正典は [SRC_MOVE](../../SRC_MOVE.md)。**残り**: 要判断 3・4 (置き場の細部・include の書き方) は仮のまま — ユーザーが別に立てる分離計画で決める。§4 の逆向きの依存 (idt.h の分割・gfx_core の名指し・dev.c の名指し) は L5 以降の別の票。
-> 上位: [ROADMAP](../../ROADMAP.md)・ソースツリーの図の正典 [08_build](../../08_build.md) §8-3・ファイル地図 [DEVELOPMENT](../../DEVELOPMENT.md) §2。関連: [TASK_REDUNDANCY](TASK_REDUNDANCY.md) (進行中、同じファイル群を触る)・[TASK_DEP_DIR](TASK_DEP_DIR.md) (依存方向)。
+> 上位: [ROADMAP](../../ROADMAP.md)・ソースツリーの図の正典 [08_build](../../08_build.md) §8-3・ファイル地図 [DEVELOPMENT](../../DEVELOPMENT.md) §2。関連: [TASK_REDUNDANCY](../../tasks/v3/TASK_REDUNDANCY.md) (進行中、同じファイル群を触る)・[TASK_DEP_DIR](TASK_DEP_DIR.md) (依存方向)。
 
 ## ユーザーの指示と決定 (2026-10-30)
 

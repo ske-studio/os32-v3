@@ -46,4 +46,4 @@ rc = g_api->kdebug_call(op, &q, sizeof(q));
 ## 4. 照合とS0
 
 既定は `required`。指定はCの開始ごとに受け取り、形式／対象の誤りは書込み前に返す。
-現 `MMIO 680a24`／`CR 1c`／`SR 01`、16進、空行・#コメント、64指定の形式を継承する（`userland/shell/cmd_gfinit.c:21`）。実行中にファイルを再読しない。
+現 `MMIO 680a24`／`CR 1c`／`SR 01`、16進、空行・#コメント、64指定の形式を継承する（`userland/shell/cmd_gfinit.c`）。実行中にファイルを再読しない。

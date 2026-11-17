@@ -186,7 +186,7 @@ SUMMARY 6/6 PASS
 ## 既知の限界
 
 - **同じ物理ディスク上の別パーティションは区別しない。**
-  `fs/ext2/ext2_super.c:131` の `ext2_find_partition()` は PC-98 パーティション
+  `fs/ext2/ext2_super.c` の `ext2_find_partition()` は PC-98 パーティション
   テーブルの最初のブート可能エントリ (`bootable & 0x80`) を見つけた時点で
   `break` するので、1 台の hd につき 1 パーティションしか触れない。さらに
   `vfs_mount()` が同じ `(ops, dev_type, dev_id)` の二重マウントを断るため、

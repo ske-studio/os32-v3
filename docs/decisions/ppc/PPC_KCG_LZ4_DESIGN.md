@@ -37,8 +37,8 @@ console_route・段 I・PLANAR4・FD フォント収録・実行中切替コマ�
 - font_guard と resident lease を維持する。描画中の確保・I/O・遅延伸長は導入しない。
 - header検査→出力P確保→圧縮時のみ入力C確保→全量read→lease validate→decode→fetched検査→close成功→差替え。
 - flags=0 は出力に直読。入力Cは公開前に解放する。失敗時は新入力・新出力・leaseを回収し、旧residentを保持する。
-- 成功時だけ既存の kcg_file.c:48–50 と同じ順で旧resident解放→新resident代入→counter reset。再ロードを拒否しない。
-- bootの呼び手は platform/powermac/ppc_kernel.c:345 の1か所。font成功後のunicode/target/FB準備順を維持する。
+- 成功時だけ既存の kcg_file.c と同じ順で旧resident解放→新resident代入→counter reset。再ロードを拒否しない。
+- bootの呼び手は platform/powermac/ppc_kernel.c の1か所。font成功後のunicode/target/FB準備順を維持する。
 - 初回loadの字形用最大同時確保はP+C=593,056B、再ロードは旧P込み888,996B＋管理分。他用途を含む1MiB arenaの高水位を測る。
 - 確保不能時はエラーで戻り、既存streamを継続する。公開kcg_load_fontのNOSYS、x86のROM/module選択は不変。
 
@@ -66,7 +66,7 @@ if args and args[0] == '--ebdt':
     return 0
 # この後は既存TTF引数処理。入口は sys.exit(main()) として失敗を伝える。
 ```
-build_ebdt_payload は現行build_ebdtのpayload構築部を分離した内部関数。`build_ebdt(path)` は `pack_kcg(build_ebdt_payload(path), 'none')` を返す形で残す（tools/tests/test_kcg_ebdt.py:30 が header 付き全バイトを期待するため、G1）。TTFの既定fallbackと --no-lz4 は維持する。
+build_ebdt_payload は現行build_ebdtのpayload構築部を分離した内部関数。`build_ebdt(path)` は `pack_kcg(build_ebdt_payload(path), 'none')` を返す形で残す（tools/tests/test_kcg_ebdt.py が header 付き全バイトを期待するため、G1）。TTFの既定fallbackと --no-lz4 は維持する。
 明示 --lz4 の依存不足は失敗。圧縮bodyがP以上ならflags=0に戻すが、依存不足を無圧縮成功で隠さない。
 生成に使うlz4版を固定して再現性を確認し、形式・サイズ・SHAを記録する。
 build編集順: ①生成器と試験を先行 ②L1のloader受入完了 ③font-fetch.mkの製品EBDT呼出しへ --lz4 を追加。
@@ -81,13 +81,13 @@ L0単独では非圧縮製品を保つ。圧縮製品への切替とL1収録を�
 
 ## 3. L1 — loader と収録（受け手: PowerPC）
 触るファイル: drivers/video/kcg/kcg_file.c、lib/lz4.cの冒頭注記、build/targets/ppc-powermac.mk、loader/統合試験。
--O0は維持する。理由: lib/lz4.c:13–15の最適化不具合の注意を解除する根拠がないため。
+-O0は維持する。理由: lib/lz4.cの最適化不具合の注意を解除する根拠がないため。
 build/targets/ppc-powermac.mkのKB_Cへlib/lz4.cを追加し、専用objectに次の1行を置く（program用objectを流用しない）。
 ```make
 $(KB_OUT)/lib/lz4.o: KB_TU_FLAGS += -O0
 ```
 既存compile recipeは $(KB_FLAGS) $(KB_TU_FLAGS) の順なので、この指定を最後の最適化指定として有効にする。
-lib/lz4.c:9–13の注記を「programとPPC kernelの専用objectへリンク、両者の最適化設定は各build規則を参照」に訂正する。
+lib/lz4.cの注記を「programとPPC kernelの専用objectへリンク、両者の最適化設定は各build規則を参照」に訂正する。
 実物programs.mk:207–208はPROGRAM_FLAGSを使用し、専用-O0は直接書かれていない。注記の「設定済み」は転記しない。
 build編集順: ①loaderと試験 ②build/targets/ppc-powermac.mkのソース追加・上記TU指定を一緒に編集 ③PPCビルドと0/1受入 ④L0製品切替。
 完了条件に追加: KB_FLAGS（-Wall -Wextra -Werror）と -O0 で lz4.c に警告が出たら lz4.c の側を直す（G3）。
@@ -113,8 +113,8 @@ R系の完了は前提にしない。build/targets/ppc-powermac.mkの他作業�
 ## 4. 文書訂正2点
 | ID・対象 | 訂正内容・確認 |
 |---|---|
-| D3: docs/decisions/gui/CONSOLE_DUAL_DESIGN.md:50 | PPCはplatform/powermac/display_dual.cに実体あり、と古い注記を更新する |
-| D1: PM事前確認の記述 | platform/pc98/kernel_gfx_config.inc:18でconfigure済み、kernel.c:208,309で呼出し/include済み。本設計を訂正記録とし、PM管理の元記録も訂正する |
+| D3: docs/decisions/gui/CONSOLE_DUAL_DESIGN.md | PPCはplatform/powermac/display_dual.cに実体あり、と古い注記を更新する |
+| D1: PM事前確認の記述 | platform/pc98/kernel_gfx_config.incでconfigure済み、kernel.cで呼出し/include済み。本設計を訂正記録とし、PM管理の元記録も訂正する |
 文書訂正はPowerPCから本線PMへ渡す。D1を製品の結線欠落と扱わず、cfg読込みの追加実装はしない。
 
 ## 5. 段 I へ送る

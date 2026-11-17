@@ -25,7 +25,7 @@ struct hwdev_ops {
 };
 ```
 
-装置境界は `recover.h:200–219` の recover_ops/opaque を再利用し、HWDEV 固有の口は call/release_work だけ。
+装置境界は `recover.h` の recover_ops/opaque を再利用し、HWDEV 固有の口は call/release_work だけ。
 
 ## 9. 部品の寿命 manifest v1 (M2/M3a の入力契約)
 

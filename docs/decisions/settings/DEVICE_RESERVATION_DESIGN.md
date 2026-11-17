@@ -27,20 +27,20 @@
 
 | # | 旧票との食い違い / 実物の根拠 | 改訂での扱い |
 |---|---|---|
-| 1 | 「owner・複数範囲 transaction なし」に対し `mm/pgalloc_resource.inc:52-144` に `ledger_reserve_set` が存在 | T1 完了部分を再利用。旧 `pgalloc_device_reserve` / `sys_device_reserve_core` は現行実体にない |
-| 2 | 固定配置 snapshot の追加要求に対し `mm/pgalloc_resource.inc:99-125` は区間台帳と L2 owner を照合済み | 別 broker 台帳を重複作成しない |
-| 3 | GUI で初回予約に対し `platform/pc98/kernel.c:198-207` は `gfx_boot_reserve` → `exec_init` | 起動時予約を維持、残りは装置集合と公開の原子性 |
-| 4 | 後発 PEGC BB 未解決に対し `gfx/gfx_core_surface.inc:191-227` は BOOT owner で上端から取得し freeze | BB を MMIO transaction に混ぜず既存 RAM/SURFACE 経路を使う |
-| 5 | GUI=0/希望値のみなら予約0に対し `gfx/gfx_core_surface.inc:135-173` は希望候補を起動時予約 | GUI=0 でも実在資源を予約、probe/enable は表示 activation 境界へ（CUI 単独は §9） |
-| 6 | PEGC と Xe10 を別 owner で拒否する旧案に対し `gfx/gfx_core_surface.inc:10-13,173` は共有 GFX owner の一括集合 | 固定表示の重なる窓は明示した同一予約グループ、利用権は排他 |
-| 7 | PEGC-alt 未使用に対し `gfx/gfx_core_surface.inc:53-55,162` は別名窓も登録 | 現行 identify 条件下の alt を落とさない。無条件な別名推定はしない |
-| 8 | 「資源レコード込み失敗不変」に対し `gfx/gfx_core_surface.inc:163-173` と `geforce_platform.c:44-47` は add が先に可視化 | 新 transaction で資源登録・owner 新設まで同時 commit |
-| 9 | 初回は PEGC/Xe10 のみに対し `drivers/video/geforce/geforce_platform.c:27-65` に GF の全 BAR 予約・部分写像がある | GF 部品を移植し直さず broker に接続。`gfx_core_surface.inc:159,223-225` の候補排他は実在装置の排他に使わない |
-| 10 | 面の隔離が未実装という旧受入に対し `mm/pgalloc.h:187-192,294-310` に SURFACE・世代・lease_count・release がある | T2 の面/lease を使用し、予約範囲を USER に直接公開しない |
+| 1 | 「owner・複数範囲 transaction なし」に対し `mm/pgalloc_resource.inc` に `ledger_reserve_set` が存在 | T1 完了部分を再利用。旧 `pgalloc_device_reserve` / `sys_device_reserve_core` は現行実体にない |
+| 2 | 固定配置 snapshot の追加要求に対し `mm/pgalloc_resource.inc` は区間台帳と L2 owner を照合済み | 別 broker 台帳を重複作成しない |
+| 3 | GUI で初回予約に対し `platform/pc98/kernel.c` は `gfx_boot_reserve` → `exec_init` | 起動時予約を維持、残りは装置集合と公開の原子性 |
+| 4 | 後発 PEGC BB 未解決に対し `gfx/gfx_core_surface.inc` は BOOT owner で上端から取得し freeze | BB を MMIO transaction に混ぜず既存 RAM/SURFACE 経路を使う |
+| 5 | GUI=0/希望値のみなら予約0に対し `gfx/gfx_core_surface.inc` は希望候補を起動時予約 | GUI=0 でも実在資源を予約、probe/enable は表示 activation 境界へ（CUI 単独は §9） |
+| 6 | PEGC と Xe10 を別 owner で拒否する旧案に対し `gfx/gfx_core_surface.inc` は共有 GFX owner の一括集合 | 固定表示の重なる窓は明示した同一予約グループ、利用権は排他 |
+| 7 | PEGC-alt 未使用に対し `gfx/gfx_core_surface.inc` は別名窓も登録 | 現行 identify 条件下の alt を落とさない。無条件な別名推定はしない |
+| 8 | 「資源レコード込み失敗不変」に対し `gfx/gfx_core_surface.inc` と `geforce_platform.c` は add が先に可視化 | 新 transaction で資源登録・owner 新設まで同時 commit |
+| 9 | 初回は PEGC/Xe10 のみに対し `drivers/video/geforce/geforce_platform.c` の `reserve()` に GF の全 BAR 予約・部分写像がある | GF 部品を移植し直さず broker に接続。`gfx_core_surface.inc` の候補排他は実在装置の排他に使わない |
+| 10 | 面の隔離が未実装という旧受入に対し `mm/pgalloc.h` に SURFACE・世代・lease_count・release がある | T2 の面/lease を使用し、予約範囲を USER に直接公開しない |
 
 - 表の略記 `geforce_platform.c` は `drivers/video/geforce/geforce_platform.c`、`gfx_core_surface.inc` は `gfx/` 配下。
-- `drivers/pci/pci.c:8,201-207` は BAR を読むだけ。`platform/pc98/pci_resources.c:17-24` の RAW は幅未確定で権限ではない。
-- `tools/tests/test_device_reservation.py:14-25,160-247` に第二 span、exact retry、部分一致、永久保持等の試験が既存。合格を今回確認した意味ではない。
+- `drivers/pci/pci.c` は BAR を読むだけ。`platform/pc98/pci_resources.c` の RAW は幅未確定で権限ではない。
+- `tools/tests/test_device_reservation.py` に第二 span、exact retry、部分一致、永久保持等の試験が既存。合格を今回確認した意味ではない。
 - 指定 `docs/decisions/realhw/HWDEV_CORE_API.md` は存在せず、同名ファイルも検索で見つからなかった。
 - 現行 `docs/decisions/MEMMAP_V3.md` に D33 本文・§6 T1 はない。アーカイブは未参照。U6/X4 は票冒頭のみを根拠とする。
 - HWDEV の現行制約は `DEVICE_STATES.md:14,29-32`：表示所有中・未分類は claim 拒否、GF の BM 禁止は維持。
@@ -122,7 +122,7 @@ int pci_resource_match(const struct ledger_resource *saved);
 | MODULE のコード/作業 RAM | MODULE / load〜停止 | callback解除→実行終了確認→既存 reclaim |
 | 表示利用権 | broker の active handle / 操作期間 | 新規lease停止→既存lease終了→装置停止→release |
 
-- **PM 決定（ID6）**: HWDEV の acquire/release 結線は外す。既存 `hwdev_claim`（`hwdev/owner.h:18-22`）と `hwdev_owner_state=DISPLAY` の拒否を維持。E_OWNER・broker の FAILED 保持は追加しない。
+- **PM 決定（ID6）**: HWDEV の acquire/release 結線は外す。既存 `hwdev_claim`（`hwdev/owner.h`）と `hwdev_owner_state=DISPLAY` の拒否を維持。E_OWNER・broker の FAILED 保持は追加しない。
 - broker の状態は RESERVED/MAPPED/READY/ACTIVE、表示 gate は空または一つの handle。同じ h の acquire は成功無操作、別 h は E_BUSY。正常 CUI 復帰で release し、次回 GUI で再取得する。
 - release は lease 終了・既存停止処理の完了後のみ。未完了なら既存停止経路に従い gate を保持する。MMIO/写像と再利用 BB は保持し、二重 release は E_STATE。
 ```c
@@ -144,10 +144,10 @@ int gfx_device_activate(devres_handle h);
 ```
 
 - 起動: RAM地図確定→PCI読取り→検証済み資源 commit→必要PT/写像準備→BB/SURFACE記述→arena freeze→exec_init。
-- `paging_init/pgalloc_init` は PCI 取込み（`platform/pc98/pci_resources.c:82`）より先。予約時に使用中 RAM と衝突した候補は E_CONFLICT で外す。
+- `paging_init/pgalloc_init` は PCI 取込み（`platform/pc98/pci_resources.c`）より先。予約時に使用中 RAM と衝突した候補は E_CONFLICT で外す。
 - GUI=0 も識別・予約・選択装置の BB 準備までは同じ。CUI 起動だけでは probe/enable しない。希望値は BB と activation の選択に使い、MMIO 収集から非選択装置を外さない。
-- `gfx_prepare_backend` の起動時 PEGC probe（`gfx/gfx_core.c:324-326`、`platform/pc98/kernel.c:250`）は表示 activation gate へ移す。起動は表示同期を変更しない read-only prepare のみ。
-- GUI=1 と CUI→GUI は同一 master/live AS=0・exec不在境界。CUI 描画アプリの既存直接 probe/init（`gfx/gfx_core.c:308`）は §9 の唯一の未決。推奨案では起動済み予約/map/BB を使い既存 gfx_init 境界で同じ表示 gate に入り、exec不在条件は GUI 経路にだけ課す。
+- `gfx_prepare_backend` の起動時 PEGC probe（`gfx/gfx_core.c`、`platform/pc98/kernel.c`）は表示 activation gate へ移す。起動は表示同期を変更しない read-only prepare のみ。
+- GUI=1 と CUI→GUI は同一 master/live AS=0・exec不在境界。CUI 描画アプリの既存直接 probe/init（`gfx/gfx_core.c`）は §9 の唯一の未決。推奨案では起動済み予約/map/BB を使い既存 gfx_init 境界で同じ表示 gate に入り、exec不在条件は GUI 経路にだけ課す。
 - exec arena 全域を禁止しない。実際の FIXED/STAGING/BB/live allocation を T1 で拒否。BB は既存 top-down、未公開失敗時だけ RAM を返す。
 - map は supervisor RW/UC を基本とし、GF の既存 WC 条件・同期は `gf_wc.c` に任せる。broker に新 WC 制御を作らない。
 - map対象全体の既存PTE属性を事前検査。RAM identity alias は既存 paging の cache/TLB 同期経路でのみ変更し、単なるPTE置換で済ませない。
@@ -178,11 +178,11 @@ int gfx_device_activate(devres_handle h);
 | 項目 | 増分の設計予算（実測ではない） |
 |---|---|
 | kernel text/rodata | broker/PCI照合/結線で約8〜16KiB、既存コード移設は二重計上しない。圧縮像への増分は未測定 |
-| 台帳 RAM | 資源 +512B。regionを16→20Bに変更して64×20−48×16=512B（現行 `mm/pgalloc.c:36` は16B、実装時sizeofを固定） |
+| 台帳 RAM | 資源 +512B。regionを16→20Bに変更して64×20−48×16=512B（現行 `mm/pgalloc.c` は16B、実装時sizeofを固定） |
 | broker常駐 | handle8×64B=512B、width_basis は8×6=48Bをhandle予算内に含む。資源/正規化scratch・計画領域は約2〜4KiB。増分総計は約4〜6KiB |
 | PT RAM | 実際にmapする異なる4MiB帯の数×4KiB。decode全域をmapしない。新broker自体は常駐PTを増やさない |
 | BB RAM | **PM 決定（ID8）**: 選択装置の分だけ（PEGC または GF client 300KiB）、PC98 fallbackは現行サイズ。非選択は MMIO 予約だけ |
-| 永久MMIOの番地帯 | GF定数は16+256+16=288MiB（`hwdev/gf/production.h:8-10`）。描画mapはBAR0と300KiB等の既存必要部のみ |
+| 永久MMIOの番地帯 | GF定数は16+256+16=288MiB（`hwdev/gf/production.h`）。描画mapはBAR0と300KiB等の既存必要部のみ |
 | 固定表示の番地帯 | PEGC512KiB、alt512KiB、Xe10 bank32KiBとlinear4MiB。bankはPEGC内なのでunionは最大5MiB |
 | 共存時 | 上記unionにTrident/PCI Cirrusの検証済みdecodeを加算。Trident基準上限の合計は12MiB+64KiB、他窓とのunionで計算する。通信帯域の消費ではなく番地占有 |
 
@@ -205,22 +205,22 @@ int gfx_device_activate(devres_handle h);
 | C4 | 変更 `gfx/gfx_core.c` | prepare/直接init結線 65 | C2/C3後、ID1決定を反映 | 0.5 |
 | D1 | 変更 `drivers/video/geforce/geforce_platform.c` | broker・rid/helper 100 | C1後、C2並列 | 0.75 |
 | D2 | 変更 `drivers/video/geforce/geforce_module.c` | publish/停止 45 | D1/C3後、F2のGF試験と取込 | 0.5 |
-| D3 | 変更 `drivers/video/geforce/gf_wc.c` | :157 owner helper 15 | D1後、G2と取込 | 0.25 |
-| D4 | 変更 `hwdev/gf/native.c` | :19 owner helperのみ 15 | C1後、G4と取込、claim結線なし | 0.25 |
-| D5 | 変更 `kdebug/kselftest/gfx_ledger.inc` | :21 rid/helper 20 | C1後 | 0.25 |
+| D3 | 変更 `drivers/video/geforce/gf_wc.c` | `eligible()` owner helper 15 | D1後、G2と取込 | 0.25 |
+| D4 | 変更 `hwdev/gf/native.c` | `reserved()` owner helperのみ 15 | C1後、G4と取込、claim結線なし | 0.25 |
+| D5 | 変更 `kdebug/kselftest/gfx_ledger.inc` | `gfx_dev_covers()` rid/helper 20 | C1後 | 0.25 |
 | E1 | 変更 `platform/pc98/kernel.c` | 起動・gate 35 | 部品完成後、直列 | 0.5 |
 | F1 | 変更 `tools/tests/test_device_reservation.py` | 原子性・容量・変異 180 | A3と一括 | 0 |
 | F2 | 新 `tools/tests/test_device_activation.py` | C1/C3/D2のtrace・変異 260 | 同一担当が依存段ごと追記 | 0 |
-| G1 | 変更 `tools/tests/gfx_boot_host.c` | :194,568 owner/選択BB 35 | C2と一括 | 0 |
-| G2 | 変更 `tools/tests/gf_wc_host.c` | :187 BDF別owner・他owner拒否の変異 25 | D3と一括 | 0 |
-| G3 | 変更 `tools/tests/lease_host.c` | :285 owner fixture 15 | A3と一括 | 0 |
-| G4 | 変更 `tools/tests/gf_production_host.c` | :243 owner fixture/native経路・誤rid拒否 30 | D1/D4と一括 | 0 |
-| G5 | 変更 `tools/tests/access_walk_host.c` | :317 owner fixture 20 | A3と一括 | 0 |
+| G1 | 変更 `tools/tests/gfx_boot_host.c` | `host_reserve()` owner/選択BB 35 | C2と一括 | 0 |
+| G2 | 変更 `tools/tests/gf_wc_host.c` | `setup()` BDF別owner・他owner拒否の変異 25 | D3と一括 | 0 |
+| G3 | 変更 `tools/tests/lease_host.c` | `_start()` owner fixture 15 | A3と一括 | 0 |
+| G4 | 変更 `tools/tests/gf_production_host.c` | `prod_reset()` owner fixture/native経路・誤rid拒否 30 | D1/D4と一括 | 0 |
+| G5 | 変更 `tools/tests/access_walk_host.c` | `host_start()` owner fixture 20 | A3と一括 | 0 |
 | P1/PM | 変更 `docs/tasks/DEFERRED_TESTS.md` | Ra266受入行 5 | E1統合時 | 0 |
 
 - 上限合計15.5KiB（kernel+部品+kdebugの合計で保守的に計上）、§6の8〜16KiB内。共有登録の増分もこの枠内、圧縮像・常駐RAMは統合時実測。
 - 共有登録 `build/*.mk`、module imports/context、試験登録、文書入口は PM 統合ブランチのみが所有。各実装者は追加行案を提出、PM がファイルごとに段を割り当てる（PARALLEL_BRANCHES §2）。
-- KAPI/SDK ABI は不変だが **部品 ABI は変更**。`hwdev/generated/hwdev_contract.h:2731,2745-2748` の16B/offset12/2B契約を20B/u32へ更新。`tools/hwdev_layout.json:1452` と `kdebug/generated/kdebug_imports.json:2688` を含む関連生成物は PM が全変更のmerge後に一回生成する（同§2）。部品とkdebugを同一契約で再ビルドし、旧像と混在させない。
+- KAPI/SDK ABI は不変だが **部品 ABI は変更**。`hwdev/generated/hwdev_contract.h` の16B/offset12/2B契約を20B/u32へ更新。`tools/hwdev_layout.json` と `kdebug/generated/kdebug_imports.json` を含む関連生成物は PM が全変更のmerge後に一回生成する（同§2）。部品とkdebugを同一契約で再ビルドし、旧像と混在させない。
 
 ## 8. 受入→試験・変異と検査順
 
@@ -253,9 +253,9 @@ int gfx_device_activate(devres_handle h);
 反論: 0件。
 
 ## 確定 (2026-11-04、claude-opus-5-5 の第 2 回、PM が反映)
-- N1: §7 の表の C2 の組に `tools/tests/test_gfx_boot.py:220-224` の変異の目印 (`ledger_reserve_set(LEDGER_OWNER_GFX, sp, n)` の行を core.index で探す) の追従を足す。C2 がその行を書き換えるなら、同じ段で目印を新しい行に直す。
-- N2: PM 決定 — 固定表示 group (PEGC/Xe10) の owner は今の `LEDGER_OWNER_GFX` (固定 7 番、mm/pgalloc.c:96) のまま。`ledger_device_commit` は新しい owner を作らない。`tools/tests/test_ledger.py:256,258` と `device_reservation_stage_host.c` は変えない。BDF ごとの DEVICE owner は GF など PCI の増設装置だけ。
+- N1: §7 の表の C2 の組に `tools/tests/test_gfx_boot.py` の変異の目印 (`ledger_reserve_set(LEDGER_OWNER_GFX, sp, n)` の行を core.index で探す) の追従を足す。C2 がその行を書き換えるなら、同じ段で目印を新しい行に直す。
+- N2: PM 決定 — 固定表示 group (PEGC/Xe10) の owner は今の `LEDGER_OWNER_GFX` (固定 7 番、mm/pgalloc.c) のまま。`ledger_device_commit` は新しい owner を作らない。`tools/tests/test_ledger.py` と `device_reservation_stage_host.c` は変えない。BDF ごとの DEVICE owner は GF など PCI の増設装置だけ。
 - N3: PM 決定 — Trident の上限の計算 (`kdebug/gfinit_resources/bounds.inc`、隣の BAR の番地から実行時に縮める) は B3 の中で共有のファイル (`drivers/pci/pci_barlen.c`/`.h`、製品のカーネルに入る) へ移し、kdebug はそれを引く。計算の正典は 1 つ。B3 の触るファイルに bounds.inc と kdebug のビルドの入力を足す。
-- N4: `devres_request.width_basis[]` は置かない。`struct ledger_resource` の既存の width_basis の欄を使い、enum に `LEDGER_WB_BARLEN_UPPER` を足して `pgalloc_resource.inc:74` の照合で受け入れる (A2/A3)。
+- N4: `devres_request.width_basis[]` は置かない。`struct ledger_resource` の既存の width_basis の欄を使い、enum に `LEDGER_WB_BARLEN_UPPER` を足して `pgalloc_resource.inc` の照合で受け入れる (A2/A3)。
 - N5: CUI 単独アプリが表示 gate を acquire した後の release は、`to_cui` に加えて exec の後始末 (正常終了・abort・longjmp の共通の出口) に 1 行置く。同じ h なら冪等。
 - ID11: §6 の「追加 RAM 256B」は「16B のまま 64 件にした場合との差」、表の「64×20−48×16=512B」は「今の 48×16B との差」。

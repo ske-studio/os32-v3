@@ -27,7 +27,7 @@
 アプリは index ではなく役割名で参照する。ウィンドウ内でアプリがパレットを自由に変えることは
 できない (ラスタ効果はフルスクリーン GFX の領分)。ただし G8 のリースで一部を貸す。
 
-アプリ側の定数は [`os32_gui_shared.h:383`](../../../../../sdk/include/os32/os32_gui_shared.h)
+アプリ側の定数は [`os32_gui_shared.h`](../../../../../sdk/include/os32/os32_gui_shared.h)
 の `GUI_SHM_OFFSET` / `GUI_SLOT_SIZE` を用いる。
 
 | スロット内のブロック | 大きさ | 内容 |

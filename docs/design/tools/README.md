@@ -18,7 +18,7 @@ ELF32、R_386_32/PC32、未解決参照拒否、生成 import 型契約、
 
 > [要確認] 元文の生成器名 tools/mkmod.py は現行と異なる。インポート表・stub は tools/gen_sqlite_imports.py が生成する。
 
-contracts の文字列 FNV により CIRRUS_MODULE_ABI_GEN は自動更新（tools/gen_sqlite_imports.py:41–44）。kernel と cirrus.mod を同じビルドの対で配る。
+contracts の文字列 FNV により CIRRUS_MODULE_ABI_GEN は自動更新（tools/gen_sqlite_imports.py）。kernel と cirrus.mod を同じビルドの対で配る。
 
 ### gen_kdebug_imports
 
@@ -37,7 +37,7 @@ contracts の文字列 FNV により CIRRUS_MODULE_ABI_GEN は自動更新（too
 
 ### gen_build_id
 
-tools/gen_build_id.py:45–55 の短縮 commit・追跡ファイルの dirty・失敗時 unknown を維持。
+tools/gen_build_id.py の短縮 commit・追跡ファイルの dirty・失敗時 unknown を維持。
 
 ### np21w_ini
 
@@ -81,7 +81,7 @@ map の LOAD 一覧・各 .o の size・最終 ELF・KMOD header を照合する
 
 ### gen_memmap
 
-- gen_memmap.py:113–119 は memmap.h の include を外して cpp で解くため、容量式を gfx_format.h 等への依存にしない。
+- gen_memmap.py は memmap.h の include を外して cpp で解くため、容量式を gfx_format.h 等への依存にしない。
 
 ## 索引
 

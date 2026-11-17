@@ -113,7 +113,7 @@ C_COMMON_HOOKS_ABSENT = $(foreach h,$(EXEC_HOOKS),$(if $(filter 0,$(HOOK_$(h))),
 | 選択の試験 | `test_build_selection.py` の fixture (x86 は不変、PowerPC は 14 本の置き場の名前だけ) |
 | 追従 (covers) | `arch/x86/exec_*.h`・`arch/ppc/exec_*.[ch]` を `covers` に持つ検査 (`tools/checks/exec-image-host.py`・`ppc-exec-*.py`・`ppc-kapi-table.py`・`ppc-syscall-code.py` など)。`run.py --lint` の missing input で洗う |
 | 追従 (PowerPC 側を単体で組む試験) | `tools/ppc/test_kapi_table.py` (`exec.c` の写しを cross で組む) に `-DOS32_HOOK_DEFAULT=0` を渡す。`tools/tests/test_ppc_rshell_link.py` (移した `exec_reclaim.c` を組む) は .c 自身が 0 を定義するのでパスの追従だけ。`tools/tests/test_ppc_terminal_work.py` はフックのヘッダを読まないので、include の名前 (`arch_exec_kapi.h`) とパスの追従だけ |
-| 追従 (arch のヘッダ・.c をパスで読む試験) | `tools/tests/test_geforce.py:616`・`test_gfx2_i3.py:36`・`test_gfx_policy_triggers.py:97`・`test_gf_cui.py:55`・`test_build_selection.py:63`・`r1_fixture_host.c`・`font_guard_host.c`・`exec_source.py`。本文から切り出す箇所と変異の目印は lint では捕まらないので、フックのヘッダの名前で `git grep` して洗い、`--mutate` で回す |
+| 追従 (arch のヘッダ・.c をパスで読む試験) | `tools/tests/test_geforce.py`・`test_gfx2_i3.py`・`test_gfx_policy_triggers.py`・`test_gf_cui.py`・`test_build_selection.py`・`r1_fixture_host.c`・`font_guard_host.c`・`exec_source.py`。本文から切り出す箇所と変異の目印は lint では捕まらないので、フックのヘッダの名前で `git grep` して洗い、`--mutate` で回す |
 
 ## 5. ファイル
 

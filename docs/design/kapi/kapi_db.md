@@ -9,9 +9,9 @@ SQLite 接続とステートメントをハンドルとして公開する。
 
 - DB の失敗は戻り値だけではプール枯渇と他の失敗を区別しにくい。
   `db_last_error` の診断を確認し、不要になった接続やステートメントを閉じる
-  (`kapi/kapi_db.c:388`, `kapi/kapi_db.c`)。ユーザーから読めるよう、
+  (`kapi/kapi_db.c` の `shm_write_row()`, `kapi/kapi_db.c`)。ユーザーから読めるよう、
   エラー文字列は共有領域へ写される (`kapi/kapi_db.c`)。
-  呼出し元によるハンドルの所有検査は `kapi/kapi_db.c:151` にある。
+  呼出し元によるハンドルの所有検査は `kapi/kapi_db.c` の `slot_get()` にある。
   `tools/tests/test_db_errstr.py` と `tools/tests/test_db_caller.py` が検査する。
 
 ## 内部設計と契約 (D1)

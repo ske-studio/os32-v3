@@ -47,7 +47,7 @@ NP21/W の受入と実機の更新は、CI の artifacts のジョブが作っ�
 
 ## 4. 落ちたとき
 
-1. `gh run view <id> --log-failed` (空なら `gh api repos/ske-studio/os32-v3/actions/jobs/<id>/logs`) で、`make[3]: *** [build/sdk.mk:181: check-<名>]` の行から落ちた検査を全部出す。check.log の `^make…: ***` の grep は使わない — 並列の検査の出力が混ざって `make[3]: ***` が行頭に来ないことがあり、2026-11-01 に落ちた 2 本のうち 1 本を見落として push した (CI の check で発覚)。
+1. `gh run view <id> --log-failed` (空なら `gh api repos/ske-studio/os32-v3/actions/jobs/<id>/logs`) で、`make[3]: *** [build/sdk.mk: check-<名>]` の行から落ちた検査を全部出す。check.log の `^make…: ***` の grep は使わない — 並列の検査の出力が混ざって `make[3]: ***` が行頭に来ないことがあり、2026-11-01 に落ちた 2 本のうち 1 本を見落として push した (CI の check で発覚)。
 2. その対象の周辺だけ読む (`sed -n` で行を絞る)。MUTATION の RED は期待どおりの行なので数えない。
 3. 直して main に別コミット。**落ちた対象だけ**を回し直して rc=0 を確かめる。全体を回し直さない。
 4. CI でだけ落ちて手元で再現しないときは、substream (Ubuntu 24.04・gcc 13・qemu 8.2、GitHub の runner と同じ) で再現する (`ssh substream`、2026-11-05 の gcc 13 の件)。

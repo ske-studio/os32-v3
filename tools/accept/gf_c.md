@@ -37,7 +37,7 @@ OS32 は単一利用者・単一タスク・協調切替で攻撃者を想定し
 |---|---|
 | 版 | 読取確認した main は `b848317074a1872c8affa6b723a650c9db7f51ba`。当日採用 SHA=［ ］、`ver` の Build=［ ］・Image CRC=［8桁］・bytes/loader=［ ］。起草時には実機値未取得。 |
 | 成果物の組 | 同じビルドのカーネル像・`kdebug.bin`・`hwdev.mod` の版、各 CRC、ビルドフラグ、配備先を記録［ ］。C op13 と対応する shell/monitor を使用。旧 VPLL 診断版の混在を避ける（(記録はアーカイブ)、docs/design/build/README.md、G:407–435）。 |
-| 実機へ入れる条件 | ビルド rc=0（既定と診断版があれば両方）、既定成果物と基点の一致、直接試験 MUTATE=0 の記録［ ］。全候補・変異・取り込み検査の終了待ちは条件に足さない。固まれば電源再投入、必要なら前の版の hsync。根拠：docs/tasks/agents/ROLES.md:17「検査」の2026-10-28決定。 |
+| 実機へ入れる条件 | ビルド rc=0（既定と診断版があれば両方）、既定成果物と基点の一致、直接試験 MUTATE=0 の記録［ ］。全候補・変異・取り込み検査の終了待ちは条件に足さない。固まれば電源再投入、必要なら前の版の hsync。根拠：docs/tasks/agents/ROLES.md「検査」の2026-10-28決定。 |
 | 退行の記録 | NP21/W の入口、非Cの既存 prepare/verify、recover/S0 復帰、CLI/peek 門の確認結果・版・証拠［ ］。未実施は未実施と記す。NP21/W を GeForce の映像の代替にしない(記録はアーカイブ)。 |
 | 前回と配線 | 4a 合格の証拠［ ］。Ra266・GeForce VGA端子→98 RGB-IN、head A/ANALOG OR0。DCB entry0 は heads0/1・CONN0 VGA。OR1比較は今回不要（docs/design/kdebug/gfinit.md）。 |
 | ROMと資源 | 当日 inspect の ROM長/CRC/chip/match、ID/BAR/Command［ ］。照合用既知値：63488 B・E9A60DE3・chip44、BAR0=24000000h/16MiB、BAR1=30000008h/256MiB窓、BAR2=25000000h/16MiB、A1後Command=0102h（M:19–20）。窓容量を実装VRAM容量と呼ばない。 |
@@ -129,6 +129,6 @@ reboot後の照合基準は50C=00000004、508=00051104、578=00000E02、PMC.ENAB
 FAIL終端を受信済みならabortを重ねない。final/EOT不着時はmonitor終了後、通信可能なら共通引数で `--command` を省略して `recover now c` を一度試す。Ctrl-Cをabortの代用にせず受信者を重ねない。出口へ戻れなければユーザーが電源再投入。復帰できたら証拠→reboot→baseline照合（M:196,203、docs/design/kdebug/recover_common/s0.md）。
 
 ## 当日前にノートで埋める未確認
-25.175MHzの**実ROM**での係数は未確認。ノートの既存段0の私有ROMを `GF_ROM_HEADER` の `gf_private_rom` に渡し、当日版 `tools/tests/gfinit_romfile_host.c` を同じhostコンパイル手順で実行する（同:8,44–61,65–110,133–154、コンパイルの組立例 tools/tests/test_gfinit.py:130–139）。本起草では実行・ビルドしない。
+25.175MHzの**実ROM**での係数は未確認。ノートの既存段0の私有ROMを `GF_ROM_HEADER` の `gf_private_rom` に渡し、当日版 `tools/tests/gfinit_romfile_host.c` を同じhostコンパイル手順で実行する（同、コンパイルの組立例 tools/tests/test_gfinit.py）。本起草では実行・ビルドしない。
 保存するのはROM長/CRC、VIDEO limits/ref、`decode.rc=0`・`diagnostic.rc=0`、`mode.request_khz=25175`、single_stage、mode.n1/m1/n2/m2/p・actual/error・error_percent_hundredths・within_half_percent=1、mode.write0..4のreg/source/keep/value。単段判定を適用したmode欄を使い、旧36MHzのtwo/single欄と混ぜない。±0.5%以内を確認しmanifestに転載する。ROM生バイトは資料へ載せない（docs/design/hwdev/gf/display/pll_program.md、同host:104–112）。
 実ROMの解が揃ってもPLL lock/実周波数、POSTなしのstateの十分性、0FACh=01の実映像、C実機所要時間は未確認のまま。実機で上の証拠を採る(記録はアーカイブ)。本作業は本ファイルの起草のみ、実機・NP21/W・ビルド・試験は未実施。

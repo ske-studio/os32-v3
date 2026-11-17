@@ -36,7 +36,7 @@ PC-9821シリーズ向け 32ビット ベアメタルOS
 | ビルドターゲット・ツール・コンパイラフラグ | [08_build.md](08_build.md) (フラグの実体は `build/config.mk`) | CLAUDE.md「Build Commands」(日常分のみ) |
 | 配備 3 経路の使い分け | [08_build.md §8-4](08_build.md#配備3経路) | [POLICY_DEV.md §4](POLICY_DEV.md)、CLAUDE.md、スキル `run-os32` |
 | ディレクトリ木 | [08_build.md §8-3](08_build.md) | CLAUDE.md / INDEX は参照のみ |
-| ソースの付け替え手順 (置き場だけを変える: 対応表・道具・バイト比較・踏んだこと) | [SRC_MOVE.md](SRC_MOVE.md) | [TASK_SRC_LAYOUT](tasks/v3/TASK_SRC_LAYOUT.md) §9、[POLICY_DEV](POLICY_DEV.md) §2 |
+| ソースの付け替え手順 (置き場だけを変える: 対応表・道具・バイト比較・踏んだこと) | [SRC_MOVE.md](SRC_MOVE.md) | TASK_SRC_LAYOUT (アーカイブ: `docs/archive/v3/TASK_SRC_LAYOUT.md`) §9、[POLICY_DEV](POLICY_DEV.md) §2 |
 | CI の本体ビルド (GitHub Actions の成果物・キャッシュ・取り方) | [08_build.md §8-6](08_build.md) (`.github/workflows/build.yml`、`tools/ci/build_cross.sh`、`tools/ci_fetch.sh`) | `check.yml` の冒頭コメント |
 | ファイル → 役割 → 仕様の対応 | [DEVELOPMENT.md §2](DEVELOPMENT.md) | — |
 | 設計書 (1 機能 1 ファイル、ソースと同じディレクトリ構造) | `docs/design/<ソースと同じパス>.md` (決まりは [POLICY_DEV.md §9](POLICY_DEV.md) の 2a) | 現行決定は下の「決定」。[設計書の入口](design/README.md) |
@@ -80,17 +80,17 @@ PC-9821シリーズ向け 32ビット ベアメタルOS
 起動時に読むデバッグ部品 `/boot/kdebug.bin` (`KDEBUG=1`) の形式と口は [08_build §8-2](08_build.md#起動時に読む部品の形式-kmod-v1)、到達確認と対の配備は [POLICY_DEBUG §2](POLICY_DEBUG.md) (票 TASK_DBGREF は受入完了でアーカイブ: `docs/archive/v3/TASK_DBGREF.md`)。
 標準フォントの描画を D15 に届かせる改善 (描き済みの字形の束・枠の詰め直し・先読み・領域の拡大・ラスタの整数化、KPEEK より先) は [TASK_FONTPERF](tasks/v3/TASK_FONTPERF.md)。
 実機でシリアル経由にメモリを読む道具 (kdebug の peek) の使い方は [rshell_peek.py](../tools/rshell_peek.py) 冒頭(票 TASK_KPEEK は受入完了でアーカイブ: `docs/archive/v3/TASK_KPEEK.md`)。
-検査の整理 (重い検査を軽く・重複を束ねる・古い試験を削る、2026-10-24 ユーザー決定) は [TASK_TEST_TIDY](tasks/v3/TASK_TEST_TIDY.md)。
-低レベルのマジックナンバーに名前を付ける段 ([C4]、v3 で足された行が中心、2026-10-25 ユーザー指示) は [TASK_MAGIC_NUM](tasks/v3/TASK_MAGIC_NUM.md)。
-fork 前からある行のマジックナンバー (OS 側、2026-10-25 ユーザー指示) は [TASK_MAGIC_NUM2](tasks/v3/TASK_MAGIC_NUM2.md)。
-ver と About の表示を実際の版と装置の状態から出す見直し (CUI・GUI、2026-10-26 ユーザー指示) は [TASK_VER_INFO](tasks/v3/TASK_VER_INFO.md)。
-OS の肥大化したコードを削る段 (表を詰める・カーネル常駐の自己試験を外へ・死んだローダ・長い関数、2026-10-25 ユーザー指示、実装は astra) は [TASK_SLIM](tasks/v3/TASK_SLIM.md)。
+検査の整理 (重い検査を軽く・重複を束ねる・古い試験を削る、2026-10-24 ユーザー決定) は TASK_TEST_TIDY (アーカイブ: `docs/archive/v3/TASK_TEST_TIDY.md`)。
+低レベルのマジックナンバーに名前を付ける段 ([C4]、v3 で足された行が中心、2026-10-25 ユーザー指示) は TASK_MAGIC_NUM (アーカイブ: `docs/archive/v3/TASK_MAGIC_NUM.md`)。
+fork 前からある行のマジックナンバー (OS 側、2026-10-25 ユーザー指示) は TASK_MAGIC_NUM2 (アーカイブ: `docs/archive/v3/TASK_MAGIC_NUM2.md`)。
+ver と About の表示を実際の版と装置の状態から出す見直し (CUI・GUI、2026-10-26 ユーザー指示) は TASK_VER_INFO (アーカイブ: `docs/archive/v3/TASK_VER_INFO.md`)。
+OS の肥大化したコードを削る段 (表を詰める・カーネル常駐の自己試験を外へ・死んだローダ・長い関数、2026-10-25 ユーザー指示、実装は astra) は TASK_SLIM (アーカイブ: `docs/archive/v3/TASK_SLIM.md`)。
 ユーザーランドを除く冗長なコードの整理 (未使用の除去・kstring への統一・重複の抽出・大きいソースの分割、2026-10-29 ユーザー指示、GeForce の後) は [TASK_REDUNDANCY](tasks/v3/TASK_REDUNDANCY.md)。
 開発方針を軽くする段 (決まりの棚卸し・試験の 4 段・1 検査 1 ファイルのランナー、2026-10-30 ユーザー指示) は [TASK_POLICY_LIGHT](tasks/v3/TASK_POLICY_LIGHT.md)。
-設計書を 1 機能 1 ファイル・ソースと同じディレクトリ構造 (`docs/design/`) へ移す段 (2026-10-30 ユーザー指示「まとめて」) は [TASK_DESIGN_LAYOUT](tasks/v3/TASK_DESIGN_LAYOUT.md)。
-ブロックデバイス (IDE・FD・CD・ext2/FAT) の遅い所を資料と突き合わせて直した記録 (受入完了 2026-11-04) は [TASK_BLOCKDEV_PERF](tasks/v3/TASK_BLOCKDEV_PERF.md)。
-カーネルのソース配置の整理 (Linux を手本に、init/・mm/・drivers/<種類>/・fs/<各FS>/、2026-10-30 ユーザー指示、L0〜L4 実施済み。現行の木は [08_build §8-3](08_build.md#8-3-ディレクトリ構造)、仮の境界と include の方針は別の分離計画で扱う) の票は [TASK_SRC_LAYOUT](tasks/v3/TASK_SRC_LAYOUT.md)。
-カーネルから具体ドライバへの依存を登録の口に寄せて外す段 (移植性、2026-10-26 ユーザー指示) は [TASK_DEP_DIR](tasks/v3/TASK_DEP_DIR.md)。
+設計書を 1 機能 1 ファイル・ソースと同じディレクトリ構造 (`docs/design/`) へ移す段 (2026-10-30 ユーザー指示「まとめて」) は TASK_DESIGN_LAYOUT (アーカイブ: `docs/archive/v3/TASK_DESIGN_LAYOUT.md`)。
+ブロックデバイス (IDE・FD・CD・ext2/FAT) の遅い所を資料と突き合わせて直した記録 (受入完了 2026-11-04) は TASK_BLOCKDEV_PERF (アーカイブ: `docs/archive/v3/TASK_BLOCKDEV_PERF.md`)。
+カーネルのソース配置の整理 (Linux を手本に、init/・mm/・drivers/<種類>/・fs/<各FS>/、2026-10-30 ユーザー指示、L0〜L4 実施済み。現行の木は [08_build §8-3](08_build.md#8-3-ディレクトリ構造)、仮の境界と include の方針は別の分離計画で扱う) の票は TASK_SRC_LAYOUT (アーカイブ: `docs/archive/v3/TASK_SRC_LAYOUT.md`)。
+カーネルから具体ドライバへの依存を登録の口に寄せて外す段 (移植性、2026-10-26 ユーザー指示) は TASK_DEP_DIR (アーカイブ: `docs/archive/v3/TASK_DEP_DIR.md`)。
 
 ## 生成文書の見方
 
@@ -403,7 +403,7 @@ archive/gui_v14/ (アーカイブ: `docs/archive/gui_v14/TASK_EDIT_GUI.md`) (v1.
 | [tasks/gui/TASK_CONTROL_PANEL.md](tasks/gui/TASK_CONTROL_PANEL.md) | コントロールパネル (設定を GUI で変えるアプリ、基準は Windows 98) **設計中 (2026-11-05)** — 設計は確定、実装は未着手 |
 | [tasks/gui/TASK_I18N.md](tasks/gui/TASK_I18N.md) | UI メッセージの多言語対応 (SQLite のメッセージ表、既定は英語、区分 + 短い名前をビルドで番号に畳む、PO 形式と POSIX `%n$` に乗る) **計画 (2026-09-30)** — 設計票は v3 後半 (T4・コントロールパネルの後)、他の文字体系は T7b の後 |
 | [tasks/gui/TASK_P8_GUI_LAYER.md](tasks/gui/TASK_P8_GUI_LAYER.md) | P8 GUI 層 (音のリングと入力) **設計中 (2026-11-05)** — 設計は確定、実装は未着手 |
-| [tasks/gui/TASK_GFX_MODES.md](tasks/gui/TASK_GFX_MODES.md)・[TASK_GFX_ACCEL_HAL](tasks/gui/TASK_GFX_ACCEL_HAL.md)・[TASK_HAL_V2](tasks/gui/TASK_HAL_V2.md)・[TASK_CONSOLE_DUAL](tasks/gui/TASK_CONSOLE_DUAL.md) | 表示の色数と解像度を「形式」と「ドライバの能力の表」で持つ (装置 × 色数 × 解像度で名前が増えない形、2026-10-26 ユーザー指示) **実装中** — G0 は小さい直し、G1 以降は設計の往復から |
+| TASK_GFX_MODES (アーカイブ: `docs/archive/gui/TASK_GFX_MODES.md`)・[TASK_GFX_ACCEL_HAL](tasks/gui/TASK_GFX_ACCEL_HAL.md)・[TASK_HAL_V2](tasks/gui/TASK_HAL_V2.md)・[TASK_CONSOLE_DUAL](tasks/gui/TASK_CONSOLE_DUAL.md) | 表示の色数と解像度を「形式」と「ドライバの能力の表」で持つ (装置 × 色数 × 解像度で名前が増えない形、2026-10-26 ユーザー指示) **実装中** — G0 は小さい直し、G1 以降は設計の往復から |
 | [tasks/gui/TASK_RASTER_SPLASH.md](tasks/gui/TASK_RASTER_SPLASH.md) | ラスタパレット画像スプラッシュ — PC-98 標準 16 色 + 走査線ごとのパレット、24/31kHz の吸収、`.osri` とホストの変換 (誤差拡散) — **受入完了 (2026-11-04)** |
 | [tasks/gui/TASK_OSRI_VIEWER.md](tasks/gui/TASK_OSRI_VIEWER.md) | .osri ビューアー (ユーザーアプリ) — カーネルに再生を任せる KAPI・既存の画面の門・表示時間 — **設計確定・実装は GeForce の後 (2026-11-04)** |
 | [tasks/gui/TASK_VIDEO_HAL.md](tasks/gui/TASK_VIDEO_HAL.md) | 表示の HAL の設計 — 計画 (2026-11-06)。GeForce と Trident のドライバの後に設計、上限は GeForce・下限は 640×400、最初に HAL の機能の一覧 |

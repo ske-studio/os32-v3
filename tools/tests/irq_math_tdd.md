@@ -36,7 +36,7 @@ W3 (NP21/W) は「配線が通っているか」を `int 0x23` と `/api/pic` �
 `kernel/irq/irq_math.c` / `.h` を置く前にハーネスを回すと `#include` が解決できない。
 
 ```
-tools/tests/irq_math_host.c:20:10: fatal error: ../../kernel/irq/irq_math.c: No such file or directory
+tools/tests/irq_math_host.c: fatal error: ../../kernel/irq/irq_math.c: No such file or directory
 ```
 
 ### RED 2 — 直す前の姿 (変異 1)

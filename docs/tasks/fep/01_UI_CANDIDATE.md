@@ -13,14 +13,14 @@
 | 前提 | 内容 |
 |------|------|
 | シングルタスク | FEP ON 時はアプリのメインループが `ime_getkey()` 内でブロックする。割り込み駆動の非同期描画は不要 |
-| メモリ制約 | カーネルヒープ + MEMSYS5。現行の MEMSYS5 容量は `lib/sqlite3/os32_sqlite_vfs.c:34`、v3 の計画予算は [MEMMAP_V3 §4-6](../../design/kernel/sqlite_engine.md) を参照。`IME_State` は `static` グローバル 1 個 (BSS) |
+| メモリ制約 | カーネルヒープ + MEMSYS5。現行の MEMSYS5 容量は `lib/sqlite3/os32_sqlite_vfs.c`、v3 の計画予算は [MEMMAP_V3 §4-6](../../design/kernel/sqlite_engine.md) を参照。`IME_State` は `static` グローバル 1 個 (BSS) |
 | 描画経路 | [CONSTRAINTS.md HW1](../../CONSTRAINTS.md#hw1-egc--grcg--gdc-描画コマンドを使わない) に従う。GFX 計画の実装時も HAL の描画経路に合わせる |
 | 既存 API 互換維持 | `ime_getchar()` / `ime_getkey()` のシグネチャと戻り値仕様は変更しない。KAPI バイナリ互換を壊さない |
 | UTF-8 内部表現 | かなバッファ・確定バッファは全て UTF-8。文字境界処理は `utf8_*` を使用 |
 
 ### データ構造
 
-`kernel/ime/ime.h:65` の `IME_State` が状態の単一実体。`state/page/per_page/render` は実装済み。
+`kernel/ime/ime.h` の `IME_State` が状態の単一実体。`state/page/per_page/render` は実装済み。
 
 ## 描画バックエンドと状態機械
 
@@ -51,7 +51,7 @@ typedef struct {
 - テキストモード実装 (`ime_render_tvram.c`): 既存の `tvram_putchar_at` / `tvram_putkanji_at` / `unicode_to_jis` をラップ。
 - 将来のグラフィックモード実装 (`ime_render_gfx.c`): GVRAM プレーンへの直接ビットマップ転送 (`05_GFX_MODE.md`)。
 
-`kernel/ime/ime.c` で TVRAM 実装を選択する。描画表の定義は `kernel/ime/ime_render.h:10`。
+`kernel/ime/ime.c` で TVRAM 実装を選択する。描画表の定義は `kernel/ime/ime_render.h`。
 
 ### 1.2 状態機械の明確化
 
@@ -215,7 +215,7 @@ static void candlist_draw(void)
 
 TVRAM ではリスト展開前に `candlist_save()` が候補領域の文字と属性を退避し、
 畳む / 確定する際に `candlist_clear()` → `candlist_restore()` で復元する
-(`kernel/ime/ime.c:76`、`kernel/ime/ime.c:98`、`kernel/ime/ime.c:120`)。退避済みフラグで二重退避を防ぐ。
+(`kernel/ime/ime.c`、`kernel/ime/ime.c`、`kernel/ime/ime.c`)。退避済みフラグで二重退避を防ぐ。
 退避バッファが無い場合は保存しないため、その場合の復元は保証されない。
 スクロールの予約行制御は P2 §4 (`02_SCROLL_GUARD.md`)、
 未実装の GVRAM 退避・復元案は P5 §3 (`05_GFX_MODE.md`) を参照。

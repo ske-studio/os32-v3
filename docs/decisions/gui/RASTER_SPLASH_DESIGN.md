@@ -31,19 +31,19 @@
 
 | 草案の記述 | 実物・設計への反映 |
 |---|---|
-| §2: パレット1、4行、100件 | 一致。`platform/pc98/boot_splash.c:15,29,44,177`。行は0,4,…,396。 |
-| §2: 4プレーンへ描画 | 一致。`platform/pc98/splash.c:30,40`。借用 BB を使用する。 |
+| §2: パレット1、4行、100件 | 一致。`platform/pc98/boot_splash.c` の `SPLASH_GRAD_LINE_STEP`。行は0,4,…,396。 |
+| §2: 4プレーンへ描画 | 一致。`platform/pc98/splash.c` の `platform_splash_clear()`。借用 BB を使用する。 |
 | §2: 120µs待ちで再生 | 差異 D1: palette-only と flip 経路は `line` を読まず、各イベント後に120µs待つ。`drivers/video/pc98/gfx_vram.c`。不等間隔・同一行複数件を現APIへ渡すだけでは再生できない。 |
 | 同上、初回と継続の扱い | 差異 D2: non-flip の dirty 初回は400行各々で待つ（最低48ms）、以後は100件各々（最低12ms）。`drivers/video/pc98/gfx_vram.c`。I/O・転送・IRQ時間は別に加算される。 |
-| §2: 最大200件 | 一致。ただし SDK の1件は8B、コメントは2行単位推奨。`sdk/include/os32/os32_kapi_shared.h:623`。200は容量上限であり時間予算ではない。 |
-| §2: 標準 planar 強制 | 一致。希望値を保存→PC98選択→init→希望値復元。`platform/pc98/splash.c:13`。 |
-| §2: 終了時復帰 | 一致。両ページ消去→shutdown→既定パレット→テキスト消去。過去の任意パレットの保存復元ではない。`platform/pc98/boot_splash.c:253`。 |
-| §6: ルートから画像を開く | 実現可能。mount は `platform/pc98/kernel.c:176`、IRQ有効化・services は234、splash は242。呼出位置を動かさない。 |
-| §9: 標準出力モードが未決 | 差異 D3: 31kHz既定は決定済み。`docs/decisions/realhw/RA266.md:48` に09a8=81の観測。未確定なのは実行時判定と位相。 |
+| §2: 最大200件 | 一致。ただし SDK の1件は8B、コメントは2行単位推奨。`sdk/include/os32/os32_kapi_shared.h`。200は容量上限であり時間予算ではない。 |
+| §2: 標準 planar 強制 | 一致。希望値を保存→PC98選択→init→希望値復元。`platform/pc98/splash.c`。 |
+| §2: 終了時復帰 | 一致。両ページ消去→shutdown→既定パレット→テキスト消去。過去の任意パレットの保存復元ではない。`platform/pc98/boot_splash.c` の `boot_splash()`。 |
+| §6: ルートから画像を開く | 実現可能。mount は `platform/pc98/kernel.c`、IRQ有効化・services は234、splash は242。呼出位置を動かさない。 |
+| §9: 標準出力モードが未決 | 差異 D3: 31kHz既定は決定済み。`docs/decisions/realhw/RA266.md` に09a8=81の観測。未確定なのは実行時判定と位相。 |
 
 - 差異は上表の3件（D1・D2は草案の現行説明への訂正、D3は前提更新）。未測定値は差異に数えない。
 - 現行はテキストGDCのVSYNC入りを待ってからグラフィックGDCの抜けを待つ（`drivers/video/pc98/gfx_vram.c`）。抜け＝可視行0とはまだ証明されていない。
-- `cpu_delay_us()` は校正済みループの整数待ちで、IRQ処理時間を補償しない（`kernel/time/cpu_calibrate.c:134`）。校正は起動初期に実施済み（`platform/pc98/kernel_boot_cpu.inc:68`）。
+- `cpu_delay_us()` は校正済みループの整数待ちで、IRQ処理時間を補償しない（`kernel/time/cpu_calibrate.c`）。校正は起動初期に実施済み（`platform/pc98/kernel_boot_cpu.inc`）。
 
 ## 2. 段0: 計測の設計
 
@@ -51,13 +51,13 @@
 |---|---|
 | PC9800Bible `docs/hw/PC9800Bible/2-7_グラフィック.md:230` | 0A8h=番号、0AAh=G、0ACh=R、0AEh=B。既存の4 OUT順を保つ。 |
 | UNDOCUMENTED `docs/hw/undocumented/io_disp.md:24,765` | 0060h/00A0h の bit5=VSYNC、bit6=HORIZONTAL BLANK。水平同期信号そのものとの同一視はしない。 |
-| `include/pegc.h:95,106,115,247` | 09A8hは `PEGC_HSYNC_PORT` / `PEGC_HSYNC_READ_HF` でD0だけ読む。書込用MASKは使わない。054Ch bit5は既存BIOS定数と `v86_bios_real_lowmem()` の起動時の写しで診断記録だけ（ページ0は未写像、fix0依頼で訂正）。 |
-| 周期・位相の正典 | `include/pegc.h:325-335` の400行SYNCと `docs/hw/undocumented/io_disp.md:1875` の公称周波数を組にする。周期のµs比は31k=`100000/3147`、24k=`100000/2483`、4行は約127.1/161.1µs。 |
+| `include/pegc.h` | 09A8hは `PEGC_HSYNC_PORT` / `PEGC_HSYNC_READ_HF` でD0だけ読む。書込用MASKは使わない。054Ch bit5は既存BIOS定数と `v86_bios_real_lowmem()` の起動時の写しで診断記録だけ（ページ0は未写像、fix0依頼で訂正）。 |
+| 周期・位相の正典 | `include/pegc.h` の400行SYNCと `docs/hw/undocumented/io_disp.md:1875` の公称周波数を組にする。周期のµs比は31k=`100000/3147`、24k=`100000/2483`、4行は約127.1/161.1µs。 |
 | NEC Technical Databook Hardware (1993) | 手元の `docs/hw/` に該当資料を確認できず、未照合。メーカー資料のタイミング表を実装前のHW3資料ゲートでPMが補う。 |
 | BSD参照 | [FreeBSD releng/10.4 sys/pc98/cbus/gdc.c](https://github.com/freebsd/freebsd-src/blob/releng/10.4/sys/pc98/cbus/gdc.c#L655):655,685 はVSYNCの抜け→入り、831は16色パレット設定。冒頭はBSD 3条項。同期・I/Oの参考に限り、描画コマンドは採らない。 |
 
 - 観測口は診断ビルド専用 `platform/pc98/splash_probe.c`。通常起動と同じ begin 後に呼び、診断終了後は共通終了処理へ戻す。新規KAPI・常駐IRQハンドラは作らない。
-- 時計は既存 `sys_time_now()`（`kernel/time/ktime.c:56`、PIT補間µs）。読出費用・1µs量子化・逆行補正回数を測る。ラスタの待ちに `cpu_delay_us()` は使わず、絶対時刻とステータスを照合する。
+- 時計は既存 `sys_time_now()`（`kernel/time/ktime.c`、PIT補間µs）。読出費用・1µs量子化・逆行補正回数を測る。ラスタの待ちに `cpu_delay_us()` は使わず、絶対時刻とステータスを照合する。
 - 全画面CLIは禁止。IF=0は目標の1行前から対象HBLANKの同一行更新終了まで、最長2行周期（31k約64µs/24k約81µs）。各保護区間後はIF=1を1行周期以上確保する（入口IF=0では動的再生しない）。立下り捕捉は§5の1行以内だけを保護する。最大値と1フレーム合計を記録する。
 
 | 測るもの | 手順・記録 |
@@ -73,7 +73,7 @@
 - 計測像: 左端に固定白の16行ごとの目盛、中央にパレット1だけの広い縦長矩形、右端に固定16色タイル。画面上下は太い固定枠にする。
 - 中央の赤/緑を4行または1行ごとに変え、カメラ用に32行帯と上/中/下の太い印も置く。副尺は固定色の8行縞を9列へ−4〜+4行ずらして並べ、動的帯と揃う列を選ぶ（周期8で両端は同位相なので粗い枠で区別）。
 - VSYNC立下りから最初の帯までを1行ずつ掃引する。beginでbit5の高期間を測り、総行数−400（31k=49、24k=40行）に近ければ `active0_lines=0`、VS幅（31k=2、24k=8行）に近ければ `active0_lines=P8>>2`（VBP:31k=34、24k=25）とする。8周期の高期間平均を行周期へ換算し±1行以内を「近い」とし、どちらにも合わなければdynamic_ok=0。NP21/Wの非表示全体型では立下りが可視行0になる。実機は選んだ位相を副尺・HBLANK番号で確かめる。立上りを原点に表示するログには実測VSYNC幅を加える。
-- カメラは表示有無・大崩れ・帯の大まかな位置だけを判定する（`docs/decisions/realhw/RA266.md:94`）。1行位置・色差・細い水平乱れをカメラ合格だけで保証しない。
+- カメラは表示有無・大崩れ・帯の大まかな位置だけを判定する（`docs/decisions/realhw/RA266.md`）。1行位置・色差・細い水平乱れをカメラ合格だけで保証しない。
 - プローブはRAMへ固定長記録し、測定区間終了後にシリアルへ出す。走査中のprintf・ファイル読み込み・カメラ要求は禁止。溢れた記録は失敗扱い。
 - 記録例: `SPLR phase=... frame=... y=... target_us=... begin_us=... end_us=... stat=... late=...`。集計はn、min、median、p99、max、欠落候補数、時計エラー数を残す。
 - PMはノートのセッションへ31kHz診断起動・受信負荷を依頼し、ログとカメラ画像名を対応させる。実機24/31kHzの物理切替と復帰はユーザーの立会い時だけ。PMのソフト操作では切り替えない。
@@ -111,10 +111,10 @@ struct OsriEvent {                    /* 8 bytes */
 - reserved_profileは常に0。n=0ならband=4、n>0でも走査モードを格納しない。同じファイルを24/31kHzで使い、行/フレームの件数上限は起動時に選んだカーネルの予算で検査する。
 - 整合性: loaderでmagic/version/固定値/予約0、正確な全長と固定offset、n<=200、範囲・整列・重複・同値再設定を検査。画像制御側で行/フレーム予算をcommit前に検査する。異なるイベント行の間隔は2行以上とし、1行間隔を予算違反で拒否する（band=1自体は形式上許すが、間隔の緩和は段4の実測後だけ）。同一行の複数件は一つの保護区間の予算で検査する。未知フラグは拒否しファイルの走査モード照合は設けない。
 - nを上限検査してから `128096+8*n` を計算し、短い読み・途中EOF・末尾余分も拒否。検査済みになるまでVRAMへ提示しない。暗号署名や複雑な回復形式は追加しない。
-- CRCはヘッダー48..51を0としてファイル全体をIEEE CRC-32。Pythonは `zlib.crc32`、Cは `lib/crc32_core.inc:13` のinit/update/finalを再利用し、finalは最後の1回だけ。
-- `lib/crc32.c:14` の一括版と同値であることを既知ベクトル・分割読みで照合する。CRCの新実装やゲストへのzlib追加は不要。
+- CRCはヘッダー48..51を0としてファイル全体をIEEE CRC-32。Pythonは `zlib.crc32`、Cは `lib/crc32_core.inc` のinit/update/finalを再利用し、finalは最後の1回だけ。
+- `lib/crc32.c` の `crc32_calc()` の一括版と同値であることを既知ベクトル・分割読みで照合する。CRCの新実装やゲストへのzlib追加は不要。
 - SDKの `GFX_RasterPalEntry` はr/g/b別バイト・pad2のRAM形式（上記`:623`）。`.osri` の8Bと同サイズでもバイナリ互換にせず、SDKヘッダー・世代・KAPIを変更しない。
-- 既存MGXは画像用、VBZはパス描画用でイベント列を持たない（`tools/img2mgx.py:51,528`、`tools/img2vbz.py:1160`）。枠を流用せずPIL・struct・CRCの既存手段を使う。
+- 既存MGXは画像用、VBZはパス描画用でイベント列を持たない（`tools/img2mgx.py`、`tools/img2vbz.py`）。枠を流用せずPIL・struct・CRCの既存手段を使う。
 
 ## 4. ホスト変換
 
@@ -190,11 +190,11 @@ void pc98_splash_raster_reset(void); /* gfx_initで未判定化、gfx_shutdown�
 | ファイル | 固定128,096B、n=100で128,896B、n=200で129,696B。圧縮なし。 |
 | RAM | 既存BB128,000Bを借用。追加は画像記述1,636B＋ヘッダー/CRC/共通再生状態。診断リングは診断ビルドのみ。 |
 | カーネル | パーサ・再生器のコード増分は未測定。内蔵ロゴ維持、画像の埋込みなし。`size`/mapとvmkernel.lz4実サイズの前後差を記録する。 |
-| ヒープ | `include/memmap.h:45` は192KiB。全画像を別途確保しない理由。4KiB単位のreadはBBへの直読みであり別4KiB配列は不要。 |
+| ヒープ | `include/memmap.h` の `KHEAP_SIZE` は192KiB。全画像を別途確保しない理由。4KiB単位のreadはBBへの直読みであり別4KiB配列は不要。 |
 | 配布像 | PM決定: 自作・生成等の権利の問題の無い原画を `assets/splash/` →build/outのOSRI→deploy.yamlの `[data]` →NORMAL。固定パス `/boot/splash.osri`。 |
-| 起動FD/MINIMAL | PM決定: 画像を入れず内蔵ロゴ。`build/packages.yaml:69,85,113` の分類を維持。共通再生器のカーネル増分はFDにも乗るので2HD/1.44MBの空きを実測する。 |
+| 起動FD/MINIMAL | PM決定: 画像を入れず内蔵ロゴ。`build/packages.yaml` の分類を維持。共通再生器のカーネル増分はFDにも乗るので2HD/1.44MBの空きを実測する。 |
 
-- `build/packages.yaml:117` には2HDの空き64KB未満を受けた除外経緯がある。現在の空きは未測定で、128KB画像を追加できるとは扱わない。
+- `build/packages.yaml` には2HDの空き64KB未満を受けた除外経緯がある。現在の空きは未測定で、128KB画像を追加できるとは扱わない。
 - `.osri` は拡張子4文字でFAT 8.3に収まらない。将来FDへ入れるならrenameと読込パス・install逆対応が別途必要。初版のFDは欠落としてロゴへ戻る。
 - 原画の追加選定は待たず、自作模様・生成画像を使う。変換依存・再生成方法を固定し、欠けた入力を黙って別画像へ置き換えない。
 
@@ -225,7 +225,7 @@ void pc98_splash_raster_reset(void); /* gfx_initで未判定化、gfx_shutdown�
 | D1 / 3 | `build/assets.mk`、権利の問題の無い試験原画の変換ルール | T1後、原画選定待ちなし |
 | D2 / 3 | `userland/deploy.yaml`、dataで配布登録 | D1後、packages.yamlは変更不要 |
 
-- N5 段の依頼の注記: L0で `drivers/video/pc98/gfx_vram.c` の注記、SDKの「2ライン単位推奨」（`os32_kapi_shared.h:620`）、KAPI説明を新しい行位置・間隔・同期失敗時の契約に合わせる。型・番号は維持し、生成物の説明は正典から再生成する。
+- N5 段の依頼の注記: L0で `drivers/video/pc98/gfx_vram.c` の注記、SDKの「2ライン単位推奨」（`os32_kapi_shared.h`）、KAPI説明を新しい行位置・間隔・同期失敗時の契約に合わせる。型・番号は維持し、生成物の説明は正典から再生成する。
 - N6 段の依頼の注記: GF_ACCELと共有する `build/kernel.mk`・`drivers/video/pc98/gfx_vram.c`・`platform/pc98/boot_splash.c`・`include/gfx_hal.h`・`tools/tests/test_src_layout.py`・`docs/design` はPMが直列化し、新規ファイルの `docs/design` と `test_src_layout` への登録もB2の一覧に含める。
 - Shared層のKAPI定義は維持。Subsystem層はpegc.hのポート/SYNC、再生ヘッダーの派生周期/位相/予算、OSRIヘッダーとconfig.h。Local層は計測回数等。[C4]に従い新旧ロゴ・画像で周期定数を複製しない。
 - GeForce加速と並行するが、gfx_vram.c・共通ヘッダー・build登録はPMが所有を調整し直列化。NP21/W操作は同時に1人。
@@ -244,7 +244,7 @@ void pc98_splash_raster_reset(void); /* gfx_initで未判定化、gfx_shutdown�
 - PMが `docs/tasks/DEFERRED_TESTS.md` に `SPLASH-24K-RH` を登録する: ユーザー立会いでPEGCを切った24kHz起動→D0/8周期/副尺/画像/内蔵ロゴ/終了を観察→ユーザーが31kHzへ復帰。段0〜4の受入条件にはせず、未確認を合格と記録しない。
 - 変異: CRC無視・上限除去・plane/bit交換・line無視・120µs相対待ち復活・24k拒否・D1混入・周期照合省略・初期色省略・IF長時間保持/復元省略・late即停止・timeout無効・再present・close欠落を各々実行時REDにする。
 - 無限待ち変異は偽I/Oの回数上限で異常終了させ、コンパイル成功だけをREDと数えない。既存ロゴ・backend希望値・復帰試験を正常対照として毎回残す。
-- 既存 `tools/tests/test_boot_splash_native.py:2` と `test_dep_dir_d_splash.py:2` のCHECK/fixture/変異目印への影響を点検する。必要なCハーネスは専用小段へ分ける。
+- 既存 `tools/tests/test_boot_splash_native.py` と `test_dep_dir_d_splash.py` のCHECK/fixture/変異目印への影響を点検する。必要なCハーネスは専用小段へ分ける。
 - 実装時は依頼SHAのpreflight、触った像のbuild、`make -k check-changed BASE=<SHA> MUTATE=0`、追加/変更試験の`--mutate`、checks lintを行う。最後の変更後のログだけを採る。
 - PMは取り込みで全体build/変異・5静的検査と媒体容量/配備集合を確認し、NHD配備は停止→配備→再起動、実機はノート経由。画像CRC・kernel CRC・カメラ画像名をRESULTへまとめる。
 
@@ -280,38 +280,38 @@ W の行番号は途中差分を含む実ファイル。`R/impl_play.md:1` の�
 
 | 対象と実物の所在 | 改訂後 |
 |---|---|
-| `M/drivers/video/pc98/splash_raster.c:154`、`W/drivers/video/pc98/splash_raster.c:154` の begin | D0 によるモード判定、9 立上り・8 周期±1%、高幅分類、gfx_init 単位の状態所有を残す。 |
-| `W/drivers/video/pc98/splash_raster.c:186` の high_us/active0_lines | 粗い捕捉期限と VS/非表示全体型の分類に残す。各 OUT の絶対予定時刻には使わない。 |
-| `W/drivers/video/pc98/splash_raster.c:105` の wait_bit | VS 周期の観測用に限定。IN→時計→H 判定の順を高速 H 待ちから除去。 |
-| `M/drivers/video/pc98/splash_raster.c:231`、`W/drivers/video/pc98/splash_raster.c:264` の capture_fall | 半行の点予測をやめ、誤差区間を持つ V/H 同時観測と番号付き H 起点へ置換。 |
-| `W/drivers/video/pc98/splash_raster.c:226` の table_ok、`:241` の image_table | 共通の事前検査を残し、実測時間予算・再同期区間・IF 窓の検査を追加。 |
-| `W/drivers/video/pc98/splash_raster.c:293` の play_events | 絶対目標・遅れた値の繰越/畳込を廃し、番号付き辺で更新、曖昧なら当該フレームを drop。 |
-| `W/drivers/video/pc98/splash_raster.c:205` の color | index→G→R→B の 4 OUT を残す。RGB 展開・探索・診断時刻読出しは辺の前に済ませる。 |
-| `W/drivers/video/pc98/splash_raster.c:213,395` の初期色/frame | 16 色の毎フレーム復元、n=0、実行中の超過で drop して次フレームへ進む G2 を残す。 |
-| `W/drivers/video/pc98/splash_raster.c:21` と `M/drivers/video/pc98/splash_raster.h:40` の診断口 | 照会口を残す。H 検出→4 OUT の間の diag_now は除去、区間・番号・理由の診断へ改める。 |
-| `W/drivers/video/pc98/splash_raster.c:342,361` の IF 窓 | 入口 IF を保存し、再生器の各保護区間≤2H、区間間の割込み処理機会≥1H を維持。 |
+| `M/drivers/video/pc98/splash_raster.c` の `pc98_splash_raster_begin()`、`W/drivers/video/pc98/splash_raster.c` の `pc98_splash_raster_begin()` の begin | D0 によるモード判定、9 立上り・8 周期±1%、高幅分類、gfx_init 単位の状態所有を残す。 |
+| `W/drivers/video/pc98/splash_raster.c` の high_us/active0_lines | 粗い捕捉期限と VS/非表示全体型の分類に残す。各 OUT の絶対予定時刻には使わない。 |
+| `W/drivers/video/pc98/splash_raster.c` の wait_bit | VS 周期の観測用に限定。IN→時計→H 判定の順を高速 H 待ちから除去。 |
+| `M/drivers/video/pc98/splash_raster.c`、`W/drivers/video/pc98/splash_raster.c` の capture_fall | 半行の点予測をやめ、誤差区間を持つ V/H 同時観測と番号付き H 起点へ置換。 |
+| `W/drivers/video/pc98/splash_raster.c` の `pc98_splash_raster_frame()` の table_ok、`capture_fall()` の image_table | 共通の事前検査を残し、実測時間予算・再同期区間・IF 窓の検査を追加。 |
+| `W/drivers/video/pc98/splash_raster.c` の play_events | 絶対目標・遅れた値の繰越/畳込を廃し、番号付き辺で更新、曖昧なら当該フレームを drop。 |
+| `W/drivers/video/pc98/splash_raster.c` の color | index→G→R→B の 4 OUT を残す。RGB 展開・探索・診断時刻読出しは辺の前に済ませる。 |
+| `W/drivers/video/pc98/splash_raster.c` の初期色/frame | 16 色の毎フレーム復元、n=0、実行中の超過で drop して次フレームへ進む G2 を残す。 |
+| `W/drivers/video/pc98/splash_raster.c` と `M/drivers/video/pc98/splash_raster.h` の診断口 | 照会口を残す。H 検出→4 OUT の間の diag_now は除去、区間・番号・理由の診断へ改める。 |
+| `W/drivers/video/pc98/splash_raster.c` の `pc98_splash_raster_table()` の IF 窓 | 入口 IF を保存し、再生器の各保護区間≤2H、区間間の割込み処理機会≥1H を維持。 |
 
 実物との食い違いは次の **6 件**。未測定事項や単なる行番号の移動は数えない。
-- D1: 依頼の「09A8h の HBLANK」は誤り。`M/include/pegc.h:95,106,114` の読出 D0 は周波数だけ。
-- D2: 模型の poll_us は IN 費用ではない。`W/tools/tests/splash_raster_host.c:33,43,53` は時計だけ時間を進め、IN は無時間。
+- D1: 依頼の「09A8h の HBLANK」は誤り。`M/include/pegc.h` の `PEGC_HSYNC_PORT` の読出 D0 は周波数だけ。
+- D2: 模型の poll_us は IN 費用ではない。`W/tools/tests/splash_raster_host.c` の `advance()` は時計だけ時間を進め、IN は無時間。
 - D3: 同模型 `:62` は両モードとも H 幅 8µs 固定。メーカーの 24k 約9.88µs、SYNC 由来の 31k 約6.36µs と異なる。
 - D4: table_ok は行・番号・間隔を検査するだけで、W/E/H 幅による時間予算をまだ検査していない（上表 `:226`）。
 - D5: NP21/W の bit6 は実機幅の証拠にできない。`~/np21w-src/src/io/gdc.c:384,438,761` の式は高期間を C/R÷水平総長にする。
-- D6: 現行 DIAG は `W/drivers/video/pc98/splash_raster.c:58,348` で辺を検出した後にも時計を読むため、通常版と異なる遅れを加える。
+- D6: 現行 DIAG は `W/drivers/video/pc98/splash_raster.c` で辺を検出した後にも時計を読むため、通常版と異なる遅れを加える。
 
 ### 2. §2 置換案 — 根拠・予算・番号の原点
 
 H は水平周期、B は安全にパレットを更新できる水平非表示幅、Q は連続 IN の実サンプル間隔上限、W は 4 OUT 完了までの上限。
 Q は IN 命令だけでなくループ・分岐・計数の費用を含む。C は時計読出し、E は位相/量子化等の余裕とし、すべて整数比で管理する。
 HBLANK は `GDC_GFX_STAT`（00A0h）の `GDC_STAT_HBLANK`（bit6）、V は同じ IN の bit5 を採る。
-根拠は `M/include/pc98.h:186,187,288`、`M/docs/hw/undocumented/io_disp.md:765`。水平同期パルス HS 自体とは区別する。
+根拠は `M/include/pc98.h`、`M/docs/hw/undocumented/io_disp.md:765`。水平同期パルス HS 自体とは区別する。
 メーカー資料は `~/os32-tmp/refs/pc98-databook/NOTES.md:4`、NEC Technical Databook Hardware (1993) p.350–351。
 BSD 参照は [FreeBSD gdc.c](https://github.com/freebsd/freebsd-src/blob/releng/10.4/sys/pc98/cbus/gdc.c#L655) の :655,685,831（BSD 3 条項）。同期待ち・パレットポートの参照に限り、描画処理を移植しない。
 
 | モード | H、総行数、VS/VBP | B の根拠と採用限界 |
 |---|---|---|
 | 24k | 100000/2483µs、440、8/25 | メーカー HFP+HS+HBP=3.04+3.04+3.8=9.88µs。bit6 と実画面の対応は実機で確認。 |
-| 31k | 100000/3147µs、449、2/34 | `M/include/pegc.h:335` の CR=78+2=80、HS=7+1=8、HFP=3+1=4、HBP=7+1=8 より H×20/100≈6.355µs。 |
+| 31k | 100000/3147µs、449、2/34 | `M/include/pegc.h` の `PEGC_GDC_MSYNC_400_31K` の CR=78+2=80、HS=7+1=8、HFP=3+1=4、HBP=7+1=8 より H×20/100≈6.355µs。 |
 
 31k の B は SYNC の導出値であり、メーカーの測定値ではない。実機の bit6 幅・極性・可視開始との関係が一致して初めて採用する。
 24k の同じ導出は H×26/106≈9.878µs。水平各値の符号化は `M/docs/hw/PC9800Bible/2-6_テキスト.md:219,270` と既存 SYNC 定義を参照。

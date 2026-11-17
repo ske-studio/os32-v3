@@ -2,7 +2,7 @@
 > 状態: **現行 (2026-10-31)** — 出所: SLIM_KERNEL_DESIGN・SLIM_KERNEL_IMPORTS・HWDEV_CORE_API (D1 で移した)
 ソース: `kernel/module/kdebug_imports.def`
 
-- 正典は `kernel/module/kdebug_imports.def`。生成JSONは編集しない（`tools/gen_kdebug_imports.py:2`）。
+- 正典は `kernel/module/kdebug_imports.def`。生成JSONは編集しない（`tools/gen_kdebug_imports.py`）。
 
 - FUNCは公開関数をカーネルで実行。元TUの私的関数やインライン化された公開関数の本体をkdebugへコピーしない。
 - GETTER/SETTERは値、PTRは番地。データの記号欄は元symbol、名前欄は生成する呼出し名。

@@ -182,13 +182,13 @@ CHECK(ext2_vfs_get_size(g_ec, "/tmp/d", &sz) == VFS_OK);   /* /tmp/d はディ�
 
 | 箇所 | 関数 | 今回の前 | 扱い |
 |---|---|---|---|
-| `fs/ext2/ext2_dir.c:267` | `ext2_mkdir` 存在確認 | **`== EXT2_OK` だけ拒否** | **P1-1 で修正** |
-| `fs/ext2/ext2_file.c:131` | `ext2_create` 存在確認 | **`== EXT2_OK` だけ拒否** | **P1-2 で修正** |
+| `fs/ext2/ext2_dir.c` | `ext2_mkdir` 存在確認 | **`== EXT2_OK` だけ拒否** | **P1-1 で修正** |
+| `fs/ext2/ext2_file.c` | `ext2_create` 存在確認 | **`== EXT2_OK` だけ拒否** | **P1-2 で修正** |
 | `fs/ext2/ext2_dir.c` | `ext2_rename` 宛先確認 | **`== EXT2_OK` だけ置き換え** | **P1-3 で修正** |
-| `fs/ext2/ext2_vfs.c:159` | `ext2_vfs_write` 既存判定 | 1 巡目で修正済 | 3 値 (OK / NOTFOUND / その他) |
+| `fs/ext2/ext2_vfs.c` | `ext2_vfs_write` 既存判定 | 1 巡目で修正済 | 3 値 (OK / NOTFOUND / その他) |
 | `fs/ext2/ext2_dir.c` | `ext2_lookup` | 1 巡目で修正済 | `return ret` |
 | `fs/ext2/ext2_file.c` | `ext2_unlink` | 元から `if (ret) return ret` | 問題なし |
-| `fs/ext2/ext2_dir.c:367` | `ext2_rmdir` | 元から `if (ret) return ret` | 問題なし |
+| `fs/ext2/ext2_dir.c` | `ext2_rmdir` | 元から `if (ret) return ret` | 問題なし |
 | `fs/ext2/ext2_dir.c` | `ext2_rename` 移動元 | 元から `if (ret) return ret` | 問題なし |
 
 直し方は 3 つとも同じ: **`EXT2_OK` なら EXIST (rename は置き換え分岐)、
@@ -436,21 +436,21 @@ M14 1 / M15 1 / M16 1 / M17 2 / M18 4)。件数が §4 より増えているの�
 
 | 場所 | 文脈 | 参照は媒体に無いか | 失敗の扱い |
 |---|---|---|---|
-| `ext2_inode.c:339` | bmap_set 新しい単一間接表の書き込み失敗 | 無い (まだ指していない) | 漏れ |
-| `ext2_inode.c:365` | bmap_set 新しい二重間接表の書き込み失敗 | 無い | 漏れ |
-| `ext2_inode.c:386` | bmap_set 新しい ind1 の書き込み失敗 | 無い | 漏れ |
-| `ext2_inode.c:393` | bmap_set 二重間接表の読み直し失敗 | 無い (まだ項目を入れていない) | 漏れ |
-| `ext2_inode.c:479/488/490/507/509/511` | `ext2_release_blocks` の中 (6 か所) | 呼び手の前提 | `leaked = 1` を立てて続ける |
-| `ext2_file.c:175` | create: bmap_set 失敗の `blk` | 無い (inode 未書き込み) | 漏れ (元の失敗を返す) |
-| `ext2_file.c:270` | ext2_write: bmap_set 失敗の `blk` | 無い (inode は切り詰めで 0 本を指す) | 漏れ |
-| `ext2_file.c:354` | write_stream: bmap_set 失敗の `new_blk` | **有るかもしれない** (既存ファイルの表) | **NOSPC のときだけ返す**。IO なら返さない (**以前は常に返していた = 相互リンク**) |
-| `ext2_dir.c:180` | add_entry: bmap_set 失敗の `new_blk` | **有るかもしれない** (ディレクトリの既存の表) | **NOSPC のときだけ返す** (以前は常に返していた) |
-| `ext2_dir.c:319` | mkdir: "." ".." の書き込み失敗 | 無い (inode 未書き込み) | 漏れ |
-| `ext2_file.c:126` (free_inode) | create 後始末 (inode 未書き込み) | 無い | 漏れ |
-| `ext2_file.c:216` (free_inode) | create の add_entry NOSPC | **切り詰めが成功したときだけ**呼ぶ | 漏れ |
-| `ext2_file.c:490` (free_inode) | unlink | 切り詰め成功のときだけ | 返せなければ IO |
-| `ext2_dir.c:290/320` (free_inode) | mkdir の割り当て失敗・"." 書き込み失敗 | 無い | 漏れ |
-| `ext2_dir.c:422` (free_inode) | rmdir | 切り詰め成功のときだけ | 返せなければ IO |
+| `ext2_inode.c` の `ext2_bmap_set()` | bmap_set 新しい単一間接表の書き込み失敗 | 無い (まだ指していない) | 漏れ |
+| `ext2_inode.c` の `ext2_bmap_set()` | bmap_set 新しい二重間接表の書き込み失敗 | 無い | 漏れ |
+| `ext2_inode.c` | bmap_set 新しい ind1 の書き込み失敗 | 無い | 漏れ |
+| `ext2_inode.c` の `ext2_bmap_set()` | bmap_set 二重間接表の読み直し失敗 | 無い (まだ項目を入れていない) | 漏れ |
+| `ext2_inode.c/488/490/507/509/511` | `ext2_release_blocks` の中 (6 か所) | 呼び手の前提 | `leaked = 1` を立てて続ける |
+| `ext2_file.c` | create: bmap_set 失敗の `blk` | 無い (inode 未書き込み) | 漏れ (元の失敗を返す) |
+| `ext2_file.c` | ext2_write: bmap_set 失敗の `blk` | 無い (inode は切り詰めで 0 本を指す) | 漏れ |
+| `ext2_file.c` | write_stream: bmap_set 失敗の `new_blk` | **有るかもしれない** (既存ファイルの表) | **NOSPC のときだけ返す**。IO なら返さない (**以前は常に返していた = 相互リンク**) |
+| `ext2_dir.c` | add_entry: bmap_set 失敗の `new_blk` | **有るかもしれない** (ディレクトリの既存の表) | **NOSPC のときだけ返す** (以前は常に返していた) |
+| `ext2_dir.c` | mkdir: "." ".." の書き込み失敗 | 無い (inode 未書き込み) | 漏れ |
+| `ext2_file.c` (free_inode) | create 後始末 (inode 未書き込み) | 無い | 漏れ |
+| `ext2_file.c` (free_inode) | create の add_entry NOSPC | **切り詰めが成功したときだけ**呼ぶ | 漏れ |
+| `ext2_file.c` (free_inode) | unlink | 切り詰め成功のときだけ | 返せなければ IO |
+| `ext2_dir.c/320` (free_inode) | mkdir の割り当て失敗・"." 書き込み失敗 | 無い | 漏れ |
+| `ext2_dir.c` (free_inode) | rmdir | 切り詰め成功のときだけ | 返せなければ IO |
 
 `ext2_free_block` / `ext2_free_inode` 本体 (P1-B): 範囲外は INVAL、読み出し失敗・
 書き込み失敗は IO、**空き数は書き込みが成功したときだけ動かす**、既に空きなら

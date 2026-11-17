@@ -19,21 +19,21 @@
 
 - **PM 決定（R10・1854h 書込み）**: 実 ROM に該当書込みは無い。別 ROM/展開 write-set に現れた場合の条件付き記録とし、descriptor の phase・値を照合して非零または承認外なら静的拒否する。命令の黙示改変・許可拡張はしない。
 
-- 根拠: nouveau (MIT、drivers/gpu/drm/nouveau/nvkm/subdev/devinit/nv04.c の setPLL_double_lowregs、NV44 は devinit=nv1a・pll_set=nv04) の MEM PLL の列は、4600h を書込みの前に読んで bit31 を立て、係数と制御の後に保存値へ戻す — OS32 の kdebug/gfinit_pll.c・237 と同じ。nouveau は 4600h を書いた後に読み戻さない。envytools の rnndb (MIT) に 4600h の定義は無い。bit31 の意味と読み戻せるかは未確認 (WO とも断定しない)。
+- 根拠: nouveau (MIT、drivers/gpu/drm/nouveau/nvkm/subdev/devinit/nv04.c の setPLL_double_lowregs、NV44 は devinit=nv1a・pll_set=nv04) の MEM PLL の列は、4600h を書込みの前に読んで bit31 を立て、係数と制御の後に保存値へ戻す — OS32 の kdebug/gfinit_pll.c と同じ。nouveau は 4600h を書いた後に読み戻さない。envytools の rnndb (MIT) に 4600h の定義は無い。bit31 の意味と読み戻せるかは未確認 (WO とも断定しない)。
 
-- 決定: 4600h の書込みの列 (bit31 を立てる・保存値へ戻す) は変えない。**4600h の 2 規則 (substep 12020h と 1202Bh、表の tools/tests/recover_tables_oracle.c:557・tools/tests/recover_tables_oracle.c:568) だけ verify mask を 0 にする** (照合をしない、生成元から直し、生成物・承認表 tools/accept/gf_main.md の 4600h の行を同期)。7FFFFFFFh にはしない (下位 31bit の読み戻しの根拠も無い)。verify=0 の成功は PLL の lock や VRAM の成功を意味しない
+- 決定: 4600h の書込みの列 (bit31 を立てる・保存値へ戻す) は変えない。**4600h の 2 規則 (substep 12020h と 1202Bh、表の tools/tests/recover_tables_oracle.c・tools/tests/recover_tables_oracle.c) だけ verify mask を 0 にする** (照合をしない、生成元から直し、生成物・承認表 tools/accept/gf_main.md の 4600h の行を同期)。7FFFFFFFh にはしない (下位 31bit の読み戻しの根拠も無い)。verify=0 の成功は PLL の lock や VRAM の成功を意味しない
 
 > [要確認] 現行は診断も hwdev/gf/runner.c を使い、main 境界の 5 node を生成する。原文の静的展開・ordinal・verify 規則を現行実装と同一とは扱えない。
 
 - 決定 (Opus のレビューの案 B): **SUB7 (MEM、12020h〜1202Eh) と SUB6 (CORE、12000h〜12005h) の書込み 21 本の verify mask をすべて 0 にする**。nouveau (MIT、nv04.c の setPLL_double_lowregs) はこれらを書いた後に読み戻さず、rnndb にも読み戻せるビットの定義が無い。実機の 1 回の観測で一部の照合を残す案は、値の組が変わると次回また止まりうるので採らない。書込みの列・値・順・保存値の復元は変えない。
 
-- 根拠の集め方: 書込み先はどれも read_safe=1 (表の tools/tests/recover_tables_oracle.c:612-616・tools/tests/recover_tables_oracle.c:734-738) なので、verify が 0 でも kdebug/recover.c が書く前に old を読んで gf_bus の行に残す。次の同じ番地への書込みの old で、前の書込みが効いたかを止めずに後から見る (例: 12028h の old で 12023h〜12027h の後の 4020h、1202Bh の old で 12020h の bit31)。
+- 根拠の集め方: 書込み先はどれも read_safe=1 (表の tools/tests/recover_tables_oracle.c・tools/tests/recover_tables_oracle.c) なので、verify が 0 でも kdebug/recover.c が書く前に old を読んで gf_bus の行に残す。次の同じ番地への書込みの old で、前の書込みが効いたかを止めずに後から見る (例: 12028h の old で 12023h〜12027h の後の 4020h、1202Bh の old で 12020h の bit31)。
 
 - 失う安全: CORE (SUB6) の 6 本と MEM の全部で、書込みの直後の照合は無くなる (係数・制御・mirror・gate・4600h の復元の不成立をその場で止めない)。もとの全ビット照合でも PLL の lock・実周波数・DRAM の正常は保証していない。書込みの失敗・許可・値・順の検査・期限・終端の cleanup と、98 側 (S0) の復帰の検証 (§163-171・§195) は変えない。
 
-- 決定: main 0〜3 で verify が非零のまま残る 10 規則のうち **9 本を 0 にする** — VIDEO PLL の 5 本 (tools/tests/recover_tables_oracle.c:572-576、C040h・680580h・680578h・680508h・C040h、SUB6/7 と同じ PLL の列で nouveau の nv04.c は書いた後に読まない)、RESET の 184Ch の戻し (tools/tests/recover_tables_oracle.c:580、PCI config の写しで 98 側の安全に効かない)、h0/h1 CR57 の戻し (tools/tests/recover_tables_oracle.c:582-583、間接 index を戻すだけで後続の選択にも 98 側にも効かない)、1700h の容量の写し (tools/tests/recover_tables_oracle.c:584、rnndb の pbus.xml で BAR1_VRAM_SIZE は align=0x100000、容量は A4 の BAR1 の試験で間接に見る)。
+- 決定: main 0〜3 で verify が非零のまま残る 10 規則のうち **9 本を 0 にする** — VIDEO PLL の 5 本 (tools/tests/recover_tables_oracle.c、C040h・680580h・680578h・680508h・C040h、SUB6/7 と同じ PLL の列で nouveau の nv04.c は書いた後に読まない)、RESET の 184Ch の戻し (tools/tests/recover_tables_oracle.c、PCI config の写しで 98 側の安全に効かない)、h0/h1 CR57 の戻し (tools/tests/recover_tables_oracle.c、間接 index を戻すだけで後続の選択にも 98 側にも効かない)、1700h の容量の写し (tools/tests/recover_tables_oracle.c、rnndb の pbus.xml で BAR1_VRAM_SIZE は align=0x100000、容量は A4 の BAR1 の試験で間接に見る)。
 
-- **残す: h0 CR3C (tools/tests/recover_tables_oracle.c:581、COPY の写し) の verify FFh**。nouveau も CR3C を書いた後に IO_RESTRICT_* の選択の添字として読み直し、VBIOS は値が保たれる前提。COPY の後は index の選択だけで data の書込みが無く、選択の読取りも REC に値を残さないので、old による後からの観測ができない — ここを外すと組の誤りを止めずに別の組の PFB を書き、原因を辿れない。
+- **残す: h0 CR3C (tools/tests/recover_tables_oracle.c、COPY の写し) の verify FFh**。nouveau も CR3C を書いた後に IO_RESTRICT_* の選択の添字として読み直し、VBIOS は値が保たれる前提。COPY の後は index の選択だけで data の書込みが無く、選択の読取りも REC に値を残さないので、old による後からの観測ができない — ここを外すと組の誤りを止めずに別の組の PFB を書き、原因を辿れない。
 
 ## GF6200_4A_S2_LAYOUT
 

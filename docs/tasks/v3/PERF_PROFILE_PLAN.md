@@ -9,34 +9,34 @@ LAN と I/O の上限の多くは、いちばん遅い経路に合わせた 1 �
 
 | 定数 (main 2026-11-16) | 値 | 何に合わせた値か |
 |---|---|---|
-| `net/rx_work.h:5` NET_RX_WORK_LIMIT_US | 120µs | NE2000 の PIO の受信の 1 回の上限 (IO_TIER の X2)。PIO で 1514B を読むと 1 枚で越え得る |
-| `net/nic.h:53` NET_RX_SCAN_MAX | 8 | 1 回の振り分けで NIC から取り出す枚数 |
-| `net/nic_rx.c:11` RX_SLOTS | 4 | link・SFS の列の枠。2026-11-16 に満杯で捨てていた (f61ad39f で link は NIC に残す形へ) |
-| `platform/powermac/nic_gem.c:16` GEM_RX_SLOTS | 4 | GEM の受け取りの枠。link の WINDOW の credit もこの 4 枠だけを数える |
-| `drivers/net/e82557/e82557_regs.h:53` E82557_RFD_COUNT | 8 | 82557 の受信の記述子 (DMA の列) |
-| `net/link.h:109` LINK_WINDOW_LEN | 2 | link の窓 |
-| `net/link.h:112・116` LINK_RTO_TICKS・LINK_TRIES | 200ms・5 回 | 10ms の tick 基準の再送 |
-| `include/remote_control.h:21` REMOTE_SFS_CALL_MAX | 1044B | 1 回の SFS の呼び出し (LAN の 1KB) |
-| `fs/serialfs/sfs_proto.h:40・43` SFS_MAX_PAYLOAD・SFS_LAN_MAX_PAYLOAD | 512B・1028B | シリアルと LAN の 1 回の読み。1 本ずつ返事を待つ (stop-and-wait) |
+| `net/rx_work.h` NET_RX_WORK_LIMIT_US | 120µs | NE2000 の PIO の受信の 1 回の上限 (IO_TIER の X2)。PIO で 1514B を読むと 1 枚で越え得る |
+| `net/nic.h` NET_RX_SCAN_MAX | 8 | 1 回の振り分けで NIC から取り出す枚数 |
+| `net/nic_rx.c` RX_SLOTS | 4 | link・SFS の列の枠。2026-11-16 に満杯で捨てていた (f61ad39f で link は NIC に残す形へ) |
+| `platform/powermac/nic_gem.c` GEM_RX_SLOTS | 4 | GEM の受け取りの枠。link の WINDOW の credit もこの 4 枠だけを数える |
+| `drivers/net/e82557/e82557_regs.h` E82557_RFD_COUNT | 8 | 82557 の受信の記述子 (DMA の列) |
+| `net/link.h` LINK_WINDOW_LEN | 2 | link の窓 |
+| `net/link.h` LINK_RTO_TICKS・LINK_TRIES | 200ms・5 回 | 10ms の tick 基準の再送 |
+| `include/remote_control.h` REMOTE_SFS_CALL_MAX | 1044B | 1 回の SFS の呼び出し (LAN の 1KB) |
+| `fs/serialfs/sfs_proto.h` SFS_MAX_PAYLOAD・SFS_LAN_MAX_PAYLOAD | 512B・1028B | シリアルと LAN の 1 回の読み。1 本ずつ返事を待つ (stop-and-wait) |
 | `kernel/io_work.h` IO_PASS_US | 500µs | I/O の Tier の 1 巡の上限 |
 | `kernel/io_policy.c` の既定の予算 | 120µs ([推]) | NE2K・NIC・TSC の 1 回の予算 |
-| `userland/system/hsync.c:106・107` FILE_BUF・CMP_BUF | 64KB・32KB | hsync の読み書きの単位 |
+| `userland/system/hsync.c (FILE_BUF_SIZE)・107` FILE_BUF・CMP_BUF | 64KB・32KB | hsync の読み書きの単位 |
 
 ### 1-2. タイマーと時刻の系
 時間の単位の多くは、論理 100Hz の tick (10ms) か、P100 級の CPU で測った µs の予算です。
 
 | 定数 (main 2026-11-16) | 値 | 何に合わせた値か |
 |---|---|---|
-| `include/memmap.h:437` PIT_HZ・`os32_kapi_shared.h:17` OS32_TICK_HZ | 100Hz | 論理 tick (公開の ABI)。物理は x86 で 1kHz (TASK_TICK_1KHZ の B14) |
-| `kernel/irq/tick_budget.h:4` IRQ0_SLOT_BUDGET_US | 120µs | IRQ0 の 1 回の枠の予算 (F_slot2 + F_demux = 25.4µs を基準) |
-| `kernel/irq/tick_budget.h:5・6` NET_TAIL_RX_US・NET_TAIL_TX_US | 23µs・17µs | 実測 14.9µs・11.0µs の 1.5 倍 (測った機体の CPU に合わせた値) |
-| `net/link.h:112` LINK_RTO_TICKS | 20 tick (200ms) | link の再送の間隔。LAN の往復は 1ms 未満でも 200ms 待つ |
+| `include/memmap.h` PIT_HZ・`os32_kapi_shared.h` OS32_TICK_HZ | 100Hz | 論理 tick (公開の ABI)。物理は x86 で 1kHz (TASK_TICK_1KHZ の B14) |
+| `kernel/irq/tick_budget.h` IRQ0_SLOT_BUDGET_US | 120µs | IRQ0 の 1 回の枠の予算 (F_slot2 + F_demux = 25.4µs を基準) |
+| `kernel/irq/tick_budget.h` NET_TAIL_RX_US・NET_TAIL_TX_US | 23µs・17µs | 実測 14.9µs・11.0µs の 1.5 倍 (測った機体の CPU に合わせた値) |
+| `net/link.h` LINK_RTO_TICKS | 20 tick (200ms) | link の再送の間隔。LAN の往復は 1ms 未満でも 200ms 待つ |
 | `net/link.h` LINK_HELLO_IDLE_MS・LINK_PROBE_TICKS | 1s・1s | 相手の探し・生存の確かめ |
-| `fs/serialfs/sfs_proto.h:158` SFS_FIRST_BYTE_MS | 2s | 応答の始まりの期限 (シリアルの 9600bps を含む) |
-| `platform/pc98/tsc_clock.c:15・22` TSC_MONITOR_US・TSC_WINDOWS | 1s・5 窓 | TSC の校正と監視 |
-| `kernel/time/ktime.h:13` TIME_RETRY_MAX | 3 | 時計の読みの再試行 |
+| `fs/serialfs/sfs_proto.h` SFS_FIRST_BYTE_MS | 2s | 応答の始まりの期限 (シリアルの 9600bps を含む) |
+| `platform/pc98/tsc_clock.c` TSC_MONITOR_US・TSC_WINDOWS | 1s・5 窓 | TSC の校正と監視 |
+| `kernel/time/ktime.h` TIME_RETRY_MAX | 3 | 時計の読みの再試行 |
 | `net/nic.h` NET_RX_ACTIVE_MS | 5ms | 受信の直後に休ませない窓 (ユーザー決定 11-16。PowerPC の QEMU で測った値) |
-| `drivers/input/kbd.h:56` KBD_RSHELL_TIMEOUT_SEC | 30s | 遠隔の会話のキー待ちの上限 (人に見える時間。モードで変えない) |
+| `drivers/input/kbd.h` KBD_RSHELL_TIMEOUT_SEC | 30s | 遠隔の会話のキー待ちの上限 (人に見える時間。モードで変えない) |
 
 - link の再送・生存の確かめ・期限の多くは 10ms の jiffy で数えている。Ra266 の LAN の往復は 1ms 未満なので、1 回の取りこぼしの回復に 200ms かかる。
 - µs の予算は、遅い CPU で測った値の 1.5 倍で決めてある。速い CPU では同じ予算で多くを処理できるが、件数の上限 (8 枚など) が先に効く。

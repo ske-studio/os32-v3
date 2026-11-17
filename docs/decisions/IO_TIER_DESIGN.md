@@ -27,13 +27,13 @@
 
 |番号|実物の確認|設計への反映|
 |---|---|---|
-|X1|idle_workはIF/EE=1・IRQ深さ0限定、再入禁止、最大4本を1周。優先・期限・予算なし（kernel/idle_work.c:6,12,26）。sys_halt以外に入力待ち・syscall入口・協調切替から呼ぶ（kernel/sys.c:42、drivers/input/kbd.c、exec/exec_syscall.inc:94、exec/exec_schedule.inc:150、net/link.c:64のLINK_IDLE、net/nic.c:151のnet_tx末尾）|協調点はこれら全体。現登録者はNE2K・NIC RX・TSC校正の3種類|
-|X2|NE2Kの8件/120µsはFG1のdemux（net/rx_work.c:17,24、net/nic.c:225）。ne2k_bh内で共有（drivers/net/ne2000/ne2000.c:523,553）。IRQは印付け（ne2000_irq.inc:54）|論点4の「IRQ内なのでTier外」は採らず、FG1予算をTierと合成|
-|X3|PCMはIRQ10から補充（drivers/sound/cs4231/pcm_cs4231.c:478）、IRQ0のpcm_tick救済も残る（:411,437,484）|T3は全面的なIRQ10専用化ではない。当面は両経路をTier外の装置保証として保存|
-|X4|e82557にはidle不足2jiffyでIRQ0のdemux救済がある（net/nic.c:298）。同箇所に独立のpending判定は無い|「IRQでは要求記録のみ」は現状の例外を伴う。今回この救済を削らない|
-|X5|移行前の観測: PPC syscallはEE=0でidle_workが進まない（exec/exec_syscall.inc:90、arch/ppc/kernel_trap.c:104）。IRQ出口のTier処理も無い（同:98、arch/x86/kernel/isr_stub.asm:95）|AC-CTX適合後は共通FG1協調点で実行。IRQ出口は作らない|
+|X1|idle_workはIF/EE=1・IRQ深さ0限定、再入禁止、最大4本を1周。優先・期限・予算なし（kernel/idle_work.c (IDLE_WORK_LIMIT)）。sys_halt以外に入力待ち・syscall入口・協調切替から呼ぶ（kernel/sys.c、drivers/input/kbd.c、exec/exec_syscall.inc、exec/exec_schedule.inc、net/link.cのLINK_IDLE、net/nic.cのnet_tx末尾）|協調点はこれら全体。現登録者はNE2K・NIC RX・TSC校正の3種類|
+|X2|NE2Kの8件/120µsはFG1のdemux（net/rx_work.c (rx_work_begin())、net/nic.c）。ne2k_bh内で共有（drivers/net/ne2000/ne2000.c）。IRQは印付け（ne2000_irq.inc）|論点4の「IRQ内なのでTier外」は採らず、FG1予算をTierと合成|
+|X3|PCMはIRQ10から補充（drivers/sound/cs4231/pcm_cs4231.c）、IRQ0のpcm_tick救済も残る（`pcm_advance_run()`）|T3は全面的なIRQ10専用化ではない。当面は両経路をTier外の装置保証として保存|
+|X4|e82557にはidle不足2jiffyでIRQ0のdemux救済がある（net/nic.c）。同箇所に独立のpending判定は無い|「IRQでは要求記録のみ」は現状の例外を伴う。今回この救済を削らない|
+|X5|移行前の観測: PPC syscallはEE=0でidle_workが進まない（exec/exec_syscall.inc、arch/ppc/kernel_trap.c）。IRQ出口のTier処理も無い（同、arch/x86/kernel/isr_stub.asm）|AC-CTX適合後は共通FG1協調点で実行。IRQ出口は作らない|
 
-- tick_dispatchは7slotを順に1周し既存tick_budgetを挟む（kernel/irq/tick.h:5、tick.c:25）。IRQ0の論理周に実行（arch/x86/kernel/isr_stub.asm:493、isr_handlers.c:549）。PPCもjiffyで実行（arch/ppc/kernel_dec.c:60）。
+- tick_dispatchは7slotを順に1周し既存tick_budgetを挟む（kernel/irq/tick.h、tick.c:25）。IRQ0の論理周に実行（arch/x86/kernel/isr_stub.asm、isr_handlers.c）。PPCもjiffyで実行（arch/ppc/kernel_dec.c）。
 - 設計のみ。preflight --fix-fonts・build・lint・変異・guestは未実施。依頼にbase指定はなく、作業木は読み取り専用。試験合格は主張しない。
 
 ## 2. 実行層と論点1（U1決定: 初版は案B）
@@ -57,8 +57,8 @@
 
 ## 3. 時計・設定・LANの境界（論点2〜5）
 - AC-TIME-4（新）: io_clock_usはIRQ/FG0/FG1から読める単調µs時計。成功時のみ出力有効、未準備NOSYS・一時失敗AGAIN。短いirq_save/restoreを内包し、源・分解能・停止中進行をAC-TIME-2と揃える。
-- x86はT1のTSC/PIT連続時計（platform/pc98/clock_source.c:78）、PPCはupper/lower/upperのTB時計（platform/powermac/clock.c:30,75）。LANが必要とするµsの読み口はio_clock_usに統一。
-- 頻繁な予算判定は§5の生countで行う。arch_tick_budget_*は流用しない。x86のstatic budget_tscはIRQで上書きされ得る（platform/pc98/tick_budget.c:8）、PPC内部単位はTB count（platform/powermac/tick_budget.c:4,16）。Tierは巡回ローカルな時計tokenを持つ。
+- x86はT1のTSC/PIT連続時計（platform/pc98/clock_source.c (platform_clock_read_us())）、PPCはupper/lower/upperのTB時計（platform/powermac/clock.c）。LANが必要とするµsの読み口はio_clock_usに統一。
+- 頻繁な予算判定は§5の生countで行う。arch_tick_budget_*は流用しない。x86のstatic budget_tscはIRQで上書きされ得る（platform/pc98/tick_budget.c）、PPC内部単位はTB count（platform/powermac/tick_budget.c (arch_tick_budget_base())）。Tierは巡回ローカルな時計tokenを持つ。
 - 時計失敗時は追加単位を開始せずMOREを残し記録。TSC校正だけは時計未準備でも有限な起動例外として1周1回進める。一般の時間保証は準備後。
 - AC-IO-1（新）はFG1の協調進行・再入無動作・欠如NOSYS、AC-IO-2（新）は設定の検証・原子的置換・LE形式・owner終了時復元を定義。
 - T2の8件/120µsは既存NIC demuxの上限であり、LAN一括転送の初期値ではない。NICは残りTier予算・既存時間上限・既存件数上限の最小まで。ne2k_bh内の複数呼出でも予算を共有する。
@@ -115,7 +115,7 @@ while (frame_ready(transfer) && io_slice_take(s))
 return waiting_for_credit(transfer) ? IO_WAIT :
        has_work(transfer) ? IO_MORE : IO_DONE;
 ```
-- アプリが最初にset/resetする時、owner IDと世代に適用前の有効表を保存。同ownerの再設定では保存元を上書きしない。正常終了・fault・killの共通資源回収で適用前へ戻す。親子は既存実行順の逆順で復元し、ID再利用で旧表を復活させない（docs/09_exec.md:20-21）。
+- アプリが最初にset/resetする時、owner IDと世代に適用前の有効表を保存。同ownerの再設定では保存元を上書きしない。正常終了・fault・killの共通資源回収で適用前へ戻す。親子は既存実行順の逆順で復元し、ID再利用で旧表を復活させない（docs/09_exec.md）。
 - 恒久表はユーザーの起動時設定。アプリresetは実行中の表をOS標準へ戻す操作で、owner終了時の復元を解除しない。子の表は子終了時に親の表へ、親終了時にその適用前へ戻る。
 ```c
 /* wire: alignment=1、全多byte値LE。native structをcastしない。 */
@@ -160,17 +160,17 @@ int io_pump(unsigned int budget_us); /* callback数、負=失敗 */
 ## 6. 移行・容量
 |現登録者／新サービス|既定|移行|
 |---|---|---|
-|ne2k_bh（ne2000_control.inc:96）|Tier2・FG|まず互換adapter、次にPIO/復旧/回収の単位と残予算|
-|net_rx_idle（net/nic.c:58）|Tier2・FG|NICと予算共有。IRQ救済は別経路のまま|
-|pc98_tsc_calibrate_work（platform/pc98/tsc_clock.c:241）|Tier3・FG|時計未準備の有限例外。通常は既存timerから要求|
+|ne2k_bh（ne2000_control.inc (ne2k_init())）|Tier2・FG|まず互換adapter、次にPIO/復旧/回収の単位と残予算|
+|net_rx_idle（net/nic.c）|Tier2・FG|NICと予算共有。IRQ救済は別経路のまま|
+|pc98_tsc_calibrate_work（platform/pc98/tsc_clock.c）|Tier3・FG|時計未準備の有限例外。通常は既存timerから要求|
 |LAN一括転送|Tier2・FG|Tier前は既存4枠の残り1枠で1周1回、LAN設計の自己予算。Tier後はLAN所有の同じstepを直接登録|
 |PCM|現IRQ経路|現状維持。案Aの利用者が決まった場合だけ別票|
 |入力/GUI、先読み/キャッシュ|将来Tier2、Tier3|現idle登録済みとは扱わず、小単位化後に追加|
 
 - idle_work_register/runの名前と最大4本の互換枠を保持。互換fnは常にpending扱いで1巡1回、io_request不要。予算非対応と明示し、A5後〜D3/D4前も回収を止めない。空の速い道は互換枠0本時だけ。既存登録者移行後に通常の単位契約を有効化。旧tick登録順は不変。
 - [推・未ビルド] 共通text 3〜5KiB、FG pump/時計adapter 0.5〜1.5KiB、RAM 3〜4KiB（16枠・表2面・owner別保存表・統計）、lz4増分2〜4KiB、設定最大272B。追加stackはmap/guest watermarkで確認。
-- MINIMALはkernel内増分のみ、診断はDEBUGへ。FD空き下限64KiB（docs/08_build.md:768）、同:767の443/655KiBは過去の測定で現余裕の証明ではない。
-- resident上限MEM_KERNEL_IMAGE_MAX（include/memmap.h:230）、圧縮像上限520,192B（TICK_1KHZ_NEXT_DESIGN §4-3）を再測定。kdebugへリンクしないので予定増分0。kdebug上限image/mem各256KiB・load_span512KiB（docs/08_build.md:195）を維持。実装時に両FD・MINIMAL・mapで合否判定。
+- MINIMALはkernel内増分のみ、診断はDEBUGへ。FD空き下限64KiB（docs/08_build.md）、同:767の443/655KiBは過去の測定で現余裕の証明ではない。
+- resident上限MEM_KERNEL_IMAGE_MAX（include/memmap.h）、圧縮像上限520,192B（TICK_1KHZ_NEXT_DESIGN §4-3）を再測定。kdebugへリンクしないので予定増分0。kdebug上限image/mem各256KiB・load_span512KiB（docs/08_build.md）を維持。実装時に両FD・MINIMAL・mapで合否判定。
 
 ## 7. ファイル・段・担当境界
 各行が1段=1ファイル=1実装者。同一ファイルは直列。B1〜B4・旧C3・D6・出口試験は削除。

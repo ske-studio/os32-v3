@@ -308,7 +308,7 @@ python3 -B tools/tests/test_install_recover.py happy chain # ケース指定
   ユーザーランドから検出できない。ホスト試験が固定しているのは「`db_close` が失敗したら
   `.new` を消さず、再起動を前提にした文言を出す」ところまでで、**再起動しなければ本当に
   危ないこと自体は試験していない** (票 §1f 4 の限界そのまま)。
-- `PRAGMA integrity_check` はカーネルの SQLite で OMIT (`lib/sqlite3/os32_sqlite_config.h:51`)。
+- `PRAGMA integrity_check` はカーネルの SQLite で OMIT (`lib/sqlite3/os32_sqlite_config.h`)。
   検査は meta + 全行走査 + バイト一致までで、索引や自由ページの健全性は見ていない。
 - ext2 の rename が実際にどの中途半端で止まるかは注入した 2 形 (両名残存 / 置換先 unlink 後の
   新名追加失敗) だけ。実 FS での再現は受入 I6 の領分。
@@ -667,7 +667,7 @@ FAT 側が負を返さない限り**欠けたファイルのまま `Installation
 `f_opendir` の失敗は元から `ff_to_vfs(fr)` の負を返しており**変更なし**。
 `f_closedir` は成功・打ち切りのどちらでも通る位置にあり、呼び忘れは無い
 (開けなかったときは `return` が先なので呼ばない = 正しい)。
-`vfs_ls` (`fs/vfs.c:344`) は `ops->list_dir()` の戻りをそのまま返すので**触っていない**。
+`vfs_ls` (`fs/vfs.c`) は `ops->list_dir()` の戻りをそのまま返すので**触っていない**。
 
 ### K-4.1 試験の範囲と遮断
 

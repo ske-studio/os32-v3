@@ -10,22 +10,22 @@
 ## r2→r3 の変更
 - R2-P1 (再起動で 412 が 0 行目を上書き): 起動の表示は `con_dual_was_live()` でも追記を選ぶ (描けるかとは別)。shutdown→再起動の通し試験を A3・A6 に足した (§3-4・§8)。
 - R2-P2-1 (GFX2_MAX_ADAPTERS が未定義): 当面の内部定数 `CON_DUAL_MAX_ADAPTERS 4`・`CON_DUAL_MAX_HEADS 2` を console_dual.h に置き、HAL v2 の C1 で `GFX2_MAX_ADAPTERS`・`gfx2_adapter.head[2]` に置き換える (§2-1)。
-- R2-P2-2 (head 1 の有無の取得元が無い): GF の暫定の能力を 1 つの内部の口 `gf_outputs_query()` (新 drivers/video/geforce/gf_outputs.c、カーネル側) にまとめた。取得元は kernel が持つ `geforce_context->display_state` (geforce_module.h:86-88) の `head[GF4_HEADS]` (hwdev/gf/display/api.h:8・21-27)。能力・接続・稼働を別の欄にした (§2-1)。
-- R2-P2-3 (head ↔ D-SUB/DVI の固定対応): 固定をやめ、各 head の `route.connector`・`route.type` (hwdev/gf/display/data.h:20-24) と connector の表から求める。同じ backend・開始状態・世代での接続・head 構成の変化は口が返す `sig` で表を更新する (§2-2)。
+- R2-P2-2 (head 1 の有無の取得元が無い): GF の暫定の能力を 1 つの内部の口 `gf_outputs_query()` (新 drivers/video/geforce/gf_outputs.c、カーネル側) にまとめた。取得元は kernel が持つ `geforce_context->display_state` (geforce_module.h) の `head[GF4_HEADS]` (hwdev/gf/display/api.h)。能力・接続・稼働を別の欄にした (§2-1)。
+- R2-P2-3 (head ↔ D-SUB/DVI の固定対応): 固定をやめ、各 head の `route.connector`・`route.type` (hwdev/gf/display/data.h) と connector の表から求める。同じ backend・開始状態・世代での接続・head 構成の変化は口が返す `sig` で表を更新する (§2-2)。
 
 ## 1. 実物の確認 (前提・§9-1 と実コードの食い違い)
 | # | 前提・§9-1 の記述 | 実物 (file:line) | 設計への帰結 |
 |---|---|---|---|
-| F1 | 内蔵と増設は別の画面 | 98・Trident・RGB-IN (GF) は 98 の切替回路で 1 端子 (pc98_route.h:4-7、TASK_GEFORCE6200.md「映像の経路」)。2 画面は GF の D-SUB/DVI を別のモニターへ直結したときだけ | 対象は GF 直結の構成だけ。0FACh は 98 のまま保つ (§3-3) |
+| F1 | 内蔵と増設は別の画面 | 98・Trident・RGB-IN (GF) は 98 の切替回路で 1 端子 (pc98_route.h (PC98_ROUTE_PORT)、TASK_GEFORCE6200.md「映像の経路」)。2 画面は GF の D-SUB/DVI を別のモニターへ直結したときだけ | 対象は GF 直結の構成だけ。0FACh は 98 のまま保つ (§3-3) |
 | F2 | Trident も相手 | Trident は 0FACh=2 を無条件に書く (trident/lifecycle.c:6-8) | 対象外 (確定)。断る |
-| F3 | 停止は con_sink の門だけ | GF の開始で `pc98_console_set_safe(0)` (backend_geforce.c:618)、route は :627・:728。safe=0 は TVRAM の口を全部止める (console.c:55・67・102・117・124・134) | pc98_route.c で直結のとき safe を戻す |
-| F4 | gfx_core_init.inc:9-14 を直す | 早い戻りは TVRAM に触らない。`_gfx_common_init` の消去 (gfx_core.c:257-269) は planar だけ | 変更なし (PPC B3 と衝突しない) |
+| F3 | 停止は con_sink の門だけ | GF の開始で `pc98_console_set_safe(0)` (backend_geforce.c)、route は `geforce_init()`・`geforce_enter()`。safe=0 は TVRAM の口を全部止める (console.c:55・67・102・117・124・134) | pc98_route.c で直結のとき safe を戻す |
+| F4 | gfx_core_init.inc を直す | 早い戻りは TVRAM に触らない。`_gfx_common_init` の消去 (gfx_core.c) は planar だけ | 変更なし (PPC B3 と衝突しない) |
 | F5 | console.c:53-56・195-204 | 門は 53-56 の他に tvram_clear 106・console_set_cursor 388 | 門は 4 か所 |
-| F6 | kernel.c:484 は消去 | GUI の後は sink が有効なので TVRAM は消さないが、`con_sink_push_clear()` (103) は積む | TVRAM と sink のクリアを分ける |
-| F7 | (パニック未記述) | `platform_fault_cell` は門なしで TVRAM に直書き、論理カーソルを進めない (emergency.c:19-23) | §4 |
-| F8 | backend の切替で世代が進む | `gfx_shutdown` は世代を進めず GF→PC98 に替える (gfx_core.c:477-490)、gshell の異常終了で呼ばれる (kernel/gui.c:154) | キャッシュの鍵に g_backend と開始状態を足す |
+| F6 | kernel.c は消去 | GUI の後は sink が有効なので TVRAM は消さないが、`con_sink_push_clear()` (103) は積む | TVRAM と sink のクリアを分ける |
+| F7 | (パニック未記述) | `platform_fault_cell` は門なしで TVRAM に直書き、論理カーソルを進めない (emergency.c) | §4 |
+| F8 | backend の切替で世代が進む | `gfx_shutdown` は世代を進めず GF→PC98 に替える (gfx_core.c)、gshell の異常終了で呼ばれる (kernel/gui.c) | キャッシュの鍵に g_backend と開始状態を足す |
 | F9 | HAL v2 の列挙がある | gfx2_* はまだコードに無い (grep 0 件)。設計は GFX2_MAX_ADAPTERS 4・head[2] (HAL_V2_DESIGN.md:532・554) | 今は g_backend から表を作り、HAL v2 の C1 後に列挙へ差し替え |
-| F10 | GF の head 数・connector を外から聞ける | `GfxBackend` に head 数の口は無い。GF の状態は kernel 所有の貸し出し `geforce_context->display_state` (geforce_module.h:86-88) に `head[2]` (enabled・route.connector/type/head_mask・dpms) と `edid_connector` (検出像の connector、無ければ GF4_CONNECTORS) がある (api.h:21-27・37-41) | §2-1 の暫定の口はここを読むだけ (geforce.mod 不変) |
+| F10 | GF の head 数・connector を外から聞ける | `GfxBackend` に head 数の口は無い。GF の状態は kernel 所有の貸し出し `geforce_context->display_state` (geforce_module.h) に `head[2]` (enabled・route.connector/type/head_mask・dpms) と `edid_connector` (検出像の connector、無ければ GF4_CONNECTORS) がある (api.h) | §2-1 の暫定の口はここを読むだけ (geforce.mod 不変) |
 
 ## 2. 構造
 ### 2-1. 出力先の表 (N 個) と HAL v2 の列挙
@@ -54,8 +54,8 @@ u32 display_dual_key(void) __attribute__((weak));   /* I/O なし。表を作り
 - 表 (display_dual_outputs が作る): 先頭に `{PC98, head 0, connector 0, PC98_ANALOG, ON, running 1, TEXT}`。続けて、`gfx2_active()` の adapter が GeForce で `gfx_is_started()` のとき、その adapter の `h < a->heads` の各 head を 1 行ずつ (GF は 2 head なので 98 と合わせて計 3 行)。adapter が 0 なら GF の行を出さない。
   - head の欄は `gfx2_head_info(a->index, h, &v)` (I/O なし) から取る。running = `v.attached`、connector = `v.connector_mask` の最下位 bit。
   - 役割: `a->state == GFX2_AD_OK` で attached な head を DESK、他は NONE。head と D-SUB/DVI の対応は conn_type から読むだけで固定しない。DVI の head に何を出すかは決めない (NONE)。
-  - conn_type・conn_status は判定の道では UNKNOWN。GF の enum_conn は DDC の I/O を出す (drivers/video/geforce/gf_v2_enum.c:71-73) ので、`con_dual_outputs` の診断を呼んだ時にだけ `gfx2_connector_info` で埋める。抜き挿しのライブ検出はしない (シングルタスク・今の要件外)。
-- display_dual_key: gfx2_active の index・gen・state・flags、`gfx_is_started()`、`gfx_init_gen`、各 head の attached・connector_mask・mode_id・scan_sid を `k = k*31 + 欄` で畳む (加算でなく)。gfx_shutdown の GF→PC98 は ACTIVE の付け替え (gfx/gfx_core.c:408) で変わる。
+  - conn_type・conn_status は判定の道では UNKNOWN。GF の enum_conn は DDC の I/O を出す (drivers/video/geforce/gf_v2_enum.c (gf_v2_enum_conn())) ので、`con_dual_outputs` の診断を呼んだ時にだけ `gfx2_connector_info` で埋める。抜き挿しのライブ検出はしない (シングルタスク・今の要件外)。
+- display_dual_key: gfx2_active の index・gen・state・flags、`gfx_is_started()`、`gfx_init_gen`、各 head の attached・connector_mask・mode_id・scan_sid を `k = k*31 + 欄` で畳む (加算でなく)。gfx_shutdown の GF→PC98 は ACTIVE の付け替え (gfx/gfx_core.c) で変わる。
 - console_dual.c・console.c が見るのは cfg・con_sink・legacy と display_dual_* の弱いシンボルだけ (どちらも PowerPC でも組む共通のソース — `make ppc-ci-image` (像と `common-compile`))。
 
 ### 2-2. 判定と表の更新条件 (console_dual.c、約 70 行)
@@ -74,7 +74,7 @@ int con_dual_active(void)
     return live;
 }
 ```
-- 表の更新条件: (1) ACTIVE の adapter が替わる (gfx_shutdown の GF→PC98、gfx/gfx_core.c:383-414 の 408) (2) 開始状態が変わる (3) init の世代が進む (4) **同じ adapter・開始状態・世代のまま** head の稼働・head と connector の対応・mode・scanout が変わる。4 つとも display_dual_key (§2-1) に畳み、1 回の出力ごとに読む (I/O なし)。
+- 表の更新条件: (1) ACTIVE の adapter が替わる (gfx_shutdown の GF→PC98、gfx/gfx_core.c の 408) (2) 開始状態が変わる (3) init の世代が進む (4) **同じ adapter・開始状態・世代のまま** head の稼働・head と connector の対応・mode・scanout が変わる。4 つとも display_dual_key (§2-1) に畳み、1 回の出力ごとに読む (I/O なし)。
 ```c
 /* display_dual.c (約 110 行) */
 int display_dual_outputs(struct con_out *o, int max)
@@ -112,16 +112,16 @@ int pc98_route_to_gf(void)
     return route_set(PC98_ROUTE_GF);
 }
 ```
-- 呼び手 (backend_geforce.c:627・728) は変えない → geforce.mod 0 バイト、kexports 不変。戻り (483 の route_to_98) は 0FACh が 00 なので無書込み。
+- 呼び手 (backend_geforce.c) は変えない → geforce.mod 0 バイト、kexports 不変。戻り (483 の route_to_98) は 0FACh が 00 なので無書込み。
 
 ### 3-4. GUI に入る/出る
 | 時点 | 今 | 2 画面 / 3 画面 |
 |---|---|---|
-| 入る (kernel.c:422-423) | sink 有効、TVRAM 凍結、0 行目に "Loading gshell..." | `con_dual_active() \|\| con_dual_was_live()` なら `shell_print` で 1 行を追記 (0 行目を上書きしない)。再起動の時は gfx_shutdown 後で started=0 なので active は偽だが was_live で追記を選ぶ (描けるかは門が決め、描けない間は sink にだけ積む) |
-| gshell の異常終了 (gui.c:154 gfx_shutdown) | GF→PC98 | 鍵が変わり active=0 になるが was_live は残る |
-| 再起動の区切り (kernel.c:484) | tvram_clear (TVRAM は残る・sink は CLEAR) | `console_session_clear()` (同じ結果を明示) |
+| 入る (kernel.c) | sink 有効、TVRAM 凍結、0 行目に "Loading gshell..." | `con_dual_active() \|\| con_dual_was_live()` なら `shell_print` で 1 行を追記 (0 行目を上書きしない)。再起動の時は gfx_shutdown 後で started=0 なので active は偽だが was_live で追記を選ぶ (描けるかは門が決め、描けない間は sink にだけ積む) |
+| gshell の異常終了 (gui.c gfx_shutdown) | GF→PC98 | 鍵が変わり active=0 になるが was_live は残る |
+| 再起動の区切り (kernel.c) | tvram_clear (TVRAM は残る・sink は CLEAR) | `console_session_clear()` (同じ結果を明示) |
 | CUI へ戻る (gdc_start 443) | was_gui なら消去 | was_live なら消さず、最後に sticky を下ろす |
-| 読み込み失敗 (kernel.c:435-436、kernel_gui_shlib.inc:13-14) | 消去 → 赤字 | 変えない |
+| 読み込み失敗 (kernel.c、kernel_gui_shlib.inc) | 消去 → 赤字 | 変えない |
 | V86 | TVRAM はゲストのもの | 変えない (I/O 0 回) |
 
 ## 4. パニック・kdebug の出力
@@ -129,7 +129,7 @@ int pc98_route_to_gf(void)
 |---|---|---|
 | 止まるパニック (二重フォールト・kernel の例外) | platform_fault_cell が 0 行目から直書き、停止 | 最後の画面として残る (以後の出力が無い)。リセットまで |
 | 復帰する例外 (アプリ、gshell の fault) | 直書き → 復帰 → 次の出力が論理カーソルの位置から続く | 直書きの行は次の出力で上書きされうる。**保持の対象は通常の出力の記録** (exec の fault の kprintf 行 = ログの 1 行) で、期間は CUI へ戻るまで (§3-4)。直書きの行の保持は約束しない |
-| kdebug | kdebug_main.c:53 の display_restore_98 (safe=1 のまま 98 の文字画面) | 変更なし。kdebug.bin 0 バイト |
+| kdebug | kdebug_main.c の display_restore_98 (safe=1 のまま 98 の文字画面) | 変更なし。kdebug.bin 0 バイト |
 
 ## 5. 設定
 - `/etc/system.cfg` の `CONSOLE_DUAL=0|1` (無い = 0)。platform/pc98/kernel_gfx_config.inc の GFX= と同じ所 (⑥ より前): `con_dual_configure(sysconfig_get_int(SYS_SYSTEM_CFG, "CONSOLE_DUAL", 0));`
@@ -180,37 +180,37 @@ int pc98_route_to_gf(void)
 
 ## 確定 (2026-11-09、astra の第 3 回、PM 決定で反映)
 - R3-1: 列挙は能力として GF の全 head を常に返す (98 と合わせて計 3 行)、停止中の head は running=0・NONE。A1g を揃えた。
-- R3-2: 接続 ON は edid_connector の一致 + edid.base_valid。値は起動・モード設定の時に検出して保存した情報、EDID の失敗のフォールバック (modes.c:321・442) を ON にしない試験と変異を足した。
+- R3-2: 接続 ON は edid_connector の一致 + edid.base_valid。値は起動・モード設定の時に検出して保存した情報、EDID の失敗のフォールバック (modes.c) を ON にしない試験と変異を足した。
 - R3-3: 抜き挿しのライブ検出はしない。暫定の口は保存された状態の列挙と明記、A6 から DVI の挿入で行が増える確認を外した。
 
 ## 確定の後の追記 (2026-11-10、今の main cfb9cec3 との前提の照らし直し、PM 決定)
 - **実装の時機 (os32powerpc の指摘)**: 本票が触るファイルは PowerPC 第 5 段 C1〜C3・B1〜B6 と同じ。cfb9cec3 の時点では第 5 段で入ったのは A (`gfx/gfx_internal.h`) と E・F だけで、§7 の 4 ファイル (`kernel/console/console.c`・`console_backend.h`・`platform/pc98/console.c`・`include/text_screen.h`) は変化なし。実装は第 5 段 Z の後に出し、そのとき移った先の構成で §1 の F1〜F10 の file:line と §7 の置き場を照らし直してから依頼する。§7 の「D3 と C1 は先に入った方に載せ直す (推奨: D3 が先)」はこの順に書き換えた。
 - **D5 と層の検査**: `platform/pc98/kernel.c` は PC-98 の platform のソース。D5 は `console_dual.h` だけを include する。共通の側 (console_dual.c・console.c) に `drivers/`・`platform/pc98/` のヘッダを足さない (足すと `tools/check_layers.py` が止める)。
-- **その他の前提は変化なし**: `tools/tests/legacy_callers_host.c` は D2 で `v86_call_dispatch` のスタブの型 (`src, count`) だけ変わり、console の偽の置き換え (`:83`・`:140-143`) は同じ。GF は 1 枚の前提も保たれる (`drivers/video/geforce/geforce_platform.c` が 2 枚目を `second ... ignored` と記録、`kdebug/recover.h:54-57`)。
+- **その他の前提は変化なし**: `tools/tests/legacy_callers_host.c` は D2 で `v86_call_dispatch` のスタブの型 (`src, count`) だけ変わり、console の偽の置き換え (`console_render_allowed()`) は同じ。GF は 1 枚の前提も保たれる (`drivers/video/geforce/geforce_platform.c` が 2 枚目を `second ... ignored` と記録、`kdebug/recover.h`)。
 
 ## 確定の後の追記 (2026-11-12、main 15738b50 との照らし直し、PM 決定)
 - **D1g を廃止し、HAL v2 の K1 を D2 に吸収する**: HAL v2 の C1・C11・G10 が main にあり、I3 は実機で PASS しているので、gf_outputs.[ch] は作らない。display_dual.c は最初から gfx2 の列挙で表を作る。HAL_V2_DESIGN §12 の K1 の行 (:1228) は「CONSOLE_DUAL の D2 に吸収」で閉じる。
-  - 対象の判定: `gfx2_active()` (gfx/v2/gfx2_int.h:88) の adapter が `kind == GFX2_KIND_GEFORCE` で、かつ `gfx_is_started()`。adapter が 0 なら GF の行を出さない (HAL_V2_DESIGN:1276)。
-  - 行の作り方: 98 の TEXT の行を 1 行目に置き、続けて `h < a->heads` の各 head を 1 行ずつ足す。head の欄は `gfx2_head_info(a->index, h, &v)` (gfx/v2/enum.c:28-40、I/O なし) から取る。
+  - 対象の判定: `gfx2_active()` (gfx/v2/gfx2_int.h) の adapter が `kind == GFX2_KIND_GEFORCE` で、かつ `gfx_is_started()`。adapter が 0 なら GF の行を出さない (HAL_V2_DESIGN:1276)。
+  - 行の作り方: 98 の TEXT の行を 1 行目に置き、続けて `h < a->heads` の各 head を 1 行ずつ足す。head の欄は `gfx2_head_info(a->index, h, &v)` (gfx/v2/enum.c、I/O なし) から取る。
     - running = `v.attached`。dpms は gfx2 から見えないので、attached をそのまま使う。
     - connector = `v.connector_mask` の最下位 bit。
   - 役割: DESK は `a->state == GFX2_AD_OK` で、かつ attached な head。v2 のアプリが head 1 に mode_set した時もこの規則に従う。ほかは NONE。
-  - conn_type・conn_status: GF の enum_conn は DDC の I/O を出す (drivers/video/geforce/gf_v2_enum.c:71-73) ので、判定の道では UNKNOWN のままにする。`con_dual_outputs` の診断を呼んだ時にだけ `gfx2_connector_info` (enum.c:42-52) で埋める。base_valid による判定 (R3-2) はこれに置き換える。抜き挿しのライブ検出をしない方針 (R3-3) は変えない。
-- **HAL v2 の公開の口の直し (段 H0)**: `gfx2_head_info` (enum.c:37) は connector_mask を中核の `a->head[h].conn_mask` で上書きしている。conn_mask を書くのは `gfx2_mode_set` (modeset.c:59) だけなので、v1 で始めた机の head は attached=1・connector_mask=0 を返す。これは backend の値 (HAL_V2_DESIGN:1663 の `1 << route`) を捨てる欠けなので、`conn_mask` が 0 の時は backend の値を残すように直す (1 行)。host 試験に「v1 の机 (conn_mask=0) の head は backend の connector_mask を返す、mode_set の後は conn_mask を返す」を足す。変異は上書きを無条件に戻す形で、RED になること。
+  - conn_type・conn_status: GF の enum_conn は DDC の I/O を出す (drivers/video/geforce/gf_v2_enum.c (gf_v2_enum_conn())) ので、判定の道では UNKNOWN のままにする。`con_dual_outputs` の診断を呼んだ時にだけ `gfx2_connector_info` (enum.c) で埋める。base_valid による判定 (R3-2) はこれに置き換える。抜き挿しのライブ検出をしない方針 (R3-3) は変えない。
+- **HAL v2 の公開の口の直し (段 H0)**: `gfx2_head_info` (enum.c) は connector_mask を中核の `a->head[h].conn_mask` で上書きしている。conn_mask を書くのは `gfx2_mode_set` (modeset.c:59) だけなので、v1 で始めた机の head は attached=1・connector_mask=0 を返す。これは backend の値 (HAL_V2_DESIGN:1663 の `1 << route`) を捨てる欠けなので、`conn_mask` が 0 の時は backend の値を残すように直す (1 行)。host 試験に「v1 の机 (conn_mask=0) の head は backend の connector_mask を返す、mode_set の後は conn_mask を返す」を足す。変異は上書きを無条件に戻す形で、RED になること。
 - **鍵は display_dual.c へ**: console_dual.c と console.c は PowerPC でも組む共通のソースだが、g_backend は gfx_core.c (PPC の外) にある。そこで §2-2 の更新条件 4 つを、弱いシンボル `u32 display_dual_key(void)` 1 つに畳む (I/O なし)。
   - 畳む欄: gfx2_active の index・gen・state・flags、`gfx_is_started()`、`gfx_init_gen`、各 head の attached・connector_mask・mode_id・scan_sid。畳み方は `k = k*31 + 欄`。
-  - gfx_shutdown の GF→PC98 では ACTIVE が付け替わる (gfx/gfx_core.c:408) ので、鍵が変わる。
+  - gfx_shutdown の GF→PC98 では ACTIVE が付け替わる (gfx/gfx_core.c) ので、鍵が変わる。
   - console_dual.c が見るのは cfg・con_sink・legacy と display_dual_* の弱いシンボルだけ (PPC では行が 0)。
 - **定数**: console_dual.h は gfx2_int.h を include せず、`#define CON_OUT_MAX 9  /* 1 + GFX2_MAX_ADAPTERS(4) × head[2] */` を置く。display_dual.c で `_Static_assert(CON_OUT_MAX >= 1 + GFX2_MAX_ADAPTERS * (sizeof gfx2_adapters[0].head / sizeof gfx2_adapters[0].head[0]))` を確かめる。§2-1 の CON_DUAL_MAX_* は使わない。
-- **text_on の手本**: platform/pc98/display.c:23-34 の display_text_start のうち 28-33 (GDC STOP・FF1 DISP ON・TEXT START) だけを写す。26-27 の gfx_current_height・gfx_flip_enabled は書かない (A2)。
+- **text_on の手本**: platform/pc98/display.c の display_text_start のうち 28-33 (GDC STOP・FF1 DISP ON・TEXT START) だけを写す。26-27 の gfx_current_height・gfx_flip_enabled は書かない (A2)。
 - **file:line の更新**:
   - platform/pc98/kernel.c の 412・473・435-436 は 423・484・446-447 に。
   - backend_geforce.c の 618・627・728・483 は 643・655・756・491 に。
-  - gfx_shutdown は gfx/gfx_core.c:383-414、パニックの直書きは platform/pc98/emergency.c:20-24。
-  - 設定の読み込みは platform/pc98/kernel_gfx_config.inc:17 の後に入れる。
+  - gfx_shutdown は gfx/gfx_core.c、パニックの直書きは platform/pc98/emergency.c (platform_fault_cell())。
+  - 設定の読み込みは platform/pc98/kernel_gfx_config.inc (kernel_gfx_config()) の後に入れる。
   - console.c の門 (53-57・106・388・428-445) と pc98_route.c (22-25・39-42・44-57) はそのまま。
-- **D3 の付帯**: console.c を組む host 試験 3 本 (tools/tests/con_sink_host.c・sep5_console_host.c・legacy_callers_host.c) に con_dual_* の stub (0 を返す) を足す。test_sep5_console.py:44 の目印の行 (`    return con_backend_safe() &&`) は変えない。PowerPC 第 5 段 C1 は main にあり、console.c は `con_backend_safe()` 経由 (platform/pc98/console.c:32-35)。D3 はその上に載せる。
-- **§4 に足す**: GF の LOST (gfx/v2/fence.c:25-43) は 0FACh・safe に触らないので、TEXT の行は描き続け、DESK の行は state ≠ OK で NONE にする。
+- **D3 の付帯**: console.c を組む host 試験 3 本 (tools/tests/con_sink_host.c・sep5_console_host.c・legacy_callers_host.c) に con_dual_* の stub (0 を返す) を足す。test_sep5_console.py の目印の行 (`    return con_backend_safe() &&`) は変えない。PowerPC 第 5 段 C1 は main にあり、console.c は `con_backend_safe()` 経由 (platform/pc98/console.c)。D3 はその上に載せる。
+- **§4 に足す**: GF の LOST (gfx/v2/fence.c) は 0FACh・safe に触らないので、TEXT の行は描き続け、DESK の行は state ≠ OK で NONE にする。
 - **§2-1・§2-2・§6・§8 を書き換えた** (gf_outputs と sig を消し、gfx2 の列挙と display_dual_key に)。
 - **段の表**: §7 を書き換えた (H0 を足し D1g を削除)。
 

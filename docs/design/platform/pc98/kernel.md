@@ -34,6 +34,6 @@ shell.bin と gshell.bin はどちらもシェル帯 (0x300000, Level 1) に常�
 - 切替のたびにシェル帯は作り直されるので、退避・復元は無い。CUI シェルの履歴・環境変数は
   `.profile` から再構築される (v1 の割り切り)。
 
-- platform/pc98/kernel.c の予約、:640 の prepare は :642 の cirrus_module_load より先。未登録 Cirrus（drivers/video/cirrus/cirrus_module.c:16）は modes=NULL のまま skip し、probe/enable を追加しない。
+- platform/pc98/kernel.c の予約、同ファイル内 の prepare は 同ファイル内 の cirrus_module_load より先。未登録 Cirrus（drivers/video/cirrus/cirrus_module.c）は modes=NULL のまま skip し、probe/enable を追加しない。
 
 > [要確認] 現行 platform/pc98/kernel.c は gfx_boot_reserve() → gfx_prepare_backend() → cirrus_module_load() の順。原文の旧行番号は写していない。

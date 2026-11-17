@@ -24,19 +24,19 @@ PM: §7 のユーザー判断を段ごとの内容/build_compare と G4 受入�
 
 | 層 | 実物・呼出しの道 (この作業木の file:line) |
 |---|---|
-| console の入口 | `kernel/console/console.c:195` shell_putchar → con_sink_push_print → putchar_raw → con_backend_putchar。shell_print は :205、console_write は :331 付近。UTF-8/JIS 変換・折返し・論理カーソルは同じ console が所有 |
+| console の入口 | `kernel/console/console.c` shell_putchar → con_sink_push_print → putchar_raw → con_backend_putchar。shell_print は 同ファイル内、console_write は 同ファイル内 付近。UTF-8/JIS 変換・折返し・論理カーソルは同じ console が所有 |
 | 画面の門 | 同 :53–57 の console_render_allowed、:103–108 の clear、:387 の cursor、:427 以降の GUI 出入。CONSOLE_DUAL 確定設計末尾の「GUI 中は消さない」を維持 |
-| PC-98 の実際の字形 | `platform/pc98/console.c:55–60` が文字コードと属性を TVRAM に書く。字形は表示ハードが生成する。:71 が全角、:125 以降が GDC cursor。通常 CUI はソフトウェアでフォントをラスタライズしない |
-| 出力先表 | `kernel/console/console_dual.h:6–14` は最大9行の役割・接続状態。`.c:22–35` は GUI/sink 有効時の TEXT 生存判定。:48 の getter は現在のキャッシュを返すだけで CUI 時に更新しない |
-| PC-98 の結線 | `platform/pc98/display_dual.c:49–70` が GF 使用時に内蔵 TVRAM の TEXT 行を追加。`drivers/video/pc98/pc98_route.c` が安全性を管理。出力先表自体には描画関数がない |
-| HAL | 実際の型は `include/gfx_hal.h:67–146` の GfxBackend、`include/gfx_mode.h:7–11` の GfxMode。`gfx/gfx_core.c:62–76` が provider から gfx2_adapter_register を呼ぶ。`gfx/v2/backend_reg.c:99–145` は既存登録口、`gfx/v2/enum.c:28` 以降は head 等の列挙 |
-| 線形表示の手本 | `drivers/video/pc98/backend_pegc.c:452` の同期転送先、:550 の GfxBackend。`drivers/video/geforce/backend_geforce.c:781–795` の登録表。`drivers/video/pc98/pegc_v2.c:5–25` の CPU 描画能力を参考にする |
-| HAL の制約 | `gfx/gfx_core_framebuffer.inc:64–82` は backend を機種の列挙で決める。`gfx/gfx_core_init.inc:11–17` は CLIENT があることを started の条件にする。単に OF の後端の表を足すだけでは起動しない |
-| フォント | `drivers/video/kcg/kcg.c:45–52` → kcg_rom_read_ank/kanji。`kernel/console/font_source.c:62–79,207–238` は VFS の read lease であって字形生成器ではない。`font_guard.c:11–26` は IRQ/例外・再入を拒む |
-| KCG の既存口 | `drivers/video/kcg/kcg_module.h:11–16` の read_ank/read_kanji/stats/invalidate、x86 は `/boot/kcg.mod`。`userland/lib/gfx/text/lconsole.c:357–360`・`gfx_kcg.c:54–98` は KCG 字形で描く先例。fontmgr は実体なし、FEP は変換辞書で字形供給とは別 |
-| PPC 出力 | `build/targets/ppc-powermac.mk` は kboot_console・console_stream・shell_putchar と con_sink をリンクし、共通 console/gfx core はリンクしていない。`kboot_console.c:27–30` は pm_log_write、`console_stream.c:7–12` は LAN/ESCC。`shell_putchar.c:5–9` は独自入口 |
-| PPC 表示 | `platform/powermac/display_provider.c:6–19,52–55` は空の後端と空の列挙、display.c は空の機種口。現状の RH 表示は HAL を通らない段印専用 |
-| root と入力 | `build/ram-root.mk:7–12` は motd と bin の ISO を kernel に埋める。`init/boot_root.c:13,28` は ISO root と /tmp ramfs。`platform/powermac/ppc_kernel.c:314–324` は root→USB→sh。`input_boot.c:31–34` が LAN/USB 合流、`shell_boot.c:30–31` が接続/キー待ち |
+| PC-98 の実際の字形 | `platform/pc98/console.c` が文字コードと属性を TVRAM に書く。字形は表示ハードが生成する。`con_backend_putkanji()` が全角、`con_backend_scroll()` 以降が GDC cursor。通常 CUI はソフトウェアでフォントをラスタライズしない |
+| 出力先表 | `kernel/console/console_dual.h` の `CON_OUT_MAX` は最大9行の役割・接続状態。`.c:22–35` は GUI/sink 有効時の TEXT 生存判定。同ファイル内 の getter は現在のキャッシュを返すだけで CUI 時に更新しない |
+| PC-98 の結線 | `platform/pc98/display_dual.c` が GF 使用時に内蔵 TVRAM の TEXT 行を追加。`drivers/video/pc98/pc98_route.c` が安全性を管理。出力先表自体には描画関数がない |
+| HAL | 実際の型は `include/gfx_hal.h` の GfxBackend、`include/gfx_mode.h` の GfxMode。`gfx/gfx_core.c` が provider から gfx2_adapter_register を呼ぶ。`gfx/v2/backend_reg.c` は既存登録口、`gfx/v2/enum.c` 以降は head 等の列挙 |
+| 線形表示の手本 | `drivers/video/pc98/backend_pegc.c` の同期転送先、:550 の GfxBackend。`drivers/video/geforce/backend_geforce.c` の登録表。`drivers/video/pc98/pegc_v2.c` の CPU 描画能力を参考にする |
+| HAL の制約 | `gfx/gfx_core_framebuffer.inc` は backend を機種の列挙で決める。`gfx/gfx_core_init.inc` の `gfx_init_mode()` は CLIENT があることを started の条件にする。単に OF の後端の表を足すだけでは起動しない |
+| フォント | `drivers/video/kcg/kcg.c` → kcg_rom_read_ank/kanji。`kernel/console/font_source.c` は VFS の read lease であって字形生成器ではない。`font_guard.c` は IRQ/例外・再入を拒む |
+| KCG の既存口 | `drivers/video/kcg/kcg_module.h` の read_ank/read_kanji/stats/invalidate、x86 は `/boot/kcg.mod`。`userland/lib/gfx/text/lconsole.c` の `lcons_sync_vram()`・`gfx_kcg.c` の `kcg_draw_ank()` は KCG 字形で描く先例。fontmgr は実体なし、FEP は変換辞書で字形供給とは別 |
+| PPC 出力 | `build/targets/ppc-powermac.mk` は kboot_console・console_stream・shell_putchar と con_sink をリンクし、共通 console/gfx core はリンクしていない。`kboot_console.c` は pm_log_write、`console_stream.c` は LAN/ESCC。`shell_putchar.c` は独自入口 |
+| PPC 表示 | `platform/powermac/display_provider.c` は空の後端と空の列挙、display.c は空の機種口。現状の RH 表示は HAL を通らない段印専用 |
+| root と入力 | `build/ram-root.mk` は motd と bin の ISO を kernel に埋める。`init/boot_root.c` は ISO root と /tmp ramfs。`platform/powermac/ppc_kernel.c` は root→USB→sh。`input_boot.c` が LAN/USB 合流、`shell_boot.c` が接続/キー待ち |
 
 依頼文・旧案との食い違いは **7件** (上表で訂正):
 1. GfxBackend/GfxMode の定義場所は gfx/gfx.h ではない。
@@ -44,8 +44,8 @@ PM: §7 のユーザー判断を段ごとの内容/build_compare と G4 受入�
 3. CONSOLE_DUAL の表は多出力の dispatch 表ではなく、CUI では更新もされない。
 4. font_source は app/shell lease であり、resident console 用 owner と glyph API は未実装。指定範囲で fontmgr という実体も確認できず、FEP を無条件にリンクすれば解決するとはしない。
 5. PPC は空の provider をリンクしさえすればよい状態ではなく、共通 console/gfx のリンク・CLIENT/台帳結線が欠ける。
-6. RAM root の現レシピはフォント無し、ISO level 1 (`tools/mkroot_image.py:23–34,64`)。本案では短名で直接読める KCG ファイルを収録する。
-7. `platform/powermac/rh_observe.c:62–79` は帯の頁だけの採取。全画面 alias は旧票の設計であって現物に実装済みではない。
+6. RAM root の現レシピはフォント無し、ISO level 1 (`tools/mkroot_image.py`)。本案では短名で直接読める KCG ファイルを収録する。
+7. `platform/powermac/rh_observe.c` は帯の頁だけの採取。全画面 alias は旧票の設計であって現物に実装済みではない。
 
 ## 2. 方式
 
@@ -101,22 +101,22 @@ int gfx_console_open(u32 adapter, u32 head, struct gfx_console_target *t);
 - v2 mode_set は同じ形状の shadow を同期 scanout に attach するだけ。flip は同期転送のみ (vblank要求は NOSYS)、flip_done は未処理無し。edid/palette/gamma/ハードcursor/dpms/vblank は NOSYS。
 - gfx_console は内部 owner の通常面を確保し lock/unlock・CPU MONO/COPY・同期 present に載せる。v1 の公開禁止 alias を直接 lock する例外は作らない。台帳・面の寿命/LOST の規則は既存通り。
 - 8bpp は固定白黒 (白0、黒255)。raw_attr の表示/反転を白黒に落とし、カラー属性の色再現は約束しない。未知 CLUT の8bppは対象外、起動情報で Apple palette と確認したものだけ許可。
-- v1_shim 採否 (N6): `gfx/v2/backend_reg.c:106` は v2=NULL で shim を選ぶが、`v1_shim.c:49–55` は面 s を捨て set_mode(id) だけを呼び、:58–66 は page_flip が NULL なら NOSYS。本案の通常 sysmem 面を同期 scanout に接続・転送する契約を満たさないため専用 of_fb_v2 を残す。列挙/CPU 描画だけなら shim で足りるが、その経路だけを合格条件にはしない。
+- v1_shim 採否 (N6): `gfx/v2/backend_reg.c` は v2=NULL で shim を選ぶが、`v1_shim.c` は面 s を捨て set_mode(id) だけを呼び、`shim_flip()` は page_flip が NULL なら NOSYS。本案の通常 sysmem 面を同期 scanout に接続・転送する契約を満たさないため専用 of_fb_v2 を残す。列挙/CPU 描画だけなら shim で足りるが、その経路だけを合格条件にはしない。
 - PPC の MMIO 書込み幅・sync は後端/arch の責務。整列32bit単位の転送を使い、端の語は shadow の隣接画素と合成し、padding/段印を越えない。VRAM 読みは不要。
 
 ### フォント供給と起動
 
 - **2026-11-13 ユーザー決定**: 字形源は「KCG の口＋東雲16から作る .kcgfont」。GUI と同じ `JF-Dot-Shinonome16.ttf` の16px・1bpp EBDT ドットをビルドで取り出す。ipaexg、TTF の輪郭ラスタ、Rust のカーネルリンクは使わない。
-- `tools/gen_font16.py:16–22` の KCG1 キャッシュ形式を復帰する。16Bヘッダ (サイズ/flags は LE)、94×94×32B 漢字＋同数 fetched＋256×16B ANK＋256B fetched。初段は非圧縮 flags=0、総計295,956B。読み込み側は flags≠0 を拒否する (bit0=LZ4 は既存定義だが初段は扱わない)。
-- 生成器に EBDT 専用入口を追加し、既存 `tools/gen_g16.py:96` の strike 読出しを共用する。JIS→Unicode と ANK の ASCII/半角カナ対応は gen_font16.py:75–89 を利用し、16×16/8×16 へビットのまま配置、拡縮/閾値処理なし。EBDT 無し・セル外の画素はビルド失敗。
+- `tools/gen_font16.py` の KCG1 キャッシュ形式を復帰する。16Bヘッダ (サイズ/flags は LE)、94×94×32B 漢字＋同数 fetched＋256×16B ANK＋256B fetched。初段は非圧縮 flags=0、総計295,956B。読み込み側は flags≠0 を拒否する (bit0=LZ4 は既存定義だが初段は扱わない)。
+- 生成器に EBDT 専用入口を追加し、既存 `tools/gen_g16.py` の strike 読出しを共用する。JIS→Unicode と ANK の ASCII/半角カナ対応は gen_font16.py を利用し、16×16/8×16 へビットのまま配置、拡縮/閾値処理なし。EBDT 無し・セル外の画素はビルド失敗。
 - 未定義 ANK は空白、未収録の有効文字は東雲の置換字形を同じ幅に配置する規則を生成時に固定。全角は左右2byte×16行、ANK は1byte×16行、MSB左。ANK/漢字の代表値と全収録字を独立に EBDT と比較する。
 - `drivers/video/kcg/` に ROM 無し用ファイル本体を追加し、KcgModuleApi と同じ read_ank(u8,16B)/read_kanji(u16 JIS,32B)/stats/invalidate を供給。PPC は静的リンク、ROM 本体や x86 module loader を引かない。PC-98 ROM 経路と `/boot/kcg.mod` は現状維持。
-- `kcg_load_font` は現状 `drivers/video/kcg/kcg.c:55–59` で NOSYS。PPC の起動時は内部 loader を使用し、既存公開 slot は NOSYS のまま維持する。復帰するのはファイル形式と ROM 無し機種の KCG 本体であり、実行中の公開フォント差替えは追加しない。
-- `font_source.[ch]` に内部 `FONT_LEASE_RESIDENT=3` と kernel resident 専用 owner/世代を追加。app/shell と同じ VFS read_at/validate/close を使い、PROTECT/PIN と専用上限1は読み込み中だけ (FD の予算 APP 3+SHELL 3+RESERVED 7=13 の式は変えない、vfs.h:323-326・vfs_fd.c:57)。app quota・app終了・shell世代変更/終了から独立させ、公開 KAPI から resident id を利用できないよう kind を検査する。
+- `kcg_load_font` は現状 `drivers/video/kcg/kcg.c` で NOSYS。PPC の起動時は内部 loader を使用し、既存公開 slot は NOSYS のまま維持する。復帰するのはファイル形式と ROM 無し機種の KCG 本体であり、実行中の公開フォント差替えは追加しない。
+- `font_source.[ch]` に内部 `FONT_LEASE_RESIDENT=3` と kernel resident 専用 owner/世代を追加。app/shell と同じ VFS read_at/validate/close を使い、PROTECT/PIN と専用上限1は読み込み中だけ (FD の予算 APP 3+SHELL 3+RESERVED 7=13 の式は変えない、vfs.h・vfs_fd.c)。app quota・app終了・shell世代変更/終了から独立させ、公開 KAPI から resident id を利用できないよう kind を検査する。
 - RAM root (埋込み ISO) の `/fonts/shino16.kcg` と `/fonts/shino16.txt` に派生物と東雲ライセンスを一組置く。拡張子 .kcg は ISO level 1 の8.3名であり、中身は .kcgfont と同一 hash。パスは [C4] の定数管理。長名 ramfs helper・TTF 同梱は不要。
 - root 後に font_guard を通して resident lease を開き、ヘッダ/正確な長さ/予約値/flags/fetched を検証し常駐キャッシュへ読込む。BE 上も LE を明示 decode、部分読込みを公開しない。検証と読み込みが済んだら lease を close する (FD を占有し続けない)。通常描画は常駐字形のみ参照して VFS・割当を行わない。
 - invalidate は ROM 再取得に転ばず常駐原本を維持して統計/派生状態だけをリセット。終了時は live を落として利用者を外し、キャッシュ解放 (lease は読み込み後に閉じ済み)。失敗時も部分確保と lease を回収し、IRQ/例外では読み込み/再ロードしない。
-- **「配布しない」の変更箇所**: `build/assets.mk:87–91` の fixture 専用扱いを、旧 ipaexg fixture と製品用東雲派生物に分ける。東雲版の生成依存・PPC RAM root の収録 manifest を追加し、既存 x86 配布集合は維持。現行フォント仕様/配布文書にもユーザー決定と KCG1 用途を記録する (更新先は実装段で INDEX から特定)。派生物は git へ入れない。
+- **「配布しない」の変更箇所**: `build/assets.mk` の fixture 専用扱いを、旧 ipaexg fixture と製品用東雲派生物に分ける。東雲版の生成依存・PPC RAM root の収録 manifest を追加し、既存 x86 配布集合は維持。現行フォント仕様/配布文書にもユーザー決定と KCG1 用途を記録する (更新先は実装段で INDEX から特定)。派生物は git へ入れない。
 - PPC root の前は既存段印/LAN/ESCC 診断。root→フォント常駐→HAL初期化→TEXT準備→clear/cursor→USB/sh の順。フォント欠損/破損時は理由を stream に残し FB を live にせず LAN/USB の既存経路を継続。
 
 ### 写像・失敗・LAN
@@ -134,7 +134,7 @@ int gfx_console_open(u32 adapter, u32 head, struct gfx_console_target *t);
 ### 写像の参照資料と検証限界
 
 - [PowerPC Open Firmware binding 2.1](https://www.devicetree.org/open-firmware/bindings/ppc/release/ppc-2_1.html) §4.1.1/4.2.6/6.1: OF address の意味、I/G と translate の契約を確認。機種固有の GPU mode register は扱わない。
-- BSD 側の手本は既存 `platform/powermac/rh_observe.c:2` が挙げる NetBSD `sys/arch/macppc/dev/ofb.c:195–202` (firmware display address)。[上流ソース](https://github.com/NetBSD/src/blob/trunk/sys/arch/macppc/dev/ofb.c) の今回の取得は失敗し、当該行・版・ライセンス本文の再照合は未完了。C段着手前に固定版で照合する技術ゲートとし、確認済みとは数えない。
+- BSD 側の手本は既存 `platform/powermac/rh_observe.c` が挙げる NetBSD `sys/arch/macppc/dev/ofb.c:195–202` (firmware display address)。[上流ソース](https://github.com/NetBSD/src/blob/trunk/sys/arch/macppc/dev/ofb.c) の今回の取得は失敗し、当該行・版・ライセンス本文の再照合は未完了。C段着手前に固定版で照合する技術ゲートとし、確認済みとは数えない。
 - Apple の当該 firmware/display のメーカー資料の追加照合もC段のHW3ゲートに残す。G4寸法・CLUTは依頼で与えられた実測値を根拠とする。GPL/QEMUソース・archive は参照していない。
 
 ## 3. 共通の場所への変更と本線への先行通知
@@ -149,7 +149,7 @@ int gfx_console_open(u32 adapter, u32 head, struct gfx_console_target *t);
 | build/assets.mk・ram-root.mk・root manifest | 東雲派生物を生成し短名で収録 | PPC 有効時だけ root 増加。x86 既定 root のバイト一致を要求 |
 
 - **[ABI] 段 D**: `GFX2_KIND_OF_FB=6`、`LEDGER_SF_OF_FB=6`、`OS32_SURFACE_OF_FB=6` を各末尾へ追加。既存1〜5を動かさず、kind/ledger/公開値の一致を static assert と surface_query で検査する。format の INDEX8/TABLE/TEXT は不変。
-- 手本は Trident=5 の追加 (637ab739「版据え置き」)。KAPI_SPEC.md:1595-1596「番号だけの追加は §3-2 と同じく版数を据え置く」に従い、KAPI の版は 84 のまま、gen_kapi.py・kapi_rust_gen.py は回さない。`sdk/include/os32/os32_surface.h` の末尾に `OS32_SURFACE_OF_FB 6`、exec/surface_query.c に STATIC_ASSERT、KAPI_SPEC:1595 の列挙に 1 行。上限の検査も追従: exec/surface_query.c:112 の `s->backend > LEDGER_SF_TRIDENT`、gfx/v2/gfx2_int.h:28 の `GFX2_KIND_MAX`、gfx/v2/enum.c:20 の names[]。関数追加はなく既存 slot・型配置は変えない。
+- 手本は Trident=5 の追加 (637ab739「版据え置き」)。KAPI_SPEC.md:1595-1596「番号だけの追加は §3-2 と同じく版数を据え置く」に従い、KAPI の版は 84 のまま、gen_kapi.py・kapi_rust_gen.py は回さない。`sdk/include/os32/os32_surface.h` の末尾に `OS32_SURFACE_OF_FB 6`、exec/surface_query.c に STATIC_ASSERT、KAPI_SPEC:1595 の列挙に 1 行。上限の検査も追従: exec/surface_query.c の `s->backend > LEDGER_SF_TRIDENT`、gfx/v2/gfx2_int.h の `GFX2_KIND_MAX`、gfx/v2/enum.c の names[]。関数追加はなく既存 slot・型配置は変えない。
 - **構造体/vtable の形の変更は0件**。それでも公開定数の追加は ABI 作業として扱う。N8: D の受入は `sep5_provider_host`・`surface_query_host` を明記し、後者の LEDGER_SF 全値走査 (:77) を6まで拡張、旧5種の応答も維持する。
 - 本線へ先に通知: stream mirror、resident owner、HAL/provider/ledger 結線、OF kind、x86 kernel と部品の再pack/CRC。console_dual の更新契約と PC-98 TVRAM の出力先は維持する。
 - 共通変更を含むため「x86生成物不変」とは宣言できない。共有/公開値を変更する段ごとに、具体的差分・対象像・基点/候補の build_compare を示し、§7 の取り込み判断を求める。
@@ -181,7 +181,7 @@ KiB=1024B。以下はリンク実測前の予算幅、圧縮前。追加依存�
 | D | gfx_console・gfx_core群・provider・OF backend/ledger/公開定数とABI生成。sep5_provider_host・surface_query_host | A後。共有 gfx ファイルは一人が所有、clean→all |
 | E | of_fb後端/v2・powermac display_provider/display/fallback・display_dual | C/D後、Fと並列可 |
 | F | 共通 fbcon と PPC con_backend・セル/カーソル/scroll/INDEX8 展開。偽PC98寸法でも同じ実装を試験 | B/D後、Eと並列可 |
-| G | gen_font16 の EBDT 入口・assets/ram-root.mk・短名manifestとroot試験、配布方針の文書追従。PPC の root に /sys/unicode.bin を収録 (漢字の道 unicode_to_jis → unicode_file_lookup、lib/utf8.c:214-218) | Bの形式固定後、E/Fと並列可 |
+| G | gen_font16 の EBDT 入口・assets/ram-root.mk・短名manifestとroot試験、配布方針の文書追従。PPC の root に /sys/unicode.bin を収録 (漢字の道 unicode_to_jis → unicode_file_lookup、lib/utf8.c) | Bの形式固定後、E/Fと並列可 |
 | H | build/targets/ppc-powermac.mk・ppc_kernel・PPC stream/shell結線、console.c mirror とその試験。PPC に kernel/console/unicode_file.c をリンク | 全段後、リンク担当一人。診断像/SH/SHELLを全部buildし A 再実行 |
 | J | QEMU INDEX8画素fixture/受入台本・G4台本・成果物サイズ比較 | H後。実機判定はPM/ユーザー |
 
@@ -218,14 +218,14 @@ KiB=1024B。以下はリンク実測前の予算幅、圧縮前。追加依存�
 
 ## 確定 (2026-11-13、Opus 5.5 の第 2 回の条件付き確定、PM が反映)
 - M1 (P1): 公開値の追加は Trident=5 と同じ「版据え置き」(KAPI_SPEC:1595-1596、637ab739)。版は 84 のまま、生成器は回さない。
-- M2 (P2): 上限の検査 surface_query.c:112・gfx2_int.h:28 の GFX2_KIND_MAX・enum.c:20 の names[] を段 D で追従。
+- M2 (P2): 上限の検査 surface_query.c (surface_query_authorize())・gfx2_int.h の GFX2_KIND_MAX・enum.c の names[] を段 D で追従。
 - M3 (P2): resident lease は検証と読み込みの後に close。PROTECT/PIN と上限 1 は読み込み中だけ、FD 予算の式は不変。R5 は close 後も字形が保たれること。
 - M4 (P2): PM 決定 — PPC の root に /sys/unicode.bin を収録し unicode_file.c をリンク (段 G・H)。漢字が □ にならないように。
 - M5 (P3): 読み込み側は flags≠0 を拒否、R5 に flags の検査を外す変異。
 
 
 ## 本線 PM の取り込みの条件 (2026-11-13)
-1. 段 D (公開値の追加) は docs/KAPI_SPEC.md:1596 の backend の列挙と、os32_surface.h の照合の試験を同じ段で更新する。
+1. 段 D (公開値の追加) は docs/KAPI_SPEC.md の backend の列挙と、os32_surface.h の照合の試験を同じ段で更新する。
 2. 段 H (console.c の shell_putchar の mirror) は x86 の kernel R1 を変える。ユーザーの判断の後、取り込みの前に本線 PM の回で NP21/W の受入 (CUI の ver・shell の出力・CONSOLE_DUAL の 2 画面) を行う。統合の枝を渡すときにその旨を書く。
 3. 段 A の試験は H より前に main に入れる。H の差分がその試験を通ることを取り込みの条件にする。
 各段の取り込みは [skip ci] の枝で依頼。
