@@ -37,7 +37,7 @@ def exercise(source, directory, expected=0, marker=None, peer=None):
     includes = [ROOT, ROOT / 'include', ROOT / 'platform/powermac',
                 ROOT / 'arch/ppc', ROOT / 'fs/serialfs', ROOT / 'lib',
                 ROOT / 'sdk/include/os32', ROOT / 'fs', ROOT / 'kernel/console',
-                ROOT / 'drivers/base']
+                ROOT / 'kernel/dev']
     sources = [path / 'io.c', ROOT / 'tools/tests/ppc_hostfs_io.c',
                ROOT / 'fs/serialfs/sfs_client.c', ROOT / 'fs/serialfs/sfs_proto.c',
                ROOT / 'arch/ppc/kernel_trap.c', ROOT / 'arch/ppc/pd_walk.c',

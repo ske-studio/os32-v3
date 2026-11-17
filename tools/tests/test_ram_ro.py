@@ -41,7 +41,7 @@ def iso_test(directory, mutate):
         source.write_text(original.replace(anchor, "devname[0] = 'c';") if variant else original)
         cmd = ['gcc-13', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-ffunction-sections',
                '-fdata-sections', '-Wl,--gc-sections', '-D__cdecl=', '-I.', '-Iinclude',
-               '-Isdk/include/os32', '-Ifs', '-Ifs/isofs', '-Idrivers/base', '-Idrivers/ata', '-Imm', '-Ilib',
+               '-Isdk/include/os32', '-Ifs', '-Ifs/isofs', '-Ikernel/dev', '-Idrivers/ata', '-Imm', '-Ilib',
                str(source), 'fs/isofs/iso9660_media.c', 'fs/vfs.c', 'drivers/base/dev.c',
                'kernel/dev/ram_ro.c', 'lib/kstring_c.c', 'tools/tests/ram_iso_host.c', '-o', str(d / 'iso-test')]
         subprocess.run(cmd, cwd=ROOT, check=True)

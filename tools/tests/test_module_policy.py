@@ -68,9 +68,9 @@ def conformance():
         for name, row in zip(expected, distributed)), 'module distribution list'
     for row in schema.COMPONENTS:
         stem = row['path'].split('/')[-1].split('.')[0]
-        adapter = {'kdebug': 'module', 'sqlite': 'sqlite_engine'}.get(stem, stem + '_module')
+        adapter = {'sqlite': 'sqlite_engine'}.get(stem, stem + '_module')
         directory = {
-            'module': 'kernel/module', 'hwdev_module': 'kernel/module',
+            'kdebug_module': 'kdebug', 'hwdev_module': 'hwdev',
             'fep_module': 'kernel/ime', 'v86_module': 'platform/pc98/legacy',
             'cd_module': 'drivers/ata', 'lan_module': 'drivers/net/e82557',
             'pcm_module': 'drivers/sound/cs4231', 'fm_module': 'drivers/sound/fm',

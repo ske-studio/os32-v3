@@ -1,3 +1,4 @@
+#include "pc98.h"
 #include "display_restore.h"
 #include "pc98_route.h"
 #include "platform_display.h"

@@ -31,7 +31,7 @@ def main():
             cmd = ['gcc-13', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
                    '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections',
                    '-D__cdecl=', '-I.', '-Iinclude', '-Isdk/include/os32', '-Ifs',
-                   '-Ifs/isofs', '-Idrivers/base', '-Idrivers/ata', '-Imm', '-Ilib',
+                   '-Ifs/isofs', '-Ikernel/dev', '-Idrivers/ata', '-Imm', '-Ilib',
                    '-Iplatform/powermac', 'platform/powermac/root_boot.c', str(d / 'boot_root.c'),
                    '-Wl,--wrap=vfs_register_fs', '-Wl,--wrap=vfs_mount',
                    'kernel/dev/ram_ro.c', 'drivers/base/dev.c', 'fs/vfs.c',

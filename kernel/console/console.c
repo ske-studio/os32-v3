@@ -26,7 +26,7 @@
 #include "console_backend.h"
 #include "kbd_inject.h"
 
-/* V86 セッション中の画面描画抑止 (platform/pc98/legacy/v86.c)。
+/* V86 セッション中の画面描画抑止 (V86 のモニタ)。
  * セッション中は低位 640KB がゲスト用バッキング RAM に差し替わる。
  * Unicode-JIS 表は独立した kernel 所有頁にあるが、TVRAM/KCG への書き込みは
  * ゲストの画面と CG 状態を汚す。

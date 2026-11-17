@@ -1,6 +1,7 @@
 /* PC-98 standard planar graphics: mode entry and display-memory clearing.
  * (第 5 段 B3: gfx/gfx_core.c・gfx_core_init.inc から移した。値と順は不変。)
  * UNDOCUMENTED io_disp.md: GDC CSRFORM、モード F/F1・F/F2、A4h/A6h のページ。 */
+#include "pc98.h"
 #include "gfx_internal.h"
 #include "display_restore.h"
 #include "kstring.h"

@@ -1,3 +1,4 @@
+#include "kernel_tick.h"   /* tick_count */
 #include "kernel/module/module.h"
 #include "hwdev/generated/hwdev_contract.h"
 #include "crt_diag.h"

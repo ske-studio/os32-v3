@@ -1,5 +1,6 @@
 /* Observation image owner: one borrowed BB and one image/plan at a time. */
 #ifdef SPLASH_RASTER_OBS
+#include "pc98.h"
 #include "platform_splash.h"
 #include "gfx_osri.h"
 #include "splash_raster_image.h"

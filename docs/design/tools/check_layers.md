@@ -106,7 +106,7 @@
 | 共通・arch が platform のヘッダを読む (R2・R7) で、機種ごとに実装を差し替える物 | 固定名 `platform_<名>.h` にする (`-Iplatform/$(PLATFORM)` が実装を選ぶ) | `platform_display_fallback.h`・`platform_link_inline.h`・`platform_ime_render.h`・`platform_pic.h`・`platform_of_layout.h`・`platform_kboot_layout.h` |
 | 共通が arch の関数を使う (R1) | 契約 `include/cpu.h` などに宣言を置く | `arch_fp_present` |
 | 共通が機種名のヘッダの定数を使う (R4・R6) | 共通の側に機種に依らない名前で値を持ち、機種の側のソースに `_Static_assert` で一致を固定する | `GFX_BB_PLANES` (`platform/pc98/gfx_init.c`)、`GFX_PALETTE_COMPONENT_*` (`drivers/video/pc98/backend_pegc.c`) |
-| ドライバが arch のヘッダを読む (R5) | 共通の口を読む (`kernel/irq/irq.h`・`kernel/irq/irq_line.h`・`kernel_tick.h`) | ドライバ 10 本の `idt.h` |
+| ドライバが arch のヘッダを読む (R5) | 共通の口を読む (`kernel/irq/irq.h`・`include/irq_line.h`・`kernel_tick.h`) | ドライバ 10 本の `idt.h` |
 
 contract のヘッダで消えるのは「共通が装置のヘッダを読む」ことで、リンクの時に呼ぶ関数の名前 (`geforce_foreground_poll`・`fdc_media_gen` など) は装置の名前のまま残る。実行時に装置を差し替える口 (HAL) にするのは、この検査の範囲の外。
 

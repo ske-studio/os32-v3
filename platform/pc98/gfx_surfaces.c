@@ -1,6 +1,7 @@
 /* PC-98 display provider: boot-time SURFACE reservation (⑥) and its tables.
  * (第 5 段 B5: gfx/gfx_core_surface.inc から移した。表の値・予約の順・BB の確保・
  * 識別と probe の区別は不変。世代・lease・公開の判定は gfx/ に残る。) */
+#include "pc98.h"
 #include "display_provider.h"
 #include "gfx_internal.h"
 #include "memmap.h"

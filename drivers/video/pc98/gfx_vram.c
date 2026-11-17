@@ -1,3 +1,4 @@
+#include "pc98.h"
 #include "serial_diag.h"
 #include "pegc.h"
 #include "os32_gui_shared.h"

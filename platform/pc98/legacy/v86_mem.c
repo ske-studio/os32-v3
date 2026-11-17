@@ -1,3 +1,4 @@
+#include "pc98.h"
 #include "bios_snapshot.h"
 #ifdef OS32_R1_FIXTURE
 #include "../../../kernel/r1_fixture.h"

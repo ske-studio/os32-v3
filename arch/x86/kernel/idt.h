@@ -79,7 +79,7 @@ void idt_init(void);
 void pic_init(void);
 
 void idt_register_irq(unsigned int irq, void (*stub)(void));
-#include "../../../kernel/irq/irq_line.h"   /* irq_enable / irq_disable */
+#include "irq_line.h"   /* irq_enable / irq_disable */
 void pic_eoi(unsigned int irq);
 
 

@@ -30,6 +30,7 @@
 /*       (io/gdc.c gdc_work, vram/scrndraw.c scrndraw_draw)                  */
 /* ======================================================================== */
 
+#include "pc98.h"
 #include "kernel_tick.h"   /* tick_count */
 #include "serial_diag.h"
 #include "memmap.h"
