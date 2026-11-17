@@ -34,7 +34,7 @@
 
 | 段 | 中身 | 枝の先端 | 試験 | レビュー |
 |---|---|---|---|---|
-| A1 | arch/ppc/kernel.ld・platform/powermac/kboot_layout.h | aed5df2f | link と ELF | 可 |
+| A1 | arch/ppc/kernel.ld・platform/powermac/platform_kboot_layout.h | aed5df2f | link と ELF | 可 |
 | A2 | 入口 kernel_entry.S | 6968df1a | QEMU で OF から起動 | 可 (2 回) |
 | B1 | OF の snapshot kboot_capture.c | 5af1aa7e | host | 可 (2 回) |
 | B2 | 配置の検証と HPT の切り出し kboot_reserve.c | 3b2a5953 | host | 可 (2 回) |

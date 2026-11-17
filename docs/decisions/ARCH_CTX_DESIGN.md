@@ -110,7 +110,7 @@
 |W4b|新 `tools/tests/arch_ctx_host.c`・新 `tools/tests/test_arch_ctx.py`（2）/380|実 trap C を fake MSR/IRQ で組む共通契約vector。EE切替・入口拒否・復帰、CHECK inputs/covers/変異。新契約のREDを確認|
 |W4c|`kernel_vectors.S`・`kernel_trap.c`・`kernel_dec.c`（3、全てarch/ppc）/120|arch-ctx-host `tools/tests/test_arch_ctx.py:20,68,88` の PRE_W4C を切り替え、EE 許可後の成功と control を検証。上記 enable/出口/深さを一括変更。W4bと既存trap/DEC試験を実行。W4f・W4gと同じ統合の枝に積む（単独では既存の深さの試験が赤になり得る）。下記host stub追従も完了条件とし、ゲスト受入まではP3へ接続しない|
 |W4d|`exec/exec_syscall.inc`・`kernel/idle_work.h`・既存 `tools/tests/test_exec_syscall_fgpoll.py`（3）/100|共通注記/期待を整合。x86・PPCとも入口で仕事1巡、無効文脈と再入は仕事なし|
-|W4e|新 `tools/accept/arch_ctx_probe.c`・新 `tools/accept/arch_ctx.py`（2）/380|ppc-usb `tools/ppc/usb_run.py:65,218,228` は syscall 中の IRQ 進行・USB 継続を期待し、`tools/checks/ppc-usb.py:1` の登録も追従。両arch共通の観測列。QEMU/NP21/Wで下表を判定。PPCの32KB stack（`arch/ppc/kboot_layout.h:29`）は、syscall内でnet_rx_idle等が動くため最大使用量を測り、境界を越えないことを確認。probeのカーネル組込は下記4か所を補助段で追従|
+|W4e|新 `tools/accept/arch_ctx_probe.c`・新 `tools/accept/arch_ctx.py`（2）/380|ppc-usb `tools/ppc/usb_run.py:65,218,228` は syscall 中の IRQ 進行・USB 継続を期待し、`tools/checks/ppc-usb.py:1` の登録も追従。両arch共通の観測列。QEMU/NP21/Wで下表を判定。PPCの32KB stack（`arch/ppc/platform_kboot_layout.h:29`）は、syscall内でnet_rx_idle等が動くため最大使用量を測り、境界を越えないことを確認。probeのカーネル組込は下記4か所を補助段で追従|
 |W4f|既存trap/DEC/idle試験とharness（各補助段1〜3）/各≤300|kboot-dec `tools/ppc/kboot_dec_host.c:38,55` は実 dispatcher → DEC の深さ 1 → 0 を検証し、`tools/ppc/kboot_dec.py:30` の変異も移す。EE=0固定やDEC二重深さを期待する試験を新契約へ。変えた行の mutation anchor を rg で探し移動、一意・runtime RED|
 |W4g|非局所出口/共有状態の限定修正（棚卸し後に実ファイル指定、各1〜3）/各≤400|W4c接続前ゲート。確かめるだけで済む見込み（根拠は下記）だが段は残す。必要な修正なしの場合も根拠を記録。未確認のまま段を閉じない|
 |W4h|P3/IO_TIER/LAN側の既存担当段（各1〜3）/各≤400|W4c〜gの両arch受入後に接続。重複EE窓を作らず、待ちと予算の元試験を保持|

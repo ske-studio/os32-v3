@@ -4,7 +4,6 @@
  * Unlike the OpenBSD macppc re-arm scheme, never restart a full period. */
 #include "ppc_trap.h"
 #include "kernel/time/tick_clock.h"
-#include "kboot_info.h"
 #include "kernel/irq/tick.h"
 #include "kernel/irq/irq.h"
 

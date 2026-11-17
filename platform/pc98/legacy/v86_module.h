@@ -1,8 +1,8 @@
 /* Private paired V86 body. Transition, PTE and exception returns stay core. */
 #ifndef V86_MODULE_H
 #define V86_MODULE_H
-#include "../module/module_runtime.h"
-#include "../module/module.h"
+#include "../../../kernel/module/module_runtime.h"
+#include "../../../kernel/module/module.h"
 #include "v86_bios.h"
 #include "v86_io.h"
 #include "v86_pic.h"

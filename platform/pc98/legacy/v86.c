@@ -15,12 +15,12 @@
 #include "v86_io.h"
 #include "v86_pic.h"
 #include "v86_bios.h"
-#include "../module/module.h"
+#include "../../../kernel/module/module.h"
 #include "platform_device.h"
 #include "../../../arch/x86/kernel/idt.h"
 #include "kprintf.h"
 #include "io.h"
-#include "../console/display_restore.h"
+#include "../../../kernel/console/display_restore.h"
 
 /* setjmp/longjmp (arch/x86/kernel/setjmp.asm) — セッションからの脱出に使う */
 #include "ksetjmp.h"
@@ -541,9 +541,9 @@ int v86_run_limit(const struct v86_context *ctx, u32 tick_limit)
  *   MOV AX,A200 / MOV ES,AX / MOV DI,009E / MOV AL,E1  / MOV ES:[DI],AL
  *   HLT
  * 0x8C000 に 0x1234 を書き、画面右上に白い 'V' を出してから HLT する。 */
-/* ゲストコード。正本は arch/x86/legacy/v86_test16.asm。
+/* ゲストコード。正本は platform/pc98/legacy/v86_test16.asm。
  * 変更したら次で再生成すること:
- *   nasm -f bin arch/x86/legacy/v86_test16.asm -o /tmp/t.bin
+ *   nasm -f bin platform/pc98/legacy/v86_test16.asm -o /tmp/t.bin
  *
  * 動作: メモリ書き込み → 許可ポート I/O (トラップしない) →
  *       拒否ポート I/O (#GP で捕まる) → IVT[08h] に自前 ISR を登録 →
@@ -671,8 +671,8 @@ int v86_smoke_test(void)
 /*  ディスクの中身を運べているかを、ゲスト側の自己申告に頼らず確かめる。    */
 /* ======================================================================== */
 
-/* 正本は arch/x86/legacy/v86_test16_disk.asm。
- *   nasm -f bin arch/x86/legacy/v86_test16_disk.asm -o /tmp/t.bin で再生成する。 */
+/* 正本は platform/pc98/legacy/v86_test16_disk.asm。
+ *   nasm -f bin platform/pc98/legacy/v86_test16_disk.asm -o /tmp/t.bin で再生成する。 */
 static const u8 v86_disk_code[] = {
     0xB8, 0x00, 0x8C, 0x8E, 0xD8, 0xC7, 0x06, 0x08, 0x00, 0x00, 0x00, 0xB8,
     0x00, 0x8D, 0x8E, 0xC0, 0x31, 0xED, 0xB1, 0x00, 0xB5, 0x01, 0xB6, 0x00,

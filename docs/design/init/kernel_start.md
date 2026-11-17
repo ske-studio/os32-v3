@@ -19,7 +19,7 @@ void kernel_start(void)            /* 割り込み禁止で入る。戻らない
 | 機種 | arch の入口 (ここを呼ぶ所) | 局面の実装 |
 |---|---|---|
 | x86-pc98 | `arch/x86/kernel/kentry.asm` → `kernel_main(mem_kb, boot_drive)` (`platform/pc98/kernel.c`、ローダの 2 つの引数を覚えて `kernel_start()` を呼ぶだけ) | `platform/pc98/kernel.c` |
-| ppc-powermac | `arch/ppc/kernel_boot.c` の `ppc_kernel_real_start()` (ページングと例外の受け口の後) | `platform/powermac/ppc_kernel.c` |
+| ppc-powermac | `platform/powermac/kernel_boot.c` の `ppc_kernel_real_start()` (ページングと例外の受け口の後) | `platform/powermac/ppc_kernel.c` |
 
 ## 契約
 

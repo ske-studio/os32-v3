@@ -30,7 +30,7 @@
 |E7|`include/ksetjmp.h:21–24` 8語、`arch/x86/kernel/setjmp.asm:35–79` 深さも保存|opaque型・archサイズ。`exec/exec_finish.inc:256,294` コピーも追従|
 |A1|`kapi/kapi_print.c:9–18,31–35,46` fixed2語後のu32列|USER可変引数cursor。内部kvprintf用の検証済み列とは区別|
 |A2|`include/types.h:23–24`、`sdk/include/os32/os32_kapi_shared.h:32–33`|公開単独利用も可能な呼出属性の口|
-- E1〜E7/A1/A2 の指摘内容は9件とも存続（内容の食い違い0）。共通CPU定数は現在 `include/cpu.h:29–32`、VM判別は `arch/x86/legacy/guest.c:20–25` に移っている。
+- E1〜E7/A1/A2 の指摘内容は9件とも存続（内容の食い違い0）。共通CPU定数は現在 `include/cpu.h:29–32`、VM判別は `platform/pc98/legacy/guest.c:20–25` に移っている。
 - `legacy_trap(native_frame)` は **arch syscall入口で最初に**呼ぶ。VMの拡張フレームを52BのUSER保存型にコピーしない。VM処理済みなら共通dispatcherを呼ばず戻る。
 - 例外分類はx86に残す：`isr_stub.asm:135–156` のVM分岐、`isr_handlers.c:299–322,400–428` のfont/sqlite優先→USERまたはsyscall→kill、通常kernel例外→exec復帰/停止。例外フレームとsyscallフレームを同型にしない。
 - 親snapshotはlaunch/resumeの生存スタック上でsetjmp前に一度保存、volatile/noinline維持。dispatchの短命スタックに退避しない。着地clear→pending cleanup→x87親復元→親snapshot復元→IF許可の既存順を維持（`exec_schedule.inc:236–248`）。
@@ -139,7 +139,7 @@ result_ready:
 ```
 - D2のlegacy口は `int legacy_call_dispatch(u32 slot, void *fn, struct kapi_arg_source *src, unsigned count, u32 *result)` とする。providerは対象判定→既存busy/CUI/admit/mailbox/caller/pin→read_block→values処理→cleanup。先にvaluesを作るとbusy＋不正引数の結果が変わるため遅延取得し、旧raw/bytes口は撤去。strings adapterも対象判別後に一括取得、未対象0/失敗負/完了正を維持。
 - 切替を小さくするため旧raw経路を一時的にx86 adapterへ閉じ込め、strings/legacy/printを順にvalues/cursorへ接続し、最後にraw口を撤去。移行中もcommonはnative引数番地を解釈しない。
-- `kapi/kapi_strings.c:62–94` はvaluesを受け、文字列の範囲検証・コピー・解放を維持しarch invokeへ。`arch/x86/legacy/v86_call.c:78–142` はpin→checked copy→呼出→cleanupの現契約を維持するadapter。`include/legacy_guest.h` のcall口もsourceからgate後に論理valuesを取得する形に同期し、none providerを追従。
+- `kapi/kapi_strings.c:62–94` はvaluesを受け、文字列の範囲検証・コピー・解放を維持しarch invokeへ。`platform/pc98/legacy/v86_call.c:78–142` はpin→checked copy→呼出→cleanupの現契約を維持するadapter。`include/legacy_guest.h` のcall口もsourceからgate後に論理valuesを取得する形に同期し、none providerを追従。
 - `kapi_print` はfixed2引数（色/format）をread、formatをstageし、rendererが消費する型についてのみva_next。14引数上限・format1024・string4096・NULL%s・失敗時一文字も出さず全解放を維持。cursorはUSER境界、`kvprintf` のu32列は検証済み整数/ポインタ値の内部境界。builtin va_listをUSERメモリだとして直接使用しない。
 - stub backendは `arch/x86/kernel/syscall_code.c`。8B stub、予約stub、LS192B、現string scratch位置を同値で返す。全区間の重複/overflowと合計PAGE_SIZE以内を検査。x86 publishはno-op、PPC後段はD-cache writeback/I-cache invalidate/orderが必要な実装口。共通はemit成功→publish→USER table利用の順。
 - LS：`exec/ring3_ls.S`→`arch/x86/kernel/ring3_ls.S` に同命令列で移設。`exec/ring3_ls.c:91` をvalues(path,skip,out)で受ける。公開slot12のcallback拒否とprivate RING3_LS_CALLは維持。FSがunwindした後CPL3でcallback、nested listing/park/killでもkernel cursorを残さない。

@@ -7,10 +7,10 @@ $(LAN_GEN) &: tools/gen_sqlite_imports.py tools/gen_kdebug_imports.py tools/prot
 
 # Later stages supply these bodies. Register their rules now; never build a
 # second resident copy. Once present, each source joins lan.mod automatically.
-LAN_HOSTSVC_SOURCES := $(wildcard net/nic_e82557.c fs/serialfs/sfs_block.c drivers/block/netcd.c)
+LAN_HOSTSVC_SOURCES := $(wildcard drivers/net/e82557/nic_e82557.c fs/serialfs/sfs_block.c drivers/block/netcd.c)
 LAN_HOSTSVC_OBJS := $(addprefix $(LAN_OUT)/,$(notdir $(LAN_HOSTSVC_SOURCES:.c=.o)))
 LAN_OBJS := $(addprefix $(LAN_OUT)/,lan_body.o e82557.o e82557_eeprom.o e82557_desc.o sfs_lan.o lan_import_slots.o lan_import_stubs.o) $(LAN_HOSTSVC_OBJS)
-$(LAN_OUT)/nic_e82557.o: net/nic_e82557.c $(LAN_GEN) build/config.mk build/lan-module.mk
+$(LAN_OUT)/nic_e82557.o: drivers/net/e82557/nic_e82557.c $(LAN_GEN) build/config.mk build/lan-module.mk
 	$(CC) $(CFLAGS_BASE) -Os -DOS32_LAN_MODULE $(LAN_INC) -c $< -o $@
 $(LAN_OUT)/sfs_block.o: fs/serialfs/sfs_block.c $(LAN_GEN) build/config.mk build/lan-module.mk
 	$(CC) $(CFLAGS_BASE) -Os -DOS32_LAN_MODULE $(LAN_INC) -c $< -o $@

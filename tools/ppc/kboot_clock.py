@@ -15,7 +15,7 @@ CHECK = dict(name='ppc-kboot-clock', tier=2, budget=60,
                      'tools/ppc/kboot_clock*', 'lib/divdi3.c'],
              inputs=['kernel/io_clock.h', 'include/types.h', 'include/callconv.h', 'include/clock_source.h',
                      'include/platform_timer.h', 'platform/powermac/ofw.h',
-                     'platform/powermac/ppc_layout.h', 'arch/ppc/ppc_boot.h',
+                     'platform/powermac/platform_of_layout.h', 'arch/ppc/ppc_boot.h',
                      'arch/ppc/ppc_pmap.h', 'arch/ppc/ppc_oea.h',
                      'sdk/include/os32/os32_kapi_shared.h', 'tools/tests/host32.py'])
 MUTATIONS = [

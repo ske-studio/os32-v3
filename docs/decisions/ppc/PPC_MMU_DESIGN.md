@@ -17,7 +17,7 @@
 |D2 PPC の原始命令ヘッダは既存ではない|S/arch/ppc は entry.S 等だけ。`arch_io.h`・`arch_cpu.h`・`platform/powermac/platform_io.h` は無い。新規作成が必要。|
 |D3 アーキ独立ヘッダの依存|S/include/cpu.h:30–34 は x86_flags.h の直接 include と cdecl の説明。この段では変更しない。定数includeはPPCの命令を生成しないが、cdeclをPPC ABIと同一視しない。|
 |D4 OF から完全に切れた状態ではない|S/arch/ppc/entry.S:42–62 は元の MSR を戻す。S/platform/powermac/boot.c:49,51 は送信失敗時 OF stdout へ戻る。切離し後には使えない。|
-|D5 BAT0 の 256MiB は物理 RAM 量ではない|S/platform/powermac/ppc_layout.h:44–45、entry.S:54–59。RAM の実在範囲は OF reg/available から別に得る。|
+|D5 BAT0 の 256MiB は物理 RAM 量ではない|S/platform/powermac/platform_of_layout.h:44–45、entry.S:54–59。RAM の実在範囲は OF reg/available から別に得る。|
 |D6 7450 と7455は同じ BAT 数ではない|NC:321–331 は7450を HIGHBAT から除外。既存 entry.S:46–53 は0～3だけ無効化。7455の4～7は切離し時に処理する。|
 |D7 実機の OF 画面は切離し後の観測路にならない|S/docs/decisions/ppc/PPC_BOOT_DESIGN.md:183–191 は外部 ESCC 未確認、FB を次段に予定。今回 FB は範囲外なので実機での完了証明はまだできない（F17）。|
 
@@ -39,7 +39,7 @@
 |mm/paging_lease.inc:5–56,59–126,135–167|pd_phys の整列/所有/active、PDE/PT 一致、lease PT 確保・map/unmap、空 PT/PDE の回収。|
 - 関連の別翻訳単位にも表形式が露出：S/mm/paging_app.c:12–33,69–119,152–208,215–226 は同じ2段表を直接操作。S/mm/paging.h:21–26 は1024×1024、VA>>22、(VA>>12)&1023、4KiB frame mask。`pd_phys` は単なる識別子ではなく pgalloc 所有の PD ページ。
 
-- mm 外の直接参照（実物を rg で照合）：`S/exec/access_walk.c:14–31`（PD/PT所有・PS・権限）、`exec/lease.c:29–35,171–229`（raw walk/cache/A・D除外）、`exec/ring3_str.c:31–44`、`exec/exec_image_map.inc:14–19,45–57,101–114`、`exec/exec_tramp_init.inc:6–9`、`arch/x86/legacy/v86_mem.c:44–50,77–95,146–154`（low PTE）、`mm/shlib.c:99–106,122–125`（USERと先頭PT）、`kernel/kaudit.c:59–62`。
+- mm 外の直接参照（実物を rg で照合）：`S/exec/access_walk.c:14–31`（PD/PT所有・PS・権限）、`exec/lease.c:29–35,171–229`（raw walk/cache/A・D除外）、`exec/ring3_str.c:31–44`、`exec/exec_image_map.inc:14–19,45–57,101–114`、`exec/exec_tramp_init.inc:6–9`、`platform/pc98/legacy/v86_mem.c:44–50,77–95,146–154`（low PTE）、`mm/shlib.c:99–106,122–125`（USERと先頭PT）、`kernel/kaudit.c:59–62`。
 - raw/cache の外部利用：`S/drivers/video/geforce/gf_wc.c:90–126`、`gf_accept.c:102–105`、`hwdev/gf/native.c:39–41`。kdebug の直接flags/raw操作7本は `kdebug_window.c:15–22,55,78–81`、`kpeek.c:94`、`selftest_exec.c:119–121`、`selftest_lease.c:23–38,55–115`、`kselftest/kcg_display_return.inc:13,34–38`、`gfx_ledger.inc:75–89`、`memmap_pool_user.inc:13,19`。表予算・定数利用は `caller_boot.inc:26`、`h4_backing.inc:212–213`、`ledger.inc:14` にもある。
 - root読書きの58参照行（rgは60一致、うち宣言2行を除く。コメント・mm内部を含み、58個の独立した呼び手ではない）：`S/exec/{appmem_map.c:27,redir_access.c:45,87,158,exec_heap.c:161,exec_finish.inc:97–100,247,291,374,exec_launch.inc:49,280,394,exec_syscall.inc:35,lease.c:377–385,v86_call.c:68,104,140–143}`、`drivers/video/{geforce/gf_wc.c:105,trident/resources.c:28}`、`kdebug/{selftest_lease.c:57,100–104,kselftest/caller_boot.inc:8,39}`、mm内部は上の表と `pgalloc_surface.inc:60,98; shlib.c:97,119; paging_app.c:15–16,208; paging.h:240,243,274`。入口への根引渡しは `exec/exec_launch.inc:430,exec_schedule.inc:268,exec.c:518`。
 - 操作別の詳細とBの移行範囲は `/home/hight/os32-tmp/run/ppc-mm-boundary/DESIGN.r1.md` §1・§5を参照。移設約2000行に加え実質変更1800～3000行、試験600～1000行であり、r1のmm中心800～1400行では足りない。
@@ -90,7 +90,7 @@
 
 - OF quiesce の分岐も照合する：N/sys/arch/macppc/macppc/machdep.c:140–142 は PowerMac11,2 / 12,1 / 7,2 のみ、NO:186–187で実行。対象QuickSilver/mac99はこの条件外なので呼ばない。OF translations の取り込み（FP:896–937）も完全切離しのため採用しない。
 - HPT の配置は保存した available を使い、低256MiBとの積集合から low vectors、ELFの全load/BSS/stackを除外して FP:1995–2029 の整列・区間分割・不足停止を適用する。予約の確定とbase/maskの記録は順2a、ゼロ化は境界後。available取得後は割当系OF呼出を止めるためclaim/再呼出は要らない。HPTをELF内の巨大BSSに置かない。RAM全量の常駐マップは今段不要。
-- [C4] `platform/powermac/ppc_layout.h` に低位予約端、BAT窓、試験VA、周期、`PM_DEC_DUMP_N=2`、写像容量、stack/ELF予算を一元化。SPR/MSR/PTEのビットは `arch/ppc/ppc_oea.h`。既存0x6000 ELF予算/0x10000 image予算（S/platform/powermac/ppc_layout.h:38–39）は新独立ターゲット用に見積り直し、リンク ASSERT に反映。
+- [C4] `platform/powermac/platform_of_layout.h` に低位予約端、BAT窓、試験VA、周期、`PM_DEC_DUMP_N=2`、写像容量、stack/ELF予算を一元化。SPR/MSR/PTEのビットは `arch/ppc/ppc_oea.h`。既存0x6000 ELF予算/0x10000 image予算（S/platform/powermac/platform_of_layout.h:38–39）は新独立ターゲット用に見積り直し、リンク ASSERT に反映。
 - [C5] `platform/powermac/ppc_memmap.h` を新設：`pm_p2v_ram(pa)`/`pm_v2p_ram(p)` は低256MiBの予約済み RAM 内だけ恒等、`pm_p2v_io(pa)` は下記固定 ESCC alias。pmap lookupは固定mapping16個を検索しoffsetを加算する内部関数（BATなら恒等）、追加の共通APIにはしない。S/include/memmap.h:32–94,450–462 の x86 配置は取り込まない。任意 alias に V2P キャストは禁止；pmap lookup を用いる。
 - I/O は DBAT にしない。ESCCの PA を4KiB単位で覆う PTE を `0xf0000000+ページ内offset` に設置（窓が跨げば2枚）、WIMG=I|G=0x28、PP=2。RAM alias は M=0x10、PP=2/3。根拠 NP と N/sys/arch/powerpc/include/oea/pte.h:77–108、FP:399–404。OF の I/O マップは捨てる。ESCC は byte load/store＋eieio（S/arch/ppc/entry.S:82–91）を維持。
 - 固定試験 VA は0x40000000（BAT0外）、VAの同じページ内offsetを保つ。RAM PAは予約済み試験ページ。HPT hi=`V | (vsid<<7) | H | ((va>>22)&0x3f)`、hash=`(vsid ^ ((va>>12)&0xffff)) & mask`、secondary=`hash^mask`、lo=`pa | WIMG | PP`。SR は T=0、Ks=0、Kp=1、N=0、VSID=(1<<4)|segment（FP:157 の生成式；単一固定contextはOS32の選択）。
@@ -240,7 +240,7 @@ volatile u32 *ppc_hpt_ptr(u32 pa); /* 語順はentryごとhi,lo、native u32 */
 |PPC独立枝（S以下）|新規/変更・目安行数／1機能|
 |---|---|
 |platform/powermac/mmu_boot.c|新180：OF情報の取得とhandoff、既存boot.cの診断停止までの経路は旧ターゲットとして保持|
-|platform/powermac/ppc_memmap.h / ppc_layout.h|新35／変更20：RAM/MMIO変換／番地定数|
+|platform/powermac/ppc_memmap.h / platform_of_layout.h|新35／変更20：RAM/MMIO変換／番地定数|
 |arch/ppc/takeover.S / cpu_setup.c|新80／新60：不可逆入口／PVRとHID設定|
 |arch/ppc/pmap.c / ppc_pmap.h|新250／新35：写像とHPT／型宣言|
 |arch/ppc/mmu.S / ppc_oea.h|新90／新70：SR/SDR1/TLB／OEA定数|

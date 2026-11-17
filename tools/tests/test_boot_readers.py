@@ -20,7 +20,7 @@ CHECK = dict(name='boot-readers-host', tier=1, covers=['tools/tests/test_module_
          'platform/pc98/bootinfo_native.h', 'platform/pc98/bootinfo_capture.c',
          'platform/pc98/bootinfo_check.c', 'platform/pc98/bios_snapshot.c',
          'platform/pc98/bios_snapshot.h', 'platform/pc98/boot_capture.c',
-         'platform/powermac/boot_capture.c', 'platform/powermac/kboot_layout.h', 'init/bootinfo.c',
+         'platform/powermac/boot_capture.c', 'platform/powermac/platform_kboot_layout.h', 'init/bootinfo.c',
     'tools/tests/test_boot_readers.py', 'tools/tests/host32.py',
     'tools/tests/kernel_includes.py', 'include/platform_boot.h',
     'include/memmap.h', 'include/types.h', 'include/build_id.h',

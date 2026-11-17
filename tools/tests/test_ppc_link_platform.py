@@ -1,6 +1,6 @@
 """PowerMac link boundary, with fake MSR and resident tick registration."""
 CHECK = dict(env=['ppc-cross'], name='ppc-link-platform-host', tier=2, budget=10, needs=[], covers=['kernel/time/tick_clock.h',
-    'platform/powermac/link_platform_inline.h', 'net/nic.c', 'net/nic.h', 'net/link.c', 'net/link_rx.inc', 'net/link_host_api.inc', 'net/link_selftest.inc',
+    'platform/powermac/platform_link_inline.h', 'net/nic.c', 'net/nic.h', 'net/link.c', 'net/link_rx.inc', 'net/link_host_api.inc', 'net/link_selftest.inc',
     'platform/powermac/link_platform.c', 'net/link_platform.h', 'net/link.h',
     'include/types.h', 'include/callconv.h', 'include/kernel_tick.h',
     'include/net_eth.h', 'kernel/idle_work.h', 'kernel/irq/tick.h',

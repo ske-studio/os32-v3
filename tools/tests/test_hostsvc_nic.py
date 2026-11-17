@@ -2,7 +2,7 @@
 """A2 real NIC lifetime/selection with fake adapters, link and A3 seams (ILP32)."""
 CHECK = dict(name='hostsvc-nic', tier=1, needs=[], budget=3.8, covers=['tools/tests/rx_io_clock.h', 'tools/tests/idle_io_sources.py',
     'kernel/io_work.[ch]', 'kernel/io_clock.h', 'kernel/io_policy.[ch]', 'kernel/idle_work.h', 'exec/appslot.h', 'net/rx_work.c', 'net/rx_work.h', 'include/clock_source.h', 'kernel/irq/tick_budget.h', 'kernel/idle_work.h',
-    'kernel/time/tick_clock.h', 'net/rx_work.c', 'net/rx_work.h', 'include/clock_source.h', 'include/kernel_tick.h', 'kernel/irq/irq.h', 'kernel/irq/tick_budget.h', 'net/link_platform.h', 'platform/pc98/link_platform_inline.h', 'net/nic.c', 'net/nic.h', 'net/nic_rx.h', 'net/link.h', 'include/net_eth.h',
+    'kernel/time/tick_clock.h', 'net/rx_work.c', 'net/rx_work.h', 'include/clock_source.h', 'include/kernel_tick.h', 'kernel/irq/irq.h', 'kernel/irq/tick_budget.h', 'net/link_platform.h', 'platform/pc98/platform_link_inline.h', 'net/nic.c', 'net/nic.h', 'net/nic_rx.h', 'net/link.h', 'include/net_eth.h',
     'kernel/irq/tick.h', 'platform/pc98/tick_order.h',
     'include/kprintf.h',
     'drivers/net/e82557/e82557_regs.h',

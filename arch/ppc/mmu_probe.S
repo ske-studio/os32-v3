@@ -1,7 +1,7 @@
 /* OS32 fault fixtures. Reserved pages/record belong to this image. */
 #include "ppc_frame.h"
 #include "ppc_oea.h"
-#include "ppc_layout.h"
+#include "platform_of_layout.h"
 .bss
 .balign PPC_PAGE_SIZE
 .globl ppc_probe_pages

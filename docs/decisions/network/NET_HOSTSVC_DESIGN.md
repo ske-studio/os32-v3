@@ -246,8 +246,8 @@ int os32_host_notice_read(const char *name, HostNotice *out); /* LISTで名前�
 | A1 | 新 net/nic.h | 70 | NIC契約、最初に固定 | 共有ヘッダ | 不要（境界追加はIで宣言） |
 | A2 | 新 net/nic.c | 220 | NIC選択・寿命、A1 | vmkernel | 提供: bind/解除/tx |
 | A3 | 新 net/nic_rx.c | 220 | 単一RX・振分、A1と並列adapter後結線 | vmkernel | 提供: net_rx_take |
-| A4 | 新 net/nic_lgy98.c | 100 | LGY adapter、A1、lgy98.cと同じく常にビルドし実行時にLGYが見つかったときだけbind (R2) | vmkernel | 不要: 同像ne2k |
-| A5 | 新 net/nic_e82557.c | 100 | 82557 adapter、A1、A4と並列 | lan.mod | 不要: 同像82557 |
+| A4 | 新 drivers/net/ne2000/nic_lgy98.c | 100 | LGY adapter、A1、lgy98.cと同じく常にビルドし実行時にLGYが見つかったときだけbind (R2) | vmkernel | 不要: 同像ne2k |
+| A5 | 新 drivers/net/e82557/nic_e82557.c | 100 | 82557 adapter、A1、A4と並列 | lan.mod | 不要: 同像82557 |
 | A6 | 改 drivers/net/ne2000/lgy98.c | 30 | link初期化/tick所有移管、A2 | vmkernel | 不要（境界追加はIで宣言） |
 | A7 | 改 drivers/net/e82557/lan_module.c | 50 | NIC利用中のmodule参照、A2 | vmkernel | 不要（境界追加はIで宣言） |
 | A8 | 改 net/link.c | 90 | ne2k直結除去・要求期限hook、A3 | vmkernel | 不要（境界追加はIで宣言） |

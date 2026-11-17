@@ -5,7 +5,7 @@
 /*  票 docs/tasks/realhw/TASK_PEGC480_REALHW.md §3 段 1。記録の形・判定は    */
 /*  v86_gcap_math.h (ホスト試験で実物のまま回す)。本体は起動時に読む部品    */
 /*  kdebug/v86_gcap.c で、カーネルからは kdebug.ops.gcap_* 経由で呼ぶ。     */
-/*  arch/x86/legacy/v86_gcap.c は KAPI slot 239 の受け口だけ。                       */
+/*  platform/pc98/legacy/v86_gcap.c は KAPI slot 239 の受け口だけ。                       */
 /* ======================================================================== */
 
 #ifndef __V86_GCAP_H

@@ -1,7 +1,7 @@
 #ifndef OS32_POWERMAC_OFW_H
 #define OS32_POWERMAC_OFW_H
 #include "ppc_boot.h"
-#include "ppc_layout.h"
+#include "platform_of_layout.h"
 struct ofw_env {
     int in, out, memory, mmu, real_mode;
     unsigned ac, sc;

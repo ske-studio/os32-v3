@@ -21,7 +21,7 @@ CHECK = dict(name='kboot-cpu', tier=2, budget=600, needs=[],
                      'arch/ppc/kernel_vectors.S', 'arch/ppc/kernel_hpt.c',
                      'arch/ppc/pd_walk.c', 'platform/powermac/ofw.c',
                      'platform/powermac/ofw.h', 'platform/powermac/escc*.c',
-                     'platform/powermac/ppc_layout.h', 'include/types.h',
+                     'platform/powermac/platform_of_layout.h', 'include/types.h',
                      'include/callconv.h', 'include/memmap.h',
                      'include/appmem_types.h', 'mm/paging.h',
                      'lib/kstring*', 'build/arch/ppc.mk'])

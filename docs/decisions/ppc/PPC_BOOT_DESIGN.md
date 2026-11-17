@@ -115,8 +115,8 @@ int ofw_map_io(int mmu, unsigned ac, cell pa) {
  * CI=-1 は -1、catch 非0 はその値を返す。成功時、method の結果を逆順で
  * 呼出元 cells[0..no) に戻す（NB:690–691）。map は no=0、catch だけを確認する。 */
 ```
-- C4 の 3 層は docs/POLICY_DEV.md §2 の Shared→Subsystem→Local。今段に公開 ABI 定数はなく Shared を増やさず、Subsystem の platform/powermac/ppc_layout.h に PPC の番地・サイズ・OF path を集約する（PM_LINK_BASE=0x20000、PM_ESCC_WINDOW=0x20、PM_ESCC_STRIDE=0x10、PM_MAP_MODE_IO=0x2a、BAT 値・stack/整列・poll 上限・RR mask）。Local はそこからの導出・参照だけにし同じ値を再定義しない。実行時の BAR/offset は DT から取得する。
-- build/config.mk:9 の LAYOUT_CPP と同じ `$(CC) -E -P -x c -imacros platform/powermac/ppc_layout.h` で boot.ld を生成。C/asm/ld 共用の定数は suffix・型宣言なし、C 専用部はガードする。出力・ISO/ログのパスは build/ppc.mk の基点→派生パス→run.py 引数で一元化する。
+- C4 の 3 層は docs/POLICY_DEV.md §2 の Shared→Subsystem→Local。今段に公開 ABI 定数はなく Shared を増やさず、Subsystem の platform/powermac/platform_of_layout.h に PPC の番地・サイズ・OF path を集約する（PM_LINK_BASE=0x20000、PM_ESCC_WINDOW=0x20、PM_ESCC_STRIDE=0x10、PM_MAP_MODE_IO=0x2a、BAT 値・stack/整列・poll 上限・RR mask）。Local はそこからの導出・参照だけにし同じ値を再定義しない。実行時の BAR/offset は DT から取得する。
+- build/config.mk:9 の LAYOUT_CPP と同じ `$(CC) -E -P -x c -imacros platform/powermac/platform_of_layout.h` で boot.ld を生成。C/asm/ld 共用の定数は suffix・型宣言なし、C 専用部はガードする。出力・ISO/ログのパスは build/ppc.mk の基点→派生パス→run.py 引数で一元化する。
 - C5: ppc_boot.h の `cell ppc_ptr_cell(const void *p)` / `void *ppc_cell_ptr(cell a)` に pointer/cell 変換を集約する（static inline）。MMIO は cell のまま外部 asm に渡し、CI の pointer 引数はこの口だけで cell 化する。
 - arch は OF/path/ESCC を知らず、platform は CPU 命令を書かない。共有 include/io.h・cpu.h の契約は次段でまとめて実装し、その時点から共有の I/O・CPU 契約を接続する。
 
@@ -132,7 +132,7 @@ int ofw_map_io(int mmu, unsigned ac, cell pa) {
 ## 5. 新規ファイルと割当て
 | ファイル | 行数目安 | 段（1 実装者が表の順に進める） |
 |---|---:|---|
-| platform/powermac/ppc_layout.h | 45 | A1 定数の 3 層、cpp 出力確認 |
+| platform/powermac/platform_of_layout.h | 45 | A1 定数の 3 層、cpp 出力確認 |
 | arch/ppc/ppc_boot.h | 45 | A2 CPU/MMIO・変換口、宣言コンパイル |
 | platform/powermac/ofw.h | 65 | A3 OF/環境/ESCC 宣言、宣言コンパイル |
 | arch/ppc/entry.S | 105 | B1 BAT/MSR・BSS・CPU/MMIO、object ビルド |

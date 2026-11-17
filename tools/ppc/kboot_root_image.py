@@ -10,7 +10,7 @@ import time
 ROOT = Path(__file__).resolve().parents[2]
 CHECK = dict(name='ppc-kboot-root-image', tier=2, budget=60,
              covers=['platform/powermac/root_image.c', 'tools/ppc/kboot_root_image.py'],
-             inputs=['arch/ppc/kernel.ld', 'platform/powermac/kboot_layout.h',
+             inputs=['arch/ppc/kernel.ld', 'platform/powermac/platform_kboot_layout.h',
                      'include/memmap.h', 'tools/gen_memmap.py', 'include/boot_root.h'])
 PREFIX = '/home/hight/opt/cross-ppc/bin/powerpc-elf-'
 

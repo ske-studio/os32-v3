@@ -8,7 +8,7 @@
 #include "nic.h"
 #include "rx_work.h"
 #include "link_platform.h"
-#include "link_platform_inline.h"
+#include "platform_link_inline.h"
 #include "clock_source.h"
 #include "kernel/time/tick_clock.h"
 #include "kernel/irq/tick_budget.h"

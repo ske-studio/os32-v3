@@ -34,7 +34,7 @@
 |---|---|---|
 | PPC-BOOT-RH (`DEFERRED_TESTS.md:37`) | Apple OF 4.x の ELF/NOTE、0x20000 非衝突、screen、非ページ境界の map、ch-a open | `platform/powermac/boot.c:36` に OF greeting、同:42 に tree/open/map 失敗。screen の実機確認は未実施 |
 | PPC-MMU-RH (:38) | 7450/7455 HIGH_BAT・HID0、DEC pending、cache/WIMG、ESCC 配線 | `platform/powermac/mmu_boot.c:253` は takeover 前の OF 出力。切離し後の実機表示を足す |
-| PPC-KBOOT-RH (:39) | 1MiB load/memsz、macio ranges、MPIC LE、TB、cache、HPT、1kHz の実時間 | `kboot_capture.c:127,163,177` は property/TB 採取、`arch/ppc/kernel_boot.c:180,185` は vector/HPT。観測は実機で要る |
+| PPC-KBOOT-RH (:39) | 1MiB load/memsz、macio ranges、MPIC LE、TB、cache、HPT、1kHz の実時間 | `kboot_capture.c:127,163,177` は property/TB 採取、`platform/powermac/kernel_boot.c:180,185` は vector/HPT。観測は実機で要る |
 | PPC-LAN-RH (:40) | clock、PHY、DMA/cache、PCI domain、AF_PACKET | 下表。QEMU の sungem 合格では閉じない |
 
 | ID | 現物照合で訂正する前提（食い違い 7 件） | 根拠と対応 |
@@ -251,7 +251,7 @@ int gem_phy_sample(struct gem *g, struct gem_phy_sample *out);
 |---|---|---|
 | 共通契約 | +platform/powermac/rh_observe.h、lan_boot.h、gem.h | 各ヘッダは自分の境界だけ。先に契約を固定 |
 | RH1-A | +platform/powermac/rh_observe.c | OF 採取・持続段表示。clock/PHY と独立に作業可能 |
-| RH1-B | arch/ppc/kernel_boot.c | OF 印の呼出し、FB/clock slot・alias・検証の統合。統合担当 1 人 |
+| RH1-B | platform/powermac/kernel_boot.c | OF 印の呼出し、FB/clock slot・alias・検証の統合。統合担当 1 人 |
 | RH1/RH2 接続 | arch/ppc/kernel_boot.h、platform/powermac/ppc_kernel.c | 前者は FB VA と devices の fb_va/clock_va、後者は FB 段 1・ESCC 診断分岐・clock_va を quiesce setup へ渡す |
 | RH1-C | platform/powermac/boot.c、mmu_boot.c | 各診断像の段印接続。ファイルごとに別差分 |
 | RH2-A | platform/powermac/gmac_tree.c | clock profile の採取だけ |

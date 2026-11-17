@@ -2,7 +2,7 @@
 /* PowerPC core-ready init (milestone 2, PPC_KBOOT_DESIGN sections 2 and 4).
  *
  * Entered through init/kernel_start.c (the common three-phase skeleton) from
- * arch/ppc/kernel_boot.c with IR=DR=1, EE=0, plan-D paging live
+ * platform/powermac/kernel_boot.c with IR=DR=1, EE=0, plan-D paging live
  * and the ESCC/MPIC I/G aliases mapped. Brings the common mm online, proves
  * trap/guard/flush, MPIC delivery and the 1 kHz decrementer with real
  * operations, then idles with EE=1. The nine KBOOT lines are the acceptance

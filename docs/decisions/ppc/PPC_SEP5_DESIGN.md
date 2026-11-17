@@ -109,7 +109,7 @@ MESSAGES['sdk'] = 'sdk'
 - 字面不変 lan: `include/lan_contract.h`, `include/pci_dev_contract.h`, `include/pci_bind_contract.h`, `drivers/net/e82557/lan_module.h`。
 - 字面不変 pcm: `include/pcm_contract.h`, `include/dma_contract.h`, `drivers/sound/cs4231/pcm_module.h`, `drivers/sound/cs4231/pcm_cs4231.h`, `kernel/irq/irq.h`, `mm/dma_pool.h`。
 - 字面不変 trident: `drivers/video/trident/trident_module.h`, `drivers/video/trident/trident.h`, `include/gfx_hal.h`, `include/gfx_mode.h`, `gfx/palette.h`, `include/debug_probe.h`。
-- 字面不変 v86: `arch/x86/legacy/v86_module.h`, `kernel/module/module.h`。
+- 字面不変 v86: `platform/pc98/legacy/v86_module.h`, `kernel/module/module.h`。
 ## 3. BSDとの照合・未確認
 - 以下N/Fは `/home/hight/os32-tmp/ref/netbsd` / `freebsd`。GPLは読んでいない。新ハード実装はないため新規vendor仕様の採用はない。PC98の既存I/O列を移設し増やさない。
 - N/sys/arch/powerpc/oea/ofw_rascons.c:255–258,274–283はwidth/height/depth/stride→rasops、:124はtextops境界。N/sys/arch/macppc/dev/ofb.c:202,264–290,438–452はFB寸法/stride/paletteをdevice側で扱う。TVRAM番地を共通consoleへ渡さない根拠。

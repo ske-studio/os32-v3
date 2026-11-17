@@ -11,7 +11,7 @@ CHECK = dict(name='ppc-terminal-work', env=['ppc-cross'], tier=1, needs=[], budg
             'kernel/idle_work.h', 'net/nic.h', 'kernel/cli/resident_cli.h', 'include/types.h',
             'include/callconv.h', 'sdk/include/os32/os32_kapi_shared.h',
             'arch/ppc/kernel_boot.h', 'arch/ppc/exec_kapi.c', 'arch/ppc/arch_exec_kapi.h',
-            'platform/powermac/kapi_table.h', 'exec/exec_syscall.inc'], basis=['AC-CTX-1'])
+            'arch/ppc/kapi_table.h', 'exec/exec_syscall.inc'], basis=['AC-CTX-1'])
 from idle_io_sources import idle_io_sources
 import os
 from pathlib import Path

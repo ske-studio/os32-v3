@@ -9,7 +9,7 @@
 #include "gfx_hal.h"
 /* -Iplatform/$(PLATFORM) で選ぶ。DISPLAY_FALLBACK_BACKEND = probe なしで必ず
  * 使える backend の番地 (リンク時定数。g_backend の静的な初期値にも使う)。 */
-#include <display_fallback.h>
+#include <platform_display_fallback.h>
 
 /* 共通側の「登録済みの mode が台帳の予約に収まるか」の判定。1 = 選べた。 */
 typedef int (*display_select_mode_fn)(GfxBackend *backend, int legacy200);

@@ -8,7 +8,7 @@ import tempfile
 
 CHECK = dict(name='ppc-kboot-log', budget=4, needs=[], covers=['platform/powermac/log.c', 'platform/powermac/kboot_log.h',
                      'platform/powermac/escc.c', 'platform/powermac/ofw.h',
-                     'platform/powermac/ppc_layout.h', 'arch/ppc/ppc_boot.h',
+                     'platform/powermac/platform_of_layout.h', 'arch/ppc/ppc_boot.h',
                      'include/types.h', 'include/callconv.h', 'tools/ppc/kboot_log_host.c',
                      'tools/ppc/kboot_log.py'])
 ROOT = Path(__file__).resolve().parents[2]

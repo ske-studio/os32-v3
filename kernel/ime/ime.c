@@ -15,7 +15,7 @@
 #include "memmap.h"
 #include "ime.h"
 #include "ime_display_private.h"
-#include <ime_default_render.h>
+#include <platform_ime_render.h>
 #include "../sqlite_engine.h"
 #include "../../drivers/input/kbd.h"
 #include "tvram.h"

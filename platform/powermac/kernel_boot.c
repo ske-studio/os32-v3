@@ -1,15 +1,15 @@
 /* OF-PPC 4.2.4/8.2; OpenBSD macppc/locore0.S:87; FreeBSD
  * aim/mmu_oea.c:685-695. Plan D uses software tables, never RAM BATs.
  * Static MMIO slots belong to the platform, outside the device ledger. */
-#include "kernel_entry.h"
-#include "kernel_boot.h"
+#include "../../arch/ppc/kernel_entry.h"
+#include "../../arch/ppc/kernel_boot.h"
 #include "kernel_start.h"
-#include "ppc_trap.h"
-#include "ppc_hpt.h"
-#include "ppc_oea.h"
-#include "arch_cpu.h"
+#include "../../arch/ppc/ppc_trap.h"
+#include "../../arch/ppc/ppc_hpt.h"
+#include "../../arch/ppc/ppc_oea.h"
+#include "../../arch/ppc/arch_cpu.h"
 #include "kboot_info.h"
-#include "kboot_layout.h"
+#include "platform_kboot_layout.h"
 #include "memory.h"
 #include "mpic_tree.h"
 #include "memory_boot.h"

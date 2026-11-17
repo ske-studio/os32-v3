@@ -27,7 +27,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 /* OpenBSD b907757a stand/ofwmagic.S:37-69, alloc and LOAD/NOTE placement. */
-#include "ppc_layout.h"
+#include "platform_of_layout.h"
     .section .note.ofw,"a",@note
     .balign PM_CELL_BYTES
     .long PM_NOTE_NAMESZ, PM_NOTE_DESCSZ, PM_NOTE_TYPE

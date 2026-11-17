@@ -65,7 +65,7 @@ void display_provider_raster_reset(void) {}
 int display_provider_restore_fallback(Backend *b) { (void)b; return 0; }
 void gfx_reinit_surfaces(int n) { (void)n; }
 int pc98_route_safe(void) { return 0; }
-/* <display_fallback.h> の PC-98 の値 (第 5 段 B4)。この fixture の型は Backend。 */
+/* <platform_display_fallback.h> の PC-98 の値 (第 5 段 B4)。この fixture の型は Backend。 */
 #define DISPLAY_FALLBACK_BACKEND (&gfx_backend_pc98)
 void gfx_select_mode(Backend *b, int n) { (void)b; (void)n; }
 void gfx_bind_client(void) {}

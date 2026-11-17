@@ -57,7 +57,7 @@ def main():
             source = (ROOT / 'arch/ppc/exec_kapi.c').read_text().replace('KernelAPI ppc_kapi_table __attribute__', 'const KernelAPI ppc_kapi_table __attribute__')
             mutant = tmp / 'mutant.c'
             mutant.write_text(source)
-            (tmp / 'kapi_table.h').write_text((ROOT / 'platform/powermac/kapi_table.h').read_text().replace('extern KernelAPI', 'extern const KernelAPI'))
+            (tmp / 'kapi_table.h').write_text((ROOT / 'arch/ppc/kapi_table.h').read_text().replace('extern KernelAPI', 'extern const KernelAPI'))
             subprocess.run([str(cc)] + flags + ['-c', str(mutant), '-o', str(tmp / 'mutant.o')], check=True)
             assert not table_ok(nm, tmp / 'mutant.o')
             print('const table: RED')

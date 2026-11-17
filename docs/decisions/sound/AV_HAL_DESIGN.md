@@ -114,7 +114,7 @@
 | WM のマウスの取り込み | input.rs:209・278-281 (`capture`・`release_capture`) | 独占中は配らない |
 | マウス `MouseState`・`mouse_poll` | include/pointer_service.h:27-34、drivers/input/mouse.c:83-102 | mouse_poll は変えない |
 | V86 の I/O の許可表と分岐 | platform/pc98/legacy/v86_io.c:96-99 (0188h–018Fh を素通し)・:332 (bitmap)・:391-393 (gcap・観測が先) | §9-1 |
-| V86 の実行 | arch/x86/legacy/v86.c:452 (`v86_run(ctx)`)・:470 (`v86_run_limit`)・:793-869 (`v86_boot2` は毎回 IPL を読み終わりに teardown)、userland/cmds/v86.c:180 | §9-2 |
+| V86 の実行 | platform/pc98/legacy/v86.c:452 (`v86_run(ctx)`)・:470 (`v86_run_limit`)・:793-869 (`v86_boot2` は毎回 IPL を読み終わりに teardown)、userland/cmds/v86.c:180 | §9-2 |
 | 合成器の契約 (DMA 時計 D・Ptarget=D+6144・owned submit) | docs/decisions/sound/SYNTH_OPNA_DESIGN.md:113-141 | §8 で置き換え |
 | USB の入力の入口 | ~/os32-tmp/run/usb/DESIGN.r5.md:191-195・§4-8 | src ごとに in2 へ (§5-4) |
 
@@ -637,7 +637,7 @@ int v86s_end(u32 sid);                              /* 今の boot2 の終わり
 - 保存: セッションの間、カーネルが `struct v86_context` (汎用レジスタ・セグメント・EFLAGS・仮想 IF と STI の影)・v86 の PIC・PIT・鍵盤・メモリの写像・FM の模型と bank の latch を持ち続ける。run の間に teardown しない。今の `v86_run_limit(ctx, tick_limit)` (v86.c:470) を「戻った時に ctx を書き戻す」形にして使う。
 - 戻る所は命令の境目だけ: (a) FM の OUT を**終えた後**、FIFO が半分以上 → FIFO。(b) PIT の tick の割込みで V86 から監視へ来た時に slice を過ぎていれば → SLICE (I/O の無い busy loop もこれで戻る)。(c) §9-3 の同期の読み → IOREAD。(d) FIFO が満杯の時の FM の OUT は実行せずに FIFO で戻る (次の run で再実行、落とさない)。
 - 幅の結線 (R4-P2-2): v86.c:247 は 66h で `opsize16 = 0` にするが :265 の `v86_gp_emulate(frame, pc, len)` に渡していない。`v86_gp_emulate(frame, pc, len, opsize16)` にし、E5・ED (IN) と E7・EF (OUT) は `opsize16 ? 2 : 4` の幅で `v86_set_ax` / `v86_set_eax` (新、EAX 全体) を使う。幅 4 の IN は 4 つの連続ポート (例: DX=0188h なら 0188h・0189h・018Ah・018Bh)。
-- IOREAD の結線 (R3-P1-3、arch/x86/legacy/v86_gp_emulate.inc:9-28 の IN の 4 形): `v86_io_in` を `v86_io_in2(port, size, &v)` (戻り 0 = 値あり・1 = 保留) にし、保留なら **AL/AX/EAX も EIP も変えずに** `V86_EMU_PEND` を返す。監視は IOREAD で run を戻る (Exit の `port・width・nq・q[]` に、幅 2/4 の IN を byte に分けた中で同期が要る byte だけ。他の byte はカーネルが答える)。次の run で `reply_valid=1` なら、`v86_fm_io` が reply を「この IN の答え」として持ち、**同じ IN を再実行**して完了させ EIP を進める (命令の途中の状態を持たない)。reply は使った時に消す。INS (文字列の IN) の FM のポートは同期せず影の値で答える (資料のある使い方が無い)。
+- IOREAD の結線 (R3-P1-3、platform/pc98/legacy/v86_gp_emulate.inc:9-28 の IN の 4 形): `v86_io_in` を `v86_io_in2(port, size, &v)` (戻り 0 = 値あり・1 = 保留) にし、保留なら **AL/AX/EAX も EIP も変えずに** `V86_EMU_PEND` を返す。監視は IOREAD で run を戻る (Exit の `port・width・nq・q[]` に、幅 2/4 の IN を byte に分けた中で同期が要る byte だけ。他の byte はカーネルが答える)。次の run で `reply_valid=1` なら、`v86_fm_io` が reply を「この IN の答え」として持ち、**同じ IN を再実行**して完了させ EIP を進める (命令の途中の状態を持たない)。reply は使った時に消す。INS (文字列の IN) の FM のポートは同期せず影の値で答える (資料のある使い方が無い)。
 - 検査: size・sid・呼び手が begin の owner (他は INVAL)・reply_valid は IOREAD の直後だけ (他は INVAL)・max ≤ 512。アプリの終了で `v86s_end` 相当を回収の並び (exec_finish.inc の V86 の行) で。STOP は今の V86 の中断と同じ。
 - 今の `v86_boot2` は残す (FM_SOFT 無しの begin→run(無期限)→end と同じ振る舞い)。
 
@@ -748,9 +748,9 @@ u32 snd2_fmq_drain(SND2_FmQ *q, SND2_FmEv *out, u32 max);
 | V0 | 資料の確認 (CS4231 の I20/I21 と PCM の IRQ の共存・PIT の one-shot)。結果を本書に追記、両方駄目ならユーザーに諮る | — | — | — | — | 照らし直し |
 | V1 | platform/pc98/legacy/v86_fm_timer.c (timer A/B・CSM・status の模型・仮想 IRQ の判定・pending の消去) | v86_pic_should_inject・Q1 | 模型 | 230 | IL | V0・Q1 |
 | V2 | platform/pc98/legacy/v86_fm_io.c (+v86_io.c の bitmap の拒否と戻し・in/out の先頭の分岐 2 行、`v86_io_in2` の保留・reply・影の有効性) | V1・Q1 | latch・FIFO・reply | 260 | IL | V1 |
-| V3 | arch/x86/legacy/v86_session.c (begin/run/end・ctx の書き戻し・IOREAD・SLICE・`v86_fm_session_end`) + v86_gp_emulate.inc の IN/OUT の幅 (opsize16・EAX・幅 4) と IN 4 形の保留 (EIP を進めない)・v86.c:265 の opsize16 の受け渡し・v86.c:503 の SOFT の分岐・run_limit の呼ぶ行 | V2 | セッション | 320 | IL | V2 |
+| V3 | platform/pc98/legacy/v86_session.c (begin/run/end・ctx の書き戻し・IOREAD・SLICE・`v86_fm_session_end`) + v86_gp_emulate.inc の IN/OUT の幅 (opsize16・EAX・幅 4) と IN 4 形の保留 (EIP を進めない)・v86.c:265 の opsize16 の受け渡し・v86.c:503 の SOFT の分岐・run_limit の呼ぶ行 | V2 | セッション | 320 | IL | V2 |
 | V4 | drivers/sound/cs4231/pcm_timer.c (hw_timer_arm・解除・hw_timer_ack と IRQ の要因の分け) | — | 装置の内部 | 130 | IL | V0・IS |
-| V5 | kapi/kapi_v86s.c (§10 の検査) + `arch/x86/legacy/v86_call.c` の slot の switch に v86s_* の 4 口、`platform/none/legacy_guest.c` で断る (末尾の追記) | V3 | — | 130 | IL | V3 |
+| V5 | kapi/kapi_v86s.c (§10 の検査) + `platform/pc98/legacy/v86_call.c` の slot の switch に v86s_* の 4 口、`platform/none/legacy_guest.c` で断る (末尾の追記) | V3 | — | 130 | IL | V3 |
 | V6 | userland/cmds/v86.c (実行のループ: run → drain → F_r への反映 → IOREAD の答え・影と shadow_seq → pump) | v86s_*・sndl_* | — | 170 | IL | V5・L3 |
 - 1,000 行を超えるファイルは無い。gshell の input.rs (1,269)・multiapp.rs (1,433) は呼ぶ行だけ、中身は excl.rs。
 
@@ -1040,5 +1040,5 @@ int snd2_chip_register(const SndChipBackend *be, void *c, const SND2_DevInfo *i)
 - **MML の KAPI の 10 欄**: §7-6 の「中身の無い欄として残す」は v3 の最後の KAPI の整理で**削除する対象**。それまでは NOSYS の本体のまま。
 
 ## 確定の後の追記 (2026-11-10、今の main cfb9cec3 との前提の照らし直し、PM 決定)
-- **v86s_* の KAPI の通り道 (§9-2・§10、V3・V5)**: V86 を走らせる口は今 `exec/exec_syscall.inc:42` の `legacy_call_dispatch(slot, wrapper, src, count, result)` → `arch/x86/legacy/guest.c:27-30` → `v86_call_dispatch` (`arch/x86/legacy/v86_call.c:78-89` の slot の switch) を通り、`arch_kapi_read_block`・`shared_stack`・呼び手の pin を検査してから `arch_kapi_invoke` する (第 3 段 D2 で引数が `args, bytes` → `struct kapi_arg_source *src, unsigned count` に変わった)。v86s_* の 4 口の slot は `KAPI_SLOT_V86_BOOT2` と同じくこの switch に足す (begin は path 2 本を持つ 136B の構造体 1 本、run は 3 引数)。PPC は `platform/none/legacy_guest.c:18-` の switch で断る。`kapi/kapi_v86s.c` は検査だけを持ち、`arch/x86/legacy` を直に呼ばない。
+- **v86s_* の KAPI の通り道 (§9-2・§10、V3・V5)**: V86 を走らせる口は今 `exec/exec_syscall.inc:42` の `legacy_call_dispatch(slot, wrapper, src, count, result)` → `platform/pc98/legacy/guest.c:27-30` → `v86_call_dispatch` (`platform/pc98/legacy/v86_call.c:78-89` の slot の switch) を通り、`arch_kapi_read_block`・`shared_stack`・呼び手の pin を検査してから `arch_kapi_invoke` する (第 3 段 D2 で引数が `args, bytes` → `struct kapi_arg_source *src, unsigned count` に変わった)。v86s_* の 4 口の slot は `KAPI_SLOT_V86_BOOT2` と同じくこの switch に足す (begin は path 2 本を持つ 136B の構造体 1 本、run は 3 引数)。PPC は `platform/none/legacy_guest.c:18-` の switch で断る。`kapi/kapi_v86s.c` は検査だけを持ち、`platform/pc98/legacy` を直に呼ばない。
 - **第 4 段 B の型の契約 (§7-6・§12 の R0c・L5・合成器の段)**: `build/abi_contract.mk` が C のコンパイル規則に order-only の `| $(ABI_CONTRACT_ORDER)` を付け、`test_type_contract.py` (covers `build/**/*.mk`) が `make -n -B` の全 C の呼出しの char/enum の旗と probe の前提を検査する (解析できない呼出しは fail closed)。R0c で外す `build/libs.mk:27・218-229・273` の範囲は不変 (`:226` の規則に `| $(ABI_CONTRACT_ORDER)` が付いた)。L5 で足し直す libs.mk の規則と新しい `build/os32snd.mk` (と合成器の段の .mk) の C の規則は、`KERNEL_CFLAGS`/`CFLAGS_BASE`/`PROGRAM_FLAGS` 由来の profile の旗と `| $(ABI_CONTRACT_ORDER)` を持ち、object を `ALL_TARGET_OBJECTS` 等の一覧に載せる。`check-type-contract` (`tools/checks/run.py:387`) を L5・合成器の段の受入に加える。

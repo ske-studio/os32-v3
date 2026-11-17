@@ -17,7 +17,7 @@ CHECK = dict(name='kboot-vectors', tier=2, budget=600,
                      'arch/ppc/cache_copy.S', 'arch/ppc/kernel_hpt.c',
                      'arch/ppc/pd_walk.c', 'arch/ppc/kernel_trap.c', 'arch/ppc/ppc_*.h', 'mm/paging.h',
                      'platform/powermac/ofw.c', 'platform/powermac/escc*.c',
-                     'platform/powermac/ofw.h', 'platform/powermac/ppc_layout.h',
+                     'platform/powermac/ofw.h', 'platform/powermac/platform_of_layout.h',
                      'lib/kstring_c.c', 'lib/kstring.h', 'include/types.h', 'include/callconv.h',
                      'include/memmap.h', 'include/appmem_types.h',
                      'tools/ppc/run.py', 'build/arch/ppc.mk'], needs=[])

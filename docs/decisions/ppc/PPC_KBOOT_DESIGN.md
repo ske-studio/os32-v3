@@ -29,7 +29,7 @@
 |照合対象|実物 file:line|判定|
 |---|---|---|
 |単体像・OF切離し|S/build/ppc.mk:51、arch/ppc/takeover.S:6、platform/powermac/mmu_boot.c:233|PACK と一致。既存成果の受入を再実施した意味ではない|
-|案C・RAM BAT|S/platform/powermac/ppc_layout.h:71、arch/ppc/cpu_setup.c:47、pmap.c:132|16写像＋256MiB RAM BAT。D接続済みではない、前提と一致|
+|案C・RAM BAT|S/platform/powermac/platform_of_layout.h:71、arch/ppc/cpu_setup.c:47、pmap.c:132|16写像＋256MiB RAM BAT。D接続済みではない、前提と一致|
 |旧計画の起動直接依存|S/docs/tasks/ppc/TASK_PPC_SEP.md:22 対 S/init/kernel_boot_cpu.inc:28,34,38,44,50,55,63|**食い違い1**：GDT/TSS/IDT/PIC/PITの直呼びは既に arch/platform 口の後ろ。順(2)の分離を再設計しない|
 |旧計画のIRQ16線前提|同 TASK:22 対 S/include/platform_irq.h:5–16、kernel/irq/irq.c:37|**食い違い2**：線数・claim/completeは既に機種契約。PPC limits:4 は暫定1線、PCI bitmap拡張は別途本線待ち|
 |時計の口|S/include/clock_source.h:4–8、kernel/time/ktime.c:38、tick.c:3|共通clampとtick_countはある。PPC DEC:35は100Hzの単体計数で本体tickではない|
@@ -72,7 +72,7 @@ KBOOT ALIVE tick_delta=<n> tb_us=<n> of_calls_delta=0
 - 依存の無い枝は並列可能、同じファイルの変更は直列。分離3 E2/E3/F、4 D/E/F、5 B1〜B6/C1〜C3/D1/D2/S1/S2/Zの既設設計は取り直さず、未着の段はkboot専用providerで迂回する。
 |段|依存・成果|主ファイルと付随差分（行）|区分|
 |---|---|---|---|
-|A1 link配置|独立、kernelの固定配置とsymbol契約|arch/ppc/kernel.ld ＋100、platform/powermac/kboot_layout.h ＋45|P|
+|A1 link配置|独立、kernelの固定配置とsymbol契約|arch/ppc/kernel.ld ＋100、platform/powermac/platform_kboot_layout.h ＋45|P|
 |A2 entry|A1、OF入口・32KiB stack・BSS|arch/ppc/kernel_entry.S ＋100、kernel_note.S ＋35|P|
 |B1 OF snapshot|独立、memory/available/clock/ESCC/MPIC記録|platform/powermac/kboot_capture.c ＋180、kboot_info.h ＋65|P|
 |B2 OF配置|A1/B1、固定領域検証とHPT切出し|platform/powermac/kboot_reserve.c ＋160|P|
@@ -83,7 +83,7 @@ KBOOT ALIVE tick_delta=<n> tb_us=<n> of_calls_delta=0
 |C4 CPU|A2、PVR/HID0/SR/SDR1/BAT引渡し|arch/ppc/kernel_cpu.c ＋90、ppc_oea.h Δ12|P|
 |D1 frame|C1、DR=0保存＋spill入口|arch/ppc/kernel_vectors.S ＋約430（既存vectorsの大半再利用）、ppc_frame.h Δ20|P|
 |D2 trap|D1/C2、fault分類とfatal|arch/ppc/kernel_trap.c ＋120、ppc_trap.h ＋30|P|
-|D3 boot口|C3/C4/D1/B3、takeover→paging|arch/ppc/kernel_boot.c ＋130、kernel_takeover.S ＋45|P|
+|D3 boot口|C3/C4/D1/B3、takeover→paging|platform/powermac/kernel_boot.c ＋130、kernel_takeover.S ＋45|P|
 |E1 MPIC発見|B1、OFバス窓を解決|platform/powermac/mpic_tree.c ＋120|P|
 |E2 MPIC駆動|E1/D2、mask/priority/IACK/EOI|platform/powermac/mpic.c ＋190、mpic.h ＋55|P|
 |E3 IRQ adapter|E2、本線bitmap着後なら接続|platform/powermac/irq.c ＋95、platform_irq_limits.h Δ8|P|
@@ -211,7 +211,7 @@ void pm_log_write(const char *bytes, u32 n);
 ## 8. 大きさ・load/claimの見積もり
 - PPC kernelは今回未リンク：text+rodata+data **0.5〜1.5MiB**、BSS/常駐表 **0.2〜0.8MiB**を初期予算とする（根拠弱、H3のsize/mapで置換）。HPTは別128KiB、入口stack32KiB・trap/spill各16KiB、固定PD/PTは既存26page枠内。
 - ELFは1MiB load、resident末尾から既存KHEAP/KAPI/SHMが続き、`MEM_KERNEL_IMAGE_MAX` と0x3E0000 guard境界をlinker ASSERTで検証する。範囲超過をOF NOTEのmax-sizeだけ広げて逃がさない。
-- 単体像のPM_LINK_BASE=0x20000/PM_MMU_IMAGE_LIMIT=0x20000/PM_STACK_SIZE=8192（S/ppc_layout.h:37,40,65）は本体に流用しない。OF NOTE、PT_LOAD p_filesz/p_memsz、entry、BSS、resident/ledger symbolsを同じ新配置から生成する。
+- 単体像のPM_LINK_BASE=0x20000/PM_MMU_IMAGE_LIMIT=0x20000/PM_STACK_SIZE=8192（S/platform_of_layout.h:37,40,65）は本体に流用しない。OF NOTE、PT_LOAD p_filesz/p_memsz、entry、BSS、resident/ledger symbolsを同じ新配置から生成する。
 - OF loaderがimageのmemszを確保していることを最終availableとPT_LOADで照合。既存像がロード可能でも1MiB以上のkernelロード保証ではない。H3/T3でOFからの実loadを条件にする。
 - 固定16MiB窓を確保できないQEMU構成ならB2は止まる。穴を支える汎用RAM adapterを先に拡大せず、OF占有とELF配置を記録してPMが配置変更を判断する。実機用の全RAM利用と回収は②後。
 
@@ -274,15 +274,15 @@ void pm_log_write(const char *bytes, u32 n);
 
 ## LAN の起動の追記 (2026-11-11、PowerPC の LAN の段 P9・P12・P25 の取り込みで決まったこと)
 - §4 の ESCC・MPIC に続く alias は次の固定 VA を使う (arch/ppc/kernel_boot.h:7)。
-- GMAC BAR の先頭 64KiB: `0xFE380000`、64KiB、supervisor RW・I/G (arch/ppc/kernel_boot.c:65,197)。
-- UniNorth PCI config address: `0xFE3C0000`、1 page、root PA + `0x800000` の 8 byte を含む I/G (arch/ppc/kernel_boot.c:39,198)。
-- UniNorth PCI config data: `0xFE3C1000`、1 page、root PA + `0xC00000` の 8 byte を含む I/G (arch/ppc/kernel_boot.c:40,199)。
-- OF tree の BAR と ranges から CPU 側 PA を決め (platform/powermac/gmac_tree.c:137,166)、各窓は PA の page 内 offset を保持する (arch/ppc/kernel_boot.c:42)。
-- tree の取得成功・BAR 長・加算・3 窓の計画が成立すると `gmac_ready=1`、初回 root で RAM・既存 alias 等との衝突や恒等写像を検査して不安全なら 0 に戻し、安全なら静的 PT に張って walk で検証する (arch/ppc/kernel_boot.c:96,118,148,193)。
+- GMAC BAR の先頭 64KiB: `0xFE380000`、64KiB、supervisor RW・I/G (platform/powermac/kernel_boot.c:65,197)。
+- UniNorth PCI config address: `0xFE3C0000`、1 page、root PA + `0x800000` の 8 byte を含む I/G (platform/powermac/kernel_boot.c:39,198)。
+- UniNorth PCI config data: `0xFE3C1000`、1 page、root PA + `0xC00000` の 8 byte を含む I/G (platform/powermac/kernel_boot.c:40,199)。
+- OF tree の BAR と ranges から CPU 側 PA を決め (platform/powermac/gmac_tree.c:137,166)、各窓は PA の page 内 offset を保持する (platform/powermac/kernel_boot.c:42)。
+- tree の取得成功・BAR 長・加算・3 窓の計画が成立すると `gmac_ready=1`、初回 root で RAM・既存 alias 等との衝突や恒等写像を検査して不安全なら 0 に戻し、安全なら静的 PT に張って walk で検証する (platform/powermac/kernel_boot.c:96,118,148,193)。
 - `memory_boot_init` より前に `gmac_ready` なら `pm_gmac_quiesce_setup` → `pm_gmac_early_quiesce` を呼ぶ (platform/powermac/ppc_kernel.c:149)。
 - 対象 ID を確認して PCI Master を解除し読み戻す。Master が 1 のままか読み戻しが失敗した場合は停止し、対象外や解除前のアクセス失敗は続行する (platform/powermac/pci_config.c:82,89)。
 - 像の予約内にある DMA pool は `0x30000` byte、その先頭 64KiB の descriptor 区画は cache を flush 後に I/G の恒等写像へ変更し、各 page を検査する (platform/powermac/gmac_dma.c:7,18,62)。
 - `pm_gmac_dma_sync` は descriptor 区画に `sync` だけを使い、buffer は `ppc_dma_sync` の cache 同期へ渡す (platform/powermac/gmac_dma.c:27)。
 - ESCC sink の直後、最初の起動ログの前に LAN log を登録する (platform/powermac/ppc_kernel.c:134,137)。
 - CLOCK の後、GMAC と log が利用可能なら `pm_lan_start`、READY 以後は 2 秒の観測中もその後も `pm_lan_poll` を回す (platform/powermac/ppc_kernel.c:238,240,251)。
-- 既存の 9 印と EE=1 の契約は維持する。UniNorth の clock の alias はまだ導入しておらず、実機の前の段に残す (arch/ppc/kernel_boot.c:193、platform/powermac/ppc_kernel.c:251)。
+- 既存の 9 印と EE=1 の契約は維持する。UniNorth の clock の alias はまだ導入しておらず、実機の前の段に残す (platform/powermac/kernel_boot.c:193、platform/powermac/ppc_kernel.c:251)。

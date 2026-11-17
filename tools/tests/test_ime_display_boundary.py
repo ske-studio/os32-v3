@@ -2,7 +2,7 @@
 """C2: real FEP generator contracts and unsupported display provider."""
 CHECK = dict(name='ime-display-boundary-host', tier=1, needs=['make:all'], budget=2,
     covers=['platform/pc98/kernel.c', 'include/ime_boot.h', 'kernel/ime/ime.h', 'tools/tests/kernel_includes.py', 'tools/tests/test_ime_display_boundary.py', 'kernel/ime/ime_display_private.h',
-            'include/ime_control.h', 'platform/*/ime_default_render.h',
+            'include/ime_control.h', 'platform/*/platform_ime_render.h',
             'platform/powermac/ime_display.c', 'kernel/ime/ime_render.h',
             'tools/prototypes/fep_imports.def', 'tools/gen_sqlite_imports.py',
             'tools/gen_kdebug_imports.py', 'tools/tests/host32.py',
@@ -102,7 +102,7 @@ def main():
                 raise AssertionError('boot dependency mutation survived')
         source = work / 'provider.c'
         source.write_text('''#include "include/ime_control.h"
-#include <ime_default_render.h>
+#include <platform_ime_render.h>
 #include "platform/powermac/ime_display.c"
 void _start(void) {
     int bad = IME_DEFAULT_RENDER != 0 || ime_display_boot(0) != -1 ||

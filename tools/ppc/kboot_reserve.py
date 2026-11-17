@@ -12,10 +12,10 @@ import host32
 CHECK = dict(name='ppc-kboot-reserve', tier=2, budget=60, covers=[
     'platform/powermac/kboot_reserve.c', 'platform/powermac/kboot_capture.c',
     'platform/powermac/gmac_tree.c',
-    'platform/powermac/kboot_info.h', 'platform/powermac/kboot_layout.h',
+    'platform/powermac/kboot_info.h', 'platform/powermac/platform_kboot_layout.h',
     'tools/ppc/kboot_reserve.py', 'tools/ppc/kboot_reserve_fake.c',
     'tools/ppc/kboot_capture_fake.c', 'platform/powermac/ofw.h',
-    'platform/powermac/ppc_layout.h', 'arch/ppc/ppc_boot.h',
+    'platform/powermac/platform_of_layout.h', 'arch/ppc/ppc_boot.h',
     'arch/ppc/ppc_pmap.h', 'arch/ppc/ppc_oea.h', 'include/memmap.h',
     'include/types.h', 'include/callconv.h', 'lib/kstring.h',
     'lib/kstring_c.c', 'tools/tests/host32.py'])

@@ -53,7 +53,7 @@ $(R1_OBJ)/%.o: %.c | $(ABI_CONTRACT_ORDER)
 	$(CC) $(CFLAGS_BASE) $(if $(filter $<,$(R1_SMALL)),-Os) -DOS32_R1_FIXTURE $(if $(filter fs/fat/fatfs/%,$<),$(INC_FATFS),$(INC_KERNEL)) -c $< -o $@
 
 # Preserve NASM's STT_FILE identity across H2's source move, including R1.
-legacy_asm_input = $(subst /arch/x86/legacy/v86_entry,/kernel/v86/v86_entry,$(1))
+legacy_asm_input = $(subst /platform/pc98/legacy/v86_entry,/kernel/v86/v86_entry,$(1))
 
 $(R1_OBJ)/%.o: %.asm sdk/crt/generations.inc arch/x86/kernel/cpu_flags.inc arch/x86/kernel/entry_layout.inc arch/x86/kernel/iret_user.inc
 	@mkdir -p $(@D) $(dir $(call legacy_asm_input,$@.asm))

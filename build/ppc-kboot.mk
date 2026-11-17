@@ -161,7 +161,7 @@ $(KB_OUT)/%.o: %.c $(KB_OUT)/memmap_layout.h build/ppc-kboot.mk $(KB_MUT_FILE) $
 $(KB_OUT)/%.o: %.S $(KB_OUT)/memmap_layout.h build/ppc-kboot.mk $(KB_MUT_FILE) $(KB_MUT_EXTRA_FILE) $(KB_MUT_THIRD_FILE)
 	@mkdir -p $(dir $@)
 	$(KB_CC) $(KB_FLAGS) -c $(call kb_src,$<) -o $@
-$(KB_OUT)/kernel.ld: arch/ppc/kernel.ld platform/powermac/kboot_layout.h $(KB_OUT)/memmap_layout.h
+$(KB_OUT)/kernel.ld: arch/ppc/kernel.ld platform/powermac/platform_kboot_layout.h $(KB_OUT)/memmap_layout.h
 	$(KB_CC) $(KB_FLAGS) -MF $@.d -E -P -x c $< -o $@
 $(KB_OUT)/motd.txt:
 	@mkdir -p $(dir $@)

@@ -35,7 +35,7 @@
 |---|---|---|
 |OF採取/解釈|platform/powermac/gmac_tree.c、kboot_capture.c|値コピーのsnapshot。CI/OF pointerを保持しない|
 |PCI設定|platform/powermac/pci_config.c|GMACに属するUniNorth root 1つ、指定BDFだけ。全PCI列挙なし|
-|MMIO alias|arch/ppc/kernel_boot.c|初回rootの静的PTE、既存ESCC/MPICと同じ管理|
+|MMIO alias|platform/powermac/kernel_boot.c|初回rootの静的PTE、既存ESCC/MPICと同じ管理|
 |DMA/cache|platform/powermac/gmac_dma.c / arch/ppc/dma_cache.c|静的pool、CPU/bus変換と同期を分離。停止不明なら永久隔離|
 |NIC|drivers/net/gem/{gem_reset,gem_mac,gem_phy,gem_ring,gem_tx,gem_rx}.c|struct gem内の状態機械、ring indexと統計。OSのheap/IRQ/module依存なし|
 |接続とpoll|platform/powermac/lan_service.c|struct gem 1個、唯一のRX drain、予算/時刻/状態遷移|
@@ -173,7 +173,7 @@ int ppc_probe_copy8(u32 va, u8 *out); /* kernel_probe.S: load成功0/onfault復�
 |H8|＋tools/ppc/test_lan_p8.py 60–160|P8|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
 |P10|Δarch/ppc/kernel_boot.h 25|P1|P9 ALIAS / A3 / 非重複|
 |H10|＋tools/ppc/test_lan_p10.py 60–160|P10|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
-|P9|Δarch/ppc/kernel_boot.c 110|P5,P8,P10|ALIAS span=65536 / A2,A3 / clock窓|
+|P9|Δplatform/powermac/kernel_boot.c 110|P5,P8,P10|ALIAS span=65536 / A2,A3 / clock窓|
 |H9|＋tools/ppc/test_lan_p9.py 60–160|P9|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
 |P11|＋arch/ppc/dma_cache.c 100|P0|P12 DMA / A4 / cache命令|
 |H11|＋tools/ppc/test_lan_p11.py 60–160|P11|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
@@ -266,7 +266,7 @@ int ppc_probe_copy8(u32 va, u8 *out); /* kernel_probe.S: load成功0/onfault復�
 
 ## 確定 (2026-11-10、Opus 5.5 の第 2 回の条件付き可を PM が反映)
 - N1 (P1) §3(b): 起動を止める条件を「Master 解除を書いたのに readback が 1」だけにした。資料 [M2] が無いことを理由に allocator の前で止めない (② を後退させない、NIC の失敗で OS を止めない)。
-- N2 (P2) §3(b)・§6: 早い段階の clock と Master 解除は `pm_gmac_early_quiesce()` (platform/powermac/pci_config.c) が持ち、ppc_kernel_main が memory_boot_init の直前で 1 回呼ぶ。P9 (arch/ppc/kernel_boot.c) は alias を張るだけで clock を呼ばない。P13 (gmac_clock.c) の前提は P8 (pci_config) で、P9 への依存は外す。
+- N2 (P2) §3(b)・§6: 早い段階の clock と Master 解除は `pm_gmac_early_quiesce()` (platform/powermac/pci_config.c) が持ち、ppc_kernel_main が memory_boot_init の直前で 1 回呼ぶ。P9 (platform/powermac/kernel_boot.c) は alias を張るだけで clock を呼ばない。P13 (gmac_clock.c) の前提は P8 (pci_config) で、P9 への依存は外す。
 - N3 (P3) 状態表: pm_gmac_dma_init (dcbf と paging_map_range) は最初の 1 回だけ。link を失って RESETTING → PREPARE に戻ったときは ring_prepare と mac_init だけを繰り返す。
 - N4 (P3) §4 PEEK: NIC が持っている RX buffer (pool の data 区画) は PEEK の許可範囲から外す (範囲が重なる要求は範囲外として拒否)。descriptor の RAM は読める。
 - N5 (P3) §7: UDP の port は固定しない。kboot_run が run ごとに空いている port の組を割り当て、QEMU の netdev とホストの道具 (--udp) に同じ値を渡す (7450 と 7455 を並べて回しても衝突しない)。本文の 18026/18027 は例。

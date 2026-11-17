@@ -105,7 +105,7 @@ u32 net_rx_demux_budget(const struct NetNicOps *ops,
 - PIO／RDC／reset はこの 120µs の保証外で、現行の有限待ち・round 上限を維持。IF=0 の IRQ5・slot2・send・leave は印／ACK／ソフト TX 列だけという NEXT §2-4 の契約を厳守する。
 - net_rx_service の再入番人は irq_save 中に検査・取得し、IF を戻して demux、終了を短い irq_save で公開。IRQ 中の再入は schedule だけ。unbind/reset は番人中には実行せず deferred にする。
 - nic.c は bind 前に永久 net_rx_idle を 1 枠登録し、unbound 時は何もしない。登録失敗は bind 失敗として報告し、無処理の NIC を公開しない。T1 校正・既存 NE2K bh と合わせて idle_work の 4 枠内で割当を検証する。
-- e82557 は PC98_TICK_E82557 の受信生産を維持し、net_tick が schedule→net_rx_idle が同じ予算で demux。IRQ0 の demux は残さない。`net/nic_e82557.c:22-23` の空 poll や SFS 呼出しに進行を依存させず、SFS 無通信時も LINK 列へ供給する。
+- e82557 は PC98_TICK_E82557 の受信生産を維持し、net_tick が schedule→net_rx_idle が同じ予算で demux。IRQ0 の demux は残さない。`drivers/net/e82557/nic_e82557.c:22-23` の空 poll や SFS 呼出しに進行を依存させず、SFS 無通信時も LINK 列へ供給する。
 - net_tick は watchdog の poll と schedule だけ。登録する同じ slot の wrapper `net_jiffy` は `net_tick(); if (!ticking) link_tick();` とする。link の 100Hz の RX 消費・RTO・deadline・TX・notify を失わない。
 - wrapper は IF=0 で ticking を取得して link_tick を実行、終了時に解放。協調 demux 中の IRQ は link_due=1 を残す。service の終了時、番人を保持した IF=0 内で link_due を消費して link_tick を 1 回実行してから解放する。複数回分は絶対期限で集約し、保留回数・遅延を測る。再入 take は schedule のみとし service を再帰させない。
 - net_nic_poll_once は互換名を維持し、IF=1・depth=0 なら service、その他は schedule して 0 を返す。IF を勝手に立てない。

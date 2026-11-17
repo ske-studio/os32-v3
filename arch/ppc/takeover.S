@@ -1,6 +1,6 @@
 /* OS32 irreversible supervisor-only boundary. */
 #include "ppc_oea.h"
-#include "ppc_layout.h"
+#include "platform_of_layout.h"
 .text
 .globl ppc_takeover
 ppc_takeover:

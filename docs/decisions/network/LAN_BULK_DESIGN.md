@@ -226,7 +226,7 @@ int lan_bulk_step(void *t, struct io_slice *s) { /* 擬似コード、所有者�
 |E|net/link.c 変更100|失効・送信優先・bulk接続、D/E0c後|
 |F|tools/host_agent.py 変更100|bulk dispatch・LIST・送出、C後Eと並列可|
 |G|net/nic.h 変更70|W2容量予約・予算口とNetNicOps.fg_service、Bに先行可|
-|G1|net/nic_lgy98.c 変更60|NE2Kのfg_serviceをne2k_bhへ接続、G後（adapter所在を実装時照合）|
+|G1|drivers/net/ne2000/nic_lgy98.c 変更60|NE2Kのfg_serviceをne2k_bhへ接続、G後（adapter所在を実装時照合）|
 |H/H1|net/nic_rx.c 変更180|既存FG取り込み維持、link23枠/共有予約、G後|
 |H2a|drivers/net/e82557/e82557_regs.h 変更30|RFD23・DMAサイズ、G後|
 |H2b|drivers/net/e82557/e82557_desc.c 変更100|ring初期化/周回/回収、H2a後|

@@ -3,7 +3,7 @@
 /* カーネルの入口の骨格。機種に依らない 1 本 (init/kernel_start.c)。
  *
  * arch の入口 (x86: kentry.asm → platform/pc98 の kernel_main、PowerPC:
- * arch/ppc/kernel_boot.c) が、ページングと例外の受け口を張った後に 1 回だけ呼ぶ。
+ * platform/powermac/kernel_boot.c) が、ページングと例外の受け口を張った後に 1 回だけ呼ぶ。
  * 割り込みは禁止のまま入る。戻らない。
  *
  * 起動の順は 3 つの局面で、順序と割り込みの有効化はここが持つ。局面の中身は

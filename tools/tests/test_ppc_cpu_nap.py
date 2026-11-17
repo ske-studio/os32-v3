@@ -10,13 +10,13 @@ import tempfile
 CHECK = dict(name='ppc-cpu-nap', tier=2, budget=30, needs=[], env=['ppc-cross'],
     covers=['tools/tests/test_ppc_cpu_nap.py', 'tools/ppc/cpu_nap*', 'arch/ppc/kernel_cpu.c',
             'arch/ppc/kernel_dec.c', 'arch/ppc/kernel_trap.c',
-            'arch/ppc/kernel_boot.c', 'arch/ppc/mmu.S', 'arch/ppc/ppc_oea.h',
+            'platform/powermac/kernel_boot.c', 'arch/ppc/mmu.S', 'arch/ppc/ppc_oea.h',
             'arch/ppc/ppc_trap.h', 'arch/ppc/ppc_frame.h', 'arch/ppc/pd_walk.c',
             'arch/ppc/ppc_pd.h', 'arch/ppc/ppc_boot.h', 'arch/ppc/arch_exec_storage.h',
             'include/exec_arch.h', 'include/types.h', 'include/callconv.h',
             'kernel/irq/irq.h', 'kernel/irq/irq_math.h', 'include/platform_irq.h',
             'platform/powermac/platform_irq_limits.h', 'arch/ppc/ppc_hpt.h',
-            'platform/powermac/ppc_layout.h'],
+            'platform/powermac/platform_of_layout.h'],
     basis=['User decision 2026-11-16 and mainline assignment (PPC NAP)'])
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = [

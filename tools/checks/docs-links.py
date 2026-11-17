@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 CHECK = dict(name='docs-links', tier=0,
-    covers=['kernel/v86/*', 'arch/x86/legacy/*', 'fs/hostdrv/hostdrvfs_proto.h', 'fs/ext2/ext2_dir.c', 'fs/ext2/ext2_vfs.c', 'fs/hostdrv/hostdrvfs.c', 'docs/**/*.md', 'CLAUDE.md', 'README.md', 'tools/tests/*_tdd.md', 'arch/README.md', 'platform/README.md', 'tools/check_docs_links.py', 'tools/tests/test_docs_links.py', 'mm/paging_app.c', 'mm/paging_app.h', 'platform/pc98/legacy/v86_io.c'],
+    covers=['kernel/v86/*', 'platform/pc98/legacy/*', 'fs/hostdrv/hostdrvfs_proto.h', 'fs/ext2/ext2_dir.c', 'fs/ext2/ext2_vfs.c', 'fs/hostdrv/hostdrvfs.c', 'docs/**/*.md', 'CLAUDE.md', 'README.md', 'tools/tests/*_tdd.md', 'arch/README.md', 'platform/README.md', 'tools/check_docs_links.py', 'tools/tests/test_docs_links.py', 'mm/paging_app.c', 'mm/paging_app.h', 'platform/pc98/legacy/v86_io.c'],
     needs=[], budget=3.1,
     basis=['[D4]'],
 )

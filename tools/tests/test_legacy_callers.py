@@ -43,7 +43,7 @@ def sources():
                    'console_hw_cursor_enable', 'console_text_gdc_stop']) +
         function(read('exec/lease.c'), 'lease_audit_all') +
         function(read('kernel/kaudit.c'), 'kselftest_run_audit'),
-        on=read('arch/x86/legacy/guest.c') + function(read('arch/x86/legacy/lowmap.c'), 'legacy_lowmap_busy'), off=read('platform/none/legacy_guest.c'))
+        on=read('platform/pc98/legacy/guest.c') + function(read('platform/pc98/legacy/lowmap.c'), 'legacy_lowmap_busy'), off=read('platform/none/legacy_guest.c'))
 
 MUTANTS = [
     ('on', 'return v86_session.open;', 'return v86_is_active();', 'open-independent'),

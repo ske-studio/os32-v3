@@ -1,7 +1,7 @@
 """A11 real API/deadline hooks; no libc, explicit ILP32 runner."""
 CHECK = dict(name='hostsvc-link-api', tier=1, needs=[], budget=3.6,
     covers=['kernel/time/tick_clock.h', 'kernel/irq/irq.h', 'kernel/irq/irq_math.h',
-            'include/platform_irq.h', 'platform/pc98/platform_irq_limits.h', 'tools/tests/link_platform_fake/link_platform_inline.h', 'net/nic.h', 'net/link_platform.h', 'platform/pc98/link_platform_inline.h', 'platform/pc98/link_platform.c', 'net/link.c', 'net/link.h', 'net/link_notify.h', 'net/link_host_api.inc',
+            'include/platform_irq.h', 'platform/pc98/platform_irq_limits.h', 'tools/tests/link_platform_fake/platform_link_inline.h', 'net/nic.h', 'net/link_platform.h', 'platform/pc98/platform_link_inline.h', 'platform/pc98/link_platform.c', 'net/link.c', 'net/link.h', 'net/link_notify.h', 'net/link_host_api.inc',
             'net/link_rx.inc', 'net/link_selftest.inc', 'lib/le_internal.h',
             'include/types.h', 'include/net_eth.h', 'include/kprintf.h',
             'lib/kstring.h', 'drivers/net/ne2000/ne2000.h',

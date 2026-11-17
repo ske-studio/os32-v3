@@ -1,6 +1,6 @@
 #include "platform_boot.h"
 #include "bootinfo.h"
-#include "kboot_layout.h"
+#include "platform_kboot_layout.h"
 /* OF snapshot/reservations stay platform-owned. No CRC has been verified. */
 void platform_boot_capture(void)
 {

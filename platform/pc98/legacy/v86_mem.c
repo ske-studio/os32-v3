@@ -1,6 +1,6 @@
 #include "bios_snapshot.h"
 #ifdef OS32_R1_FIXTURE
-#include "../r1_fixture.h"
+#include "../../../kernel/r1_fixture.h"
 #endif
 /* ======================================================================== */
 /*  V86_MEM.C — V86 ゲスト用アドレス空間                                    */
@@ -16,8 +16,8 @@
 #include "io.h"
 #include "v86_io.h"
 #include "v86_bios.h"
-#include "../module/module.h"
-#include "../kselftest.h"
+#include "../../../kernel/module/module.h"
+#include "../../../kernel/kselftest.h"
 #include "tvram.h"
 #include "../../../include/platform_emergency.h"
 #include "../../../gfx/gfx.h"

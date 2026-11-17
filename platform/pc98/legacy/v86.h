@@ -141,7 +141,7 @@ enum v86_exit_reason {
  * 正常には戻らず、セッション終了は longjmp 経由になる。 */
 void v86_enter(const struct v86_context *ctx);
 
-/* #GP の V86 経路から呼ばれる一次ハンドラ (arch/x86/legacy/v86.c)。
+/* #GP の V86 経路から呼ばれる一次ハンドラ (platform/pc98/legacy/v86.c)。
  * 0 を返すと V86 へ復帰、非 0 でセッション終了。 */
 int v86_gp_handler(u32 *frame);
 

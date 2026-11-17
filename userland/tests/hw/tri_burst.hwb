@@ -275,6 +275,24 @@
  log "trial-d-clear-both"
  let trialcr = burstcr & 0xF9
  call burst_trial
+ # PciRetry (xf86-video-trident trident_dac.c:555-560, PROVIDIA9682: 0x1F off / 0xDF on).
+ mmiowrite8 v + 0x3D4 0x55
+ mmioread8 v + 0x3D5 -> retrycr
+ print "CR55-saved" retrycr
+ mmiowrite16 v + 0x3D4 0x55 | (0xDF << 8)
+ mmiowrite8 v + 0x3D4 0x55
+ mmioread8 v + 0x3D5 -> t
+ print "CR55-retry-on" t
+ log "trial-e-retry-original"
+ let trialcr = burstcr
+ call burst_trial
+ log "trial-f-retry-clear-both"
+ let trialcr = burstcr & 0xF9
+ call burst_trial
+ mmiowrite16 v + 0x3D4 0x55 | (retrycr << 8)
+ mmiowrite8 v + 0x3D4 0x55
+ mmioread8 v + 0x3D5 -> t
+ print "CR55-restored" t
  mmiowrite16 v + 0x3D4 0x39 | (burstcr << 8)
  mmioread8 v + 0x3D5 -> t
  print "CR39-restored" t

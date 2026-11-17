@@ -1,4 +1,4 @@
-CHECK = dict(env=['ppc-cross', 'qemu-ppc'], name='ppc-rh-fb', tier=2, budget=600, needs=['make:ppc-ci-image', 'make:build/out/memmap_layout.h'], covers=[
+CHECK = dict(env=['ppc-cross', 'qemu-ppc'], name='ppc-rh-fb', tier=2, budget=600, needs=['make:ppc-ci-image', 'make:build/out/memmap_layout.h'], covers=['platform/powermac/kernel_boot.c', 
     'include/memmap.h', 'tools/gen_memmap.py', 'build/kernel.mk',
     'arch/x86/kernel/kentry.asm',
     'boot/loader_fat_new.asm',
@@ -21,7 +21,7 @@ CHECK = dict(env=['ppc-cross', 'qemu-ppc'], name='ppc-rh-fb', tier=2, budget=600
     'platform/powermac/rh_observe.[ch]', 'arch/ppc/**',
     'platform/powermac/ppc_kernel.c', 'platform/powermac/boot.c',
     'platform/powermac/mmu_boot.c', 'platform/powermac/mmu_start.c',
-    'platform/powermac/ppc_layout.h', 'platform/powermac/lan_boot.h',
+    'platform/powermac/platform_of_layout.h', 'platform/powermac/lan_boot.h',
     'build/ppc.mk', 'build/ppc-kboot.mk', 'tools/ppc/rh_fb.py',
     'tools/ppc/kboot_boot.py', 'tools/ppc/kboot_boot_guest.c',
     'tools/checks/ppc-rh-fb.py', 'tools/ppc/kboot_vectors.py', 'tools/ppc/run.py',
