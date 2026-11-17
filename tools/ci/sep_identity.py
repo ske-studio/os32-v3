@@ -76,6 +76,28 @@ def compare_objects(base, head, moved):
     return different, only_base, only_head
 
 
+def moved_object_pairs(diff_paths, moved):
+    """build_compare が違うと言ったパスのうち、移したソースの .o を (基点の .o, HEAD の .o) の対にする。
+
+    戻り値は (対の一覧, 対にならなかったパス)。build_compare は .o をパスで比べるので、置き場を
+    移した .o は基点と HEAD の両方で「片方にしか無い」と出る。中身を比べるのは呼び手。
+    """
+    stems = {new.rsplit('.', 1)[0]: old.rsplit('.', 1)[0] for new, old in moved.items()}
+    paths = set(diff_paths)
+    pairs, used = [], set()
+    for path in sorted(paths):
+        if not path.endswith('.o'):
+            continue
+        for new, old in stems.items():
+            tail = '/' + new + '.o'
+            if path.endswith(tail):
+                before = path[:-len(tail)] + '/' + old + '.o'
+                if before in paths:
+                    pairs.append((before, path))
+                    used.update((before, path))
+    return pairs, sorted(paths - used)
+
+
 def hash_objects(tree):
     result = {}
     for path in sorted((tree / 'build/out/ppc-kboot').rglob('*.o')):
@@ -145,7 +167,16 @@ def main(argv=None):
         if result.returncode not in (0, 1):
             print('\n'.join(lines[-40:]))
             raise RuntimeError('tools/build_compare.py failed to run')
-        failed |= verdict('x86', result.returncode == 0, changes, [line for line in lines if 'DIFF' in line])
+        different = [line.split(None, 1)[1].strip() for line in lines if line.startswith('DIFF')]
+        moved = renames(git(ROOT, 'diff', '--name-status', '-M90', base, head))
+        pairs, different = moved_object_pairs(different, moved)
+        for before, after in pairs:
+            # 置き場を移した .o: 基点の古い置き場の物と、HEAD の新しい置き場の物の中身を比べる。
+            if (args.work / 'x86/base' / before).read_bytes() != (args.work / 'x86/target' / after).read_bytes():
+                different.append(after + ' (移す前の ' + before + ' と中身が違う)')
+        if pairs:
+            print('x86: 置き場を移した .o を ' + str(len(pairs)) + ' 組、中身で比べた')
+        failed |= verdict('x86', not different, changes, ['違う: ' + name for name in different])
     if 'ppc' in targets:
         moved = renames(git(ROOT, 'diff', '--name-status', '-M90', base, head))
         hashes = [build_ppc(snapshot(ROOT, revision, args.work / 'ppc' / name), args.jobs)

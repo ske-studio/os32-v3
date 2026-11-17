@@ -67,6 +67,20 @@ def suite(tool):
                              (['sh/arch/ppc/moved_hook', 'sh/gone/old'], ['sh/exec/absent/moved_hook', 'sh/new/file']))
             self.assertEqual(tool.compare_objects(base, dict(base), {}), ([], [], []))
 
+        def test_moved_object_pairs(self):
+            moved = {'platform/pc98/moved_main.c': 'init/moved_main.c', 'platform/pc98/note.md': 'init/note.md'}
+            diff = ['build/out/obj/init/moved_main.o', 'build/out/obj/platform/pc98/moved_main.o',
+                    'build/out/r1/obj/init/moved_main.o', 'build/out/r1/obj/platform/pc98/moved_main.o',
+                    'build/out/kernel.bin', 'build/out/obj/mm/paging.o']
+            pairs, rest = tool.moved_object_pairs(diff, moved)
+            self.assertEqual(pairs, [('build/out/obj/init/moved_main.o', 'build/out/obj/platform/pc98/moved_main.o'),
+                                     ('build/out/r1/obj/init/moved_main.o', 'build/out/r1/obj/platform/pc98/moved_main.o')])
+            # 移していない物の違いと、出荷する生成物の違いは残る。
+            self.assertEqual(rest, ['build/out/kernel.bin', 'build/out/obj/mm/paging.o'])
+            # 基点の側の .o が違いに出ていなければ対にしない (新しく増えただけの .o は違いのまま)。
+            self.assertEqual(tool.moved_object_pairs(['build/out/obj/platform/pc98/moved_main.o'], moved),
+                             ([], ['build/out/obj/platform/pc98/moved_main.o']))
+
         def test_hash_objects_skips_volatile(self):
             with tempfile.TemporaryDirectory(prefix='os32-sep-identity-') as directory:
                 tree = Path(directory)
@@ -114,6 +128,9 @@ MUTANTS = [
     ("for key in base if key not in mapped)", "for key in base if False)"),
     ("for key in mapped if key not in base)", "for key in mapped if False)"),
     ("if path.name in VOLATILE:", "if False:"),
+    ("                if before in paths:\n", "                if True:\n"),
+    ("    return pairs, sorted(paths - used)", "    return pairs, sorted(paths)"),
+    ("before = path[:-len(tail)] + '/' + old + '.o'", "before = path"),
     ("return name not in changes", "return False"),
     ("    if identical:\n", "    if identical or name in changes:\n"),
 ]
