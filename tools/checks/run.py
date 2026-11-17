@@ -438,6 +438,10 @@ PATH_AUDIT_ALLOW = {
         "fake guest replaces HTTP/time/screenshots; main's output directory is unused",
     ("check-key-inject-host", "tools/" + "gui_gate" + ".py"):
         "key expansion and mocked key sends only; main's output directory is unused",
+    ("check-ci-gate-host", "tools/ci/gate.py"):
+        "the host test calls pure functions on fake rows and logs; make and checks are never run",
+    ("check-ci-gate-host", "tools/tests/test_ci_gate.py"):
+        "fake logs live in TemporaryDirectory; repository artifacts are never read",
     ("check-sep-identity-host", "tools/ci/sep_identity.py"):
         "the host test calls pure functions on fake hashes; images are never built or read",
     ("check-sep-identity-host", "tools/build_compare.py"):

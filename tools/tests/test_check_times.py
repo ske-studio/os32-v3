@@ -154,6 +154,22 @@ class CheckTimesTest(unittest.TestCase):
         self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
         self.assertEqual(len((self.root / 'build/out/check_times.tsv').read_text().splitlines()), 1)
 
+    def test_log_dir_moves_output_to_one_log_per_check(self):
+        logs = self.root / 'logs'
+        self.env['CHECK_LOG_DIR'] = str(logs)
+        for fail in (0, 7):
+            with self.subTest(fail=fail):
+                result = self.make('check-par', f'FAIL={fail}')
+                self.assertEqual(result.returncode, 2 if fail else 0, result.stdout + result.stderr)
+                rows = self.rows(self.root / 'build/out/check_times.tsv')
+                self.assertEqual(rows['check-b'][1], 2 if fail else 0)
+                # Nothing from a check reaches the shared output; each has its own complete log.
+                self.assertNotIn('fake-a', result.stdout)
+                self.assertNotIn('fake-b', result.stderr)
+                self.assertIn('fake-a\n', (logs / 'check-a.log').read_text())
+                self.assertIn('fake-b\n', (logs / 'check-b.log').read_text())
+                self.assertNotIn('fake-b', (logs / 'check-a.log').read_text())
+
     def test_command_rc_and_output(self):
         path = self.root / 'direct.tsv'
         result = subprocess.run([sys.executable, str(self.root / 'tools/check_time.py'),
@@ -180,6 +196,8 @@ def main():
             ('timer', '{rc}\\n', '{0}\\n'),
             ('timer', '{name}\\t', 'wrong\\t'),
             ('timer', 'elapsed = time.monotonic() - start', 'elapsed = 0'),
+            ('timer', "log = Path(log_dir) / (name + '.log')", "log = Path(log_dir) / 'all.log'"),
+            ('timer', 'stdout=out, stderr=subprocess.STDOUT)', 'stdout=out)'),
             ('sdk', '--reset "$(CHECK_TIMES)"', '--reset "$(CHECK_TIMES).unused"'),
             ('sdk', 'check-par CHECK_PAR_TARGETS="$$CC_STAGE1"', '$$CC_STAGE1'),
             ('sdk', '$(foreach edge,$(CHECK_EDGES),$(eval $(subst :, : ,$(edge))))', ''),

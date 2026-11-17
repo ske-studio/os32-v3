@@ -12,7 +12,7 @@
 | 生成物が基点と同じ (x86 の約 1,200 個、PowerPC の像の約 950 本の `.o`) | 見ない | 段ごとに手元で 20〜40 分かけて組み比べた |
 | ソース・`.mk` の本文を目印にした変異が今も当たる | 変異なしで回すので見ない | 一覧を消した段で目印が消えた試験が 1 本、基点の時点で既にずれていた試験が 2 本、手元の長い回しで見つかった |
 
-`wt/sep-*` の枝に push すると `.github/workflows/sep.yml` がこの 2 つを回す。main への取り込みの判定は今までどおり check・build で、これは分離の枝の追加の関門。
+`wt/sep-*` の枝に push すると `.github/workflows/sep.yml` がこの 2 つを回す (変異込みの検査の側の設計は [gate.md](gate.md))。main への取り込みの判定は今までどおり check・build で、これは分離の枝の追加の関門。
 
 ## 2. 生成物の一致 (`identity` のジョブ)
 
@@ -40,13 +40,9 @@
 - 行の全体が `Sep-Changes:` で始まる時だけ宣言と読む。`x86`・`ppc` 以外の語は誤り。
 - 宣言はその段の受入のやり方を変える印でもある: `x86` を宣言した段は NP21/W の受入、`ppc` を宣言した段は QEMU の検査 (`ppc-qemu` のジョブ) で確かめる。
 
-## 4. 変異込みの検査 (`mutate`・`ppc-mutate`・`ppc-qemu` のジョブ)
+## 4. 変異込みの検査
 
-| ジョブ | 中身 |
-|---|---|
-| `mutate` | `make all` の後 `make check -k -j4 MUTATE=1` (full-check.yml と同じ。全部の検査を変異込みで) |
-| `ppc-mutate` | PowerPC の toolchain が要る検査を `MUTATE=1` で 1 本ずつ (`run.py --run all` は最初の失敗で止まるので、落ちた物を全部挙げる形に) |
-| `ppc-qemu` | PowerPC の QEMU の検査を `MUTATE=1` で |
+同じ workflow の `checks` のジョブが、全部の検査を変異込みで 6 シャードに分けて回す。形と決まりは [gate.md](gate.md)。
 
 ## 5. 範囲の外
 
