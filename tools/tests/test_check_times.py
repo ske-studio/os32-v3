@@ -175,7 +175,7 @@ class CheckTimesTest(unittest.TestCase):
         result = subprocess.run([sys.executable, str(self.root / 'tools/check_time.py'),
                                  str(path), 'direct', sys.executable, '-c',
                                  'import sys; print("out"); print("err", file=sys.stderr); sys.exit(7)'],
-                                capture_output=True, text=True)
+                                capture_output=True, text=True, env=self.env)  # 呼び手の CHECK_LOG_DIR を継がない
         self.assertEqual((result.returncode, result.stdout, result.stderr), (7, 'out\n', 'err\n'))
         name, elapsed, rc = path.read_text().strip().split('\t')
         self.assertEqual((name, rc), ('direct', '7'))

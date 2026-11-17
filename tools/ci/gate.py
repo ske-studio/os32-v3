@@ -33,10 +33,15 @@ TOOLS = (
     ('e2fsck', None, 'apt: e2fsprogs'),
     ('cargo', None, 'Rust (rust-toolchain.toml)'),
 )
+# 道具は在ってもデータが無いと検査の途中で落ちる物 (QEMU の mac99 の firmware と VGA の ROM)。
+FILES = (
+    ('/usr/share/qemu/openbios-ppc', 'apt: qemu-system-data (qemu-system-ppc が連れてくる)'),
+    ('/usr/share/seabios/vgabios-stdvga.bin', 'apt: seabios (qemu-system が連れてくる)'),
+)
 
 
-def missing_tools(env, which=shutil.which):
-    """[(道具, 入れ方)]。クロスコンパイラは <変数>/bin の下、ほかは PATH。"""
+def missing_tools(env, which=shutil.which, exists=os.path.isfile):
+    """[(道具かファイル, 入れ方)]。クロスコンパイラは <変数>/bin の下、ほかの道具は PATH。"""
     missing = []
     for name, variable, how in TOOLS:
         if variable:
@@ -46,6 +51,7 @@ def missing_tools(env, which=shutil.which):
             found = which(name) is not None
         if not found:
             missing.append((name, how))
+    missing += [(path, how) for path, how in FILES if not exists(path)]
     return missing
 
 

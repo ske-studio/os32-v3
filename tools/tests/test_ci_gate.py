@@ -36,10 +36,13 @@ def suite(tool):
                 env = dict(CROSS_DIR=str(cross.parent), PPC_CROSS_DIR=str(Path(directory) / 'none'))
                 present = {'nasm', 'gcc-13', 'qemu-i386', 'genisoimage', 'e2fsck', 'cargo',
                            'i386-elf-gcc', 'powerpc-elf-gcc'}
-                found = tool.missing_tools(env, which=lambda name: '/usr/bin/' + name if name in present else None)
-            # クロスコンパイラは PATH ではなく <変数>/bin で探す。足りない物は全部挙がる。
-            self.assertEqual([name for name, _ in found], ['powerpc-elf-gcc', 'qemu-system-ppc'])
-            self.assertEqual([name for name, _ in tool.missing_tools({}, which=lambda name: '/x')],
+                found = tool.missing_tools(env, which=lambda name: '/usr/bin/' + name if name in present else None,
+                                           exists=lambda path: 'openbios' in path)
+            # クロスコンパイラは PATH ではなく <変数>/bin で探す。足りない物は道具もデータも全部挙がる。
+            self.assertEqual([name for name, _ in found],
+                             ['powerpc-elf-gcc', 'qemu-system-ppc', '/usr/share/seabios/vgabios-stdvga.bin'])
+            self.assertEqual([name for name, _ in tool.missing_tools({}, which=lambda name: '/x',
+                                                                     exists=lambda path: True)],
                              ['i386-elf-gcc', 'powerpc-elf-gcc'])
 
         def test_parse_times(self):
@@ -105,6 +108,7 @@ def suite(tool):
 MUTANTS = [
     ("found = bool(base) and os.access(os.path.join(base, 'bin', name), os.X_OK)", "found = which(name) is not None"),
     ("        if not found:\n            missing.append((name, how))", "        if not found:\n            return [(name, how)]"),
+    ("missing += [(path, how) for path, how in FILES if not exists(path)]", "pass"),
     ("if len(parts) == 3:", "if len(parts) == 3 and parts[0] not in rows:"),
     ("re.match(r'SKIP\\b', line)", "'SKIP' in line"),
     ("status='missing', seconds=0.0", "status='pass', seconds=0.0"),

@@ -9,7 +9,8 @@ runs:
       shell: timeout 600 bash --noprofile --norc -e -o pipefail {0}
       run: |
         sudo apt-get update
-        sudo apt-get install -y --no-install-recommends gcc-13 qemu-system-ppc
+        # qemu-system は mac99 の VGA の ROM (seabios) を連れてくる。無いと QEMU が起動直後に終わる。
+        sudo apt-get install -y --no-install-recommends gcc-13 qemu-system-ppc qemu-system
     - uses: ./.github/actions/build-setup
     - uses: ./.github/actions/ppc-setup
     - name: Python requirements and cross compiler on PATH
