@@ -34,7 +34,7 @@ PM: §7 のユーザー判断を段ごとの内容/build_compare と G4 受入�
 | HAL の制約 | `gfx/gfx_core_framebuffer.inc:64–82` は backend を機種の列挙で決める。`gfx/gfx_core_init.inc:11–17` は CLIENT があることを started の条件にする。単に OF の後端の表を足すだけでは起動しない |
 | フォント | `drivers/video/kcg/kcg.c:45–52` → kcg_rom_read_ank/kanji。`kernel/console/font_source.c:62–79,207–238` は VFS の read lease であって字形生成器ではない。`font_guard.c:11–26` は IRQ/例外・再入を拒む |
 | KCG の既存口 | `drivers/video/kcg/kcg_module.h:11–16` の read_ank/read_kanji/stats/invalidate、x86 は `/boot/kcg.mod`。`userland/lib/gfx/text/lconsole.c:357–360`・`gfx_kcg.c:54–98` は KCG 字形で描く先例。fontmgr は実体なし、FEP は変換辞書で字形供給とは別 |
-| PPC 出力 | `build/ppc-kboot.mk:57,75–85` は kboot_console・console_stream・shell_putchar と con_sink をリンクし、共通 console/gfx core はリンクしていない。`kboot_console.c:27–30` は pm_log_write、`console_stream.c:7–12` は LAN/ESCC。`shell_putchar.c:5–9` は独自入口 |
+| PPC 出力 | `build/targets/ppc-powermac.mk` は kboot_console・console_stream・shell_putchar と con_sink をリンクし、共通 console/gfx core はリンクしていない。`kboot_console.c:27–30` は pm_log_write、`console_stream.c:7–12` は LAN/ESCC。`shell_putchar.c:5–9` は独自入口 |
 | PPC 表示 | `platform/powermac/display_provider.c:6–19,52–55` は空の後端と空の列挙、display.c は空の機種口。現状の RH 表示は HAL を通らない段印専用 |
 | root と入力 | `build/ram-root.mk:7–12` は motd と bin の ISO を kernel に埋める。`init/boot_root.c:13,28` は ISO root と /tmp ramfs。`platform/powermac/ppc_kernel.c:314–324` は root→USB→sh。`input_boot.c:31–34` が LAN/USB 合流、`shell_boot.c:30–31` が接続/キー待ち |
 
@@ -182,7 +182,7 @@ KiB=1024B。以下はリンク実測前の予算幅、圧縮前。追加依存�
 | E | of_fb後端/v2・powermac display_provider/display/fallback・display_dual | C/D後、Fと並列可 |
 | F | 共通 fbcon と PPC con_backend・セル/カーソル/scroll/INDEX8 展開。偽PC98寸法でも同じ実装を試験 | B/D後、Eと並列可 |
 | G | gen_font16 の EBDT 入口・assets/ram-root.mk・短名manifestとroot試験、配布方針の文書追従。PPC の root に /sys/unicode.bin を収録 (漢字の道 unicode_to_jis → unicode_file_lookup、lib/utf8.c:214-218) | Bの形式固定後、E/Fと並列可 |
-| H | ppc-kboot.mk・ppc_kernel・PPC stream/shell結線、console.c mirror とその試験。PPC に kernel/console/unicode_file.c をリンク | 全段後、リンク担当一人。診断像/SH/SHELLを全部buildし A 再実行 |
+| H | build/targets/ppc-powermac.mk・ppc_kernel・PPC stream/shell結線、console.c mirror とその試験。PPC に kernel/console/unicode_file.c をリンク | 全段後、リンク担当一人。診断像/SH/SHELLを全部buildし A 再実行 |
 | J | QEMU INDEX8画素fixture/受入台本・G4台本・成果物サイズ比較 | H後。実機判定はPM/ユーザー |
 
 各段の試験は同じ担当が同時に更新。統合担当は必要リンク一覧・固定hash・dep-dir を洗う。

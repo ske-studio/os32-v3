@@ -64,14 +64,23 @@ def check_kboot(root):
     """Every PowerPC image selects exactly the pinned sources, in owner-set order (no link-order list)."""
     expected = json.loads((ROOT / 'tools/tests/fixtures/build_profile_ppc.json').read_text())
     (root / 'kboot-query.mk').write_text(KBOOT_QUERY)
+    command = ['make', '-s', '-f', 'build/config.mk', '-f', 'build/targets/ppc-powermac.mk', '-f', 'kboot-query.mk',
+               'ARCH=ppc', 'PLATFORM=powermac']
     for name, image in expected.items():
-        out = subprocess.check_output(['make', '-s', '-f', 'build/ppc-kboot.mk', '-f', 'kboot-query.mk',
-                                       *image['flags'], 'kboot-query'], cwd=root, text=True,
-                                      stderr=subprocess.PIPE)
-        actual = dict(line.split('=', 1) for line in out.splitlines() if line.startswith('KB_'))
-        assert actual['KB_OUT'] == image['KB_OUT'], name
-        for key in ('KB_ASM', 'KB_C'):
-            assert actual[key].split() == image[key], (name, key)
+        # 像は旗でも名前でも選べる (build/images/ppc-flags.mk)。NEGATIVE の像は旗だけ。
+        selectors = [image['flags']] + ([] if 'NEGATIVE=1' in image['flags'] else [['IMAGE=kboot-' + name]])
+        for selector in selectors:
+            out = subprocess.check_output([*command, *selector, 'kboot-query'], cwd=root, text=True,
+                                          stderr=subprocess.PIPE)
+            actual = dict(line.split('=', 1) for line in out.splitlines() if line.startswith('KB_'))
+            assert actual['KB_OUT'] == image['KB_OUT'], (name, selector)
+            for key in ('KB_ASM', 'KB_C'):
+                assert actual[key].split() == image[key], (name, key, selector)
+    # 名前と旗の両方を与えて食い違えば止まる。合っていれば通る。
+    assert subprocess.run([*command, 'IMAGE=kboot-core', 'KBOOT_SH=1', 'kboot-query'], cwd=root,
+                          capture_output=True).returncode != 0
+    assert subprocess.run([*command, 'IMAGE=kboot-sh', 'KBOOT_SH=1', 'KBOOT_LINK=0', 'kboot-query'], cwd=root,
+                          capture_output=True).returncode == 0
 
 
 def check_user_selection(root):
@@ -134,7 +143,11 @@ if __name__ == '__main__':
                      'C_COMMON_CLI = kernel/cli/resident_cli.c kernel/cli/unordered.c',
                      AssertionError, 'kboot source added to an owner set'),
                     ('build/images/kboot-link.mk', 'FEATURE_LINK = 1', 'FEATURE_LINK = 0',
-                     AssertionError, 'kboot image feature value')):
+                     AssertionError, 'kboot image feature value'),
+                    ('build/images/ppc-flags.mk', 'KBOOT_SH := $(if $(filter kboot-sh kboot-link-sh,$(IMAGE)),1,0)',
+                     'KBOOT_SH := 0', subprocess.CalledProcessError, 'image name no longer sets its flags'),
+                    ('build/images/ppc-flags.mk', 'ifneq ($(IMAGE),$(KB_IMAGE))', 'ifneq ($(IMAGE),$(IMAGE))',
+                     AssertionError, 'image name and flags may disagree')):
                 target = root / path
                 source = target.read_text()
                 assert source.count(anchor) == 1, (path, anchor)

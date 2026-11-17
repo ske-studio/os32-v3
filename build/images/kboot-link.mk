@@ -1,4 +1,4 @@
-# PowerPC の link の診断の像 (build/ppc-kboot.mk の既定)。
+# PowerPC の link の診断の像 (build/targets/ppc-powermac.mk の既定)。
 IMAGE_ORDER = kboot
 IMAGE_TARGET = ppc-powermac
 FEATURE_LINK = 1

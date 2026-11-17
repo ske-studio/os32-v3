@@ -109,10 +109,13 @@ def hash_objects(tree):
 
 def build_ppc(tree, jobs):
     env = dict(os.environ)
+    # 畳む前の木 (基点が古い時) は build/ppc-kboot.mk を直に呼ぶ。今の木は最上位の入口。
+    entry = (['-f', 'build/ppc-kboot.mk'] if (Path(tree) / 'build/ppc-kboot.mk').is_file()
+             else ['ARCH=ppc', 'PLATFORM=powermac'])
     for name in ('MAKEFLAGS', 'MFLAGS', 'MAKEOVERRIDES', 'GNUMAKEFLAGS', 'BUILD_OUT'):
         env.pop(name, None)
     for flags in PPC_IMAGES:
-        subprocess.run(['make', '-j' + str(jobs), '-f', 'build/ppc-kboot.mk', *flags], cwd=tree, env=env,
+        subprocess.run(['make', '-j' + str(jobs), *entry, *flags], cwd=tree, env=env,
                        check=True, stdout=subprocess.DEVNULL)
     return hash_objects(tree)
 

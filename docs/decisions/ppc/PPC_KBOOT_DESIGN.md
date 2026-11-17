@@ -36,7 +36,7 @@
 |bootinfo|S/include/bootinfo.h:8–11、platform/powermac/boot_capture.c:4|native image口は既存、RAM表は無い。PPC暫定ゼロ情報を正式captureへ替える|
 |メモリprovider|S/platform/powermac/platform_memory_desc.h:1–14、mm/memory_boot.c:245|暫定値実走禁止は前提と一致。OFサイズをmem_kbへ丸投げするだけでは不足|
 |trap/frame/exec|S/arch/ppc/ppc_frame.h:3–19、vectors.S:309–315、include/exec_arch.h:6–37|176B native frame とopaque exec口はある。frame構築前DR=1、PPC exec provider未提供。第2段は共通fault handlerまでは作っていない|
-|全リンク・console|S/build/targets/ppc-powermac.mk:4–9、arch/ppc/arch_cpu.h:4–12、arch_io.h:10–12|compile-only、root/stack/idle未実装。第5段display/console provider着後もESCC製品実装は別途必要|
+|全リンク・console|S/build/targets/ppc-powermac.mk、arch/ppc/arch_cpu.h:4–12、arch_io.h:10–12|compile-only、root/stack/idle未実装。第5段display/console provider着後もESCC製品実装は別途必要|
 - 食い違いは古い TASK の代表記述との2件。PACK の既存成果・未着段の前提との矛盾は0件。未実装の存在を「食い違い」に重複計上しない。
 
 ## 2. ②の製品範囲と合否
@@ -93,7 +93,7 @@ KBOOT ALIVE tick_delta=<n> tb_us=<n> of_calls_delta=0
 |G2 console provider|G1、console TUを除外し直接互換口を提供|platform/powermac/kboot_console.c ＋120|P|
 |H1 非対応provider|D3/E3/G2、閉包の未解決のみ分類・専用providerで充足|arch/ppc/kboot_unavailable.c ＋120、arch_exec_storage.h ＋25、arch_io.h Δ8|P|
 |H2 init|B3/D3/E3/F2/G2/H1、実mm初期化|platform/powermac/ppc_kernel.c ＋150|P|
-|H3 本体graph|H2、段階link・未解決/PIT_HZ利用者監査|build/targets/ppc-powermac.mk Δ40、build/arch/ppc-sources.mk Δ20、build/platform/powermac.mk Δ20、build/ppc-kboot.mk ＋100|I|
+|H3 本体graph|H2、段階link・未解決/PIT_HZ利用者監査|build/targets/ppc-powermac.mk Δ40、build/arch/ppc-sources.mk Δ20、build/platform/powermac.mk Δ20、build/targets/ppc-powermac.mk ＋100|I|
 |T1 host|各部品着後、入力/更新列/順序|tools/ppc/kboot_host.c ＋280、kboot_model_host.c ＋180、kboot_host.py ＋100|I|
 |T2 guest|C〜H後、実fault・root・IRQ・tick|arch/ppc/kboot_probe.S ＋150、platform/powermac/kboot_probe.c ＋160|P|
 |T3 acceptance|T1/T2/H3、二CPU＋負試験|tools/ppc/kboot_run.py ＋240、kboot_mutations.py ＋100|I|

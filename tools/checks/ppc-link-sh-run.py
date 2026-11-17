@@ -2,7 +2,7 @@
 CHECK = dict(name='ppc-link-sh-run', env=['ppc-cross','qemu-ppc'], tier=2,
     budget=2400, needs=['make:ppc-ci-image'], full_only=True,
     covers=['fs/serialfs/serialfs_persistent.c', 'tools/ppc/link_sh_run.py', 'tools/tests/test_ppc_link_sh_run.py',
-            'build/ppc-kboot.mk','build/ppc-user.mk','userland/shell/rshell_lan.c',
+            'build/targets/ppc-powermac.mk','build/ppc-user.mk','userland/shell/rshell_lan.c',
             'platform/powermac/**','arch/ppc/**','kernel/console/**','mm/kmalloc.c',
             'tools/host_agent.py','tools/host_operator_socket.py','tools/host_rshell.py',
             'tools/ppc_link_transport.py','tools/remote_transport.py','tools/ppc/**',

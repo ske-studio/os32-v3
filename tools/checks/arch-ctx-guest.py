@@ -5,7 +5,7 @@ CHECK = dict(env=['ppc-cross', 'qemu-ppc'], name='arch-ctx-guest', tier=2, budge
                      'platform/pc98/tick_order.h', 'userland/tests/ring3_hello.c',
                      'userland/tests/ring3_marker.h', 'tools/np21w_mcp/*.py',
                      'exec/**', 'kernel/sys.c', 'kernel/irq/**', 'kernel/time/**',
-                     'build/ppc-kboot.mk', 'build/ppc-user.mk', 'sdk/**',
+                     'build/targets/ppc-powermac.mk', 'build/ppc-user.mk', 'sdk/**',
                      'userland/ppc/**', 'include/**', 'tools/ppc/kboot_accept.py',
                      'tools/ppc/kboot_run.py', 'tools/ppc/run.py',
                      'tools/checks/arch-ctx-guest.py', 'platform/powermac/ppc_kernel.c', 'mm/**', 'lib/**', 'build/arch/ppc.mk', 'tools/*.py', 'tools/ppc/**'],

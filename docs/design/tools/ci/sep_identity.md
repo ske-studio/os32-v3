@@ -21,7 +21,7 @@
 | 対象 | 比べ方 |
 |---|---|
 | `x86` | `tools/build_compare.py <基点> <HEAD>` (2 つの写しを組んで、出荷する生成物を比べる。build ID と日時は固定される) |
-| `ppc` | 基点と HEAD を `git archive` で写し、それぞれ PowerPC の 6 像 (core・link・sh・link-sh・shell・neg1) を `make -f build/ppc-kboot.mk` で組んで、`build/out/ppc-kboot` の下の `.o` の sha256 を比べる |
+| `ppc` | 基点と HEAD を `git archive` で写し、それぞれ PowerPC の 6 像 (core・link・sh・link-sh・shell・neg1) を `make ARCH=ppc PLATFORM=powermac` で組んで、`build/out/ppc-kboot` の下の `.o` の sha256 を比べる |
 
 - PowerPC の `.o` は「像・ソースのパス」で対にする。`git diff --name-status -M90` が移動と見たソースは、古いパスの `.o` と対にする (置き場だけ変えた段で「消えた・増えた」にならない)。
 - `root_image_blob.o` (RAM root の ISO) は同じ入力でも作るたびに変わるので比べない。カーネルのコードではない。

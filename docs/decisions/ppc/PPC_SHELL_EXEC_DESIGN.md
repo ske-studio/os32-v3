@@ -327,7 +327,7 @@ make ARCH=ppc PLATFORM=powermac hello
 |B28|PPC target build：USER 入口・libgcc 非リンク|B06・B27|不変|
 |B29|PPC clock provider：共通 tick 単位 (論理 10ms、DEC は物理 1kHz)|統合前必須|不変|
 |B30|PPC exec 初期化 TU：既存サービス初期化の接続|B18・B22・B24・F15|不変|
-|B31|`build/ppc-kboot.mk`：既存 exec 閉包 link|F01–F20・B28–B30|不変|
+|B31|`build/targets/ppc-powermac.mk`：既存 exec 閉包 link|F01–F20・B28–B30|不変|
 |B32|resident CLI の `.h/.c`＋`cli_boot.c`：run callback|S-A・B31|共・不変|
 |B33|`userland/ppc/hello.c`：受入アプリ|B28|不変|
 |B34|PPC root image 入力：hello 同梱|B33|不変|

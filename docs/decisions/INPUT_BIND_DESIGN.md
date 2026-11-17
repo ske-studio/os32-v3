@@ -259,9 +259,9 @@
 |3c[n]|mode/STOP/flush抽出を3a後に先行し、旧変換で受入可能にする。M2/X-cookedへの逆依存を置かず、X-cookedは3c全段後|
 |4b|従来「4a/3b後」を「4a/M2/M3後」へ変更、PPC旧policyは維持。4b-mapでX-cookedを含む全結線条件を満たして有効化|
 
-- B完了条件 (ROLES §4-3): 新ソースは `build/sources/order.mk` (順)、`build/sources/common.mk`またはarch/platform一覧 (選択)、`tools/tests/fixtures/build_profile_x86.json`のC_KERNEL、PPC像に入る場合 `build/ppc-kboot.mk`一覧へ追従。`check-build-selection-host`・`make all`で確認。
+- B完了条件 (ROLES §4-3): 新ソースは `build/sources/order.mk` (順)、`build/sources/common.mk`またはarch/platform一覧 (選択)、`tools/tests/fixtures/build_profile_x86.json`のC_KERNEL、PPC像に入る場合 `build/targets/ppc-powermac.mk`一覧へ追従。`check-build-selection-host`・`make all`で確認。
 - A0z完了条件 (同§4-3): 版2か所 (kapi.json・生成os32_kapi_shared.h)、README/INDEX/KAPI_SPEC、レビュー済指紋 `tools/tests/fixtures/dep_dir_a/l01.json` kapi_sha256・l04.json api_sha256・l05a.json public_sha256、`tools/tests/hwdev_contract_fixture.py`のHWDEV layout CRC/inventory、`tools/tests/test_ime_display_boundary.py`のFEP_MODULE_ABI_GENを追従。`check-dep-dir-a-l01`〜`l06`・`check-hwdev-image-host`・`check-ime-display-boundary-host`・KAPI audit/ranges/version、`make clean && make all`。
-- 共通箇所の完了条件 (同§4-3): PPC像リンク、手元確認は `PATH=/home/hight/opt/cross-ppc/bin:$PATH make -f build/ppc-kboot.mk KBOOT_SH=1`。新しい製品関数呼出しは兄弟stubを持つ全試験土台 (#include型/python切出し型) をrgで確認して追従。
+- 共通箇所の完了条件 (同§4-3): PPC像リンク、手元確認は `PATH=/home/hight/opt/cross-ppc/bin:$PATH make ARCH=ppc PLATFORM=powermac KBOOT_SH=1`。新しい製品関数呼出しは兄弟stubを持つ全試験土台 (#include型/python切出し型) をrgで確認して追従。
 - 試験の完了条件 (同§4-3): PPC toolchain/QEMU/socket不在は理由付きSKIP・rc=0、OS32_REQUIRE_PPC=1では失敗、`PPC_CROSS_DIR=/nonexistent make check-<名前>`で確認。CHECK covers/basisまたはkind/env_limit/pinsと変異anchorを追従、`tools/checks/run.py --lint`と `python3 ~/os32-tmp/bin/stale_anchor.py <基点>`。一覧/指紋/生成値は手計算せず生成器/試験出力を基点と比較し、意図した変更だけか確認。
 - F10: 4b-mapは親4b・M0〜M8・X-cooked・A0z・U1・U2・E-x・E-p・U3g・Lと対応B完了後。CHECK pinsは `[input-hal/4b-map,input-bind/U3-03,input-bind/F3,input-bind/F4,input-bind/N2-B]`、basisは本票§2/§2a/§3/§5の確定版。旧単独`U3`を残さず、N2のユーザー決定とF3/F4のPM推奨 (ユーザーに提示済み、反論なし) を反映して着手する。
 - host/変異: 列の順/spcl逆向き/lock OR→XOR/AltGr欠落、Caps→Ctrlのcooked/raw整合と物理救済、左右合流/usage差分欠落、UTF-8部分投入、peek副作用を各固有anchorでruntime RED。同じ入力の正常対照は最後の製品変更後に必ずPASS、変異だけREDでも受入しない。

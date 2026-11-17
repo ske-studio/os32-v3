@@ -21,7 +21,7 @@ CHECK = dict(name='ppc-kboot-link', tier=1, budget=20,
             'tools/host_agent.py', 'tools/host_operator_socket.py', 'tools/host_rshell.py',
             'tools/ppc_link_transport.py', 'tools/remote_transport.py', 'tools/*host*.py',
             'platform/powermac/**', 'arch/ppc/**', 'platform/powermac/ppc_kernel.c', 'tools/lan_bridge.py',
-            'build/ppc-kboot.mk', 'arch/ppc/kernel.ld'],
+            'build/targets/ppc-powermac.mk', 'arch/ppc/kernel.ld'],
     basis=['PPC_P5_REST_DESIGN §2 K・§5'])
 
 

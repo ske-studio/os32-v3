@@ -136,7 +136,7 @@ N4 に従い I/O 専用 adapter は追加しない。上表は arch 入口全体
 |AC-HOST-1|G: owner・handle の寿命、部分 write、借用 read buffer は次操作前にコピー。C: transport。A: HOSTDOWN/STALE を保存、不在は型別。文脈は Host API の既存契約を継承し IRQ 待機を導入しない|`platform_host_*` (`include/platform_host.h:6`)、`host_alive_snapshot` (`net/host_mailbox.h:15`)|`platform/pc98/device_host.c:31`|main の公開 Host 群は不在。PLN1 は代替 ABI ではない。LAN 移行で `platform/powermac/hostfs_peer.c:14` の世代実体を共通化し二重リンクを防ぐ|`AC-HOST-1/owner-buffer-generation`（T1 で作る） / LAN §5・ABI|
 |AC-SFS-1|G: can_wait は IRQ 外かつ期限時計と transport が協調して進められること。絶対期限を全段で共有し、新 sid で write を再実行しない。C: IRQ 駆動/poll。A: can_wait=0 は要求を出さず IO。FG0/FG1 の可否は provider ごとに判定|`SfsIo.now/idle/can_wait` (`fs/serialfs/sfs_client.h:29`)、deadline 契約 (`:96`)|UART/LAN の既存 IF 条件を保持 (`fs/serialfs/serialfs_session.c:79`、`fs/serialfs/sfs_lan.c:150`)|`pm_hfs_can_wait` は IRQ 外、TB 時計と poll により FG0 でも進行 (`platform/powermac/hostfs_io.c:37`、`:46`)。現実装を保ち F1 は注釈・試験だけ|`AC-SFS-1/fg0-timeout-irq-reject-no-replay`（T1 で作る） / LAN §5|
 |AC-LIBC-1|G: ユーザーランドの C ライブラリはどのアーキも newlib nano (x86 と同じ版・configure・無改変)。syscall は KAPI の関数表、sbrk は nano の adapter。C: アーキごとの crt0・syscalls.c・allocator の adapter・浮動小数点の旗。A: 自前の libc やアプリごとの代用の関数で置き換えない。カーネルは newlib とリンクしない (ユーザー決定 2026-11-16、POLICY_DEV §1)|`tools/ci/build_cross.sh` の NEWLIB_VER・configure、`sdk/allocator/nano_inputs.json`、`sdk/crt/syscalls.c`|i386-elf の newlib nano 4.4.0 を `-lc -lgcc` で静的にリンク (`build/programs.mk`)|**未** (ユーザーランドは libc なし、`build/ppc-user.mk`)。PowerPC の段で入れる|共通の試験は移植の段で決める / POLICY_DEV §1|
-|AC-BUILD-1|G: 共通口の provider と共通ソースの closure を両像で検査。C: 像の profile・能力一覧。A: 不在は明示 manifest、未解決参照を成功 stub で埋めない。実行文脈は対象外|`C_KERNEL` 等のソース選択 (`build/sources/common.mk:1`)、順序 (`build/sources/order.mk:1`)、PPC 選択 (`build/ppc-kboot.mk:71`)|`build/config.mk:142` の arch/platform 選択|PPC SH 像もリンク。KBOOT_SH/SHELL は像の選択であり CPU 能力ではない。BE/ILP32 を含む ABI 検査を保つ|`AC-BUILD-1/closure-profiles`（T1 で作る） / BUILD・PPC_IMPL_RULES §1|
+|AC-BUILD-1|G: 共通口の provider と共通ソースの closure を両像で検査。C: 像の profile・能力一覧。A: 不在は明示 manifest、未解決参照を成功 stub で埋めない。実行文脈は対象外|`C_KERNEL` 等のソース選択 (`build/sources/common.mk:1`)、順序 (`build/sources/order.mk:1`)、PPC 選択 (`build/targets/ppc-powermac.mk`)|`build/config.mk:142` の arch/platform 選択|PPC SH 像もリンク。KBOOT_SH/SHELL は像の選択であり CPU 能力ではない。BE/ILP32 を含む ABI 検査を保つ|`AC-BUILD-1/closure-profiles`（T1 で作る） / BUILD・PPC_IMPL_RULES §1|
 
 ## 5. W2 で確定した NIC・link の契約
 
@@ -170,7 +170,7 @@ P1 系列と link-closeack を含む main `4e0e8b1e` の実物で確定した。
 |F8|本線、PowerPC 照合|`sdk/kapi_target_ppc.py`、T1 の 2 ファイル / 220 行|T1b・T1d。型別不在・void と照会の対応・内部描画と公開不在を検査。照会の無い群は利用不可とし ABI 追加を勝手に行わない|
 |F9a (任意)|本線、PowerPC レビュー|`include/clock_source.h`、T1 の 2 ファイル / 220 行|W1・T1a。源・分解能・停止中進行の内部照会を宣言。未提供は unknown として利用側で拒否|
 |F9b (任意)|本線、PowerPC が PPC 実体担当|`platform/pc98/clock_source.c`、`platform/powermac/clock.c`、対応する時計試験 / 250 行|F9a。能力を実際の源に一致させ、counter_hz の既存意味を保持。両実体の登録が済むまで利用側を結線しない|
-|B1|本線、PowerPC 照合|`build/ppc-kboot.mk`、`build/sources/common.mk`、T1 試験 / 250 行|T1a、対象の共通変更後。差分 manifest と両像リンクで closure を検査、大規模な一覧移動は行わない|
+|B1|本線、PowerPC 照合|`build/targets/ppc-powermac.mk`、`build/sources/common.mk`、T1 試験 / 250 行|T1a、対象の共通変更後。差分 manifest と両像リンクで closure を検査、大規模な一覧移動は行わない|
 |W4|本線、PowerPC 確認|[ARCH_CTX_DESIGN](ARCH_CTX_DESIGN.md) の各段|実行文脈の契約と実装を受け入れる。適合は受入まで未|
 |W3|本線、PowerPC 確認|本書、`PPC_NOTES.md`、`ARCH_BRINGUP_ORDER.md` / 150 行|各担当段の受入後。W4 の受入後は AC-CTX も結線対象に含め、適合 ID と能力差を結線、未実機項目は延期台帳の関門へ。試験ログを契約本文へ複製しない|
 

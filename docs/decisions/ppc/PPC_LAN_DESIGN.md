@@ -42,7 +42,7 @@
 |ログqueue|platform/powermac/lan_log.c|登録済み静的sinkとFIFO。NICへ直送しない|
 |線上codec/診断|platform/powermac/lan_wire.c / lan_monitor.c|wireはbyte codec、monitorは固定要求だけ。RXはserviceから借用|
 |host|tools/ppc_lan_host.py|保存・表示・診断送受信を1プロセスで所有|
-- 上記C/arch ASMはbuild/ppc-kboot.mkの明示TU一覧へ追加しPPCKERN.ELFに静的リンク。Pythonは像に入れない。net/nic.c、link、SFS transport、lan.modはリンクしない。 汎用GEM coreにはplatform依存を注入。将来NetNicOps（net/nic.h:11）の非待機口へadapter化できるが、この段では共通netの時計/ID/受信分配を変更しない。
+- 上記C/arch ASMはbuild/targets/ppc-powermac.mkの明示TU一覧へ追加しPPCKERN.ELFに静的リンク。Pythonは像に入れない。net/nic.c、link、SFS transport、lan.modはリンクしない。 汎用GEM coreにはplatform依存を注入。将来NetNicOps（net/nic.h:11）の非待機口へadapter化できるが、この段では共通netの時計/ID/受信分配を変更しない。
 ## 3. 境目（名前・引数は実装契約）
 ```c
 /* lan_boot.h所有: lan_rc/pm_* /lan_message/monitor status。gem.h所有: dma_sync/gem_dma/gem_io/struct gem。内部u8/u16/u32/u64。 */
@@ -213,7 +213,7 @@ int ppc_probe_copy8(u32 va, u8 *out); /* kernel_probe.S: load成功0/onfault復�
 |H24|＋tools/ppc/test_lan_p24.py 60–160|P24|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
 |P25|Δplatform/powermac/ppc_kernel.c 30|P24|ALIVE/LAN BUDGET / A11 / tick継続|
 |H25|＋tools/ppc/test_lan_p25.py 60–160|P25|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
-|P26|Δbuild/ppc-kboot.mk 30|P10,P25|IMAGE symbols/size / A12 / 配置|
+|P26|Δbuild/targets/ppc-powermac.mk 30|P10,P25|IMAGE symbols/size / A12 / 配置|
 |H26|＋tools/ppc/test_lan_p26.py 60–160|P26|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
 |P29|Δtools/ppc/kboot_run.py 140|P23,P26|LAN印＋既存9印 / A11,A12 / ―|
 |H29|＋tools/ppc/test_lan_p29.py 60–160|P29|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
@@ -290,7 +290,7 @@ int ppc_probe_copy8(u32 va, u8 *out); /* kernel_probe.S: load成功0/onfault復�
 
 ## 実装で決めたこと (2026-11-11、段 P4・P5・P12・P20・P21 の取り込みで PM が決定)
 - boot_id は capture (kboot_capture.c、host で試験する) では作らない。TB と PVR を読んで `pm_gmac_boot_id` を呼ぶのは LAN の service を始める直前の段 P25 (platform/powermac/ppc_kernel.c)。
-- struct pm_kboot_info に `struct pm_gmac_boot gmac` と `int gmac_rc` を足し、kboot_capture.c は tree walk の後に pm_gmac_capture を 1 回呼ぶ。LAN の失敗で起動を止めない。kboot_capture.c が gmac_tree.c を要するので、像の段 P26 の一部 (build/ppc-kboot.mk の明示の TU に gmac_tree.c) と、kboot_capture.c を組む既存の試験 4 本の TU の追従を前倒しした。
+- struct pm_kboot_info に `struct pm_gmac_boot gmac` と `int gmac_rc` を足し、kboot_capture.c は tree walk の後に pm_gmac_capture を 1 回呼ぶ。LAN の失敗で起動を止めない。kboot_capture.c が gmac_tree.c を要するので、像の段 P26 の一部 (build/targets/ppc-powermac.mk の明示の TU に gmac_tree.c) と、kboot_capture.c を組む既存の試験 4 本の TU の追従を前倒しした。
 - ログの待ち行列の送信の側の口: `int pm_lan_log_peek(const u8 **data, u32 *len, u64 *seq, u64 *records, u64 *bytes, u32 *status)` (閉じた最古の slot を静的な scratch で見せる。status の bit0 = 飽和。開いた slot を閉じるのは、それが唯一の slot のときだけ) と `void pm_lan_log_complete(int result)` (受理で取り除き、AGAIN で残す)。宣言は lan_boot.h。
 - DMA の pool は BSS (image の予約の中)。実際の像での収容の確認は段 P26 の link map。
 

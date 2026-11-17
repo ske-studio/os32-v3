@@ -118,7 +118,7 @@
 - PPC の IRQ handler からは、非局所の出口 (longjmp・kill・exec_pending_transfer) を出さない。.Ltrap_busy が残り、次の PR=0 の IRQ が fatal になるため。
 - W4gの見込みの根拠: longjmpの着地 `exec/exec_launch.inc:336`・`exec/exec_schedule.inc:246` は _enable、PPCのsetjmp.Sは深さを復元する。IRQ frameはtrap slotでexec_kernel_spを読まない。arch_entry_enter・arch_user_resumeは先にppc_irq_save（`arch/ppc/exec_enter.S:11`・`arch/ppc/exec_resume.S:11`）。x86もsys_exitでIF=1のまま同じ着地へ進む。これらは確認を省く根拠ではなく、追加修正が不要と見込む根拠。
 - W4cの完了条件: kernel_trap.cを組むhost試験 `tools/ppc/test_user_trap_host.c`・`tools/ppc/kboot_dec_host.c`・`tools/tests/ppc_hostfs_io.c` に ppc_enable/ppc_irq_save のstubを用意する（ROLES §4-3）。追従はW4fの補助段に割り当て、W4cと同じ統合枝で検証する。
-- W4eでprobeをカーネルへ組み込む場合は order.mk・common.mk・build_profile_x86.json・ppc-kboot.mk の4か所を追従する。補助段は前2ファイル/後2ファイルの各2ファイル・各≤80行とし、1段3ファイル上限を守る。
+- W4eでprobeをカーネルへ組み込む場合は order.mk・common.mk・build_profile_x86.json・build/targets/ppc-powermac.mk の4か所を追従する。補助段は前2ファイル/後2ファイルの各2ファイル・各≤80行とし、1段3ファイル上限を守る。
 
 |試験/契約|受入の観測（ゲストはPM担当）|一意anchorの変異・RED条件|
 |---|---|---|

@@ -110,12 +110,12 @@ int input_legacy_wait(int mode, int interruptible);
 | ③c capture 期限 | HAL 4c に含める (本線に H7 として依頼)。HAL が入れない場合は、③c を kernel/input_wait.c (共通) の実装の段に替える (1〜3 ファイル) | bridge の wait 開始起点 (x86 と同じ kbd.c:754・:792)、FREEZE 閉鎖、期限後の文字の待ちは CR・キーの待ちは ESC、STOP、END/owner 回収を検証。con_sink 通知の段は設けない |
 | ③d 出力・shell 起動 | d1: console_stream・console_log、d2: shell_putchar・shell_boot（各 2 ファイル） | d1→d2 の順で出力・起動を結線。T1 変異、fault 再起動と既存像ビルド |
 | ④ 共通 shell（直列） | rshell.c/rshell_lan.c/shell.h、main.c、profile.h | final の APP 専用実体。local try の行頭優先・半行 LAN 保留・exit。共通 rshell/capture/owner 回帰、x86 build_compare MATCH を目標 |
-| ⑤ 像 | ppc_kernel.c、ppc-user.mk、ppc-kboot.mk | final の専用 sh.bin/root・出力先・ROOT_BINS 依存、SH+LINK 許可、KBOOT_SHELL+LINK 拒否。旧 TU/HostFS 除外、bridge/provider のリンク閉包と map を確認 |
+| ⑤ 像 | ppc_kernel.c、ppc-user.mk、build/targets/ppc-powermac.mk | final の専用 sh.bin/root・出力先・ROOT_BINS 依存、SH+LINK 許可、KBOOT_SHELL+LINK 拒否。旧 TU/HostFS 除外、bridge/provider のリンク閉包と map を確認 |
 | ⑥ QEMU | sc_run.py、ppc_sh_output.py、link_run.py | 7450/7455 で下表。新 agent/プロトコルなし。変更試験の --mutate と lint、HAL 共同試験を重複作成しない |
 - 段の順: ② → ③a → (HAL 4c、③c を含む) → ③b-1 → ③b-2 → (HAL 4b) → ④ → ⑤ (③d を含む) → ⑥。③d は link-SH の像にしか効かず、その像は ⑤ で作るので、⑤ にまとめた (2026-11-15、本線 PM 了承)。⑤ が大きければ ⑤a 像・⑤b 出力 (旧 ③d1)・⑤c 起動 (旧 ③d2) に分ける。HAL 4b は「③b の local を共通の cooked ring に結び替え、③b-1 の peek を消す」段。③d は ③a の後なら ③b・HAL 4b と並べてよい (4c が遅れたら ③d を先に進める)。③b は peek の pump (input_boot.c:31) を消すので、③a の像別の work の登録より先に入れない (PLN1 の LAN の入力が止まる)。③d は ③a の後なら ③b と並べてよい。
 - ③d: PLN1 の像の出力の側の直接の poll (console_stream.c:12・shell_putchar.c:9 の pm_terminal_poll) は残す。idle_work の登録と重なっても、LAN は lan_service.c:248-249 の poll_at を先に進めるので入れ子の 2 回目は何もしない。USB は 10ms の間引きと irq_save で守られる。この 2 つを受入の「二重登録なし」の根拠にする。link-SH の像では、旧端末の TU が外れるので、この直接の poll も無くなる。
 - ③a〜d（d は d1/d2）の各小段は試験・ビルド一覧の変更も含め 1〜3 ファイル・400 行以下とし、超える場合は同じ段内でさらに分割する。各小段で組める状態を保つ。共通 shell は final のとおり直列。
-- ③の完了条件に、新規ソースの ROLES §4-3 追従（build/sources/order.mk、build/sources/common.mk または arch/platform 一覧、tools/tests/fixtures/build_profile_x86.json の C_KERNEL、PPC は build/ppc-kboot.mk）と選択・リンク確認を含める。io_pump.c は追加しない。
+- ③の完了条件に、新規ソースの ROLES §4-3 追従（build/sources/order.mk、build/sources/common.mk または arch/platform 一覧、tools/tests/fixtures/build_profile_x86.json の C_KERNEL、PPC は build/targets/ppc-powermac.mk）と選択・リンク確認を含める。io_pump.c は追加しない。
 - host_notice 共通本体無変更、serial_* 不在、必要 flag だけ実体化、正常/異常の owner 回収、生成物手編集禁止は final のとおり。
 
 ## 6. 受入と変異（H=host、Q=QEMU 7450/7455 両方）
@@ -155,7 +155,7 @@ int input_legacy_wait(int mode, int interruptible);
 ## 確定の後に決めたこと (2026-11-15、PowerPC PM)
 - 段の順と HAL 4c: ③a は HAL 4c より先に出した (ユーザー決定 11-15、本線 PM の休止を受けて)。§5 の段の順を正とし、§3 と §7 の「HAL の 1p・1a・1b・4c は P3 ③ の厳密な前提」は、入力に触る ③b 以降の前提と読む。
 - ② (main 620c5237): PLN1 の像の host_mailbox_commit は、void の宣言のまま無処理にした (stage が NOSYS を返し、kapi_host_notice の本体が先に戻るので commit は呼ばれない)。
-- ③a (main 0ab4a885): pm_link_service_once (link-SH の前景の仕事) は段 ⑤ に移した。今の link 像は shell の無い診断像で、USB を組まない (build/ppc-kboot.mk の KBOOT_LINK と KBOOT_SH の排他)。⑤ で link-SH の像に USB を入れるときに、一緒に作って登録する。③a は、PLN1 の像 (KBOOT_SH=1) の terminal_service_once の登録 (platform/powermac/ppc_kernel.c、再入防止つき) と、usb_boot.c の注釈だけを入れた。各像の idle_work の登録数は、PLN1 の像が 1/4 (terminal_service_once)、link の診断像が 1/4 (net_rx_idle)。
+- ③a (main 0ab4a885): pm_link_service_once (link-SH の前景の仕事) は段 ⑤ に移した。今の link 像は shell の無い診断像で、USB を組まない (build/targets/ppc-powermac.mk の KBOOT_LINK と KBOOT_SH の排他)。⑤ で link-SH の像に USB を入れるときに、一緒に作って登録する。③a は、PLN1 の像 (KBOOT_SH=1) の terminal_service_once の登録 (platform/powermac/ppc_kernel.c、再入防止つき) と、usb_boot.c の注釈だけを入れた。各像の idle_work の登録数は、PLN1 の像が 1/4 (terminal_service_once)、link の診断像が 1/4 (net_rx_idle)。
 
 - **sys_yield の訂正 (2026-11-15):** §2 の「sys_halt は返値を捨て、sys_yield は返す」(両方を ppc_kapi_wait_once に結ぶ) は誤り。② でそのとおり結んだところ、arch-ctx-guest の lifecycle (exec_start の子が sys_yield で park して state 4 になる) が壊れた (② の a12d0ec8 から、CI の段 2 の準備で発見)。sys_yield は x86 と同じ exec_sys_yield (park の点、idle_work_run を自分で呼ぶ) に戻し、ppc_kapi_wait_once は sys_halt だけに結ぶ。
 - **HAL 4c の順の入れ替えで決めたこと (2026-11-15、本線 PM の依頼と Opus のレビュー F3・F4 を受けて PowerPC PM が反映):**
@@ -191,12 +191,12 @@ int input_legacy_wait(int mode, int interruptible);
 
 |食い違い ID|前提・見込みと実物（根拠）|必要な修正|
 |---|---|---|
-|E1|確定設計 §5:147・§6:190–192 は resident CLI。`build/ppc-kboot.mk:101` の KBOOT_SHELL と SH は別物|P3 の対象を SH に改訂|
+|E1|確定設計 §5:147・§6:190–192 は resident CLI。`build/targets/ppc-powermac.mk` の KBOOT_SHELL と SH は別物|P3 の対象を SH に改訂|
 |E2|SH に全ソースは入る (`build/ppc-user.mk:39`) が `userland/ppc/sh/profile.h:4` は SHELL_AS_APP。`userland/shell/main.c:128` は rshell 登録を除外、`rshell.c:364,478,610` は LAN 実行・poll・コマンド入口を除外|単なる KAPI 結線では不可。共通 rshell のアプリ対応が必要|
 |E3|`exec/exec_kapi_init.inc:508,559` は代入だけ。PPC の host provider は `sdk/kapi_target_ppc.py:156,251` の absent、notice_serial は `:266` の ZERO_SLOTS、include は `sdk/gen_kapi.py:520` の除外対象|slot・ZERO_SLOTS・include とリンク対象を一緒に直す|
 |E4|`rshell.c:445,475,496` は serial 初期化・ser_wd・rsh_serial_follow に依存。sys_halt は `sdk/kapi_target_ppc.py:7` の void 無処理、sys_yield は `sdk/kapi.json:1513` から exec_sys_yield。`arch/ppc/exec_kapi.c:1–7` は表だけで待機 endpoint は無い|APP 入口を別に定義し、PPC halt/yield を同じ新 endpoint に結ぶ|
-|E5|SH+LINK は error (`build/ppc-kboot.mk:17`)。出力先は LINK 優先で `/link` になり診断像と衝突 (`:37`)|組合せを許可し `/link/sh` を分離|
-|E6|SH は旧 HostFS も組む (`build/ppc-kboot.mk:137`)。`hostfs_peer.c:14` は共通 mailbox と同名 host_alive_snapshot、`lan_service.c:98,108` の PLN1 FS 口は link で消える|P3 link-SH は旧 HostFS を組まない。SFS on link は P4|
+|E5|SH+LINK は error (`build/targets/ppc-powermac.mk`)。出力先は LINK 優先で `/link` になり診断像と衝突 (`:37`)|組合せを許可し `/link/sh` を分離|
+|E6|SH は旧 HostFS も組む (`build/targets/ppc-powermac.mk`)。`hostfs_peer.c:14` は共通 mailbox と同名 host_alive_snapshot、`lan_service.c:98,108` の PLN1 FS 口は link で消える|P3 link-SH は旧 HostFS を組まない。SFS on link は P4|
 |E7|`shell_boot.c:33` は TERM_OPEN/USB 打鍵待ち。`input_boot.c:21,31` と `console_stream.c:11` は link 像から外される terminal TU に依存|起動待ち・poll・入力・出力を PLN1 から切り離す|
 |E8|`arch/ppc/exec_enter.S:25` は USER を EE=1 で起動し、USER 復帰ごとに DEC が進む。不足は `terminal_input.c:73–78` の USB poll と `lan_service.c:291–299` の bind/mailbox 初期化を含む前景処理|EE の窓は不要。前景処理だけを待機 endpoint から 1 回進める|
 |E9|`arch/ppc/exec_reclaim.c:4` の host owner 回収は空|owner 終了・異常終了で handle 回収を結線|
@@ -272,7 +272,7 @@ int input_legacy_wait(int mode, int interruptible);
 |② provider|H3 device_host.c、H4 exec_reclaim.c、H8 kapi_target_ppc.py、H9 gen_kapi.py、PPC exec_kapi.c/.h、PLN1 mailbox stub、必要な build リンクリスト、T1|halt/yield は当段では従来動作を包む共通 endpoint とし、③で link-SH の helper 呼出しを接続。host/notice・flag provider と stub を同段でリンク。test_kapi_binding.py・test_remote_x9.py を更新し、新 test_ppc_rshell_link.py の provider/owner 試験とともに --mutate。両 PPC 像が組めることを確認|
 |③ 前景と入出力|新 arch/ppc/io_pump.c (N4 の口)、H1/H2 link_platform.c/.h、I1 input_boot.c、I2 console_stream.c、I3 console_log.c、I4 shell_putchar.c、S4 shell_boot.c、endpoint、T1|EE 不変で USB/LAN 各 1 回。旧 terminal 依存を除き、capture/STOP/入力期限と fault 後再起動。T1 の前景/入力/capture 変異と既存像ビルド|
 |④ 共通 shell（直列）|S1 rshell.c・rshell_lan.c・shell.h、S2 main.c、S3 profile.h|APP init/loop と execute/handoff の専用実体、USB 行と exit 契約。共通の受入済み経路は保持。共通 rshell/capture/owner 試験、APP の行頭/半行/exit 試験、x86 build_compare MATCH を目標|
-|⑤ 像|B1 ppc_kernel.c、B2 ppc-user.mk、B3 ppc-kboot.mk|SH+LINK 許可、KBOOT_SHELL+LINK 拒否。kernel は /link/sh、remote SH は別出力。ROOT_BINS（ppc-kboot.mk:47）とその依存・再帰 make の出力先も専用 sh.bin へ切替。専用 root の中身を照合し、旧 HostFS/TU を除外。PLN1 SH・link 診断像もビルド|
+|⑤ 像|B1 ppc_kernel.c、B2 ppc-user.mk、B3 build/targets/ppc-powermac.mk|SH+LINK 許可、KBOOT_SHELL+LINK 拒否。kernel は /link/sh、remote SH は別出力。ROOT_BINS（build/targets/ppc-powermac.mk）とその依存・再帰 make の出力先も専用 sh.bin へ切替。専用 root の中身を照合し、旧 HostFS/TU を除外。PLN1 SH・link 診断像もビルド|
 |⑥ QEMU|T2 sc_run.py、T3 ppc_sh_output.py、T4 link_run.py|7450/7455 の既存機構で §6 を実行。T3 は USB/LAN のみ。新 agent/プロトコルを作らず、変更試験の --mutate と lint を実行|
 - 一段を 1 ファイルへ分断しない。②で必要なリンクリストは先に整え、⑤は像選択と専用出力を完成させる。生成器の変更と再生成は②で一体化し、PLN1 SH と link-SH の未定義参照を残さない。
 - net/link・kernel/con_sink・exec 共通本体は原則無変更。既存終了口に回収不足が見つかった場合は②に補修と試験を含める。

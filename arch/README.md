@@ -87,7 +87,7 @@ x86 にしか意味の無い仕組みなので `include/` に契約を置かず�
    `build/images/<IMAGE>.mk` が機能の値を決める。共通の場所の持ち物は
    `build/sources/common.mk` に機能ごとの組 (`C_COMMON_<機能>`) で宣言し、
    arch・platform の持ち物も同じ機能の名前の組で宣言する。PowerPC の製品の像
-   (`build/ppc-kboot.mk`) もこの所有者集合から引く
+   (`build/targets/ppc-powermac.mk`) もこの所有者集合から引く
    ([docs/design/build/select.md](../docs/design/build/select.md))。
    `build/targets/<arch>-<platform>.mk` は製品の到達点を定める。
    `sdk/target_profile.py` は module codec・配置・guard の能力を定め、
@@ -138,8 +138,8 @@ ARM 実装は別票で行う。
 `make ARCH=ppc PLATFORM=powermac [IMAGE=<名>]` は PowerPC の製品の像
 `PPCKERN.ELF` を組む。ソースは x86 と同じ所有者集合 (`build/select.mk`) から
 像の構成 (`build/images/kboot-*.mk`、既定は `kboot-link`) で選び、規則は
-`build/ppc-kboot.mk` が持つ (最上位からは sub-make で呼ぶ。道具は
-`make -f build/ppc-kboot.mk KBOOT_LINK=… KBOOT_SH=…` の旗でも同じ像を選べる)。
+`build/targets/ppc-powermac.mk` が持つ (最上位からは sub-make で呼ぶ。道具は
+`make ARCH=ppc PLATFORM=powermac KBOOT_LINK=… KBOOT_SH=…` の旗でも同じ像を選べる)。
 出力は `build/out/ppc-kboot/` の下、コンパイラは `PPC_CROSS_DIR`
 （既定 `/home/hight/opt/cross-ppc`）から選ぶ。SDK/module/deploy は明示エラーとなる。
 x86 の feature off は compile-only である。

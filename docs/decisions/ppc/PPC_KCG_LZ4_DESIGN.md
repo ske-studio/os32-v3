@@ -80,18 +80,18 @@ L0単独では非圧縮製品を保つ。圧縮製品への切替とL1収録を�
 | 再現性 | 固定版・同一入力の2回生成でbytesとSHA一致 | 予約欄を非0にして期待header検査がRED |
 
 ## 3. L1 — loader と収録（受け手: PowerPC）
-触るファイル: drivers/video/kcg/kcg_file.c、lib/lz4.cの冒頭注記、build/ppc-kboot.mk、loader/統合試験。
+触るファイル: drivers/video/kcg/kcg_file.c、lib/lz4.cの冒頭注記、build/targets/ppc-powermac.mk、loader/統合試験。
 -O0は維持する。理由: lib/lz4.c:13–15の最適化不具合の注意を解除する根拠がないため。
-ppc-kboot.mkのKB_Cへlib/lz4.cを追加し、専用objectに次の1行を置く（program用objectを流用しない）。
+build/targets/ppc-powermac.mkのKB_Cへlib/lz4.cを追加し、専用objectに次の1行を置く（program用objectを流用しない）。
 ```make
 $(KB_OUT)/lib/lz4.o: KB_TU_FLAGS += -O0
 ```
 既存compile recipeは $(KB_FLAGS) $(KB_TU_FLAGS) の順なので、この指定を最後の最適化指定として有効にする。
 lib/lz4.c:9–13の注記を「programとPPC kernelの専用objectへリンク、両者の最適化設定は各build規則を参照」に訂正する。
 実物programs.mk:207–208はPROGRAM_FLAGSを使用し、専用-O0は直接書かれていない。注記の「設定済み」は転記しない。
-build編集順: ①loaderと試験 ②ppc-kboot.mkのソース追加・上記TU指定を一緒に編集 ③PPCビルドと0/1受入 ④L0製品切替。
+build編集順: ①loaderと試験 ②build/targets/ppc-powermac.mkのソース追加・上記TU指定を一緒に編集 ③PPCビルドと0/1受入 ④L0製品切替。
 完了条件に追加: KB_FLAGS（-Wall -Wextra -Werror）と -O0 で lz4.c に警告が出たら lz4.c の側を直す（G3）。
-R系の完了は前提にしない。ppc-kboot.mkの他作業との順序・所有はPowerPC PMが調整する。
+R系の完了は前提にしない。build/targets/ppc-powermac.mkの他作業との順序・所有はPowerPC PMが調整する。
 既存build/ppc-ram-root.jsonのフォント収録パスとライセンスは維持し、生成済み圧縮ファイルを既存経路で収録する。
 
 | 受入 | 正常対照（未変異でPASS） | 変異（実行時RED） |

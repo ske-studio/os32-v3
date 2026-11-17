@@ -2,7 +2,7 @@
 """Verify every KCG cell against the EBDT bitmap and the PPC root manifest."""
 CHECK = dict(name='kcg-ebdt', tier=1, needs=['make:all', 'make:assets/fonts/shino16.kcgfont', 'make:unicode_bin'], budget=60,
              covers=['tools/gen_font16.py', 'tools/gen_g16.py', 'tools/mkroot_image.py',
-                     'build/ram-root.mk', 'build/ppc-kboot.mk', 'build/assets.mk', 'build/font-fetch.mk',
+                     'build/ram-root.mk', 'build/targets/ppc-powermac.mk', 'build/assets.mk', 'build/font-fetch.mk',
                      'assets/fonts/**', 'tools/fetch_fonts.py',
                      'tools/gen_unicode.c', 'lib/unicode_jis_table.h', 'kernel/console/unicode_file.h',
                      'include/endian_le.h', 'include/types.h', 'include/callconv.h',

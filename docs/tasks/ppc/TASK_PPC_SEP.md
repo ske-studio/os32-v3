@@ -27,7 +27,7 @@
 |---|---|---|
 | 共通のソースが機種・装置のヘッダを読まない | 層の検査の違反は x86-pc98・ppc-powermac とも 0。共通が装置の関数を使う所は `include/<名>_contract.h`、機種ごとに差し替えるヘッダは固定名 `platform_<名>.h`、機種のソースは持ち主の置き場 | `tools/check_layers.py` (基準 `tools/layers_baseline.json` は空。直し方は設計書 `docs/design/tools/check_layers.md` §8) |
 | 共通の置き場のソースは両方の arch で組める | PowerPC の像に入っていない共通のソース (`C_COMMON_PC98_PENDING`) も PowerPC のコンパイラを通す | `make ppc-ci-image` の `common-compile` (CI の ppc-compile) |
-| ビルドのソースの選択は 1 か所 | 所有者集合 `build/select.mk` (共通・arch・platform・機能)。PowerPC の像は `make ARCH=ppc PLATFORM=powermac [IMAGE=kboot-*] kernel` | `build-selection-host` (設計書 `docs/design/build/select.md`) |
+| ビルドのソースの選択は 1 か所、入口の Makefile は 1 本 | 所有者集合 `build/select.mk` (共通・arch・platform・機能)。PowerPC の像は最上位の `make ARCH=ppc PLATFORM=powermac [IMAGE=kboot-*] kernel` で、規則は `build/targets/ppc-powermac.mk`、像は名前か旗 (`build/images/ppc-flags.mk`) で選ぶ | `build-selection-host` (設計書 `docs/design/build/select.md`) |
 | 入口の骨格は 1 本 | `init/kernel_start.c` (局面の中身は `platform/pc98/kernel.c`・`platform/powermac/ppc_kernel.c`) | 設計書 `docs/design/init/kernel_start.md` |
 
 第 5 段で見送った 3 点 (PEGC の診断と raster の移設、gfx の共通ヘッダの pc98.h の依存、共通の core に残る backend の名前) は解消した: `gfx_vram.c` は `drivers/video/pc98/` へ、`gfx/gfx.h`・`gfx_internal.h`・`palette.h` は PC-98 のヘッダを読まない。
@@ -36,7 +36,6 @@
 
 | # | 残件 | 要る物 |
 |---|---|---|
-| 1 | `build/ppc-kboot.mk` の規則を target の定義へ畳み込む | 試験・道具 45 本の呼び方 |
 | 2 | PowerPC の像の `-D` の名前の差し替え 11 件 (kprintf の行き先など) を口にする | PowerPC の振る舞いが変わるので QEMU の受入 |
 | 4 | exec のフック 14 本を、提供者が像に在る物から PowerPC で本物に | 同上 |
 | 5 | contract で残った、リンクの時の装置の名前 (`geforce_foreground_poll` など) を実行時の口に | 本線の HAL の段 |

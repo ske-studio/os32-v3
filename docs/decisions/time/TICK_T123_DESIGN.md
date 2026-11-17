@@ -32,7 +32,7 @@
 | X4 | net_rx_take は取り出しだけ | `net/nic_rx.c:73-75` は IF=0 で net_nic_poll_once を呼ぶ。新しい協調処理をここから強制実行できない |
 | X5 | PCM slot1 の観測は毎物理 tick | `kernel/irq/tick.c:25` は論理 dispatch、`pcm_cs4231.c:429-431` はそこから advance。救済の観測間隔は約 10ms。1ms と仮定しない |
 | X6 | PCM の tick はコピーだけ | `pcm_cs4231.c:406-418` は PI ACK・停止・再始動も担う。コピーを外しても停止期限の進行は残す |
-| X7 | GEM も既存 net/nic の口 | `build/ppc-kboot.mk:58-69` は専用 LAN と GEM、`platform/powermac/lan_service.c:143-158` は PLN1。`net/nic.c` の OS32 demux とは別プロトコル |
+| X7 | GEM も既存 net/nic の口 | `build/targets/ppc-powermac.mk` は専用 LAN と GEM、`platform/powermac/lan_service.c:143-158` は PLN1。`net/nic.c` の OS32 demux とは別プロトコル |
 | X8 | IRQ0 から IRQ10 へコピーを新設する | `pcm_cs4231.c:390,423-427` は既に IRQ10→advance→copy。IRQ0 のコピーは IF=0 窓で half を跨いだ場合。slot1 120µs の内訳は未測定なのでコピー元別に計測する |
 
 - 実測根拠: `RESULT_realhw2.md` 第4回（run/tick-a3）。IRQ0 最大 184.7µs、slot1 最大 120µs は余裕が小さい。PIT 読み平均 3.8µs（PCM 中 5.9µs）。

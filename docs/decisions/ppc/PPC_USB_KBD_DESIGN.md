@@ -135,7 +135,7 @@ void usbp_input_key_repeat(u8 src, u8 sc) {
 | platform/powermac/usb_platform.c | 既存 src 管理・ログを残したまま callback から接続、keyboard release を種類で分岐 |
 | platform/powermac/input_boot.c | LAN/USB の選択、先読み、drop 照会。input_decode.c の LAN 変換は維持 |
 | platform/powermac/shell_boot.c | 待ちを LAN OPEN または USB FIFO 非空に変更。最初の USB キーを保持 |
-| build/ppc-kboot.mk | 上記2個の .c を sh 像だけに追加。対象の規則本体は実装時に確認する |
+| build/targets/ppc-powermac.mk | 上記2個の .c を sh 像だけに追加。対象の規則本体は実装時に確認する |
 | ＋tools/tests/ppc_input_usb_host.c | 状態・変換・FIFO・provider 合流の host 試験（製品関数を実行） |
 | ＋tools/checks/ver-ppc-input-usb.py | host の実行と一意な変異。CHECK に全製品入力・header・試験本体を列挙 |
 | tools/ppc/usb_run.py / sc_run.py | 製品像の sh 受入を追加、既存 probe と LAN 遅延起動受入を保持。下記4本の anchor と件数検査を追従。CHECK の入力・covers を追従 |

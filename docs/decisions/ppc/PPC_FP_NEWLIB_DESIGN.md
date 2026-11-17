@@ -31,7 +31,7 @@ AC-LIBC-1 (`docs/decisions/ARCH_COMPAT_CONTRACT.md:129`) と AC-BUILD-1 (:130) �
 |D2|`arch/ppc/arch_exec_storage.h:14-15`|保存域 1B/align1。264B/align8 にする|
 |D3|`arch/ppc/ppc_oea.h:6-14`、`kernel_vectors.S:455`|FP/FE の定義と例外内 FP 有効化が無い。明示使用区間を設ける|
 |D4|`arch/ppc/kernel_trap.c:106-118`|USER の 0x800 は汎用 kill、特権側は unknown。専用理由を付ける|
-|D5|`build/arch/ppc.mk:9`、`build/ppc-kboot.mk:153`、`build/ppc.mk:16-17`|全体 soft-float、CPU は 7450。kernel は -mcpu=7450 維持。USER/SQLite TU を hard-float・750 互換にする|
+|D5|`build/arch/ppc.mk:9`、`build/targets/ppc-powermac.mk`、`build/ppc.mk:16-17`|全体 soft-float、CPU は 7450。kernel は -mcpu=7450 維持。USER/SQLite TU を hard-float・750 互換にする|
 |D6|`build/ppc-user.mk:29-30,75-76`|libc/libgcc/adapter/syscalls がリンクされない|
 |D7|`sdk/crt/ppc/start.c:13-16` 対 `sdk/crt/crt0_c.c:44-53`|_init と help の共通動作が無い|
 |D8|`sdk/link/ppc/app.ld:10-30`|small-data/GOT/fixup の明示配置が無い|
@@ -102,7 +102,7 @@ void ppc_kernel_fp_end(const struct ppc_kernel_fp_guard *g);
 - 共通と kboot の双方で TU ごとの旗を一意に指定。後置で偶然上書きする形を避け、soft/hard の二重指定を検査する。
 - hard-float TU は整数だけの関数にも FP load/store を使いうる (コピー最適化等)。`-fno-builtin` だけに頼らず一般 kernel は soft-float のまま、最終逆アセンブルで拒否する。
 - FP 許可 TU の整数公開口だけを `sqlite_engine_run` 経由で呼ぶ。将来の sqlite_entry/object 全体を allowlist にし、任意の kernel object を許可しない。
-- `build/ppc-kboot.mk` は GCC driver による no-undefined と整数命令監査がある。FP 三関数と stack/guard の関数範囲だけ監査例外を追加し、残りの禁止を維持。
+- `build/targets/ppc-powermac.mk` は GCC driver による no-undefined と整数命令監査がある。FP 三関数と stack/guard の関数範囲だけ監査例外を追加し、残りの禁止を維持。
 - 各 ELF は `powerpc-elf-nm -u` が空、map に libgcc/libc が無いことを確認。hard-float でも i64 変換・long double・整数除算の helper は残りうる。
 - IME の SQLite object には `nm -u`、最終 map/`objdump -dr` で `__*df*`/`__*sf*`/`__*di*` 等を列挙。通常 float/double は FPU 命令で満たし、不足 helper は必要な bit/整数算法だけ OS32 `lib/` に BSD/MIT 根拠で実装する別段へ。libgcc 追加や成功 stub で塞がない。
 - kernel/boot の -mcpu=7450 は維持する。750 互換は USER と SQLite TU の命令だけに求め、最終 ELF の該当範囲を逆アセンブルして監査する。archive 自体は ISA 判定対象にしない (_restvr_* の未抽出 member による誤検出を防ぐ)。不適合なら同版・同 configure・無改変で750向けに再構築する。x86 は再構築しない。
@@ -164,7 +164,7 @@ void sqlite_call_on_alt_stack(void (*call)(void *), u32 top, void *frame);
 |newlib/adapter/CRT|各 USER bin、root image 経由で kboot にも|小 app 20〜60KiB、%f 使用 app 40〜100KiB、shell 30〜100KiB (旧部品の減少を差引)|同梱 bin 数 × 増分が支配的|
 |SQLite 本体/別 stack|IME 段の kernel/module|今回0、本体は次段で実測|今回の余裕を本体込みと誤認しない|
 
-- `arch/ppc/kernel.ld:37,54-59` の file/resident/chain end を個別に記録し、常駐像サイズ (__kernel_resident_end - __kernel_image_start) の上限 `0x275000` と照合する。root_image_blob.o は、KB_EXEC が有効な像 (KBOOT_SH=1 か KBOOT_SHELL=1、build/ppc-kboot.mk:36・98-136) では build/ppc-kboot.mk:127 の KB_EXTRA に常に入り、その増分も算入する。KBOOT_SH=0 の診断像には入らない。別に heap 等を含む最終 chain を PM_KERNEL_CHAIN_LIMIT と照合する (同じ上限と取り違えない)。
+- `arch/ppc/kernel.ld:37,54-59` の file/resident/chain end を個別に記録し、常駐像サイズ (__kernel_resident_end - __kernel_image_start) の上限 `0x275000` と照合する。root_image_blob.o は、KB_EXEC が有効な像 (KBOOT_SH=1 か KBOOT_SHELL=1、build/targets/ppc-powermac.mk・98-136) では build/targets/ppc-powermac.mk の KB_EXTRA に常に入り、その増分も算入する。KBOOT_SH=0 の診断像には入らない。別に heap 等を含む最終 chain を PM_KERNEL_CHAIN_LIMIT と照合する (同じ上限と取り違えない)。
 - 上限は正典の layout 定数を使い、設計の値を build に複写しない。上限直前の予算だけで合格にせず linker ASSERT と iso/ELF の実サイズを通す。
 - N3 の全 USER を詰めた像で再測定し、超過なら test apps を外部試験媒体に置く。製品 shell の機能を削ったり窓を拡大して通さない。
 
@@ -185,7 +185,7 @@ void sqlite_call_on_alt_stack(void (*call)(void *), u32 top, void *frame);
 |B通常復帰|arch/ppc/kernel_vectors.S|変8|USER SRR1 の FE をマスク|
 |B理由定義|arch/ppc/ppc_trap.h|変3|0x800 専用理由の enum 追加|
 |B fault|arch/ppc/kernel_trap.c|変12|0x800 専用理由|
-|B登録|build/ppc-kboot.mk|変20|FP objects/audit登録、CPU 7450 維持|
+|B登録|build/targets/ppc-powermac.mk|変20|FP objects/audit登録、CPU 7450 維持|
 |B旗|build/arch/ppc.mk|変10|kernel 7450 維持、USER hard-float 分離|
 |B boot|build/ppc.mk|変更なし|7450、soft 維持|
 |B監査|tools/ppc/kboot_audit.py|変60|限定 FP 許可、無関係命令は禁止|

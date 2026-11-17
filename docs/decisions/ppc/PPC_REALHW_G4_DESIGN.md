@@ -45,7 +45,7 @@
 | D4 | 「切離し後も OF 画面でログが読める」ではない | `kernel_boot.c:231` で detach、`kboot_console.c:63-65` は画面能力なし。FB の段表示が必要 |
 | D5 | 「USB PowerMac の殻はこれから全部作る」ではない | `kboot_capture.c:197-198` は sh 像で USB 採取、`usb_boot.c:41-54` に OCR/IR 静止、`usb_platform.c:16` に専用 pool |
 | D6 | 「カメラが G4 を見ている」ではない | PACK の現状は左の PC-98。RA266 §3-1 の約 5fps の観測を右へ向けてから開始 |
-| D7 | RAM root は既に ELF に同梱済み | `arch/ppc/kernel.ld:20-22`、`build/ppc-kboot.mk:36,90`、`root_image.c:5-8`、`root_boot.c:4`。追加実装不要 |
+| D7 | RAM root は既に ELF に同梱済み | `arch/ppc/kernel.ld:20-22`、`build/targets/ppc-powermac.mk`、`root_image.c:5-8`、`root_boot.c:4`。追加実装不要 |
 
 - 上記の食い違いは設計上の前提の訂正数。実機の故障を検出した数ではない。
 - `gmac_tree.c:122` の root_pa は PCI bridge。clock の `0xf8000020` を root_pa+0x20 としてはいけない。

@@ -19,7 +19,7 @@ CHECK = dict(env=['ppc-cross', 'qemu-ppc'], name='ppc-fb', tier=2, budget=900, n
     'tools/serialfs_host.py', 'tools/host_tree_manifest.py', 'tools/host_image.py', 'tools/lan_bridge.py',
     'tools/gen_memmap.py', 'sdk/gen_kapi.py', 'tools/gen_font16.py',
     'tools/gen_g16.py', 'tools/gen_unicode.py', 'tools/mkroot_image.py',
-    'build/ppc-kboot.mk', 'build/ppc-user.mk', 'build/ppc-ram-root.json',
+    'build/targets/ppc-powermac.mk', 'build/ppc-user.mk', 'build/ppc-ram-root.json',
     'build/ram-root.mk', 'platform/powermac/ppc_kernel.c', 'arch/ppc/**',
     'platform/powermac/**', 'kernel/console/**', 'kernel/irq/tick.c',
     'kernel/time/tick.c', 'kernel/sys.c', 'drivers/video/of_fb/**',

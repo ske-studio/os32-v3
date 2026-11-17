@@ -18,7 +18,7 @@ from kboot_run import ROOT, ROM, QMP, command, require, serial, validate, lan
 
 CHECK = dict(name='ppc-sh-output', tier=2, budget=900, needs=[],
              covers=['tools/ppc/ppc_sh_output.py', 'userland/ppc/outprobe.c'],
-             inputs=['build/ppc-kboot.mk', 'build/ppc-user.mk',
+             inputs=['build/targets/ppc-powermac.mk', 'build/ppc-user.mk',
                      'platform/powermac/kboot_console.c', 'platform/powermac/console_stream.c',
                      'fs/vfs_fd.c', 'tools/ppc/kboot_accept.py', 'tools/ppc/kboot_run.py',
                      'tools/ppc/sc_run.py', 'tools/ppc_lan_host.py',

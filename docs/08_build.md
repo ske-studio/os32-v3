@@ -1224,8 +1224,8 @@ tools/ci_fetch.sh --dry-run             # 選ばれる run と artifact を表�
 [design/build/select.md](design/build/select.md))。
 
 PowerPC の `make ARCH=ppc PLATFORM=powermac [IMAGE=kboot-*]` は製品の像 `PPCKERN.ELF` を組む。
-ソースは x86 と同じ所有者集合から像の構成で選び、規則は `build/ppc-kboot.mk` が持つ
-(最上位からは sub-make で呼ぶ。`make -f build/ppc-kboot.mk` に `KBOOT_LINK`・`KBOOT_SH`・`KBOOT_SHELL`
+ソースは x86 と同じ所有者集合から像の構成で選び、規則は `build/targets/ppc-powermac.mk` が持つ
+(最上位からは sub-make で呼ぶ。`make ARCH=ppc PLATFORM=powermac` に `KBOOT_LINK`・`KBOOT_SH`・`KBOOT_SHELL`
 の旗を渡しても同じ像を選べる)。`PPC_CROSS_DIR=/home/hight/opt/cross-ppc`、出力は `build/out/ppc-kboot/` の下。
 module・SDK・配備へは進めない (明示エラー)。共通のソースが機種のヘッダを読む辺は
 `tools/check_layers.py` が両方の像で数える。

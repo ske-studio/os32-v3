@@ -3,6 +3,11 @@ ifeq ($(filter $(PLATFORM),pc98 powermac),)
 $(error unsupported PLATFORM $(PLATFORM))
 endif
 # 像の構成 (docs/design/build/select.md §3-1): 像が機能の値と順の式を決める。
+# PowerPC は旗 (KBOOT_*) でも像を選べるので、先に旗と IMAGE を突き合わせる。
+PPC_FLAGS_MK ?= build/images/ppc-flags.mk
+ifeq ($(ARCH),ppc)
+include $(PPC_FLAGS_MK)
+endif
 IMAGE ?= $(if $(filter powermac,$(PLATFORM)),kboot-link,pc98)
 ifeq ($(wildcard build/images/$(IMAGE).mk),)
 $(error unknown IMAGE $(IMAGE))

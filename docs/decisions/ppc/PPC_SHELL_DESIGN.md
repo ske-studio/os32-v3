@@ -315,7 +315,7 @@ VfsOps ramfs_ops = {
 |A21/W2|変更 arch/ppc/kernel.ld|section保持・symbol|10〜20|
 |A22a/W2|新規 platform/powermac/root_boot.c|名前の表の登録と mount の順 (root → /tmp)。常に組む|40〜70|
 |A22b/W2|新規 platform/powermac/cli_boot.c|resident_cli_ops の adapter (getkey・write・poll・cat・put)。KBOOT_SHELL=1 のときだけ組む|70〜110|
-|A23/W3|変更 build/ppc-kboot.mk|選択構成・blob・閉包リンク|50〜90|
+|A23/W3|変更 build/targets/ppc-powermac.mk|選択構成・blob・閉包リンク|50〜90|
 |A24/W3|変更 platform/powermac/ppc_kernel.c|S-A 選択時の開始|10〜25|
 |A25/W0 †|変更 fs/vfs.h|VFS_DEV_RAM 追加|1〜3|
 |A26/W0 †|新規 fs/ramfs/ramfs.h|上限・ops 宣言|20|

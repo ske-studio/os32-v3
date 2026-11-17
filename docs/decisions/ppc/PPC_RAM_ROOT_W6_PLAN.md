@@ -32,7 +32,7 @@ r1 で確認済みの食い違い5件は維持する。未実装の接続とは�
 |差1|設計:164,168 は RAM root を cd0 とする|`kernel/dev/ram_ro.c:32`、`init/boot_root.c:11` の rd0 を採用|
 |差2|設計:168 は boot_root 内で ISO 登録|現行登録は `platform/powermac/root_boot.c:14`。共通 init へ移す|
 |差3|設計:369 は rdN 対応を追加する段を記載|`fs/isofs/iso9660.c:377` は既に `VFS_DEV_RAM` を受ける|
-|差4|設計:180 は S-B で hello.bin 追加までを記載|`build/ppc-kboot.mk:127` は hello.bin と fault.bin を同梱済み|
+|差4|設計:180 は S-B で hello.bin 追加までを記載|`build/targets/ppc-powermac.mk` は hello.bin と fault.bin を同梱済み|
 |差5|設計:371 の vmkernel.lz4 293KiB|過去値としてのみ使用。現在の容量合格を意味しない|
 
 |維持する基礎|根拠・契約|
@@ -59,7 +59,7 @@ GPL の資料・コードおよび `docs/archive/` は参照していない。
 |不足|境目・対象|概算行|★|
 |---|---|---:|---|
 |C1 静的 ISO の build の口|新規 `build/ram-root.mk`、既存 ISO 非module経路|30〜60|有効化時★|
-|C2 root image/blob の build の口|同 mk、`build/ppc-kboot.mk`。ISO と任意の blob object を生成|40〜70|有効化時★|
+|C2 root image/blob の build の口|同 mk、`build/targets/ppc-powermac.mk`。ISO と任意の blob object を生成|40〜70|有効化時★|
 |C3 共通初期化と mount|`include/boot_root.h`、`init/boot_root.c`、PowerMac wrapper|40〜70|接続時★|
 |C4 内容・容量・名前の契約|`mkroot_image.py`、mkpkg 連携、容量確認用 host check|50〜90|入力変更時★|
 

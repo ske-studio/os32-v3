@@ -214,10 +214,10 @@ CLI像 ：RAM root → pm_exec_boot → pm_cli_boot
 
 |段|ファイル|行数|依存|共通の場所か|★か|追従する試験|回す check|
 |---|---|---:|---|---|---|---|---|
-|N01|`userland/ppc/nest.c`、`tools/ppc/sc_run.py`、`build/ppc-user.mk`、`build/ppc-kboot.mk` (root に足す bin の変数と試験用の出力先)|≤300|最初|PPC専用|なし|試験用root・nest反復・既存hello/fault|nest QEMU、USER build、L|
+|N01|`userland/ppc/nest.c`、`tools/ppc/sc_run.py`、`build/ppc-user.mk`、`build/targets/ppc-powermac.mk` (root に足す bin の変数と試験用の出力先)|≤300|最初|PPC専用|なし|試験用root・nest反復・既存hello/fault|nest QEMU、USER build、L|
 |P01|`userland/ppc/sh/profile.h`|≤80|なし|専用|なし|S01/S02 の既定展開・選択契約|X、L|
 |P02|`input_decode.c`、`input_boot.c`、`input_boot.h`（platform/powermac）|≤365|なし|専用|なし|I、既存LAN入力試験|I、L|
-|P03|`platform/powermac/kboot_console.c`、`build/ppc-kboot.mk`|≤120|N01 (同じ mk、直列)|PPC専用|なし|O、既存kboot出力・変異|O、既存対象試験、L|
+|P03|`platform/powermac/kboot_console.c`、`build/targets/ppc-powermac.mk`|≤120|N01 (同じ mk、直列)|PPC専用|なし|O、既存kboot出力・変異|O、既存対象試験、L|
 |P04|`exec_boot.c`、`shell_boot.c`、`shell_boot.h`（platform/powermac）|≤130|P02/P03|専用|なし|接続待ち・exit再起動・ロード失敗|SC、L|
 |U01|`runtime.c`、`format.c`、`runtime.h`（userland/ppc/sh）|≤300|P01|専用|なし|R、g_api/kapi一致、help色出力|R、L|
 |U02|`stdio.c`、`include/stdio.h`（同上）|≤220|U01|専用|なし|R、短いwrite・redirect・無操作stdio|R、L|
@@ -225,7 +225,7 @@ CLI像 ：RAM root → pm_exec_boot → pm_cli_boot
 |S01|`main.c`、`cmd_base.c`、`cmd_env.c`（userland/shell）|約120|P01/U01|共|なし|ver/hwb/about/mem、sh_shell、ver-shell-host|対象host試験、x86 programs、L|
 |S02|`userland/shell/sh_exec.inc`、`sh_launch.inc`|≤120|N01/P01|共|なし|sh_launch/status/truncation、X|対象host試験、x86 programs、L|
 |B01|`build/ppc-user.mk`|≤120|U01–03/S01–02|PPC専用|なし|R、既存ls/help、hello/fault|sh＋hello/fault build、R、L|
-|B02|`build/ppc-kboot.mk`、`platform/powermac/ppc_kernel.c`|≤180|P02–04/B01|PPC専用|なし|三像・NEGATIVE・既存消費者|三像build、対象kboot/LAN試験、L|
+|B02|`build/targets/ppc-powermac.mk`、`platform/powermac/ppc_kernel.c`|≤180|P02–04/B01|PPC専用|なし|三像・NEGATIVE・既存消費者|三像build、対象kboot/LAN試験、L|
 |T01|`tools/tests/ppc_sh_runtime.py`、`ppc_sh_input.py`|≤400|U/P|試験|なし|R/I の実ソース試験と変異|R/I --mutate、L|
 |T02|`test_ver_shell.py`、`test_hwb_shell.py`、`test_about_info.py`|≤200|S01|試験|なし|旧anchor・include・固定hash・dep-dir|各変更試験 --mutate、L|
 |T03|`test_mem_stat.py`、`sh_shell_host.c`、`tools/checks/ver-shell-host.py`|≤200|S01|試験|なし|同上、CHECK の入力追従|mem/sh-shell/ver-shell-host、L|
@@ -238,7 +238,7 @@ CLI像 ：RAM root → pm_exec_boot → pm_cli_boot
 - T02〜T05 の既存ファイルは anchor 等が変わる場合だけ編集し、不要な書換えはしない。
 - ラッパー `test_sh_shell.py`・`test_sh_status.py`・`test_sh_truncation.py` も対応段で実行する。
 - 新規試験は自身の CHECK に入力を宣言し、追加の登録ファイルが必要なら試験段側に含める。
-- N01→P03→B02 (build/ppc-kboot.mk)、N01→B01 (build/ppc-user.mk)、N01→T06 (sc_run.py) は同一ファイルを触るため直列にする。N01 (入れ子の実動作) を前提にするのは結線の段 S02・B01・B02 だけで、P02・P03 (mk 以外)・U01〜U03 は N01 を待たずに並列で出してよい。
+- N01→P03→B02 (build/targets/ppc-powermac.mk)、N01→B01 (build/ppc-user.mk)、N01→T06 (sc_run.py) は同一ファイルを触るため直列にする。N01 (入れ子の実動作) を前提にするのは結線の段 S02・B01・B02 だけで、P02・P03 (mk 以外)・U01〜U03 は N01 を待たずに並列で出してよい。
 - ls/help の流用元は変更不要。共通 exec・shell_service・InputOps 宣言も現時点では変更不要。
 
 **8. 変異・検査・延期**
@@ -278,8 +278,8 @@ r1→r2 の変更の数 13 / 反論の数 0
 
 
 ## 確定 (2026-11-12、Opus 5.5 の第 2 回の条件付き確定を PM が反映)
-- N2 (P2): N01 のファイルに build/ppc-kboot.mk (root に足す bin の変数と試験用の出力先) を加え、同じ mk を触る P03・B02 と直列にした (§7 の表)。
-- N3 (P3、PM 決定): fd1 の既定の出力を端末へ向ける結び替えは **fs/vfs_fd.c:528 の 1 か所 (fd1 の既定の出力) だけ**にする。console_write と kernel の kprintf はログのまま。PPC の第 3 像の build で fs/vfs_fd.o にだけ置き換えの名前を渡すか、platform の provider を介すかは P03 の実装で決める (kboot_accept の変異 build (ppc-kboot.mk:101-104) でも同じ形で組まれること)。共通の C のソースは変えない。
+- N2 (P2): N01 のファイルに build/targets/ppc-powermac.mk (root に足す bin の変数と試験用の出力先) を加え、同じ mk を触る P03・B02 と直列にした (§7 の表)。
+- N3 (P3、PM 決定): fd1 の既定の出力を端末へ向ける結び替えは **fs/vfs_fd.c:528 の 1 か所 (fd1 の既定の出力) だけ**にする。console_write と kernel の kprintf はログのまま。PPC の第 3 像の build で fs/vfs_fd.o にだけ置き換えの名前を渡すか、platform の provider を介すかは P03 の実装で決める (kboot_accept の変異 build (build/targets/ppc-powermac.mk-104) でも同じ形で組まれること)。共通の C のソースは変えない。
 - N4 (P3): N01 を前提にするのは S02・B01・B02 だけ。P01・P02・U01〜U03 は依存なしで並列に出せる (§7 の表を直した)。
 - N5 (P3): SH_LAUNCH_SYNC の選択は sh_exec.inc:89 の `#ifndef SHELL_AS_APP` と sh_launch.inc 末尾の sh_exec_result の 2 か所。既定値は userland/ppc/sh/profile.h (P01) が与え、shell.h には置かない (x86 は未定義 = 今の展開)。
 - N6 (P3): 端末の接続の判定は、platform/powermac の中に「接続しているか」を返す小さな関数を置く (pm_term_state は STATE の message を組み立てる関数なので使わない)。P04 に含める。

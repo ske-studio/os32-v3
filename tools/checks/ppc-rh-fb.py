@@ -22,7 +22,7 @@ CHECK = dict(env=['ppc-cross', 'qemu-ppc'], name='ppc-rh-fb', tier=2, budget=600
     'platform/powermac/ppc_kernel.c', 'platform/powermac/boot.c',
     'platform/powermac/mmu_boot.c', 'platform/powermac/mmu_start.c',
     'platform/powermac/platform_of_layout.h', 'platform/powermac/lan_boot.h',
-    'build/ppc.mk', 'build/ppc-kboot.mk', 'tools/ppc/rh_fb.py',
+    'build/ppc.mk', 'build/targets/ppc-powermac.mk', 'tools/ppc/rh_fb.py',
     'tools/ppc/kboot_boot.py', 'tools/ppc/kboot_boot_guest.c',
     'tools/checks/ppc-rh-fb.py', 'tools/ppc/kboot_vectors.py', 'tools/ppc/run.py',
     'tools/tests/kernel_includes.py',

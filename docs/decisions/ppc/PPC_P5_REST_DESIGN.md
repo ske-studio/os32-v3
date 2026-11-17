@@ -67,7 +67,7 @@ def assess_real_link(events, evidence):
 |R|配備済み製品像と SHA。Host client から RSH submit/result を照合、Session.cmd 不使用|QEMU/start 無し。常駐 agent のみ利用|
 |C|link_sh_run.settings(work) の計測付き link-SH に nest 等を追加、Session.cmd を利用。旧serial像は明示0|局所 start は link_sh の -g・USB kbd・USB_QEMU_CLOCK を明示保持|
 |O|製品 link-SH (SH=1/LINK=1) に outprobe、必要な変異だけ付与。局所 rsh_command、Session.cmd 不使用|局所 start は -nographic、USB無し、icount無し、sungem 接続|
-|U|製品の link-SH (KBOOT_SH=1 KBOOT_LINK=1) と局所の rsh_command (O と同じ形)。差し替え口 (KB_MUT・EXTRA・THIRD の 3 つ、build/ppc-kboot.mk:189) は変異の 1〜2 本だけに使い、観測の差し込みには使わない (PM 決定 N2)|局所 start は -g、USB_QEMU_CLOCK (icount)、起動時 usb-mouse のみ。列挙待ち後 device_add usb-kbd,id=kbd|
+|U|製品の link-SH (KBOOT_SH=1 KBOOT_LINK=1) と局所の rsh_command (O と同じ形)。差し替え口 (KB_MUT・EXTRA・THIRD の 3 つ、build/targets/ppc-powermac.mk) は変異の 1〜2 本だけに使い、観測の差し込みには使わない (PM 決定 N2)|局所 start は -g、USB_QEMU_CLOCK (icount)、起動時 usb-mouse のみ。列挙待ち後 device_add usb-kbd,id=kbd|
 ### kboot_run (変更 ≤250 行)
 - --link を追加。切替までは明示選択、最終的に入力 ELF の link 固有シンボルと指定値を照合し、未知像を黙って PLN1 扱いしない。
 - --elf の像は再ビルド・改変禁止。正像は link_run.accept / link_diag_run.Diagnostics、negative/旧像は既存経路へ振り分ける。K が加えるのは ELF/map/OF との値照合と OF/READY の観測だけとし、別のセッション基盤は作らない。
@@ -107,7 +107,7 @@ def assess_real_link(events, evidence):
 - 抜去 release、再列挙、再打鍵、screen.ppm を残す。--lan --mutate でも no-service/syscall-ee を実行し、生存だけの RED を認めない。
 
 ## 3. 既定を link に切り替える段
-- build/ppc-kboot.mk だけ、100行以下。KBOOT_LINK ?= 1 とする。KBOOT_SHELL=1 / NEGATIVE≠0 は既存の禁止条件を維持し、呼出側に明示 KBOOT_LINK=0 を要求する。
+- build/targets/ppc-powermac.mk だけ、100行以下。KBOOT_LINK ?= 1 とする。KBOOT_SHELL=1 / NEGATIVE≠0 は既存の禁止条件を維持し、呼出側に明示 KBOOT_LINK=0 を要求する。
 - F3 の確認済み呼出元と処置は下表で固定。関門は「KBOOT_SH=1 かつ KBOOT_LINK 未指定の呼出元が0件」および各試験の合格。SHELL/NEGATIVE/無指定の旧起動も明示0にする。共有 build 関数へ一律0を注入せず呼出側を直す。
 |ファイル:行|今渡しているフラグ|既定の切替の後の扱い (KBOOT_LINK=0 を明示して PLN1 に残す / link に移す)|どの準備段で直すか|
 |---|---|---|---|
@@ -156,7 +156,7 @@ def assess_real_link(events, evidence):
 |P10 / tools/ppc/ppc_sh_output.py|250行|並列可、D前|§3の明示フラグと従来受入|
 |P11 / tools/accept/arch_ctx.py|250行|並列可、D前|§3の明示フラグと従来受入 (arch-ctx-guest)|
 |G / DEFERRED_TESTS（既存の正本ファイル）|250行|P1〜P11 と並列可、D前|PPC-LINK-G4行追加、G4完了時に同ファイルの別段で削除|
-|D / build/ppc-kboot.mk|100行|P1〜P11、K/C/O/U/R、Gと下記統合受入後、直列|像再生成、map/size、QEMU全一巡と旧像回帰、Gの延期行確認|
+|D / build/targets/ppc-powermac.mk|100行|P1〜P11、K/C/O/U/R、Gと下記統合受入後、直列|像再生成、map/size、QEMU全一巡と旧像回帰、Gの延期行確認|
 - 準備段 P1〜P11 は互いに並列可 (どれも別ファイル)。関門は D の前に全部が揃うこと。同じファイルの組 (P1 と U、P9 と C、P10 と O) だけは表の依存に従う (PM 決定 N4)。U/C/O はそれぞれ P1/P9/P10 後、他段の前提ヘルパーを保つ。
 - 250行は差分の追加+削除で計数。超過するなら実装前に同一ファイルの別段へ分割し、必要な共通抽出も1ファイル別依頼にする。
 - 各試験の CHECK.inputs に実際の共通 transport/HostAgent/Session/生成入力を宣言。kboot/realhw の未登録評価は別 host 試験ファイル (各400行以下) で登録する。

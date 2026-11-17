@@ -16,7 +16,7 @@ class Negative:
 NEGATIVES = {
     'fixture-fatal': Negative('FATAL fixture', 'KBOOT OF-OFF calls=1',
                               'fixture_stop'),
-    # Real kernel images: make -f build/ppc-kboot.mk NEGATIVE=<n>.
+    # Real kernel images: make ARCH=ppc PLATFORM=powermac NEGATIVE=<n>.
     # 1: unarmed supervisor load from the not-present low megabyte (reason 2 = DSI miss).
     'kernel-dsi': Negative('FATAL trap vector=0x300 reason=0x2 addr=0x80000',
                            'KBOOT MEMORY online=1 heap=1 shm=1', 'ppc_trap_stop'),

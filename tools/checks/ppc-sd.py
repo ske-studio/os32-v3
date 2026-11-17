@@ -29,7 +29,7 @@ CHECK = dict(env=['ppc-cross', 'qemu-ppc'], name='ppc-sd', tier=2, budget=900, n
                      'arch/ppc/ofw_note.S',
                      'build/core.yaml',
                      'build/out/ppc-user/**',
-                     'build/ppc-kboot.mk',
+                     'build/targets/ppc-powermac.mk',
                      'build/ppc-user.mk',
                      'fs/serialfs/*.[ch]',
                      'platform/powermac/ppc_kernel.c',

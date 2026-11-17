@@ -92,9 +92,9 @@ HOOK_DEFS := $(foreach h,$(EXEC_HOOKS),-D$(call hook_macro,$(h))=$(HOOK_$(h)))
 C_COMMON_HOOKS_ABSENT = $(foreach h,$(EXEC_HOOKS),$(if $(filter 0,$(HOOK_$(h))),exec/absent/exec_$(h).c))
 ```
 
-- `select.mk` が像のファイルの後で `include build/sources/hooks.mk` する (`HOOK_DEFS` は `:=` なので、機能の値が決まった後に読む)。`build/ppc-kboot.mk` の `KB_FLAGS :=` は `select.mk` の include より後にあるので `$(HOOK_DEFS)` を足せる。`KB_SELECT_MK` に `build/sources/hooks.mk` を足す (値を替えたら組み直される)。
+- `select.mk` が像のファイルの後で `include build/sources/hooks.mk` する (`HOOK_DEFS` は `:=` なので、機能の値が決まった後に読む)。`build/targets/ppc-powermac.mk` の `KB_FLAGS :=` は `select.mk` の include より後にあるので `$(HOOK_DEFS)` を足せる。`KB_SELECT_MK` に `build/sources/hooks.mk` を足す (値を替えたら組み直される)。
 - `select.mk` は `C_COMMON_EXEC_HOOKS = $(if $(filter 1,$(FEATURE_EXEC)),$(C_COMMON_HOOKS_ABSENT))` を作って `C_SELECTED` に足す。x86-pc98 は全部 1 なので空、kboot の core・link は exec を持たないので空。
-- `select.mk` で `KERNEL_CFLAGS_EXTRA += $(HOOK_DEFS)` (TICK1K と同じ足し方で、arch を問わない。`build/targets/x86-pc98.mk` は基点と固定されているので触らない)。R1 の像と kdebug の部品も `KERNEL_CFLAGS_EXTRA` を含む旗で組むので受け取る。PowerPC の像は `build/ppc-kboot.mk` の `KB_FLAGS` に `$(HOOK_DEFS)`。
+- `select.mk` で `KERNEL_CFLAGS_EXTRA += $(HOOK_DEFS)` (TICK1K と同じ足し方で、arch を問わない。`build/targets/x86-pc98.mk` は基点と固定されているので触らない)。R1 の像と kdebug の部品も `KERNEL_CFLAGS_EXTRA` を含む旗で組むので受け取る。PowerPC の像は `build/targets/ppc-powermac.mk` の `KB_FLAGS` に `$(HOOK_DEFS)`。
 - 順: PowerPC の像は順の一覧を持たない (所有者集合の順で並ぶ。設計は `docs/design/build/select.md` §4)。
 
 ### 3-4. CPU・配置の 2 組
@@ -123,7 +123,7 @@ C_COMMON_HOOKS_ABSENT = $(foreach h,$(EXEC_HOOKS),$(if $(filter 0,$(HOOK_$(h))),
 | 移動 | `arch/ppc/exec_<名>.c` 14 本 → `exec/absent/exec_<名>.c` |
 | 改名 | `arch/{x86,ppc}/exec_cache.h` → `arch_exec_cache.h`、`arch/{x86,ppc}/exec_kapi.h` → `arch_exec_kapi.h` |
 | 削除 | `arch/x86/exec_<名>.h` 14 本、`arch/ppc/exec_<名>.h` 14 本 |
-| 変更 | `build/select.mk`・`build/sources/order.mk`・`build/arch/ppc-sources.mk`・`build/ppc-kboot.mk`、`exec/exec.c` (include 2 行)、`arch/ppc/syscall_code.c`・`exec_cache.c`・`exec_kapi.c` (include)、`include/exec_arch.h`、`tools/layers_baseline.json`、`tools/tests/fixtures/build_profile_ppc.json`、検査の `covers`、`arch/README.md`、`docs/design/build/select.md` (段 2 の行) |
+| 変更 | `build/select.mk`・`build/sources/order.mk`・`build/arch/ppc-sources.mk`・`build/targets/ppc-powermac.mk`、`exec/exec.c` (include 2 行)、`arch/ppc/syscall_code.c`・`exec_cache.c`・`exec_kapi.c` (include)、`include/exec_arch.h`、`tools/layers_baseline.json`、`tools/tests/fixtures/build_profile_ppc.json`、検査の `covers`、`arch/README.md`、`docs/design/build/select.md` (段 2 の行) |
 
 ## 6. 未決
 
