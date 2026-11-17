@@ -268,8 +268,8 @@ ifneq ($(strip $(filter-out $(C_ORDER_KBOOT),$(C_SELECTED)) $(filter-out $(GAS_O
 $(error source without link order: $(filter-out $(C_ORDER_KBOOT),$(C_SELECTED)) $(filter-out $(GAS_ORDER_KBOOT),$(GAS_SELECTED)))
 endif
 else
-C_ORDER = $(C_ORDER_LEGACY) $(C_ARCH_NEW) $(C_PLATFORM_NEW)
-C_KERNEL = $(filter $(C_SELECTED),$(C_ORDER)) $(C_PLATFORM_NEW) $(C_DIAGNOSTICS) $(filter $(C_SELECTED),$(C_ORDER_TAIL))
+C_ORDER = $(C_ORDER_LEGACY) $(C_ARCH_NEW)
+C_KERNEL = $(filter $(C_SELECTED),$(C_ORDER)) $(C_DIAGNOSTICS) $(filter $(C_SELECTED),$(C_ORDER_TAIL))
 endif
 ASM_KERNEL = $(filter $(ASM_ARCH) $(ASM_FEATURES),$(ASM_ORDER_LEGACY))
 KERNEL_SRC_DIRS = $(filter $(INCLUDE_COMMON) $(INCLUDE_ARCH) $(INCLUDE_PLATFORM) $(INCLUDE_FEATURES),$(INCLUDE_ORDER_LEGACY))

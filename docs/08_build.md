@@ -1214,10 +1214,16 @@ tools/ci_fetch.sh --dry-run             # 選ばれる run と artifact を表�
 製品規則は `build/targets/`、共有コンパイル規則は `build/kernel-objects.mk` にある。
 新しい選択 mk は通常の再構築依存であり、同じ出力先の target 変更は拒否する。
 `FEATURE_*` の off は完全非搭載サービスが未実装のため `kernel-compile` 専用。
+像の構成 (どの機能を入れるか) は arch・platform と独立の軸で、`build/images/<IMAGE>.mk` が決める
+(x86-pc98 の既定は `pc98`、ppc-powermac の既定は `kboot-link`。設計は
+[design/build/select.md](design/build/select.md))。
 
-PowerPC の `make ARCH=ppc PLATFORM=powermac` は compile-only で、
-`PPC_CROSS_DIR=/home/hight/opt/cross-ppc`、出力 `build/out/ppc-powermac` を使う。
-未分離の共通候補のエラーは測定結果として残し、リンク・module・SDK・配備へは進めない。
+PowerPC の `make ARCH=ppc PLATFORM=powermac [IMAGE=kboot-*]` は製品の像 `PPCKERN.ELF` を組む。
+ソースは x86 と同じ所有者集合から像の構成で選び、規則は `build/ppc-kboot.mk` が持つ
+(最上位からは sub-make で呼ぶ。`make -f build/ppc-kboot.mk` に `KBOOT_LINK`・`KBOOT_SH`・`KBOOT_SHELL`
+の旗を渡しても同じ像を選べる)。`PPC_CROSS_DIR=/home/hight/opt/cross-ppc`、出力は `build/out/ppc-kboot/` の下。
+module・SDK・配備へは進めない (明示エラー)。共通のソースが機種のヘッダを読む辺は
+`tools/check_layers.py` が両方の像で数える。
 独立 bootstrap は `make ppc-boot` / `make ppc-boot-check`。
 原始命令ヘッダだけを足して移植完了とはしない（[arch の手順](../arch/README.md)）。
 

@@ -164,6 +164,7 @@ legacy の式は今の `select.mk:241-243` に末尾の一覧を足しただけ 
 - compile だけの計測 (`tools/ppc/check_compile.py`・`check_accept.py` と 2 つの一覧、`test_ppc_selection.py`、検査 `ppc-selection-host`) と、それを保つための一時の像を削除した。層の検査は `tools/check_layers.py` が持つ。
 - 最上位の `make ARCH=ppc PLATFORM=powermac [IMAGE=kboot-*]` の `kernel` と `all` は、`build/targets/ppc-powermac.mk` が `$(MAKE) -f build/ppc-kboot.mk KBOOT_LINK=… KBOOT_SH=… KBOOT_SHELL=…` へ sub-make で渡す (include しない — `select.mk` の二度読みと `kb-user` の再帰を避ける)。旗は像の機能の値から作る。
 - `build/ppc-kboot.mk` は旗から像を決め、コマンドラインの `IMAGE=` が食い違えば止める (最上位から同じ名前が届くのは通す)。
+- 最上位の ARCH=ppc の `kernel-compile` は拒否する (像を組むのは `build/ppc-kboot.mk` の旗と出力だけ。`build/targets/ppc-powermac.mk` は `build/kernel-objects.mk` を読まない)。x86 の式から、定義する所が無くなった `C_PLATFORM_NEW` を外した。
 - 確かめ: `test_build_selection.py` (最上位の ARCH=ppc の `C_KERNEL`・`GAS_KERNEL` が `kboot-link` の固定した並びと同じ、ARCH=ppc に `IMAGE=pc98` は拒否)、PowerPC の 6 像の `.o` が前と同じ、CI の ppc-compile・ppc-qemu。
 
 ### 段 2 以降
