@@ -36,10 +36,11 @@
 
 | # | 残件 | 要る物 |
 |---|---|---|
-| 4 | exec のフック 14 本を、提供者が像に在る物から PowerPC で本物に | 同上 |
+| 4 | exec のフック 14 本を、提供者が像に在る物から PowerPC で本物に (構造は「機能の有無を像が決める」形で済み。本物にするのは GUI・音・shlib などの PowerPC への移植) | PowerPC の機能の有効化ごとに QEMU の受入 |
 | 5 | contract で残った、リンクの時の装置の名前 (`geforce_foreground_poll` など) を実行時の口に | 本線の HAL の段 |
 | 6 | `C_COMMON_PC98_PENDING` の 44 本を、PowerPC の像の機能の組へ移す | PowerPC の機能の有効化ごと |
-| 7 | KAPI の名前に装置が出る関数、`include/memmap.h` が PC-98 の番地の地図であること、PowerPC のユーザーランドの newlib | 設計から |
+| 7 | KAPI の名前に装置が出る関数、PowerPC のユーザーランドの newlib | 設計から |
+| 8 | `include/memmap.h` の PC-98 だけの名前 (起動・BIOS・表示の 43 個) を機種の置き場へ分ける。残りの 102 個は PowerPC の像も使う OS 共通の番地の地図で、43 個を共通のソースは使っていない | [C4] の正典に触るのでユーザーの判断 |
 
 設計からの配置の変更 (残件ではない):
 
