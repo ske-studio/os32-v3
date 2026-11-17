@@ -38,7 +38,7 @@ MUTANTS = [
   'FAIL g_backend == (safe ? &gfx_backend_pc98 : &gfx_backend_geforce)'),
  ('pc98-display-required',
   '    return backend == LEDGER_SF_PC98 || displays == 1;',
-  '    return displays == (backend == LEDGER_SF_PC98 ? GVRAM_PLANES : 1);',
+  '    return displays == (backend == LEDGER_SF_PC98 ? GFX_BB_PLANES : 1);',
   'FAIL bb[0] && gfx_backend_pc98.bb_base'),
  ('mode-capacity-disabled',
   '    if (!gfx_mode_fits(be, mode)) return 0;',

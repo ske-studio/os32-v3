@@ -133,8 +133,8 @@ def image(work, mutation):
     elf = build(work/'image', *opts)
     changes = {
         'dec-rearm': ('arch/ppc/kernel_dec.c', '    ppc_write_dec((u32)remaining);', '    extern volatile u32 ctx_started;\n    if (!ctx_started) ppc_write_dec((u32)remaining);'),
-        'halt-ee': ('kernel/sys.c', '    idle_work_run();\n    _halt();',
-                    '    idle_work_run();\n    _disable();\n    _halt();'),
+        'halt-ee': ('kernel/idle_work.c', '    idle_work_run();\n    if (!net_rx_recent(NET_RX_ACTIVE_MS)) _idle();',
+                    '    idle_work_run();\n    if (!net_rx_recent(NET_RX_ACTIVE_MS)) { _disable(); for (;;) _halt(); }'),
         'resume-result': ('exec/exec.c', '#include "exec_schedule.inc"', None),
     }
     if mutation in changes:
