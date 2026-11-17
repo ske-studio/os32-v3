@@ -45,19 +45,20 @@ PowerPC の空の実体のうち、提供者 (`kernel/serial_diag.c`・`kernel/c
 #ifndef OS32_EXEC_GUI_H
 #define OS32_EXEC_GUI_H
 #include "exec_hooks.h"
-typedef void (*ExecGuiPump)(void);
 #if OS32_HOOK_GUI
 #include "gui.h"
+typedef void (*ExecGuiPump)(void);
 static inline ExecGuiPump exec_gui_pump(void) { return (ExecGuiPump)gui_get_pump(); }
 static inline void exec_gui_owner_exit(int owner, int kind) { gui_owner_exit(owner, kind); }
 #else
+typedef void (*ExecGuiPump)(void);
 ExecGuiPump exec_gui_pump(void);
 void exec_gui_owner_exit(int owner, int kind);
 #endif
 #endif
 ```
 
-`#if` の上は今の x86 のヘッダの中身、下は今の PowerPC のヘッダの中身をそのまま置く (型の宣言など両方に要る物だけ外に出す)。`arch/README.md` が禁じているのは CPU 名での分岐で、これは像の構成の値での分岐。x86 のヘッダが 2 段上を指して読んでいる 3 本 (`gfx/v2/gfx2_exec.h`・`gfx/v2/gfx2_int.h`・`drivers/video/geforce/geforce_module.h`) は、置き場が 1 段浅くなるので 1 段上を指す形に直す (`__FILE__` は使っていないので機械語は変わらない)。
+`#if` の側は移す前の x86 のヘッダの中身、`#else` の側は移す前の PowerPC のヘッダの中身を、字句を変えずにそのまま置く (型の宣言が両方に要る時も、外に出さず両方の側に 1 回ずつ置く — 前後の字句の一致で確かめられるように)。`arch/README.md` が禁じているのは CPU 名での分岐で、これは像の構成の値での分岐。x86 のヘッダが 2 段上を指して読んでいる 3 本 (`gfx/v2/gfx2_exec.h`・`gfx/v2/gfx2_int.h`・`drivers/video/geforce/geforce_module.h`) は、置き場が 1 段浅くなるので 1 段上を指す形に直す (`__FILE__` は使っていないので機械語は変わらない)。
 
 `exec/exec_hooks.h` は、マクロを渡さない組み方の既定を 1 つの値で持つ:
 
@@ -92,7 +93,7 @@ C_COMMON_HOOKS_ABSENT = $(foreach h,$(EXEC_HOOKS),$(if $(filter 0,$(HOOK_$(h))),
 ```
 
 - `select.mk` が像のファイルの後で `include build/sources/hooks.mk` する (`HOOK_DEFS` は `:=` なので、機能の値が決まった後に読む)。`build/ppc-kboot.mk` の `KB_FLAGS :=` は `select.mk` の include より後にあるので `$(HOOK_DEFS)` を足せる。`KB_SELECT_MK` に `build/sources/hooks.mk` を足す (値を替えたら組み直される)。
-- `select.mk` は `C_COMMON` に `$(if $(filter 1,$(FEATURE_EXEC)),$(C_COMMON_HOOKS_ABSENT))` を足す。x86-pc98 は全部 1 なので空。
+- `select.mk` は `C_COMMON_EXEC_HOOKS = $(if $(filter 1,$(FEATURE_EXEC)),$(C_COMMON_HOOKS_ABSENT))` を作って `C_SELECTED` に足す。x86-pc98 は全部 1 なので空、kboot の core・link は exec を持たないので空。
 - `select.mk` で `KERNEL_CFLAGS_EXTRA += $(HOOK_DEFS)` (TICK1K と同じ足し方で、arch を問わない。`build/targets/x86-pc98.mk` は基点と固定されているので触らない)。R1 の像と kdebug の部品も `KERNEL_CFLAGS_EXTRA` を含む旗で組むので受け取る。PowerPC の像は `build/ppc-kboot.mk` の `KB_FLAGS` に `$(HOOK_DEFS)`。
 - 順: `C_ORDER_KBOOT` の `$(wildcard arch/ppc/exec_*.c)` は、今は 19 本が名前の整列順で混ざって並んでいる (cache, context, entry, font_guard, font_lease, gfx, gfx_poll, gui, ime, kapi, kapi_db, legacy, r1, reclaim, selftest, serial_diag, shlib, snd, surface)。**この混ざった順のまま** 19 本を literal に書き、移した 14 本だけ置き場を `exec/absent/` にする (塊に分けて並べ直さない — リンクの順が変わると exec の像の配置が変わる)。`build/arch/ppc-sources.mk` の `C_ARCH_EXEC` も wildcard をやめて残る 5 本を literal にする。fixture `build_profile_ppc.json` は該当の 14 個の名前だけ書き換える (並びは同じ)。
 
