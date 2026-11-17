@@ -33,7 +33,7 @@ CHECK = dict(name='hostsvc-contracts', tier=1, needs=[],
             'drivers/hostdrv/hostdrvfs.c', 'fs/isofs/iso9660.c',
             'fs/serialfs/serialfs.c', 'drivers/base/dev.c',
             'drivers/ata/cd_body.c', 'drivers/net/e82557/lan_body.c'], budget=5.7,
-    basis=['NET_HOSTSVC_DESIGN §2', 'NET_HOSTSVC_DESIGN §3', 'NET_HOSTSVC_DESIGN §4', 'NET_HOSTSVC_DESIGN §5'],
+    basis=['docs/design/net/nic.md 受信の振り分け', 'docs/design/fs/serialfs/serialfs_persistent.md 期限', 'docs/design/fs/serialfs/sfs_block.md 通信の形式', 'docs/design/net/link_notify.md 通信の形式'],
 )
 
 import argparse

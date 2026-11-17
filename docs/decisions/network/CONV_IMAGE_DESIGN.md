@@ -29,7 +29,7 @@
 | `drivers/video/cirrus/backend_cirrus.c` | CirrusもPACKED8。現状の灰は6bitの2+2kでPEGCと不一致。PMの別修正 `wt/cirrus-gray` でPEGCへ統一することが本設計の前提。全装置で共通の論理既定色を使い、DAC精度差はバックエンドに従う。 |
 | `docs/05_drivers.md`、`drivers/video/geforce/backend_geforce.c` | **差異4**: 文書の3バックエンド表にはGeForceがないが実装はPACKED8を持つ。drivers/videoにTrident実装なし。機種名でなく面形式で要求する。 |
 | `docs/05_drivers.md`、`docs/decisions/gui/OSRI_VIEWER_DESIGN.md` | 面間隔32000Bと現在の高さは別。CPL3はクライアント面を借りHALでpresent、表示VRAMの物理番地を渡さない。 |
-| `docs/decisions/network/NET_HOSTSVC_DESIGN.md`「アプリの口」「サービスの一覧」 | 共通基盤は確定設計だがこの画像サービスは別設計枠。実装済みとは扱わない。 |
+| `docs/archive/network/NET_HOSTSVC_DESIGN.md`「アプリの口」「サービスの一覧」 | 共通基盤は確定設計だがこの画像サービスは別設計枠。実装済みとは扱わない。 |
 ## 2. 要求の形
 - 名前は `os32.conv.image`。os32. は OS32 標準、ske-studio が定めた。LISTは提供可能時だけ `os32.conv.image 1 <世代内id> builtin` を追加する。
 - 要求行は短いASCII、画像指定は本文へ置く。URL・空白入りパス・固定256色が要求行の上限を超えない。パースはshell非経由。
@@ -175,7 +175,7 @@ int os32_host_image_release(Os32ImageInfo *image, u32 timeout);
 | T2 | 新 tools/tests/host_image_sdk.c | C89とSDK fake transport/面guard検証、B1～B3 |
 | T3 | 新 tools/tests/test_host_image_sdk.py | T2ビルド・qemu実行・変異・CHECK、T2 |
 | T4 | 新 userland/tests/host_image_test.c | NP21/W/実機で取得→表示→復帰、B2/B3 |
-| D1 | 改 docs/decisions/network/NET_HOSTSVC_DESIGN.md | 採用後にサービス境界・受入結果を反映、全段後 |
+| D1 | 改 docs/archive/network/NET_HOSTSVC_DESIGN.md | 採用後にサービス境界・受入結果を反映、全段後 |
 - B4は不要: build/libs.mkがuserland/lib/host/*.cをwildcard収集する。
 - 1ファイル約500行以内。既存巨大CLIを複製せず公開関数をimportする。新テスト/guest像のビルド登録が別ファイルなら各1段を追加し、同一ファイル段は直列。今回は設計のみで上記ファイルは変更しない。
 ## 8. 受入 → 試験・変異・段の順

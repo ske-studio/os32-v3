@@ -1,4 +1,4 @@
-"""Host-side independent notification sender (NET_HOSTSVC_DESIGN §5)."""
+"""Host-side independent notification sender (docs/design/tools/host_notify.md)."""
 from collections import deque
 import secrets
 import struct

@@ -12,7 +12,7 @@ CHECK = dict(name='splash-obs-host', tier=1,
             'lib/le_internal.h', 'lib/crc32_core.inc', 'lib/serial_diag.h', 'lib/kstring.h',
             'drivers/char/serial.h', 'include/config.h', 'gfx/palette.h'],
     needs=[], budget=9.2,
-    basis=['RASTER_SPLASH_PL_DESIGN', 'RASTER_SPLASH_S5_DESIGN §2', 'RASTER_SPLASH_S5_DESIGN §3', 'RASTER_SPLASH_S5_DESIGN §4'],
+    basis=['docs/design/platform/pc98/splash_obs.c.md 流れ', 'docs/design/drivers/video/pc98/splash_raster_plan.c.md 列の作り方', 'docs/design/drivers/video/pc98/splash_raster_play.c.md 1 フレームの手順', 'docs/design/gfx/osri_profile.h.md 本数の数え方 (ゲストとホストで同じ)'],
 )
 
 import argparse

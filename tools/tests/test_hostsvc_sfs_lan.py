@@ -10,7 +10,7 @@ CHECK = dict(name='hostsvc-sfs-lan', tier=1, needs=[], budget=3.6, covers=['tool
     'sdk/include/os32/os32_kapi_shared.h',
     'tools/tests/hostsvc_sfs_lan_host.c', 'tools/tests/host32.py',
     'tools/tests/kernel_includes.py', 'build/config.mk'],
-    basis=['NET_HOSTSVC_DESIGN §2', 'NET_HOSTSVC_DESIGN §3', 'NET_HOSTSVC_DESIGN §11'],
+    basis=['docs/design/net/nic.md 受信の振り分け', 'docs/design/fs/serialfs/serialfs_persistent.md 期限', 'docs/design/fs/serialfs/serialfs_persistent.md 何をするか'],
 )
 
 import argparse

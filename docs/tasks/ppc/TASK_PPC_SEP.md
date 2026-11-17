@@ -1,6 +1,7 @@
 # TASK_PPC_SEP — PowerPC 移植とアーキテクチャ分離の計画
 
-> 状態: **受入完了 (2026-11-17)** — 機種依存の分離は 11-17 の作り直しで完了の基準 3 つ (ユーザー決定「共通ソースが機種ヘッダを読む数 0・ビルド 1 系統・入口の骨格 1 本」) を満たした。今の仕組みと決まりは下の「現在地」。第 1〜5 段 (Z まで main、b98087e8) の確定設計 (完了記録) は PPC_SEP1_DESIGN (アーカイブ: `docs/archive/decisions/PPC_SEP1_DESIGN.md`)・PPC_SEP2_DESIGN (アーカイブ: `docs/archive/decisions/PPC_SEP2_DESIGN.md`)・PPC_SEP3_DESIGN (アーカイブ: `docs/archive/decisions/PPC_SEP3_DESIGN.md`)・PPC_SEP4_DESIGN (アーカイブ: `docs/archive/decisions/PPC_SEP4_DESIGN.md`)・PPC_SEP5_DESIGN (アーカイブ: `docs/archive/decisions/PPC_SEP5_DESIGN.md`)。実装と取り込みの決まりは [PPC_IMPL_RULES](../../decisions/ppc/PPC_IMPL_RULES.md)。2026-11-10 から到達点 ② (票 TASK_PPC_KBOOT) を優先し、分離の残り (下表の「未着手」) は ② の後か、本線の受入の待ちが減った時点で再開する。調査の全文は ~/os32-tmp/run/ppc-arch-survey/SURVEY.md。
+> 状態: **受入完了 (2026-11-17)** — 機種依存の分離は 11-17 の作り直しで完了の基準 3 つ (ユーザー決定「共通ソースが機種ヘッダを読む数 0・ビルド 1 系統・入口の骨格 1 本」) を満たした。今の仕組みと決まりは下の「現在地」。第 1〜5 段 (Z まで main、b98087e8) の確定設計 (完了記録) は PPC_SEP1_DESIGN (アーカイブ: `docs/archive/decisions/PPC_SEP1_DESIGN.md`)・PPC_SEP2_DESIGN (アーカイブ: `docs/archive/decisions/PPC_SEP2_DESIGN.md`)・[PPC_SEP3_DESIGN](../../decisions/ppc/PPC_SEP3_DESIGN.md)・PPC_SEP4_DESIGN (アーカイブ: `docs/archive/decisions/PPC_SEP4_DESIGN.md`)・[PPC_SEP5_DESIGN](../../decisions/ppc/PPC_SEP5_DESIGN.md)。実装と取り込みの決まりは [PPC_IMPL_RULES](../../decisions/ppc/PPC_IMPL_RULES.md)。2026-11-10 から到達点 ② (票 TASK_PPC_KBOOT) を優先し、分離の残り (下表の「未着手」) は ② の後か、本線の受入の待ちが減った時点で再開する。調査の全文は ~/os32-tmp/run/ppc-arch-survey/SURVEY.md。
+> 完了の基準: (1) `tools/check_layers.py` の違反が x86-pc98・ppc-powermac の両方で 0、(2) ソースの選択が `build/select.mk` の 1 か所で入口の Makefile が 1 本、(3) 入口の骨格が `init/kernel_start.c` の 1 本 (ユーザー決定 2026-11-17)。3 つとも満たした。
 
 ## 第 1〜5 段の状態 (2026-11-10 の記録)
 

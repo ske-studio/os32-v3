@@ -97,7 +97,7 @@
 | `net/ne2000/lgy98.c` `ne2000.c` `ne2000_ring.c` `ne2000_io.asm` `ne2000_regs.h` | LGY-98 (NE2000 互換 C バス LAN)。カード固有 / 8390 本体 / リング計算 (ホスト試験可) / 16bit PIO / レジスタ定数の正典。既定は有効 (カード未装着時は起動継続)。無効化は `make kernel-nolgy98` (`build/config.mk`) | 票 `tasks/network/PLAN.md` |
 | `sound/fm/fm.c` | OPN/OPM | [05 §5-3](05_drivers.md) |
 | `sound/fm/snd_engine.c` | FM/SSG シーケンサ (タイマ IRQ 駆動) | [05 §5-3](05_drivers.md) |
-| `sound/cs4231/pcm_cs4231.c` `pcm_cs4231_math.c` | CS4231 (MATE-X PCM) の PCM 再生 (リングは DMA プール、IRQ は動的登録) — v2.1 | 票 TASK_PCM_CS4231 |
+| `sound/cs4231/pcm_cs4231.c` `pcm_cs4231_math.c` | CS4231 (MATE-X PCM) の PCM 再生 (リングは DMA プール、IRQ は動的登録) — v2.1 | [設計書](design/drivers/sound/cs4231/pcm_cs4231.md) |
 | `video/kcg/kcg.c` | 旧 `.kcgfont` の読込 / KCG facadeへの橋 | [05 §5-9](05_drivers.md) |
 | `video/kcg/kcg_body.c` `video/kcg/kcg_module.c` | KCG ROM/cache部品 / typed facade | [05 §5-9](05_drivers.md) |
 | `video/cirrus/wab_glue.h` `wab_glue_xe10.c` `wab_cirrus.c` | ウィンドウアクセラレータ: ボードグルー契約 / Xe10 内蔵 (ID 5Bh、0FAAh/0FABh) / CL-GD5430 チップ (BLT は I/O 経由、8bpp、DAC)。定数は `include/wab_xe10.h` | 設計 `docs/design/drivers/video/cirrus/wab_cirrus.md`・`docs/design/include/gfx_hal.md`、archive/gui_v11/TASK_H3 (アーカイブ: `docs/archive/gui_v11/TASK_H3_cirrus.md`) |

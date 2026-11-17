@@ -18,7 +18,7 @@ Use the WSL toolchain described in [INSTALL.md](INSTALL.md): i386-elf GCC, NASM,
 - `make kernel`: build the kernel and SQLite.
 - `make programs`: build userland programs.
 - apps/game builds are deferred under H-7. Run `git submodule update --init` and `make external` only after the [reopening gate](docs/tasks/v3/T2H_EXTERNAL_GATE.md#再開前に揃える-8-項目) is satisfied and reopening is approved.
-- `make check-<name>`: one host test or repository check (add `MUTATE=1` for its mutants). `make check-fast` runs every check without mutants and is what CI runs; do not run it or `make check` locally (see the worktree section). Stages and times: [docs/08_build.md](docs/08_build.md) §8-4.
+- `make check-<name>`: one host test or repository check (add `MUTATE=1` for its mutants). CI runs `make check` (every check with its mutants, in six shards); do not run the full set locally (see the worktree section). Stages and times: [docs/08_build.md](docs/08_build.md) §8-4.
 - `make math_test`: build an individual guest test.
 
 Run images in NP21/W. Stop the emulator before `make deploy-kernel`, then restart it. See [docs/08_build.md](docs/08_build.md) for deployment details.
@@ -31,7 +31,7 @@ Worktrees have no `.env`. Before anything else, export
 `tools/preflight.sh --base <SHA from the request> --fix-fonts` and fix every NG. Build what the request asks for (`make all`, or `make kernel` / the module / userland image you touched — never suppress the build that catches ripple into other tests), then the tests you added or touched with `--mutate` (each mutation anchor unique and
 RED at runtime; if you changed or removed a product line, `grep -rn` tools/tests for mutations anchored on it and move
 them), and `python3 -B tools/checks/run.py --lint` (a new test declares its inputs in its own `CHECK` dict). Do not run
-`make check-changed` or the full mutation pass: the landing check is GitHub CI (check + build's `check-fast`, every check without mutation) and the mutation pass is the `full-check` workflow (user decision 2026-11-05, docs/tasks/agents/ROLES.md §0).
+the full mutation pass locally: the landing check is GitHub CI (check + build, every check with mutation; docs/tasks/agents/ROLES.md §0). `make check-changed` is an optional local convenience, never a gate.
 Run checks in the foreground and wait for them to finish instead of re-reading partial logs; never abort and restart a run. Only logs produced after your last source change count as passing.
 Never commit (the sandbox keeps `.git` read-only; the PM commits).
 

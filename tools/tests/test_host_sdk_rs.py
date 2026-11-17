@@ -5,7 +5,7 @@ CHECK = dict(name='host-sdk-rs-host', tier=1,
             'sdk/rust/os32api/src/cfg.rs', 'sdk/rust/os32api/src/ls.rs',
             'tools/tests/os32api_host.py', 'tools/tests/host_sdk_rs_host.rs',
             'tools/tests/test_host_sdk_rs.py'], needs=[], budget=3.5,
-    basis=['NET_HOSTSVC_DESIGN §7'],
+    basis=['docs/design/userland/lib/host/host_call.md 口'],
 )
 import argparse
 from pathlib import Path

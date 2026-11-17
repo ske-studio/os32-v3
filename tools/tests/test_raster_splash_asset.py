@@ -9,7 +9,7 @@ CHECK = dict(name='raster-splash-asset-host', tier=1,
             'tools/deploy_protect.py', 'userland/deploy.yaml',
             'tools/tests/test_raster_splash_asset.py'],
     needs=['make:all', 'make:osri-enc2-core'], budget=3.3,
-    basis=['RASTER_SPLASH_S5_DESIGN §5'],
+    basis=['docs/design/tools/raster_splash_asset.md 使い方と契約', 'docs/design/tools/raster_splash_asset.md 配布'],
 )
 
 import argparse

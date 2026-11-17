@@ -110,6 +110,23 @@ class RunnerTest(unittest.TestCase):
         self.write('docs/current.md', 'REAL-ID MISSING-ID\n')
         self.assertEqual(self.cli('--lint')[0], 0)
 
+    def test_basis_must_name_a_current_document(self):
+        self.write('docs/archive/x/OLD_DESIGN.md', 'old\n')
+        self.write('docs/decisions/LIVE_DESIGN.md', 'live\n')
+        self.write('docs/design/a/b.md', 'design\n')
+        self.write('docs/archive/x/BOTH.md', 'old copy\n')
+        self.write('docs/decisions/BOTH.md', 'still current\n')
+        self.check('good', basis=['LIVE_DESIGN §2', 'docs/design/a/b.md 契約', 'BOTH §1', '[ABI]', 'KAPI_SPEC §3-1'])
+        self.assertEqual(self.cli('--lint')[0], 0)
+        for basis, message in ((['OLD_DESIGN §2'], 'bad: basis points to an archived document: OLD_DESIGN §2'),
+                               (['docs/archive/x/OLD_DESIGN.md 契約'],
+                                'bad: basis points to an archived document: docs/archive/x/OLD_DESIGN.md 契約'),
+                               (['docs/design/a/gone.md 契約'], 'bad: basis document not found: docs/design/a/gone.md 契約')):
+            self.check('bad', basis=basis)
+            rc, _, err = self.cli('--lint')
+            self.assertEqual(rc, 1, basis)
+            self.assertIn(message, err)
+
     def test_full_only_placement(self):
         self.check('a', needs=['make:alpha'])
         self.check('slow', tier=1, full_only=True, needs=['make:beta'])
@@ -1037,6 +1054,14 @@ def run_mutations():
          'if True:', 'test_expectation_warnings_and_pins'),
         ('metadata-pin-missing', 'if pin not in found_pins:',
          'if False:', 'test_expectation_warnings_and_pins'),
+        ('basis-archived-name', 'if head.startswith("docs/archive/") or (name in archived and name not in current):',
+         'if head.startswith("docs/archive/"):', 'test_basis_must_name_a_current_document'),
+        ('basis-archived-path', 'if head.startswith("docs/archive/") or (name in archived and name not in current):',
+         'if (name in archived and name not in current) and not head.endswith(".md"):', 'test_basis_must_name_a_current_document'),
+        ('basis-still-current', '(name in archived and name not in current)',
+         '(name in archived)', 'test_basis_must_name_a_current_document'),
+        ('basis-missing-path', 'elif head.startswith("docs/") and head.endswith(".md") and not (root / head).is_file():',
+         'elif False:', 'test_basis_must_name_a_current_document'),
         ('routine-placement', 'checks[dep].full_only for dep in closure(checks, (n,))',
          'False for dep in closure(checks, (n,))', 'test_full_only_placement'),
         ('index-stale', 'if data["signature"] == signature:', 'if True:',

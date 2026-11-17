@@ -1159,6 +1159,22 @@ def lint(root, checks):
         for pin in c.pins:
             if pin not in found_pins:
                 errors.append(c.name + ": pins ID not found in docs: " + pin)
+    # 期待の出所 (basis) は現行の文書を指す。アーカイブへ移した文書を出所にしない (読まれない置き場の
+    # 契約は確かめようが無い)。文書を移す時は、basis を今の仕様を持つ設計書へ付け替える。
+    docs = root / "docs"
+    archived = {p.stem for p in (docs / "archive").rglob("*.md")} if (docs / "archive").is_dir() else set()
+    current = {p.stem for p in docs.rglob("*.md")
+               if p.relative_to(docs).parts[0] not in {"archive", "hw"}} if docs.is_dir() else set()
+    for c in checks.values():
+        for item in c.basis:
+            if not isinstance(item, str) or not item.split():
+                continue
+            head = item.split()[0]
+            name = Path(head).stem if head.endswith(".md") else head.split("§")[0]
+            if head.startswith("docs/archive/") or (name in archived and name not in current):
+                errors.append(c.name + ": basis points to an archived document: " + item)
+            elif head.startswith("docs/") and head.endswith(".md") and not (root / head).is_file():
+                errors.append(c.name + ": basis document not found: " + item)
     snapshot = tracked(root)
     generated = set(KAPI_GENERATED) | {f for f in snapshot if "_generated." in Path(f).name
                 or "generations." in Path(f).name or "/generated/" in f}
@@ -1275,7 +1291,7 @@ def main(argv: list[str]) -> int:
     args = parser.parse_args(argv)
     try:
         checks = indexed_discover(ROOT) if args.list or args.make or args.run else discover(ROOT)
-        # check-fast と静的 CI は full_only とその利用者を full-check に残す。
+        # check-fast と静的 CI は full_only とその利用者を回さない (build.yml の make check が回す)。
         routine = os.environ.get("CHECK_ROUTINE") == "1" and (args.list or args.make or args.run)
         eligible = {n: c for n, c in checks.items() if not routine or not any(
             checks[dep].full_only for dep in closure(checks, (n,)))}

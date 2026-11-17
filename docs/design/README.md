@@ -151,8 +151,10 @@
 - [tools/nhd_deploy.md](tools/nhd_deploy.md)
 - [userland/gshell/src/input.md](userland/gshell/src/input.md)
 - [userland/lib/gfx/libos32gfx_core.md](userland/lib/gfx/libos32gfx_core.md)
+- [userland/lib/host/host_call.md](userland/lib/host/host_call.md)
 - [userland/lib/ui/libos32ui_core.md](userland/lib/ui/libos32ui_core.md)
 - [userland/rust/libos32gui/src/draw.md](userland/rust/libos32gui/src/draw.md)
+- [userland/system/hsync_protect.md](userland/system/hsync_protect.md)
 
 - [iso9660](fs/isofs/iso9660.md)
 - [iso9660_dir_read](fs/isofs/iso9660_dir_read.md)

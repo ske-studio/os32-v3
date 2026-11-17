@@ -10,7 +10,7 @@ CHECK = dict(name='hostsvc-link-api', tier=1, needs=[], budget=3.6,
             'tools/tests/kernel_includes.py', 'tools/tests/host32.py',
             'tools/tests/hostsvc_link_api_host.c', 'include/remote_control.h', 'net/host_mailbox.h', 'sdk/include/os32/os32_host_notice.h'],
     env=[],
-    basis=['LAN_OPERATOR_DESIGN §5', 'NET_HOSTSVC_DESIGN §6', 'NET_HOSTSVC_DESIGN §7', 'NET_HOSTSVC_DESIGN §11'],
+    basis=['LAN_OPERATOR_DESIGN §5', 'docs/design/net/link_host_api.md 誤りの意味', 'docs/design/net/README.md 誤りの番号', 'docs/design/net/link_host_api.md 容量'],
 )
 import argparse
 from pathlib import Path

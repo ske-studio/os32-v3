@@ -9,7 +9,7 @@ CHECK = dict(name='hostsvc-init', tier=1, needs=[], budget=3.9, covers=[
     'sdk/include/os32/os32_host_notice.h', 'mm/kmalloc.h', 'lib/kstring.h', 'sdk/include/os32/os32_kapi_shared.h',
     'tools/tests/hostsvc_init_host.c', 'tools/tests/host32.py',
     'tools/tests/kernel_includes.py', 'build/config.mk'],
-    basis=['NET_HOSTSVC_DESIGN §3'],
+    basis=['docs/design/fs/serialfs/serialfs_persistent.md 何をするか'],
     pins=['LAN_BULK_DESIGN'],
 )
 import os

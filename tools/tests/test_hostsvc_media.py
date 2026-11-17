@@ -9,7 +9,7 @@ CHECK = dict(name='hostsvc-media', tier=1, needs=[], budget=6.5, covers=[
     'drivers/base/dev.c', 'kernel/dev/dev.h',
     'tools/tests/hostsvc_media_host.c', 'tools/tests/host32.py',
     'tools/tests/kernel_includes.py', 'build/config.mk'],
-    basis=['NET_HOSTSVC_DESIGN §4', 'NET_HOSTSVC_DESIGN §11'],
+    basis=['docs/design/fs/isofs/iso9660_media.md 不変条件', 'docs/design/drivers/block/netcd.md 読みと媒体の確かめ'],
 )
 
 import argparse

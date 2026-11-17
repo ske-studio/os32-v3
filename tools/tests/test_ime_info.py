@@ -3,7 +3,7 @@
 CHECK = dict(name='ime-info', tier=1, needs=[], budget=2.8, covers=[
     'tools/tests/test_ime_info.py', 'userland/cmds/ime_info.inc',
     'sdk/include/os32/**'],
-    basis=['DICT_META_DESIGN §2', 'DICT_META_DESIGN §3', 'DICT_META_DESIGN §4', 'DICT_META_DESIGN §5', 'DICT_META_DESIGN §6', 'DICT_META_DESIGN §1'],
+    basis=['docs/design/kernel/ime/ime_dict_info.md 表示'],
 )
 import argparse
 from pathlib import Path

@@ -39,7 +39,7 @@ jobs:
       OS32_CLANG_CROSS_FREE: "1"
       # 静的ゲートは make の前提 (CHECK の needs) を組まない — クロス無しで旧と同じ振る舞い。
       CHECK_NO_NEEDS: "1"
-      CHECK_ROUTINE: "1"  # full_only は full-check だけで回す。
+      CHECK_ROUTINE: "1"  # full_only は build.yml の `make check` が回す。
       LYCHEE_VERSION: "0.24.2"
       LYCHEE_SHA256: "73657a111819a30c47c08352896796f23d64e4eb2b3ed39b6d32149241566fc5"
     steps:
@@ -205,12 +205,12 @@ jobs:
         env:
           OS32_ACCEPT_IPA_LICENSE: "1"
         run: |
-          CHECK_ROUTINE=1 MUTATE=0 python3 -B tools/checks/run.py --run all --env ppc-cross --exclude-env qemu-ppc
+          MUTATE=1 python3 -B tools/checks/run.py --run all --env ppc-cross --exclude-env qemu-ppc
 
   ppc-qemu:
     needs: ppc-compile
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@v4
         with:
@@ -236,7 +236,7 @@ jobs:
           OS32_ACCEPT_IPA_LICENSE: "1"
           TMPDIR: ${{ runner.temp }}
         run: |
-          CHECK_ROUTINE=1 OS32_REQUIRE_PPC=1 MUTATE=0 python3 -B tools/checks/run.py --run all --env qemu-ppc
+          OS32_REQUIRE_PPC=1 MUTATE=1 python3 -B tools/checks/run.py --run all --env qemu-ppc
       - name: PPC QEMU diagnostics
         if: failure()
         run: |

@@ -1,7 +1,7 @@
 # TASK_DICT_META — FEP 辞書のメタ情報と、学習データの別ファイル化
 
-> 状態: **受入完了 (2026-11-07)** — 段 A〜P を main に入れた (2df328af)。NP21/W のゲスト受入 fep_meta_test は 37/37 PASS (メタ 20 キー・学習・S→L→S の頻度・予約 224/225KiB・ID/品詞の不一致)。受入で見つけた製品の不具合 2 件 (hsync の設定の SQL の CAST、同じ辞書の選び直しの probe の衝突) も main に。残りは延ばした試験 FEPLEARN-1 (学習 → hsync で system の辞書を差し替え → 再起動で学習が残る、DEFERRED_TESTS)。確定設計は [DICT_META_DESIGN](../../decisions/fep/DICT_META_DESIGN.md) (astra 起草、Opus レビュー 2 回、PM 決定は同文書の末尾)。以下の本文は 2026-09-30 の計画で、食い違えば確定設計を正とする。
-> 上位: [FEP の索引](00_INDEX.md)。契約・形式・実装分担・受入の正典は [DICT_META_DESIGN](../../decisions/fep/DICT_META_DESIGN.md) §2〜9 と末尾の確定事項。
+> 状態: **受入完了 (2026-11-07)** — 段 A〜P を main に入れた (2df328af)。NP21/W のゲスト受入 fep_meta_test は 37/37 PASS (メタ 20 キー・学習・S→L→S の頻度・予約 224/225KiB・ID/品詞の不一致)。受入で見つけた製品の不具合 2 件 (hsync の設定の SQL の CAST、同じ辞書の選び直しの probe の衝突) も main に。残りは延ばした試験 FEPLEARN-1 (学習 → hsync で system の辞書を差し替え → 再起動で学習が残る、DEFERRED_TESTS)。確定設計は [DICT_META_DESIGN](../decisions/DICT_META_DESIGN.md) (astra 起草、Opus レビュー 2 回、PM 決定は同文書の末尾)。以下の本文は 2026-09-30 の計画で、食い違えば確定設計を正とする。
+> 上位: [FEP の索引](../../tasks/fep/00_INDEX.md)。契約・形式・実装分担・受入の正典は [DICT_META_DESIGN](../decisions/DICT_META_DESIGN.md) §2〜9 と末尾の確定事項。
 
 ## 0. 決定
 
@@ -14,7 +14,7 @@
 | M5 | `license` / `attribution` は原文全文を辞書に収録し、`ime_dict_info` で分割取得する | 確定設計 §2・末尾の公開契約 |
 | M6 | 旧い学習データは移さず、新しい学習 DB は空から作る。`fep_user.db*` を hsync の保護名にする | ユーザー 2026-11-05、確定設計 §4 |
 
-[^memory]: 現行 [MEMMAP_V3 D27](../../decisions/MEMMAP_V3.md#0-決定事項の一覧-d1d36) は同ファイルの 30 行目。D28 と §4-6 は現行文書に無い。メタ情報・別ファイル化の契約は確定設計 §2・3、予約の具体的な手順は同 §5・6 を参照する。
+[^memory]: ../../tasks/fep/現行 [MEMMAP_V3 D27](../../decisions/MEMMAP_V3.md#0-決定事項の一覧-d1d36) は同ファイルの 30 行目。D28 と §4-6 は現行文書に無い。メタ情報・別ファイル化の契約は確定設計 §2・3、予約の具体的な手順は同 §5・6 を参照する。
 
 ## 1. 現行の契約
 
@@ -39,5 +39,5 @@ cfg set system fep_user_dict_path text /etc/fep_meta_user.db
 ## 3. 受入の残件
 
 - ゲスト未実行。登録と NP21/W での実行・観測は PM が担当する。
-- 配備・hsync・再起動後の学習 4 列保持と FDRECOV の消失条件は [FEPLEARN-1](../DEFERRED_TESTS.md) に残す。PM のゲスト受入後に閉じる。
+- 配備・hsync・再起動後の学習 4 列保持と FDRECOV の消失条件は [FEPLEARN-1](../../tasks/DEFERRED_TESTS.md) に残す。PM のゲスト受入後に閉じる。
 - 壊れたヘッダ等のゲストで作らない状態は `tools/tests/test_fep_meta.py`、ROFS・hsync 保護等は確定設計 §9 の受入で扱う。

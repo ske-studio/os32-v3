@@ -5,7 +5,7 @@ CHECK = dict(name='hostsvc-block-contract', tier=1, needs=[], budget=3.1, covers
     'lib/crc32.h', 'lib/le_internal.h', 'include/types.h',
     'include/time_units.h', 'include/memmap.h', 'tools/tests/host32.py',
     'tools/tests/kernel_includes.py', 'build/config.mk'],
-    basis=['NET_HOSTSVC_DESIGN §4'],
+    basis=['docs/design/fs/serialfs/sfs_block.md 通信の形式'],
 )
 
 import argparse

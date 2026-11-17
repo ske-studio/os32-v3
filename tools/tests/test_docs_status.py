@@ -12,6 +12,7 @@ check(root) の結果を見る。実物のリポジトリの木は check-docs-st
 """
 import contextlib
 import importlib.util
+import json
 import io
 import os
 import pathlib
@@ -196,7 +197,7 @@ def case_main_rc(mod, tmp):
         sys.argv = ["x", "--root", root]
         with contextlib.redirect_stdout(io.StringIO()):
             rc_bad = mod.main()
-        root2 = tree(tmp, {"TASK_A.md": head("> 状態: **計画**")})
+        root2 = tree(tmp, {"TASK_A.md": head("> 状態: **計画**\n> 完了の基準: 検査 x の違反が 0 件")})
         sys.argv = ["x", "--root", root2]
         with contextlib.redirect_stdout(io.StringIO()):
             rc_ok = mod.main()
@@ -223,7 +224,84 @@ def case_stage_heading_forms(mod, tmp):
               '説明ラベルで段が終了した: %s %r' % (label, warnings))
 
 
+def tickets(mod, tmp, files, exceptions=None):
+    root = tree(tmp, files)
+    if exceptions is not None:
+        os.makedirs(os.path.join(root, "tools"))
+        with open(os.path.join(root, "tools", "docs_status_exceptions.json"), "w", encoding="utf-8") as f:
+            json.dump(exceptions, f)
+    return mod.ticket_problems(root)
+
+
+OPEN = "> 状態: **計画 (2026-11-18)**"
+CRIT = "\n> 完了の基準: 検査 x の違反が 0 件"
+
+
+def case_ticket_criteria(mod, tmp):
+    probs = tickets(mod, tmp, {
+        "a/TASK_OK.md": "# 票\n\n" + OPEN + CRIT + "\n",
+        "a/TASK_NONE.md": "# 票\n\n" + OPEN + "\n",
+        "a/TASK_EMPTY.md": "# 票\n\n" + OPEN + "\n> 完了の基準:\n",
+        "a/TASK_LATE.md": "# 票\n\n" + OPEN + "\n" + "本文\n" * 20 + "> 完了の基準: 遅すぎる\n",
+        "a/TASK_WAIT.md": "# 票\n\n> 状態: **受入完了・実機確認待ち (2026-11-18)**\n",
+        "a/NOTE.md": "# メモ\n\n" + OPEN + "\n",
+    })
+    names = sorted(p.split(":")[0] for p in probs)
+    check(names == ["docs/tasks/a/TASK_EMPTY.md", "docs/tasks/a/TASK_LATE.md", "docs/tasks/a/TASK_NONE.md",
+                    "docs/tasks/a/TASK_WAIT.md"], "基準の行の要る票: %r" % probs)
+    check(all("完了の基準" in p for p in probs), "文: %r" % probs)
+
+
+def case_ticket_criteria_exceptions(mod, tmp):
+    files = {"a/TASK_OLD.md": "# 票\n\n" + OPEN + "\n", "a/TASK_NEW.md": "# 票\n\n" + OPEN + CRIT + "\n",
+             "a/TASK_DONE.md": "# 票\n\n> 状態: **完了記録 (2026-11-18)**\n"}
+    done = {"docs/tasks/a/TASK_DONE.md": "残す理由"}
+    check(tickets(mod, tmp, files, {"no_criteria": ["docs/tasks/a/TASK_OLD.md"], "done_in_place": done}) == [],
+          "例外の票が落ちた")
+    probs = tickets(mod, tmp, files, {"no_criteria": ["docs/tasks/a/TASK_OLD.md", "docs/tasks/a/TASK_NEW.md"],
+                                      "done_in_place": done})
+    check(len(probs) == 1 and "TASK_NEW.md: 完了の基準の行がある" in probs[0], "行を書いた票の例外: %r" % probs)
+    probs = tickets(mod, tmp, files, {"no_criteria": ["docs/tasks/a/TASK_OLD.md", "docs/tasks/a/TASK_DONE.md"],
+                                      "done_in_place": done})
+    check(len(probs) == 1 and "TASK_DONE.md: 進行中の票ではない" in probs[0], "進行中でない票の例外: %r" % probs)
+    probs = tickets(mod, tmp, files, {"no_criteria": ["docs/tasks/a/TASK_OLD.md", "docs/tasks/a/TASK_GONE.md"],
+                                      "done_in_place": done})
+    check(len(probs) == 1 and "TASK_GONE.md: 票が無い" in probs[0], "消えた票の例外: %r" % probs)
+
+
+def case_ticket_done_in_place(mod, tmp):
+    files = {"a/TASK_DONE.md": "# 票\n\n> 状態: **受入完了 (2026-11-18)** — 根拠\n",
+             "a/TASK_REC.md": "# 票\n\n状態: 完了記録。\n",
+             "a/TASK_OPEN.md": "# 票\n\n" + OPEN + CRIT + "\n",
+             "a/RECORD.md": "# 記録\n\n> 状態: **完了記録 (2026-11-18)**\n"}
+    probs = tickets(mod, tmp, files)
+    check(sorted(p.split(":")[0] for p in probs) == ["docs/tasks/a/TASK_DONE.md", "docs/tasks/a/TASK_REC.md"]
+          and all("docs/archive/ へ移す" in p for p in probs), "完了した票: %r" % probs)
+    keep = {"docs/tasks/a/TASK_DONE.md": "今の仕様の入口", "docs/tasks/a/TASK_REC.md": "引き継ぎが指す"}
+    check(tickets(mod, tmp, files, {"done_in_place": keep}) == [], "理由つきで残す票が落ちた")
+    probs = tickets(mod, tmp, files, {"done_in_place": dict(keep, **{"docs/tasks/a/TASK_REC.md": " "})})
+    check(len(probs) == 1 and "TASK_REC.md" in probs[0], "理由が空の例外: %r" % probs)
+    probs = tickets(mod, tmp, files, {"done_in_place": dict(keep, **{"docs/tasks/a/TASK_OPEN.md": "誤り"})})
+    check(len(probs) == 1 and "TASK_OPEN.md: 完了した票ではない" in probs[0], "進行中の票の例外: %r" % probs)
+
+
+def case_main_counts_ticket_rules(mod, tmp):
+    root = tree(tmp, {"a/TASK_NONE.md": "# 票\n\n" + OPEN + "\n"})
+    argv = sys.argv
+    sys.argv = ["check_docs_status.py", "--root", root]
+    try:
+        with contextlib.redirect_stdout(io.StringIO()):
+            rc = mod.main()
+    finally:
+        sys.argv = argv
+    check(rc == 1, "票の決まりの違反で rc=%r" % rc)
+
+
 CASES = {
+    "ticket_criteria": case_ticket_criteria,
+    "ticket_criteria_exceptions": case_ticket_criteria_exceptions,
+    "ticket_done_in_place": case_ticket_done_in_place,
+    "main_counts_ticket_rules": case_main_counts_ticket_rules,
     "stage_heading_forms": case_stage_heading_forms,
     "vocab_ok": case_vocab_ok,
     "longest_word": case_longest_word,
@@ -258,6 +336,19 @@ MUTATIONS = [
     (r'problems.append\("%s:%d: 語彙の外', 'pass  # ("%s:%d: 語彙の外', "語彙の外を報告しない"),
     (r"return 1\n    print\(\"OK", "return 0\n    print(\"OK", "問題があっても rc=0"),
     (r"base = os.path.join\(root, TASKS\)", "base = os.path.join(root, 'docs')", "archive まで見る"),
+    (r"if no > CRITERIA_LINES:\n                break", "pass", "完了の基準の行の位置の制限を外す"),
+    (r'r"\^> 完了の基準:\\s\*\\S"', 'r"^> 完了の基準:"', "中身の無い完了の基準を通す"),
+    (r'OPEN_WORDS = \("計画", ', 'OPEN_WORDS = (', "計画の票に完了の基準を求めない"),
+    (r'"受入待ち", "受入完了・実機確認待ち"\)', '"受入待ち")', "実機確認待ちの票に完了の基準を求めない"),
+    (r"if not TICKET_RE.match\(os.path.basename\(p\)\):\n            continue", "pass", "票でない文書にも当てる"),
+    (r"            elif not criteria:", "            elif False:", "完了の基準の無い票を通す"),
+    (r"                if criteria:\n", "                if False:\n", "行を書いた票の例外を残させる"),
+    (r'        elif rel in no_criteria:', '        elif False:', "進行中でない票の例外を残させる"),
+    (r'DONE_WORDS = \("受入完了", "完了記録", "撤回"\)', 'DONE_WORDS = ("撤回",)', "完了した票を現行の棚に置かせる"),
+    (r'if not str\(done_in_place.get\(rel, ""\)\).strip\(\):', 'if rel not in done_in_place:', "理由が空の例外を通す"),
+    (r'        elif rel in done_in_place:', '        elif False:', "進行中の票を完了の例外に置かせる"),
+    (r'for rel in sorted\(\(set\(no_criteria\) \| set\(done_in_place\)\) - seen\):', 'for rel in []:', "消えた票の例外を残させる"),
+    (r"problems = check\(args.root\) \+ ticket_problems\(args.root\)", "problems = check(args.root)", "票の決まりを main が数えない"),
 ]
 
 

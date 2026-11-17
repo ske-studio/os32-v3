@@ -8,7 +8,7 @@ CHECK = dict(name='osri-enc2-core', tier=1, needs=['make:osri-enc2-core'], budge
                      'tools/osri_enc2_dither.py', 'tools/osri_enc2_pack.py',
                      'tools/img2osri.py', 'tools/osri_enc2_compare.py',
                      'tools/osri_enc2_decode.py', 'tools/osri_enc2_metrics.py'],
-    basis=['RASTER_SPLASH_ENC2_DESIGN'],
+    basis=['docs/design/tools/osri_enc2.md 役割の分担', 'docs/design/tools/osri_enc2.md 整数の規則 (Python と C で同じ)'],
 )
 
 import argparse

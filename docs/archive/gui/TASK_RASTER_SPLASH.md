@@ -1,6 +1,6 @@
 # TASK_RASTER_SPLASH — ラスタパレット画像スプラッシュ (PC-98 標準 16 色 + 走査線ごとのパレット)
 
-> 状態: **受入完了 (2026-11-04、ユーザー「ラスタの件はこれで締めてください」)** — 常用の可変 OUT (enc2・B31) と配布の画像の経路が main (S5a〜S5d、385a4589)。実機 Ra266 31k で `/boot/user.osri` (ネオン街、画面全体で 518 色) がカメラに映り、最初の約 1 秒のデフォルトパレットは演出 (ユーザー指定)。24.8kHz の実機でもユーザー「24.8kHzでもバッチリでした。」。現行の正典は [RASTER_SPLASH_S5_DESIGN](../../decisions/gui/RASTER_SPLASH_S5_DESIGN.md)、画像形式は [RASTER_SPLASH_ENC2_DESIGN](../../decisions/gui/RASTER_SPLASH_ENC2_DESIGN.md)。.osri のビューアー (ユーザーアプリ) は別の票 TASK_OSRI_VIEWER で GeForce の後。
+> 状態: **受入完了 (2026-11-04、ユーザー「ラスタの件はこれで締めてください」)** — 常用の可変 OUT (enc2・B31) と配布の画像の経路が main (S5a〜S5d、385a4589)。実機 Ra266 31k で `/boot/user.osri` (ネオン街、画面全体で 518 色) がカメラに映り、最初の約 1 秒のデフォルトパレットは演出 (ユーザー指定)。24.8kHz の実機でもユーザー「24.8kHzでもバッチリでした。」。現行の正典は [RASTER_SPLASH_S5_DESIGN](RASTER_SPLASH_S5_DESIGN.md)、画像形式は [RASTER_SPLASH_ENC2_DESIGN](RASTER_SPLASH_ENC2_DESIGN.md)。.osri のビューアー (ユーザーアプリ) は別の票 TASK_OSRI_VIEWER で GeForce の後。
 
 ## 0. ユーザーの決定・指示 (2026-11-01、原文)
 
@@ -14,7 +14,7 @@
 
 ## 1. 詳細設計
 
-画像形式・変換・再生と段の順は [RASTER_SPLASH_PL_DESIGN §6・§7](../../decisions/gui/RASTER_SPLASH_PL_DESIGN.md) に従う。仕様の本文は正典を参照する。
+画像形式・変換・再生と段の順は [RASTER_SPLASH_PL_DESIGN §6・§7](RASTER_SPLASH_PL_DESIGN.md) に従う。仕様の本文は正典を参照する。
 
 ## 2. 段の状態
 

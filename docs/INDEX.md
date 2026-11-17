@@ -67,7 +67,7 @@ PC-9821シリーズ向け 32ビット ベアメタルOS
 | 実機 Ra266 の機体構成・基準構成 (2026-10-15 のスナップショット) と実機の方針 (82557・PCI・Trident・1.44MB・しないこと) | [decisions/realhw/RA266.md](decisions/realhw/RA266.md) (2026-10-22 に realhw/PLAN の本文を節の番号のまま移した) | 実機の票の一覧は [tasks/realhw/PLAN.md](tasks/realhw/PLAN.md) (索引) |
 | 実機 Ra266 の画面ドライバ (内蔵 Trident 1023:9660) の設計・資料・段取り | [tasks/realhw/TASK_TRIDENT_DRIVER.md](tasks/realhw/TASK_TRIDENT_DRIVER.md) (設計中 — 設計票 v5 が Codex 5 回目で Approve、実装は未着手) | [decisions/realhw/RA266.md](decisions/realhw/RA266.md) §7、[ROADMAP.md](ROADMAP.md) (1 行) |
 | PCI の IRQ を機器の種類で振り直す (共通の層と PC-98・PowerMac G4 の backend) | [tasks/realhw/TASK_PCI_IRQ_ROUTE.md](tasks/realhw/TASK_PCI_IRQ_ROUTE.md) (設計中 — 設計は確定、実装を待つ) | [decisions/realhw/RA266.md](decisions/realhw/RA266.md) §1-1 |
-| GeForce の PCI の位置を起動時の列挙で見つける (決め打ち 0:13.0 の撤去) | [tasks/realhw/TASK_GF_BDF.md](tasks/realhw/TASK_GF_BDF.md) (実装中) | |
+| GeForce の PCI の位置を起動時の列挙で見つける (決め打ち 0:13.0 の撤去) | [design/kdebug/recover_gf_locate.md](design/kdebug/recover_gf_locate.md)・[design/drivers/pci/pci_locate.md](design/drivers/pci/pci_locate.md) (受入完了 2026-11-10) | |
 | 実機 Ra266 の PCI の IDE カード HighPoint HPT370 (大きな HDD・UDMA・DVD マルチドライブ) | [tasks/realhw/TASK_HPT370.md](tasks/realhw/TASK_HPT370.md) (計画 — 調べの台本の段階) | [decisions/realhw/RA266.md](decisions/realhw/RA266.md) §1-1 |
 | ハードウェア調査の道具 HW-BASIC (PCI・I/O・MMIO の読み書きとスクリプト、許可リストなし) | [tasks/realhw/TASK_HW_BASIC.md](tasks/realhw/TASK_HW_BASIC.md) (設計中 — 設計は確定、実装はこれから) |
 | 実機 Ra266 の GeForce 6200 (PCI 0:13.0) の観測方針と手順の計画 | [tasks/realhw/TASK_GEFORCE6200.md](tasks/realhw/TASK_GEFORCE6200.md) (実装中 — 4a の S1〜S7 は main、次は S8 (実機の立会い)) | [tasks/realhw/GEFORCE6200_VBIOS.md](tasks/realhw/GEFORCE6200_VBIOS.md) (VBIOS について分かっていることのまとめ) |
@@ -308,7 +308,7 @@ OS の肥大化したコードを削る段 (表を詰める・カーネル常駐
 | [tasks/v3/RUST_VS_C11.md](tasks/v3/RUST_VS_C11.md) | **Rust にする部品と C11 に揃える部品 — 設計中・方針確定 (2026-09-30、U5 の調査票、決定は MEMMAP_V3 D36)** — C11 化 (T0) の範囲とコスト (小)、Rust の今の使われ方と道具 (nightly + build-std、`i686-os32-none.json` の既定 CPU は `generic`、os32api、`os32_lz4` のカーネルリンク実績、ビルド時間)、IRQ 文脈の制約、候補 24 件の比較表 (新規 / 既存 / 既に Rust)、推奨 (合成器と OpenType は Rust、カーネル核・FS・FEP・SDK・デコーダは C11)、混在の約束 (FFI・所有権・panic・x87・target JSON)、相対コスト、ユーザー決定 7 点 + (a)、**386 下限の守り方 (§7: `cpu=i386` でも LLVM は `bswap` / `cmpxchg` / `xadd` を出す — 回避実装 + 最終成果物の検査を必須に)**、Codex 事実確認の対応表 (§8) |
 | `docs/archive/v3/TASK_C11_MIGRATION.md` | **T0: C89 (gnu89) → C11 (gnu11) への移行 — 受入完了 (2026-09-30、main `f5bcb35`)** — 範囲は「言語モードと検査の移行」に限定 (本体・ブート・userland・SDK 実装は gnu11、公開 SDK ヘッダは C89 互換、SQLite 系は gnu89 の専用規則、全面書き換えなし)、前提文書の訂正 (§2: `kernel.mk:175` は SQLite 本体でない、`CFLAGS_SQLITE` の継承、`shm.c` は修正済み、`check_constraints.py` は言語検査をしていない)、作業の分類表 (§3)、C11 機能の採用範囲 (§4)、gnu89 → gnu11 の意味の差 (§5)、実施順序 1〜7 と検査 (§6)、受入 (§7)、ユーザー判断 3 点 (§8) は推奨どおり承認・[C1] は §9 の文面で改訂済み、`make check-c-dialect` を新設、A8 は Codex Approve・A9 は NP21/W で合格 |
 | [tasks/v3/TASK_HAL_WIRING.md](tasks/v3/TASK_HAL_WIRING.md) | 結線の土台 (割り込みの動的登録 / 8237 / DMA プール / PCI の結線表 / µs 時計) **受入完了・実機確認待ち** (残: W7) |
-| [tasks/v3/TASK_PCM_CS4231.md](tasks/v3/TASK_PCM_CS4231.md) | CS4231 (MATE-X PCM) の PCM 再生ドライバ **受入待ち** (E0〜E4 合格、残: E5 は NP21/W、E6 は実機の聴取)。ini の SNDboard は [D2] |
+| [design/drivers/sound/cs4231/pcm_cs4231.md](design/drivers/sound/cs4231/pcm_cs4231.md) | CS4231 (MATE-X PCM) の PCM 再生ドライバ **受入完了 (2026-11-08)**。まだ確かめていない項目は設計書の「未確認」。ini の SNDboard は [D2] |
 | [tasks/v3/TASK_AV_HAL.md](tasks/v3/TASK_AV_HAL.md) | サウンド・入力の HAL (DirectSound・XInput 相当の土台、FM/PSG の口) **設計中 (2026-11-09)** — 設計は確定・承認済み、実装を待つ |
 | [tasks/v3/TASK_SYNTH_OPNA.md](tasks/v3/TASK_SYNTH_OPNA.md) | PCM の合成器 (ソフト OPNA、fmgen の移植) **設計中 (2026-11-05)** — 設計は確定、実装は未着手 |
 | [tasks/v3/TASK_TICK_1KHZ.md](tasks/v3/TASK_TICK_1KHZ.md) | P3 の 1kHz IRQ0 tick (実測 → 二周期への切り替え) **設計中 (2026-11-05)** — 設計は確定、実装は未着手 |
@@ -366,7 +366,7 @@ OS の肥大化したコードを削る段 (表を詰める・カーネル常駐
 | [tasks/network/PLAN.md](tasks/network/PLAN.md) | LGY-98 / NE2000 **ドライバ**計画 — M1〜M3 エミュレータ合格、既定で有効 (2026-09-14 決裁) |
 | [tasks/network/LINK_PLAN.md](tasks/network/LINK_PLAN.md) | リンクプロトコル (ワイヤ v2) / Host Services 計画 |
 | [tasks/network/HOST_SERVICES_PLAN.md](tasks/network/HOST_SERVICES_PLAN.md) | Host Services 詳細計画 — N1〜N4 受入完了。N5 (実機 LAN) は実機の内蔵 82557 の票 ([TASK_LAN_82557](tasks/realhw/TASK_LAN_82557.md) の L-B) に吸収。LGY-98 はエミュレータで回帰を取る経路として残る |
-| [tasks/network/TASK_NET_HOSTSVC.md](tasks/network/TASK_NET_HOSTSVC.md) | ネットワーク越しの Host Services — 実機の /host・ネットワーク越しの CD (os32.iso9660)・知らせのメールボックス・サービスの一覧と os32. の名前 (設計中 2026-11-05) |
+| [tasks/network/TASK_NET_HOSTSVC.md](tasks/network/TASK_NET_HOSTSVC.md) | ネットワーク越しの Host Services — 実機の /host・ネットワーク越しの CD (os32.iso9660)・知らせのメールボックス・サービスの一覧と os32. の名前 (受入完了 2026-11-08。今の仕様は [design/net/README.md](design/net/README.md)。os32.time・os32.conv.image は未実装) |
 | [tasks/network/TASK_LAN_OPERATOR.md](tasks/network/TASK_LAN_OPERATOR.md) | 操作口 (rshell・gshell) を LAN が既定・serial が退避先に、PowerPC の PLN1 を link に統合 (設計確定 2026-11-14) |
 | [tasks/network/TASK_LAN_BULK.md](tasks/network/TASK_LAN_BULK.md) | LAN の一括転送 (link の新しい op、/host の LAN 経路を link へ一本化) **設計中 (2026-11-14)** — 設計は確定、実装は未着手 |
 | [tasks/network/TASK_HSYNC_MANIFEST.md](tasks/network/TASK_HSYNC_MANIFEST.md) | hsync の往復を減らす (ホストの木の一覧と CRC で比べる) **実装中 (2026-11-16)** |
@@ -404,7 +404,7 @@ archive/gui_v14/ (アーカイブ: `docs/archive/gui_v14/TASK_EDIT_GUI.md`) (v1.
 | [tasks/gui/TASK_I18N.md](tasks/gui/TASK_I18N.md) | UI メッセージの多言語対応 (SQLite のメッセージ表、既定は英語、区分 + 短い名前をビルドで番号に畳む、PO 形式と POSIX `%n$` に乗る) **計画 (2026-09-30)** — 設計票は v3 後半 (T4・コントロールパネルの後)、他の文字体系は T7b の後 |
 | [tasks/gui/TASK_P8_GUI_LAYER.md](tasks/gui/TASK_P8_GUI_LAYER.md) | P8 GUI 層 (音のリングと入力) **設計中 (2026-11-05)** — 設計は確定、実装は未着手 |
 | TASK_GFX_MODES (アーカイブ: `docs/archive/gui/TASK_GFX_MODES.md`)・[TASK_GFX_ACCEL_HAL](tasks/gui/TASK_GFX_ACCEL_HAL.md)・[TASK_HAL_V2](tasks/gui/TASK_HAL_V2.md)・[TASK_CONSOLE_DUAL](tasks/gui/TASK_CONSOLE_DUAL.md) | 表示の色数と解像度を「形式」と「ドライバの能力の表」で持つ (装置 × 色数 × 解像度で名前が増えない形、2026-10-26 ユーザー指示) **実装中** — G0 は小さい直し、G1 以降は設計の往復から |
-| [tasks/gui/TASK_RASTER_SPLASH.md](tasks/gui/TASK_RASTER_SPLASH.md) | ラスタパレット画像スプラッシュ — PC-98 標準 16 色 + 走査線ごとのパレット、24/31kHz の吸収、`.osri` とホストの変換 (誤差拡散) — **受入完了 (2026-11-04)** |
+| [design/platform/pc98/boot_splash.c.md](design/platform/pc98/boot_splash.c.md) | ラスタパレット画像スプラッシュ — PC-98 標準 16 色 + 走査線ごとのパレット、24/31kHz の吸収、`.osri` とホストの変換 (受入完了 2026-11-04。現行の設計書の入口) |
 | [tasks/gui/TASK_OSRI_VIEWER.md](tasks/gui/TASK_OSRI_VIEWER.md) | .osri ビューアー (ユーザーアプリ) — カーネルに再生を任せる KAPI・既存の画面の門・表示時間 — **設計確定・実装は GeForce の後 (2026-11-04)** |
 | [tasks/gui/TASK_VIDEO_HAL.md](tasks/gui/TASK_VIDEO_HAL.md) | 表示の HAL の設計 — 計画 (2026-11-06)。GeForce と Trident のドライバの後に設計、上限は GeForce・下限は 640×400、最初に HAL の機能の一覧 |
 | `docs/archive/gui_v14/TASK_EDIT_GUI.md` | テキストエディタの GUI 版 **受入完了 (2026-09-18)** — v1.4 の最後の受入試験。API の退行検出を兼ねる (複数行の編集部品) |
@@ -431,7 +431,7 @@ archive/v21/ (アーカイブ: `docs/archive/README.md`) へ落とした (FORK_P
 |-------------|------|
 | [tasks/fep/00_INDEX.md](tasks/fep/00_INDEX.md) | FEP (日本語入力) 拡張 — 詳細設計 P1〜P7 の索引 (実装状況付き) |
 | [tasks/fep/FEP_STATUS.md](tasks/fep/FEP_STATUS.md) / [FEP_FUTURE.md](tasks/fep/FEP_FUTURE.md) | FEP のアーキテクチャ説明 (2026-04-27 の快照) / 今後の拡張 |
-| [tasks/fep/TASK_DICT_META.md](tasks/fep/TASK_DICT_META.md) | FEP 辞書のメタ情報 (形式の版・dict_id・license/attribution・`mem_reserve_kb` 等) と学習データの別ファイル化 — **計画** (ユーザー決定 2026-09-30、着手は **v3 の後の方**。v3 P10)。学習データの移行は二段 (M6、Codex X8) |
+| [design/kernel/ime/README.md](design/kernel/ime/README.md) | FEP 辞書のメタ情報 (形式の版・dict_id・license/attribution・`mem_reserve_kb` 等) と学習データの別ファイル化 — 受入完了 (2026-11-07)。辞書の形式は [design/tools/fep_to_sqlite.md](design/tools/fep_to_sqlite.md) |
 | `docs/archive/v21/v86v2/README.md` | **V86 サブシステム (再挑戦)** — 16bit ゲスト実行 (完了記録)。到達点は `04_implementation_status.md` |
 | `docs/archive/v21/wintree_port/PORT_PLAN.md` | feat/vdm 系作業ツリーの移植計画と実施結果 |
 | `docs/archive/v21/sqlite/00_INDEX.md` | SQLite カーネル統合 — 設計・実装 (全 7 部) |

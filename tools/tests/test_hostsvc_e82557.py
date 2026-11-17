@@ -6,7 +6,7 @@ CHECK = dict(name='hostsvc-e82557', tier=1, needs=[], budget=3.4, covers=[
     'sdk/include/os32/os32_kapi_shared.h',
     'tools/tests/hostsvc_e82557_host.c', 'tools/tests/host32.py',
     'tools/tests/kernel_includes.py', 'build/config.mk'],
-    basis=['NET_HOSTSVC_DESIGN §2', 'NET_HOSTSVC_DESIGN §6'],
+    basis=['docs/design/net/nic.md 装置の選択と寿命', 'docs/design/net/nic.md 受信を誰がいつ進めるか'],
 )
 import argparse
 import os

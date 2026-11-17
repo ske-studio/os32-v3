@@ -29,7 +29,7 @@
 |`sdk/include/os32/os32_kapi_shared.h`、`exec/os32x_hdr.c`|OS32X v4=60B、4世代照合、SHLIB表32B＋絶対関数番地。GUI版と汎用protocolを区別する|
 |`userland/rust/libos32gui/src/shlib.rs`、`sdk/rust/os32api/src/gui/stub.rs`|GUI表は122関数、Rust stub と番号を照合。生成元を共通化して libc でも使う|
 |`build/packages.yaml`、`userland/deploy.yaml`|FD=BOOT＋MINIMAL−除外。外部救援7本は install/cdinst/hsync/less/grep/hexdump/cfg、shell は core|
-|`build/programs.mk`、`docs/decisions/network/NET_HOSTSVC_DESIGN.md`|GUI は libos32host を内包、現規則は末尾に `-lc -lgcc`。host_call は SDK の待機関数で libc と別の責務|
+|`build/programs.mk`、`docs/design/userland/lib/host/host_call.md`|GUI は libos32host を内包、現規則は末尾に `-lc -lgcc`。host_call は SDK の待機関数で libc と別の責務|
 - r1の差6を訂正し、残る食い違いは6件。差6と§8はPM指定mainを再確認、他の実物確認はr1を継承。mainの既存ELFで§8を実測（再ビルド・git操作なし）。
 
 ## 2. Linux (glibc) との対応

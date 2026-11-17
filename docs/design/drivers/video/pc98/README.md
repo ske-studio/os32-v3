@@ -8,3 +8,7 @@
 - [pc98_route.md](pc98_route.md)
 - [splash_raster.c.md](splash_raster.c.md)
 - [splash_raster.h.md](splash_raster.h.md)
+- [splash_raster_plan.c.md](splash_raster_plan.c.md)
+- [splash_raster_play.c.md](splash_raster_play.c.md)
+- [splash_raster_run.c.md](splash_raster_run.c.md)
+- [splash_raster_image.c.md](splash_raster_image.c.md)

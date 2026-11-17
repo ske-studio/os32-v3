@@ -13,8 +13,7 @@
 新しく書くカーネルの中の出力は `kprintf`。端末に出なければ意味が無い物だけ `console_printf` にする。
 今 `console_printf` を使うのは `net/nic.c`・`net/link_selftest.inc`・`exec/exec_finish.inc`・`exec/exec_launch.inc`、
 `console_vprintf` を使うのは `kapi/kapi_print.c` (ユーザープログラムが KAPI の `kprintf` を呼ぶ道。syscall の入口が
-この口だけ特別に扱う)。KAPI の表のポインタ (`exec/exec_kapi_init.inc`、生成物) は `kprintf` を指したまま —
-カーネルの中から表を直に呼ぶ道で、PC-98 では同じ関数。
+この口だけ特別に扱う)。KAPI の表のポインタも `console_printf` を指す (`sdk/kapi.json` の `target`)。
 
 ## 仕組み
 

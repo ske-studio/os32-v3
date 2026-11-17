@@ -7,7 +7,7 @@
 
 | # | 欠点 | 根拠 |
 |---|---|---|
-| F1 | **変異込みの検査が関門になっていない。** 毎回の CI (check・build) は変異なしで、変異込みは夜間の `full-check` だけ。落ちても何も止まらないので、main に赤が溜まる | 夜間の full-check は直近 4 回のうち 3 回が失敗 (11-14・11-15・11-17)。同じ SHA の check・build は成功。11-17 (`75c7c6f69`) は `c-dialect`・`np21w-ini-live-host`・`x87-lifecycle-host` と ppc-compile のジョブが失敗。`x87-lifecycle-host` は `c94bdc0f4`、`ppc-hello-build` は `6dbae6efa` から変異の目印がずれたままだった |
+| F1 | **変異込みの検査が関門になっていなかった。** 毎回の CI は変異なしで、変異込みは夜間の `full-check` だけだった。2026-11-18 に、build の `checks` と check の PowerPC の段を変異込みにし、`full-check` を無くした | 夜間の full-check は 11-14〜17 の 4 回のうち 3 回が失敗し、同じ SHA の check・build は成功していた。変異の目印が古い検査が、数日〜数週間そのままだった |
 | F2 | **失敗がログから読めない。** 変異の「期待どおりの失敗」の出力が全部 1 本のログに流れる | 11-17 の full-check の失敗ログは 1.4 GB・1,200 万行。そのうち 1,087 万行が同じ 1 行の繰り返し。落ちた検査の名前は `*** [...check-<名>] Error` を grep しないと分からない |
 | F3 | **1 本の失敗が残りを隠す。** `tools/checks/run.py --run all` は最初の失敗で止まる。ジョブの `needs` で後ろのジョブも走らない | check.yml・full-check.yml の ppc-compile は `--run all`。11-17 は ppc-compile が 16 分で落ち、`ppc-qemu` は skipped |
 | F4 | **検査の一覧が YAML に手書きで写っている** | check.yml の static-check は `make check-<名>` を約 30 行並べる (選び方は冒頭の註の手順で人が決めた)。`tools/ci/ppc_scope.py` は共通・PowerPC・x86 のパスの一覧を別に持つ |
@@ -75,8 +75,7 @@ SKIP の行は挙げるだけで落とさない: 試験が自分の出力とし�
 |---|---|---|
 | check.yml `static-check` | `make check-<名>` を手で並べる | クロスコンパイラ無しで回る検査に CHECK の `env` で印を付け、`gate.py run` に環境の絞り込みを足して一覧を登録から取る (G4)。道具の事前確認の表を環境ごとに持つ |
 | check.yml `ppc-compile`・`ppc-qemu` | `run.py --run all`、`needs` の鎖、`ppc_scope.py` のパスの一覧 | `gate.py run` に替える (G2・G3)。PowerPC を回すかどうかの判定は、パスの一覧ではなく所有者集合 (`build/select.mk`) から引く |
-| build.yml `check-fast` (6 シャード) | `make -k check-fast CHECK_SHARD=…` | `gate.py run --no-mutate --shard …` に替えると、表・検査ごとのログ・回っていない検査の検出が付く (G2・G3)。`gate-setup` にすると PowerPC の検査が SKIP にならない (G5・G6) |
-| full-check.yml | 1 ジョブで `make check -k -j4 MUTATE=1`、ログ 1 本 | `sep` の `checks` と同じ行列にする (G1・G3・G8)。夜間ではなく push ごとの関門にするかは、実測の時間を見て決める |
+| build.yml `checks` (6 シャード) | `make -k check CHECK_SHARD=…` (全部の検査を変異込み、2026-11-18 から) | `gate.py run --shard …` に替えると、表・検査ごとのログ・回っていない検査の検出が付く (G2・G3)。`gate-setup` にすると PowerPC の検査が SKIP にならない (G5・G6) |
 | 用意 | apt の行が 4 か所 | `gate-setup` に寄せる (G5) |
 
 ## 5. 入れた時に確かめたこと・測ったこと

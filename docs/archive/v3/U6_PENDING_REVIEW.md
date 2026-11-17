@@ -4,7 +4,7 @@
 > それまでの状態: 草案 (2026-09-30) — ユーザーが内容を再確認するための仕分け表。決定ではない
 >
 > 発行: コーダー `claude-fable-5-1` (2026-09-30)、PM の指示 (ユーザー指示「U6 の仕分け表を作る」) による。基点 `feat/gui` 2a6cc836 (KernelAPI v68)。
-> 読んだもの: 5 件の票 ([F2_OWNERSHIP](../../tasks/settings/F2_OWNERSHIP.md) / [FEP_BOUNDARY](../../tasks/settings/FEP_BOUNDARY.md) / [MEMORY_RAM_INTEGRATION](../settings/MEMORY_RAM_INTEGRATION.md) / [DEVICE_RESERVATION](../../tasks/settings/DEVICE_RESERVATION.md)、F3a〜c は [S0_FOUNDATION §3](../settings/S0_FOUNDATION.md) の表)、保留の出典 ([HANDOVER_v14 §3](../agents/HANDOVER_v14.md)、[S0_PLAN_2026-09-13 §2 後回し欄](../settings/S0_PLAN_2026-09-13.md))、[V3_PLAN_DRAFT](V3_PLAN_DRAFT.md) §1-3・§3・§4、**[TASK_MEMMAP_V3](../../decisions/MEMMAP_V3.md) の決定 D1〜D28・§2-2 lease・§3-5 池の運用規則 R1〜R7・§4-6 SQLite/FEP の取り分・§6 票 T0〜T7**、[TASK_DICT_META](../../tasks/fep/TASK_DICT_META.md)、[TASK_TRIDENT_DRIVER §4-2](../../tasks/realhw/TASK_TRIDENT_DRIVER.md)。
+> 読んだもの: 5 件の票 ([F2_OWNERSHIP](../../tasks/settings/F2_OWNERSHIP.md) / [FEP_BOUNDARY](../../tasks/settings/FEP_BOUNDARY.md) / [MEMORY_RAM_INTEGRATION](../settings/MEMORY_RAM_INTEGRATION.md) / [DEVICE_RESERVATION](../../tasks/settings/DEVICE_RESERVATION.md)、F3a〜c は [S0_FOUNDATION §3](../settings/S0_FOUNDATION.md) の表)、保留の出典 ([HANDOVER_v14 §3](../agents/HANDOVER_v14.md)、[S0_PLAN_2026-09-13 §2 後回し欄](../settings/S0_PLAN_2026-09-13.md))、[V3_PLAN_DRAFT](V3_PLAN_DRAFT.md) §1-3・§3・§4、**[TASK_MEMMAP_V3](../../decisions/MEMMAP_V3.md) の決定 D1〜D28・§2-2 lease・§3-5 池の運用規則 R1〜R7・§4-6 SQLite/FEP の取り分・§6 票 T0〜T7**、[TASK_DICT_META](TASK_DICT_META.md)、[TASK_TRIDENT_DRIVER §4-2](../../tasks/realhw/TASK_TRIDENT_DRIVER.md)。
 > **「今の状態」の列は 2026-09-30 に HEAD 2a6cc836 のソースと `git log` で確かめたもの** (根拠は §3)。票の本文の行番号は 09-13 の作業ツリーのものなので、ここでは関数名で書く。
 
 ---

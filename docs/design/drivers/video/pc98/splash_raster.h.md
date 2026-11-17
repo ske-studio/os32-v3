@@ -1,34 +1,41 @@
-# splash_raster.h — 共通再生の内部契約
+# drivers/video/pc98/splash_raster.h — 走査の判定の状態と内部の口
 
-状態: **現行 (2026-11-01)**。ソース: `drivers/video/pc98/splash_raster.h`。
+> 状態: **現行 (2026-11-18)** — 出所: RASTER_SPLASH_*_DESIGN・TASK_RASTER_SPLASH (要約して移した)
+ソース: `drivers/video/pc98/splash_raster.h`
 
-`SplashRaster` は再生器が所有する。`state()` の初回利用時に判定し、以後は同じ
-状態を借用する。`reset()` は gfx_init/shutdown の寿命境界で呼ぶ内部フックで、
-接続は後続 L0 が担当する。直接 begin を呼ぶ場合はゼロ初期化した状態を渡す。
-begin/frame/table は OK/NO_SYNC を戻し、last_result にも保存する。周期・位相の
-不一致は begin 自体の成功と dynamic_ok=0 で区別する。
+## 何をするか
 
-周期は µs の分子100000・分母2483/3147。SYNC は pegc.h の400行マスタ設定から
-総行数・VS幅・VBPを取り出す。単色ロゴの上限は1件/行、行間隔は2行以上。
-実機の複数色予算は未測定であり、この定数は段0の表再生の制限である。
-frame は段0では差分0の初期16色だけを扱い、OSRI差分は段2で追加する。
+PC-98 標準の 16 色の画面で、行ごとにパレットを書き換える処理 (起動のロゴ・公開 KAPI `gfx_present_raster`・起動の画像・ビューアー) が共有する「走査の判定の状態」と、その周期の定数を持つ。
 
-診断記述型と `pc98_splash_raster_diag()` は SPLASH_RASTER_DIAG の内側だけに置く。配列長を公開定数にせず、count/capacityと借用のconst eventsポインタで読む。通常のSplashRaster配置と公開KAPIは維持する。
+## 周期の定数 (Subsystem 層)
 
-LC-A は内部の整数比予算を追加する。`SplashRasterBudget` の全分子は共通の
-`den` に従い、H/B/Q/C/W の範囲、成功 IN から OUT までの分岐、時計誤差、
-再入口費用を分ける。Q は IN 単命令の値ではなく比較・計数を含むサンプル間隔。
-24k の B 参考値は NEC の9.88µs、31k は SYNC 由来20000/3147µsであり、
-実測した bit6 の幅と取り違えない。採否式はヘッダーコメントの厳密な不等式。
+行の周期は µs の有理数 `SPLASH_RASTER_LINE_NUM_US / den` で表す (分子 100000)。値は `include/pegc.h` の 400 行の SYNC の表 (`PEGC_GDC_MSYNC_400`・`PEGC_GDC_MSYNC_400_31K`) から実行時に取り出す。
 
-`SplashRasterEntryBudget` は内側へ丸めた二つの入口区間 S と予定入口 r、
-追加費用 D、J_max を持つ。両入口なら U_(j+1)−r−D、一入口なら U−r。
-フレームは全イベント/中継・F 捕捉・初期色完了余裕の最小値を取る。
-負の余裕を符号付きで残し、未測定を正の予算にしない。J は粗待ち末尾から
-入口までの累積遅延であり、単一 ISR の最長時間ではない。
+| 周波数 | den | 1 行 | 総行数 | VS | VBP | 1 フレーム |
+|---|---|---|---|---|---|---|
+| 24kHz | 2483 | 約 40.27µs | 440 | 8 | 25 | 約 17.72ms |
+| 31kHz | 3147 | 約 31.78µs | 449 | 2 | 34 | 約 14.27ms |
 
-診断専用の費用・入口記録と4型分類は同じ内部ヘッダーで共有する。
-費用は IF=0 の total_us/samples と上限 upper_num_us/upper_samples、束の回数 batch、
-IF=1 の open_total_us/open_max_us を別々に持つ。upper_us は粗待ち用の切上げ値。
-Q/W の上限は端点時計Cの束平均を差し引くため、上限の分母と束の回数は異なり得る。
-通常版の `SplashRaster`、公開 SDK/KAPI と再生手順は LC-A では変更しない。
+- 24k の値は NEC PC-9800 Technical Databook Hardware (1993) p.351 の表と一致する。31k の表はこの資料に無いので、SYNC の値と実測で決めた。
+- `SPLASH_RASTER_SYNC_TIMEOUT_US` (100ms) は VSYNC の待ちの上限。`MIN_GAP` 2 は公開 table の異なる行の間隔の下限。
+- `*_BLANK_NUM_US` (24k は 9.88µs、31k は SYNC から求めた H×20/100) は参考値で、実測の bit6 の幅とは別物。
+
+## 状態 `struct SplashRaster`
+
+- mode (24K/31K)・line_num_us/line_den・total_lines/vs_lines/vbp_lines・active0_lines・high_us・checked・dynamic_ok・last_result・frame/late/dropped/unapplied。
+- active0_lines は、VSYNC の立下り F の後で可視行 0 の前にある行数。bit5 (VSYNC) の高の期間が「非表示全体」型なら 0、「VS だけ」型なら VBP。NP21/W は前者で、実機の型は実測で確かめる。
+- dynamic_ok=1 は、周期の照合と型の分類が両方通ったという意味。0 でも begin は成功で、固定色の表示はできる。
+
+## 寿命と口の契約
+
+- 状態の実体は `splash_raster.c` の static 1 つ。`pc98_splash_raster_state()` は初回の利用で `begin` を呼び (遅延判定)、以後は同じ状態を貸す。
+- `pc98_splash_raster_reset()` は、gfx の初期化の入口 (`gfx/gfx_core_init.inc`) と `gfx_shutdown` (`gfx/gfx_core.c`) から `display_provider_raster_reset` (`platform/pc98/gfx_selector_lifecycle.inc`) 経由で呼ばれる。判定の結果を次の gfx_init へ持ち越さない。
+- `begin`・`frame`・`table` は `SPLASH_RASTER_OK` (0) か `SPLASH_RASTER_NO_SYNC` (-1) を返し、last_result にも残す。
+- 行ごとの画像の再生 (`pl_v2_*`) は別のファイル ([splash_raster_play.c](splash_raster_play.c.md)) で、この状態を借りるだけ。
+
+## 診断だけの型
+
+- `SPLASH_RASTER_DIAG` の内側の型 (`SplashRasterProbeCost`・`ProbeEntry`・`EventDiag`・`Diag`) と `pc98_splash_raster_diag()` は診断の像だけにある。記録は次の frame/reset まで借りる。
+- `SplashRasterBudget`・`SplashRasterEntryBudget`・`SplashRasterImageBudget`・`enum SplashRasterWave`・`SPLASH_RASTER_IMAGE_OUTS` (5)・`IMAGE_DIAG_OUTS` (6) は、いまは診断の probe (`platform/pc98/splash_probe.c`) だけが使う。通常の再生は使わない。
+- 予算の式の意味 (ヘッダのコメント): Q はサンプル間隔 (IN と比較と計数を含む)、D は成功した IN から列の開始まで、W は列全体、B は bit6 の高の幅、E は誤差。採否は `Q+D+W+E < B_min` と `Q < min(B_min, H_min−B_max)`。単位は 1/den µs の整数比。
+- `SPLASH_RASTER_PER_LINE` は使う所が無い。

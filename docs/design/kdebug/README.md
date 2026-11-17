@@ -32,6 +32,7 @@
 - [kdebug/recover.c](recover.md)
 - [kdebug/recover_cleanup.h](recover_cleanup.md)
 - [kdebug/recover_gf.c](recover_gf.md)
+- [kdebug/recover_gf_locate.c](recover_gf_locate.md)
 - [kdebug/recover_profile.c](recover_profile.md)
 - [kdebug/recover_virtual.c](recover_virtual.md)
 - [kdebug/recover_wire.h](recover_wire.md)

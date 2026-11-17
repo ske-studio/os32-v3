@@ -14,3 +14,4 @@
 
 - [gfx/gfx_osri.h](gfx_osri.h.md)
 - [gfx/gfx_osri.c](gfx_osri.c.md)
+- [gfx/osri_profile.h](osri_profile.h.md)

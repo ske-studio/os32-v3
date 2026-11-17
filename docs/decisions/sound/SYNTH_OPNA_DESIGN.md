@@ -32,7 +32,7 @@
 | D5 | 「表を const 化」だけでは alloc/浮動小数点は消えない。N `fmgen_opna.cpp:1436,1485-1568` は ADPCM RAM と外部 WAV を確保、`:540`・`fmgen_fmgen.cpp:262-266`・`fmgen_psg.cpp:89-91` は設定時の浮動小数点 | RAM は C 所有、WAV は通常文脈で準備、設定用係数もホスト生成 |
 | D6 | `RUST_VS_C11.md` §1-3 の「panic を無音化」と §3-2 の「panic→kpanic」は異なる。abort panic は通常の戻り値に戻せない | 回復可能な障害は Result→無音、実 panic は診断付き停止。unwind/longjmp による復帰はしない |
 
-`TASK_PCM_CS4231.md:255-258` の E4 は合格、E3 に未実施項目、E5 は未、E6 は部分。合成器先行の妨げではないが、PCM 全体の受入完了とは記さない。
+PCM (CS4231) は受入完了 (2026-11-08)。まだ確かめていない項目は設計書 `docs/design/drivers/sound/cs4231/pcm_cs4231.md` の「未確認」が持つ。合成器先行の妨げではない。
 `drivers/sound/fm/fm.c` の `opn_write_checked` は実ポート・BUSY 待ち専用。`snd_engine.c` は tick と既存 FM 関数で発音する。
 `fm_module.h` の snd API、`pcm_module.h` の PCM API は既存の公開面を維持する。
 

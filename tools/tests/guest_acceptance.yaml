@@ -2538,7 +2538,7 @@
   contract:
   - userland/tests/pcm_test.c
   - docs/09_exec.md#gui-の-kapi-loop-の-stop
-  - docs/tasks/v3/TASK_PCM_CS4231.md
+  - docs/design/drivers/sound/cs4231/pcm_cs4231.md
   mode: manual
   prereq: "R6: L-h、PM の派生 t2h_64mb_118.ini (ram-64mb、snd118-on / SNDboard=64)。np21w_ctl.py stop → start --ini t2h_64mb_118.ini ([D1])、gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC 一致、64MB を確認。終了後は原本 ini で start し保存した元の GFX= を戻す。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: '[pcm] 起動行; pcm_test E5 (CPL3 CUI); GUI再生 park/resume'

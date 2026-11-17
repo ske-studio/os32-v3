@@ -69,15 +69,9 @@ def wiring():
     assert steps[1]['run'] == 'python3 -B tools/ci/ppc_scope.py'
     assert steps[1]['env']['PPC_ARCH'] == "${{ github.event_name == 'workflow_dispatch' && inputs.arch || 'auto' }}"
     assert all(s.get('if') == "steps.scope.outputs.scope == 'ppc'" for s in steps[2:])
-    full = yaml.safe_load((ROOT / '.github/workflows/full-check.yml').read_text())
-    ppc = full['jobs']['ppc-compile']['steps']
-    assert all('if' not in s for s in ppc)
-    assert ppc[0]['with']['ref'] == "${{ github.event_name == 'workflow_dispatch' && inputs.ref || 'main' }}"
-    assert any(s.get('uses') == './.github/actions/ppc-setup' for s in ppc)
-    assert any('MUTATE=1 python3 -B tools/checks/run.py --run all --env ppc-cross --exclude-env qemu-ppc' in s.get('run', '') for s in ppc)
     # Origin: mainline PM's PACK.md decision, documented in docs/TESTS.md.
     command = 'python3 -B tools/checks/run.py --run all --env ppc-cross --exclude-env qemu-ppc'
-    for job_steps, routine, mutate in ((steps, True, 0), (ppc, False, 1)):
+    for job_steps, routine, mutate in ((steps, False, 1),):   # 関門は変異込み (docs/POLICY_CI.md G1)
         runs = '\n'.join(step.get('run', '') for step in job_steps)
         assert command in runs
         assert f'MUTATE={mutate} ' + command in runs
@@ -88,7 +82,7 @@ def wiring():
             assert dependency in runs
         assert 'qemu-system-ppc' not in runs
     command = 'python3 -B tools/checks/run.py --run all --env qemu-ppc'
-    for flow, routine, mutate in ((workflow, True, 0), (full, False, 1)):
+    for flow, routine, mutate in ((workflow, False, 1),):
         job = flow['jobs']['ppc-qemu']
         assert job['needs'] == 'ppc-compile'
         assert job['timeout-minutes'] >= 60
@@ -97,11 +91,8 @@ def wiring():
         assert any(s.get('name') == 'PPC QEMU diagnostics' and s.get('if') == 'failure()'
                    for s in job['steps'])
         assert guest[0] == flow['jobs']['ppc-compile']['steps'][0]
-        if routine:
-            assert guest[1] == steps[1]
-            assert all(s.get('if') == "steps.scope.outputs.scope == 'ppc'" for s in guest[2:])
-        else:
-            assert all('if' not in s for s in guest)
+        assert guest[1] == steps[1]
+        assert all(s.get('if') == "steps.scope.outputs.scope == 'ppc'" for s in guest[2:])
         runs = '\n'.join(s.get('run', '') for s in guest)
         assert f'OS32_REQUIRE_PPC=1 MUTATE={mutate} ' + command in runs
         assert ('CHECK_ROUTINE=1 ' in runs) == routine

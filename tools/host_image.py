@@ -1,4 +1,4 @@
-"""Read-only SFS block RPC backend (NET_HOSTSVC_DESIGN §4, addendum #11).
+"""Read-only SFS block RPC backend (docs/design/tools/lanfs_host.md 仮想の像).
 
 H1 owns framing and duplicate-request caching. This module owns session FDs;
 wire identity is size + mtime_ns, with no independent host media counter.

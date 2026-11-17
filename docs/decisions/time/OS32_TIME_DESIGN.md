@@ -30,7 +30,7 @@
 | TIME | `tools/host_agent.py`: ローカル時刻の秒精度文字列、UTC offset・世代・送信時刻なし |
 | 設定 | `init/sysconfig.c` はsystem.cfg整数読出し。`kernel/sqlite_engine.c` はsettings.dbのsystem/ival。`userland/lib/cfg/libos32cfg.h` にDBの共通口 |
 | 設定設計票 | `docs/decisions/settings/DEVICE_RESERVATION_DESIGN.md` は資源予約・PCI configであり、時刻設定の永続化規約はない |
-| ホスト | `docs/decisions/network/NET_HOSTSVC_DESIGN.md` 以降: 内部ALIVE非消費、IRQで同期しない、8要求、HOSTDOWN、LISTとhost_call |
+| ホスト | `docs/archive/network/NET_HOSTSVC_DESIGN.md` 以降: 内部ALIVE非消費、IRQで同期しない、8要求、HOSTDOWN、LISTとhost_call |
 
 r1で挙げた食い違い・未確認点の扱い（R3/R9を反映、未確認を修正根拠にしない）。
 1. `rtc.c:40,115,123` はパラレル48bit。Bible 2-4も48bit、io_cal.mdに40bitの記載なし、NP21/Wも48bit。外部メーカー資料だけでは年無効と断定せず現行読みを維持。PMがRa266の現行dateの年をシリアル出力で確認し、不正時だけ別段で読みをシリアル方式へ直す。

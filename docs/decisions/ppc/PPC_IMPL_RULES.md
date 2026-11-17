@@ -45,7 +45,7 @@ CI は統合の枝で os32-v3 の PM が 1 回だけ回すので、PowerPC の�
 
 ## 4. 取り込みと報告
 
-- push は tip のコミットに `[skip ci]`。cherry-pick した tip にも付け直す。push の後に `git ls-remote origin refs/heads/<枝>` で SHA を確かめてから本線の PM に送る (推測の SHA を送らない)。`gh run list --branch <枝>` で CI が走っていないことも見る。
+- push は tip のコミットに `[skip ci]`。cherry-pick した tip にも付け直す。push の後に `git ls-remote origin refs/heads/<枝>` で SHA を確かめてから本線の PM に送る (推測の SHA を送らない)。`gh run list --branch <枝>` で CI が走っていないことも見る。`[skip ci]` は作業の枝だけ — main に入るのは、統合の枝 (`wt/int-*`、先頭に `[skip ci]` を付けない) の SHA で check・build が通った物だけ (PARALLEL_BRANCHES §3)。
 - 積んだ枝は main を取り込み直してから送る。取り込み後の検査は 1 本ずつ回し直す。
 - **比較の主張には比べた 2 つの SHA を書く**。merge の前の build_compare の結果を merge の後の枝の説明に使わない。報告が参照する証拠のファイルが run の置き場にあることを確かめ、受入をする側に渡す。
 - 段の独立レビューは書き手と別のモデル (ROLES §0)。P1・P2 の直しの確認は同じレビュアーに差分だけ。P3 だけや 30 行程度の機械的な直しは PM が読んで着地してよい。

@@ -2,7 +2,7 @@
 """Exercise Linux host services with isolated executable stand-ins."""
 CHECK = dict(name='hostsvc-linux', tier=1, needs=[],
              covers=['tools/host_linux.py'], budget=3.3,
-    basis=['NET_HOSTSVC_DESIGN §6'],
+    basis=['docs/design/tools/host_agent.md ネットワーク越しの Host Services'],
 )
 
 import argparse

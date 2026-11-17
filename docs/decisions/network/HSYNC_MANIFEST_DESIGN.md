@@ -35,7 +35,7 @@
 - open 用 get_file_size も STAT を呼ぶ（同:181）。明示的 sys_stat を消すだけでは STAT=0 にならない。
 - LIST の各項目には日時がない（fs/serialfs/sfs_proto.h）。既存 LIST の再利用だけでは不足。
 - lib/crc32.c (crc32_calc()) は共通核の公開窓口。hsync は既に同じ核を直接組み込む。
-- docs/decisions/network/NET_HOSTSVC_DESIGN.md はパス+offset、遠隔 file handle なしを規定。
+- docs/design/fs/serialfs/sfs_block.md「不変条件」は、/host のファイルをパス+offset で要求し遠隔 file handle を持たないと規定。
 - docs/decisions/network/LAN_OPERATOR_DESIGN.md は共通 backend と CALL ごとの 1000 ms 期限を規定。
 
 ## 2. ゲストからの口
@@ -181,7 +181,7 @@
 | E/2 | tools/tests/test_hsync_inventory.py 新規 | 350 | A を組む C harness、CHECK inputs 宣言 |
 | F/2 | tools/tests/test_host_tree_manifest.py 新規 | 350 | B の host/境界/失敗/変異、CHECK inputs 宣言 |
 | G/3 | tools/tests/test_hsync_inventory_flow.py 新規 | 380 | C/D と三 adapter の統合、旧動作退行・計数 |
-| H/3 | docs/decisions/network/NET_HOSTSVC_DESIGN.md 変更 | 55 | 仮想ファイル wire と寿命の正典追記 |
+| H/3 | docs/archive/network/NET_HOSTSVC_DESIGN.md 変更 | 55 | 仮想ファイル wire と寿命の正典追記 |
 - 波1は A/B 並列、波2は C/D/E/F 並列、波3は G/H 並列。各ファイルの担当を重ねない。
 - A の静的 helper は既存 KernelAPI と CRC 核を使用。build list 変更なしの .inc 方式。
 - Bは渡されたHostFSの_stat_raw/_kind/mtime関数/fd helperを呼び、serialfs_hostをimportしない。A/B着手時にhelper契約を固定し、B単体は同契約の試験用FS、C後に実HostFS両分岐で確認する。

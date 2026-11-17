@@ -53,6 +53,7 @@ make programs
 
 1. `sdk/kapi.json` の `api` 配列の**末尾**にエントリを追加する。
    既存スロットの並べ替え・削除は**禁止** (ビルド済みバイナリの ABI が壊れる)。
+   検査 `make check-kapi-abi` が基点 (origin/main) の口の並び・名前・戻り値・引数と比べる。壊すのが正しい変更は、コミットの本文に `KAPI-Break: <理由>` と書く。
    必要なヘッダは同ファイルの `includes` に、プロトタイプは `externs` に追加する。
    - `target` — 実体の関数名がエントリ名と異なる場合に指定
    - `body` — ラッパー本体をインラインで書く場合に指定
@@ -129,7 +130,7 @@ KAPI は append-only で版番号は単調増加。複数の計画が独立に�
 | v77 | **受入済み (T7b S3b、2026-10-20 — 実装は T7b-b1 S2)** | app 用 font read lease `font_source_open` / `font_source_read_at` / `font_source_close` (slot 250〜252)。4 世代・データ欄は不変。 | 本書 §4-14 |
 | v78 | **受入済み (TASK_KPEEK、2026-10-21 — 実装は T1)** | `kdebug_call` (slot 253)。kdebug 部品の ops slot 19 (`dbg_call`) へ渡す汎用の 1 本、部品が無ければ `OS32_ERR_NOSYS`。要求 `KdebugPeek` (1064B)。4 世代・データ欄は不変。 | 本書 §4-15 |
 | v79 | **実装済み (2026-10-26、VER_INFO V9、ゲスト未確認)** | `sys_ver_info` (slot 254)。ver/About 共通の固定長行を返す | 本書 §4・[os32_ver_info.md](design/sdk/include/os32/README.md#os32_ver_info) |
-| v80 | **実装済み (2026-11-05、main)** | `exec_stop_culprit` (slot 255)・`ime_dict_info` (slot 256)・`gfx_osri_show` (slot 257) の 3 本。4 世代・データ欄は不変 | 本書 §4-16・[DICT_META_DESIGN](decisions/fep/DICT_META_DESIGN.md)・[OSRI_VIEWER_DESIGN](decisions/gui/OSRI_VIEWER_DESIGN.md) |
+| v80 | **実装済み (2026-11-05、main)** | `exec_stop_culprit` (slot 255)・`ime_dict_info` (slot 256)・`gfx_osri_show` (slot 257) の 3 本。4 世代・データ欄は不変 | 本書 §4-16・[ime_dict_info の設計](design/kernel/ime/ime_dict_info.md)・[OSRI_VIEWER_DESIGN](decisions/gui/OSRI_VIEWER_DESIGN.md) |
 | v81 | **実装済み (2026-11-05、ホスト検証)** | `ime_dict_suspend(int on)` (slot 258 / 0x410): on=1 は辞書を閉じ、0 は閉じたときだけ再読込して元の mode に戻す。二重操作は 0、失敗は非ゼロ (再読込失敗は FEP OFF)。hsync --fep-off の停止中配備用 | 本書 §3-1 |
 | v82 | **実装済み (2026-11-07、ホスト検証)** | `host_notice_read` / `host_notice_serial` (slot 259〜260) | 本書 §4-17 |
 | v83 | **宣言追加 (2026-11-08、GFX_ACCEL_HAL H1)** | INDEX8 専用 `gfx_hw_submit` / `gfx_hw_get` (slot 261〜262)。H1 の入口は NOSYS、検査・実装は H2 | [確定設計 §3-2](decisions/gui/GFX_ACCEL_HAL_DESIGN.md#3-2-kapi-os32-kapi-addversion-8283) |
@@ -1177,7 +1178,7 @@ v46 はそれを**カーネル内の 8KB のリング (シンク)** に溜め、
 
 16 ビット・ステレオ・**44.1k と 22.05kHz だけ**の再生。単位は **frame**
 (左右 1 組 = 4 バイト)。録音・ミキサ (出力減衰以外)・PIO・V86 への提供は無い。
-設計と受入の状態は票 TASK_PCM_CS4231 (受入待ち) が持つ。
+設計は [pcm_cs4231 の設計書](design/drivers/sound/cs4231/pcm_cs4231.md) (受入完了 2026-11-08、まだ確かめていない項目は「未確認」)。
 
 - **`pcm_open(rate)`** — `44100` / `22050` 以外は `OS32_ERR_INVAL`。
   戻り 0 / `OS32_ERR_NOSYS` (検出できない) / `OS32_ERR_FULL` (他の owner が
@@ -1722,8 +1723,8 @@ ver / About 用に、実行中カーネルの版・装置の保存値・識別�
 - `ime_dict_info` (slot 256 / 0x408): 選択中のシステム辞書のメタ情報 20 キー (`IME_DICT_INFO_*`) を
   UTF-8 の文字列で `offset` から最大 `capacity - 1` byte 写す (NUL 込み、`IME_DICT_INFO_CAP` = 256 を
   超える capacity は 256 として扱う)。戻り = 写した byte 数 (0 = 終わり) / `NOSYS` (FEP なし) /
-  `AGAIN` (辞書なし) / `INVAL` / `NOTFOUND` (未収録) / `IO` / `STALE`。FEP 部品の ops slot 21 (`dict_info`、
-  `FEP_MODULE_OPS_VERSION` 2) へ渡す。正典は [DICT_META_DESIGN](decisions/fep/DICT_META_DESIGN.md) の追記 (確定 A1〜A6)。
+  `AGAIN` (辞書なし) / `INVAL` / `NOTFOUND` (未収録) / `IO` / `STALE` / `BUSY` (接続の隔離)。FEP 部品の ops slot 21 (`dict_info`、
+  `FEP_MODULE_OPS_VERSION` 4) へ渡す。正典は [ime_dict_info の設計](design/kernel/ime/ime_dict_info.md)。
   起動結線後、STATUS は検査済みの形式 1 で `meta`、旧形式で `legacy`、辞書なしで `unloaded`。
   先行実装の `metadata-unavailable` は返さない。旧形式でも FORMAT_VERSION=0、DICT_ID、
   POS_TABLE_VERSION、COST_SCALE、MEM_RESERVE_KB=192、CACHE_PAGES=16 と固定パスの VARIANT は
@@ -1750,7 +1751,7 @@ ver / About 用に、実行中カーネルの版・装置の保存値・識別�
 呼び手の書込み範囲を検査し、カーネルの一時 `HostNotice` へ stage、copyout が成功した後、
 同じ世代・serial だけ commit する。不正な CPL3 ポインタと copyout 失敗は通知を消費しない。
 `host_notice_serial` は最新の投入通番を非消費で返す (初期値 0)。
-契約の正典は [NET_HOSTSVC_DESIGN](decisions/network/NET_HOSTSVC_DESIGN.md) §7・追記 #4。
+契約の正典は [net/host_mailbox](design/net/host_mailbox.md)「取り出す」。
 B5 (gshell) と SDK の利用側は別段。今回、新 API を呼ぶ既存アプリはないため、
 `build/app.conf` の要求版は据え置く。利用側を接続する段で v82 以上へ上げる。
 

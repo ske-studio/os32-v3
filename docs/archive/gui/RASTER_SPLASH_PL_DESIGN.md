@@ -228,7 +228,7 @@ else if (armed) {
 | V7 | `tools/tests/splash_raster_diag_host.c` | 連続測定の模型。M1後。 |
 | V8 | `tools/tests/test_splash_raster_diag.py` | V7実行・通常版診断RAMなし。V7後。 |
 | A1 | `tools/accept/raster_splash.py` | ホスト→NP21/W→実機の証拠集約。V群後。 |
-| D1 | `docs/decisions/gui/RASTER_SPLASH_DESIGN.md` | 本改訂の反映。採用判断後。 |
+| D1 | `docs/archive/gui/RASTER_SPLASH_DESIGN.md` | 本改訂の反映。採用判断後。 |
 
 - PMの追従票も1ファイルずつ: 対応する各`docs/design/*.md`、`tools/tests/test_src_layout.py`、時計例外を記す`docs/KAPI_SPEC.md`、期限変更が及ぶ`platform/pc98/splash.c`、資産変換の`build/assets.mk`。必要な宣言／登録の更新を機能追加と混ぜない。
 - 公開KAPIの型・世代・200件上限は変更しない。ロゴの既決H計数改訂は既存担当と直列調整し、本案で別の公開再生器を作らない。共有ファイルとNP21/W操作はPMが直列化。
@@ -415,7 +415,7 @@ Ra266のl=3120ではq/l=3147/3120≈1.008654、n=2086、nq+C=6637023≤7000000�
 P3条件：積上げ66L+C+2q≤67L≤70Lが成り立つ条件はC+2q≤L（時計上限≤(L−2q−量子µs×d)/(2d)、今回約14.4µs）；今回78675≤100000。現物はこの条件・積上げ式を直接検査していないため、条件外へこの説明を一般化しない。
 70Hは31kでceil(7000000/3147)=2225µs、24kでceil(7000000/2483)=2820µsで20ms未満；CLI〜保存IF復元を上限に含めて実測確認する。通常再生の402H_max+Cexit<20ms、公開table／ロゴの≤2Hは維持。
 PIT 24576/2457600秒=10msに対して採取は1tick未満；採取前の保留IRQ0処理、採取後の既存≥1H開放・IRQ再開を維持すれば保留は高々1回でtickを失わず、M1の新たなtick補正は不要。画像再生§3のPIT精算、§6の受信損失記録・受信欠落0を採否に追加しない方針・IRQ再開確認を維持し、実機で64周期・IF時間・tick／受信記録を再採取する。
-書換一覧（文書）：docs/decisions/gui/RASTER_SPLASH_PL_DESIGN.md §3の142行と末尾「M1の固定の計測列」の323行へ固定70H・上記式と条件を追記する；現行の両箇所には「66H」の文字列はない。
+書換一覧（文書）：docs/archive/gui/RASTER_SPLASH_PL_DESIGN.md §3の142行と末尾「M1の固定の計測列」の323行へ固定70H・上記式と条件を追記する；現行の両箇所には「66H」の文字列はない。
 書換一覧（現物）：platform/pc98/splash_probe.cのlimit=(PROBE_HPERIODS+2)*Lを(PROBE_HPERIODS+6)*Lへ、407行のunchanged 66Hと477行の66H固定拒否コメントを70Hへ整合；479行cap・482行excess・498〜499行事後検査は共通limitに追従。校正32H／64Hとcountは変更不要。
 r1→r2 の変更：67Hを比の余裕を持つ固定70Hへ変更し、丸め込みの比上限と反例の通過、P3のC+2q≤L条件を明記、書換一覧を70Hへ更新。
 
@@ -448,7 +448,7 @@ r1→r2 の変更：67Hを比の余裕を持つ固定70Hへ変更し、丸め込
 - `splash_raster_image.c`以降は先頭番号を先行、以後の色ごとに番号OUTを発行する。`splash_raster.c` の `color()`〜も番号→G→R→Bの明示OUT。自動増加を利用するコードはなく、観測でも仮定しない。
 - `build/kernel.mk`でDIAGのprobeを登録、が別BUILD_OUTの入口。`platform/pc98/boot_splash.c` の `boot_splash()`の通常3秒経路はOBSから呼ばない。`platform/pc98/kernel.c`のroot mountはのboot_splashより先。
 - `splash_raster.c`の既存POLL_LIMIT=1000000を観測の待機上限にも使う設計とし、同値の私有定数を置く場合は由来を明記。`include/memmap.h` の `PIT_HZ`のPITは100Hz（レビュー照合）。
-- 状態票 `docs/tasks/gui/TASK_RASTER_SPLASH.md` は案1の計測整理待ち。観測を別段として追記し、常用認定済みと書かない。ホストfloatは食い違いではない。
+- 状態票 `docs/archive/gui/TASK_RASTER_SPLASH.md` は案1の計測整理待ち。観測を別段として追記し、常用認定済みと書かない。ホストfloatは食い違いではない。
 
 ### ホスト：同じ人物原画から16枚
 - 原画の絶対パス・SHA256、T1のSHA、Pillow/NumPy版をmanifestへ固定。640×400への既存リサイズ・黒合成を共有し、各Nは原画から独立変換する。
@@ -533,8 +533,8 @@ int pl_obs_frame(struct SplashRaster *, const struct OsriImage *,
 | ORV | 新`tools/tests/splash_obs_host.c` | 実物CのI/O模型・IF・終了を検証。 |
 | OV | 新`tools/tests/test_splash_obs.py` | host試験/変異/.text照合を駆動。 |
 | OREG | `Makefile` | PM専有、試験登録。 |
-| OD | `docs/decisions/gui/RASTER_SPLASH_PL_DESIGN.md` | PMが追記反映。 |
-| OTS | `docs/tasks/gui/TASK_RASTER_SPLASH.md` | PMが観測と常用認定の状態を区別。 |
+| OD | `docs/archive/gui/RASTER_SPLASH_PL_DESIGN.md` | PMが追記反映。 |
+| OTS | `docs/archive/gui/TASK_RASTER_SPLASH.md` | PMが観測と常用認定の状態を区別。 |
 - `docs/tasks/agents/PARALLEL_BRANCHES.md §2`に従い共有登録はPMの1ブランチだけ、生成物は統合後1回。配備・NP21/W・実機・結線は直列。本稿では実装者を起動しない。
 
 ### 受入・記録・未決

@@ -54,22 +54,21 @@
 - `RASTER_LINE_US` は実装から削除済みで、`tools/tests/cpu_calibrate_host.c` のコメントだけに残る。古い120µs待ちを現在の根拠にしない。
 - 読込失敗でもBBには部分画素が入り得る（`gfx/gfx_osri.c` の `osri_load()`）。検査完了前の転送は禁止する。
 - B31は「HBLANK内に全OUTが収まる」保証ではない。enc2は可視域への色変更のはみ出しも評価する。
-- 根拠: `docs/decisions/gui/RASTER_SPLASH_ENC2_DESIGN.md`。生成時の探索はホスト専用（同:94）。
+- 根拠: `docs/design/tools/osri_enc2.md` の「時刻のモデル (はみ出しの見た目)」。生成時の探索はホスト専用（同じ文書の「役割の分担」）。
 
 ### S5 後との差分（未実装扱いの境界）
 
 | S5確定事項 | ビューアーへの影響と根拠 |
 |---|---|
-| v2検査の共通化 | 通常/OBSとも6384件・行16番号、任意順・同値、band1/2/4。`docs/decisions/gui/RASTER_SPLASH_S5_DESIGN.md`。 |
-| B31共通核 | `pl_v2_prepare/frame`、64B行・25608B plan、旧核撤去。S5設計:30,63。 |
-| OUT再計算 | `C + max(M-1,0)`、先頭番号先行OUTを除き31以下。ファイルにBの欄はない。S5設計:26。 |
-| 常用所有 | load→prepare→転送→約1秒preview→再生→cleanup。S5設計:38。 |
-| 期限 | tickとフレームモデルの大きい方、DROPも課金、tick補正なし。S5設計:44,141。 |
-| 段 | S5a=形式/準備/核、S5b=常用所有/期限、S5c=生成、S5d=配布/実機。S5設計:137。 |
+| v2検査の共通化 | 通常/OBSとも6384件・行16番号、任意順・同値、band1/2/4。`docs/design/gfx/gfx_osri.h.md` の「イベントの意味と版の違い」。 |
+| B31共通核 | `pl_v2_prepare/frame`、64B行・25608B plan、旧核撤去。`docs/design/drivers/video/pc98/splash_raster_plan.c.md`・`splash_raster_play.c.md`。 |
+| OUT再計算 | `C + max(M-1,0)`、先頭番号先行OUTを除き31以下。ファイルにBの欄はない。`docs/design/gfx/osri_profile.h.md` の「本数の数え方 (ゲストとホストで同じ)」。 |
+| 常用所有 | load→prepare→転送→約1秒preview→再生→cleanup。`docs/design/platform/pc98/splash_image.c.md` の「手順と結果」。 |
+| 期限 | tickとフレームモデルの大きい方、DROPも課金、tick補正なし。`docs/design/drivers/video/pc98/splash_raster_run.c.md` の「口の契約」。 |
+| 段 | S5a=形式/準備/核、S5b=常用所有/期限、S5c=生成、S5d=配布/実機。いずれも受入完了 (2026-11-04)。 |
 
-- 上表の「S5設計」は `docs/decisions/gui/RASTER_SPLASH_S5_DESIGN.md` の略記。
-- 票 `docs/tasks/gui/TASK_RASTER_SPLASH.md` は実装中・固定画像経路実装済みを記載。S5a/bの完了証拠にはしない。
-- PL末尾はVSYNCによるDROPとenc2への参照を追記済み。`docs/decisions/gui/RASTER_SPLASH_PL_DESIGN.md`。
+- 上表の根拠は、S5 の確定設計を要約して移した `docs/design/` の各設計書。
+- 可視の途中の VSYNC による DROP は `docs/design/drivers/video/pc98/splash_raster_play.c.md` の「1 フレームの手順」。
 - ENC2本文の観測専用/47本とS5の常用/B31は段が異なる。後続仕様はS5を採る。
 - 実物との食い違いは3件として記録: D1=通常v2検査の旧制限、D2=旧核/OBS47とS5共通B31、D3=RASTER_LINE_US不在。
 - D1/D2は移行中の差であり不具合断定ではない。スプラッシュ結線先など未読箇所を追加の確認済み差として数えない。
@@ -165,7 +164,7 @@ int gfx_osri_show(const char *path, u32 duration_ms);
 | 固定画像一時heap | 現行loader型を使うならimage51110B、plan不要。最適化のため別型は作らない。 |
 | BB | 既存128000Bを借用、追加画素バッファ0B。BB込み動的payloadは204718B。 |
 | 入力ファイル | 最大179168B、全ファイルの別コピーは作らずVFSから読む。 |
-| S5自身 | plan/型変更は上記増分と別。S5設計:102のkernel暫定32KiB枠を二重に計上しない。 |
+| S5自身 | plan/型変更は上記増分と別。S5 の確定設計にあった kernel の暫定 32KiB 枠を二重に計上しない。 |
 
 - CUI文字状態の保存領域が既存復帰機構で不足する場合は実装前に再見積もりする。GPU画素全退避は採らない。
 - kernel508KiB上限・媒体空き・実heap・読込/prepare/転送の秒数は実装段で測る。推定サイズを合格証拠にしない。

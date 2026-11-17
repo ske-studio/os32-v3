@@ -33,8 +33,8 @@ newlib・Rust クレート 3 つ・IPADIC 由来の辞書・IPAex 由来のフ�
 PC-98 のハードウェア資料 (PC-9800 Bible、UNDOCUMENTED 9801/9821) は**著作権物で、リポジトリに入れない**
 (`docs/hw/` は gitignore、`tools/sync_hwdocs.sh` で手元に写す)。コードと文書にあるのは出典の §番号と要旨だけ。
 
-生成される辞書 DB にライセンスと出所を運ばせる件は
-[docs/tasks/fep/TASK_DICT_META.md](docs/tasks/fep/TASK_DICT_META.md) (M5)。
+生成される辞書 DB は meta の `license`・`attribution` に IPADIC の `COPYING` の全文を収める
+([docs/design/tools/fep_to_sqlite.md](docs/design/tools/fep_to_sqlite.md) の「形式 1」)。
 
 T2f f1b の単体接続は、上記 newlib nano の検証済み member 6 個をコピーし、
 `objcopy --redefine-sym` で私有名に変換する。nano のソース・命令本体は無改変、

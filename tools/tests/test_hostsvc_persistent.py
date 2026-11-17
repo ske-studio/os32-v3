@@ -22,7 +22,7 @@ CHECK = dict(name='hostsvc-persistent', tier=1, needs=[], budget=3.9, covers=[
     'include/types.h', 'include/io.h', 'mm/kmalloc.h',
     'lib/crc32.c', 'lib/crc32.h', 'lib/le_internal.h', 'lib/kstring.h',
     'lib/kstring_asm.asm', 'include/console.h', 'include/memmap.h'],
-    env=[], basis=['PACK ppc-sfs-deadline PM condition B', 'LAN_OPERATOR_DESIGN §5', 'NET_HOSTSVC_DESIGN §3'],
+    env=[], basis=['PACK ppc-sfs-deadline PM condition B', 'LAN_OPERATOR_DESIGN §5', 'docs/design/fs/serialfs/serialfs_persistent.md セッションと世代'],
 )
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (

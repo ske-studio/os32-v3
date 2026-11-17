@@ -26,6 +26,16 @@ check_docs_status.py — docs/tasks/ の票の状態行が語彙を守ってい�
 * `TASK_*.md`・`HANDOVER_*.md`・`CHECKLIST_*.md`・名前に `PLAN` を含むものは
   状態行が**必須**。それ以外は、状態行があれば語彙を守る。
 
+## 票の 2 つの決まり (POLICY_DEV §8)
+
+* **完了の基準**: 進行中の票 (`TASK_*.md` で、状態が 計画・設計中・実装中・受入待ち・受入完了・実機確認待ち) は、
+  先頭 20 行以内に `> 完了の基準: <測れる到達点>` の行を持つ。何が幾つになれば終わりかを、検査や数で書く。
+* **完了した票は現行の棚に置かない**: 状態が 受入完了・完了記録・撤回 の `TASK_*.md` は `docs/archive/` へ移す
+  (`tools/move_docs.py`)。
+* 例外は `tools/docs_status_exceptions.json`: `no_criteria` (決まりより前からある、基準の行が無い票の一覧。
+  増やさない) と `done_in_place` (完了しても現行の棚に残す票と、その理由)。例外が要らなくなったら
+  (行を書いた・移した・消えた) 一覧から外さないと落ちる。
+
 段の記録 (`**e11b1 ...**:` など数字を含む英字 ID の太字見出し) は、次の
 段の見出しまたは Markdown 見出しまでの非空行を数える (見出し本文のない行を除き、
 連続した表は 1 行)。10 行超と、未実施/延期/未確認を含む行に
@@ -40,6 +50,7 @@ DEFERRED_TESTS.md の表の ID がない場合は警告のみ。`--strict` で�
 """
 
 import argparse
+import json
 import os
 import re
 import sys
@@ -53,6 +64,12 @@ END = "<!-- status-vocab:end -->"
 STATUS_RE = re.compile(r"(?:^|> |/ )状態:\s*(.*)$")
 BOUNDARY = " \t*(（—。、"
 REQUIRED_RE = re.compile(r"^(TASK_|HANDOVER_|CHECKLIST_).*\.md$|PLAN.*\.md$")
+TICKET_RE = re.compile(r"^TASK_.*\.md$")
+EXCEPTIONS = os.path.join("tools", "docs_status_exceptions.json")
+CRITERIA_LINES = 20
+CRITERIA_RE = re.compile(r"^> 完了の基準:\s*\S")
+OPEN_WORDS = ("計画", "設計中", "実装中", "受入待ち", "受入完了・実機確認待ち")
+DONE_WORDS = ("受入完了", "完了記録", "撤回")
 
 
 def load_vocab(root):
@@ -129,6 +146,59 @@ def check(root):
         no, value = st
         if word_of(value, vocab) is None:
             problems.append("%s:%d: 語彙の外の状態行: %s" % (rel, no, value[:60]))
+    return problems
+
+
+def has_criteria(path):
+    with open(path, encoding="utf-8", errors="replace") as f:
+        for no, line in enumerate(f, 1):
+            if no > CRITERIA_LINES:
+                break
+            if CRITERIA_RE.match(line):
+                return True
+    return False
+
+
+def load_exceptions(root):
+    path = os.path.join(root, EXCEPTIONS)
+    if not os.path.exists(path):
+        return [], {}
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+    return list(data.get("no_criteria", [])), dict(data.get("done_in_place", {}))
+
+
+def ticket_problems(root):
+    """票の 2 つの決まり (完了の基準・完了した票の置き場) の問題の一覧。"""
+    vocab = load_vocab(root)
+    no_criteria, done_in_place = load_exceptions(root)
+    problems = []
+    seen = set()
+    for p in task_docs(root):
+        if not TICKET_RE.match(os.path.basename(p)):
+            continue
+        rel = os.path.relpath(p, root).replace(os.sep, "/")
+        seen.add(rel)
+        st = status_line(p)
+        word = word_of(st[1], vocab) if st else None
+        criteria = has_criteria(p)
+        if word in OPEN_WORDS:
+            if rel in no_criteria:
+                if criteria:
+                    problems.append("%s: 完了の基準の行がある。%s の no_criteria から外す" % (rel, EXCEPTIONS))
+            elif not criteria:
+                problems.append("%s: `> 完了の基準:` の行がありません (先頭 %d 行、測れる到達点を書く)"
+                                % (rel, CRITERIA_LINES))
+        elif rel in no_criteria:
+            problems.append("%s: 進行中の票ではない。%s の no_criteria から外す" % (rel, EXCEPTIONS))
+        if word in DONE_WORDS:
+            if not str(done_in_place.get(rel, "")).strip():
+                problems.append("%s: 完了した票 (%s) が現行の棚にある。tools/move_docs.py で docs/archive/ へ移す"
+                                % (rel, word))
+        elif rel in done_in_place:
+            problems.append("%s: 完了した票ではない。%s の done_in_place から外す" % (rel, EXCEPTIONS))
+    for rel in sorted((set(no_criteria) | set(done_in_place)) - seen):
+        problems.append("%s: 票が無い。%s から外す" % (rel, EXCEPTIONS))
     return problems
 
 
@@ -210,7 +280,7 @@ def main():
     ap.add_argument("--strict", action="store_true", help="段の記録の警告も失敗にする")
     args = ap.parse_args()
     try:
-        problems = check(args.root)
+        problems = check(args.root) + ticket_problems(args.root)
         warnings = record_warnings(args.root)
     except (OSError, ValueError) as e:
         print("Error: %s" % e, file=sys.stderr)
@@ -222,7 +292,7 @@ def main():
     if problems:
         for s in problems:
             print(s)
-        print("NG — 状態行 %d 件。語彙は docs/POLICY_DEV.md §8" % len(problems))
+        print("NG — 状態行・票の決まり %d 件。docs/POLICY_DEV.md §8" % len(problems))
         return 1
     print("OK — docs/tasks/ の状態行はすべて語彙どおり (docs/POLICY_DEV.md §8)")
     return int(args.strict and bool(warnings))

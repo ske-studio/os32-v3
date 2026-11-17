@@ -3,7 +3,7 @@
 CHECK = dict(name='hostsvc-services', tier=1, needs=[], budget=2.9,
              covers=['tools/host_services.py', 'tools/hostsvc_contracts.pyi',
                      'tools/tests/hostsvc_fixture.py'],
-    basis=['NET_HOSTSVC_DESIGN §6'],
+    basis=['docs/design/tools/host_services.md 今の一覧'],
 )
 import argparse
 import importlib.util

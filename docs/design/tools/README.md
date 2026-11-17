@@ -88,6 +88,7 @@ map の LOAD 一覧・各 .o の size・最終 ELF・KMOD header を照合する
 - [tools/accept/README](accept/README.md)
 
 - [tools/check_doc_line_refs](check_doc_line_refs.md)
+- [tools/check_kapi_abi](check_kapi_abi.md)
 - [tools/check_layers](check_layers.md)
 
 - [tools/checks/README](checks/README.md)
@@ -96,6 +97,8 @@ map の LOAD 一覧・各 .o の size・最終 ELF・KMOD header を照合する
 
 - [tools/ci/sep_identity](ci/sep_identity.md)
 
+- [tools/fep_to_sqlite](fep_to_sqlite.md)
+
 - [tools/gen_font16](gen_font16.md)
 
 - [tools/gen_hwdev_contract](gen_hwdev_contract.md)
@@ -103,6 +106,12 @@ map の LOAD 一覧・各 .o の size・最終 ELF・KMOD header を照合する
 - [tools/gfinit_mode_tables](gfinit_mode_tables.md)
 
 - [tools/host_agent](host_agent.md)
+
+- [tools/host_notify](host_notify.md)
+
+- [tools/host_services](host_services.md)
+
+- [tools/lanfs_host](lanfs_host.md)
 
 - [tools/mkd88](mkd88.md)
 
@@ -117,3 +126,7 @@ map の LOAD 一覧・各 .o の size・最終 ELF・KMOD header を照合する
 - [tools/tests/README](tests/README.md)
 
 - [tools/img2osri](img2osri.md)
+
+- [tools/osri_enc2](osri_enc2.md)
+
+- [tools/raster_splash_asset](raster_splash_asset.md)

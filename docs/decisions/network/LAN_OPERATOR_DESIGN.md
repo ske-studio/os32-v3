@@ -27,7 +27,7 @@
 - PM-LOG: PLOGを共通LOG/_service_logに変更、x86 bootlogも送れる契約にしos32.予約名を使わない。
 
 ## 1. 実物の確認（r1 の有効な確認を保持）
-- 統合判断1（wt/int-1114cのPOLICY_DEV §1）: 同じ役目は本線のlink/host_agent、HOST_SERVICES_PLAN §§2–3、NET_HOSTSVC_DESIGN §§2/5/6/9とPPCのPLN1診断・LOG・端末・HostFSにある（r3の確認を継承、§5の対応表）。新しい独立プロトコルは作らない。
+- 統合判断1（wt/int-1114cのPOLICY_DEV §1）: 同じ役目は本線のlink/host_agent、HOST_SERVICES_PLAN §§2–3、docs/design/net/README.md (Host Services の LAN の経路)・docs/design/net/nic.md・docs/design/net/host_mailbox.md・docs/design/tools/host_notify.md・docs/design/net/link_host_api.md・docs/design/tools/host_agent.mdとPPCのPLN1診断・LOG・端末・HostFSにある（r3の確認を継承、§5の対応表）。新しい独立プロトコルは作らない。
 - 統合判断2: link/通知/LOG/SFS backendとホスト操作口は1つの実装に統合する。tick・IRQ・idle・NICはlink_platform/NetNicOpsのHALへ分離し、PC98/GEMと既存CLIのadapterだけをplatformに残す。PPC専用GSERIALは作らない。
 - 統合判断3: 共通link v2・共通tick・既存VFS/常駐mount・既存shellの実行経路を維持するため計画の向きと一致。PPCからSFS on linkを実証しx86 raw SFS廃止は§9の後続関門とする。レビューにもこの3点を渡す。
 |確認|現在の根拠・含意（作業木相対 file:line）|
@@ -37,7 +37,7 @@
 |EOT/実行|`userland/shell/rshell.c` の拒否・空行・exit例外・SFS分岐・echo/実行後EOTを維持。`tools/rshell_serial.py` のEOTはrcではなく、SFS結果行判定は専用。|
 |像と起動|rshellはshell.bin (`build/programs.mk`)、sh.bin対象外 (`userland/shell/main.c`)。`ui.c` 付近のserial初期化・rshell自動開始を維持。|
 |sink|`include/con_sink.h` は8192B（レコードheader込み）。`con_sink.c` にenable/disable/read/stat/owner回収、読取り所有者は1人。enableは公開KAPIでない。|
-|通知|`tools/host_notify.py` は名前→LIST番号に依存。`NET_HOSTSVC_DESIGN §5` の65535は競合消費なので、番号指定だけでは先取りを防げない。予約番号・検索除外の追加が必要。|
+|通知|`tools/host_notify.py` は名前→LIST番号に依存。docs/design/net/host_mailbox.md「取り出す」の65535は競合消費なので、番号指定だけでは先取りを防げない。予約番号・検索除外の追加が必要。|
 |GUI|`gserial.rs` はserial直結、openはserial初期化依存。`wm.rs` は通知を消費せず前景にイベント配送。LAN入力と返答の差替えが必要。|
 |帯域|`net/link.c` はクラス交互TX、回数上限とtick_budget、100Hz駆動、末尾にnotify_tick。WDATAは最大1400BでACK待ち。LAN化だけで所要時間は保証しない。|
 |PPC依存|`net/link.c` のidt/io/idle、`net/nic.c` のPC98 tick、mailboxのirq依存を移植する必要がある。PLN1 codecだけの移動では成立しない。|
@@ -78,7 +78,7 @@ class CommandTransport:
 - agentは1件を結果またはUNKNOWNまで保持し、UNKNOWN後は対象ゲストのREADY再確認と利用者の明示的な再開まで次を送らない。CLIの切断だけでは実行中枠を解放しない。UNKNOWNのIDも照合情報を保持し、同じagent世代・boot-token・IDの遅延RSH OUTを再接続後も受理する。長さ/drop/echo/EOT検査合格なら結果確定、READYのdoneだけでは完了にしない。旧世代/別bootのOUTは拒否し、遅延結果でも再送しない。
 
 - **U5 常駐**: ホスト起動時からNICごとにhost_agentを1つ常駐させる。rshell/gserial/LOG表示/SFSのCLIは8027へ接続し、agentを子プロセスとして起動・停止しない。切断してもサービスは存続し、ゲスト不在中も操作口と再接続待ちを維持する（既存open_streamのブロック中もprobeを処理）。
-- 設定は `/etc/os32/host-agent/<instance>.json`（root所有0640）に `iface,root,allow-write,peer,backend,frame-endpoint,operator-endpoint,state-dir` を記載。rootは絶対パス、allow-write既定false、peerは固定ゲストMAC。state-dir に世代・id・sfs_generation を永続しない (NET_HOSTSVC_DESIGN:154、agent の再起動は新しい世代、A5)。ロックとログだけを置く。設定検証後に起動し、NIC重複はロックで拒否。複数NICは127.0.0.1:8027、127.0.0.2:8027等で操作口を分離し、8026とstate-dirもinstance別にする。
+- 設定は `/etc/os32/host-agent/<instance>.json`（root所有0640）に `iface,root,allow-write,peer,backend,frame-endpoint,operator-endpoint,state-dir` を記載。rootは絶対パス、allow-write既定false、peerは固定ゲストMAC。state-dir に世代・id・sfs_generation を永続しない (docs/design/tools/host_notify.md「何をするか」、agent の再起動は新しい世代、A5)。ロックとログだけを置く。設定検証後に起動し、NIC重複はロックで拒否。複数NICは127.0.0.1:8027、127.0.0.2:8027等で操作口を分離し、8026とstate-dirもinstance別にする。
 - unit原本は `tools/systemd/os32-host-agent@.service`、ExecStartは `/usr/bin/python3 /opt/os32/tools/host_agent_service.py --config /etc/os32/host-agent/%i.json`、Type=simple、Restart=on-failure、RestartSec=2、WantedBy=multi-user.target。専用os32-hostユーザー、永続状態は `/var/lib/os32-host-agent/%i`。必要なraw権限はunitのCAP_NET_RAWに限定する。
 - インストールは管理者が一度、専用ユーザーと設定/状態ディレクトリを作成→tools一式を `/opt/os32/tools` に配置→設定を編集しrootへの必要な読書き権限を付与→unitを `/etc/systemd/system/` へ配置→`systemctl daemon-reload`→`systemctl enable --now os32-host-agent@<instance>`。Ubuntuノート・systemd有効のWSLは同じunitを使う。WSLはWindowsログオン時のタスクで対象ディストリビューションを起動・維持する。systemd無効環境では同タスクが `wsl.exe -d <distro> --exec /usr/bin/python3 /opt/os32/tools/host_agent_service.py --config <設定>` を監視再起動し、ゲスト/台本と独立して常駐させる。
 - Ubuntuの物理NICは既存lan_bridge→8026→agent、raw SFSはlanfs_host.pyの既存Server/HostFSを維持する。サービスrunnerがbridge/lanfs_hostを同じ設定で常駐管理し、root/allow-write/peerを渡す。SFS MARK全3Bで分離し二重応答を防ぎ、NIC送信MACを揃える。PPCのSFS CALLは同じbackend実装をagent内で使う。raw SFS自体はCLI用8027へ載せ替えない。
@@ -130,7 +130,7 @@ pub fn emit(id: &[u8], bytes: &[u8]); // 有界enqueue、serial_putsを呼ばな
 - SFS CALLはhost_agent内backendで既存SFS sid/seqの重複cacheの内側へdispatchする（新たなファイル実装を作らない）。BYE等の片道もlinkでは空本文200を返す。CRC/最大frame1044B、LEのSFSとlink、BEの診断payloadを明示codecで扱う。
 - link ridをFSの再実行キーにしない。同一sid/seqの同内容だけ再送、write結果不明は新sidで再実行禁止。ALIVE変更で旧FD失効、/hostの常駐寿命・RO既定・allow-write・HOSTDOWN/STALEを維持。
 - PPCのput_untilはSFS frameを1つ保留し、待機pollがhost_open/write/status/read/closeを進め、完成frameだけ既存rxへ渡す。SFS frame 1つ (CALL 1往復) ごとに入口の1000ms絶対期限を取り、open/write/status/readの全段で共有し、AGAINで取り直さない。VFSのread/writeの各chunk・listの各頁と、事前のensure/HELLOはそれぞれ直前に期限を取る。失敗したCALLをVFSで再実行しない。openのHOSTDOWN/FULLはWDATA送信前に限って同じ期限内でopenから再試行し、WDATA送信後は開き直さない。
-- x86 raw SFSは現状維持。SFS CALLはPPCから先に実証し、x86全利用者/FD導入を載せ替えてraw SFSを廃止する作業はNET_HOSTSVC_DESIGN §9の後続関門。
+- x86 raw SFSは現状維持。SFS CALLはPPCから先に実証し、x86全利用者/FD導入を載せ替えてraw SFSを廃止する作業はdocs/design/net/README.md「共通の決まり」と TASK_LAN_BULK の後続関門。
 ```c
 /* net/link_platform.h: 機械依存をこの境界へ。x86動作は既存実体で保持。 */
 u32 link_platform_now(void); /* 共通tick_countを使用、10ms、周回比較。独自TB時計は作らない */

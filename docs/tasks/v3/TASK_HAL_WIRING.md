@@ -1,6 +1,6 @@
 # TASK_HAL_WIRING — 結線の土台 (割り込みの動的登録 / 8237 DMA の共通部 / DMA プール / PCI の結線表 / µs 時計)
 
-> 後続: [TASK_LAN_82557](../realhw/TASK_LAN_82557.md)・[TASK_PCM_CS4231](TASK_PCM_CS4231.md)
+> 後続: [TASK_LAN_82557](../realhw/TASK_LAN_82557.md)・[pcm_cs4231 の設計書](../../design/drivers/sound/cs4231/pcm_cs4231.md)
 
 > 状態: **受入完了・実機確認待ち (2026-09-23)** — NP21/W 受入、Codex 実装レビュー Approve、v2.1 に同梱。実機は W0 と W4 が合格 (W4: `timetest` TIME PASS・`clamped 0 of 10000`、archive の HANDOVER_2026-09-22 §次の実機の回)。残: W7 (キャッシュ整合、実機)。(2026-09-29 の棚卸しで更新)
 >
@@ -294,7 +294,7 @@ int  dma_above_1mb_state(void);   /* DMA_A20_VERIFIED / DMA_A20_UNREADABLE / DMA
   CUS = Idle かつ RUS = Idle を読む。これが証拠。reset 後も Idle にならなければもう 1 回 reset、それでも駄目なら
   **隔離** (下記)。開始命令を出す前 (probe の (5) まで) は DMA は起きていないので証拠は要らない。PCM は
   `dma_chan_mask(ch)` + CS4231 の再生許可ビットを落とした後の**装置側**の確認 (remaining の一致は証拠にしない)。
-- 用途と大きさ: 82557 の CB (数 KB) + RFD 8 本 × 1.5KB ≒ 16KB、PCM リング 16KB (ステージング16KBはKHEAP、[PCM §2-1](TASK_PCM_CS4231.md#2-1-カーネル-driverssoundcs4231pcm_cs4231c--pcm_cs4231_mathc-純粋部))、余裕32KB。
+- 用途と大きさ: 82557 の CB (数 KB) + RFD 8 本 × 1.5KB ≒ 16KB、PCM リング 16KB (ステージング16KBはKHEAP、[pcm_cs4231 の設計書](../../design/drivers/sound/cs4231/pcm_cs4231.md#データの形と不変条件))、余裕32KB。
   FDC の 1KB は**静的配列のまま** (起動最初期に要る)。
 - 純粋関数: 最初適合 + 整列 + 64KB 跨ぎの判定、span の登録 / 解放 / 不正解放をホスト試験に。
 

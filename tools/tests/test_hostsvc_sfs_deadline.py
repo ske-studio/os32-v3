@@ -10,7 +10,7 @@ CHECK = dict(name='hostsvc-sfs-deadline', tier=1, needs=[], budget=4.0, covers=[
     'tools/tests/hostsvc_sfs_deadline_host.c', 'tools/tests/hostsvc_fixture.h',
     'tools/tests/hostsvc_fixture.c', 'tools/tests/host32.py',
     'tools/tests/kernel_includes.py', 'build/config.mk'],
-    basis=['NET_HOSTSVC_DESIGN §3', 'AC-SFS-1'],
+    basis=['docs/design/fs/serialfs/serialfs_persistent.md 期限', 'AC-SFS-1'],
 )
 
 import argparse

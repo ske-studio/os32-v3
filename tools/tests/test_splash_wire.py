@@ -12,7 +12,7 @@ CHECK = dict(name='splash-wire-host', tier=1,
             'gfx/gfx.h', 'gfx/palette.h', 'include/types.h', 'include/pc98.h', 'include/pegc.h',
             'include/sys.h', 'include/gfx_hal.h', 'include/text_screen.h',
             'sdk/include/os32/os32_kapi_shared.h'], needs=[], budget=72.5,
-    basis=['RASTER_SPLASH_S5_DESIGN §2', 'RASTER_SPLASH_S5_DESIGN §3', 'RASTER_SPLASH_PL_DESIGN §2', 'RASTER_SPLASH_DESIGN §3'],
+    basis=['docs/design/platform/pc98/splash_image.c.md 手順と結果', 'docs/design/platform/pc98/splash_image.c.md 時間の予算', 'docs/design/gfx/gfx_osri.c.md 手順', 'docs/design/gfx/gfx_osri.h.md ファイルの配置'],
     env_limit='実playerをfake port/clock/VRAMで確認するが、実映像・壁時計とIRQ落ちは保証しない。',
 )
 import argparse

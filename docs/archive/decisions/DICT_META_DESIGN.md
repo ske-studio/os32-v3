@@ -193,7 +193,7 @@ int hsp_set_fep_user_path(const char *absolute_path); /* 正規化済み設定�
 - PM専有の共有登録: build/*.mk、fep_imports.def、試験CHECK/登録、packages.yaml、sdk/kapi.json。
 - PMは各登録ファイルを個別の直列段として扱う（各+5〜30行）。KAPI生成物・FEP ops/外側中継・boot結線も実名照合後に1ファイルずつ担当を固定する。
 - kapi_db.c は変更無し。既存EXEC groupと課金をそのまま使う。
-- 文書担当が docs/tasks/fep/TASK_DICT_META.md（§0脚注を現行D27:30へ訂正、D28・§4-6欠落を明記）、同00_INDEX.md、docs/tasks/DEFERRED_TESTS.md を各1段・各約20行で所有。今回の成果物は本設計のみ。
+- 文書担当が docs/archive/v3/TASK_DICT_META.md（§0脚注を現行D27:30へ訂正、D28・§4-6欠落を明記）、同00_INDEX.md、docs/tasks/DEFERRED_TESTS.md を各1段・各約20行で所有。今回の成果物は本設計のみ。
 
 ## 9. 受入→試験・変異、実装時の検査
 | 受入項目 | 試験（実施予定） | 変異（各1行、実行時RED） |
@@ -238,7 +238,7 @@ int hsp_set_fep_user_path(const char *absolute_path); /* 正規化済み設定�
 # ime_dict_info — 辞書メタ情報を返す KAPI の詳細設計 r1
 2026-11-05 / Codex（実行モデル ID は取得不能。gpt-6-astra と断定しない）。
 対象は返却口だけ。リポジトリ編集・ビルド・試験・配備は未実施。
-根拠は `/home/hight/os32-v3` の `docs/decisions/fep/DICT_META_DESIGN.md` §2・3・5・6、`docs/tasks/fep/TASK_DICT_META.md`。
+根拠は `/home/hight/os32-v3` の `docs/archive/decisions/DICT_META_DESIGN.md` §2・3・5・6、`docs/archive/v3/TASK_DICT_META.md`。
 追加規約は `docs/KAPI_SPEC.md` §3-1・3-3、`.claude/skills/os32-kapi-add/SKILL.md`、`docs/CONSTRAINTS.md` [C1]〜[D4]・[ABI]。
 
 ### 1. 公開契約

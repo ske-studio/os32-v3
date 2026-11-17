@@ -136,7 +136,7 @@
         "..."
       ],
       "direct": true,
-      "target": "kprintf"
+      "target": "console_printf"
     },
     {
       "name": "sys_unlink",

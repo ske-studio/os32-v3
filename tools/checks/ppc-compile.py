@@ -9,7 +9,6 @@ CHECK = dict(env=['ppc-cross'], name='ppc-compile', tier=1, budget=180, needs=['
         'tools/checks/ppc-sd.py',
         'tools/checks/ppc-sh-output.py',
         'tools/ci/ppc_scope.py',
-        '.github/workflows/full-check.yml',
         'tools/ppc/compile_ci.py',
         'tools/tests/ppc_ci.py',
                      'tools/ci/build_cross.sh', 'tools/ci/build_cross_ppc.sh', 'Makefile',
