@@ -34,9 +34,9 @@ EXPRのRは同W substep内でrecoverが採取・評価する（別Qの値をRで
 
 記録専用readは診断有効かつmain=2/pc=E623h/substep=12040h～12044hの5規則に限定し、verify_mask=0を維持。不一致は止めず、readのアクセス失敗・送信失敗は既存の失敗／S0復帰へ。
 
-kdebug/recover.c:2015–2032の読取りと不一致判定を分離し、read_safe確認後にlogged_read（同:943–956）を使う。RUNNINGの5本でaccess BEGIN/ENDが10行、call_pointが5回増える（ops->read直呼びはしない）。
+kdebug/recover.cの読取りと不一致判定を分離し、read_safe確認後にlogged_read（同:943–956）を使う。RUNNINGの5本でaccess BEGIN/ENDが10行、call_pointが5回増える（ops->read直呼びはしない）。
 
-前例は同じVIDEO PLL 5規則の旧verify非零版(記録はアーカイブ)；同じverify読戻し経路（kdebug/recover.c:2016–2020,943–956）が各到達規則で同じaccess行を出していた。
+前例は同じVIDEO PLL 5規則の旧verify非零版(記録はアーカイブ)；同じverify読戻し経路（kdebug/recover.c）が各到達規則で同じaccess行を出していた。
 
 SAMPLE・固定RAM・新しいREC形式は不要。既存gf_bus ENDへ全32bitを記録し、増分は上記access 10行。
 

@@ -351,7 +351,7 @@ FAIL slot_layout_append:448: db_slot_layout_ok(KAPI_SLOT_COUNT + 1)
 (`--include=*.c --include=*.h --include=*.inc --include=*.py --include=*.rs
 --include=*.asm`、生成物と `sdk/gen_kapi.py` を除く)。
 
-**該当は `kapi/kapi_db.c:1151` の 1 か所だけ**だった。他の利用は全部
+**該当は `kapi/kapi_db.c` の 1 か所だけ**だった。他の利用は全部
 「表の長さから導く」形で、末尾追記に対して正しい:
 
 | 箇所 | 使い方 | 追記で壊れるか |
@@ -359,13 +359,13 @@ FAIL slot_layout_append:448: db_slot_layout_ok(KAPI_SLOT_COUNT + 1)
 | `exec/exec.c:102` | `for (i = 0; i < KAPI_FUNC_COUNT; i++)` (トランポリンのスタブ生成) | 壊れない |
 | `exec/exec.c:120,801,1698` | `tbl[2 + KAPI_FUNC_COUNT + 0/1]` (データフィールドの位置) | 壊れない |
 | `exec/exec.c:314` | スタブ帯の大きさ `KAPI_FUNC_COUNT * 8` | 壊れない |
-| `exec/exec.c:1063` | `if (slot >= (u32)KAPI_FUNC_COUNT)` (ディスパッチャの範囲検査) | 壊れない |
+| `exec/exec.c` | `if (slot >= (u32)KAPI_FUNC_COUNT)` (ディスパッチャの範囲検査) | 壊れない |
 | `exec/ring3_str.h:40` | `RING3_USTR_OFF` の式 | 壊れない |
 | `kapi/kapi_generated.c` (生成物) | `kapi_argsize[KAPI_FUNC_COUNT]` / `kapi_argptr[...]` | 壊れない |
 | `tools/tests/ring3_str_host.c:45,129` | `KAPI_FUNC_COUNT * 8` の式 | 壊れない |
 | `tools/tests/test_hsync_h3.py:87` | 生成ヘッダと `kapi.json` の件数一致 (再生成忘れの検出) | **そういう検査なので正しい** |
 
-`KAPI_SLOT_<NAME>` を固定値と比べる行 (`kapi/kapi_db.c:1152-1155` ほか) は
+`KAPI_SLOT_<NAME>` を固定値と比べる行 (`kapi/kapi_db.c` ほか) は
 **既存スロットが動いていないこと**の検査で、末尾追記では変化しない。残した。
 
 #### 追記 (2026-09-16) — この調査は**同じ誤りの別の綴り**を取りこぼしていた

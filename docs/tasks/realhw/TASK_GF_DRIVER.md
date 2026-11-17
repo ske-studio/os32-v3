@@ -76,17 +76,17 @@
 - 元 76 行: | 情報・モード一覧 `modes` | 既知装置と 1 モード、現在モードを返す | `dispnv04/crtc.c:643`（設定側。OS32 の一覧そのものは無し） | 4F00/01/03、pp.25/30/44 | `hwdev/gfinit_mode.h:6`／定数を共有、一覧接続は service の新規分に含む |
 - 元 77 行: | モード設定 `modeset` | 中層から共有列を呼ぶ組立て | `dispnv04/crtc.c:708,731`、`hw.c:827` | 4F02、p.40 | `hwdev/gf_load_state.c:11`／共有、接続は service の新規分に含む |
 - 元 78 行: | timing `timing` | H/V→標準 CR・overflow、固定 progressive | `dispnv04/crtc.c:237–413` | 02 の内部 | `kdebug/gfinit_mode.c:33–77`／移動 |
-- 元 79 行: | 画素形式 `format` | PACKED8・GR/AR の値（GENERAL は dac_format） | `dispnv04/crtc.c:418–449,589` | 01/02 の内部 | `kdebug/gfinit_mode.c:78–101`／移動 |
-- 元 80 行: | pitch `pitch` | 640 byte、CR13/19/42 の値 | `dispnv04/crtc.c:838–908` | 4F06、p.48 | `kdebug/gfinit_mode.c:64–69`／移動、任意変更は後続 |
-- 元 81 行: | 表示先頭 `start` | START=0、単位は BAR1 相対 byte | `dispnv04/crtc.c:838–908`、`hw.c:772` | 4F07、p.50 | `kdebug/gfinit_mode.c:96`・共有列／移動、非零は後続 |
-- 元 82 行: | PLL `pll_program` | solver と 5 書込み、選択 50C・524 | `nvkm/subdev/devinit/nv04.c:200`、`dispnv04/hw.c:468` | 4F0B p.59／02 の内部 | `kdebug/gfinit_pll.c:196`／移動、任意 clock の公開無し |
-- 元 83 行: | パレット `palette` | mask/index/RGB、部分更新、256 項の shadow | `dispnv04/hw.c:795–810`、`crtc.c:778` | 4F09、p.54 | `kdebug/gfinit_plan_c.c:518`、`gfinit_bus.c:195`／アクセスを共有、新接続 |
-- 元 84 行: | DAC 精度 `dac_format` | 初版 8bit 固定、GENERAL の設定と情報 | `dispnv04/crtc.c:589–606` | 4F08、p.53 | `kdebug/gfinit_mode.c:98`／移動、6bit 切替は後続 |
+- 元 79 行: | 画素形式 `format` | PACKED8・GR/AR の値（GENERAL は dac_format） | `dispnv04/crtc.c:418–449,589` | 01/02 の内部 | `kdebug/gfinit_mode.c`／移動 |
+- 元 80 行: | pitch `pitch` | 640 byte、CR13/19/42 の値 | `dispnv04/crtc.c:838–908` | 4F06、p.48 | `kdebug/gfinit_mode.c`／移動、任意変更は後続 |
+- 元 81 行: | 表示先頭 `start` | START=0、単位は BAR1 相対 byte | `dispnv04/crtc.c:838–908`、`hw.c:772` | 4F07、p.50 | `kdebug/gfinit_mode.c`・共有列／移動、非零は後続 |
+- 元 82 行: | PLL `pll_program` | solver と 5 書込み、選択 50C・524 | `nvkm/subdev/devinit/nv04.c:200`、`dispnv04/hw.c:468` | 4F0B p.59／02 の内部 | `kdebug/gfinit_pll.c`／移動、任意 clock の公開無し |
+- 元 83 行: | パレット `palette` | mask/index/RGB、部分更新、256 項の shadow | `dispnv04/hw.c:795–810`、`crtc.c:778` | 4F09、p.54 | `kdebug/gfinit_plan_c.c`、`gfinit_bus.c:195`／アクセスを共有、新接続 |
+- 元 84 行: | DAC 精度 `dac_format` | 初版 8bit 固定、GENERAL の設定と情報 | `dispnv04/crtc.c:589–606` | 4F08、p.53 | `kdebug/gfinit_mode.c`／移動、6bit 切替は後続 |
 - 元 85 行: | protect/blank `blank` | VGA protect と画面 blank、同期停止とは別 | `dispnv04/hw.c:110–124`、`hw.h:243`、`crtc.c:721` | Core の独立機能無し | `hwdev/generated/gf_mode_rows.inc:1` の P/L1/L3／操作部分移動 |
-- 元 87 行: | GF 出力選択 `output` | head A/OR0、DACCLK・TEST、他経路を停止 | `dispnv04/dac.c:375–409`、`dfp.c:93–110` | Core の独立機能無し | `kdebug/gfinit_mode.c:97–105`・共有列／移動、TV/DVI 無し |
-- 元 88 行: | cursor `cursor` | offset=0・非表示だけ | `dispnv04/cursor.c:9–59` | Core に該当無し | `kdebug/gfinit_mode.c:82–94`・共有列／移動 |
-- 元 89 行: | 表示 FIFO `fifo` | NV44A burst=4、lwm=C0、CR1B/20/47 | `dispnv04/arb.c:239–264`、`hw.c:712` | 02 の内部 | `kdebug/gfinit_mode.c:92`・共有列／移動 |
-- 元 90 行: | 拡張状態 `extended` | 60081C/850・CR33/52 等、overlay 停止 | `dispnv04/hw.c:665–772` | 02 の内部 | `kdebug/gfinit_mode.c:85–100`・共有列／移動 |
+- 元 87 行: | GF 出力選択 `output` | head A/OR0、DACCLK・TEST、他経路を停止 | `dispnv04/dac.c:375–409`、`dfp.c:93–110` | Core の独立機能無し | `kdebug/gfinit_mode.c`・共有列／移動、TV/DVI 無し |
+- 元 88 行: | cursor `cursor` | offset=0・非表示だけ | `dispnv04/cursor.c:9–59` | Core に該当無し | `kdebug/gfinit_mode.c`・共有列／移動 |
+- 元 89 行: | 表示 FIFO `fifo` | NV44A burst=4、lwm=C0、CR1B/20/47 | `dispnv04/arb.c:239–264`、`hw.c:712` | 02 の内部 | `kdebug/gfinit_mode.c`・共有列／移動 |
+- 元 90 行: | 拡張状態 `extended` | 60081C/850・CR33/52 等、overlay 停止 | `dispnv04/hw.c:665–772` | 02 の内部 | `kdebug/gfinit_mode.c`・共有列／移動 |
 - 元 91 行: | 基準状態 `baseline` | init 後に一度採取、再 modeset の入力 | `dispnv04/hw.c:813`（採る範囲は OS32 限定） | 4F04 p.45 の一部分 | `kdebug/gf_stage_state.c:20`／I/O 非依存部分を共有化 |
 - 元 92 行: | 停止 `quiesce` | 1850→1854→PMC140 を 0、旧 timing は戻さない | 完全対応無し、PC-98 共存上の差分 | 04 の完全復元ではない | `kdebug/recover_gf.c:125`／列を共有化 |
 - 93: | 98 切替・復帰 `drivers/video/pc98/pc98_route.c` | 0FACh、decode 確認、98 再描画 | 無し、PC-98 固有 | 無し | `kdebug/recover_profile.c:42–71`、`T/TASK_GEFORCE6200.md:86`／低層だけ共有化 |

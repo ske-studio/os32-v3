@@ -38,7 +38,7 @@ REC: `transport_state()` の `phase=state event=RESTORING` 行だけに必須u32
 
 ## GF6200_VPLL_PROBE
 
-現行verify=0のEND.readback=FFFFFFFFhは未採取であり実測ではない（kdebug/recover.c:2015–2032）。
+現行verify=0のEND.readback=FFFFFFFFhは未採取であり実測ではない（kdebug/recover.c）。
 
 ## HWDEV_DESIGN
 

@@ -229,7 +229,7 @@ MUTATE temp_names_synced          RED (期待どおり落ちた)
 
 票 §1 の 7 と §2-3 末尾が「v52 のカーネルの上で新しい hsync を動かす場面は現に
 起こる」「既定は `kernel_too_old` で断り、`--unsafe-overwrite` のときだけ直接上書き」
-としているが、`exec/exec.c:1276` は `hdr->min_api_ver > KAPI_VERSION` のバイナリを
+としているが、`exec/exec.c` は `hdr->min_api_ver > KAPI_VERSION` のバイナリを
 「invalid OS32X binary」として**起動そのものを拒否する**。53 を宣言すると
 `kernel_too_old` も `--unsafe-overwrite` も届かない。
 

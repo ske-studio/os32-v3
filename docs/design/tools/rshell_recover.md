@@ -46,7 +46,7 @@ PAUSEDは完全な非終端応答として従来通りexit=0/表示PAUSEDを維�
 
 PARTIAL/overrideは現状どおり失敗終了・証拠保存、OK条件や終端表示は変更しない。
 
-hostは既存metadataのversion（O/kdebug/recover.c:448–449、O/tools/rshell_recover.py:41,122–123）=56504C03hで診断版を識別し、対象5規則だけverify=0でも実測として扱い、それ以外の版でこの5規則のreadback≠NONE（FFFFFFFFh）が出たら誤りとする（他のverify非零規則は従来どおり）。
+hostは既存metadataのversion（O/kdebug/recover.c、O/tools/rshell_recover.py:41,122–123）=56504C03hで診断版を識別し、対象5規則だけverify=0でも実測として扱い、それ以外の版でこの5規則のreadback≠NONE（FFFFFFFFh）が出たら誤りとする（他のverify非零規則は従来どおり）。
 
 **止めずに記録し、ホスト (rshell_recover.py) で読み戻しを見て判定する**。
 

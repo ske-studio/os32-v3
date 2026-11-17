@@ -100,7 +100,7 @@ int  idle_work_register(void (*fn)(void));   /* 最大 4 件 */
  * IRQ 文脈の判定は kctx_irq_depth だけで行う (nic.in_irq は slot2 の終わりで 0 に戻るので使わない) */
 int net_tx(const void *frame, u32 len);  /* irq_restore の後、kctx_irq_depth==0 なら idle_work_run() (IF=1 で送り出す) */
 ```
-- 呼ぶ所 (hlt の直前): `kernel/sys.c:41` (sys_halt。GUI の WM は 1 周ごとに通る)・`exec/exec_schedule.inc:150` (sys_yield の先頭、geforce_foreground_poll の隣)・`drivers/input/kbd.c:734,770,792`・**`net/link.c:59` の `LINK_IDLE()`** (`do { idle_work_run(); _idle(); } while (0)`。`link_selftest.inc:22,34,45,61` の待ちが、送受が進まずに timeout しないようにする。host 試験用の `link_test_idle` (:46-49) は変えない)。
+- 呼ぶ所 (hlt の直前): `kernel/sys.c:41` (sys_halt。GUI の WM は 1 周ごとに通る)・`exec/exec_schedule.inc:150` (sys_yield の先頭、geforce_foreground_poll の隣)・`drivers/input/kbd.c`・**`net/link.c:59` の `LINK_IDLE()`** (`do { idle_work_run(); _idle(); } while (0)`。`link_selftest.inc:22,34,45,61` の待ちが、送受が進まずに timeout しないようにする。host 試験用の `link_test_idle` (:46-49) は変えない)。
 - 制限: アプリが syscall も待ちも無しに計算している間は NIC が止まる。リング 16KB が溢れたら、既存の OVW 復旧を次の協調処理で行い、link の RTO で再送される。この転送量は受入で測る。
 - e82557 (実機) は bus master なので PIO が無い。予算 (§2-3) だけ掛ける。異常復旧の待ちが IRQ の中に無いことは A2-a で確かめる。
 

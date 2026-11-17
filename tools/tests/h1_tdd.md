@@ -511,7 +511,7 @@ Basic 問い合わせだけが IO、Standard と列挙は成功する状況。ex
   `fs/ext2/ext2_dir.c:22` の `EXT2_ERR_NOTDIR`)。B6 / B7 の影響を受けない。
 - KAPI ラッパ (`kapi/kapi_generated.c`) は種別を自分で判定せず、
   `vfs_ls` / `vfs_stat` / `vfs_open` をそのまま呼ぶだけ。
-- `kapi/kapi_db.c:916,935` は `vfs_stat` を直接使う (種別ではなくサイズの確認)。
+- `kapi/kapi_db.c` は `vfs_stat` を直接使う (種別ではなくサイズの確認)。
 - ユーザーランド側の種別判定は `fs_path_kind` / `fs_is_dir` で、これは往復 3 の
   B5 で直した別系統 (`sys_stat` が正)。
 

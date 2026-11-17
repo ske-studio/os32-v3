@@ -25,7 +25,7 @@
 |D2|`hwdev/generated/hwdev_contract.h:2509–2510` の gf5=1768/align4、`hwdev/gf/feature5.h:150–170`|失敗要因は存続。旧2439/2440・feature5:138という参照位置は移動|
 |D3|`sdk/include/os32/os32_gui_shared.h:256,278–288`|Widget=6/value@2、Event=16/value@10 の packed は存続。失敗・例外の実測は未確認|
 |D4 PCI|`include/pci_dev_contract.h:29–46`、`userland/shell/cmd_pci.c:23`|native 数値のコピー。u16 align2/u32 align4なら両targetで40B、bar@12、command@38。PCI config 空間の LE バイト列とは別|
-|D4 boot|`include/bootinfo.h:8–11` は共通 native。`platform/pc98/bootinfo_native.h:5–28`、`bootinfo_wire.h`、`bootinfo_check.c:17–34,83–121` に分離済み|旧 include/bootinfo.h:95 の i386 配置指摘は現所在に合わない（食い違い2）。wire は offset 読み、native の memcpy 解釈ではない|
+|D4 boot|`include/bootinfo.h:8–11` は共通 native。`platform/pc98/bootinfo_native.h:5–28`、`bootinfo_wire.h`、`bootinfo_check.c:17–34,83–121` に分離済み|旧 include/bootinfo.h の i386 配置指摘は現所在に合わない（食い違い2）。wire は offset 読み、native の memcpy 解釈ではない|
 - `arch/README.md` は build/source/target 選択と selected の限界を既に記載。追加は「型幅・整列・byte orderを別々に検査」「module native 配置はtarget毎」だけ。
 - 第3段 §2 A2 と末尾確定に従う。現 shared.h:32–33 の旧 cdecl 定義と A2 設計の差は第3段所有であり、本段で SDK ヘッダを編集しない。
 

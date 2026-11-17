@@ -26,21 +26,21 @@ P3：当日のCRC、main 4後に終了する場合のabort→電源、N1の根�
 | 起動・inspect | 電源を入れ直す→ver・CRC・IDLE・新baseline→inspect を1回。上記像・ROM同定を照合（docs/design/kdebug/gfinit/rom.md、tools/accept/gf_s8.md:38–41）。 |
 | A1 | ユーザー承認→size-bars。BAR長・復元・Command=0102h/BM=0・REC final OK verified=1を確認（docs/design/kdebug/recover_gf.md、tools/accept/gf_s8.md:17–23）。 |
 | A2 | 結果を見せて承認→prepare→新sidでPAUSED。G1・別名応答・98更新を確認。**A2後・main 0前にPSTRAPS読値から組=3を記録済み**を承認前提とする。今回提示されたS8結果にはその記録がないため、下記P2-3の観測手段が整うまでmain 0を承認しない（(記録はアーカイブ)、tools/accept/gf_s8.md:35）。 |
-| main 0→1→2→3 | **A2と同じ起動・同じsessionのPAUSEDの続き**。各表を示し、その1本だけ承認→RUN_ONE→PAUSED→RECと98画面を確認。間にabort・再起動・補助コマンドを挟まない（docs/design/userland/shell/cmd_gfinit.md、kdebug/gfinit.c:373–378、kdebug/recover.c:1230–1255）。 |
+| main 0→1→2→3 | **A2と同じ起動・同じsessionのPAUSEDの続き**。各表を示し、その1本だけ承認→RUN_ONE→PAUSED→RECと98画面を確認。間にabort・再起動・補助コマンドを挟まない（docs/design/userland/shell/cmd_gfinit.md、kdebug/gfinit.c:373–378、kdebug/recover.c）。 |
 | main 4→停止 | DONEのみを静的確認し `run-one <sid> 4 --allow-write`→PAUSED。GPU書込みなし。**A4の前で承認待ち、未承認のverifyを送らない**。同じ立会いで続けない場合は同sidでabort→期待PARTIAL/S0/verified=1→電源再投入。次回A4には全mainの再実行が必要（(記録はアーカイブ)、kdebug/gfinit.c:379–381、tools/accept/gf_s8.md:32–41）。 |
 
 表の読み方：番地はBAR0からのoffset、MMIOは32bit。CR/SRは8bitでindex選択も書込みに含む（選択値は名称末尾、例CR3Cなら3Ch）。CR index/data=6013D4/6013D5h+head×2000h、SR=C03C4/C03C5h+head×2000h（docs/design/hwdev/gf/bus.md、T:587–740）。
-`R(w,b)` は「実機で決まる」旧値を用いる `(old & ~w) OR b`（幅内）。wは変更可能mask、bは設定bits。保持maskとの取り違えに注意（kdebug/recover_gf.c:152–156、kdebug/recover.c:1850–1867）。
-`選択[...]` は `(head0.CR3C & 70h)>>4` の0〜7番を1つ選ぶ。全8値を順に書く意味ではない。許可表は全8組を通し、COPYのverify FFhも計算値との一致だけで組3を強制しない。組違いでもmain 0は別組のPFBを書いて走りきりうるため、A2後の組3記録が承認の前提（docs/design/kdebug/gfinit_decode.md、T:91–152,581、kdebug/recover.c:1925）。
-verify欄の `0` は**実装に書込み直後のreadback照合なし**、一致済みではない。非零Vは `(actual XOR new)&V=0`。値は左欄のnew／退避値／計算結果（kdebug/recover.c:1916–1930）。
+`R(w,b)` は「実機で決まる」旧値を用いる `(old & ~w) OR b`（幅内）。wは変更可能mask、bは設定bits。保持maskとの取り違えに注意（kdebug/recover_gf.c:152–156、kdebug/recover.c）。
+`選択[...]` は `(head0.CR3C & 70h)>>4` の0〜7番を1つ選ぶ。全8値を順に書く意味ではない。許可表は全8組を通し、COPYのverify FFhも計算値との一致だけで組3を強制しない。組違いでもmain 0は別組のPFBを書いて走りきりうるため、A2後の組3記録が承認の前提（docs/design/kdebug/gfinit_decode.md、T:91–152,581、kdebug/recover.c）。
+verify欄の `0` は**実装に書込み直後のreadback照合なし**、一致済みではない。非零Vは `(actual XOR new)&V=0`。値は左欄のnew／退避値／計算結果（kdebug/recover.c）。
 書込み数はRUN phaseの**静的許可行数**（index・全選択肢・PLL内部・SUB/CALL込み、REPEAT未展開）：0/1/2/3=141/229/123/51。実行回数は分岐・反復で異なる。T:38–584のmain_id列を集計（列定義 kdebug/recover_gf.c:213–218）。
-PLL表記は「実機で決まる」：CR3C選択とPLL limits、N/M/P探索、実機から退避した制御値でnewを算出。CORE 200MHz・MEM 400MHz・VIDEO 36MHzが期待、解なしなら無書込み停止。係数=`(N2<<24)|(M2<<16)|(N1<<8)|M1`、補助値=`(saved&keep)|bits`（docs/design/kdebug/gfinit_exec.md、kdebug/gfinit_pll.c:196–244）。
-PLL gate・制御・mirror・powerの書込み順とmaskは `kdebug/gfinit_pll.c:206–242` の列を使用。計算値のreadbackでありPLL lockやVRAM成功とは呼ばない(記録はアーカイブ)。
-COPYは「実機で決まる」：CR3CはPSTRAPSのshift/mask結果を旧CR3Cの保持部分へOR（期待3xh）、1700hは10020Ch読値をshift・mask・xorし旧1700hの保持部分へOR。引数は検査済みplan、式は `kdebug/recover_gf.c:164–175`、生成は `kdebug/gfinit_decode.c:596–604`（docs/design/hwdev/gf/op/copy_nv_reg.md）。
+PLL表記は「実機で決まる」：CR3C選択とPLL limits、N/M/P探索、実機から退避した制御値でnewを算出。CORE 200MHz・MEM 400MHz・VIDEO 36MHzが期待、解なしなら無書込み停止。係数=`(N2<<24)|(M2<<16)|(N1<<8)|M1`、補助値=`(saved&keep)|bits`（docs/design/kdebug/gfinit_exec.md、kdebug/gfinit_pll.c）。
+PLL gate・制御・mirror・powerの書込み順とmaskは `kdebug/gfinit_pll.c` の列を使用。計算値のreadbackでありPLL lockやVRAM成功とは呼ばない(記録はアーカイブ)。
+COPYは「実機で決まる」：CR3CはPSTRAPSのshift/mask結果を旧CR3Cの保持部分へOR（期待3xh）、1700hは10020Ch読値をshift・mask・xorし旧1700hの保持部分へOR。引数は検査済みplan、式は `kdebug/recover_gf.c:164–175`、生成は `kdebug/gfinit_decode.c`（docs/design/hwdev/gf/op/copy_nv_reg.md）。
 
 ## main 0：承認してから1本だけ
 
-含むもの：SUB6(E728 CORE PLL)・SUB7(E754 MEM PLL)、RESET（184Ch退避→0F00hクリア→PMC2段書込み・10µs→184Ch復元→1850h=0）。CALL/REPEATなし。SR01 bit5をhead1→head0で立てる。98表示は変化しないはずだが、PMC/strap/PLLの変更で異常は起こりうる（docs/design/hwdev/gf/op/reset.md、T:43–55,531–532,551–571,580、kdebug/gfinit_decode.c:606–616）。
+含むもの：SUB6(E728 CORE PLL)・SUB7(E754 MEM PLL)、RESET（184Ch退避→0F00hクリア→PMC2段書込み・10µs→184Ch復元→1850h=0）。CALL/REPEATなし。SR01 bit5をhead1→head0で立てる。98表示は変化しないはずだが、PMC/strap/PLLの変更で異常は起こりうる（docs/design/hwdev/gf/op/reset.md、T:43–55,531–532,551–571,580、kdebug/gfinit_decode.c）。
 
 | 書込み先（幅） | 値／決め方（同じ先は列記順、条件skipあり） | verify mask | 根拠（規則；target） |
 |---|---|---|---|
@@ -190,11 +190,11 @@ COPYは「実機で決まる」：CR3CはPSTRAPSのshift/mask結果を旧CR3Cの
 
 | 項目 | 承認時・実行後に確認する内容 |
 |---|---|
-| main 0/1/2/3 共通の時間見込み | 実測秒数は未確認。**trial全体（A2＋各main＋続けるA4）の送信除外実行時間の合計60秒**と、各RUN_ONEの60秒の2枠がある。spentは各callをまたいで積算し、PAUSED待ちは除外。各mainの待ち累計5秒・動的4096上限は別。A2と各main直後にノートで開始→PAUSEDの壁時計経過・累計を記録し、UART込みの観測値をゲストspentと同一視しない（kdebug/recover.c:740–751,1084–1090,1169、kdebug/recover_profile.c:85–87、kdebug/recover.h:90、kdebug/gfinit_exec.c:5–24、kdebug/gfinit.c:109–114）。 |
+| main 0/1/2/3 共通の時間見込み | 実測秒数は未確認。**trial全体（A2＋各main＋続けるA4）の送信除外実行時間の合計60秒**と、各RUN_ONEの60秒の2枠がある。spentは各callをまたいで積算し、PAUSED待ちは除外。各mainの待ち累計5秒・動的4096上限は別。A2と各main直後にノートで開始→PAUSEDの壁時計経過・累計を記録し、UART込みの観測値をゲストspentと同一視しない（kdebug/recover.c、kdebug/recover_profile.c:85–87、kdebug/recover.h:90、kdebug/gfinit_exec.c:5–24、kdebug/gfinit.c:109–114）。 |
 | UART込みの期限 | 9600bpsではログが支配しうる。B=(128+12×plan.node_count+4×plan.arg_count)×(RECOVER_ROW_MAX+1)、Tlog=2×ceil(B×frame_bits/actual_baud)+3秒。**hostの `--timeout` は ceil(60+Tlog) 秒を明示**し、各呼出しに同じ保守的上限を使う。既定60秒は使わない。B/Tlogの当日plan根拠をノートへ渡せない場合は推測で開始せず、算定値の記録を用意する。host壁時計枠を延ばしてもゲストtrialの残り実行時間は増えない（kdebug/gfinit.c:261–286、tools/rshell_recover.py:95–108,197）。 |
-| 1命令・内部操作ごとの確認 | safe pointのabort/期限、expected node・phase/main・head、許可先/幅/値式/変更mask、BEGIN送信、実アクセス、非零verify maskの比較、END、正しい次edge。未知命令・未知書込み・予定外の順序・readback不一致・bus/log失敗は後続停止（kdebug/gfinit_exec.c:80–126、kdebug/recover.c:1850–1867,1904–1934）。 |
+| 1命令・内部操作ごとの確認 | safe pointのabort/期限、expected node・phase/main・head、許可先/幅/値式/変更mask、BEGIN送信、実アクセス、非零verify maskの比較、END、正しい次edge。未知命令・未知書込み・予定外の順序・readback不一致・bus/log失敗は後続停止（kdebug/gfinit_exec.c:80–126、kdebug/recover.c）。 |
 | RUN_ONE自身が失敗した終端 | 読戻し不一致・未知書込み等はfail→cleanupを自動実行。期待は `result=FAIL target=S0 unknown=1`、S0復帰成功時だけ `verified=1`、失敗なら0。trialには原因、lost_linesも保存。終端を受けたらabortを重ねず98を目視して電源再投入へ。終端不着は下記応答なし経路（kdebug/recover.c:369–376,1048–1063,1249–1251）。 |
-| N1・全mainの保持 | cfg50/54・PBUS1850/1854は32bit全maskで0。各RUN境界にもzero guard、E81E前後は4先を照合。E81EのSR01自身はverify mask=0なので「解除readback合格」と報告しない。安全の根拠はcfg50h=0でGF出力を止め、4a中は0FAChが98表示のままであること（docs/decisions/realhw/GF6200_4A_DESIGN.md、kdebug/recover_gf.c:15–19、kdebug/recover.c:1676–1692,1994–2011、T:521–522）。 |
+| N1・全mainの保持 | cfg50/54・PBUS1850/1854は32bit全maskで0。各RUN境界にもzero guard、E81E前後は4先を照合。E81EのSR01自身はverify mask=0なので「解除readback合格」と報告しない。安全の根拠はcfg50h=0でGF出力を止め、4a中は0FAChが98表示のままであること（docs/decisions/realhw/GF6200_4A_DESIGN.md、kdebug/recover_gf.c:15–19、kdebug/recover.c、T:521–522）。 |
 | main 0の追加確認 | A2後に記録したPSTRAPSから組3を確認し、COPY直後CR3C=3xhも確認する。COPY照合は組3を保証せず、実行後の組違い発見では既にPFB書込み済み。組3の100220=03080E0Bh・100224=05010405h・100228=20220303h・10022C=41088102h・100234=00266622hは予定値であり、verify=0を照合済みと扱わない（docs/design/hwdev/gf/bus.md、T:91–143,581）。 |
 | P2-3：組3を読み取りだけで記録する手段 | PSTRAPSの32bit読値x・導出組=`(x>>2)&7`・同sid/起動をRECに残す（docs/tasks/realhw/GEFORCE6200_VBIOS.md:248–249）。kpeekは任意番地を読めるがPAUSED門で拒否、A2 snapshotはBARのみ、prepare固定列にもPSTRAPS読取はないため、**現行の口ではA2後の必要記録を取得できない**（kdebug/kdebug_main.c:130–142、kdebug/recover_gf.c:119–123,305–315）。必要なのはA2前処理完了後・PAUSED帰還前に、recover管理下でBAR0+101000hを32bit読取りし値と導出組をRECへ残す観測処理。実装・検証は別作業、今回は追加しない。過去の冷間値やA2前のpeekで代替せず、記録なしならmain 0を開始しない。 |
 | main 3のDRAM詳細 | SUB8はCR44を0へ戻し、条件により1002CC/2C4のbit0をset→clear、bit6をset→clear、1002C8/2C0のbit8をset→clear。組・条件は実機CR3Cから決まる。DRAMの状態と内容が変わり、失敗時は98が維持されてもS1復元不可、電源再投入で戻す（docs/design/kdebug/recover_common/s0.md）。10020Chには書かず、COMPUTE_MEMは容量を生成しない（T:533–549,584、docs/design/hwdev/gf/op/compute_mem.md）。 |

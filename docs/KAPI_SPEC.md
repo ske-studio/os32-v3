@@ -599,7 +599,7 @@ FD 起動の辞書なしは `SQLITE_ONLY` とし、recover-settings のため `d
 - **1 group = 1 接続 = 1 回の open**。開くのは `os32_sqlite_group_open` だけで、URI (`SQLITE_OPEN_URI`・`file:`) による VFS の差し替えは SQLite に渡す前に断る。default VFS からの所属無しの file open は fail-closed (`SQLITE_CANTOPEN`)。main / journal / 一時ファイルなど、実際に開いた FD は全部その group に属し、open の途中 (OPENING) から所属する。
 - SQLITE の FD は通常の `vfs_close`・`vfs_close_owned`・`vfs_fd_set_protect` では閉じない・外さない。閉じるのは xClose の lease 経由だけ。
 - `db_*` (KAPI) は EXEC group を呼び手の owner で取り、`exec_cleanup_owned_resources` (`db_cleanup_owned`) はその owner の EXEC group だけを閉じる。FEP・settings など常駐側は RESIDENT group を使い、アプリの終了で触られない。
-- `os32_sqlite_group_finish` が FREE に戻すのは「`sqlite3_close` OK・その group の FD が 0・xClose / lease の sticky な失敗無し」のときだけで、どれかが外れたら QUARANTINED にして再起動まで残す。KAPI の `db_close` では未 commit の ROLLBACK の失敗も QUARANTINED にする。`sqlite3_finalize` が評価エラー (制約違反など) を返しても statement は消えているので、それだけでは隔離しない (エラーは `db_last_error` に残り、close と回収が済めば FREE、`kapi/kapi_db.c:590`・`kernel/ime/ime_dict.c:428`)。RESIDENT のいずれかが QUARANTINED の間は RESIDENT の新しい acquire を `SQLITE_BUSY` で断る (残る slot を借りて標準起動を続けない)。
+- `os32_sqlite_group_finish` が FREE に戻すのは「`sqlite3_close` OK・その group の FD が 0・xClose / lease の sticky な失敗無し」のときだけで、どれかが外れたら QUARANTINED にして再起動まで残す。KAPI の `db_close` では未 commit の ROLLBACK の失敗も QUARANTINED にする。`sqlite3_finalize` が評価エラー (制約違反など) を返しても statement は消えているので、それだけでは隔離しない (エラーは `db_last_error` に残り、close と回収が済めば FREE、`kapi/kapi_db.c`・`kernel/ime/ime_dict.c:428`)。RESIDENT のいずれかが QUARANTINED の間は RESIDENT の新しい acquire を `SQLITE_BUSY` で断る (残る slot を借りて標準起動を続けない)。
 - 起動時は settings が RESIDENT 1 本を acquire → open (RO) → close → finish で返してから FEP を始める。FEP は辞書 RO と学習 RW に RESIDENT 2 本を使う (学習無効時は辞書の 1 本)。3 本目は切り替え時の一時 probe に使う (`kernel/ime/ime_dict.c`)。
 
 | Offset | フィールド | プロトタイプ |
@@ -860,7 +860,7 @@ v46 はそれを**カーネル内の 8KB のリング (シンク)** に溜め、
 - **宣言なしは断る (D1a)**: GUI 中に `OS32X_FLAG_GFX` (`mkos32x --gfx`) の立っていない CPL=3 が
   `gfx_init` / `gfx_init_200` を呼んだら、本体を呼ばずに拒否する。
   `gfx_init_reject_count` に加算して `appslot_abort_request()` で中断を要求し、
-  syscall 出口の `ring3_abort_check()` でアプリを畳む (`exec/appslot.c:839`)。
+  syscall 出口の `ring3_abort_check()` でアプリを畳む (`exec/appslot.c`)。
   `gfx_init` は `void` なので戻り値では知らせられない。CUI 中は宣言を要求しない。
 - 非シェルの外部プログラムは CPL=3 で動く。撤去済みの `OS32X_FLAG_FORCE_CPL0`
   は既知フラグに含まれず、入口で拒否される (`exec/os32x_hdr.c:6`)。
@@ -1123,7 +1123,7 @@ v46 はそれを**カーネル内の 8KB のリング (シンク)** に溜め、
   #PF は起きない。帯の検証だけでは止まらない。
 - `ring3_user_ranges_writable` は `caller_access_get_user` で syscall 入口の呼び手を
   取得し、2 本の出力をそれぞれ `check_caller_write_range` で検査する
-  (`exec/exec.c:846`)。呼び手の AS と B1 台帳に基づくページ単位の検査で、
+  (`exec/exec.c`)。呼び手の AS と B1 台帳に基づくページ単位の検査で、
   検査のための master CR3 への切替は行わない。caller の検証契約は §3-3 を参照。
 
 ### PCI 結線の診断 (v60)
@@ -1496,7 +1496,7 @@ LBA28、無ければ word 53 bit0 の現在の CHS、それも無ければ既定
   変わらない)。`vfs_resolve_path` は長さ・成分数の超過を切り詰めず
   `VFS_ERR_NAMETOOLONG` で拒否する (詳細は [06_filesystem.md](06_filesystem.md) §6-1)。
   DB 側は解決前にも `db_resolve_fits` で長さと成分数を保守的に検査し、
-  超過や解決失敗は `SQLITE_CANTOPEN` で断る (`kapi/kapi_db.c:907`)。
+  超過や解決失敗は `SQLITE_CANTOPEN` で断る (`kapi/kapi_db.c`)。
   また `<絶対名>-journal` が下位層の path 容量 (`VFS_MAX_PATH` = 256B、SQLite の
   `mxPathname` も 256) に収まることを別に検査し、超過は open 前に
   `SQLITE_CANTOPEN` で断る。RW は `PRAGMA journal_mode` が `delete` で

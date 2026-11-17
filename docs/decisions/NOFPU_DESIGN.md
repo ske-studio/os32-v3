@@ -15,7 +15,7 @@
 
 | file:line | 確認結果と設計への反映 |
 |---|---|
-| `arch/x86/kernel/boot_after_paging.c:9` | EM/TS を無条件解除。probe 結果で確定する処理へ置換 |
+| `arch/x86/kernel/boot_after_paging.c` | EM/TS を無条件解除。probe 結果で確定する処理へ置換 |
 | `arch/x86/kernel/x87.c:12` | 初手のメモリ宛て FNSTSW を AX 宛てに変更、probe 中の限定 #NM 復帰を用意 |
 | `arch/x86/kernel/x87.c:19` | save/restore/init は現在 present guard 内。absent 側へ software state 操作を追加 |
 | `platform/pc98/kernel_boot_memory.inc:97` | paging 後、SQLite より前に probe を完了させる |

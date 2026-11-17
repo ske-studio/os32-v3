@@ -27,7 +27,7 @@
 
 |番号|実物の確認|設計への反映|
 |---|---|---|
-|X1|idle_workはIF/EE=1・IRQ深さ0限定、再入禁止、最大4本を1周。優先・期限・予算なし（kernel/idle_work.c:6,12,26）。sys_halt以外に入力待ち・syscall入口・協調切替から呼ぶ（kernel/sys.c:42、drivers/input/kbd.c:736,774,800、exec/exec_syscall.inc:94、exec/exec_schedule.inc:150、net/link.c:64のLINK_IDLE、net/nic.c:151のnet_tx末尾）|協調点はこれら全体。現登録者はNE2K・NIC RX・TSC校正の3種類|
+|X1|idle_workはIF/EE=1・IRQ深さ0限定、再入禁止、最大4本を1周。優先・期限・予算なし（kernel/idle_work.c:6,12,26）。sys_halt以外に入力待ち・syscall入口・協調切替から呼ぶ（kernel/sys.c:42、drivers/input/kbd.c、exec/exec_syscall.inc:94、exec/exec_schedule.inc:150、net/link.c:64のLINK_IDLE、net/nic.c:151のnet_tx末尾）|協調点はこれら全体。現登録者はNE2K・NIC RX・TSC校正の3種類|
 |X2|NE2Kの8件/120µsはFG1のdemux（net/rx_work.c:17,24、net/nic.c:225）。ne2k_bh内で共有（drivers/net/ne2000/ne2000.c:523,553）。IRQは印付け（ne2000_irq.inc:54）|論点4の「IRQ内なのでTier外」は採らず、FG1予算をTierと合成|
 |X3|PCMはIRQ10から補充（drivers/sound/cs4231/pcm_cs4231.c:478）、IRQ0のpcm_tick救済も残る（:411,437,484）|T3は全面的なIRQ10専用化ではない。当面は両経路をTier外の装置保証として保存|
 |X4|e82557にはidle不足2jiffyでIRQ0のdemux救済がある（net/nic.c:298）。同箇所に独立のpending判定は無い|「IRQでは要求記録のみ」は現状の例外を伴う。今回この救済を削らない|

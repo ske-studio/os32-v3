@@ -23,7 +23,7 @@ r5 は main `4bb31fe` の再照合 (`~/os32-tmp/run/t5recheck/RECHECK.md`・`TIC
 | e11 公開版・4世代を後で照合 | 吸収済み (T2/DBGREF) | `sdk/kapi.json:2`、`:3`: format=4、KAPI ABI=1、memory=4、shlib=2、機能版76。更新時は生成値で照合する |
 | 専用module核・生成器・リンカ | T4で実装済み | `kernel/module/module_runtime.c`・単一schema・mkmod・PAIR必須のPOST_ROOT SQLiteを拡張する。核の再新設はしない (§2) |
 | SQLite分離とroot順 | T4実績へ更新 | SQLiteはowner割当の部品へ移行済み。root → PG/台帳の順は維持、U19の前倒しは作らない (§5) |
-| B1 checked copy と B3/B4・F2/F3 は別 | 維持 | `docs/archive/v3/TASK_T2D_T2H.md:94,587`。`db_exec` の切捨て・finalize先行は `kapi/kapi_db.c:610`。旧SQL入口も含む拒否時不変契約は§3-1・§9 |
+| B1 checked copy と B3/B4・F2/F3 は別 | 維持 | `docs/archive/v3/TASK_T2D_T2H.md:94,587`。`db_exec` の切捨て・finalize先行は `kapi/kapi_db.c`。旧SQL入口も含む拒否時不変契約は§3-1・§9 |
 | 512KiB単一MEMSYS5・FEP優先取り分 | T4実績・予約方針更新 | FEP予約は既定192KiB、下げる向きの上書きも可、下限は実測の最大。APP+SYSTEM上限319,488Bは既定時の値。全outerの代替stackとRESIDENT groupを維持 |
 | FEP予約量・S/M/L最大負荷 | T4実績を継承 | §7-2のhost値と受入一式を区別。T5-0aでゲストstackを測定し、未測定経路を記録 |
 | LAN/82557の移設範囲 | 更新 | TX/RX/IRQ・BOUNDとLB-3・LAN版/host実機受入済み (`drivers/net/e82557/e82557.c:377,700,729,793`、`docs/tasks/realhw/TASK_LAN_82557.md:3`)。T5c-4で移設回帰。LB-4まで完了とはしない |
@@ -62,7 +62,7 @@ T2dのB1とT4のB3/B4を維持し、FEP追加は既存module/import生成入力�
 | E11-A2b | T4b-7でraw KAPI待ち利用者の明示ゲスト試験 | kbd/IME/serial/FMの待ち、CUI/GUI STOP、通常完了、内部ログ中は中断しない対照。B4のengine中断禁止と一緒に確認 |
 | X-1 (本票分) | T4b-1でDB文字列、T4b-8で残るNUL入力とkprintf可変引数、T5a-1でFEP文字列 | ページ0のNP化はT7。残る全公開文字列口の一覧を作りB1済み/今回/他票を対応させ、DB/FEPだけでX-1全体を閉じない |
 
-X-11の出発点は `~/os32-tmp/evidence/2026-10-07/audit-classification.md:33,43,57,60`。現在は全体の直前exec結果 (`exec/exec.c:2190`)、先着単一reader (`kernel/console/con_sink.c:251`)、WMへ実ownerを渡す入口 (`kernel/gui.c:66`)、共有FEP (`kernel/ime/ime.c:603,641,715,767,850,891,912`) である。今回の方針案は、単一利用者の共有サービスという意味を保ち、正常な利用順・無効値・取消・出力寿命を明文化すること。本人別の結果保存や新しい権限表を自動追加しない。共有入力を二重消費する反例が出た場合は既存のWM/前景配送との接続で解消可能か確認し、契約選択が残るものは個別の契約判断へ送る。T5aではGUIRUNKEY-1の端末/起動連鎖への配送、IMECAND/IMEINDと終了中STOPを回帰し、証拠なしに台帳を閉じない。
+X-11の出発点は `~/os32-tmp/evidence/2026-10-07/audit-classification.md:33,43,57,60`。現在は全体の直前exec結果 (`exec/exec.c`)、先着単一reader (`kernel/console/con_sink.c:251`)、WMへ実ownerを渡す入口 (`kernel/gui.c:66`)、共有FEP (`kernel/ime/ime.c`) である。今回の方針案は、単一利用者の共有サービスという意味を保ち、正常な利用順・無効値・取消・出力寿命を明文化すること。本人別の結果保存や新しい権限表を自動追加しない。共有入力を二重消費する反例が出た場合は既存のWM/前景配送との接続で解消可能か確認し、契約選択が残るものは個別の契約判断へ送る。T5aではGUIRUNKEY-1の端末/起動連鎖への配送、IMECAND/IMEINDと終了中STOPを回帰し、証拠なしに台帳を閉じない。
 
 ### 1-3. X-1 公開 NUL 入力・可変引数の担当表
 
@@ -178,7 +178,7 @@ D27の「512KiBの単一MEMSYS5」は維持する。`cache_size`やsoft limitだ
 
 辞書切替が起動時予約を超える場合は設定だけ保存し再起動要求、現在の辞書を保つ。アプリopen上限、割当拒否、FEP使用量を診断し、FEPを任意省略してメモリ試験を通さない。
 
-負荷fixtureのUSER mallocはSQLite MEMSYS5と別計上する。shellのexec_heap256KiB固定分割 (`exec/exec.c:1638`) とSDK副arena最小64KiB (管理頁込み、失敗時は旧丸め量で再試行、`sdk/allocator/nano_adapter.c:260`) を使い、既存sbrk/exec_heap採取を再利用する。F-9のO(N)・extent上限・reallocはT4で再設計しない。
+負荷fixtureのUSER mallocはSQLite MEMSYS5と別計上する。shellのexec_heap256KiB固定分割 (`exec/exec.c`) とSDK副arena最小64KiB (管理頁込み、失敗時は旧丸め量で再試行、`sdk/allocator/nano_adapter.c:260`) を使い、既存sbrk/exec_heap採取を再利用する。F-9のO(N)・extent上限・reallocはT4で再設計しない。
 
 ### 3-4. 必須サービスを一括公開するboot transaction
 
@@ -256,7 +256,7 @@ gfxの副作用のない識別・resource記録はcoreに残す案とする。R7
 
 KCG移設でもUnicode探索はcoreに残す。撤去済みleaseや表ポインタimportを復活させない。低位 `MEM_KCG_LZ4_TEMP_BASE/END` はT7aまでFIXEDのまま (`include/memmap.h:118`、T3補遺)。font close→BB/mailbox初期化→USER公開を守り、splash/V86回収で一般池へ返さない。
 
-h4は既存の低位/物理32MiB超USER bufferでext2/HostDrv往復とowner回収を行う (`kdebug/kselftest.c:1012,1182`)。移設後もS4 VFS/DMA importはcore facade経由で保ち (:1717,1845)、依存が使える時点で同fixtureを回す。HostDrvはcoreの現行順を保ち、h4のSKIPを成功に数えない。DMA境界検査のtransfer=none (:1175) はPCM/FDC実転送の証拠ではない。
+h4は既存の低位/物理32MiB超USER bufferでext2/HostDrv往復とowner回収を行う (`kdebug/kselftest.c`)。移設後もS4 VFS/DMA importはcore facade経由で保ち (:1717,1845)、依存が使える時点で同fixtureを回す。HostDrvはcoreの現行順を保ち、h4のSKIPを成功に数えない。DMA境界検査のtransfer=none (:1175) はPCM/FDC実転送の証拠ではない。
 
 T6b-1/2は凍結。圧縮像が508KiBの8割の406.4KiB (≈416kB) に近づいたら起票する。T6b-MのFD容量対策は継続する。
 
@@ -274,7 +274,7 @@ T5の順は **T5-0a → T5-0b → T5a-1/2/3 → T5b-4 (縮小) → T5c-0 (前倒
 | T4a-2 (1日) | VA0 SQLite prototype・import生成・reloc量測定 | ①未解決/外部data/不支持relocを生成拒否 ②非整列正常relocは成功、末尾−2/BSS/重複/import交差は書込0 ③base加算overflow拒否 ④実画像/body/prefix/件数と上限を確定。境界緩和変異を検出。SQLite専用importを別生成し、KDEBUG S4正常像を対照にする (§2-1)。 |
 | T4a-3 (1日) | MEMSYS5 hook/タグ方式のhost prototype | ①HEAP→GETMALLOC→MALLOCの実allocatorを通る ②realloc失敗で旧block内容/勘定不変 ③別文脈freeと表満杯で漏れ0 ④heap+タグ総量≤512KiB。タグ/丸め勘定削除変異を検出 |
 | T4a-4 (1日) | 最大負荷S/M/Lの取り分測定fixture | ①app sort/prepareで上限到達後も各辞書1語変換/学習が通る ②全辞書切替で最大一時量を記録 ③予約超えは旧辞書保持＋再起動要求 ④共通予約・APP上限・最大連続要求を数値化。APP割当門削除で対照が崩れる。USER mallocとMEMSYS5を分け、既存sbrk/exec_heap採取を使う (§3-3)。 |
-| T4a-5 (1日) | module record・load/start/abort共通核 | ①全確保点失敗でowner/page/FDが開始前へ ②init完了前はexport未公開 ③prefix返却後もexport/dependencyが有効 ④満杯/二重abortで二重freeなし ⑤未停止参照は隔離。先行公開/無条件free変異を検出。KDEBUG OFFはload/owner0、ONはRUNNING・自己試験実行を確認 (`platform/pc98/kernel.c:594,669,672`)。 |
+| T4a-5 (1日) | module record・load/start/abort共通核 | ①全確保点失敗でowner/page/FDが開始前へ ②init完了前はexport未公開 ③prefix返却後もexport/dependencyが有効 ④満杯/二重abortで二重freeなし ⑤未停止参照は隔離。先行公開/無条件free変異を検出。KDEBUG OFFはload/owner0、ONはRUNNING・自己試験実行を確認 (`platform/pc98/kernel.c`)。 |
 | T4b-1 (0.5日) | B3のcopy核・3入口の拒否時不変契約 (§9 決定済み) | ①1023B+NUL成功、1024B+NUL/未終端/guard跨ぎ失敗 ②copy拒否でengine進入0・ファイル不変 ③出力はleave後。finalize先行/切捨て変異を検出。stmt/slot/SHMは拒否時不変に固定し、3入口の拒否→stepと資源回収を対照試験する。核だけの合格を公開接続の受入にしない |
 | T4b-2 (1日) | engine guard・sqlite_stack.asm・例外/STOP接続 | ①全outerのESPが128KiB stack内で戻りregister/IF一致 ②再入/IRQ/IF=0 I/Oは副作用前拒否 ③engine中faultはfail-stop、app-kill/cleanup0 ④STOPはleave後に1回 ⑤通常VFS callbackのactive連続。guard迂回/早期STOP変異を検出。EXECNESTのcaller/TSS.ESP0保持とCPL0のESP切替を区別 (§3-1)。 |
 | T4b-3 (1日) | F2 group/lease・KAPI/IME/boot利用者 | ①RESIDENT2slotをsettings返却→FEPで再利用 ②所属無しopen拒否 ③遅延journalは同group ④別DB親子/同ownerのT01/T02/T07/T12で子だけ回収 ⑤close失敗は隔離・再利用なし。現ownerへの誤帰属変異を検出 |

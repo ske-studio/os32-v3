@@ -238,7 +238,7 @@ int hsp_set_fep_user_path(const char *absolute_path); /* 正規化済み設定�
 # ime_dict_info — 辞書メタ情報を返す KAPI の詳細設計 r1
 2026-11-05 / Codex（実行モデル ID は取得不能。gpt-6-astra と断定しない）。
 対象は返却口だけ。リポジトリ編集・ビルド・試験・配備は未実施。
-根拠は `/home/hight/os32-v3` の `docs/decisions/fep/DICT_META_DESIGN.md` §2・3・5・6、`docs/tasks/fep/TASK_DICT_META.md:106`。
+根拠は `/home/hight/os32-v3` の `docs/decisions/fep/DICT_META_DESIGN.md` §2・3・5・6、`docs/tasks/fep/TASK_DICT_META.md`。
 追加規約は `docs/KAPI_SPEC.md` §3-1・3-3、`.claude/skills/os32-kapi-add/SKILL.md`、`docs/CONSTRAINTS.md` [C1]〜[D4]・[ABI]。
 
 ### 1. 公開契約

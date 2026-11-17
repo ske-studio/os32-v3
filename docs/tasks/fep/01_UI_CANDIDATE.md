@@ -51,7 +51,7 @@ typedef struct {
 - テキストモード実装 (`ime_render_tvram.c`): 既存の `tvram_putchar_at` / `tvram_putkanji_at` / `unicode_to_jis` をラップ。
 - 将来のグラフィックモード実装 (`ime_render_gfx.c`): GVRAM プレーンへの直接ビットマップ転送 (`05_GFX_MODE.md`)。
 
-`kernel/ime/ime.c:592` で TVRAM 実装を選択する。描画表の定義は `kernel/ime/ime_render.h:10`。
+`kernel/ime/ime.c` で TVRAM 実装を選択する。描画表の定義は `kernel/ime/ime_render.h:10`。
 
 ### 1.2 状態機械の明確化
 

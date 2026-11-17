@@ -2,7 +2,7 @@
 > 状態: **現行 (2026-10-30)** — 出所: GF_DRIVER_DESIGN (2026-10-29 確定、D0 で移した)
 ソース: `platform/pc98/kernel.c`
 
-**`GFX=geforce` は `GUI≠1` のとき許す**（F5・N4）。起動予約前に既存の設定読取りで判定し、GUI=1 なら拒否して pc98 を選ぶ。GUI 省略時は既定値 0（`platform/pc98/kernel.c:521`）。最初の `gfx_init`（GUI または CUI の描画アプリ）で、承認待ち無しに devinit を一度行う（N5、`gfx/gfx_core.c:960,1014`）。
+**`GFX=geforce` は `GUI≠1` のとき許す**（F5・N4）。起動予約前に既存の設定読取りで判定し、GUI=1 なら拒否して pc98 を選ぶ。GUI 省略時は既定値 0（`platform/pc98/kernel.c`）。最初の `gfx_init`（GUI または CUI の描画アプリ）で、承認待ち無しに devinit を一度行う（N5、`gfx/gfx_core.c`）。
 
 ## 内部設計と契約 (D1)
 
@@ -34,6 +34,6 @@ shell.bin と gshell.bin はどちらもシェル帯 (0x300000, Level 1) に常�
 - 切替のたびにシェル帯は作り直されるので、退避・復元は無い。CUI シェルの履歴・環境変数は
   `.profile` から再構築される (v1 の割り切り)。
 
-- platform/pc98/kernel.c:590 の予約、:640 の prepare は :642 の cirrus_module_load より先。未登録 Cirrus（drivers/video/cirrus/cirrus_module.c:16）は modes=NULL のまま skip し、probe/enable を追加しない。
+- platform/pc98/kernel.c の予約、:640 の prepare は :642 の cirrus_module_load より先。未登録 Cirrus（drivers/video/cirrus/cirrus_module.c:16）は modes=NULL のまま skip し、probe/enable を追加しない。
 
 > [要確認] 現行 platform/pc98/kernel.c は gfx_boot_reserve() → gfx_prepare_backend() → cirrus_module_load() の順。原文の旧行番号は写していない。

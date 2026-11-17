@@ -19,7 +19,7 @@ struct hwdev_ops {
                        const struct recover_ops *base,
                        struct recover_transport *transport,
                        const struct recover_profile *s0);
-    /* G1: gfinit_call (kdebug/gfinit.h:20-21) と同じ 6 引数。wrapper は名前を変えずに素通しする
+    /* G1: gfinit_call (kdebug/gfinit.h) と同じ 6 引数。wrapper は名前を変えずに素通しする
        (GF は transport と S0 profile を受けて開始する、gfinit.c:154) */
     void (__cdecl *release_work)(void); /* cleanup 後のみ、HW 操作なし */
 };

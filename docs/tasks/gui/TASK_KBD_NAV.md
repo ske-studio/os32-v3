@@ -8,7 +8,7 @@
 
 ## 0. 事実 (2026-09-25 の調査、ファイル:行)
 
-- キーは IRQ1 → raw リング → gshell `capture_keyboard` (`userland/gshell/src/input.rs`)。1 件 = `scan | down<<8 | mods<<9`。mods の並びは `drivers/input/kbd.h:131-135` (SHIFT 01 / CAPS 02 / **KANA 04** / GRPH 08 / CTRL 10)。修飾キー自身 (0x70-0x74) は Key として配らない (input.rs:349)。
+- キーは IRQ1 → raw リング → gshell `capture_keyboard` (`userland/gshell/src/input.rs`)。1 件 = `scan | down<<8 | mods<<9`。mods の並びは `drivers/input/kbd.h` (SHIFT 01 / CAPS 02 / **KANA 04** / GRPH 08 / CTRL 10)。修飾キー自身 (0x70-0x74) は Key として配らない (input.rs:349)。
 - 振り分けの順: X4 の退避判定 (input.rs:317) → 修飾 → CTRL+STOP → SHIFT+SPACE (FEP) → modal (input.rs:377) → startmenu → (窓なし) standalone → FEP → 最前面の窓。
 - マウスは `capture_mouse` がキーボードを読み切った**後に 1 回**、`mouse_poll` の現在値と `prev_buttons` の差分でエッジを作る (input.rs:454-)。X4 では WM の領分のエッジを保留して `prev_buttons` を進めない (input.rs:551)。全画面 GFX 中はマウスを誰にも配らない (input.rs:466)。
 - **カナ**: `drivers/input/kbd.c:299` は **make でだけ状態を反転**し break を無視する (CAPS も同じ)。OS32 のどこもカナの状態を使っていない。修飾の現在値は KAPI `kbd_get_modifiers` で読める。

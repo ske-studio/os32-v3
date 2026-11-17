@@ -33,8 +33,8 @@
 |---|---|
 | §2: パレット1、4行、100件 | 一致。`platform/pc98/boot_splash.c:15,29,44,177`。行は0,4,…,396。 |
 | §2: 4プレーンへ描画 | 一致。`platform/pc98/splash.c:30,40`。借用 BB を使用する。 |
-| §2: 120µs待ちで再生 | 差異 D1: palette-only と flip 経路は `line` を読まず、各イベント後に120µs待つ。`drivers/video/pc98/gfx_vram.c:421,464`。不等間隔・同一行複数件を現APIへ渡すだけでは再生できない。 |
-| 同上、初回と継続の扱い | 差異 D2: non-flip の dirty 初回は400行各々で待つ（最低48ms）、以後は100件各々（最低12ms）。`drivers/video/pc98/gfx_vram.c:446,460,464`。I/O・転送・IRQ時間は別に加算される。 |
+| §2: 120µs待ちで再生 | 差異 D1: palette-only と flip 経路は `line` を読まず、各イベント後に120µs待つ。`drivers/video/pc98/gfx_vram.c`。不等間隔・同一行複数件を現APIへ渡すだけでは再生できない。 |
+| 同上、初回と継続の扱い | 差異 D2: non-flip の dirty 初回は400行各々で待つ（最低48ms）、以後は100件各々（最低12ms）。`drivers/video/pc98/gfx_vram.c`。I/O・転送・IRQ時間は別に加算される。 |
 | §2: 最大200件 | 一致。ただし SDK の1件は8B、コメントは2行単位推奨。`sdk/include/os32/os32_kapi_shared.h:623`。200は容量上限であり時間予算ではない。 |
 | §2: 標準 planar 強制 | 一致。希望値を保存→PC98選択→init→希望値復元。`platform/pc98/splash.c:13`。 |
 | §2: 終了時復帰 | 一致。両ページ消去→shutdown→既定パレット→テキスト消去。過去の任意パレットの保存復元ではない。`platform/pc98/boot_splash.c:253`。 |
@@ -42,7 +42,7 @@
 | §9: 標準出力モードが未決 | 差異 D3: 31kHz既定は決定済み。`docs/decisions/realhw/RA266.md:48` に09a8=81の観測。未確定なのは実行時判定と位相。 |
 
 - 差異は上表の3件（D1・D2は草案の現行説明への訂正、D3は前提更新）。未測定値は差異に数えない。
-- 現行はテキストGDCのVSYNC入りを待ってからグラフィックGDCの抜けを待つ（`drivers/video/pc98/gfx_vram.c:418,420`）。抜け＝可視行0とはまだ証明されていない。
+- 現行はテキストGDCのVSYNC入りを待ってからグラフィックGDCの抜けを待つ（`drivers/video/pc98/gfx_vram.c`）。抜け＝可視行0とはまだ証明されていない。
 - `cpu_delay_us()` は校正済みループの整数待ちで、IRQ処理時間を補償しない（`kernel/time/cpu_calibrate.c:134`）。校正は起動初期に実施済み（`platform/pc98/kernel_boot_cpu.inc:68`）。
 
 ## 2. 段0: 計測の設計
@@ -225,7 +225,7 @@ void pc98_splash_raster_reset(void); /* gfx_initで未判定化、gfx_shutdown�
 | D1 / 3 | `build/assets.mk`、権利の問題の無い試験原画の変換ルール | T1後、原画選定待ちなし |
 | D2 / 3 | `userland/deploy.yaml`、dataで配布登録 | D1後、packages.yamlは変更不要 |
 
-- N5 段の依頼の注記: L0で `drivers/video/pc98/gfx_vram.c:362-382` の注記、SDKの「2ライン単位推奨」（`os32_kapi_shared.h:620`）、KAPI説明を新しい行位置・間隔・同期失敗時の契約に合わせる。型・番号は維持し、生成物の説明は正典から再生成する。
+- N5 段の依頼の注記: L0で `drivers/video/pc98/gfx_vram.c` の注記、SDKの「2ライン単位推奨」（`os32_kapi_shared.h:620`）、KAPI説明を新しい行位置・間隔・同期失敗時の契約に合わせる。型・番号は維持し、生成物の説明は正典から再生成する。
 - N6 段の依頼の注記: GF_ACCELと共有する `build/kernel.mk`・`drivers/video/pc98/gfx_vram.c`・`platform/pc98/boot_splash.c`・`include/gfx_hal.h`・`tools/tests/test_src_layout.py`・`docs/design` はPMが直列化し、新規ファイルの `docs/design` と `test_src_layout` への登録もB2の一覧に含める。
 - Shared層のKAPI定義は維持。Subsystem層はpegc.hのポート/SYNC、再生ヘッダーの派生周期/位相/予算、OSRIヘッダーとconfig.h。Local層は計測回数等。[C4]に従い新旧ロゴ・画像で周期定数を複製しない。
 - GeForce加速と並行するが、gfx_vram.c・共通ヘッダー・build登録はPMが所有を調整し直列化。NP21/W操作は同時に1人。
@@ -375,7 +375,7 @@ G が空、時計誤差が1行以上、区間の上限を保証できない場�
 4行間隔でも「最大2Hなら常に可」とはしない。A/G/C/W から区間の終了上限と次の開始下限の差≥1Hを事前検査する。
 N=99 の差分＋起点1区間なら保守的合計≤200H、31k約6.36ms/24k約8.05ms。中継M区間があればさらに≤2MH。
 実際は `Σ(粗待ち終了→辺待ち→OUT→終了時計→復元)` を記録し、最大は31k約63.55µs/24k約80.55µs以内。
-「IF=1窓」は再生器が保持してCLIしない区間を指す。IRQ自身と sys_time_now 内の短いCLI（`M/kernel/time/ktime.c:70`）は別集計する。
+「IF=1窓」は再生器が保持してCLIしない区間を指す。IRQ自身と sys_time_now 内の短いCLI（`M/kernel/time/ktime.c`）は別集計する。
 実機で物理的に連続した IF=1 を要求する解釈では現行時計も違反するため、IRQ受付可能時間・PIT tick・受信欠落で契約を検証する。
 
 ### 4. 取り逃がし・初期色・late/drop

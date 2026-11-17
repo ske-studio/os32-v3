@@ -130,7 +130,7 @@
 
 | ファイル | 最初のエラー |
 |---|---|
-| `exec/exec.c` | `exec/exec.c:1728:13: error: unknown register name 'eax' in 'asm'` |
+| `exec/exec.c` | `exec/exec.c:13: error: unknown register name 'eax' in 'asm'` |
 | `drivers/video/pc98/gfx_vram.c` | `gfx/gfx_internal.h:52:5: error: impossible constraint in 'asm'` |
 | `arch/x86/kernel/gdt.c` | `arch/x86/kernel/gdt.c:40:5: error: unknown register name 'eax' in 'asm'` |
 | `mm/paging.c` | `mm/paging.c:545: Error: ARM register expected -- 'mov %cr3,r3'` |
@@ -138,7 +138,7 @@
 
 この 5 本は `io.h` を経由せず**その場に x86 asm を書いている**もの。`gdt` / `tss` /
 `cr3` は x86 の仕組みそのものなので、順序 3 で `arch/x86/` へ移す対象。
-`gfx/gfx_internal.h:52` と `exec/exec.c:1728` は移設先の判断が要る。
+`gfx/gfx_internal.h:52` と `exec/exec.c` は移設先の判断が要る。
 
 ### (b) `io.h` 経由 — 33 本
 
@@ -419,7 +419,7 @@ x86 の既定は `lib/kstring_asm.asm` のまま (`build/kernel.mk` の `ARCH` �
 
 | 順序 4 まで | 順序 5 以後 | 本数 |
 |---|---|---|
-| `exec/exec.c:1735` (リング降下) | `arch/x86/arch_cpu.h:69` | 1 |
+| `exec/exec.c` (リング降下) | `arch/x86/arch_cpu.h:69` | 1 |
 | `arch/x86/kernel/gdt.c:40` (lgdt + セグメント) | `arch/x86/x86_desc.h:25` | 1 |
 | `mm/paging.c:545` (`mov %cr3`) | `arch/x86/arch_cpu.h:29` | 1 |
 | `arch/x86/kernel/tss.c:53` (`ltr`) | `arch/x86/x86_desc.h:45` | 1 |

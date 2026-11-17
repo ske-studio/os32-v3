@@ -1621,7 +1621,7 @@ void gf_v2_fence_reset(struct gf_v2 *g)
 }
 ```
 - LOST の 2 つの形: (1) 柔らかい LOST (fence の待ちが 1 秒を越えたが drain は通った、または他の道の recover で epoch が変わった) は層 4 が生きているので、次の mode_set (G2) か v1 の起動の道 (G1) の `gf_v2_start` で戻る。(2) 固い LOST (drain も通らない) は `links->failed` → `gf4_service_failed` (recover.c:341-350) が表示を止め `reusable = 0`、v1 は次の present で `geforce_fail` (backend_geforce.c:528-533、`failed` は戻らない) へ進み PC-98 に切り替わる。以後 `gf_v2_start` は層 4 が ready でないので GF3_ESTATE、mode_set は IO で、戻るのは再起動だけ (ユーザー判断 2026-11-10「自動の回復をしない」の範囲。下の「ユーザーの判断が要る分岐」)。
-- `links->failed` の中の `geforce_display_failed` (gfx/gfx_core.c:414-419) は中核の `gfx2_adapter_lost` の中から呼ばれる入れ子になるが、v1 の `geforce_set_mode` の drain の失敗 (backend_geforce.c:313) と同じ入れ子で、adapter は既に LOST・gen+1 なので C14 の rebind は待つ物が無い。
+- `links->failed` の中の `geforce_display_failed` (gfx/gfx_core.c) は中核の `gfx2_adapter_lost` の中から呼ばれる入れ子になるが、v1 の `geforce_set_mode` の drain の失敗 (backend_geforce.c:313) と同じ入れ子で、adapter は既に LOST・gen+1 なので C14 の rebind は待つ物が無い。
 
 **G1 への結び (G1 の段が入れる行。G1 は再依頼の前なので G1 の行 §12 に書いた)**
 - `gf_v2_inst` は static にせず定義し、gf_v2.h の extern で読む。表の `.stop = gf_v2_stop`。check は `gf_v2_inst.lost || !g->g3` の間は全部 NOSYS。`geforce_direct_ok` (backend_geforce.c:121-124) に `&& !gf_v2_inst.lost`。

@@ -164,7 +164,7 @@ RED は「修正を戻すと落ちる」形で確認した (実際の出力):
 4d の初版は `appslot_reclaim` が `fd_redirect_close_state()` で枠の `file_fd` を
 閉じていたが、その `file_fd` は `fd_redirect_to_file` の `vfs_open` が **その ID の
 owner タグ**で取ったものなので、`exec_reclaim_owned` の (2) `vfs_close_owned(id)`
-(`exec/exec.c:746`) が先に同じ FD を閉じている。つまり park 中 kill では同じ FD に
+(`exec/exec.c`) が先に同じ FD を閉じている。つまり park 中 kill では同じ FD に
 `vfs_close` が 2 回掛かっていた (いまの `vfs_close` と回収順では間に FD 再利用が
 入る反例は無いが、「二重 close しない」という説明が実態と違った)。
 

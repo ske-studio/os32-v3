@@ -101,7 +101,7 @@ REC予算は転送/比較の計2組4行（480行ずつの処理は内部反復�
 
 > [要確認] GF_STAGES の C 実行は定数期限へ移行している。この旧 C 送信予算式は現行の C-only には適用されない。
 
-5 回の読取りに新しい時間の上限は作らない。既存の verify の読取り (kdebug/recover.c:2016-2020・943-956) と同じく、送信の時間は tx_ticks、読取りの時間は試行の spent に数え (同:312-338・808-818)、期限の検査 (同:1168-1183) で超えたら REC_TIMEOUT。trial_limit (60 秒、recover_profile.c:86-88) は変えない。
+5 回の読取りに新しい時間の上限は作らない。既存の verify の読取り (kdebug/recover.c・943-956) と同じく、送信の時間は tx_ticks、読取りの時間は試行の spent に数え (同:312-338・808-818)、期限の検査 (同:1168-1183) で超えたら REC_TIMEOUT。trial_limit (60 秒、recover_profile.c:86-88) は変えない。
 
 - 予算: 増える 10 行・最大 3850B は RUNNING だけ。B'=B+3850 で log_limit と transport.max_polls を算出し直す (gfinit.c:273-288)。cleanup の restore_limit・P/S の予約・diag/final は変えない。
 

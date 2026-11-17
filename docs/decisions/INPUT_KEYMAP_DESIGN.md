@@ -16,7 +16,7 @@
 |D1|H:149、B:49|PC-98 sc を共通表の添字に固定 → 表は backend 固有 keycode、sc は旧出口の互換属性|
 |D2|H:184、B:234（M2）|PC-98/JIS 文字化1本・FreeBSD8列本体 → keysym 評価器1本と PC98/HID の別表|
 |D3|B:55-65|照合前の左右/Enter/記号の合流、AT→PC98照合 → usage を保って評価し、旧rawだけ合流|
-|D4|B:61,63、`drivers/usb/hid_kbd_map.c:112-118`|0x90/91 DROP、Command欠落 → 英数/かな操作と独立Command修飾|
+|D4|B:61,63、`drivers/usb/hid_kbd_map.c`|0x90/91 DROP、Command欠落 → 英数/かな操作と独立Command修飾|
 |D5|`input/hal/kbd_merge.c:66,94,128-143`|自前の2表と小文字だけCtrl化 → backend の keysym と共通評価|
 |D6|`platform/powermac/usb_platform.c:158-164`、`input_usb.c:23-38`|sc化後の独自押下/文字ring → usage のまま共通 capture|
 |D7|`platform/powermac/input_keymap.c:33-46`|Ctrl+C=27、通常文字の上位scなし → 03 と全キーの互換sc|

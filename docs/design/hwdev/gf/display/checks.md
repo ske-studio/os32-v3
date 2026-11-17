@@ -18,4 +18,4 @@ route01 とセルは上層の切替後に判定し、共有列の終了条件に
 必須CHECKの正典は `gfinit_plan_c.c:216` の内容を移す。50Cはmask EFFFFFFF／期待10000204、508は0007FFFF、578は8000FFFF、580 bit8、524=s&~50000、C040=初回値。
 PLL係数は50C選択後。CONFIG&3=2、START=0、CR00..18（最終11=AB/17=C3）と19/1A/25/28/44/42/1B/20/47、CR33=s&~3B、SR01=01、MISC=E3、GENERAL=20100130。
 CR1Aはmask D7、ほかの列挙CRはFF。DACCLK&101=1、TESTはbit20だけ。cfg50/54・1850/1854=0、Command0102、route&3=1、セル復元・VRAM一致も出口で確認する。
-50C bit28、CR1A bit3/5、680A24の旧全bit照合は復活させない（`docs/POLICY_DEBUG.md:1585`）。DACの自動増分やARのFF操作を通常MMIOのreadbackにしない。
+50C bit28、CR1A bit3/5、680A24の旧全bit照合は復活させない（`docs/POLICY_DEBUG.md`）。DACの自動増分やARのFF操作を通常MMIOのreadbackにしない。

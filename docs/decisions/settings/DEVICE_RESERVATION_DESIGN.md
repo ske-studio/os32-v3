@@ -110,7 +110,7 @@ int pci_resource_match(const struct ledger_resource *saved);
 - RAW は現行の起動収集順のまま保持。RAW約8+GF3+固定4+Trident3=18を32枠に収め、超過は E_CAPACITY。診断 RAW を予約権限に数えない。
 - 内蔵 PCI GPU は選択に関係なく読取り識別。検証済み decode は全て予約する。未知幅は予約済みと表示せず E_UNVERIFIED。
 - **PM 決定（ID4）**: Trident は `BARLEN_DESIGN.md:22-25` の保守的上限を予約幅に使う。1023:9660/rev=d3/endpoint/BAR0〜2/attr=0 と BIOS 非重複配置・再割当てなしの条件を adapter が確認。
-- 基準の BAR0/1/2 は各4MiB/64KiB/8MiB。根拠は `kdebug/gfinit_resources.c:24-26`、`gfinit_resources/bars.inc:26-28`。正確な SIZING と呼ばず width_basis=BARLEN_UPPER を handle と再要求照合用 scratch に保持する。
+- 基準の BAR0/1/2 は各4MiB/64KiB/8MiB。根拠は `kdebug/gfinit_resources.c`、`gfinit_resources/bars.inc:26-28`。正確な SIZING と呼ばず width_basis=BARLEN_UPPER を handle と再要求照合用 scratch に保持する。
 - 実行中の sizing（全1書込み）は追加しない。既存 RAM 割当との重なりは E_CONFLICT で当該候補を外すだけ。RAM オンライン化の巻戻し・起動停止は追加しない。
 
 ## 4. owner・寿命・表示利用の解除
@@ -255,7 +255,7 @@ int gfx_device_activate(devres_handle h);
 ## 確定 (2026-11-04、claude-opus-5-5 の第 2 回、PM が反映)
 - N1: §7 の表の C2 の組に `tools/tests/test_gfx_boot.py:220-224` の変異の目印 (`ledger_reserve_set(LEDGER_OWNER_GFX, sp, n)` の行を core.index で探す) の追従を足す。C2 がその行を書き換えるなら、同じ段で目印を新しい行に直す。
 - N2: PM 決定 — 固定表示 group (PEGC/Xe10) の owner は今の `LEDGER_OWNER_GFX` (固定 7 番、mm/pgalloc.c:96) のまま。`ledger_device_commit` は新しい owner を作らない。`tools/tests/test_ledger.py:256,258` と `device_reservation_stage_host.c` は変えない。BDF ごとの DEVICE owner は GF など PCI の増設装置だけ。
-- N3: PM 決定 — Trident の上限の計算 (`kdebug/gfinit_resources/bounds.inc:72-73`、隣の BAR の番地から実行時に縮める) は B3 の中で共有のファイル (`drivers/pci/pci_barlen.c`/`.h`、製品のカーネルに入る) へ移し、kdebug はそれを引く。計算の正典は 1 つ。B3 の触るファイルに bounds.inc と kdebug のビルドの入力を足す。
+- N3: PM 決定 — Trident の上限の計算 (`kdebug/gfinit_resources/bounds.inc`、隣の BAR の番地から実行時に縮める) は B3 の中で共有のファイル (`drivers/pci/pci_barlen.c`/`.h`、製品のカーネルに入る) へ移し、kdebug はそれを引く。計算の正典は 1 つ。B3 の触るファイルに bounds.inc と kdebug のビルドの入力を足す。
 - N4: `devres_request.width_basis[]` は置かない。`struct ledger_resource` の既存の width_basis の欄を使い、enum に `LEDGER_WB_BARLEN_UPPER` を足して `pgalloc_resource.inc:74` の照合で受け入れる (A2/A3)。
 - N5: CUI 単独アプリが表示 gate を acquire した後の release は、`to_cui` に加えて exec の後始末 (正常終了・abort・longjmp の共通の出口) に 1 行置く。同じ h なら冪等。
 - ID11: §6 の「追加 RAM 256B」は「16B のまま 64 件にした場合との差」、表の「64×20−48×16=512B」は「今の 48×16B との差」。

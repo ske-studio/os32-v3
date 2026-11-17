@@ -299,7 +299,7 @@ python3 -B tools/tests/test_sbrk_tier.py    # 回 4 (新規)
 対象票: `docs/archive/gui_v13/TASK_K5B_kernel.md` (差し戻し 2026-09-11)
 実機の観測 (PM、NP21/W、15MB 構成): `kselftest_pass=44 kselftest_fail=0` でカーネルは
 起動しているのに、text VRAM 1 行目が `FATAL: shell.bin load failed` + shlib のロード
-報告、EIP = `kernel_main+0xd4c` (`platform/pc98/kernel.c:582` の停止ループ)。
+報告、EIP = `kernel_main+0xd4c` (`platform/pc98/kernel.c` の停止ループ)。
 
 | 回 | 対象 | RED | GREEN |
 |---|---|---|---|
@@ -321,7 +321,7 @@ ret = ext2_read_block(ctx, phys, &dst[total_read]);   /* 端数ブロックで�
 
 K5b-K 前は exec が「ファイル全体をロード番地へ」読んでいたので、溢れ先は
 そのプログラム自身の帯の中で無害だった。K5b-K が D1 の手順 2 のためにヘッダを
-**先読み**するようにし (`exec/exec.c:996`)、宛先を
+**先読み**するようにし (`exec/exec.c`)、宛先を
 
 ```c
 static u8 hdrbuf[OS32X_HDR_V2_SIZE + 64];   /* = 108 バイト、カーネル .bss */
@@ -339,14 +339,14 @@ static u8 hdrbuf[OS32X_HDR_V2_SIZE + 64];   /* = 108 バイト、カーネル .b
 
 で、`hdrbuf` の 108 バイトの直後に **`resolved[]` (解決済みパス) が居た**。
 ヘッダ先読みが `resolved` をファイルの中身で塗り潰し、続く本体読み込み
-`vfs_read(resolved, file_buf, read_max)` (`exec/exec.c:1298`) がゴミのパスを
+`vfs_read(resolved, file_buf, read_max)` (`exec/exec.c`) がゴミのパスを
 引くので `sz <= 0` → **`EXEC_ERR_NOT_FOUND`**。`/sys/shell.bin` も FDD
 フォールバック (`SYS_SHELL_BIN_FDD` は同じ綴り) も同じところで落ちるため、
-`platform/pc98/kernel.c:582` の `FATAL: shell.bin load failed` に落ちる。
+`platform/pc98/kernel.c` の `FATAL: shell.bin load failed` に落ちる。
 `EXEC_ERR_NOMEM` の経路 (`[DBG] NOMEM: ...`) は**通っていない** — 画面に
 その行が 1 つも出ていないことと符合する。
 
-`14000` (実機の 2 行目) は別物ではなく、`mm/shlib.c:191` の
+`14000` (実機の 2 行目) は別物ではなく、`mm/shlib.c` の
 
 ```
 [shlib] /sys/lib/libos32gui.shlib v1 loaded: 101 funcs, text 20 pg, data 4 pg @414000
@@ -541,7 +541,7 @@ python3 -B tools/check_constraints.py            # EXIT=0
 | `build/programs.mk` / `userland/*/Makefile` | `--cpl0` を渡している行は無い (`ring3_hello` / `ring3_fault` / `hello_r3` / `faultprobe_r3` はいずれも CPL=3 側の検証用) |
 | `apps/` (submodule) | `deploy.yaml` / `Makefile` / `app.conf` を含め `cpl0` の記述なし |
 | `game/` (submodule) | 同上、記述なし |
-| 消費側 | `exec/appslot.c:113` `appslot_launch_is_app()` (`want_ring3` を落とす) と `mm/shlib.c:181` (CPL=0 プログラムは shlib の master をそのまま共有) |
+| 消費側 | `exec/appslot.c:113` `appslot_launch_is_app()` (`want_ring3` を落とす) と `mm/shlib.c` (CPL=0 プログラムは shlib の master をそのまま共有) |
 
 つまり `--cpl0` は現在「手で `sdk/mkos32x.py --cpl0` を叩いたときだけ立つエスケープ
 ハッチ」で、標準の配備物には 1 本も無い。gshell 配下でこの拒否に当たるのは、その手製

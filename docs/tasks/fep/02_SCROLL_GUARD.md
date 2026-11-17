@@ -111,7 +111,7 @@ void ime_toggle(void) {
 
 > 候補リストウィンドウ (`01_UI_CANDIDATE.md` §5) を TVRAM で多行表示する間は `reserve = rows+1` に
 > 一時拡張し、畳んだら 1 に戻す処理も実装済み。現行は候補 3 行 + インライン 1 行を保護する
-> (`kernel/ime/ime.c:374`、`kernel/ime/ime.c:453`)。
+> (`kernel/ime/ime.c:374`、`kernel/ime/ime.c`)。
 
 ---
 

@@ -44,10 +44,10 @@
 | 現行通常 | v1≤200、v2≤1197・行3番号。行内番号昇順、同値拒否。`gfx/gfx_osri.h:15`、`gfx/gfx_osri.c:87`。 |
 | 現行OBS | v2≤6384・行16番号、行内任意順・同値可、番号重複拒否。`gfx/gfx_osri.c:9,55,89,97`。 |
 | 旧通常核 | `pl_prepare/pl_frame`、最大6 OUTの型・認定方式。`drivers/video/pc98/splash_raster_image.h:13,19`。 |
-| OBS準備 | `pl_obs_prepare`、band1/v2専用、差分成分をG/R/B順に列化。`drivers/video/pc98/splash_raster_image.c:769`。 |
-| OBS制限 | 現物の上限47 OUT、格納64、plan52008B。`drivers/video/pc98/splash_raster_image.h:25`。 |
-| HBLANK核 | activeで先頭番号を選び、H立上りで列を実行、VSYNCならDROP。`drivers/video/pc98/splash_raster_image.c:939`（pl_obs_frame、919はobs_edge）。 |
-| IF区間 | VBLANK待ちはIF開放、その後CLI、初期色・可視行走査、全出口で復元。`drivers/video/pc98/splash_raster_image.c:939`。 |
+| OBS準備 | `pl_obs_prepare`、band1/v2専用、差分成分をG/R/B順に列化。`drivers/video/pc98/splash_raster_image.c`。 |
+| OBS制限 | 現物の上限47 OUT、格納64、plan52008B。`drivers/video/pc98/splash_raster_image.h`。 |
+| HBLANK核 | activeで先頭番号を選び、H立上りで列を実行、VSYNCならDROP。`drivers/video/pc98/splash_raster_image.c`（pl_obs_frame、919はobs_edge）。 |
+| IF区間 | VBLANK待ちはIF開放、その後CLI、初期色・可視行走査、全出口で復元。`drivers/video/pc98/splash_raster_image.c`。 |
 | 既存公開ラスタ | dirty転送/flip後 `pc98_splash_raster_table` へ。`drivers/video/pc98/gfx_vram.c:311,333`。OSRI核ではない。 |
 
 - `drivers/video/pc98/gfx_vram.c:305` は目標行直前〜HBLANKの4 OUTだけ保護し、保護間にIF開放を置く方式。
@@ -136,7 +136,7 @@ int gfx_osri_show(const char *path, u32 duration_ms);
 - 引数なしはusageを出す。ファイル一覧・次画像・拡縮・回転・PNG/JPEG対応は初版に加えない。
 - GUI中も--gfx宣言で既存の全画面取得を許す。gfx_init→gfx_kapi_claim→appslot_gfx_claimの門を通り、GUIウィンドウ内には表示しない。
 - showはgfx開始済みを必須とし、con_sink_is_enabled()のときだけ呼出元==appslot_gfx_owner()も検査する。不成立はBUSY。CUIでは所有者がWMのままでも許可する。
-- gfx_shutdownと同じGUI限定の所有照合を使う（gfx/gfx_core.c:431）。static gfx_startedには内部読み口を1つ足す。showはgfx_init/shutdownを呼ばず、所有者・開始状態を変更しない。
+- gfx_shutdownと同じGUI限定の所有照合を使う（gfx/gfx_core.c）。static gfx_startedには内部読み口を1つ足す。showはgfx_init/shutdownを呼ばず、所有者・開始状態を変更しない。
 - HALに現在の表示経路のOSRI hookを1つ置く。pc98 GDC 640×400 planar4の31k/24kに対応し、GeForce/PEGC480/200ラインはNOSYS。gfx/からpl_v2_*を直接呼ばない。
 - HAL hookの署名案は `int (*osri_show)(const struct OsriImage *, const struct PlV2Plan *, run_ctl *)`。固定画像のplanはNULL、run_ctlは時間・取消状態を持つ内部型。hook欠如はNOSYS。
 - パレットは全16色を使うため、GUIの部分leaseで済ませない。TVRAM文字重畳も表示中は隠し、終了時に復元する。

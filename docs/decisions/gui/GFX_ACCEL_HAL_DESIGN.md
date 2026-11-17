@@ -31,7 +31,7 @@
 ## 1. 実物の確認 (r2 と同じ。r3 で足した行だけ)
 - r2 の §1-1〜§1-4 はそのまま有効。食い違いは 4 件 (GeForce の fill/blit の書き先、M2MF では CPU が空かない、gfx_hal.h:73、Trident の間隔: main は待ち無し・wt/tri-gap は 80ns)。
 - userland/lib/gfx/libos32gfx_core.c:174-181 `libos32gfx_check`: CPL=0 で ready なら何も見ずに 0 を返す。:204-208 `gfx_present` は dirty を積むだけ。:210-234 の getchar・trygetchar・yield・halt は呼んだ後に `libos32gfx_check` を通る。
-- gfx/gfx_core_surface.inc:323-353 `gfx_reinit_surface_roles`: (0) で `lease_revoke_surface` (写像を外す)、(1) で `ledger_surface_regen` (世代を上げる)、最後に `gfx_bind_client`。
+- gfx/gfx_core_surface.inc `gfx_reinit_surface_roles`: (0) で `lease_revoke_surface` (写像を外す)、(1) で `ledger_surface_regen` (世代を上げる)、最後に `gfx_bind_client`。
 - exec/surface_query.c:205-212: `surface_query` も `surface_query_authorize` (:95-106) を通る。lease は :251、bundle は :259。
 - userland/gshell/src/visible.rs:186-: `recompute_and_expose` が全部の窓の vis を計算し直し、露出した所を dirty に足す。vis と dirty はクライアントのローカル座標 (wm.rs:11)。
 
@@ -437,4 +437,4 @@ void gfx_cmd_drop(void);
 ## 確定の後の追記 (2026-11-10、今の main cfb9cec3 との前提の照らし直し、PM 決定)
 - **H2a は不要で閉じる**: H2 は命令の読みの検査に既存の `ring3_user_range_ok` (`exec/exec.c:467`) を使って着地した (`gfx/gfx_hw_submit.c:16-17`)。「要れば `ring3_user_range_readable`」の条件は満たされないので H2a は出さない。§3-2 の断片と §7 の H2a の行を書き換えた (writable は今 `exec/exec.c:445`)。
 - **S1 と PPC**: `drivers/video/pc98/gfx_vram.c` は PC-98 の表示の装置のソース (PowerPC では組まない)。`:186-189` の `_memcpy_w` は `arch_copy16` 経由。S1 は共通の `gfx/` に asm・pc98 のヘッダを足さない (足すと層の検査 `tools/check_layers.py` と PowerPC の `common-compile` が止める)。damage.rs のパスは `userland/gshell/src/damage.rs`。
-- **G4m・G5m の位置**: GeForce の PCI の位置は `recover_gf_dev()` (`kdebug/recover.h:57`) で決まる。新しい段は 0:13 の直値を書かない (`drivers/video/geforce/gf_accept.c:177-178` の型を真似ない)。
+- **G4m・G5m の位置**: GeForce の PCI の位置は `recover_gf_dev()` (`kdebug/recover.h:57`) で決まる。新しい段は 0:13 の直値を書かない (`drivers/video/geforce/gf_accept.c` の型を真似ない)。

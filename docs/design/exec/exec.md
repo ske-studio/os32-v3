@@ -14,13 +14,13 @@
   実行文脈の回帰は `tools/tests/test_exec_r1.py` で確認する。
 
 - 終了時に全 FD やパイプを回収すると、親や常駐処理の資源まで壊す。
-  `exec/exec.c:1054` は終了する owner の DB、FD、パイプを回収し、保護 FD を除外する。
+  `exec/exec.c` は終了する owner の DB、FD、パイプを回収し、保護 FD を除外する。
   DB の rollback に FD が要るため DB の回収を FD より先にする。
   所有者別回収は `tools/tests/test_owner_reclaim.py` で確認する。
 
 - syscall 中の WM の fault も、その syscall を出したアプリに帰属する。
   画面に例外が出ずアプリが消える場合、`fault_kill_count` とともに
-  `ring3_wm_fault_count` を確認する (`exec/exec.c:1508`)。
+  `ring3_wm_fault_count` を確認する (`exec/exec.c`)。
   WM 深さを消す前に後者を数える契約は `make check-ring3-guard-host` が検査する。
 
 ## 内部設計と契約 (D1)

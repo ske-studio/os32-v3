@@ -184,12 +184,12 @@ CHECK(ext2_vfs_get_size(g_ec, "/tmp/d", &sz) == VFS_OK);   /* /tmp/d はディ�
 |---|---|---|---|
 | `fs/ext2/ext2_dir.c:267` | `ext2_mkdir` 存在確認 | **`== EXT2_OK` だけ拒否** | **P1-1 で修正** |
 | `fs/ext2/ext2_file.c:131` | `ext2_create` 存在確認 | **`== EXT2_OK` だけ拒否** | **P1-2 で修正** |
-| `fs/ext2/ext2_dir.c:537` | `ext2_rename` 宛先確認 | **`== EXT2_OK` だけ置き換え** | **P1-3 で修正** |
+| `fs/ext2/ext2_dir.c` | `ext2_rename` 宛先確認 | **`== EXT2_OK` だけ置き換え** | **P1-3 で修正** |
 | `fs/ext2/ext2_vfs.c:159` | `ext2_vfs_write` 既存判定 | 1 巡目で修正済 | 3 値 (OK / NOTFOUND / その他) |
-| `fs/ext2/ext2_dir.c:617` | `ext2_lookup` | 1 巡目で修正済 | `return ret` |
-| `fs/ext2/ext2_file.c:379` | `ext2_unlink` | 元から `if (ret) return ret` | 問題なし |
+| `fs/ext2/ext2_dir.c` | `ext2_lookup` | 1 巡目で修正済 | `return ret` |
+| `fs/ext2/ext2_file.c` | `ext2_unlink` | 元から `if (ret) return ret` | 問題なし |
 | `fs/ext2/ext2_dir.c:367` | `ext2_rmdir` | 元から `if (ret) return ret` | 問題なし |
-| `fs/ext2/ext2_dir.c:520` | `ext2_rename` 移動元 | 元から `if (ret) return ret` | 問題なし |
+| `fs/ext2/ext2_dir.c` | `ext2_rename` 移動元 | 元から `if (ret) return ret` | 問題なし |
 
 直し方は 3 つとも同じ: **`EXT2_OK` なら EXIST (rename は置き換え分岐)、
 `EXT2_ERR_NOTFOUND` のときだけ先へ進み、それ以外は何も書かずにそのまま返す。**

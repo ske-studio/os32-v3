@@ -27,7 +27,7 @@ AC-LIBC-1 (`docs/decisions/ARCH_COMPAT_CONTRACT.md:129`) と AC-BUILD-1 (:130) �
 
 |ID|実物 (file:line)|到達点との差・処置|
 |---|---|---|
-|D1|`arch/ppc/exec_context.c:51-53`|FP 三関数が空。専用 .S へ移す|
+|D1|`arch/ppc/exec_context.c`|FP 三関数が空。専用 .S へ移す|
 |D2|`arch/ppc/arch_exec_storage.h:14-15`|保存域 1B/align1。264B/align8 にする|
 |D3|`arch/ppc/ppc_oea.h:6-14`、`kernel_vectors.S:455`|FP/FE の定義と例外内 FP 有効化が無い。明示使用区間を設ける|
 |D4|`arch/ppc/kernel_trap.c:106-118`|USER の 0x800 は汎用 kill、特権側は unknown。専用理由を付ける|
@@ -102,7 +102,7 @@ void ppc_kernel_fp_end(const struct ppc_kernel_fp_guard *g);
 - 共通と kboot の双方で TU ごとの旗を一意に指定。後置で偶然上書きする形を避け、soft/hard の二重指定を検査する。
 - hard-float TU は整数だけの関数にも FP load/store を使いうる (コピー最適化等)。`-fno-builtin` だけに頼らず一般 kernel は soft-float のまま、最終逆アセンブルで拒否する。
 - FP 許可 TU の整数公開口だけを `sqlite_engine_run` 経由で呼ぶ。将来の sqlite_entry/object 全体を allowlist にし、任意の kernel object を許可しない。
-- `build/ppc-kboot.mk:225-235` は GCC driver による no-undefined と整数命令監査がある。FP 三関数と stack/guard の関数範囲だけ監査例外を追加し、残りの禁止を維持。
+- `build/ppc-kboot.mk` は GCC driver による no-undefined と整数命令監査がある。FP 三関数と stack/guard の関数範囲だけ監査例外を追加し、残りの禁止を維持。
 - 各 ELF は `powerpc-elf-nm -u` が空、map に libgcc/libc が無いことを確認。hard-float でも i64 変換・long double・整数除算の helper は残りうる。
 - IME の SQLite object には `nm -u`、最終 map/`objdump -dr` で `__*df*`/`__*sf*`/`__*di*` 等を列挙。通常 float/double は FPU 命令で満たし、不足 helper は必要な bit/整数算法だけ OS32 `lib/` に BSD/MIT 根拠で実装する別段へ。libgcc 追加や成功 stub で塞がない。
 - kernel/boot の -mcpu=7450 は維持する。750 互換は USER と SQLite TU の命令だけに求め、最終 ELF の該当範囲を逆アセンブルして監査する。archive 自体は ISA 判定対象にしない (_restvr_* の未抽出 member による誤検出を防ぐ)。不適合なら同版・同 configure・無改変で750向けに再構築する。x86 は再構築しない。

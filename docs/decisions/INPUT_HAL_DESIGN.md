@@ -27,7 +27,7 @@
 | D2 / I1 | `platform/powermac/input_usb.c:30,51` は独自押下表と文字キュー、`input_boot.c:47,49,50,53` は中断指定無視・pressed=0・raw=-1・GUI無処理。現行の `platform/powermac/input_boot.c:47` にはcapture待機の期限も無い | AV in2 と AC-INPUT-1 の能力・不在区別に不足。共通状態から raw/mods/pressed を提供し、待機を共通化 |
 | D3 / I2 | `drivers/input/mouse.c:83,99,120,175` に poll 採取・座標・8255ボタン・カーソル | AV §5-4 の独立採取でない。採取と読み出しを分け、PointerOps は互換スナップショットへ |
 | D4 / I4 | `drivers/usb/hid_mouse.c:10` → `platform/powermac/usb_platform.c:166` はログだけ | USB §4-8 の mouse_ext と AV in2 に未結線。PPC の入力成功はマウス配送成功を意味しない |
-| D5 / I5 | `drivers/input/kbd.c:639,678,769,832` が注入・serial・park を選択 | AV の物理イベント入口だけでは置換不能。文字端末 bridge を共通層へ抽出 |
+| D5 / I5 | `drivers/input/kbd.c` が注入・serial・park を選択 | AV の物理イベント入口だけでは置換不能。文字端末 bridge を共通層へ抽出 |
 | D6 / I1・I4 | `platform/powermac/usb_platform.c:151` は kind ごと4枠、`:160` は PPC 独自関数へ。`hid_kbd.c:29,69` は差分と repeat を別通知 | USB §4-8 の本体+USB kbd_merge 未結線。AV §5-4 の merge前・src別採取を共通の唯一の入口で実現 |
 | D7 / I4 | `usb_platform.c:153` の入力種別は鍵盤/マウスのみ、`hid_mouse.c:2` は boot 3B | AV §5-1/5-5 の4パッド・振動・一般HIDは未実装。既存HIDをXInputパッドとして扱わず後段へ |
 - I3: PPC 常駐CLIは `platform/powermac/terminal_input.c:26,50,81` → `cli_boot.c:22`。棚卸しの事実を引継ぎ、LAN_OPERATOR P3の担当とする。AVの欠陥として重複集計しない。

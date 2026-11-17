@@ -20,7 +20,7 @@
 |I3|`kernel/time/pit.c:26` fallback込み設定、`pit_math.c:49` 100Hzのみ、`:55` 2入力クロックのみ、`:71` 整数分周。`ktime.c:66` 未準備NOSYS、`:70` IF保存、`:76` 採取、`:85` 再試行、`:94` clamp、`:102` IF復元、`:107` 出力|3回失敗AGAIN、失敗時出力不変、IF復元後にuserへ書く。32bit tick wrapを含め現仕様を変えない|
 |I4/I5|`include/cpu.h:30` x86_flags直include、`:32` ABI_WORD_BYTES=4、`:34` ABI_STACK_ALIGN=16。`drivers/net/ne2000/ne2000.c:149` eflags_ifにpushfl/popl|I4はflagsだけ切る。ABI定数とcdeclは第3段へ。I5は既存 `_irq_enabled()` に置換|
 |A6|`kernel/r1_fixture.c:37,44` ud2、`kernel/font_guard_fixture.c:23` DS破壊、`:24` page0アクセス|fault注入だけarch化。font faultは停止が正解であり、例外復帰試験とは区別|
-|V5|`include/bootinfo.h:6,38,73,95` INT1Bh/LE/DA80・81/struct wire。`init/bootinfo.c:60` capture、`:74` magic消去|wireをPPCに課さない。PC98の64B wire・検査順・ログ・KAPIレイアウトは維持|
+|V5|`include/bootinfo.h:6,38,73,95` INT1Bh/LE/DA80・81/struct wire。`init/bootinfo.c` capture、`:74` magic消去|wireをPPCに課さない。PC98の64B wire・検査順・ログ・KAPIレイアウトは維持|
 |例外|`arch/x86/kernel/isr_handlers.c:290,297,316` font→SQLite→user/syscall分類、`isr_stub.asm:242,333` #GP/#PFとV86経路|x86 frame復号はarchに保持。停止・復帰の優先順と既存exec fault出口を変えない|
 
 ### V86呼び手の全範囲（製品C/h/incとx86 ASMを検索、コメント・生成物は別記）
@@ -38,7 +38,7 @@
 |`exec/exec_kapi_init.inc:431–434,506`、`kapi/kapi_generated.c:1765–1786,2321`|5スロット/引数/ラッパー不変。既存名facadeを残す。非搭載5口のNOSYSと出力不変を試験|
 |`kdebug/kselftest/memmap.inc:17`、`kcg_display_return.inc:26`、`kdebug_main.c:205–215`、`kdebug/v86_gcap.c:36–43`、generated V86 imports/exports|x86 feature所有。互換ヘッダ/シンボルで本線変更を避ける。test_v86_gcap/test_v86_module。PPCでは選択しない|
 |`drivers/input/kbd.c:37–39,332,388–390` / `:270`、`drivers/video/pc98/backend_pegc.c:157`、`kdebug/crt_diag.c:18`|Eでkbdのactive/request_exit/pushをlegacy口へ、BIOS読者はGのgetterへ（PEGCは互換getter）。kbd_status/kbd_dlog/kbd_fgpoll/pegc_mode/crt_diagで非活動・入力・BIOS値を検証|
-|`kernel/v86/*`内部、`gfx/gfx_core_surface.inc:379` gfx_v86_return、kapi_sys.c監査カウンタ|前者はbackend内部、後二者は復帰先/統計でV86 frame不要。名称のみの一括改名はしない|
+|`kernel/v86/*`内部、`gfx/gfx_core_surface.inc` gfx_v86_return、kapi_sys.c監査カウンタ|前者はbackend内部、後二者は復帰先/統計でV86 frame不要。名称のみの一括改名はしない|
 
 ## 2. 契約とx86の置き場
 ### 起動・例外（B段）

@@ -397,7 +397,7 @@ int pci_bind_all(const struct pci_driver *const *table, int n);   /* 1 件ずつ
   `pci_bind_info`) は、書く前に `ring3_user_range_writable(ptr, len)` (新設、`exec/exec.c`) を通し、通らなければ
   `ring3_fault_kill()`**。**現行の検査手順 (T2)**: `ring3_user_ranges_writable_always` が
   `caller_access_get_user` で caller の PD を取得し、2本とも `check_caller_write_range` で検査する
-  (`exec/exec.c:846-857`)。master CR3 への往復は旧実装の背景であり、現行の必須手順ではない。
+  (`exec/exec.c`)。master CR3 への往復は旧実装の背景であり、現行の必須手順ではない。
   2本の検査が通ってから書き、検査と書込みの間に GUI ポンプ・yield・park を挟まない。
   検査は KAPI wrapper に置く (カーネル内部からの時計呼び出しはローカル変数を渡すので USER を要求しない)。
   検査順: NULL・帯境界跨ぎ・交差の負返却 → 全出力の writable 検査 → 書き込み。
@@ -439,7 +439,7 @@ int pci_bind_all(const struct pci_driver *const *table, int n);   /* 1 件ずつ
   いない)。最長 IF=0 (`irq_off_max_us`) とハンドラの 1ms 超診断は未実装 (別に起こす)。
 
 - **出力保護**: 現行は §1-5 の caller PD 検査を使う。USER と WM/TRUSTED の識別は
-  `ring3_guard_active` に従い、現在の CR3 だけで代用しない (`exec/exec.c:842-857`)。
+  `ring3_guard_active` に従い、現在の CR3 だけで代用しない (`exec/exec.c`)。
   PDE/PTE の実効書込み権限を検査し、2本目の拒否でも1本目を書かない。
   受入では非恒等写像の物理側への反映・拒否時の全出力不変・復帰後 CR3 一致を確認する。
   V86 中のホスト側時計と DOS 独自 `INT 80h` は区別する (後者の ABI は対象外)。
