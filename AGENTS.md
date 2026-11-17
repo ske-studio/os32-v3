@@ -49,6 +49,16 @@ Follow the verification stage table in [ROLES §0](docs/tasks/agents/ROLES.md) a
 
 Use focused Conventional Commits, matching history: `fix(exec): ...`, `feat(deploy): ...`, or `docs: ...`. For review, describe the problem, resulting behavior, relevant issues, and validation; include screenshots for visible changes.
 
+## Task Playbooks
+
+The step-by-step playbooks live under `.claude/skills/<name>/SKILL.md`. They are plain Markdown; read the one that matches the task before starting.
+
+- `os32-arch-sep`: adding or moving code across the common / CPU / machine / device boundary (layer check, contract headers, `platform_<name>.h`, `Sep-Changes:`).
+- `os32-test-basis`: registering a check, replacing hash / commit / count pins, fixing stale mutation anchors.
+- `os32-kapi-add`: adding or changing a KernelAPI entry.
+- `os32-ci-read`: reading CI failures and re-running (PM).
+- `os32-archive`: summarizing a finished ticket into `docs/design/` before moving it to `docs/archive/` (PM; policy in [docs/POLICY_ARCHIVE.md](docs/POLICY_ARCHIVE.md)).
+
 ## Authoritative Guidance
 
 Read [CLAUDE.md](CLAUDE.md) for agent instructions (current team roles: [docs/tasks/agents/ROLES.md](docs/tasks/agents/ROLES.md) §0) and [docs/CONSTRAINTS.md](docs/CONSTRAINTS.md) for mandatory rules. Use [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) to navigate tasks. Update the authoritative document identified in [docs/INDEX.md](docs/INDEX.md), keeping summaries here brief. Never expose `.env` contents or commit the copyrighted `docs/hw/` mirror. [D4]: read or cite `docs/archive/` only when the user (or the PM's request, quoting the user) tells you to — never use archived documents as the basis for work. For new hardware work, follow [HW3]: consult the vendor manual and a BSD/MIT-licensed existing implementation (e.g. FreeBSD), cite them, and never copy code or structure from GPL sources such as Linux.

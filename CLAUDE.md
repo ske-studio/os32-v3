@@ -18,7 +18,7 @@
 ビルド・配備・検査の正典は [docs/08_build.md](docs/08_build.md) §8-1「ビルド手順」・§8-2「ビルドパイプライン」・§8-4「ホスト側イメージ生成ツール」(配備と「検査の 3 段」)。
 `make all` / `make kernel` / `make programs` でビルドする。
 `make check-<name>` は指定の検査 (実装者は触ったファイルを直接組む試験だけ回す)。取り込みの検査は GitHub の CI (check と build。全部の検査を変異込みで回す)。手元の `check-changed` は関門ではない ([PARALLEL_BRANCHES](docs/tasks/agents/PARALLEL_BRANCHES.md) §3)。
-PM の作業のスキル: **[os32-design-rally](.claude/skills/os32-design-rally/SKILL.md)** (設計の往復)・**[os32-delegate](.claude/skills/os32-delegate/SKILL.md#2-実装の依頼の型)** (実装の依頼)・**[os32-land](.claude/skills/os32-land/SKILL.md#3-検査)** (取り込み・CI・push)・**[os32-realhw-update](.claude/skills/os32-realhw-update/SKILL.md#1-ノートへの依頼の形-この順で書く)** (実機の更新はノートのセッションに頼む)・**`run-os32`** (NP21/W のゲストを叩く)。
+PM の作業のスキル: **[os32-design-rally](.claude/skills/os32-design-rally/SKILL.md)** (設計の往復)・**[os32-delegate](.claude/skills/os32-delegate/SKILL.md#2-実装の依頼の型)** (実装の依頼)・**[os32-land](.claude/skills/os32-land/SKILL.md#3-検査)** (取り込み・CI・push)・**[os32-realhw-update](.claude/skills/os32-realhw-update/SKILL.md#1-ノートへの依頼の形-この順で書く)** (実機の更新はノートのセッションに頼む)・**`run-os32`** (NP21/W のゲストを叩く)・**[os32-ci-read](.claude/skills/os32-ci-read/SKILL.md)** (CI の結果を読む・回し直す)・**[os32-archive](.claude/skills/os32-archive/SKILL.md)** (票を要約してアーカイブへ)・**[os32-decision-fold](.claude/skills/os32-decision-fold/SKILL.md)** (ユーザー決定を正典の一覧へ)。
 KAPI 変更後は `make clean` → `make all` ([ABI])。
 `make deploy` は HostDrv、`make deploy-kernel` / `deploy-boot` は NP21/W 停止後 ([D1])。
 
@@ -52,6 +52,8 @@ KAPI 変更後は `make clean` → `make all` ([ABI])。
 | 番地・帯域 | [`docs/02_memory.md`](docs/02_memory.md) §2-1 (説明の正典。地図は `make docs-gen` → `build/out/MEMMAP.md`、定義は `include/memmap.h`、PC-98 の起動の番地は `platform/pc98/platform_boot_layout.h`) |
 | ビルド・配備・検証を選ぶ | [`docs/08_build.md`](docs/08_build.md) §8-4 |
 | KAPI の追加・変更 | スキル **[os32-kapi-add](.claude/skills/os32-kapi-add/SKILL.md)**、[`docs/KAPI_SPEC.md`](docs/KAPI_SPEC.md) §3-1 ([ABI]) |
+| 共通・CPU・機種・装置の境目に触る (層の検査、機種のヘッダ、ソースの移動) | スキル **[os32-arch-sep](.claude/skills/os32-arch-sep/SKILL.md)**、[`docs/design/tools/check_layers.md`](docs/design/tools/check_layers.md) §8 |
+| 検査を足す・試験の固定を直す・変異の目印 | スキル **[os32-test-basis](.claude/skills/os32-test-basis/SKILL.md)**、[`docs/POLICY_DEV.md`](docs/POLICY_DEV.md) §6 |
 | エミュレータ上の障害 / ini の変更 | スキル **`run-os32`** / **`os32-emu-config`** (ini は PM だけ) |
 | 実行モデル (CPL=3、資源回収) / 描画 | [`docs/09_exec.md`](docs/09_exec.md) / [`docs/05_drivers.md`](docs/05_drivers.md) §5-5 |
 

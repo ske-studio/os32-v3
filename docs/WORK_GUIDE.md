@@ -19,4 +19,9 @@
 | LAN (LGY-98) | ドライバ 票 `tasks/network/PLAN.md` (M0〜M5、進捗 §9)、リンク層+Host Services 票 `tasks/network/LINK_PLAN.md` | `drivers/net/ne2000/lgy98.c` `ne2000.c` `ne2000_ring.c` `ne2000_io.asm`、有効化は `make kernel-lgy98` (戻すのは `kernel-nolgy98`) | [08_build §8-4](08_build.md)・[ROLES §0「検査」](tasks/agents/ROLES.md) |
 | ビルド・配備の仕組みを変える | [08_build.md](08_build.md) | `Makefile` `build/*.mk` `tools/*.py` | [08_build §8-4](08_build.md)・[ROLES §0「検査」](tasks/agents/ROLES.md) |
 | 障害を追う | [POLICY_DEBUG.md](POLICY_DEBUG.md) (§2 反映確認 → §4 教訓集 → §5 道具) | — | `tools/np21w_mcp/`、`/api/tvram` |
+| 共通・CPU・機種・装置の境目に触る | スキル `.claude/skills/os32-arch-sep`、[層の検査 §3・§4・§8](design/tools/check_layers.md)、[ソースの選択](design/build/select.md) | 持ち主の置き場 (`arch/<cpu>/`・`platform/<機種>/`・`drivers/`・共通)、口は `include/<名>_contract.h`・固定名 `platform_<名>.h` | `make check-layers-x86 check-layers-ppc`、両方の像のビルド、分離の枝は CI の `sep` |
+| 検査を足す・試験の固定を直す | スキル `.claude/skills/os32-test-basis`、[POLICY_DEV §6](POLICY_DEV.md)、[TESTS.md](TESTS.md) | `tools/checks/<名>.py` (宣言)・`tools/tests/` | `python3 tools/checks/run.py --lint`、`MUTATE=1 make check-<名>` |
+| CI の赤を読む・回し直す | スキル `.claude/skills/os32-ci-read`、[POLICY_CI.md](POLICY_CI.md) | — | `gh run list` (数分おきに 1 回) |
+| 票を完了にする・文書を減らす | スキル `.claude/skills/os32-archive`、[POLICY_ARCHIVE.md](POLICY_ARCHIVE.md) | 要約は `docs/design/<ソースと同じパス>.md`、移動は `tools/move_docs.py` | 文書の検査 5 本と `check-archive-refs`、`run.py --lint` |
+| ユーザーの決定を残す | スキル `.claude/skills/os32-decision-fold` | [POLICY_DEV §10](POLICY_DEV.md)・[ROLES §6](tasks/agents/ROLES.md) の表 | 文書の検査 |
 | 資料を直す | INDEX.md の正典表で更新先を 1 つに決める | その 1 か所 + 参照側は要約のみ | [08_build §8-4](08_build.md)・[ROLES §0「検査」](tasks/agents/ROLES.md) |

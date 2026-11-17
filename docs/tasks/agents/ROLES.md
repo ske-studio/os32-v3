@@ -137,7 +137,7 @@ PM は着地の前に worktree の `git log -1` を確かめる。参照先が�
 ## 6. 承認の要る操作・要らない操作と、運用の決まり (ユーザー決定の一覧)
 
 §0 の「決裁」を、操作ごとに今有効な形で並べる。決定が変わったら行を書き換える (経緯は git)。PM の個人の memory には写さない。
-設計の前提の一覧は POLICY_DEV §10 (`docs/POLICY_DEV.md`)。
+設計の前提の一覧は POLICY_DEV §10 (`docs/POLICY_DEV.md`)。行の足し方と memory の畳み直しはスキル `.claude/skills/os32-decision-fold`。
 
 | 操作 | 承認 | 条件・やり方 | 決定 |
 |---|---|---|---|
