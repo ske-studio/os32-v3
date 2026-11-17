@@ -17,7 +17,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 TARGETS = ('x86', 'ppc')
-# PowerPC の像 (build/ppc-kboot.mk の旗) — CI の 4 像と、常駐 CLI・NEGATIVE の像。
+# PowerPC の像 (build/images/ppc-flags.mk の旗) — CI の 4 像と、常駐 CLI・NEGATIVE の像。
 PPC_IMAGES = (['KBOOT_LINK=0'], [], ['KBOOT_SH=1', 'KBOOT_LINK=0'], ['KBOOT_SH=1'],
               ['KBOOT_SHELL=1', 'KBOOT_LINK=0'], ['NEGATIVE=1', 'KBOOT_LINK=0'])
 # RAM root の ISO は同じ入力でも作るたびに変わる (時刻)。カーネルのコードではない。
@@ -109,13 +109,10 @@ def hash_objects(tree):
 
 def build_ppc(tree, jobs):
     env = dict(os.environ)
-    # 畳む前の木 (基点が古い時) は build/ppc-kboot.mk を直に呼ぶ。今の木は最上位の入口。
-    entry = (['-f', 'build/ppc-kboot.mk'] if (Path(tree) / 'build/ppc-kboot.mk').is_file()
-             else ['ARCH=ppc', 'PLATFORM=powermac'])
     for name in ('MAKEFLAGS', 'MFLAGS', 'MAKEOVERRIDES', 'GNUMAKEFLAGS', 'BUILD_OUT'):
         env.pop(name, None)
     for flags in PPC_IMAGES:
-        subprocess.run(['make', '-j' + str(jobs), *entry, *flags], cwd=tree, env=env,
+        subprocess.run(['make', '-j' + str(jobs), 'ARCH=ppc', 'PLATFORM=powermac', *flags], cwd=tree, env=env,
                        check=True, stdout=subprocess.DEVNULL)
     return hash_objects(tree)
 

@@ -170,7 +170,7 @@ legacy の式は今の `select.mk:241-243` に末尾の一覧を足しただけ 
 |---|---|---|---|
 | 2 (済) | `exec_*.h` 16 組を arch の軸から外す。フックの 14 組は `exec/exec_<名>.h` と `exec/absent/exec_<名>.c`、CPU・配置の 2 組は契約の固定名 `arch_exec_cache.h`・`arch_exec_kapi.h`。設計は [exec/exec_hooks.md](../exec/exec_hooks.md) | 機械語は変わらない → `tools/build_compare.py` で全部一致 | `.o` が置き場の名前を除いて前と一致、ppc-qemu |
 | 3 (済) | 順の一覧を 1 本に: PowerPC の像は順の一覧を持たず、所有者集合の順で並べる (`C_ORDER_KBOOT`・`GAS_ORDER_KBOOT` を削除)。順の一覧は x86 の `C_ORDER_LEGACY` だけ | 不変 | 配置が変わる → PowerPC の検査 (QEMU を含む) の全部 |
-| 4 | `-D` の差し替え 11 件を口へ: `kprintf` 系 8 件は出力先を登録する口、`console_write=pm_fd1_write`・`console_stream_write=pm_cli_write` は `con_sink`、`CONSOLE_PUTCHAR_MIRROR` と `shell_print_utf8` の別名は像の機能の旗 | 触る所だけ build_compare | ppc-qemu |
+| 4 (済) | `-D` の名前の差し替え 11 件を口へ: `kprintf` はカーネルの診断の出力で行き先は機種が決め、端末に必ず出す物は `console_printf` (PowerMac の exec を持つ像は `platform/powermac/log_printf.c` が `kprintf` を作る)。コンソールの鏡・UTF-8 の道・fd 1 の出力先は機種ごとの固定名 `platform_console.h`。設計は [lib/kprintf.md](../lib/kprintf.md) | 機械語は名前と契約の指紋だけが変わる (`tools/build_compare.py`) | 配置が変わる → PowerPC の検査 (QEMU を含む) |
 | 5 (済) | 像の規則を `build/targets/ppc-powermac.mk` に畳み、独立の Makefile を削除。道具は `make ARCH=ppc PLATFORM=powermac` に旗か `IMAGE=<名>` を付けて呼ぶ。試験が規則・旗の対応の写しを差し替える口は `TARGET_MK`・`PPC_FLAGS_MK`。出力の置き場 `build/out/ppc-kboot/<像>/` は変えない | 不変 | PowerPC の `.o` が前と同じ (workflow `sep`)、ppc-compile・ppc-qemu |
 | 後 | `PC98_PENDING` の 49 本を include を直した順に本来の機能へ。入口の統合で `#if KBOOT_*` を機能の値に | | |
 

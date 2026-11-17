@@ -68,6 +68,7 @@ void appslot_gfx_owner_exit(int id)
     if (id == owner) { CHECK(!device.active); owner = 1; transferred++; }
 }
 static void kprintf(u8 a, const char *s, ...) { (void)a; (void)s; }
+static void console_printf(u8 a, const char *s, ...) { (void)a; (void)s; }
 static int exec_gfx_return_emergency(u32 owner_id, int reason) { return gfx_return_emergency(owner_id, reason); }
 static inline int exec_font_guard_active(void) { return font_guard_active; }
 static inline void exec_font_guard_fault(u32 v, u32 p, u32 a) { font_guard_fault(v, p, a); }

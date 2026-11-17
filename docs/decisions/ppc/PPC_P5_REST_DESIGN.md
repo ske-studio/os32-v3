@@ -120,9 +120,9 @@ def assess_real_link(events, evidence):
 |tools/ppc/kboot_accept.py:68,79,86,105|無指定 / NEGATIVE=N / KB_MUT等|全て0を明示してPLN1、build/make公開ヘルパーの既定は変更しない|P7|
 |tools/ppc/sb_run.py:134,154|SHELL=1、KB_MUT等|0を明示してPLN1|P8|
 |tools/ppc/sc_run.py:133,268,364|SHELL=1,BINS / SH=1,KB_MUT等 / SH=1|既存経路全て0を明示してPLN1、新--linkのみSH=1,LINK=1|P9 (旧経路)、C (link追加)|
-|tools/ppc/ppc_sh_output.py:124,139|SHELL=1、FD1_STREAM=1、bins、KB_MUT等|既存経路0を明示してPLN1、新--linkはSH=1,LINK=1|P10 (旧経路)、O (link追加)|
+|tools/ppc/ppc_sh_output.py:124,139|SHELL=1、bins、KB_MUT等|既存経路0を明示してPLN1、新--linkはSH=1,LINK=1|P10 (旧経路)、O (link追加)|
 |tools/accept/arch_ctx.py:128|SH=1、LINK 未指定、KB_ROOT_BINS に build/out/ppc-user/fault.bin、KB_MUT|0 を明示して PLN1 に残す (CHECK は arch-ctx-guest)|P11 (PM 決定 N3)|
-- 表の SH/LINK/SHELL/FD1_STREAM は KBOOT_SH/KBOOT_LINK/KBOOT_SHELL/KB_FD1_STREAM の略。fb は import 元も追跡し、各ファイルの build/settings 呼出を実物検索した。
+- 表の SH/LINK/SHELL は KBOOT_SH/KBOOT_LINK/KBOOT_SHELL の略。fb は import 元も追跡し、各ファイルの build/settings 呼出を実物検索した。
 - :37/:47 の link/link-sh と USER 出力分離、:89 の旧 wire/terminal/input 除外、:141 の hostfs_link 選択を維持。旧 object の流用は禁止。
 - 廃止の意味は既定生成像から PLN1 wire を除去すること。明示0の旧像と旧試験は :232 の旧像回帰として保持し、新 link 像の必須合否に混ぜない。
 - PLN1 ソース削除・旧像ビルド禁止はこの段に含めない。ロールバックと旧 CLI/FS 比較を可能にする。

@@ -85,7 +85,7 @@ def main():
         flags = [os.environ.get('CC', 'gcc'), '-m32', '-std=gnu11', '-ffreestanding', '-fno-pie', '-no-pie',
                  '-fno-builtin', '-nostdlib', '-static', '-ffunction-sections', '-fdata-sections',
                  '-Wall', '-Wextra', '-Werror', '-D__cdecl=', '-D__KERNEL_BUILD__',
-                 '-I.', '-Iinclude', '-Isdk/include/os32', '-Imm', '-Ilib',
+                 '-I.', '-Iinclude', '-Iplatform/pc98', '-Isdk/include/os32', '-Imm', '-Ilib',
                  '-Wl,--gc-sections']
         for mutant in range(1 + 2 * int(args.mutate)):
             source = original

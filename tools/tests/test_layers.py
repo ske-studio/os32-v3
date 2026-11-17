@@ -102,7 +102,7 @@ def suite(tool):
                 'include/pc98.h': '', 'include/v86_call.h': '', 'arch/x86/arch_io.h': '',
                 'include/legacy_guest.h': '', 'include/kbd.h': '', 'platform/none/null_provider.c': '',
                 'gfx/only_shell.c': inc('pc98.h'), 'gfx/only_neg.c': inc('pc98.h'),
-                'gfx/only_fd1.c': inc('pc98.h'), OUT + '/ppc-kboot/gen/exports.c': inc('pc98.h'),
+                OUT + '/ppc-kboot/gen/exports.c': inc('pc98.h'),
                 'gfx/old.h': inc('wab_xe10.h'), 'include/wab_xe10.h': '',
             }
             deps = {
@@ -111,7 +111,6 @@ def suite(tool):
                 'ppc-kboot/platform/none/l.d': ['platform/none/null_provider.c'],
                 'ppc-kboot/shell/gfx/s.d': ['gfx/only_shell.c', 'include/pc98.h'],
                 'ppc-kboot/neg1/gfx/n.d': ['gfx/only_neg.c', 'include/pc98.h'],
-                'ppc-kboot/link/fd1-stream/gfx/f.d': ['gfx/only_fd1.c', 'include/pc98.h'],
                 'ppc-kboot/gen/exports.d': [OUT + '/ppc-kboot/gen/exports.c', 'include/pc98.h'],
                 'ppc-kboot/gfx/gone.d': ['gfx/gone.c', 'gfx/old.h', 'include/wab_xe10.h'],
                 'ppc-kboot/sh/gfx/h.d': ['gfx/h.c', 'gfx/g.h', 'include/pc98.h',
@@ -222,8 +221,7 @@ MUTANTS = [
     ("sorted(observed - expected)", "[]"),
     ("sorted(expected - observed)", "[]"),
     ("empty.append(dep_root)", "pass"),
-    ("if not dep.relative_to(base).parts[0].startswith(skip)", "if True"),
-    ("and SKIP_ANY not in dep.relative_to(base).parts]", "]"),
+    ("if not dep.relative_to(base).parts[0].startswith(skip)]", "if True]"),
     ("elif not inside(real) or real.startswith('build/'):", "elif not inside(real):"),
     ("if mark == '\"' and local in files:", "if local in files:"),
     ("'kdebug', 'lan', 'pcm', 'sqlite-proto', 'trident', 'v86'", "'kdebug', 'lan', 'pcm', 'trident', 'v86'"),

@@ -289,7 +289,7 @@ r1→r2 の変更の数 13 / 反論の数 0
 
 - N01 で見つかった USER の入れ子の不具合を `arch/ppc/exec_context.c` で修正。
 - R01 で ramfs の FD の口を用意。
-- P03 の fd1 の結び替えは `fs/vfs_fd.o` の 1 か所 (`KB_FD1_STREAM`)。
+- P03 の fd1 の結び替えは `fs/vfs_fd.c` の 1 か所 (`platform_fd1_write`、機種ごとの `platform_console.h`)。
 - 受入アプリは 8.3 名 `outprobe` を使う。
 - serial 版の試験は停止の前に EE=0 とする。
 - K01 の時計の検査は TB の読み 2 回で挟み、周期は変えない。

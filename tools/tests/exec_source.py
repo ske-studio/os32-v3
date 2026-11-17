@@ -34,4 +34,6 @@ def exec_fixture_preamble():
     return ('#include "exec_shlib.h"\n'
             '#include "exec_serial_diag.h"\n'
             '#include "exec_gfx_poll.h"\n'
-            '#include "owner_diag.h"\n')
+            '#include "owner_diag.h"\n'
+            # 手本は端末向けの出力 (console_printf) も、自分の kprintf の手本で受ける。
+            '#define console_printf kprintf\n')

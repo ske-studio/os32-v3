@@ -86,7 +86,7 @@ CASES = [
 ]
 
 INC = ["-I" + str(ROOT / p) for p in
-       ("include", "fs", "drivers", "sdk/include", "sdk/include/os32",
+       ("include", "platform/pc98", "fs", "drivers", "sdk/include", "sdk/include/os32",
         "lib", "lib/sqlite3", "userland/lib", "userland/lib/cfg")]
 CONFIG = str(ROOT / "lib/sqlite3/os32_sqlite_config.h")
 

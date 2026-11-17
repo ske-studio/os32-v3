@@ -16,7 +16,7 @@
 | 像の名前 | `.d` の根 (`build/out/` の下) | 前提 |
 |---|---|---|
 | `x86-pc98` | `obj` `cd` `cirrus` `fep` `fm` `geforce` `hwdev` `kcg` `kdebug` `lan` `pcm` `sqlite-proto` `trident` `v86` | `make all` |
-| `ppc-powermac` | `ppc-kboot` (CI が組む 4 像の和集合。直下の `shell`・`neg*` と、どの段にあっても `fd1-stream` は、CI が組まない像の置き場なので数えない) | `make ppc-ci-image` |
+| `ppc-powermac` | `ppc-kboot` (CI が組む 4 像の和集合。直下の `shell`・`neg*` は、CI が組まない像の置き場なので数えない) | `make ppc-ci-image` |
 
 `.d` の先頭の前提をその TU のソース、残りをその TU が読んだファイルの集合とする。TU は重複を除いたソースで数え、`build/out/` の下に生成されたソース (部品の import の表など) は見ない。ソースが木に無い `.d` (消した・改名したソースの残り) は数えない。パスは作業木の相対に正規化する。作業木の外は見ない。`build/out/` の下の生成ヘッダは読む側としても読まれる側としても見ない。ソースが `build/out/**/gen/kapi/kapi_generated.c` のときは中身はその場所から読み、名前は `kapi/kapi_generated.c` として扱う。
 
@@ -89,7 +89,7 @@
 - `kernel/ver_collect.c → arch/x86/kernel/x87.h` は `x86-pc98` の R1 に載る。`arch/x86/x86_flags.h`・`arch/ppc/ppc_oea.h` のように契約の実装の内側だけで読まれるヘッダは、共通のソースの違反に載らない。
 - `ppc-powermac` の R6 には `include/pc98.h` を読む辺が 3 件ある (`gfx/gfx.h`・`gfx/gfx_internal.h`・`include/pegc.h`)。
 - 基準から 1 行消すと `new violation`、基準に無い 1 行を足すと `stale baseline (remove)` で rc≠0 (`test_layers.py` の `test_baseline_ratchet`)。
-- `test_layers.py --mutate` は規則ごと・解決の決まりごと・数えない場所ごと・戻り止めごとに実行時 RED (26 本)。
+- `test_layers.py --mutate` は規則ごと・解決の決まりごと・数えない場所ごと・戻り止めごとに実行時 RED (25 本)。
 
 `layers-x86` は build.yml の `make check-fast` で、`layers-ppc` は check.yml の ppc-compile (`--run all --env ppc-cross`) で回る (check.yml の static-check は像を組まないので回らない)。
 

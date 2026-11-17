@@ -261,7 +261,7 @@ def main():
     else:
         injected.write_text(text.replace(before, '    (void)serial;'))
     bins = 'KB_ROOT_BINS=build/out/ppc-user/hello.bin build/out/ppc-user/fault.bin build/out/ppc-user/outprobe.bin'
-    settings = ['KBOOT_SHELL=1', 'KBOOT_LINK=0', 'KB_FD1_STREAM=1', bins,
+    settings = ['KBOOT_SHELL=1', 'KBOOT_LINK=0', bins,
                 'KB_MUT_EXTRA_SRC='+src, 'KB_MUT_EXTRA_FILE='+str(injected)]
     if args.serial:
         settings += ['KB_MUT_THIRD_SRC='+cli, 'KB_MUT_THIRD_FILE='+str(cli_file)]

@@ -1,6 +1,7 @@
 /* Diagnostic formatter endpoints: preserve the log protocol, while drawing
  * through the common console without feeding the terminal mirror again. */
 #include "console.h"
+#include "console_log.h"
 #include "kboot_log.h"
 #include "kstring.h"
 #if KBOOT_LINK

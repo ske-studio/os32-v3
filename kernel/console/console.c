@@ -7,9 +7,7 @@
 
 /* PowerPC mirrors shell characters to its stream; x86 cmd_terminal sends
  * its own serial characters. */
-#ifndef CONSOLE_PUTCHAR_MIRROR
-#define CONSOLE_PUTCHAR_MIRROR 0
-#endif
+#include "platform_console.h"   /* CONSOLE_PUTCHAR_MIRROR・CONSOLE_UTF8_AS_STREAM (機種ごとの固定名) */
 
 #define CONSOLE_TAB_COLS 4
 #include "types.h"
@@ -297,6 +295,10 @@ void shell_print_utf8(const char *utf8_str, u8 color)
 {
     const u8 *p = (const u8 *)utf8_str;
 
+    if (CONSOLE_UTF8_AS_STREAM) {
+        console_write(utf8_str, kstrlen(utf8_str), color);
+        return;
+    }
     con_sink_push_print(utf8_str, kstrlen(utf8_str), color);
     bootlog_push(utf8_str, kstrlen(utf8_str));
     if (rshell_active || boot_serial_mirror) {

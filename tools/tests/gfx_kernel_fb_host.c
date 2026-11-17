@@ -84,6 +84,7 @@ void *kmemset(void *d, int c, u32 n) { u8 *p=d; while(n--) *p++=c; return d; }
 void *kmemcpy(void *d, const void *s, u32 n) { u8 *p=d; const u8 *q=s; while(n--) *p++=*q++; return d; }
 static u32 host_kprintf_count;
 void __cdecl kprintf(u8 a,const char *f,...) { (void)a;(void)f; host_kprintf_count++; }
+void __cdecl console_printf(u8 a,const char *f,...) { (void)a;(void)f; host_kprintf_count++; }
 static u32 arena_top_pfn;   /* 凍結した exec 上端 (PFN) */
 
 static u32 ws_pages(u32 limit)

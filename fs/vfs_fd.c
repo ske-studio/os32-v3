@@ -9,6 +9,7 @@
 #include "fd_redirect.h"
 #include "os32_kapi_shared.h" /* O_RDONLY, SEEK_SET 等 */
 #include "console.h"
+#include "platform_console.h"   /* platform_fd1_write (機種ごとの固定名) */
 #include "input_service.h"
 #include "kstring.h"
 #include "exec/exec.h"
@@ -525,7 +526,7 @@ int vfs_write_fd(int fd, const void *buf, u32 size)
             return fd_redirect_write(fd, buf, size);
         }
         /* デフォルト: コンソール出力 */
-        console_write((const char *)buf, size, ATTR_WHITE);
+        platform_fd1_write((const char *)buf, size, ATTR_WHITE);
         return size;
     }
     if (fd == 0) return VFS_ERR_INVAL;

@@ -74,7 +74,7 @@ int net_bind(const struct NetNicOps *ops)
         if (!rc && !tick_registered) {
             rc = link_platform_tick_register(net_jiffy);
             if (rc) {
-                kprintf(ATTR_YELLOW, "[nic] tick registration failed: %d\n", rc);
+                console_printf(ATTR_YELLOW, "[nic] tick registration failed: %d\n", rc);
                 rc = OS32_ERR_BUSY;
             } else tick_registered = 1;
         }

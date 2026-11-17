@@ -15,10 +15,8 @@ IMAGES = {
                                  'kdebug', 'lan', 'pcm', 'sqlite-proto', 'trident', 'v86')),
     'ppc-powermac': ('ppc', 'powermac', ('ppc-kboot',)),
 }
-# 数えない場所: CI (tools/ppc/compile_ci.py の 4 像) が組まない像の置き場。
-# 根の直下の shell・neg* と、どの段にあっても fd1-stream。
+# 数えない場所: CI (tools/ppc/compile_ci.py の 4 像) が組まない像の置き場 (根の直下の shell・neg*)。
 SKIP_FIRST = {'ppc-kboot': ('shell', 'neg')}
-SKIP_ANY = 'fd1-stream'
 # include/ にある機種名のヘッダ -> (軸, 機種)。置き場を移したら行を消す。
 NAMED = {
     'pc98.h': ('platform', 'pc98'), 'pegc.h': ('platform', 'pc98'),
@@ -132,8 +130,7 @@ def measure(root, image):
         base = root / 'build/out' / dep_root
         skip = SKIP_FIRST.get(dep_root, ())
         deps = [dep for dep in sorted(base.rglob('*.d'))
-                if not dep.relative_to(base).parts[0].startswith(skip)
-                and SKIP_ANY not in dep.relative_to(base).parts]
+                if not dep.relative_to(base).parts[0].startswith(skip)]
         if not deps:
             empty.append(dep_root)
         for dep in deps:

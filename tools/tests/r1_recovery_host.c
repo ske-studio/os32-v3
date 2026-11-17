@@ -41,6 +41,7 @@ static void check_cr3(u32 root) {
 void *kmemset(void *p, int c, u32 n) { u8 *b=p; while (n--) *b++=c; return p; }
 void *kmemcpy(void *p, const void *q, u32 n) { u8 *a=p; const u8 *b=q; while(n--) *a++=*b++; return p; }
 void __cdecl kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
+void __cdecl console_printf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
 void kfree(void *p) { (void)p; }
 static char serial[4096];
 static u32 serial_len;
