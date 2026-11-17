@@ -4,14 +4,14 @@
 /* GPR0-31, LR, CR, CTR, XER, SRR0/1, DAR, DSISR and vector. */
 #define ARCH_USER_BYTES 176
 #define ARCH_USER_ALIGN 4
-/* Parent address-space root and the kernel SP used on USER entry. */
-#define PPC_PRIV_ROOT_OFFSET 0
-#define PPC_PRIV_KERNEL_SP_OFFSET 4
-#define ARCH_PRIV_BYTES 8
+/* Kernel SP used on USER entry. */
+#define PPC_PRIV_KERNEL_SP_OFFSET 0
+#define ARCH_PRIV_BYTES 4
 #define ARCH_PRIV_ALIGN 4
 #define ARCH_ENTRY_BYTES 24
 #define ARCH_ENTRY_ALIGN 4
-/* USER has no floating-point or vector state. */
-#define ARCH_FP_BYTES 1
-#define ARCH_FP_ALIGN 1
+/* 32 FPR bit images followed by the 8-byte mffs image; no vector state. */
+#define PPC_FP_FPSCR_OFFSET 256
+#define ARCH_FP_BYTES 264
+#define ARCH_FP_ALIGN 8
 #endif

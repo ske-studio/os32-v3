@@ -644,6 +644,7 @@ static void stubs(void)
     CHECK(os32_sqlite_close(0) == OS32_ERR_NOSYS);
     CHECK(os32_sqlite_exec(0, "select 1", 0, 0, 0) == OS32_ERR_NOSYS);
     CHECK(os32_sqlite_memory_used() == 0);
+    CHECK(os32_sqlite_column_f64_bits(0, 0) == 0ULL);
     CHECK(os32_sqlite_outer_canary() == -1);
 }
 static int selected(void *arg, int n, char **values, char **names)
@@ -1093,6 +1094,23 @@ void _start(void)
     CHECK(os32_sqlite_step(stmt) == SQLITE_DONE);
     CHECK(os32_sqlite_finalize(stmt) == SQLITE_OK);
     if (input[0] >= 40 && input[0] <= 44) { stack_workload(db, input[0]); finish(0); }
+    CHECK(os32_sqlite_prepare_v2(db,
+        "SELECT 1.5, -2.75, 1.5+2.75, 1.5*2.0, 3.0/2.0, "
+        "date('now'), time('now'), strftime('%Y-%m-%d %H:%M:%S','now'), "
+        "julianday('1970-01-01'), 1.5<2.75, 1.5=1.5",
+        -1, &stmt, 0) == SQLITE_OK);
+    CHECK(os32_sqlite_step(stmt) == SQLITE_ROW);
+    CHECK(os32_sqlite_column_f64_bits(stmt, 0) == 0x3ff8000000000000ULL);
+    CHECK(os32_sqlite_column_f64_bits(stmt, 1) == 0xc006000000000000ULL);
+    CHECK(os32_sqlite_column_f64_bits(stmt, 2) == 0x4011000000000000ULL);
+    CHECK(os32_sqlite_column_f64_bits(stmt, 3) == 0x4008000000000000ULL);
+    CHECK(os32_sqlite_column_f64_bits(stmt, 4) == 0x3ff8000000000000ULL);
+    CHECK(!memcmp(os32_sqlite_column_text(stmt, 5), "2023-11-14", 11));
+    CHECK(!memcmp(os32_sqlite_column_text(stmt, 6), "22:13:20", 9));
+    CHECK(!memcmp(os32_sqlite_column_text(stmt, 7), "2023-11-14 22:13:20", 20));
+    CHECK(os32_sqlite_column_f64_bits(stmt, 8) == 0x41429ec5c0000000ULL);
+    CHECK(os32_sqlite_column_int(stmt, 9) == 1 && os32_sqlite_column_int(stmt, 10) == 1);
+    CHECK(os32_sqlite_finalize(stmt) == SQLITE_OK);
     /* Recursive expression parsing on the real engine stack, product config. */
     CHECK(os32_sqlite_prepare_v2(db,
         "SELECT abs(abs(abs(abs(abs(abs(abs(abs(abs(abs(abs(abs("

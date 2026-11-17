@@ -1,3 +1,6 @@
+#ifdef TICK_PROBE
+#include "tick_probe.h"
+#endif
 /* Intel SDM Vol.3A 253668-060US, 11.11.1-4/7-8 and 11.12.
  * The caller owns the device range and drawing lifetime; this owns CPU state.
  */
@@ -208,6 +211,9 @@ int x86_wc_acquire(u32 base, u32 bytes, struct x86_wc_lease *lease)
     lease->owned = 1;
     new_base = (base & addr_mask) | MTRR_WC;
     new_mask = (addr_mask & ~((unsigned long long)bytes - 1)) | MTRR_VALID;
+#ifdef TICK_PROBE
+    tick_probe_wc_begin((unsigned long)__builtin_return_address(0));
+#endif
     wc_begin(&saved);
     wc_wrmsr(MSR_DEF_TYPE, def_type & ~MTRR_ENABLE);
     wc_write_pair(lease->slot, new_base, new_mask);
@@ -218,6 +224,9 @@ int x86_wc_acquire(u32 base, u32 bytes, struct x86_wc_lease *lease)
     }
     wc_wrmsr(MSR_DEF_TYPE, def_type);
     wc_end(&saved);
+#ifdef TICK_PROBE
+    tick_probe_wc_end();
+#endif
     lease->active = 1; /* Fatal rollback retains the recovery lease. */
     if (result >= 0) lease->active = result;
     return result;
@@ -228,18 +237,30 @@ int x86_wc_release(struct x86_wc_lease *lease)
     struct wc_cpu_state saved;
     if (!lease->active) return 0;
     if (!lease->owned) {
+#ifdef TICK_PROBE
+        tick_probe_wc_begin((unsigned long)__builtin_return_address(0));
+#endif
         wc_begin(&saved);
         wc_end(&saved);
+#ifdef TICK_PROBE
+        tick_probe_wc_end();
+#endif
         lease->active = 0;
         return 0;
     }
     unsigned long long def_type = wc_rdmsr(MSR_DEF_TYPE);
+#ifdef TICK_PROBE
+    tick_probe_wc_begin((unsigned long)__builtin_return_address(0));
+#endif
     wc_begin(&saved);
     wc_wrmsr(MSR_DEF_TYPE, def_type & ~MTRR_ENABLE);
     wc_write_pair(lease->slot, lease->old_base, lease->old_mask);
     int restored = wc_pair_matches(lease->slot, lease->old_base, lease->old_mask);
     wc_wrmsr(MSR_DEF_TYPE, def_type);
     wc_end(&saved);
+#ifdef TICK_PROBE
+    tick_probe_wc_end();
+#endif
     if (!restored) return -1;
     lease->active = 0;
     return 0;

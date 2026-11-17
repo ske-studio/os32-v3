@@ -1,6 +1,6 @@
 # kernel/v86/ — 設計
 > 状態: **現行 (2026-10-31)** — 出所: DEP_DIR_C_DESIGN・DEP_DIR_D1_DESIGN・DEP_DIR_D_DESIGN・MEMMAP_V3 (D1 で移した)
-ソース: `arch/x86/legacy/`（旧 `kernel/v86/` は転送ヘッダのみ）、機種 BIOS・PIC・KBD・I/O は `platform/pc98/legacy/`
+ソース: `platform/pc98/legacy/`（V86 のモニタと、機種の BIOS・PIC・KBD・I/O。旧 `kernel/v86/` は転送ヘッダのみ）
 
 ### v86_bios
 
@@ -16,7 +16,7 @@ V86失敗はline→残列空白の順で同口を使う。
 
 低位 640KB は V86 用などに解放してよい
 
-**V86 セッション中だけ** `v86_mem.c` の既存機構どおり master の低位 (ページ 0 は実物、アリーナ 0x1000〜0x9FFFF、VRAM 0xA0000〜0xBFFFF、ROM) に USER を立て、**終了時に supervisor へ復元する** (`v86_mem.c:73,99`、`v86.c:93`)。
+**V86 セッション中だけ** `v86_mem.c` の既存機構どおり master の低位 (ページ 0 は実物、アリーナ 0x1000〜0x9FFFF、VRAM 0xA0000〜0xBFFFF、ROM) に USER を立て、**終了時に supervisor へ復元する** (`v86_mem.c`、`v86.c:93`)。
 
 | 何 | なぜ連続 | 対処 |
 |---|---|---|
@@ -24,4 +24,4 @@ V86失敗はline→残列空白の順で同口を使う。
 
 ## 索引
 
-- [arch/x86/legacy/v86.c](v86.md)
+- [platform/pc98/legacy/v86.c](v86.md)

@@ -39,9 +39,10 @@
 /* ======================================================================== */
 
 #include "paging.h"
+#include "paging_app.h"
 
 #include "io.h"
-#include "legacy_lowmap.h"
+#include "paging_lowmap.h"
 #include "cpu.h"      /* arch_mmu_* (実装は arch/$(ARCH)/arch_cpu.h) */
 #include "memmap.h"
 #include "pgalloc.h"
@@ -62,6 +63,7 @@ static u32 native_cache_bits(u32 a)
     return 0;
 }
 
+u32 paging_irq_ops;
 u32 paging_sqlite_stack_guard;
 
 /* カーネルスタック帯のレイアウト不変条件。

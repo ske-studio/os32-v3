@@ -6,7 +6,7 @@
 
 | 指摘 | 答え |
 |---|---|
-| ③ shlib 184KB | 池から実ページ数、owner=shlib。text は各 AS の私有 PT に RO+USER (`shlib.c:262` の attach を AS ごとに)、data 複製は owner=そのアプリ (**私有総量 2MB の内側**) |
+| ③ shlib 184KB | 池から実ページ数、owner=shlib。text は各 AS の私有 PT に RO+USER (`shlib.c` の attach を AS ごとに)、data 複製は owner=そのアプリ (**私有総量 2MB の内側**) |
 
 | 何 | なぜ連続 | 対処 |
 |---|---|---|

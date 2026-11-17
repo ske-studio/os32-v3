@@ -6,6 +6,8 @@
 #include "ppc_hpt.h"
 #include "ppc_pd.h"
 #include "ppc_trap.h"
+/* Fixture owns IRQ context storage; no shared product definition. */
+volatile u32 kctx_irq_depth;
 #define TEST_VA 0x50000000U
 #define NEST_VA 0x60000000U
 #define IO_VA 0xfe300000U

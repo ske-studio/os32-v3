@@ -2205,7 +2205,7 @@ fn a_running_app_yields_to_a_parked_app_that_has_a_deliverable_paint() {
 /*      `op_wait` の中では**予約するだけ**で、park で top-level へ    */
 /*      戻ったところで実行する。                                     */
 /*  A3: `SWITCH_CUI` / `SHUTDOWN` で Quit に応答しないアプリは        */
-/*      `QUIT_GRACE_CYCLES` 周待ってから畳む。                       */
+/*      `QUIT_GRACE_TICKS` ジフィ (3 秒) 待ってから畳む。                       */
 /* ================================================================ */
 
 /// アプリ 2 本 (owner 2, 3) をグローバルの `GuiState` に載せる。
@@ -2323,54 +2323,45 @@ fn ctrl_stop_with_focus_on_another_app_clears_the_abort_and_kills_the_focused_on
     wm::g().inited = false;
 }
 
-/* ---- (c) SWITCH_CUI: Quit に応答しないアプリは N 周後に畳む ---- */
+/* ---- (c) Quit の猶予はジフィで測る (u32 の周回も含む) ---- */
 #[test]
-fn switch_cui_folds_an_app_that_ignores_quit_after_the_grace_cycles() {
+fn switch_cui_grace_ticks() {
     use crate::{mocks, multiapp, session, wm};
     use os32api::gui::proto::GUI_SESSION_SWITCH_CUI;
-    mocks::init();
-    session::clear(); /* 前の試験の SessionAction を持ち越さない */
-    let shm = mocks::Shm::new();
-    two_app_global(&shm);
+    for start in [100u32, u32::MAX - 149] {
+        mocks::init();
+        session::clear();
+        let shm = mocks::Shm::new();
+        two_app_global(&shm);
+        mocks::set_tick(start);
+        wm::g().now = start;
+        assert_eq!(session::set_wm(wm::g(), GUI_SESSION_SWITCH_CUI, b"\0"), 0);
+        assert_eq!(session::quit_grace_left(), session::QUIT_GRACE_TICKS);
+        wm::g().reclaim_owner(3);
+        session::reclaim_owner(3);
+        multiapp::on_owner_exit(3);
 
-    /* 全アプリへ Quit を配る (契約 S5)。 */
-    assert_eq!(session::set_wm(wm::g(), GUI_SESSION_SWITCH_CUI, b"\0"), 0);
-    assert_eq!(
-        session::quit_grace_left(),
-        session::QUIT_GRACE_CYCLES,
-        "Quit を配ったのに猶予が始まっていない"
-    );
-
-    /* アプリ 3 は Quit に応じて終了した (回収は `gui_owner_exit` 経由)。 */
-    wm::g().reclaim_owner(3);
-    session::reclaim_owner(3);
-    multiapp::on_owner_exit(3);
-
-    /* アプリ 2 は Quit を無視して待ち続ける。N-1 周ではまだ畳まない。 */
-    let mut n = 0;
-    while n < session::QUIT_GRACE_CYCLES - 1 {
+        // 1 kHz の像や WAIT_POLL による多数の周でも時刻が同じなら切れない。
+        for _ in 0..1000 { session::x3_cycle(wm::g()); }
+        assert!(!multiapp::pending_top_level_work(), "同じジフィで切れた");
+        assert_eq!(session::quit_grace_left(), session::QUIT_GRACE_TICKS);
+        let before = start.wrapping_add(session::QUIT_GRACE_TICKS - 1);
+        mocks::set_tick(before);
+        wm::g().now = before;
         session::x3_cycle(wm::g());
-        n += 1;
+        assert_eq!(session::quit_grace_left(), 1);
+        assert!(!multiapp::pending_top_level_work(), "期限前に切れた");
+        let deadline = before.wrapping_add(1);
+        mocks::set_tick(deadline);
+        wm::g().now = deadline;
+        session::x3_cycle(wm::g());
+        assert_eq!(session::quit_grace_left(), 0);
+        assert!(multiapp::pending_top_level_work(), "期限で kill が予約されない");
+        assert!(multiapp::resume_one(wm::g()));
+        assert_eq!(mocks::kill_calls(), vec![2]);
+        assert_eq!(multiapp::live_count(), 0);
+        wm::g().inited = false;
     }
-    assert!(
-        !multiapp::pending_top_level_work(),
-        "猶予が切れる前に畳もうとした ({n} 周)"
-    );
-
-    /* N 周目で打ち切り。 */
-    session::x3_cycle(wm::g());
-    assert!(
-        multiapp::pending_top_level_work(),
-        "N 周待っても応答しないアプリが畳まれない (SWITCH_CUI が永久に成立しない)"
-    );
-    assert!(multiapp::resume_one(wm::g()), "top-level が kill を実行しない");
-    assert_eq!(
-        mocks::kill_calls(),
-        vec![2],
-        "応答したアプリまで畳んだ / 相手が違う"
-    );
-    assert_eq!(multiapp::live_count(), 0, "全回収になっていない");
-    wm::g().inited = false;
 }
 
 /* ---- (c') 全員が応答したら誰も畳まない ---- */
@@ -2392,7 +2383,7 @@ fn switch_cui_kills_nobody_when_every_app_answers_the_quit() {
         id += 1;
     }
     let mut n = 0;
-    while n < session::QUIT_GRACE_CYCLES + 2 {
+    while n < session::QUIT_GRACE_TICKS + 2 {
         session::x3_cycle(wm::g());
         n += 1;
     }
@@ -4629,6 +4620,26 @@ fn k80_stop_culprit_wins_over_fullscreen_owner() {
     fullscreen::reset();
 }
 
+#[test]
+fn remote_g3_delivery_does_not_consume_notice() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    static READS: AtomicUsize = AtomicUsize::new(0);
+    unsafe extern "C" fn read(_: u32, _: u32, _: *mut u8) -> i32 {
+        READS.fetch_add(1, Ordering::SeqCst); -7
+    }
+    crate::mocks::init();
+    READS.store(0, Ordering::SeqCst);
+    let mut api = unsafe { core::ptr::read(os32api::api()) };
+    api.host_notice_read = read;
+    os32api::os32_init(Box::into_raw(Box::new(api)));
+    let shm = crate::mocks::Shm::new();
+    let mut st = g2w_state(&shm);
+    crate::mocks::HOST_NOTICE_SERIAL.store(1, Ordering::SeqCst);
+    crate::wm::wm_cycle(&mut st, crate::input::Ctx::Wait);
+    assert_eq!(READS.load(Ordering::SeqCst), 0);
+    assert_eq!(g2w_events(&st, 2).len(), 1);
+}
+
 // B5: gshell は通知を消費せず、前景のアプリへ payload なしで知らせる。
 #[test]
 fn host_notice_cycles_deliver_once_to_foreground() {
@@ -4813,4 +4824,156 @@ fn w2_failed_check_skips_draw() {
     wm::wm_cycle(&mut st, input::Ctx::Wait);
     assert!(st.screen_dirty.is_empty(), "successful check must draw retained damage");
     assert!(mocks::present_counts().1 > before.1);
+}
+
+#[test]
+fn poll_clock_fallback_and_same_ms_wake() {
+    use crate::{mocks, multiapp, poll_clock};
+    use std::sync::atomic::{AtomicU32, Ordering};
+    static US_LO: AtomicU32 = AtomicU32::new(0);
+    static US_HI: AtomicU32 = AtomicU32::new(0);
+    unsafe extern "C" fn clock(lo: *mut u32, hi: *mut u32) -> i32 {
+        *lo = US_LO.load(Ordering::SeqCst);
+        *hi = US_HI.load(Ordering::SeqCst);
+        0
+    }
+    unsafe extern "C" fn failed(_: *mut u32, _: *mut u32) -> i32 { -1 }
+    mocks::init();
+    unsafe { (*os32api::api_ptr()).sys_time_now = failed; }
+    mocks::set_tick(123);
+    assert_eq!(poll_clock::poll_now(), 1230);
+    mocks::set_tick(u32::MAX);
+    assert_eq!(poll_clock::poll_now(), u32::MAX.wrapping_mul(10));
+    unsafe { (*os32api::api_ptr()).sys_time_now = clock; }
+    let shm = mocks::Shm::new();
+    let mut st = one_gui_app_and_a_polling_app(&shm);
+    US_LO.store(1_000_000, Ordering::SeqCst);
+    assert_eq!(poll_clock::poll_now(), 1000);
+    assert!(multiapp::resume_one(&mut st));
+    US_LO.store(1_000_500, Ordering::SeqCst);
+    assert!(!multiapp::resume_one(&mut st));
+    US_LO.store(1_001_000, Ordering::SeqCst);
+    assert!(multiapp::resume_one(&mut st));
+    US_HI.store(1, Ordering::SeqCst);
+    US_LO.store(0, Ordering::SeqCst);
+    assert_eq!(poll_clock::poll_now(), 4_294_967);
+}
+
+// The halt script models nine physical IRQs per jiffy and observes real mouse polls.
+static G3_HALTS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+static G3_POLLS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+static G3_OBS: std::sync::Mutex<Vec<usize>> = std::sync::Mutex::new(Vec::new());
+static G3_MODE: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+unsafe extern "C" fn g3_mouse(p: *mut u8) {
+    G3_POLLS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    std::ptr::write_bytes(p, 0, 10);
+}
+unsafe extern "C" fn g3_halt() {
+    use std::sync::atomic::Ordering::SeqCst;
+    let n = G3_HALTS.fetch_add(1, SeqCst) + 1;
+    G3_OBS.lock().unwrap().push(G3_POLLS.load(SeqCst));
+    if n == 9 { crate::mocks::set_tick(1); }
+    if n == 10 {
+        match G3_MODE.load(SeqCst) {
+            1 => crate::mocks::push_rawkeys(&[0x11d]),
+            2 => crate::mocks::set_kbd_pending(1),
+            3 => crate::mocks::push_rawkeys(&[0x60 | 0x100 | (0x10 << 9)]),
+            _ => {}
+        }
+    }
+    if n == 11 { crate::wm::g().quit = true; }
+    if n == 12 { crate::mocks::set_tick(2); }
+    assert!(n < 20, "halt loop did not progress");
+}
+fn g3_setup(mode: usize) {
+    use std::sync::atomic::Ordering::SeqCst;
+    crate::mocks::init();
+    G3_HALTS.store(0, SeqCst);
+    G3_POLLS.store(0, SeqCst);
+    G3_MODE.store(mode, SeqCst);
+    G3_OBS.lock().unwrap().clear();
+    unsafe { (*os32api::api_ptr()).mouse_poll = g3_mouse; (*os32api::api_ptr()).sys_halt = g3_halt; }
+}
+static G3_CLOCK_CALLS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+unsafe extern "C" fn g3_clock(_: *mut u32, _: *mut u32) -> i32 {
+    G3_CLOCK_CALLS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    -1
+}
+#[test]
+fn g3_no_apps_halt_without_poll_clock() {
+    use std::sync::atomic::Ordering::SeqCst;
+    g3_setup(0);
+    G3_CLOCK_CALLS.store(0, SeqCst);
+    unsafe { (*os32api::api_ptr()).sys_time_now = g3_clock; }
+    let st = crate::wm::g();
+    *st = crate::wm::GuiState::NEW;
+    assert!(crate::standalone_loop(st));
+    assert!(G3_HALTS.load(SeqCst) >= 9);
+    assert_eq!(G3_CLOCK_CALLS.load(SeqCst), 0);
+}
+#[test]
+fn g3_standalone_halt_tick_and_key() {
+    g3_setup(1);
+    let st = crate::wm::g();
+    *st = crate::wm::GuiState::NEW;
+    assert!(crate::standalone_loop(st));
+    assert_eq!(*G3_OBS.lock().unwrap(), vec![1,1,1,1,1,1,1,1,1,2,3]);
+}
+#[test]
+fn g3_wait_halt_until_deadline() {
+    g3_setup(0);
+    let shm = crate::mocks::Shm::new();
+    let st = crate::wm::g();
+    *st = four_app_state(&shm);
+    st.inited = true;
+    crate::handler::gshell_gui_handler(os32api::gui::proto::GUI_OP_WAIT, 1, 2);
+    assert_eq!(G3_HALTS.load(std::sync::atomic::Ordering::SeqCst), 9);
+    assert_eq!(G3_POLLS.load(std::sync::atomic::Ordering::SeqCst), 2);
+    crate::wm::g().inited = false;
+}
+
+#[test]
+fn g3_standalone_injected_pending_does_not_cycle() {
+    g3_setup(2);
+    let st = crate::wm::g();
+    *st = crate::wm::GuiState::NEW;
+    assert!(crate::standalone_loop(st));
+    assert_eq!(*G3_OBS.lock().unwrap(), vec![1,1,1,1,1,1,1,1,1,2,2]);
+}
+
+#[test]
+fn g3_wait_same_tick_raw_key_cycles() {
+    g3_setup(1);
+    let shm = crate::mocks::Shm::new();
+    let st = crate::wm::g();
+    *st = four_app_state(&shm);
+    st.inited = true;
+    crate::handler::gshell_gui_handler(os32api::gui::proto::GUI_OP_WAIT, 2, 2);
+    assert_eq!(G3_HALTS.load(std::sync::atomic::Ordering::SeqCst), 12);
+    assert_eq!(G3_POLLS.load(std::sync::atomic::Ordering::SeqCst), 4);
+    crate::wm::g().inited = false;
+}
+
+#[test]
+fn g3_standalone_same_tick_ctrl_stop() {
+    g3_setup(3);
+    let st = crate::wm::g();
+    *st = crate::wm::GuiState::NEW;
+    assert!(crate::standalone_loop(st));
+    assert_eq!(*G3_OBS.lock().unwrap(), vec![1,1,1,1,1,1,1,1,1,2,3]);
+    assert!(!st.abort_seen, "top-level must consume CTRL+STOP");
+}
+
+#[test]
+fn g3_wait_same_tick_ctrl_stop() {
+    g3_setup(3);
+    let shm = crate::mocks::Shm::new();
+    let st = crate::wm::g();
+    *st = four_app_state(&shm);
+    st.inited = true;
+    crate::handler::gshell_gui_handler(os32api::gui::proto::GUI_OP_WAIT, 2, 2);
+    assert_eq!(G3_POLLS.load(std::sync::atomic::Ordering::SeqCst), 4);
+    assert!(crate::multiapp::pending_top_level_work());
+    assert!(!crate::wm::g().abort_seen);
+    crate::wm::g().inited = false;
 }

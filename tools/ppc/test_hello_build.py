@@ -1,9 +1,6 @@
 #!/usr/bin/env python3
 """Build the PPC USER acceptance application through its make entry point."""
-CHECK = dict(covers=['build/ppc-user.mk', 'userland/ppc/hello.c', 'userland/ppc/fault.c',
-                     'tools/ppc/test_hello_build.py'],
-             inputs=['Makefile', 'build/**', 'sdk/**', 'userland/ppc/hello.c', 'userland/ppc/fault.c',
-                     'tools/ppc/test_hello_build.py'])
+import os
 from pathlib import Path
 import shutil
 import struct
@@ -16,21 +13,21 @@ sys.path.insert(0, str(ROOT / 'sdk'))
 import os32x_hdr as hdr
 
 
-def exercise(root, mutant=False):
+def build(root):
     result = subprocess.run(['make', '-j1', 'ARCH=ppc', 'PLATFORM=powermac', 'hello', 'ppc-fault'],
                             cwd=root, capture_output=True, text=True)
     out = root / 'build/out/ppc-user'
-    if mutant:
-        assert result.returncode != 0 and 'missing validated link inputs' in result.stderr
-        assert (out / 'hello.elf').is_file() and (out / 'hello.raw').is_file()
-        assert not (out / 'hello.inputs.json').exists()
-        return
+    return result, out
+
+
+def exercise(root):
+    result, out = build(root)
     assert result.returncode == 0, result.stdout + result.stderr
     elf = hdr.Elf32(out / 'hello.elf')
     fields = struct.unpack('<16I', (out / 'hello.bin').read_bytes()[:64])
     assert fields[3] & 0x40 and fields[10] == 0x80100000
     assert fields[10] + fields[4] == elf.e_entry == elf.symbols['_start']
-    nm = subprocess.run(['/home/hight/opt/cross-ppc/bin/powerpc-elf-nm', '-u', out / 'hello.elf'],
+    nm = subprocess.run([(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc') + '/bin/powerpc-elf-nm'), '-u', out / 'hello.elf'],
                         capture_output=True, text=True, check=True)
     assert not nm.stdout.strip(), nm.stdout
     fault = struct.unpack('<16I', (out / 'fault.bin').read_bytes()[:64])
@@ -52,11 +49,16 @@ def main():
         if '--mutate' in sys.argv:
             rule = root / 'build/ppc-user.mk'
             source = rule.read_text()
+            # The app rule and the fp_probe rule share this recipe line; unguard the app rule (the first).
             old = 'python3 sdk/link_guard.py --target $(SDK_TARGET) $(LD)'
-            assert source.count(old) == 1
-            rule.write_text(source.replace(old, '$(LD)'))
+            assert source.count(old) == 2 and source.index(old) < source.index('fp_probe.elf:')
+            rule.write_text(source.replace(old, '$(LD)', 1))
             shutil.rmtree(root / 'build/out/ppc-user')
-            exercise(root, True)
+            result, out = build(root)
+            assert result.returncode != 0 and 'missing validated link inputs' in result.stderr
+            assert (out / 'hello.elf').is_file() and (out / 'hello.raw').is_file()
+            assert not (out / 'hello.inputs.json').exists()
+            print('PPC hello unguarded link: RED (1)')
     print('PPC hello build: OK')
 
 

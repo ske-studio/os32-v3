@@ -3,7 +3,7 @@
  * add periods to the negative DEC, preserving interrupt latency/phase.
  * Unlike the OpenBSD macppc re-arm scheme, never restart a full period. */
 #include "ppc_trap.h"
-#include "kernel_tick.h"
+#include "kernel/time/tick_clock.h"
 #include "kernel/irq/tick.h"
 #include "kernel/irq/irq.h"
 
@@ -14,8 +14,8 @@ static u32 next_period(void)
 {
     u32 value = period;
     fraction += remainder;
-    if (fraction >= 100) {
-        fraction -= 100;
+    if (fraction >= PM_DEC_HZ) {
+        fraction -= PM_DEC_HZ;
         ++value;
     }
     return value;
@@ -24,9 +24,10 @@ static u32 next_period(void)
 int ppc_dec_start(u32 tb_hz, u32 tick_hz)
 {
     /* Keep every period positive, and signed DEC additions in range.
-     * Match the F1 admission bounds; the public tick unit is always 10ms. */
+     * Match the F1 admission bounds; DEC is 1ms, logical ticks are 10ms. */
     if (ppc_irq_enabled() || tb_hz < 1000000 || tb_hz > 1000000000 ||
-        tick_hz != 100) return -1;
+        tick_hz != PM_DEC_HZ) return -1;
+    if (tick_clock_config(1, tick_hz)) return -1;
     ready = 0;
     period = tb_hz / tick_hz;
     remainder = tb_hz % tick_hz;
@@ -53,18 +54,22 @@ void ppc_decrementer_interrupt(struct ppc_frame *frame)
         ++elapsed;
     }
     ppc_write_dec((u32)remaining);
-    ++kctx_irq_depth;
-    while (elapsed--) {
-        ++tick_count;
-        tick_dispatch();
-    }
-    --kctx_irq_depth;
+    while (elapsed--)
+        if (tick_clock_step() & TICK_STEP_JIFFY) tick_dispatch();
 }
 
 void arch_cpu_idle(void)
 {
-    ppc_enable();
-    for (;;) __asm__ volatile("" ::: "memory");
+    /* FG1 only (EE=1, not in IRQ): nap until the next interrupt (DEC is 1 kHz).
+     * EE=0 callers keep the old contract: enable and return without sleeping.
+     * A wake-up marked between the caller's work check and the nap is
+     * picked up by the next DEC, within 1 ms. */
+    if (!ppc_irq_enabled() || kctx_irq_depth != 0) {
+        ppc_enable();
+        __asm__ volatile("nop" ::: "memory");
+        return;
+    }
+    ppc_cpu_nap();
 }
 
 void arch_cpu_halt(void)

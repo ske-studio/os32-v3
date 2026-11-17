@@ -29,17 +29,17 @@
 12. ユーザー決定: §9-1 を閉じた。GeForce の既定は DIRECT。P0 は効果を記録するためだけに回す → §4、§9
 
 ## 1. 実物の確認 (r2 と同じ。r3 で足した行だけ)
-- r2 の §1-1〜§1-4 はそのまま有効。食い違いは 4 件 (GeForce の fill/blit の書き先、M2MF では CPU が空かない、gfx_hal.h:73、Trident の間隔: main は待ち無し・wt/tri-gap は 80ns)。
-- userland/lib/gfx/libos32gfx_core.c:174-181 `libos32gfx_check`: CPL=0 で ready なら何も見ずに 0 を返す。:204-208 `gfx_present` は dirty を積むだけ。:210-234 の getchar・trygetchar・yield・halt は呼んだ後に `libos32gfx_check` を通る。
-- gfx/gfx_core_surface.inc:323-353 `gfx_reinit_surface_roles`: (0) で `lease_revoke_surface` (写像を外す)、(1) で `ledger_surface_regen` (世代を上げる)、最後に `gfx_bind_client`。
-- exec/surface_query.c:205-212: `surface_query` も `surface_query_authorize` (:95-106) を通る。lease は :251、bundle は :259。
-- userland/gshell/src/visible.rs:186-: `recompute_and_expose` が全部の窓の vis を計算し直し、露出した所を dirty に足す。vis と dirty はクライアントのローカル座標 (wm.rs:11)。
+- r2 の §1-1〜§1-4 はそのまま有効。食い違いは 4 件 (GeForce の fill/blit の書き先、M2MF では CPU が空かない、gfx_hal.h、Trident の間隔: main は待ち無し・wt/tri-gap は 80ns)。
+- userland/lib/gfx/libos32gfx_core.c `libos32gfx_check`: CPL=0 で ready なら何も見ずに 0 を返す。同ファイル内 `gfx_present` は dirty を積むだけ。`libos32gfx_getchar()` の getchar・trygetchar・yield・halt は呼んだ後に `libos32gfx_check` を通る。
+- gfx/gfx_core_surface.inc `gfx_reinit_surface_roles`: (0) で `lease_revoke_surface` (写像を外す)、(1) で `ledger_surface_regen` (世代を上げる)、最後に `gfx_bind_client`。
+- exec/surface_query.c: `surface_query` も `surface_query_authorize`  を通る。lease は `surface_api_lease()`、bundle は `surface_api_bundle()`。
+- userland/gshell/src/visible.rs-: `recompute_and_expose` が全部の窓の vis を計算し直し、露出した所を dirty に足す。vis と dirty はクライアントのローカル座標 (wm.rs)。
 
 ## 2. 方式 (決定済み)
 | backend | 正 | 書く経路 |
 |---|---|---|
 | GeForce (INDEX8・640×480・常設の写像の中) | **VRAM (DIRECT、既定)** | HAL の口 → DISPLAY |
-| GeForce (常設の写像の外・全画面の間) | RAM (SHADOW) | 今の CLIENT と present (backend_geforce.c:560-591) |
+| GeForce (常設の写像の外・全画面の間) | RAM (SHADOW) | 今の CLIENT と present (backend_geforce.c) |
 | Trident・Cirrus・PEGC・PC-98 | RAM (SHADOW) | 今のまま |
 - 契約 G4: DIRECT の間、CPL=3 は CLIENT も DISPLAY も写像しない。RAM の CLIENT は登録したまま残し、SHADOW に戻るときと全画面アプリが使う。DIRECT の間は中身が古い。
 - 読むのは GET だけ。XOR は ROP、透過は key 付きの PUT か透過の MONO で行う。
@@ -82,7 +82,7 @@ typedef struct GfxDirectOps {
     int (*shadow_fill_rect)(int, int, int, int, u8);  /* SHADOW のときの表の値 (CLIENT が RAM なら NULL) */
     int (*shadow_blit)(int, int, int, int, int, int);
 ```
-- GeForce は backend_geforce.c:260-262 で表を直接書くのをやめる。代わりに `direct_ops` を埋め、`shadow_*` は NULL にする。走査面の確定は `gfx_policy_reeval` に任せる。
+- GeForce は backend_geforce.c で表を直接書くのをやめる。代わりに `direct_ops` を埋め、`shadow_*` は NULL にする。走査面の確定は `gfx_policy_reeval` に任せる。
 - fill_rop・mono・put・get の色・鍵・画素は **INDEX8 専用** (§3-7)。
 - `mono` は任意。透過、または `mono==NULL` のときは、カーネルの gfx_hw_mono_cpu.c が展開する。1 は fg、0 は `fg^1` にして、行を束ねた小片 (4KiB) ごとに `put(key = bg<0 ? fg^1 : -1)` を呼ぶ。不透明なら 0 を bg にする。
 - `fill_rect`・`blit` の書き先: DIRECT なら DISPLAY。SHADOW で CLIENT が VRAM の backend なら CLIENT。SHADOW で CLIENT が RAM なら NULL (GeForce の SHADOW も NULL)。
@@ -111,7 +111,7 @@ if (n > GFX_CMD_MAX || (user && !ring3_user_range_ok((u32)cmds, n * sizeof(GFX_C
 for (u32 i = 0; i < n; i++) { int rc = submit_one(&cmds[i], user); if (rc) return rc; *done = i + 1; }
 return 0;
 ```
-- 命令ごとの検査は r2 の表のとおり。COPY は 2 つの矩形を一緒に削る。PUT は `w ≤ pitch` で範囲が `(h-1)*pitch+w`、MONO は `(w+7)/8 ≤ pitch`、GET は書けること。どれも u32 のあふれを見る。読みの検査は既存の `ring3_user_range_ok` (exec/exec.c:467) を使う (H2 の着地、gfx/gfx_hw_submit.c:16-17)。
+- 命令ごとの検査は r2 の表のとおり。COPY は 2 つの矩形を一緒に削る。PUT は `w ≤ pitch` で範囲が `(h-1)*pitch+w`、MONO は `(w+7)/8 ≤ pitch`、GET は書けること。どれも u32 のあふれを見る。読みの検査は既存の `ring3_user_range_ok` (exec/exec.c) を使う (H2 の着地、gfx/gfx_hw_submit.c)。
 - `*done` は全部終わった先頭の数。`cmds[*done]` は途中まで書いたかもしれないので、再送しない。
 
 ### 3-3. libos32gfx・libos32gui・WM の境目
@@ -138,9 +138,9 @@ int libos32gfx_check(void)
 int libos32gfx_take_regen(void) { int r = gfx_regen; gfx_regen = 0; return r; }
 ```
 - `gfx_flush()`: 区画を submit する。成功なら 0。NOSYS・STALE・そのほかの誤りでは、束を捨てて `gfx_lost=1` にし、負の値を返す (次の check で attach し直す)。
-- check (= flush) を通る所: C の `gfx_present` (:204)・`libos32gfx_getchar`・`trygetchar` (キーがあったとき)・`yield`・`halt` (:210-234、**呼ぶ前**に flush、呼んだ後に check)。Rust の client.rs の COMMIT・WAIT・POLL の前。wm.rs:906 の前。filer_core.c:277・tilemap_compose.c:877 の前。libos32gfx の detach・終了。束が 64 本を超えるとき、または区画があふれるとき。
+- check (= flush) を通る所: C の `gfx_present` (:204)・`libos32gfx_getchar`・`trygetchar` (キーがあったとき)・`yield`・`halt` (:210-234、**呼ぶ前**に flush、呼んだ後に check)。Rust の client.rs の COMMIT・WAIT・POLL の前。wm.rs の前。filer_core.c・tilemap_compose.c (tilemap_present()) の前。libos32gfx の detach・終了。束が 64 本を超えるとき、または区画があふれるとき。
 - 描き直しの順は**固定**: check → (成功したら) take_regen → 描き直し。flush だけでは回復しない (flush は gfx_lost を立てるだけで、attach し直すのは check)。
-  - gshell: 各周の頭 (wm.rs の周の入口、:1180 付近の wm_cycle の先頭) と flush_present (:898) で `libos32gfx_check()` を呼ぶ。0 が返ってから `take_regen` を見て、立っていれば `composite_full` と `invalidate_all_clients` を呼ぶ。check が負なら、その周は描かずに次の周で check をやり直す。
+  - gshell: 各周の頭 (wm.rs の周の入口、同ファイル内 付近の wm_cycle の先頭) と flush_present  で `libos32gfx_check()` を呼ぶ。0 が返ってから `take_regen` を見て、立っていれば `composite_full` と `invalidate_all_clients` を呼ぶ。check が負なら、その周は描かずに次の周で check をやり直す。
   - libos32gui: client.rs の WAIT・POLL (:331 付近) から戻ったら、`libos32gfx_check()` → 0 なら `take_regen` → 立っていれば自分の窓を全面 INVALIDATE する。COMMIT の前は flush だけを行う。
 ```rust
 // userland/rust/libos32gui/src/client.rs: WAIT/POLL の戻りの共通の後処理
@@ -176,7 +176,7 @@ static void push_rows(u16 op, ..., const u8 *src, u32 pitch, u32 rowbytes, int h
 | いつ | 向き |
 |---|---|
 | GUI に入る・全画面から GUI に戻る・page_flip/set_mode で写像の中に戻る | 共通の条件 (下) を満たせば DIRECT |
-| 全画面に入る (gfx_core.c:30 `appslot_gfx_claim`)・GUI を出る・`gfx_shutdown` (:466-)・写像の外への page_flip/set_mode (backend_geforce.c:239-263)・backend の誤り | SHADOW |
+| 全画面に入る (gfx_core.c `appslot_gfx_claim`)・GUI を出る・`gfx_shutdown` ・写像の外への page_flip/set_mode (backend_geforce.c)・backend の誤り | SHADOW |
 - 呼ぶ側は向きを決めない。どの契機でも `gfx_policy_reeval()` を呼び、向きは下の共通の条件だけで決める (走査面の確定が「全画面中は SHADOW」より優先されることは無い)。
 ```c
 /* DIRECT へ移る共通の条件: GUI が画面を所有し、全画面の所有者がいない (surface_query.c:96-103 と同じ判定の材料) */
@@ -212,13 +212,13 @@ static int gfx_policy_blocks_map(u32 role)
     return g_backend && g_backend->policy == GFX_POLICY_DIRECT &&
            (role == LEDGER_ROLE_CLIENT || role == LEDGER_ROLE_DISPLAY);
 }
-/* exec/surface_query.c:251 surface_api_lease・:259 surface_api_bundle の先頭、
+/* exec/surface_query.c surface_api_lease・:259 surface_api_bundle の先頭、
    gfx_core_bridge.inc:9 と CPL=3 からの gfx_get_framebuffer: */
 if (gfx_policy_blocks_map(role)) return OS32_ERR_NOSYS;   /* bridge・get_framebuffer は 0 で埋める */
 ```
-- 全画面アプリの DISPLAY の lease (surface_query.c:102) は SHADOW の中で今どおり。契約は縮めない。
+- 全画面アプリの DISPLAY の lease (surface_query.c) は SHADOW の中で今どおり。契約は縮めない。
 
-### 3-5. 窓の移動 (userland/gshell/src/movecopy.rs、input.rs:896-926 と wm.rs:1497-1512 から呼ぶ)
+### 3-5. 窓の移動 (userland/gshell/src/movecopy.rs、input.rs:896-926 と wm.rs から呼ぶ)
 ```
 old_outer = w.outer(); old_org = w.client_origin(); old_vis = w.vis      // ローカル座標
 cursor::hide; drop_drag_frame                                            // 枠の消去で生じた dirty も下で引く
@@ -276,7 +276,7 @@ add_dirty(w, rv − cp)                               // Paint で返す
 ## 5. backend ごとの対応
 | backend | 方式 | 中身 |
 |---|---|---|
-| GeForce | **DIRECT が既定**。`direct_ok` が偽 (写像の外・非 INDEX8・寸法違い) または全画面の間は SHADOW。非 INDEX8 と寸法違いは今どおり GUI 不可 (backend_geforce.c:553-556) | fill・blit・fill_rop は gf3 (GXcopy/GXxor)、put は CPU の dword + WC で key は画素を飛ばし最後に t_d、get は UC の読み (写像の中だけなので常に可)、mono は D4 で不透明だけ gf3_mono、hw_ops を数える |
+| GeForce | **DIRECT が既定**。`direct_ok` が偽 (写像の外・非 INDEX8・寸法違い) または全画面の間は SHADOW。非 INDEX8 と寸法違いは今どおり GUI 不可 (backend_geforce.c) | fill・blit・fill_rop は gf3 (GXcopy/GXxor)、put は CPU の dword + WC で key は画素を飛ばし最後に t_d、get は UC の読み (写像の中だけなので常に可)、mono は D4 で不透明だけ gf3_mono、hw_ops を数える |
 | Trident | SHADOW (ram_fallback・GE 無効・80ns) | 変えない (方式は常に SHADOW、lease も今どおり) |
 | Cirrus・PEGC・PC-98 | SHADOW | 変えない |
 
@@ -293,11 +293,11 @@ vmkernel +3KB (FD に入る。FD_MIN_FREE_KB=64 を check-packages-host で確�
 | H2a | exec/exec.c | 不要で閉じた (H2 が読みに既存の `ring3_user_range_ok` を使って着地) | — | 0 |
 | H3 | gfx/gfx_hw_mono_cpu.c (新) | 透過も不透明も小片にまとめて put | H1 | 80 |
 | H4 | gfx/gfx_policy.c (新) | §3-4 の `gfx_direct_wanted`・`gfx_policy_reeval`・hook の差し替え・世代 | H1 | 140 |
-| H5 | exec/surface_query.c:251・259、gfx_core_bridge.inc:9、gfx_core_framebuffer.inc:49 | `gfx_policy_blocks_map` (共通の認可には入れない) | H4 | 30 |
+| H5 | exec/surface_query.c、gfx_core_bridge.inc、gfx_core_framebuffer.inc (gfx_get_framebuffer()) | `gfx_policy_blocks_map` (共通の認可には入れない) | H4 | 30 |
 | H6 | gfx/gfx_core.c | 全画面に入る・出る、GUI に入る・出る、shutdown から `gfx_policy_reeval` を呼ぶ | H4 | 20 |
 | G1 | drivers/video/geforce/gf_direct.c (新) | `gf_direct_ok` (写像の中という条件を含む)・put・get・`direct_ops` | H1 | 200 |
 | G2 | drivers/video/geforce/gf_hook.c | 書き先を DISPLAY に、fill_rop (GXcopy/GXxor)、hw_ops を数える | H1 | 50 |
-| G3 | backend_geforce.c (:239-263・:260-262・:640・present)、geforce_module.c:210-214 | 走査面が確定したら `gfx_policy_reeval()` を呼ぶ (向きは決めない)。表への直書きを外して `direct_ops` を登録、能力ビット、present は数えるだけ、新しい口の `module_text_contains` | G1・G2・H4 | 60 |
+| G3 | backend_geforce.c (`gf_hook_scan_changed()`・`geforce_query()`・present)、geforce_module.c | 走査面が確定したら `gfx_policy_reeval()` を呼ぶ (向きは決めない)。表への直書きを外して `direct_ops` を登録、能力ビット、present は数えるだけ、新しい口の `module_text_contains` | G1・G2・H4 | 60 |
 | L0 | userland/lib/gfx/libos32gfx_core.c | §3-3a の check・take_regen、DIRECT の attach・detach、gfx_present・getchar・trygetchar・yield・halt の前に flush | H1 | 70 |
 | L1 | userland/lib/gfx/draw/gfx_cmd.c (新) | §3-3b の束・区画への写し・行での分け・gfx_flush | H1 | 170 |
 | L2 | userland/lib/gfx/draw/gfx_draw.c | 点・線・矩形・get_pixel の振り分け | L1 | 60 |
@@ -305,16 +305,16 @@ vmkernel +3KB (FD に入る。FD_MIN_FREE_KB=64 を check-packages-host で確�
 | L4 | userland/lib/gfx/text/gfx_font.c・gfx_kcg.c | 文字列を 1bpp の小片に並べて MONO 1 本 | L1 | 70 |
 | L5 | userland/lib/gfx/draw/gfx_blt.c・gfx_sprite.c・gfx_surface.c・gfx_rotate.c | 面 → PUT (色鍵) | L1 | 70 |
 | L6 | userland/lib/gfx/draw/gfx_copy.c (新) | gfx_copy_rect (SHADOW / DIRECT) | L1 | 60 |
-| L7 | userland/lib/filer/filer_core.c:277、userland/lib/tilemap/tilemap_compose.c:877 | 前に gfx_flush | L1 | 10 |
+| L7 | userland/lib/filer/filer_core.c、userland/lib/tilemap/tilemap_compose.c | 前に gfx_flush | L1 | 10 |
 | U1 | userland/rust/libos32gui/src/draw.rs | fb_base の 12 か所を振り分け、XOR は fill_rop、失敗したら INVALIDATE | L1 | 90 |
 | U2 | libos32gui/src/client.rs・scroll.rs (新) | COMMIT の前に flush、WAIT・POLL の戻りで check → take_regen → INVALIDATE、§3-6 のクライアント側 | L0・W3 | 80 |
 | U3 | libos32gui/src/widget.rs:498-501 | リストのスクロールを U2 で | U2 | 30 |
 | U4 | edit_gui/src/lib.rs:256、filer/src/lib.rs:358・1401 | U2 を使う | U2 | 40 |
 | W1 | userland/gshell/src/movecopy.rs (新) | §3-5 の順 | L6 | 160 |
-| W2 | gshell/src/input.rs:896-926、wm.rs:898・906・1180・1497-1512 | W1 を呼ぶ、flush_present の前と各周の頭で check → take_regen → 描き直し | W1・L0 | 50 |
+| W2 | gshell/src/input.rs:896-926、wm.rs | W1 を呼ぶ、flush_present の前と各周の頭で check → take_regen → 描き直し | W1・L0 | 50 |
 | W3 | gshell/src/scroll_op.rs (新)・handler.rs の表・reqs.rs、os32_gui_shared.h・proto.rs | §3-6 の WM の式、GUI の proto の版を上げる | W1 | 140 |
 | W4 | gshell/src/cursor.rs | DIRECT の下地は gfx_hw_get を 1 回 (160B) | L1 | 30 |
-| S1 | gfx/gfx_vram.c・userland/gshell/src/damage.rs | D3 (中身は P0 の結果で票に書く)。gfx_vram.c は PPC の初回成功集合なので PPC でも組めるまま直す | P0 | 未定 |
+| S1 | drivers/video/pc98/gfx_vram.c・userland/gshell/src/damage.rs | D3 (中身は P0 の結果で票に書く)。gfx_vram.c は PPC の初回成功集合なので PPC でも組めるまま直す | P0 | 未定 |
 | G4m | drivers/video/geforce/gf_hook_mono.c (新) | D4: 不透明の mono を gf3_mono で | G3 | 60 |
 | G5m | drivers/video/geforce/gf_put_m2mf.c (新) | D5: 不透明の大きい put・get を gf3_upload/download で。大きさは P0 から PM が決める | G3・P0 | 70 |
 - 並列: P0a・P0b・H1・H2a は最初に同時に出せる。H1 の後に H2・H3・H4・G1・G2・L0・L1 を同時に。H4 の後に H5・H6。L1 の後に L2〜L7・U1・W4 を同時に。W1 の後に W2・W3。U2 は L0 と W3 の後で、U3・U4 はその後。G4m・G5m は G3 の後。
@@ -358,10 +358,10 @@ vmkernel +3KB (FD に入る。FD_MIN_FREE_KB=64 を check-packages-host で確�
 
 
 ## P0a 典型操作の台本 (DESIGN.final §7 P0a を置き換える)
-1. **操作は 6 本**。§4 の表は効果の例で、操作の一覧ではない。台本の名前と中身は次のとおり。`move` は最前面の窓を右へ 64px 動かして戻す (`wm::move_window`、wm.rs:1497)。`scroll` は焦点の edit_gui に PageDown。`menu` はスタートメニューを開くキー (kbdnav の割り当て) を押して開き、もう一度押して閉じる。`desktop` は `wm::composite_full` (wm.rs:1007)。`char` は焦点の edit_gui に `a` と BS を交互に入れる。`list` は焦点の filer に ↓。
+1. **操作は 6 本**。§4 の表は効果の例で、操作の一覧ではない。台本の名前と中身は次のとおり。`move` は最前面の窓を右へ 64px 動かして戻す (`wm::move_window`、wm.rs)。`scroll` は焦点の edit_gui に PageDown。`menu` はスタートメニューを開くキー (kbdnav の割り当て) を押して開き、もう一度押して閉じる。`desktop` は `wm::composite_full` (wm.rs)。`char` は焦点の edit_gui に `a` と BS を交互に入れる。`list` は焦点の filer に ↓。
 2. **起動の入口は gserial の動詞** `ops <名前> <回数>` だけにする (gserial.rs:128-142 の parse に 1 行、:229-272 の dispatch に 1 行)。シェルの命令・起動引数・/api/key は使わない。実機 (ノートのシリアル) と NP21/W は同じ経路で動く。
-3. **前提は呼ぶ側が整える**: edit_gui・filer の起動と焦点は、既存の `key`・`type` で台本の前に済ませておく。焦点の窓の持ち主が違えば `error "pre" 3`。gf_accept (wm.rs:1743) の計測中なら `error "busy" 4`。
-4. **入力**: キーは `Cmd::Key` と同じ注入の経路 (gserial.rs:264-270) で入れる。move と desktop は WM の関数を直接呼ぶ。
+3. **前提は呼ぶ側が整える**: edit_gui・filer の起動と焦点は、既存の `key`・`type` で台本の前に済ませておく。焦点の窓の持ち主が違えば `error "pre" 3`。gf_accept (wm.rs) の計測中なら `error "busy" 4`。
+4. **入力**: キーは `Cmd::Key` と同じ注入の経路 (gserial.rs (execute())) で入れる。move と desktop は WM の関数を直接呼ぶ。
 5. **計測の状態の持ち主は `GuiState.ops`**。feature gf_accel_accept のときだけ、wm.rs の GuiState にフィールドを 1 つ足す。
 ```rust
 // userland/gshell/src/typical_ops.rs (新)
@@ -370,23 +370,23 @@ pub struct Run { op: u8, warm: u8, left: u16, i: u16, t0: u64, deadline: u32,
 pub fn start(st: &mut GuiState, id: &[u8], op: u8, n: u16) -> Result<(), u8>; // gserial から
 pub fn on_cycle_end(st: &mut GuiState);   // wm.rs の周の関数 (:1180 付近) の最後、flush_present の後に 1 行
 ```
-6. **始まりと終わり**: 始まりは注入の直前の `now()` と `gfx_stats` (wm.rs:1759 の now と同じ時計)。終わりは、注入の後の周で次の 4 つがそろい、その周の flush_present が済んだ時点。(a) 全部の窓の `dirty`・`issued` が空、(b) リングに配っていない物が無い、(c) `configure_pending` が無い、(d) その周で COMMIT が 1 回以上あった (desktop と move は WM の flush でよい)。1 回 2 秒で打ち切り、その回は `FAILED` として記録する。次の回は、終わった次の周で入れる。
-7. **回数と出力**: warmup 10 回の後に本番 n 回 (既定 50)。1 回ごとに `GOP1 <名前> <i> <µs> <Δpresent_bytes> <Δcommits> <Δhw_ops>` を出す (`serial_puts`、GFW1 と同じ出し方、wm.rs:1836-1838)。全部終わったら `reply(id, "end 0")`。DIRECT の量 (PUT・MONO・GET のバイト) の列は G 段で数が揃ってから末尾に足す。今は出さない。
+6. **始まりと終わり**: 始まりは注入の直前の `now()` と `gfx_stats` (wm.rs の now と同じ時計)。終わりは、注入の後の周で次の 4 つがそろい、その周の flush_present が済んだ時点。(a) 全部の窓の `dirty`・`issued` が空、(b) リングに配っていない物が無い、(c) `configure_pending` が無い、(d) その周で COMMIT が 1 回以上あった (desktop と move は WM の flush でよい)。1 回 2 秒で打ち切り、その回は `FAILED` として記録する。次の回は、終わった次の周で入れる。
+7. **回数と出力**: warmup 10 回の後に本番 n 回 (既定 50)。1 回ごとに `GOP1 <名前> <i> <µs> <Δpresent_bytes> <Δcommits> <Δhw_ops>` を出す (`serial_puts`、GFW1 と同じ出し方、wm.rs)。全部終わったら `reply(id, "end 0")`。DIRECT の量 (PUT・MONO・GET のバイト) の列は G 段で数が揃ってから末尾に足す。今は出さない。
 8. **触ってよいファイル**: typical_ops.rs (新)、gserial.rs (parse・dispatch の 2 行と `Cmd::Ops`)、wm.rs (GuiState のフィールド 1 つ・on_cycle_end の呼び出し 1 行)、lib.rs (`#[cfg(feature = "gf_accel_accept")] mod typical_ops;`)。ほかのファイルには触らない。host の試験は gshell/host/ に typical_ops_tests.rs を新しく足す (parse、終わりの 4 条件、打ち切り)。
 
 ## P0b HAL の素の時間 (DESIGN.final §7 P0b を置き換える)
-1. **置き場**: `drivers/video/geforce/gf_accept_prim.c` をやめ、**kdebug/gf_prim_bench.c (新、hwdev.mod)** にする。既存の層 3 の受入 (kdebug/gf_accel_test.c) と同じく、module の境界は `geforce_accel_ops()` (gf3_test_ops) と `geforce_foundation_ops()` だけを通る。dispatch の検査は gf_accel_test.c:96-104 と同じ条件を自前で持つ (static は共有しない)。
-2. **線 (wire)**: kdebug/gf_command_wire.h:11-14 の `enum gf2_case` の末尾に `GF6_PRIM` を足す。tools/hwdev_layout.json の enum の並びを作り直す。シェルは userland/shell/cmd_gf2.c:10-12 の `cases[]` の末尾に `"prim"` を足し、:33-35 の上限を `GF6_PRIM` にする。`gf2 prim <項目>` の項目の番号は session に入れる。
-3. **振り分け** (kdebug/gf_command_test.c:272- に 1 つ足す):
+1. **置き場**: `drivers/video/geforce/gf_accept_prim.c` をやめ、**kdebug/gf_prim_bench.c (新、hwdev.mod)** にする。既存の層 3 の受入 (kdebug/gf_accel_test.c) と同じく、module の境界は `geforce_accel_ops()` (gf3_test_ops) と `geforce_foundation_ops()` だけを通る。dispatch の検査は gf_accel_test.c と同じ条件を自前で持つ (static は共有しない)。
+2. **線 (wire)**: kdebug/gf_command_wire.h の `enum gf2_case` の末尾に `GF6_PRIM` を足す。tools/hwdev_layout.json の enum の並びを作り直す。シェルは userland/shell/cmd_gf2.c の `cases[]` の末尾に `"prim"` を足し、`shell_cmd_gf2()` の上限を `GF6_PRIM` にする。`gf2 prim <項目>` の項目の番号は session に入れる。
+3. **振り分け** (kdebug/gf_command_test.c (phase())- に 1 つ足す):
 ```c
 if (q.size == sizeof(q) && q.test == GF6_PRIM && !q.rc) {
     int rc = gf_prim_bench(q.session);   /* kdebug/gf_prim_bench.h: int gf_prim_bench(u32 item); */
     request->session = 0; request->rc = rc; return rc;
 }
 ```
-4. **ビルド**: build/hwdev.mk:5 の `HWDEV_GF` に `gf_prim_bench` を足す。tools/tests/test_kdebug_imports.py の許可の一覧に、新しく使う名前があれば足す。
+4. **ビルド**: build/hwdev.mk の `HWDEV_GF` に `gf_prim_bench` を足す。tools/tests/test_kdebug_imports.py の許可の一覧に、新しく使う名前があれば足す。
 5. **項目** (session、0 は全部): 1 `fence` (1×1 の fill = t_f)・2 `fill` (全面)・3 `copy` (全面、重なり無し)・4 `mono` (1KB の不透明)・5 `ifc` (64KB の upload、force_m2mf=false)・6 `m2mf` (64KB の upload、force_m2mf=true)・7 `bar0` (BAR0 0x000000 の 32 ビットの読み = t_d)。書き先は `o->test_surface` で、表示面には書かない。test_surface が 640×480 より小さいときは、面の寸法で測って寸法も出す。
-6. **時計と回数**: `f->io.timing.clock_us` (gf_accel_test.c:123 と同じ)。1 本が短いので、100 本を 1 組として組の時間を測る。warmup 1 組の後に本番 50 組。
+6. **時計と回数**: `f->io.timing.clock_us` (gf_accel_test.c と同じ)。1 本が短いので、100 本を 1 組として組の時間を測る。warmup 1 組の後に本番 50 組。
 7. **CPU の WC の put は測らない**: test_surface の写像は WC の窓 (512KiB) の外なので、値が違ってしまう。DESIGN の 24µs/KB (TASK_GF_ACCEL 段 0、全面 7.37ms) をそのまま使う。
 8. **出力**: `GFP1 <項目> <組> <組の µs> <1 本の ns> <rc>`。終わりに `GFP1 done rc=<rc>` (serial_puts_polled)。
 9. **t_k は CPL=3 の別の段 P0c で測る** (kdebug はカーネルの中なので測れない)。userland/tests/kapi_cost.c (新、40 行): `gfx_screen_info(&si)` を 1000 回呼び、前後を `sys_time_now` で測って 1 回の ns を出す。副作用の無い今の KAPI を使い、新しい submit は待たない。DIRECT の submit の実際の t_k は H2 の後に P0a を回し直して得る。
@@ -435,6 +435,6 @@ void gfx_cmd_drop(void);
 - U1 の draw.rs は失敗時に窓 ID で INVALIDATE しない。失敗は `gfx_lost` に残り、次の check が `gfx_regen` を立てる。U2 の WAIT・POLL の戻りで check → take_regen → 自分の窓を全面 INVALIDATE の順に回復する。§7 の U1 の「失敗したら INVALIDATE」はこの意味に読み替える。
 
 ## 確定の後の追記 (2026-11-10、今の main cfb9cec3 との前提の照らし直し、PM 決定)
-- **H2a は不要で閉じる**: H2 は命令の読みの検査に既存の `ring3_user_range_ok` (`exec/exec.c:467`) を使って着地した (`gfx/gfx_hw_submit.c:16-17`)。「要れば `ring3_user_range_readable`」の条件は満たされないので H2a は出さない。§3-2 の断片と §7 の H2a の行を書き換えた (writable は今 `exec/exec.c:445`)。
-- **S1 と PPC**: `gfx/gfx_vram.c` は第 5 段で `tools/ppc/selected_success.json` の PPC の初回成功集合に入り、`:186-189` の `_memcpy_w` は `arch_copy16` 経由になった。`tools/ppc/known_header_dependencies.json` に `gfx/gfx_vram.c → drivers/video/pc98/splash_raster.h` が登録済み。S1 は gfx_vram.c を PPC でも組めるまま直す (asm・新しい pc98 のヘッダを足さない、足すなら既知の依存に登録)。damage.rs のパスは `userland/gshell/src/damage.rs`。
-- **G4m・G5m の位置**: GeForce の PCI の位置は `recover_gf_dev()` (`kdebug/recover.h:57`) で決まる。新しい段は 0:13 の直値を書かない (`drivers/video/geforce/gf_accept.c:177-178` の型を真似ない)。
+- **H2a は不要で閉じる**: H2 は命令の読みの検査に既存の `ring3_user_range_ok` (`exec/exec.c`) を使って着地した (`gfx/gfx_hw_submit.c`)。「要れば `ring3_user_range_readable`」の条件は満たされないので H2a は出さない。§3-2 の断片と §7 の H2a の行を書き換えた (writable は今 `exec/exec.c`)。
+- **S1 と PPC**: `drivers/video/pc98/gfx_vram.c` は PC-98 の表示の装置のソース (PowerPC では組まない)。`_flush_dirty_queue()` の `_memcpy_w` は `arch_copy16` 経由。S1 は共通の `gfx/` に asm・pc98 のヘッダを足さない (足すと層の検査 `tools/check_layers.py` と PowerPC の `common-compile` が止める)。damage.rs のパスは `userland/gshell/src/damage.rs`。
+- **G4m・G5m の位置**: GeForce の PCI の位置は `recover_gf_dev()` (`kdebug/recover.h`) で決まる。新しい段は 0:13 の直値を書かない (`drivers/video/geforce/gf_accept.c` の型を真似ない)。

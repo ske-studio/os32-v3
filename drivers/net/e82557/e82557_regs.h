@@ -30,7 +30,7 @@
 #define E82557_RU_BASE         6u
 #define E82557_RESET_US        20u
 #define E82557_SCB_WAIT_US     100u
-#define E82557_SCB_POLL_US     10u
+#define E82557_SCB_POLL_US     2u
 #define E82557_SCB_CUC_SHIFT   4
 #define E82557_CUS_SHIFT       6
 #define E82557_RUS_SHIFT       2

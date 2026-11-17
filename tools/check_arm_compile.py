@@ -243,6 +243,9 @@ def scan_glob():
     found = []
     for d in SCAN_DIRS:
         root_dir = os.path.join(PROJ_DIR, d)
+        if d.endswith(".c") and os.path.isfile(root_dir):
+            found.append(d)     # 根がファイル 1 本 (置き場を移した入口など)
+            continue
         if not os.path.isdir(root_dir):
             continue
         for root, _dirs, files in os.walk(root_dir):

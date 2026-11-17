@@ -1,4 +1,6 @@
 #define OS32_SQLITE_DIRECT_TEST 1
+/* Module availability is provided by the host fixture. */
+int services_public = 1;
 /* ========================================================================= */
 /*  KAPI_DB_V50_HOST.C — 票 S0-K §1d のホスト TDD                            */
 /*                                                                           */
@@ -1468,3 +1470,5 @@ int main(int argc, char **argv)
 void pc98_serial_puts_polled(const char *s) { (void)s; }
 int pc98_serial_gate_active(void) { return 0; }
 #include "serial_emergency_host.h"
+
+#include "sqlite_bits_host.h"

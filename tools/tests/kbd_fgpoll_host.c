@@ -1,3 +1,7 @@
+#include "kbd_capture_fixture_host.h"
+#include "../../input/hal/legacy_ring.c"
+#include "../../input/hal/legacy_mode.c"
+#include "../../kernel/input_legacy.c"
 /* F2/F2i: compile the real keyboard with a foreground/device boundary.
  * No drawing or real keyboard input is needed to advance the wait loops. */
 #include "types.h"
@@ -11,6 +15,8 @@ static unsigned polls, halts, violations;
 static int pending, serial_byte = -1, injected = -1, wait_mode;
 volatile u32 tick_count;
 int rshell_active;
+static int capture;
+int con_sink_capture_active(void) { return capture; }
 
 static void say(const char *s)
 {
@@ -33,8 +39,7 @@ static void host_halt(void)
     tick_count += wait_mode == 2 ? KBD_RSHELL_TIMEOUT_SEC * PIT_HZ / 2 : 1;
     if (++halts == 3) {
         if (wait_mode == 1) {
-            kbd_buf[0] = 0x1d61;
-            kbd_count = 1;
+            legacy_cooked_push(0x1d61);
         } else {
             pending = 1;
         }
@@ -63,9 +68,9 @@ int kbd_inject_take(u8 *out)
 static void fresh(void)
 {
     polls = halts = violations = 0;
-    pending = rshell_active = kbd_gui_mode = wait_mode = 0;
+    pending = rshell_active = kbd_gui_mode = wait_mode = capture = 0;
     serial_byte = injected = -1;
-    kbd_head = kbd_count = 0;
+    legacy_cooked_flush();
     _enable();
 }
 
@@ -83,17 +88,15 @@ static int test(void)
           "noninterruptible getchar wakes on key");
     fresh();
     wait_mode = 1;
-    CHECK(kbd_getkey_wait(0) == 0x1d61 && halts == 3 && polls == 3 && !violations,
+    CHECK(kbd_getkey_wait(0) == 0x1d61 && halts == 3 && polls == 4 && !violations,
           "noninterruptible getkey wakes on key");
 
     fresh();
     CHECK(kbd_trygetchar() == -1 && polls == 1, "empty trychar polls");
     CHECK(kbd_trygetkey() == -1 && polls == 2, "empty trykey polls");
-    kbd_buf[0] = 0x1d61;
-    kbd_count = 1;
+    legacy_cooked_push(0x1d61);
     CHECK(kbd_trygetchar() == 'a' && polls == 3, "ready trychar polls and preserves ASCII");
-    kbd_buf[1] = 0x1d61;
-    kbd_count = 1;
+    legacy_cooked_push(0x1d61);
     CHECK(kbd_trygetkey() == 0x1d61 && polls == 4, "ready trykey polls and preserves scan");
     rshell_active = 1;
     serial_byte = 's';
@@ -123,13 +126,34 @@ static int test(void)
     pending = 1;
     CHECK(kbd_getchar_wait(1) == -1 && kbd_getkey_wait(1) == -1 && !polls,
           "GUI wait keeps park path");
+    fresh(); capture = 1; rshell_active = 1; serial_byte = 's'; wait_mode = 2;
+    tick_count = U32_MAX - PIT_HZ;
+    CHECK(kbd_trygetchar() == -1 && serial_byte == 's', "capture trychar serial");
+    CHECK(kbd_trygetkey() == -1 && serial_byte == 's', "capture trykey serial");
+    polls = 0; rshell_active = 0;
+    CHECK(kbd_getchar_wait(0) == '\r' && halts == 2 && serial_byte == 's', "capture char deadline");
+    fresh(); capture = 1; rshell_active = 1; serial_byte = 's'; wait_mode = 2;
+    CHECK(kbd_getchar_wait(0) == '\r' && serial_byte == 's', "capture wait serial");
+    fresh(); capture = 1; wait_mode = 2; tick_count = U32_MAX - PIT_HZ;
+    CHECK(kbd_getkey_wait(0) == 0x1b && halts == 2, "capture key deadline");
     say("GREEN keyboard CUI foreground waits and tries\n");
     return 0;
 }
 
 void _start(void)
 {
+    input_legacy_register(&kbd_legacy_provider);
     int rc = test();
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc));
     __builtin_unreachable();
 }
+
+/* Device work is covered by ne2k_bh_host; this fixture supplies no callbacks. */
+void idle_work_run(void) { }
+
+int serial_peekchar(void) { return serial_byte; }
+int kbd_inject_peek(u8 *out) { if (injected < 0) return 0; *out = (u8)injected; return 1; }
+
+void idle_wait_step(void) { idle_work_run(); host_halt(); }
+
+void bootlog_push(const char *s, u32 n) { (void)s; (void)n; }

@@ -14,7 +14,7 @@ CHECK = dict(name='exec-hwb-abort-host', tier=1,
             'arch/x86/**', 'platform/pc98/**', 'sdk/include/os32/**',
             'userland/shell/hwb.h', 'kdebug/hwb_wire.h', 'build/config.mk',
             'kernel/console/font_guard.h', 'kernel/console/font_source.h',
-            'arch/x86/legacy/v86_mem.h', 'arch/x86/legacy/v86.h', 'kernel/kselftest.h',
+            'platform/pc98/legacy/v86_mem.h', 'platform/pc98/legacy/v86.h', 'kernel/kselftest.h',
             'kernel/ime/ime.h', 'kernel/ime/ime_render.h', 'kernel/gui.h',
             'mm/paging.h', 'mm/physmem.h', 'mm/kmalloc.h', 'mm/pgalloc.h',
             'mm/shlib.h', 'mm/shm.h', 'lib/serial_diag.h', 'lib/kstring.h',
@@ -22,7 +22,9 @@ CHECK = dict(name='exec-hwb-abort-host', tier=1,
             'fs/fd_redirect.h', 'fs/pipe_buffer.h',
             'gfx/gfx.h', 'drivers/sound/fm/snd_engine.h',
             'kapi/kapi_host.h', 'kapi/kapi_db.h', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h'],
-    needs=[], budget=5.8)
+    needs=[], budget=5.8,
+    basis=['HW_BASIC_DESIGN §3'],
+)
 
 import sys
 import hwb_host

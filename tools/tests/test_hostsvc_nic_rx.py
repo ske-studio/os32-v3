@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """A3 real receive demux/queues with fake NIC polling (ILP32)."""
-CHECK = dict(name='hostsvc-nic-rx', tier=1, needs=[], budget=3.5, covers=[
+CHECK = dict(name='hostsvc-nic-rx', tier=1, needs=[], budget=3.5, covers=['tools/tests/rx_io_clock.h', 'tools/tests/idle_io_sources.py',
+    'kernel/io_work.[ch]', 'kernel/io_clock.h', 'kernel/io_policy.[ch]', 'kernel/idle_work.h', 'exec/appslot.h', 'net/rx_work.c', 'net/rx_work.h', 'include/clock_source.h', 'kernel/irq/tick_budget.h',
     'net/nic_rx.c', 'lib/kstring.h', 'net/nic.h', 'net/nic_rx.h', 'net/link.h', 'include/net_eth.h',
     'kernel/irq/tick.h', 'platform/pc98/tick_order.h',
     'drivers/net/e82557/e82557_regs.h',
     'sdk/include/os32/os32_kapi_shared.h',
     'tools/tests/hostsvc_fixture.h', 'tools/tests/hostsvc_fixture.c',
     'tools/tests/hostsvc_nic_rx_host.c', 'tools/tests/host32.py',
-    'tools/tests/kernel_includes.py', 'build/config.mk'])
+    'tools/tests/kernel_includes.py', 'build/config.mk'],
+    basis=['docs/design/net/nic.md 受信の振り分け', 'docs/design/net/nic.md 受信を誰がいつ進めるか'],
+)
 
 import argparse
 import os
@@ -18,6 +21,7 @@ import tempfile
 
 import host32
 from kernel_includes import include_flags
+from idle_io_sources import idle_io_sources
 
 ROOT = Path(__file__).resolve().parents[2]
 FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra',
@@ -27,12 +31,12 @@ MUTATIONS = (
     ('mark-byte0', 'n >= 3 && p[0] == 0x05 && p[1] == 0x53 && p[2] == 0x46', 'n >= 1 && p[0] == 0x05'),
     ('stop-on-full', '            continue;\n        }\n        u32 tail', '            break;\n        }\n        u32 tail'),
     ('drop-count', 'net_rx_sfs_dropped++;', 'net_rx_sfs_dropped += 2;'),
-    ('link-drop-count', 'net_rx_link_dropped++;', 'net_rx_link_dropped += 2;'),
+    ('link-full-keeps', 'if (link_queue.count == RX_SLOTS) { net_rx_schedule(); break; }', 'if (0) { net_rx_schedule(); break; }'),
     ('sender', 'peer && !mac_equal(rx_frame + ETH_ALEN, peer)', '0 && peer && !mac_equal(rx_frame + ETH_ALEN, peer)'),
     ('broadcast', 'if (!own && (sfs || n == 0 || p[0] != LINK_OP_HELLO))', 'if (0 && !own && (sfs || n == 0 || p[0] != LINK_OP_HELLO))'),
     ('consume-nospace', 'if (cap >= *len)', 'if (cap + 1 >= *len)'),
-    ('scan-budget', 'scan < NET_RX_SCAN_MAX', 'scan <= NET_RX_SCAN_MAX'),
-    ('reset-other', 'if (q) q->head = q->count = 0;', 'if (q) { sfs_queue.count = link_queue.count = 0; }'),
+    ('scan-budget', 'if (!rx_work_take(b))', 'if (b->used++ > NET_RX_SCAN_MAX)' ),
+    ('reset-other', 'if (q && !net_rx_defer_reset(protocol)) q->head = q->count = 0;', 'if (q) { sfs_queue.count = link_queue.count = 0; }'),
     ('restore-if', '    irq_restore(flags);\n    return rc;', '    irq_restore(flags | 1);\n    return rc;'),
 )
 
@@ -43,9 +47,9 @@ def build_run(work, source):
     exe = work / 'nic-test'
     subprocess.run(['gcc', *FLAGS, '-I' + str(work), '-I' + str(ROOT),
                     '-I' + str(ROOT / 'tools/tests'), *include_flags(ROOT),
-                    '-nostdlib', '-static', '-no-pie', str(src),
+                    '-nostdlib', '-static', '-no-pie', str(src), str(ROOT / 'net/rx_work.c'),
                     str(ROOT / 'tools/tests/hostsvc_fixture.c'),
-                    str(ROOT / 'tools/tests/hostsvc_nic_rx_host.c'), '-o', str(exe)],
+                    str(ROOT / 'tools/tests/hostsvc_nic_rx_host.c'), *idle_io_sources(ROOT, work, compat=False), '-o', str(exe)],
                    check=True, cwd=ROOT)
     return host32.run([str(exe)], cwd=ROOT).returncode
 

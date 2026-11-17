@@ -60,6 +60,22 @@ void ppc_cpu_disable_bats(u32 pvr)
     ppc_isync();
 }
 
+/* MPC7450UM tables 2-6/2-33; OpenBSD macppc/macppc/cpu.c:362-370. */
+void ppc_cpu_power_init(u32 pvr)
+{
+    u32 version = pvr >> 16;
+    if (version != PPC_PVR_7450 && version != PPC_PVR_7455)
+        return;
+    u32 hid = ppc_read_hid0();
+    /* Unlike OpenBSD's DOZE mask, preserve bit 8: HIGH_BAT_EN on 7455. */
+    hid = (hid & ~PPC_HID_SLEEP) | PPC_HID_NAP | PPC_HID_DPM;
+    /* SGE/BTIC/LRSTK/FOLD/BHT are unrelated to power saving; preserve them. */
+    ppc_sync();
+    ppc_write_hid0(hid);
+    ppc_sync();
+    ppc_isync();
+}
+
 void ppc_cpu_load_segments(void)
 {
     ppc_sync();

@@ -3,7 +3,9 @@
 CHECK = dict(name='gfx2-modeset-host', tier=1, needs=[], budget=5,
     covers=['gfx/v2/modeset.c', 'gfx/v2/gfx2_int.h',
             'tools/tests/gfx2_modeset_host.c', 'tools/tests/test_gfx2_modeset.py',
-            'tools/tests/host32.py'])
+            'tools/tests/host32.py'],
+    basis=['HAL_V2_DESIGN §9-3'],
+)
 from pathlib import Path
 import argparse
 import subprocess

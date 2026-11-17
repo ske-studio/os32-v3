@@ -72,7 +72,7 @@ static void *kmemcpy(void *d, const void *s, u32 n) { return memcpy(d, s, n); }
 static void *kmemset(void *d, int v, u32 n) { return memset(d, v, n); }
 static int kprintf_quiet = 1;
 static u8 kprintf_last_color;
-static void kprintf(u8 color, const char *fmt, ...)
+static void console_printf(u8 color, const char *fmt, ...)
 {
     kprintf_last_color = color;
     (void)fmt;
@@ -154,6 +154,8 @@ int net_tx(const void *frame, u32 length)
     return NE2K_OK;
 }
 
+u32 net_rx_queued(u16 protocol) { return protocol == NET_RX_LINK && nic_rxh != nic_rxt; }
+
 int net_rx_take(u16 protocol, void *frame, u32 capacity, u32 *length)
 {
     unsigned int n;
@@ -183,7 +185,10 @@ u32 net_rx_credit_bytes(void)
 /* ======================================================================== */
 /*  贋タイマ + 贋 cli / sti                                                  */
 /* ======================================================================== */
+volatile u32 kctx_irq_depth;
 volatile u32 tick_count = 0;
+u32 link_platform_now(void) { return tick_count; }
+u32 tick_clock_ms(void) { return tick_count * 10u; }
 static int  irq_depth = 0;              /* IF=0 のネスト段数 */
 static u32  timer_deferred = 0;         /* IF=0 中に延期した tick 数 */
 static u32  timer_ran = 0;
@@ -199,13 +204,13 @@ static void run_link_tick(void)
     link_tick_fwd();
 }
 
-unsigned int link_test_irq_save(void)
+u32 link_platform_lock(void)
 {
     irq_depth++;
     return 0;
 }
 
-void link_test_irq_restore(unsigned int flags)
+void link_platform_unlock(u32 flags)
 {
     (void)flags;
     irq_depth--;
@@ -229,14 +234,13 @@ static void host_tick(void)
 }
 
 /* link.c の hlt 待ちの代わり (IF=1 で次のタイマまで寝る)。 */
-void link_test_idle(void) { host_tick(); }
+void link_platform_idle(void) { host_tick(); }
 
 static void ticks(int n) { int i; for (i = 0; i < n; i++) host_tick(); }
 
 /* ======================================================================== */
 /*  実物                                                                    */
 /* ======================================================================== */
-#define LINK_HOST_TEST 1
 #ifndef LINK_SOURCE
 #define LINK_SOURCE "../../net/link.c"
 #endif
@@ -531,7 +535,7 @@ static int agent_start(void)
                "host_agent.open_stream = lambda args: host_agent.FrameStream(peer)\n"
                "sys.exit(host_agent.main())\n",
                fd_arg, "--once", "--state-dir", agent_state,
-               "--agent-gen", "4660", "--quiet", "--offline", (char *)NULL);
+               "--agent-gen", "4660", "--quiet", "--offline", "--operator-port", "0", (char *)NULL);
         _exit(127);
     }
     close(pair[1]);
@@ -737,6 +741,7 @@ static void r2_R9_alternating_tx_one_frame_per_tick(void)
         const u8 *src = 0;
         (void)link_host_read_stage(a, 1400, &src, host_owner);
     }
+    nic_tx_allow = 0; /* Queue both classes before the measured tick interval. */
     check(link_host_write(b, "abcd", 4, host_owner) == 4, "host_write が受け付けない");
     tx_clear();
     ticks(12);
@@ -792,6 +797,95 @@ static void r3_B1_release_resends_until_bit0_ack(void)
     ticks(LINK_RTO_TICKS * 3);
     after = tx_count(LINK_OP_RELEASE);
     check(after == 0, "bit0 の ACK の後も RELEASE を送り続けた");
+}
+
+/* DATA RX と TX の間に前景が読み切って close。NIC busy でも順序を守る。 */
+static void close_flushes_ack_before_release(void)
+{
+    u8 pl[LINK_RESP_LEN], body[] = { 1, 2, 3 };
+    const u8 *src = 0;
+    i32 h, next;
+    int ack, release;
+    u32 rid;
+
+    script_handshake(SCRIPT_SESS, 0);
+    h = link_host_open("GET /x", 6, host_owner);
+    check(h >= 0, "open failed");
+    if (h < 0) return;
+    rid = link_h[h].rid;
+    ticks(3);
+    resp_pl(pl, 200, sizeof(body));
+    inject(LINK_OP_RESPONSE, 0, script_epoch, 0, 0, rid, SCRIPT_SESS, pl, sizeof(pl));
+    ticks(2);
+    (void)link_host_read_stage(h, sizeof(body), &src, host_owner);
+    tx_clear();
+    inject(LINK_OP_DATA, 0, script_epoch, 1, 0, rid, SCRIPT_SESS, body, sizeof(body));
+    link_rx_pump();                    /* TX はまだ回さない */
+    check(link_host_read_stage(h, sizeof(body), &src, host_owner) == sizeof(body),
+          "final DATA was not read");
+    check(link_host_close(h, host_owner) == 0, "close failed");
+    check(txn == 0, "close sent directly");
+    nic_busy = 1;
+    ticks(2);
+    check(txn == 0, "busy NIC accepted control");
+    nic_busy = 0;
+    ticks(1);                          /* 1 tick 1 frame: ACK だけ */
+    ack = tx_next(0, LINK_OP_ACK);
+    check(ack >= 0 && tx_rid(ack) == rid && tx_ack(ack) == 1 &&
+          tx_epoch(ack) == script_epoch, "closed rid lost its cumulative ACK");
+    check(tx_count(LINK_OP_RELEASE) == 0, "RELEASE preceded ACK");
+    ticks(1);
+    release = tx_next(0, LINK_OP_RELEASE);
+    check(release > ack && tx_rid(release) == rid, "RELEASE did not follow ACK");
+
+    /* Agent の RELEASE 完了 (本文の配送状態を消す) まで再利用しない。 */
+    next = link_host_open("PING", 4, host_owner);
+    check(next >= 0 && next != h, "pending RELEASE slot reused");
+    inject(LINK_OP_ACK, LINK_F_RELACK, script_epoch, 0, 0, rid, SCRIPT_SESS, 0, 0);
+    link_rx_pump();
+    next = link_host_open("GET /next", 9, host_owner);
+    check(next == h && link_h[next].rid != rid, "released slot was not reused");
+    tx_clear();
+    ticks(LINK_RTO_TICKS + 3);
+    check(tx_count(LINK_OP_ACK) == 0, "old ACK leaked into new rid");
+}
+
+/* 実 Agent でも最終 DATA の ACK を close 後に送り、配送を完了する。 */
+static void agent_close_after_data_stops_delivery(void)
+{
+    u32 st = 0, len = 0, rid, received;
+    u8 body[3];
+    i32 h;
+    int ack, release;
+
+    if (agent_start() != 0) { check(0, "agent start failed"); return; }
+    check(agent_up(200), "agent handshake failed");
+    h = link_host_open("GET /pattern/3", 14, host_owner);
+    check(h >= 0, "agent open failed");
+    if (h < 0) { agent_stop(); return; }
+    rid = link_h[h].rid;
+    check(wait_status(h, &st, &len, 300) == 0 && st == 200 && len == 3,
+          "agent response failed");
+    /* WINDOW を Agent へ渡し、返ってきた DATA は TX を止めて受ける。 */
+    const u8 *src = 0;
+    (void)link_host_read_stage(h, sizeof(body), &src, host_owner);
+    host_tick();
+    nic_busy = 1;
+    check(read_all(h, body, sizeof(body), 100) == sizeof(body), "agent DATA missing");
+    check(link_h[h].want_ack, "DATA ACK was not deferred");
+    tx_clear();
+    check(link_host_close(h, host_owner) == 0, "agent close failed");
+    nic_busy = 0;
+    ticks(10);
+    ack = tx_next(0, LINK_OP_ACK);
+    release = tx_next(0, LINK_OP_RELEASE);
+    check(ack >= 0 && tx_ack(ack) == 1 && tx_rid(ack) == rid && release > ack,
+          "agent did not receive ACK before RELEASE");
+    check(!link_h[h].rel_pending, "agent did not complete RELEASE");
+    received = link_rx_frames;
+    ticks(50);
+    check(link_rx_frames == received, "agent kept delivering after close");
+    agent_stop();
 }
 
 /* B6: STALE のハンドルの close は RELEASE を送らない (新 epoch の rid を
@@ -1000,6 +1094,27 @@ static void r4_R4_resync_during_user_copy_keeps_the_return_value(void)
     link_host_close(h, host_owner);
 }
 
+static void hello_idle_retry(void)
+{
+    const u8 synack[LINK_HELLO_SA_LEN] = {0};
+    ticks(1);
+    for (int i = 1; i < LINK_TRIES; i++) {
+        ticks(LINK_RTO_TICKS);
+        check(tx_count(LINK_OP_HELLO) == i + 1, "initial SYN interval");
+    }
+    ticks(LINK_RTO_TICKS);
+    check(tx_count(LINK_OP_HELLO) == LINK_TRIES, "idle SYN sent too early");
+    ticks(LINK_HELLO_IDLE_TICKS - LINK_RTO_TICKS);
+    check(tx_count(LINK_OP_HELLO) == LINK_TRIES + 1, "idle SYN missing");
+    inject(LINK_OP_HELLO, LINK_HS_SYN, 0, 0, 0, 0, 0, 0, 0);
+    host_tick();
+    ticks(LINK_RTO_TICKS);
+    check(tx_count(LINK_OP_HELLO) == LINK_TRIES + 1, "SYN restored RTO");
+    inject(LINK_OP_HELLO, LINK_HS_SYNACK, 0, 0, 0, 0, 0, synack, sizeof(synack));
+    host_tick();
+    check(tx_count(LINK_OP_HELLO) == LINK_TRIES + 2, "receive did not restore RTO");
+}
+
 /* HELLO 各段階の消失: SYN / SYN-ACK / CONFIRM / ESTABLISHED */
 static void r4_hello_stage_losses(void)
 {
@@ -1153,12 +1268,12 @@ static void irq_if0_defers_the_timer_then_runs_it(void)
 
     script_handshake(SCRIPT_SESS, 0);
     ran0 = timer_ran;
-    f = link_test_irq_save();
+    f = link_platform_lock();
     host_tick();
     host_tick();
     check(timer_ran == ran0, "IF=0 中にタイマが走った");
     check(timer_deferred == 2, "延期が数えられていない");
-    link_test_irq_restore(f);
+    link_platform_unlock(f);
     check(timer_ran == ran0 + 1, "復元直後の tick が走らない");
 }
 
@@ -1294,6 +1409,15 @@ static void decl_len_parsing(void)
     check(link_decl_len("PRINT DATA 7 4096", 17) == 4096, "PRINT DATA");
     check(link_decl_len("PRINT OPEN rep text", 19) == 0, "PRINT OPEN に宣言長が付いた");
     check(link_decl_len("PUT /file/x 12", 14) == 12, "PUT");
+    check(link_decl_len("RSH OUT boot id drop 42", sizeof("RSH OUT boot id drop 42") - 1) == 42, "RSH OUT");
+    check(link_decl_len("GS OUT boot id drop 43", sizeof("GS OUT boot id drop 43") - 1) == 43, "GS OUT");
+    check(link_decl_len("PDIAG OUT boot id status 44", sizeof("PDIAG OUT boot id status 44") - 1) == 44, "PDIAG OUT");
+    check(link_decl_len("LOG boot seq dr db flags 45", sizeof("LOG boot seq dr db flags 45") - 1) == 45, "LOG");
+    check(link_decl_len("RSH OUT boot id 42", sizeof("RSH OUT boot id 42") - 1) == 0, "short RSH OUT");
+    check(link_decl_len("GS OUT boot id 43", sizeof("GS OUT boot id 43") - 1) == 0, "short GS OUT");
+    check(link_decl_len("PDIAG OUT boot id 44", sizeof("PDIAG OUT boot id 44") - 1) == 0, "short PDIAG OUT");
+    check(link_decl_len("LOG boot seq dr db 45", sizeof("LOG boot seq dr db 45") - 1) == 0, "short LOG");
+    check(link_decl_len("RSH READY boot id drop 42", sizeof("RSH READY boot id drop 42") - 1) == 0, "RSH READY");
     check(link_decl_len("ECHO abc", 8) == 0, "数字でない宣言長を受けた");
     check(link_decl_len("ECHO 99999999", 13) == 0, "64KB 超の宣言長を受けた");
 }
@@ -1502,6 +1626,7 @@ static void check_pending_tx_rto(u8 op)
 static void tx_rto_starts_at_nic_acceptance(void)
 {
     script_handshake(SCRIPT_SESS, 0);
+    nic_tx_allow = 0;
     i32 h = link_host_open("ECHO 6", 6, host_owner);
     check(h >= 0, "ECHO が開けない");
     check_pending_tx_rto(LINK_OP_REQUEST);
@@ -1512,6 +1637,7 @@ static void tx_rto_starts_at_nic_acceptance(void)
     host_tick();
     inject(LINK_OP_ACK, 0, script_epoch, 0, 0, 1, SCRIPT_SESS, 0, 0);
     host_tick();
+    nic_tx_allow = 0;
     check(link_host_write(h, "abc", 3, host_owner) == 3, "WDATA を積めない");
     check_pending_tx_rto(LINK_OP_WDATA);
     inject(LINK_OP_ACK, 0, script_epoch, 0, 1, 1, SCRIPT_SESS, 0, 0);
@@ -1618,8 +1744,9 @@ static void l0_timeout_tombstone_at_status_restore_is_counted_once(void)
     script_handshake(SCRIPT_SESS, 0);
     selftest_reply_mode = 0;             /* ACK だけ返し、業務応答を遅延する。 */
     tx_hook = selftest_reply;
-    /* REQUEST goes out on the next tick, ACK arrives one tick later. */
-    selftest_deadline = tick_count + 2 + LINK_HOST_SILENCE_TICKS;
+    /* Immediate REQUEST; ACK is consumed on the next tick. */
+    nic_tx_allow = 1;
+    selftest_deadline = tick_count + 1 + LINK_HOST_SILENCE_TICKS;
     irq_restore_hook = selftest_tombstone_at_deadline_restore;
     link_selftest(1);
     check(!irq_restore_hook && link_tombstones == 0 && link_resyncs == 0,
@@ -1764,6 +1891,8 @@ static void n1fix2_scripted_inorder_over_64k(void)
 struct testcase { const char *name; void (*fn)(void); };
 
 static struct testcase cases[] = {
+    { "close_flushes_ack_before_release", close_flushes_ack_before_release },
+    { "agent_close_after_data_stops_delivery", agent_close_after_data_stops_delivery },
     { "r2_R1_agent_request_response_body",          r2_R1_agent_request_response_body },
     { "r2_R8_selftest_is_driven_only_by_the_timer", r2_R8_selftest_is_driven_only_by_the_timer },
     { "r2_R3_lost_response_expires_without_probe",   r2_R3_lost_response_expires_without_probe },
@@ -1778,6 +1907,7 @@ static struct testcase cases[] = {
     { "r3_B8_dispatcher_kill_and_wrapper_inval",    r3_B8_dispatcher_kill_and_wrapper_inval },
     { "r4_R4_resync_during_user_copy_keeps_the_return_value",
       r4_R4_resync_during_user_copy_keeps_the_return_value },
+    { "hello_idle_retry", hello_idle_retry },
     { "r4_hello_stage_losses",                      r4_hello_stage_losses },
     { "r4_cpl0_open_close",                         r4_cpl0_open_close },
     { "r6_agent_silence_expires_then_resync_stales_handles", r6_agent_silence_expires_then_resync_stales_handles },
@@ -1834,3 +1964,7 @@ void link_notify_session(u16 s, u16 e, int x, u32 g, u16 a)
 void link_notify_rx(u32 s, const u8 *p, u16 n) { (void)s; (void)p; (void)n; }
 void link_notify_reset(void) { }
 void link_notify_tick(u32 now) { (void)now; }
+
+/* Foreground link fixture: IRQ0 budgeting is exercised by tick_budget_host. */
+u32 tick_budget_cnt(u32 us) { return us; }
+int tick_budget_take(u32 share, u32 tail) { (void)share; (void)tail; return 1; }

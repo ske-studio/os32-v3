@@ -6,7 +6,9 @@ CHECK = dict(name='fep-user-store', tier=1, needs=[], budget=4.3,
             'lib/sqlite3/os32_sqlite_vfs.h', 'lib/kstring_c.c',
             'tools/tests/fep_user_store_host.c', 'tools/tests/fep_store_fixture.c',
             'tools/tests/fep_store_fixture.h', 'tools/tests/host32.py',
-            'tools/tests/kernel_includes.py', 'build/config.mk'])
+            'tools/tests/kernel_includes.py', 'build/config.mk'],
+    basis=['docs/design/kernel/ime/ime_user_store.md 形', 'docs/design/kernel/ime/ime_user_store.md 開く手順'],
+)
 import argparse
 import os
 from pathlib import Path

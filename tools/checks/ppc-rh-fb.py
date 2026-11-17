@@ -1,0 +1,48 @@
+CHECK = dict(env=['ppc-cross', 'qemu-ppc'], name='ppc-rh-fb', tier=2, budget=600, needs=['make:ppc-ci-image', 'make:build/out/memmap_layout.h'], covers=['platform/powermac/kernel_boot.c', 
+    'include/memmap.h', 'tools/gen_memmap.py', 'build/kernel.mk',
+    'arch/x86/kernel/kentry.asm',
+    'boot/loader_fat_new.asm',
+    'build/os32.ld',
+    'fs/fd_redirect.c',
+    'fs/pipe_buffer.c',
+    'mm/shm.c',
+    'sdk/kapi.json',
+    'sdk/link/app.ld',
+    'sdk/link/app_sys.ld',
+    'sdk/link/shlib.ld',
+    'sdk/os32x_hdr.py',
+    'sdk/rust/os32api/src/gui/proto.rs',
+    'sdk/rust/os32api/src/gui/stub.rs',
+    'tools/check_artifacts.py',
+    'tools/mkshlib.py',
+    'tools/tests/owner_reclaim_host.c',
+    'tools/tests/test_owner_reclaim.py',
+    'userland/rust/libos32gui/src/shlib.rs',
+    'platform/powermac/rh_observe.[ch]', 'arch/ppc/**',
+    'platform/powermac/ppc_kernel.c', 'platform/powermac/boot.c',
+    'platform/powermac/mmu_boot.c', 'platform/powermac/mmu_start.c',
+    'platform/powermac/platform_of_layout.h', 'platform/powermac/lan_boot.h',
+    'build/ppc.mk', 'build/targets/ppc-powermac.mk', 'tools/ppc/rh_fb.py',
+    'tools/ppc/kboot_boot.py', 'tools/ppc/kboot_boot_guest.c',
+    'tools/checks/ppc-rh-fb.py', 'tools/ppc/kboot_vectors.py', 'tools/ppc/run.py',
+    'tools/tests/kernel_includes.py',
+    'lib/kstring_c.c',
+    'mm/memory_boot.c', 'mm/paging.c', 'mm/pgalloc.c', 'mm/physmem.c',
+    'platform/powermac/escc.c', 'platform/powermac/escc_tree.c',
+    'platform/powermac/gmac_tree.c', 'platform/powermac/kboot_capture.c',
+    'platform/powermac/kboot_reserve.c', 'platform/powermac/memory.c',
+    'platform/powermac/mpic_tree.c', 'platform/powermac/ofw.c',
+    'tools/ppc/kboot_boot_host.c', 'tools/ppc/kboot_vectors_fixture.[cS]',
+    'build/out/ppc/kboot-vectors/**'],
+    basis=['PPC_REALHW_G4_DESIGN §3', 'PPC_REALHW_G4_DESIGN §6'],
+    env_limit='QEMUのOF framebufferを確認するが、mac99 VGA/OpenBIOSはQuickSilverの実OF framebufferとcache属性を保証しない。',
+    full_only=True,
+)
+
+
+def run(ctx):
+    import os
+    import subprocess
+    return subprocess.call(['python3', '-B', 'tools/ppc/rh_fb.py'] +
+                           (['--mutate'] if ctx.mutate else []),
+                           cwd=ctx.root, env=dict(os.environ))

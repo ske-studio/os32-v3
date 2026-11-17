@@ -184,3 +184,7 @@ int sfs_put_path(u8 *out, u16 room, const char *path)
     }
     return (int)(n + 1);
 }
+
+/* LAN_OPERATOR_DESIGN §5: the link declaration covers one LAN SFS frame. */
+#include "remote_control.h"
+_Static_assert(REMOTE_SFS_CALL_MAX == SFS_BUFFER_FRAME, "SFS CALL frame capacity");

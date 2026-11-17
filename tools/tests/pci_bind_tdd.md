@@ -28,7 +28,7 @@ probe が失敗したときに「装置に触っていない」のか「未知�
 
 ```
 $ python3 -B tools/tests/test_pci_bind.py
-tools/tests/pci_bind_host.c:15:10: fatal error: ../../drivers/pci/pci_bind_match.c: No such file or directory
+tools/tests/pci_bind_host.c: fatal error: ../../drivers/pci/pci_bind_match.c: No such file or directory
 ```
 
 ### RED 2 — QUARANTINE で打ち切らない (変異 1 / 2)

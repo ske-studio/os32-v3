@@ -43,6 +43,37 @@ static u32 scalar(int node, const char *name, int *present)
     if (n!=4) { error=LAN_EINVAL; return 0; }
     return be32(prop);
 }
+/* RH0 supplies the measured model. Empty means no machine is approved. */
+static const char clock_model[] = "";
+#define UNINORTH_PA 0xf8000000u
+#define UNINORTH_CLOCK_OFFSET 0x20u
+static void clock_profile(int root, struct pm_gmac_boot *b)
+{
+    unsigned len = kstrlen(clock_model);
+    if (!len) return;
+    int n = get(root, "model");
+    if (!((n == (int)len || (n == (int)len + 1 && !prop[len])) &&
+          !kstrncmp((char *)prop, clock_model, len))) goto done;
+    int node = ofw_finddevice("/uni-n"), present;
+    if (!node || node == -1 || ofw_parent(node) != root) goto done;
+    u32 ac = scalar(root, "#address-cells", &present); if (!present) ac = 2;
+    u32 sc = scalar(root, "#size-cells", &present); if (!present) sc = 1;
+    if (ac < 1 || ac > 2 || sc < 1 || sc > 2) goto done;
+    n = get(node, "reg");
+    unsigned stride = (ac + sc) * 4;
+    if (n <= 0 || (unsigned)n % stride) goto done;
+    for (unsigned i = 0; i < (unsigned)n; i += stride) {
+        const u8 *p = prop + i;
+        if ((ac == 2 && be32(p)) || (sc == 2 && be32(p + ac * 4))) continue;
+        u32 base = be32(p + (ac - 1) * 4), bytes = be32(p + (ac + sc - 1) * 4);
+        if (base == UNINORTH_PA && bytes >= UNINORTH_CLOCK_OFFSET + 4 &&
+            bytes <= 0xffffffffu - base)
+            b->clock = (struct pm_clock_boot){UNINORTH_PA + UNINORTH_CLOCK_OFFSET, 2, 1};
+    }
+done:
+    /* An unrecognised clock description never invalidates the LAN snapshot. */
+    error = 0;
+}
 static void walk(int node, unsigned depth)
 {
     while (node && node!=-1 && !error) {
@@ -176,6 +207,7 @@ int pm_gmac_capture(struct pm_gmac_boot *out)
     if (!nonzero || (b.mac[0]&1)) { error=LAN_EINVAL; goto fail; }
     /* NetBSD macppc/pci/uninorth.c:179-180 supplies pci_bus_dma_tag. */
     b.dma_bytes=0x1000000; b.profile=1;
+    clock_profile(root, &b);
     bootargs(&b);
     if (error) goto fail;
     *out=b; return LAN_OK;

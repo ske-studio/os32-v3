@@ -5,7 +5,9 @@ CHECK = dict(name='gf-direct', tier=1, needs=[], budget=8,
                      'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
                      'drivers/video/geforce/geforce_module.h', 'hwdev/gf/**',
                      'hwdev/gfinit_mode.h', 'include/**', 'gfx/gfx.h',
-                     'kernel/module/*.h', 'build/config.mk'])
+                     'kernel/module/*.h', 'build/config.mk'],
+    basis=['GFX_ACCEL_HAL_DESIGN §3', 'GFX_ACCEL_HAL_DESIGN §4'],
+)
 import argparse
 import os
 from pathlib import Path

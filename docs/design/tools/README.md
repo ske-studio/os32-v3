@@ -18,7 +18,7 @@ ELF32、R_386_32/PC32、未解決参照拒否、生成 import 型契約、
 
 > [要確認] 元文の生成器名 tools/mkmod.py は現行と異なる。インポート表・stub は tools/gen_sqlite_imports.py が生成する。
 
-contracts の文字列 FNV により CIRRUS_MODULE_ABI_GEN は自動更新（tools/gen_sqlite_imports.py:41–44）。kernel と cirrus.mod を同じビルドの対で配る。
+contracts の文字列 FNV により CIRRUS_MODULE_ABI_GEN は自動更新（tools/gen_sqlite_imports.py）。kernel と cirrus.mod を同じビルドの対で配る。
 
 ### gen_kdebug_imports
 
@@ -37,9 +37,11 @@ contracts の文字列 FNV により CIRRUS_MODULE_ABI_GEN は自動更新（too
 
 ### gen_build_id
 
-tools/gen_build_id.py:45–55 の短縮 commit・追跡ファイルの dirty・失敗時 unknown を維持。
+tools/gen_build_id.py の短縮 commit・追跡ファイルの dirty・失敗時 unknown を維持。
 
 ### np21w_ini
+
+`cpu-386` / `cpu-486sx` は派生 ini の CPU_FAMI・CPU_MODE・CPU_STEP・CPU_FEAT をそれぞれ 3/0/8/0・4/2/3/0 に設定する (NP21/W `src/i386c/ia32/cpu.h:519-525,647-648`、`src/win9x/ini.cpp:685-688`)。4 鍵の欠落・重複・不正値は拒否する。
 
 | 共通変換 | EXTRAにCRT31K、_extra_valueにtrue/false検証を追加。ALLOWEDには入れず既存操作・receiptを維持。 |
 
@@ -79,13 +81,23 @@ map の LOAD 一覧・各 .o の size・最終 ELF・KMOD header を照合する
 
 ### gen_memmap
 
-- gen_memmap.py:113–119 は memmap.h の include を外して cpp で解くため、容量式を gfx_format.h 等への依存にしない。
+- gen_memmap.py は memmap.h の include を外して cpp で解くため、容量式を gfx_format.h 等への依存にしない。
 
 ## 索引
 
 - [tools/accept/README](accept/README.md)
 
+- [tools/check_doc_line_refs](check_doc_line_refs.md)
+- [tools/check_kapi_abi](check_kapi_abi.md)
+- [tools/check_layers](check_layers.md)
+
 - [tools/checks/README](checks/README.md)
+
+- [tools/ci/gate](ci/gate.md)
+
+- [tools/ci/sep_identity](ci/sep_identity.md)
+
+- [tools/fep_to_sqlite](fep_to_sqlite.md)
 
 - [tools/gen_font16](gen_font16.md)
 
@@ -94,6 +106,12 @@ map の LOAD 一覧・各 .o の size・最終 ELF・KMOD header を照合する
 - [tools/gfinit_mode_tables](gfinit_mode_tables.md)
 
 - [tools/host_agent](host_agent.md)
+
+- [tools/host_notify](host_notify.md)
+
+- [tools/host_services](host_services.md)
+
+- [tools/lanfs_host](lanfs_host.md)
 
 - [tools/mkd88](mkd88.md)
 
@@ -108,3 +126,7 @@ map の LOAD 一覧・各 .o の size・最終 ELF・KMOD header を照合する
 - [tools/tests/README](tests/README.md)
 
 - [tools/img2osri](img2osri.md)
+
+- [tools/osri_enc2](osri_enc2.md)
+
+- [tools/raster_splash_asset](raster_splash_asset.md)

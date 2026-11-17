@@ -295,11 +295,11 @@
       "stub": "0"
     },
     {
-      "name": "column_double",
-      "result": "double",
+      "name": "column_f64_bits",
+      "result": "u64",
       "args": "sqlite3_stmt *stmt, int column",
       "target": "sqlite3_column_double",
-      "wrapper": "os32_sqlite_column_double",
+      "wrapper": "os32_sqlite_column_f64_bits",
       "io": 0,
       "stub": "0"
     },

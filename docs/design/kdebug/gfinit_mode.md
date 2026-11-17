@@ -8,7 +8,7 @@ mode_bit と zero 初期化は共有、集約関数は呼出しだけ。palette:
 
 白い外枠と黒・赤・緑・青・白・cyan・magenta・黄の静止縦帯、左上だけ白黒市松を表示し、色・幅・上下左右・静止を目視する。8bpp は VRAM 転送量を抑える案；32bpp は色形式の比較が必要になった後へ送る。
 
-[HW1]の通常描画はbackbuffer→gfx_present/dirtyのHAL経路（`docs/CONSTRAINTS.md:73–81`）。本票は既存A4と同じ専有VRAMへの診断パターン転送として扱う明示差分で、CUIのHALを切り替えない。白枠は外周8px、市松は内側左上64×64px、残りは80px幅8帯；通常アプリ描画への流用は後段。
+[HW1]の通常描画はbackbuffer→gfx_present/dirtyのHAL経路（`docs/CONSTRAINTS.md`）。本票は既存A4と同じ専有VRAMへの診断パターン転送として扱う明示差分で、CUIのHALを切り替えない。白枠は外周8px、市松は内側左上64×64px、残りは80px幅8帯；通常アプリ描画への流用は後段。
 
 - 市松は **1 マス 8×8 px** (64×64 px の中に 8×8 マス)、**左上のマスは白**で白・黒を交互 (palette の番号は段 1 の kdebug/gfinit_mode.c の表で白=4・黒=0)。位置は外周の白枠 (8 px) の内側の左上 x=8〜71・y=8〜71。
 

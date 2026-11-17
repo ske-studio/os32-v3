@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
 """A2 real NIC lifetime/selection with fake adapters, link and A3 seams (ILP32)."""
-CHECK = dict(name='hostsvc-nic', tier=1, needs=[], budget=3.8, covers=[
-    'net/nic.c', 'net/nic.h', 'net/nic_rx.h', 'net/link.h', 'include/net_eth.h',
+CHECK = dict(name='hostsvc-nic', tier=1, needs=[], budget=3.8, covers=['tools/tests/rx_io_clock.h', 'tools/tests/idle_io_sources.py',
+    'kernel/io_work.[ch]', 'kernel/io_clock.h', 'kernel/io_policy.[ch]', 'kernel/idle_work.h', 'exec/appslot.h', 'net/rx_work.c', 'net/rx_work.h', 'include/clock_source.h', 'kernel/irq/tick_budget.h', 'kernel/idle_work.h',
+    'kernel/time/tick_clock.h', 'net/rx_work.c', 'net/rx_work.h', 'include/clock_source.h', 'include/kernel_tick.h', 'kernel/irq/irq.h', 'kernel/irq/tick_budget.h', 'net/link_platform.h', 'platform/pc98/platform_link_inline.h', 'net/nic.c', 'net/nic.h', 'net/nic_rx.h', 'net/link.h', 'include/net_eth.h',
     'kernel/irq/tick.h', 'platform/pc98/tick_order.h',
     'include/kprintf.h',
     'drivers/net/e82557/e82557_regs.h',
     'sdk/include/os32/os32_kapi_shared.h',
     'tools/tests/hostsvc_fixture.h', 'tools/tests/hostsvc_fixture.c',
     'tools/tests/hostsvc_nic_host.c', 'tools/tests/host32.py',
-    'tools/tests/kernel_includes.py', 'build/config.mk'])
+    'tools/tests/kernel_includes.py', 'build/config.mk'],
+    basis=['docs/design/net/nic.md 受信の振り分け'],
+    pins=['LAN_BULK_DESIGN'],
+)
 
 import argparse
 import os
@@ -19,6 +23,7 @@ import tempfile
 
 import host32
 from kernel_includes import include_flags
+from idle_io_sources import idle_io_sources
 
 ROOT = Path(__file__).resolve().parents[2]
 FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra',
@@ -26,6 +31,14 @@ FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra',
 # A2 portion of §11 nic: selection, lifetime, dispatch and TX facade.
 # MARK/EOF mutation belongs to the A3 demux stage, not this fake boundary.
 MUTATIONS = (
+    ('fg-bind-reset', '            idle_ms_valid = 0;', '            /* reset omitted */'),
+    ('fg-link-before-demux',
+     '    count = (int)net_rx_demux_budget(bound, local_mac, fixed_peer ? peer_mac : 0, b);\n    flags = link_platform_lock();\n    rx_finish();',
+     '    flags = link_platform_lock();\n    rx_finish();\n    link_platform_unlock(flags);\n    count = (int)net_rx_demux_budget(bound, local_mac, fixed_peer ? peer_mac : 0, b);\n    flags = link_platform_lock();'),
+    ('fg-unthrottled', 'if (!idle_ms_valid || ms != last_idle_ms)', 'if (1)'),
+    ('fg-no-link', 'link_due = 1; /* Foreground progress, consumed by rx_finish. */',
+     'link_due = 0; /* Foreground progress, consumed by rx_finish. */'),
+    ('fg-in-irq', '!_irq_enabled() || kctx_irq_depth != 0', '!_irq_enabled()'),
     ('restart-same-peer', 'return 0; /* Same NIC/peer: preserve the handshake and its nonce. */',
      'return OS32_ERR_BUSY;'),
     ('auto-preference', 'choice = adapters[NET_NIC_E82557] ? NET_NIC_E82557 : NET_NIC_LGY98;',
@@ -36,18 +49,20 @@ MUTATIONS = (
      'bound ? (bound->tx(frame, len), 0) : OS32_ERR_HOSTDOWN'),
     ('unbound-result', 'int rc = OS32_ERR_HOSTDOWN;', 'int rc = 0;'),
     ('double-bind', 'if (bound) rc = OS32_ERR_BUSY;', 'if (bound) rc = 0;'),
-    ('unbind-queues', '    net_rx_reset(NET_RX_LINK);\n    irq_restore(flags);',
-     '    net_rx_reset(NET_RX_SFS);\n    irq_restore(flags);'),
-    ('fixed-peer', 'fixed_peer ? peer_mac : 0', 'fixed_peer ? 0 : peer_mac'),
-    ('tick-link', '        link_tick();', '        if (0) link_tick();'),
-    ('poll-count', 'if (!rc) received++;', 'if (!rc) received += 2;'),
+    ('unbind-queues', '    net_rx_reset(NET_RX_LINK);\n    link_platform_unlock(flags);',
+     '    net_rx_reset(NET_RX_SFS);\n    link_platform_unlock(flags);'),
+    ('fixed-peer', 'count = (int)net_rx_demux_budget(bound, local_mac, fixed_peer ? peer_mac : 0, b);',
+     'count = (int)net_rx_demux_budget(bound, local_mac, fixed_peer ? 0 : peer_mac, b);'),
+    ('tick-link', '            link_tick();', '            if (0) link_tick();'),
+    ('poll-count', 'return count;\n}', 'return count * 2;\n}'),
     ('rx-credit', 'bound ? bound->rx_credit_bytes() : 0',
      'bound ? (bound->rx_credit_bytes(), 0) : 0'),
     ('tick-error-domain', '                rc = OS32_ERR_BUSY;',
      '                rc = TICK_ERR_BUSY;'),
-    ('tick-poll-reentry', 'int count = ticking ? 0 : poll_once_locked();',
-     'int count = poll_once_locked();'),
-    ('tick-recursion', 'if (bound && !ticking) {', 'if (bound) {'),
+    ('tick-poll-reentry', '!bound || ticking || unbind_due',
+     '!bound || unbind_due'),
+    ('tick-recursion', 'if (bound && !ticking) {\n        ticking = 1;',
+     'if (bound) {\n        ticking = 1;'),
 )
 
 
@@ -55,11 +70,14 @@ def build_run(work, source):
     src = work / 'nic.c'
     src.write_text(source)
     exe = work / 'nic-test'
-    subprocess.run(['gcc', *FLAGS, '-I' + str(work), '-I' + str(ROOT),
+    compiler_headers = subprocess.check_output(
+        ['gcc', '-print-file-name=include'], text=True).strip()
+    subprocess.run(['gcc', *FLAGS, '-nostdinc', '-isystem', compiler_headers,
+                    '-I' + str(work), '-I' + str(ROOT),
                     '-I' + str(ROOT / 'tools/tests'), *include_flags(ROOT),
-                    '-nostdlib', '-static', '-no-pie', str(src),
+                    '-nostdlib', '-static', '-no-pie', str(src), str(ROOT / 'net/rx_work.c'),
                     str(ROOT / 'tools/tests/hostsvc_fixture.c'),
-                    str(ROOT / 'tools/tests/hostsvc_nic_host.c'), '-o', str(exe)],
+                    str(ROOT / 'tools/tests/hostsvc_nic_host.c'), *idle_io_sources(ROOT, work, compat=False), '-o', str(exe)],
                    check=True, cwd=ROOT)
     return host32.run([str(exe)], cwd=ROOT).returncode
 
@@ -72,10 +90,13 @@ def main():
     with tempfile.TemporaryDirectory(prefix='hostsvc-nic-') as tmp:
         work = Path(tmp)
         (work / 'io.h').write_text(
+            '#ifndef NIC_TEST_IO_H\n#define NIC_TEST_IO_H\n'
+            'static inline void _idle(void) {}\n'
             'unsigned int nic_test_irq_save(void);\n'
             'void nic_test_irq_restore(unsigned int);\n'
             '#define irq_save nic_test_irq_save\n'
-            '#define irq_restore nic_test_irq_restore\n')
+            '#define irq_restore nic_test_irq_restore\n'
+            'int nic_test_irq_enabled(void);\n#define _irq_enabled nic_test_irq_enabled\n#endif\n')
         # Production includes are compiled separately; only execution replaces cli.
         cross = Path(os.environ.get('CROSS_DIR', '/home/hight/opt/cross'))
         subprocess.run([str(cross / 'bin/i386-elf-gcc'), *FLAGS,

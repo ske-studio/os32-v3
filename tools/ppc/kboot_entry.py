@@ -14,11 +14,11 @@ from run import ROOT, ROM, QMP, command, require
 
 CHECK = dict(name='ppc-kboot-entry', tier=2, budget=600,
              covers=['arch/ppc/kernel_entry.S', 'arch/ppc/kernel_entry.h',
-                     'arch/ppc/kernel.ld', 'platform/powermac/kboot_layout.h',
+                     'arch/ppc/kernel.ld', 'platform/powermac/platform_kboot_layout.h',
                      'tools/ppc/kboot_entry.py', 'tools/ppc/run.py',
                      'platform/powermac/ofw.c', 'platform/powermac/ofw.h',
                      'platform/powermac/escc.c', 'platform/powermac/escc_tree.c',
-                     'platform/powermac/ppc_layout.h', 'arch/ppc/ppc_boot.h',
+                     'platform/powermac/platform_of_layout.h', 'arch/ppc/ppc_boot.h',
                      'lib/kstring_c.c', 'lib/kstring.h', 'include/types.h',
                      'include/memmap.h', 'tools/gen_memmap.py', 'build/arch/ppc.mk'])
 PREFIX = '/home/hight/opt/cross-ppc/bin/powerpc-elf-'
@@ -29,7 +29,7 @@ FLAGS = ['-mcpu=7450', '-m32', '-mbig-endian', '-msoft-float', '-mno-altivec',
 CANARY = r'''
 #include "kernel_entry.h"
 #include "ofw.h"
-#include "platform/powermac/kboot_layout.h"
+#include "platform/powermac/platform_kboot_layout.h"
 volatile unsigned captured[3] = {1,1,1};
 volatile unsigned char bss_canary[37];
 void entry_canary_fail(void);

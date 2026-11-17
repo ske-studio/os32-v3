@@ -1,7 +1,7 @@
 # pit_clock — RED → GREEN の記録
 
 票: [`docs/tasks/v3/TASK_HAL_WIRING.md`](../../docs/tasks/v3/TASK_HAL_WIRING.md) §1-0
-対象: `kernel/time/pit_math.c` (分周の算数) / `kernel/time/sysclk.c` (クロック判定) / `arch/x86/kernel/idt.c` (積む側)
+対象: `kernel/time/pit_math.c` (分周の算数) / `platform/pc98/sysclk.c` (クロック判定) / `arch/x86/kernel/idt.c` (積む側)
 試験: `tools/tests/test_pit_clock.py` + `tools/tests/pit_clock_host.c`
 実行: `make check-pit-clock-host` (`check-par` の列)
 
@@ -26,7 +26,7 @@ PC-98 の 8253 TCU に入るクロックは機種で 2 通りある (`0000:0501h
 **NP21/W は 1.9968MHz 設定なので、エミュレータでは一度も踏めない** — §4-49・
 §4-51・§4-53 と同じ型 (エミュレータが模擬しない機種差)。クロック判定そのものは
 `drivers/char/serial.c` の `serial_detect_clock()` に既にあったが、呼ばれるのは
-`kernel.c:228` = `pit_init` (194 行) の **34 行あと**で、PIT は見ていなかった。
+`kernel.c` = `pit_init` (194 行) の **34 行あと**で、PIT は見ていなかった。
 
 ## RED
 
@@ -37,7 +37,7 @@ PC-98 の 8253 TCU に入るクロックは機種で 2 通りある (`0000:0501h
 
 ```
 $ python3 -B tools/tests/test_pit_clock.py
-tools/tests/pit_clock_host.c:17:10: fatal error: ../../kernel/time/pit_math.c: No such file or directory
+tools/tests/pit_clock_host.c: fatal error: ../../kernel/time/pit_math.c: No such file or directory
    17 | #include "../../kernel/time/pit_math.c"
 compilation terminated.
 subprocess.CalledProcessError: Command '['gcc', '-std=gnu89', ... ]' returned non-zero exit status 1.
@@ -97,3 +97,10 @@ MUTATION 5 RED (2 件): 断ったのに valid を立てる (呼び出し側が�
 / `mode == PIT_MODE_TIMER0` / `sysclk_detected()`)。
 実時間そのものの照合は、実機で `tick_count` を 60 秒ぶん読んでホストの単調時計と
 突き合わせる ([POLICY_DEBUG §4-54](../../docs/POLICY_DEBUG.md#4-54-pit-の実時間))。
+
+## 段 L B6・B7' の境界
+
+`pit_clock_host.c` は分周値と表示用 `period_us` の試験なので100Hzの期待値を保つ。
+µs補間は `time_us_from64` の raw・reload・clk_hz の有理式に移り、
+`period_us` は計算に使わない。100Hzの両クロックの互換性と1000Hzの
+精度・単調性は `test_clock_caller.py`、純粋な算数は `test_time_math.py` で見る。

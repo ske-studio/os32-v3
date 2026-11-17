@@ -9,7 +9,7 @@
 #include "gfx_hal.h"
 /* -Iplatform/$(PLATFORM) で選ぶ。DISPLAY_FALLBACK_BACKEND = probe なしで必ず
  * 使える backend の番地 (リンク時定数。g_backend の静的な初期値にも使う)。 */
-#include <display_fallback.h>
+#include <platform_display_fallback.h>
 
 /* 共通側の「登録済みの mode が台帳の予約に収まるか」の判定。1 = 選べた。 */
 typedef int (*display_select_mode_fn)(GfxBackend *backend, int legacy200);
@@ -37,5 +37,15 @@ u32 display_provider_display_records(u32 ledger_backend);
 u32 display_provider_display_first(u32 plane);
 
 void display_provider_each(void (*fn)(GfxBackend *be, void *arg), void *arg);
+
+/* Platform lifecycle policy. Common core retains mode selection and binding.
+ * client_before_init: the backend consumes ledger CLIENT during init. */
+int display_provider_client_before_init(const GfxBackend *backend);
+int display_provider_init_failed(GfxBackend *backend);
+int display_provider_idle_safe(int pref);
+void display_provider_prepare_failed(GfxBackend *backend);
+void display_provider_raster_reset(void);
+int display_provider_restore_fallback(GfxBackend *backend);
+u32 display_provider_ver_kind(const GfxBackend *backend);
 
 #endif

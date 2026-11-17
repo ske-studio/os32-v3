@@ -83,7 +83,7 @@ static void link_on_response(struct link_handle *e, u8 flags, const u8 *pl)
     u32 ln = le_read32(pl + LINK_RESPONSE_LENGTH_OFF);
 
     link_host_progress((i32)(e - link_h));
-    e->last_rx_tick = tick_count;
+    e->last_rx_tick = link_platform_now();
     e->probes = 0;
     if (flags & LINK_F_CTRL) {
         switch (st) {
@@ -157,6 +157,8 @@ static void link_dispatch(const u8 *f, unsigned int flen)
     if (!link_paylen_ok(op, flags, plen)) { link_rx_dropped++; return; }
     pl = h + LINK_HDR_LEN;
     link_rx_frames++;
+    if (op != LINK_OP_HELLO || flags == LINK_HS_SYNACK || flags == LINK_HS_ESTAB)
+        link_hello_idle = 0;
 
     if (op == LINK_OP_HELLO) {
         link_on_hello(f + ETH_ALEN, flags, epoch, seq, ack, sess, pl, plen);
@@ -182,6 +184,7 @@ static void link_dispatch(const u8 *f, unsigned int flen)
                 if (link_h[i].rel_pending && link_h[i].rel_rid == rid) {
                     link_h[i].rel_pending = 0;
                     link_h[i].rel_due = 0;
+                    link_h[i].rel_want_ack = 0;
                     link_h[i].rel_tries = 0;
                 }
             }
@@ -189,7 +192,7 @@ static void link_dispatch(const u8 *f, unsigned int flen)
         }
         e = link_by_rid(rid);
         if (!e) { link_rx_dropped++; break; }
-        e->last_rx_tick = tick_count;
+        e->last_rx_tick = link_platform_now();
         e->probes = 0;
         if (!e->req_acked) {
             link_host_progress((i32)(e - link_h)); /* REQUEST ACK advances */
@@ -213,7 +216,7 @@ static void link_dispatch(const u8 *f, unsigned int flen)
     case LINK_OP_DATA:
         e = link_by_rid(rid);
         if (!e || !e->ring_owner) { link_rx_dropped++; break; }
-        e->last_rx_tick = tick_count;
+        e->last_rx_tick = link_platform_now();
         e->probes = 0;
         if (seq == e->ack_seq + 1) {
             if (plen <= link_stream_free()) {
@@ -239,7 +242,7 @@ static void link_dispatch(const u8 *f, unsigned int flen)
     case LINK_OP_EOF:
         e = link_by_rid(rid);
         if (!e || !e->ring_owner) { link_rx_dropped++; break; }
-        e->last_rx_tick = tick_count;
+        e->last_rx_tick = link_platform_now();
         link_l2_eof = 1;
         link_l1_done = 1;
         break;
@@ -255,6 +258,9 @@ static void link_rx_pump(void)
     int n;
     for (n = 0; n < LINK_RX_BUDGET; n++) {
         u32 len = 0;
+        if (!net_rx_queued(NET_RX_LINK)) break;
+        if (!tick_budget_take(tick_budget_cnt(IRQ0_SLOT_BUDGET_US / 2),
+                              tick_budget_cnt(NET_TAIL_RX_US))) break;
         if (net_rx_take(NET_RX_LINK, link_rxbuf, sizeof(link_rxbuf), &len) != 0) break;
         link_dispatch(link_rxbuf, len);
     }

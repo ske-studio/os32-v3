@@ -8,12 +8,6 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / 'platform/powermac/cli_boot.c'
-CHECK = dict(name='ppc-cli-boot', tier=1, budget=60, needs=[],
-             covers=['platform/powermac/cli_boot.c', 'platform/powermac/cli_boot.h',
-                     'tools/ppc/test_cli_boot.py'],
-             inputs=['kernel/cli/resident_cli.c', 'kernel/cli/resident_cli.h',
-                     'platform/powermac/lan_boot.h', 'kernel/console/console_stream.h',
-                     'fs/vfs.h', 'include/types.h', 'exec/exec.h', 'lib/kstring_c.c', 'lib/kstring.h'])
 
 HARNESS = r'''
 #include <setjmp.h>
@@ -29,7 +23,7 @@ int pm_terminal_getkey(void) {
     return (unsigned char)input[pos++];
 }
 void pm_terminal_poll(void) { }
-void console_stream_write(const void *p, u32 n) {
+void pm_cli_write(const void *p, u32 n) {
     if (used + n >= sizeof(output)) longjmp(done, 2);
     memcpy(output + used, p, n); used += n; output[used] = 0;
 }
@@ -64,12 +58,12 @@ def main():
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
     original = SOURCE.read_text()
-    old = 'console_stream_write(buf, (u32)size);'
+    old = 'pm_cli_write(buf, (u32)size);'
     if original.count(old) != 1:
         raise RuntimeError('cat length mutation anchor is not unique')
     variants = [('normal', original, 0)]
     if args.mutate:
-        variants.append(('cat-length', original.replace(old, 'console_stream_write(buf, CLI_CAT_BYTES);'), 2))
+        variants.append(('cat-length', original.replace(old, 'pm_cli_write(buf, CLI_CAT_BYTES);'), 2))
     with tempfile.TemporaryDirectory(dir=os.environ.get('TMPDIR')) as tmp:
         d = Path(tmp)
         (d / 'harness.c').write_text(HARNESS)

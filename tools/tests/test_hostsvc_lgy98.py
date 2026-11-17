@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """LGY adapter against the existing driver's host fake."""
 CHECK = dict(name='hostsvc-lgy98', tier=1, needs=[], budget=3.1, covers=[
-    'net/nic_lgy98.c', 'net/nic.h', 'net/link.h',
+    'drivers/net/ne2000/nic_lgy98.c', 'net/nic.h', 'net/link.h',
     'drivers/net/ne2000/ne2000.h', 'drivers/net/ne2000/ne2000_regs.h',
     'sdk/include/os32/os32_kapi_shared.h', 'tools/tests/hostsvc_fixture.h',
     'tools/tests/hostsvc_fixture.c', 'tools/tests/hostsvc_lgy98_host.c',
-    'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'build/config.mk'])
+    'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'build/config.mk'],
+    basis=['docs/design/net/nic.md 装置の選択と寿命', 'AC-NET-1'],
+)
 import argparse
 import os
 from pathlib import Path
@@ -39,7 +41,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    original = (ROOT / 'net/nic_lgy98.c').read_text()
+    original = (ROOT / 'drivers/net/ne2000/nic_lgy98.c').read_text()
     with tempfile.TemporaryDirectory(prefix='hostsvc-lgy98-') as tmp:
         work = Path(tmp)
         rc = build_run(work, original)

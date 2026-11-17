@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 CHECK = dict(name='ver-state-name-host', tier=1,
-    covers=['include/callconv.h', 'include/abi.h', 'arch/x86/arch_abi.h', 'kernel/module/module.c', 'tools/tests/test_ver_state_name.py', 'tools/tests/ver_test_utils.py', 'tools/tests/host32.py', 'include/types.h', 'tools/tests/kernel_includes.py'],
-    needs=[], budget=2.8)
+    covers=['include/callconv.h', 'include/abi.h', 'arch/x86/arch_abi.h', 'kdebug/kdebug_module.c', 'tools/tests/test_ver_state_name.py', 'tools/tests/ver_test_utils.py', 'tools/tests/host32.py', 'include/types.h', 'tools/tests/kernel_includes.py'],
+    needs=[], budget=2.8,
+    kind='characterization',
+)
 
 
 def run(ctx) -> int:

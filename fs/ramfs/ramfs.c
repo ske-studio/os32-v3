@@ -85,6 +85,39 @@ static int ramfs_write(void *ctx, const char *path, const void *buf, u32 size)
     return (int)size;
 }
 
+static int ramfs_size(void *ctx, const char *path, u32 *size)
+{
+    const char *name = file_name(path);
+    RamFile *file = name ? find_file(ctx, name) : 0;
+    if (!file) return VFS_ERR_NOTFOUND;
+    *size = file->size;
+    return VFS_OK;
+}
+
+static int ramfs_read_stream(void *ctx, const char *path, void *buf, u32 size, u32 offset)
+{
+    const char *name = file_name(path);
+    RamFile *file = name ? find_file(ctx, name) : 0;
+    if (!file) return VFS_ERR_NOTFOUND;
+    if (offset >= file->size) return 0;
+    if (size > file->size - offset) size = file->size - offset;
+    kmemcpy(buf, file->data + offset, size);
+    return (int)size;
+}
+
+static int ramfs_write_stream(void *ctx, const char *path, const void *buf, u32 size, u32 offset)
+{
+    const char *name = file_name(path);
+    RamFile *file = name ? find_file(ctx, name) : 0;
+    if (!file) return VFS_ERR_NOTFOUND;
+    if (!size) return 0;  /* a zero-length write must not move the end */
+    if (offset > RAMFS_FILE_MAX || size > RAMFS_FILE_MAX - offset) return VFS_ERR_NOSPC;
+    if (offset > file->size) kmemset(file->data + file->size, 0, offset - file->size);
+    kmemcpy(file->data + offset, buf, size);
+    if (offset + size > file->size) file->size = offset + size;
+    return (int)size;
+}
+
 static int ramfs_list(void *ctx, const char *path, vfs_dir_cb cb, void *user)
 {
     RamFs *fs = ctx;
@@ -123,5 +156,6 @@ static int ramfs_stat(void *ctx, const char *path, OS32_Stat *out)
 VfsOps ramfs_ops = {
     .name = "ramfs", .mount = ramfs_mount, .umount = ramfs_umount,
     .is_mounted = ramfs_is_mounted, .read_file = ramfs_read,
-    .write_file = ramfs_write, .list_dir = ramfs_list, .stat = ramfs_stat
+    .write_file = ramfs_write, .get_file_size = ramfs_size,
+    .read_stream = ramfs_read_stream, .write_stream = ramfs_write_stream, .list_dir = ramfs_list, .stat = ramfs_stat
 };

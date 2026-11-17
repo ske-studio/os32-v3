@@ -1219,6 +1219,7 @@ pub fn wm_cycle(st: &mut GuiState, ctx: input::Ctx) {
     #[cfg(feature = "gf_accel_accept")]
     if ctx != input::Ctx::Pump { gf_accept::event_done(); }
     if ctx != input::Ctx::Pump {
+        crate::gserial::poll_lan(st);
         deliver_host_notice(st);
         /* モーダルの X3 分 (W4): 保留していた VFS 走査と、sticky な
          * `GUI_EV_MODAL` の再配送 (リングに空きができるまで諦めない)。 */

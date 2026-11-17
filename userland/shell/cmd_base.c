@@ -94,6 +94,7 @@ int shell_print_kdebug(int detail)
     return 0;
 }
 
+#ifndef SH_BASE_MINIMAL
 static int cmd_ver(int argc, char **argv)
 {
     OS32_VerInfo report;
@@ -144,6 +145,8 @@ static int cmd_beep(int argc, char **argv)
     return 0;
 }
 
+#endif
+
 static int cmd_uptime(int argc, char **argv)
 {
     u32 s = g_api->get_tick() / 100;
@@ -152,6 +155,7 @@ static int cmd_uptime(int argc, char **argv)
     return 0;
 }
 
+#ifndef SH_BASE_MINIMAL
 static int cmd_np2(int argc, char **argv)
 {
     (void)argc; (void)argv;
@@ -165,6 +169,8 @@ static int cmd_np2(int argc, char **argv)
     }
     return 0;
 }
+
+#endif
 
 static int cmd_time(int argc, char **argv)
 {
@@ -243,12 +249,16 @@ static const ShellCmd base_cmds[] = {
     { "clear",  cmd_clear,  "",      "Clear the screen" },
     { "cls",    cmd_clear,  "",      "Alias for clear" },
     { "tick",   cmd_tick,   "",      "Show system uptime ticks" },
+#ifndef SH_BASE_MINIMAL
     { "ver",    cmd_ver,    "",      "Show OS version" },
     { "uname",  cmd_ver,    "",      "Alias for ver" },
     { "date",   cmd_date,   "",      "Show RTC date/time" },
     { "beep",   cmd_beep,   "",      "Play startup beep" },
+#endif
     { "uptime", cmd_uptime, "",      "Show sys uptime" },
+#ifndef SH_BASE_MINIMAL
     { "np2",    cmd_np2,    "",      "Detect NP21/W emulator" },
+#endif
     { "time",   cmd_time,   "CMD",   "Measure command time" },
 #ifdef SHELL_AS_APP
     { "exit",   cmd_exit,   "[N]",   "Leave this shell" },

@@ -53,7 +53,7 @@ def run(runner, mutation=None):
     pointer_calls = {
         'mouse_poll': ('&state', 'pointer_seen == 1 && pointer_output == &state && state.x == -123 && state.y == 456 && state.dx == 7 && state.dy == -8 && state.buttons == (MOUSE_BTN_LEFT | MOUSE_BTN_RIGHT) && state.mode == MOUSE_MODE_SEAMLESS'),
         'mouse_available': ('', 'pointer_seen == 2'),
-        'mouse_set_bounds': ('-31, -42, 513, 624', 'pointer_seen == 3 && pointer_bounds[0] == -31 && pointer_bounds[1] == -42 && pointer_bounds[2] == 513 && pointer_bounds[3] == 624'),
+        'mouse_set_bounds': ('-31, -42, 513, 624', 'pointer_seen == 3 && pointer_seen_bounds[0] == -31 && pointer_seen_bounds[1] == -42 && pointer_seen_bounds[2] == 513 && pointer_seen_bounds[3] == 624'),
         'mouse_cursor_set_mode': ('MOUSE_CURSOR_TEXT', 'pointer_seen == 4 && pointer_mode == MOUSE_CURSOR_TEXT'),
         'mouse_cursor_show': ('', 'pointer_seen == 5'),
         'mouse_cursor_hide': ('', 'pointer_seen == 6'),
@@ -132,7 +132,7 @@ def run(runner, mutation=None):
     assert clock_wrapper
     sys_time = re.search(r'^os_time_t sys_time\(void\)\n\{.*?^\}',
                          (ROOT / 'kernel/sys.c').read_text(), re.M | re.S)
-    diskio = (ROOT / 'fs/fat/fatfs/diskio.c').read_text()
+    diskio = (ROOT / 'drivers/block/fat_diskio.c').read_text()
     fattime = re.search(r'^DWORD get_fattime\(void\)\n\{.*?^\}', diskio, re.M | re.S)
     assert sys_time and fattime
     constants = '\n'.join(re.findall(r'^#define DOS_.*$', diskio, re.M))
@@ -176,7 +176,7 @@ def run(runner, mutation=None):
 
 
 def contracts():
-    boot = (ROOT / 'init/kernel.c').read_text()
+    boot = (ROOT / 'platform/pc98/kernel.c').read_text()
     assert re.search(r'kstack_hw_init\(\);\s*pc98_boot_bind\(&boot, boot_drive\);', boot)
     platform = (ROOT / 'platform/pc98/boot.c').read_text()
     assert '    pc98_d2_bind();' in platform
@@ -187,7 +187,7 @@ def contracts():
         assert not re.search(r'#include.*drivers/(kbd|mouse)\.h', source)
         code = re.sub(r'/\*.*?\*/|//[^\n]*', '', source, flags=re.S)
         assert not re.search(r'\bkbd_(?:getchar|getkey|set_gui_mode|discard_stop)\s*\(', code)
-    for name, header in (('kernel/ime/ime.c', '../../drivers/input/kbd.h'),
+    for name, header in (('kernel/ime/ime.c', 'kbd_contract.h'),
                          ('kdebug/kselftest.c', '../drivers/input/kbd.h')):
         assert '#include "' + header + '"' in read_text(ROOT / name)
     assert '#include "../../drivers/input/mouse.h"' in platform
@@ -227,7 +227,7 @@ def contracts():
             symbols = subprocess.check_output(['nm', '-u', str(obj)], text=True)
             assert symbols.split() == (['U', 'emergency_output'] if source == 'serial_diag' else []), symbols
     assert 'clock_register(&pc98_clock);' in bind
-    for name in ('kernel/sys.c', 'fs/fat/fatfs/diskio.c'):
+    for name in ('kernel/sys.c', 'drivers/block/fat_diskio.c'):
         source = read_text(ROOT / name)
         assert '#include "clock_service.h"' in source
         assert 'RTC_YEAR_' not in source and 'rtc_read(' not in source

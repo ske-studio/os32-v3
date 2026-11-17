@@ -76,7 +76,7 @@ static void irq_restore(unsigned int flags) { restores++; irq_on = flags; }
 #undef now_us
 #include "../../gfx/gfx_osri.c"
 #include "../../platform/pc98/splash_obs.c"
-#include "../../init/boot_splash.c"
+#include "../../platform/pc98/boot_splash.c"
 #define plan guarded_plan.value
 
 struct SplashRaster *pc98_splash_raster_state(void) { return &state; }

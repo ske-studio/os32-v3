@@ -1,4 +1,6 @@
 #define OS32_SQLITE_DIRECT_TEST 1
+/* Module availability is provided by the host fixture. */
+int services_public = 1;
 /* ========================================================================= */
 /*  CFG_HOST.C — 票 S2-C §4 のホスト TDD                                     */
 /*                                                                           */
@@ -3780,3 +3782,5 @@ int main(int argc, char **argv)
     if (strcmp(argv[1], "tsv")) printf("PASS %s\n", argv[1]);
     return 0;
 }
+
+#include "sqlite_bits_host.h"

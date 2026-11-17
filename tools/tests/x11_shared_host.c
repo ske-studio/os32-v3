@@ -1,3 +1,10 @@
+#define LEGACY_KEYMAP_SOURCE "legacy_keymap_source.inc"
+#define KBD_MERGE_SOURCE "kbd_merge_source.inc"
+#include "kbd_capture_fixture_host.h"
+#include "../../input/hal/legacy_ring.c"
+#include "../../input/hal/legacy_mode.c"
+#include "../../kernel/input_legacy.c"
+#include "../../kernel/input_wait.c"
 /* X-11: real shared services and keyboard queues, ILP32. Device rendering,
  * dictionary storage and CPU transitions are fixture boundaries. No per-owner
  * IME state: switching owners alone must never manufacture a private copy. */
@@ -13,6 +20,8 @@
 
 int services_public = 1;
 void geforce_foreground_poll(void) { }
+/* No device callbacks are registered in this boundary fixture. */
+void idle_work_run(void) { }
 volatile u32 services_boot_fault;
 static int owner = 1, user, wm_depth, wait_depth, calls, seen_owner;
 static int opens, reopens, searches, learns, management, storage_rc;
@@ -23,7 +32,7 @@ static u32 gui_ime_cells[25][80];
 static AppSlot slots[APP_SLOT_COUNT];
 volatile u32 tick_count;
 volatile int exec_nest_level, ring3_wm_depth;
-int rshell_active;
+int rshell_active, boot_serial_mirror;
 
 static void say(const char *s)
 {
@@ -33,6 +42,7 @@ static void say(const char *s)
 #define CHECK(c, msg) do { if (!(c)) { say("FAIL " msg "\n"); return 1; } } while (0)
 int res_owner_get(void) { return owner; }
 void res_owner_set(int id) { owner = id; }
+static u32 io_syscall_suspend(int owner) { (void)owner; return 0; }
 int appslot_cur(void) { return owner; }
 AppSlot *appslot_get(int id) { return &slots[id]; }
 int appslot_gfx_owner(void) { return 0; }
@@ -149,7 +159,7 @@ int fep_store_user_clear(FepStore *d)
 #include "../../drivers/input/kbd_dlog.c"
 #include "kbd_source.inc"
 /* Back the CUI candidate save/restore addresses with host memory. */
-#include "tvram.h"
+#include "text_screen.h"
 #include "tvram_private.h"   /* PC-98 の番地 (第 5 段 C1) */
 static u16 fixture_tvram_text[25 * 80];
 static u8 fixture_tvram_attr[25 * 160];
@@ -179,9 +189,9 @@ static void reset(void)
     con_sink_owner_exit(con_sink_reader_get());
     con_sink_disable();
     kbd_set_gui_mode(0);
-    kbd_head = kbd_tail = kbd_count = 0;
+    legacy_cooked_flush();
     kbd_raw_head = kbd_raw_tail = kbd_raw_count = 0;
-    kbd_shift_state = 0;
+    kbd_hal_init(0);
     kmemset(&g_ime, 0, sizeof(g_ime));
     ime_delivery_clear();
     g_ime.per_page = 9;
@@ -246,7 +256,7 @@ static int delivery(void)
     con_sink_enable(); kbd_set_gui_mode(1);
     key(0x1d);
     int raw = kbd_trygetrawkey();
-    CHECK((raw & 0x1ff) == (0x100 | 0x1d) && !kbd_count, "WM raw only");
+    CHECK((raw & 0x1ff) == (0x100 | 0x1d) && !legacy_cooked_pending(), "WM raw only");
     CHECK(ime_feed_key((0x1d << 8) | 'a') == -1, "WM kana consumed");
     CHECK((kbd_trygetrawkey() & 0x1ff) == 0x1d && kbd_trygetrawkey() == -1,
           "WM make and break each once");
@@ -289,7 +299,7 @@ static int candidate_order(void)
             key(KEY_SPACE);
             if (list) key(KEY_XFER);
             /* Polls build the real preedit/candidate state without blocking. */
-            while (kbd_count) CHECK(ime_trygetkey() == -1, "IMEORDER composing consumed");
+            while (legacy_cooked_pending()) CHECK(ime_trygetkey() == -1, "IMEORDER composing consumed");
             CHECK(g_ime.state == (list ? IME_ST_CANDLIST : IME_ST_CONVERT) &&
                   kstrcmp(g_ime.results[0].kanji, "換字") == 0,
                   "IMEORDER kanji conversion ready");
@@ -735,6 +745,7 @@ static int candidate_boundaries(void)
 
 void _start(void)
 {
+    input_legacy_register(&kbd_legacy_provider);
     emergency_gate = 1; /* Preserve the shared-service fixture's closed gate. */
     pc98_d2_bind();
     int rc = unpublished() || cui_key_conversion() || modes() || delivery() || candidate_order() || cui_return_indicator() || lifetime() || gui_input_lifetime() ||
@@ -749,3 +760,7 @@ void _start(void)
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc) : "memory");
     for (;;) {}
 }
+
+void idle_wait_step(void) { idle_work_run(); _halt(); }
+
+void bootlog_push(const char *s, u32 n) { (void)s; (void)n; }

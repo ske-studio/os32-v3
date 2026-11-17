@@ -7,9 +7,8 @@ test_multiapp_model.py と同じ様式 — ホスト ILP32 GNU11 で走らせた
 同じソースがカーネルと同じフラグの i386-elf-gcc -Werror でも通ることを
 別に見る ([C1] GNU11)。Make・エミュレータ・libc は使わない。
 
-ホスト側だけ -DCON_SINK_NO_IRQ_LOCK を付ける: CPL=3 では cli/popfl を
-実行できないため。クロス側は付けないので、include/io.h を使う本番の経路も
-同じ試験の中でコンパイルされる。
+ホスト側は arch_io.h を IRQ 状態を持つ模型へ差し替える。
+クロス側は include/io.h の本番の実装をコンパイルする。
 """
 from kernel_includes import include_flags
 import argparse
@@ -35,11 +34,12 @@ CONSOLE_SRC = ROOT / "kernel/console/console.c"
 def run(tmp, source, runner, console_source=None, boot_source=None):
     (tmp / "con_sink.c").write_text(source)
     (tmp / "console.c").write_text(console_source or CONSOLE_SRC.read_text())
-    (tmp / "boot_serial.inc").write_text(boot_source or (ROOT / "init/boot_serial.inc").read_text())
-    fixture = HOST_SRC.read_text().replace('"../../kernel/console/console.c"', '"console.c"').replace('"../../init/boot_serial.inc"', '"boot_serial.inc"').replace('"../../platform/pc98/console.c"', '"' + str(ROOT / "platform/pc98/console.c") + '"')
+    (tmp / "boot_serial.inc").write_text(boot_source or (ROOT / "platform/pc98/boot_serial.inc").read_text())
+    fixture = HOST_SRC.read_text().replace('"../../kernel/console/console.c"', '"console.c"').replace('"../../platform/pc98/boot_serial.inc"', '"boot_serial.inc"').replace('"../../platform/pc98/console.c"', '"' + str(ROOT / "platform/pc98/console.c") + '"')
     (tmp / "fixture.c").write_text(fixture)
     exe = tmp / "con-sink"
-    subprocess.run(["gcc", *FLAGS, "-O0", "-DCON_SINK_NO_IRQ_LOCK",
+    subprocess.run(["gcc", *FLAGS, "-O0",
+                    "-I" + str(ROOT / "tools/tests/con_sink_arch"),
                     "-D__KERNEL_BUILD__", "-I" + str(tmp), "-I" + str(ROOT / "tools/tests"), *INCLUDES,
                     "-nostdlib", "-static", "-no-pie",
                     str(tmp / "fixture.c"), "-o", str(exe)], cwd=ROOT, check=True)
@@ -76,6 +76,9 @@ if __name__ == "__main__":
         print("TARGET i386-elf console.c COMPILE PASS", flush=True)
         if args.mutate:
             for old, new, expected in [
+                ('return irq_save();', 'return 0;', 'irq saves observed'),
+                ('irq_restore(f);', '(void)f;', 'irq restores observed'),
+                ('irq_restore(f);', 'irq_restore(f | 0x200);', 'irq flags restored'),
                 ('ring_put(color);', 'ring_put(color ^ 1);', 'FAIL 2e'),
                 ('ring_put((u8)CON_SINK_REC_CLEAR);',
                  'ring_put(0x7f);', 'FAIL 2m'),
@@ -87,8 +90,8 @@ if __name__ == "__main__":
                  '        if (g_count) ring_drop_oldest();', 'FAIL 5e'),
                 ('ring_reset();\n    g_enabled = 0;',
                  'g_enabled = 0;', 'FAIL 6c'),
-                ('if (g_reader == id) g_reader = CON_SINK_NO_READER;',
-                 '(void)id;', 'FAIL 7f'),
+                ('if (g_reader == id) {',
+                 'if (0) {', 'FAIL 7f'),
                 ('ring_put((u8)id);', 'ring_put((u8)id ^ 1);', 'FAIL 10c'),
             ]:
                 assert source.count(old) == 1, old
@@ -96,7 +99,7 @@ if __name__ == "__main__":
                 assert result.returncode == 1 and expected in result.stdout, result.stdout
                 print('RED runtime:', expected, flush=True)
             console = CONSOLE_SRC.read_text()
-            boot = (ROOT / "init/boot_serial.inc").read_text()
+            boot = (ROOT / "platform/pc98/boot_serial.inc").read_text()
             for label, old, new in [
                 ("print", "if (rshell_active || boot_serial_mirror) con_output_putchar(*str);", "if (rshell_active) con_output_putchar(*str);"),
                 ("utf8", "if (rshell_active || boot_serial_mirror) {\n        const char *s", "if (rshell_active) {\n        const char *s"),

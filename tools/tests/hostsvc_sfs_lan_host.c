@@ -1,6 +1,8 @@
+#include "rx_io_clock.h"
 /* A10: real LAN transport/protocol and A3 queues; fake hardware/clock only. */
 #include "fs/serialfs/sfs_lan.h"
 #include "net/nic_rx.h"
+#include "net/rx_work.h"
 #include "os32_kapi_shared.h"
 #define REQUIRE(e) do { if (!(e)) return __LINE__; } while (0)
 static const u8 local[6] = {2,0,0,0,0,1}, peer[6] = {2,0,0,0,0,2};
@@ -120,7 +122,18 @@ static int suite(void)
 }
 void _start(void)
 {
+    test_rx_clock_install();
     int rc = suite();
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc) : "memory");
     __builtin_unreachable();
 }
+
+int platform_clock_read_us(u32 *lo, u32 *hi) { *lo = *hi = 0; return 0; }
+u32 tick_budget_cnt(u32 us) { return us; }
+int tick_budget_take(u32 share, u32 tail) { (void)share; (void)tail; return 1; }
+void net_rx_schedule(void) {}
+int net_rx_defer_reset(u16 protocol) { (void)protocol; return 0; }
+
+int tick_budget_peek(u32 share, u32 tail) { (void)share; (void)tail; return 1; }
+
+void net_rx_note(void) {}

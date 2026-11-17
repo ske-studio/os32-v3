@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Build a plain ISO9660 root image using an installed ISO tool."""
 import argparse
+import json
 from pathlib import Path
 import shutil
 import subprocess
@@ -21,7 +22,7 @@ def fd_free_bytes(geometry, iso_size, loader_size):
 
 
 # ISO 9660 level 1 d-characters: anything else would be renamed by the tool.
-_D_NAME = __import__('re').compile(r'[A-Z0-9_]{1,8}(\.[A-Z0-9_]{0,3})?')
+_D_NAME = __import__('re').compile(r'[A-Z0-9_]{1,8}(\.[A-Z0-9_]{1,3})?')
 _D_DIR = __import__('re').compile(r'[A-Z0-9_]{1,8}')  # directories: no extension
 
 
@@ -37,6 +38,15 @@ def check_collision(target, seen):
     seen.add(target)
 
 
+def unique_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f'duplicate JSON key: {key}')
+        result[key] = value
+    return result
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     source = parser.add_mutually_exclusive_group(required=True)
@@ -46,8 +56,11 @@ def main():
     parser.add_argument('--fd', action='store_true')
     parser.add_argument('--base', type=Path, default=Path('.'))
     parser.add_argument('--bin', type=Path, action='append', default=[])
+    parser.add_argument('--manifest', type=Path)
     parser.add_argument('--out', type=Path, required=True)
     args = parser.parse_args()
+    if args.manifest and args.motd is None:
+        parser.error('--manifest requires --motd')
     if args.bin and args.motd is None:
         parser.error("--bin requires --motd")
     if bool(args.plan) != args.fd:
@@ -106,6 +119,14 @@ def main():
                     (staging / 'bin').mkdir()
                     for app in args.bin:
                         shutil.copyfile(app, staging / 'bin' / app.name)
+                if args.manifest:
+                    seen = {'ETC/MOTD'} | {'BIN/' + app.name.upper() for app in args.bin}
+                    for guest, host in json.loads(args.manifest.read_text(), object_pairs_hook=unique_object).items():
+                        target = guest.strip('/').upper()
+                        check_collision(target, seen)
+                        dest = staging / target
+                        dest.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copyfile(host, dest)
                 create(staging)
     except (OSError, ValueError, subprocess.CalledProcessError) as exc:
         print(f'mkroot_image: {exc}', file=sys.stderr)

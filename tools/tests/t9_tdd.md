@@ -125,7 +125,7 @@ RED になる**ことを確認してから GREEN に戻した (下の「落ち�
 ページ属性 (PTE の USER ビット) はホストでは踏めないので、カーネル側の
 `exec_tramp_user_selftest()` (3 項) を `kselftest_run_post_exec()` から呼ぶ。
 `kselftest_run()` は `exec_init()` より**前**に走りトランポリンページがまだ
-無いため、この項だけ `init/kernel.c` が `exec_init()` の直後に別口で回す。
+無いため、この項だけ `platform/pc98/kernel.c` が `exec_init()` の直後に別口で回す。
 **この 3 項は実機でしか踏めない (未実施)。**
 
 ## 4d. Codex 網羅レビュー 往復 8 の T1 (2026-09-13)
@@ -164,7 +164,7 @@ RED は「修正を戻すと落ちる」形で確認した (実際の出力):
 4d の初版は `appslot_reclaim` が `fd_redirect_close_state()` で枠の `file_fd` を
 閉じていたが、その `file_fd` は `fd_redirect_to_file` の `vfs_open` が **その ID の
 owner タグ**で取ったものなので、`exec_reclaim_owned` の (2) `vfs_close_owned(id)`
-(`exec/exec.c:746`) が先に同じ FD を閉じている。つまり park 中 kill では同じ FD に
+(`exec/exec.c`) が先に同じ FD を閉じている。つまり park 中 kill では同じ FD に
 `vfs_close` が 2 回掛かっていた (いまの `vfs_close` と回収順では間に FD 再利用が
 入る反例は無いが、「二重 close しない」という説明が実態と違った)。
 
@@ -365,7 +365,7 @@ $ python3 -B tools/check_constraints.py
 ```
 
 `cargo clippy -p t5a_display` は**この票より前から**落ちる
-(`storage.rs:22` の `clippy::mut_from_ref` が deny)。今回足した / 触った
+(`storage.rs` の `clippy::mut_from_ref` が deny)。今回足した / 触った
 `launch.rs` `prompt.rs` `guest.rs` には clippy の指摘は 1 件も無い。
 ## A-5. 実装レビュー往復 1/3 の blocker (A、2026-09-13)
 

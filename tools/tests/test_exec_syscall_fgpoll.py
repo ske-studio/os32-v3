@@ -9,7 +9,9 @@ CHECK = dict(name='exec-syscall-fgpoll-host', tier=1, budget=2.8,
                      'exec/exec_syscall.inc', 'drivers/video/geforce/geforce_module.h',
                      'tools/tests/host32.py',
                      'tools/tests/kernel_includes.py', 'build/config.mk',
-                     'include/**'])
+                     'include/**', 'kernel/io_work.h', 'kernel/io_kapi.h', 'sdk/include/os32/os32_kapi_slots.h'],
+    basis=['AC-CTX-1', 'AC-CTX-4', 'AC-CTX-6', 'GF_GUARD_THERM_DESIGN §5'],
+)
 
 import argparse
 import os
@@ -36,6 +38,8 @@ static int caller, ring3_in_syscall, checks, polls, aborts, parks;
 static bool due, stop_pending;
 static struct arch_syscall *g_cur_frame, *saved_frame;
 static u32 tick_count=100;
+static int io_ends;
+static __attribute__((unused)) void io_syscall_end(int owner) { CHECK(owner == 2 && parks == 1); io_ends++; }
 static void caller_access_leave(const int *prev) { caller=*prev; }
 static void exec_cui_display_abort(void) { CHECK(!caller); }
 bool geforce_fg_due(u32 now) {
@@ -58,6 +62,7 @@ static void syscall_tail(u32 *frame) {
     struct arch_syscall *prev_frame=saved_frame;
     struct arch_syscall call = { frame };
     u32 result = 1234;
+    int io_owner = 2;
 /* PRODUCT */
 void _start(void) {
     u32 frame[13]={0}, parent[13]={0};
@@ -66,9 +71,10 @@ void _start(void) {
     for (int mode=0; mode<3; mode++) {
         caller=1; ring3_in_syscall=1; g_cur_frame=&child_call;
         due=mode!=0; stop_pending=mode==2;
-        checks=polls=aborts=parks=0;
+        checks=polls=aborts=parks=io_ends=0;
         syscall_tail(frame);
         CHECK(checks==1 && polls==(int)due && parks==1);
+        CHECK(io_ends == 1);
         CHECK(!caller && ring3_in_syscall==7 && g_cur_frame==&parent_call);
     }
     finish(0);
@@ -92,6 +98,37 @@ def run_case(folder, source, label, mutant=False):
     print(('MUTATE runtime RED: ' if mutant else 'GREEN: ') + label, flush=True)
 
 
+def run_entry(folder, source, mutant=False):
+    start = source.index('    ring3_gui_pump();')
+    end = source.index('    arch_kapi_source(', start)
+    entry = source[start:end]
+    fixture = folder / 'entry.c'
+    fixture.write_text(r"""
+#include "os32_kapi_slots.h"
+static int pumps, work;
+static void ring3_gui_pump(void) { pumps++; }
+static __attribute__((unused)) void idle_work_run(void) { work++; }
+void _start(void) {
+for (unsigned int slot = KAPI_SLOT_IO_PUMP - 1; slot <= KAPI_SLOT_IO_PUMP; ++slot) {
+pumps = work = 0;
+""" + entry + r"""
+    int rc = !(pumps == 1 && work == (slot != KAPI_SLOT_IO_PUMP));
+    if (rc) { __asm__ volatile("int $0x80" : : "a"(1), "b"(rc) : "memory"); }
+}
+    int rc = 0;
+    __asm__ volatile("int $0x80" : : "a"(1), "b"(rc) : "memory");
+    __builtin_unreachable();
+}
+""")
+    exe = folder / 'entry'
+    subprocess.run(['gcc', '-m32', '-O2', '-Wall', '-Wextra', '-Werror',
+                    '-ffreestanding', '-fno-pie', '-fno-stack-protector',
+                    '-nostdlib', '-static', '-no-pie', '-I'+str(ROOT/'sdk/include/os32'), str(fixture), '-o', str(exe)], check=True)
+    rc = host32.run([str(exe)]).returncode
+    assert rc == (1 if mutant else 0), rc
+    print(('MUTATE runtime RED: ' if mutant else 'GREEN: ') + 'syscall-idle', flush=True)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
@@ -100,7 +137,13 @@ def main():
     with tempfile.TemporaryDirectory(prefix='syscall-fgpoll-') as td:
         folder = Path(td)
         run_case(folder, source, 'syscall-tail')
+        run_entry(folder, source)
         if args.mutate:
+            old = '    if (slot != KAPI_SLOT_IO_PUMP) idle_work_run(); /* IO_PUMP_ONCE */'
+            assert source.count(old) == 1
+            run_entry(folder, source.replace(old, ''), True)
+            run_entry(folder, source.replace(old, '    idle_work_run();'), True)
+            run_case(folder, source.replace('io_syscall_end(io_owner); /* IO_SYSCALL_RETURN */', '(void)io_owner; /* IO_SYSCALL_RETURN */'), 'syscall-total-count', True)
             old = 'if (exec_gfx_poll_due(tick_count)) exec_gfx_poll();'
             assert source.count(old) == 1
             run_case(folder, source.replace(old,

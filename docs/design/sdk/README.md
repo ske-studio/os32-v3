@@ -27,19 +27,19 @@ C resident CRT はこの欄を除外し、gshell は retry を有効化しない
 
 ### gen_kapi
 
-`sdk/gen_kapi.py:569–581` は body が target より優先、target省略時は name。
+`sdk/gen_kapi.py` は body が target より優先、target省略時は name。
 
-`sdk/gen_kapi.py:569–580` は既にbody/targetを解決するので生成ロジック追加は不要。
+`sdk/gen_kapi.py` は既にbody/targetを解決するので生成ロジック追加は不要。
 
 ### os32x_hdr
 
 C / Rust の生成物と**各コンパイル単位**に ABI 識別を結び付けて最終 ELF の印・旧シンボル・配置を照合する
 
-- sdk/os32x_hdr.py:264–271 の effective_min_api が生成済み OS32X_MIN_API まで要求版を上げる。新ユーザーランドは新カーネル専用で、旧カーネルは exec 時に拒否する。app.conf の変更と到達しない表示ガードは不要。
+- sdk/os32x_hdr.py の effective_min_api が生成済み OS32X_MIN_API まで要求版を上げる。新ユーザーランドは新カーネル専用で、旧カーネルは exec 時に拒否する。app.conf の変更と到達しない表示ガードは不要。
 
 ### kapi_rust_gen
 
-**Rust 生成器 (`sdk/kapi_rust_gen.py:45`) は未知の非ポインタ型を `u32` に倒さず生成失敗に**する
+**Rust 生成器 (`sdk/kapi_rust_gen.py`) は未知の非ポインタ型を `u32` に倒さず生成失敗に**する
 
 ## 索引
 

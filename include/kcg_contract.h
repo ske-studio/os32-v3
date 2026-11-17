@@ -47,4 +47,17 @@ int kcg_draw_utf8(int x, int y, const char *utf8_str, u8 fg, u8 bg);
 /* 旧 KAPI slot。起動中を含め常に NOSYS、副作用なし。 */
 int kcg_load_font(const char *path);
 
+/* ======== 部品 (kcg.mod) との口 ======== */
+typedef struct {
+    u32 hits, misses;
+} KcgCacheStats;
+typedef struct {
+    void (*read_ank)(u8 ch, u8 *buf);
+    void (*read_kanji)(u16 jis, u8 *buf);
+    void (*stats)(KcgCacheStats *out);
+    void (*invalidate)(void);
+} KcgModuleApi;
+/* 1 = 部品が読み込まれて ROM を読める。 */
+int kcg_module_ready(void);
+
 #endif /* KCG_CONTRACT_H */

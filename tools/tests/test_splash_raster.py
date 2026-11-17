@@ -5,7 +5,9 @@ CHECK = dict(name='splash-raster-host', tier=1,
             'tools/tests/kernel_includes.py', 'gfx/gfx_osri.h', 'gfx/gfx.h',
             'include/types.h', 'include/pc98.h', 'include/pegc.h', 'include/sys.h', 'gfx/palette.h',
             'sdk/include/os32/os32_kapi_shared.h'],
-    needs=[], budget=4.7)
+    needs=[], budget=4.7,
+    basis=['docs/design/drivers/video/pc98/splash_raster.c.md begin の判定', 'docs/design/drivers/video/pc98/splash_raster.c.md 公開の表 (table) の再生', 'docs/design/drivers/video/pc98/splash_raster.h.md 周期の定数 (Subsystem 層)'],
+)
 
 import argparse
 import os

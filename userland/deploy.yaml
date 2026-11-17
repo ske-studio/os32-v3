@@ -17,6 +17,9 @@
 
 filesystem:
   files:
+    - host: userland/diag/mmtimetest.bin
+      guest: /usr/bin/
+      tags: [test]
     - host: userland/tests/gfx2_rh.bin
       guest: /usr/bin/
       tags: [test]

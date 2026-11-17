@@ -2,12 +2,14 @@
 """C1: the console takes its grid, default colour and route guard from the backend."""
 CHECK = dict(name='sep5-console-host', tier=1, needs=[], budget=10,
     covers=['kernel/console/console.c', 'kernel/console/console_backend.h',
-            'platform/pc98/console.c', 'platform/pc98/tvram_private.h', 'include/tvram.h',
+            'platform/pc98/console.c', 'platform/pc98/tvram_private.h', 'include/text_screen.h',
             'drivers/video/pc98/pc98_route.h', 'lib/utf8.c', 'lib/utf8.h',
             'tools/tests/sep5_console_host.c', 'tools/tests/sep5_console_pc98_host.c',
             'tools/tests/test_sep5_console.py', 'tools/tests/host32.py',
             'tools/tests/kernel_includes.py', 'build/config.mk', 'include/**',
-            'arch/x86/**', 'platform/pc98/**', 'kernel/console/**', 'sdk/include/os32/**'])
+            'arch/x86/**', 'platform/pc98/**', 'kernel/console/**', 'sdk/include/os32/**'],
+    basis=['PPC_SEP5_DESIGN §2.1', 'AC-DISPLAY-1'],
+)
 import argparse
 from pathlib import Path
 import subprocess
@@ -87,8 +89,8 @@ def boundary():
     console = (ROOT / CONSOLE).read_text()
     for word in ('pc98', 'TVRAM_COLS', 'TVRAM_ROWS', 'TATTR_', 'TVRAM_BASE', 'TVRAM_ATTR'):
         assert word not in console, word
-    header = (ROOT / 'include/tvram.h').read_text()
-    assert '#include "pc98.h"' not in header and '#define' not in header.replace('#define __TVRAM_H', '')
+    header = (ROOT / 'include/text_screen.h').read_text()
+    assert '#include "pc98.h"' not in header and '#define' not in header.replace('#define OS32_TEXT_SCREEN_H', '')
 
 
 def main():

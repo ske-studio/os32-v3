@@ -472,10 +472,10 @@ void console_write(const char *buf, u32 size, u8 color)
 { (void)buf; (void)size; (void)color; }
 int res_owner_get(void) { return 0; }
 
-/* HostDrv 側のサイズ取得の純規則も実物を取り込む (③、fs/hostdrv/hostdrvfs.c が使う)。
+/* HostDrv 側のサイズ取得の純規則も実物を取り込む (③、drivers/hostdrv/hostdrvfs.c が使う)。
  * hostdrvfs.c 本体はハイパーコールを叩くのでホストでは組めないが、
  * 判定はこの .inc の純関数に切り出してある (票 H1 と同じ作法)。 */
-#include "../../fs/hostdrv/hostdrv_stat_rules.inc"
+#include "../../drivers/hostdrv/hostdrv_stat_rules.inc"
 
 #include "../../fs/ext2/ext2_super.c"
 #include "../../fs/ext2/ext2_inode.c"
@@ -4967,7 +4967,7 @@ static void synth_normal(void)
  * 成功し、NT はディレクトリにもサイズを返す**。 */
 static void stage_c(void)
 {
-    report("== 段 C: HostDrv のサイズ取得の純規則 (fs/hostdrv/hostdrv_stat_rules.inc) ==\n");
+    report("== 段 C: HostDrv のサイズ取得の純規則 (drivers/hostdrv/hostdrv_stat_rules.inc) ==\n");
     report("  [C1] hdrv_size_result\n");
 
     /* 通常ファイル: 問い合わせが通っていればサイズを返してよい */

@@ -49,7 +49,7 @@ python3 -B tools/tests/test_cfg.py --sanitize s5_pure s5_bench s5_pool cmd
 
 | # | 決めたこと | 理由 |
 |---|---|---|
-| A | int の get は `cfg_read_int` + 既定値の埋め戻しで**その場に `cfg_get_int` を展開**した | 票の失敗の数え方は「get の負 (NOTFOUND は数えない)」。`cfg_get_int` は値を返す口なので負の戻りが**エラーではなく値**になり、数えられない。`cfg_get_int` は `cfg_read_int` の 1 行のラッパ (`libos32cfg.c:612`) なので引く手間は同じ |
+| A | int の get は `cfg_read_int` + 既定値の埋め戻しで**その場に `cfg_get_int` を展開**した | 票の失敗の数え方は「get の負 (NOTFOUND は数えない)」。`cfg_get_int` は値を返す口なので負の戻りが**エラーではなく値**になり、数えられない。`cfg_get_int` は `cfg_read_int` の 1 行のラッパ (`libos32cfg.c`) なので引く手間は同じ |
 | B | 「無いキー」は `gshell nosuch/key`、4 件に 1 件 (`j % 4 == 3`)。残りは 3 キーの巡回 | m=20 で 無いキー 5 件 / 各キー 5 件 (`s5_pure` で固定) |
 | C | `iter` 行は 10 回ごと **と最終回** | 票は「10 回ごと」だが、`cfg_bench 3 8` のような短い測り方で 1 行も出ないのは実測票として使えない |
 | D | プールは close の**直前** (接続を抱えている間) と**直後**の 2 点を読み、ピークは両方の最大、end は最後の直後値 | close 後だけだとピークが取れない (RED R7)。start はループに入る前の 1 回 |
@@ -192,7 +192,7 @@ san = ["-fsanitize=address,signed-integer-overflow",
 
 | # | 壊し方 | 落ちる CHECK |
 |---|---|---|
-| B1 | `static int bn_sink;` + `bn_sink += iv;` に戻す | `--sanitize` で `cfg_bench.c:515: runtime error: signed integer overflow: 2147483647 + 2147483647 cannot be represented in type 'int'` — レビューの反例そのもの (試験が DB に `2147483647` を入れてから走らせる) |
+| B1 | `static int bn_sink;` + `bn_sink += iv;` に戻す | `--sanitize` で `cfg_bench.c: runtime error: signed integer overflow: 2147483647 + 2147483647 cannot be represented in type 'int'` — レビューの反例そのもの (試験が DB に `2147483647` を入れてから走らせる) |
 | B2 | 状態を open 直後に採る | `FAIL c_s5_bench: cap_has("status 4 ERROR\n")` (`inj_prep_fail = "ival"` で get の prepare だけ落とす) |
 | B3a | 上限を `1000000 / 10000` に戻す | `FAIL c_s5_pure: bn_parse_u32("10001", 1, BN_MAX_N, &v) == -1` |
 | B3b | `t_sum += ticks` に戻す | `FAIL c_s5_pure: st.saturated && st.t_sum == 4294967295u` |

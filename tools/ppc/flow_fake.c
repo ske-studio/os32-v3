@@ -141,6 +141,24 @@ static int tree_script(void)
 static int fake_ci(void *frame)
 {
     cell *a = frame;
+    const char *rh_name = ppc_cell_ptr(a[0]);
+    cell *rh_v = a + 3;
+    if (!kstrcmp(rh_name, "instance-to-package")) { rh_v[1] = 0; return 0; }
+    if (!kstrcmp(rh_name, "finddevice") &&
+        !kstrcmp(ppc_cell_ptr(rh_v[0]), "/chosen") && cursor &&
+        kstrcmp(steps[cursor].text ? steps[cursor].text : "", "/chosen")) {
+        rh_v[1] = phandle(7); return 0;
+    }
+    if (!kstrcmp(rh_name, "getprop") &&
+        !kstrcmp(ppc_cell_ptr(rh_v[1]), "stdout") && rh_v[3] == 4 &&
+        cursor && kstrcmp(steps[cursor].text ? steps[cursor].text : "", "stdout")) {
+        unsigned char *b = ppc_cell_ptr(rh_v[2]);
+        b[0] = b[1] = b[2] = 0; b[3] = scenario == SCREEN ? 9 : 8;
+        rh_v[4] = 4; return 0;
+    }
+    if (!kstrcmp(rh_name, "write") && rh_v[2] == 86) {
+        rh_v[3] = rh_v[2]; return 0;
+    }
     REQUIRE(cursor < used, 20);
     struct flow_step *s = &steps[cursor++];
     const char *name = ppc_cell_ptr(a[0]);

@@ -3,7 +3,9 @@ CHECK = dict(name='gfx2-enum-host', tier=1, needs=[], budget=8,
     covers=['gfx/v2/enum.c', 'lib/kstring_c.c', 'gfx/v2/gfx2_int.h', 'include/gfx_hal.h',
             'include/gfx_hal2.h', 'sdk/include/os32/os32_gfx2.h',
             'tools/tests/gfx2_enum_host.c', 'tools/tests/test_gfx2_enum.py',
-            'tools/tests/host32.py'])
+            'tools/tests/host32.py'],
+    basis=['HAL_V2_DESIGN §9-1', 'HAL_V2_DESIGN §12-1'],
+)
 
 def run(ctx):
     import os

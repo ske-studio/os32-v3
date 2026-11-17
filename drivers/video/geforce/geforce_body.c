@@ -14,7 +14,8 @@ static int safe(void) { return !production.attempted || !gf_production_decode_sa
 static int stop(void)
 {
     const struct geforce_platform *p = geforce_context->platform;
-    int rc = p && p->wc_stop ? p->wc_stop() : 0;
+    /* The pinned device retains WC across ordinary display stops. */
+    int rc = !identify() && p && p->wc_stop ? p->wc_stop() : 0;
     if (gf_production_quiesce(&production)) rc = -1;
     return rc;
 }

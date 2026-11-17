@@ -297,6 +297,12 @@ static const u8 kapi_fixed_count[] = {
     3, /* gfx2_cursor_show */
     3, /* gfx2_dpms */
     6, /* gfx2_present */
+    1, /* con_sink_capture */
+    1, /* boot_token_get */
+    2, /* io_policy_set */
+    3, /* io_policy_get */
+    0, /* io_policy_reset */
+    1, /* io_pump */
 };
 static const u8 kapi_fixed_kind[][KAPI_FIXED_MAX] = {
     { 0 }, /* gfx_init */
@@ -591,5 +597,11 @@ static const u8 kapi_fixed_kind[][KAPI_FIXED_MAX] = {
     { KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER }, /* gfx2_cursor_show */
     { KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER }, /* gfx2_dpms */
     { KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER }, /* gfx2_present */
+    { KAPI_VALUE_INTEGER }, /* con_sink_capture */
+    { KAPI_VALUE_POINTER }, /* boot_token_get */
+    { KAPI_VALUE_POINTER, KAPI_VALUE_INTEGER }, /* io_policy_set */
+    { KAPI_VALUE_POINTER, KAPI_VALUE_INTEGER, KAPI_VALUE_POINTER }, /* io_policy_get */
+    { 0 }, /* io_policy_reset */
+    { KAPI_VALUE_INTEGER }, /* io_pump */
 };
 #endif

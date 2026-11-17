@@ -11,7 +11,10 @@ CHECK = dict(name='splash-raster-diag-host', tier=1,
             'gfx/gfx_internal.h', 'include/gfx_hal.h', 'mm/paging.h',
             'platform/pc98/legacy/v86_bios.h', 'drivers/char/serial.h', 'lib/serial_diag.h',
             'include/bootinfo.h', 'include/build_id.h', 'include/config.h',
-            'arch/x86/kernel/idt.h', 'kernel/time/ktime.h'], needs=[], budget=33.2)
+            'arch/x86/kernel/idt.h', 'kernel/time/ktime.h'], needs=[], budget=33.2,
+    basis=['docs/design/drivers/video/pc98/splash_raster.c.md 診断の像', 'docs/design/platform/pc98/splash_probe.c.md 1 行の OUT の列の計測 (PL の列・M1)', 'docs/design/drivers/video/pc98/splash_raster_image.c.md 診断だけに残る型'],
+    env_limit='模型の診断時刻とobject配置を確認するが、物理IF=0時間と実走査時序は保証しない。',
+)
 import argparse
 import os
 from pathlib import Path

@@ -3,7 +3,7 @@
 #include <stdarg.h>
 #include "fs/vfs_device.h"
 #include "fs/isofs/iso9660.h"
-#include "drivers/block/ram_ro.h"
+#include "kernel/dev/ram_ro.h"
 #include "lib/kstring.h"
 
 volatile u32 tick_count;

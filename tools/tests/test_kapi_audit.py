@@ -10,7 +10,7 @@ import host32
 from test_exec_r1 import function
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-SOURCES = ('kernel/console/console.c', 'drivers/sound/fm/fm.c', 'drivers/char/serial.c', 'kapi/kapi_generated.c', 'drivers/input/kbd.c', 'kernel/ime/ime.c', 'exec/exec.c', 'kernel/ime/ime_dict.c')
+SOURCES = ('kernel/console/console.c', 'drivers/sound/fm/fm.c', 'drivers/char/serial.c', 'kapi/kapi_generated.c', 'drivers/input/kbd.c', 'kernel/ime/ime.c', 'exec/exec.c', 'kernel/ime/ime_dict.c', 'kernel/input_wait.c')
 MUTATIONS = [
     ('cursor x low', 0, 'if (x < 0) x = 0;', ''),
     ('cursor x high', 0, 'if (x >= CON_COLS) x = CON_COLS - 1;', ''),
@@ -35,11 +35,11 @@ MUTATIONS += [
      '        if (ring3_wait_pending()) ring3_abort_check();\n        serial_puts(".");'),
     ('extended log drops STOP', 7, '        serial_puts(".");',
      '        appslot_get(appslot_cur())->abort_req = 0;\n        serial_puts(".");'),
-    ('rshell counts wakeups', 4, '(u32)(tick_count - start_tick)', '(waits + 0 * start_tick)'),
-    ('rshell timeout 3 seconds', 4, 'KBD_RSHELL_TIMEOUT_SEC * PIT_HZ', '3 * PIT_HZ'),
-    ('kbd char wait', 4, '            if (interruptible && ring3_wait_pending()) return -1;', ''),
-    ('kbd key wait', 4, '    while (kbd_count == 0) {\n        kbd_foreground_poll();\n        if (interruptible && ring3_wait_pending()) return -1;', '    while (kbd_count == 0) {\n        kbd_foreground_poll();'),
-    ('kbd gui wait', 4, '        if (interruptible && ring3_wait_pending()) return -1; /* GUI fallback */', ''),
+    ('rshell counts wakeups', 8, '(u32)(p->wait_ticks() - start)', '(waits + 0 * start)'),
+    ('rshell timeout 3 seconds', 4, 'return KBD_RSHELL_TIMEOUT_SEC * PIT_HZ;', 'return 3 * PIT_HZ;'),
+    ('kbd char wait', 8, 'if (interruptible && p->wait_pending && p->wait_pending())', 'if (gui && interruptible && p->wait_pending && p->wait_pending())'),
+    ('kbd key wait', 8, 'if (interruptible && p->wait_pending && p->wait_pending())', 'if (mode != IL_KEY && interruptible && p->wait_pending && p->wait_pending())'),
+    ('kbd gui wait', 8, 'if (interruptible && p->wait_pending && p->wait_pending())', 'if (!gui && interruptible && p->wait_pending && p->wait_pending())'),
     ('ime char cleanup', 5, 'ime_getchar_kapi', 'cleanup'),
     ('ime key cleanup', 5, 'ime_getkey_kapi', 'cleanup'),
     ('wait user guard', 6, '!ring3_call_from_user() || ', ''),
@@ -80,6 +80,8 @@ def run(runner, mutation=None, case=0, expected=None):
     sources[6] = 'static void exec_cui_display_abort(void) {}\n' + sources[6]
     if mutation:
         name, idx, old, new = mutation
+        if name in ('rshell counts wakeups', 'rshell timeout 3 seconds', 'kbd char wait', 'kbd gui wait'):
+            assert sources[idx].count(old) == 1, name
         if new in ('ch < 0', 'ch >= OPN_CHANNEL_COUNT', 'abort', 'user-guard', 'probe', 'cleanup', 'keyoff'):
             start = sources[idx].index(old + '(')
             end = sources[idx].index('\n}', start)
@@ -108,7 +110,7 @@ def run(runner, mutation=None, case=0, expected=None):
     with tempfile.TemporaryDirectory(prefix='kapi-audit-') as directory:
         work = pathlib.Path(directory)
         sources[7] = function(sources[7], 'ime_dict_log_probe')
-        for inc, source in zip(('console_source.inc', 'fm_source.inc', 'serial_source.inc', 'rshell_source.inc', 'kbd_source.inc', 'ime_source.inc', 'wait_source.inc', 'ime_log_source.inc'), sources):
+        for inc, source in zip(('console_source.inc', 'fm_source.inc', 'serial_source.inc', 'rshell_source.inc', 'kbd_source.inc', 'ime_source.inc', 'wait_source.inc', 'ime_log_source.inc', 'input_wait_source.inc'), sources):
             (work / inc).write_text(source)
         exe = work / 'fixture'
         cmd = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Werror', '-Wno-unused-variable', '-ffreestanding',

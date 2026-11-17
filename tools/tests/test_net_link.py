@@ -30,7 +30,7 @@ GENERATED = ROOT / "kapi/kapi_generated.c"
 
 # ヘッダは実物の置き場を通す。ホストに持ち込めないものは net_link_host.c が
 # **include ガードを先に define して**中身を自前のものに差し替える。
-INC = include_flags(ROOT)
+INC = ['-I' + str(ROOT / 'tools/tests/link_platform_fake'), *include_flags(ROOT)]
 FLAGS = ["-std=gnu11", "-O0", "-Wall", "-Wextra", "-Werror",
          "-Wno-pointer-to-int-cast",
          "-Wno-unused-parameter"]
@@ -41,11 +41,19 @@ TARGET_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie
                 "-D__KERNEL_BUILD__"]
 # arch/x86 + platform/pc98: include/io.h は契約だけで、実装は固定名
 # arch_io.h / platform_io.h を引く (順序 3)。build/config.mk の INC_KERNEL と
-# 同じものをここでも渡す (ホスト側は LINK_HOST_TEST で io.h を外すので不要
-# だが、--target はカーネルと同じ素性で組むので要る)。
+# 同じものをクロス側へ渡す。ホスト側は platform の include 境界で差し替える。
 TARGET_INC = include_flags(ROOT)
 
 MUTATIONS = (
+    ('close-drops-pending-ack', 'link_host_api.inc',
+     'e->rel_want_ack = e->want_ack;',
+     'e->rel_want_ack = 0;', 'close_flushes_ack_before_release'),
+    ('remote-log-missing', 'link_host_api.inc',
+     '    else if (tok_eq(req, a0, b0, REMOTE_REQ_LOG)) which = 6;\n',
+     '', 'decl_len_parsing'),
+    ('remote-field-count-missing', 'link_host_api.inc',
+     '        if (n < which + 1) return 0;',
+     '        if (n < 1) return 0;', 'decl_len_parsing'),
     ('l0-timeout-not-counted', 'link_selftest.inc',
      'if (rc == OS32_ERR_AGAIN || rc == OS32_ERR_HOSTDOWN)',
      'if (rc == OS32_ERR_AGAIN)',
@@ -71,13 +79,13 @@ MUTATIONS = (
      'e->rel_pending && !e->rel_due && since(e->rel_tick)',
      'e->rel_pending && since(e->rel_tick)', 'tx_rto_starts_at_nic_acceptance'),
     ('request-send-does-not-start-rto', 'link.c',
-     'e->req_due = 0;\n            e->last_tx_tick = tick_count;',
+     'e->req_due = 0;\n            e->last_tx_tick = link_platform_now();',
      'e->req_due = 0;', 'tx_rto_starts_at_nic_acceptance'),
     ('wdata-send-does-not-start-rto', 'link.c',
-     'e->w_due = 0;\n            e->last_tx_tick = tick_count;',
+     'e->w_due = 0;\n            e->last_tx_tick = link_platform_now();',
      'e->w_due = 0;', 'tx_rto_starts_at_nic_acceptance'),
     ('release-send-does-not-start-rto', 'link.c',
-     'e->rel_due = 0;\n                e->rel_tick = tick_count;',
+     'e->rel_due = 0;\n                e->rel_tick = link_platform_now();',
      'e->rel_due = 0;', 'tx_rto_starts_at_nic_acceptance'),
     ('ring-overflow-not-counted', 'link_rx.inc',
      'link_l2_overflow++;     /* 空き不足',
@@ -164,7 +172,7 @@ def check_timer_calls_link_tick():
                 registrations.append(path.relative_to(ROOT).as_posix())
     assert registrations == [], registrations
     nic = (ROOT / "net/nic.c").read_text()
-    assert "tick_register(PC98_TICK_LINK, net_tick)" in nic
+    assert "link_platform_tick_register(net_jiffy)" in nic
     assert "link_tick();" in nic
     kapi = (ROOT / "kapi/kapi_host.c").read_text(encoding="utf-8")
     assert "link_tick" not in kapi, "KAPI ラッパーが link_tick を呼んでいる"

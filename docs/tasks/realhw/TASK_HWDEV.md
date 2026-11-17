@@ -17,7 +17,7 @@ kdebug.bin に入っている実機の調査・試行・復帰 (realhw_recover �
 
 - **部品の台帳 (tools/module_schema.py) の 11 枠目を HWDEV に使う** (台帳は 10 枠で 10 種類が使用済み)。定義は [部品の台帳](../../design/tools/module_schema.md)。
 - 設計の A 案と、初版は boot 中に入れ替えない部品の寿命は、設計の提案としてレビューで承認された (Opus 2 往復、確定 G1〜G5)。
-- **owner の作業領域の上限は 267 頁** (2048 node の最悪の場合の実測、S6 送りの 251 頁を訂正)。内訳は [作業領域の契約](../../design/include/hwdev_private.md) (267 頁の当時値の記録はアーカイブ)。
+- **owner の作業領域の上限は 267 頁** (2048 node の最悪の場合の実測、S6 送りの 251 頁を訂正)。内訳は [作業領域の契約](../../design/hwdev/hwdev_private.md) (267 頁の当時値の記録はアーカイブ)。
 
 ## 2. 方式の結論 — A (今の C と表をそのまま部品へ移す)
 
@@ -51,9 +51,9 @@ kdebug.bin に入っている実機の調査・試行・復帰 (realhw_recover �
 実装の状態を確かめ直して、上の表の後半の順序を次に替える (表の各段の合格条件は変えない)。
 
 1. **M5 を M4 より先に**: 大きさの条件はもう満たした。配備定義・`KERNEL_PAIRED_MODULES`・generations-manifest・KDEBUG=0 の門の試験だけの軽い段。起動のたびの `[hwdev] rejected: NOT_FOUND` もここで消える。
-2. **新しい段 BARLEN (設計、astra 起草 → Opus レビュー)**: A1 の資源の確認 (`kdebug/gfinit_resources.c:79-85`) は、メモリを有効にした他の装置に 0 でないメモリ BAR があると長さを知る手段が無いので断る。2026-10-15 の基準構成の生データでは **0:8.0 Trident (Command 0002h、BAR 0x20000000/0x20400000/0x20800000) と 0:11.0 82557 (Command 0147h、BAR0 0x20410008・BAR2 0x20500000) が該当し、いまのコードのままでは A1 は必ず断られる** (0:7.0 NEC は BAR が全部 0 で通る)。装置ごとの BAR の長さの根拠 ([HW3] の資料・BSD 実装) と照合の形を決める。M4 と並行でき、S8 の前提。旧 T5 前の「Trident・NEC の BAR を読む」はこの段に置き換える。 **main (1fd0a49、2026-10-23、sol 実装・astra 取り込み可)** — NP21/W で起動・hwdev の handle は変わらず (`~/os32-tmp/evidence/2026-10-23/m5_np21w/BARLEN.md`)、実機の照合は S8。
+2. **新しい段 BARLEN (設計、astra 起草 → Opus レビュー)**: A1 の資源の確認 (`kdebug/gfinit_resources.c`) は、メモリを有効にした他の装置に 0 でないメモリ BAR があると長さを知る手段が無いので断る。2026-10-15 の基準構成の生データでは **0:8.0 Trident (Command 0002h、BAR 0x20000000/0x20400000/0x20800000) と 0:11.0 82557 (Command 0147h、BAR0 0x20410008・BAR2 0x20500000) が該当し、いまのコードのままでは A1 は必ず断られる** (0:7.0 NEC は BAR が全部 0 で通る)。装置ごとの BAR の長さの根拠 ([HW3] の資料・BSD 実装) と照合の形を決める。M4 と並行でき、S8 の前提。旧 T5 前の「Trident・NEC の BAR を読む」はこの段に置き換える。 **main (1fd0a49、2026-10-23、sol 実装・astra 取り込み可)** — NP21/W で起動・hwdev の handle は変わらず (`~/os32-tmp/evidence/2026-10-23/m5_np21w/BARLEN.md`)、実機の照合は S8。
 3. **M4a と M4b**: 対象は誰も持っていない GeForce (バス 0 の列挙で見つけた位置) だけなので、まとめて 1 段にできるかを依頼の前に PM が決める。送り項目の「S0 の最小 GF 復帰」の扱いはここで決める。
-4. **旧 S7**: `recover` の先例 (`userland/shell/cmd_recover.c` が部品の private な `kdebug/recover_wire.h` を直接読み KAPI を変えない) に揃え、KAPI の版上げを避ける方向で設計を見直す (旧 S7 と CORE_API §6 の書換えの記録はアーカイブ)。M5 と同じ段にできるかは設計の後に決める。 **2026-10-23 確定**: [cmd_gfinit.md](../../design/userland/shell/cmd_gfinit.md) — private wire、KAPI 不変、段 S7a (wire と `gfinit inspect`) → S7b (実機の回、ROM と version.chip) → S7c (op 6〜10、`--allow-write` 必須)。 S7a は main (2026-10-23、NP21/W の入口は `~/os32-tmp/evidence/2026-10-23/s7a_np21w/RESULT.md`)。 S7c は main (a5f3351)。**S7b は合格** (2026-10-23、実機で `gfinit inspect` rc=0・chip=44・match=1、abort で lease を返す、`~/os32-tmp/evidence/2026-10-23/realhw_s7b/RESULT.md`) — 途中で不具合 2 件を直した (BIT の 'i' 表の版 5385f90、PLL 表のキーの一致が無いとき最初のエントリ 53793df)。**S7b で注意**: INSPECT は chip=0x44 を前提にする (kdebug/gfinit.c:193) — 実 ROM の version.chip が違えば `match=0 rc=-1` で GF の流れが止まるので、S8 に入る前にそこで止めて設計に戻す (REALHW_RECOVER_ADDENDUM.md:226 は未確認のまま)。
+4. **旧 S7**: `recover` の先例 (`userland/shell/cmd_recover.c` が部品の private な `kdebug/recover_wire.h` を直接読み KAPI を変えない) に揃え、KAPI の版上げを避ける方向で設計を見直す (旧 S7 と CORE_API §6 の書換えの記録はアーカイブ)。M5 と同じ段にできるかは設計の後に決める。 **2026-10-23 確定**: [cmd_gfinit.md](../../design/userland/shell/cmd_gfinit.md) — private wire、KAPI 不変、段 S7a (wire と `gfinit inspect`) → S7b (実機の回、ROM と version.chip) → S7c (op 6〜10、`--allow-write` 必須)。 S7a は main (2026-10-23、NP21/W の入口は `~/os32-tmp/evidence/2026-10-23/s7a_np21w/RESULT.md`)。 S7c は main (a5f3351)。**S7b は合格** (2026-10-23、実機で `gfinit inspect` rc=0・chip=44・match=1、abort で lease を返す、`~/os32-tmp/evidence/2026-10-23/realhw_s7b/RESULT.md`) — 途中で不具合 2 件を直した (BIT の 'i' 表の版 5385f90、PLL 表のキーの一致が無いとき最初のエントリ 53793df)。**S7b で注意**: INSPECT は chip=0x44 を前提にする (kdebug/gfinit.c) — 実 ROM の version.chip が違えば `match=0 rc=-1` で GF の流れが止まるので、S8 に入る前にそこで止めて設計に戻す (REALHW_RECOVER_ADDENDUM.md:226 は未確認のまま)。
 5. **T4b**: NP21/W に GeForce は無いので、GPU への試行が通ることは T4b では確かめない (実機の S8 以降)。戻す処理そのものの項目 (`recover now 0` の PARTIAL と 98 復帰、仮想の試行・PAUSED・期限・故障、送信詰まり・poll 上限・終端不着、旧版一式への巻戻し) は DEFERRED_TESTS の RECOVER-T4B の行のまま残す。先に `np21w_ini_live.py` に 31kHz の鍵を足し、M5 の配備確認と同じ回に回す。
 6. **T5 と S8**: T5 は A1・A2 の測定と併合してよい (当時の併合方針の記録はアーカイブ)。書込みなしの部分 (status・version.chip の実 ROM 確認 — snapshot は S8 の A1 の REC で取る、2026-10-23 PM 決定) は立会いなしでシリアルで先に回し、0FACh の初めての書込みと目視は S8 と同じ立会いの回にまとめる。
 
@@ -72,7 +72,7 @@ kdebug.bin に入っている実機の調査・試行・復帰 (realhw_recover �
 確定 2026-10-22 (astra 起草・Opus 2 往復・PM が最終修正)。往復の版と REVIEW は `~/os32-tmp/run/devmod/` に残る。
 
 - [HWDEV の設計](../../design/hwdev/README.md)・[採用方針](../../decisions/realhw/HWDEV_DESIGN.md) — 所有者と核・部品の分担。比較・見積り・段分けの記録はアーカイブ。
-- [核の slot と import](../../design/hwdev/hwdev_imports.md)・[private ABI と寿命](../../design/include/hwdev_private.md)・[contract_crc の生成](../../design/tools/gen_hwdev_contract.md)・[部品の台帳](../../design/tools/module_schema.md)
+- [核の slot と import](../../design/hwdev/hwdev_imports.md)・[private ABI と寿命](../../design/hwdev/hwdev_private.md)・[contract_crc の生成](../../design/tools/gen_hwdev_contract.md)・[部品の台帳](../../design/tools/module_schema.md)
 - [DEVICE_STATES.md](../../decisions/realhw/DEVICE_STATES.md) — 共通の要件: 想定する装置ごとに要る状態と、今の recover の前提で足りない所
 
 - [cmd_gfinit.md](../../design/userland/shell/cmd_gfinit.md) — 旧 S7 (2026-10-23 確定): シェルの `gfinit` コマンドで GF の op 5〜10 を呼ぶ。private な kdebug/gfinit_wire.h、KAPI 不変。INSPECT は ROM・version.chip の 1 行、書込みを伴う op は `--allow-write` 必須
@@ -118,4 +118,4 @@ kdebug.bin に入っている実機の調査・試行・復帰 (realhw_recover �
 - 証拠は `~/os32-tmp/run/hwdev_m3c/`。M4 の所有照合・終端と M5 の配備は本段に含めない。
 
 ## 送り項目 (取り込みのレビューの P3)
-- (BARLEN か T4b で) M4: kernel/module/hwdev_module.c:121-126 — registration ref の取得に失敗すると rc≠0 なのに body は published のまま (直前の条件で実際には起きない) → 失敗時に published=0 にするか不変条件をコメントに。 **済** (0a2bf5b、失敗時に published=0)
+- (BARLEN か T4b で) M4: hwdev/hwdev_module.c — registration ref の取得に失敗すると rc≠0 なのに body は published のまま (直前の条件で実際には起きない) → 失敗時に published=0 にするか不変条件をコメントに。 **済** (0a2bf5b、失敗時に published=0)

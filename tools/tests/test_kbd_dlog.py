@@ -16,8 +16,10 @@ tools/tests/kbd_hostshim/io.h で模型へ回す。
   python3 -B tools/tests/test_kbd_dlog.py --mutate   # 否定側 (変異が RED になるか)
 """
 CHECK = dict(name='kbd-dlog-host', tier=1,
-    covers=['include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'include/kbd.h', 'drivers/input/kbd.h', 'platform/pc98/legacy/v86_kbd.h', 'drivers/input/kbd.c', 'drivers/input/kbd_fgpoll.inc', 'drivers/video/geforce/geforce_module.h', 'drivers/input/kbd_dlog.c', 'drivers/input/kbd_status.c', 'tools/tests/kbd_dlog_host.c', 'userland/shell/kbd_watch.c', 'tools/tests/mutpar.py', 'drivers/input/mouse.c', 'tools/tests/serial_emergency_host.h', 'kernel/serial_diag.c', 'include/console_output.h', 'lib/serial_diag.h', 'tools/tests/kernel_includes.py'],
-    needs=[], budget=3.4)
+    covers=['input/hal/legacy_keymap.c', 'input/keymaps/pc98_jp.c', 'drivers/input/kbd_hal.c', 'input/hal/in2_dev.c', 'input/hal/in2_state.c', 'input/hal/kbd_merge.c', 'tools/tests/kbd_capture_fixture_host.h', 'input/hal/keymap_registry.c', 'input/hal/keymap_eval.c', 'input/hal/keymap_state.c', 'input/hal/keymap.h', 'kernel/idle_work.h', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'include/kbd.h', 'drivers/input/kbd.h', 'platform/pc98/legacy/v86_kbd.h', 'drivers/input/kbd.c', 'input/hal/legacy_ring.c', 'input/hal/legacy_mode.c', 'kernel/input_legacy.c', 'kernel/input_wait.c', 'input/hal/in2_int.h', 'drivers/input/kbd_fgpoll.inc', 'drivers/video/geforce/geforce_module.h', 'drivers/input/kbd_dlog.c', 'drivers/input/kbd_status.c', 'tools/tests/kbd_dlog_host.c', 'userland/shell/kbd_watch.c', 'tools/tests/mutpar.py', 'drivers/input/mouse.c', 'tools/tests/serial_emergency_host.h', 'kernel/serial_diag.c', 'include/console_output.h', 'lib/serial_diag.h', 'tools/tests/kernel_includes.py'],
+    needs=[], budget=3.4,
+    kind='characterization',
+)
 
 from kernel_includes import include_flags
 import pathlib
@@ -34,6 +36,7 @@ SHIM = ROOT / "tools/tests/kbd_hostshim"
 SOURCES = {
     "d": "drivers/input/kbd_dlog.c",
     "k": "drivers/input/kbd.c",
+    "g": "input/hal/kbd_merge.c",
     "w": "userland/shell/kbd_watch.c",
     "m": "drivers/input/mouse.c",
 }
@@ -84,28 +87,21 @@ MUTATIONS = [
     ("k", r"    if \(out == NULL \|\| max <= 0\) \{\n        return OS32_ERR_INVAL;\n    \}\n",
      "",
      "引数を検査しない (NULL へ書く / 0 件を成功と答える)"),
-    ("k", r"(    is_mod = is_lock;.*?\n    }\n)(.*?)(?=    /\* 生イベント)",
-     r"\2\1",
-     "修飾更新を V86 分岐の後へ戻す (V86 中の CTRL break が OS32 に反映されない)"),
-    ("k", r"(        if \(legacy_kbd_push\(scancode\)\) {.*?\n        }\n)        return;",
-     r"\1",
-     "V86 へ渡した後も OS32 へ配る (通常キーが cooked/raw に混入する)"),
-    # ロックキーの方式 B (票 TASK_KBD_NAV §2)
-    ("k", r"    if \(is_break\) kbd_shift_state &= \(u8\)~bit;\n    else          kbd_shift_state \|= bit;\n",
-     "    if (!is_break) kbd_shift_state ^= bit;\n",
-     "ロックキーを方式 A に戻す (make で反転、break を無視)"),
-    ("k", r"    if \(is_break\) kbd_shift_state &= \(u8\)~bit;\n    else          kbd_shift_state \|= bit;\n",
-     "    if (!is_break) kbd_shift_state |= bit;\n",
-     "ロックキーの break を無視する (make で立てるだけ = 外しても落ちない)"),
-    ("k", r"    is_lock = kbd_lock_apply\(keycode, is_break\);\n",
-     "    is_lock = legacy_active() ? 0 : kbd_lock_apply(keycode, is_break);\n",
-     "V86 中はロックを追わない (セッション後に食い違う)"),
-    ("k", r"kbd_shift_state = kbd_lock_bits_from_bios\(kbd_bios_shift_peek\(\)\);",
-     "kbd_shift_state = 0;",
-     "起動時に 053Ah を見ない (ロックしたまま起動すると OFF と思う)"),
-    ("k", r"kbd_shift_state = kbd_lock_bits_from_bios\(kbd_bios_shift_peek\(\)\);",
-     "kbd_shift_state = kbd_bios_shift_peek();",
-     "053Ah を丸ごと写す (SHIFT / GRPH / CTRL まで引き継ぐ)"),
+    ("g", r"        e->buttons = kbd_shift_state = input_key_mods\(\);\n        if \(legacy_active\(\)\) return;",
+     "        if (legacy_active()) return;\n        e->buttons = kbd_shift_state = input_key_mods();",
+     "V86 中は修飾 snapshot を更新しない"),
+    ("g", r"        if \(legacy_active\(\)\) return;", "        if (0) return;",
+     "V86 のキーを OS32 にも配る"),
+    ("g", r"if \(down\) mechanical\[e->src - 1\] \|= bit;", "if (down) mechanical[e->src - 1] ^= bit;",
+     "機械式ロックを make で反転する"),
+    ("g", r"else mechanical\[e->src - 1\] &= ~bit;", "else (void)bit;",
+     "ロックの break を無視する"),
+    ("g", r"if \(origin == INPUT_ORIGIN_NATIVE\)", "if (origin == INPUT_ORIGIN_NATIVE && !legacy_active())",
+     "V86 中は機械式ロックを追わない"),
+    ("k", r"kbd_hal_init\(kbd_lock_bits_from_bios\(kbd_bios_shift_peek\(\)\)\);", "kbd_hal_init(0);",
+     "BIOS の初期ロックを捨てる"),
+    ("k", r"kbd_hal_init\(kbd_lock_bits_from_bios\(kbd_bios_shift_peek\(\)\)\);", "kbd_hal_init(kbd_lock_bits_from_bios(kbd_bios_shift_peek())); kbd_shift_state = kbd_bios_shift_peek();",
+     "BIOS の SHIFT/GRPH/CTRL も引き継ぐ"),
     ("k", r"if \(bios_shift & BIOS_KB_SHIFT_CAPS\) s \|= SHIFT_CAPS;",
      "if (bios_shift & BIOS_KB_SHIFT_CAPS) s |= SHIFT_KANA;",
      "053Ah の CAPS をカナと取り違える"),
@@ -147,7 +143,7 @@ def host_build(tmp, mutated=None):
             text = (ROOT / rel).read_text(encoding="utf-8")
         dst.write_text(text, encoding="utf-8")
     cmd = ["gcc", *FLAGS, "-I" + str(SHIM), "-I" + str(src_dir),
-           "-I" + str(ROOT / "userland/shell"), *include_flags(ROOT),
+           "-I" + str(ROOT / "userland/shell"), "-I" + str(ROOT / "input/hal"), *include_flags(ROOT),
            str(HARNESS), "-o", str(exe)]
     subprocess.run(cmd, cwd=ROOT, check=True)
     return exe

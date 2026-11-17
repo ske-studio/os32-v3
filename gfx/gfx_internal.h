@@ -2,7 +2,6 @@
 #define __GFX_INTERNAL_H
 
 #include "gfx.h"
-#include "pc98.h"
 #include "memmap.h"
 #include "palette.h"
 
@@ -22,7 +21,7 @@ static inline int gfx_clip_screen(int *x, int *y, int *w, int *h,
 /* ======================================================================== */
 /*  内部変数アクセス                                                        */
 /* ======================================================================== */
-extern u8 *bb[GVRAM_PLANES];
+extern u8 *bb[GFX_BB_PLANES];
 extern u8 *bb_b;
 extern u8 *bb_r;
 extern u8 *bb_g;

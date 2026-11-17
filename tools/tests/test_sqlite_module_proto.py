@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """T4c-1: paired product SQLite controls, write-free rejection and mutants."""
 CHECK = dict(name='sqlite-module-proto-host', tier=1,
-    covers=['kernel/ime/ime_display_private.h', 'platform/pc98/ime_default_render.h', 'platform/pc98/ime_display.c', 'include/ime_control.h', 'include/diag_stack.h', 'arch/*/arch_diag_stack.h', 'platform/pc98/bootinfo_wire.h', 'platform/pc98/bootinfo_native.h', 'drivers/base/dev.c', 'fs/vfs.c', 'Makefile', 'build/config.mk', 'build/sqlite-proto.mk', 'build/sqlite-module.ld', 'tools/gen_sqlite_imports.py', 'tools/gen_kdebug_imports.py', 'tools/sqlite_module_proto.py', 'tools/mkmod.py', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'tools/prototypes/sqlite_imports.def', 'tools/tests/sqlite_module_proto_tdd.md', 'tools/tests/test_module_image.py', 'tools/tests/module_image_host.c', 'tools/tests/test_module_runtime.py', 'tools/tests/module_runtime_host.c', 'tools/tests/sqlite_module_host.c', 'tools/tests/test_mkmod.py', 'tools/tests/host32.py', 'kernel/module/module_image.c', 'kernel/module/module_image.h', 'kernel/module/module_runtime.c', 'kernel/module/module_runtime.h', 'kernel/sqlite_engine.c', 'kernel/sqlite_engine.h', 'mm/paging.h', 'arch/x86/kernel/isr_handlers.c', 'kernel/sqlite_outer.c', 'mm/memory_boot.h', 'kernel/module/module.h', 'kernel/irq/irq.h', 'mm/pgalloc.h', 'include/memmap.h', 'include/bootinfo.h', 'include/config.h', 'kernel/module/module_schema.h', 'mm/kmalloc.h', 'lib/sqlite3/sqlite3.c', 'lib/sqlite3/sqlite3.h', 'lib/sqlite3/os32_sqlite_vfs.c', 'lib/sqlite3/os32_sqlite_module.c', 'lib/sqlite3/generated/sqlite_facade.h', 'lib/sqlite3/generated/sqlite_imports.h', 'lib/sqlite3/generated/sqlite_kexports.c', 'lib/sqlite3/os32_sqlite_outer.h', 'lib/sqlite3/sqlite_stack.asm', 'lib/sqlite3/os32_sqlite_vfs.h', 'lib/sqlite3/os32_sqlite_config.h', 'lib/kstring.c', 'lib/kstring_c.c', 'lib/kstring.h', 'lib/kmath.c', 'lib/divdi3.c', 'fs/vfs.h', 'include/types.h', 'include/kprintf.h', 'include/sys.h', 'sdk/kapi.json', 'sdk/link/generations.ld', 'sdk/include/os32/os32_unit_stamp.h', 'kdebug/generated/kdebug_imports.json', 'build/module.ld', 'kernel/module/kdebug_imports.def', 'kernel/ime/ime.c', 'kernel/ime/ime.h', 'kernel/ime/ime_dict.c', 'kernel/ime/ime_render.h', 'kernel/console/unicode_file.c', 'kernel/console/unicode_file.h', 'lib/sqlite3/os32_sqlite_test.c', 'include/endian_le.h', 'kapi/kapi_sys.c', 'tools/prototypes/fep_imports.def', 'kernel/ime/fep_module.c', 'kernel/ime/fep_module.h', 'kernel/ime/fep_body.c', 'kernel/ime/ime_dict_info.c', 'kernel/ime/ime_conn.c', 'kernel/ime/ime_user_store.c', 'kernel/ime/ime_store.h', 'kernel/ime/ime_suspend.c', 'build/fep-module.mk', 'kernel/ime/ime_romkana.c', 'platform/pc98/ime_render_tvram.c', 'fs/fd_redirect.h', 'lib/utf8.h', 'include/tvram.h', 'drivers/input/kbd.h', 'drivers/char/serial.h', 'exec/exec.h', 'include/con_sink.h', 'include/redir_access.h', 'build/fep-module.ld', 'build/out/fep/*.o', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'tools/tests/kernel_includes.py'],
-    needs=['make:sqlite-module-proto'], budget=14.6)
+    covers=['build/softfloat.mk', 'lib/softfloat/**', 'lib/softfloat_abi.c', 'kernel/ime/ime_display_private.h', 'platform/pc98/platform_ime_render.h', 'platform/pc98/ime_display.c', 'include/ime_control.h', 'include/diag_stack.h', 'arch/*/arch_diag_stack.h', 'platform/pc98/bootinfo_wire.h', 'platform/pc98/bootinfo_native.h', 'drivers/base/dev.c', 'fs/vfs.c', 'Makefile', 'build/config.mk', 'build/sqlite-proto.mk', 'build/sqlite-module.ld', 'tools/gen_sqlite_imports.py', 'tools/gen_kdebug_imports.py', 'tools/sqlite_module_proto.py', 'tools/mkmod.py', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'tools/prototypes/sqlite_imports.def', 'tools/tests/sqlite_module_proto_tdd.md', 'tools/tests/test_module_image.py', 'tools/tests/module_image_host.c', 'tools/tests/test_module_runtime.py', 'tools/tests/module_runtime_host.c', 'tools/tests/sqlite_module_host.c', 'tools/tests/test_mkmod.py', 'tools/tests/host32.py', 'kernel/module/module_image.c', 'kernel/module/module_image.h', 'kernel/module/module_runtime.c', 'kernel/module/module_runtime.h', 'kernel/sqlite_engine.c', 'kernel/sqlite_engine.h', 'mm/paging.h', 'arch/x86/kernel/isr_handlers.c', 'kernel/sqlite_outer.c', 'mm/memory_boot.h', 'kernel/module/module.h', 'kernel/irq/irq.h', 'mm/pgalloc.h', 'include/memmap.h', 'include/bootinfo.h', 'include/config.h', 'kernel/module/module_schema.h', 'mm/kmalloc.h', 'lib/sqlite3/sqlite3.c', 'lib/sqlite3/sqlite3.h', 'lib/sqlite3/os32_sqlite_vfs.c', 'lib/sqlite3/os32_sqlite_module.c', 'lib/sqlite3/generated/sqlite_facade.h', 'lib/sqlite3/generated/sqlite_imports.h', 'lib/sqlite3/generated/sqlite_kexports.c', 'lib/sqlite3/os32_sqlite_outer.h', 'lib/sqlite3/sqlite_stack.asm', 'lib/sqlite3/os32_sqlite_vfs.h', 'lib/sqlite3/os32_sqlite_config.h', 'lib/kstring.c', 'lib/kstring_c.c', 'lib/kstring.h', 'lib/kmath.c', 'lib/divdi3.c', 'fs/vfs.h', 'include/types.h', 'include/kprintf.h', 'include/sys.h', 'sdk/kapi.json', 'sdk/link/generations.ld', 'sdk/include/os32/os32_unit_stamp.h', 'kdebug/generated/kdebug_imports.json', 'build/module.ld', 'kernel/module/kdebug_imports.def', 'kernel/ime/ime.c', 'kernel/ime/ime.h', 'kernel/ime/ime_dict.c', 'kernel/ime/ime_render.h', 'kernel/console/unicode_file.c', 'kernel/console/unicode_file.h', 'lib/sqlite3/os32_sqlite_test.c', 'include/endian_le.h', 'kapi/kapi_sys.c', 'tools/prototypes/fep_imports.def', 'kernel/ime/fep_module.c', 'kernel/ime/fep_module.h', 'kernel/ime/fep_body.c', 'kernel/ime/ime_dict_info.c', 'kernel/ime/ime_conn.c', 'kernel/ime/ime_user_store.c', 'kernel/ime/ime_store.h', 'kernel/ime/ime_suspend.c', 'build/fep-module.mk', 'kernel/ime/ime_romkana.c', 'platform/pc98/ime_render_tvram.c', 'fs/fd_redirect.h', 'lib/utf8.h', 'include/text_screen.h', 'drivers/input/kbd.h', 'drivers/char/serial.h', 'exec/exec.h', 'include/con_sink.h', 'include/redir_access.h', 'build/fep-module.ld', 'build/out/fep/*.o', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'tools/tests/kernel_includes.py'],
+    needs=['make:sqlite-module-proto'], budget=14.6,
+    basis=['[L1]', '[ABI]'],
+)
 
 import argparse
 import json
@@ -75,7 +77,7 @@ def real_suite(exe, directory, vmkernel, runner, packer=mkmod):
     assert not {'memcpy', 'memset', 'tick_count'} & {e['name'] for e in metadata['imports']}
     assert stats['mem_size'] < 384 * 1024, 'static pool was retained'
     contract = dict(kapi=spec['version'], layout=spec['generations']['memory_layout'],
-                    abi=metadata['module_abi_gen'], module_id=2, ops=2, img_valid=1, pair=pair,
+                    abi=metadata['module_abi_gen'], module_id=2, ops=3, img_valid=1, pair=pair,
                     imports=[(mkmod.fnv1a(e['name'].encode()), e['type_ver'], e['kind'])
                              for e in metadata['imports']],
                     exports=[(1, mkmod.fnv1a(b'initialize'), 1)], runner=runner)
@@ -84,12 +86,12 @@ def real_suite(exe, directory, vmkernel, runner, packer=mkmod):
     check(validate(exe, image, relocate_base=0xffffffff - stats['mem_size'] + 1, **contract),
           11, 'real SQLite base overflow')
     h = struct.unpack_from('<36I', image)
-    assert h[9] == 1 and h[31] == pair and h[33] == 2
+    assert h[9] == 1 and h[31] == pair and h[33] == 3
     for name, field, value, rc in (
             ('PAIR required', 9, 0, 3), ('old/new pair', 31, pair ^ 1, 4),
             ('old layout', 5, spec['generations']['memory_layout'] ^ 1, 6),
             ('old module ABI', 6, metadata['module_abi_gen'] ^ 1, 6),
-            ('old ops v1', 33, 1, 6)):
+            ('old ops v2', 33, 2, 6)):
         bad = bytearray(image)
         word(bad, field, value)
         check(validate(exe, crc(bad), relocate_base=0x1200000, **contract), rc, name)
@@ -101,7 +103,8 @@ def real_suite(exe, directory, vmkernel, runner, packer=mkmod):
         word(bad, field, value)
         check(validate(exe, crc(bad), relocate_base=0x1200000, **contract), 3, 'SQLite policy cap')
     # Separate image/load-span caps with all other ranges still legal.
-    for prefix, memory in ((147456, h[10]), (143360, 524288)):
+    image_prefix = (524288 - (len(image) - h[11]) + 4096) & ~4095
+    for prefix, memory in ((image_prefix, h[10]), (143360, 524288)):
         bad = bytearray(image[:h[11]])
         bad.extend(bytes(prefix - len(bad)))
         bad.extend(image[h[11]:])
@@ -516,7 +519,8 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
         objects = [obj_path if name == 'os32_sqlite_vfs' else directory / (name + '.o')
                    for name in ('sqlite3', 'os32_sqlite_vfs', 'sqlite_module',
                                 'sqlite_import_slots', 'sqlite_import_stubs',
-                                'kstring', 'kstring_c', 'kmath', 'divdi3')]
+                                'kstring', 'kstring_c', 'kmath', 'divdi3', 'softfloat_abi')]
+        objects += sorted((directory / 'softfloat').glob('*.o'))
         subprocess.run([compiler.with_name('i386-elf-ld'), '-m', 'elf_i386', '--emit-relocs',
                         '-T', ROOT / 'build/sqlite-module.ld', *objects,
                         '-o', elf_path], cwd=ROOT, check=True)

@@ -4,10 +4,12 @@ CHECK = dict(name='clock-caller-host', tier=4,
             'kernel/time/ktime.c', 'kernel/time/ktime.h', 'kernel/time/time_math.c',
             'kernel/time/time_math.h', 'platform/pc98/clock_source.c',
             'platform/pc98/pit_time.c', 'platform/pc98/pit_time.h',
-            'platform/pc98/pit.h', 'platform/pc98/pit_math.h',
-            'include/clock_source.h', 'include/kernel_tick.h', 'include/platform_timer.h',
+            'platform/pc98/pit.h', 'platform/pc98/pit_math.h', 'platform/pc98/tsc_clock.h', 'platform/pc98/clock_source.h', 'kernel/io_clock.h',
+            'kernel/time/tick_clock.h', 'kernel/irq/tick_budget.h', 'include/clock_source.h', 'include/kernel_tick.h', 'include/platform_timer.h',
             'tools/tests/dep_dir_b_io_shim.h', 'tools/tests/kernel_includes.py', 'tools/tests/host32.py'],
-    needs=[], budget=2.9)
+    needs=[], budget=2.9,
+    basis=['AC-TIME-1', 'AC-TIME-2', 'KAPI_SPEC §3-3'],
+)
 from pathlib import Path
 import subprocess
 import tempfile
@@ -16,6 +18,19 @@ from kernel_includes import include_flags
 from host32 import run as host_run
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
+    ('platform/pc98/clock_source.c', 'ready ? pc98_tsc_read_us(&l, &h) : pc98_pit_read_us(&l, &h)',
+     'ready ? pc98_pit_read_us(&l, &h) : pc98_pit_read_us(&l, &h)'),
+    ('platform/pc98/clock_source.c', 'if (pit_rebased) us = public_origin + (us - pit_origin);',
+     '(void)public_origin; (void)pit_origin;'),
+    ('platform/pc98/clock_source.c', 'out->ready = ps->valid && clock_config_rc == 0;',
+     'out->ready = ps->valid;'),
+    ('platform/pc98/clock_source.c', 'clock_config_rc = tick_clock_config(ps->reload, ps->clk_hz);',
+     '(void)tick_clock_config(ps->reload, ps->clk_hz); clock_config_rc = 0;'),
+    ('platform/pc98/clock_source.c', '        tick_clock_raw(&raw_lo, &raw_hi);',
+     '        raw_lo = tick_count; raw_hi = 0;'),
+    ('platform/pc98/clock_source.c', '            raw += snap.tick;',
+     '            raw = (raw & ~0xffffffffULL) | (unsigned int)((unsigned int)raw + snap.tick);'),
+
     ('platform/pc98/clock_source.c', 'attempt < TIME_RETRY_MAX;', 'attempt < 1;'),
     ('kernel/time/ktime.c', 'if (time_clamp(us, s_last_us, &us)) ktime_clamp_count++;',
      '(void)time_clamp;'),
@@ -25,7 +40,8 @@ MUTATIONS = (
 
 
 def verify(work, mutation=None):
-    for rel in ('platform/pc98/clock_source.c', 'kernel/time/ktime.c'):
+    for rel in ('platform/pc98/clock_source.c', 'kernel/time/ktime.c',
+                'platform/pc98/clock_source.h', 'include/clock_source.h', 'kernel/io_clock.h'):
         text = (ROOT / rel).read_text()
         if mutation and rel == mutation[0]:
             assert text.count(mutation[1]) == 1

@@ -8,7 +8,9 @@ CHECK = dict(name='sep5-display-host', tier=1, needs=[], budget=5,
             'tools/tests/kernel_includes.py', 'build/config.mk',
             'gfx/palette.h', 'include/**', 'arch/x86/**', 'gfx/gfx_internal.h',
             'gfx/gfx.h', 'platform/pc98/**', 'drivers/video/pc98/pc98_route.h',
-            'sdk/include/os32/**', 'exec/surface_limits.h'])
+            'sdk/include/os32/**', 'exec/surface_limits.h'],
+    basis=['PPC_SEP5_DESIGN §2.1'],
+)
 import argparse
 from pathlib import Path
 import subprocess

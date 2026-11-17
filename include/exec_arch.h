@@ -3,6 +3,9 @@
 #define OS32_EXEC_ARCH_H
 #include "types.h"
 #include "arch_exec_storage.h"
+/* arch_exec_cache.h が arch_exec_publish(dst, bytes) を関数かマクロで与える: 書いた命令を
+ * 実行に公開する (PowerPC は命令キャッシュの flush、x86 は何もしない)。arch_exec_kapi.h が
+ * exec_kapi_table() を与える。どちらも exec/exec.c が直に読む。 */
 struct arch_syscall { void *native; };
 void exec_syscall_dispatch(struct arch_syscall *);
 struct arch_user_context {
@@ -16,7 +19,9 @@ struct arch_entry_context {
     unsigned char opaque[ARCH_ENTRY_BYTES];
 } __attribute__((aligned(ARCH_ENTRY_ALIGN)));
 /* Floating-point (and vector) state of one USER context; opaque outside arch.
- * The kernel itself is integer-only: this is saved/restored only around USER. */
+ * General kernel code is integer-only. An arch may also preserve this state
+ * around an explicitly guarded kernel FP interval. Restore/init callers must
+ * use the arch integer ABI; no floating-point arguments cross this boundary. */
 struct arch_fp_context {
     unsigned char opaque[ARCH_FP_BYTES];
 } __attribute__((aligned(ARCH_FP_ALIGN)));

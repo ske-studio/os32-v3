@@ -5,8 +5,10 @@ CHECK = dict(name='fatfs-read-cache-host', tier=1,
                      'fs/fat/fatfs_vfs.c', 'fs/fat/fatfs_vfs_read_cache.inc',
                      'fs/fat/fatfs/ff.c', 'fs/fat/fatfs/ff.h',
                      'fs/fat/fatfs/ffconf.h', 'fs/fat/fatfs/diskio.h',
-                     'drivers/block/pc98pt.c'],
-             needs=[], budget=4.1)
+                     'fs/pc98pt.c'],
+             needs=[], budget=4.1,
+    kind='characterization',
+)
 import os
 import pathlib
 import subprocess
@@ -59,8 +61,8 @@ def main():
                 '"../vfs_name_rules.inc"', '"vfs_name_rules.inc"')
             (tmp / 'fatfs_vfs.c').write_text(wrapper)
             fixture = (ROOT / 'tools/tests/fatfs_read_cache_host.c').read_text()
-            fixture = fixture.replace('"../../drivers/block/pc98pt.c"',
-                                      '"drivers/block/pc98pt.c"').replace(
+            fixture = fixture.replace('"../../fs/pc98pt.c"',
+                                      '"fs/pc98pt.c"').replace(
                 '"../../fs/fat/fatfs_vfs.c"', '"fatfs_vfs.c"')
             (tmp / 'fixture.c').write_text(fixture)
             for name, old, new, case in MUTANTS:

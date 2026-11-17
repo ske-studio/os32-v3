@@ -246,3 +246,50 @@ void font_lease_close_shell(void)
         if (s->kind == FONT_LEASE_SHELL) (void)font_lease_release(s);
     }
 }
+
+/* Kernel resident lease uses its own kind and owner, independent of shell. */
+static i32 font_lease_resident_token(u32 id, FontLease **out)
+{
+    u32 idx = id & FONT_LEASE_IDX_MASK;
+    FontLease *s;
+    if (idx >= FONT_LEASE_SLOTS) return OS32_ERR_INVAL;
+    s = &g_font_leases[idx];
+    if (s->id_gen != (id >> FONT_LEASE_IDX_BITS)) return OS32_ERR_STALE;
+    if (s->kind != FONT_LEASE_RESIDENT) return OS32_ERR_INVAL;
+    if (s->owner_gen != FONT_RESIDENT_GENERATION) return OS32_ERR_STALE;
+    *out = s;
+    return 0;
+}
+
+i32 font_lease_resident_open(const char *path, u32 *out_id, u32 *out_size)
+{
+    if (!path || !out_id || !out_size) return OS32_ERR_INVAL;
+    if (font_lease_count(FONT_LEASE_RESIDENT, 0, 1) >= 1) return OS32_ERR_NOSPC;
+    return font_lease_install(FONT_LEASE_RESIDENT, path, FONT_RESIDENT_OWNER,
+                              (VFS_FONT_OPEN_PROTECT | VFS_FONT_OPEN_PIN),
+                              FONT_RESIDENT_GENERATION, out_id, out_size);
+}
+
+i32 font_lease_resident_read_at(u32 id, u32 offset, void *dst, u32 len)
+{
+    FontLease *s = 0;
+    i32 rc = font_lease_resident_token(id, &s);
+    if (rc) return rc;
+    return vfs_font_read_at(&s->vfs, offset, dst, len);
+}
+
+i32 font_lease_resident_validate(u32 id)
+{
+    FontLease *s = 0;
+    i32 rc = font_lease_resident_token(id, &s);
+    if (rc) return rc;
+    return vfs_validate_font(&s->vfs);
+}
+
+i32 font_lease_resident_close(u32 id)
+{
+    FontLease *s = 0;
+    i32 rc = font_lease_resident_token(id, &s);
+    if (rc) return rc;
+    return font_lease_release(s);
+}

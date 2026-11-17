@@ -1,7 +1,9 @@
 """D1b registry and resident ownership; CPU IF is an explicit host seam."""
 CHECK = dict(name='tick-host', tier=3,
-    covers=['drivers/video/geforce/geforce_tick.[ch]', 'kernel/irq/tick.c', 'kernel/irq/tick.h', 'kernel/irq/irq.h', 'include/types.h', 'platform/pc98/tick_order.h', 'arch/x86/kernel/isr_handlers.c', 'build/kernel.mk', 'tools/tests/tick_host.c', 'tools/tests/host32.py', 'drivers/sound/fm/fm_module.c', 'drivers/sound/cs4231/pcm_module.c', 'drivers/net/e82557/lan_module.c', 'drivers/net/ne2000/ne2000.c', 'drivers/net/ne2000/ne2000_control.inc', 'drivers/net/ne2000/lgy98.c', 'net/link.c', 'net/nic.c', 'tools/tests/kernel_includes.py'],
-    needs=[], budget=2.9)
+    covers=['drivers/video/geforce/geforce_tick.[ch]', 'kernel/irq/tick.c', 'arch/x86/arch_tick_budget.h', 'kernel/irq/tick.h', 'kernel/irq/irq.h', 'include/types.h', 'platform/pc98/tick_order.h', 'arch/x86/kernel/isr_handlers.c', 'build/kernel.mk', 'tools/tests/tick_host.c', 'tools/tests/host32.py', 'drivers/sound/fm/fm_module.c', 'drivers/sound/cs4231/pcm_module.c', 'drivers/net/e82557/lan_module.c', 'drivers/net/ne2000/ne2000.c', 'drivers/net/ne2000/ne2000_control.inc', 'drivers/net/ne2000/lgy98.c', 'net/link_platform.h', 'platform/pc98/platform_link_inline.h', 'platform/pc98/link_platform.c', 'net/link.c', 'net/nic.c', 'tools/tests/kernel_includes.py'],
+    needs=[], budget=2.9,
+    basis=['AC-SYNC-1', 'AC-TIME-1', 'IO_TIER_DESIGN §6'],
+)
 
 from kernel_includes import include_flags
 import os
@@ -21,7 +23,7 @@ OWNERS = {
     'drivers/sound/cs4231/pcm_module.c': ('PCM', 'pcm_tick', 'int pcm_module_load(void)'),
     'drivers/net/ne2000/ne2000.c': ('NE2K', 'ne2k_timer_tick', 'int ne2k_init('),
     'drivers/net/e82557/lan_module.c': ('E82557', 'e82557_tick', 'int lan_module_load(void)'),
-    'net/nic.c': ('LINK', 'net_tick', 'int net_bind('),
+    'net/nic.c': ('LINK', 'net_jiffy', 'int net_bind('),
     'drivers/net/ne2000/lgy98.c': ('LGY98', 'lgy98_tick', 'int lgy98_attach('),
     'drivers/video/geforce/geforce_tick.c': ('GF', 'geforce_tick', 'int geforce_tick_bind('),
 }
@@ -40,7 +42,8 @@ def wiring():
         if rel == 'drivers/net/ne2000/ne2000.c':
             src = src.replace('#include "ne2000_control.inc"',
                               (ROOT / 'drivers/net/ne2000/ne2000_control.inc').read_text())
-        registration = f'tick_register(PC98_TICK_{slot}, {fn})'
+        registration = (f'link_platform_tick_register({fn})' if rel == 'net/nic.c'
+                        else f'tick_register(PC98_TICK_{slot}, {fn})')
         assert src.count(registration) == 1 and registration in src[src.index(entry):]
         assert fn not in body
         if rel != 'net/nic.c':
@@ -81,6 +84,11 @@ def main():
         if '--mutate' in sys.argv:
             original = (ROOT / 'kernel/irq/tick.c').read_text()
             mutants = [
+                ('        if (slot == ARCH_TICK_BUDGET_FIRST_SLOT) tick_budget_begin();', '', 'budget begin omitted'),
+                ('    for (unsigned int slot = 0; slot < TICK_SLOT_COUNT; slot++) {\n#ifdef TICK_PROBE\n        if (slot == ARCH_TICK_BUDGET_FIRST_SLOT) tick_probe_extra_begin(TP_BUDGET);\n#endif\n        if (slot == ARCH_TICK_BUDGET_FIRST_SLOT) tick_budget_begin();',
+                 '    tick_budget_begin();\n    for (unsigned int slot = 0; slot < TICK_SLOT_COUNT; slot++) {', 'budget begin before loop'),
+                ('if (slot == ARCH_TICK_BUDGET_FIRST_SLOT) tick_budget_begin();',
+                 'if (slot == ARCH_TICK_BUDGET_FIRST_SLOT && slots[slot].fn) tick_budget_begin();', 'budget begin only with callback'),
                 ('kctx_irq_depth != 0', 'kctx_irq_depth > 1', 'IRQ registration accepted'),
                 ('slots[slot].fn != fn', 'slots[slot].fn == fn', 'duplicate/competition reversed'),
                 ('else slots[slot].fn = fn;', 'else slots[slot].fn = 0;', 'registration lost'),

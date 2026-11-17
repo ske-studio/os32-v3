@@ -12,22 +12,24 @@ import host32
 CHECK = dict(name='ppc-kboot-reserve', tier=2, budget=60, covers=[
     'platform/powermac/kboot_reserve.c', 'platform/powermac/kboot_capture.c',
     'platform/powermac/gmac_tree.c',
-    'platform/powermac/kboot_info.h', 'platform/powermac/kboot_layout.h',
+    'platform/powermac/kboot_info.h', 'platform/powermac/platform_kboot_layout.h',
     'tools/ppc/kboot_reserve.py', 'tools/ppc/kboot_reserve_fake.c',
     'tools/ppc/kboot_capture_fake.c', 'platform/powermac/ofw.h',
-    'platform/powermac/ppc_layout.h', 'arch/ppc/ppc_boot.h',
+    'platform/powermac/platform_of_layout.h', 'arch/ppc/ppc_boot.h',
     'arch/ppc/ppc_pmap.h', 'arch/ppc/ppc_oea.h', 'include/memmap.h',
     'include/types.h', 'include/callconv.h', 'lib/kstring.h',
     'lib/kstring_c.c', 'tools/tests/host32.py'])
 MUTATIONS = [
-    ('ignore-hole', 'if (r->v[i].start>first) return 0;', 'if (0) return 0;', {1: (77, 'CR0'), 6: (77, 'CR0'), 7: (77, 'CR0'), 11: (77, 'CR0')}),
+    ('ignore-hole', 'if (r->v[i].start>first) return 0;', 'if (0) return 0;', {1: (77, 'CR0'), 6: (77, 'CR0'), 7: (77, 'CR0'), 11: (77, 'CR0'), 15: (77, 'CR0')}),
     ('image-unowned', 'if (r->start<end && r->start+r->size>first)',
      'if (0 && r->start<end && r->start+r->size>first)', {2: (77, 'CR0')}),
     ('hpt-align-down', 'start=(start+PM_HPT_BYTES-1)&~(PM_HPT_BYTES-1);',
      'start=start&~(PM_HPT_BYTES-1);', {3: (77, 'CR0'), 5: (78, 'CR0')}),
-    ('window-end', '!covered(&info->available,end,PM_WINDOW_END)',
-     '!covered(&info->available,end,PM_WINDOW_END-1)', {6: (77, 'CR0')}),
+    ('window-end', '!covered(&info->available,window,PM_WINDOW_END)',
+     '!covered(&info->available,window,PM_WINDOW_END-1)', {6: (77, 'CR0')}),
     ('skip-vector', 'if (!covered(&info->ram,0,PM_VECTOR_END))', 'if (0)', {7: (77, 'CR0')}),
+    ('no-image-slack', 'r->start-end<=PM_IMAGE_SLACK', '0', {14: (77, 'CR5')}),
+    ('unbounded-slack', 'r->start-end<=PM_IMAGE_SLACK', '1', {11: (77, 'CR0'), 15: (77, 'CR0')}),
     ('stale-snapshot', 'pm_kboot_refresh_available(info);', '(void)info;', {11: (77, 'CR0')}),
 ]
 
@@ -52,12 +54,12 @@ def exercise(directory, source, expected):
                     '-Wl,--defsym,__kernel_resident_end=0x300000', '-o', str(exe)],
                    check=True, timeout=60)
     actual = {}
-    for case in range(14):
+    for case in range(16):
         result = host32.run([str(exe), str(case)], capture_output=True, timeout=10)
         marks = result.stdout.decode('ascii')
         if result.returncode or case in expected:
             actual[case] = (result.returncode, marks)
-        elif marks != ('CR' + str([0, 5, 3, 6, 5, 0, 5, 4, 0, 2, 6, 5, 1, 0][case])
+        elif marks != ('CR' + str([0, 5, 3, 6, 5, 0, 5, 4, 0, 2, 6, 5, 1, 0, 0, 5][case])
                        if case != 8 else '') or result.stderr:
             raise RuntimeError(f'case {case}: unexpected marks {marks!r} or stderr {result.stderr!r}')
         if result.stderr:
@@ -76,7 +78,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix='kboot-reserve-') as temp:
         directory = Path(temp)
         exercise(directory, product, {})
-        print('GREEN: 14 ILP32 reserve/capture cases')
+        print('GREEN: 16 ILP32 reserve/capture cases')
         if args.mutate:
             original = product.read_text()
             for name, old, new, expected in MUTATIONS:

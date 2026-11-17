@@ -39,7 +39,7 @@ static int heap_map(struct addrspace *as, struct appmem_table *table,
 #undef KAPI_HIT
 
 static struct { u32 sbrk_heap_limit; } heap_kapi, *kapi = &heap_kapi;
-static u32 ring3_tramp_page[KAPI_FUNC_COUNT + 2];
+static u32 ring3_tramp_page[KAPI_DATA_IDX_SBRK_HEAP_LIMIT + 1];
 volatile int exec_nest_level;
 AppSlot *appslot_at(int id) { return &g_slot[id]; }
 #include "heap_context_source.c"

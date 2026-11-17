@@ -4,6 +4,7 @@
 #include "ppc_trap.h"
 #include "ppc_hpt.h"
 #include "exec_arch.h"
+#include "kernel/irq/irq.h"
 
 extern void ring3_fault_kill(void);
 static void (*external_handler)(struct ppc_frame *);
@@ -91,18 +92,33 @@ void ppc_trap_dispatch(struct ppc_frame *f)
                      (PPC_MSR_IR | PPC_MSR_DR);
     if (!f || !translated) goto fatal;
     if (f->vector == 0x500 || f->vector == PPC_VECTOR_DEC) {
+        /* Extra defensive clearing on entry, beyond the BSD idle examples. */
+        f->srr1 &= ~PPC_MSR_POW;
         void (*handler)(struct ppc_frame *) =
             f->vector == 0x500 ? external_handler : dec_handler;
-        if (handler) { handler(f); return; }
+        if (handler) {
+            ++kctx_irq_depth;
+            handler(f);
+            --kctx_irq_depth;
+            return;
+        }
         reason = PPC_TRAP_UNREGISTERED;
     } else if (f->srr1 & PPC_MSR_PR) {
         if (f->vector == 0xc00) {
             struct arch_syscall call = { f };
+            ppc_enable();
             exec_syscall_dispatch(&call);
+            (void)ppc_irq_save();
             return;
         }
+        if (f->vector == 0x800) {
+            reason = PPC_TRAP_FP_UNAVAILABLE;
+            if (fatal_ready && ppc_root_current())
+                ppc_trap_fatal_sink(f, reason);
+        }
         ring3_fault_kill();
-        reason = PPC_TRAP_USER | PPC_TRAP_UNSUPPORTED;
+        reason = f->vector == 0x800 ? PPC_TRAP_FP_UNAVAILABLE :
+                 PPC_TRAP_USER | PPC_TRAP_UNSUPPORTED;
     } else if (f->vector == PPC_VECTOR_DSI || f->vector == PPC_VECTOR_ISI) {
         reason = fault_reason(f);
         if (probe.active && f->srr0 == probe.pc &&
@@ -122,6 +138,8 @@ void ppc_trap_dispatch(struct ppc_frame *f)
         if (cause == 0x00080000) reason = PPC_TRAP_PROGRAM_ILLEGAL | PPC_TRAP_UNSUPPORTED;
         if (cause == 0x00040000) reason = PPC_TRAP_PROGRAM_PRIVILEGED | PPC_TRAP_UNSUPPORTED;
         if (cause == 0x00020000) reason = PPC_TRAP_PROGRAM_TRAP | PPC_TRAP_UNSUPPORTED;
+    } else if (f->vector == 0x800) {
+        reason = PPC_TRAP_FP_UNAVAILABLE;
     } else if (f->vector == 0x600) {
         reason = PPC_TRAP_ALIGNMENT;
     } else if (f->vector == 0xc00) {

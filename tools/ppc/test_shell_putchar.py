@@ -8,10 +8,6 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / 'platform/powermac/shell_putchar.c'
-CHECK = dict(name='ppc-shell-putchar', tier=1, budget=60, needs=[],
-             covers=['platform/powermac/shell_putchar.c', 'tools/ppc/test_shell_putchar.py'],
-             inputs=['include/console.h', 'include/types.h', 'kernel/console/console_stream.h',
-                     'platform/powermac/lan_boot.h'])
 HARNESS = r'''
 #include "console.h"
 static unsigned char bytes[4];

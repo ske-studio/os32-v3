@@ -32,6 +32,12 @@ void con_sink_enable(void);    /* GUI へ入る: 空で始める */
 void con_sink_disable(void);   /* CUI へ戻る: 溜まっているものを捨てる */
 int  con_sink_is_enabled(void);
 
+#define CON_SINK_CAPTURE_BEGIN  1u
+#define CON_SINK_CAPTURE_FREEZE 2u
+#define CON_SINK_CAPTURE_END    3u
+int con_sink_capture(unsigned int op);
+int con_sink_capture_active(void);
+
 /* --- 積む側 (console.c の入口から。割込み文脈からも呼ばれる) ------------ */
 void con_sink_push_print(const char *buf, u32 len, u8 color);
 void con_sink_push_clear(void);

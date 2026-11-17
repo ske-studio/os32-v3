@@ -1,6 +1,8 @@
+#include "rx_io_clock.h"
 /* A3 real queues/demux, fake NIC boundary. Limits: design §2 and 82557 RFD ring. */
 #include "hostsvc_fixture.h"
 #include "net/nic_rx.h"
+#include "net/rx_work.h"
 #include "net/link.h"
 #include "drivers/net/e82557/e82557_regs.h"
 #include "os32_kapi_shared.h"
@@ -37,7 +39,7 @@ static int rx(void *out, u32 cap, u32 *len)
 {
     int rc;
     calls++;
-    if (hs_if()) bad_if++;
+    if (!hs_if()) bad_if++;
     if (hs_failure_take("nic.rx", &rc)) return rc;
     if (!count) return OS32_ERR_AGAIN;
     *len = lengths[head];
@@ -51,13 +53,11 @@ static const struct NetNicOps ops = {0, rx, 0, 0, 0};
 /* Same A2 boot state and tick contract: unbound/ticking does no poll. */
 int net_nic_poll_once(void)
 {
-    unsigned int flags = nic_test_irq_save();
     u32 before = count;
-    if (bound && !ticking) {
+    if (bound && !ticking && hs_if()) {
         polls++;
         net_rx_demux(&ops, local, fixed_peer);
     }
-    nic_test_irq_restore(flags);
     return (int)(before - count);
 }
 static u8 *frame(u8 op, u32 len, u8 tag)
@@ -105,8 +105,8 @@ static int suite(void)
         REQUIRE(net_rx_take(NET_RX_LINK, output, sizeof(output), &n) == 0);
         REQUIRE(output[n-1] == round+1 && polls == prior+1 && equal(output, eof, n));
     }
-    /* Exact production queue capacity, both directions; full drops newest. */
-    for (u32 proto = NET_RX_SFS; proto <= NET_RX_LINK; proto++) {
+    /* Exact production queue capacity. A full SFS queue drops newest. */
+    for (u32 proto = NET_RX_SFS; proto <= NET_RX_SFS; proto++) {
         reset();
         u8 op = proto == NET_RX_SFS ? 0x05 : LINK_OP_DATA;
         u16 other = proto == NET_RX_SFS ? NET_RX_LINK : NET_RX_SFS;
@@ -125,8 +125,25 @@ static int suite(void)
         }
         REQUIRE(net_rx_take(proto, output, sizeof(output), &n) == OS32_ERR_AGAIN);
     }
+    /* A full link queue leaves frames in the NIC; nothing is dropped and the
+     * waiting frame arrives once link_tick has taken one. */
     reset();
-    for (u32 i = 0; i < NET_RX_SCAN_MAX; i++) frame(LINK_OP_DATA, ETH_ZLEN, 0);
+    {
+        u32 before = net_rx_link_dropped;
+        for (u32 i = 0; i < EXPECT_SLOTS; i++) frame(LINK_OP_DATA, FRAME_BYTES, (u8)i);
+        REQUIRE(net_nic_poll_once() == EXPECT_SLOTS);
+        frame(LINK_OP_DATA, FRAME_BYTES, 99);
+        REQUIRE(net_nic_poll_once() == 0 && net_rx_link_dropped == before);
+        REQUIRE(net_rx_take(NET_RX_LINK, output, sizeof(output), &n) == 0 && output[n-1] == 0);
+        REQUIRE(net_nic_poll_once() == 1 && net_rx_link_dropped == before);
+        for (u32 i = 1; i < EXPECT_SLOTS; i++)
+            REQUIRE(net_rx_take(NET_RX_LINK, output, sizeof(output), &n) == 0 && output[n-1] == i);
+        REQUIRE(net_rx_take(NET_RX_LINK, output, sizeof(output), &n) == 0 && output[n-1] == 99);
+    }
+    reset();
+    /* One poll scans at most NET_RX_SCAN_MAX frames (foreign ethertype, so the
+     * link queue never fills and the scan limit alone ends the batch). */
+    for (u32 i = 0; i < NET_RX_SCAN_MAX; i++) frame(LINK_OP_DATA, ETH_ZLEN, 0)[ETH_TYPE_OFF] = 0;
     REQUIRE(net_nic_poll_once() == NET_RX_SCAN_MAX);
     REQUIRE(calls == NET_RX_SCAN_MAX && count == 0);
     reset();
@@ -183,7 +200,18 @@ static int suite(void)
 }
 void _start(void)
 {
+    test_rx_clock_install();
     int rc = suite();
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc ? rc % 250 + 1 : 0));
     __builtin_unreachable();
 }
+
+int platform_clock_read_us(u32 *lo, u32 *hi) { *lo = *hi = 0; return 0; }
+u32 tick_budget_cnt(u32 us) { return us; }
+int tick_budget_take(u32 share, u32 tail) { (void)share; (void)tail; return 1; }
+void net_rx_schedule(void) {}
+int net_rx_defer_reset(u16 protocol) { (void)protocol; return 0; }
+
+int tick_budget_peek(u32 share, u32 tail) { (void)share; (void)tail; return 1; }
+
+void net_rx_note(void) {}

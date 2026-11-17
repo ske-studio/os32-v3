@@ -27,14 +27,14 @@
 |---|---|---|
 | D1 | `RUST_VS_C11.md:67`（N1）の NP21/W 生 frame 比較は、そのまま FM 比較にはならない。N `win9x/aidebug/aidebug_api.cpp:843-889` は CS4231 DMA の採取 | 元 C++ と Rust の比較と、CS4231 転送比較を分ける |
 | D2 | NP21/W が常に fmgen とは限らない。N `win9x/ext/opna.cpp:142-182,392-430` は設定・能力別に分岐、API `:772` が `usefmgen` を返す | FM 直接出力の実装識別に限る。CS4231 DMA 比較の前提にしない。稼働値は未確認 |
-| D3 | `RUST_VS_C11.md` §1-3 は描画 256 frame を想定するが、`pcm_cs4231.h:119-125` は半分 2048・リング 4096・ステージング 4096 frame、`.c:151-164,385` はコピーだけ | 256 frame は計算の単位。DMA 半分を変更せず、既存ステージングへ供給する |
-| D4 | V86 提供は未接続。`platform/pc98/legacy/v86_io.c:97-99` は 0188h–018Fh を素通し、`:387-434` にソフト OPNA の処理なし、`v86.c:500-503` は実 IRQ を開く | ソフト選択時だけ trap、仮想 IRQ12 を接続 |
+| D3 | `RUST_VS_C11.md` §1-3 は描画 256 frame を想定するが、`pcm_cs4231.h` は半分 2048・リング 4096・ステージング 4096 frame、`.c:151-164,385` はコピーだけ | 256 frame は計算の単位。DMA 半分を変更せず、既存ステージングへ供給する |
+| D4 | V86 提供は未接続。`platform/pc98/legacy/v86_io.c` の `v86_io_allow()` は 0188h–018Fh を素通し、`v86_io_in()` にソフト OPNA の処理なし、`v86.c:500-503` は実 IRQ を開く | ソフト選択時だけ trap、仮想 IRQ12 を接続 |
 | D5 | 「表を const 化」だけでは alloc/浮動小数点は消えない。N `fmgen_opna.cpp:1436,1485-1568` は ADPCM RAM と外部 WAV を確保、`:540`・`fmgen_fmgen.cpp:262-266`・`fmgen_psg.cpp:89-91` は設定時の浮動小数点 | RAM は C 所有、WAV は通常文脈で準備、設定用係数もホスト生成 |
 | D6 | `RUST_VS_C11.md` §1-3 の「panic を無音化」と §3-2 の「panic→kpanic」は異なる。abort panic は通常の戻り値に戻せない | 回復可能な障害は Result→無音、実 panic は診断付き停止。unwind/longjmp による復帰はしない |
 
-`TASK_PCM_CS4231.md:255-258` の E4 は合格、E3 に未実施項目、E5 は未、E6 は部分。合成器先行の妨げではないが、PCM 全体の受入完了とは記さない。
-`drivers/sound/fm/fm.c:54-86` の `opn_write_checked` は実ポート・BUSY 待ち専用。`snd_engine.c:4,207-210` は tick と既存 FM 関数で発音する。
-`fm_module.h:24-35` の snd API、`pcm_module.h:10-20` の PCM API は既存の公開面を維持する。
+PCM (CS4231) は受入完了 (2026-11-08)。まだ確かめていない項目は設計書 `docs/design/drivers/sound/cs4231/pcm_cs4231.md` の「未確認」が持つ。合成器先行の妨げではない。
+`drivers/sound/fm/fm.c` の `opn_write_checked` は実ポート・BUSY 待ち専用。`snd_engine.c` は tick と既存 FM 関数で発音する。
+`fm_module.h` の snd API、`pcm_module.h` の PCM API は既存の公開面を維持する。
 
 ## 2. 分担・移植範囲・条件
 経路: `snd / V86 → C の時刻・所有者制御 → Rust OPNA → s16le stereo → PCM staging → CS4231 DMA`。
@@ -209,7 +209,7 @@ IRQ stack の増分目標 <2 KiB、既存 16 KiB 内。再帰・可変長 stack 
 | G `kernel/v86/v86_opna.c` | 新300、latch/幅変換/pending/session | E 後、F と並列可 |
 | G `kernel/v86/v86_opna.h` | 新40、V86 adapter 宣言 | G 前に固定 |
 | G `platform/pc98/legacy/v86_io.c` | 改約25、bitmap と優先分岐だけ | G 後 |
-| G `arch/x86/legacy/v86.c` | 改約30、begin/end/IRQ12選択/復帰口 | G 後 |
+| G `platform/pc98/legacy/v86.c` | 改約30、begin/end/IRQ12選択/復帰口 | G 後 |
 | F `drivers/sound/fm/snd_engine.c` | 改約80、開始/終端/ownerと通常文脈source要求 | F後 |
 | G `drivers/sound/synth/synth_timer.c` | 新250、timer制御/FIFO/期限起床adapter、§10(c)決定後 | E後 |
 | H `tools/tests/opna_host/compiler.h` | 新60、ホスト専用最小shim | H前 |

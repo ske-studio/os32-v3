@@ -1,13 +1,29 @@
-/* ILP32 product code, only privileged operations are fake. */
+/* ILP32 product code; privileged operations are fake. Config fault injection
+ * passes an invalid denominator to the real clock to test restart rollback. */
 #include "ppc_trap.h"
 #include "kernel_tick.h"
 #include "arch_io.h"
 #include "kernel/irq/tick.h"
 #include "kernel/irq/irq.h"
 volatile u32 kctx_irq_depth;
-static int dec, writes, enabled;
+static int dec, writes, enabled, reject_config;
+int __real_tick_clock_config(u32 num, u32 den);
+int __wrap_tick_clock_config(u32 num, u32 den)
+{ return __real_tick_clock_config(num, reject_config ? 0 : den); }
 static u32 calls, mark;
-static void (*handler)(struct ppc_frame *);
+#include "exec_arch.h"
+u32 ppc_trap_msr(void) { return 0x30; }
+u32 ppc_root_current(void) { return 0; }
+void ppc_trap_stop(void) { __builtin_trap(); }
+void ppc_trap_fatal_sink(const struct ppc_frame *f, u32 r) { (void)f; (void)r; __builtin_trap(); }
+void ring3_fault_kill(void) { __builtin_trap(); }
+void exec_syscall_dispatch(struct arch_syscall *c) { (void)c; __builtin_trap(); }
+static void handler(struct ppc_frame *unused)
+{
+    (void)unused;
+    struct ppc_frame f = { .vector = PPC_VECTOR_DEC };
+    ppc_trap_dispatch(&f);
+}
 static void finish(int code)
 {
     __asm__ volatile("int $0x80" : : "a"(4), "b"(1), "c"(&mark), "d"(4) : "memory");
@@ -15,18 +31,14 @@ static void finish(int code)
     __builtin_unreachable();
 }
 static void check(int ok, u32 stage) { mark=stage; if (!ok) finish(stage); }
+void ppc_cpu_nap(void) { }
 int ppc_irq_enabled(void) { return enabled; }
 void ppc_enable(void) {
     enabled=1;
-#ifdef DEC_IDLE_TEST
-    mark=18; finish(0);
-#endif
 }
 void ppc_disable(void) { enabled=0; }
 int ppc_read_dec(void) { return dec; }
 void ppc_write_dec(u32 value) { dec=(int)value; ++writes; }
-void ppc_trap_set_handler(u32 vector, void (*fn)(struct ppc_frame *))
-{ check(vector==0x900,2); handler=fn; }
 u32 ppc_irq_save(void) { u32 saved=enabled; enabled=0; return saved; }
 void ppc_irq_restore(u32 saved) { enabled=(int)saved; }
 static void forbidden_callback(void) { check(0,21); }
@@ -39,38 +51,51 @@ static void tick_callback(void)
 void _start(void)
 {
 #ifdef DEC_IDLE_TEST
-    _idle();
-    mark=18; finish(18);
+    enabled=0; _idle();
+    mark=18; finish(enabled ? 0 : 18);
 #endif
     check(tick_register(0,tick_callback)==0,23);
     dec=-99;
     ppc_decrementer_interrupt(0);
     check(dec==PPC_DEC_FAR && !tick_count && !calls,4);
-    check(ppc_dec_start(25000000,1000)==-1,5);
-    check(ppc_dec_start(25000000,100)==0 && handler==ppc_decrementer_interrupt,6);
-    check(dec==250000,7);
+    check(ppc_dec_start(25000000,100)==-1,5);
+    check(ppc_dec_start(25000000,1000)==0,6);
+    check(dec==25000,7);
     int before=writes;
-    dec=-750001;
+    dec=-75001;
     handler(0);
-    check(writes==before+1 && dec==249999,8);
-    check(tick_count==4 && calls==4,9);
+    check(writes==before+1 && dec==24999,8);
+    check(tick_count==0 && calls==0,9);
     check(kctx_irq_depth==0,20);
     dec=100;
     handler(0);
-    check(dec==100 && tick_count==4,10);
-    check(ppc_dec_start(33333333,100)==0,11);
+    check(dec==100 && tick_count==0,10);
+    for (u32 i=0;i<6;++i) { dec=0; handler(0); }
+    check(tick_count==1 && calls==1,24);
+    check(ppc_dec_start(33333333,1000)==0,11);
     u32 sum=dec;
-    for (u32 i=1;i<100;++i) {
+    for (u32 i=1;i<1000;++i) {
         dec=0; handler(0);
-        check(dec==333333 || dec==333334,12);
+        check(dec==33333 || dec==33334,12);
         sum+=(u32)dec;
     }
     check(sum==33333333,13);
+    dec=0; handler(0);
+    check(tick_count==101 && calls==101,25);
+    reject_config=1; before=writes;
+    int previous=dec;
+    check(ppc_dec_start(25000000,1000)==-1 && writes==before && dec==previous,26);
+    dec=0; handler(0);
+    check(dec==33333 || dec==33334,27);
+    reject_config=0;
     enabled=1; before=writes;
-    check(ppc_dec_start(25000000,100)==-1 && writes==before,14);
+    check(ppc_dec_start(25000000,1000)==-1 && writes==before,14);
     enabled=0;
     arch_cpu_halt(); check(!enabled,15);
     enabled=1; arch_cpu_halt(); check(enabled,16);
     check(kctx_irq_depth==0,20);
     mark=17; finish(0);
 }
+
+void tick_budget_begin(void) { }
+void tick_budget_end(void) { }

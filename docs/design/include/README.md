@@ -214,7 +214,6 @@ drop 観測変数の既存実体はカーネルに残し、宣言を `include/kb
 - [include/gfx_format.h](gfx_format.md)
 - [include/gfx_hal.h](gfx_hal.md)
 - [include/gfx_mode.h](gfx_mode.md)
-- [include/hwdev_private.h](hwdev_private.md)
 - [include/input_service.h](input_service.md)
 - [io.md](io.md)
 - [include/kselftest_probe.h](kselftest_probe.md)

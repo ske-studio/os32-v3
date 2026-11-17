@@ -2,7 +2,10 @@
 # B5 adds production fixtures; CI measured 77.81s for the expanded test.
 CHECK = dict(name='gf-production-host', tier=1,
     covers=['drivers/video/geforce/gf_v2.h', 'gfx/v2/*.h', 'sdk/include/os32/os32_gfx2.h', 'tools/tests/cc_cache.py', 'drivers/pci/pci_barsize.h', 'drivers/pci/pci_barsize.c', 'drivers/pci/pci_locate.c', 'kdebug/recover_gf_locate.c', 'hwdev/gf/master.c', 'gfx/gfx_policy.h', 'gfx/gfx_osri_view.h', 'drivers/video/geforce/geforce_platform.c', 'tools/tests/test_gf_production.py', 'tools/tests/gf_ownerless_fixture.py', 'tools/tests/gf_accel_no_bind.h', 'tools/tests/gf_accel_unbound_stubs.c', 'include/io.h', 'arch/x86/arch_io.h', 'tools/tests/host_arch/arch_io.h', 'tools/tests/gf_production_hal_host.inc', 'lib/serial_diag.h', 'include/kprintf.h', 'hwdev/gf/bus.c', 'hwdev/gf/devinit.c', 'hwdev/gf/native.c', 'hwdev/gf/pll.c', 'hwdev/gf/resources.c', 'hwdev/gf/runner.c', 'hwdev/gf/save.c', 'hwdev/gf/service.c', 'hwdev/gf/accel_surface.c', 'hwdev/gf_load_state.c', 'kdebug/gfinit_decode.c', 'kdebug/gfinit_pll.c', 'kdebug/gfinit_resources.c', 'kdebug/recover.c', 'kdebug/recover_common/*.inc', 'kdebug/recover_plan/*.inc', 'kdebug/recover_gf_stage/*.inc', 'kdebug/recover_gf.c', 'kernel/sys.c', 'init/sysconfig.c', 'tools/tests/gf_production_host.c', 'tools/tests/gf_foundation_width_host.h', 'tools/tests/gfinit_host.c', 'tools/tests/host32.py', 'tools/tests/recover_gf_host.c', 'hwdev/gf/*.h', 'hwdev/gf/display/*.c', 'hwdev/gf/display/*.h', 'hwdev/gf/op/*.c', 'include/gf_production.h', 'include/gfx_hal.h', 'gfx/gfx_internal.h', 'drivers/video/geforce/geforce_body.c', 'drivers/video/geforce/geforce_module.c', 'drivers/video/geforce/geforce_module.h', 'drivers/video/geforce/backend_geforce.c', 'drivers/video/geforce/gf_present.c', 'gfx/palette.h', 'drivers/video/pc98/pc98_route.h', 'tools/tests/kernel_includes.py', 'include/video_wc.h', 'arch/x86/kernel/video_wc.c', 'arch/ppc/video_wc.c'],
-    needs=[], budget=80.0)
+    needs=[], budget=80.0,
+    basis=['GF_FEAT1_DESIGN §2', 'GF_FEAT1_DESIGN §3', 'GF_FEAT1_DESIGN §8'],
+    env_limit='偽clock/bus/moduleで資源gateとcleanupを確認するが、実IRQ・MMIO・cacheと出画は保証しない。',
+)
 
 from kernel_includes import include_flags
 from gf_ownerless_fixture import ownerless_body
@@ -58,7 +61,7 @@ def main(override=None, dev=13):
             cc_cache.build(['gcc', *flags, '-DGF_PRODUCTION_MODULE',
                             '-Dgf_display_modeset=gf_unused_legacy_modeset',
                             '-c', str(source), '-o', str(obj)], check=True)
-        module=(ROOT/'drivers/video/geforce/geforce_module.c').read_text()
+        module=(override[1] if override and override[0]=='drivers/video/geforce/geforce_module.c' else ROOT/'drivers/video/geforce/geforce_module.c').read_text()
         a=module.index('static int geforce_return(')
         (Path(tmp)/'geforce_return.inc').write_text(module[a:module.index('static int geforce_start(',a)].replace('static GfxBackendV2 gf_v2_kcopy;', ''))
         backend=Path(tmp)/'backend.o'
@@ -106,6 +109,9 @@ def main(override=None, dev=13):
 
 def mutations():
     rows = [
+        ('drivers/video/geforce/geforce_module.c',
+         'int rc = p->wc_stop && p->wc_stop() < 0 ? -1 : 0;',
+         'int rc = 0;', 'return-wc-stop'),
         ('hwdev/gf/master.c',
          'pci_cfg_write16(RECOVER_GF_BUS, RECOVER_GF_DEV, RECOVER_GF_FN,\n                        PCI_CFG_COMMAND, RECOVER_COMMAND_RUN)',
          'pci_cfg_write16(RECOVER_GF_BUS, 13, RECOVER_GF_FN,\n                        PCI_CFG_COMMAND, RECOVER_COMMAND_RUN)', 'M9 master destination'),

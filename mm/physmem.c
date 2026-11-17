@@ -77,13 +77,7 @@ int physmem_exclude(struct physmem *m, u32 first, u32 end, u32 kind)
 
 int physmem_add_trusted(struct physmem *m, u32 first, u32 end, u32 source)
 {
-    if (source != PHYSMEM_SOURCE_MACHINE) {
-#if defined(PHYSMEM_HOST_TEST) && PHYSMEM_HOST_TEST == 1 && !defined(__KERNEL_BUILD__)
-        if (source != PHYSMEM_SOURCE_SYNTHETIC) return 0;
-#else
-        return 0;
-#endif
-    }
+    if (source != PHYSMEM_SOURCE_MACHINE) return 0;
     return overlay(m, first, end, PHYSMEM_RAM, source);
 }
 

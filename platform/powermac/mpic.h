@@ -10,9 +10,7 @@
 #define PM_MPIC_DRAIN_LIMIT 256U
 #define PM_MPIC_WINDOW_MIN 0x200b4U
 #define PM_MPIC_WINDOW_MAX 0x40000U
-/* E2 private claim, to be adapted to the common IRQ contract in E3.
- * IPI is a native vector, never a source bitmap line. */
-struct irq_claim { unsigned native_token; };
+#include "platform_irq.h"
 enum pm_mpic_error {
     PM_MPIC_INIT_OK, PM_MPIC_WINDOW, PM_MPIC_ORDER,
     PM_MPIC_SOURCES, PM_MPIC_DRAIN

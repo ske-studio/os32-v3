@@ -5,7 +5,7 @@ static u32 host_cr3, host_flushes, host_flushed_cr3;
 #include "idt.h"
 #include "platform_emergency.h"
 #include "memmap.h"
-#include "tvram.h"
+#include "text_screen.h"
 #include "tvram_private.h"   /* PC-98 の番地 (第 5 段 C1) */
 /* Keep fault output in the fixture's mapped TVRAM, without normal console. */
 void platform_fault_cell(u32 pos, u16 code, u8 attr)
@@ -15,7 +15,7 @@ void platform_fault_cell(u32 pos, u16 code, u8 attr)
 }
 #include "v86_mem.h"
 #include "paging.c"
-#include "../../arch/x86/legacy/lowmap.c"
+#include "../../platform/pc98/legacy/lowmap.c"
 /* Layout symbols are supplied by kernel_layout.linker_flags(). */
 #include "pgalloc_host_source.c"
 #define HOST_POOL_IRQ_SAVE() 0U

@@ -309,8 +309,8 @@ static int cmd_terminal(int argc, char **argv)
              * get_tick の連打で 1 tick を潰していたが、リング 3 では
              * KAPI 1 回 6us でアイドルが CPU を振り切る。sys_halt なら
              * 待ち時間 (~1 tick) を保ったまま get_tick 呼び出しがゼロになる。 */
-            u32 w = g_api->get_tick() + 1;
-            while (g_api->get_tick() < w) g_api->sys_halt();
+            u32 w = g_api->get_tick();
+            while ((u32)(g_api->get_tick() - w) < 1) g_api->sys_halt();
         }
     }
     g_api->kprintf(ATTR_CYAN, "%s", "\n[Terminal closed]\n");
@@ -324,8 +324,8 @@ static void rshell_end_reply(void)
 {
     g_api->buz_off();
     {
-        u32 wait_end = g_api->get_tick() + 1;
-        while (g_api->get_tick() < wait_end) g_api->sys_halt();
+        u32 wait_start = g_api->get_tick();
+        while ((u32)(g_api->get_tick() - wait_start) < 1) g_api->sys_halt();
     }
     /* **EOT を送れたかは診断に出すだけ** (往復 4)。番犬の解除は
      * `serial ack` だけが決めるので、ここの成否は解除に関与しない。
@@ -352,14 +352,88 @@ static unsigned long rsh_io_tick(void *ctx)
 
 static void rsh_io_idle(void *ctx)
 {
-    u32 w = g_api->get_tick() + 1;
+    u32 w = g_api->get_tick();
     (void)ctx;
-    while (g_api->get_tick() < w) g_api->sys_halt();
+    while ((u32)(g_api->get_tick() - w) < 1) g_api->sys_halt();
 }
 
 static const struct rsh_io rsh_io_real = {
     rsh_io_getch, rsh_io_tick, rsh_io_idle, (void *)0
 };
+
+#ifndef SHELL_AS_APP
+/* Whole-line GUI handoff, including the existing GSERIAL timeout form. */
+static const char *rsh_gui_command(const char *line)
+{
+    const char *p;
+    while (*line == ' ') line++;
+    p = line;
+    if (!strncmp(p, "gui", 3) && (!p[3] || p[3] == ' ')) {
+        p += 3;
+        while (*p == ' ') p++;
+        return *p ? 0 : "os32gui";
+    }
+    if (strncmp(p, "os32gui", 7) || (p[7] && p[7] != ' ')) return 0;
+    p += 7;
+    while (*p == ' ') p++;
+    if (!*p) return line;
+    if (strncmp(p, "-t ", 3)) return 0;
+    p += 3;
+    while (*p == ' ') p++;
+    if (*p >= '0' && *p <= '9') {
+        u32 seconds = 0;
+        do {
+            if (seconds > (0x7fffffffu / OS32_TICK_HZ - (u32)(*p - '0')) / 10u)
+                return 0;
+            seconds = seconds * 10u + (u32)(*p++ - '0');
+        } while (*p >= '0' && *p <= '9');
+        while (*p == ' ') p++;
+        if (!*p) return line;
+    }
+    return 0;
+}
+
+/* Called only inside LAN capture; 1 defers GUI execution until ACCEPT/END. */
+int rsh_lan_execute(const char *line)
+{
+    const char *child = rsh_sfs_child(line);
+    if (str_eq(line, "rshell lantrace")) {
+        (void)execute_command(line);
+        return 0;
+    }
+    if (rsh_gui_command(line)) {
+        g_api->kprintf(ATTR_CYAN, "%s", "Switching to GUI shell...\n");
+        return 1;
+    }
+    if (child) {
+        /* A resident /host makes sfs_begin select its LAN scope. Other mounted
+         * filesystems fail BUSY before the UART path can open a session. */
+        if (!g_api->sys_is_mounted(RSHELL_HOST_PREFIX)) {
+            g_api->kprintf(ATTR_RED, "%s", "sfs: LAN rshell requires --sfs-lan resident /host\n");
+            sh_status_set(SH_STATUS_USAGE);
+        } else sh_status_set(sfs_run_child(child));
+    } else {
+        static const char *const uart[] = { "serial", "terminal", "send", "tvdump", "rshell" };
+        const char *p = line;
+        while (*p == ' ') p++;
+        for (unsigned int i = 0; i < sizeof(uart) / sizeof(uart[0]); i++) {
+            unsigned int n = strlen(uart[i]);
+            if (!strncmp(p, uart[i], n) && (!p[n] || p[n] == ' ')) {
+                g_api->kprintf(ATTR_RED, "%s", "rshell: serial command refused over LAN\n");
+                sh_status_set(SH_STATUS_USAGE);
+                return 0;
+            }
+        }
+        (void)execute_command(line);
+    }
+    return 0;
+}
+
+int rsh_lan_handoff(const char *line)
+{
+    return execute_command(rsh_gui_command(line));
+}
+#endif
 
 static int __attribute__((unused)) cmd_rshell_resident(int argc, char **argv)
 {
@@ -373,6 +447,7 @@ static int __attribute__((unused)) cmd_rshell_resident(int argc, char **argv)
         return SH_STATUS_ERROR;
     }
 
+    rsh_lan_reset();
     g_api->rshell_set_active(1);
     rsh_in_rshell = 1;
     g_api->kprintf(ATTR_GREEN, "%s", "Remote shell active (ESC to exit)\n");
@@ -400,11 +475,17 @@ static int __attribute__((unused)) cmd_rshell_resident(int argc, char **argv)
              * 来なければ元の速度へ戻して EOT を返す (ホストはそちらで
              * 待っている)。 */
             (void)ser_wd_poll();
+#ifndef SHELL_AS_APP
+            /* No serial byte has started a line. poll owns the complete LAN
+             * execution; neither this loop nor rsh_line_rest runs inside it. */
+            if (g_api->host_notice_read && rsh_lan_poll() == RSH_LAN_EXIT)
+                goto rshell_exit;
+#endif
             {
                 /* rshell コマンド待ち。sys_halt でアイドル時の get_tick
                  * 連打 (実測 311k/s) を止める。SER 受信 IRQ でも起きる。 */
-                u32 w = g_api->get_tick() + 1;
-                while (g_api->get_tick() < w) g_api->sys_halt();
+                u32 w = g_api->get_tick();
+                while ((u32)(g_api->get_tick() - w) < 1) g_api->sys_halt();
             }
         }
 
@@ -513,6 +594,7 @@ rshell_exit:
      *                     次のコマンドの終端と取り違える (票 §2-2 の裏)。 */
     if (ln.bytes > 0) rshell_end_reply();
 
+    rsh_lan_reset();
     rsh_in_rshell = 0;
     /* **arm 中で未確認なら、抜ける前にここで戻す** (往復 4 B4)。
      * 抜けたあとは ser_wd_poll を呼ぶ者が居ないので、番犬が仕掛かったまま
@@ -530,6 +612,11 @@ static int cmd_rshell(int argc, char **argv)
     g_api->kprintf(ATTR_RED, "%s", "rshell: resident shell only\n");
     return SH_STATUS_ERROR;
 #else
+    if (argc == 2 && str_eq(argv[1], "lantrace")) {
+        extern void rsh_lan_trace_show(void);
+        rsh_lan_trace_show();
+        return 0;
+    }
     return cmd_rshell_resident(argc, argv);
 #endif
 }
@@ -930,7 +1017,7 @@ static int cmd_tvdump(int argc, char **argv)
 static const ShellCmd rshell_cmds[] = {
     { "serial",   cmd_serial,   "[baud]",        "Show RS-232C status / init at baud (115200 = V-FAST)" },
     { "terminal", cmd_terminal, "",              "Enter serial terminal mode" },
-    { "rshell",   cmd_rshell,   "",              "Start remote shell host" },
+    { "rshell",   cmd_rshell,   "[lantrace]",              "Start remote shell host" },
     { "send",     cmd_send,     "TEXT...",       "Send text via serial" },
     { "hotdeploy", cmd_hotdeploy, "[PATH LEN CRC32]",
       "Write staging buffer to file (no args: report buffer address)" },

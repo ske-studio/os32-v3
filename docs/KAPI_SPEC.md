@@ -1,4 +1,4 @@
-# KernelAPI v84 仕様書
+# KernelAPI v87 仕様書
 
 外部プログラム (OS32X) がカーネル機能を利用するためのAPIテーブル仕様。
 
@@ -16,8 +16,8 @@
 | 最大プログラムサイズ | 仮想配置で決まる: image・BSS・libc の初期域は 0x80100000 から、exec_heap の予約起点 0x88000000 の手前まで (配置と検査は [09_exec.md](09_exec.md)「Ring3 の USER 写像」) |
 | プログラム専用ヒープ | exec_heap 0x88000000〜 (既定 64KB だけ map、`mem_map` で伸長) と libc の sbrk |
 | プログラム専用スタック | 0x90000000 の直下に可変量 (既定 256KiB、OS32X ヘッダの `stack_size`)、その下に guard 1 ページ |
-| 現在のバージョン | **84** |
-| 合計エントリ数 | **304** (ヘッダ 2 + 関数表の容量 300 (うち実装 292・予約 8) + データフィールド 2)。データ欄は **0x4B8 に固定** (§4-0) |
+| 現在のバージョン | **87** |
+| 合計エントリ数 | **304** (ヘッダ 2 + 関数表の容量 300 (うち実装 294・予約 6) + データフィールド 2)。データ欄は **0x4B8 に固定** (§4-0) |
 
 ---
 
@@ -53,6 +53,7 @@ make programs
 
 1. `sdk/kapi.json` の `api` 配列の**末尾**にエントリを追加する。
    既存スロットの並べ替え・削除は**禁止** (ビルド済みバイナリの ABI が壊れる)。
+   検査 `make check-kapi-abi` が基点 (origin/main) の口の並び・名前・戻り値・引数と比べる。壊すのが正しい変更は、コミットの本文に `KAPI-Break: <理由>` と書く。
    必要なヘッダは同ファイルの `includes` に、プロトタイプは `externs` に追加する。
    - `target` — 実体の関数名がエントリ名と異なる場合に指定
    - `body` — ラッパー本体をインラインで書く場合に指定
@@ -117,7 +118,7 @@ KAPI は append-only で版番号は単調増加。複数の計画が独立に�
 | v65 | **実装済み (2026-09-24、手元ビルドのみ)** | 起動したイメージの識別 (票 TASK_SERIAL_HOSTFS 部品 A-4): `boot_image_info` 1 本 (slot 234 = 0x3B0)。`BootImageInfo` (40 バイト) に**ローダが検査して起動した** `vmkernel.lz4` のファイル全体の CRC32・長さ・記録の有無・どのローダか (FD / HDD) と、カーネルを組んだ git のコミット ID を写す。0 / `OS32_ERR_INVAL` (CPL=0 / WM で `out` が NULL。CPL=3 は wrap で kill)。同じ版で **VK32 を v2** (エントリごとの展開後 CRC32 + 完全長 + ファイル全体の CRC32、`boot/boot_defs.h`) に、**ブート情報域を v2** (0x30〜0x3F のイメージ欄、`include/bootinfo.h`) にした — v1 のイメージはどちらのローダも `VK32: unknown version` で止まる。**ローダ (FD イメージ / HDD の LBA 2〜17) と `vmkernel.lz4` を同時に入れ替える** (旧ローダと新イメージ・新ローダと旧イメージはどちらも起動しない)。`ver` と起動画面に `Commit:` / `Image CRC:` | `docs/archive/realhw_v21/TASK_SERIAL_HOSTFS.md` 部品 A-4 |
 | v66 | **実装済み (2026-09-25、手元ビルドとホスト試験のみ)** | シリアル越しの /host (票 TASK_SERIAL_HOSTFS 部品 B): `sfs_begin` / `sfs_end` / `serial_diag` の 3 本 (slot 235〜237 = 0x3B4〜0x3BC)。常駐シェルの `sfs run <コマンド行>` だけがセッションを開き (送受信のゲート → HELLO → `/host` に SerialFS)、子がどう終わっても BYE → アンマウント → 隔離 → 溜めた出力と終了コードを長さ付きのフレームで送る → ゲートを下ろす。`serial_diag` は受信の OE / FE / PE と受信リング溢れの数。同じ版で `vfs_mount` が同じ prefix の二重登録を断る | `docs/archive/realhw_v21/TASK_SERIAL_HOSTFS.md` 部品 B |
 | v67 | **実装済み (2026-09-26、手元ビルドとホスト試験のみ)** | キーボードの受信記録 `kbd_diag_log` 1 本 (slot 238 = 0x3C0)。IRQ1 が 0041h から**使うバイトを読むたびに** `KbdDiagLogEnt` (8 バイト: seq / 生の code / 処理後の修飾 / 印) を 32 件の循環リングへ積み、`after_seq` より新しい分を古い順に写す。EMPTY / ERROR で捨てたバイトは積まない。上書きで失われた分は写した先頭の seq の飛びで分かる。シェルの `kbdstat -w` が使う — 実機のカナ / CAPS が「ロックで make、解除で break」か「押すたびに make だけ」かを見る準備。実体は `drivers/input/kbd_dlog.c` / `drivers/input/kbd.c` | 票 TASK_KBD_NAV §3 |
-| v68 | **実装済み (2026-09-26、手元ビルドとホスト試験のみ)** | 実機の ROM の INT 18h の I/O 記録 `v86_gdc_capture` 1 本 (slot 239 = 0x3C4)。`mode = V86G_MODE_ROM` は V86 で実機の ROM の AH=31h を呼んで今のモードを読み、その bit の並び (NP21/W の bit2 / Bible 3-2 の bit3) から 640x480 の AH=30h を決めて呼び、同じ AH=30h で元のモードへ戻して (戻れなければ OS32 の表 `pegc_restore_text_sync`) CUI を作り直す。その間に捕まえた OUT を**畳まずに**最大 512 件、IN をポートごとの回数で `V86Gcap` (8460 バイト) へ写す。`V86G_MODE_SELFTEST` は決まった I/O 列の試験ゲストで記録器を確かめる (実機へ通さない)。`v86 -g [-t]` が使う。実体は `arch/x86/legacy/v86_gcap.c` / `kdebug/v86_gcap_math.c` | 票 TASK_PEGC480_REALHW §3 段 1 |
+| v68 | **実装済み (2026-09-26、手元ビルドとホスト試験のみ)** | 実機の ROM の INT 18h の I/O 記録 `v86_gdc_capture` 1 本 (slot 239 = 0x3C4)。`mode = V86G_MODE_ROM` は V86 で実機の ROM の AH=31h を呼んで今のモードを読み、その bit の並び (NP21/W の bit2 / Bible 3-2 の bit3) から 640x480 の AH=30h を決めて呼び、同じ AH=30h で元のモードへ戻して (戻れなければ OS32 の表 `pegc_restore_text_sync`) CUI を作り直す。その間に捕まえた OUT を**畳まずに**最大 512 件、IN をポートごとの回数で `V86Gcap` (8460 バイト) へ写す。`V86G_MODE_SELFTEST` は決まった I/O 列の試験ゲストで記録器を確かめる (実機へ通さない)。`v86 -g [-t]` が使う。実体は `platform/pc98/legacy/v86_gcap.c` / `kdebug/v86_gcap_math.c` | 票 TASK_PEGC480_REALHW §3 段 1 |
 | v69 | **実装済み (2026-10-01、手元ビルド・ホスト試験)** | T2c: OS32X v4 / 4 世代の正典・高位配置・可変 stack。KAPI slot の追加・並べ替えなし | 票 TASK_T2_APPBAND §4-6・T2c-R |
 | v70 | **受入済み (T2、2026-10-16 — 実装は 2026-10-07 の e11c1)** | surface query/lease/bundle/unlease・値返し ls・本人識別の 6 本 (slot 240〜245)。公開値型・ページ/SHM 定数、pipe の CPL3 制限。e11b2 で memory_layout 世代 2 (版70は不変、旧世代1は拒否) | §4-10 |
 | v71 | **受入済み (2026-10-08、f12 ゲスト受入)** | USER 専用 `mem_map` / `mem_unmap` (slot 246・247)。f12 で memory_layout 世代 3 (KAPI 71・slot・データ欄は不変)。USER の最小初期量と mem_map による伸長へ切替。旧世代は拒否。 |
@@ -129,11 +130,13 @@ KAPI は append-only で版番号は単調増加。複数の計画が独立に�
 | v77 | **受入済み (T7b S3b、2026-10-20 — 実装は T7b-b1 S2)** | app 用 font read lease `font_source_open` / `font_source_read_at` / `font_source_close` (slot 250〜252)。4 世代・データ欄は不変。 | 本書 §4-14 |
 | v78 | **受入済み (TASK_KPEEK、2026-10-21 — 実装は T1)** | `kdebug_call` (slot 253)。kdebug 部品の ops slot 19 (`dbg_call`) へ渡す汎用の 1 本、部品が無ければ `OS32_ERR_NOSYS`。要求 `KdebugPeek` (1064B)。4 世代・データ欄は不変。 | 本書 §4-15 |
 | v79 | **実装済み (2026-10-26、VER_INFO V9、ゲスト未確認)** | `sys_ver_info` (slot 254)。ver/About 共通の固定長行を返す | 本書 §4・[os32_ver_info.md](design/sdk/include/os32/README.md#os32_ver_info) |
-| v80 | **実装済み (2026-11-05、main)** | `exec_stop_culprit` (slot 255)・`ime_dict_info` (slot 256)・`gfx_osri_show` (slot 257) の 3 本。4 世代・データ欄は不変 | 本書 §4-16・[DICT_META_DESIGN](decisions/fep/DICT_META_DESIGN.md)・[OSRI_VIEWER_DESIGN](decisions/gui/OSRI_VIEWER_DESIGN.md) |
+| v80 | **実装済み (2026-11-05、main)** | `exec_stop_culprit` (slot 255)・`ime_dict_info` (slot 256)・`gfx_osri_show` (slot 257) の 3 本。4 世代・データ欄は不変 | 本書 §4-16・[ime_dict_info の設計](design/kernel/ime/ime_dict_info.md)・[OSRI_VIEWER_DESIGN](decisions/gui/OSRI_VIEWER_DESIGN.md) |
 | v81 | **実装済み (2026-11-05、ホスト検証)** | `ime_dict_suspend(int on)` (slot 258 / 0x410): on=1 は辞書を閉じ、0 は閉じたときだけ再読込して元の mode に戻す。二重操作は 0、失敗は非ゼロ (再読込失敗は FEP OFF)。hsync --fep-off の停止中配備用 | 本書 §3-1 |
 | v82 | **実装済み (2026-11-07、ホスト検証)** | `host_notice_read` / `host_notice_serial` (slot 259〜260) | 本書 §4-17 |
 | v83 | **宣言追加 (2026-11-08、GFX_ACCEL_HAL H1)** | INDEX8 専用 `gfx_hw_submit` / `gfx_hw_get` (slot 261〜262)。H1 の入口は NOSYS、検査・実装は H2 | [確定設計 §3-2](decisions/gui/GFX_ACCEL_HAL_DESIGN.md#3-2-kapi-os32-kapi-addversion-8283) |
 | v84 | **宣言・仮実体 (HAL v2 A0)** | `gfx2_adapter_count`〜`gfx2_present` 29 本 (slot 263〜291、offset 0x424〜0x494)。A0 はすべて NOSYS、実装と受入は C/G/Y/I 各段 | [確定設計 §11](decisions/gui/HAL_V2_DESIGN.md#11-今の版との関係と-a0-宣言だけを先に置く段) |
+| v86 | **実装 (LAN 操作口 X9b)** | `boot_token_get` (slot 293、offset 0x49C)。起動中一定の識別子 16 バイトを写す | 本書 §4 |
+| v85 | **宣言追加 (LAN 操作口 X9)** | `con_sink_capture` (slot 292、offset 0x498)。capture の開始・固定・終了を既存 owner 契約で行う | [設計 §3](decisions/network/LAN_OPERATOR_DESIGN.md) |
 
 調停 (2026-09-06、同日改訂): GUI (K1〜W2) を先に実装するので **v42 = GUI、v43 = ネットワーク Host Services**
 に確定。実装順が入れ替わるときは、着手前にこの表を更新してから版番号を取ること。
@@ -300,7 +303,7 @@ v62 まではデータ欄 (`sbrk_heap_limit` / `shm_base`) を関数表の**直�
 |---|---|---|
 | 関数表の容量 R | **300** スロット (`KAPI_FUNC_CAPACITY`) | `sdk/kapi.json` の `func_capacity` |
 | データ欄の先頭 | **0x4B8** = 8 + 4 × R (`KAPI_DATA_FIELDS_OFF`) | `sdk/gen_kapi.py` が生成 |
-| 予約スロット | 292〜299 (`kapi_reserved[8]`、v84 時点。v83 は 263〜299、v82 は 261〜299、v81 は 259〜299、v79 は 255〜299、v77 は 253〜299、v72 は 249〜299、v68 は 240〜299、v67 は 239〜299、v66 は 238〜299、v65 は 235〜299、v64 は 234〜299、v63 は 230〜299)。カーネルの表は `kapi_reserved_nosys` (= `OS32_ERR_NOSYS`)、CPL=3 のトランポリンは int 0x80 のスタブ (ディスパッチャが `slot >= KAPI_FUNC_COUNT` で kill)。**NULL にしない** | `exec/exec.c` |
+| 予約スロット | 294〜299 (`kapi_reserved[6]`、v86 時点。v85 は 293〜299。v84 は 292〜299。v83 は 263〜299、v82 は 261〜299、v81 は 259〜299、v79 は 255〜299、v77 は 253〜299、v72 は 249〜299、v68 は 240〜299、v67 は 239〜299、v66 は 238〜299、v65 は 235〜299、v64 は 234〜299、v63 は 230〜299)。カーネルの表は `kapi_reserved_nosys` (= `OS32_ERR_NOSYS`)、CPL=3 のトランポリンは int 0x80 のスタブ (ディスパッチャが `slot >= KAPI_FUNC_COUNT` で kill)。**NULL にしない** | `exec/exec.c` |
 | R の上限 | トランポリン 1 ページ: `sizeof(KernelAPI)` + スタブ 8B × R + 写し場 256B ≤ 4096 → **R ≤ 318** (`STATIC_ASSERT`) | `exec/exec.c` |
 
 関数を足すときは `kapi_reserved[]` が 1 本減るだけで、データ欄は動かない。**関数数が R を
@@ -597,7 +600,7 @@ FD 起動の辞書なしは `SQLITE_ONLY` とし、recover-settings のため `d
 - **1 group = 1 接続 = 1 回の open**。開くのは `os32_sqlite_group_open` だけで、URI (`SQLITE_OPEN_URI`・`file:`) による VFS の差し替えは SQLite に渡す前に断る。default VFS からの所属無しの file open は fail-closed (`SQLITE_CANTOPEN`)。main / journal / 一時ファイルなど、実際に開いた FD は全部その group に属し、open の途中 (OPENING) から所属する。
 - SQLITE の FD は通常の `vfs_close`・`vfs_close_owned`・`vfs_fd_set_protect` では閉じない・外さない。閉じるのは xClose の lease 経由だけ。
 - `db_*` (KAPI) は EXEC group を呼び手の owner で取り、`exec_cleanup_owned_resources` (`db_cleanup_owned`) はその owner の EXEC group だけを閉じる。FEP・settings など常駐側は RESIDENT group を使い、アプリの終了で触られない。
-- `os32_sqlite_group_finish` が FREE に戻すのは「`sqlite3_close` OK・その group の FD が 0・xClose / lease の sticky な失敗無し」のときだけで、どれかが外れたら QUARANTINED にして再起動まで残す。KAPI の `db_close` では未 commit の ROLLBACK の失敗も QUARANTINED にする。`sqlite3_finalize` が評価エラー (制約違反など) を返しても statement は消えているので、それだけでは隔離しない (エラーは `db_last_error` に残り、close と回収が済めば FREE、`kapi/kapi_db.c:590`・`kernel/ime/ime_dict.c:428`)。RESIDENT のいずれかが QUARANTINED の間は RESIDENT の新しい acquire を `SQLITE_BUSY` で断る (残る slot を借りて標準起動を続けない)。
+- `os32_sqlite_group_finish` が FREE に戻すのは「`sqlite3_close` OK・その group の FD が 0・xClose / lease の sticky な失敗無し」のときだけで、どれかが外れたら QUARANTINED にして再起動まで残す。KAPI の `db_close` では未 commit の ROLLBACK の失敗も QUARANTINED にする。`sqlite3_finalize` が評価エラー (制約違反など) を返しても statement は消えているので、それだけでは隔離しない (エラーは `db_last_error` に残り、close と回収が済めば FREE、`kapi/kapi_db.c`・`kernel/ime/ime_dict.c`)。RESIDENT のいずれかが QUARANTINED の間は RESIDENT の新しい acquire を `SQLITE_BUSY` で断る (残る slot を借りて標準起動を続けない)。
 - 起動時は settings が RESIDENT 1 本を acquire → open (RO) → close → finish で返してから FEP を始める。FEP は辞書 RO と学習 RW に RESIDENT 2 本を使う (学習無効時は辞書の 1 本)。3 本目は切り替え時の一時 probe に使う (`kernel/ime/ime_dict.c`)。
 
 | Offset | フィールド | プロトタイプ |
@@ -858,10 +861,10 @@ v46 はそれを**カーネル内の 8KB のリング (シンク)** に溜め、
 - **宣言なしは断る (D1a)**: GUI 中に `OS32X_FLAG_GFX` (`mkos32x --gfx`) の立っていない CPL=3 が
   `gfx_init` / `gfx_init_200` を呼んだら、本体を呼ばずに拒否する。
   `gfx_init_reject_count` に加算して `appslot_abort_request()` で中断を要求し、
-  syscall 出口の `ring3_abort_check()` でアプリを畳む (`exec/appslot.c:839`)。
+  syscall 出口の `ring3_abort_check()` でアプリを畳む (`exec/appslot.c`)。
   `gfx_init` は `void` なので戻り値では知らせられない。CUI 中は宣言を要求しない。
 - 非シェルの外部プログラムは CPL=3 で動く。撤去済みの `OS32X_FLAG_FORCE_CPL0`
-  は既知フラグに含まれず、入口で拒否される (`exec/os32x_hdr.c:6`)。
+  は既知フラグに含まれず、入口で拒否される (`exec/os32x_hdr.c` の `os32x_layout_check()`)。
 - 低位 VRAM は supervisor 写像で、CPL=3 からの直接書き込みは保護違反になる。
   描画は KAPI または授権された lease 経由で行う
   ([09_exec.md](09_exec.md)「Ring3 の USER 写像」)。
@@ -1121,7 +1124,7 @@ v46 はそれを**カーネル内の 8KB のリング (シンク)** に溜め、
   #PF は起きない。帯の検証だけでは止まらない。
 - `ring3_user_ranges_writable` は `caller_access_get_user` で syscall 入口の呼び手を
   取得し、2 本の出力をそれぞれ `check_caller_write_range` で検査する
-  (`exec/exec.c:846`)。呼び手の AS と B1 台帳に基づくページ単位の検査で、
+  (`exec/exec.c`)。呼び手の AS と B1 台帳に基づくページ単位の検査で、
   検査のための master CR3 への切替は行わない。caller の検証契約は §3-3 を参照。
 
 ### PCI 結線の診断 (v60)
@@ -1175,7 +1178,7 @@ v46 はそれを**カーネル内の 8KB のリング (シンク)** に溜め、
 
 16 ビット・ステレオ・**44.1k と 22.05kHz だけ**の再生。単位は **frame**
 (左右 1 組 = 4 バイト)。録音・ミキサ (出力減衰以外)・PIO・V86 への提供は無い。
-設計と受入の状態は票 TASK_PCM_CS4231 (受入待ち) が持つ。
+設計は [pcm_cs4231 の設計書](design/drivers/sound/cs4231/pcm_cs4231.md) (受入完了 2026-11-08、まだ確かめていない項目は「未確認」)。
 
 - **`pcm_open(rate)`** — `44100` / `22050` 以外は `OS32_ERR_INVAL`。
   戻り 0 / `OS32_ERR_NOSYS` (検出できない) / `OS32_ERR_FULL` (他の owner が
@@ -1293,7 +1296,7 @@ v46 はそれを**カーネル内の 8KB のリング (シンク)** に溜め、
 ATA の LBA I/O (`ide_read_sector` 系・`dev_blk_*` の hd0-3) は IDENTIFY word 49 bit9 なら
 LBA28、無ければ word 53 bit0 の現在の CHS、それも無ければ既定の CHS。範囲外
 (LBA28 の上限 2^28・総数・シリンダ 16 ビット・`lba + count` の桁あふれ) は 1 セクタも
-出さずに `IDE_ERR_RANGE` (-4)。区画表 (LBA 1) は **PC-98 標準配置** (`drivers/block/pc98pt.h`)
+出さずに `IDE_ERR_RANGE` (-4)。区画表 (LBA 1) は **PC-98 標準配置** (`fs/pc98pt.h`)
 で、ext2 の区画探索は見つからない・読めないときに失敗する (以前は LBA 1088 を仮定した)。
 
 ### 起動したイメージの識別 (v65)
@@ -1428,7 +1431,7 @@ LBA28、無ければ word 53 bit0 の現在の CHS、それも無ければ既定
   ROM の採取が `V86G_ST_OK` 以外なら OUT 列と IN の表は出さない (`n_out = n_in = 0`、回数と理由は残す)。
   出力は生成ラッパの `out` 検査 (8460 バイト)。
 
-`V86Gcap` (8460 バイト、`os32_kapi_shared.h`、並びは `arch/x86/legacy/v86_gcap.c` の STATIC_ASSERT):
+`V86Gcap` (8460 バイト、`os32_kapi_shared.h`、並びは `platform/pc98/legacy/v86_gcap.c` の STATIC_ASSERT):
 
 | フィールド | 内容 |
 |---|---|
@@ -1494,7 +1497,7 @@ LBA28、無ければ word 53 bit0 の現在の CHS、それも無ければ既定
   変わらない)。`vfs_resolve_path` は長さ・成分数の超過を切り詰めず
   `VFS_ERR_NAMETOOLONG` で拒否する (詳細は [06_filesystem.md](06_filesystem.md) §6-1)。
   DB 側は解決前にも `db_resolve_fits` で長さと成分数を保守的に検査し、
-  超過や解決失敗は `SQLITE_CANTOPEN` で断る (`kapi/kapi_db.c:907`)。
+  超過や解決失敗は `SQLITE_CANTOPEN` で断る (`kapi/kapi_db.c`)。
   また `<絶対名>-journal` が下位層の path 容量 (`VFS_MAX_PATH` = 256B、SQLite の
   `mxPathname` も 256) に収まることを別に検査し、超過は open 前に
   `SQLITE_CANTOPEN` で断る。RW は `PRAGMA journal_mode` が `delete` で
@@ -1594,7 +1597,8 @@ CPL=3 は生成 wrap が全出力範囲を検査してから target を呼ぶ。
 物理番地・kernel ポインタ・cache 指定は公開しない。base/planes は呼び手の lease VA。
 公開 role/backend/access/format の `OS32_SURFACE_*` 定数は kernel と静的照合する。
 backend は PC98=1、PEGC=2、CIRRUS=3、GEFORCE=4、TRIDENT=5 (`OS32_SURFACE_TRIDENT`)。
-TRIDENT は番号だけの追加で構造体・スロットを変えないため、§3-2 の番号追加と同じく版数を据え置く。
+OF_FB=6 (`OS32_SURFACE_OF_FB`) を末尾に追加する。
+TRIDENT・OF_FB は番号だけの追加で構造体・スロットを変えないため、§3-2 の番号追加と同じく版数を据え置く。
 `OS32_PAGE_SIZE=4096`、`OS32_SHM_BLOCK_SIZE=16384` も kernel と静的照合する。
 
 - `surface_query`: 初期化済みの選択 backend の値 snapshot を返す。lease は増やさない。
@@ -1719,8 +1723,8 @@ ver / About 用に、実行中カーネルの版・装置の保存値・識別�
 - `ime_dict_info` (slot 256 / 0x408): 選択中のシステム辞書のメタ情報 20 キー (`IME_DICT_INFO_*`) を
   UTF-8 の文字列で `offset` から最大 `capacity - 1` byte 写す (NUL 込み、`IME_DICT_INFO_CAP` = 256 を
   超える capacity は 256 として扱う)。戻り = 写した byte 数 (0 = 終わり) / `NOSYS` (FEP なし) /
-  `AGAIN` (辞書なし) / `INVAL` / `NOTFOUND` (未収録) / `IO` / `STALE`。FEP 部品の ops slot 21 (`dict_info`、
-  `FEP_MODULE_OPS_VERSION` 2) へ渡す。正典は [DICT_META_DESIGN](decisions/fep/DICT_META_DESIGN.md) の追記 (確定 A1〜A6)。
+  `AGAIN` (辞書なし) / `INVAL` / `NOTFOUND` (未収録) / `IO` / `STALE` / `BUSY` (接続の隔離)。FEP 部品の ops slot 21 (`dict_info`、
+  `FEP_MODULE_OPS_VERSION` 4) へ渡す。正典は [ime_dict_info の設計](design/kernel/ime/ime_dict_info.md)。
   起動結線後、STATUS は検査済みの形式 1 で `meta`、旧形式で `legacy`、辞書なしで `unloaded`。
   先行実装の `metadata-unavailable` は返さない。旧形式でも FORMAT_VERSION=0、DICT_ID、
   POS_TABLE_VERSION、COST_SCALE、MEM_RESERVE_KB=192、CACHE_PAGES=16 と固定パスの VARIANT は
@@ -1747,13 +1751,13 @@ ver / About 用に、実行中カーネルの版・装置の保存値・識別�
 呼び手の書込み範囲を検査し、カーネルの一時 `HostNotice` へ stage、copyout が成功した後、
 同じ世代・serial だけ commit する。不正な CPL3 ポインタと copyout 失敗は通知を消費しない。
 `host_notice_serial` は最新の投入通番を非消費で返す (初期値 0)。
-契約の正典は [NET_HOSTSVC_DESIGN](decisions/network/NET_HOSTSVC_DESIGN.md) §7・追記 #4。
+契約の正典は [net/host_mailbox](design/net/host_mailbox.md)「取り出す」。
 B5 (gshell) と SDK の利用側は別段。今回、新 API を呼ぶ既存アプリはないため、
 `build/app.conf` の要求版は据え置く。利用側を接続する段で v82 以上へ上げる。
 
 ### 予約スロット (v63〜)
 
-0x498〜0x4B4 (slot 292〜299、8 本、v84 時点) は `kapi_reserved[]`。関数を足すと先頭から使う
+0x4B0〜0x4B4 (slot 298〜299、2 本、v87 時点) は `kapi_reserved[]`。関数を足すと先頭から使う
 (§4-0)。カーネルの表は `kapi_reserved_nosys` (`OS32_ERR_NOSYS`)、トランポリンは
 int 0x80 のスタブで、CPL=3 からの呼び出しはアプリを kill する。
 
@@ -2062,7 +2066,7 @@ slot 249。ひらがな U+3041..3093 とカタカナ U+30A1..30F6 は算術変�
 (kernel owner の使用頁 +7、空き −7、`other` へ重複加算しない)。
 
 **読込順序と失敗** (`kernel/console/unicode_file.c` の `unicode_file_load`):
-- 呼出しは `init/kernel.c` の初期自己試験の終了直後。root mount・paging・memory_boot_init・初期試験に
+- 呼出しは `platform/pc98/kernel.c` の初期自己試験の終了直後。root mount・paging・memory_boot_init・初期試験に
   よる再初期化が済み、`kaudit_boot_pages`・KAPI 構築 `exec_init`・IME より前。ここまでの起動表示は
   ASCII とし、日本語の最初の描画・外部 KAPI 呼出しの前に成否を確定する。
 - `vfs_stat` で長さ 28,252 B を確認し、確保した頁へ `vfs_read`、返却長も一致することを確認する。
@@ -2161,6 +2165,12 @@ private import 表は `kernel/module/kdebug_imports.def` が正で、317 件
 | 0x48C | gfx2_cursor_show | `int(u32 a, u32 head, u32 show)` |
 | 0x490 | gfx2_dpms | `int(u32 a, u32 head, u32 state)` |
 | 0x494 | gfx2_present | `int(u32 a, u32 head, i16 x, i16 y, u16 w, u16 h)` |
+| 0x498 | con_sink_capture | `int(u32 op)` |
+| 0x49C | boot_token_get | `void(u8 *out)` |
+| 0x4A0 | io_policy_set | `int(const void *bytes, unsigned int len)` |
+| 0x4A4 | io_policy_get | `int(void *bytes, unsigned int cap, unsigned int *needed)` |
+| 0x4A8 | io_policy_reset | `int(void)` |
+| 0x4AC | io_pump | `int(unsigned int budget_us)` |
 
 slot 253。kdebug 部品 (`/boot/kdebug.bin`、`KDEBUG=1` のときだけ読む) の ops slot 19
 `dbg_call` へそのまま渡す受け口 (`kernel/module/kdebug_call.c`)。部品が動いていない・slot 19 が
@@ -2168,3 +2178,13 @@ slot 253。kdebug 部品 (`/boot/kdebug.bin`、`KDEBUG=1` のときだけ読む)
 op は `KDEBUG_OP_*` (`os32_kapi_shared.h`)、peek の要求は `KdebugPeek` (1064 バイト、
 LAN の欄 flags / tag / dst を含む最終形)。以後の kdebug コマンドはこの 1 本に載せる。
 peek のゲスト側の構文は [07_shell.md](07_shell.md)、ホスト側の採取と照合は [rshell_peek.py](../tools/rshell_peek.py) 冒頭(設計の記録は `docs/archive/v3/TASK_KPEEK.md`)。
+
+### I/O policy と pump (v87)
+
+slot 294〜297。設定は IOT1 の LE byte 列で、公開構造体への cast はしない。
+`io_policy_get` は必要長を返し、容量不足は FULL、部分コピーなし。
+4 口とも FG1 限定、IRQ・例外・排他中は BUSY。pump は予算 0 で INVAL、
+上限 500µs に丸めて 1 巡回し callback 数を返す。時計未提供は NOSYS。
+owner は資源 owner のアプリ ID。通常アプリは AS 生存世代、常駐シェルは
+shell 登録世代を既存の寿命 token として使い、AS 破棄前の共通回収で復元する。
+公開引数は既存 C89 基本型、エラーは既存 OS32_ERR_* を共用する。

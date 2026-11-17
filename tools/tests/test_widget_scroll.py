@@ -8,7 +8,9 @@ CHECK = dict(name='widget-scroll-host', tier=1,
             'userland/rust/filer/src/lib.rs', 'userland/rust/libos32gui/src/shlib.rs',
             'userland/rust/libos32gui_stub/src/widget.rs', 'userland/rust/libos32gui_stub/src/scroll.rs',
             'sdk/rust/os32api/src/**'],
-    needs=[], budget=12.0)
+    needs=[], budget=12.0,
+    kind='characterization',
+)
 import argparse
 from pathlib import Path
 import subprocess

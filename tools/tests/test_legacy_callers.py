@@ -1,12 +1,14 @@
 """Optional legacy provider links and genuine caller admission/unwind slices."""
 CHECK = dict(name='legacy-callers-host', tier=1,
-    covers=['include/legacy_lowmap.h', 'mm/paging_lowmap.inc', 'include/legacy_guest.h', 'arch/x86/**', 'platform/pc98/**', 'exec/*.h', 'mm/*.h',
+    covers=['mm/paging_lowmap.h', 'mm/paging_lowmap.inc', 'include/legacy_guest.h', 'arch/x86/**', 'platform/pc98/**', 'exec/*.h', 'mm/*.h',
             'kernel/v86/*.h', 'kernel/module/*.h', 'platform/none/legacy_guest.c',
             'exec/exec_*.inc', 'exec/lease.c', 'kernel/kaudit.c', 'kernel/console/console.c',
             'tools/tests/legacy_callers_host.c', 'tools/tests/legacy_guest_fake.h',
             'tools/tests/test_legacy_callers.py', 'tools/tests/kernel_includes.py',
             'tools/tests/host32.py', 'include/**', 'sdk/include/os32/**'],
-    needs=[], budget=2.9)
+    needs=[], budget=2.9,
+    basis=['PPC_SEP3_DESIGN §2', 'ARCH_COMPAT_CONTRACT', 'KAPI_SPEC'],
+)
 from pathlib import Path
 import subprocess
 import sys
@@ -41,7 +43,7 @@ def sources():
                    'console_hw_cursor_enable', 'console_text_gdc_stop']) +
         function(read('exec/lease.c'), 'lease_audit_all') +
         function(read('kernel/kaudit.c'), 'kselftest_run_audit'),
-        on=read('arch/x86/legacy/guest.c') + function(read('arch/x86/legacy/lowmap.c'), 'legacy_lowmap_busy'), off=read('platform/none/legacy_guest.c'))
+        on=read('platform/pc98/legacy/guest.c') + function(read('platform/pc98/legacy/lowmap.c'), 'legacy_lowmap_busy'), off=read('platform/none/legacy_guest.c'))
 
 MUTANTS = [
     ('on', 'return v86_session.open;', 'return v86_is_active();', 'open-independent'),

@@ -13,7 +13,9 @@ CHECK = dict(name='sqlite-product-sql', tier=1, needs=[], budget=21.2,
             'assets/settings/defaults.tsv',
             'lib/sqlite3/sqlite3.c', 'lib/sqlite3/sqlite3.h',
             'lib/sqlite3/os32_sqlite_config.h', 'userland/**',
-            'kernel/sqlite_engine.c', 'kernel/ime/ime_*.c', 'kapi/kapi_db.c'])
+            'kernel/sqlite_engine.c', 'kernel/ime/ime_*.c', 'kapi/kapi_db.c'],
+    kind='characterization',
+)
 import argparse
 import ast
 import ctypes as C

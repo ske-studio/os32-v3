@@ -13,6 +13,34 @@
 ## 0. 読み方
 
 <!-- manual:intro -->
+### CHECK の宣言
+
+期待を決める規則は [POLICY_DEV §6](POLICY_DEV.md#6-検証) が正典。
+`tools/checks/run.py --lint` は宣言の型と `pins` の ID を検査する。
+
+| 欄 | 型・既定値 | 意味 |
+|---|---|---|
+| `basis` | 空でない文字列の list、既定 `[]` | 期待の出所となる設計の ID (例 `['AC-CTX-1', 'IO_TIER_DESIGN §4']`)。契約の試験に書く |
+| `kind` | `'contract'` / `'characterization'` | `basis` が空でなければ既定は `contract`。現状の記録には `characterization` を明記する |
+| `env` | 空でない文字列の list、既定 `[]` | 実行環境。許可値は `ppc-cross` (PowerPC toolchain)、`qemu-ppc` (PowerPC QEMU/OpenBIOS)、`socket` (host socket)。未知の値はエラー |
+| `env_limit` | 文字列、省略可 | この環境で出せない故障の型 (例「host の偽 MMIO、posted write は見えない」) |
+| `pins` | 空でない文字列の list、既定 `[]` | 固定している欠陥を変える設計の ID。現行の `docs/` 本文に存在すること (archive・hw は対象外) |
+| `full_only` | bool、既定 `False` | `True` は `make check-fast` と静的 CI (`check.yml`) から外す。CI の build の `make check` は回す |
+
+`basis` が空で `kind` も無い宣言は lint の error とし、件数を表示する。
+`kind='contract'` だけでは期待の出所にならないので、契約には `basis` を書く。
+
+`full_only` とそれを前提にする検査は、`CHECK_ROUTINE=1` の list・make 登録・実行から除外する。
+`make check-fast` と静的 CI (`check.yml`) がこの指定を使い、シャードの前提の準備から除外する。
+`make check` と明示的な `make check-<名前>` は通常どおり実行する (`CHECK_ROUTINE` 未指定時)。
+`--list` と `--run` は `--env VALUE` (すべて含む)・`--exclude-env VALUE` (いずれも含まない) で環境を選べる。両方とも複数指定可。
+`qemu-ppc` の包みは check.yml の ppc-qemu が full_only 込み・変異ありで回す。
+
+例: `MUTATE=1 python3 -B tools/checks/run.py --run all --env ppc-cross --exclude-env qemu-ppc`。
+`all` は全登録検査から選び、`CHECK_ROUTINE=1` を外すと `full_only` も含む。`needs` の前提は通常どおり準備する。
+既存の `tier=4` は変更選択時だけの指定で、`check-fast` の対象からは外れない。
+この段では既存試験の分類と配置は一括変更しない。
+
 ### 表が言えること / 言えないこと
 
 表は `build/*.mk` と試験スクリプトから**機械で読める事実だけ**を出す。次の 3 つは
@@ -76,7 +104,7 @@ CI の静的ゲート (`.github/workflows/check.yml`、os32-v3 で 2026-09-30 �
 生成表 (`build/out/TESTS.md`) の「CI ○」の `make <target>` (yml の行から生成) と、CI 専用の「生成物が `sdk/kapi.json` と
 一致するか」(`gen_kapi.py` / `kapi_rust_gen.py` を回して `git diff --exit-code` で 5 ファイル)。
 クロスコンパイラと rustc が無い状態で rc=0 になる検査だけを載せているので、末尾で `i386-elf-gcc` を
-使うホスト試験と rustc が要るものは本体ビルドの `build.yml` の `make check-fast` が回す
+使うホスト試験と rustc が要るものは本体ビルドの `build.yml` の `make check` が回す
 ([08_build.md §8-6](08_build.md))。**`check.yml` の成功を GUI やカーネルの動作確認とは扱わない**。
 <!-- /manual:outside -->
 
@@ -89,8 +117,8 @@ CI の静的ゲート (`.github/workflows/check.yml`、os32-v3 で 2026-09-30 �
 | 今も残る項目 | 現行コードで確認した状態 |
 |---|---|
 | b2 | `build/checks.d/check-privileged.mk:5` は `--strict` を付けず、findings があっても失敗しない。ゲート化の扱いは未決。 |
-| c3 / d1 | `tools/tests/test_hsync_protect.py:10` のとおり、`hsync` の inode 比較はコンパイル確認だけで、動作を検査しない。 |
-| R1 | `tools/tests/multiapp_model_host.c:6` の純粋な模型が残り、実物ソースの状態遷移を試験していない。 |
+| c3 / d1 | `tools/tests/test_hsync_protect.py` のとおり、`hsync` の inode 比較はコンパイル確認だけで、動作を検査しない。 |
+| R1 | `tools/tests/multiapp_model_host.c` の純粋な模型が残り、実物ソースの状態遷移を試験していない。 |
 
 2026-09-14 の分類・改善案 R1〜R12・未読記録の経緯: `docs/archive/TEST_INVENTORY_2026-09-14.md` §2〜§4。
 今も残る項目は上の表だけ。たとえば R8 の再構築試験は

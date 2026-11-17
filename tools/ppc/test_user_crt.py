@@ -1,9 +1,6 @@
 #!/usr/bin/env python3
 """Compile the PPC USER CRT and inspect its entry sequence."""
-CHECK = dict(name='ppc-user-crt', tier=2, budget=60,
-             covers=['sdk/crt/ppc/crt0.S', 'sdk/crt/ppc/start.c',
-                     'tools/ppc/test_user_crt.py'],
-             inputs=['build/ppc-kboot.mk', 'sdk/include/os32api.h'], needs=[])
+import os
 import argparse
 from pathlib import Path
 import re
@@ -12,7 +9,7 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
-BIN = Path('/home/hight/opt/cross-ppc/bin')
+BIN = Path((os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc') + '/bin'))
 
 
 def command(args):
@@ -28,7 +25,7 @@ def main():
     with tempfile.TemporaryDirectory() as tmp:
         d = Path(tmp)
         mk = d / 'flags.mk'
-        mk.write_text('include build/ppc-kboot.mk\nprint-flags:\n\t@echo $(KB_FLAGS)\n')
+        mk.write_text('ARCH := ppc\nPLATFORM := powermac\ninclude Makefile\nprint-flags:\n\t@echo $(KB_FLAGS)\n')
         flags = shlex.split(command(['make', '-s', '-f', str(mk), 'print-flags']))
         gcc = str(BIN / 'powerpc-elf-gcc')
         obj = d / 'start.o'

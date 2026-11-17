@@ -22,34 +22,65 @@ def check(root):
         root, ['-f', 'build/geforce-module.mk'])['GEFORCE_DISPLAY_STATE_SOURCES']
     for name, value in expected.items():
         assert actual[name] == value, name
+    assert not any('platform/powermac/hostfs' in name for name in actual['C_KERNEL'])
     c = query(root, ['KSTRING_C_SRC=lib/kstring_c.c'])['C_KERNEL']
     assert c.count('lib/kstring_c.c') == 1
     assert c.index('lib/kstring_c.c') == c.index('lib/divdi3.c') + 1
+    # Top-level ARCH=ppc selects the product default image (kboot-link) from the same owner sets.
     ppc = query(root, ['ARCH=ppc', 'PLATFORM=powermac'], config_only=True)
-    assert ppc['C_KERNEL'].count('lib/kstring_c.c') == 1
-    assert not ppc['ASM_KERNEL']
-    assert ppc['GAS_KERNEL'] == ['arch/ppc/entry.S', 'arch/ppc/ofw_note.S']
-    assert 'drivers/video/geforce/gf_wc.c' in ppc['C_KERNEL']
-    assert 'arch/ppc/video_wc.c' in ppc['C_KERNEL']
-    for name in ppc['C_KERNEL'] + ppc['KERNEL_SRC_DIRS']:
-        # D1 compiles GPU applicability with the no-WC PPC provider.
-        if name == 'drivers/video/geforce/gf_wc.c':
-            continue
-        assert not any(x in name for x in ('arch/x86', 'platform/pc98', 'kernel/v86', 'drivers/video/geforce')), name
-    assert 'drivers/base' in ppc['KERNEL_SRC_DIRS']
-    assert 'exec/ring3_ls.c' in ppc['C_KERNEL']
+    link = json.loads((ROOT / 'tools/tests/fixtures/build_profile_ppc.json').read_text())['link']
+    assert ppc['C_KERNEL'] == link['KB_C'] and ppc['GAS_KERNEL'] == link['KB_ASM'] and not ppc['ASM_KERNEL']
+    assert 'exec/ring3_ls.c' in actual['C_KERNEL']
     assert actual['C_KERNEL'].index('exec/ring3_ls.c') == expected['C_KERNEL'].index('exec/ring3_ls.c')
     off = query(root, ['FEATURE_' + name + '=0' for name in FEATURES], config_only=True)
     assert not any(path in name for name in off['C_KERNEL'] for path in
-                   ('kernel/v86/', 'arch/x86/legacy/', 'platform/pc98/legacy/'))
+                   ('kernel/v86/', 'platform/pc98/legacy/'))
     assert not any('geforce/' in name for name in off['C_KERNEL'])
-    for assignments in (['FEATURE_UNKNOWN=1'], ['ARCH=ppc','PLATFORM=powermac','FEATURE_V86=1'], ['FEATURE_KDEBUG=0']):
+    for assignments in (['FEATURE_UNKNOWN=1'], ['ARCH=ppc','PLATFORM=powermac','FEATURE_V86=1'], ['FEATURE_KDEBUG=0'],
+                        ['FEATURE_LINK=0'], ['IMAGE=kboot-link'], ['IMAGE=unknown'],
+                        ['ARCH=ppc', 'PLATFORM=powermac', 'IMAGE=pc98']):
         try:
             query(root, assignments, config_only=True)
         except subprocess.CalledProcessError:
             pass
         else:
             raise AssertionError(assignments)
+
+
+KBOOT_QUERY = ('.PHONY: kboot-query\nkboot-query:\n'
+               '\t@echo "KB_ASM=$(KB_ASM)"\n\t@echo "KB_C=$(KB_C)"\n\t@echo "KB_OUT=$(KB_OUT)"\n')
+
+
+def copy_kboot_names(root):
+    # Wildcards in the kboot owner sets and link order need only the file names.
+    for pattern in ('exec/*.c', 'arch/ppc/exec_*.c', 'drivers/usb/*.c'):
+        for source in ROOT.glob(pattern):
+            target = root / source.relative_to(ROOT)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.touch()
+
+
+def check_kboot(root):
+    """Every PowerPC image selects exactly the pinned sources, in owner-set order (no link-order list)."""
+    expected = json.loads((ROOT / 'tools/tests/fixtures/build_profile_ppc.json').read_text())
+    (root / 'kboot-query.mk').write_text(KBOOT_QUERY)
+    command = ['make', '-s', '-f', 'build/config.mk', '-f', 'build/targets/ppc-powermac.mk', '-f', 'kboot-query.mk',
+               'ARCH=ppc', 'PLATFORM=powermac']
+    for name, image in expected.items():
+        # 像は旗でも名前でも選べる (build/images/ppc-flags.mk)。NEGATIVE の像は旗だけ。
+        selectors = [image['flags']] + ([] if 'NEGATIVE=1' in image['flags'] else [['IMAGE=kboot-' + name]])
+        for selector in selectors:
+            out = subprocess.check_output([*command, *selector, 'kboot-query'], cwd=root, text=True,
+                                          stderr=subprocess.PIPE)
+            actual = dict(line.split('=', 1) for line in out.splitlines() if line.startswith('KB_'))
+            assert actual['KB_OUT'] == image['KB_OUT'], (name, selector)
+            for key in ('KB_ASM', 'KB_C'):
+                assert actual[key].split() == image[key], (name, key, selector)
+    # 名前と旗の両方を与えて食い違えば止まる。合っていれば通る。
+    assert subprocess.run([*command, 'IMAGE=kboot-core', 'KBOOT_SH=1', 'kboot-query'], cwd=root,
+                          capture_output=True).returncode != 0
+    assert subprocess.run([*command, 'IMAGE=kboot-sh', 'KBOOT_SH=1', 'KBOOT_LINK=0', 'kboot-query'], cwd=root,
+                          capture_output=True).returncode == 0
 
 
 def check_user_selection(root):
@@ -99,7 +130,36 @@ if __name__ == '__main__':
         # No libgcc invocation is allowed by these query-only tests.
         check(root)
         check_user_selection(root)
+        copy_kboot_names(root)
+        check_kboot(root)
         if args.mutate:
+            for path, anchor, mutant, expected, label in (
+                    ('build/platform/powermac.mk', 'platform/powermac/rh_observe.c platform/powermac/ofw.c',
+                     'platform/powermac/ofw.c platform/powermac/rh_observe.c',
+                     AssertionError, 'reordered kboot sources'),
+                    ('build/platform/powermac.mk', ' platform/powermac/nic_gem.c', '',
+                     AssertionError, 'dropped kboot owner entry'),
+                    ('build/sources/common.mk', 'C_COMMON_CLI = kernel/cli/resident_cli.c',
+                     'C_COMMON_CLI = kernel/cli/resident_cli.c kernel/cli/unordered.c',
+                     AssertionError, 'kboot source added to an owner set'),
+                    ('build/images/kboot-link.mk', 'FEATURE_LINK = 1', 'FEATURE_LINK = 0',
+                     AssertionError, 'kboot image feature value'),
+                    ('build/images/ppc-flags.mk', 'KBOOT_SH := $(if $(filter kboot-sh kboot-link-sh,$(IMAGE)),1,0)',
+                     'KBOOT_SH := 0', subprocess.CalledProcessError, 'image name no longer sets its flags'),
+                    ('build/images/ppc-flags.mk', 'ifneq ($(IMAGE),$(KB_IMAGE))', 'ifneq ($(IMAGE),$(IMAGE))',
+                     AssertionError, 'image name and flags may disagree')):
+                target = root / path
+                source = target.read_text()
+                assert source.count(anchor) == 1, (path, anchor)
+                target.write_text(source.replace(anchor, mutant))
+                try:
+                    check_kboot(root)
+                except expected:
+                    print('RED: ' + label + ' rejected at runtime')
+                else:
+                    raise SystemExit(label + ' mutation survived')
+                target.write_text(source)
+            check_kboot(root)
             target = root / 'build/sdk-target.mk'
             source = target.read_text()
             anchor = '--make-user --root sdk'

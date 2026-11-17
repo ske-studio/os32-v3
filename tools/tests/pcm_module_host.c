@@ -222,3 +222,7 @@ const struct boot_common *boot_common_get(void) {
     info.image_valid = bi->img_valid; info.image_crc = bi->img_crc; info.image_size = bi->img_size;
     return &info;
 }
+
+/* Clock-independent registry fixture. */
+void tick_budget_begin(void) { }
+void tick_budget_end(void) { }

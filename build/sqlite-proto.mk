@@ -6,6 +6,8 @@ $(SQLITE_PROTO_GEN) &: tools/gen_sqlite_imports.py tools/gen_kdebug_imports.py t
 	python3 tools/gen_sqlite_imports.py --out-dir $(SQLITE_PROTO_OUT)
 
 SQLITE_PROTO_OBJS := $(addprefix $(SQLITE_PROTO_OUT)/,sqlite3.o os32_sqlite_vfs.o sqlite_module.o sqlite_import_slots.o sqlite_import_stubs.o kstring.o kstring_c.o kmath.o divdi3.o)
+SQLITE_SOFTFLOAT_OBJS := $(addprefix $(SQLITE_PROTO_OUT)/softfloat/,$(notdir $(SOFTFLOAT_SQLITE_SOURCES:.c=.o))) $(SQLITE_PROTO_OUT)/softfloat_abi.o
+SQLITE_PROTO_OBJS += $(SQLITE_SOFTFLOAT_OBJS)
 SQLITE_PROTO_INC := $(INC_SQLITE) -I. -I$(SQLITE_PROTO_OUT)
 $(SQLITE_PROTO_OUT)/sqlite3.o: lib/sqlite3/sqlite3.c lib/sqlite3/os32_sqlite_config.h build/config.mk build/sqlite-proto.mk
 	mkdir -p $(@D)
@@ -14,16 +16,21 @@ $(SQLITE_PROTO_OUT)/os32_sqlite_vfs.o: $(SQLITE_PROTO_OUT)/os32_sqlite_vfs.c $(S
 	$(CC) $(CFLAGS_SQLITE) -include lib/sqlite3/os32_sqlite_config.h $(SQLITE_PROTO_INC) -c $< -o $@
 $(SQLITE_PROTO_OUT)/sqlite_module.o: lib/sqlite3/os32_sqlite_module.c lib/sqlite3/os32_sqlite_vfs.h build/config.mk build/sqlite-proto.mk
 	mkdir -p $(@D)
-	$(CC) $(CFLAGS_BASE) -Os $(SQLITE_PROTO_INC) -c $< -o $@
+	$(CC) $(CFLAGS_BASE) $(SOFTFLOAT_FLAGS) -Os $(SQLITE_PROTO_INC) -c $< -o $@
 $(SQLITE_PROTO_OUT)/sqlite_import_slots.o $(SQLITE_PROTO_OUT)/sqlite_provider_types.o: $(SQLITE_PROTO_OUT)/%.o: $(SQLITE_PROTO_OUT)/%.c $(SQLITE_PROTO_OUT)/sqlite_imports.h build/config.mk build/sqlite-proto.mk
 	$(CC) $(CFLAGS_BASE) -Os -Werror $(SQLITE_PROTO_INC) -c $< -o $@
 $(SQLITE_PROTO_OUT)/sqlite_import_stubs.o: $(SQLITE_PROTO_OUT)/sqlite_import_stubs.S build/config.mk build/sqlite-proto.mk
 	$(CC) $(CFLAGS_MACHINE) -c $< -o $@
 $(SQLITE_PROTO_OUT)/kstring.o $(SQLITE_PROTO_OUT)/kstring_c.o $(SQLITE_PROTO_OUT)/kmath.o $(SQLITE_PROTO_OUT)/divdi3.o: $(SQLITE_PROTO_OUT)/%.o: lib/%.c build/config.mk build/sqlite-proto.mk
 	mkdir -p $(@D)
-	$(CC) $(CFLAGS_BASE) -Os $(INC_LIB) -c $< -o $@
+	$(CC) $(CFLAGS_BASE) $(SOFTFLOAT_FLAGS) -Os $(INC_LIB) -c $< -o $@
+$(SQLITE_PROTO_OUT)/softfloat/%.o: lib/softfloat/%.c build/softfloat.mk
+	mkdir -p $(@D)
+	$(CC) $(SOFTFLOAT_CFLAGS) -Ilib/softfloat -c $< -o $@
+$(SQLITE_PROTO_OUT)/softfloat_abi.o: lib/softfloat_abi.c build/softfloat.mk
+	$(CC) $(SOFTFLOAT_CFLAGS) -Ilib -c $< -o $@
 $(SQLITE_PROTO_OUT)/sqlite.elf: $(SQLITE_PROTO_OBJS) build/sqlite-module.ld sdk/link/generations.ld
-	$(MODULE_LD) $(MODULE_LDFLAGS) --emit-relocs -T build/sqlite-module.ld -Map=$(SQLITE_PROTO_OUT)/sqlite.map $(SQLITE_PROTO_OBJS) -o $@
+	$(MODULE_LD) $(MODULE_LDFLAGS) --gc-sections --undefined=sqlite_module_ops --emit-relocs -T build/sqlite-module.ld -Map=$(SQLITE_PROTO_OUT)/sqlite.map $(SQLITE_PROTO_OBJS) -o $@
 # Measurement consumes the already built VK32 without invoking its FORCE
 # relink (which would stale distribution hashes while host checks run).
 $(SQLITE_PROTO_OUT)/sqlite.bin: .FORCE $(SQLITE_PROTO_OUT)/sqlite.elf $(SQLITE_PROTO_OUT)/sqlite_imports.json tools/sqlite_module_proto.py tools/mkmod.py sdk/target_profile.py tools/module_schema.py sdk/kapi.json

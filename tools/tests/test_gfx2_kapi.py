@@ -3,7 +3,9 @@
 CHECK = dict(name='gfx2-kapi-host', tier=1, needs=[], budget=5,
     covers=['tools/tests/test_gfx2_kapi.py', 'tools/tests/host32.py',
             'sdk/kapi.json', 'kapi/kapi_generated.c',
-            'sdk/include/os32/os32_gfx2.h'])
+            'sdk/include/os32/os32_gfx2.h'],
+    basis=['HAL_V2_DESIGN §11-1', '[ABI]', 'KAPI_SPEC §3-1'],
+)
 import argparse
 import json
 from pathlib import Path

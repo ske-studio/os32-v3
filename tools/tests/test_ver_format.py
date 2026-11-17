@@ -4,7 +4,7 @@ from ver_test_utils import ROOT, arguments, execute, function
 
 
 def run(source, runner):
-    names = function((ROOT/'kernel/module/module.c').read_text(), 'const char *kdebug_state_name(')
+    names = function((ROOT/'kdebug/kdebug_module.c').read_text(), 'const char *kdebug_state_name(')
     try:
         return execute((ROOT/'tools/tests/ver_format_host.c').read_text(), runner,
                        {'ver_format_source.c': source, 'ver_state_source.c': names},
@@ -17,13 +17,20 @@ def run(source, runner):
 def main():
     args = arguments()
     source = (ROOT/'kernel/ver_format.c').read_text()
-    assert run(source, args.runner).returncode == 0
+    for define in ('', '#define OS32_X87_EMU_LINKED\n'):
+        assert run(define + source, args.runner).returncode == 0
     if args.mutate:
         old = 'if (s->boot.crc_valid) {'
         assert source.count(old) == 1
         result = run(source.replace(old, 'if (!s->boot.crc_valid) {'), args.runner)
         assert result.returncode == 1 and 'FAIL:' in result.stdout
         print('RED: crc_valid inverted')
+        old = '#ifdef OS32_X87_EMU_LINKED'
+        assert source.count(old) == 1
+        for define in ('', '#define OS32_X87_EMU_LINKED\n'):
+            result = run(define + source.replace(old, '#ifndef OS32_X87_EMU_LINKED'), args.runner)
+            assert result.returncode == 1 and 'FAIL:' in result.stdout
+        print('RED: emulator link flag inverted (both images)')
 
 
 if __name__ == '__main__':

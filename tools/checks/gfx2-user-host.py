@@ -8,7 +8,9 @@ CHECK = dict(name='gfx2-user-host', tier=1, needs=[], budget=10,
             'sdk/include/os32/os32_generations.h', 'sdk/include/os32/os32_surface.h',
             'sdk/include/os32/os32_ls.h', 'build/libs.mk',
             'tools/tests/gfx2_user_host.c', 'tools/tests/test_gfx2_user.py',
-            'tools/tests/host32.py'])
+            'tools/tests/host32.py'],
+    basis=['HAL_V2_DESIGN §3-3', 'HAL_V2_DESIGN §11-3', 'HAL_V2_DESIGN §13-1'],
+)
 
 
 def run(ctx):

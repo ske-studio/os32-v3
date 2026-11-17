@@ -45,7 +45,9 @@ CHECK = dict(name='gfx-geforce-policy-host', tier=1, needs=[], budget=15, covers
     'sdk/include/os32/os32_ls.h',
     'sdk/include/os32/os32_surface.h',
     'sdk/include/os32/os32_ver_info.h',
-    'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py'])
+    'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py'],
+    basis=['GFX_ACCEL_HAL_DESIGN §2', 'GFX_ACCEL_HAL_DESIGN §3-1', 'GFX_ACCEL_HAL_DESIGN §3-4'],
+)
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
     ('v2-lost', ' && !gf_v2_inst.lost;', ';'),

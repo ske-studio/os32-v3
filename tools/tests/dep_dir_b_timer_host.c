@@ -25,10 +25,12 @@ const u8 *v86_bios_real_lowmem(void)
 {
     clocks++; event('B', BIOS_WORK_SYSCLK, lowmem[BIOS_WORK_SYSCLK]); return lowmem;
 }
-static volatile u32 tick_storage;
-static volatile u32 *read_tick(void)
+int tick_clock_config(u32 num, u32 den)
+{ return num && den ? 0 : -1; }
+void tick_clock_raw(u32 *lo, u32 *hi)
 {
-    event('K', 0, tick_value); tick_storage = tick_value; return &tick_storage;
+    check(!enabled);
+    event('K', 0, tick_value); *lo = tick_value; *hi = 0;
 }
 void outp(unsigned int port, unsigned int value)
 {
@@ -57,10 +59,14 @@ void io_wait(void) { event('T', 0, 0); }
 void io_wait_n(int n) { event('T', 0, (unsigned int)n); }
 #include "clock_source.inc"
 #include "pit_source.inc"
-/* Instrument the real volatile tick read, after idt.h has declared its symbol. */
-#define tick_count (*read_tick())
+int pc98_tsc_init(void) { return -1; }
+int pc98_tsc_rate(u32 *m, u32 *s, u32 *g)
+{ (void)m; (void)s; (void)g; return OS32_ERR_NOSYS; }
+struct io_clock_ops;
+void io_clock_set_ops(const struct io_clock_ops *ops) { (void)ops; }
+int pc98_tsc_ready(void) { return 0; }
+int pc98_tsc_read_us(u32 *lo, u32 *hi) { (void)lo; (void)hi; return -1; }
 #include "ktime_source.inc"
-#undef tick_count
 static void samples(unsigned int p1, unsigned int count, unsigned int p2, unsigned int n)
 {
     unsigned int i;
@@ -93,7 +99,7 @@ void _start(void)
     check(sysclk_is_8mhz() == !!(TEST_CLOCK_BYTE & BIOS_SYSCLK_8MHZ));
     lowmem[BIOS_WORK_SYSCLK] ^= BIOS_SYSCLK_8MHZ;
     sysclk_detect(); check(clocks == 1 && sysclk_detected());
-    check(pit_init(PIT_HZ) == 0);
+    check(platform_clock_init(PIT_HZ) == 0);
     check(pit_get_setup()->period_us == 10000);
 #ifdef TEST_RETRY_VALUE
     /* Separate run keeps the captured L13 trace unchanged. Use hardware I/O
@@ -159,3 +165,5 @@ void _start(void)
     check(ktime_clamp_count > 0);
     finish(0);
 }
+
+void tick_budget_config(void) { } /* Clock caller fixture. */

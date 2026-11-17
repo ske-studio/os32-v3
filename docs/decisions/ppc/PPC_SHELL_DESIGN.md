@@ -12,17 +12,17 @@ S-A の詳細設計と S-B 以後の計画。ユーザー判断の未決は0件�
 
 |区分|確認結果・設計への反映|根拠|
 |---|---|---|
-|食い違い①|常駐 shell の待ちは `ime_getkey()`。丸ごとのリンクでは IME が入る|`userland/shell/ui.c:22–25,658`|
-|食い違い②|ISO の CD imports は `OS32_CD_MODULE` 時だけ。静的リンクでは imports 分離不要|`fs/isofs/iso9660.c:25–30`|
-|食い違い③|ISO mount は `VFS_DEV_CD` と `cdN` を使用。RAM Device 登録だけでは不足|`fs/isofs/iso9660.c:371–382`|
-|名前登録|名前表は差替え式。platform が cd・ram をまとめて登録する|`fs/vfs.c:373–399,427`|
-|既存方針との衝突|「S-A は③の USER 実装前、S-B は③」へ更新する|`docs/tasks/ppc/TASK_PPC_LAN.md:12–14`|
-|既存起動との衝突|x86 は root mount 後に外部常駐 shell を `exec_run()`。S-A は C 関数呼出し|`init/kernel.c:185,430`|
-|既存 UI との衝突|座標 console とは別に stream の口を追加する|`userland/shell/ui.c:120,133`、`kernel/console/console_backend.h:22–27`|
-|SDK の現状|PPC は SDK/layout 無効。既存 shell は i386 CRT・libc・PC98 区画処理をリンク|`sdk/target_profile.py:18–20`、`build/programs.mk:99–108`|
-|入力の現状|InputOps は19関数で NULL 検査なし。S-A の専用 getkey では登録不要|`include/input_service.h:10–31`、`kernel/input_service.c:52–70`|
-|実行形式|OS32X は LE 出力・native field 検証、ELF 読取りも LE 固定|`sdk/os32x_hdr.py:82–89,285`、`exec/os32x_hdr.c:9`|
-|時間の現状|ISO の tick 差は idle cache 破棄。固定 RAM の読取りの正しさに影響しない|`fs/isofs/iso9660.c:80–90`、`drivers/base/dev.c:353–358`|
+|食い違い①|常駐 shell の待ちは `ime_getkey()`。丸ごとのリンクでは IME が入る|`userland/shell/ui.c`|
+|食い違い②|ISO の CD imports は `OS32_CD_MODULE` 時だけ。静的リンクでは imports 分離不要|`fs/isofs/iso9660.c`|
+|食い違い③|ISO mount は `VFS_DEV_CD` と `cdN` を使用。RAM Device 登録だけでは不足|`fs/isofs/iso9660.c`|
+|名前登録|名前表は差替え式。platform が cd・ram をまとめて登録する|`fs/vfs.c` の `vfs_device_names_register()`|
+|既存方針との衝突|「S-A は③の USER 実装前、S-B は③」へ更新する|`docs/tasks/ppc/TASK_PPC_LAN.md`|
+|既存起動との衝突|x86 は root mount 後に外部常駐 shell を `exec_run()`。S-A は C 関数呼出し|`platform/pc98/kernel.c`|
+|既存 UI との衝突|座標 console とは別に stream の口を追加する|`userland/shell/ui.c` の `redraw_line()`、`kernel/console/console_backend.h`|
+|SDK の現状|PPC は SDK/layout 無効。既存 shell は i386 CRT・libc・PC98 区画処理をリンク|`sdk/target_profile.py`、`build/programs.mk`|
+|入力の現状|InputOps は19関数で NULL 検査なし。S-A の専用 getkey では登録不要|`include/input_service.h`、`kernel/input_service.c`|
+|実行形式|OS32X は LE 出力・native field 検証、ELF 読取りも LE 固定|`sdk/os32x_hdr.py`、`exec/os32x_hdr.c` の `os32x_layout_check()`|
+|時間の現状|ISO の tick 差は idle cache 破棄。固定 RAM の読取りの正しさに影響しない|`fs/isofs/iso9660.c`、`drivers/base/dev.c` の `dev_media_check()`|
 
 以下の新規関数・構造体は提案契約。既存宣言との一致を未確認の箇所まで主張しない。
 
@@ -46,7 +46,7 @@ kernel に入るまでに kernel・root の全量を RAM に写す。後から�
 |W4|USER ABI・SDK・exec 詳細設計|S-A 後、別の往復で詳細設計|大|
 |W5|USER 最小実装→外部 hello→終了→呼び手 (開発用 CLI) へ復帰|W4 後、複数波へ再分解|大|
 |W6|PC-98 FD loader から共通 RAM root へ接続|全量読込み・容量・boot 情報を別設計|中〜大|
-|W7|既存 OS32 shell を PPC USER の sh.bin として組み、製品の起動は root を mount した後 kernel が sh.bin を直接起動 (x86 の `init/kernel.c:430` と同じ形、小さな CLI を挟まない)|S-B 後。`SHELL_AS_APP` と USER 入出力を接続。前提: InputOps の登録 (19 本すべて) と USER の stdout を stream へ|大、再分解|
+|W7|既存 OS32 shell を PPC USER の sh.bin として組み、製品の起動は root を mount した後 kernel が sh.bin を直接起動 (x86 の `platform/pc98/kernel.c` と同じ形、小さな CLI を挟まない)|S-B 後。`SHELL_AS_APP` と USER 入出力を接続。前提: InputOps の登録 (19 本すべて) と USER の stdout を stream へ|大、再分解|
 |W8|書ける媒体を後から mount して保存|PPC は Host Services の LAN 版 `/host`、PC-98 は既存 FD/HDD/Host Services|輪郭のみ|
 |W9|docs/tasks/agents/PORT_FLOW.md に新しいアーキテクチャの立ち上げの順 (起動 → RAM root → 開発用の小さな CLI (resident_cli_ops をつなぐ) → USER アプリ → 本物のシェル) を短く足す|W7 後|小 (文書)|
 
@@ -56,7 +56,7 @@ kernel に入るまでに kernel・root の全量を RAM に写す。後から�
 - AS 切替、共有 kernel mapping、USER stack、fault 時の子だけの終了、資源回収も S-B に含む。
 - USER と必要なライブラリを soft-float/no-AltiVec で揃え、命令公開時の cache 同期を定義する。
 - OS32X の LE wire と CPU の BE を分離。ELF は EI_DATA に従い、CPU/ABI 識別を確定する。
-- `docs/09_exec.md:20,39–54,64` の親への復帰を維持。暫定保存域を ABI 承認としない。
+- `docs/09_exec.md` の親への復帰を維持。暫定保存域を ABI 承認としない。
 - ③の負債は `PPC_KBOOT_DESIGN.md:165,244–246`。S-A 完了を USER 基盤の完成とは数えない。
 - 製品の起動は小さな CLI を通らない。小さな CLI は KBOOT_SHELL=1 のときだけリンクされる開発用の経路 (新しいアーキテクチャの立ち上げ用)。`SHELL_AS_APP` は `kbd_getkey()` 経路を使う。
 - `/tmp` は揮発性。残す物は W8 の媒体へ書く。S-A に保存プロトコルを足さない。
@@ -103,7 +103,7 @@ void pm_term_tx_complete(void);           /* gem_tx受理後だけ除去 */
 - STATE は接続時と以後1秒ごと。最後の OUT 喪失も next_seq で分かるが、完全配送は保証しない。
 - **LOG と OUT は交互、空なら他方で計4試行まで。STATE は BEACON と同じく枠の外。TX AGAIN ならその回の送信列を終える。**
 - RX→RSP→LOG→BEACON に OUT/STATE を加える。入力は診断応答枠に依存させない。
-- `lan_service.c:86–89` の REQ 限定分岐を型別 dispatch に変更。`lan_monitor.c` は無変更。
+- `lan_service.c` の `receive()` の REQ 限定分岐を型別 dispatch に変更。`lan_monitor.c` は無変更。
 
 ### 4. ホスト・入力待ち・stream・ESCC
 
@@ -149,14 +149,14 @@ static int terminal_getkey(void) {
 |FD 再利用|FD は運搬媒体、RAM 内 ISO を読む|同様。運搬媒体と root の FS は別でよい|
 |判断|S-A の実装量が小さいため採用|FD 全体容量が制約になった時点で再比較|
 
-根拠：`iso9660_media.c:69–79,109–117`、`fatfs_vfs.c:20,595`、`diskio.c:24–25`。
+根拠：`iso9660_media.c` の `media_read()`、`fatfs_vfs.c`、`diskio.c:24–25`。
 
 ```c
 /* include/boot_root.h：呼び手がVFS初期化・名前登録済み */
 struct boot_root_image { const u8 *base; u32 bytes; };
 /* baseはplatformが予約・写像済み。起動中不変、解放しない。 */
 int boot_root_mount(const struct boot_root_image *image);
-/* drivers/block/ram_ro.h */
+/* kernel/dev/ram_ro.h */
 struct ram_ro { Device dev; const u8 *base; u32 bytes; };
 int ram_ro_register(struct ram_ro *, const struct boot_root_image *);
 int ram_ro_read(struct ram_ro *, u32 lba, u32 count, void *dst);
@@ -170,7 +170,7 @@ int ram_ro_read(struct ram_ro *, u32 lba, u32 count, void *dst);
 - **PPC は `dev_init()` を呼ばない**。同関数は fd0/fd1 を登録する。Device の初期表は BSS を使う。
 - 名前表は共通 boot_root.c に置かず、platform/powermac/root_boot.c が mount 前に登録する。
 - image 長は2048B整列。block read の LBA 範囲を境界で検査する。dev.h は変更しない。
-- cat は一括 VFS read を使う。`loop_dev.c:295,380` は file-backed なので root の下回りに使わない。
+- cat は一括 VFS read を使う。`loop_dev.c` の `loop_dev_attach()` は file-backed なので root の下回りに使わない。
 
 ### 6. image 作成・予約・受渡し
 
@@ -188,7 +188,7 @@ void pm_root_image(struct boot_root_image *out);
 ```
 
 - 最初は起動 ELF に同梱。OF が detach 前に全 ELF を読むため、起動後に媒体を読まない条件を満たす。
-- `kboot_reserve.c:45–55,69–70` の image 全体予約に blob を含める。複製・展開・別予約表は不要。
+- `kboot_reserve.c` の image 全体予約に blob を含める。複製・展開・別予約表は不要。
 - map で root の予約内収容、固定窓・arena との非衝突を確認。容量超過は PM が配置を再設計する。
 - kboot_reserve.c は原則無変更。memmap.h・config.h は変更しない。
 - 将来 OF 別読みを使う場合も、全量を予約済み RAM に読み、detach 前に受渡しを終えて kernel に入る。
@@ -296,13 +296,13 @@ VfsOps ramfs_ops = {
 |---|---|---|---:|
 |A01/W0|変更 platform/powermac/lan_boot.h|端末型・口|35|
 |A02/W0 †|新規 include/boot_root.h|呼び手の名前登録を含む契約|20|
-|A03/W0 †|新規 drivers/block/ram_ro.h|RAM Device 契約、A02|25|
+|A03/W0 †|新規 kernel/dev/ram_ro.h|RAM Device 契約、A02|25|
 |A04/W0 †|新規 kernel/console/console_stream.h|stream 契約|15|
 |A05/W0 †|新規 kernel/cli/resident_cli.h|CLI・cat・put 契約|30|
 |A06/W1|変更 platform/powermac/lan_wire.c|追加型 codec、A01|25〜50|
 |A07/W1|新規 platform/powermac/lan_terminal.c|端末世代・FIFO・統計|220〜280|
 |A08/W1|変更 tools/ppc_lan_host.py|端末モード・codec|140〜220|
-|A10/W1 †|新規 drivers/block/ram_ro.c|RO block、dev_register_cd|100〜160|
+|A10/W1 †|新規 kernel/dev/ram_ro.c|RO block、dev_register_cd|100〜160|
 |A11/W1|新規 tools/mkroot_image.py|image生成、空の/tmp、サイズ報告|60〜100|
 |A12/W1 †|新規 kernel/cli/resident_cli.c|行編集、3コマンド、echoの一形|200〜280|
 |C1/W1|既存 dev.c・iso9660.c の compile 確認|W2 前に PPC flags で試す。共通修正は出す前に本線通知|確認段|
@@ -315,8 +315,8 @@ VfsOps ramfs_ops = {
 |A21/W2|変更 arch/ppc/kernel.ld|section保持・symbol|10〜20|
 |A22a/W2|新規 platform/powermac/root_boot.c|名前の表の登録と mount の順 (root → /tmp)。常に組む|40〜70|
 |A22b/W2|新規 platform/powermac/cli_boot.c|resident_cli_ops の adapter (getkey・write・poll・cat・put)。KBOOT_SHELL=1 のときだけ組む|70〜110|
-|A23/W3|変更 build/ppc-kboot.mk|選択構成・blob・閉包リンク|50〜90|
-|A24/W3|変更 init/ppc_kernel.c|S-A 選択時の開始|10〜25|
+|A23/W3|変更 build/targets/ppc-powermac.mk|選択構成・blob・閉包リンク|50〜90|
+|A24/W3|変更 platform/powermac/ppc_kernel.c|S-A 選択時の開始|10〜25|
 |A25/W0 †|変更 fs/vfs.h|VFS_DEV_RAM 追加|1〜3|
 |A26/W0 †|新規 fs/ramfs/ramfs.h|上限・ops 宣言|20|
 |A27/W1 †|新規 fs/ramfs/ramfs.c|一階層ramfs、A25/A26|200〜300|
@@ -366,10 +366,10 @@ VfsOps ramfs_ops = {
 - W9 (PORT_FLOW の立ち上げの順) を足し、W7 に InputOps (19 本) と USER の stdout の前提を書いた。
 
 ## 確定の後の追記 1 (2026-11-11、本線の独立レビュー (PC-98 の FD 起動の観点、Opus) と段 C1 の結果を PM が反映。本文と食い違う所はこの節が優先)
-- **P1-1 cd0 を使わない**: PC-98 では root の mount が cd.mod より先で、RAM root が cd0 を取ると ATAPI が cd1 になり cdinst (userland/system/cdinst.c:33,37,115) と netcd (drivers/block/netcd.c:33,155) と kernel_mount_children が壊れる。→ PowerPC の S-A の暫定にも cd0 を使わない。RAM の装置は種別 `VFS_DEV_RAM` に揃え、名前の表の 1 行 `{"rd",VFS_NAME_DIGIT_PREFIX,VFS_DEV_RAM,0,2}` で `rd0` = RAM root (ISO9660)、`rd1` = /tmp の ramfs。ram_ro は `dev_register_cd` ではなく名前 `rd0` で dev_register する (§5 の P2-2 の形を置き換える)。iso9660_mount (fs/isofs/iso9660.c:377-381、今は VFS_DEV_CD と "cdN" の決め打ち) が `VFS_DEV_RAM` の `rdN` も受けるようにする段を足す (**★ x86 の生成物 (cd.mod) が変わる**、本線の受入が要る)。§8 の `{"ram",...}` の行と `ram0` は `rd1` に置き換える。
-- **P1-2 FS の登録は呼び手**: PC-98 では iso9660.o は cd.mod の中にしか無く (build/cd-module.mk:8-17)、root の mount の時点で "iso9660" は未登録。→ boot_root.h の前提条件に「呼び手が名前の表と FS (iso9660) を登録済み」を書く。§1 の食い違い② (静的リンクなら imports の分離は不要) は PowerPC だけの話。PC-98 で (a) ISO9660 を kernel に静的に入れ cd.mod は装置だけにするか (b) cd.mod が登録済みを受け入れるかは W6 で本線と決める。
-- **P2-1 FD ローダの上限 (W6)**: boot/loader_fat_new.asm:20-21 の MAX_IMAGE_SIZE は 508KiB (0x10000〜0x8EFFF、実モード)。今の vmkernel.lz4 は 293KiB で root の余りは約 215KiB。W6 の条件を「圧縮した kernel + root ≤ 508KiB、または実モードと PM を往復する bounce を設計 (64KB 境界の読み方は保つ、[HW2])」とする。
-- **P2-2 置き場 (W6)**: 低位は V86 が上書きする帯。選択肢は (A) kernel の ELF に同梱 (MEM_KERNEL_IMAGE_MAX の中、boot 情報の変更不要、P2-1 の制約を受ける) と (B) MEM_BOOT_BUNDLE (0x600000) を pgalloc の初期化直後に台帳で予約し P2V で 1 か所に集める (root の mount は init/kernel.c:185 で pgalloc の初期化より前なので順の変更を伴う)。
+- **P1-1 cd0 を使わない**: PC-98 では root の mount が cd.mod より先で、RAM root が cd0 を取ると ATAPI が cd1 になり cdinst (userland/system/cdinst.c) と netcd (drivers/block/netcd.c) と kernel_mount_children が壊れる。→ PowerPC の S-A の暫定にも cd0 を使わない。RAM の装置は種別 `VFS_DEV_RAM` に揃え、名前の表の 1 行 `{"rd",VFS_NAME_DIGIT_PREFIX,VFS_DEV_RAM,0,2}` で `rd0` = RAM root (ISO9660)、`rd1` = /tmp の ramfs。ram_ro は `dev_register_cd` ではなく名前 `rd0` で dev_register する (§5 の P2-2 の形を置き換える)。iso9660_mount (fs/isofs/iso9660.c、今は VFS_DEV_CD と "cdN" の決め打ち) が `VFS_DEV_RAM` の `rdN` も受けるようにする段を足す (**★ x86 の生成物 (cd.mod) が変わる**、本線の受入が要る)。§8 の `{"ram",...}` の行と `ram0` は `rd1` に置き換える。
+- **P1-2 FS の登録は呼び手**: PC-98 では iso9660.o は cd.mod の中にしか無く (build/cd-module.mk)、root の mount の時点で "iso9660" は未登録。→ boot_root.h の前提条件に「呼び手が名前の表と FS (iso9660) を登録済み」を書く。§1 の食い違い② (静的リンクなら imports の分離は不要) は PowerPC だけの話。PC-98 で (a) ISO9660 を kernel に静的に入れ cd.mod は装置だけにするか (b) cd.mod が登録済みを受け入れるかは W6 で本線と決める。
+- **P2-1 FD ローダの上限 (W6)**: boot/loader_fat_new.asm の MAX_IMAGE_SIZE は 508KiB (0x10000〜0x8EFFF、実モード)。今の vmkernel.lz4 は 293KiB で root の余りは約 215KiB。W6 の条件を「圧縮した kernel + root ≤ 508KiB、または実モードと PM を往復する bounce を設計 (64KB 境界の読み方は保つ、[HW2])」とする。
+- **P2-2 置き場 (W6)**: 低位は V86 が上書きする帯。選択肢は (A) kernel の ELF に同梱 (MEM_KERNEL_IMAGE_MAX の中、boot 情報の変更不要、P2-1 の制約を受ける) と (B) MEM_BOOT_BUNDLE (0x600000) を pgalloc の初期化直後に台帳で予約し P2V で 1 か所に集める (root の mount は platform/pc98/kernel.c で pgalloc の初期化より前なので順の変更を伴う)。
 - **P2-3 boot 情報 (W6)**: wire は 0x40 で空きは 4B (platform/pc98/bootinfo_wire.h)、版は一致しか見ない。(B) を採るなら「kernel は v2 と v3 の両方を受ける」と W6 で決める ((A) なら不要)。
 - **P3-1**: fs/vfs.h の 1 行は x86 の生成物を変えない見込みだが、新しいヘッダは HWDEV_HEADERS の wildcard と CHECK の covers に当たる。確認は CI の kernel.elf と kernel.map の比較で。
-- **段 C1 の結果 (PPC の KB_FLAGS で 5 TU を試した)**: vfs.c と dev.c は通る (dev.c の fdc・ide への参照は dev_init・dev_register_hdd・fd/hd の関数からだけで、PPC はそれらを呼ばないので gc-sections で落ちる見込み、A23 のリンクで確かめる)。fs/vfs_fd.c:821 の `attr` の未使用 (-Werror=unused-parameter) と、fs/isofs/iso9660.h:17 の `#include "atapi.h"` (ISO_RA_SECTORS = ATAPI_READ_MAX_SECTORS = 16 のためだけ) で止まる。→ 共通ファイルの小さい段 C2: vfs_fd.c に `(void)attr;`、iso9660.h は atapi.h を include せず `#define ISO_RA_SECTORS 16` (ATAPI の READ(10) の分割数と同じ値、関係はコメントに 1 行) にする (x86 の生成物は不変の見込み)。
+- **段 C1 の結果 (PPC の KB_FLAGS で 5 TU を試した)**: vfs.c と dev.c は通る (dev.c の fdc・ide への参照は dev_init・dev_register_hdd・fd/hd の関数からだけで、PPC はそれらを呼ばないので gc-sections で落ちる見込み、A23 のリンクで確かめる)。fs/vfs_fd.c の `attr` の未使用 (-Werror=unused-parameter) と、fs/isofs/iso9660.h の `#include "atapi.h"` (ISO_RA_SECTORS = ATAPI_READ_MAX_SECTORS = 16 のためだけ) で止まる。→ 共通ファイルの小さい段 C2: vfs_fd.c に `(void)attr;`、iso9660.h は atapi.h を include せず `#define ISO_RA_SECTORS 16` (ATAPI の READ(10) の分割数と同じ値、関係はコメントに 1 行) にする (x86 の生成物は不変の見込み)。

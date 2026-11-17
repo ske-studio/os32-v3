@@ -52,3 +52,13 @@ void hs_copyout_run_hook(void)
     copy_hook = 0;
     if (hook) hook();
 }
+
+/* These protocol fixtures register no cooperative device work. */
+volatile u32 kctx_irq_depth;
+void idle_work_run(void) { }
+
+/* Deterministic boot identity for the virtual guest. */
+void boot_token_get(u8 out[16])
+{
+    for (unsigned int i = 0; i < 16; ++i) out[i] = (u8)(i + 1);
+}

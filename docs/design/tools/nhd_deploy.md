@@ -8,11 +8,11 @@ NHD の ext2 区画を扱い、ファイルや起動部品を配備する。
 ## 落とし穴
 
 - **媒体配置**: 直接配置したデータが ext2 区画に重なるとスーパーブロックを壊す。
-  現行のカーネルと対の部品は ext2 の `/boot` に置く (`tools/nhd_deploy.py:712`)。
-  区画の開始と長さを媒体の区画表・ジオメトリと照合し、旧直接配置の空き量を上限に使わない (`tools/nhd_deploy.py:861`)。
+  現行のカーネルと対の部品は ext2 の `/boot` に置く (`tools/nhd_deploy.py`)。
+  区画の開始と長さを媒体の区画表・ジオメトリと照合し、旧直接配置の空き量を上限に使わない (`tools/nhd_deploy.py` の `plan_migrate_pt()`)。
   配置の直接試験は未確認。
 
 - **使用中の媒体**: NP21/W が NHD を開いていると配備が失敗し、古い像を起動しうる。
   停止してから配備し再起動後に `ver` と成果物を照合する。配備の失敗は終了コードで確認する。
-  `ensure_local_nhd` はローカル像の存在を確認するが、稼働中の全直接呼出しを拒否する仕組みではない (`tools/nhd_deploy.py:353`)。
-  配備失敗の回帰は `tools/tests/test_nhd_deploy_failure.py:107`。
+  `ensure_local_nhd` はローカル像の存在を確認するが、稼働中の全直接呼出しを拒否する仕組みではない (`tools/nhd_deploy.py`)。
+  配備失敗の回帰は `tools/tests/test_nhd_deploy_failure.py` の `test_enospc_is_not_reported_as_success()`。

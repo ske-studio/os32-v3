@@ -261,7 +261,7 @@ assertion `left == right` failed: 状態行が 1 本に連結されたまま
 | `open_wm_settings` の戻り値 | 見るようにした。偽なら `Req::Open` を保持して次の周回で開き直す (通知経路と同じ形)。現状 false に到達する反例は無いが、契約 R1 をコードで表した |
 | ホスト試験の不足 | **S20** を足した: (a) 保存時の `cfg_open` 負、(b) 予約〜消費の間に DB が非 OK へ変わる (`Open(1) → Close` だけで `begin` に進まない)、(c) 両キー変更で set が失敗 (**S5 で (c1) 1 本目 / (c2) 2 本目 に割った**)、(d) 時計だけの保存、(e) 両キーの保存順 (color → clock)、(f) 適用値と再読込値が違う組合せ (無編集の OK は書かない / 編集すれば再読込値からの差分を書く) |
 | S09b が実スケジューラ全体でない | そのまま。`op_wait` → park → `standalone_loop` の**制御の流れ**はカーネルの領分で、ホストの `exec_park` は longjmp できない (`mocks.rs` の注記どおり)。ここで見るのは WM の判断 (`should_park` / `pick` の門) に留める (**S5 でコメントをその範囲に限定した**) |
-| `gui_gate.py:198` の旧記述 | PM の担当ファイルなので触っていない |
+| `gui_gate.py` の `rshell_closed_fresh()` の旧記述 | PM の担当ファイルなので触っていない |
 
 ### 再実行 (GREEN)
 

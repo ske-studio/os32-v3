@@ -68,4 +68,4 @@ unresolved_count 非0の inventory は bind を拒否し、PLL 入口の NONE �
 
 ## SLIM_HWDEV_DESIGN
 
-- node_layout/node_write（recover.h:336–337）の保持ポインタ、recover.c:694のq-p->rulesは連続した従来配列を指すので意味が変わらない。
+- node_layout/node_write（recover.h）の保持ポインタ、recover.c:694のq-p->rulesは連続した従来配列を指すので意味が変わらない。

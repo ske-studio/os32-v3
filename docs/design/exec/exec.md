@@ -9,18 +9,18 @@
 
 - 呼出しをまたいで ESP などを呼出し側破壊レジスタだけに置くと復帰先のスタックが壊れる。
   現行の `exec_setjmp` は必要なレジスタと文脈の深さを保存し、`exec_longjmp` で復元する
-  (`arch/x86/kernel/setjmp.asm:30`, `arch/x86/kernel/setjmp.asm:55`)。
-  復帰後に使う文脈は呼出し前に控え、保存場所の寿命を守る (`exec/exec.c:347`)。
+  (`arch/x86/kernel/setjmp.asm`, `arch/x86/kernel/setjmp.asm`)。
+  復帰後に使う文脈は呼出し前に控え、保存場所の寿命を守る (`exec/exec.c`)。
   実行文脈の回帰は `tools/tests/test_exec_r1.py` で確認する。
 
 - 終了時に全 FD やパイプを回収すると、親や常駐処理の資源まで壊す。
-  `exec/exec.c:1054` は終了する owner の DB、FD、パイプを回収し、保護 FD を除外する。
+  `exec/exec.c` は終了する owner の DB、FD、パイプを回収し、保護 FD を除外する。
   DB の rollback に FD が要るため DB の回収を FD より先にする。
   所有者別回収は `tools/tests/test_owner_reclaim.py` で確認する。
 
 - syscall 中の WM の fault も、その syscall を出したアプリに帰属する。
   画面に例外が出ずアプリが消える場合、`fault_kill_count` とともに
-  `ring3_wm_fault_count` を確認する (`exec/exec.c:1508`)。
+  `ring3_wm_fault_count` を確認する (`exec/exec.c`)。
   WM 深さを消す前に後者を数える契約は `make check-ring3-guard-host` が検査する。
 
 ## 内部設計と契約 (D1)
@@ -37,10 +37,10 @@
 
   - **強制脱出 (CTRL+STOP・番犬・gfx 拒否) の契約**: IRQ が行うのは `abort_req` を立てること (要求) と、割り込まれた文脈が CPL=3 のときに**割り込みフレームを捨てて exec_run の復帰点へ制御を移すこと** (制御移譲) の 2 つだけ。AS の破棄・物理の返却・owner ごとの回収 (`exec_teardown_app`、`exec_reclaim_owned` → `pcm_reclaim` …) は、復帰点で IF=1 に戻してから **通常文脈** (§3-5-3) で行う。
 
-  1. **起動時に確保するのは最小量**: code/BSS・スタック (既定 256KB、OS32X ヘッダで可変)・ヘッダの `heap_size` 指定分 (未指定 = `MEM_EXEC_HEAP_MIN` 64KB、`memmap.h:434`)・shlib data の複製・PD/PT。これが取れなければ起動を拒否する。予算の決まったアプリ (ゲーム等) は `heap_size` で起動時に確保しきる — 旧 R2 の「起動時に確保しきる」はこの形として残る。
+  1. **起動時に確保するのは最小量**: code/BSS・スタック (既定 256KB、OS32X ヘッダで可変)・ヘッダの `heap_size` 指定分 (未指定 = `MEM_EXEC_HEAP_MIN` 64KB、`memmap.h`)・shlib data の複製・PD/PT。これが取れなければ起動を拒否する。予算の決まったアプリ (ゲーム等) は `heap_size` で起動時に確保しきる — 旧 R2 の「起動時に確保しきる」はこの形として残る。
 
 - execは「計算できるtrampアドレス」と「初期化済みring3_tramp_page」を区別する。
-- `exec/exec.c:510` のexec_tramp_page_addrはraw配列の整列番地を返す。初期化済み判定の代用は禁止。
+- `exec/exec.c` のexec_tramp_page_addrはraw配列の整列番地を返す。初期化済み判定の代用は禁止。
 
 exec/exec.c
 C3は外部プログラム向けで、この内部import用にkapi層や__cdeclを足さない。

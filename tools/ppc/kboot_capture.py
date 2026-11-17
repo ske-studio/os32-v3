@@ -14,7 +14,7 @@ import host32
 CHECK = dict(name='ppc-kboot-capture', tier=2, budget=60,
              covers=['platform/powermac/kboot_capture.c', 'platform/powermac/kboot_info.h',
                      'tools/ppc/kboot_capture.py', 'tools/ppc/kboot_capture_fake.c',
-                     'platform/powermac/ofw.h', 'platform/powermac/ppc_layout.h',
+                     'platform/powermac/ofw.h', 'platform/powermac/platform_of_layout.h',
                      'arch/ppc/ppc_boot.h', 'arch/ppc/ppc_pmap.h', 'arch/ppc/ppc_oea.h',
                      'include/types.h', 'include/callconv.h', 'lib/kstring.h',
                      'lib/kstring_c.c', 'tools/tests/host32.py'])
@@ -26,6 +26,8 @@ MUTATIONS = [
     ('ignore-hole', 'r.start<=out->v[kept-1].start+out->v[kept-1].size', '1'),
     ('cell-count', 'unsigned stride=(ac+sc)*PM_CELL_BYTES;', 'unsigned stride=2*PM_CELL_BYTES;'),
     ('overflow', 'size>0xffffffffUL-start', '0'),
+    ('empty-bank-fatal', 'if (!size) continue;', 'if (!size) fail("FAIL:KBOOT:MEMORY-OVERFLOW\\r\\n");'),
+    ('all-empty-accepted', 'if (!out->count) fail', 'if (0) fail'),
     ('limit-off-by-one', 'count>PM_REGION_COUNT', 'count>=PM_REGION_COUNT'),
     ('borrow-property', 'return &info;', 'return (const struct pm_kboot_info *)property;'),
     ('omit-gmac', 'info.gmac_rc = pm_gmac_capture(&info.gmac);', 'info.gmac_rc = LAN_ENODEV;'),

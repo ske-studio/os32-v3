@@ -22,6 +22,8 @@ import tempfile
 import time
 
 ROOT = Path(__file__).resolve().parents[2]
+# 次段で全 CHECK に出所を埋めた後、ここだけ True にして error にする。
+REQUIRE_EXPECTATION_SOURCE = True
 BASE_REFS = ("main", "origin/main", "feat/gui", "origin/feat/gui")
 IGNORE = ("docs/hw", "docs/hw/**", ".claude/**")
 # Build/toolchain inputs and infrastructure used across check recipes.
@@ -385,16 +387,23 @@ def compiler_headers(root, sources, inc_dirs):
     return frozenset(found)
 
 PATH_AUDIT_ALLOW = {
+    ("check-ppc-kboot-link", "tools/ppc/link_run.py"):
+        "recorded fixture predicates only; accept/main never read repository images",
+    ("check-ppc-kboot-link", "tools/ppc/run.py"):
+        "uses require and synthetic ELF only; build/static/qemu entry points never run",
+    ("check-ppc-link-sh", "tools/tests/test_ppc_link_sh.py"):
+        "make expansion compares image path names only; host fixtures live in TemporaryDirectory",
+    ("check-ppc-link-run-host", "tools/ppc/link_run.py"):
+        "offline predicates and pipe-only QMP probe; accept/main never run or read ELF images",
+    ("check-ppc-link-run-host", "tools/ppc/run.py"):
+        "only QMP and require are used; build/static/qemu entry points are never called",
     ("check-type-contract", "tools/tests/test_type_contract.py"):
         "recipe inventory and H5 artifacts use private TemporaryDirectory roots only",
     ("check-type-contract", "tools/build_compare.py"):
         "H5 calls compare on private fixture roots; snapshot/build main is never invoked",
-    ("check-ppc-selection-host", "tools/build_compare.py"):
-        "host test imports scanners only; snapshot/build entry point is never called",
     ("check-target-profile-host", "tools/gen_memmap.py"):
         "unsupported target is rejected before reading layout artifacts",
     "tools/tests/test_build_selection.py": "make fixture has a private build directory",
-    "tools/tests/test_ppc_selection.py": "private query/dry-run fixture; compiler is never executed",
     ("check-shell-service-host", "tools/tests/test_shell_service.py"):
         "build configuration is copied only for private query and host mutations",
 
@@ -429,6 +438,20 @@ PATH_AUDIT_ALLOW = {
         "fake guest replaces HTTP/time/screenshots; main's output directory is unused",
     ("check-key-inject-host", "tools/" + "gui_gate" + ".py"):
         "key expansion and mocked key sends only; main's output directory is unused",
+    ("check-ci-gate-host", "tools/ci/gate.py"):
+        "the host test calls pure functions on fake rows and logs; make and checks are never run",
+    ("check-ci-gate-host", "tools/tests/test_ci_gate.py"):
+        "fake logs live in TemporaryDirectory; repository artifacts are never read",
+    ("check-sep-identity-host", "tools/ci/sep_identity.py"):
+        "the host test calls pure functions on fake hashes; images are never built or read",
+    ("check-sep-identity-host", "tools/build_compare.py"):
+        "named only as the x86 comparison command; the host test never runs it",
+    ("check-sep-identity-host", "tools/tests/test_sep_identity.py"):
+        "fake objects live in TemporaryDirectory; repository artifacts are never read",
+    ("check-layers-host", "tools/check_layers.py"):
+        "the host test passes a private root; main's default root is unused",
+    ("check-layers-host", "tools/tests/test_layers.py"):
+        "fake .d files live in TemporaryDirectory; repository artifacts are never read",
     ("check-access-host", "tools/" + "h3_park_resume" + ".py"):
         "identity observer uses synthetic memory; main's ELF/map defaults are unused",
 }
@@ -569,6 +592,9 @@ def script_path_refs(text):
                 refs.add((line, path, dynamic))
     return sorted(refs)
 
+CHECK_ENVS = frozenset({"ppc-cross", "qemu-ppc", "socket"})
+
+
 @dataclass(frozen=True)
 class Check:
     name: str
@@ -579,6 +605,12 @@ class Check:
     needs: tuple[str, ...] = ()
     mutate_tier: int = 2
     weight: float | None = None
+    basis: tuple[str, ...] = ()
+    kind: str | None = None
+    env_limit: str | None = None
+    pins: tuple[str, ...] = ()
+    full_only: bool = False
+    env: tuple[str, ...] = ()
 
     @property
     def seconds(self):
@@ -674,7 +706,8 @@ def indexed_discover(root):
         data = json.loads(cache.read_text())
         if data["signature"] == signature:
             return {row["name"]: Check(**dict(row, covers=tuple(row["covers"]),
-                                             needs=tuple(row["needs"]))) for row in data["checks"]}
+                                             needs=tuple(row["needs"]),
+                                             env=tuple(row["env"]), basis=tuple(row["basis"]), pins=tuple(row["pins"]))) for row in data["checks"]}
     except (OSError, ValueError, TypeError, KeyError):
         pass
     checks = discover(root)
@@ -742,16 +775,25 @@ def discover(root: Path) -> dict[str, Check]:
             reject("CHECK values must be literal")
         if len(data) != len(node.keywords):
             reject("duplicate CHECK field")
-        allowed = {"name", "covers", "budget", "tier", "needs", "mutate_tier"}
+        allowed = {"name", "covers", "budget", "tier", "needs", "mutate_tier",
+                   "basis", "kind", "env_limit", "pins", "full_only", "env"}
         if set(data) - allowed or not {"name", "covers", "budget"} <= data.keys():
             reject("invalid CHECK fields")
         name = data["name"]
         if not isinstance(name, str) or not re.fullmatch(r"[a-z0-9][a-z0-9_-]*", name):
             reject("invalid name")
-        for field, default in (("covers", None), ("needs", [])):
+        for field, default in (("covers", None), ("needs", []), ("basis", []), ("pins", []), ("env", [])):
             value = data.get(field, default)
             if not isinstance(value, list) or not all(isinstance(s, str) and s for s in value):
                 reject(field + " must be list[str]")
+        if set(data.get("env", [])) - CHECK_ENVS:
+            reject("unknown env")
+        if "kind" in data and data["kind"] not in ("contract", "characterization"):
+            reject("invalid kind")
+        if "env_limit" in data and not isinstance(data["env_limit"], str):
+            reject("env_limit must be str")
+        if "full_only" in data and type(data["full_only"]) is not bool:
+            reject("full_only must be bool")
         for field, default, minimum in (("tier", 1, 0), ("mutate_tier", 2, 1)):
             value = data.get(field, default)
             if type(value) is not int or not minimum <= value <= 4:
@@ -773,7 +815,11 @@ def discover(root: Path) -> dict[str, Check]:
         if name in checks:
             reject("duplicate name: " + name)
         checks[name] = Check(name, rel, tuple(data["covers"]), float(data["budget"]),
-                             data.get("tier", 1), tuple(data.get("needs", [])), data.get("mutate_tier", 2))
+                             data.get("tier", 1), tuple(data.get("needs", [])), data.get("mutate_tier", 2),
+                             basis=tuple(data.get("basis", [])),
+                             kind=data.get("kind", "contract" if data.get("basis") else None),
+                             env_limit=data.get("env_limit"), pins=tuple(data.get("pins", [])),
+                             full_only=data.get("full_only", False), env=tuple(data.get("env", [])))
     weights = root / "tools/checks/weights.json"
     if weights.exists():
         for name, seconds in json.loads(weights.read_text())["seconds"].items():
@@ -1093,6 +1139,42 @@ def emit_shell(result: Plan) -> str:
 
 def lint(root, checks):
     errors = []
+    missing_source = sum(not c.basis and c.kind is None for c in checks.values())
+    if missing_source:
+        message = f"{missing_source} CHECK(s) without basis or kind"
+        if REQUIRE_EXPECTATION_SOURCE:
+            errors.append(message)
+        else:
+            print("warning: " + message, file=sys.stderr)
+    # 現行の設計だけを出所にする。archive と著作権物の hw は読まない。
+    pin_ids = {pin for c in checks.values() for pin in c.pins}
+    found_pins = set()
+    if pin_ids:
+        for path in (root / "docs").rglob("*"):
+            if not path.is_file() or path.relative_to(root / "docs").parts[0] in {"archive", "hw"}:
+                continue
+            content = path.read_text(encoding="utf-8", errors="replace")
+            found_pins.update(pin for pin in pin_ids if pin in content)
+    for c in checks.values():
+        for pin in c.pins:
+            if pin not in found_pins:
+                errors.append(c.name + ": pins ID not found in docs: " + pin)
+    # 期待の出所 (basis) は現行の文書を指す。アーカイブへ移した文書を出所にしない (読まれない置き場の
+    # 契約は確かめようが無い)。文書を移す時は、basis を今の仕様を持つ設計書へ付け替える。
+    docs = root / "docs"
+    archived = {p.stem for p in (docs / "archive").rglob("*.md")} if (docs / "archive").is_dir() else set()
+    current = {p.stem for p in docs.rglob("*.md")
+               if p.relative_to(docs).parts[0] not in {"archive", "hw"}} if docs.is_dir() else set()
+    for c in checks.values():
+        for item in c.basis:
+            if not isinstance(item, str) or not item.split():
+                continue
+            head = item.split()[0]
+            name = Path(head).stem if head.endswith(".md") else head.split("§")[0]
+            if head.startswith("docs/archive/") or (name in archived and name not in current):
+                errors.append(c.name + ": basis points to an archived document: " + item)
+            elif head.startswith("docs/") and head.endswith(".md") and not (root / head).is_file():
+                errors.append(c.name + ": basis document not found: " + item)
     snapshot = tracked(root)
     generated = set(KAPI_GENERATED) | {f for f in snapshot if "_generated." in Path(f).name
                 or "generations." in Path(f).name or "/generated/" in f}
@@ -1152,6 +1234,12 @@ def lint(root, checks):
 
 
 def run_one(check: Check, ctx: Context) -> int:
+    # Mixed host/PPC checks retain their host coverage when cross is optional.
+    if "ppc-cross" in check.env and os.environ.get("OS32_REQUIRE_PPC") == "1":
+        cross = Path(os.environ.get("PPC_CROSS_DIR", "/home/hight/opt/cross-ppc"))
+        if not (cross / "bin/powerpc-elf-gcc").is_file():
+            print("FAIL check-" + check.name + ": PPC toolchain unavailable", flush=True)
+            return 1
     spec = importlib.util.spec_from_file_location("_os32_check_" + check.name.replace("-", "_"), ctx.root / check.path)
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
@@ -1189,7 +1277,7 @@ def main(argv: list[str]) -> int:
     action.add_argument("--list", action="store_true")
     action.add_argument("--make", action="store_true", help="emit all make registration variables")
     action.add_argument("--select", action="store_true")
-    action.add_argument("--run", nargs="+")
+    action.add_argument("--run", nargs="+", help="check names or all (subject to environment filters)")
     action.add_argument("--lint", action="store_true")
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--needs", action="store_true", help="with --list: selected make prerequisites")
@@ -1198,17 +1286,27 @@ def main(argv: list[str]) -> int:
     source.add_argument("--base")
     source.add_argument("--files", nargs="*")
     parser.add_argument("--tier", type=int, choices=range(5), default=0)
+    parser.add_argument("--env", action="append", default=[], choices=sorted(CHECK_ENVS))
+    parser.add_argument("--exclude-env", action="append", default=[], choices=sorted(CHECK_ENVS))
     args = parser.parse_args(argv)
     try:
         checks = indexed_discover(ROOT) if args.list or args.make or args.run else discover(ROOT)
-        names = ordered(checks)
+        # check-fast と静的 CI は full_only とその利用者を回さない (build.yml の make check が回す)。
+        routine = os.environ.get("CHECK_ROUTINE") == "1" and (args.list or args.make or args.run)
+        eligible = {n: c for n, c in checks.items() if not routine or not any(
+            checks[dep].full_only for dep in closure(checks, (n,)))}
+        if (args.env or args.exclude_env) and not (args.list or args.run):
+            raise ValueError("environment filters require --list or --run")
+        eligible = {n: c for n, c in eligible.items()
+                    if set(args.env) <= set(c.env) and not set(args.exclude_env) & set(c.env)}
+        names = ordered(eligible)
         if args.shard is not None:
             if not (args.list or args.make) or not re.fullmatch(r"[0-9]+/[1-9][0-9]*", args.shard):
                 raise ValueError("--shard requires --list or --make and index/count")
             index, count = map(int, args.shard.split("/"))
             if index >= count:
                 raise ValueError("shard index must be less than count")
-            names = shards(checks, count)[index]
+            names = shards(eligible, count)[index]
         if args.needs and (not args.list or args.json):
             raise ValueError("--needs requires --list without --json")
         if args.make:
@@ -1233,9 +1331,10 @@ def main(argv: list[str]) -> int:
             print(f"check-changed: {result.mode}, tier {result.tier}, {len(result.stage)} checks", file=sys.stderr)
             print(emit_shell(result), end="")
             return 0
-        names = {n.removeprefix("check-") for n in args.run}
+        names = set(checks) if args.run == ["all"] else {n.removeprefix("check-") for n in args.run}
         if names - checks.keys():
             raise ValueError("unknown check: " + " ".join(sorted(names - checks.keys())))
+        names &= eligible.keys()
         child = os.environ.get("CHECK_TIME_CHILD") == "1"
         stage = ordered(checks, names) if child else closure(checks, names)
         needs = () if child or os.environ.get("CHECK_NO_NEEDS") == "1" else make_needs(checks, stage)

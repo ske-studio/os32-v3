@@ -3,8 +3,10 @@
 --mutate covers T1 plus ADDENDUM.r2 §3 T1b mutations; hardware PTE work is T2.
 """
 CHECK = dict(name='recover-host', tier=1,
-    covers=['tools/tests/recover_gf_dev_stub.c', 'kdebug/recover.c', 'kdebug/recover_common/*.inc', 'kdebug/recover_plan/*.inc', 'kdebug/recover_gf_stage/*.inc', 'kdebug/recover.h', 'include/types.h', 'tools/tests/recover_host.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'kdebug/recover_profile.c', 'lib/pc98_cell.h', 'include/memmap.h', 'tools/tests/recover_hostshim/io.h', 'arch/x86/kernel/idt.h', 'platform/pc98/pit.h', 'include/kernel_tick.h', 'platform/pc98/pit_math.h', 'platform/pc98/platform_io.h', 'arch/x86/arch_io.h', 'arch/x86/x86_flags.h', 'include/pc98.h', 'mm/paging.h', 'include/io.h', 'kdebug/kdebug_window.c', 'kdebug/kdebug_window.h', 'kdebug/recover_wire.h', 'drivers/pci/pci_decode.h', 'include/config.h', 'kdebug/recover_diag.h', 'kdebug/recover_cleanup.h', 'include/pci_dev_contract.h', 'kdebug/gf_stage_state.h', 'kdebug/gfinit_pll.h'],
-    needs=[], budget=6.7)
+    covers=['tools/tests/recover_gf_dev_stub.c', 'kdebug/recover.c', 'kdebug/recover_common/*.inc', 'kdebug/recover_plan/*.inc', 'kdebug/recover_gf_stage/*.inc', 'kdebug/recover.h', 'include/types.h', 'tools/tests/recover_host.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'kdebug/recover_profile.c', 'lib/pc98_cell.h', 'include/memmap.h', 'tools/tests/recover_hostshim/io.h', 'arch/x86/kernel/idt.h', 'platform/pc98/pit.h', 'include/kernel_tick.h', 'platform/pc98/pit_math.h', 'platform/pc98/platform_io.h', 'arch/x86/arch_io.h', 'arch/x86/x86_flags.h', 'include/pc98.h', 'mm/paging.h', 'include/io.h', 'kdebug/kdebug_window.c', 'kdebug/kdebug_window.h', 'kdebug/recover_wire.h', 'drivers/pci/pci_decode.h', 'include/config.h', 'kdebug/recover_diag.h', 'kdebug/recover_cleanup.h', 'include/pci_dev_contract.h', 'kdebug/gf_stage_state.h', 'kdebug/gfinit_pll.h', 'tools/tests/test_recover.py', 'tools/tests/test_recover_t3.py', 'tools/rshell_recover.py', 'tools/lan_bridge.py', 'tools/host_image.py', 'tools/lanfs_host.py', 'tools/rshell_peek.py', 'tools/rshell_hwb.py', 'tools/rshell_serial.py', 'tools/serialfs_host.py', 'tools/host_tree_manifest.py'],
+    needs=[], budget=6.7,
+    basis=['REALHW_RECOVER_DESIGN §2', 'REALHW_RECOVER_DESIGN §3', 'REALHW_RECOVER_DESIGN §4', 'REALHW_RECOVER_DESIGN §5'],
+)
 
 import os
 import pathlib
@@ -162,6 +164,7 @@ MUTATIONS += [
     ("t2_restore_reextended", "u32 limit = cb.ticks;", "r->restore_tick = r->ops->ticks(r->opaque); u32 limit = cb.ticks;", "kdebug/recover_common/clock.inc"),
     ("t2_failed_verified", "state(r, r->failed ? REC_FAILED : REC_VERIFIED);", "r->failed = false; state(r, REC_VERIFIED);", "kdebug/recover_common/s0.inc"),
     ("t2_restore_wrap_inverted", "r->restore_tick) < limit", "r->restore_tick) > limit", "kdebug/recover_common/clock.inc"),
+    ("t2_pit_no_accumulation", "elapsed+=delta; previous=current;", "elapsed=delta; previous=current;", "kdebug/recover_profile.c"),
     ("t2_pit_round_down", "+(scaled%PIT_PERIOD_SCALE!=0)", "", "kdebug/recover_profile.c"),
     ("t2_pit_irq_lost", "    irq_restore(flags);\n    return low", "    (void)flags;\n    return low", "kdebug/recover_profile.c"),
     ("t2_pte_restore_removed", "w->ops->unmap(w->opaque, w->va + i * MEM_PAGE_SIZE, w->raw[i])", "0", "kdebug/kdebug_window.c"),
@@ -216,13 +219,19 @@ def one_mutation(item):
 
 
 def main():
+    import test_recover_t3 as t3
+
     with tempfile.TemporaryDirectory(prefix="recover-host-") as td:
         exe = pathlib.Path(td) / "recover-host"
-        subprocess.run(host_cmd(exe), cwd=ROOT, check=True)
-        rc = host32.run([str(exe)], cwd=ROOT, timeout=60).returncode
+        subprocess.run(host_cmd(exe) + ["-DRECOVER_T3_CAPTURE"], cwd=ROOT, check=True)
+        result = host32.run([str(exe)], cwd=ROOT, timeout=30, capture_output=True)
+        rc = result.returncode
+        if rc:
+            print(result.stdout.decode(), end="")
         print(f"HOST recover rc={rc}", flush=True)
         if rc:
             return 1
+        t3.score_capture(result.stdout.decode())
         cross = pathlib.Path(os.environ["CROSS_DIR"]) / "bin/i386-elf-gcc"
         subprocess.run([str(cross), *FLAGS, "-O2", "-I" + str(ROOT / "include"),
                         "-c", str(ROOT / SOURCE), "-o", str(pathlib.Path(td) / "recover.o")],
@@ -233,8 +242,9 @@ def main():
                        cwd=ROOT, check=True)
         print("TARGET i386-elf GNU11 core/profile compile PASS", flush=True)
         if "--mutate" in sys.argv:
-            return int(bool(mutpar.run_with_control(
-                one_mutation, MUTATIONS, ("control", "", ""))))
+            base_rc = mutpar.run_with_control(one_mutation, MUTATIONS, ("control", "", ""))
+            t3_rc = mutpar.run_with_control(t3.one, t3.MUTATIONS, ("control", "", ""))
+            return int(bool(base_rc or t3_rc))
     return 0
 
 

@@ -14,12 +14,12 @@ CHECK = {'id': 'ppc-lan-p21', 'covers': ['platform/powermac/lan_wire.c'],
                     'include/types.h', 'lib/kstring.h']}
 SOURCE = ROOT / 'platform/powermac/lan_wire.c'
 MUTATIONS = [
-    ('seq-le', 'put_be(dst + PLN1_OFF_SEQ, m->seq, 8);', 'for (i = 0; i < 8; ++i) dst[PLN1_OFF_SEQ + i] = (u8)(m->seq >> (8 * i));', 2),
+    ('seq-le', 'put_be(dst + PLN1_OFF_SEQ, h->seq, 8);', 'for (i = 0; i < 8; ++i) dst[PLN1_OFF_SEQ + i] = (u8)(h->seq >> (8 * i));', 2),
     ('header', 'get_be(src + PLN1_OFF_HEADER_BYTES, 2) != PLN1_HEADER_BYTES ||', '0 ||', 19),
-    ('limit', 'len > PLN1_PAYLOAD_MAX || len > bytes - PLN1_HEADER_BYTES)', 'len > bytes - PLN1_HEADER_BYTES)', 21),
+    ('limit', 'h->payload_bytes > PLN1_PAYLOAD_MAX)', '0)', 21),
     ('reserved', 'get_be(src + PLN1_OFF_RESERVED, 4) != 0 ||', '0 ||', 20),
     ('clear', 'kmemset(m, 0, sizeof(*m));', '(void)m;', 17),
-    ('nonce', 'if (m->host_nonce[i]) return LAN_EINVAL;', 'if (0) return LAN_EINVAL;', 11),
+    ('nonce', 'if (h->host_nonce[i]) return 0;', 'if (0) return 0;', 11),
 ]
 
 

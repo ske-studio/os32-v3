@@ -17,7 +17,9 @@
 """
 CHECK = dict(name='kprintf-attr-host', tier=4,
     covers=['include/callconv.h', 'lib/kprintf.c', 'lib/kprintf_attr.c', 'include/console_attr.h', 'platform/pc98/console_attr.c', 'tools/tests/kprintf_attr_host.c', 'include/types.h', 'include/pc98.h', 'include/kprintf.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_host_notice.h', 'sdk/include/os32/os32_ver_info.h', 'sdk/include/os32/os32_generations.h', 'sdk/include/os32/os32_surface.h', 'sdk/include/os32/os32_gfx2.h', 'sdk/include/os32/os32_ls.h', 'sdk/include/os32/os32_kapi_generated.h'],
-    needs=[], budget=3.0)
+    needs=[], budget=3.0,
+    basis=['KAPI_SPEC'],
+)
 
 import pathlib
 import re
@@ -122,7 +124,7 @@ def check_entry():
     下流 (shell_print / console_write) は全部 kprintf の attr を使うので、
     入口の 1 行があることを見れば足りる。
     """
-    text = (ROOT / "lib/kprintf.c").read_text(encoding="utf-8")
+    text = (ROOT / "lib/kprintf_format.inc").read_text(encoding="utf-8")
     n = text.count("attr = kprintf_attr_to_pc98(attr);")
     print(f"ENTRY kprintf applies conversion x{n}", flush=True)
     return 0 if n == 1 else 1

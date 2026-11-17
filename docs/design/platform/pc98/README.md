@@ -4,7 +4,7 @@
 
 - 単一利用者・単一タスク・協調切替、整数演算。カーネル→具体ドライバだけを外す。逆方向、既存検査、エラー、待ち、復旧を保つ。権限機構は追加しない。
 
-- 確定境界: D2 §2–4 の入力・出力・時計の表と未登録値、D3 §3 の boot_step と IF/順序を維持。`platform/pc98/boot.c:243` の bind に新フェーズを足さない。
+- 確定境界: D2 §2–4 の入力・出力・時計の表と未登録値、D3 §3 の boot_step と IF/順序を維持。`platform/pc98/boot.c` の `pc98_boot_bind()` の bind に新フェーズを足さない。
 - B §2 のリンク時固定口・§試験の基点列固定を踏襲。C §3 の固定名ヘッダ/static const は必要な機種記述だけに使い、状態表を増やさない。
 
 ## 2. 共通の契約と生成経路
@@ -24,9 +24,9 @@
 - PC-9821、単一利用者・単一タスク・協調切替。目的は固まらない・壊さない・戻せること。整数演算、既存 I/O と待ちを維持。
 - KAPI 番号・署名・呼出規約、部品 ABI、配置世代を変更しない。CLAUDE.md [C1]–[D4] を適用。新規ハード制御方式は導入しない。
 
-- D1 §2: `tick_register`、6枠、IRQ0/IF=0、SND→PCM→NE2K→E82557→LINK→LGY98 を維持。`arch/x86/kernel/isr_handlers.c:540` の dispatch は変更しない。
+- D1 §2: `tick_register`、6枠、IRQ0/IF=0、SND→PCM→NE2K→E82557→LINK→LGY98 を維持。`arch/x86/kernel/isr_handlers.c` の dispatch は変更しない。
 - D3 §3: `boot_platform_register(const struct boot_platform *)` と `step[BOOT_POINT_COUNT]` は既存のまま。
-  `init/kernel.c:117` の bind、`:176` PIC→`:182` sysclk→BOOT_DMA→`:187` PIT の呼出位置、IF、ログを固定する。
+  `platform/pc98/kernel.c` の bind、`kernel_main()` PIC→`kernel_main()` sysclk→BOOT_DMA→`kernel_main()` PIT の呼出位置、IF、ログを固定する。
 
 ## 2. 共通境界 — リンク時固定の小さい口
 
@@ -295,3 +295,17 @@ static struct gfx_kernel_fb splash_fb;
 - [platform/pc98/splash_image.c](splash_image.c.md)
 
 - [platform/pc98/splash_probe.c](splash_probe.c.md)
+
+- [platform/pc98/kernel.c](kernel.md)
+
+- [platform/pc98/kernel_gfx_config.inc](kernel_gfx_config.md)
+
+- [platform/pc98/boot_platform.c](boot_platform.md)
+
+- [platform/pc98/sysclk.c](sysclk.md)
+
+- [platform/pc98/boot_splash.c](boot_splash.c.md)
+
+- [platform/pc98/splash.c](splash.c.md)
+
+- [platform/pc98/splash_obs.c](splash_obs.c.md)

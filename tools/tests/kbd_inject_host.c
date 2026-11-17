@@ -12,7 +12,7 @@
  *
  *  カーネル帯に要るものは 2 つだけ (con_sink_host.c と同じ):
  *    - 割込み禁止区間: ホストは CPL=3 で cli/popfl を実行できないので
- *      CON_SINK_NO_IRQ_LOCK / KBD_INJECT_NO_IRQ_LOCK で空の錠に差し替える。
+ *      con_sink は arch_io.h の状態模型、注入は既存の空の錠を使う。
  *    - 所有者: fs/fd_redirect.c の res_owner_get/set をここで持つ。
  *
  *  libc は使わない (-nostdlib、Linux の int 0x80 で write/exit するだけ)。
@@ -20,6 +20,7 @@
  * ======================================================================== */
 
 /* ---- カーネル帯の代わり ------------------------------------------------ */
+int rshell_active, boot_serial_mirror;
 static int g_owner;
 int  res_owner_get(void)      { return g_owner; }
 void res_owner_set(int owner) { g_owner = owner; }

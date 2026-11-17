@@ -5,6 +5,7 @@
 #include "os32_kapi_slots.h"
 #include "appslot.h"
 #include "paging.h"
+#include "paging_app.h"
 #include "pgalloc.h"
 #include "exec.h"
 #include "v86_mem.h"

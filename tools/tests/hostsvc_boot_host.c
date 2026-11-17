@@ -1,3 +1,4 @@
+#include "rx_io_clock.h"
 /* Boot composition: production load/init, LGY attach, both adapters and NIC.
  * Module relocation and device I/O are seams; no seam registers or binds NICs. */
 #define net_lgy98_adapter attach_unit_adapter
@@ -25,6 +26,7 @@ void link_init(const u8 mac[ETH_ALEN]);
 #include "bootinfo.h"
 #include "bootinfo_native.h"
 #include "io.h"
+#include "net/rx_work.h"
 extern const struct NetAdapter net_lgy98_adapter;
 void *kmemset(void *dst, int value, u32 n)
 { u8 *p = dst; for (u32 i = 0; i < n; i++) p[i] = (u8)value; return dst; }
@@ -97,23 +99,30 @@ int module_ref_release(struct module_handle h, enum module_ref_kind kind)
 int tick_register(unsigned int slot, tick_fn fn)
 {
     if (slot == PC98_TICK_LINK) {
-        if (fn != net_tick) return TICK_ERR_INVAL;
+        if (fn != net_jiffy) return TICK_ERR_INVAL;
         link_registrations++;
     }
     return 0;
 }
 volatile u32 tick_count;
-unsigned int link_test_irq_save(void) { return 0; }
-void link_test_irq_restore(unsigned int f) { (void)f; }
-void link_test_idle(void) { }
+u32 link_platform_now(void) { return tick_count; }
+u32 tick_clock_ms(void) { return tick_count * 10u; }
+static u32 link_test_if = 1;
+u32 link_platform_lock(void) { u32 f = link_test_if; link_test_if = 0; return f; }
+void link_platform_unlock(u32 f) { link_test_if = f; }
+int link_platform_tick_register(void (*fn)(void))
+{
+    return tick_register(PC98_TICK_LINK, fn);
+}
+void link_platform_idle(void) { }
 void link_notify_reset(void) { }
 void link_notify_tick(u32 now) { (void)now; }
 void link_notify_session(u16 s, u16 e, int x, u32 g, u16 a)
 { (void)s; (void)e; (void)x; (void)g; (void)a; }
 void link_notify_rx(u32 seq, const u8 *p, u16 n) { (void)seq; (void)p; (void)n; }
+u32 net_rx_queued(u16 protocol) { (void)protocol; return 0; }
 int net_rx_take(u16 protocol, void *out, u32 cap, u32 *len)
 { (void)protocol; (void)out; (void)cap; (void)len; return OS32_ERR_AGAIN; }
-#define LINK_HOST_TEST
 #define link_init boot_real_link_init
 #define link_tick boot_real_link_tick
 #define link_selftest boot_real_link_selftest
@@ -140,8 +149,13 @@ void net_rx_demux(const struct NetNicOps *ops, const u8 *mac, const u8 *peer)
         for (u32 i = 0; i < 6; i++)
             if (peer[i] != configured_peer[i]) saw_fixed_peer = -1;
 }
+u32 net_rx_demux_budget(const struct NetNicOps *ops, const u8 mac[6],
+                        const u8 peer[6], struct rx_work_budget *budget)
+{ (void)budget; net_rx_demux(ops, mac, peer); return 0; }
+int tick_budget_peek(u32 share, u32 tail) { (void)share; (void)tail; return 1; }
 unsigned int ne2k_rx_ring_free_pages(void) { return 8; }
 unsigned int ne2k_rx_queue_free(void) { return 4; }
+int _irq_enabled(void) { return 1; }
 unsigned int boot_irq_save(void) { return 0; }
 void boot_irq_restore(unsigned int flags) { (void)flags; }
 
@@ -157,7 +171,7 @@ static int boot_run(int mode)
     if (mac[0] != (present ? 16 : 0)) return 23;
     if (link_inits != 1 || link_registrations != 1) return 24;
     if (record.active_refs != (present ? 1u : 0u)) return 25;
-    net_tick();
+    net_jiffy();
     if (link_ticks != 1) return 26;
     if (mode >= 6) {
         link_hello_ok = 1;
@@ -172,8 +186,9 @@ static int boot_run(int mode)
         rc = net_start(NET_NIC_AUTO, peer);
         if (rc || link_inits != 2) return 31;
     } else if (rc) return 28;
-    net_tick();
+    net_jiffy();
     if (mode != 7 && (link_inits != 1 || syns + tx_calls != 1)) return 29;
+    if (io_dispatch(IO_PASS_US) != 1) return 33;
     if (saw_fixed_peer != (mode >= 5)) return 32;
     net_unbind();
     if (record.active_refs || net_mac(mac) != OS32_ERR_HOSTDOWN) return 27;
@@ -181,6 +196,7 @@ static int boot_run(int mode)
 }
 void _start(void)
 {
+    test_rx_clock_install();
     u8 mode;
     int n;
     __asm__ volatile("int $0x80" : "=a"(n) : "0"(3), "b"(0), "c"(&mode), "d"(1) : "memory");
@@ -195,3 +211,9 @@ const struct boot_common *boot_common_get(void) {
     info.image_valid = bi->img_valid; info.image_crc = bi->img_crc; info.image_size = bi->img_size;
     return &info;
 }
+
+/* Foreground link fixture: IRQ0 budgeting is exercised by tick_budget_host. */
+u32 tick_budget_cnt(u32 us) { return us; }
+int tick_budget_take(u32 share, u32 tail) { (void)share; (void)tail; return 1; }
+
+int platform_clock_read_us(u32 *lo, u32 *hi) { *lo = *hi = 0; return 0; }

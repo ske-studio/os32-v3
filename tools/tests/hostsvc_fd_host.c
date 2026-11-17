@@ -138,3 +138,9 @@ static int suite(void)
     return 0;
 }
 void _start(void) { int rc=suite(); __asm__ volatile("int $0x80"::"a"(1),"b"(rc):"memory"); __builtin_unreachable(); }
+
+/* Deterministic boot identity for the virtual guest. */
+void boot_token_get(u8 out[16])
+{
+    for (unsigned int i = 0; i < 16; ++i) out[i] = (u8)(i + 1);
+}

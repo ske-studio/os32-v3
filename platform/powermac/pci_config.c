@@ -1,6 +1,8 @@
 /* UniNorth configuration access: NetBSD macppc/pci/uninorth.c:191-271. */
 #include "lan_boot.h"
 #include "ppc_oea.h"
+#include "kernel_boot.h"
+#include "drivers/net/gem/gem.h"
 
 #define PCI_COMMAND 4u
 #define PCI_MASTER 4u
@@ -72,12 +74,25 @@ int pm_pci_write32(struct pm_pci *p, u32 bdf, u32 reg, u32 value)
 
 static const struct pm_gmac_boot *saved_boot;
 static struct pm_pci saved_pci;
+static u32 saved_clock_va, rh_setup;
+static struct pm_gmac_rh_sample rh;
+const struct pm_gmac_rh_sample *pm_gmac_rh_sample(void) { return &rh; }
 /* P25 supplies the captured snapshot and P9's mapped aliases. */
 void pm_gmac_quiesce_setup(const struct pm_gmac_boot *boot, const struct pm_pci *pci)
 {
+    saved_clock_va = rh_setup = 0;
+    rh = (struct pm_gmac_rh_sample){0};
     saved_boot = boot;
     if (pci) saved_pci = *pci;
     else saved_boot = 0;
+}
+int pm_gmac_quiesce_setup_rh(const struct pm_gmac_boot *b, const struct pm_pci *p,
+                            u32 clock_va)
+{
+    pm_gmac_quiesce_setup(b, p);
+    saved_clock_va = clock_va;
+    rh_setup = 1;
+    return b && p ? LAN_OK : LAN_EINVAL;
 }
 int pm_gmac_early_quiesce(void)
 {
@@ -86,9 +101,19 @@ int pm_gmac_early_quiesce(void)
     if (!b || !b->node || b->profile != PM_GMAC_PROFILE_UNINORTH ||
         b->vendor_device != GMAC_ID || saved_pci.target_bdf != b->bdf)
         return 0;
+    if (b->clock.valid) {
+        rh.clock_rc = pm_gmac_clock(b, saved_clock_va);
+        if (rh.clock_rc) return 0; /* Service reports the failure and stays off. */
+    }
     if (pm_pci_read32(&saved_pci, b->bdf, 0, &id) || id != b->vendor_device)
         return 0;
     if (pm_pci_read32(&saved_pci, b->bdf, PCI_COMMAND, &command)) return 0;
+    if (rh_setup) {
+        rh.command = command & 0xffffu;
+        rh.tx_enable = le_read(PPC_BOOT_GMAC_VA + GEM_MAC_TX_CONFIG) & GEM_MAC_TX_ENABLE;
+        rh.rx_enable = le_read(PPC_BOOT_GMAC_VA + GEM_MAC_RX_CONFIG) & GEM_MAC_RX_ENABLE;
+        rh.valid = 1;
+    }
     if (pm_pci_write32(&saved_pci, b->bdf, PCI_COMMAND, command & ~PCI_MASTER)) return 0;
     if (pm_pci_read32(&saved_pci, b->bdf, PCI_COMMAND, &command)) return LAN_EIO;
     return (command & PCI_MASTER) ? LAN_EIO : 0;

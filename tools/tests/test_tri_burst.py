@@ -8,7 +8,10 @@ CHECK = dict(name='tri-burst', tier=1, needs=[], budget=141.7, covers=[
     'userland/shell/hwb.h', 'userland/shell/hwb_probe.c', 'userland/shell/hwb_parse.c',
     'userland/shell/hwb_exec.c', 'userland/shell/hwb_log.c',
     'kdebug/probe_wire.h', 'kdebug/hwb_wire.h', 'include/types.h',
-    'sdk/include/os32/os32_kapi_shared.h'])
+    'sdk/include/os32/os32_kapi_shared.h'],
+    kind='characterization',
+    env_limit='CR39値でdropを人工定義したfake busを確認するが、実カードのburst故障と候補値の効果は保証しない。',
+)
 import json
 from pathlib import Path
 import tempfile

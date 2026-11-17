@@ -1,5 +1,5 @@
 #include "gfx2_core_fake.h"
-/* P1 is covered by pegc-v2-host; v1 lifecycle tests fake C1/Y4 and the table. */
+/* P1 is covered by pegc-mode-host; v1 lifecycle tests fake C1/Y4 and the table. */
 const GfxBackendV2 pegc_backend_v2 = {.abi = GFX_HAL2_ABI};
 static u8 pegc_sync_fake;
 __attribute__((weak)) int gfxsync_bind(const char *key, const GfxSyncTarget *t, GfxSyncCtx **out)
@@ -84,6 +84,7 @@ void *kmemset(void *d, int c, u32 n) { u8 *p=d; while(n--) *p++=c; return d; }
 void *kmemcpy(void *d, const void *s, u32 n) { u8 *p=d; const u8 *q=s; while(n--) *p++=*q++; return d; }
 static u32 host_kprintf_count;
 void __cdecl kprintf(u8 a,const char *f,...) { (void)a;(void)f; host_kprintf_count++; }
+void __cdecl console_printf(u8 a,const char *f,...) { (void)a;(void)f; host_kprintf_count++; }
 static u32 arena_top_pfn;   /* 凍結した exec 上端 (PFN) */
 
 static u32 ws_pages(u32 limit)
@@ -113,7 +114,7 @@ static void boot(void)
     paging_init(CFG_KB);
     physmem_bootstrap_legacy(&m, low_kb);
     if (CFG_KB > 16384)
-        CHECK(physmem_add_trusted(&m, 4096, limit, PHYSMEM_SOURCE_SYNTHETIC));
+        CHECK(physmem_add_trusted(&m, 4096, limit, PHYSMEM_SOURCE_MACHINE));
     top = physmem_legacy_end(&m);
     l.capacity = pgalloc_metadata_bytes(&m);
     if (CFG_KB > 12288) {

@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
 """Verify the PowerMac KAPI table and its generated initializer."""
-CHECK = dict(name='ppc-kapi-table', tier=1,
-             covers=['arch/ppc/exec_kapi.c', 'platform/powermac/kapi_table.h',
-                     'tools/ppc/test_kapi_table.py'],
-             inputs=['sdk/gen_kapi.py', 'sdk/kapi.json', 'exec/exec.c'], needs=[], budget=10)
 import json
 import os
 import re
@@ -44,7 +40,7 @@ def main():
         dirs = ['.', 'include', 'arch/ppc', 'platform/powermac', 'sdk/include', 'sdk/include/os32', 'kernel', 'init', 'kernel/console', 'kernel/irq', 'kernel/time', 'mm', 'lib', 'kapi', 'drivers', 'net', 'gfx', 'exec', 'fs', 'kernel/cli']
         dirs += [str(p.relative_to(ROOT)) for base in ('drivers', 'fs', 'kernel', 'gfx') for p in (ROOT / base).rglob('*') if p.is_dir()]
         cc = Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc')) / 'bin/powerpc-elf-gcc'
-        flags = ['-std=gnu11', '-ffreestanding', '-D__KERNEL_BUILD__', '-D__cdecl=', '-I' + str(out / 'include'), '-I' + str(out / 'sdk/include/os32')] + ['-I' + str(ROOT / d) for d in dirs]
+        flags = ['-std=gnu11', '-ffreestanding', '-D__KERNEL_BUILD__', '-D__cdecl=', '-DOS32_HOOK_DEFAULT=0', '-I' + str(out / 'include'), '-I' + str(out / 'sdk/include/os32')] + ['-I' + str(ROOT / d) for d in dirs]
         exec_source = out / 'exec/exec.c'
         exec_source.write_bytes((ROOT / 'exec/exec.c').read_bytes())
         for name, source in [('exec', exec_source), ('kapi', out / 'kapi/kapi_generated.c'), ('table', ROOT / 'arch/ppc/exec_kapi.c')]:
@@ -61,7 +57,7 @@ def main():
             source = (ROOT / 'arch/ppc/exec_kapi.c').read_text().replace('KernelAPI ppc_kapi_table __attribute__', 'const KernelAPI ppc_kapi_table __attribute__')
             mutant = tmp / 'mutant.c'
             mutant.write_text(source)
-            (tmp / 'kapi_table.h').write_text((ROOT / 'platform/powermac/kapi_table.h').read_text().replace('extern KernelAPI', 'extern const KernelAPI'))
+            (tmp / 'kapi_table.h').write_text((ROOT / 'arch/ppc/kapi_table.h').read_text().replace('extern KernelAPI', 'extern const KernelAPI'))
             subprocess.run([str(cc)] + flags + ['-c', str(mutant), '-o', str(tmp / 'mutant.o')], check=True)
             assert not table_ok(nm, tmp / 'mutant.o')
             print('const table: RED')

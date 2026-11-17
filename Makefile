@@ -44,7 +44,9 @@ include build/config.mk
 ifeq ($(ARCH),x86)
 ABI_CONTRACT_ORDER := abi-contract-probe
 endif
-include build/targets/$(ARCH)-$(PLATFORM).mk
+# 製品の規則。TARGET_MK は試験が写しを差し替える時だけ与える。
+TARGET_MK ?= build/targets/$(ARCH)-$(PLATFORM).mk
+include $(TARGET_MK)
 include build/abi_contract.mk
 
 # The bootstrap remains independent; always forward its own cross directory.
@@ -54,6 +56,11 @@ ppc-boot:
 	$(MAKE) --no-print-directory -j1 -f build/ppc.mk CROSS_DIR=$(PPC_CROSS_DIR) all
 ppc-boot-check:
 	$(MAKE) --no-print-directory -j1 -f build/ppc.mk CROSS_DIR=$(PPC_CROSS_DIR) check
+
+# Stage 1 PPC image prerequisite; local toolchains remain optional.
+.PHONY: ppc-ci-image
+ppc-ci-image:
+	PPC_CROSS_DIR="$(PPC_CROSS_DIR)" python3 -B tools/ppc/compile_ci.py
 
 # ドキュメントを Windows 側 (C:\WATCOM\docs\os32) へミラー / 逆方向は tools/sync_hwdocs.sh
 .PHONY: docs-gen tests-inventory docs-win

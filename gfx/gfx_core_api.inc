@@ -19,11 +19,7 @@ int gfx_ver_state(GFX_ScreenInfo *out, u32 *kind, u32 *active)
     const GfxMode *mode = gfx_backend_mode(g_backend);
     if (gfx_started) info.height = gfx_current_height;
     else if (mode) info.height = mode->height;
-    if (g_backend == &gfx_backend_pc98) *kind = GFX_VER_PC98;
-    else if (g_backend == &gfx_backend_pegc) *kind = GFX_VER_PEGC;
-    else if (g_backend == &gfx_backend_cirrus) *kind = GFX_VER_CIRRUS;
-    else if (g_backend == &gfx_backend_geforce) *kind = GFX_VER_GEFORCE;
-    else if (g_backend == &gfx_backend_trident) *kind = GFX_VER_TRIDENT;
+    *kind = display_provider_ver_kind(g_backend);
     *active = gfx_started != 0;
     *out = info;
     return 0;

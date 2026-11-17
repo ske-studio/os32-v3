@@ -150,4 +150,174 @@
       "newlib/libc/stdlib/nano-mallocr.c": "ddd9154fae788262390a61d6b0e144a4d8f7e52efb097484ac3db6398904e2e5"
     }
   }
+,
+  "targets": {
+    "powerpc-elf": {
+      "toolchain": {
+        "upstream": {
+          "version": "4.4.0.20231231",
+          "url": "https://sourceware.org/pub/newlib/newlib-4.4.0.20231231.tar.gz",
+          "sha256": "0c166a39e1bf0951dfafcd68949fe0e4b6d3658081d6282f39aeefc6310f2f13",
+          "files": {
+            "newlib/libc/stdlib/nano-mallocr.c": "ddd9154fae788262390a61d6b0e144a4d8f7e52efb097484ac3db6398904e2e5",
+            "newlib/libc/stdlib/_mallocr.c": "3c1d983e2bfbae9fff42f758adf37faee1b29bdcb26b42431af30dfa0de90fb5",
+            "newlib/libc/stdlib/mallocr.c": "d96c89bb5c9b7f462ffef23623c11c893d0f719f3767fb77271d85f43f0cd7f6",
+            "newlib/libc/stdlib/freer.c": "f0153a66e4bf9e097c09b27faf7f32b73612aa8477bac39048403b21f531b419",
+            "newlib/libc/stdlib/callocr.c": "c9ffb1a862e70daa253505e6246e5be7e28330be6ead610dd1b7ae9096665b71",
+            "newlib/libc/stdlib/reallocr.c": "d58143515949e51a7dbe8c37c0f5599555720af2595e55d78c8c23b305879ce8",
+            "newlib/libc/stdlib/malloc.c": "db5fd8c6122e66eeab479cce5d013814806db4bbdc0ab2730811750276d4eca4",
+            "newlib/libc/stdlib/calloc.c": "8f07fc47b9ba9da20a273131d3e8a8a975f3c91213017976036e8ea4f6c41085",
+            "newlib/libc/stdlib/realloc.c": "d7e38bceb27558d00e20771ac01655b4535f74fba99dd1375994b06d8e2d6fe3",
+            "newlib/libc/stdlib/mallinfor.c": "2ecc52e0125313419f84d46be6e74d67df02f9a5789125af69242bfd2ac15cbd",
+            "newlib/libc/stdlib/mallstatsr.c": "0908b44830d799937a74c3aa2517f5a1c5c54b268c6591dfb4dfdfedb948943d",
+            "COPYING.NEWLIB": "9a59b4ee3af067045fe0ea78786201c42d54756fe48cbccf44f3dfc398474717",
+            "newlib/libc/stdlib/malloptr.c": "44faf7b96dcc229d8fb77281cc5ca10d5fb902dd99b184ba8d8cb33ac30737c0",
+            "newlib/libc/stdlib/mlock.c": "41b3b77f24a0136880afb7dbdfe079fbc1f57cae765da3dafa57d802ac9a39bc",
+            "newlib/libc/stdlib/aligned_alloc.c": "259939fd326c70b5871dbb712eea96cb37443da13c37be4189311acbf36cd77a",
+            "newlib/libc/stdlib/pvallocr.c": "34988b9e8a5c89afc69179b92367fa68384a8ce95a414b5ec3a15eca5a8aae2f",
+            "newlib/libc/stdlib/malign.c": "335d8f434a0ceac379651fb36c1fe5531490e4ebd752b103615334cc6a2bf92c",
+            "newlib/libc/stdlib/mstats.c": "7bb7e62ee08ea26a9b73835a014e903cae30496305c1de65914ff02ebb2521ff",
+            "newlib/libc/stdlib/vallocr.c": "e0ef8254caffd0d9aa305433f0eb0c6fcad606782f4092f75d97bc4079987f17",
+            "newlib/libc/stdlib/msizer.c": "99068fed2a4259f29bd503a8c81a1288833874f2cfe056566dba31f3fbd99f41",
+            "newlib/libc/stdlib/malignr.c": "771a834c59cea3f86fc1e33f21ac9e5a432766510588ec253df859ff604bdcdf",
+            "newlib/libc/reent/sbrkr.c": "e8cedcfae270bfe98888c0f665fefb20f6b1150fd4ca765c4dacbb5218dd0d95",
+            "newlib/libc/stdlib/valloc.c": "4db29cf107a3026e223ae65ef2868f612109eb5c0081855047b4b7fa8e08f178",
+            "newlib/libc/stdlib/cfreer.c": "eb65704ce6da876dd3fea38f22bf6ad40fab5c8ba27e17b751de4b3f9fcec8ec",
+            "newlib/libc/stdlib/msize.c": "4a620b0506eb1bba3c4c0fe94451eebb1b1801a0920d913c4799273c773c5ea5"
+          }
+        },
+        "configure": [
+          "--disable-multilib",
+          "--disable-newlib-supplied-syscalls",
+          "--enable-newlib-nano-malloc",
+          "--enable-newlib-nano-formatted-io"
+        ],
+        "target": "powerpc-elf",
+        "gcc": "13.2.0",
+        "cflags": "-g -O2",
+        "patches": [],
+        "symbols": {
+          "malloc": "libc_a-malloc.o",
+          "free": "libc_a-malloc.o",
+          "calloc": "libc_a-calloc.o",
+          "realloc": "libc_a-realloc.o",
+          "_malloc_r": "libc_a-mallocr.o",
+          "_free_r": "libc_a-freer.o",
+          "_calloc_r": "libc_a-callocr.o",
+          "_realloc_r": "libc_a-reallocr.o",
+          "__malloc_free_list": "libc_a-mallocr.o",
+          "__malloc_sbrk_start": "libc_a-mallocr.o",
+          "__malloc_current_mallinfo": "libc_a-mallinfor.o",
+          "_memalign_r": "libc_a-malignr.o",
+          "memalign": "libc_a-malign.o",
+          "aligned_alloc": "libc_a-aligned_alloc.o",
+          "_valloc_r": "libc_a-vallocr.o",
+          "_pvalloc_r": "libc_a-pvallocr.o",
+          "valloc": "libc_a-valloc.o",
+          "pvalloc": "libc_a-valloc.o",
+          "_malloc_usable_size_r": "libc_a-msizer.o",
+          "_mallopt_r": "libc_a-malloptr.o",
+          "mallopt": "libc_a-mstats.o",
+          "malloc_stats": "libc_a-mstats.o",
+          "_cfree_r": "libc_a-cfreer.o",
+          "_mallinfo_r": "libc_a-mallinfor.o",
+          "_malloc_stats_r": "libc_a-mallstatsr.o",
+          "_sbrk_r": "libc_a-sbrkr.o",
+          "__malloc_lock": "libc_a-mlock.o",
+          "__malloc_unlock": "libc_a-mlock.o",
+          "mallinfo": "libc_a-mstats.o",
+          "malloc_usable_size": "libc_a-msize.o"
+        },
+        "local": {
+          "archives": {
+            "libc.a": "2974fe8240eeaad448f47d4253bac4122c88446df9fd1f66551082999a979ae3",
+            "libg.a": "2974fe8240eeaad448f47d4253bac4122c88446df9fd1f66551082999a979ae3"
+          },
+          "members": {
+            "libc_a-calloc.o": "d9c4c08a3e0901955a95d9ba054d9987201bcf4392aacd56be58bc6fce89525c",
+            "libc_a-callocr.o": "f338c781403e521fafce388beddbe9252d113fab1f1d30d090a87ea35191572c",
+            "libc_a-freer.o": "3bd46204b13ee76414b4b4700b24e1dada991a3bcb410af0bf1c5e7b1cb55029",
+            "libc_a-mallinfor.o": "2c85d3fa6b4e2a5c954db5274f01bdcef58cf3e76e8adca880393726175660ac",
+            "libc_a-malloc.o": "913a7d70443d972c0b4d2a5379a3c702b7766d6ec328fe335ac1aaf3dcd2d6bf",
+            "libc_a-mallocr.o": "ef6c1fb03bfa02dd767d1d1e300da1c32452e55e71896561d5ff83371b9fbfc2",
+            "libc_a-mallstatsr.o": "5a875446857b5dc169b51680fa4c9bf158ece040a6b65d67beff266152bb362e",
+            "libc_a-realloc.o": "9c0cc33cfd2aae2f74b0b407dd7444a9720a6720461bc7c4922204d14f1dea38",
+            "libc_a-reallocr.o": "628531320f4e80eacf4f23c4e9eb545f59b8a2ee471444937597114318540698",
+            "libc_a-malignr.o": "8fd6a7b6dbb712df7add7af81b3a3a58fd7f560448c61d5475835ee6e19af893",
+            "libc_a-malign.o": "ca15bbf90c13ef4263c5da0e914c706a0264cf874cf3b9cebb7735565afa48ee",
+            "libc_a-aligned_alloc.o": "082899bd98c89fd734482f5e30b0b4c88f5f72dd9bde79059dcebd0eccdcbe0c",
+            "libc_a-vallocr.o": "5be32bf74c1ce3723787cf4ec8d169bf2c33fd57d23d0c52b160127ddd13bb8b",
+            "libc_a-pvallocr.o": "5a75ddd18e4a50c84fd14251fc0b9258cbbdffb5d421616f97c1285fa12bc496",
+            "libc_a-valloc.o": "ecfffc6fb376ee1d38da5ede553d1e2d598eeeccca6b8b6e8e845518ff31b503",
+            "libc_a-msizer.o": "2b94a193de4ef2ad6ddb96c4a8e1e11a7b150e957bb1a7beaafd08e5b45c88fe",
+            "libc_a-malloptr.o": "3592a3966b8bff657571ac1ce123c087cb320388df5a6aaaa9478d8c999ed442",
+            "libc_a-mstats.o": "f39efc324483732e6f37cec3bff603783804458466ea20c0fc89c39405ac9235",
+            "libc_a-cfreer.o": "256d78eb0073914a3ca53c236735c971bc3ca4ba89b155514a01038e02a7a284",
+            "libc_a-sbrkr.o": "a089c4a34965e426bfbbf55b5bf49aff976ea4cd193bea96d02289632aa7c26a",
+            "libc_a-mlock.o": "fc537899fdad378300d6698f5860765d33c5f2222a55b31d658322248a3a01fd",
+            "libc_a-msize.o": "a04c8dcc16abf4bb93dc9324cc773b0da11128a1cb048d19117adfa77fcf4b22"
+          },
+          "absent": [
+            "libc_nano.a",
+            "libg_nano.a"
+          ]
+        },
+        "license": {
+          "nano": "ARM Ltd (2012, 2013), BSD 3-clause; nano.LICENSE",
+          "distribution": "COPYING.NEWLIB (file-specific notices; hash in upstream.files)"
+        },
+        "abi": [
+          "-mcpu=750",
+          "-m32",
+          "-mbig-endian",
+          "-mhard-float",
+          "-mcall-sysv",
+          "-mno-eabi",
+          "-mno-altivec",
+          "-msdata=none"
+        ],
+        "multilib": ".",
+        "byte_order": "big",
+        "float_abi": "hard"
+      },
+      "sdk_build": {
+        "status": "PowerPC private nano; shared adapter unchanged",
+        "sources": {
+          "sdk/allocator/nano_adapter.c": "5d0396d953112443a3cba7b9a0f02352a029701933ae520a384ccebaea3a9fc3",
+          "sdk/allocator/nano_adapter.h": "fe7d202c48a0056c656629b06810f46568efbaa53778eaab3ada14f52e2258e3",
+          "sdk/allocator/build_nano.py": "5ee17bf0d3d550c01f5abb083f3202ab580c158ceb41f7c85266ec0b980d3dde",
+          "sdk/allocator/check_link.py": "12a6826d36eb95912e1d2739b3ee36d17d3bf5de2edd8457289761e5ef541302",
+          "sdk/allocator/build_nano_target.py": "2c0a36a1618d6331d91a17c426acb760da665ff1a3705b64f16e9242fdad51e9",
+          "sdk/allocator/check_link_target.py": "93775e38e59d4884ac5fc0206078b605d108fe5a9a066013b016018592aa4ed7"
+        },
+        "patches": [],
+        "mode": "objcopy-private-members",
+        "members": [
+          "libc_a-mallocr.o",
+          "libc_a-freer.o",
+          "libc_a-callocr.o",
+          "libc_a-reallocr.o",
+          "libc_a-msizer.o",
+          "libc_a-mallinfor.o"
+        ],
+        "renames": {
+          "_malloc_r": "os32_private_malloc_r",
+          "_free_r": "os32_private_free_r",
+          "_calloc_r": "os32_private_calloc_r",
+          "_realloc_r": "os32_private_realloc_r",
+          "_malloc_usable_size_r": "os32_private_malloc_usable_size_r",
+          "_mallinfo_r": "os32_private_mallinfo_r",
+          "__malloc_free_list": "os32_private_free_list",
+          "__malloc_sbrk_start": "os32_private_sbrk_start",
+          "__malloc_current_mallinfo": "os32_private_current_mallinfo",
+          "_sbrk_r": "os32_nano_sbrk",
+          "__malloc_lock": "os32_nano_lock",
+          "__malloc_unlock": "os32_nano_unlock"
+        },
+        "upstream": {
+          "newlib/libc/stdlib/nano-mallocr.c": "ddd9154fae788262390a61d6b0e144a4d8f7e52efb097484ac3db6398904e2e5"
+        }
+      }
+    }
+  }
 }

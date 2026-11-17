@@ -42,9 +42,8 @@ SHA-256 を照合。第三者ミラーは使わない。プロキシは `https_p
 
 ### §8-2 ビルドパイプライン
 
-CI は配布物の `artifacts` と検査の `check-fast` を並列に実行する。取り方と合格条件の正典は
+CI は配布物の `artifacts` と検査の `checks` (全部の検査を変異込みで、6 シャード) を並列に実行する。取り方と合格条件の正典は
 [§8-6](#8-6-github-actions-での本体ビルド)。
-変異込みの全体検査は Actions の `full-check` → Run workflow (入力 `ref`、既定 `main`) で起動でき、毎日 03:00 JST にも `main` に対して実行する。
 
 ```
 === カーネルビルド ===
@@ -136,7 +135,7 @@ GUI アプリ      → libos32gui_stub (ジャンプ表への薄いスタブ) �
 ne2000 リングと gcc + python3 だけで回るホスト試験。どの検査が CI に載っているかは
 `build/out/TESTS.md` ([生成手順](INDEX.md#生成文書の見方)) の CI 列 (`check.yml` の個別実行と `build.yml` の全検査の和集合から生成)。
 残り (末尾で `i386-elf-gcc` を使うホスト試験、rustc が要るもの、`check-manifests` / `check-packages-host` /
-`check-memmap` のように `make all` の成果物を読むもの) は `build.yml` の `make check-fast` が回す (§8-6)。
+`check-memmap` のように `make all` の成果物を読むもの) は `build.yml` の `make check` が回す (§8-6)。
 
 **コンパイラとフラグ** (実体は `build/config.mk`。ここは読むための写しで、値は config.mk が正しい):
 
@@ -164,7 +163,7 @@ SQLite は既存 VA0/module 生成器で GNU89 の engine/VFS を組み、typed 
 `/boot` の部品 (`kdebug.bin`・`*.mod`) は全部同じ形式。値の正は `tools/module_schema.py` (生成 `kernel/module/module_schema.h`)、検査の実体は `kernel/module/module_image.c`、生成は `tools/mkmod.py`。
 
 - **並び**: `header (144 B、u32 LE × 36 語) → reloc 表 → import 表 → export 表 → 名前表 → (4096 B 整列) → payload (text / rodata / data) → bss (ファイルには無い)`。C の構造体を cast して読まず、語ごとに little-endian で decode する。
-- **ヘッダの語** (添字): 0 magic `'KMOD'`、1 format 1、2 header_size 144、3 image_size (= payload_offset + payload_size)、4 KAPI 機能版、5 memory_layout 世代、6 module_abi_gen (`.def` 全文の FNV-1a)、7 module_id、8 phase (2 = POST_ROOT)、9 flags (bit0 = 対の CRC あり)、10 mem_size、11 payload_offset、12 payload_size、13〜20 text/ro/data/bss の off・size、21〜26 reloc/import/export 表の offset・**件数**、27〜28 名前表の offset・**バイト長** (NUL を含む、`tools/mkmod.py:299`)、29 init、30 stop、31 pair_image_crc、32 image_crc、33 ops_version、34〜35 予約。
+- **ヘッダの語** (添字): 0 magic `'KMOD'`、1 format 1、2 header_size 144、3 image_size (= payload_offset + payload_size)、4 KAPI 機能版、5 memory_layout 世代、6 module_abi_gen (`.def` 全文の FNV-1a)、7 module_id、8 phase (2 = POST_ROOT)、9 flags (bit0 = 対の CRC あり)、10 mem_size、11 payload_offset、12 payload_size、13〜20 text/ro/data/bss の off・size、21〜26 reloc/import/export 表の offset・**件数**、27〜28 名前表の offset・**バイト長** (NUL を含む、`tools/mkmod.py`)、29 init、30 stop、31 pair_image_crc、32 image_crc、33 ops_version、34〜35 予約。
 - **基点**: 表の offset (21・23・25・27) は容器の先頭基点。節・init・stop・reloc の書込位置・import slot・export の入口は body 基点 (`body_base = container_base + payload_offset`、body は VA 0 でリンクした像)。`load_span = payload_offset + mem_size` を 1 回で確保する。
 - **表の 1 件**: reloc は `u32 off` (`R_386_32` の書込位置)。import は `{u32 name_hash; u16 type_ver; u16 kind; u32 slot_off}` 12 B、export は `{u32 name_hash; u16 slot; u16 ver; u32 entry_off}` 12 B。名前表は import の順、続いて export の順に NUL 区切りの名前を並べたもの。
 - **ローダーが拒否する条件** (`kernel/module/module_image.c`。本体は最初の 144 B だけで header の検査を済ませてから `load_span` を確保し、どれかが外れたら init を一度も呼ばずに断る):
@@ -213,25 +212,30 @@ SQLite は既存 VA0/module 生成器で GNU89 の engine/VFS を組み、typed 
 ```
 os32-v3/
 ├── boot/           ブートローダー (16bit/32bit ASM + C)
-├── init/           起動の順序だけ (kernel_main、起動情報・起動ログ、/etc/system.cfg、スプラッシュ)
+├── init/           入口の骨格 (kernel_start.c — 起動の 3 つの局面の順。中身は platform/)、起動情報・起動ログ、/etc/system.cfg
 ├── kernel/         常駐サービス・診断・ver・GUI の背骨 (gui.c)・SQLite の常駐側・試験専用の器
 │   ├── irq/        割り込みの動的登録・IRQ0 コールバック
-│   ├── time/       µs 時計・PIT の分周・システムクロックの判定・CPU の校正
-│   ├── module/     部品 (KMOD) の検証と load/start/abort、kdebug/hwdev の受け口
+│   ├── time/       µs 時計・tick の時計・CPU の校正
+│   ├── module/     部品 (KMOD) の検証と load/start/abort の核 (部品ごとの読み込みは各装置の *_module.c、kdebug/・hwdev/ の側)
+│   ├── dev/        装置の登録簿の口 (dev.h) と RAM の読み取り専用のブロック装置 (ram_ro)
 │   ├── console/    TVRAM コンソール・console シンク・フォントの lease・Unicode 表
 │   ├── ime/        FEP (fep.mod の本体と窓口)
 │   └── v86/        x86 専用の旧パス互換転送ヘッダのみ
 ├── mm/             ページング・物理ページ台帳・カーネルヒープ・DMA プール・SHM・shlib
 ├── arch/           CPU 依存の実装。`ARCH ?= x86` で選ぶ。足し方は arch/README.md
 │   └── x86/        原始命令の実装 (arch_io.h — 割り込み制御・CPU 停止・IDT ロード、arch_cpu.h — CR3/CR0・リング降下、x86_desc.h — GDT/TSS ロード)
-│       ├── kernel/ GDT/IDT/TSS・#DF・例外の受け口・入口 asm (kentry.asm)・リング 3 降下 (ring3_entry.asm)
-│       └── legacy/ V86 モニタ・低位メモリ・v86.mod の結線 (BIOS・装置の模倣は platform/pc98/legacy/)
-├── platform/       機種依存の実装 (pc98/platform_io.h — ポート I/O・I/O ウェイト ほか)。`PLATFORM ?= pc98` で選ぶ
-├── include/        カーネル内の共通ヘッダ (memmap.h, gfx_hal.h, wab_xe10.h 等)。io.h / cpu.h は原始命令の**契約**だけ、platform_*.h は機種境界の契約
+│       └── kernel/ GDT/IDT/TSS・#DF・例外の受け口・入口 asm (kentry.asm)・リング 3 降下 (ring3_entry.asm)
+│   (arch/ppc/ は PowerPC: 入口 asm・例外・HPT・decrementer・exec の arch の口)
+├── platform/       機種依存の実装。`PLATFORM ?= pc98` で選ぶ。固定名 platform_*.h は機種ごとに差し替える契約の実装
+│   ├── pc98/       入口の 3 つの局面 (kernel.c)・起動の段・スプラッシュ・PIT とシステムクロック・表示の provider
+│   │   └── legacy/ V86 モニタ・低位メモリ・v86.mod の結線と、BIOS・PIC・KBD・I/O の模擬
+│   └── powermac/   入口の 3 つの局面 (ppc_kernel.c)・起動 (kernel_boot.c)・OF・MPIC・GMAC・コンソール
+├── include/        カーネル内の共通ヘッダ (memmap.h, gfx_hal.h 等)。io.h / cpu.h は原始命令の**契約**だけ、platform_*.h は機種境界の契約、*_contract.h は共通と装置の間の口 (共通は装置のヘッダを読まない — design/tools/check_layers.md §8)
 ├── drivers/        ハードウェアドライバ (装置の種類ごと。部品の窓口 *_module.c と本体 *_body.c、表示のバックエンドは装置の隣)
-│   ├── base/       装置の共通層 (デバイス登録簿 dev)
+│   ├── base/       デバイス登録簿の実装 (dev.c。口 dev.h は kernel/dev/)
 │   ├── ata/        IDE・ATAPI と cd.mod
-│   ├── block/      FDC・論理ディスク・ループバック・PC-98 区画表・SCSI 定数
+│   ├── block/      FDC・論理ディスク・ループバック・FatFs の装置層 (fat_diskio.c)・SCSI 定数
+│   ├── hostdrv/    NP21/W の HostDrv (/host) の FS (エミュレータの I/O ポートの口)
 │   ├── char/       シリアル・RTC・NP21/W ハイパーコール
 │   ├── dma/        8237 DMA
 │   ├── input/      キーボード・マウス
@@ -239,11 +243,10 @@ os32-v3/
 │   ├── net/        LAN カード (ne2000/ — DP8390 系と LGY-98、e82557/ — Intel 8255x と lan.mod)
 │   ├── sound/      音源 (fm/ — OPN・サウンドエンジンと fm.mod、cs4231/ — CS4231 PCM と pcm.mod)
 │   └── video/      表示装置 (kcg/ — 漢字 ROM と kcg.mod、cirrus/ — Cirrus・Xe10 グルー・HAL バックエンドと cirrus.mod、geforce/ — GeForce の HAL バックエンドと geforce.mod、pc98/ — 内蔵表示 (GDC planar・PEGC) のバックエンド)
-├── gfx/            描画 HAL の共通層だけ (gfx_core・VRAM・スクロール・パレット。バックエンドは drivers/video/)
-├── fs/             VFS・fd・リダイレクト・パイプ (共通層)
+├── gfx/            描画 HAL の共通層だけ (gfx_core・スクロール・パレット。PC-98 の VRAM への提示とバックエンドは drivers/video/)
+├── fs/             VFS・fd・リダイレクト・パイプ (共通層)、PC-98 の区画表 pc98pt.[ch] (ローダ・ユーザーランドと共有)
 │   ├── ext2/       ext2 (NHD の主 FS)
 │   ├── fat/        FatFs の VFS 結線 (fatfs/ — vendor の FatFs、中身は不変)
-│   ├── hostdrv/    HostDrv (/host)
 │   ├── isofs/      ISO9660 (CD-ROM)
 │   └── serialfs/   SerialFS (シリアル・LAN 越しの /host)
 ├── net/            リンク層 (link.c)
@@ -253,7 +256,7 @@ os32-v3/
 ├── hwdev/          装置の核 HWDEV の部品 (hwdev.mod) の中身
 ├── lib/            汎用ライブラリ (utf8, path, sqlite3, zlib, microtar 等。vendor したものは各ディレクトリの README.OS32 が出所とライセンスの正典)
 ├── userland/       ユーザー空間 (shell/, gshell/ (GUI シェル, Rust), cmds/, system/, tests/, rust/ (libos32gui 等), lib/)
-├── .github/        GitHub Actions (workflows/check.yml: 静的ゲート、workflows/build.yml: 本体ビルド + check-fast)
+├── .github/        GitHub Actions (workflows/check.yml: 静的ゲート、workflows/build.yml: 本体ビルド + 全部の検査を変異込みで)
 ├── apps/           git submodule (ske-studio/os32-apps) — 標準アプリ。make external / make apps
 ├── game/           git submodule (ske-studio/os32-game) — 対戦スゴロク RPG。make external / make game
 ├── docs/hw/        PC-98 資料のローカルミラー (git 管理外、tools/sync_hwdocs.sh)
@@ -272,6 +275,8 @@ os32-v3/
 ファイルごとの役割は DEVELOPMENT.md §2 (ファイル地図)。この配置にした理由と旧い配置からの対応表は票 TASK_SRC_LAYOUT §2・§3 (記録)。
 
 ### §8-4 ホスト側イメージ生成ツール
+
+> **ゲストを止めた後の NHD (2026-11-15)**: 変異の像などでゲストを hlt で止めたまま NP21/W を停止した後は、次を配備する前に `nhd_deploy.py pull` → `e2fsck -fn` で調べ、エラーがあれば `e2fsck -fy` で直す (W4e の変異の後に本 NHD の ext2 に書きかけが残った)。
 
 #### `tools/nhd_deploy.py` (現行の標準デプロイツール)
 NHD HDDイメージの管理をホスト側で一元化するデプロイメントツール。`deploy.yaml` に基づき、カーネル・ローダー・全ファイルを一括デプロイする。
@@ -296,7 +301,7 @@ make deploy                                                # HostDrv 同期 → 
 > 状態ではコピーが失敗またはサイレントに無効化される。**必ず
 > `tools/np21w_ctl.py stop` → `make deploy-kernel` → `tools/np21w_ctl.py start --ini np21x64w.ini`
 > の順で実行**し、デプロイ後は `ver` の Build タイムスタンプで反映を確認すること
-> ([反映確認](POLICY_DEBUG.md#2-バイナリ反映の確認-最優先) / [HostDrv の共有状態](design/fs/hostdrv/hostdrvfs.md#落とし穴))。
+> ([反映確認](POLICY_DEBUG.md#2-バイナリ反映の確認-最優先) / [HostDrv の共有状態](design/drivers/hostdrv/hostdrvfs.md#落とし穴))。
 
 <a id="ビルドターゲット"></a>
 Makefile ターゲットとの対応 (`build/deploy.mk`)。**このリポジトリで
@@ -426,9 +431,9 @@ python3 tools/gen_memmap.py --manifest --check
 
 | ターゲット | 回すもの | いつ | 所要時間 |
 |---|---|---|---|
-| `make check-fast` | 全検査を変異なし | GitHub の CI の build ジョブ (取り込みの検査)。手元では回さない | 304.24秒 (2026-10-04、-j4/qemu、build変更によるmake変種9回込み) |
-| `make check-changed` | 段と当たりから選んだ列を実行。当たりだけ変異込み。docs だけなら文書系のみ | 使わない (取り込みの検査は CI、実装者は触った試験だけ、PARALLEL_BRANCHES §3) | 選択集合に依存 |
-| `make check` | 全検査を変異込み | GitHub の workflow `full-check` (毎晩と手動、ROLES §0「検査」) | 967.50秒 (16分7.5秒、2026-10-04、-j4/qemu、レビュー修正後)。改修前の当日ログは12〜48分で条件差あり |
+| `make check-fast` | 全検査を変異なし | 手元で全体をざっと見たい時 (関門ではない) | 304.24秒 (2026-10-04、-j4/qemu、build変更によるmake変種9回込み) |
+| `make check-changed` | 段と当たりから選んだ列を実行。当たりだけ変異込み。docs だけなら文書系のみ | 手元で、変えた所に関係する検査をまとめて見たい時 (関門ではない。30 分を超えるなら止めて push する) | 選択集合に依存 |
+| `make check` | 全検査を変異込み | GitHub の CI の build の `checks` (6 シャード、取り込みの関門)。手元では回さない | 967.50秒 (16分7.5秒、2026-10-04、-j4/qemu、レビュー修正後)。改修前の当日ログは12〜48分で条件差あり |
 
 上の所要時間を測った条件と RED/GREEN の記録はアーカイブ `docs/archive/v3/TASK_T2D_T2H_RECORDS.md`。
 `MUTATE=1` / `0` / `sel` と `MUTATE_TARGETS` で変異を切り替える。
@@ -438,7 +443,8 @@ python3 tools/gen_memmap.py --manifest --check
 
 **誰がいつ回すか**: 実装者・PM の担当、`MUTATE=0`・lint の条件、取り込みの検査の 3 段は、正典 [ROLES §0「検査」](tasks/agents/ROLES.md) に従う。
 
-段の取り込みは GitHub の CI で検査し、変異込みの全体は GitHub の `full-check` で回す ([ROLES §0「検査」](tasks/agents/ROLES.md))。
+段の取り込みは GitHub の CI で検査する。CI は全部の検査を変異込みで回す ([ROLES §0「検査」](tasks/agents/ROLES.md)、`docs/POLICY_CI.md` G1)。夜だけ・手動だけの全体検査は無い。
+機種依存の分離の枝 (`wt/sep-*`) には workflow `sep` があり、push ごとに変異込みの全検査 (6 シャード) と「生成物が基点と同じ」を回す。既存の CI の欠点を直した手本として組んであり、手元でも同じ入口 (`python3 -B tools/ci/gate.py run --shard 0/6 --out <置き場>`) で回せる ([design/tools/ci/gate.md](design/tools/ci/gate.md)、[sep_identity.md](design/tools/ci/sep_identity.md))。
 変更は基点からHEADまでと、未コミット (staged/unstaged)・未追跡の和。
 基点は `tools/checks/run.py` の `BASE_REFS` (main、origin/main、feat/gui、origin/feat/gui の順) に見つかる merge-base。
 merge-base が HEAD と同じ作業枝では **HEAD** を使い、直前の取り込みを変更に数えない。
@@ -473,7 +479,7 @@ merge-base が HEAD と同じ作業枝では **HEAD** を使い、直前の取�
 | 翻訳単位の結果 (`tools/clang_ast/result_cache.py`) | `check-c-dialect`・`check-p2v`・`check-arch-asm` とその host 試験の単位ごとの指摘 | `${XDG_CACHE_HOME:-~/.cache}/os32/checks/v1/<道具>/` | `OS32_CHECK_CACHE=<置き場>` / `off` |
 | host32 の固定物 (`tools/tests/host32.py` の `build()`) | `host32.build` で組む host 試験の実行物 | `${XDG_CACHE_HOME:-~/.cache}/os32/host32-fixtures/` (512 MiB / 8192 件で古い順に消す) | `OS32_HOST32_CACHE=<置き場>` / `off` (= 今までの `build/out/host32-fixtures/`) |
 
-- 環境変数 `CI` が空でなく、切り替えを指定していないときは、結果のキャッシュは使わず、固定物は `build/out/` に置く。build の check-fast は `OS32_CHECK_CACHE=$RUNNER_TEMP/check-cache` を明示し、ジョブ内でだけ結果を共有する。actions/cache への保存・復元はせず、ジョブ終了で捨てる。c-dialect-host は check-c-dialect の完了を待って温めを再利用し、p2v は同じ検査内の2回の走査で共有する。full-check の既定は変えない。
+- 環境変数 `CI` が空でなく、切り替えを指定していないときは、結果のキャッシュは使わず、固定物は `build/out/` に置く。build の checks は `OS32_CHECK_CACHE=$RUNNER_TEMP/check-cache` を明示し、ジョブ内でだけ結果を共有する。actions/cache への保存・復元はせず、ジョブ終了で捨てる。c-dialect-host は check-c-dialect の完了を待って温めを再利用し、p2v は同じ検査内の2回の走査で共有する。full-check の既定は変えない。
 - 結果の鍵: 単位のソースと全部の依存 (system・生成ヘッダを含む) の生のバイト、`clang -E` の展開結果、元の引数と実効の引数、`clang --version` と libclang の版、検査器と `tools/clang_ast/` の中身の hash。作業木の root は `<root>` に直してから入れるので、ほかの作業木でも当たる。解析の失敗は保存しない。当たっても make の dry-run・言語モード・探り・SDK の検査は毎回回る。
 - 固定物の鍵: 前処理の結果、引数 (作業木の root と一時ディレクトリの名前は直す。`-Wl,`・`-Xlinker`・`-L`・`-D` とその値は直さない。`-g` のときは何も直さず cwd も入れる)、コンパイラの識別、`.o`/`.a` の中身。
 - C のコンパイルは `tools/tests/cc_cache.py` で ccache を選択的に使う。host32 と対応する host/cross 試験では、通常のコンパイルとリンクを翻訳単位ごとに分け、変異で変わらない単位を再利用する。PATH は包まない。`OS32_NO_CCACHE=1` で無効。`-g` 付きのコンパイルとリンクなど、分割の影響があり得る呼び出しは直接実行する。`base_dir` のパス書き換えと sloppiness は使わず、`__FILE__`・デバッグ情報・cwd を保つ。
@@ -674,7 +680,7 @@ python3 tools/mkpkg.py --list packages/NORMAL.PKG                # 中身の一�
 
 cdinst の展開は依存の順 BOOT → MINIMAL → GUI → NORMAL → DEBUG。Minimal だけの HDD で
 `/etc/system.cfg` が `GUI=1` でも、gshell が無いのでカーネルは `gshell load failed -> CUI shell`
-を出して CUI で上がる (`init/kernel.c` のシェル起動ループ。shlib が無いのは
+を出して CUI で上がる (`platform/pc98/kernel.c` のシェル起動ループ。shlib が無いのは
 `[shlib] ... not found (GUI shlib disabled)` で、拒否理由は立たない)。
 
 **MINIMAL =「起動して、HDD に入れて、壊れたときに直して、残りを取ってこられる」
@@ -1054,7 +1060,7 @@ python3 tools/check_nano_inputs.py --cross-dir "$CROSS_DIR" --record-built \
 各変数はそのtoolchainを作った未改変の実入力へ設定する。元の入力が残っていない場合は
 `tools/ci/build_cross.sh --prefix "$CROSS_DIR" --work "$CROSS_WORK" < /dev/null`
 で作り直す (§8-5冒頭の手順)。構築スクリプトが同じ検証とreceipt生成を行う。
-CIの `build.yml` は `make check-fast` の同じ検査を使う。
+CIの `build.yml` は `make check` の同じ検査を使う。
 CI再構築ではDWARF内のbuild path等が異なり得るため、手元のアーカイブhashとのbyte一致は要求しない。
 `tools/ci/build_cross.sh` はtarball/関連ソースの固定hash・実configure・CFLAGS・nano提供元を
 検査した後、構築固有のhashをprefix直下の `os32-nano-build.json` に記録する。
@@ -1112,9 +1118,9 @@ Windows 表記へ変換して使う。変換が合わない環境では環境変
 ### §8-6 GitHub Actions での本体ビルド
 
 `.github/workflows/build.yml` (workflow 名 `build`) は、配布物の `artifacts` と
-検査6シャード (`check-fast (0)`〜`check-fast (5)`) を依存関係なしで並列に動かす。
+検査6シャード (`checks (0)`〜`checks (5)`) を依存関係なしで並列に動かす。
 共通の composite action で準備し、`artifacts` は core の完全ビルド・配布物の upload を行う。
-各検査シャードは `make -k check-fast CHECK_SHARD=i/6` を回し、そのシャードの CHECK needs
+各検査シャードは `make -k check CHECK_SHARD=i/6` (全部の検査を変異込み) を回し、そのシャードの CHECK needs
 (推移的な check 前提を含む) に必要な make 前提だけを `check-prepare` で組む。
 main へ入れる判定は配布物・検査6本と静的ゲートの `check.yml` がすべて合格すること
 (変異込みの `make check` は回さない)。arch-asm と le-access は build の全範囲検査に集約し、
@@ -1147,12 +1153,13 @@ budget は重みの2倍で、超過は警告だけ。未計測の検査は CHECK
 | 項目 | 内容 |
 |---|---|
 | 起動 | `main` / `wt/**` への push、tag `v*` の push、手動 (workflow_dispatch)。同じ ref の古い run は打ち切る |
-| ビルド | `artifacts`: `make -j$(nproc) all` → `make -j$(nproc) deploy-u3 iso` (一時 `HOSTDRV_DIR` / `NP21W_DIR`) → upload。配布物の 1 呼出しで起動 FD 2 種・ISO・HostDrv を同じ build に揃え、世代表・期待表を今の成果物から再生成する。並列の `check-fast` 6本: `make -k check-fast CHECK_SHARD=i/6` (必要な前提だけ準備、同じ SHA の統合枝で成功済みなら検査を省略) |
+| ビルド | `artifacts`: `make -j$(nproc) all` → `make -j$(nproc) deploy-u3 iso` (一時 `HOSTDRV_DIR` / `NP21W_DIR`) → upload。配布物の 1 呼出しで起動 FD 2 種・ISO・HostDrv を同じ build に揃え、世代表・期待表を今の成果物から再生成する。並列の `checks` 6本: `make -k check CHECK_SHARD=i/6` (全部の検査を変異込み。必要な前提だけ準備、同じ SHA の統合枝で成功済みなら検査を省略) |
 | 準備・runner | `.github/actions/build-setup/action.yml` が ccache の静的本体 (版と SHA-256 を固定)・apt・Rust・クロスツールチェーンとフォントのキャッシュ・取得を共有する。配布物と検査ジョブは `ubuntu-latest` (自前の runner substream は遅いので使わない、ユーザー決定 2026-11-05)。同じ ref の concurrency をジョブ別にも設ける |
 | submodule | **`apps/` と `game/` (private submodule) は v3 の CI では組まない** (ユーザー決定 2026-09-30: 今回の開発に要らないので `SUBMODULE_TOKEN` は登録しない)。必要になったら secret `SUBMODULE_TOKEN` (os32-apps / os32-game の Contents: read を持つ fine-grained PAT) で submodule 取得 + `make external` の step を足す (FORK_PLAN §3 d ③ (アーカイブ: `docs/archive/v3/FORK_PLAN.md`)) |
 | フォント | IPAex の TTF はリポジトリに無く `tools/fetch_fonts.py` が IPA の公式配布から取る (§8-2)。CI は `OS32_ACCEPT_IPA_LICENSE=1` で非対話に同意し (リポジトリ所有者が同意済みの前提)、取れた ttf を key `ipaex-<zip の SHA-256>` (`fetch_fonts.py --print-zip-sha256`) で `actions/cache` に置く |
 | 文書だけの push | `docs/**`・`*.md`・`.claude/**` だけの push では回さない (`paths-ignore`。文書の検査は `check.yml`)。同じ ref の run は 1 つ (`cancel-in-progress`) なので、**run の途中でその ref へ push すると打ち切られる** |
 | ツールチェーン | `tools/ci/build_cross.sh` (§8-5) で `~/opt/cross` に作り、`actions/cache` で保存。キーは `cross-i386-elf-<OS>-gcc<版>-newlib<版>-<構築入力/builder/inventory名のSHA256>` (`check_nano_inputs.py --cache-key`)。**構築入力・builder・inventory名を変えたときに作り直す**。SDK用ソース/patch・local hash値の変更はキーを変えない。os32 での実測 (2026-09-23): 初回はツールチェーン約 25 分、キャッシュが効けば run 全体で約 2 分 (ubuntu-latest 4 vCPU、キャッシュ 335MB)。os32-v3 での実走はまだ (最初の push で見る) |
+| PowerPC (段1) | check.yml の専用 job `ppc-compile` だけが `ppc-setup` を使い、`tools/ci/build_cross_ppc.sh` で nano newlib 付き toolchain を別キーに保存。`PPC_CROSS_DIR` と `OS32_REQUIRE_PPC=1` を渡し、`check-ppc-compile` で `KBOOT_SH=1` の像を組む (QEMU 不要)。auto は origin/main との merge-base からの差で PPC・共通変更を選び、統合枝は常時実行。手動 arch は auto/x86/ppc/both。PowerPC の検査も変異込みで回す。 |
 | Rust | `rust-toolchain.toml` (nightly + rust-src) を `rustup toolchain install` (引数なし) で解決。`target/` のキャッシュは無し (最小構成。遅ければ `Swatinem/rust-cache` を足す) |
 | apt | `build-essential nasm genisoimage e2fsprogs qemu-user clang libclang-dev llvm-dev python3-clang` + ツールチェーン構築の `libgmp-dev libmpfr-dev libmpc-dev texinfo bison flex`。`.deb` を `actions/cache` に保存し、キーは OS の版・arch・runner image の版・パッケージ一覧の SHA-256。miss 時だけ既定ミラーから取得し、復元後は `/var/cache/apt/archives` から `--no-download` で入れる。Host dependencies の上限は 1200 秒、共通準備全体は 90 分。Python は `requirements.txt`。FD イメージは `tools/mkfat12.py` (純 Python) なので mtools は要らない |
 | 上限 | 配布物・各検査シャードとも `timeout-minutes: 150` |
@@ -1185,7 +1192,7 @@ tools/ci_fetch.sh --dry-run             # 選ばれる run と artifact を表�
 ```
 
 指定 SHA (短縮可) / ブランチの最新の `build.yml` run を、run 全体の status で絞らず選ぶ。
-その run の `artifacts` ジョブが成功していれば、検査の完了を待たず取得する。`check-fast` が失敗・実行中なら
+その run の `artifacts` ジョブが成功していれば、検査の完了を待たず取得する。`checks` が失敗・実行中なら
 その旨を 1 行表示する (調べの版も取得できる)。`artifacts` が未完了なら待機中と表示して終了 1、
 `--wait` なら 10 秒ごとに待つ。`artifacts` が失敗・取消等なら取得せず終了 1。
 
@@ -1211,10 +1218,16 @@ tools/ci_fetch.sh --dry-run             # 選ばれる run と artifact を表�
 製品規則は `build/targets/`、共有コンパイル規則は `build/kernel-objects.mk` にある。
 新しい選択 mk は通常の再構築依存であり、同じ出力先の target 変更は拒否する。
 `FEATURE_*` の off は完全非搭載サービスが未実装のため `kernel-compile` 専用。
+像の構成 (どの機能を入れるか) は arch・platform と独立の軸で、`build/images/<IMAGE>.mk` が決める
+(x86-pc98 の既定は `pc98`、ppc-powermac の既定は `kboot-link`。設計は
+[design/build/select.md](design/build/select.md))。
 
-PowerPC の `make ARCH=ppc PLATFORM=powermac` は compile-only で、
-`PPC_CROSS_DIR=/home/hight/opt/cross-ppc`、出力 `build/out/ppc-powermac` を使う。
-未分離の共通候補のエラーは測定結果として残し、リンク・module・SDK・配備へは進めない。
+PowerPC の `make ARCH=ppc PLATFORM=powermac [IMAGE=kboot-*]` は製品の像 `PPCKERN.ELF` を組む。
+ソースは x86 と同じ所有者集合から像の構成で選び、規則は `build/targets/ppc-powermac.mk` が持つ
+(最上位からは sub-make で呼ぶ。`make ARCH=ppc PLATFORM=powermac` に `KBOOT_LINK`・`KBOOT_SH`・`KBOOT_SHELL`
+の旗を渡しても同じ像を選べる)。`PPC_CROSS_DIR=/home/hight/opt/cross-ppc`、出力は `build/out/ppc-kboot/` の下。
+module・SDK・配備へは進めない (明示エラー)。共通のソースが機種のヘッダを読む辺は
+`tools/check_layers.py` が両方の像で数える。
 独立 bootstrap は `make ppc-boot` / `make ppc-boot-check`。
 原始命令ヘッダだけを足して移植完了とはしない（[arch の手順](../arch/README.md)）。
 

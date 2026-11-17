@@ -39,7 +39,8 @@ int gf_production_quiesce(struct gf_production *p) { (void)p;return -1; }
 int gf_production_point(void *p) { (void)p;return -1; }
 int pc98_route_select_98(void) { return 0; }
 int pc98_route_to_98(void) { return 0; }
-static int return_registered;
+static int return_registered, wc_acquires;
+static int fixture_wc_start(void) { CHECK(return_registered); wc_acquires++; return 1; }
 void gf_production_set_return(int (*callback)(void *),void *opaque)
 { (void)callback;(void)opaque;CHECK(registered);return_registered++; }
 GfxCounters gfx_counters;
@@ -121,6 +122,7 @@ void _start(void)
     read_input(input,sizeof(input)); read_input(file,sizeof(file));
     kmemcpy(&imports[0].name_hash,file+152,4);
     kmemcpy(&exports[4].name_hash,file+164,4); exports[4].version=1;
+    fixture_platform.wc_start=fixture_wc_start;
     context.platform=&fixture_platform;
     fixture_platform.opaque=&production;
     CHECK(!gf4_data_bind(&context.display_data,&context.display_state));
@@ -241,11 +243,11 @@ void _start(void)
     int rc=module_start(geforce_handle);
     CHECK(!probes && !enables); /* KDEBUG=0 registration never starts hardware. */
     if (input[1]) {
-        CHECK(rc==MODULE_INIT_FAILED && !registered && !r->registration_refs);
+        CHECK(rc==MODULE_INIT_FAILED && !registered && !r->registration_refs && !wc_acquires);
         CHECK(!accel_slot && !geforce_accel_ops());
         CHECK(!gfx_backend_geforce.probe()); empty(); finish(0);
     }
-    CHECK(!rc && registered && r->registration_refs==2 && return_registered==1);
+    CHECK(!rc && registered && r->registration_refs==2 && return_registered==1 && wc_acquires==1);
     production_bind();
     CHECK(geforce_foundation_ops()==&gf1_module_ops);
     CHECK(geforce_accel_ops()==&accel_ops_a);

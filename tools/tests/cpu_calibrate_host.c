@@ -162,7 +162,7 @@ static void delay_scale(void)
 
     /* **つまり cpu_delay_us の利用者は実待ちが 10 倍に伸びる。**
      * drivers/char/serial.c (TxRDY のポーリング間隔)、drivers/net/ne2000/ne2000.c
-     * (RDC / RESET / OVW)、gfx/gfx_vram.c (RASTER_LINE_US) の 3 つ。
+     * (RDC / RESET / OVW)、drivers/video/pc98/gfx_vram.c (RASTER_LINE_US) の 3 つ。
      * いままで**短すぎた**ので、伸びるのが正しい向き。 */
     CHECK(good > bad);
 }

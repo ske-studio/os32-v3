@@ -655,8 +655,8 @@ class Ledger(unittest.TestCase):
 
     def test_jmpbuf_length_not_hardcoded(self):
         self.assertEqual(jmpbuf_hardcoded(), [])
-        v86 = paging_source(ROOT / 'arch/x86/legacy/v86.c')
-        self.assertIn('k_jmpbuf jmpbuf', (ROOT / 'arch/x86/legacy/v86_mem.h').read_text())
+        v86 = paging_source(ROOT / 'platform/pc98/legacy/v86.c')
+        self.assertIn('k_jmpbuf jmpbuf', (ROOT / 'platform/pc98/legacy/v86_mem.h').read_text())
         self.assertIn('#define v86_jmpbuf v86_session.jmpbuf', v86)
 
     def test_broker_judgement_unchanged(self):

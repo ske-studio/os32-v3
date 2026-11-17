@@ -8,7 +8,7 @@
 /* PIT_MODE is defined in pc98.h. */
 
 /* システムクロックは機種で 2 通り (1.9968MHz / 2.4576MHz)。**決め打ちしない** */
-/* — 判定は kernel/time/sysclk.c、分周の算数は platform/pc98/pit_math.c。               */
+/* — 判定は platform/pc98/sysclk.c、分周の算数は platform/pc98/pit_math.c。               */
 /* 直す前はここに PIT_CLOCK = 1996800 があり、2.4576MHz 系では 100Hz のつもり */
 /* の tick が 123Hz (8.125ms) になっていた (docs/POLICY_DEBUG.md#4-54-pit-の実時間)。    */
 
@@ -24,6 +24,9 @@
  * **既定 PIT_HZ を積んだ** (タイマ無しで起動を続けない)。いまは PIT_HZ
  * 以外を受けない (票 TASK_HAL_WIRING §1-0)。 */
 int pit_init(unsigned int hz);
+
+/* PIT #0 の現在値だけをラッチして読む。 */
+unsigned int pit_read_count(void);
 
 /* platform/pc98/pit.c が所有する、直前の pit_init が積んだ設定。valid = 0 なら一度も積んでいない。 */
 const struct pit_setup *pit_get_setup(void);

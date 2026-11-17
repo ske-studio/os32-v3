@@ -4,12 +4,14 @@ The scheduler and resident poll are boundary stubs. Full thermal/module
 composition belongs to U6; no sensor timing or IRQ execution is modeled here.
 """
 CHECK = dict(name='exec-fgpoll-host', tier=1, budget=2.7,
-             covers=['tools/tests/test_exec_fgpoll.py',
+             covers=['kernel/idle_work.h', 'net/nic.h', 'tools/tests/test_exec_fgpoll.py',
                      'exec/exec_schedule.inc', 'exec/appslot.h', 'exec/exec.h',
                      'tools/tests/kernel_includes.py', 'tools/tests/host32.py',
                      'build/config.mk', 'include/**', 'arch/x86/**',
                      'sdk/include/os32/**', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py',
-                     'mm/paging.h', 'fs/vfs_stdin.h', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h'])
+                     'mm/paging.h', 'fs/vfs_stdin.h', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h'],
+    basis=['AC-CTX-4', 'IO_TIER_DESIGN §2'],
+)
 
 import argparse
 import os
@@ -33,6 +35,11 @@ def function(source, name):
 
 
 HOST = r'''
+#include "net/nic.h"
+void idle_work_run(void) { }
+static int enabled = 1, recent;
+int _irq_enabled(void) { return enabled; }
+int net_rx_recent(u32 ms) { return recent && ms == NET_RX_ACTIVE_MS; }
 #include "appslot.h"
 #include "host_exec_context.h"
 #include "exec.h"
@@ -101,6 +108,7 @@ void _start(void) {
         CHECK(ring3_park_reject_count == (u32)(mode != 0));
     }
     /* Each early yield halt, including CUI and CPL0, dispatches once. */
+    for (int wait = 0; wait < 3; ++wait)
     for (int mode = 0; mode < 7; mode++) {
         reset();
         if (mode == 0) { gui = 0; g_cur_app = 0; g_cur_frame = 0; }
@@ -110,10 +118,11 @@ void _start(void) {
         if (mode == 4) reject = -1;
         if (mode == 5) bad_slot = 1;
         if (mode == 6) bad_slot = 2;
-        CHECK(exec_sys_yield() == 0 && polls == 1 && halts == 1 && !transfers);
+        enabled = wait != 2; recent = wait == 1;
+        CHECK(exec_sys_yield() == 0 && polls == 1 && halts == (wait == 0) && !transfers);
         CHECK(ring3_park_reject_count == (u32)(mode >= 5));
     }
-    reset();
+    reset(); enabled = 1; recent = 0;
     CHECK(exec_sys_yield() == 0 && polls == 1 && !halts && transfers == 1);
     say("GREEN foreground before park/halt\n");
     die(0);
@@ -148,6 +157,15 @@ def main():
         folder = Path(td)
         run_case(folder, source, 'poll/yield')
         if args.mutate:
+            gate = 'if (_irq_enabled() && !net_rx_recent(NET_RX_ACTIVE_MS)) _halt();'
+            for context in ('if (!con_sink_is_enabled()) {',
+                            'if (!g_cur_app || !g_cur_app->cpl3 || g_cur_frame == 0) {',
+                            'if (appslot_park_yield_check() < 0) {',
+                            'ring3_park_reject_count++;'):
+                anchor = context + '\n        ' + gate
+                assert source.count(anchor) == 1, context
+                run_case(folder, source.replace(anchor, context + '\n        _halt();'),
+                         'yield-RX/' + context, mutant=True)
             for name in ('exec_park_poll', 'exec_sys_yield'):
                 original = function(source, name)
                 anchor = '    exec_gfx_poll();\n'

@@ -5,7 +5,9 @@ CHECK = dict(name='debug-probe', tier=1, needs=[], budget=3.5,
             'kernel/module/module_schema.h', 'include/types.h', 'include/memmap.h',
             'sdk/include/os32/os32_kapi_shared.h', 'lib/kstring.h', 'lib/kstring_c.c',
             'tools/tests/debug_probe_host.c', 'tools/tests/host32.py',
-            'tools/tests/kernel_includes.py', 'build/config.mk', 'build/kernel.mk'])
+            'tools/tests/kernel_includes.py', 'build/config.mk', 'build/kernel.mk'],
+    basis=['KDBG_PROBE_DESIGN'],
+)
 import os
 from pathlib import Path
 import subprocess

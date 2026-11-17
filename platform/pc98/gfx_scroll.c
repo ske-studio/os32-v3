@@ -1,3 +1,4 @@
+#include "pc98.h"
 #include "gfx_internal.h"
 #include "display_restore.h"
 

@@ -1,3 +1,5 @@
+#include "x87.h"
+#include "x87_nm.h"
 #include "../../../kernel/sqlite_engine.h"
 #include "../../../kernel/console/font_guard.h"
 #include "../../../kernel/module/module_runtime.h"
@@ -59,7 +61,7 @@ extern volatile int ring3_in_syscall;
 extern volatile int ring3_wm_depth;
 
 #include "serial_diag.h"
-#include "tvram.h"
+#include "text_screen.h"
 #include "../../../include/platform_emergency.h"
 
 /* シリアルポートにもログを出力するためのヘルパー */
@@ -537,7 +539,7 @@ void isr_unexpected_report(u32 irq)
 
 /* ======================================================================== */
 /*  timer_handler — タイマ割り込みハンドラ (IRQ0)                           */
-/*  tick_countのインクリメントはASMスタブで行う                             */
+/*  tick_count は ASM スタブから呼ぶ tick_clock_step で進める               */
 /* ======================================================================== */
 #include "../../../kernel/irq/tick.h"
 
@@ -547,4 +549,18 @@ void timer_handler(void)
     r1_fixture_timer();
 #endif
     tick_dispatch();
+}
+
+void nm_handler(struct x87_nm_frame *frame)
+{
+    if (x87_probe_nm(frame->cs, frame->eflags, &frame->eip)) return;
+    if ((frame->cs & 3u) == 3u && !(frame->eflags & (1u << 17))) {
+        struct x87_emu_trap trap;
+        x87_nm_read(frame, &trap);
+        if (x87_emulate_nm(&trap)) {
+            x87_nm_write(frame, &trap);
+            return;
+        }
+    }
+    exception_handler(frame->error, frame->vector, frame->eip, &frame->edi);
 }

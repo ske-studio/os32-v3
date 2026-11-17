@@ -1,15 +1,34 @@
 /* Real link.c/A11 under ILP32, no libc. Only IRQ/clock/NIC are seams. */
-#define LINK_HOST_TEST
 #include "types.h"
+volatile u32 kctx_irq_depth;
 volatile u32 tick_count;
+u32 link_platform_now(void) { return tick_count; }
+u32 tick_clock_ms(void) { return tick_count * 10u; }
 static unsigned int test_if = 1;
-unsigned int link_test_irq_save(void) { unsigned int f = test_if; test_if = 0; return f; }
-void link_test_irq_restore(unsigned int f) { test_if = f; }
-void link_test_idle(void) { }
+u32 link_platform_lock(void) { unsigned int f = test_if; test_if = 0; return f; }
+void link_platform_unlock(u32 f) { test_if = f; }
+void link_platform_idle(void) { }
 #include "net/link.c"
 /* API-only fixture: B2 notification behavior is covered by link-core. */
 static int notify_resets;
 void link_notify_reset(void) { notify_resets++; }
+static int tx_calls, tx_busy = 1, tx_reenter, tx_nested;
+static u8 last_op;
+int net_tx(const void *frame, u32 len)
+{
+    (void)len;
+    if (tx_busy) return OS32_ERR_AGAIN;
+    tx_calls++;
+    last_op = ((const u8 *)frame)[LINK_ETH_HDR_LEN + LINK_OFF_OP];
+    if (tx_reenter) {
+        tx_reenter = 0;
+        int before = tx_calls;
+        (void)link_host_open("TIME", 4, 2);
+        tx_nested = tx_calls != before;
+    }
+    return 0;
+}
+u32 net_rx_credit_bytes(void) { return 23 * LINK_PAGE_BYTES; }
 int net_mac(u8 out[6]) { (void)out; return 0; }
 void *kmemcpy(void *dst, const void *src, u32 n)
 {
@@ -48,6 +67,19 @@ static int verify_named_body(void)
     CHECK(link_decl_len("os32.clip GET", 13) == 0);
     CHECK(link_decl_len("os32.print STATUS 1", 19) == 0);
     CHECK(link_decl_len("os32.clip PUT 65537", sizeof("os32.clip PUT 65537") - 1) == 0);
+    CHECK(link_decl_len("SFS CALL 20", sizeof("SFS CALL 20") - 1) == 20);
+    CHECK(link_decl_len("SFS CALL 1044", sizeof("SFS CALL 1044") - 1) == 1044);
+    CHECK(link_decl_len("SFS CALL 1045", sizeof("SFS CALL 1045") - 1) == 0);
+    CHECK(link_decl_len("SFS CALL 0", sizeof("SFS CALL 0") - 1) == 0);
+    CHECK(link_decl_len("SFS CALL", sizeof("SFS CALL") - 1) == 0);
+    for (int invalid = 0; invalid < 2; ++invalid) {
+        const char *req = invalid ? "SFS CALL 1045" : "SFS CALL 0";
+        i32 h = link_host_open(req, invalid ? 13 : 10, 1);
+        CHECK(h == 0);
+        CHECK(link_host_write(h, "x", 1, 1) == OS32_ERR_INVAL);
+        CHECK(link_host_close(h, 1) == 0);
+        link_h[h].rel_pending = 0;
+    }
     return 0;
 }
 static int verify(void)
@@ -94,11 +126,43 @@ static int verify(void)
     CHECK(test_if == 1);
     return 0;
 }
+static int verify_immediate_tx(void)
+{
+    kmemset(link_h, 0, sizeof(link_h));
+    link_state = LINK_S_UP; link_hs_due = 0; link_next_rid = 1;
+    tx_busy = 0; tx_calls = 0;
+    u32 now = tick_count;
+    i32 h = link_host_open("ECHO 3", 6, 1);
+    CHECK(h == 0 && tx_calls == 1 && last_op == LINK_OP_REQUEST);
+    CHECK(!link_h[h].req_due && tick_count == now && test_if == 1);
+    link_h[h].req_acked = 1;
+    CHECK(link_host_write(h, "abc", 3, 1) == 3);
+    CHECK(tx_calls == 2 && last_op == LINK_OP_WDATA && tick_count == now);
+    CHECK(!link_h[h].w_due && test_if == 1);
+    kctx_irq_depth = 1;
+    h = link_host_open("ECHO 3", 6, 1);
+    CHECK(h == 1 && tx_calls == 2 && link_h[h].req_due);
+    link_h[h].req_acked = 1;
+    CHECK(link_host_write(h, "abc", 3, 1) == 3);
+    CHECK(tx_calls == 2 && link_h[h].w_due);
+    kctx_irq_depth = 0;
+    tx_busy = 1;
+    CHECK(link_host_open("TIME", 4, 1) == 2 && link_h[2].req_due);
+    tx_busy = 0; tx_reenter = 1;
+    CHECK(link_host_open("TIME", 4, 1) == 3);
+    CHECK(!tx_nested && !link_tx_pending() && tick_count == now);
+    return 0;
+}
 void _start(void)
 {
     int rc = verify_named_body();
     if (!rc) rc = verify();
+    if (!rc) rc = verify_immediate_tx();
     if (rc) rc = 1;
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc) : "memory");
     __builtin_unreachable();
 }
+
+/* Foreground link fixture: IRQ0 budgeting is exercised by tick_budget_host. */
+u32 tick_budget_cnt(u32 us) { return us; }
+int tick_budget_take(u32 share, u32 tail) { (void)share; (void)tail; return 1; }

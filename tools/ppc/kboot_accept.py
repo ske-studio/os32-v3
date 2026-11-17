@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Milestone-2 acceptance of the real PowerPC kernel (PPC_KBOOT_DESIGN section 2).
 
-Builds build/ppc-kboot.mk, then requires on QEMU mac99:
+Builds the PowerPC kernel image (make ARCH=ppc PLATFORM=powermac), then requires on QEMU mac99:
   - the nine KBOOT milestones, >=2 s READY and a continuing 1 kHz tick (7450 and 7455);
   - each registered negative image: reached marker -> exact FATAL -> stop symbol;
   - with --mutate: each product mutation yields exactly its expected meter verdict.
@@ -22,15 +22,15 @@ from kboot_mutations import KERNEL_NEGATIVES, KERNEL_MUTATIONS, AUDIT_MUTATIONS
 import re
 
 CHECK = dict(name='ppc-kboot-accept', tier=2, budget=900, covers=[
-    'init/ppc_kernel.c', 'arch/ppc/**', 'platform/powermac/**', 'mm/**', 'kernel/sys.c',
+    'platform/powermac/ppc_kernel.c', 'arch/ppc/**', 'platform/powermac/**', 'mm/**', 'kernel/sys.c',
     'kernel/irq/tick.c', 'kernel/time/tick.c', 'fs/fd_redirect.c', 'lib/kprintf.c',
-    'lib/kstring_c.c', 'lib/divdi3.c', 'include/**', 'build/ppc-kboot.mk',
+    'lib/kstring_c.c', 'lib/divdi3.c', 'include/**', 'build/targets/ppc-powermac.mk',
     'tools/ppc/kboot_accept.py', 'tools/ppc/kboot_run.py', 'tools/ppc/kboot_mutations.py',
     'tools/ppc/run.py', 'tools/gen_memmap.py'])
 
 
 def make(out, *settings):
-    result = subprocess.run(['make', '--no-print-directory', '-f', 'build/ppc-kboot.mk',
+    result = subprocess.run(['make', '--no-print-directory', 'ARCH=ppc', 'PLATFORM=powermac',
                              'KB_OUT='+str(out), *settings], cwd=ROOT, text=True,
                             capture_output=True)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -65,7 +65,7 @@ def main():
     base.mkdir(parents=True, exist_ok=True)
     work = Path(tempfile.mkdtemp(prefix='run-', dir=base))
     cpus = ['7450', '7455'] if args.cpu == 'both' else [args.cpu]
-    elf = build(work/'kernel')
+    elf = build(work/'kernel', 'KBOOT_LINK=0')
     skipped = False
     for cpu in cpus:
         evidence = meter.accept(elf, cpu, 60, work/('normal-'+cpu))
@@ -76,14 +76,14 @@ def main():
         meter.accept(elf, cpu, 60, work/('lan-off-'+cpu), lan_off=True)
         print('GREEN LAN OFF '+cpu, flush=True)
     for name, number in KERNEL_NEGATIVES.items():
-        negative = build(work/name, 'NEGATIVE='+str(number))
+        negative = build(work/name, 'KBOOT_LINK=0', 'NEGATIVE='+str(number))
         for cpu in cpus:
             meter.accept(negative, cpu, 30, work/(name+'-'+cpu), name)
             print('GREEN negative '+name+' '+cpu, flush=True)
     red = 0
     if args.mutate:
         for name, source, before, after, expected, evidence_line in KERNEL_MUTATIONS:
-            mutant = build(work/('mutant-'+name),
+            mutant = build(work/('mutant-'+name), 'KBOOT_LINK=0',
                            *mutant_settings(work, name, source, before, after))
             guest = work/('mutant-'+name+'-guest')
             try:
@@ -102,7 +102,7 @@ def main():
             else:
                 raise RuntimeError('SURVIVED '+name)
         for name, source, before, after, finding in AUDIT_MUTATIONS:
-            result = make(work/('audit-'+name),
+            result = make(work/('audit-'+name), 'KBOOT_LINK=0',
                           *mutant_settings(work, name, source, before, after))
             output = result.stdout+result.stderr
             # The image must link; only the audit may reject it, for this reason.

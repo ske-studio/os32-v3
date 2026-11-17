@@ -3,9 +3,14 @@
  * Bit encodings cross-checked with NetBSD oea/pte.h and oea/hid.h. */
 #ifndef OS32_PPC_OEA_H
 #define OS32_PPC_OEA_H
+#define PPC_MSR_POW 0x00040000u
 #define PPC_MSR_EE 0x8000
 #define PPC_MSR_PR 0x4000
+#define PPC_MSR_FP 0x2000
 #define PPC_MSR_ME 0x1000
+#define PPC_MSR_FE0 0x800
+#define PPC_MSR_FE1 0x100
+#define PPC_MSR_FE (PPC_MSR_FE0|PPC_MSR_FE1)
 #define PPC_MSR_BE 0x200
 #define PPC_MSR_IP 0x40
 #define PPC_MSR_IR 0x20
@@ -42,6 +47,8 @@
 #define PPC_HID_LRSTK 0x10
 #define PPC_HID_FOLD 0x08
 #define PPC_HID_BHT 0x04
+#define PPC_HID_NAP 0x00400000
+#define PPC_HID_DPM 0x00100000
 #define PPC_HID_SLEEP 0x00200000
 #define PPC_PTE_V 0x80000000
 #define PPC_PTE_H 0x40
@@ -71,8 +78,11 @@ struct ppc_vector_image;
  * Remaining CPU functions require real mode with interrupts disabled. */
 int ppc_cpu_identify(u32 *pvr);
 void ppc_cpu_disable_bats(u32 pvr);
+void ppc_cpu_power_init(u32 pvr);
 void ppc_cpu_load_segments(void);
 void ppc_cpu_load_sdr1(u32 sdr1);
+/* Foreground wait requires EE=1; preserves EE. */
+void ppc_cpu_nap(void);
 void ppc_enable(void);
 u32 ppc_irq_save(void);
 void ppc_irq_restore(u32 saved_msr);

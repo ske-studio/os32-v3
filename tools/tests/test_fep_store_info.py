@@ -7,7 +7,9 @@ CHECK = dict(name='fep-store-info', tier=1, needs=[], budget=3.5,
             'tools/tests/fep_store_fixture.h', 'tools/tests/host32.py',
             'tools/tests/kernel_includes.py', 'build/config.mk',
             'lib/sqlite3/os32_sqlite_outer.h', 'lib/sqlite3/os32_sqlite_vfs.h',
-            'include/redir_access.h', 'sdk/include/os32/os32_kapi_shared.h'])
+            'include/redir_access.h', 'sdk/include/os32/os32_kapi_shared.h'],
+    basis=['docs/design/kernel/ime/ime_dict_info.md 口', 'docs/design/kernel/ime/ime_dict_info.md 状態と誤り', 'docs/design/kernel/ime/ime_dict_info.md 仕組み'],
+)
 import argparse
 import os
 from pathlib import Path

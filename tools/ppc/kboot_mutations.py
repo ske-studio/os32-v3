@@ -16,7 +16,7 @@ class Negative:
 NEGATIVES = {
     'fixture-fatal': Negative('FATAL fixture', 'KBOOT OF-OFF calls=1',
                               'fixture_stop'),
-    # Real kernel images: make -f build/ppc-kboot.mk NEGATIVE=<n>.
+    # Real kernel images: make ARCH=ppc PLATFORM=powermac NEGATIVE=<n>.
     # 1: unarmed supervisor load from the not-present low megabyte (reason 2 = DSI miss).
     'kernel-dsi': Negative('FATAL trap vector=0x300 reason=0x2 addr=0x80000',
                            'KBOOT MEMORY online=1 heap=1 shm=1', 'ppc_trap_stop'),
@@ -43,7 +43,45 @@ KERNEL_MUTATIONS = (
      'milestone 6 order/format', r'^KBOOT MPIC sources=\d+ priority=0 cpu=0 delivery=bad$'),
     ('half-rate', 'arch/ppc/kernel_dec.c',
      '    period = tb_hz / tick_hz;', '    period = tb_hz / tick_hz * 2;',
-     'ALIVE tick/TB mismatch', r'^KBOOT ALIVE tick_delta=(9\d|10\d) tb_us=20000\d\d of_calls_delta=0$'),
+     'forbidden diagnostic', r'^FATAL kboot dec_rate$'),
+    ('dec-100hz', 'arch/ppc/kernel_dec.c',
+     '''    if (fraction >= PM_DEC_HZ) {
+        fraction -= PM_DEC_HZ;
+        ++value;
+    }
+    return value;
+}
+
+int ppc_dec_start(u32 tb_hz, u32 tick_hz)
+{
+    /* Keep every period positive, and signed DEC additions in range.
+     * Match the F1 admission bounds; DEC is 1ms, logical ticks are 10ms. */
+    if (ppc_irq_enabled() || tb_hz < 1000000 || tb_hz > 1000000000 ||
+        tick_hz != PM_DEC_HZ) return -1;
+    if (tick_clock_config(1, tick_hz)) return -1;
+    ready = 0;
+    period = tb_hz / tick_hz;
+    remainder = tb_hz % tick_hz;
+''',
+     '''    if (fraction >= 100) {
+        fraction -= 100;
+        ++value;
+    }
+    return value;
+}
+
+int ppc_dec_start(u32 tb_hz, u32 tick_hz)
+{
+    /* Keep every period positive, and signed DEC additions in range.
+     * Match the F1 admission bounds; DEC is 1ms, logical ticks are 10ms. */
+    if (ppc_irq_enabled() || tb_hz < 1000000 || tb_hz > 1000000000 ||
+        tick_hz != PM_DEC_HZ) return -1;
+    if (tick_clock_config(1, tick_hz)) return -1;
+    ready = 0;
+    period = tb_hz / 100;
+    remainder = tb_hz % 100;
+''',
+     'forbidden diagnostic', r'^FATAL kboot dec_rate$'),
     ('onfault-reason', 'arch/ppc/kernel_trap.c',
      'reason == PPC_TRAP_DSI_IO) : reason == probe.reason)',
      'reason == PPC_TRAP_DSI_IO) : reason != probe.reason)',
@@ -53,11 +91,11 @@ KERNEL_MUTATIONS = (
      'milestone 5 order/format', TRAP % ('pass', 'pass', 'pass', 'bad')),
     # Not a guard-mapping mutation (D3's kboot_boot.py owns those): this proves
     # the guard word is computed, i.e. a load that does not fault reports bad.
-    ('guard-probe-nonfault', 'init/ppc_kernel.c',
+    ('guard-probe-nonfault', 'platform/powermac/ppc_kernel.c',
      '    int guard = probe_dsi(MEM_STACK_GUARD);',
      '    int guard = probe_dsi((u32)flush_a);',
      'milestone 5 order/format', TRAP % ('pass', 'pass', 'bad', 'pass')),
-    ('shm-no-shared-user', 'init/ppc_kernel.c',
+    ('shm-no-shared-user', 'platform/powermac/ppc_kernel.c',
      '    int shared_user = paging_boot_user_shared((u32)user_gate) == 0;',
      '    int shared_user = 1; (void)user_gate;',
      'milestone 4 order/format', r'^KBOOT MEMORY online=1 heap=1 shm=0$'),
@@ -78,9 +116,9 @@ KERNEL_MUTATIONS = (
 
 # Audit mutations: the build itself must fail with exactly this audit finding.
 AUDIT_MUTATIONS = (
-    ('pit-direct', 'init/ppc_kernel.c', '#define KBOOT_ATTR 0x07',
+    ('pit-direct', 'platform/powermac/ppc_kernel.c', '#define KBOOT_ATTR 0x07',
      '#define KBOOT_ATTR (0x07 + 0 * PIT_HZ)', 'PIT_HZ user in the 1 kHz closure'),
-    ('pit-via-macro', 'init/ppc_kernel.c', '#define KBOOT_ATTR 0x07',
+    ('pit-via-macro', 'platform/powermac/ppc_kernel.c', '#define KBOOT_ATTR 0x07',
      '#define KBOOT_ATTR (0x07 + 0 * TICK_MS)', 'PIT_HZ user in the 1 kHz closure'),
     ('float-insn', 'arch/ppc/kernel_probe.S', 'ppc_probe_syscall:\n    sc\n',
      'ppc_probe_syscall:\n    sc\n    fneg 1,1\n', 'floating-point/AltiVec instruction'),

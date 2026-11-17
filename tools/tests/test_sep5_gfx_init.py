@@ -2,12 +2,14 @@
 """B3: PC-98 planar bring-up provider keeps the pre-separation I/O and memory trace."""
 CHECK = dict(name='sep5-gfx-init-host', tier=1, needs=[], budget=5,
     covers=['gfx/palette.c', 'platform/pc98/gfx_init.c', 'kernel/console/display_restore.h',
-            'gfx/gfx_core.c', 'gfx/gfx_core_init.inc', 'gfx/gfx_vram.c', 'gfx/gfx_internal.h', 'gfx/gfx.h',
+            'gfx/gfx_core.c', 'gfx/gfx_core_init.inc', 'drivers/video/pc98/gfx_vram.c', 'gfx/gfx_internal.h', 'gfx/gfx.h',
             'platform/powermac/display.c', 'platform/powermac/display_provider.c', 'tools/tests/sep5_gfx_init_host.c',
             'tools/tests/test_sep5_gfx_init.py', 'tools/tests/host32.py',
             'tools/tests/kernel_includes.py', 'build/config.mk', 'include/**',
             'arch/x86/**', 'platform/pc98/**', 'lib/kstring.h', 'sdk/include/os32/**',
-            'gfx/palette.h', 'drivers/video/pc98/splash_raster.h', 'exec/surface_limits.h'])
+            'gfx/palette.h', 'drivers/video/pc98/splash_raster.h', 'exec/surface_limits.h'],
+    basis=['PPC_SEP5_DESIGN §2.1'],
+)
 import argparse
 from pathlib import Path
 import re
@@ -37,7 +39,7 @@ MUTATIONS = (
      'VRAM_PLANE_B, VRAM_PLANE_G, VRAM_PLANE_R, VRAM_PLANE_I\n    };\n    return'),
     ('clear-one-page', PROVIDER, '    _out(GDC_ACCESS_PAGE, GDC_PAGE_1);\n    kmemset', '    _out(GDC_ACCESS_PAGE, GDC_PAGE_0);\n    kmemset'),
 )
-CORE = {'core': 'gfx/gfx_core.c', 'init': 'gfx/gfx_core_init.inc', 'vram': 'gfx/gfx_vram.c'}
+CORE = {'core': 'gfx/gfx_core.c', 'init': 'gfx/gfx_core_init.inc', 'vram': 'drivers/video/pc98/gfx_vram.c'}
 # The common callers are extracted from the product text and *executed* with
 # recording fakes; these mutants must fail that executed trace.
 CORE_MUTATIONS = (

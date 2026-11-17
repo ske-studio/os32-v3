@@ -22,6 +22,9 @@ userland/tests/trim_back.elf userland/tests/trim_front.elf: sdk/allocator/nano_a
 
 userland/tests/pcm_play.elf: userland/tests/pcm_wav.h
 
+# nano libc keeps %f optional; the compatibility test exercises it explicitly.
+userland/tests/klibc_test.elf: PROGRAM_LDFLAGS += -u _printf_float
+
 # === CRT0 ビルドルール ===
 sdk/crt/crt0.o: sdk/crt/crt0.asm
 	$(AS) -f elf32 $< -o $@
@@ -79,7 +82,7 @@ SHELL_OBJ = $(SHELL_SRC:.c=.o)
 # include/memmap.h: cmd_sys.c の `mem` が常駐帯の定数を印字する (FONTPERF F3b で
 # 帯を再割りしたとき、これが無いと旧い番地を印字する shell.bin が出来た)。
 # lib/crc32_core.inc: cmd_peek.c の CRC32 (hsync・ローダと同じ核)。
-SHELL_DEPS = kdebug/probe_wire.h kdebug/hwb_wire.h userland/shell/hwb.h kdebug/gf_command_wire.h kdebug/gf_foundation_wire.h kdebug/gfinit_wire.h kdebug/recover_wire.h sdk/include/os32/ls.h userland/shell/shell.h userland/shell/hdprep_plan.h drivers/block/pc98pt.h include/memmap.h lib/crc32_core.inc $(wildcard userland/shell/*.inc)
+SHELL_DEPS = kdebug/probe_wire.h kdebug/hwb_wire.h userland/shell/hwb.h kdebug/gf_command_wire.h kdebug/gf_foundation_wire.h kdebug/gfinit_wire.h kdebug/recover_wire.h sdk/include/os32/ls.h userland/shell/shell.h userland/shell/hdprep_plan.h fs/pc98pt.h include/memmap.h lib/crc32_core.inc $(wildcard userland/shell/*.inc)
 
 userland/shell/%.o: userland/shell/%.c $(SHELL_DEPS) | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -Iuserland/shell $(INC_libos32filer) -c $< -o $@
@@ -93,12 +96,12 @@ PCI_DECODE_USER_OBJ = userland/shell/pci_decode_user.o
 $(PCI_DECODE_USER_OBJ): drivers/pci/pci_decode.c drivers/pci/pci_decode.h | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -Idrivers -c drivers/pci/pci_decode.c -o $@
 
-# 区画表の共有部 (drivers/block/pc98pt.c) も同じ扱い — `hdprep` が書く区画表は
+# 区画表の共有部 (fs/pc98pt.c) も同じ扱い — `hdprep` が書く区画表は
 # カーネル・ローダ・nhd_deploy.py と 1 バイトも違ってはいけない
 # (票 TASK_HDD_INSTALL 段 1-4)。
 PC98PT_USER_OBJ = userland/shell/pc98pt_user.o
-$(PC98PT_USER_OBJ): drivers/block/pc98pt.c drivers/block/pc98pt.h | $(ABI_CONTRACT_ORDER)
-	$(CC) $(PROGRAM_FLAGS) -Idrivers -c drivers/block/pc98pt.c -o $@
+$(PC98PT_USER_OBJ): fs/pc98pt.c fs/pc98pt.h | $(ABI_CONTRACT_ORDER)
+	$(CC) $(PROGRAM_FLAGS) -Idrivers -c fs/pc98pt.c -o $@
 
 $(BUILD_OUT)/app_sys.ld: sdk/link/app_sys.ld $(LAYOUT_HEADER)
 	$(CC) -E -P -x c -I$(BUILD_OUT) $< -o $@
@@ -129,9 +132,9 @@ $(SH_PCI_DECODE_OBJ): drivers/pci/pci_decode.c drivers/pci/pci_decode.h | $(ABI_
 	$(CC) $(PROGRAM_FLAGS) -DSHELL_AS_APP -Idrivers -c drivers/pci/pci_decode.c -o $@
 
 SH_PC98PT_OBJ = $(SH_OBJDIR)/pc98pt_user.o
-$(SH_PC98PT_OBJ): drivers/block/pc98pt.c drivers/block/pc98pt.h | $(ABI_CONTRACT_ORDER)
+$(SH_PC98PT_OBJ): fs/pc98pt.c fs/pc98pt.h | $(ABI_CONTRACT_ORDER)
 	@mkdir -p $(SH_OBJDIR)
-	$(CC) $(PROGRAM_FLAGS) -DSHELL_AS_APP -Idrivers -c drivers/block/pc98pt.c -o $@
+	$(CC) $(PROGRAM_FLAGS) -DSHELL_AS_APP -Idrivers -c fs/pc98pt.c -o $@
 
 # main.c だけが #include する .inc の明示依存 (レシピ無し = 上のパターン規則に
 # 前提だけを足す)。$(SHELL_DEPS) の wildcard でも拾えるが、wildcard は
@@ -223,20 +226,20 @@ userland/system/cdinst.o: userland/system/cdinst.c userland/lib/rt/pkg.h userlan
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
 
 # hd0 の規則は install と共有 (userland/system/inst_hdd.c / inst_disk.c)。区画表
-# (drivers/block/pc98pt.c)、幾何と計画 (userland/shell/hdprep_plan.c)、ext2 の配置
+# (fs/pc98pt.c)、幾何と計画 (userland/shell/hdprep_plan.c)、ext2 の配置
 # (fs/ext2/ext2_layout.c) はカーネル・hdprep と同じソースを組む — **写さない**
 # (票 TASK_HDD_INSTALL 段 2-9)。
 INST_HDRS = userland/system/inst_hdd.h userland/system/inst_disk.h \
-            userland/shell/hdprep_plan.h drivers/block/pc98pt.h fs/ext2/ext2_layout.h $(SDK_KAPI_HDR)
+            userland/shell/hdprep_plan.h fs/pc98pt.h fs/ext2/ext2_layout.h $(SDK_KAPI_HDR)
 userland/system/inst_disk.o: userland/system/inst_disk.c $(INST_HDRS) | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
 userland/system/inst_hdd.o: userland/system/inst_hdd.c $(INST_HDRS) | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
 userland/system/ext2_layout_user.o: fs/ext2/ext2_layout.c fs/ext2/ext2_layout.h | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
-userland/system/hdprep_plan_inst.o: userland/shell/hdprep_plan.c userland/shell/hdprep_plan.h drivers/block/pc98pt.h | $(ABI_CONTRACT_ORDER)
+userland/system/hdprep_plan_inst.o: userland/shell/hdprep_plan.c userland/shell/hdprep_plan.h fs/pc98pt.h | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
-userland/system/pc98pt_inst.o: drivers/block/pc98pt.c drivers/block/pc98pt.h | $(ABI_CONTRACT_ORDER)
+userland/system/pc98pt_inst.o: fs/pc98pt.c fs/pc98pt.h | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -Idrivers -c $< -o $@
 INST_OBJ = userland/system/inst_hdd.o userland/system/inst_disk.o \
            userland/system/hdprep_plan_inst.o userland/system/pc98pt_inst.o \
@@ -379,6 +382,8 @@ $(1): $$(CRT0_OBJ) $(4)/$(1).bin
 endef
 
 # --- テストプログラム登録 ---
+
+$(eval $(call DEFINE_TEST,mmtimetest,$$(LIBMMTIME_OBJ),$$(INC_libmmtime),userland/diag))
 
 $(eval $(call DEFINE_TEST,gfx2_i2,$$(GFX_OBJ),$$(INC_libos32gfx),userland/tests))
 
@@ -718,7 +723,7 @@ programs_base: $(CRT0_OBJ) $(BASE_PROGRAMS_BIN) $(BUILD_OUT)/int80.img
 $(BUILD_OUT)/int80.img: tools/gen_v86_int80.py
 	python3 $< --out $@
 
-programs: gfx2_i2 hwscroll_probe libs $(DBG_OBJ) programs_base sh bench cdinst lz4_cmd bench_scale2x faultprobe ring3_hello ring3_fault ring3_guard hello_r3 gfx200_test gfx_demo200 blit_test blit_test2 demo_tile tile_bench rotate_test db_test dbq e2test sqlite_standalone math_test input_test kbd_echo asset_test asset_demo ecs_test save_test mgx_test kstr_bench hello_gfx_rust alloc_demo_rust math_test_rs_rust font_test_rust gui_demo_rust gdi_test_rust lease_test_rust gui_bench_rust v12_api_test_rust filer_rust edit_gui_rust about_rust gshell shlib
+programs: mmtimetest gfx2_i2 hwscroll_probe libs $(DBG_OBJ) programs_base sh bench cdinst lz4_cmd bench_scale2x faultprobe ring3_hello ring3_fault ring3_guard hello_r3 gfx200_test gfx_demo200 blit_test blit_test2 demo_tile tile_bench rotate_test db_test dbq e2test sqlite_standalone math_test input_test kbd_echo asset_test asset_demo ecs_test save_test mgx_test kstr_bench hello_gfx_rust alloc_demo_rust math_test_rs_rust font_test_rust gui_demo_rust gdi_test_rust lease_test_rust gui_bench_rust v12_api_test_rust filer_rust edit_gui_rust about_rust gshell shlib
 
 # === KAPI ヘッダ依存 ===
 userland/%.o: $(SDK_KAPI_HDR)
@@ -727,6 +732,7 @@ $(shell find userland -name '*.o' 2>/dev/null): $(SDK_KAPI_HDR)
 # === プログラムクリーン ===
 clean-programs: clean-rust clean-gshell
 	rm -f $(FAULTPROBE_OBJ)
+	rm -f userland/diag/mmtimetest.o userland/diag/mmtimetest.elf userland/diag/mmtimetest.raw userland/diag/mmtimetest.bin
 	rm -f userland/cmds/*.o userland/cmds/*.elf userland/cmds/*.raw userland/cmds/*.bin
 	rm -f userland/tests/*.o userland/tests/*.elf userland/tests/*.raw userland/tests/*.bin
 	rm -f userland/tests/kstr_ren_a.txt userland/tests/kstr_ren_c.txt userland/tests/kstr_c_raw.d

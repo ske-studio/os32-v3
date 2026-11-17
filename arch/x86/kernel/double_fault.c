@@ -9,7 +9,7 @@
 #include "memmap.h"
 #include "../../../mm/paging.h"
 #include "io.h"
-#include "tvram.h"
+#include "text_screen.h"
 #include "../../../include/platform_emergency.h"
 #include "pc98.h"
 #include "serial_diag.h"

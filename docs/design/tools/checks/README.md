@@ -82,10 +82,10 @@ R1/R2 は `tools/tests/test_*.py` に宣言を足し、集約入口・道具ラ�
 | D3 | `tools/check_map.yaml:19` の broad は静的5本に限らない。属性を移さず、`**` を unmatched の解消に数えない共通規則へ |
 | D4 | `tools/check_select.py:759,975` は静的 include 閉包と gcc 結果の和。この選択用依存を run に含める |
 | D5 | `build/checks.d/check-arm-compile.mk:11`、`check-gfinit-fixture-host.mk:4`、`check-memmap-audit-host.mk:8` の列外入口は手書き make へ残す |
-| D6 | `tools/check_privileged.py:132` は .o、`tools/tests/test_kprintf_window.py:310` は unittest と scanner。差分化は P1b の3本に限る |
-| D7 | 旧形式参照は inventory・方言・計時・依頼パック試験に加え、`tools/tests/test_dep_dir_d_console.py:202`・`test_dep_dir_d_display.py:97`・`test_dep_dir_d_splash.py:83` の yaml 読取と `test_ci_stab.py:91` の checks.d glob。R3 で同時に置換する |
-| D8 | `build/sdk.mk:174` の共有前提は親 make が1回組む。`build/checks.d/check-ver-info-host.mk:4` の11検査は選択の閉包へ加えるだけ |
-| D9 | `.claude/skills/os32-delegate/SKILL.md:30`・`.agents/skills/os32-delegate/SKILL.md:29` は旧呼出しに --select が無い。置換時に補う |
+| D6 | `tools/check_privileged.py` の `main()` は .o、`tools/tests/test_kprintf_window.py` は unittest と scanner。差分化は P1b の3本に限る |
+| D7 | 旧形式参照は inventory・方言・計時・依頼パック試験に加え、`tools/tests/test_dep_dir_d_console.py` の `grid_verify()`・`test_dep_dir_d_display.py`・`test_dep_dir_d_splash.py` の yaml 読取と `test_ci_stab.py` の checks.d glob。R3 で同時に置換する |
+| D8 | `build/sdk.mk` の共有前提は親 make が1回組む。`build/checks.d/check-ver-info-host.mk:4` の11検査は選択の閉包へ加えるだけ |
+| D9 | `.claude/skills/os32-delegate/SKILL.md`・`.agents/skills/os32-delegate/SKILL.md:29` は旧呼出しに --select が無い。置換時に補う |
 
 未決は0件。R1 はこの Check・Plan 契約で (a) run.py と試験、(b) convert.py を並列に実装できる。
 受入は既存の R1 道具試験、R2 の200件同値、R3 の直近10件計時・段4の列照合。詳細は各文書の試験節に置く。

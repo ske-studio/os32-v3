@@ -842,7 +842,7 @@ static void __cdecl h_console_set_cursor(int x, int y) { (void)x; (void)y; }
 static void __cdecl h_tvram_clear(void) {}
 
 /* ルートのデバイス名 (vfs_devname("/"))。既定は HDD。FD のルート名は
- * test_sh_truncation.py が init/kernel.c から読んで -DFD_ROOT_DEV で渡す
+ * test_sh_truncation.py が platform/pc98/kernel.c から読んで -DFD_ROOT_DEV で渡す
  * (試験の側で "fd0" を決め打ちしない) */
 #ifndef FD_ROOT_DEV
 #error "FD_ROOT_DEV (kernel.c の FD ルートのデバイス名) を -D で渡すこと"
@@ -1012,8 +1012,11 @@ int shell_cmd_gfinit(int argc, char **argv) { (void)argc; (void)argv; return 0; 
  * (build/programs.mk の PC98PT_USER_OBJ)。 */
 #include "../../userland/shell/cmd_hdprep.c"
 #include "../../userland/shell/hdprep_plan.c"
-#include "../../drivers/block/pc98pt.c"
+#include "../../fs/pc98pt.c"
 #include "../../userland/shell/cmd_filer.c"
+void rsh_lan_reset(void) {}
+int rsh_lan_poll(void) { return OS32_ERR_AGAIN; }
+void rsh_lan_trace_show(void) {}
 #include "../../userland/shell/rshell.c"
 #include "../../userland/shell/serial_watchdog.c"   /* rshell.c の番犬 (往復 2) */
 #include "../../userland/shell/ui.c"

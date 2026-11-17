@@ -1,6 +1,6 @@
 # arch/x86/kernel/mtrr_wc.c / mtrr_wc.h — CPU の WC lease
 
-> 状態: **現行 (2026-11-01)** — CPU 部品のみ。GeForce への結線は後段。
+> 状態: **現行 (2026-11-01)** — CPU 部品。GeForce は kernel の video_wc を通して利用する。
 
 ## 契約と境界
 
@@ -16,6 +16,9 @@
 -1 のあとに UC fallback として継続してはいけない。呼出側が起動を失敗させる。
 `release` は復元成功・借用解除・inactive の場合 0、復元未確認の場合 -1。
 未確認時は active を保持する。二重 release は命令を実行しない。
+GeForce の呼出側は最初に取得した lease を起動中保持する。通常の表示停止では release せず、
+identity 喪失時の共通 stop と受入版の明示的な停止だけで release を呼ぶ。
+再開始は active lease の前回結果 (復元未確認の負値も含む) を返し、命令列を繰り返さない。
 
 ## 能力と組の選択
 

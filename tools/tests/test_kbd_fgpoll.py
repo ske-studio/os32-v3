@@ -1,13 +1,15 @@
 """F2/F2i: real keyboard CUI foreground calls, ILP32 runtime mutants."""
 CHECK = dict(name='kbd-fgpoll-host', tier=1, needs=[], budget=3.4,
-             covers=['tools/tests/test_kbd_fgpoll.py', 'tools/tests/kbd_fgpoll_host.c',
-                     'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
+             covers=['input/hal/legacy_keymap.c', 'input/keymaps/pc98_jp.c', 'drivers/input/kbd_hal.c', 'input/hal/in2_dev.c', 'input/hal/in2_state.c', 'input/hal/kbd_merge.c', 'tools/tests/kbd_capture_fixture_host.h', 'input/hal/keymap_registry.c', 'input/hal/keymap_eval.c', 'input/hal/keymap_state.c', 'input/hal/keymap.h', 'kernel/idle_work.h', 'tools/tests/test_kbd_fgpoll.py', 'tools/tests/kbd_fgpoll_host.c',
+                     'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'tools/tests/test_remote_x8a.py',
                      'tools/tests/host_arch/**', 'build/config.mk',
-                     'drivers/input/kbd.c', 'drivers/input/kbd_fgpoll.inc',
+                     'drivers/input/kbd.c', 'input/hal/legacy_ring.c', 'input/hal/legacy_mode.c', 'kernel/input_legacy.c', 'kernel/input_wait.c', 'input/hal/in2_int.h', 'drivers/input/kbd_fgpoll.inc',
                      'drivers/input/*.h', 'drivers/char/serial.h',
                      'drivers/video/geforce/geforce_module.h',
                      'kernel/module/*.h', 'platform/pc98/legacy/v86_bios.h',
-                     'include/**'])
+                     'include/**'],
+    kind='characterization',
+)
 
 import argparse
 import os
@@ -23,30 +25,34 @@ from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 KBD = 'drivers/input/kbd.c'
 ADAPTER = 'drivers/input/kbd_fgpoll.inc'
+WAIT = 'kernel/input_wait.c'
 # Unique anchors; each mutant must compile, fail a runtime assertion and be
 # followed by an unmodified GREEN control. One mutant for each connection.
 MUTATIONS = [
     ('adapter-dispatch', ADAPTER, 'if (!kbd_gui_mode)', 'if (0 && !kbd_gui_mode)'),
     ('trychar-connection', KBD,
-     'int kbd_trygetchar(void)\n{\n    u16 entry;\n\n    kbd_foreground_poll();',
-     'int kbd_trygetchar(void)\n{\n    u16 entry;'),
+     'int kbd_trygetchar(void)\n{\n    kbd_foreground_poll();',
+     'int kbd_trygetchar(void)\n{\n'),
     ('trykey-connection', KBD,
-     'int kbd_trygetkey(void)\n{\n    u16 entry;\n\n    kbd_foreground_poll();',
-     'int kbd_trygetkey(void)\n{\n    u16 entry;'),
+     'int kbd_trygetkey(void)\n{\n    kbd_foreground_poll();',
+     'int kbd_trygetkey(void)\n{\n'),
     ('char-wait-connection', KBD,
-     '            kbd_foreground_poll();\n            /* キーボードバッファ */',
-     '            /* キーボードバッファ */'),
-    ('key-wait-connection', KBD,
-     '    while (kbd_count == 0) {\n        kbd_foreground_poll();',
-     '    while (kbd_count == 0) {'),
-]
+     '.wait_prepare = kbd_foreground_poll', '.wait_prepare = 0'),
+    ('key-wait-connection', WAIT,
+     'if (p->wait_prepare) p->wait_prepare();',
+     'if (mode != IL_KEY && p->wait_prepare) p->wait_prepare();'),
+    ('char deadline', WAIT, 'timed = !gui && (capture ||', 'timed = !gui && ((0 && capture) ||'),
+    ('key deadline', WAIT, 'timed = !gui && (capture ||',
+     'timed = !gui && ((mode != IL_KEY && capture) ||'),
+    ('wait serial', WAIT, 'p->terminal_enabled() && p->terminal_try)', 'p->terminal_try)'),
 
+]
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    originals = {name: (ROOT / name).read_text() for name in (KBD, ADAPTER)}
+    originals = {name: (ROOT / name).read_text() for name in (KBD, ADAPTER, WAIT)}
     with tempfile.TemporaryDirectory(prefix='kbd-fgpoll-') as directory:
         tmp = Path(directory)
         exe = tmp / 'host'
@@ -56,10 +62,10 @@ def main():
                    '-ffunction-sections', '-fdata-sections', '-nostdlib',
                    '-static', '-no-pie', '-Wl,--gc-sections', '-I' + str(tmp),
                    '-I' + str(ROOT / 'tools/tests/host_arch'), *include_flags(ROOT),
-                   str(ROOT / 'tools/tests/kbd_fgpoll_host.c'), '-o', str(exe)]
+                   str(ROOT / 'tools/tests/kbd_fgpoll_host.c'), str(tmp / 'input_wait.c'), '-o', str(exe)]
 
         def build(inputs):
-            for name, output in ((KBD, 'kbd_source.c'), (ADAPTER, 'kbd_fgpoll.inc')):
+            for name, output in ((KBD, 'kbd_source.c'), (ADAPTER, 'kbd_fgpoll.inc'), (WAIT, 'input_wait.c')):
                 def relocate(match):
                     if match[1] == 'kbd_fgpoll.inc':
                         return '#include "' + str(tmp / 'kbd_fgpoll.inc') + '"'
@@ -89,14 +95,12 @@ def main():
                     control()
                     print(f'RESTORED GREEN {label}', flush=True)
 
-
 def run(ctx):
     env = dict(os.environ, HOST32_RUNNERS=' '.join(ctx.runners))
     command = [sys.executable, '-B', 'tools/tests/test_kbd_fgpoll.py']
     if ctx.mutate:
         command.append('--mutate')
     return subprocess.call(command, cwd=ctx.root, env=env, close_fds=False)
-
 
 if __name__ == '__main__':
     main()

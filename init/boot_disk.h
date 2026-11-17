@@ -1,6 +1,6 @@
 #ifndef OS32_BOOT_DISK_H
 #define OS32_BOOT_DISK_H
-#include "../platform/pc98/bootinfo_native.h"
+#include "types.h"
 #include "os32_kapi_shared.h"
 
 /* Internal foreground/KAPI contract; excluded from the HWDEV wire umbrella. */

@@ -8,8 +8,12 @@ static void checkpoint(unsigned n)
 #define setjmp(x) __builtin_setjmp(x)
 #define longjmp(x,n) __builtin_longjmp(x,n)
 #include "ppc_trap.h"
+/* Fixture owns IRQ context storage; no shared product definition. */
+volatile u32 kctx_irq_depth;
 static void *stopped[5];
 static u32 machine=0x30, reason, dumps, reads, handled, root=0x1000, leaf;
+void ppc_enable(void) { machine |= PPC_MSR_EE; }
+u32 ppc_irq_save(void) { u32 old = machine; machine &= ~PPC_MSR_EE; return old; }
 u32 ppc_trap_msr(void) { return machine; }
 u32 ppc_root_current(void) { return root; }
 void ppc_trap_stop(void) { longjmp(stopped,1); }
@@ -67,7 +71,7 @@ int main(void)
     }
     const u32 vectors[]={0x400,0x600,0x700,0xc00,0x500,0x900,0x800};
     const u32 other[]={PPC_TRAP_ISI,PPC_TRAP_ALIGNMENT,0x100|PPC_TRAP_UNKNOWN,
-        0x100|PPC_TRAP_SC,PPC_TRAP_UNREGISTERED,PPC_TRAP_UNREGISTERED,PPC_TRAP_UNKNOWN};
+        0x100|PPC_TRAP_SC,PPC_TRAP_UNREGISTERED,PPC_TRAP_UNREGISTERED,PPC_TRAP_FP_UNAVAILABLE};
     for(u32 i=0;i<7;++i) {
         f.vector=vectors[i]; f.srr1=i==0?PPC_ISI_MISS:0; fatal(&f,other[i]);
     }

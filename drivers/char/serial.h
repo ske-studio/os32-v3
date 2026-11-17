@@ -8,6 +8,7 @@
 #ifndef __SERIAL_H
 #define __SERIAL_H
 
+#include "serial_contract.h"
 #include "types.h"
 #include "../../lib/serial_diag.h"
 
@@ -163,10 +164,10 @@
 /*    2.4576MHz (clk/16 = 153600): 9600 / 19200 / 38400 すべてちょうど       */
 /* ======================================================================== */
 /*  **番地・ビット・クロック値の定義は include/pc98.h 1 か所** ([C4])。      */
-/*  ここは従来名の別名だけ。0000:0501h を実際に読むのは kernel/time/sysclk.c で、 */
+/*  ここは従来名の別名だけ。0000:0501h を実際に読むのは platform/pc98/sysclk.c で、 */
 /*  シリアルは `sysclk_hz()` / `sysclk_is_8mhz()` の保存値を見る。            */
 /*  **このヘッダから pc98.h は include しない** — serial.h を引くだけの TU   */
-/*  (kapi/kapi_generated.c) に pc98.h の定数が流れ込むと、tvram.h と         */
+/*  (kapi/kapi_generated.c) に pc98.h の定数が流れ込むと、text_screen.h と         */
 /*  TVRAM_BPR が二重定義になって警告が出る。使う側 (drivers/char/serial.c) が     */
 /*  pc98.h を include しているので、別名はそこで展開される。                 */
 /* ======================================================================== */
@@ -259,14 +260,6 @@ void serial_init(unsigned long baud);
  * 戻しは serial_init(9600)。 */
 int serial_init_vfast(unsigned long baud);
 
-/* 現在の設定を 3 つの数で返す (CPL=3 から KAPI 越しに読むための口。
- * **カーネルのポインタは渡さない** — docs/design/kapi/kapi_db.md#落とし穴 の db_last_error と
- * 同じ事故を繰り返さないため)。NULL は飛ばす。戻りは 0 = 初期化済み、
- * -1 = まだ serial_init を呼んでいない (値は書くが当てにならない)。
- *   mode: SER_MODE_COMPAT / SER_MODE_VFAST
- *   baud: **実効値** (要求値ではない)
- *   fifo: 0136h の判定 (1 = FIFO 搭載機) */
-int serial_get_status(u32 *mode, u32 *baud, u32 *fifo);
 
 /* 1 バイト送る。**戻り値で成否を返す** (Codex レビュー往復 3 ③)。
  *   SER_TX_OK      (0) = UART へ書けた
@@ -274,14 +267,11 @@ int serial_get_status(u32 *mode, u32 *baud, u32 *fifo);
  * 既存の呼び手は戻り値を無視してよい。KAPI の `serial_putchar` は従来どおり
  * void で受ける (`kapi/kapi_generated.c` の wrapper が捨てる) ので、
  * 外部プログラムから見た ABI は変わっていない ([ABI])。 */
-int serial_putchar(char c);
-void serial_puts(const char *str);
 void pc98_serial_puts_polled(const char *str);
 int  serial_getchar(void);     /* ブロッキング */
 int  serial_trygetchar(void);  /* ノンブロッキング: -1=なし */
 int  serial_peekchar(void);    /* 覗くだけ (取り出さない): -1=なし */
 int  serial_has_data(void);    /* 受信バッファにデータがあるか */
-int  serial_is_initialized(void);
 
 /* ======================================================================== */
 /*  SerialFS セッションのゲート (票 TASK_SERIAL_HOSTFS §1-v3、serial.c の注記) */
@@ -293,19 +283,7 @@ int  serial_is_initialized(void);
  * 保持の余裕。相手が送り続けていても抜ける) */
 #define SER_GATE_DRAIN_MAX  64
 
-/* ゲートを上げ下げする。どちらでも受信リングを空にする。上げると保留
- * リングも空にする (下ろしても保留リングは残す — 呼び手が汲む)。 */
-void serial_gate_set(int on);
 int  pc98_serial_gate_active(void);
-/* ゲートを通らずに線へ出す (SerialFS のフレーム)。SER_TX_OK / DROPPED */
-int  serial_gate_put(const u8 *buf, u32 n);
-/* ゲートを通らずに 1 バイト受ける (RxRDY を直接見て FIFO の残りも汲む)。
- * -1 = 無い */
-int  serial_gate_get(void);
-/* 保留リングから最大 max バイト取り出す */
-u32  serial_hold_take(u8 *buf, u32 max);
-/* 保留リングが溢れて捨てたバイト数 (ゲートを上げると 0) */
-u32  serial_hold_dropped(void);
 /* 受信の誤りの計数 (ISR とゲートの受信器が数える)。NULL は飛ばす */
 void serial_diag_get(u32 *oe, u32 *fe, u32 *pe, u32 *overflow);
 

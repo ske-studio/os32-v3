@@ -8,6 +8,15 @@
 #include "kprintf.h"
 #include "kstring.h"
 #include "kboot_log.h"
+#if KBOOT_SHELL || KBOOT_SH
+#include "kernel/console/console_stream.h"
+
+void pm_fd1_write(const char *buf, u32 size, u8 color)
+{
+    (void)color;
+    console_stream_write(buf, size);
+}
+#endif
 
 int rshell_active;
 
@@ -63,6 +72,6 @@ void console_get_size(int *w, int *h)
 }
 void console_set_cursor(int x, int y) { (void)x; (void)y; }
 void console_hw_cursor_enable(void) { }
-/* init/kernel.c also declares these void screen controls locally. */
+/* platform/pc98/kernel.c also declares these void screen controls locally. */
 void console_text_gdc_stop(void) { }
 void console_text_gdc_start(void) { }

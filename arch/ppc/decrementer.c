@@ -30,11 +30,11 @@
  */
 /* NetBSD clock.c:148-159; single integer-only periodic DEC owner. */
 #include "ppc_frame.h"
-#include "ppc_layout.h"
+#include "platform_of_layout.h"
 static u32 period, count;
 void ppc_dec_init(u32 tb_hz)
 {
-    period=tb_hz/PM_DEC_HZ;
+    period=tb_hz/PM_DIAG_DEC_HZ;
     count=0;
     ppc_write_dec(period);
 }

@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 """Exercise PPC ELF packaging and the endian mutation."""
-CHECK = dict(covers=['sdk/os32x_hdr.py', 'sdk/mkos32x.py', 'tools/ppc/test_os32x_endian.py'],
-             inputs=['sdk/**', 'tools/ppc/test_os32x_endian.py'])
 import hashlib
 import json
 import os
@@ -13,14 +11,14 @@ import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
-PPC = Path('/home/hight/opt/cross-ppc/bin')
+PPC = Path((os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc') + '/bin'))
 
 
 def call(args, **kwargs):
     return subprocess.run([str(x) for x in args], check=True, capture_output=True, **kwargs)
 
 
-def exercise(tmp, sdk, mutant=False):
+def package(tmp, sdk):
     src = tmp / 'app.c'
     src.write_text('__attribute__((section(".text.startup"))) void start(void) {}\n'
                    'int data = 7; int bss;\n'
@@ -43,15 +41,18 @@ def exercise(tmp, sdk, mutant=False):
     elf.with_suffix('.inputs.json').write_text(json.dumps({'elf_sha256': hashlib.sha256(elf.read_bytes()).hexdigest()}))
     cmd = [sys.executable, '-B', sdk / 'mkos32x.py', raw, out, '--elf', elf, '--target', 'ppc-powermac']
     result = subprocess.run([str(x) for x in cmd], capture_output=True, text=True)
-    if mutant:
-        assert result.returncode != 0, 'endian mutant survived'
-        return
+    return result, out, raw, elf, cmd
+
+
+def exercise(tmp, sdk):
+    result, out, raw, elf, cmd = package(tmp, sdk)
     assert result.returncode == 0, result.stderr
     fields = struct.unpack('<16I', out.read_bytes()[:64])
     assert fields[3] & 0x40 and fields[4] == 0 and fields[10] == 0x80100000 and fields[11] == 0x1234
     assert out.read_bytes()[64:] == raw.read_bytes()
+    src = tmp / 'app.c'
     x86 = tmp / 'x86.elf'
-    call(['/home/hight/opt/cross/bin/i386-elf-gcc', '-m32', '-ffreestanding', '-nostdlib', '-c', src, '-o', x86])
+    call(['gcc', '-m32', '-ffreestanding', '-nostdlib', '-c', src, '-o', x86])
     cmd[cmd.index(elf)] = x86
     result = subprocess.run([str(x) for x in cmd], capture_output=True, text=True)
     assert result.returncode != 0 and 'ELF target mismatch' in result.stderr
@@ -71,7 +72,9 @@ def main():
             old = "self.endian = '<' if d[5] == 1 else '>'"
             assert s.count(old) == 1
             path.write_text(s.replace(old, "self.endian = '>' if d[5] == 1 else '<'"))
-            exercise(tmp, sdk, True)
+            result, _, _, _, _ = package(tmp, sdk)
+            assert result.returncode != 0, 'endian mutant survived'
+            print('PPC ELF endian: RED (1)')
     print('PPC ELF packaging: OK')
 
 

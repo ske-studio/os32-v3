@@ -593,6 +593,7 @@ class FontVendorTest(unittest.TestCase):
 
 DEPLOY_YAML = ROOT / "userland" / "deploy.yaml"
 ASSETS_MK = ROOT / "build" / "assets.mk"
+FONT_FETCH_MK = ROOT / "build" / "font-fetch.mk"  # 取得の規則は assets.mk から include
 PATHS_RS = ROOT / "userland" / "lib" / "font" / "src" / "paths.rs"
 G16_NAME = "JF-Dot-Shinonome16.g16"  # TASK_FONTPERF ⓐ (build/assets.mk GUI_FONT_G16)
 DEPLOY_SOURCE = None  # check_mutations() が差し替える (本物は書き換えない)
@@ -631,7 +632,7 @@ class GuiFontDeployTest(unittest.TestCase):
             self.assertEqual(e.get("tags"), ["gui"], host)
 
     def test_build_fetches_what_is_deployed(self):
-        mk = ASSETS_MK.read_text()
+        mk = ASSETS_MK.read_text() + FONT_FETCH_MK.read_text()
         for name in self.fetched_names():
             self.assertIn("$(FONT_DIR)/" + name, mk)
         self.assertRegex(mk, r"ASSETS_DEPLOYED = assets/fep.db \$\(GUI_FONT_FILES\)")

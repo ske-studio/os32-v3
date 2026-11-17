@@ -2,7 +2,7 @@
 
 > 上位: [TASK_PPC_KBOOT](TASK_PPC_KBOOT.md)
 
-> 状態: **受入完了・実機確認待ち (2026-11-11)** — QEMU 7450・7455 で受入済み。LAN (GMAC) で起動ログをホストへ保存し 5 診断が往復する。受入は kboot_run・kboot_accept・kboot_all に入った。実機の前の段 (UniNorth の clock の alias、実機の PHY、cache・DMA) は持越し台帳の PPC-LAN-RH。段の状態は §2。確定設計は [PPC_LAN_DESIGN](../../decisions/ppc/PPC_LAN_DESIGN.md)。手本は BSD (ユーザー決定)。メーカー資料は未入手で、実機に載せる条件にはしない。
+> 状態: **受入完了 (2026-11-13)** — G4 実機で確認 (票 TASK_PPC_REALHW §2)。QEMU 7450・7455 で受入済み。LAN (GMAC) で起動ログをホストへ保存し 5 診断が往復する。受入は kboot_run・kboot_accept・kboot_all に入った。実機の前の段 (UniNorth の clock の alias、実機の PHY、cache・DMA) は持越し台帳の PPC-LAN-RH。段の状態は §2。確定設計は [PPC_LAN_DESIGN](../../decisions/ppc/PPC_LAN_DESIGN.md)。手本は BSD (ユーザー決定)。メーカー資料は未入手で、実機に載せる条件にはしない。
 
 ## 0. ユーザー決定
 
@@ -20,6 +20,7 @@ PM 決定 (2026-11-10、設計の往復の中で。ユーザーに報告済み):
 - 診断コマンドは 5 個。5 番目は範囲つきの読み出し (PEEK): managed RAM とカーネルの像だけ、1 回 256 バイトまで、範囲外・MMIO・NIC が持っている受信 buffer は拒否。書込みと任意番地は入れない。
 - ホストの道具 (tools/ppc_lan_host.py) の運び方は 2 つ: QEMU と試験は UDP (QEMU の socket netdev は Ethernet の frame を 1 datagram に 1 枚で運ぶ。root も TAP も要らない)、実機は AF_PACKET。codec は共通。
 - PLN1 (線の上の形式) に認証は無い。既定では起動ログを broadcast で流し、同じ L2 から PEEK でカーネルの RAM を読める。開発用の LAN での診断が前提で、共用の LAN につなぐときは peer を指定する。
+- 2026-11-14 (本線 PM 経由): PLN1 の各機能 (BEACON・診断・端末・HostFS) は link (0x88B5) と Host Services に統合する。PLN1 には新しい機能を足さない。移行の各段 (P1〜P4) の受入は QEMU 7450・7455 で行う。G4 実機の確認は、移行の前に PLN1 の版で 1 回、既定を link に切り替えた後にもう 1 回行う (ユーザーの補足 11-14「完成前にLANの機能を試すと言う意味の今の版の確かめです。別に実機で確認しない意味ではないです」)。セキュリティ (認証・番地の制限・許可リスト) は考えない。段と分担は票 TASK_LAN_OPERATOR (docs/tasks/network/) §2、確定設計は [LAN_OPERATOR_DESIGN](../../decisions/network/LAN_OPERATOR_DESIGN.md)。
 - ② の境界 (mount・module・exec・USER なし) は広げない。NIC の失敗で OS を止めない (止めるのは「bus master の解除を書いたのに読み戻しが 1」のときだけ)。
 
 ## 1. 詳細設計 (確定) の要約
@@ -48,6 +49,16 @@ PM 決定 (2026-11-10、設計の往復の中で。ユーザーに報告済み):
 | P26・P25 | main (d50dfda0、7 本目、LAN の実装の到達)。LAN の TU 15 本が PPC の像に入り、起動が ESCC の後に log を登録・GMAC を quiesce・CLOCK の後に pm_lan_start・READY 以後を pm_lan_poll で回す。PM の QEMU の実測で到達点を確認 (設計の「7 本目の実測」) |
 | P29・P31+P32・P33 と H29 | 実装・独立レビュー済 (2026-11-11、統合の枝 wt/ppc-lanint8 = 8 本目 = LAN の最後)。P29: kboot_run.py が LAN を持つ像で UDP の netdev とホストの Host を使い、保存・5 診断・PEEK・MEMORY を照合 (sandbox では SKIP LAN socket rc=3)、--lan-off。P31+P32 (最小、1 段にまとめた): kboot_accept が SKIP を 3 で返し LAN 無効を両 CPU で 1 回、kboot_all が 3 を SKIP と数える。P33: PPC_KBOOT_DESIGN に LAN の起動の追記 |
 | P30・H30・H31・H32・H33 | やめた (2026-11-11、ユーザーの「過剰に防御してませんか？」を受けた PM 決定。故障の道筋は host の模型 H14・H17・H24 が持ち、QEMU で重ねない。設計 PPC_LAN_MARKS_DESIGN の末尾) |
+| link への移行の P1 の節目 (P1a〜P1g・P2c・P5-t・P5-log、TASK_LAN_OPERATOR §2) | 統合の枝 wt/int-ppc-1114p (2026-11-14)。`make ARCH=ppc PLATFORM=powermac KBOOT_LINK=1` の診断像 (shell 無し) で PLN1 の wire を外し、link・nic・GEM adapter (4 枠の保留、credit は空き枠×1514B) を組む。HELLO・ALIVE・TIME・LOG が往復し、FB の帯に HELLO の送信 (16)・確立 (17) の印。受入は `tools/ppc/link_run.py --require-ack` (7450・7455)。製品の既定は PLN1 のまま |
+| P3 (共通の SH を link に載せる、案 B) | 確定設計は [PPC_P3_DESIGN](../../decisions/ppc/PPC_P3_DESIGN.md) (v2、2026-11-15)。② (host/KAPI provider、ppc_kapi_wait_once) は main 620c5237、③a (PLN1 の像の前景の仕事を idle_work に) は main 0ab4a885。③b 以降は入力の HAL の段 4c の後 (本線の PC で進める、ユーザー決定 11-15)。pm_link_service_once は ⑤ へ移した。⑥ QEMU 受入は未、台本・host/像の検査と PM のコマンドは `/home/hight/os32-tmp/run/ppc-p3-6/RESULT.md` |
+| LAN 操作口 P5 の残り (台本 5 本の link 化、既定を link へ) | 確定設計は [PPC_P5_REST_DESIGN](../../decisions/ppc/PPC_P5_REST_DESIGN.md) (2026-11-16)。段: K (kboot_run)・R・C・O・U、準備段 P1〜P11 (KBOOT_SH=1 だけを渡す呼び出し元に KBOOT_LINK を明示)、G (DEFERRED に PPC-LINK-G4)、D (build/targets/ppc-powermac.mk の既定を link)。ユーザー決定: G4 の受入は QEMU 合格後すぐ、cp の速さは記録だけ。済み: P5-t・P5-sd/fs (main c798c2d8)。状態: 実装中 |
+
+link の時計の約束 (ARCH_COMPAT_CONTRACT の「link_platform_now は論理 100Hz の jiffy」) の PowerPC の実測 (2026-11-14、QEMU mac99、TB 100MHz との比):
+- 7450 単体 (ネット無し): 99.97/s。
+- agent とつないだ状態: 7450 は 99.39〜100.26/s、7455 は 99.47〜100.23/s。
+- 満たし方: arch/ppc/kernel_dec.c の `tick_clock_config(1, tick_hz)` が、物理 1kHz の DEC を論理 100Hz の tick_count に変換する。link_platform_now は tick_count を返す。
+
+tools/ppc/test_lan_p1.py は、どの CHECK にも登録されていない。main の時点で pm_gmac_boot の offset と sizeof の静的 assert で落ちている (b77a94ad の RC の変更から)。PLN1 の試験として、既定を link に切り替える段で退役させる (退役予定・未登録)。
 
 ## 3. 実装スケジュール (2026-11-11、fable 起案、PM 確認)
 
@@ -64,7 +75,7 @@ PM 決定 (2026-11-10、設計の往復の中で。ユーザーに報告済み):
 | W2 | S1 先行スモーク (取り込まない patch を ~/os32-tmp/run/ppc-lan-s1/ に) | P24a・P24c | terra が patch、PM が sandbox の外で QEMU | reset → MIF → PHY → ring → nonce 1 枚の TX と RX 1 枚を tools/ppc_lan_host.py --udp で見る |
 | W2 | M1 設計の追記 (LAN 印の一覧、P29〜P32 の受入の形) | なし | astra 起草 → Opus のサブエージェント (往復 3 回まで) | PM が確定して設計に追記 |
 | W3 | P24 lan_service.c + H24 | P24a・b・d (P24c は H24 で模型) | terra | H24 = service を製品の TU ごと (gem core・log・wire・monitor・diag) 組み、A8・A10・A11 の変異 |
-| W4 | P26 build/ppc-kboot.mk → P25 init/ppc_kernel.c (同じ作業木・同じ実装者・この順) | 6 本目 + S1 の直し | terra、UDP つきの QEMU は PM | 像の link、link map (pool の収容・禁止 symbol)、既存 9 印、PM の実測 A7・A8・A10・A11 |
+| W4 | P26 build/targets/ppc-powermac.mk → P25 platform/powermac/ppc_kernel.c (同じ作業木・同じ実装者・この順) | 6 本目 + S1 の直し | terra、UDP つきの QEMU は PM | 像の link、link map (pool の収容・禁止 symbol)、既存 9 印、PM の実測 A7・A8・A10・A11 |
 | W4 | P33 PPC_KBOOT_DESIGN.md | なし | terra または PM (文書だけ、H は作らない = 確定の R3) | check-docs-tree |
 | W5 | P29 kboot_run.py + H29 | M1・P26 | terra、UDP の run は PM | 既定 sungem・LAN 無効の負経路・9 印と禁止語の維持 |
 | W6 | P30 kboot_mutations.py → P31 kboot_accept.py → P32 kboot_all.py | 直前の段 | terra (直列)、UDP の run は PM | 各 H --mutate、P32 の後に kboot_all 全体 (PM、外) |
@@ -73,13 +84,13 @@ PM 決定 (2026-11-10、設計の往復の中で。ユーザーに報告済み):
 - P24 は宣言が設計で決まっているので、P24d のレビューが 1 回通った時点で着手してよい。P24c を待たない。
 - H29 を fixture (保存済みの serial とホストの capture) で書けるなら、P29 は M1 の確定後に W4 と並べて前倒しする。
 - sandbox は AF_INET を作れない。P29 以降は「sandbox の中は fixture の H と rc=3 の別行、UDP つきの実行は PM」の往復になり、1 往復に PM の実行 5〜10 分が乗る。
-- P25 の挿入行は 5 本目が main に入った後の init/ppc_kernel.c で照らし直す (DESIGN.final の行番号はレビュー時点)。
+- P25 の挿入行は 5 本目が main に入った後の platform/powermac/ppc_kernel.c で照らし直す (DESIGN.final の行番号はレビュー時点)。
 
 ### 3.2 取り込みのまとめ
 
 | 本 | 中身 | 像 | 統合の検査 (~/os32-tmp/run/ppc-lan0/int5.sh の形に足す物) |
 |---|---|---|---|
-| 6 本目 | P24a・P24b・P24c・P24d・P24 と各 H、票と設計の追記 (DESIGN.final、M1 と S1 の観測。S1 で core の直しが出ればその段も) | x86 不変。PPC の像は P5b (像に入っている gmac_tree.c の bdf) で変わる。P14b・P17c・P12b の TU (gem_reset・gem_phy・gmac_dma・lan_gem_io) と P24 の新しい TU は P26 まで ppc-kboot.mk に入らない | (1) 新しい H と直した段の H の --mutate (2) 像が変わるので kboot_all (9 印) と kboot の変異を sandbox の外で、PPCKERN.map に lan_service・lan_diag・lan_log が無いこと (3) 新しい TU の powerpc-elf-gcc compile と `nm -u` (4) gcc の関門 (下) |
+| 6 本目 | P24a・P24b・P24c・P24d・P24 と各 H、票と設計の追記 (DESIGN.final、M1 と S1 の観測。S1 で core の直しが出ればその段も) | x86 不変。PPC の像は P5b (像に入っている gmac_tree.c の bdf) で変わる。P14b・P17c・P12b の TU (gem_reset・gem_phy・gmac_dma・lan_gem_io) と P24 の新しい TU は P26 まで build/targets/ppc-powermac.mk に入らない | (1) 新しい H と直した段の H の --mutate (2) 像が変わるので kboot_all (9 印) と kboot の変異を sandbox の外で、PPCKERN.map に lan_service・lan_diag・lan_log が無いこと (3) 新しい TU の powerpc-elf-gcc compile と `nm -u` (4) gcc の関門 (下) |
 | 7 本目 = LAN の実装の到達 | P26 + P25 (同じ取り込み、D3)、QEMU の実測で出た直し、PM の実測の証拠 (起動ログがホストに届き 5 診断が往復、7450・7455) を票と設計の追記に。**これで本線は HAL へ進める** (ユーザー決定 2026-11-11: 7 本目を分ける) |
 | 8 本目 = LAN の最後 | P29〜P32 (受入の自動化)、P33、票を「実装済」に、実機前の段を DEFERRED_TESTS に | x86 不変、PPC の像が変わる | (1) kboot_all を sandbox の外で 7450・7455 (2) ホストの保存と serial の一致、欠落数、5 診断の応答 (3) link map (pool・サイズ・禁止 symbol) (4) LAN 無効の負経路 (5) build_compare --all (差は images/os32_install.iso の 1 件だけを許す、いつもの既知の差) (6) gcc の関門 |
 

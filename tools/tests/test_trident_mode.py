@@ -10,7 +10,9 @@ CHECK = dict(name='trident-mode', tier=1, needs=[], budget=27.4,
             'tools/tests/trident_device_fake.c', 'tools/tests/trident_device_fake.h',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
             'build/config.mk', 'include/types.h', 'include/memmap.h',
-            'gfx/palette.h', 'include/pegc.h'])
+            'gfx/palette.h', 'include/pegc.h'],
+    basis=['TRIDENT_FULL_DESIGN §5', 'TRIDENT_S3_DESIGN §1', 'TRIDENT_S3_DESIGN §3'],
+)
 import argparse
 import os
 from pathlib import Path

@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Link and package a PowerPC user application with the production CRT."""
-CHECK = dict(covers=['sdk/link/ppc/app.ld', 'tools/ppc/test_app_link.py'],
-             inputs=['sdk/**', 'tools/ppc/test_app_link.py'])
+import os
 from pathlib import Path
 import struct
 import shutil
@@ -10,7 +9,7 @@ import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
-BIN = Path('/home/hight/opt/cross-ppc/bin')
+BIN = Path((os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc') + '/bin'))
 sys.path.insert(0, str(ROOT / 'sdk'))
 import os32x_hdr as hdr
 
@@ -19,12 +18,8 @@ def call(args):
     return subprocess.run([str(x) for x in args], check=True, text=True)
 
 
-def exercise(tmp, mutant=False):
+def build(tmp, source):
     script = tmp / 'app.ld'
-    source = (ROOT / 'sdk/link/ppc/app.ld').read_text()
-    if mutant:
-        assert source.count('0x80100000') == 1
-        source = source.replace('0x80100000', '0x80000000')
     script.write_text(source)
     main = tmp / 'main.c'
     main.write_text('#include "os32api.h"\nint initialized = 7; int zeroed;\n'
@@ -50,23 +45,24 @@ def exercise(tmp, mutant=False):
                BIN / 'powerpc-elf-ld', '--gc-sections', '-T', script, '-o', elf, *objs]
     call(command)
     assert elf.with_suffix('.inputs.json').is_file()
-    if not mutant:
-        for name, source, diagnostic in [
-                ('missing', 'int missing_unit;\n', 'missing per-unit generations'),
-                ('wrong', '__attribute__((used,section(".os32_generations"))) const unsigned int bad[] = {0,0,0,0};\n', 'incompatible per-unit generations')]:
-            src = tmp / (name + '.c'); src.write_text(source)
-            obj = tmp / (name + '.o')
-            call([BIN / 'powerpc-elf-gcc', *flags[:-2], '-c', src, '-o', obj])
-            result = subprocess.run([str(x) for x in [*command, obj]], capture_output=True, text=True)
-            assert result.returncode != 0 and diagnostic in result.stderr, result.stderr
-        result = subprocess.run([str(x) for x in [*command, '-lgcc']], capture_output=True, text=True)
-        assert result.returncode != 0 and 'does not support' in result.stderr
-        call(command)
+    return elf, command, flags
+
+
+def exercise(tmp):
+    elf, command, flags = build(tmp, (ROOT / 'sdk/link/ppc/app.ld').read_text())
+    for name, source, diagnostic in [
+            ('missing', 'int missing_unit;\n', 'missing per-unit generations'),
+            ('wrong', '__attribute__((used,section(".os32_generations"))) const unsigned int bad[] = {0,0,0,0};\n', 'incompatible per-unit generations')]:
+        src = tmp / (name + '.c'); src.write_text(source)
+        obj = tmp / (name + '.o')
+        call([BIN / 'powerpc-elf-gcc', *flags[:-2], '-c', src, '-o', obj])
+        result = subprocess.run([str(x) for x in [*command, obj]], capture_output=True, text=True)
+        assert result.returncode != 0 and diagnostic in result.stderr, result.stderr
+    result = subprocess.run([str(x) for x in [*command, '-lgcc']], capture_output=True, text=True)
+    assert result.returncode != 0 and 'does not support' in result.stderr
+    call(command)
     parsed = hdr.Elf32(elf)
     base_ok = parsed.e_entry == 0x80100000 and parsed.symbols['_start'] == 0x80100000
-    if mutant:
-        assert not base_ok, 'base mutation survived'
-        return
     assert base_ok
     sections = {s['name']: s for s in parsed.sections}
     text, data, bss = (sections[n] for n in ('.text', '.data', '.bss'))
@@ -88,7 +84,13 @@ def main():
     with tempfile.TemporaryDirectory() as td:
         exercise(Path(td))
         if '--mutate' in sys.argv:
-            exercise(Path(td), True)
+            source = (ROOT / 'sdk/link/ppc/app.ld').read_text()
+            assert source.count('0x80100000') == 1
+            elf, _, _ = build(Path(td), source.replace('0x80100000', '0x80000000'))
+            parsed = hdr.Elf32(elf)
+            base_ok = parsed.e_entry == 0x80100000 and parsed.symbols['_start'] == 0x80100000
+            assert not base_ok, 'base mutation survived'
+            print('PPC app base: RED (1)')
             (Path(td) / 'app.ld').write_text((ROOT / 'sdk/link/ppc/app.ld').read_text())
             sdk = Path(td) / 'sdk'; shutil.copytree(ROOT / 'sdk', sdk)
             guard = sdk / 'link_guard.py'; text = guard.read_text()
@@ -100,6 +102,7 @@ def main():
                    *[Path(td) / f'{i}.o' for i in range(3)]]
             result = subprocess.run([str(x) for x in cmd], capture_output=True, text=True)
             assert result.returncode != 0 and 'incompatible per-unit generations' in result.stderr, result.stderr
+            print('PPC link guard endian: RED (1)')
     print('PPC app link: OK')
 
 

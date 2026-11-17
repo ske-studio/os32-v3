@@ -75,6 +75,10 @@ except ImportError:  # pragma: no cover
     serial = None
 
 EOT = b"\x04"
+OPEN_SETTLE_S = 0.15  # 実機 Ra266: RESET の 61ms 後に開く前の残りの 1 バイト (2026-11-14)
+# OS32_SERIAL_RAW_LOG を指定すると追記形式で monotonic 秒とバイト列を記録。
+# reset の count は直前の in_waiting のスナップショットであり厳密な実捨却数ではない。
+
 
 # SerialFS のホスト側 (同じディレクトリ)。pyserial と同じく import 時に
 # 落とさない — 無くても従来の cmd / repl は動く。
@@ -230,12 +234,61 @@ def read_size(port):
     return n if n > 0 else 1
 
 
+class RawLogPort:
+    """Log the port boundary as timestamped text; bytes are hexadecimal."""
+    def __init__(self, port, path):
+        self.port = port
+        self.log = open(path, "a", encoding="ascii", buffering=1)
+
+    def _record(self, event, detail):
+        self.log.write("%.9f %s %s\n" % (time.monotonic(), event, detail))
+
+    def __getattr__(self, name):
+        return getattr(self.port, name)
+
+    def read(self, size):
+        data = self.port.read(size)
+        if data:
+            self._record("RX", data.hex())
+        return data
+
+    def write(self, data):
+        count = self.port.write(data)
+        if count:
+            self._record("TX", bytes(data[:count]).hex())
+        return count
+
+    def reset_input_buffer(self):
+        self._record("RESET_BEFORE", "in_waiting=%d" % self.port.in_waiting)
+        self.port.reset_input_buffer()
+        self._record("RESET_AFTER", "in_waiting=%d" % self.port.in_waiting)
+
+    def close(self):
+        try:
+            self.port.close()
+        finally:
+            self.log.close()
+
+
 def open_port(name, baud):
     if name.startswith(AIDEBUG_PREFIX):
         # NP21/W の COM1 (速度は模擬されないので baud は使わない)
-        return AidebugPort(name[len(AIDEBUG_PREFIX):])
-    return serial.Serial(name, baudrate=baud, bytesize=8, parity="N",
-                         stopbits=1, timeout=0.2)
+        port = AidebugPort(name[len(AIDEBUG_PREFIX):])
+    else:
+        port = serial.Serial(name, baudrate=baud, bytesize=8, parity="N",
+                             stopbits=1, timeout=0.2)
+        # 開く前 (相手の CTS が非アクティブ) にゲストの UART に残った 1 バイトは、
+        # 開いて CTS が立った直後 (実機で約 60ms) に届く。待ってから捨てる。
+        time.sleep(OPEN_SETTLE_S)
+        port.reset_input_buffer()
+    path = os.environ.get("OS32_SERIAL_RAW_LOG")
+    if not path:
+        return port
+    try:
+        return RawLogPort(port, path)
+    except Exception:
+        port.close()
+        raise
 
 
 def read_until_eot(port, timeout_s):
@@ -280,6 +333,22 @@ def check_echo(text, cmd):
     head = text.lstrip("\r\n")
     first = head.split("\n", 1)[0].rstrip("\r")
     return first == echo_line(cmd)
+
+
+def run_serial(port, line, timeout_s, out=None):
+    """Send one command on an open port; rc describes the exchange, not the guest."""
+    text, ok = send_cmd(port, line, timeout_s)
+    if out is not None:
+        out.write(text)
+    if not ok:
+        if out is not None:
+            print("\n[rshell_serial] timeout waiting for EOT (%.0fs)" % timeout_s)
+        return 1, text
+    if not check_echo(text, line):
+        if out is not None:
+            print("[rshell_serial] desync: expected echo of %r" % line)
+        return 1, text
+    return 0, text
 
 
 def ack_ok(text):
@@ -576,17 +645,7 @@ def run_line(args, port, line, server=None, out=None):
                  " line_not_quiet" if flags & serialfs_host.XF_NOT_QUIET
                  else ""))
         return (0 if code == 0 else 1), text
-    text, ok = send_cmd(port, line, args.timeout)
-    out.write(text)
-    if not ok:
-        print("\n[rshell_serial] timeout waiting for EOT (%.0fs)" % args.timeout)
-        return 1, text
-    # **応答がこのコマンドのものか確かめる** (往復 2 B3)。EOT の対応が
-    # 1 つずれていると、以後ずっと前のコマンドの応答を読み続ける。
-    if not check_echo(text, line):
-        print("[rshell_serial] desync: expected echo of %r" % line)
-        return 1, text
-    return 0, text
+    return run_serial(port, line, args.timeout, out)
 
 
 def lan_result(text, line, eot):

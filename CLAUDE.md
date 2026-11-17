@@ -9,7 +9,7 @@
 **PM の推奨は基本的に承認、[D2] と実機の物理操作は個別承認**。**3 ラリーで決着しない争点はユーザーへ**。
 承認済みスコープの中では止まらずに進め、止まるのは [D1]〜[D4] の承認・仕様の分岐・スコープ拡大・独立レビューが要る地点。
 **このリポジトリ os32-v3 が現行** (os32 の v2.x は戻り先、[VERSIONS](docs/decisions/VERSIONS.md) §2)。
-**カーネル層に分かっている不具合があるあいだは新機能より先に直す**、**カーネルの機能は整数演算が第一、浮動小数点が要るときは実装前にユーザーに確認** ([POLICY_DEV](docs/POLICY_DEV.md) §1・§2)。
+**カーネル層に分かっている不具合があるあいだは新機能より先に直す**、**カーネルの機能は整数演算が第一、浮動小数点が要るときは実装前にユーザーに確認**、**2026-11-14 から HAL 中心期: 装置は HAL の口の実装として作り、arch の拡張と HAL と関係の薄い新装置は着手しない** ([POLICY_DEV](docs/POLICY_DEV.md) §1・§2)。
 
 実装者の完了条件と PM の取り込み・節目の検査は [ROLES §0「検査」](docs/tasks/agents/ROLES.md) に従う。`make all` は PM が担当する。手本がある移植は [PORT_FLOW](docs/tasks/agents/PORT_FLOW.md) に従い、宣言・コーディングの段ではビルドしない。
 
@@ -17,7 +17,7 @@
 
 ビルド・配備・検査の正典は [docs/08_build.md](docs/08_build.md) §8-1「ビルド手順」・§8-2「ビルドパイプライン」・§8-4「ホスト側イメージ生成ツール」(配備と「検査の 3 段」)。
 `make all` / `make kernel` / `make programs` でビルドする。
-`make check-<name>` は指定の検査 (実装者は触ったファイルを直接組む試験だけ回す)。取り込みの検査は GitHub の CI (build の `make check-fast` = 全部を変異なし)、変異込みの全体は workflow `full-check`。`check-changed` は使わない ([PARALLEL_BRANCHES](docs/tasks/agents/PARALLEL_BRANCHES.md) §3)。
+`make check-<name>` は指定の検査 (実装者は触ったファイルを直接組む試験だけ回す)。取り込みの検査は GitHub の CI (check と build。全部の検査を変異込みで回す)。手元の `check-changed` は関門ではない ([PARALLEL_BRANCHES](docs/tasks/agents/PARALLEL_BRANCHES.md) §3)。
 PM の作業のスキル: **[os32-design-rally](.claude/skills/os32-design-rally/SKILL.md)** (設計の往復)・**[os32-delegate](.claude/skills/os32-delegate/SKILL.md#2-実装の依頼の型)** (実装の依頼)・**[os32-land](.claude/skills/os32-land/SKILL.md#3-検査)** (取り込み・CI・push)・**[os32-realhw-update](.claude/skills/os32-realhw-update/SKILL.md#1-ノートへの依頼の形-この順で書く)** (実機の更新はノートのセッションに頼む)・**`run-os32`** (NP21/W のゲストを叩く)。
 KAPI 変更後は `make clean` → `make all` ([ABI])。
 `make deploy` は HostDrv、`make deploy-kernel` / `deploy-boot` は NP21/W 停止後 ([D1])。

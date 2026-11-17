@@ -45,8 +45,8 @@ int pit_compute(unsigned long clk_hz, unsigned int hz, struct pit_setup *out)
     out->mode = 0;
     out->valid = 0;
 
-    /* この票で扱うのは 100Hz だけ。1kHz 版 (§5-5) はここを広げる。 */
-    if (hz != (unsigned int)PIT_HZ) {
+    /* 論理 tick の 100Hz と試験像の物理 1000Hz を受ける。 */
+    if (hz != (unsigned int)PIT_HZ && hz != 1000u) {
         return PIT_ERR_HZ;
     }
 
@@ -57,7 +57,7 @@ int pit_compute(unsigned long clk_hz, unsigned int hz, struct pit_setup *out)
         return PIT_ERR_CLOCK;
     }
 
-    raw = clk_hz / (unsigned long)hz;
+    raw = (clk_hz + (unsigned long)hz / 2) / (unsigned long)hz;
     if (raw == 0 || raw > (unsigned long)PIT_RELOAD_MAX) {
         return PIT_ERR_RELOAD;
     }

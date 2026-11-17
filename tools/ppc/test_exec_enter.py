@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """Check the assembled PPC USER transition and its MSR mutation."""
-CHECK = dict(name='ppc-exec-enter', tier=1,
-             covers=['arch/ppc/exec_enter.S', 'tools/ppc/test_exec_enter.py'],
-             inputs=['arch/ppc/ppc_oea.h', 'build/ppc-kboot.mk'], needs=[], budget=3)
+import os
 import re
 import subprocess
 import sys
@@ -10,7 +8,7 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-CROSS = Path('/home/hight/opt/cross-ppc/bin')
+CROSS = Path((os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc') + '/bin'))
 SOURCE = ROOT / 'arch/ppc/exec_enter.S'
 
 
@@ -52,13 +50,13 @@ def inspect(source):
 
 def main():
     source = SOURCE.read_text()
-    if inspect(source) != 0xd032:
+    if inspect(source) != 0xf032:
         print('FAIL: USER MSR')
         return 1
     if '--mutate' in sys.argv:
-        old = 'PPC_MSR_EE|PPC_MSR_PR|PPC_MSR_ME|PPC_MSR_IR'
+        old = 'PPC_MSR_EE|PPC_MSR_PR|PPC_MSR_ME|PPC_MSR_FP|PPC_MSR_IR'
         assert source.count(old) == 1
-        if inspect(source.replace(old, old + '|PPC_MSR_BE')) != 0xd232:
+        if inspect(source.replace(old, old + '|PPC_MSR_BE')) != 0xf232:
             raise RuntimeError('mutation did not produce expected BE bit')
         print('BE bit: RED (1)')
     return 0

@@ -9,6 +9,8 @@ static u32 head, count;
 static u64 in_next, in_drop_frames, out_next, out_drop, out_bytes;
 static int connected;
 
+int pm_term_connected(void) { return connected; }
+
 static int same_bytes(const u8 *a, const u8 *b, u32 n)
 {
     u32 i;

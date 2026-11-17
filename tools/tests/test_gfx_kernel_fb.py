@@ -16,7 +16,7 @@ from mutpar import run_ordered
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 TARGET_SRCS = ['gfx/gfx_core.c', 'gfx/gfx_emergency.c',
                'drivers/video/pc98/backend_pc98.c', 'drivers/video/pc98/backend_pegc.c',
-               'drivers/video/cirrus/backend_cirrus.c', 'drivers/video/cirrus/cirrus_identify.c', 'gfx/gfx_vram.c', 'gfx/gfx_scroll.c', 'platform/pc98/gfx_scroll.c', 'platform/pc98/gfx_init.c', 'platform/pc98/gfx_selector.c', 'platform/pc98/gfx_surfaces.c',
+               'drivers/video/cirrus/backend_cirrus.c', 'drivers/video/cirrus/cirrus_identify.c', 'drivers/video/pc98/gfx_vram.c', 'gfx/gfx_scroll.c', 'platform/pc98/gfx_scroll.c', 'platform/pc98/gfx_init.c', 'platform/pc98/gfx_selector.c', 'platform/pc98/gfx_surfaces.c',
                'exec/surface_query.c', 'exec/lease.c', 'exec/access_walk.c',
                'exec/redir_access.c', 'mm/shlib.c', 'mm/paging.c',
                'mm/pgalloc.c',
@@ -33,12 +33,12 @@ MUTANTS = [
   '    return GFX_PFN(gfx_display_planes[plane ? 0 : 1]);',
   'FAIL !surface_query_refs(&source,source.refs,source.count,LEDGER_PERM_RW)'),
  ('geforce-leave-backend',
-  'if (g_backend == &gfx_backend_geforce && pc98_route_safe()) {',
-  'if (g_backend == &gfx_backend_geforce && !g_backend->probe() && pc98_route_safe()) {',
+  'if (display_provider_restore_fallback(g_backend)) {',
+  'if (display_provider_restore_fallback(g_backend) && !g_backend->probe()) {',
   'FAIL g_backend == (safe ? &gfx_backend_pc98 : &gfx_backend_geforce)'),
  ('pc98-display-required',
   '    return backend == LEDGER_SF_PC98 || displays == 1;',
-  '    return displays == (backend == LEDGER_SF_PC98 ? GVRAM_PLANES : 1);',
+  '    return displays == (backend == LEDGER_SF_PC98 ? GFX_BB_PLANES : 1);',
   'FAIL bb[0] && gfx_backend_pc98.bb_base'),
  ('mode-capacity-disabled',
   '    if (!gfx_mode_fits(be, mode)) return 0;',
@@ -76,7 +76,7 @@ MUTANTS = [
   'FAIL ledger_surface_find(LEDGER_SF_PEGC,LEDGER_ROLE_DISPLAY) != 0'),
  ('display-absent', '!ledger_surface_create(&gfx_pegc_display, 0)', '1',
   'FAIL ledger_surface_find(LEDGER_SF_PEGC,LEDGER_ROLE_DISPLAY) != 0'),
- ('preinit-backend', 'selected ? gfx_sf_backend() : LEDGER_SF_PC98', 'gfx_sf_backend()',
+ ('preinit-backend', 'selected ? gfx_sf_backend() : display_provider_ledger(DISPLAY_FALLBACK_BACKEND)', 'gfx_sf_backend()',
   'FAIL fb.width == sf->width && fb.height == height'),
  # Missing CLIENT emits L2 with started=0 before returning.
  ('init200-rebind', '    gfx_bind_client(); /* retain 400-line plane stride in both modes */',
@@ -235,5 +235,18 @@ def main():
             result=run_case(None,args.runner,[(unit,old,new)])
             assert result.returncode == 1 and expected in result.stdout,(name,result.stdout,result.stderr)
             print('RED '+name)
-        print(f'PASS {len(MUTANTS)+3}/{len(MUTANTS)+3} runtime mutants')
+        for name, changes in [
+            ('lease-entry-guards', [
+                ('exec/surface_query.c',
+                 '    if (gfx_policy_blocks_map(role)) return OS32_ERR_NOSYS;\n    int rc = surface_api_source(role, &source);\n    return rc ? rc : surface_lease(',
+                 '    int rc = surface_api_source(role, &source);\n    return rc ? rc : surface_lease('),
+                ('exec/surface_query.c',
+                 '    if (gfx_policy_blocks_map(role)) return OS32_ERR_NOSYS;\n    int rc = surface_api_source(role, &source);\n    return rc ? rc : surface_lease_bundle(',
+                 '    int rc = surface_api_source(role, &source);\n    return rc ? rc : surface_lease_bundle(')]),
+            ('bridge-guard', [('gfx/gfx_core.c',
+                '    if (gfx_policy_blocks_map(LEDGER_ROLE_CLIENT)) goto fail;', '')])]:
+            result = run_case(None, args.runner, extra_changes=changes)
+            assert result.returncode == 1 and 'FAIL ' in result.stdout, (name, result.stdout, result.stderr)
+            print('RED (runtime): ' + name)
+        print(f'PASS {len(MUTANTS)+5}/{len(MUTANTS)+5} runtime mutants')
 if __name__ == '__main__': main()

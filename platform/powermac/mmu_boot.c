@@ -145,6 +145,7 @@
 /* NetBSD ofw_machdep.c:215-310; FreeBSD mmu_oea.c:820-842,1995-2029.
  * The interval scan subtracts reservations without growing region arrays. */
 #include "ofw.h"
+#include "rh_observe.h"
 #include "ppc_pmap.h"
 #include "ppc_memmap.h"
 #include "kstring.h"
@@ -236,7 +237,14 @@ void powermac_mmu_boot(ppc_ci ci)
     struct pm_escc s;
     ofw_init(ci);
     if (ofw_setup(&e)) ppc_stop();
-    if (pm_escc_prepare(&e,&s)) fail(e.out,"FAIL:ESCC\r\n");
+    pm_rh_of_mark(0);
+    int fb_rc = pm_rh_capture(e.out);
+    if (fb_rc < 0) fail(e.out,"FAIL:FB\r\n");
+    pm_rh_of_mark(1);
+    if (pm_escc_prepare(&e,&s)) {
+        pm_rh_of_mark(PM_RH_ESCC_PREPARE);
+        fail(e.out,"FAIL:ESCC\r\n");
+    }
     info.escc_pa=s.csr;
     int root=ofw_finddevice(PM_ROOT);
     if (timebase(ofw_child(root))) fail(e.out,"FAIL:TB\r\n");
@@ -249,10 +257,12 @@ void powermac_mmu_boot(ppc_ci ci)
     if (regions(&avail,mac?1:e.ac,mac?1:e.sc,n)) fail(e.out,"FAIL:AVAILABLE\r\n");
     info.ram=&ram; info.avail=&avail;
     if (hpt_allocate()) fail(e.out,"FAIL:HPT\r\n");
+    pm_rh_of_mark(2);
     static const char takeover[]="TAKEOVER\r\n";
     if (ofw_write(e.out,takeover,sizeof(takeover)-1)!=sizeof(takeover)-1)
         fail(e.out,"FAIL:STDOUT\r\n");
     if (pm_escc_drain(&s)) fail(e.out,"FAIL:DRAIN\r\n");
+    ofw_detach();
     ppc_takeover(&info);
     ppc_stop();
 }

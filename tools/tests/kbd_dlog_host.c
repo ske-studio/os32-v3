@@ -1,3 +1,11 @@
+#define KBD_MERGE_SOURCE "input/hal/kbd_merge.c"
+#include "kbd_capture_fixture_host.h"
+#include "../../input/hal/legacy_ring.c"
+#include "../../input/hal/legacy_mode.c"
+#include "../../kernel/input_legacy.c"
+#include "../../kernel/input_wait.c"
+/* No device callbacks are registered in this boundary fixture. */
+void idle_work_run(void) { }
 /* ======================================================================== */
 /*  KBD_DLOG_HOST.C — キーボードの受信記録 (KAPI v67 kbd_diag_log) と        */
 /*  `kbdstat -w` の行をそのままホストで回す                                 */
@@ -100,8 +108,17 @@ int bus_mouse_init(void) { return 1; }
 int seamless_mouse_init(void) { return 0; }
 int seamless_mouse_poll(i16 *x, i16 *y) { (void)x; (void)y; return 0; }
 u8 mouse_read_buttons(void) { return stub_mouse_buttons; }
-void bus_mouse_get(i16 *dx, i16 *dy, u8 *buttons)
-{ *dx = 0; *dy = 0; *buttons = stub_mouse_buttons; }
+void mouse_hal_seamless_init(void) {}
+void mouse_hal_seamless_poll(void) {}
+void mouse_ext_mode(int enabled) { (void)enabled; }
+void mouse_legacy_snapshot(i16 *dx, i16 *dy, u8 *buttons, i16 *x, i16 *y)
+{ *dx = *dy = 0; *buttons = stub_mouse_buttons; *x = 319; *y = 199; }
+u8 input_buttons(void) { return stub_mouse_buttons; }
+void pointer_position(i16 *x, i16 *y) { *x = 319; *y = 199; }
+void pointer_get_bounds(i16 *x0, i16 *y0, i16 *x1, i16 *y1)
+{ *x0 = *y0 = 0; *x1 = 639; *y1 = 399; }
+void pointer_bounds(i16 x0, i16 y0, i16 x1, i16 y1)
+{ (void)x0; (void)y0; (void)x1; (void)y1; }
 int tvram_reverse_cell(int x, int y) { (void)x; (void)y; return 1; }
 
 /* 1 回の IRQ1: 0043h = st、0041h = data */
@@ -266,7 +283,7 @@ static void case_irq_flags_api(void)
     CHECK(out[0].flags == KBD_DLOG_F_V86 && out[0].mods == KBD_DLOG_MOD_KANA);
     CHECK(out[1].flags == KBD_DLOG_F_V86 && out[1].mods == (KBD_DLOG_MOD_KANA | KBD_DLOG_MOD_SHIFT));
     CHECK(stub_v86_pushed == 2);
-    CHECK(kbd_is_pressed(0x72) == 0 && kbd_is_pressed(0x70) == 0);
+    CHECK(kbd_is_pressed(0x72) == 1 && kbd_is_pressed(0x70) == 1);
     CHECK(out[2].flags == KBD_DLOG_F_GUI && out[2].mods == (KBD_DLOG_MOD_KANA | KBD_DLOG_MOD_SHIFT));
 
     CHECK(kbd_diag_log(0, (KbdDiagLogEnt *)0, 4) == OS32_ERR_INVAL);
@@ -321,16 +338,17 @@ static void case_irq_v86_mods(void)
         CHECK(kbd_trygetkey() == -1);
     }
 
-    /* 通常キーは V86 だけへ渡り、cooked/raw/押下表へ混入しない。 */
+    /* 設計 §3: V86 中も押下を追い、cooked/raw への配送はしない。 */
     for (i = 0; i < 2; i++) {
         fresh();
         kbd_set_gui_mode(i);
         stub_v86 = 1;
         irq(KBD_STAT_RXRDY, 0x1D);
-        CHECK(kbd_is_pressed(0x1D) == 0);
+        CHECK(kbd_is_pressed(0x1D) == 1);
         irq(KBD_STAT_RXRDY, 0x9D);
         CHECK(stub_v86_pushed == 2);
         stub_v86 = 0;
+        CHECK(kbd_is_pressed(0x1D) == 0);
         CHECK(kbd_trygetkey() == -1);
         CHECK(kbd_trygetrawkey() == -1);
         CHECK(kbd_get_modifiers() == 0);
@@ -556,6 +574,7 @@ static const struct { const char *name; void (*fn)(void); } cases[] = {
 
 int main(int argc, char **argv)
 {
+    input_legacy_register(&kbd_legacy_provider);
     unsigned int i;
     int ran = 0;
     for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
@@ -574,3 +593,9 @@ int main(int argc, char **argv)
 void pc98_serial_puts_polled(const char *s) { (void)s; }
 int pc98_serial_gate_active(void) { return 0; }
 #include "serial_emergency_host.h"
+
+int con_sink_capture_active(void) { return 0; }
+
+void idle_wait_step(void) { idle_work_run(); }
+
+void bootlog_push(const char *s, u32 n) { (void)s; (void)n; }

@@ -1,6 +1,7 @@
 /* LAN resident /host owner (NET_HOSTSVC_DESIGN §3, #5/#6/#7/#10).
  * Task context only; IRQ notifications are observed through the snapshot. */
 #include "serialfs.h"
+#include "boot_token.h"
 #include "net/host_mailbox.h"
 #include "os32_kapi_shared.h"
 
@@ -13,6 +14,7 @@ static struct SfsPersistent resident;
 static struct SfsPersistentConfig config;
 static u32 host_generation, nonce;
 static int enabled, scope, host_valid, reconnect;
+static int nonce_ready;
 
 int sfs_persistent_enabled(void) { return enabled; }
 const SfsClient *sfs_persistent_client(void)
@@ -34,9 +36,9 @@ void sfs_alive_observe(u32 generation)
     if (!enabled) return;
     if (host_valid && host_generation != generation)
         sfs_persistent_stale();
+    if (!host_valid) reconnect = 1;
     host_generation = generation;
     host_valid = 1;
-    reconnect = 1;
 }
 
 static void observe_snapshot(const struct HostAlive *alive)
@@ -131,6 +133,14 @@ int sfs_ensure_session(u32 deadline)
     c->fails = 0;
     if ((i32)(config.io->now(config.io_ctx) - deadline) >= 0)
         return OS32_ERR_HOSTDOWN;
+    if (!nonce_ready) {
+        u8 token[16];
+        boot_token_get(token);
+        /* CRC32 of all 16 boot-token bytes; byte-oriented on x86 and PPC.
+         * A simple four-word XOR would cancel repeated clock words on x86. */
+        nonce = sfs_crc32(token, sizeof(token));
+        nonce_ready = 1;
+    }
     /* Never reuse a nonce after a failed exchange, including clock wrap. */
     if (++nonce == 0) ++nonce;
     rc = sfs_client_hello_deadline(c, nonce, deadline);

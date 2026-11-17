@@ -6,7 +6,9 @@
 # unicode.bin / kernel.elf / kernel.map をリポジトリルートから分離する)
 ARCH ?= x86
 PLATFORM ?= pc98
-ifeq ($(ARCH),ppc)
+ifeq ($(TICK1K),1)
+BUILD_OUT ?= build/out/tick1k
+else ifeq ($(ARCH),ppc)
 BUILD_OUT ?= build/out/ppc-powermac
 else
 BUILD_OUT ?= build/out
@@ -62,6 +64,7 @@ SDK_KAPI_HDR = sdk/include/os32/os32_kapi_shared.h
 # "arch_io.h" / "platform_io.h" をここで解決する。
 INC_COMMON = -I. -Iinclude -Iarch/$(ARCH) -Iplatform/$(PLATFORM) $(SDK_INC)
 
+include build/softfloat.mk
 include build/select.mk
 KERNEL_SRC_INCLUDES = $(addprefix -I,$(KERNEL_SRC_DIRS))
 
@@ -144,7 +147,7 @@ CFLAGS_COMMON = $(C_STD) $(C_DIALECT_ERRORS) $(CFLAGS_MACHINE)
 KERNEL_CFLAGS = -include sdk/include/os32/os32_unit_stamp.h $(CFLAGS_COMMON) -O2 -Wall -D__KERNEL_BUILD__
 # 計測やデバッグ用の一時フラグをコマンドラインから足す口。
 #   例: make kernel KERNEL_CFLAGS_EXTRA=-DKAPI_PROFILE
-KERNEL_CFLAGS += $(KERNEL_CFLAGS_EXTRA)
+KERNEL_CFLAGS += $(KERNEL_CFLAGS_EXTRA) $(X87_KERNEL_FLAGS)
 
 # LAN (LGY-98)。**既定で有効** (Host Services を製品機能に、ユーザー決裁 2026-09-14)。
 #   既定 (stamp 無し) = 有効・FLAGS 0 (driver + リンク層のみ、DIAG/REFLECT/LINKTEST 無し)。
@@ -187,7 +190,7 @@ CFLAGS_BASE = $(KERNEL_CFLAGS)
 # 言語指定は C_STD_SQLITE (gnu89)。CFLAGS_COMMON を継承すると gnu11 になるので
 # 機械・ABI の旗 (CFLAGS_MACHINE) だけを継ぐ。
 CFLAGS_SQLITE = $(C_STD_SQLITE) $(CFLAGS_MACHINE) -Os -ffunction-sections -fdata-sections \
-                -Wno-long-long -w -DNDEBUG -D__KERNEL_BUILD__
+                -Wno-long-long -w -DNDEBUG -D__KERNEL_BUILD__ $(if $(filter x86,$(ARCH)),$(SOFTFLOAT_FLAGS))
 LDFLAGS = -m $(ELF_EMULATION) -T $(BUILD_OUT)/os32.ld -Map=$(BUILD_OUT)/kernel.map -nostdlib --nmagic --gc-sections \
 	-L$(shell $(CC) -print-libgcc-file-name | xargs dirname)
 

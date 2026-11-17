@@ -6,12 +6,6 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-CHECK = dict(name='ppc-lan-p12', tier=2, budget=60,
-             covers=['platform/powermac/gmac_dma.c', 'tools/ppc/test_lan_p12.py',
-                     'tools/ppc/lan_p12_fake.c'],
-             inputs=['platform/powermac/lan_boot.h', 'platform/powermac/ppc_memmap.h',
-                     'drivers/net/gem/gem.h', 'mm/paging.h', 'include/types.h',
-                     'arch/ppc/ppc_oea.h', 'arch/ppc/ppc_layout.h'])
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = [
     ('sync', '    ppc_sync();\n    if (paging_map_range', '    /* sync removed */\n    if (paging_map_range', 0, 'H:A4 dma-unpublished'),

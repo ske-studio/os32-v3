@@ -20,6 +20,8 @@ from test_exec_r1 import function
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SOURCES = {
     'kbd_source.inc': 'drivers/input/kbd.c',
+    'kbd_merge_source.inc': 'input/hal/kbd_merge.c',
+    'legacy_keymap_source.inc': 'input/hal/legacy_keymap.c',
     'ime_source.inc': 'kernel/ime/ime.c',
     'ime_delivery.inc': 'kernel/ime/ime_delivery.inc',
     'ime_cui_process.inc': 'kernel/ime/ime_cui_process.inc',
@@ -70,7 +72,7 @@ def run(mutation=None):
         assert getter
         (work / 'exec_result.inc').write_text(
             'static int g_last_kind, g_last_code;\n' + getter[0])
-        includes = ['-I' + str(work)] + ['-I' + str(ROOT / 'tools/tests/host_arch'), *include_flags(ROOT)]
+        includes = ['-I' + str(work), '-I' + str(ROOT / 'input/hal')] + ['-I' + str(ROOT / 'tools/tests/host_arch'), *include_flags(ROOT)]
         exe = work / 'test'
         subprocess.run(['nasm', '-f', 'elf32', str(ROOT / 'arch/x86/kernel/setjmp.asm'),
                         '-o', str(work / 'setjmp.o')], check=True)
@@ -233,11 +235,11 @@ MUTATIONS = [
      '    if (op == GUI_OP_OWNER_EXIT) return OS32_ERR_INVAL;', '',
      'FAIL internal owner exit rejected'),
     ('reader-early-release', 'sink_source.inc',
-     '    if (g_reader == id) g_reader = CON_SINK_NO_READER;',
-     '    g_reader = CON_SINK_NO_READER;', 'FAIL reader retained across child exit'),
-    ('GUI-cooked-double-enqueue', 'kbd_source.inc',
-     '    if (kbd_gui_mode) return;\n\n    /* スキャンコード',
-     '    /* スキャンコード', 'FAIL WM raw only'),
+     '    if (g_reader == id) {',
+     '    if (1) {', 'FAIL reader retained across child exit'),
+    ('GUI-cooked-double-enqueue', 'legacy_keymap_source.inc',
+     '        if (sc != 0xff && raw_due) legacy_raw_push(sc, !down, physical_mods);\n        return;',
+     '        if (sc != 0xff && raw_due) legacy_raw_push(sc, !down, physical_mods);', 'FAIL WM raw only'),
 ]
 
 

@@ -30,6 +30,7 @@ static void report(const char *text, u32 len)
 #define HOST_POOL_IRQ_RESTORE(f) ((void)(f))
 #include "pgalloc_host_fixture.h"
 void __cdecl kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
+void __cdecl console_printf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
 
 /* 試験が決める「機械の姿」: 割り当ててよい物理の上限と、いまの BB。 */
 static u32 t_usable_end;

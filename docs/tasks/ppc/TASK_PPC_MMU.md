@@ -14,4 +14,4 @@ PPC_BOOT_DESIGN の見取り図は FB の直描きを MMU より先に置いて�
 
 ## 2. 実行
 
-`make -f build/ppc.mk`、`python3 tools/ppc/mmu_run.py --timeout 30 [--mutate] [--stage A|B|C]`。計測は `python3 tools/ppc/check_compile.py`。
+`make -f build/ppc.mk`、`python3 tools/ppc/mmu_run.py --timeout 30 [--mutate] [--stage A|B|C]`。

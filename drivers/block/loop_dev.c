@@ -15,7 +15,7 @@
 /* ======================================================================== */
 
 #include "loop_dev.h"
-#include "../base/dev.h"
+#include "../../kernel/dev/dev.h"
 #include "vfs.h"
 #include "kprintf.h"
 #include "le_internal.h"

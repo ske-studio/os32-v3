@@ -1,11 +1,5 @@
 #!/usr/bin/env python3
 """Exercise the PPC parent context across a simulated child longjmp."""
-CHECK = dict(name='ppc-exec-return', tier=1,
-             covers=['tools/ppc/test_exec_return.py'],
-             inputs=['arch/ppc/exec_context.c', 'arch/ppc/arch_cpu.h',
-                     'arch/ppc/arch_exec_storage.h', 'include/exec_arch.h',
-                     'include/types.h', 'arch/ppc/ppc_frame.h',
-                     'arch/ppc/exec_resume.S', 'lib/kstring.h', 'lib/kstring_c.c'], needs=[], budget=3)
 import subprocess
 import sys
 import tempfile
@@ -26,13 +20,16 @@ static void say(const char *s, int n) {
 }
 static int check(void) {
     volatile struct arch_priv_context parent;
-    root = 0x1234; ppc_exec_kernel_sp = 0x5678;
+    /* launch snapshots the kernel root, not the parent USER root. */
+    root = 0xaaaa; ppc_exec_kernel_sp = 0x5678;
     arch_priv_save(&parent);
     if (!__builtin_setjmp(landing)) {
         root = 0xaaaa; ppc_exec_kernel_sp = 0xbbbb;
         __builtin_longjmp(landing, 1);
     }
     say("reached=parent\n", 15);
+    /* exec_restore_context selects the parent before private restoration. */
+    root = 0x1234;
     arch_priv_restore(&parent);
     if (root != 0x1234) { say("FAIL: root\n", 11); return 5; }
     if (ppc_exec_kernel_sp != 0x5678) return 6;
@@ -85,6 +82,11 @@ def resume_check(source):
     regs = [0] * 32
     regs[30] = 0x1000
     frame = [0x2000 + i for i in range(44)]
+    # MSR[FP]=1, MSR[FE0/FE1]=0 is the PPC user-return contract.
+    # Seed both exception bits and clear FP so every change is observable.
+    frame[37] = 0x10900
+    expected_special = frame[32:38]
+    expected_special[5] = (frame[37] & ~0x900) | 0x2000
     spr = {}
     special = {}
     started = False
@@ -106,6 +108,15 @@ def resume_check(source):
                        'PPC_FRAME_SRR0': 144, 'PPC_FRAME_SRR1': 148}
             offset = offsets[off] if off in offsets else int(off)
             regs[int(dst)] = frame[(regs[int(base[:-1])] + offset - 0x1000) // 4]
+        elif op == 'li':
+            constants = {'PPC_MSR_FE': 0x900, 'PPC_MSR_FP': 0x2000}
+            regs[int(args[0])] = constants[args[1]] if args[1] in constants else int(args[1], 0)
+        elif op == 'andc':
+            dst, left, right = map(int, args)
+            regs[dst] = regs[left] & ~regs[right]
+        elif op == 'ori':
+            dst, left, value = args
+            regs[int(dst)] = regs[int(left)] | (0x2000 if value == 'PPC_MSR_FP' else int(value, 0))
         elif op.startswith('mtsprg'):
             spr[op[-1]] = regs[int(args[0])]
         elif op.startswith('mfsprg'):
@@ -116,7 +127,7 @@ def resume_check(source):
                 srr_started = True
         elif op == 'rfi':
             return (regs == frame[:32] and
-                    [special.get(k) for k in ('mtlr', 'mtcr', 'mtctr', 'mtxer', 'mtsrr0', 'mtsrr1')] == frame[32:38])
+                    [special.get(k) for k in ('mtlr', 'mtcr', 'mtctr', 'mtxer', 'mtsrr0', 'mtsrr1')] == expected_special)
         else:
             return False
     return False
@@ -133,9 +144,13 @@ def main():
         print('resume baseline failed')
         return 1
     if '--mutate' in sys.argv:
-        old = '    arch_mmu_load_root(root);'
+        old = '    ppc_exec_kernel_sp = sp;'
         assert source.count(old) == 1
-        result = execute(source.replace(old, '    (void)root;'))
+        # The mutant reloads a saved root, so it needs the MMU declaration the
+        # product no longer includes after the P04 cleanup.
+        result = execute('#include "arch_cpu.h"\n' + source.replace(old, '    u32 stale_root;\n'
+                                        '    __builtin_memcpy(&stale_root, (const void *)saved->opaque, sizeof(stale_root));\n'
+                                        '    arch_mmu_load_root(stale_root);\n' + old))
         if result.returncode != 5 or result.stdout != 'reached=parent\nFAIL: root\n':
             print('mutation unexpected:', result.returncode, result.stdout, result.stderr)
             return 1
@@ -154,6 +169,15 @@ def main():
             print('resume mutation survived')
             return 1
         print('resume r3: RED (1)')
+        for name, old, new in [
+                ('FP', '    ori 0,0,PPC_MSR_FP', '    ori 0,0,0'),
+                ('FE0', '    li 4,PPC_MSR_FE', '    li 4,0x100'),
+                ('FE1', '    li 4,PPC_MSR_FE', '    li 4,0x800')]:
+            assert asm.count(old) == 1
+            if resume_check(asm.replace(old, new)):
+                print('resume ' + name + ' mutation survived')
+                return 1
+            print('resume ' + name + ': RED (1)')
     return 0
 
 

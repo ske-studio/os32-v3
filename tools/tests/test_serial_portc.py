@@ -16,8 +16,10 @@ platform_io.h) だけをここで作る偽物に差し替える。偽物は 8255
   python3 -B tools/tests/test_serial_portc.py --mutate   # 否定側 (変異が RED になるか)
 """
 CHECK = dict(name='serial-portc-host', tier=1,
-    covers=['drivers/char/serial.c', 'drivers/char/serial_plan.c', 'kernel/sys.c', 'tools/tests/serial_portc_host.c', 'tools/tests/serial_emergency_host.h', 'kernel/serial_diag.c', 'include/console_output.h', 'lib/serial_diag.h', 'include/platform_sys.h', 'platform/pc98/system.c', 'tools/tests/kernel_includes.py'],
-    needs=[], budget=3.0)
+    covers=['drivers/char/serial.c', 'drivers/char/serial.h', 'drivers/char/serial_plan.h', 'drivers/char/serial_plan.c', 'kernel/sys.c', 'tools/tests/serial_portc_host.c', 'tools/tests/serial_emergency_host.h', 'kernel/serial_diag.c', 'include/console_output.h', 'lib/serial_diag.h', 'include/platform_sys.h', 'platform/pc98/system.c', 'tools/tests/kernel_includes.py'],
+    needs=[], budget=3.0,
+    kind='characterization',
+)
 
 from kernel_includes import include_flags
 import pathlib
@@ -36,7 +38,7 @@ SRCS = {
 }
 CASES = ["bsr_polarity", "init_bsr_only", "isr_edge_bsr", "real_hw_story",
          "init_from_all_ones", "isr_drain_limit_edge", "vfast_fifo_path",
-         "sys_buz_values"]
+         "sys_buz_values", "tx_stuck_story"]
 
 # platform/pc98/system.c の platform_buzzer_on/off の関数本体を
 # **そのまま**切り出して sys_buz.inc にする (転送関数を写さない)。
@@ -61,7 +63,12 @@ static inline void _enable(void) {}
 static inline void _disable(void) {}
 static inline unsigned int irq_save(void) { return 0; }
 static inline void irq_restore(unsigned int flags) { (void)flags; }
+#ifdef SERIAL_TX_STUCK_HOST
+int fake_irq_enabled(void);
+static inline int _irq_enabled(void) { return fake_irq_enabled(); }
+#else
 static inline int _irq_enabled(void) { return 0; }
+#endif
 static inline void _lidt(void *ptr) { (void)ptr; }
 static inline void _halt(void) {}
 static inline void _idle(void) {}
@@ -89,6 +96,10 @@ static inline void io_wait_n(int n) { while (n-- > 0) io_wait(); }
 # 否定側。実装を 1 か所だけ壊して RED になることを見る。
 # (ソース, パターン, 置換, 説明)
 MUTATIONS = [
+    ("drivers/char/serial.c", r"    s_tx_stuck = 1;", "    s_tx_stuck = 0;",
+     "TX outage never latches: every byte pays the budget"),
+    ("drivers/char/serial.c", r"    s_tx_stuck = 0;", "    /* keep stuck */",
+     "TX recovery never clears: the next short stall drops a byte"),
     ("drivers/char/serial.c",
      r"        u8 cur = \(u8\)\(inp\(SER_MASK\) & \(IEN_RX \| IEN_TXEMP \| IEN_TX\)\);\n"
      r"        ser_ien_bsr\(cur, 0\);\n",

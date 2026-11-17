@@ -441,9 +441,9 @@ static void geforce_palette_init(void)
     const PaletteEntry *sys = palette_get_all();
     u32 i = 0;
     for (; i < GF_LEASE_FIRST; ++i) {
-        initial_palette[i * GFX_RGB_COMPONENTS + GFX_RGB_R] = (sys[i].r & GFX_PALETTE_COMPONENT_MASK) * PEGC_PAL_KAPI_SCALE;
-        initial_palette[i * GFX_RGB_COMPONENTS + GFX_RGB_G] = (sys[i].g & GFX_PALETTE_COMPONENT_MASK) * PEGC_PAL_KAPI_SCALE;
-        initial_palette[i * GFX_RGB_COMPONENTS + GFX_RGB_B] = (sys[i].b & GFX_PALETTE_COMPONENT_MASK) * PEGC_PAL_KAPI_SCALE;
+        initial_palette[i * GFX_RGB_COMPONENTS + GFX_RGB_R] = (sys[i].r & GFX_PALETTE_COMPONENT_MASK) * GFX_PALETTE_COMPONENT_SCALE;
+        initial_palette[i * GFX_RGB_COMPONENTS + GFX_RGB_G] = (sys[i].g & GFX_PALETTE_COMPONENT_MASK) * GFX_PALETTE_COMPONENT_SCALE;
+        initial_palette[i * GFX_RGB_COMPONENTS + GFX_RGB_B] = (sys[i].b & GFX_PALETTE_COMPONENT_MASK) * GFX_PALETTE_COMPONENT_SCALE;
     }
     for (u32 r = 0; r < GFX_PALETTE_CUBE_LEVELS; ++r)
         for (u32 g = 0; g < GFX_PALETTE_CUBE_LEVELS; ++g)
@@ -742,7 +742,7 @@ static void geforce_set_palette(int first, int count, const u8 *rgb)
     if (!active || !rgb || first < 0 || count <= 0 || first >= (int)VIDEO_PALETTE_ENTRIES ||
         count > (int)VIDEO_PALETTE_ENTRIES - first) return;
     for (int i = 0; i < count * GFX_RGB_COMPONENTS; ++i)
-        converted[i] = (rgb[i] & GFX_PALETTE_COMPONENT_MASK) * PEGC_PAL_KAPI_SCALE;
+        converted[i] = (rgb[i] & GFX_PALETTE_COMPONENT_MASK) * GFX_PALETTE_COMPONENT_SCALE;
     if (video_palette(device, first, count, converted)) { geforce_fail(); return; }
     for (int i = 0; i < count && first + i < GF_LEASE_FIRST; ++i)
         palette_shadow_set(first + i, rgb[i * GFX_RGB_COMPONENTS],

@@ -1,4 +1,5 @@
 /* 要求行の解析と非同期ホスト API・所有者回収。link.c から取り込む。 */
+#include "remote_control.h"
 
 /* 100Hz: 1000ms without peer progress (NET_HOSTSVC_DESIGN §6).
  * Separate from last_rx_tick, which the old STATUS scheduler also writes.
@@ -24,7 +25,7 @@ void link_host_progress(i32 h)
     struct link_handle *e = &link_h[h];
     struct link_host_deadline *d = link_deadline_for(e);
     if (d && !d->expired && e->state != LINK_H_FREE && e->state != LINK_H_STALE)
-        d->progress_tick = tick_count;
+        d->progress_tick = link_platform_now();
 }
 
 void link_host_deadlines(void)
@@ -36,7 +37,7 @@ void link_host_deadlines(void)
             e->state == LINK_H_STALE || e->state == LINK_H_DONE) continue;
         /* All bytes received means only the local reader remains. */
         if (e->state == LINK_H_RESP && e->recv_bytes >= e->length) continue;
-        if ((u32)(tick_count - d->progress_tick) < LINK_HOST_SILENCE_TICKS) continue;
+        if ((u32)(link_platform_now() - d->progress_tick) < LINK_HOST_SILENCE_TICKS) continue;
         d->expired = 1;
         /* Keep the existing session failure detector alive after local expiry
          * (N4). RELEASE replaces request/body retransmission, and RELACK can
@@ -122,8 +123,17 @@ u32 link_decl_len(const char *req, u32 len)
     if (!tok(req, len, 0, &a0, &b0)) return 0;
     if (tok_eq(req, a0, b0, "ECHO")) which = 1;
     else if (tok_eq(req, a0, b0, "PUT")) which = 2;
+    else if (tok_eq(req, a0, b0, REMOTE_REQ_LOG)) which = 6;
     else if (tok(req, len, 1, &a1, &b1)) {
-        if ((tok_eq(req, a0, b0, "CLIP") || tok_eq(req, a0, b0, "os32.clip")) && tok_eq(req, a1, b1, "PUT")) which = 2;
+        if (tok_eq(req, a0, b0, "SFS") && tok_eq(req, a1, b1, "CALL")) {
+            if (!tok(req, len, 2, &a, &b)) return 0;
+            u32 length = tok_num(req, a, b);
+            return length <= REMOTE_SFS_CALL_MAX ? length : 0;
+        }
+        if ((tok_eq(req, a0, b0, "RSH") || tok_eq(req, a0, b0, "GS") ||
+             tok_eq(req, a0, b0, "PDIAG")) && tok_eq(req, a1, b1, "OUT")) which = 5;
+        else if (tok_eq(req, a0, b0, "RSH") && tok_eq(req, a1, b1, "ACCEPT")) which = 4;
+        else if ((tok_eq(req, a0, b0, "CLIP") || tok_eq(req, a0, b0, "os32.clip")) && tok_eq(req, a1, b1, "PUT")) which = 2;
         else if ((tok_eq(req, a0, b0, "PRINT") || tok_eq(req, a0, b0, "os32.print")) && tok_eq(req, a1, b1, "DATA")) which = 3;
     }
     if (which < 0) return 0;
@@ -208,17 +218,19 @@ i32 link_host_open(const char *req, u32 len, int owner)
         e->w_due = 0;
         e->decl_len = link_decl_len((const char *)e->req_copy, len);
         e->wsent_total = 0;
-        e->last_rx_tick = tick_count;
+        e->last_rx_tick = link_platform_now();
         link_deadline[hh] = (struct link_host_deadline){
-            .progress_tick = tick_count, .rid = e->rid,
+            .progress_tick = link_platform_now(), .rid = e->rid,
             .gen = e->gen, .epoch = e->epoch, .expired = 0
         };
         e->retries = 0;
         e->probes = 0;
         e->ack_seq = 0;
+        e->window_sent = 0;
         e->want_ack = e->want_window = e->want_status = 0;
         e->ctrl_cursor = 0;
     }
+    link_tx_kick();
     LINK_IRQ_RESTORE(f);
     return hh;
 }
@@ -322,6 +334,7 @@ i32 link_host_write(i32 h, const void *buf, u32 len, int owner)
     e->w_due = 1;
     e->retries = 0;
     e->wsent_total += n;
+    link_tx_kick();
     LINK_IRQ_RESTORE(f);
     return (i32)n;
 }
@@ -336,6 +349,8 @@ static void link_free_handle(struct link_handle *e, int idx)
         e->rel_epoch = e->epoch;
         e->rel_tries = 0;
         e->rel_interval = LINK_RTO_TICKS;
+        e->rel_want_ack = e->want_ack;
+        e->rel_ack_seq = e->ack_seq;
     }
     if (e->ring_owner) {
         e->ring_owner = 0;

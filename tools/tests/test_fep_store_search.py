@@ -31,7 +31,9 @@ CHECK = dict(name='fep-store-search', tier=1, needs=[], budget=6.5,
         'tools/tests/input_fixture_host.h',
         'tools/tests/serial_emergency_host.h',
         'build/config.mk',
-    ])
+    ],
+    basis=['docs/design/kernel/ime/ime_dict.md 検索の合成', 'docs/design/kernel/ime/ime_user_store.md 開く手順'],
+)
 
 import argparse
 import os

@@ -121,9 +121,6 @@ static u32 model_limit(const struct physmem *m)
         m->legacy_ceiling > PHYSMEM_LEGACY_MAX_PFN) return 0;
     allowed = PHYSMEM_SOURCE_LEGACY | PHYSMEM_SOURCE_MACHINE;
     allowed |= PHYSMEM_SOURCE_KERNEL_SLACK;
-#if defined(PHYSMEM_HOST_TEST) && PHYSMEM_HOST_TEST == 1 && !defined(__KERNEL_BUILD__)
-    allowed |= PHYSMEM_SOURCE_SYNTHETIC;
-#endif
     end = limit = 0;
     for (i = 0; i < m->count; i++) {
         r = &m->ranges[i];

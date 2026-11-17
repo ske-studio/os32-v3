@@ -18,15 +18,32 @@ struct NetNicOps {
 
 /* Bind once at boot. Shared users must not drain the NIC directly. */
 int net_bind(const struct NetNicOps *ops);
-/* Poll/demux once with IF saved/cli. Unbound: 0; otherwise frames received. */
+struct rx_work_budget;
+void net_rx_schedule(void);
+int net_rx_service(void);
+/* Keep foreground RX active for this long after an accepted OS32 frame. */
+#define NET_RX_ACTIVE_MS 5u
+int net_rx_recent(u32 window_ms);
+void net_rx_batch_begin(void);
+/* Returns zero if another batch already owns the receive budget. */
+struct io_slice;
+int net_rx_batch_begin_slice(struct io_slice *slice);
+void net_rx_batch_end(void);
+/* Queue reset is deferred while demux owns a reserved tail. */
+int net_rx_defer_reset(u16 protocol);
+u32 net_rx_demux_budget(const struct NetNicOps *ops, const u8 local[6],
+                         const u8 peer[6], struct rx_work_budget *budget);
+/* Service in cooperative context; otherwise schedule only. */
 int net_nic_poll_once(void);
-/* Separate fixed SFS/link queues (4 x 1514B each). Save IF/cli; if this queue
- * is empty poll/demux once; take a frame; restore IF. Never drive link here.
+/* Separate fixed SFS/link queues (4 x 1514B each). If empty, request service
+ * before locking; then take a frame and restore IF.
  * SFS reset discards only its own queue. */
 int net_rx_take(u16 protocol, void *out, u32 cap, u32 *len);
+/* Queued frames only; caller holds IF=0. */
+u32 net_rx_queued(u16 protocol);
 
 /* net/nic.h: NetNicOps は段0のまま。id: AUTO=0, E82557=1, LGY98=2 */
-enum NetNicId { NET_NIC_AUTO, NET_NIC_E82557, NET_NIC_LGY98 };
+enum NetNicId { NET_NIC_AUTO, NET_NIC_E82557, NET_NIC_LGY98, NET_NIC_COUNT };
 struct NetAdapter { int (*acquire)(const struct NetNicOps **out); void (*release)(void); };
 int net_adapter_register(enum NetNicId id, const struct NetAdapter *adapter);
 int net_start(enum NetNicId choice, const u8 peer[6]); void net_unbind(void);
@@ -37,7 +54,7 @@ extern const struct NetAdapter net_lgy98_adapter, net_e82557_adapter;
 /* Logical protocols, not EtherTypes. Empty AGAIN; insufficient cap NOSPC
  * sets required length without consuming; unknown protocol INVAL. */
 enum NetRxProtocol { NET_RX_SFS = 1, NET_RX_LINK = 2 };
-void net_rx_reset(u16 protocol); void net_tick(void);
+void net_rx_reset(u16 protocol); void net_tick(void); void net_jiffy(void);
 /* AUTO prefers E82557. Missing explicit adapter: NOSYS; double start: BUSY.
  * task acquire owns the module reference; unbind stops tick/queues with IF
  * saved, then releases in task context. Borrowed ops live until release.

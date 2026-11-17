@@ -1,4 +1,4 @@
-"""Host-side independent notification sender (NET_HOSTSVC_DESIGN §5)."""
+"""Host-side independent notification sender (docs/design/tools/host_notify.md)."""
 from collections import deque
 import secrets
 import struct
@@ -8,6 +8,7 @@ DATA_MAX = 236
 QUEUE_MAX = 64
 WINDOW_MAX = 4
 RETRANSMIT_SECONDS = 0.1
+SILENCE_SECONDS = 2.5
 ALIVE_SECONDS = 5.0
 
 
@@ -34,6 +35,9 @@ class Notify:
         self.window = 0
         self.deadline = None
         self.next_alive = None
+        self.silent = False
+        self.progress = None
+        self.acked = False
 
     def session(self, sess, epoch, now):
         self.reset()
@@ -45,10 +49,16 @@ class Notify:
         return struct.pack('<IH', self.generation, self.registry.resolve('os32.alive'))
 
     def notify(self, name, kind, data):
-        service = self.registry.resolve(name)
+        self.notify_number(self.registry.resolve(name), kind, data)
+
+    def notify_number(self, service, kind, data):
+        """Queue a notification for an explicitly numbered service."""
         data = bytes(data)
         if not 1 <= service <= 65534 or not 0 <= kind <= 65535 or len(data) > DATA_MAX:
             raise ValueError('invalid notification')
+        if self.silent:
+            self.dropped += 1
+            return
         payload = struct.pack('<IHHHH', self.generation, service, kind, len(data), 0) + data
         if len(self.pending) + len(self.inflight) == QUEUE_MAX:
             self.dropped += 1
@@ -66,6 +76,10 @@ class Notify:
         # Acknowledgements beyond the last sent sequence cannot acknowledge data.
         if ack >= self.next_seq:
             return
+        self.acked = True
+        if self.silent:
+            self.silent = False
+            self.deadline = 0
         while self.inflight and self.inflight[0][0] <= ack:
             self.inflight.popleft()
         self.window = min(max(window, 0), WINDOW_MAX)
@@ -75,9 +89,22 @@ class Notify:
     def tick(self, now):
         if self.sess is None:
             return []
+        if self.acked:
+            self.progress, self.acked = now, False
+        if self.inflight and not self.silent and now - self.progress >= SILENCE_SECONDS:
+            self.silent = True
+            self.dropped += len(self.pending)
+            self.pending.clear()
+            self.deadline = now + SILENCE_SECONDS
         if now >= self.next_alive:
             self._alive()
             self.next_alive = now + ALIVE_SECONDS
+        if self.silent:
+            if now < self.deadline:
+                return []
+            self.deadline = now + SILENCE_SECONDS
+            return [(OP_NOTIFY, 0, seq, 0, 0, 0, payload)
+                    for seq, payload in list(self.inflight)[:1]]
         frames = []
         if self.inflight and self.deadline is not None and now >= self.deadline:
             frames.extend((OP_NOTIFY, 0, seq, 0, 0, 0, payload)
@@ -87,6 +114,8 @@ class Notify:
             payload = self.pending.popleft()
             seq = self.next_seq
             self.next_seq += 1
+            if not self.inflight:
+                self.progress = now
             self.inflight.append((seq, payload))
             frames.append((OP_NOTIFY, 0, seq, 0, 0, 0, payload))
             if self.deadline is None:

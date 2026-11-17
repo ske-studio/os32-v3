@@ -3,7 +3,9 @@
 CHECK = dict(name='hostsvc-image', tier=1, needs=[], budget=2.8,
              covers=['tools/host_image.py', 'tools/hostsvc_contracts.pyi',
                      'fs/serialfs/sfs_proto.h', 'sdk/include/os32/os32_kapi_shared.h',
-                     'tools/tests/hostsvc_fixture.py'])
+                     'tools/tests/hostsvc_fixture.py'],
+    basis=['docs/design/tools/lanfs_host.md 仮想の像'],
+)
 import argparse
 import errno
 import importlib.util

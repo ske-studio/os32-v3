@@ -13,6 +13,9 @@
 //!          デバッグ時だけ DEBUG_SHORTCUTS で戻せる)
 //! ```
 //!
+//! halt 復帰後、同じジフィで物理キー (raw リング) の入力がなければ WM 全周を省き、
+//! 他の IRQ による途中の復帰でもアプリの再開判定を行う。
+//!
 //! モジュールの役割:
 //!
 //! | ファイル | 役割 |
@@ -74,6 +77,7 @@ mod lease;
 mod modal;
 mod movecopy;
 mod multiapp;
+mod poll_clock;
 mod os32x;
 mod pump;
 mod reqs;
@@ -88,6 +92,7 @@ mod timer;
 mod trim;
 mod diagnostics;
 mod gserial;
+mod gserial_link;
 mod visible;
 mod wm;
 
@@ -113,6 +118,42 @@ const RUN_REFUSED: i32 = 0;
 /// 起動設定 (`GUI=0/1`)。CUI へ戻すときにここを書き換える (契約 S6 の 4)。
 /// 正典は `include/config.h` の `SYS_SYSTEM_CFG`。
 static SYSTEM_CFG: &[u8] = b"/etc/system.cfg\0";
+
+static LANTRACE_GS_PATH: &[u8] = b"/tmp/lantrace_gs.txt\0";
+struct LanTrace { entries: [(&'static str, u32); 16], len: usize }
+impl LanTrace {
+    const fn new() -> Self { Self { entries: [("", 0); 16], len: 0 } }
+    fn mark(&mut self, name: &'static str) {
+        if self.len < self.entries.len() {
+            self.entries[self.len] = (name, unsafe { (os32api::api().get_tick)() });
+            self.len += 1;
+        }
+    }
+    fn write(&self) {
+        use core::fmt::Write;
+        struct Buffer { bytes: [u8; 1024], len: usize }
+        impl core::fmt::Write for Buffer {
+            fn write_str(&mut self, s: &str) -> core::fmt::Result {
+                if s.len() > self.bytes.len() - self.len { return Err(core::fmt::Error); }
+                self.bytes[self.len..self.len + s.len()].copy_from_slice(s.as_bytes());
+                self.len += s.len(); Ok(())
+            }
+        }
+        let mut out = Buffer { bytes: [0; 1024], len: 0 };
+        for i in 0..self.len {
+            let (name, tick) = self.entries[i];
+            let delta = if i == 0 { 0 } else { tick.wrapping_sub(self.entries[i - 1].1) };
+            let _ = writeln!(out, "gs_{} tick={} delta={}", name, tick, delta);
+        }
+        unsafe {
+            let a = os32api::api();
+            let fd = (a.sys_open)(LANTRACE_GS_PATH.as_ptr(), 0x01 | 0x0100 | 0x0200);
+            if fd >= 0 { let _ = (a.sys_write)(fd, out.bytes.as_ptr(), out.len as u32); (a.sys_close)(fd); }
+        }
+    }
+}
+static mut LANTRACE_GS: LanTrace = LanTrace::new();
+
 
 /// **デバッグ専用スイッチ** (票 W3 §4.1、ユーザー決定 2026-09-06)。
 ///
@@ -149,6 +190,7 @@ pub extern "C" fn main(_argc: i32, _argv: *const *const u8, api: *mut KernelAPI)
     }
     os32api::os32_init(api);
 
+    unsafe { LANTRACE_GS = LanTrace::new(); LANTRACE_GS.mark("start"); }
     let st = wm::g();
     *st = wm::GuiState::NEW;
     /* SHM の先頭 (KAPI のデータフィールド)。スロットは +192KB から 16KB ずつ。 */
@@ -197,15 +239,21 @@ pub extern "C" fn main(_argc: i32, _argv: *const *const u8, api: *mut KernelAPI)
     /* 設定レジストリ (票 S4 §2)。**gfx attach の後・最初の合成の前**に 1 回。
      * DB が無い / 壊れている / 版が新しいときも既定値で起動を続ける
      * (DESIGN §5 の fallback)。 */
+    unsafe { LANTRACE_GS.mark("config_start"); }
     st.cfg = settings::load(0);
+    unsafe { LANTRACE_GS.mark("config_done"); }
 
     /* 字形 engine (T7b-b3)。lease の open は段 B の open 文脈 (WM 外の通常
      * 文脈) でだけ通るので、gui_register の後・最初の合成の前のここで開く。
      * 開けなければ KCG だけで描く (次の consume で 1 回だけ開き直す)。 */
+    unsafe { LANTRACE_GS.mark("font_start"); }
     font::open_at_safe_point(st, st.cfg.font_set);
+    unsafe { LANTRACE_GS.mark("font_done"); }
 
     /* デスクトップ。全画面 present は WM だけ (契約 G4)。 */
+    unsafe { LANTRACE_GS.mark("composite_start"); }
     wm::composite_full(st);
+    unsafe { LANTRACE_GS.mark("composite_done"); }
 
     /* 起動時通知 (票 S4 §2 の B3)。**最初の合成の後**に仕込み、実際に出るのは
      * top-level の最初の周回 (`settings::consume`)。gshell 実行中の `kprintf`
@@ -213,7 +261,10 @@ pub extern "C" fn main(_argc: i32, _argv: *const *const u8, api: *mut KernelAPI)
      * 届く唯一の経路。 */
     settings::startup_notice(&st.cfg);
     loop_notice();
+    unsafe { LANTRACE_GS.mark("open_lan_start"); }
     gserial::open(st, serial_timeout);
+    gserial::open_lan(st, serial_timeout);
+    unsafe { LANTRACE_GS.mark("ready_queued"); LANTRACE_GS.write(); }
     font::announce(st);
 
     /* ---- 単独ループ (契約 T8: アプリが居ないときは gshell が X3 を回す) ---- */
@@ -236,50 +287,56 @@ fn run_standalone(st: &mut wm::GuiState) -> i32 {
 /// 単独ループ (契約 T8)。CUI への handoff が成立して gshell を抜けるときだけ
 /// false を返す。
 fn standalone_loop(st: &mut wm::GuiState) -> bool {
+    let mut halted = false;
+    let mut cycle_tick = 0;
     while !st.quit || session::owner_active(st) {
-        wm::wm_cycle(st, input::Ctx::Standalone);
-        /* top-level (owner 1) で受けた CTRL+STOP (票 T8 D4d / T9 受入 S6)。 */
-        top_level_abort(st);
-        if st.launch_pending {
-            st.launch_pending = false;
-            launch_app(st);
+        if !halted || cycle_due(cycle_tick) || input::capture_keyboard(st, input::Ctx::Standalone) {
+            wm::wm_cycle(st, input::Ctx::Standalone);
+            cycle_tick = st.now;
+            /* top-level (owner 1) で受けた CTRL+STOP (票 T8 D4d / T9 受入 S6)。 */
+            top_level_abort(st);
+            if st.launch_pending {
+                st.launch_pending = false;
+                launch_app(st);
+            }
+            /* 設定レジストリの予約と通知 (票 S4 §3)。**DB に触れるのはここだけ** —
+             * `Req::Open` / `Req::Save` の open 〜 close を 1 周回の中で閉じ、
+             * 間に yield / 合成 / 他イベント処理を挟まない。走っているアプリは
+             * `multiapp::should_park` の (a) が `settings::pending()` を見て譲る
+             * ので、予約が立てば必ずここへ来る。 */
+            settings::consume(st);
+            /* SessionAction のトップレベル handoff (契約 §7)。`launch_app` から
+             * 戻った直後と、park で戻った周回でここを通る。**WM の文脈
+             * (X1/X3/X4) からは絶対に来ない** = 入れ子 exec_run にならない。
+             *
+             * K5b-W: `LAUNCH` は「1 本増やす」なので他のアプリが生きていても
+             * 実行してよい。`SWITCH_CUI` / `SHUTDOWN` だけが全回収を待つ
+             * (判定は `session::ready_to_run`、契約 S2 の読み替え)。 */
+            if st.quit && session::ready_to_run(st) {
+                return true; // Fault: existing cleanup, without a config write/retry.
+            }
+            if session::ready_to_run(st) && !session_handoff(st) {
+                /* SWITCH_CUI が成立した (shell 切替済み)。ここで gshell を抜ける。 */
+                return false;
+            }
+            /* 起動要求表 (KAPI v49、票 T9 D3 (3)(4))。`session_handoff` と**同じ
+             * 地点** = `exec_start` / `exec_resume` から戻った後、park 判定
+             * (`multiapp::resume_one`) の前で、WM が自分の文脈 (owner 1) で走って
+             * いる唯一の場所。`launch_take` / `launch_report` / `exec_kill` は
+             * どれもここでしか通らない。 */
+            drain_launch_requests(st);
+            /* 全画面の後始末の保険 (票 T8-3、PM 実測 2026-09-12)。所有者が
+             * `exec_kill` / fault で畳まれた経路は `exec_start` / `exec_resume` の
+             * 復帰点を通らないので、所有者の問い合わせが 1 度も走らないことが
+             * ある。全画面中は入力もタイマも実質止まる = 誰も ready にならない
+             * ので、そのまま下の `sys_halt` へ落ちると画面が凍ったまま永久に
+             * 待つ。**全画面中だけ** KAPI 1 本 (`gfx_screen_owner`) で見る。
+             * ここは top-level (owner 1) なので復帰の `gfx_init` を呼んでよい。 */
+            if fullscreen::active() {
+                after_exec(st);
+            }
         }
-        /* 設定レジストリの予約と通知 (票 S4 §3)。**DB に触れるのはここだけ** —
-         * `Req::Open` / `Req::Save` の open 〜 close を 1 周回の中で閉じ、
-         * 間に yield / 合成 / 他イベント処理を挟まない。走っているアプリは
-         * `multiapp::should_park` の (a) が `settings::pending()` を見て譲る
-         * ので、予約が立てば必ずここへ来る。 */
-        settings::consume(st);
-        /* SessionAction のトップレベル handoff (契約 §7)。`launch_app` から
-         * 戻った直後と、park で戻った周回でここを通る。**WM の文脈
-         * (X1/X3/X4) からは絶対に来ない** = 入れ子 exec_run にならない。
-         *
-         * K5b-W: `LAUNCH` は「1 本増やす」なので他のアプリが生きていても
-         * 実行してよい。`SWITCH_CUI` / `SHUTDOWN` だけが全回収を待つ
-         * (判定は `session::ready_to_run`、契約 S2 の読み替え)。 */
-        if st.quit && session::ready_to_run(st) {
-            return true; // Fault: existing cleanup, without a config write/retry.
-        }
-        if session::ready_to_run(st) && !session_handoff(st) {
-            /* SWITCH_CUI が成立した (shell 切替済み)。ここで gshell を抜ける。 */
-            return false;
-        }
-        /* 起動要求表 (KAPI v49、票 T9 D3 (3)(4))。`session_handoff` と**同じ
-         * 地点** = `exec_start` / `exec_resume` から戻った後、park 判定
-         * (`multiapp::resume_one`) の前で、WM が自分の文脈 (owner 1) で走って
-         * いる唯一の場所。`launch_take` / `launch_report` / `exec_kill` は
-         * どれもここでしか通らない。 */
-        drain_launch_requests(st);
-        /* 全画面の後始末の保険 (票 T8-3、PM 実測 2026-09-12)。所有者が
-         * `exec_kill` / fault で畳まれた経路は `exec_start` / `exec_resume` の
-         * 復帰点を通らないので、所有者の問い合わせが 1 度も走らないことが
-         * ある。全画面中は入力もタイマも実質止まる = 誰も ready にならない
-         * ので、そのまま下の `sys_halt` へ落ちると画面が凍ったまま永久に
-         * 待つ。**全画面中だけ** KAPI 1 本 (`gfx_screen_owner`) で見る。
-         * ここは top-level (owner 1) なので復帰の `gfx_init` を呼んでよい。 */
-        if fullscreen::active() {
-            after_exec(st);
-        }
+        halted = false;
         /* 止めてあるアプリのうち 1 本を起こす (D11-3 の (2))。起こす相手が
          * 居る間は halt しない — halt すると次の PIT まで誰も進めない。
          * ポーリングで譲った 1 本 (`WAIT_POLL`) もここで起きる (D8 の最下位:
@@ -290,8 +347,14 @@ fn standalone_loop(st: &mut wm::GuiState) -> bool {
         }
         /* 待ちは sys_halt のみ (get_tick スピン禁止)。 */
         unsafe { (os32api::api().sys_halt)() };
+        halted = true;
     }
     true
+}
+
+/// halt 復帰後にジフィが進んだかを調べる。
+fn cycle_due(last_tick: u32) -> bool {
+    (unsafe { (os32api::api().get_tick)() }) != last_tick
 }
 
 /// top-level (owner 1) で受けた CTRL+STOP を処理する (票 T8 D4d / T9 受入 S6)。
@@ -666,6 +729,7 @@ fn switch_cui(st: &mut wm::GuiState) -> bool {
         (a.ime_set_render)(core::ptr::null_mut());
         (a.gfx_shutdown)();
     }
+    unsafe { LANTRACE_GS.mark("cfg_save_start"); }
     if !st.quit && !cfg_set_gui(b"0") {
         /* 失敗: GFX を戻してデスクトップへ復帰し、action は捨てる。 */
         gfx::init();
@@ -687,14 +751,27 @@ fn switch_cui(st: &mut wm::GuiState) -> bool {
         );
         return true;
     }
+    unsafe { LANTRACE_GS.mark("cfg_save_done"); LANTRACE_GS.mark("font_close_start"); }
     session::clear();
     /* shell lease を閉じる (retire も残りを閉じるが、閉じてから抜ける)。 */
     font::close_all();
+    unsafe { LANTRACE_GS.mark("font_close_done"); }
     unsafe {
         let a = os32api::api();
         (a.tvram_clear)();
+        LANTRACE_GS.mark("notify_wait_start");
         gserial::cui_done(st);
+        loop {
+            // Saving config/closing resources can span ticks after the last WM cycle.
+            st.now = (a.get_tick)();
+            if !gserial::shutdown_pending(st) { break; }
+            gserial::poll_lan(st);
+            (a.sys_halt)();
+        }
+        LANTRACE_GS.mark("notify_wait_done");
         (a.rshell_set_active)(1);
+        LANTRACE_GS.mark("switch_shell");
+        LANTRACE_GS.write();
         (a.sys_switch_shell)(CUI_SHELL.as_ptr());
     }
     false

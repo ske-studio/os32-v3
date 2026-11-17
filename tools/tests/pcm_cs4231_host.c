@@ -256,6 +256,14 @@ volatile u32 tick_count;
  * 起動 35 分 48 秒 (2^31 µs) や 71 分 (2^32 µs) を跨ぐ試験に要る。 */
 static unsigned long long sim_now_us;
 static int sim_time_fail;
+static u32 sim_jiffy_hi;
+
+void tick_clock_jiffy64(u32 *lo, u32 *hi)
+{
+    CHECK(pcm_shim_irq_depth > 0);
+    *lo = tick_count;
+    *hi = sim_jiffy_hi;
+}
 
 int sys_time_now(u32 *lo, u32 *hi)
 {
@@ -410,6 +418,7 @@ static void reset_all(void)
     tick_count = 0;
     sim_now_us = 0;
     sim_time_fail = 0;
+    sim_jiffy_hi = 0;
     sim_owner = 1;
     pcm_shim_irq_depth = 0;
 
@@ -1127,7 +1136,9 @@ static void step(u32 pos_frames, u32 ticks)
 {
     sim_set_pos(pos_frames);
     sim_advance_time(ticks);
-    run_isr(pcm_tick);                   /* ISR と同じく IF=0 で */
+    unsigned int f = irq_save();
+    (void)pcm_irq(PCM_IRQ, 0);           /* 通常補充は IRQ10 */
+    irq_restore(f);
 }
 
 static void case_close(void)
@@ -1243,7 +1254,7 @@ static void case_guard(void)
         pcm_tick();
         CHECK(IO_ACCESSES == 0);
         CHECK(trace_n == 0);
-        CHECK(pcm_advance() == IRQ_NONE);
+        CHECK(pcm_advance(PCM_FROM_IRQ10) == IRQ_NONE);
         CHECK(IO_ACCESSES == 0);
     }
 
@@ -1260,11 +1271,11 @@ static void case_guard(void)
     CHECK(open_ok(PCM_RATE_44100) == 0);
     g_pcm.state = PCM_ST_OPEN;
     dev_reg[PCM_I_ALTSTAT] = 0;
-    CHECK(pcm_advance() == IRQ_NONE);
+    CHECK(pcm_advance(PCM_FROM_IRQ10) == IRQ_NONE);
     dev_reg[PCM_I_ALTSTAT] = PCM_ALT_PI;
-    CHECK(pcm_advance() == IRQ_HANDLED);
+    CHECK(pcm_advance(PCM_FROM_IRQ10) == IRQ_HANDLED);
     CHECK((dev_reg[PCM_I_ALTSTAT] & PCM_ALT_PI) == 0);   /* 消した */
-    CHECK(pcm_advance() == IRQ_NONE);
+    CHECK(pcm_advance(PCM_FROM_IRQ10) == IRQ_NONE);
 }
 
 /* reclaim は**どの状態からでも 1 度だけ**解放する */
@@ -1616,6 +1627,11 @@ static void case_clock(void)
     sim_time_fail = 1;                       /* 代用は tick × 10ms = 0 */
     step(100, 0);
     CHECK(g_pcm.now == 5000U);               /* 戻らない */
+    tick_count = 0xffffffffU;
+    CHECK(pcm_clock_us() == 0xffffffffULL * PCM_US_PER_TICK);
+    tick_count = 0;
+    sim_jiffy_hi = 1;
+    CHECK(pcm_clock_us() == 0x100000000ULL * PCM_US_PER_TICK);
     sim_time_fail = 0;
 }
 

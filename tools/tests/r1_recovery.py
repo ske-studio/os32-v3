@@ -48,9 +48,9 @@ def recovery(tmp, function, runner, mutation=None):
     # The CUI display return is outside the R1 recovery probes.
     stage('tails_source.c', 'static void exec_cui_display_abort(void) {}\n'
           'static void host_resume_tail(int app_id) { AppSlot *a=appslot_get(app_id); int restart_stdin=0; int fp_depth=0;\n'
-          + tail + '}\nstatic void host_syscall_tail(u32 *frame) { int prev_caller=0, prev_in_syscall=0; struct arch_syscall *prev_frame=0; struct arch_syscall call = { frame }; u32 result = frame[7];\n' + end + '}\n')
+          + tail + '}\nstatic void host_syscall_tail(u32 *frame) { int io_owner = appslot_cur(); int prev_caller=0, prev_in_syscall=0; struct arch_syscall *prev_frame=0; struct arch_syscall call = { frame }; u32 result = frame[7];\n' + end + '}\n')
     # Linux cannot map guest page zero. Only BIOS/CPU/device edges are substitutes.
-    stage('v86_source.c', read('arch/x86/legacy/v86_mem.c').replace(
+    stage('v86_source.c', read('platform/pc98/legacy/v86_mem.c').replace(
         'P2V(V86_REMAP_START)', 'host_low').replace('P2V(MEM_AUTOPLAY_MAILBOX_BASE)', '(host_low + MEM_AUTOPLAY_MAILBOX_BASE)'))
     entry = function(read('arch/x86/kernel/isr_handlers.c'), 'void exception_handler(')
     entry = entry[:entry.index('    /* 画面上部クリア */')] + '}\n'
@@ -109,7 +109,7 @@ RECOVERY_MUTANTS = [
     ('ready-injection', 'kernel/r1_fixture.c',
      'arch_fixture_ud(); /* CPL0, before entering the V86 guest. */',
      '(void)0; /* ready injection removed */', 'FAIL 0'),
-    ('K1-hook', 'arch/x86/legacy/v86_mem.c', '    r1_fixture_v86_ready();', '    /* omitted */', 'FAIL 0'),
+    ('K1-hook', 'platform/pc98/legacy/v86_mem.c', '    r1_fixture_v86_ready();', '    /* omitted */', 'FAIL 0'),
     ('parent-hook', 'exec/exec.c', '        exec_r1_fixture_parent(id);', '        /* omitted */', 'FAIL g_slot[2].as->appmem_poisoned'),
     ('parent-too-late', 'exec/exec.c',
      '#ifdef OS32_R1_FIXTURE\n        exec_r1_fixture_parent(id);\n#endif\n        parent = appslot_return_target(id);',
@@ -129,7 +129,7 @@ RECOVERY_MUTANTS = [
     ('quarantine-account', 'exec/exec.c', '    exec_as_leftover_pages += ledger_owner_pages(a->as->owner);', '    /* omitted */', 'FAIL ledger_owner_pages(owner)==pages'),
     ('quarantine-pages', 'exec/exec.c', '    exec_as_leftover_pages += ledger_owner_pages(a->as->owner);',
      '    u32 lost; ledger_reclaim_owner(a->as->owner, &lost);', 'FAIL ledger_owner_pages(owner)==pages'),
-    ('normal-context-release', 'arch/x86/legacy/v86_mem.c',
+    ('normal-context-release', 'platform/pc98/legacy/v86_mem.c',
      'if (kctx_irq_depth || kctx_exc_depth) goto done;',
      '/* exception-depth guard omitted */', 'FAIL !kctx_exc_depth'),
 ]

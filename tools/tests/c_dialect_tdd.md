@@ -12,7 +12,7 @@
 
 1. `make -n -B all` のコンパイル行 (`i386-elf-gcc … -c`) を読み、旗の組 (−I・依存生成・`-c`・`-o`・ソースを除いたもの) ごとに
    `-E -dM` で `__STDC_VERSION__` / `__STRICT_ANSI__` を聞く。期待は SQLite 系 (`lib/sqlite3/{sqlite3,os32_sqlite_vfs,os32_sqlite_test}.c`、
-   `userland/tests/sqlite_standalone/`) が gnu89、それ以外が gnu11。SQLite 系・`init/kernel.c`・`boot/boot_main.c` がコンパイル行に無ければ落ちる (空振りの番人)。
+   `userland/tests/sqlite_standalone/`) が gnu89、それ以外が gnu11。SQLite 系・`platform/pc98/kernel.c`・`boot/boot_main.c` がコンパイル行に無ければ落ちる (空振りの番人)。
 2. gnu11 の旗の組ごとに探りを 5 本コンパイルする: VLA・暗黙の関数宣言・暗黙 int・偽の `STATIC_ASSERT` は**期待する診断の文言つきで**拒否、
    真の `STATIC_ASSERT` は通る。`STATIC_ASSERT` は木の `include/types.h` の実物のマクロを使う。
 3. 公開 SDK ヘッダ (`sdk/include/os32/*.h`。`os32_kapi_shared.h` もここ) は `-std=gnu89 -Wc90-c99-compat -Wc99-c11-compat
@@ -170,7 +170,7 @@ MUTATIONS 27/27 RED; CONTROLS 5/5 GREEN
 
 ## 旧版が見ていなかったもの (2026-10-01 の clang 版以前)
 
-- 非定数式の `STATIC_ASSERT` (旧 `tss.c:17` の形) は gnu11 の `_Static_assert` が GCC の畳み込みで通すことがあり、探りでは拒否を要求しない
+- 非定数式の `STATIC_ASSERT` (旧 `tss.c` の形) は gnu11 の `_Static_assert` が GCC の畳み込みで通すことがあり、探りでは拒否を要求しない
   (票 §5 の「`_Static_assert` の限界」— 実物は段 2 で `offsetof` にした)。
 - 匿名構造体・共用体 (T0 で新規導入しない) は字句では見分けにくいので検査していない。
 - 自作コードの旧式 (K&R) 関数定義の禁止は旗 (`-Werror=old-style-definition`) にしていない — `CFLAGS_COMMON` を継ぐ zlib (vendor) の 35 件が落ちるため。

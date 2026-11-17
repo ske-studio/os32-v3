@@ -31,7 +31,7 @@
 /* Kernel D1: FreeBSD trap_subr32.S:93-158,231,346-378 and
  * OpenBSD macppc/locore.S:853-949; MPC7450UM 4.3/4.6.
  * Unlike the standalone image, every frame access before dispatch is real.
- * Single CPU, integer only. EE stays clear; synchronous reentry has one
+ * Single CPU, integer only. Only USER syscall bodies permit EE; reentry has one
  * independent spill slot. No access is made through the interrupted r1.
  * All resident symbols below must be reserved and identity mapped by A1/D3.
  */
@@ -459,10 +459,11 @@ ppc_kernel_frame_complete:
     bl ppc_trap_dispatch
 .globl ppc_kernel_vector_return
 ppc_kernel_vector_return:
-/* Identity code/stack; stop translation before reading the restored frame.
+/* Identity code/stack; stop IRQs and translation before restoring the frame.
  * No mutable global scratch survives a translated C call. */
     mfmsr 3
-    li 4,(PPC_MSR_IR|PPC_MSR_DR|PPC_MSR_RI)
+    li 4,0
+    ori 4,4,(PPC_MSR_EE|PPC_MSR_IR|PPC_MSR_DR|PPC_MSR_RI)
     andc 3,3,4
     mtmsr 3
     isync
@@ -521,6 +522,9 @@ ppc_kernel_vector_return:
 .Lrestore_user:
     lwz 0,PPC_CALL_SIZE+PPC_FRAME_SRR0(1)
     lwz 3,PPC_CALL_SIZE+PPC_FRAME_SRR1(1)
+    li 4,PPC_MSR_FE
+    andc 3,3,4
+    ori 3,3,PPC_MSR_FP
     mtsprg3 3
     lwz 3,PPC_CALL_SIZE+PPC_FRAME_LR(1)
     mtlr 3

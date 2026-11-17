@@ -20,7 +20,7 @@
 機能名 (「有効」「リトライ」) の記述は根拠にしない。別実装 (FreeBSD、エミュレータのソース) で裏を取る。それでも決まらない値 (機種依存で、しかも読者指摘で逆の可能性が併記されているもの) は
 **自動では触らず、実機で確かめてから明示的に呼ぶ口**を用意する。「Bible と UNDOCUMENTED が矛盾したら UNDOCUMENTED」という一律の規則より、この決め方のほうが強い。
 
-出典: [sysclk「落とし穴」](design/kernel/time/sysclk.md#落とし穴)、[POLICY_DEBUG §4-57](POLICY_DEBUG.md#4-57-キーボード-8251-の信号線)、[POLICY_DEBUG §4-59](POLICY_DEBUG.md#4-59-8255-ポート-c-の副作用)。
+出典: [sysclk「落とし穴」](design/platform/pc98/sysclk.md#落とし穴)、[POLICY_DEBUG §4-57](POLICY_DEBUG.md#4-57-キーボード-8251-の信号線)、[POLICY_DEBUG §4-59](POLICY_DEBUG.md#4-59-8255-ポート-c-の副作用)。
 
 ## 2. エミュレータで確認済みが実機で通らない — 模擬していない量を「確認済み」と書かない
 

@@ -164,7 +164,7 @@
 #define SFS_RESYNC_MAX_MS  1000    /* その待ちの上限 (相手が送り続けるとき) */
 #define SFS_QUIET_MS       500     /* セッションの終わりの隔離: 静かな時間 */
 #define SFS_QUIET_MAX_MS   5000    /* 隔離の上限 (決裁 1B) */
-#define SFS_TICK_MS        TICK_MS      /* tick_count の周期 */
+#define SFS_TICK_MS 10u /* SfsIo.now の単位 (10ms、sfs_client.h の約束)。PIT_HZ に依らない */
 /* 番号は 1〜SFS_SEQ_LAST を使う。次が SFS_SEQ_LAST を越える要求は IO で
  * 失敗させ、セッションを閉じる (u16 を周回させない、§1-v3 Codex N4)。 */
 #define SFS_SEQ_LAST       0xFFFEu

@@ -18,10 +18,11 @@ CHECK = dict(name='ppc-kboot-boot', tier=2, budget=600, covers=[
     'tools/ppc/kboot_boot*', 'tools/ppc/kboot_vectors.py', 'tools/ppc/run.py',
     'tools/tests/kernel_includes.py', 'build/arch/ppc.mk'])
 PRODUCT = ['arch/ppc/entry.S', 'arch/ppc/kernel_entry.S', 'arch/ppc/kernel_takeover.S',
-    'arch/ppc/kernel_boot.c', 'arch/ppc/kernel_cpu.c', 'arch/ppc/kernel_vectors.S',
+    'platform/powermac/kernel_boot.c', 'arch/ppc/kernel_cpu.c', 'arch/ppc/kernel_vectors.S',
     'arch/ppc/kernel_mmu.S', 'arch/ppc/kernel_hpt.c', 'arch/ppc/kernel_trap.c',
     'arch/ppc/kboot_unavailable.c',
     'arch/ppc/pd_walk.c', 'arch/ppc/mmu.S', 'arch/ppc/cache_copy.S',
+    'platform/powermac/rh_observe.c',
     'platform/powermac/ofw.c', 'platform/powermac/escc.c',
     'platform/powermac/escc_tree.c', 'platform/powermac/kboot_capture.c',
     'platform/powermac/gmac_tree.c',
@@ -102,45 +103,48 @@ def observe(out, elf, cpu, negative, red=None):
 
 # name, product file, unique anchor, replacement, guest probe, stop + reached marks.
 MUTATIONS = [
- ('no-alias','arch/ppc/kernel_boot.c','        install_alias(root, &escc_alias);',
+ ('no-alias','platform/powermac/kernel_boot.c','        install_alias(root, &escc_alias);',
   '        /* mutant: omit ESCC */',0,('ppc_boot_walk_stop',[b'TAKEOVER'])),
- ('hpt-present','arch/ppc/kernel_boot.c','            *leaf(root, a) = 0;',
+ ('hpt-present','platform/powermac/kernel_boot.c','            *leaf(root, a) = 0;',
   '            *leaf(root, a) = a | PAGE_RW;',0,('ppc_boot_walk_stop',[b'TAKEOVER'])),
- ('of-after-detach','arch/ppc/kernel_boot.c','    info->of_calls_at_detach = ofw_detach();',
+ ('of-after-detach','platform/powermac/kernel_boot.c','    info->of_calls_at_detach = ofw_detach();',
   '    info->of_calls_at_detach = ofw_detach();\n    ofw_write(e.out, mark, sizeof(mark)-1);',
   0,('ofw_detached_stop',[b'TAKEOVER'])),
- ('no-bat-retirement','arch/ppc/kernel_boot.c','    ppc_cpu_disable_bats(pvr);',
+ ('no-bat-retirement','platform/powermac/kernel_boot.c','    ppc_cpu_disable_bats(pvr);',
   '    (void)pvr;',1,('fixture_fail',[b'TAKEOVER',b'PAGING:MAIN',b'PROBE:LOW',b'FAIL:SURVIVED'])),
 ]
 
-def host(out, bad, mutant=False):
+def host(out, bad, mutant=False, shell=False, full_mutation=None):
     out.mkdir(parents=True,exist_ok=True)
-    src=(ROOT/'arch/ppc/kernel_boot.c').read_text()
+    src=(ROOT/'platform/powermac/kernel_boot.c').read_text()
     if mutant:
         anchor='        if (!boot_walk_valid(root)) ppc_boot_walk_stop();'
         require(src.count(anchor)==1,'unique walk anchor')
         src=src.replace(anchor,'        if (0 && !boot_walk_valid(root)) ppc_boot_walk_stop();')
+    if full_mutation:
+        require(src.count(full_mutation[0]) == 1, 'unique full mutation')
+        src=src.replace(full_mutation[0], full_mutation[1])
     (out/'kernel_boot_source.c').write_text(src)
     exe=out/'host'
     command(['gcc','-m32','-std=gnu11','-O2','-Wall','-Wextra','-Werror',
         '-ffreestanding','-fno-builtin','-fno-pie','-no-pie','-fno-stack-protector',
         '-nostdlib','-static','-ffunction-sections','-fdata-sections','-Wl,--gc-sections',
-        '-D__cdecl=','-DBOOT_BAD_WALK='+str(int(bad)), '-I'+str(out),
+        '-D__cdecl=','-DBOOT_BAD_WALK='+str(int(bad)), '-DKBOOT_SH='+str(int(shell)), '-I'+str(out),
         '-I'+str(ROOT/'arch/ppc'),'-I'+str(ROOT/'platform/powermac'),
         *include_flags(ROOT), ROOT/'tools/ppc/kboot_boot_host.c',
-        ROOT/'arch/ppc/pd_walk.c','-o',exe])
+        ROOT/'arch/ppc/pd_walk.c', *([ROOT/'platform/powermac/rh_observe.c', ROOT/'platform/powermac/ofw.c', ROOT/'lib/kstring_c.c'] if shell else []), '-o',exe])
     p=subprocess.run(['qemu-i386',str(exe)],capture_output=True,text=True,timeout=30)
-    expected=31 if mutant else 0
+    expected=full_mutation[2] if full_mutation else 31 if mutant else 0
     require(p.returncode==expected and 'REACHED:ALIAS' in p.stdout and
             'REACHED:ROOT' in p.stdout and
-            ('FAIL:WALK-SKIPPED' if mutant else 'GREEN:REJECT' if bad else 'GREEN:ROOT') in p.stdout,
+            (full_mutation[3] if full_mutation else 'FAIL:WALK-SKIPPED' if mutant else 'GREEN:REJECT' if bad else 'GREEN:ROOT') in p.stdout,
             'host verdict '+str(p.returncode)+' '+p.stdout)
     print('RED: walk-skipped' if mutant else 'GREEN: host',p.stdout,flush=True)
 
 
 def lan_host(out, case, mutation=None):
     out.mkdir(parents=True, exist_ok=True)
-    src=(ROOT/'arch/ppc/kernel_boot.c').read_text()
+    src=(ROOT/'platform/powermac/kernel_boot.c').read_text()
     if mutation:
         require(src.count(mutation[0]) == 1, 'unique LAN mutation')
         src=src.replace(mutation[0], mutation[1])
@@ -175,12 +179,15 @@ def main():
         elf=build(directory,negative)
         for cpu in ['7450','7455']:
             observe(directory,elf,cpu,negative)
+    host(out/'host-sh', False, shell=True)
     for case in range(6):
         lan_host(out/('lan-'+str(case)),case)
     host(out/'host',False)
     host(out/'host-bad',True)
     host(out/'host-order',2)
     if args.mutate:
+        host(out/'full-no-restore', False, shell=True, full_mutation=('if (!ppc_boot_alias_plan(band->pa, band->bytes, PPC_BOOT_FB_VA, &fb_alias))', 'if (0 && !ppc_boot_alias_plan(band->pa, band->bytes, PPC_BOOT_FB_VA, &fb_alias))', 99, 'STOP:WALK'))
+        host(out/'full-no-discard', False, shell=True, full_mutation=('            pm_rh_discard_full();', '            /* mutant */', 45, 'FAIL:FULL-STATE'))
         lan_mutations = [
             (2, '        if (boot_devices.gmac_ready)\n            for (u32 i = 0; i < 3; i++) install_alias(root, &gmac_alias[i]);',
              '        if (1)\n            for (u32 i = 0; i < 3; i++) install_alias(root, &gmac_alias[i]);', 43, 'FAIL:DISABLED-ALIAS'),

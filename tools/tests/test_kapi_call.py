@@ -9,7 +9,9 @@ CHECK = dict(name='kapi-call-host', tier=1,
             'tools/tests/test_kapi_call.py', 'tools/tests/host_exec_context.h',
             'tools/tests/host_exec_entry.h', 'tools/tests/host_arch/*.h',
             'tools/tests/kernel_includes.py', 'tools/tests/host32.py'],
-    needs=[], budget=5)
+    needs=[], budget=5,
+    basis=['KAPI_SPEC §2', 'KAPI_SPEC §3-3', 'AC-KAPI-1'],
+)
 from pathlib import Path
 import json
 import os
@@ -98,6 +100,9 @@ void ring3_fault_kill(void) { kills++; } /* N3: deliberately returns. */
 static void exec_cui_display_abort(void) {}
 static void ring3_abort_check(void) { aborts++; if (abort_now) __builtin_longjmp(abort_target,1); }
 static void ring3_gui_pump(void) {}
+static void idle_work_run(void) {}
+void io_syscall_begin(int owner) { (void)owner; }
+void io_syscall_end(int owner) { (void)owner; }
 int ring3_ptr_ok(u32 p) { return p==0 || p>=0x1000000; }
 static void exec_park_stop(struct arch_syscall *c) { CHECK(c->native==frame); parks++; }
 bool geforce_fg_due(u32 now) { (void)now; return 0; }

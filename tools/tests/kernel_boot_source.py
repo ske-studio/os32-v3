@@ -8,8 +8,8 @@ import re
 
 
 def kernel_parts(root):
-    source = (root / 'init/kernel.c').read_text()
-    return ['init/' + name for name in
+    source = (root / 'platform/pc98/kernel.c').read_text()
+    return ['platform/pc98/' + name for name in
             re.findall(r'^#include "(kernel_(?:boot_cpu|boot_memory|gfx_config)\.inc)"$',
                        source, re.M)]
 
@@ -20,10 +20,10 @@ def kernel_source(root, overrides=None):
     def read(path):
         return overrides[path] if path in overrides else (root / path).read_text()
 
-    source = read('init/kernel.c')
+    source = read('platform/pc98/kernel.c')
     source = re.sub(
         r'^#include "(kernel_(?:boot_cpu|boot_memory|gfx_config)\.inc)"$',
-        lambda m: read('init/' + m[1]), source, flags=re.M)
+        lambda m: read('platform/pc98/' + m[1]), source, flags=re.M)
     for name, parameters, arguments in (
         ('kernel_boot_cpu', 'u32 mem_kb, struct boot_context *boot', 'mem_kb, &boot'),
         ('kernel_boot_memory', 'u32 mem_kb, struct boot_context *boot', 'mem_kb, &boot'),

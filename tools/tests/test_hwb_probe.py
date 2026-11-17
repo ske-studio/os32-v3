@@ -8,7 +8,9 @@ CHECK = dict(name='hwb-probe-host', tier=1, budget=9.4, needs=[], covers=[
     'tools/tests/hwb_probe_host.c', 'tools/tests/hwb_probe_engine.c',
     'tools/tests/hwb_shell_host.c', 'tools/tests/probe_host.c',
     'tools/tests/hwb_fake.h', 'tools/tests/hwb_host.py', 'tools/tests/host32.py',
-    'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py'])
+    'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py'],
+    basis=['KDBG_PROBE_DESIGN', 'HW_BASIC_DESIGN'],
+)
 import sys
 import tempfile
 from pathlib import Path

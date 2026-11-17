@@ -2,7 +2,9 @@
 CHECK = dict(name='divdi3-host', tier=1,
     covers=['lib/divdi3.c', 'tools/tests/divdi3_host.c',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
-    needs=[], budget=3.5)
+    needs=[], budget=3.5,
+    basis=['[L1]'],
+)
 
 import argparse
 import os

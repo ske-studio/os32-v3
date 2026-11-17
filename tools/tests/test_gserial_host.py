@@ -109,7 +109,7 @@ class GserialTests(unittest.TestCase):
         with patch.object(self.mod.secrets, "token_hex", return_value="1234abcd"):
             with patch.object(self.mod, "open_port", return_value=port):
                 with patch.object(self.mod.sys, "stdout", self.out):
-                    self.assertEqual(self.mod.main(["--port", "COM3", "px"]), 0)
+                    self.assertEqual(self.mod.main(["--transport", "serial", "--port", "COM3", "px"]), 0)
         self.assertEqual(port.writes, [b"\x011234abcd px\n"])
         self.assertIn(payload.decode(), self.out.getvalue())
         self.assertIn("end 0", self.out.getvalue())
@@ -224,21 +224,21 @@ class GserialTests(unittest.TestCase):
             port = FakePort(reply=lambda data: [b"gs:" + data[1:9] + b" end 0\n"])
             with patch.object(self.mod, "open_port", return_value=port) as opener:
                 with patch.object(self.mod.sys, "stdout", self.out):
-                    self.assertEqual(self.mod.main(["--port", "aidebug:http://fake", command] + args), 0)
+                    self.assertEqual(self.mod.main(["--transport", "serial", "--port", "aidebug:http://fake", command] + args), 0)
             opener.assert_called_once_with("aidebug:http://fake", 9600)
             self.assertTrue(port.closed)
             self.assertEqual(port.writes[0][10:-1].decode(), wire)
         port = FakePort(reply=lambda data: [b"gs:" + data[1:9] + b" end 2\n"])
         with patch.object(self.mod, "open_port", return_value=port):
             with patch.object(self.mod.sys, "stdout", self.out):
-                self.assertEqual(self.mod.main(["--port", "COM3", "ping"]), 1)
+                self.assertEqual(self.mod.main(["--transport", "serial", "--port", "COM3", "ping"]), 1)
         self.assertTrue(port.closed)
         self.assertEqual(self.mod.DEFAULT_TIMEOUT, 15.0)
 
 
 MUTATIONS = [
-    ('prefix = "gs:" + request_id + " "', 'prefix = "gs:"', "accept other ids"),
-    ('re.fullmatch(r"end ([0-4])", payload)', 're.search(r"end ([0-4])", payload)', "accept nonterminal suffix"),
+    ('prefix = "gs:" + request_id + " "\n        deadline', 'prefix = "gs:"\n        deadline', "accept other ids"),
+    ('terminal = re.fullmatch(r"end ([0-4])", payload)\n                if terminal:', 'terminal = re.search(r"end ([0-4])", payload)\n                if terminal:', "accept nonterminal suffix"),
     ('del buf[:end + 1]\n            return data, True', 'buf.clear()\n            return data, True', "discard EOT tail"),
     ('del buf[:end + 1]\n            return line.decode', 'buf.clear()\n            return line.decode', "discard line tail"),
     ('request_id = secrets.token_hex(4)', 'request_id = "1234abcd"', "reuse constant id"),

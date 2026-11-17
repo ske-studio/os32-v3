@@ -27,16 +27,15 @@ struct time_snapshot {
 int time_decide(int p1, int p2, unsigned int t, unsigned int count,
                 struct time_snapshot *out);
 
-/* us = tick × period_us + (reload − count) × period_us ÷ reload。
- * **tick との積は 64bit で行う** — u32 だと 71 分で桁あふれる
- * (429496 tick × 10000µs = 4.29×10^9 > 2^32-1)。
- *
- * 出力は **`unsigned int`** で受ける (どの環境でも 32bit)。カーネルの `u32` は
- * `unsigned long` だが、ホストではそれが 64bit になり「上下に割る」という
- * 試験そのものが素通しになる — pit_math と同じ理由 (pit_clock_tdd.md 末尾)。 */
-void time_us_from(unsigned int tick, unsigned int count, unsigned int reload,
-                  unsigned int period_us,
-                  unsigned int *lo, unsigned int *hi);
+/* raw は物理 IRQ の 64bit 数 (lo/hi は各 32bit)。
+ * cycles = raw * reload + (reload - count)
+ * us = cycles / clk_hz * 1000000 + (cycles % clk_hz) * 1000000 / clk_hz
+ * count > reload は経過 0、clk_hz == 0 は us = 0 とする。
+ * cycles と us が 64bit に収まる範囲で使う。
+ * ホストの unsigned long は 64bit なので、入出力の語は unsigned int にする。 */
+void time_us_from64(unsigned int raw_lo, unsigned int raw_hi,
+                    unsigned int count, unsigned int reload,
+                    unsigned int clk_hz, unsigned int *lo, unsigned int *hi);
 
 void time_branch_reset(void);
 

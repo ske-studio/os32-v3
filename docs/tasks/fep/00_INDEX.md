@@ -32,7 +32,7 @@ OS32 カーネル常駐型 FEP (日本語入力フロントエンドプロセッ
 | P5 | [`05_GFX_MODE.md`](05_GFX_MODE.md) | GFX モード対応 | 未着手 | 高(大規模) | §1 描画抽象化 |
 | P6 | [`06_MISC.md`](06_MISC.md) | その他 (XFER / kprintf va_args) | 一部 (XFER の候補操作。入力中の変換開始は未対応) | 低 | なし |
 | P7 | [`07_BUNSETSU.md`](07_BUNSETSU.md) | 連文節変換 (将来構想・保留) | 未着手 | 低 | 全て |
-| — | [`TASK_DICT_META.md`](TASK_DICT_META.md) | 辞書のメタ情報 (形式の版・dict_id・license・`mem_reserve_kb` 等) と学習データの別ファイル化 (`/etc/fep_user.db`)。確定設計は [DICT_META_DESIGN](../../decisions/fep/DICT_META_DESIGN.md) | **実装中** (段 A〜N は main、段 P のゲスト試験・文書。PM のゲスト受入待ち) | 中 | v3 T4 (SQLite モジュール化)・T5a (FEP モジュール化) |
+| — | `TASK_DICT_META` (アーカイブ) | 辞書のメタ情報 (形式の版・dict_id・license・`mem_reserve_kb` 等) と学習データの別ファイル化 (`/etc/fep_user.db`)。今の仕様は [kernel/ime の設計](../../design/kernel/ime/README.md) と [辞書の形式](../../design/tools/fep_to_sqlite.md) | **受入完了 (2026-11-07)**。残りはゲストの受入 FEPLEARN-1・FEPLEARN-2 ([DEFERRED_TESTS](../DEFERRED_TESTS.md)) | 中 | v3 T4 (SQLite モジュール化)・T5a (FEP モジュール化) |
 
 P1→P2→P3 は独立して着手可能。P5 は描画バックエンド抽象化を伴う最大の変更で、
 他フェーズと切り離して最後に実施する。
@@ -88,7 +88,7 @@ P1→P2→P3 は独立して着手可能。P5 は描画バックエンド抽象�
 | `kernel/ime/ime_render_tvram.c` | ● | | | | ● | | 新規 |
 | `kernel/ime/ime_render_gfx.c` | | | | | ● | | 新規 |
 | `kernel/console/console.c` | | ● | | | | | スクロール改修 |
-| `include/tvram.h` | | ● | | | | | API 追加 |
+| `include/text_screen.h` | | ● | | | | | API 追加 |
 | `gfx/gfx_core.c` / `gfx.h` | | | | | ● | | `gfx_is_active` 公開 |
 | `kapi/kapi_generated.c` (生成物) | | | ● | | | | 生成ラッパー |
 | `exec/exec_kapi_init.inc` (生成物) | | | ● | | | | KAPI 登録 (手編集しない) |

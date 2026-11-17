@@ -1,3 +1,8 @@
+#include "kernel/irq/tick_budget.h"
+#include "kernel/time/tick_clock.h"
+#ifdef TICK_PROBE
+#include "kernel/time/tick_probe.h"
+#endif
 /* ======================================================================== */
 /*  LINK.C — OS32 リンクプロトコル v2 (非ブロッキング)                        */
 /*                                                                          */
@@ -5,20 +10,21 @@
 /*  NIC 共用層が駆動・送信・credit を所有する。                               */
 /*                                                                          */
 /*  設計の 3 本柱:                                                           */
-/*   (1) **状態機械を進めるのは `link_tick()` だけ** (100Hz、IRQ0 文脈)。      */
-/*       KAPI は状態を読み書きするだけで待たず、`link_tick` を呼ばない。      */
+/*   (1) RX・期限処理は link_tick() (tick と FG1 の協調点、期限は jiffy)。   */
+/*       KAPI は待たず、前景の open/write は TX だけを直ちに試す。      */
 /*   (2) KAPI と `link_tick` の排他は **IF 保存復元の短い cli 区間**          */
-/*       (include/io.h の irq_save / irq_restore)。区間内では待たない。       */
+/*       (link_platform_lock / link_platform_unlock)。区間内では待たない。       */
 /*   (3) ワイヤ上の値は **バイト単位の LE アクセサ**で読み書きする。構造体     */
 /*       キャストも非アラインアクセスもしない (`rid` は 4B 境界に載らない)。  */
 /* ======================================================================== */
 
 #include "link.h"
 #include "nic.h"
+#include "irq.h"
 #include "link_notify.h"
 
-/* Legacy selftests still use the LGY declarations. */
-#include "ne2000.h"
+#include "link_platform.h"
+#include "platform_link_inline.h" /* Selected by the platform include path. */
 #include "kstring.h"
 #include "kprintf.h"
 #include "le_internal.h"
@@ -33,31 +39,10 @@
 #define LINK_TX_CLASS_COUNT 2
 #define LINK_HANDSHAKE_BUDGET 2
 
-/* ------------------------------------------------------------------------ */
-/*  カーネル / ホスト試験の切り替え                                          */
-/*                                                                          */
-/*  tools/tests/net_link_host.c はこのファイルを #include して、タイマ・NIC・ */
-/*  cli / sti を贋物に差し替える。カーネルでは include/io.h の実物を使う。    */
-/* ------------------------------------------------------------------------ */
-#ifdef LINK_HOST_TEST
-extern volatile u32 tick_count;
-unsigned int link_test_irq_save(void);
-void link_test_irq_restore(unsigned int flags);
-void link_test_idle(void);
-#define LINK_IRQ_SAVE()      link_test_irq_save()
-#define LINK_IRQ_RESTORE(f)  link_test_irq_restore(f)
-#define LINK_IDLE()          link_test_idle()
-#else
-#include "idt.h"            /* tick_count */
-#include "io.h"             /* irq_save / irq_restore / _idle */
-#define LINK_IRQ_SAVE()      irq_save()
-#define LINK_IRQ_RESTORE(f)  irq_restore(f)
-/* IF=1 で次の割り込みまで寝る。「許可する」と「眠る」は io.h の _idle() が
- * 1 つの不可分な原始命令として持つ (間に割り込みを入れない =
- * docs/design/arch/x86/kernel/ring3_entry.md#落とし穴 と同じ作法)。_enable(); _halt(); に分けてはいけない
- * 理由は io.h の _idle() の註。順序 3 ではここが HAL の待ち 1 関数になる。 */
-#define LINK_IDLE()          _idle()
-#endif
+/* All clock, exclusion and foreground wait operations cross the platform seam. */
+#define LINK_IRQ_SAVE()      link_platform_lock()
+#define LINK_IRQ_RESTORE(f)  link_platform_unlock(f)
+#define LINK_IDLE()          link_platform_idle()
 
 static const u8 link_bcast[ETH_ALEN] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
 
@@ -86,6 +71,7 @@ static u32 link_agent_nonce = 0;
 static u16 link_syn_sess = 0;       /* 最後に送った SYN の sess (写しの照合用) */
 static u16 link_syn_epoch = 0;
 static u32 link_hs_tick = 0;
+static int link_hello_idle = 0;
 static u32 link_hs_tries = 0;
 static int link_hs_due = 0;         /* 1 = SYN を送る / 2 = CONFIRM を送る */
 static u32 link_next_rid = 1;       /* セッション内で単調増加、0 は使わない */
@@ -116,6 +102,8 @@ struct link_handle {
     u32 probes;
     u8  rel_pending;                /* ハンドル専用の RELEASE スロット */
     u8  rel_due;
+    u8  rel_want_ack;               /* close 前の ACK、RELEASE より先に送る */
+    u32 rel_ack_seq;
     u32 rel_rid;
     u16 rel_epoch;
     u32 rel_tick;
@@ -124,6 +112,9 @@ struct link_handle {
     u8  want_ack;
     u8  want_window;
     u8  want_status;
+    u8  window_sent;
+    u16 window_credit;
+    u32 window_ms;
     u32 ack_seq;                    /* 累積 ACK (受けた最終 in-order DATA seq) */
     u8  ctrl_cursor;                /* 制御の種類を巡回する位置 */
     u8  req_copy[LINK_MAX_PAYLOAD];
@@ -277,7 +268,7 @@ static void link_drop_all(void)
         e->req_due = e->w_due = 0;
         e->wlen = 0;
         e->want_ack = e->want_window = e->want_status = 0;
-        e->rel_pending = e->rel_due = 0;
+        e->rel_pending = e->rel_due = e->rel_want_ack = 0;
         e->ring_owner = 0;
         e->probes = 0;
     }
@@ -326,7 +317,7 @@ static u16 link_credit_pages(void)
 /* ======================================================================== */
 /*  タイマ — 再送・probe・handshake の期限を見て「送る印」を立てる            */
 /* ======================================================================== */
-static u32 since(u32 t) { return tick_count - t; }
+static u32 since(u32 t) { return link_platform_now() - t; }
 
 static void link_timers(void)
 {
@@ -335,7 +326,8 @@ static void link_timers(void)
     if (link_state != LINK_S_UP) {
         /* 出す印が立っている間 (= まだ NIC が受けていない) は期限を数えない。
          * RTO は **NIC が送信を受理した tick から** (往復 2 の R9)。 */
-        if (!link_hs_due && since(link_hs_tick) >= LINK_RTO_TICKS) {
+        if (!link_hs_due && since(link_hs_tick) >=
+            (link_state == LINK_S_SYN && link_hello_idle ? LINK_HELLO_IDLE_TICKS : LINK_RTO_TICKS)) {
             if (link_hs_tries >= LINK_TRIES) {
                 /* CONFIRM が通らない → SYN からやり直す */
                 link_start_hello(link_syn_sess, link_syn_epoch);
@@ -388,11 +380,14 @@ static void link_timers(void)
                 if (e->probes >= LINK_PROBE_MAX) { link_resync(); return; }
                 e->want_status = 1;
                 e->probes++;
-                e->last_rx_tick = tick_count;
+                e->last_rx_tick = link_platform_now();
             }
         }
-        /* WINDOW は本文を待っている間ずっと (制御枠で 1 周回 1 本に集約される) */
-        if (e->ring_owner && e->state == LINK_H_RESP && e->recv_bytes < e->length)
+        /* Repeat waiting WINDOW once per ms; changed credit is immediate.
+         * Record only NIC acceptance, so a refused advertisement stays due. */
+        if (e->ring_owner && e->state == LINK_H_RESP && e->recv_bytes < e->length &&
+            (!e->window_sent || e->window_ms != tick_clock_ms() ||
+             e->window_credit != link_credit_pages()))
             e->want_window = 1;
     }
 }
@@ -416,7 +411,9 @@ static int link_tx_control(void)
             ok = link_send(LINK_OP_HELLO, LINK_HS_CONFIRM, link_nonce,
                            link_agent_nonce, 0, 0, 0);
         if (!ok) return -1;
-        link_hs_tick = tick_count;
+        if (link_state == LINK_S_SYN && link_hs_tries >= LINK_TRIES - 1)
+            link_hello_idle = 1;
+        link_hs_tick = link_platform_now();
         link_hs_due = 0;
         return 1;
     }
@@ -428,10 +425,19 @@ static int link_tx_control(void)
         for (k = 0; k < LINK_CTRL_KIND_COUNT; k++) {
             u8 kind = (u8)((e->ctrl_cursor + k) % LINK_CTRL_KIND_COUNT);
             if (kind == LINK_CTRL_RELEASE && e->rel_due) {
+                /* close は送信せず、専用スロットで ACK → RELEASE を守る。
+                 * NIC が拒否したときも ACK を残して次の巡回で試す。 */
+                if (e->rel_want_ack) {
+                    if (!link_send_ex(LINK_OP_ACK, 0, link_sess, e->rel_epoch,
+                                      0, e->rel_ack_seq, e->rel_rid, 0, 0)) return -1;
+                    e->rel_want_ack = 0;
+                    link_ctrl_next = (int)(((link_ctrl_next + n) % LINK_HANDLES) + 1) % LINK_HANDLES;
+                    return 1;
+                }
                 if (!link_send_ex(LINK_OP_RELEASE, 0, link_sess, e->rel_epoch,
                                   0, 0, e->rel_rid, 0, 0)) return -1;
                 e->rel_due = 0;
-                e->rel_tick = tick_count;
+                e->rel_tick = link_platform_now();
             } else if (kind == LINK_CTRL_ACK && e->want_ack) {
                 if (!link_send(LINK_OP_ACK, 0, 0, e->ack_seq, e->rid, 0, 0)) return -1;
                 e->want_ack = 0;
@@ -442,6 +448,9 @@ static int link_tx_control(void)
                 if (!link_send(LINK_OP_WINDOW, 0, 0, e->ack_seq, e->rid,
                                pl, LINK_WINDOW_LEN)) return -1;
                 e->want_window = 0;
+                e->window_sent = 1;
+                e->window_ms = tick_clock_ms();
+                e->window_credit = credit;
                 link_l1_windows++;
                 if (credit > link_l1_max_credit) link_l1_max_credit = credit;
                 if (credit && (link_l1_min_credit == 0 || credit < link_l1_min_credit))
@@ -473,7 +482,7 @@ static int link_tx_normal(void)
             if (!link_send(LINK_OP_REQUEST, 0, 0, 0, e->rid,
                            e->req_copy, e->req_len)) return -1;
             e->req_due = 0;
-            e->last_tx_tick = tick_count;        /* RTO は NIC 受理から数える */
+            e->last_tx_tick = link_platform_now();        /* RTO は NIC 受理から数える */
             link_norm_next = (idx + 1) % LINK_HANDLES;
             return 1;
         }
@@ -481,10 +490,23 @@ static int link_tx_normal(void)
             if (!link_send(LINK_OP_WDATA, 0, e->wseq, 0, e->rid,
                            e->wcopy, e->wlen)) return -1;
             e->w_due = 0;
-            e->last_tx_tick = tick_count;
+            e->last_tx_tick = link_platform_now();
             link_norm_next = (idx + 1) % LINK_HANDLES;
             return 1;
         }
+    }
+    return 0;
+}
+
+static int link_tx_pending(void)
+{
+    if (link_hs_due) return 1;
+    if (link_state != LINK_S_UP) return 0;
+    for (int i = 0; i < LINK_HANDLES; i++) {
+        struct link_handle *e = &link_h[i];
+        if (e->rel_due || e->want_ack || e->want_window || e->want_status) return 1;
+        if (e->state != LINK_H_FREE && e->state != LINK_H_STALE &&
+            (e->req_due || (e->w_due && e->wlen))) return 1;
     }
     return 0;
 }
@@ -494,6 +516,9 @@ static void link_tx_round(void)
     int idle = 0;
     int budget = LINK_TX_CLASS_COUNT * (LINK_HANDLES * LINK_CTRL_KIND_COUNT + LINK_HANDSHAKE_BUDGET);
     while (budget-- > 0 && idle < LINK_TX_CLASS_COUNT) {
+        if (!link_tx_pending()) break;
+        if (!tick_budget_take(tick_budget_cnt(IRQ0_SLOT_BUDGET_US),
+                              tick_budget_cnt(NET_TAIL_TX_US))) break;
         int rc = link_tx_turn ? link_tx_normal() : link_tx_control();
         if (rc < 0) { link_tx_deferred++; return; } /* NIC busy → 位置を進めず次の周回へ */
         link_tx_turn ^= 1;                          /* 送れた / 空のときだけ次の種類へ */
@@ -501,18 +526,60 @@ static void link_tx_round(void)
     }
 }
 
+/* Called with IRQs masked after publishing foreground request data.  Keep the
+ * guard set through TX: a NIC callback must not reenter the shared TX buffer. */
+static void link_tx_kick(void)
+{
+    static int running;
+    if (kctx_irq_depth || running || !link_ready) return;
+    running = 1;
+    link_tx_round();
+    running = 0;
+}
+
 /* ======================================================================== */
-/*  link_tick — プロトコルの唯一の駆動元 (100Hz、IRQ0 文脈)                  */
+/*  link_tick — RX・期限処理と TX を駆動 (tick と FG1 の待ち、期限は jiffy)。                */
+/*  前景の open・write は TX だけを直ちに試す。                             */
 /* ======================================================================== */
 void link_tick(void)
 {
     if (!link_ready) return;
     /* net_tick owns the bound-NIC/reentry guards and invokes us with IF=0. */
+#ifdef TICK_PROBE
+    tick_probe_net_begin(TP_NET1);
+#endif
     link_rx_pump();
+#ifdef TICK_PROBE
+    tick_probe_net_end(TP_NET1);
+#endif
+#ifdef TICK_PROBE
+    tick_probe_net_begin(TP_NET2);
+#endif
     link_host_deadlines();
+#ifdef TICK_PROBE
+    tick_probe_net_end(TP_NET2);
+#endif
+#ifdef TICK_PROBE
+    tick_probe_net_begin(TP_NET3);
+#endif
     link_timers();
+#ifdef TICK_PROBE
+    tick_probe_net_end(TP_NET3);
+#endif
+#ifdef TICK_PROBE
+    tick_probe_net_begin(TP_NET4);
+#endif
     link_tx_round();
-    link_notify_tick(tick_count);
+#ifdef TICK_PROBE
+    tick_probe_net_end(TP_NET4);
+#endif
+#ifdef TICK_PROBE
+    tick_probe_net_begin(TP_NET5);
+#endif
+    link_notify_tick(link_platform_now());
+#ifdef TICK_PROBE
+    tick_probe_net_end(TP_NET5);
+#endif
 }
 
 /* ======================================================================== */
@@ -529,6 +596,7 @@ void link_init(const u8 my_mac[ETH_ALEN])
     link_epoch = 0;
     link_agent_gen = 0;
     link_state = LINK_S_DOWN;
+    link_hello_idle = 0;
     link_hello_ok = 0;
     link_next_rid = 1;
     link_ring_owner = -1;
@@ -538,7 +606,7 @@ void link_init(const u8 my_mac[ETH_ALEN])
     /* nonce の初期値は tick を種にする (一意性は要らない — 応答の対応付けだけ)。
      * 同じ値で再起動しても、sess を採番するのは Agent なので別セッションになる
      * (TASK_N0 §1b、往復 3 の B3)。 */
-    link_nonce = tick_count;
+    link_nonce = link_platform_now();
     link_ready = 1;
     link_start_hello(0, 1);
 }

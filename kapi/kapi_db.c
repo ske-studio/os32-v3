@@ -16,6 +16,7 @@
 #include "os32_sqlite_outer.h"
 #include "kstring.h"
 #include "utf8.h"
+#include "softfloat_bits.h"
 #include "kprintf.h"
 #include "os32_sqlite_vfs.h"
 #include "memmap.h"
@@ -27,11 +28,7 @@ extern int ring3_call_from_user(void);
 
 /* SQLite calls go through the typed outer facade. Stage caller strings in
  * core memory before the module is entered; the module never retains them. */
-#ifdef OS32_SQLITE_DIRECT_TEST
-#define DB_MODULE_READY() 1
-#else
 #define DB_MODULE_READY() services_public
-#endif
 #define SQL_COPY_BUF_SIZE DB_SQL_MAX_BYTES
 static char sql_copy_buf[SQL_COPY_BUF_SIZE];
 

@@ -4,7 +4,7 @@
 票  : docs/archive/realhw_v21/TASK_HDD_INSTALL.md 段 1 / §1-v3 (N3〜N7、R3-1)
 
 実物を 1 行も写さずに回す:
-  tools/tests/hdd_stage1_host.c  drivers/block/pc98pt.c・drivers/ata/ide_addr.c・
+  tools/tests/hdd_stage1_host.c  fs/pc98pt.c・drivers/ata/ide_addr.c・
                                  fs/ext2/ext2_layout.c・userland/shell/hdprep_plan.c
   tools/tests/ext2_part_host.c   fs/ext2/ext2_super.c・ext2_fmt.c (区画探索と format_at)
   tools/pc98pt.py / tools/nhd_deploy.py (migrate-pt) — Python 側
@@ -42,7 +42,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 import gen_memmap as gen
 HARNESS = ROOT / "tools/tests/hdd_stage1_host.c"
 PART_HARNESS = ROOT / "tools/tests/ext2_part_host.c"
-PT_SRC = ROOT / "drivers/block/pc98pt.c"
+PT_SRC = ROOT / "fs/pc98pt.c"
 ADDR_SRC = ROOT / "drivers/ata/ide_addr.c"
 LAYOUT_SRC = ROOT / "fs/ext2/ext2_layout.c"
 HDPREP_SRC = ROOT / "userland/shell/hdprep_plan.c"
@@ -70,18 +70,18 @@ PART_INC_DIRS = ["include", "fs", "lib", "kernel", "drivers", "sdk/include/os32"
 
 # ---- 否定側 (C): (ファイル, 前, 後, 説明) -----------------------------------
 C_MUTATIONS = [
-    ("drivers/block/pc98pt.h", "#define PC98PT_OFF_SSECT      8", "#define PC98PT_OFF_SSECT      6",
+    ("fs/pc98pt.h", "#define PC98PT_OFF_SSECT      8", "#define PC98PT_OFF_SSECT      6",
      "開始セクタを旧配置の +6 で読み書きする"),
-    ("drivers/block/pc98pt.c", "    if (disk_total != 0 && end_excl > disk_total) return PC98PT_ERR_RANGE;",
+    ("fs/pc98pt.c", "    if (disk_total != 0 && end_excl > disk_total) return PC98PT_ERR_RANGE;",
      "    if (0 && disk_total != 0 && end_excl > disk_total) return PC98PT_ERR_RANGE;",
      "終わりがディスクの外でも通す"),
-    ("drivers/block/pc98pt.c", "    if (end_excl <= start) return PC98PT_ERR_RANGE;\n", "",
+    ("fs/pc98pt.c", "    if (end_excl <= start) return PC98PT_ERR_RANGE;\n", "",
      "終わり <= 開始を通す (旧配置を別の場所として読む)"),
-    ("drivers/block/pc98pt.c", "    if ((start % cylsz) != 0 || (len % cylsz) != 0) return PC98PT_ERR_ALIGN;\n", "",
+    ("fs/pc98pt.c", "    if ((start % cylsz) != 0 || (len % cylsz) != 0) return PC98PT_ERR_ALIGN;\n", "",
      "シリンダ境界に無い区画を書く"),
-    ("drivers/block/pc98pt.c", "        if (e.sys_id != PC98PT_SID_OS32) continue;", "        if (e.sys_id == 0) continue;",
+    ("fs/pc98pt.c", "        if (e.sys_id != PC98PT_SID_OS32) continue;", "        if (e.sys_id == 0) continue;",
      "OS32 以外 (FAT) の項目を ext2 として拾う"),
-    ("drivers/block/pc98pt.c", "    if (head >= heads || sect >= spt || cyl > PC98PT_MAX_CYL)\n        return PC98PT_ERR_RANGE;\n", "",
+    ("fs/pc98pt.c", "    if (head >= heads || sect >= spt || cyl > PC98PT_MAX_CYL)\n        return PC98PT_ERR_RANGE;\n", "",
      "開始ヘッド・セクタが幾何の外でも通す"),
     ("drivers/ata/ide_addr.c", "IDE_DRVHEAD_BASE | IDE_DRVHEAD_LBA | slave |", "IDE_DRVHEAD_BASE | slave |",
      "LBA28 なのに DRV/HEAD の bit6 を立てない (CHS として解釈される)"),
@@ -155,12 +155,12 @@ C_MUTATIONS = [
      "ext2_format が IDENTIFY の幾何で見つけた区画に書く (m3)"),
     ("fs/ext2/ext2_fmt.c", "    if (total_sectors > EXT2L_MAX_SECTORS(EXT2_MAX_GROUPS))\n", "    if (0)\n",
      "ext2_format が 32 グループを超える区画で頭打ちにせず断る (m2)"),
-    ("drivers/block/pc98pt.c", "        return 1;\n    }\n    return 0;\n}\n\nint pc98pt_make_os32(",
+    ("fs/pc98pt.c", "        return 1;\n    }\n    return 0;\n}\n\nint pc98pt_make_os32(",
      "        return 0;\n    }\n    return 0;\n}\n\nint pc98pt_make_os32(",
      "旧配置を検出しない (カーネルが移行の案内を出せない、M2)"),
     ("fs/ext2/ext2_fmt.c", "    if (!platform_ide_range_ok(ide_drive, base_lba, lay.total_blocks * (unsigned long)EXT2_SECTORS_PER_BLOCK))\n        return EXT2_ERR_INVAL;\n", "",
      "ext2_format の頭打ちの後の範囲を ATA の上限と照合しない (ラリー 2 の 3)"),
-    ("drivers/block/pc98pt.c", "            return 0;                       /* 標準配置で読める */",
+    ("fs/pc98pt.c", "            return 0;                       /* 標準配置で読める */",
      "            (void)0;", "標準配置の表を旧配置と誤認する"),
     # E03a: 抽出境界の順と失敗伝播 (format_io_order が実 I/O で検出)。
     ("fs/ext2/ext2_fmt.c", "    ret = fmt_write_groups(&fmt_ctx, &lay);\n    if (ret != 0) return EXT2_ERR_IO;\n\n    ret = fmt_write_backups(&fmt_ctx, &lay);\n    if (ret != 0) return EXT2_ERR_IO;\n",
@@ -846,7 +846,7 @@ def build_target(tmp):
             "-fno-pie", "-fno-stack-protector", "-nostdlib", "-mno-red-zone",
             "-fcommon", "-O2", "-Wall", "-Werror",
             "-D__KERNEL_BUILD__", *include_flags(ROOT)]
-    for rel in ("drivers/block/pc98pt.c", "drivers/ata/ide_addr.c", "fs/ext2/ext2_layout.c",
+    for rel in ("fs/pc98pt.c", "drivers/ata/ide_addr.c", "fs/ext2/ext2_layout.c",
                 "userland/shell/hdprep_plan.c"):
         out = pathlib.Path(tmp) / (pathlib.Path(rel).stem + ".o")
         run([*base, "-c", str(ROOT / rel), "-o", str(out)], check=True)
@@ -867,7 +867,7 @@ def build_target(tmp):
 #  変異                                                                     #
 # ======================================================================== #
 
-MIRROR = ["include/platform_device.h", "include/ide_contract.h", "drivers/ata/ide.h", "drivers/block/pc98pt.c", "drivers/block/pc98pt.h", "drivers/ata/ide_addr.c",
+MIRROR = ["include/platform_device.h", "include/ide_contract.h", "drivers/ata/ide.h", "fs/pc98pt.c", "fs/pc98pt.h", "drivers/ata/ide_addr.c",
           "drivers/ata/ide_addr.h", "fs/ext2/ext2_layout.c", "fs/ext2/ext2_layout.h",
           "userland/shell/hdprep_plan.c", "userland/shell/hdprep_plan.h",
           "fs/ext2/ext2_super.c", "fs/ext2/ext2_super_block_io.inc", "fs/ext2/ext2_fmt.c", "fs/ext2/ext2_inode.c", "fs/ext2/ext2_dir.c",
@@ -903,7 +903,7 @@ def _controls(mutations):
 # 回さない。表に無いファイル (ヘッダなど) は両方組む。表が gcc -MM の依存より狭ければ
 # mutate_c() が落ちる (mutpar.check_rebuild_table)。
 REBUILD = {
-    "drivers/block/pc98pt.c": ("pure", "part"),
+    "fs/pc98pt.c": ("pure", "part"),
     "drivers/ata/ide_addr.c": ("pure",),
     "fs/ext2/ext2_layout.c": ("pure", "part"),
     "userland/shell/hdprep_plan.c": ("pure",),

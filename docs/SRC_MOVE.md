@@ -1,7 +1,7 @@
 # ソースの付け替え手順 (ファイルの置き場を変える)
 
 > 状態: **現行 (2026-10-30)** — ソースファイルの**置き場だけ**を変える (中身・名前・リンク順は変えない) ときの手順の正典。
-> 最初の適用は [TASK_SRC_LAYOUT](tasks/v3/TASK_SRC_LAYOUT.md) (L0〜L3)。
+> 最初の適用は TASK_SRC_LAYOUT (アーカイブ: `docs/archive/v3/TASK_SRC_LAYOUT.md`) (L0〜L3)。
 > 関数をファイルに切り分ける手順は別 ([POLICY_DEV](POLICY_DEV.md) §2「分割の手段」)。ディレクトリ木の正典は [08_build](08_build.md) §8-3。
 
 ## 1. 考え方

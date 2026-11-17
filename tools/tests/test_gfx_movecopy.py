@@ -11,7 +11,9 @@ CHECK = dict(name='gfx-movecopy-host', tier=1, needs=[], budget=30, covers=[
     'userland/gshell/src/**', 'userland/gshell/host/**', 'userland/gshell/build.rs',
     'sdk/rust/os32api/src/**', 'sdk/include/os32/os32_kapi_shared.h',
     'tools/tests/os32api_host.py', 'userland/lib/font/**',
-    'tools/tests/test_gfx_movecopy.py'])
+    'tools/tests/test_gfx_movecopy.py'],
+    basis=['GFX_ACCEL_HAL_DESIGN §3-5'],
+)
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
     ('fep-source', 'wm::overlay_rects(st)', '[crate::modal::rect(), crate::taskbar::rect(st), crate::startmenu::rect()]'),

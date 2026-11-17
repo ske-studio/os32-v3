@@ -4,7 +4,7 @@ static int imetab_candidate(int list)
     reset(); user = 1; owner = 2; ime_toggle();
     key(0x1d); key(KEY_SPACE);
     if (list) key(KEY_XFER);
-    while (kbd_count) CHECK(ime_trygetkey() == -1, "IMETAB composition consumed");
+    while (legacy_cooked_pending()) CHECK(ime_trygetkey() == -1, "IMETAB composition consumed");
     CHECK(g_ime.state == (list ? IME_ST_CANDLIST : IME_ST_CONVERT) &&
           !kstrcmp(g_ime.results[0].kanji, "亜"), "IMETAB candidate ready");
     return 0;
@@ -22,21 +22,21 @@ static int imetab_delivery(void)
         for (u32 r = 0; r < sizeof(readers)/sizeof(readers[0]); r++) {
             for (u32 k = 0; k < sizeof(scans); k++) {
                 CHECK(!imetab_candidate(list), "IMETAB setup");
-                if (k == 2) kbd_shift_state = SHIFT_CTRL;
+                if (k == 2) kbd_hal_capture(KEY_CTRL);
                 key(scans[k]);
-                kbd_shift_state = 0;
+                kbd_hal_capture(KEY_CTRL | SCANCODE_BREAK);
                 key(0x1d); /* queued before any candidate byte has been read */
                 for (u32 b = 0; b < sizeof(candidate) - 1; b++) {
                     CHECK(readers[r]() == candidate[b], "IMETAB candidate before transparent key");
-                    CHECK(kbd_count == 1, "IMETAB queued a untouched while draining");
+                    CHECK(legacy_cooked_pending() == 1, "IMETAB queued a untouched while draining");
                 }
                 CHECK(learns == 1, "IMETAB candidate learned once");
                 if (chars[k] || (r & 1)) {
                     CHECK(readers[r]() == ((r & 1) ? (scans[k] << 8) | chars[k] : chars[k]),
                           "IMETAB original transparent key once with scan");
-                    CHECK(kbd_count == 1, "IMETAB pending key before queued a");
+                    CHECK(legacy_cooked_pending() == 1, "IMETAB pending key before queued a");
                 } else if (r == 0) {
-                    CHECK(readers[r]() == -1 && kbd_count == 1,
+                    CHECK(readers[r]() == -1 && legacy_cooked_pending() == 1,
                           "IMETAB scan-only poll consumes only pending key");
                 } else {
                     /* Blocking getchar skips F1, processes queued a, then Enter. */

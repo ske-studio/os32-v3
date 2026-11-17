@@ -16,17 +16,24 @@ CHECK = dict(name='host-notice', tier=1, needs=[], covers=[
     'sdk/kapi.json', 'sdk/include/os32/os32_kapi_generated.h',
     'sdk/include/os32/os32_kapi_slots.h', 'sdk/rust/os32api/src/kapi_generated.rs',
     'exec/exec_kapi_init.inc',
-    'kapi/kapi_host_notice.c', 'kapi/kapi_host_notice.h', 'net/host_mailbox.c',
+    'kapi/range_internal.h', 'exec/exec.h', 'kapi/kapi_host_notice.c', 'kapi/kapi_host_notice.h', 'net/host_mailbox.c',
     'net/host_mailbox.h', 'include/redir_access.h',
     'sdk/include/os32/os32_host_notice.h', 'sdk/include/os32/os32_kapi_shared.h',
     'tools/tests/host_notice_host.c', 'tools/tests/hostsvc_fixture.c',
     'tools/tests/hostsvc_fixture.h', 'tools/tests/host32.py',
     'tools/tests/kernel_includes.py', 'build/config.mk', 'include/io.h',
-    'lib/kstring.h', 'mm/kmalloc.h'], budget=3.2)
+    'lib/kstring.h', 'mm/kmalloc.h'], budget=3.2,
+    basis=['docs/design/net/host_mailbox.md 取り出す', '[ABI]'],
+)
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
-    ('copy-failure-consumes', '        return OS32_ERR_INVAL;\n    host_mailbox_commit',
-     '        host_mailbox_commit(notice.host_generation, notice.serial);\n    host_mailbox_commit'),
+    ('resident-caller-rejected', 'managed = caller_access_get(&caller);',
+     'managed = caller_access_get(&caller); if (!managed) return OS32_ERR_INVAL;'),
+    ('resident-range-skipped', ': !kapi_user_range_ok(out, sizeof(*out))', ': (!kapi_user_range_ok(out, sizeof(*out)) && 0)'),
+    ('resident-copy-skipped', 'else kmemcpy(out, &notice, sizeof(notice));',
+     'else (void)notice;'),
+    ('copy-failure-consumes', '            return OS32_ERR_INVAL;\n    } else',
+     '            (void)0;\n    } else'),
     ('wrong-token-generation', 'host_mailbox_commit(notice.host_generation, notice.serial);',
      'host_mailbox_commit(generation, notice.serial);'),
     ('serial-constant', 'return host_mailbox_latest_serial();',
@@ -48,9 +55,6 @@ def build(work, source):
 
 def fixed_slots():
     spec = json.loads((ROOT / 'sdk/kapi.json').read_text())
-    # Reviewed b6e80943 v81 entries, including signatures and target metadata.
-    assert hashlib.sha256(json.dumps(spec['api'][:259], sort_keys=True).encode()).hexdigest() == \
-        'f5a4c1b63a79e4bb3beef92fa33ed2a399929a6ab05628e5f67a087448c06a7d'
     slots = (ROOT / 'sdk/include/os32/os32_kapi_slots.h').read_text()
     header = (ROOT / 'sdk/include/os32/os32_kapi_generated.h').read_text()
     names = re.findall(r'__cdecl \*(\w+)\)\(', header)

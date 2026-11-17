@@ -18,8 +18,8 @@
 3. ホスト ILP32 GNU89 (`gcc -m32 -march=i386 -ffreestanding -Werror -nostdlib`) で走らせ、
    **同じソース**をカーネルと同じフラグの `i386-elf-gcc -Werror` でもコンパイルする ([C1])。
 
-ホスト側だけ `-DCON_SINK_NO_IRQ_LOCK` / `-DKBD_INJECT_NO_IRQ_LOCK` を付ける (CPL=3 では
-`cli` / `popfl` を実行できない)。`make`・エミュレータ・配備は使わない。
+con_sink の排他は include パスで IRQ 状態模型へ差し替える。
+注入リングは既存の `-DKBD_INJECT_NO_IRQ_LOCK` を使う (CPL=3 では特権命令を実行できない)。`make`・エミュレータ・配備は使わない。
 
 `exec/exec.c` はホストに持ち込めない (CR3 / setjmp / ページテーブル)。ケース 19 は
 `exec_park_kbd` / `exec_resume` の **kbd 分岐 3 行だけ**をハーネスへ写す

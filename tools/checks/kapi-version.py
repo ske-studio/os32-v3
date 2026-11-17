@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 CHECK = dict(name='kapi-version', tier=0,
     covers=['docs/INDEX.md', 'docs/KAPI_SPEC.md', 'sdk/os32x_hdr.py', 'sdk/rust/os32api/src/kapi_generated.rs', 'tools/check_kapi_version.py', 'userland/rust/libos32gui/src/cfgro.rs', 'README.md', 'sdk/kapi.json'],
-    needs=[], budget=3.1)
+    needs=[], budget=3.1,
+    basis=['[ABI]', 'KAPI_SPEC §3-1', 'KAPI_SPEC §4-0'],
+)
 
 
 def run(ctx) -> int:

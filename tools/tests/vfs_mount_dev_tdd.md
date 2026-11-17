@@ -49,7 +49,7 @@ mounts[1] prefix=/fd0  ctx=0x001562E0 dev=fd0(t1,i0) base_lba=1632 dev_ptr=0x001
 - `ext2_find_partition(0x100)` → `ide_get_info(0x100)` → `drive_info[0]` → base_lba 1632
 
 と**すべて種別が消えて hd0 に化ける**。ブート時の自動マウントループ
-(`init/kernel.c`) が root 以外の全ブロックデバイスに ext2 を試すので、
+(`platform/pc98/kernel.c`) が root 以外の全ブロックデバイスに ext2 を試すので、
 `/fd0` として 2 つ目の `Ext2Ctx` が必ずできる。
 
 `vfs_sync()` は全マウントを順に回すため:
@@ -115,7 +115,7 @@ SUMMARY 4/4 PASS
 `userland/rust/filer/src/lib.rs` の同一ファイル判定は
 `sst.st_ino != 0 && sst.st_dev == stbuf.st_dev && sst.st_ino == stbuf.st_ino`。
 ところが `st_dev` を埋める FS ドライバが 1 つも無い — `fs/ext2/ext2_vfs.c` と
-`fs/isofs/iso9660.c` は `st_dev = 0` 固定、`fs/hostdrv/hostdrvfs.c` と `fs/fat/fatfs_vfs.c` は
+`fs/isofs/iso9660.c` は `st_dev = 0` 固定、`drivers/hostdrv/hostdrvfs.c` と `fs/fat/fatfs_vfs.c` は
 `kmemset` のまま。よって **hd0 と hd1 で inode 番号が一致すると、別ディスクの
 別ファイルが「同じファイル」になり、正当な上書きコピーまで拒まれる**。
 ext2 の inode 番号は FS 内でしか一意でないので、12 (lost+found の次) のような
@@ -186,7 +186,7 @@ SUMMARY 6/6 PASS
 ## 既知の限界
 
 - **同じ物理ディスク上の別パーティションは区別しない。**
-  `fs/ext2/ext2_super.c:131` の `ext2_find_partition()` は PC-98 パーティション
+  `fs/ext2/ext2_super.c` の `ext2_find_partition()` は PC-98 パーティション
   テーブルの最初のブート可能エントリ (`bootable & 0x80`) を見つけた時点で
   `break` するので、1 台の hd につき 1 パーティションしか触れない。さらに
   `vfs_mount()` が同じ `(ops, dev_type, dev_id)` の二重マウントを断るため、

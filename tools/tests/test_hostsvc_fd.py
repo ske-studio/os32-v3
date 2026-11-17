@@ -2,11 +2,13 @@
 """D6 FD resource generation with real C1 and libc-free ILP32 runtime."""
 CHECK = dict(name='hostsvc-fd', tier=1, needs=[], budget=4.1, covers=[
     'fs/vfs_fd.c', 'fs/vfs_fd_stdin.inc', 'fs/vfs_stdin.h', 'fs/vfs.h',
-    'fs/serialfs/serialfs_persistent.c', 'fs/serialfs/serialfs.h',
+    'fs/serialfs/serialfs_persistent.c', 'include/boot_token.h', 'fs/serialfs/serialfs.h',
     'fs/serialfs/sfs_client.h', 'fs/serialfs/sfs_proto.h',
     'net/host_mailbox.h', 'exec/exec.h',
     'tools/tests/hostsvc_fd_host.c', 'tools/tests/host32.py',
-    'tools/tests/kernel_includes.py', 'build/config.mk'])
+    'tools/tests/kernel_includes.py', 'build/config.mk'],
+    basis=['docs/design/drivers/block/netcd.md 起動の手順と設定'],
+)
 
 import argparse
 import os

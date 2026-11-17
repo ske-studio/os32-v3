@@ -4,7 +4,9 @@ CHECK = dict(name='gf1-engine-stop', tier=1,
             'hwdev/gf/internal.h', 'kdebug/recover.h', 'include/types.h',
             'tools/tests/gf1_engine_stop_host.c', 'tools/tests/test_gf1_engine_stop.py',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
-    needs=[], budget=2.8)
+    needs=[], budget=2.8,
+    basis=['GF_FEAT1_DESIGN §3', 'GF_STOP_REF_DESIGN'],
+)
 
 from pathlib import Path
 import os

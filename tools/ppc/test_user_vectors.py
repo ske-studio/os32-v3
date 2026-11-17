@@ -1,15 +1,13 @@
 #!/usr/bin/env python3
 """Inspect the assembled USER exception path and its busy-word mutation."""
-CHECK = dict(name='ppc-user-vectors', tier=1, budget=10, needs=[],
-             covers=['arch/ppc/kernel_vectors.S', 'tools/ppc/test_user_vectors.py'],
-             inputs=['arch/ppc/ppc_frame.h', 'arch/ppc/ppc_oea.h'])
+import os
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-CROSS = Path('/home/hight/opt/cross-ppc/bin')
+CROSS = Path((os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc') + '/bin'))
 SOURCE = ROOT / 'arch/ppc/kernel_vectors.S'
 
 
@@ -47,7 +45,8 @@ def main():
         anchor = '.Luser_frame:\n    lis 1,ppc_exec_kernel_sp@ha'
         assert source.count(anchor) == 1
         mutant = source.replace(anchor, '.Luser_frame:\n    lis 1,.Ltrap_busy@ha\n    li 29,1\n    stw 29,.Ltrap_busy@l(1)\n    lis 1,ppc_exec_kernel_sp@ha')
-        if inspect(mutant):
+        correct = inspect(mutant)
+        if correct:
             raise RuntimeError('busy-word mutation survived')
         print('USER busy-word store: RED (1)')
         anchor = '    mtsrr1 1\n    mfsprg1 0'

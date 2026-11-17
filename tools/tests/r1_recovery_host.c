@@ -19,9 +19,9 @@ static void check_cr3(u32 root);
 #include "exec_r1.h"
 #include "v86.h"
 #include "v86_mem.h"
-#include "tvram.h"
+#include "text_screen.h"
 #include "paging_source.c"
-#include "../../arch/x86/legacy/lowmap.c"
+#include "../../platform/pc98/legacy/lowmap.c"
 #include "pgalloc_source.c"
 #include "pgalloc_host_fixture.h"
 /* Layout symbols are supplied by kernel_layout.linker_flags(). */
@@ -41,6 +41,7 @@ static void check_cr3(u32 root) {
 void *kmemset(void *p, int c, u32 n) { u8 *b=p; while (n--) *b++=c; return p; }
 void *kmemcpy(void *p, const void *q, u32 n) { u8 *a=p; const u8 *b=q; while(n--) *a++=*b++; return p; }
 void __cdecl kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
+void __cdecl console_printf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
 void kfree(void *p) { (void)p; }
 static char serial[4096];
 static u32 serial_len;
@@ -107,6 +108,8 @@ void exec_longjmp(k_jmpbuf buf) {
     kctx_exc_depth=kctx_irq_depth=0; /* setjmp.asm restores the trusted depths. */
     __builtin_longjmp(jump,1);
 }
+static u32 io_syscall_suspend(int owner) { (void)owner; return 0; }
+static void io_syscall_end(int owner) { (void)owner; }
 static void exec_restore_context(int id) {
     AppSlot *a=appslot_at(id);
     g_cur_app=a->cpl3 ? a : 0;

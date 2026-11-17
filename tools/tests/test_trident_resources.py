@@ -64,7 +64,9 @@ CHECK = dict(name='trident-resources', tier=1, needs=[], budget=16.1,
         'tools/tests/trident_device_fake.c',
         'tools/tests/trident_device_fake.h',
         'tools/tests/trident_resources_host.c',
-    ])
+    ],
+    basis=['TRIDENT_FULL_DESIGN §2', 'TRIDENT_S3_DESIGN §4', 'BARLEN_DESIGN'],
+)
 import argparse
 import os
 from pathlib import Path

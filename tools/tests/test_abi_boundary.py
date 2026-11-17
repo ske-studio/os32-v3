@@ -6,7 +6,9 @@ CHECK = dict(name='abi-boundary', tier=1, needs=[], budget=15,
             'tools/tests/host_arch/arch_abi.h',
             'include/callconv.h', 'sdk/include/os32/**',
             'arch/x86/kernel/cpu_flags.inc',
-            'tools/tests/test_abi_boundary.py', 'tools/tests/host32.py'])
+            'tools/tests/test_abi_boundary.py', 'tools/tests/host32.py'],
+    basis=['[C1]', '[ABI]', 'KAPI_SPEC §3-1'],
+)
 import argparse
 from pathlib import Path
 import subprocess

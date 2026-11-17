@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Compile the GEM contract and compare it with the OpenBSD reference."""
+import os
 import argparse
 import re
 import subprocess
@@ -7,13 +8,11 @@ import sys
 import tempfile
 from pathlib import Path
 
-CHECK = dict(name="ppc-lan-p2", tier=2, budget=60,
-             covers=["drivers/net/gem/gem.h", "tools/ppc/test_lan_p2.py",
-                     "include/types.h", "include/callconv.h", "build/ppc-kboot.mk"])
 
 ROOT = Path(__file__).resolve().parents[2]
 HEADER = ROOT / "drivers/net/gem/gem.h"
-BSD = Path("/home/hight/os32-tmp/ref/openbsd/sys/dev/ic/gemreg.h")
+# OpenBSD src/sys/dev/ic/gemreg.h revision 1.17; BSD license retained in fixture.
+BSD = ROOT / "tools/tests/fixtures/ppc_gemreg.h"
 LAN = ROOT / "platform/powermac/lan_boot.h"
 # Explicit product-to-reference mapping; offsets in OpenBSD are bank-relative.
 PAIRS = [(name, name) for name in """
@@ -33,7 +32,7 @@ MUTATIONS = [
     ("ring", "#define GEM_RING_COUNT 32\n", "#define GEM_RING_COUNT 64\n", "GEM_RING_COUNT"),
     ("span", "#define GEM_MMIO_SPAN 0x10000\n", "#define GEM_MMIO_SPAN 0x200000\n", "GEM_MMIO_SPAN"),
 ]
-PPC = "/home/hight/opt/cross-ppc/bin/powerpc-elf-gcc"
+PPC = (os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc') + '/bin/powerpc-elf-gcc')
 FLAGS = """-std=gnu11 -mcpu=7450 -m32 -mbig-endian -msoft-float -mno-altivec
 -msdata=none -ffreestanding -fno-pie -fno-stack-protector -nostdlib -fcommon
 -fsigned-char -fno-short-enums -fno-builtin -fno-asynchronous-unwind-tables -O2

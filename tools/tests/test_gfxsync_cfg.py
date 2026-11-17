@@ -11,7 +11,9 @@ CHECK = dict(name='gfxsync-cfg-host', tier=1, needs=[], budget=15,
              covers=['gfx/sync/sync_cfg.c', 'gfx/sync/sync_int.h', 'include/gfx_sync.h',
                      'include/config.h', 'fs/vfs.h', 'tools/tests/gfxsync_cfg_host.c',
                      'tools/tests/test_gfxsync_cfg.py', 'tools/tests/host32.py',
-                     'tools/tests/kernel_includes.py'])
+                     'tools/tests/kernel_includes.py'],
+    basis=['HAL_V2_DESIGN §10'],
+)
 ROOT = Path(__file__).resolve().parents[2]
 
 def run_one(work, source):

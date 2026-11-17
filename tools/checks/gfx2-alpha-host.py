@@ -2,7 +2,9 @@
 CHECK = dict(name='gfx2-alpha-host', tier=1, needs=[], budget=5,
     covers=['gfx/v2/sw_alpha.c', 'gfx/v2/gfx2_sw.h', 'gfx/v2/gfx2_int.h',
             'include/**', 'mm/pgalloc.h', 'tools/tests/gfx2_alpha_host.c',
-            'tools/tests/test_gfx2_alpha.py', 'tools/tests/host32.py'])
+            'tools/tests/test_gfx2_alpha.py', 'tools/tests/host32.py'],
+    basis=['HAL_V2_DESIGN §3-3', 'HAL_V2_DESIGN §13-1'],
+)
 
 def run(ctx):
     import os

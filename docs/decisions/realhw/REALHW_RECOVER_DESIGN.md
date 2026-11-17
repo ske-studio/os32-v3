@@ -15,10 +15,10 @@
 
 ## 3. 軽い順の復帰階梯
 
-| ⑤ reboot / 旧版 | 復帰不能を記録→可能なら FS sync→reboot。新起動の ver を待ち、S2 と S0 を照合。版の問題なら旧一式へ戻す | reboot の EOT 不着は既知。起動の期限で停止、無限再起動しない。CPU リセットの `sys_reboot` (`R/kernel/sys.c:16`) で PCI RST# が出る保証はなく、GPU 状態が残る可能性がある。S2 の COLD 比較で warm-residue を記録し、装置不調が残れば⑥ |
+| ⑤ reboot / 旧版 | 復帰不能を記録→可能なら FS sync→reboot。新起動の ver を待ち、S2 と S0 を照合。版の問題なら旧一式へ戻す | reboot の EOT 不着は既知。起動の期限で停止、無限再起動しない。CPU リセットの `sys_reboot` (`R/kernel/sys.c`) で PCI RST# が出る保証はなく、GPU 状態が残る可能性がある。S2 の COLD 比較で warm-residue を記録し、装置不調が残れば⑥ |
 | ⑥ 無応答 | CPU/バス停止、割込み禁止で処理不能、MMIO が帰らない場合は最後のログを保存して止める | ソフトでの復帰は保証しない。ユーザーの物理操作で再投入し S2/COLD を再採取 |
 
-- **(PM 修正 2026-10-21、ユーザー情報) GeForce の映像は「抜いちゃダメボード」経由で 98 の切替回路の RGB-IN につながる** (1 本のモニタ、`docs/tasks/realhw/TASK_GEFORCE6200.md:61`)。切替は 0FACh (bit1 = 内蔵/RGB 側 か 98 か、bit0 = RGB-IN スルー か 内蔵 [推]、`docs/tasks/realhw/TASK_TRIDENT_DRIVER.md` §3-7)。r2/r3 の「別コネクタ・0FACh は GeForce に使わない」は取り消す。
+- **(PM 修正 2026-10-21、ユーザー情報) GeForce の映像は「抜いちゃダメボード」経由で 98 の切替回路の RGB-IN につながる** (1 本のモニタ、`docs/tasks/realhw/TASK_GEFORCE6200.md`)。切替は 0FACh (bit1 = 内蔵/RGB 側 か 98 か、bit0 = RGB-IN スルー か 内蔵 [推]、`docs/tasks/realhw/TASK_TRIDENT_DRIVER.md` §3-7)。r2/r3 の「別コネクタ・0FACh は GeForce に使わない」は取り消す。
 
 - **Ra266 で 0FACh を初めて書くのは T5 の中の明示承認の 1 回** (Trident T9 の関門と同じ扱い、戻らなければリセット)。それまでは読みだけで、bit1..0≠00b なら書かずに FAILED として止める。GeForce を映す値 (RGB-IN 選択) は 4b の前に確かめる項目で、recover は書かない。
 

@@ -20,3 +20,7 @@
 `return ime_input_key(ascii, scancode);`。g_imeと候補表示staticは元ファイルに残す
 
 - [候補確定と透過キーの配送](ime_delivery.md): 共有の確定列・1件保留、取消と park/resume の契約。
+- [辞書の接続の内部契約](ime_store.md): core と FEP が共有する型・定数・誤りの意味、接続の寿命。
+- [2 接続と検索の合成・切替](ime_dict.md): システム辞書 RO と学習 DB RW、候補の合成、S/M/L の切替、回復、停止と再開。
+- [学習 DB](ime_user_store.md): `/etc/fep_user.db` の置き場・形・検査と作成。
+- [辞書のメタ情報の KAPI](ime_dict_info.md): `ime_dict_info` の 20 キー、byte で切る返し方、誤り。

@@ -5,7 +5,10 @@
 """
 CHECK = dict(name='np21w-ini-live-host', tier=1,
     covers=['tools/np21w_ini_live.py', 'tools/np21w_ini.py'],
-    needs=[], budget=4.7)
+    needs=[], budget=4.7,
+    basis=['[D1]', '[D2]'],
+    full_only=True,
+)
 
 import copy
 import importlib.util
@@ -1709,11 +1712,11 @@ def mutate():
     common_src = SRC.with_name('np21w_ini.py')
     common = common_src.read_text(encoding='utf-8')
     common_mutations = [
-        ("EXTRA = {'SNDBOARD', 'NP2NETSOCK', 'E_RESUME', 'CRT31K'}",
-         "EXTRA = {'SNDBOARD', 'NP2NETSOCK', 'E_RESUME', 'CRT31K'}",
+        ("EXTRA = {'SNDBOARD', 'NP2NETSOCK', 'E_RESUME', 'CRT31K',\n",
+         "EXTRA = {'SNDBOARD', 'NP2NETSOCK', 'E_RESUME', 'CRT31K',\n",
          "shared transform identity control (must stay GREEN)"),
-        ("EXTRA = {'SNDBOARD', 'NP2NETSOCK', 'E_RESUME', 'CRT31K'}",
-         "ALLOWED['CRT31K'] = ('true', 'false')\nEXTRA = {'SNDBOARD', 'NP2NETSOCK', 'E_RESUME'}",
+        ("EXTRA = {'SNDBOARD', 'NP2NETSOCK', 'E_RESUME', 'CRT31K',\n",
+         "ALLOWED['CRT31K'] = ('true', 'false')\nEXTRA = {'SNDBOARD', 'NP2NETSOCK', 'E_RESUME',\n",
          "CRT31K moved to ALLOWED breaks old fixtures and receipts"),
         ("elif key in ('E_RESUME', 'CRT31K'):",
          "elif key == 'E_RESUME':",

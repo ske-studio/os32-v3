@@ -5,8 +5,10 @@ Real kdebug/crt_diag.c, independent I/O shim and protected 1MB BIOS memory.
 Run: python3 -B tools/tests/test_crt_diag.py [--mutate]
 """
 CHECK = dict(name='crt-diag-host', tier=1,
-    covers=['kdebug/generated/**', 'arch/x86/legacy/v86_mem.h', 'kdebug/crt_diag.c', 'init/kernel.c', 'init/bootlog.c', 'tools/tests/crt_diag_host.c', 'tools/tests/crt_diag_hostshim/io.h', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py'],
-    needs=[], budget=3.5)
+    covers=['kdebug/generated/**', 'platform/pc98/legacy/v86_mem.h', 'kdebug/crt_diag.c', 'platform/pc98/kernel.c', 'init/bootlog.c', 'tools/tests/crt_diag_host.c', 'tools/tests/crt_diag_hostshim/io.h', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py'],
+    needs=[], budget=3.5,
+    kind='characterization',
+)
 
 from kernel_includes import include_flags
 import os

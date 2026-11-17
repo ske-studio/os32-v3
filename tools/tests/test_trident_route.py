@@ -11,7 +11,9 @@ CHECK = dict(name='trident-route', tier=1, needs=[], budget=9.1,
             'tools/tests/trident_route_host.c',
             'tools/tests/trident_device_fake.c', 'tools/tests/trident_device_fake.h',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
-            'build/config.mk', 'include/types.h', 'include/memmap.h', 'gfx/palette.h'])
+            'build/config.mk', 'include/types.h', 'include/memmap.h', 'gfx/palette.h'],
+    basis=['TRIDENT_S3_DESIGN §1', 'TRIDENT_S3_DESIGN §3'],
+)
 
 import argparse
 import os

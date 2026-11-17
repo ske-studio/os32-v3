@@ -1,13 +1,16 @@
 """A8 real link.c TX/credit/tick deadline integration, libc-free ILP32."""
 CHECK = dict(name='hostsvc-link-core', tier=1, needs=[], budget=3.7,
-    covers=['net/link_notify.c', 'net/link_notify.h', 'net/host_mailbox.h',
-            'sdk/include/os32/os32_host_notice.h', 'net/link.c', 'net/nic.h', 'net/link.h', 'net/link_host_api.inc',
+    covers=['kernel/time/tick_clock.h', 'kernel/irq/irq.h', 'kernel/irq/irq_math.h',
+            'include/platform_irq.h', 'platform/pc98/platform_irq_limits.h', 'tools/tests/link_platform_fake/platform_link_inline.h', 'net/link_notify.c', 'net/link_notify.h', 'net/host_mailbox.h',
+            'sdk/include/os32/os32_host_notice.h', 'net/link_platform.h', 'platform/pc98/platform_link_inline.h', 'platform/pc98/link_platform.c', 'net/link.c', 'net/nic.h', 'net/link.h', 'net/link_host_api.inc',
             'net/link_rx.inc', 'net/link_selftest.inc', 'lib/le_internal.h',
             'include/types.h', 'include/net_eth.h', 'include/kprintf.h',
             'lib/kstring.h', 'drivers/net/ne2000/ne2000.h',
             'sdk/include/os32/os32_kapi_shared.h', 'build/config.mk',
             'tools/tests/kernel_includes.py', 'tools/tests/host32.py',
-            'tools/tests/hostsvc_link_core_host.c'])
+            'tools/tests/hostsvc_link_core_host.c'],
+    basis=['docs/design/net/nic.md 装置の選択と寿命', 'docs/design/net/link_host_api.md 誤りの意味', 'AC-NET-1', 'AC-NET-3'],
+)
 import argparse
 from pathlib import Path
 import shutil
@@ -20,8 +23,12 @@ ANCHOR = '    link_host_deadlines();'
 
 
 MUTATIONS = (
+    ('net/link.c', 'e->window_ms != tick_clock_ms()', 'e->window_ms != link_platform_now()'),
+    ('net/link.c', '(!e->window_sent || e->window_ms != tick_clock_ms() ||\n             e->window_credit != link_credit_pages())', '1'),
+    ('net/link.c', 'e->window_credit != link_credit_pages()', '0'),
+    ('net/link_host_api.inc', '        e->window_sent = 0;', '        e->window_sent = 1;'),
     ('net/link_host_api.inc', '            e->rel_tick = e->last_tx_tick;',
-     '            e->rel_tick = tick_count;'),
+     '            e->rel_tick = link_platform_now();'),
     ('net/link_host_api.inc', '        e->rel_pending = 1;\n        e->rel_rid = e->rid;',
      '        e->rel_pending = 0;\n        e->rel_rid = e->rid;'),
     ('net/link_host_api.inc', '            e->rel_interval = LINK_PROBE_TICKS;',
@@ -38,7 +45,7 @@ MUTATIONS = (
     ('net/link_rx.inc', 'if (seq == e->ack_seq + 1)', 'if (seq >= e->ack_seq)'),
     ('net/link_rx.inc', 'if (rid != LINK_NOTIFY_RID)', 'if (0 && rid != LINK_NOTIFY_RID)'),
     ('net/link_rx.inc', 'int extended = plen == LINK_HELLO_ES_EXT_LEN;', 'int extended = plen == LINK_HELLO_ES_EXT_LEN && 0;'),
-    ('net/link.c', '    link_notify_tick(tick_count);', ''),
+    ('net/link.c', '    link_notify_tick(link_platform_now());', ''),
     ('net/link.c', '    link_notify_reset();', ''),
 )
 
@@ -54,10 +61,10 @@ def build(folder, mutant=None):
         core.write_text(source.replace(anchor, replacement))
     exe = folder / 'probe'
     subprocess.run(['gcc', '-std=gnu11', '-m32', '-march=i386', '-O2',
-        '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-nostdlib', '-static',
+        '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-nostdinc', '-nostdlib', '-static',
         '-fno-pie', '-no-pie', '-fno-stack-protector', '-ffunction-sections',
         '-fdata-sections', '-Wl,--gc-sections', '-I' + str(folder),
-        *include_flags(ROOT), str(ROOT / 'tools/tests/hostsvc_link_core_host.c'),
+        '-I' + str(ROOT / 'tools/tests/link_platform_fake'), *include_flags(ROOT), str(ROOT / 'tools/tests/hostsvc_link_core_host.c'),
         '-o', str(exe)], check=True)
     return exe
 

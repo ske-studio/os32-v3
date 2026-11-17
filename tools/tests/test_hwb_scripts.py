@@ -10,7 +10,10 @@ CHECK = dict(name='hwb-scripts-host', tier=1, budget=35.0, needs=[], covers=[
     'tools/tests/kernel_includes.py', 'tools/tests/mutpar.py',
     'userland/tests/hw/trident_mode.hwb', 'userland/shell/hwb_exec.c',
     'userland/shell/hwb_log.c', 'tools/tests/hwb_scripts_host.c',
-    'userland/tests/hw/gf_regs.hwb', 'userland/tests/hw/hpt370_probe.hwb', 'userland/tests/hw/gf_palette.hwb', 'userland/tests/hw/tri_w32.hwb', 'userland/tests/hw/tri_burst.hwb', 'userland/tests/hw/tri_burst2.hwb', 'userland/tests/hw/tri_burst3.hwb', 'userland/tests/hw/tri_burst4.hwb', 'userland/tests/hw/tri_burst5.hwb', 'userland/tests/hw/tri_burst6.hwb'])
+    'userland/tests/hw/gf_regs.hwb', 'userland/tests/hw/hpt370_probe.hwb', 'userland/tests/hw/gf_palette.hwb', 'userland/tests/hw/tri_w32.hwb', 'userland/tests/hw/tri_burst.hwb', 'userland/tests/hw/tri_burst2.hwb', 'userland/tests/hw/tri_burst3.hwb', 'userland/tests/hw/tri_burst4.hwb', 'userland/tests/hw/tri_burst5.hwb', 'userland/tests/hw/tri_burst6.hwb'],
+    basis=['HW_BASIC_DESIGN §7'],
+    env_limit='偽I/Oでparserと記録順を確認するが、実GDC/Tridentの復元とFAC writeの効果は保証しない。',
+)
 import json
 import os
 from pathlib import Path

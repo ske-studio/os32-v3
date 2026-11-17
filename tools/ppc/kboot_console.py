@@ -9,7 +9,7 @@ import tempfile
 CHECK = dict(name='ppc-kboot-console', budget=5, needs=[], covers=[
     'platform/powermac/kboot_console.c', 'platform/powermac/log.c',
     'platform/powermac/kboot_log.h', 'platform/powermac/escc.c',
-    'platform/powermac/ofw.h', 'platform/powermac/ppc_layout.h',
+    'platform/powermac/ofw.h', 'platform/powermac/platform_of_layout.h',
     'arch/ppc/ppc_boot.h', 'include/console.h', 'include/kprintf.h',
     'include/types.h', 'include/callconv.h', 'lib/kstring.h',
     'lib/kstring_c.c', 'lib/kprintf.c', 'sdk/include/os32/os32_kapi_shared.h',

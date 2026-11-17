@@ -2,7 +2,9 @@
 """Run the actual ime info printer against byte-sliced metadata."""
 CHECK = dict(name='ime-info', tier=1, needs=[], budget=2.8, covers=[
     'tools/tests/test_ime_info.py', 'userland/cmds/ime_info.inc',
-    'sdk/include/os32/**'])
+    'sdk/include/os32/**'],
+    basis=['docs/design/kernel/ime/ime_dict_info.md 表示'],
+)
 import argparse
 from pathlib import Path
 import subprocess

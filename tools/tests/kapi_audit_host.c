@@ -1,3 +1,7 @@
+#include "kbd_capture_fixture_host.h"
+#include "../../input/hal/legacy_ring.c"
+#include "../../input/hal/legacy_mode.c"
+#include "../../kernel/input_legacy.c"
 /* Compile real console/FM/serial/kbd/IME bodies and the rshell wrapper.
  * Replace device I/O, scheduler landings and dictionary storage. */
 #include "types.h"
@@ -10,6 +14,8 @@ bool geforce_fg_due(u32 now) { (void)now; return false; }
 #include "os32_kapi_shared.h"
 int services_public = 1;
 void geforce_foreground_poll(void) { }
+/* No device callbacks are registered in this boundary fixture. */
+void idle_work_run(void) { }
 volatile u32 services_boot_fault;
 static unsigned ports, waits, abort_checks, request_wait=3, opn_reg, last_key;
 static volatile int user, escaped;
@@ -87,6 +93,7 @@ static int injected_byte = -1;
 u32 kbd_inject_pending(void) { return injected_byte >= 0; }
 int kbd_inject_peek(u8 *out) { if (injected_byte < 0) return 0; *out = (u8)injected_byte; return 1; }
 void appslot_poll_yield_reset(void) {}
+#include "input_wait_source.inc"
 #include "kbd_source.inc"
 #include "../../platform/pc98/ime_display.c"
 #include "ime_source.inc"
@@ -232,7 +239,7 @@ static void input_wait(void)
 {
     if (input_wake && waits == 1) {
         if (kbd_gui_mode) injected_byte='A';
-        else { kbd_head=0; kbd_count=1; kbd_buf[0]=('A' | (KEY_RETURN << 8)); }
+        else { legacy_cooked_flush(); legacy_cooked_push('A' | (KEY_RETURN << 8)); }
     }
 }
 static int input_call(void)
@@ -248,7 +255,7 @@ static int test_input(void)
 {
     for (input_kind=0; input_kind<4; input_kind++) {
         int value;
-        user=1; kbd_gui_mode=0; rshell_active=0; kbd_count=0;
+        user=1; kbd_gui_mode=0; rshell_active=0; legacy_cooked_flush();
         g_ime.mode=IME_MODE_OFF; g_ime.commit_len=g_ime.commit_pos=0;
         waits=abort_checks=0; escaped=abort_requested=stop_requested=stop_on_wait=0;
         if (!__builtin_setjmp(jump)) (void)input_call();
@@ -276,17 +283,17 @@ static int test_input(void)
         CHECK(value==(input_kind==0 || input_kind==2 ? 'A' : ('A' | (KEY_RETURN << 8))),
               "trusted input value");
         input_wake=0; wait_hook=0; stop_on_wait=abort_requested=stop_requested=0;
-        user=1; kbd_head=0; kbd_count=1; kbd_buf[0]='B'; waits=0;
+        user=1; legacy_cooked_flush(); legacy_cooked_push('B'); waits=0;
         CHECK(input_call()=='B' && !waits, "input ready");
         /* Actual empty wait followed by delayed input, for every public entry
          * in CUI and the GUI fallback. A successful normal GUI park is above. */
         for (int gui=0; gui<2; gui++) {
-            kbd_gui_mode=sink=gui; kbd_count=0; injected_byte=-1;
+            kbd_gui_mode=sink=gui; legacy_cooked_flush(); injected_byte=-1;
             waits=abort_checks=0; escaped=abort_requested=stop_requested=stop_on_wait=0;
             input_wake=1; wait_hook=input_wait;
             value=input_call();
             CHECK(value==(gui || input_kind==0 || input_kind==2 ? 'A' : ('A' | (KEY_RETURN << 8))) &&
-                  waits==2 && !abort_checks && !escaped && !kbd_count && injected_byte<0,
+                  waits==2 && !abort_checks && !escaped && !legacy_cooked_pending() && injected_byte<0,
                   "raw delayed CUI/GUI input completes once");
         }
         input_wake=0; wait_hook=0; kbd_gui_mode=sink=0;
@@ -294,7 +301,7 @@ static int test_input(void)
     for (input_kind=0; input_kind<4; input_kind++) {
         int value=-2;
         user=1; abort_requested=stop_requested=1; escaped=0;
-        input_wake=1; wait_hook=input_wait; waits=abort_checks=0; kbd_count=0;
+        input_wake=1; wait_hook=input_wait; waits=abort_checks=0; legacy_cooked_flush();
         g_ime.mode=IME_MODE_OFF; g_ime.commit_len=g_ime.commit_pos=0;
         if (!__builtin_setjmp(jump)) {
             switch (input_kind) {
@@ -308,7 +315,7 @@ static int test_input(void)
               "internal keyboard and IME do not abort USER syscall");
     }
     input_wake=0; wait_hook=0; abort_requested=stop_requested=0;
-    user=0; rshell_active=1; kbd_count=ser_count=0; waits=abort_checks=0;
+    user=0; rshell_active=1; legacy_cooked_flush(); ser_count=0; waits=abort_checks=0;
     tick_count=(u32)-1000; rshell_wait_fixture=1;
     CHECK(wrap_kbd_getchar()==' ' && waits==6000 && tick_count==(u32)2000 && !abort_checks,
           "trusted rshell timeout after 30 seconds across tick wrap");
@@ -323,7 +330,7 @@ static int test_input(void)
     g_ime.mode=IME_MODE_HIRAGANA; g_ime.state=IME_ST_CONVERT;
     g_ime.result_count=1; g_ime.candidate_idx=0;
     g_ime.results[0].kanji[0]='K'; g_ime.results[0].kanji[1]=0;
-    user=1; kbd_gui_mode=0; kbd_count=0; stop_requested=1; abort_requested=0;
+    user=1; kbd_gui_mode=0; legacy_cooked_flush(); stop_requested=1; abort_requested=0;
     sink=1; kbd_gui_mode=1;
     CHECK(wrap_ime_getkey()==-1 && g_ime.state==IME_ST_CONVERT && g_ime.result_count==1,
           "GUI STOP preserves WM composition");
@@ -343,7 +350,7 @@ static int test_input(void)
     }
     abort_requested=0;
     /* gui=0 nested child ignores WM STOP and continues to real input. */
-    wait_slot.gui=0; input_wake=1; wait_hook=input_wait; waits=0; kbd_count=0;
+    wait_slot.gui=0; input_wake=1; wait_hook=input_wait; waits=0; legacy_cooked_flush();
     CHECK(wrap_kbd_getchar()=='A' && waits==2, "gui=0 ignores pending WM STOP");
     wait_slot.gui=1; input_wake=0; wait_hook=0;
     g_ime.mode=IME_MODE_OFF; g_ime.state=IME_ST_INPUT; stop_requested=0;
@@ -552,8 +559,13 @@ static int test(void)
 }
 void _start(void)
 {
+    input_legacy_register(&kbd_legacy_provider);
     pc98_d2_bind();
     int rc=test();
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc) : "memory");
     __builtin_unreachable();
 }
+
+int con_sink_capture_active(void) { return 0; }
+
+void idle_wait_step(void) { idle_work_run(); _halt(); }

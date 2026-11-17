@@ -163,6 +163,8 @@ static void test(void)
     }
     if (scenario==16) ac=3;
     if (scenario==17) tuple(reg,1,1,0,0);
+    /* G4 PowerMac3,5: empty DIMM banks are listed with size 0 and skipped. */
+    if (scenario==25) { tuple(reg+8,1,1,0x8000000,0); tuple(reg+16,1,1,0x8000000,0); rn=24; }
     emit("reached=A1\n");
     const struct pm_kboot_info *p=pm_kboot_capture(0);
     REQUIRE(!expected_stop);

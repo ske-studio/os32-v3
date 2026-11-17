@@ -24,8 +24,10 @@ ATAPI_READ_MAX_SECTORS を 32 にした版 (1 回の転送が 64KB = byte count 
 ない変異) は SURVIVED でなければならない。
 """
 CHECK = dict(name='cd-read-host', tier=1,
-    covers=['platform/pc98/boot_capture.c', 'fs/isofs/iso9660_media.c', 'fs/isofs/iso9660_media.h', 'fs/isofs/iso9660_dir_record.inc', 'tools/tests/cd_read_host_multiple_reset.inc', 'fs/isofs/iso9660.h', 'tools/tests/cd_read_host_pio.inc', 'drivers/ata/atapi_pio.inc', 'fs/isofs/iso9660_dir_read.inc', 'tools/tests/cd_read_host_dir.inc', 'tools/tests/mutpar.py', 'drivers/ata/atapi.c', 'drivers/ata/atapi.h', 'kernel/time/cpu_calibrate.h', 'fs/isofs/iso9660.c', 'tools/tests/cd_pkg_host.c', 'tools/tests/cd_read_host.c', 'userland/lib/rt/pkg.c', 'drivers/ata/cd_body.c', 'drivers/ata/cd_module.h', 'kernel/module/module_runtime.h', 'kernel/module/module_image.h', 'kernel/module/module_schema.h', 'fs/vfs.h', 'drivers/base/dev.h', 'init/kernel.c', 'fs/vfs.c', 'drivers/base/dev.c', 'drivers/block/disk.h', 'drivers/block/fdc.h', 'drivers/block/fdc_decide.h', 'include/console.h', 'include/kbd.h', 'include/pc98.h', 'include/types.h', 'lib/kstring.h', 'tools/tests/atapi_hostshim/io.h', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'include/ide_contract.h', 'include/platform_device.h', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py'],
-    needs=[], budget=20.3)
+    covers=['platform/pc98/boot_capture.c', 'fs/isofs/iso9660_media.c', 'fs/isofs/iso9660_media.h', 'fs/isofs/iso9660_dir_record.inc', 'tools/tests/cd_read_host_multiple_reset.inc', 'fs/isofs/iso9660.h', 'tools/tests/cd_read_host_pio.inc', 'drivers/ata/atapi_pio.inc', 'fs/isofs/iso9660_dir_read.inc', 'tools/tests/cd_read_host_dir.inc', 'tools/tests/mutpar.py', 'drivers/ata/atapi.c', 'drivers/ata/atapi.h', 'kernel/time/cpu_calibrate.h', 'fs/isofs/iso9660.c', 'tools/tests/cd_pkg_host.c', 'tools/tests/cd_read_host.c', 'userland/lib/rt/pkg.c', 'drivers/ata/cd_body.c', 'drivers/ata/cd_module.h', 'kernel/module/module_runtime.h', 'kernel/module/module_image.h', 'kernel/module/module_schema.h', 'fs/vfs.h', 'kernel/dev/dev.h', 'platform/pc98/kernel.c', 'fs/vfs.c', 'drivers/base/dev.c', 'drivers/block/disk.h', 'drivers/block/fdc.h', 'drivers/block/fdc_decide.h', 'include/console.h', 'include/kbd.h', 'include/pc98.h', 'include/types.h', 'lib/kstring.h', 'tools/tests/atapi_hostshim/io.h', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'include/ide_contract.h', 'include/platform_device.h', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py'],
+    needs=[], budget=20.3,
+    kind='characterization',
+)
 
 from kernel_boot_source import kernel_parts, kernel_source
 from kernel_includes import include_flags
@@ -42,10 +44,10 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 READ_HARNESS = "tools/tests/cd_read_host.c"
 PKG_HARNESS = "tools/tests/cd_pkg_host.c"
 SHIM = "tools/tests/atapi_hostshim"
-TREE_FILES = ["platform/pc98/boot_capture.c", "tools/tests/cd_read_host_multiple_reset.inc", 'drivers/ata/atapi_pio.inc', 'fs/isofs/iso9660_dir_read.inc', "include/platform_device.h", "include/ide_contract.h", "init/kernel.c", "drivers/ata/cd_body.c", "drivers/ata/cd_module.h",
+TREE_FILES = ["platform/pc98/boot_capture.c", "tools/tests/cd_read_host_multiple_reset.inc", 'drivers/ata/atapi_pio.inc', 'fs/isofs/iso9660_dir_read.inc', "include/platform_device.h", "include/ide_contract.h", "platform/pc98/kernel.c", "drivers/ata/cd_body.c", "drivers/ata/cd_module.h",
               "fs/isofs/iso9660_dir_record.inc",
               "fs/vfs.c", "fs/vfs.h", "fs/vfs_device.h",
-              "platform/pc98/boot_names.c", "platform/pc98/boot_names.h", "drivers/ata/ide.h", "drivers/base/dev.c", "drivers/base/dev.h",
+              "platform/pc98/boot_names.c", "platform/pc98/boot_names.h", "drivers/ata/ide.h", "drivers/base/dev.c", "kernel/dev/dev.h",
               "drivers/ata/atapi.c", "drivers/ata/atapi.h", "fs/isofs/iso9660.c", "fs/isofs/iso9660.h", "fs/isofs/iso9660_media.c", "fs/isofs/iso9660_media.h",
               "userland/lib/rt/pkg.c", "userland/lib/rt/pkg.h",
               READ_HARNESS, "tools/tests/cd_read_host_dir.inc", "tools/tests/cd_read_host_pio.inc", PKG_HARNESS, SHIM + "/io.h"]
@@ -94,7 +96,7 @@ REBUILD = {
     "fs/isofs/iso9660_dir_read.inc": ("read", "wide"),
     "fs/isofs/iso9660_dir_record.inc": ("read", "wide"),
     "drivers/ata/cd_body.c": ("read", "wide"),
-    "init/kernel.c": ("read", "wide"),
+    "platform/pc98/kernel.c": ("read", "wide"),
     "fs/vfs.c": ("read", "wide"),
     "platform/pc98/boot_names.c": ("read", "wide"),
     "drivers/base/dev.c": ("read", "wide"),
@@ -545,7 +547,7 @@ MUTATIONS = [
      "SRST の行の limit= に PACKET の上限を出す (31 秒を待ったのに 10s と出る)"),
     ("drivers/ata/cd_body.c", r"    if \(rc\) \{", "    if (rc) { return 0;",
      "R1: 空トレイで cd0 を登録せず後挿入 sys_mount が失敗"),
-    ("init/kernel.c", r"            if \(!d->sect_size \|\| !d->total_sects\) continue;",
+    ("platform/pc98/kernel.c", r"            if \(!d->sect_size \|\| !d->total_sects\) continue;",
      "            if (0) continue;", "R2: 未 attach/容量なし装置も自動 mount"),
     ("fs/vfs.c", r"(int vfs_dev_parse\(const char \*name, int \*dev_type, int \*dev_id\)\n\{)",
      r"\1" + "\n    if (name[0] == 'l' && name[1] == 'o') { *dev_type = VFS_DEV_CD; *dev_id = 0; return VFS_OK; }",

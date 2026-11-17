@@ -2,8 +2,10 @@
 記録: tools/tests/kdebug_init_tdd.md
 """
 CHECK = dict(name='kdebug-init-host', tier=1,
-    covers=['platform/pc98/boot_capture.c', 'platform/pc98/bootinfo_wire.h', 'platform/pc98/bootinfo_native.h', 'kdebug/probe.c', 'kdebug/probe_index.c', 'kdebug/probe_wire.h', 'include/debug_probe.h', 'kdebug/hwb_access.c', 'kdebug/hwb_wire.h', 'drivers/pci/pci_hwb.h', 'exec/exec_hwb.h', 'kdebug/selftest_exec.c', 'exec/ring3_str.h', 'kdebug/selftest_lease.c', 'kernel/module/module_schema.h', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'build/kdebug.mk', 'build/module.ld', 'include/config.h', 'include/types.h', 'include/bootinfo.h', 'include/kprintf.h', 'include/memmap.h', 'kernel/module/module.c', 'kernel/module/module_runtime.c', 'kernel/module/module_runtime.h', 'kernel/module/module.h', 'kernel/module/module_image.c', 'kernel/module/module_image.h', 'mm/pgalloc.h', 'init/sysconfig.h', 'kernel/module/kdebug_imports.def', 'kdebug/nic_trace.c', 'kdebug/nic_trace.h', 'drivers/net/e82557/e82557.h', 'fs/vfs.h', 'tools/tests/nic_trace_host.c', 'kdebug/kdebug_main.c', 'kdebug/tri_command_wire.h', 'kdebug/trident_command_test.h', 'kdebug/trident_command_test.c', 'drivers/video/trident/trident*.h', 'lib/serial_diag.h', 'kdebug/recover.c', 'kdebug/recover_common/*.inc', 'kdebug/recover_plan/*.inc', 'kdebug/recover_gf_stage/*.inc', 'kdebug/recover.h', 'kdebug/recover_profile.c', 'kdebug/recover_gf_locate.c', 'drivers/pci/pci_locate.c', 'drivers/pci/pci_locate.h', 'kdebug/recover_wire.h', 'kdebug/gfinit.h', 'drivers/char/serial.h', 'drivers/char/serial_plan.h', 'kernel/console/display_restore.h', 'kernel/module/kdebug_call.c', 'kdebug/kselftest.c', 'kdebug/kselftest/**', 'kdebug/selftest_internal.h', 'kernel/kselftest.h', 'kdebug/crt_diag.c', 'tools/gen_kdebug_imports.py', 'tools/mkmod.py', 'tools/tests/kdebug_init_host.c', 'kdebug/kpeek.h', 'tools/tests/kdebug_loader_host.c', 'tools/tests/kdebug_init_tdd.md', 'tools/tests/test_mkmod.py', 'tools/tests/host32.py', 'sdk/kapi.json', 'tools/tests/module_image_host.c', 'tools/tests/test_module_image.py', 'kdebug/generated/**', 'kdebug/v86_gcap.c', 'kdebug/v86_gcap_math.c', 'kdebug/kpeek.c', 'init/kernel.c', 'kernel/kselftest_report.c', 'mm/memory_boot.h', 'kdebug/kdebug_window.c', 'kdebug/kdebug_window.h', 'hwdev/generated/hwdev_core.c', 'hwdev/generated/hwdev_contract.h', 'include/hwdev_private.h', 'kernel/module/hwdev_module.h', 'kdebug/recover_virtual.h', 'kdebug/recover_virtual.c', 'kdebug/selftest_kbd_inject.c', 'include/kselftest_probe.h', 'kdebug/recover_cleanup.h', 'kdebug/recover_diag.h', 'include/pci_dev_contract.h', 'include/pci_bind_contract.h', 'include/platform_display.h', 'platform/pc98/display_private.h', 'platform/pc98/display.c', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py'],
-    needs=['make:all'], budget=11.6)
+    covers=['platform/pc98/boot_capture.c', 'platform/pc98/bootinfo_wire.h', 'platform/pc98/bootinfo_native.h', 'kdebug/probe.c', 'kdebug/probe_index.c', 'kdebug/probe_wire.h', 'include/debug_probe.h', 'kdebug/hwb_access.c', 'kdebug/hwb_wire.h', 'drivers/pci/pci_hwb.h', 'exec/exec_hwb.h', 'kdebug/selftest_exec.c', 'exec/ring3_str.h', 'kdebug/selftest_lease.c', 'kernel/module/module_schema.h', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'build/kdebug.mk', 'build/module.ld', 'include/config.h', 'include/types.h', 'include/bootinfo.h', 'include/kprintf.h', 'include/memmap.h', 'kdebug/kdebug_module.c', 'kernel/module/module_runtime.c', 'kernel/module/module_runtime.h', 'kernel/module/module.h', 'kernel/module/module_image.c', 'kernel/module/module_image.h', 'mm/pgalloc.h', 'init/sysconfig.h', 'kernel/module/kdebug_imports.def', 'kdebug/nic_trace.c', 'kdebug/nic_trace.h', 'drivers/net/e82557/e82557.h', 'fs/vfs.h', 'tools/tests/nic_trace_host.c', 'kdebug/kdebug_main.c', 'kdebug/tri_command_wire.h', 'kdebug/trident_command_test.h', 'kdebug/trident_command_test.c', 'drivers/video/trident/trident*.h', 'lib/serial_diag.h', 'kdebug/recover.c', 'kdebug/recover_common/*.inc', 'kdebug/recover_plan/*.inc', 'kdebug/recover_gf_stage/*.inc', 'kdebug/recover.h', 'kdebug/recover_profile.c', 'kdebug/recover_gf_locate.c', 'drivers/pci/pci_locate.c', 'drivers/pci/pci_locate.h', 'kdebug/recover_wire.h', 'kdebug/gfinit.h', 'drivers/char/serial.h', 'drivers/char/serial_plan.h', 'kernel/console/display_restore.h', 'kernel/module/kdebug_call.c', 'kdebug/kselftest.c', 'kdebug/kselftest/**', 'kdebug/selftest_internal.h', 'kernel/kselftest.h', 'kdebug/crt_diag.c', 'tools/gen_kdebug_imports.py', 'tools/mkmod.py', 'tools/tests/kdebug_init_host.c', 'kdebug/kpeek.h', 'tools/tests/kdebug_loader_host.c', 'tools/tests/kdebug_init_tdd.md', 'tools/tests/test_mkmod.py', 'tools/tests/host32.py', 'sdk/kapi.json', 'tools/tests/module_image_host.c', 'tools/tests/test_module_image.py', 'kdebug/generated/**', 'kdebug/v86_gcap.c', 'kdebug/v86_gcap_math.c', 'kdebug/kpeek.c', 'platform/pc98/kernel.c', 'kernel/kselftest_report.c', 'mm/memory_boot.h', 'kdebug/kdebug_window.c', 'kdebug/kdebug_window.h', 'hwdev/generated/hwdev_core.c', 'hwdev/generated/hwdev_contract.h', 'hwdev/hwdev_private.h', 'hwdev/hwdev_module.h', 'kdebug/recover_virtual.h', 'kdebug/recover_virtual.c', 'kdebug/selftest_kbd_inject.c', 'include/kselftest_probe.h', 'kdebug/recover_cleanup.h', 'kdebug/recover_diag.h', 'include/pci_dev_contract.h', 'include/pci_bind_contract.h', 'include/platform_display.h', 'platform/pc98/display_private.h', 'platform/pc98/display.c', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py'],
+    needs=['make:all'], budget=11.6,
+    basis=['KDBG_PROBE_DESIGN §2', '[ABI]'],
+)
 
 from kernel_boot_source import kernel_source as read_kernel_source
 from kernel_includes import include_flags
@@ -155,7 +157,7 @@ def main():
             command([*host, ROOT / 'tools/tests/kdebug_loader_host.c', call_source,
                      module_source, ROOT / 'kernel/module/module_image.c', ROOT / 'kernel/module/module_runtime.c',
                      ROOT / 'kernel/kselftest_report.c', folder / 'loader_exports.c', '-o', exe])
-        build_loader(ROOT / 'kernel/module/module.c')
+        build_loader(ROOT / 'kdebug/kdebug_module.c')
         cases = [('off', 0, 0, 0, image), ('other-config', 2, 0, 0, image),
                  ('running', 1, 0, 1, image)]
         for fail, state in ((1, 2), (2, 8), (3, 8), (4, 7), (5, 7), (6, 8), (7, 5), (8, 10)):
@@ -236,7 +238,7 @@ def main():
                     assert result.returncode == 0, (label, result.returncode)
                 print('PASS loader', label, f'boot pair={boot_pair:08x}', flush=True)
         if '--mutate' in sys.argv or '--mutate-running' in sys.argv:
-            module_source = (ROOT / 'kernel/module/module.c').read_text()
+            module_source = (ROOT / 'kdebug/kdebug_module.c').read_text()
             assignment = '    kdebug.state = KDEBUG_RUNNING;'
             assert module_source.count(assignment) == 1
             without_gate = kernel_source
@@ -262,7 +264,7 @@ def main():
             assert call_source.count(gate) == 1
             mutant = folder / 'kdebug-call-always-nosys.c'
             mutant.write_text(call_source.replace(gate, 'return 0 ?'))
-            build_loader(ROOT / 'kernel/module/module.c', mutant)
+            build_loader(ROOT / 'kdebug/kdebug_module.c', mutant)
             payload = struct.pack('<5I', 0, 0, 0, len(image), pair) + image
             for runner in os.environ.get('HOST32_RUNNERS', 'native qemu').split():
                 result = host32.run([str(exe)], input=payload, runner=runner, capture_output=True)

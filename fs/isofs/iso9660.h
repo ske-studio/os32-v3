@@ -14,7 +14,7 @@
 
 #include "../vfs.h"
 #include "memmap.h"   /* PIT_HZ */
-#include "atapi.h"    /* ATAPI_READ_MAX_SECTORS */
+#include "atapi_contract.h"    /* ATAPI_READ_MAX_SECTORS */
 
 /* ISO 9660 定数 */
 #define ISO_SECTOR_SIZE       2048

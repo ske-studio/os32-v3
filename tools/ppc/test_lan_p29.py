@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Exercise LAN acceptance with synthetic evidence and product mutations."""
 import argparse
+import os
 from pathlib import Path
 import struct
 import sys
@@ -9,10 +10,6 @@ import types
 from unittest.mock import patch
 import kboot_run as meter
 
-CHECK = dict(name='ppc-lan-p29', tier=1, budget=60, needs=[],
-             covers=['tools/ppc/test_lan_p29.py'],
-             inputs=['tools/ppc/test_lan_p29.py', 'tools/ppc/kboot_run.py',
-                     'tools/ppc_lan_host.py', 'tools/ppc/run.py', 'tools/ppc/kboot_mutations.py'])
 
 
 def cases(mod, elf):
@@ -74,7 +71,9 @@ def main():
             mutant = types.ModuleType('mutant')
             exec(compile(source.replace(before, '        return 0\n    for cpu in (['), meter.__file__, 'exec'), mutant.__dict__)
             (Path(tmp)/'lan-skip').touch()
-            with patch.object(sys, 'argv', ['meter', '--elf', str(elf), '--cpu', '7450']), patch.object(mutant, 'accept', return_value=Path(tmp)):
+            # main() reads TMPDIR before calling accept; CI's ppc-compile job has none.
+            with patch.object(sys, 'argv', ['meter', '--elf', str(elf), '--cpu', '7450']), patch.object(mutant, 'accept', return_value=Path(tmp)), \
+                 patch.dict(os.environ, {'TMPDIR': tmp}):
                 assert mutant.main() == 0
             print('RED H:A12 skip-as-pass')
     print('PASS H29')

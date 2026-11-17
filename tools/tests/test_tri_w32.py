@@ -6,7 +6,9 @@ CHECK = dict(name='tri-w32', tier=1, needs=[], budget=8.7, covers=[
     'userland/shell/hwb.h', 'userland/shell/hwb_probe.c', 'userland/shell/hwb_parse.c',
     'userland/shell/hwb_exec.c', 'userland/shell/hwb_log.c',
     'kdebug/probe_wire.h', 'kdebug/hwb_wire.h', 'include/types.h',
-    'sdk/include/os32/os32_kapi_shared.h'])
+    'sdk/include/os32/os32_kapi_shared.h'],
+    kind='characterization',
+)
 import json
 from pathlib import Path
 import tempfile

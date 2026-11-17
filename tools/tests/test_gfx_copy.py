@@ -14,7 +14,9 @@ CHECK = dict(name='gfx-copy-host', tier=1, needs=[], budget=15, covers=[
     'userland/lib/gfx/gfx_direct_internal.h', 'userland/lib/gfx/libgfx_internal.h',
     'userland/lib/gfx/libos32gfx.h', 'sdk/include/os32/**',
     'tools/tests/gfx_copy_host.c', 'tools/tests/test_gfx_copy.py',
-    'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py'])
+    'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py'],
+    basis=['GFX_ACCEL_HAL_DESIGN §3-3'],
+)
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = 'userland/lib/gfx/draw/gfx_copy.c'
 MUTATIONS = tuple((name, SOURCE, old, new) for name, old, new in (

@@ -21,7 +21,10 @@ CHECK = dict(name='gfx2-i1-host', tier=2, needs=['make:all'], budget=60,
             'lib/kstring_c.c', 'lib/dma_contract.c', 'kernel/module/**',
             'kernel/console/display_restore.h',
             'exec/lease.c', 'exec/lease.h', 'exec/appslot.h',
-            'init/kernel.c', 'build/os32.ld', 'userland/tests/gfx2_i1.c', 'userland/deploy.yaml'])
+            'platform/pc98/kernel.c', 'build/os32.ld', 'userland/tests/gfx2_i1.c', 'userland/deploy.yaml'],
+    basis=['HAL_V2_DESIGN §7-4', 'HAL_V2_DESIGN §13-1', 'HAL_V2_DESIGN §13-2'],
+    env_limit='hostでallocator/ledger/PTの回収を確認するが、CPU MMU/deviceがfakeのため旧VAの実アクセス拒否とTLBは保証しない。',
+)
 ROOT = Path(__file__).resolve().parents[2]
 UNITS = ['backend_reg', 'caps', 'surface', 'vram_heap', 'gart', 'lock',
          'fence', 'owner_release', 'map_audit', 'sysmem', 'v1_shim', 'a0_weak']

@@ -60,9 +60,10 @@ def run(runner, mutant=None):
         mocks, calls, stub_calls, bindings, refused_calls, io_refused_calls = [], [], [], [], [], []
         for row in rows:
             ret, name, args, target, wrapper = [row[k] for k in ('result','name','args','target','wrapper')]
-            value = '(void *)0x1234' if '*' in ret else '73'
+            value = '(void *)0x1234' if '*' in ret else '0x3ff8000000000000ULL' if ret == 'u64' else '73'
             result = 'return;' if ret == 'void' else f'return {value};'
-            mocks.append(f'{ret} {target}({args}) {{ CHECK(0); {result} }}')
+            if name != 'column_f64_bits':
+                mocks.append(f'{ret} {target}({args}) {{ CHECK(0); {result} }}')
             mocks.append(f'static {ret} exported_{name}({args}) {{ probe(); {result} }}')
             bindings.append(f'.{name} = exported_{name},')
             argv = ', '.join('0' for _ in args.split(',')) if args != 'void' else ''

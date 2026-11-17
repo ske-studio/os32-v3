@@ -9,7 +9,7 @@ from exec_source import exec_source
 from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
-RESTORE = '        arch_fp_restore(&fp_parent[fp_depth]);\n        ring3_context_restore(&caller_context);\n        _enable();\n        /* 畳み'
+RESTORE = '        arch_fp_restore(&fp_parent[fp_depth]);\n        ring3_context_restore(&caller_context);\n        _enable();\n        io_syscall_resume(launcher_id, io_parent_depth); /* IO_SYSCALL_PARENT */\n        /* 畳み'
 MUTATIONS = (
     ('nested-restore-zero', RESTORE, RESTORE.replace('[fp_depth]', '[0]')),
     ('nested-restore-previous', RESTORE,

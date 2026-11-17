@@ -10,8 +10,7 @@ void gfx_policy_reeval(void) {}
  *  kernel/console/con_sink.c を 1 行も写さずそのまま #include する (模型ではない)。
  *  カーネル帯に要るものは 2 つだけ:
  *    - 割込み禁止区間: ホストは CPL=3 で cli/popfl を実行できないので
- *      CON_SINK_NO_IRQ_LOCK で空の錠に差し替える。守っている不変条件
- *      (「錠の中でしか head/tail/count を動かさない」) はソースの形が同じ。
+ *      arch_io.h の IRQ 状態模型で保存・復元を観測する。
  *    - 所有者: fs/fd_redirect.c の res_owner_get/set をここで持つ。
  *
  *  test_multiapp_model.py と同じ様式 — ホスト ILP32 GNU89 で走らせ、同じ
@@ -20,18 +19,23 @@ void gfx_policy_reeval(void) {}
  * ======================================================================== */
 
 /* ---- カーネル帯の代わり ------------------------------------------------ */
-static int g_owner;
-int  res_owner_get(void)      { return g_owner; }
+#include "io.h"
+static int g_owner, observe_irq, observed_unlocked;
+int res_owner_get(void)
+{
+    if (observe_irq && _irq_enabled()) observed_unlocked++;
+    return g_owner;
+}
 void res_owner_set(int owner) { g_owner = owner; }
 
-/* 実物。CON_SINK_NO_IRQ_LOCK は test_con_sink.py が -D で渡す。 */
+/* 実物。IRQ の模型は include パスで選ぶ。 */
 #include "con_sink.c"
 
 /* ======================================================================== */
 /*  kernel/console/console.c も**実物のまま**取り込む (K6C-2)                        */
 /*                                                                          */
 /*  「シンク有効中は描画関数が TVRAM に触らない」を見るために要るのは 2 つ:  */
-/*    - テキスト VRAM: tvram.h の TVRAM_BASE / TVRAM_ATTR はただの番地       */
+/*    - テキスト VRAM: text_screen.h の TVRAM_BASE / TVRAM_ATTR はただの番地       */
 /*      マクロなので、ホスト配列へ差し替えられる (console.c は                */
 /*      `#define TVRAM_TEXT TVRAM_BASE` で使うだけ)。                        */
 /*    - I/O ポート: CPL=3 では outb が撃てないので、記録するだけの            */
@@ -40,9 +44,9 @@ void res_owner_set(int owner) { g_owner = owner; }
 /*  範囲外なので pragma で黙らせる。番地マクロ以外はカーネルと同じソース。    */
 /* ======================================================================== */
 
-#include "tvram.h"
+#include "text_screen.h"
 #include "tvram_private.h"   /* PC-98 の番地 (第 5 段 C1) */
-/* tvram.h now includes the canonical pc98.h constants. */
+/* text_screen.h now includes the canonical pc98.h constants. */
 #include "pc98.h"
 #include "io.h"
 #include "utf8.h"
@@ -863,7 +867,7 @@ static void capture_init(u32 baud) { if (baud == SYS_SERIAL_BAUD) boot_serial_in
 static const PortOps capture_port = { .init = capture_init };
 const char *bootlog_compose(const char *header, u32 *len)
 { (void)header; *len = 4; return "old\n"; }
-#include "../../init/boot_serial.inc"
+#include "../../platform/pc98/boot_serial.inc"
 
 static void case_boot_serial(void)
 {
@@ -904,11 +908,41 @@ static void case_output_copy(void)
     rshell_active = 0; g_v86 = 0;
 }
 
+/* Both entry IF states and a nested caller must survive the real sink path. */
+static void case_irq_state(void)
+{
+    unsigned int initial, saves, restores, outer;
+    for (initial = 0x46; initial <= 0x246; initial += 0x200) {
+        reset_all();
+        host_arch_if = initial;
+        saves = sink_irq_saves;
+        restores = sink_irq_restores;
+        observe_irq = 1;
+        check(con_sink_capture(CON_SINK_CAPTURE_BEGIN) == 0, "irq begin");
+        check(con_sink_capture(CON_SINK_CAPTURE_BEGIN) == OS32_ERR_BUSY, "irq busy");
+        check(con_sink_capture(CON_SINK_CAPTURE_END) == 0, "irq end");
+        observe_irq = 0;
+        check(sink_irq_saves == saves + 3, "irq saves observed");
+        check(sink_irq_restores == restores + 3, "irq restores observed");
+        check(host_arch_if == initial, "irq flags restored");
+        check(!observed_unlocked && !sink_irq_bad_restore, "irq disabled inside sink");
+    }
+    host_arch_if = 0x246;
+    outer = irq_save();
+    con_sink_enable();
+    con_sink_push_clear();
+    con_sink_disable();
+    check(host_arch_if == (outer & ~X86_EFLAGS_IF), "irq nested caller preserved");
+    irq_restore(outer);
+    check(host_arch_if == outer, "irq outer caller restored");
+}
+
 int main(void)
 {
     con_output_register(&capture_output);
     failures = 0;
     report("con_sink ring (K6C)\n");
+    case_irq_state();
     case_boot_serial();
     case_output_copy();
     case_disabled_is_silent();

@@ -4,18 +4,14 @@ import argparse
 import os
 from pathlib import Path
 import re
+import shutil
 import shlex
 import subprocess
 import tempfile
 
-CHECK = dict(name='ppc-lan-p24c', tier=2, budget=60,
-             covers=['platform/powermac/lan_gem_io.c', 'tools/ppc/test_lan_p24c.py'],
-             inputs=['platform/powermac/lan_boot.h', 'drivers/net/gem/gem.h',
-                     'arch/ppc/kernel_boot.h', 'platform/powermac/kboot_info.h',
-                     'build/ppc-kboot.mk'])
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / 'platform/powermac/lan_gem_io.c'
-PPC = Path(os.environ.get('CROSS_DIR', '/home/hight/opt/cross-ppc')) / 'bin'
+PPC = Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc')) / 'bin'
 
 HARNESS = r'''
 #include "platform/powermac/lan_boot.h"
@@ -69,11 +65,19 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
+    required = [str(PPC / ('powerpc-elf-' + tool))
+                for tool in ('gcc', 'objdump', 'nm')]
+    missing = [tool for tool in required if shutil.which(tool) is None]
+    if missing:
+        required_ppc = os.environ.get('OS32_REQUIRE_PPC') == '1'
+        print(('FAIL' if required_ppc else 'SKIP') +
+              ' p24c: PPC toolchain unavailable: ' + ', '.join(missing))
+        return int(required_ppc)
     original = SOURCE.read_text()
     with tempfile.TemporaryDirectory() as td:
         d = Path(td)
         mk = d / 'flags.mk'
-        mk.write_text('include build/ppc-kboot.mk\nprint-flags:\n\t@echo $(KB_FLAGS)\n')
+        mk.write_text('ARCH := ppc\nPLATFORM := powermac\ninclude Makefile\nprint-flags:\n\t@echo $(KB_FLAGS)\n')
         flags = shlex.split(require(['make', '-s', '-f', str(mk), 'print-flags']))
         def cross(src):
             f = d / 'source.c'; f.write_text(src)

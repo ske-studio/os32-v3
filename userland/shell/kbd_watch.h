@@ -14,8 +14,8 @@
 
 /* 1 行のバッファ長 (NUL 込み)。いちばん長い行でも収まる大きさ。 */
 #define KBDW_LINE_MAX       96
-/* 何秒で打ち切るか。tick は PIT_HZ (include/memmap.h、100Hz) — シェルは
- * memmap.h を引かないので写しを置く (get_tick() / 100 が秒の既存の流儀)。 */
+/* get_tick は物理 IRQ と独立した 100Hz のジフィ。秒への換算に使う。
+ * シェルは memmap.h を引かないので写しを置く。 */
 #define KBDW_TIMEOUT_SEC    30
 #define KBDW_TICK_HZ        100
 #define KBDW_KEY_ESC        0x1B   /* 終了キー (cooked の ASCII) */

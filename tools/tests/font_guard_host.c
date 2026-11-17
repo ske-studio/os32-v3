@@ -1,3 +1,5 @@
+/* No device callbacks are registered in this boundary fixture. */
+void idle_work_run(void) { }
 #include "host_exec_context.h"
 /* Product guard and exec/ISR slices. IRQ/CR3 and nonreturning kernel
  * transitions are modeled; no signal/alternate stack is claimed to model
@@ -9,6 +11,8 @@
 void arch_fp_save(struct arch_fp_context *p) { (void)p; }
 void geforce_foreground_poll(void) {}
 #include "exec.h"
+#include "net/nic.h"
+int net_rx_recent(u32 ms) { (void)ms; return 0; }
 #include "io.h"
 #include "pgalloc.h"
 #include "exec_heap.h"
@@ -31,6 +35,7 @@ volatile u32 ring3_park_reject_count;
 static void *jump[5];
 static u32 fault_vector, fault_address, fault_pc;
 static int fault_seen;
+static u32 io_syscall_suspend(int owner) { (void)owner; return 0; }
 int appslot_cur(void) { return 2; }
 AppSlot *appslot_get(int id) { (void)id; return &app; }
 int appslot_stop_pending(void) { return stop_pending; }

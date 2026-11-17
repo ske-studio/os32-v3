@@ -31,6 +31,7 @@ GREEN のまま通ってしまう変異があれば、その規則を試験が�
 import host32
 import os
 import pathlib
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -398,6 +399,10 @@ if __name__ == "__main__":
             print("EXIT sh_status_host(%s)=%d" % (vname, rc), flush=True)
             failed += rc != 0
 
+            if shutil.which("i386-elf-gcc") is None:
+                # The PPC CI job has no x86 cross; the x86 jobs compile this part.
+                print("SKIP TARGET i386-elf compile (%s): x86 cross absent" % vname, flush=True)
+                continue
             subprocess.run(["i386-elf-gcc", *BASE, *extra, "-O2", "-nostdlib",
                             "-mno-red-zone", "-fcommon", *shim, *INCLUDES,
                             "-c", str(HOST_SRC),

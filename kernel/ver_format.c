@@ -99,8 +99,13 @@ void __attribute__((cold)) ver_format(const VerSnapshot *s, OS32_VerInfo *out)
     ver_end(&b);
 
     b = ver_line(out, VER_DEVICE, "CPU");
-    ver_text(&b, "x86 32-bit PM+Paging; calib=");
+    ver_text(&b, "x86 32-bit; calib=");
     ver_text(&b, s->cpu_measured ? "measured" : "default");
+#ifdef OS32_X87_EMU_LINKED
+    ver_text(&b, s->fpu_present ? "; FPU=hw" : "; FPU=none(emu)");
+#else
+    ver_text(&b, s->fpu_present ? "; FPU=hw" : "; FPU=none");
+#endif
     ver_end(&b);
     b = ver_line(out, VER_DEVICE, "PIC");
     ver_text(&b, "8259A x2; vectors=");

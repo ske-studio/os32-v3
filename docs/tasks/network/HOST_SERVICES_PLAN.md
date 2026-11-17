@@ -68,8 +68,8 @@ Agent は宣言長ぶん受け切ったら RESPONSE を返す。要求ごとに 
 | 212 | `host_close` | `i32 h` | 0 / 負 | 任意の状態から解放し RELEASE を送る (転送 ACK まで再送)。`exec_reclaim_owned` で **owner 回収** (`host_owner_exit`) |
 
 - エラー写像: 送信失敗 `OS32_ERR_IO` (-1)、引数不正 `INVAL` (-9)、未対応 `NOSYS` (-10)、待ち `AGAIN` (-14、K7 で取得済み)、リンク断 (HELLO 再同期中) / 再同期で失効したハンドル `STALE` (-11)、空き無し `FULL`。固有番号は取らない。
-- **カーネル内の駆動**: プロトコルを進めるのは 100Hz の `link_tick` だけ (KAPI は状態を読み書きするだけで待たず、`link_tick` を呼ばない)。反射モード (`LGY98_FLAG_REFLECT`) では `link_tick` を起動しない。GUI 配下のアプリは T8 D8 のポーリング型 (WAIT_POLL) と同じ作法で待つ (`sys_yield` → 再試行)。CUI のコマンドは `sys_halt` ループ。
-- 同期版 `link_service_get()` / L1 / L2 の自己試験は非同期 API の上に書き直す (KAPI にはしない、状態機械を進めるのは `link_tick` だけ)。
+- **カーネル内の駆動**: RX と期限処理は 100Hz の `link_tick` が進め、前景の `host_open`・`host_write` は TX だけを直ちに試す (KAPI は待たず、`link_tick` を呼ばない)。反射モード (`LGY98_FLAG_REFLECT`) では `link_tick` を起動しない。GUI 配下のアプリは T8 D8 のポーリング型 (WAIT_POLL) と同じ作法で待つ (`sys_yield` → 再試行)。CUI のコマンドは `sys_halt` ループ。
+- 同期版 `link_service_get()` / L1 / L2 の自己試験は非同期 API の上に書き直す (KAPI にはしない、RX と期限処理は `link_tick`、前景の open・write は TX だけを直ちに試す)。
 - データフィールド (`sbrk_heap_limit` / `shm_base`) は 0x35C / 0x360 へ移る。全体 clean rebuild (F0 の方針)。
 
 ## 4. 印刷の設計 (Host Agent 側)

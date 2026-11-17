@@ -21,7 +21,7 @@ int sys_time_now(u32 *lo, u32 *hi);
 #include "../../drivers/video/pc98/splash_raster_image.c"
 #include "../../drivers/video/pc98/splash_raster_run.c"
 #include "../../platform/pc98/splash_image.c"
-#include "../../init/boot_splash.c"
+#include "../../platform/pc98/boot_splash.c"
 
 static u8 wire_pixels[OSRI_PIXELS_BYTES];
 static struct OsriImage wire_image;

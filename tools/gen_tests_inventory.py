@@ -180,8 +180,10 @@ def parse_makefiles():
 
 def list_checks():
     """Read the runner's public registry without importing any checks."""
+    # 一覧は文書なので full_only も含めて全部を載せる (CI の CHECK_ROUTINE=1 で抜けないように)。
+    env = {k: v for k, v in os.environ.items() if k != 'CHECK_ROUTINE'}
     return json.loads(subprocess.check_output(
-        [sys.executable, '-B', str(Path(ROOT) / 'tools/checks/run.py'), '--list', '--json'],
+        [sys.executable, '-B', str(Path(ROOT) / 'tools/checks/run.py'), '--list', '--json'], env=env,
         cwd=ROOT, text=True))
 
 
@@ -401,7 +403,7 @@ def ci_targets(rules, targets):
     # The matrix covers every registered check, including full AST scans removed
     # from the cross-free static table. Standalone targets still need explicit CI.
     covered = ({row['target'] for row in list_checks()} & set(targets)
-               if re.search(r'^\s*make\s+(?:-k\s+)?check-fast\b', build, re.M) else set())
+               if re.search(r'^\s*make\s+(?:-k\s+)?check\b', build, re.M) else set())
     for t in targets:
         if re.search(r"\bmake\s+%s\b" % re.escape(t), text):
             covered.add(t)

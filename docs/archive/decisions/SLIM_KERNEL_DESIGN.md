@@ -26,7 +26,7 @@
 
 | 票との差（4件） | 実物・根拠 |
 |---|---|
-| E1: カーネル344KB | `docs/tasks/v3/TASK_SLIM.md:14` に対し `size build/out/kernel.elf`: text=339,219、data=30,519、合計369,738 B（361.07 KiB）。BSS=210,680 Bは別勘定 |
+| E1: カーネル344KB | `docs/archive/v3/TASK_SLIM.md:14` に対し `size build/out/kernel.elf`: text=339,219、data=30,519、合計369,738 B（361.07 KiB）。BSS=210,680 Bは別勘定 |
 | E2: 自己試験42関数 | 同`:19`に対し `nm -S --size-sort build/out/kernel.elf` の `selftest` を含む t/T は27記号13,510 B。本体16本12,912 B、補助等11記号598 B。42本は再現しない |
 | E3: 呼び手はkselftestだけ | 同`:19`に対し `drivers/net/ne2000/lgy98.c:136`→link、`drivers/video/pc98/backend_pegc.c:591`→PEGC。後者は検出結果を決める実動作 |
 | E4: FDへの効果の前提 | 同`:24`のFD節約は構成依存。現物 `images/os32_boot{,144}.img` の全ディレクトリにkdebug.binもhwdev.modも無い。kdebug入りFDの空きとして使ってはいけない |
@@ -208,7 +208,7 @@ import表と既存利用者:
 | 変更 tools/tests/test_{con_sink,kbd_inject,lease,kdebug_imports,kdebug_init}.py と関連fixture | 移植.o・host用接続、旧名互換、生成契約、各10〜60行 |
 | 新規 tools/tests/test_slim_selftest.py | 状態復元・実import経由のデータ/関数番地照合、100〜200行。S4用hostログ基盤は作らない |
 | 変更 tools/check_p2v_allow.txt、tools/tests/memmap_audit_host.c、lease_host.c、test_kapi_layout.py、r1関連fixture | exec試験2本の許可を移植先へ、lease呼先/リンク入力・ソース検査を追従（各5〜30行） |
-| 変更 docs/tasks/v3/TASK_SLIM.md | S3/S4実測・残置・#4結論、各段10行以内。bootソースは変更なし |
+| 変更 docs/archive/v3/TASK_SLIM.md | S3/S4実測・残置・#4結論、各段10行以内。bootソースは変更なし |
 
 ## 7. 受入 → 試験・変異・実装段
 

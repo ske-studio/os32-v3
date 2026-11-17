@@ -17,7 +17,7 @@ CHECK = dict(name='ppc-sb', tier=2, budget=900, needs=[],
              covers=['tools/ppc/sb_run.py', 'tools/ppc/shell_run.py',
                      'tools/mkroot_image.py', 'build/ppc-user.mk',
                      'userland/ppc/fault.c'],
-             inputs=['build/ppc-kboot.mk', 'platform/powermac/cli_boot.c',
+             inputs=['build/targets/ppc-powermac.mk', 'platform/powermac/cli_boot.c',
                      'arch/ppc/kapi_call.c', 'arch/ppc/kernel_trap.c',
                      'tools/ppc/kboot_accept.py', 'tools/ppc/kboot_run.py',
                      'tools/ppc/run.py', 'userland/ppc/hello.c'])
@@ -29,7 +29,9 @@ INPUT = r'''
 #include "kernel_tick.h"
 __attribute__((noinline, noreturn)) void sb_done(void)
 {
-    __asm__ volatile(".globl sb_stop\nsb_stop: b sb_stop");
+    /* MSR[EE]=0 first: a decrementer interrupt must not move the stop PC. */
+    __asm__ volatile("mfmsr 3\n rlwinm 3,3,0,17,15\n mtmsr 3\n isync\n"
+                     ".globl sb_stop\nsb_stop: b sb_stop" ::: "r3", "memory");
     __builtin_unreachable();
 }
 static int sb_getkey(void)
@@ -61,10 +63,10 @@ def serial_accept(elf, cpu, out, expected):
     symbols = {p[2]: int(p[0], 16) for line in command([PREFIX+'nm', '-n', elf]).splitlines()
                if len(p := line.split()) == 3}
     a, b = out/'serial-a.log', out/'serial-b.log'
-    args = ['qemu-system-ppc', '-M', 'mac99', '-cpu', cpu, '-m', '128M', '-smp', '1',
+    args = ['qemu-system-ppc', *(['-g', '800x600x8'] if os.environ.get('PPC_FB') == '1' else []), '-M', 'mac99', '-cpu', cpu, '-m', '128M', '-smp', '1',
             '-accel', 'tcg', '-bios', str(ROM), '-drive', f'file={iso},media=cdrom,id=bootcd',
             '-boot', 'd', '-prom-env', 'boot-device=cd:,\\PPCKERN.ELF',
-            '-prom-env', 'auto-boot?=true', '-nographic', '-serial', 'file:'+str(a),
+            '-prom-env', 'auto-boot?=true', *(['-display', 'none'] if os.environ.get('PPC_FB') == '1' else ['-nographic']), '-serial', 'file:'+str(a),
             '-serial', 'file:'+str(b), '-monitor', 'none', '-qmp', 'stdio', '-no-reboot', '-nic', 'none']
     deadline = time.monotonic()+60
     q = None
@@ -85,7 +87,12 @@ def serial_accept(elf, cpu, out, expected):
                     regs = q.call('human-monitor-command', {'command-line': 'info registers'})
                     (out/'registers.txt').write_text(regs)
                     pc = re.search(r'NIP\s+([0-9a-fA-F]+)', regs)
-                    require(pc and int(pc[1], 16) == symbols['sb_stop'], 'unexpected stop PC')
+                    # Serial bytes precede the local framebuffer redraw. The
+                    # DONE marker is not the stop boundary until that returns.
+                    if not pc or int(pc[1], 16) != symbols['sb_stop']:
+                        q.call('cont')
+                        time.sleep(.01)
+                        continue
                     validate(aa, bb, True)
                     require(ejected, 'CD not ejected')
                     actual = aa.split('SB READY\n', 1)[1]
@@ -124,7 +131,7 @@ def main():
     injected = work/'cli_boot.c'
     injected.write_text(text.replace('enum { CLI_CAT_BYTES', INPUT+'\nenum { CLI_CAT_BYTES')
                         .replace('.getkey = pm_terminal_getkey', '.getkey = sb_getkey'))
-    settings = ['KBOOT_SHELL=1', 'KB_MUT_SRC='+source, 'KB_MUT_FILE='+str(injected)]
+    settings = ['KBOOT_SHELL=1', 'KBOOT_LINK=0', 'KB_MUT_SRC='+source, 'KB_MUT_FILE='+str(injected)]
     elf = build(work/'normal', *settings)
     expected = HELLO+HELLO+FAULT+HELLO
     for cpu in cpus:
@@ -144,7 +151,7 @@ def main():
         for name, src, before, after, transcript in mutations:
             extra = mutant_settings(work, name, src, before, after)
             extra = [s.replace('KB_MUT_', 'KB_MUT_EXTRA_') for s in extra]
-            mutant = build(work/name, *settings, *extra)
+            mutant = build(work/name, 'KBOOT_LINK=0', *settings, *extra)
             serial_accept(mutant, cpus[0], work/(name+'-guest'), transcript)
             require(transcript != expected, 'mutation did not change verdict')
             print('RED '+name+': exact transcript and sb_stop (QEMU rc=0)', flush=True)

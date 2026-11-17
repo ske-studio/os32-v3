@@ -5,7 +5,9 @@ CHECK = dict(name='gfx2-submit-host', tier=1, needs=[], budget=15,
             'exec/exec.h', 'exec/surface_limits.h', 'gfx/gfx.h',
             'sdk/include/os32/**', 'mm/pgalloc.h', 'mm/paging.h', 'mm/physmem.h',
             'tools/tests/gfx2_submit_host.c', 'tools/tests/test_gfx2_submit.py',
-            'tools/tests/host32.py'])
+            'tools/tests/host32.py'],
+    basis=['HAL_V2_DESIGN §5-3', 'HAL_V2_DESIGN §12-1'],
+)
 
 
 def run(ctx):

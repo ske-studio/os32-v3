@@ -1,3 +1,4 @@
+#include "kernel_tick.h"   /* tick_count */
 #include "gfx/v2/gfx2_int.h"
 #include "debug_probe.h"
 #include "geforce_module.h"
@@ -17,7 +18,6 @@
 #include "../../../exec/appslot.h"
 #include "serial_diag.h"
 #include "io.h"
-#include "idt.h"
 #include "time_units.h"
 #include "../../../hwdev/gf/display/api.h"
 #include "leave_log.h"
@@ -75,6 +75,7 @@ static void foreground_deadline_update(const struct gf5_test_ops *ops)
     if ((g->fan.sensor_poll && !g->next_sensor) ||
         (g->fan.mode==GF5_FAN_AUTO && !g->next_auto)) next=now;
     u32 delay=next>now ? (u32)(next-now) : 0;
+    /* tick_count は物理 IRQ と独立した 100Hz のジフィ。 */
     foreground_next_tick=tick+delay/(USEC_PER_SEC/PIT_HZ);
     foreground_deadline_valid=true;
 }
@@ -185,7 +186,8 @@ static int geforce_return(void *opaque)
     struct geforce_platform *p = opaque;
     struct gf_display_context *video = p->device ? p->device->context : 0;
     struct gf_io *leave_io = video ? &video->io : 0;
-    int rc = p->stop ? p->stop() : 0;
+    int rc = p->wc_stop && p->wc_stop() < 0 ? -1 : 0;
+    if (p->stop && p->stop()) rc = -1;
     /* Match backend stop: sample after quiesce, before 98 restore/redraw. */
     geforce_leave_log(leave_io, rc);
     if (pc98_route_to_98()) rc = -1;
@@ -322,6 +324,7 @@ static int geforce_start(struct module_record *r, u32 entry, u32 *exports)
     }
     registered=1;
     if (context.platform) gf_production_set_return(geforce_return, context.platform);
+    if (context.platform && context.platform->wc_start) (void)context.platform->wc_start();
     return 0;
 failed:
     accel_slot=0;
@@ -386,6 +389,9 @@ int geforce_module_load(void)
     if (!rc && !module_exports(geforce_handle)) rc=MODULE_INIT_FAILED;
     if (!rc) gfx_backend_geforce=candidate;
     else {
+        /* module_start can fail after registration, as can module_exports. */
+        if (registered && context.platform && context.platform->wc_stop)
+            (void)context.platform->wc_stop();
         foundation_slot=0;accel_slot=0;
         display_slot=0;display_restore_slot=0;feature5_slot=0;
     }

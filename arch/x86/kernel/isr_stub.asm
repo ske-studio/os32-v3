@@ -108,7 +108,7 @@ extern page_fault_handler
 extern timer_handler
 extern kbd_irq_handler
 extern serial_irq_handler
-extern tick_count
+extern tick_clock_step
 extern mouse_irq_handler
 extern v86_reflect_irq
 extern v86_tick_and_check_timeout
@@ -242,7 +242,51 @@ ISR_NOERR_V86 3                ;; #BP ブレークポイント
 ISR_NOERR_V86 4                ;; #OF オーバーフロー
 ISR_NOERR_V86 5                ;; #BR BOUND範囲外
 ISR_NOERR_V86 6                ;; #UD 未定義命令
-ISR_NOERR_V86 7                ;; #NM コプロセッサ不在
+;; #NM alone can resume after emulation. Keep the original segments, including
+;; null selectors, instead of IRETD_USER's replacement with USER_DS.
+extern nm_handler
+global isr_stub_7
+isr_stub_7:
+        cli
+        test    dword [esp + IRET_EFLAGS_OFF], EFLAGS_VM
+        jnz     .from_v86
+        push    0
+        push    7
+        EXC_ENTER
+        pushad
+        push    ds
+        push    es
+        push    fs
+        push    gs
+        RESTORE_KSEG
+        cld
+        push    esp
+        call    nm_handler
+        add     esp, ABI_WORD_BYTES
+        EXC_LEAVE
+        pop     gs
+        pop     fs
+        pop     es
+        pop     ds
+        popad
+        add     esp, ISR_COMMON_SKIP_BYTES
+        iretd
+.from_v86:
+        EXC_ENTER
+        push    0
+        pushad
+        RESTORE_KSEG
+        cld
+        mov     eax, esp
+        push    7
+        push    eax
+        call    v86_fault_handler
+        add     esp, 2 * ABI_WORD_BYTES
+        call    v86_exit_to_kernel
+.hang:
+        cli
+        hlt
+        jmp     .hang
 ISR_ERR   8                    ;; #DF ダブルフォルト
 ISR_NOERR_V86 9                ;; コプロセッサセグメントオーバーラン
 ISR_ERR_V86   10               ;; #TS 無効TSS
@@ -463,6 +507,7 @@ irq_stub_common_%1:
         push    dword %1                ;; IRQ 番号 (ベクタではない)
         call    irq_dispatch
         add     esp, ABI_WORD_BYTES
+        TP_LEAVE %1
         IRQ_LEAVE
         popad
         IRETD_USER
@@ -489,8 +534,9 @@ irq_stub_0:
         RESTORE_KSEG
         cld                     ;; 割り込みの入口は DF を消さない (往復 3 B3)
 
-        ;; tick_count をインクリメント
-        inc     dword [tick_count]
+        call    tick_clock_step
+        test    eax, 1          ;; TICK_STEP_JIFFY
+        jz      .phys_only
 
         ;; Cハンドラを呼び出し
         TP_BEGIN 1
@@ -521,7 +567,13 @@ irq_stub_0:
         call    v86_exit_to_kernel              ;; longjmp するので戻らない
 .no_timeout:
         TP_END 11
-
+        jmp     .done
+.phys_only:
+        TP_BEGIN 9
+        mov     al, OCW2_EOI
+        out     PIC1_CMD, al
+        TP_END 9
+.done:
         IRQ_LEAVE
         TP_LEAVE 0
         popad

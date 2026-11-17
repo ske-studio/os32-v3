@@ -6,16 +6,14 @@ from pathlib import Path
 import subprocess
 import tempfile
 
-CHECK = dict(name='ppc-lan-p19', tier=2, budget=60,
-             covers=['drivers/net/gem/gem_rx.c', 'tools/ppc/test_lan_p19.py', 'tools/ppc/lan_p19_fake.c'],
-             inputs=['drivers/net/gem/gem.h', 'drivers/net/gem/gem_ring.c', 'include/types.h'])
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = [
     ('owned', 'if (flags & GEM_RD_OWN)', 'if (!(flags & GEM_RD_OWN))', 'H:A7 rx-owned'),
     ('producer', '(slot + GEM_RX_PUBLISHED) % GEM_RING_COUNT', 'slot', 'H:golden'),
     ('offset', 'buf[i + 2]', 'buf[i + 0]', 'H:offset'),
     ('crc', '(flags & GEM_RD_BAD_CRC) || ', '', 'H:bad'),
-    ('budget', 'seen < 8', 'seen < 9', 'H:A11 budget'),
+    ('budget', 'u32 b = GEM_RX_SCAN_BUDGET;', 'u32 b = GEM_RX_SCAN_BUDGET + 1;', 'H:A11 budget'),
+    ('budget-decrement', '(*budget)--;', '(void)budget;', 'H:some-budget'),
     ('kick-count', 'g->rx_head % 4 == 0', '1', 'H:kick-count'),
     ('kick-value', '(g->rx_head + GEM_RX_PUBLISHED) & 31', 'g->rx_head', 'H:kick-value'),
     ('postread', 'if (g->io.sync(buf, GEM_BUF_SIZE, DMA_POSTREAD)) return GEM_EIO;', 'if (0) return GEM_EIO;', 'H:buffer-read'),

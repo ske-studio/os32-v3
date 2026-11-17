@@ -89,7 +89,7 @@ def records_case(mod, root):
     warnings = mod.record_warnings(str(root))
     assert len(warnings) == 3 and all('台帳ID' in w for w in warnings), warnings
     write(root, 'docs/POLICY_DEV.md', '<!-- status-vocab:begin -->\n| 語 | 意味 |\n|---|---|\n| 計画 | fixture |\n<!-- status-vocab:end -->\n')
-    write(root, 'docs/tasks/a/TASK_X.md', '状態: 計画\n' + heading + '未確認\n')
+    write(root, 'docs/tasks/a/TASK_X.md', '状態: 計画\n> 完了の基準: fixture\n' + heading + '未確認\n')
     saved = sys.argv
     try:
         for strict, expected in ((False, 0), (True, 1)):
@@ -110,7 +110,7 @@ def records_case(mod, root):
             ledger.unlink()
         else:
             ledger.write_text(content)
-        write(root, 'docs/tasks/a/TASK_X.md', '状態: 計画\n**f5 完了**:\n未確認\n')
+        write(root, 'docs/tasks/a/TASK_X.md', '状態: 計画\n> 完了の基準: fixture\n**f5 完了**:\n未確認\n')
         warnings = mod.record_warnings(str(root))
         assert len(warnings) == 2 and '台帳を読めません' in warnings[0], warnings
         saved = sys.argv

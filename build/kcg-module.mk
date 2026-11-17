@@ -1,7 +1,7 @@
 # T5c-1: reuse T4 function imports, VA0 packing and paired distribution.
 KCG_OUT := $(BUILD_OUT)/kcg
 KCG_GEN := $(addprefix $(KCG_OUT)/,kcg_imports.h kcg_imports.json kcg_import_slots.c kcg_import_stubs.S kcg_provider_types.c kcg_kexports.c)
-KCG_DEF_SOURCES := drivers/video/kcg/kcg_module.h lib/kstring.h include/kprintf.h
+KCG_DEF_SOURCES := drivers/video/kcg/kcg_module.h include/kcg_contract.h lib/kstring.h include/kprintf.h
 $(KCG_GEN) &: tools/gen_sqlite_imports.py tools/gen_kdebug_imports.py tools/prototypes/kcg_imports.def $(KCG_DEF_SOURCES)
 	python3 tools/gen_sqlite_imports.py --module kcg --out-dir $(KCG_OUT)
 

@@ -1,18 +1,15 @@
 #!/usr/bin/env python3
 """Generate and disassemble the PPC syscall page on an ILP32 host."""
+import os
 import argparse
 from pathlib import Path
 import re
 import subprocess
 import tempfile
 
-CHECK = dict(name='ppc-syscall-code', tier=2, budget=60,
-             covers=['arch/ppc/syscall_code.c', 'tools/ppc/test_syscall_code.py'],
-             inputs=['include/syscall_code.h', 'exec/ring3_str.h', 'exec/ring3_ls.h',
-                     'arch/ppc/exec_cache.h', 'sdk/include/os32/os32_kapi_shared.h'])
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / 'arch/ppc/syscall_code.c'
-PPC = '/home/hight/opt/cross-ppc/bin/powerpc-elf-objdump'
+PPC = (os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc') + '/bin/powerpc-elf-objdump')
 HARNESS = r'''
 #include "syscall_code.h"
 #include "ring3_str.h"

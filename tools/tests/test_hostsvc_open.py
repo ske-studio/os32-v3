@@ -10,7 +10,7 @@ import host32
 from kernel_includes import include_flags
 
 CHECK = dict(name='hostsvc-open', tier=1, needs=[], budget=4.0, covers=[
-    'fs/serialfs/serialfs_persistent.c', 'fs/serialfs/serialfs.h',
+    'fs/serialfs/serialfs_persistent.c', 'include/boot_token.h', 'fs/serialfs/serialfs.h',
     'fs/serialfs/serialfs.c', 'fs/serialfs/sfs_client.c', 'fs/serialfs/sfs_client.h',
     'fs/serialfs/sfs_proto.c', 'fs/serialfs/sfs_proto.h',
     'fs/vfs.c', 'fs/vfs.h', 'fs/vfs_device.h',
@@ -22,7 +22,9 @@ CHECK = dict(name='hostsvc-open', tier=1, needs=[], budget=4.0, covers=[
     'tools/tests/kernel_includes.py', 'build/config.mk',
     'include/types.h', 'include/io.h', 'mm/kmalloc.h',
     'lib/crc32.c', 'lib/crc32.h', 'lib/le_internal.h', 'lib/kstring.h',
-    'lib/kstring_asm.asm', 'include/console.h', 'include/memmap.h'])
+    'lib/kstring_asm.asm', 'include/console.h', 'include/memmap.h'],
+    basis=['docs/design/fs/serialfs/serialfs_persistent.md セッションと世代'],
+)
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
     ('no-retry', 'goto open_probe;', 'if (0) { goto open_probe; } return VFS_ERR_STALE;'),

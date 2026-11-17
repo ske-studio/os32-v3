@@ -44,7 +44,8 @@ import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 PROVIDER = 'platform/pc98/gfx_surfaces.c'   # ⑥ の表と手順 (第 5 段 B5 で gfx_core から移った)
-SOURCES = ('gfx/gfx_core.c', PROVIDER, 'mm/paging.c', 'mm/pgalloc.c',
+SELECTOR = 'platform/pc98/gfx_selector.c'
+SOURCES = ('gfx/gfx_core.c', PROVIDER, SELECTOR, 'mm/paging.c', 'mm/pgalloc.c',
            'kernel/sys.c',
            'kdebug/kselftest/gfx_ledger.inc')
 HOST = ROOT / 'tools/tests/gfx_boot_host.c'
@@ -129,7 +130,11 @@ def build(texts, tmp):
         source = source.replace('irq_save()', 'host_irq_save()').replace(
             'irq_restore(flags)', 'host_irq_restore(flags)')
         (tmp / f'{unit}_host_source.c').write_text(source)
-    (tmp / 'gfx_boot_slice.inc').write_text(slice_gfx(gfx_text(texts['gfx/gfx_core.c'], texts[PROVIDER])))
+    selector = texts[SELECTOR]
+    start = selector.index('u32 display_provider_ledger(')
+    end = selector.index('\n}', start) + 2
+    (tmp / 'gfx_boot_slice.inc').write_text(
+        selector[start:end] + '\n' + slice_gfx(gfx_text(texts['gfx/gfx_core.c'], texts[PROVIDER])))
     # Execute the real planar boot assertion before and after owner transfer.
     selftest = texts['kdebug/kselftest/gfx_ledger.inc'].split('static void __attribute__((cold)) test_gfx_ledger(void)', 1)[1]
     start = selftest.index('    check(p &&')
@@ -191,7 +196,7 @@ def text_problems():
         is_gui = k.rindex('if (is_gui) {', 0, to_gshell)
         run_shell = k.index('rc = exec_run(kcg_unavailable')
     except ValueError as e:
-        return problems + ['init/kernel.c: 目印が見つからない (%s)' % e]
+        return problems + ['platform/pc98/kernel.c: 目印が見つからない (%s)' % e]
     if not gfx_cfg < reserve < exec_init:
         problems.append('kernel.c: GFX= の読み取り → gfx_boot_reserve → exec_init の順でない')
     if not is_gui < to_gshell < run_shell:

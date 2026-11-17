@@ -24,9 +24,9 @@
 /*  EOT までのフレームでない部分を出力として出す)。                        */
 /* ======================================================================== */
 #include "serialfs.h"
-#include "serial.h"
-#include "serial_plan.h"      /* SER_TX_OK */
+#include "serial_contract.h"
 #include "io.h"
+#include "kernel/idle_work.h"
 #include "kprintf.h"
 #include "kstring.h"
 #include "appslot.h"            /* APP_ID_SHELL */
@@ -34,7 +34,6 @@
 #include "sfs_lan.h"
 #include "sys.h"
 #include "lan_contract.h"
-#include "lan_module.h"
 #include "sysconfig.h"
 #include "config.h"
 
@@ -67,7 +66,7 @@ static u32 g_lan_rxfull;
 static int sio_put(void *ctx, const u8 *buf, u32 n)
 {
     (void)ctx;
-    return serial_gate_put(buf, n) == SER_TX_OK ? 0 : -1;
+    return serial_gate_put(buf, n) == KAPI_SER_TX_OK ? 0 : -1;
 }
 
 static int sio_get(void *ctx)
@@ -86,7 +85,7 @@ static void sio_idle(void *ctx)
 {
     (void)ctx;
     /* can_wait (IF=1) を確かめてからしか呼ばれない。IF=0 の hlt は起きない */
-    _halt();
+    idle_wait_step();
 }
 
 static int sio_can_wait(void *ctx)

@@ -5,11 +5,22 @@
 #include "arch/ppc/ppc_oea.h"
 #include "lib/kstring.h"
 
-struct entry { struct lan_message req, rsp; };
+#if !KBOOT_LINK
+/* Internal command key; only make_key below knows the legacy envelope. */
+struct request_key {
+    struct pm_diag_message command;
+    u32 request_id;
+    u64 serial, records, bytes;
+    u16 flags;
+    u8 identity[32], kind;
+};
+struct entry { struct request_key req; struct lan_message rsp; };
 static struct entry cache[16];
 static u8 session_mac[6], session_nonce[16];
 static u32 count, next, last;
 static int active;
+
+#endif
 
 static u32 get(const u8 *p, u32 n)
 {
@@ -21,20 +32,35 @@ static void put(u8 *p, u64 v, u32 n)
 {
     while (n) { --n; p[n] = (u8)v; v >>= 8; }
 }
+#if !KBOOT_LINK
 static int equal(const u8 *a, const u8 *b, u32 n)
 {
     while (n--) if (*a++ != *b++) return 0;
     return 1;
 }
-static int same_request(const struct lan_message *a, const struct lan_message *b)
+static void make_key(const struct lan_message *q, struct request_key *key)
 {
-    return equal(a->boot_id,b->boot_id,16) && equal(a->host_nonce,b->host_nonce,16) &&
-        a->seq == b->seq && a->drop_records == b->drop_records &&
-        a->drop_bytes == b->drop_bytes && a->request_id == b->request_id &&
-        a->opcode == b->opcode && a->status == b->status && a->flags == b->flags &&
-        a->type == b->type && a->payload_bytes == b->payload_bytes &&
-        equal(a->payload,b->payload,a->payload_bytes);
+    memset(key, 0, sizeof(*key));
+    key->request_id = q->request_id; key->serial = q->seq;
+    key->records = q->drop_records; key->bytes = q->drop_bytes;
+    key->flags = q->flags; key->kind = q->type;
+    memcpy(key->identity, q->boot_id, 16);
+    memcpy(key->identity + 16, q->host_nonce, 16);
+    key->command.opcode = q->opcode; key->command.status = q->status;
+    key->command.payload_bytes = q->payload_bytes;
+    memcpy(key->command.payload, q->payload, q->payload_bytes);
 }
+static int same_request(const struct request_key *a, const struct request_key *b)
+{
+    return a->request_id == b->request_id && a->serial == b->serial &&
+        a->records == b->records && a->bytes == b->bytes &&
+        a->flags == b->flags && a->kind == b->kind &&
+        equal(a->identity, b->identity, sizeof(a->identity)) &&
+        a->command.opcode == b->command.opcode && a->command.status == b->command.status &&
+        a->command.payload_bytes == b->command.payload_bytes &&
+        equal(a->command.payload, b->command.payload, a->command.payload_bytes);
+}
+#endif
 static int contains(const struct pm_lan_range *r, u32 base, u32 len)
 {
     return base >= r->base && base - r->base < r->size &&
@@ -52,10 +78,11 @@ int pm_lan_copy8(u32 va, u8 *out)
     ppc_irq_restore(flags);
     return rc;
 }
-static void execute(const struct lan_message *q, const struct pm_lan_diag *d,
-                    struct lan_message *r)
+void pm_lan_execute(const struct pm_diag_message *q, const struct pm_lan_diag *d,
+                    struct pm_diag_message *r)
 {
     u32 i, n, off, va, pa, tick, hz;
+    memset(r, 0, sizeof(*r));
     u64 tb, us;
     const struct pm_lan_range *range = 0;
     const u32 *words;
@@ -100,17 +127,20 @@ static void execute(const struct lan_message *q, const struct pm_lan_diag *d,
 bad_range:
     r->payload_bytes = 0; r->status = PLN1_STATUS_RANGE;
 }
+#if !KBOOT_LINK
 int pm_lan_monitor(const struct lan_message *q, const u8 mac[6],
                    const struct pm_lan_diag *d, struct lan_message *r)
 {
     u32 i;
+    struct request_key key;
     if (!q || !mac || !d || !r || q->type != PLN1_TYPE_REQ || q->payload_bytes > 256) return 0;
     if (!active || !equal(mac, session_mac, 6) || !equal(q->host_nonce, session_nonce, 16)) {
         memcpy(session_mac, mac, 6); memcpy(session_nonce, q->host_nonce, 16);
         count = next = last = 0; active = 1;
     }
+    make_key(q, &key);
     for (i = 0; i < count; ++i) if (cache[i].req.request_id == q->request_id) {
-        if (same_request(q, &cache[i].req)) { *r = cache[i].rsp; return 1; }
+        if (same_request(&key, &cache[i].req)) { *r = cache[i].rsp; return 1; }
         memset(r, 0, sizeof(*r)); *r = *q; r->type = PLN1_TYPE_RSP;
         r->payload_bytes = 0; r->status = PLN1_STATUS_CONFLICT; return 1;
     }
@@ -118,8 +148,14 @@ int pm_lan_monitor(const struct lan_message *q, const u8 mac[6],
     memcpy(r->boot_id, q->boot_id, 16); memcpy(r->host_nonce, q->host_nonce, 16);
     r->seq = q->seq; r->request_id = q->request_id; r->opcode = q->opcode; r->type = PLN1_TYPE_RSP;
     if (count && q->request_id <= last) { r->status = PLN1_STATUS_STALE; return 1; }
-    execute(q, d, r);
-    cache[next].req = *q; cache[next].rsp = *r;
+    struct pm_diag_message request = {.opcode = q->opcode, .payload_bytes = q->payload_bytes}, result;
+    memcpy(request.payload, q->payload, q->payload_bytes);
+    pm_lan_execute(&request, d, &result);
+    r->status = result.status; r->payload_bytes = result.payload_bytes;
+    memcpy(r->payload, result.payload, result.payload_bytes);
+    cache[next].req = key; cache[next].rsp = *r;
     next = (next + 1) % 16; if (count < 16) ++count; last = q->request_id;
     return 1;
 }
+
+#endif

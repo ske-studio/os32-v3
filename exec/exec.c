@@ -1,3 +1,4 @@
+#include "kernel/idle_work.h"
 #include "exec_legacy.h"
 #include "exec_font_guard.h"
 #ifdef OS32_R1_FIXTURE
@@ -27,7 +28,7 @@
 #include "paging.h"
 #include "pgalloc.h"
 #include "exec_shlib.h"
-#include "exec_kapi.h"
+#include "arch_exec_kapi.h"
 #include "lease.h"
 #include "fd_redirect.h"
 #include "pipe_buffer.h"
@@ -42,7 +43,7 @@
 #include "exec_kapi_db.h"
 #include "path.h"        /* path_get_drive / path_get_cwd (CPL=3 向けの写し) */
 #include "exec_arch.h"
-#include "exec_cache.h"
+#include "arch_exec_cache.h"
 #include "kapi_call.h"
 #include "ring3_ls.h"
 #include "os32_kapi_slots.h"

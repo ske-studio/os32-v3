@@ -162,7 +162,7 @@ static int exec_launch(const char *cmdline, int gui_arg)
                   os32x_layout_check(hdr, (u32)sz, (u32)KAPI_DATA_FIELDS_OFF);
         if (lrc != OS32X_LAYOUT_OK) {
             if (is_shell) g_layout_reject = 1;
-            kprintf(ATTR_YELLOW, "[exec] %s: %s (bin=%x kernel=%x)\n", path,
+            console_printf(ATTR_YELLOW, "[exec] %s: %s (bin=%x kernel=%x)\n", path,
                     os32x_layout_reason(lrc),
                     (lrc == OS32X_LAYOUT_MISMATCH) ? hdr->kapi_data_off : 0u,
                     (u32)KAPI_DATA_FIELDS_OFF);
@@ -320,6 +320,7 @@ static int exec_launch(const char *cmdline, int gui_arg)
 
     /* ======== setjmp — この ID の呼び出し元へ帰る点 ======== */
     volatile int fp_depth = exec_nest_level;
+    volatile u32 io_parent_depth = 0;
     volatile Ring3CallContext caller_context;
     ring3_context_save(&caller_context);
     if (exec_setjmp(ctx->jmpbuf) != 0) {
@@ -327,6 +328,7 @@ static int exec_launch(const char *cmdline, int gui_arg)
         /* ======== longjmp復帰ポイント ========
          * ローカル変数は当てにできない (setjmp 後に書き換わったものが
          * 復帰側では読めない)。caller_context は setjmp 前から不変。
+         * io_parent_depth は volatile で子 commit 後の深さを保持する。
          *
          * フォルト経由の復帰では例外ゲートが IF をクリアしたまま longjmp
          * してくる (exec_longjmp は EFLAGS を復元しない)。呼び出し元は常に
@@ -335,6 +337,7 @@ static int exec_launch(const char *cmdline, int gui_arg)
         arch_fp_restore(&fp_parent[fp_depth]);
         ring3_context_restore(&caller_context);
         _enable();
+        io_syscall_resume(launcher_id, io_parent_depth); /* IO_SYSCALL_PARENT */
         /* 畳み (終了 / fault / CTRL+STOP) も park も、戻す作業は
          * exec_exit / exec_pending_finish / exec_park で済んでいる。 */
         if (g_longjmp_reason == EXEC_LJ_PARK) {
@@ -392,6 +395,7 @@ static int exec_launch(const char *cmdline, int gui_arg)
             shell_service_retire();
             shell_service_publish(load_base, text_sz);
         } else {
+            io_parent_depth = io_syscall_suspend(launcher_id); /* IO_SYSCALL_CHILD */
             appslot_start_commit(id, gui, need_pages);
             if (want_ring3) exec_owner_diag(ctx, 0, 0, 0);
             /* 暴走判定の起点 (票 T9 §12 S6)。 */

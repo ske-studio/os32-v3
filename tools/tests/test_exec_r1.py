@@ -30,8 +30,8 @@ def landing(s, start, buf, name):
     jump = s.index('    if (exec_setjmp(' + buf + ') != 0)', a)
     b = s.index('\n    }', jump) + len('\n    }')
     return ('static int ' + name + '_body(void) {\n'
-            '    AppSlot *a = &slots[2], *ctx = a; int gui = host_gui;\n'
-            '    (void)ctx; (void)gui;\n'
+            '    AppSlot *a = &slots[2], *ctx = a; int gui = host_gui, launcher_id = 1;\n'
+            '    (void)ctx; (void)gui; (void)launcher_id;\n'
             + s[a:b] + '\n'
             '    simulate(); return 99;\n}\n'
             'static int ' + name + '(void) {\n'
@@ -51,6 +51,10 @@ PRE = r'''
 bool geforce_fg_due(u32 now) { (void)now; return false; }
 
 void geforce_foreground_poll(void) {}
+#include "net/nic.h"
+void idle_work_run(void) {}
+int _irq_enabled(void) { return 1; }
+int net_rx_recent(u32 ms) { (void)ms; return 0; }
 static u32 host_cr3;
 #include "font_guard_inactive.h"
 #include "shell_service_stub_host.h"   /* T7b-b2 S3b: exec.c の結線の弱い贋物 */
@@ -131,6 +135,7 @@ static u8 resident_bytes[4096] __attribute__((aligned(8)));
 static u8 child_heap_bytes[4096] __attribute__((aligned(8)));
 static u32 resident_used, *resident_sentinel;
 void __cdecl kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; die(__LINE__); }
+void __cdecl console_printf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; die(__LINE__); }
 void res_owner_set(int id) { owner = id; }
 static void exec_cpl0_release(void) {}
 int appslot_return_target(int id) { CHECK(id == 2); return slots[id].parent; }
@@ -671,8 +676,8 @@ class ExecR1(unittest.TestCase):
 MUTATIONS = (
     ('x87-kill-restore', '    exec_reclaim_resources(id);\n    exec_teardown_app(a);\n    appslot_reclaim(id);\n    exec_notify_owned(id, EXEC_KIND_ABORTED);',
      '    arch_fp_restore(&a->fp_state);\n    exec_reclaim_resources(id);\n    exec_teardown_app(a);\n    appslot_reclaim(id);\n    exec_notify_owned(id, EXEC_KIND_ABORTED);'),
-    ('x87-launch-landing', '        exec_pending_finish();\n        arch_fp_restore(&fp_parent[fp_depth]);\n        ring3_context_restore(&caller_context);\n        _enable();\n        /* 畳み',
-     '        exec_pending_finish();\n        (void)fp_depth;\n        ring3_context_restore(&caller_context);\n        _enable();\n        /* 畳み'),
+    ('x87-launch-landing', '        exec_pending_finish();\n        arch_fp_restore(&fp_parent[fp_depth]);\n        ring3_context_restore(&caller_context);\n        _enable();\n        io_syscall_resume(launcher_id, io_parent_depth); /* IO_SYSCALL_PARENT */\n        /* 畳み',
+     '        exec_pending_finish();\n        (void)fp_depth;\n        ring3_context_restore(&caller_context);\n        _enable();\n        io_syscall_resume(launcher_id, io_parent_depth); /* IO_SYSCALL_PARENT */\n        /* 畳み'),
     ('x87-resume-landing', '        exec_pending_finish();\n        arch_fp_restore(&fp_parent[fp_depth]);\n        ring3_context_restore(&caller_context);\n        _enable();\n        if (g_longjmp_reason',
      '        exec_pending_finish();\n        (void)fp_depth;\n        ring3_context_restore(&caller_context);\n        _enable();\n        if (g_longjmp_reason'),
     ('stdin-wrong-call', '        arch_syscall_slot(g_cur_frame) != KAPI_SLOT_SYS_READ ||', ''),
@@ -722,8 +727,8 @@ MUTATIONS = (
      '    g_pending_id = id;            /* callback'),
     ('resume-landing-missing', '        exec_pending_finish();\n        arch_fp_restore(&fp_parent[fp_depth]);\n        ring3_context_restore(&caller_context);\n        _enable();\n        if (g_longjmp_reason',
      '        arch_fp_restore(&fp_parent[fp_depth]);\n        _enable();\n        if (g_longjmp_reason'),
-    ('launch-landing-missing', '        exec_pending_finish();\n        arch_fp_restore(&fp_parent[fp_depth]);\n        ring3_context_restore(&caller_context);\n        _enable();\n        /* 畳み',
-     '        arch_fp_restore(&fp_parent[fp_depth]);\n        _enable();\n        /* 畳み'),
+    ('launch-landing-missing', '        exec_pending_finish();\n        arch_fp_restore(&fp_parent[fp_depth]);\n        ring3_context_restore(&caller_context);\n        _enable();\n        io_syscall_resume(launcher_id, io_parent_depth); /* IO_SYSCALL_PARENT */\n        /* 畳み',
+     '        arch_fp_restore(&fp_parent[fp_depth]);\n        _enable();\n        io_syscall_resume(launcher_id, io_parent_depth); /* IO_SYSCALL_PARENT */\n        /* 畳み'),
 )
 
 if __name__ == '__main__':

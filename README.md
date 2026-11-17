@@ -43,7 +43,7 @@ v3 の最低条件は **8MB 機で GUI + 私有 2MB のアプリ** (目標、[V3
   - カーネル帯 3MB + 常駐シェル 1MB の固定帯、カーネル像は圧縮して読み込む
   - **ドライバ・部品の動的読み込み** — SQLite・FEP・CD・漢字 ROM・FM・PCM・V86・LAN・Cirrus を `/boot/*.mod` に分け、像と部品の世代を照合して読み込む
   - 低位 640KB を V86 に渡す、OpenType フォント (字形の整数化・先読みで、実機の 40 字の描画が 300 → 100ms)
-- **KernelAPI v84** — fork のときに 1 回整理し、世代の識別と旧新混在の検査を入れた
+- **KernelAPI v87** — fork のときに 1 回整理し、世代の識別と旧新混在の検査を入れた
 - **実機 (PC-9821Ra266)**
   - 内蔵 **Intel 82557** の LAN ドライバ (OS32 で初めての PCI 装置)。LAN 版 SerialFS で、HDD 起動のままの更新 (`hsync`) がシリアルの約 4 倍に
   - シリアル・LAN 経由のメモリの読み出し (KPEEK)、実機試験を決まった状態へ戻す処理 (realhw_recover)
@@ -61,7 +61,7 @@ v3 の最低条件は **8MB 機で GUI + 私有 2MB のアプリ** (目標、[V3
 - **IDT/PIC** 完全制御 (IRQ再マッピング, ISR ハンドラ)
 - **ページング** + ガードページ による安全なメモリ管理
 - **kmalloc** カーネルメモリアロケータ
-- **KernelAPI v84 (現行値、fork 時点の値ではない)** — 関数表 (容量 300、うち 292 実装) + 固定オフセットのデータ欄による外部プログラムインタフェース
+- **KernelAPI v87 (現行値、fork 時点の値ではない)** — 関数表 (容量 300、うち 294 実装) + 固定オフセットのデータ欄による外部プログラムインタフェース
 - プログラム終了時の**リソース自動回収** (FD, リダイレクト, パイプ, 共有メモリ)
 
 ### ファイルシステム
@@ -163,7 +163,7 @@ os32-v3/
 ├── platform/   — 機種依存実装 (pc98/ に PIC・装置の配線・機種固有 I/O)
 ├── drivers/    — 装置の種類ごとのドライバ (base/ata/block/char/dma/input/pci/net/sound/video)。部品の窓口・本体と表示バックエンドは装置の隣
 ├── gfx/        — 描画 HAL の共通層 (装置別バックエンドは drivers/video/ の下)
-├── fs/         — VFS・fd・パイプの共通層と ext2/fat/isofs/hostdrv/serialfs (FatFs は fat/fatfs/)
+├── fs/         — VFS・fd・パイプの共通層と ext2/fat/isofs/serialfs (FatFs は fat/fatfs/)
 ├── exec/       — プログラムローダー (OS32X)
 ├── kapi/       — KernelAPIラッパー (自動生成)
 ├── kdebug/     — デバッグ・実機試験の部品 (KDEBUG=1 で読み込む)
@@ -194,7 +194,7 @@ os32-v3/
 ```bash
 make all           # カーネル + 全プログラム + SDK + D88イメージ + ISO (apps/game が無くても組める)
 make external      # apps/ + game/ — H-7 の再開決定後だけ (下記参照)
-make check-fast    # ホスト試験と文書・生成物の検査 (変異なし)
+make check-fast    # ホスト試験と文書・生成物の検査 (変異なし。取り込みの関門は GitHub の CI = 変異込み)
 make clean         # クリーン
 make deploy        # HostDrv (C:\os32) へのデプロイ (再起動不要)
 make deploy-kernel # NHDイメージへのデプロイ (要NP21/W再起動)

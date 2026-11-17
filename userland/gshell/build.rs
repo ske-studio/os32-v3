@@ -54,4 +54,26 @@ fn main() {
         output += &format!("pub const {name}: i32 = {value};\n");
     }
     fs::write(PathBuf::from(env::var("OUT_DIR").unwrap()).join("kapi_err.rs"), output).unwrap();
+    // G1: read the LAN operator contract; never duplicate its numeric values.
+    let mut output = String::new();
+    for (file, names) in [
+        ("../../include/remote_control.h", vec!["REMOTE_SVC_GSERIAL", "REMOTE_NOTIFY_EXECUTE", "REMOTE_NOTIFY_PROBE", "REMOTE_GSERIAL_LINE_MAX", "REMOTE_ID8_HEX_DIGITS"]),
+        ("../../net/link.h", vec!["LINK_MAX_PAYLOAD", "LINK_NOTIFY_DATA_MAX"]),
+        ("../../sdk/include/os32/os32_kapi_shared.h", vec!["OS32_ERR_AGAIN", "OS32_ERR_STALE", "OS32_ERR_FULL"]),
+    ] {
+        let header = root.join(file);
+        println!("cargo:rerun-if-changed={}", header.display());
+        let source = fs::read_to_string(header).unwrap();
+        for name in names {
+            let value = source.lines().find_map(|line| {
+                let words: Vec<_> = line.split_whitespace().collect();
+                if words.get(0) == Some(&"#define") && words.get(1) == Some(&name) {
+                    Some(words[2].trim_end_matches(['u', 'U']).parse::<i32>().unwrap())
+                } else { None }
+            }).unwrap_or_else(|| panic!("missing shared constant {name}"));
+            output += &format!("const {name}: i32 = {value};\n");
+        }
+    }
+    fs::write(PathBuf::from(env::var("OUT_DIR").unwrap()).join("remote_control.rs"), output).unwrap();
+
 }

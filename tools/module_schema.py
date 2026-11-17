@@ -64,7 +64,7 @@ COMPONENTS = (
         dependencies=(), required=True,
         module_id=2, phase=CONSTANTS['PHASE_POST_ROOT'],
         required_flags=CONSTANTS["FLAG_PAIR"], allowed_flags=CONSTANTS["FLAG_PAIR"], stop_allowed=0,
-        ops_version=2, ops_slots=1, image_max=524288, mem_max=524288,
+        ops_version=3, ops_slots=1, image_max=524288, mem_max=524288,
         reloc_max=4096, export_max=1, load_span_max=544768,
         init_symbol='sqlite_module_init', imports_symbol='sqlite_import_slots',
         ops_symbol='sqlite_module_ops', ops_names=('initialize',),

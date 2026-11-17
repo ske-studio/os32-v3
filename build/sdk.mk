@@ -10,7 +10,7 @@ SDK_OUT = build/sdk
 
 # 公開ヘッダを SDK に載せるプラットフォームライブラリ。
 # rt/ は "rt/dbgserial.h" 形式で引くので別扱い (下のルール参照)。
-SDK_LIB_HEADER_DIRS = math gfx db ui input asset snd tilemap md filer mgx save ecs cfg
+SDK_LIB_HEADER_DIRS = math gfx db ui input asset snd tilemap md filer mgx save ecs cfg mmtime
 
 # kapi.json の version が KAPI バージョンの唯一の情報源。
 # ヘッダ・Rust バインディング・ドキュメントはすべてここから導出する。
@@ -103,9 +103,9 @@ sdk-dist: sdk
 # — **実物を書き換える試験を列に足さない**。
 #
 # 検査は 3 通りの回し方がある (2026-09-26、docs/08_build.md §8-4)。列と recipe は
-# 共通で、違うのは**変異 (否定側) を回すかどうか**だけ:
+# 共通で、変異 (否定側) の有無と full_only の配置を切り替える:
 #
-#   make check-fast     全部の検査を変異なしで並列に。作業中に何度でも
+#   make check-fast     full_only 以外を変異なしで並列に。
 #   make check-changed  段と当たりで列を選び、当たりだけ変異込み
 #                        (BASE=<ref>、既定は main 等との merge-base)。
 #                       CHECK 宣言と tools/checks/run.py で段と列を選ぶ
@@ -128,9 +128,9 @@ check:
 	@python3 tools/check_tree_unchanged.py --verify par
 
 check-fast:
-	+@$(MAKE) check-prepare
+	+@$(MAKE) check-prepare CHECK_ROUTINE=1
 	@python3 tools/check_tree_unchanged.py --save fast
-	+@$(MAKE) check-par CHECK_NEEDS= MUTATE=0
+	+@$(MAKE) check-par CHECK_NEEDS= MUTATE=0 CHECK_ROUTINE=1
 	@python3 tools/check_tree_unchanged.py --verify fast
 
 # FILES= は明示的な変更なし。取り込みのコード変更は段2以上。
@@ -168,7 +168,7 @@ CHECK_NAMES := $(filter check-%,$(MAKECMDGOALS))
 CHECK_ALL_NEEDS :=
 else
 CHECK_SHARD ?=
-CHECK_REGISTRATION := $(shell python3 -B tools/checks/run.py --make $(if $(CHECK_SHARD),--shard $(CHECK_SHARD)))
+CHECK_REGISTRATION := $(shell CHECK_ROUTINE=$(CHECK_ROUTINE) python3 -B tools/checks/run.py --make $(if $(CHECK_SHARD),--shard $(CHECK_SHARD)))
 ifneq ($(.SHELLSTATUS),0)
 $(error tools/checks/run.py --make failed (make registration))
 endif

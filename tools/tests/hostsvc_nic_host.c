@@ -1,7 +1,12 @@
+#include "kernel/io_policy.h"
+#include "kernel/io_work.h"
+#include "rx_io_clock.h"
 /* A2 NIC unit: real nic.c, fake adapter and A3/link boundaries.
  * No A3 filtering/queues or hardware behavior is claimed by this unit. */
 #include "hostsvc_fixture.h"
 #include "net/nic_rx.h"
+#include "net/rx_work.h"
+#include "kernel/irq/irq.h"
 #include "net/link.h"
 #include "kernel/irq/tick.h"
 #include "platform/pc98/tick_order.h"
@@ -16,8 +21,11 @@ static int polls, demuxes, links, inits, resets[3], bad_if, order, recurse;
 static int tick_rc, registrations;
 static int tick_logs, logged_tick_rc, poll_reentry, poll_reentry_rc;
 static tick_fn callback;
+static void rx_idle(void) { io_request(IO_SVC_NET_RX); (void)io_dispatch(IO_PASS_US); }
+static u32 fake_ms;
+u32 tick_clock_ms(void) { return fake_ms; }
 static u8 seen_peer[6], seen_local[6];
-static int saw_peer;
+static int saw_peer, fg_order;
 u32 link_hello_ok;
 u8 link_peer_mac[ETH_ALEN];
 static u32 pending, rx_calls, rx_head;
@@ -42,7 +50,7 @@ unsigned int nic_test_irq_save(void)
 }
 void nic_test_irq_restore(unsigned int flags) { hs_set_if(flags); }
 static void check_cli(void) { if (hs_if()) bad_if++; }
-void __cdecl kprintf(u8 attr, const char *fmt, ...)
+void __cdecl console_printf(u8 attr, const char *fmt, ...)
 {
     static const char expected[] = "[nic] tick registration failed: %d\n";
     va_list args;
@@ -77,7 +85,8 @@ static int tx(const void *frame, u32 len)
 static int rx(void *out, u32 cap, u32 *len)
 {
     int rc;
-    check_cli(); rx_calls++;
+    if (!hs_if() && !kctx_irq_depth) bad_if++;
+    rx_calls++;
     if (hs_failure_take("nic.rx", &rc)) return rc;
     if (!pending) return OS32_ERR_AGAIN;
     *len = rx_lengths[rx_head];
@@ -92,7 +101,11 @@ static void mac(u8 *out)
     check_cli();
     for (u32 i = 0; i < 6; i++) out[i] = mac_addr[i];
 }
-static void poll(void) { check_cli(); polls++; order = 1; }
+static void poll(void)
+{
+    check_cli(); polls++; order = 1;
+    if (fg_order) { if (fg_order != 1) bad_if++; fg_order = 2; }
+}
 static u32 credit(void) { check_cli(); return 4096; }
 static const struct NetNicOps ops = {tx, rx, mac, poll, credit};
 static const struct NetNicOps broken_ops = {tx, rx, mac, 0, credit};
@@ -140,21 +153,31 @@ int hs_tx_take(void *out, u32 cap, u32 *len)
     return 0;
 }
 void net_rx_reset(u16 protocol) { check_cli(); resets[protocol]++; }
-void net_rx_demux(const struct NetNicOps *nic, const u8 local[6], const u8 peer[6])
+u32 net_rx_demux_budget(const struct NetNicOps *nic, const u8 local[6],
+                         const u8 peer[6], struct rx_work_budget *b)
 {
     u8 buf[(ETH_FRAME_MAX - ETH_FCS_LEN)]; u32 len;
-    check_cli(); demuxes++;
-    if (order != 1) bad_if++;
+    u32 count = 0;
+    if (!hs_if() && !kctx_irq_depth) bad_if++;
+    demuxes++;
+    if (fg_order) { if (fg_order != 2) bad_if++; fg_order = 3; }
+    if (poll_reentry == 2) {
+        poll_reentry = 0;
+        int before = demuxes;
+        if (net_nic_poll_once() != 0 || demuxes != before) bad_if++;
+    }
     order = 2;
     saw_peer = peer != 0;
     for (u32 i = 0; i < 6; i++) {
         seen_local[i] = local[i];
         if (peer) seen_peer[i] = peer[i];
     }
-    for (u32 i = 0; i < NET_RX_SCAN_MAX; i++) {
+    while (rx_work_take(b)) {
         if (nic->rx(buf, sizeof(buf), &len)) break;
+        count++;
         if (len != ETH_ZLEN || buf[ETH_ZLEN - 1] != ETH_ZLEN) bad_if++;
     }
+    return count;
 }
 void link_init(const u8 local[6])
 {
@@ -165,14 +188,19 @@ void link_init(const u8 local[6])
 void link_tick(void)
 {
     check_cli(); links++;
-    if (order != 2) bad_if++;
+    if (fg_order) { if (fg_order != 3) bad_if++; fg_order = 0; }
+    if (order != 1 && order != 2) bad_if++;
     order = 3;
     if (poll_reentry) {
         int old_polls = polls, old_demuxes = demuxes;
         poll_reentry_rc = net_nic_poll_once();
         if (polls != old_polls || demuxes != old_demuxes || hs_if()) bad_if++;
     }
-    if (recurse) net_tick();
+    if (recurse) {
+        int before = polls;
+        net_tick();
+        if (polls != before) bad_if++;
+    }
 }
 static int test(void)
 {
@@ -202,7 +230,7 @@ static int test(void)
     }
     REQUIRE(net_tx(frame, sizeof(frame)) == OS32_ERR_HOSTDOWN); tick_rc = 0;
     REQUIRE(net_start(NET_NIC_AUTO, 0) == 0 && selected == 2);
-    REQUIRE(registrations == 4 && callback == net_tick); /* No link_init registration. */
+    REQUIRE(registrations == 4 && callback == net_jiffy); /* No link_init registration. */
     int saved_inits = inits, saved_acquired = acquired;
     REQUIRE(net_start(NET_NIC_AUTO, 0) == 0);
     REQUIRE(inits == saved_inits && acquired == saved_acquired);
@@ -245,7 +273,7 @@ static int test(void)
     REQUIRE(hs_rx(NET_NIC_E82557, frame, sizeof(frame)) == OS32_ERR_AGAIN);
     int old_links = links, old_polls = polls;
     REQUIRE(net_nic_poll_once() == (int)NET_RX_SCAN_MAX && pending == 0);
-    REQUIRE(polls == old_polls + 1 && links == old_links);
+    REQUIRE(polls == old_polls && links == old_links);
     REQUIRE(saw_peer && equal(seen_peer, peer_addr, 6));
     REQUIRE(equal(seen_local, mac_addr, 6) && hs_if());
     REQUIRE(hs_rx(NET_NIC_E82557, frame, sizeof(frame)) == 0);
@@ -257,9 +285,26 @@ static int test(void)
     REQUIRE(net_mac(out) == 0 && !hs_if());
     REQUIRE(net_rx_credit_bytes() == 4096 && !hs_if());
     REQUIRE(net_nic_poll_once() == 0 && !hs_if()); hs_set_if(1);
+    poll_reentry = 2; net_rx_service();
+    old_links = links; old_polls = polls;
+    fg_order = 1; rx_idle();
+    REQUIRE(!fg_order && !bad_if);
+    REQUIRE(links == old_links + 1 && polls == old_polls + 1);
+    rx_idle();
+    REQUIRE(links == old_links + 1 && polls == old_polls + 1);
+    fake_ms++;
+    rx_idle();
+    REQUIRE(links == old_links + 2 && polls == old_polls + 2);
+    fake_ms++;
+    kctx_irq_depth = 1; rx_idle(); kctx_irq_depth = 0;
+    REQUIRE(links == old_links + 2 && polls == old_polls + 2);
+    hs_set_if(0); rx_idle(); hs_set_if(1);
+    REQUIRE(links == old_links + 2 && polls == old_polls + 2);
+    rx_idle();
+    REQUIRE(links == old_links + 3 && polls == old_polls + 3);
     old_links = links; old_polls = polls; recurse = 1;
     poll_reentry = 1; poll_reentry_rc = -1;
-    callback(); REQUIRE(links == old_links + 1 && polls == old_polls + 1);
+    callback(); REQUIRE(links == old_links + 1 && polls == old_polls + 2);
     REQUIRE(poll_reentry_rc == 0 && !bad_if && hs_if());
     recurse = 0; poll_reentry = 0;
     int sfs = resets[NET_RX_SFS], link = resets[NET_RX_LINK];
@@ -273,6 +318,11 @@ static int test(void)
     net_unbind(); REQUIRE(released == 7);
     /* Direct binding borrows ops and must not release a module reference. */
     REQUIRE(net_bind(&ops) == 0);
+    /* Same ms as the previous binding: a fresh NIC still gets one service. */
+    old_links = links; old_polls = polls;
+    fg_order = 1; rx_idle();
+    REQUIRE(!fg_order && !bad_if && links == old_links + 1 && polls == old_polls + 1);
+    rx_idle(); REQUIRE(links == old_links + 1 && polls == old_polls + 1);
     net_unbind(); REQUIRE(released == 7);
     REQUIRE(inits == 4 && acquired == 8 && registrations == 4);
     REQUIRE(rx_calls && demuxes && !bad_if && hs_if());
@@ -280,7 +330,16 @@ static int test(void)
 }
 void _start(void)
 {
+    test_rx_clock_install();
     int rc = test();
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc) : "memory");
     __builtin_unreachable();
 }
+
+int platform_clock_read_us(u32 *lo, u32 *hi) { *lo = *hi = 0; return 0; }
+u32 tick_budget_cnt(u32 us) { return us; }
+int tick_budget_take(u32 share, u32 tail) { (void)share; (void)tail; return 1; }
+volatile u32 tick_count;
+int nic_test_irq_enabled(void) { return hs_if(); }
+
+int tick_budget_peek(u32 share, u32 tail) { (void)share; (void)tail; return 1; }

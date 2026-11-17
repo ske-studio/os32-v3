@@ -9,6 +9,7 @@ enum dma_sync;
 struct gem;
 struct gem_dma;
 struct gem_io;
+struct gem_phy_sample;
 struct ppc_boot_alias;
 
 enum lan_rc {
@@ -44,6 +45,10 @@ enum pln1_status {
 #define PLN1_TYPE_RSP 4
 enum { PLN1_TERM_OPEN = 5, PLN1_TERM_IN = 6,
        PLN1_TERM_OUT = 7, PLN1_TERM_STATE = 8 };
+#define PLN1_FS_OPEN 9
+#define PLN1_FS_REQ 10
+#define PLN1_FS_RSP 11
+#define PLN1_FS_FRAME_MAX 1044
 #define PLN1_HEADER_BYTES 80
 #define PLN1_ETHERTYPE 0x88b6
 #define PLN1_PAYLOAD_MAX 256
@@ -76,7 +81,9 @@ enum { PLN1_TERM_OPEN = 5, PLN1_TERM_IN = 6,
 struct pm_pci_window { u32 ss, pci_base, cpu_base, bytes; };
 #define PM_GMAC_BOOT_ID_OVERRIDE 1u
 #define PM_GMAC_PEER_OVERRIDE 2u
+struct pm_clock_boot { u32 pa, mask, valid; };
 struct pm_gmac_boot {
+    struct pm_clock_boot clock;
     u32 root_node, node, root_pa, bus_first, bus_last;
     u32 bdf, bar_reg, bar_bus, bar_pa, bar_bytes, vendor_device;
     u8 mac[6], peer_mac[6], boot_id[16];
@@ -86,6 +93,13 @@ struct pm_gmac_boot {
     u32 override_flags;
 };
 struct pm_pci { u32 addr_va, data_va, bus_first, bus_last, target_bdf; };
+struct lan_header {
+    u8 boot_id[16], host_nonce[16];
+    u64 seq, drop_records, drop_bytes;
+    u32 request_id;
+    u16 opcode, status, payload_bytes, flags;
+    u8 type;
+};
 struct lan_message {
     u8 boot_id[16], host_nonce[16];
     u64 seq, drop_records, drop_bytes;
@@ -103,6 +117,9 @@ int pm_pci_write32(struct pm_pci *, u32 bdf, u32 reg, u32 value);
 int pm_gmac_alias_plan(const struct pm_gmac_boot *, struct ppc_boot_alias *out);
 /* 0: proceed (Master read back clear, or GMAC absent/unknown and PCI untouched); negative: Master remained set after clearing, stop. */
 void pm_gmac_quiesce_setup(const struct pm_gmac_boot *, const struct pm_pci *);
+int pm_gmac_quiesce_setup_rh(const struct pm_gmac_boot *, const struct pm_pci *, u32 clock_va);
+struct pm_gmac_rh_sample { u32 command, tx_enable, rx_enable, valid; int clock_rc; };
+const struct pm_gmac_rh_sample *pm_gmac_rh_sample(void);
 int pm_gmac_early_quiesce(void);
 int pm_gmac_dma_init(const struct pm_gmac_boot *, struct gem_dma *out);
 int pm_gmac_dma_sync(void *cpu, u32 bytes, enum dma_sync op);
@@ -115,8 +132,14 @@ int pm_lan_log_peek(const u8 **data, u32 *len, u64 *seq,
                     u64 *records, u64 *bytes, u32 *status);
 void pm_lan_log_stats(u64 *next, u64 *records, u64 *bytes, u32 *flags);
 void pm_lan_log_complete(int result);
+void pm_lan_phy_observer(void (*notify)(const struct gem_phy_sample *, int));
 int pm_lan_start(const struct pm_gmac_boot *);
 void pm_lan_poll(u64 now);
+/* Borrow the existing device only while the service is RUNNING. */
+struct gem *pm_lan_running_gem(u8 mac[6]);
+int pm_lan_decode_header(const u8 *src, u32 n, struct lan_header *h);
+int pm_lan_encode_payload(u8 *dst, u32 cap, const struct lan_header *h,
+                          const u8 *payload, u32 len, u32 *used);
 int pm_lan_encode(u8 *dst, u32 cap, const struct lan_message *m, u32 *used);
 int pm_lan_decode(const u8 *src, u32 bytes, struct lan_message *m);
 void pm_term_receive(const struct lan_message *, const u8 src[6]);
@@ -124,6 +147,7 @@ void pm_term_write(const u8 *, u32 bytes);
 int pm_term_tx_peek(struct lan_message *);
 void pm_term_tx_complete(void); /* Only after gem_tx accepts the message. */
 int pm_term_state(struct lan_message *out);
+int pm_term_connected(void);
 const u8 *pm_term_peer(void);
 void pm_terminal_feed(const u8 *bytes, u32 len);
 void pm_terminal_line_lost(void);
@@ -131,6 +155,9 @@ void pm_terminal_open(void);
 int pm_terminal_trygetkey(void);
 int pm_terminal_getkey(void);
 void pm_terminal_poll(void);
+#if KBOOT_SH
+int pm_terminal_work_register(void);
+#endif
 struct pm_lan_range { u32 base, size; };
 /* The service supplies valid fields and excludes RX buffers from peek_ok. */
 struct pm_lan_diag {
@@ -145,6 +172,11 @@ struct pm_lan_diag {
 /* Call only with a free response slot and after validating the peer and request. */
 int pm_lan_monitor(const struct lan_message *req, const u8 src_mac[6],
                    const struct pm_lan_diag *d, struct lan_message *rsp);
+/* Transport-independent diagnostic execution; serialization belongs to caller. */
+struct pm_diag_message { u16 opcode, status, payload_bytes; u8 payload[256]; };
+void pm_lan_execute(const struct pm_diag_message *, const struct pm_lan_diag *,
+                    struct pm_diag_message *);
+void pm_link_diag_poll(const struct pm_lan_diag *, u64 now, u32 tb_hz);
 int pm_lan_copy8(u32 va, u8 *out);
 const struct pm_lan_diag *pm_lan_diag_snapshot(const struct pm_gmac_boot *boot, const struct gem *g, u32 state, u64 request_drops);
 
@@ -200,4 +232,6 @@ _Static_assert(PLN1_REQ_MEMORY_BYTES == 0, "PLN1_REQ_MEMORY_BYTES");
 _Static_assert(PLN1_REQ_READ_DIAG_BYTES == 4, "PLN1_REQ_READ_DIAG_BYTES");
 _Static_assert(PLN1_REQ_PEEK_BYTES == 8, "PLN1_REQ_PEEK_BYTES");
 
+/* Foreground LOG transport, KBOOT_LINK images only. */
+void pm_link_log_poll(void);
 #endif

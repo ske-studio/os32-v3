@@ -24,7 +24,7 @@ CR52は毎回 `(初回s+4)&FF`、C040の復元先も初回値で固定する。
 
 - CHECK の node は source/key/mask/expected/keep/result-slot を hash に含める。524・CR33・C040 は既存 single-use capture を使い、結果は `gfinit_plan.c_checks` に保持する。510 は mask=0、TEST は bit20 のみで sense を除外する。
 
-builderの `c_check_in`（`gfinit_plan_c.c:184–201`）が発行する全CHECK nodeに入口の印を付け
+builderの `c_check_in`（`gfinit_plan_c.c`）が発行する全CHECK nodeに入口の印を付け
 
 recordで不一致を非停止にするのは **印のない `REC_CHECK_TARGET` だけ**。入口TARGET（Command・cfg50/54・1850/1854・BARを含む）とIDENTITY/ROUTE/CELLは照合を続ける。読取り/送信失敗は印に関係なくS0へ進む。
 

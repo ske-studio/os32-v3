@@ -5,7 +5,9 @@ CHECK = dict(name='pci-scan-host', tier=4,
             'tools/tests/pci_scan_host.c', 'tools/tests/test_pci_scan.py',
             'kdebug/gfinit_resources.c', 'kdebug/gfinit_resources.h', 'kdebug/gfinit_resources/*.inc',
             'tools/tests/host32.py', 'tools/tests/mutpar.py', 'include/types.h', 'include/pci_dev_contract.h', 'include/pc98.h', 'include/kprintf.h', 'kdebug/recover.h',
-            'sdk/include/os32/os32_kapi_shared.h'], needs=[], budget=5)
+            'sdk/include/os32/os32_kapi_shared.h'], needs=[], budget=5,
+    kind='characterization',
+)
 import pathlib
 import subprocess
 import sys

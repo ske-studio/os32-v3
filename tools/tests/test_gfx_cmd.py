@@ -14,7 +14,9 @@ CHECK = dict(name='gfx-cmd-host', tier=1, needs=[], budget=15, covers=[
     'userland/lib/gfx/libos32gfx.h', 'sdk/include/os32/os32api.h',
     'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_kapi_generated.h',
     'tools/tests/gfx_cmd_host.c', 'tools/tests/test_gfx_cmd.py',
-    'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py'])
+    'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py'],
+    basis=['GFX_ACCEL_HAL_DESIGN §3-3'],
+)
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = 'userland/lib/gfx/draw/gfx_cmd.c'
 MUTATIONS = tuple((name, SOURCE, old, new) for name, old, new in (

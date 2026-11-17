@@ -4,7 +4,9 @@ Only intended runtime FAIL labels count as RED; errors/timeouts are separate.
 """
 CHECK = dict(name='appmem-map-host', tier=1,
     covers=['tools/tests/font_guard_inactive.h', 'sdk/kapi.json', 'kapi/kapi_generated.c', 'exec/exec.c', 'exec/lease.c', 'exec/appmem.c', 'exec/appmem_map.c', 'exec/appmem_unmap.c', 'mm/paging_app.c', 'mm/paging.c', 'mm/pgalloc.c', 'mm/physmem.c', 'tools/tests/appmem_map_host.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'exec/appslot.c', 'exec/exec_heap.c', 'exec/exec_heap.h', 'mm/kmalloc.c', 'mm/kmalloc.h', 'exec/redir_access.c', 'exec/access_walk.c', 'tools/tests/exec_heap_host.h', 'exec/owner_diag.h', 'tools/tests/kernel_layout.py', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'tools/tests/paging_source.py', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h'],
-    needs=['make:all'], budget=5.9)
+    needs=['make:all'], budget=5.9,
+    basis=['KAPI_SPEC §3-3', 'KAPI_SPEC §4-10', 'KAPI_SPEC §4-11'],
+)
 
 from exec_source import exec_fixture_preamble, read_text
 from paging_source import paging_source
@@ -27,7 +29,7 @@ TARGET_SRCS = ['include/callconv.h', 'include/abi.h', 'arch/x86/arch_abi.h', 'to
     'exec/appmem.h', 'mm/paging_app.h', 'mm/paging.c', 'mm/paging.h',
     'mm/pgalloc.c', 'mm/pgalloc.h', 'mm/physmem.c', 'mm/physmem.h',
     'include/appmem_types.h', 'sdk/include/os32/os32_kapi_shared.h', 'include/types.h', 'include/memmap.h', 'include/io.h',
-    'include/cpu.h', 'include/pc98.h', 'include/sys.h', 'include/tvram.h',
+    'include/cpu.h', 'include/pc98.h', 'include/sys.h', 'include/text_screen.h',
     'arch/x86/kernel/gdt.h', 'arch/x86/kernel/tss.h', 'arch/x86/arch_cpu.h', 'arch/x86/arch_io.h', 'lib/kstring.h', 'tools/tests/appmem_map_host.c',
     'tools/tests/test_appmem_map.py', 'tools/tests/pgalloc_host_fixture.h',
     'tools/tests/host_arch/arch_cpu.h', 'tools/tests/host_arch/arch_io.h',
@@ -217,7 +219,7 @@ def main():
                 parts.append('static void host_resume_tail(int app_id) { AppSlot *a = appslot_get(app_id); int restart_stdin = 0;\n' + tail + '\n}')
                 dispatch = function(source, 'void exec_syscall_dispatch(')
                 tail = dispatch[dispatch.index('syscall_complete:') + len('syscall_complete:'):dispatch.rfind('}')]
-                parts.append('static void host_syscall_tail(struct arch_user_context *frame) { int prev_caller = 0, prev_in_syscall = 0; struct arch_syscall *prev_frame = 0; struct arch_syscall call = { frame->opaque }; u32 result = HOST_FRAME(*frame)[7];\n' + tail + '\n}')
+                parts.append('static void host_syscall_tail(struct arch_user_context *frame) { int io_owner = appslot_cur(); int prev_caller = 0, prev_in_syscall = 0; struct arch_syscall *prev_frame = 0; struct arch_syscall call = { frame->opaque }; u32 result = HOST_FRAME(*frame)[7];\n' + tail + '\n}')
                 return exec_fixture_preamble() + '\n'.join(parts)
 
             def heap_context_parts(source):

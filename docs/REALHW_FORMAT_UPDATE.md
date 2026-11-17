@@ -21,7 +21,7 @@ KAPI の版が上がるだけの版、配置の世代 (`memory_layout`) が変�
    | 写す物 | 理由 |
    |---|---|
    | `/boot` の全部 (`vmkernel.lz4`・`kdebug.bin`・部品の `.mod` 全部) | 部品はカーネルの像の CRC と対で照合される (`kernel/module/module_image.c` の pair)。sqlite と fep は起動に要る |
-   | `/sys/shell.bin` | カーネルが起動で読む (`init/kernel.c` の `exec_run(SYS_SHELL_BIN)`) |
+   | `/sys/shell.bin` | カーネルが起動で読む (`platform/pc98/kernel.c` の `exec_run(SYS_SHELL_BIN)`) |
    | `/sys/lib/libos32gui.shlib` | GUI に要る (古いままだと CUI に落ちる)。シェルまでなら無くてもよい |
 
    ```

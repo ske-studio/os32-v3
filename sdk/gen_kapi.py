@@ -653,6 +653,16 @@ for slot, api in enumerate(data["api"]):
     if not args_str: args_str = "void"
 
     c_content += f"{ret} __cdecl wrap_{name}({args_str})\n{{\n"
+    # sys_yield stays on the common exec_sys_yield: it parks an exec_start child
+    # (arch-ctx-guest lifecycle) and runs idle_work itself.
+    if TARGET == "ppc-powermac" and name == "sys_halt":
+        c_content += "    extern i32 ppc_kapi_wait_once(void);\n"
+        c_content += "    (void)ppc_kapi_wait_once();\n"
+        c_content += "}\n\n"
+        continue
+    if TARGET == "ppc-powermac" and name == "tvram_clear":
+        c_content += "    extern void pm_console_clear(void);\n    pm_console_clear();\n}\n\n"
+        continue
     if TARGET == "ppc-powermac" and name in ABSENT_PROVIDER_SLOTS:
         for arg in get_arg_names(api.get("args", [])):
             c_content += f"    (void){arg};\n"

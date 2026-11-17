@@ -39,7 +39,7 @@ def main():
     for name in ['build/boot.mk', 'build/targets/x86-pc98.mk'] + [
             str(p.relative_to(ROOT)) for p in (ROOT / 'boot').glob('*') if p.is_file()
             and p.suffix in ('.c', '.h', '.asm', '.inc', '.ld')]:
-        baseline = subprocess.check_output(['git', 'show', '3ebbd208:' + name], cwd=ROOT)
+        baseline = subprocess.check_output(['git', 'show', '663e72e67:' + name], cwd=ROOT)
         assert (ROOT / name).read_bytes() == baseline, name
     with tempfile.TemporaryDirectory(prefix='sep5-boot-') as directory:
         root = Path(directory)

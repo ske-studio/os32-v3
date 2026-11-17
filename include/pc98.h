@@ -161,7 +161,7 @@
 #define SYSCLK_2458         2457600UL   /* 2.4576MHz */
 
 /* どちらのクロックかは BIOS ワークエリア 0000:0501h の bit7 で分かる。
- * **定義はここ 1 か所** ([C4]) — 読むのは kernel/time/sysclk.c だけで、
+ * **定義はここ 1 か所** ([C4]) — 読むのは platform/pc98/sysclk.c だけで、
  * drivers/char/serial.h は別名 (TIMER_CLK_*) を張るだけにしてある。
  * 根拠の資料と食い違いの決着は drivers/char/serial.h の注記を参照。 */
 #define BIOS_WORK_SYSCLK    0x00000501UL  /* BYTE: bit7=1 なら 8MHz系 */
@@ -309,7 +309,7 @@
 /* ====================================================================== */
 /*  テキストVRAM — PC9800Bible §2-6-1, §4-2                               */
 /* ====================================================================== */
-/* 基本アドレス・サイズは tvram.h にも定義あり (TVRAM_BASE, TVRAM_ATTR等)      */
+/* 基本アドレス・サイズは text_screen.h にも定義あり (TVRAM_BASE, TVRAM_ATTR等)      */
 #define TVRAM_CHAR_BASE      0x000A0000UL  /* 文字エリア先頭 */
 #define TVRAM_ATTR_BASE      0x000A2000UL  /* アトリビュートエリア先頭 */
 #define TVRAM_CG_WINDOW      0x000A4000UL  /* CGウィンドウ先頭 */
@@ -352,11 +352,15 @@
 /* ====================================================================== */
 /*  グラフィックVRAM — PC9800Bible §2-7, §4-2                             */
 /* ====================================================================== */
-/* Native VRAM address canon; gfx.h/tvram.h use aliases. */
+/* Native VRAM address canon; gfx.h/text_screen.h use aliases. */
 #define GVRAM_PLANE_B        0x000A8000UL  /* プレーン0: 青 */
 #define GVRAM_PLANE_R        0x000B0000UL  /* プレーン1: 赤 */
 #define GVRAM_PLANE_G        0x000B8000UL  /* プレーン2: 緑 */
 #define GVRAM_PLANE_I        0x000E0000UL  /* プレーン3: 輝度 */
+#define VRAM_PLANE_B  GVRAM_PLANE_B   /* 青 / Plane 0 */
+#define VRAM_PLANE_R  GVRAM_PLANE_R   /* 赤 / Plane 1 */
+#define VRAM_PLANE_G  GVRAM_PLANE_G   /* 緑 / Plane 2 */
+#define VRAM_PLANE_I  GVRAM_PLANE_I   /* 輝度 / Plane 3 */
 
 /* Native VRAM backing is FIXED/UC in the ledger. Exclude CG and ROM.
  * This predicate is also usable before memory_boot installs the ledger. */

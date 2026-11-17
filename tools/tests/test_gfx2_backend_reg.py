@@ -14,7 +14,9 @@ CHECK = dict(name='gfx2-backend-reg-host', tier=1, needs=[], budget=20,
     covers=['gfx/v2/backend_reg.c', 'gfx/v2/gfx2_int.h',
             'platform/pc98/gfx_selector.c', 'gfx/gfx_core.c', 'gfx/gfx_core_init.inc',
             'tools/tests/gfx2_backend_reg_host.c', 'tools/tests/test_gfx2_backend_reg.py',
-            'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'tools/tests/mutpar.py'])
+            'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'tools/tests/mutpar.py'],
+    basis=['HAL_V2_DESIGN §11-7'],
+)
 ROOT = Path(__file__).resolve().parents[2]
 REG = 'gfx/v2/backend_reg.c'
 PROVIDER = 'platform/pc98/gfx_selector.c'

@@ -10,14 +10,28 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tools/tests'))
 import host32
 CHECK = dict(name='ppc-kboot-clock', tier=2, budget=60,
-             covers=['platform/powermac/clock.c', 'platform/powermac/kboot_info.h',
+             basis=['IO_TIER_DESIGN §5/P5 (PM 2026-11-16)'],
+             covers=['platform/powermac/ppc_kernel.c', 'platform/powermac/clock.c', 'platform/powermac/kboot_info.h',
                      'tools/ppc/kboot_clock*', 'lib/divdi3.c'],
-             inputs=['include/types.h', 'include/callconv.h', 'include/clock_source.h',
+             inputs=['kernel/io_clock.h', 'include/types.h', 'include/callconv.h', 'include/clock_source.h',
                      'include/platform_timer.h', 'platform/powermac/ofw.h',
-                     'platform/powermac/ppc_layout.h', 'arch/ppc/ppc_boot.h',
+                     'platform/powermac/platform_of_layout.h', 'arch/ppc/ppc_boot.h',
                      'arch/ppc/ppc_pmap.h', 'arch/ppc/ppc_oea.h',
                      'sdk/include/os32/os32_kapi_shared.h', 'tools/tests/host32.py'])
 MUTATIONS = [
+    # IO_TIER_DESIGN §5・P5 (本線 PM 決定 2026-11-16).
+    ('mul-rounded-up', '((unsigned long long)bound_hz << shift) / 1000000',
+     '(((unsigned long long)bound_hz << shift) + 999999) / 1000000', 21),
+    ('shift-fixed', 'u32 shift = 32;', 'u32 shift = 22;', 21),
+    ('hotpath-division', '((unsigned long long)us * io_clock.mul) >> io_clock.shift',
+     '(unsigned long long)us * bound_hz / 1000000', 23),
+    ('generation-ignored', 'generation != io_clock.generation', '((void)generation, 0)', 25),
+    ('half-wrap-removed', 'if (value >= (1ULL << 31))', 'if (0)', 24),
+    ('raw-unready', 'if (!io_clock.source) return OS32_ERR_NOSYS;\n    *count',
+     'if (0) return OS32_ERR_NOSYS;\n    *count', 20),
+    ('convert-unready', 'if (!io_clock.source) return OS32_ERR_NOSYS;\n    if (source',
+     'if (0) return OS32_ERR_NOSYS;\n    if (source', 20),
+    ('install-unready', 'if (io_clock.source) io_clock_set_ops', 'if (1) io_clock_set_ops', 26),
     ('retry-removed', 'while (upper != again)', 'while (0 && upper != again)', 6),
     ('upper-comparison', 'while (upper != again)', 'while (upper == again)', 3),
     ('rounding', '(delta / hz) * 1000000', '(delta / hz) * 1000000 + 1', 6),
@@ -34,7 +48,7 @@ def exercise(directory, source):
                     '-ffreestanding', '-fno-builtin', '-fno-pie', '-no-pie',
                     '-fno-stack-protector', '-nostdlib', '-static', '-D__cdecl=',
                     '-I'+str(directory),
-                    *['-I'+str(ROOT / p) for p in ('include', 'platform/powermac',
+                    *['-I'+str(ROOT / p) for p in ('.', 'include', 'platform/powermac',
                                                   'arch/ppc', 'sdk/include/os32')],
                     str(ROOT / 'tools/ppc/kboot_clock_fake.c'),
                     str(ROOT / 'lib/divdi3.c'), '-o', str(exe)], check=True, timeout=60)
@@ -44,6 +58,45 @@ def exercise(directory, source):
         raise RuntimeError('test failure: runtime timeout; not RED') from None
 
 
+def rate_test(directory, source, mutant=False):
+    start = source.index('    u32 want = (u32)((tb1_b - tb0_a)')
+    end = source.index('    kprintf(KBOOT_ATTR, "KBOOT CLOCK', start)
+    block = source[start:end]
+    old = '(unsigned long long)got + 1 < lower ||\n        (unsigned long long)got > upper + 1'
+    if block.count(old) != 1:
+        raise RuntimeError('rate mutation anchor must be unique')
+    if mutant:
+        block = block.replace(old, '((void)got, (void)lower, (void)upper, 0)')
+    program = r"""
+#include <stdint.h>
+typedef uint32_t u32;
+struct info { u32 tb_hz; };
+static int check(unsigned long long tb0_a, unsigned long long tb0_b,
+                 unsigned long long tb1_a, unsigned long long tb1_b, u32 sample) {
+    struct info data = {1000000}, *info = &data;
+    u32 us0 = 0, us_lo = sample;
+#define kboot_stop(reason) return 1
+""" + block + r"""
+    return 0;
+}
+int main(void) {
+    if (check(0, 1000, 31000, 32000, 31000)) return 1;
+    if (check(0, 1000, 31000, 32000, 60000) != 1) return 2;
+    if (check(0, 1000, 31000, 32000, 10000) != 1) return 3;
+    if (check(0, 0, 9000, 9000, 9000) != 1) return 4;
+    if (check(0, 1000, 31000, 32000, 29999)) return 5;
+    if (check(0, 1000, 31000, 32000, 32001)) return 6;
+    return 0;
+}
+"""
+    path = directory / 'rate.c'
+    path.write_text(program)
+    exe = directory / 'rate-test'
+    subprocess.run(['gcc', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
+                    str(path), '-o', str(exe)], check=True, timeout=60)
+    return subprocess.run([str(exe)], timeout=2).returncode
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--mutate', action='store_true')
@@ -51,6 +104,15 @@ def main():
     source = (ROOT / 'platform/powermac/clock.c').read_text()
     with tempfile.TemporaryDirectory(prefix='kboot-clock-') as temp:
         directory = Path(temp)
+        rate_source = (ROOT / 'platform/powermac/ppc_kernel.c').read_text()
+        if rate_test(directory, rate_source) != 0:
+            raise RuntimeError('rate baseline failed')
+        print('GREEN: bracketed clock rate')
+        if args.mutate:
+            result = rate_test(directory, rate_source, mutant=True)
+            if result != 2:
+                raise RuntimeError(f'rate mutation: expected 2, got {result}')
+            print('RED: rate comparison removed: expected=2 actual=2')
         result = exercise(directory, source)
         if result:
             raise RuntimeError(f'baseline: {result}')

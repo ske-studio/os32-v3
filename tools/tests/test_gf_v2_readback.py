@@ -12,7 +12,9 @@ CHECK = dict(name='gf-v2-readback-host', tier=1, needs=[], budget=15,
             'drivers/video/geforce/*.h', 'hwdev/gf/**', 'gfx/v2/*.h', 'include/*.h',
             'arch/*/arch_copy.h', 'sdk/include/os32/*.h',
             'tools/tests/gf_v2_readback_host.c', 'tools/tests/test_gf_v2_readback.py',
-            'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'tools/tests/mutpar.py'])
+            'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'tools/tests/mutpar.py'],
+    basis=['HAL_V2_DESIGN §7-5', 'HAL_V2_DESIGN §13-3'],
+)
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = 'drivers/video/geforce/gf_v2_ops.c'
 MUTATIONS = (

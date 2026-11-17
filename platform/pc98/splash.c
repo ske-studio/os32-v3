@@ -1,4 +1,5 @@
 /* PC-9821 boot splash: fixed PC98 backend and borrowed planar framebuffer. */
+#include "pc98.h"
 #include "platform_splash.h"
 #include "gfx.h"
 #include "gfx_internal.h"

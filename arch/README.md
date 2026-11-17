@@ -16,6 +16,8 @@ OS32 の移植点は **2 本の軸**に分かれている。
 | [`include/abi.h`](../include/abi.h) | 引数語の幅・整列とスタック整列 | `arch_abi.h` |
 | [`include/cpu.h`](../include/cpu.h) | アドレス変換表の根と TLB・変換の有効化、ユーザモードへの遷移、別スタックでの呼び出し | `arch_cpu.h` |
 | [`include/exec_arch.h`](../include/exec_arch.h) | syscall の借用 view、USER 保存域、親の特権 snapshot と復帰 | `arch_exec_storage.h` (容量・整列のみ) |
+| `include/exec_arch.h` の註 | 書いた命令を実行に公開する `arch_exec_publish(dst, bytes)` (関数かマクロ) | `arch_exec_cache.h` |
+| `arch_exec_kapi.h` 自身の註 | 起動時に組む KAPI の関数表の番地 `exec_kapi_table()` | `arch_exec_kapi.h` |
 
     #include "arch_io.h"        /* arch/$(ARCH)/arch_io.h     */
     #include "platform_io.h"    /* platform/$(PLATFORM)/platform_io.h */
@@ -81,6 +83,12 @@ x86 にしか意味の無い仕組みなので `include/` に契約を置かず�
    各 `build/features/*.mk` は早期には集合と遅期適用用の値だけを宣言する。
    `build/sources/order.mk` が既存のリンク/include 順を保持し、`build/select.mk`
    が所有者集合で filter する。共通候補の選択は移植成功を意味しない。
+   像の構成 (どの機能を入れるか) は arch・platform と独立の 3 本目の軸で、
+   `build/images/<IMAGE>.mk` が機能の値を決める。共通の場所の持ち物は
+   `build/sources/common.mk` に機能ごとの組 (`C_COMMON_<機能>`) で宣言し、
+   arch・platform の持ち物も同じ機能の名前の組で宣言する。PowerPC の製品の像
+   (`build/targets/ppc-powermac.mk`) もこの所有者集合から引く
+   ([docs/design/build/select.md](../docs/design/build/select.md))。
    `build/targets/<arch>-<platform>.mk` は製品の到達点を定める。
    `sdk/target_profile.py` は module codec・配置・guard の能力を定め、
    未実装の能力は入力を読む前に拒否する。
@@ -127,27 +135,28 @@ ARM 実装は別票で行う。
 
 ## PowerPC の現在の到達点
 
-`make ARCH=ppc PLATFORM=powermac` は共通候補と既存 bootstrap の C/GAS を
-コンパイルする。出力は `build/out/ppc-powermac`、コンパイラは
-`PPC_CROSS_DIR`（既定 `/home/hight/opt/cross-ppc`）から選ぶ。
-この一覧 (selected) は全 TU 成功に達していない: 分離の第 5 段の後で 120 TU のうち 112 が成功し、
-残る 8 本は PC98・x86 の装置のヘッダを直に include する共通のソース
-(gfx_core.c、exec.c、kapi_generated.c、module.c、fatfs の 2 本、ext2_super.c、serialfs_session.c)。
-SDK/module/deploy は明示エラーとなる。x86 の feature off も compile-only である。
+`make ARCH=ppc PLATFORM=powermac [IMAGE=<名>]` は PowerPC の製品の像
+`PPCKERN.ELF` を組む。ソースは x86 と同じ所有者集合 (`build/select.mk`) から
+像の構成 (`build/images/kboot-*.mk`、既定は `kboot-link`) で選び、規則は
+`build/targets/ppc-powermac.mk` が持つ (最上位からは sub-make で呼ぶ。道具は
+`make ARCH=ppc PLATFORM=powermac KBOOT_LINK=… KBOOT_SH=…` の旗でも同じ像を選べる)。
+出力は `build/out/ppc-kboot/` の下、コンパイラは `PPC_CROSS_DIR`
+（既定 `/home/hight/opt/cross-ppc`）から選ぶ。SDK/module/deploy は明示エラーとなる。
+x86 の feature off は compile-only である。
 
-**本体のリンクと起動は別の入口で達している (到達点 ②、2026-11-10)**:
-`make -f build/ppc-kboot.mk` が `init/ppc_kernel.c` から到達する閉包
-(共通の mm・kprintf・tick と arch/ppc・platform/powermac) を
-`build/out/ppc-kboot/PPCKERN.ELF` にリンクし、QEMU mac99 で OF から入って
-案 D の paging・例外・MPIC・1kHz の decrementer まで初期化する
-(`python3 -B tools/ppc/kboot_accept.py`)。VFS・module・exec・USER・画面は含まない。
-票は docs/tasks/ppc/ の TASK_PPC_KBOOT。
+共通の場所のソースのうち、PowerPC の像にまだ入っていない物は
+`build/sources/common.mk` の `C_COMMON_PC98_PENDING` に並んでいる。これらも
+PowerPC のコンパイラは通す (`make ppc-ci-image` の `common-compile`。リンクは
+しない)。共通のソースが機種・装置のヘッダを読む辺は
+`python3 -B tools/check_layers.py` が両方の像の `.d` から数え、基準
+(`tools/layers_baseline.json`、今は 0) より増えても減っても落ちる。直し方の表は
+docs/design/tools/check_layers.md §8。起動の順は共通の `init/kernel_start.c` が
+持ち、局面の中身は `platform/<機種>/` が実装する。
 
-実測は `python3 -B tools/ppc/check_compile.py --source-profile selected --accept --json`。
-必須 7 本、ELF32/BE/EM_PPC、実 `.d`、全 TU の試行と失敗分類を照合する。
+像は QEMU mac99 で OF から入り、案 D の paging・例外・MPIC・decrementer まで
+初期化する (`python3 -B tools/ppc/kboot_accept.py`)。票は docs/tasks/ppc/ の TASK_PPC_KBOOT。
 既存 bootstrap は `make ppc-boot` / `make ppc-boot-check` で独立して扱う。
 x86 の旧一覧を ARM に通す測定は別系列のまま維持する。
 
 内部呼出属性は [`callconv.h`](../include/callconv.h) に集約する。
-i386 は cdecl、他 target は通常 C ABI。PPC の ABI 定数は 4/4/16 の暫定値で、
-selected compile の依存確認用であり PPC 実走を許可しない。
+i386 は cdecl、他 target は通常 C ABI。

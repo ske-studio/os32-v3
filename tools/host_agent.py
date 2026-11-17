@@ -27,6 +27,7 @@ import binascii
 import os
 import random
 import re
+import queue
 import select
 import shutil
 import socket
@@ -34,11 +35,16 @@ import struct
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 
 import host_linux
+from host_sfs_link import SfsLink, MAX_FRAME as SFS_MAX_FRAME
+from lanfs_host import MARK as SFS_MARK
 from host_notify import Notify, new_generation
 from host_services import Registry
+from host_rshell import Operator, RSHELL, GSERIAL, RESULT_MAX
+from host_operator_socket import OperatorSocket
 
 # ---------------------------------------------------------------- ワイヤ定数
 LINK_ETHERTYPE = 0x88B5
@@ -82,7 +88,10 @@ EPOCH_MAX = 0xFFFF
 ACTIVE_MAX = 2          # 同時受付 (OS32 のハンドル数と同じ)
 TOMB_WINDOW = 8         # 墓標を落としてよい高さ (high_water - 8)
 HOLE_FILL_MAX = 64      # 一度に作る HOLE の上限 (異常な rid 跳躍への歯止め)
-FRAME_PAGES = 6         # 最大フレームが占める SRAM ページ数 (保守的)
+FRAME_PAGES = 6         # guest の 1 frame admission 閾値
+LINK_PAGE_BYTES = 256
+RX_OVERHEAD = 8         # NE2000 receive header + FCS
+RX_DATA_FRAMES = 3      # net/nic_rx.c RX_SLOTS=4、EOF に 1 枠を残す
 STREAM_PLEN = 512       # 本文ストリームの 1 フレームあたりのバイト数
 
 # op ごとの payload 長 (min, max)。一致しないフレームは捨てる (v2 パーサの検査)
@@ -368,17 +377,23 @@ class HostAgent:
     def __init__(self, mac, state_dir=None, agent_gen=None, quiet=False,
                  rng=None, sess_start=0, allow_net=True, file_root=None,
                  spool_dir=None, print_dir=None, clip="none", printer=False,
-                 lines_per_page=DEFAULT_LINES_PER_PAGE):
+                 lines_per_page=DEFAULT_LINES_PER_PAGE, peer=None, allow_write=()):
         self.mac = mac
+        self.configured_peer = peer
         self.quiet = quiet
         self.rng = rng or random.Random()
         self.agent_gen = agent_gen if agent_gen is not None else self.rng.randint(1, 0xFFFF)
         self.host_generation = new_generation()
         self.registry = Registry(self.host_generation)
         self.notifier = Notify(self.registry, self.host_generation)
+        self.operator = Operator(self.notifier)
+        self.operator_socket = None
         self.sessions = SessCounter(state_dir, sess_start)
         self.allow_net = allow_net
         self.file_root = file_root
+        self.allow_write = allow_write
+        self.sfs_link = None
+        self._sfs_generation = None
         # ---- N2: PRINT / CLIP サービスの設定 ----
         # ジョブ保存 (job.txt + スプール) は最初の PRINT OPEN で用意する (印刷を
         # 使わない試験に空の一時ディレクトリを撒かない)。clip の既定は none で、
@@ -436,6 +451,10 @@ class HostAgent:
     def handle(self, frame, out, pcap=None):
         if pcap:
             pcap.write(frame)
+        # Raw SFS belongs to lanfs_host; the agent serves only SFS CALL.
+        if (len(frame) >= ETH_HDR + 3 and frame[12:14] == struct.pack(">H", LINK_ETHERTYPE)
+                and frame[14:17] == SFS_MARK):
+            return  # raw SFS: no response
         if len(frame) < ETH_HDR + LINK_HDR:
             self.counts["dropped"] += 1
             return
@@ -501,6 +520,8 @@ class HostAgent:
 
     # ------------------------------------------------------- 3 way HELLO
     def _on_hello(self, src, flags, epoch, seq, ack, sess, payload, out):
+        if self.configured_peer is not None and src != self.configured_peer:
+            return
         self.counts["hello"] += 1
         if flags == HS_SYN:
             self._on_syn(src, epoch, seq, sess, out)
@@ -560,7 +581,9 @@ class HostAgent:
             self._print_failed(job["ent"], "session changed")
         self.pending = {}
         new_sess = c["sess"] != self.sess
+        self.operator.session_reset()
         self.sess, self.epoch, self.peer = c["sess"], c["epoch"], c["mac"]
+        self.operator.session_start((self.sess, self.epoch))
         self.established = True
         if new_sess:
             self.ledger = {}                          # セッションが変われば墓標も捨てる
@@ -659,7 +682,11 @@ class HostAgent:
             ent["last_seq"] = seq
             if ent["resp"] is None and ent["decl"] > 0:
                 room = ent["decl"] - len(ent["got"])
-                ent["got"] += payload[:room]
+                if (ent.get("line", "").startswith("PDIAG ") or
+                        ent.get("sfs_deadline") is not None) and len(payload) > room:
+                    self._answer(rid, ent, HTTP_BAD, b"", None, out)
+                else:
+                    ent["got"] += payload[:room]
         # 重複 / 先行は本文を触らず累積 ACK だけ返す (Go-Back-N)
         self._ack(rid, ent["last_seq"], out)
         if (ent["resp"] is None and ent["decl"] > 0
@@ -711,11 +738,20 @@ class HostAgent:
         d["credit"] = credit
         self._pump(rid, ent, out)
 
+    @staticmethod
+    def _frame_pages(d, seq):
+        ln = min(d["plen"], d["total"] - (seq - 1) * d["plen"])
+        return (ETH_HDR + LINK_HDR + ln + RX_OVERHEAD + LINK_PAGE_BYTES - 1) // LINK_PAGE_BYTES
+
     def _pump(self, rid, ent, out):
         d = ent["deliver"]
         while d["sent"] < d["nframes"]:
-            inflight = FRAME_PAGES * (d["sent"] - d["acked"])
-            if inflight + FRAME_PAGES > d["credit"]:
+            if d["sent"] - d["acked"] >= RX_DATA_FRAMES:
+                break
+            inflight = sum(self._frame_pages(d, seq)
+                           for seq in range(d["acked"] + 1, d["sent"] + 1))
+            pages = self._frame_pages(d, d["sent"] + 1)
+            if inflight + max(FRAME_PAGES, pages) > d["credit"]:
                 break
             seq = d["sent"] + 1
             if seq == d["dropseq"] and not d["dropped"]:
@@ -728,7 +764,7 @@ class HostAgent:
             out.send(self.build(self.peer, OP_DATA, seq=seq, rid=rid, payload=body))
             d["sent"] = seq
             d["max_inflight"] = max(d["max_inflight"],
-                                    FRAME_PAGES * (d["sent"] - d["acked"]))
+                                    inflight + pages)
         if d["sent"] >= d["nframes"] and not d["eof"]:
             out.send(self.build(self.peer, OP_EOF, seq=d["nframes"] + 1, rid=rid))
             d["eof"] = True
@@ -759,6 +795,30 @@ class HostAgent:
         parts = line.split()
         verb = parts[0].upper() if parts else ""
         # --- 宣言長 (WDATA) のある要求。範囲は要求行の時点で検査 (B2) ---
+        if verb in ("RSH", "GS", "PDIAG", "LOG"):
+            if verb == "RSH" and len(parts) > 1 and parts[1] == "READY":
+                self._service_rshell(rid, ent, parts, out)
+            elif verb == "PDIAG" and len(parts) == 6 and parts[5] == "0":
+                # A refused diagnostic (non-zero status) carries no body and so no WDATA.
+                ent["got"] = b""
+                self._service_rshell(rid, ent, parts, out)
+            else:
+                expected = 7 if verb == "LOG" else (5 if parts[:2] == ["RSH", "ACCEPT"] else 6)
+                decl = self._decl(parts[-1] if len(parts) == expected else "", RESULT_MAX if verb != "LOG" else DECL_MAX_BYTES)
+                if decl is None:
+                    self._answer(rid, ent, HTTP_BAD, b"", None, out)
+                else:
+                    ent["decl"] = decl
+            return
+        if verb == "SFS":
+            decl = self._decl(parts[2] if len(parts) == 3 and parts[1] == "CALL" else "",
+                              SFS_MAX_FRAME)
+            if decl is None:
+                self._answer(rid, ent, HTTP_BAD, b"", None, out)
+            else:
+                ent["decl"] = decl
+                ent["sfs_deadline"] = self.now() + 1.0
+            return
         if verb == "ECHO":
             decl = self._decl(parts[1] if len(parts) > 1 else "", DECL_MAX_BYTES)
             if decl is None:
@@ -844,6 +904,42 @@ class HostAgent:
             status, body = self.registry.dispatch(line, b"")
             self._answer(rid, ent, status, body, None, out)
 
+    def _service_rshell(self, rid, ent, parts, out):
+        status, body = HTTP_BAD, b""
+        session = (self.sess, self.epoch)
+        if len(parts) == 7 and parts[:2] == ["RSH", "READY"] and parts[4] == "1":
+            if self.operator.accept_ready(self.host_generation, session, parts[2],
+                                          parts[3], parts[5], parts[6]):
+                service = {"cui": RSHELL, "gui": GSERIAL, "diag": 65532}[parts[3]]
+                body = ("gen %d svc %d\n" % (self.host_generation, service)).encode()
+                status = HTTP_OK
+        elif len(parts) == 6 and parts[0] in ("RSH", "GS", "PDIAG") and parts[1] == "OUT":
+            if DECL_RE.fullmatch(parts[4]) and DECL_RE.fullmatch(parts[5]):
+                length = int(parts[5])
+                if length == len(ent["got"]) and self.operator.accept_output(
+                        self.host_generation, session, parts[2], parts[3], int(parts[4]),
+                        ent["got"], length, {"RSH": "cui", "GS": "gui", "PDIAG": "diag"}[parts[0]]):
+                    status = HTTP_OK
+        elif len(parts) == 5 and parts[:2] == ["RSH", "ACCEPT"]:
+            if (DECL_RE.fullmatch(parts[4]) and self.operator.accept_handoff(
+                    self.host_generation, session, parts[2], parts[3],
+                    ent["got"], int(parts[4]))):
+                status = HTTP_OK
+        self._answer(rid, ent, status, body, None, out)
+
+    def _service_log(self, rid, ent, parts, out):
+        if (len(parts) != 7 or not re.fullmatch(r"[0-9a-fA-F]{32}", parts[1]) or
+                not all(DECL_RE.fullmatch(x) for x in parts[2:]) or
+                int(parts[6]) != len(ent["got"])):
+            self._answer(rid, ent, HTTP_BAD, b"", None, out)
+            return
+        record = dict(boot=parts[1].lower(), seq=int(parts[2]), drop_records=int(parts[3]),
+                      drop_bytes=int(parts[4]), flags=int(parts[5]), text=ent["got"])
+        self.log("LOG", record)
+        if self.operator_socket is not None:
+            self.operator_socket.publish_log(record)
+        self._answer(rid, ent, HTTP_OK, b"", None, out)
+
     def _service_get(self, rid, ent, resource, out):
         if resource.startswith("/pattern/"):
             try:
@@ -918,7 +1014,13 @@ class HostAgent:
         parts = ent.get("line", ent["req"].decode("latin1").strip()).split()
         verb = parts[0].upper() if parts else ""
         sub = parts[1].upper() if len(parts) > 1 else ""
-        if verb == "ECHO":
+        if verb == "SFS":
+            self._service_sfs(rid, ent, out)
+        elif verb in ("RSH", "GS", "PDIAG"):
+            self._service_rshell(rid, ent, parts, out)
+        elif verb == "LOG":
+            self._service_log(rid, ent, parts, out)
+        elif verb == "ECHO":
             self._answer(rid, ent, 200, ent["got"], None, out)   # 折り返し
         elif verb == "PRINT" and sub == "DATA":
             self._print_data_finish(rid, ent, out)
@@ -926,6 +1028,31 @@ class HostAgent:
             self._clip_put_finish(rid, ent, out)
         else:
             self._answer(rid, ent, HTTP_NOT_IMPL, b"", None, out)  # PUT ほか (B6)
+
+    def _sfs_backend(self):
+        # Link rid/session changes must not erase the SFS sid/seq replay cache.
+        if self.sfs_link is None or self._sfs_generation != self.host_generation:
+            self.sfs_link = SfsLink(self.file_root, allow_write=self.allow_write,
+                                    peer=self.configured_peer)
+            self._sfs_generation = self.host_generation
+        return self.sfs_link
+
+    def _service_sfs(self, rid, ent, out):
+        if len(ent["got"]) != ent["decl"]:
+            self._answer(rid, ent, HTTP_BAD, b"", None, out)
+            return
+        if self.now() >= ent["sfs_deadline"] or self.file_root is None:
+            self._answer(rid, ent, HTTP_UNAVAIL, b"", None, out)
+            return
+        try:
+            body = self._sfs_backend().call(ent["got"], self.peer)
+        except ValueError:
+            self._answer(rid, ent, HTTP_BAD, b"", None, out)
+            return
+        if self.now() >= ent["sfs_deadline"]:
+            self._answer(rid, ent, HTTP_UNAVAIL, b"", None, out)
+            return
+        self._answer(rid, ent, 200, body, None, out)
 
     def _answer(self, rid, ent, status, body, gen, out,
                 total=None, plen=STREAM_PLEN, dropseq=0):
@@ -951,6 +1078,10 @@ class HostAgent:
         for op, flags, seq, ack, rid, window, payload in self.notifier.tick(now):
             out.send(self.build(self.peer, op, flags, seq=seq, ack=ack,
                                 rid=rid, payload=payload))
+        for rid, ent in list(self.ledger.items()):
+            if (ent.get("resp") is None and "sfs_deadline" in ent
+                    and now >= ent["sfs_deadline"]):
+                self._answer(rid, ent, HTTP_UNAVAIL, b"", None, out)
         for rid in list(self.pending):
             job = self.pending[rid]
             ent = job["ent"]
@@ -1390,9 +1521,47 @@ def open_stream(args):
     return FrameStream(conn)
 
 
+def wait_for_stream(args, operator_socket):
+    """Keep the operator responsive while the frame transport opens."""
+    result = queue.Queue(maxsize=1)
+
+    def connect():
+        try:
+            result.put((open_stream(args), None))
+        except Exception as exc:
+            result.put((None, exc))
+
+    threading.Thread(target=connect, daemon=True).start()
+    while True:
+        try:
+            stream, error = result.get_nowait()
+        except queue.Empty:
+            service_operator(operator_socket, TICK_INTERVAL)
+            continue
+        if error is not None:
+            raise error
+        return stream
+
+
+def service_operator(operator_socket, timeout):
+    ready, _, _ = select.select(operator_socket.fileno_list(), [], [], timeout)
+    for fd in ready:
+        operator_socket.on_readable(fd)
+    operator_socket.poll(time.monotonic())
+
+
+def retry_wait(operator_socket):
+    deadline = time.monotonic() + 1.0
+    while time.monotonic() < deadline:
+        service_operator(operator_socket, max(0, min(TICK_INTERVAL, deadline - time.monotonic())))
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--config", metavar="FILE")
+    ap.add_argument("--operator-port", type=int, metavar="PORT",
+                    help="操作口の localhost ポート (0 は空きポート)")
     ap.add_argument("--listen", default="127.0.0.1:8026", metavar="HOST:PORT")
     ap.add_argument("--connect", metavar="HOST:PORT")
     ap.add_argument("--unix", metavar="PATH", help="UNIX ソケットで待ち受ける (ホスト TDD 用)")
@@ -1417,6 +1586,22 @@ def main():
                     metavar="{auto,win32,wsl,wayland,xclip,file:<path>,none}",
                     help="クリップボード backend (既定 auto)")
     args = ap.parse_args()
+    config = None
+    operator_addr = None
+    if args.config:
+        from host_agent_config import load_config, config_summary
+        try:
+            config = load_config(args.config)
+            args.listen = config["frame-endpoint"]
+            args.file_root = config["root"]
+            host, port = config["operator-endpoint"].rsplit(":", 1)
+            operator_addr = (host, int(port))
+        except (OSError, ValueError) as exc:
+            ap.error(str(exc))
+    if args.operator_port is not None:
+        if not 0 <= args.operator_port <= 65535:
+            ap.error("--operator-port must be between 0 and 65535")
+        operator_addr = ("127.0.0.1", args.operator_port)
     if not valid_clip_arg(args.clip):
         ap.error("--clip は {auto,win32,wsl,wayland,xclip,none} か file:<path> "
                  "(不正: %r)" % args.clip)
@@ -1428,18 +1613,31 @@ def main():
                       allow_net=not args.offline, file_root=args.file_root,
                       spool_dir=args.spool_dir, print_dir=args.print_dir,
                       clip=args.clip, printer=args.printer,
-                      lines_per_page=args.lines_per_page)
+                      lines_per_page=args.lines_per_page,
+                      peer=parse_mac(config["peer"]) if config else None,
+                      allow_write=("/",) if config and config["allow-write"] else ())
+    try:
+        commit = subprocess.check_output(["git", "-c", "safe.directory=*", "rev-parse", "HEAD"],  # /opt/os32 は利用者の持ち物、サービスは別ユーザー
+                                         cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                         text=True, stderr=subprocess.DEVNULL).strip()
+    except (OSError, subprocess.CalledProcessError):
+        commit = ""
+    def info():
+        return dict(commit=commit, config=config_summary(config) if config else
+                    dict(iface=None, root=args.file_root, allow_write=False, peer=None),
+                    peer=mac_str(agent.peer) if agent.established else None)
+    agent.operator_socket = OperatorSocket(operator_addr, agent.operator, info)
     pcap = Pcap(args.pcap) if args.pcap else None
     print("host_agent v2 mac %s agent-gen %d (wire v2, 3-way HELLO, rid ledger)"
           % (args.mac, agent.agent_gen), flush=True)
 
     while True:
         try:
-            stream = open_stream(args)
+            stream = wait_for_stream(args, agent.operator_socket)
         except OSError as e:
             print("connect failed: %s" % e, flush=True)
             if args.connect:
-                time.sleep(1.0)
+                retry_wait(agent.operator_socket)
                 continue
             return 1
         try:
@@ -1447,21 +1645,29 @@ def main():
                 # select で待つことで子プロセス (CLIP wsl) の完了 / 期限を巡回で
                 # 拾える (往復 3 B-1)。読めるものが無ければ tick だけ回す。
                 try:
-                    ready, _, _ = select.select([stream.sock], [], [], TICK_INTERVAL)
+                    ready, _, _ = select.select([stream.sock] + agent.operator_socket.fileno_list(), [], [], TICK_INTERVAL)
                 except OSError as e:
                     raise ConnectionError(str(e))
-                if ready:
-                    for frame in stream.recv_frames():
-                        agent.handle(frame, stream, pcap)
+                for fd in ready:
+                    if fd == stream.sock:
+                        for frame in stream.recv_frames():
+                            agent.handle(frame, stream, pcap)
+                    else:
+                        agent.operator_socket.on_readable(fd)
                 agent.tick(stream)
+                agent.operator_socket.poll(time.monotonic())
         except ConnectionError as e:
+            agent.operator.session_reset()
+            agent.established = False
+            agent.notifier.reset()
+            stream.sock.close()
             print("disconnected: %s (%s)" % (e, agent.counts), flush=True)
             if args.once:
                 return 0
             if args.connect or args.unix:
                 if args.unix:
                     continue
-                time.sleep(1.0)
+                retry_wait(agent.operator_socket)
 
 
 if __name__ == "__main__":

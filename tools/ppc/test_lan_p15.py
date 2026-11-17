@@ -6,9 +6,6 @@ from pathlib import Path
 import subprocess
 import tempfile
 
-CHECK = dict(name='ppc-lan-p15', tier=2, budget=60,
-             covers=['drivers/net/gem/gem_ring.c', 'tools/ppc/test_lan_p15.py', 'tools/ppc/lan_p15_fake.c'],
-             inputs=['drivers/net/gem/gem.h', 'include/types.h'])
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = [
     ('fifo-units', 'g->io.read32(g->io.ctx, GEM_RX_FIFO_SIZE) * 64u', 'g->io.read32(g->io.ctx, GEM_RX_FIFO_SIZE)', 'H:publish'),

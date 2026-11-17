@@ -462,6 +462,7 @@ class GuiTests(unittest.TestCase):
             (root / 'exec/appslot.h').write_text(source.replace('int  in_op_wait;',
                 'u32 added_field; int  in_op_wait;'))
             (root / 'include/memmap.h').write_text((ROOT / 'include/memmap.h').read_text())
+            (root / 'include/app_ids.h').write_text((ROOT / 'include/app_ids.h').read_text())
             for owner in range(1, 6):
                 self.http.put(0x160000 + owner * 64 + 20, struct.pack('<II', 99, owner % 2))
             with patch.object(gui, 'ROOT', root):

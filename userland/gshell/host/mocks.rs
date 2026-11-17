@@ -955,6 +955,8 @@ unsafe extern "C" fn switch_shell(s: *const u8) -> i32 {
 pub static HOST_NOTICE_SERIAL: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
 unsafe extern "C" fn host_notice_serial() -> u32 { HOST_NOTICE_SERIAL.load(Ordering::SeqCst) }
 
+unsafe extern "C" fn time_now_unavailable(_: *mut u32, _: *mut u32) -> i32 { -1 }
+
 pub fn init() {
     REGEN_RC.store(0, Ordering::SeqCst);
     REGEN_VALUE.store(0, Ordering::SeqCst);
@@ -962,6 +964,7 @@ pub fn init() {
     unsafe { gfx_ready = 1; }
     let mut a = os32api::mock_api();
     a.get_tick = get_tick;
+    a.sys_time_now = time_now_unavailable;
     a.host_notice_serial = host_notice_serial;
     HOST_NOTICE_SERIAL.store(0, Ordering::SeqCst);
     a.serial_trygetchar = serial_trygetchar;

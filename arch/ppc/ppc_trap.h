@@ -11,14 +11,18 @@ enum ppc_trap_reason {
     PPC_TRAP_ISI_PROTECT, PPC_TRAP_ISI_NOEXEC,
     PPC_TRAP_PROGRAM_FP, PPC_TRAP_PROGRAM_ILLEGAL,
     PPC_TRAP_PROGRAM_PRIVILEGED, PPC_TRAP_PROGRAM_TRAP,
+    PPC_TRAP_FP_UNAVAILABLE,
     PPC_TRAP_UNSUPPORTED = 0x100
 };
 void ppc_trap_set_handler(u32 vector, void (*handler)(struct ppc_frame *));
+#define PM_DEC_HZ 1000u   /* Physical DEC rate (1ms). */
 /* Boot CPU, EE=0. Success arms DEC before the caller may enable EE.
- * tick_hz must be 100 (10ms); failure leaves existing clock untouched. */
+ * tick_hz must be PM_DEC_HZ (1ms DEC); tick_clock_step makes 10ms ticks.
+ * Failure leaves existing clock untouched. */
 int ppc_dec_start(u32 tb_hz, u32 tick_hz);
 void ppc_decrementer_interrupt(struct ppc_frame *frame);
-void arch_cpu_idle(void) __attribute__((noreturn));
+/* Foreground only; returns with EE enabled. Never call from trap/IRQ. */
+void arch_cpu_idle(void);
 void arch_cpu_halt(void);
 void arch_cpu_stop(void) __attribute__((noreturn));
 /* Reader must access software PD/PT physical words via mapped RAM, DR=1.

@@ -414,7 +414,7 @@ static void test_registry(void)
     EXPECT(gfx2_adapter_register(&v1[4], 5, 1) == OS32_ERR_FULL && gfx2_active() == a);
     EXPECT(gfx2_adapter_register(NULL, 1, 0) == OS32_ERR_INVAL);
     EXPECT(gfx2_adapter_register(&v1[5], 0, 0) == OS32_ERR_INVAL);
-    EXPECT(gfx2_adapter_register(&v1[5], 6, 0) == OS32_ERR_INVAL);
+    EXPECT(gfx2_adapter_register(&v1[5], GFX2_KIND_MAX + 1, 0) == OS32_ERR_INVAL);
     EXPECT(gfx2_adapter_register(&v1[5], 1, 4) == OS32_ERR_INVAL);
 }
 static void test_sync_caller(void)
@@ -453,8 +453,10 @@ static GfxBackend *select_backend;
 static int ring3_call_from_user(void) { return 0; }
 static int con_sink_is_enabled(void) { return 0; }
 static int appslot_gfx_owner(void) { return 42; }
-static int pc98_route_safe(void) { return 1; }
-static void pc98_splash_raster_reset(void) { }
+int pc98_route_safe(void) { return 1; }
+int gfx_return_emergency(u32 owner, int reason) { (void)owner; (void)reason; return 0; }
+static int raster_resets;
+void pc98_splash_raster_reset(void) { raster_resets++; }
 static void gfx_policy_reeval(void) { }
 static void gfx_reinit_surfaces(int finish) { (void)finish; core_reinits++; }
 static int gfx_select_mode(GfxBackend *be, int legacy) { (void)be; (void)legacy; return 1; }
@@ -479,6 +481,10 @@ static void test_core_calls(void)
     select_backend = &gfx_backend_geforce;
     int binds = rebinds;
     gfx_init_mode(0);
+    EXPECT(raster_resets == 1);
+    EXPECT(display_provider_client_before_init(select_backend));
+    EXPECT(display_provider_idle_safe(GFX_PREF_GEFORCE));
+    EXPECT(!display_provider_init_failed(select_backend));
     struct gfx2_adapter *a = gfx2_active();
     EXPECT(a && a->v1 == select_backend && palette_resets == 1 && rebinds == binds + 1);
     EXPECT(gfx2_adapter_get(3) && !gfx2_adapter_get(4));

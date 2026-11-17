@@ -53,6 +53,7 @@
  * `host:` を /host/ へ直したパスの幅 (実効 - 1)。 */
 #define RSHELL_LINE_MAX       128
 #define RSHELL_HOST_PATH_MAX  256
+#define RSHELL_HOST_PREFIX    "/host"
 
 /* env_expand の戻り値。負はすべて「展開できなかった」で、-2 は
  * **変数名が ENV_NAME_MAX に収まらなかった**ことを表す (T9)。
@@ -187,6 +188,18 @@ int  shell_cmd_recover(int argc, char **argv);
 int  shell_cmd_peek(int argc, char **argv); /* cmd_peek.c: peek (TASK_KPEEK、表は cmd_sys.c) */
 void shell_cmd_hdprep_init(void); /* cmd_hdprep.c: hdprep (票 TASK_HDD_INSTALL 段 1) */
 void shell_rshell_init(void);
+/* X10: foreground LAN entry points; line-boundary arbitration is X11. */
+int rsh_lan_execute(const char *line);
+int rsh_lan_handoff(const char *line);
+/* Returned after the LAN exit reply attempt and capture END. */
+#define RSH_LAN_EXIT 2
+#ifdef SHELL_REMOTE_APP
+void rsh_lan_app_init(void);
+int rsh_lan_app_loop(void);
+#endif
+int rsh_lan_poll(void);
+void rsh_lan_reset(void);
+int rsh_lan_flush(unsigned int id, unsigned int dropped);
 void shell_cmd_env_init(void);
 void shell_cmd_script_init(void);
 void shell_cmd_filer_init(void);

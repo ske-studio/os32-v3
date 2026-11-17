@@ -64,6 +64,9 @@ static inline void arch_mmu_flush_tlb(void);
  *       取り出すため)。変換以外の CPU 設定には触らない。ブートで 1 回だけ。 */
 static inline void arch_mmu_enable(void);
 
+/* 浮動小数点の装置があるか (起動の時の判定の結果。1 = ある)。公開の KAPI ではない。 */
+int arch_fp_present(void);
+
 /* ======================================================================== */
 /*  2. 実装の取り込み                                                       */
 /*                                                                          */
@@ -74,4 +77,5 @@ static inline void arch_mmu_enable(void);
 #include "arch_cpu.h"       /* arch/$(ARCH)/arch_cpu.h */
 
 #endif /* !__ASSEMBLER__ */
+
 #endif /* CPU_H */

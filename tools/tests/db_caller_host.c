@@ -1,5 +1,7 @@
 #include "host_exec_context.h"
 #define OS32_SQLITE_DIRECT_TEST 1
+/* Module availability is provided by the host fixture. */
+int services_public = 1;
 /* Actual dispatcher, DB/output wrappers, VFS and caller copy/walk.
  * Only SQLite and the filesystem driver are entry-recording boundaries. */
 #define HOST_DB_CALLER_TEST
@@ -30,7 +32,7 @@ void ring3_fault_kill(void) {
 #include "kapi_db.h"
 #include "kapi_print.h"
 #include "kapi_strings.h"
-#include "../../drivers/base/dev.h"
+#include "../../kernel/dev/dev.h"
 int con_sink_is_enabled(void) { return 0; }
 #include "disk_policy_host_source.c"
 /* The denied write must return before device lookup or IO. */
@@ -52,6 +54,7 @@ static u32 tick_count;
 volatile u32 ring3_caller_reject_count;
 static void ring3_abort_check(void) {}
 static void ring3_gui_pump(void) {}
+static void idle_work_run(void) {}
 static int stop_park_calls;
 static void exec_park_stop(struct arch_syscall *frame) { (void)frame; stop_park_calls++; }
 /* kprintf is outside this fixture; sys_stat uses the real string staging. */
@@ -396,3 +399,5 @@ int kstrcmp(const char *a, const char *b) { while (*a && *a == *b) { a++; b++; }
 int kstrncmp(const char *a, const char *b, u32 n) { while (n && *a && *a == *b) { a++; b++; n--; } return n ? (u8)*a - (u8)*b : 0; }
 char *kstrncpy(char *d, const char *s, u32 n) { u32 i = 0; if (n) { for (; i + 1 < n && s[i]; i++) d[i] = s[i]; d[i] = 0; } return d; }
 char *kstrncat(char *d, const char *s, u32 n) { u32 count = kstrlen(d); if (count < n) kstrncpy(d + count, s, n - count); return d; }
+
+#include "sqlite_bits_host.h"

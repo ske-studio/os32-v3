@@ -13,7 +13,10 @@ CHECK = dict(name='splash-probe-host', tier=1,
             'include/bootinfo.h', 'include/build_id.h', 'include/config.h', 'arch/x86/kernel/idt.h',
             'kernel/time/ktime.h', 'sdk/include/os32/os32_kapi_shared.h'], needs=[],
     # Reduced host workload measured 13.13 s locally; allow over 2x headroom.
-    budget=51.6)
+    budget=51.6,
+    basis=['docs/design/platform/pc98/splash_probe.c.md 1 行の OUT の列の計測 (PL の列・M1)', 'docs/design/drivers/video/pc98/splash_raster.c.md begin の判定'],
+    env_limit='fake scan/clockでprobeの有限走査を確認するが、実入力波形とIRQ blackoutは保証しない。',
+)
 import argparse
 import os
 import re

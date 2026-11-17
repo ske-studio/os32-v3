@@ -1,7 +1,5 @@
 {
   "base": "466010d7",
-  "kapi_sha256_recipe": "Review sdk/kapi.json append-only ABI changes, load it with json.loads, pop includes, then SHA256(json.dumps(spec, sort_keys=True).encode()).hexdigest(); refresh only kapi_sha256, preserving base and old_generations.",
-  "kapi_sha256": "44e74f11b50aabe93de7adc374e4f6801052e0e91423e5d4603bcde7c757218f",
   "apis": {
     "pcm": {
       "type": "PcmModuleApi",
@@ -157,7 +155,7 @@
     "kdebug": 815368837
   },
   "imports_sha256": {
-    "pcm": "3434cbffe02404f83ea2e62f1d18e3cdb38e2da619b90af87cb4eff78ea07e16",
+    "pcm": "d4947c6cda1df7c7ef90dfe4e14e8c7c8ff2ee53ea203f14f48b72dfb882e2f1",
     "fm": "78fb135af8b858bf87eb388f46a9f4add4a21ba66ae5314a380a9308c58fcd66",
     "lan": "6090403dcb0741935e4b6ba68e147205c7591c5536357314681061ecc443f605",
     "kdebug": "772108d27c2e52b28f7d26016e76ec606fb04abbb4a1cde9189b9d4030f93edc"

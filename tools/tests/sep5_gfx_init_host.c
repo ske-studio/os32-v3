@@ -85,7 +85,7 @@ static void backend_enter(void) { event(EV_CALL, F_ENTER, 0); }
 static GfxMode host_mode = { .height = 400 };
 static GfxBackend host_backend = { .enter = backend_enter, .selected_mode = &host_mode };
 GfxBackend *g_backend = &host_backend;
-void pc98_splash_raster_reset(void) { event(EV_CALL, F_SPLASH, 0); }
+void display_provider_raster_reset(void) { event(EV_CALL, F_SPLASH, 0); }
 static int select_packed;
 static int palette_writes;
 void display_palette4_write(int idx, u8 r, u8 g, u8 b)
@@ -123,7 +123,7 @@ void palette_init(void) { event(EV_CALL, F_PALETTE, 0); }
 void gfx_scroll_init(void) { event(EV_CALL, F_SCROLL, 0); }
 #include "gfx_core_slice.inc"
 
-/* B6: the common present path (gfx/gfx_vram.c _flip_page and _present_dirty),
+/* B6: the common present path (drivers/video/pc98/gfx_vram.c _flip_page and _present_dirty),
  * extracted from the product text; transfer steps are recording fakes. */
 enum { F_MERGE = 20, F_FLUSH };
 GfxCounters gfx_counters;

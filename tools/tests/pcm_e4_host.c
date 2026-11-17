@@ -90,3 +90,7 @@ int main(void)
         test_case(scene);
     return failed != 0;
 }
+
+/* Clock-independent registry fixture. */
+void tick_budget_begin(void) { }
+void tick_budget_end(void) { }

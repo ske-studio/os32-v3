@@ -9,11 +9,12 @@ u32 paging_app_pt_nospc_count, paging_app_data_nospc_count;
 
 int paging_app_context(const struct addrspace *as)
 {
+    if (kctx_irq_depth || kctx_exc_depth) { paging_irq_ops++; return 0; }
     if (!as || as->appmem_poisoned || !as->pd_phys || as->pd_phys % PAGE_SIZE || !as->lease_pt_phys[0] ||
         as->app_pde != APP_BAND_PDE || as->app_pde_count != MEM_APP_BAND_MAX_PDES ||
         !pgalloc_page_owned(as->pd_phys / PAGE_SIZE, as->owner) ||
         (paging_current_cr3() != paging_kernel_pd_phys() &&
-         paging_current_cr3() != as->pd_phys) || kctx_irq_depth || kctx_exc_depth ||
+         paging_current_cr3() != as->pd_phys) ||
         !_irq_enabled()) return 0;
     const u32 *pd = P2V(as->pd_phys);
     for (u32 k = 0; k < MEM_APP_BAND_MAX_PDES; k++) {

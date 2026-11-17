@@ -7,7 +7,9 @@ CHECK = dict(name='trident-sync-host', tier=1, needs=[], budget=3.8,
             'gfx/gfx_internal.h', 'gfx/gfx.h', 'include/gfx_hal.h', 'include/gfx_format.h',
             'include/gfx_mode.h', 'mm/kmalloc.h', 'sdk/include/os32/os32_kapi_shared.h',
             'sdk/include/os32/os32_generations.h', 'include/types.h', 'include/memmap.h',
-            'include/pegc.h', 'include/pc98.h', 'gfx/palette.h', 'build/config.mk'])
+            'include/pegc.h', 'include/pc98.h', 'gfx/palette.h', 'build/config.mk'],
+    basis=['HAL_V2_DESIGN §10', 'HAL_V2_DESIGN §13-3', 'TRIDENT_FULL_DESIGN'],
+)
 
 def run(ctx):
     import os

@@ -3,15 +3,45 @@
 #include "kstring.h"
 static unsigned scenario;
 static u32 pci_addr;
+#ifdef RH2_TREE
+static u32 command = 7, clock_word = 0x12340000, clock_calls, phase, bad_order;
+u32 pm_clock_read(u32 va) { if (va != 0x3000) bad_order = 1; return clock_word; }
+void pm_clock_write(u32 va, u32 v) { if (va != 0x3000) bad_order = 1; clock_word = v; clock_calls++; phase = 1; }
+#endif
 u32 ppc_irq_save(void) { return 0; }
 void ppc_irq_restore(u32 flags) { (void)flags; }
-void pm_pci_mmio_write32(u32 va, u32 value) { if (va==0x1000) pci_addr=__builtin_bswap32(value); }
-u32 pm_pci_mmio_read32(u32 va) { return __builtin_bswap32(va==0x1000?pci_addr:pci_addr==(1u<<15)?0x0021106b:0xffffffffu); }
+void pm_pci_mmio_write32(u32 va, u32 value) {
+    if (va == 0x1000) {
+#ifdef RH2_TREE
+        if (scenario == 26 && !phase) bad_order = 1;
+        if (phase == 1) phase = 2;
+#endif
+        pci_addr = __builtin_bswap32(value);
+    }
+#ifdef RH2_TREE
+    else if (va == 0x2004) command = __builtin_bswap32(value);
+#endif
+}
+u32 pm_pci_mmio_read32(u32 va) {
+#ifdef RH2_TREE
+    if (va >= 0xfe380000) return __builtin_bswap32(1);
+    if (va == 0x2004) return __builtin_bswap32(command);
+#endif
+    return __builtin_bswap32(va==0x1000?pci_addr:pci_addr==(1u<<15)?0x0021106b:0xffffffffu);
+}
 
 static void put(u8 *p,u32 v) { p[0]=v>>24; p[1]=v>>16; p[2]=v>>8; p[3]=v; }
 static int property(int node,const char *name,u8 *p)
 {
     const char *s=0; unsigned n=0;
+#ifdef RH2_TREE
+    if (node == 1 && !kstrcmp(name, "model")) s = scenario == 27 ? "QEMU,Mac99" : "fixture,QuickSilver";
+    if (node == 6 && !kstrcmp(name, "reg")) {
+        put(p, scenario == 29 ? 0xf2000000 : 0xf8000000);
+        put(p+4, scenario == 30 ? 0x20 : scenario == 31 ? 0xffffffff : 0x1000);
+        return scenario == 32 ? 7 : 8;
+    }
+#endif
     if (node==1 && !kstrcmp(name,"#address-cells")) { put(p,scenario==21?2:1); return 4; }
     if (node==1 && !kstrcmp(name,"#size-cells")) { put(p,scenario==16?2:1); return 4; }
     if (node==2 && !kstrcmp(name,"compatible")) s=scenario==3?"u3":"uni-north";
@@ -49,7 +79,11 @@ static int property(int node,const char *name,u8 *p)
     if (!s) return -1;
     do { p[n]=s[n]; } while (s[n++]); return n;
 }
-int ofw_finddevice(const char *s) { return !kstrcmp(s,"/")?1:!kstrcmp(s,"/chosen")?5:0; }
+int ofw_finddevice(const char *s) { return !kstrcmp(s,"/")?1:!kstrcmp(s,"/chosen")?5:
+#ifdef RH2_TREE
+    !kstrcmp(s,"/uni-n") && scenario != 28 ? 6 :
+#endif
+    0; }
 int ofw_parent(int n) { return n==3||n==4?2:n==2?(scenario==15?6:1):n==6?1:0; }
 int ofw_child(int n) { if (scenario==22 || scenario==23) { if (n==3) return 100; if (n>=100 && n<(scenario==22?105:106)) return n+1; } return n==1?2:n==2?3:0; }
 int ofw_peer(int n) { if (scenario==24 || scenario==25) { if (n==2) return 100; if (n>=100 && n<(scenario==24?1121:1122)) return n+1; } return n==3 && scenario==2?4:0; }
@@ -68,6 +102,21 @@ void entry(unsigned *stack)
 {
     const char *p=(const char *)stack[2]; while (*p) scenario=scenario*10+(*p++-'0');
     struct pm_gmac_boot b; mark(); int rc=pm_gmac_capture(&b);
+#ifdef RH2_TREE
+    if (scenario >= 26) {
+        if (rc) { diagnostic(1001); quit(1); }
+        if (b.clock.valid != (scenario == 26)) { diagnostic(1003); quit(1); }
+        struct pm_pci p = {0x1000,0x2000,b.bus_first,b.bus_last,b.bdf};
+        if (pm_gmac_quiesce_setup_rh(&b, &p, 0x3000) || pm_gmac_early_quiesce()) { diagnostic(1003); quit(1); }
+        const struct pm_gmac_rh_sample *q = pm_gmac_rh_sample();
+        if (clock_calls != (scenario == 26) || bad_order || command != 3 ||
+            !q->valid || q->command != 7 || q->tx_enable != 1 || q->rx_enable != 1 ||
+            (scenario == 26 && (phase != 2 || clock_word != 0x12340002 || b.clock.pa != 0xf8000020 || b.clock.mask != 2))) {
+            diagnostic(1003); quit(1);
+        }
+        quit(0);
+    }
+#endif
     const int expected[]={0,LAN_ENODEV,LAN_EUNSUPPORTED,LAN_EUNSUPPORTED,LAN_EINVAL,LAN_ERANGE,LAN_ERANGE,LAN_ERANGE,LAN_ERANGE,LAN_EINVAL,LAN_EINVAL,0,0,LAN_EUNSUPPORTED,0,LAN_EUNSUPPORTED,LAN_ERANGE,LAN_ERANGE,LAN_ERANGE,LAN_ERANGE,LAN_ERANGE,LAN_ERANGE,0,LAN_ERANGE,0,LAN_ERANGE};
     if (rc!=expected[scenario]) { diagnostic(1001); quit(1); }
     if (rc) { const u8 *v=(const u8 *)&b; for (unsigned i=0;i<sizeof(b);i++) REQUIRE(!v[i]); quit(0); }
@@ -83,3 +132,7 @@ void entry(unsigned *stack)
     quit(0);
 }
 __asm__(".global _start\n_start:\n mov %esp,%eax\n push %eax\n call entry\n");
+
+#ifndef RH2_TREE
+int pm_gmac_clock(const struct pm_gmac_boot *b, u32 va) { (void)b; (void)va; return LAN_EUNSUPPORTED; }
+#endif

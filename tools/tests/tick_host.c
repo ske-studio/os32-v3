@@ -19,11 +19,15 @@ static void irq_restore(unsigned int f) { CHECK(!(host_if & 0x200U)); host_if = 
 #endif
 #include TICK_SOURCE
 volatile u32 kctx_irq_depth;
-static unsigned int log[TICK_SLOT_COUNT], count;
+static unsigned int log[TICK_SLOT_COUNT + 2], count;
+#define BEGIN_EVENT TICK_SLOT_COUNT
+#define END_EVENT (TICK_SLOT_COUNT + 1)
+static unsigned int phase;
 static void record(unsigned int n) {
+    CHECK(phase == (n < ARCH_TICK_BUDGET_FIRST_SLOT ? 0U : 1U));
     CHECK(kctx_irq_depth && !(host_if & 0x200U));
     CHECK(tick_register(n, 0) == TICK_ERR_CTX);
-    CHECK(count < TICK_SLOT_COUNT); log[count++] = n;
+    CHECK(count < TICK_SLOT_COUNT + 2); log[count++] = n;
 }
 static void snd(void) { record(PC98_TICK_SND); }
 static void pcm(void) { record(PC98_TICK_PCM); }
@@ -34,8 +38,8 @@ static void lgy98(void) { record(PC98_TICK_LGY98); }
 static void gf(void) { record(PC98_TICK_GF); }
 static tick_fn callbacks[] = {snd, pcm, ne2k, e82557, link, lgy98, gf};
 static void dispatch(unsigned int expected) {
-    count = 0; host_if = 0x2; kctx_irq_depth = 1;
-    tick_dispatch(); CHECK(count == expected);
+    count = 0; phase = 0; host_if = 0x2; kctx_irq_depth = 1;
+    tick_dispatch(); CHECK(count == expected + 2); CHECK(phase == 2);
     kctx_irq_depth = 0;
 }
 void _start(void) {
@@ -55,11 +59,25 @@ void _start(void) {
             kctx_irq_depth = 0;
         }
         dispatch(TICK_SLOT_COUNT - n);
-        for (unsigned int i = 0; i < count; i++) CHECK(log[i] == n + i);
+        unsigned int pos = 0;
+        for (unsigned int i = n; i < TICK_SLOT_COUNT; i++) {
+            if (i == ARCH_TICK_BUDGET_FIRST_SLOT ||
+                (i == n && n > ARCH_TICK_BUDGET_FIRST_SLOT))
+                CHECK(log[pos++] == BEGIN_EVENT);
+            CHECK(log[pos++] == i);
+        }
+        CHECK(log[pos++] == END_EVENT); CHECK(pos == count);
     }
     dispatch(TICK_SLOT_COUNT);
-    for (unsigned int i = 0; i < count; i++) CHECK(log[i] == i);
+    for (unsigned int i = 0; i < TICK_SLOT_COUNT; i++)
+        CHECK(log[i + (i >= ARCH_TICK_BUDGET_FIRST_SLOT)] == i);
+    CHECK(log[ARCH_TICK_BUDGET_FIRST_SLOT] == BEGIN_EVENT);
+    CHECK(log[TICK_SLOT_COUNT + 1] == END_EVENT);
     CHECK(saves == restores);
     __asm__ volatile("int $0x80" : : "a"(1), "b"(0));
     for (;;) {}
 }
+
+/* Clock-independent registry fixture. */
+void tick_budget_begin(void) { CHECK(phase == 0); CHECK(count < TICK_SLOT_COUNT + 2); log[count++] = BEGIN_EVENT; phase = 1; }
+void tick_budget_end(void) { CHECK(phase == 1); CHECK(count < TICK_SLOT_COUNT + 2); log[count++] = END_EVENT; phase = 2; }

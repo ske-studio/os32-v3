@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """D3 network CD with real persistent session, block RPC and wire protocol."""
 CHECK = dict(name='hostsvc-netcd', tier=1, needs=[], budget=31.5, covers=[
-    'drivers/block/netcd.c', 'drivers/block/netcd.h', 'drivers/base/dev.h',
+    'drivers/block/netcd.c', 'drivers/block/netcd.h', 'kernel/dev/dev.h',
     'fs/serialfs/sfs_block.c', 'fs/serialfs/sfs_block.h',
-    'fs/serialfs/serialfs_persistent.c', 'fs/serialfs/serialfs.h',
+    'fs/serialfs/serialfs_persistent.c', 'include/boot_token.h', 'fs/serialfs/serialfs.h',
     'fs/serialfs/sfs_client.c', 'fs/serialfs/sfs_client.h',
     'fs/serialfs/sfs_proto.c', 'fs/serialfs/sfs_proto.h',
     'net/host_mailbox.h', 'net/nic.h', 'fs/vfs.h',
@@ -12,7 +12,10 @@ CHECK = dict(name='hostsvc-netcd', tier=1, needs=[], budget=31.5, covers=[
     'tools/tests/hostsvc_fixture.h', 'tools/tests/host32.py',
     'tools/tests/kernel_includes.py', 'build/config.mk', 'include/types.h',
     'lib/crc32.c', 'lib/crc32.h', 'lib/le_internal.h',
-    'lib/kstring.h', 'lib/kstring_asm.asm'])
+    'lib/kstring.h', 'lib/kstring_asm.asm'],
+    env=[], basis=['PACK ppc-sfs-deadline PM condition B', 'LAN_OPERATOR_DESIGN §5', 'docs/design/drivers/block/netcd.md 読みと媒体の確かめ'],
+    env_limit='fake network/NIC/mediaでsession・世代・期限を確認するが、実ネットワークと実媒体の障害は再現しない。',
+)
 
 import argparse
 import os
@@ -53,7 +56,8 @@ def build_run(work, source):
     exe = work / 'netcd-test'
     subprocess.run(['gcc', '-m32', '-march=i386', '-std=gnu11', '-O2',
         '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-pie',
-        '-fno-stack-protector', '-nostdlib', '-static', '-no-pie',
+        '-fno-stack-protector', '-nostdlib', '-nostdinc', '-isystem',
+        subprocess.check_output(['gcc', '-print-file-name=include'], text=True).strip(), '-static', '-no-pie',
         '-I' + str(ROOT), '-I' + str(ROOT / 'drivers/block'), *include_flags(ROOT),
         '-DPRODUCT_SOURCE="' + str(src) + '"',
         *[str(ROOT / p) for p in [

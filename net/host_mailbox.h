@@ -1,6 +1,8 @@
 /* NET_HOSTSVC_DESIGN addendum: shared declarations, implementation in later stages. */
 #ifndef OS32_NET_HOST_MAILBOX_H
 #define OS32_NET_HOST_MAILBOX_H
+#define MAILBOX_ALL 65535u
+
 #include "types.h"
 #include "../sdk/include/os32/os32_host_notice.h"
 

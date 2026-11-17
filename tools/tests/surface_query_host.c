@@ -74,9 +74,18 @@ static void caller_copy_tests(void)
     ledger_surfaces[sid[0]].role = LEDGER_ROLE_CLIENT;
     ledger_surfaces[sid[0]].backend = LEDGER_SF_PC98;
     ledger_surfaces[sid[0]].perm_max = LEDGER_PERM_RW;
-    for (u32 backend = LEDGER_SF_PC98; backend <= LEDGER_SF_TRIDENT; backend++) {
+    for (u32 backend = LEDGER_SF_PC98; backend <= LEDGER_SF_OF_FB; backend++) {
         source.backend = backend; ledger_surfaces[sid[0]].backend = backend;
         query_expect(0);
+        CHECK(value->desc[0].backend == backend && value->desc[0].width == 64 &&
+              value->desc[0].height == 16 && value->desc[0].pitch == 8);
+        source.role = LEDGER_ROLE_DISPLAY;
+        ledger_surfaces[sid[0]].role = LEDGER_ROLE_DISPLAY;
+        slot.hdr_flags = OS32X_FLAG_GFX;
+        if (backend != LEDGER_SF_PC98) query_expect(0);
+        source.role = LEDGER_ROLE_CLIENT;
+        ledger_surfaces[sid[0]].role = LEDGER_ROLE_CLIENT;
+        slot.hdr_flags = 0;
     }
     /* Exercise authorize directly: snapshot/backend mismatch must not mask it. */
     unsigned int saved_irq = irq_save();
@@ -85,7 +94,7 @@ static void caller_copy_tests(void)
         source.backend = role <= LEDGER_ROLE_DISPLAY ? 0 : LEDGER_SF_PC98;
         CHECK(surface_query_authorize(&source, &auth) == OS32_ERR_INVAL);
         if (role <= LEDGER_ROLE_DISPLAY) {
-            source.backend = LEDGER_SF_TRIDENT + 1;
+            source.backend = LEDGER_SF_OF_FB + 1;
             CHECK(surface_query_authorize(&source, &auth) == OS32_ERR_INVAL);
         }
     }

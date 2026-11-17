@@ -7,7 +7,9 @@ CHECK = dict(name='trident-cpu32', tier=1, needs=[], budget=4.2,
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'tools/tests/mutpar.py',
             'drivers/video/trident/*.h', 'include/*.h', 'gfx/*.h',
             'lib/serial_diag.h', 'drivers/char/serial.h', 'kernel/module/*.h',
-            'sdk/include/os32/*.h', 'build/config.mk'])
+            'sdk/include/os32/*.h', 'build/config.mk'],
+    basis=['TRIDENT_FULL_DESIGN §3', 'TRIDENT_FULL_DESIGN §10'],
+)
 import os
 from pathlib import Path
 import subprocess

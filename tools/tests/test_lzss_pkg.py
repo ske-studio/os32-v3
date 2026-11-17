@@ -7,7 +7,9 @@ The regression used to corrupt /b[0] in a match starting at A[17988], distance
 """
 CHECK = dict(name='lzss-pkg-host', tier=1,
     covers=['tools/mkpkg.py', 'tools/deploy_manifests.py', 'build/core.yaml', 'userland/deploy.yaml', 'userland/lib/rt/pkg.c', 'tools/tests/lzss_pkg_host.c', 'tools/tests/host32.py'],
-    needs=['make:all'], budget=28.9)
+    needs=['make:all'], budget=28.9,
+    kind='characterization',
+)
 
 import argparse
 import hashlib

@@ -7,7 +7,7 @@ CHECK = dict(name='osri-view-host', tier=1,
             'drivers/video/pc98/splash_raster_run.h', 'drivers/video/pc98/splash_raster_play.c',
             'drivers/video/pc98/splash_raster_image.h',
             'drivers/video/pc98/splash_raster_image.c', 'platform/pc98/splash.c',
-            'platform/pc98/splash_image.c', 'init/boot_splash.c',
+            'platform/pc98/splash_image.c', 'platform/pc98/boot_splash.c',
             'drivers/video/pc98/splash_raster_play.h', 'drivers/video/pc98/splash_raster_plan.c',
             'drivers/video/pc98/splash_raster.c', 'drivers/video/pc98/splash_raster.h',
             'tools/tests/test_osri_view.py', 'tools/tests/osri_view_host.c',
@@ -21,7 +21,9 @@ CHECK = dict(name='osri-view-host', tier=1,
             'exec/appslot.h', 'exec/exec.h', 'fs/vfs.h', 'fs/serialfs/serialfs.h',
             'fs/serialfs/sfs_client.h', 'mm/kmalloc.h', 'lib/kstring.h', 'lib/serial_diag.h',
             'lib/le_internal.h', 'lib/crc32_core.inc', 'sdk/include/os32/os32_kapi_shared.h', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h'],
-    needs=[], budget=5.6)
+    needs=[], budget=5.6,
+    basis=['OSRI_VIEWER_DESIGN §2', 'OSRI_VIEWER_DESIGN §3', 'OSRI_VIEWER_DESIGN §4', 'OSRI_VIEWER_DESIGN §5', 'OSRI_VIEWER_DESIGN §6'],
+)
 import subprocess
 
 def run(ctx):

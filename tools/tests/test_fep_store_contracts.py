@@ -11,7 +11,9 @@ CHECK = dict(name='fep-store-contracts', tier=1, needs=[], budget=4.4,
             'kernel/ime/fep_module.h', 'kernel/module/module_runtime.h',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
             'build/config.mk', 'kernel/ime/ime_dict_info.c',
-            'lib/sqlite3/os32_sqlite_vfs.h'])
+            'lib/sqlite3/os32_sqlite_vfs.h'],
+    basis=['docs/design/kernel/ime/ime_store.md 型と不変条件', 'docs/design/kernel/ime/ime_store.md 口の持ち主'],
+)
 
 import argparse
 import os

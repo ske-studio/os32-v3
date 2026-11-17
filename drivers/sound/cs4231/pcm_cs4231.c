@@ -12,11 +12,14 @@
 /*   - Index と Data の組は 1 つの irq_save の中 (往復 1 B9)。               */
 /* ======================================================================== */
 
+#include "kernel_tick.h"   /* tick_count */
 #include "pcm_cs4231.h"
+#include "pcm_refill.h"
 #include "../../dma/dma8237.h"
 #include "dma_pool.h"
 #include "kmalloc.h"     /* ステージングは DMA しないので KHEAP から */
 #include "irq.h"
+#include "tick_clock.h"  /* tick_clock_jiffy64 */
 #ifdef OS32_PCM_MODULE
 #include "pcm_module.h"
 extern u32 ktime_ticks(void);
@@ -26,7 +29,6 @@ extern u32 ktime_ticks(void);
 #define dma_alloc pcm_module_dma_alloc
 #define dma_free pcm_module_dma_free
 #else
-#include "idt.h"        /* tick_count */
 #endif
 #include "io.h"
 #include "kprintf.h"
@@ -183,8 +185,12 @@ static unsigned long long pcm_clock_us(void)
 {
     u32 lo = 0, hi = 0;
 
-    if (sys_time_now(&lo, &hi) != 0)
-        return (unsigned long long)tick_count * PCM_US_PER_TICK;
+    if (sys_time_now(&lo, &hi) != 0) {
+        unsigned int flags = irq_save();
+        tick_clock_jiffy64(&lo, &hi);
+        irq_restore(flags);
+        return (((unsigned long long)hi << BITS_PER_U32) | lo) * PCM_US_PER_TICK;
+    }
     return ((unsigned long long)hi << BITS_PER_U32) | (unsigned long long)lo;
 }
 
@@ -364,11 +370,31 @@ static void pcm_advance_restart(void)
     if (g_pcm.close_pending) g_pcm.state = PCM_ST_DRAINING;
 }
 
-static void pcm_advance_run(void)
+enum pcm_advance_origin { PCM_FROM_IRQ10, PCM_FROM_TICK };
+
+#ifdef PCM_REFILL_DIAG
+/* Build with KERNEL_CFLAGS_EXTRA=-DPCM_REFILL_DIAG.
+ * Private map symbols: [IRQ10, IRQ0], observation and copy/zero separately.
+ * Clock instrumentation is diagnostic-only; totals/maxima are microseconds. */
+struct pcm_refill_stat { u32 calls, total_us, max_us; };
+struct pcm_refill_stat pcm_diag_observe[2], pcm_diag_refill[2];
+static void pcm_refill_record(struct pcm_refill_stat *s, u32 start)
+{
+    u32 elapsed = (u32)pcm_clock_us() - start;
+    s->calls++;
+    s->total_us += elapsed;
+    if (elapsed > s->max_us) s->max_us = elapsed;
+}
+#endif
+
+static void pcm_advance_run(enum pcm_advance_origin origin)
 {
     struct pcm_act act;
-    u32 left = 0, p1 = 0;
+    u32 left = 0, p1 = 0, now;
     int tc = 0, have = 0;
+#ifdef PCM_REFILL_DIAG
+    u32 started = (u32)pcm_clock_us();
+#endif
 
     /* close が RS_* の途中で立てた close_pending を RUNNING でも拾う
      * (RS_RESTART の完了と close の入口がどちらの順でも drain に入る)。 */
@@ -381,12 +407,46 @@ static void pcm_advance_run(void)
         /* tc は**判定に使わない** (往復 6 R1/R2)。診断の通知だけ落とす。 */
         if (tc) dma_chan_ack_tc(PCM_DMA_CHAN);
     }
-    pcm_obs(&g_pcm, have, p1, pcm_now(), &act);
-    if (act.refill) pcm_copy_half(act.to_half, act.src_off, act.frames);
+    now = pcm_now();
+    if (origin == PCM_FROM_TICK && have &&
+        p1 / PCM_HALF_FRAMES != g_pcm.half) {
+        /* Recheck immediately before either deferral or pcm_obs. Do not
+         * publish a half/staging/drain change until the rescue is due. */
+        have = dma_chan_remaining(PCM_DMA_CHAN, &left, &tc) == 0;
+        if (have) {
+            p1 = pcm_pos_frames(left);
+            if (tc) dma_chan_ack_tc(PCM_DMA_CHAN);
+        }
+        now = pcm_now();
+        if (have && p1 / PCM_HALF_FRAMES != g_pcm.half &&
+            (u32)(now - g_pcm.now) <
+                (PCM_HALF_FRAMES * USEC_PER_SEC) / g_pcm.rate &&
+            pcm_cont(g_pcm.half, g_pcm.pos, p1 / PCM_HALF_FRAMES, p1)
+                != PCM_CONT_LOST &&
+            !pcm_tick_rescue_due(p1, g_pcm.rate)) {
+#ifdef PCM_REFILL_DIAG
+            pcm_refill_record(&pcm_diag_observe[origin], started);
+#endif
+            return;
+        }
+    }
+    pcm_obs(&g_pcm, have, p1, now, &act);
+#ifdef PCM_REFILL_DIAG
+    pcm_refill_record(&pcm_diag_observe[origin], started);
+#endif
+    if (act.refill) {
+#ifdef PCM_REFILL_DIAG
+        started = (u32)pcm_clock_us();
+#endif
+        pcm_copy_half(act.to_half, act.src_off, act.frames);
+#ifdef PCM_REFILL_DIAG
+        pcm_refill_record(&pcm_diag_refill[origin], started);
+#endif
+    }
     if (act.entered) pcm_stop_entry();
 }
 
-static int pcm_advance(void)
+static int pcm_advance(enum pcm_advance_origin origin)
 {
     int handled = 0;
 
@@ -406,7 +466,7 @@ static int pcm_advance(void)
 
     switch (g_pcm.state) {
     case PCM_ST_RUNNING:
-    case PCM_ST_DRAINING:   pcm_advance_run(); break;
+    case PCM_ST_DRAINING:   pcm_advance_run(origin); break;
     case PCM_ST_RS_STOP:
     case PCM_ST_STOP_REQ:   pcm_advance_stop(); break;
     case PCM_ST_RS_RESTART: pcm_advance_restart(); break;
@@ -418,12 +478,12 @@ static int pcm_advance(void)
 static int pcm_irq(unsigned int irq, void *arg)
 {
     (void)irq; (void)arg;
-    return pcm_advance();
+    return pcm_advance(PCM_FROM_IRQ10);
 }
 
 void pcm_tick(void)
 {
-    (void)pcm_advance();
+    (void)pcm_advance(PCM_FROM_TICK);
 }
 
 /* ======================================================================== */
@@ -522,6 +582,7 @@ int pcm_open(u32 rate)
     if (s_fault_sticky) return OS32_ERR_IO;
     if (g_pcm.state != PCM_ST_CLOSED) return PCM_ERR_BUSY;
     if (pcm_fmt_for_rate(rate, &fmt) != 0) return OS32_ERR_INVAL;
+    if (pcm_refill_threshold(rate) >= PCM_HALF_FRAMES) return OS32_ERR_INVAL;
 
     /* 巻き戻しも pcm_release を通るので、**1 度だけ**の錠を先に外す。 */
     g_pcm.finalized = 0;
