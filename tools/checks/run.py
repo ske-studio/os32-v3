@@ -438,6 +438,12 @@ PATH_AUDIT_ALLOW = {
         "fake guest replaces HTTP/time/screenshots; main's output directory is unused",
     ("check-key-inject-host", "tools/" + "gui_gate" + ".py"):
         "key expansion and mocked key sends only; main's output directory is unused",
+    ("check-sep-identity-host", "tools/ci/sep_identity.py"):
+        "the host test calls pure functions on fake hashes; images are never built or read",
+    ("check-sep-identity-host", "tools/build_compare.py"):
+        "named only as the x86 comparison command; the host test never runs it",
+    ("check-sep-identity-host", "tools/tests/test_sep_identity.py"):
+        "fake objects live in TemporaryDirectory; repository artifacts are never read",
     ("check-layers-host", "tools/check_layers.py"):
         "the host test passes a private root; main's default root is unused",
     ("check-layers-host", "tools/tests/test_layers.py"):

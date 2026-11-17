@@ -1,0 +1,152 @@
+# 機種依存の分離の枝 (wt/sep-*) 専用の検査 (docs/design/tools/ci/sep_identity.md)。
+#
+# 毎回の CI (check.yml・build.yml) は変異なしで回るので、ソースや .mk の本文を目印にした変異のずれと、
+# 「移すだけの段で生成物が変わっていないこと」は見ない。この枝ではその 2 つを push ごとに確かめる:
+#   identity   x86 の生成物と PowerPC の像の .o が基点 (origin/main との merge-base) と同じ。
+#              変わる段はコミットの本文に `Sep-Changes: x86` / `Sep-Changes: ppc` と書いて宣言する。
+#   mutate     全部の検査を変異込みで (full-check.yml と同じ make check MUTATE=1)。
+#   ppc-mutate PowerPC の toolchain が要る検査を変異込みで (1 本ずつ、落ちても残りを回す)。
+#   ppc-qemu   PowerPC の QEMU の検査を変異込みで。
+# main への取り込みの判定は今までどおり check.yml・build.yml。これは分離の枝の追加の関門。
+name: sep
+
+on:
+  push:
+    branches: ["wt/sep-**"]
+  workflow_dispatch:
+
+concurrency:
+  group: sep-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  identity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: PPC build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential gcc-13 qemu-user ccache libgmp-dev libmpfr-dev libmpc-dev texinfo bison flex genisoimage
+          python3 -m pip install --quiet -r requirements.txt
+      - uses: ./.github/actions/build-setup
+      - uses: ./.github/actions/ppc-setup
+      - name: Products identical to the merge base
+        env:
+          OS32_ACCEPT_IPA_LICENSE: "1"
+          TMPDIR: ${{ runner.temp }}
+        run: |
+          export PATH="$CROSS_DIR/bin:$PATH"
+          git fetch --no-tags origin main
+          python3 -B tools/ci/sep_identity.py --work "$RUNNER_TEMP/sep-identity"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sep-identity
+          path: |
+            ${{ runner.temp }}/sep-identity/ppc-objects.json
+            ${{ runner.temp }}/sep-identity/x86/*.log
+          retention-days: 14
+          if-no-files-found: ignore
+
+  mutate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/build-setup
+      - name: Build core (make all)
+        env:
+          OS32_ACCEPT_IPA_LICENSE: "1"
+        run: |
+          export PATH="$CROSS_DIR/bin:$PATH"
+          make -j"$(nproc)" all CROSS_DIR="$CROSS_DIR" NP21W_DIR="$RUNNER_TEMP/np21w"
+      - name: make check (mutation)
+        env:
+          OS32_CLANG_CROSS_FREE: "0"
+          OS32_MUT_JOBS: "4"
+        run: |
+          set -euo pipefail
+          export PATH="$CROSS_DIR/bin:$PATH"
+          make check -k -j4 MUTATE=1 CROSS_DIR="$CROSS_DIR" NP21W_DIR="$RUNNER_TEMP/np21w" 2>&1 | tee "$RUNNER_TEMP/sep-mutate.log"
+      - name: Collect check results
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/sep-mutate-results"
+          if [ -f build/out/check_times.tsv ]; then
+            cp build/out/check_times.tsv "$RUNNER_TEMP/sep-mutate-results/"
+            awk -F '\t' '$3 != 0 { print $1 }' build/out/check_times.tsv > "$RUNNER_TEMP/sep-mutate-results/failed-checks.txt"
+            echo "failed checks:"; cat "$RUNNER_TEMP/sep-mutate-results/failed-checks.txt"
+          fi
+          if [ -f "$RUNNER_TEMP/sep-mutate.log" ]; then cp "$RUNNER_TEMP/sep-mutate.log" "$RUNNER_TEMP/sep-mutate-results/"; fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sep-mutate-results
+          path: ${{ runner.temp }}/sep-mutate-results/
+          retention-days: 14
+          if-no-files-found: ignore
+
+  ppc-mutate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: PPC build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential gcc-13 qemu-user ccache libgmp-dev libmpfr-dev libmpc-dev texinfo bison flex genisoimage
+          python3 -m pip install --quiet -r requirements.txt
+      - uses: ./.github/actions/build-setup
+      - uses: ./.github/actions/ppc-setup
+      - name: PPC image and host checks (mutation, every check)
+        env:
+          OS32_ACCEPT_IPA_LICENSE: "1"
+        run: |
+          # run.py --run all は最初の失敗で止まる。1 本ずつ回して、落ちた物を全部挙げる。
+          failed=""
+          for name in $(python3 -B tools/checks/run.py --list --env ppc-cross --exclude-env qemu-ppc | sed 's/^check-//'); do
+            if MUTATE=1 python3 -B tools/checks/run.py --run "$name" > "$RUNNER_TEMP/ppc-$name.log" 2>&1; then
+              echo "ok   $name"
+            else
+              echo "FAIL $name"; tail -30 "$RUNNER_TEMP/ppc-$name.log"; failed="$failed $name"
+            fi
+          done
+          if [ -n "$failed" ]; then echo "failed checks:$failed"; exit 1; fi
+
+  ppc-qemu:
+    needs: ppc-mutate
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: PPC build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential gcc-13 qemu-user ccache libgmp-dev libmpfr-dev libmpc-dev texinfo bison flex genisoimage qemu-system-ppc qemu-system
+          python3 -m pip install --quiet -r requirements.txt
+      - uses: ./.github/actions/build-setup
+      - uses: ./.github/actions/ppc-setup
+      - name: PPC QEMU guest checks (mutation)
+        env:
+          OS32_ACCEPT_IPA_LICENSE: "1"
+          TMPDIR: ${{ runner.temp }}
+        run: |
+          OS32_REQUIRE_PPC=1 MUTATE=1 python3 -B tools/checks/run.py --run all --env qemu-ppc
+      - name: PPC QEMU diagnostics
+        if: failure()
+        run: |
+          cat /etc/os-release | head -2; qemu-system-ppc --version; ls -l /usr/share/qemu/openbios-ppc || true
+          find "$RUNNER_TEMP" -name 'qemu.stderr' -size +0 -print -exec tail -20 {} \; || true

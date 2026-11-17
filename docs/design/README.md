@@ -135,6 +135,7 @@
 - [mm/pgalloc.md](mm/pgalloc.md)
 - [sdk/include/os32/os32_surface.md](sdk/include/os32/os32_surface.md)
 - [tools/check_layers.md](tools/check_layers.md)
+- [tools/ci/sep_identity.md](tools/ci/sep_identity.md)
 - [tools/gen_font16.md](tools/gen_font16.md)
 - [tools/gfinit_mode_tables.md](tools/gfinit_mode_tables.md)
 - [tools/host_agent.md](tools/host_agent.md)
