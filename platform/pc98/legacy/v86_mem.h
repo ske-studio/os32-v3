@@ -21,6 +21,7 @@
 #include "ksetjmp.h"
 #include "../../../mm/paging.h"
 #include "memmap.h"
+#include "platform_boot_layout.h"
 
 /* リマップ範囲は 0x00000 から VRAM の直前 (0xA0000) まで = 640KB。
  *

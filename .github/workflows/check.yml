@@ -149,6 +149,8 @@ jobs:
           make check-docs-tree-host
           make check-docs-line-refs
           make check-docs-line-refs-host
+          make check-archive-refs
+          make check-archive-refs-host
           make check-docs-status
           make check-docs-status-host
           make check-tests-inventory

@@ -10,6 +10,7 @@ static void bundle_root_check(unsigned long root);
 #include "../../platform/pc98/legacy/lowmap.c"
 #include "platform_emergency.h"
 #include "memmap.h"
+#include "platform_boot_layout.h"
 #include "text_screen.h"
 #include "tvram_private.h"   /* PC-98 の番地 (第 5 段 C1) */
 /* Keep fault output in the fixture's mapped TVRAM, without normal console. */

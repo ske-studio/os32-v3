@@ -289,6 +289,7 @@ static struct gfx_kernel_fb splash_fb;
 - [platform/pc98/pic](pic.md)
 
 - [platform/pc98/platform_memory_desc](platform_memory_desc.md)
+- [platform/pc98/platform_boot_layout](platform_boot_layout.md) — PC-98 の起動と低位メモリの番地
 
 - [platform/pc98/timer](timer.md)
 

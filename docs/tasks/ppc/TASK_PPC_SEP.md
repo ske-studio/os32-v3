@@ -33,6 +33,8 @@
 
 第 5 段で見送った 3 点 (PEGC の診断と raster の移設、gfx の共通ヘッダの pc98.h の依存、共通の core に残る backend の名前) は解消した: `gfx_vram.c` は `drivers/video/pc98/` へ、`gfx/gfx.h`・`gfx_internal.h`・`palette.h` は PC-98 のヘッダを読まない。
 
+`include/memmap.h` の PC-98 だけの番地 (リアルモードの起動と低位メモリの 13 個: ローダの置き場・起動時のスタック・IVT の保護範囲・自動プレイの mailbox) は `platform/pc98/platform_boot_layout.h` へ分けた (2026-11-18、設計 `docs/design/platform/pc98/platform_boot_layout.md`)。地図と生成ヘッダは分ける前と同じ中身。共通のソースが使わない名前はほかに 21 個あるが、memmap.h に残した: OS の配置から導く値 (鎖の最悪の配置・固定 paging の枠数・装置の窓の中の割り当てなど) と、対になる名前を共通のソースが使う物 (`MEM_BIOS_ROM_START`・`MEM_BOOTINFO_SIZE` など) で、機種だけの事実として切り出せない。
+
 残件 (分離の構造の外、または PowerPC の機能の有効化):
 
 | # | 残件 | 要る物 |
@@ -41,7 +43,6 @@
 | 5 | contract で残った、リンクの時の装置の名前 (`geforce_foreground_poll` など) を実行時の口に | 本線の HAL の段 |
 | 6 | `C_COMMON_PC98_PENDING` の 44 本を、PowerPC の像の機能の組へ移す | PowerPC の機能の有効化ごと |
 | 7 | KAPI の名前に装置が出る関数、PowerPC のユーザーランドの newlib | 設計から |
-| 8 | `include/memmap.h` の PC-98 だけの名前 (起動・BIOS・表示の 43 個) を機種の置き場へ分ける。残りの 102 個は PowerPC の像も使う OS 共通の番地の地図で、43 個を共通のソースは使っていない | [C4] の正典に触るのでユーザーの判断 |
 
 設計からの配置の変更 (残件ではない):
 

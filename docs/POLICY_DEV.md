@@ -77,7 +77,7 @@ C の基準は [C1](CONSTRAINTS.md)、検査は `make check-c-dialect`。既存�
 | Subsystem Layer | 各サブシステムヘッダ (`vfs.h`, `pc98.h` 等) | `VFS_MAX_PATH`, `TVRAM_COLS` |
 | Local Layer | 各モジュール内で定数化 | バッファオフセット等 |
 
-1 つの意味に名前は 1 つ。番地・帯は `include/memmap.h` 等の正典を使う。NASM の C と共通の値は `.inc` に置き host 試験で一致を確かめる。kdebug・hwdev のヘッダは [hwdev の契約](design/hwdev/README.md) を参照。
+1 つの意味に名前は 1 つ。番地・帯は `include/memmap.h` (OS の配置)・`platform/<機種>/` の番地のヘッダ (PC-98 は `platform_boot_layout.h`) 等の正典を使う。NASM の C と共通の値は `.inc` に置き host 試験で一致を確かめる。kdebug・hwdev のヘッダは [hwdev の契約](design/hwdev/README.md) を参照。
 
 ## §3. ハードウェア制約
 

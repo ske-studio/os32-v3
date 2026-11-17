@@ -242,7 +242,7 @@ def mutant(case):
             target = root / 'platform/pc98/sysclk.c'
             params = 'void *p' if name == 'grouped-cr3-pointer' else 'void'
             target.write_text(target.read_text() + '\n'
-                + '#include "memmap.h"\n#define RING3_HEAP_TOP 0x800000u\nu32 buffer_phys; void paging_load_cr3(u32 pd_phys);\n'
+                + '#include "memmap.h"\n#include "platform_boot_layout.h"\n#define RING3_HEAP_TOP 0x800000u\nu32 buffer_phys; void paging_load_cr3(u32 pd_phys);\n'
                 + 'void p2v_mutant(' + params + ') {\n' + body + '\n}\n')
             expected = f'p2v_mutant: {rule}'
         # The full checker parses this target too. Require its specific runtime

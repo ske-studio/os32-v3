@@ -26,7 +26,7 @@
 
 | 検査 | 中身 |
 |---|---|
-| `docs-line-refs` | 実物の木を数えて基準と照らす。CI の check (static-check) と build (check-fast) で回る |
+| `docs-line-refs` | 実物の木を数えて基準と照らす。CI の check (static-check) と build (checks) で回る |
 | `docs-line-refs-host` | 偽の木での単体試験 4 本と変異 10 本 (数える条件・除く置き場・基準との比較の両方向・終了コード) |
 
 ## 範囲の外
