@@ -78,9 +78,9 @@ def wiring():
         assert ('CHECK_ROUTINE=1 ' in runs) == routine
         assert 'make check-ppc-compile' not in runs
         assert any(step.get('uses') == './.github/actions/build-setup' for step in job_steps)
-        for dependency in ('gcc-13', 'qemu-user', 'ccache'):
+        # 変異の試験が QEMU を起動するので、ppc-qemu の段と同じ道具を入れる。
+        for dependency in ('gcc-13', 'qemu-user', 'ccache', 'qemu-system-ppc', 'qemu-system-data'):
             assert dependency in runs
-        assert 'qemu-system-ppc' not in runs
     command = 'python3 -B tools/checks/run.py --run all --env qemu-ppc'
     for flow, routine, mutate in ((workflow, False, 1),):
         job = flow['jobs']['ppc-qemu']
