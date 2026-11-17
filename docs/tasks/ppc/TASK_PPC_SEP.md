@@ -38,7 +38,6 @@
 |---|---|---|
 | 1 | `build/ppc-kboot.mk` の規則を target の定義へ畳み込む | 試験・道具 45 本の呼び方 |
 | 2 | PowerPC の像の `-D` の名前の差し替え 11 件 (kprintf の行き先など) を口にする | PowerPC の振る舞いが変わるので QEMU の受入 |
-| 3 | リンクの順の一覧 (`C_ORDER_LEGACY`・`C_ORDER_KBOOT`) を 1 本に | PowerPC の像の配置が変わるので QEMU の受入 |
 | 4 | exec のフック 14 本を、提供者が像に在る物から PowerPC で本物に | 同上 |
 | 5 | contract で残った、リンクの時の装置の名前 (`geforce_foreground_poll` など) を実行時の口に | 本線の HAL の段 |
 | 6 | `C_COMMON_PC98_PENDING` の 44 本を、PowerPC の像の機能の組へ移す | PowerPC の機能の有効化ごと |

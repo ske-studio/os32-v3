@@ -261,16 +261,14 @@ KERNEL_CFLAGS_EXTRA += $(HOOK_DEFS)
 C_COMMON_EXEC_HOOKS = $(if $(filter 1,$(FEATURE_EXEC)),$(C_COMMON_HOOKS_ABSENT))
 C_SELECTED = $(C_COMMON) $(C_COMMON_EXEC_HOOKS) $(C_ARCH) $(C_PLATFORM) $(C_FEATURES)
 ifeq ($(IMAGE_ORDER),kboot)
-# kboot の像: arch・platform の持ち物も像の機能ごとの組から選ぶ。順に無いソースは落とさずに止める。
+# kboot の像: arch・platform の持ち物も像の機能ごとの組から選ぶ。リンクの並びは所有者集合の順
+# (arch/ppc/kernel.ld が入口を .text.entry で先頭に置くので、並びに意味は無い。順の一覧は持たない)。
 image_owned = $($(1)_CORE) $(foreach f,$(IMAGE_FEATURES),$(if $(filter 1,$(FEATURE_$(f))),$($(1)_$(f)),$($(1)_NO$(f))))
 C_ARCH += $(call image_owned,C_ARCH)
 C_PLATFORM += $(call image_owned,C_PLATFORM)
 GAS_SELECTED = $(call image_owned,GAS_ARCH)
-C_KERNEL = $(filter $(C_SELECTED),$(C_ORDER_KBOOT))
-GAS_KERNEL = $(filter $(GAS_SELECTED),$(GAS_ORDER_KBOOT))
-ifneq ($(strip $(filter-out $(C_ORDER_KBOOT),$(C_SELECTED)) $(filter-out $(GAS_ORDER_KBOOT),$(GAS_SELECTED))),)
-$(error source without link order: $(filter-out $(C_ORDER_KBOOT),$(C_SELECTED)) $(filter-out $(GAS_ORDER_KBOOT),$(GAS_SELECTED)))
-endif
+C_KERNEL = $(C_SELECTED)
+GAS_KERNEL = $(GAS_SELECTED)
 else
 C_ORDER = $(C_ORDER_LEGACY) $(C_ARCH_NEW)
 C_KERNEL = $(filter $(C_SELECTED),$(C_ORDER)) $(C_DIAGNOSTICS) $(filter $(C_SELECTED),$(C_ORDER_TAIL))

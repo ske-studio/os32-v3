@@ -61,7 +61,7 @@ def copy_kboot_names(root):
 
 
 def check_kboot(root):
-    """Every PowerPC image selects exactly the pinned sources in the pinned link order."""
+    """Every PowerPC image selects exactly the pinned sources, in owner-set order (no link-order list)."""
     expected = json.loads((ROOT / 'tools/tests/fixtures/build_profile_ppc.json').read_text())
     (root / 'kboot-query.mk').write_text(KBOOT_QUERY)
     for name, image in expected.items():
@@ -125,14 +125,14 @@ if __name__ == '__main__':
         check_kboot(root)
         if args.mutate:
             for path, anchor, mutant, expected, label in (
-                    ('build/sources/order.mk', 'platform/powermac/rh_observe.c platform/powermac/ofw.c',
+                    ('build/platform/powermac.mk', 'platform/powermac/rh_observe.c platform/powermac/ofw.c',
                      'platform/powermac/ofw.c platform/powermac/rh_observe.c',
                      AssertionError, 'reordered kboot sources'),
                     ('build/platform/powermac.mk', ' platform/powermac/nic_gem.c', '',
                      AssertionError, 'dropped kboot owner entry'),
                     ('build/sources/common.mk', 'C_COMMON_CLI = kernel/cli/resident_cli.c',
                      'C_COMMON_CLI = kernel/cli/resident_cli.c kernel/cli/unordered.c',
-                     subprocess.CalledProcessError, 'kboot source without link order'),
+                     AssertionError, 'kboot source added to an owner set'),
                     ('build/images/kboot-link.mk', 'FEATURE_LINK = 1', 'FEATURE_LINK = 0',
                      AssertionError, 'kboot image feature value')):
                 target = root / path

@@ -95,7 +95,7 @@ C_COMMON_HOOKS_ABSENT = $(foreach h,$(EXEC_HOOKS),$(if $(filter 0,$(HOOK_$(h))),
 - `select.mk` が像のファイルの後で `include build/sources/hooks.mk` する (`HOOK_DEFS` は `:=` なので、機能の値が決まった後に読む)。`build/ppc-kboot.mk` の `KB_FLAGS :=` は `select.mk` の include より後にあるので `$(HOOK_DEFS)` を足せる。`KB_SELECT_MK` に `build/sources/hooks.mk` を足す (値を替えたら組み直される)。
 - `select.mk` は `C_COMMON_EXEC_HOOKS = $(if $(filter 1,$(FEATURE_EXEC)),$(C_COMMON_HOOKS_ABSENT))` を作って `C_SELECTED` に足す。x86-pc98 は全部 1 なので空、kboot の core・link は exec を持たないので空。
 - `select.mk` で `KERNEL_CFLAGS_EXTRA += $(HOOK_DEFS)` (TICK1K と同じ足し方で、arch を問わない。`build/targets/x86-pc98.mk` は基点と固定されているので触らない)。R1 の像と kdebug の部品も `KERNEL_CFLAGS_EXTRA` を含む旗で組むので受け取る。PowerPC の像は `build/ppc-kboot.mk` の `KB_FLAGS` に `$(HOOK_DEFS)`。
-- 順: `C_ORDER_KBOOT` の `$(wildcard arch/ppc/exec_*.c)` は、今は 19 本が名前の整列順で混ざって並んでいる (cache, context, entry, font_guard, font_lease, gfx, gfx_poll, gui, ime, kapi, kapi_db, legacy, r1, reclaim, selftest, serial_diag, shlib, snd, surface)。**この混ざった順のまま** 19 本を literal に書き、移した 14 本だけ置き場を `exec/absent/` にする (塊に分けて並べ直さない — リンクの順が変わると exec の像の配置が変わる)。`build/arch/ppc-sources.mk` の `C_ARCH_EXEC` も wildcard をやめて残る 5 本を literal にする。fixture `build_profile_ppc.json` は該当の 14 個の名前だけ書き換える (並びは同じ)。
+- 順: PowerPC の像は順の一覧を持たない (所有者集合の順で並ぶ。設計は `docs/design/build/select.md` §4)。
 
 ### 3-4. CPU・配置の 2 組
 

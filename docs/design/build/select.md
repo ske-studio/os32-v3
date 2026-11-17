@@ -119,15 +119,12 @@ x86-pc98 の既定の `C_KERNEL` 376 本は並びごと変えない (`build_prof
 ```make
 # build/sources/order.mk に足す
 C_ORDER_TAIL = platform/pc98/tsc_math.c platform/pc98/tsc_clock.c net/rx_work.c
-C_ORDER_KBOOT = <6 像の今の並びを全部再現する 254 本>
-GAS_ORDER_KBOOT = <12 本>
 # build/select.mk
 ifeq ($(IMAGE_ORDER),kboot)
-C_KERNEL = $(filter $(C_SELECTED),$(C_ORDER_KBOOT))
-GAS_KERNEL = $(filter $(GAS_SELECTED),$(GAS_ORDER_KBOOT))
-ifneq ($(filter-out $(C_ORDER_KBOOT),$(C_SELECTED))$(filter-out $(GAS_ORDER_KBOOT),$(GAS_SELECTED)),)
-$(error source without link order: $(filter-out $(C_ORDER_KBOOT),$(C_SELECTED)) $(filter-out $(GAS_ORDER_KBOOT),$(GAS_SELECTED)))
-endif
+# PowerPC の像: 並びは所有者集合の順。arch/ppc/kernel.ld が入口を .text.entry で先頭に置くので、
+# 並びに意味は無い。順の一覧は持たない。
+C_KERNEL = $(C_SELECTED)
+GAS_KERNEL = $(GAS_SELECTED)
 else
 C_ORDER = $(C_ORDER_LEGACY) $(C_ARCH_NEW) $(C_PLATFORM_NEW)
 C_KERNEL = $(filter $(C_SELECTED),$(C_ORDER)) $(C_PLATFORM_NEW) $(C_DIAGNOSTICS) $(filter $(C_SELECTED),$(C_ORDER_TAIL))
@@ -172,7 +169,7 @@ legacy の式は今の `select.mk:241-243` に末尾の一覧を足しただけ 
 | 段 | 中身 | x86 の確かめ | PowerPC の確かめ |
 |---|---|---|---|
 | 2 (済) | `exec_*.h` 16 組を arch の軸から外す。フックの 14 組は `exec/exec_<名>.h` と `exec/absent/exec_<名>.c`、CPU・配置の 2 組は契約の固定名 `arch_exec_cache.h`・`arch_exec_kapi.h`。設計は [exec/exec_hooks.md](../exec/exec_hooks.md) | 機械語は変わらない → `tools/build_compare.py` で全部一致 | `.o` が置き場の名前を除いて前と一致、ppc-qemu |
-| 3 | 順の一覧を 1 本に (`C_ORDER_KBOOT` を消す) | 不変 | 配置が変わる → ppc-qemu の全部 |
+| 3 (済) | 順の一覧を 1 本に: PowerPC の像は順の一覧を持たず、所有者集合の順で並べる (`C_ORDER_KBOOT`・`GAS_ORDER_KBOOT` を削除)。順の一覧は x86 の `C_ORDER_LEGACY` だけ | 不変 | 配置が変わる → PowerPC の検査 (QEMU を含む) の全部 |
 | 4 | `-D` の差し替え 11 件を口へ: `kprintf` 系 8 件は出力先を登録する口、`console_write=pm_fd1_write`・`console_stream_write=pm_cli_write` は `con_sink`、`CONSOLE_PUTCHAR_MIRROR` と `shell_print_utf8` の別名は像の機能の旗 | 触る所だけ build_compare | ppc-qemu |
 | 5 | `make -f build/ppc-kboot.mk` を呼ぶ 42 の道具を `make ARCH=ppc PLATFORM=powermac IMAGE=<名>` に替え、規則を `build/targets/ppc-powermac.mk` へ移して `build/ppc-kboot.mk` を削除。出力は `build/out/ppc-powermac/<IMAGE>/` (層の検査の根の表も直す) | 不変 | ppc-compile・ppc-qemu |
 | 後 | `PC98_PENDING` の 49 本を include を直した順に本来の機能へ。入口の統合で `#if KBOOT_*` を機能の値に | | |
