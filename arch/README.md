@@ -16,6 +16,8 @@ OS32 の移植点は **2 本の軸**に分かれている。
 | [`include/abi.h`](../include/abi.h) | 引数語の幅・整列とスタック整列 | `arch_abi.h` |
 | [`include/cpu.h`](../include/cpu.h) | アドレス変換表の根と TLB・変換の有効化、ユーザモードへの遷移、別スタックでの呼び出し | `arch_cpu.h` |
 | [`include/exec_arch.h`](../include/exec_arch.h) | syscall の借用 view、USER 保存域、親の特権 snapshot と復帰 | `arch_exec_storage.h` (容量・整列のみ) |
+| `include/exec_arch.h` の註 | 書いた命令を実行に公開する `arch_exec_publish(dst, bytes)` (関数かマクロ) | `arch_exec_cache.h` |
+| `arch_exec_kapi.h` 自身の註 | 起動時に組む KAPI の関数表の番地 `exec_kapi_table()` | `arch_exec_kapi.h` |
 
     #include "arch_io.h"        /* arch/$(ARCH)/arch_io.h     */
     #include "platform_io.h"    /* platform/$(PLATFORM)/platform_io.h */

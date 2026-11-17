@@ -1,6 +1,6 @@
 # build/select.mk — カーネルのビルドを 1 系統にし、像の構成の軸を作る (BUILD_UNIFY_DESIGN)
 
-> 状態: **現行 (2026-11-17)** — 出所: 機種依存の分離の作り直しの 2 段目 (ユーザー決定 2026-11-17「共通ソースが機種ヘッダを読む数 0・ビルド 1 系統・入口の骨格 1 本」)。Opus 5.5 のレビュー 2 回で確定。段 1a・1b は実装済み、段 2 以降は未着手。§1 の実物は段 1a の前 (origin/main `75c7c6f69`) の姿。
+> 状態: **現行 (2026-11-17)** — 出所: 機種依存の分離の作り直しの 2 段目 (ユーザー決定 2026-11-17「共通ソースが機種ヘッダを読む数 0・ビルド 1 系統・入口の骨格 1 本」)。Opus 5.5 のレビュー 2 回で確定。段 1a・1b・2 は実装済み、段 3 以降は未着手。§1 の実物は段 1a の前 (origin/main `75c7c6f69`) の姿。
 ソース: `build/select.mk`、`build/images/`、`build/sources/`、`build/arch/`、`build/platform/`、`build/features/`、`build/ppc-kboot.mk`
 
 ## 1. 実物 (origin/main `75c7c6f69`)
@@ -171,7 +171,7 @@ legacy の式は今の `select.mk:241-243` に末尾の一覧を足しただけ 
 
 | 段 | 中身 | x86 の確かめ | PowerPC の確かめ |
 |---|---|---|---|
-| 2 | `exec_*.h` 16 組を機能の「在る実体・無い実体」へ。`arch/<a>/` には CPU に依る物 (`exec_cache`) だけ残す。宣言は `exec/hooks/<名>.h`、実体は `exec/hooks/<名>.c` と `<名>_absent.c`、機能の組が選ぶ。1 組ずつの割り当ては段 2 の設計で決める | 機械語が変わる → NP21/W の最小受入。`arch/x86/exec_*.h` を直に読む host の試験 (`tools/tests/r1_fixture_host.c`・`font_guard_host.c`・`exec_source.py` など) の追従 | ppc-qemu |
+| 2 (済) | `exec_*.h` 16 組を arch の軸から外す。フックの 14 組は `exec/exec_<名>.h` と `exec/absent/exec_<名>.c`、CPU・配置の 2 組は契約の固定名 `arch_exec_cache.h`・`arch_exec_kapi.h`。設計は [exec/exec_hooks.md](../exec/exec_hooks.md) | 機械語は変わらない → `tools/build_compare.py` で全部一致 | `.o` が置き場の名前を除いて前と一致、ppc-qemu |
 | 3 | 順の一覧を 1 本に (`C_ORDER_KBOOT` を消す) | 不変 | 配置が変わる → ppc-qemu の全部 |
 | 4 | `-D` の差し替え 11 件を口へ: `kprintf` 系 8 件は出力先を登録する口、`console_write=pm_fd1_write`・`console_stream_write=pm_cli_write` は `con_sink`、`CONSOLE_PUTCHAR_MIRROR` と `shell_print_utf8` の別名は像の機能の旗 | 触る所だけ build_compare | ppc-qemu |
 | 5 | `make -f build/ppc-kboot.mk` を呼ぶ 42 の道具を `make ARCH=ppc PLATFORM=powermac IMAGE=<名>` に替え、規則を `build/targets/ppc-powermac.mk` へ移して `build/ppc-kboot.mk` を削除。出力は `build/out/ppc-powermac/<IMAGE>/` (層の検査の根の表も直す) | 不変 | ppc-compile・ppc-qemu |

@@ -91,6 +91,7 @@
 - [drivers/video/pc98/pc98_route.md](drivers/video/pc98/pc98_route.md)
 - [exec/exec.md](exec/exec.md)
 - [exec/exec_heap.md](exec/exec_heap.md)
+- [exec/exec_hooks.md](exec/exec_hooks.md)
 - [exec/ring3_str.md](exec/ring3_str.md)
 - [exec/surface_query.md](exec/surface_query.md)
 - [fs/ext2/ext2_dir.md](fs/ext2/ext2_dir.md)

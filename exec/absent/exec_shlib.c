@@ -1,3 +1,5 @@
+/* この像にはフックの提供者が無い (build/sources/hooks.mk)。宣言の側のヘッダを読む。 */
+#define OS32_HOOK_SHLIB 0
 #include "exec_shlib.h"
 int exec_shlib_addrspace_attach(struct addrspace *as) { (void)as; return 0; }
 void exec_shlib_addrspace_detach(struct addrspace *as) { (void)as; }

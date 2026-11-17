@@ -1,3 +1,5 @@
+/* この像にはフックの提供者が無い (build/sources/hooks.mk)。宣言の側のヘッダを読む。 */
+#define OS32_HOOK_FONT_LEASE 0
 #include "exec_font_lease.h"
 #include "os32_kapi_shared.h"
 i32 exec_font_lease_shell_open(const char *path, u32 gen, u32 *id, u32 *size) { (void)path; (void)gen; (void)id; (void)size; return OS32_ERR_NOTFOUND; }

@@ -1,3 +1,5 @@
+/* この像にはフックの提供者が無い (build/sources/hooks.mk)。宣言の側のヘッダを読む。 */
+#define OS32_HOOK_SURFACE 0
 #include "exec_surface.h"
 struct ledger_surface *exec_surface_at(u32 sid) { (void)sid; return 0; }
 u32 exec_surface_backend(void) { return 0; }

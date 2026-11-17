@@ -1,3 +1,5 @@
+/* この像にはフックの提供者が無い (build/sources/hooks.mk)。宣言の側のヘッダを読む。 */
+#define OS32_HOOK_LEGACY 0
 #include "exec_legacy.h"
 
 int exec_legacy_pinned(void) { return 0; }

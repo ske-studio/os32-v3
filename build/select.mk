@@ -19,6 +19,7 @@ $(foreach f,USERSHELL USB CLI,$(if $(filter 1,$(FEATURE_$(f))),$(if $(filter 1,$
 ifeq ($(FEATURE_USERSHELL)$(FEATURE_CLI),11)
 $(error FEATURE_USERSHELL and FEATURE_CLI are mutually exclusive)
 endif
+include build/sources/hooks.mk
 include build/sources/order.mk
 include build/sources/common.mk
 include build/arch/$(ARCH)-sources.mk
@@ -255,7 +256,10 @@ $(error FEATURE_HWDEV requires FEATURE_KDEBUG)
 endif
 endif
 
-C_SELECTED = $(C_COMMON) $(C_ARCH) $(C_PLATFORM) $(C_FEATURES)
+# exec のフックの旗は arch を問わず渡す。無い時の実体は exec を持つ像だけが組む。
+KERNEL_CFLAGS_EXTRA += $(HOOK_DEFS)
+C_COMMON_EXEC_HOOKS = $(if $(filter 1,$(FEATURE_EXEC)),$(C_COMMON_HOOKS_ABSENT))
+C_SELECTED = $(C_COMMON) $(C_COMMON_EXEC_HOOKS) $(C_ARCH) $(C_PLATFORM) $(C_FEATURES)
 ifeq ($(IMAGE_ORDER),kboot)
 # kboot の像: arch・platform の持ち物も像の機能ごとの組から選ぶ。順に無いソースは落とさずに止める。
 image_owned = $($(1)_CORE) $(foreach f,$(IMAGE_FEATURES),$(if $(filter 1,$(FEATURE_$(f))),$($(1)_$(f)),$($(1)_NO$(f))))
