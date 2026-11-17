@@ -2,7 +2,13 @@
 
 ## Project Structure & Module Organization
 
-OS32 is a 32-bit bare-metal OS for NEC PC-9801/9821 machines. Kernel code lives in `init/`, `kernel/` (with `irq/`, `time/`, `module/`, `console/`, `ime/`, `v86/`), `mm/`, `arch/x86/kernel/`, `exec/`, `drivers/` (one subdirectory per device class), `fs/` (one subdirectory per filesystem), and `gfx/` (the HAL common layer; backends sit in `drivers/video/`); see `docs/08_build.md` §8-3; shared headers and utilities live in `include/` and `lib/`. `userland/` contains the shell, commands, libraries, and tests. `sdk/` provides application headers, startup code, and Rust bindings. `apps/` and `game/` are independent Git submodules. Assets live in `assets/`; build rules and host tools live in `build/` and `tools/`.
+OS32 is a 32-bit bare-metal OS for NEC PC-9801/9821 machines (x86) and the PowerMac G4 (PowerPC). The tree is split by owner:
+
+- **Common** (builds for every machine): `init/` (the boot skeleton `kernel_start.c`), `kernel/` (with `irq/`, `time/`, `module/`, `console/`, `ime/`, `dev/`), `mm/`, `exec/`, `fs/` (one subdirectory per filesystem), `gfx/` (the HAL common layer), `net/`, `input/`, `kapi/`, `lib/`, `include/`.
+- **CPU**: `arch/x86/`, `arch/ppc/`. **Machine**: `platform/pc98/` (PC-98 boot phases in `kernel.c`, the V86 monitor in `legacy/`), `platform/powermac/`.
+- **Devices**: `drivers/` (one subdirectory per device class; video backends in `drivers/video/`), `hwdev/`, `kdebug/`.
+
+Layering rule (enforced in CI by `tools/check_layers.py`, baseline zero): common code must not include a CPU, machine or device header. When common code needs a device function, declare it in `include/<name>_contract.h` and let the device header include that; a header that each machine implements differently uses the fixed name `platform_<name>.h`; machine-specific sources live under their owner. The fix table is `docs/design/tools/check_layers.md` §8. Every source in a common directory must also compile for PowerPC (`make ppc-ci-image`, target `common-compile`). See `docs/08_build.md` §8-3 for the tree. `userland/` contains the shell, commands, libraries, and tests. `sdk/` provides application headers, startup code, and Rust bindings. `apps/` and `game/` are independent Git submodules. Assets live in `assets/`; build rules and host tools live in `build/` and `tools/`.
 
 ## Build, Test, and Development Commands
 
@@ -12,7 +18,7 @@ Use the WSL toolchain described in [INSTALL.md](INSTALL.md): i386-elf GCC, NASM,
 - `make kernel`: build the kernel and SQLite.
 - `make programs`: build userland programs.
 - apps/game builds are deferred under H-7. Run `git submodule update --init` and `make external` only after the [reopening gate](docs/tasks/v3/T2H_EXTERNAL_GATE.md#再開前に揃える-8-項目) is satisfied and reopening is approved.
-- `make check-fast` / `make check-changed` / `make check`: host tests and repository checks (KAPI versions, manifests, constraint IDs, privileged instructions, docs links / orphans / status-line vocabulary) — without mutants / with mutants only for what you changed / with all mutants (before merging). Stages and times: [docs/08_build.md](docs/08_build.md) §8-4.
+- `make check-<name>`: one host test or repository check (add `MUTATE=1` for its mutants). `make check-fast` runs every check without mutants and is what CI runs; do not run it or `make check` locally (see the worktree section). Stages and times: [docs/08_build.md](docs/08_build.md) §8-4.
 - `make math_test`: build an individual guest test.
 
 Run images in NP21/W. Stop the emulator before `make deploy-kernel`, then restart it. See [docs/08_build.md](docs/08_build.md) for deployment details.

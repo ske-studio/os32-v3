@@ -436,5 +436,5 @@ void gfx_cmd_drop(void);
 
 ## 確定の後の追記 (2026-11-10、今の main cfb9cec3 との前提の照らし直し、PM 決定)
 - **H2a は不要で閉じる**: H2 は命令の読みの検査に既存の `ring3_user_range_ok` (`exec/exec.c:467`) を使って着地した (`gfx/gfx_hw_submit.c:16-17`)。「要れば `ring3_user_range_readable`」の条件は満たされないので H2a は出さない。§3-2 の断片と §7 の H2a の行を書き換えた (writable は今 `exec/exec.c:445`)。
-- **S1 と PPC**: `drivers/video/pc98/gfx_vram.c` は第 5 段で `tools/ppc/selected_success.json` の PPC の初回成功集合に入り、`:186-189` の `_memcpy_w` は `arch_copy16` 経由になった。`tools/ppc/known_header_dependencies.json` に `drivers/video/pc98/gfx_vram.c → drivers/video/pc98/splash_raster.h` が登録済み。S1 は gfx_vram.c を PPC でも組めるまま直す (asm・新しい pc98 のヘッダを足さない、足すなら既知の依存に登録)。damage.rs のパスは `userland/gshell/src/damage.rs`。
+- **S1 と PPC**: `drivers/video/pc98/gfx_vram.c` は PC-98 の表示の装置のソース (PowerPC では組まない)。`:186-189` の `_memcpy_w` は `arch_copy16` 経由。S1 は共通の `gfx/` に asm・pc98 のヘッダを足さない (足すと層の検査 `tools/check_layers.py` と PowerPC の `common-compile` が止める)。damage.rs のパスは `userland/gshell/src/damage.rs`。
 - **G4m・G5m の位置**: GeForce の PCI の位置は `recover_gf_dev()` (`kdebug/recover.h:57`) で決まる。新しい段は 0:13 の直値を書かない (`drivers/video/geforce/gf_accept.c:177-178` の型を真似ない)。

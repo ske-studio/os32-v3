@@ -2,7 +2,7 @@
 > 状態: **現行 (2026-10-30)** — 出所: GF_DRIVER_DESIGN (2026-10-29 確定、D0 で移した)
 ソース: `hwdev/gf/internal.h`
 
-head/skip、SUB の復帰、REPEAT、RESET の強制実行・184C 復元、CR のラッチ復元は各命令試験に残す。skip 中の CR44 による head 更新も維持する（`O/kdebug/gfinit_decode.c:79–96`）。
+head/skip、SUB の復帰、REPEAT、RESET の強制実行・184C 復元、CR のラッチ復元は各命令試験に残す。skip 中の CR44 による head 更新も維持する（`kdebug/gfinit_decode.c:79–96`）。
 
 HAL に GF のレジスタ・ROM・recover token を出さない。
 状態は BAR raw/base/length・写像・ROM 識別・PLL limits・初期化済み・基準値 valid・mode/palette/blank・stop 成否・再利用可否。同期・非再入で扱う。

@@ -154,14 +154,14 @@ legacy の式は今の `select.mk:241-243` に末尾の一覧を足しただけ 
   `KB_INC_EXTRA` の条件 (`-Inet` は LINK の時、exec の `-I` の群は EXEC の時)・`KB_EXTRA`・TU ごとの旗・KAPI の生成・`memmap_layout.h`・RAM root (`RAM_ROOT_C` は `build/ram-root.mk` が持つので、その分は `C_PLATFORM_EXEC` に `$(RAM_ROOT_C)` として載せる)・`kboot_audit`・`KB_MUT_*`・`kb-user` は今の規則のまま残す (条件は `KB_EXEC`・`KBOOT_*` のままでよい)。
 - 確かめ:
   - x86: `build_profile_x86.json` が不変 (`build-selection-host`)。手元で `tools/build_compare.py` で kernel.bin と部品が一致。
-  - PowerPC: 6 像の `KB_ASM`・`KB_C` の並びを `tools/tests/fixtures/build_profile_ppc.json` に固定し、`test_build_selection.py` が `make -f build/ppc-kboot.mk` から引いて比べる (段の前の木で取った値を fixture にする)。手元で 6 像の `PPCKERN.ELF` の sha256 が前後で同じ。今の `test_build_selection.py:29-41`・`test_ppc_selection.py` がそのまま通る)。
+  - PowerPC: 6 像の `KB_ASM`・`KB_C` の並びを `tools/tests/fixtures/build_profile_ppc.json` に固定し、`test_build_selection.py` が `make -f build/ppc-kboot.mk` から引いて比べる (段の前の木で取った値を fixture にする)。手元で 6 像の `PPCKERN.ELF` の sha256 が前後で同じ。今の `test_build_selection.py` がそのまま通る)。
   - `tools/tests/test_remote_x9.py:45` (`ppc-kboot.mk` の本文に `kernel/console/con_sink.c` があること) は、`select.mk` から引いた `kboot-link-sh` の `C_KERNEL` に在ることに書き換える。
   - CI: check (ppc-compile・ppc-qemu)・build。
 - 触るファイル: `build/images/*.mk` (7)、`build/sources/common.mk`・`order.mk`、`build/select.mk`、`build/features/pc98-devices.mk`、`build/platform/pc98.mk`・`powermac.mk`、`build/arch/ppc-sources.mk`、`build/kernel-objects.mk`、`build/ppc-kboot.mk`、`tools/tests/test_build_selection.py`・`test_remote_x9.py`・`fixtures/build_profile_ppc.json`、`tools/check_arm_compile.py` は触らない (`KSTRING_C_SRC` の前提は同じ。`config.mk` だけの問い合わせの対象集合には、`kernel-objects.mk` が後から足していた `tsc_math.c`・`tsc_clock.c`・`rx_work.c` の 3 本が増え、実際の `C_KERNEL` と同じになる)。`build/ppc-kboot.mk` の .o と `PPCKERN.ELF` は、一覧と順を持つ .mk (`KB_SELECT_MK`) を前提に持つ (一覧を変えたら組み直される)。
 
 ### 段 1b — compile だけの計測を消し、`make ARCH=ppc` を製品の入口にする
 
-- compile だけの計測 (`tools/ppc/check_compile.py`・`check_accept.py` と 2 つの一覧、`test_ppc_selection.py`、検査 `ppc-selection-host`) と、それを保つための一時の像を削除した。層の検査は `tools/check_layers.py` が持つ。
+- compile だけの計測は持たない。共通のソースが機種のヘッダを読まないことは層の検査 `tools/check_layers.py` が、PowerPC でも組めることは `make ppc-ci-image` の `common-compile` が見る。
 - 最上位の `make ARCH=ppc PLATFORM=powermac [IMAGE=kboot-*]` の `kernel` と `all` は、`build/targets/ppc-powermac.mk` が `$(MAKE) -f build/ppc-kboot.mk KBOOT_LINK=… KBOOT_SH=… KBOOT_SHELL=…` へ sub-make で渡す (include しない — `select.mk` の二度読みと `kb-user` の再帰を避ける)。旗は像の機能の値から作る。
 - `build/ppc-kboot.mk` は旗から像を決め、コマンドラインの `IMAGE=` が食い違えば止める (最上位から同じ名前が届くのは通す)。
 - 最上位の ARCH=ppc の `kernel-compile` は拒否する (像を組むのは `build/ppc-kboot.mk` の旗と出力だけ。`build/targets/ppc-powermac.mk` は `build/kernel-objects.mk` を読まない)。x86 の式から、定義する所が無くなった `C_PLATFORM_NEW` を外した。

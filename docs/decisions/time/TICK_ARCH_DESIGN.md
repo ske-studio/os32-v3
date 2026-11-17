@@ -25,7 +25,7 @@
 | X3 | B29 (`7d288722`) は PowerPC の DEC を 100Hz にして tick 単位を合わせた | `kernel_dec.c:29` (`tick_hz != 100`)、`platform/powermac/clock.c:47` (`pm_tick_hz` = 100)、`platform/powermac/ppc_kernel.c:232,241-242` (待ちは 1・+3 の論理 tick)、`ppc_trap.h:18` | DEC だけ 1kHz に戻し、論理 100Hz は tick_clock_step で作る。待ちの論理 tick の値は B29 のまま残す (§4) |
 | X4 | NEXT B1・T1K §3 は SDK 共有ヘッダに `STATIC_ASSERT(OS32_TICK_HZ == PIT_HZ)` を置いた | `os32_kapi_shared.h:193-194` は `__KERNEL_BUILD__` で memmap.h を読み、PowerPC も `-D__KERNEL_BUILD__` (`build/ppc-kboot.mk:93`)。`tools/ppc/kboot_audit.py:28,71-82` は `-E -dU` で PIT_HZ を**検査しただけ**の TU も落とす | SDK ヘッダには `OS32_TICK_HZ` をリテラルの 100 で置くだけにする。assert は x86 だけの `platform/pc98/clock_source.c` に置く (既に `pit.h` と `os32_kapi_shared.h` を読んでいる、`:3`・`:6`) |
 | X5 | NEXT §3-3「`clock_source.c` は `tick_clock_raw` を読む」 | PowerPC の µs 時計は TB から直に出す (`platform/powermac/clock.c:72-84`)。tick に依らない | raw を µs に使うのは x86 の clock_source だけ。PowerPC は raw を起動の照合にだけ使う (§2-4) |
-| X6 | 「kernel/time/tick.c は PPC の像に入るか」 | 入る: `tools/ppc/selected_success.json:107,118` (kernel/irq/tick.c・kernel/time/tick.c)、`build/ppc-kboot.mk:50`。host 試験 `tools/ppc/kboot_dec.py:36` も tick.c を直に組む。`build/ppc.mk:55` の独立像 (`arch/ppc/decrementer.c`) は tick.c を組まない | tick_clock は tick.c に置けば 2 arch で共通になる |
+| X6 | 「kernel/time/tick.c は PPC の像に入るか」 | 入る: `build/sources/common.mk` の `C_COMMON_CORE` (kernel/irq/tick.c・kernel/time/tick.c)。host 試験 `tools/ppc/kboot_dec.py:36` も tick.c を直に組む。`build/ppc.mk:55` の独立像 (`arch/ppc/decrementer.c`) は tick.c を組まない | tick_clock は tick.c に置けば 2 arch で共通になる |
 | X7 | B29 の理由「1ms の検査はシェル像で境目の読み違いにより揺らいだ」(PPC_SHELL_EXEC_DESIGN の B29) | 起動の検査は tick_count (論理) を数える (`platform/powermac/ppc_kernel.c:232,241-242`)。QMP の観測 `kboot_tick` は `--defsym,kboot_tick=tick_count` (`build/ppc-kboot.mk:139`) | 論理 tick は 100Hz のままなので、検査の間隔 (3 tick)・`tools/ppc/kboot_run*.py`・`kboot_dec_fixture.inc` の 100Hz の期待値は**変えない** |
 
 ## 1. 今の tick の道 (横並び)
@@ -119,7 +119,7 @@ void tick_clock_jiffy64(u32 *lo, u32 *hi); /* 周回しないジフィ。IF=0 �
 | `kernel/time/tick.c` (変) | `tick_count` (今の `:3`) と tick_hi・raw・位相・ms の状態、§2-1 の 5 関数 |
 | `include/kernel_tick.h` (変なし) | `extern volatile u32 tick_count;` のまま (ASM・既存の読み手) |
 | `sdk/include/os32/os32_kapi_shared.h` (変、+2) | `#define OS32_TICK_HZ 100` (リテラル。公開 tick の単位の明文化、C89)。**STATIC_ASSERT はここに置かない** (X4) |
-- PPC の閉包: tick_clock.h は `kernel/` に置き、`tools/ppc/check_accept.py:11-18` の禁止の接頭辞 (`arch/x86/`・`platform/pc98/`・`drivers/*` ほか) を include しないので、`tools/ppc/known_header_dependencies.json` は変えない (組を足すと `check_accept.py:54-55` で stale になる)。
+- PPC の閉包: tick_clock.h は `kernel/` に置き、`arch/x86/`・`platform/pc98/`・`drivers/` のヘッダを include しない (include すると層の検査 `tools/check_layers.py` が止める)。
 - `tools/ppc/kboot_dec.py:33-36` の host の組み立てに `-I sdk/include/os32` を、`inputs` に `kernel/time/tick_clock.h`・`sdk/include/os32/os32_kapi_shared.h` を足す (tick.c が OS32_TICK_HZ を読むため)。
 
 ### 3-2. arch の側
@@ -160,7 +160,7 @@ B29 (`7d288722`、11 ファイル) のうち、**物理の周期に関わる所�
 ### 5-1. 段 C: 共通の tick_clock と x86 の 100Hz の結線
 | 段 | ファイル | 新/変 | 行 | ★ x86 の生成物 | 試験 |
 |---|---|---|---|---|---|
-| C1 | `kernel/time/tick_clock.h`・`kernel/time/tick.c`・`sdk/include/os32/os32_kapi_shared.h` (`OS32_TICK_HZ` をリテラルの 100 で。PIT_HZ で定義しない) | 新・変・変 | 45・+80・+2 | ★ (tick.c に関数が増える。呼び手はまだ無いので挙動は同じ) | C3 の host 試験。PPC の `check_compile.py --accept` (os32powerpc) |
+| C1 | `kernel/time/tick_clock.h`・`kernel/time/tick.c`・`sdk/include/os32/os32_kapi_shared.h` (`OS32_TICK_HZ` をリテラルの 100 で。PIT_HZ で定義しない) | 新・変・変 | 45・+80・+2 | ★ (tick.c に関数が増える。呼び手はまだ無いので挙動は同じ) | C3 の host 試験。PPC は `make ppc-ci-image` (像と `common-compile`) (os32powerpc) |
 | C2 | `arch/x86/kernel/isr_stub.asm:493`・`platform/pc98/clock_source.c:9` (config と STATIC_ASSERT)・`tools/tests/clock_caller_host.c` (tick_clock_config の偽物 +3) | 変 | +12・+6・+3 | ★ (ISR と起動。100Hz の値で config、毎 IRQ が 1 ジフィ) | 既存の test_tick・test_clock_caller・test_pit_clock・test_tick_probe が無変更で通る。NP21/W の起動・60 秒で IRQ0 = timer_handler = 6000。tick_probe の像も組む。C2 で `isr_handlers.c:540` の注記も直す |
 | C3 | `tools/tests/tick_clock_host.c`・`tools/tests/test_tick_clock.py` | 新 | 240・160 | なし | 4 つの x86 の組 (19968/1996800・24576/2457600・1997/1996800・2458/2457600) と PowerPC の 1/1000 で 60 秒分のジフィ・ms が有理式どおり (差 ≤1) / 未 config で旧動作 / config の 5 つの拒否と、拒否で状態が変わらないこと / raw・tick_hi の繰り上げ。変異: `while`→`if`、`!clk` の分岐を消す、`num*OS32_TICK_HZ <= den` の検査を消す、`++raw_hi` を消す |
 - C1 と C2 は 1 本の統合の枝で入れる。C1 単独でも、C2 単独 (config だけで ISR が inc のまま) でも起動する。

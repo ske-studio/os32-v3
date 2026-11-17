@@ -1,6 +1,6 @@
 # PPC_SEP3_DESIGN — 分離の第 3 段 (文脈・起動引数・syscall)
 
-> 状態: **現行 (2026-11-08)** — 共通 C が x86 の文脈・フレーム・呼出規約を直接知っている所 (E1〜E7・A1・A2) を arch の口の後ろへ移す。x86 の KAPI・SDK・CRT の ABI は変えない。段の状態は票 TASK_PPC_SEP が持つ。
+> 状態: **完了記録 (2026-11-08 確定、2026-11-17 に記録へ)** — 第 3 段は main に入った。分離の仕組みは 11-17 の作り直しで置き換わり、今の決まりは票 TASK_PPC_SEP の「現在地」(層の検査 `tools/check_layers.py`・所有者集合 `build/select.mk`・入口の骨格 `init/kernel_start.c`)。本文の selected の計測と known の表は今は無い。以下は確定した時の本文: 共通 C が x86 の文脈・フレーム・呼出規約を直接知っている所 (E1〜E7・A1・A2) を arch の口の後ろへ移す。x86 の KAPI・SDK・CRT の ABI は変えない。段の状態は票 TASK_PPC_SEP が持つ。
 > 出所: ~/os32-tmp/run/ppc-sep3/DESIGN.final.md を 2026-11-08 に写した (gpt-6-astra 起草 r1〜r2、Opus 5.5 第 1・2 回、PM が N1〜N3 を反映)。
 ## r1→r2 の変更
 - R1：legacy→caller→abort/pump→private LS→範囲→guard→legacy/print/strings→ptrmask→invoke→出口をコード化。

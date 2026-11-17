@@ -1,6 +1,6 @@
 # PPC_SEP1_DESIGN — 分離の第 1 段 (ツールチェーン・ソース選択・生成物形式)
 
-> 状態: **現行 (2026-11-07)** — x86 の生成物を変えずに、make ARCH=ppc PLATFORM=powermac が PowerPC のソース一覧でコンパイルまで進む形にする。段の状態は票 TASK_PPC_SEP が持つ。
+> 状態: **完了記録 (2026-11-07 確定、2026-11-17 に記録へ)** — 第 1 段は main に入った。分離の仕組みは 11-17 の作り直しで置き換わり、今の決まりは票 TASK_PPC_SEP の「現在地」(層の検査 `tools/check_layers.py`・所有者集合 `build/select.mk`・入口の骨格 `init/kernel_start.c`)。本文の selected の計測と known の表は今は無い。以下は確定した時の本文: x86 の生成物を変えずに、make ARCH=ppc PLATFORM=powermac が PowerPC のソース一覧でコンパイルまで進む形にする。段の状態は票 TASK_PPC_SEP が持つ。
 > 出所: ~/os32-tmp/run/ppc-sep1/DESIGN.final.md を 2026-11-07 に写した (astra 起草 r1〜r2、Opus 5.5 第 1・2 回)。
 
 - 読取元 `/home/hight/wt/os32-v3/ppc-env`、実装基点=`89a81bc33454035dacadb4281fed91f2a7e64c80`（origin/main）、2026-11-07。読取木HEADは229ed19だが、基点とのMakefile/build差分ゼロをgit diffで確認。行番号はこの共通版。PPC 計測器だけ `ppc-gauge` の枝を読んだ。

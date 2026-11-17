@@ -213,25 +213,30 @@ SQLite は既存 VA0/module 生成器で GNU89 の engine/VFS を組み、typed 
 ```
 os32-v3/
 ├── boot/           ブートローダー (16bit/32bit ASM + C)
-├── init/           起動の順序だけ (kernel_main、起動情報・起動ログ、/etc/system.cfg、スプラッシュ)
+├── init/           入口の骨格 (kernel_start.c — 起動の 3 つの局面の順。中身は platform/)、起動情報・起動ログ、/etc/system.cfg
 ├── kernel/         常駐サービス・診断・ver・GUI の背骨 (gui.c)・SQLite の常駐側・試験専用の器
 │   ├── irq/        割り込みの動的登録・IRQ0 コールバック
-│   ├── time/       µs 時計・PIT の分周・システムクロックの判定・CPU の校正
-│   ├── module/     部品 (KMOD) の検証と load/start/abort、kdebug/hwdev の受け口
+│   ├── time/       µs 時計・tick の時計・CPU の校正
+│   ├── module/     部品 (KMOD) の検証と load/start/abort の核 (部品ごとの読み込みは各装置の *_module.c、kdebug/・hwdev/ の側)
+│   ├── dev/        装置の登録簿の口 (dev.h) と RAM の読み取り専用のブロック装置 (ram_ro)
 │   ├── console/    TVRAM コンソール・console シンク・フォントの lease・Unicode 表
 │   ├── ime/        FEP (fep.mod の本体と窓口)
 │   └── v86/        x86 専用の旧パス互換転送ヘッダのみ
 ├── mm/             ページング・物理ページ台帳・カーネルヒープ・DMA プール・SHM・shlib
 ├── arch/           CPU 依存の実装。`ARCH ?= x86` で選ぶ。足し方は arch/README.md
 │   └── x86/        原始命令の実装 (arch_io.h — 割り込み制御・CPU 停止・IDT ロード、arch_cpu.h — CR3/CR0・リング降下、x86_desc.h — GDT/TSS ロード)
-│       ├── kernel/ GDT/IDT/TSS・#DF・例外の受け口・入口 asm (kentry.asm)・リング 3 降下 (ring3_entry.asm)
-│       └── legacy/ V86 モニタ・低位メモリ・v86.mod の結線 (BIOS・装置の模倣は platform/pc98/legacy/)
-├── platform/       機種依存の実装 (pc98/platform_io.h — ポート I/O・I/O ウェイト ほか)。`PLATFORM ?= pc98` で選ぶ
-├── include/        カーネル内の共通ヘッダ (memmap.h, gfx_hal.h, wab_xe10.h 等)。io.h / cpu.h は原始命令の**契約**だけ、platform_*.h は機種境界の契約
+│       └── kernel/ GDT/IDT/TSS・#DF・例外の受け口・入口 asm (kentry.asm)・リング 3 降下 (ring3_entry.asm)
+│   (arch/ppc/ は PowerPC: 入口 asm・例外・HPT・decrementer・exec の arch の口)
+├── platform/       機種依存の実装。`PLATFORM ?= pc98` で選ぶ。固定名 platform_*.h は機種ごとに差し替える契約の実装
+│   ├── pc98/       入口の 3 つの局面 (kernel.c)・起動の段・スプラッシュ・PIT とシステムクロック・表示の provider
+│   │   └── legacy/ V86 モニタ・低位メモリ・v86.mod の結線と、BIOS・PIC・KBD・I/O の模擬
+│   └── powermac/   入口の 3 つの局面 (ppc_kernel.c)・起動 (kernel_boot.c)・OF・MPIC・GMAC・コンソール
+├── include/        カーネル内の共通ヘッダ (memmap.h, gfx_hal.h 等)。io.h / cpu.h は原始命令の**契約**だけ、platform_*.h は機種境界の契約、*_contract.h は共通と装置の間の口 (共通は装置のヘッダを読まない — design/tools/check_layers.md §8)
 ├── drivers/        ハードウェアドライバ (装置の種類ごと。部品の窓口 *_module.c と本体 *_body.c、表示のバックエンドは装置の隣)
-│   ├── base/       装置の共通層 (デバイス登録簿 dev)
+│   ├── base/       デバイス登録簿の実装 (dev.c。口 dev.h は kernel/dev/)
 │   ├── ata/        IDE・ATAPI と cd.mod
-│   ├── block/      FDC・論理ディスク・ループバック・PC-98 区画表・SCSI 定数
+│   ├── block/      FDC・論理ディスク・ループバック・FatFs の装置層 (fat_diskio.c)・SCSI 定数
+│   ├── hostdrv/    NP21/W の HostDrv (/host) の FS (エミュレータの I/O ポートの口)
 │   ├── char/       シリアル・RTC・NP21/W ハイパーコール
 │   ├── dma/        8237 DMA
 │   ├── input/      キーボード・マウス
@@ -239,11 +244,10 @@ os32-v3/
 │   ├── net/        LAN カード (ne2000/ — DP8390 系と LGY-98、e82557/ — Intel 8255x と lan.mod)
 │   ├── sound/      音源 (fm/ — OPN・サウンドエンジンと fm.mod、cs4231/ — CS4231 PCM と pcm.mod)
 │   └── video/      表示装置 (kcg/ — 漢字 ROM と kcg.mod、cirrus/ — Cirrus・Xe10 グルー・HAL バックエンドと cirrus.mod、geforce/ — GeForce の HAL バックエンドと geforce.mod、pc98/ — 内蔵表示 (GDC planar・PEGC) のバックエンド)
-├── gfx/            描画 HAL の共通層だけ (gfx_core・VRAM・スクロール・パレット。バックエンドは drivers/video/)
-├── fs/             VFS・fd・リダイレクト・パイプ (共通層)
+├── gfx/            描画 HAL の共通層だけ (gfx_core・スクロール・パレット。PC-98 の VRAM への提示とバックエンドは drivers/video/)
+├── fs/             VFS・fd・リダイレクト・パイプ (共通層)、PC-98 の区画表 pc98pt.[ch] (ローダ・ユーザーランドと共有)
 │   ├── ext2/       ext2 (NHD の主 FS)
 │   ├── fat/        FatFs の VFS 結線 (fatfs/ — vendor の FatFs、中身は不変)
-│   ├── hostdrv/    HostDrv (/host)
 │   ├── isofs/      ISO9660 (CD-ROM)
 │   └── serialfs/   SerialFS (シリアル・LAN 越しの /host)
 ├── net/            リンク層 (link.c)

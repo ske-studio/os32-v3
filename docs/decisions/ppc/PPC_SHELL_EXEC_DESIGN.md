@@ -31,7 +31,7 @@
 |8|文書の戻り値は status 表、非 GUI 実装は終了値|`exec/exec_launch.inc:342`。受入では7を返す|
 |9|exec の主要2 TU は selected 成功一覧にない|`exec/exec.c`、`kapi/kapi_generated.c`。§9の facade 段で接続|
 
-- `exec/`・`kapi/` の直下 `.c` と `tools/ppc/selected_success.json` の差は上記2 TU。
+- `exec/`・`kapi/` の直下 `.c` のうち、この設計の時点で PowerPC で組めなかったのは上記 2 TU。
 - `exec_syscall.inc` は独立 TU ではなく `exec.c` の閉包。成功一覧への不在は今回の再測定結果ではない。
 - 停止依存の根拠は `exec.c:1–42`、`exec_syscall.inc:84–170` と関係する呼出しの限定 grep。
 - USER 属性は既存：Ks=0/Kp=1、USER RO=PP1、USER RW=PP2（`pd_walk.c:10,44–46`）。

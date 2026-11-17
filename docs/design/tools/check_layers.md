@@ -7,7 +7,7 @@
 
 共通のソースが機種のヘッダを読む数を、製品の像の依存ファイル (`.d`) から機械で数え、今の違反を基準ファイルに固定する。違反が 1 件でも増えたら CI が落ち、減ったら基準ファイルを同じ変更で減らさないと落ちる (戻り止め)。後の段はこの基準ファイルを空にしていく。
 
-根拠 (origin/main `75c7c6f69`): PowerPC の製品の像 (KBOOT_SH=1) は `include/pc98.h` を 42 TU が読む。既存の計測 `tools/ppc/check_compile.py --accept` は CI で実測されず、2026-11-17 に `kernel/ver_collect.c` が `x87.h` を読み始めたのを誰も止めなかった。x86 の像には同種の検査が無い。
+根拠 (origin/main `75c7c6f69`): PowerPC の製品の像 (KBOOT_SH=1) は `include/pc98.h` を 42 TU が読む。当時あった compile だけの計測は CI で回っておらず、2026-11-17 に `kernel/ver_collect.c` が `x87.h` を読み始めたのを誰も止めなかった。x86 の像には同種の検査が無い。
 
 ## 2. 入力
 

@@ -291,4 +291,4 @@ int platform_pci_irq_route(u8 group, u16 line); /* 1 group ずつ。can_reroute=
 - **GeForce の前提は着地済み**: `GF_IRQ_LINE 6U` は消え (b690586c・afe45f35)、`hwdev/gf/irq.c:93-101` で 0x3C の線を読んで `IRQ_F_SHARED` で登録、解除は `:296`。BDF は `recover_gf_dev()` (`kdebug/recover.h:55-57`)。§2 の判定を「耐える」に、§5 の前提の行を着地済みに書き換えた。
 - **段 9**: 起点は `irq.c:93-101`・`:290-300`。`irq.c:95` の `!irq_line || irq_line >= IRQ_LINE_MAX` (16) を GF1_EIRQ で断る検査は、追記 1 P2-1 (G4 は 32 以上の線) とぶつかるので、段 9 で外して共通の層の判定に任せる。
 - **§6 の受入のログ**: 今の形は `[gf1] PCI IRQ=5 register=0` (線の数字は括弧に入らない、不正な線は ` invalid=`。`hwdev/gf/irq.c:80-81・:101`)。受入の文字列を直した。
-- **段 10**: `kernel/irq/irq_math.c`・`irq.c`・`tick.c`・`platform/pc98/kernel.c` は `tools/ppc/selected_success.json` (PPC の初回成功集合、減ると check が非 0) に入っている。段 10 と段 4 の `platform/pc98/kernel.c` 側の呼びは、PPC のクロスコンパイルが通ることを完了条件にする (x86 の asm・pc98 のヘッダを足さない)。
+- **段 10**: `kernel/irq/irq_math.c`・`irq.c`・`tick.c` は PowerPC でも組む共通のソース (像か `make ppc-ci-image` (像と `common-compile`))。段 10 は PowerPC のコンパイルが通ることと、層の検査 `tools/check_layers.py` の違反 0 を完了条件にする (共通の側に x86 の asm・pc98 のヘッダを足さない)。段 4 の呼びを置く `platform/pc98/kernel.c` は PC-98 の platform のソース。

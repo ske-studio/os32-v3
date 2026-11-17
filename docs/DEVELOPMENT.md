@@ -13,13 +13,16 @@
 
 ## 2. ファイル地図 (どのファイルが何で、仕様はどこか)
 
-### 起動 `init/`
+### 起動 `init/` (共通の骨格) と `platform/pc98/` (PC-98 の入口)
+
+ファイルの列で `platform/pc98/` と書いていない物は `init/` の下。
 
 | ファイル | 役割 | 仕様 |
 |---|---|---|
-| `kernel.c` (入口は `arch/x86/kernel/kentry.asm`) | 起動、シェル起動ループ (CUI `/sys/shell.bin` ⇄ GUI `/bin/gshell.bin` を `gui_take_next_shell()` で往復)、`/etc/system.cfg` の反映 | [01 §1-2](01_system.md) |
+| `kernel_start.c` | 入口の骨格 (機種に依らない 1 本): `platform_boot_machine` → 割り込みの有効化 → `platform_boot_services` → `platform_boot_run`。局面の中身は platform が実装する | 設計 `docs/design/init/kernel_start.md` |
+| `platform/pc98/kernel.c` (入口は `arch/x86/kernel/kentry.asm` → `kernel_main` → `kernel_start`) | PC-98 の 3 つの局面: 起動、シェル起動ループ (CUI `/sys/shell.bin` ⇄ GUI `/bin/gshell.bin` を `gui_take_next_shell()` で往復)、`/etc/system.cfg` の反映 | [01 §1-2](01_system.md) |
 | `sysconfig.c` | `/etc/system.cfg` の解析 (`GUI=0/1`、`GFX=pc98\|pegc\|cirrus\|auto`) | [01 §1-2](01_system.md)、archive/gui_v11/TASK_K4 (アーカイブ: `docs/archive/gui_v11/TASK_K4_gui_boot.md`) |
-| `bootinfo.c` `bootinfo_check.c` | ローダから受け取る起動情報 (起動元、イメージの CRC `VK32` → `ver` の `Image CRC`) — v2.1 | archive/realhw_v21/TASK_HDD_INSTALL (アーカイブ: `docs/archive/realhw_v21/TASK_HDD_INSTALL.md`) 段 0 |
+| `bootinfo.c`、`platform/pc98/bootinfo_check.c` | ローダから受け取る起動情報 (起動元、イメージの CRC `VK32` → `ver` の `Image CRC`) — v2.1 | archive/realhw_v21/TASK_HDD_INSTALL (アーカイブ: `docs/archive/realhw_v21/TASK_HDD_INSTALL.md`) 段 0 |
 | `bootlog.c` `bootlog_save.c` | 起動ログ `/var/log/boot.log` (前回分は `.1`) — v2.1 | [RELEASE_v2.1 §1](RELEASE_v2.1.md) |
 
 ### メモリ `mm/`
@@ -43,13 +46,13 @@
 | `kselftest_report.c` (項目の本体は `kdebug/kselftest.c`) | ブート時セルフテスト (kstring / kmalloc / kprintf)。プリミティブを触ったら項目を足す | [POLICY_DEBUG §2](POLICY_DEBUG.md) |
 | `irq/irq.c` `irq/irq_math.c` | 割り込みの動的登録 (`irq_register`、共有 IRQ、storm の検出) — v2.1 | 票 TASK_HAL_WIRING §1-1 |
 | `time/ktime.c` `time/time_math.c` | µs 時計 (`ktime_*`、2.4576MHz 系のクランプ) — v2.1 | 票 TASK_HAL_WIRING §1-5 |
-| `time/sysclk.c` `time/pit_math.c` `time/cpu_calibrate.c` `time/cpu_calibrate_math.c` | システムクロックの判定 (1.9968 / 2.4576MHz、`0000:0501h` bit7) → PIT の分周、CPU の校正 — v2.1 | [POLICY_DEBUG §4-54](POLICY_DEBUG.md#4-54-pit-の実時間) |
-| `module/module.c` / `module/module_image.c` / `module/module_runtime.c` | 部品の検証・固定 record・load/start/abort と隔離の核、および `/boot/kdebug.bin` の接続 (KDEBUG=1 のときだけ、root マウント後)。部品の中身は `kdebug/` | 票 TASK_T4_T6_MODULES §2-2、[08_build §8-2](08_build.md#起動時に読む部品の形式-kmod-v1) (形式・kdebug の口) |
+| `platform/pc98/sysclk.c` `platform/pc98/pit_math.c`、`time/cpu_calibrate.c` `time/cpu_calibrate_math.c` | システムクロックの判定 (1.9968 / 2.4576MHz、`0000:0501h` bit7) → PIT の分周、CPU の校正 — v2.1 | [POLICY_DEBUG §4-54](POLICY_DEBUG.md#4-54-pit-の実時間) |
+| `module/module_image.c` / `module/module_runtime.c`、`kdebug/kdebug_module.c` | 部品の検証・固定 record・load/start/abort と隔離の核。`/boot/kdebug.bin` の接続 (KDEBUG=1 のときだけ、root マウント後) は部品の側の `kdebug/kdebug_module.c`。部品ごとの読み込みは各装置の `*_module.c` (HWDEV は `hwdev/hwdev_module.c`) | 票 TASK_T4_T6_MODULES §2-2、[08_build §8-2](08_build.md#起動時に読む部品の形式-kmod-v1) (形式・kdebug の口) |
 | `console/console.c` | TVRAM 出力、スクロール予約 (`tvram_set_scroll_reserve`)、GDC カーソル | [05 §5-9](05_drivers.md) 周辺、[console「落とし穴」](design/kernel/console/console.md#落とし穴) |
 | `console/con_sink.c` | console シンク — GUI モード中のカーネル出力を 8KB のリングに溜め、端末アプリが `con_sink_read` (KAPI v46) で吸う | [KAPI_SPEC v46 節](KAPI_SPEC.md)、`docs/archive/gui_v13/TASK_K6C_console.md` |
 | `ime/ime.c` `ime/ime_romkana.c` `ime/ime_dict.c` `ime/ime_render*.c` | FEP。描画は関数表 (`ime_render.h`) 越し。GUI は `ime_feed_key` / `ime_set_render` (KAPI v42) で WM が FEP を持つ | 票 `tasks/fep/00_INDEX.md`、archive/gui_v11/TASK_W2 (アーカイブ: `docs/archive/gui_v11/TASK_W2_fep_lease_modal.md`) |
-| `v86/v86*.c` | V86 モニタ、仮想 PIC、キー所有権、脱出キー | archive/v21/v86v2/ (アーカイブ: `docs/archive/v21/v86v2/README.md`) |
-| `v86/v86_gcap.c`、`kdebug/` の `v86_gcap_math.c` `v86_test16_gcap.asm` | `v86 -g`: 実機の ROM が INT 18h AH=30h/31h で流す I/O (OUT 列) を記録 — v2.1 | 票 TASK_PEGC480_REALHW §3 段 1、[POLICY_DEBUG §4-62](POLICY_DEBUG.md#4-62-pegc-の実機モード) |
+| `platform/pc98/legacy/v86*.c` (`kernel/v86/` は転送ヘッダだけ) | V86 モニタ、仮想 PIC、キー所有権、脱出キー | archive/v21/v86v2/ (アーカイブ: `docs/archive/v21/v86v2/README.md`) |
+| `platform/pc98/legacy/v86_gcap.c`、`kdebug/` の `v86_gcap.c` `v86_gcap_math.c` `v86_test16_gcap.asm` | `v86 -g`: 実機の ROM が INT 18h AH=30h/31h で流す I/O (OUT 列) を記録 — v2.1 | 票 TASK_PEGC480_REALHW §3 段 1、[POLICY_DEBUG §4-62](POLICY_DEBUG.md#4-62-pegc-の実機モード) |
 
 ### CPU 依存 `arch/x86/kernel/`
 
@@ -81,7 +84,7 @@
 | `base/dev.c` | デバイス登録簿 (装置の共通層) | [05 §5-2, §5-11](05_drivers.md) |
 | `block/fdc.c` `block/disk.h` `block/loop_dev.c` | FDC、論理ディスク、ループバック | [05 §5-2, §5-11](05_drivers.md) |
 | `block/fdc_track.c` `block/fdc_decide.c` | FD のトラック読みと 8 セクタの LRU / 時間上限の判定 (機構の最悪値から) — v2.1 | archive/realhw_v21/TASK_FDC_REALHW (アーカイブ: `docs/archive/realhw_v21/TASK_FDC_REALHW.md`)、[POLICY_DEBUG §4-51](POLICY_DEBUG.md#4-51-fdc-の時間と-dma) |
-| `block/pc98pt.c` `ata/ide_addr.c` | PC-98 の区画表の読み書き (HDD インストール) / ATA のセクタ指定の選択と範囲検査 — v2.1 | archive/realhw_v21/TASK_HDD_INSTALL (アーカイブ: `docs/archive/realhw_v21/TASK_HDD_INSTALL.md`) |
+| `ata/ide_addr.c` (区画表の読み書きは共通の `fs/pc98pt.c`。ローダ・ユーザーランドと共有) | ATA のセクタ指定の選択と範囲検査 / PC-98 の区画表 (HDD インストール) — v2.1 | archive/realhw_v21/TASK_HDD_INSTALL (アーカイブ: `docs/archive/realhw_v21/TASK_HDD_INSTALL.md`) |
 | `ata/ide.c` `ata/atapi.c` | IDE HDD、ATAPI CD-ROM | [06 §6-3](06_filesystem.md)、[05 §5-6](05_drivers.md) |
 | `dma/dma8237.c` `dma/dma8237_math.c` | 8237 DMA の共通部 (`dma_chan_setup`、auto-init) — v2.1 | 票 TASK_HAL_WIRING §1-2 |
 | `pci/pci.c` `pci/pci_decode.c` `pci/pci_bind.c` `pci/pci_bind_match.c` | PCI の列挙 (メカニズム #1)・構成空間のデコード・結線表 (ドライバとの結び付け)、`lspci -v` — v2.1 | 票 TASK_LAN_82557 (L-A)、票 TASK_HAL_WIRING §1-4 |
@@ -107,7 +110,7 @@
 | `pipe_buffer.c` `fd_redirect.c` | パイプ・リダイレクト | [06 §6-4, §6-5](06_filesystem.md) |
 | `ext2/ext2_*.c` | ext2 読み書き (NHD の主 FS) | [06 §6-2](06_filesystem.md) |
 | `fat/fatfs/` `fat/fatfs_vfs.c` | FatFs (唯一の FAT 実装、`fatfs/` は vendor の中身のまま) | [06 §6-8](06_filesystem.md) |
-| `hostdrv/hostdrvfs.c` | HostDrv (`/host`) | [06 §6-7](06_filesystem.md) |
+| `drivers/hostdrv/hostdrvfs.c` (NP21/W の I/O ポートの口なので装置の側) | HostDrv (`/host`) | [06 §6-7](06_filesystem.md) |
 | `isofs/iso9660.c` | CD-ROM | [06 §6-6](06_filesystem.md) |
 | `serialfs/serialfs.c` `serialfs_session.c` `sfs_client.c` `sfs_proto.c` | SerialFS — シリアル越しの `/host` (ホスト側は `tools/serialfs_host.py`)。`hsync --root` と組んで実機の HDD を更新する — v2.1 | archive/realhw_v21/TASK_SERIAL_HOSTFS (アーカイブ: `docs/archive/realhw_v21/TASK_SERIAL_HOSTFS.md`) |
 
@@ -115,7 +118,7 @@
 
 | ファイル | 役割 | 仕様 |
 |---|---|---|
-| `gfx/gfx_core.c` `gfx_vram.c` `palette.c` | HAL の入口: バックエンド選択 (probe 順 Cirrus → PEGC → 9801 (auto で Cirrus を試すのは NP21/W の上だけ、Cirrus のリニア窓はデバイス窓の帯 0xFE000000〜 — v2.1)、`GFX=` の強制)、present (ページフリップ)、パレット、カウンタ (`gfx_stats`)、`gfx_bb_phys_range` | [05 §5-5](05_drivers.md) |
+| `gfx/gfx_core.c` `palette.c`、`drivers/video/pc98/gfx_vram.c` (PC-98 の VRAM への提示) | HAL の入口: バックエンド選択 (probe 順 Cirrus → PEGC → 9801 (auto で Cirrus を試すのは NP21/W の上だけ、Cirrus のリニア窓はデバイス窓の帯 0xFE000000〜 — v2.1)、`GFX=` の強制)、present (ページフリップ)、パレット、カウンタ (`gfx_stats`)、`gfx_bb_phys_range` | [05 §5-5](05_drivers.md) |
 | `drivers/video/pc98/backend_pc98.c` `backend_pegc.c`、`drivers/video/cirrus/backend_cirrus.c`、`include/gfx_hal.h` | バックエンド表 `GfxBackend` (probe / init / query / present_rect / fill / blit / enter / leave / shutdown) と 3 実装: 9801 4 プレーン (BB は pool から確保した 32 頁 (SURFACE))、PEGC 640×480×256 (F00000h/FFF00000h 窓 (043Bh bit2=1 は後者)、BB は arena 上端の 300KB (gfx_boot_reserve))、Cirrus GD5430 (0xFE000000 リニア窓、表示面 + クライアント面、エンジン BLT) | [05 §5-5](05_drivers.md)、[02 §2-1](02_memory.md)、決定 `docs/design/include/gfx_hal.md` |
 | `lib/sqlite3/os32_sqlite_vfs.c` `os32_sqlite_config.h` `sqlite_stack.asm` | カーネル内 SQLite (core BSS の直後、MEMSYS5 384KB、代替スタック) | archive/v21/sqlite/ (アーカイブ: `docs/archive/v21/sqlite/00_INDEX.md`) |
 | `boot/boot_*.asm` `loader_*.asm` `boot_main.c` `ext2_mini.c` `lz4_mini.c` | IPL、第 2 段ローダ (PM 遷移を含む、分割禁止)、LZ4 展開 | [01 §1-2](01_system.md)、[10 §10-2, §10-3](10_notes.md)、archive/v21/boot_reform/ (アーカイブ: `docs/archive/v21/boot_reform/00_OVERVIEW.md`) |

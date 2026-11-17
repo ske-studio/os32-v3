@@ -1,6 +1,6 @@
 # PPC_SEP4_DESIGN — 分離の第 4 段 (型の幅・配置・モジュール)
 
-> 状態: **現行 (2026-11-09)** — 共通のコードが i386 の型の幅・符号・配置を暗黙に前提にしている所を、ビルドの契約 (-fsyntax-only の static assert・生成器の target 別の出力) として明示する。x86 の ABI・配置・生成物は変えない (対象 D1〜D4)。段の状態は票 TASK_PPC_SEP が持つ。
+> 状態: **完了記録 (2026-11-09 確定、2026-11-17 に記録へ)** — 第 4 段は main に入った。分離の仕組みは 11-17 の作り直しで置き換わり、今の決まりは票 TASK_PPC_SEP の「現在地」(層の検査 `tools/check_layers.py`・所有者集合 `build/select.mk`・入口の骨格 `init/kernel_start.c`)。本文の selected の計測と known の表は今は無い。以下は確定した時の本文: 共通のコードが i386 の型の幅・符号・配置を暗黙に前提にしている所を、ビルドの契約 (-fsyntax-only の static assert・生成器の target 別の出力) として明示する。x86 の ABI・配置・生成物は変えない (対象 D1〜D4)。段の状態は票 TASK_PPC_SEP が持つ。
 > 出所: ~/os32-tmp/run/ppc-sep4/DESIGN.final.md を 2026-11-09 に写した (gpt-6-astra 起草 r1〜r2、Opus 5.5 第 1・2 回、PM が第 2 回の P3 と PM 決定を反映)。
 ## r1→r2 の変更
 - ID 1（PM 決定）：型・record/assert probe を `-fsyntax-only` に統一し、.o と build/out の出力を作らない。

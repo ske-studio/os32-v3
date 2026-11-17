@@ -145,10 +145,13 @@ ARM 実装は別票で行う。
 x86 の feature off は compile-only である。
 
 共通の場所のソースのうち、PowerPC の像にまだ入っていない物は
-`build/sources/common.mk` の `C_COMMON_PC98_PENDING` に並んでいる (PC98・x86 の
-ヘッダを直に読む物など)。共通のソースが機種のヘッダを読む辺は
+`build/sources/common.mk` の `C_COMMON_PC98_PENDING` に並んでいる。これらも
+PowerPC のコンパイラは通す (`make ppc-ci-image` の `common-compile`。リンクは
+しない)。共通のソースが機種・装置のヘッダを読む辺は
 `python3 -B tools/check_layers.py` が両方の像の `.d` から数え、基準
-(`tools/layers_baseline.json`) より増えても減っても落ちる。
+(`tools/layers_baseline.json`、今は 0) より増えても減っても落ちる。直し方の表は
+docs/design/tools/check_layers.md §8。起動の順は共通の `init/kernel_start.c` が
+持ち、局面の中身は `platform/<機種>/` が実装する。
 
 像は QEMU mac99 で OF から入り、案 D の paging・例外・MPIC・decrementer まで
 初期化する (`python3 -B tools/ppc/kboot_accept.py`)。票は docs/tasks/ppc/ の TASK_PPC_KBOOT。

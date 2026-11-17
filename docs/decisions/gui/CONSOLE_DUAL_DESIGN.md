@@ -56,7 +56,7 @@ u32 display_dual_key(void) __attribute__((weak));   /* I/O なし。表を作り
   - 役割: `a->state == GFX2_AD_OK` で attached な head を DESK、他は NONE。head と D-SUB/DVI の対応は conn_type から読むだけで固定しない。DVI の head に何を出すかは決めない (NONE)。
   - conn_type・conn_status は判定の道では UNKNOWN。GF の enum_conn は DDC の I/O を出す (drivers/video/geforce/gf_v2_enum.c:71-73) ので、`con_dual_outputs` の診断を呼んだ時にだけ `gfx2_connector_info` で埋める。抜き挿しのライブ検出はしない (シングルタスク・今の要件外)。
 - display_dual_key: gfx2_active の index・gen・state・flags、`gfx_is_started()`、`gfx_init_gen`、各 head の attached・connector_mask・mode_id・scan_sid を `k = k*31 + 欄` で畳む (加算でなく)。gfx_shutdown の GF→PC98 は ACTIVE の付け替え (gfx/gfx_core.c:408) で変わる。
-- console_dual.c・console.c が見るのは cfg・con_sink・legacy と display_dual_* の弱いシンボルだけ (どちらも PPC の成功集合に入る、tools/ppc/selected_success.json:98)。
+- console_dual.c・console.c が見るのは cfg・con_sink・legacy と display_dual_* の弱いシンボルだけ (どちらも PowerPC でも組む共通のソース — `make ppc-ci-image` (像と `common-compile`))。
 
 ### 2-2. 判定と表の更新条件 (console_dual.c、約 70 行)
 ```c
@@ -185,7 +185,7 @@ int pc98_route_to_gf(void)
 
 ## 確定の後の追記 (2026-11-10、今の main cfb9cec3 との前提の照らし直し、PM 決定)
 - **実装の時機 (os32powerpc の指摘)**: 本票が触るファイルは PowerPC 第 5 段 C1〜C3・B1〜B6 と同じ。cfb9cec3 の時点では第 5 段で入ったのは A (`gfx/gfx_internal.h`) と E・F だけで、§7 の 4 ファイル (`kernel/console/console.c`・`console_backend.h`・`platform/pc98/console.c`・`include/text_screen.h`) は変化なし。実装は第 5 段 Z の後に出し、そのとき移った先の構成で §1 の F1〜F10 の file:line と §7 の置き場を照らし直してから依頼する。§7 の「D3 と C1 は先に入った方に載せ直す (推奨: D3 が先)」はこの順に書き換えた。
-- **D5 と PPC の選択集合**: `platform/pc98/kernel.c` は `tools/ppc/selected_success.json` の PPC の初回成功集合に入っている (範囲の前から)。D5 は `console_dual.h` だけを include し、`drivers/`・`platform/pc98/` のヘッダを足さない (今の設計どおり)。足すなら `tools/ppc/known_header_dependencies.json` に組を足す。
+- **D5 と層の検査**: `platform/pc98/kernel.c` は PC-98 の platform のソース。D5 は `console_dual.h` だけを include する。共通の側 (console_dual.c・console.c) に `drivers/`・`platform/pc98/` のヘッダを足さない (足すと `tools/check_layers.py` が止める)。
 - **その他の前提は変化なし**: `tools/tests/legacy_callers_host.c` は D2 で `v86_call_dispatch` のスタブの型 (`src, count`) だけ変わり、console の偽の置き換え (`:83`・`:140-143`) は同じ。GF は 1 枚の前提も保たれる (`drivers/video/geforce/geforce_platform.c` が 2 枚目を `second ... ignored` と記録、`kdebug/recover.h:54-57`)。
 
 ## 確定の後の追記 (2026-11-12、main 15738b50 との照らし直し、PM 決定)
@@ -197,7 +197,7 @@ int pc98_route_to_gf(void)
   - 役割: DESK は `a->state == GFX2_AD_OK` で、かつ attached な head。v2 のアプリが head 1 に mode_set した時もこの規則に従う。ほかは NONE。
   - conn_type・conn_status: GF の enum_conn は DDC の I/O を出す (drivers/video/geforce/gf_v2_enum.c:71-73) ので、判定の道では UNKNOWN のままにする。`con_dual_outputs` の診断を呼んだ時にだけ `gfx2_connector_info` (enum.c:42-52) で埋める。base_valid による判定 (R3-2) はこれに置き換える。抜き挿しのライブ検出をしない方針 (R3-3) は変えない。
 - **HAL v2 の公開の口の直し (段 H0)**: `gfx2_head_info` (enum.c:37) は connector_mask を中核の `a->head[h].conn_mask` で上書きしている。conn_mask を書くのは `gfx2_mode_set` (modeset.c:59) だけなので、v1 で始めた机の head は attached=1・connector_mask=0 を返す。これは backend の値 (HAL_V2_DESIGN:1663 の `1 << route`) を捨てる欠けなので、`conn_mask` が 0 の時は backend の値を残すように直す (1 行)。host 試験に「v1 の机 (conn_mask=0) の head は backend の connector_mask を返す、mode_set の後は conn_mask を返す」を足す。変異は上書きを無条件に戻す形で、RED になること。
-- **鍵は display_dual.c へ**: console_dual.c と console.c は PPC の成功集合に入る (tools/ppc/selected_success.json:98) が、g_backend は gfx_core.c (PPC の外) にある。そこで §2-2 の更新条件 4 つを、弱いシンボル `u32 display_dual_key(void)` 1 つに畳む (I/O なし)。
+- **鍵は display_dual.c へ**: console_dual.c と console.c は PowerPC でも組む共通のソースだが、g_backend は gfx_core.c (PPC の外) にある。そこで §2-2 の更新条件 4 つを、弱いシンボル `u32 display_dual_key(void)` 1 つに畳む (I/O なし)。
   - 畳む欄: gfx2_active の index・gen・state・flags、`gfx_is_started()`、`gfx_init_gen`、各 head の attached・connector_mask・mode_id・scan_sid。畳み方は `k = k*31 + 欄`。
   - gfx_shutdown の GF→PC98 では ACTIVE が付け替わる (gfx/gfx_core.c:408) ので、鍵が変わる。
   - console_dual.c が見るのは cfg・con_sink・legacy と display_dual_* の弱いシンボルだけ (PPC では行が 0)。

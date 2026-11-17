@@ -97,7 +97,7 @@ KBOOT ALIVE tick_delta=<n> tb_us=<n> of_calls_delta=0
 |T1 host|各部品着後、入力/更新列/順序|tools/ppc/kboot_host.c ＋280、kboot_model_host.c ＋180、kboot_host.py ＋100|I|
 |T2 guest|C〜H後、実fault・root・IRQ・tick|arch/ppc/kboot_probe.S ＋150、platform/powermac/kboot_probe.c ＋160|P|
 |T3 acceptance|T1/T2/H3、二CPU＋負試験|tools/ppc/kboot_run.py ＋240、kboot_mutations.py ＋100|I|
-|T4 回帰・記録|全段後|tools/checks/ppc-kboot-host.py ＋25（CHECK inputs明記）、tools/ppc/check_compile.py Δ15、selected_success.json/known_header_dependencies.json 各実測差分、arch/README.md Δ20、docs/tasks/ppc/TASK_PPC_SEP.md Δ20|I|
+|T4 回帰・記録|全段後|tools/checks/ppc-kboot-host.py ＋25（CHECK inputs明記）、arch/README.md Δ20、docs/tasks/ppc/TASK_PPC_SEP.md Δ20|I|
 - 並列の波：{A1,B1,C1,G1}→{A2,B2,C2,D1,E1,F1}→{B3,C3,C4,D2,E2,F2,G2}→{D3,E3,H1}→H2→H3→T（各波内も表の依存順を守る。H1の最終分類はD3/E3後）。分離3 F・4 F・5 C1〜C3/Zの着地を待たない。E3は②専用外部入口にE2を接続できる（§6）。段Pは②直後GMACの前提で、②の待ち条件ではない。
 - 見積もり計：製品約3,000〜3,700行（ベクタ再利用約350行込み）、試験約1,200行、文書/選択約200行。D単独の旧1,730〜2,200行には本体link/OF予約/console/MPICは含まれない。1人直列で約15〜24人日。未着分離段の待ち時間は②のcritical pathに含めない。
 

@@ -1,6 +1,6 @@
 # PPC_SEP2_DESIGN — 分離の第 2 段 (起動・例外・IRQ・時計・V86)
 
-> 状態: **現行 (2026-11-07)** — x86 の振る舞いを変えずに、起動の段・IRQ controller・時間源・V86 の optional な口を契約にする。段の状態は票 TASK_PPC_SEP が持つ。
+> 状態: **完了記録 (2026-11-07 確定、2026-11-17 に記録へ)** — 第 2 段は main に入った。分離の仕組みは 11-17 の作り直しで置き換わり、今の決まりは票 TASK_PPC_SEP の「現在地」(層の検査 `tools/check_layers.py`・所有者集合 `build/select.mk`・入口の骨格 `init/kernel_start.c`)。本文の selected の計測と known の表は今は無い。以下は確定した時の本文: x86 の振る舞いを変えずに、起動の段・IRQ controller・時間源・V86 の optional な口を契約にする。段の状態は票 TASK_PPC_SEP が持つ。
 > 出所: ~/os32-tmp/run/ppc-sep2/DESIGN.final.md を 2026-11-07 に写した (astra 起草 r1〜r2、Opus 5.5 第 1・2 回)。
 
 - 2026-11-07。読取元 S=`/home/hight/wt/os32-v3/ppc-sep1`（第1段 `wt/ppc-sep1`）。第2段は第1段の上に積み、実装・比較の基点は第1段が main に入った SHA とする。以下の相対 file:line は S の実物確認に基づく。
