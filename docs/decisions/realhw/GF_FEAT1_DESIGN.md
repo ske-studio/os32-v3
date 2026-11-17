@@ -417,7 +417,7 @@ PM は宣言追補→C0/C1/C2/C4/C5→診断 owner 接続・C8→module dispatch
 - P3: drivers/video/geforce/geforce_module.h に `struct gf3_test_ops;` の前方宣言を足す。getter は kdebug の import にだけ足す (C9 と gfinit.c はどちらも kdebug)。prepare(f, bars, n) で貸す常設 adapter の opaque は診断の lease の bus (診断の f の revoked はその bus の REVOKE が立てる)。
 - P3 の訂正 (2026-11-02、PM、CK の sol の指摘): 「getter は kdebug の import にだけ」は誤り。kdebug/gfinit.c と gf_stage_state.c は build/hwdev.mk:5-12 で -DHWDEV_MODULE として hwdev.mod に組まれる (kdebug.mk の KDEBUG_OBJS には無い)。getter は**それを使うファイルが入る像の import に足す** — gfinit.c・gf_stage_state.c は hwdev、C9 (gf_foundation_test.c) は置く像に合わせる。追記の当初の記述 (:402、kdebug と hwdev の両方) に戻す。
 - 段の順 (PM): gf_foundation_revoke (hwdev/gf/foundation.c) は CK が書く。CK を先に取り込み、CW をその上に進めて仕上げる。
-- 段の分け直し (2026-11-02、PM): CK の 3 回目の停止 (C9 の cycle で診断表示の stop/start をどの入口・状態遷移で行うかが未規定、kdebug/gfinit.c:46-77・348-461、include/hwdev_private.h:15-22) を受け、CK を **C7・C8・gf_foundation_revoke・宣言の追補** に絞る。**C9 (実機のシリアルの試験の入口) は CW の取り込みの後**に、設計者が入口の契約を追記してから出す。
+- 段の分け直し (2026-11-02、PM): CK の 3 回目の停止 (C9 の cycle で診断表示の stop/start をどの入口・状態遷移で行うかが未規定、kdebug/gfinit.c:46-77・348-461、hwdev/hwdev_private.h:15-22) を受け、CK を **C7・C8・gf_foundation_revoke・宣言の追補** に絞る。**C9 (実機のシリアルの試験の入口) は CW の取り込みの後**に、設計者が入口の契約を追記してから出す。
 
 ## CK の実装で設計者が決めたこと
 - C7 の固定表は変動する PMC 値を表せないため、Command の QUIESCE rule に REC_GF_ENGINE_STOP を登録し write_verify から固定停止関数を呼ぶ；汎用 plan/式の実行契約は変更せず、FIFO→GR→MPEG の現値 clear/read/set/read を既存の guarded bus・REC・safe point で実施し、どの失敗も後続 Command/保存復元を止める。

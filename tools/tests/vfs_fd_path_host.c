@@ -1405,7 +1405,7 @@ static void fat_clock_legacy(RTC_Time *t)
 static const ClockOps fat_clock = { fat_clock_date, fat_clock_legacy };
 #include "drivers/block/fdc_track.c"
 #define disk_write fatwp_disk_write_impl
-#include "fatfs/diskio.c"
+#include "drivers/block/fat_diskio.c"
 #undef disk_write
 DRESULT disk_write(BYTE pdrv, const BYTE *buff, LBA_t sector, UINT count)
 {

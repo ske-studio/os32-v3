@@ -1,7 +1,7 @@
 /* Read saved device/diagnostic state only; no probing, output or yield. */
 #include "ver_info.h"
 #ifndef __powerpc__
-#include "x87.h"
+#include "cpu.h"
 #endif
 #include "time/cpu_calibrate.h"
 #include "boot_diag.h"

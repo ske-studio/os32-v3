@@ -10,8 +10,8 @@
 /*  出典: FatFs R0.15 Application Note (elm-chan.org)                       */
 /* ======================================================================== */
 
-#include "ff.h"
-#include "diskio.h"
+#include "../../fs/fat/fatfs/ff.h"
+#include "../../fs/fat/fatfs/diskio.h"
 
 /* disk.h は CHS版 disk_read/disk_write を宣言しており、
  * FatFSの diskio.h の disk_read/disk_write と名前が衝突する。
@@ -23,7 +23,7 @@
 #include "clock_service.h"
 #include "fdc.h"
 #include "fdc_track.h"  /* FD の読みをトラック単位に束ねる (純粋な層) */
-#include "diskio_os32.h"
+#include "../../fs/fat/fatfs/diskio_os32.h"
 #include "kstring.h"
 #include "kprintf.h"
 

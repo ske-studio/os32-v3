@@ -1,6 +1,7 @@
 #ifdef TICK_PROBE
 #include "kernel/time/tick_probe.h"
 #endif
+#include "kernel_tick.h"   /* tick_count */
 #include "tick.h"
 #include "tick_order.h"
 _Static_assert(PC98_TICK_COUNT <= TICK_SLOT_COUNT, "PC98 tick slots exceed table");
@@ -28,7 +29,6 @@ _Static_assert(PC98_TICK_COUNT <= TICK_SLOT_COUNT, "PC98 tick slots exceed table
 #include "ne2000_regs.h"
 #include "ne2000_ring.h"
 #include "io.h"
-#include "idt.h"
 #include "irq.h"      /* IRQ_NONE / IRQ_HANDLED / IRQ_DEFERRED */
 #include "kprintf.h"
 #include "kstring.h"

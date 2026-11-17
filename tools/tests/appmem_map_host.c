@@ -13,7 +13,7 @@ int gfx2_head_restore_v1(struct gfx2_adapter *a, u32 head)
 bool geforce_fg_due(u32 now) { (void)now; return false; }
 void geforce_foreground_poll(void) {}
 
-#include "tvram.h"
+#include "text_screen.h"
 #include "appmem.h"
 #include "appslot.h"
 #include "lease.h"

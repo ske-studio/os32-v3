@@ -33,7 +33,7 @@
 #include "../../kernel/time/cpu_calibrate.h"
 #include "clock_source.h"
 #include "kernel_tick.h"
-#include "../../kernel/time/sysclk.h"   /* 0000:0501h のクロック判定 (pit_init より前に呼ぶ) */
+#include "sysclk.h"   /* 0000:0501h のクロック判定 (pit_init より前に呼ぶ) */
 #include "../../mm/paging.h"
 #include "../../mm/memory_boot.h"
 #include "../../mm/pgalloc.h"     /* ledger_resource_import_pci (T1d ⑥-0) */
@@ -54,7 +54,7 @@
 
 
 #include "dev.h"
-#include "tvram.h"
+#include "text_screen.h"
 #include "pc98.h"
 #include "memmap.h"
 #include "config.h"

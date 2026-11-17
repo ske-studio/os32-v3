@@ -18,7 +18,7 @@
 #include "v86_bios.h"
 #include "../../../kernel/module/module.h"
 #include "../../../kernel/kselftest.h"
-#include "tvram.h"
+#include "text_screen.h"
 #include "../../../include/platform_emergency.h"
 #include "../../../gfx/gfx.h"
 

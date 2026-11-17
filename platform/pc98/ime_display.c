@@ -1,7 +1,7 @@
 /* PC-98 FEP-private candidate planes and boot resources. */
 #include "kernel/ime/ime_display_private.h"
 #include "pc98.h"
-#include "tvram.h"
+#include "text_screen.h"
 #include "tvram_private.h"
 #include "memmap.h"
 #include "mm/kmalloc.h"

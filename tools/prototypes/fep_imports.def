@@ -82,19 +82,19 @@
       "symbol": "kbd_getkey_wait",
       "context": "normal",
       "irq": false,
-      "source": "drivers/input/kbd.h"
+      "source": "include/kbd_contract.h"
     },
     {
       "symbol": "kbd_trygetchar",
       "context": "normal",
       "irq": false,
-      "source": "drivers/input/kbd.h"
+      "source": "include/kbd_contract.h"
     },
     {
       "symbol": "kbd_trygetkey",
       "context": "normal",
       "irq": false,
-      "source": "drivers/input/kbd.h"
+      "source": "include/kbd_contract.h"
     },
     {
       "symbol": "kfree",
@@ -346,7 +346,7 @@
       "symbol": "serial_puts",
       "context": "normal",
       "irq": false,
-      "source": "drivers/char/serial.h"
+      "source": "include/serial_contract.h"
     },
     {
       "symbol": "sqlite_engine_available",
@@ -358,25 +358,25 @@
       "symbol": "tvram_putchar_at",
       "context": "normal",
       "irq": false,
-      "source": "include/tvram.h"
+      "source": "include/text_screen.h"
     },
     {
       "symbol": "tvram_putkanji_at",
       "context": "normal",
       "irq": false,
-      "source": "include/tvram.h"
+      "source": "include/text_screen.h"
     },
     {
       "symbol": "tvram_readchar_at",
       "context": "normal",
       "irq": false,
-      "source": "include/tvram.h"
+      "source": "include/text_screen.h"
     },
     {
       "symbol": "tvram_set_scroll_reserve",
       "context": "normal",
       "irq": false,
-      "source": "include/tvram.h"
+      "source": "include/text_screen.h"
     },
     {
       "symbol": "unicode_to_ank",

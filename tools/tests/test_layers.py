@@ -95,25 +95,25 @@ def suite(tool):
 
         def test_foreign_machine_wins(self):
             files = {
-                'gfx/g.h': inc('pc98.h'), 'gfx/g.c': inc('g.h', 'legacy_lowmap.h', 'arch_io.h',
+                'gfx/g.h': inc('pc98.h'), 'gfx/g.c': inc('g.h', 'v86_call.h', 'arch_io.h',
                                                          'legacy_guest.h', 'kbd.h'),
                 'gfx/h.c': inc('g.h', 'stub.h'), 'drivers/video/fb.c': inc('pc98.h'),
                 'arch/x86/kernel/x.c': '', 'platform/none/stub.h': '',
-                'include/pc98.h': '', 'include/legacy_lowmap.h': '', 'arch/x86/arch_io.h': '',
+                'include/pc98.h': '', 'include/v86_call.h': '', 'arch/x86/arch_io.h': '',
                 'include/legacy_guest.h': '', 'include/kbd.h': '', 'platform/none/null_provider.c': '',
                 'gfx/only_shell.c': inc('pc98.h'), 'gfx/only_neg.c': inc('pc98.h'),
                 'gfx/only_fd1.c': inc('pc98.h'), OUT + '/ppc-kboot/gen/exports.c': inc('pc98.h'),
-                'gfx/old.h': inc('tvram.h'), 'include/tvram.h': '',
+                'gfx/old.h': inc('wab_xe10.h'), 'include/wab_xe10.h': '',
             }
             deps = {
-                'ppc-kboot/gfx/g.d': ['gfx/g.c', 'gfx/g.h', 'include/pc98.h', 'include/legacy_lowmap.h',
+                'ppc-kboot/gfx/g.d': ['gfx/g.c', 'gfx/g.h', 'include/pc98.h', 'include/v86_call.h',
                                       'arch/x86/arch_io.h', 'include/legacy_guest.h', 'include/kbd.h'],
                 'ppc-kboot/platform/none/l.d': ['platform/none/null_provider.c'],
                 'ppc-kboot/shell/gfx/s.d': ['gfx/only_shell.c', 'include/pc98.h'],
                 'ppc-kboot/neg1/gfx/n.d': ['gfx/only_neg.c', 'include/pc98.h'],
                 'ppc-kboot/link/fd1-stream/gfx/f.d': ['gfx/only_fd1.c', 'include/pc98.h'],
                 'ppc-kboot/gen/exports.d': [OUT + '/ppc-kboot/gen/exports.c', 'include/pc98.h'],
-                'ppc-kboot/gfx/gone.d': ['gfx/gone.c', 'gfx/old.h', 'include/tvram.h'],
+                'ppc-kboot/gfx/gone.d': ['gfx/gone.c', 'gfx/old.h', 'include/wab_xe10.h'],
                 'ppc-kboot/sh/gfx/h.d': ['gfx/h.c', 'gfx/g.h', 'include/pc98.h',
                                          'platform/none/stub.h'],
                 'ppc-kboot/drivers/fb.d': ['drivers/video/fb.c', 'include/pc98.h'],
@@ -121,7 +121,7 @@ def suite(tool):
             }
             self.assertEqual(self.edges('ppc-powermac', files, deps), {
                 ('R6', 'gfx/g.h', 'include/pc98.h'): 2,
-                ('R6', 'gfx/g.c', 'include/legacy_lowmap.h'): 1,
+                ('R6', 'gfx/g.c', 'include/v86_call.h'): 1,
                 ('R6', 'gfx/g.c', 'arch/x86/arch_io.h'): 1,
                 ('R6', 'drivers/video/fb.c', 'include/pc98.h'): 1,
                 ('R6', 'arch/x86/kernel/x.c', '-'): 1,
@@ -150,15 +150,15 @@ def suite(tool):
 
         def test_generated_kapi_and_build_headers(self):
             files = {
-                GEN + 'kapi/kapi_generated.c': inc('tvram.h', 'gen.h'),
+                GEN + 'kapi/kapi_generated.c': inc('wab_xe10.h', 'gen.h'),
                 GEN + 'gen.h': inc('pc98.h'),
-                'include/tvram.h': '', 'include/pc98.h': '',
+                'include/wab_xe10.h': '', 'include/pc98.h': '',
             }
-            words = [GEN + 'kapi/kapi_generated.c', 'include/tvram.h',
+            words = [GEN + 'kapi/kapi_generated.c', 'include/wab_xe10.h',
                      GEN + 'gen.h', 'include/pc98.h', '/usr/include/x.h']
             build(self.root, files, {'ppc-kboot/sh/gen/kapi/kapi_generated.d': words})
             found, units, empty = tool.measure(self.root, 'ppc-powermac')
-            self.assertEqual(set(found), {('R6', 'kapi/kapi_generated.c', 'include/tvram.h')})
+            self.assertEqual(set(found), {('R6', 'kapi/kapi_generated.c', 'include/wab_xe10.h')})
             self.assertEqual((units, empty), ({'kapi/kapi_generated.c'}, []))
 
         def run_tool(self, *argv):

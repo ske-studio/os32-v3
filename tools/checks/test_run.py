@@ -454,7 +454,7 @@ class RunnerTest(unittest.TestCase):
             'docs-links': ['fs/hostdrv/hostdrvfs_proto.h'],
         }
         cases['privileged'] += ['drivers/pci/pci_decode.c', 'drivers/pci/pci_decode.h',
-                                'drivers/block/pc98pt.c', 'drivers/block/pc98pt.h',
+                                'fs/pc98pt.c', 'fs/pc98pt.h',
                                 'fs/ext2/ext2_layout.c', 'fs/ext2/ext2_layout.h']
         actual = Path(__file__).resolve().parents[2]
         # Read the real CHECK declarations, but use empty source fixtures so a

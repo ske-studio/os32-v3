@@ -22,8 +22,8 @@ SKIP_ANY = 'fd1-stream'
 # include/ にある機種名のヘッダ -> (軸, 機種)。置き場を移したら行を消す。
 NAMED = {
     'pc98.h': ('platform', 'pc98'), 'pegc.h': ('platform', 'pc98'),
-    'tvram.h': ('platform', 'pc98'), 'wab_xe10.h': ('platform', 'pc98'),
-    'v86_call.h': ('arch', 'x86'), 'legacy_lowmap.h': ('arch', 'x86'),
+    'wab_xe10.h': ('platform', 'pc98'),
+    'v86_call.h': ('arch', 'x86'),
 }
 DEVICE_ROOTS = ('drivers', 'hwdev', 'kdebug')
 GENERATED_KAPI = '/gen/kapi/kapi_generated.c'

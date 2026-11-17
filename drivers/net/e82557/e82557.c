@@ -7,7 +7,6 @@
 #include "kernel/irq/irq.h"
 #ifndef E82557_HOST_TEST
 #include "io.h"
-#include "arch/x86/kernel/idt.h"
 #include "kernel/time/cpu_calibrate.h"
 #include "init/sysconfig.h"
 #include "kernel/module/module.h"

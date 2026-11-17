@@ -1,5 +1,5 @@
 /* ======================================================================== */
-/*  DISKIO_OS32.H — fs/fatfs/diskio.c の OS32 側の口                       */
+/*  DISKIO_OS32.H — drivers/block/fat_diskio.c の口                       */
 /*                                                                          */
 /*  diskio.h は FatFs (ChaN) の配布物で、ff.h の型 (BYTE / LBA_t など) を   */
 /*  前提にする。FatFs の型を持ち込まずに呼びたい側 (platform/pc98/kernel.c、      */

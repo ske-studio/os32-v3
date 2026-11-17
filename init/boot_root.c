@@ -1,5 +1,5 @@
 #include "boot_root.h"
-#include "drivers/block/ram_ro.h"
+#include "kernel/dev/ram_ro.h"
 #include "fs/vfs.h"
 #include "fs/isofs/iso9660.h"
 #include "fs/ramfs/ramfs.h"

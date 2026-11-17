@@ -43,4 +43,8 @@ int e82557_loopback(int on);
  * TCB C is DMA completion, never evidence of wire success (SDM :4648-4663). */
 u32 e82557_stat(u32 idx);
 
+/* SerialFS の LAN セッションのあいだ、部品を降ろさせない。 */
+int lan_module_session_acquire(void);
+void lan_module_session_release(void);
+
 #endif

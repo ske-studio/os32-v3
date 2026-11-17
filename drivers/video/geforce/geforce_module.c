@@ -1,3 +1,4 @@
+#include "kernel_tick.h"   /* tick_count */
 #include "gfx/v2/gfx2_int.h"
 #include "debug_probe.h"
 #include "geforce_module.h"
@@ -17,7 +18,6 @@
 #include "../../../exec/appslot.h"
 #include "serial_diag.h"
 #include "io.h"
-#include "idt.h"
 #include "time_units.h"
 #include "../../../hwdev/gf/display/api.h"
 #include "leave_log.h"

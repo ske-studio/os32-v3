@@ -28,7 +28,6 @@ extern u32 ktime_ticks(void);
 #define dma_alloc pcm_module_dma_alloc
 #define dma_free pcm_module_dma_free
 #else
-#include "idt.h"        /* tick_count */
 #endif
 #include "io.h"
 #include "kprintf.h"

@@ -18,7 +18,7 @@ void console_stream_write(const void *bytes, u32 len)
 #include "kboot_log.h"
 #include "console_output.h"
 #include "console.h"
-#include "tvram.h"
+#include "text_screen.h"
 #include "kstring.h"
 extern int boot_serial_mirror;
 #if !KBOOT_LINK

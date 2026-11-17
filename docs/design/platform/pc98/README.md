@@ -301,3 +301,5 @@ static struct gfx_kernel_fb splash_fb;
 - [platform/pc98/kernel_gfx_config.inc](kernel_gfx_config.md)
 
 - [platform/pc98/boot_platform.c](boot_platform.md)
+
+- [platform/pc98/sysclk.c](sysclk.md)

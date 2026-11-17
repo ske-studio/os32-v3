@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """D3 network CD with real persistent session, block RPC and wire protocol."""
 CHECK = dict(name='hostsvc-netcd', tier=1, needs=[], budget=31.5, covers=[
-    'drivers/block/netcd.c', 'drivers/block/netcd.h', 'drivers/base/dev.h',
+    'drivers/block/netcd.c', 'drivers/block/netcd.h', 'kernel/dev/dev.h',
     'fs/serialfs/sfs_block.c', 'fs/serialfs/sfs_block.h',
     'fs/serialfs/serialfs_persistent.c', 'include/boot_token.h', 'fs/serialfs/serialfs.h',
     'fs/serialfs/sfs_client.c', 'fs/serialfs/sfs_client.h',

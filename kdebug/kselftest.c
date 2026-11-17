@@ -36,7 +36,7 @@
 #include "lease.h"
 #include "con_sink.h"
 #include "pc98.h"
-#include "tvram.h"
+#include "text_screen.h"
 #include "console.h"
 #include "kbd_inject.h"
 #include "../drivers/input/kbd.h"          /* kbd_diag / KBD_CMD_* (docs/POLICY_DEBUG.md#4-57-キーボード-8251-の信号線) */
@@ -47,7 +47,7 @@
 #include "kapi_db.h"
 #include "cpu_calibrate.h"
 #include "cpu_calibrate_math.h"
-#include "idt.h"          /* pit_get_setup / PIT_MODE_TIMER0 */
+#include "platform_pic.h"  /* OCW3_IRR (PIC の自己試験) */
 #include "sysclk.h"       /* sysclk_hz / sysclk_detected */
 #include "memmap.h"       /* PIT_HZ / MEM_DMA_POOL_* */
 #include "vfs.h"

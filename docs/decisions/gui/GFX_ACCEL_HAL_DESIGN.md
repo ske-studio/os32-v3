@@ -314,7 +314,7 @@ vmkernel +3KB (FD に入る。FD_MIN_FREE_KB=64 を check-packages-host で確�
 | W2 | gshell/src/input.rs:896-926、wm.rs:898・906・1180・1497-1512 | W1 を呼ぶ、flush_present の前と各周の頭で check → take_regen → 描き直し | W1・L0 | 50 |
 | W3 | gshell/src/scroll_op.rs (新)・handler.rs の表・reqs.rs、os32_gui_shared.h・proto.rs | §3-6 の WM の式、GUI の proto の版を上げる | W1 | 140 |
 | W4 | gshell/src/cursor.rs | DIRECT の下地は gfx_hw_get を 1 回 (160B) | L1 | 30 |
-| S1 | gfx/gfx_vram.c・userland/gshell/src/damage.rs | D3 (中身は P0 の結果で票に書く)。gfx_vram.c は PPC の初回成功集合なので PPC でも組めるまま直す | P0 | 未定 |
+| S1 | drivers/video/pc98/gfx_vram.c・userland/gshell/src/damage.rs | D3 (中身は P0 の結果で票に書く)。gfx_vram.c は PPC の初回成功集合なので PPC でも組めるまま直す | P0 | 未定 |
 | G4m | drivers/video/geforce/gf_hook_mono.c (新) | D4: 不透明の mono を gf3_mono で | G3 | 60 |
 | G5m | drivers/video/geforce/gf_put_m2mf.c (新) | D5: 不透明の大きい put・get を gf3_upload/download で。大きさは P0 から PM が決める | G3・P0 | 70 |
 - 並列: P0a・P0b・H1・H2a は最初に同時に出せる。H1 の後に H2・H3・H4・G1・G2・L0・L1 を同時に。H4 の後に H5・H6。L1 の後に L2〜L7・U1・W4 を同時に。W1 の後に W2・W3。U2 は L0 と W3 の後で、U3・U4 はその後。G4m・G5m は G3 の後。
@@ -436,5 +436,5 @@ void gfx_cmd_drop(void);
 
 ## 確定の後の追記 (2026-11-10、今の main cfb9cec3 との前提の照らし直し、PM 決定)
 - **H2a は不要で閉じる**: H2 は命令の読みの検査に既存の `ring3_user_range_ok` (`exec/exec.c:467`) を使って着地した (`gfx/gfx_hw_submit.c:16-17`)。「要れば `ring3_user_range_readable`」の条件は満たされないので H2a は出さない。§3-2 の断片と §7 の H2a の行を書き換えた (writable は今 `exec/exec.c:445`)。
-- **S1 と PPC**: `gfx/gfx_vram.c` は第 5 段で `tools/ppc/selected_success.json` の PPC の初回成功集合に入り、`:186-189` の `_memcpy_w` は `arch_copy16` 経由になった。`tools/ppc/known_header_dependencies.json` に `gfx/gfx_vram.c → drivers/video/pc98/splash_raster.h` が登録済み。S1 は gfx_vram.c を PPC でも組めるまま直す (asm・新しい pc98 のヘッダを足さない、足すなら既知の依存に登録)。damage.rs のパスは `userland/gshell/src/damage.rs`。
+- **S1 と PPC**: `drivers/video/pc98/gfx_vram.c` は第 5 段で `tools/ppc/selected_success.json` の PPC の初回成功集合に入り、`:186-189` の `_memcpy_w` は `arch_copy16` 経由になった。`tools/ppc/known_header_dependencies.json` に `drivers/video/pc98/gfx_vram.c → drivers/video/pc98/splash_raster.h` が登録済み。S1 は gfx_vram.c を PPC でも組めるまま直す (asm・新しい pc98 のヘッダを足さない、足すなら既知の依存に登録)。damage.rs のパスは `userland/gshell/src/damage.rs`。
 - **G4m・G5m の位置**: GeForce の PCI の位置は `recover_gf_dev()` (`kdebug/recover.h:57`) で決まる。新しい段は 0:13 の直値を書かない (`drivers/video/geforce/gf_accept.c:177-178` の型を真似ない)。

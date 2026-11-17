@@ -1,8 +1,8 @@
 #ifndef CRT_DIAG_H
 #define CRT_DIAG_H
 
-#include "types.h"
-#include "pc98.h"
+#include "../include/types.h"
+#include "../include/pc98.h"
 
 /* BIOS work and memory switches: raw bytes only; no bank selection. */
 #define CRT_DIAG_W0400       BIOS_WORK_0400

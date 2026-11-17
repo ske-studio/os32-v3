@@ -2,7 +2,7 @@
 #ifndef OS32_FBCON_H
 #define OS32_FBCON_H
 #include "gfx/gfx_console.h"
-#include "drivers/video/kcg/kcg_module.h"
+#include "kcg_contract.h"
 #include "console_backend.h"
 #define FBCON_DEFAULT_ATTR 0xe1u
 #define FBCON_REVERSE 0x04u

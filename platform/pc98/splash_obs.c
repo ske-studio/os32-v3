@@ -10,7 +10,7 @@
 #include "serial_diag.h"
 #include "serial.h"
 #include "config.h"
-#include "tvram.h"
+#include "text_screen.h"
 #include "vfs.h"
 #include "../lib/le_internal.h"
 

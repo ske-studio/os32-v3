@@ -33,7 +33,7 @@
 | `arch:<a>` | `arch/<a>/**` |
 | `platform:<p>` | `platform/<p>/**` |
 | `device` | `drivers/**` `hwdev/**` `kdebug/**` |
-| `named:<機種>` | `include/` にある機種名のヘッダ。表は道具の定数に 1 か所: `pc98.h`・`pegc.h`・`tvram.h`・`wab_xe10.h` は `pc98`、`v86_call.h`・`legacy_lowmap.h` は `x86`。`include/kbd.h` (共通のキーの値) と `include/legacy_guest.h` (提供者を 1 つ link する契約、無い像は `platform/none`) は共通 |
+| `named:<機種>` | `include/` にある機種名のヘッダ。表は道具の定数に 1 か所: `pc98.h`・`pegc.h`・`wab_xe10.h` は `pc98`、`v86_call.h` は `x86`。`include/text_screen.h` (文字画面の口。旧名 tvram.h、中身は機種に依らず両方の機種が実装する) と `mm/paging_lowmap.h` (共通の mm が実装する低位の写像の口。旧名 include/legacy_lowmap.h) は表に入れない。`include/kbd.h` (共通のキーの値) と `include/legacy_guest.h` (提供者を 1 つ link する契約、無い像は `platform/none`) は共通 |
 | `common` | 上のどれでもない作業木の中のファイル (`kernel` `init` `exec` `mm` `fs` `gfx` `net` `kapi` `input` `lib` `include` `sdk` ほか) |
 
 契約の実装の固定名 (`arch/<a>/arch_*.h`、`platform/<p>/platform_*.h`) は、その像の arch・platform の物である限り違反にしない (`arch/README.md` の決まり)。`arch_` で始まらない名前は、両方の arch に同じ名前で対になっていても固定名ではないので R1 に数える (例: `platform/powermac/ppc_kernel.c → arch/ppc/kernel_boot.h`)。`platform/none` はどの像にとっても別の機種ではない。
@@ -95,6 +95,21 @@
 
 違反を直した段は、同じ変更で `python3 -B tools/check_layers.py --write-baseline` を両方の像を組んだ木で回し、減った基準ファイルをコミットする。
 
-## 8. 範囲の外
+## 8. 違反を 0 にした時の直し方 (2026-11-17)
+
+基準値は両方の像で 0 (`tools/layers_baseline.json` の 2 つの一覧が空)。新しい違反は検査が止める。足す時は次の形で直す。
+
+| 違反の形 | 直し方 | 例 |
+|---|---|---|
+| 置き場と持ち主の食い違い (機種のソースが共通の置き場にある、装置の接着が共通にある) | `docs/SRC_MOVE.md` の手順で持ち主の置き場へ移す。中身は変えない | 入口 `init/kernel.c` → `platform/pc98/`、V86 → `platform/pc98/legacy/`、`net/nic_*.c` → `drivers/net/`、`kernel/module/module.c` → `kdebug/kdebug_module.c`、`fs/fat/fatfs/diskio.c` → `drivers/block/fat_diskio.c` |
+| 共通が装置の関数・型を使う (R3) | 共通が要る宣言だけを `include/<名>_contract.h` に置き、装置のヘッダがそれを include する (宣言は 1 か所)。共通は contract だけを読む | `geforce_contract.h`・`kcg_contract.h`・`snd_contract.h`・`lan_contract.h`・`atapi_contract.h`・`serial_contract.h`・`kbd_contract.h`・`fdc_contract.h`・`v86_contract.h` |
+| 共通・arch が platform のヘッダを読む (R2・R7) で、機種ごとに実装を差し替える物 | 固定名 `platform_<名>.h` にする (`-Iplatform/$(PLATFORM)` が実装を選ぶ) | `platform_display_fallback.h`・`platform_link_inline.h`・`platform_ime_render.h`・`platform_pic.h`・`platform_of_layout.h`・`platform_kboot_layout.h` |
+| 共通が arch の関数を使う (R1) | 契約 `include/cpu.h` などに宣言を置く | `arch_fp_present` |
+| 共通が機種名のヘッダの定数を使う (R4・R6) | 共通の側に機種に依らない名前で値を持ち、機種の側のソースに `_Static_assert` で一致を固定する | `GFX_BB_PLANES` (`platform/pc98/gfx_init.c`)、`GFX_PALETTE_COMPONENT_*` (`drivers/video/pc98/backend_pegc.c`) |
+| ドライバが arch のヘッダを読む (R5) | 共通の口を読む (`kernel/irq/irq.h`・`kernel/irq/irq_line.h`・`kernel_tick.h`) | ドライバ 10 本の `idt.h` |
+
+contract のヘッダで消えるのは「共通が装置のヘッダを読む」ことで、リンクの時に呼ぶ関数の名前 (`geforce_foreground_poll`・`fdc_media_gen` など) は装置の名前のまま残る。実行時に装置を差し替える口 (HAL) にするのは、この検査の範囲の外。
+
+## 9. 範囲の外
 
 ユーザーランドの依存は見ない。違反を直すことはしない。装置どうしの機種の区分 (`drivers/base/dev.c` が PowerPC の像で PC-98 の `drivers/block/fdc.h` を読む、など) は `drivers/` をまとめて `device` にしているので数えない — `drivers/` の置き場を機種で分ける段で R6 に入る。`include/memmap.h` の中身 (PC-98 の番地の地図) も、ヘッダの置き場の検査では数えない。`build/out/ppc-kboot` の下に CI が組まない像 (`KBOOT_SHELL=1`・`NEGATIVE`) を手元で組んであると、その像の辺も数える。

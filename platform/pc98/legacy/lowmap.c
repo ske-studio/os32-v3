@@ -1,6 +1,6 @@
 /* Native legacy mapping service; feature-off never opens a transaction. */
 #include "legacy_guest.h"
-#include "legacy_lowmap.h"
+#include "paging_lowmap.h"
 #include "v86_mem.h"
 int legacy_lowmap_busy(void) { return paging_lowmap_busy(); }
 

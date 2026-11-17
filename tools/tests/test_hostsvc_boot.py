@@ -5,7 +5,7 @@ CHECK = dict(name='hostsvc-boot', tier=1, needs=['make:all'], budget=5.2, covers
     'net/rx_work.[ch]', 'kernel/time/tick_clock.h', 'tools/tests/link_platform_fake/platform_link_inline.h', 'kernel/idle_work.h', 'platform/pc98/boot_capture.c', 'platform/pc98/bootinfo_wire.h', 'platform/pc98/bootinfo_native.h',
     'drivers/net/e82557/lan_body.c',
     'drivers/block/netcd.h',
-    'drivers/base/dev.h',
+    'kernel/dev/dev.h',
     'fs/serialfs/sfs_block.h',
     'drivers/net/e82557/lan_module.c',
     'drivers/net/e82557/lan_module.h',

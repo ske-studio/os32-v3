@@ -2,7 +2,7 @@
 /*  HDD_STAGE1_HOST.C — 票 TASK_HDD_INSTALL 段 1 の純粋関数をそのまま回す    */
 /*                                                                          */
 /*  実物を 1 行も写さずに #include する:                                    */
-/*    drivers/block/pc98pt.c          区画表の共有部 (標準配置)                   */
+/*    fs/pc98pt.c          区画表の共有部 (標準配置)                   */
 /*    drivers/ata/ide_addr.c        ATA の指定の方式 (LBA28 / 現在 / 既定) と範囲 */
 /*    fs/ext2/ext2_layout.c          format の大きさの固定点 (N7)                 */
 /*    userland/shell/hdprep_plan.c  hdprep の断る条件と計画                  */
@@ -18,7 +18,7 @@
 #include <string.h>
 #include <stddef.h>
 
-#include "../../drivers/block/pc98pt.c"
+#include "../../fs/pc98pt.c"
 #include "../../drivers/ata/ide_addr.c"
 #include "../../fs/ext2/ext2_layout.c"
 #include "../../userland/shell/hdprep_plan.c"

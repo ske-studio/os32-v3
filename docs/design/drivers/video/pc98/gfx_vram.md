@@ -1,4 +1,4 @@
-# gfx/gfx_vram.c — dirty 転送とラスタ提示
+# drivers/video/pc98/gfx_vram.c — dirty 転送とラスタ提示
 
 > 状態: **現行 (2026-11-01)**。
 

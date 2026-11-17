@@ -18,7 +18,7 @@
 #include "hwdev/gf/gf2_test.h"
 #include "hwdev/gf/production.h"
 #include "kdebug/kpeek.h"
-#include "include/hwdev_private.h"
+#include "hwdev/hwdev_private.h"
 #include "drivers/char/serial.h"
 #include "drivers/pci/pci.h"
 #include "drivers/video/geforce/geforce_module.h"
@@ -62,7 +62,7 @@ struct hwdev_core_api {
     i32 (*kpeek_call)(u32 op, void *buf, u32 size);
     int (*recover_gf_runner_access)(struct recover *r, u32 pc, u32 bar, u32 off, u32 width, bool write, u32 *value);
 };
-#define HWDEV_CONTRACT_CRC 0xc3e1bfb2U
+#define HWDEV_CONTRACT_CRC 0xa2cd0c6fU
 #define HWDEV_LAYOUT_CRC 0x4d4feffaU
 #define HWDEV_IMPORT_COUNT 48U
 #define HWDEV_CORE_SLOTS 26U

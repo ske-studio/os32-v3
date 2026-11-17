@@ -1,6 +1,6 @@
 """Optional legacy provider links and genuine caller admission/unwind slices."""
 CHECK = dict(name='legacy-callers-host', tier=1,
-    covers=['include/legacy_lowmap.h', 'mm/paging_lowmap.inc', 'include/legacy_guest.h', 'arch/x86/**', 'platform/pc98/**', 'exec/*.h', 'mm/*.h',
+    covers=['mm/paging_lowmap.h', 'mm/paging_lowmap.inc', 'include/legacy_guest.h', 'arch/x86/**', 'platform/pc98/**', 'exec/*.h', 'mm/*.h',
             'kernel/v86/*.h', 'kernel/module/*.h', 'platform/none/legacy_guest.c',
             'exec/exec_*.inc', 'exec/lease.c', 'kernel/kaudit.c', 'kernel/console/console.c',
             'tools/tests/legacy_callers_host.c', 'tools/tests/legacy_guest_fake.h',

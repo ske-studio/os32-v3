@@ -1,7 +1,7 @@
 #include "in2_int.h"
 #include "io.h"
 #include "os32_kapi_shared.h"
-#include "../../drivers/input/kbd.h"
+#include "kbd_contract.h"
 
 extern volatile u32 tick_count;
 

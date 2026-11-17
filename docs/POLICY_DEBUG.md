@@ -80,9 +80,9 @@ OFF の起動は `ver` の Image CRC と `boot.log` で到達を確認する。
 - PEGC の実機モードは実機 ROM の OUT 列で照合する。→ [4-62](#4-62-pegc-の実機モード)
 - 書くだけのレジスタは読み返せるとは限らない。→ [4-63](#4-63-レジスタの読戻し)
 - シリアルの分周・クロック判定。
-  → [serial](design/drivers/char/serial.md#落とし穴)、[sysclk](design/kernel/time/sysclk.md#落とし穴)
+  → [serial](design/drivers/char/serial.md#落とし穴)、[sysclk](design/platform/pc98/sysclk.md#落とし穴)
 - FD の IPL・媒体ジオメトリ・D88。
-  → [boot_fat](design/boot/boot_fat.md#落とし穴)、[loader_fat_new](design/boot/loader_fat_new.md#落とし穴)、[diskio](design/fs/fat/fatfs/diskio.md#落とし穴)、[mkd88](design/tools/mkd88.md#落とし穴)
+  → [boot_fat](design/boot/boot_fat.md#落とし穴)、[loader_fat_new](design/boot/loader_fat_new.md#落とし穴)、[diskio](design/drivers/block/fat_diskio.md#落とし穴)、[mkd88](design/tools/mkd88.md#落とし穴)
 - FDC の予算・再試行・キャッシュ。
   → [fdc](design/drivers/block/fdc.md#落とし穴)、[fdc_track](design/drivers/block/fdc_track.md#落とし穴)
 - ISR と foreground 間の状態観測。→ [pcm_cs4231](design/drivers/sound/cs4231/pcm_cs4231.md#落とし穴)
@@ -165,7 +165,7 @@ NHD 配備は HostDrv を更新しない。古い HostDrv から `hsync` する�
 ### 4-49. シリアルの実効速度
 
 NP21/W は baud の実効値を保証しない。エミュレータで通信できても実機の速度照合にはならない。
-分周・警告・対応速度は [serial](design/drivers/char/serial.md#落とし穴)、クロックは [sysclk](design/kernel/time/sysclk.md#落とし穴)。
+分周・警告・対応速度は [serial](design/drivers/char/serial.md#落とし穴)、クロックは [sysclk](design/platform/pc98/sysclk.md#落とし穴)。
 
 ### 4-51. FDC の時間と DMA
 
@@ -180,7 +180,7 @@ FRY 無しでも NP21/W では通るが、実機では Not Ready になりうる
 ### 4-54. PIT の実時間
 
 両クロックのホスト試験が通っても、実機での tick の実時間は別に照合する。
-判定順は [sysclk](design/kernel/time/sysclk.md#落とし穴)、reload と周期は [pit](design/kernel/time/pit.md#落とし穴)。
+判定順は [sysclk](design/platform/pc98/sysclk.md#落とし穴)、reload と周期は [pit](design/kernel/time/pit.md#落とし穴)。
 
 ### 4-55. io_wait() 連打後の FD 読取
 

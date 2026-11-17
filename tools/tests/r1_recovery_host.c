@@ -19,7 +19,7 @@ static void check_cr3(u32 root);
 #include "exec_r1.h"
 #include "v86.h"
 #include "v86_mem.h"
-#include "tvram.h"
+#include "text_screen.h"
 #include "paging_source.c"
 #include "../../platform/pc98/legacy/lowmap.c"
 #include "pgalloc_source.c"

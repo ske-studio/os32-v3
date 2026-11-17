@@ -424,7 +424,7 @@ int netcd_media_check(Device *dev, u32 *generation);
 D2は無状態RPC、0/負、BREADはcount=1..2/cap>=count*512・statusと成功長一致必須。ensure後sidがblock.sidと異なれば古いhandleを送らずSTALE。D3はDevice.privの私有ctxにNetCd・aliasのcopy・SfsBlockを保持、再接続時BOPEN・同一性比較して更新する。countを2以下へ分割しても操作期限は一つ。registerは通信せずcd0を予約、既存ならEXIST。
 ## #9 Device の u32 LBA と媒体境界（本文 §§4・7、使用 D3〜D5/D7/D8/I）
 ```c
-/* drivers/base/dev.h: Device末尾へ追加（既存blk_readの型は変えない） */
+/* kernel/dev/dev.h: Device末尾へ追加（既存blk_readの型は変えない） */
 /* int (*blk_read_u32)(Device *, u32 lba, int count, void *buf); */
 /* int (*media_check)(Device *, u32 *generation); */
 int dev_media_check(Device *dev, u32 *generation);
@@ -506,7 +506,7 @@ hs_failは次の該当一回だけ（nic.tx/nic.rx/heap/copyout/sfs.reply）、P
 | S1〜S4、sdk/list | SDK: fake KAPI/yieldと実LIST解決、C89/ILP32/Rust契約、CPL3はN |
 宣言段はtest_hostsvc_contracts.pyへ型/offset/相互includeとfixture自己試験を追加。各試験のCHECK.coversに実依存を宣言（現行ランナーにinputsキーはない）。本番結線試験とruntime RED変異は各段の受入へ残し、未結線単体だけで全体合格としない。
 ## 宣言の段2で入れるヘッダの一覧
-改: net/nic.h、fs/serialfs/serialfs.h、fs/serialfs/sfs_client.h、drivers/base/dev.h、fs/vfs.h。新: net/nic_rx.h、net/link_notify.h、net/host_mailbox.h、sdk/include/os32/os32_host_notice.h、fs/serialfs/sfs_block.h、drivers/block/netcd.h、fs/isofs/iso9660_media.h、tools/tests/hostsvc_fixture.h。
+改: net/nic.h、fs/serialfs/serialfs.h、fs/serialfs/sfs_client.h、kernel/dev/dev.h、fs/vfs.h。新: net/nic_rx.h、net/link_notify.h、net/host_mailbox.h、sdk/include/os32/os32_host_notice.h、fs/serialfs/sfs_block.h、drivers/block/netcd.h、fs/isofs/iso9660_media.h、tools/tests/hostsvc_fixture.h。
 併せて hostsvc_contracts.pyi（Protocolを実クラスの契約として固定）、fixture.c/.py・参照像・契約試験を先に固定する。I担当のdev.c/vfs.c変更・輸出入台帳と生成入力は所有者を一本化、共有ヘッダは後続段が再定義しない。
 ## 宣言の段2の後に並列に出せる段
 宣言/土台のレビュー統合後、異なるファイルの A2〜A8/A10/A11、B2〜B5、C1〜C4、D2〜D8、H1〜H4/H6/H7、S1/S2/S4 と対応試験を、上記契約を輸入して並列コーディング可。A9はA8と同翻訳単位なのでA8後、H5はH3/H4/H7後、I結線/生成は直列統合。A1/B1/C5/D1/S3の共有宣言は先行段へ吸収。部品の実装依存と実行受入の順序は本文§10/11を維持する。

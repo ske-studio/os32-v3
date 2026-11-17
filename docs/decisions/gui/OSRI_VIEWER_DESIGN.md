@@ -48,9 +48,9 @@
 | OBS制限 | 現物の上限47 OUT、格納64、plan52008B。`drivers/video/pc98/splash_raster_image.h:25`。 |
 | HBLANK核 | activeで先頭番号を選び、H立上りで列を実行、VSYNCならDROP。`drivers/video/pc98/splash_raster_image.c:939`（pl_obs_frame、919はobs_edge）。 |
 | IF区間 | VBLANK待ちはIF開放、その後CLI、初期色・可視行走査、全出口で復元。`drivers/video/pc98/splash_raster_image.c:939`。 |
-| 既存公開ラスタ | dirty転送/flip後 `pc98_splash_raster_table` へ。`gfx/gfx_vram.c:311,333`。OSRI核ではない。 |
+| 既存公開ラスタ | dirty転送/flip後 `pc98_splash_raster_table` へ。`drivers/video/pc98/gfx_vram.c:311,333`。OSRI核ではない。 |
 
-- `gfx/gfx_vram.c:305` は目標行直前〜HBLANKの4 OUTだけ保護し、保護間にIF開放を置く方式。
+- `drivers/video/pc98/gfx_vram.c:305` は目標行直前〜HBLANKの4 OUTだけ保護し、保護間にIF開放を置く方式。
 - `RASTER_LINE_US` は実装から削除済みで、`tools/tests/cpu_calibrate_host.c:165` のコメントだけに残る。古い120µs待ちを現在の根拠にしない。
 - 読込失敗でもBBには部分画素が入り得る（`gfx/gfx_osri.c:76,107`）。検査完了前の転送は禁止する。
 - B31は「HBLANK内に全OUTが収まる」保証ではない。enc2は可視域への色変更のはみ出しも評価する。

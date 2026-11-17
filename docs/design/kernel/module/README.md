@@ -27,7 +27,5 @@ kernel→既存dbg_call。
 
 ## 索引
 
-- [kernel/module/hwdev_module.c](hwdev_module.md)
 - [kernel/module/kdebug_imports.def](kdebug_imports.md)
-- [kernel/module/module.c](module.md)
 - [kernel/module/module_runtime.c](module_runtime.md)

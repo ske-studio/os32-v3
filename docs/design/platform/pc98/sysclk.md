@@ -1,4 +1,4 @@
-# kernel/time/sysclk.c — システムクロック判定
+# platform/pc98/sysclk.c — システムクロック判定
 
 > 状態: **現行 (2026-10-31)**
 
@@ -14,7 +14,7 @@
 ## 内部設計と契約 (D1)
 
 ```c
-/* kernel/time/sysclk.c: s_hz/s_is_8mhz/s_detected は従来の所有者に残す */
+/* platform/pc98/sysclk.c: s_hz/s_is_8mhz/s_detected は従来の所有者に残す */
 void sysclk_detect(void) {
     struct platform_clock_value v;
     if (s_detected) return;
@@ -25,4 +25,4 @@ void sysclk_detect(void) {
 
 |所有者／文脈|移動・維持する中身|
 |---|---|
-|kernel/time/sysclk.c|未判定既定1996800Hz/is_8mhz=0/detected=0、検出済み判定、3 getter を維持。RTC の clock 登録表とは無関係|
+|platform/pc98/sysclk.c|未判定既定1996800Hz/is_8mhz=0/detected=0、検出済み判定、3 getter を維持。RTC の clock 登録表とは無関係|

@@ -314,7 +314,7 @@ int gfx2_lock_revoke(struct gfx2_surf *s)   /* C14 の rebind だけが呼ぶ。
 }
 ```
 - 文脈: `paging_lease_unmap` は CR3 が kernel か `map_as` の時だけ通る (mm/paging_lease.inc:5-11)。別名を lock できるのは画面の持ち主だけ (§6-5) なので、持ち主の KAPI の中の mode の変更と kernel の文脈 (gfx_init) では外せる。ほかの AS の文脈で走った時の IO は §7-5 の unlock の IO と同じ扱い (PTE と頁はその AS の破棄で返る)。
-- v1 の入口 (present_rect (gfx/gfx_vram.c:55-63・:284-298)・fill_rect・blit (gfx/gfx_core_api.inc:66-78)・fill_rop・put・mono・get・gfx_hw_submit:70・gfx_hw_get:95・osri_show・set_mode・page_flip・DISPLAY の lease の開始と終わり (exec/lease.c の `surface_lease`:245-296・`surface_lease_bundle`:302-353)) は全部 `v1_bridge_begin(alias, access)`/`end` を通す: CPU も v1 の HW も触る前に §6-2 の待ち (v2 の束が別名に書いた分を待つ)。v1 の GF の HW は同期なので (D9) `v1_bridge_end` の fence は 0 で、別名の面に番号を記録しない。v1 が非同期の HW を持つ時に初めて C3 に口を足す (A0 の版上げ)。
+- v1 の入口 (present_rect (drivers/video/pc98/gfx_vram.c:55-63・:284-298)・fill_rect・blit (gfx/gfx_core_api.inc:66-78)・fill_rop・put・mono・get・gfx_hw_submit:70・gfx_hw_get:95・osri_show・set_mode・page_flip・DISPLAY の lease の開始と終わり (exec/lease.c の `surface_lease`:245-296・`surface_lease_bundle`:302-353)) は全部 `v1_bridge_begin(alias, access)`/`end` を通す: CPU も v1 の HW も触る前に §6-2 の待ち (v2 の束が別名に書いた分を待つ)。v1 の GF の HW は同期なので (D9) `v1_bridge_end` の fence は 0 で、別名の面に番号を記録しない。v1 が非同期の HW を持つ時に初めて C3 に口を足す (A0 の版上げ)。
 - lock か v1 の lease (全画面アプリの DISPLAY) が開いている面への投入は `OS32_ERR_BUSY` (読むだけの投入は READONLY の lock の間なら通す)。lease の終わり・unlock で `cpu_end` の吐き出し。
 
 ## 7. 面
@@ -1201,7 +1201,7 @@ void gfx2_adapter_activate(struct gfx2_adapter *a)            /* ACTIVE の付�
 | C11 | gfx/v2/enum.c | `be->enum_*`・`edid` (v1 から作る列挙は C11 の `gfx2_v1_enum_*` (§11-2) で、C16 の shim が呼ぶ) | 公開・C12・C16 | — | 200 | I3 |
 | C12 | gfx/v2/modeset.c | C3・C4・C11・`be->mode_set`・`gfx_policy_reeval` (H4) | 公開 | `adapter.head[]`・`restore_on_leave` | 160 | I3 |
 | C13 | gfx/v2/display.c | `be->flip`・`flip_done`・`vblank_wait`・`palette`・`gamma`・`cursor_*`・`dpms` (v1 だけの backend は C16 の shim の中で v1 の hook へ)・C4・`gfxsync_write_rows` | 公開・C1 (`gfx2_head_detach`・`gfx2_pal_reset16`)・C14 (`gfx2_pal_set_v1`)・C15 | `adapter.head[].pend_sid`、`surf.dirty` を 0 に、`gfx2_pal` (§9-2) | 240 | I3 |
-| C14 | gfx/v2/v1_bridge.c (+gfx_core.c 3 か所・gfx_hw_submit.c:70・95・surface_query.c・gfx/gfx_vram.c (present_rect :55-63・:284-298)・gfx/gfx_core_api.inc (fill・blit :66-78、パレットの写しの `gfx2_pal_set_v1` を `gfx_set_palette_hal` :50-59・`gfx_lease_palette` :102-130)・exec/lease.c (DISPLAY の lease、`surface_lease`:245-296・`surface_lease_bundle`:302-353) の呼ぶ行)。exec/lease.c は M3 も触るので **M3 の後**に着手。C7 の追補 `gfx2_lock_revoke` (gfx/v2/lock.c・gfx2_int.h の宣言・`tools/checks/gfx2_wiring.txt` に `I2 kernel gfx2_lock_revoke`、§6-5) を C14 の枝の最初の commit で入れる | C3・C4 (`gfx2_surf_alias`・`alias_update`)・C7 (`gfx2_lock_revoke`) | v1 の入口 | 別名の面 | 220 | I2 |
+| C14 | gfx/v2/v1_bridge.c (+gfx_core.c 3 か所・gfx_hw_submit.c:70・95・surface_query.c・drivers/video/pc98/gfx_vram.c (present_rect :55-63・:284-298)・gfx/gfx_core_api.inc (fill・blit :66-78、パレットの写しの `gfx2_pal_set_v1` を `gfx_set_palette_hal` :50-59・`gfx_lease_palette` :102-130)・exec/lease.c (DISPLAY の lease、`surface_lease`:245-296・`surface_lease_bundle`:302-353) の呼ぶ行)。exec/lease.c は M3 も触るので **M3 の後**に着手。C7 の追補 `gfx2_lock_revoke` (gfx/v2/lock.c・gfx2_int.h の宣言・`tools/checks/gfx2_wiring.txt` に `I2 kernel gfx2_lock_revoke`、§6-5) を C14 の枝の最初の commit で入れる | C3・C4 (`gfx2_surf_alias`・`alias_update`)・C7 (`gfx2_lock_revoke`) | v1 の入口 | 別名の面 | 220 | I2 |
 | C16 | gfx/v2/v1_shim.c (R4、§11-7 のコード。`gfx2_v1_shim`・`gfx2_lost_be`) | C10 (`gfx2_caps_from_v1`)・C11 (`gfx2_v1_enum_*`)・v1 の hook | C1 | — | 180 | I1 |
 | C17 | gfx/v2/map_audit.c (R1、§7-4 のコード) | C7 (`gfx2_surf_page`) | M3 (`lease_audit_all`) | — | 70 | I1 |
 | C18 | gfx/v2/sysmem.c (R2、§7-2 の表とコード) | `pgalloc_alloc_n_owner`・`pgalloc_free_n_owner` | C4 | `surf.sys_pfn`・`sys_n`・`kva` | 60 | I1 |
@@ -1232,7 +1232,7 @@ void gfx2_adapter_activate(struct gfx2_adapter *a)            /* ACTIVE の付�
 合計 カーネル約 7,200 行・ユーザーランド約 400 行。1,000 行を超えるファイルは無い。ATI の backend は別の設計。
 
 - **順の制約**: exec/lease.c は M3 と C14 の両方が触るので M3 → C14 の順にする (同時に走らせない)。
-- **PPC で組めること (完了条件)**: C14・M1・M2・M3 (exec/lease.c) と gfx/v2・gfx/sync の全 TU は PPC のクロスコンパイルが通ることを完了条件にする。`gfx/gfx_hw_submit.c`・`gfx/gfx_vram.c`・`mm/paging.c`・`mm/pgalloc.c`・`exec/lease.c` は `tools/ppc/selected_success.json` の PPC の初回成功集合に入っており、gfx/v2・gfx/sync の新しい TU も A0 がこの集合に足す。gfx/v2・gfx/sync は pc98 と x86 のヘッダを include しない (CPU に依る所は §10 の arch の口、表示の機種に依る所は provider と backend の表)。x86 の asm・pc98 のヘッダを既存の TU に増やさない、増やすなら `tools/ppc/known_header_dependencies.json` に組を足す。
+- **PPC で組めること (完了条件)**: C14・M1・M2・M3 (exec/lease.c) と gfx/v2・gfx/sync の全 TU は PPC のクロスコンパイルが通ることを完了条件にする。`gfx/gfx_hw_submit.c`・`drivers/video/pc98/gfx_vram.c`・`mm/paging.c`・`mm/pgalloc.c`・`exec/lease.c` は `tools/ppc/selected_success.json` の PPC の初回成功集合に入っており、gfx/v2・gfx/sync の新しい TU も A0 がこの集合に足す。gfx/v2・gfx/sync は pc98 と x86 のヘッダを include しない (CPU に依る所は §10 の arch の口、表示の機種に依る所は provider と backend の表)。x86 の asm・pc98 のヘッダを既存の TU に増やさない、増やすなら `tools/ppc/known_header_dependencies.json` に組を足す。
 
 ### 12-1. 段ごとの失敗・入力の境界・試験
 観点は (1) 失敗の戻り値と失敗の後の状態、(2) 入力の境界 (0・あふれ・整列・上限)、(3) §13-1 の試験の行。どの段も「失敗では共有の状態を変えない (全部か無し)」が既定で、例外だけを書く。装置や写像の後始末が失敗した物は §7-3 の KEEP と (5) の隔離の 1 つの道へ寄せる。手本と同じ所は手本の名だけを書く。

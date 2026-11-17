@@ -156,7 +156,7 @@ static int terminal_getkey(void) {
 struct boot_root_image { const u8 *base; u32 bytes; };
 /* baseはplatformが予約・写像済み。起動中不変、解放しない。 */
 int boot_root_mount(const struct boot_root_image *image);
-/* drivers/block/ram_ro.h */
+/* kernel/dev/ram_ro.h */
 struct ram_ro { Device dev; const u8 *base; u32 bytes; };
 int ram_ro_register(struct ram_ro *, const struct boot_root_image *);
 int ram_ro_read(struct ram_ro *, u32 lba, u32 count, void *dst);
@@ -296,13 +296,13 @@ VfsOps ramfs_ops = {
 |---|---|---|---:|
 |A01/W0|変更 platform/powermac/lan_boot.h|端末型・口|35|
 |A02/W0 †|新規 include/boot_root.h|呼び手の名前登録を含む契約|20|
-|A03/W0 †|新規 drivers/block/ram_ro.h|RAM Device 契約、A02|25|
+|A03/W0 †|新規 kernel/dev/ram_ro.h|RAM Device 契約、A02|25|
 |A04/W0 †|新規 kernel/console/console_stream.h|stream 契約|15|
 |A05/W0 †|新規 kernel/cli/resident_cli.h|CLI・cat・put 契約|30|
 |A06/W1|変更 platform/powermac/lan_wire.c|追加型 codec、A01|25〜50|
 |A07/W1|新規 platform/powermac/lan_terminal.c|端末世代・FIFO・統計|220〜280|
 |A08/W1|変更 tools/ppc_lan_host.py|端末モード・codec|140〜220|
-|A10/W1 †|新規 drivers/block/ram_ro.c|RO block、dev_register_cd|100〜160|
+|A10/W1 †|新規 kernel/dev/ram_ro.c|RO block、dev_register_cd|100〜160|
 |A11/W1|新規 tools/mkroot_image.py|image生成、空の/tmp、サイズ報告|60〜100|
 |A12/W1 †|新規 kernel/cli/resident_cli.c|行編集、3コマンド、echoの一形|200〜280|
 |C1/W1|既存 dev.c・iso9660.c の compile 確認|W2 前に PPC flags で試す。共通修正は出す前に本線通知|確認段|

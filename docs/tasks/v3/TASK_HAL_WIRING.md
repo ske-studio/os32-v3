@@ -34,7 +34,7 @@ BIOS ワークを読んで保存 (R3)、DMA プールは **SHM ではなく SQLi
 `0000:0501h` bit7 = 0)** では 100Hz を頼んでも **tick = 8.125ms (123Hz)** になっており、`tick_count` を使う待ち・番犬・
 校正すべてが 23% 速い。
 
-- **`sysclk_detect()` (新設、`kernel/time/sysclk.c`)**: `paging_init()` より**前** (PG=0、物理番地がそのまま見える) に
+- **`sysclk_detect()` (新設、`platform/pc98/sysclk.c`)**: `paging_init()` より**前** (PG=0、物理番地がそのまま見える) に
   `kernel.c` から 1 回だけ呼び、`0000:0501h` bit7 を読んで `g_sysclk_hz` (1996800 / 2457600) と `g_sysclk_8mhz` に保存する。
   以後は**保存値だけを読む**。既存の `serial_detect_clock()` は CR3 が master と一致しないと何もしない (PG=0 では
   CR3 が未設定なので現状は**検出をスキップして既定値のまま**) — これを保存値の参照に置き換え、CR3 検査を消す。

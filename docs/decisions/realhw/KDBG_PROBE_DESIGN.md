@@ -26,8 +26,8 @@ r1→r2 の変更
 | `kernel/module/kdebug_call.c:21` | 未ロード時の呼出しは NOSYS。公開 KAPI を増やさず新しい private op を運べる |
 | `kernel/module/kdebug_imports.def:2555` 以降 | HWアクセス・資源照会等の kernel imports。末尾は index 320 |
 | `hwdev/hwdev_imports.def:180`、`docs/design/hwdev/hwdev_imports.md:7,38` | HWDEV の core と kernel import は別物。末尾追加、生成、監査が必要 |
-| `kernel/module/hwdev_module.c:90,123` | hwdev は kdebug RUNNING が前提、公開後は登録参照で保持 |
-| `kernel/module/module.h:7,12`、`kernel/module/module.c:74` | kdebug ops v4、公開は検査後。ops を伸ばさず内部 import で橋渡しする |
+| `hwdev/hwdev_module.c:90,123` | hwdev は kdebug RUNNING が前提、公開後は登録参照で保持 |
+| `kernel/module/module.h:7,12`、`kdebug/kdebug_module.c:74` | kdebug ops v4、公開は検査後。ops を伸ばさず内部 import で橋渡しする |
 | `drivers/video/trident/lifecycle.c:84`、`trident_module.c:156,167` | Trident は独立部品で screen_init と detach を持つ。HWDEV imports だけでは届かない |
 - 一度採取点を配備した後は、項目・幅・番地・有効化を台本だけで変更する。新しい採取位置の追加はビルドが要る。
 - 既存の固定診断・HW_OP=18・EDID の結果は初版では維持する。ソフト状態の汎用採取は別機能。
@@ -58,7 +58,7 @@ typedef i32 (*probe_get_decls_fn)(const struct probe_decl **table, u32 *count);
 - 名前は ASCII `[a-z0-9_.]`、1..31字、全体で重複不可。宣言表の RO、文字列の終端、slot の RW 所属・整列を owner 範囲で検証。
 - 各部品の export に宣言表を返す関数を末尾追加し、loader が export 検査後・最初のドライバ操作前に登録する。該当部品 ops/version・export 契約を更新。
 - export 番号は0起点: hwdev は `hwdev_main.c:26-30` の末尾に `[2] get_probe_decls`、GF 本番は `drivers/video/geforce/geforce_body.c:65-68` に `[2]`、Trident は `drivers/video/trident/trident_body.c:14-17` に `[4]` を追加。全て上記型、関数 text 所属と表を検証する。
-- 登録位置: `kernel/module/hwdev_module.c:82` の検査後・:83 の公開前、`drivers/video/geforce/geforce_module.c:231` の参照保持後・:232 前、`drivers/video/trident/trident_module.c:158` の参照保持後・:159 の prepare 前。start 中の登録は暫定とし、RUNNING 後に利用可、失敗時は解除する。
+- 登録位置: `hwdev/hwdev_module.c:82` の検査後・:83 の公開前、`drivers/video/geforce/geforce_module.c:231` の参照保持後・:232 前、`drivers/video/trident/trident_module.c:158` の参照保持後・:159 の prepare 前。start 中の登録は暫定とし、RUNNING 後に利用可、失敗時は解除する。
 - HWDEV と GF production 側で同じソースを別像に組む場合は、実行主体ごとに登録し、同名の同時公開を拒否する。採取対象は実際に選択された主体1つ。
 - Trident も専用 loader/export/import 生成経路を使う。kdebug の関数アドレスをドライバへリンクしない。
 - kdebug_init は変更しない。最初の ARM で kdebug が kernel broker に callback を渡す。broker が RUNNING・text 所属を検査し kdebug の登録参照を保持。

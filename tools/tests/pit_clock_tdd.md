@@ -1,7 +1,7 @@
 # pit_clock — RED → GREEN の記録
 
 票: [`docs/tasks/v3/TASK_HAL_WIRING.md`](../../docs/tasks/v3/TASK_HAL_WIRING.md) §1-0
-対象: `kernel/time/pit_math.c` (分周の算数) / `kernel/time/sysclk.c` (クロック判定) / `arch/x86/kernel/idt.c` (積む側)
+対象: `kernel/time/pit_math.c` (分周の算数) / `platform/pc98/sysclk.c` (クロック判定) / `arch/x86/kernel/idt.c` (積む側)
 試験: `tools/tests/test_pit_clock.py` + `tools/tests/pit_clock_host.c`
 実行: `make check-pit-clock-host` (`check-par` の列)
 

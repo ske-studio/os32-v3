@@ -8,7 +8,6 @@
 #ifndef __GFX_H
 #define __GFX_H
 
-#include "pc98.h"
 #include "../exec/surface_limits.h"
 #include "types.h"  /* u8, u16, u32 */
 
@@ -23,14 +22,8 @@
 #define GFX_HEIGHT_200   200
 #define GFX_PLANE_SZ_200 16000  /* 80 * 200 = 16000 bytes/plane */
 
-/* ======== VRAMプレーンアドレス (PC9800Bible §2-7) ======== */
-#define VRAM_PLANE_B  GVRAM_PLANE_B   /* 青 / Plane 0 */
-#define VRAM_PLANE_R  GVRAM_PLANE_R   /* 赤 / Plane 1 */
-#define VRAM_PLANE_G  GVRAM_PLANE_G   /* 緑 / Plane 2 */
-#define VRAM_PLANE_I  GVRAM_PLANE_I   /* 輝度 / Plane 3 */
-
-/* ======== パレットI/O (16色モード) ======== */
-/* PAL_*_PORT are defined by pc98.h. */
+/* 16 色の planar の面の数 (B/R/G/I)。バックバッファの枚数。 */
+#define GFX_BB_PLANES 4
 
 /* ======== データ構造 ======== */
 

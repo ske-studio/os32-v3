@@ -16,7 +16,7 @@
 #include "gfx.h"
 #include "../../include/platform_splash.h"
 #include "palette.h"
-#include "tvram.h"
+#include "text_screen.h"
 #include "types.h"
 #include "os32_kapi_shared.h"
 #include "config.h"

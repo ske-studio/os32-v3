@@ -515,7 +515,7 @@
       "stage": "S2",
       "kind": "FUNC",
       "symbol": "kbd_diag",
-      "source": "drivers/input/kbd.h",
+      "source": "include/kbd_contract.h",
       "context_safe": false,
       "index": 63
     },
@@ -1012,7 +1012,7 @@
       "stage": "S2",
       "kind": "FUNC",
       "symbol": "sysclk_detected",
-      "source": "kernel/time/sysclk.h",
+      "source": "platform/pc98/sysclk.h",
       "context_safe": false,
       "index": 125
     },
@@ -1020,7 +1020,7 @@
       "stage": "S2",
       "kind": "FUNC",
       "symbol": "sysclk_hz",
-      "source": "kernel/time/sysclk.h",
+      "source": "platform/pc98/sysclk.h",
       "context_safe": false,
       "index": 126
     },
@@ -1046,7 +1046,7 @@
       "stage": "S2",
       "kind": "FUNC",
       "symbol": "tvram_readchar_at",
-      "source": "include/tvram.h",
+      "source": "include/text_screen.h",
       "context_safe": false,
       "index": 129
     },
@@ -2133,7 +2133,7 @@
       "stage": "S5",
       "kind": "FUNC",
       "symbol": "hwdev_module_ops",
-      "source": "kernel/module/hwdev_module.h",
+      "source": "hwdev/hwdev_module.h",
       "context_safe": false,
       "index": 263
     },

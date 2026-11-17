@@ -300,7 +300,7 @@ STATIC_ASSERT(sizeof(struct OsriImage) == 9614, osri_image_size);
 - §6の依存変更あり: `宣言段受入 → H1b → F1`。H2/T1の「H1後」はH1a後と読み替え、他の依存は維持する。H1bとF1を同じ取り込み単位にし、各小段の1ファイル所有は維持する。
 - H1b/F1の組合せでv1/v2読込を受け入れ、R1/I1は既定の依存どおり後続する。旧型と新型をcastで接続せず、旧オブジェクトとの混在も認めない。
 
-公開KAPIは変更しない。型・200件定義は `sdk/include/os32/os32_kapi_shared.h:634`、世代は `sdk/kapi.json:2`。公開入口 `gfx/gfx_vram.c:311` と再生検査 `drivers/video/pc98/splash_raster.c:260`、`:267`、`:271` を維持する。
+公開KAPIは変更しない。型・200件定義は `sdk/include/os32/os32_kapi_shared.h:634`、世代は `sdk/kapi.json:2`。公開入口 `drivers/video/pc98/gfx_vram.c:311` と再生検査 `drivers/video/pc98/splash_raster.c:260`、`:267`、`:271` を維持する。
 公開型の利用者はロゴ `platform/pc98/boot_splash.c:179`、`:205`、診断 `platform/pc98/splash_probe.c:66`、`:763`、アプリ `apps/raster/raster.c:297`、`:426`。1197件の画像RAM型へ切り替えず、公開の200件／2行制限を保持する。
 
 ## 宣言の段 (H1a・H2〜H6) の取り込みで後続の段へ送る項目 (2026-11-03、PM 決定)

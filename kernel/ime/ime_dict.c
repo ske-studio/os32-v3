@@ -28,7 +28,7 @@
 #include "vfs.h"
 #include "utf8.h"
 #include "kprintf.h"
-#include "serial.h"
+#include "serial_contract.h"
 #include "kstring.h"
 #include "../../mm/kmalloc.h"
 #include "os32_kapi_shared.h"

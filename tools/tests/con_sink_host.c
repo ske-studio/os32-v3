@@ -35,7 +35,7 @@ void res_owner_set(int owner) { g_owner = owner; }
 /*  kernel/console/console.c も**実物のまま**取り込む (K6C-2)                        */
 /*                                                                          */
 /*  「シンク有効中は描画関数が TVRAM に触らない」を見るために要るのは 2 つ:  */
-/*    - テキスト VRAM: tvram.h の TVRAM_BASE / TVRAM_ATTR はただの番地       */
+/*    - テキスト VRAM: text_screen.h の TVRAM_BASE / TVRAM_ATTR はただの番地       */
 /*      マクロなので、ホスト配列へ差し替えられる (console.c は                */
 /*      `#define TVRAM_TEXT TVRAM_BASE` で使うだけ)。                        */
 /*    - I/O ポート: CPL=3 では outb が撃てないので、記録するだけの            */
@@ -44,9 +44,9 @@ void res_owner_set(int owner) { g_owner = owner; }
 /*  範囲外なので pragma で黙らせる。番地マクロ以外はカーネルと同じソース。    */
 /* ======================================================================== */
 
-#include "tvram.h"
+#include "text_screen.h"
 #include "tvram_private.h"   /* PC-98 の番地 (第 5 段 C1) */
-/* tvram.h now includes the canonical pc98.h constants. */
+/* text_screen.h now includes the canonical pc98.h constants. */
 #include "pc98.h"
 #include "io.h"
 #include "utf8.h"

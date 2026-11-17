@@ -1,6 +1,6 @@
 #include "bootinfo_native.h"
 /* Actual facade + runtime + validator; synthetic M2 or built GF body. */
-#include "../../kernel/module/hwdev_module.c"
+#include "../../hwdev/hwdev_module.c"
 #include "pgalloc.h"
 #include "memmap.h"
 #include "vfs.h"

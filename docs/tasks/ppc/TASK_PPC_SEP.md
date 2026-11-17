@@ -40,15 +40,15 @@
 |---|---|---|
 | gfx/gfx_core.c | v86_bios.h (ほかに pegc.h・wab_xe10.h・pc98_route.h・splash_raster.h・kcg_module.h・geforce_module.h) | 下の「第 5 段で見送った物」。backend の名前と PEGC の BIOS ワークの読み方を provider へ |
 | exec/exec.c・kapi/kapi_generated.c | kernel/ime/ime.h | IME の部品の口 (FEP) を exec・KAPI から狭い facade で引く段。③ (ユーザ実行) の前 |
-| kernel/module/module.c | kdebug_imports.h | module の import の表を arch・platform の選択へ。③ の前 |
-| fs/fat/fatfs/diskio.c・fs/fat/fatfs_vfs.c・fs/ext2/ext2_super.c | fdc.h・pc98pt.h | ブロック装置と区画表を platform の口へ。③ の前 (mount は ② の境界の外) |
+| kdebug/kdebug_module.c | kdebug_imports.h | module の import の表を arch・platform の選択へ。③ の前 |
+| drivers/block/fat_diskio.c・fs/fat/fatfs_vfs.c・fs/ext2/ext2_super.c | fdc.h・pc98pt.h | ブロック装置と区画表を platform の口へ。③ の前 (mount は ② の境界の外) |
 | fs/serialfs/serialfs_session.c | serial.h | SerialFS の線を platform の口へ。LAN (Host Services) の段と同時 |
 
 第 5 段で見送った物 (設計 PPC_SEP5_DESIGN の B5・B6 の行のうち、この段では入れていない)。B6 は部分完了で、下の 1・2 が残件:
 
 | # | 残件 | 対象 | 後続の段 | 完了の条件 |
 |---|---|---|---|---|
-| 1 | 診断と raster の移設 | gfx/gfx_vram.c の gfx_diag_px (PEGC の窓を読む) と gfx_present_raster の pc98_splash_raster_table の呼出し、gfx/gfx_core.c の pc98_splash_raster_reset | PPC の FB の表示 backend を足す段の前 (② の後の FB の段) | gfx/gfx_vram.c が pegc.h・splash_raster.h を include しない。test_boot_splash_native の raster の変異 4 本が provider の実体を通って RED のまま |
+| 1 | 診断と raster の移設 | drivers/video/pc98/gfx_vram.c の gfx_diag_px (PEGC の窓を読む) と gfx_present_raster の pc98_splash_raster_table の呼出し、gfx/gfx_core.c の pc98_splash_raster_reset | PPC の FB の表示 backend を足す段の前 (② の後の FB の段) | drivers/video/pc98/gfx_vram.c が pegc.h・splash_raster.h を include しない。test_boot_splash_native の raster の変異 4 本が provider の実体を通って RED のまま |
 | 2 | gfx の共通ヘッダの pc98.h の依存 | gfx/gfx.h:11・gfx/gfx_internal.h:5 の `#include "pc98.h"` (GVRAM_PLANES・VRAM_PLANE_*・GDC の定数の利用者が広い) | 同上 | 2 つのヘッダが pc98.h を include せず、PC98 の定数は各実体が直に include。x86 は build_compare で不変 |
 | 3 | 共通の core に残る backend の名前 | gfx/gfx_core.c の pc98_route_safe・`g_backend == &gfx_backend_geforce/trident` の分岐、gfx/gfx_core_surface.inc の gfx_sf_backend、gfx/gfx_core_framebuffer.inc の backend の名前、PEGC の BIOS ワーク (v86_bios.h) | 同上 | gfx/gfx_core.c が PPC の selected で成功する (今は v86_bios.h で止まる) |
 

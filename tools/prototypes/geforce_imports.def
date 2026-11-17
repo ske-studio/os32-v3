@@ -34,7 +34,7 @@
     },
     {
       "symbol": "geforce_display_failed",
-      "source": "drivers/video/geforce/geforce_module.h",
+      "source": "include/geforce_contract.h",
       "context": "normal",
       "irq": false
     },

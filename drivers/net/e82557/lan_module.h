@@ -36,8 +36,6 @@ int lan_module_load(void);
 int lan_module_netcd_register(const char *alias);
 void lan_module_pci_bind_fallback(void);
 int lan_module_abort(void);
-int lan_module_session_acquire(void);
-void lan_module_session_release(void);
 int lan_module_quiet(void);
 int lan_module_release(void);
 int lan_module_irq_register(unsigned int irq, irq_handler_fn fn, void *arg, unsigned int flags);

@@ -30,4 +30,3 @@ CPU の行の「実測か既定か」は値からは見分けない (正しい�
 ## 索引
 
 - [platform/pc98/pit.c](pit.md)
-- [kernel/time/sysclk.c](sysclk.md)

@@ -22,7 +22,7 @@
 #include "serialfs.h"
 #include "io.h"
 #include "pc98.h"
-#include "tvram.h"
+#include "text_screen.h"
 #include "kprintf.h"
 
 extern int fatfs_init(void);

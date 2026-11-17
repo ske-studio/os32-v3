@@ -9,6 +9,7 @@
 #ifndef __SND_ENGINE_H
 #define __SND_ENGINE_H
 
+#include "snd_contract.h"
 #include "types.h"
 
 /* ======================================================================== */
@@ -56,20 +57,7 @@ void snd_init(void);
 /* timer_handler から毎tick呼ばれるメインループ */
 void snd_tick(void);
 
-/* BGM 制御 */
-void snd_bgm_play(const char *mml);
-void snd_bgm_stop(void);
-int  snd_bgm_is_playing(void);
-
-/* SE 制御 */
-void snd_se_play(int se_id);
-void snd_se_play_raw(int note, int duration_ticks, int tone);
-
-/* マスター制御 */
-void snd_set_master(int enable);
-
-/* BGM持続フラグ (1=exec_exit時にBGMを停止しない) */
-void snd_bgm_set_persist(int persist);
+/* BGM・SE・マスター・persist の制御は include/snd_contract.h。 */
 int  snd_bgm_get_persist(void);
 
 /* exec_exit 時に呼ばれるクリーンアップ (所有者を見ない旧口)。
@@ -98,17 +86,9 @@ void snd_cleanup(void);
  * STATIC_ASSERT ではなく exec 側の APP_SLOT_COUNT と同じ 6 に揃えてある。 */
 #define SND_OWNER_MAX   6
 
-/* 音の所有者をフォーカスに追従させる。app_id = 新しいフォーカス窓の owner
- * (1 = シェル帯 / 2〜5 = アプリ)。戻り値 0 / OS32_ERR_INVAL。
- * W レーン (gshell) がフォーカス切替のたびに呼ぶ。 */
-i32 snd_focus(int app_id);
 
 /* いま音を出してよい所有者 (診断・試験用)。 */
 int snd_focus_owner(void);
 
-/* 終了・kill 時にその ID の音の状態だけを捨てる (exec_exit / exec_kill)。
- * 鳴っているのがその ID なら止め、所有権をシェル帯 (1) へ戻す。
- * 他のアプリの退避済み BGM は 1 バイトも触らない。 */
-void snd_owner_exit(int owner);
 
 #endif /* __SND_ENGINE_H */

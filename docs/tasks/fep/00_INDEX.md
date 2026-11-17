@@ -88,7 +88,7 @@ P1→P2→P3 は独立して着手可能。P5 は描画バックエンド抽象�
 | `kernel/ime/ime_render_tvram.c` | ● | | | | ● | | 新規 |
 | `kernel/ime/ime_render_gfx.c` | | | | | ● | | 新規 |
 | `kernel/console/console.c` | | ● | | | | | スクロール改修 |
-| `include/tvram.h` | | ● | | | | | API 追加 |
+| `include/text_screen.h` | | ● | | | | | API 追加 |
 | `gfx/gfx_core.c` / `gfx.h` | | | | | ● | | `gfx_is_active` 公開 |
 | `kapi/kapi_generated.c` (生成物) | | | ● | | | | 生成ラッパー |
 | `exec/exec_kapi_init.inc` (生成物) | | | ● | | | | KAPI 登録 (手編集しない) |

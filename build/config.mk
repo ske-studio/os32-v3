@@ -70,7 +70,7 @@ KERNEL_SRC_INCLUDES = $(addprefix -I,$(KERNEL_SRC_DIRS))
 
 # カーネルコア: 自身 + ドライバ + fs + exec + shell + gfx + lib + kapi
 # (kernel.c は全サブシステムの初期化を行うため全モジュールを参照)
-INC_KERNEL = $(INC_COMMON) $(KERNEL_SRC_INCLUDES) -Idrivers -Inet -Idrivers/net/e82557 -Idrivers/net/ne2000 -Ifs -Iexec -Igfx -Ilib -Ikapi -Ilib/sqlite3
+INC_KERNEL = $(INC_COMMON) $(KERNEL_SRC_INCLUDES) -Idrivers -Inet -Ifs -Iexec -Igfx -Ilib -Ikapi -Ilib/sqlite3
 
 # ドライバ: 共通 + 自身 + gfx (kcg->gfx依存)
 INC_DRIVERS = $(INC_COMMON) -Idrivers -Igfx -Ilib $(KERNEL_SRC_INCLUDES)
@@ -89,7 +89,7 @@ INC_FATFS = -Ifs/fat/fatfs $(INC_COMMON) -Ifs -Idrivers $(KERNEL_SRC_INCLUDES) -
 INC_EXEC = $(INC_COMMON) -Iexec -Ikapi -Ifs -Igfx -Idrivers -Ilib $(KERNEL_SRC_INCLUDES)
 
 # KAPI: 全モジュール (全APIラッパーのため)
-INC_KAPI = $(INC_COMMON) -Ikapi $(KERNEL_SRC_INCLUDES) -Idrivers -Inet -Idrivers/net/e82557 -Idrivers/net/ne2000 -Ifs -Iexec -Igfx -Ilib -Ilib/sqlite3
+INC_KAPI = $(INC_COMMON) -Ikapi $(KERNEL_SRC_INCLUDES) -Idrivers -Inet -Ifs -Iexec -Igfx -Ilib -Ilib/sqlite3
 
 # lib: 共通 + 自身 (汎用ライブラリ: カーネル依存なし)
 INC_LIB = $(INC_COMMON) -Ilib

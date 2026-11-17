@@ -95,7 +95,7 @@ IPL はルートディレクトリを `0x6000` へ**一括で**読む。標準�
 | `build/boot.mk` | `boot_fat144.bin` / `loader_fat144.bin` を `-DFD144` で組む |
 | `build/image.mk` | ファイル一覧を `define FDD_IMAGE_ARGS` で 1 か所に。`images/os32_boot144.img` と `make fd144`。**1,474,560 でなければエラーで止める** |
 | `drivers/block/fdc.h` / `fdc.c` | `fdc_geom_144`、ドライブごとの現在ジオメトリ (`fdc_get_geom` / `fdc_set_media` / `fdc_set_media_by_daua`)、`fdc_set_3mode` (04BEh) |
-| `fs/fat/fatfs/diskio.c` | LBA→CHS と `GET_SECTOR_COUNT/SIZE` を**ジオメトリ駆動**に (マクロ直読みをやめた) |
+| `drivers/block/fat_diskio.c` | LBA→CHS と `GET_SECTOR_COUNT/SIZE` を**ジオメトリ駆動**に (マクロ直読みをやめた) |
 | `drivers/base/dev.c` | `dev_init()` が記述子を現在のジオメトリで書き直す |
 | `platform/pc98/kernel.c` | `boot_drive` の DA/UA でメディアを選ぶ。**`dev_init()` より前。** 3モードの状態を画面へ (`144M` / 赤い `144?`) |
 

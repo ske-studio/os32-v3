@@ -192,7 +192,7 @@ static void real_hw_story(void)
     unsigned long before;
 
     /* 1. 0000:0501h bit7 = 0 → 2.4576MHz 系。
-     *    (判定そのものは kernel/time/sysclk.c。ここは決まったあとの算数。) */
+     *    (判定そのものは platform/pc98/sysclk.c。ここは決まったあとの算数。) */
     CHECK(pit_compute(SYSCLK_2458, (unsigned int)PIT_HZ, &s) == 0);
     CHECK(s.reload == RELOAD_2458);
     CHECK(s.period_us == PERIOD_100HZ);

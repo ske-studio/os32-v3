@@ -1,6 +1,6 @@
-# kernel/module/module.c — 設計
+# kdebug/kdebug_module.c — 設計
 > 状態: **現行 (2026-10-31)** — 出所: VER_INFO_DESIGN・HWDEV_CORE_API・HWDEV_DESIGN (D1 で移した)
-ソース: `kernel/module/module.c`
+ソース: `kdebug/kdebug_module.c`
 
 kdebug_state_name()
 state<0 / 配列上限以上→UNKNOWN

@@ -15,7 +15,7 @@ static void check_flush_owned(void);
 #include "legacy_guest_fake.h"
 #include "v86_call.h"
 #include "idt.h"
-#include "tvram.h"
+#include "text_screen.h"
 #include "tvram_private.h"   /* PC-98 の番地 (第 5 段 C1) */
 #include "paging.c"
 #include "../../platform/pc98/legacy/lowmap.c"

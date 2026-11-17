@@ -33,9 +33,9 @@ KDEBUG_GENERATED := $(addprefix $(KDEBUG_GEN)/,kdebug_imports.h kdebug_imports.j
 $(KDEBUG_GENERATED) &: kernel/module/kdebug_imports.def tools/gen_kdebug_imports.py tools/mkmod.py sdk/target_profile.py tools/module_schema.py build/kdebug.mk $(MODULE_SCHEMA) $(KDEBUG_DEF_SOURCES)
 	python3 tools/gen_kdebug_imports.py --stage $(KDEBUG_STAGE) --out-dir $(KDEBUG_GEN)
 
-$(KERNEL_OBJ_PREFIX)kernel/module/module.o: kernel/module/module.c build/config.mk build/kdebug.mk $(KDEBUG_GEN)/kdebug_imports.h $(MODULE_SCHEMA)
+$(KERNEL_OBJ_PREFIX)kdebug/kdebug_module.o: kdebug/kdebug_module.c build/config.mk build/kdebug.mk $(KDEBUG_GEN)/kdebug_imports.h $(MODULE_SCHEMA)
 	@mkdir -p $(@D)
-	$(CC) $(KERNEL_CFLAGS) $(INC_KERNEL) -I$(KDEBUG_GEN) -c kernel/module/module.c -o $@
+	$(CC) $(KERNEL_CFLAGS) $(INC_KERNEL) -I$(KDEBUG_GEN) -c kdebug/kdebug_module.c -o $@
 
 $(KDEBUG_OUT)/recover_profile.o: KERNEL_CFLAGS += -DRECOVER_MODULE
 
@@ -68,16 +68,16 @@ $(BUILD_OUT)/kdebug.bin: $(KDEBUG_OUT)/kdebug.elf $(KDEBUG_GEN)/kdebug_imports.j
 $(R1_OUT)/kdebug.bin: $(KDEBUG_OUT)/kdebug.elf $(KDEBUG_GEN)/kdebug_imports.json $(R1_OUT)/vmkernel.lz4 tools/mkmod.py sdk/target_profile.py tools/module_schema.py sdk/kapi.json sdk/include/os32/os32_generations.h build/kdebug.mk
 	$(call pack_kdebug,$(R1_OUT)/vmkernel.lz4)
 
-$(R1_OBJ)/kernel/module/module.o: kernel/module/module.c build/config.mk build/kdebug.mk $(KDEBUG_GEN)/kdebug_imports.h
+$(R1_OBJ)/kdebug/kdebug_module.o: kdebug/kdebug_module.c build/config.mk build/kdebug.mk $(KDEBUG_GEN)/kdebug_imports.h
 	mkdir -p $(@D)
-	$(CC) $(KERNEL_CFLAGS) -DOS32_R1_FIXTURE $(INC_KERNEL) -I$(KDEBUG_GEN) -c kernel/module/module.c -o $@
+	$(CC) $(KERNEL_CFLAGS) -DOS32_R1_FIXTURE $(INC_KERNEL) -I$(KDEBUG_GEN) -c kdebug/kdebug_module.c -o $@
 $(R1_OUT)/kernel.elf: $(KDEBUG_KEXPORT_OBJ)
 R1_OBJECTS += $(KDEBUG_KEXPORT_OBJ)
 
 all: $(BUILD_OUT)/kdebug.bin
-$(R1_OBJ)/kernel/module/module.o \
+$(R1_OBJ)/kdebug/kdebug_module.o \
     $(R1_OBJ)/kernel/module/module_image.o $(R1_OBJ)/kernel/module/module_runtime.o \
-    $(KERNEL_OBJ_PREFIX)kernel/module/module.o $(KERNEL_OBJ_PREFIX)kernel/module/module_image.o \
+    $(KERNEL_OBJ_PREFIX)kdebug/kdebug_module.o $(KERNEL_OBJ_PREFIX)kernel/module/module_image.o \
     $(KERNEL_OBJ_PREFIX)kernel/module/module_runtime.o: $(MODULE_SCHEMA)
 -include $(KDEBUG_OBJS:.o=.d) $(KDEBUG_KEXPORT_OBJ:.o=.d)
 
@@ -90,7 +90,7 @@ $(HWDEV_GENERATED) &: tools/module_schema.py hwdev/hwdev_imports.def kernel/modu
 $(KDEBUG_OUT)/hwdev_core.o: $(HWDEV_GEN)/hwdev_core.c $(HWDEV_GEN)/hwdev_contract.h
 	mkdir -p $(@D)
 	$(CC) $(KERNEL_CFLAGS) $(INC_KERNEL) -I$(HWDEV_GEN) -c $< -o $@
-$(KDEBUG_OUT)/kdebug_main.o $(KERNEL_OBJ_PREFIX)kernel/module/hwdev_module.o $(R1_OBJ)/kernel/module/hwdev_module.o: $(HWDEV_GENERATED)
+$(KDEBUG_OUT)/kdebug_main.o $(KERNEL_OBJ_PREFIX)hwdev/hwdev_module.o $(R1_OBJ)/hwdev/hwdev_module.o: $(HWDEV_GENERATED)
 $(KDEBUG_OUT)/kdebug.elf: $(KDEBUG_OUT)/hwdev_core.o
 
 -include $(KDEBUG_OUT)/hwdev_core.d

@@ -1,7 +1,7 @@
 #ifndef RAM_RO_H
 #define RAM_RO_H
 
-#include "drivers/base/dev.h"
+#include "kernel/dev/dev.h"
 #include "boot_root.h"
 
 struct ram_ro { Device dev; const u8 *base; u32 bytes; };

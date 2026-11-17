@@ -131,7 +131,7 @@
 | ファイル | 最初のエラー |
 |---|---|
 | `exec/exec.c` | `exec/exec.c:1728:13: error: unknown register name 'eax' in 'asm'` |
-| `gfx/gfx_vram.c` | `gfx/gfx_internal.h:52:5: error: impossible constraint in 'asm'` |
+| `drivers/video/pc98/gfx_vram.c` | `gfx/gfx_internal.h:52:5: error: impossible constraint in 'asm'` |
 | `arch/x86/kernel/gdt.c` | `arch/x86/kernel/gdt.c:40:5: error: unknown register name 'eax' in 'asm'` |
 | `mm/paging.c` | `mm/paging.c:545: Error: ARM register expected -- 'mov %cr3,r3'` |
 | `arch/x86/kernel/tss.c` | `arch/x86/kernel/tss.c:53:5: error: impossible constraint in 'asm'` |
@@ -323,7 +323,7 @@ ABI の両側に同じ前提がかかる。
 | `include/io.h:58` (`_enable`) | `arch/x86/arch_io.h:17` | 1 |
 | `include/io.h:74` (`irq_save`) | `arch/x86/arch_io.h:27` | 6 |
 
-(a) の 5 本 (`exec/exec.c` `gfx/gfx_vram.c` `arch/x86/kernel/gdt.c` `mm/paging.c`
+(a) の 5 本 (`exec/exec.c` `drivers/video/pc98/gfx_vram.c` `arch/x86/kernel/gdt.c` `mm/paging.c`
 `arch/x86/kernel/tss.c`) はエラー行もそのまま。順序 1 の §3 が「`gdt` / `tss` / `cr3` は
 順序 3 で `arch/x86/` へ移す対象」と書いていたが、**この 5 本の移設は行って
 いない** — 順序 3 の承認範囲は `io.h` の分割と受け皿の導入までで、`gdt.c` /
@@ -423,7 +423,7 @@ x86 の既定は `lib/kstring_asm.asm` のまま (`build/kernel.mk` の `ARCH` �
 | `arch/x86/kernel/gdt.c:40` (lgdt + セグメント) | `arch/x86/x86_desc.h:25` | 1 |
 | `mm/paging.c:545` (`mov %cr3`) | `arch/x86/arch_cpu.h:29` | 1 |
 | `arch/x86/kernel/tss.c:53` (`ltr`) | `arch/x86/x86_desc.h:45` | 1 |
-| `gfx/gfx_vram.c` (`rep movsw` ほか) | 変わらず `gfx/gfx_internal.h:52` | 1 |
+| `drivers/video/pc98/gfx_vram.c` (`rep movsw` ほか) | 変わらず `gfx/gfx_internal.h:52` | 1 |
 
 分類 (a) の意味は「差し替え先がまだ決まっていない、その場の x86 asm」なので、
 `arch/` や `platform/` の下に入ったものは (b) 側に数えるよう
@@ -441,7 +441,7 @@ x86 の既定は `lib/kstring_asm.asm` のまま (`build/kernel.mk` の `ARCH` �
 * その結果 `mm/paging.c` が `pc98.h` を引く理由が無くなったので外した
   (`.o` は md5 一致のまま)。ページングのコードが機種ヘッダに依存しなくなる。
 
-残る (a) の 1 本は `gfx/gfx_vram.c` (`gfx/gfx_internal.h` の `rep movsw` /
+残る (a) の 1 本は `drivers/video/pc98/gfx_vram.c` (`gfx/gfx_internal.h` の `rep movsw` /
 `rep stosl`)。これはデバイス層 (VRAM への転送) の話で、順序 5 の範囲外
 (HANDOVER_2026-09-16 §5「やらないこと」)。
 

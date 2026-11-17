@@ -37,7 +37,7 @@ void tvram_scroll(void)
 /* console.c: 保護行数 (下から数えた固定行)。0=従来通り全行 */
 static int g_scroll_reserve = 0;
 
-void tvram_set_scroll_reserve(int rows)   /* 公開 API (tvram.h) */
+void tvram_set_scroll_reserve(int rows)   /* 公開 API (text_screen.h) */
 {
     if (rows < 0) rows = 0;
     if (rows >= TVRAM_ROWS) rows = TVRAM_ROWS - 1;
@@ -119,7 +119,7 @@ void ime_toggle(void) {
 
 | 対象 | 変更 |
 |------|------|
-| `include/tvram.h` | `void tvram_set_scroll_reserve(int rows);` 宣言追加 |
+| `include/text_screen.h` | `void tvram_set_scroll_reserve(int rows);` 宣言追加 |
 | `kernel/console/console.c` | `g_scroll_reserve`、`tvram_scroll` 改修、カーソル境界 `CONSOLE_LAST_ROW` 化 |
 | `kernel/ime/ime.c` | `ime_toggle`/`ime_set_mode` で予約行設定 |
 

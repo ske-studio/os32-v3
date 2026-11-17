@@ -17,7 +17,7 @@
 ない変異) は SURVIVED でなければならない。
 """
 CHECK = dict(name='fdc-track-host', tier=1,
-    covers=['lib/dma_contract.c', 'include/dma_contract.h', 'drivers/block/fdc.c', 'drivers/block/fdc_io.inc', 'drivers/block/fdc_seek_reset.inc', 'drivers/block/fdc_transfer.inc', 'drivers/block/fdc_command.inc', 'drivers/block/fdc_sector_transfer.inc', 'drivers/block/fdc.h', 'kernel/irq/irq.c', 'kernel/irq/irq.h', 'kernel/irq/irq_math.c', 'kernel/irq/irq_math.h', 'arch/x86/kernel/idt.c', 'arch/x86/kernel/idt.h', 'arch/x86/kernel/isr_handlers.c', 'platform/pc98/kernel.c', 'arch/x86/kernel/isr_stub.asm', 'arch/x86/kernel/iret_user.inc', 'tools/tests/fdc_hostshim/**', 'drivers/block/fdc_decide.c', 'drivers/block/fdc_track.c', 'fs/fat/fatfs/diskio.c', 'fs/fat/fatfs/ff.c', 'fs/fat/fatfs_vfs.c', 'tools/tests/fdc_track_host.c', 'drivers/dma/dma8237_math.c', 'tools/check_artifacts.py', 'include/clock_service.h', 'kernel/time/clock_service.c', 'include/platform_irq.h', 'platform/pc98/pic.c', 'include/platform_device.h', 'include/ide_contract.h', 'tools/tests/kernel_includes.py'],
+    covers=['lib/dma_contract.c', 'include/dma_contract.h', 'drivers/block/fdc.c', 'drivers/block/fdc_io.inc', 'drivers/block/fdc_seek_reset.inc', 'drivers/block/fdc_transfer.inc', 'drivers/block/fdc_command.inc', 'drivers/block/fdc_sector_transfer.inc', 'drivers/block/fdc.h', 'kernel/irq/irq.c', 'kernel/irq/irq.h', 'kernel/irq/irq_math.c', 'kernel/irq/irq_math.h', 'arch/x86/kernel/idt.c', 'arch/x86/kernel/idt.h', 'arch/x86/kernel/isr_handlers.c', 'platform/pc98/kernel.c', 'arch/x86/kernel/isr_stub.asm', 'arch/x86/kernel/iret_user.inc', 'tools/tests/fdc_hostshim/**', 'drivers/block/fdc_decide.c', 'drivers/block/fdc_track.c', 'drivers/block/fat_diskio.c', 'fs/fat/fatfs/ff.c', 'fs/fat/fatfs_vfs.c', 'tools/tests/fdc_track_host.c', 'drivers/dma/dma8237_math.c', 'tools/check_artifacts.py', 'include/clock_service.h', 'kernel/time/clock_service.c', 'include/platform_irq.h', 'platform/pc98/pic.c', 'include/platform_device.h', 'include/ide_contract.h', 'tools/tests/kernel_includes.py'],
     needs=['make:all'], budget=4.7,
     basis=['[HW2]'],
 )
@@ -35,7 +35,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 HARNESS = ROOT / "tools/tests/fdc_track_host.c"
 SHIM = ROOT / "tools/tests/fdc_hostshim"
 SOURCES = ["drivers/block/fdc_track.c", "drivers/block/fdc.c", "drivers/block/fdc_decide.c",
-           "fs/fat/fatfs/diskio.c"]
+           "drivers/block/fat_diskio.c"]
 
 CASES = ["fdc_irq_registration", "split_2hd", "split_144", "readahead_count1", "cross_boundary",
          "fallback_single", "single_fail", "cache_rules", "oversize_geom",
@@ -445,7 +445,7 @@ MUTATIONS = [
      "(u32)(now - c->last_tick) >= (u32)FDC_TRACK_IDLE_TICKS",
      "2 秒規則の境目を 1 tick 早める"),
     # --- diskio.c の結線
-    ("fs/fat/fatfs/diskio.c",
+    ("drivers/block/fat_diskio.c",
      r"        fdc_track_invalidate\(&fdd_track\);\n        fdd_status = 0;",
      "        fdd_status = 0;",
      "disk_initialize で先読みを捨てない (Ready 変化の無い入れ替え)"),
@@ -526,7 +526,7 @@ def host_build(tmp, mutated=None):
                      "drivers/block/fdc_sector_transfer.inc",
                      "drivers/block/fdc_decide.c", "drivers/block/fdc_decide.h",
                      "drivers/dma/dma8237_math.c", "lib/dma_contract.c",
-                     "fs/fat/fatfs/diskio.c",
+                     "drivers/block/fat_diskio.c",
                      "fs/fat/fatfs_vfs_read_cache.inc"):
             (tree / rel_).parent.mkdir(parents=True, exist_ok=True)
             (tree / rel_).write_text(

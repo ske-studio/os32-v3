@@ -42,7 +42,7 @@
 #include "paging_app.h"
 
 #include "io.h"
-#include "legacy_lowmap.h"
+#include "paging_lowmap.h"
 #include "cpu.h"      /* arch_mmu_* (実装は arch/$(ARCH)/arch_cpu.h) */
 #include "memmap.h"
 #include "pgalloc.h"

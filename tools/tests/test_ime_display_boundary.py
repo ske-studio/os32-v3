@@ -14,7 +14,7 @@ CHECK = dict(name='ime-display-boundary-host', tier=1, needs=['make:all'], budge
             'include/con_sink.h',
             'include/kprintf.h',
             'include/redir_access.h',
-            'include/tvram.h',
+            'include/text_screen.h',
             'include/types.h',
             'kernel/ime/fep_module.h',
             'kernel/ime/ime_store.h',

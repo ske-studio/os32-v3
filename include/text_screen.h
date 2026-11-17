@@ -2,8 +2,8 @@
 /*  TVRAM.H — テキストVRAM操作関数宣言                                      */
 /* ======================================================================== */
 
-#ifndef __TVRAM_H
-#define __TVRAM_H
+#ifndef OS32_TEXT_SCREEN_H
+#define OS32_TEXT_SCREEN_H
 
 #include "types.h"
 
@@ -32,4 +32,4 @@ void tvram_scroll(void);
 /* スクロール保護設定 */
 void tvram_set_scroll_reserve(int rows);
 
-#endif /* __TVRAM_H */
+#endif /* OS32_TEXT_SCREEN_H */

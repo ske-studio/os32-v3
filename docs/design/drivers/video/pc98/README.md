@@ -4,6 +4,7 @@
 
 - [backend_pc98.md](backend_pc98.md)
 - [backend_pegc.md](backend_pegc.md)
+- [gfx_vram.md](gfx_vram.md)
 - [pc98_route.md](pc98_route.md)
 - [splash_raster.c.md](splash_raster.c.md)
 - [splash_raster.h.md](splash_raster.h.md)

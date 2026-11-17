@@ -17,8 +17,8 @@
 #include "ime_display_private.h"
 #include <platform_ime_render.h>
 #include "../sqlite_engine.h"
-#include "../../drivers/input/kbd.h"
-#include "tvram.h"
+#include "kbd_contract.h"
+#include "text_screen.h"
 #include "console.h"
 #include "utf8.h"
 #include "kprintf.h"

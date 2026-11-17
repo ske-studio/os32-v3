@@ -13,7 +13,7 @@
 - 対象: [`drivers/block/fdc_track.c`](../../drivers/block/fdc_track.c) (区切り・先読み・読み直しの純粋な層)、
   [`drivers/block/fdc.c`](../../drivers/block/fdc.c) (`fdc_read_sectors`、覚えたシリンダ)、
   [`drivers/block/fdc_decide.c`](../../drivers/block/fdc_decide.c) (`fdc_rw_timeout_ticks`)、
-  [`fs/fat/fatfs/diskio.c`](../../fs/fat/fatfs/diskio.c) (結線と、書き込み・再初期化での破棄)
+  [`drivers/block/fat_diskio.c`](../../drivers/block/fat_diskio.c) (結線と、書き込み・再初期化での破棄)
 - 実行: `python3 -B tools/tests/test_fdc_track.py [--target] [--mutate] [case ...]`
   (`make check-fdc-track-host` が `--target --mutate` 付きで回す)
 - 試験: [`fdc_track_host.c`](fdc_track_host.c) — 実物を `#include` する。

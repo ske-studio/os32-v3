@@ -53,7 +53,7 @@ userland/lib/rt/pkg.c を取り込み、RAM 上の 8MB の ext2 で
 """
 import sqlite_cc
 CHECK = dict(name='vfs-fd-path-host', tier=1,
-    covers=['tools/tests/sqlite_cc.py', 'fs/**', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'build/core.yaml', 'drivers/block/pc98pt.c', 'fs/ext2/ext2_file.c', 'fs/ext2/ext2_vfs.c', 'fs/fat/fatfs/ff.c', 'fs/fat/fatfs/diskio.c', 'fs/fat/fatfs/diskio_os32.h', 'drivers/block/fdc.h', 'drivers/block/fdc_track.c', 'drivers/block/fdc_track.h', 'drivers/char/rtc.h', 'fs/fat/fatfs_vfs.c', 'fs/hostdrv/hostdrvfs.c', 'fs/isofs/iso9660.c', 'fs/vfs.c', 'fs/vfs_fd.c', 'fs/vfs_fd_stdin.inc', 'fs/vfs_stdin.h', 'exec/exec.h', 'kernel/ime/ime_dict.c', 'kernel/ime/ime_conn.c', 'kernel/ime/ime_user_store.c', 'kernel/ime/ime_store.h', 'tools/tests/fep_store_host.h', 'lib/kstring.h', 'lib/kutf16.c', 'lib/sqlite3/os32_sqlite_vfs.c', 'lib/sqlite3/sqlite3.c', 'sdk/crt/syscalls.c', 'tools/deploy_manifests.py', 'tools/mkpkg.py', 'tools/tests/ime_dict_host.c', 'tools/tests/newlib_errno_host.c', 'tools/tests/vfs_fd_path_host.c', 'tools/tests/vfs_fd_sqlite_host.c', 'userland/deploy.yaml', 'userland/shell/hdprep_plan.c', 'userland/system/cdinst.c', 'fs/ext2/ext2_dir.c', 'fs/ext2/ext2_fmt.c', 'fs/ext2/ext2_inode.c', 'fs/ext2/ext2_layout.c', 'fs/ext2/ext2_super.c', 'userland/system/inst_disk.c', 'userland/system/inst_hdd.c', 'userland/lib/rt/ls.c', 'sdk/include/os32/ls.h', 'sdk/allocator/nano_adapter.c', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h', 'include/clock_service.h', 'kernel/time/clock_service.c', 'tools/tests/serial_emergency_host.h', 'kernel/serial_diag.c', 'include/console_output.h', 'lib/serial_diag.h', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'include/platform_device.h', 'include/ide_contract.h', 'tools/tests/kernel_includes.py'],
+    covers=['tools/tests/sqlite_cc.py', 'fs/**', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'build/core.yaml', 'fs/pc98pt.c', 'fs/ext2/ext2_file.c', 'fs/ext2/ext2_vfs.c', 'fs/fat/fatfs/ff.c', 'drivers/block/fat_diskio.c', 'fs/fat/fatfs/diskio_os32.h', 'drivers/block/fdc.h', 'drivers/block/fdc_track.c', 'drivers/block/fdc_track.h', 'drivers/char/rtc.h', 'fs/fat/fatfs_vfs.c', 'fs/hostdrv/hostdrvfs.c', 'fs/isofs/iso9660.c', 'fs/vfs.c', 'fs/vfs_fd.c', 'fs/vfs_fd_stdin.inc', 'fs/vfs_stdin.h', 'exec/exec.h', 'kernel/ime/ime_dict.c', 'kernel/ime/ime_conn.c', 'kernel/ime/ime_user_store.c', 'kernel/ime/ime_store.h', 'tools/tests/fep_store_host.h', 'lib/kstring.h', 'lib/kutf16.c', 'lib/sqlite3/os32_sqlite_vfs.c', 'lib/sqlite3/sqlite3.c', 'sdk/crt/syscalls.c', 'tools/deploy_manifests.py', 'tools/mkpkg.py', 'tools/tests/ime_dict_host.c', 'tools/tests/newlib_errno_host.c', 'tools/tests/vfs_fd_path_host.c', 'tools/tests/vfs_fd_sqlite_host.c', 'userland/deploy.yaml', 'userland/shell/hdprep_plan.c', 'userland/system/cdinst.c', 'fs/ext2/ext2_dir.c', 'fs/ext2/ext2_fmt.c', 'fs/ext2/ext2_inode.c', 'fs/ext2/ext2_layout.c', 'fs/ext2/ext2_super.c', 'userland/system/inst_disk.c', 'userland/system/inst_hdd.c', 'userland/lib/rt/ls.c', 'sdk/include/os32/ls.h', 'sdk/allocator/nano_adapter.c', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h', 'include/clock_service.h', 'kernel/time/clock_service.c', 'tools/tests/serial_emergency_host.h', 'kernel/serial_diag.c', 'include/console_output.h', 'lib/serial_diag.h', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'include/platform_device.h', 'include/ide_contract.h', 'tools/tests/kernel_includes.py'],
     needs=['make:all'], budget=14.6,
     kind='characterization',
 )
@@ -99,9 +99,9 @@ TARGET_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
 # FDWP の (a) の読み失敗は「窓を捨てない」変異で再現する。
 # STA_PROTECT の変異は再マウントで読みが戻るため、FDC への再試行の数で殺す。
 MUTANTS = [
-    ("FDWP: 正常対照 (何も変えない)", "fs/fat/fatfs/diskio.c",
+    ("FDWP: 正常対照 (何も変えない)", "drivers/block/fat_diskio.c",
      "    fdd_status |= STA_PROTECT;", "    fdd_status |= STA_PROTECT;"),
-    ("FDWP: NW で STA_PROTECT を立てない", "fs/fat/fatfs/diskio.c",
+    ("FDWP: NW で STA_PROTECT を立てない", "drivers/block/fat_diskio.c",
      "    fdd_status |= STA_PROTECT;", "    /* NW を忘れる */"),
     ("FDWP: 書込み失敗で汚れた窓を捨てない", "fs/fat/fatfs_vfs.c",
      "    if (fr == FR_DISK_ERR || fr == FR_WRITE_PROTECTED) {",
@@ -928,7 +928,7 @@ REBUILD = {
     "fs/vfs_name_rules.inc": ("harness",),
     "fs/ext2/ext2_file.c": ("harness",),
     "fs/fat/fatfs_vfs.c": ("harness",),
-    "fs/fat/fatfs/diskio.c": ("harness",),
+    "drivers/block/fat_diskio.c": ("harness",),
     "lib/kutf16.c": ("harness",),
     "lib/rt/pkg.c": ("harness",),
     "system/cdinst.c": ("harness",),

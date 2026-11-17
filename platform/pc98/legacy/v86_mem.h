@@ -17,7 +17,7 @@
 
 #include "pc98.h"
 #include "types.h"
-#include "legacy_lowmap.h"
+#include "paging_lowmap.h"
 #include "ksetjmp.h"
 #include "../../../mm/paging.h"
 #include "memmap.h"

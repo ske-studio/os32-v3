@@ -1207,7 +1207,7 @@ int shell_cmd_gfinit(int argc, char **argv) { (void)argc; (void)argv; return 0; 
  * (build/programs.mk の PC98PT_USER_OBJ)。 */
 #include "../../userland/shell/cmd_hdprep.c"
 #include "../../userland/shell/hdprep_plan.c"
-#include "../../drivers/block/pc98pt.c"
+#include "../../fs/pc98pt.c"
 #include "../../userland/shell/cmd_filer.c"
 void rsh_lan_reset(void) {}
 int rsh_lan_poll(void) { return OS32_ERR_AGAIN; }

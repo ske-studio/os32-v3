@@ -7,7 +7,7 @@ CHECK = dict(name='type-contract', tier=1, needs=[], budget=180,
             'tools/build_compare.py', 'tools/gen_build_id.py',
             'Makefile', 'build/**/*.mk', 'sdk/include/os32/**',
             'kernel/module/kdebug_imports.def', 'sdk/kapi.json',
-            'boot/*.c', 'drivers/block/pc98pt.c', 'lib/sqlite3/sqlite3.c',
+            'boot/*.c', 'fs/pc98pt.c', 'lib/sqlite3/sqlite3.c',
             'userland/tests/sqlite_standalone/*.c'],
     basis=['[C1]', '[ABI]', 'KAPI_SPEC §2'],
 )
@@ -194,7 +194,7 @@ def inspect_recipes(root, goals):
             boot_sources = {'boot/boot_main.c': 'boot_main.o',
                 'boot/boot_debug.c': 'boot_debug.o', 'boot/ext2_mini.c': 'ext2_mini.o',
                 'boot/lz4_mini.c': 'lz4_mini.o', 'boot/vk32_boot.c': 'vk32_boot.o',
-                'drivers/block/pc98pt.c': 'pc98pt_boot.o'}
+                'fs/pc98pt.c': 'pc98pt_boot.o'}
             boot = (len(sources) == 1 and sources[0] in boot_sources and
                     output == 'boot/' + boot_sources[sources[0]])
             standalone_sources = {'lib/sqlite3/sqlite3.c': 'sqlite3_user.o',

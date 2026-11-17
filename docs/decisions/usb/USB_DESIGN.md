@@ -166,7 +166,7 @@ r5 は、失敗・取り外し・番地・再試行の扱いを**独自の状態
 | 割込み・tick | `kernel/irq/irq.h:9-35`、`kernel/irq/tick.h:5-14`、`platform/pc98/tick_order.h` |
 | 部品 | `kernel/module/module_runtime.h:24-34,63`、手本 `drivers/net/e82557/lan_module.c:50,98-107,222` |
 | 入力 | `drivers/input/kbd.c:333` (IRQ から `kbd_deliver`)、`:344`、修飾の状態 `:365-377`、`drivers/input/mouse.c:83-128` |
-| ブロック | `drivers/base/dev.h:36-119` |
+| ブロック | `kernel/dev/dev.h:36-119` |
 | LE (バイト列) | `include/endian_le.h:36-61` |
 
 ### 1-2. 食い違い (9 件、r1 と同じ。#6・末尾を訂正)

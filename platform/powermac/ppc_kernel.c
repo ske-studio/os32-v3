@@ -48,7 +48,7 @@
 #include "gfx/v2/gfx2_int.h"
 #include "config.h"
 #include "console.h"
-#include "tvram.h"
+#include "text_screen.h"
 #if KBOOT_SH
 #include "shell_boot.h"
 #include "input_boot.h"

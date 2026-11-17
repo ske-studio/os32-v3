@@ -196,7 +196,7 @@ void probe(void) {
         body = ('\nvoid p1b_probe(void) {\n'
                 '    int *restrict p = (int *)0x123400;\n'
                 '    __asm__ volatile("cli"); (void)p;\n}\n')
-        other = 'kernel/time/sysclk.c'
+        other = 'platform/pc98/sysclk.c'
         target = 'drivers/block/fdc.c'
         with tempfile.TemporaryDirectory() as tmp:
             changed = 'drivers/block/p1b_probe.inc'
@@ -229,7 +229,7 @@ def mutant(case):
     name, body, rule = case
     with tempfile.TemporaryDirectory(prefix='os32-p2v-') as tmp:
         root = pathlib.Path(tmp)
-        root = mutant_tree(ROOT, root / 'tree', {}, real={'platform/pc98/bootinfo_capture.c','kernel/time/sysclk.c'})
+        root = mutant_tree(ROOT, root / 'tree', {}, real={'platform/pc98/bootinfo_capture.c','platform/pc98/sysclk.c'})
         if name.startswith('bootinfo-'):
             target = root / 'platform/pc98/bootinfo_capture.c'
             original = 'volatile u8 *low = (volatile u8 *)P2V_IO(MEM_BOOTINFO_BASE);'
@@ -239,7 +239,7 @@ def mutant(case):
             target.write_text(source.replace(original, body))
             expected = f'bootinfo_capture: {rule}'
         else:
-            target = root / 'kernel/time/sysclk.c'
+            target = root / 'platform/pc98/sysclk.c'
             params = 'void *p' if name == 'grouped-cr3-pointer' else 'void'
             target.write_text(target.read_text() + '\n'
                 + '#include "memmap.h"\n#define RING3_HEAP_TOP 0x800000u\nu32 buffer_phys; void paging_load_cr3(u32 pd_phys);\n'

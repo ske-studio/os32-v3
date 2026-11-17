@@ -1,6 +1,6 @@
 #ifndef HWDEV_PRIVATE_H
 #define HWDEV_PRIVATE_H
-#include "types.h"
+#include "../include/types.h"
 #include "kdebug/recover.h"
 #define HWDEV_ABI 1U
 #define HWDEV_MODULE_OPS_VERSION 2U

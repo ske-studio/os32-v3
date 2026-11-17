@@ -13,6 +13,7 @@
 #ifndef __V86_H
 #define __V86_H
 
+#include "v86_contract.h"
 #include "types.h"
 #include "cpu.h"
 
@@ -223,22 +224,7 @@ int v86_tick_and_check_timeout(void);
 void v86_request_exit(void);
 int  v86_check_exit_request(void);
 
-/* Phase 1 スモークテスト: 最小の 16bit コードを V86 で実行し、
- * カーネルが生存したまま戻れることを確認する。戻り値は v86_exit_reason。
- * 検証が済んだら削除する一時コード。 */
-int v86_smoke_test(void);
-
-/* ディスクイメージからゲストをブートする。IPL を 1FC0:0000 に読み、
- * そこへ制御を渡す。戻り値は v86_exit_reason。 */
-int v86_boot(const char *path);
-
-/* 2 イメージ版。path がブートドライブ (slot 0)、second は 2 台目 (slot 1、
- * NULL 可)。HDD イメージ (.nhd/.hdi) なら DA/UA 0x80、FDD なら 0x90 になる。 */
-int v86_boot2(const char *path, const char *second);
-
-/* ディスクテスト: イメージを attach し、ゲストに INT 1Bh READ をさせて
- * 読めた中身を loop_dev の直読と突き合わせる。0=一致、負=失敗。 */
-int v86_disk_test(const char *path);
+/* KAPI が指す v86_smoke_test・v86_boot・v86_boot2・v86_disk_test は include/v86_contract.h。 */
 
 /* スモークテストが使う低位メモリ (memmap.h の「空き 20KB」内) */
 #define V86_TEST_CODE_ADDR   0x8A000UL

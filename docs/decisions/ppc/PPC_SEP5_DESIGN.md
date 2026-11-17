@@ -25,8 +25,8 @@
 |ID|実物 file:line|判定・移設先|
 |---|---|---|
 |V2|gfx/gfx_core.c:256–279（TVRAM消去/FF2）、:388–404（両plane消去）、gfx/gfx_scroll.c:5–64、gfx/palette.c:36–41|指摘存続。platform/pc98/{gfx_init.c,gfx_scroll.c,display.c}へ。palette shadowは共通に残す|
-|V2補足|gfx/gfx_core_init.inc:4,29–48、gfx/gfx_vram.c:221–222,245、gfx/gfx_core_surface.inc:119–125、gfx/gfx.h:11、gfx/gfx_core.c:56,89|初期化inc、flip/vsync、TVRAM surface、既定backend/候補もPC98依存。代表3ファイルだけの移設では完了しない|
-|V3|kernel/ime/ime_render_tvram.c:20–75、kernel/ime/ime_render.inc:7,19,61–86,187–213（TVRAM依存23箇所）、ime.c:94–97（保存領域確保）、kernel/console/console.c:75–89,174,245–274,381–383,450–451、include/tvram.h:9–13|指摘存続。低位操作は既にplatform/pc98/console.c:21–125、属性はconsole_attr.c:61。既存con_backendを拡張し全consoleを移さない|
+|V2補足|gfx/gfx_core_init.inc:4,29–48、drivers/video/pc98/gfx_vram.c:221–222,245、gfx/gfx_core_surface.inc:119–125、gfx/gfx.h:11、gfx/gfx_core.c:56,89|初期化inc、flip/vsync、TVRAM surface、既定backend/候補もPC98依存。代表3ファイルだけの移設では完了しない|
+|V3|kernel/ime/ime_render_tvram.c:20–75、kernel/ime/ime_render.inc:7,19,61–86,187–213（TVRAM依存23箇所）、ime.c:94–97（保存領域確保）、kernel/console/console.c:75–89,174,245–274,381–383,450–451、include/text_screen.h:9–13|指摘存続。低位操作は既にplatform/pc98/console.c:21–125、属性はconsole_attr.c:61。既存con_backendを拡張し全consoleを移さない|
 |A3|gfx/gfx_internal.h:70–80|rep movsw/movslが残る。arch/x86/arch_copy.hへ同じinlineを移す。gfx_vramは間接利用|
 |A5|drivers/video/geforce/gf_wc.c:5,30–90,93–125,169–185、gf_accept.c:64–145|CPUID/RDMSR/flags、x86_wc_lease、PAT/alias検証あり。MTRR書込は既にarch/x86/kernel/mtrr_wc.c。GPU判定だけ共通に残す|
 |A7|lib/sqlite3/sqlite3.c:76622,76896,97488,100672|TRACE中のESP asm 4点が存続。診断用inline providerへ。SQLite全面移設なし|
@@ -60,7 +60,7 @@ void ime_set_render(void *table);
 - `gfx_core_surface.inc`の固定面descriptor/機種候補をplatform/pc98/gfx_surfaces.cへ。共通のlease検証・世代管理は残し、providerからconst descriptor群と既定backend/候補を取得する。TVRAM面のrevokeを省略しない。PC98のboot reserve順・BB確保・identifyとprobeの区別を保存する。
 - `gfx_vram.c`のページI/Oとtext-vsync、splash診断をPC98 providerへ。CPUコピー/present/dirtyは共通に残す。gfx.h/gfx_internal.hのpc98.h依存を除き、PC98定数は各実体が直接includeする。legacy640×200/400・planar4の形式定数と実装ポートを混同しない。
 - consoleはcursor_x/y、g_scroll_reserve、sink/V86/GUI gateを所有。geometryは固定x86 80×25、別providerで任意の正の寸法を表す。console_get_sizeとwrap/clamp/scrollが同じgeometryを使う。TVRAM_ROWS/ATTR_WHITEの暗黙includeを除去する。
-- tvram_*は既存KAPI/import利用者用の互換入口を残す。include/tvram.hは宣言だけにしTVRAM_BASE/ATTRはPC98実装へ。生のJIS/readchar/raw属性契約はlegacy adapterに残し、共通UnicodeからFBへはcell drawの別実装が可能。既存利用者のコード/属性値は変えない。
+- tvram_*は既存KAPI/import利用者用の互換入口を残す。include/text_screen.hは宣言だけにしTVRAM_BASE/ATTRはPC98実装へ。生のJIS/readchar/raw属性契約はlegacy adapterに残し、共通UnicodeからFBへはcell drawの別実装が可能。既存利用者のコード/属性値は変えない。
 - IME_Renderの字面・形・g_ime_render_tvramシンボルは維持。ime_render_tvram.cは同basenameのplatform/pc98/ime_render_tvram.cへ移し、FEP内のprivate backendとしてリンク。共通IMEは非契約ヘッダkernel/ime/ime_display_private.hの寸法/末行・保存復元・資源操作を呼ぶ。IME_Renderやkexports/importsへ追加しない。
 - private口はime_display_cols/preedit_row、ime_display_save/restore(top,rows)、ime_display_boot(fault)/bytes/abort。PC98 backendがbufferとTVRAM read/writeを所有、既存3行×80列の確保量・失敗注入・部分確保・解放順・bytes計上を保持。ime.c:86–98,120–123は委譲、ime_render.incから番地/BPR/COLS/固定24を除く。候補表示の論理状態と非TVRAM rendererのclear_row経路は共通に残し、TVRAM renderer時だけ保存復元する。
 - PC98のgeometryは従来の80列/末行24（GUI rendererも同じ論理寸法）、hostでは別寸法を注入。PPCは未対応providerで製品起動を拒否。defaultはplatform/{pc98,powermac}/ime_default_render.hで選ぶ。C2はC区分、通常/R1のFEPを組んでからC1でtvram.hのpc98.hを外す。
@@ -100,7 +100,7 @@ MESSAGES['sdk'] = 'sdk'
 - `sdk/gen_kapi.py`の第3段target/ABI選択を再実装しない。kapi_abi_x86.py/内部callconvと公開shared.hの既存cdecl、およびprofileの整合をhostで検証。確定設計との差を解消するために公開ヘッダを後追い編集しない。PPCでextern Cが使えることをPPC OS32 syscall/CRT対応済みと解釈しない。
 - boot/とbuild/boot.mkは現状維持。includeは既にbuild/targets/x86-pc98.mkのみ。Fはbuild/targets/ppc-powermac.mkがboot/sdk/programsをunsupportedでtool起動前に拒否する試験だけを追加。boot規則・既存字面試験を変えない。
 - SDK公開ヘッダと下記全contractsはコメントも含め字面不変（sqlite_imports.defはcontractsなし）。tools/gen_sqlite_imports.pyの本文連結hashを守り、import/exportsも増やさない。PPC SDKで公開呼出属性を変える段は[ABI]として版/世代・指紋の正規再生成・clean→all・SDK/CRT/module再ビルドと受入をセットにした別段。本段のx86公開ヘッダは不変。
-- 字面不変 cd: `drivers/ata/cd_module.h`, `drivers/base/dev.h`, `fs/vfs.h`。
+- 字面不変 cd: `drivers/ata/cd_module.h`, `kernel/dev/dev.h`, `fs/vfs.h`。
 - 字面不変 cirrus: `drivers/video/cirrus/cirrus_module.h`, `include/gfx_hal.h`, `include/gfx_mode.h`, `drivers/video/cirrus/wab_glue.h`。
 - 字面不変 fep: `kernel/ime/fep_module.h`, `kernel/ime/ime_render.h`, `sdk/include/os32/os32_kapi_shared.h`。
 - 字面不変 fm: `include/fm_contract.h`, `drivers/sound/fm/fm_module.h`, `drivers/sound/fm/fm.h`, `drivers/sound/fm/snd_engine.h`。
@@ -126,9 +126,9 @@ MESSAGES['sdk'] = 'sdk'
 |B3 init/B2|gfx/gfx_core.c 70、gfx/gfx_core_init.inc 35、platform/pc98/gfx_init.c +110、同.h +15|C、H3/N1/N3。HAL coreと直列|
 |B4 provider/B3|gfx/gfx_core.c 60、platform/pc98/gfx_selector.c +100、include/display_provider.h +35、platform/powermac/display_provider.c +25（未対応）|C、H3/N1/N3。default/list/probe/fallbackのみ|
 |B5 surfaces/B4|gfx/gfx_core_surface.inc 160、platform/pc98/gfx_surfaces.c 移160、display_provider.h 10|C、H3/N1/N3。第4段r2は配置probeのみ、製品編集の競合なし|
-|B6 present/B5|gfx/gfx_vram.c 55、platform/pc98/display.c +65、gfx/gfx.h 5、gfx_internal.h 5、残る直接pc98定数読者のinclude各1–3|C、H1/H2/H3/N3。HAL present/dirtyと直列|
+|B6 present/B5|drivers/video/pc98/gfx_vram.c 55、platform/pc98/display.c +65、gfx/gfx.h 5、gfx_internal.h 5、残る直接pc98定数読者のinclude各1–3|C、H1/H2/H3/N3。HAL present/dirtyと直列|
 |C2 IME/B1|kernel/ime/ime_render_tvram.c→platform/pc98/ime_render_tvram.c 移76＋保存復元/資源処理100、ime_render.inc 90、ime.c 35、ime_display_private.h +25、platform/{pc98,powermac}/ime_default_render.h 各+8、powermac/ime_display.c +25、include/ime_control.h +10、kernel/gui.c 1、build/fep-module.mk 15、tools/build_compare.py 5|C、H4/H9/N2、GUI known 3組。ime_render.hは0行|
-|C1 console/C2|kernel/console/console.c 45、console_backend.h +12、platform/pc98/console.c 15、include/tvram.h 5、platform/pc98/tvram_private.h +10、PC98 の FEP 部品 2 本 (C2 で移した platform/pc98/ime_render_tvram.c と PC98 の ime_display 実装) は pc98.h を直に include 各 1|C、H4/N1/N2。第3段D2のlegacy gate試験後|
+|C1 console/C2|kernel/console/console.c 45、console_backend.h +12、platform/pc98/console.c 15、include/text_screen.h 5、platform/pc98/tvram_private.h +10、PC98 の FEP 部品 2 本 (C2 で移した platform/pc98/ime_render_tvram.c と PC98 の ime_display 実装) は pc98.h を直に include 各 1|C、H4/N1/N2。第3段D2のlegacy gate試験後|
 |C3 boot IME facade/C2|include/ime_boot.h +20、platform/pc98/kernel.c 1、既存ime.hの宣言include整理5|I、H4/H9、init known 3組（§7）|
 |D1 WC/独立|drivers/video/geforce/gf_wc.c 130、arch/x86/kernel/video_wc.c 移150、include/video_wc.h +25、arch/ppc/video_wc.c +20|C、H5/N4。mtrr_wc.cは既存実体を使用|
 |D2 accept/D1|drivers/video/geforce/gf_accept.c 110、arch/x86/video/gf_accept_cpu.c 移130、arch/ppc/video/gf_accept_cpu.c +8、build/geforce-module.mk:89–96のGFA source/規則15|C、H5/N4。module ABI/exportsは不変|
@@ -204,7 +204,7 @@ MESSAGES['sdk'] = 'sdk'
 - 実装者は変更したkernel/SQLite・R1・GF受入module・boot像・SDK/該当userlandを省略せずビルド、触った試験--mutateと`python3 -B tools/checks/run.py --lint`。ABI変更ならclean→all。landingはCI check/build、全mutationはfull-check。check-changedは回さない。最後のソース変更後のログのみ合格とする。
 ## 7. selectedとknownの差分目標
 - 現行固定値は90 TU/21組。check_compile.pyの`--source-profile selected --accept --json`と実.dで確認してからJSONを減らす。通過TUを選択から外して件数を良く見せない。移設元/先の同一性も別欄で記録する。
-- A/Bの新規通過候補は`gfx/gfx_vram.c`、`gfx/gfx_core.c`、C1は`kernel/console/console.c`、D1は`drivers/video/geforce/gf_wc.c`（GF配置の残る二次障害は実装時に別計測）。各TUの二次障害を実測し、通過数は未確定。gfx_scroll.c/palette.cは既に90本に含まれ、新規成功には加算しない。
+- A/Bの新規通過候補は`drivers/video/pc98/gfx_vram.c`、`gfx/gfx_core.c`、C1は`kernel/console/console.c`、D1は`drivers/video/geforce/gf_wc.c`（GF配置の残る二次障害は実装時に別計測）。各TUの二次障害を実測し、通過数は未確定。gfx_scroll.c/palette.cは既に90本に含まれ、新規成功には加算しない。
 - `ime_render_tvram`はPC98選択へ移り、PPCのFB実装ではない。gf_acceptは受入module、SQLiteは専用buildのTRACE両構成、CRT/bootは専用製品なので、selectedの成功数と混ぜない。provider新規TUも共通TUの解消と別集計する。
 - C2で解く3組：`kernel/gui.c → kernel/ime/{ime.h,ime_render.h,ime_store.h}`。C3で解く3組：`platform/pc98/kernel.c → kernel/ime/{ime.h,ime_render.h,ime_store.h}`。実.d消失を確認し21→15組を目標とする。新facadeは本当に必要な関数だけで重いincludeを持たない。
 - 残す15組：kernel/sys.c→geforce_module.h（pollが現役）、platform/pc98/kernel.c→double_fault/gdt/idt（3）、cd/lan/pcm/fm/snd_engine（5）、cirrus/geforce/kcg/trident/trident_module（5）、platform/pc98/boot.h（1）。本票で空ヘッダ化/allowlist削除はしない。sys→GFの1組もWC移設だけでは解消しない。

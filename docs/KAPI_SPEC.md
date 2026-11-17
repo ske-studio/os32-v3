@@ -1295,7 +1295,7 @@ v46 はそれを**カーネル内の 8KB のリング (シンク)** に溜め、
 ATA の LBA I/O (`ide_read_sector` 系・`dev_blk_*` の hd0-3) は IDENTIFY word 49 bit9 なら
 LBA28、無ければ word 53 bit0 の現在の CHS、それも無ければ既定の CHS。範囲外
 (LBA28 の上限 2^28・総数・シリンダ 16 ビット・`lba + count` の桁あふれ) は 1 セクタも
-出さずに `IDE_ERR_RANGE` (-4)。区画表 (LBA 1) は **PC-98 標準配置** (`drivers/block/pc98pt.h`)
+出さずに `IDE_ERR_RANGE` (-4)。区画表 (LBA 1) は **PC-98 標準配置** (`fs/pc98pt.h`)
 で、ext2 の区画探索は見つからない・読めないときに失敗する (以前は LBA 1088 を仮定した)。
 
 ### 起動したイメージの識別 (v65)

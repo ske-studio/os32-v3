@@ -123,7 +123,7 @@ void palette_init(void) { event(EV_CALL, F_PALETTE, 0); }
 void gfx_scroll_init(void) { event(EV_CALL, F_SCROLL, 0); }
 #include "gfx_core_slice.inc"
 
-/* B6: the common present path (gfx/gfx_vram.c _flip_page and _present_dirty),
+/* B6: the common present path (drivers/video/pc98/gfx_vram.c _flip_page and _present_dirty),
  * extracted from the product text; transfer steps are recording fakes. */
 enum { F_MERGE = 20, F_FLUSH };
 GfxCounters gfx_counters;

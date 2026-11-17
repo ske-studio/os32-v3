@@ -19,7 +19,7 @@
     },
     {
       "symbol": "snd_set_master",
-      "source": "drivers/sound/fm/snd_engine.h",
+      "source": "include/snd_contract.h",
       "context": "normal,exception",
       "irq": true
     },

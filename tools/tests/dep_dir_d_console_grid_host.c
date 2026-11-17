@@ -3,7 +3,7 @@
  * plane snapshots, logical cursor, sink/log/serial and GDC event order. */
 #include "types.h"
 #include "memmap.h"
-#include "tvram.h"
+#include "text_screen.h"
 #include "io.h"
 #include "utf8.h"
 #include "console_output.h"

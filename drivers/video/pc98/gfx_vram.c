@@ -2,12 +2,12 @@
 #include "pegc.h"
 #include "os32_gui_shared.h"
 #include "memmap.h"
-#include "gfx_internal.h"
+#include "../../../gfx/gfx_internal.h"
 #include "gfx_hal.h"
-#include "v2/gfx2_int.h"
+#include "../../../gfx/v2/gfx2_int.h"
 #include "display_restore.h"
 #include "os32_kapi_shared.h"
-#include "../drivers/video/pc98/splash_raster.h"
+#include "splash_raster.h"
 #include "io.h"
 
 /* Present reads the CLIENT and writes the DISPLAY synchronously. */

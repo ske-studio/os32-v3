@@ -26,7 +26,7 @@
 
 | 境界 | 契約 |
 | --- | --- |
-| kdebug import 268 | `const struct hwdev_ops *hwdev_module_ops(void)` (`kernel/module/hwdev_module.h`)、S5 の末尾追加。既存 0〜267 は不変、private import 契約 CRC は生成器で更新 |
+| kdebug import 268 | `const struct hwdev_ops *hwdev_module_ops(void)` (`hwdev/hwdev_module.h`)、S5 の末尾追加。既存 0〜267 は不変、private import 契約 CRC は生成器で更新 |
 | op 5〜10 | 公開済み ops を取得し、未読み込み・非公開なら `-1`、要求を書き換えず recovery_attach も実行しない。取得後は既存の attach と 6 引数を維持して `ops->call` |
 | op 3/4 | S0 の attach・recover と結果を維持。op 4 の recover が成功または状態遷移した後だけ、公開済みなら `ops->release_work`。部品なしでは解放呼出しなし |
 

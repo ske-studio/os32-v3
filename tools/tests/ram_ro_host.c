@@ -1,4 +1,4 @@
-#include "drivers/block/ram_ro.h"
+#include "kernel/dev/ram_ro.h"
 #include "os32_kapi_shared.h"
 #include <string.h>
 

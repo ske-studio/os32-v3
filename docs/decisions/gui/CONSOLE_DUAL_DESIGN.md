@@ -184,7 +184,7 @@ int pc98_route_to_gf(void)
 - R3-3: 抜き挿しのライブ検出はしない。暫定の口は保存された状態の列挙と明記、A6 から DVI の挿入で行が増える確認を外した。
 
 ## 確定の後の追記 (2026-11-10、今の main cfb9cec3 との前提の照らし直し、PM 決定)
-- **実装の時機 (os32powerpc の指摘)**: 本票が触るファイルは PowerPC 第 5 段 C1〜C3・B1〜B6 と同じ。cfb9cec3 の時点では第 5 段で入ったのは A (`gfx/gfx_internal.h`) と E・F だけで、§7 の 4 ファイル (`kernel/console/console.c`・`console_backend.h`・`platform/pc98/console.c`・`include/tvram.h`) は変化なし。実装は第 5 段 Z の後に出し、そのとき移った先の構成で §1 の F1〜F10 の file:line と §7 の置き場を照らし直してから依頼する。§7 の「D3 と C1 は先に入った方に載せ直す (推奨: D3 が先)」はこの順に書き換えた。
+- **実装の時機 (os32powerpc の指摘)**: 本票が触るファイルは PowerPC 第 5 段 C1〜C3・B1〜B6 と同じ。cfb9cec3 の時点では第 5 段で入ったのは A (`gfx/gfx_internal.h`) と E・F だけで、§7 の 4 ファイル (`kernel/console/console.c`・`console_backend.h`・`platform/pc98/console.c`・`include/text_screen.h`) は変化なし。実装は第 5 段 Z の後に出し、そのとき移った先の構成で §1 の F1〜F10 の file:line と §7 の置き場を照らし直してから依頼する。§7 の「D3 と C1 は先に入った方に載せ直す (推奨: D3 が先)」はこの順に書き換えた。
 - **D5 と PPC の選択集合**: `platform/pc98/kernel.c` は `tools/ppc/selected_success.json` の PPC の初回成功集合に入っている (範囲の前から)。D5 は `console_dual.h` だけを include し、`drivers/`・`platform/pc98/` のヘッダを足さない (今の設計どおり)。足すなら `tools/ppc/known_header_dependencies.json` に組を足す。
 - **その他の前提は変化なし**: `tools/tests/legacy_callers_host.c` は D2 で `v86_call_dispatch` のスタブの型 (`src, count`) だけ変わり、console の偽の置き換え (`:83`・`:140-143`) は同じ。GF は 1 枚の前提も保たれる (`drivers/video/geforce/geforce_platform.c` が 2 枚目を `second ... ignored` と記録、`kdebug/recover.h:54-57`)。
 

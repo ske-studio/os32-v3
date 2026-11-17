@@ -1,6 +1,6 @@
 /* Per-mount read-only FIL lifetime; included before FatFsCtx.
  * Contract: docs/design/fs/fat/fatfs_vfs_read_cache.md */
-#include "fdc.h"
+#include "fdc_contract.h"
 
 #if FF_FS_LOCK != 0
 #error "fatfs_vfs_read_cache requires FF_FS_LOCK=0"

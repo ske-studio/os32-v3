@@ -30,7 +30,7 @@ $(BUILD_OUT)/config/df-guard.flags $(BUILD_OUT)/config/lgy98.flags $(BUILD_OUT)/
 	@if cmp -s $@.tmp $@; then rm -f $@.tmp; else mv $@.tmp $@; fi
 
 # Resident debug loader and validator: preserve the source-adjacent flags.
-$(addprefix $(KERNEL_OBJ_PREFIX),kernel/module/module.o kernel/module/module_image.o kernel/module/module_runtime.o): private KERNEL_CFLAGS += -Os
+$(addprefix $(KERNEL_OBJ_PREFIX),kdebug/kdebug_module.o kernel/module/module_image.o kernel/module/module_runtime.o): private KERNEL_CFLAGS += -Os
 
 # 常駐 shell の内部入口 (T7b-b2、exec/shell_service.c)。wrapper は
 # __builtin_return_address(0) で呼び手を確かめるので、このファイルだけ
@@ -107,7 +107,7 @@ $(addprefix $(KERNEL_OBJ_PREFIX),$(filter exec/%.o kapi/%.o,$(C_KERNEL:.c=.o))):
 $(KERNEL_OBJ_PREFIX)drivers/net/ne2000/lgy98.o: $(BUILD_OUT)/config/lgy98.flags
 $(KERNEL_OBJ_PREFIX)kapi/kapi_sys.o: $(BUILD_OUT)/config/source-date.flags
 $(KERNEL_OBJ_PREFIX)fs/fat/fatfs/ff.o: fs/fat/fatfs/ffconf.h fs/fat/fatfs/string.h
-$(KERNEL_OBJ_PREFIX)fs/fat/fatfs/diskio.o: fs/fat/fatfs/ff.h fs/fat/fatfs/diskio.h
+$(KERNEL_OBJ_PREFIX)drivers/block/fat_diskio.o: fs/fat/fatfs/ff.h fs/fat/fatfs/diskio.h
 
 $(addprefix $(KERNEL_OBJ_PREFIX),$(ASM_KERNEL:.asm=.o)): $(KERNEL_OBJ_PREFIX)%.o: %.asm sdk/crt/generations.inc arch/x86/kernel/cpu_flags.inc arch/x86/kernel/entry_layout.inc arch/x86/kernel/iret_user.inc
 	@mkdir -p $(@D) $(dir $(call legacy_asm_input,$(BUILD_OUT)/asm/$<))

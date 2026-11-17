@@ -11,16 +11,13 @@
 #ifndef __V86_GCAP_H
 #define __V86_GCAP_H
 
+#include "v86_contract.h"
 #include "types.h"
 #include "os32_kapi_shared.h"   /* V86Gcap */
 
 /* 診断の数え。実体は kaudit.c に残る (部品からは kdi_ptr_* で触る) */
 extern u32 v86_gcap_phase, v86_gcap_alloc_count, v86_gcap_free_count;
 
-/* KAPI v68 v86_gdc_capture の本体。mode = V86G_MODE_ROM / V86G_MODE_SELFTEST。
- * 記録を out へ写し、status (V86G_ST_*、>= 0) を返す。始められなければ負
- * (OS32_ERR_INVAL / OS32_ERR_BUSY / OS32_ERR_NOSPC、out は触らない)。 */
-int v86_gdc_capture(int mode, V86Gcap *out);
 
 /* 採取中か (v86_io.c の方針の切り替えに使う) */
 int v86_gcap_active(void);

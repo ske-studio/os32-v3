@@ -1,6 +1,6 @@
-#ifndef OS32_LEGACY_LOWMAP_H
-#define OS32_LEGACY_LOWMAP_H
-#include "types.h"
+#ifndef OS32_PAGING_LOWMAP_H
+#define OS32_PAGING_LOWMAP_H
+#include "../include/types.h"
 /* Caller-owned storage, no allocation. One snapshot is the transaction token.
  * count/limit are fixed at open; restore never takes new caller geometry.
  * Restore writes all PTEs, both saved PDEs, flushes once, checks, then unlocks.

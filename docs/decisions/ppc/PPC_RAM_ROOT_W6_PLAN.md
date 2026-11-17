@@ -29,7 +29,7 @@ r1 で確認済みの食い違い5件は維持する。未実装の接続とは�
 
 |番号|設計・前提|実物と計画への反映|
 |---|---|---|
-|差1|設計:164,168 は RAM root を cd0 とする|`drivers/block/ram_ro.c:32`、`init/boot_root.c:11` の rd0 を採用|
+|差1|設計:164,168 は RAM root を cd0 とする|`kernel/dev/ram_ro.c:32`、`init/boot_root.c:11` の rd0 を採用|
 |差2|設計:168 は boot_root 内で ISO 登録|現行登録は `platform/powermac/root_boot.c:14`。共通 init へ移す|
 |差3|設計:369 は rdN 対応を追加する段を記載|`fs/isofs/iso9660.c:377` は既に `VFS_DEV_RAM` を受ける|
 |差4|設計:180 は S-B で hello.bin 追加までを記載|`build/ppc-kboot.mk:127` は hello.bin と fault.bin を同梱済み|

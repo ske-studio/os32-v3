@@ -15,7 +15,7 @@
 #include "types.h"
 #include "console_output.h"
 #include "utf8.h"
-#include "tvram.h"
+#include "text_screen.h"
 #include "kprintf.h"
 #include "kstring.h"
 #include "con_sink.h"

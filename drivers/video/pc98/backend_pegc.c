@@ -30,8 +30,8 @@
 /*       (io/gdc.c gdc_work, vram/scrndraw.c scrndraw_draw)                  */
 /* ======================================================================== */
 
+#include "kernel_tick.h"   /* tick_count */
 #include "serial_diag.h"
-#include "idt.h"
 #include "memmap.h"
 #include "../../../gfx/gfx_internal.h"   /* gfx.h (PAL_*_PORT), pc98.h, memmap.h, _out/_in */
 #include "gfx_hal.h"
@@ -541,6 +541,9 @@ static void pegc_init(void)
 #include "backend_pegc_present.inc"
 
 #include "backend_pegc_restore.inc"
+
+_Static_assert(GFX_PALETTE_COMPONENT_BITS == PEGC_PAL_KAPI_BITS && GFX_PALETTE_COMPONENT_MASK == PEGC_PAL_KAPI_MASK &&
+               GFX_PALETTE_COMPONENT_SCALE == PEGC_PAL_KAPI_SCALE, "KAPI palette component follows PEGC");
 
 /* ------------------------------------------------------------------------ */
 /*  バックエンド表。                                                        */

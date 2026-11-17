@@ -18,7 +18,7 @@ PM の解釈: 前の票 TASK_MAGIC_NUM が外した **fork (a238ab1) 前から�
 |---|---|---|---|---|---|
 | k | kernel・exec・kapi | 40 | 68 | 32 | GDT/IDT/PIC の値、isr の保存フレームの添字、v86 のレジスタ語・BIOS ワーク、TVRAM の属性、IME の容量 |
 | d | drivers・platform | 33 | 76 | 36 | NIC の既存名と重複 (ne2000・lgy98)、IDE の IDENTIFY の欄、ATAPI の CDB、FDC の結果、ループデバイスの形式の欄 |
-| f | fs・gfx・net・lib・include・arch | 34 | 70 | 26 | Ethernet の値を net/link が別に持つ、ext2 の値の二重定義 (ext2.h と ext2_layout.h)、tvram.h と pc98.h の重複、GDC のポートの別名、HostDrv の 260 |
+| f | fs・gfx・net・lib・include・arch | 34 | 70 | 26 | Ethernet の値を net/link が別に持つ、ext2 の値の二重定義 (ext2.h と ext2_layout.h)、text_screen.h と pc98.h の重複、GDC のポートの別名、HostDrv の 260 |
 | b | boot・kdebug・hwdev | 27 | 67 | 17 | ローダの番地・probe の上限、VK32/LZ4/FAT の欄の位置、BIOS の呼び出し (kdebug・hwdev は前の票で直したので 0) |
 
 区分は前の票と同じ (A = 名前が既にある、B = 名前が無く重複か意味が読めない、C = 局所の値)。

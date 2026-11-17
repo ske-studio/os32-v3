@@ -1,6 +1,6 @@
 #include "debug_probe.h"
 #include "hwdev_module.h"
-#include "module.h"
+#include "../kernel/module/module.h"
 #include "hwdev/generated/hwdev_imports.h"
 #include "bootinfo.h"
 #include "config.h"

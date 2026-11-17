@@ -32,7 +32,7 @@ int osri_load_checked(const char *path, struct gfx_kernel_fb *dst, struct OsriIm
         dst->format != GFX_BB_PLANAR4) return OS32_ERR_INVAL;
     plane = dst->pitch * dst->height;
     if (plane != GFX_PLANE_SZ || !dst->planes[0]) return OS32_ERR_INVAL;
-    for (i = 1; i < GVRAM_PLANES; i++)
+    for (i = 1; i < GFX_BB_PLANES; i++)
         if (dst->planes[i] != dst->planes[0] + i * plane) return OS32_ERR_INVAL;
     fd = vfs_open(path, O_RDONLY);
     if (fd < 0) {
@@ -67,7 +67,7 @@ int osri_load_checked(const char *path, struct gfx_kernel_fb *dst, struct OsriIm
         current[i] = image->pal[i] = le_read16(pal + 2 * i);
         if (current[i] > 0xfff) goto done;
     }
-    for (i = 0; i < GVRAM_PLANES; i++)
+    for (i = 0; i < GFX_BB_PLANES; i++)
         if (read_part(fd, dst->planes[i], plane, &crc)) { result = OS32_ERR_IO; goto done; }
     image->count = (u16)count; image->band = (u16)band;
     image->version = version;
