@@ -140,6 +140,7 @@
 - [lib/utf8.md](lib/utf8.md)
 - [mm/pgalloc.md](mm/pgalloc.md)
 - [sdk/include/os32/os32_surface.md](sdk/include/os32/os32_surface.md)
+- [tools/check_doc_line_refs.md](tools/check_doc_line_refs.md)
 - [tools/check_layers.md](tools/check_layers.md)
 - [tools/ci/gate.md](tools/ci/gate.md)
 - [tools/ci/sep_identity.md](tools/ci/sep_identity.md)

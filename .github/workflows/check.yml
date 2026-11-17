@@ -147,6 +147,8 @@ jobs:
           make check-docs-orphans
           make check-docs-tree
           make check-docs-tree-host
+          make check-docs-line-refs
+          make check-docs-line-refs-host
           make check-docs-status
           make check-docs-status-host
           make check-tests-inventory
