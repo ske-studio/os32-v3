@@ -2,6 +2,21 @@
 ifeq ($(filter $(PLATFORM),pc98 powermac),)
 $(error unsupported PLATFORM $(PLATFORM))
 endif
+# 像の構成 (docs/design/build/select.md §3-1): 像が機能の値と順の式を決める。
+IMAGE ?= $(if $(filter powermac,$(PLATFORM)),ppc-selected,pc98)
+ifeq ($(wildcard build/images/$(IMAGE).mk),)
+$(error unknown IMAGE $(IMAGE))
+endif
+include build/images/$(IMAGE).mk
+ifneq ($(ARCH)-$(PLATFORM),$(IMAGE_TARGET))
+$(error IMAGE $(IMAGE) is for $(IMAGE_TARGET), not $(ARCH)-$(PLATFORM))
+endif
+IMAGE_FEATURES = LINK EXEC USERSHELL USB CLI PC98_PENDING
+$(foreach f,$(IMAGE_FEATURES),$(if $(filter-out 1,$(words $(filter 0 1,$(FEATURE_$(f))))),$(error invalid FEATURE_$(f))))
+$(foreach f,USERSHELL USB CLI,$(if $(filter 1,$(FEATURE_$(f))),$(if $(filter 1,$(FEATURE_EXEC)),,$(error FEATURE_$(f) requires FEATURE_EXEC))))
+ifeq ($(FEATURE_USERSHELL)$(FEATURE_CLI),11)
+$(error FEATURE_USERSHELL and FEATURE_CLI are mutually exclusive)
+endif
 include build/sources/order.mk
 include build/sources/common.mk
 include build/arch/$(ARCH)-sources.mk
@@ -19,7 +34,7 @@ ifneq ($(ARCH)-$(PLATFORM),x86-pc98)
 $(error unsupported FEATURE_V86 on $(ARCH)-$(PLATFORM))
 endif
 include build/features/v86.mk
-else
+else ifeq ($(FEATURE_EXEC),1)
 C_FEATURES += platform/none/legacy_guest.c
 endif
 FEATURE_X87 ?= $(DEFAULT_FEATURE_VALUE)
@@ -239,8 +254,21 @@ endif
 endif
 
 C_SELECTED = $(C_COMMON) $(C_ARCH) $(C_PLATFORM) $(C_FEATURES)
+ifeq ($(IMAGE_ORDER),kboot)
+# kboot の像: arch・platform の持ち物も像の機能ごとの組から選ぶ。順に無いソースは落とさずに止める。
+image_owned = $($(1)_CORE) $(foreach f,$(IMAGE_FEATURES),$(if $(filter 1,$(FEATURE_$(f))),$($(1)_$(f)),$($(1)_NO$(f))))
+C_ARCH += $(call image_owned,C_ARCH)
+C_PLATFORM += $(call image_owned,C_PLATFORM)
+GAS_SELECTED = $(call image_owned,GAS_ARCH)
+C_KERNEL = $(filter $(C_SELECTED),$(C_ORDER_KBOOT))
+GAS_KERNEL = $(filter $(GAS_SELECTED),$(GAS_ORDER_KBOOT))
+ifneq ($(strip $(filter-out $(C_ORDER_KBOOT),$(C_SELECTED)) $(filter-out $(GAS_ORDER_KBOOT),$(GAS_SELECTED))),)
+$(error source without link order: $(filter-out $(C_ORDER_KBOOT),$(C_SELECTED)) $(filter-out $(GAS_ORDER_KBOOT),$(GAS_SELECTED)))
+endif
+else
 C_ORDER = $(C_ORDER_LEGACY) $(C_ARCH_NEW) $(C_PLATFORM_NEW)
-C_KERNEL = $(filter $(C_SELECTED),$(C_ORDER)) $(C_PLATFORM_NEW) $(C_DIAGNOSTICS)
+C_KERNEL = $(filter $(C_SELECTED),$(C_ORDER)) $(C_PLATFORM_NEW) $(C_DIAGNOSTICS) $(filter $(C_SELECTED),$(C_ORDER_TAIL))
+endif
 ASM_KERNEL = $(filter $(ASM_ARCH) $(ASM_FEATURES),$(ASM_ORDER_LEGACY))
 KERNEL_SRC_DIRS = $(filter $(INCLUDE_COMMON) $(INCLUDE_ARCH) $(INCLUDE_PLATFORM) $(INCLUDE_FEATURES),$(INCLUDE_ORDER_LEGACY))
 ifneq ($(words $(C_SELECTED)),$(words $(sort $(C_SELECTED))))
@@ -253,7 +281,8 @@ $(error tick probe requires x86-pc98 kdebug)
 endif
 DIAGNOSTIC_TICK_PROBE_BUILD = kernel/time/tick_probe.c
 endif
-KNOWN_FEATURE_VARIABLES = $(addprefix FEATURE_,$(shell echo $(FEATURES) | tr 'a-z-' 'A-Z_'))
+LEGACY_FEATURE_VARIABLES = $(addprefix FEATURE_,$(shell echo $(FEATURES) | tr 'a-z-' 'A-Z_'))
+KNOWN_FEATURE_VARIABLES = $(LEGACY_FEATURE_VARIABLES) $(addprefix FEATURE_,$(IMAGE_FEATURES))
 ifneq ($(filter-out $(KNOWN_FEATURE_VARIABLES),$(filter FEATURE_%,$(.VARIABLES))),)
 $(error unknown feature variable $(filter-out $(KNOWN_FEATURE_VARIABLES),$(filter FEATURE_%,$(.VARIABLES))))
 endif

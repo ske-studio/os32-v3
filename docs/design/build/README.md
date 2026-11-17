@@ -40,3 +40,7 @@ imports を同じ像へリンク。kexports は kernel 側
 ### kernel
 
 - build/kernel.mk:57–65 は .FORCE で tools/gen_build_id.py を実行し、内容変更時だけ build_id.c を更新。
+
+## 索引
+
+- [build/select](select.md) — ソースの持ち主の一覧・像の構成の軸・順の式

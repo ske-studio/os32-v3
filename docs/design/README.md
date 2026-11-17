@@ -79,6 +79,7 @@
 - [arch/x86/kernel/ring3_entry.md](arch/x86/kernel/ring3_entry.md)
 - [boot/boot_fat.md](boot/boot_fat.md)
 - [boot/loader_fat_new.md](boot/loader_fat_new.md)
+- [build/select.md](build/select.md)
 - [drivers/block/fdc.md](drivers/block/fdc.md)
 - [drivers/block/fdc_track.md](drivers/block/fdc_track.md)
 - [drivers/char/serial.md](drivers/char/serial.md)

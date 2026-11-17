@@ -81,6 +81,12 @@ x86 にしか意味の無い仕組みなので `include/` に契約を置かず�
    各 `build/features/*.mk` は早期には集合と遅期適用用の値だけを宣言する。
    `build/sources/order.mk` が既存のリンク/include 順を保持し、`build/select.mk`
    が所有者集合で filter する。共通候補の選択は移植成功を意味しない。
+   像の構成 (どの機能を入れるか) は arch・platform と独立の 3 本目の軸で、
+   `build/images/<IMAGE>.mk` が機能の値を決める。共通の場所の持ち物は
+   `build/sources/common.mk` に機能ごとの組 (`C_COMMON_<機能>`) で宣言し、
+   arch・platform の持ち物も同じ機能の名前の組で宣言する。PowerPC の製品の像
+   (`build/ppc-kboot.mk`) もこの所有者集合から引く
+   ([docs/design/build/select.md](../docs/design/build/select.md))。
    `build/targets/<arch>-<platform>.mk` は製品の到達点を定める。
    `sdk/target_profile.py` は module codec・配置・guard の能力を定め、
    未実装の能力は入力を読む前に拒否する。

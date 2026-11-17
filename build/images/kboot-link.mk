@@ -1,0 +1,9 @@
+# PowerPC の link の診断の像 (build/ppc-kboot.mk の既定)。
+IMAGE_ORDER = kboot
+IMAGE_TARGET = ppc-powermac
+FEATURE_LINK ?= 1
+FEATURE_EXEC ?= 0
+FEATURE_USERSHELL ?= 0
+FEATURE_USB ?= 0
+FEATURE_CLI ?= 0
+FEATURE_PC98_PENDING ?= 0

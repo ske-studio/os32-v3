@@ -53,6 +53,39 @@ def check(root):
             raise AssertionError(assignments)
 
 
+KBOOT_QUERY = ('.PHONY: kboot-query\nkboot-query:\n'
+               '\t@echo "KB_ASM=$(KB_ASM)"\n\t@echo "KB_C=$(KB_C)"\n\t@echo "KB_OUT=$(KB_OUT)"\n')
+
+
+def copy_kboot_names(root):
+    # Wildcards in the kboot owner sets and link order need only the file names.
+    for pattern in ('exec/*.c', 'arch/ppc/exec_*.c', 'drivers/usb/*.c'):
+        for source in ROOT.glob(pattern):
+            target = root / source.relative_to(ROOT)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.touch()
+
+
+def check_kboot(root):
+    """Every PowerPC image selects exactly the pinned sources in the pinned link order."""
+    expected = json.loads((ROOT / 'tools/tests/fixtures/build_profile_ppc.json').read_text())
+    (root / 'kboot-query.mk').write_text(KBOOT_QUERY)
+    for name, image in expected.items():
+        if name == 'ppc-selected':
+            # Top-level ARCH=ppc keeps the compile-only gauge set until the gauge is removed.
+            actual = query(root, ['ARCH=ppc', 'PLATFORM=powermac'], config_only=True)
+            for key, value in image.items():
+                assert actual[key] == value, (name, key)
+            continue
+        out = subprocess.check_output(['make', '-s', '-f', 'build/ppc-kboot.mk', '-f', 'kboot-query.mk',
+                                       *image['flags'], 'kboot-query'], cwd=root, text=True,
+                                      stderr=subprocess.PIPE)
+        actual = dict(line.split('=', 1) for line in out.splitlines() if line.startswith('KB_'))
+        assert actual['KB_OUT'] == image['KB_OUT'], name
+        for key in ('KB_ASM', 'KB_C'):
+            assert actual[key].split() == image[key], (name, key)
+
+
 def check_user_selection(root):
     (root / 'user-query.mk').write_text(
         'include build/config.mk\n.PHONY: user-query\n'
@@ -100,7 +133,34 @@ if __name__ == '__main__':
         # No libgcc invocation is allowed by these query-only tests.
         check(root)
         check_user_selection(root)
+        copy_kboot_names(root)
+        check_kboot(root)
         if args.mutate:
+            for path, anchor, mutant, expected, label in (
+                    ('build/sources/order.mk', 'platform/powermac/rh_observe.c platform/powermac/ofw.c',
+                     'platform/powermac/ofw.c platform/powermac/rh_observe.c',
+                     AssertionError, 'reordered kboot sources'),
+                    ('build/platform/powermac.mk', ' platform/powermac/nic_gem.c', '',
+                     AssertionError, 'dropped kboot owner entry'),
+                    ('build/sources/common.mk', 'C_COMMON_CLI = kernel/cli/resident_cli.c',
+                     'C_COMMON_CLI = kernel/cli/resident_cli.c kernel/cli/unordered.c',
+                     subprocess.CalledProcessError, 'kboot source without link order'),
+                    ('build/images/kboot-link.mk', 'FEATURE_LINK ?= 1', 'FEATURE_LINK ?= 0',
+                     AssertionError, 'kboot image feature value'),
+                    ('build/images/ppc-selected.mk', ' net/nic.c', '',
+                     AssertionError, 'gauge image exclusion')):
+                target = root / path
+                source = target.read_text()
+                assert source.count(anchor) == 1, (path, anchor)
+                target.write_text(source.replace(anchor, mutant))
+                try:
+                    check_kboot(root)
+                except expected:
+                    print('RED: ' + label + ' rejected at runtime')
+                else:
+                    raise SystemExit(label + ' mutation survived')
+                target.write_text(source)
+            check_kboot(root)
             target = root / 'build/sdk-target.mk'
             source = target.read_text()
             anchor = '--make-user --root sdk'
