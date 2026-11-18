@@ -100,8 +100,8 @@ def run(runner, mutation=None):
         call = f'wrap_{name}({call_args})'
         port_checks.append((f'CHECK({call} == {result});' if result else call + ';') +
                            f'CHECK({check} && hit == {slot});')
-    sys_source = (ROOT / 'kapi/kapi_sys.c').read_text()
-    diag_body = re.search(r'^int kapi_serial_diag\([^\n]*\)\n\{.*?^\}', sys_source, re.M | re.S)
+    port_source = (ROOT / 'kapi/kapi_port.c').read_text()
+    diag_body = re.search(r'^int kapi_serial_diag\([^\n]*\)\n\{.*?^\}', port_source, re.M | re.S)
     assert diag_body
     port_selected.insert(0, diag_body[0])
     port_checks += ['CHECK(kapi_serial_diag(0) == OS32_ERR_INVAL);',
@@ -212,7 +212,7 @@ def contracts():
     for registration in ('port_register(&pc98_port);', 'con_output_register(&pc98_console_output);'):
         assert registration in bind
     assert 'const EmergencyOps emergency_output' in bind
-    for name in ('kernel/console/console.c', 'kernel/ver_collect.c', 'kapi/kapi_sys.c',
+    for name in ('kernel/console/console.c', 'kernel/ver_collect.c', 'kapi/kapi_port.c',
                  'exec/exec.c', 'arch/x86/kernel/isr_handlers.c', 'arch/x86/kernel/double_fault.c'):
         source = read_text(ROOT / name)
         assert not re.search(r'#include[^\n]*["/]serial\.h"', source), name

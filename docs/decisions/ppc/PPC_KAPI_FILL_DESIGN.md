@@ -106,7 +106,7 @@ A は共通本体を選択・初期化して通常 wrap に接続。B は既存�
 - console_font ［font_source_close → font_lease_app_close @ kernel/console/font_source.c］
 - port ［serial_init → port_init @ kernel/port_service.c］ ［serial_puts → port_puts_kapi @ kernel/port_service.c］ ［serial_getchar → port_getchar_kapi @ kernel/port_service.c］ ［serial_putchar → port_putchar_kapi @ kernel/port_service.c］
 - port ［serial_trygetchar → port_trygetchar @ kernel/port_service.c］ ［serial_is_initialized → port_is_initialized @ kernel/port_service.c］ ［serial_init_vfast → port_init_vfast @ kernel/port_service.c］ ［serial_get_status → port_get_status @ kernel/port_service.c］
-- port ［serial_diag → kapi_serial_diag @ kapi/kapi_sys.c］
+- port ［serial_diag → kapi_serial_diag @ kapi/kapi_port.c］
 - gui ［gui_call → gui_call @ kernel/gui.c］ ［gui_register → gui_register @ kernel/gui.c］ ［sys_switch_shell → sys_switch_shell @ kernel/gui.c］
 - sound ［fm_startup_sound → fm_startup_sound @ drivers/sound/fm/fm.c］ ［fm_play_mml → fm_play_mml_kapi @ drivers/sound/fm/fm.c］ ［snd_bgm_play → snd_bgm_play @ drivers/sound/fm/fm_module.c］ ［snd_bgm_stop → snd_bgm_stop @ drivers/sound/fm/fm_module.c］
 - sound ［snd_bgm_is_playing → snd_bgm_is_playing @ drivers/sound/fm/fm_module.c］ ［snd_se_play → snd_se_play @ drivers/sound/fm/fm_module.c］ ［snd_se_play_raw → snd_se_play_raw @ drivers/sound/fm/fm_module.c］ ［snd_set_master → snd_set_master @ drivers/sound/fm/fm_module.c］
@@ -128,7 +128,7 @@ A は共通本体を選択・初期化して通常 wrap に接続。B は既存�
 - db ［db_last_error → kapi_db_last_error @ kapi/kapi_db.c］ ［db_mem_used → kapi_db_mem_used @ kapi/kapi_db.c］ ［db_open_existing → kapi_db_open_existing @ kapi/kapi_db_v50.inc］ ［db_prepare_only → kapi_db_prepare_only @ kapi/kapi_db_v50.inc］
 - db ［db_bind_int → kapi_db_bind_int @ kapi/kapi_db_v50.inc］ ［db_bind_text → kapi_db_bind_text @ kapi/kapi_db_v50.inc］ ［db_bind_blob → kapi_db_bind_blob @ kapi/kapi_db_v50.inc］ ［db_bind_null → kapi_db_bind_null @ kapi/kapi_db_v50.inc］
 - db ［db_error_code → kapi_db_error_code @ kapi/kapi_db_v50.inc］
-- system_info ［sys_get_build_info → kapi_sys_get_build_info @ kapi/kapi_sys.c］ ［sys_set_mtime → kapi_sys_set_mtime @ kapi/kapi_sys.c］ ［sys_time_now → kapi_sys_time_now @ kapi/kapi_sys.c］ ［mem_stat → kapi_mem_stat @ kapi/kapi_sys.c］
+- system_info ［sys_get_build_info → kapi_sys_get_build_info @ kapi/kapi_sys.c］ ［sys_set_mtime → kapi_sys_set_mtime @ kapi/kapi_sysinfo.c］ ［sys_time_now → kapi_sys_time_now @ kapi/kapi_sys.c］ ［mem_stat → kapi_mem_stat @ kapi/kapi_sys.c］
 - system_info ［sys_ver_info → kapi_sys_ver_info @ kapi/kapi_sys.c］
 - ime ［ime_getchar → ime_getchar_kapi @ kernel/ime/fep_module.c］ ［ime_trygetchar → ime_trygetchar @ kernel/ime/fep_module.c］ ［ime_toggle → ime_toggle @ kernel/ime/fep_module.c］ ［ime_is_active → ime_is_active @ kernel/ime/fep_module.c］
 - ime ［ime_set_mode → ime_set_mode @ kernel/ime/fep_module.c］ ［ime_get_mode → ime_get_mode @ kernel/ime/fep_module.c］ ［ime_getkey → ime_getkey_kapi @ kernel/ime/fep_module.c］ ［ime_switch_dict → ime_switch_dict @ kernel/ime/fep_module.c］
