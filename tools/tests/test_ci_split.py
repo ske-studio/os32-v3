@@ -2,7 +2,7 @@
 """CI job independence and early artifact downloads, without GitHub access."""
 CHECK = dict(name='ci-split-host', tier=0,
              covers=['.github/workflows/check.yml', '.github/workflows/build.yml',
-                     '.github/actions/build-setup/action.yml', 'tools/ci/build_cross.sh', 'tools/fetch_fonts.py',
+                     '.github/actions/build-setup/action.yml', '.github/actions/static-setup/action.yml', 'tools/ci/build_cross.sh', 'tools/fetch_fonts.py',
                      'tools/ci/ppc_scope.py', 'tools/ci/build_cross_ppc.sh', '.github/actions/ppc-setup/action.yml', 'tools/ci_fetch.sh', 'tools/ci/reuse_success.py', 'tools/checks/weights.json',
                      'tools/checks/run.py', 'tools/tests/test_ci_split.py',
                      'CLAUDE.md', 'README.md', 'docs/INDEX.md'],
@@ -204,6 +204,14 @@ DOC_EXCLUSIONS = {
 def document_cases(source):
     workflow = yaml.safe_load(source)
     reuse_gate_cases(workflow, 'check.yml', 'static-check')
+    # 用意は composite action の 1 行だけ。workflow に apt の行を書かない (docs/POLICY_CI.md G5)。
+    static = workflow['jobs']['static-check']['steps']
+    assert [s.get('uses') for s in static if s.get('uses', '').startswith('./.github/actions/')] == ['./.github/actions/static-setup']
+    assert 'apt-get' not in source, 'apt belongs to composite actions'
+    static_setup = (ROOT / '.github/actions/static-setup/action.yml').read_text()
+    for dependency in ('build-essential', 'e2fsprogs', 'python3-clang', 'libnewlib-dev', 'PyYAML lz4'):
+        assert dependency in static_setup, dependency
+    assert 'cross' not in yaml.safe_load(static_setup)['runs']['steps'][0]['run'], 'static gate stays cross-free'
     runs = [step.get('run', '') for job in workflow['jobs'].values()
             for step in job['steps']]
     targets = set(re.findall(r'^\s*make\s+(check-[\w-]+)\s*$', '\n'.join(runs), re.M))

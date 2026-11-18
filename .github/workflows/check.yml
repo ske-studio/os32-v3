@@ -57,15 +57,9 @@ jobs:
         with:
           python-version: "3.12"
 
-      # ホスト試験の外部コマンド: gcc (build-essential)、e2fsck / mke2fs (e2fsprogs)。
-      # C AST の vendor include は libnewlib-dev のヘッダで解析する (クロス GCC は不要)。
-      # Python は tools/mkvmkernel.py 系が lz4 を使う。
-      - name: Host dependencies
+      # 用意は 1 か所 (docs/POLICY_CI.md G5、票 TASK_CI_REWORK の段 S2c)。クロス無しのまま。
+      - uses: ./.github/actions/static-setup
         if: steps.prior.outputs.reuse != 'true'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends ccache build-essential e2fsprogs clang libclang-dev llvm-dev python3-clang libnewlib-dev
-          python3 -m pip install --quiet PyYAML lz4
 
       - name: SQLite ccache setup
         if: steps.prior.outputs.reuse != 'true'
