@@ -1800,6 +1800,23 @@ def delivery_ack_ignores_invalid_progress():
     assert delivery["acked"] == 1 and a.ledger[1] == {"st": "RELEASED"}
 
 
+def delivery_ack_after_rewind():
+    a, o = up()
+    o.send(HA.OP_REQUEST, rid=1, payload=b"STREAM 1024 512 0")
+    credit = struct.pack("<H", 12)
+    out = o.send(HA.OP_WINDOW, rid=1, payload=credit)
+    assert [p["seq"] for p in out if p["op"] == HA.OP_DATA] == [1, 2]
+    assert not o.send(HA.OP_ACK, rid=1, ack=1)
+    delivery = a.ledger[1]["deliver"]
+    for _ in range(8):
+        assert not o.send(HA.OP_WINDOW, rid=1, ack=1, payload=b"\0\0")
+    assert (delivery["acked"], delivery["sent"]) == (1, 1)
+
+    assert not o.send(HA.OP_ACK, rid=1, ack=2)
+    assert (delivery["acked"], delivery["sent"], delivery["credit"]) == (2, 2, 0)
+    assert not o.send(HA.OP_WINDOW, rid=1, ack=1, payload=credit)
+
+
 def delivery_ack_recovers_missing_tail():
     a, o = up()
     o.send(HA.OP_REQUEST, rid=1, payload=b"STREAM 1024 512 2")
@@ -1834,9 +1851,11 @@ def h5_mutations():
         ('proc = host_linux.print_start(data, None, job["kind"] == "raw")', 'raise host_linux.ServiceUnavailable("mutant")'),
         ('proc = host_linux.clip_start("get", b"", b)', 'raise host_linux.ServiceUnavailable("mutant")'),
         ('self._advance_delivery_ack(self.ledger.get(rid), ack)', 'pass'),
-        ('d["acked"] < ack <= d["sent"]', 'd["acked"] < ack'),
+        ('d["acked"] < ack <= d["max_sent"]', 'd["acked"] < ack'),
         ('d["stall"] = 0\n        return True', 'return True'),
         ('if flags == 0:\n                self._advance_delivery_ack', 'if True:\n                self._advance_delivery_ack'),
+        ('d["acked"] < ack <= d["max_sent"]', 'd["acked"] < ack <= d["sent"]'),
+        ('d["sent"] = max(d["sent"], ack)', 'pass'),
     ]
     source = (ROOT / "tools/host_agent.py").read_text()
     with tempfile.TemporaryDirectory(prefix="h5-mutants-") as directory:
@@ -1851,7 +1870,7 @@ def h5_mutations():
                 for case in (length_based_credit, hs_syn_candidates, h5_hello_list_and_notify,
                              h5_named_services_and_linux_clip, h5_linux_print_lifecycle,
                              delivery_ack_prevents_retransmit, delivery_ack_ignores_invalid_progress,
-                             delivery_ack_recovers_missing_tail):
+                             delivery_ack_after_rewind, delivery_ack_recovers_missing_tail):
                     case()
             except AssertionError:
                 print("  RED h5 mutation %d" % index, flush=True)
@@ -1951,6 +1970,7 @@ CASES = [
     window_cadence_contract,
     delivery_ack_prevents_retransmit,
     delivery_ack_ignores_invalid_progress,
+    delivery_ack_after_rewind,
     delivery_ack_recovers_missing_tail,
     time_format_is_19_bytes,
 ]
