@@ -57,8 +57,8 @@ def wiring():
     check = (ROOT / '.github/workflows/check.yml').read_text()
     build = (ROOT / '.github/workflows/build.yml').read_text()
     assert 'ppc-setup' not in build
-    # ppc-compile と、main のキャッシュを保つ ppc-toolchain-cache。ppc-qemu は gate-setup の中で呼ぶ。
-    assert check.count('- uses: ./.github/actions/ppc-setup') == 2
+    # main のキャッシュを保つ ppc-toolchain-cache だけ。ppc-compile・ppc-qemu は gate-setup の中で呼ぶ。
+    assert check.count('- uses: ./.github/actions/ppc-setup') == 1
     assert '  ppc-compile:' in check
     workflow = yaml.safe_load(check)
     triggers = workflow.get('on', workflow.get(True))
@@ -79,10 +79,9 @@ def wiring():
         assert f'MUTATE={mutate} ' + command in runs
         assert ('CHECK_ROUTINE=1 ' in runs) == routine
         assert 'make check-ppc-compile' not in runs
-        assert any(step.get('uses') == './.github/actions/build-setup' for step in job_steps)
-        # 変異の試験が QEMU を起動するので、ppc-qemu の段と同じ道具を入れる。
-        for dependency in ('gcc-13', 'qemu-user', 'ccache', 'qemu-system-ppc', 'qemu-system-data'):
-            assert dependency in runs
+        # 変異の試験が QEMU を起動するので、ppc-qemu と同じ gate-setup の 1 行だけ (apt の行をジョブに書かない)。
+        assert [s.get('uses') for s in job_steps if s.get('uses', '').startswith('./.github/actions/')] == ['./.github/actions/gate-setup']
+        assert 'apt-get' not in runs
     # QEMU の検査は 4 本に割って並べ、手本の道具 (tools/ci/gate.py) の 1 行で回す (変異込みが既定)。
     command = 'python3 -B tools/ci/gate.py run --env qemu-ppc --shard ${{ matrix.shard }}/4 --out "$RUNNER_TEMP/gate"'
     for flow, routine, mutate in ((workflow, False, 1),):
