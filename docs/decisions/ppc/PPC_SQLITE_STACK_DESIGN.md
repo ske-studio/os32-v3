@@ -20,17 +20,17 @@
 
 | # | 確定設計との差 | main の根拠 |
 |---|---|---|
-| 1 | S guard 結線で共通が PPC 専用ヘッダを直に読む形は新しい R1 に当たる。既存の guard 処理を共通契約から呼べる形にする。 | `kernel/sqlite_engine.c:39`、`arch/ppc/kernel_fp.h:5`、`arch/ppc/kernel_fp.c:13,29`、`docs/design/tools/check_layers.md:29,41,98` |
-| 2 | §5 の `lib/sqlite3/` は共通所有。PPC 命令の trampoline は CPU 所有とする。 | `docs/decisions/ppc/PPC_FP_NEWLIB_DESIGN.md:148`、`docs/design/tools/check_layers.md:29-39` |
-| 3 | feature 内の NASM/GAS 排他選択では現行の PPC 試験に届かない。SQLite feature は PowerMac で既定 0、1 の明示指定も拒否される。 | `build/features/sqlite.mk:1-5`、`build/platform/powermac.mk:2`、`build/select.mk:158-167,274-276` |
-| 4 | 共通の engine は現在 `C_FEATURES` 所属で、PPC の未リンク共通 TU の検査対象から漏れている。単体コンパイルには SQLite ヘッダの探索パスも要る。 | `build/features/sqlite.mk:2`、`build/sources/common.mk:10`、`build/targets/ppc-powermac.mk:71-88`、`kernel/sqlite_engine.c:20-21`、`lib/sqlite3/generated/sqlite_facade.h:4` |
+| 1 | S guard 結線で共通が PPC 専用ヘッダを直に読む形は新しい R1 に当たる。既存の guard 処理を共通契約から呼べる形にする。 | `kernel/sqlite_engine.c`、`arch/ppc/kernel_fp.h`、`arch/ppc/kernel_fp.c`、`docs/design/tools/check_layers.md` |
+| 2 | §5 の `lib/sqlite3/` は共通所有。PPC 命令の trampoline は CPU 所有とする。 | `docs/decisions/ppc/PPC_FP_NEWLIB_DESIGN.md`、`docs/design/tools/check_layers.md` |
+| 3 | feature 内の NASM/GAS 排他選択では現行の PPC 試験に届かない。SQLite feature は PowerMac で既定 0、1 の明示指定も拒否される。 | `build/features/sqlite.mk`、`build/platform/powermac.mk`、`build/select.mk` |
+| 4 | 共通の engine は現在 `C_FEATURES` 所属で、PPC の未リンク共通 TU の検査対象から漏れている。単体コンパイルには SQLite ヘッダの探索パスも要る。 | `build/features/sqlite.mk`、`build/sources/common.mk`、`build/targets/ppc-powermac.mk`、`kernel/sqlite_engine.c`、`lib/sqlite3/generated/sqlite_facade.h` |
 
 - 現行 TU を link-sh の make が出す PPC コンパイル行で確認。既定の探索パスでは `os32_sqlite_config.h` が見つからず、対象 TU に `-Ilib/sqlite3` を足すと `-Werror` 付きでコンパイル成功。出力先は `/dev/null`。新しい口を含む版の確認は §6。
 - `build/images/ppc-flags.mk` は kboot 像と旗の対応を担う。SQLite の有効化は上記 `build/select.mk` の判定に従う。
-- 統合判断 1。同じ役目は x86 の `lib/sqlite3/sqlite_stack.asm:14-26` にある。どちらも旧 SP を保持し、整列した別スタックで callback を呼んで戻す。
+- 統合判断 1。同じ役目は x86 の `lib/sqlite3/sqlite_stack.asm` にある。どちらも旧 SP を保持し、整列した別スタックで callback を呼んで戻す。
 - 統合判断 2。整数 ABI の `sqlite_call_on_alt_stack` と共通の `sqlite_engine_run` を両 arch で共有する。SP/LR と非揮発レジスタの保存だけ CPU ごとの assembly が担う。PPC ではさらに共通契約越しに FP 保護を行う。
 - 統合判断 3。確定設計の §2・§5 の順序と後段の製品有効化に沿う。AC-BUILD-1 の provider/closure は両像で検査する。AC-LIBC-1 は確定設計全体の USER 側の契約で、この段の callback 境界は整数だけ。両 arch で callback への引数、SP 整列と復元、戻り先、非揮発状態、canary を観測する。FP の契約 ID は確定判断どおり追加不要。
-- 参照する手本は確定設計 §5 の N `.../setjmp.S:36-66,76-104`、F `lib/libc/powerpc/gen/_setjmp.S:59,86`、OS32 `sqlite_stack.asm:14-26` と `docs/ppc/abi.md`。
+- 参照する手本は確定設計 §5 の N `.../setjmp.S`、F `lib/libc/powerpc/gen/_setjmp.S`、OS32 `sqlite_stack.asm` と `docs/ppc/abi.md`。
 
 ## 2. 口の形
 
@@ -155,7 +155,7 @@ static inline void arch_kernel_fp_end(const struct arch_kernel_fp_guard *g)
 - 呼出し・stub の棚卸しは `test_sqlite_engine.py`、`fep_host_build.py`、`test_fep_core_boot.py`、`test_sqlite_module_proto.py` のソースコピー/切出しまで行う。x86 fixture は既存の x86 include 経路を確認し、独自の `host_arch` だけで引く fixture には同名のダミー型と static inline を用意する。PPC 受入は本物の guard を使用する。
 - `test_ppc_fp.py` の F3 は `set_msr` の定義だけを模擬版に置換し、現在はその前の include と宣言も `guard.inc` に残す。包みは加工境界の前に置き、`ppc_fp_guard_host.c` から組んだ GREEN=0／no-restore RED=3／再 GREEN=0 を確認する。`test_ppc_fp.py` と `ppc-fp-guest` の covers に `arch/ppc/arch_kernel_fp.h` を加える。
 - 変更された既存 CHECK の covers/dep-dir と変異用コピーを追従する。新規 CHECK に covers、basis/kind、依存および該当する env_limit/pins を宣言する。
-- `tools/tests/test_sqlite_engine.py:28` の trampoline 呼出しアンカーは維持。reentry/STOP と他の兄弟試験の目印も grep で確認し、置換が必要なら一意な新位置で実行 RED を確認する。PM は `stale_anchor.py 756b5b17` を回す。
+- `tools/tests/test_sqlite_engine.py` の trampoline 呼出しアンカーは維持。reentry/STOP と他の兄弟試験の目印も grep で確認し、置換が必要なら一意な新位置で実行 RED を確認する。PM は `stale_anchor.py 756b5b17` を回す。
 
 ## 6. 受入 → 試験と変異
 
