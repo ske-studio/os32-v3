@@ -19,6 +19,8 @@ int main(int argc, char **argv, KernelAPI *api)
     int rc;
 
     rc = api->surface_query(role, &before);
+    if (rc == OS32_ERR_NOSYS)
+        return report(api, "SURFACE provider absent\n", 10);
     if (rc || before.count != 1 || before.desc[0].role != role ||
         before.desc[0].backend != OS32_SURFACE_OF_FB ||
         before.desc[0].format != OS32_SURFACE_PACKED8 ||
@@ -59,9 +61,11 @@ int main(int argc, char **argv, KernelAPI *api)
         !after.desc[0].ref.generation ||
         after.desc[0].ref.generation == before.desc[0].ref.generation)
         return report(api, "SURFACE regeneration failed\n", 7);
-    if (api->surface_lease(role, &before.desc[0].ref, OS32_SURFACE_RW, &view)
-        != OS32_ERR_STALE)
-        return report(api, "SURFACE stale ref failed\n", 8);
+    rc = api->surface_lease(role, &before.desc[0].ref, OS32_SURFACE_RW, &view);
+    if (rc == 0)
+        return report(api, "SURFACE stale ref accepted\n", 8);
+    if (rc != OS32_ERR_STALE)
+        return report(api, "SURFACE stale ref unexpected error\n", 11);
     if (api->surface_lease(role, &after.desc[0].ref, OS32_SURFACE_RW, &view) ||
         api->surface_unlease(view.token))
         return report(api, "SURFACE fresh ref failed\n", 9);

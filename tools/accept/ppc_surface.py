@@ -14,8 +14,8 @@ sys.path[:0] = [str(ROOT / 'tools'), str(ROOT / 'tools/ppc')]
 
 EXPECTED = {
     'normal': (b'SURFACE OK\n\n', b'0\n'),
-    'ignore-generation': (b'SURFACE stale ref failed\n', b'8\n'),
-    'absent': (b'SURFACE query failed\n', b'1\n'),
+    'ignore-generation': (b'SURFACE stale ref accepted\n', b'8\n'),
+    'absent': (b'SURFACE provider absent\n', b'10\n'),
 }
 
 

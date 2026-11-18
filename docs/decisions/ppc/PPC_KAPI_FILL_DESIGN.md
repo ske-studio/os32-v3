@@ -62,7 +62,8 @@ A は共通本体を選択・初期化して通常 wrap に接続。B は既存�
 |組|本数|x86 の実体・所有者|道・必要な後端・先行段|重複防止の照合対象|
 |---|---:|---|---|---|
 |sys|3|共通 kernel/sys.c → 機種 platform_reset / platform_buzzer_*|reboot B は 確定設計 PPC_RESET_DESIGN.md の PMU/Cuda 受入後。buz 2本は暫定 E、Mac のシステムビープは AV HAL 後に再判定|sys_reboot の呼出元・本体|
-|surface|4|共通 exec/surface_query.c|A。表示 ledger・所有者登録後、単独と束の lease を公開|同じ surface_api_*|
+|surface（単独）|3|共通 exec/surface_query.c|A。OF FB の CLIENT を表示 ledger に登録し、surface_query・surface_lease・surface_unlease を公開|surface_api_query・surface_api_lease・surface_api_unlease|
+|surface（束）|1|共通 exec/surface_query.c|D。本線の #18 の確定設計を待って gfx_surface_lease を公開|surface_api_bundle|
 |gfx|22|装置 drivers/video/pc98/gfx_vram.c、共通 gfx/gfx_core.c と各 inc、gfx_hw_submit.c、kapi/kapi_osri.c|C は present 系と dirty の共通方針を先に移設。A は情報・所有者・共通描画。B は可視面・palette・raster・HW 能力。OF FB の実能力を検査。OSRI は VFS 後|gfx_core と OSRI デコーダ|
 |clock|1|共通 kernel/time/clock_service.c → 装置 drivers/char/rtc.c|B。drivers/macintosh/ の reset と同じ via_command を使う rtc_readを暦時計に登録、単調時計とは別|clock_read_legacy と VIA インスタンス|
 |console_font|9|共通 kernel/console/{console,font_source,unicode_file}.c|セル5本 A は既存 fbcon、字形 lease 3本と文字変換 A は KCG1・変換表の配備後|con_backend 経由・lease の所有者|
@@ -247,7 +248,8 @@ A の場合も、対象像が持つ弱い代役に解決されていないこと
 |port|ESCC 対向と既知バイトを往復。入力なしの try、設定速度、diag と initialized を照合|送受信の1文字破棄、速度応答固定|
 |pointer|USB 相対移動、端で clamp、ボタン押下中に抜き、再接続。カーソル show/hide と位置を観測|release 配送を落として押下残りを検出|
 |console_font|指定セルの ANK/JIS、反転と scroll の画面・読戻し、既知フォント部分読取と close 後の拒否|行送りを1行ずらす、lease 範囲端をずらす|
-|surface|公開面を query→lease→unlease、世代変更後の再利用は STALE。束の後半失敗で先頭も未取得|世代判定を無効化|
+|surface（単独）|OF FB の CLIENT を query→lease→書込と読戻し→unlease。解除済み token は INVAL、世代変更後の旧 ref は STALE。アプリ終了時に残した lease を回収|世代照合を無効にすると旧 ref の取得が成功。提供者を外すと query が NOSYS|
+|surface（束、本線 #18 の確定設計後）|QEMU で事前確認による INVAL と、その後の再取得を確認|束の後半で失敗した場合の巻き戻しは本線の host 受入で確認|
 |gfx|画面寸法と owner を取得、既知矩形だけ更新し周囲の pixel を保存。非対応 raster/HW は能力に一致|dirty 範囲の右端を欠落させる|
 |gfx2|adapter/head/connector/mode と caps、面生成・lock・描画・present・解放。fence と非対応 EDID 等は実能力どおり|of_fb_v2 の固定モード比較を外し異寸法が通ることを検出|
 |gui|登録者に要求が一度届き、GUI 終了後に shell に入力が戻る|終了時の所有解放を省略|
