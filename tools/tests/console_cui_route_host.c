@@ -3,7 +3,7 @@
 #include "types.h"
 #include "memmap.h"
 #include "pc98.h"
-#include "tvram.h"
+#include "text_screen.h"
 #include "tvram_private.h"
 #include "console_dual.h"
 #include "gfx/v2/gfx2_int.h"

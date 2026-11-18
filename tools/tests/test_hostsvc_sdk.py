@@ -6,7 +6,7 @@ CHECK = dict(name='hostsvc-sdk', tier=1, needs=[], budget=3.5, covers=[
     'sdk/include/os32/os32api.h', 'sdk/include/os32/os32_kapi_shared.h',
     'sdk/include/os32/os32_kapi_generated.h', 'sdk/include/os32/os32_host_notice.h',
     'include/types.h', 'tools/tests/hostsvc_sdk_host.c', 'tools/tests/host32.py'],
-    basis=['NET_HOSTSVC_DESIGN'],
+    basis=['docs/design/userland/lib/host/host_call.md 口'],
 )
 
 import argparse

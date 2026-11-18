@@ -6,13 +6,13 @@ CHECK = dict(name='splash-obs-host', tier=1,
             'drivers/video/pc98/splash_raster.c',
             'drivers/video/pc98/splash_raster_image.h', 'drivers/video/pc98/splash_raster.h',
             'gfx/gfx_osri.c', 'gfx/gfx_osri.h', 'platform/pc98/splash_obs.c',
-            'platform/pc98/splash.c', 'platform/pc98/splash_image.c', 'init/boot_splash.c',
+            'platform/pc98/splash.c', 'platform/pc98/splash_image.c', 'platform/pc98/boot_splash.c',
             'include/platform_splash.h', 'tools/tests/splash_obs_host.c',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
             'lib/le_internal.h', 'lib/crc32_core.inc', 'lib/serial_diag.h', 'lib/kstring.h',
             'drivers/char/serial.h', 'include/config.h', 'gfx/palette.h'],
     needs=[], budget=9.2,
-    basis=['RASTER_SPLASH_PL_DESIGN', 'RASTER_SPLASH_S5_DESIGN §2', 'RASTER_SPLASH_S5_DESIGN §3', 'RASTER_SPLASH_S5_DESIGN §4'],
+    basis=['docs/design/platform/pc98/splash_obs.c.md 流れ', 'docs/design/drivers/video/pc98/splash_raster_plan.c.md 列の作り方', 'docs/design/drivers/video/pc98/splash_raster_play.c.md 1 フレームの手順', 'docs/design/gfx/osri_profile.h.md 本数の数え方 (ゲストとホストで同じ)'],
 )
 
 import argparse
@@ -36,7 +36,7 @@ HEADER = 'gfx/gfx_osri.h'
 SOURCES = [PLAYER, PLAN, PREVIEW, 'gfx/osri_profile.h',
            'drivers/video/pc98/splash_raster_play.h', OWNER, HEADER, 'gfx/gfx_osri.c',
            'drivers/video/pc98/splash_raster_image.h', 'include/platform_splash.h',
-           'init/boot_splash.c', 'lib/le_internal.h', 'lib/crc32_core.inc',
+           'platform/pc98/boot_splash.c', 'lib/le_internal.h', 'lib/crc32_core.inc',
            'tools/tests/splash_obs_host.c']
 MUTATIONS = (
     ('prepare capacity', PLAN, 'image->count > OSRI_IMAGE_EVENTS', 'image->count >= OSRI_IMAGE_EVENTS'),

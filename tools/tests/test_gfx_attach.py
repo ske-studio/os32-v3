@@ -17,7 +17,7 @@ TARGET_SRCS = [
     'drivers/video/pc98/backend_pegc.c',
     'drivers/video/cirrus/backend_cirrus.c',
     'drivers/video/cirrus/cirrus_identify.c',
-    'gfx/gfx_vram.c',
+    'drivers/video/pc98/gfx_vram.c',
     'gfx/gfx_scroll.c', 'platform/pc98/gfx_scroll.c', 'platform/pc98/gfx_init.c', 'platform/pc98/gfx_selector.c', 'platform/pc98/gfx_surfaces.c',
     'exec/surface_query.c',
     'exec/lease.c',

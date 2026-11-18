@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 CHECK = dict(name='remote-x9', tier=1, needs=[], budget=5,
-    covers=['sdk/kapi.json', 'sdk/gen_kapi.py', 'sdk/kapi_target_ppc.py',
+    covers=['tools/tests/fixtures/build_profile_ppc.json', 'sdk/kapi.json', 'sdk/gen_kapi.py', 'sdk/kapi_target_ppc.py',
             'sdk/kapi_rust_gen.py', 'sdk/include/os32/os32_kapi_shared.h',
             'sdk/include/os32/os32_kapi_generated.h', 'sdk/include/os32/os32_kapi_slots.h',
             'sdk/rust/os32api/src/kapi_generated.rs', 'include/kapi_call_generated.h',
             'kapi/kapi_generated.c', 'exec/exec_kapi_init.inc',
-            'build/ppc-kboot.mk', 'kernel/console/con_sink.c', 'tools/tests/test_remote_x9.py'],
+            'build/targets/ppc-powermac.mk', 'kernel/console/con_sink.c', 'tools/tests/test_remote_x9.py'],
     basis=['LAN_OPERATOR_DESIGN §3', '[ABI]'],
 )
 import argparse
@@ -42,7 +42,9 @@ def main():
                 assert 'i32 __cdecl wrap_sys_yield(void)\n{\n    KAPI_HIT(200);\n    return exec_sys_yield();\n}\n' in generated
                 assert 'rshell_active = active;' in generated
                 assert 'int __cdecl wrap_serial_is_initialized(void)\n{\n    return (int)0;\n}\n' in generated
-            assert 'kernel/console/con_sink.c' in (ROOT / 'build/ppc-kboot.mk').read_text()
+            # The pinned link-SH source list (checked against make by build-selection-host).
+            assert 'kernel/console/con_sink.c' in json.loads(
+                (ROOT / 'tools/tests/fixtures/build_profile_ppc.json').read_text())['link-sh']['KB_C']
         x86 = out / 'x86-pc98'
         for name in OUTPUTS:
             assert (x86 / name).read_bytes() == (ROOT / name).read_bytes(), name

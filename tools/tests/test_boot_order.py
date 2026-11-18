@@ -6,10 +6,10 @@ import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
-PATHS = ['init/kernel_boot_cpu.inc', 'init/kernel_boot_memory.inc',
+PATHS = ['platform/pc98/kernel_boot_cpu.inc', 'platform/pc98/kernel_boot_memory.inc',
          'arch/x86/kernel/boot_cpu.c', 'arch/x86/kernel/boot_after_paging.c',
          'platform/pc98/boot_irq.c']
-CHECK = dict(name='boot-order-host', tier=1, covers=['include/clock_source.h', 'init/kernel_boot_cpu.inc', 'init/kernel_boot_memory.inc',
+CHECK = dict(name='boot-order-host', tier=1, covers=['include/clock_source.h', 'platform/pc98/kernel_boot_cpu.inc', 'platform/pc98/kernel_boot_memory.inc',
     'arch/x86/kernel/boot_cpu.c', 'arch/x86/kernel/boot_after_paging.c',
     'platform/pc98/boot_irq.c',
     'tools/tests/test_boot_order.py',

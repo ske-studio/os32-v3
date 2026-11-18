@@ -1,6 +1,6 @@
 # メモリ地図の生成と照合 — TDD 記録 (2026-09-17)
 
-票: `docs/archive/kernel_v21/TASK_KSTACK_USER.md` §4 の 1・2・3 と §4-bis
+契約: `docs/design/tools/gen_memmap.md` (静的な地図の検査)・`docs/design/mm/paging.md` の「地図の自己診断と、最悪配置の表明」(実物のページ表の照合と `STATIC_ASSERT`)。出所は票 TASK_KSTACK_USER の §4 の 1・2・3 と §4-bis。
 
 対象: `tools/gen_memmap.py` / `mm/paging.c` / `kdebug/kselftest.c` / `include/memmap.h`
 試験: `tools/tests/test_memmap_gen.py` / `tools/tests/test_memmap_boot.py` + `memmap_boot_host.c`
@@ -42,19 +42,22 @@
 から実値の地図を起こす。**実物の `memmap.h` を使い、`kernel.map` だけ差し替える**
 ので、番地を直しても試験は腐らない。
 
-| 場面 | `__bss_end` | 期待 |
+今の場面と値は `tools/tests/test_memmap_gen.py` の `cases` (常駐の終端 BROKEN = `0x380000`、CLEAN = `0x280000`)。
+
+| 場面 | 常駐の終端 | 期待 |
 |---|---|---|
-| BROKEN | `0x180000` (予算超過) | `--check` = 1。予算超過 1 + 逆転 1 + 重なり 3 を名指し |
-| CLEAN | `0x140000` (予算内) | `--write` → `--check` = 0 |
-| ARTIFACT | `0x140000` | `build/out/MEMMAP.md` の改変・欠落でも `--check` = 0。再生成で復元し、説明文書を変えない |
-| MIRROR | `0x140000` | `build/os32.ld` の写しをずらす / `kentry.asm` を数値直書きに戻すと `--check` = 1 |
-| NOMAP | (`kernel.map` 無し) | **推測せず** 2 で止まり、地図を 1 行も出さない |
+| BROKEN | `0x380000` (予算超過) | `--check` が非 0。予算超過 1 + 逆転 1 + SHM 本体と固定の枠の重なりを名指し |
+| ESCAPE | `0x280000` | GUI 予約を SHM 本体の外へ 1 ページはみ出させると `--check` が非 0 (はみ出し) |
+| CLEAN | `0x280000` (予算内) | `--write` → `--check` = 0。表の行は絶対番地で始まる |
+| ARTIFACT | `0x280000` | `build/out/MEMMAP.md` の改変・欠落でも `--check` = 0。再生成で復元し、説明文書を変えない |
+| MIRROR | `0x280000` | `build/os32.ld` の写しをずらす / `kentry.asm` を数値直書きに戻すと `--check` が非 0 |
+| NOMAP | (`kernel.map` 無し) | **推測せず** 止まり (終了コード 2)、地図を 1 行も出さない |
 
 RED だったこと: どれも道具そのものが無かった。とくに NOMAP —
 `__bss_end` を決め打ちにすると「それらしい嘘の地図」が出る。今回の穴と
 まったく同じ失敗をもう一度書くことになるので、**止まる**のが正しい。
 
-否定側 (`--mutate`、3/3 RED):
+否定側 (`--mutate`。今の一覧は `tools/tests/test_memmap_gen.py` の `MUTATIONS`。中心の 4 本):
 
 | 変異 | 何を外すか | 落ちる場所 |
 |---|---|---|
@@ -69,23 +72,17 @@ RED だったこと: どれも道具そのものが無かった。とくに NOMA
 
 ### 2. `paging_memmap_selftest()` (動的 — 実装が設計どおりか)
 
-PDE 0 の PTE 1024 本を `memmap.h` から導いた期待値と比べ、食い違った区間を
+0 から `MEM_DMA_POOL_END` までの全ページを `memmap.h` から導いた期待値と比べ、食い違った区間を
 `paging_memmap_bad[]` に積んで `kselftest_fail` に数える。
 `tools/tests/memmap_boot_host.c` が `mm/paging.c` を**そのまま** `#include` し、
 `paging_init` → `paging_reclaim_conventional` → `shm_init` 相当 → KAPI 踏み台、
 というカーネルの起動順を再生してから呼ぶ。ゲストを起動せずに件数と区間が確定する。
 
-| 場面 | `__bss_end` | 撥ねた逆転 | 食い違い |
-|---|---|---|---|
-| 典型 (今のカーネルとほぼ同じ) | `0x16C560` | 0 | **0 本** |
-| 予算ちょうど (後方予約が空) | `0x175000` | 0 | **0 本** |
-| 予算を 1 ページ超過 | `0x176000` | 1 | 1 本 (`0x200000` 期待 RW / 実物 NP) |
-
-3 つめが肝心。**リンカの `ASSERT` が本来ここまで来させない形**だが、もし来たら
-SHM 後方ガードがカーネル帯域を突き抜けて SQLite 帯の先頭ページを not-present に
-する。自己診断がそれを見られるのは、期待値が **「帯の境界 `MEM_KERNEL_BAND_END`
-は固定番地」** を守っていて、育ちすぎた浮動番地に境界を越えさせないから。
-変異 `band-unbounded` はまさにそこを崩す。
+今の場面は `tools/tests/test_memmap_boot.py` の `CASES` (典型 = 常駐の終端 `0x280000`、
+SLACK が空 = `0x375000`。どちらも撥ねた逆転 0・食い違い 0 本)。予算超過の配置は
+リンカの `ASSERT` が来させない。自己診断が予算超過を見られるのは、期待値が
+**「帯の境界 `MEM_KERNEL_BAND_END` は固定番地」** を守っていて、育ちすぎた浮動番地に
+境界を越えさせないから。変異 `band-unbounded` はまさにそこを崩す。
 
 ### 決裁 D1/D2 の前は
 
@@ -95,14 +92,15 @@ SHM 後方ガードがカーネル帯域を突き抜けて SQLite 帯の先頭�
 「実際に使っているスタックページ」`0x1FF000` に乗り、`shm_init` の直後の
 `push` で三重フォルトするところまで来ていた。
 
-否定側 (`--mutate`、3/3 RED):
+否定側 (`--mutate`。今の一覧は `tools/tests/test_memmap_boot.py` の `MUTATIONS`。中心の 3 本):
 
 | 変異 | 何を壊すか | なぜ落ちるべきか |
 |---|---|---|
 | `no-reject` | 逆転を撥ねても数えない | 空振りが成功に見えていた元の姿 |
 | `band-unbounded` | 浮動番地の規則を帯の外へも広げる | 自己診断そのものが穴を隠す |
-| `resv-blind` | 空と逆転を区別せず空の予約域にも範囲指定を投げる | 正常な形を異常として数える |
 | `no-coalesce` | 食い違いを 1 本にまとめない | 「4KB のずれ」と「帯ごと違う」が同じ顔になる |
+
+ほかに固定のページ表の枠 (`fixed-*`) と SLACK (`slack-old-np`) の変異がある。
 
 `band-unbounded` が**この試験のいちばん大事な一本**。期待値の 1 行から
 `a <= MEM_KERNEL_BAND_END` を外すだけで、期待値が壊れた定数から作られるように
@@ -110,7 +108,7 @@ SHM 後方ガードがカーネル帯域を突き抜けて SQLite 帯の先頭�
 **期待値の作り方を間違えれば何も見えない**。
 
 否定側は **全部の場面で** 回す。1 場面だけだと、その場面では無害な変異を
-「試験が見逃した」と取り違える (`resv-blind` は「予算ちょうど」でしか差が出ない)。
+「試験が見逃した」と取り違える。
 
 ### 3. `shm_init()` の写しについて
 
@@ -125,26 +123,16 @@ SHM 後方ガードがカーネル帯域を突き抜けて SQLite 帯の先頭�
 
 ### D1 — 配置
 
-| | 前 | 後 |
-|---|---|---|
-| 共有メモリ | 256KB (16 ブロック) | **224KB (14 ブロック)** |
-| GUI 予約 | `MEM_SHM_BASE + 0x30000` の決め打ち | **常に末尾 4 ブロック** (`MEM_SHM_GUI_OFFSET`) |
-| カーネルスタック | `0x1FC000`-`0x1FFFFF` | **`0x2FC000`-`0x2FFFFF`** |
-| スタックガード | `0x1FB000` | **`0x2FB000`** |
-
 要点は「浮いた番地 (`KHEAP_BASE` 以降) と固定番地を同じ帯で隣り合わせにしない」。
-カーネル帯域は丸ごと浮動側に渡し、スタックは固定番地しか無い SQLite 帯域の
-末尾へ出した。予算 468KB に対して本体 433KB。
+カーネル帯域は丸ごと浮動側に渡し、スタックは帯の外の固定番地に置く。GUI 予約は
+常に SHM の末尾のブロック (`MEM_SHM_GUI_OFFSET`)。今の番地と大きさは `include/memmap.h`。
 
 ### D2 — 門をリンカに置く
 
 `KHEAP_BASE` は浮かせたまま。代わりに `build/os32.ld` の
 
-```
-ASSERT(__bss_end <= KERNEL_LOAD_ADDR + MEM_KERNEL_IMAGE_MAX, "...")
-```
-
-が上限をリンク時に保証する。**上限が保証されれば「予算いっぱいまで育った
+`ASSERT` (今は常駐の鎖の終端 `LAYOUT_MEM_SHM_RESV_START` が固定ページ表の手前の
+ガード以下、`MEM_KERNEL_IMAGE_MAX` の予算と同値) が上限をリンク時に保証する。**上限が保証されれば「予算いっぱいまで育った
 場合の配置」が定数式で書ける**ので、重なりの `STATIC_ASSERT` が
 `#ifdef` 無しで有効にできる。実値 (`KHEAP_BASE`) は定数式ではないので
 `STATIC_ASSERT` では扱えない — 条件が真でも
@@ -176,8 +164,8 @@ C のヘッダを読めない相手 (リンカスクリプト / NASM) と、SDK 
 
 | 場所 | 写している値 |
 |---|---|
-| `build/os32.ld` | `KERNEL_LOAD_ADDR` / `MEM_KSTACK_TOP` / `MEM_KERNEL_IMAGE_MAX` |
-| `arch/x86/kernel/kentry.asm` | 値ではなく `os32.ld` の絶対シンボルを `extern` で引く (数値直書きに戻したら検出) |
+| `build/os32.ld` ほか | 今の一覧は `tools/gen_memmap.py` の `MIRRORS` |
+| `arch/x86/kernel/kentry.asm` | 値ではなく生成ヘッダの `LAYOUT_MEM_KSTACK_TOP` を引く (数値直書きに戻したら検出) |
 | `sdk/include/os32/os32_gui_shared.h` | `GUI_SHM_OFFSET` = `MEM_SHM_GUI_OFFSET` |
 | `sdk/rust/os32api/src/gui/proto.rs` | 同上 (C ⇄ Rust は `make check-gui-proto` も見る) |
 
@@ -187,6 +175,6 @@ C のヘッダを読めない相手 (リンカスクリプト / NASM) と、SDK 
   NP21/W 上の kselftest 出力ではない。
 - 票の受入 G1 (`crash` が落ちる) / G4 (スタックを深く使う 16KB) / G7 (回帰) は
   実機でしか確かめられないので試験していない。`crash` の書き込み先が
-  `MEM_STACK_GUARD` (= `0x2FB000`) を指すことはコンパイルで担保されているだけ。
+  `MEM_STACK_GUARD` を指すことはコンパイルで担保されているだけ。
 - `make all` / `make check` 全体は回していない (`make kernel` と
   `make programs` と個別ターゲットのみ)。

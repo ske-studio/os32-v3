@@ -65,7 +65,7 @@ void display_provider_raster_reset(void) {}
 int display_provider_restore_fallback(Backend *b) { (void)b; return 0; }
 void gfx_reinit_surfaces(int n) { (void)n; }
 int pc98_route_safe(void) { return 0; }
-/* <display_fallback.h> の PC-98 の値 (第 5 段 B4)。この fixture の型は Backend。 */
+/* <platform_display_fallback.h> の PC-98 の値 (第 5 段 B4)。この fixture の型は Backend。 */
 #define DISPLAY_FALLBACK_BACKEND (&gfx_backend_pc98)
 void gfx_select_mode(Backend *b, int n) { (void)b; (void)n; }
 void gfx_bind_client(void) {}
@@ -94,7 +94,7 @@ def run_case(runner, mutation):
         name, path, anchor = mutation
         assert sources[path].count(anchor) == 1, name
         sources[path] = sources[path].replace(anchor, anchor.replace('exec_surface_policy_reeval();', '(void)0;', 1).replace('gfx_policy_reeval();', '(void)0;', 1), 1)
-    code = PRELUDE + '\n' + function((ROOT / 'arch/x86/exec_surface.h').read_text(), 'static inline void exec_surface_policy_reeval(') + '\n' + '\n'.join([
+    code = PRELUDE + '\n' + function((ROOT / 'exec/exec_surface.h').read_text(), 'static inline void exec_surface_policy_reeval(') + '\n' + '\n'.join([
         function(sources['gfx/gfx_core.c'], 'static int gfx_kapi_claim(void)'),
         function(sources['gfx/gfx_core.c'], 'void gfx_shutdown(void)'),
         function(sources['kernel/console/console.c'], 'void console_text_gdc_stop(void)'),

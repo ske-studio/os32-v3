@@ -14,7 +14,7 @@ h0/h1 CR57 の戻し
 COPY の後は index の選択だけで data の書込みが無く、選択の読取りも REC に値を残さないので、old による後からの観測ができない — ここを外すと組の誤りを止めずに別の組の PFB を書き、原因を辿れない。
 
 680508h
-N:205,207の保存読取り。係数定義E:10–14,41。HWDEV read_safe=1（O/kdebug/generated/recover_gf_tables.inc:739）
+N:205,207の保存読取り。係数定義E:10–14,41。HWDEV read_safe=1（O/kdebug/generated/recover_gf_tables.inc (targets_small())）
 680578h
 N:206,208の保存読取り。E:26–29,88はNV31:NV34限定なのでNV44Aへの根拠はN。read_safe=1（同:740）
 680580h

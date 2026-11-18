@@ -18,7 +18,7 @@ from kboot_run import ROOT, ROM, QMP, command, require, serial, validate, lan
 
 CHECK = dict(name='ppc-sh-output', tier=2, budget=900, needs=[],
              covers=['tools/ppc/ppc_sh_output.py', 'userland/ppc/outprobe.c'],
-             inputs=['build/ppc-kboot.mk', 'build/ppc-user.mk',
+             inputs=['build/targets/ppc-powermac.mk', 'build/ppc-user.mk',
                      'platform/powermac/kboot_console.c', 'platform/powermac/console_stream.c',
                      'fs/vfs_fd.c', 'tools/ppc/kboot_accept.py', 'tools/ppc/kboot_run.py',
                      'tools/ppc/sc_run.py', 'tools/ppc_lan_host.py',
@@ -261,7 +261,7 @@ def main():
     else:
         injected.write_text(text.replace(before, '    (void)serial;'))
     bins = 'KB_ROOT_BINS=build/out/ppc-user/hello.bin build/out/ppc-user/fault.bin build/out/ppc-user/outprobe.bin'
-    settings = ['KBOOT_SHELL=1', 'KBOOT_LINK=0', 'KB_FD1_STREAM=1', bins,
+    settings = ['KBOOT_SHELL=1', 'KBOOT_LINK=0', bins,
                 'KB_MUT_EXTRA_SRC='+src, 'KB_MUT_EXTRA_FILE='+str(injected)]
     if args.serial:
         settings += ['KB_MUT_THIRD_SRC='+cli, 'KB_MUT_THIRD_FILE='+str(cli_file)]

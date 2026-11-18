@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """B4: the display provider keeps the pre-separation backend selection table."""
 CHECK = dict(name='sep5-provider-host', tier=1, needs=[], budget=5,
-    covers=['platform/pc98/gfx_selector.c', 'platform/pc98/gfx_selector_lifecycle.inc', 'platform/pc98/display_fallback.h',
+    covers=['platform/pc98/gfx_selector.c', 'platform/pc98/gfx_selector_lifecycle.inc', 'platform/pc98/platform_display_fallback.h',
             'include/display_provider.h', 'include/gfx_hal.h', 'gfx/gfx_core.c',
             'gfx/gfx_core_framebuffer.inc', 'gfx/gfx_core_surface.inc', 'gfx/gfx_internal.h',
             'tools/tests/sep5_provider_client_host.c', 'tools/tests/sep5_provider_host.c',

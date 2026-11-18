@@ -23,16 +23,16 @@
 ## 1. 実物と確定設計の差（D1〜D7、7件）
 | ID / 棚卸し | 実物（file:line） | 確定設計との差・本案の処置 |
 |---|---|---|
-| D1 / I1 | `kernel/input_service.c:1,50` は状態なしの転送。`drivers/input/kbd.c:131,149,397,407,450` が raw・gui_mode・押下・cooked を所有 | AV §5 の共通状態は未実装。装置から状態を移す。全入力がシェルへ直接配送という現状認識は正確でない |
-| D2 / I1 | `platform/powermac/input_usb.c:30,51` は独自押下表と文字キュー、`input_boot.c:47,49,50,53` は中断指定無視・pressed=0・raw=-1・GUI無処理。現行の `platform/powermac/input_boot.c:47` にはcapture待機の期限も無い | AV in2 と AC-INPUT-1 の能力・不在区別に不足。共通状態から raw/mods/pressed を提供し、待機を共通化 |
-| D3 / I2 | `drivers/input/mouse.c:83,99,120,175` に poll 採取・座標・8255ボタン・カーソル | AV §5-4 の独立採取でない。採取と読み出しを分け、PointerOps は互換スナップショットへ |
-| D4 / I4 | `drivers/usb/hid_mouse.c:10` → `platform/powermac/usb_platform.c:166` はログだけ | USB §4-8 の mouse_ext と AV in2 に未結線。PPC の入力成功はマウス配送成功を意味しない |
-| D5 / I5 | `drivers/input/kbd.c:639,678,769,832` が注入・serial・park を選択 | AV の物理イベント入口だけでは置換不能。文字端末 bridge を共通層へ抽出 |
-| D6 / I1・I4 | `platform/powermac/usb_platform.c:151` は kind ごと4枠、`:160` は PPC 独自関数へ。`hid_kbd.c:29,69` は差分と repeat を別通知 | USB §4-8 の本体+USB kbd_merge 未結線。AV §5-4 の merge前・src別採取を共通の唯一の入口で実現 |
-| D7 / I4 | `usb_platform.c:153` の入力種別は鍵盤/マウスのみ、`hid_mouse.c:2` は boot 3B | AV §5-1/5-5 の4パッド・振動・一般HIDは未実装。既存HIDをXInputパッドとして扱わず後段へ |
-- I3: PPC 常駐CLIは `platform/powermac/terminal_input.c:26,50,81` → `cli_boot.c:22`。棚卸しの事実を引継ぎ、LAN_OPERATOR P3の担当とする。AVの欠陥として重複集計しない。
-- USB事実: OHCI/列挙/ハブ/boot HID は `drivers/usb/` に既に共通化。usage→PC-98 sc は `hid_kbd_map.c:8`、左右修飾の多対一は `hid_kbd.c:18,26` の押下数から差分化する。
-- PPCはUSB IRQ未接続（`usb_platform.c:129`）、100Hz tickと前景10ms pollingで進行。DMAのbus窓・キャッシュ・PCI/OF写像・TB時計はPPC固有。今回実機を再試験したという意味ではない。
+| D1 / I1 | `kernel/input_service.c` は状態なしの転送。`drivers/input/kbd.c` が raw・gui_mode・押下・cooked を所有 | AV §5 の共通状態は未実装。装置から状態を移す。全入力がシェルへ直接配送という現状認識は正確でない |
+| D2 / I1 | `platform/powermac/input_usb.c` は独自押下表と文字キュー、`input_boot.c` は中断指定無視・pressed=0・raw=-1・GUI無処理。現行の `platform/powermac/input_boot.c` にはcapture待機の期限も無い | AV in2 と AC-INPUT-1 の能力・不在区別に不足。共通状態から raw/mods/pressed を提供し、待機を共通化 |
+| D3 / I2 | `drivers/input/mouse.c` に poll 採取・座標・8255ボタン・カーソル | AV §5-4 の独立採取でない。採取と読み出しを分け、PointerOps は互換スナップショットへ |
+| D4 / I4 | `drivers/usb/hid_mouse.c` の `mouse_done()` → `platform/powermac/usb_platform.c` の `usbp_input_mouse()` はログだけ | USB §4-8 の mouse_ext と AV in2 に未結線。PPC の入力成功はマウス配送成功を意味しない |
+| D5 / I5 | `drivers/input/kbd.c` が注入・serial・park を選択 | AV の物理イベント入口だけでは置換不能。文字端末 bridge を共通層へ抽出 |
+| D6 / I1・I4 | `platform/powermac/usb_platform.c` は kind ごと4枠、`usbp_input_key()` は PPC 独自関数へ。`hid_kbd.c` は差分と repeat を別通知 | USB §4-8 の本体+USB kbd_merge 未結線。AV §5-4 の merge前・src別採取を共通の唯一の入口で実現 |
+| D7 / I4 | `usb_platform.c` の `usbp_input_src_alloc()` の入力種別は鍵盤/マウスのみ、`hid_mouse.c` は boot 3B | AV §5-1/5-5 の4パッド・振動・一般HIDは未実装。既存HIDをXInputパッドとして扱わず後段へ |
+- I3: PPC 常駐CLIは `platform/powermac/terminal_input.c` の `pm_terminal_feed()` → `cli_boot.c` の `pm_cli_boot()`。棚卸しの事実を引継ぎ、LAN_OPERATOR P3の担当とする。AVの欠陥として重複集計しない。
+- USB事実: OHCI/列挙/ハブ/boot HID は `drivers/usb/` に既に共通化。usage→PC-98 sc は `hid_kbd_map.c`、左右修飾の多対一は `hid_kbd.c` の押下数から差分化する。
+- PPCはUSB IRQ未接続（`usb_platform.c`）、100Hz tickと前景10ms pollingで進行。DMAのbus窓・キャッシュ・PCI/OF写像・TB時計はPPC固有。今回実機を再試験したという意味ではない。
 ## 2. 層と所有者
 
 `装置 → sc/down/src・移動/ボタン/時刻 → 共通入力状態 → InputOps / in2 / PointerOps → 利用者`
@@ -113,10 +113,10 @@ if (old != down) {
 ```
 
 - 未押下breakは無作用。同じキーを別srcがmakeすれば旧makeは届くが、breakは最後のsrcだけ。rawにはイベント時点の合成修飾を焼く。
-- Caps/Kanaは源の種類で処理する。本体の機械式はmakeで源別lock=1、breakで0（kbd.c:234-245）。USBは全USB鍵盤で共有するlock bitを各新makeで反転し、breakでは保持（現Capsはinput_usb.c:39）。Caps/Kana各1bit、repeatでは反転しない。
+- Caps/Kanaは源の種類で処理する。本体の機械式はmakeで源別lock=1、breakで0（kbd.c）。USBは全USB鍵盤で共有するlock bitを各新makeで反転し、breakでは保持（現Capsはinput_usb.c:39）。Caps/Kana各1bit、repeatでは反転しない。
 - 合成は各lock bitについて `lock_global = mechanical_lock | usb_lock`。USB源別のlockは持たず、USB AでON→USB Bの次makeでOFF。物理held/cntとは別に更新し、emit_legacy_keyは再反転しない。USB抜去は物理heldを解放するが共有usb_lockを反転/消去しない（初期化で0）。本体breakはmechanical_lockだけを0にする。
 - `in2_state.c`はsrc押下/ボタンとin2累積、`kbd_merge.c`は合成数、`in2_ring.c`は128件/seq/drop、`legacy_ring.c`は旧raw/cooked（各128×u16）。重複したpressed表は作らず合成数から照会。
-- rawはGUI時のみ、cookedはCUI時のみ。`legacy_mode.c`がgui_mode・切替時flush・STOP抑制を所有、`kernel/gui.c:119,147`の切替口は維持。kbd.cは装置/診断/legacy adapterのみへ縮小する。
+- rawはGUI時のみ、cookedはCUI時のみ。`legacy_mode.c`がgui_mode・切替時flush・STOP抑制を所有、`kernel/gui.c`の切替口は維持。kbd.cは装置/診断/legacy adapterのみへ縮小する。
 - V86の間もheldと修飾（mechanical_lock/usb_lockを含む）は追うが、旧raw/cookedリングとin2には積まない。物理状態追跡とOSへの公開を分け、入退場で溜めたイベントをflushする。CTRL+STOPのIRQ要求とV86退出要求の実行は既存arch経路に残す。
 
 ## 4. 実行文脈・時刻・マウス
@@ -141,7 +141,7 @@ if (old != down) {
 - I5は `kernel/input_legacy.c`へ。GUI注入は既存 `kbd_inject` の宛先/UTF-8 byte queueを維持し、serial/LANは文字端末として接続。sc=0のcookedを返し、raw/in2/物理pressedへ入れない。
 - 最初の抽出段1aは非待機の選択helperとtry内の協調yieldを移す。GUI時はIL_LOCAL_CHARなら-1でparkせず早期復帰。それ以外は注入だけを見て早期復帰し、空ならproviderのpark_pollを1回呼び、戻った場合は-1。serial/localへフォールスルーしない。peekもGUIのlocalは-1、それ以外は注入を非消費で見るだけでparkしない。
 - x86 CUIのtry/peekはserial（rshellかつcaptureでない）→local。IL_KEYはcooked key、IL_CHAR/IL_LOCAL_CHARは低位byteを返す。local-onlyはserialを見ない。local try_key/peek_keyはkbd.cのlocal cookedを包みbridgeへ再入しない。serial/注入/GUI照会/parkもprovider経由で、共通層から装置symbolを直接参照しない。
-- 待機版は別段で移す。getcharはlocal優先、getkey_waitはserialを読まない（kbd.c:705,789）。GUI waitはproviderのpark_kbdを使い、park_poll/park_kbdとも通常returnはpark不成立時だけ。成立時は戻らず、try再開値はbyteまたは-1、wait再開値はbyte。中断・再開を口別fixtureで固定し、一律tryループへ置換しない。
+- 待機版は別段で移す。getcharはlocal優先、getkey_waitはserialを読まない（kbd.c）。GUI waitはproviderのpark_kbdを使い、park_poll/park_kbdとも通常returnはpark不成立時だけ。成立時は戻らず、try再開値はbyteまたは-1、wait再開値はbyte。中断・再開を口別fixtureで固定し、一律tryループへ置換しない。
 - PPCは像別に登録する。PLN1像は terminal=NULL とし、local を「LAN (decoder と完成key先読み 1 個、platform 側) が先、空なら USB」の 1 つの口にする (2026-11-15、PowerPC P3 ③b-2。共通の wait(IL_KEY) は local だけを読むため。交互選択はやめた。PPC_P3_DESIGN 末尾)。link-SH像はmailboxのコマンドでありterminal/injectはNULL、local try_key/peek_keyとshell行頭の調停を使う。LAN交互選択をlink-SHへ持ち込まない。
 - peek/has_keyは予算付きの有限採取（byte→decoder→完成key先読み）を許す。禁止は完成keyの消費と交互選択順の更新。選択順は実際のtryで消費した時だけ更新する。現input_boot.c:31-37のpoll/take/選択更新一体のpeekをそのまま移さず分離し、PLN1のwhile(!kbd_has_key()) sys_yield()も進行させる。
 - capture期限は待機開始時点から数える。FREEZE中は閉じたまま、期限後は文字待ちがCR、キー待ちがESC。con_sink通知の例外を設けない。振る舞いの注: capture中の1コマンドが何度も待つ場合、それぞれが30秒まで待てる（x86現行と同じ）。コマンド全体の上限はhost側の待ちが担う。
@@ -159,7 +159,7 @@ if (old != down) {
 | 基本BSS | held 2,048 + cnt 128 + raw/cooked 512 + 内部ring 2,048/seq 256 + 源/座標/lock管理約2KiB ≈7KiB | 動的巨大キューなし。既存PPC/PC98キュー削除後の純増をmapで測る |
 | 焦点/独占/pad状態 | AV input/hal計約1,000行の内数、4slot含め約1KiB追加目安 | 常駐。初版はMINIMALでも同じ入力契約、USB本体は省く |
 | USB | 確定設計§9: 段1 text約24KiB/BSS約4KiB、後段約42KiB | x86 usb.modは64KiB想定、常駐殻約3KiB。MINIMAL/起動FDにusb.modを入れない。PPC現行常駐組込みは維持 |
-| kdebug | 入力製品/host fixtureを入れず増分0を目標 | `docs/08_build.md:195` のimage/mem各262,144B、load_span524,288Bを維持 |
+| kdebug | 入力製品/host fixtureを入れず増分0を目標 | `docs/08_build.md` のimage/mem各262,144B、load_span524,288Bを維持 |
 
 - 内部ring 2KiBとseq 256B等は上段内数で二重加算しない。USBのkbd_merge/mouse_ext約3KiB枠も共通化分との二重計上を避ける。
 - FDは圧縮後サイズとMINIMAL一式で判定し、空き容量を推測しない。実装の各統合段で前後map/size/FD作成結果を記録、収まらなければ構成判断へ戻す。
@@ -170,7 +170,7 @@ if (old != down) {
 - 共通部品を追加/変更する各段（特に1a・3a〜3c）はx86/PPC両方の像のリンクを必須受入とし、PPCの未定義symbolを残さない。必要なbuild登録段Bをその段の受入前に完了する。
 - `T_x` は `tools/tests/input_<x>_host.c`（新、80〜140行）、既存契約試験があればそれを変更。移動も追加+削除で数え、表の小移動は一回60〜100行を上限に反復する。
 
-- 既存の基準はmainのARCH_COMPAT T1b（tools/tests/test_arch_compat.py:107-121）。AC-INPUT-1のPPC4件はXFAIL、AV_HALのIN2_MAX_DEV=16もmain反映済み。文書0/段0は実装対象から削除。
+- 既存の基準はmainのARCH_COMPAT T1b（tools/tests/test_arch_compat.py）。AC-INPUT-1のPPC4件はXFAIL、AV_HALのIN2_MAX_DEV=16もmain反映済み。文書0/段0は実装対象から削除。
 
 | 段 | ファイル（種類・概算） | 依存・出口・並列 |
 |---|---|---|
@@ -188,7 +188,7 @@ if (old != down) {
 | 4b | PPC input_usb.c（変160）、input_boot.c（変100）、tools/tests/test_arch_compat.py（変100） | 4a/3b/4c後、PowerPC P3③bがあればその後（input_boot.cは4c→P3③b→4bの直列）。共通状態/出口へ。③bのlocalを共通cooked ringに結び替え、③bで足したUSBの非消費peekを消す。U3までは旧keymap policy維持。raw/pressed/modsのbit 2/4/8をPASS化しPPC期待14→0、XFAIL表示/変異期待を更新、CHECK pins=[input-hal/4b]を外す |
 | 4b-map | platform/powermac/input_keymap.c（削除約70）、tools/tests/ppc_input_usb_host.c（変100）、tools/checks/ver-ppc-input-usb.py（変80） | **追補 INPUT_BIND_DESIGN §6 の段の後**。4b後、build登録削除は直前B段。旧pm_input_keymap直呼びと27期待をU3準拠の共通口試験へ変更、CHECK pins=[input-hal/4b-map,U3]とbasisを更新 |
 | 4c-pre | kernel/input_wait.c（新130）、T_wait（新130） | 1b後、待機契約を両archで受入、4cへ結線 |
-| 4c | kernel/input_wait.c（変100）、input_boot.c（変60）、tools/tests/test_arch_compat.py（変180） | **1b/4c-pre後**（4bに依らない）。PPCは既存input_boot.cの先読み付きtry_key/peek（LANとUSBの交互選択）をproviderのlocalとして登録し（terminalはNULL）、InputOpsの読み口（getkey_wait・getchar・peekkey・has_key）を同じ経路で共通の待ちへ委譲する。input_usb.cは変えず、独自状態の除去はP3③b。共通input_wait.cへ期限規則を先に置く。完了条件: PPC providerで待機開始起点（x86 kbd.c:754,792と同じ）・各待機30秒・期限後の文字CR/キーESC・FREEZE中の閉鎖・中断の要求を受けたら抜ける（要求はhostの偽物、USBのSTOPの実物はU3/4b-map）を試験で満たす。bit1をPASS化しPPC期待15→14、XFAILの列挙からbit1を外し、ppc-cancel-xpassを新しい中断経路を壊すRED（観測15）に替え、raw/pressed/modifiersのxpassの観測値を12/10/6に直す。CHECK pins=[input-hal/4b]（残るXFAIL 2/4/8） |
+| 4c | kernel/input_wait.c（変100）、input_boot.c（変60）、tools/tests/test_arch_compat.py（変180） | **1b/4c-pre後**（4bに依らない）。PPCは既存input_boot.cの先読み付きtry_key/peek（LANとUSBの交互選択）をproviderのlocalとして登録し（terminalはNULL）、InputOpsの読み口（getkey_wait・getchar・peekkey・has_key）を同じ経路で共通の待ちへ委譲する。input_usb.cは変えず、独自状態の除去はP3③b。共通input_wait.cへ期限規則を先に置く。完了条件: PPC providerで待機開始起点（x86 kbd.cと同じ）・各待機30秒・期限後の文字CR/キーESC・FREEZE中の閉鎖・中断の要求を受けたら抜ける（要求はhostの偽物、USBのSTOPの実物はU3/4b-map）を試験で満たす。bit1をPASS化しPPC期待15→14、XFAILの列挙からbit1を外し、ppc-cancel-xpassを新しい中断経路を壊すRED（観測15）に替え、raw/pressed/modifiersのxpassの観測値を12/10/6に直す。CHECK pins=[input-hal/4b]（残るXFAIL 2/4/8） |
 | 4d[n] | input_wait.c（変80）、kbd.c（変100）、T_wait（変100） | 1b/4c後、x86 wait/parkを4cで先に置いた同じ共通期限規則へ口ごとに2〜3段で載せる。4bとファイルが重ならず並列可 |
 | 5a | input/hal/mouse_ext.c（新100）、pointer_state.c（新140）、T_pointer（新130） | 2a後、鍵盤移動とは並列可 |
 | 5b | drivers/input/mouse_hal.c（新130）、mouse_bus.c（変30）、T_pointer（変100） | IRQ採取を一度に限定 |

@@ -4,7 +4,7 @@
 
 #include "kernel/ime/ime_render.h"
 #include "pc98.h"
-#include "tvram.h"
+#include "text_screen.h"
 #include "utf8.h"
 
 /* 空関数 */

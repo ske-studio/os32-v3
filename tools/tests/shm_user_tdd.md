@@ -1,6 +1,6 @@
 # T2e e10a SHM/boot USER 試験記録
 
-正典: TASK_T2D_T2H.md e10a (アーカイブ: `docs/archive/v3/TASK_T2D_T2H.md`)。
+契約: `docs/design/mm/paging_map.md`・`docs/design/mm/shm.md` (出所は票 TASK_T2D_T2H e10a)。
 
 ## 対象と境界
 
@@ -34,7 +34,7 @@ v86_mem.c を ILP32 で実行する。実 paging_addrspace_create で二つの P
 `NP21W_DIR=/dev/null`。全体検査を直接実行。
 既存memmapの13変異の意図と、予算超過/空予約/固定PT/IFの対照は維持する。
 `test_memory_boot.py` は19件。`test_owner_reclaim.py` のpaging stubを専用口へ追随。
-実行ログは `/home/hight/os32-tmp/e10a-*.log`、全体結果は正典のe10a節へ追記する。
+実行ログは `/home/hight/os32-tmp/e10a-*.log`、全体結果は票 TASK_T2D_T2H の e10a 節へ記録した。
 ゲスト、native runner、配備、ini、NHD、実機、commit/push は未実施。
 
 初回全体検査rc=2: surface bundleのexecコード抽出が撤去したSHMコメントに依存。

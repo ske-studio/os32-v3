@@ -1,6 +1,6 @@
 /* Early boot and fault output; independent of the normal console. */
 #include "platform_emergency.h"
-#include "tvram.h"
+#include "text_screen.h"
 #include "tvram_private.h"
 #include "memmap.h"
 

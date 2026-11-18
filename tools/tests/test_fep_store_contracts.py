@@ -12,7 +12,7 @@ CHECK = dict(name='fep-store-contracts', tier=1, needs=[], budget=4.4,
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
             'build/config.mk', 'kernel/ime/ime_dict_info.c',
             'lib/sqlite3/os32_sqlite_vfs.h'],
-    basis=['DICT_META_DESIGN §2', 'DICT_META_DESIGN §3', 'DICT_META_DESIGN §4', 'DICT_META_DESIGN §5', 'DICT_META_DESIGN §6', 'DICT_META_DESIGN §1'],
+    basis=['docs/design/kernel/ime/ime_store.md 型と不変条件', 'docs/design/kernel/ime/ime_store.md 口の持ち主'],
 )
 
 import argparse

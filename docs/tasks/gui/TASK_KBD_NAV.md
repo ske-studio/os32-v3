@@ -8,12 +8,12 @@
 
 ## 0. 事実 (2026-09-25 の調査、ファイル:行)
 
-- キーは IRQ1 → raw リング → gshell `capture_keyboard` (`userland/gshell/src/input.rs`)。1 件 = `scan | down<<8 | mods<<9`。mods の並びは `drivers/input/kbd.h:131-135` (SHIFT 01 / CAPS 02 / **KANA 04** / GRPH 08 / CTRL 10)。修飾キー自身 (0x70-0x74) は Key として配らない (input.rs:349)。
+- キーは IRQ1 → raw リング → gshell `capture_keyboard` (`userland/gshell/src/input.rs`)。1 件 = `scan | down<<8 | mods<<9`。mods の並びは `drivers/input/kbd.h` (SHIFT 01 / CAPS 02 / **KANA 04** / GRPH 08 / CTRL 10)。修飾キー自身 (0x70-0x74) は Key として配らない (input.rs:349)。
 - 振り分けの順: X4 の退避判定 (input.rs:317) → 修飾 → CTRL+STOP → SHIFT+SPACE (FEP) → modal (input.rs:377) → startmenu → (窓なし) standalone → FEP → 最前面の窓。
 - マウスは `capture_mouse` がキーボードを読み切った**後に 1 回**、`mouse_poll` の現在値と `prev_buttons` の差分でエッジを作る (input.rs:454-)。X4 では WM の領分のエッジを保留して `prev_buttons` を進めない (input.rs:551)。全画面 GFX 中はマウスを誰にも配らない (input.rs:466)。
-- **カナ**: `drivers/input/kbd.c:299` は **make でだけ状態を反転**し break を無視する (CAPS も同じ)。OS32 のどこもカナの状態を使っていない。修飾の現在値は KAPI `kbd_get_modifiers` で読める。
-- FEP の確定文字は**確定した時点の**フォーカス窓へ配る (fep.rs:454)。WM のフォーカス変更 (`wm::set_focus`、wm.rs:1032) は FEP の未確定文字を確定も取消もしない — **マウスで窓を切り替えたときにも同じ穴がある** (既存)。
-- `libos32ui` (microUI、`mui_pump_input_ch`) のアプリは WM のイベントではなく `mouse_poll` を直接読む (`userland/lib/ui/libos32ui_core.c:192`)。今の利用者は `apps/ui_demo` だけ。
+- **カナ**: `drivers/input/kbd.c` は **make でだけ状態を反転**し break を無視する (CAPS も同じ)。OS32 のどこもカナの状態を使っていない。修飾の現在値は KAPI `kbd_get_modifiers` で読める。
+- FEP の確定文字は**確定した時点の**フォーカス窓へ配る (fep.rs (flush_text()))。WM のフォーカス変更 (`wm::set_focus`、wm.rs) は FEP の未確定文字を確定も取消もしない — **マウスで窓を切り替えたときにも同じ穴がある** (既存)。
+- `libos32ui` (microUI、`mui_pump_input_ch`) のアプリは WM のイベントではなく `mouse_poll` を直接読む (`userland/lib/ui/libos32ui_core.c`)。今の利用者は `apps/ui_demo` だけ。
 
 ## 1. 方針
 
@@ -129,7 +129,7 @@ WM のショートカットとマウスキーは状態機械を動かすので *
 
 ### 1-5. カナの状態と、モードが切れるとき — Codex 指摘 P2-5
 
-- モードは **raw に焼き込まれた修飾の KANA ビット**で決める (`drivers/input/kbd.c:283` — 修飾キー自身の raw は更新後の値を載せる)。
+- モードは **raw に焼き込まれた修飾の KANA ビット**で決める (`drivers/input/kbd.c` — 修飾キー自身の raw は更新後の値を載せる)。
   カナの raw を修飾として捨てる前に、その raw の KANA ビットでモードを決め直す。**現在値 (`kbd_get_modifiers()`) は使わない** —
   「カナ ON → 5 → カナ OFF」が溜まっていると最初から OFF を読んでしまう (Codex 2 回目 A2)。
   現在値を読むのは gshell の起動時の初期化だけ (カナをロックしたまま GUI に入った場合)。

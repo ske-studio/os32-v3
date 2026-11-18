@@ -1,5 +1,6 @@
 /* backend_pc98_osri.c — gfx_osri_show の pc98 GDC 640x400 planar4 の hook (KAPI v80)。
  * backend_pc98.c の表の .osri_show から呼ばれる。正典 docs/decisions/gui/OSRI_VIEWER_DESIGN.md §3。 */
+#include "pc98.h"
 #include "../../../gfx/gfx_internal.h"
 #include "gfx_hal.h"
 #include "os32_kapi_shared.h"

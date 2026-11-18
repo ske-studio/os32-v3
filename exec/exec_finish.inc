@@ -31,7 +31,7 @@ static void exec_teardown_app(AppSlot *a)
     u32 before = exec_as_leftover_pages;
     /* 共有ライブラリの .data 複製ページを返す (PD 破棄の前, K3) */
     if (lease_revoke_all(a->as))
-        kprintf(ATTR_RED, "lease revoke failed during teardown\n");
+        console_printf(ATTR_RED, "lease revoke failed during teardown\n");
     if (exec_gfx_owner_release(a->as))
         paging_addrspace_poison(a->as);
     /* Revoke foreign leases even when private pages are quarantined. */
@@ -219,7 +219,7 @@ static void exec_notify_owned(int id, int kind)
      * を見て、1 に戻っていれば復帰の描き直しに入る。 */
     int restore_rc = exec_gfx_return_emergency((u32)id, kind);
     if (restore_rc)
-        kprintf(KLOG_ATTR, "[gfx] emergency owner=%d restore rc=%d\n", id, restore_rc);
+        console_printf(KLOG_ATTR, "[gfx] emergency owner=%d restore rc=%d\n", id, restore_rc);
     appslot_gfx_owner_exit(id);
 }
 

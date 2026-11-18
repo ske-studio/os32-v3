@@ -49,9 +49,10 @@ def main():
         if '--mutate' in sys.argv:
             rule = root / 'build/ppc-user.mk'
             source = rule.read_text()
+            # The app rule and the fp_probe rule share this recipe line; unguard the app rule (the first).
             old = 'python3 sdk/link_guard.py --target $(SDK_TARGET) $(LD)'
-            assert source.count(old) == 1
-            rule.write_text(source.replace(old, '$(LD)'))
+            assert source.count(old) == 2 and source.index(old) < source.index('fp_probe.elf:')
+            rule.write_text(source.replace(old, '$(LD)', 1))
             shutil.rmtree(root / 'build/out/ppc-user')
             result, out = build(root)
             assert result.returncode != 0 and 'missing validated link inputs' in result.stderr

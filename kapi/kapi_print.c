@@ -42,7 +42,7 @@ int kapi_print_call(struct kapi_arg_source *src)
         }
         count++;
     }
-    kvprintf((u8)fixed.value[0], format, args);
+    console_vprintf((u8)fixed.value[0], format, args);
     ok = 1;
 out:
     for (u32 i = 0; i < KAPI_PRINT_ARG_LIMIT; i++)

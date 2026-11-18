@@ -315,7 +315,7 @@ KAPI v42 / `GUI_PROTO_VERSION=1` / AppVTable 既存 layout を維持する。
 
 `modal_result` は **event 到着後だけ呼ぶ API** とする。未完成状態をポーリングする口は公開しない。
 この呼出制約はエラー名の有無とは独立であり、現行の `OS32_ERR_AGAIN` は
-[`os32_kapi_shared.h:647`](../../../../sdk/include/os32/os32_kapi_shared.h) に定義されている。
+[`os32_kapi_shared.h`](../../../../sdk/include/os32/os32_kapi_shared.h) に定義されている。
 
 互換条件:
 

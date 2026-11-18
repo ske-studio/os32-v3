@@ -1,6 +1,6 @@
 #include "in2_int.h"
 #include "io.h"
-#include "../../drivers/input/kbd.h"
+#include "kbd_contract.h"
 /* The producer is IRQ1; flush/reset callers hold the same exclusion. */
 static volatile u16 kbd_buf[KBD_BUF_SIZE];
 static volatile int kbd_head, kbd_tail, kbd_count;

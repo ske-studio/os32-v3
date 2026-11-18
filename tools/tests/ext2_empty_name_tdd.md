@@ -1,6 +1,6 @@
 # ext2_empty_name TDD 記録 — 長さ 0 の名前を ext2 に載せない
 
-対象票: `docs/archive/kernel_v21/TASK_EXT2_EMPTY_NAME.md`
+契約: `docs/design/fs/ext2/ext2_dir.md` の「名前の検査 — 長さ 0 の名前を媒体に載せない」・`docs/design/fs/vfs.md` (マウント点そのものへの操作)。出所は票 TASK_EXT2_EMPTY_NAME
 試験: `tools/tests/ext2_empty_name_host.c` (実物の `fs/ext2/ext2_*.c` + `fs/vfs.c` + `fs/vfs_fd.c` + `userland/lib/rt/pkg.c` を `#include`)
 実行: `python3 -B tools/tests/test_ext2_empty_name.py [--target] [--mutants] [case]` / `make check-ext2-empty-name-host`
 

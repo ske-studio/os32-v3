@@ -60,7 +60,7 @@ NP21/W の kselftest はこれで **「1 万回連続読みで逆行しない」
 ### RED 1 — 実装が無い
 
 ```
-tools/tests/time_math_host.c:19:10: fatal error: ../../kernel/time/time_math.c: No such file or directory
+tools/tests/time_math_host.c: fatal error: ../../kernel/time/time_math.c: No such file or directory
 ```
 
 ### RED 2 — 直す前の姿 (変異 1)

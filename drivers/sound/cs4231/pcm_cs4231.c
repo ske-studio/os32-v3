@@ -12,6 +12,7 @@
 /*   - Index と Data の組は 1 つの irq_save の中 (往復 1 B9)。               */
 /* ======================================================================== */
 
+#include "kernel_tick.h"   /* tick_count */
 #include "pcm_cs4231.h"
 #include "pcm_refill.h"
 #include "../../dma/dma8237.h"
@@ -28,7 +29,6 @@ extern u32 ktime_ticks(void);
 #define dma_alloc pcm_module_dma_alloc
 #define dma_free pcm_module_dma_free
 #else
-#include "idt.h"        /* tick_count */
 #endif
 #include "io.h"
 #include "kprintf.h"

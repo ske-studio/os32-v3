@@ -407,6 +407,7 @@ int irq_register(unsigned int irq,irq_handler_fn fn,void *arg,unsigned int flags
 int irq_unregister(unsigned int irq,irq_handler_fn fn,void *arg)
 { CHECK(!irq_depth && irq==3 && fn==handler && !arg && registered && !freed && resets>last_start_reset && mask==1); registered=0; unregistered++; return 0; }
 int kutoa_dec(u32 value,char *buf,int cap) { return snprintf(buf,cap,"%u",value); }
+#include "kernel_tick.h"   /* 本物の宣言を先に読んでおく (下の差し替えの後では読ませない) */
 #define tick_count fake_ticks()
 #define E82557_HOST_TEST
 #include "../../drivers/net/e82557/e82557.c"

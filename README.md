@@ -163,7 +163,7 @@ os32-v3/
 ├── platform/   — 機種依存実装 (pc98/ に PIC・装置の配線・機種固有 I/O)
 ├── drivers/    — 装置の種類ごとのドライバ (base/ata/block/char/dma/input/pci/net/sound/video)。部品の窓口・本体と表示バックエンドは装置の隣
 ├── gfx/        — 描画 HAL の共通層 (装置別バックエンドは drivers/video/ の下)
-├── fs/         — VFS・fd・パイプの共通層と ext2/fat/isofs/hostdrv/serialfs (FatFs は fat/fatfs/)
+├── fs/         — VFS・fd・パイプの共通層と ext2/fat/isofs/serialfs (FatFs は fat/fatfs/)
 ├── exec/       — プログラムローダー (OS32X)
 ├── kapi/       — KernelAPIラッパー (自動生成)
 ├── kdebug/     — デバッグ・実機試験の部品 (KDEBUG=1 で読み込む)
@@ -194,7 +194,7 @@ os32-v3/
 ```bash
 make all           # カーネル + 全プログラム + SDK + D88イメージ + ISO (apps/game が無くても組める)
 make external      # apps/ + game/ — H-7 の再開決定後だけ (下記参照)
-make check-fast    # ホスト試験と文書・生成物の検査 (変異なし)
+make check-fast    # ホスト試験と文書・生成物の検査 (変異なし。取り込みの関門は GitHub の CI = 変異込み)
 make clean         # クリーン
 make deploy        # HostDrv (C:\os32) へのデプロイ (再起動不要)
 make deploy-kernel # NHDイメージへのデプロイ (要NP21/W再起動)

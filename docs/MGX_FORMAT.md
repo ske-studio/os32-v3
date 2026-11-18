@@ -163,7 +163,7 @@ ZLIB の場合、ペイロードは `zlib.compress()` の出力そのままで�
 - 末尾 4 バイトの **Adler-32** がそのまま完全性検査に使える (独自 CRC は持たない)
 
 ゲスト側は zlib の `inflate()` にストリームを渡す。ラッパ `[CMF][FLG]` の検査と
-末尾の Adler-32 照合も `inflate()` が行う (`userland/lib/mgx/mgx_decode.c:151`)。
+末尾の Adler-32 照合も `inflate()` が行う (`userland/lib/mgx/mgx_decode.c`)。
 
 圧縮後サイズが生データ以上になった場合、エンコーダは codec を STORED に落とす。
 

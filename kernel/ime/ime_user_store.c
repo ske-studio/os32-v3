@@ -4,7 +4,7 @@
 #include "vfs.h"
 #include "kstring.h"
 #include "kprintf.h"
-#include "tvram.h"
+#include "text_screen.h"
 #ifdef OS32_FEP_MODULE
 #include "fep_imports.h"
 #endif

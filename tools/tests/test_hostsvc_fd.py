@@ -7,7 +7,7 @@ CHECK = dict(name='hostsvc-fd', tier=1, needs=[], budget=4.1, covers=[
     'net/host_mailbox.h', 'exec/exec.h',
     'tools/tests/hostsvc_fd_host.c', 'tools/tests/host32.py',
     'tools/tests/kernel_includes.py', 'build/config.mk'],
-    basis=['NET_HOSTSVC_DESIGN §4', 'NET_HOSTSVC_DESIGN §11'],
+    basis=['docs/design/drivers/block/netcd.md 起動の手順と設定'],
 )
 
 import argparse

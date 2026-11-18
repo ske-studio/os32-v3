@@ -1,7 +1,8 @@
 # TASK_EDIT_GUI — 本文と桁・折り返し (ホスト試験の記録)
 
-- 票: `docs/archive/gui_v14/TASK_EDIT_GUI.md`
-  — 受入 **E8** (本文の操作をゲスト抜きで確かめる) と **E10**
+- 契約の正典: `docs/design/userland/rust/edit_gui/src/doc.md` (本文) と
+  `docs/design/userland/rust/libos32gui/src/textcore.md` (桁・折り返し・
+  `WK_TEXTBOX` の下請け)。出所は票 TASK_EDIT_GUI の受入 **E8** (本文の操作をゲスト抜きで確かめる) と **E10**
   (既存の `WK_TEXTBOX` の見え方と振る舞いが変わっていない)
 - 実行: `python3 -B tools/tests/test_edit_doc.py [--mutate]`
   (`make check-edit-doc-host` が `--mutate` 付きで回す)
@@ -20,7 +21,7 @@
 
 ## 1. 何を確かめる試験か
 
-票 §2 の切り分けはこうなっている:
+本文と部品の切り分け (`docs/design/userland/rust/edit_gui/src/doc.md` の「切り分け」):
 
 - **本文はアプリ (`doc::Doc`) が持つ。** 部品 (`WK_TEXTAREA`) は持たない。
 - アプリが折り返して、**いま見えている行だけ**を部品へ写す。
@@ -86,9 +87,9 @@ GREEN のまま通った。行の短い write (`WRITE_MODE=1`、`size > 1` の�
 
 ## 4. この試験が見ていないこと ([V4])
 
-- **描画**。`draw_textarea` は 1 度も実行していない。桁の数え方が
-  `draw.rs::decode_glyph` と一致していることは**目で突き合わせただけ**で、
-  試験では固定していない (`textcore::cols_of` のコメントに規則を書いてある)。
+- **描画**。`draw_textarea` は 1 度も実行していない。桁の数え方は今は
+  `draw.rs` の `decode_glyph` も `textcore::cols_at` を呼ぶ同じ実体だが、
+  描いた幅そのものは試験で固定していない (規則は設計書の「桁の規則」)。
 - **`textarea_take_input` の配線**。確定文字列が WM →
   `widget::on_text` → 溜め → `App::on_text_changed` → `doc.insert` と流れることは
   ゲストでしか確かめられない。

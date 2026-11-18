@@ -1,8 +1,9 @@
 # N1 — Host Services 基盤 (ワイヤ v2 / `net/link.c` 非ブロッキング / KAPI v51 / Agent v2) の TDD 記録
 
-票: `docs/archive/network/TASK_N1.md`、
-契約の正典は `docs/archive/network/TASK_N0.md` 第 5 版
-(§1a ABI / §1b ワイヤ v2 / §2 駆動・排他・状態機械 / §3 TDD の全ケース)。
+契約: ワイヤ v2・HELLO・駆動・状態機械は [`docs/design/net/link_wire.md`](../../docs/design/net/link_wire.md)、
+KAPI の口は [`docs/design/net/link_host_api.md`](../../docs/design/net/link_host_api.md)、
+Agent のセッション採番と rid 台帳は [`docs/design/tools/host_agent.md`](../../docs/design/tools/host_agent.md)
+(出所の票 TASK_N1・TASK_N0 第 5 版。下の「N0 §N」「往復 N の RN / BN」はその票の節と指摘の番号)。
 
 試験は 2 本。**どちらも実物のソースを動かす**:
 
@@ -77,7 +78,7 @@
 | `decl_len_parsing` | HOST_SERVICES_PLAN §2 | `ECHO` / `CLIP PUT` / `PRINT DATA` / `PUT` の宣言長、GET には付かない |
 | `owner_exit_reclaims_handles` | §1a owner 回収 | `host_owner_exit(4)` が owner 4 のハンドルだけ回収し RELEASE を出す |
 | `handles_are_owner_private` | §1a | 他人のハンドルは status / close ともに INVAL |
-| `open_error_codes` | §1a `host_open` | 未確立 STALE / 0 長・1400B 超 INVAL / 3 本目 FULL / NIC 無し NOSYS / RELEASE 未 ACK の枠は AGAIN |
+| `open_error_codes` | §1a `host_open` | 未確立 HOSTDOWN / 0 長・1400B 超 INVAL / 9 本目 FULL (`LINK_HANDLES` = 8) / NIC 停止 HOSTDOWN / RELEASE 未 ACK の枠は AGAIN |
 | `last_data_and_eof_loss` | §3 その他 | 最終 DATA 消失。**EOF だけでは完了にしない** (完了は `recv_bytes == length`) |
 | `data_gap_is_dropped_and_reacked` | §1b DATA | 先行 DATA を捨てて累積 ACK を止め、埋まると進む (Go-Back-N) |
 | `n2_no_drop_roundtrip_has_zero_retransmits` | N1-fix N2 (a) / F4 | 無ドロップ往復で `link_retransmits == 0` (未送信フレームに RTO を課さない) |
@@ -112,7 +113,8 @@ SUMMARY 21/25 PASS
   **同じ RTC 秒・同じ初期 tick で再起動した OS32 が旧 sess を貰う** (= B3 の反例そのもの)。
   N0 §1b は「`seq` = OS32 の nonce (**HELLO ごとに +1**)」なので、SYN の再送は必ず
   別の nonce になる。候補の使い回しをやめ、**SYN のたびに候補を作り直す**ことにした
-  (`tools/host_agent.py` の `_on_syn`)。採番するのは新セッションの SYN だけで、
+  (`tools/host_agent.py` の `_on_syn`。今のコードは、未確認の候補と同じ MAC・同じ `req_sess` の SYN には
+  候補の sess を渡し、確認済みの候補は使い回さない)。採番するのは新セッションの SYN だけで、
   セッション内の再同期 (`req_sess` == 現行 sess) は同じ sess のまま = 再送で sess を減らさない。
 - **R2 / R3 / window は試験側の思い違い**。R2 は「再起動側が新 sess で成立する」ことを
   見るべきなのに `a.sess != old` を主張していた (Agent は CONFIRM が来るまで切り替えない
@@ -154,6 +156,7 @@ GREEN: `SUMMARY 29/29 PASS` + `TARGET i386-elf GNU89 -Werror COMPILE PASS`。
    3 way の表は SYN-ACK に 6B (`agent` + `req_sess` + `req_epoch`) を要求している。
    後者 (往復 4 の反映) を採り、**SYN 0 / SYN-ACK 6 / CONFIRM 0 / ESTABLISHED 2** とした
    (ESTABLISHED の 2B は `agent`。OS32 が世代を確定できるようにする)。
+   今は拡張の長さ (SYN-ACK 12 / ESTABLISHED 8、ホストの世代と ALIVE の番号を足した形) も受ける。
    両端の検査表: `net/link.c` の `link_paylen_ok`、`tools/host_agent.py` の `HELLO_PAYLEN`。
 2. **制御 RESPONSE の符号**: `PROCESSING = 1` / `TOMBSTONE = 2` / `NO_SLOT = 3`
    (`net/link.h` の `LINK_CTL_*`、`host_agent.py` の `CTL_*`)。N0 は名前だけを決めていた。
@@ -171,11 +174,11 @@ GREEN: `SUMMARY 29/29 PASS` + `TARGET i386-elf GNU89 -Werror COMPILE PASS`。
    FREE のハンドルが取れた時点で枠は必ず空いている = `AGAIN` は
    「専用スロットの RELEASE が未 ACK」のときだけ返る。
 7. **rid / epoch の枯渇**: `link_next_rid` が `0xFFFFFFFF` に達した `host_open` は
-   再同期 (新セッション) を起こして `STALE` を返す。`epoch` が 65535 のときの再同期は
+   再同期 (新セッション) を起こして `HOSTDOWN` を返す (今のコード)。`epoch` が 65535 のときの再同期は
    `sess = 0` の SYN (新セッション)。
 8. **Agent の HOLE 生成に上限**: `high_water` が跳ねたとき作る HOLE は最大 64 件
    (`HOLE_FILL_MAX`)。壊れたフレームが巨大な rid を名乗っても台帳が膨らまない。
-   OS32 のハンドルは 2 本なので正常系では 1〜2 件しか出ない。
+   HOLE の数は OS32 の生きているハンドルの数で抑えられる (今は `LINK_HANDLES` = 8)。
 9. **`sess.txt` の書き方**: `<state-dir>/sess.txt` に 10 進 1 行。`.tmp` へ書いて
    `fsync` → `os.replace` (途中で落ちても番号が戻らない)。`--state-dir` を渡さない
    (既定) ときはメモリ内だけ = 試験用。

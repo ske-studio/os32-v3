@@ -1,6 +1,7 @@
 # K6-RAM: 物理 RAM の人為的な上限 (16MB) の撤廃 — ホスト TDD 記録
 
-票: `docs/archive/gui_v13/TASK_K6_ram_ceiling.md` (2026-09-11)。
+契約の正典: `docs/design/mm/memory_boot.md` の「16MB 超の RAM — 人為的な上限を置かない」と
+`docs/design/mm/paging.md` の「ブート窓 (`paging_init`)」(出所は票 TASK_K6_ram_ceiling)。
 ゲスト検証 (受入 M1〜M5) は PM / テスターの担当で、ここに記録があるのはホスト試験だけ。
 
 ## 実行した RED → GREEN
@@ -31,7 +32,7 @@
   と workspace の動的サイズ決定を入れて GREEN。検査内容:
   - `pgalloc_limit_pfn()` が検出量ちょうど (人為的な切り詰めが無い)。
   - `[0xF00, 0x1000)` が RESERVED で、`pgalloc_alloc_n_pfn` がそこから 1 ページも返さない (M5)。
-  - `[MEM_PHYS_MMIO_TOP, 4GB)` が MMIO。
+  - `[MEM_PHYS_MMIO_TOP, 4GB)` が MMIO (今は登録の上限 `MEM_PHYS_RAM_CEILING` = 2GB から上が丸ごと MMIO)。
   - 検出量の**最終ページ**が確保でき、解放できる。
   - `sys_usable_mem_end()` は workspace 直下のまま = exec のレイアウト不変。
   - metadata / workspace が `[MEM_APP_BAND_MAX_TOP, MEM_SYSTEM_SPACE_BASE)` の内側。
@@ -48,12 +49,14 @@
 - 4GB 相当 (`MEM_PHYS_MMIO_TOP / PAGE_SIZE`) では表の置き場所が尽きるので丸める。
   検査は「表は置き場所 (room) を超えない」「PDE 1 枚ぶん増やすと超える = 目一杯まで取る」
   「それでも 2GB 超を覆える」の 3 点で、具体的な数値定数は置かない。
+  (今の試験は 3 点目が逆で、登録の上限 2GB (D11) が入ったので「丸めた量は 2GB 未満」を見る。)
 - 置き場所が無い構成では 0 を返して legacy へ落ちる (でっち上げない)。
 
 ### 5. ブート順の固定 (`test_memory_boot.py::test_kernel_boot_order_and_failstop`)
 
 - `memory_boot_detect` → `paging_init` → `memory_boot_init` の順であることを
-  `init/kernel.c` のソース上で検査する行を追加。
+  ソース上で検査する行を追加 (今は `platform/pc98/kernel_boot_memory.inc` にあり、
+  `tools/tests/kernel_boot_source.py` が `kernel.c` に展開して読む)。
 
 ## 実行結果 (2026-09-11)
 
@@ -72,7 +75,7 @@
 | `python3 tools/check_constraints.py` | EXIT=0 |
 | i386-elf-gcc `-Wall -Wextra` (kernel.c / paging.c / pgalloc.c / physmem.c / memory_boot.c / sys.c / backend_cirrus.c) | 新規警告ゼロ |
 
-`init/kernel.c` に残る 2 件 (`TVRAM_BPR` の再定義、`kprintf` の暗黙宣言) は
+`platform/pc98/kernel.c` に残る 2 件 (`TVRAM_BPR` の再定義、`kprintf` の暗黙宣言) は
 HEAD (`8d5ba3b`) でも同じく出る既存のもので、この票の変更とは無関係。
 
 ## ホスト試験で**証明していない**こと
@@ -134,6 +137,5 @@ K6-RAM で上端の定義が「RAM の上端 / 1024」になり、15MB 機でも
   `sys_top_reserved` が 300KB になるかは PM / テスターの受入でしか確かめられない。
 - `make` は一度も回していない (コーダーの禁止事項)。目標コンパイルは変更した 2 ファイルの
   単体 `i386-elf-gcc -c` のみ。
-- `drivers/video/cirrus/backend_cirrus.c` の `cirrus_win_usable()` は**この票では直していない**。同じ型の
-  誤判定なので、**高位 RAM がある構成ではリニア窓 0x1000000 が常に不可になる**
-  (K6-RAM 決裁 (4)、Cirrus レーン再開時)。
+- Cirrus の窓の判定はこの票では直していない。今は `drivers/video/cirrus/cirrus_identify.c` の
+  `cirrus_win_usable()` が同じ `pgalloc_range_has_ram` を通っている。

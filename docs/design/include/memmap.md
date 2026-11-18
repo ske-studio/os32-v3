@@ -78,7 +78,7 @@ shlib 0x80000000〜 (仮想 1MB、物理は実ページ数) → exec 0x80100000 
 | 0x500000–0x7EFFFF | 池 (集積移動・旧同梱予約は作らない) | — | 通常のowner割当 |
 | [0x7F0000,0x800000) | DMA専用予約 | 64KiB | 常駐、一般池へ配らない |
 
-SHM の容量と GUI 予約範囲の正典は [`include/memmap.h:167・192–194`](../../../include/memmap.h)
+SHM の容量と GUI 予約範囲の正典は [`include/memmap.h`](../../../include/memmap.h)
 (`MEM_SHM_SIZE` / `MEM_SHM_GUI_SIZE` / `MEM_SHM_GUI_OFFSET`)。
 
 - **16MB システム空間**: 16MB 以上積める機種では F00000h〜FFFFFFh をシステム用 (PEGC VRAM /

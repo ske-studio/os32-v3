@@ -1,6 +1,8 @@
 # HDD インストーラ (段 2) — RED→GREEN の記録
 
-- 票: `docs/archive/realhw_v21/TASK_HDD_INSTALL.md` 段 2 (9〜11) / §1-v3 (N4・N6・N8・R3-1)
+- 契約: `docs/design/userland/system/inst_disk.md` (モード・大きさ・容量・パス・IPL と区画表)・
+  `docs/design/userland/system/inst_hdd.md` (順序・マウント・ERASE・鍵)・`docs/design/userland/system/cdinst.md`
+  (パッケージの事前検査)・`docs/design/boot/ext2_mini.md` (ローダの上限)
 - 実行: `python3 -B tools/tests/test_hdd_stage2.py --target --mutate` (`make check-hdd-stage2-host`)
 - ハーネス: `tools/tests/hdd_stage2_host.c` (純粋関数、ホスト 64 ビット + libc)、
   `tools/tests/cdinst_host.c` (実物の cdinst.c を main から、ILP32 -nostdlib)、
@@ -22,7 +24,7 @@
 
 ## 2. RED
 
-- `inst_disk.c` / `inst_hdd.c` と cdinst / install の新しい手順はこの票で作った。**実装と試験は同じ作業の
+- `inst_disk.c` / `inst_hdd.c` と cdinst / install の新しい手順は TASK_HDD_INSTALL 段 2 で作った。**実装と試験は同じ作業の
   中で書いた (試験先行ではない)**。旧動作 (IPL のヘッド 8 固定・IDENTIFY の幾何を IPL に書く・ディスク全体の
   format・区画表を読み戻さない・ext2_mini の切り詰め) は §3 の変異で再現して RED を確かめた。
 - `boot/ext2_mini.c` の上限は段 0 で直っていた。この段で初めて試験を付けた (変異 2 本が RED)。
@@ -88,7 +90,7 @@ wrap がそれを呼ぶこと、`exec/exec.c` の 4 本の `*_user` がトラン
 ## 6. 明示の消去 ERASE (2026-09-25、wt/cdinst-wipe、N4 の例外)
 
 実機 Ra266 の 8GB が FOREIGN (-40) で断られた (前の OS の区画表)。断る表のときだけ要約を出して `ERASE` を
-求める道を `inst_hdd.c` に足した (票 TASK_HDD_INSTALL 段 2 の追補)。
+求める道を `inst_hdd.c` に足した (TASK_HDD_INSTALL 段 2 の追補、契約は `docs/design/userland/system/inst_hdd.md`「明示の消去 `ERASE`」)。
 
 足したケース (`cdinst_host.c` と `install_fresh_host.c` に同名の 3 本):
 - `erase`: FOREIGN・MULTI・55AA だけ・BROKEN・START × 8/17・16/63 × ERASE でない入力 12 通り (空行・`erase`・

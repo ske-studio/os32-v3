@@ -5,7 +5,7 @@
 > [要確認] 旧静的展開の substep と現行 shared runner は一致を確認していない。
 
 共通計算は共有する。
-head/skip、SUB の復帰、REPEAT、RESET の強制実行・184C 復元、CR のラッチ復元は各命令試験に残す。skip 中の CR44 による head 更新も維持する（`O/kdebug/gfinit_decode.c:79–96`）。
+head/skip、SUB の復帰、REPEAT、RESET の強制実行・184C 復元、CR のラッチ復元は各命令試験に残す。skip 中の CR44 による head 更新も維持する（`kdebug/gfinit_decode.c` の `gfinit_decode_rom()`）。
 
 F8：新規 host は実 ROM fixture の差分試験一つと REPEAT/SUB/CONDITION/MACRO/RESET/PLL の個別 case が中心。全命令へ一律 4 case を新設しない。skip/head、呼出し/反復上限、RESET 強制実行/184C 復元、PLL 26/7/1/1/2 と失敗点を重点化する。
 既存試験は機能別の入口へ移し、fake bus/clock を共有する。削除後も旧 executor を試験用コピーとして残さず、製品表から期待値を作って自己一致を主張しない。

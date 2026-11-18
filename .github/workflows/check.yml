@@ -39,7 +39,7 @@ jobs:
       OS32_CLANG_CROSS_FREE: "1"
       # 静的ゲートは make の前提 (CHECK の needs) を組まない — クロス無しで旧と同じ振る舞い。
       CHECK_NO_NEEDS: "1"
-      CHECK_ROUTINE: "1"  # full_only は full-check だけで回す。
+      CHECK_ROUTINE: "1"  # full_only は build.yml の `make check` が回す。
       LYCHEE_VERSION: "0.24.2"
       LYCHEE_SHA256: "73657a111819a30c47c08352896796f23d64e4eb2b3ed39b6d32149241566fc5"
     steps:
@@ -147,6 +147,10 @@ jobs:
           make check-docs-orphans
           make check-docs-tree
           make check-docs-tree-host
+          make check-docs-line-refs
+          make check-docs-line-refs-host
+          make check-archive-refs
+          make check-archive-refs-host
           make check-docs-status
           make check-docs-status-host
           make check-tests-inventory
@@ -192,7 +196,8 @@ jobs:
         if: steps.scope.outputs.scope == 'ppc'
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends build-essential gcc-13 qemu-user ccache libgmp-dev libmpfr-dev libmpc-dev texinfo bison flex genisoimage
+          # 変異の試験には QEMU を起動する物がある (tools/ppc/test_lan_p29.py)。ppc-qemu の段と同じ道具を入れる。
+          sudo apt-get install -y --no-install-recommends build-essential gcc-13 qemu-user ccache libgmp-dev libmpfr-dev libmpc-dev texinfo bison flex genisoimage qemu-system-ppc qemu-system-data seabios
           python3 -m pip install --quiet -r requirements.txt
       - uses: ./.github/actions/build-setup
         if: steps.scope.outputs.scope == 'ppc'
@@ -203,12 +208,30 @@ jobs:
         env:
           OS32_ACCEPT_IPA_LICENSE: "1"
         run: |
-          CHECK_ROUTINE=1 MUTATE=0 python3 -B tools/checks/run.py --run all --env ppc-cross --exclude-env qemu-ppc
+          MUTATE=1 python3 -B tools/checks/run.py --run all --env ppc-cross --exclude-env qemu-ppc
 
-  ppc-qemu:
-    needs: ppc-compile
+  # キャッシュは枝ごとで、枝が読めるのは自分の枝と main の物だけ。PowerPC のクロスコンパイラを main の
+  # キャッシュに置いておくと、どの枝の最初の回も作り直さずに済む (無いと PowerPC の各ジョブが 13〜15 分
+  # かけて組む。2026-11-18 の実測)。main の push は PowerPC の検査を範囲の判定で回さない事があるので、
+  # キャッシュだけをこのジョブで保つ (当たれば 1 分以内)。
+  ppc-toolchain-cache:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/ppc-setup
+
+  # QEMU で機械を丸ごと模擬する検査 (12 本、変異込み)。1 本のジョブで直列に回すと 53〜61 分かかるので、
+  # 4 本に割って並べる (シャードの中は 1 本ずつ)。割り方は検査の重み (tools/checks/weights.json) から。
+  # ppc-compile の成果物は読まないので needs で鎖にしない (docs/POLICY_CI.md G2)。
+  ppc-qemu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -234,7 +257,23 @@ jobs:
           OS32_ACCEPT_IPA_LICENSE: "1"
           TMPDIR: ${{ runner.temp }}
         run: |
-          CHECK_ROUTINE=1 OS32_REQUIRE_PPC=1 MUTATE=0 python3 -B tools/checks/run.py --run all --env qemu-ppc
+          python3 -B tools/ci/gate.py run --env qemu-ppc --shard ${{ matrix.shard }}/4 --out "$RUNNER_TEMP/gate"
+      - name: Upload check times
+        if: always() && steps.scope.outputs.scope == 'ppc'
+        uses: actions/upload-artifact@v4
+        with:
+          name: check-times-${{ github.sha }}-ppc-qemu-${{ matrix.shard }}
+          path: ${{ runner.temp }}/gate/check_times.tsv
+          if-no-files-found: warn
+      - name: Upload failed logs
+        if: failure() && steps.scope.outputs.scope == 'ppc'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ppc-qemu-failed-${{ matrix.shard }}
+          path: |
+            ${{ runner.temp }}/gate/results.json
+            ${{ runner.temp }}/gate/failed-logs/
+          if-no-files-found: warn
       - name: PPC QEMU diagnostics
         if: failure()
         run: |

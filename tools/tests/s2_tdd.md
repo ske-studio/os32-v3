@@ -1,7 +1,9 @@
 # S2-C — `libos32cfg` / `cfg` コマンドのホスト TDD 記録
 
-票: `docs/archive/settings/TASK_S2.md` 第 5 版 §0 の **S2-C**。
-契約の正典は `docs/archive/settings/S0_FOUNDATION.md` §2 と
+票: TASK_S2 第 5 版 §0 の **S2-C**。
+契約の正典は `docs/design/userland/lib/cfg/libos32cfg.md` (「設定レジストリの全体の約束」・「schema の検査」・「API の戻り値」)、
+`docs/design/userland/lib/cfg/cfg_init.md`・`cfg_tsv.md`、`docs/design/userland/cmds/cfg.md`、
+§W は `docs/design/userland/rust/libos32gui/src/cfgro.md`、それと
 [`DESIGN.md`](../../docs/tasks/settings/DESIGN.md) §3〜§5。
 走らせ方:
 

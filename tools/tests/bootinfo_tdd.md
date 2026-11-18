@@ -1,7 +1,7 @@
 # bootinfo — RED → GREEN の記録
 
-票: `docs/archive/realhw_v21/TASK_HDD_INSTALL.md` 段 0 (§1-v3 N1 / N2)
-対象: `init/bootinfo_check.c` (検証と表示行) / `boot/bootinfo.inc` (NASM 側の写し) / `init/bootinfo.c` (写す側)
+契約: `docs/design/platform/pc98/bootinfo_check.md` (形式・検証の順序・使える規則・表示行)
+対象: `platform/pc98/bootinfo_check.c` (検証と表示行) / `boot/bootinfo.inc` (NASM 側の写し) / `init/bootinfo.c` (写す側)
 試験: `tools/tests/test_bootinfo.py` + `tools/tests/bootinfo_host.c`
 実行: `make check-bootinfo-host` (`check-par` の列)
 
@@ -72,11 +72,11 @@ INC MUTATION 3 RED: DL を DH と同じ位置に書く
 | `good` | 実機想定の域 (80h = 16382/16/63、81h = CF=1 AH=60h) を通す。封の値 (magic `42 4F 54 49`、check `BC B0 AB B6`) を**数で**固定 |
 | `magic` | magic 0 (ローダが書いていない / 起動のたびの初期化で止まった)、全 0、全 FF (フォントのゴミ) を断る |
 | `check_word` | check が 0 (magic まで書いて止まった) / 1 ビット違いを断る |
-| `version` | 版 2、ドライブ数 3 を断る |
+| `version` | 版 1・3、ドライブ数 3 を断る |
 | `sum` | 封の後にドライブ記録が変わった域を断る |
 | `rules` | 1 ドライブの規則: queried / DA 80h・81h / CF=0 / BX=512 / CX・DH・DL ≠ 0 / ローダの valid。NP21/W の NHD (8/17) は通し、空きスロット (全 0) は断る |
 | `format` | 起動画面の `[hdd] bios …` / `[hdd] bios geom: none …` / `[hdd] ataN …` の書式と、小さい buf での終端 |
-| `inc_mirror` | `boot/bootinfo.inc` の EQU が `include/bootinfo.h` と名前ごとに一致 (番地 `MEM_BOOTINFO_BASE` は `gen_memmap.py --check`) |
+| `inc_mirror` | `boot/bootinfo.inc` の EQU が `platform/pc98/bootinfo_wire.h` と名前ごとに一致 (番地 `MEM_BOOTINFO_BASE` は `gen_memmap.py --check`) |
 
 `--target` は i386-elf で `init/bootinfo.c` (構造体 `bootinfo_wire` の並びと
 オフセット定数の一致を `STATIC_ASSERT`) と `drivers/ata/ide.c` を通す。

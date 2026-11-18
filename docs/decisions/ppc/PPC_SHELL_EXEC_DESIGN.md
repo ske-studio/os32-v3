@@ -21,20 +21,20 @@
 
 |#|実物との食い違い／不足|根拠と処置|
 |---|---|---|
-|1|OS32X wire は LE、kernel は native 構造体を参照|`exec/os32x_hdr.c:9`。読込み時に decode|
-|2|ELF と配置刻印の読取りも LE 固定|`sdk/os32x_hdr.py:80–89,193`。EI_DATA に従う|
-|3|PPC profile の SDK 能力は無効|`sdk/target_profile.py:18–20`。USER C 能力だけ開く|
-|4|CRT は x86 stack 引数専用|`sdk/crt/crt0.asm:33–37`。PPC `_start` を別実装|
-|5|USER 例外・SC は停止経路|`arch/ppc/kernel_trap.c:90–125`。既存 exec dispatch に接続|
+|1|OS32X wire は LE、kernel は native 構造体を参照|`exec/os32x_hdr.c`。読込み時に decode|
+|2|ELF と配置刻印の読取りも LE 固定|`sdk/os32x_hdr.py` の `__init__()`。EI_DATA に従う|
+|3|PPC profile の SDK 能力は無効|`sdk/target_profile.py`。USER C 能力だけ開く|
+|4|CRT は x86 stack 引数専用|`sdk/crt/crt0.asm`。PPC `_start` を別実装|
+|5|USER 例外・SC は停止経路|`arch/ppc/kernel_trap.c` の `ppc_trap_dispatch()`。既存 exec dispatch に接続|
 |6|保存域・FP 域が暫定|`arch/ppc/arch_exec_storage.h`。整数 ABI に確定|
-|7|KAPI 引数サイズ生成は i386 cdecl 前提|`sdk/gen_kapi.py:436–439`。target 別 adapter|
-|8|文書の戻り値は status 表、非 GUI 実装は終了値|`exec/exec_launch.inc:342`。受入では7を返す|
+|7|KAPI 引数サイズ生成は i386 cdecl 前提|`sdk/gen_kapi.py`。target 別 adapter|
+|8|文書の戻り値は status 表、非 GUI 実装は終了値|`exec/exec_launch.inc` の `exec_launch()`。受入では7を返す|
 |9|exec の主要2 TU は selected 成功一覧にない|`exec/exec.c`、`kapi/kapi_generated.c`。§9の facade 段で接続|
 
-- `exec/`・`kapi/` の直下 `.c` と `tools/ppc/selected_success.json` の差は上記2 TU。
+- `exec/`・`kapi/` の直下 `.c` のうち、この設計の時点で PowerPC で組めなかったのは上記 2 TU。
 - `exec_syscall.inc` は独立 TU ではなく `exec.c` の閉包。成功一覧への不在は今回の再測定結果ではない。
-- 停止依存の根拠は `exec.c:1–42`、`exec_syscall.inc:84–170` と関係する呼出しの限定 grep。
-- USER 属性は既存：Ks=0/Kp=1、USER RO=PP1、USER RW=PP2（`pd_walk.c:10,44–46`）。
+- 停止依存の根拠は `exec.c`、`exec_syscall.inc` と関係する呼出しの限定 grep。
+- USER 属性は既存：Ks=0/Kp=1、USER RO=PP1、USER RW=PP2（`pd_walk.c`）。
 - root 切替・HPT/TLB 消去・BAT 撤去も既存。旧 B15・B16 の再実装は不要。
 - libc 等の存在と ABI 適合は別。hello は newlib・libm・libnosys・libgcc をリンクしない。
 - `SHELL_AS_APP` は既存。W7 の shell 全機能を今回の受入へ加えない。
@@ -176,7 +176,7 @@ else existing_kernel_fault(f);
 - fault は `EXEC_ERR_FAULT` を保存し、正常終了と同じ共通回収経路へ合流する。
 - 共有 kernel mapping 上で親 root に戻してから子 AS を解放する。
 - FD・heap・ページ等を既存順で回収し、親 owner・heap・例外入口用 SP を復元。
-- `exec_launch.inc:320–342` の生存 stack と setjmp 着地点、既存 pending-finish 規約を維持。
+- `exec_launch.inc` の生存 stack と setjmp 着地点、既存 pending-finish 規約を維持。
 - PPC setjmp/longjmp は r1/r2/r13–r31・LR・CR に加え、IRQ・例外の深さ2語を保存・復元。
 - この集合は25語＝100B。暫定 `ARCH_JMP_BYTES=96` を合わせ、保存 offset と整合させる。
 - `ARCH_USER_BYTES=176`、entry=24B、priv は root と入口 kernel-SP の8Bを基本とする。
@@ -316,18 +316,18 @@ make ARCH=ppc PLATFORM=powermac hello
 |F13|`exec_syscall.inc`＋KAPI 表の口＋PPC実体：KAPI_ADDR 参照。PPC の KAPI_ADDR は platform/powermac の配置の header に置き、include/memmap.h には触らない (HAL v2 との約束)|B08、x86 は元の表参照へ inline 展開|共・不変|
 |F14|生成器＋PPC binding helper：不要 wrapper の実依存を除去|F02・F05・F07・F10、型付き未対応応答|共・不変|
 |F15|KAPI 初期化生成口＋PPC 表実体：全 slot と metadata の配置|F13・F14、既存初期化経路へ接続|共・不変|
-|F16|font guard の口＋PPC 実体 (fault は既存の停止)：`font_guard_fault` (定義は x86 の isr_handlers.c だけ、呼ぶ所は exec_finish.inc:329,345・exec_fault.inc:15)|**HAL v2 の I1 の後の main を基点** (exec_finish.inc)|共・不変|
-|F17|kselftest の口＋PPC 実体 (no-op)：`kselftest_run_audit` (exec_launch.inc:379)、`kselftest_probe.h` の include (exec.c:43)|独立|共・不変|
-|F18|r1 fixture の口＋PPC 実体 (no-op)：`r1_fixture_resume`・`r1_fixture_parent` (exec_schedule.inc:254・exec_finish.inc:312、kernel/r1_fixture.c は legacy_guest.h を include)|**HAL v2 の I1 の後の main を基点** (exec_finish.inc)|共・不変|
-|F19|pcm の回収の口＋PPC 実体 (no-op)：`pcm_reclaim` (exec_finish.inc:157)、host の回収 (exec_finish.inc:207)|**HAL v2 の I1 の後の main を基点** (exec_finish.inc)|共・不変|
-|F20|exec.c の残りの include の口：`serial_diag.h`・`kapi_db.h` (exec.c:6,11)|F01|共・不変|
+|F16|font guard の口＋PPC 実体 (fault は既存の停止)：`font_guard_fault` (定義は x86 の isr_handlers.c だけ、呼ぶ所は exec_finish.inc・exec_fault.inc)|**HAL v2 の I1 の後の main を基点** (exec_finish.inc)|共・不変|
+|F17|kselftest の口＋PPC 実体 (no-op)：`kselftest_run_audit` (exec_launch.inc)、`kselftest_probe.h` の include (exec.c)|独立|共・不変|
+|F18|r1 fixture の口＋PPC 実体 (no-op)：`r1_fixture_resume`・`r1_fixture_parent` (exec_schedule.inc・exec_finish.inc、kernel/r1_fixture.c は legacy_guest.h を include)|**HAL v2 の I1 の後の main を基点** (exec_finish.inc)|共・不変|
+|F19|pcm の回収の口＋PPC 実体 (no-op)：`pcm_reclaim` (exec_finish.inc)、host の回収 (exec_finish.inc)|**HAL v2 の I1 の後の main を基点** (exec_finish.inc)|共・不変|
+|F20|exec.c の残りの include の口：`serial_diag.h`・`kapi_db.h` (exec.c)|F01|共・不変|
 |B25|PPC `crt0.S`＋`start.c`：CRT|B07、arch と並列|不変|
 |B26|PPC `app.ld`：USER 配置|B04・B25|不変|
 |B27|`sdk/link_guard.py`：PPC USER 検証接続|B05・B26|共・不変|
 |B28|PPC target build：USER 入口・libgcc 非リンク|B06・B27|不変|
 |B29|PPC clock provider：共通 tick 単位 (論理 10ms、DEC は物理 1kHz)|統合前必須|不変|
 |B30|PPC exec 初期化 TU：既存サービス初期化の接続|B18・B22・B24・F15|不変|
-|B31|`build/ppc-kboot.mk`：既存 exec 閉包 link|F01–F20・B28–B30|不変|
+|B31|`build/targets/ppc-powermac.mk`：既存 exec 閉包 link|F01–F20・B28–B30|不変|
 |B32|resident CLI の `.h/.c`＋`cli_boot.c`：run callback|S-A・B31|共・不変|
 |B33|`userland/ppc/hello.c`：受入アプリ|B28|不変|
 |B34|PPC root image 入力：hello 同梱|B33|不変|

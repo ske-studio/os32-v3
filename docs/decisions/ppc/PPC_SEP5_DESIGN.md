@@ -1,6 +1,6 @@
 # PPC_SEP5_DESIGN — 分離の第 5 段 (描画・残る asm・SDK)
 
-> 状態: **現行 (2026-11-09)** — 共通のコードが持つ PC-98 の画面・x86 の命令・SDK の i386 前提を、表示の backend・arch・SDK の target profile の後ろへ移す。x86 の ABI・生成物・表示と FEP の指紋は変えない (対象 V2〜V4・A3・A5・A7・K1・K2)。段の状態は票 TASK_PPC_SEP が持つ。
+> 状態: **完了記録 (2026-11-09 確定、2026-11-17 に記録へ)** — 第 5 段は main に入った。分離の仕組みは 11-17 の作り直しで置き換わり、今の決まりは票 TASK_PPC_SEP の「現在地」(層の検査 `tools/check_layers.py`・所有者集合 `build/select.mk`・入口の骨格 `init/kernel_start.c`)。本文の selected の計測と known の表は今は無い。以下は確定した時の本文: 共通のコードが持つ PC-98 の画面・x86 の命令・SDK の i386 前提を、表示の backend・arch・SDK の target profile の後ろへ移す。x86 の ABI・生成物・表示と FEP の指紋は変えない (対象 V2〜V4・A3・A5・A7・K1・K2)。段の状態は票 TASK_PPC_SEP が持つ。
 > 出所: ~/os32-tmp/run/ppc-sep5/DESIGN.final.md を 2026-11-09 に写した (gpt-6-astra 起草 r1〜r2、Opus 5.5 第 1・2 回、PM が第 2 回の P3 と PM 決定を反映)。
 ## r1→r2 の変更
 - F1: 全部品contractsの字面不変を列挙。ime_render.hの編集を除きH9変異先を修正。
@@ -24,18 +24,18 @@
 ## 1. 実物の照合（行は基点）
 |ID|実物 file:line|判定・移設先|
 |---|---|---|
-|V2|gfx/gfx_core.c:256–279（TVRAM消去/FF2）、:388–404（両plane消去）、gfx/gfx_scroll.c:5–64、gfx/palette.c:36–41|指摘存続。platform/pc98/{gfx_init.c,gfx_scroll.c,display.c}へ。palette shadowは共通に残す|
-|V2補足|gfx/gfx_core_init.inc:4,29–48、gfx/gfx_vram.c:221–222,245、gfx/gfx_core_surface.inc:119–125、gfx/gfx.h:11、gfx/gfx_core.c:56,89|初期化inc、flip/vsync、TVRAM surface、既定backend/候補もPC98依存。代表3ファイルだけの移設では完了しない|
-|V3|kernel/ime/ime_render_tvram.c:20–75、kernel/ime/ime_render.inc:7,19,61–86,187–213（TVRAM依存23箇所）、ime.c:94–97（保存領域確保）、kernel/console/console.c:75–89,174,245–274,381–383,450–451、include/tvram.h:9–13|指摘存続。低位操作は既にplatform/pc98/console.c:21–125、属性はconsole_attr.c:61。既存con_backendを拡張し全consoleを移さない|
-|A3|gfx/gfx_internal.h:70–80|rep movsw/movslが残る。arch/x86/arch_copy.hへ同じinlineを移す。gfx_vramは間接利用|
-|A5|drivers/video/geforce/gf_wc.c:5,30–90,93–125,169–185、gf_accept.c:64–145|CPUID/RDMSR/flags、x86_wc_lease、PAT/alias検証あり。MTRR書込は既にarch/x86/kernel/mtrr_wc.c。GPU判定だけ共通に残す|
-|A7|lib/sqlite3/sqlite3.c:76622,76896,97488,100672|TRACE中のESP asm 4点が存続。診断用inline providerへ。SQLite全面移設なし|
-|V4|boot/boot_hdd.asm:7,102、boot/boot_fat.asm:7、boot/loader_hdd.asm:451、boot/boot_main.c:71–120、build/targets/x86-pc98.mk:2|PC98 BIOS/x86専用。boot.mk選択は既設。build/targets/ppc-powermac.mkのboot/sdk/programs拒否を試験（食い違い3）|
-|K1|sdk/crt/crt0.asm:5,33–37、sdk/link/app.ld:4,11–15、build/config.mk:207,217–218|CRT/配置の指摘存続。ただしelf_i386固定は既にbuild/arch/x86.mk:13のELF_EMULATIONへ移動（食い違い1）|
-|K2|sdk/rust/i686-os32-none.json:2–11、sdk/rust/os32api/src/ls.rs:25–26|指摘存続。extern C callbackはtarget ABIに従う。JSONだけPPC化しても動かない|
+|V2|gfx/gfx_core.c（TVRAM消去/FF2）、同ファイル内（両plane消去）、gfx/gfx_scroll.c、gfx/palette.c|指摘存続。platform/pc98/{gfx_init.c,gfx_scroll.c,display.c}へ。palette shadowは共通に残す|
+|V2補足|gfx/gfx_core_init.inc (gfx_init_mode())、drivers/video/pc98/gfx_vram.c、gfx/gfx_core_surface.inc、gfx/gfx.h、gfx/gfx_core.c|初期化inc、flip/vsync、TVRAM surface、既定backend/候補もPC98依存。代表3ファイルだけの移設では完了しない|
+|V3|kernel/ime/ime_render_tvram.c:20–75、kernel/ime/ime_render.inc（TVRAM依存23箇所）、ime.c:94–97（保存領域確保）、kernel/console/console.c、include/text_screen.h|指摘存続。低位操作は既にplatform/pc98/console.c、属性はconsole_attr.c:61。既存con_backendを拡張し全consoleを移さない|
+|A3|gfx/gfx_internal.h|rep movsw/movslが残る。arch/x86/arch_copy.hへ同じinlineを移す。gfx_vramは間接利用|
+|A5|drivers/video/geforce/gf_wc.c、gf_accept.c|CPUID/RDMSR/flags、x86_wc_lease、PAT/alias検証あり。MTRR書込は既にarch/x86/kernel/mtrr_wc.c。GPU判定だけ共通に残す|
+|A7|lib/sqlite3/sqlite3.c|TRACE中のESP asm 4点が存続。診断用inline providerへ。SQLite全面移設なし|
+|V4|boot/boot_hdd.asm、boot/boot_fat.asm、boot/loader_hdd.asm、boot/boot_main.c、build/targets/x86-pc98.mk|PC98 BIOS/x86専用。boot.mk選択は既設。build/targets/ppc-powermac.mkのboot/sdk/programs拒否を試験（食い違い3）|
+|K1|sdk/crt/crt0.asm、sdk/link/app.ld、build/config.mk|CRT/配置の指摘存続。ただしelf_i386固定は既にbuild/arch/x86.mkのELF_EMULATIONへ移動（食い違い1）|
+|K2|sdk/rust/i686-os32-none.json、sdk/rust/os32api/src/ls.rs|指摘存続。extern C callbackはtarget ABIに従う。JSONだけPPC化しても動かない|
 - 食い違いはSURVEYのelf_emulation、確定設計の公開callconv（PM撤回済み）、boot選択の既実装の計3件。行番号ずれ、V2補足、既存HALは数えない。
-- HAL確認：gfx/gfx_hw_submit.c:60–70はbackend mono/CPU fallbackへ、gfx/gfx_policy.c:51はmono有効化、gfx/gfx_hw_mono_cpu.c:7は共通fallback。userland/lib/gfx/draw/gfx_cmd.cを通る投入とdraw/geom、userland/rust/libos32guiは既存HALを利用し本票で再設計しない。V2の機種制御とA3のコピーはなお残る。
-- 第3段の属性口は既にinclude/callconv.h（arch/README.md末尾）、公開shared.h:32–33は旧cdeclを保持（食い違い2。PM決定で公開os32_callconv.h新設は取り下げ。PPC_SEP3_DESIGN.md A2との差は第3段Fで正典へ反映）。初回4引数はarch/x86/kernel/exec_entry.c:23–28。CRTのargc/argv/api/auxとUSER20B/CPL0 16Bをそのまま使う。
+- HAL確認：gfx/gfx_hw_submit.cはbackend mono/CPU fallbackへ、gfx/gfx_policy.cはmono有効化、gfx/gfx_hw_mono_cpu.cは共通fallback。userland/lib/gfx/draw/gfx_cmd.cを通る投入とdraw/geom、userland/rust/libos32guiは既存HALを利用し本票で再設計しない。V2の機種制御とA3のコピーはなお残る。
+- 第3段の属性口は既にinclude/callconv.h（arch/README.md末尾）、公開shared.h:32–33は旧cdeclを保持（食い違い2。PM決定で公開os32_callconv.h新設は取り下げ。PPC_SEP3_DESIGN.md A2との差は第3段Fで正典へ反映）。初回4引数はarch/x86/kernel/exec_entry.c。CRTのargc/argv/api/auxとUSER20B/CPL0 16Bをそのまま使う。
 - 第2段PPC_SEP2_DESIGN.md:119–130,233のbootinfo native/wire分離、boot_common_setとplatform captureは変更しない。ローダ選択はruntime boot/platform口とは別。PPC入口はplatform/powermac/boot.cを継続する。
 ## 2. 契約と所有
 ### 2.1 描画・console・IME
@@ -54,17 +54,17 @@ u8 con_backend_color(unsigned role); /* default-white等。既存raw属性ABIは
 void ime_set_render(void *table);
 ```
 - display_*はbuildで選ぶ静的provider。PC98実体はplatform/pc98/。既存display.cへpalette/text/vsync/flipを追加、scroll/init/selector/surfacesも同ディレクトリへ。既存display_text_start/restore_98/recover_*とkdebug kexportsの宣言・挙動・輸入契約は保持する。PPCには未対応provider（描画未実装）を置き、selected用に無操作口を供給しても起動profileは拒否を維持する。FBへGDCのポートやPRAMを渡さない。新ハード駆動は後段。
-- `display_scroll`は内部専用。公開KAPI `gfx_hardware_scroll(int lines)`（sdk/kapi.json:693、tilemap利用）の相対行という意味は不変。`display_scroll`の入力は論理行/寸法/ページ。正規化したvram_scroll_yは共通gfx/gfx_scroll.cが所有、PC98側だけSL倍率・GFX_WPL・PRAM・vsync順を知る。bb無しは旧通り状態も触らない。非scroll backendは能力なしとして呼ばずCPU presentを使う（PPC実装は後段）。
+- `display_scroll`は内部専用。公開KAPI `gfx_hardware_scroll(int lines)`（sdk/kapi.json、tilemap利用）の相対行という意味は不変。`display_scroll`の入力は論理行/寸法/ページ。正規化したvram_scroll_yは共通gfx/gfx_scroll.cが所有、PC98側だけSL倍率・GFX_WPL・PRAM・vsync順を知る。bb無しは旧通り状態も触らない。非scroll backendは能力なしとして呼ばずCPU presentを使う（PPC実装は後段）。
 - palette.cの16色shadow、4bit mask、初期値、shadow_set/getはKAPI互換の共通状態。writeだけPC98へ。PEGCの8bit paletteとshadow_setを二重変換しない。新FBはこのlegacy16色とnative pixel色を区別して実装できる口。
 - gfx_coreのdirty/bb/世代/revokeは共通所有。_gfx_common_initのTVRAM消去は4plane存在確認後、bb消去の前、FF2は後という順を維持。PC98専用init・clear pages・fallback選択は新gfx_init.c/selector.cへ。PC98 fallbackのNULL init慣行も保持。
 - `gfx_core_surface.inc`の固定面descriptor/機種候補をplatform/pc98/gfx_surfaces.cへ。共通のlease検証・世代管理は残し、providerからconst descriptor群と既定backend/候補を取得する。TVRAM面のrevokeを省略しない。PC98のboot reserve順・BB確保・identifyとprobeの区別を保存する。
 - `gfx_vram.c`のページI/Oとtext-vsync、splash診断をPC98 providerへ。CPUコピー/present/dirtyは共通に残す。gfx.h/gfx_internal.hのpc98.h依存を除き、PC98定数は各実体が直接includeする。legacy640×200/400・planar4の形式定数と実装ポートを混同しない。
 - consoleはcursor_x/y、g_scroll_reserve、sink/V86/GUI gateを所有。geometryは固定x86 80×25、別providerで任意の正の寸法を表す。console_get_sizeとwrap/clamp/scrollが同じgeometryを使う。TVRAM_ROWS/ATTR_WHITEの暗黙includeを除去する。
-- tvram_*は既存KAPI/import利用者用の互換入口を残す。include/tvram.hは宣言だけにしTVRAM_BASE/ATTRはPC98実装へ。生のJIS/readchar/raw属性契約はlegacy adapterに残し、共通UnicodeからFBへはcell drawの別実装が可能。既存利用者のコード/属性値は変えない。
+- tvram_*は既存KAPI/import利用者用の互換入口を残す。include/text_screen.hは宣言だけにしTVRAM_BASE/ATTRはPC98実装へ。生のJIS/readchar/raw属性契約はlegacy adapterに残し、共通UnicodeからFBへはcell drawの別実装が可能。既存利用者のコード/属性値は変えない。
 - IME_Renderの字面・形・g_ime_render_tvramシンボルは維持。ime_render_tvram.cは同basenameのplatform/pc98/ime_render_tvram.cへ移し、FEP内のprivate backendとしてリンク。共通IMEは非契約ヘッダkernel/ime/ime_display_private.hの寸法/末行・保存復元・資源操作を呼ぶ。IME_Renderやkexports/importsへ追加しない。
 - private口はime_display_cols/preedit_row、ime_display_save/restore(top,rows)、ime_display_boot(fault)/bytes/abort。PC98 backendがbufferとTVRAM read/writeを所有、既存3行×80列の確保量・失敗注入・部分確保・解放順・bytes計上を保持。ime.c:86–98,120–123は委譲、ime_render.incから番地/BPR/COLS/固定24を除く。候補表示の論理状態と非TVRAM rendererのclear_row経路は共通に残し、TVRAM renderer時だけ保存復元する。
 - PC98のgeometryは従来の80列/末行24（GUI rendererも同じ論理寸法）、hostでは別寸法を注入。PPCは未対応providerで製品起動を拒否。defaultはplatform/{pc98,powermac}/ime_default_render.hで選ぶ。C2はC区分、通常/R1のFEPを組んでからC1でtvram.hのpc98.hを外す。
-- kernel/gui.cはime_control.hだけをinclude（ime_set_render(NULL)の所有者検証・復旧順不変）。init/kernel.cのIME boot呼出は別の狭いime_boot.h宣言にし、重いime.h/ime_store.h連鎖を外す。public SDKヘッダには触らない。
+- kernel/gui.cはime_control.hだけをinclude（ime_set_render(NULL)の所有者検証・復旧順不変）。platform/pc98/kernel.cのIME boot呼出は別の狭いime_boot.h宣言にし、重いime.h/ime_store.h連鎖を外す。public SDKヘッダには触らない。
 ### 2.2 コピー・WC・診断
 ```c
 /* include/copy_units.h -> 固定名arch_copy.h。既存名はgfx内inline alias */
@@ -83,7 +83,7 @@ int arch_video_cache_inspect(u32 phase, u32 base, u32 bytes,
 - copyは非重複、単位数（byte数でない）、ゼロ可、callerが有効範囲を保証。x86 providerは現asm/constraints/DF=0前提をそのままinline、PPCはvolatile u8ポインタによるCコピーでLE/BEいずれもbyte保存、アクセスを維持しMMIO幅最適化は後段。memmoveやDMA同期へ契約を拡大しない。
 - `gf_wc.c`に残すのはBAR/ledger/surface/identity/RAM重複判定。mapped_uc/no_alias/bar0_uc/PATとlease/resultはarch/x86/kernel/video_wc.cへ、既存mtrr_wc.cに委譲。PPC providerはactive=0/eligible=0/start=0/stop=0、MTRRを真似ない。
 - startはactiveなら旧結果を返す順を維持（再identifyより先）。非active時にGPU判定→arch eligible→acquire。stopはGPUの再識別を要求しない。単一GPUという現仕様で静的状態1組、汎用allocator/ロックは足さない。
-- `gf_accept.c:95–145`のinspect全体とcpu/msr record生成をarch/x86/video/gf_accept_cpu.cへ移す。GeForce moduleと一緒にsource選択しkernelの新importにはしない。既存report callbackを借用、CPU recordの整形bufferはarch側の呼出中だけ所有し、順序/phase/ログ文字列を保持。PPC版は0（判定不可）を返しUC/WC測定成功に見せない。
+- `gf_accept.c`のinspect全体とcpu/msr record生成をarch/x86/video/gf_accept_cpu.cへ移す。GeForce moduleと一緒にsource選択しkernelの新importにはしない。既存report callbackを借用、CPU recordの整形bufferはarch側の呼出中だけ所有し、順序/phase/ログ文字列を保持。PPC版は0（判定不可）を返しUC/WC測定成功に見せない。
 - CPUID可否検査→vendor→MSR能力→RDMSR、flags復元はx86内部。共通にCPUID leafやMSR番号を公開しない。mmのソフト2段表をCPUキャッシュ属性と同一視せず、x86のPAT解釈/alias walkをarchへ閉じる。
 - SQLiteはTRACE時だけdiag_stack.hをincludeして4箇所をarch_diag_sp()へ（unsigned longは現u32と同幅）、x86はalways_inlineの同命令。PPCは0（診断未提供）で実装可能、ログのesp表記はx86互換として保持。TRACE=offは前処理後byte不変を目標、onの診断値/生成物は別比較。GNU89を維持しSQLite本体にCPU ifdefを足さない。
 ### 2.3 boot・SDK target profile
@@ -96,11 +96,11 @@ MESSAGES['sdk'] = 'sdk'
 # require(target, 'sdk') はinput読取・出力削除・tool起動より前に拒否
 ```
 - 既存elf_identity/module_codec/layout/link_guardは残す。make用の同じ値をprofile CLIから出力し、build/sdk-target.mkが読む。CRT_USER/RESIDENT・app/app_sys/shlib link・Rust target・ELF emulation・call ABIをひと組で検証する。未対応PPCの任意パス上書きで拒否を迂回させない。
-- build/config.mk:207,217–218、build/sdk.mk:19–50、sdk/example/hello/Makefile:36,41とRustビルド入口をこの選択へ接続。Rustはuserland/{rust,gshell}/.cargo/config.tomlの既定target・相対pathの綴りとcargo引数を保持し、profileとsdk/rustc_stamp.pyは選択targetをtool起動前に検証するだけにする。単独SDKには同じprofile入口を配布する。既定x86の引数順、crt順、staging内の既存パスとCRT/ライブラリ内容を保持し、ツールとprofileメタデータのみ変更可。CRT asm/C、link scripts、Rust JSON/ls.rs、生成publicヘッダは編集しない。
+- build/config.mk、build/sdk.mk、sdk/example/hello/Makefile:36,41とRustビルド入口をこの選択へ接続。Rustはuserland/{rust,gshell}/.cargo/config.tomlの既定target・相対pathの綴りとcargo引数を保持し、profileとsdk/rustc_stamp.pyは選択targetをtool起動前に検証するだけにする。単独SDKには同じprofile入口を配布する。既定x86の引数順、crt順、staging内の既存パスとCRT/ライブラリ内容を保持し、ツールとprofileメタデータのみ変更可。CRT asm/C、link scripts、Rust JSON/ls.rs、生成publicヘッダは編集しない。
 - `sdk/gen_kapi.py`の第3段target/ABI選択を再実装しない。kapi_abi_x86.py/内部callconvと公開shared.hの既存cdecl、およびprofileの整合をhostで検証。確定設計との差を解消するために公開ヘッダを後追い編集しない。PPCでextern Cが使えることをPPC OS32 syscall/CRT対応済みと解釈しない。
 - boot/とbuild/boot.mkは現状維持。includeは既にbuild/targets/x86-pc98.mkのみ。Fはbuild/targets/ppc-powermac.mkがboot/sdk/programsをunsupportedでtool起動前に拒否する試験だけを追加。boot規則・既存字面試験を変えない。
 - SDK公開ヘッダと下記全contractsはコメントも含め字面不変（sqlite_imports.defはcontractsなし）。tools/gen_sqlite_imports.pyの本文連結hashを守り、import/exportsも増やさない。PPC SDKで公開呼出属性を変える段は[ABI]として版/世代・指紋の正規再生成・clean→all・SDK/CRT/module再ビルドと受入をセットにした別段。本段のx86公開ヘッダは不変。
-- 字面不変 cd: `drivers/ata/cd_module.h`, `drivers/base/dev.h`, `fs/vfs.h`。
+- 字面不変 cd: `drivers/ata/cd_module.h`, `kernel/dev/dev.h`, `fs/vfs.h`。
 - 字面不変 cirrus: `drivers/video/cirrus/cirrus_module.h`, `include/gfx_hal.h`, `include/gfx_mode.h`, `drivers/video/cirrus/wab_glue.h`。
 - 字面不変 fep: `kernel/ime/fep_module.h`, `kernel/ime/ime_render.h`, `sdk/include/os32/os32_kapi_shared.h`。
 - 字面不変 fm: `include/fm_contract.h`, `drivers/sound/fm/fm_module.h`, `drivers/sound/fm/fm.h`, `drivers/sound/fm/snd_engine.h`。
@@ -109,7 +109,7 @@ MESSAGES['sdk'] = 'sdk'
 - 字面不変 lan: `include/lan_contract.h`, `include/pci_dev_contract.h`, `include/pci_bind_contract.h`, `drivers/net/e82557/lan_module.h`。
 - 字面不変 pcm: `include/pcm_contract.h`, `include/dma_contract.h`, `drivers/sound/cs4231/pcm_module.h`, `drivers/sound/cs4231/pcm_cs4231.h`, `kernel/irq/irq.h`, `mm/dma_pool.h`。
 - 字面不変 trident: `drivers/video/trident/trident_module.h`, `drivers/video/trident/trident.h`, `include/gfx_hal.h`, `include/gfx_mode.h`, `gfx/palette.h`, `include/debug_probe.h`。
-- 字面不変 v86: `arch/x86/legacy/v86_module.h`, `kernel/module/module.h`。
+- 字面不変 v86: `platform/pc98/legacy/v86_module.h`, `kernel/module/module.h`。
 ## 3. BSDとの照合・未確認
 - 以下N/Fは `/home/hight/os32-tmp/ref/netbsd` / `freebsd`。GPLは読んでいない。新ハード実装はないため新規vendor仕様の採用はない。PC98の既存I/O列を移設し増やさない。
 - N/sys/arch/powerpc/oea/ofw_rascons.c:255–258,274–283はwidth/height/depth/stride→rasops、:124はtextops境界。N/sys/arch/macppc/dev/ofb.c:202,264–290,438–452はFB寸法/stride/paletteをdevice側で扱う。TVRAM番地を共通consoleへ渡さない根拠。
@@ -120,28 +120,28 @@ MESSAGES['sdk'] = 'sdk'
 - 全行KAPI slot/世代・SDK公開ヘッダ・CRT入口・FEP指紋は不変。SDKツール/stagingメタデータだけS段で変化。kdebug等のpaired checksum変化とABI変化を区別する。
 |段/前提|主ファイル・補助（新規/変更規模）|区分・受入（§6）|
 |---|---|---|
-|A コピー/基点|gfx/gfx_internal.h 16、include/copy_units.h +12、arch/{x86,ppc}/arch_copy.h 各+25、tools/tests/host_arch/arch_copy.h +25|I、H1/比較。HALとgfx_internalで衝突。drivers/video/pc98/backend_pegc_present.inc:73の呼出もH1対象|
+|A コピー/基点|gfx/gfx_internal.h 16、include/copy_units.h +12、arch/{x86,ppc}/arch_copy.h 各+25、tools/tests/host_arch/arch_copy.h +25|I、H1/比較。HALとgfx_internalで衝突。drivers/video/pc98/backend_pegc_present.incの呼出もH1対象|
 |B1 palette/A|gfx/palette.c 12、kernel/console/display_restore.h +25、platform/pc98/display.c +20、platform/powermac/display.c +25（未対応口）|C、H2/N1/N3。HAL palette試験と直列|
 |B2 scroll/B1|gfx/gfx_scroll.c 55、platform/pc98/gfx_scroll.c 移55、kernel/console/display_restore.h 5|C、H2/N3。vram_scroll_yは移さない|
 |B3 init/B2|gfx/gfx_core.c 70、gfx/gfx_core_init.inc 35、platform/pc98/gfx_init.c +110、同.h +15|C、H3/N1/N3。HAL coreと直列|
 |B4 provider/B3|gfx/gfx_core.c 60、platform/pc98/gfx_selector.c +100、include/display_provider.h +35、platform/powermac/display_provider.c +25（未対応）|C、H3/N1/N3。default/list/probe/fallbackのみ|
 |B5 surfaces/B4|gfx/gfx_core_surface.inc 160、platform/pc98/gfx_surfaces.c 移160、display_provider.h 10|C、H3/N1/N3。第4段r2は配置probeのみ、製品編集の競合なし|
-|B6 present/B5|gfx/gfx_vram.c 55、platform/pc98/display.c +65、gfx/gfx.h 5、gfx_internal.h 5、残る直接pc98定数読者のinclude各1–3|C、H1/H2/H3/N3。HAL present/dirtyと直列|
+|B6 present/B5|drivers/video/pc98/gfx_vram.c 55、platform/pc98/display.c +65、gfx/gfx.h 5、gfx_internal.h 5、残る直接pc98定数読者のinclude各1–3|C、H1/H2/H3/N3。HAL present/dirtyと直列|
 |C2 IME/B1|kernel/ime/ime_render_tvram.c→platform/pc98/ime_render_tvram.c 移76＋保存復元/資源処理100、ime_render.inc 90、ime.c 35、ime_display_private.h +25、platform/{pc98,powermac}/ime_default_render.h 各+8、powermac/ime_display.c +25、include/ime_control.h +10、kernel/gui.c 1、build/fep-module.mk 15、tools/build_compare.py 5|C、H4/H9/N2、GUI known 3組。ime_render.hは0行|
-|C1 console/C2|kernel/console/console.c 45、console_backend.h +12、platform/pc98/console.c 15、include/tvram.h 5、platform/pc98/tvram_private.h +10、PC98 の FEP 部品 2 本 (C2 で移した platform/pc98/ime_render_tvram.c と PC98 の ime_display 実装) は pc98.h を直に include 各 1|C、H4/N1/N2。第3段D2のlegacy gate試験後|
-|C3 boot IME facade/C2|include/ime_boot.h +20、init/kernel.c 1、既存ime.hの宣言include整理5|I、H4/H9、init known 3組（§7）|
+|C1 console/C2|kernel/console/console.c 45、console_backend.h +12、platform/pc98/console.c 15、include/text_screen.h 5、platform/pc98/tvram_private.h +10、PC98 の FEP 部品 2 本 (C2 で移した platform/pc98/ime_render_tvram.c と PC98 の ime_display 実装) は pc98.h を直に include 各 1|C、H4/N1/N2。第3段D2のlegacy gate試験後|
+|C3 boot IME facade/C2|include/ime_boot.h +20、platform/pc98/kernel.c 1、既存ime.hの宣言include整理5|I、H4/H9、init known 3組（§7）|
 |D1 WC/独立|drivers/video/geforce/gf_wc.c 130、arch/x86/kernel/video_wc.c 移150、include/video_wc.h +25、arch/ppc/video_wc.c +20|C、H5/N4。mtrr_wc.cは既存実体を使用|
-|D2 accept/D1|drivers/video/geforce/gf_accept.c 110、arch/x86/video/gf_accept_cpu.c 移130、arch/ppc/video/gf_accept_cpu.c +8、build/geforce-module.mk:89–96のGFA source/規則15|C、H5/N4。module ABI/exportsは不変|
+|D2 accept/D1|drivers/video/geforce/gf_accept.c 110、arch/x86/video/gf_accept_cpu.c 移130、arch/ppc/video/gf_accept_cpu.c +8、build/geforce-module.mkのGFA source/規則15|C、H5/N4。module ABI/exportsは不変|
 |E SQLite/独立|lib/sqlite3/sqlite3.c 9、include/diag_stack.h +8、arch/{x86,ppc}/arch_diag_stack.h 各+12|I(off)/C(on)、H6。第4段r2はtypesを変更せず競合なし|
 |F boot選択/独立|tools/tests/test_sep5_boot.py +120、tools/checks/sep5-boot-host.py +15。製品ファイル変更0|I、H7。既設のPPC boot/sdk/programs拒否、boot像不変|
 |S1 profile/第3段F後|sdk/target_profile.py 40、build/sdk-target.mk +45、build/config.mk 15、sdk/target_profile_cli.py +45、tools/build_compare.py 10（tool pin）|I、H8。config/order登録は他段と直列|
-|S2 SDK接続/S1|build/sdk.mk 15、sdk/example/hello/Makefile 15、sdk/rustc_stamp.py 15（target拒否）、build/programs.mk:163,171,610,626のRust呼出規則20、userland/{rust,gshell}/.cargo/config.toml 0（検証入力のみ）、SDK README/arch README各15、tools/build_compare.py 10（配布tool pin）|I、H8/N5。PPC SDK拒否確認、CRT/JSON本文変更なし。arch/README.mdは第4段Fと直列|
+|S2 SDK接続/S1|build/sdk.mk 15、sdk/example/hello/Makefile 15、sdk/rustc_stamp.py 15（target拒否）、build/programs.mkのRust呼出規則20、userland/{rust,gshell}/.cargo/config.toml 0（検証入力のみ）、SDK README/arch README各15、tools/build_compare.py 10（配布tool pin）|I、H8/N5。PPC SDK拒否確認、CRT/JSON本文変更なし。arch/README.mdは第4段Fと直列|
 |Z 全段・第4段F後|tools/ppc/{selected_success,known_header_dependencies}.json 実測分、arch/README.md・TASK_PPC_SEP.md 各15、受入台本30|I、H9、全Nと容量/比較記録。第4段Fとarch/README.md・docs/tasks/ppc/TASK_PPC_SEP.mdが衝突（S2のarch READMEも同じ）|
 - source結線は製品のsourceを変える各段（Fは除く）のbuild/{sources/order.mk,select.mk,arch/x86-sources.mk,platform/pc98.mk,platform/powermac.mk}に各3–20行、tools/tests/fixtures/build_profile_x86.json各3–15行。移設位置で元のリンク順を保持する。全部Zへ先送りしない。
 - 新規hostはtools/tests/test_sep5_{copy,display,provider,console,wc,trace,boot,sdk,boundary}.py 各120–220行、必要なC harness各80–180行。各CHECK inputsと新tools/checks/sep5-{copy,display,provider,console,wc,trace,boot,sdk,boundary}-host.py登録各10–25行。既存試験の追従は§5各ファイル2–30行（抽出変更は30–100行）。
 - 製品の新規/変更約1,600–2,400行＋移設約600行、試験新規約1,800–3,000行、既存追従約500–1,200行。原計画900–2,000行は試験とinc/選択漏れを含まないため幅を広げた。実装開始時に各段のdiffで更新する。
 - 第3段D2/D3/E2/E3はexec/kapiの共有口を変えるためS1/S2は第3段F完了後。C1のlegacy_guest_fakeとgfx host抽出もD2と直列。第4段r2 §5はtypes/GF/GUIの製品編集を含まないためB5/D1/E/S1のその前提は外す。S2/Zの文書衝突は上表。GFX_ACCEL_HALのcore/internal/palette/vram・draw/geom・GUI試験は同時編集しない。
-- Aのuserland複製userland/lib/gfx/libgfx_internal.h:6–10は後段（GFX_ACCEL_HALのH2a・L2–L6・G3、PEGC DIRECTの残件と同じ台帳）。本段で解消した扱いにしない。
+- Aのuserland複製userland/lib/gfx/libgfx_internal.hは後段（GFX_ACCEL_HALのH2a・L2–L6・G3、PEGC DIRECTの残件と同じ台帳）。本段で解消した扱いにしない。
 - C2のbuild/fep-module.mkはFEP_OBJSのime_render_tvram.oの位置/出力名を保持し、kernel/ime/%.cのstatic pattern対象からそれだけ外しplatform/pc98/ime_render_tvram.cの明示規則を追加。同じFEP_INC/OS32_FEP_MODULEでprivate口を部品内解決、新kernel importは不要。
 - 比較台帳: tools/build_compare.pyのH2_OBJECT_MOVESをB2/B5/D1/D2で点検（各3–10行）。元objectが残る抽出は移動表へ入れず旧objectの比較と新objectのC差分を記録し、丸ごとの移動だけ実際の旧新名を追加。C2はFEP出力名を保持するため追加不要、source/STT_FILEを確認。A/C3/E(off)/F/Zはobject移動なし、不一致ならI受入を止める。
 - S1/S2はALLOWED_TOOL_DIFFSへ実配布のtarget_profile.py/CLI/rustc_stamp.py等の旧新sha256を段ごとにレビュー後pin（新規の旧値はNone）。未配布ファイルは登録せず、パスだけの例外や全SDK除外を作らない。基点/段直前の比較を両方記録。
@@ -155,30 +155,30 @@ MESSAGES['sdk'] = 'sdk'
 |B5/B6|core_surface/vram→gfx_surfaces/display、gfx.h/internal|T test_gfx_kernel_fb/attach/map_policy/transfer・test_gf_display・Trident present/lifecycle群; C gfx-host・gf-runner-host・gui-host|
 |C2|ime_render_tvram→同basenameのplatform実体、ime_render.inc/ime.c/private口、gui|T test_ime_display/unicode_surface/fep_core_boot/fep_budget/fep_boundary/fep_module/fep_generator_meta/hsync_fep/x11_shared・fep_host_build・ime_display_host; C x11-shared-host・sqlite-engine-host・fep-budget-host・fep-standard-host・fep-worst-load-host・gui-host、新sep5-console-host|
 |C1|console/backend、tvram.h→PC98 private定数|T test_dep_dir_d_console/con_sink/legacy_callers/ime_display・kernel_includes・console_grid.json; C con-sink-host・d2-services-host・gui-host・x11-shared-host|
-|C3|init/kernel.c・ime.h→ime_boot.h|T test_fep_core_boot/fep_boundary/sqlite_engine/hsync_fep・kernel_includes; C sqlite-engine-host・x11-shared-host・gui-host|
+|C3|platform/pc98/kernel.c・ime.h→ime_boot.h|T test_fep_core_boot/fep_boundary/sqlite_engine/hsync_fep・kernel_includes; C sqlite-engine-host・x11-shared-host・gui-host|
 |D1/D2|gf_wc/accept→arch video_wc/gf_accept_cpu|T test_geforce（wc_lifecycleのCPU範囲抽出/独自-I）・gf_wc_host/recovery・test_gf_production/gf_display; C gf-runner-host・gfinit-host、新sep5-wc-host|
 |E|sqlite3.c→diag_stack/arch_diag_stack|T test_sqlite_memsys5/sqlite_product_sql/sqlite_module_proto; C sqlite-memsys5-host・sqlite-engine-host、新sep5-trace-host|
 |F|boot資産/targetsは不変、拒否試験追加|T test_build_selection/ppc_selection/c_dialect:583/no_libgcc:22/hdd_stage1/2（MIRROR不変）; C hdd-stage1-host・hdd-stage2-host、新sep5-boot-host|
 |S1/S2|profile/CLI/sdk-target/rustc_stamp/sdk・programs、比較pin|T test_build_profile/gen_kapi_cli/host_sdk_rs/kapi_layout/ls_client/h2_fixtures; C target-profile-host・target-toolchain-host・tools-host・h2-fixtures-host、新sep5-sdk-host|
 |Z/全段|selected/known、source/order登録、比較台帳|T test_build_selection/ppc_selection/src_layout/check_result_cache; C check-select-host・tests-inventory・docs-orphans、新sep5-boundary-host|
 - test_gfx_attachのHEADERS、test_gfx_kernel_fbの関数差替/gcc、test_dep_dir_d_consoleのFILES/GRID_FILES、test_ime_displayの抽出/gccは各担当段で更新。fakeだけでなく移設後の製品関数を組む。全変更/削除行のmutation anchorを検索し一意化してruntime REDを確認。以下はr1の広い検索候補を保持した補助台帳。直接追従は上表が主、無関係な試験を一括編集せず各段でcovers/inputs閉包を再確認する。
-- T実物参照：`fep_host_build.py:16`、`kernel_includes.py:3,16,27`、`r1_recovery.py:143`、`test_app_band_pde.py:56`、`test_appmem_map.py:30`、`test_boot_named_constants.py:60,102,113`。 `test_boot_splash_native.py:3,34,37,46`、`test_bootinfo.py:7,15,28,118`、`test_bootlog.py:21,177`、`test_build_profile.py:16,17,20`、`test_build_selection.py:74`、`test_c_dialect.py:17,98,99,108`。 `test_cfg.py:12,185`、`test_check_result_cache.py:4`、`test_ci_stab.py:3`、`test_cirrus_module.py:5`、`test_cirrus_win.py:35`、`test_clang_ast.py:71,176,177`。 `test_con_sink.py:25,30,32`、`test_d2_services.py:215`、`test_db_errstr.py:32,397`、`test_debug_probe.py:8`、`test_dep_dir_a_l04.py:6`、`test_dep_dir_a_l05a.py:6`。 `test_dep_dir_a_l06.py:3`、`test_dep_dir_a_l08.py:3`、`test_dep_dir_a_l09.py:3`、`test_dep_dir_a_l10.py:3`、`test_dep_dir_d_console.py:3,130,133`、`test_dep_dir_d_display.py:3,28`。
-- T実物参照：`test_dep_dir_d_splash.py:3,27`、`test_deploy_set.py:64,69,488`、`test_display_cleanup.py:6,20`、`test_edit_doc.py:25`、`test_exec_fgpoll.py:10`、`test_exec_hwb_abort.py:15`。 `test_exec_syscall_fgpoll.py:11`、`test_fep_boundary.py:111`、`test_fep_budget.py:45,56,184`、`test_fep_conn.py:7`、`test_fep_core_boot.py:4`、`test_fep_generator_meta.py:40`。 `test_fep_meta.py:14,50`、`test_fep_module.py:8`、`test_fep_standard.py:86`、`test_fep_store_contracts.py:13`、`test_fep_store_info.py:8`、`test_fep_store_search.py:32,63`。 `test_fep_user_store.py:9`、`test_font_source.py:44`、`test_geforce.py:3,236,247,249`、`test_geforce_fgpoll.py:5,7`、`test_geforce_heat_backend.py:10,12`、`test_gen_kapi_cli.py:22`。 `test_gf1_instmem_map.py:13`、`test_gf5.py:359,360`、`test_gf_accel.py:4,9,543,602`、`test_gf_command.py:3`、`test_gf_direct.py:8`、`test_gf_display.py:3,1593,1599`。
-- T実物参照：`test_gf_objwait.py:2`、`test_gf_production.py:3`、`test_gfx_accel_a0.py:14`、`test_gfx_accel_hal.py:14`、`test_gfx_attach.py:15,21,31,44`、`test_gfx_boot.py:8,46,105,110`。 `test_gfx_bounds.py:23`、`test_gfx_copy.py:14`、`test_gfx_draw_direct.py:13`、`test_gfx_geom_direct.py:18`、`test_gfx_kernel_fb.py:17,19,127`、`test_gfx_map_policy.py:9,10,33`。 `test_gfx_policy.py:13`、`test_gfx_policy_triggers.py:10,14,15,16`、`test_gfx_reattach.py:15,69`、`test_gfx_reinit.py:13,20,23,24`、`test_gfx_transfer.py:28`、`test_h2_fixtures.py:168`。 `test_h5_shapes.py:5`、`test_hdd_stage1.py:854`、`test_hdd_stage2.py:13,82,121,256`、`test_host_mailbox.py:22`、`test_host_notice.py:24`、`test_host_sdk_rs.py:5`。 `test_hostsvc_block.py:13`、`test_hostsvc_block_contract.py:7`、`test_hostsvc_boot.py:52`、`test_hostsvc_contracts.py:16`、`test_hostsvc_e82557.py:8`、`test_hostsvc_fd.py:9`。
-- T実物参照：`test_hostsvc_init.py:11`、`test_hostsvc_lgy98.py:8`、`test_hostsvc_lgy98_attach.py:11`、`test_hostsvc_link_api.py:8`、`test_hostsvc_link_core.py:8`、`test_hostsvc_media.py:11`。 `test_hostsvc_netcd.py:13`、`test_hostsvc_nic.py:11`、`test_hostsvc_nic_rx.py:10`、`test_hostsvc_open.py:22`、`test_hostsvc_persistent.py:21`、`test_hostsvc_serialfs.py:21`。 `test_hostsvc_sfs_deadline.py:12`、`test_hostsvc_sfs_lan.py:11`、`test_hsync_h1.py:49,54`、`test_hsync_protect.py:26`、`test_hwb_scripts.py:4,25`、`test_ime_display.py:4,40,48`。 `test_install_recover.py:11,61`、`test_kapi_audit.py:13`、`test_kapi_bounds.py:13`、`test_kapi_layout.py:51,335,350,354`、`test_kbd_fgpoll.py:5`、`test_kbd_inject.py:28`。 `test_kcg_module.py:3,84`、`test_kpeek.py:40`、`test_kstring_c.py:26,55`、`test_lan_module.py:109`、`test_layout_defs.py:110`、`test_ledger_device_map.py:10`。
+- T実物参照：`fep_host_build.py`、`kernel_includes.py`、`r1_recovery.py`、`test_app_band_pde.py`、`test_appmem_map.py`、`test_boot_named_constants.py` の `main()`。 `test_boot_splash_native.py`、`test_bootinfo.py`、`test_bootlog.py`、`test_build_profile.py` の `check()`、`test_build_selection.py`、`test_c_dialect.py`。 `test_cfg.py`、`test_check_result_cache.py`、`test_ci_stab.py`、`test_cirrus_module.py`、`test_cirrus_win.py`、`test_clang_ast.py` の `test_changed_unit_dependencies()`。 `test_con_sink.py`、`test_d2_services.py`、`test_db_errstr.py`、`test_debug_probe.py`、`test_dep_dir_a_l04.py`、`test_dep_dir_a_l05a.py`。 `test_dep_dir_a_l06.py`、`test_dep_dir_a_l08.py`、`test_dep_dir_a_l09.py`、`test_dep_dir_a_l10.py`、`test_dep_dir_d_console.py`、`test_dep_dir_d_display.py`。
+- T実物参照：`test_dep_dir_d_splash.py`、`test_deploy_set.py` の `setUp()`、`test_display_cleanup.py`、`test_edit_doc.py`、`test_exec_fgpoll.py`、`test_exec_hwb_abort.py`。 `test_exec_syscall_fgpoll.py`、`test_fep_boundary.py` の `main()`、`test_fep_budget.py` の `inputs()`、`test_fep_conn.py`、`test_fep_core_boot.py`、`test_fep_generator_meta.py` の `exercise()`。 `test_fep_meta.py`、`test_fep_module.py`、`test_fep_standard.py` の `main()`、`test_fep_store_contracts.py`、`test_fep_store_info.py`、`test_fep_store_search.py`。 `test_fep_user_store.py`、`test_font_source.py`、`test_geforce.py`、`test_geforce_fgpoll.py`、`test_geforce_heat_backend.py`、`test_gen_kapi_cli.py` の `test_read_only_arguments()`。 `test_gf1_instmem_map.py`、`test_gf5.py`、`test_gf_accel.py`、`test_gf_command.py`、`test_gf_direct.py`、`test_gf_display.py`。
+- T実物参照：`test_gf_objwait.py`、`test_gf_production.py`、`test_gfx_accel_a0.py`、`test_gfx_accel_hal.py`、`test_gfx_attach.py`、`test_gfx_boot.py`。 `test_gfx_bounds.py`、`test_gfx_copy.py`、`test_gfx_draw_direct.py`、`test_gfx_geom_direct.py`、`test_gfx_kernel_fb.py`、`test_gfx_map_policy.py`。 `test_gfx_policy.py`、`test_gfx_policy_triggers.py`、`test_gfx_reattach.py`、`test_gfx_reinit.py`、`test_gfx_transfer.py`、`test_h2_fixtures.py` の `test_old_object()`。 `test_h5_shapes.py`、`test_hdd_stage1.py` の `build_target()`、`test_hdd_stage2.py`、`test_host_mailbox.py`、`test_host_notice.py`、`test_host_sdk_rs.py`。 `test_hostsvc_block.py`、`test_hostsvc_block_contract.py`、`test_hostsvc_boot.py`、`test_hostsvc_contracts.py`、`test_hostsvc_e82557.py`、`test_hostsvc_fd.py`。
+- T実物参照：`test_hostsvc_init.py`、`test_hostsvc_lgy98.py`、`test_hostsvc_lgy98_attach.py`、`test_hostsvc_link_api.py`、`test_hostsvc_link_core.py`、`test_hostsvc_media.py`。 `test_hostsvc_netcd.py`、`test_hostsvc_nic.py`、`test_hostsvc_nic_rx.py`、`test_hostsvc_open.py`、`test_hostsvc_persistent.py`、`test_hostsvc_serialfs.py`。 `test_hostsvc_sfs_deadline.py`、`test_hostsvc_sfs_lan.py`、`test_hsync_h1.py`、`test_hsync_protect.py`、`test_hwb_scripts.py`、`test_ime_display.py`。 `test_install_recover.py`、`test_kapi_audit.py`、`test_kapi_bounds.py`、`test_kapi_layout.py`、`test_kbd_fgpoll.py`、`test_kbd_inject.py`。 `test_kcg_module.py`、`test_kpeek.py`、`test_kstring_c.py`、`test_lan_module.py` の `boot_distribution()`、`test_layout_defs.py` の `check_generated()`、`test_ledger_device_map.py`。
 - T実物参照：`test_ledger_surface_map.py:10`、`test_legacy_callers.py:5,39`、`test_link_notify.py:21`、`test_lowmap_callers.py:3`、`test_ls_client.py:51,54,70,73`、`test_mem_stat.py:8`。 `test_memmap_audit.py:75,78,80,86`、`test_memmap_boot.py:35,218`、`test_memmap_gen.py:93,95,104,420`、`test_mk_settings_db.py:133,214,320,328`、`test_nano_adapter.py:6,173`、`test_nano_inputs.py:7`。 `test_net_link.py:43`、`test_no_libgcc.py:22,23`、`test_np21w_ini.py:183`、`test_osri.py:284`、`test_osri_view.py:14`、`test_packages.py:67,69,160,170`。 `test_paging_bounds.py:28`、`test_paging_device_map.py:13`、`test_pcm_e4.py:50,52`、`test_pegc_mode.py:20,38`、`test_pgalloc_range.py:18`、`test_ppc_selection.py:98`。 `test_raster_splash_asset.py:146`、`test_raw_wait.py:8,102,113`、`test_result_conv.py:239`、`test_serialfs.py:25,1278`、`test_shell_service.py:258`、`test_shm_user.py:51,127,151`。
-- T実物参照：`test_shutdown_probe.py:7,9,42`、`test_splash_probe.py:10`、`test_splash_raster_diag.py:11`、`test_splash_wire.py:13`、`test_sqlite_memsys5.py:28`、`test_sqlite_module_proto.py:4,502,538,547`。 `test_sqlite_product_sql.py:14,264`、`test_sqlite_vfs_identity.py:3,77`、`test_src_layout.py:7,59,77,119`、`test_stat_cmd.py:31`、`test_trident_contracts.py:13`、`test_trident_cpu32.py:10`。 `test_trident_emergency.py:9,13,23,30`、`test_trident_gap.py:14`、`test_trident_lifecycle.py:4`、`test_trident_mode.py:12`、`test_trident_module.py:20,22`、`test_trident_palette.py:4,7,17,64`。 `test_trident_pc98init.py:16`、`test_trident_present.py:8,11`、`test_trident_regs.py:11`、`test_trident_resources.py:10`、`test_trident_restore.py:18`、`test_trident_route.py:14`。
-- T実物参照：`test_trident_save.py:16`、`test_trident_vram.py:12`、`test_trim_back_rs.py:118,123`、`test_trim_flow.py:9`、`test_trim_kernel.py:7`、`test_unicode_surface.py:7,26,32,42`。 `test_v86_low.py:6`、`test_vfs_fd_path.py:55,444`、`test_vk32_crc.py:7,8,43,44`、`test_vmkernel_layout.py:61`、`test_vmkernel_lz4.py:7,9,24,44`。 `appmem_map_host.c:10`、`boot_splash_native_host.c:44`、`cdinst_host.c:547,548`、`cfg_host.c:6`、`con_sink_host.c:31,34,43,44`、`db_errstr_host.c:9`。 `dep_dir_d3_boot_host.c:10`、`dep_dir_d_console_grid_host.c:6`、`dep_dir_d_display_host.c:4`、`dep_dir_d_emergency_host.c:4`、`dep_dir_d_splash_host.c:4`、`ext2_mini_host.c:7`。 `fep_boundary_host.c:167`、`gf4_b8_host.c:6`、`gf_display_palette_host.c:1`、`gf_wc_host.c:40,50,51,52`、`gfx_accel_a0_host.c:3`、`gfx_boot_host.c:9,147`。
-- T実物参照：`gfx_kernel_fb_host.c:30`、`h3b_fixtures_host.c:9`、`hwb_shell_host.c:15,313`、`ime_dict_host.c:5`、`ime_display_host.c:7,45`、`install_recover_host.c:6`。 `kapi_audit_host.c:184`、`kapi_bounds_host.c:6,27`、`kapi_db_v50_host.c:5`、`lease_host.c:2`、`osri_view_host.c:6`、`pegc_mode_host.c:52,57,398,405`。 `r1_recovery_host.c:21`、`shm_user_host.c:8`、`surface_bundle_host.c:13`、`v86_low_host.c:18`、`vk32_host.c:9,10`、`vmkernel_lz4_host.c:6,9`。 `x11_shared_host.c:78,152,186`。 `gfinit_output_host.h:3`。 `gf_wc_recovery_host.inc:35,123`。 `fixtures/build_profile_x86.json:75,153,162,169`、`fixtures/dep_dir_c/manifest.json:149`、`fixtures/dep_dir_d/console_grid.json:3`。
-- C covers（glob一致も含む）：`arch-asm.py:3`、`c-dialect.py:3`、`check-select-host.py:3`、`con-sink-host.py:3`、`d2-services-host.py:3`、`deploy-set-host.py:3`、`docs-orphans.py:3`。
-- C covers（glob一致も含む）：`double-fault-host.py:3`、`fep-budget-host.py:3`、`fep-standard-host.py:3`、`fep-worst-load-host.py:3`、`font-guard-host.py:3`、`font-host.py:3`、`gf-runner-host.py:3`。
-- C covers（glob一致も含む）：`gfinit-host.py:3`、`gfx-host.py:3`、`gshell-host.py:3`、`gui-host.py:3`、`h2-fixtures-host.py:3`、`h3b-fixtures-host.py:3`、`hdd-stage1-host.py:3`。
-- C covers（glob一致も含む）：`hdd-stage2-host.py:3`、`kapi-audit-host.py:3`、`kapi-bounds-host.py:3`、`kapi-layout-host.py:3`、`kapi-out.py:3`、`le-access.py:3`、`ls-client-host.py:3`。
-- C covers（glob一致も含む）：`manifests.py:3`、`map.py:3`、`memmap-audit-host.py:3`、`memmap-host.py:3`、`memmap.py:3`、`memory-host.py:3`、`mkmod-host.py:3`。
+- T実物参照：`test_shutdown_probe.py`、`test_splash_probe.py`、`test_splash_raster_diag.py`、`test_splash_wire.py`、`test_sqlite_memsys5.py` の `build()`、`test_sqlite_module_proto.py`。 `test_sqlite_product_sql.py`、`test_sqlite_vfs_identity.py`、`test_src_layout.py`、`test_stat_cmd.py`、`test_trident_contracts.py`、`test_trident_cpu32.py`。 `test_trident_emergency.py`、`test_trident_gap.py`、`test_trident_lifecycle.py`、`test_trident_mode.py`、`test_trident_module.py`、`test_trident_palette.py`。 `test_trident_pc98init.py`、`test_trident_present.py`、`test_trident_regs.py`、`test_trident_resources.py`、`test_trident_restore.py`、`test_trident_route.py`。
+- T実物参照：`test_trident_save.py`、`test_trident_vram.py`、`test_trim_back_rs.py`、`test_trim_flow.py`、`test_trim_kernel.py`、`test_unicode_surface.py`。 `test_v86_low.py`、`test_vfs_fd_path.py`、`test_vk32_crc.py`、`test_vmkernel_layout.py`、`test_vmkernel_lz4.py`。 `appmem_map_host.c` の `geforce_foreground_poll()`、`boot_splash_native_host.c` の `irq_save()`、`cdinst_host.c` の `boot_pkg()`、`cfg_host.c`、`con_sink_host.c` の `gfx_policy_reeval()`、`db_errstr_host.c`。 `dep_dir_d3_boot_host.c`、`dep_dir_d_console_grid_host.c`、`dep_dir_d_display_host.c`、`dep_dir_d_emergency_host.c`、`dep_dir_d_splash_host.c`、`ext2_mini_host.c`。 `fep_boundary_host.c`、`gf4_b8_host.c`、`gf_display_palette_host.c`、`gf_wc_host.c` の `gf_wc_msr()`、`gfx_accel_a0_host.c`、`gfx_boot_host.c`。
+- T実物参照：`gfx_kernel_fb_host.c`、`h3b_fixtures_host.c`、`hwb_shell_host.c`、`ime_dict_host.c`、`ime_display_host.c`、`install_recover_host.c`。 `kapi_audit_host.c`、`kapi_bounds_host.c`、`kapi_db_v50_host.c`、`lease_host.c`、`osri_view_host.c`、`pegc_mode_host.c`。 `r1_recovery_host.c` の `geforce_foreground_poll()`、`shm_user_host.c`、`surface_bundle_host.c`、`v86_low_host.c`、`vk32_host.c`、`vmkernel_lz4_host.c`。 `x11_shared_host.c`。 `gfinit_output_host.h`。 `gf_wc_recovery_host.inc`。 `fixtures/build_profile_x86.json:75,153,162,169`、`fixtures/dep_dir_c/manifest.json:149`、`fixtures/dep_dir_d/console_grid.json:3`。
+- C covers（glob一致も含む）：`arch-asm.py`、`c-dialect.py`、`check-select-host.py`、`con-sink-host.py`、`d2-services-host.py`、`deploy-set-host.py`、`docs-orphans.py`。
+- C covers（glob一致も含む）：`double-fault-host.py`、`fep-budget-host.py`、`fep-standard-host.py`、`fep-worst-load-host.py`、`font-guard-host.py`、`font-host.py`、`gf-runner-host.py`。
+- C covers（glob一致も含む）：`gfinit-host.py`、`gfx-host.py`、`gshell-host.py`、`gui-host.py`、`h2-fixtures-host.py`、`h3b-fixtures-host.py`、`hdd-stage1-host.py`。
+- C covers（glob一致も含む）：`hdd-stage2-host.py`、`kapi-audit-host.py`、`kapi-bounds-host.py`、`kapi-layout-host.py`、`kapi-out.py`、`le-access.py`、`ls-client-host.py`。
+- C covers（glob一致も含む）：`manifests.py`、`map.py`、`memmap-audit-host.py`、`memmap-host.py`、`memmap.py`、`memory-host.py`、`mkmod-host.py`。
 - C covers（glob一致も含む）：`np21w-gui-host.py:3`、`osri-view-host.py:3`、`p2v.py:3`、`privileged.py:3`、`r1-fixture-host.py:3`、`shm-user-host.py:3`、`sqlite-memsys5-host.py:3`。
-- C covers（glob一致も含む）：`target-profile-host.py:3`、`target-toolchain-host.py:3`、`test_run.py:156`、`tests-inventory.py:3`、`tools-host.py:3`、`trim-back-rs-host.py:3`、`ver-gfx-host.py:3`。
-- C covers（glob一致も含む）：`ver-info-host.py:3`、`vk32-crc-host.py:3`。
-- C補助参照：`map.py:3`、`run.py:119,127`、`test_run.py:223,346,350,376`。移設でcovers/inputsの選択範囲が狭まらないことも更新対象。既存のglobに含まれる新ファイルは重複登録不要。
+- C covers（glob一致も含む）：`target-profile-host.py`、`target-toolchain-host.py`、`test_run.py`、`tests-inventory.py`、`tools-host.py`、`trim-back-rs-host.py`、`ver-gfx-host.py`。
+- C covers（glob一致も含む）：`ver-info-host.py`、`vk32-crc-host.py`。
+- C補助参照：`map.py`、`run.py:119,127`、`test_run.py`。移設でcovers/inputsの選択範囲が狭まらないことも更新対象。既存のglobに含まれる新ファイルは重複登録不要。
 ## 6. 受入項目 → 試験 → 変異（実装時）
 |ID/項目|host/selected/NPの観測と既存試験|一意anchorの実行時RED変異|
 |---|---|---|
@@ -204,18 +204,18 @@ MESSAGES['sdk'] = 'sdk'
 - 実装者は変更したkernel/SQLite・R1・GF受入module・boot像・SDK/該当userlandを省略せずビルド、触った試験--mutateと`python3 -B tools/checks/run.py --lint`。ABI変更ならclean→all。landingはCI check/build、全mutationはfull-check。check-changedは回さない。最後のソース変更後のログのみ合格とする。
 ## 7. selectedとknownの差分目標
 - 現行固定値は90 TU/21組。check_compile.pyの`--source-profile selected --accept --json`と実.dで確認してからJSONを減らす。通過TUを選択から外して件数を良く見せない。移設元/先の同一性も別欄で記録する。
-- A/Bの新規通過候補は`gfx/gfx_vram.c`、`gfx/gfx_core.c`、C1は`kernel/console/console.c`、D1は`drivers/video/geforce/gf_wc.c`（GF配置の残る二次障害は実装時に別計測）。各TUの二次障害を実測し、通過数は未確定。gfx_scroll.c/palette.cは既に90本に含まれ、新規成功には加算しない。
+- A/Bの新規通過候補は`drivers/video/pc98/gfx_vram.c`、`gfx/gfx_core.c`、C1は`kernel/console/console.c`、D1は`drivers/video/geforce/gf_wc.c`（GF配置の残る二次障害は実装時に別計測）。各TUの二次障害を実測し、通過数は未確定。gfx_scroll.c/palette.cは既に90本に含まれ、新規成功には加算しない。
 - `ime_render_tvram`はPC98選択へ移り、PPCのFB実装ではない。gf_acceptは受入module、SQLiteは専用buildのTRACE両構成、CRT/bootは専用製品なので、selectedの成功数と混ぜない。provider新規TUも共通TUの解消と別集計する。
-- C2で解く3組：`kernel/gui.c → kernel/ime/{ime.h,ime_render.h,ime_store.h}`。C3で解く3組：`init/kernel.c → kernel/ime/{ime.h,ime_render.h,ime_store.h}`。実.d消失を確認し21→15組を目標とする。新facadeは本当に必要な関数だけで重いincludeを持たない。
-- 残す15組：kernel/sys.c→geforce_module.h（pollが現役）、init/kernel.c→double_fault/gdt/idt（3）、cd/lan/pcm/fm/snd_engine（5）、cirrus/geforce/kcg/trident/trident_module（5）、platform/pc98/boot.h（1）。本票で空ヘッダ化/allowlist削除はしない。sys→GFの1組もWC移設だけでは解消しない。
+- C2で解く3組：`kernel/gui.c → kernel/ime/{ime.h,ime_render.h,ime_store.h}`。C3で解く3組：`platform/pc98/kernel.c → kernel/ime/{ime.h,ime_render.h,ime_store.h}`。実.d消失を確認し21→15組を目標とする。新facadeは本当に必要な関数だけで重いincludeを持たない。
+- 残す15組：kernel/sys.c→geforce_module.h（pollが現役）、platform/pc98/kernel.c→double_fault/gdt/idt（3）、cd/lan/pcm/fm/snd_engine（5）、cirrus/geforce/kcg/trident/trident_module（5）、platform/pc98/boot.h（1）。本票で空ヘッダ化/allowlist削除はしない。sys→GFの1組もWC移設だけでは解消しない。
 - selected成功は原始口/依存の検査でありbootinfo・surface endian・callback ABI・PPC全リンク/実走の代替ではない。未対応display/SDK providerを選んだ製品が実行可能扱いされないことをH7/H8/H9で検査する。
 ## 8. 容量予算・完了・未決
 |対象|上限の根拠・本段の見込み|実装時の必須記録|
 |---|---|---|
-|kernel通常/R1 resident|include/memmap.h:230式は0x275000=2516KiB。移設中心、provider/call増分text概算0–8KiB、rodata/data/bss 0–1KiB、巨大buffer追加なし|__kernel_resident_end/map、通常/R1各headroom。R1も同じ予算で個別計測|
-|vmkernel圧縮/起動FD|boot/boot_defs.h:116 MAX_IMAGE_SIZE=508KiB。FD1.44MBはbuild/image.mk:35の1474560byte、1.23MBも既存生成器の空きsectorで判定。圧縮増分は0–4KiB概算だが保証できない|vmkernel.lz4実sizeとFD配置空き。boot sector/loaderはI段でbyte/長さ一致、HDD loaderも比較|
-|FEP module|tools/module_schema.py:79 の image_max/mem_max 各 64KiB。C2 で FEP に約 100 行を移す。11-05 の build で fep.elf は text 17.3KB・bss 7.6KB で超えるおそれは低い [推]|C2 の前後の fep.elf の image/mem の大きさ|
-|kdebug.bin/paired modules|tools/module_schema.py:55でkdebug image/mem各256KiB。kdebugコード追加なし、import変更無しが目標。kernel pair CRC変更でbin byteは変わり得る|image_size/mem_sizeとpair一致。WCはkernel/GeForce受入module側、受入module自身のpolicy上限も確認|
+|kernel通常/R1 resident|include/memmap.h式は0x275000=2516KiB。移設中心、provider/call増分text概算0–8KiB、rodata/data/bss 0–1KiB、巨大buffer追加なし|__kernel_resident_end/map、通常/R1各headroom。R1も同じ予算で個別計測|
+|vmkernel圧縮/起動FD|boot/boot_defs.h MAX_IMAGE_SIZE=508KiB。FD1.44MBはbuild/image.mkの1474560byte、1.23MBも既存生成器の空きsectorで判定。圧縮増分は0–4KiB概算だが保証できない|vmkernel.lz4実sizeとFD配置空き。boot sector/loaderはI段でbyte/長さ一致、HDD loaderも比較|
+|FEP module|tools/module_schema.py の image_max/mem_max 各 64KiB。C2 で FEP に約 100 行を移す。11-05 の build で fep.elf は text 17.3KB・bss 7.6KB で超えるおそれは低い [推]|C2 の前後の fep.elf の image/mem の大きさ|
+|kdebug.bin/paired modules|tools/module_schema.pyでkdebug image/mem各256KiB。kdebugコード追加なし、import変更無しが目標。kernel pair CRC変更でbin byteは変わり得る|image_size/mem_sizeとpair一致。WCはkernel/GeForce受入module側、受入module自身のpolicy上限も確認|
 - 空き容量の基点実測は本作業では未実施。上限を跨がないとは断言しない。超過した段は不受入とし不要wrapper/重複表を減らす。SHM/heap/FDフォーマット・上限の引上げを本票に混ぜない。
 - 完了は各段の比較またはNP証拠、既存host追従/変異/lint、CI、selected実.d、容量、KAPI/SDK/CRT/FEP指紋保存が揃ったとき。外部apps/gameはH-7により外部未ビルド。PPC FB/ユーザCRT/target実装は後段。
 - ユーザー判断を要する未決：0件。BSDユーザCRT・Rust公式仕様の未確認は後段実装前の調査事項で、今回のPPC明示拒否の選択を妨げない。推奨はx86公開契約を保持し本票の順で分離すること。
@@ -224,6 +224,6 @@ MESSAGES['sdk'] = 'sdk'
 
 ## 確定 (2026-11-09、Opus 5.5 第 2 回の可を PM が反映)
 - N1 (P3)：C1 の行に、C2 で移した PC98 の FEP 部品 2 本 (platform/pc98/ime_render_tvram.c と PC98 の ime_display 実装) が pc98.h を直に include することを足した。
-- N2 (P3)：§8 の容量の表に FEP module (tools/module_schema.py:79 の image/mem 各 64KiB) の行を足した。
+- N2 (P3)：§8 の容量の表に FEP module (tools/module_schema.py の image/mem 各 64KiB) の行を足した。
 - PM 決定 (REVIEW.r1 末尾)：F10 公開の os32_callconv.h は作らない (第 3 段 A の実装で公開の os32_kapi_shared.h を byte 一致に保ち、内部の include/callconv.h を呼出属性の口にした決定を正とする。確定設計 PPC_SEP3_DESIGN の A2 との差は第 3 段 F で正典に反映)。F4 boot の段は ppc-powermac の拒否を確かめる試験だけに縮める。F2 IME の candlist の保存と復元は PC98 の表示の backend に置き、IME_Render の口 (FEP の契約・kexports) に足さない。
 - 第 1 回の F1〜F13 はすべて r2 で直り、第 2 回で確認された。第 4 段の確定版とは文書 2 本 (arch/README.md・TASK_PPC_SEP.md) だけが重なり、S2/Z を第 4 段 F の後に直列で置く。ユーザー判断の未決 0 件。

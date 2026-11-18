@@ -97,7 +97,7 @@ if row != 480 goto paint
 - 枠は先頭/最終行を `mmiofill8` のcount=640、各中間行の左右をcount=1で白(7)にする。左右マークは位置/大きさの異なる小矩形を行ごとのfillで描く。水平色帯の高さ64、最終色帯32。乗算はpitchの累積加算で不要。
 - 新命令は **`mmiofillW address count value`（W=8/16/32）**。countはバイト数でなく書込み回数（1以上のu32）、valueは幅内、addressは既存のphys/bar/window。countは単一数値/変数/括弧式、valueは行末までの式。自然整列と最終バイトの32bit越境を最初の書込み前に検査し、幅ごとに番地を進めて同じ値を書く。特定PCI装置への制限・BARサイズの推定・自動readbackは加えない。
 - fillはshell内で既存WRITEを繰り返す。BAR解決はfillの開始時に1回、wire/KAPIは変更しない。各要素の前に既存POINTで中止を確認し、失敗/中止で即停止、書込みのundo/再送なし。ログはfill全体でbegin/endの1組（開始番地・幅・count・値、成功した回数・rc）とし、途中失敗の位置は開始番地+成功回数×幅から求める。固まった場合はend欠落として扱う。
-- 現行の毎命令ログ (`userland/shell/hwb_exec.c:366,379`) ではr1の約54万命令が約107万行になるため、行fillへ置換する。色帯は480 fill、枠/小矩形も行単位でログ量を抑える。98側表示中に作画を終え、切替後の5秒に描画時間を含めない。32変数/64ラベル/64KiB/深さ8 (`H:47`) 内に収め、scratch変数を再利用する。
+- 現行の毎命令ログ (`userland/shell/hwb_exec.c` の `hwb_step()`) ではr1の約54万命令が約107万行になるため、行fillへ置換する。色帯は480 fill、枠/小矩形も行単位でログ量を抑える。98側表示中に作画を終え、切替後の5秒に描画時間を含めない。32変数/64ラベル/64KiB/深さ8 (`H:47`) 内に収め、scratch変数を再利用する。
 - VRAM容量は SPR の申告・実アクセス可能範囲・BAR decode 幅を別欄に記録する。段3前には BAR サイズを Memory Enable の一時停止→BAR 保存/測定/復元→Command16復元の別 script で測り、隣接装置との非重複を確認する（PCI status を巻き込むDWORD RMWは禁止）。容量境界の保存/異値/alias/復元試験は、その範囲内で別回に行う。段2で二面分を要求しない。
 
 ## 3. 保存・復元の範囲と実機での判定
@@ -190,6 +190,6 @@ trident_route_enable(&resident);
 なし（0 件）。F1〜F6 と PM 決定をすべて反映。
 
 ## 確定 (2026-11-05、Opus 第 2 回、PM が反映)
-- N1 (P2): 未定義の初期変数 keepgr6 は ARG で止まる (hwb_parse.c:84-92、初期変数は mode だけ) → **mode=3 = mode=1 と同じ列で GR06 だけ元値**に変えた。引数は mode だけ。
-- N2 (P3, 実装の依頼に書く): 色帯は 64 行ぶんの連続領域を 1 回ずつ (8 回) fill、左右の枠は「行末+次の行頭」を mmiofill8 count=2 (約 480 回)。writes は書いた要素の数。tools/rshell_hwb.py と test_rshell_hwb.py を段 2a に加え、fill の count・done を検査する (今は未知の op を素通し rshell_hwb.py:52-62)。
+- N1 (P2): 未定義の初期変数 keepgr6 は ARG で止まる (hwb_parse.c、初期変数は mode だけ) → **mode=3 = mode=1 と同じ列で GR06 だけ元値**に変えた。引数は mode だけ。
+- N2 (P3, 実装の依頼に書く): 色帯は 64 行ぶんの連続領域を 1 回ずつ (8 回) fill、左右の枠は「行末+次の行頭」を mmiofill8 count=2 (約 480 回)。writes は書いた要素の数。tools/rshell_hwb.py と test_rshell_hwb.py を段 2a に加え、fill の count・done を検査する (今は未知の op を素通し rshell_hwb.py)。
 - N3 (P3, 実装の依頼に書く): 票の行番号は main で引用し直す (T:252→253、§4 の R2〜R4 は T:295 付近)。

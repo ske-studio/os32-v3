@@ -25,7 +25,7 @@ def main():
     with tempfile.TemporaryDirectory() as tmp:
         d = Path(tmp)
         mk = d / 'flags.mk'
-        mk.write_text('include build/ppc-kboot.mk\nprint-flags:\n\t@echo $(KB_FLAGS)\n')
+        mk.write_text('ARCH := ppc\nPLATFORM := powermac\ninclude Makefile\nprint-flags:\n\t@echo $(KB_FLAGS)\n')
         flags = shlex.split(command(['make', '-s', '-f', str(mk), 'print-flags']))
         gcc = str(BIN / 'powerpc-elf-gcc')
         obj = d / 'start.o'

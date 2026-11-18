@@ -1,4 +1,4 @@
-#include "geforce_module.h"
+#include "geforce_contract.h"
 #include "serial_diag.h"
 #include "memmap.h"
 #include "gfx_internal.h"
@@ -17,7 +17,7 @@
 #include "paging.h"       /* paging_map_phys: ⑥ の窓の写像 */
 #include "kprintf.h"
 #include "kselftest.h"
-#include "kcg_module.h"
+#include "kcg_contract.h"
 #include "gui.h"
 #include "../exec/surface_query.h"
 #include "../exec/appslot.h"

@@ -1,6 +1,6 @@
 # fstat_redir TDD 記録 — `fstat` がリダイレクトを見ておらず `isatty` と食い違う
 
-対象票: `docs/archive/test/TASK_FSTAT_REDIR.md` の受入 **F4 / F5**
+契約: [`docs/design/fs/vfs_fd_fstat.md`](../../docs/design/fs/vfs_fd_fstat.md) (出所の票 TASK_FSTAT_REDIR。この試験はその受入 **F4 / F5**、下の「票 §N」はその票の節)
 試験: `tools/tests/fstat_redir_host.c` (実物の `fs/vfs.c` + `fs/vfs_fd.c` + `fs/fd_redirect.c` を `#include`)
 実行: `python3 -B tools/tests/test_fstat_redir.py [--target] [--mutate]` / `make check-fstat-redir-host`
 関連: `tools/tests/test_result_conv.py` (userland の `stat_t` を贋 KAPI で走らせる側)

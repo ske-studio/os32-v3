@@ -27,7 +27,7 @@ main 0〜4 の結果を見て、同じ試行の PAUSED から VERIFY を一度�
 | main 0〜3 | 各本を個別承認して順番どおり全て成功、差分・REC と98表示更新を確認済み。失敗した残りを飛ばさない（(記録はアーカイブ)、G:373–379）。 |
 | main 4 | DONE のみと静的確認した main 4 を完了し、同じ sid の PAUSED を受信済み。`next_main=5` が VERIFY の入口条件（(記録はアーカイブ)、G:374–381、E:75–76）。 |
 | 試行の連続性 | A2 から同じ sid/state/log/CRC を保つ。abort・再起動・補助コマンドを挟まない。承認待ち PAUSED のまま結果を提示する（docs/design/userland/shell/cmd_gfinit.md、R:1230–1255）。 |
-| 経過時間の残り | 残りは `(trial_limit-spent)/PIT_HZ` 秒。A2・main 0〜4 の消費を引いた試行全体60秒の残りであり、A4専用60秒を取り直さない（C:90、`kdebug/recover_profile.c:86–87`、G:345、R:1169,1235–1242）。 |
+| 経過時間の残り | 残りは `(trial_limit-spent)/PIT_HZ` 秒。A2・main 0〜4 の消費を引いた試行全体60秒の残りであり、A4専用60秒を取り直さない（C:90、`kdebug/recover_profile.c`、G:345、R:1169,1235–1242）。 |
 | 時間記録の限界 | 正確な spent の当日値は本資料では未取得。壁時計から承認待ちまで引き算して残りと呼ばない。期限切れは安全点で停止・cleanup。PAUSED 中の status 追加も行わない（R:738–750,1076–1090,1284–1285）。 |
 | 確定 N2 | ノートの `--timeout 900` を使用し、小さくしない。送信時間は別枠、承認待ちは積算外。Tlog の事前実測を開始条件へ復活させない（M:222、docs/design/kdebug/README.md、R:744–750,1235）。 |
 | 確定 N3 | 資料不足・承認なしなら main 4 後に abort → 電源再投入で終わる。今回の資料を用意しても自動継続しない（M:223、docs/decisions/realhw/GF6200_4A_DESIGN.md）。 |
@@ -51,7 +51,7 @@ main 0〜4 の結果を見て、同じ試行の PAUSED から VERIFY を一度�
 | 最大範囲 | L=256MiBなら最終DWORDは0x3FFFFFFC、53点。そのうち17点は先頭1KiB内で重複、追加36点。最小試験との和集合は最大292 DWORD＝1168バイト | P:36–45,127–133（M:20 の窓長を代入して算出） |
 | 件数の下限 | 容量不明は256先。有効容量16〜256MiB以上なら和集合284〜292先。窓全体を連続して塗る試験ではない | P:10–45,114–133（集合から算出） |
 | 予約と内容保全 | 実装の予約は先頭1KiBだけでなくBAR1窓全体 `{0,bar1_length}`。そこから上記点のみ書く。先頭256語の退避はあるが書戻し処理はなく、外側alias点の退避もない | P:215,227–250、R:1013–1017 |
-| アクセス方式 | PCD写像、volatileアクセス。安全な読取によるposted write排出を設計が要求。疎な点の成功は全セル健全性の保証ではない | `kdebug/kdebug_window.c:26–36,81`、docs/design/kdebug/gfinit_plan.md |
+| アクセス方式 | PCD写像、volatileアクセス。安全な読取によるposted write排出を設計が要求。疎な点の成功は全セル健全性の保証ではない | `kdebug/kdebug_window.c`、docs/design/kdebug/gfinit_plan.md |
 | 不一致 | 最小比較または署名比較が偽なら trial_end(REC_VERIFY)、残りを実行しない。バス・期限・ログ異常も共通cleanupへ | P:239–246、R:1076–1090,1248–1252,1273–1276 |
 | 所要時間 | 実機所要時間は未測定。最小512書込＋容量有効時最大53署名書込と読戻し・REC送信がある。ゲストは残り実行予算とopcode期限、別の送信期限を適用し、壁時計900秒の完走保証ではない | P:168–210、R:1076–1089、G:259–286、M:222 |
 
@@ -108,10 +108,10 @@ S0は98 CUI・legacy解放・予約テキストセル復元検証、S1は安全�
 
 ## 確定 (2026-10-26、Opus 5.5 のレビュー (P1 なし) を PM が反映 — 本文の該当の行より優先する)
 
-- **F1 (PM 決定: 採用)**: final/EOT を確かめた後、**電源を入れ直す前に**、読み取りだけで kpeek を回して最終値を記録する — `rshell_serial.py --port /dev/ttyUSB0 cmd 'peek -m -w4 0x24000200 4'` (PMC.ENABLE 200h)、`cmd 'peek -m -w4 0x24100220 24'` (PFB 100220〜234h)、`cmd 'peek -m -w4 0x24680508 4'`・`'… 0x24680578 4'`・`'… 0x24680580 4'` (PRAMDAC)。final END の後は PAUSED ではないので kpeek は通り、Command=0x0102 で Mem=1 のまま、quiesce が書くのは 1850・1854・140 だけ (kdebug/recover.h:22-35)。PLL の 4000〜403Ch も指定して読める。これを取れば、A4 が成功したときに 4a の合否を電源の入れ直しの前に出せる (取らずに電源を入れ直すと 4a は保留で、最初からやり直し)。
-- **F2**: alias の点は **52 (うち 16 点は先頭 1KiB の中で重なる)** — alias_offsets(2^28) は {0,4,8} と 2^k−4・2^k (k=4..27) と 2^28−4 (kdebug/gfinit_plan.c:36-45)。1KiB の中は 0,4,8,12,16,28,32,60,64,124,128,252,256,508,512,1020 の 16 点、外は 36 点、和集合 292 (16MiB のとき 284) は本文どおり。
-- **F3**: ノートの `rshell_recover.py` は result=OK のときだけ成功とするので (tools/rshell_recover.py:68-73,123-128,236-238)、**正常な A4 でも必ず rc=1 と `recover: missing/failed verification or lost logs` が出る**。final の行で判定する。
-- **F4**: VERIFY の中で saved_count≠256 のときは trial_end を通らず、REC_OPERATION (trial=3) の FAIL になる (gfinit_plan.c:248、recover.c:1250-1251)。終端の表の trial の値に 3 も加える。
+- **F1 (PM 決定: 採用)**: final/EOT を確かめた後、**電源を入れ直す前に**、読み取りだけで kpeek を回して最終値を記録する — `rshell_serial.py --port /dev/ttyUSB0 cmd 'peek -m -w4 0x24000200 4'` (PMC.ENABLE 200h)、`cmd 'peek -m -w4 0x24100220 24'` (PFB 100220〜234h)、`cmd 'peek -m -w4 0x24680508 4'`・`'… 0x24680578 4'`・`'… 0x24680580 4'` (PRAMDAC)。final END の後は PAUSED ではないので kpeek は通り、Command=0x0102 で Mem=1 のまま、quiesce が書くのは 1850・1854・140 だけ (kdebug/recover.h)。PLL の 4000〜403Ch も指定して読める。これを取れば、A4 が成功したときに 4a の合否を電源の入れ直しの前に出せる (取らずに電源を入れ直すと 4a は保留で、最初からやり直し)。
+- **F2**: alias の点は **52 (うち 16 点は先頭 1KiB の中で重なる)** — alias_offsets(2^28) は {0,4,8} と 2^k−4・2^k (k=4..27) と 2^28−4 (kdebug/gfinit_plan.c)。1KiB の中は 0,4,8,12,16,28,32,60,64,124,128,252,256,508,512,1020 の 16 点、外は 36 点、和集合 292 (16MiB のとき 284) は本文どおり。
+- **F3**: ノートの `rshell_recover.py` は result=OK のときだけ成功とするので (tools/rshell_recover.py)、**正常な A4 でも必ず rc=1 と `recover: missing/failed verification or lost logs` が出る**。final の行で判定する。
+- **F4**: VERIFY の中で saved_count≠256 のときは trial_end を通らず、REC_OPERATION (trial=3) の FAIL になる (gfinit_plan.c、recover.c:1250-1251)。終端の表の trial の値に 3 も加える。
 - ユーザー決定 (2026-10-26): **A4 は同じ立会い・同じ試行で続ける** (推奨どおり)。実施は次に実機の前に行くとき。
 
 VIDEO PLL 診断版を用いる回は、[main の観測手順](gf_main.md#video-pll-直後の観測-gf_vpll_probe)に従い、

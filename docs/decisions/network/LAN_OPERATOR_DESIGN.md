@@ -27,23 +27,23 @@
 - PM-LOG: PLOGを共通LOG/_service_logに変更、x86 bootlogも送れる契約にしos32.予約名を使わない。
 
 ## 1. 実物の確認（r1 の有効な確認を保持）
-- 統合判断1（wt/int-1114cのPOLICY_DEV §1）: 同じ役目は本線のlink/host_agent、HOST_SERVICES_PLAN §§2–3、NET_HOSTSVC_DESIGN §§2/5/6/9とPPCのPLN1診断・LOG・端末・HostFSにある（r3の確認を継承、§5の対応表）。新しい独立プロトコルは作らない。
+- 統合判断1（wt/int-1114cのPOLICY_DEV §1）: 同じ役目は本線のlink/host_agent、HOST_SERVICES_PLAN §§2–3、docs/design/net/README.md (Host Services の LAN の経路)・docs/design/net/nic.md・docs/design/net/host_mailbox.md・docs/design/tools/host_notify.md・docs/design/net/link_host_api.md・docs/design/tools/host_agent.mdとPPCのPLN1診断・LOG・端末・HostFSにある（r3の確認を継承、§5の対応表）。新しい独立プロトコルは作らない。
 - 統合判断2: link/通知/LOG/SFS backendとホスト操作口は1つの実装に統合する。tick・IRQ・idle・NICはlink_platform/NetNicOpsのHALへ分離し、PC98/GEMと既存CLIのadapterだけをplatformに残す。PPC専用GSERIALは作らない。
 - 統合判断3: 共通link v2・共通tick・既存VFS/常駐mount・既存shellの実行経路を維持するため計画の向きと一致。PPCからSFS on linkを実証しx86 raw SFS廃止は§9の後続関門とする。レビューにもこの3点を渡す。
 |確認|現在の根拠・含意（作業木相対 file:line）|
 |---|---|
-|serial TX|`drivers/char/serial.c:644,654,677` は TxRDY の待ち・予算超過時 HLT・IF=0 の上限。常時spinとの断定は誤りだが、出力中の待ちを避ける目的は有効。|
-|console|`kernel/console/console.c:203,218,300,340` はsinkへ出力。`:205,222,302,342` のserial複写は rshell_active **または** boot_serial_mirror。文字単位の既存非複写とsinkの全PRINT取得は区別する。|
-|EOT/実行|`userland/shell/rshell.c:425–497` の拒否・空行・exit例外・SFS分岐・echo/実行後EOTを維持。`tools/rshell_serial.py:258,592` のEOTはrcではなく、SFS結果行判定は専用。|
-|像と起動|rshellはshell.bin (`build/programs.mk:106`)、sh.bin対象外 (`userland/shell/main.c:128`)。`ui.c:633` 付近のserial初期化・rshell自動開始を維持。|
-|sink|`include/con_sink.h:21` は8192B（レコードheader込み）。`con_sink.c:125,133,243,297,312` にenable/disable/read/stat/owner回収、読取り所有者は1人。enableは公開KAPIでない。|
-|通知|`tools/host_notify.py:47` は名前→LIST番号に依存。`NET_HOSTSVC_DESIGN §5` の65535は競合消費なので、番号指定だけでは先取りを防げない。予約番号・検索除外の追加が必要。|
-|GUI|`gserial.rs:64,81,292` はserial直結、openはserial初期化依存。`wm.rs:1180` は通知を消費せず前景にイベント配送。LAN入力と返答の差替えが必要。|
-|帯域|`net/link.c:514–573` はクラス交互TX、回数上限とtick_budget、100Hz駆動、末尾にnotify_tick。WDATAは最大1400BでACK待ち。LAN化だけで所要時間は保証しない。|
-|PPC依存|`net/link.c:56–65` のidt/io/idle、`net/nic.c:8–17,63` のPC98 tick、mailboxのirq依存を移植する必要がある。PLN1 codecだけの移動では成立しない。|
-|hsync|`userland/system/hsync.c:370,984,1449,1728` 等にファイルごとの出力があり、件数依存で8KiB以内とは証明できない。上限超過の実行結果と取得失敗を分ける。|
+|serial TX|`drivers/char/serial.c` は TxRDY の待ち・予算超過時 HLT・IF=0 の上限。常時spinとの断定は誤りだが、出力中の待ちを避ける目的は有効。|
+|console|`kernel/console/console.c` はsinkへ出力。`shell_putchar()` のserial複写は rshell_active **または** boot_serial_mirror。文字単位の既存非複写とsinkの全PRINT取得は区別する。|
+|EOT/実行|`userland/shell/rshell.c` の拒否・空行・exit例外・SFS分岐・echo/実行後EOTを維持。`tools/rshell_serial.py` のEOTはrcではなく、SFS結果行判定は専用。|
+|像と起動|rshellはshell.bin (`build/programs.mk`)、sh.bin対象外 (`userland/shell/main.c`)。`ui.c` 付近のserial初期化・rshell自動開始を維持。|
+|sink|`include/con_sink.h` は8192B（レコードheader込み）。`con_sink.c` にenable/disable/read/stat/owner回収、読取り所有者は1人。enableは公開KAPIでない。|
+|通知|`tools/host_notify.py` は名前→LIST番号に依存。docs/design/net/host_mailbox.md「取り出す」の65535は競合消費なので、番号指定だけでは先取りを防げない。予約番号・検索除外の追加が必要。|
+|GUI|`gserial.rs` はserial直結、openはserial初期化依存。`wm.rs` は通知を消費せず前景にイベント配送。LAN入力と返答の差替えが必要。|
+|帯域|`net/link.c` はクラス交互TX、回数上限とtick_budget、100Hz駆動、末尾にnotify_tick。WDATAは最大1400BでACK待ち。LAN化だけで所要時間は保証しない。|
+|PPC依存|`net/link.c` のidt/io/idle、`net/nic.c` のPC98 tick、mailboxのirq依存を移植する必要がある。PLN1 codecだけの移動では成立しない。|
+|hsync|`userland/system/hsync.c` の `ls_cb()` 等にファイルごとの出力があり、件数依存で8KiB以内とは証明できない。上限超過の実行結果と取得失敗を分ける。|
 - 9600bps・8N1で1536Bは線上だけで約1600ms。既存T1c遅延との因果とLAN所要時間は今回未測定。
-- x86既存NIC demuxは0x88B5内のSFS MARK全3Bとlinkを分離 (`net/nic_rx.c:54,61`)。x86のraw SFSは今回廃止しない。
+- x86既存NIC demuxは0x88B5内のSFS MARK全3Bとlinkを分離 (`net/nic_rx.c`)。x86のraw SFSは今回廃止しない。
 
 ## 2. 通信契約とホストの口
 - EtherType **0x88B5**、既存link v2を使う。新しいEthernet型・GSERIAL型・任意execサービスを追加しない。NOTIFYはコマンド、REQUEST/WDATAは結果を運ぶ。
@@ -78,11 +78,11 @@ class CommandTransport:
 - agentは1件を結果またはUNKNOWNまで保持し、UNKNOWN後は対象ゲストのREADY再確認と利用者の明示的な再開まで次を送らない。CLIの切断だけでは実行中枠を解放しない。UNKNOWNのIDも照合情報を保持し、同じagent世代・boot-token・IDの遅延RSH OUTを再接続後も受理する。長さ/drop/echo/EOT検査合格なら結果確定、READYのdoneだけでは完了にしない。旧世代/別bootのOUTは拒否し、遅延結果でも再送しない。
 
 - **U5 常駐**: ホスト起動時からNICごとにhost_agentを1つ常駐させる。rshell/gserial/LOG表示/SFSのCLIは8027へ接続し、agentを子プロセスとして起動・停止しない。切断してもサービスは存続し、ゲスト不在中も操作口と再接続待ちを維持する（既存open_streamのブロック中もprobeを処理）。
-- 設定は `/etc/os32/host-agent/<instance>.json`（root所有0640）に `iface,root,allow-write,peer,backend,frame-endpoint,operator-endpoint,state-dir` を記載。rootは絶対パス、allow-write既定false、peerは固定ゲストMAC。state-dir に世代・id・sfs_generation を永続しない (NET_HOSTSVC_DESIGN:154、agent の再起動は新しい世代、A5)。ロックとログだけを置く。設定検証後に起動し、NIC重複はロックで拒否。複数NICは127.0.0.1:8027、127.0.0.2:8027等で操作口を分離し、8026とstate-dirもinstance別にする。
+- 設定は `/etc/os32/host-agent/<instance>.json`（root所有0640）に `iface,root,allow-write,peer,backend,frame-endpoint,operator-endpoint,state-dir` を記載。rootは絶対パス、allow-write既定false、peerは固定ゲストMAC。state-dir に世代・id・sfs_generation を永続しない (docs/design/tools/host_notify.md「何をするか」、agent の再起動は新しい世代、A5)。ロックとログだけを置く。設定検証後に起動し、NIC重複はロックで拒否。複数NICは127.0.0.1:8027、127.0.0.2:8027等で操作口を分離し、8026とstate-dirもinstance別にする。
 - unit原本は `tools/systemd/os32-host-agent@.service`、ExecStartは `/usr/bin/python3 /opt/os32/tools/host_agent_service.py --config /etc/os32/host-agent/%i.json`、Type=simple、Restart=on-failure、RestartSec=2、WantedBy=multi-user.target。専用os32-hostユーザー、永続状態は `/var/lib/os32-host-agent/%i`。必要なraw権限はunitのCAP_NET_RAWに限定する。
 - インストールは管理者が一度、専用ユーザーと設定/状態ディレクトリを作成→tools一式を `/opt/os32/tools` に配置→設定を編集しrootへの必要な読書き権限を付与→unitを `/etc/systemd/system/` へ配置→`systemctl daemon-reload`→`systemctl enable --now os32-host-agent@<instance>`。Ubuntuノート・systemd有効のWSLは同じunitを使う。WSLはWindowsログオン時のタスクで対象ディストリビューションを起動・維持する。systemd無効環境では同タスクが `wsl.exe -d <distro> --exec /usr/bin/python3 /opt/os32/tools/host_agent_service.py --config <設定>` を監視再起動し、ゲスト/台本と独立して常駐させる。
 - Ubuntuの物理NICは既存lan_bridge→8026→agent、raw SFSはlanfs_host.pyの既存Server/HostFSを維持する。サービスrunnerがbridge/lanfs_hostを同じ設定で常駐管理し、root/allow-write/peerを渡す。SFS MARK全3Bで分離し二重応答を防ぎ、NIC送信MACを揃える。PPCのSFS CALLは同じbackend実装をagent内で使う。raw SFS自体はCLI用8027へ載せ替えない。
-- WSL→Windows NP21/W は既存の NP2NETSOCK (4B BE 長＋Ethernet) の 8026 経路を今の向きのまま使う: WSL の agent が 127.0.0.1:8026 で listen し、NP21/W が NP2NETSOCK=127.0.0.1:8026 で接続しに来る (`host_agent.py:17`、`docs/tasks/network/PLAN.md:266`)。Windows 側に listen の口を開かない (A3)。NP21/W が切断の後に再接続するかは NP21/W の試験の項目に入れる。WSL の NAT を raw Ethernet の橋とみなさない。NP21 の raw SFS もこの frame 経路で MARK を demux する。
+- WSL→Windows NP21/W は既存の NP2NETSOCK (4B BE 長＋Ethernet) の 8026 経路を今の向きのまま使う: WSL の agent が 127.0.0.1:8026 で listen し、NP21/W が NP2NETSOCK=127.0.0.1:8026 で接続しに来る (`host_agent.py:17`、`docs/tasks/network/PLAN.md`)。Windows 側に listen の口を開かない (A3)。NP21/W が切断の後に再接続するかは NP21/W の試験の項目に入れる。WSL の NAT を raw Ethernet の橋とみなさない。NP21 の raw SFS もこの frame 経路で MARK を demux する。
 
 ## 3. CUI の境目・出力・寿命
 ```c
@@ -122,15 +122,15 @@ pub fn emit(id: &[u8], bytes: &[u8]); // 有界enqueue、serial_putsを呼ばな
 |PLN1の機能|移行先と流用（file:line）|
 |---|---|
 |BEACON/生存|HELLO/ALIVEが接続・ホスト世代、ゲストboot-token付きREADYが再起動識別。統計は診断STATUSへ。初回ログはHELLO待ちで捨てず既存リングに保持。|
-|LOG|`LOG <boot> <seq> <drop_records> <drop_bytes> <flags> <len>` + WDATA。`lan_log.c:98,105,121,127` のregister/peek/stats/completeを流用。host_agentの`_service_log`が受信しCLIで表示。PPC専用名/os32.予約名を使わず、x86 bootlogも同じ形式で送れる共通サービスとする。200受信まで同chunk保持。ただし4xxの恒久的な拒否は同chunkを破棄し、欠落chunk数・bytesを計数して次へ進む。session断も欠落を計数し完全配送と称さない。|
-|REQ/RSP診断|番号65532のNOTIFY(kind=1、id8+opcode+既存BE引数のhex)→`PDIAG OUT <boot> <id> <status> <len>`+WDATA。`lan_monitor.c:43,55,103` のprobe・5命令/範囲検査・cacheを流用、MAC+nonceをlink peer+host世代由来の内部キーに置換。副作用なし・PEEK256B/READ_DIAG128B維持。|
-|TERM_OPEN/IN/OUT/STATE|READY/NOTIFY/RSH OUTへ。`terminal_input.c:13,26` の行取消/feedを流用、旧seq/dropはlinkと結果dropへ。`lan_terminal.c:27,52` のPLN1状態は廃止、CLI解釈器は維持。|
-|FS_OPEN/REQ/RSP|**SFS on link**を選択。`SFS CALL <len>`+WDATAでSFS frameを渡し、200+DATAにSFS応答frame。`hostfs_io.c:54` のCRC/長さ検査、`:79` の絶対期限、既存SfsClient/VFSを流用。|
-|HostFS peer/世代|`hostfs_peer.c:9,21,30` の固定peer検査・世代変化の意図を維持し、PLN1 nonce観測を共通HostAliveへ置換。`:14` の重複host_alive_snapshot実体は削除、共通実体を使う。|
+|LOG|`LOG <boot> <seq> <drop_records> <drop_bytes> <flags> <len>` + WDATA。`lan_log.c` のregister/peek/stats/completeを流用。host_agentの`_service_log`が受信しCLIで表示。PPC専用名/os32.予約名を使わず、x86 bootlogも同じ形式で送れる共通サービスとする。200受信まで同chunk保持。ただし4xxの恒久的な拒否は同chunkを破棄し、欠落chunk数・bytesを計数して次へ進む。session断も欠落を計数し完全配送と称さない。|
+|REQ/RSP診断|番号65532のNOTIFY(kind=1、id8+opcode+既存BE引数のhex)→`PDIAG OUT <boot> <id> <status> <len>`+WDATA。`lan_monitor.c` のprobe・5命令/範囲検査・cacheを流用、MAC+nonceをlink peer+host世代由来の内部キーに置換。副作用なし・PEEK256B/READ_DIAG128B維持。|
+|TERM_OPEN/IN/OUT/STATE|READY/NOTIFY/RSH OUTへ。`terminal_input.c` の `pm_terminal_line_lost()` の行取消/feedを流用、旧seq/dropはlinkと結果dropへ。`lan_terminal.c` の `pm_term_receive()` のPLN1状態は廃止、CLI解釈器は維持。|
+|FS_OPEN/REQ/RSP|**SFS on link**を選択。`SFS CALL <len>`+WDATAでSFS frameを渡し、200+DATAにSFS応答frame。`hostfs_io.c` のCRC/長さ検査、`pm_hfs_put_until()` の絶対期限、既存SfsClient/VFSを流用。|
+|HostFS peer/世代|`hostfs_peer.c` の固定peer検査・世代変化の意図を維持し、PLN1 nonce観測を共通HostAliveへ置換。同ファイル内 の重複host_alive_snapshot実体は削除、共通実体を使う。|
 - SFS CALLはhost_agent内backendで既存SFS sid/seqの重複cacheの内側へdispatchする（新たなファイル実装を作らない）。BYE等の片道もlinkでは空本文200を返す。CRC/最大frame1044B、LEのSFSとlink、BEの診断payloadを明示codecで扱う。
 - link ridをFSの再実行キーにしない。同一sid/seqの同内容だけ再送、write結果不明は新sidで再実行禁止。ALIVE変更で旧FD失効、/hostの常駐寿命・RO既定・allow-write・HOSTDOWN/STALEを維持。
 - PPCのput_untilはSFS frameを1つ保留し、待機pollがhost_open/write/status/read/closeを進め、完成frameだけ既存rxへ渡す。SFS frame 1つ (CALL 1往復) ごとに入口の1000ms絶対期限を取り、open/write/status/readの全段で共有し、AGAINで取り直さない。VFSのread/writeの各chunk・listの各頁と、事前のensure/HELLOはそれぞれ直前に期限を取る。失敗したCALLをVFSで再実行しない。openのHOSTDOWN/FULLはWDATA送信前に限って同じ期限内でopenから再試行し、WDATA送信後は開き直さない。
-- x86 raw SFSは現状維持。SFS CALLはPPCから先に実証し、x86全利用者/FD導入を載せ替えてraw SFSを廃止する作業はNET_HOSTSVC_DESIGN §9の後続関門。
+- x86 raw SFSは現状維持。SFS CALLはPPCから先に実証し、x86全利用者/FD導入を載せ替えてraw SFSを廃止する作業はdocs/design/net/README.md「共通の決まり」と TASK_LAN_BULK の後続関門。
 ```c
 /* net/link_platform.h: 機械依存をこの境界へ。x86動作は既存実体で保持。 */
 u32 link_platform_now(void); /* 共通tick_countを使用、10ms、周回比較。独自TB時計は作らない */
@@ -143,7 +143,7 @@ void link_platform_idle(void); /* 前景専用、再入禁止。IRQ/送信内か
  * 前景のpm_lan_pollはlink像のRXに触らない(A1)。 */
 ```
 - tick_budgetは共通tick枠の予算と既存回数上限を守り、PPCで無制限成功stubにしない。mailbox・NICのirq保存はPPCのMSR保存/復元、所有者は既存resident CLIのowner規約を使い、ring3のx86命令依存を持ち込まない。
-- `lan_service.c:202,251` のreset/PHY/GEM poll、`lan_gem_io.c` とDMA処理は流用。RXを旧serviceとnetが二重drainしない。移行中はビルド選択でPLN1かlinkのどちらか1つのみ、既存PLN1像を戻り先として保存する。
+- `lan_service.c` のreset/PHY/GEM poll、`lan_gem_io.c` とDMA処理は流用。RXを旧serviceとnetが二重drainしない。移行中はビルド選択でPLN1かlinkのどちらか1つのみ、既存PLN1像を戻り先として保存する。
 - PPC CLIは行頭でLAN完全行を受けるadapterを足し、既存CLIを呼ぶ。LANコマンド中のstream出力を8KiB captureに向けESCC複写を抑止、終了後RSH OUT。ESCCの対話・Ctrl-C・行取消は退避先として維持、入力待ちを必要とする対話プログラムはserial選択で使う。
 - PPCの早期診断・LOGはshell無し像でも動く。NOTIFYからIRQで診断を実行せず、前景pollの後に1件だけ処理。PPCにgshellが存在するとは仮定せず、GSERIAL移植は含めない。
 
@@ -151,19 +151,19 @@ void link_platform_idle(void); /* 前景専用、再入禁止。IRQ/送信内か
 
 P1 系列を含む main `4e0e8b1e` の実物を確認した。契約 ID は `docs/decisions/ARCH_COMPAT_CONTRACT.md` §5。適合は全項目「未 (T1 で確かめる)」のまま。
 
-- **AC-NET-1**: 消費単位は link page (`LINK_PAGE_BYTES=256`、`net/link.h:129`)。`link_credit_pages` (`net/link.c:305`〜`:311`) は NIC の `rx_credit_bytes` と本文リングの空きをそれぞれ256B単位で切り捨て、小さい方から `LINK_CREDIT_MARGIN=12` ページを引く (下限ゼロ)。本文リングは `LINK_STREAM_BUF=8192` (`net/link.h:123`)。
-- 1 frame の admit には `LINK_MAXFRAME_PAGES=6` (`net/link.h:127`) が必要なので、NIC 側だけでも margin と合わせて最低18ページ (4608B) が要る。これは6ページの frame を admit する閾値であり、credit が正になるだけなら13ページでよい。本文リング側の空きも必要。host は未 ACK の各 frame を実長 (Ethernet + link header + payload、NE2000 の受信 header/FCS 8B を含む) の256B切上げで見積もり、次の frame に残り6ページ以上ある間だけ送る。512B本文は3ページなので credit 11で2本を送れる。共通 RX queue (`net/nic_rx.c` の `RX_SLOTS=4`) の枠数も守り、EOF の1枠を除いて未 ACK DATA は最大3本とする。
-- NE2K (LGY-98) は ring と queue の空きの小さい方 (`net/nic_lgy98.c:38`〜`:42`)、e82557 は空き frame 数×frame 長 (`net/nic_e82557.c:25`〜`:27`) を byte で返す (`net/nic.h:16`)。
-- GEM は4枠の FIFO、credit は空き枠×1514B (`platform/powermac/nic_gem.c:15`〜`:18`、`:78`〜`:82`)。空なら6056B＝23ページ (切り捨て)、1枠保留なら4542B＝17ページ。後者は4608B未満で margin 後5ページとなり、6ページの frame は admit されない。閾値に近い容量と保留時境界の受入は F5 に残す。
-- **AC-NET-2**: RX の所有者は共通 NIC 1つ。共通 NIC の poll と link の進行は tick と、`idle_work_run` の FG1 の地点 (待ち・syscall 入口・`net_tx` の後) から1msに1回まで行う (`tick_clock_ms`、同じ ms の再呼出は demux のみ)。IRQ 内・EE/IF=0 の前景からは進めない。tick の `net_jiffy` と保留分の `rx_finish` (`net/nic.c`、`platform/powermac/link_platform.c:32`)。前景の `pm_lan_poll` は独自に RX を汲まない (P1g A1)。`poll` は空き枠があるときだけ `gem_rx` を一度呼ぶ (`platform/powermac/nic_gem.c:61`〜`:76`)。内部走査は最大8 descriptor (`drivers/net/gem/gem_rx.c:26`)、TX 回収の予算も8 (`platform/powermac/nic_gem.c:65`)。外側 work の `NET_RX_SCAN_MAX=8` (`net/nic.h:47`) と掛けても1回の poll の GEM descriptor 走査は最大8のまま。共通 RX queue の容量は `RX_SLOTS`・`RX_FRAME_BYTES` (`net/nic_rx.c:11`〜`:12`) が正。
+- **AC-NET-1**: 消費単位は link page (`LINK_PAGE_BYTES=256`、`net/link.h`)。`link_credit_pages` (`net/link.c`〜同ファイル内) は NIC の `rx_credit_bytes` と本文リングの空きをそれぞれ256B単位で切り捨て、小さい方から `LINK_CREDIT_MARGIN=12` ページを引く (下限ゼロ)。本文リングは `LINK_STREAM_BUF=8192` (`net/link.h`)。
+- 1 frame の admit には `LINK_MAXFRAME_PAGES=6` (`net/link.h`) が必要なので、NIC 側だけでも margin と合わせて最低18ページ (4608B) が要る。これは6ページの frame を admit する閾値であり、credit が正になるだけなら13ページでよい。本文リング側の空きも必要。host は未 ACK の各 frame を実長 (Ethernet + link header + payload、NE2000 の受信 header/FCS 8B を含む) の256B切上げで見積もり、次の frame に残り6ページ以上ある間だけ送る。512B本文は3ページなので credit 11で2本を送れる。共通 RX queue (`net/nic_rx.c` の `RX_SLOTS=4`) の枠数も守り、EOF の1枠を除いて未 ACK DATA は最大3本とする。
+- NE2K (LGY-98) は ring と queue の空きの小さい方 (`drivers/net/ne2000/nic_lgy98.c`〜`lgy_credit()`)、e82557 は空き frame 数×frame 長 (`drivers/net/e82557/nic_e82557.c`〜`nic_credit()`) を byte で返す (`net/nic.h`)。
+- GEM は4枠の FIFO、credit は空き枠×1514B (`platform/powermac/nic_gem.c`〜同ファイル内)。空なら6056B＝23ページ (切り捨て)、1枠保留なら4542B＝17ページ。後者は4608B未満で margin 後5ページとなり、6ページの frame は admit されない。閾値に近い容量と保留時境界の受入は F5 に残す。
+- **AC-NET-2**: RX の所有者は共通 NIC 1つ。共通 NIC の poll と link の進行は tick と、`idle_work_run` の FG1 の地点 (待ち・syscall 入口・`net_tx` の後) から1msに1回まで行う (`tick_clock_ms`、同じ ms の再呼出は demux のみ)。IRQ 内・EE/IF=0 の前景からは進めない。tick の `net_jiffy` と保留分の `rx_finish` (`net/nic.c`、`platform/powermac/link_platform.c`)。前景の `pm_lan_poll` は独自に RX を汲まない (P1g A1)。`poll` は空き枠があるときだけ `gem_rx` を一度呼ぶ (`platform/powermac/nic_gem.c`〜同ファイル内)。内部走査は最大8 descriptor (`drivers/net/gem/gem_rx.c`)、TX 回収の予算も8 (`platform/powermac/nic_gem.c`)。外側 work の `NET_RX_SCAN_MAX=8` (`net/nic.h`) と掛けても1回の poll の GEM descriptor 走査は最大8のまま。共通 RX queue の容量は `RX_SLOTS`・`RX_FRAME_BYTES` (`net/nic_rx.c`〜同ファイル内) が正。
 - **poll の持越し**: `net_tick` が `ticking` のため NIC の poll を飛ばしたら `poll_due` を立てる。複数回の要求は1回にまとめ、`rx_finish` が IRQ を保存して禁止したまま、`ticking` を保持して `poll_due` を消し、`bound->poll()` と `net_rx_schedule()` を各1回行ってから保留した `link_tick` を処理する。通常の tick で poll を実行した場合も保留分を消化し、bind/unbind では保留を消す。GEM・e82557・LGY-98 で共通とし、NIC 内の回数上限は変えない。x86 の tick 内救済は既存の `tick_budget` 判定に従う demux だけで、poll を追加しない。
 - 前景の進行は `ticking` の排他内で poll、有限 demux、`rx_finish` の link_tick の順。RTO は既存の jiffy のまま。前景 TX は同じ68周上限を守り、tick_budget は tick 外では非アクティブ。x86 の待ちは `_idle`/`_halt` で PIT 等の割り込みまで眠り、空回りしない。この協調点で `last_idle_jiffy` を更新するので、tick の `LINK_RX_IDLE_RESCUE_JIFFIES=2` 救済 demux と重ならない (救済は poll を追加しない)。
 - 本文待ちの WINDOW はハンドルごとに同じ ms (`tick_clock_ms`)・同じ credit では1本までとし、credit の変化は同じ ms でも次の link 進行で直ちに広告する。最終送信の ms/credit は NIC 受理時だけ更新し、拒否なら保留する。x86 は PIT 1回で ms が10進むため広告本数は jiffy 単位の間引きと同じ。RTO は jiffy のまま。host_agent の絶対 credit・累積 ACK・ACK 不変 WINDOW 8回での再送は従来のまま。
-- tick 文脈の時間予算は共通 `tick_budget` の枠に従う (`platform/powermac/link_platform.c:9`、`net/nic.c:11`)。回数上限だけで時間の適合を宣言せず、GEM の時間予算の実測は F5 へ送る。
+- tick 文脈の時間予算は共通 `tick_budget` の枠に従う (`platform/powermac/link_platform.c`、`net/nic.c`)。回数上限だけで時間の適合を宣言せず、GEM の時間予算の実測は F5 へ送る。
 - **前景からの即時 TX**: `link_host_open`・`link_host_write` が要求を受理して送信待ちの印を立てた直後、IRQ 状態を保存した排他区間で `link_tx_kick` を1回呼ぶ。link 初期化済み・IRQ 外 (`kctx_irq_depth == 0`)・再入なしの場合だけ `link_tx_round` を1回実行し、送信待ちがなければ直ちに戻る。前景では `tick_budget` の時間制限は動かず、回数上限は `2 * (8 * 4 + 2) = 68` 周。各周の送信は最大1本で、送信待ちなし・2種類連続で送る物なし・NIC 拒否でも停止する。NIC の未完了枠が空で回収が進まない場合、e82557 は1本、LGY-98 は TXQ 4本、GEM は31本で満杯になり、次の試行で止まる（既存の占有分だけ少なくなる）。e82557 は送信口でも完了を回収するため、完了が進む場合も含む絶対上限は68周であり、本数から時間上限を推定しない。IRQ を止める時間の実測は F5 で確認する。syscall 内の EE=0 も IRQ 文脈とは区別され、この TX は進む。W3 の実行文脈の扱いには、この即時 TX と、tick または `idle_work_run` の FG1 の地点 (待ち・syscall 入口・`net_tx` の後) で進む RX・期限処理を分けて結線し、通常 syscall を FG1 で共通 dispatch に渡す AC-CTX-1 と、FG0 の許可状態を保存・復元する AC-CTX-3 の契約は維持し、EE=0 での即時 TX を syscall 入口の FG1 適合の代わりにしない。適合の確認は W3/F5 の受入に従う。
-- **AC-NET-3**: `LINK_RTO_TICKS=20` (200ms)・`LINK_TRIES=5` (`net/link.h:112`、`:116`)。RTO は NIC 受理から数え、`link_platform_now` は論理100Hzの jiffy (`net/link_platform.h:7`)。PowerPC も `tick_count` を返す (`platform/powermac/link_platform.c:15`)。実測は `docs/tasks/ppc/TASK_PPC_LAN.md:54` にあり、独自の時計を増やさない。
-- close の保留 ACK は link-closeack (main `9e39176a`) で修正済み。`link_free_handle` が `rel_want_ack`・`rel_ack_seq` を保存 (`net/link_host_api.inc:344`〜`:345`) し、NIC が受理するまで保留して RELEASE より先に送る (`net/link.c:424`〜`:436`)。
-- PowerPC の USER は EE=1 (`arch/ppc/exec_enter.S:25`)。USER に戻るたび DEC から共通 tick 枠の `net_jiffy` と `link_tick` が進む (`arch/ppc/kernel_dec.c:60`、`net/nic.c:286`、`:311`)。syscall 内 (EE=0) では DEC による RX・期限処理は進まないが、前景の open・write による即時 TX は進む。**W3 (実行文脈ごとの約束) ではこの区別を突き合わせ、syscall 内の RX・期限処理の進行を即時 TX で保証したとは扱わない**。idle の復帰契約は ARCH_COMPAT §2、実装の整合は F2b が担当する。
+- **AC-NET-3**: `LINK_RTO_TICKS=20` (200ms)・`LINK_TRIES=5` (`net/link.h`)。RTO は NIC 受理から数え、`link_platform_now` は論理100Hzの jiffy (`net/link_platform.h`)。PowerPC も `tick_count` を返す (`platform/powermac/link_platform.c`)。実測は `docs/tasks/ppc/TASK_PPC_LAN.md` にあり、独自の時計を増やさない。
+- close の保留 ACK は link-closeack (main `9e39176a`) で修正済み。`link_free_handle` が `rel_want_ack`・`rel_ack_seq` を保存 (`net/link_host_api.inc`〜同ファイル内) し、NIC が受理するまで保留して RELEASE より先に送る (`net/link.c`〜`link_tx_control()`)。
+- PowerPC の USER は EE=1 (`arch/ppc/exec_enter.S`)。USER に戻るたび DEC から共通 tick 枠の `net_jiffy` と `link_tick` が進む (`arch/ppc/kernel_dec.c`、`net/nic.c`)。syscall 内 (EE=0) では DEC による RX・期限処理は進まないが、前景の open・write による即時 TX は進む。**W3 (実行文脈ごとの約束) ではこの区別を突き合わせ、syscall 内の RX・期限処理の進行を即時 TX で保証したとは扱わない**。idle の復帰契約は ARCH_COMPAT §2、実装の整合は F2b が担当する。
 
 ## 6. terra に出す段（各依頼1〜3ファイル・400行以下）
 行数は手書き製品差分の上限予算。各行を別依頼とし、同じ機能の検査も合計400行に収まらなければ契約試験/受入台本を別依頼へ分ける。生成物は機械生成の行数を別記し、手編集しない。
@@ -218,14 +218,14 @@ P1 系列を含む main `4e0e8b1e` の実物を確認した。契約 ID は `doc
 |P5-sc/sh|`tools/ppc/sc_run`・`ppc_sh_output`を各1ファイル別依頼|各250|P5-t／P3受入前|
 |P5-sd/fs|`tools/ppc/sd_run`・`tools/ppc_hostfs.py`を各1ファイル別依頼|各250|P5-t／P4受入前|
 |P5-usb|`tools/ppc/usb_run`、共通transportへ|250|P5-t／当該台本の節目より先、遅くとも既定切替前|
-|P4c 試験|ppc-hostfs-io: `tools/tests/ppc_hostfs_io.c:247,274`|試験|新経路の期限・IRQ 拒否・再実行禁止を検証|
-|P4a 試験|ppc-hostfs-server: `tools/tests/ppc_hostfs_server.py:42,45,50`|試験|新経路の write 一回・世代失効・RO を検証|
-|P4a 試験|ppc-hostfs-wire: `tools/tests/ppc_hostfs_wire.py:44,48`|試験|新 codec の長さ・CRC 拒否を検証|
-|P2/P5-log 試験|ppc-lan-p23: `tools/ppc/test_lan_p23.py:63,91,119`|試験|新 LOG・WDATA・予約 NOTIFY 診断の形式を検証|
-|P3 試験|ppc-lan-terminal-host: `tools/ppc/test_lan_terminal_host.py:40,59`|試験|READY/NOTIFY/RSH OUT の端末内容・欠落報告を検証|
-|P5-sd/fs 試験|ppc-sd: `tools/ppc/sd_run.py:72,179,212`|試験|新 transport で永続化・再起動後の旧要求拒否を検証|
-|P4 結線試験|hostsvc-init: `tools/tests/hostsvc_init_host.c:79,123`|試験|pointer 一致に代え /host 常駐・borrowed 寿命を振る舞いで検証|
-|P4a 試験|lanfs-host: `tools/tests/test_lanfs.py:51,104,456`|試験|新経路を検証し serial SFS・netcd を維持|
+|P4c 試験|ppc-hostfs-io: `tools/tests/ppc_hostfs_io.c`|試験|新経路の期限・IRQ 拒否・再実行禁止を検証|
+|P4a 試験|ppc-hostfs-server: `tools/tests/ppc_hostfs_server.py`|試験|新経路の write 一回・世代失効・RO を検証|
+|P4a 試験|ppc-hostfs-wire: `tools/tests/ppc_hostfs_wire.py`|試験|新 codec の長さ・CRC 拒否を検証|
+|P2/P5-log 試験|ppc-lan-p23: `tools/ppc/test_lan_p23.py` の `exercise()`|試験|新 LOG・WDATA・予約 NOTIFY 診断の形式を検証|
+|P3 試験|ppc-lan-terminal-host: `tools/ppc/test_lan_terminal_host.py`|試験|READY/NOTIFY/RSH OUT の端末内容・欠落報告を検証|
+|P5-sd/fs 試験|ppc-sd: `tools/ppc/sd_run.py`|試験|新 transport で永続化・再起動後の旧要求拒否を検証|
+|P4 結線試験|hostsvc-init: `tools/tests/hostsvc_init_host.c`|試験|pointer 一致に代え /host 常駐・borrowed 寿命を振る舞いで検証|
+|P4a 試験|lanfs-host: `tools/tests/test_lanfs.py`|試験|新経路を検証し serial SFS・netcd を維持|
 - 結線小差分も別依頼: con_sink.h、shellヘッダ、gshell module宣言、x86 build、PPC build、PPC mailboxのlock/heap結線、PPC boot/hostfs_boot、console stream口、host_agentのLOG重複記録をそれぞれ1ファイル・各150行以下。共通tick予算のarch口も1ファイルずつP1へ含め、無制限stubで完了にしない。
 - 最初のlink像はP1＋LOG（P2cまで）を合わせる。FB帯に「HELLO送信」「HELLO確立」の段階印を追加し、ログ・診断のない像を出さない。P1＋LOG/P2はlink診断像、P3はlink CLI像、P4はlink HostFS像として独立受入。機能不足の像で既定PLN1像を置換しない。P5後、PPC buildの既定をlinkへ変更する1ファイル段（100行以下、**PPC生成物変更**）で旧wireを廃止。
 - X0→X1–X9→X10–X14→G1–G4を先に出してx86受入。P1→X6のLOG受け口/P5-logの表示→P2c→P2a/b→P3→P4→既定切替。P5-tと各台本は対応節目の前に完了。共通ファイルは直列、PPC設計の正典3票とnetwork正典への契約更新はPMが各1ファイル段で行う。
@@ -249,7 +249,7 @@ H=host製品コード試験、N=NP21/W LGY-98/NE2K **上のlink**、R=Ra266 e825
 |gui引渡し G|H/N/R: ACCEPTの200前にGUI未起動、readyで移行、起動失敗/結果喪失で再実行なし、GSERIAL→CUI復帰。|200確認前にGUI起動。|
 |GSERIAL G|H/N/R: SOH/id8/end N・keys/watchdog/gs:!、他アプリHOST_NOTICE・前景なし・FIFO溢れ。serial版同台本も合格。|通知を65535で読む、またはLAN replyをUARTに出す。|
 |帯域/共存 X/G|H/N/R: TIME/CLIP/既存SFSと1.5KiB peek併走、ACK遅延/AGAINでも有界進行。Rはserial/LAN時間・TX呼出数・T1c遅延採取、200ms目標（未達は原因記録）。|host_writeのAGAINでbusy loop、またはserial mirror抑止解除。|
-|P1＋LOG基盤|H/Q: HELLO/ALIVE/TIME、BE CPUのLE wire golden、link断復帰、tick登録/tick_count・1poll予算/再入なし、旧PLN1選択像も起動。PPCでlinkをビルド、heap高水位≤1MiBとPLN1静的TX/RX不在をmapに記録。lan_service.c:202/:251のreset/PHY/pollが同じ関数の流用であることをdiffで示す。FBのHELLO送信/確立印と初期LOG受信を観測。|tick登録を外す、またはRX二重drain。|
+|P1＋LOG基盤|H/Q: HELLO/ALIVE/TIME、BE CPUのLE wire golden、link断復帰、tick登録/tick_count・1poll予算/再入なし、旧PLN1選択像も起動。PPCでlinkをビルド、heap高水位≤1MiBとPLN1静的TX/RX不在をmapに記録。lan_service.c/:251のreset/PHY/pollが同じ関数の流用であることをdiffで示す。FBのHELLO送信/確立印と初期LOG受信を観測。|tick登録を外す、またはRX二重drain。|
 |P2診断/log|H/Q: 5診断・PEEK境界/DSI・cache競合、初期ログ・drop・末尾喪失を表示、shell無しlink像でも成立。|PEEK PA範囲照合またはlog drop報告を削除。|
 |P3端末|H/Q: ver相当の既存CLI/echo/失敗rc/出力超過、ESCCとの行分離・Ctrl-C退避、旧PLN1 CLI像の基準と機能照合。|LAN中ESCC複写を有効化、またはID重複実行。|
 |P4 HostFS|H/Q: /host read/write/RO・CRC・1044B最大・1000ms期限・再起動旧FD STALE、WDATA/応答喪失時write一回。|新ridごとSFS重複cacheを消す。|

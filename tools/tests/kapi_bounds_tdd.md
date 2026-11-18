@@ -1,7 +1,9 @@
 # KAPI の範囲検査 — 実ターゲットのホスト試験
 
-対象票: `docs/archive/v3/TASK_T2D_T2H.md` T2e
-「KAPI の範囲検査の欠落の修正」。2026-10-03、GPT-6。
+契約: `docs/design/platform/pc98/console.md`・`docs/design/drivers/sound/fm/fm.md`・
+`docs/design/kapi/kapi_db.md` の「`kapi_db_column_text` の範囲検査」・
+`docs/design/gfx/gfx_core.md` の「KAPI 引数の範囲」・`docs/design/drivers/video/pc98/gfx_vram.md` の「KAPI 引数の範囲」
+(出所は票 TASK_T2D_T2H T2e「KAPI の範囲検査の欠落の修正」)。2026-10-03、GPT-6。
 
 ## RED → GREEN
 

@@ -29,7 +29,7 @@ TARGET_SRCS = ['include/callconv.h', 'include/abi.h', 'arch/x86/arch_abi.h', 'to
     'exec/appmem.h', 'mm/paging_app.h', 'mm/paging.c', 'mm/paging.h',
     'mm/pgalloc.c', 'mm/pgalloc.h', 'mm/physmem.c', 'mm/physmem.h',
     'include/appmem_types.h', 'sdk/include/os32/os32_kapi_shared.h', 'include/types.h', 'include/memmap.h', 'include/io.h',
-    'include/cpu.h', 'include/pc98.h', 'include/sys.h', 'include/tvram.h',
+    'include/cpu.h', 'include/pc98.h', 'include/sys.h', 'include/text_screen.h',
     'arch/x86/kernel/gdt.h', 'arch/x86/kernel/tss.h', 'arch/x86/arch_cpu.h', 'arch/x86/arch_io.h', 'lib/kstring.h', 'tools/tests/appmem_map_host.c',
     'tools/tests/test_appmem_map.py', 'tools/tests/pgalloc_host_fixture.h',
     'tools/tests/host_arch/arch_cpu.h', 'tools/tests/host_arch/arch_io.h',

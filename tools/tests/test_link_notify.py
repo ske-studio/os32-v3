@@ -21,7 +21,7 @@ CHECK = dict(name='link-notify', tier=1, needs=[], covers=[
     'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'build/config.mk',
     'include/io.h', 'include/types.h', 'include/net_eth.h', 'lib/le_internal.h',
     'lib/kstring.h', 'mm/kmalloc.h'], budget=3.1,
-    basis=['NET_HOSTSVC_DESIGN §5'],
+    basis=['docs/design/net/link_notify.md 受け手の規則'],
 )
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (

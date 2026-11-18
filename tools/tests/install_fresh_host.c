@@ -24,7 +24,7 @@
 #include <stddef.h>
 
 #include "os32api.h"
-#include "drivers/block/pc98pt.h"     /* 区画表を読み戻して確かめる (段 2) */
+#include "fs/pc98pt.h"     /* 区画表を読み戻して確かめる (段 2) */
 #include "userland/system/inst_disk.h"
 
 /* ---- kprintf の捕捉 ---------------------------------------------------- */

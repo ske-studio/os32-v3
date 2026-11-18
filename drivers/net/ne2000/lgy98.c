@@ -16,7 +16,6 @@ _Static_assert(PC98_TICK_COUNT <= TICK_SLOT_COUNT, "PC98 tick slots exceed table
 #include "../../char/np2sysp.h"
 #include "config.h"
 #include "kprintf.h"
-#include "idt.h"
 #include "irq.h"       /* irq_register / IRQ_F_SHARED (票 TASK_HAL_WIRING §1-1) */
 #include "io.h"
 #include "kstring.h"

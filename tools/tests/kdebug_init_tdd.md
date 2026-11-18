@@ -1,6 +1,6 @@
 # kdebug init / loader (S1a)
 
-票: TASK_DBGREF (アーカイブ: `docs/archive/v3/TASK_DBGREF.md`) §3-4・§4・S1a。
+契約: `docs/design/kdebug/kdebug_module.md` の「読み込みと公開」・`docs/design/kernel/module/module_runtime.md` の「読み込み・開始・巻き戻しの順序」、形式は `docs/08_build.md` §8-2「起動時に読む部品の形式 (KMOD v1)」。出所は票 TASK_DBGREF の §3-4・§4・S1a。
 `make check-kdebug-init-host` は実物 init を ILP32 で呼び、候補表の完全一致と
 import 呼出しゼロを検査する。`--mutate` は kprintf 呼出し・候補未設定を RED にする。
 

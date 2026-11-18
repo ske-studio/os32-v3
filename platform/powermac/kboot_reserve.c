@@ -4,7 +4,7 @@
  * Separate RAM/available: OpenBSD macppc/macppc/ofw_machdep.c:136-153.
  * Unlike BSD's general memory adapter, admit only the design's fixed window. */
 #include "kboot_info.h"
-#include "kboot_layout.h"
+#include "platform_kboot_layout.h"
 #define PM_ADMITTED_END 0x01000000U
 #define PM_WINDOW_END 0x00f00000U
 #define PM_VECTOR_END 0x00003000U

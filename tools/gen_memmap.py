@@ -57,6 +57,9 @@ MAP_REL = "build/out/kernel.map"
 ELF_REL = "build/out/kernel.elf"
 LAYOUT_REL = "build/out/layout-manifest.json"
 HDR_REL = "include/memmap.h"
+# 機種の番地のヘッダ (PC-98 のリアルモードの起動と低位メモリ)。番地の正典の一部で、
+# 地図・重なりの検査・生成ヘッダは include/memmap.h と合わせて読む。
+PLATFORM_HDR_RELS = ("platform/pc98/platform_boot_layout.h",)
 
 BEGIN = "<!-- 生成: tools/gen_memmap.py --write (この印の中は手で書かない) -->"
 END = "<!-- /生成: tools/gen_memmap.py -->"
@@ -116,6 +119,13 @@ def read_defines(header_path):
     # 式はビルドと同じく C プリプロセッサで解く。#include は型だけなので外し、
     # 試験の切り出したヘッダが include ツリーの写しを要らないようにする。
     if os.path.basename(header_path) == "memmap.h":
+        # 機種の番地のヘッダを後ろに続けて、1 つの定義の集まりとして解く。
+        root = os.path.dirname(os.path.dirname(os.path.abspath(header_path)))
+        for rel in PLATFORM_HDR_RELS:
+            extra = os.path.join(root, rel)
+            if os.path.exists(extra):
+                with open(extra, encoding="utf-8") as f:
+                    text += "\n" + re.sub(r"\\\n", " ", f.read())
         source = re.sub(r'^\s*#include[^\n]*', '', text, flags=re.M)
         text = subprocess.run(["cpp", "-dM", "-E", "-x", "c",
                                "-"],
@@ -977,7 +987,9 @@ def layout_manifest(root, map_path, elf_path, limit_name=None):
         canon = json.load(f)
     if generation["kapi_version"] != canon["version"] or generation["generations"] != canon["generations"]:
         raise ValueError("generations-manifest: generation mismatch")
-    artifacts = [artifact(p) for p in (elf_path, map_path, os.path.join(root, HDR_REL), generation_path)]
+    headers = [os.path.join(root, HDR_REL)] + [os.path.join(root, rel) for rel in PLATFORM_HDR_RELS
+                                               if os.path.exists(os.path.join(root, rel))]
+    artifacts = [artifact(p) for p in (elf_path, map_path, *headers, generation_path)]
     recorded = {entry["path"]: entry for entry in generation["files"]}
     for name in ("kernel.bin", "vmkernel.lz4"):
         rel = os.path.relpath(os.path.join(output_dir, name), root)

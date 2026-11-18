@@ -19,17 +19,17 @@
 ## 1. 実物の確認
 |実物・根拠|設計への意味／食い違い番号|
 |---|---|
-|`mm/shlib.c:13,25,37` は単一の大域状態と GUI の固定パス。`include/memmap.h:405–410` は1MiB、app=0x80100000|差1: 汎用複数枠は未実装。名前の変更だけでは libc を載せられない|
-|`mm/shlib.c:93–110` は全 AS に GUI を付け、data を複製。`exec/exec_image_map.inc:5` はその全枚数を予算化|差2: 非依存 CUI にも付く。依存集合ごとの attach と予算へ変更|
-|`mm/shlib.c:57` と `sdk/link/shlib.ld:42` は text 直後を data とする|差3: text 増加でデータ番地が変わる。公開データ固定番地 ABI には新配置が必要|
-|`exec/exec_image_map.inc:76` は常駐 shell の依存を拒否。`docs/09_exec.md:17` は低位 shell を supervisor 共有|差4: shell.bin はそのまま共有 libc を呼べない。P7 は静的を継続|
-|`build/config.mk:212–213`、`build/programs.mk:37–50,437` は CRT＋私有 nano allocator＋`-lc -lgcc`|差5: 「libc 全体が nano 版」とは確認できない。実物は private nano allocator と toolchain libc.a の組合せ|
-|`sdk/crt/syscalls.c:130–135`、mainの `docs/decisions/time/OS32_TIME_DESIGN.md:63,154,193`|差6訂正: 時刻設計は存在。sys_timeはローカル暦epoch、tv_usec=0を維持、UTC/µsは新KAPI time_get。時計ページは本票では口だけ予約|
-|`build/programs.mk:665` は「0x400000 常駐」、実定義は `include/memmap.h:405` の0x80000000|差7: 古いコメント。実装根拠は現定義とする|
-|`sdk/include/os32/os32_kapi_shared.h:230–285`、`exec/os32x_hdr.c:8–18`|OS32X v4=60B、4世代照合、SHLIB表32B＋絶対関数番地。GUI版と汎用protocolを区別する|
-|`userland/rust/libos32gui/src/shlib.rs:209,217`、`sdk/rust/os32api/src/gui/stub.rs:15`|GUI表は122関数、Rust stub と番号を照合。生成元を共通化して libc でも使う|
-|`build/packages.yaml:39,113`、`userland/deploy.yaml:43–69,392–403`|FD=BOOT＋MINIMAL−除外。外部救援7本は install/cdinst/hsync/less/grep/hexdump/cfg、shell は core|
-|`build/programs.mk:675–687`、`docs/decisions/network/NET_HOSTSVC_DESIGN.md:185–193`|GUI は libos32host を内包、現規則は末尾に `-lc -lgcc`。host_call は SDK の待機関数で libc と別の責務|
+|`mm/shlib.c` は単一の大域状態と GUI の固定パス。`include/memmap.h` は1MiB、app=0x80100000|差1: 汎用複数枠は未実装。名前の変更だけでは libc を載せられない|
+|`mm/shlib.c` は全 AS に GUI を付け、data を複製。`exec/exec_image_map.inc` はその全枚数を予算化|差2: 非依存 CUI にも付く。依存集合ごとの attach と予算へ変更|
+|`mm/shlib.c` と `sdk/link/shlib.ld` は text 直後を data とする|差3: text 増加でデータ番地が変わる。公開データ固定番地 ABI には新配置が必要|
+|`exec/exec_image_map.inc` は常駐 shell の依存を拒否。`docs/09_exec.md` は低位 shell を supervisor 共有|差4: shell.bin はそのまま共有 libc を呼べない。P7 は静的を継続|
+|`build/config.mk`、`build/programs.mk` は CRT＋私有 nano allocator＋`-lc -lgcc`|差5: 「libc 全体が nano 版」とは確認できない。実物は private nano allocator と toolchain libc.a の組合せ|
+|`sdk/crt/syscalls.c`、mainの `docs/decisions/time/OS32_TIME_DESIGN.md`|差6訂正: 時刻設計は存在。sys_timeはローカル暦epoch、tv_usec=0を維持、UTC/µsは新KAPI time_get。時計ページは本票では口だけ予約|
+|`build/programs.mk` は「0x400000 常駐」、実定義は `include/memmap.h` の0x80000000|差7: 古いコメント。実装根拠は現定義とする|
+|`sdk/include/os32/os32_kapi_shared.h`、`exec/os32x_hdr.c`|OS32X v4=60B、4世代照合、SHLIB表32B＋絶対関数番地。GUI版と汎用protocolを区別する|
+|`userland/rust/libos32gui/src/shlib.rs`、`sdk/rust/os32api/src/gui/stub.rs`|GUI表は122関数、Rust stub と番号を照合。生成元を共通化して libc でも使う|
+|`build/packages.yaml`、`userland/deploy.yaml`|FD=BOOT＋MINIMAL−除外。外部救援7本は install/cdinst/hsync/less/grep/hexdump/cfg、shell は core|
+|`build/programs.mk`、`docs/design/userland/lib/host/host_call.md`|GUI は libos32host を内包、現規則は末尾に `-lc -lgcc`。host_call は SDK の待機関数で libc と別の責務|
 - r1の差6を訂正し、残る食い違いは6件。差6と§8はPM指定mainを再確認、他の実物確認はr1を継承。mainの既存ELFで§8を実測（再ビルド・git操作なし）。
 
 ## 2. Linux (glibc) との対応
@@ -52,7 +52,7 @@
 |2|0x80100000–0x80180000|libos32gui.1|
 |3|0x80180000–0x80200000|将来枠。末尾0x801FF000–0x80200000を時計ページとして別予約|
 - 各通常枠512KiB、先頭16KiBが表、+0x4000–0x8000は公開RO固定区画、+0x8000からtext/private rodata、上限+0x70000。data固定先頭は+0x70000、上限64KiB。RO内部の予約余白はpayloadに含め、RO末尾とdata間の穴・未使用枠は写像・複製しない。
-- APP_BAND は可変PDEの既存方式（`include/memmap.h:316–323`）を維持。image最大長、PT予算、最初のPDEの残量を新app先頭から再計算。heap=0x88000000、stack帯は維持。
+- APP_BAND は可変PDEの既存方式（`include/memmap.h`）を維持。image最大長、PT予算、最初のPDEの残量を新app先頭から再計算。heap=0x88000000、stack帯は維持。
 - 定義元は memmap.h（帯）、公開shlib ABI（枠ID/offset）、config.h（配備パス）の3層。リンカ・Rust・Pythonへ生成し数値の二重管理をなくす。
 ```c
 /* 新protocol。全フィールド u32、LE、自然4B配置、64B。C89対応。 */
@@ -121,14 +121,14 @@ void __cdecl os32_libc_fini(void);              /* entry[1] */
 |export|公開関数・newlibヘッダのmacro/inlineが参照する内部関数・dataを版別ABI票へ登録。ソース許可リストではない。未提供関数は通常の未定義参照でリンク時に分かる|
 |syscall adapter|`_read/_write/_open/_close/_lseek/_stat/...` とOS32 errno変換をlibc側へ。KAPIだけを呼ぶ。静的救援も同じソースから別objectを作る|
 |malloc|nano state、primary/secondary arena、trim/retry、large allocation台帳はlibcのAS私有dataに1組。heap実体は既存アプリのmem_map領域で、shlibのdata枠からは取らない|
-|初期break|`sdk/allocator/nano_adapter.c:139` のリンク時 `_end` は共有libc自身の末尾になるため使えない。CRTからLibcStartのアプリ末尾と初期commit境界を渡し、以後libcがbreakを唯一管理|
+|初期break|`sdk/allocator/nano_adapter.c` のリンク時 `_end` は共有libc自身の末尾になるため使えない。CRTからLibcStartのアプリ末尾と初期commit境界を渡し、以後libcがbreakを唯一管理|
 |stdio/errno|FILE、buffer、atexit、locale、乱数、環境はASごと。公開reentと `_r` 関数を揃える。`_impure_ptr`をkernelが切り替える方式にはしない|
 |再入|CR3切替で状態が切り替わる。協調yield前後の状態保持、既存nano busy/in_trim規則を維持。同じASのcallbackからallocator再入を許さない。thread用lockやTLSは追加しない|
 |host_call|SDK/libos32hostに残す。共有アプリ・GUIからのlibc参照は同一libcへ、静的救援は静的libcへ。host待機がlibc initやmallocから逆向きに呼ばれる依存を作らない|
 - `libc→KAPI`、`GUI→libc＋KAPI`。共有アプリとGUIのリンク行から `-lc` と `$(NANO_LIB)` を外しstubへ置換、CRTの静的syscalls/nanoも共有経路へ混ぜない。link_guardがmapのlibc.a/libos32nano.aメンバー不在を検査し、未提供関数は未定義参照で失敗させる。libc像と静的救援だけが実体をリンクする。新libc像に `-lgcc` を漫然と追加せず、必要helperは[L1]適合の既存実装へ解決する。
 - 時計の結び目: `{time_page,time_abi}` と上記VAを予約し、P7では0/0。将来のkernel所有RO+USER頁の実体・更新は別の時刻実装へ委譲する。libc `_gettimeofday` はページ提供有無によらず `sys_time` とtv_usec=0を維持し、UTC/µsは新KAPI time_getを使う。
-- `exec/exec_launch.inc:370` のapp用aux=0を、app stack上に複製した `{u32 bytes,time_page,time_abi;}` へのUSERポインタにする。shell用auxは既存ShellServiceのまま。shared_startがapp auxを読みLibcStartへ写す。時計未提供時は0/0で、この情報のためにkernelポインタを公開しない。
-- 時刻の意味は `docs/decisions/time/OS32_TIME_DESIGN.md:63,154,193` に従う。ページpayload・整合読取は将来の別契約とし、未知版は利用しない。P7は置き場と引渡しだけで、newlibの時刻意味・精度を変更しない。
+- `exec/exec_launch.inc` のapp用aux=0を、app stack上に複製した `{u32 bytes,time_page,time_abi;}` へのUSERポインタにする。shell用auxは既存ShellServiceのまま。shared_startがapp auxを読みLibcStartへ写す。時計未提供時は0/0で、この情報のためにkernelポインタを公開しない。
+- 時刻の意味は `docs/decisions/time/OS32_TIME_DESIGN.md` に従う。ページpayload・整合読取は将来の別契約とし、未知版は利用しない。P7は置き場と引渡しだけで、newlibの時刻意味・精度を変更しない。
 
 ## 6. 起動と配備
 - 順序: VFS→shlib.idxの登録/像検査→静的shell→アプリ要求の依存検査→AS作成/必要枠attach→CRT libc init→アプリ初期化。kernelはユーザーlibc initを呼ばない。
@@ -150,7 +150,7 @@ void __cdecl os32_libc_fini(void);              /* entry[1] */
 - 2026-11-05、main `/home/hight/os32-v3` の既存ELFを `i386-elf-size -A` とGUIの `nm` で測定。debug/世代刻印等の非ロードsectionは除外。成果物の再build・ソースとの一致検証は行っていない。
 |対象|実測／計画値・算式|
 |---|---|
-|現GUI実測|表4096＋text151192＋rodata3924 B、整列後RO=0x27000=156 KiB（39頁）。data23088＋BSS17104=40192 B=0x9d00、複製は40 KiB（10頁）。build/programs.mk:678の8頁コメントは古い|
+|現GUI実測|表4096＋text151192＋rodata3924 B、整列後RO=0x27000=156 KiB（39頁）。data23088＋BSS17104=40192 B=0x9d00、複製は40 KiB（10頁）。build/programs.mkの8頁コメントは古い|
 |現一般アプリ実測|userland/cmdsのwc.elf: text17573/data1760/BSS131656 B、sort.elf: 17557/1792/82536 B、hdate.elf: 21157/1856/16968 B。各RW量は133416/84328/18824 B（純量、ページ整列前）|
 |libc.1像（計画）|text/private rodata160–320＋表16＋公開RO予約16＋初期data4–12=196–364。全exportのlink mapで確定。合計RO上限448KiBを超えればP7配置確定前に枠を見直す|
 |libc per-AS（計画）|data+BSS 8–24（公開固定区画4を含む）。64KiB予約全体は複製しない。stdio buffer/heap追加は別計上|
@@ -179,7 +179,7 @@ void __cdecl os32_libc_fini(void);              /* entry[1] */
 |B6|`exec/exec_launch.inc`|入口前の依存計画、attachとCRT起動情報|
 |B7|`exec/exec_image_map.inc`|必要data/PT予算・app帯境界・欠損診断|
 |B8|`exec/exec_finish.inc`|ASの依存集合を使ってdetach|
-|B9|`init/kernel_gui_shlib.inc`|GUI専用の失敗通知を枠別診断へ。kernel.cの既存shlib_init呼出し位置は維持|
+|B9|`platform/pc98/kernel_gui_shlib.inc`|GUI専用の失敗通知を枠別診断へ。kernel.cの既存shlib_init呼出し位置は維持|
 |C1|`sdk/libc/state.c`（新）|impure.o代替の固定公開data、reent/stdio初期化と終了|
 |C2|`sdk/crt/shared_start.c`（新）|LibcStartを組み、libc init前後の順を所有|
 |C3|`sdk/crt/crt0_c.c`|static/shared入口の結線、return/exit経路|
@@ -229,7 +229,7 @@ H=host、N=NP21/W、R=PC-9821。変異は各試験の一意な1行anchor、通�
 反論: 0件。
 
 ## 確定 (2026-11-05、Opus 第 2 回「確定してよい」、PM が反映)
-- N1 (P2) §4: environ の定義は state.c だけに置き、sdk/crt/syscalls.c:140 の定義 (`char **environ = (char **)__env;`) は C4 で削除する。
+- N1 (P2) §4: environ の定義は state.c だけに置き、sdk/crt/syscalls.c の定義 (`char **environ = (char **)__env;`) は C4 で削除する。
 - N2 (P3) §4: D+0x008 は予約 (0)。このツールチェーンの libc.a に `_global_impure_ptr` の定義・参照は無い (nm で 0 件)。
 - N3 (P3) §4: state.c は `_REENT_INIT(_impure_data)` (sys/reent.h:653) で初期化し、stdin/stdout/stderr を `__sf[0..2]` に結ぶ (元の impure.o の再配置 4 件と同じ)。
 - N4 (P3) §3: 表と公開 RO 区画の未使用の末尾ページは payload に含めず、写像しない (ヘッダの検算もこれに合わせる)。

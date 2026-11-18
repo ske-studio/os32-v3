@@ -61,7 +61,7 @@ extern volatile int ring3_in_syscall;
 extern volatile int ring3_wm_depth;
 
 #include "serial_diag.h"
-#include "tvram.h"
+#include "text_screen.h"
 #include "../../../include/platform_emergency.h"
 
 /* シリアルポートにもログを出力するためのヘルパー */

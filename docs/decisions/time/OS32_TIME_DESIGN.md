@@ -21,23 +21,23 @@
 ## 1. 実物の確認
 | 項目 | file:line と確認内容 |
 |---|---|
-| RTC | `drivers/char/rtc.c:47,110,168`: パラレルコマンド、48bit読出し、ClockOpsは読みだけ。書く口なし |
-| 年 | `drivers/char/rtc.h:20`: pivot=80、1980〜2079。`rtc.c:145`: 不正日付の一部を丸めて正常に見せる |
-| tick/µs | `arch/x86/kernel/idt.c:19` はu32、`kernel/time/ktime.c:4,10,14,56` は10ms＋PIT補間、IRQ損失と約497日周回は未対応 |
-| KAPI | `sdk/kapi.json:125,195,1648`: get_tick、rtc_read、sys_time_now。後者はUTCでなく起動からのµs（`include/sys.h:47`） |
-| sys_time | `sdk/kapi.json:687`、`kernel/sys.c:168–173`: ローカル暦をepochとするu32。newlib (`sdk/crt/syscalls.c:130–135`)・SQLite (`lib/sqlite3/os32_sqlite_vfs.c:655–661`)・FAT (`fatfs/diskio.c:393`) の時刻源 |
-| date/hdate | `userland/shell/cmd_base.c:126,134`: 引数無視、年を20xx固定表示。`userland/cmds/hdate.c:4,43`: ホスト表示のみ、RTC未更新 |
-| TIME | `tools/host_agent.py:791`: ローカル時刻の秒精度文字列、UTC offset・世代・送信時刻なし |
-| 設定 | `init/sysconfig.c:117` はsystem.cfg整数読出し。`kernel/sqlite_engine.c:214` はsettings.dbのsystem/ival。`userland/lib/cfg/libos32cfg.h:82,109` にDBの共通口 |
-| 設定設計票 | `docs/decisions/settings/DEVICE_RESERVATION_DESIGN.md:66,94` は資源予約・PCI configであり、時刻設定の永続化規約はない |
-| ホスト | `docs/decisions/network/NET_HOSTSVC_DESIGN.md:120` 以降: 内部ALIVE非消費、IRQで同期しない、8要求、HOSTDOWN、LISTとhost_call |
+| RTC | `drivers/char/rtc.c`: パラレルコマンド、48bit読出し、ClockOpsは読みだけ。書く口なし |
+| 年 | `drivers/char/rtc.h` の `RTC_YEAR_PIVOT`: pivot=80、1980〜2079。`rtc.c`: 不正日付の一部を丸めて正常に見せる |
+| tick/µs | `arch/x86/kernel/idt.c` はu32、`kernel/time/ktime.c` は10ms＋PIT補間、IRQ損失と約497日周回は未対応 |
+| KAPI | `sdk/kapi.json`: get_tick、rtc_read、sys_time_now。後者はUTCでなく起動からのµs（`include/sys.h`） |
+| sys_time | `sdk/kapi.json`、`kernel/sys.c`: ローカル暦をepochとするu32。newlib (`sdk/crt/syscalls.c`)・SQLite (`lib/sqlite3/os32_sqlite_vfs.c`)・FAT (`fatfs/diskio.c:393`) の時刻源 |
+| date/hdate | `userland/shell/cmd_base.c`: 引数無視、年を20xx固定表示。`userland/cmds/hdate.c`: ホスト表示のみ、RTC未更新 |
+| TIME | `tools/host_agent.py`: ローカル時刻の秒精度文字列、UTC offset・世代・送信時刻なし |
+| 設定 | `init/sysconfig.c` はsystem.cfg整数読出し。`kernel/sqlite_engine.c` はsettings.dbのsystem/ival。`userland/lib/cfg/libos32cfg.h` にDBの共通口 |
+| 設定設計票 | `docs/decisions/settings/DEVICE_RESERVATION_DESIGN.md` は資源予約・PCI configであり、時刻設定の永続化規約はない |
+| ホスト | `docs/archive/network/NET_HOSTSVC_DESIGN.md` 以降: 内部ALIVE非消費、IRQで同期しない、8要求、HOSTDOWN、LISTとhost_call |
 
 r1で挙げた食い違い・未確認点の扱い（R3/R9を反映、未確認を修正根拠にしない）。
 1. `rtc.c:40,115,123` はパラレル48bit。Bible 2-4も48bit、io_cal.mdに40bitの記載なし、NP21/Wも48bit。外部メーカー資料だけでは年無効と断定せず現行読みを維持。PMがRa266の現行dateの年をシリアル出力で確認し、不正時だけ別段で読みをシリアル方式へ直す。
-2. `rtc.c:84` の立下りと外部メーカー資料の立上りの対応は未照合。読みの変更根拠にせず§9の実機波形で確認。
-3. `rtc.c:115` 後の待ちと外部メーカー資料のTIME READ後20µsの適用条件は未照合。§9で確認し、読みの待ち時間変更は別段で判断。
-4. `rtc.c:158` の1980〜2079と`cmd_base.c:134` の20xx固定が相違。新dateはフル年を表示。
-5. `rtc.c:2` のμPD4990A一律表記とUNDOCUMENTEDの9821搭載品表が相違。4993(A)の互換モードも実機対象。
+2. `rtc.c` の `rtc_read_48bits()` の立下りと外部メーカー資料の立上りの対応は未照合。読みの変更根拠にせず§9の実機波形で確認。
+3. `rtc.c` の `rtc_read()` 後の待ちと外部メーカー資料のTIME READ後20µsの適用条件は未照合。§9で確認し、読みの待ち時間変更は別段で判断。
+4. `rtc.c` の1980〜2079と`cmd_base.c` の20xx固定が相違。新dateはフル年を表示。
+5. `rtc.c` のμPD4990A一律表記とUNDOCUMENTEDの9821搭載品表が相違。4993(A)の互換モードも実機対象。
 
 ## 2. 時刻の持ち方
 ```c
@@ -53,7 +53,7 @@ int time_apply_host(i64 target_us, i32 offset_min, u32 generation, int force);
 int time_set_local(const struct time_local *in); /* full year/month/day/hour/min */
 void time_poll(void);              /* IF=1の協調実行点、非待機、再入なら何もしない */
 ```
-- UTCは符号付き64bit µs、通常の算術は足算・比較・32bit係数との乗算。公開は秒(lo/hi)＋usecへ変換。暦変換は既存`lib/os_time.c:26`の`datetime_to_epoch`を再利用し、旧u32契約を維持。内部64bit/負値の拡張が要る範囲は同ファイルに集約し、負値の除算は床丸め。
+- UTCは符号付き64bit µs、通常の算術は足算・比較・32bit係数との乗算。公開は秒(lo/hi)＋usecへ変換。暦変換は既存`lib/os_time.c`の`datetime_to_epoch`を再利用し、旧u32契約を維持。内部64bit/負値の拡張が要る範囲は同ファイルに集約し、負値の除算は床丸め。
 - 64bit除算は既存ライセンス適合helperを確認して使用、なければ時刻算術ファイルに定数除算を実装。[L1]に従いlibgcc依存を発生させない。
 - `sys_time_now`の意味・既存slotは維持。IRQ0のtick更新点で上位tickを加算し、PIT snapshotのpending補正で桁上がりする場合も上位へ伝播させる。読出し間隔に依存する周回検出にはしない。
 - 64bit snapshotと時計状態commitだけIF保存/cli/復元。暦変換・通信・設定I/O中はIF=1。長いCLIによるtick欠落は保証外のまま記録する。
@@ -182,7 +182,7 @@ int time_sync(void); /* 非待機受付、既に要求中はAGAIN、結果はtim
 | D2 tools/host_agent.py | サービス/LIST登録、D1へdispatch |
 | D3 新kernel/time/host_time.c | 非待機同期、世代/操作通番、gate、期限 |
 | D4 新kernel/time/time_config.c | system.cfg読込とoffset差分保存、既存KEY=VALUE規約 |
-| E1 init/kernel.c | 初期化・起動初回poll、設定読込順序 |
+| E1 platform/pc98/kernel.c | 初期化・起動初回poll、設定読込順序 |
 | E2 exec/exec_schedule.inc | park_kbd/park_poll/sys_yieldのCUI分岐より前でpoll、再入回避 |
 | E3 net/link_host_api.inc | 再OPENのgate、TIME自身は内部フラグで通す |
 | E4 drivers/block/netcd.c（確定票の新設先） | BOPEN前gate |

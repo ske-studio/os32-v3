@@ -8,7 +8,7 @@ CHECK = dict(env=['ppc-cross'], name='arch-ctx-host', tier=2, budget=15, needs=[
     'arch/ppc/kernel_trap.c', 'arch/ppc/*.h',
     'arch/x86/kernel/syscall_entry.c', 'arch/x86/arch_exec_storage.h',
     'exec/exec_syscall.inc', 'kernel/idle_work.[ch]', 'net/nic.h', 'kernel/irq/irq.h',
-    'init/ppc_kernel.c', 'platform/powermac/lan_monitor.c', 'platform/powermac/platform_irq_limits.h',
+    'platform/powermac/ppc_kernel.c', 'platform/powermac/lan_monitor.c', 'platform/powermac/platform_irq_limits.h',
     'include/**', 'sdk/include/os32/**'],
     # W4c landed: the PPC vectors now assert the contract, so nothing here is pinned any more.
     basis=['AC-CTX-1', 'AC-CTX-5', 'AC-CTX-7'],
@@ -65,7 +65,7 @@ def run(ctx):
         (work / 'ctx_entry.inc').write_text(common[start:common.index('    arch_kapi_source(', start)])
         start = monitor.index('int pm_lan_copy8(')
         (work / 'ctx_onfault.inc').write_text(monitor[start:monitor.index('\nvoid pm_lan_execute(', start)])
-        probes = (root / 'init/ppc_kernel.c').read_text()
+        probes = (root / 'platform/powermac/ppc_kernel.c').read_text()
         start = probes.index('static int probe_dsi(')
         (work / 'ctx_probes.inc').write_text(probes[start:probes.index('/* Remap one VA', start)])
         for provider, trap, vectors in [('ppc', ppc, VECTORS), ('x86', x86, (1, 4))]:

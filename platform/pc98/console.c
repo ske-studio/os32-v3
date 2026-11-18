@@ -1,14 +1,14 @@
 /* PC-9821 normal console grid and GDC cursor; fixed resident backend. */
 #include "memmap.h"
 #include "types.h"
-#include "tvram.h"
+#include "text_screen.h"
 #include "tvram_private.h"
 #include "io.h"
 #include "pc98.h"
 #include "console_backend.h"
 #include "pc98_route.h"
 
-/* テキストVRAM定義 (tvram.hとpc98.hの定義を使用) */
+/* テキストVRAM定義 (text_screen.hとpc98.hの定義を使用) */
 #define TVRAM_TEXT  TVRAM_BASE
 STATIC_ASSERT(TVRAM_ROWS * TVRAM_BPR <= TVRAM_ATTR_BASE - TVRAM_CHAR_BASE,
               console_text_within_plane);

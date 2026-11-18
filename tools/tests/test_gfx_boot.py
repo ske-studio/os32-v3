@@ -196,7 +196,7 @@ def text_problems():
         is_gui = k.rindex('if (is_gui) {', 0, to_gshell)
         run_shell = k.index('rc = exec_run(kcg_unavailable')
     except ValueError as e:
-        return problems + ['init/kernel.c: 目印が見つからない (%s)' % e]
+        return problems + ['platform/pc98/kernel.c: 目印が見つからない (%s)' % e]
     if not gfx_cfg < reserve < exec_init:
         problems.append('kernel.c: GFX= の読み取り → gfx_boot_reserve → exec_init の順でない')
     if not is_gui < to_gshell < run_shell:

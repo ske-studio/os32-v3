@@ -24,7 +24,7 @@
 #include "link_notify.h"
 
 #include "link_platform.h"
-#include "link_platform_inline.h" /* Selected by the platform include path. */
+#include "platform_link_inline.h" /* Selected by the platform include path. */
 #include "kstring.h"
 #include "kprintf.h"
 #include "le_internal.h"

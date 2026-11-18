@@ -11,6 +11,7 @@
 #ifndef FDC_H
 #define FDC_H
 
+#include "fdc_contract.h"
 #include "types.h"       /* u8, u16, u32 型定義 */
 #include "fdc_decide.h"  /* ST0 のビット定義と純粋な判定 (ホストで試験する) */
 
@@ -252,7 +253,7 @@
  * 最大 16KB の詰め物が出ていた (レビューの指摘)。
  *
  * DMA プール (MEM_DMA_POOL_BASE) は使わない: fdc_init() は dma_pool_init()
- * より前に走り、kselftest_run() がプールを作り直す (init/kernel.c の注記)。 */
+ * より前に走り、kselftest_run() がプールを作り直す (platform/pc98/kernel.c の注記)。 */
 #define FDC_TRACK_MAX_BYTES  (18 * 512)  /* 1.44MB の 1 トラック = 9216B */
 #define FDC_DMA_BUF_SIZE     FDC_TRACK_MAX_BYTES
 /* 先読みのスロット数と、1 セクタの読みを覚えるセクタキャッシュの数。
@@ -442,11 +443,7 @@ void fdc_get_stats(struct fdc_stats *out);
 /* 数を 1 行で出す (tag は場面の名前。何も起きていなければ出さない)。 */
 void fdc_print_stats(const char *tag);
 
-/* ドライブの中身の世代。**書き込み (fdc_write_sector_geom を通るもの全部 —
- * FatFs、dev.c の fd0/fd1、KAPI の dev_blk_write)、Ready 変化 (媒体の
- * 入れ替え)、fdc_set_media のたびに増える**。先読み (drivers/block/fdc_track.c)
- * はスロットを埋めたときの世代と比べ、違えば当てない。 */
-u32 fdc_media_gen(int drv);
+/* u32 fdc_media_gen(int drv) (ドライブの中身の世代) は include/fdc_contract.h。 */
 
 /* 先読みのスロット i (0 ≦ i < FDC_TRACK_SLOTS) の先頭。各
  * FDC_TRACK_MAX_BYTES バイト。DMA の窓とは重ならない (同じ静的領域の中)。

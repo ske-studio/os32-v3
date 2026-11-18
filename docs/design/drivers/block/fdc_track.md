@@ -7,6 +7,6 @@
 ## 落とし穴
 
 - **上位層の読み順**: 1 セクタずつ SEEK と READ を繰り返すと回転待ちで遅くなる。
-  要求から EOT までの先読みと複数のトラック枠、セクタの LRU を使う (`drivers/block/fdc_track.c:185`)。
+  要求から EOT までの先読みと複数のトラック枠、セクタの LRU を使う (`drivers/block/fdc_track.c` の `fdc_track_read_inner()`)。
   FAT とデータやディレクトリの往復では単一の先読み枠が追い出されるため、上位層の実際のアクセス順も調べる。
   分割・先読み・再読込は `make check-fdc-track-host` が検査する。

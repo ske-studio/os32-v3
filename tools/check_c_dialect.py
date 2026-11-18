@@ -33,7 +33,7 @@ REQUIRED_SRCS = SQLITE_SRCS + (
     "lib/sqlite3/os32_sqlite_test.c",
     "userland/tests/sqlite_standalone/sqlite_standalone.c",
     "userland/tests/sqlite_standalone/sqlite_user_vfs.c",
-    "init/kernel.c",
+    "platform/pc98/kernel.c",
     "boot/boot_main.c",
 )
 

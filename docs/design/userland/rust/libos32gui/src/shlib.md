@@ -24,4 +24,4 @@ SHADOW・本文変更・複写失敗では従来と同じ全体再描画へ戻�
 
 `os32gui_w_focused` (entry 77) は窓スロット添字を取る既存 ABI を維持する。
 アプリは WindowId を取る `os32gui_w_focused_in` を使う。定義は
-[`shlib.rs:1171・1183–1187`](../../../../../../userland/rust/libos32gui/src/shlib.rs)。
+[`shlib.rs`](../../../../../../userland/rust/libos32gui/src/shlib.rs)。

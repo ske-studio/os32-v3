@@ -1,6 +1,6 @@
 # TDD 記録 — CS4231 (MATE-X PCM) 再生ドライバ
 
-票: [`docs/tasks/v3/TASK_PCM_CS4231.md`](../../docs/tasks/v3/TASK_PCM_CS4231.md) §2-3 / §3 E1
+設計: [`docs/design/drivers/sound/cs4231/pcm_cs4231.md`](../../docs/design/drivers/sound/cs4231/pcm_cs4231.md#確かめ)
 対象: `drivers/sound/cs4231/pcm_cs4231_math.c` (純粋部) と `drivers/sound/cs4231/pcm_cs4231.c` (I/O と状態機械)
 走らせ方: `make check-pcm-cs4231-host` (= `python3 -B tools/tests/test_pcm_cs4231.py --target --mutate`)
 

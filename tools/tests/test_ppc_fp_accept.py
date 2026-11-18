@@ -15,7 +15,7 @@ CHECK = dict(name='ppc-fp-accept-host', env=['ppc-cross', 'qemu-ppc'], tier=1, b
     covers=['tools/tests/test_ppc_fp_accept.py', 'tools/accept/ppc_fp.py',
             'arch/ppc/exec_enter.S', 'arch/ppc/exec_resume.S', 'arch/ppc/kernel_vectors.S',
             'arch/ppc/fp_context.S', 'arch/ppc/kernel_trap.c',
-            'build/ppc-user.mk', 'build/ppc-kboot.mk',
+            'build/ppc-user.mk', 'build/targets/ppc-powermac.mk',
             'userland/ppc/fp_probe_main.c', 'userland/ppc/fp_probe.S',
             'tools/tests/ppc_fp_accept_host.c', 'sdk/include/os32/**'],
     basis=['PPC_FP_NEWLIB_DESIGN §8 F1〜F5'])

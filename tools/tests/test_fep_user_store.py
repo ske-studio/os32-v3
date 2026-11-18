@@ -7,7 +7,7 @@ CHECK = dict(name='fep-user-store', tier=1, needs=[], budget=4.3,
             'tools/tests/fep_user_store_host.c', 'tools/tests/fep_store_fixture.c',
             'tools/tests/fep_store_fixture.h', 'tools/tests/host32.py',
             'tools/tests/kernel_includes.py', 'build/config.mk'],
-    basis=['DICT_META_DESIGN §2', 'DICT_META_DESIGN §3', 'DICT_META_DESIGN §4', 'DICT_META_DESIGN §5', 'DICT_META_DESIGN §6', 'DICT_META_DESIGN §1'],
+    basis=['docs/design/kernel/ime/ime_user_store.md 形', 'docs/design/kernel/ime/ime_user_store.md 開く手順'],
 )
 import argparse
 import os

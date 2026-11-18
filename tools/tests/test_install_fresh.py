@@ -11,7 +11,7 @@
 `--target` は i386-elf-gcc で install.c を単体コンパイル ([C1] GNU11 / -Werror)。
 """
 CHECK = dict(name='install-fresh-host', tier=1,
-    covers=['drivers/block/pc98pt.c', 'fs/ext2/ext2_layout.c', 'tools/tests/install_fresh_host.c', 'userland/shell/hdprep_plan.c', 'userland/system/inst_disk.c', 'userland/system/inst_hdd.c', 'userland/system/install.c'],
+    covers=['fs/pc98pt.c', 'fs/ext2/ext2_layout.c', 'tools/tests/install_fresh_host.c', 'userland/shell/hdprep_plan.c', 'userland/system/inst_disk.c', 'userland/system/inst_hdd.c', 'userland/system/install.c'],
     needs=[], budget=5.9,
     kind='characterization',
 )
@@ -51,7 +51,7 @@ INC = ["-I" + str(ROOT / p) for p in
 # 段 2: install.c が繋ぐ共有部 (build/programs.mk の INST_OBJ と同じ顔ぶれ)。
 # 写さずに実物を別の翻訳単位として組む。
 SHARED = ["userland/system/inst_hdd.c", "userland/system/inst_disk.c",
-          "userland/shell/hdprep_plan.c", "drivers/block/pc98pt.c", "fs/ext2/ext2_layout.c"]
+          "userland/shell/hdprep_plan.c", "fs/pc98pt.c", "fs/ext2/ext2_layout.c"]
 
 
 def build(tmp, sanitize, extra=(), root=ROOT):

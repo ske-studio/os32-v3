@@ -1,12 +1,12 @@
 /* ======================================================================== */
 /*  HDPREP_PLAN.C — `hdprep` の判定と計画 (純粋関数)                         */
 /*                                                                          */
-/*  規則は hdprep_plan.h。区画表の中身は drivers/block/pc98pt.c (共有部) で読む。 */
+/*  規則は hdprep_plan.h。区画表の中身は fs/pc98pt.c (共有部) で読む。 */
 /*  32 ビットの桁あふれに頼る計算はしない (ホスト試験は 64 ビットで回る)。   */
 /* ======================================================================== */
 
 #include "hdprep_plan.h"
-#include "drivers/block/pc98pt.h"   /* PROGRAM_FLAGS の -I. で引く */
+#include "fs/pc98pt.h"   /* PROGRAM_FLAGS の -I. で引く */
 
 int hdprep_check_geom(const HdprepGeom *g)
 {

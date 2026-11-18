@@ -80,6 +80,7 @@ void *kmemcpy(void *dst, const void *src, u32 n)
     return dst;
 }
 void kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
+void console_printf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
 void link_init(const u8 mac[ETH_ALEN]) { (void)mac; link_inits++; }
 void link_selftest(int rounds) { (void)rounds; }
 void link_l1_bulk(unsigned int count, unsigned int payload) { (void)count; (void)payload; }

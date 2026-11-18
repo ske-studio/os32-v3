@@ -1,5 +1,5 @@
 /* MPC7450UM 3.4.4: publish writes before fetching instructions. */
-#include "exec_cache.h"
+#include "arch_exec_cache.h"
 #define __ASSEMBLER__
 #include "ppc_oea.h"
 #undef __ASSEMBLER__

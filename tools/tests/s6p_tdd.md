@@ -1,7 +1,7 @@
 # S6-P (ext2 の小さな書き込みが極端に遅い) — ホスト TDD の記録
 
-票: S6-P / 観測は `docs/archive/settings/TASK_S6.md` 「PM 受入記録」
-診断: `docs/archive/settings/TASK_S6P.md`
+票: S6-P (観測は TASK_S6 の受入記録、診断は TASK_S6P)
+契約: `docs/design/fs/ext2/ext2_super.md` 「小さな書き込みの I/O を減らす 2 つの仕掛け」、`docs/design/userland/cmds/tar.md` 「書き込みの形」
 実装 (段 B, ext2): `fs/ext2/ext2_ctx.h` / `fs/ext2/ext2_super.c` / `fs/ext2/ext2_inode.c` / `fs/ext2/ext2_dir.c` /
       `fs/ext2/ext2_vfs.c` / `fs/ext2/ext2_priv.h` / `fs/ext2/ext2_fmt.c`
 実装 (段 A, 呼び出し側): `lib/microtar/microtar.c` の `write_null_bytes()`
@@ -52,7 +52,7 @@
 | `mtar_finalize` → `write_null_bytes(1024)` | **1B × 1024** | 512B × 2 |
 | 合計 | **1523 回** | **5 回** |
 
-`write_null_bytes()` (microtar.c:111) は `for (i = 0; i < n; i++) twrite(tar, &nul, 1);`
+`write_null_bytes()` (microtar.c) は `for (i = 0; i < n; i++) twrite(tar, &nul, 1);`
 — 1 バイトずつ書く。後方 `lseek` は create 経路には出ない (`mtar_seek(last_header)` は
 read 側)。`lseek` 自体は `fs/vfs_fd.c` の `vfs_seek` が `VfsFile.offset` を
 書き換えるだけなので **0 セクタ** (ケース P4 で表明)。

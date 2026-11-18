@@ -14,7 +14,7 @@ import host32
 CHECK = dict(name='ppc-kboot-capture', tier=2, budget=60,
              covers=['platform/powermac/kboot_capture.c', 'platform/powermac/kboot_info.h',
                      'tools/ppc/kboot_capture.py', 'tools/ppc/kboot_capture_fake.c',
-                     'platform/powermac/ofw.h', 'platform/powermac/ppc_layout.h',
+                     'platform/powermac/ofw.h', 'platform/powermac/platform_of_layout.h',
                      'arch/ppc/ppc_boot.h', 'arch/ppc/ppc_pmap.h', 'arch/ppc/ppc_oea.h',
                      'include/types.h', 'include/callconv.h', 'lib/kstring.h',
                      'lib/kstring_c.c', 'tools/tests/host32.py'])

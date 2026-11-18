@@ -13,9 +13,12 @@ SOURCES = {
     'console_dual_source.inc': 'kernel/console/console_dual.c',
     'display_dual_source.inc': 'platform/pc98/display_dual.c',
     'pc98_console_source.inc': 'platform/pc98/console.c',
+    # 機種ごとの方針 (固定名 platform_console.h)。構成ごとに片方を選ぶ。
+    'platform_console_pc98.inc': 'platform/pc98/platform_console.h',
+    'platform_console_powermac.inc': 'platform/powermac/platform_console.h',
 }
 MUTANTS = [
-    ('x86 default mirror enabled', 'console_source.inc',
+    ('x86 default mirror enabled', 'platform_console_pc98.inc',
      '#define CONSOLE_PUTCHAR_MIRROR 0',
      '#define CONSOLE_PUTCHAR_MIRROR 1', 'character mirror policy'),
     ('character mirror missing', 'console_source.inc',
@@ -61,6 +64,8 @@ MUTANTS = [
 def build_run(tmp, sources, ppc):
     for name, source in sources.items():
         (tmp / name).write_text(source)
+    (tmp / 'platform_console.h').write_text(
+        '#include "platform_console_%s.inc"\n' % ('powermac' if ppc else 'pc98'))
     exe = tmp / 'console-cui-route'
     subprocess.run([
         'gcc', '-m32', '-std=gnu11', '-O0', '-ffreestanding', '-fno-builtin',
@@ -68,7 +73,6 @@ def build_run(tmp, sources, ppc):
         '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections',
         '-Wall', '-Wextra', '-Werror', '-Wno-sign-compare',
         '-DEXPECT_PUTCHAR_MIRROR=' + str(ppc),
-        *(['-DCONSOLE_PUTCHAR_MIRROR=1'] if ppc else []),
         '-D__KERNEL_BUILD__', '-I' + str(tmp), '-I' + str(ROOT),
         '-I' + str(ROOT / 'tools/tests'), *include_flags(ROOT),
         str(ROOT / 'tools/tests/console_cui_route_host.c'),

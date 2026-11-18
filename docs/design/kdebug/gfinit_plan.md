@@ -38,6 +38,6 @@ A4 等の plan 合成
 
 ## SLIM_HWDEV_DESIGN
 
-gfinit_plan.c:109–113のコピーは同じ配列への自己代入となり、そのままでよい。
+gfinit_plan.c (gfinit_plan_prefix())のコピーは同じ配列への自己代入となり、そのままでよい。
 
-- gfinit_plan.c:83,102–103,167とVRAM用追記、decode/bus/exec内の表参照も従来型の直接参照のまま。
+- gfinit_plan.cとVRAM用追記、decode/bus/exec内の表参照も従来型の直接参照のまま。

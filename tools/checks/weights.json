@@ -19,6 +19,22 @@
     {
       "artifact": "check-times-e22256d479f24be046a03739c510841101bbef4d-2",
       "sha256": "b90199ea0315cecbdf4a00a49e845428bc9c9503698d3617bf0869d6421f80cc"
+    },
+    {
+      "artifact": "check-times-8078bf3495a80876e234171a2ec8c2888a01a87d-ppc-qemu-0",
+      "sha256": "37ee728ba2c7469ed672a1e8325d192fb5f885683f7621ed57523a8872b35cc1"
+    },
+    {
+      "artifact": "check-times-8078bf3495a80876e234171a2ec8c2888a01a87d-ppc-qemu-1",
+      "sha256": "730cbb406ebdbb1f3cfbd3de43e620096a3e7f4898696134d52d00788fd44344"
+    },
+    {
+      "artifact": "check-times-8078bf3495a80876e234171a2ec8c2888a01a87d-ppc-qemu-2",
+      "sha256": "ad07d24fad5bcab0129ce2e88eac23e4c931c729d18e3087d57b7d1a43d1245e"
+    },
+    {
+      "artifact": "check-times-8078bf3495a80876e234171a2ec8c2888a01a87d-ppc-qemu-3",
+      "sha256": "85707a49686cfe8494ad028e4bcd58a681989bf6f8dd9594685e5185367bf72a"
     }
   ],
   "seconds": {
@@ -27,6 +43,7 @@
     "appmem-host": 3.172635,
     "appmem-map-host": 5.664773,
     "arch-asm": 266.255407,
+    "arch-ctx-guest": 620.198891,
     "b8-open-host": 42.24959,
     "boot-order-host": 2.734105,
     "boot-readers-host": 3.186042,
@@ -312,7 +329,17 @@
     "pegc-mode-host": 3.4177,
     "pit-clock-host": 2.799469,
     "platform-memory-host": 2.646895,
-    "ppc-selection-host": 2.841641,
+    "ppc-fb": 623.865231,
+    "ppc-fp-accept-host": 0.277654,
+    "ppc-fp-guest": 389.666821,
+    "ppc-link-sh-run": 1024.223467,
+    "ppc-mmu": 82.959379,
+    "ppc-rh-fb": 12.249415,
+    "ppc-sc": 107.542302,
+    "ppc-sd": 75.530835,
+    "ppc-sd-link": 166.629841,
+    "ppc-sh-output": 36.355016,
+    "ppc-usb": 498.334765,
     "preflight-host": 4.421956,
     "privileged": 7.8109,
     "probe-host": 4.63924,
@@ -429,6 +456,7 @@
     "appmem-host": 3,
     "appmem-map-host": 3,
     "arch-asm": 3,
+    "arch-ctx-guest": 1,
     "b8-open-host": 3,
     "boot-order-host": 3,
     "boot-readers-host": 3,
@@ -714,7 +742,17 @@
     "pegc-mode-host": 3,
     "pit-clock-host": 3,
     "platform-memory-host": 3,
-    "ppc-selection-host": 3,
+    "ppc-fb": 1,
+    "ppc-fp-accept-host": 1,
+    "ppc-fp-guest": 1,
+    "ppc-link-sh-run": 1,
+    "ppc-mmu": 1,
+    "ppc-rh-fb": 1,
+    "ppc-sc": 1,
+    "ppc-sd": 1,
+    "ppc-sd-link": 1,
+    "ppc-sh-output": 1,
+    "ppc-usb": 1,
     "preflight-host": 3,
     "privileged": 3,
     "probe-host": 2,

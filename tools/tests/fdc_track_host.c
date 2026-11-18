@@ -35,7 +35,7 @@
 /* test_fdc_track.py が実 pic.c から切り出す EOI と ISR 操作。 */
 #include "fdc_pic_source.c"
 #include "clock_service.c"
-#include "../../fs/fat/fatfs/diskio.c"
+#include "../../drivers/block/fat_diskio.c"
 /* FatFs 本体も実物を通す (font_replay)。ff.c は外部のコードなので、試験側の
  * 厳しい警告だけ外す (カーネルのビルドでは元の警告のまま)。 */
 #pragma GCC diagnostic push

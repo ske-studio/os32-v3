@@ -1,8 +1,9 @@
 # S3 — リカバリ (`install --recover-settings`) と `cfg import` のホスト TDD 記録
 
-票: `docs/archive/settings/TASK_S3.md`、
-契約の正典は `docs/archive/settings/S0_FOUNDATION.md` §6
-(明示リカバリ契約) と `docs/archive/settings/TASK_S0.md` §D (配備保護)。
+票: TASK_S3。
+契約の正典は `docs/design/userland/system/install_recover.md` (明示リカバリ契約)、
+`docs/design/userland/lib/cfg/cfg_import.md`・`docs/design/userland/lib/cfg/cfg_json.md` (`cfg import`)、
+`docs/design/tools/deploy_protect.md` (配備保護)、`docs/design/fs/fat/fatfs_vfs.md` (FAT の stat と列挙)。
 
 3 票 (S3-I / S3-C / S3-D) が同じファイルに書くので、節を票ごとに分ける。
 **自分の節だけ**を書き、他の節には触れないこと。
@@ -35,22 +36,21 @@ S0-D の配備保護は `/etc/settings.db` `-journal` `-wal` `-shm` `.bak` の 5
 
 足した先は 2 か所だけ (新しい判定は増やさない。S0-D の 2 段判定にそのまま乗る):
 
-- `tools/deploy_protect.py` の `PROTECTED_BASENAMES` (5 → **11 名**)。
+- `tools/deploy_protect.py` の `PROTECTED_BASENAMES` (**13 名**: 復旧が扱う 11 名 + `-wal`・`-shm`)。
   名前規則 (`name_is_protected`)、実体検査の収集対象 (`_protected_identities`)、
   試験側の `FakeRun.touched_protected` が同じ集合を参照しているので、
   nhd_deploy (manifest / HostDrv 丸写し / copy / copy-all / rm / remove_partial) /
   hostdrv_deploy (manifest / clean) / prune_stale (prune_nhd / prune_hostdrv) の
   **全経路**が 1 か所の変更で揃う。
-- `userland/system/hsync_protect.inc` の `hsp_protected_names` (5 → **11 名**)。
+- `userland/system/hsync_protect.inc` の `hsp_protected_names` (同じ **13 名**)。
   名前規則 (`hsp_name_protected` / `hsp_ancestor_protected`) と、hsync.c が
   `/etc` を `sys_ls` で列挙して実在名を拾うときの一致判定
   (`hsp_is_protected_basename` = 実体規則の入口) が同じ表を見る。
 
 付随して `userland/system/hsync.c` の `HS_MAX_PROT` を **16 → 24**。これは
 「`/etc` の実在名を何件まで集めるか」の上限で、越えると hsync は守れないとして
-**同期を拒否する**。表が 5 名のときは余裕 11 だったが、リカバリ途中の `/etc` は
-9 名 + `-wal` / `-shm` = 11 名になりうるので、16 のままだと大文字小文字違いの
-別名が 5 つあるだけで通常同期が止まる。余裕を元と同じだけ保つ。
+**同期を拒否する**。リカバリ途中の `/etc` は 11 名 + `-wal` / `-shm` = 13 名に
+なりうるので、大文字小文字違いの別名のぶんの余裕を 11 残してある。
 
 ### D.2 試験の範囲と遮断
 
@@ -157,10 +157,11 @@ symlink / hardlink の別名は `S3RecoveryJudgement` の 3 件が判定その�
 
 # S3 — リカバリのホスト TDD 記録
 
-票: `docs/archive/settings/TASK_S3.md` 第 5 版。
-契約の正典は `docs/archive/settings/S0_FOUNDATION.md` §6
-(明示リカバリ契約)、`docs/archive/settings/TASK_S2.md` §1-1 (b) の meta 検査 SQL と
-§1-7 (f) の rename 両名検査、`docs/archive/settings/TASK_S0.md` (配備保護)。
+票: TASK_S3。
+契約の正典は `docs/design/userland/system/install_recover.md` (明示リカバリ契約)、
+`docs/design/userland/lib/cfg/libos32cfg.md` の「schema の検査」(meta 検査 SQL) と
+`docs/design/userland/lib/cfg/cfg_init.md` の「rename の後の両名検査」、
+`docs/design/tools/deploy_protect.md` (配備保護)。
 
 ---
 
@@ -308,7 +309,7 @@ python3 -B tools/tests/test_install_recover.py happy chain # ケース指定
   ユーザーランドから検出できない。ホスト試験が固定しているのは「`db_close` が失敗したら
   `.new` を消さず、再起動を前提にした文言を出す」ところまでで、**再起動しなければ本当に
   危ないこと自体は試験していない** (票 §1f 4 の限界そのまま)。
-- `PRAGMA integrity_check` はカーネルの SQLite で OMIT (`lib/sqlite3/os32_sqlite_config.h:51`)。
+- `PRAGMA integrity_check` はカーネルの SQLite で OMIT (`lib/sqlite3/os32_sqlite_config.h`)。
   検査は meta + 全行走査 + バイト一致までで、索引や自由ページの健全性は見ていない。
 - ext2 の rename が実際にどの中途半端で止まるかは注入した 2 形 (両名残存 / 置換先 unlink 後の
   新名追加失敗) だけ。実 FS での再現は受入 I6 の領分。
@@ -518,7 +519,7 @@ SUMMARY 7/7 PASS
 - 実 FatFs (`fs/fat/fatfs/ff.c`) が 8.3 に収まらない名前で本当に `FR_INVALID_NAME` を返すことは
   **贋物で仮定している**。根拠は実機の `ls -l /etc/settings.db-journal` = `Invalid argument`
   (受入時の観測) と `ffconf.h` の `FF_USE_LFN 0` であって、この試験の中では確かめていない。
-- HostDrv (`fs/hostdrv/hostdrvfs.c`) と iso9660 の stat は見ていない。本件は FAT だけの写像。
+- HostDrv (`drivers/hostdrv/hostdrvfs.c`) と iso9660 の stat は見ていない。本件は FAT だけの写像。
 - `make all` / `make check` は未実行。`fs/fat/fatfs_vfs.c` の単体クロスコンパイル
   (`i386-elf-gcc -Wall -Wextra -Werror`) だけ通した。
 
@@ -628,7 +629,7 @@ jr.val_b64` と `ran("import", "/b64.json", "--scope", "gshell", NULL) == 0`)。
 
 ## K-4. `fatfs_vfs_list` の列挙エラー伝播 (票 S3I2-K) — 2026-09-14
 
-> 票 (`docs/archive/settings/TASK_S3I2.md` §0) が指した「§K-3」。この文書には S3-K の
+> 票 TASK_S3I2 が指した「§K-3」。この文書には S3-K の
 > `## K-3. この試験が言えないこと ([V4])` が既にあるので、既存節を消さずに番号をずらした。
 
 ### K-4.0 何を直したか、なぜ要るか
@@ -667,7 +668,7 @@ FAT 側が負を返さない限り**欠けたファイルのまま `Installation
 `f_opendir` の失敗は元から `ff_to_vfs(fr)` の負を返しており**変更なし**。
 `f_closedir` は成功・打ち切りのどちらでも通る位置にあり、呼び忘れは無い
 (開けなかったときは `return` が先なので呼ばない = 正しい)。
-`vfs_ls` (`fs/vfs.c:344`) は `ops->list_dir()` の戻りをそのまま返すので**触っていない**。
+`vfs_ls` (`fs/vfs.c`) は `ops->list_dir()` の戻りをそのまま返すので**触っていない**。
 
 ### K-4.1 試験の範囲と遮断
 

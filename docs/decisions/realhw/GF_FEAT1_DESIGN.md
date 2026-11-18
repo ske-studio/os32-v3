@@ -27,21 +27,21 @@ R10: PM判断に従い宣言だけの変更をA0に統合。
 
 | # | 票・比較側 | 現物と設計への反映 |
 |---|---|---|
-| 1 | 票§2は devinit・recover override・期待値の撤回を列挙 | `O/hwdev/gf/bus.c:29,109` も **毎回0102hとの完全一致**を要求。初期化だけ0106hにすると最初のMMIOで失敗。RUN/STOP別判定にする。 |
-| 2 | overrideの置換だけで復帰も直るように読める | `O/kdebug/recover_profile.c:297` はBM=0を画面復帰条件にする。`:221–231` はQUIESCEとRESTOREが同値。RUN=0106h、S0=0102hを分離し、S0のBM=0条件は維持する。 |
+| 1 | 票§2は devinit・recover override・期待値の撤回を列挙 | `O/hwdev/gf/bus.c` の `raw()` も **毎回0102hとの完全一致**を要求。初期化だけ0106hにすると最初のMMIOで失敗。RUN/STOP別判定にする。 |
+| 2 | overrideの置換だけで復帰も直るように読める | `O/kdebug/recover_profile.c` はBM=0を画面復帰条件にする。`gf_rules()` はQUIESCEとRESTOREが同値。RUN=0106h、S0=0102hを分離し、S0のBM=0条件は維持する。 |
 | 3 | 比較:28,63のU1「MC/表示IRQ本体未取得」 | 手元には無いが同じ版の原本を取得確認。`N/nvkm/subdev/mc/nv44.c:43–46` はnv04のIRQ操作＋nv17の集約表、`N/nvkm/engine/disp/nv04.c:80` がPCRTC ACKを行う。U1のこの部分は解消。 |
-| 4 | 票の修正対象はPMCの通常検証を列挙しない | `O/hwdev/gf/devinit.c:99–106 validate`はinitializedなら200hをbaseline_pmcと完全一致で比較する。層1のMC開始/engine停止に合わせたexpected_pmcが必要。保存した表示baseline自体は書き換えない。 |
+| 4 | 票の修正対象はPMCの通常検証を列挙しない | `O/hwdev/gf/devinit.c validate`はinitializedなら200hをbaseline_pmcと完全一致で比較する。層1のMC開始/engine停止に合わせたexpected_pmcが必要。保存した表示baseline自体は書き換えない。 |
 
-追加の現状確認（食い違いには数えない）: `O/hwdev/gf/devinit.c:74–78` はWORDで0102hを書き読戻す。`internal.h:209` の常設mapはBAR0/1だけ。
-`bus.c:26–27` のBAR1許可は307200Bまで。`O/docs/02_memory.md:152` のPT予算もBAR0 16MiB＋表示300KiBまでで、PRAMIN写像を含まない。
-`service.c:25–29` はacquire→init→baseline→scratch解放。`internal.h:195–198` のownerに層1の生存期間hookはまだ無い。
-`O/drivers/video/geforce/backend_geforce.c:99–102` の停止はvideo_stopへ到達。`geforce_module.c:98–99` はimport契約を持つ。新IRQ依存は契約にも追加が必要。
-IRQ先例は `O/drivers/net/e82557/e82557.c:697–704`（共有登録→BM）、`:754–762`（DMA停止→登録解除→BM復元）。VBLANKとPIT待ちは別物（比較:29）。
+追加の現状確認（食い違いには数えない）: `O/hwdev/gf/devinit.c` はWORDで0102hを書き読戻す。`internal.h` の常設mapはBAR0/1だけ。
+`bus.c` の `raw()` のBAR1許可は307200Bまで。`O/docs/02_memory.md` のPT予算もBAR0 16MiB＋表示300KiBまでで、PRAMIN写像を含まない。
+`service.c:25–29` はacquire→init→baseline→scratch解放。`internal.h` のownerに層1の生存期間hookはまだ無い。
+`O/drivers/video/geforce/backend_geforce.c` の停止はvideo_stopへ到達。`geforce_module.c` はimport契約を持つ。新IRQ依存は契約にも追加が必要。
+IRQ先例は `O/drivers/net/e82557/e82557.c` の `e82557_probe()`（共有登録→BM）、同ファイル内（DMA停止→登録解除→BM復元）。VBLANKとPIT待ちは別物（比較:29）。
 原本補完: [MC nv44](https://github.com/torvalds/linux/blob/c03c1a14507dfaf8b856c2608f9ac216021fc222/drivers/gpu/drm/nouveau/nvkm/subdev/mc/nv44.c)、同ディレクトリのnv04.c/nv17.c/base.c、[表示IRQ](https://github.com/torvalds/linux/blob/c03c1a14507dfaf8b856c2608f9ac216021fc222/drivers/gpu/drm/nouveau/nvkm/engine/disp/nv04.c)、nvkm/core/intr.c。行番号は同コミットの原本。リポジトリには保存しない。
 
 ## 2. 境界と状態の所有者
 `struct gf_production` が層1を1個所有し、display.owner経由で開始/停止。IRQのargも同じ層1。scratch・ROMと一緒に解放しない。
-既存 `struct gf_io`（`O/hwdev/gf/internal.h:35–44`）を通常処理/偽MMIOで再利用。IRQはPCI再照会・window切替・待ちをしない常設MMIO adapterを使う。
+既存 `struct gf_io`（`O/hwdev/gf/internal.h`）を通常処理/偽MMIOで再利用。IRQはPCI再照会・window切替・待ちをしない常設MMIO adapterを使う。
 
 ```c
 /* 新規 foundation.h。以下は内部ABI。既存公開 video_ops は変更しない。 */
@@ -102,15 +102,15 @@ struct gf_instmem_map_ops {
 | 2 latency timerも扱う | 同`:881`がLinux PCIサービスに委譲。nouveau本体にはlatency補正関数/閾値なし | cfg8 latency(0Dh)が16未満なら64、以上なら保持。変更時は0Chをread16し下位cache lineを保存、上位を64にしてwrite16(0Ch)、read8(0Dh)で確認。不一致EPCI。0Eh/0Fhには書かない。 |
 | 3 IRQを閉じる | `N/nvkm/subdev/mc/nv04.c:82 nv04_mc_intr_unarm`は140h=0→読戻し。表示は`N/dispnv04/disp.c:57 nv04_display_fini`の`:67–69` | 短いirq_save/restore内でrunning=false・tick参照解除→PMC閉→§5の各source mask/ACK。停止中は再armしない。 |
 | 4 GPUのエンジンを停止 | `N/nvkm/core/subdev.c:54–85 nvkm_subdev_fini`はnvkm_mc_reset、`engine/device/base.c:2964–2975 nvkm_device_fini`はsubdev逆順。`mc/nv17.c:27–30`のGR=1000h/FIFO=100h/MPEG=2h | FIFO→GR→MPEGごとに200hの対象bitをclear→read→set→readするresetパルス（各MC disable/enableに対応）。読戻し不一致ESTOP、BM維持。無投入・source mask済みで実施、表示bit保持。 |
-| 5 engine停止確認後 | `N/nouveau_drm.c:926–940 nouveau_drm_remove`:後始末→nvkm_device_del/free_irq→pci_disable_device、suspend`:1047–1052`も後始末→PCI停止。`O/drivers/net/e82557/e82557.c:758–759`はunregister→BM解除 | irq_unregister成功→Command=0102hをWORD書込/読戻し→STOP期待値→instmem/map解放。latencyは戻さない（pci_clear_masterと同じ）。EIRQならBM維持、EPCIならmap/所有状態を残す。 |
+| 5 engine停止確認後 | `N/nouveau_drm.c:926–940 nouveau_drm_remove`:後始末→nvkm_device_del/free_irq→pci_disable_device、suspend`:1047–1052`も後始末→PCI停止。`O/drivers/net/e82557/e82557.c`はunregister→BM解除 | irq_unregister成功→Command=0102hをWORD書込/読戻し→STOP期待値→instmem/map解放。latencyは戻さない（pci_clear_masterと同じ）。EIRQならBM維持、EPCIならmap/所有状態を残す。 |
 
 - 手本との差: RUN=0106h固定はOS32既存のdecode方針（I/O無効/MEM有効/SERR有効）を残してBMだけ撤回するため。Linux一般のCommand全bit方針の移植ではない。
 - latencyの16/64は**nouveau内に無いOS32の明示方針**。Linuxの通常のPCI latency調整相当を狙うが、arch override/max_latency可変設定は持たない。GPL PCI実装は転記しない。
 - engine停止のFIFO→GR→MPEGは**合成した順で、手本の順は未確認** (nvkm_device_fini の subdev の逆順を決める layout.h が refs に無い。MPEG→GR→FIFO の可能性がある。層1は投入済みの仕事が無いので順による害は無い見込み)。この合成列は手本に一体のS0列としては無い。層1は投入済み仕事が無いため各engine finiのresetパルスを合成し、層2は前段に固有の停止処理を追加する。
 - 200h読戻しは `nv04_mc_device_enabled:49–51` と同じ状態確認。読戻し失敗時にBMを先に落とさないのは「GPU停止後にBM解除」という契約を守るため。
-- `bus.c:29,109`は`expected_command`を照合（RUN/STOP両方でcleanup可能）。`:109`のdecode_safeはA2/通常validateからも呼ばれるためSTOP専用にしない。診断のgf_stage_state.c:63もexpected_commandを照合。
-- `devinit.c:105`と`gf_stage_state.c:70`はexpected_pmcを照合。開始前baseline_pmc、MC初期化後ffffffffh、正常停止後もresetパルスの最終setでffffffffh。段の保存値との完全一致は使わず、既存表示baselineは保存のまま。
-- `recover.h:160`の単一OVERRIDEをRUN/STOPの名前に分ける。`recover_profile.c:221–231`のS0/RESTOREにはSTOPを使い、その前に同じengine停止列を登録する。`:297`のBM=0確認は維持。
+- `bus.c`は`expected_command`を照合（RUN/STOP両方でcleanup可能）。のdecode_safeはA2/通常validateからも呼ばれるためSTOP専用にしない。診断のgf_stage_state.c:63もexpected_commandを照合。
+- `devinit.c`と`gf_stage_state.c`はexpected_pmcを照合。開始前baseline_pmc、MC初期化後ffffffffh、正常停止後もresetパルスの最終setでffffffffh。段の保存値との完全一致は使わず、既存表示baselineは保存のまま。
+- `recover.h`の単一OVERRIDEをRUN/STOPの名前に分ける。`recover_profile.c`のS0/RESTOREにはSTOPを使い、その前に同じengine停止列を登録する。のBM=0確認は維持。
 - restoreでBIOS由来0106hを自動復元しない。OS32は停止状態を返すので0102hを終値とする。既存RECログ・quiesce_count/予算式（同`:244–264`）も追加操作数で再計算する。
 
 ## 4. (b) VRAM / PRAMIN / instmem
@@ -123,7 +123,7 @@ struct gf_instmem_map_ops {
 | 4 PRAMIN aperture | `instmem/nv40.c:238 nv40_instmem_new`の`:249–253`はBAR2_INSTをmap。`:146,152`のrd32/wr32と`:48–58`のobject accessはaperture+instance offset。`engine/device/pci.c:1564–1577 nvkm_device_pci_resource_idx`は64bit BARを2slotとして数える | OS32の第三memory resourceを照合し、先頭R byteを常設UCでmap。PCI configのBAR slot番号と配列indexを混同しない。resource長>=R、map失敗EMAP。BAR0+700000hの旧nv04経路に置換しない。 |
 | 5 固定領域を順に確保 | oneinit`:183–206`:VBIOS→RAMHT→RAMRO→RAMFC | instance offsetでVBIOS[0,10000h)、RAMHT[10000h,18000h)、RAMRO/pad[18000h,20000h)、RAMFC/pad[20000h,40000h)。VBIOSは保存、RAMHT/RAMFCはzero、RAMROはfalse。同じ順にallocatorで確保。 |
 | 6 可変領域 | `nv40_instobj_new:120–138`のsize/alignment付きheap確保、`nv40_instobj_addr:87–89`はnode offset | [40000h,R)からfirst-fit。caller-owned gf_instをoffset順リストへ挿入、freeで除去。align=0は1、非2冪/size0/範囲外はEINVAL、空き不足ENOSPC。free後の穴も再利用。 |
-| 7 CPU書込→利用側へ | `nv40_instobj_release:68–70`のwmb、rd32/wr32`:48–58` | instmemはf->bar2を直接UCで32bit読書きしgf_ioを通らない（bus.c:25–27の制限を回避）。偽MMIOはmap_ops差替え。整列確認、zero指定だけゼロ化、publish前compiler barrier＋aperture読戻し。MMIO失敗EIO。 |
+| 7 CPU書込→利用側へ | `nv40_instobj_release:68–70`のwmb、rd32/wr32`:48–58` | instmemはf->bar2を直接UCで32bit読書きしgf_ioを通らない（bus.c (raw())の制限を回避）。偽MMIOはmap_ops差替え。整列確認、zero指定だけゼロ化、publish前compiler barrier＋aperture読戻し。MMIO失敗EIO。 |
 
 - **予約区間とinstance addressは別**。`gf_inst.off`はPRAMIN aperture相対であり、`V-R+off`をGPUアドレスとして返してはいけない。
 - 層2へはramht/ramro/ramfcのハンドルを貸す。RAMHTはoff=10000h,size=8000h、RAMRO実使用200h＋padding、RAMFC実使用1000h＋paddingを含め予約する。
@@ -131,7 +131,7 @@ struct gf_instmem_map_ops {
 - 手本との差: LinuxのWC mapではなく既存OS32 MMIOと同じUC。まず順序を固定でき、instmem書込量も小さいため。PRAMINをVRAMの新しい表示面として登録しない。
 - allocatorはnouveauの汎用mmを移植せず、同じsize/alignment/free契約の小さいリストを実装する。単一装置・協調呼出しなのでmutexは不要。IRQからは呼ばない。
 - RAMHTのzero根拠は `N/nvkm/core/ramht.c:141 nvkm_ramht_new`の`:157`（gpuobj_newのzero=true）。解放は層2の可変handle→固定4領域→mapの順、固定領域の個別freeは公開しない。
-- BAR2 mapのPTはceil((BAR2先頭の4MiB内offset+R)/4MiB)頁を追加予算化。`docs/02_memory.md:152`の既存5頁に含めない。OS RAMをR byte確保するわけではない。
+- BAR2 mapのPTはceil((BAR2先頭の4MiB内offset+R)/4MiB)頁を追加予算化。`docs/02_memory.md`の既存5頁に含めない。OS RAMをR byte確保するわけではない。
 
 ## 5. (c) PMC / PFIFO / PGRAPH / PCRTC IRQ
 
@@ -151,7 +151,7 @@ struct gf_instmem_map_ops {
 - ACK後の残留sourceをmaskし、未知PMCは記録してPMCも閉じIRQ_DEFERRED。手本`core/intr.c:210–217`は未処理IRQをblock。OS32ではtickが毎回gf_irq_pollを1巡呼び、PMC集約/現在のenableで省略せず各既知statusを要求maskで回収・再ACKし、未使用の8100h/9100h/1100h/B100hもmask/ACKし、残留が消えたsourceだけ要求enableへ復元、PMC残件なしなら140h=1へ戻す。未知が続く間もtickは既知のVBLANK等を回収する。
 - 残件なしは最後に140h=1→IRQ_HANDLED。IRQ内は1巡、printf/alloc/待ち/復旧をしない。snapshotは短いirq_save/restoreでstructをコピーし、serial出力は呼出側。
 - R5根拠: `N/nvkm/engine/mpeg/nv31.c:224,240–241 nv31_mpeg_init`はstatus ACK→enable。PMPEGを閉じたままにするのは層1で使わないため。PVIDEO/PTIMER/PBUSの番地・各initとの対応は`REVIEW.r1.md:R5`を根拠とする（指定commitのdisp/timer/busソースはローカル未取得、取得も失敗したため関数の行番号は未検証。実装時に照合）。
-- tick契約は`O/kernel/irq/irq.h:14–19`。常駐geforce_tick.cがslot6へtick_register、`tick.h:5`を7、tick_order末尾にPC98_TICK_GFを追加。登録失敗EIRQ。解除APIが無いのでmodule関数をtick表へ直接残さず、常駐trampolineがcallback/argを所有する。
+- tick契約は`O/kernel/irq/irq.h`。常駐geforce_tick.cがslot6へtick_register、`tick.h`を7、tick_order末尾にPC98_TICK_GFを追加。登録失敗EIRQ。解除APIが無いのでmodule関数をtick表へ直接残さず、常駐trampolineがcallback/argを所有する。
 - bind(NULL,NULL)はirq_save/restore内で参照を消す。登録は前景で1回、同一登録は冪等。running=true時は毎tick回収（deferred限定にしない）。stop/失敗巻戻しはrunning=false→unbindをunregister/unmap/module detachより先に実施。gf_irq_pollは要求maskをstateに保持し、待ち・alloc・printfなし。真に未知の残留要因には推測でACKしない。
 - 未知の要因でPMCを閉じているあいだはVBLANKをtickでしか拾わないので、tickの周期が垂直同期より遅いと少なく数える (受入の「A 増加」には影響しない)。
 - counterはu32の自然wrap、差分はunsignedで計算。全経過フレーム数ではなく「IRQで観測したVBLANK数」。長いCLI中の取りこぼしを補間しない。
@@ -161,7 +161,7 @@ struct gf_instmem_map_ops {
 | 入れ先 | 増分text/rodata | 常駐RAM / VRAM | 制限への影響 |
 |---|---:|---|---|
 | geforce.mod | master 0.6、instmem 1.8、IRQ 2.5、engine stop 0.3、統合/map 1.0、計約6.2（予算8） | 状態約0.3KiB＋callerの割当記述、追加PTは§4。VRAM Rは末尾を予約 | 大きい本体をkernel/起動FDへ複製しない。modをFDへ同梱する構成なら格納量+約8KiBを要確認。 |
-| kernel | IRQ import/停止adapter・常駐tick 約0.5（予算0.8） | 追加PT以外の固定BSSは小ポインタ群のみ | `include/memmap.h:230`のMEM_KERNEL_IMAGE_MAXと既存link ASSERTで確認。 |
+| kernel | IRQ import/停止adapter・常駐tick 約0.5（予算0.8） | 追加PT以外の固定BSSは小ポインタ群のみ | `include/memmap.h`のMEM_KERNEL_IMAGE_MAXと既存link ASSERTで確認。 |
 | kdebug.bin / 診断部品 | recover列・診断入口約0.8（予算1.5） | stats snapshot約0.05KiB、ログ予算増 | 層1本体を複製せずmodule側試験入口を使う。KDEBUG=0で本番がリンクすること。 |
 
 許可された資料には現在のFD空き量/kdebug.bin上限の数値がないので「収まる」とは断定しない。実装段で既存の像サイズ検査と実ビルド前後差を必須にし、上限は緩めない。今回ビルド/配備はしない。
@@ -173,7 +173,7 @@ import現状は`build/out/geforce/geforce_imports.h:34`の20。irq_register/unre
 
 | 段 | ファイル（O/相対、新/変） | 単一の役目 | 行数 / 依存 |
 |---|---|---|---|
-| A0 | hwdev/gf/foundation.h 新、hwdev/gf/production.h・hwdev/gf/internal.h・kdebug/recover.h・kernel/irq/tick.h・platform/pc98/tick_order.h 変、drivers/video/geforce/geforce_tick.h 新、tools/tests/tick_host.c・tools/tests/test_tick.py 変 | 内部ABI・所有state・hook・RUN/STOP・tick枠6→7の宣言。tick の試験も 7 枠に (tick_host.c:34 の callbacks[] を 7 個に、test_tick.py:12-21 の OWNERS と :3 の covers に geforce_tick.c) | 計170 / 最初 |
+| A0 | hwdev/gf/foundation.h 新、hwdev/gf/production.h・hwdev/gf/internal.h・kdebug/recover.h・kernel/irq/tick.h・platform/pc98/tick_order.h 変、drivers/video/geforce/geforce_tick.h 新、tools/tests/tick_host.c・tools/tests/test_tick.py 変 | 内部ABI・所有state・hook・RUN/STOP・tick枠6→7の宣言。tick の試験も 7 枠に (tick_host.c の callbacks[] を 7 個に、test_tick.py の OWNERS と 同ファイル内 の covers に geforce_tick.c) | 計170 / 最初 |
 | B0 | hwdev/gf/master.c 新 | PCI BM/latency | 80 / A0 |
 | B1 | hwdev/gf/instmem.c 新 | instance確保/free/access | 180 / A0 |
 | B2 | hwdev/gf/irq.c 新 | 登録/dispatch/ACK/counter | 240 / A0 |
@@ -188,7 +188,7 @@ import現状は`build/out/geforce/geforce_imports.h:34`の20。irq_register/unre
 | C4 | hwdev/gf/display/quiesce.c 変 | 全停止入口の共通stop接続 | 12 / C0 |
 | C5 | drivers/video/geforce/geforce_module.c 変 | tick unbind/IRQ登録解除済みをdetach条件にする | 20 / B2,B6 |
 | C7 | kdebug/recover_profile.c 変 | engine停止列とS0/REC予算 | 55 / B3,A0 |
-| C8 | kdebug/gf_stage_state.c 変 | :63 Command・:70 PMCをexpected_command/expected_pmcと照合 | 10 / A0,C0 |
+| C8 | kdebug/gf_stage_state.c 変 | `gf_stage_entry()` Command・`gf_stage_entry()` PMCをexpected_command/expected_pmcと照合 | 10 / A0,C0 |
 | C9 | kdebug/gf_foundation_test.c 新 | serial試験adapter | 100 / C0 |
 | C10 | tools/prototypes/geforce_imports.def 変 | import契約追加（kexports生成元） | 50〜70 / A0,B5,B6 |
 | C11 | build/geforce-module.mk 変 | 新部品/常駐tick配置とimport生成依存 | 20 / B群,C10 |
@@ -197,7 +197,7 @@ import現状は`build/out/geforce/geforce_imports.h:34`の20。irq_register/unre
 | D2 | docs/02_memory.md 変 | BAR2 PT予算の追記 | 8 / B5 |
 | T0 | tests/gf_foundation_test.c 新（既存host配置規則に合わせる） | 偽PCI/MMIO/IRQの順序検査 | 240 / B〜C群 |
 
-`build/geforce-module.mk:3–6,23–33`が`tools/gen_sqlite_imports.py:162–171`からimportsとgeforce_kexportsを生成する。生成契約との件数・各シンボルの完全一致を検査する。back-endの描画関数表とGUIは変更不要。資源予約定数の追加が必要なら実定義元を1段追加。
+`build/geforce-module.mk`が`tools/gen_sqlite_imports.py`からimportsとgeforce_kexportsを生成する。生成契約との件数・各シンボルの完全一致を検査する。back-endの描画関数表とGUIは変更不要。資源予約定数の追加が必要なら実定義元を1段追加。
 診断ownerも新hookを満たすよう、その定義元を同様に1段追加。型だけ変えてNULL呼出しを残さない。1機能を複数の新規実装Cへ分散しない。
 
 ## 8. 受入→試験・変異、段の検査
@@ -239,7 +239,7 @@ import現状は`build/out/geforce/geforce_imports.h:34`の20。irq_register/unre
 
 > 確定本文 §2 の「map 時に予約、unmap 後に予約解除」は PM 決定で覆す (BAR の予約は起動時の永久予約のまま、層 1 は map/unmap だけ)。
 O/ は /home/hight/os32-v3/、N/ は /home/hight/os32-tmp/refs/geforce6200/nouveau/drivers/gpu/drm/nouveau/。
-BAR の予約は起動時の永久予約（O/drivers/video/geforce/geforce_platform.c:14–42）のまま、層1は map/unmap だけを所有する。
+BAR の予約は起動時の永久予約（O/drivers/video/geforce/geforce_platform.c (reserve())）のまま、層1は map/unmap だけを所有する。
 手本: N/nvkm/subdev/instmem/nv40.c:249–253 は BAR を ioremap_wc するだけ、:222–223 は iounmap；:164–179 の予約は VRAM 末尾の instmem 用であり BAR decode の再予約ではない。
 
 ### 欠け1 — build 対象を決める
@@ -256,7 +256,7 @@ C10 の import 契約と B6 provider を揃え、C11 で除外を撤去し常駐
 C10 は下記 production map adapter の paging_map_phys・paging_set_not_present も import に含め、既存 paging_pte_raw を再利用し、生成契約との完全一致を検査する。
 
 ### 欠け2 — resource・V・R と呼出し順
-resource の入口は既存 gf_production_identify → boot_resources → gf_production_prepare(boot) → p->display.bars（O/hwdev/gf/devinit.c:30–36）。
+resource の入口は既存 gf_production_identify → boot_resources → gf_production_prepare(boot) → p->display.bars（O/hwdev/gf/devinit.c）。
 C1 の owner start adapter は既存の資源再照合成功後、第三 memory resource の p->display.bars[2] を f->instmem_bar に値コピーしてから C0 を呼ぶ。
 これは PCI BAR slot を再解釈する経路ではない。diagnostic/fake owner も照合済みの同じ resource を設定する。
 C0 はその snapshot を使い、map_owner を具体型へ cast しない。snapshot は scratch/ROM と独立し、失敗した stop の後も保持する。
@@ -267,7 +267,7 @@ V/R を f->imem.vram_bytes/reserved に保存し、gf_instmem_map(f, &f->instmem
 B5 は valid・ページ整列・範囲内・resource.length>=R を確認する。不成立/map 失敗は GF1_EMAP。
 C0 の順は master_enable → mc_init（IRQ 閉）→ instmem_init〔V/R 算出 → B5 map → 固定4領域確保〕→ tick bind → IRQ attach → enable。
 固定領域は VBIOS → RAMHT → RAMRO/pad → RAMFC/pad、map 成功前には確保も zero もしない。成功した map の aperture_bytes は R。
-途中失敗は C0 の foundation_stop へ戻し、その順 (r2 §3・foundation.h:84-85) に従う (ここで列を書き直さない)。停止失敗時は必要な所有状態を保持する。
+途中失敗は C0 の foundation_stop へ戻し、その順 (r2 §3・foundation.h) に従う (ここで列を書き直さない)。停止失敗時は必要な所有状態を保持する。
 
 ### A0 追補 — PM が出す変更行（リポジトリはこの依頼では変更しない）
 foundation.h の struct gf_foundation に次の1行を追加する。
@@ -294,19 +294,19 @@ gf_instmem_init(f) と gf_instmem_map(f,bar,bytes) の関数宣言、production.
 
 ### 欠け3 — map/unmap API と失敗
 O/ で rg -n 'paging_map_phys|paging_unmap' mm include を実行し、paging_unmap は存在しないと確認した。
-map は paging_map_phys(base, base, R/PAGE_SIZE, PAGE_RW | PTE_PCD)（mm/paging.h:124、mm/paging_map.inc:107）。PTE_USER は付けない。
+map は paging_map_phys(base, base, R/PAGE_SIZE, PAGE_RW | PTE_PCD)（mm/paging.h、mm/paging_map.inc）。PTE_USER は付けない。
 B5 production adapter は geforce_range_reserved(base,R) の成功と、対象全頁の paging_pte_raw の Present=0 を先に確認し、既存の他者の map は上書きしない。
 成功後だけ *out=P2V_IO(base) を公開する。引数/予約/PTE 検査の失敗は無変更、paging_map_phys の失敗も全範囲無変更・追加 PT 全解放（同 .inc:14–48,107–119）。
 成功後に失敗し得る処理を置かず、map 失敗時の個別ページ巻戻しや ledger_reserve_set は呼ばない。B5 は失敗を GF1_EMAP に変換する。
-unmap は paging_set_not_present(base, base+R-1)（mm/paging.h:143、mm/paging_map.inc:241）。end は inclusive；全対象の P を落とし TLB を flush する。
+unmap は paging_set_not_present(base, base+R-1)（mm/paging.h、mm/paging_map.inc）。end は inclusive；全対象の P を落とし TLB を flush する。
 これはアクセス解除であり PTE の frame/属性や PT 自体は残る。PT は master の寿命まで保持し、再開始で再利用する。永久 BAR 予約も残す。
 unmap 成功時だけ mapped=false・bar2=NULL・aperture_bytes=0。失敗は GF1_EMAP とし、それらと ops/owner を保持して stop 再試行へ渡す。
-新 PT は live AS≠0 では作れない (mm/paging.h:114–116、paging_map.inc:22-25) ので、**BAR2 の PT は起動時に作る** (下の「確定」の B7)。B5 の map は既存の PT に P を立てるだけになる。
+新 PT は live AS≠0 では作れない (mm/paging.h、paging_map.inc) ので、**BAR2 の PT は起動時に作る** (下の「確定」の B7)。B5 の map は既存の PT に P を立てるだけになる。
 BAR2 の追加 PT 予算は §4 の ceil((base の4MiB内offset+R)/4MiB) を D2 に明記する。unmap による PT の回収を予算に織り込まない。
 B1/B5 host 試験は V/R と map-before-zero、map拒否時の無変更、末尾頁だけまでの unmap、unmap失敗時の所有保持、再開始を検査する。
 
 ### 確定 (2026-11-02、Opus 第 3 回、PM が反映)
-- P1 (欠け 3): GeForce の開始は GUI を起こしたとき (live AS≥1) なので、初回 map で新 PT を作る形では毎回 GF1_EMAP になる。BAR2 (0x25000000、PDE 0x94) の PT は今 geforce_platform.c:38-41 で作られていない (BAR0 の 0x90〜0x93 と表示の窓 0xC0 だけ、:7-9 の STATIC_ASSERT で 5 頁)。**段 B7 (drivers/video/geforce/geforce_platform.c) を足す**: reserve() で BAR2 の先頭 R_max を起動時に paging_map_phys(PAGE_RW|PTE_PCD) で張り、すぐ paging_set_not_present で閉じる。R_max = vs=8 の R = align4096((4980h*8+4000h)*32+100000h) = 618000h (PT 2 頁)、BAR2 の長さで切る。STATIC_ASSERT・GF_PRODUCTION_PT_PAGES・docs/02_memory.md:152 の予算を +2。AS は PDE ごと写すので、どの AS からも同じ PT が見え、B5 の「全頁 Present=0 を確かめて map → set_not_present で unmap」はそのまま成り立つ。手本 (ioremap だけ) との差は「OS32 では新しい PT を後から作れないため」。
+- P1 (欠け 3): GeForce の開始は GUI を起こしたとき (live AS≥1) なので、初回 map で新 PT を作る形では毎回 GF1_EMAP になる。BAR2 (0x25000000、PDE 0x94) の PT は今 geforce_platform.c:38-41 で作られていない (BAR0 の 0x90〜0x93 と表示の窓 0xC0 だけ、:7-9 の STATIC_ASSERT で 5 頁)。**段 B7 (drivers/video/geforce/geforce_platform.c) を足す**: reserve() で BAR2 の先頭 R_max を起動時に paging_map_phys(PAGE_RW|PTE_PCD) で張り、すぐ paging_set_not_present で閉じる。R_max = vs=8 の R = align4096((4980h*8+4000h)*32+100000h) = 618000h (PT 2 頁)、BAR2 の長さで切る。STATIC_ASSERT・GF_PRODUCTION_PT_PAGES・docs/02_memory.md の予算を +2。AS は PDE ごと写すので、どの AS からも同じ PT が見え、B5 の「全頁 Present=0 を確かめて map → set_not_present で unmap」はそのまま成り立つ。手本 (ioremap だけ) との差は「OS32 では新しい PT を後から作れないため」。
 - P3 (欠け 1): filter-out は未解決の import を持つものだけ (master・instmem・irq・instmem_map・foundation)。mc.c・engine_stop.c (B4・B3、main) は今も geforce.mod に組まれリンクできているので外さない。
 - P3 (欠け 2): 途中失敗の後始末は foundation_stop の順に従う (列を書き直さない)。
 - 段の順: **A0 追補** (foundation.h の追加 2 行・コメント 5 行、build/geforce-module.mk の filter-out) と **B7** (geforce_platform.c の BAR2 の PT) を先に出し、取り込んでから B0・B1・B2・B5 を続ける。
@@ -411,13 +411,13 @@ PM は宣言追補→C0/C1/C2/C4/C5→診断 owner 接続・C8→module dispatch
 
 ### 確定 (2026-11-02、Opus 第 4 回、PM が反映)
 - P2-a: 失効 (revoked) を見たら、foundation の停止は B5 の unmap (paging_set_not_present、CPU の PTE を落とすだけで BAR には書かない) を呼ぶ。旧 BAR2 の物理番地への PTE を Present のまま残さない。B1 の gf_inst_read32/write32 の API は変えない (unmap の後は呼ばれない — running=false の後なので)。
-- P2-b: 失効でも 98 の表示への切り替え (backend_geforce.c:101 の pc98_route_to_98、GeForce の MMIO を使わない) は従来どおり行う。display/quiesce.c の gf_display_stop で変えるのは「失効のときは reusable=false を保持する」ことだけ (書き込みの拒否を全行試し、最後に engaged=false にする今の動きは変えない)。
+- P2-b: 失効でも 98 の表示への切り替え (backend_geforce.c の pc98_route_to_98、GeForce の MMIO を使わない) は従来どおり行う。display/quiesce.c の gf_display_stop で変えるのは「失効のときは reusable=false を保持する」ことだけ (書き込みの拒否を全行試し、最後に engaged=false にする今の動きは変えない)。
 - P2-c: 層 3 の確定設計の末尾にも同じ日付で 1 行足した (accel_out の欄と OPS_VERSION 3 はこの追記の §3 で確保済み、層 3 の C5 は 0 行)。
 - P3: identity が一致して BAR だけが変わった場合に config 経由で Command=0102h を書くか (手本 nouveau_drm.c:940 の pci_disable_device 相当) は、DMA を出す層 2 で決める。層 1 は書かない。
 - P3: drivers/video/geforce/geforce_module.h に `struct gf3_test_ops;` の前方宣言を足す。getter は kdebug の import にだけ足す (C9 と gfinit.c はどちらも kdebug)。prepare(f, bars, n) で貸す常設 adapter の opaque は診断の lease の bus (診断の f の revoked はその bus の REVOKE が立てる)。
-- P3 の訂正 (2026-11-02、PM、CK の sol の指摘): 「getter は kdebug の import にだけ」は誤り。kdebug/gfinit.c と gf_stage_state.c は build/hwdev.mk:5-12 で -DHWDEV_MODULE として hwdev.mod に組まれる (kdebug.mk の KDEBUG_OBJS には無い)。getter は**それを使うファイルが入る像の import に足す** — gfinit.c・gf_stage_state.c は hwdev、C9 (gf_foundation_test.c) は置く像に合わせる。追記の当初の記述 (:402、kdebug と hwdev の両方) に戻す。
+- P3 の訂正 (2026-11-02、PM、CK の sol の指摘): 「getter は kdebug の import にだけ」は誤り。kdebug/gfinit.c と gf_stage_state.c は build/hwdev.mk で -DHWDEV_MODULE として hwdev.mod に組まれる (kdebug.mk の KDEBUG_OBJS には無い)。getter は**それを使うファイルが入る像の import に足す** — gfinit.c・gf_stage_state.c は hwdev、C9 (gf_foundation_test.c) は置く像に合わせる。追記の当初の記述 (同ファイル内、kdebug と hwdev の両方) に戻す。
 - 段の順 (PM): gf_foundation_revoke (hwdev/gf/foundation.c) は CK が書く。CK を先に取り込み、CW をその上に進めて仕上げる。
-- 段の分け直し (2026-11-02、PM): CK の 3 回目の停止 (C9 の cycle で診断表示の stop/start をどの入口・状態遷移で行うかが未規定、kdebug/gfinit.c:46-77・348-461、include/hwdev_private.h:15-22) を受け、CK を **C7・C8・gf_foundation_revoke・宣言の追補** に絞る。**C9 (実機のシリアルの試験の入口) は CW の取り込みの後**に、設計者が入口の契約を追記してから出す。
+- 段の分け直し (2026-11-02、PM): CK の 3 回目の停止 (C9 の cycle で診断表示の stop/start をどの入口・状態遷移で行うかが未規定、kdebug/gfinit.c、hwdev/hwdev_private.h) を受け、CK を **C7・C8・gf_foundation_revoke・宣言の追補** に絞る。**C9 (実機のシリアルの試験の入口) は CW の取り込みの後**に、設計者が入口の契約を追記してから出す。
 
 ## CK の実装で設計者が決めたこと
 - C7 の固定表は変動する PMC 値を表せないため、Command の QUIESCE rule に REC_GF_ENGINE_STOP を登録し write_verify から固定停止関数を呼ぶ；汎用 plan/式の実行契約は変更せず、FIFO→GR→MPEG の現値 clear/read/set/read を既存の guarded bus・REC・safe point で実施し、どの失敗も後続 Command/保存復元を止める。
@@ -425,10 +425,10 @@ PM は宣言追補→C0/C1/C2/C4/C5→診断 owner 接続・C8→module dispatch
 - C8 は stage に const foundation 借用欄を追加して参照なし/失効を拒否する；所有者の設定と寿命の結線は CW、CK は共有レイアウトの入力台帳も追従させ生成器で契約 CRC を更新する（公開 KAPI 変更なし）。
 
 ### CK の取り込みで CW へ送る項目 (2026-11-02、Opus レビュー、PM)
-- P2-1: C7 は recover_gf_profile に載ったが本番の呼び手は無い (本番の gfinit の回復表 recover_gf_template、kdebug/recover_gf.c:127,209 の quiesce は PBUS1850/1854/PMC_IRQ の 3 行)。§3:113 のとおりで、本番で engine を止めるのは §2:369 の「cleanup/S0 の前の stop フック」= CW の結線だけ。CW はこのフックを必ず結ぶ。
-- P2-2: gf_foundation_stop (hwdev/gf/foundation.c:61-88) に、失効のときに先に戻る分岐 (追記 :341-345) と P2-a の B5 unmap がまだ無い → **CW で足す** (失効なら MMIO を書かずに unmap して GF1_EPCI)。
-- P3-1: revoke の試験 (tools/tests/gf1_foundation_host.c:212-219) は saves==restores しか見ない → 呼ぶ前の saves を控えて +1 を CHECK し、「CLI を外す」変異を足す (CW)。
-- P3-2: engine の bit (0x100/0x1000/0x2) が kdebug/recover_common/s0.inc:91 と hwdev/gf/engine_stop.c:6-8 に別々にある → recover.h の RECOVER_PMC_ENABLE の隣に共通の定義を置く (CW)。
+- P2-1: C7 は recover_gf_profile に載ったが本番の呼び手は無い (本番の gfinit の回復表 recover_gf_template、kdebug/recover_gf.c の quiesce は PBUS1850/1854/PMC_IRQ の 3 行)。§3:113 のとおりで、本番で engine を止めるのは §2:369 の「cleanup/S0 の前の stop フック」= CW の結線だけ。CW はこのフックを必ず結ぶ。
+- P2-2: gf_foundation_stop (hwdev/gf/foundation.c) に、失効のときに先に戻る分岐 (追記 同ファイル内) と P2-a の B5 unmap がまだ無い → **CW で足す** (失効なら MMIO を書かずに unmap して GF1_EPCI)。
+- P3-1: revoke の試験 (tools/tests/gf1_foundation_host.c) は saves==restores しか見ない → 呼ぶ前の saves を控えて +1 を CHECK し、「CLI を外す」変異を足す (CW)。
+- P3-2: engine の bit (0x100/0x1000/0x2) が kdebug/recover_common/s0.inc と hwdev/gf/engine_stop.c に別々にある → recover.h の RECOVER_PMC_ENABLE の隣に共通の定義を置く (CW)。
 - P3-3: CK から CW の取り込みまでのあいだ stage.foundation の設定が無く gf_stage_entry は -1 → そのあいだ C 段の診断を実機で回さない。
 
 ## CW の実装で設計者が決めたこと
@@ -447,7 +447,7 @@ PM は宣言追補→C0/C1/C2/C4/C5→診断 owner 接続・C8→module dispatch
 
 > 出所: ~/os32-tmp/run/gf-c9/ADDENDUM.md (astra 起草 r1・r2、Opus レビュー r1 Request changes → r2 写してよい、P3 2 件を PM が反映)。
 対象: main 502be34e (GF 側の現物は 40fec057 から変化なし)。GF_FEAT1_DESIGN.md の本文・CW 末尾・ユーザー決定を維持する。
-C9 は試験 adapter のみ。既存経路（init/kernel.c:253）の module 登録・既存予約を使い、試験から load/reserve/GUI 起動をしない。
+C9 は試験 adapter のみ。既存経路（platform/pc98/kernel.c）の module 登録・既存予約を使い、試験から load/reserve/GUI 起動をしない。
 未公開なら `unavailable`。診断 owner を使える起動経路を新設せず、利用不能を合格に数えない。
 ### 像と入口
 `kdebug/gf_foundation_test.c` は **hwdev.mod** に組む。gfinit.c と同じ像なので control/lease を外へ渡さない。
@@ -499,8 +499,8 @@ cycle は RUN→表示stop→STOP→表示start→RUN の各区間1000ms。元�
 cycle 全体を trial_step で包まない。区間ごとの trial_step を終えて PAUSED に戻してから display(false/true) を呼ぶ。
 診断 STOP 区間は REC_VERIFIED のまま時計・ソフト snapshot・上記 PCI 読取りで測定する。初回 start の代わりに承認済み gfinit 手順を自動実行しない。
 CUI/rshell の要求は `gf1 status|instmem|vblank|cycle`（改行終端）、owner は自動選択。新しい汎用コマンドや承認方式は設けない。
-GUI RUN では shell.bin と gshell.bin は同時常駐せず（init/kernel.c:340）、GSERIAL open が rshell を切る（gshell/src/gserial.rs:84）；直接の gf1 行は実行されない。
-本番は既存 GFX=geforce・GUI=0 起動→os32gui で RUN とし、利用者が GUI 端末 sh.bin を開いてフォーカスする。共通 gf1 を結線し、既存 GSERIAL の `SOH + 8桁hex ID + " type gf1 cycle" + LF`、次に同形式の `key 1c`（Enter）で実行する。同様に他caseも入力可、GF1応答は C9 が `serial_puts_polled` で直接 serial 出力 (GUI 中の kprintf は con_sink で GUI 端末へ流れ、GSERIAL は端末の文字をシリアルへ返さない — kernel/console/console.c:186・200、userland/gshell/src/gserial.rs。devinit.c は geforce.mod の部品で、hwdev.mod には serial_puts_polled の import を追加する。C9b で hwdev/hwdev_imports.def と docs/design/hwdev/hwdev_imports.md の表の末尾に serial_puts_polled (取得元は kdebug と同じ lib/serial_diag.h) を 1 本足し、契約と stub は PM がまとめビルドで再生成する。geforce.mod の import 31 本は変わらない)。
+GUI RUN では shell.bin と gshell.bin は同時常駐せず（platform/pc98/kernel.c）、GSERIAL open が rshell を切る（gshell/src/gserial.rs:84）；直接の gf1 行は実行されない。
+本番は既存 GFX=geforce・GUI=0 起動→os32gui で RUN とし、利用者が GUI 端末 sh.bin を開いてフォーカスする。共通 gf1 を結線し、既存 GSERIAL の `SOH + 8桁hex ID + " type gf1 cycle" + LF`、次に同形式の `key 1c`（Enter）で実行する。同様に他caseも入力可、GF1応答は C9 が `serial_puts_polled` で直接 serial 出力 (GUI 中の kprintf は con_sink で GUI 端末へ流れ、GSERIAL は端末の文字をシリアルへ返さない — kernel/console/console.c、userland/gshell/src/gserial.rs。devinit.c は geforce.mod の部品で、hwdev.mod には serial_puts_polled の import を追加する。C9b で hwdev/hwdev_imports.def と docs/design/hwdev/hwdev_imports.md の表の末尾に serial_puts_polled (取得元は kdebug と同じ lib/serial_diag.h) を 1 本足し、契約と stub は PM がまとめビルドで再生成する。geforce.mod の import 31 本は変わらない)。
 根拠: gserial.rs の parse/enqueue/deliver、shell/main.c:112–118（共通表・rshellのみ除外）、userland/sh.inputs.json。GUI/GSERIAL は変更しない。CUI 復帰は gfx_shutdown 済み（gshell/src/lib.rs:678）なので STOP status のみ、cycle は上記 precheck で ng。
 応答は完了時 `GF1 case=<...> owner=production|diagnostic session=<n> phase=<...> ms=<実測> rc=<n> result=ok|ng|unavailable`。
 各 phase 行に `command_expected/actual pmc_expected/actual flags delta_entries/fifo/graph/vblankA/vblankB unknown bytes bad_off crc_before/after` を付ける。
@@ -529,11 +529,11 @@ int gf_foundation_test(struct gf1_request *, struct gf_foundation *, const struc
 rc = read_row(row_owner, y, row); /* 成功時だけ crc32_core_update(state, row, 640) */
 ```
 C9b の gfinit.c が選択済み owner の同期専用 callback/context を渡す（保存しない）。callback は成功0、失敗は既存 gf1_rc を返す。
-診断 callback は gf_mode_vram (gfinit.c:169-173) と同じく先に gf_owned(r) を確かめ、trial_step 内で各行前と最終行後に recover_safe_point(r)、行取得は gfinit_bus_mode_read_row(&g->bus,y,row)。
-新 bus 入口は gfinit_bus.c:140-154 の ready/y/範囲検査・memory_config と recover_window_access を共有し、write=false、4 byteずつ取得して低位byteから row に格納する。戻り値は既存同様0/-1、callback は失敗を GF1_EIO に変換。
+診断 callback は gf_mode_vram (gfinit.c) と同じく先に gf_owned(r) を確かめ、trial_step 内で各行前と最終行後に recover_safe_point(r)、行取得は gfinit_bus_mode_read_row(&g->bus,y,row)。
+新 bus 入口は gfinit_bus.c の ready/y/範囲検査・memory_config と recover_window_access を共有し、write=false、4 byteずつ取得して低位byteから row に格納する。戻り値は既存同様0/-1、callback は失敗を GF1_EIO に変換。
 既存 mode_row の比較契約は変更しない。memory_config (:80-91) の identity/BAR/失効検査と既存 window の復元を通し、登録 target を偽装せず、直接 window を試験から呼ばない。
 本番 callback（C9b、gfinit.c）は slot->production と一致する f から offsetof(struct gf_production,foundation) で p を得て、p->display.io.read(p->display.io.opaque,1,y*640+x,4,&v) を x=0..636 に呼び、低位byteから格納する（y<480）。失敗は GF1_EIO。
-本番の結線は hwdev/gf/devinit.c:90-91、入口は bus.c:26-39 の gf_production_read、実読取りは native.c:46-60 の既存 CPU map。f->io.read は BAR0 専用なので両 owner とも表示には使わない。
+本番の結線は hwdev/gf/devinit.c、入口は bus.c の gf_production_read、実読取りは native.c の既存 CPU map。f->io.read は BAR0 専用なので両 owner とも表示には使わない。
 読む範囲は両方とも BAR1 の [0,307200)、640×480×8bit 全体。追加の常設 map・予約・import は不要。診断の一時 window 操作は既存のものだけ。
 C9a は lib/crc32_core.inc を使い各走査で INIT→480行 update→final を1回、CRC前→INST_PAGE→CRC後の順に比較する。診断はこの列を trial_step 内で実施し、途中失敗は未測定CRC=na/result=ng、不一致も GF1_EIO。測定中は既定どおり serial 出力しない。
 宣言変更は追加1行＋置換1行＝2行（r2 の宣言追補総数は8→9行、static/include/生成物は除く）。C9a は callback 消費まで、bus実装・両callback・呼出元・共有入力台帳 (tools/hwdev_layout.json に struct gf_production の foundation・display.io の 2 欄を足す)/契約生成の追従は C9b。確定本文の撤回なし、新しい守り・回復機構なし。

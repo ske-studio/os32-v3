@@ -49,7 +49,7 @@
     },
     {
       "symbol": "serial_puts",
-      "source": "drivers/char/serial.h",
+      "source": "include/serial_contract.h",
       "context": "normal",
       "irq": false
     },

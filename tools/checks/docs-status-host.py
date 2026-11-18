@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 CHECK = dict(name='docs-status-host', tier=0,
-    covers=['docs/tasks/**/*.md', 'docs/POLICY_DEV.md', 'tools/check_docs_status.py', 'tools/tests/test_docs_status.py', 'docs/tasks/DEFERRED_TESTS.md'],
+    covers=['docs/tasks/**/*.md', 'docs/POLICY_DEV.md', 'tools/docs_status_exceptions.json', 'tools/check_docs_status.py', 'tools/tests/test_docs_status.py', 'docs/tasks/DEFERRED_TESTS.md'],
     needs=[], budget=3.0,
     basis=['POLICY_DEV §8'],
     full_only=True,

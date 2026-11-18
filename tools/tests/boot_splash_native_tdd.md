@@ -2,7 +2,7 @@
 
 ## Scope and finding
 
-Read `init/kernel.c`, `init/boot_splash.c/.h`, `gfx/gfx_core.c`,
+Read `platform/pc98/kernel.c`, `init/boot_splash.c/.h`, `gfx/gfx_core.c`,
 `gfx/gfx_internal.h`, `include/gfx_hal.h`, PC98 backend and optional backend
 init/shutdown paths before implementation. No `system.cfg` exists in this
 checkout (`git ls-files '*system*cfg*'` and recursive `Path.glob` returned none).
@@ -50,8 +50,8 @@ hardware initialization are **not** verified.
 
 ## Banked planar cleanup extension (2026-10-03)
 
-For the display cleanup fix in 票
-`docs/archive/v3/TASK_T2D_T2H.md`, the harness now includes
+For the display cleanup fix (contract: `docs/design/platform/pc98/gfx_init.md`
+and `docs/design/platform/pc98/display.md`), the harness now includes
 real `gfx_vram.c` in addition to splash/core/PC98 code. Raster presentation is
 no longer stubbed: A6h switches a two-page, four-plane host memory model, and
 A4h records that real raster transfers painted both pages. Timing, port I/O,
@@ -73,11 +73,11 @@ optional-backend exclusions into verified results.
 
 ## Target compile and isolation
 
-`i386-elf-gcc` compiled `init/boot_splash.c` and unchanged `gfx/gfx_core.c` to a
+`i386-elf-gcc` compiled `platform/pc98/boot_splash.c` and unchanged `gfx/gfx_core.c` to a
 private TemporaryDirectory with repository kernel include paths and GNU89,
 i386 freestanding flags, plus `-Wall -Wextra -Werror
 -Wdeclaration-after-statement`. Both compiled without diagnostics.
-`git diff --check -- init/boot_splash.c init/boot_splash.h` passed.
+`git diff --check -- platform/pc98/boot_splash.c platform/pc98/boot_splash.h` passed.
 No shared object/build output, full build, deployment or emulator run was used.
 
 ## Outstanding lifecycle work (not implemented here)

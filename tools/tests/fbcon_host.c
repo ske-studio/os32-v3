@@ -2,7 +2,7 @@
 #include "types.h"
 #include "kstring.h"
 #include "console.h"
-#include "tvram.h"
+#include "text_screen.h"
 #include "platform/powermac/pm_console.h"
 #include "fbcon_source.inc"
 static void finish(int rc) __attribute__((noreturn));

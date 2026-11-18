@@ -1,7 +1,7 @@
 #ifndef OS32_PPC_PMAP_H
 #define OS32_PPC_PMAP_H
 #include "ppc_oea.h"
-#include "ppc_layout.h"
+#include "platform_of_layout.h"
 struct pm_region { u32 start, size; };
 struct pm_regions { u32 count; struct pm_region v[PM_REGION_COUNT]; };
 struct pm_boot_info {

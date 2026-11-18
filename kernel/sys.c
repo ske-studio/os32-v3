@@ -5,7 +5,7 @@
 
 #include "sys.h"
 #include "gf_production.h"
-#include "../drivers/video/geforce/geforce_module.h"
+#include "geforce_contract.h"
 #include "../mm/pgalloc.h"
 #include "memmap.h"
 #include "io.h"

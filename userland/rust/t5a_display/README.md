@@ -1,9 +1,9 @@
 # t5a_display — GUI 端末アプリ
 
 `con_sink` の出力を表示し、起動要求表を通じてコマンドを実行する端末。
-現行の登録は `build/app.conf:200` の `userland/tests/t5a_display` (launcher 宣言)。
-Rust workspace・ビルド・配備にも登録済み (`userland/rust/Cargo.toml:25`、
-`build/programs.mk:633`、`userland/deploy.yaml:461`)。
+現行の登録は `build/app.conf` の `userland/tests/t5a_display` (launcher 宣言)。
+Rust workspace・ビルド・配備にも登録済み (`userland/rust/Cargo.toml`、
+`build/programs.mk`、`userland/deploy.yaml`)。
 旧提出報告・段別差分・二窓の操作台本は [TDD_LOG の過去記録](TDD_LOG.md#旧-readme-の提出記録-2026-10-17-保存) に分けた。
 
 ## 現在の操作と起動要求
@@ -23,7 +23,7 @@ Rust workspace・ビルド・配備にも登録済み (`userland/rust/Cargo.toml
 ## 表示と入力の境界
 
 `sink.rs` は `con_sink` のレコード列を解く純パーサ。EXIT の共有定義は
-`sdk/include/os32/os32_kapi_shared.h:691` (`CON_SINK_REC_EXIT`) と
+`sdk/include/os32/os32_kapi_shared.h` (`CON_SINK_REC_EXIT`) と
 同 `:697` (`CON_SINK_HDR_EXIT`) にある。
 `session.rs` は CLEAR と容量満杯時の再初期化を `Fixture::Live` にまとめ、
 畳んだ回数・捨てた文字・無視した CURSOR を状態行へ渡す。履歴を黙って消さない。

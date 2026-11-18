@@ -7,8 +7,10 @@ import host32
 from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 SOURCES = {'stream.inc':'platform/powermac/console_stream.c',
-           'log.inc':'platform/powermac/console_log.c'}
-MUTANTS = [('UTF-8 byte length','stream.inc','console_write(text, kstrlen(text), color);', 'console_write(text, 1, color);'),('poll removed','stream.inc','    pm_terminal_poll();',''),
+           'log.inc':'platform/powermac/console_log.c',
+           'platform_console.h':'platform/powermac/platform_console.h'}
+MUTANTS = [('UTF-8 byte length','utf8.inc','console_write(utf8_str, kstrlen(utf8_str), color);', 'console_write(utf8_str, 1, color);'),
+           ('UTF-8 leaves the stream path','platform_console.h','#define CONSOLE_UTF8_AS_STREAM 1','#define CONSOLE_UTF8_AS_STREAM 0'),('poll removed','stream.inc','    pm_terminal_poll();',''),
            ('diagnostic mirrored','log.inc','    boot_serial_mirror = rshell_active = 0;','')]
 def run(tmp, sources):
     for name,text in sources.items(): (tmp/name).write_text(text)
@@ -26,6 +28,11 @@ def run(tmp, sources):
 def main():
     p=argparse.ArgumentParser();p.add_argument('--mutate',action='store_true');a=p.parse_args()
     sources={n:(ROOT/f).read_text() for n,f in SOURCES.items()}
+    # 共通の shell_print_utf8 のうち、PowerMac の方針 (CONSOLE_UTF8_AS_STREAM) で通る道だけを取り出す。
+    console=(ROOT/'kernel/console/console.c').read_text()
+    start=console.index('void shell_print_utf8(const char *utf8_str, u8 color)')
+    end=console.index('        return;\n    }\n',start)+len('        return;\n    }\n')
+    sources['utf8.inc']=console[start:end]+'}\n'
     with tempfile.TemporaryDirectory(prefix='ppc-stream-') as d:
         tmp=Path(d)
         subprocess.run(['python3','-B','sdk/gen_kapi.py','--target','ppc-powermac',

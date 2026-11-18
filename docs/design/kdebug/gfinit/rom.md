@@ -14,7 +14,7 @@ trial の外の INSPECT は例外として通常の 1 行と終わりの行を�
 
 ## GF6200_S7_SHELL
 
-- `kdebug/gfinit.c:117-147,174-203` のINSPECTはROM二重読取・PCIR・checksum・decode。表示を足すだけでsnapshot経路は作らない。
+- `kdebug/gfinit.c` のINSPECTはROM二重読取・PCIR・checksum・decode。表示を足すだけでsnapshot経路は作らない。
 
 - D2：INSPECTは通常行 `GF inspect sid= rc= rom_len= crc= chip= expect= match=` と `GF inspect-end sid= rc=` だけ。RECのsid/seqを進めない。
 

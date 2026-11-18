@@ -4,7 +4,7 @@
 
 ## 1. RAM の root とフォント
 
-- PowerPC の RAM の root (埋め込み ISO、ISO level 1 の 8.3 名) は `build/ppc-kboot.mk` が `ROOT_MANIFEST=build/ppc-ram-root.json` で中身を足す。共通の `build/ram-root.mk` は呼び手が指定した時だけ manifest を使う。PC-98 の root は変えない。
+- PowerPC の RAM の root (埋め込み ISO、ISO level 1 の 8.3 名) は `build/targets/ppc-powermac.mk` が `ROOT_MANIFEST=build/ppc-ram-root.json` で中身を足す。共通の `build/ram-root.mk` は呼び手が指定した時だけ manifest を使う。PC-98 の root は変えない。
 - 収録: `/fonts/shino16.kcg` (東雲 16 の 16px EBDT から作る KCG1、LZ4 の flags=1 で 187,980B 前後、展開後 295,940B)・`/fonts/shino16.txt` (東雲のライセンス)・`/sys/unicode.bin` (漢字の道 unicode_to_jis が読む)。パスは `include/config.h` の `SYS_FB_FONT`・`SYS_FB_FONT_LICENSE`・`SYS_UNICODE_BIN`。
 - 字形の源は 2026-11-13 のユーザー決定「KCG の口 + 東雲 16 から作る .kcgfont」。ROM の無い機種の KCG の本体 `drivers/video/kcg/kcg_file.c` が KcgModuleApi と同じ口で返す。PC-98 は今までどおり CG ROM と `/boot/kcg.mod`、旧 `.kcgfont` の配布と `kcg_load_font` の NOSYS は変えない。
 - KCG1: 16B の LE ヘッダ (`KCG1`・展開後サイズ・flags)、94×94×32B の漢字・fetched、256×16B の ANK・fetched。flags は 0 (非圧縮) と 1 (本体全体が 1 つの LZ4 block) だけを受け、他は拒否する ([PPC_KCG_LZ4_DESIGN](PPC_KCG_LZ4_DESIGN.md))。製品の生成は `python3 tools/gen_font16.py --ebdt <JF-Dot-Shinonome16.ttf> <out> --lz4` (`build/font-fetch.mk`、Python の lz4 が要る)。派生物は git に入れない。
@@ -27,7 +27,7 @@
 - USB の受入は `-icount shift=auto` (TCG では OHCI のフレームの時計が TB から遅れる)。
 - LAN・USB の受入は時間に敏感で、ホストの負荷が高い (load 10 前後) と時間切れや打鍵の重複で落ちることがある。負荷の下がった時に回し直して確かめる。
 
-QEMU の sungem は、受信リングが満杯の間に来た電文を溜め、RXDMA_KICK を書いても配り直さない (-trace sungem_rx_* で観測、2026-11-15)。そのため、受信の有効化の前に 27 本以上溜まると受信が止まる。製品では回避しない (ホストが送り続けないことで防ぐ、NET_HOSTSVC_DESIGN §5)。
+QEMU の sungem は、受信リングが満杯の間に来た電文を溜め、RXDMA_KICK を書いても配り直さない (-trace sungem_rx_* で観測、2026-11-15)。そのため、受信の有効化の前に 27 本以上溜まると受信が止まる。製品では回避しない (ホストが送り続けないことで防ぐ、docs/design/tools/host_notify.md「送りの規則」の沈黙)。
 
 `-icount` の下で待ちが NAP すると、QEMU の仮想の時計とゲストの TB が、実時間から瞬間的にずれる (2026-11-16 観測)。
 - 平均の tick の進みは変わらない。

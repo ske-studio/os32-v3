@@ -2,7 +2,7 @@
  * Real Device dispatch and VFS refresh are connected by stage I. */
 #include "fs/isofs/iso9660.h"
 #include "fs/isofs/iso9660_media.h"
-#include "drivers/base/dev.h"
+#include "kernel/dev/dev.h"
 #include "lib/kstring.h"
 #include "kmalloc.h"
 #include "endian_le.h"

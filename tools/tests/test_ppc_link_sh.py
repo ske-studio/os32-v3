@@ -16,7 +16,7 @@ import host32
 ROOT = Path(__file__).resolve().parents[2]
 CHECK = dict(name='ppc-link-sh', env=['ppc-cross'], tier=1, needs=[], budget=60,
     covers=['tools/tests/test_ppc_link_sh.py', 'tools/tests/host32.py',
-            'build/ppc-kboot.mk', 'build/ppc-user.mk', 'init/ppc_kernel.c',
+            'build/targets/ppc-powermac.mk', 'build/ppc-user.mk', 'platform/powermac/ppc_kernel.c',
             'platform/powermac/hostfs_boot.c', 'platform/powermac/hostfs_link_io.c',
             'platform/powermac/hostfs_link_peer.c',
             'net/host_mailbox.c', 'net/link.c', 'net/nic.c',
@@ -126,11 +126,11 @@ def execute(tmp, source, harness):
 
 def manifest(makefile, flags, fields):
     rule='p3-manifest:;@echo '+ ' END '.join('$('+f+')' for f in fields)
-    return subprocess.check_output(['make','-s','-f',str(makefile),*flags,'--eval='+rule,'p3-manifest'],cwd=ROOT,text=True).strip().split(' END ')
+    return subprocess.check_output(['make','-s','ARCH=ppc','PLATFORM=powermac','TARGET_MK='+str(makefile),*flags,'--eval='+rule,'p3-manifest'],cwd=ROOT,text=True).strip().split(' END ')
 
 
 def selection(tmp, mutate):
-    original=(ROOT/'build/ppc-kboot.mk').read_text()
+    original=(ROOT/'build/targets/ppc-powermac.mk').read_text()
     def check(text):
         path=tmp/'image.mk'; path.write_text(text)
         link=manifest(path,['KBOOT_SH=1','KBOOT_LINK=1'],['KB_OUT','ROOT_BINS','KB_C'])
@@ -143,17 +143,20 @@ def selection(tmp, mutate):
         for flags,out in [(['KBOOT_SH=1','KBOOT_LINK=0'],'sh'),(['KBOOT_LINK=1'],'link'),(['KBOOT_SHELL=1','KBOOT_LINK=0'],'shell')]:
             assert manifest(path,flags,['KB_OUT'])[0]=='build/out/ppc-kboot/'+out
         # Review F2: the link-SH user build selects the SHELL_REMOTE_APP profile.
-        recipe=subprocess.run(['make','-n','-f',str(path),'KBOOT_SH=1','KBOOT_LINK=1','kb-user'],cwd=ROOT,capture_output=True,text=True).stdout
+        recipe=subprocess.run(['make','--no-print-directory','-n','ARCH=ppc','PLATFORM=powermac','TARGET_MK='+str(path),'KBOOT_SH=1','KBOOT_LINK=1','kb-user'],cwd=ROOT,capture_output=True,text=True).stdout
         assert 'PPC_SH_PROFILE=userland/ppc/sh/link_profile.h' in recipe.splitlines()[0]
-        plain=subprocess.run(['make','-n','-f',str(path),'KBOOT_SH=1','KBOOT_LINK=0','kb-user'],cwd=ROOT,capture_output=True,text=True).stdout
+        plain=subprocess.run(['make','--no-print-directory','-n','ARCH=ppc','PLATFORM=powermac','TARGET_MK='+str(path),'KBOOT_SH=1','KBOOT_LINK=0','kb-user'],cwd=ROOT,capture_output=True,text=True).stdout
         assert 'link_profile.h' not in plain.splitlines()[0]
-        rejected=subprocess.run(['make','-s','-f',str(path),'KBOOT_SHELL=1','KBOOT_LINK=1','-n'],cwd=ROOT,capture_output=True)
+        rejected=subprocess.run(['make','-s','ARCH=ppc','PLATFORM=powermac','TARGET_MK='+str(path),'KBOOT_SHELL=1','KBOOT_LINK=1','-n'],cwd=ROOT,capture_output=True)
         assert rejected.returncode!=0
+        # The flags are the only image selector here: command-line features or IMAGE must not disagree with KB_OUT.
+        for override in ('FEATURE_LINK=0','IMAGE=kboot-core'):
+            assert subprocess.run(['make','-s','ARCH=ppc','PLATFORM=powermac','TARGET_MK='+str(path),'KBOOT_SH=1',override,'-n'],cwd=ROOT,capture_output=True).returncode!=0
     check(original)
     # Explicit legacy selections must also survive the future link default.
     check(original.replace('KBOOT_LINK ?= 0', 'KBOOT_LINK ?= 1'))
     if mutate:
-        for old,new in [('link-sh,link','link,link'),('KB_SH_OUT := build/out/ppc-user$(if $(filter 1,$(KBOOT_LINK)),/link-sh)','KB_SH_OUT := build/out/ppc-user'),('ifeq ($(KBOOT_LINK),1)\nKB_C += platform/powermac/hostfs_link_io.c','ifneq ($(KBOOT_LINK),1)\nKB_C += platform/powermac/hostfs_link_io.c'),(' PPC_SH_PROFILE=userland/ppc/sh/link_profile.h',' ')]:
+        for old,new in [('link-sh,link','link,link'),('KB_SH_OUT := build/out/ppc-user$(if $(filter 1,$(KBOOT_LINK)),/link-sh)','KB_SH_OUT := build/out/ppc-user'),('KB_C := $(C_KERNEL)','KB_C := $(filter-out platform/powermac/hostfs_link_io.c,$(C_KERNEL)) platform/powermac/hostfs_io.c'),(' PPC_SH_PROFILE=userland/ppc/sh/link_profile.h',' ')]:
             assert original.count(old)==1
             try: check(original.replace(old,new))
             except AssertionError: print('RED selection',old)
@@ -171,7 +174,7 @@ def main():
     work=work[work.index('#if KBOOT_SH'):]
     start=work.index('    do {'); end=work.index('    pm_lan_poll',start)
     work=work[:start]+'    hi=1; lo=2; again=hi; (void)again;\n'+work[end:]
-    boot=(ROOT/'init/ppc_kernel.c').read_text()
+    boot=(ROOT/'platform/powermac/ppc_kernel.c').read_text()
     registration=boot[boot.index('#if KBOOT_LINK\n        int work_rc'):]
     registration=registration[:registration.index('        if (work_rc)')]
     work += '\n#include "kernel/idle_work.h"\nint idle_work_register(void (*fn)(void)) { CHECK(fn==pm_link_service_once); return 0; }\nstatic void registration(void) {\n'+registration+'CHECK(work_rc==0); }\n'

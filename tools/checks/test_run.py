@@ -110,6 +110,23 @@ class RunnerTest(unittest.TestCase):
         self.write('docs/current.md', 'REAL-ID MISSING-ID\n')
         self.assertEqual(self.cli('--lint')[0], 0)
 
+    def test_basis_must_name_a_current_document(self):
+        self.write('docs/archive/x/OLD_DESIGN.md', 'old\n')
+        self.write('docs/decisions/LIVE_DESIGN.md', 'live\n')
+        self.write('docs/design/a/b.md', 'design\n')
+        self.write('docs/archive/x/BOTH.md', 'old copy\n')
+        self.write('docs/decisions/BOTH.md', 'still current\n')
+        self.check('good', basis=['LIVE_DESIGN §2', 'docs/design/a/b.md 契約', 'BOTH §1', '[ABI]', 'KAPI_SPEC §3-1'])
+        self.assertEqual(self.cli('--lint')[0], 0)
+        for basis, message in ((['OLD_DESIGN §2'], 'bad: basis points to an archived document: OLD_DESIGN §2'),
+                               (['docs/archive/x/OLD_DESIGN.md 契約'],
+                                'bad: basis points to an archived document: docs/archive/x/OLD_DESIGN.md 契約'),
+                               (['docs/design/a/gone.md 契約'], 'bad: basis document not found: docs/design/a/gone.md 契約')):
+            self.check('bad', basis=basis)
+            rc, _, err = self.cli('--lint')
+            self.assertEqual(rc, 1, basis)
+            self.assertIn(message, err)
+
     def test_full_only_placement(self):
         self.check('a', needs=['make:alpha'])
         self.check('slow', tier=1, full_only=True, needs=['make:beta'])
@@ -213,6 +230,17 @@ class RunnerTest(unittest.TestCase):
             self.assertEqual((self.root / 'prepared').read_text().splitlines(), [expected])
             (self.root / 'prepared').unlink()
 
+    def test_run_leaves_no_core_files(self):
+        import resource
+        soft, hard = resource.getrlimit(resource.RLIMIT_CORE)
+        try:
+            if hard != 0:
+                resource.setrlimit(resource.RLIMIT_CORE, (min(4096, hard) if hard != resource.RLIM_INFINITY else 4096, hard))
+            R.no_core_files()
+            self.assertEqual(resource.getrlimit(resource.RLIMIT_CORE), (0, hard))
+        finally:
+            resource.setrlimit(resource.RLIMIT_CORE, (soft, hard))
+
     def test_weight_update_median_success_only(self):
         spec = importlib.util.spec_from_file_location('weights', Path(R.__file__).with_name('calibrate_weights.py'))
         updater = importlib.util.module_from_spec(spec)
@@ -227,6 +255,23 @@ class RunnerTest(unittest.TestCase):
         one.write_text('check-a\tnan\t0\n')
         with self.assertRaises(ValueError):
             updater.measurements([one])
+        # A guest check is measured only by the job that boots the guest; a host check only elsewhere.
+        shard = self.write('check-times-abc-3/check_times.tsv', 'check-guest\t1\t0\ncheck-host\t40\t0\n')
+        guest = self.write('check-times-abc-ppc-qemu-1/check_times.tsv', 'check-guest\t600\t0\ncheck-host\t2\t0\n')
+        envs = {'guest': ('ppc-cross', 'qemu-ppc'), 'host': ()}
+        filtered = updater.measurements([shard, guest], envs)
+        self.assertEqual(filtered['seconds'], {'guest': 600, 'host': 40})
+        self.assertEqual(filtered['samples'], {'guest': 1, 'host': 1})
+        self.assertEqual(updater.measurements([shard, guest])['samples'], {'guest': 2, 'host': 2})
+        self.assertTrue(updater.provides_qemu('check-times-abc-ppc-qemu-0'))
+        # --merge: measured checks are replaced, the rest keep the stored weight and sample count.
+        stored = dict(sources=[dict(artifact='old', sha256='0' * 64)], seconds={'guest': 5, 'kept': 70}, samples={'guest': 9, 'kept': 3})
+        both = updater.merged(stored, filtered)
+        self.assertEqual(both['seconds'], {'guest': 600, 'host': 40, 'kept': 70})
+        self.assertEqual(both['samples'], {'guest': 1, 'host': 1, 'kept': 3})
+        self.assertEqual([s['artifact'] for s in both['sources']],
+                         ['old', 'check-times-abc-3', 'check-times-abc-ppc-qemu-1'])
+        self.assertFalse(updater.provides_qemu('check-times-abc-0'))
 
     def setUp(self):
         # Legacy fixtures exercise warning mode; strict mode is tested explicitly.
@@ -451,10 +496,10 @@ class RunnerTest(unittest.TestCase):
             'privileged': ['lib/kstring_asm.asm', 'lib/kstring_c.c', 'lib/kstring.h',
                            'lib/utf8.h', 'lib/lz4.h', 'lib/microtar/microtar.h',
                            'lib/sqlite3/sqlite3.c', 'lib/crc32_core.inc'],
-            'docs-links': ['fs/hostdrv/hostdrvfs_proto.h'],
+            'docs-links': ['drivers/hostdrv/hostdrvfs_proto.h'],
         }
         cases['privileged'] += ['drivers/pci/pci_decode.c', 'drivers/pci/pci_decode.h',
-                                'drivers/block/pc98pt.c', 'drivers/block/pc98pt.h',
+                                'fs/pc98pt.c', 'fs/pc98pt.h',
                                 'fs/ext2/ext2_layout.c', 'fs/ext2/ext2_layout.h']
         actual = Path(__file__).resolve().parents[2]
         # Read the real CHECK declarations, but use empty source fixtures so a
@@ -1037,6 +1082,14 @@ def run_mutations():
          'if True:', 'test_expectation_warnings_and_pins'),
         ('metadata-pin-missing', 'if pin not in found_pins:',
          'if False:', 'test_expectation_warnings_and_pins'),
+        ('basis-archived-name', 'if head.startswith("docs/archive/") or (name in archived and name not in current):',
+         'if head.startswith("docs/archive/"):', 'test_basis_must_name_a_current_document'),
+        ('basis-archived-path', 'if head.startswith("docs/archive/") or (name in archived and name not in current):',
+         'if (name in archived and name not in current) and not head.endswith(".md"):', 'test_basis_must_name_a_current_document'),
+        ('basis-still-current', '(name in archived and name not in current)',
+         '(name in archived)', 'test_basis_must_name_a_current_document'),
+        ('basis-missing-path', 'elif head.startswith("docs/") and head.endswith(".md") and not (root / head).is_file():',
+         'elif False:', 'test_basis_must_name_a_current_document'),
         ('routine-placement', 'checks[dep].full_only for dep in closure(checks, (n,))',
          'False for dep in closure(checks, (n,))', 'test_full_only_placement'),
         ('index-stale', 'if data["signature"] == signature:', 'if True:',

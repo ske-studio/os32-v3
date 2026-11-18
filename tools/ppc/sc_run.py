@@ -17,7 +17,7 @@ from sb_run import INPUT, serial_accept
 
 CHECK = dict(name='ppc-sc', tier=2, budget=900, needs=[],
              covers=['platform/powermac/input_usb.[ch]', 'platform/powermac/input_keymap.c', 'tools/ppc/sc_run.py', 'userland/ppc/nest.c'],
-             inputs=['build/ppc-user.mk', 'build/ppc-kboot.mk',
+             inputs=['build/ppc-user.mk', 'build/targets/ppc-powermac.mk',
                      'tools/ppc/sb_run.py', 'tools/ppc/kboot_accept.py',
                      'tools/ppc/kboot_run.py', 'tools/ppc/run.py',
                      'tools/ppc_lan_host.py', 'tools/mkroot_image.py',

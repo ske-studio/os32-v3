@@ -1,3 +1,4 @@
+#include "pc98.h"
 #include "kernel/console/console_dual.h"
 #include "gfx/v2/gfx2_int.h"
 #include "gfx/gfx_internal.h"

@@ -19,7 +19,7 @@ CHECK = dict(name='ppc-sd', tier=2, budget=900, needs=[],
                      'tools/ppc_lan_host.py', 'tools/ppc_hostfs.py'],
              inputs=['tools/ppc/sc_run.py', 'tools/ppc/kboot_accept.py',
                      'tools/ppc/kboot_run.py', 'tools/ppc/run.py',
-                     'build/ppc-kboot.mk', 'build/ppc-user.mk',
+                     'build/targets/ppc-powermac.mk', 'build/ppc-user.mk',
                      'fs/serialfs/*.[ch]', 'tools/lanfs_host.py',
                      'tools/serialfs_host.py'])
 

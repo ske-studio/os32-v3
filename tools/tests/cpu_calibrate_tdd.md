@@ -1,6 +1,6 @@
 # cpu_calibrate — RED → GREEN の記録
 
-票: `docs/archive/realhw_v21/TASK_SERIAL_VFAST.md` (往復 3)
+契約: `docs/design/kernel/time/cpu_calibrate.md` (止め方・計算・フォールバック、出所は TASK_SERIAL_VFAST 往復 3)
 対象: `kernel/time/cpu_calibrate_math.c` (止め方と計算) / `kernel/time/cpu_calibrate.c` (計測)
 試験: `tools/tests/test_cpu_calibrate.py` + `tools/tests/cpu_calibrate_host.c`
 実行: `make check-cpu-calibrate-host` (`check-par` の列)
@@ -124,7 +124,7 @@ s_loops_per_tick = cpu_calibrate_compute(total, ticks);
 |---|---|---|
 | `drivers/char/serial.c` | TxRDY のポーリング間隔 (`SER_TX_POLL_US` = 5µs) | **意図どおりになる**。ただし予算自体は tick 基準に変えたので、ここが多少ずれても結果は変わらない |
 | `drivers/net/ne2000/ne2000.c` | `NE2K_RDC_POLL_US` / `NE2K_RESET_POLL_US` / `NE2K_OVW_WAIT_US` のポーリング間隔 | いずれも**有限回ポーリングの間隔**で、待ちの上限は回数で決まる。間隔が伸びる = 上限までの実時間が伸びるので、**取りこぼしは減る方向**。逆に「回数を使い切るまでの時間」が 7〜13 倍になるので、切断された機器を待つ最悪時間は伸びる (実機で要観察) |
-| `gfx/gfx_vram.c` | `RASTER_LINE_US` (走査線 1 本ぶんの待ち) | **ここが一番効く**。短すぎた待ちが本来の長さになるので、ティアリング対策としては正しくなるが、**描画が遅くなったように見える可能性がある**。実機で GUI の体感を見ること |
+| `drivers/video/pc98/gfx_vram.c` | `RASTER_LINE_US` (走査線 1 本ぶんの待ち) | **ここが一番効く**。短すぎた待ちが本来の長さになるので、ティアリング対策としては正しくなるが、**描画が遅くなったように見える可能性がある**。実機で GUI の体感を見ること |
 
 **まだ実機で確かめていない** ([V4])。NP21/W の実測は
 `cpu_calib_rounds = 16 / cpu_calib_ticks = 5` = 校正値 `16 × 200,000 / 5`
@@ -137,6 +137,6 @@ NP21/W 上の ne2000 / gfx の挙動 (特にスプラッシュ) は PM が見る
 - **実機での校正値そのもの。** 266MHz で `cpu_calib_rounds` ≒ 50 /
   `cpu_calib_ticks` = 5 / `loops_per_tick` が 100 万台後半〜200 万台になるはず、
   という見積もりでしかない。`kernel.map` から読んで確かめる。
-- **シリアルの実効速度が上がったか** (票 S5: 9600 で 900 B/s 以上、
+- **シリアルの実効速度が上がったか** (TASK_SERIAL_VFAST の受入 S5: 9600 で 900 B/s 以上、
   115200 で 8 KB/s 以上)。ここが本題で、実機でしか測れない。
 - **ne2000 / gfx_vram への影響。** 上の表は読みであって実測ではない。

@@ -95,7 +95,7 @@ def main():
         else: print('SKIP PPC cross compiler unavailable')
         if '--mutate' in sys.argv:
             copy = tmp / 'tree'
-            for directory in ('include', 'sdk/include', 'arch', 'kernel', 'drivers', 'fs', 'exec', 'mm', 'lib'):
+            for directory in ('include', 'sdk/include', 'arch', 'platform', 'kernel', 'drivers', 'fs', 'exec', 'mm', 'lib'):
                 shutil.copytree(ROOT / directory, copy / directory, ignore=shutil.ignore_patterns('out', 'sdk', '__pycache__'), dirs_exist_ok=True)
             (copy / 'tools/tests').mkdir(parents=True)
             shutil.copy2(ROOT / 'tools/tests/kcg_file_host.c', copy / 'tools/tests')

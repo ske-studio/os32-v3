@@ -30,7 +30,7 @@
  */
 /* Adapted from NetBSD 36eddebc Locore.c:69-186, 7450/7455 only.
  * The ABI frame, explicit stop and MMIO primitives are OS32 additions. */
-#include "ppc_layout.h"
+#include "platform_of_layout.h"
     .text
     .balign PM_CELL_BYTES
     .globl _start

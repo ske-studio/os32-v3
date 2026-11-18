@@ -12,7 +12,7 @@ SR/CR/GR/AR・DAC dataの副作用は型で扱い、領域一括MMIO許可にし
 
 必須CHECKは50C全bit、524の計算値、580 bit8、C040復元値、CONFIG&3/START、標準CR/形式/pitch/blank/sync・DACCLK&101、cfg/route。TEST_CONTROLはbit20だけ比較しsenseを除外、未知・未使用scratchは記録のみ。ARはFF操作付き専用列、DACは書込み専用列としread_safeな通常MMIOへ偽装しない。
 
-0FAChは現行target検査で禁止（`kdebug/recover.c:605–608`）。Cの固定route節だけ既存route callbackを使う専用操作を結線し、01/読戻しmask03、終端00を定義。任意I/O opは足さない。S0の98セル部分を出力中CHECKでも再利用する（§5）。
+0FAChは現行target検査で禁止（`kdebug/recover.c`）。Cの固定route節だけ既存route callbackを使う専用操作を結線し、01/読戻しmask03、終端00を定義。任意I/O opは足さない。S0の98セル部分を出力中CHECKでも再利用する（§5）。
 
 - `recover_plan_access` が固定範囲・方向の型を扱い、`recover_ops.mode_vram` へ渡す。正常時はgf_busが方向ごとにBEGIN/ENDの計4行（bar/off/len/dir）。比較は不一致後も全域を読み、最初のbyteのBAR1相対off/期待値/実値だけをENDに保持し、既存のREC_VERIFY失敗出口へ進む。
 

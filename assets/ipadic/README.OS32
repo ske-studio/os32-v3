@@ -20,5 +20,5 @@ EUC-JP、sha256 fca02d9adb601d101eccdf3131119abfff2d9c825ef5c759d7a89ebbaa972099
 
 利用: `tools/fep_to_sqlite.py` が `assets/fep.db` (FEP の辞書、ゲストの `/db/fep.db`)
 を生成する。生成物 (`fep*.db`、`fep.dic`) は git に入れない (`.gitignore`)。
-生成した辞書の `meta` に license / attribution を運ばせる件は
-`docs/tasks/fep/TASK_DICT_META.md` (M5)。
+生成した辞書の `meta` は license / attribution に COPYING の全文を収める
+(形式は `docs/design/tools/fep_to_sqlite.md`)。

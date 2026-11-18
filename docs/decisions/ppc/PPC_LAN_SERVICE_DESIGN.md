@@ -124,7 +124,7 @@ alias有効・memory初期化済み・単回startをserviceで再検査しない
 |P24補助・lan_gem_io.c|新規70～100行。PPC I/O 実体、ppc_dma_sync のプロトタイプは .c の中。lan_boot.h の pm_lan_gem_io の宣言を同じ段で。|
 |P24補助・lan_diag.c|新規100～150行。固定scratch・2区間・診断組立て。lan_boot.h の pm_lan_diag_snapshot の宣言を同じ段で。|
 |P24・lan_service.c|新規210～240行見込み。7状態・L2・キュー結線。補助と各別段。|
-|P25＋P26・init/ppc_kernel.c / build/ppc-kboot.mk|+35～50 / +15～30行。LAN最後の同じ取り込みで結線・全必要TU/依存登録・link map確認。|
+|P25＋P26・platform/powermac/ppc_kernel.c / build/targets/ppc-powermac.mk|+35～50 / +15～30行。LAN最後の同じ取り込みで結線・全必要TU/依存登録・link map確認。|
 |実機前の別段・clock alias/PA/先行呼出し|D1によるN2延期。今回の前提2段には含めない。|
 ## 5. 受入→試験→変異
 A8：実sinkのKBOOT全byte、PHY待ち、16KiB+256B、断線/再接続、AGAIN保持/OK除去、空FIFO統計をraw bytesと照合。再接続で初回seq=0を強制しない。変異はAGAIN除去・統計反映削除。

@@ -6,7 +6,7 @@ product arithmetic. Compile headers separately with host/cross compilers, then
 execute ILP32 layout checks. Mutations must compile and fail at runtime.
 """
 INITIALIZER_UNITS = ('fs/ext2/ext2_vfs.c', 'fs/fat/fatfs_vfs.c',
-                     'fs/hostdrv/hostdrvfs.c', 'fs/isofs/iso9660.c',
+                     'drivers/hostdrv/hostdrvfs.c', 'fs/isofs/iso9660.c',
                      'fs/serialfs/serialfs.c', 'drivers/base/dev.c',
                      'drivers/ata/cd_body.c', 'drivers/net/e82557/lan_body.c')
 
@@ -20,7 +20,7 @@ CHECK = dict(name='hostsvc-contracts', tier=1, needs=[],
             'sdk/include/os32/os32_host_notice.h',
             'fs/serialfs/sfs_client.h',
             'fs/serialfs/sfs_block.h',
-            'drivers/base/dev.h',
+            'kernel/dev/dev.h',
             'drivers/block/netcd.h',
             'fs/vfs.h',
             'fs/isofs/iso9660_media.h',
@@ -30,10 +30,10 @@ CHECK = dict(name='hostsvc-contracts', tier=1, needs=[],
             'tools/tests/hostsvc_fixture.c', 'tools/tests/hostsvc_fixture.py',
             'tools/hostsvc_contracts.pyi',
             'fs/ext2/ext2_vfs.c', 'fs/fat/fatfs_vfs.c',
-            'fs/hostdrv/hostdrvfs.c', 'fs/isofs/iso9660.c',
+            'drivers/hostdrv/hostdrvfs.c', 'fs/isofs/iso9660.c',
             'fs/serialfs/serialfs.c', 'drivers/base/dev.c',
             'drivers/ata/cd_body.c', 'drivers/net/e82557/lan_body.c'], budget=5.7,
-    basis=['NET_HOSTSVC_DESIGN §2', 'NET_HOSTSVC_DESIGN §3', 'NET_HOSTSVC_DESIGN §4', 'NET_HOSTSVC_DESIGN §5'],
+    basis=['docs/design/net/nic.md 受信の振り分け', 'docs/design/fs/serialfs/serialfs_persistent.md 期限', 'docs/design/fs/serialfs/sfs_block.md 通信の形式', 'docs/design/net/link_notify.md 通信の形式'],
 )
 
 import argparse
@@ -59,7 +59,7 @@ HEADERS = (
     'sdk/include/os32/os32_host_notice.h',
     'fs/serialfs/sfs_client.h',
     'fs/serialfs/sfs_block.h',
-    'drivers/base/dev.h',
+    'kernel/dev/dev.h',
     'drivers/block/netcd.h',
     'fs/vfs.h',
     'fs/isofs/iso9660_media.h',
@@ -125,7 +125,7 @@ MUTATIONS += (
     ('lan-order', 'drivers/net/e82557/lan_module.h',
      '    const struct NetAdapter *adapter;\n    int (*netcd_register)(const char *);',
      '    int (*netcd_register)(const char *);\n    const struct NetAdapter *adapter;'),
-    ('device-order', 'drivers/base/dev.h',
+    ('device-order', 'kernel/dev/dev.h',
      '    int (*blk_read_u32)(Device *, u32 lba, int count, void *buf);\n    int (*media_check)(Device *, u32 *generation);',
      '    int (*media_check)(Device *, u32 *generation);\n    int (*blk_read_u32)(Device *, u32 lba, int count, void *buf);'),
 )

@@ -1,6 +1,7 @@
 # Display cleanup: V86 CUI exits and planar pages
 
-票: `docs/archive/v3/TASK_T2D_T2H.md` の表示不具合の修正。
+契約: `docs/design/platform/pc98/display.md` (V86 の CUI 復帰)・`docs/design/platform/pc98/gfx_init.md` (両ページの消去)。
+出所は票 TASK_T2D_T2H の表示不具合の修正。
 
 ## Scope
 

@@ -29,6 +29,7 @@ u8 kprintf_attr_to_pc98(u8 attr) { return con_backend_printf_attr(attr); }
 
 ## 索引
 
+- [lib/kprintf.c](kprintf.md)
 - [pc98_cell.md](pc98_cell.md)
 - [lib/sqlite3/](sqlite3/README.md)
 - [lib/utf8.c](utf8.md)

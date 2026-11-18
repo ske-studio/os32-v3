@@ -135,6 +135,7 @@ static u8 resident_bytes[4096] __attribute__((aligned(8)));
 static u8 child_heap_bytes[4096] __attribute__((aligned(8)));
 static u32 resident_used, *resident_sentinel;
 void __cdecl kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; die(__LINE__); }
+void __cdecl console_printf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; die(__LINE__); }
 void res_owner_set(int id) { owner = id; }
 static void exec_cpl0_release(void) {}
 int appslot_return_target(int id) { CHECK(id == 2); return slots[id].parent; }

@@ -135,10 +135,10 @@ static int test(void)
     CHECK(eq(g_prot_name[0], names[0]));
     alias_dev = 7; alias_ino = 100;
     CHECK(is_same_as_protected("/bin/alias") == 1);
-    /* Existing 11 + default 3 + custom 3 = 17; then mixed-case/suffix names. */
+    /* Existing 13 + default 3 + custom 3 = 19; then mixed-case/suffix names. */
     for (i = 0; hsp_protected_names[i]; i++)
         str_ncpy(names[i], hsp_protected_names[i], sizeof(names[i]));
-    CHECK(i == 11);
+    CHECK(i == 13);
     for (j = 0; j < 3; j++, i++) {
         str_ncpy(names[i], "fep_user.db", sizeof(names[i]));
         str_ncat(names[i], suffix[j], sizeof(names[i]));
@@ -148,7 +148,7 @@ static int test(void)
         str_ncat(names[i], suffix[j], sizeof(names[i]));
     }
     entries = i;
-    CHECK(scan_protected_entities() == 0 && g_prot_count == 17);
+    CHECK(scan_protected_entities() == 0 && g_prot_count == 19);
     for (; i < 25; i++) {
         str_ncpy(names[i], "FeP_User.Db.extra", sizeof(names[i]));
         names[i][16] = (char)('A' + i); names[i][17] = 0;

@@ -3,6 +3,7 @@
 #include "ofw.h"
 #include "lan_boot.h"
 #include "ppc_pmap.h"
+#include "ppc_trap.h"   /* PM_DEC_HZ */
 /* Native platform-owned snapshot. Raw properties below retain BE encoding. */
 #define PM_KBOOT_PROP_BYTES 512
 #define PM_KBOOT_ANCESTORS 8
@@ -42,7 +43,6 @@ void pm_clock_bind(const struct pm_kboot_info *info);
 struct io_clock_ops;
 extern const struct io_clock_ops pm_io_clock_ops;
 void pm_io_clock_install(void);
-#define PM_DEC_HZ 1000u
 u32 pm_tick_hz(void); /* Physical DEC Hz. */
 const struct pm_kboot_info *pm_kboot_capture(ppc_ci ci);
 /* Final snapshot only: after reserve, no OF allocation/map before detach. */
@@ -54,5 +54,4 @@ enum pm_kboot_reserve_result {
 };
 int pm_kboot_reserve(struct pm_kboot_info *info);
 void pm_kernel_takeover(const struct pm_kboot_info *) __attribute__((noreturn));
-void ppc_kernel_main(void) __attribute__((noreturn));
 #endif

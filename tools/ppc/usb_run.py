@@ -21,7 +21,7 @@ USB_QEMU_CLOCK = ['-icount', 'shift=auto']
 
 CHECK = dict(name='ppc-usb', tier=2, budget=900, needs=['make:kernel'],
              covers=['platform/powermac/console_stream.c', 'platform/powermac/console_log.c',
-                     'platform/powermac/log.c', 'platform/powermac/kboot_log.h', 'platform/powermac/input_usb.c', 'platform/powermac/input_keymap.c', 'platform/powermac/input_usb.h', 'tools/tests/host32.py', 'tools/ppc/usb_run.py', 'platform/powermac/usb*', 'build/ppc-kboot.mk', 'init/ppc_kernel.c',
+                     'platform/powermac/log.c', 'platform/powermac/kboot_log.h', 'platform/powermac/input_usb.c', 'platform/powermac/input_keymap.c', 'platform/powermac/input_usb.h', 'tools/tests/host32.py', 'tools/ppc/usb_run.py', 'platform/powermac/usb*', 'build/targets/ppc-powermac.mk', 'platform/powermac/ppc_kernel.c',
                      'platform/powermac/kboot_capture.c', 'drivers/usb/*.[ch]',
                      'include/usb_platform.h', 'include/endian_dma.h',
                      'arch/ppc/arch_endian_dma.h', 'tools/ppc/kboot_accept.py',
@@ -458,7 +458,11 @@ def product_accept(elf, cpu, out, mode, late=False):
                     # HOME moves to the beginning; advance to x and delete it.
                     for _ in range(6): key('right')
                     key('delete'); key('ret')
-                    wait_for(lambda: output()[start:].endswith('sh> '), 'edit prompt')
+                    # DELETE redraws the line, and redraw_line ends by printing the prompt again
+                    # (the cursor is then moved without output). The stream therefore ends with
+                    # 'sh> ' before Enter is consumed; wait for the fd1 result as well, as above.
+                    wait_for(lambda: output()[start:].endswith('sh> ') and
+                             'hi' in output()[start:].splitlines()[1:], 'edit result prompt')
                     require('hi' in output()[start:].splitlines()[1:], 'HOME/LEFT/RIGHT/DEL result')
                     start=len(output()); text_keys('echo '); key('a', hold=800); time.sleep(.15)
                     time.sleep(.15); held=output(); time.sleep(.15); require(output()==held, 'no repeat after release')

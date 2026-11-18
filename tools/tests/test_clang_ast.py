@@ -273,7 +273,7 @@ if __name__ == '__main__':
                 # driver inputs keep their repository-relative paths.
                 if source.is_absolute():
                     self.assertTrue((source.parent / (source.parent.name + '_imports.h')).is_file())
-        self.assertTrue({'init/kernel.c', 'boot/boot_main.c',
+        self.assertTrue({'platform/pc98/kernel.c', 'boot/boot_main.c',
                          'lib/sqlite3/sqlite3.c', 'sdk/crt/syscalls.c',
                          'sdk/allocator/nano_adapter.c'} <= sources)
         self.assertTrue(any(u['src'] == 'sdk/crt/syscalls.c' and

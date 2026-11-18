@@ -1,6 +1,6 @@
 #include "gfx2_bridge_fake.h"
 #include "types.h"
-#include "tvram.h"
+#include "text_screen.h"
 #include "tvram_private.h"   /* PC-98 の番地 (第 5 段 C1) */
 static u32 host_cr3;
 static void host_sync(u32 root);

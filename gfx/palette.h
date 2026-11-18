@@ -18,7 +18,6 @@
 
 #include "types.h"
 #include "gfx_format.h"
-#include "pegc.h"
 
 /* パレットエントリ (各4bit: 0-15) */
 typedef struct {
@@ -32,8 +31,11 @@ typedef struct {
 #define GFX_RGB_R 0
 #define GFX_RGB_G 1
 #define GFX_RGB_B 2
-#define GFX_PALETTE_COMPONENT_BITS PEGC_PAL_KAPI_BITS /* 正典は include/pegc.h */
-#define GFX_PALETTE_COMPONENT_MASK PEGC_PAL_KAPI_MASK /* 正典は include/pegc.h */
+#define GFX_PALETTE_COMPONENT_BITS 4     /* KAPI の成分幅 (PEGC の側は include/pegc.h の PEGC_PAL_KAPI_BITS と同じ値) */
+#define GFX_PALETTE_COMPONENT_MASK 0x0F  /* KAPI 側の輝度は 4bit (0〜15) */
+#define GFX_PALETTE_COMPONENT_SCALE 17   /* 4bit → 8bit の伸張係数 (15*17 = 255) */
+_Static_assert(GFX_PALETTE_COMPONENT_MASK == (1u << GFX_PALETTE_COMPONENT_BITS) - 1u &&
+               GFX_PALETTE_COMPONENT_MASK * GFX_PALETTE_COMPONENT_SCALE == 255u, "palette component width, mask and scale agree");
 #define GFX_PALETTE_CUBE_LEVELS 6
 #define GFX_PALETTE_GRAY_FIRST 8
 #define GFX_PALETTE_GRAY_STEP 10

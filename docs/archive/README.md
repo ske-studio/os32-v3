@@ -2,11 +2,21 @@
 
 **現行仕様 (運用の正典)。** 2026-09-16 開設。
 
-`docs/tasks/` は「いま動いている作業」の棚であってほしいが、票は受入が済んでも消せない
-(なぜその実装になったかの根拠であり、あとから仕様を問われるのはたいてい完了した票の中身)。
-両方を満たすために、**受入完了して参照頻度が下がった票はここへ落とし、索引の行は残す**。
-`docs/tasks/` を開いたときに目に入るのは進行中のものだけになり、完了した票は
-`docs/INDEX.md` から 1 段深いところで生き続ける。
+受入が済んだ票と、役目を終えた設計・記録の置き場。`docs/tasks/` と `docs/decisions/` を
+「いま動いている作業と、いま有効な決定」だけの棚にするために、完了した物をここへ移す。
+
+**ここの文書は過去の記録で、現行の約束ではない** (規則 [D4]、`docs/CONSTRAINTS.md`):
+
+* ユーザーの指示があるときだけ読む・引く。作業・設計・レビューの根拠にしない。
+* 現行の文書からはリンクしない。所在は文字で書く (`(アーカイブ: \`docs/archive/<籠>/<名>.md\`)`)。
+* 試験・検査・受入の一覧からも指さない。検査の宣言の basis は `python3 tools/checks/run.py --lint` が止める。
+  `tools/tests/*_tdd.md` とソースの註に残っている古い票のパスは来歴の記録で、根拠には使わず、新しく足さない
+  (`make check-archive-refs` が件数の増加を止める。設計 `docs/design/tools/check_archive_refs.md`)。
+* 今の仕様として引かれている中身は、**移す前に** 現行の文書 (`docs/design/<ソースと同じパス>.md` か
+  §1〜§10 の仕様) へ要約する。移した後に「仕様はアーカイブの票を読め」という状態を作らない。
+
+この README だけは現行の文書 (籠の一覧と移し方)。アーカイブへ移す作業のときに読む。
+何を・いつ移すか、移す前に何を要約するか、要約の書き方は `docs/POLICY_ARCHIVE.md` (手順はスキル `.claude/skills/os32-archive`)。
 
 ## 籠の切り方
 
@@ -18,7 +28,7 @@
 | `gui_v12/` | GUI シェル v1.2 の票 5 本と完了版の作業分担票 TASKS。現行の SDK が正典として参照する CONTRACTS は `tasks/gui/v12/` に残る |
 | `gui_v13_reviews/` | GUI シェル v1.3 のレビュー記録・クロスリンク・途中保存 |
 | `settings/` | 設定レジストリの受入完了票 (S2 / S3 / S3I2 / S4 / S5、2026-09-29 に S0 / S6 / S6P と S0 の計画・基盤設計を追加) |
-| `network/` | Host Services の票 (N0〜N4) |
+| `network/` | Host Services の票 (N0〜N4)。2026-11-18: NET_HOSTSVC_DESIGN (実装済みの Host Services の設計。今の仕様は `docs/design/net/README.md` から辿る設計書。票 TASK_NET_HOSTSVC と未実装の OS32_TIME_DESIGN・CONV_IMAGE_DESIGN は現行の棚) |
 | `kernel_v2/` | カーネル 2.0 の完了記録 8 本 |
 | `shell/` | hsync H1〜H4・B8 (FS_TYPE)・シェルの切り詰め・終了コードの票 7 本 (2026-09-29 に移動)、親の計画 HSYNC_IMPROVEMENT_PLAN (2026-10-25) |
 | `test/` | ゲスト試験ランナー 3 段 (FSTAT_REDIR / TEST_RESULT / TEST_RUNNER) |
@@ -31,9 +41,11 @@
 | `portability/` | kstring の速度実測 (TASK_KSTRING_BENCH)、N1 の移植性調査 (SURVEY_N1)。32 ビット限定方針の正典 ARM_GAUGE は `tasks/portability/` に残る |
 | `arch_port/` | 別リポジトリ `pw-sh4-research` の調査の快照 (索引・Brain i.MX28・M0 監査)。未対処所見も原文のまま保持 |
 | `v4/` | V4_GAME_PLATFORM_DRAFT (v3 対象外の草案)。ROADMAP・V3_PLAN からの参照を維持 |
-| `v3/` | v3 で受入完了・完了記録になった票 (2026-10-02): T0 の TASK_C11_MIGRATION、TASK_CLANG_CHECKS、TASK_EXT2_ERRORS_INVESTIGATION、T1 の TASK_T1_LEDGER、策定時の PLAN・U6_PENDING_REVIEW・V3_PLAN_DRAFT、TASK_T2D_T2H から切り出した T2d の結果 (TASK_T2D_RESULTS)、TASK_T2_APPBAND §5-1 から切り出した T2a〜T2c の結果 (TASK_T2ABC_RESULTS)。MEMMAP の §11 の経緯 (TASK_MEMMAP_V3_RESULTS)、HAL の §3-1 の受入記録 (TASK_HAL_WIRING_RESULTS)、PCM の実装記録 (TASK_PCM_CS4231_RESULTS)。2026-10-22 に T3ab の段の票 8 本 (`t3ab/`、A〜G と索引の README、受入完了 2026-10-17、残件は台帳 T3AB-R1)。2026-10-22 に TASK_T2D_T2H (T2d〜T2h の詳細設計、受入完了 2026-10-16。約束の節は 09_exec・KAPI_SPEC §4-10・decisions/MEMMAP_V3 §7 へ移し、ゲストの受入の contract は現行の正典を指す)。2026-10-25 に T3 の票 TASK_T3_LAYOUT (受入完了 2026-10-18、契約は 02_memory §2-1) と補遺 T3D1_UNICODE_FILE (契約は KAPI_SPEC §4-13)、T3 前の文書整理の計画 DOCS_REORG_T3、完了記録 APP_BAND_PDE (元 `tasks/memory/`)。2026-10-28 に TASK_DBGREF (受入完了 2026-10-16、部品の形式と口は 08_build §8-2、到達確認は POLICY_DEBUG §2)・TASK_KPEEK (受入完了 2026-10-21、使い方は POLICY_DEBUG §5)・TASK_T2_APPBAND (受入完了 2026-10-16、契約は MEMMAP_V3・09_exec・KAPI_SPEC)。進行中・受入待ちの v3 票 (V3_PLAN・T4 以降・HAL_WIRING・PCM_CS4231 など) は `tasks/v3/` に残る |
+| `v3/` | v3 で受入完了・完了記録になった票 (2026-10-02): T0 の TASK_C11_MIGRATION、TASK_CLANG_CHECKS、TASK_EXT2_ERRORS_INVESTIGATION、T1 の TASK_T1_LEDGER、策定時の PLAN・U6_PENDING_REVIEW・V3_PLAN_DRAFT、TASK_T2D_T2H から切り出した T2d の結果 (TASK_T2D_RESULTS)、TASK_T2_APPBAND §5-1 から切り出した T2a〜T2c の結果 (TASK_T2ABC_RESULTS)。MEMMAP の §11 の経緯 (TASK_MEMMAP_V3_RESULTS)、HAL の §3-1 の受入記録 (TASK_HAL_WIRING_RESULTS)、PCM の実装記録 (TASK_PCM_CS4231_RESULTS)。2026-10-22 に T3ab の段の票 8 本 (`t3ab/`、A〜G と索引の README、受入完了 2026-10-17、残件は台帳 T3AB-R1)。2026-10-22 に TASK_T2D_T2H (T2d〜T2h の詳細設計、受入完了 2026-10-16。約束の節は 09_exec・KAPI_SPEC §4-10・decisions/MEMMAP_V3 §7 へ移し、ゲストの受入の contract は現行の正典を指す)。2026-10-25 に T3 の票 TASK_T3_LAYOUT (受入完了 2026-10-18、契約は 02_memory §2-1) と補遺 T3D1_UNICODE_FILE (契約は KAPI_SPEC §4-13)、T3 前の文書整理の計画 DOCS_REORG_T3、完了記録 APP_BAND_PDE (元 `tasks/memory/`)。2026-10-28 に TASK_DBGREF (受入完了 2026-10-16、部品の形式と口は 08_build §8-2、到達確認は POLICY_DEBUG §2)・TASK_KPEEK (受入完了 2026-10-21、使い方は POLICY_DEBUG §5)・TASK_T2_APPBAND (受入完了 2026-10-16、契約は MEMMAP_V3・09_exec・KAPI_SPEC)。進行中・受入待ちの v3 票 (V3_PLAN・T4 以降・HAL_WIRING・PCM_CS4231 など) は `tasks/v3/` に残る。2026-11-18 に受入完了の票 9 本 (TASK_BLOCKDEV_PERF・TASK_DEP_DIR・TASK_DESIGN_LAYOUT・TASK_MAGIC_NUM・TASK_MAGIC_NUM2・TASK_SLIM・TASK_SRC_LAYOUT・TASK_TEST_TIDY・TASK_VER_INFO)、TASK_PCM_CS4231 (今の仕様は `docs/design/drivers/sound/cs4231/pcm_cs4231.md`)、TASK_DICT_META (今の仕様は `docs/design/kernel/ime/`) |
 | `realhw/` | 実機の票の証拠の控え (FD144・LAN_PCI・PEGC480・TRIDENT の設計経緯) と、2026-10-28 に移した TASK_PEGC480_REALHW (受入完了 2026-09-30、今の仕様は 05_drivers §5-5) |
-| `realhw_v3/` | v3 で受入完了した実機の票 (2026-10-25: TASK_FDRECOV — FD 起動から LAN で HDD 一式を復旧、受入完了 2026-10-17) |
+| `realhw_v3/` | v3 で受入完了した実機の票 (2026-10-25: TASK_FDRECOV — FD 起動から LAN で HDD 一式を復旧、受入完了 2026-10-17)。2026-11-18: TASK_GF_DRIVER (GeForce 6200 の本番の画面ドライバ、受入完了 2026-10-30)、TASK_GF_BDF と GF_BDF_DESIGN (今の仕様は `docs/design/kdebug/recover_gf_locate.md`・`docs/design/drivers/pci/pci_locate.md`) |
+| `decisions/` | 設計書を `docs/design/` へ移した後の元の決定の文書 (DEP_DIR の各設計・SLIM_KERNEL_DESIGN など、2026-10-31)。2026-11-18: 機種依存の分離の第 1・2・4 段の確定設計 PPC_SEP1・2・4_DESIGN (完了記録。第 3・5 段は試験が契約の出所 (basis) に引いているので `docs/decisions/ppc/` に残した。今の仕組みは票 `docs/tasks/ppc/TASK_PPC_SEP.md` の「現在地」と `docs/design/` の層の検査・ソースの選択・入口の骨格の設計書)。DICT_META_DESIGN (今の仕様は `docs/design/kernel/ime/` と `docs/design/tools/fep_to_sqlite.md`) |
+| `gui/` | 表示の HAL の受入完了の票 (2026-11-18: TASK_GFX_MODES — 色数と解像度を形式と能力の表で持つ、受入完了 2026-10-26)。TASK_RASTER_SPLASH と RASTER_SPLASH の設計 4 本 (今の仕様は `docs/design/platform/pc98/boot_splash.c.md` から辿る設計書) |
 | `agents/` | 引き継ぎ (HANDOVER_v14 / 2026-09-16 / 09-18 / 09-22 / 09-29 / 10-06 / 10-08 / 10-09)・反省会の記録 (REVIEW_2026-10-06 / 10-14、2026-10-25 に移動)・体制の快照 (RETROSPECTIVE_2026-09-09)・Hermes の最上位プロンプト (SOUL.md、撤収済み・効力なし) |
 | 直下 | 領域に属さない単発の記録 (`REFACTORING_PLAN.md` `ROADMAP_v1.0.md` `TEST_INVENTORY_2026-09-14.md` `debug_kcg_load_font.md`) |
 
@@ -41,7 +53,7 @@
 **現行の契約・仕様として参照されていない完了版の計画・契約はアーカイブしてよい (ユーザー決定 2026-10-02)。**
 ファイル名だけで判定せず、今の作業・コード・CLAUDE.md・INDEX の正典表からの参照の役割を確認する。
 現行の契約として使われるもの、未完了・判断保留のものは元の棚に残す。
-別系統の調査の快照や v3 の対象外の草案も移せるが、今後の方針の根拠を指す参照は維持する。
+別系統の調査の快照や v3 の対象外の草案も移せる。今後の方針の根拠になる中身は、移す前に現行の文書へ写す。
 進行中の票は完了した段の記録だけを `…_RESULTS.md` へそのまま切り出し、元票に案内を残す。
 未確認・未実施の受入と残件は元票に残し、完了したことにしない。
 **ただし (ユーザー決定 2026-10-22)**: 残件が [持越し台帳](../tasks/DEFERRED_TESTS.md) の行にあり、その行が ID だけで (票を開かずに) 何を・なぜ・いつ確かめるか読めるなら、残件のある票もアーカイブしてよい (台帳は 2026-10-06 に延期の正典になり、上の規則はそれより前の 2026-10-02 のもの)。行が票の節を読まないと分からないときは、その節を先に仕様の文書へ移す。移す前に、その票を指す台帳の行を 1 本ずつ読んで確かめる。
@@ -76,10 +88,12 @@ make check-tests-inventory                    # 試験の登録を照合する
 * **`check-docs-links` が通ること** — 相対パスが 1 段ずれるのはいちばん起きやすい
   壊し方なので、`docs/archive/` はリンク検査から除外していない
   (`tools/check_docs_links.py` の docstring)。
-* **索引には残すこと** — 票の行を `docs/INDEX.md` から消さない。リンク先が
-  `tasks/…` から `archive/…` に変わるだけ。`check-docs-orphans` は
-  `docs/INDEX.md` を唯一の起点に辿るので、消すとそのまま孤児になる。
+* **索引には所在を文字で残すこと** — `docs/INDEX.md` の行を消さず、リンクを
+  `(アーカイブ: \`docs/archive/…\`)` の文字に替える (`tools/move_docs.py` の後で当てる)。
+  現行の文書からアーカイブへのリンクは `check-docs-tree` が 0 件であることを見る。
+  アーカイブの文書は索引から辿れないのが正しい形 (`tools/check_docs_orphans.py` の docstring)。
 * **本文は書き換えないこと** — 移動でいじってよいのはリンクだけ。完了記録を
   あとから直すと、当時の判断の記録でなくなる。続きが要るなら新しい票を立てる。
-* **票は票のまま** — `tools/tests/*_tdd.md` が根拠として指す票がここへ来ても
-  参照は生きる (`check_docs_orphans.py` の起点集合は `docs/archive/**` を含む)。
+* **試験の出所を先に付け替えること** — 検査の宣言の basis がその票・設計を出所に
+  引いているなら、それは今の契約。移す前に `docs/design/` へ要約して引き先を替える
+  (アーカイブを指す basis は lint が止める)。

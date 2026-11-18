@@ -2,7 +2,7 @@
 """Host notification wire, timing, queue, and mutation tests."""
 CHECK = dict(name='host-notify', tier=1, needs=[],
              covers=['tools/host_notify.py', 'net/link.h'], budget=2.8,
-    basis=['NET_HOSTSVC_DESIGN §5', 'NET_HOSTSVC_DESIGN §5 (silence limit)'],
+    basis=['docs/design/tools/host_notify.md 送りの規則'],
 )
 import argparse
 import importlib.util

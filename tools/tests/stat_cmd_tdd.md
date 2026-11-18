@@ -8,7 +8,8 @@
 
 背景: S3 (設定のリカバリ) は root の `st_dev` を `(dev_type << 8 | unit) + 1` で
 復号して FDD ブートを判定し、`st_ino` で同一性を見る
-(`docs/archive/settings/TASK_S3.md` §1a / §1b)。ゲスト上でその 2 つを観測する
+(`docs/design/userland/system/install_recover.md` の「起動媒体と対象」・「事前の走査」)。
+契約の正典は `docs/design/userland/cmds/stat.md`。ゲスト上でその 2 つを観測する
 手段が無かったので、実機観測の根拠を作るために足した道具。
 
 ## 事実関係 (RED の出し方)
@@ -79,7 +80,7 @@ SUMMARY 5/5 PASS
 
 | case | 内容 |
 |---|---|
-| `dev` | `st_dev` の生値と復号: hd0 = 1、fd0 = 257 (TASK_S3 §1a の値)、hd1 = 2、ser0 / cd0 / host0、未知の種別は `type7 unit1` と数字のまま、0 は `unknown` |
+| `dev` | `st_dev` の生値と復号: hd0 = 1、fd0 = 257 (`docs/design/userland/system/install_recover.md` の「起動媒体と対象」と同じ式)、hd1 = 2、ser0 / cd0 / host0、未知の種別は `type7 unit1` と数字のまま、0 は `unknown` |
 | `fields` | 種別 (FILE / DIR / DEV / UNKNOWN = `st_mode & OS_S_IFMT`)、`size=` / `ino=` / `mode=0100644` (8 進) / `nlink=` / `atime=` `mtime=` `ctime=`、1 パス = 1 行 |
 | `notfound` | `stat: <path>: <理由>` と終了コード 1。`OS32_ERR_*` は番号ではなく言葉 (NOTFOUND / IO / NOMOUNT) |
 | `multi` | 途中の 1 つが失敗しても残りを続け、行数は 3 (2 件 + エラー 1)、終了コードは 1。全部成功なら 0 |

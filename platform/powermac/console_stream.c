@@ -16,9 +16,11 @@ void console_stream_write(const void *bytes, u32 len)
 #endif
 
 #include "kboot_log.h"
+#include "cli_boot.h"
+#include "platform_console.h"
 #include "console_output.h"
 #include "console.h"
-#include "tvram.h"
+#include "text_screen.h"
 #include "kstring.h"
 extern int boot_serial_mirror;
 #if !KBOOT_LINK
@@ -66,10 +68,4 @@ void pm_console_clear(void)
 #if !KBOOT_LINK
     console_stream_write("\033[2J\033[H", 7);
 #endif
-}
-
-/* USER UTF-8 echo follows fd1's decoded console path, including its one mirror. */
-void shell_print_utf8(const char *text, u8 color)
-{
-    console_write(text, kstrlen(text), color);
 }

@@ -1,6 +1,6 @@
 # TASK_HAL_WIRING — 結線の土台 (割り込みの動的登録 / 8237 DMA の共通部 / DMA プール / PCI の結線表 / µs 時計)
 
-> 後続: [TASK_LAN_82557](../realhw/TASK_LAN_82557.md)・[TASK_PCM_CS4231](TASK_PCM_CS4231.md)
+> 後続: [TASK_LAN_82557](../realhw/TASK_LAN_82557.md)・[pcm_cs4231 の設計書](../../design/drivers/sound/cs4231/pcm_cs4231.md)
 
 > 状態: **受入完了・実機確認待ち (2026-09-23)** — NP21/W 受入、Codex 実装レビュー Approve、v2.1 に同梱。実機は W0 と W4 が合格 (W4: `timetest` TIME PASS・`clamped 0 of 10000`、archive の HANDOVER_2026-09-22 §次の実機の回)。残: W7 (キャッシュ整合、実機)。(2026-09-29 の棚卸しで更新)
 >
@@ -34,7 +34,7 @@ BIOS ワークを読んで保存 (R3)、DMA プールは **SHM ではなく SQLi
 `0000:0501h` bit7 = 0)** では 100Hz を頼んでも **tick = 8.125ms (123Hz)** になっており、`tick_count` を使う待ち・番犬・
 校正すべてが 23% 速い。
 
-- **`sysclk_detect()` (新設、`kernel/time/sysclk.c`)**: `paging_init()` より**前** (PG=0、物理番地がそのまま見える) に
+- **`sysclk_detect()` (新設、`platform/pc98/sysclk.c`)**: `paging_init()` より**前** (PG=0、物理番地がそのまま見える) に
   `kernel.c` から 1 回だけ呼び、`0000:0501h` bit7 を読んで `g_sysclk_hz` (1996800 / 2457600) と `g_sysclk_8mhz` に保存する。
   以後は**保存値だけを読む**。既存の `serial_detect_clock()` は CR3 が master と一致しないと何もしない (PG=0 では
   CR3 が未設定なので現状は**検出をスキップして既定値のまま**) — これを保存値の参照に置き換え、CR3 検査を消す。
@@ -294,7 +294,7 @@ int  dma_above_1mb_state(void);   /* DMA_A20_VERIFIED / DMA_A20_UNREADABLE / DMA
   CUS = Idle かつ RUS = Idle を読む。これが証拠。reset 後も Idle にならなければもう 1 回 reset、それでも駄目なら
   **隔離** (下記)。開始命令を出す前 (probe の (5) まで) は DMA は起きていないので証拠は要らない。PCM は
   `dma_chan_mask(ch)` + CS4231 の再生許可ビットを落とした後の**装置側**の確認 (remaining の一致は証拠にしない)。
-- 用途と大きさ: 82557 の CB (数 KB) + RFD 8 本 × 1.5KB ≒ 16KB、PCM リング 16KB (ステージング16KBはKHEAP、[PCM §2-1](TASK_PCM_CS4231.md#2-1-カーネル-driverssoundcs4231pcm_cs4231c--pcm_cs4231_mathc-純粋部))、余裕32KB。
+- 用途と大きさ: 82557 の CB (数 KB) + RFD 8 本 × 1.5KB ≒ 16KB、PCM リング 16KB (ステージング16KBはKHEAP、[pcm_cs4231 の設計書](../../design/drivers/sound/cs4231/pcm_cs4231.md#データの形と不変条件))、余裕32KB。
   FDC の 1KB は**静的配列のまま** (起動最初期に要る)。
 - 純粋関数: 最初適合 + 整列 + 64KB 跨ぎの判定、span の登録 / 解放 / 不正解放をホスト試験に。
 
@@ -358,7 +358,7 @@ int pci_bind_all(const struct pci_driver *const *table, int n);   /* 1 件ずつ
   `[quarantined noisy irq N masked]` / `[... unmaskable]` を出す。W1/W3 に「線の保持でエッジが来ない」「共有者が
   HANDLED」の両反例を足す。
 - Command の更新は**下位 16 ビットだけ**書く (`pci_cfg_write16` を足す。上位の Status は W1C)。
-- 表は静的 (`init/kernel.c`、最初は 82557 の 1 行)。`pci_bind_all` は **pgalloc と DMA プールの初期化の後**。
+- 表は静的 (`platform/pc98/kernel.c`、最初は 82557 の 1 行)。`pci_bind_all` は **pgalloc と DMA プールの初期化の後**。
   §3 の動的読み込みが来たら `size` で版を確かめる。
 
 - **実装・受入**: ホスト合格 (`tools/tests/pci_bind_tdd.md`)。診断取得口も実装済み。
@@ -397,7 +397,7 @@ int pci_bind_all(const struct pci_driver *const *table, int n);   /* 1 件ずつ
   `pci_bind_info`) は、書く前に `ring3_user_range_writable(ptr, len)` (新設、`exec/exec.c`) を通し、通らなければ
   `ring3_fault_kill()`**。**現行の検査手順 (T2)**: `ring3_user_ranges_writable_always` が
   `caller_access_get_user` で caller の PD を取得し、2本とも `check_caller_write_range` で検査する
-  (`exec/exec.c:846-857`)。master CR3 への往復は旧実装の背景であり、現行の必須手順ではない。
+  (`exec/exec.c`)。master CR3 への往復は旧実装の背景であり、現行の必須手順ではない。
   2本の検査が通ってから書き、検査と書込みの間に GUI ポンプ・yield・park を挟まない。
   検査は KAPI wrapper に置く (カーネル内部からの時計呼び出しはローカル変数を渡すので USER を要求しない)。
   検査順: NULL・帯境界跨ぎ・交差の負返却 → 全出力の writable 検査 → 書き込み。
@@ -433,13 +433,13 @@ int pci_bind_all(const struct pci_driver *const *table, int n);   /* 1 件ずつ
 ### 1-6. 実装の注意 (往復 5・6・12 の非 blocker、実装レビュー往復 1)
 
 - **ISR 文脈の登録・解除は全 IRQ の共通深さで拒否する**。固定 IRQ・tick を含む `IRQ_ENTER/LEAVE` が
-  `kctx_irq_depth` を更新し (`arch/x86/kernel/isr_stub.asm:61-66`)、`irq_register` / `irq_unregister` が判定へ渡す
-  (`kernel/irq/irq.c:55,81`)。
+  `kctx_irq_depth` を更新し (`arch/x86/kernel/isr_stub.asm`)、`irq_register` / `irq_unregister` が判定へ渡す
+  (`kernel/irq/irq.c` の `irq_register()`)。
 - W4 の「1000 回の所要時間」は平均であって IF=0 の最長時間ではない (IF=1 の区間と割り込みを含み、KAPI の CR3 往復も測って
   いない)。最長 IF=0 (`irq_off_max_us`) とハンドラの 1ms 超診断は未実装 (別に起こす)。
 
 - **出力保護**: 現行は §1-5 の caller PD 検査を使う。USER と WM/TRUSTED の識別は
-  `ring3_guard_active` に従い、現在の CR3 だけで代用しない (`exec/exec.c:842-857`)。
+  `ring3_guard_active` に従い、現在の CR3 だけで代用しない (`exec/exec.c`)。
   PDE/PTE の実効書込み権限を検査し、2本目の拒否でも1本目を書かない。
   受入では非恒等写像の物理側への反映・拒否時の全出力不変・復帰後 CR3 一致を確認する。
   V86 中のホスト側時計と DOS 独自 `INT 80h` は区別する (後者の ABI は対象外)。
@@ -528,5 +528,5 @@ int pci_bind_all(const struct pci_driver *const *table, int n);   /* 1 件ずつ
 
 ## 6. この票の外で見つけた不整合
 
-- `tools/memmap_audit_live.py:25` は GUI 基点を `MEM_SHM_BASE + 0x30000` で決め打ちしている。正典 (`MEM_SHM_GUI_OFFSET`
+- `tools/memmap_audit_live.py` は GUI 基点を `MEM_SHM_BASE + 0x30000` で決め打ちしている。正典 (`MEM_SHM_GUI_OFFSET`
   = 0x28000) とずれている (2026-09-17 の末尾相対化の取り残し)。別の小票で直す。

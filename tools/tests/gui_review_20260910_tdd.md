@@ -12,7 +12,7 @@
 
 **到達可能性の確認** (ソース):
 
-- `userland/gshell/src/input.rs:489-493` — `rdown_edge` / `rup_edge` で
+- `userland/gshell/src/input.rs` — `rdown_edge` / `rup_edge` で
   `forward_button(st, mx, my, MOUSE_BTN_RIGHT, ..)` を呼ぶ。
 - `input.rs:752` `forward_button` → `ring::ev_button(down, .., button, ..)` が
   `GuiEvtButton.button` に 1/2 を載せる (契約 D4)。プロデューサはここ 1 箇所だけ。
@@ -68,7 +68,7 @@ GREEN: `SUMMARY PASS` (12 項目)。
 - Enter #2: `fep::feed` は `Fed::Pass` (変換中でない) → `modal::on_key` が
   RETURN を受けて `finish` → ダイアログが閉じる。field は空のまま。
 - そのあと `flush_text` が走るが `modal::is_open()` は既に false なので、
-  `fep.rs:461` の分岐でアプリ配送側へ落ち、確定文字が背後のアプリへ `Text`
+  `fep.rs` の分岐でアプリ配送側へ落ち、確定文字が背後のアプリへ `Text`
   として流れる (宛先が無ければ捨てられる)。
 
 → **指摘は正しい**。結果が空になり、確定文字はアプリへ漏れる。

@@ -72,7 +72,7 @@ static void *kmemcpy(void *d, const void *s, u32 n) { return memcpy(d, s, n); }
 static void *kmemset(void *d, int v, u32 n) { return memset(d, v, n); }
 static int kprintf_quiet = 1;
 static u8 kprintf_last_color;
-static void kprintf(u8 color, const char *fmt, ...)
+static void console_printf(u8 color, const char *fmt, ...)
 {
     kprintf_last_color = color;
     (void)fmt;

@@ -208,13 +208,13 @@
     },
     {
       "symbol": "lan_module_session_acquire",
-      "source": "drivers/net/e82557/lan_module.h",
+      "source": "include/lan_contract.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "lan_module_session_release",
-      "source": "drivers/net/e82557/lan_module.h",
+      "source": "include/lan_contract.h",
       "context": "normal",
       "irq": false
     },
@@ -274,13 +274,13 @@
     },
     {
       "symbol": "dev_find",
-      "source": "drivers/base/dev.h",
+      "source": "kernel/dev/dev.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "dev_register",
-      "source": "drivers/base/dev.h",
+      "source": "kernel/dev/dev.h",
       "context": "normal",
       "irq": false
     }

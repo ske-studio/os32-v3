@@ -3,7 +3,7 @@
 CHECK = dict(name='ppc-rh-observe-host', tier=2, budget=30, needs=[], covers=[
     'platform/powermac/rh_observe.[ch]', 'platform/powermac/ofw.[ch]',
     'tools/ppc/rh_observe_host.c', 'tools/tests/test_ppc_rh_observe.py',
-    'arch/ppc/ppc_boot.h', 'platform/powermac/ppc_layout.h',
+    'arch/ppc/ppc_boot.h', 'platform/powermac/platform_of_layout.h',
     'lib/kstring_c.c', 'lib/kstring.h', 'include/types.h', 'tools/tests/host32.py'],
     basis=['PPC_REALHW_G4_DESIGN §3', 'PPC_REALHW_G4_DESIGN §6'],
 )

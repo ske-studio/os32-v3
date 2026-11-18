@@ -37,7 +37,7 @@ slot は 0 始まり、追加は末尾だけ。この表を `tools/hwdev_audit.p
 
 核の型付き表では core 関数だけを表の順に並べる (最後のポインタは 26 番目)。
 
-- **G2**: `recover_hal_wait_frame` (recover.h:373・recover_profile.c:119) は gfinit.c:80 の static const 初期化子で関数ポインタとして使う。アドレスは stub のアドレスで、R_386_32 再配置を受ける。
+- **G2**: `recover_hal_wait_frame` (recover.h・recover_profile.c) は gfinit.c の static const 初期化子で関数ポインタとして使う。アドレスは stub のアドレスで、R_386_32 再配置を受ける。
 
 ## 3. HWDEV の import の生成 (G3)
 
@@ -73,4 +73,4 @@ M5 の末尾 3 slot は GeForce production adapter 用に保持する共有宣�
 
 `boot_image_info`・`pci_cfg_write32/16` も要る。`kmemcpy` は現行 GF の未解決参照に無いので入れない。`__os32_abi_1_mem_4_fmt_4` は既存 linker の世代契約で、import slot にしない。
 
-- GF ソースは変更せず、既存関数名の生成 stub が HWDEV imports の slot 経由で核を呼ぶ。装置境界は recover.h:200–219 の recover_ops/opaque を再利用し、local_cleanup/screen_safe/raw_config/read/write を重複定義しない。wrapper が既存 gfinit_call と gfinit_recover_end を call/release_work へ接続する。
+- GF ソースは変更せず、既存関数名の生成 stub が HWDEV imports の slot 経由で核を呼ぶ。装置境界は recover.h の recover_ops/opaque を再利用し、local_cleanup/screen_safe/raw_config/read/write を重複定義しない。wrapper が既存 gfinit_call と gfinit_recover_end を call/release_work へ接続する。
