@@ -2,6 +2,8 @@
 #include "drivers/net/gem/gem.h"
 #include "arch/ppc/kernel_boot.h"
 #include "kboot_info.h"
+#include "kboot_log.h"
+#include "kprintf.h"
 
 #define PCI_COMMAND 4u
 #define PCI_MASTER 4u
@@ -49,6 +51,26 @@ static int master(void *ctx)
     return (command & PCI_MASTER) ? GEM_OK : GEM_EIO;
 }
 
+static void rx_bad_length(u32 count, unsigned long long flags,
+                          unsigned long long addr, u32 length,
+                          const u8 *data, u32 captured)
+{
+    static const char hex[] = "0123456789abcdef";
+    char prefix[2 * GEM_RX_DIAG_BYTES + 1];
+    for (u32 i = 0; i < captured; i++) {
+        prefix[2 * i] = hex[data[i] >> 4];
+        prefix[2 * i + 1] = hex[data[i] & 15];
+    }
+    prefix[2 * captured] = '\0';
+
+    int saved = pm_log_stream_only;
+    pm_log_stream_only = 1;
+    kprintf(7, "G4 H n=%u flags=%08x%08x addr=%08x%08x len=%u captured=%u data=%s\r\n",
+            count, (u32)(flags >> 32), (u32)flags, (u32)(addr >> 32), (u32)addr,
+            length, captured, prefix);
+    pm_log_stream_only = saved;
+}
+
 int pm_lan_gem_io(const struct pm_gmac_boot *b, struct gem_io *out)
 {
     const struct ppc_boot_devices *dev = ppc_boot_devices();
@@ -57,6 +79,7 @@ int pm_lan_gem_io(const struct pm_gmac_boot *b, struct gem_io *out)
                              b->bus_first, b->bus_last, b->bdf};
     *out = (struct gem_io){ .ctx = &hw, .read32 = rd, .write32 = wr,
         .tb = tb64, .tb_hz = ppc_boot_info()->tb_hz,
-        .sync = pm_gmac_dma_sync, .master_enable = master };
+        .sync = pm_gmac_dma_sync, .master_enable = master,
+        .rx_bad_length = rx_bad_length };
     return GEM_OK;
 }

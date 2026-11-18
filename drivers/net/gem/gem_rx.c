@@ -12,6 +12,10 @@ static void put64(u8 *p, unsigned long long v)
     for (u32 i = 0; i < 8; i++) p[i] = (u8)(v >> (i * 8));
 }
 
+#define GEM_RX_FRAME_OFFSET 2u
+_Static_assert(GEM_RX_FRAME_OFFSET + GEM_RX_DIAG_BYTES <= GEM_BUF_SIZE,
+               "RX diagnostic prefix fits in the DMA buffer");
+
 int gem_rx_some(struct gem *g, void *frame, u32 cap, u32 *bytes, u32 *budget)
 {
     u8 *base, *desc, *buf, *target;
@@ -46,7 +50,14 @@ int gem_rx_some(struct gem *g, void *frame, u32 cap, u32 *bytes, u32 *budget)
         result = GEM_AGAIN;
         if ((flags & GEM_RD_BAD_CRC) || length < 14 || length > 1514) {
             if (flags & GEM_RD_BAD_CRC) g->rx_counts.bad_crc++;
-            if (length < 14 || length > 1514) g->rx_counts.bad_length++;
+            if (length < 14 || length > 1514) {
+                u32 count = ++g->rx_counts.bad_length;
+                if (g->io.rx_bad_length && (count <= 16 || count % 64 == 16)) {
+                    u32 captured = length < GEM_RX_DIAG_BYTES ? length : GEM_RX_DIAG_BYTES;
+                    g->io.rx_bad_length(count, flags, get64(desc + GEM_DESC_ADDR_OFFSET),
+                                        length, buf + GEM_RX_FRAME_OFFSET, captured);
+                }
+            }
             g->rx_drops++;
         } else if (cap < length) {
             g->rx_counts.cap++;

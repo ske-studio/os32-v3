@@ -173,6 +173,7 @@
 #define GEM_POOL_TX_BUF 0x10000u
 #define GEM_POOL_RX_BUF 0x20000u
 #define GEM_BUF_SIZE 2048u
+#define GEM_RX_DIAG_BYTES 32u
 #define GEM_POOL_SIZE 0x30000u
 #define GEM_RING_COUNT 32
 #define GEM_RX_PUBLISHED 28
@@ -198,6 +199,10 @@ struct gem_io {
     u32 tb_hz;
     int (*sync)(void *, u32, enum dma_sync);
     int (*master_enable)(void *); /* PCI master set and readback, before DMA enable. */
+    /* Optional synchronous diagnostic, before the RX buffer is recycled. */
+    void (*rx_bad_length)(u32 count, unsigned long long flags,
+                          unsigned long long addr, u32 length,
+                          const u8 *data, u32 captured);
 };
 struct gem_phy_sample {
     u32 port, addr, id1, id2, bmcr, bmsr, anar, anlpar, gtcr, gtsr;
