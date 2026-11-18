@@ -6,7 +6,7 @@
 
 - スプリアス処理は現行 `irq_eoi_plan` のまま。IRQ7/15 の新たな判定、EOI 統合、I/O wait の追加はしない。
 
-容量は選択先 `platform_irq_limits.h`、PC98 は16線/動的9線。controller 契約は [PPC_SEP2_DESIGN §2](../../../decisions/ppc/PPC_SEP2_DESIGN.md#irqc段)。
+容量は選択先 `platform_irq_limits.h`、PC98 は16線/動的9線。controller 契約は PPC_SEP2_DESIGN §2 (アーカイブ: `docs/archive/decisions/PPC_SEP2_DESIGN.md`)。
 
 ## 索引
 

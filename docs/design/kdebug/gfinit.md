@@ -2,7 +2,7 @@
 > 状態: **現行 (2026-10-30)** — 出所: GF_DRIVER_DESIGN (2026-10-29 確定、D0 で移した)
 ソース: `kdebug/gfinit.c`
 
-**診断 owner/lease は `kdebug/gfinit.c:70–74` のまま**（F7）。核から `int gf_production_selected(void)` 一つを export し、GFX=geforce の起動では gfinit の入口で拒否する。本番の成否や GUI 終了後にも拒否を保ち、診断と本番は設定変更＋再起動で入れ替える。S0/緊急復帰入口は止めない。
+**診断 owner/lease は `kdebug/gfinit.c` のまま**（F7）。核から `int gf_production_selected(void)` 一つを export し、GFX=geforce の起動では gfinit の入口で拒否する。本番の成否や GUI 終了後にも拒否を保ち、診断と本番は設定変更＋再起動で入れ替える。S0/緊急復帰入口は止めない。
 共有 parser は一つ。診断用出力/接続・lifetime/stages・owner/lease は元の場所に残す。
 KDEBUG=0 fake 起動、初回 Command 書込みは 1 回・BAR 書込みは 0、0x0106→0x0102 の 16bit 確認と不一致時の停止、A2/main順・期限・各失敗出口、選択中 gfinit 拒否、再 devinit 無し
 
@@ -22,11 +22,11 @@ KDEBUG=0 fake 起動、初回 Command 書込みは 1 回・BAR 書込みは 0、
 
 ## GF6200_4C_DESIGN
 
-4a 合格を前提に、新しい同一試行の A2→main 0〜4→C を行う。旧 A4 は終端するので間に挟まない（`kdebug/gfinit.c:388–390`）。今回の VRAM 試験範囲は表示領域だけで、4a の容量試験を再実施したとはしない。
+4a 合格を前提に、新しい同一試行の A2→main 0〜4→C を行う。旧 A4 は終端するので間に挟まない（`kdebug/gfinit.c` の `gf_c_only()`）。今回の VRAM 試験範囲は表示領域だけで、4a の容量試験を再実施したとはしない。
 
-新opは**13の `gfinit modeset <sid> --allow-write` 1つ**。終了は既存abort。40B/version1・op5〜12・KAPI slotは維持（`kdebug/gfinit_wire.h:4–17`, `kdebug/kdebug_main.c:115–123`）。
+新opは**13の `gfinit modeset <sid> --allow-write` 1つ**。終了は既存abort。40B/version1・op5〜12・KAPI slotは維持（`kdebug/gfinit_wire.h` の `GF_INIT_MAINS`, `kdebug/kdebug_main.c`）。
 
-flagsはprepare時にownerへ保存しplan/hash/profile_crcへ反映。再送cacheはprepareのflagsも比較する（現状はop/mainのみ、`kdebug/gfinit.c:365–375`）。途中のflag変更や旧prepareからmodesetを受け付けない。
+flagsはprepare時にownerへ保存しplan/hash/profile_crcへ反映。再送cacheはprepareのflagsも比較する（現状はop/mainのみ、`kdebug/gfinit.c`）。途中のflag変更や旧prepareからmodesetを受け付けない。
 
 C実施時は同sid/next_main=5/PAUSEDを確認；旧verifyはMODE_Cでは使わず、通常prepareのA4は従来どおり。
 
@@ -38,7 +38,7 @@ C実施時は同sid/next_main=5/PAUSEDを確認；旧verifyはMODE_Cでは使わ
 
 ## GF6200_S7_SHELL
 
-- `kdebug/gfinit.h:5-17` は既存op5〜10と40B要求。`kdebug/gfinit.c:297-307` は版・内外size・旗・4096 steps・出力欄ゼロを検査する（r1確認時の行番号）。
+- `kdebug/gfinit.h` は既存op5〜10と40B要求。`kdebug/gfinit.c` は版・内外size・旗・4096 steps・出力欄ゼロを検査する（r1確認時の行番号）。
 
 - gfinit.hはwireをincludeし40B assertと関数宣言を保持。
 
@@ -46,15 +46,15 @@ C実施時は同sid/next_main=5/PAUSEDを確認；旧verifyはMODE_Cでは使わ
 
 ## GF_STAGES_DESIGN
 
-局所index/lock/窓の保存値はCの各回で採り、初期化基準値と混ぜない。**init完了時は `gfinit_call` 末尾（`gfinit.c:463–467`）の `gf_release_rom` を飛ばす**。
+局所index/lock/窓の保存値はCの各回で採り、初期化基準値と混ぜない。**init完了時は `gfinit_call` 末尾（`gfinit.c`）の `gf_release_rom` を飛ばす**。
 
-同じ条件を `gfinit_recover_end`（`gfinit.c:235`）にも適用し、既存ownerのcompiled・profile・bus・leaseとその参照先ROM/decoded/flowを常駐で保持する。値領域へpointerを複製しない。
+同じ条件を `gfinit_recover_end`（`gfinit.c`）にも適用し、既存ownerのcompiled・profile・bus・leaseとその参照先ROM/decoded/flowを常駐で保持する。値領域へpointerを複製しない。
 
 init完了の無効化時は再Cを拒否し、S0が参照するprofile/callbackを使い終えてから既存の解放手順へ戻す。再起動で全常駐値は消える。cold latchによる新initの拒否は緩めない。
 
 入口案は `gfinit c-only --allow-write --verify record|required [--no-verify-file PATH]`。ゲストが新しい実行番号を採番し、毎回Qから実行する。途中nodeの再開ではない。
 
-C-onlyはcold latchで拒否する `gf_inspect/gf_begin`（`gfinit.c:242,361`）を呼ばず、同じownerの専用入口から新sidを得る。初期化の入口は変更しない。
+C-onlyはcold latchで拒否する `gf_inspect/gf_begin`（`gfinit.c`）を呼ばず、同じownerの専用入口から新sidを得る。初期化の入口は変更しない。
 
 例外条件Eは「init完了・基準値valid・C-only・再C許可・直前S0成功・ID/BAR等の入口検査成功」がすべて成立した場合だけ。3か所とも同じEを使い、failedを先に消して通さない。
 
@@ -82,7 +82,7 @@ timeout・送信失敗からの自動再Cは初版では行わず、既存のS0�
 
 | 実物・根拠 (file:line) | 確認したこと |
 | --- | --- |
-| `kdebug/gfinit.c:25`、`:46`、`:213` | GF owner、ページ確保、開始と bind。ROM/decode/plan/flow は試行寿命、A1 成功時だけ次の準備まで一部保持 |
+| `kdebug/gfinit.c`、`gfinit_owner()` | GF owner、ページ確保、開始と bind。ROM/decode/plan/flow は試行寿命、A1 成功時だけ次の準備まで一部保持 |
 
 - PAUSED も lease と部品参照を保持。解放は局所 cleanup → 共通終端 → 結果保持 → plan/profile 参照解除 → 作業領域 free → lease 解放。A1 成功の ROM/decode 保持は既存例外として参照を残す。
 
@@ -115,17 +115,17 @@ timeout・送信失敗からの自動再Cは初版では行わず、既存のS0�
 
 ## SLIM_HWDEV_DESIGN
 
-- gfinit.c:228：inspectでclaim後にg->compiledをgf_alloc(sizeof(*g->compiled))、展開後にidentity設定・bus_init・probe・ROM/decodeへ進む。
+- gfinit.c：inspectでclaim後にg->compiledをgf_alloc(sizeof(*g->compiled))、展開後にidentity設定・bus_init・probe・ROM/decodeへ進む。
 
 - 確保後のprobe/ROM/decode/展開の失敗は全てgf_release_romへ集約し、追加した160 KiBとleaseを残さない。inspect済み表示は成功時だけ。
 
-- gfinit.c:308：gf_beginではcompiled存在を確認して再展開し、identityを再設定。SIZE_BARSにも必ず展開済みprofileを渡す。
+- gfinit.c：gf_beginではcompiled存在を確認して再展開し、identityを再設定。SIZE_BARSにも必ず展開済みprofileを渡す。
 
 - RUNのgfinit.c:317の遅延確保は削除。
 
-- gf_read（gfinit.c:94）はcompiledの存在だけで通知せず、`r->plan == &g->compiled->plan`も条件にする。先行確保しただけのSIZE_BARSではplan_readを呼ばない。
+- gf_read（gfinit.c）はcompiledの存在だけで通知せず、`r->plan == &g->compiled->plan`も条件にする。先行確保しただけのSIZE_BARSではplan_readを呼ばない。
 
-- gf_release_rom（gfinit.c:194–209）は既存のdetach成功を確認→全backing解放→compiled=NULL→expand(&g->profile,NULL)の順。失敗したdetachを飛ばして解放しない。
+- gf_release_rom（gfinit.c）は既存のdetach成功を確認→全backing解放→compiled=NULL→expand(&g->profile,NULL)の順。失敗したdetachを飛ばして解放しない。
 
 - 再展開はinspectまたは既存gf_beginのIDLE/VERIFIED門内だけ。bind後からcleanup完了まで配列の番地・内容・参照先の寿命を保つ。
 

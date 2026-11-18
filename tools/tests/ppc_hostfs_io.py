@@ -14,7 +14,7 @@ CHECK = dict(name='ppc-hostfs-io', tier=1, budget=30, covers=COVERS,
              inputs=['platform/powermac/lan_boot.h', 'fs/serialfs/sfs_client.c',
                      'fs/serialfs/sfs_proto.c', 'fs/serialfs/*.h', 'fs/vfs*',
                      'fs/serialfs/serialfs.c', 'fs/serialfs/serialfs_persistent.c', 'include/boot_token.h',
-                     'kernel/console/*.h', 'drivers/base/dev.h', 'net/host_mailbox.h',
+                     'kernel/console/*.h', 'kernel/dev/dev.h', 'net/host_mailbox.h',
                      'lib/kstring_c.c',
                      'arch/ppc/pd_walk.c', 'arch/ppc/*.h',
                      'kernel/irq/irq.h', 'kernel/irq/irq_math.h',
@@ -37,7 +37,7 @@ def exercise(source, directory, expected=0, marker=None, peer=None):
     includes = [ROOT, ROOT / 'include', ROOT / 'platform/powermac',
                 ROOT / 'arch/ppc', ROOT / 'fs/serialfs', ROOT / 'lib',
                 ROOT / 'sdk/include/os32', ROOT / 'fs', ROOT / 'kernel/console',
-                ROOT / 'drivers/base']
+                ROOT / 'kernel/dev']
     sources = [path / 'io.c', ROOT / 'tools/tests/ppc_hostfs_io.c',
                ROOT / 'fs/serialfs/sfs_client.c', ROOT / 'fs/serialfs/sfs_proto.c',
                ROOT / 'arch/ppc/kernel_trap.c', ROOT / 'arch/ppc/pd_walk.c',

@@ -25,7 +25,7 @@ CHECK = dict(name='ppc-fp', env=['ppc-cross'], tier=2, budget=60, needs=[],
             'arch/ppc/ppc_*.h', 'arch/ppc/pd_walk.c', 'include/**', 'mm/pgalloc.h',
             'kernel/irq/irq.h', 'kernel/irq/irq_math.h',
             'platform/powermac/platform_irq_limits.h', 'build/arch/ppc.mk',
-            'build/ppc-kboot.mk', 'tools/ppc/kboot_audit.py',
+            'build/targets/ppc-powermac.mk', 'tools/ppc/kboot_audit.py',
             'tools/ppc/test_user_trap*', 'tools/ppc/test_exec_enter.py',
             'tools/accept/ppc_fp.py'],
     basis=['PPC_FP_NEWLIB_DESIGN §8 F1〜F5・B1'])

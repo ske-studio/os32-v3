@@ -211,7 +211,7 @@ SURVIVED でなければ試験が不安定。変異の一覧と結果は `test_c
   `ATAPI_READY_RETRIES` を 20 にして**待ちの合計は最大 20 × 250ms = 5.0 秒**。
   **tick_count で待たない理由**: tick は PIT の割り込み (IF=1) が前提で、呼ばれる文脈 (起動時の `atapi_init`、
   KAPI 経由の読み) で割り込みが開いていると決められない。`cpu_delay_us` は割り込み禁止でも待て、`atapi_init` は
-  `cpu_calibrate` の後 (`init/kernel.c`)
+  `cpu_calibrate` の後 (`platform/pc98/kernel.c`)
 - ホスト試験の贋物 `cpu_delay_us` を実物どおり `CPU_DELAY_US_MAX` で丸める形にした (以前は `g_delay_us += us`
   で丸めず、1 回 250ms の呼び方を見抜けなかった)
 - **P3** SRST を解いた直後、BSY の解除を待たずに DRV_HEAD を書いていた。→ `atapi_srst`: 解いて 2ms
@@ -224,7 +224,11 @@ SURVIVED でなければ試験が不安定。変異の一覧と結果は `test_c
   UA を 1 回しか出し直さない) は全部 RED。全 61 本 RED / 0 SURVIVED (対照は SURVIVED)
 - ATAPI の待ち上限 (ループ回数) を tick の秒単位にする件は別票
 
-## 3-6. 待ちの上限を秒で (2026-09-26、TASK_ATAPI_TIMEOUT (アーカイブ: `docs/archive/realhw_v21/TASK_ATAPI_TIMEOUT.md`))
+## 3-6. 待ちの上限を秒で (2026-09-26、TASK_ATAPI_TIMEOUT)
+
+契約: `docs/05_drivers.md` §5-6 の「待ちの上限 (秒)」(上限の表・遅いだけと固まったの境目・バスが死んだ印・起動の最悪時間) と
+`atapi_read_capacity` の行 (04h/02h の START STOP UNIT)。
+
 
 - BSY / DRQ の待ちを `IDE_TIMEOUT_LOOP` (100 万回の inp) から**時間**へ: `atapi_wait_clear` が読み 1 回ごとに
   `cpu_delay_us` を最初の 20 回は 10µs、それ以後は `ATAPI_POLL_US` (100µs) 挟んで合計を数える。上限は `ATAPI_CMD_TIMEOUT_US` 10 秒 (init の間は

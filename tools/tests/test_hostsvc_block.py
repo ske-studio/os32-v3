@@ -11,7 +11,7 @@ CHECK = dict(name='hostsvc-block', tier=1, needs=[], budget=4.1, covers=[
     'tools/tests/hostsvc_block_host.c', 'tools/tests/hostsvc_fixture.h',
     'tools/tests/hostsvc_fixture.c', 'tools/tests/host32.py',
     'tools/tests/kernel_includes.py', 'build/config.mk'],
-    basis=['NET_HOSTSVC_DESIGN §4'],
+    basis=['docs/design/fs/serialfs/sfs_block.md 不変条件'],
 )
 
 import argparse

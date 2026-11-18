@@ -12,7 +12,7 @@ CHECK = dict(name='fep-meta', tier=1, needs=[], budget=25.4, covers=['tools/test
     'lib/sqlite3/**', 'lib/kstring*', 'lib/kmath.c', 'lib/divdi3.c',
     'fs/vfs_fd.c', 'fs/vfs.h', 'include/**',
     'sdk/include/os32/os32_kapi_shared.h', 'build/config.mk'],
-    basis=['DICT_META_DESIGN §2', 'DICT_META_DESIGN §9'],
+    basis=['docs/design/tools/fep_to_sqlite.md 形式 1', 'docs/design/tools/fep_to_sqlite.md 旧形式', 'docs/design/kernel/sqlite_engine.md fep_meta_probe の契約', 'docs/design/kernel/ime/ime_dict.md 切替'],
 )
 
 import argparse

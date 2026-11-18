@@ -1,6 +1,6 @@
 CHECK = dict(name='nofpu-host', tier=1, budget=12,
     covers=['tools/tests/test_nofpu.py', 'tools/tests/test_packages.py',
-            'assets/filetypes', 'drivers/block/pc98pt.c', 'fs/ext2/ext2_layout.c',
+            'assets/filetypes', 'fs/pc98pt.c', 'fs/ext2/ext2_layout.c',
             'tools/check_artifacts.py', 'tools/tests/install_fresh_host.c',
             'userland/shell/hdprep_plan.c', 'userland/system/cdinst.c',
             'userland/system/inst_disk.c', 'userland/system/inst_hdd.c',

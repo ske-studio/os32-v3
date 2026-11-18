@@ -31,7 +31,7 @@
 /* FreeBSD trap_subr32.S:93-241,346-378; single supervisor save, no FP/VMX. */
 #include "ppc_frame.h"
 #include "ppc_oea.h"
-#include "ppc_layout.h"
+#include "platform_of_layout.h"
 .section .rodata.vectors,"a"
 .balign PPC_CACHE_LINE
 ppc_vector_source:

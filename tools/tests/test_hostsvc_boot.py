@@ -2,10 +2,10 @@
 """Production boot assembly starts exactly one shared NIC (ILP32/qemu)."""
 CHECK = dict(name='hostsvc-boot', tier=1, needs=['make:all'], budget=5.2, covers=['tools/tests/rx_io_clock.h', 'tools/tests/idle_io_sources.py',
     'kernel/io_work.[ch]', 'kernel/io_clock.h', 'kernel/io_policy.[ch]', 'kernel/idle_work.h', 'exec/appslot.h',
-    'net/rx_work.[ch]', 'kernel/time/tick_clock.h', 'tools/tests/link_platform_fake/link_platform_inline.h', 'kernel/idle_work.h', 'platform/pc98/boot_capture.c', 'platform/pc98/bootinfo_wire.h', 'platform/pc98/bootinfo_native.h',
+    'net/rx_work.[ch]', 'kernel/time/tick_clock.h', 'tools/tests/link_platform_fake/platform_link_inline.h', 'kernel/idle_work.h', 'platform/pc98/boot_capture.c', 'platform/pc98/bootinfo_wire.h', 'platform/pc98/bootinfo_native.h',
     'drivers/net/e82557/lan_body.c',
     'drivers/block/netcd.h',
-    'drivers/base/dev.h',
+    'kernel/dev/dev.h',
     'fs/serialfs/sfs_block.h',
     'drivers/net/e82557/lan_module.c',
     'drivers/net/e82557/lan_module.h',
@@ -20,9 +20,9 @@ CHECK = dict(name='hostsvc-boot', tier=1, needs=['make:all'], budget=5.2, covers
     'net/nic.h',
     'net/nic_rx.h',
     'net/rx_work.h',
-    'net/nic_e82557.c',
-    'net/nic_lgy98.c',
-    'net/link.h', 'net/link_platform.h', 'platform/pc98/link_platform_inline.h', 'platform/pc98/link_platform.c', 'net/link.c', 'net/link_notify.h', 'net/link_host_api.inc',
+    'drivers/net/e82557/nic_e82557.c',
+    'drivers/net/ne2000/nic_lgy98.c',
+    'net/link.h', 'net/link_platform.h', 'platform/pc98/platform_link_inline.h', 'platform/pc98/link_platform.c', 'net/link.c', 'net/link_notify.h', 'net/link_host_api.inc',
     'net/link_rx.inc', 'net/link_selftest.inc', 'lib/le_internal.h',
     'kernel/irq/tick.h',
     'kernel/irq/irq.h',
@@ -53,8 +53,8 @@ CHECK = dict(name='hostsvc-boot', tier=1, needs=['make:all'], budget=5.2, covers
     'tools/prototypes/lan_imports.def',
     'build/out/lan/lan_imports.h',
     'build/config.mk',
-    'init/kernel.c',
-    'init/kernel_boot_memory.inc',
+    'platform/pc98/kernel.c',
+    'platform/pc98/kernel_boot_memory.inc',
     'platform/pc98/boot.c',
     'tools/tests/hostsvc_boot_host.c',
     'tools/tests/hostsvc_lgy98_attach_host.c',
@@ -64,7 +64,7 @@ CHECK = dict(name='hostsvc-boot', tier=1, needs=['make:all'], budget=5.2, covers
     'tools/tests/kernel_includes.py',
     'tools/tests/kernel_boot_source.py',
 ],
-    basis=['NET_HOSTSVC_DESIGN §2'],
+    basis=['docs/design/drivers/block/netcd.md 起動の手順と設定'],
     pins=['LAN_BULK_DESIGN'],
 )
 import argparse
@@ -106,8 +106,8 @@ def build_run(work, sources):
                     '-DLAN_RESIDENT_SOURCE="' + str(paths[1]) + '"',
                     '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
                     str(ROOT / 'tools/tests/hostsvc_boot_host.c'), str(paths[2]),
-                    str(paths[3]), str(ROOT / 'net/nic_e82557.c'),
-                    str(ROOT / 'net/nic_lgy98.c'), str(ROOT / 'tools/tests/hostsvc_fixture.c'),
+                    str(paths[3]), str(ROOT / 'drivers/net/e82557/nic_e82557.c'),
+                    str(ROOT / 'drivers/net/ne2000/nic_lgy98.c'), str(ROOT / 'tools/tests/hostsvc_fixture.c'),
                     str(ROOT / 'net/rx_work.c'), *idle_io_sources(ROOT, work, compat=False), '-o', str(exe)], check=True)
     return [host32.run([str(exe)], input=bytes([mode]), capture_output=True).returncode
             for mode in (1, 2, 3, 4, 5, 6, 7)]

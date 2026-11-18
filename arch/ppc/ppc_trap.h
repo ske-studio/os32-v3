@@ -15,6 +15,7 @@ enum ppc_trap_reason {
     PPC_TRAP_UNSUPPORTED = 0x100
 };
 void ppc_trap_set_handler(u32 vector, void (*handler)(struct ppc_frame *));
+#define PM_DEC_HZ 1000u   /* Physical DEC rate (1ms). */
 /* Boot CPU, EE=0. Success arms DEC before the caller may enable EE.
  * tick_hz must be PM_DEC_HZ (1ms DEC); tick_clock_step makes 10ms ticks.
  * Failure leaves existing clock untouched. */

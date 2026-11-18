@@ -11,7 +11,7 @@ import time
 
 ROOT = Path(__file__).resolve().parents[2]
 CHECK = dict(name='ppc-kboot-layout', tier=2, budget=60,
-             covers=['arch/ppc/kernel.ld', 'platform/powermac/kboot_layout.h',
+             covers=['arch/ppc/kernel.ld', 'platform/powermac/platform_kboot_layout.h',
                      'include/memmap.h', 'tools/gen_memmap.py',
                      'tools/ppc/kboot_layout.py', 'lib/kstring_c.c', 'lib/kstring.h',
                      'lib/crc32.c', 'lib/crc32_core.inc', 'lib/crc32.h',
@@ -34,7 +34,7 @@ def verify(work, script, cc, prefix):
              '-mno-altivec', '-msdata=none', '-ffreestanding', '-fno-pie',
              '-fno-stack-protector', '-nostdlib', '-fcommon', '-fsigned-char',
              '-fno-short-enums', '-D__cdecl=', '-Iinclude', '-Ilib', '-I.']
-    (work/'entry.c').write_text('''#include "platform/powermac/kboot_layout.h"
+    (work/'entry.c').write_text('''#include "platform/powermac/platform_kboot_layout.h"
 void ppc_kernel_entry(void) { for (;;) {} }
 unsigned char common_storage[123];
 const unsigned layout[] = {PM_KERNEL_BASE, PM_KERNEL_IMAGE_MAX,

@@ -50,7 +50,7 @@ unsigned int nic_test_irq_save(void)
 }
 void nic_test_irq_restore(unsigned int flags) { hs_set_if(flags); }
 static void check_cli(void) { if (hs_if()) bad_if++; }
-void __cdecl kprintf(u8 attr, const char *fmt, ...)
+void __cdecl console_printf(u8 attr, const char *fmt, ...)
 {
     static const char expected[] = "[nic] tick registration failed: %d\n";
     va_list args;

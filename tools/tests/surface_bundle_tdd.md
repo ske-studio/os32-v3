@@ -1,6 +1,6 @@
 # T2e e3 — DISPLAY 4面束と native alias
 
-票: TASK_T2D_T2H (アーカイブ: `docs/archive/v3/TASK_T2D_T2H.md`) §2-5 e3。
+契約: `docs/design/exec/lease.md` の「公開 lease の契約」・`docs/design/exec/surface_query.md` の「授権と ref の照合」(出所は票 TASK_T2D_T2H §2-5 e3)。
 
 `test_surface_bundle.py` は `test_surface_lease.py` の ILP32 ビルド足場を共有し、
 実 lease/query/B1/access_walk/paging/pgalloc を走らせる。`host32.py` 経由で
@@ -54,4 +54,4 @@ IRQ/例外の入口拒否を外す3変異を追加し、束は **21/21 runtime R
 単面CLIENT/DISPLAYにもbackend照合を追加し **18/18 runtime RED** (既存17の意図を維持)。
 世代のquery+lease+paging変異はそのまま。同一unitの重複差替えと、同じfixture TUを
 再構築するpaging/V86/execの複数同時差替えはrun()のassertで拒否する。
-旧17構成+静的1検査とgfx17変異も維持。結果の正典は票§2-5 e3。
+旧17構成+静的1検査とgfx17変異も維持。結果の記録は票 TASK_T2D_T2H §2-5 e3。

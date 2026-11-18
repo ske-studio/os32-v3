@@ -59,3 +59,6 @@ GUI は SHM の末尾を予約し、`shm_alloc` の管理表で使用済みに�
 - [mm/paging.c](paging.md)
 - [mm/pgalloc.c](pgalloc.md)
 - [mm/shlib.c](shlib.md)
+- [paging_app](paging_app.md)
+- [shm](shm.md)
+- [paging_map](paging_map.md)

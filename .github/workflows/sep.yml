@@ -1,0 +1,93 @@
+# 機種依存の分離の枝 (wt/sep-*) の検査。既存の CI の欠点を直した手本として組んである
+# (欠点・決まり・既存の workflow への当て方は docs/design/tools/ci/gate.md)。
+#
+#   checks    **手動で起動した時だけ** (Actions の Run workflow か `gh workflow run sep.yml --ref <枝>`)。
+#             分離の作業のあいだは push ごとには回さない (ユーザーの指示 2026-11-17「今回の実装に必要な分だけ」)。
+#             全部の検査を変異込みで、6 シャードに分けて回す。検査の一覧は CHECK の登録からだけ取る
+#             (この YAML に検査の名前を書かない)。どのシャードも同じ環境 (x86・PowerPC のコンパイラ、
+#             QEMU) なので、道具が無くて飛ばす検査が無い。1 本落ちても残りを回し、結果の表を
+#             ジョブの要約に、落ちた検査のログだけを成果物に残す。
+#   identity  x86 の生成物と PowerPC の像の .o が基点 (origin/main との merge-base) と同じ。
+#             変わる段はコミットの本文に `Sep-Changes: x86` / `Sep-Changes: ppc` と書いて宣言する。
+#
+# 手元でも同じ入口で回せる:
+#   python3 -B tools/ci/gate.py run --shard 0/6 --out <置き場>
+#   python3 -B tools/ci/sep_identity.py --work <置き場>
+# main への取り込みの判定は今までどおり check.yml・build.yml。これは分離の枝の追加の関門。
+name: sep
+
+on:
+  push:
+    branches: ["wt/sep-**"]
+  workflow_dispatch:
+
+concurrency:
+  group: sep-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    if: github.event_name == 'workflow_dispatch'
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5]
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/gate-setup
+      - name: Every check of this shard, with mutation
+        env:
+          OS32_ACCEPT_IPA_LICENSE: "1"
+          OS32_CLANG_CROSS_FREE: "0"
+          OS32_MUT_JOBS: "4"
+          NP21W_DIR: ${{ runner.temp }}/np21w
+          TMPDIR: ${{ runner.temp }}
+        run: python3 -B tools/ci/gate.py run --shard ${{ matrix.shard }}/6 --out "$RUNNER_TEMP/gate"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sep-checks-${{ matrix.shard }}
+          path: |
+            ${{ runner.temp }}/gate/results.json
+            ${{ runner.temp }}/gate/check_times.tsv
+            ${{ runner.temp }}/gate/make.log
+            ${{ runner.temp }}/gate/failed-logs/
+          retention-days: 14
+          if-no-files-found: warn
+
+  identity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/gate-setup
+      - name: Products identical to the merge base
+        env:
+          OS32_ACCEPT_IPA_LICENSE: "1"
+          TMPDIR: ${{ runner.temp }}
+        shell: bash
+        run: |
+          git fetch --no-tags origin main
+          set +e
+          python3 -B tools/ci/sep_identity.py --work "$RUNNER_TEMP/sep-identity" 2>&1 | tee "$RUNNER_TEMP/identity.txt"
+          rc=${PIPESTATUS[0]}
+          { echo '## 生成物が基点と同じか'; echo; echo '```'
+            grep -E '^(基点|PASS|FAIL|ppc:|  )' "$RUNNER_TEMP/identity.txt" | head -80
+            echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit $rc
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sep-identity
+          path: ${{ runner.temp }}/sep-identity/ppc-objects.json
+          retention-days: 14
+          if-no-files-found: ignore

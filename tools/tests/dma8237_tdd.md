@@ -49,7 +49,7 @@ Vol.2「DMAコントローラ」(io_dma.md 152〜155 行) は
 
 ```
 $ python3 -B tools/tests/test_dma8237.py
-tools/tests/dma8237_host.c:16:10: fatal error: ../../drivers/dma/dma8237_math.c: No such file or directory
+tools/tests/dma8237_host.c: fatal error: ../../drivers/dma/dma8237_math.c: No such file or directory
 ```
 
 ### RED 2 — ポート表を式で出した姿 (変異 5)

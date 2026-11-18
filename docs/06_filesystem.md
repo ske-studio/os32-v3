@@ -334,7 +334,7 @@ NP21/WエミュレータのHostDrv機能を利用し、ホストPC (Windows) の
 | 関数 | 説明 |
 |------|------|
 公開エントリは `hostdrvfs_init` / `hostdrvfs_detect` の 2 つだけで、VfsOps に
-登録される実体は `hdrv_*` 接頭辞を持つ (`fs/hostdrv/hostdrvfs.c`)。
+登録される実体は `hdrv_*` 接頭辞を持つ (`drivers/hostdrv/hostdrvfs.c`)。
 
 | 関数 | 説明 |
 |------|------|

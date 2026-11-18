@@ -13,7 +13,7 @@
 - 対象: [`drivers/block/fdc_track.c`](../../drivers/block/fdc_track.c) (区切り・先読み・読み直しの純粋な層)、
   [`drivers/block/fdc.c`](../../drivers/block/fdc.c) (`fdc_read_sectors`、覚えたシリンダ)、
   [`drivers/block/fdc_decide.c`](../../drivers/block/fdc_decide.c) (`fdc_rw_timeout_ticks`)、
-  [`fs/fat/fatfs/diskio.c`](../../fs/fat/fatfs/diskio.c) (結線と、書き込み・再初期化での破棄)
+  [`drivers/block/fat_diskio.c`](../../drivers/block/fat_diskio.c) (結線と、書き込み・再初期化での破棄)
 - 実行: `python3 -B tools/tests/test_fdc_track.py [--target] [--mutate] [case ...]`
   (`make check-fdc-track-host` が `--target --mutate` 付きで回す)
 - 試験: [`fdc_track_host.c`](fdc_track_host.c) — 実物を `#include` する。
@@ -66,7 +66,7 @@ PM の実測: フォントの読み込みは 4a8fad4 とほぼ同じ約 3 分。
   Ready 変化は SIS のどこで見ても世代を進め、覚えたシリンダを捨てる
   (`readychange_invalidates`)
 - 起動時に `[fdc] font: seek= skip= recal= tmo= foreign= rdy= multi=ok/fail nr= single= retry= write=`
-  を 1 行出す (`init/kernel.c`、FD に触っていなければ出ない)
+  を 1 行出す (`platform/pc98/kernel.c`、FD に触っていなければ出ない)
 
 ## 0-2. 6541ef1 の実測 (2026-09-24 夜) — まだ当たっていなかった理由と直したもの
 

@@ -16,19 +16,19 @@
 
 |番号|計画と実物の食い違い・制約|実物と処置|
 |---|---|---|
-|D1|N1のhost_*はFSの口ではない|HOST_SERVICES_PLAN.md:64、net/link_host_api.inc:157。W8はVFS→SerialFSを使う|
-|D2|HostDrvFSは一般的なHost Services FSではない|fs/hostdrv/hostdrvfs.c:81はNP21/W専用I/O。PowerPCには組まない|
-|D3|ops登録・mountだけでは動かない|serialfs.c:118のSERIAL型・permitと、persistent所有者・SfsIoが必要|
-|D4|PowerPC端末はゲストのUDP protocolではない|ppc_lan_host.py:70のUDPはEthernet搬送、lan_service.c:105はEtherType判定|
-|D5|現行PLN1は型8まで・payload256B|lan_boot.h:94、lan_wire.c:82。FS最大1044Bを通常messageへコピーしない|
+|D1|N1のhost_*はFSの口ではない|HOST_SERVICES_PLAN.md:64、net/link_host_api.inc (link_host_open())。W8はVFS→SerialFSを使う|
+|D2|HostDrvFSは一般的なHost Services FSではない|drivers/hostdrv/hostdrvfs.cはNP21/W専用I/O。PowerPCには組まない|
+|D3|ops登録・mountだけでは動かない|serialfs.cのSERIAL型・permitと、persistent所有者・SfsIoが必要|
+|D4|PowerPC端末はゲストのUDP protocolではない|ppc_lan_host.pyのUDPはEthernet搬送、lan_service.cはEtherType判定|
+|D5|現行PLN1は型8まで・payload256B|lan_boot.h、lan_wire.c。FS最大1044Bを通常messageへコピーしない|
 |D6|既存mnt群を丸ごと登録できない|PPC profileにmntなし。cmd_mnt.cは3引数必須・serialfs拒否・他コマンドも登録|
-|D7|旧§8のram0/cd0は現行名ではない|PPC_SHELL_DESIGN.md:369、root_boot.c:7のrd0/rd1を維持|
-|D8|素のServerだけではLANの遅延複製を防げない|tools/lanfs_host.py:31,58–106のLanServerとfs/serialfs/sfs_lan.c:32–146を手本にする|
+|D7|旧§8のram0/cd0は現行名ではない|PPC_SHELL_DESIGN.md:369、root_boot.cのrd0/rd1を維持|
+|D8|素のServerだけではLANの遅延複製を防げない|tools/lanfs_host.pyのLanServerとfs/serialfs/sfs_lan.cを手本にする|
 
-- W8の方向は `docs/decisions/ppc/PPC_SHELL_DESIGN.md:50` と一致する。
+- W8の方向は `docs/decisions/ppc/PPC_SHELL_DESIGN.md` と一致する。
 - SerialFSのFS本体・既存VfsOps・resource generationを再利用し、輸送と接続先観測を差し替える。
-- `sfs_client.h:24` のSfsIoはput/get/now/idle/can_wait/put_untilを持つ。
-- `serialfs_persistent.c:72` はpermit→vfs_mountを実装済み。開始時にHELLOを待たない。
+- `sfs_client.h` のSfsIoはput/get/now/idle/can_wait/put_untilを持つ。
+- `serialfs_persistent.c` はpermit→vfs_mountを実装済み。開始時にHELLOを待たない。
 - PC-98のLAN常駐 `/host` とhsyncの受入は `TASK_NET_HOSTSVC.md:3` にある。
 - N1の100Hz IRQ駆動状態機械は移植せず、PowerPCのGMAC pollを使う。
 - KAPIのsfs_begin/end・host_*不在指定は維持し、既存FSとplatformの間で閉じる。
@@ -156,7 +156,7 @@ return gem_tx(&s.g, s.tx, used + 14);
 
 **SfsIo と待機**
 
-- USER scは `kernel_trap.c:90–101` でEE=0のまま実行されるため、tick_count・ppc_irq_enabledを待機判定に使わない。
+- USER scは `kernel_trap.c` の `ppc_trap_dispatch()` でEE=0のまま実行されるため、tick_count・ppc_irq_enabledを待機判定に使わない。
 - TB読取りは `terminal_input.c:58–73` の上位・下位・上位の再読取りを手本にする。
 
 ```c
@@ -266,8 +266,8 @@ if reply is not None:
 |P06|platform/powermac/lan_service.c|FS直接RX・外部payload TX・状態gate、P04/05|150／不変|
 |P07|platform/powermac/root_boot.c|COM1追加・sizeofで登録個数算出|10／不変|
 |P08|platform/powermac/hostfs_boot.c 新規|FS登録・時計設定・persistent開始|50／不変|
-|P09|init/ppc_kernel.c|第3像のroot後・sh前にP08を呼ぶ|20／不変|
-|P10|build/ppc-kboot.mk|FS閉包・provider・既存除算helper確認、P09|65／不変|
+|P09|platform/powermac/ppc_kernel.c|第3像のroot後・sh前にP08を呼ぶ|20／不変|
+|P10|build/targets/ppc-powermac.mk|FS閉包・provider・既存除算helper確認、P09|65／不変|
 |P11|arch/ppc/kernel_trap.c|DEC/外部IRQの私有depth・照会関数|25／不変|
 |P12|arch/ppc/ppc_trap.h|P11の照会宣言、P04へ結線|5／不変|
 |H01|tools/ppc_hostfs.py 新規|LanServer契約再利用・1028B・boot reset|280／不変|

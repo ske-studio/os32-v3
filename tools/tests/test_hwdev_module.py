@@ -151,12 +151,12 @@ def main():
         subprocess.run(build(exe), check=True)
         run(exe, cases)
         if '--mutate' in sys.argv:
-            source = (ROOT / 'kernel/module/hwdev_module.c').read_text()
+            source = (ROOT / 'hwdev/hwdev_module.c').read_text()
             for name, old, new in MUTATIONS:
                 assert source.count(old) == 1, name
                 with tempfile.TemporaryDirectory(prefix='hwdev-mut-') as mt:
                     mexe = Path(mt) / 'host'
-                    mutpar.build_in_tree(ROOT, mt, {'kernel/module/hwdev_module.c': source.replace(old, new)},
+                    mutpar.build_in_tree(ROOT, mt, {'hwdev/hwdev_module.c': source.replace(old, new)},
                                          [build(mexe)], capture_output=True)
                     try:
                         run(mexe, cases)

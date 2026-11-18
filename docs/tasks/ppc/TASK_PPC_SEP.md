@@ -1,8 +1,9 @@
 # TASK_PPC_SEP — PowerPC 移植とアーキテクチャ分離の計画
 
-> 状態: **実装中 (2026-11-10)** — 案 D を採用、MMU の外の 33 件を順に直す。計画の段 (第 1〜5 段) は Z まで main (b98087e8、2026-11-10)。残るのは PPC で組めない 8 TU と第 5 段で見送った 3 点 (下の「実測 (第 5 段 Z)」) で、② の後の段の中で解く。確定設計は [PPC_SEP1_DESIGN](../../decisions/ppc/PPC_SEP1_DESIGN.md)・[PPC_SEP2_DESIGN](../../decisions/ppc/PPC_SEP2_DESIGN.md)・[PPC_SEP3_DESIGN](../../decisions/ppc/PPC_SEP3_DESIGN.md)・[PPC_SEP4_DESIGN](../../decisions/ppc/PPC_SEP4_DESIGN.md)・[PPC_SEP5_DESIGN](../../decisions/ppc/PPC_SEP5_DESIGN.md)。実装と取り込みの決まりは [PPC_IMPL_RULES](../../decisions/ppc/PPC_IMPL_RULES.md)。2026-11-10 から到達点 ② (票 TASK_PPC_KBOOT) を優先し、分離の残り (下表の「未着手」) は ② の後か、本線の受入の待ちが減った時点で再開する。調査の全文は ~/os32-tmp/run/ppc-arch-survey/SURVEY.md。
+> 状態: **受入完了 (2026-11-17)** — 機種依存の分離は 11-17 の作り直しで完了の基準 3 つ (ユーザー決定「共通ソースが機種ヘッダを読む数 0・ビルド 1 系統・入口の骨格 1 本」) を満たした。今の仕組みと決まりは下の「現在地」。第 1〜5 段 (Z まで main、b98087e8) の確定設計 (完了記録) は PPC_SEP1_DESIGN (アーカイブ: `docs/archive/decisions/PPC_SEP1_DESIGN.md`)・PPC_SEP2_DESIGN (アーカイブ: `docs/archive/decisions/PPC_SEP2_DESIGN.md`)・[PPC_SEP3_DESIGN](../../decisions/ppc/PPC_SEP3_DESIGN.md)・PPC_SEP4_DESIGN (アーカイブ: `docs/archive/decisions/PPC_SEP4_DESIGN.md`)・[PPC_SEP5_DESIGN](../../decisions/ppc/PPC_SEP5_DESIGN.md)。実装と取り込みの決まりは [PPC_IMPL_RULES](../../decisions/ppc/PPC_IMPL_RULES.md)。2026-11-10 から到達点 ② (票 TASK_PPC_KBOOT) を優先し、分離の残り (下表の「未着手」) は ② の後か、本線の受入の待ちが減った時点で再開する。調査の全文は ~/os32-tmp/run/ppc-arch-survey/SURVEY.md。
+> 完了の基準: (1) `tools/check_layers.py` の違反が x86-pc98・ppc-powermac の両方で 0、(2) ソースの選択が `build/select.mk` の 1 か所で入口の Makefile が 1 本、(3) 入口の骨格が `init/kernel_start.c` の 1 本 (ユーザー決定 2026-11-17)。3 つとも満たした。
 
-## 段の状態 (2026-11-10)
+## 第 1〜5 段の状態 (2026-11-10 の記録)
 
 受入の区分: x86 の生成物が不変の段は build_compare、変わる段は os32-v3 の PM の NP21/W。積んだ枝は main を取り込み直してから送る。
 
@@ -21,36 +22,27 @@
 | 第 5 段 B5・B6・S2 | 起動時の SURFACE の予約と表を provider へ (platform/pc98/gfx_surfaces.c)、present のページ切替・VSYNC 待ち・表示メモリの番地を provider へ (platform/pc98/gfx_init.c、**B6 は部分完了** — 残件は下の「第 5 段で見送った物」)、SDK の利用箇所 (example の Makefile・Rust の規則・rustc の wrapper・配布物) を profile へ | main (b98087e8)。B5・B6 は NP21/W の一括受入 (30/30、B6 の 5 枚は画素差 0)、S2 は build_compare で配布物 4 件と ISO だけの差 (区分 I)。flip を使わない同期の present (VSYNC 待ち) の経路は NP21/W では未確認 (host の試験 sep5-gfx-init-host が見ている) |
 | 第 5 段 Z | 全段の後の実測と記録 (製品コードは触らない) | 済 (2026-11-10、下の「実測 (第 5 段 Z)」)。CONSOLE_DUAL は Z の後と本線と合意 |
 
-### 実測 (第 3 段 F・第 4 段 F、2026-11-10)
+## 現在地 (2026-11-17、分離の作り直しの後)
 
-`python3 -B tools/ppc/check_compile.py --source-profile selected --accept --json` (到達点 ② の枝の上、main 2259debc): 119 TU のうち 97 が成功、22 が失敗、受入の誤り 0。known_header_dependencies.json は 24 組。失敗は全部 missing-header で、原因は次の 2 つに分かれる。
-
-| 原因 | TU | 解く段 |
-|---|---:|---|
-| `exec/appslot.h:26` の `x87.h` (x86 の FPU の保存域の型を共通のヘッダが直に include) | 13 (exec 8、gfx 3、kapi 2、kernel/kbd_inject.c) | 未割当 — 文脈の保存域を arch の口の後ろへ (第 3 段の arch_exec_storage の続き)。**1 本のヘッダで 13 TU が通る** |
-| PC98・x86 の装置のヘッダ (pc98_route.h・v86_bios.h・fdc.h・pc98pt.h・serial.h・kdebug_imports.h・ime.h) | 9 | console.c は第 5 段 C1、gfx_core.c は B3〜B5、kapi_generated.c は C3。fs と serialfs と module は ③ の前の段 |
-
-### 実測 (第 5 段 Z、2026-11-10)
-
-同じ計測を第 5 段 B6 の先端 (main 8a6096fc + B5 + B6) で回した結果: **120 TU のうち 112 が成功、8 が失敗**、受入の誤り 0 (成功の一覧 tools/ppc/selected_success.json は 112 件、known_header_dependencies.json は 21 組)。再開の時点 (main 92cb185e) は 119 TU のうち 97。増えた 15 本の内訳は、浮動小数点の保存域で 13、C1 で kernel/console/console.c、B4 で platform/powermac/display_provider.c (新規)。
-
-失敗の 8 本は全部 missing-header で、PC98・x86 の装置のヘッダを共通のソースが直に include している:
-
-| TU | 止まるヘッダ | 解く所 |
+| 完了の基準 | 今の形 | 番人 |
 |---|---|---|
-| gfx/gfx_core.c | v86_bios.h (ほかに pegc.h・wab_xe10.h・pc98_route.h・splash_raster.h・kcg_module.h・geforce_module.h) | 下の「第 5 段で見送った物」。backend の名前と PEGC の BIOS ワークの読み方を provider へ |
-| exec/exec.c・kapi/kapi_generated.c | kernel/ime/ime.h | IME の部品の口 (FEP) を exec・KAPI から狭い facade で引く段。③ (ユーザ実行) の前 |
-| kernel/module/module.c | kdebug_imports.h | module の import の表を arch・platform の選択へ。③ の前 |
-| fs/fat/fatfs/diskio.c・fs/fat/fatfs_vfs.c・fs/ext2/ext2_super.c | fdc.h・pc98pt.h | ブロック装置と区画表を platform の口へ。③ の前 (mount は ② の境界の外) |
-| fs/serialfs/serialfs_session.c | serial.h | SerialFS の線を platform の口へ。LAN (Host Services) の段と同時 |
+| 共通のソースが機種・装置のヘッダを読まない | 層の検査の違反は x86-pc98・ppc-powermac とも 0。共通が装置の関数を使う所は `include/<名>_contract.h`、機種ごとに差し替えるヘッダは固定名 `platform_<名>.h`、機種のソースは持ち主の置き場 | `tools/check_layers.py` (基準 `tools/layers_baseline.json` は空。直し方は設計書 `docs/design/tools/check_layers.md` §8) |
+| 共通の置き場のソースは両方の arch で組める | PowerPC の像に入っていない共通のソース (`C_COMMON_PC98_PENDING`) も PowerPC のコンパイラを通す | `make ppc-ci-image` の `common-compile` (CI の ppc-compile) |
+| ビルドのソースの選択は 1 か所、入口の Makefile は 1 本 | 所有者集合 `build/select.mk` (共通・arch・platform・機能)。PowerPC の像は最上位の `make ARCH=ppc PLATFORM=powermac [IMAGE=kboot-*] kernel` で、規則は `build/targets/ppc-powermac.mk`、像は名前か旗 (`build/images/ppc-flags.mk`) で選ぶ | `build-selection-host` (設計書 `docs/design/build/select.md`) |
+| 入口の骨格は 1 本 | `init/kernel_start.c` (局面の中身は `platform/pc98/kernel.c`・`platform/powermac/ppc_kernel.c`) | 設計書 `docs/design/init/kernel_start.md` |
 
-第 5 段で見送った物 (設計 PPC_SEP5_DESIGN の B5・B6 の行のうち、この段では入れていない)。B6 は部分完了で、下の 1・2 が残件:
+第 5 段で見送った 3 点 (PEGC の診断と raster の移設、gfx の共通ヘッダの pc98.h の依存、共通の core に残る backend の名前) は解消した: `gfx_vram.c` は `drivers/video/pc98/` へ、`gfx/gfx.h`・`gfx_internal.h`・`palette.h` は PC-98 のヘッダを読まない。
 
-| # | 残件 | 対象 | 後続の段 | 完了の条件 |
-|---|---|---|---|---|
-| 1 | 診断と raster の移設 | gfx/gfx_vram.c の gfx_diag_px (PEGC の窓を読む) と gfx_present_raster の pc98_splash_raster_table の呼出し、gfx/gfx_core.c の pc98_splash_raster_reset | PPC の FB の表示 backend を足す段の前 (② の後の FB の段) | gfx/gfx_vram.c が pegc.h・splash_raster.h を include しない。test_boot_splash_native の raster の変異 4 本が provider の実体を通って RED のまま |
-| 2 | gfx の共通ヘッダの pc98.h の依存 | gfx/gfx.h:11・gfx/gfx_internal.h:5 の `#include "pc98.h"` (GVRAM_PLANES・VRAM_PLANE_*・GDC の定数の利用者が広い) | 同上 | 2 つのヘッダが pc98.h を include せず、PC98 の定数は各実体が直に include。x86 は build_compare で不変 |
-| 3 | 共通の core に残る backend の名前 | gfx/gfx_core.c の pc98_route_safe・`g_backend == &gfx_backend_geforce/trident` の分岐、gfx/gfx_core_surface.inc の gfx_sf_backend、gfx/gfx_core_framebuffer.inc の backend の名前、PEGC の BIOS ワーク (v86_bios.h) | 同上 | gfx/gfx_core.c が PPC の selected で成功する (今は v86_bios.h で止まる) |
+`include/memmap.h` の PC-98 だけの番地 (リアルモードの起動と低位メモリの 13 個: ローダの置き場・起動時のスタック・IVT の保護範囲・自動プレイの mailbox) は `platform/pc98/platform_boot_layout.h` へ分けた (2026-11-18、設計 `docs/design/platform/pc98/platform_boot_layout.md`)。地図と生成ヘッダは分ける前と同じ中身。共通のソースが使わない名前はほかに 21 個あるが、memmap.h に残した: OS の配置から導く値 (鎖の最悪の配置・固定 paging の枠数・装置の窓の中の割り当てなど) と、対になる名前を共通のソースが使う物 (`MEM_BIOS_ROM_START`・`MEM_BOOTINFO_SIZE` など) で、機種だけの事実として切り出せない。
+
+残件 (分離の構造の外、または PowerPC の機能の有効化):
+
+| # | 残件 | 要る物 |
+|---|---|---|
+| 4 | exec のフック 14 本を、提供者が像に在る物から PowerPC で本物に (構造は「機能の有無を像が決める」形で済み。本物にするのは GUI・音・shlib などの PowerPC への移植) | PowerPC の機能の有効化ごとに QEMU の受入 |
+| 5 | contract で残った、リンクの時の装置の名前 (`geforce_foreground_poll` など) を実行時の口に | 本線の HAL の段 |
+| 6 | `C_COMMON_PC98_PENDING` の 44 本を、PowerPC の像の機能の組へ移す | PowerPC の機能の有効化ごと |
+| 7 | KAPI の名前に装置が出る関数、PowerPC のユーザーランドの newlib | 設計から |
 
 設計からの配置の変更 (残件ではない):
 
@@ -60,7 +52,7 @@
 
 x86 の受入で未確認のまま残る物: B2 の hardware scroll の +1 行 (上の表)、flip を使わない同期の present (B6)、Cirrus・GeForce・Trident の選択と予約の経路 (NP21/W の標準構成では通らない。host の試験が見ている)、v86 の往復での console (C1)。
 
-PPC の型・配置は `python3 -B tools/ppc/check_layout.py` で確かめる (第 4 段 E)。本体の link と起動は selected とは別の入口 (票 TASK_PPC_KBOOT)。
+PPC の型・配置は `python3 -B tools/ppc/check_layout.py` で確かめる (第 4 段 E)。本体の link と起動は票 TASK_PPC_KBOOT。
 
 **本体接続は案 D とし、案 B には着手しない。分離は実際に甘く、MMU 外の33件も直す。**
 今の ppc-mmu は案 C を続け、`include/cpu.h` は変えず、context 操作は `arch/ppc/ppc_pmap.h` の `ppc_*` に閉じる。
@@ -79,16 +71,16 @@ x86 本線は止めず、小枝ごとに受入済みの変更だけを取り込�
 
 |領域（SURVEY の ID）|大|中|小|代表例・実物|
 |---|---:|---:|---:|---|
-|実行・文脈 E1〜E7|6|1|0|`exec/exec_schedule.inc:267` の EIP-=2、`exec_tramp_init.inc:57` の x86 機械語生成|
-|割込み・起動・時計 I1〜I5|3|2|0|`init/kernel_boot_cpu.inc:28` 以降の GDT/TSS/IDT/PIC/PIT 順、IRQ の16線前提|
+|実行・文脈 E1〜E7|6|1|0|`exec/exec_schedule.inc` の `exec_resume()` の EIP-=2、`exec_tramp_init.inc` の x86 機械語生成|
+|割込み・起動・時計 I1〜I5|3|2|0|`platform/pc98/kernel_boot_cpu.inc` の `kernel_boot_cpu()` 以降の GDT/TSS/IDT/PIC/PIT 順、IRQ の16線前提|
 |引数・asm A1〜A7|1|5|1|`kapi/kapi_print.c` の可変引数、`gfx/gfx_internal.h` の rep 命令|
-|V86・描画・boot V1〜V5|1|4|0|共通 exec の V86 呼び手、`gfx/gfx_core.c:259` の TVRAM 直参照|
-|SDK・CRT・Rust K1〜K2|2|0|0|`sdk/crt/crt0.asm:5` の BITS 32、Rust target の x86/LE 固定|
+|V86・描画・boot V1〜V5|1|4|0|共通 exec の V86 呼び手、`gfx/gfx_core.c` の TVRAM 直参照|
+|SDK・CRT・Rust K1〜K2|2|0|0|`sdk/crt/crt0.asm` の BITS 32、Rust target の x86/LE 固定|
 |型幅・配置 D1〜D4|2|1|1|long を u32 とする契約、gf5 の配置アサート失敗、packed の未整列アクセス|
-|ビルド B1〜B2・生成器 T1|3|0|0|`build/kernel.mk:6` の固定 ASM 一覧、`tools/mkmod.py` の i386/LE 固定|
+|ビルド B1〜B2・生成器 T1|3|0|0|`build/kernel.mk` の固定 ASM 一覧、`tools/mkmod.py` の i386/LE 固定|
 |合計|18|13|2|33件。確定31件、推定2件（D3/D4）。大は設計・共有契約、中は境界移設、小は任意経路・文言|
 
-`arch/README.md:28-29` の「ディレクトリを 1 つ足すことで閉じる」は、MMU だけでなく、起動・実行 ABI・機種依存・生成器にも成り立っていない。
+`arch/README.md` の「ディレクトリを 1 つ足すことで閉じる」は、MMU だけでなく、起動・実行 ABI・機種依存・生成器にも成り立っていない。
 件数は原因群単位で、ファイル数ではない。PC-98 専用ドライバの配置は別集計。mm/paging と既知の `lib/kprintf.c` X1 は33件に含めない。
 調査は全実行経路・全ポート・外部 apps/game・全 KAPI ABI を網羅せず、gf5 の正確な配置差、packed の実害、PC-98 専用ドライバ総数、V86 呼び手の網羅性も未確認。元調査のコンパイル結果は再実行していない。
 
@@ -106,7 +98,7 @@ C/D の規模は設計§2の比較用の値で、33件の修正・SDK・全受�
 |OS32 案 D|x86 形の2段の PD/PT|全部遅延・HPT 1個・切替と flush で全消去。**この組合せは手本に無い**|
 
 ソフトの表から spill で詰める部分の型は同じ。ただし **x86 形の表を読むこと自体は手本に無い**。低 RAM を無条件 RW にする経路は guard を破るため、OS32 では PD/PT の保護を読む必要がある。
-正典は `arch/README.md:28-29` の「ディレクトリを 1 つ足すことで閉じる」の例外として「OS32 のソフトの表の形式は x86 の2段の表と同じ」と明記し、`docs/02_memory.md` はそこを参照して形式・属性・運用を説明する。
+正典は `arch/README.md` の「ディレクトリを 1 つ足すことで閉じる」の例外として「OS32 のソフトの表の形式は x86 の2段の表と同じ」と明記し、`docs/02_memory.md` はそこを参照して形式・属性・運用を説明する。
 B をやめると表形式の完全分離を失う。別 CPU・アドレス幅・大ページなどでこの形式が制約になる場合、または遅延挿入の改善でも受入性能を満たせない場合に再検討する。ページアウト導入時には A/D の扱いも再設計する。
 
 **D は実走未検証で、確認済みなのは試作ヘッダによるコンパイルだけ。リンク・配置互換・実 HPT の動作成功を意味しない。**

@@ -6,7 +6,7 @@
 |---|---|
 | 54 ZM_CR_GROUP | I:1213 `init_zm_cr_group` |
 
-skip 中の CR44 による head 更新も維持する（`O/kdebug/gfinit_decode.c:79–96`）。
+skip 中の CR44 による head 更新も維持する（`kdebug/gfinit_decode.c` の `gfinit_decode_rom()`）。
 
 ## 移し替えた設計
 

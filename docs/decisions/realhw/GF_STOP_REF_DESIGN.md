@@ -25,7 +25,7 @@
 |---|---|---|
 | F1 | 停止の DPMS ON は `svc_dpms_on` (D/service.c:139-172)、呼び出しは :651-655。suspend の DPMS ON は `rec_dpms_on` (D/recover.c:138-169)、呼び出しは :194 | ソース |
 | F2 | DPMS ON の根拠は OS32 の設計だけ (GF_FEAT4_DESIGN.md:59・561・655・722) | grep |
-| F3 | OS32 は起動時の CRTC の状態を保存していない。今あるのは 3 つだけで、SR01・CR17・CR1A・DACCLK は保存も復元もしていない。<br>・baseline (D/baseline.c:12-36): nv_crtc_save の「mode_reg の種」(V/crtc.c:684-689) に当たる<br>・ロックと index (hwdev/gf/bus.c:73-98)<br>・PCRTC_START (D/quiesce.c:59-67) | ソース |
+| F3 | OS32 は起動時の CRTC の状態を保存していない。今あるのは 3 つだけで、SR01・CR17・CR1A・DACCLK は保存も復元もしていない。<br>・baseline (D/baseline.c:12-36): nv_crtc_save の「mode_reg の種」(V/crtc.c:684-689) に当たる<br>・ロックと index (hwdev/gf/bus.c)<br>・PCRTC_START (D/quiesce.c:59-67) | ソース |
 | F4 | nouveau の unload の順:<br>1. `nouveau_display_fini(dev,false,false)` (N/nouveau_drm.c:597-598)<br>2. `drm_helper_force_disable_all` → 使われていないエンコーダーに dpms(OFF)。CRTC は `.disable = nv_crtc_disable` (V/crtc.c:801-813) で unpin だけ<br>3. `nv04_display_fini` (V/disp.c:56-96、INTR_EN=0)<br>4. `nv04_display_destroy` (V/disp.c:189-208): enc_restore (:196-197) → nv_crtc_restore (:199-200) → フォントの復元 (:202)<br>5. `nouveau_accel_fini` (N/nouveau_drm.c:601) | refs |
 | F5 | `nv_crtc_restore` (V/crtc.c:692-706) = owner → `nouveau_hw_load_state` → CR21=保存値 → last_dpms=CLEARED。<br>`nouveau_hw_load_state` (V/hw.c:827-835) の順: VgaProtect(true) → ramdac (:468-536) → ext (:665-772) → palette (:795-811) → vga (:564-586) → VgaProtect(false)。<br>VgaProtect(false) は SR01 bit5 を必ず落とし (V/hw.h:243-256)、vga の CR の書き込みは CR11 bit7 を必ず立てて終わる (`nv_lock_vga_crtc_base(true)`、V/hw.h:272-284) | refs |
 | F6 | nouveau の保存: create の中 (V/disp.c:245 フォント → :297-299 crtc → :301-302 enc) と、init の先頭 (V/disp.c:112-121、load と resume)。create は nvkm devinit (POST) の後。<br>フォントの保存・復元は最後に `NVBlankScreen(head, false)` を両 head に書く (V/hw.c:367-369) ので、フォントの後に読む crtc の保存値の SR01 bit5 は 0 になる | refs |
@@ -62,7 +62,7 @@ S0 7eee4b40 で、owner を CR44 で切り替えて読んだ値。証拠はノ�
 | 3 | cursor hide (:649) | 無し。cursor のレジスタは #8 で保存値に戻る | **手本に無い**。外した (末尾の追記) |
 | 4 | **DPMS ON** (:651-655) | 無い | **外す** (ユーザー決定) |
 | 5 | (無い) | エンコーダー dpms(OFF) (force_disable_all) | **足す** |
-| 6 | (無い) | PCRTC_INTR_EN_0=0 (V/disp.c:66-69) | 順が違う。このレジスタは F1 の IRQ 層が持ち、F2/F1 の停止で 0 にする (hwdev/gf/irq.c:91・226-234)。F4 から書くと F1 の wanted_heads と食い違うので変えない |
+| 6 | (無い) | PCRTC_INTR_EN_0=0 (V/disp.c:66-69) | 順が違う。このレジスタは F1 の IRQ 層が持ち、F2/F1 の停止で 0 にする (hwdev/gf/irq.c)。F4 から書くと F1 の wanted_heads と食い違うので変えない |
 | 7 | (無い) | enc_restore (V/disp.c:196-197) | **足す** |
 | 8 | (無い) | nv_crtc_restore (V/disp.c:199-200) | **足す** |
 | 9 | (無い) | フォントの復元 (V/disp.c:202、V/hw.c:309-371) | **足す** (Q2 で入れると決めた。置き場は §3-2 #9) |
@@ -103,7 +103,7 @@ S0 7eee4b40 で、owner を CR44 で切り替えて読んだ値。証拠はノ�
   - エンコーダー (DCB の route ごと): `output` (DACCLK)・TMDS の bound head・TV の state
   - フォント `font[4][16384]` (u32、256KiB)
   - `valid` (crtc・enc の保存が揃ったか)・`fonts_valid` (フォントの保存が揃ったか)
-- フォントの 256KiB は static に置かず、保存の時に `pgalloc_alloc_phys` で取る (hwdev/gf/devinit.c:183 の scratch と同じ型)。AR10 bit0=1 (graphics) なら、手本どおり保存しない (V/hw.c:322-326) のでページも取らない。
+- フォントの 256KiB は static に置かず、保存の時に `pgalloc_alloc_phys` で取る (hwdev/gf/devinit.c の scratch と同じ型)。AR10 bit0=1 (graphics) なら、手本どおり保存しない (V/hw.c:322-326) のでページも取らない。
 
 **時機: devinit を実際に走らせた直後の 1 回だけ**
 - `gf4_hw_save(c,l)` を `svc_rom` の 1 か所 (D/service.c:314 の `gf_display_baseline` の後、:316-319 の feature5_deadline・`svc_feature5` の前、`l->owner->release` の前) で呼ぶ。module の寿命で最初の devinit の直後なので、nouveau の create (devinit の後) に当たる。
@@ -115,10 +115,10 @@ S0 7eee4b40 で、owner を CR44 で切り替えて読んだ値。証拠はノ�
   - nouveau 自身も V/disp.c:104-111 で、保存は「load の前の状態」のためと書いている。
 - 保存の順 (A5): **フォント → crtc (head 0・1) → エンコーダー** (V/disp.c:245 → 297-299 → 301-302)。F6 のとおり、フォントの後に読む head 1 の SR01 bit5 は 0 になる (S0 の 20 ではない)。手本どおりこのまま。
 - 保存の前に拡張 CR を解錠する (CR1F=57)。nvkm devinit の `nvkm_lockvgac(false)` (DI/base.c:94) に当たり、今の `svc_detect_prepare` (D/service.c:472) と同じ書き込み。
-- レジスタの読み書きは devinit と同じ `l->io` (production の io) を使う。svc_rom は F1/F2 の前で、まだ `c->ch->f` が無いため。BAR1 の 0〜64KiB は `raw` が許す VRAM の範囲 (hwdev/gf/bus.c:31-32、GF_MODE_VRAM_BYTES まで) に入る。
+- レジスタの読み書きは devinit と同じ `l->io` (production の io) を使う。svc_rom は F1/F2 の前で、まだ `c->ch->f` が無いため。BAR1 の 0〜64KiB は `raw` が許す VRAM の範囲 (hwdev/gf/bus.c、GF_MODE_VRAM_BYTES まで) に入る。
 
 **valid と失敗の扱い (A9・B1)**
-- **保存に失敗しても svc_rom は成功させる** (開始は続ける)。devinit の acquire は module の寿命で 1 回しか試せない (hwdev/gf/devinit.c:175-176 の `p->attempted`) ので、保存の失敗で開始を失敗にすると GF が二度と使えなくなる。手本も保存の失敗で止めない (V/hw.c:330-334、フォントの map に失敗しても記録して続ける)。
+- **保存に失敗しても svc_rom は成功させる** (開始は続ける)。devinit の acquire は module の寿命で 1 回しか試せない (hwdev/gf/devinit.c の `p->attempted`) ので、保存の失敗で開始を失敗にすると GF が二度と使えなくなる。手本も保存の失敗で止めない (V/hw.c:330-334、フォントの map に失敗しても記録して続ける)。
 - フォントのページが取れない、またはフォントの読みが失敗したら、フォントだけ飛ばして `fonts_valid=false` とし、`[gf4] hw save fonts skipped rc=…` を記録する。crtc・enc の保存は続ける。
 - crtc・enc の保存が失敗したら `valid=false` とし、`[gf4] hw save failed stage=… rc=…` を記録する。停止は restore しない (§3-2)。
 - `valid`・`fonts_valid` が true になるのは、それぞれ全部読めたときだけ。どちらも false に戻すのは module の終了 (`gf4_hw_state_reset`。フォントのページもここで返す) だけ。保存は 1 回きりなので、失敗した module の寿命の間は restore しない。
@@ -183,7 +183,7 @@ S0 7eee4b40 で、owner を CR44 で切り替えて読んだ値。証拠はノ�
    - FP_TG → FP_DEBUG 0-2 → MARGIN → 8C0 → A20・A24・A34 → CTV 38 個
 3. `nv_load_state_ext` (:665-772):
    - ENGINE_CTRL を CR33 (LCD) より先に書く (:671-678)。
-   - **PVIDEO_STOP=1・PVIDEO_INTR_EN=0・OFFSET_BUFF(0/1)=0・LIMIT(0/1)・UVPLANE_LIMIT(0/1)=VRAM の量-1・PBUS_POWERCTRL_2=0** (:682-690)。VRAM の量は validate が読む PFB の量 (hwdev/gf/devinit.c:209-213) を使う。
+   - **PVIDEO_STOP=1・PVIDEO_INTR_EN=0・OFFSET_BUFF(0/1)=0・LIMIT(0/1)・UVPLANE_LIMIT(0/1)=VRAM の量-1・PBUS_POWERCTRL_2=0** (:682-690)。VRAM の量は validate が読む PFB の量 (hwdev/gf/devinit.c) を使う。
    - CURSOR_CONFIG・830・834 (:692-694)・GPIO_EXT (:697)・850 (:700)。**PRAMDAC_900 の bit16 は crtc_cfg==HSYNC なら立て、でなければ落とす** (:702-706)。
    - 続く順:
      - CONFIG (:710)
@@ -212,11 +212,11 @@ S0 7eee4b40 で、owner を CR44 で切り替えて読んだ値。証拠はノ�
 
 - 停止の restore が head 0 を起動時の値 (CR17=0、無信号) に戻すので、CUI に戻ると右のモニターは無信号になる。ユーザー決定の「DPMS で切る」はこれで満たされる。
 - **`display_dual_dpms` を外す (段 S5)**。外す所:
-  - 関数 `platform/pc98/display_dual.c:27-37`
-  - 宣言 `kernel/console/console_dual.h:24`
-  - 呼び出し `gfx/gfx_core.c:394` (停止の前の dpms(3)) と `gfx/gfx_core_init.inc:16` (開始の後の dpms(0))
-  - 試験の弱いシンボル `tools/tests/gfx2_backend_reg_host.c:473`・`tools/tests/test_gfx_policy_triggers.py:70`・`tools/tests/sep5_gfx_init_host.c:124`
-  - `tools/tests/console_dual_host.c:92-95・221-223` (A3 DPMS)、`tools/tests/test_console_dual.py:52` (変異 'DPMS call')
+  - 関数 `platform/pc98/display_dual.c`
+  - 宣言 `kernel/console/console_dual.h`
+  - 呼び出し `gfx/gfx_core.c` (停止の前の dpms(3)) と `gfx/gfx_core_init.inc` の `gfx_init_mode()` (開始の後の dpms(0))
+  - 試験の弱いシンボル `tools/tests/gfx2_backend_reg_host.c` の `gfx_scroll_init()`・`tools/tests/test_gfx_policy_triggers.py`・`tools/tests/sep5_gfx_init_host.c`
+  - `tools/tests/console_dual_host.c` (A3 DPMS)、`tools/tests/test_console_dual.py` (変異 'DPMS call')
 - 開始の後の dpms(0) が要らない理由: GUI への再入は毎回 `svc_initial` が `dpms=GF4_ON` の image (D/service.c:372) で modeset し、commit で DPMS ON にする。
 - 外すのは S4 (restore が入る段) の実機の受入 R5 の後。S4 より前に外しても、svc_dpms_on のせいで右に机が止まって映る今の状態と同じなので害は無いが、受入の意味が無くなる。
 
@@ -226,10 +226,10 @@ S0 7eee4b40 で、owner を CR44 で切り替えて読んだ値。証拠はノ�
 
 | 試験 | 直し |
 |---|---|
-| tools/tests/gf4_c2rec_host.c:327-330 | suspend の前後で SR01・CR17・CR1A・DACCLK への書き込みが 0 回、settle が無いことに替える |
-| tools/tests/test_gf_display.py:1264-1270 (変異 `c2rec`/`saved-blank`) | 削除して §5-2 の変異に替える |
-| tools/tests/gf4_c2svc_host.c:339-349 | 停止は常に settle が無く、最初の時計は F3 fini。saved_closed=false の場合も同じ結果になる行を足す |
-| tools/tests/gf4_c2svc_host.c:357 の注記 | "suspend does not write DPMS" に替える |
+| tools/tests/gf4_c2rec_host.c | suspend の前後で SR01・CR17・CR1A・DACCLK への書き込みが 0 回、settle が無いことに替える |
+| tools/tests/test_gf_display.py (変異 `c2rec`/`saved-blank`) | 削除して §5-2 の変異に替える |
+| tools/tests/gf4_c2svc_host.c | 停止は常に settle が無く、最初の時計は F3 fini。saved_closed=false の場合も同じ結果になる行を足す |
+| tools/tests/gf4_c2svc_host.c の注記 | "suspend does not write DPMS" に替える |
 | tools/tests/gf4_c2log_host.c (S0 で足した detect state の欄) | 2 回目の開始の期待値を「1 回目と同じ。ただし SR01 bit5・CR11 bit7・CR21 を除く」にする (fixture は停止の restore を通す) |
 | tools/tests/console_dual_host.c・test_console_dual.py ほか 3 本 | S5 で §4 の行を削除する |
 | gf4_c2stop_host.c・gf5_display_lifetime 系 | 書き込みの数や順を見る行が落ちたら、fixture の CR/SR/RAMDAC の初期値を S0 の 1 回目の値にして直す |
@@ -314,7 +314,7 @@ S0 7eee4b40 で、owner を CR44 で切り替えて読んだ値。証拠はノ�
   - PLL も 1 回目の 51104/80000e02 に戻っていること。
   - 違う欄が出たら、その欄の restore の漏れとして記録する。
 - **R2**: `gfx2_rh` を 2 回続けて回し、PASS と描画を確かめる (カメラ)。
-- **R3**: GUI 中に F5 の suspend/restart (性能段の切り替え、feature5_links.c:152-165) と、診断の STOP→START (command_test.c:195-213) を各 1 回。机が戻ること。(STANDBY のままかの確かめは外した。GUI の間に STANDBY に入れる口が無い、ユーザー決定 2026-11-12「R3 から外す」。)
+- **R3**: GUI 中に F5 の suspend/restart (性能段の切り替え、feature5_links.c) と、診断の STOP→START (command_test.c (call())) を各 1 回。机が戻ること。(STANDBY のままかの確かめは外した。GUI の間に STANDBY に入れる口が無い、ユーザー決定 2026-11-12「R3 から外す」。)
 - **R4**: 停止の時、98 に替わる前に変な表示が一瞬出るかを見る (カメラの連写、記録だけ)。
 - **R5'**: 診断の保存 (diagnostic_saved) を持ったまま停止 → 開始 → 診断の restore で画が戻ること。シリアルに `fonts skipped` が出ること。
 
@@ -334,13 +334,13 @@ S0 7eee4b40 で、owner を CR44 で切り替えて読んだ値。証拠はノ�
 - **:656** の末尾に足す → 「restart は表示の保存をし直さない (保存は svc_rom の 1 か所だけ。restart の未初期化の枝は、restart が hold_saved → suspend → ready → initialized を要するので到達しない)。理由: 実機 (2026-11-12、S0) で 2 回目の開始の値が前の停止の後の GUI の mode (CR17=c3・VPLL 21a07) だったため。OS32 は 2 回目以降に devinit を走らせないので、nouveau の init・resume の保存し直し (V/disp.c:112-121) を写すと GUI の mode を保存してしまう。」
 - **:722 (N3)** → 「- N3 (P3) suspend の前の値: STOP→START で戻す論理 head・DPMS・hold・IRQ は、suspend の前処理 (pending の収束・cursor hide) より前に `hold_saved` へ取る。」
 - **X4 (時計の失敗) の文**に足す → 「時計が読めない gf_display_stop でも、期限の要らない restore (DAC・TV の DACCLK と TV の state、crtc_restore) は下の停止の前に行う。エンコーダー OFF・TMDS の script・フォントの復元は期限か fence が要るので飛ばし、記録する。」
-- **valid の文を新しく置く** → 「表示の保存値は module の寿命で 1 つで、svc_rom の devinit の直後に 1 回だけ取る。保存に失敗しても開始は続ける (devinit の acquire は 1 回しか試せない、hwdev/gf/devinit.c:175-176。手本も V/hw.c:330-334 で記録して続ける)。フォントが取れなければ fonts_valid=false でフォントだけ復元しない。crtc・enc が取れなければ valid=false で、停止は restore しない。valid・fonts_valid を落とすのは module の終了だけ。restore も production の io (l->io) を使う。」
+- **valid の文を新しく置く** → 「表示の保存値は module の寿命で 1 つで、svc_rom の devinit の直後に 1 回だけ取る。保存に失敗しても開始は続ける (devinit の acquire は 1 回しか試せない、hwdev/gf/devinit.c。手本も V/hw.c:330-334 で記録して続ける)。フォントが取れなければ fonts_valid=false でフォントだけ復元しない。crtc・enc が取れなければ valid=false で、停止は restore しない。valid・fonts_valid を落とすのは module の終了だけ。restore も production の io (l->io) を使う。」
 
 ### 8-2. docs/decisions/gui/CONSOLE_DUAL_DESIGN.md
 
 - **:230** → 「- **CUI へ戻る時の GF の head**: 中核から DPMS を呼ばない。停止の restore が起動時の値 (devinit の後の CR17=0、無信号) に戻すので、右のモニターは無信号になる (実機 S0、2026-11-12)。GUI に戻る時は GF の開始の初期 mode (DPMS ON) が点けるので、開始の後の dpms(0) も置かない。`display_dual_dpms` は持たない。」
 - **:232** の A6 の受入の項 → 「A6 の受入に『CUI へ戻ると右のモニターが無信号になり、GUI に戻ると点く』と『端末の sh の ver の結果が 98 にも出る』を足す。」
-- §8 の変異の表から 'DPMS call' (test_console_dual.py:52) を削除し、A3 の通しから DPMS の確認を外す。
+- §8 の変異の表から 'DPMS call' (test_console_dual.py) を削除し、A3 の通しから DPMS の確認を外す。
 
 ## 9. 残る点
 

@@ -162,7 +162,7 @@ static int exec_launch(const char *cmdline, int gui_arg)
                   os32x_layout_check(hdr, (u32)sz, (u32)KAPI_DATA_FIELDS_OFF);
         if (lrc != OS32X_LAYOUT_OK) {
             if (is_shell) g_layout_reject = 1;
-            kprintf(ATTR_YELLOW, "[exec] %s: %s (bin=%x kernel=%x)\n", path,
+            console_printf(ATTR_YELLOW, "[exec] %s: %s (bin=%x kernel=%x)\n", path,
                     os32x_layout_reason(lrc),
                     (lrc == OS32X_LAYOUT_MISMATCH) ? hdr->kapi_data_off : 0u,
                     (u32)KAPI_DATA_FIELDS_OFF);

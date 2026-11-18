@@ -35,7 +35,7 @@
 | 対象 | 数 | 読み方 |
 |---|---|---|
 | 規則の文書 | POLICY_DEV 429 行、POLICY_DEBUG 1,590、CONSTRAINTS 217、ROLES 126、SRC_MOVE 63、CLAUDE.md 103、AGENTS.md 48、skills 12 本 1,442 — 計 4,018 行 | ROLES §0 の「検査」の行 2,614 字に 3 つの流れ (3 段・Tx・実機の版) と承認の日付 6 件が混ざる |
-| 検査の 3 か所 | **`make` の列 237 本** (`check_lists`)、build/checks.d **244** .mk、tools/check_map.d **241** .yaml **8,699 行** (平均 36 入力、82 本が `**` を含む)、tools/tests/test_*.py **313** 本 (mk から呼ばれるのは 181 本、残りは `host32_check` 経由や他の道具 63 本) | 1 検査が 3 ファイルに分かれ、`check_select.py` (1,565 行) が読み合わせる。mk の 43 本は recipe が 2 行以上、4 本は前提の目標を持つ (`check-ver-info-host`、`sdk.mk:174`) |
+| 検査の 3 か所 | **`make` の列 237 本** (`check_lists`)、build/checks.d **244** .mk、tools/check_map.d **241** .yaml **8,699 行** (平均 36 入力、82 本が `**` を含む)、tools/tests/test_*.py **313** 本 (mk から呼ばれるのは 181 本、残りは `host32_check` 経由や他の道具 63 本) | 1 検査が 3 ファイルに分かれ、`check_select.py` (1,565 行) が読み合わせる。mk の 43 本は recipe が 2 行以上、4 本は前提の目標を持つ (`check-ver-info-host`、`sdk.mk`) |
 | 3 か所の追従 | 10-16 以降の非 merge コミットで check_map.d を触ったもの **253**、checks.d 131、tools/tests 491。yaml だけのコミットは **3** | 対応表は「試験を直すたびに一緒に直す」税。独立に価値を足した回数 (3) に対して 250 回の追従 |
 | 所要 | 10-25 の記録 (`n8/check_times.tsv`、198 本、変異なし) 直列 **1,311 s**、181 本は 10 s 未満、静的 3 本 (c-dialect 154・p2v 108・arch-asm 69) で 331 s (25%)。古い記録 (226 本) は 3,195 s だが -j の重なりの下の値で、**38 本が今は無い (kstr-bench を含む)、49 本が未計測** | 今の 237 本の直列の所要は未計測 (記録は 198 本まで)。静的 3 本が 1/4〜1/3 は 2 記録で一致 |
 | 選び方 | `plan()` の mode `sel` は `st = list(par)` = **全部を回し**、変異だけ当たりに絞る (`check_select.py:1402`)。**直近 60 コミット**: 文書だけ 18、`sel` 30 (当たり **中央値 16 本**、最小 2、最大 46)、`full` (安全側で全部) 4、ヘッダを含む 8 は未計測 | 当たりだけ回せば 237 → 16 本 (中央値)。待ちの主因はここ |
@@ -50,7 +50,7 @@ r1 §A-1〜A-7 のまま (CONSTRAINTS 19 → 14 ID、POLICY_DEV 34 → 15 節、
 
 - **ROLES §0「検査」の行** は §C の表 + §C-2 の 1 段落で置き換える。**実機の試験・調べの版の 1 文** (`ROLES.md:17`「ビルドが通ればそのまま実機に入れる … 既定の成果物が基点と同じこと・直接の試験の MUTATE=0」) は消さず、§C の表の註に移す (R-7)。
 - **ROLES §4-1 の「対応表に `Makefile`・`build/*.mk` を直接書かない」** と `--lint` の説明は、対応表が無くなるので消える (§C-2)。
-- **08_build §8-4 の検査の節・`sdk.mk:105-113` の註釈** は「3 か所 + check_select」の説明から「宣言 + ランナー」の説明に書き換える (P2 で、P1 の後 — R-6)。
+- **08_build §8-4 の検査の節・`sdk.mk` の註釈** は「3 か所 + check_select」の説明から「宣言 + ランナー」の説明に書き換える (P2 で、P1 の後 — R-6)。
 - 文書の畳みで新しい操作 (`--files`、`CC_TIER`、`run.py`) に触れる箇所は、**その操作が main に入ってから**書く (R-6)。先に入れてよいのは経緯・日付の削除と写しの除去だけ。
 
 ## B. 安定した部分の試験を外す
@@ -61,7 +61,7 @@ r1 §A-1〜A-7 のまま (CONSTRAINTS 19 → 14 ID、POLICY_DEV 34 → 15 節、
 2. **そのファイルの v3 の「振る舞いを変えた」コミットが直近 1 か月で 2 件以下** (`beh.tsv`、件名から整理・移動・定数・文書・試験を除いた数)。
 3. **外からの境目が凍結** — KAPI の版・部品の契約 (`*_MODULE_ABI_GEN`)・配置の世代に次の票で触れない (ROADMAP・HANDOVER §2)。
 
-**検査を段 4 (tier 4) にできるのは、その検査の covers (§C-2) の .c/.asm/.inc の全部が 1〜3 を満たすとき**。1 本でも満たさないファイルを組む検査は段 4 にしない — これで cd-read (isofs/iso9660.c は 4 件)・dma-pool (mm/dma_pool_math.c は 2 件だが init/kernel.c・fdc.c を組む) は候補から外れる (R-1)。kbd.c 5・serial.c 4・fdc.c 3・pcm_cs4231.c 3・fm.c 3 を組む検査も外れる (R-3)。
+**検査を段 4 (tier 4) にできるのは、その検査の covers (§C-2) の .c/.asm/.inc の全部が 1〜3 を満たすとき**。1 本でも満たさないファイルを組む検査は段 4 にしない — これで cd-read (isofs/iso9660.c は 4 件)・dma-pool (mm/dma_pool_math.c は 2 件だが platform/pc98/kernel.c・fdc.c を組む) は候補から外れる (R-1)。kbd.c 5・serial.c 4・fdc.c 3・pcm_cs4231.c 3・fm.c 3 を組む検査も外れる (R-3)。
 
 ### B-2 候補の実測 (今の yaml を covers の代わりに使った近似)
 
@@ -75,7 +75,7 @@ r1 §A-1〜A-7 のまま (CONSTRAINTS 19 → 14 ID、POLICY_DEV 34 → 15 節、
 | ver-collect-host | platform/pc98/* (0) | 未計測 |
 
 合計 **約 7 秒**。r1 の「45 本・505 s」は (a) 領域ごとの扱い (R-3)、(b) 消えた kstr-bench 238 s (R-8)、(c) 共有試験 (R-1) の 3 つを含んでいた。**段 4 送りは待ちを減らす策ではなく、追従を減らす策**と位置づけ直す: 当たった検査 11 本は横断の整理 (DEP_DIR・SRC_LAYOUT の形) で毎回落ちて直される側で、段 4 なら節目にまとめて追従すればよい。
-今の yaml は include の連鎖 (init/kernel.c・kselftest/** など) を手で並べているので真の covers より広く、§C-2 で covers が「実際に組む .c」に狭まれば候補は増える [推、R2 の変換の後に数え直す]。候補の一覧は PM が R2 で書き、月 1 の棚卸し (§E-4) で見直す。
+今の yaml は include の連鎖 (platform/pc98/kernel.c・kselftest/** など) を手で並べているので真の covers より広く、§C-2 で covers が「実際に組む .c」に狭まれば候補は増える [推、R2 の変換の後に数え直す]。候補の一覧は PM が R2 で書き、月 1 の棚卸し (§E-4) で見直す。
 
 ### B-3 外し方の 3 択 (変更なし、当て先だけ直す)
 
@@ -132,7 +132,7 @@ def run(ctx) -> int:
     ...
 ```
 
-- 静的検査 (p2v・c-dialect・arch-asm・privileged・kprintf-window) は `covers=["**/*.c", "**/*.asm"]`・`scope="files"` で、`ctx.files` に**変わった翻訳単位** (変えた .h を include する .c は gcc -MM の逆引き) を受けて差分だけ見る。今は `--root` しか受けない (`check_p2v.py:247`、`check_arch_asm.py:56`)。段 4 では全部。
+- 静的検査 (p2v・c-dialect・arch-asm・privileged・kprintf-window) は `covers=["**/*.c", "**/*.asm"]`・`scope="files"` で、`ctx.files` に**変わった翻訳単位** (変えた .h を include する .c は gcc -MM の逆引き) を受けて差分だけ見る。今は `--root` しか受けない (`check_p2v.py`、`check_arch_asm.py`)。段 4 では全部。
 - 他の道具を呼ぶだけの検査 (`check-memmap` → `gen_memmap.py --check`、`check-shlib` → `mkshlib.py --check`、63 本) は、`run()` が subprocess で呼ぶ 10 行の検査ファイルにする。道具の本体は動かさない。
 - 生成物を読む検査 (今の `artifact_readers:` 10 本) は `needs=["all"]` + covers に `build/out/**` の読む物。`--lint` の「読み手の登録漏れ」(`check_select.py:1150-1207`) は「covers に無い build/out を読んだ」の 1 検査に縮む。
 - 1 検査に試験スクリプトが 2 本以上 (mk の 43 本、`check-ver-info-host` は 11 本の前提 + 2 本) は、`run()` が順に呼ぶか、`needs` に他の検査の名を書く (前提は 4 本だけ)。
@@ -145,7 +145,7 @@ def run(ctx) -> int:
 4. **段**: 変更の共通の親の深さ → 1〜3、`full` の glob に当たれば 4。宣言漏れはエラー。
 5. **回す**: 段 0〜3 は `{c | c が当たり ∧ c.tier != 4}` とその前提だけ。静的・tier 0・tier 3 の無条件追加はしない。段 4 は全部。変異は `段 ≥ c.mutate_tier` の当たりだけ。
 6. **先に組む**: 回す検査の `needs` の和集合を 1 回 `make`。
-7. **出力**: 今の `check_changed.sh` と同じ `CC_STAGE1`・`CC_MUT1` + `CC_TIER`・`CC_NEEDS`。`make check-changed` (`sdk.mk:134-144`) の形は変えない。
+7. **出力**: 今の `check_changed.sh` と同じ `CC_STAGE1`・`CC_MUT1` + `CC_TIER`・`CC_NEEDS`。`make check-changed` (`sdk.mk`) の形は変えない。
 8. **`--lint`**: 宣言のあるファイルだけが列に載る・covers のパスが実在する・`name` が重複しない・build/out を読むなら needs にある。数秒。
 
 ### C-2-3 今の 3 か所からの移し替え (機械変換 + 同値の確認)
@@ -156,9 +156,9 @@ def run(ctx) -> int:
 
 ### C-2-4 make・CI・スキルとの関係
 
-- `make check-<名>` は残る: `sdk.mk` の `include build/checks.d/*.mk` (`:160`) を **1 つのパターン規則** `check-%: ; python3 tools/checks/run.py --run $*` と `CHECK_PAR_TARGETS := $(shell run.py --list)` に置き換える。`check` / `check-fast` / `check-changed` / `check-par` の名と `MUTATE=` の意味 (`sdk.mk:114-118`) は変えない。
+- `make check-<名>` は残る: `sdk.mk` の `include build/checks.d/*.mk`  を **1 つのパターン規則** `check-%: ; python3 tools/checks/run.py --run $*` と `CHECK_PAR_TARGETS := $(shell run.py --list)` に置き換える。`check` / `check-fast` / `check-changed` / `check-par` の名と `MUTATE=` の意味 (`sdk.mk`) は変えない。
 - CI: `check.yml` の `make check-*` 28 行と `build.yml` の `make check-fast` は**そのまま**。`gen_tests_inventory.py` (mk と check.yml を読む) は `run.py --list --json` を読む形に。
-- スキル: `os32-delegate` :30・:34、`os32-land` :35 の `check_select.py` → `run.py` (5 か所)。`--pack` (依頼文の参照) は使っていれば `run.py --pack` に移す。`test_changes.py:11` の `TEST_PREFIXES` から check_map.d・checks.d を外す。
+- スキル: `os32-delegate` :30・:34、`os32-land` :35 の `check_select.py` → `run.py` (5 か所)。`--pack` (依頼文の参照) は使っていれば `run.py --pack` に移す。`test_changes.py` の `TEST_PREFIXES` から check_map.d・checks.d を外す。
 
 ### C-2-5 消えるもの・残るもの
 
@@ -225,11 +225,11 @@ r1 §E の 6 項に 1 つ差し替え: **6. 試験を足す = 検査ファイル
 
 ## H. 実測の出所 (r2 で足した分)
 
-- 本数: `python3 -c "import check_select as c; ..."` で `check_lists` = 237、`load_map()["checks"]` = 241・入力 8,699・平均 36.1・中央値 25・`**` 82。`ls build/checks.d | wc -l` 244。mk の分類: `grep -l "tools/tests/test_" build/checks.d/*.mk` 181、recipe 2 行以上 43、前提あり 4 (`sdk.mk:174`、`check-ver-info-host.mk`)。
+- 本数: `python3 -c "import check_select as c; ..."` で `check_lists` = 237、`load_map()["checks"]` = 241・入力 8,699・平均 36.1・中央値 25・`**` 82。`ls build/checks.d | wc -l` 244。mk の分類: `grep -l "tools/tests/test_" build/checks.d/*.mk` 181、recipe 2 行以上 43、前提あり 4 (`sdk.mk`、`check-ver-info-host.mk`)。
 - 所要: `~/os32-tmp/run/n8/check_times.tsv` (2026-10-25、198 本、合計 1,310.95 s、10 s 未満 181)。古い `barlen-impl/final-times.tsv` (226 本、3,194.93 s) は今の列と突き合わせて 38 本が無い (kstr-bench は `3937eca9` 2026-10-24 で削除)、49 本が未計測。
 - 選び方: `check_select.py:1402` (`st = list(par)`)、`:1388` (unmatched → 全部)、`:963` (gcc -MM)、`:975-989` (`extract`・`effective_checks`)、`:1150-1207` (lint)、`:1534` (main)。直近 60 コミットの `plan()` の実行: 文書だけ 18・`sel` 30 (当たりの中央値 16)・`full` 4・ヘッダ含み 8 (未計測)。
 - 追従: `git log --since=2026-10-16 --no-merges -- tools/check_map.d` 253、`build/checks.d` 131、`tools/tests` 491、yaml だけのコミット 3。
 - 試験の形: `main` 305、`--mutate` 240、`MUTATIONS` 149、unittest/pytest 59、共有部品の使用数は `grep -l "import host32|from host32"` など (154/144/80/19/14)。
 - 安定の候補: `check_map.d/*.yaml` の kernel 層の .c/.asm/.inc を全部 `beh.tsv` ≤ 2 かつ活発な領域の外で絞る → 11 検査 (B-2 の表)、所要は n8 の値。ファイル単位では 112/297。
-- 規則の行: `ROLES.md:17` (検査の行、実機の調べの版の文)、`:86` (ゲスト受入 3 段の (2))、`:108` (T4 で踏んだもの)。`sdk.mk:105-118` (MUTATE)、`:134-144` (check-changed)、`:150` (HOST32_RUNNERS)、`:156` (host32_check)、`:160` (include checks.d)。`check_p2v.py:247`・`check_arch_asm.py:56` (`--root` だけ)、`check_c_dialect.py:526` (main)。`.github/workflows/check.yml` の `make check-*` 28 行。スキルの参照: `os32-delegate/SKILL.md:30,34`、`os32-land/SKILL.md:35`。`tools/test_changes.py:11`、`tools/gen_tests_inventory.py` 冒頭 (mk と check.yml を読む)。
+- 規則の行: `ROLES.md:17` (検査の行、実機の調べの版の文)、`:86` (ゲスト受入 3 段の (2))、`:108` (T4 で踏んだもの)。`sdk.mk` (MUTATE)、同ファイル内 (check-changed)、同ファイル内 (HOST32_RUNNERS)、同ファイル内 (host32_check)、同ファイル内 (include checks.d)。`check_p2v.py`・`check_arch_asm.py` (`--root` だけ)、`check_c_dialect.py` (main)。`.github/workflows/check.yml` の `make check-*` 28 行。スキルの参照: `os32-delegate/SKILL.md:30,34`、`os32-land/SKILL.md:35`。`tools/test_changes.py`、`tools/gen_tests_inventory.py` 冒頭 (mk と check.yml を読む)。
 - r1 の出所 (§H) はそのまま有効。

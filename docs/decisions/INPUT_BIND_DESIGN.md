@@ -49,7 +49,7 @@
 
 - 実行時の物理scは従来どおりPC98の0..127、BSD表は256行で後半128行のAltGr bankも保持。AT keycode→PC98はhost変換器だけで行い、E0/E1バイトと正規化keycodeを混同しない。
 - **F4 PM 推奨 (ユーザーに提示済み、反論なし)**: 修飾/ロックのspclを受理し、makeで表の操作を確定・保持、breakでは保持した操作を解放 (BSD `R/sys/dev/kbd/kbd.c:1256-1258,1354-1359`)。Caps→Ctrl等がcooked/旧raw modsの両方に効く。
-- 物理held/src/cntを唯一の押下状態とし、表から導くlogical mods/lockは派生状態。新makeでのみUSB共有lockを反転、本体機械式lockはmake/set・break/clear、両者OR。PC98 Kanaは既存IME用派生bitとして維持し、jp.pc98の114=laltは案Bの配布差分で8列ともnopへ変更し、Kanaは表外の派生bitとする。114はnopだが修飾扱いでcooked entryを作らない (`kbd.c:360-383`のis_modと同じ)。案Aでは114=laltを保持しKana機能を外す。
+- 物理held/src/cntを唯一の押下状態とし、表から導くlogical mods/lockは派生状態。新makeでのみUSB共有lockを反転、本体機械式lockはmake/set・break/clear、両者OR。PC98 Kanaは既存IME用派生bitとして維持し、jp.pc98の114=laltは案Bの配布差分で8列ともnopへ変更し、Kanaは表外の派生bitとする。114はnopだが修飾扱いでcooked entryを作らない (`kbd.c`のis_modと同じ)。案Aでは114=laltを保持しKana機能を外す。
 - 表交換は押下中BUSYとして古いmake/新しいbreakの混在を防ぐ。機械式lockの安定ONは妨げず、交換時に物理位置から再導出、USB lockは意味の変わったbitをreset。通常repeatでlockを反転しない。
 - 緊急CTRL+STOP/CTRL+GRPH+DELだけは物理CTRL/GRPH/STOP/DELで判定、表から独立。Caps→Ctrlでは緊急停止を作らず、物理Ctrlを他キーへ変更しても救済を失わない。F4代案:修飾/lockの変更をUNSUPPORTEDとする (BSD踏襲度が下がるため非推奨)。
 - in2はmerge前の物理キー/物理modsを保持しbindingを掛けない。旧rawはsc/downを保持しmodsのみlogical値へ。独占でWMに残すSTOP/CTRL/GRPH/TABは物理scで選別する。
@@ -68,10 +68,10 @@
 
 ## 2a. jp.pc98.kbd と今の OS32 の差分台帳 (N2、案Bで確定)
 
-- 番号は10進/16進、BSD欄と現行欄はbase/shift/ctrl/shift+ctrl/alt/alt+shift/alt+ctrl/alt+shift+ctrlの8列、BSD末尾[]はflgs。`R/share/syscons/keymaps/jp.pc98.kbd`は番号nの行がfile:(n+6)。現行値はhex、`drivers/input/kbd.c:164-215,459-475`の2表+Caps/Ctrl処理 (Altは無作用) を評価した値。
+- 番号は10進/16進、BSD欄と現行欄はbase/shift/ctrl/shift+ctrl/alt/alt+shift/alt+ctrl/alt+shift+ctrlの8列、BSD末尾[]はflgs。`R/share/syscons/keymaps/jp.pc98.kbd`は番号nの行がfile:(n+6)。現行値はhex、`drivers/input/kbd.c`の2表+Caps/Ctrl処理 (Altは無作用) を評価した値。
 - 表はCaps=Num=OFF。Caps=ONでは現行の英字大小反転後に小文字だけCtrl化、BSDはC/N条件で列xor1なので英字Ctrl列にも差がある (同じ英字行に含む)。Numによる追加差は057のNだがbase/shiftは同値、alt+ctrlは両方boot。Kana差は114。raw scの値を比較対象から消さない。
 - ユーザー決定 2026-11-15「文字は BSD、操作は DOS」によりBを採用。比較欄のA=jp.pc98全セル/特殊操作を無変更で評価 (ただし§1の未提供特殊操作は無視)。B=文字キーはBSD、操作キー/旧ナビゲーションbyteは以下の明示差分と出口規則。Bの「LEGACY」は§3のLEGACY_CONTROL、ETXとの区別を維持。BSDの通常文字が新たな制御文字になる差も隠さず採用結果を示す。
-- 今の使い手の略号 (全てrepository file:line): P=`userland/shell/ui.c:773-775`(印字判定/非印字無作用)、E=同`:770`(ESC取消)、T=同`:757`、R=同`:660`、D=同`:748`、U=同`:686`+`userland/cmds/less.c:405`、L=ui`:710`、V=ui`:724`、W=ui`:694`+less`:402`、H=ui`:735`+less`:408`、J=less`:41,411`、I=`kernel/ime/ime.c:289-291`、K=`drivers/input/kbd.c:239-245,366`、G=`drivers/input/kbd.c:476-481`(sc付き旧出口)+`userland/gshell/src/input.rs:108-110,129-130`(同値変換)。Gの行はこの読取範囲で専用CUI操作の使い手が確認できず、推測しない。 F=`userland/shell/cmd_filer.c:44-50,476-508` (byteのESC/上下左右)、LS=`userland/cmds/less.c:38-41,220-225,390,402-411` (ESC/7F/上下)、IN=`userland/system/install.c:255` (ESC)、HD=`userland/system/inst_hdd.c:236` (ESC)、RS=`userland/shell/rshell.c:294,471` (ESC)。台帳には新しく出る制御byteを同じ値として受け取る使い手も含める。uiの矢印/HOME/DELはsc判定で、Ctrl+記号をそのscに合成しない。
+- 今の使い手の略号 (全てrepository file:line): P=`userland/shell/ui.c`(印字判定/非印字無作用)、E=同(ESC取消)、T=同、R=同、D=同、U=同+`userland/cmds/less.c`、L=ui、V=ui、W=ui+less、H=ui+less、J=less、I=`kernel/ime/ime.c`、K=`drivers/input/kbd.c`、G=`drivers/input/kbd.c`(sc付き旧出口)+`userland/gshell/src/input.rs`(同値変換)。Gの行はこの読取範囲で専用CUI操作の使い手が確認できず、推測しない。 F=`userland/shell/cmd_filer.c` (byteのESC/上下左右)、LS=`userland/cmds/less.c` (ESC/7F/上下)、IN=`userland/system/install.c` (ESC)、HD=`userland/system/inst_hdd.c` (ESC)、RS=`userland/shell/rshell.c` (ESC)。台帳には新しく出る制御byteを同じ値として受け取る使い手も含める。uiの矢印/HOME/DELはsc判定で、Ctrl+記号をそのscに合成しない。
 
 |番号|キー|BSDの値 (8列)|今のOS32の値 (8列)|今の使い手|案A「BSDのまま」の結果|案B「文字BSD・操作/制御コード維持」の結果|
 |---|---|---|---|---|---|---|
@@ -162,7 +162,7 @@
 
 ## 3. 文脈・出口・中断
 
-- N1/S6: `exec/exec_abort.inc:73-77`の「GUIの宛先を知るのはWMだけ」を上位規則とする。con_sink有効中、IRQは通常入力の文脈を引かず物理状態/in2/旧raw配送のみ。実行中の裏slotのRUNNING宣言を見てCtrl+Cを中断にしない。既存暴走時の物理CTRL+STOP救済例外だけ維持し、通常ETXには拡張しない。
+- N1/S6: `exec/exec_abort.inc`の「GUIの宛先を知るのはWMだけ」を上位規則とする。con_sink有効中、IRQは通常入力の文脈を引かず物理状態/in2/旧raw配送のみ。実行中の裏slotのRUNNING宣言を見てCtrl+Cを中断にしない。既存暴走時の物理CTRL+STOP救済例外だけ維持し、通常ETXには拡張しない。
 - CUIは前景実行単位のowner/exec_gen/command_gen/contextをIRQ内でsnapshotし、BSD評価→IME優先→端末意味→cooked/操作。GUIはgshellが焦点の実行単位を確定しrawを一度評価、GUI編集か端末意味かを選択して既存WM停止口へ渡す。焦点世代が変われば破棄、GUI注入byteをbridgeで再解釈しない。IRQのlogical mods更新は状態の導出だけで文脈操作を発火しない。
 - N3: 評価結果にCHAR_ETX (spcl=0の表セルがETX)/CHAR/BSD_SPECIAL/LEGACY_CONTROLの種別を持つ。台帳のRLDN等の旧制御コードはLEGACY_CONTROLで、低位byte=03でもVINTR判定に使わない。物理中断は表の通常文字評価が設定VINTRに一致するmake (既定03ではCHAR_ETX、または明示Cmd+.操作)、文字端末serial/LANだけ受信byteで判定。種別は旧ABIへ落とす前に利用し、旧getkeyはscを維持、shellは低位byteだけで再判定せず共通処理を使う。
 - KAPI案 `kbd_policy_context_set(context,flags)` は呼出し実行単位の文脈をFG1で登録する口 (宣言を登録するownerと入力の宛先選択は別)。contextはLINE_EDIT/RUNNING/BYTE_INPUT/GUI、flagsはISIG/ICANON相当のみ。一般アプリの起動/execの宣言なし既定はRUNNING+ISIG。最初の常駐shellはkernelの起動経路が、ユーザーコードへ入る前にLINE_EDIT+ISIG/ICANONを設定する (x86/PPC共通、名前照合による特権ではない)。復帰時は親の文脈へ戻す。
@@ -178,14 +178,14 @@
 |LINE_EDIT / RUNNING / BYTE_INPUT|既定は順にISIG=1,ICANON=1 / ISIG=1,ICANON=0 / ISIG=0,ICANON=0。RUNNINGのcanonical入力はアプリが明示指定。シェル編集と実行中断の配送先を追加区別する|
 
 - **F3 PM 推奨 (ユーザーに提示済み、反論なし)**: PC98 RUNNINGはCtrl+C/裸STOPで実行中アプリを止める。ただしIME変換中は両方ともIMEへ先に渡し、取消の一打を中断へ再投入しない。MacはOS X TerminalのCtrl+C/Cmd+.をSIGINT相当へ。F3代案:裸STOPをIME専用の現行挙動に残す (DOS標準から外れるため非推奨)。
-- IME本体が変換開始/終了時に内部 `kbd_policy_ime_state(active,owner,command_gen)` を公開し、IRQはそのsnapshotを読むだけ。PC98 profileでactive時のSTOP/ETXは取消pendingを専用保持し、FG1のIMEが消費。MacのVINTRは通常の中断経路を使い、旧OS XのIME条件の実証はQ4で記録する。辞書/学習処理をIRQから呼ばず、満杯でも取消を失わない。`kernel/ime/ime.c:289-291`のSTOP取消から接続する。
+- IME本体が変換開始/終了時に内部 `kbd_policy_ime_state(active,owner,command_gen)` を公開し、IRQはそのsnapshotを読むだけ。PC98 profileでactive時のSTOP/ETXは取消pendingを専用保持し、FG1のIMEが消費。MacのVINTRは通常の中断経路を使い、旧OS XのIME条件の実証はQ4で記録する。辞書/学習処理をIRQから呼ばず、満杯でも取消を失わない。`kernel/ime/ime.c`のSTOP取消から接続する。
 - 中断pendingは `{owner,exec_gen,command_gen,reason}`。CUIはIRQ採取時、GUIはWMが焦点宛先を決定した時に固定し、ring3/PPC協調口/待機解除で消費直前に一致確認。要求した文字は次のシェルへ残さず、一度だけ消費、repeatから再要求しない。
-- N4は2種の印を分ける: (1) hwb/実行中断pendingはowner/exec_gen/command_gen不一致で捨て、command_beginで旧印破棄→新世代公開、end/exec終了で消去する。(2) display_restore_pendingは中断世代とは別の冪等な後始末。表示ownerと資源の世代を保持し、FG1のcommand_end/exec終了/STOP回収で `appslot_gfx_owner_exit` 相当を実行してから消す (`exec/exec_abort.inc:8-16`)。
+- N4は2種の印を分ける: (1) hwb/実行中断pendingはowner/exec_gen/command_gen不一致で捨て、command_beginで旧印破棄→新世代公開、end/exec終了で消去する。(2) display_restore_pendingは中断世代とは別の冪等な後始末。表示ownerと資源の世代を保持し、FG1のcommand_end/exec終了/STOP回収で `appslot_gfx_owner_exit` 相当を実行してから消す (`exec/exec_abort.inc`)。
 - 表示復帰はcommand_gen不一致だけで捨てない。表示ownerの資源が既に回収済みなら完了扱い、新ownerの表示を解放しない。IRQでは実行せずpendingを保持し、次コマンド開始前の安全点で後始末完了を保証する。ls中断を次のhwbへ持ち越さず、描画中の組込STOPではテキスト画面へ戻す。
-- 物理CTRL+STOPの既存救済とGUI STOP抑制は維持。V86中はOS側表の操作を配送せず状態追跡のみ、`drivers/input/kbd.c:389-394`の退出経路を保持。PPC非協調コードに中断期限は約束しない。
+- 物理CTRL+STOPの既存救済とGUI STOP抑制は維持。V86中はOS側表の操作を配送せず状態追跡のみ、`drivers/input/kbd.c`の退出経路を保持。PPC非協調コードに中断期限は約束しない。
 - 操作IDはNONE/INTERRUPT/CANCEL_LINE/EOF_INPUT/KILL_TO_BOL/KILL_TO_EOL/REDRAW/CLEAR_VIEW/COPY/CUT/PASTE/UNDO/REDO/SELECT_ALL/SWITCH_APP/CLOSE/BSD_SPECIAL。BSD特殊IDとは別名前空間、未実装受け手にはUNSUPPORTED、新機能を実装して埋めない。
 - 旧getchar/getkey/peek slot/型は維持、ETXは全archで03。`kbd_policy_delivery_set(BYTE|ACTION)` と `kbd_policy_action_read(out,max)` はowner単位の選択式出口、通知 `{u32 action,command_gen,time_ms,value}`、BYTEとACTIONへ同じ入力を二重配送しない。切替は入力pending/composeをflushするがdisplay_restore_pendingは消さず後始末する。
-- 既存 `userland/lib/input/libos32input.h:29-31,61-98,131-162` のinput_bind/INPUT_CTXはゲームのアクション/保存スロットで維持。本票のAPIは `kbd_policy_*`、共有ユーザー処理は同ディレクトリの別 `kbd_policy.c/.h`、INPUT_CTXを端末文脈に転用しない。
+- 既存 `userland/lib/input/libos32input.h` のinput_bind/INPUT_CTXはゲームのアクション/保存スロットで維持。本票のAPIは `kbd_policy_*`、共有ユーザー処理は同ディレクトリの別 `kbd_policy.c/.h`、INPUT_CTXを端末文脈に転用しない。
 - gshellはrawから共有kbd_policy処理を一度呼び、操作が消費したmakeのbreakも通常配送へ漏らさない。焦点交代で押下解消/compose/保留操作を消去。EXCL_KBDではAV規則どおりWMへのCommand操作を止め、アプリが生入力を扱う。
 - F9(a): UTF-8文字の全byte分を確認して全部または無しでリング投入 (欠落数を記録)。途中byteを制御文字へ再解釈しない。peekでは文脈操作を実行しない。
 - F9(b): Mac-CUIのESCは0x1bを保持、行取消にしない。既存のescape列decoderに渡し、未認識の単独ESCは編集側で無作用。PC98のESC取消は保持。
@@ -217,7 +217,7 @@
 |profile|基準/既定|今との差|
 |---|---|---|
 |PC98 CUI (DOS)|jp.pc98基底+§2a案Bの全差分。RUNNINGのCtrl+C/STOPは中断、IME変換中はIME取消優先。編集中ETX/ESC/STOPは行取消。SUB+EnterはEOF、画面消去はCLS|裸STOPは従来cookedのIME取消キー (`ime.c:289`) から、非変換RUNNINGでは中断へ。Ctrl+Cも実行停止/行取消へ変わる。CTRL+STOPは維持|
-|Mac CUI (OS X)|USB JIS/US基底、Ctrl+C=03/Cmd+.はSIGINT相当、編集中Ctrl+Cは取消、ESC取消なし。Ctrl+DはEOF、Ctrl+U/Kは編集、Ctrl+L再描画、Cmd+K表示消去|`platform/powermac/input_keymap.c:33`のCtrl+C→27を廃止。Apple鍵盤に専用Break/Pauseを要求しない|
+|Mac CUI (OS X)|USB JIS/US基底、Ctrl+C=03/Cmd+.はSIGINT相当、編集中Ctrl+Cは取消、ESC取消なし。Ctrl+DはEOF、Ctrl+U/Kは編集、Ctrl+L再描画、Cmd+K表示消去|`platform/powermac/input_keymap.c` の `pm_input_keymap()`のCtrl+C→27を廃止。Apple鍵盤に専用Break/Pauseを要求しない|
 |PC98 GUI (Windows)|Ctrl+X/C/V/Z/Y/A、GRPH+Tab/F4は対応操作通知|Ctrl+Cはコピーであって通常中断ではない。既存救済は残す。未提供操作の実装追加はしない|
 |Mac GUI (OS X)|Cmd+X/C/V/Z/A、Shift+Cmd+Z、Cmd+Tab/Wは対応操作通知|CommandをControl/GRPHと区別、独占中のWMショートカットは配送しない|
 
@@ -242,7 +242,7 @@
 |M8[n]|drivers/usb/hid_kbd_map.c、内部sc宣言、T_usb /300|M1/M3、Command sc監査/追加、全usage照合の期待を同時更新|
 |A0準備/A0z|公開宣言/layout試験を各≤350、親§7のA0zへ合流。原子的kapi.json/生成/版/provider切替の400行例外は親U1と同じ|親A0zの既存依存にM2〜M8を追加、版上げは1回。新中断の有効化はまだしない|
 |U1[n]|userland/lib/input/kbd_policy.c/.h、T_user /380|A0z、既存input_bindと別の操作/文脈ラッパー|
-|U2-x0 / U2-p0|x86: init/kernel.c / PPC: platform/powermac/shell_boot.c、各T_shell /≤350|A0z/U1/M5後、各arch別小段で初期shellのLINE_EDIT接続を先行。起動箇所は下記file:lineで固定|
+|U2-x0 / U2-p0|x86: platform/pc98/kernel.c / PPC: platform/powermac/shell_boot.c、各T_shell /≤350|A0z/U1/M5後、各arch別小段で初期shellのLINE_EDIT接続を先行。起動箇所は下記file:lineで固定|
 |U2[n]|userland/shell/ui.c、T_shell、内部宣言1個 /350|U2-x0/U2-p0後、両archのLINE_EDIT/command_begin/end、EOF/ESC|
 |E-x[n]/E-p[n]|x86: arch/x86/input_interrupt.c (新) / PPC: arch/ppc/input_interrupt.c (新)、共通exec/exec_abort.inc、各T_exec /≤380|A0z/U2/M6/M7、archごとのadapterはこの1ファイルに固定し別段。shell宣言済みで通常中断を有効化|
 |U3g[n]|userland/gshell/src/input.rs、T_gui、ユーザー側結線1個 /380|U1/M3/M8/A0z、GUI操作・独占・make/break消費|
@@ -250,7 +250,7 @@
 |B[n]|§6完了条件のbuild/fixtureを1〜3ファイルずつ /≤350|order/selection/fixture/PPC一覧を全て追従してから当該部品を受入。B単独一段に4ファイルを詰めない|
 |4b-map[n]|platform/powermac/input_keymap.c、ppc_input_usb_host.c、ver-ppc-input-usb.py /350|下記依存全完了、27期待廃止/旧ファイル削除、build除去は直前B|
 
-- B6の現行起動経路 (int-1115k、main a822e11c): x86は `init/kernel.c:407-417` でGUI/CUIを決め、`:450-451`のexec_runでshellを起動するため、U2-x0の接続ファイルはinit/kernel.c。PowerPCは `platform/powermac/shell_boot.c:29-36` のpm_shell_bootからexec_run("/bin/sh.bin")を呼ぶため、U2-p0はplatform/powermac/shell_boot.c。各々、CUI初期shellのユーザーコードへ入る前にLINE_EDITを引き渡す。E-x/E-pは上表の新規adapterから共通exec/exec_abort.incの要求/待機解除へ結線する。
+- B6の現行起動経路 (int-1115k、main a822e11c): x86は `platform/pc98/kernel.c` でGUI/CUIを決め、のexec_runでshellを起動するため、U2-x0の接続ファイルはplatform/pc98/kernel.c。PowerPCは `platform/powermac/shell_boot.c` のpm_shell_bootからexec_run("/bin/sh.bin")を呼ぶため、U2-p0はplatform/powermac/shell_boot.c。各々、CUI初期shellのユーザーコードへ入る前にLINE_EDITを引き渡す。E-x/E-pは上表の新規adapterから共通exec/exec_abort.incの要求/待機解除へ結線する。
 
 |親の段|書き換える依存/責務|
 |---|---|
@@ -259,9 +259,9 @@
 |3c[n]|mode/STOP/flush抽出を3a後に先行し、旧変換で受入可能にする。M2/X-cookedへの逆依存を置かず、X-cookedは3c全段後|
 |4b|従来「4a/3b後」を「4a/M2/M3後」へ変更、PPC旧policyは維持。4b-mapでX-cookedを含む全結線条件を満たして有効化|
 
-- B完了条件 (ROLES §4-3): 新ソースは `build/sources/order.mk` (順)、`build/sources/common.mk`またはarch/platform一覧 (選択)、`tools/tests/fixtures/build_profile_x86.json`のC_KERNEL、PPC像に入る場合 `build/ppc-kboot.mk`一覧へ追従。`check-build-selection-host`・`make all`で確認。
+- B完了条件 (ROLES §4-3): 新ソースは `build/sources/order.mk` (順)、`build/sources/common.mk`またはarch/platform一覧 (選択)、`tools/tests/fixtures/build_profile_x86.json`のC_KERNEL、PPC像に入る場合 `build/targets/ppc-powermac.mk`一覧へ追従。`check-build-selection-host`・`make all`で確認。
 - A0z完了条件 (同§4-3): 版2か所 (kapi.json・生成os32_kapi_shared.h)、README/INDEX/KAPI_SPEC、レビュー済指紋 `tools/tests/fixtures/dep_dir_a/l01.json` kapi_sha256・l04.json api_sha256・l05a.json public_sha256、`tools/tests/hwdev_contract_fixture.py`のHWDEV layout CRC/inventory、`tools/tests/test_ime_display_boundary.py`のFEP_MODULE_ABI_GENを追従。`check-dep-dir-a-l01`〜`l06`・`check-hwdev-image-host`・`check-ime-display-boundary-host`・KAPI audit/ranges/version、`make clean && make all`。
-- 共通箇所の完了条件 (同§4-3): PPC像リンク、手元確認は `PATH=/home/hight/opt/cross-ppc/bin:$PATH make -f build/ppc-kboot.mk KBOOT_SH=1`。新しい製品関数呼出しは兄弟stubを持つ全試験土台 (#include型/python切出し型) をrgで確認して追従。
+- 共通箇所の完了条件 (同§4-3): PPC像リンク、手元確認は `PATH=/home/hight/opt/cross-ppc/bin:$PATH make ARCH=ppc PLATFORM=powermac KBOOT_SH=1`。新しい製品関数呼出しは兄弟stubを持つ全試験土台 (#include型/python切出し型) をrgで確認して追従。
 - 試験の完了条件 (同§4-3): PPC toolchain/QEMU/socket不在は理由付きSKIP・rc=0、OS32_REQUIRE_PPC=1では失敗、`PPC_CROSS_DIR=/nonexistent make check-<名前>`で確認。CHECK covers/basisまたはkind/env_limit/pinsと変異anchorを追従、`tools/checks/run.py --lint`と `python3 ~/os32-tmp/bin/stale_anchor.py <基点>`。一覧/指紋/生成値は手計算せず生成器/試験出力を基点と比較し、意図した変更だけか確認。
 - F10: 4b-mapは親4b・M0〜M8・X-cooked・A0z・U1・U2・E-x・E-p・U3g・Lと対応B完了後。CHECK pinsは `[input-hal/4b-map,input-bind/U3-03,input-bind/F3,input-bind/F4,input-bind/N2-B]`、basisは本票§2/§2a/§3/§5の確定版。旧単独`U3`を残さず、N2のユーザー決定とF3/F4のPM推奨 (ユーザーに提示済み、反論なし) を反映して着手する。
 - host/変異: 列の順/spcl逆向き/lock OR→XOR/AltGr欠落、Caps→Ctrlのcooked/raw整合と物理救済、左右合流/usage差分欠落、UTF-8部分投入、peek副作用を各固有anchorでruntime RED。同じ入力の正常対照は最後の製品変更後に必ずPASS、変異だけREDでも受入しない。

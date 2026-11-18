@@ -1,6 +1,6 @@
 # T2f f1a nano入力台帳のホスト記録
 
-票: `docs/archive/v3/TASK_T2D_T2H.md` §3-5 f1a。
+契約: `docs/design/tools/check_nano_inputs.md` (出所は票 TASK_T2D_T2H §3-5 f1a)。
 
 実toolchainの固定台帳をGREEN対照に、アーカイブhash、member hash、symbol提供元、
 専用名アーカイブの有無、CI receiptの由来/設定/builder、およびreceipt生成の

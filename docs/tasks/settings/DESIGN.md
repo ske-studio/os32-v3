@@ -7,7 +7,7 @@
 
 Windows のレジストリに相当する「設定の置き場」を 1 つに決める。
 実装は従来の DB API に加え、v50 の `db_open_existing`・`db_prepare_only`・bind 群・
-`db_error_code` を使う (`userland/lib/cfg/cfg_backend.c:13`)。
+`db_error_code` を使う (`userland/lib/cfg/cfg_backend.c`)。
 
 ---
 
@@ -60,7 +60,7 @@ ESC で無言のまま CUI へ落とさない (v1.2 S6) のと同じ考え方で
   2. 媒体のマスタをコピー。
   3. `meta.schema_version` を読んで表示し、`sync`。
   4. `system.cfg` は触らない (別の復旧手順。両方壊れたときは `edit` で直す)。
-- 欠損だけなら通常運用の `cfg init` で作成できる (`userland/cmds/cfg.c:535`)。既存 DB の初期化ではなく、残骸も消さない (`userland/lib/cfg/cfg_init.c:4`)。
+- 欠損だけなら通常運用の `cfg init` で作成できる (`userland/cmds/cfg.c`)。既存 DB の初期化ではなく、残骸も消さない (`userland/lib/cfg/cfg_init.c`)。
 - ライブラリ側は「壊れている」と判定しても **自分で消さない**。起動時のメッセージ
   (`settings.db unreadable: boot from install disk and run install --recover-settings`) を出し、
   コード内の最小既定値で動く (§5)。
@@ -128,7 +128,7 @@ int   cfg_begin(CfgDb *db); int cfg_commit(CfgDb *db); int cfg_rollback(CfgDb *d
 int   cfg_status(const CfgDb *db);                     /* CFG_OK / CFG_MISSING / CFG_CORRUPT / CFG_VERSION */
 ```
 
-- `cfg_open(writable=0)` は読み取り専用で開き、`writable=1` は書き込み用に開く。open は `BEGIN` しないので、変更前に `cfg_begin(db)` を呼ぶ (`userland/lib/cfg/libos32cfg.c:424`)。
+- `cfg_open(writable=0)` は読み取り専用で開き、`writable=1` は書き込み用に開く。open は `BEGIN` しないので、変更前に `cfg_begin(db)` を呼ぶ (`userland/lib/cfg/libos32cfg.c`)。
   **開きっぱなしにしない**: SQLite のプール (384KB、FEP 辞書と共有) を占有しないため、
   読むときは open → get → close、書くときは open → begin → set… → commit → close。
 - 既定値は呼び出し側が渡す (`def`)。ライブラリは「無ければ def」で、DB が無いときも同じ振る舞い

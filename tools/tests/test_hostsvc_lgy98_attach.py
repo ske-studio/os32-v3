@@ -9,7 +9,7 @@ CHECK = dict(name='hostsvc-lgy98-attach', tier=1, needs=[], budget=3.4, covers=[
     'sdk/include/os32/os32_kapi_shared.h', 'tools/tests/hostsvc_fixture.h',
     'tools/tests/hostsvc_fixture.c', 'tools/tests/hostsvc_lgy98_attach_host.c',
     'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'build/config.mk'],
-    basis=['NET_HOSTSVC_DESIGN §2', 'NET_HOSTSVC_DESIGN §3'],
+    basis=['docs/design/net/nic.md 装置の選択と寿命', 'docs/design/fs/serialfs/serialfs_persistent.md 何をするか'],
 )
 import argparse
 import os

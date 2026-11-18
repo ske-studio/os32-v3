@@ -1,7 +1,8 @@
 # B6 / B7 — `vfs_path_kind()` と、それを消費する `vfs_open()` (ホスト試験の記録)
 
-- 票: `docs/archive/shell/HSYNC_IMPROVEMENT_PLAN.md`
-  (票 H1) / Codex 実装レビュー 往復 3 の **B6**、往復 4 の **B7**。退行が入ったのは `d574704`
+- 契約: [vfs_path_kind](../../docs/design/fs/vfs_path_kind.md) (種別の判定と受け手) /
+  [vfs_fd_open](../../docs/design/fs/vfs_fd_open.md) (open の受け手)。
+  出所は票 H1 / Codex 実装レビュー 往復 3 の **B6**、往復 4 の **B7**。退行が入ったのは `d574704`
 - 上位の記録: [`h1_tdd.md`](h1_tdd.md) — H1 全体の RED→GREEN はそちら
 - 実行: `python3 -B tools/tests/test_vfs_kind.py [--target]`
   (`make check-fs-kind-host` が同じものを `--target` 付きで回す)

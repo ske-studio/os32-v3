@@ -2,7 +2,7 @@
   "schema": 1,
   "contracts": [
     "drivers/ata/cd_module.h",
-    "drivers/base/dev.h",
+    "kernel/dev/dev.h",
     "fs/vfs.h"
   ],
   "imports": [
@@ -16,13 +16,13 @@
       "symbol": "dev_find",
       "context": "normal",
       "irq": false,
-      "source": "drivers/base/dev.h"
+      "source": "kernel/dev/dev.h"
     },
     {
       "symbol": "dev_blk_read_lba",
       "context": "normal",
       "irq": false,
-      "source": "drivers/base/dev.h"
+      "source": "kernel/dev/dev.h"
     },
     {
       "symbol": "kfree",
@@ -88,7 +88,7 @@
       "symbol": "dev_media_check",
       "context": "normal",
       "irq": false,
-      "source": "drivers/base/dev.h"
+      "source": "kernel/dev/dev.h"
     },
     {
       "symbol": "vfs_fd_stale_mount",

@@ -160,7 +160,7 @@ static u32 native_cache_bits(u32 a)
 |各段|build/checks.d/check-dep-dir-c-memory-host.mk、tools/check_map.d/check-dep-dir-c-memory-host.yaml|新規各20～40、選択検査へ登録|
 |各段|既存tools/testsの該当runner/shim、関連tools/check_map.d/*.yaml|変更各0～25、依存パス/コピー/リンク/変異先を追従|
 |必要時|kernel/module/kdebug_imports.def等の実装元指定|変更0～数行、移動したsourceのみ、symbol/slot固定|
-|記録|docs/tasks/v3/TASK_DEP_DIR.md|変更5～10、実施した受入・保留・証拠のみ記録|
+|記録|docs/archive/v3/TASK_DEP_DIR.md|変更5～10、実施した受入・保留・証拠のみ記録|
 
 ## 7. 受入 → 試験・変異、既存利用者、段分け
 

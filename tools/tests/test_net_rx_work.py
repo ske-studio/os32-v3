@@ -2,7 +2,7 @@
 CHECK = dict(name='net-rx-work-host', tier=4, needs=[], budget=8,
     covers=['tools/tests/rx_io_clock.h', 'tools/tests/idle_io_sources.py', 'kernel/io_work.[ch]',
             'kernel/io_clock.h', 'kernel/io_policy.[ch]', 'exec/appslot.h',
-            'kernel/time/tick_clock.h', 'net/link_platform.h', 'platform/pc98/link_platform_inline.h', 'net/nic.c', 'net/nic.h', 'net/nic_rx.c', 'net/nic_rx.h',
+            'kernel/time/tick_clock.h', 'net/link_platform.h', 'platform/pc98/platform_link_inline.h', 'net/nic.c', 'net/nic.h', 'net/nic_rx.c', 'net/nic_rx.h',
             'net/rx_work.c', 'net/rx_work.h', 'net/link.h',
             'kernel/idle_work.c', 'kernel/idle_work.h', 'kernel/irq/tick.h',
             'kernel/irq/tick_budget.h', 'kernel/irq/tick_budget.c',
@@ -85,10 +85,10 @@ def verify(work, mutation=None, link=False):
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_text(source)
     # Override only the platform scheduling constant, retaining PC-98 host IRQs.
-    header = (ROOT / 'platform/pc98/link_platform_inline.h').read_text()
+    header = (ROOT / 'platform/pc98/platform_link_inline.h').read_text()
     anchor = '#define LINK_PLATFORM_TICK_RX_LGY98_SLOT 0'
     assert header.count(anchor) == 1
-    (work / 'link_platform_inline.h').write_text(header.replace(
+    (work / 'platform_link_inline.h').write_text(header.replace(
         anchor, '#define LINK_PLATFORM_TICK_RX_LGY98_SLOT ' + str(int(link))))
     product = (ROOT / 'kernel/io_work.c').read_text()
     if mutation and mutation[0] == 'kernel/io_work.c':

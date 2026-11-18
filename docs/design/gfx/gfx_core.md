@@ -8,9 +8,9 @@
 
 RAM CLIENT 300 KiB と BAR1+[0,4B000h) の DISPLAY を SURFACE 台帳へ別登録し、`bb_base/bb_size/bb_pitch` と framebuffer API は CLIENT を返す。**PEGC と GF の CLIENT は一方だけ予約**し、600 KiB の二重確保を避ける（F10）。
 モード一覧は 1 行、`gfx_init_200` の packed=480 選択を保つ。
-**`GFX=geforce` は `GUI≠1` のとき許す**（F5・N4）。起動予約前に既存の設定読取りで判定し、GUI=1 なら拒否して pc98 を選ぶ。GUI 省略時は既定値 0（`O/init/kernel.c:521`）。最初の `gfx_init`（GUI または CUI の描画アプリ）で、承認待ち無しに devinit を一度行う（N5、`O/gfx/gfx_core.c:960,1014`）。
-これで再起動時は GF devinit に入らず 98 CUI へ戻れる。起動時上書きキー等の新しい脱出機構や auto 優先候補化は足さない（`O/init/kernel.c:343–366,577–582`）。
-prepare は識別/資源確認だけ。init で `video_start`→初回転送→98 セル確認→route01 確認まで行い、初回 enter は無操作。void init 後の probe=0 で既存失敗出口へ渡す（`O/gfx/gfx_core.c:932–945`）。
+**`GFX=geforce` は `GUI≠1` のとき許す**（F5・N4）。起動予約前に既存の設定読取りで判定し、GUI=1 なら拒否して pc98 を選ぶ。GUI 省略時は既定値 0（`platform/pc98/kernel.c`）。最初の `gfx_init`（GUI または CUI の描画アプリ）で、承認待ち無しに devinit を一度行う（N5、`gfx/gfx_core.c`）。
+これで再起動時は GF devinit に入らず 98 CUI へ戻れる。起動時上書きキー等の新しい脱出機構や auto 優先候補化は足さない（`platform/pc98/kernel.c` の `kernel_shell_loop()`）。
+prepare は識別/資源確認だけ。init で `video_start`→初回転送→98 セル確認→route01 確認まで行い、初回 enter は無操作。void init 後の probe=0 で既存失敗出口へ渡す（`gfx/gfx_core.c`）。
 **GF 初期化失敗時は pc98 へ落とす**（同:937）。ただし legacy decode 解放未確認では planar 初期化/98 VRAM 書込みを行わず、gfx_started=0、既存 serial/再起動経路へ留める。安全条件を init/init_200 と故障出口に通す。
 表示中の転送/palette/再 enter 失敗も stop→route00→既存 GUI 終了境界→面の再結線へ進む。使用中の GUI の下で寸法の違う BB へ即時に差し替えず、KAPI の void 型は維持する。
 
@@ -82,14 +82,24 @@ static int gfx_select_mode(GfxBackend *be, int legacy200);
 
 - PEGC CLIENT は候補識別時に 75 頁=300 KiB を予約、DISPLAY は既存リニア窓内の 300 KiB。
 
-- **起動時の予約と面の型板は変更しない**。gfx_core.c:313–359,442–445 は memmap 等の現行容量定数を使い続ける。
+- **起動時の予約と面の型板は変更しない**。gfx_core.c は memmap 等の現行容量定数を使い続ける。
 - 登録済みの mode を選ぶ時だけ、計算した pitch×height×planes と既存 CLIENT/DISPLAY の容量を照合する。PC98 は固定 plane_offset の最終端でも照合する。
 - init のたびに追加確保・移動しない。型板を表から生成する変更、boot の候補表最大値計算は範囲外。
 - gfx_kernel_framebuffer は選択後に mode の幅と現在高さを使い、未開始時は boot PC98 の既存寸法を維持する。
-- SURFACE の PC98 200 時の収納高さ 400 は維持し、公開 framebuffer の高さ 200 と区別する（gfx_core.c:192–199）。
+- SURFACE の PC98 200 時の収納高さ 400 は維持し、公開 framebuffer の高さ 200 と区別する（gfx_core.c）。
 - lease は既存の台帳 npages と plane_offset をそのまま使用。exec/lease.c と exec/surface_query.h は変更不要。
 - 再 init の既存 revoke→bind→完了処理と面世代を維持する。モードポインタを更新しただけで古いリースを再利用しない。
 
 確定の B1 の高さの式 (`gfx_started ? gfx_current_height : gfx_backend_mode(be)->height`) は gfx_core.c の static な `gfx_started` を使う
 
 98 の 16 色のバックエンドは init の関数を持たない (gfx_core.c が init=NULL を見て GDC を初期化する)。
+
+## KAPI 引数の範囲 (`gfx/gfx_core_api.inc`・`gfx/gfx_internal.h`)
+
+> 出所: TASK_T2D_T2H (T2e の KAPI の範囲検査の欠落の修正) の契約を今のソースと照らして要約 (2026-11-18)
+
+- `gfx_lease_palette(first, count, rgb)`: `count <= 0`・`first < 0`・rgb が NULL は `OS32_ERR_INVAL`。256 色機 (lease の範囲がある) は `[lease_first, lease_first + lease_count)` の中だけ、16 色機は `first < 16` かつ `count <= 16 - first`。和 (`first + count`) を作ってから比べず、`count <= limit - first` の形で桁あふれを避ける。
+- 矩形のクリップは `gfx_clip_screen` に集める。PEGC・Cirrus の backend (`drivers/video/pc98/backend_pegc.c`・`drivers/video/cirrus/backend_cirrus.c`) と dirty の登録はこれを通し、画面の外の矩形は転送しない・巨大な幅と高さは最終画素へ切る。Cirrus のエンジンへ渡す引数は画面の中に収まる。
+- スクロール量は `gfx/gfx_scroll.c` で現在の高さの剰余にしてから足す (`INT_MIN`・`INT_MAX` でも表示の範囲に収まる)。
+
+検査は `tools/tests/test_kapi_bounds.py` と `tools/tests/test_gfx_bounds.py` (`test_gfx_kernel_fb.py` の 3 backend・台帳・paging の足場を再利用し、PEGC の面の後方 16 B の番兵が変わらないことまで見る)。

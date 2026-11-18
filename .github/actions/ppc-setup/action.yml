@@ -21,6 +21,12 @@ runs:
       with:
         path: ~/opt/cross-ppc
         key: ${{ steps.key.outputs.key }}
+    - name: Toolchain build dependencies (cache miss only)
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends build-essential libgmp-dev libmpfr-dev libmpc-dev texinfo bison flex
     - name: Build powerpc-elf toolchain (cache miss only)
       if: steps.cache.outputs.cache-hit != 'true'
       shell: timeout 3600 bash --noprofile --norc -e -o pipefail {0}

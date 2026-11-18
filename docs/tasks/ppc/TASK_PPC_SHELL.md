@@ -21,7 +21,7 @@
 全文は [PPC_SHELL_DESIGN](../../decisions/ppc/PPC_SHELL_DESIGN.md)。最終の到達点 S-B (USER の ABI・exec の facade) は [PPC_SHELL_EXEC_DESIGN](../../decisions/ppc/PPC_SHELL_EXEC_DESIGN.md)。
 
 - LAN の端末: PLN1 に端末の型 4 つ (OPEN・IN・OUT・STATE)。出力は「届く分だけ + 欠落数」、入力の欠落はその行を実行しない。所有は lan_terminal.c、送信予算は LOG と OUT で計 4、STATE は枠の外。
-- root: ISO9660 の読み取り専用 image を起動像に同梱 (tools/mkroot_image.py)、共通の口 include/boot_root.h と RAM の block device drivers/block/ram_ro.c (cd0 として登録)。名前の表は platform/powermac/root_boot.c が mount の前に登録。/tmp に新しい小さな ramfs (fs/ramfs/)。
+- root: ISO9660 の読み取り専用 image を起動像に同梱 (tools/mkroot_image.py)、共通の口 include/boot_root.h と RAM の block device kernel/dev/ram_ro.c (cd0 として登録)。名前の表は platform/powermac/root_boot.c が mount の前に登録。/tmp に新しい小さな ramfs (fs/ramfs/)。
 - 開発用の小さな CLI: kernel/cli/resident_cli.c (help・echo・cat と `> ファイル`)、端末と poll は resident_cli_ops の口で受ける。
 - 段: W0 (宣言) → W1 (部品) → W2 (接続) → W3 (PPC の起動に結線・閉包リンク・S-A の通し受入) → W4 (S-B の詳細設計) → W5 (S-B) → W6 (PC-98 の FD 起動から共通 RAM root、本線) → W7 (sh.bin、製品の起動) → W8 (書ける媒体の後 mount) → W9 (移植の手順書 PORT_FLOW に立ち上げの順)。
 - 共通の場所の部品 (include/・fs/・drivers/block/・init/・kernel/) に触る段は、出す前に本線の PM に知らせる。include/memmap.h と include/config.h は変えない。

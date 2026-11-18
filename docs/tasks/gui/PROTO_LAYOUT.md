@@ -17,15 +17,15 @@
 `GuiEvent` は種別・sub・serial・WindowId の共通ヘッダと payload を持つ。
 WindowId は index と generation を含み、Widget の value は packed の非整列フィールド。
 各構造体の型・サイズ・オフセットは
-[`os32_gui_shared.h:233–287`](../../../sdk/include/os32/os32_gui_shared.h) の構造体と `STATIC_ASSERT` を参照する。
+[`os32_gui_shared.h`](../../../sdk/include/os32/os32_gui_shared.h) の構造体と `STATIC_ASSERT` を参照する。
 
 ## SHM 予約 (memmap.h)
 
 GUI は SHM 末尾の予約範囲をスロットに分割する。
-容量と範囲は [`memmap.h:167・192–194`](../../../include/memmap.h) の
+容量と範囲は [`memmap.h`](../../../include/memmap.h) の
 `MEM_SHM_SIZE` / `MEM_SHM_GUI_SIZE` / `MEM_SHM_GUI_OFFSET`、
-アプリからの計算は [`os32_gui_shared.h:383–385`](../../../sdk/include/os32/os32_gui_shared.h) の `GUI_SHM_OFFSET` / `GUI_SLOT_SIZE` / `GUI_SLOT_MAX` が正典。
-[`mm/shm.c:119–122`](../../../mm/shm.c) はこの範囲を `SHM_RESERVED` に固定し、
+アプリからの計算は [`os32_gui_shared.h`](../../../sdk/include/os32/os32_gui_shared.h) の `GUI_SHM_OFFSET` / `GUI_SLOT_SIZE` / `GUI_SLOT_MAX` が正典。
+[`mm/shm.c`](../../../mm/shm.c) はこの範囲を `SHM_RESERVED` に固定し、
 `shm_alloc` は配らず、`shm_free` / `shm_cleanup_all` は触らない。
 
 ## 番号・上限・色

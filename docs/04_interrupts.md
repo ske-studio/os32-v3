@@ -28,9 +28,9 @@ PC-98のPICはPC/ATと異なるポートアドレスとカスケード構成を�
 |------|-----|
 | カウンタ#0 ポート | 0x71 |
 | モードレジスタ | 0x77 |
-| システムクロック | 1,996,800 Hz (8MHz系) / 2,457,600 Hz (10MHz系)。`kernel/time/sysclk.c` が BIOS ワーク領域から判定 |
+| システムクロック | 1,996,800 Hz (8MHz系) / 2,457,600 Hz (10MHz系)。`platform/pc98/sysclk.c` が BIOS ワーク領域から判定 |
 | 割り込み周波数 | 100 Hz |
-| カウント値 | 19,968 / 24,576 (両系とも 100 Hz、`platform/pc98/pit_math.c:69`) |
+| カウント値 | 19,968 / 24,576 (両系とも 100 Hz、`platform/pc98/pit_math.c` の `pit_compute()`) |
 | グローバル変数 | `tick_count` (volatile u32) |
 
 ---

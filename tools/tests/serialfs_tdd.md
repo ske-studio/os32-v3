@@ -1,7 +1,8 @@
 # serialfs 検証記録 (シリアル越しの /host、`sfs run`)
 
-票: TASK_SERIAL_HOSTFS (アーカイブ: `docs/archive/realhw_v21/TASK_SERIAL_HOSTFS.md`) 部品 B
-(§1-v2 / §1-v3 / ユーザー決裁 2026-09-24)。受入 T1 と T5 のホスト部分。
+契約: `docs/design/fs/serialfs/sfs_client.md` (フレーム・再送・期限・線の死・ホスト側)・
+`docs/design/fs/serialfs/serialfs_session.md` (`sfs run` の流れ・ゲート)・`docs/design/fs/serialfs/serialfs.md` (VFS の契約)、
+`.old` の門は `docs/manpages/hsync.1`「カーネルの .old」。TASK_SERIAL_HOSTFS の受入 T1 と T5 のホスト部分。
 
 ## この文書の性格
 

@@ -2,7 +2,7 @@
 """KCG packing acceptance through the CHECK runner."""
 CHECK = dict(name='kcg-lz4-host', tier=1,
     covers=['tools/gen_font16.py', 'tools/gen_g16.py', 'tools/mkroot_image.py',
-     'build/ram-root.mk', 'build/ppc-kboot.mk', 'build/assets.mk', 'build/font-fetch.mk',
+     'build/ram-root.mk', 'build/targets/ppc-powermac.mk', 'build/assets.mk', 'build/font-fetch.mk',
      'assets/fonts/**', 'tools/fetch_fonts.py', 'tools/gen_unicode.c',
      'lib/unicode_jis_table.h', 'kernel/console/unicode_file.h', 'include/endian_le.h',
      'include/types.h', 'include/callconv.h', 'build/ppc-ram-root.json', 'include/config.h',

@@ -43,6 +43,7 @@ void pm_terminal_poll(void)
     depth--;
 }
 #include "stream.inc"
+#include "utf8.inc"
 #include "log.inc"
 #include "clear.inc"
 static void finish(int rc)

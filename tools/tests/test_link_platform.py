@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Compile the standalone link platform contract for host and PowerPC."""
 CHECK = dict(env=['ppc-cross'], name='link-platform-host', tier=2, budget=10, needs=[], covers=[
-    'platform/pc98/link_platform_inline.h', 'platform/pc98/link_platform.c', 'net/link_platform.h', 'net/link_selftest.inc', 'include/types.h', 'include/callconv.h',
+    'platform/pc98/platform_link_inline.h', 'platform/pc98/link_platform.c', 'net/link_platform.h', 'net/link_selftest.inc', 'include/types.h', 'include/callconv.h',
     'tools/tests/test_link_platform.py', 'tools/tests/host32.py',
     'kernel/idle_work.h', 'arch/x86/kernel/idt.h', 'include/io.h'],
     basis=['LAN_OPERATOR_DESIGN §5', 'ARCH_COMPAT_CONTRACT §4.1'],
@@ -49,7 +49,7 @@ def run(ctx):
         (work / 'kernel/idle_work.h').write_text('void idle_wait_step(void);\n')
         probe = r'''#include "net/link_platform.h"
 #ifdef TEST_PC98_INLINE
-#include "platform/pc98/link_platform_inline.h"
+#include "platform/pc98/platform_link_inline.h"
 #endif
 #include "kernel/irq/tick.h"
 static unsigned int registered_slot;
@@ -108,7 +108,7 @@ void _start(void) {
         probe = probe.replace('/* BOOT_WAIT */', selftest[start:end])
         (work / 'runtime.c').write_text(probe)
         products = [(ctx.root / 'platform/pc98/link_platform.c').read_text(),
-                    (ctx.root / 'platform/pc98/link_platform_inline.h').read_text()]
+                    (ctx.root / 'platform/pc98/platform_link_inline.h').read_text()]
         (work / 'platform/pc98').mkdir(parents=True)
         mutations = [
             ('return tick_register(PC98_TICK_LINK, fn);', 'return tick_register(0, fn);', 'tick slot'),
@@ -124,7 +124,7 @@ void _start(void) {
                 assert product.count(a) == 1
             for text, label in variants:
                 (work / 'platform.c').write_text(products[0] if inline else text)
-                (work / 'platform/pc98/link_platform_inline.h').write_text(
+                (work / 'platform/pc98/platform_link_inline.h').write_text(
                     text if inline else products[1])
                 exe = work / 'runtime'
                 subprocess.run(['gcc', '-m32', '-std=gnu11', '-O2', '-Wall',

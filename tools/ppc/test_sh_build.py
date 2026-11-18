@@ -37,7 +37,7 @@ def main():
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
         shutil.copy(ROOT / 'Makefile', root)
-        for name in ('build', 'sdk', 'userland', 'include', 'drivers', 'lib', 'kdebug', 'hwdev', 'tools'):
+        for name in ('build', 'sdk', 'userland', 'include', 'drivers', 'fs', 'lib', 'kdebug', 'hwdev', 'tools'):
             shutil.copytree(ROOT / name, root / name,
                             ignore=shutil.ignore_patterns('out', '*.o', '*.d', '*.bin', '*.elf', '*.raw', 'target'))
         (root / 'net').mkdir()

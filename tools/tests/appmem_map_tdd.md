@@ -1,6 +1,7 @@
 # T2f f3 map transaction のホスト試験記録
 
-票: `docs/archive/v3/TASK_T2D_T2H.md` §3-5 f3。
+契約: `docs/design/mm/paging_app.md`・`docs/design/exec/appmem.md` の「map の取引」「unmap」、
+USER の exec_heap (f9/f10) は `docs/design/exec/exec_heap.md` の「USER の exec_heap」(出所は票 TASK_T2D_T2H §3-5 f3〜f10)。
 PM 判断 `/home/hight/os32-tmp/ref_f3.md` §8 Q1〜Q10 を適用する未結線の先行準備。
 実 [appmem.c](../../exec/appmem.c)、[appmem_map.c](../../exec/appmem_map.c)、
 [paging_app.c](../../mm/paging_app.c)、paging/pgalloc/physmem を ILP32 で連結する。

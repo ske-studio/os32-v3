@@ -77,7 +77,7 @@ EEPROM の未知のシーケンスを初期化の必須条件にしない。
 | `drivers/net/ne2000/ne2000.h` | カーネル内部 API、状態、結果コード |
 | `drivers/net/ne2000/ne2000_regs.h` | レジスタ定数の正典。NASM が必要な定数は生成 include で共有 |
 | `arch/x86/kernel/isr_stub.asm` / `arch/x86/kernel/idt.c` | NIC IRQ 入口・登録・EOI の責任を一元化 |
-| `init/kernel.c` / `include/config.h` | 無効が既定の起動設定、初期化順 |
+| `platform/pc98/kernel.c` / `include/config.h` | 無効が既定の起動設定、初期化順 |
 | `build/kernel.mk` | C/ASM ソースと必要な include path・生成依存関係 |
 
 汎用ネットワークフレームワークや関数ポインタ式のバス抽象化は最初は作らない。

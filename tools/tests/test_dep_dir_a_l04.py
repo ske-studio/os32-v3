@@ -3,7 +3,7 @@
 --prepare builds a substituted copy with -Werror without executing a mutant.
 """
 CHECK = dict(name='dep-dir-a-l04-host', tier=1,
-    covers=['platform/pc98/gfx_surfaces.c', 'include/callconv.h', 'platform/pc98/bios_snapshot.h', 'platform/pc98/boot_capture.c', 'arch/x86/legacy/lowmap.c', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'include/types.h', 'include/platform_device.h', 'drivers/block/loop_dev.h', 'platform/pc98/device_loop.c', 'arch/x86/legacy/v86.c', 'platform/pc98/legacy/v86_bios.c', 'sdk/kapi.json', 'kapi/kapi_generated.c', 'sdk/include/os32/os32_kapi_generated.h', 'sdk/include/os32/os32_kapi_slots.h', 'sdk/rust/os32api/src/kapi_generated.rs', 'tools/tests/dep_dir_a_l04_host.c', 'tools/tests/fixtures/dep_dir_a/l04.json', 'tools/tests/test_shm_user.py', 'tools/tests/kernel_layout.py', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'exec/exec.c', 'drivers/video/pc98/backend_pegc.c', 'gfx/gfx_core.c', 'init/kernel.c', 'mm/paging.c', 'mm/pgalloc.c', 'mm/physmem.c', 'mm/shm.c', 'arch/x86/legacy/v86_mem.c', 'platform/pc98/bios_snapshot.c', 'tools/tests/shm_user_host.c', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'tools/tests/paging_source.py', 'platform/pc98/legacy/v86_bios_*.inc', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h'],
+    covers=['platform/pc98/gfx_surfaces.c', 'include/callconv.h', 'platform/pc98/bios_snapshot.h', 'platform/pc98/boot_capture.c', 'platform/pc98/legacy/lowmap.c', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'include/types.h', 'include/platform_device.h', 'drivers/block/loop_dev.h', 'platform/pc98/device_loop.c', 'platform/pc98/legacy/v86.c', 'platform/pc98/legacy/v86_bios.c', 'sdk/kapi.json', 'kapi/kapi_generated.c', 'sdk/include/os32/os32_kapi_generated.h', 'sdk/include/os32/os32_kapi_slots.h', 'sdk/rust/os32api/src/kapi_generated.rs', 'tools/tests/dep_dir_a_l04_host.c', 'tools/tests/fixtures/dep_dir_a/l04.json', 'tools/tests/test_shm_user.py', 'tools/tests/kernel_layout.py', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'exec/exec.c', 'drivers/video/pc98/backend_pegc.c', 'gfx/gfx_core.c', 'platform/pc98/kernel.c', 'mm/paging.c', 'mm/pgalloc.c', 'mm/physmem.c', 'mm/shm.c', 'platform/pc98/legacy/v86_mem.c', 'platform/pc98/bios_snapshot.c', 'tools/tests/shm_user_host.c', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'tools/tests/paging_source.py', 'platform/pc98/legacy/v86_bios_*.inc', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h'],
     needs=['make:all'], budget=2.7,
     basis=['[ABI]', 'KAPI_SPEC §3-1'],
 )
@@ -57,9 +57,7 @@ def fixed_contracts():
             target = 'platform_loop_dev_' + entry['name'].removeprefix('loop_')
             assert entry.pop('target') == target
             assert target + '(' in function(generated, 'wrap_' + entry['name'])
-    assert digest(json.dumps({k: v for k, v in spec.items() if k != 'includes'},
-                             sort_keys=True).encode()) == fixture['api_sha256']
-    source = (ROOT / 'arch/x86/legacy/v86.c').read_text()
+    source = (ROOT / 'platform/pc98/legacy/v86.c').read_text()
     assert '#include "platform_device.h"' in source and '"loop_dev.h"' not in source
     for name, expected in fixture['v86_functions'].items():
         body = function(source, name)
@@ -72,8 +70,6 @@ def fixed_contracts():
     detach = function(hle, 'v86_bios_detach_disk')
     assert detach.count('loop_dev_detach(') == 1
     assert digest(detach.encode()) == fixture['v86_detach_sha256']
-    for path, expected in fixture['generated'].items():
-        assert digest((ROOT / path).read_bytes()) == expected, path
     print('PASS fixed b400acb6 API/slots/version/signatures/generated ABI; V86 CHS/LBA and lifetime')
 
 

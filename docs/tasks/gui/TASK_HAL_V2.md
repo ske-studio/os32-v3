@@ -32,7 +32,7 @@
 | I2 (描画の道)・I3 (表示の道) | 未着手 |
 | CONSOLE_DUAL (決定 C) | 確定設計あり ([CONSOLE_DUAL_DESIGN](../../decisions/gui/CONSOLE_DUAL_DESIGN.md)、段は TASK_CONSOLE_DUAL) |
 
-注意: TASK_PPC_SEP の予定の段 3 番 (gfx/gfx_core.c の `g_backend == &gfx_backend_geforce/trident` の分岐を provider へ移す) と 1 番 (gfx/gfx_vram.c)、TASK_GFX_ACCEL_HAL の S1 (gfx/gfx_vram.c) は、C1・C14 と同じ所に触る。これらと C1・C14 を同時に走らせない。
+注意: TASK_PPC_SEP の予定の段 3 番 (gfx/gfx_core.c の `g_backend == &gfx_backend_geforce/trident` の分岐を provider へ移す) と 1 番 (drivers/video/pc98/gfx_vram.c)、TASK_GFX_ACCEL_HAL の S1 (drivers/video/pc98/gfx_vram.c) は、C1・C14 と同じ所に触る。これらと C1・C14 を同時に走らせない。
 
 ## 3. 受入の仕分け (ユーザー決定 2026-11-11「はい、その形で進めて」)
 NP21/W に GeForce・Trident は無く PEGC だけなので、段ごとに確かめる場所を分ける。

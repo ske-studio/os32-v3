@@ -3,6 +3,9 @@
 #define OS32_EXEC_ARCH_H
 #include "types.h"
 #include "arch_exec_storage.h"
+/* arch_exec_cache.h が arch_exec_publish(dst, bytes) を関数かマクロで与える: 書いた命令を
+ * 実行に公開する (PowerPC は命令キャッシュの flush、x86 は何もしない)。arch_exec_kapi.h が
+ * exec_kapi_table() を与える。どちらも exec/exec.c が直に読む。 */
 struct arch_syscall { void *native; };
 void exec_syscall_dispatch(struct arch_syscall *);
 struct arch_user_context {

@@ -1,4 +1,5 @@
 /* LB-3: probe loopback, bounded IRQ/tick service and foreground packet API. */
+#include "kernel_tick.h"   /* tick_count */
 #include "e82557.h"
 #include "../../pci/pci_bind.h"
 #include "e82557_eeprom.h"
@@ -7,7 +8,6 @@
 #include "kernel/irq/irq.h"
 #ifndef E82557_HOST_TEST
 #include "io.h"
-#include "arch/x86/kernel/idt.h"
 #include "kernel/time/cpu_calibrate.h"
 #include "init/sysconfig.h"
 #include "kernel/module/module.h"

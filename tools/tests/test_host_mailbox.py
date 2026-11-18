@@ -21,7 +21,7 @@ CHECK = dict(name='host-mailbox', tier=1, needs=[], covers=[
     'tools/tests/hostsvc_fixture.h', 'tools/tests/host32.py',
     'tools/tests/kernel_includes.py', 'build/config.mk',
     'include/io.h', 'lib/kstring.h', 'mm/kmalloc.h'], budget=3.3,
-    basis=['NET_HOSTSVC_DESIGN §5'],
+    basis=['docs/design/net/host_mailbox.md 入れる'],
 )
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (

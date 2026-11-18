@@ -1,6 +1,6 @@
 # T2f f1b 実 nano の単体接続記録
 
-票: `docs/archive/v3/TASK_T2D_T2H.md` §3-5 f1b。
+契約: `docs/design/sdk/allocator/nano_adapter.md` の「arena と morecore・大きな塊・trim」(出所は票 TASK_T2D_T2H §3-5 f1b)。
 
 2026-10-03、Codex gpt-6-astra、wt/t2f1b、基点 d4d5a2b。
 `test_nano_adapter.py --runner qemu --mutate` は rc=0。

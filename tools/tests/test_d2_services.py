@@ -132,7 +132,7 @@ def run(runner, mutation=None):
     assert clock_wrapper
     sys_time = re.search(r'^os_time_t sys_time\(void\)\n\{.*?^\}',
                          (ROOT / 'kernel/sys.c').read_text(), re.M | re.S)
-    diskio = (ROOT / 'fs/fat/fatfs/diskio.c').read_text()
+    diskio = (ROOT / 'drivers/block/fat_diskio.c').read_text()
     fattime = re.search(r'^DWORD get_fattime\(void\)\n\{.*?^\}', diskio, re.M | re.S)
     assert sys_time and fattime
     constants = '\n'.join(re.findall(r'^#define DOS_.*$', diskio, re.M))
@@ -176,7 +176,7 @@ def run(runner, mutation=None):
 
 
 def contracts():
-    boot = (ROOT / 'init/kernel.c').read_text()
+    boot = (ROOT / 'platform/pc98/kernel.c').read_text()
     assert re.search(r'kstack_hw_init\(\);\s*pc98_boot_bind\(&boot, boot_drive\);', boot)
     platform = (ROOT / 'platform/pc98/boot.c').read_text()
     assert '    pc98_d2_bind();' in platform
@@ -187,7 +187,7 @@ def contracts():
         assert not re.search(r'#include.*drivers/(kbd|mouse)\.h', source)
         code = re.sub(r'/\*.*?\*/|//[^\n]*', '', source, flags=re.S)
         assert not re.search(r'\bkbd_(?:getchar|getkey|set_gui_mode|discard_stop)\s*\(', code)
-    for name, header in (('kernel/ime/ime.c', '../../drivers/input/kbd.h'),
+    for name, header in (('kernel/ime/ime.c', 'kbd_contract.h'),
                          ('kdebug/kselftest.c', '../drivers/input/kbd.h')):
         assert '#include "' + header + '"' in read_text(ROOT / name)
     assert '#include "../../drivers/input/mouse.h"' in platform
@@ -227,7 +227,7 @@ def contracts():
             symbols = subprocess.check_output(['nm', '-u', str(obj)], text=True)
             assert symbols.split() == (['U', 'emergency_output'] if source == 'serial_diag' else []), symbols
     assert 'clock_register(&pc98_clock);' in bind
-    for name in ('kernel/sys.c', 'fs/fat/fatfs/diskio.c'):
+    for name in ('kernel/sys.c', 'drivers/block/fat_diskio.c'):
         source = read_text(ROOT / name)
         assert '#include "clock_service.h"' in source
         assert 'RTC_YEAR_' not in source and 'rtc_read(' not in source

@@ -22,7 +22,7 @@ CHECK = dict(name='hostsvc-serialfs', tier=1, needs=[], budget=4.1, covers=[
     'include/types.h', 'include/io.h', 'mm/kmalloc.h',
     'lib/crc32.c', 'lib/crc32.h', 'lib/le_internal.h', 'lib/kstring.h',
     'lib/kstring_asm.asm', 'include/console.h', 'include/memmap.h'],
-    env=[], basis=['NET_HOSTSVC_DESIGN §3', 'AC-SFS-1',
+    env=[], basis=['docs/design/fs/serialfs/serialfs_persistent.md 期限', 'AC-SFS-1',
         'LAN_OPERATOR_DESIGN §5', 'PACK ppc-sfs-deadline PM conditions A/B'],
 )
 ROOT = Path(__file__).resolve().parents[2]

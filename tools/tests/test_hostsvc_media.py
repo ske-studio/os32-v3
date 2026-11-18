@@ -6,10 +6,10 @@ CHECK = dict(name='hostsvc-media', tier=1, needs=[], budget=6.5, covers=[
     'fs/vfs.c', 'fs/vfs.h', 'fs/vfs_device.h',
     'fs/vfs_fd.c', 'fs/vfs_fd_stdin.inc', 'fs/vfs_stdin.h', 'exec/exec.h',
     'platform/pc98/boot_names.c', 'platform/pc98/boot_names.h',
-    'drivers/base/dev.c', 'drivers/base/dev.h',
+    'drivers/base/dev.c', 'kernel/dev/dev.h',
     'tools/tests/hostsvc_media_host.c', 'tools/tests/host32.py',
     'tools/tests/kernel_includes.py', 'build/config.mk'],
-    basis=['NET_HOSTSVC_DESIGN §4', 'NET_HOSTSVC_DESIGN §11'],
+    basis=['docs/design/fs/isofs/iso9660_media.md 不変条件', 'docs/design/drivers/block/netcd.md 読みと媒体の確かめ'],
 )
 
 import argparse

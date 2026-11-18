@@ -7,7 +7,7 @@
   3. no translation unit *uses* PIT_HZ, directly or through another macro
      (e.g. TICK_MS): PIT_HZ is a PC-98 name; common code uses OS32_TICK_HZ.
 
-Called by build/ppc-kboot.mk. Any tool failure is a failed audit.
+Called by build/targets/ppc-powermac.mk. Any tool failure is a failed audit.
 """
 import argparse
 import os

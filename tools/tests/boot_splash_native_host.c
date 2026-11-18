@@ -61,7 +61,7 @@ const u8 *v86_bios_real_lowmem(void)
 }
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-variable" /* existing bottom in gfx_vram.c */
-#include "../../gfx/gfx_vram.c"
+#include "../../drivers/video/pc98/gfx_vram.c"
 /* OSRI is an ILP32 wire layout; keep its size assertions live on LP64. */
 #define u32 uint32_t
 #include "../../gfx/gfx_osri.h"
@@ -69,7 +69,7 @@ const u8 *v86_bios_real_lowmem(void)
 #include "../../drivers/video/pc98/splash_raster.c"
 #pragma GCC diagnostic pop
 #include "../../platform/pc98/splash.c"
-#include "../../init/boot_splash.c"
+#include "../../platform/pc98/boot_splash.c"
 
 GfxBackend gfx_backend_geforce = { .name = "geforce-unavailable" };
 void gui_display_failed(void) { abort(); }

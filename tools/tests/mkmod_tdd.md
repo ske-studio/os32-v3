@@ -1,6 +1,6 @@
 # KMOD producer and private import ABI host regression record
 
-票: `docs/archive/v3/TASK_DBGREF.md` §3-2・§3-6・§4、依頼パック `~/os32-tmp/run/dbgref/PACK_s0.md`。
+契約: `docs/design/tools/mkmod.md`、形式は `docs/08_build.md` §8-2「起動時に読む部品の形式 (KMOD v1)」。出所は票 TASK_DBGREF の §3-2・§3-6・§4。
 実行: `make check-mkmod-host MUTATE=1 HOST32_RUNNERS=qemu`。
 
 `test_mkmod.py` links a real i386 ELF with generated 211 import slots and stubs,

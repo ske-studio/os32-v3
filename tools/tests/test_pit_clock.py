@@ -14,7 +14,7 @@ I/O もタイマも触らず、模型は 1 つも要らない。
   python3 -B tools/tests/test_pit_clock.py --mutate   # 否定側 (変異が RED になるか)
 """
 CHECK = dict(name='pit-clock-host', tier=4,
-    covers=['kdebug/kselftest/pit_setup.inc', 'include/time_units.h', 'arch/x86/kernel/idt.c', 'platform/pc98/pit_math.c', 'kernel/time/sysclk.c', 'tools/tests/pit_clock_host.c', 'include/platform_irq.h', 'platform/pc98/pic.c', 'include/platform_timer.h', 'platform/pc98/clock.c', 'platform/pc98/pit.c', 'platform/pc98/timer.c', 'tools/tests/kernel_includes.py'],
+    covers=['kdebug/kselftest/pit_setup.inc', 'include/time_units.h', 'arch/x86/kernel/idt.c', 'platform/pc98/pit_math.c', 'platform/pc98/sysclk.c', 'tools/tests/pit_clock_host.c', 'include/platform_irq.h', 'platform/pc98/pic.c', 'include/platform_timer.h', 'platform/pc98/clock.c', 'platform/pc98/pit.c', 'platform/pc98/timer.c', 'tools/tests/kernel_includes.py'],
     needs=[], budget=3.2,
     basis=['AC-TIME-1', 'AC-TIME-2'],
 )
@@ -35,7 +35,7 @@ SETUP = ROOT / "kdebug/kselftest/pit_setup.inc"
 # STATIC_ASSERT (中間積が 32bit に収まるか) が効くのもこちら側。
 TARGET_SRCS = [
     ("platform/pc98/pit_math.c", []),
-    ("kernel/time/sysclk.c", []),
+    ("platform/pc98/sysclk.c", []),
     ("arch/x86/kernel/idt.c", []),
     ("platform/pc98/pit.c", []),
     ("platform/pc98/clock.c", []),

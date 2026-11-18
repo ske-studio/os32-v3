@@ -18,7 +18,7 @@ CHECK = dict(name='ppc-kboot-boot', tier=2, budget=600, covers=[
     'tools/ppc/kboot_boot*', 'tools/ppc/kboot_vectors.py', 'tools/ppc/run.py',
     'tools/tests/kernel_includes.py', 'build/arch/ppc.mk'])
 PRODUCT = ['arch/ppc/entry.S', 'arch/ppc/kernel_entry.S', 'arch/ppc/kernel_takeover.S',
-    'arch/ppc/kernel_boot.c', 'arch/ppc/kernel_cpu.c', 'arch/ppc/kernel_vectors.S',
+    'platform/powermac/kernel_boot.c', 'arch/ppc/kernel_cpu.c', 'arch/ppc/kernel_vectors.S',
     'arch/ppc/kernel_mmu.S', 'arch/ppc/kernel_hpt.c', 'arch/ppc/kernel_trap.c',
     'arch/ppc/kboot_unavailable.c',
     'arch/ppc/pd_walk.c', 'arch/ppc/mmu.S', 'arch/ppc/cache_copy.S',
@@ -103,20 +103,20 @@ def observe(out, elf, cpu, negative, red=None):
 
 # name, product file, unique anchor, replacement, guest probe, stop + reached marks.
 MUTATIONS = [
- ('no-alias','arch/ppc/kernel_boot.c','        install_alias(root, &escc_alias);',
+ ('no-alias','platform/powermac/kernel_boot.c','        install_alias(root, &escc_alias);',
   '        /* mutant: omit ESCC */',0,('ppc_boot_walk_stop',[b'TAKEOVER'])),
- ('hpt-present','arch/ppc/kernel_boot.c','            *leaf(root, a) = 0;',
+ ('hpt-present','platform/powermac/kernel_boot.c','            *leaf(root, a) = 0;',
   '            *leaf(root, a) = a | PAGE_RW;',0,('ppc_boot_walk_stop',[b'TAKEOVER'])),
- ('of-after-detach','arch/ppc/kernel_boot.c','    info->of_calls_at_detach = ofw_detach();',
+ ('of-after-detach','platform/powermac/kernel_boot.c','    info->of_calls_at_detach = ofw_detach();',
   '    info->of_calls_at_detach = ofw_detach();\n    ofw_write(e.out, mark, sizeof(mark)-1);',
   0,('ofw_detached_stop',[b'TAKEOVER'])),
- ('no-bat-retirement','arch/ppc/kernel_boot.c','    ppc_cpu_disable_bats(pvr);',
+ ('no-bat-retirement','platform/powermac/kernel_boot.c','    ppc_cpu_disable_bats(pvr);',
   '    (void)pvr;',1,('fixture_fail',[b'TAKEOVER',b'PAGING:MAIN',b'PROBE:LOW',b'FAIL:SURVIVED'])),
 ]
 
 def host(out, bad, mutant=False, shell=False, full_mutation=None):
     out.mkdir(parents=True,exist_ok=True)
-    src=(ROOT/'arch/ppc/kernel_boot.c').read_text()
+    src=(ROOT/'platform/powermac/kernel_boot.c').read_text()
     if mutant:
         anchor='        if (!boot_walk_valid(root)) ppc_boot_walk_stop();'
         require(src.count(anchor)==1,'unique walk anchor')
@@ -144,7 +144,7 @@ def host(out, bad, mutant=False, shell=False, full_mutation=None):
 
 def lan_host(out, case, mutation=None):
     out.mkdir(parents=True, exist_ok=True)
-    src=(ROOT/'arch/ppc/kernel_boot.c').read_text()
+    src=(ROOT/'platform/powermac/kernel_boot.c').read_text()
     if mutation:
         require(src.count(mutation[0]) == 1, 'unique LAN mutation')
         src=src.replace(mutation[0], mutation[1])

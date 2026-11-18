@@ -161,7 +161,7 @@ def allowed_tool_difference(rel, a, b):
 
 # H2: explicit old/new object paths; final images remain byte comparisons.
 H2_OBJECT_MOVES = {
-    'kernel/v86/' + name + '.o': 'arch/x86/legacy/' + name + '.o'
+    'kernel/v86/' + name + '.o': 'platform/pc98/legacy/' + name + '.o'
     for name in ('v86', 'v86_mem', 'v86_module', 'v86_gcap', 'v86_entry')
 }
 
@@ -242,7 +242,7 @@ def object_paths(root):
             if key.startswith('build/out/obj/'):
                 key = key[len('build/out/obj/'):]
             # E: compare the moved adapter against its original translation unit.
-            key = key.replace("arch/x86/legacy/v86_call.o", "exec/v86_call.o")
+            key = key.replace("platform/pc98/legacy/v86_call.o", "exec/v86_call.o")
             key = key.replace("platform/pc98/bootinfo_check.o", "init/bootinfo_check.o")
             key = key.replace("platform/pc98/bios_snapshot.o", "kernel/v86/v86_snapshot.o")
             for old, new in H2_OBJECT_MOVES.items():

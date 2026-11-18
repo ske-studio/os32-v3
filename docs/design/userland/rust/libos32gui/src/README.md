@@ -37,7 +37,7 @@ C resident CRT はこの欄を除外し、gshell は retry を有効化しない
 
 シングルタスク前提なら不要。0x6A000 の 128KB をそのまま使う。
 
-> [要確認] 0x6A000 固定の記述に対し、現行の `userland/lib/gfx/libos32gfx_core.c:103` 以降は CLIENT 面を query / lease し返された番地を使う。共有 BB・per-window の前提は要照合。
+> [要確認] 0x6A000 固定の記述に対し、現行の `userland/lib/gfx/libos32gfx_core.c` 以降は CLIENT 面を query / lease し返された番地を使う。共有 BB・per-window の前提は要照合。
 
 | 採用 | 解く欠点 | 386 でのコスト |
 |---|---|---|
@@ -103,3 +103,5 @@ shlib は `trim_events / trim_done_sent`
 - [app.rs](app.md)
 - [shlib.rs](shlib.md)
 - [widget.rs](widget.md)
+- [cfgro](cfgro.md)
+- [textcore](textcore.md)

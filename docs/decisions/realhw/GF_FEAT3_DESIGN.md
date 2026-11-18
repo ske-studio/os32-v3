@@ -18,11 +18,11 @@ r1→r2 の変更: ID別
 
 ## 1. 実物の確認 (file:line)
 - 略号: O=/home/hight/os32-v3、X=/home/hight/os32-tmp/refs/geforce6200/xf86-video-nouveau/src、V=/home/hight/os32-tmp/refs/geforce6200/nouveau-v6.1/drivers/gpu/drm/nouveau、N=/home/hight/os32-tmp/refs/geforce6200/nouveau/drivers/gpu/drm/nouveau (c03c1a1)。A=X/nv_accel_common.c、E=X/nv04_exa.c、F=V/nv04_fbcon.c、H=X/hwdefs/nv01_2d.xml.h、M=X/hwdefs/nv_m2mf.xml.h。
-- O/docs/tasks/realhw/TASK_GF_FEATURES.md:14–41: 層3は全2D機能、GUIは別票。O/docs/decisions/realhw/GF_FEATURE_COMPARE.md:40–48を参照。r1と実物/手本の食い違い **4件** (ID 1・2・4・5) を本版で修正。未実装を実装済みとは数えない。
-- O/drivers/video/geforce/backend_geforce.c:196–213: PACKED8、関数表にfill_rect/blitなし。O/include/gfx_hal.h:55–56はint戻り値、fillの色はu8。O/gfx/gfx_core_api.inc:65–76はhook呼出しまたはNOSYSのみ (自動CPU fallbackではない)。
-- O/drivers/video/geforce/gf_present.c:18–60はCPUのBAR1転送。O/drivers/video/geforce/backend_geforce.c:116–120,160–163から呼ぶ。この経路は変更しない。
+- O/docs/tasks/realhw/TASK_GF_FEATURES.md: 層3は全2D機能、GUIは別票。O/docs/decisions/realhw/GF_FEATURE_COMPARE.mdを参照。r1と実物/手本の食い違い **4件** (ID 1・2・4・5) を本版で修正。未実装を実装済みとは数えない。
+- O/drivers/video/geforce/backend_geforce.c: PACKED8、関数表にfill_rect/blitなし。O/include/gfx_hal.hはint戻り値、fillの色はu8。O/gfx/gfx_core_api.incはhook呼出しまたはNOSYSのみ (自動CPU fallbackではない)。
+- O/drivers/video/geforce/gf_present.cはCPUのBAR1転送。O/drivers/video/geforce/backend_geforce.c (geforce_transfer())から呼ぶ。この経路は変更しない。
 - F:143–165は8/16/32bpp、F:197–199はhandle 005fでもclass 009f。A:192はNV44でもSURFACE_2D **0062**、A:547はIFC **008a**。3062/308aを機械的に選ばない (308aはN/nvkm/engine/gr/nv44.c:83–100の一覧にない)。
-- 確定F1=O/docs/decisions/realhw/GF_FEAT1_DESIGN.md:42–95、F2=GF_FEAT2_DESIGN.md:53–186,200–226,250以降を境界とする。シングルタスク・協調切替、整数、GNU11、公開SDK C89、kstring、番地/サイズ定数3層、P2V系集約。[C1]〜[D4]/[HW3]を維持。MITの著作権/許諾を移植部分に保持、GPLは写さない。
+- 確定F1=O/docs/decisions/realhw/GF_FEAT1_DESIGN.md、F2=GF_FEAT2_DESIGN.md:53–186,200–226,250以降を境界とする。シングルタスク・協調切替、整数、GNU11、公開SDK C89、kstring、番地/サイズ定数3層、P2V系集約。[C1]〜[D4]/[HW3]を維持。MITの著作権/許諾を移植部分に保持、GPLは写さない。
 - 指定関数の数値化に必要なH/MとX/hwdefs/nv_object.xml.h、SIFM実行列には比較§7のX/nv04_xv_blit.c:48–160だけを補助参照。以下の数値は特記以外16進、寸法/行数/予算は10進。
 
 ## 2. 共通境界・所有・誤りコード
@@ -195,7 +195,7 @@ struct gf3_test_ops { struct gf3_ctx *ctx;
   __typeof__(&gf_vram_view_map) map; __typeof__(&gf_vram_view_unmap) unmap;
 }; /* 内部GNU11のみ。A0で各宣言の後に置く。 */
 ```
-- hookは!activeならOS32_ERR_NOSYS、fillはcirrus_clip同様gfx_clip_screenで切り空なら0。blitは負座標→OS32_ERR_INVAL、面外起点→0、w/hを両矩形が収まるまで減算で縮め、非正なら0 (O/drivers/video/cirrus/backend_cirrus.c:403–406,462–504、G5)。その後借用ctx/scanでGXcopy/全maskのgf3_fill/copy、成功0、HW失敗OS32_ERR_IOかつlast_rc保持。描画先はscanoutでありG5のclient面とは異なる (票§3のGUI接続残タスク)。HALのu8色はINDEX8のまま。
+- hookは!activeならOS32_ERR_NOSYS、fillはcirrus_clip同様gfx_clip_screenで切り空なら0。blitは負座標→OS32_ERR_INVAL、面外起点→0、w/hを両矩形が収まるまで減算で縮め、非正なら0 (O/drivers/video/cirrus/backend_cirrus.c、G5)。その後借用ctx/scanでGXcopy/全maskのgf3_fill/copy、成功0、HW失敗OS32_ERR_IOかつlast_rc保持。描画先はscanoutでありG5のclient面とは異なる (票§3のGUI接続残タスク)。HALのu8色はINDEX8のまま。
 - 新upload/download/monoはGfxBackend ABIを広げずgf3 APIと試験dispatchで提供。`GeforceModuleContext`の既存 `const struct gf3_test_ops **accel_out;` とfoundation_outを保持し、kernelがstaticなslotの番地を渡し、moduleは初期化成功時 `*geforce_context->accel_out=&ops;`、停止/abort前にNULL。ctxはhookと同じproduction.accelを借用、recover中は公開解除し成功後再公開。kernelは呼出しごとslotを読みunload後に保持しない。GEFORCE_MODULE_OPS_VERSIONは既存版4を維持し、F3では版を上げない。F4 C3の版5宣言は共有登録順に従う。
 - serial: `gf3 init|fill|copy|mono|ifc|upload|download|scale|present-m2mf|all` に対応するcase_id、開始時PCI ID/BDF/epoch/format/pitch/off、終了時rc/seq/reference/比較byte数/先頭不一致を記録。fault詳細はF2の記録を使用。
 - GUI呼出し/新syscall/描画モデル変更なし。hookを利用するkernel試験中はCPU presentと競合させず、試験後は既存RAM BBからCPU presentで復元。BBが正という現契約を変えない (票§3)。
@@ -277,9 +277,9 @@ struct gf3_test_ops { struct gf3_ctx *ctx;
 | 境目／持ち主 | 宣言段で凍結する追記 |
 |---|---|
 | 起動・停止／A3・C1・C2 | `production.accel`は移動不可の常駐所有。現行`service.c:25–42`はdevinit→表示設定→F1→F2。F2 RUN後にgf3_init、成功後だけhook/accel_outを公開。通常停止は受付・slot閉→gf3_fini→既存gf2_stop。FAULT時はfiniのfenceを無理に発行せずF2停止へ渡し、停止成功後に上位記述子を無効化する。 |
-| 復旧／C1 | `command.c:43–72,159–169`のstopは層3を含む可変instを解放し、recoverはF1/F2だけを再構成する。上位所有者がslot閉→gf2_recover→旧gf3記述子無効化→gf3_init→scan再bind→公開を直列実行。失敗時は公開せず、解放済みobjectを再度object_delしない。 |
+| 復旧／C1 | `command.c`のstopは層3を含む可変instを解放し、recoverはF1/F2だけを再構成する。上位所有者がslot閉→gf2_recover→旧gf3記述子無効化→gf3_init→scan再bind→公開を直列実行。失敗時は公開せず、解放済みobjectを再度object_delしない。 |
 | notifier／A0・B0 | 既決P3どおり`struct gf_inst notify_storage`をgf3_ctxへ追加し32B確保（零化しない）、`notify`は別の16B ctxdma。差分: 手本のPRAMIN相対off（N/nvkm/subdev/instmem/nv40.c:89）をVRAM絶対off=`vram_bytes-reserved+notify_storage.off`へ変換。理由: 相対offのままVRAM宛先にすると0x40000以上のinstが表示面（0x4B000）と重なる。N/nouveau_drm.c:429のzero=falseを維持、class003d/RW、limit=off+31。GR削除→ctxdma削除→storage解放。instを値コピーしない。現行`dmaobj.c:31`・`instmem.c:40`に合わせる。 |
-| CPUのVRAM窓／A0＋追加V0 | `command_platform.c:5–43`はpush専用でRUN中の追加mapを拒否する。新`hwdev/gf/vram_view.h/.c`に独立したextent/va/bytesを所有する型付きmap/unmap口を置く。既存map_ops/map_ownerを借用し、ch->va/mapped/push_extentを変更しない。試験readback、F4 cursor、F5退避が共用し、予約照合・完了後アクセス・unmap失敗時保持を引き継ぐ。F3試験opsのmap/unmap型もこの口へ変更。 |
+| CPUのVRAM窓／A0＋追加V0 | `command_platform.c`はpush専用でRUN中の追加mapを拒否する。新`hwdev/gf/vram_view.h/.c`に独立したextent/va/bytesを所有する型付きmap/unmap口を置く。既存map_ops/map_ownerを借用し、ch->va/mapped/push_extentを変更しない。試験readback、F4 cursor、F5退避が共用し、予約照合・完了後アクセス・unmap失敗時保持を引き継ぐ。F3試験opsのmap/unmap型もこの口へ変更。 |
 | 絶対期限／A0 | **PM 決定（4）**: 手本N/nvkm/engine/fifo/nv04.c:233と現行fifo.c:216どおり、pauseはF2独自の2秒、fenceと描画はdl。期限付きpause追加A0a/B12は削除。fence_emit内でkick済みなので二重kickを削除。resumeはvoidでlast_rcを残すため、上位adapterがlast_rc/stateを照合しrcを返す。 |
 | DMA staging／B8 | 起動時に確保済みの`staging_live`とpci_dmaを借用し、毎回dma_getしない。確保失敗のVRAM専用RUNは有効、M2MF PCI経路だけENOSPC。stagingの解放はF2だけ。 |
 | 面台帳／A0・V0・T0 | **PM 決定（6）**: F3 A0が`hwdev/gf/vram_view.h`に`struct gf_vram_reservation`（owner/off/bytes/reservation_id/generation）と列挙契約を宣言・凍結、V0が窓/台帳実装を所有。F3 B1・F4 B6/B7・F5 B6は同型を利用。表示・試験面とpush B・末尾instmemを分離し、F4がcursor/front/backを登録、F5が退避extentを列挙。一般heapは追加せず、notifierは表示直後に置かない。 |
@@ -303,8 +303,8 @@ struct gf3_test_ops { struct gf3_ctx *ctx;
 | hwdev全層 | 126.59＋0＋(0〜12)＋(0〜4) = 126.59〜142.59 | 124＋0＋(0〜12)＋(0〜4) = 124〜140 | 上限192KiB内。image残49.41、mem残52をmetadata/丸めにも充てる |
 | 媒体・別台帳 | geforceは起動FD対象外 | kernel helper/state/診断・VRAM予約・動的snapshot/ROMは別 | まとめビルド後にKDEBUG=0/1とhwdev/R1を計測 |
 - **PM 決定（1、上限の広げ方）**: F3≤28、F4≤24、F5≤24KiB（mem増分、C1込み）を配分し、圧縮を発注条件にしない。load_spanはprefix想定16＋mem上側140＝156KiBに対し52KiBの余裕；memを160まで使ってもprefixに48KiBを残す。import本数制限は復活させず、統合時にimage/mem/prefix/load_spanを独立採取する。
-- 物理の根拠: `kernel/module/module_runtime.c:70–86`はload_span分の物理頁をpgallocから動的取得しP2Vで配置・再配置する。geforce専用の固定読込番地帯や128KiBの常駐RAM枠、KHEAPからの像確保は無い。上限は予約量ではなく検査値で、拡大だけで208KiBを消費しない。従って今回の拡大を妨げる固定の物理制約は無い（実機空きRAMの実測保証ではなく、取得失敗は既存ローダーで処理）。
-- `docs/08_build.md:181–202`の容量表の正はschema。F4 C3が`tools/module_schema.py:188`を更新し同表にGEFORCE行を追加して同期し、PM登録段が生成物を更新。生成物は手編集しない。
+- 物理の根拠: `kernel/module/module_runtime.c`はload_span分の物理頁をpgallocから動的取得しP2Vで配置・再配置する。geforce専用の固定読込番地帯や128KiBの常駐RAM枠、KHEAPからの像確保は無い。上限は予約量ではなく検査値で、拡大だけで208KiBを消費しない。従って今回の拡大を妨げる固定の物理制約は無い（実機空きRAMの実測保証ではなく、取得失敗は既存ローダーで処理）。
+- `docs/08_build.md`の容量表の正はschema。F4 C3が`tools/module_schema.py`を更新し同表にGEFORCE行を追加して同期し、PM登録段が生成物を更新。生成物は手編集しない。
 
 ### 共有ファイルの衝突表・所有段
 
@@ -316,7 +316,7 @@ struct gf3_test_ops { struct gf3_ctx *ctx;
 | 新hwdev/gf/vram_view.h/.c | F3 A0/V0、F3 B1、F4 B6/B7、F5 B6 | PM 決定（4・6）: F3 A0が窓/面台帳型、V0が実装を所有。F4/F5は利用のみ。command.h/fifo.cへの期限口追加なし。 |
 | backend_geforce.c・include/gfx_hal.h・kernelソース列 | F3 C0a、F4 C1/C4、F5前景結線 | F3 C0a→F4 C1/C4→F5前景段。HAL宣言だけ先に独立凍結、各backendの追随も単一担当。 |
 | build/hwdev.mk・hwdev/hwdev_imports.def・docs/design/hwdev/hwdev_imports.md | 各層共有計算/診断変更 | 各層登録担当の直列列。import変更は表/件数も同時、他段は必要性と取得元ヘッダーを報告。 |
-| tools/gen_hwdev_contract.py・tools/hwdev_layout.json・契約/schema/import生成物（kernel/module/module_schema.hを含む） | 全層の配置/契約変更 | PMの登録段だけ。生成器の件数/台帳を追随し、生成は全部品統合後に1回。kernel/module/module_schema.hはtools/gen_module_schema.pyの生成物で、点検時:259–260にgeforceの上限131072がある。F4 C3がtools/module_schema.py:188を変更したらPM登録段で再生成する。B担当による生成/生成物手編集なし。 |
+| tools/gen_hwdev_contract.py・tools/hwdev_layout.json・契約/schema/import生成物（kernel/module/module_schema.hを含む） | 全層の配置/契約変更 | PMの登録段だけ。生成器の件数/台帳を追随し、生成は全部品統合後に1回。kernel/module/module_schema.hはtools/gen_module_schema.pyの生成物で、点検時:259–260にgeforceの上限131072がある。F4 C3がtools/module_schema.pyを変更したらPM登録段で再生成する。B担当による生成/生成物手編集なし。 |
 | tools/tests/test_gf_command.py・test_gf_accel.py・test_gf_display.py・test_gf5.py | F2追随、各層B群 | 前者はPM登録段、残りはF3 A2/F4 A2/F5 A3が各1人で所有。BはCHECK/case/変異tupleを報告。 |
 | hwdev_contract_fixture.py・test_dep_dir_a_l02.py・sh_{status,shell,truncation}_host.c・recover_virtual_fixture_host.inc・hwdev_audit.py（tools/tests等） | 契約/ソース追加の波及 | PM登録段が該当分を追随。各実装者は当たる一覧を報告、件数/CRCは可能なら元から導出。 |
 | kdebug/gfinit_*・hwdev/gfinit_mode.h・kdebug/gf_command_test.c・DEFERRED_TESTS.md | F4 A0、F5 C0/C1、F3 T1、全層台帳 | F4 A0を先行。F5 C0はB1と同一所有者で直列、C1 tables.incはF4 A0後。診断dispatch/台帳はPM登録段へ追加行報告。 |
@@ -366,14 +366,14 @@ int gf_vram_view_unmap(struct gf_vram_view *view);
 ```
 - 初期値は全欄 0。窓は呼出側所有、成功 map から成功 unmap まで同じ記憶域を維持し、値コピーしない。F3 readback/F5 一時コピーは呼出し内の局所記憶域、F4 の保持窓は常駐 ctx 内に置ける。借用 ops/owner は解除成功まで存続する。
 - map は `ch->bar1` の頁丸めした部分 extent を UC で写す。start=off&~4095U、end=ceil((off+len)/4096)*4096 を桁あふれなく求め、extent は [start,end)、map_bytes=end-start、map_base は下位 map の返す基底、va=map_base+(off-start)、bytes=len。成功時だけ全所有欄と借用 ops/owner を保存して `*out=va`、0 を返す。`ch->va/mapped/push_extent` は変更せず、push が map 済みでも利用できる。
-- off/len は byte、非零 len と 4B 整列を要求。BAR1・物理番地の加算範囲は `command_platform.c:11–15` と同じ条件。加えて範囲全体が共通台帳の生存予約 1 件に含まれることを照合する。4B に丸めた readback 要求範囲も予約内であること。頁丸め後の extent は BAR1・物理番地の有効範囲内を要求するが、予約への包含照合は要求範囲 off/len に行い、CPU はその範囲外にアクセスしない。
+- off/len は byte、非零 len と 4B 整列を要求。BAR1・物理番地の加算範囲は `command_platform.c` と同じ条件。加えて範囲全体が共通台帳の生存予約 1 件に含まれることを照合する。4B に丸めた readback 要求範囲も予約内であること。頁丸め後の extent は BAR1・物理番地の有効範囲内を要求するが、予約への包含照合は要求範囲 off/len に行い、CPU はその範囲外にアクセスしない。
 - NULL 引数・ops 不備・二重 map・範囲/整列不正・下位 map 失敗は `GF2_EMAP=-203`、予約不存在は `GF3_ESTATE=-304`。失敗時は窓と出力を変更しない。台帳/ch の対応不成立も ESTATE。
 - unmap は保存した ops/owner/map_base/map_bytes を使用し、成功時に全欄を 0 に戻して 0。NULL・未 map・下位失敗は GF2_EMAP、全所有欄を保持して再試行可能とする。
 - map は GPU 完了を待たない。呼出側が reference 完了（restore は GPU がその領域を使わない区間）を保証し、CPU アクセス後は必要な posted write 排出を済ませて unmap。窓を解除するまで対応予約を解除せず、停止/復旧前に全窓を閉じる。解除失敗時は予約・adapter の所有を保持する。
-- PM 決定 (ID 3): 起動時の BAR1 表示先頭 75 頁は既存の bar1_map を借用して読み書きし、窓の頁丸め extent がそこに重なる場合は GF2_EMAP。借用表示 map に窓の unmap は呼ばない。根拠: `hwdev/gf/production.h:55`、`drivers/video/geforce/geforce_platform.c:24`。
-- 保持したままにする窓（F4 cursor 等）と T0 試験面の予約は off/bytes を 4KiB 整列とし、別予約の窓が同じ頁を共有しない。下位の頁単位契約は `hwdev/gf/instmem_map.c:12–15,24–25` に合わせる。
+- PM 決定 (ID 3): 起動時の BAR1 表示先頭 75 頁は既存の bar1_map を借用して読み書きし、窓の頁丸め extent がそこに重なる場合は GF2_EMAP。借用表示 map に窓の unmap は呼ばない。根拠: `hwdev/gf/production.h`、`drivers/video/geforce/geforce_platform.c`。
+- 保持したままにする窓（F4 cursor 等）と T0 試験面の予約は off/bytes を 4KiB 整列とし、別予約の窓が同じ頁を共有しない。下位の頁単位契約は `hwdev/gf/instmem_map.c` に合わせる。
 - F3 `gf3_test_ops.map/unmap` は上記関数へのポインタ型（既決の `__typeof__`）に固定。F4 cursor と F5 の未マップ領域の退避も同じ口を使う。T0 の表示面 readback は既存 bar1_map を借用する。
-- 手本 N=`/home/hight/os32-tmp/refs/geforce6200/nouveau/drivers/gpu/drm/nouveau`、`N/nouveau_bo.c:669–679` の BO 固有 kmap、`:684–689` の kunmap に対応。OS32 は BO/TTM の代わりに呼出側窓と既存 map_ops を使う。int unmap と失敗時保持は `hwdev/gf/command_platform.c:32–42` の既存失敗契約に合わせる。TTM の reserve ロックは協調前景では追加しない。
+- 手本 N=`/home/hight/os32-tmp/refs/geforce6200/nouveau/drivers/gpu/drm/nouveau`、`N/nouveau_bo.c:669–679` の BO 固有 kmap、`:684–689` の kunmap に対応。OS32 は BO/TTM の代わりに呼出側窓と既存 map_ops を使う。int unmap と失敗時保持は `hwdev/gf/command_platform.c` の既存失敗契約に合わせる。TTM の reserve ロックは協調前景では追加しない。
 
 ### 2. 面予約台帳
 ```c
@@ -478,7 +478,7 @@ int gf3_m2mf(struct gf3_ctx *c, u32 in_handle, u32 out_handle, u32 in_off, u32 o
 - 対応: E:394–410 の BO refn/validation を呼出側の予約確認に、:412–430 を B7 に分離。N/nouveau_bo.c:594–599,618–629 の固定配置寿命に相当。BO を受け取らない既存 raw ABI に推測認可を追加せず、協調前景の同一所有期間で保証する。手本の非同期 BO 待ちは §7 の同期 API に合わせる。
 
 ### G1 — A1 が所有する host API の全一覧
-`tools/tests/gf_accel_host.h` は試験 TU だけに include。`GF3_HOST_UNIT` は B0〜B10 を 0〜10、C0 を 11、依存 stub 無しを 12 とする必須選択（範囲外/未定義は #error）。旧 GF3_HOST_COMMAND_STUBS と個別自作 stub は廃止。既存 B0 試験（tools/tests/gf_accel_b0_host.c:6）は A1 確定後に B0 担当が GF3_HOST_B0 を GF3_HOST_UNIT=0 に移行し、自作 stub 12 個を削除する。各呼出しの前提（pause 中・!ready・dl・align=16・zero=false）は該当 event の observe で照合する。製品 TU は1本、選択された製品の定義は絶対に stub しない。C1/C2/C4 の結合は 12 と F1/F2/各B実物を使う。
+`tools/tests/gf_accel_host.h` は試験 TU だけに include。`GF3_HOST_UNIT` は B0〜B10 を 0〜10、C0 を 11、依存 stub 無しを 12 とする必須選択（範囲外/未定義は #error）。旧 GF3_HOST_COMMAND_STUBS と個別自作 stub は廃止。既存 B0 試験（tools/tests/gf_accel_b0_host.c）は A1 確定後に B0 担当が GF3_HOST_B0 を GF3_HOST_UNIT=0 に移行し、自作 stub 12 個を削除する。各呼出しの前提（pause 中・!ready・dl・align=16・zero=false）は該当 event の observe で照合する。製品 TU は1本、選択された製品の定義は絶対に stub しない。C1/C2/C4 の結合は 12 と F1/F2/各B実物を使う。
 以下が新しい完全定義・宣言。helper はヘッダー内 static inline、依存 stub だけ外部定義。大きな記憶域は試験の static 領域、画像/記録バッファは呼出側借用、heap/VLA/libc は使わない。
 ```c
 enum gf3_host_op { H_EMIT, H_FENCE, H_WAIT, H_FAULT, H_PAUSE, H_RESUME, H_STOP, H_ALLOC, H_FREE, H_DMA_NEW, H_GR_NEW, H_DEL, H_MATCH, H_FORMAT, H_SPAN, H_SURFACE_CHECK, H_RAM_CHECK, H_SURFACE_SET, H_ROP, H_IFC, H_M2MF, H_UPLOAD, H_FILL, H_COPY, H_READ, H_WRITE, H_CLOCK, H_SLEEP, H_OP_COUNT };
@@ -515,7 +515,7 @@ static inline void gf3_host_ref_scale(const struct gf3_host_image *src, struct g
 - trace_clear は記録数/calls/waits だけを零化（状態/画像/失敗設定/時刻は保持）。fail_at は op の nth 回目だけ rc を返す設定、nth=0 は全回、rc=0 は解除。成功・失敗とも event を先に予約し、返却 rc と引数を記録、observe を帰還前に呼ぶ。配列満杯・不正な試験入力は常時有効 assert→gf2_host_fail→exit(1)、切捨てや製品 ENOSPC に偽装しない。
 - event.a は関数宣言順の非pointer引数（enum/bool/u8/u16もu32、rect/fenceは宣言順の欄へ展開）、event.p は宣言順のpointer引数。余りは0。struct入力の内容比較は observe 内で行い、pointerを後で逆参照しない。emit成功時だけ packets と words に payload を深くコピー（first は words 添字）、失敗 emit は event のみ。全呼出しで dl を記録する。
 - READ/WRITE は 32bit MMIO のみ、未設定 read=0、成功 write を writes と regs に保存。clock は now を返し、wait は成功時だけ now+=us/waits++。callback の注入 rc はそのまま返す。非空 stub の FENCE は epoch/++seq を発行、WAIT は fault→epoch→絶対期限→完了の順で検査し、complete_after 回の wait(1us) 後に成功（0=即時、U32_MAX=完了しない）。旧epochは GF2_EFAULT=-206、期限は GF2_ETIME=-205、clock/wait失敗は GF2_EIO=-204。GET==PUTを完了としない。
-- F2 stub は command.h、F1 stub は foundation.h、F3 stub は accel.h、MATCH は vram_view.h の**既存の完全な型**で定義する（別の stub 用製品 ABI は作らない）。PAUSE/RESUME は paused を変更、RESUME 注入失敗は void のため ch.last_rc にだけ保存し、FAULT には遷移させない（F2 fifo.c:232–238）、STOP 成功は OFF と資源解放、失敗は資源保持。FAULT 注入は fault.latched=true/state=FAULT/last_rc=rc を設定する。ALLOC は alloc_off（試験が設定した instmem aperture 相対）から通知領域を確保、NEW/DEL は出力 object と live_objects を更新し pause 中を assert。FREE は void で失敗注入不可。成功・注入失敗とも出力/所有は各製品 F1/F2 の実物の契約に合わせる。DMA_NEW の descriptor 書込み失敗は確保を解放して inst.size を残し handle=0、rc=GF2_EIO とする（F2 dmaobj.c:42–46）。
+- F2 stub は command.h、F1 stub は foundation.h、F3 stub は accel.h、MATCH は vram_view.h の**既存の完全な型**で定義する（別の stub 用製品 ABI は作らない）。PAUSE/RESUME は paused を変更、RESUME 注入失敗は void のため ch.last_rc にだけ保存し、FAULT には遷移させない（F2 fifo.c:232–238）、STOP 成功は OFF と資源解放、失敗は資源保持。FAULT 注入は fault.latched=true/state=FAULT/last_rc=rc を設定する。ALLOC は alloc_off（試験が設定した instmem aperture 相対）から通知領域を確保、NEW/DEL は出力 object と live_objects を更新し pause 中を assert。FREE は void で失敗注入不可。成功・注入失敗とも出力/所有は各製品 F1/F2 の実物の契約に合わせる。DMA_NEW の descriptor 書込み失敗は確保を解放して inst.size を残し handle=0、rc=GF2_EIO とする（F2 dmaobj.c）。
 - MATCH は h.reservations の生存値を ID/世代/owner/包含で照合（生産台帳実装には link しない）。FORMAT/SPAN/SURFACE_CHECK/RAM_CHECK は本追記の正常値と検査を独立に供給し、各 op に失敗注入可能。SURFACE_SET/ROP は引数を記録するだけで HW packet は合成しない。B1/B2 の packet 試験と、利用側の呼出し引数試験を混同しない。
 - IFC/M2MF/UPLOAD/FILL/COPY は typed 引数の記録・注入に加え、成功時だけ借用画像を CPU 参照で更新する同期 stub。IFC/M2MF は FENCE/WAIT stub を経てから更新、失敗時は更新しない。M2MF は handles により vram/staging を選択、B8 の pack/unpack と再利用順を observe で検査。製品 B7 にはこの M2MF stub は存在せず、packet/実 WAIT 呼出しを照合する。host は全 GPU の emulator を作らない。
 
@@ -582,7 +582,7 @@ static inline void gf3_host_ref_scale(const struct gf3_host_image *src, struct g
 - B4 単独 host は G1 の SURFACE_SET/ROP stub の引数を observe 内で照合し、実 B4 の BLIT packet と fence/deadline/失敗伝播を検証する。stub は SF packet を生成しない。B1 結合で SF の両 offset/pitch と全面検査を確認し、実機の重なり結果は T0 がコピー前保存像から作る期待像と照合する。
 
 ### 確定の補い (2026-11-04、claude-opus-5-5、PM が反映)
-- R1: rc の順は src の検査 → dst の検査 → fmt の一致で、最初の rc を返す (B1 の gf3_surface_set、accel_surface.c:91-97 と同じ順)。
+- R1: rc の順は src の検査 → dst の検査 → fmt の一致で、最初の rc を返す (B1 の gf3_surface_set、accel_surface.c と同じ順)。
 - R2: pitch=65536・height=65536 の例は span_check 経由の ERANGE。pitch の 16bit の上限は B1 の試験が持つ。
 - R3: 非重複の例の前提に、[128,256) の予約 (ID・世代は別) を足す。
 - R4: 同一面の 8 方向・同位置の例は、A で sr=(4,1,4,2)、dst を (3..5, 0..2) の 8 点と (4,1) とし、payload を列挙する。T0 には「重なる copy は同じ descriptor で」。
@@ -616,24 +616,24 @@ i32 gf3_service_stop(struct gf3_service *s);
 i32 gf3_service_recover(struct gf3_service *s, u32 dl);
 ```
 C1 は全欄零の static `struct gf3_service` を 1 個所有。production/slot は借用、node の owner は各 node 自身の番地。ctx は A3 の `production.accel` のみで複製しない。get は登録済み `&p->chan` と一致する時だけその service を返し、NULL/診断 ch/未 bind は NULL（誤りコードなし）。
-追加結線段 C1b は `drivers/video/geforce/geforce_body.c:37–40` で `gf3_service_bind(&production,context->accel_out)` を呼ぶ。bind は必要ポインタ NULL で GF3_EINVAL=-301、別 p/slot への再 bind は GF3_ESTATE=-304、同じ組は無変更 0。初回だけ両借用を保存して slot を NULL にする。登録失敗は module 初期化失敗へ伝播。
+追加結線段 C1b は `drivers/video/geforce/geforce_body.c` で `gf3_service_bind(&production,context->accel_out)` を呼ぶ。bind は必要ポインタ NULL で GF3_EINVAL=-301、別 p/slot への再 bind は GF3_ESTATE=-304、同じ組は無変更 0。初回だけ両借用を保存して slot を NULL にする。登録失敗は module 初期化失敗へ伝播。
 start は未初期化 accel を対象とし、ready 済みは ESTATE。F2 RUN 後、台帳 init→既決 scan/test reserve→gf3_init→ctx/scan bind→slot=&s->ops。既存予約は失敗後の再試行用に保持し、同じ node を二重 reserve しない。surface は予約値から構築し、ops.ctx/test_surface は常駐所有物を指す。C0a の情報取得、試験面配置 N2、F4 の所有移動 N3 は既決どおり。
 close は slot=NULL→gf_hook_scan_bind(false,NULL)→全窓 close（下記）。受付を閉じるために fini より先に accel.ready を潰さない。借用 dispatch/ctx は呼出し間で保持禁止。fini は ready かつ ch が RUN・fault 未検出・epoch 一致の時だけ gf3_fini、それ以外は 0 で F2 停止へ渡す。
 invalidate は「旧 F2 の停止完了を確認済み」の内部口。旧 obj[12]/notify/notify_storage/notify_off/epoch を零化し ready=false、ch の借用と last_rc は保持。object_del/free を呼ばず、生存 inst node を零化しない。release は試験→表示の生存 node を gf_vram_release し各成功分の surface を零化、ID/世代の履歴は残す。未登録分は無操作。
 bind/get/invalidate 以外の service 口は NULL s で EINVAL、開始に必要な RUN/epoch/所有状態不成立は ESTATE、成功 0、下位 F1/F2/F3 の負 rc は原値。下位失敗を accel.last_rc に保存。invalidate の NULL は無操作。release の失敗は未解放分を保持し、再試行時は生存分だけ扱う。
 C2 は command_get 後 get(ch) し、NULL なら既存の停止列、非 NULL の時 close→fini→既存 gf2_stop→既存 foundation_stop/restore/quiesce 列を実行。close 失敗では F2/F1 停止へ進まず、予約・adapter・未解除窓を保持。fini 失敗でも F2 停止は試み、最初の rc を保存する。
-F2 停止完了は rc==0 だけでなく ch->state==GF2_OFF で判定（command.c:60–72,142–156 は fault rc を残して OFF にできる）。OFF 確認後だけ invalidate。F2 未停止なら予約を保持し、既存 revoked 時の外側 route00/decode-safe 処理は妨げない。
+F2 停止完了は rc==0 だけでなく ch->state==GF2_OFF で判定（command.c は fault rc を残して OFF にできる）。OFF 確認後だけ invalidate。F2 未停止なら予約を保持し、既存 revoked 時の外側 route00/decode-safe 処理は妨げない。
 表示の restore/quiesce まで成功して利用が終わった時だけ release。表示停止失敗では予約を保持。C2 の既存返値 0/-1 と最初の display.last_rc を維持し、engaged=false でも保持予約の後処理を飛ばさない。slot はすべての失敗で閉じたまま。start の途中失敗もこの停止列で巻き戻す。
 C1-2 の対応は N/nvkm/engine/fifo/uchan.c:272–298 の block/remove/unbind→bind/allow/insert、C2-1 は同列と `N/nvkm/engine/fifo/nv04.c:41–99` の stop/start。OS32 は単一所有者を既存 command_get の ch で検索し、production キャストや新 display callback は不要。node の解放は N/nouveau_bo.c:618–629 の unpin 相当で、TTM 所有を既決常駐予約に置換する。
 
 ### C1-1 — production の停止・復旧入口
-追加結線段 C1t は `hwdev/gf/command_test.c:173–195` を所有。production 分岐の GF2T_STOP は service_stop、GF2T_RECOVER は service_recover、GF2T_START は F2 start 成功後 service_start へ結線。production で service 未 bind は GF3_ESTATE、診断 ch は従来の gf2_* を直接呼ぶ。revoked 拒否は維持する。
+追加結線段 C1t は `hwdev/gf/command_test.c` を所有。production 分岐の GF2T_STOP は service_stop、GF2T_RECOVER は service_recover、GF2T_START は F2 start 成功後 service_start へ結線。production で service 未 bind は GF3_ESTATE、診断 ch は従来の gf2_* を直接呼ぶ。revoked 拒否は維持する。
 service_stop は `gf_display_stop(&s->production->display)` を呼び、成功 0、失敗は保存した display.last_rc（無ければ GF2_ESTOP=-210）を返す。単なる F2 停止で表示予約を解放しない。通常 video_stop と診断 STOP は同じ C2 列へ入る。
 recover は close→gf2_stop→OFF 確認→gf2_recover→旧 gf3 記述子 invalidate→旧予約 release/再 reserve→gf3_init→scan 再 bind→slot 再公開。事前 gf2_stop は停止完了と再起動失敗を分けるためで、gf2_recover 内の stop は OFF のため無操作。新しい F2 API は足さない。
 事前 stop が OFF に達しなければ原 rc（無ければ ESTOP）で終了し全所有を保持。OFF なら過去の fault rc は復旧を妨げない。gf2_recover が失敗しても旧記述子は invalidate 可だが予約を保持し、再初期化・公開しない。新 F2 の残存資源は F2 が保持する。次の再試行も同列。
 gf2_recover 成功後だけ旧予約を更新して古い surface の ID/世代を失効させる。gf3_init/予約更新の途中失敗は上記停止列へ送り、未解放分を保持、最初の rc を返す。復旧後 start はこの更新済み予約を使う。通常 start は同じ初期化・公開 helper を共用する。
 service_start/recover の dl は操作全体の絶対期限。C1/C2 の通常呼出しは既存 clock_us の現在時刻+GF3_TIMEOUT_US、診断は q->deadline_us を渡し、更新しない。clock 失敗は GF2_EIO=-204、停止自体は F2 に渡せるが fini の新 fence は発行しない。
-対応: N/nvkm/engine/fifo/uchan.c:272–298、同 runl.c:68–82,115–128,132–141 の受付停止→回復→再開。runlist の回復は後代 GPU の例で NV44 の reset 手順として移植しない。OS32 は既決の明示同期 gf2_recover（O/hwdev/gf/command.c:159–169）を使い、workqueue・多 channel・自動再送を足さない。事前 stop は同関数の再起動失敗が ESTOP も返す実契約を区別するため。
+対応: N/nvkm/engine/fifo/uchan.c:272–298、同 runl.c:68–82,115–128,132–141 の受付停止→回復→再開。runlist の回復は後代 GPU の例で NV44 の reset 手順として移植しない。OS32 は既決の明示同期 gf2_recover（O/hwdev/gf/command.c）を使い、workqueue・多 channel・自動再送を足さない。事前 stop は同関数の再起動失敗が ESTOP も返す実契約を区別するため。
 
 ### C2-2 — 任意の呼出側窓を持ち主に閉じさせる
 A0 は `hwdev/gf/vram_view.h` の既存 struct 末尾に下記 4 欄だけ追加する。完全形（既存 map/unmap の引数と test_ops の型は不変）:
@@ -664,17 +664,17 @@ V0 は map/unmap/列挙、T0 は試験窓 callback、F4 は cursor、F5 は一�
 A0 が `drivers/video/geforce/geforce_module.h` の既存前方宣言の直後に `const struct gf3_test_ops *geforce_accel_ops(void);` を追加し、C4 が同 .c に `const struct gf3_test_ops *geforce_accel_ops(void) { return registered ? accel_slot : 0; }` を実装する。未登録/未公開/停止/失敗は NULL、別の誤り値はない。
 slot は kernel の既存 static accel_slot、表は module/C1 が所有。T0 は各呼出し直前に取得し、NULL は利用不可、帰還後は表・ctx・面の借用を保持しない。C4 は load/start 失敗・abort 前に slot を NULL にし、detach 拒否でも再公開しない。既存 Context 欄と OPS_VERSION=4 は維持する。
 PM 登録段が `kernel/module/kdebug_imports.def` に symbol=geforce_accel_ops/source=drivers/video/geforce/geforce_module.h を既存 geforce_foundation_ops と同じ方式で追加し、生成物・import 試験を追随する。geforce 側 import は不要、HWDEV に未使用 import は足さない。C5 の header 確認 0 行はこの宣言追加のみ A0 に移す。版 4→5 と feature5_out 等は F4 C3 のまま。
-対応: N/nvkm/engine/fifo/uchan.c:276–297 の利用可否切替。nouveau に OS32 module slot ABI の対応物は無く、O/drivers/video/geforce/geforce_module.c:20–27 の foundation 取得口と同じ借用公開を用いる。
+対応: N/nvkm/engine/fifo/uchan.c:276–297 の利用可否切替。nouveau に OS32 module slot ABI の対応物は無く、O/drivers/video/geforce/geforce_module.c の foundation 取得口と同じ借用公開を用いる。
 未決: 0 件。実装の追加所有段は A0（宣言）、C1b（body）、C1t（command_test）、V0/T0（窓追随）、PM（登録）。各段は直列統合し、検証は通常停止・fault/OFF・ESTOP 保持・復旧各段失敗・窓解除失敗/再試行・診断 ch 分離・slot 再取得を結合試験で照合する。
 
 ### 確定の補い (2026-11-04、claude-opus-5-5、PM が反映 — 本文と食い違えばこちら)
-- F1: `service_stop` は close → fini → gf2_stop → OFF の確認 → 記述子の invalidate までにし、予約は保持する。表示の停止 (`gf_display_stop`) と予約の release は C2 (video_stop・gf_failure) だけに残す (診断の GF2T_STOP が表示全体を止めないように、層 2 の command_test.c:193 と同じ)。
+- F1: `service_stop` は close → fini → gf2_stop → OFF の確認 → 記述子の invalidate までにし、予約は保持する。表示の停止 (`gf_display_stop`) と予約の release は C2 (video_stop・gf_failure) だけに残す (診断の GF2T_STOP が表示全体を止めないように、層 2 の command_test.c と同じ)。
 - F2: recover の途中失敗 (gf3_init・予約の更新) は「slot を閉じたまま予約と ctx を保持して rc を返す」。片付けは次の C2 の停止が行う (fini は ready でないので飛ばし、gf2_stop が inst を全部解放する)。
-- F3: recover では scan の幾何 (pitch・width・height・phys) を残し、予約の ID と世代だけを付け替える。bind の時に取った幾何は `gf3_service` の欄に写して保持する (`geforce_backend_framebuffer_info` は video_start の中でしか使えない、accel.h:200-206)。
+- F3: recover では scan の幾何 (pitch・width・height・phys) を残し、予約の ID と世代だけを付け替える。bind の時に取った幾何は `gf3_service` の欄に写して保持する (`geforce_backend_framebuffer_info` は video_start の中でしか使えない、accel.h)。
 - F4: recover の公開 (hook と slot) は display.engaged のときだけ。engaged でなければ F2 の復旧だけ (層 2 と同じ)。`!engaged` で入った停止の後処理は「ch が OFF のときだけ release」。
-- F5: V0 の map の成功は、呼出側が先に入れた close と close_owner を保持し、ch と next だけを足す (今の vram_view.c:147 の全欄の上書きを直す — V0 の段で)。
+- F5: V0 の map の成功は、呼出側が先に入れた close と close_owner を保持し、ch と next だけを足す (今の vram_view.c の全欄の上書きを直す — V0 の段で)。
 - F6: 凍結の例外として、map の前提に close を足す (close が無ければ GF2_EMAP)。V0 の host 試験と既存の窓の利用者は追随する。
-- F7: revoked のときは窓の close の失敗を記録して先へ進む (quiesce.c:18-20 の「cleanup の行は全部試す」に合わせる)。
+- F7: revoked のときは窓の close の失敗を記録して先へ進む (quiesce.c の「cleanup の行は全部試す」に合わせる)。
 
 ## 追記 (2026-11-04、C1 の欠け — 試験面の幾何、PM 決定)
 - `gf3_service.test` (T0 が借りる試験面) の幾何は表示面に合わせる: `fmt` = 表示面の fmt、`width` = 表示面の width、`pitch` = 表示面の pitch (64B の整列を満たさないときは 64B に切り上げ)、`height` = min(表示面の height, floor(試験面の予約の bytes / pitch))。予約の範囲は結線の追記の N2 (表示の予約の末尾の次の 4KiB 境界から B 以下の最後の 4KiB 境界まで)。height が 0 なら GF2_ENOSPC で試験面を公開しない (表示は続ける)。根拠: T0 の比べ方 (§13) は表示面と同じ形式・幅の面への描画と読み戻しで、別の幾何は要らない。

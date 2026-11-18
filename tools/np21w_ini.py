@@ -41,10 +41,11 @@ import uuid
 # SUPPORT_LARGE_MEMORY 無効時は UINT8、どちらも MEMORY_MAXSIZE でクランプ)。
 # ブートローダが 1MB から 512KB 刻みで実測するので
 # (NHD 起動は boot/loader_hdd.asm、FD は boot/loader_fat_new.asm の .probe_loop、同じ算法)、
-# ゲストの総容量はこの値で決まる。値は 2 つだけ通す:
+# ゲストの総容量はこの値で決まる。通す値は下の ALLOWED の 6 つ:
 #   16 = 現行構成 (ゲスト 15360KB = 15MB。実測 2026-09-09)
 #    7 = ゲスト 8MB。memory_boot の legacy フォールバックを通す
 #    8 = ゲスト 9MB。PEGC (640x480) の 300KB 予約がアプリ帯の外に出る最小構成
+#   33・65・129 = 16MB を超える RAM の試験の値 (65 は構成 `ram-64mb` = ゲスト 64MB)
 # 8MB は CUI の最低動作環境であって GUI の最低要件ではない
 # (INSTALL.md / docs/02_memory.md / docs/02_memory.md の旧配置の注記)。
 ALLOWED = {'USEGD5430': ('true', 'false'), 'GD5430TYPE': ('91',),

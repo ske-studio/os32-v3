@@ -1,7 +1,9 @@
 # K5b-K TDD 記録 — アプリ 4 本の同時実行 (カーネル側、KAPI v44)
 
-対象票: `docs/archive/gui_v13/TASK_K5B_kernel.md`
-設計の正典: `docs/archive/gui_v13/TASK_K5_multiapp.md` §設計 D0〜D11 + 決裁 (2026-09-11)
+契約の正典: park・resume と印は `docs/design/exec/appslot_transition.md`、起動の入場・畳み・CTRL+STOP は
+`docs/design/exec/appslot.md` の「起動・畳み・CTRL+STOP・画面の所有者の判定」、アプリ帯の写像は
+`docs/design/mm/paging.md` の「アプリ帯の AS」、SHM の所有者ごとの回収は `docs/design/mm/shm.md`。
+出所は票 TASK_K5B_kernel と TASK_K5_multiapp (設計 D0〜D11 + 決裁)。
 
 新しい挙動ごとに **RED を先に見てから GREEN にした**。RED は「実装前の状態を
 再現したビルド」で実際に走らせて記録している (後付けの偽装ではない)。RED 用の
@@ -190,8 +192,13 @@ check-multiapp-impl-host:
 
 # 追記: 回 4 — sbrk 物理の二段構え (ユーザー決裁 2026-09-11)
 
-対象票: `docs/archive/gui_v13/TASK_K5B_kernel.md` 作業 8
-決裁: `docs/archive/gui_v13/TASK_K5_multiapp.md` 末尾の決裁表「sbrk は二段構え (2026-09-11)」
+票 TASK_K5B_kernel の作業 8、決裁は TASK_K5_multiapp 末尾の決裁表「sbrk は二段構え」。
+
+> **今のコードにこの二段構えは無い**。`exec_sbrk_pick_tier`・`exec_sbrk_tier_last` と
+> `tools/tests/test_sbrk_tier.py`・`sbrk_tier_host.c` は撤去済みで、今の `exec_launch`
+> (`exec/exec_launch.inc`) は sbrk の初期量を本体の BSS 端 + 1 ページに置き、
+> 要るページ数を `exec_ring3_pages` (`exec/exec_image_map.inc`) の 1 本の式で勘定する。
+> 以下 (回 4 と回 8) は当時の記録。
 
 | 回 | 対象 | RED | GREEN |
 |---|---|---|---|
@@ -296,10 +303,11 @@ python3 -B tools/tests/test_sbrk_tier.py    # 回 4 (新規)
 
 # 追記: 回 5 (節 R) — 実機初回起動の差し戻し「FATAL: shell.bin load failed」
 
-対象票: `docs/archive/gui_v13/TASK_K5B_kernel.md` (差し戻し 2026-09-11)
+票 TASK_K5B_kernel の差し戻し (2026-09-11)。`ext2_read_file` が `max_size` を越えて書かない契約は
+`docs/design/fs/ext2/ext2_file.md` の「落とし穴」。
 実機の観測 (PM、NP21/W、15MB 構成): `kselftest_pass=44 kselftest_fail=0` でカーネルは
 起動しているのに、text VRAM 1 行目が `FATAL: shell.bin load failed` + shlib のロード
-報告、EIP = `kernel_main+0xd4c` (`init/kernel.c:582` の停止ループ)。
+報告、EIP = `kernel_main+0xd4c` (`platform/pc98/kernel.c` の停止ループ)。
 
 | 回 | 対象 | RED | GREEN |
 |---|---|---|---|
@@ -308,7 +316,7 @@ python3 -B tools/tests/test_sbrk_tier.py    # 回 4 (新規)
 
 ## 原因 (推測ではなく実ソースと `kernel.map` で確定)
 
-`fs/ext2/ext2_file.c:34` (K5b-K 前からある行) —
+`fs/ext2/ext2_file.c` の `ext2_read_file()` (K5b-K 前からある行) —
 
 ```c
 ret = ext2_read_block(ctx, phys, &dst[total_read]);   /* 端数ブロックでも 1KB 書く */
@@ -321,7 +329,7 @@ ret = ext2_read_block(ctx, phys, &dst[total_read]);   /* 端数ブロックで�
 
 K5b-K 前は exec が「ファイル全体をロード番地へ」読んでいたので、溢れ先は
 そのプログラム自身の帯の中で無害だった。K5b-K が D1 の手順 2 のためにヘッダを
-**先読み**するようにし (`exec/exec.c:996`)、宛先を
+**先読み**するようにし (`exec/exec.c`)、宛先を
 
 ```c
 static u8 hdrbuf[OS32X_HDR_V2_SIZE + 64];   /* = 108 バイト、カーネル .bss */
@@ -339,14 +347,14 @@ static u8 hdrbuf[OS32X_HDR_V2_SIZE + 64];   /* = 108 バイト、カーネル .b
 
 で、`hdrbuf` の 108 バイトの直後に **`resolved[]` (解決済みパス) が居た**。
 ヘッダ先読みが `resolved` をファイルの中身で塗り潰し、続く本体読み込み
-`vfs_read(resolved, file_buf, read_max)` (`exec/exec.c:1298`) がゴミのパスを
+`vfs_read(resolved, file_buf, read_max)` (`exec/exec.c`) がゴミのパスを
 引くので `sz <= 0` → **`EXEC_ERR_NOT_FOUND`**。`/sys/shell.bin` も FDD
 フォールバック (`SYS_SHELL_BIN_FDD` は同じ綴り) も同じところで落ちるため、
-`init/kernel.c:582` の `FATAL: shell.bin load failed` に落ちる。
+`platform/pc98/kernel.c` の `FATAL: shell.bin load failed` に落ちる。
 `EXEC_ERR_NOMEM` の経路 (`[DBG] NOMEM: ...`) は**通っていない** — 画面に
 その行が 1 つも出ていないことと符合する。
 
-`14000` (実機の 2 行目) は別物ではなく、`mm/shlib.c:191` の
+`14000` (実機の 2 行目) は別物ではなく、`mm/shlib.c` の
 
 ```
 [shlib] /sys/lib/libos32gui.shlib v1 loaded: 101 funcs, text 20 pg, data 4 pg @414000
@@ -431,7 +439,11 @@ K5b-K で登録されていなかった `test_multiapp_impl.py` / `test_owner_re
 
 # 追記: 回 6 (ケース 19) — CPL=3 アプリ生存中は `--cpl0` の子を拒否 (申し送り A1)
 
-対象票: `docs/archive/gui_v13/TASK_K5B_kernel.md` 末尾「申し送り A1」/ **ユーザー決裁 2026-09-11**
+票 TASK_K5B_kernel の末尾「申し送り A1」/ **ユーザー決裁 2026-09-11**。
+
+> **今のコードに `appslot_cpl0_admit` は無い**。非シェルのプログラムはローダが CPL=3 だけを許し
+> (`exec_launch` の `want_ring3 = !is_shell`)、`--cpl0` の子がアプリ帯を丸ごと押さえる経路が無くなった。
+> 以下は当時の記録。
 
 | 回 | 対象 | RED | GREEN |
 |---|---|---|---|
@@ -459,7 +471,7 @@ per-app 物理も同じ pgalloc から取るので、GUI アプリが park 中�
    `paging_addrspace_create_n` / `exec_heap_save_state` / `ring3_band_set` の
    どれよりも手前。claim も alloc も 1 つも行わないので `exec_restore_band` も要らない。
 
-戻り値は `OS32_ERR_FULL` (`sdk/include/os32/os32_kapi_shared.h:311`、「スロット / 資源が満杯」)。
+戻り値は `OS32_ERR_FULL` (`sdk/include/os32/os32_kapi_shared.h`、「スロット / 資源が満杯」)。
 専用番号は増やしていない。`exec_launch` の既存の拒否と流儀を揃えてある —
 ID の池が尽きたときの `appslot_start_admit` も `OS32_ERR_FULL`、物理不足は
 `EXEC_ERR_NOMEM` (`exec_status_t`)、ヘッダ不正は `EXEC_ERR_INVALID`。`exec_run` は
@@ -537,11 +549,11 @@ python3 -B tools/check_constraints.py            # EXIT=0
 
 | 場所 | 内容 |
 |---|---|
-| `sdk/mkos32x.py:190` | `--cpl0` → `OS32X_FLAG_FORCE_CPL0` (0x0004) をヘッダの `flags` に立てる。**唯一の生成側** |
+| `sdk/mkos32x.py` | `--cpl0` → `OS32X_FLAG_FORCE_CPL0` (0x0004) をヘッダの `flags` に立てる。**唯一の生成側** |
 | `build/programs.mk` / `userland/*/Makefile` | `--cpl0` を渡している行は無い (`ring3_hello` / `ring3_fault` / `hello_r3` / `faultprobe_r3` はいずれも CPL=3 側の検証用) |
 | `apps/` (submodule) | `deploy.yaml` / `Makefile` / `app.conf` を含め `cpl0` の記述なし |
 | `game/` (submodule) | 同上、記述なし |
-| 消費側 | `exec/appslot.c:113` `appslot_launch_is_app()` (`want_ring3` を落とす) と `mm/shlib.c:181` (CPL=0 プログラムは shlib の master をそのまま共有) |
+| 消費側 | `exec/appslot.c` の `appslot_init()` `appslot_launch_is_app()` (`want_ring3` を落とす) と `mm/shlib.c` (CPL=0 プログラムは shlib の master をそのまま共有) |
 
 つまり `--cpl0` は現在「手で `sdk/mkos32x.py --cpl0` を叩いたときだけ立つエスケープ
 ハッチ」で、標準の配備物には 1 本も無い。gshell 配下でこの拒否に当たるのは、その手製
@@ -551,8 +563,8 @@ python3 -B tools/check_constraints.py            # EXIT=0
 
 # 追記: 回 7 (ケース 20) — `exec_abort_clear` で CTRL+STOP の宛先を付け替える (KAPI v45)
 
-対象票: `docs/archive/gui_v13/TASK_K5B_gshell.md`
-「決裁が要る点 A1」/ **ユーザー決裁 2026-09-11 の A1**
+票 TASK_K5B_gshell の「決裁が要る点 A1」/ **ユーザー決裁 2026-09-11 の A1**。
+今の契約は `docs/design/exec/appslot.md` の「畳み・CTRL+STOP」(`appslot_abort_clear`)。
 
 | 回 | 対象 | RED | GREEN |
 |---|---|---|---|
@@ -560,7 +572,7 @@ python3 -B tools/check_constraints.py            # EXIT=0
 
 ## 何が足りていなかったか
 
-CTRL+STOP は IRQ1 (`drivers/input/kbd.c:235` → `ring3_abort_request` → `appslot_abort_request`)
+CTRL+STOP は IRQ1 (`drivers/input/kbd.c` → `ring3_abort_request` → `appslot_abort_request`)
 の時点で **走っているアプリ** の `AppSlot.abort_req` を無条件に立てる。IRQ1 の時点で
 カーネルが知っているのはそれだけだからで、宛先は選べない。ところが契約 T6 の宛先は
 **フォーカス窓のアプリ**。4 本同時実行では両者が食い違い、WM (gshell) がフォーカス窓の
@@ -659,7 +671,8 @@ make kernel                                       # EXIT=0、-Wall の警告 0
 
 # 追記: 回 8 (ケース 4) — 3 領域の外で取る付随ページを勘定に入れる (K7)
 
-票: `docs/archive/gui_v13/TASK_K5B_kernel.md` 「K7」
+票 TASK_K5B_kernel の「K7」。付随ページ (shlib の私有 data/BSS) を勘定に入れる形は今も
+`exec_ring3_extra_pages` に残っている。
 
 ## 何が壊れていたか
 

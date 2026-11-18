@@ -159,7 +159,7 @@ int fep_store_user_clear(FepStore *d)
 #include "../../drivers/input/kbd_dlog.c"
 #include "kbd_source.inc"
 /* Back the CUI candidate save/restore addresses with host memory. */
-#include "tvram.h"
+#include "text_screen.h"
 #include "tvram_private.h"   /* PC-98 の番地 (第 5 段 C1) */
 static u16 fixture_tvram_text[25 * 80];
 static u8 fixture_tvram_attr[25 * 160];

@@ -1,10 +1,13 @@
 /* PC-98 standard planar graphics: mode entry and display-memory clearing.
  * (第 5 段 B3: gfx/gfx_core.c・gfx_core_init.inc から移した。値と順は不変。)
  * UNDOCUMENTED io_disp.md: GDC CSRFORM、モード F/F1・F/F2、A4h/A6h のページ。 */
+#include "pc98.h"
 #include "gfx_internal.h"
 #include "display_restore.h"
 #include "kstring.h"
 #include "memmap.h"
+
+_Static_assert(GFX_BB_PLANES == GVRAM_PLANES, "planar backbuffer planes follow the PC-98 GVRAM");
 
 /* テキスト VRAM を見えなくする (文字 0・属性 0)。console_clear とは別の口。 */
 void display_text_hide(void)
@@ -41,7 +44,7 @@ void display_flip_pages(int display, int access)
     _out(GDC_ACCESS_PAGE, access ? GDC_PAGE_1 : GDC_PAGE_0);
 }
 
-/* テキスト GDC の状態の VSYNC が立つまで回る (第 5 段 B6: gfx/gfx_vram.c から)。 */
+/* テキスト GDC の状態の VSYNC が立つまで回る (第 5 段 B6: drivers/video/pc98/gfx_vram.c から)。 */
 void display_wait_vsync(void)
 {
     while ((_in(GDC_TEXT_STAT) & GDC_STAT_VSYNC) == 0) { }

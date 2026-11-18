@@ -1,6 +1,6 @@
 """Normal image owner: real preparation, bounded deadlines and cleanup."""
 CHECK = dict(name='splash-v2-host', tier=1,
-    covers=['platform/pc98/splash_image.c', 'include/platform_splash.h', 'init/boot_splash.c',
+    covers=['platform/pc98/splash_image.c', 'include/platform_splash.h', 'platform/pc98/boot_splash.c',
             'drivers/video/pc98/splash_raster_plan.c', 'drivers/video/pc98/splash_raster_play.h',
             'drivers/video/pc98/splash_raster_image.h', 'drivers/video/pc98/splash_raster.h',
             'drivers/video/pc98/splash_raster_run.c', 'drivers/video/pc98/splash_raster_run.h',
@@ -10,7 +10,7 @@ CHECK = dict(name='splash-v2-host', tier=1,
             'sdk/include/os32/os32_kapi_shared.h', 'fs/vfs.h', 'mm/kmalloc.h', 'include/kprintf.h', 'lib/kstring.h',
             'tools/tests/splash_v2_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
     needs=[], budget=3.6,
-    basis=['RASTER_SPLASH_S5_DESIGN §2', 'RASTER_SPLASH_S5_DESIGN §4', 'RASTER_SPLASH_S5_DESIGN §8'],
+    basis=['docs/design/platform/pc98/splash_image.c.md 手順と結果', 'docs/design/platform/pc98/splash_image.c.md 時間の予算', 'docs/design/drivers/video/pc98/splash_raster_run.c.md 口の契約'],
 )
 import argparse
 import os
@@ -92,7 +92,7 @@ def no_division():
         assert not subprocess.check_output([nm, '-u', str(exe)], text=True).strip()
         assert host32.run([str(exe)], runner='qemu', capture_output=True).returncode == 0
     assert not any('platform_splash_try_image_until' in (ROOT/p).read_text() for p in
-                   ('include/platform_splash.h', OWNER, 'init/boot_splash.c'))
+                   ('include/platform_splash.h', OWNER, 'platform/pc98/boot_splash.c'))
     print('GREEN owner object/disassembly/link without libgcc: no 64-bit division helpers; obsolete entry absent', flush=True)
 def main():
     p=argparse.ArgumentParser(); p.add_argument('--mutate', action='store_true'); args=p.parse_args()

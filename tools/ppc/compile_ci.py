@@ -7,6 +7,8 @@ import subprocess
 
 IMAGES = (['KBOOT_SH=0', 'KBOOT_LINK=0'], ['KBOOT_SH=0', 'KBOOT_LINK=1'],
           ['KBOOT_SH=1', 'KBOOT_LINK=0'], ['KBOOT_SH=1', 'KBOOT_LINK=1'])
+# 像に入っていない共通のソースのコンパイルだけの関門 (build/targets/ppc-powermac.mk の common-compile)。
+COMMON_COMPILE = ['KBOOT_SH=1', 'KBOOT_LINK=1', 'common-compile']
 
 
 def run(root, env=None):
@@ -21,9 +23,9 @@ def run(root, env=None):
         env.pop(key, None)
     # Every image the PPC acceptance uses, with KBOOT_LINK explicit: the core
     # (kboot_accept/kboot_run), the link diagnostic, PLN1 SH and link-SH.
-    for flags in IMAGES:
+    for flags in (*IMAGES, COMMON_COMPILE):
         result = subprocess.call(
-            ['make', '-f', 'build/ppc-kboot.mk', *flags, 'PPC_CROSS_DIR=' + str(cross)],
+            ['make', 'ARCH=ppc', 'PLATFORM=powermac', *flags, 'PPC_CROSS_DIR=' + str(cross)],
             cwd=root, env=env)
         if result:
             return result

@@ -33,18 +33,18 @@ F1 は受入済みという依頼条件を前提とする。
 
 | 場所 | 現状と F2 に必要な差分 |
 |---|---|
-| `kapi/kapi_db.c:37–45,198–233,247–272,462–478` | DbSlot は owner／isolated を保持。finalize→必要なら ROLLBACK→sqlite3_close、close 失敗時は slot のみ隔離。FD の情報はない。owner/all cleanup は isolated を再試行しない |
-| `tools/tests/kapi_db_owned_tdd.md:3–5,55–65` | F1 の既存 host 証跡は実 DB slot＋SQLite mock。実 VFS／FD／exec／FEP 生存の証拠ではない |
-| `lib/sqlite3/os32_sqlite_vfs.c:68–85,180–222` | Os32File は fd だけ。xOpen は現在 owner の `vfs_open`。xClose は void の `vfs_close` を呼ぶ。`os32_sqlite_db_fd` は main しか返さない |
-| `fs/vfs_fd.c:38–150` | FD 表は in_use／protect／owner。vfs_open は res_owner_get で付与。vfs_close は protect を無視して表を空ける。vfs_close_owned だけが protect を除外する。backend close callback は現在ない |
-| `fs/fd_redirect.c:18–22,109–137` | owner は再利用される nest 整数。redirect reset は直接 vfs_close を呼ぶため、「protect したから全 close 経路で安全」ではない |
-| `exec/exec.c:448–511` | heap reset 後、redirect→FD→pipe→SHM→sound→**db_cleanup_all**→GUI→nest 減算。親 DB の破壊と SQLite より先の FD 解放が残る |
-| `exec/exec.c:386–442,1016–1019,1112,1208` | nest 更新後の起動失敗は exec_launch_abort。現在は子コード未実行・owner 資源なしを前提に owner cleanup を省略 |
-| `exec/exec.c:252–258,514–533,565–636,651–663,1288` | CTRL+STOP→ring3_fault_kill→exec_fault_recover→exec_exit。通常 sys_exit と CPL0 entry return も exec_exit。STOP は SQLite/KAPI の途中ではなく静かな境界へ持ち越す |
-| `kernel/ime/ime_dict.c:25–31,61–127,220–267,270–426` | FEP は直接 SQLite。open 完了後に main のみ protect、close 前に解除し close の結果を捨てる。検索・学習・列挙・削除・export・clear がある。export 出力 FD は SQLite FD ではない |
+| `kapi/kapi_db.c` | DbSlot は owner／isolated を保持。finalize→必要なら ROLLBACK→sqlite3_close、close 失敗時は slot のみ隔離。FD の情報はない。owner/all cleanup は isolated を再試行しない |
+| `tools/tests/kapi_db_owned_tdd.md` | F1 の既存 host 証跡は実 DB slot＋SQLite mock。実 VFS／FD／exec／FEP 生存の証拠ではない |
+| `lib/sqlite3/os32_sqlite_vfs.c` | Os32File は fd だけ。xOpen は現在 owner の `vfs_open`。xClose は void の `vfs_close` を呼ぶ。`os32_sqlite_db_fd` は main しか返さない |
+| `fs/vfs_fd.c` | FD 表は in_use／protect／owner。vfs_open は res_owner_get で付与。vfs_close は protect を無視して表を空ける。vfs_close_owned だけが protect を除外する。backend close callback は現在ない |
+| `fs/fd_redirect.c` | owner は再利用される nest 整数。redirect reset は直接 vfs_close を呼ぶため、「protect したから全 close 経路で安全」ではない |
+| `exec/exec.c` | heap reset 後、redirect→FD→pipe→SHM→sound→**db_cleanup_all**→GUI→nest 減算。親 DB の破壊と SQLite より先の FD 解放が残る |
+| `exec/exec.c` | nest 更新後の起動失敗は exec_launch_abort。現在は子コード未実行・owner 資源なしを前提に owner cleanup を省略 |
+| `exec/exec.c` | CTRL+STOP→ring3_fault_kill→exec_fault_recover→exec_exit。通常 sys_exit と CPL0 entry return も exec_exit。STOP は SQLite/KAPI の途中ではなく静かな境界へ持ち越す |
+| `kernel/ime/ime_dict.c` | FEP は直接 SQLite。open 完了後に main のみ protect、close 前に解除し close の結果を捨てる。検索・学習・列挙・削除・export・clear がある。export 出力 FD は SQLite FD ではない |
 
 **接続から xOpen へ所有情報を運ぶ既存経路**:
-`lib/sqlite3/sqlite3.c:189567–189584` は指定 VFS を `db->pVfs` に保存して main を開く。
+`lib/sqlite3/sqlite3.c` は指定 VFS を `db->pVfs` に保存して main を開く。
 `:64484–64491` は Pager に pVfs を保存、`:64737,64878` は journal を同じ VFS で開く。
 メモリ journal の遅延実体化も `:109886–109892` の `copy.pVfs` を使う。
 temp pager は `:63227–63240`、sorter は `:107820–107831` で接続由来の VFS を使う。
@@ -107,7 +107,7 @@ B の owner は一度も変更しない。FEP が B 実行中に初めて学習�
 
 ### 3.1a scoped 実装の契約差分
 
-§3.1 の pointer 型 API は旧案。現行の宣言は `lib/sqlite3/os32_sqlite_vfs.h:23` を参照。
+§3.1 の pointer 型 API は旧案。現行の宣言は `lib/sqlite3/os32_sqlite_vfs.h` を参照。
 
 - 専用 descriptor は DB_MAX_CONNECTIONS=8 + RESIDENT=1、非 default 一度登録。
   再 acquire では cookie/世代などの可変状態だけを更新し、登録済み pNext を触らない。

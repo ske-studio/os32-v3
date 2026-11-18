@@ -13,7 +13,7 @@ CHECK = dict(name='ext2-read-cache-host', tier=1, budget=4.2,
                      'tools/tests/ext2_read_cache_host.c',
                      'tools/tests/test_ext2_read_cache.py', 'tools/tests/host32.py',
                      'tools/tests/hdd_pt_fake.h', 'tools/tests/kernel_includes.py',
-                     'drivers/block/pc98pt.c', 'drivers/block/pc98pt.h', 'include/ide_contract.h',
+                     'fs/pc98pt.c', 'fs/pc98pt.h', 'include/ide_contract.h',
                      'include/platform_device.h'], needs=[],
     kind='characterization',
 )

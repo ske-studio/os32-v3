@@ -168,7 +168,7 @@ int lan_bulk_step(void *t, struct io_slice *s) { /* 擬似コード、所有者�
 ```
 - 口はio-tierと同一、時計はio_clock_us（AC-TIME-4）、x86 TSC/PPC TBはそのprovider内に隠す。io-tier D6は削除する合意で、本稿から別設計ファイルは書き換えない。
 - io_slice_takeは時間・総unitsを開始前に検査、RX取り込み/link処理/bulkで同じsliceを使い途中で予算を作り直さない。frameを再カウントしても安全側。最後の1単位超過を測り、次回は実測上限で開始可否を判断。
-- 現NIC取り込みはnet_rx_idle/net/rx_work.cで既にFG。link dispatchの通常経路をFGへ移すが、FGが10 jiffy（100ms）linkを回していなければIRQ0で既存link_tickを1回実行する救済を残す。busyなら実行せず次回に持ち越す。nic.c:298の既存e82557限定回収も維持。
+- 現NIC取り込みはnet_rx_idle/net/rx_work.cで既にFG。link dispatchの通常経路をFGへ移すが、FGが10 jiffy（100ms）linkを回していなければIRQ0で既存link_tickを1回実行する救済を残す。busyなら実行せず次回に持ち越す。nic.cの既存e82557限定回収も維持。
 - KAPIは所有中にhandle世代を固定、busyのまま待ち・アプリcallback禁止。E0の不変条件は「通常FG＋既存IRQ0救済、共有busyによる単一所有」。IRQ0は救済条件成立時だけlink状態を進め、他はpending/時刻を記録する。短いirq_saveはbusy/pending受渡し用、NICのticking guardと相互待ちしない。救済は新bulk/保存処理やTier dispatcherを実行せず、新opはFGへ保留する。
 - JはAC-CTX適合入口から共通FG1待ちを使い、終端/負値まで有限のroundを反復する。IRQ・共有busy/lock保持・再入状態では待たず、条件不成立はエラー。IRQ出口dispatcherは作らない。
 - Tier前の登録はidle_workの1本、4枠満杯は初期化失敗。VFS待ちは直接駆動で進め、IO_WAITも再受信/期限を確認しHLTしない。lan_bulk_stepは自身のbusyを持ち、入れ子では状態・sliceを変更せずIO_MORE。Tier導入後も同じstepを使う。
@@ -220,19 +220,19 @@ int lan_bulk_step(void *t, struct io_slice *s) { /* 擬似コード、所有者�
 |E0b|net/link.c 変更180|通常dispatchをFG化・共有busy/最終FG時刻・救済、E0a後|
 |E0k|net/link_host_api.inc 変更100|KAPIをFG所有guardへ置換、E0b後|
 |E0c|net/nic.c 変更100|IRQ0の10jiffy/busy条件付きlink救済、既存RX接続、E0k/G後|
-|E0c 試験|hostsvc-boot: `tools/tests/hostsvc_boot_host.c:172-173`|通常 FG 駆動と 10 jiffy 無活動時の IRQ0 救済を検証する|
-|E0c 試験|hostsvc-nic: `tools/tests/hostsvc_nic_host.c:177,275`・`tools/tests/test_hostsvc_nic.py`|通常 FG と IRQ0 救済の駆動・変異を分けて検証する|
-|E0c 試験|net-rx-work-host: `tools/tests/net_rx_work_host.c:82-84,194-198`|FG の LINK 消費と 10 jiffy 救済を検証し旧 wrapper 保証との世代差を解消する|
+|E0c 試験|hostsvc-boot: `tools/tests/hostsvc_boot_host.c`|通常 FG 駆動と 10 jiffy 無活動時の IRQ0 救済を検証する|
+|E0c 試験|hostsvc-nic: `tools/tests/hostsvc_nic_host.c` の `link_tick()`・`tools/tests/test_hostsvc_nic.py`|通常 FG と IRQ0 救済の駆動・変異を分けて検証する|
+|E0c 試験|net-rx-work-host: `tools/tests/net_rx_work_host.c`|FG の LINK 消費と 10 jiffy 救済を検証し旧 wrapper 保証との世代差を解消する|
 |E|net/link.c 変更100|失効・送信優先・bulk接続、D/E0c後|
 |F|tools/host_agent.py 変更100|bulk dispatch・LIST・送出、C後Eと並列可|
 |G|net/nic.h 変更70|W2容量予約・予算口とNetNicOps.fg_service、Bに先行可|
-|G1|net/nic_lgy98.c 変更60|NE2Kのfg_serviceをne2k_bhへ接続、G後（adapter所在を実装時照合）|
+|G1|drivers/net/ne2000/nic_lgy98.c 変更60|NE2Kのfg_serviceをne2k_bhへ接続、G後（adapter所在を実装時照合）|
 |H/H1|net/nic_rx.c 変更180|既存FG取り込み維持、link23枠/共有予約、G後|
 |H2a|drivers/net/e82557/e82557_regs.h 変更30|RFD23・DMAサイズ、G後|
 |H2b|drivers/net/e82557/e82557_desc.c 変更100|ring初期化/周回/回収、H2a後|
 |H2c|drivers/net/e82557/e82557.c 変更60|DMA領域確保・境界検証、H2b後|
 |H3|platform/powermac/nic_gem.c 変更120|4枠経路のadmission拡大、G/W2後|
-|H3 試験|gem-adapter-host: `tools/tests/gem_adapter_host.c:65,72,76-87`|公開 credit から満杯・解放・wrap を検証し、23 枠の受入を別に置く。tick 側 RX 所有を維持|
+|H3 試験|gem-adapter-host: `tools/tests/gem_adapter_host.c` の `_start()`|公開 credit から満杯・解放・wrap を検証し、23 枠の受入を別に置く。tick 側 RX 所有を維持|
 |I|net/bulk_work.c 新180|io_slice_begin/idle_work・bulk自身の再入guard、B1/B2/H/E0cとio-tier A1・A3・T1・T2後、LAN専有|
 |J|fs/hostsvc/hostsvc.c 新380|VFS OPEN・fg_service/RXを回す共通FG1待ち、I/G1とio-tier A1・A3・T1・T2およびAC-CTX受入後|
 |K|tools/host_fs_meta.py 新250|stat/list等、A後並列可|
@@ -269,8 +269,8 @@ int lan_bulk_step(void *t, struct io_slice *s) { /* 擬似コード、所有者�
 - ユーザー判断の未決 **0件**。p95≤50ms・max≤100ms、非転送時との差も併記を採用済み。GEMのメーカー上限資料照合は実装ゲートでありユーザー判断ではない。 N/予算調整、W2確定、棚卸し、実測は担当工程の作業とする。
 - 実物との食い違い **2件**（設計による変更予定は数えない）。
   1. r0「ARCH_COMPAT_CONTRACTが作業木になく未確認」→今回のorigin/mainには存在。§5はW2の予約で、確定容量保証ではない。
-  2. PACK「今はpwriteしてclose」→serialfs_host.py:543–572はsecure側がpwrite_all、他方はseek/write＋withのclose。両方fsyncなし、完了意味は一致。
-- 基点9e39176aではlink.c:543、nic.c:213/310がlink駆動、net_rx_idle:257は既存FG取り込み。E0で旧不変条件と新op受付を更新。TASK_NET_HOSTSVC §0の旧共存方針より今回の決定を優先する。
+  2. PACK「今はpwriteしてclose」→serialfs_host.pyはsecure側がpwrite_all、他方はseek/write＋withのclose。両方fsyncなし、完了意味は一致。
+- 基点9e39176aではlink.c:543、nic.c/310がlink駆動、net_rx_idle:257は既存FG取り込み。E0で旧不変条件と新op受付を更新。TASK_NET_HOSTSVC §0の旧共存方針より今回の決定を優先する。
 - 反論: 0件。F1〜F13、R4とユーザー/PM決定を採用。
 
 ## 確定 (2026-11-14、Opus 第 2 回、PM 決定を反映)

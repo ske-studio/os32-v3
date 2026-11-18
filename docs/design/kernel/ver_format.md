@@ -4,7 +4,7 @@
 
 | 行 | 出す値／取り方 | 取れないとき／意味の限界 |
 |---|---|---|
-| PIC | `8259A x2; vectors=20h/28h (configured)`。arch/x86/kernel/idt.h:101–102 の設定定数 | 起動済みの設定説明。実チップを検出済みと主張しない |
+| PIC | `8259A x2; vectors=20h/28h (configured)`。arch/x86/kernel/idt.h の設定定数 | 起動済みの設定説明。実チップを検出済みと主張しない |
 
 - count は実際の件数。装置 unknown は行を残す。boot_image_info 失敗時だけ Commit/CRC を従来どおり省く。
 - formatter は上限付き追記 helper と u32 の10進/16進変換だけで作る。符号・NUL・残容量を先に扱い、カーネル文字列関数は kstrlen/kstrncpy 等を使う。

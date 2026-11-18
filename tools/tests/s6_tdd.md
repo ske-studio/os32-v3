@@ -137,7 +137,7 @@ CASE name_exactly_100
 
 ## まだ見ていないこと (ゲスト受入へ)
 
-`docs/archive/settings/TASK_S6.md` §4 に一覧。要点は 2 つ:
+`docs/design/userland/cmds/tar.md` 「ゲストでしか確かめられない事」に一覧。要点は 2 つ:
 
 - **`sys_lseek` の後方シーク**を短い間隔で繰り返す (`mtar_read_header` は
   512B 読んでヘッダ先頭へ戻る) のは `tar` が初めて。既存の利用者

@@ -124,7 +124,7 @@ def check_entry():
     下流 (shell_print / console_write) は全部 kprintf の attr を使うので、
     入口の 1 行があることを見れば足りる。
     """
-    text = (ROOT / "lib/kprintf.c").read_text(encoding="utf-8")
+    text = (ROOT / "lib/kprintf_format.inc").read_text(encoding="utf-8")
     n = text.count("attr = kprintf_attr_to_pc98(attr);")
     print(f"ENTRY kprintf applies conversion x{n}", flush=True)
     return 0 if n == 1 else 1

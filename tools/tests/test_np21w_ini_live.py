@@ -1712,11 +1712,11 @@ def mutate():
     common_src = SRC.with_name('np21w_ini.py')
     common = common_src.read_text(encoding='utf-8')
     common_mutations = [
-        ("EXTRA = {'SNDBOARD', 'NP2NETSOCK', 'E_RESUME', 'CRT31K'}",
-         "EXTRA = {'SNDBOARD', 'NP2NETSOCK', 'E_RESUME', 'CRT31K'}",
+        ("EXTRA = {'SNDBOARD', 'NP2NETSOCK', 'E_RESUME', 'CRT31K',\n",
+         "EXTRA = {'SNDBOARD', 'NP2NETSOCK', 'E_RESUME', 'CRT31K',\n",
          "shared transform identity control (must stay GREEN)"),
-        ("EXTRA = {'SNDBOARD', 'NP2NETSOCK', 'E_RESUME', 'CRT31K'}",
-         "ALLOWED['CRT31K'] = ('true', 'false')\nEXTRA = {'SNDBOARD', 'NP2NETSOCK', 'E_RESUME'}",
+        ("EXTRA = {'SNDBOARD', 'NP2NETSOCK', 'E_RESUME', 'CRT31K',\n",
+         "ALLOWED['CRT31K'] = ('true', 'false')\nEXTRA = {'SNDBOARD', 'NP2NETSOCK', 'E_RESUME',\n",
          "CRT31K moved to ALLOWED breaks old fixtures and receipts"),
         ("elif key in ('E_RESUME', 'CRT31K'):",
          "elif key == 'E_RESUME':",

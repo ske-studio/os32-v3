@@ -167,7 +167,7 @@ void _start(void)
     __asm__ volatile("int $0x80" : "=a"(result) : "a"(90), "b"(args) : "memory");
     CHECK(result == 0x180000);
 
-    /* ---- カーネルの起動順そのもの (init/kernel.c) ---- */
+    /* ---- カーネルの起動順そのもの (platform/pc98/kernel.c) ---- */
     host_map_fixed_paging();
     for (i = MEM_FIXED_PAGING_USED_END; i < MEM_FIXED_PAGING_FRAME_END; i += sizeof(u32))
         *(u32 *)i = 0xA55A1234;

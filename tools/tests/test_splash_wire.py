@@ -1,6 +1,6 @@
 """Boot wire: fixed/v1/v2 OSRI, real loader/players, deadlines and cleanup."""
 CHECK = dict(name='splash-wire-host', tier=1,
-    covers=['init/boot_splash.c', 'drivers/video/pc98/splash_raster_image.c', 'platform/pc98/splash.c', 'platform/pc98/splash_image.c',
+    covers=['platform/pc98/boot_splash.c', 'drivers/video/pc98/splash_raster_image.c', 'platform/pc98/splash.c', 'platform/pc98/splash_image.c',
             'drivers/video/pc98/splash_raster_plan.c', 'drivers/video/pc98/splash_raster_play.c',
             'drivers/video/pc98/splash_raster_run.c', 'drivers/video/pc98/splash_raster_run.h',
             'drivers/video/pc98/splash_raster_play.h', 'drivers/video/pc98/splash_raster_image.h',
@@ -10,9 +10,9 @@ CHECK = dict(name='splash-wire-host', tier=1,
             'tools/tests/kernel_includes.py', 'tools/tests/host32.py', 'lib/le_internal.h',
             'lib/crc32_core.inc', 'lib/kstring.h', 'mm/kmalloc.h', 'fs/vfs.h',
             'gfx/gfx.h', 'gfx/palette.h', 'include/types.h', 'include/pc98.h', 'include/pegc.h',
-            'include/sys.h', 'include/gfx_hal.h', 'include/tvram.h',
+            'include/sys.h', 'include/gfx_hal.h', 'include/text_screen.h',
             'sdk/include/os32/os32_kapi_shared.h'], needs=[], budget=72.5,
-    basis=['RASTER_SPLASH_S5_DESIGN §2', 'RASTER_SPLASH_S5_DESIGN §3', 'RASTER_SPLASH_PL_DESIGN §2', 'RASTER_SPLASH_DESIGN §3'],
+    basis=['docs/design/platform/pc98/splash_image.c.md 手順と結果', 'docs/design/platform/pc98/splash_image.c.md 時間の予算', 'docs/design/gfx/gfx_osri.c.md 手順', 'docs/design/gfx/gfx_osri.h.md ファイルの配置'],
     env_limit='実playerをfake port/clock/VRAMで確認するが、実映像・壁時計とIRQ落ちは保証しない。',
 )
 import argparse
@@ -25,24 +25,24 @@ import zlib
 import host32
 from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
-SOURCES = ['init/boot_splash.c', 'platform/pc98/splash.c', 'platform/pc98/splash_image.c',
+SOURCES = ['platform/pc98/boot_splash.c', 'platform/pc98/splash.c', 'platform/pc98/splash_image.c',
            'drivers/video/pc98/splash_raster.c', 'drivers/video/pc98/splash_raster_plan.c',
            'drivers/video/pc98/splash_raster_play.c', 'drivers/video/pc98/splash_raster_image.c',
            'drivers/video/pc98/splash_raster_run.c', 'drivers/video/pc98/splash_raster_run.h',
            'gfx/gfx_osri.c', 'lib/le_internal.h',
            'lib/crc32_core.inc', 'tools/tests/splash_wire_host.c', 'tools/tests/splash_raster_host.c']
 MUTATIONS = (
-    ('image window', 'init/boot_splash.c', 'u32 end_tick = start_tick + PLATFORM_SPLASH_IMAGE_TICKS;', 'u32 end_tick = start_tick + PLATFORM_SPLASH_TICKS;'),
-    ('logo window', 'init/boot_splash.c', 'u32 logo_end = start_tick + PLATFORM_SPLASH_TICKS;', 'u32 logo_end = start_tick + PLATFORM_SPLASH_IMAGE_TICKS;'),
-    ('fallback clamp', 'init/boot_splash.c', 'else if ((i32)(end_tick - logo_end) > 0) end_tick = logo_end;', 'else if (0) end_tick = logo_end;'),
+    ('image window', 'platform/pc98/boot_splash.c', 'u32 end_tick = start_tick + PLATFORM_SPLASH_IMAGE_TICKS;', 'u32 end_tick = start_tick + PLATFORM_SPLASH_TICKS;'),
+    ('logo window', 'platform/pc98/boot_splash.c', 'u32 logo_end = start_tick + PLATFORM_SPLASH_TICKS;', 'u32 logo_end = start_tick + PLATFORM_SPLASH_IMAGE_TICKS;'),
+    ('fallback clamp', 'platform/pc98/boot_splash.c', 'else if ((i32)(end_tick - logo_end) > 0) end_tick = logo_end;', 'else if (0) end_tick = logo_end;'),
     ('omit user priority', 'platform/pc98/splash_image.c',
      '!vfs_stat(SYS_SPLASH_USER_IMAGE, &stat)', '(0 && !vfs_stat(SYS_SPLASH_USER_IMAGE, &stat))'),
     ('omit release', 'platform/pc98/splash_image.c', 'if (image) kfree(image);', '(void)image;'),
     ('omit close', 'gfx/gfx_osri.c', 'vfs_close(fd);', '(void)fd;'),
     ('omit fixed commit', 'platform/pc98/splash_image.c', '    gfx_present_nosync();', '    (void)fb;'),
-    ('extend deadline', 'init/boot_splash.c', '    /* パレット設定 */', '    end_tick = tick_count + PLATFORM_SPLASH_TICKS;\n    /* パレット設定 */'),
-    ('omit static pacing', 'init/boot_splash.c', 'if (platform_splash_wait_frame(end_tick)) break;', 'break;'),
-    ('omit failed-load redraw', 'init/boot_splash.c', 'platform_splash_clear(PAL_GRAD);', '(void)PAL_GRAD;'),
+    ('extend deadline', 'platform/pc98/boot_splash.c', '    /* パレット設定 */', '    end_tick = tick_count + PLATFORM_SPLASH_TICKS;\n    /* パレット設定 */'),
+    ('omit static pacing', 'platform/pc98/boot_splash.c', 'if (platform_splash_wait_frame(end_tick)) break;', 'break;'),
+    ('omit failed-load redraw', 'platform/pc98/boot_splash.c', 'platform_splash_clear(PAL_GRAD);', '(void)PAL_GRAD;'),
     ('ignore CRC', 'gfx/gfx_osri.c', 'crc32_core_final(crc) != expected', '(0 && crc32_core_final(crc) != expected)'),
 )
 def osri(events=False):

@@ -1,7 +1,7 @@
 # vmkernel_lz4 検証記録 (LZ4 高圧縮と展開側 3 実装)
 
-票: TASK_SERIAL_HOSTFS (アーカイブ: `docs/archive/realhw_v21/TASK_SERIAL_HOSTFS.md`) 部品 A-1
-(先行して着地)。生成側の上限検査は TASK_HDD_INSTALL (アーカイブ: `docs/archive/realhw_v21/TASK_HDD_INSTALL.md`) N8。
+契約: 展開側 3 実装は `docs/design/boot/lz4_mini.md`、生成側 (HC level 12・`MAX_IMAGE_SIZE` の上限) は
+`docs/08_build.md` §8-2 の mkvmkernel.py の段 (出所は TASK_SERIAL_HOSTFS 部品 A-1 と TASK_HDD_INSTALL N8)。
 
 ## この文書の性格
 

@@ -1,7 +1,7 @@
 /* pcm_test e4 -> existing kdebug_call, present only in the diagnostic image. */
+#include "kernel_tick.h"   /* tick_count */
 #include "pcm_e4_diag.h"
 #include "pcm_cs4231.h"
-#include "idt.h"
 #include "io.h"
 #include "serial.h"
 #include "kprintf.h"

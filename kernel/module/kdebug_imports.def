@@ -515,7 +515,7 @@
       "stage": "S2",
       "kind": "FUNC",
       "symbol": "kbd_diag",
-      "source": "drivers/input/kbd.h",
+      "source": "include/kbd_contract.h",
       "context_safe": false,
       "index": 63
     },
@@ -860,7 +860,7 @@
       "stage": "S2",
       "kind": "FUNC",
       "symbol": "paging_v86_session_open",
-      "source": "arch/x86/legacy/v86_mem.h",
+      "source": "platform/pc98/legacy/v86_mem.h",
       "context_safe": false,
       "index": 106
     },
@@ -1012,7 +1012,7 @@
       "stage": "S2",
       "kind": "FUNC",
       "symbol": "sysclk_detected",
-      "source": "kernel/time/sysclk.h",
+      "source": "platform/pc98/sysclk.h",
       "context_safe": false,
       "index": 125
     },
@@ -1020,7 +1020,7 @@
       "stage": "S2",
       "kind": "FUNC",
       "symbol": "sysclk_hz",
-      "source": "kernel/time/sysclk.h",
+      "source": "platform/pc98/sysclk.h",
       "context_safe": false,
       "index": 126
     },
@@ -1046,7 +1046,7 @@
       "stage": "S2",
       "kind": "FUNC",
       "symbol": "tvram_readchar_at",
-      "source": "include/tvram.h",
+      "source": "include/text_screen.h",
       "context_safe": false,
       "index": 129
     },
@@ -1601,7 +1601,7 @@
       "stage": "S3",
       "kind": "FUNC",
       "symbol": "v86_gui_refuse",
-      "source": "arch/x86/legacy/v86.h",
+      "source": "platform/pc98/legacy/v86.h",
       "context_safe": false,
       "index": 197
     },
@@ -1609,7 +1609,7 @@
       "stage": "S3",
       "kind": "FUNC",
       "symbol": "v86_is_active",
-      "source": "arch/x86/legacy/v86.h",
+      "source": "platform/pc98/legacy/v86.h",
       "context_safe": false,
       "index": 198
     },
@@ -1617,7 +1617,7 @@
       "stage": "S3",
       "kind": "FUNC",
       "symbol": "v86_mem_setup",
-      "source": "arch/x86/legacy/v86_mem.h",
+      "source": "platform/pc98/legacy/v86_mem.h",
       "context_safe": false,
       "index": 199
     },
@@ -1625,7 +1625,7 @@
       "stage": "S3",
       "kind": "FUNC",
       "symbol": "v86_mem_teardown",
-      "source": "arch/x86/legacy/v86_mem.h",
+      "source": "platform/pc98/legacy/v86_mem.h",
       "context_safe": false,
       "index": 200
     },
@@ -1641,7 +1641,7 @@
       "stage": "S3",
       "kind": "FUNC",
       "symbol": "v86_run_limit",
-      "source": "arch/x86/legacy/v86.h",
+      "source": "platform/pc98/legacy/v86.h",
       "context_safe": false,
       "index": 202
     },
@@ -1665,7 +1665,7 @@
       "stage": "S3",
       "kind": "PTR",
       "symbol": "v86_session",
-      "source": "arch/x86/legacy/v86_mem.h",
+      "source": "platform/pc98/legacy/v86_mem.h",
       "context_safe": true,
       "index": 205
     },
@@ -1673,7 +1673,7 @@
       "stage": "S3",
       "kind": "PTR",
       "symbol": "v86_gcap_phase",
-      "source": "arch/x86/legacy/v86_gcap.h",
+      "source": "platform/pc98/legacy/v86_gcap.h",
       "context_safe": true,
       "index": 206
     },
@@ -1681,7 +1681,7 @@
       "stage": "S3",
       "kind": "PTR",
       "symbol": "v86_gcap_alloc_count",
-      "source": "arch/x86/legacy/v86_gcap.h",
+      "source": "platform/pc98/legacy/v86_gcap.h",
       "context_safe": false,
       "index": 207
     },
@@ -1689,7 +1689,7 @@
       "stage": "S3",
       "kind": "PTR",
       "symbol": "v86_gcap_free_count",
-      "source": "arch/x86/legacy/v86_gcap.h",
+      "source": "platform/pc98/legacy/v86_gcap.h",
       "context_safe": false,
       "index": 208
     },
@@ -2133,7 +2133,7 @@
       "stage": "S5",
       "kind": "FUNC",
       "symbol": "hwdev_module_ops",
-      "source": "kernel/module/hwdev_module.h",
+      "source": "hwdev/hwdev_module.h",
       "context_safe": false,
       "index": 263
     },

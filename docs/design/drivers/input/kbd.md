@@ -6,8 +6,8 @@
 
 ## 落とし穴
 
-- **8251 の状態と反射**: コマンド 0x16 は RxE と RTY# HIGH を保つ。0x14 は RTY# を LOW にする (`drivers/input/kbd.c:314`)。
-  IRQ では先に状態を読み、空ならデータを読まない。PE/FE は捨て、OE のみなら受信バイトを使ってエラーを解除する (`drivers/input/kbd.c:285`)。
+- **8251 の状態と反射**: コマンド 0x16 は RxE と RTY# HIGH を保つ。0x14 は RTY# を LOW にする (`drivers/input/kbd.c`)。
+  IRQ では先に状態を読み、空ならデータを読まない。PE/FE は捨て、OE のみなら受信バイトを使ってエラーを解除する (`drivers/input/kbd.c` の `kbd_irq_handler()`)。
   実データのない IRQ を V86 に反射すると偽のキーになるため、分類結果に従って反射する。
   `make check-kbd-status-host` と起動時のキーボード自己試験が守る。信号線の効果は実機でも確認する。
 

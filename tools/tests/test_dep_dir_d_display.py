@@ -1,6 +1,6 @@
 """L19: fixed pre-move restore/ready/cell traces; isolated resident closure."""
 CHECK = dict(name='dep-dir-d-display-host', tier=1,
-    covers=['include/callconv.h', 'platform/pc98/bios_snapshot.h', 'arch/x86/arch_io.h', 'arch/x86/x86_flags.h', 'exec/surface_limits.h', 'gfx/gfx.h', 'gfx/gfx_internal.h', 'include/copy_units.h', 'arch/x86/arch_copy.h', 'gfx/palette.h', 'include/con_sink.h', 'include/console.h', 'include/gfx_format.h', 'include/io.h', 'include/memmap.h', 'include/pc98.h', 'include/pegc.h', 'include/types.h', 'kernel/console/display_restore.h', 'include/platform_display.h', 'platform/pc98/legacy/v86_bios.h', 'platform/pc98/display.c', 'platform/pc98/display_private.h', 'platform/pc98/platform_io.h', 'sdk/include/os32/os32_generations.h', 'sdk/include/os32/os32_kapi_generated.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_host_notice.h', 'sdk/include/os32/os32_gfx2.h', 'sdk/include/os32/os32_ls.h', 'sdk/include/os32/os32_surface.h', 'sdk/include/os32/os32_ver_info.h', 'tools/tests/dep_dir_d_display_host.c', 'tools/tests/host32.py', 'tools/tests/fixtures/dep_dir_d/**', 'arch/x86/legacy/v86.c', 'drivers/video/pc98/pc98_route.h', 'tools/tests/kernel_includes.py'],
+    covers=['include/callconv.h', 'platform/pc98/bios_snapshot.h', 'arch/x86/arch_io.h', 'arch/x86/x86_flags.h', 'exec/surface_limits.h', 'gfx/gfx.h', 'gfx/gfx_internal.h', 'include/copy_units.h', 'arch/x86/arch_copy.h', 'gfx/palette.h', 'include/con_sink.h', 'include/console.h', 'include/gfx_format.h', 'include/io.h', 'include/memmap.h', 'include/pc98.h', 'include/pegc.h', 'include/types.h', 'kernel/console/display_restore.h', 'include/platform_display.h', 'platform/pc98/legacy/v86_bios.h', 'platform/pc98/display.c', 'platform/pc98/display_private.h', 'platform/pc98/platform_io.h', 'sdk/include/os32/os32_generations.h', 'sdk/include/os32/os32_kapi_generated.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_host_notice.h', 'sdk/include/os32/os32_gfx2.h', 'sdk/include/os32/os32_ls.h', 'sdk/include/os32/os32_surface.h', 'sdk/include/os32/os32_ver_info.h', 'tools/tests/dep_dir_d_display_host.c', 'tools/tests/host32.py', 'tools/tests/fixtures/dep_dir_d/**', 'platform/pc98/legacy/v86.c', 'drivers/video/pc98/pc98_route.h', 'tools/tests/kernel_includes.py'],
     needs=[], budget=3.0,
     basis=['AC-DISPLAY-1', '[HW1]'],
 )
@@ -108,7 +108,7 @@ def main():
         assert rel in CHECK['covers'], rel
     selected = 'C_KERNEL = ' + ' '.join(query(ROOT, config_only=True)['C_KERNEL'])
     resident(selected)
-    generic=(ROOT/'arch/x86/legacy/v86.c').read_text()
+    generic=(ROOT/'platform/pc98/legacy/v86.c').read_text()
     for name in ('display_out','display_text_start','display_restore_98','display_recover_ready',
                  'display_recover_cell_read','display_recover_cell_write'):
         assert not re.search(r'^(?:static )?(?:void|int) '+name+r'\(',generic,re.M),name

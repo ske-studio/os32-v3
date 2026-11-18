@@ -4,11 +4,12 @@ import os
 from pathlib import Path
 import subprocess
 
-# KB_C, KB_INC and generators in build/ppc-kboot.mk / ram-root.mk.
+# KB_C, KB_INC and generators in build/targets/ppc-powermac.mk / ram-root.mk; the owner sets in build/select.mk.
 COMMON = ('kernel/', 'lib/', 'include/', 'net/', 'fs/', 'mm/', 'exec/',
           'gfx/', 'drivers/', 'init/', 'sdk/', 'kapi/', 'userland/shell/',
           'assets/fonts/', 'platform/none/', 'userland/lib/')
-PPC = ('arch/ppc/', 'platform/powermac/', 'build/ppc', 'userland/ppc/',
+PPC = ('arch/ppc/', 'platform/powermac/', 'build/ppc', 'build/targets/ppc-', 'build/images/',
+       'build/select.mk', 'build/sources/', 'build/arch/ppc', 'build/platform/powermac', 'userland/ppc/',
        'tools/ppc/', 'tools/checks/', 'tools/tests/', '.github/actions/ppc-setup/')
 EXACT = ('Makefile', 'tools/ci/build_cross_ppc.sh', 'tools/ci/ppc_scope.py',
          '.github/workflows/check.yml')

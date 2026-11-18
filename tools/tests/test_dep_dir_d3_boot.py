@@ -8,15 +8,15 @@ import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCES = ('platform/pc98/boot.c', 'init/boot_platform.c', 'init/boot_display.c', 'platform/pc98/emergency.c')
-HEADERS = ('include/ide_contract.h', 'init/boot_platform.h', 'init/boot_display.h', 'include/platform_emergency.h')
+SOURCES = ('platform/pc98/boot.c', 'platform/pc98/boot_platform.c', 'platform/pc98/boot_display.c', 'platform/pc98/emergency.c')
+HEADERS = ('include/ide_contract.h', 'platform/pc98/boot_platform.h', 'platform/pc98/boot_display.h', 'include/platform_emergency.h')
 
 
 def kernel_order(kernel=None, overrides=None):
     if kernel is None:
         kernel = kernel_source(ROOT, overrides)
     else:
-        kernel = kernel_source(ROOT, {'init/kernel.c': kernel})
+        kernel = kernel_source(ROOT, {'platform/pc98/kernel.c': kernel})
     lan = re.search(r'^static void kernel_boot_lan\(struct boot_context \*boot\)\n\{\n(.*?)^}\n',
                     kernel, re.M | re.S)
     assert lan, 'shared LAN boot helper'
@@ -85,7 +85,7 @@ def kernel_order(kernel=None, overrides=None):
 
 def build(work, mutation=None):
     # Positive and mutation copies use the same headers and include paths.
-    for rel in (*SOURCES, *HEADERS, 'init/kernel.c', *kernel_parts(ROOT)):
+    for rel in (*SOURCES, *HEADERS, 'platform/pc98/kernel.c', *kernel_parts(ROOT)):
         text = (ROOT / rel).read_text()
         if mutation and rel == mutation[0]:
             _, old, new = mutation
@@ -97,7 +97,7 @@ def build(work, mutation=None):
     for rel, out in zip(SOURCES, ('pc98_boot_source.inc', 'boot_platform_source.inc', 'boot_display_source.inc', 'emergency_source.inc')):
         text = (work / rel).read_text()
         (work / out).write_text(re.sub(r'^#include[^\n]*\n', '', text, flags=re.M))
-    kernel = (work / 'init/kernel.c').read_text()
+    kernel = (work / 'platform/pc98/kernel.c').read_text()
     start = kernel.index('    {\n        int rc;', kernel.index('"MOUNT..."'))
     end = kernel.index('    boot_platform_run(BOOT_CLOCK, &boot);', start)
     child = re.search(r'static inline void kernel_mount_children\(const char \*root_dev\)\n\{.*?\n}\n', kernel, re.S)
@@ -115,7 +115,7 @@ def build(work, mutation=None):
 
 def main():
     kernel_order()
-    kernel = (ROOT / 'init/kernel.c').read_text()
+    kernel = (ROOT / 'platform/pc98/kernel.c').read_text()
     # Definitions can move without changing execution; follow the call sites.
     includes = [f'#include "{Path(p).name}"' for p in kernel_parts(ROOT)]
     assert len(includes) == 3
@@ -129,7 +129,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix='dep-dir-d3-boot-') as td:
         subprocess.run([str(build(Path(td)))], check=True)
     if '--mutate' in sys.argv:
-        memory_path = 'init/kernel_boot_memory.inc'
+        memory_path = 'platform/pc98/kernel_boot_memory.inc'
         memory = (ROOT / memory_path).read_text()
         early_order = ('        kernel_boot_lan(boot);\n'
                        '        int rc = lan_module_netcd_register(netcd_alias);')
@@ -181,7 +181,7 @@ def main():
             ('platform/pc98/boot.c',
              'drive == BOOT_DRIVE_FDD || drive == BOOT_DRIVE_FDD_144',
              '(drive & BIOS_DA_TYPE_MASK) == BOOT_DRIVE_FDD || (drive & BIOS_DA_TYPE_MASK) == BOOT_DRIVE_FDD_144'),
-            ('init/kernel.c', 'if (match) continue;', 'if (match && 0) continue;'),
+            ('platform/pc98/kernel.c', 'if (match) continue;', 'if (match && 0) continue;'),
         ):
             with tempfile.TemporaryDirectory(prefix='dep-dir-d3-c-mut-') as td:
                 rc = subprocess.run([str(build(Path(td), mutation))]).returncode

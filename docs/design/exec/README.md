@@ -6,7 +6,7 @@
 
 | 通常文脈 | どこ | 備考 |
 |---|---|---|
-| syscall の入口 / wrap の中 | `ring3_syscall_dispatch` (`exec.c:1440-1452`) と KAPI の wrap | IF=1 (`int80_stub` が sti 済み)。`ring3_abort_check` はここで畳んでよい |
+| syscall の入口 / wrap の中 | `ring3_syscall_dispatch` (`exec.c`) と KAPI の wrap | IF=1 (`int80_stub` が sti 済み)。`ring3_abort_check` はここで畳んでよい |
 | exec_run の復帰点 | longjmp の着地、IF=1 に戻した後 | R1 の (b) 回収はここ |
 | WM のハンドラ | gshell の OP_WAIT からの `exec_kill(宛先)` | CPL=0 だが syscall の中 (`ring3_wm_depth`)、通常文脈 |
 | 起動時・モジュール読み込み | `kernel.c` の初期化列 | live AS = 0 |
@@ -39,7 +39,7 @@
 
 ### v86_call
 
-V86 は CUI 専用 (`exec.c:1743-1747`)。CPL=3 の `v86` コマンドが同期 KAPI を呼ぶため、**呼出元 AS は保存・停止したまま保持する例外**とし、他の通常 AS (parked・親 AS を含む) が存在すれば入場を拒否する。セッション中は呼出元を実行せず、終了時に低位状態と呼出元 CR3 を復元してから KAPI へ戻る。
+V86 は CUI 専用 (`exec.c`)。CPL=3 の `v86` コマンドが同期 KAPI を呼ぶため、**呼出元 AS は保存・停止したまま保持する例外**とし、他の通常 AS (parked・親 AS を含む) が存在すれば入場を拒否する。セッション中は呼出元を実行せず、終了時に低位状態と呼出元 CR3 を復元してから KAPI へ戻る。
 
 ### appmem_map
 
@@ -83,3 +83,5 @@ BB は owner=boot → gshell (永続) の移譲 1 回だけで、GUI 終了 → 
 - [exec/lease.c](lease.md)
 - [exec/ring3_str.c](ring3_str.md)
 - [surface_query.md](surface_query.md)
+- [appmem](appmem.md)
+- [appslot_transition](appslot_transition.md)

@@ -17,7 +17,7 @@ CHECK = dict(name='remote-g2', tier=1, needs=[], budget=20, covers=[
     'net/link.h', 'exec/shell_service.h',
     'sdk/include/os32/**', 'tools/tests/test_remote_g2.py',
     'tools/tests/test_remote_g3.py', 'tools/tests/test_remote_g3b.py'],
-    basis=['LAN_OPERATOR_DESIGN', 'NET_HOSTSVC_DESIGN §5'],
+    basis=['LAN_OPERATOR_DESIGN', 'docs/design/tools/host_notify.md 何をするか'],
 )
 ROOT = Path(__file__).resolve().parents[2]
 

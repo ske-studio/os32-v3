@@ -16,7 +16,7 @@
 切り詰め済みの名前で path を組むので、48B 以上の名前は**実在しない path** か
 **同じ 47B の接頭辞を持つ別ファイル**になる。日本語は 3B/字なので 16 字で届く。
 
-契約 M1 (`docs/tasks/gui/v12/CONTRACTS.md:253`)
+契約 M1 (`docs/tasks/gui/v12/CONTRACTS.md`)
 「最大 255B。path/text を切り詰めて別値として返してはならない」に反する。
 
 **修正**: 収まらなかった行に `too_long` を立て、`enter_dir` と `build_selection`

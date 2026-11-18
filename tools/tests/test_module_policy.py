@@ -1,6 +1,6 @@
 """T5c-6 table validation and conformance of existing policy consumers."""
 CHECK = dict(name='module-policy-host', tier=1,
-    covers=['exec/os32x_hdr.c', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'kernel/module/module_schema.h', 'include/config.h', 'build/core.yaml', 'init/kernel.c', 'kernel/sqlite_engine.c', 'userland/system/hsync.c', 'userland/shell/ui.c', 'kernel/module/module.c', 'kernel/ime/fep_module.c', 'drivers/ata/cd_module.c', 'drivers/video/kcg/kcg_module.c', 'drivers/sound/fm/fm_module.c', 'drivers/sound/cs4231/pcm_module.c', 'arch/x86/legacy/v86_module.c', 'drivers/net/e82557/lan_module.c', 'drivers/video/cirrus/cirrus_module.c', 'drivers/video/trident/trident_module.c', 'build/kernel.*', 'build/out/*'],
+    covers=['exec/os32x_hdr.c', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'kernel/module/module_schema.h', 'include/config.h', 'build/core.yaml', 'platform/pc98/kernel.c', 'kernel/sqlite_engine.c', 'userland/system/hsync.c', 'userland/shell/ui.c', 'kdebug/kdebug_module.c', 'kernel/ime/fep_module.c', 'drivers/ata/cd_module.c', 'drivers/video/kcg/kcg_module.c', 'drivers/sound/fm/fm_module.c', 'drivers/sound/cs4231/pcm_module.c', 'platform/pc98/legacy/v86_module.c', 'drivers/net/e82557/lan_module.c', 'drivers/video/cirrus/cirrus_module.c', 'drivers/video/trident/trident_module.c', 'build/kernel.*', 'build/out/*'],
     needs=['make:all'], budget=4.3,
     kind='characterization',
 )
@@ -68,10 +68,10 @@ def conformance():
         for name, row in zip(expected, distributed)), 'module distribution list'
     for row in schema.COMPONENTS:
         stem = row['path'].split('/')[-1].split('.')[0]
-        adapter = {'kdebug': 'module', 'sqlite': 'sqlite_engine'}.get(stem, stem + '_module')
+        adapter = {'sqlite': 'sqlite_engine'}.get(stem, stem + '_module')
         directory = {
-            'module': 'kernel/module', 'hwdev_module': 'kernel/module',
-            'fep_module': 'kernel/ime', 'v86_module': 'arch/x86/legacy',
+            'kdebug_module': 'kdebug', 'hwdev_module': 'hwdev',
+            'fep_module': 'kernel/ime', 'v86_module': 'platform/pc98/legacy',
             'cd_module': 'drivers/ata', 'lan_module': 'drivers/net/e82557',
             'pcm_module': 'drivers/sound/cs4231', 'fm_module': 'drivers/sound/fm',
             'cirrus_module': 'drivers/video/cirrus', 'trident_module': 'drivers/video/trident',
@@ -84,7 +84,7 @@ def conformance():
         if row['name'] == 'HWDEV':
             assert row['dependencies'] == (schema.CONSTANTS['ID_KDEBUG'],)
             assert '.dependencies = &core_handle, .dependency_count = 1' in source
-            assert '(void)hwdev_module_load(handle);' in (ROOT/'kernel/module/module.c').read_text()
+            assert '(void)hwdev_module_load(handle);' in (ROOT/'kdebug/kdebug_module.c').read_text()
         elif row['dependencies']:
             assert row['dependencies'] == (schema.CONSTANTS['ID_SQLITE'],)
             assert '.dependencies = &sqlite, .dependency_count = 1' in source
@@ -99,7 +99,7 @@ def conformance():
     assert 'kdebug.bin / sqlite.mod' not in hsync
     # Core splash returns into unconditional boot continuation. SerialFS's FS
     # registration is earlier; actual serial/rshell service starts in shell ui.
-    kernel = (ROOT / 'init/kernel.c').read_text()
+    kernel = (ROOT / 'platform/pc98/kernel.c').read_text()
     assert kernel.count('    boot_splash();') == 1
     assert kernel.index('    boot_splash();') < kernel.index('rc = exec_run(kcg_unavailable')
     ui = (ROOT / 'userland/shell/ui.c').read_text()

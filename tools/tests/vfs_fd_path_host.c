@@ -1405,7 +1405,7 @@ static void fat_clock_legacy(RTC_Time *t)
 static const ClockOps fat_clock = { fat_clock_date, fat_clock_legacy };
 #include "drivers/block/fdc_track.c"
 #define disk_write fatwp_disk_write_impl
-#include "fatfs/diskio.c"
+#include "fat_diskio.c"   /* -I <木>/drivers/block (変異の写しが先に当たる) */
 #undef disk_write
 DRESULT disk_write(BYTE pdrv, const BYTE *buff, LBA_t sector, UINT count)
 {
@@ -1919,9 +1919,9 @@ static void case_fatname(void)
 }
 
 /* 合成ドライバ: ext2 の口の前に Win32 (HostDrv) の名前の入口検査を置く。
- * 実物の fs/hostdrv/hostdrvfs.c はハイパーコールを叩くのでホストで組めない。
+ * 実物の drivers/hostdrv/hostdrvfs.c はハイパーコールを叩くのでホストで組めない。
  * 規則は同じ vfs_name_rule_check (配線は test_vfs_fd_path.py の hostwire 段が
- * fs/hostdrv/hostdrvfs.c の本文で確かめる)。 */
+ * drivers/hostdrv/hostdrvfs.c の本文で確かめる)。 */
 static VfsOps g_win_ops;
 #define WIN_CHK(p) do { int r_ = vfs_name_rule_check((p), VFS_NAME_RULE_WIN32); \
                         if (r_ != VFS_OK) return r_; } while (0)

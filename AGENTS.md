@@ -2,7 +2,13 @@
 
 ## Project Structure & Module Organization
 
-OS32 is a 32-bit bare-metal OS for NEC PC-9801/9821 machines. Kernel code lives in `init/`, `kernel/` (with `irq/`, `time/`, `module/`, `console/`, `ime/`, `v86/`), `mm/`, `arch/x86/kernel/`, `exec/`, `drivers/` (one subdirectory per device class), `fs/` (one subdirectory per filesystem), and `gfx/` (the HAL common layer; backends sit in `drivers/video/`); see `docs/08_build.md` §8-3; shared headers and utilities live in `include/` and `lib/`. `userland/` contains the shell, commands, libraries, and tests. `sdk/` provides application headers, startup code, and Rust bindings. `apps/` and `game/` are independent Git submodules. Assets live in `assets/`; build rules and host tools live in `build/` and `tools/`.
+OS32 is a 32-bit bare-metal OS for NEC PC-9801/9821 machines (x86) and the PowerMac G4 (PowerPC). The tree is split by owner:
+
+- **Common** (builds for every machine): `init/` (the boot skeleton `kernel_start.c`), `kernel/` (with `irq/`, `time/`, `module/`, `console/`, `ime/`, `dev/`), `mm/`, `exec/`, `fs/` (one subdirectory per filesystem), `gfx/` (the HAL common layer), `net/`, `input/`, `kapi/`, `lib/`, `include/`.
+- **CPU**: `arch/x86/`, `arch/ppc/`. **Machine**: `platform/pc98/` (PC-98 boot phases in `kernel.c`, the V86 monitor in `legacy/`), `platform/powermac/`.
+- **Devices**: `drivers/` (one subdirectory per device class; video backends in `drivers/video/`), `hwdev/`, `kdebug/`.
+
+Layering rule (enforced in CI by `tools/check_layers.py`, baseline zero): common code must not include a CPU, machine or device header. When common code needs a device function, declare it in `include/<name>_contract.h` and let the device header include that; a header that each machine implements differently uses the fixed name `platform_<name>.h`; machine-specific sources live under their owner. The fix table is `docs/design/tools/check_layers.md` §8. Every source in a common directory must also compile for PowerPC (`make ppc-ci-image`, target `common-compile`). See `docs/08_build.md` §8-3 for the tree. `userland/` contains the shell, commands, libraries, and tests. `sdk/` provides application headers, startup code, and Rust bindings. `apps/` and `game/` are independent Git submodules. Assets live in `assets/`; build rules and host tools live in `build/` and `tools/`.
 
 ## Build, Test, and Development Commands
 
@@ -12,7 +18,7 @@ Use the WSL toolchain described in [INSTALL.md](INSTALL.md): i386-elf GCC, NASM,
 - `make kernel`: build the kernel and SQLite.
 - `make programs`: build userland programs.
 - apps/game builds are deferred under H-7. Run `git submodule update --init` and `make external` only after the [reopening gate](docs/tasks/v3/T2H_EXTERNAL_GATE.md#再開前に揃える-8-項目) is satisfied and reopening is approved.
-- `make check-fast` / `make check-changed` / `make check`: host tests and repository checks (KAPI versions, manifests, constraint IDs, privileged instructions, docs links / orphans / status-line vocabulary) — without mutants / with mutants only for what you changed / with all mutants (before merging). Stages and times: [docs/08_build.md](docs/08_build.md) §8-4.
+- `make check-<name>`: one host test or repository check (add `MUTATE=1` for its mutants). CI runs `make check` (every check with its mutants, in six shards); do not run the full set locally (see the worktree section). Stages and times: [docs/08_build.md](docs/08_build.md) §8-4.
 - `make math_test`: build an individual guest test.
 
 Run images in NP21/W. Stop the emulator before `make deploy-kernel`, then restart it. See [docs/08_build.md](docs/08_build.md) for deployment details.
@@ -25,13 +31,13 @@ Worktrees have no `.env`. Before anything else, export
 `tools/preflight.sh --base <SHA from the request> --fix-fonts` and fix every NG. Build what the request asks for (`make all`, or `make kernel` / the module / userland image you touched — never suppress the build that catches ripple into other tests), then the tests you added or touched with `--mutate` (each mutation anchor unique and
 RED at runtime; if you changed or removed a product line, `grep -rn` tools/tests for mutations anchored on it and move
 them), and `python3 -B tools/checks/run.py --lint` (a new test declares its inputs in its own `CHECK` dict). Do not run
-`make check-changed` or the full mutation pass: the landing check is GitHub CI (check + build's `check-fast`, every check without mutation) and the mutation pass is the `full-check` workflow (user decision 2026-11-05, docs/tasks/agents/ROLES.md §0).
+the full mutation pass locally: the landing check is GitHub CI (check + build, every check with mutation; docs/tasks/agents/ROLES.md §0). `make check-changed` is an optional local convenience, never a gate.
 Run checks in the foreground and wait for them to finish instead of re-reading partial logs; never abort and restart a run. Only logs produced after your last source change count as passing.
 Never commit (the sandbox keeps `.git` read-only; the PM commits).
 
 ## Coding Style & Naming Conventions
 
-Match surrounding formatting; C typically uses four-space indentation, while Make recipes require tabs. Internal C is GNU11 ([C1]): `//`, mid-block declarations, `_Static_assert` (via `STATIC_ASSERT`), `<stdbool.h>` for pure booleans and designated initializers are allowed, but do not mass-rewrite existing code; implicit declarations, implicit int and VLAs are errors. Public SDK headers (`sdk/include/os32/*.h`, including `sdk/include/os32/os32_kapi_shared.h`) must stay C89/GNU89-compatible, and SQLite keeps GNU89. Use `snake_case` functions, uppercase constants, and `libos32*` library names. Use kernel `kstring` helpers instead of libc equivalents.
+Match surrounding formatting; C typically uses four-space indentation, while Make recipes require tabs. Internal C is GNU11 ([C1]): `//`, mid-block declarations, `_Static_assert` (via `STATIC_ASSERT`), `<stdbool.h>` for pure booleans and designated initializers are allowed, but do not mass-rewrite existing code; implicit declarations, implicit int and VLAs are errors. Public SDK headers (`sdk/include/os32/*.h`, including `sdk/include/os32/os32_kapi_shared.h`) must stay C89/GNU89-compatible, and SQLite keeps GNU89. Use `snake_case` functions, uppercase constants, and `libos32*` library names. Use kernel `kstring` helpers instead of libc equivalents. `kprintf` is the kernel diagnostic output and each machine chooses where it goes; call `console_printf` only for output that must reach the terminal (`docs/design/lib/kprintf.md`). Build rules never rename symbols with `-D`.
 
 Never hand-edit generated KAPI files. Follow [docs/KAPI_SPEC.md](docs/KAPI_SPEC.md) for append-only API changes and regeneration; rebuild with `make clean` followed by `make all` after ABI changes.
 
@@ -42,6 +48,17 @@ Follow the verification stage table in [ROLES §0](docs/tasks/agents/ROLES.md) a
 ## Commit & Pull Request Guidelines
 
 Use focused Conventional Commits, matching history: `fix(exec): ...`, `feat(deploy): ...`, or `docs: ...`. For review, describe the problem, resulting behavior, relevant issues, and validation; include screenshots for visible changes.
+
+## Task Playbooks
+
+The step-by-step playbooks live under `.claude/skills/<name>/SKILL.md`. They are plain Markdown; read the one that matches the task before starting.
+
+- `os32-arch-sep`: adding or moving code across the common / CPU / machine / device boundary (layer check, contract headers, `platform_<name>.h`, `Sep-Changes:`).
+- `os32-test-basis`: registering a check, replacing hash / commit / count pins, fixing stale mutation anchors.
+- `os32-kapi-add`: adding or changing a KernelAPI entry.
+- `os32-ci-read`: reading CI failures and re-running (PM).
+- `os32-ci-inventory`: measuring per-check time and shard balance, recalibrating `tools/checks/weights.json` (PM).
+- `os32-archive`: summarizing a finished ticket into `docs/design/` before moving it to `docs/archive/` (PM; policy in [docs/POLICY_ARCHIVE.md](docs/POLICY_ARCHIVE.md)).
 
 ## Authoritative Guidance
 

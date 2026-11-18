@@ -33,7 +33,7 @@ void gf5_plan_invalidate(struct gf5 *);
 | 失効 N/clk/base.c:591–596（終了時 worker 完了） | ROM acquire/release、表示 stop/save 開始、FAULT で無効化。epoch はチャンネル本体の値を検査、同じ ROM ポインタ再利用も generation で拒否。restore は新epochで calc し直す。 |
 
 - 差分理由: 手本は plan が private。OS32 は公開値型を保ちながら、その値が直近 calc の出力であることを内部 guard で強制する。
-- readbackは正規係数をO/hwdev/gf/clock.c:79–85と同順でdecodeした値と厳密一致させる。calc actualは単段がO/kdebug/gfinit_pll/solve.inc:28の丸め、readbackは切捨てなので差は最大1kHz、二段は同:43,56,60とclock.c:79,83,85の演算順が一致し差0。actualだけの比較でFAULTにしない。係数/muxの有効ビットも照合し、熱上限はdecode値で判定する。
+- readbackは正規係数をO/hwdev/gf/clock.cと同順でdecodeした値と厳密一致させる。calc actualは単段がO/kdebug/gfinit_pll/solve.incの丸め、readbackは切捨てなので差は最大1kHz、二段は同:43,56,60とclock.c:79,83,85の演算順が一致し差0。actualだけの比較でFAULTにしない。係数/muxの有効ビットも照合し、熱上限はdecode値で判定する。
 - actual からだけの再計算は採らない。丸め後の周波数は元要求と異なり、等価な別係数への再探索で正規出力を拒否し得るため。
 - guard は1組だけ。calc B は calc A を失効させる。同一値の複写は許すが、改変・旧世代・二度目 prog は拒否する。ROM generation 周回時は旧 guard 無効のまま再初期化する。
 

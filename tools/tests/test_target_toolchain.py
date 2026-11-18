@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Toolchain selection and inherited command-line overrides without compilers."""
 import argparse
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -24,7 +25,9 @@ def check(root):
         assert custom['CC'] == custom['RAW_CC'] == ['custom-cc']
         ppc = query(root, [*assignments, 'ARCH=ppc', 'PLATFORM=powermac',
                            'CROSS_DIR=/x86'], config_only=True)
-        assert ppc['RAW_CC'] == ['/home/hight/opt/cross-ppc/bin/powerpc-elf-gcc']
+        # build/arch/ppc.mk: PPC_CROSS_DIR ?= /home/hight/opt/cross-ppc (the environment may point elsewhere).
+        cross = os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc')
+        assert ppc['RAW_CC'] == [cross + '/bin/powerpc-elf-gcc']
         assert ppc['CC'] == prefix + ppc['RAW_CC']
         assert '-mbig-endian' in ppc['CFLAGS_MACHINE']
         assert '-march=i386' not in ppc['CFLAGS_MACHINE']

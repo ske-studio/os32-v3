@@ -11,7 +11,7 @@
 /*                      LBA デバイスには直接委譲する汎用ラッパー             */
 /* ======================================================================== */
 
-#include "dev.h"
+#include "../../kernel/dev/dev.h"
 #include "os32_kapi_shared.h"
 #include "../block/disk.h"
 #include "../ata/ide.h"

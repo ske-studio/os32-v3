@@ -1,101 +1,75 @@
-# app_band_pde — アプリ帯の可変 PDE 化 のホスト TDD
+# app_band_pde — アプリ帯の AS (疎な私有 PT) のホスト TDD
 
-対象票: `docs/archive/v3/APP_BAND_PDE.md`
+契約: `docs/design/mm/paging.md` の「アプリ帯の AS」(出所は票 APP_BAND_PDE)
 実行: `make check-memory-host` / `python3 -B tools/tests/test_app_band_pde.py`
 三点セット: `app_band_pde_host.c` (検査本体) / `test_app_band_pde.py` (ビルドと実行) /
 このファイル (何を見ているか)。
 
 ## 何を検証するか
 
-1 アプリに渡せるメモリが搭載 RAM に依らず約 2.5MB で頭打ちになっていた原因は、
-アプリ固有のページディレクトリエントリ (PDE) が **1 枚 (4MB) しかない**ことだった。
-これを要求量に応じて 4MB 単位で増やす変更を、実物の `mm/paging.c` を
-ホストで動かして検査する。ゲスト (NP21/W) の検証ではない。
+アプリ帯 (`MEM_APP_BAND_BASE` から `MEM_APP_BAND_MAX_PDES` 枚の PDE) の AS を、
+実物の `mm/paging.c` (`paging_addrspace.inc`・`paging_lease.inc` を含む) をホストで
+動かして検査する。ゲスト (NP21/W) の検証ではない。
+
+当初の票は「PDE を 1 枚から要求量に応じて 2 枚へ増やす」(`paging_app_band_pdes()` が
+枚数を決める) 設計だった。その機構は撤去され、今は AS の作成で PD だけを取り、
+アプリ帯の私有 PT は写像のときに 1 枚ずつ確保する (疎)。この試験は今の形を見る。
 
 ## 作り
 
-`test_paging_bounds.py` と同じ仕掛け:
-
 - `mm/paging.c` を読み、特権命令 (`mov %cr3` / `mov %cr0`) だけを
-  ホスト変数への代入に置換して `paging_host_source.c` として書き出す
+  ホスト変数への代入に置換して `paging_host_source.c` として書き出す。
+  `pgalloc_alloc_phys` は失敗の位置を指定できる差し替え (`fail_at`) を通す
 - `mm/pgalloc.c` は `irq_save` / `irq_restore` を潰して同様に書き出す
-- `mm/physmem.c` はそのままリンクする
-- `-m32 -march=i386 -std=gnu89 -Werror -Wdeclaration-after-statement` で
-  ILP32 としてビルドし、`-nostdlib -static` で直接走らせる (libc に依存しない)
-- 最後に **クロスコンパイラ (`i386-elf-gcc -O2`) でも** `mm/paging.c` を
-  コンパイルして、ホストだけで通る C になっていないことを確かめる
+- `kdebug/kselftest/ledger.inc` の台帳の自己診断も同じ実行物へ取り込む
+- `-m32 -march=i386 -std=gnu11 -ffreestanding` で ILP32 としてビルドし、
+  libc に依存せず直接走らせる
 
-恒等で読み書きできる実メモリは `mmap` (int 0x80 #90) で `0x400000` から 12MB
-張る。`paging_init(16384)` + `pgalloc_init(16384)` の後に検査に入る。
+17MB 構成の池の backing を `mmap` (int 0x80 #90) で恒等に張り、
+`paging_init` と池の起動を 17MB・8MB・16MB の各構成で行う。
 
 ## 検査項目
 
-### A. 枚数計算 `paging_app_band_pdes(code_end, heap_req, ram_top)`
+### A. 作成直後の AS (17MB / 8MB の両構成)
 
-純関数。票 §4-1 の規則そのもの。
+- `paging_addrspace_create` の直後、所有者のページは PD 1 枚だけ。
+  アプリ帯の PT も lease 窓の PT も 0 枚
+- 破棄でデータ以外が返り、台帳の回収で残り 2 枚 (データ) が戻る。池の空きは作成前と同じ
+- `paging_addrspace_create_lease` は PD + lease 窓の先頭 PT の 2 枚
+- 台帳の自己診断 (`test_ledger`) が通り、空きが元へ戻る
 
-| 入力 | 期待 | 意図 |
-|---|---|---|
-| `heap_req == 0` | 常に **1** | heap_size を指定しないプログラムのレイアウトを 1 バイトも動かさない (回帰ゼロの要) |
-| 1 枚に収まる要求 | 1 | 境界ちょうど (`fit`) は 1、`fit + 1 ページ` で 2 |
-| 4MB 要求 | 2 | 帯を伸ばす本題 |
-| 非常に大きい要求 | `MEM_APP_BAND_MAX_PDES` | 上限で頭打ち (PEGC のリニア窓を踏まない) |
-| `ram_top` が小さい (8MB 構成相当) | 1 | 空き RAM が無ければ伸ばさない。入らなければ exec が `EXEC_ERR_NOMEM` で拒否する |
-| `ram_top == 0` / 帯の底以下 | 1 | 最低 1 枚は必ず返す (従来の挙動を壊さない) |
-| `code_end` が桁あふれするほど大きい | 1〜MAX の範囲内 | 算術のあふれで大きい枚数を返さない |
+### B. 疎な私有 PT と master の隔離
 
-### B. 枚数 1 = 現行と完全に同じレイアウト (最重要)
+- 2 つの AS を作り、片方の帯の 3 か所 (プログラムの先頭・exec_heap の起点・stack の最上ページ)
+  に `map_user(PTE_USER)` すると、それぞれの PDE に PT が 1 枚ずつ確保される。
+  もう一方の AS と master の PDE は 0 のまま
+- 私有 PT の PTE は `phys | RW | USER`。所有者のページは PD + lease PT + PT 3 枚 + データ 3 枚
+- 各ページを `free_user_range` で返し、両 AS を破棄すると空きが元へ戻る
+- `paging_app_band_selftest()` == 0 (kselftest に載せているもの)。実行後に空きが元へ戻る
 
-`paging_addrspace_create(as)` (= `_n(as, 1)`) で:
+### C. 確保の失敗
 
-- `app_pde == APP_BAND_PDE` / `app_pde_count == 1`
-- 先頭 PDE **だけ**がアプリ PT に差し替わる (`PRESENT|RW`、USER はまだ立たない)
-- 2 枚目の PDE は master と同じ値のまま = 共有
-- アプリ PT は master の同帯 PT と同一 identity で始まる (V1)
-- 2 枚目の帯への `map_user` は「共有帯」として master の PT に書かれる — 従来の動作
-- 破棄で PD 1 + PT 1 がきっちり返る
+- `create_lease` の 1 枚目・2 枚目の確保を失敗させると -1、所有者のページは 0、空きは不変
+- PDE 境界をまたぐ `map_user_range_phys` で 1 枚目・2 枚目の PT の確保を失敗させると -1。
+  部分的な PT は残らず (`app_pt_phys[0]`・`[1]` が 0)、PD の帯の PDE も 0
 
-### C/D. 枚数 2
+### 変異
 
-- `used` が PD + PT 2 枚ぶんだけ増える。2 枚の PT は別物
-- 両方の PDE がアプリ PT を指し、**master の PDE は無傷**
-- 2 枚目のアプリ PT も master の同帯 PT の identity コピーで始まる
-- 2 枚目に `map_user(PTE_USER)` → 書かれるのはアプリ固有 PT。
-  **master の PT は 1 ビットも変わらない**
-- USER は当該アプリの PD の PDE にだけ立ち、master の PDE には伝播しない (票 §2)
-- PDE 境界をまたぐ `map_user_range` が両方のアプリ PT に落ちる
-- 帯の外 (VRAM 0xA8000) は従来どおり master の共有 PT に書かれ、
-  master の PDE には USER が付かない
-- 破棄後、master の PDE / PT が元の値に戻っている
+`single-PDE` (帯の枚数を 1 に)・`master-USER` (USER を master の PDE に)・
+`PT-destroy-leak`・`partial-PT-leak`・`kselftest-old-AS-count` (自己診断の旧い枚数の期待)
+をそれぞれ実行時に検出する。
 
-### E. 引数不正・物理ページ不足
-
-- `pde_count == 0` / `> MEM_APP_BAND_MAX_PDES` / `as == NULL` は `-1`。1 ページも取らない
-- 空きをちょうど 2 ページまで吸い出した状態で `_n(as, 2)` は `-1` を返し、
-  **確保済みの PD と 1 枚目を返して**空きが 2 のままであること
-  (途中確保を握ったまま失敗すると、失敗するたびに RAM が減る)
-- その状態でも `_n(as, 1)` は成功する (PD + PT ちょうど 2 ページ)
-
-### F/G. 自己診断
-
-- `paging_app_band_selftest()` == 0 (ブート時 `kselftest` に載せているもの)
-- 既存の `paging_map_user_keep_selftest()` / `paging_pd_clone_selftest()` が
-  引き続き 0 (回帰ゼロ)
-- どれも実行後に確保ページ数が元に戻る
-
-## RED → GREEN の経過 (2026-09-10)
+## RED → GREEN の経過 (2026-09-10、当初の 1〜2 枚の版)
 
 1. 実装前: `paging_app_band_pdes` / `paging_app_band_selftest` が未宣言、
    `MEM_APP_BAND_MAX_PDES` / `MEM_APP_BAND_PDE_SIZE` が未定義、
    `struct addrspace` に `app_pde_count` が無い — コンパイルエラーで RED
-2. `paging.c` / `paging.h` / `memmap.h` 実装後: E の「2 枚目で尽きる」だけが赤。
+2. `paging.c` / `paging.h` / `memmap.h` 実装後: 「2 枚目で尽きる」だけが赤。
    ホストの `pgalloc_alloc_n_pfn` 差し替えでは `pgalloc_alloc_page()` を
    止められなかった (pgalloc.c 内部の呼び出しは差し替え前の名前で解決される)
    ため。空きを実際に吸い出す形に検査を書き直して GREEN
 
 ## この試験が見ていないもの
 
-- `exec/exec.c` のレイアウト決定 (ホストで動かすには依存が多すぎる)。
-  純粋な算術部分だけを `paging_app_band_pdes()` に切り出して A で見ている
-- ゲスト上の実挙動 (kselftest、`ring3_guard` の否定試験、8MB / 15MB 構成)。
-  票 §5 のとおり PM が NP21/W で行う
+- `exec/exec.c` の起動時のレイアウト決定と、アプリ帯への初期写像
+- ゲスト上の実挙動 (kselftest、`ring3_guard` の否定試験、8MB / 15MB 構成)。PM が NP21/W で行う

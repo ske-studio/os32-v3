@@ -18,6 +18,11 @@
 /*      python3 tools/gen_memmap.py --check  (重なり・逆転を検査する)         */
 /*                                                                          */
 /*  下の #define が番地の正典であることは変わらない。                         */
+/*                                                                          */
+/*  PC-98 のリアルモードの起動と低位メモリの番地 (ローダの置き場・起動時の    */
+/*  スタック・自動プレイの mailbox) は platform/pc98/platform_boot_layout.h。   */
+/*  ここには CPU・機種に依らず OS が使う配置だけを置く。地図と検査の道具     */
+/*  (tools/gen_memmap.py) は両方を読む。                                      */
 /* ======================================================================== */
 
 #ifndef MEMMAP_H
@@ -45,21 +50,6 @@ extern u32 __ledger_fixed_start, __ledger_fixed_end;
 #define KHEAP_SIZE 0x030000UL /* 192KiB */
 
 /* ====================================================================== */
-/*  ページング保護範囲                                                      */
-/* ====================================================================== */
-
-/* IVT/BIOSデータ領域: Read-Only (ブート後に再利用されるまで) */
-/* ページ0 (0x0-0xFFF) はブート後に NOT PRESENT (NULLポインタ検出) */
-#define MEM_IVT_PROT_START    0x01000UL
-#define MEM_IVT_PROT_END      0x05FFFUL
-
-/* loader.bin (使用済み): Read-Only → ブート後に再利用 
- * (注: ブートローダーが 0x804E に作成した GDT は
- *  カーネル初期化時 (gdt_init) に安全な上位メモリへ退避されます) */
-#define MEM_LOADER_START      0x08000UL
-#define MEM_LOADER_END        0x08FFFUL
-
-/* ====================================================================== */
 /*  カーネルスタック: 固定 PT 枠の後、guard 1頁 + stack 16KiB。             */
 /*  低位は V86 のために維持する。ISR ネストの高水位は別途実測する。          */
 /* ====================================================================== */
@@ -71,24 +61,6 @@ extern u32 __ledger_fixed_start, __ledger_fixed_end;
 /* arch/x86/kernel/kentry.asm は ESP をここへ張り替える。ASM・ld は tools/gen_memmap.py
  * が生成する $(BUILD_OUT)/memmap_layout.h の LAYOUT_MEM_KSTACK_TOP を CPP で
  * 読む。直書きに戻していないことは `gen_memmap.py --check` が見る ([C4])。 */
-
-/* ブート時スタック (ローダー専用)。
- *
- * **ここは低位のままでなければならない。** ローダーは PM に入った後も
- * ディスク BIOS (INT 1Bh) を呼ぶためにリアルモードへ戻るので、SS:SP で
- * 届く 1MB 未満にスタックが要る。3 つのローダーの `mov esp, 0009FFFCh` が
- * この値。カーネルは kentry.asm で MEM_KSTACK_TOP に張り替えるため、
- * この領域はカーネルが動き出した時点で用済みになる
- * (V86 セッションはブートの遥か後なので競合しない)。 */
-#define MEM_BOOT_STACK_TOP    0x9FFFCUL
-
-/* ローダ専用の低位番地。NASM の写しへの適用は N12。地図として数値を保つ。 */
-#define MEM_BOOT_RM_STACK_TOP  0x07C00UL
-#define MEM_BOOT_FAT_BUF       0x06000UL
-#define MEM_BOOT_COMPRESSED_BASE 0x10000UL
-#define MEM_BOOT_BIOS_PARAM_BASE 0x07F00UL
-#define MEM_HDD_IPL_BASE       0x1FC00UL
-#define MEM_BOOT_PROBE_END     0x1000000UL /* 現行 RAM probe の上限 (排他) */
 
 /* 例外診断の旧来の stack trace 上限。メモリ帯を広げる変更は別件。 */
 #define MEM_TRACE_STACK_LIMIT  0xF00000UL
@@ -125,11 +97,6 @@ extern u32 __ledger_fixed_start, __ledger_fixed_end;
 
 /* planar BB: boot時にpoolから連続32頁を確保し、既存SURFACEで管理する。 */
 #define MEM_GFX_BB_SIZE         0x20000UL  /* 128KiB (32000B × 4プレーン) */
-
-/* 自動プレイ mailbox: game/app の実装と game/tools/autoplay/driver.py の対。
- * 配置や大きさを変えるときは game 側も同じコミットで直す (CLAUDE.md)。 */
-#define MEM_AUTOPLAY_MAILBOX_BASE 0x90000UL
-#define MEM_AUTOPLAY_MAILBOX_SIZE 868UL
 
 /* ====================================================================== */
 /*  8bpp パックドバックバッファ (PEGC 256 色, GUI v1.1 H2)                  */

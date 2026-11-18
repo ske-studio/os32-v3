@@ -403,7 +403,7 @@ def ci_targets(rules, targets):
     # The matrix covers every registered check, including full AST scans removed
     # from the cross-free static table. Standalone targets still need explicit CI.
     covered = ({row['target'] for row in list_checks()} & set(targets)
-               if re.search(r'^\s*make\s+(?:-k\s+)?check-fast\b', build, re.M) else set())
+               if re.search(r'^\s*make\s+(?:-k\s+)?check\b', build, re.M) else set())
     for t in targets:
         if re.search(r"\bmake\s+%s\b" % re.escape(t), text):
             covered.add(t)

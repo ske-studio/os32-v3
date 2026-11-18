@@ -20,8 +20,8 @@ CI は統合の枝で os32-v3 の PM が 1 回だけ回すので、PowerPC の�
 | 6 | tools/source_roots.py の SCAN_ROOTS (新しい置き場が走査の外) | 新しい置き場を足す |
 | 7 | kdebug の import (kernel/module/kdebug_imports.def の source 欄、slot は詰めない・並べ替えない) と tools/tests/fixtures/dep_dir_a/l01.json の指紋。FEP の MODULE_ABI_GEN の指紋 (部品の contracts の字面から計算) | 指紋を変えない。contracts のヘッダはコメント 1 字も触らない |
 | 8 | tools/tests/test_ci_stab.py の規則 (`if not mutant:` を書かない、covers に足す、試験の補助関数に `run` という名前を使わない) | `python3 -B tools/tests/test_ci_stab.py` |
-| 9 | 新しい host32 の試験が 32 ビットの libc (crt1.o) に頼る (CI と WSL に無い、この PC にはあるので手元では通る) | `gcc -m32 -ffreestanding -fno-pie -no-pie -nostdlib -static`、`_start` から exit (手本 tools/tests/test_abi_boundary.py:41-51、tools/tests/host32.py) |
-| 10 | PPC の selected の計測 (tools/ppc/known_header_dependencies.json・selected_success.json) | `python3 -B tools/ppc/check_compile.py --source-profile selected --accept --json` で減らさない |
+| 9 | 新しい host32 の試験が 32 ビットの libc (crt1.o) に頼る (CI と WSL に無い、この PC にはあるので手元では通る) | `gcc -m32 -ffreestanding -fno-pie -no-pie -nostdlib -static`、`_start` から exit (手本 tools/tests/test_abi_boundary.py、tools/tests/host32.py) |
+| 10 | 層の検査 (共通のソースが機種のヘッダを読む辺、tools/layers_baseline.json) | 像を組んでから `python3 -B tools/check_layers.py` で増やさない。減らした段は同じ変更で `--write-baseline` |
 | 11 | GeForce まわりを組む host 試験 | tools/tests/recover_gf_dev_stub.c のリンクが要る。main を取り込んだら GeForce の試験 (test_geforce・test_gf_*・recovery など) を回し直す |
 | 12 | 新しいヘッダを既存のヘッダから include した (第 5 段 A で CI の build が落ちた) | `grep -rl '<既存のヘッダ>' tools/tests/test_*.py` の全部を実際に回す |
 | 13 | 文書の枝 (文書だけの push では build の CI が走らず、統合の枝で初めて出る) | `make check-docs-tree` を**単独で**回して出力の NG を見る。票 (docs/tasks/) どうしは「上位:」と後続以外リンクせず、「票 TASK_<名>」と名前を文字で書く |
@@ -45,7 +45,7 @@ CI は統合の枝で os32-v3 の PM が 1 回だけ回すので、PowerPC の�
 
 ## 4. 取り込みと報告
 
-- push は tip のコミットに `[skip ci]`。cherry-pick した tip にも付け直す。push の後に `git ls-remote origin refs/heads/<枝>` で SHA を確かめてから本線の PM に送る (推測の SHA を送らない)。`gh run list --branch <枝>` で CI が走っていないことも見る。
+- push は tip のコミットに `[skip ci]`。cherry-pick した tip にも付け直す。push の後に `git ls-remote origin refs/heads/<枝>` で SHA を確かめてから本線の PM に送る (推測の SHA を送らない)。`gh run list --branch <枝>` で CI が走っていないことも見る。`[skip ci]` は作業の枝だけ — main に入るのは、統合の枝 (`wt/int-*`、先頭に `[skip ci]` を付けない) の SHA で check・build が通った物だけ (PARALLEL_BRANCHES §3)。
 - 積んだ枝は main を取り込み直してから送る。取り込み後の検査は 1 本ずつ回し直す。
 - **比較の主張には比べた 2 つの SHA を書く**。merge の前の build_compare の結果を merge の後の枝の説明に使わない。報告が参照する証拠のファイルが run の置き場にあることを確かめ、受入をする側に渡す。
 - 段の独立レビューは書き手と別のモデル (ROLES §0)。P1・P2 の直しの確認は同じレビュアーに差分だけ。P3 だけや 30 行程度の機械的な直しは PM が読んで着地してよい。

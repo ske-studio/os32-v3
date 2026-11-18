@@ -1,6 +1,7 @@
 # hsync H2 TDD 記録 — 一時ファイル + 検証 + 置換
 
-対象票: `docs/archive/shell/TASK_H2.md` §2-3 / §2-4 / §4-1
+契約: [hsync_replace](../../docs/design/userland/system/hsync_replace.md) (手順・公開の判定・予約名・古いカーネルの門・同期先の制限)。
+出所は票 TASK_H2 §2-3 / §2-4 / §4-1 (下の A14a などの ID は §4-1 の受入表の番号)
 試験: `tools/tests/hsync_h2_host.c` (実物の `userland/system/hsync.c` を `#include`)
 実行: `python3 -B tools/tests/test_hsync_h2.py [--target] [--mutate]` / `make check-hsync-host`
 
@@ -229,7 +230,7 @@ MUTATE temp_names_synced          RED (期待どおり落ちた)
 
 票 §1 の 7 と §2-3 末尾が「v52 のカーネルの上で新しい hsync を動かす場面は現に
 起こる」「既定は `kernel_too_old` で断り、`--unsafe-overwrite` のときだけ直接上書き」
-としているが、`exec/exec.c:1276` は `hdr->min_api_ver > KAPI_VERSION` のバイナリを
+としているが、`exec/exec.c` は `hdr->min_api_ver > KAPI_VERSION` のバイナリを
 「invalid OS32X binary」として**起動そのものを拒否する**。53 を宣言すると
 `kernel_too_old` も `--unsafe-overwrite` も届かない。
 
@@ -287,7 +288,7 @@ default_sys_exclusion (-v でしか出ない) で黙って飛ばされていた 
 ### `--root <根>` — 同期先の根を替える (2026-09-26、ユーザー提案)
 
 FD の新しいカーネルで起動し、SerialFS 越しの /host から /hd0 (HDD) を更新するための口
-(docs/archive/realhw_v21/TASK_SERIAL_HOSTFS.md §5)。`case_root` (FD 起動 = ルート fd0、/hd0 = hd0
+(契約は `docs/manpages/hsync.1` の「同期先の根 (--root)」)。`case_root` (FD 起動 = ルート fd0、/hd0 = hd0
 で根の inode 2) で見るもの:
 
 - `--root /hd0` (全体)・`--root /hd0 bin`: /hd0 の下だけが変わり、FD の /bin/a.bin と / は無変更

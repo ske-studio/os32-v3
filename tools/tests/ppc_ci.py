@@ -25,11 +25,11 @@ def matrix(source):
                  patch.object(module.subprocess, 'call', return_value=0) as build:
                 rc = module.run(ROOT, env)
                 assert rc == int(required and not present), (required, present, rc)
-                assert build.call_count == (len(module.IMAGES) if present else 0)
+                assert build.call_count == (len(module.IMAGES) + 1 if present else 0)
                 if present:
                     # Expectation origin: PPC_P5_REST_DESIGN §3 P6 (all four images explicit).
                     built = [c.args[0][3:-1] for c in build.call_args_list]
-                    assert built == [list(f) for f in module.IMAGES], built
+                    assert built == [list(f) for f in module.IMAGES] + [module.COMMON_COMPILE], built
             if present:
                 with patch.object(module.shutil, 'which', return_value='/compiler'), \
                      patch.object(module.subprocess, 'call', return_value=7):
@@ -56,7 +56,8 @@ def wiring():
     check = (ROOT / '.github/workflows/check.yml').read_text()
     build = (ROOT / '.github/workflows/build.yml').read_text()
     assert 'ppc-setup' not in build
-    assert check.count('- uses: ./.github/actions/ppc-setup') == 2
+    # ppc-compile・ppc-qemu と、main のキャッシュを保つ ppc-toolchain-cache。
+    assert check.count('- uses: ./.github/actions/ppc-setup') == 3
     assert '  ppc-compile:' in check
     workflow = yaml.safe_load(check)
     triggers = workflow.get('on', workflow.get(True))
@@ -69,47 +70,56 @@ def wiring():
     assert steps[1]['run'] == 'python3 -B tools/ci/ppc_scope.py'
     assert steps[1]['env']['PPC_ARCH'] == "${{ github.event_name == 'workflow_dispatch' && inputs.arch || 'auto' }}"
     assert all(s.get('if') == "steps.scope.outputs.scope == 'ppc'" for s in steps[2:])
-    full = yaml.safe_load((ROOT / '.github/workflows/full-check.yml').read_text())
-    ppc = full['jobs']['ppc-compile']['steps']
-    assert all('if' not in s for s in ppc)
-    assert ppc[0]['with']['ref'] == "${{ github.event_name == 'workflow_dispatch' && inputs.ref || 'main' }}"
-    assert any(s.get('uses') == './.github/actions/ppc-setup' for s in ppc)
-    assert any('MUTATE=1 python3 -B tools/checks/run.py --run all --env ppc-cross --exclude-env qemu-ppc' in s.get('run', '') for s in ppc)
     # Origin: mainline PM's PACK.md decision, documented in docs/TESTS.md.
     command = 'python3 -B tools/checks/run.py --run all --env ppc-cross --exclude-env qemu-ppc'
-    for job_steps, routine, mutate in ((steps, True, 0), (ppc, False, 1)):
+    for job_steps, routine, mutate in ((steps, False, 1),):   # 関門は変異込み (docs/POLICY_CI.md G1)
         runs = '\n'.join(step.get('run', '') for step in job_steps)
         assert command in runs
         assert f'MUTATE={mutate} ' + command in runs
         assert ('CHECK_ROUTINE=1 ' in runs) == routine
         assert 'make check-ppc-compile' not in runs
         assert any(step.get('uses') == './.github/actions/build-setup' for step in job_steps)
-        for dependency in ('gcc-13', 'qemu-user', 'ccache'):
+        # 変異の試験が QEMU を起動するので、ppc-qemu の段と同じ道具を入れる。
+        for dependency in ('gcc-13', 'qemu-user', 'ccache', 'qemu-system-ppc', 'qemu-system-data'):
             assert dependency in runs
-        assert 'qemu-system-ppc' not in runs
-    command = 'python3 -B tools/checks/run.py --run all --env qemu-ppc'
-    for flow, routine, mutate in ((workflow, True, 0), (full, False, 1)):
+    # QEMU の検査は 4 本に割って並べ、手本の道具 (tools/ci/gate.py) の 1 行で回す (変異込みが既定)。
+    command = 'python3 -B tools/ci/gate.py run --env qemu-ppc --shard ${{ matrix.shard }}/4 --out "$RUNNER_TEMP/gate"'
+    for flow, routine, mutate in ((workflow, False, 1),):
         job = flow['jobs']['ppc-qemu']
-        assert job['needs'] == 'ppc-compile'
+        # ppc-compile の成果物は読まないので鎖にしない (docs/POLICY_CI.md G2)。
+        assert 'needs' not in job
+        assert job['strategy'] == {'fail-fast': False, 'matrix': {'shard': [0, 1, 2, 3]}}
         assert job['timeout-minutes'] >= 60
         # The failure-only diagnostics step prints qemu.stderr; it is not part of the run.
         guest = [s for s in job['steps'] if s.get('name') != 'PPC QEMU diagnostics']
         assert any(s.get('name') == 'PPC QEMU diagnostics' and s.get('if') == 'failure()'
                    for s in job['steps'])
         assert guest[0] == flow['jobs']['ppc-compile']['steps'][0]
-        if routine:
-            assert guest[1] == steps[1]
-            assert all(s.get('if') == "steps.scope.outputs.scope == 'ppc'" for s in guest[2:])
-        else:
-            assert all('if' not in s for s in guest)
+        assert guest[1] == steps[1]
+        # 成果物を出す手順は always()・failure() と and で繋ぐ。範囲の条件はどの手順にも要る。
+        uploads = ('Upload check times', 'Upload failed logs')
+        assert all(s.get('if') == "steps.scope.outputs.scope == 'ppc'" for s in guest[2:] if s.get('name') not in uploads)
+        assert all(s.get('if', '').endswith("&& steps.scope.outputs.scope == 'ppc'") for s in guest if s.get('name') in uploads)
         runs = '\n'.join(s.get('run', '') for s in guest)
-        assert f'OS32_REQUIRE_PPC=1 MUTATE={mutate} ' + command in runs
+        assert command in runs
+        assert '--no-mutate' not in runs and 'run.py --run' not in runs
         assert ('CHECK_ROUTINE=1 ' in runs) == routine
+        # 検査ごとの所要は成果物に出す (重みの作り直しに使う: tools/checks/calibrate_weights.py)。
+        times = [s for s in guest if s.get('name') == 'Upload check times']
+        assert times and times[0]['with']['name'] == 'check-times-${{ github.sha }}-ppc-qemu-${{ matrix.shard }}'
+        assert times[0]['if'] == "always() && steps.scope.outputs.scope == 'ppc'"
         for dependency in ('qemu-system-ppc', 'qemu-system-data', 'genisoimage', 'qemu-user', 'gcc-13', 'ccache'):
             assert dependency in runs
         for action_name in ('build-setup', 'ppc-setup'):
             assert any(s.get('uses') == './.github/actions/' + action_name for s in guest)
+    # 枝が読めるキャッシュは自分の枝と main の物だけ。main がクロスコンパイラのキャッシュを保つ。
+    warm = workflow['jobs']['ppc-toolchain-cache']
+    assert warm['if'] == "github.ref == 'refs/heads/main'"
+    assert [s.get('uses') for s in warm['steps']] == ['actions/checkout@v4', './.github/actions/ppc-setup']
     action = yaml.safe_load((ROOT / '.github/actions/ppc-setup/action.yml').read_text())
+    by_name = {step['name']: step for step in action['runs']['steps']}
+    for name in ('Toolchain build dependencies (cache miss only)', 'Build powerpc-elf toolchain (cache miss only)'):
+        assert by_name[name]['if'] == "steps.cache.outputs.cache-hit != 'true'"
     commands = '\n'.join(step.get('run', '') for step in action['runs']['steps'])
     assert 'sha256sum tools/ci/build_cross_ppc.sh' in commands
     assert 'tools/ci/build_cross.sh' not in commands
@@ -135,7 +145,7 @@ def guest_prerequisites():
 def scope_matrix(source):
     module = types.ModuleType('scope_subject')
     exec(compile(source, 'ppc_scope.py', 'exec'), module.__dict__)
-    for path in ('arch/ppc/entry.S', 'platform/powermac/ofw.c', 'build/ppc-kboot.mk',
+    for path in ('arch/ppc/entry.S', 'platform/powermac/ofw.c', 'build/targets/ppc-powermac.mk', 'build/images/ppc-flags.mk', 'build/select.mk',
                  'userland/ppc/a.c', 'tools/ppc/compile_ci.py',
                  'tools/ci/build_cross_ppc.sh', '.github/actions/ppc-setup/action.yml',
                  'tools/ci/ppc_scope.py', '.github/workflows/check.yml',

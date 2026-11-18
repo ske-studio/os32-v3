@@ -37,9 +37,10 @@ dry-run 無書き込み、実適用拒否時の入力未読、秘密フィール
 
 ## 根拠と残課題
 
-- 許可キー/値: `docs/archive/gui_v11/TASK_H3_cirrus.md` §0 と
-  `docs/tasks/gui/TASKS.md` 2026-09-06 WAB OFF 再確認。
-  `[NekoProject21] USEGD5430=true/false`, `GD5430TYPE=91` のみ。
+- 許可キー/値の正典: `docs/design/tools/np21w_ini.md` の「固定値の欄 (`ALLOWED`)」
+  (出所は TASK_H3_cirrus §0)。この覚えを書いた時点の許可は
+  `[NekoProject21] USEGD5430=true/false`, `GD5430TYPE=91` だけで、今は
+  `USEPEGCP`・`EXMEMORY` と追加の欄 (`EXTRA`)・パスの欄も増えている。
   外部 NP21/W ソースの最初に試した `windows/ini.cpp`, `windows/ini.c`,
   `wab/cirrus_vga.c` パスは不存在だった。上記リポジトリ内文書を根拠とし、
   未確認のソースや実 ini を根拠としたとは扱わない。

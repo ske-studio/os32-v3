@@ -31,19 +31,19 @@ F2 の「SQLite 内部 fault は通常 cleanup で回復できない」という
 
 | 根拠 | 現状／必要な変更 |
 |---|---|
-| `kernel/ime/ime.c:895–912` | list/delete/export は caller pointer をそのまま dict 層へ渡す。clear は pointer なし |
-| `kernel/ime/ime_dict.c:271–325` | prefix を prepare 後に SQLITE_STATIC bind。ROW 中に out を直接書き、最後に finalize。途中の user fault は stmt を残して脱出し得る |
-| `kernel/ime/ime_dict.c:329–364` | NULL/空 kanji は同じ yomi の全候補削除。prepare 後に yomi/kanji を bind する。invalid→空文字変換は削除対象を拡大する |
-| `kernel/ime/ime_dict.c:368–407` | user path を VFS に直渡しし、O_TRUNC open が prepare より先。無効 path は file 操作より前に拒否する必要がある |
-| `kernel/ime/ime_dict.c:61–267,411–425` | open/close/reopen/search/learn/clear も直接 SQLite。search/learn の SQLITE_STATIC binding は reset だけでは解放されない。常駐 stmt の寿命も対象 |
-| `kernel/ime/ime.c:283–285,491,878–891` | 学習は kernel の候補配列、検索は kana_buf、switch は整数から選ぶ kernel literal path。user facade と trusted 内部呼出しを混同しない |
-| `kernel/ime/ime.h:28–35,64–74`、`sdk/include/os32/os32_kapi_shared.h:419–424` | 結果 yomi/kanji は各32 byte、入力 kana_buf は128 byte。**結果幅32を入力上限の根拠にできない** |
-| `userland/cmds/ime.c:32,119–164` | list は entries[64]/max=64。prefix/yomi/kanji/path は argv を直接渡し、32 byte 制限なし。省略 prefix と kanji は空文字、export 既定は `/tmp/userdict.csv` |
-| `mm/paging.c:409–416` | paging_is_present は master の page_tables を参照するだけ。現在 caller PD の PDE/PTE USER/RW 判定に流用できない |
-| `exec/exec.c:310–324,592–622` | ring3_ptr_ok は先頭番地の帯域判定。長さ、跨ぐページ、実効 USER/RW は検証しない。wrapper 中は caller CR3 のまま |
-| `arch/x86/kernel/isr_handlers.c:246–251,337–349`、`exec/exec.c:651–662,448–516` | ring3_in_syscall が真なら kernel 内 fault も app kill→AS破棄→exec_exit。現在 exec_exit は FD cleanup 後に db_cleanup_all。エンジン中断後の cleanup 再入は安全でない |
-| `arch/x86/kernel/ring3_entry.asm:44–63` | int80 本体は sti、出口は cli。49行の古い「cli不要」コメントでなく実命令と57行以降を正とする |
-| `kapi/kapi_db.c:28–33,198–233,275–365` | path 256/SQL 1024 のコピーはあるが checked copy でなく切捨て。exec/prepare は **旧 active_stmt finalize が SQL copy より先** |
+| `kernel/ime/ime.c` | list/delete/export は caller pointer をそのまま dict 層へ渡す。clear は pointer なし |
+| `kernel/ime/ime_dict.c` | prefix を prepare 後に SQLITE_STATIC bind。ROW 中に out を直接書き、最後に finalize。途中の user fault は stmt を残して脱出し得る |
+| `kernel/ime/ime_dict.c` | NULL/空 kanji は同じ yomi の全候補削除。prepare 後に yomi/kanji を bind する。invalid→空文字変換は削除対象を拡大する |
+| `kernel/ime/ime_dict.c` | user path を VFS に直渡しし、O_TRUNC open が prepare より先。無効 path は file 操作より前に拒否する必要がある |
+| `kernel/ime/ime_dict.c` | open/close/reopen/search/learn/clear も直接 SQLite。search/learn の SQLITE_STATIC binding は reset だけでは解放されない。常駐 stmt の寿命も対象 |
+| `kernel/ime/ime.c` | 学習は kernel の候補配列、検索は kana_buf、switch は整数から選ぶ kernel literal path。user facade と trusted 内部呼出しを混同しない |
+| `kernel/ime/ime.h`、`sdk/include/os32/os32_kapi_shared.h` | 結果 yomi/kanji は各32 byte、入力 kana_buf は128 byte。**結果幅32を入力上限の根拠にできない** |
+| `userland/cmds/ime.c` | list は entries[64]/max=64。prefix/yomi/kanji/path は argv を直接渡し、32 byte 制限なし。省略 prefix と kanji は空文字、export 既定は `/tmp/userdict.csv` |
+| `mm/paging.c` | paging_is_present は master の page_tables を参照するだけ。現在 caller PD の PDE/PTE USER/RW 判定に流用できない |
+| `exec/exec.c` | ring3_ptr_ok は先頭番地の帯域判定。長さ、跨ぐページ、実効 USER/RW は検証しない。wrapper 中は caller CR3 のまま |
+| `arch/x86/kernel/isr_handlers.c`、`exec/exec.c` | ring3_in_syscall が真なら kernel 内 fault も app kill→AS破棄→exec_exit。現在 exec_exit は FD cleanup 後に db_cleanup_all。エンジン中断後の cleanup 再入は安全でない |
+| `arch/x86/kernel/ring3_entry.asm` | int80 本体は sti、出口は cli。49行の古い「cli不要」コメントでなく実命令と57行以降を正とする |
+| `kapi/kapi_db.c` | path 256/SQL 1024 のコピーはあるが checked copy でなく切捨て。exec/prepare は **旧 active_stmt finalize が SQL copy より先** |
 
 ## 3. 上限・返値・NULL の提案を先に凍結する
 

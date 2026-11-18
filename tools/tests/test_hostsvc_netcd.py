@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """D3 network CD with real persistent session, block RPC and wire protocol."""
 CHECK = dict(name='hostsvc-netcd', tier=1, needs=[], budget=31.5, covers=[
-    'drivers/block/netcd.c', 'drivers/block/netcd.h', 'drivers/base/dev.h',
+    'drivers/block/netcd.c', 'drivers/block/netcd.h', 'kernel/dev/dev.h',
     'fs/serialfs/sfs_block.c', 'fs/serialfs/sfs_block.h',
     'fs/serialfs/serialfs_persistent.c', 'include/boot_token.h', 'fs/serialfs/serialfs.h',
     'fs/serialfs/sfs_client.c', 'fs/serialfs/sfs_client.h',
@@ -13,7 +13,7 @@ CHECK = dict(name='hostsvc-netcd', tier=1, needs=[], budget=31.5, covers=[
     'tools/tests/kernel_includes.py', 'build/config.mk', 'include/types.h',
     'lib/crc32.c', 'lib/crc32.h', 'lib/le_internal.h',
     'lib/kstring.h', 'lib/kstring_asm.asm'],
-    env=[], basis=['PACK ppc-sfs-deadline PM condition B', 'LAN_OPERATOR_DESIGN §5', 'NET_HOSTSVC_DESIGN §4'],
+    env=[], basis=['PACK ppc-sfs-deadline PM condition B', 'LAN_OPERATOR_DESIGN §5', 'docs/design/drivers/block/netcd.md 読みと媒体の確かめ'],
     env_limit='fake network/NIC/mediaでsession・世代・期限を確認するが、実ネットワークと実媒体の障害は再現しない。',
 )
 

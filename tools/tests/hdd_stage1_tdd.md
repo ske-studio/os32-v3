@@ -1,6 +1,8 @@
 # HDD の一時置き場 (段 1) — RED→GREEN の記録
 
-- 票: `docs/archive/realhw_v21/TASK_HDD_INSTALL.md` 段 1 / §1-v3 (N3〜N7、R3-1)
+- 契約: `docs/design/fs/pc98pt.md`・`docs/design/drivers/ata/ide_addr.md`・`docs/design/fs/ext2/ext2_layout.md`・
+  `docs/design/fs/ext2/ext2_fmt.md`・`docs/design/fs/ext2/ext2_super.md`「区画の探索とマウントの範囲」・
+  `docs/design/userland/shell/hdprep_plan.md`、migrate-pt は `docs/08_build.md` §8-4 の「v64 の区画表の移行」
 - 実行: `python3 -B tools/tests/test_hdd_stage1.py --target --mutate` (`make check-hdd-stage1-host`)
 - ハーネス: `tools/tests/hdd_stage1_host.c` (純粋関数、ホスト 64 ビット + libc)、
   `tools/tests/ext2_part_host.c` (ext2 の区画探索と format_at、ILP32 -nostdlib)
@@ -9,7 +11,7 @@
 
 | 対象 | ケース | 見るもの |
 |---|---|---|
-| `drivers/block/pc98pt.c` | `pt_offsets` / `pt_817` / `pt_1663` / `pt_reject` | 標準配置 (+8/+9/+10-11) と `PC98PartEntry` (fatfs と共有) の一致、8/17 (NHD の 1632〜) と 16/63 (2016〜) のバイト列、境界に無い区画・16 ビット超のシリンダ (F3)・幾何 0・終わり <= 開始・ディスクの外・FAT の項目・**旧配置のバイト列を別の場所として読まない** |
+| `fs/pc98pt.c` | `pt_offsets` / `pt_817` / `pt_1663` / `pt_reject` | 標準配置 (+8/+9/+10-11) と `PC98PartEntry` (fatfs と共有) の一致、8/17 (NHD の 1632〜) と 16/63 (2016〜) のバイト列、境界に無い区画・16 ビット超のシリンダ (F3)・幾何 0・終わり <= 開始・ディスクの外・FAT の項目・**旧配置のバイト列を別の場所として読まない** |
 | `drivers/ata/ide_addr.c` | `ata_lba28` / `ata_range` / `ata_chs` | word 49 bit9 → LBA28 (DRV/HEAD bit6、LBA[27:24])、総数と 2^28 の上限 (`lba=268435456` が LBA 0 に化けない)、`lba + count` の桁あふれ、word 53 bit0 の現在の幾何を既定より優先 (F13)、既定 0 → 8/17・シリンダ 16 ビット、ヘッド 17 以上は使わない |
 | `fs/ext2/ext2_layout.c` | `layout` | Codex の 16,652 セクタ (最終グループ 133 < 必要 135 → 1 グループ 8,193 ブロック)、32/33 グループ境界 (262,145 / 262,146 ブロック)、g=2 (非スパース) と g=3 (スパース) の境目を 1 ブロックずつ掃いて「落とした大きさは素朴な配置が本当に足りない」「落とさなかった大きさは足りる」の両方が出る、128〜524,288 セクタの全長で最終グループが収まり長さを超えない |
 | `userland/shell/hdprep_plan.c` | `hdprep_geom` / `hdprep_disk` / `hdprep_mounts` / `hdprep_plan` | 断る条件の全部 (ATA 無し・BIOS 幾何なし / 無効・BX≠512・LBA も現在の CHS も無い・LBA 1 の項目 (どの添字でも、OS32 自身でも)・LBA 0 の 55AA・ルートの hd0・大きさ 8〜256 の外)、マウント中は umount が要る、16/63 で開始 2016・256MiB をシリンダへ切り下げ、BIOS の CX と IDENTIFY の総数の小さい方で頭打ち、計画した区画が共有部の書き手と固定点をそのまま通る |
@@ -20,7 +22,7 @@
 
 ## 2. RED
 
-- 新しい純粋関数 (`pc98pt.c` / `ide_addr.c` / `ext2_layout.c` / `hdprep_plan.c`) はこの票で作った。
+- 新しい純粋関数 (`pc98pt.c` / `ide_addr.c` / `ext2_layout.c` / `hdprep_plan.c`) は TASK_HDD_INSTALL 段 1 で作った。
   **実装と試験は同じ作業の中で書いた (試験先行ではない)**。試験が実装の誤りを捕まえることは
   §3 の変異 (各判定を 1 つずつ外す・旧動作に戻す) で確かめた。
 - 旧動作は**変異で再現して RED を確かめた** (関数の形が変わったので HEAD のソースを

@@ -44,7 +44,7 @@ int gfx_osri_view(const char *path, u32 duration_ms, int caller)
         kfree(image);
     }
     /* A failed loader may have partially overwritten the borrowed BB. */
-    for (u32 i = 0; i < GVRAM_PLANES; i++) kmemset(fb.planes[i], 0, GFX_PLANE_SZ);
+    for (u32 i = 0; i < GFX_BB_PLANES; i++) kmemset(fb.planes[i], 0, GFX_PLANE_SZ);
     dirty_queue.count = 0;
     prev_dirty.count = 0;
     v1_bridge_end(GFX2_ROLE_DISPLAY, GFX2_CPU_W, 0);

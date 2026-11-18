@@ -25,9 +25,8 @@ GeForce・ラスタに限らず、機能の開発全般の決まり。手本が�
 
 ## 3. 検査と実機
 
-- **取り込みの検査は全部 GitHub の CI** (メインストリームを含む、ユーザー決定 2026-11-05「取り込みの検査は GitHub の CI に一本化する (メインストリームも含む)」)。枝を push し、check と build (`make check-fast` = 全部の検査、変異なし) が通ったら main に早送りする。main の push は、同一 SHA・同一 workflow の統合枝 (`wt/int-*`) の成功を API で確認できれば検査を省略する。取得失敗・不明な結果なら検査を回し、配布物は毎回作る ([08_build §8-6](../../08_build.md#8-6-github-actions-での本体ビルド))。
-- **実装者**は触った像のビルドと、足した・触った試験 (`--mutate` を含む)・lint だけを回す。`check-changed` は回さない (CI の check-fast が全部を回す)。
-- **変異込みの全体検査**は GitHub の workflow `full-check` (手動の起動と、毎晩 main に対して、ユーザー決定 2026-11-05)。
+- **取り込みの検査は全部 GitHub の CI** (メインストリームを含む、ユーザー決定 2026-11-05「取り込みの検査は GitHub の CI に一本化する (メインストリームも含む)」)。枝を push し、check と build (`make check` = 全部の検査を変異込みで、6 シャード) が通ったら main に早送りする。**`[skip ci]` を付けたコミットは取り込めない** — 関門はその SHA の check・build の success を要る (文書だけの変更は check だけ)。main の push は、同一 SHA・同一 workflow の統合枝 (`wt/int-*`) の成功を API で確認できれば検査を省略する。取得失敗・不明な結果なら検査を回し、配布物は毎回作る ([08_build §8-6](../../08_build.md#8-6-github-actions-での本体ビルド))。
+- **実装者**は触った像のビルドと、足した・触った試験 (`--mutate` を含む)・lint だけを回す。全体は CI が回す。関係する検査を手元でまとめて見たい時は `make check-changed` を使ってよい (関門ではない)。
 - **substream** (Ubuntu 24.04・gcc 13) は PowerPC (PowerMac G4) の移植の開発機 (ユーザー決定 2026-11-07、セッション os32powerpc)。GitHub Actions の runner は止めてあり、CI には使わない (GitHub より 2.5〜4 倍遅い、ユーザー決定 2026-11-05)。
 - **受入待ちの枝は統合の枝 (`wt/int-<日付><記号>`) にまとめて受け入れる** — 形は ROLES §4-2。
 - **merge は終わった順** — 後から入るブランチは、入る直前の main を取り込んで push し直し、CI を通し直す (衝突の解消を含む)。

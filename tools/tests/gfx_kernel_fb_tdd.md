@@ -1,6 +1,6 @@
 # T2e e4: kernel framebuffer / backend geometry
 
-設計票: TASK_T2D_T2H §2 (アーカイブ: `docs/archive/v3/TASK_T2D_T2H.md`)。
+契約: `docs/design/gfx/gfx_core_framebuffer.md`・`docs/design/gfx/gfx_core.md` の「4. 選択モードと容量を分けて大きさを決める」(出所は票 TASK_T2D_T2H §2 e4)。
 PM 判断: 作業依頼の `ref_e4.md` §8 Q1〜Q10。独立レビューP2-1を受け、PMがQ3を訂正 (公開query/互換fbは選択backend)。
 
 `test_gfx_kernel_fb.py --runner qemu --mutate` は **正常496チェック、10/10 runtime RED**。

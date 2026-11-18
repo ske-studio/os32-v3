@@ -8,7 +8,7 @@
 #include "include/config.h"
 #include "lib/kstring.h"
 #include "kprintf.h"
-#include "init/boot_platform.h"
+#include "platform/pc98/boot_platform.h"
 #define CHECK(x) do { if (!(x)) fail(__LINE__); } while (0)
 static void fail(int line) { __asm__ volatile("int $0x80"::"a"(1),"b"(line % 250 + 1)); __builtin_unreachable(); }
 volatile u32 tick_count;

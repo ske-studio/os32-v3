@@ -14,9 +14,8 @@
 #define ATAPI_H
 
 #include "ide.h"
+#include "atapi_contract.h"
 
-/* ======== CD-ROM セクタサイズ ======== */
-#define ATAPI_SECTOR_SIZE    2048
 
 /* Packet and response byte layout. */
 #define ATAPI_CDB_BYTES                   12
@@ -40,9 +39,7 @@
  * **実機の CD ドライブとの相性で困ったら、ここを 1 にすれば旧来の読み方に戻る**。
  * 16 = 32KB。PIO の byte count limit (下) はこれより大きくてよい。
  * (ホスト試験は -D で 32 にした版も回す = 1 回の転送が 64KB を超える形) */
-#ifndef ATAPI_READ_MAX_SECTORS
-#define ATAPI_READ_MAX_SECTORS  16
-#endif
+/* 値は include/atapi_contract.h の ATAPI_READ_MAX_SECTORS。 */
 
 /* PACKET の byte count limit (Cylinder Low/High) に書く上限。1 回の DRQ で
  * デバイスが渡してよいバイト数。ATA の規定で偶数、0xFFFF は使わない。
@@ -197,7 +194,7 @@ int atapi_read_sectors(u32 lba, u32 count, void *buf);
  * は覚えた値と違えばキャッシュを捨てる。**NP21/W は READ(10) で UNIT
  * ATTENTION を返さない** (交換は TEST UNIT READY だけが報告する) ので、
  * エミュレータではこの経路は動かない */
-u32 atapi_media_gen(void);
+/* u32 atapi_media_gen(void) は include/atapi_contract.h。 */
 
 /* 読みの統計 (試験と起動時の行のため) */
 typedef struct {

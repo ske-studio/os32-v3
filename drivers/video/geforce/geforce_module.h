@@ -3,6 +3,7 @@
 #define GEFORCE_MODULE_H
 #include <stdbool.h>
 #include "gfx_hal.h"
+#include "geforce_contract.h"
 #include "video_service.h"
 #include "../../../hwdev/gf/stop_state.h"
 #include "../../../kernel/module/module_runtime.h"
@@ -37,17 +38,10 @@ const struct gf5_test_ops *geforce_feature5_ops(void);
 void geforce_backend_feature5_bind(struct gf5 *);
 void gf_hook_feature5_bind(struct gf5 *);
 int geforce_foundation_display(bool start);
-/* Resident foreground adapter: reread the F5 slot on every dispatch, never
- * cache module ctx/ops. No IRQ calls. Consume pending heat stop at the common
- * exit while retaining reentry protection; backend stop owns active/routed. */
-void geforce_foreground_poll(void);
 void geforce_heat_notice(void);
-/* Resident tick/pending query only; no module callback or MMIO. */
-bool geforce_fg_due(u32 now_tick);
 /* Value-only stop request; do not retain any module pointers. The consumer
  * owns no-route sync/halt; geforce_return must retain its reboot semantics. */
 void geforce_heat_stop_request(i32 reason, i32 milli_c, i32 source_rc);
-void geforce_display_stopped(void);
 int geforce_heat_latch_clear(void);
 struct geforce_platform {
     struct video_device *device;
@@ -75,7 +69,6 @@ int geforce_range_reserved(u32 base, u32 length);
 /* Resolve one fully containing boot-reserved BAR, 0/-1. Invalid/overflowing
  * ranges and ambiguous matches fail without changing owner/rid outputs. */
 int geforce_resource_lookup(u32 base, u32 bytes, u32 *owner, u32 *rid);
-void geforce_display_failed(void);
 typedef struct {
     GfxBackend *backend;
     GfxCounters *counters;

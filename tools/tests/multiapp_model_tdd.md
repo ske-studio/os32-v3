@@ -1,6 +1,9 @@
 # multiapp_model — GUI アプリ 4 本同時実行 (K5a) のホスト TDD
 
-対象票: `docs/archive/gui_v13/TASK_K5_multiapp.md` §K5a-8
+契約の正典: 選択規則 (R6) は `docs/design/userland/gshell/src/multiapp.md`、
+park・resume と ID の池 (R1〜R5) は `docs/design/exec/appslot_transition.md` と
+`docs/design/exec/appslot.md` の「起動・畳み・CTRL+STOP・画面の所有者の判定」。
+出所は票 TASK_K5_multiapp の §K5a-8。
 実行: `python3 -B tools/tests/test_multiapp_model.py` (`make check` への登録は PM)
 三点セット: `multiapp_model_host.c` (模型 + 検査本体) / `test_multiapp_model.py` (ビルドと実行) /
 このファイル (何を見ているか + RED→GREEN の記録)。
@@ -117,7 +120,7 @@ GREEN になって初めて意味を持つので、単独では根拠にしな�
 | 12 | 選択規則: 入力群のフォーカス最優先 / 入力群の巡回 / 導出群の巡回 / 導出群ではフォーカスを優先しない / 入力は導出より先 / ready ゼロなら誰も起こさない | 票 D11、受入 G9 |
 | 13 | park 判定: 自分に入力なら戻る / 他に ready が無ければ戻る (1 本のときの回帰ゼロ) / 他に入力があれば譲る / 他も導出だけなら譲る / 自分が ready でなければ譲る | 票 D11 (1) |
 | 14 | 飢餓なし: 導出群だけの 4 本が 2,3,4,5 の順にちょうど 1 回ずつ走り、1 周したら先頭へ戻る | 票 D11 |
-| 15 | **自作入力で park を回避できない** (独立レビュー [P2] 1 回目の反例、`N`=2): A が毎周自分に `Focus` を湧かせ (`wm.rs:969-985` → `input.rs:855-872`)、B は `Paint` 待ちで park 中。park は必ず起きる / B は必ず走る / B は `N`=2 の上限 **10 にちょうど届く** / 定数 `MA_STARVE_BOUND` の内側 | 票 D11-3a、受入 G9 |
+| 15 | **自作入力で park を回避できない** (独立レビュー [P2] 1 回目の反例、`N`=2): A が毎周自分に `Focus` を湧かせ (`wm.rs` → `input.rs:855-872`)、B は `Paint` 待ちで park 中。park は必ず起きる / B は必ず走る / B は `N`=2 の上限 **10 にちょうど届く** / 定数 `MA_STARVE_BOUND` の内側 | 票 D11-3a、受入 G9 |
 | 16 | **ラウンドをまたぐ待ちの上限** (同 2 回目の反例、`N`=4): A が入力を消費して `Paint` を残し park、B/C/D は入力群を維持。A は必ず走る / 再導出した上限以内 / **ちょうど 30 に届く** (式がタイト) / フォーカスを B・D に置いても超えない | 票 D11-3a、受入 G9 |
 | 17 | **top-level にしか出来ない仕事があれば譲る** (PM 受入 2026-09-11、K5b-W からの提案): `LAUNCH` が保留なら他に ready が居なくても・自分の入力の据え置き中でも譲る / 保留が消えれば従来どおり / 保留での park は `input_streak` を動かさない / 保留を 1 回で消費した経路の待ち回数は従来と同じ **30** / 保留が続いても上界 30 を超えない | 票 D11-3、受入 G9 |
 
@@ -129,7 +132,7 @@ GREEN になって初めて意味を持つので、単独では根拠にしな�
   時間で横取りする仕組みではない — 上限に当たったアプリも、自分が `OP_WAIT` に
   入った地点で譲るのであって、走っている最中に取り上げられることは無い。
 - `ready` の**計算**そのもの。`input_ready` / `derived_ready` は試験が直接立てる。
-  実物では WM が `wake_ready()` (`handler.rs:396-417`) と `session::quit[]` から
+  実物では WM が `wake_ready()` (`handler.rs`) と `session::quit[]` から
   毎周期算出する — その算出が正しいかは W レーンの担当で、ここでは
   「2 群に分かれた後の選び方」だけを固定している。
 - **上限の式が依る 3 つの前提**そのもの (起算点 = park した `OP_WAIT` / 継続 ready /

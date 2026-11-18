@@ -184,7 +184,7 @@ int main(void)
 
     printf("== S3-D リカバリ生成物の名前 (票 TASK_S3 §0、往復 3 の B5) ==\n");
     /* `install --recover-settings` / `--revert-settings` が /hd0/etc に作る
-     * 7 名 (票 §1b の 9 名から本体 `settings.db` と `settings.db-journal` を
+     * 9 名 (復旧が扱う 11 名から本体 `settings.db` と `settings.db-journal` を
      * 除いたもの)。`.bak` / `.bak-journal` は元の対の**唯一の写し**、
      * `.recover-state` は phase の印なので、通常同期 (hsync) が 1 つでも
      * 掴むと「元へ戻す」経路そのものが消える。`.new*` / `.failed*` も
@@ -198,6 +198,8 @@ int main(void)
             "settings.db.new",
             "settings.db.new-journal",
             "settings.db.recover-state",
+            "settings.db.master.new",
+            "settings.db.master.new-journal",
             0
         };
         char path[HSP_MAX_PATH];
@@ -240,7 +242,7 @@ int main(void)
     }
 
     printf("== S3-D 似ているだけの名前は通す ==\n");
-    /* 接頭一致で拾うと通常配備の対象まで止まる。7 名は**完全一致**だけ。 */
+    /* 接頭一致で拾うと通常配備の対象まで止まる。9 名は**完全一致**だけ。 */
     check(!hsp_path_protected("/etc/settings.db.bak2"), "bak2");
     check(!hsp_path_protected("/etc/settings.db.new2"), "new2");
     check(!hsp_path_protected("/etc/settings.db.recover"), "recover");
@@ -248,6 +250,10 @@ int main(void)
     check(!hsp_path_protected("/etc/settings.db.recover-state.old"),
           "recover-state.old");
     check(!hsp_path_protected("/etc/settings.db.failed.old"), "failed.old");
+    check(!hsp_path_protected("/etc/settings.db.master"), "master");
+    check(!hsp_path_protected("/etc/settings.db.master.new2"), "master.new2");
+    check(!hsp_path_protected("/etc/settings.db.master.new-journal2"),
+          "master.new-journal2");
     check(!hsp_path_protected("/etc/settings.dbbak"), "settings.dbbak");
     check(!hsp_path_protected("/etc/settings.db.bak-journal2"),
           "bak-journal2");
@@ -275,10 +281,10 @@ int main(void)
         /* hsync.c は /etc の**実在名**を HS_MAX_PROT 件まで集め、越えたら
          * 「守れない」として同期を拒否する。表が伸びると余裕が減るので、
          * 名前を足すときは HS_MAX_PROT (現在 24) を必ず見直すこと。
-         * リカバリ途中の /etc は票 TASK_S3 §1b の 9 名 + wal/shm = 11 名。 */
+         * リカバリ途中の /etc は復旧が扱う 11 名 + wal/shm = 13 名。 */
         int n = 0;
         while (hsp_protected_names[n]) n++;
-        check(n == 11, "保護対象は 11 名 (本体 2 + wal/shm 2 + リカバリ 7)");
+        check(n == 13, "保護対象は 13 名 (本体 2 + wal/shm 2 + リカバリ 9)");
     }
 
     printf("== B1 '\\' を含むパスは正規化の入口で断る ==\n");

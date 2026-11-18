@@ -7,15 +7,13 @@
 
 /* PowerPC mirrors shell characters to its stream; x86 cmd_terminal sends
  * its own serial characters. */
-#ifndef CONSOLE_PUTCHAR_MIRROR
-#define CONSOLE_PUTCHAR_MIRROR 0
-#endif
+#include "platform_console.h"   /* CONSOLE_PUTCHAR_MIRROR・CONSOLE_UTF8_AS_STREAM (機種ごとの固定名) */
 
 #define CONSOLE_TAB_COLS 4
 #include "types.h"
 #include "console_output.h"
 #include "utf8.h"
-#include "tvram.h"
+#include "text_screen.h"
 #include "kprintf.h"
 #include "kstring.h"
 #include "con_sink.h"
@@ -26,7 +24,7 @@
 #include "console_backend.h"
 #include "kbd_inject.h"
 
-/* V86 セッション中の画面描画抑止 (arch/x86/legacy/v86.c)。
+/* V86 セッション中の画面描画抑止 (V86 のモニタ)。
  * セッション中は低位 640KB がゲスト用バッキング RAM に差し替わる。
  * Unicode-JIS 表は独立した kernel 所有頁にあるが、TVRAM/KCG への書き込みは
  * ゲストの画面と CG 状態を汚す。
@@ -297,6 +295,10 @@ void shell_print_utf8(const char *utf8_str, u8 color)
 {
     const u8 *p = (const u8 *)utf8_str;
 
+    if (CONSOLE_UTF8_AS_STREAM) {
+        console_write(utf8_str, kstrlen(utf8_str), color);
+        return;
+    }
     con_sink_push_print(utf8_str, kstrlen(utf8_str), color);
     bootlog_push(utf8_str, kstrlen(utf8_str));
     if (rshell_active || boot_serial_mirror) {

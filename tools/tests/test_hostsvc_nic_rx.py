@@ -9,7 +9,7 @@ CHECK = dict(name='hostsvc-nic-rx', tier=1, needs=[], budget=3.5, covers=['tools
     'tools/tests/hostsvc_fixture.h', 'tools/tests/hostsvc_fixture.c',
     'tools/tests/hostsvc_nic_rx_host.c', 'tools/tests/host32.py',
     'tools/tests/kernel_includes.py', 'build/config.mk'],
-    basis=['NET_HOSTSVC_DESIGN §2', 'NET_HOSTSVC_DESIGN §11'],
+    basis=['docs/design/net/nic.md 受信の振り分け', 'docs/design/net/nic.md 受信を誰がいつ進めるか'],
 )
 
 import argparse

@@ -235,10 +235,12 @@ static void exec_owner_diag(AppSlot *a, int exiting, u32 pages, u32 leftover)
 static void kfree(void *p) { CHECK(p != NULL); }
 void serial_puts_polled(const char *s) { (void)s; CHECK(0); }
 #define kprintf print
+#define console_printf print
 static int exec_gfx_owner_release(struct addrspace *as) { (void)as; return 0; }
 #include "exec_serial_diag.h"
 #include "allocator_teardown.inc"
 #undef kprintf
+#undef console_printf
 
 static void retained_and_exit(void)
 {

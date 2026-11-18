@@ -11,11 +11,11 @@ sys.path.insert(0, str(ROOT / 'tools/tests'))
 import host32
 CHECK = dict(name='ppc-kboot-clock', tier=2, budget=60,
              basis=['IO_TIER_DESIGN §5/P5 (PM 2026-11-16)'],
-             covers=['init/ppc_kernel.c', 'platform/powermac/clock.c', 'platform/powermac/kboot_info.h',
+             covers=['platform/powermac/ppc_kernel.c', 'platform/powermac/clock.c', 'platform/powermac/kboot_info.h',
                      'tools/ppc/kboot_clock*', 'lib/divdi3.c'],
              inputs=['kernel/io_clock.h', 'include/types.h', 'include/callconv.h', 'include/clock_source.h',
                      'include/platform_timer.h', 'platform/powermac/ofw.h',
-                     'platform/powermac/ppc_layout.h', 'arch/ppc/ppc_boot.h',
+                     'platform/powermac/platform_of_layout.h', 'arch/ppc/ppc_boot.h',
                      'arch/ppc/ppc_pmap.h', 'arch/ppc/ppc_oea.h',
                      'sdk/include/os32/os32_kapi_shared.h', 'tools/tests/host32.py'])
 MUTATIONS = [
@@ -104,7 +104,7 @@ def main():
     source = (ROOT / 'platform/powermac/clock.c').read_text()
     with tempfile.TemporaryDirectory(prefix='kboot-clock-') as temp:
         directory = Path(temp)
-        rate_source = (ROOT / 'init/ppc_kernel.c').read_text()
+        rate_source = (ROOT / 'platform/powermac/ppc_kernel.c').read_text()
         if rate_test(directory, rate_source) != 0:
             raise RuntimeError('rate baseline failed')
         print('GREEN: bracketed clock rate')

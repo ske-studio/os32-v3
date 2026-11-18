@@ -198,6 +198,7 @@ void paging_load_cr3(u32 pd)
 void shell_print(const char *s, u8 a) { (void)s; (void)a; CHECK(0); }
 void shell_print_dec(u32 n, u8 a) { (void)n; (void)a; CHECK(0); }
 void __cdecl kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; CHECK(0); }
+void __cdecl console_printf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; CHECK(0); }
 int appslot_cur(void) { return argv_mode && is_user ? 3 : 1; }
 AppSlot *appslot_at(int id) { CHECK(id >= 0 && id < APP_SLOT_COUNT); last_slot_id = id; return &slots[id]; }
 int appslot_start_admit(int gui, u32 pages, u32 free_pages) { (void)gui; (void)pages; (void)free_pages; return 2; }

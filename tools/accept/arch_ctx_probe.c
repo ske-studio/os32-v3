@@ -6,7 +6,7 @@
 #include "kernel/irq/irq.h"
 #include "kernel_tick.h"
 #include "mpic.h"
-#include "kboot_layout.h"
+#include "platform_kboot_layout.h"
 #include "kprintf.h"
 #include "kstring.h"
 #include "con_sink.h"

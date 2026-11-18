@@ -91,13 +91,13 @@ p2v/c-dialect/arch-asm の run だけが既存 --files 契約へ渡す。未着�
 
 ## make と実行
 
-MUTATE=0/1/sel、MUTATE_TARGETS、MUT/MUTS は `build/sdk.mk:114` と同じ。単独 CLI の既定も1。
-HOST32_RUNNERS の全列で正常対照、変異は先頭 runner だけ (`build/sdk.mk:156`)。host32 以外の処理は繰り返さない。
+MUTATE=0/1/sel、MUTATE_TARGETS、MUT/MUTS は `build/sdk.mk` と同じ。単独 CLI の既定も1。
+HOST32_RUNNERS の全列で正常対照、変異は先頭 runner だけ (`build/sdk.mk`)。host32 以外の処理は繰り返さない。
 旧 recipe の行順、環境、失敗中断を run に移す。旧 __main__/unittest は subprocess の argv で呼び、一律 main() 呼出しへ変えない。
 make は --make で得た全検査名に `.PHONY` と静的パターン `$(CHECK_NAMES): check-%:` を付ける。列外7入口は手書き make のまま。
 check-changed は CC_NEEDS を1回組み、tree save → check-par → verify の順。check/fast は全列の needs を同様に集める。
 親 make の登録は --make 1起動で行う。CHECK_ALL_NEEDS は --list --needs と同じ選択結果の閉包から得て、check-time 間の依存辺も同時に登録する。宣言索引 (build/out/check-index.json) は宣言候補・parser・weights.json の変更で無効化する。`CHECK_SHARD=i/n` があれば CHECK_PAR_TARGETS の既定をそのシャード列にする。全検査の登録を維持し、make 前提は選んだシャードの分だけ準備する。
-check-par の既存計時子は CHECK_TIME_CHILD=1 を渡す。子の --run は指定名の本体だけを実行し、閉包の再展開・前提の再準備をしない (`build/sdk.mk:169,174`)。
+check-par の既存計時子は CHECK_TIME_CHILD=1 を渡す。子の --run は指定名の本体だけを実行し、閉包の再展開・前提の再準備をしない (`build/sdk.mk`)。
 直接 make check-X/CLI --run は同じ閉包の make needs をまとめて1回組んでから実行する。ver-info の前提は重複なく選択へ加える。
 BUILD_OUT/SQLITE_PROTO_OUT/CROSS_DIR 等は make の展開値を渡し、Python にパスの別定義を作らない。
 check-changed は CC_FILES_JSON を各 run の ctx.files へ渡す。空 stage は検査呼出しを省き、全列へ戻さない。親 make の -j/-k、計時、tree save/verify を維持する。

@@ -125,7 +125,7 @@ RED になる**ことを確認してから GREEN に戻した (下の「落ち�
 ページ属性 (PTE の USER ビット) はホストでは踏めないので、カーネル側の
 `exec_tramp_user_selftest()` (3 項) を `kselftest_run_post_exec()` から呼ぶ。
 `kselftest_run()` は `exec_init()` より**前**に走りトランポリンページがまだ
-無いため、この項だけ `init/kernel.c` が `exec_init()` の直後に別口で回す。
+無いため、この項だけ `platform/pc98/kernel.c` が `exec_init()` の直後に別口で回す。
 **この 3 項は実機でしか踏めない (未実施)。**
 
 ## 4d. Codex 網羅レビュー 往復 8 の T1 (2026-09-13)
@@ -164,7 +164,7 @@ RED は「修正を戻すと落ちる」形で確認した (実際の出力):
 4d の初版は `appslot_reclaim` が `fd_redirect_close_state()` で枠の `file_fd` を
 閉じていたが、その `file_fd` は `fd_redirect_to_file` の `vfs_open` が **その ID の
 owner タグ**で取ったものなので、`exec_reclaim_owned` の (2) `vfs_close_owned(id)`
-(`exec/exec.c:746`) が先に同じ FD を閉じている。つまり park 中 kill では同じ FD に
+(`exec/exec.c`) が先に同じ FD を閉じている。つまり park 中 kill では同じ FD に
 `vfs_close` が 2 回掛かっていた (いまの `vfs_close` と回収順では間に FD 再利用が
 入る反例は無いが、「二重 close しない」という説明が実態と違った)。
 
@@ -300,7 +300,7 @@ TARGET i386-elf GNU89 -Werror COMPILE PASS
 
 # A. 端末 (t5a_display) の要求表切り替え — ホスト TDD の記録
 
-票: `docs/archive/gui_v13/TASK_T9_sh.md` §1 D4 / D9、§1a の ABI 表。
+契約の正典: `docs/design/userland/rust/t5a_display/src/launch.md` (出所は票 TASK_T9_sh §1 D4 / D9、§1a の ABI 表)。
 実行: `make check-t5a-host` (= `cargo test --manifest-path
 userland/rust/t5a_display/host_tests/Cargo.toml --target x86_64-unknown-linux-gnu --offline`)。
 実機・エミュレータ・`make` は**未実施** ([V4])。
@@ -343,7 +343,7 @@ RED を確認し、戻して GREEN に戻した (K の §2 と同じやり方)�
 | `a_negative_poll_returns_to_the_prompt_instead_of_hanging` | `OS32_ERR_STALE` / 未知の status でも接続モードに居座らない |
 | `escape_cancels_once_and_waits_for_done` | ESC → `cancel` 0 → 接続モードのまま `DONE` を待つ。2 度目の ESC は出さない |
 | `again_retries_the_cancel_on_the_next_timer` | `AGAIN` → 次の poll で再試行 → `RUNNING` で通る → `DONE` |
-| `stale_cancel_returns_to_the_prompt` | `STALE` (もう `DONE` / `FAILED`) はそのままプロンプトへ |
+| `stale_cancel_returns_to_the_prompt` | `STALE` (もう `DONE` / `FAILED`) はそのままプロンプトへ (A-5 で逆になり、今は `stale_cancel_keeps_the_token_and_waits_for_the_poll`) |
 
 `prompt.rs` 側は `attached_row_names_the_child_and_offers_cancel` (最下行が
 `[running id=3] ESC=cancel` / `[cancelling id=3] wait`)、`message_rc_prints_the_
@@ -365,7 +365,7 @@ $ python3 -B tools/check_constraints.py
 ```
 
 `cargo clippy -p t5a_display` は**この票より前から**落ちる
-(`storage.rs:22` の `clippy::mut_from_ref` が deny)。今回足した / 触った
+(`storage.rs` の `clippy::mut_from_ref` が deny)。今回足した / 触った
 `launch.rs` `prompt.rs` `guest.rs` には clippy の指摘は 1 件も無い。
 ## A-5. 実装レビュー往復 1/3 の blocker (A、2026-09-13)
 
@@ -544,7 +544,10 @@ D5 の巡回と tick の間引きは **WM の領分** (D11-5: カーネルは順
 
 # T9-S ホスト TDD の記録 (sh.bin の起動待ち)
 
-票: `docs/archive/gui_v13/TASK_T9_sh.md` §1 D3a。
+契約の正典: `docs/design/userland/shell/sh_launch.md` (出所は票 TASK_T9_sh §1 D3a)。
+
+> 今のコードとの違い: GUI 外 (`launch_req` が `OS32_ERR_INVAL`) は次の PATH 候補へ回さず走査を止める
+> (票 TASK_EXIT_STATUS の R1b)。`launch_poll` が負のときは `EXEC_ERR_GENERAL` (-1) を返す。
 実行: `make check-sh-exec-host` (うち `python3 -B tools/tests/test_sh_launch.py`)。
 
 `tools/tests/sh_launch_host.c` が `userland/shell/sh_launch.inc` を**そのまま**
@@ -584,7 +587,9 @@ D5 の巡回と tick の間引きは **WM の領分** (D11-5: カーネルは順
 
 # T9-S ホスト TDD の記録 2 (行再描画と source 中の exit)
 
-票: `docs/archive/gui_v13/TASK_T9_sh.md` §1 D2(d) と
+契約の正典: `docs/design/userland/shell/sh_redraw.md` (行の再描画) と
+`docs/design/userland/shell/exit_status.md` の「4. `exit [N]` と終了要求」(source 中の exit)。
+出所は票 TASK_T9_sh §1 D2(d) と
 実装レビュー (往復 1/3) の blocker 1 / 2。
 実行: `make check-sh-exec-host` (うち `python3 -B tools/tests/test_sh_shell.py`)。
 

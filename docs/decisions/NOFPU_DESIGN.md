@@ -15,25 +15,25 @@
 
 | file:line | 確認結果と設計への反映 |
 |---|---|
-| `arch/x86/kernel/boot_after_paging.c:9` | EM/TS を無条件解除。probe 結果で確定する処理へ置換 |
-| `arch/x86/kernel/x87.c:12` | 初手のメモリ宛て FNSTSW を AX 宛てに変更、probe 中の限定 #NM 復帰を用意 |
-| `arch/x86/kernel/x87.c:19` | save/restore/init は現在 present guard 内。absent 側へ software state 操作を追加 |
-| `init/kernel_boot_memory.inc:97` | paging 後、SQLite より前に probe を完了させる |
-| `lib/sqlite3/os32_sqlite_config.h:59` | soft-float 使用というコメントと実際の x86 flags が不一致。実装して一致させる |
-| `build/config.mk:191`、`build/sqlite-proto.mk:12` | SQLite の gnu89/機械 flags を維持し、soft 専用 flags を加える |
-| `build/sqlite-proto.mk:17` | module wrapper は CFLAGS_BASE。sqlite3.o だけ soft にしては ABI が壊れる |
-| `tools/prototypes/sqlite_imports.def:298` | column_double の返値が double。部品境界を u64 の binary64 bit 列へ変更 |
-| `tools/gen_sqlite_imports.py:98` | facade/stub/call frame/module adapter を同じ定義から生成する |
-| `lib/sqlite3/os32_sqlite_outer.h:21`、`kernel/sqlite_outer.c:8` | 外側 double 宣言と生成 wrapper の両方を整数 ABI へ変更 |
-| `kapi/kapi_db_helpers.inc:347` | SQLITE_FLOAT の double→i32 変換が resident x87 を生成。bit 列→soft 変換へ変更 |
-| `sdk/include/os32/os32_kapi_shared.h:61` | 現行 DB_TYPE_FLOAT の payload は i32。今回もこの公開形式を維持 |
-| `lib/kmath.c:12` | fabs(double) も対象。部品内の FP 呼出し先を含めて soft ABI を閉じる |
-| `lib/sqlite3/os32_sqlite_vfs.c:655` | xCurrentTime は double の Julian day を書く。VFS も soft でコンパイル |
-| `lib/sqlite3/sqlite3.c:27144` | libc gmtime/strftime を使う短縮 currentTimeFunc は OMIT_DATETIME 時だけ |
-| `build/programs.mk:419` | 単体版 SQLite は別の userland ビルド。newlib と通常 x87 ABI を維持 |
-| `userland/tests/fp_stop.c:24` | FNSTENV/FLDENV も必須。`:31` は CW と非空 stack を用いる停止/復帰試験 |
-| `arch/x86/kernel/isr_stub.asm:244`、`:354` | #NM は現在共通例外へ。成功時 IRET に戻る専用入口を設ける |
-| `exec/access_walk.c:8` | owner/USER/書込み権限を検査する as_access_page を emulator のアクセス基盤に使う |
+| `arch/x86/kernel/boot_after_paging.c` | EM/TS を無条件解除。probe 結果で確定する処理へ置換 |
+| `arch/x86/kernel/x87.c` の `x87_probe()` | 初手のメモリ宛て FNSTSW を AX 宛てに変更、probe 中の限定 #NM 復帰を用意 |
+| `arch/x86/kernel/x87.c` | save/restore/init は現在 present guard 内。absent 側へ software state 操作を追加 |
+| `platform/pc98/kernel_boot_memory.inc` | paging 後、SQLite より前に probe を完了させる |
+| `lib/sqlite3/os32_sqlite_config.h` | soft-float 使用というコメントと実際の x86 flags が不一致。実装して一致させる |
+| `build/config.mk`、`build/sqlite-proto.mk` | SQLite の gnu89/機械 flags を維持し、soft 専用 flags を加える |
+| `build/sqlite-proto.mk` | module wrapper は CFLAGS_BASE。sqlite3.o だけ soft にしては ABI が壊れる |
+| `tools/prototypes/sqlite_imports.def` | column_double の返値が double。部品境界を u64 の binary64 bit 列へ変更 |
+| `tools/gen_sqlite_imports.py` | facade/stub/call frame/module adapter を同じ定義から生成する |
+| `lib/sqlite3/os32_sqlite_outer.h`、`kernel/sqlite_outer.c` | 外側 double 宣言と生成 wrapper の両方を整数 ABI へ変更 |
+| `kapi/kapi_db_helpers.inc` | SQLITE_FLOAT の double→i32 変換が resident x87 を生成。bit 列→soft 変換へ変更 |
+| `sdk/include/os32/os32_kapi_shared.h` | 現行 DB_TYPE_FLOAT の payload は i32。今回もこの公開形式を維持 |
+| `lib/kmath.c` | fabs(double) も対象。部品内の FP 呼出し先を含めて soft ABI を閉じる |
+| `lib/sqlite3/os32_sqlite_vfs.c` | xCurrentTime は double の Julian day を書く。VFS も soft でコンパイル |
+| `lib/sqlite3/sqlite3.c` | libc gmtime/strftime を使う短縮 currentTimeFunc は OMIT_DATETIME 時だけ |
+| `build/programs.mk` | 単体版 SQLite は別の userland ビルド。newlib と通常 x87 ABI を維持 |
+| `userland/tests/fp_stop.c` | FNSTENV/FLDENV も必須。`main()` は CW と非空 stack を用いる停止/復帰試験 |
+| `arch/x86/kernel/isr_stub.asm`、`isr_common` | #NM は現在共通例外へ。成功時 IRET に戻る専用入口を設ける |
+| `exec/access_walk.c` | owner/USER/書込み権限を検査する as_access_page を emulator のアクセス基盤に使う |
 
 - `/home/hight/os32-v3/build/out` の11月12日既存 ELF を読取り測定。worktree の最新ビルド合格を意味しない。
 - kernel.elf: **17命令** = x87.c の7 + slot_step_result の5 + os32_sqlite_column_double の3 + call/stub の2。
@@ -92,12 +92,12 @@
 | 共通header | `softfloat.h`、`softfloat_types.h`、`internals.h`、`primitiveTypes.h`、`primitives.h`、`specialize.h` と選択依存 | vendor原本を保存、OS32 port差分を明記 |
 | 移さない計算 | f16/bfloat16/f128、使わないFMA/rem、SoftFloat 2 の `F/softfloat/` | 宣言がheaderにあっても未使用objectを入れない |
 
-- 型は同梱の `sw_float32_t{v}` / `sw_float64_t{v}` / `sw_extFloat80_t{signif,signExp}`（softfloat_types.h:54/:55/:81）。native float/long double に置換しない。
+- 型は同梱の `sw_float32_t{v}` / `sw_float64_t{v}` / `sw_extFloat80_t{signif,signExp}`（softfloat_types.h/:55/:81）。native float/long double に置換しない。
 - r2 の not-FAST_INT64/extF80M への変更方針を撤回し、移植元と同じ **SOFTFLOAT_FAST_INT64 と値渡しextF80 API** を基準にする。
-- 同梱 platform.h:43 **と** softfloat_types.h:41 の両方に定義がある。一方だけ変更して異なるABIを作らない。
+- 同梱 platform.h **と** softfloat_types.h の両方に定義がある。一方だけ変更して異なるABIを作らない。
 - FAST_INT64 は64bit CPU必須という意味ではない。32bitで生成される整数helperを自前実装で満たし、nmで閉包確認する。
 - LITTLEENDIAN は x86 port 内だけに固定。PPC の既存flags/型へ横流ししない。structのpaddingはwire/108byteへコピーしない。
-- platform.h:71 の builtin CLZ は portで無効化し、選択した整数 primitive を使う。`__clzdi2` や128bit compiler runtime の意図しない導入を防ぐ。
+- platform.h の builtin CLZ は portで無効化し、選択した整数 primitive を使う。`__clzdi2` や128bit compiler runtime の意図しない導入を防ぐ。
 - SQLite関連は GNU89、移植した命令層/helperは GNU11。どちらも `-march=i386 -msoft-float -mno-fp-ret-in-387`、libgcc/host libc/libmなし。
 - vendorのC++化はしない。Eは `.cpp` だが移植対象の処理をC関数として切り出せる。boolはstdbool、型変換は明示し、C++ runtimeを導入しない。
 - 計算本体のsource/port規則はSQLiteとx87で共有し、kernelとsqlite.modへ必要subsetを別リンクする。部品の寿命/既存importsを壊す共通常駐APIは新設しない。
@@ -133,10 +133,10 @@
 - moduleは内部double→bit union、outer/header/call/stubはu64。kapi_db_helpers.incは `softfp_f64_to_i32_trunc(bits)` を使いresident doubleを除去する。
 - 既存DB_TYPE_FLOATのi32 payloadは維持。非有限/範囲外はINT32_MIN、SQLite内部のREAL保持と公開KAPI変更を混同しない。
 - 内部facadeのOPS世代を更新し旧部品混在を拒否、clean→all。公開KAPI追加は不要、生成物は手編集しない。
-- sqlite3.c:27144のlibc版currentTimeFuncはOMIT_DATETIME時だけで今回含まれない。OMIT_LOCALTIME=1は維持する。
-- 通常current_timestamp→datetimeFunc→sqlite3StmtCurrentTime→VFS（os32_sqlite_vfs.c:655）のsys_time整数秒をsoftでJulian dayへ変換する。
+- sqlite3.cのlibc版currentTimeFuncはOMIT_DATETIME時だけで今回含まれない。OMIT_LOCALTIME=1は維持する。
+- 通常current_timestamp→datetimeFunc→sqlite3StmtCurrentTime→VFS（os32_sqlite_vfs.c）のsys_time整数秒をsoftでJulian dayへ変換する。
 - time/gmtime/gmtime_r/strftime/localtimeのlibc依存をmap/nmで禁止し、固定時刻でSQLのdate/time/julianday/strftimeを実動確認する。
-- programs.mk:419のuserland単体SQLiteはnewlib・通常x87 ABIを維持し、no-FPUでは命令エミュレータで動く。
+- programs.mkのuserland単体SQLiteはnewlib・通常x87 ABIを維持し、no-FPUでは命令エミュレータで動く。
 
 ## 4. NP21/W の BSD x87 実装を移植する
 
@@ -270,8 +270,8 @@
 |---|---|
 | kernel.elf | 既存731852byte（symbol込み）。常駐 section 増分は soft計算+emulator 約60–160KiBを仮置き |
 | sqlite.elf / sqlite.mod | 既存518780 / 396280byte。f64 subset/helper 増分20–80KiBを仮置き、重複分も数える |
-| vmkernel.lz4 | 既存337365byte、上限520192byte（boot/boot_defs.h:116）。差182827byteだが未圧縮増分とは比較しない |
-| 起動2HD FD | 1261568byte、FAT/cluster込み、tools/tests/test_packages.py:82 の空き64KiB以上 |
+| vmkernel.lz4 | 既存337365byte、上限520192byte（boot/boot_defs.h）。差182827byteだが未圧縮増分とは比較しない |
+| 起動2HD FD | 1261568byte、FAT/cluster込み、tools/tests/test_packages.py の空き64KiB以上 |
 | RAM | AppSlot の108byteは増やさない。active108byte、作業state/buffer、SoftFloat globals/stackを別計測 |
 | SQLite pool | 既存512KiB。code/work stack の追加をこの値に含めた扱いにしない |
 
@@ -591,7 +591,7 @@ C1 照合に使い、FISTTP opcode は従来どおり公開しない。B10/C3/C4
 ## 判定と #NM の段の取り込みで後の段へ送る項目 (2026-11-17、Opus レビュー)
 
 - 結線の段 (エミュレータを像にリンクする段):
-  - ver_format.c:104 の表示をリンクの旗で分ける。エミュレータを組んでいない像で FPU の無い機体は「none」と出す。組んだ像は「none(emu)」と出す。
+  - ver_format.c の表示をリンクの旗で分ける。エミュレータを組んでいない像で FPU の無い機体は「none」と出す。組んだ像は「none(emu)」と出す。
   - 変異を 3〜4 本足す。対象は次のとおり。
     - ハンドラの順 (probe より先に emulate する)
     - asm で元の segment を pop しない

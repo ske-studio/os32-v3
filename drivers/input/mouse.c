@@ -5,6 +5,7 @@
 /*  外部からは mouse_poll() で統一的にアクセスできる。                      */
 /* ======================================================================== */
 
+#include "irq_line.h"
 #include "mouse.h"
 #include "../../input/hal/in2_int.h"
 #include "kbd.h"
@@ -12,7 +13,6 @@
 #include "../char/np2sysp.h"
 #include "pc98.h"
 #include "io.h"
-#include "idt.h"
 #include "kprintf.h"
 
 /* ====================================================================== */

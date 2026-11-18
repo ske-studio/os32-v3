@@ -44,7 +44,9 @@ include build/config.mk
 ifeq ($(ARCH),x86)
 ABI_CONTRACT_ORDER := abi-contract-probe
 endif
-include build/targets/$(ARCH)-$(PLATFORM).mk
+# 製品の規則。TARGET_MK は試験が写しを差し替える時だけ与える。
+TARGET_MK ?= build/targets/$(ARCH)-$(PLATFORM).mk
+include $(TARGET_MK)
 include build/abi_contract.mk
 
 # The bootstrap remains independent; always forward its own cross directory.

@@ -7,6 +7,6 @@
 ## 落とし穴
 
 - **上書きされた区間は判定できない**: 受信順は最後のコードだけでは分からず、遅い読み手は循環リングの古い項目を失う。
-  `drivers/input/kbd_dlog.c:34` は seq を振り、`drivers/input/kbd_dlog.c:45` は残っている範囲を返す。
-  `kbdstat -w` の seq の飛びと LOST 表示を確認し、欠落区間のキー動作を推定しない (`userland/shell/kbd_watch.c:146`)。
+  `drivers/input/kbd_dlog.c` の `kbd_dlog_push()` は seq を振り、`drivers/input/kbd_dlog.c` の `kbd_dlog_copy()` は残っている範囲を返す。
+  `kbdstat -w` の seq の飛びと LOST 表示を確認し、欠落区間のキー動作を推定しない (`userland/shell/kbd_watch.c`)。
   `make check-kbd-dlog-host` が欠落表示を検査する。

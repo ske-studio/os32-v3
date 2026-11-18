@@ -6,7 +6,7 @@ int services_public = 1;
 #include "serial_diag_host.h"
 #include "types.h"
 #include "memmap.h"
-#include "tvram.h"
+#include "text_screen.h"
 #include "io.h"
 
 static u16 memory[(TVRAM_CG_WINDOW - TVRAM_CHAR_BASE) / 2 + 2];

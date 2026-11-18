@@ -15,6 +15,7 @@
 /*  この表にもう 1 枚ずつ足す (H2 / H3)。                                     */
 /* ======================================================================== */
 
+#include "pc98.h"
 #include "memmap.h"
 #include "../../../gfx/gfx_internal.h"   /* gfx.h, pc98.h, palette.h, 内部変数, _out 等 */
 #include "gfx_hal.h"

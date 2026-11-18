@@ -15,11 +15,11 @@ T9 (sh.bin = 常駐シェルの CPL=3 ビルド) の実装レビュー (Codex、
 - 入れ子 glob (`source /tmp/s*.sh` の内側で glob) の解放一覧が共有され解放漏れ / 二重 free 診断。
 - 引用付き builtin (`"echo" a | echo b`) をパイプ事前判定が誤拒否。引用内の `|` も分割。`exec` は空白入り引数の引用を復元しない。
 - `cp -r` の収集表 64 件上限で切る (断りは出るが、途中まで写した子は残る)。
-- symlink の型が DIR 以外 FILE (`ext2_vfs.c:59`)。
-- glob の `mem_alloc` 失敗が行の失敗に伝わらない (`sh_args.inc:79`)。
+- symlink の型が DIR 以外 FILE (`ext2_vfs.c` の `ext2_resolve_path()`)。
+- glob の `mem_alloc` 失敗が行の失敗に伝わらない (`sh_args.inc`)。
 - `?` は照合では 1 バイトに一致するが glob の開始条件は `*` だけ。
 - `sys_ls` コールバック内の KAPI 再入 (CPL=0 で int 0x80) — **カーネル側**。`find.bin` が CPL=3 で `[Process crashed]`。sh.bin は写し取りで回避 (T9 B2)。
 - カーネル帯ポインタを CPL=3 に返す KAPI 5 本 (`vfs_devname` / `path_get_drive` / `path_get_cwd` / `db_column_text` / `db_last_error`) — **カーネル側**。`sys_getcwd` は T9 R1 で `ring3_user_str` の写しに。
-- `losetup` 後の退場で loop スロットが回収済み FD を保持 (`drivers/block/loop_dev.c:928`) — **カーネル側**。sh.bin では `losetup` / `dd loN` を cui only に。
-- ファイル名補完が 126B で名前を切る (`ui.c:210`)。
-- シェルの `ls` (`userland/shell/cmd_dir.c:43`) は `sys_ls` の戻り値を見ないので、列挙途中の I/O 失敗 (S3I2-K で FAT が負を返すようになった後も) を表示できない — **シェル側** (2026-09-14、TASK_S3I2 §4-7)。
+- `losetup` 後の退場で loop スロットが回収済み FD を保持 (`drivers/block/loop_dev.c`) — **カーネル側**。sh.bin では `losetup` / `dd loN` を cui only に。
+- ファイル名補完が 126B で名前を切る (`ui.c` の `file_comp_cb()`)。
+- シェルの `ls` (`userland/shell/cmd_dir.c`) は `sys_ls` の戻り値を見ないので、列挙途中の I/O 失敗 (S3I2-K で FAT が負を返すようになった後も) を表示できない — **シェル側** (2026-09-14、TASK_S3I2 §4-7)。

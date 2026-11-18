@@ -14,7 +14,8 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 MIRRORS = {
-    "memmap_defs.inc": "include/memmap.h",
+    # 起動の番地は機種のヘッダ、KIB・MEM_1MB・KERNEL_LOAD_ADDR はそれが読む include/memmap.h。
+    "memmap_defs.inc": "platform/pc98/platform_boot_layout.h",
     "pc98_defs.inc": "include/pc98.h",
     "gdt_defs.inc": "arch/x86/kernel/gdt.h",
     "hex_defs.inc": "lib/kstring.h",
@@ -62,7 +63,7 @@ def main():
                             ld_text, re.M)
         assert address, "loader.ld must name its load address"
         assert re.search(r'\.\s*=\s*MEM_LOADER_START;', ld_text)
-        check_c("include/memmap.h", [("MEM_LOADER_START",
+        check_c("platform/pc98/platform_boot_layout.h", [("MEM_LOADER_START",
                                          int(address[1], 16))])
         # Local wire-format/policy constants also get independent fixed values.
         local = {

@@ -3,7 +3,7 @@
 #include "ring3_str.h"
 #include "ring3_ls.h"
 #include "paging.h"
-#include "exec_cache.h"
+#include "arch_exec_cache.h"
 
 STATIC_ASSERT(KAPI_STUB_SIZE == 8u, ppc_syscall_stub_size);
 STATIC_ASSERT(RING3_LS_SHIM_CAP >= 16, ppc_syscall_shim_size);

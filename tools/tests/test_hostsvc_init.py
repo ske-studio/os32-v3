@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """I1 resident SFS boot wiring, borrowed lifetime and common peer (ILP32)."""
 CHECK = dict(name='hostsvc-init', tier=1, needs=[], budget=3.9, covers=[
-    'init/kernel.c', 'init/kernel_boot_memory.inc', 'init/sysconfig.h', 'init/boot_platform.h',
+    'platform/pc98/kernel.c', 'platform/pc98/kernel_boot_memory.inc', 'init/sysconfig.h', 'platform/pc98/boot_platform.h',
     'include/config.h', 'include/types.h', 'include/kprintf.h', 'include/net_eth.h',
     'fs/serialfs/serialfs.h', 'fs/serialfs/sfs_lan.h', 'fs/serialfs/sfs_lan.c',
     'fs/serialfs/sfs_client.h', 'fs/serialfs/sfs_proto.h', 'fs/vfs.h',
@@ -9,7 +9,7 @@ CHECK = dict(name='hostsvc-init', tier=1, needs=[], budget=3.9, covers=[
     'sdk/include/os32/os32_host_notice.h', 'mm/kmalloc.h', 'lib/kstring.h', 'sdk/include/os32/os32_kapi_shared.h',
     'tools/tests/hostsvc_init_host.c', 'tools/tests/host32.py',
     'tools/tests/kernel_includes.py', 'build/config.mk'],
-    basis=['NET_HOSTSVC_DESIGN §3'],
+    basis=['docs/design/fs/serialfs/serialfs_persistent.md 何をするか'],
     pins=['LAN_BULK_DESIGN'],
 )
 import os
@@ -46,7 +46,7 @@ def build_run(work, source):
         str(ROOT / 'tools/tests/hostsvc_init_host.c'), str(work / 'lan.c'), str(ROOT / 'net/host_mailbox.c'), '-o', str(exe)], check=True)
     return [host32.run([str(exe)], input=bytes([m]), capture_output=True).returncode for m in range(10)]
 def main():
-    source = (ROOT / 'init/kernel_boot_memory.inc').read_text().split('static void kernel_boot_memory(')[0]
+    source = (ROOT / 'platform/pc98/kernel_boot_memory.inc').read_text().split('static void kernel_boot_memory(')[0]
     with tempfile.TemporaryDirectory(prefix='hostsvc-init-') as td:
         work=Path(td)
         (work / 'io.h').write_text('static inline unsigned int irq_save(void) { return 0; }\n'

@@ -13,18 +13,18 @@ sys.path[:0] = [str(ROOT/'tools/ppc'), str(ROOT/'tools')]
 import kboot_run as meter
 
 CHECK = dict(name='ppc-tx0', tier=1, budget=10,
-    covers=['tools/tests/test_ppc_tx0.py', 'tools/ppc/**', 'tools/*.py', 'build/ppc-kboot.mk',
+    covers=['tools/tests/test_ppc_tx0.py', 'tools/ppc/**', 'tools/*.py', 'build/targets/ppc-powermac.mk',
             'build/*.mk', 'build/*.json'],
     basis=['PPC_P5_REST_DESIGN §3 TX0・§5'])
 
 
 def exercise(work, mutate):
-    original = (ROOT/'build/ppc-kboot.mk').read_text()
+    original = (ROOT/'build/images/ppc-flags.mk').read_text()
     def selection(source):
         mk = work/'default.mk'; mk.write_text(source)
         rule = 'selection:;@echo $(KBOOT_LINK) $(KB_OUT)'
         for flags, suffix in [([], 'link'), (['KBOOT_SH=1'], 'link-sh')]:
-            result = subprocess.check_output(['make', '-s', '-f', str(mk), *flags,
+            result = subprocess.check_output(['make', '-s', 'ARCH=ppc', 'PLATFORM=powermac', 'PPC_FLAGS_MK='+str(mk), *flags,
                 '--eval='+rule, 'selection'], cwd=ROOT, text=True).strip()
             assert result == '1 build/out/ppc-kboot/'+suffix, result
     selection(original)

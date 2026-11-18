@@ -8,7 +8,7 @@
 /* PIT_MODE is defined in pc98.h. */
 
 /* システムクロックは機種で 2 通り (1.9968MHz / 2.4576MHz)。**決め打ちしない** */
-/* — 判定は kernel/time/sysclk.c、分周の算数は platform/pc98/pit_math.c。               */
+/* — 判定は platform/pc98/sysclk.c、分周の算数は platform/pc98/pit_math.c。               */
 /* 直す前はここに PIT_CLOCK = 1996800 があり、2.4576MHz 系では 100Hz のつもり */
 /* の tick が 123Hz (8.125ms) になっていた (docs/POLICY_DEBUG.md#4-54-pit-の実時間)。    */
 

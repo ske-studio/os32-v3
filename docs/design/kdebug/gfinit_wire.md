@@ -16,7 +16,7 @@ private な `kdebug/gfinit_wire.h` を shell (`cmd_gfinit.c`) が直接読み、
 
 ## GF6200_S7_SHELL
 
-- `userland/shell/cmd_recover.c:5,52` と `kdebug/recover_wire.h:3` がprivate wire＋既存kdebug_callの先例。導入版78・slot253を使い、KAPIは変えない。
+- `userland/shell/cmd_recover.c` と `kdebug/recover_wire.h` がprivate wire＋既存kdebug_callの先例。導入版78・slot253を使い、KAPIは変えない。
 
 ## 2 wire とコマンド
 

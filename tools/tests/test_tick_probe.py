@@ -1,9 +1,9 @@
 """A1 real aggregation and boot call boundary, ILP32/qemu, runtime mutants."""
 CHECK = dict(name='tick-probe-host', tier=4, needs=[], budget=5,
     covers=['kernel/time/tick_probe.c', 'kernel/time/tick_probe.h',
-            'net/link_platform.h', 'platform/pc98/link_platform_inline.h', 'platform/pc98/link_platform.c', 'net/link.c', 'net/nic.c', 'drivers/net/ne2000/ne2000.c',
+            'net/link_platform.h', 'platform/pc98/platform_link_inline.h', 'platform/pc98/link_platform.c', 'net/link.c', 'net/nic.c', 'drivers/net/ne2000/ne2000.c',
             'drivers/net/ne2000/ne2000_data.inc',
-            'init/kernel.c', 'tools/tests/tick_probe_host.c',
+            'platform/pc98/kernel.c', 'tools/tests/tick_probe_host.c',
             'arch/x86/kernel/isr_stub.asm', 'kernel/irq/tick.c',
             'arch/x86/arch_io.h', 'kdebug/tick_probe.c',
             'userland/diag/tickprobe.c', 'build/kernel.mk',
@@ -25,7 +25,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def main():
     original = (ROOT / 'kernel/time/tick_probe.c').read_text()
-    kernel = (ROOT / 'init/kernel.c').read_text()
+    kernel = (ROOT / 'platform/pc98/kernel.c').read_text()
     begin = kernel.index('#ifdef TICK_PROBE\n    tick_probe_boot();')
     end = kernel.index('#endif', kernel.index('    tick_probe_splash(0);', begin))
     boundary = kernel[begin:end + len('#endif')] + '\n'

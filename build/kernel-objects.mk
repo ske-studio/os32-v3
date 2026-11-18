@@ -1,10 +1,3 @@
-ifeq ($(PLATFORM),pc98)
-C_KERNEL += platform/pc98/tsc_math.c platform/pc98/tsc_clock.c
-endif
-# T2 finite receive executor (PC-98 NIC path only).
-ifeq ($(ARCH),x86)
-C_KERNEL += net/rx_work.c
-endif
 # Shared kernel object derivation and path-specific compiler flags.
 C_KERNEL_OBJ = $(addprefix $(KERNEL_OBJ_PREFIX),$(C_KERNEL:.c=.o))
 ASM_KERNEL_OBJ = $(addprefix $(KERNEL_OBJ_PREFIX),$(ASM_KERNEL:.asm=.o) $(ASM_EXTRA_OBJ))
@@ -37,7 +30,7 @@ $(BUILD_OUT)/config/df-guard.flags $(BUILD_OUT)/config/lgy98.flags $(BUILD_OUT)/
 	@if cmp -s $@.tmp $@; then rm -f $@.tmp; else mv $@.tmp $@; fi
 
 # Resident debug loader and validator: preserve the source-adjacent flags.
-$(addprefix $(KERNEL_OBJ_PREFIX),kernel/module/module.o kernel/module/module_image.o kernel/module/module_runtime.o): private KERNEL_CFLAGS += -Os
+$(addprefix $(KERNEL_OBJ_PREFIX),kdebug/kdebug_module.o kernel/module/module_image.o kernel/module/module_runtime.o): private KERNEL_CFLAGS += -Os
 
 # 常駐 shell の内部入口 (T7b-b2、exec/shell_service.c)。wrapper は
 # __builtin_return_address(0) で呼び手を確かめるので、このファイルだけ
@@ -60,7 +53,7 @@ $(R1_OBJ)/%.o: %.c | $(ABI_CONTRACT_ORDER)
 	$(CC) $(CFLAGS_BASE) $(if $(filter $<,$(R1_SMALL)),-Os) -DOS32_R1_FIXTURE $(if $(filter fs/fat/fatfs/%,$<),$(INC_FATFS),$(INC_KERNEL)) -c $< -o $@
 
 # Preserve NASM's STT_FILE identity across H2's source move, including R1.
-legacy_asm_input = $(subst /arch/x86/legacy/v86_entry,/kernel/v86/v86_entry,$(1))
+legacy_asm_input = $(subst /platform/pc98/legacy/v86_entry,/kernel/v86/v86_entry,$(1))
 
 $(R1_OBJ)/%.o: %.asm sdk/crt/generations.inc arch/x86/kernel/cpu_flags.inc arch/x86/kernel/entry_layout.inc arch/x86/kernel/iret_user.inc
 	@mkdir -p $(@D) $(dir $(call legacy_asm_input,$@.asm))
@@ -114,7 +107,7 @@ $(addprefix $(KERNEL_OBJ_PREFIX),$(filter exec/%.o kapi/%.o,$(C_KERNEL:.c=.o))):
 $(KERNEL_OBJ_PREFIX)drivers/net/ne2000/lgy98.o: $(BUILD_OUT)/config/lgy98.flags
 $(KERNEL_OBJ_PREFIX)kapi/kapi_sys.o: $(BUILD_OUT)/config/source-date.flags
 $(KERNEL_OBJ_PREFIX)fs/fat/fatfs/ff.o: fs/fat/fatfs/ffconf.h fs/fat/fatfs/string.h
-$(KERNEL_OBJ_PREFIX)fs/fat/fatfs/diskio.o: fs/fat/fatfs/ff.h fs/fat/fatfs/diskio.h
+$(KERNEL_OBJ_PREFIX)drivers/block/fat_diskio.o: fs/fat/fatfs/ff.h fs/fat/fatfs/diskio.h
 
 $(addprefix $(KERNEL_OBJ_PREFIX),$(ASM_KERNEL:.asm=.o)): $(KERNEL_OBJ_PREFIX)%.o: %.asm sdk/crt/generations.inc arch/x86/kernel/cpu_flags.inc arch/x86/kernel/entry_layout.inc arch/x86/kernel/iret_user.inc
 	@mkdir -p $(@D) $(dir $(call legacy_asm_input,$(BUILD_OUT)/asm/$<))
@@ -150,7 +143,7 @@ $(file >$(TARGET_STAMP),$(ARCH)-$(PLATFORM))
 endif
 
 SELECTION_STAMP = $(BUILD_OUT)/config/selection.flags
-$(SELECTION_STAMP): private BUILD_OPTION = $(ARCH)-$(PLATFORM) $(CC) $(KERNEL_CFLAGS) $(foreach feature,$(KNOWN_FEATURE_VARIABLES),$(feature)=$($(feature)))
+$(SELECTION_STAMP): private BUILD_OPTION = $(ARCH)-$(PLATFORM) IMAGE=$(IMAGE) $(CC) $(KERNEL_CFLAGS) $(foreach feature,$(KNOWN_FEATURE_VARIABLES),$(feature)=$($(feature)))
 $(SELECTION_STAMP): .FORCE
 	@mkdir -p $(@D)
 	@printf '%s\n' '$(BUILD_OPTION)' > $@.tmp

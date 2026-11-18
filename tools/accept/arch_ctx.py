@@ -141,9 +141,8 @@ def image(work, mutation):
     elf = build(work/'image', *opts)
     changes = {
         'dec-rearm': ('arch/ppc/kernel_dec.c', '    ppc_write_dec((u32)remaining);', '    extern volatile u32 ctx_started;\n    if (!ctx_started) ppc_write_dec((u32)remaining);'),
-        # sys_halt waits through the common idle_wait_step (ba489ef3).
-        'halt-ee': ('kernel/sys.c', '    idle_wait_step();',
-                    '    _disable();\n    idle_wait_step();'),
+        'halt-ee': ('kernel/idle_work.c', '    idle_work_run();\n    if (!net_rx_recent(NET_RX_ACTIVE_MS)) _idle();',
+                    '    idle_work_run();\n    if (!net_rx_recent(NET_RX_ACTIVE_MS)) { _disable(); for (;;) _halt(); }'),
         'resume-result': ('exec/exec.c', '#include "exec_schedule.inc"', None),
     }
     if mutation in changes:
