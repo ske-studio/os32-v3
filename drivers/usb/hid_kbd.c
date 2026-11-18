@@ -33,6 +33,7 @@ static void kbd_done(struct usb_xfer *x)
                 s->prev[i] = now[i];
             }
         }
+        usbp_input_usage_commit(s->boot.iface->src);
         if (s->repeat != 0xffff && !now[s->repeat]) s->repeat = 0xffff;
     }
 restart:

@@ -48,15 +48,19 @@ def check(mutate):
             assert result.returncode == 0, result.returncode
             print('HID runtime OK', swap)
         platform = (ROOT/'platform/powermac/usb_platform.c').read_text()
-        adapter = platform[platform.index('void usbp_input_usage('):
+        adapter = platform[platform.index('static u8 usage_held'):platform.index('static u32 tb_frequency')]
+        adapter += platform[platform.index('void usbp_input_usage('):
                            platform.index('void usbp_input_mouse(')]
         adapter += platform[platform.index('void usbp_input_release('):
                             platform.index('void usbp_log(')]
         variants = [('GREEN', adapter)]
         if mutate:
-            anchor = 'if (--refs[sc] == 0)'
+            anchor = 'if (i == n) {'
             assert adapter.count(anchor) == 1
-            variants.append(('alias premature break', adapter.replace(anchor, 'if (--refs[sc] < 256)')))
+            variants.append(('duplicate change', adapter.replace(anchor, 'if (i <= n) {')))
+            anchor = 'usbp_input_key(src, sc, down);'
+            assert adapter.count(anchor) == 1
+            variants.append(('missing commit notification', adapter.replace(anchor, '(void)down;')))
         for name, content in variants:
             (tmp/'adapter.inc').write_text(content)
             subprocess.run(['gcc', '-m32', *bare, *flags, '-I'+str(tmp),
@@ -68,8 +72,9 @@ def check(mutate):
             print(name, 'adapter runtime rc=', result.returncode)
         if mutate:
             mutations = [
+                ('drivers/usb/hid_kbd.c', 'usbp_input_usage_commit(s->boot.iface->src);', '(void)s;'),
                 ('drivers/usb/hid_kbd.c', 'now[i] && !hid_kbd_norepeat(i)', 'now[i]'),
-                ('drivers/usb/hid_kbd.c', 'if (hid_kbd_order(i) != order) continue;', 'if (order != 0) continue;'),
+                ('drivers/usb/hid_kbd.c', 'if (hid_kbd_order(i) != order) continue;', 'if (hid_kbd_order(i) != (order == 0 ? 0 : 3 - order)) continue;'),
                 ('drivers/usb/hid_boot.h', 'b->x.short_ok = 1;', 'b->x.short_ok = 0;'),
                 ('drivers/usb/hid_kbd_map.c', 'return hid_jp_backend.compat_sc[usage];',
                  'return usage == 0x47 ? 0x46 : hid_jp_backend.compat_sc[usage];'),

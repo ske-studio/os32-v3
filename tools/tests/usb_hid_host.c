@@ -37,7 +37,7 @@ u8 hid_kbd_order(u8 usage);
 #define REQUIRE(c) do { if (!(c)) return __LINE__; } while (0)
 struct event { int kind, src, a, b, c; };
 static struct event events[128];
-static unsigned ne, frees, stops, starts, cancelled;
+static unsigned ne, frees, stops, starts, cancelled, commits;
 static u32 clock_ms;
 static struct usb_ctrl_req req;
 static int pending, fail_setup, fail_start;
@@ -52,6 +52,7 @@ void *usbp_mem_alloc(u32 n) { return calloc(1, n); }
 void usbp_mem_free(void *p) { ++frees; free(p); }
 int usbp_input_src_alloc(int kind) { return kind + 1; }
 void usbp_input_usage(u8 src, u8 sc, int down) { record(0, src, sc, down, 0); }
+void usbp_input_usage_commit(u8 src) { (void)src; ++commits; }
 void usbp_input_usage_repeat(u8 src, u8 sc) { record(1, src, sc, 0, 0); }
 void usbp_input_mouse(u8 src, i16 dx, i16 dy, u8 b) { record(2, src, dx, dy, b); }
 void usbp_input_release(int kind, u8 src) { record(3, src, kind, 0, 0); }
@@ -89,7 +90,14 @@ static void report(unsigned iface, const u8 *r, unsigned n, int error)
     memcpy(x->buf.va,r,n); x->actual=n; x->error=error;
     if (error == USB_X_OK && n < x->len)
         x->error = x->short_ok ? USB_X_SHORT : USB_X_SHORT_NG;
+    unsigned before = commits;
     x->done(x);
+    if (iface == 0 && error == USB_X_OK && n >= 8) {
+        int valid = 1;
+        for (unsigned i = 2; i < 8; ++i)
+            if (r[i] >= 1 && r[i] <= 3) valid = 0;
+        if (commits != before + valid) abort();
+    }
 }
 static u8 cfg[] = {
     9,2,41,0,2,1,0,0x80,50,

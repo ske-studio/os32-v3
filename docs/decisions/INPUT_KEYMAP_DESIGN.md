@@ -550,6 +550,6 @@ PM決定 (2026-11-17): S0aは`km_source_release`の空inlineを維持し、別�
 
 ## S2u・S1m・S2a の取り込みで S2m へ送る項目 (2026-11-18、Opus レビュー、どれも P3)
 
-- tools/tests/test_usb_hid.py: 今の順の変異は群 0 以外を全部捨てる形。受入の表の「lock 後回し」に合わせ、群 1 と群 2 を入れ替える変異を 1 本足す。
-- tools/tests/usb_usage_adapter_host.c: `usage_held`・`usage_refs` の宣言を試験の側で書き直している。切り出しの範囲に usb_platform.c の static の宣言 2 行も含め、製品の宣言に追従させる。
+- tools/tests/test_usb_hid.py: 順の変異はこの段で修正済み。修飾の群を先頭に保ち、lock と通常の群を入れ替える。
+- tools/tests/usb_usage_adapter_host.c: static 宣言を製品から切り出す形にこの段で修正済み。
 - input_keymap_backend.c は C_PLATFORM_USB 側に置いた。USERSHELL=1 で USB=0 の像を作るときは、backend の置き場を USERSHELL 側に移す (今はその像が無い)。

@@ -23,6 +23,8 @@ static u8 used[PM_USB_DMA_BYTES / PM_USB_PAGE];
 static u8 sources[2];
 static u8 usage_held[4][256];
 static u16 usage_refs[4][128];
+static struct { u8 sc, before; } usage_changes[4][128];
+static u8 usage_change_count[4];
 static u32 tb_frequency;
 static struct { u32 bdf, va; int used; } maps[PM_USB_CONTROLLERS];
 void ppc_dcbf_line(void *);
@@ -178,11 +180,28 @@ void usbp_input_usage(u8 src, u8 usage, int down)
     if (!!held[usage] == !!down) return;
     held[usage] = !!down;
     if (sc >= 128) return;
-    if (down) {
-        if (refs[sc]++ == 0) usbp_input_key(src, sc, 1);
-    } else {
-        if (--refs[sc] == 0) usbp_input_key(src, sc, 0);
+    u8 n = usage_change_count[src - 1];
+    unsigned i;
+    for (i = 0; i < n; ++i)
+        if (usage_changes[src - 1][i].sc == sc) break;
+    if (i == n) {
+        usage_changes[src - 1][n].sc = sc;
+        usage_changes[src - 1][n].before = refs[sc] != 0;
+        ++usage_change_count[src - 1];
     }
+    if (down) ++refs[sc];
+    else --refs[sc];
+}
+void usbp_input_usage_commit(u8 src)
+{
+    if (src < 1 || src > 4) return;
+    for (unsigned i = 0; i < usage_change_count[src - 1]; ++i) {
+        u8 sc = usage_changes[src - 1][i].sc;
+        int down = usage_refs[src - 1][sc] != 0;
+        if (down != usage_changes[src - 1][i].before)
+            usbp_input_key(src, sc, down);
+    }
+    usage_change_count[src - 1] = 0;
 }
 void usbp_input_usage_repeat(u8 src, u8 usage)
 {
@@ -197,6 +216,7 @@ void usbp_input_release(int kind, u8 src)
     if (kind == 0) {
         pm_input_usb_release(src);
         if (src >= 1 && src <= 4) {
+            usage_change_count[src - 1] = 0;
             for (unsigned i = 0; i < 256; ++i) usage_held[src - 1][i] = 0;
             for (unsigned i = 0; i < 128; ++i) usage_refs[src - 1][i] = 0;
         }

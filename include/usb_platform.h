@@ -45,6 +45,7 @@ enum { USBP_INPUT_KBD, USBP_INPUT_MOUSE };
 /* Input calls require IF=0. Sources 1..4; exhausted allocation returns <0. */
 int usbp_input_src_alloc(int kind);
 void usbp_input_usage(u8 src, u8 usage, int down);
+void usbp_input_usage_commit(u8 src);
 void usbp_input_usage_repeat(u8 src, u8 usage);
 void usbp_input_key(u8 src, u8 sc, int down);
 void usbp_input_key_repeat(u8 src, u8 sc);

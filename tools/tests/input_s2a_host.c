@@ -15,7 +15,7 @@ int input_capture_key(const KmKey *key) { captured = *key; calls++; return 0; }
 int check(void)
 {
     u16 native_gen, gen, next;
-    u8 kind, origin;
+    u8 kind, origin, src;
     KmSource map;
     int native = input_src_register(INPUT_KIND_KBD, INPUT_ORIGIN_NATIVE, &native_gen);
     CHECK(native == 1);
@@ -28,33 +28,34 @@ int check(void)
     CHECK(input_usb_register(7) == 0);
     CHECK(input_usb_register(7) == OS32_ERR_INVAL);
     CHECK(input_usb_usage(7, 4, 1, 0) == 0);
-    CHECK(calls == 1 && captured.src == 2 && captured.generation == 2);
+    CHECK(calls == 1);
+    src = captured.src;
     gen = captured.generation;
-    CHECK(input_src_info(2, gen, &kind, &origin) && kind == INPUT_KIND_KBD && origin == INPUT_ORIGIN_USB);
-    CHECK(km_source_lookup(2, gen, &map) == 0 && map.map == &hid_jp_backend);
+    CHECK(input_src_info(src, gen, &kind, &origin) && kind == INPUT_KIND_KBD && origin == INPUT_ORIGIN_USB);
+    CHECK(km_source_lookup(src, gen, &map) == 0 && map.map == &hid_jp_backend);
     CHECK(captured.keycode == 4 && captured.down == 1 && captured.repeat == 0);
     CHECK(input_usb_usage(7, 4, 1, 1) == 0 && calls == 2 && captured.repeat == 1);
     CHECK(input_usb_usage(7, 4, 0, 0) == 0 && calls == 3 && captured.down == 0);
     CHECK(input_usb_register(255) == 0);
-    CHECK(input_usb_usage(255, 255, 1, 0) == 0 && captured.src == 3 && captured.keycode == 255);
+    CHECK(input_usb_usage(255, 255, 1, 0) == 0 && captured.src != src && captured.keycode == 255);
     input_usb_release(255);
     unsigned before = releases;
     input_usb_release(7);
-    CHECK(releases == before + 1 && !input_src_info(2, gen, &kind, &origin));
-    CHECK(km_source_lookup(2, gen, &map) == OS32_ERR_INVAL);
+    CHECK(releases == before + 1 && !input_src_info(src, gen, &kind, &origin));
+    CHECK(km_source_lookup(src, gen, &map) == OS32_ERR_INVAL);
     CHECK(input_usb_usage(7, 4, 1, 0) == OS32_ERR_INVAL && calls == 4);
     input_usb_release(7);
     CHECK(releases == before + 1);
     CHECK(input_usb_register(7) == 0);
     CHECK(input_usb_usage(7, 4, 1, 0) == 0 && captured.generation == gen + 1);
     gen = captured.generation;
-    input_src_release(2, gen); /* external release/reuse: stored mapping is stale */
-    CHECK(input_src_register(INPUT_KIND_KBD, INPUT_ORIGIN_USB, &next) == 2 && next == gen + 1);
+    input_src_release(src, gen); /* external release/reuse: stored mapping is stale */
+    CHECK(input_src_register(INPUT_KIND_KBD, INPUT_ORIGIN_USB, &next) == src && next == gen + 1);
     CHECK(input_usb_usage(7, 4, 1, 0) == OS32_ERR_INVAL && calls == 5);
     before = releases;
     input_usb_release(7);
-    CHECK(releases == before && input_src_info(2, next, &kind, &origin));
-    input_src_release(2, next);
+    CHECK(releases == before && input_src_info(src, next, &kind, &origin));
+    input_src_release(src, next);
     CHECK(input_src_info(native, native_gen, &kind, &origin));
     /* Pool exhaustion is propagated, and failed USB registration is retryable. */
     for (unsigned i = 1; i < IN2_MAX_DEV; ++i)

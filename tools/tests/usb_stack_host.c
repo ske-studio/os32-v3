@@ -34,6 +34,7 @@ void usbp_input_usage(u8 src, u8 sc, int down)
     if (!irq_depth || keys >= 32) { bad_dma=1; return; }
     key_src[keys]=src; key_sc[keys]=sc; key_down[keys++]=(u8)down;
 }
+void usbp_input_usage_commit(u8 src) { (void)src; }
 void usbp_input_usage_repeat(u8 src, u8 sc) { (void)src; (void)sc; }
 void usbp_input_mouse(u8 src, i16 dx, i16 dy, u8 b)
 { (void)src; (void)b; ++mice; mouse_dx=dx; mouse_dy=dy; }
