@@ -110,6 +110,7 @@ KAPI の出力先に渡した場合は `ring3_user_ranges_writable` が拒否し
 
 SHM の先頭 1 ブロック (16KB) は DB 結果・エラー文用、末尾 4 ブロックは GUI 用に固定予約する。
 `shm_alloc` が配るのは残り 9 ブロックで、解放・所有者回収・全回収でも固定予約を維持する。
+PowerMac のシェル付きイメージも同じ `mm/shm.c` を `sys_shm_alloc`・`sys_shm_lock`・`sys_shm_free` に結線し、アプリ終了時にその所有者のブロックを回収する。
 
 通常の AS map/unmap は私有 PT だけを操作し、共有 PT に掛かる要求は無変更で拒否する。
 lease (0xF0000000〜 の私有窓、契約は [lease](design/exec/lease.md)、API は [KAPI_SPEC.md](KAPI_SPEC.md) の surface 系) と map の固定表は AS ごとに lease `MEM_LEASE_MAX` (8) 本・extent `APPMEM_EXTENT_MAX` (32) 本で、実行中に増やさない。静的リンクの libos32gfx と libos32gui.shlib の中の libos32gfx は別の実体なので、両方で描く GUI アプリは CLIENT lease を 2 本使う (8 本の内数)。

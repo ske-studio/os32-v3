@@ -83,6 +83,9 @@ input_trygetchar_local
 input_trygetkey
 input_trygetrawkey
 kapi_sys_exit
+shm_alloc
+shm_free
+shm_lock
 kbd_inject
 kbd_inject_pending
 kmalloc_free
@@ -188,9 +191,9 @@ def generate(tmp, mutation=None):
 def main():
     entries = [x for x in json.loads((ROOT / 'sdk/kapi.json').read_text())['api']
                if x['name'] in ABSENT_PROVIDER_SLOTS]
-    assert len(entries) == 189
+    assert len(entries) == 186
     assert {'buz_on', 'buz_off', 'rtc_read'} <= ABSENT_PROVIDER_SLOTS
-    assert 'sys_reboot' not in ABSENT_PROVIDER_SLOTS
+    assert not {'sys_reboot', 'sys_shm_alloc', 'sys_shm_lock', 'sys_shm_free'} & ABSENT_PROVIDER_SLOTS
     with tempfile.TemporaryDirectory(prefix='ppc-binding-') as directory:
         tmp = Path(directory)
         (tmp / 'normal').mkdir()
@@ -216,8 +219,9 @@ def main():
         nm = cc.with_name('powerpc-elf-nm')
         undefined = {line.split()[-1] for line in subprocess.check_output(
             [str(nm), '-u', str(tmp / 'kapi.o')], text=True).splitlines()}
-        if 'sys_reboot' not in undefined:
-            print('missing sys_reboot provider'); return 1
+        missing = {'sys_reboot', 'shm_alloc', 'shm_free', 'shm_lock'} - undefined
+        if missing:
+            print('missing providers:', sorted(missing)); return 1
         unexpected = undefined - ALLOWED_UNDEFINED
         if unexpected:
             print('unexpected providers:', sorted(unexpected)); return 1
