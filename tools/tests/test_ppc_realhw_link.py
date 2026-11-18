@@ -188,28 +188,51 @@ def main():
                 return saved['rsh'][len(self.lines)-1]['result']
             def close(self):
                 pass
-        client = Client()
         image = tmp/'image'
         image.write_bytes(b'fixture deployed image')
-        args = SimpleNamespace(iface='fake0', case='nest', out=tmp/'run', image=image,
-                               machine='fixture OF/PVR', peer=PEER, seconds=.01,
-                               command='', expected='', list_frames=False, camera_frame=[])
-        def monotonic():
-            if client.transport.events or len(client.lines) < len(saved['rsh']):
-                return 0.0
-            return 2 * args.seconds
 
-        with patch.object(rh, 'PassivePacket', return_value=FakePacket()), \
-                patch.object(rh, 'Capture', FakeCapture), \
-                patch.object(rh, 'LinkHost', return_value=client), \
-                patch.object(rh.select, 'select', return_value=([], [], [])), \
-                patch.object(rh, 'time', SimpleNamespace(
-                    monotonic=monotonic, time=iter((100, 104)).__next__)):
-            assert rh.link_main(args) == 0
-        assert client.lines == ['/bin/nest.bin', 'echo $?']
-        assert json.loads((args.out/'result.json').read_text())['pass']
-        stored = json.loads((args.out/'link-evidence.json').read_text())
-        assert len(stored['logs']) == 2 and len(stored['rsh']) == 2
+        def collect(out):
+            client = Client()
+            args = SimpleNamespace(iface='fake0', case='nest', out=out, image=image,
+                                   machine='fixture OF/PVR', peer=PEER, seconds=.01,
+                                   command='', expected='', list_frames=False, camera_frame=[])
+            # Allow the deadline setup, four loop checks (two logs and two
+            # commands), and two send timeouts before forcing expiry.
+            clock_reads = 0
+
+            def monotonic():
+                nonlocal clock_reads
+                clock_reads += 1
+                pending = client.transport.events or len(client.lines) < len(saved['rsh'])
+                if pending and clock_reads <= 7:
+                    return 0.0
+                return 2 * args.seconds
+
+            with patch.object(rh, 'PassivePacket', return_value=FakePacket()), \
+                    patch.object(rh, 'Capture', FakeCapture), \
+                    patch.object(rh, 'LinkHost', return_value=client), \
+                    patch.object(rh.select, 'select', return_value=([], [], [])), \
+                    patch.object(rh, 'time', SimpleNamespace(
+                        monotonic=monotonic, time=iter((100, 104)).__next__)):
+                status = rh.link_main(args)
+            assert client.lines == ['/bin/nest.bin', 'echo $?'], client.lines
+            assert status == 0
+            assert json.loads((out/'result.json').read_text())['pass']
+            stored = json.loads((out/'link-evidence.json').read_text())
+            assert len(stored['logs']) == 2 and len(stored['rsh']) == 2
+
+        collect(tmp/'run')
+        if '--mutate' in sys.argv:
+            link_script = rh.link_script
+            with patch.object(rh, 'link_script',
+                              side_effect=lambda *args: link_script(*args)[:1]):
+                try:
+                    collect(tmp/'missing-second-command')
+                except AssertionError as exc:
+                    assert exc.args == (['/bin/nest.bin'],)
+                    print('RED missing-second-command: '+str(exc))
+                else:
+                    raise AssertionError('missing-second-command survived')
         # Opening AF_PACKET is replaced; assert ETH_P_ALL and no send surface.
         class Socket:
             def bind(self, address):
