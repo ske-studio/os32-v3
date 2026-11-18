@@ -42,7 +42,7 @@ void kfree(void *p) { (void)p; }
 char kprintf_spec(const char **p, int *w, int *l, char *pad) {
     (void)w; (void)l; (void)pad; return **p;
 }
-void kvprintf(u8 attr, const char *fmt, const u32 *args) {
+void console_vprintf(u8 attr, const char *fmt, const u32 *args) {
     const char *s = (const char *)(uptr)args[0];
     rendered = attr == 7 && fmt[0] == '%' && fmt[1] == 's' &&
                s[0] == 'o' && s[1] == 'k' && !s[2];
