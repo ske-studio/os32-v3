@@ -18,7 +18,8 @@ gh run list --branch <枝> --limit 4 --json name,event,status,headSha -q '.[] | 
 | 状態 | 理由 | 直し方 |
 |---|---|---|
 | 1 本も無い | コミットの本文に CI を飛ばす印 (角括弧つきの skip ci) の文字列がある。説明として書いても飛ぶ | 印を含まないコミットを足す (空のコミットでよい) |
-| build だけ無い | 変更が文書だけ (build.yml の paths-ignore)・空のコミット・同じ木の force-push | `gh workflow run build.yml --ref <枝>` |
+| build だけ無い | 変更が文書だけ (build.yml の paths-ignore) | 正しい。文書だけは check の success で取り込む。build は手で起こさない (ユーザー決定 2026-11-19、PARALLEL_BRANCHES §3) |
+| build だけ無い (文書以外も変えた) | 空のコミット・同じ木の force-push | `gh workflow run build.yml --ref <枝>` |
 | 古い SHA のまま | 続けて push した。古い実行は打ち切られる | 最後の SHA の行を待つ |
 
 ## 2. 待つ

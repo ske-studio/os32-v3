@@ -34,7 +34,7 @@ GitHub の CI (ユーザー決定 2026-11-05、メインストリームを含む
 
 | 何を入れたか | 検査 |
 |---|---|
-| 文書だけ (docs・票・CLAUDE.md・スキル) | その場で `CHECK_NO_NEEDS=1 make check-docs-links check-docs-orphans check-docs-status check-docs-tree check-constraints MUTATE=0` (`CHECK_NO_NEEDS=1` は宣言の前提 (`make all`) を組まない — 文書の検査は成果物を読まない。check-docs-tree は相互リンクの数を基準と比べる — リンクを足したら必ず入れる)。**新しい文書は `git add` してから検査する** — 文書の木 (tools/doc_graph.py) は `git ls-files` の .md だけを見るので、追跡されていない新しいファイルのリンクを数えない。文書だけのコミットには build が走らないので、main の CI も気づかない (2026-11-07、PowerPC の票の追加で踏んだ)。**検査が読む文書を触ったら、その検査も足す** — 例: `docs/KAPI_SPEC.md` の表 → `check-kapi-version`。どの検査が文書を読むかは `python3 tools/checks/run.py --select --files <文書>` で出す。文書だけのコミットには build が走らない (path filter) |
+| 文書だけ (docs・票・CLAUDE.md・スキル) | **枝を push して check (約 4 分) の success を読んでから main へ** (手元の検査だけで main に入れない、ユーザー決定 2026-11-19)。push の前に、その場で `CHECK_NO_NEEDS=1 make check-docs-links check-docs-orphans check-docs-status check-docs-tree check-constraints MUTATE=0` (`CHECK_NO_NEEDS=1` は宣言の前提 (`make all`) を組まない — 文書の検査は成果物を読まない。check-docs-tree は相互リンクの数を基準と比べる — リンクを足したら必ず入れる)。**新しい文書は `git add` してから検査する** — 文書の木 (tools/doc_graph.py) は `git ls-files` の .md だけを見るので、追跡されていない新しいファイルのリンクを数えない。文書だけのコミットには build が走らないので、main の CI も気づかない (2026-11-07、PowerPC の票の追加で踏んだ)。**検査が読む文書を触ったら、その検査も足す** — 例: `docs/KAPI_SPEC.md` の表 → `check-kapi-version`。どの検査が文書を読むかは `python3 tools/checks/run.py --select --files <文書>` で出す。文書だけのコミットには build が走らない (path filter) |
 | 段・小さな取り込み | 受入待ちの枝は統合の枝 `wt/int-<日付><記号>` にまとめて merge し ([ROLES §4-2](../../../docs/tasks/agents/ROLES.md#4-2-統合の枝と一括の受入-本線))、その枝を push (`git push -q origin wt/<名>`) → GitHub の check (静的) と build (artifacts: make all と配布物 / checks (0)〜(5): **6 本の合計で全部の検査、変異込み。6 本とも成功が必要**、分け方は [08_build §8-6](../../../docs/08_build.md#8-6-github-actions-での本体ビルド)) が通るのを待つ |
 
 - 取り込みの検査は GitHub の CI。CI を待つときは push した最後の SHA で (`gh run list --branch wt/<名> --commit <SHA>`)、待ちには上限を付ける。
@@ -58,7 +58,7 @@ NP21/W の受入と実機の更新は、CI の artifacts のジョブが作っ�
 - 作業木の `assets/fonts` に IPAex が無い (同意済みの main から写す、gitignore)。
 - CI だけ落ちる: CI は 32bit の試験を native で走らせる (手元は qemu)。`HOST32_RUNNERS="native qemu"` で再現する。
 - 自分が書いていない変更がコミットに紛れる: 作業木はほかのエージェントも書ける。`git add -A` の前に `git status --short` を読み、覚えの無いファイルは外して出所を確かめる (2026-11-17、`userland/tests/hw/tri_burst.hwb` の 18 行が紛れて検査が落ちた)。
-- CI が 1 本も起動しない: コミットの本文に、CI を飛ばす印 (角括弧つきの skip ci) の文字列が説明としてでも入っていると、GitHub は CI を飛ばす。印の名前を文に書く時は角括弧を付けない。変更が文書だけ・空のコミットの push では build が起動しない (`gh workflow run build.yml --ref <枝>`)。push の直後に `gh run list --branch <枝>` で起動を確かめる (2026-11-18)。
+- CI が 1 本も起動しない: コミットの本文に、CI を飛ばす印 (角括弧つきの skip ci) の文字列が説明としてでも入っていると、GitHub は CI を飛ばす。印の名前を文に書く時は角括弧を付けない。空のコミット・同じ木の force-push では build が起動しない (`gh workflow run build.yml --ref <枝>`)。変更が文書だけの時も build は起動しないが、それで正しい — 文書だけは check の success で取り込み、build は手で起こさない (ユーザー決定 2026-11-19)。push の直後に `gh run list --branch <枝>` で起動を確かめる (2026-11-18)。
 - CI の待ち: `gh run watch` を何本も裏で回さない (3 秒ごとに問い合わせて、API の上限 1 時間 5,000 回を使い切る)。`gh run list` を数分おきに 1 回。
 - 揺れる試験: 回し直し (`gh run rerun <id> --failed`) で通したら、検査の名前・落ち方・日付を `docs/tasks/DEFERRED_TESTS.md` に行で残す。同じ検査の 2 回目が出たら、直すまで行を閉じない (回し直しで通す運用を常態にしない)。
 - CI だけ落ちる (2): `.github/workflows/check.yml` は検査を**名前で直接**呼ぶ。手元の check-changed はこのファイルを見ないので、検査を消す・改名・束ねた取り込みは `grep -rn <検査名> .github` で参照が残っていないか見てから push する (2026-10-24、TT5 で消した 2 本の名前が残り CI が `No rule to make target` で落ちた)。
