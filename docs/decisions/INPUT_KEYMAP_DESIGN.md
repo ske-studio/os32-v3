@@ -547,3 +547,9 @@ PM決定 (2026-11-17): S0aは`km_source_release`の空inlineを維持し、別�
 - no_keydata の判定と、kbd_merge.c の capture_state の boot_locks の上乗せを消す変異を 1 本ずつ足す。
 - legacy_keymap.c: 静的な表が不正 (km_eval の INVAL) なら予備の経路も全キーを捨てる。今の表では起きない。S3x の段で、起動時に km_eval を 1 回試して boot.log に残すかを決める。
 - userland/gshell/src/input.rs の旧い表の写しは G 段で更新する。
+
+## S2u・S1m・S2a の取り込みで S2m へ送る項目 (2026-11-18、Opus レビュー、どれも P3)
+
+- tools/tests/test_usb_hid.py: 今の順の変異は群 0 以外を全部捨てる形。受入の表の「lock 後回し」に合わせ、群 1 と群 2 を入れ替える変異を 1 本足す。
+- tools/tests/usb_usage_adapter_host.c: `usage_held`・`usage_refs` の宣言を試験の側で書き直している。切り出しの範囲に usb_platform.c の static の宣言 2 行も含め、製品の宣言に追従させる。
+- input_keymap_backend.c は C_PLATFORM_USB 側に置いた。USERSHELL=1 で USB=0 の像を作るときは、backend の置き場を USERSHELL 側に移す (今はその像が無い)。
