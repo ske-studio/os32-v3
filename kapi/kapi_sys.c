@@ -18,7 +18,7 @@
 #include "pgalloc.h"
 #include "io.h"
 #include "kstack_hw.h"
-#include "sqlite_engine.h"
+#include "platform_build_info.h"
 #include "module.h"
 #include "ver_info.h"
 extern u32 exec_as_leftover_pages;
@@ -164,8 +164,7 @@ void kapi_sys_get_build_info(char *buf, int size)
     /* int の size を無検証で u32 に渡すと負値が巨大長に化ける */
     if (!buf || size <= 0) return;
     build_time_copy(buf, (u32)size);
-    sqlite_engine_stack_report();
-    services_report();
+    platform_build_info_report();
 }
 
 /* The generated __cdecl wrapper supplies the existing output-range check. */
