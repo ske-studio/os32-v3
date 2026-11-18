@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """N1 段 1: tools/host_agent.py v2 の TDD (TASK_N0 §3 の Agent 側項目)。
 
+配送 ACK の根拠は docs/tasks/network/LINK_PLAN.md §2-1・§4・§6
+(WINDOW の絶対値 credit、累積 ACK、未 ACK 分だけの再送)。
+
 贋 OS32 は**フレームを直接組む** (Agent の build を借りない) ので、20B ヘッダの
 直列化・op ごとの payload 長検査・sess / epoch の照合もここで踏む。
 Agent は実物 (tools/host_agent.py の HostAgent) をそのまま import し、出口だけ
@@ -1755,6 +1758,81 @@ def window_cadence_contract():
     assert window(6, ack=2) == [3]  # Cumulative ACK frees in-flight credit.
 
 
+def delivery_ack_prevents_retransmit():
+    a, o = up()
+    o.send(HA.OP_REQUEST, rid=1, payload=b"GET /pattern/512")
+    delivery = a.ledger[1]["deliver"]
+    assert not o.send(HA.OP_ACK, rid=1)
+    assert (delivery["sent"], delivery["credit"], delivery["stall"]) == (0, 0, 0)
+
+    credit = struct.pack("<H", 6)
+    out = o.send(HA.OP_WINDOW, rid=1, payload=credit)
+    assert [p["seq"] for p in out if p["op"] == HA.OP_DATA] == [1]
+    assert delivery["stall"] == 1
+    assert not o.send(HA.OP_ACK, rid=1, ack=1)
+    assert (delivery["acked"], delivery["stall"], delivery["credit"]) == (1, 0, 6)
+    for _ in range(8):
+        assert not o.send(HA.OP_WINDOW, rid=1, payload=credit)
+    assert delivery["retx"] == 0
+
+
+def delivery_ack_ignores_invalid_progress():
+    a, o = up()
+    for rid in (1, 2):
+        o.send(HA.OP_REQUEST, rid=rid, payload=b"GET /pattern/1024")
+    credit = struct.pack("<H", 6)
+    o.send(HA.OP_WINDOW, rid=1, payload=credit)
+    delivery = a.ledger[1]["deliver"]
+    for rid, flags, ack in ((1, 0, 2), (2, 0, 1), (1, HA.F_RELACK, 1), (1, 0, 0)):
+        assert not o.send(HA.OP_ACK, flags, rid=rid, ack=ack)
+        assert (delivery["acked"], delivery["stall"]) == (0, 1)
+        assert a.ledger[2]["deliver"]["acked"] == 0
+    assert not o.send(HA.OP_WINDOW, rid=1, ack=2, payload=credit)
+    assert (delivery["acked"], delivery["sent"]) == (0, 1)
+
+    # ACK opens credit, but only a subsequent WINDOW may pump more DATA.
+    assert not o.send(HA.OP_ACK, rid=1, ack=1)
+    assert (delivery["acked"], delivery["sent"], delivery["credit"]) == (1, 1, 6)
+    assert only(o.send(HA.OP_WINDOW, rid=1, payload=credit), HA.OP_DATA)["seq"] == 2
+    only(o.send(HA.OP_RELEASE, rid=1), HA.OP_ACK)
+    assert not o.send(HA.OP_ACK, rid=1, ack=2)
+    assert not o.send(HA.OP_WINDOW, rid=1, ack=2, payload=credit)
+    assert delivery["acked"] == 1 and a.ledger[1] == {"st": "RELEASED"}
+
+
+def delivery_ack_after_rewind():
+    a, o = up()
+    o.send(HA.OP_REQUEST, rid=1, payload=b"STREAM 1024 512 0")
+    credit = struct.pack("<H", 12)
+    out = o.send(HA.OP_WINDOW, rid=1, payload=credit)
+    assert [p["seq"] for p in out if p["op"] == HA.OP_DATA] == [1, 2]
+    assert not o.send(HA.OP_ACK, rid=1, ack=1)
+    delivery = a.ledger[1]["deliver"]
+    for _ in range(8):
+        assert not o.send(HA.OP_WINDOW, rid=1, ack=1, payload=b"\0\0")
+    assert (delivery["acked"], delivery["sent"]) == (1, 1)
+
+    assert not o.send(HA.OP_ACK, rid=1, ack=2)
+    assert (delivery["acked"], delivery["sent"], delivery["credit"]) == (2, 2, 0)
+    assert not o.send(HA.OP_WINDOW, rid=1, ack=1, payload=credit)
+
+
+def delivery_ack_recovers_missing_tail():
+    a, o = up()
+    o.send(HA.OP_REQUEST, rid=1, payload=b"STREAM 1024 512 2")
+    credit = struct.pack("<H", 12)
+    out = o.send(HA.OP_WINDOW, rid=1, payload=credit)
+    assert only(out, HA.OP_DATA)["seq"] == 1
+    assert only(out, HA.OP_EOF)["seq"] == 3
+    assert not o.send(HA.OP_ACK, rid=1, ack=1)
+    for _ in range(7):
+        assert not o.send(HA.OP_WINDOW, rid=1, ack=1, payload=credit)
+        assert not o.send(HA.OP_ACK, rid=1, ack=1)
+    out = o.send(HA.OP_WINDOW, rid=1, ack=1, payload=credit)
+    assert [(p["op"], p["seq"]) for p in out] == [(HA.OP_DATA, 2)]
+    assert a.ledger[1]["deliver"]["retx"] == 1
+
+
 def h5_mutations():
     global HA
     original = HA
@@ -1772,6 +1850,12 @@ def h5_mutations():
         ('elif line == "LIST" or "." in name:', 'elif line == "LIST" or "." in name:\n            self._answer(rid, ent, 404, b"", None, out)\n            return'),
         ('proc = host_linux.print_start(data, None, job["kind"] == "raw")', 'raise host_linux.ServiceUnavailable("mutant")'),
         ('proc = host_linux.clip_start("get", b"", b)', 'raise host_linux.ServiceUnavailable("mutant")'),
+        ('self._advance_delivery_ack(self.ledger.get(rid), ack)', 'pass'),
+        ('d["acked"] < ack <= d["max_sent"]', 'd["acked"] < ack'),
+        ('d["stall"] = 0\n        return True', 'return True'),
+        ('if flags == 0:\n                self._advance_delivery_ack', 'if True:\n                self._advance_delivery_ack'),
+        ('d["acked"] < ack <= d["max_sent"]', 'd["acked"] < ack <= d["sent"]'),
+        ('d["sent"] = max(d["sent"], ack)', 'pass'),
     ]
     source = (ROOT / "tools/host_agent.py").read_text()
     with tempfile.TemporaryDirectory(prefix="h5-mutants-") as directory:
@@ -1783,7 +1867,10 @@ def h5_mutations():
             HA = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(HA)
             try:
-                for case in (length_based_credit, hs_syn_candidates, h5_hello_list_and_notify, h5_named_services_and_linux_clip, h5_linux_print_lifecycle):
+                for case in (length_based_credit, hs_syn_candidates, h5_hello_list_and_notify,
+                             h5_named_services_and_linux_clip, h5_linux_print_lifecycle,
+                             delivery_ack_prevents_retransmit, delivery_ack_ignores_invalid_progress,
+                             delivery_ack_after_rewind, delivery_ack_recovers_missing_tail):
                     case()
             except AssertionError:
                 print("  RED h5 mutation %d" % index, flush=True)
@@ -1881,6 +1968,10 @@ CASES = [
     wdata_dedup_by_sess_rid_seq,
     window_gates_delivery,
     window_cadence_contract,
+    delivery_ack_prevents_retransmit,
+    delivery_ack_ignores_invalid_progress,
+    delivery_ack_after_rewind,
+    delivery_ack_recovers_missing_tail,
     time_format_is_19_bytes,
 ]
 

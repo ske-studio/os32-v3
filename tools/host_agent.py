@@ -507,6 +507,8 @@ class HostAgent:
         elif op == OP_ACK:
             self.counts["ack"] += 1
             self.note_rid(rid)
+            if flags == 0:
+                self._advance_delivery_ack(self.ledger.get(rid), ack)
         else:
             self.counts["dropped"] += 1
 
@@ -720,17 +722,26 @@ class HostAgent:
         self._reap_tombstones()
         self._ack(rid, 0, out, flags=F_RELACK)
 
-    # --------------------------------------------------------- WINDOW
+    # ---------------------------------------------------- ACK / WINDOW
+    @staticmethod
+    def _advance_delivery_ack(ent, ack):
+        if ent is None or ent["st"] != "ACTIVE" or ent["deliver"] is None:
+            return False
+        d = ent["deliver"]
+        if not d["acked"] < ack <= d["max_sent"]:
+            return False
+        d["acked"] = ack
+        d["sent"] = max(d["sent"], ack)
+        d["stall"] = 0
+        return True
+
     def _on_window(self, rid, ack, credit, out):
         ent = self.ledger.get(rid)
         self.note_rid(rid)
         if ent is None or ent["st"] != "ACTIVE" or ent["deliver"] is None:
             return
         d = ent["deliver"]
-        if ack > d["acked"]:
-            d["acked"] = ack
-            d["stall"] = 0
-        else:
+        if not self._advance_delivery_ack(ent, ack):
             d["stall"] += 1
             if d["stall"] >= 8 and d["sent"] > d["acked"]:
                 d["retx"] += d["sent"] - d["acked"]    # ack が進まない = 欠落
@@ -764,6 +775,7 @@ class HostAgent:
             body = ent["gen"](off, ln) if ent["gen"] else ent["body"][off:off + ln]
             out.send(self.build(self.peer, OP_DATA, seq=seq, rid=rid, payload=body))
             d["sent"] = seq
+            d["max_sent"] = max(d["max_sent"], seq)
             d["max_inflight"] = max(d["max_inflight"],
                                     inflight + pages)
         if d["sent"] >= d["nframes"] and not d["eof"]:
@@ -1066,7 +1078,8 @@ class HostAgent:
         if total > 0:
             nframes = (total + plen - 1) // plen
             ent["deliver"] = {"total": total, "plen": plen, "nframes": nframes,
-                              "sent": 0, "acked": 0, "credit": 0, "eof": False,
+                              "sent": 0, "max_sent": 0, "acked": 0,
+                              "credit": 0, "eof": False,
                               "dropseq": dropseq, "dropped": False, "stall": 0,
                               "retx": 0, "max_inflight": 0}
         self._biz(rid, status, total, out)
