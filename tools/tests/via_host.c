@@ -4,13 +4,13 @@
 #include "via.c" /* Exercise the private receive contract as well as restart. */
 
 enum { STALL = 1, PENDING = 2, COLLISION = 4, REPLY = 8, FREE_STALL = 16,
-       OVERSIZE = 32, REPEAT = 64 };
+       OVERSIZE = 32, REPEAT = 64, FAKE = 128, NO_DATA = 256 };
 
 struct bus {
     u8 b, ddr, acr, ier, sr, tx[8];
-    unsigned sent, frames, received, flags, polls, bytes;
-    bool pmu, active, pending, done, armed, loaded, bad;
-    unsigned long long ticks, frame_ended;
+    unsigned sent, frames, received, flags, polls, bytes, prep_edges;
+    bool pmu, active, pending, done, armed, loaded, bad, prep_idle;
+    unsigned long long ticks, frame_ended, prep_time, fake_time;
 };
 
 static u8 bus_read(void *cookie, u32 reg)
@@ -18,6 +18,13 @@ static u8 bus_read(void *cookie, u32 reg)
     struct bus *b = cookie;
     switch (reg) {
     case 0x0000:
+        if ((b->flags & FAKE) && b->fake_time && b->ticks - b->fake_time >= 100) {
+            b->pending = false;
+            if (b->ticks - b->fake_time >= 400) {
+                b->flags &= ~FAKE;
+                b->pending = true;
+            }
+        }
         return (b->b & 0xf7) | (b->pending ? 0 : 0x08);
     case 0x0400: return b->ddr;
     case 0x1600: return b->acr;
@@ -51,7 +58,7 @@ static u8 bus_read(void *cookie, u32 reg)
 static void arm(struct bus *b)
 {
     b->polls = 0;
-    b->armed = !(b->flags & STALL);
+    b->armed = !(b->flags & STALL) && !((b->flags & NO_DATA) && !(b->acr & 0x10));
 }
 
 static void bus_write(void *cookie, u32 reg, u8 value)
@@ -65,7 +72,8 @@ static void bus_write(void *cookie, u32 reg, u8 value)
         b->ier &= ~value;
         return;
     case 0x1400:
-        b->bad |= !(b->acr & 0x10) || b->loaded;
+        b->done = false;
+        b->bad |= !(b->acr & 0x10) || b->loaded || b->armed;
         if (b->sent < sizeof(b->tx))
             b->tx[b->sent] = value;
         ++b->sent;
@@ -80,8 +88,24 @@ static void bus_write(void *cookie, u32 reg, u8 value)
 
     u8 changed = b->b ^ value;
     b->b = value;
-    if (!b->active)
+    if (!b->active) {
+        if (!b->prep_idle) {
+            if ((value & 0x30) == 0x30) {
+                b->prep_idle = true;
+                b->prep_time = b->ticks;
+            }
+        } else if (!b->pmu && (changed & 0x30)) {
+            static const u8 edges[] = {0x10, 0x00, 0x20, 0x30};
+            b->bad |= b->prep_edges >= 4 ||
+                      (value & 0x30) != edges[b->prep_edges] ||
+                      b->ticks - b->prep_time < 150;
+            ++b->prep_edges;
+            b->prep_time = b->ticks;
+        } else if (!b->prep_edges) {
+            b->prep_time = b->ticks;
+        }
         return;
+    }
     b->bad |= !(value & 0x40);
     if (b->pmu) {
         b->bad |= !(value & 0x20);
@@ -118,6 +142,8 @@ static void bus_write(void *cookie, u32 reg, u8 value)
         } else if (!b->pending && b->frames && (b->flags & REPLY)) {
             b->flags &= ~REPLY;
             b->pending = true;
+            if (b->flags & FAKE)
+                b->fake_time = b->ticks;
         }
     }
 }
@@ -139,7 +165,7 @@ static int exercise(enum via_kind kind, unsigned flags, int expected,
     };
     struct via_controller v = {kind, {&b, bus_read, bus_write, bus_ticks, 1000000}};
     if (via_prepare(&v) || b.bad || b.ddr != (b.pmu ? 0x51 : 0x71) ||
-        b.b != 0x78 || (!b.pmu && (b.acr != 0x8c || b.done || b.ier != 0x13)))
+        b.b != 0x78 || (!b.pmu && (b.prep_edges != 4 || b.acr != 0x8c || b.done || b.ier != 0x13)))
         return 1;
 
     b.active = true;
@@ -192,12 +218,26 @@ static int probe(void)
         {VIA_CUDA, PENDING | OVERSIZE, -7, 0, 0, false, false},
         {VIA_CUDA, COLLISION | REPEAT, -5, 0, 0, false, false},
         {VIA_CUDA, REPLY, 0, 2, 0, false, false},
+        {VIA_CUDA, REPLY | FAKE, 0, 2, 1, true, false},
     };
     for (unsigned i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
         int rc = exercise(cases[i].kind, cases[i].flags, cases[i].expected,
                           cases[i].sent, cases[i].received, cases[i].reply, cases[i].wrap);
         if (rc)
             return 10 * (i + 1) + rc;
+    }
+    /* Each half of the receive predicate must independently suppress reception. */
+    for (unsigned i = 0; i < 2; ++i) {
+        struct bus b = {.b = 0x60, .ddr = 0x49, .acr = 0x90, .ier = 0x17};
+        struct via_controller v = {VIA_CUDA, {&b, bus_read, bus_write, bus_ticks, 1000000}};
+        u8 in[2] = {0};
+        u32 got = 99;
+        const u8 cmd[] = {1, 0x11};
+        if (via_prepare(&v)) return 141;
+        b.active = true;
+        b.flags = REPLY | NO_DATA;
+        if (via_command(&v, cmd, 2, i ? in : NULL, i ? 0 : 2, &got) ||
+            got || b.received || !b.pending || b.bad) return 142 + i;
     }
     return 0;
 }
