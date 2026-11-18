@@ -21,7 +21,8 @@ DRIVER = ROOT / 'drivers/macintosh'
 CASES = ('Cuda reset/wrap', 'PMU reset', 'Cuda pending', 'Cuda collision',
          'Cuda reply cap', 'Cuda stalled', 'PMU busy timeout', 'PMU idle timeout',
          'PMU free timeout', 'Cuda frame limit', 'Cuda overall deadline',
-         'Cuda restart with unconsumed reply')
+         'Cuda restart with unconsumed reply', 'Cuda fake start reply',
+         'Cuda receive predicate')
 MUTATIONS = (
     ('cuda-pseudo', 'CUDA_PSEUDO = 0x01', 'CUDA_PSEUDO = 0x02', 15),
     ('cuda-reset', 'CUDA_RESET = 0x11', 'CUDA_RESET = 0x12', 15),
@@ -31,8 +32,13 @@ MUTATIONS = (
     ('missing-ack', 'write8(v, SR, out[i]);\n                cuda_toggle_ack(v);',
      'write8(v, SR, out[i]);\n                (void)0;', 12),
     ('pb3-polarity', '(read8(v, PORT_B) & PB3) == 0', '(read8(v, PORT_B) & PB3) != 0', 12),
-    ('stale-ifr', '(void)read8(v, SR); /* Clear a stale completion before shifting. */',
-     '(void)0;', 13),
+    ('stale-ifr', 'if (!wait_bit(v, start, IFR, SR_DONE, true))\n                    break;',
+     'if (false)\n                    break;', 13),
+    ('fake-start', 'return 1; /* Fake start: no frame was received. */', 'return 0;', 134),
+    ('null-reply', 'rc || !in || !cap', 'rc || !cap', 142),
+    ('zero-cap', 'rc || !in || !cap', 'rc || !in', 143),
+    ('prepare-delay', 'if (!delay(v, start, CUDA_SETTLE))\n        goto timeout;\n    update(v, PORT_B, TIP, 0);',
+     'if (false)\n        goto timeout;\n    update(v, PORT_B, TIP, 0);', 11),
     ('collision-drop', 'rc = 1; /* Collision, go back to input before receiving. */',
      'rc = 0;', 44),
     ('edge-deadline', '|| current - begin >= ticks',

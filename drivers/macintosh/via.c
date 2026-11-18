@@ -156,7 +156,7 @@ static int cuda_receive(struct via_controller *v, via_ticks start,
     if (delay(v, start, CUDA_SETTLE)) {
         (void)read8(v, SR); /* Dummy byte at start of frame. */
         if (!cuda_pending(v))
-            return 0;
+            return 1; /* Fake start: no frame was received. */
         update(v, ACR, SHIFT_OUT, 0);
         update(v, PORT_B, TIP, 0);
         for (u32 n = 0; n < CUDA_FRAME_MAX; ++n) {
@@ -213,7 +213,7 @@ static int cuda_send(struct via_controller *v, via_ticks start, const u8 *out, u
                 return rc;
         }
         rc = cuda_receive(v, start, NULL, 0, &discarded);
-        if (rc)
+        if (rc < 0)
             return rc;
         if (!delay(v, start, CUDA_RETRY))
             return CUDA_SEND_TIMEOUT;
@@ -233,9 +233,12 @@ static int via_command(struct via_controller *v, const u8 *out, u32 n,
     int rc = cuda_send(v, start, out, n);
     if (rc || !in || !cap)
         return rc;
-    if (!wait_bit(v, start, PORT_B, PB3, false))
-        return CUDA_RECEIVE_TIMEOUT;
-    return cuda_receive(v, start, in, cap, got);
+    do {
+        if (!wait_bit(v, start, PORT_B, PB3, false))
+            return CUDA_RECEIVE_TIMEOUT;
+        rc = cuda_receive(v, start, in, cap, got);
+    } while (rc == 1);
+    return rc;
 }
 
 int via_restart(struct via_controller *v)
