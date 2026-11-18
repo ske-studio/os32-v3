@@ -99,7 +99,11 @@ def observe(elf, cpu, evidence, case):
                 body = rsh_command(session, '/bin/portprob.bin' + (' echo' if echo else ''),
                                    during=send if echo else None)
                 status = rsh_command(session, 'echo $?')
-                require((body, status) == EXPECTED[case], repr((case, body, status)))
+                # The shell adds a blank line only when the probe's last write ended the line;
+                # compare the probe's own text and the exit status.
+                want_body, want_status = EXPECTED[case]
+                require((body.rstrip(b'\n'), status) == (want_body.rstrip(b'\n'), want_status),
+                        repr((case, body, status)))
                 if case == 'normal':
                     def echoed():
                         receive()
