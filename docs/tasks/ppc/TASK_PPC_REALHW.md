@@ -73,3 +73,8 @@ PowerPC に固有の注意事項 (起動の行・BOOTP/BSDP・画面・メモリ
 - 固まりは無くなった: `echo x`、`ls /host`、11-17 に止まった `cat /host/f` を 5 回 (0.5〜0.6 秒)、180 秒放置の後の `cat /host/f` が全部通過。応答が止まる類の停止は 0 回。**MACHCFG P-R4 の 1 手目 (7450 で NAP=0) で、固まる問題には足りた**。2 手目 (DPM・POW も外す) には進まない。
 - 新しく見えた不具合: `/host` の 64 KiB の読み書きが、ほぼ交互に途中で失敗する (持越し台帳 PPC-G4-SFS-FLAP)。`/tmp` には何もマウントされていない (PPC-G4-TMP)。証拠は実機ノートの ~/os32-tmp/evidence/2026-11-18/ppc-rh/ (host1〜host3、frames_w1w3.txt)。
 - PowerPC には platform_reset が無く、`reboot` は何もしない (KAPI の sys_reboot が提供者無し)。再起動の段を設計中。
+
+### 2026-11-18: LAN からの再起動 (PowerMac の platform_reset) と /host の調べ
+- G4 QuickSilver は VIA-PMU (起動の LOG「VIA kind=pmu pa=80016000 va=fe3c4000 rc=ok compatible=pmu」)。
+- LAN の RSH で `reboot` → 約 23 秒で TFTP の RRQ → 5 秒後に HELLO → cui → `echo x`、を 2 回 (21:37〜21:38)。ホスト側の operator の退避 (resume の一般化) で、再起動の後に pending は残らなかった。以後、G4 の像の差し替えは LAN からの reboot で行い、電源の入れ直しは要らない。
+- /host の交互の失敗 (PPC-G4-SFS-FLAP) の調べ: PHY と MAC は 100 Mb/s 全二重で合っている (G4 PHY の行)、RX FIFO は 10 KiB。GEM の受信の落ちは全部「長さが 14〜1514 の範囲の外」(G4 G の len) で、cp をしていない間も約 1 秒に 1 本。失敗の回は host の RESPONSE が G4 で受からない (no_response)。落ちた電文の正体を調べの像 4 (G4 H、生の descriptor と先頭 32 バイト) で調べている。
