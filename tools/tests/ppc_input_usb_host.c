@@ -8,6 +8,8 @@ static int lan[256], ln, lp, polls, locked;
 static u32 now;
 int con_sink_capture_active(void) { return 0; }
 int ring3_wait_pending(void) { return 0; }
+/* S1m: the keymap backend registration is outside this test (input_s2a_host covers it). */
+int pm_input_keymap_register(void) { return 0; }
 static int pending_lan = -1;
 void idle_work_run(void) { if (pending_lan >= 0) { lan[ln++] = pending_lan; pending_lan = -1; } }
 void arch_cpu_idle(void) {}
