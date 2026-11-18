@@ -23,6 +23,7 @@
 
 #include "os32_kapi_shared.h"
 #include "memmap.h"
+#include "user_read_contract.h"
 
 /* ネスト実行の上限は exec/appslot.h の ID の池 (APP_ID_MIN..APP_ID_MAX)。
  * 同時に生きられる非シェル ID は APP_MAX_APPS = 4 で、GUI アプリと CUI の
@@ -145,11 +146,6 @@ int exec_layout_rejected(void);
 /* p が CPL=3 アプリへ USER で貸してある帯にあるか (先頭 1 番地だけ)。
  * NULL は 1 (wrap 側が意味を決める)。ディスパッチャの早期検証と同じ規則。 */
 int ring3_ptr_ok(u32 p);
-
-/* Read permission through the fixed caller's managed page walk (PDE/PTE
- * PRESENT|USER and registered backing). No CR3 switch. CPL0/WM direct calls
- * retain their explicit trusted convention. NULL/overflow/NP refuse. */
-int ring3_user_range_ok(u32 p, u32 len);
 
 /* 出力引数として渡された CPL=3 の番地に**書いてよいか**。
  * OS32 は CR0.WP = 0 なので、読み取り専用の USER ページ (共有ライブラリの

@@ -50,6 +50,7 @@ char *kstrncpy(char *d, const char *s, u32 n)
     d[i] = 0;
     return d;
 }
+#include "platform_build_info.h"
 #include "sys_build_info.inc"
 static struct bootinfo bi;
 u32 host_flags = 0x202;

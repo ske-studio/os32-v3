@@ -43,6 +43,7 @@
 #include "include/redir_access.h"
 #include "include/sys.h"
 #include "include/text_screen.h"
+#include "include/user_read_contract.h"
 #include "kapi/kapi_db.h"
 #include "kdebug/gf5_test.h"
 #include "kdebug/gf_display_test.h"

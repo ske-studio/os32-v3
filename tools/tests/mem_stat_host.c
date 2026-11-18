@@ -107,6 +107,7 @@ static u32 ime_boot_bytes(void) { return 0; }
 #undef module_record_get
 static void sqlite_stack_report_stub(void) {}
 #define sqlite_engine_stack_report sqlite_stack_report_stub
+#include "platform_build_info.h"
 #include "build_info_source.c"
 #undef sqlite_engine_stack_report
 static void ver_diagnostics(void)
