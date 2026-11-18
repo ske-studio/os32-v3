@@ -50,10 +50,11 @@ static int serial_write(void *ctx, const char *bytes, u32 n)
 }
 static const struct pm_log_sink serial_sink = { serial_write, &serial };
 #if KBOOT_SHELL || KBOOT_SH
-/* Zilog UM0109 §3, BRG time constant with the MacIO 3.6864 MHz
- * PCLK and x16 async clock. Only channel A's clock registers are changed. */
+/* Zilog UM0109 §3, BRG time constant with the MacIO 3.6864 MHz RTxC
+ * and x16 async clock (NetBSD macppc zs.c:303,321,669-673). */
 enum {
-    ESCC_BRG_RATE = 3686400 / (2 * 16),
+    ESCC_RTXC_HZ = 3686400,
+    ESCC_BRG_RATE = ESCC_RTXC_HZ / (2 * 16),
     ESCC_WR4 = 4,
     ESCC_WR4_ASYNC_1STOP_X16 = 0x44,
     ESCC_WR11 = 11,
@@ -61,7 +62,7 @@ enum {
     ESCC_WR12 = 12,
     ESCC_WR13 = 13,
     ESCC_WR14 = 14,
-    ESCC_WR14_BRG_PCLK = 0x02,
+    ESCC_WR14_BRG_RTXC = 0x00,
     ESCC_WR14_BRG_ENABLE = 0x01,
 };
 static u32 escc_baud;
@@ -76,17 +77,19 @@ static int escc_port_init_vfast(u32 baud)
 {
     if (!baud || baud > ESCC_BRG_RATE / 2 || ESCC_BRG_RATE % baud)
         return -2;
+    if (baud == escc_baud)
+        return -1;
 
-    unsigned divisor = ESCC_BRG_RATE / baud - 2;
-    if (divisor > 0xffff || pm_escc_drain(&serial))
+    unsigned time_constant = ESCC_BRG_RATE / baud - 2;
+    if (time_constant > 0xffff || pm_escc_drain(&serial))
         return -2;
 
-    escc_write_register(ESCC_WR14, ESCC_WR14_BRG_PCLK);
+    escc_write_register(ESCC_WR14, ESCC_WR14_BRG_RTXC);
     escc_write_register(ESCC_WR4, ESCC_WR4_ASYNC_1STOP_X16);
     escc_write_register(ESCC_WR11, ESCC_WR11_TX_RX_BRG);
-    escc_write_register(ESCC_WR12, divisor & 0xff);
-    escc_write_register(ESCC_WR13, divisor >> 8);
-    escc_write_register(ESCC_WR14, ESCC_WR14_BRG_PCLK | ESCC_WR14_BRG_ENABLE);
+    escc_write_register(ESCC_WR12, time_constant & 0xff);
+    escc_write_register(ESCC_WR13, time_constant >> 8);
+    escc_write_register(ESCC_WR14, ESCC_WR14_BRG_RTXC | ESCC_WR14_BRG_ENABLE);
     escc_baud = baud;
     return -1; /* The exact rate runs on ESCC's normal clock path. */
 }

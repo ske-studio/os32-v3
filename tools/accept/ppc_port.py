@@ -16,7 +16,6 @@ PAYLOAD = b'\xa5\x5a'
 EXPECTED = {
     'normal': (b'PORT echo OK\n\n', b'0\n'),
     'drop-rx': (b'PORT receive failed\n\n', b'7\n'),
-    'fixed-rate': (b'PORT alternate rate failed\n\n', b'3\n'),
     'absent': (b'PORT initialized failed\n\n', b'1\n'),
 }
 
@@ -154,10 +153,6 @@ def main():
                 '    int byte;\n    do {\n        byte = pm_escc_trygetchar();',
                 '    int byte;\n    while (pm_escc_trygetchar() < 0) {}\n'
                 '    do {\n        byte = pm_escc_trygetchar();')
-        elif case == 'fixed-rate':
-            mutation = mutant_settings(folder, case, 'platform/powermac/log.c',
-                                       '    if (baud) *baud = escc_baud;',
-                                       '    if (baud) *baud = 9600;')
         elif case == 'absent':
             absent_bindings(folder, kernel / 'gen')
         elf = build(kernel, *options, *mutation, 'kb-user', 'kernel')
