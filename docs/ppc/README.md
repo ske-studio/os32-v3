@@ -81,4 +81,4 @@ RR1 の読みは CSR の選択を完結させ、受信は送信データを書�
 の `zs_iflush` と `sys/dev/ic/z8530reg.h:139,397-404`。
 `make check-ppc-kboot-log MUTATE=1` は FIFO と送信の共存をホストで検査する。
 QEMU の RSH からの読戻しは、既知バイトを mac99 のチャネル A に送って
-PortOps 経由で値と順序、空の try を照合できる段 3c で行う。
+PortOps 経由で値と順序、空の try を照合できる port の組の公開の段 (PPC_KAPI_FILL_DESIGN §2 の port の行、道 B) で行う。
