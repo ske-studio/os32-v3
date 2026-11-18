@@ -5,7 +5,7 @@ Common exec, caller validation, owner, FD and heap providers remain bound.
 
 PROVIDER_GROUPS = {
     'sys': (frozenset({'buz_on', 'buz_off'}), frozenset([])),
-    'surface': (frozenset({'surface_query', 'surface_lease', 'gfx_surface_lease', 'surface_unlease'}), frozenset([])),
+    'surface': (frozenset({'gfx_surface_lease'}), frozenset([])),
     'gfx': (frozenset({
         'gfx_init',
         'gfx_init_200',
