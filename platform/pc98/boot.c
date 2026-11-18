@@ -28,12 +28,6 @@
 extern int fatfs_init(void);
 extern void pc98_d2_bind(void);
 
-/* dev_findをPathDeviceValidatorとして使用するラッパー */
-static int dev_find_validator(const char *name)
-{
-    return (dev_find(name) != (void *)0) ? 1 : 0;
-}
-
 static void pc98_boot_dma(const struct boot_context *ctx)
 {
     (void)ctx;
@@ -132,7 +126,7 @@ static void pc98_boot_dev_fs(const struct boot_context *ctx)
     fs_registration_failed |= fatfs_init() != VFS_OK;
     fs_registration_failed |= hostdrvfs_init() != VFS_OK;
     fs_registration_failed |= serialfs_init() != VFS_OK;
-    path_set_device_validator(dev_find_validator);
+    path_set_device_validator(dev_name_present);
     tvram_print(64, 1, fs_registration_failed ? "NG" : "OK", TATTR_WHITE);
     if (fs_registration_failed)
         kprintf(TATTR_WHITE, "VFS: filesystem registration failed\n");

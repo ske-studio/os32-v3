@@ -98,7 +98,17 @@ Device *dev_find(const char *name)
         if (!strcmp(name, children[i].name)) return &children[i];
     return NULL;
 }
-static void path_set_device_validator(int (*fn)(const char *)) { CHECK(fn("test") == 0); event("validator;"); }
+int dev_name_present(const char *name)
+{
+    CHECK(!strcmp(name, "test"));
+    return 0;
+}
+static void path_set_device_validator(int (*fn)(const char *))
+{
+    CHECK(fn == dev_name_present);
+    CHECK(fn("test") == 0);
+    event("validator;");
+}
 static void pci_init(void) { event("pci;"); }
 int ide_init(void) { event("ide;"); return disk_count; }
 int ide_drive_present(int d) { event("present%d;", d); return d == 0 || d == 2; }

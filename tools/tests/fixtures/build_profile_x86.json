@@ -17,6 +17,7 @@
     "platform/pc98/boot_platform.c",
     "platform/pc98/boot_display.c",
     "platform/pc98/emergency.c",
+    "kernel/dev/dev.c",
     "platform/pc98/boot.c",
     "kernel/console/font_guard.c",
     "init/kernel_start.c",

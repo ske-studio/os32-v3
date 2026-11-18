@@ -3,11 +3,6 @@
 #include "kernel/dev/dev.h"
 #include "lib/path.h"
 
-static int pm_path_device_present(const char *name)
-{
-    return dev_find(name) != 0;
-}
-
 int pm_root_boot(const struct boot_root_image *image)
 {
     static const struct vfs_device_name names[] = {
@@ -24,6 +19,6 @@ int pm_root_boot(const struct boot_root_image *image)
     rc = boot_root_start(image);
     if (rc) return rc;
     path_init();
-    path_set_device_validator(pm_path_device_present);
+    path_set_device_validator(dev_name_present);
     return path_set_drive(vfs_devname("/"));
 }
