@@ -14,18 +14,18 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "sdk"))
 from kapi_target_ppc import ABSENT_PROVIDER_SLOTS, absent_result
 
-# Expected absent slots after stage 4a (PPC_KAPI_FILL_DESIGN §4 item 10).
+# Expected absent slots after the stage 5c queries (PPC_KAPI_FILL_DESIGN §4 item 10).
 EXPECTED_ABSENT_SLOTS = frozenset("""
 boot_image_info buz_off buz_on db_bind_blob db_bind_int db_bind_null
 db_bind_text db_close db_column_int db_column_text db_error_code db_exec
 db_finalize db_last_error db_mem_used db_open db_open_existing db_prepare
 db_prepare_only db_step ext2_format ext2_format_at fm_note_off fm_note_on
 fm_play_mml fm_set_tone_num fm_startup_sound font_source_close font_source_open
-font_source_read_at gfx2_adapter_count gfx2_adapter_gen gfx2_adapter_info
-gfx2_caps gfx2_check_op gfx2_connector_edid gfx2_connector_info
+font_source_read_at
+gfx2_check_op
 gfx2_cursor_image gfx2_cursor_move gfx2_cursor_show gfx2_dpms gfx2_fence_query
-gfx2_fence_wait gfx2_flip gfx2_gamma gfx2_head_info gfx2_lock gfx2_mode_count
-gfx2_mode_get gfx2_mode_set gfx2_palette gfx2_present gfx2_screen_surface
+gfx2_fence_wait gfx2_flip gfx2_gamma gfx2_lock
+gfx2_mode_set gfx2_palette gfx2_present gfx2_screen_surface
 gfx2_submit gfx2_surface_create gfx2_surface_desc gfx2_surface_free gfx2_unlock
 gfx2_vblank_wait gfx_add_dirty_rect gfx_get_framebuffer gfx_get_palette
 gfx_hardware_scroll gfx_hw_blit gfx_hw_fill_rect gfx_hw_get gfx_hw_submit
@@ -52,6 +52,12 @@ ssg_volume surface_lease surface_query surface_unlease sys_get_build_info
 sys_set_mtime    sys_switch_shell
 sys_time_now sys_ver_info unicode_to_jis v86_boot v86_boot2 v86_disktest
 v86_gdc_capture v86_selftest
+""".split())
+
+GFX2_QUERY_PROVIDERS = frozenset("""
+gfx2_adapter_count gfx2_adapter_info gfx2_adapter_gen
+gfx2_caps gfx2_head_info gfx2_connector_info
+gfx2_connector_edid gfx2_mode_count gfx2_mode_get
 """.split())
 
 # Fixed allowlist: exec/*.c (including exec_*.inc), KBOOT_SHELL=1 TUs,
@@ -258,7 +264,7 @@ def main():
         return 1
     entries = [api for api in json.loads((ROOT / 'sdk/kapi.json').read_text())['api']
                if api['name'] in EXPECTED_ABSENT_SLOTS]
-    assert len(entries) == 176
+    assert len(entries) == 167
     assert {'buz_on', 'buz_off', 'rtc_read'} <= ABSENT_PROVIDER_SLOTS
     assert not {'sys_reboot', 'sys_shm_alloc', 'sys_shm_lock', 'sys_shm_free'} & ABSENT_PROVIDER_SLOTS
     with tempfile.TemporaryDirectory(prefix='ppc-binding-') as directory:
@@ -293,7 +299,10 @@ def main():
                    'tvram_scroll', 'shm_alloc', 'shm_free', 'shm_lock'} - undefined
         if missing:
             print('missing console providers:', sorted(missing)); return 1
-        unexpected = undefined - ALLOWED_UNDEFINED
+        missing = GFX2_QUERY_PROVIDERS - undefined
+        if missing:
+            print('missing gfx2 query providers:', sorted(missing)); return 1
+        unexpected = undefined - (ALLOWED_UNDEFINED | GFX2_QUERY_PROVIDERS)
         if unexpected:
             print('unexpected providers:', sorted(unexpected)); return 1
         print('undefined providers:', len(undefined))
