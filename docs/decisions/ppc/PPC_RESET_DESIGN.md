@@ -251,3 +251,68 @@ Apple の Power Mac G4 (September 2002) Developer Note、vendor/text/apple-pmg4-
 - P3-2: §3 via_command — Cuda の応答 frame を待つのは `in != NULL かつ cap > 0` の時だけ。それ以外は送信の完了で戻る。
 - P3-3: §2 platform_reset — 失敗の時に LAN の LOG を流し続ける期限は、ppc_kernel.c の既存の 2 秒の poll と同じ `2 × tb_hz` (TB の差) とする。
 - P3-4: §5 の「受信は 1 byte ずつ廃棄」「MMIO は通常 2 ページ」を、cap まで保存・窓 3 ページに直した (上の §5)。
+
+## 確定後の追記 (2026-11-18、R-b の設計の欠け: USB の物理の MMIO と VIA の窓、astra 起草、Opus 1 回)
+
+## PowerMac reset 設計追記 r1（確定）— 遅れて判明する OHCI の物理窓
+
+### §2　割当てと判定時点
+
+実機では VIA の reg は mac-io の子オフセットで、親のメモリ BAR の割当て内に収まる。
+OHCI の BAR0 は別の PCI function のメモリ資源である。正常なファームウェアの
+割当てでは、両装置が同じ CPU 物理ページをデコードする配置は生じない。
+OS32 が使う mac-io の割当てと PCI 親窓の区別は docs/ppc/open-firmware.md に従う。
+QEMU mac99 でも OpenBIOS の macio の assigned-addresses が割当て済み基底を持つ
+（docs/ppc/qemu-mac99.md の E1・E2）。OHCI も PCI BAR の割当てを受ける。
+いずれも正常配置での結論であり、OF の木だけから後刻の BAR0 の値は証明できない。
+VIA の最初の書き込みは局面 1 の pm_via_prepare() で、USB の BAR の照合 (局面 2 の pm_usb_boot) より前になる。通常のファームウェアの割り当てでは重ならないので、この順は変えない (R-b のレビューの P1 は到達しないことで受け入れる)。後の照合は USB の側の診断として、重なりを見たら LOG 1 行を出して USB だけを外し、VIA は残す。
+
+kernel_boot.c の slots[] と USB 固定 VA の静的検査は VA を扱う。
+VIA は takeover 後の walk 成功で公開する。比較対象は via_alias.pa と via_alias.bytes
+（ページ丸め済みの実際の写像）とし、レジスタ先頭や予約上限 PM_VIA_BYTES は使わない。
+同ファイルに機種内照会を置き、via_window.h には関数宣言を足す。
+
+```c
+int pm_via_phys_overlap(u32 pa, u32 bytes)
+{
+    return via_window.rc == 0 &&
+           overlap(pa, bytes, via_alias.pa, via_alias.bytes);
+}
+```
+
+pm_usb_boot の BAR0 読出し・形式検査の次に、usb_platform.c の usbp_mmio_map を呼ぶ。
+同関数で現 root のメモリ ranges を選び、BAR を CPU PA に変換し、ページ整列を確認する。
+その直後、maps[] の既存 BDF 検索・スロット取得・paging_map_phys のいずれにも先立ち一度比較する。
+
+```c
+if (pm_via_phys_overlap(pa, PM_USB_PAGE)) {
+    usbp_log("USB SKIP bdf=%02x:%02x.%u pa=%08x reason=via-overlap",
+             f->bus, f->dev, f->fn, pa);
+    return -1;
+}
+```
+
+pm_usb_boot の usbp_cfg_cmd(..., 2, 0) は map 成功後、takeover 前に移す。
+cfg_cmd 失敗時は作成した USB map を unmap して次へ進む。
+衝突時は当該 OHCI のみを採用せず、上記一行を残して列挙を続ける。
+PCI command の変更、OHCI MMIO、HC 登録は行わない。公開済み VIA での reset と起動を維持する。
+
+### §7　試験と変異
+
+host fixture で PCI 基底と CPU 基底を異ならせ、変換後の BAR ページを VIA 写像の
+先頭・末尾ページに順に重ねる。各回とも SKIP 一行、map 発行・cfg_cmd・takeover は各 0 回、
+VIA の va/rc は保存値のまま、続く非衝突 HC は登録まで進むことを確認する。
+VIA の直前・直後の隣接ページ、VIA 未公開の場合は通常の USB 経路を通す。
+変異は比較の pa を bus に置換して衝突例を RED、overlap の境界を含端にして隣接例を RED。
+QEMU は既存 USB 起動と reset の正常経路で確認し、実機の BAR 再配置は試験条件にしない。
+
+### §6　実装単位
+
+R-b の直し一段。platform/powermac/{kernel_boot.c,via_window.h,usb_platform.c,usb_boot.c}
+と tools/tests/test_powermac_reset.py 配下の試験登録・host fixture を対象とする。
+system.c は公開済み窓の利用者のまま。共通層・装置層・KAPI の変更は不要。
+
+### 追記の確定 (2026-11-18、Opus 第 1 回、PM が反映)
+- R-b の astra のレビューの P2 3 件 — (a) platform/powermac/kernel_boot.c の install_via が pm_usb_roots の構成の窓 (usb_boot.c の root->pa+0x800000 と +0xc00000) と照合していない、(b) platform/powermac/via_tree.c の ranges が別 BDF・別 BAR でも数値が mac-io の BAR0 の内なら採用する (BAR トークン付きの親番地では BDF・BAR の一致を必須に)、(c) via_tree.c で ofw_child/ofw_peer の失敗 -1 を正常の終端 0 と同じに扱う (-1 は探索の失敗として伝播、候補の発見の後に失敗する fixture を足す) — は、この追記の範囲外で、R-b の実装の直しとして PM が出す ((a) はこの追記の照合と同じ段にまとめてよい)。
+- 根拠の実物の値: QEMU mac99 で VIA は pa=80016000 (R-b の LOG)。OHCI の BAR0 の値は実装の段の QEMU で LOG に出して並べる。G4 の値は未確認。
+- 試験の土台 (PM 決定): 新しく tools/ppc/usb_via_overlap_host.c を作り、差し替える関数は paging_map_phys・usbp_cfg_read32・usbp_cfg_write32 (または今の cfg の書き込みの関数)・pm_usb_roots の窓・OHCI の start。登録は tools/tests/test_powermac_reset.py の CHECK (powermac-reset) に足す。
