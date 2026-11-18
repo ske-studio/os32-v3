@@ -1,10 +1,20 @@
 /* PPC_FP_NEWLIB_DESIGN §2; explicit, single-CPU FP interval. */
-#include "kernel_fp.h"
+#include "arch_kernel_fp.h"
 #include "ppc_oea.h"
 #include "kernel/irq/irq.h"
 #include "mm/pgalloc.h"
 
 static const struct ppc_kernel_fp_guard *active;
+int arch_kernel_fp_begin(struct arch_kernel_fp_guard *g)
+{
+    return ppc_kernel_fp_begin(g ? &g->ppc : 0);
+}
+
+void arch_kernel_fp_end(const struct arch_kernel_fp_guard *g)
+{
+    ppc_kernel_fp_end(&g->ppc);
+}
+
 static void set_msr(u32 value)
 {
     __asm__ volatile("sync; mtmsr %0; isync" : : "r"(value) : "memory");

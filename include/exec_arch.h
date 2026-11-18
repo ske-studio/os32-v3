@@ -6,6 +6,11 @@
 /* arch_exec_cache.h が arch_exec_publish(dst, bytes) を関数かマクロで与える: 書いた命令を
  * 実行に公開する (PowerPC は命令キャッシュの flush、x86 は何もしない)。arch_exec_kapi.h が
  * exec_kapi_table() を与える。どちらも exec/exec.c が直に読む。 */
+/* Begin returns 0 on success. End pairs with a successful begin.
+ * Keep the guard on the caller's stack through the alternate-stack call. */
+struct arch_kernel_fp_guard;
+typedef int arch_kernel_fp_begin_fn(struct arch_kernel_fp_guard *);
+typedef void arch_kernel_fp_end_fn(const struct arch_kernel_fp_guard *);
 struct arch_syscall { void *native; };
 void exec_syscall_dispatch(struct arch_syscall *);
 struct arch_user_context {
