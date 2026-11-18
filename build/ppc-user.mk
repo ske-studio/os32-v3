@@ -7,8 +7,9 @@ PPC_USER_FLAGS := $(filter-out -mcpu=7450 -msoft-float,$(USER_CFLAGS)) $(PPC_USE
 # All USER links share one validated CRT/allocator closure.
 PPC_USER_CRT += $(PPC_USER_OUT)/syscalls.o $(PPC_USER_OUT)/help.o
 PPC_USER_NANO := $(PPC_USER_OUT)/nano/libos32nano.a
-PPC_USER_LIBC := $(shell $(CC) $(PPC_USER_ABI) -print-file-name=libc.a)
-PPC_USER_LIBGCC := $(shell $(CC) $(PPC_USER_ABI) -print-libgcc-file-name)
+# Recursive: parse must not run the compiler (unsupported targets reject with zero calls, test_sep5_boot).
+PPC_USER_LIBC = $(shell $(CC) $(PPC_USER_ABI) -print-file-name=libc.a)
+PPC_USER_LIBGCC = $(shell $(CC) $(PPC_USER_ABI) -print-libgcc-file-name)
 PPC_USER_LIBS = -L$(dir $(PPC_USER_LIBC)) -L$(dir $(PPC_USER_LIBGCC)) $(PPC_USER_NANO) -lc -lgcc
 PPC_USER_FLOAT ?= -u _printf_float
 PPC_USER_LINK = python3 sdk/link_guard.py --target $(SDK_TARGET) --ar $(LD:%-ld=%-ar) $(LD) -m $(SDK_TARGET_ELF_EMULATION) --gc-sections -z noexecstack -T $(SDK_TARGET_APP_LINK) $(PPC_USER_FLOAT)
@@ -19,7 +20,7 @@ $(PPC_USER_OUT)/syscalls.o: sdk/crt/syscalls.c sdk/allocator/nano_adapter.h user
 $(PPC_USER_OUT)/help.o: sdk/crt/help.c sdk/include/os32/help.h $(SDK_KAPI_HDR) | $(PPC_USER_OUT)
 	$(CC) $(PPC_USER_FLAGS) -c $< -o $@
 
-$(PPC_USER_NANO) $(PPC_USER_NANO:.a=.json) &: sdk/allocator/build_nano_target.py sdk/allocator/nano_adapter.c sdk/allocator/nano_adapter.h sdk/allocator/nano_inputs.json tools/check_nano_inputs_target.py tools/check_nano_inputs.py $(PPC_USER_OUT)/syscalls.o $(PPC_USER_LIBC)
+$(PPC_USER_NANO) $(PPC_USER_NANO:.a=.json) &: sdk/allocator/build_nano_target.py sdk/allocator/nano_adapter.c sdk/allocator/nano_adapter.h sdk/allocator/nano_inputs.json tools/check_nano_inputs_target.py tools/check_nano_inputs.py $(PPC_USER_OUT)/syscalls.o
 	python3 -B sdk/allocator/build_nano_target.py --cross-dir $(PPC_CROSS_DIR) $(@D) --crt $(PPC_USER_OUT)/syscalls.o
 
 PPC_USER_APPS := $(addprefix $(PPC_USER_OUT)/,hello fault nest outprobe nlprobe)

@@ -69,7 +69,7 @@ def image(work, mutation):
     libc = command([prefix+'gcc', *abi, '-print-file-name=libc.a']).strip()
     libgcc = command([prefix+'gcc', *abi, '-print-libgcc-file-name']).strip()
     out = 'build/out/ppc-user/'
-    command(['python3', 'sdk/link_guard.py', '--target', 'ppc-powermac', prefix+'ld',
+    command(['python3', 'sdk/link_guard.py', '--target', 'ppc-powermac', '--ar', prefix+'ar', prefix+'ld',
              '-m', 'elf32ppc', '--gc-sections', '-z', 'noexecstack', '-T', 'sdk/link/ppc/app.ld',
              '-u', '_printf_float', '-o', work/'ctx.elf', out+'crt0.o', out+'crt0_c.o',
              out+'syscalls.o', out+'help.o', work/'user.o',

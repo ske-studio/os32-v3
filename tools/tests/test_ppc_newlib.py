@@ -19,7 +19,9 @@ import test_nano_targets as nano
 import build_nano_target as builder
 import check_nano_inputs_target as inputs
 
-CHECK = dict(name='ppc-newlib', tier=2, env=['ppc-cross'], budget=60, needs=['make:all'],
+# Fixtures build their own objects; only the generated SDK headers are needed (as nano-targets).
+CHECK = dict(name='ppc-newlib', tier=2, env=['ppc-cross'], budget=60,
+    needs=['make:sdk/include/os32/os32_unit_stamp.h'],
     covers=['tools/tests/test_ppc_newlib.py', 'tools/tests/ppc_newlib_host.c',
             'tools/accept/ppc_newlib.py', 'build/ppc-user.mk', 'sdk/crt/ppc/start.c',
             'sdk/link_guard.py', 'userland/ppc/nlprobe.c',
