@@ -54,7 +54,7 @@ LAN と I/O の上限の多くは、いちばん遅い経路に合わせた 1 �
 
 - 選び方 (案): 起動時に自動で決め、設定で上書きできる。
   - 自動の判定は、bind した NIC が DMA (adapter の能力の印) か、CPU の段 (`arch_cpu_has_mmx` などの既存の判定)、メモリの量で行う。
-  - 上書きは `/etc/system.cfg` に `PERF=compat|ra266|auto`。
+  - 上書きは機種の設定ファイル `/etc/machine.cfg` の `perf.profile` (0 = 互換、1 = Ra266、2 = 自動) から受け、P1 で bind のときの判定と繋ぐ (票 TASK_MACHCFG、2026-11-18。`/etc/system.cfg` には置かない)。暫定の既定は 0。
 - 1 つの NIC の上で、モードを途中で替えることはしない (bind のときに決める)。
 - 時間の決まり:
   - 論理 tick 100Hz と公開の ABI は、両方のモードで変えない。
@@ -90,3 +90,16 @@ LAN と I/O の上限の多くは、いちばん遅い経路に合わせた 1 �
 3. 時間の単位: link の再送の間隔を Ra266 基準モードで短くする (例 200ms → 20〜50ms) か。論理 tick 100Hz と公開の ABI は両方のモードで変えない形でよいか。
 4. P6 (pipelining) を、Ra266 基準モードに限って HAL 中心期の後に回すか。
 5. 着手の時期 (I/O の Tier と hsync の後、など)。
+
+## 6. 機種の固有の設定の改修項目 (ユーザー指示 2026-11-17「既に作ってあるものはリファクタリング計画での改修項目として記録」)
+
+機種の設定ファイルの仕組みは票 TASK_MACHCFG。そこへ移さなかった既存の設定を、ここで改修する。
+
+| 項目 | 今 | 改修の向き |
+|---|---|---|
+| PowerPC 7450 の NAP | `arch/ppc/kernel_cpu.c` の PVR の分岐 (7450 と 7455 に同じ HID0 の操作) | 機種の既定の表へ移す (TASK_MACHCFG の段 F・G)。実機の HID0 と /host の完走は票 TASK_PPC_REALHW §2 に戻す |
+| system.cfg の GFX・GUI・CONSOLE_DUAL・GFXDIAG | `platform/pc98/kernel_gfx_config.inc`・`platform/pc98/kernel.c` | バックエンドの指定 (機種による既定) と、表示・診断の利用者の設定を分ける。旧キーの互換と優先の順を別の段で決める |
+| system.cfg の BOOTSERIAL・E82557・E82557_PHYVENDOR・KDEBUG | `platform/pc98/boot_serial.inc`・`drivers/net/e82557/e82557.c`・`kdebug/kdebug_module.c` | 機種による既定か、利用者の指定かを分け、機種による物だけを移す候補にする |
+| SFS_LAN・SFS_LAN_PEER の二重 | `/etc/system.cfg` (`fs/serialfs/serialfs_session.c`) と `netcd.cfg` (`platform/pc98/kernel_boot_memory.inc`) の両方 | 置き場を 1 つにする |
+| netcd.cfg、PowerMac の SFS の既定 | `assets/netcd.cfg`、`platform/powermac/hostfs_boot.c` | 接続先 (利用者) と機種の差を切り分け、機種による既定だけを移す候補にする |
+| sync.cfg の PCI 別の待ち時間 | `assets/gfx/sync.cfg` (票 TASK_HAL_V2 の 2026-11-09 の行) | 装置の持ち物として残す。機種の値との持ち主の境だけ確かめる |

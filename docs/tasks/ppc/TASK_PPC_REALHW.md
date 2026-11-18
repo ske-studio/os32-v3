@@ -67,3 +67,9 @@ PowerPC に固有の注意事項 (起動の行・BOOTP/BSDP・画面・メモリ
   - 次に電源を入れて /host が通れば、原因で確定する。
 - 直しの方向: 機種の設定ファイル (本線が設計中、ユーザー指示「機種の固有の設定はコンフィグファイルで」) で NAP を切り替える。それまでの暫定は 7450 で NAP を立てない。リファクタリング計画 (PERF_PROFILE_PLAN の「機種の固有の設定」) に改修項目として入れる。
 - LOG の受入 (seq 0 から) は、agent を起動の後に付けたので未確認。次は agent と採取を起動の前に立てる。
+
+### 2026-11-18: 見分けの像 4c0f7ef4 (NAP だけ外した) の実機確認
+- 起動: 18:52:43 に TFTP で os32-sh.elf (4c0f7ef4) を読み、5 秒後に link の HELLO。LOG は seq 0〜4 を欠けなく受信 (KBOOT READY → FB → USB → LAN STATE 5 → LINK HEAP → USB DEV 05ac:0206)。実機ノートの G4 用の host_agent と bootp は 11-18 から常駐のサービス (os32-g4-agent・os32-g4-bootp)。
+- 固まりは無くなった: `echo x`、`ls /host`、11-17 に止まった `cat /host/f` を 5 回 (0.5〜0.6 秒)、180 秒放置の後の `cat /host/f` が全部通過。応答が止まる類の停止は 0 回。**MACHCFG P-R4 の 1 手目 (7450 で NAP=0) で、固まる問題には足りた**。2 手目 (DPM・POW も外す) には進まない。
+- 新しく見えた不具合: `/host` の 64 KiB の読み書きが、ほぼ交互に途中で失敗する (持越し台帳 PPC-G4-SFS-FLAP)。`/tmp` には何もマウントされていない (PPC-G4-TMP)。証拠は実機ノートの ~/os32-tmp/evidence/2026-11-18/ppc-rh/ (host1〜host3、frames_w1w3.txt)。
+- PowerPC には platform_reset が無く、`reboot` は何もしない (KAPI の sys_reboot が提供者無し)。再起動の段を設計中。
