@@ -136,6 +136,9 @@ def settings(work, mutation=None):
 
 class Session:
     qemu_clock = USB_QEMU_CLOCK
+    qmp_type = None  # None = the module-level PumpQMP at start() (tests patch link_sh_run.PumpQMP)
+    machine = "mac99"
+    reboot_args = ("-no-reboot",)
 
     def __init__(self, elf, cpu, out, timeout, late=False):
         self.out, self.elf, self.cpu = out, elf, cpu
@@ -169,11 +172,11 @@ class Session:
         with socket.socket(socket.AF_INET,socket.SOCK_DGRAM) as reservation:
             reservation.bind(('127.0.0.1',0)); port=reservation.getsockname()[1]
             self.io = UDP(f'127.0.0.1:0,127.0.0.1:{port}')
-        args = ['qemu-system-ppc','-M','mac99','-cpu',self.cpu,'-m','128M','-smp','1',
+        args = ['qemu-system-ppc','-M',self.machine,'-cpu',self.cpu,'-m','128M','-smp','1',
             '-accel','tcg','-bios',str(ROM),'-cdrom',str(iso),'-boot','d',
             '-prom-env','boot-device=cd:,\\PPCKERN.ELF','-prom-env','auto-boot?=true',
             '-g','800x600x8','-display','none','-serial','file:'+str(self.out/'serial-a.log'),
-            '-serial','file:'+str(self.out/'serial-b.log'),'-monitor','none','-qmp','stdio','-no-reboot',
+            '-serial','file:'+str(self.out/'serial-b.log'),'-monitor','none','-qmp','stdio',*self.reboot_args,
             '-nic','none','-device','sungem,netdev=n0,mac=52:54:00:12:34:56','-netdev',
             f'socket,id=n0,udp=127.0.0.1:{self.io.sock.getsockname()[1]},localaddr=127.0.0.1:{port}',
             '-usb','-device','usb-kbd,id=kbd',*self.qemu_clock]
@@ -181,7 +184,7 @@ class Session:
             elf_sha256=hashlib.sha256(self.elf.read_bytes()).hexdigest()),indent=2))
         self.err=(self.out/'qemu.stderr').open('w'); self.frames=(self.out/'frames.log').open('w')
         self.p=subprocess.Popen(args,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=self.err,bufsize=0)
-        self.q=PumpQMP(self.p,self.deadline,self.pump)
+        self.q=(self.qmp_type or PumpQMP)(self.p,self.deadline,self.pump)
 
     def send(self, frame):
         self.frames.write('> '+bytes(frame).hex()+'\n'); self.io.send(frame)
@@ -380,6 +383,115 @@ def accept(elf,cpu,out,timeout,late=False,verdict=None):
             allocation_failures=s.word('p3_alloc_failures'),end_count=s.word('p3_end_count')),indent=2))
         s.q.call('quit'); s.p.wait(timeout=5); require(s.p.returncode==0,'QEMU rc')
     finally: s.close()
+
+
+
+class ResetQMP(PumpQMP):
+    def __init__(self, process, deadline, pump):
+        self.events = []
+        super().__init__(process, deadline, pump)
+
+    def read(self):
+        message = super().read()
+        if 'event' in message:
+            self.events.append(message)
+        return message
+
+
+class ResetSession(Session):
+    qmp_type = ResetQMP
+    reboot_args = ()
+
+    def serial(self):
+        path = self.out/'serial-a.log'
+        return path.read_text(errors='replace') if path.is_file() else ''
+
+    def echo(self):
+        op = self.agent.operator
+        ident = op.submit('cui', 'echo x', 'accept')
+        self.wait(lambda: ident in op.results or (op.pending and
+                  op.pending['state'] == 'done'), 'echo x result')
+        result = op.take_result() or op.results[ident]
+        require(result['id'] == ident and result['state'] == 'done', 'echo x completion')
+        check_body('echo x', result['result'], b'x\n')
+
+
+def accept_reset(elf, out, timeout, via, mutation=None):
+    """PPC_RESET_DESIGN §7: real CUI reboot, guest RESET, and a new boot ID."""
+    s = ResetSession(elf, '7450', out, timeout)
+    if via == 'pmu':
+        s.machine = 'mac99,via=pmu'
+    try:
+        s.start()
+        op = s.agent.operator
+        via_ready = re.compile(rf'VIA kind={via} [^\r\n]* rc=ok ')
+        s.wait(lambda: s.ready() and op.ready['mode'] == 'cui' and
+               'KBOOT OF-OFF' in s.serial() and via_ready.search(s.serial()),
+               f'{via} VIA, OF-OFF and CUI READY', 60)
+        for line in s.serial().splitlines():
+            if 'KBOOT OF-OFF' in line or f'VIA kind={via} ' in line:
+                print(line, flush=True)
+        s.echo()
+        s.wait(lambda: s.word('g_capture') == 0, 'echo capture released')
+        # The response drains all events queued before the RSH submission.
+        s.q.call('query-status')
+        first_event = len(s.q.events)
+        serial_offset = (out/'serial-a.log').stat().st_size
+        boot = op.ready['boot']
+        ident = op.submit('cui', 'reboot', 'accept', timeout_ms=30000)
+        print(f'RSH reboot: id={ident} boot={boot} serial_offset={serial_offset}', flush=True)
+
+        def observe_reset():
+            s.q.call('query-status')
+            return next((event for event in s.q.events[first_event:]
+                         if event['event'] == 'RESET' and
+                         event.get('data', {}).get('guest') is True), None)
+
+        if mutation == 'cuda-reset-byte':
+            def sent_mutant_byte():
+                require(not observe_reset(), 'SURVIVED '+mutation)
+                return s.word('reset_sent_byte') == 0x1ff
+            s.wait(sent_mutant_byte, 'Cuda reset byte 0xff sent', 30)
+            print('Cuda reset byte sent: 0xff', flush=True)
+
+        until = time.monotonic() + 30
+        reset = None
+        while time.monotonic() < until:
+            reset = observe_reset()
+            if reset:
+                break
+            time.sleep(.05)
+        if mutation:
+            require(not reset, 'SURVIVED '+mutation)
+            if mutation == 'reboot-absent':
+                result = op.take_result() or op.results.get(ident)
+                require(result and result['id'] == ident, 'reboot stub did not return')
+                check_body('reboot', result['result'], b'')
+            else:
+                require(op.pending and op.pending['id'] == ident and
+                        op.pending['result'] is None, 'reboot unexpectedly returned')
+            print(f'RED {mutation}: reboot ran without guest RESET (30 s)', flush=True)
+            return
+
+        require(reset, f'{via}: no guest RESET within 30 s; evidence={out}')
+        print(json.dumps(reset), flush=True)
+        # UDP has no disconnect event. Mirror the HostAgent CLI's disconnect
+        # handling so old NOTIFY retries cannot fill sungem's RX queue during
+        # OpenBIOS. Keep the operator so the new READY can retire reboot.
+        op.session_reset()
+        s.agent.established = False
+        s.agent.notifier.reset()
+        s.wait(lambda: s.ready() and op.ready['mode'] == 'cui' and op.ready['boot'] != boot,
+               'CUI READY from a new boot', 60)
+        retired = op.results.get(ident)
+        require(retired and retired['state'] == 'boot_changed' and
+                retired['boot'] == boot and op.pending is None, 'reboot request retirement')
+        s.echo()
+        print(f'GREEN {via} 7450: boot {boot} -> {op.ready["boot"]}; reboot retired; echo x', flush=True)
+    finally:
+        if s.q:
+            (out/'qmp-events.json').write_text(json.dumps(s.q.events, indent=2))
+        s.close()
 
 
 def main():

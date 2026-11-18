@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Exercise the operator client against the real socket adapter."""
+"""Exercise the operator client against the real socket adapter.
+
+期待の出所: PPC_RESET_DESIGN §7 operator・A7
+"""
 import argparse
 import importlib.util
 import io
@@ -24,7 +27,7 @@ CHECK = dict(name='remote-x13', tier=1, needs=[], budget=10,
                      'tools/host_image.py', 'tools/lan_bridge.py', 'tools/lanfs_host.py',
                      'tools/rshell_hwb.py', 'tools/rshell_peek.py', 'tools/rshell_serial.py',
                      'tools/serialfs_host.py', 'tools/host_tree_manifest.py'],
-    basis=['LAN_OPERATOR_DESIGN §2'],
+    basis=['LAN_OPERATOR_DESIGN §2', 'docs/decisions/ppc/PPC_RESET_DESIGN.md §7 operator・A7'],
     full_only=True,
 )
 
@@ -246,14 +249,99 @@ def test_auto(path):
     print('PASS auto matrix')
 
 
+def test_boot_retirement(operator_source=None, socket_source=None):
+    import host_rshell
+    op_ns = {'__name__': 'mutant_operator'}
+    exec(compile(operator_source or (ROOT / 'tools/host_rshell.py').read_text(), 'operator', 'exec'), op_ns)
+    sock_ns = {'__name__': 'mutant_socket'}
+    exec(compile(socket_source or (ROOT / 'tools/host_operator_socket.py').read_text(), 'socket', 'exec'), sock_ns)
+    class Notify:
+        generation = 1
+        def notify_number(self, *args):
+            pass
+    a, b = 'a' * 32, 'b' * 32
+    for line in ('reboot', 'ver'):
+        op = op_ns['Operator'](Notify())
+        op.session_start(1)
+        assert op.accept_ready(1, 1, a, 'cui', 'none', 'idle')
+        ident = op.submit('cui', line, None)
+        op.unknown()
+        assert op.accept_ready(1, 1, a, 'cui', 'none', 'idle')
+        assert op.pending is not None, 'same boot retired'
+        assert not op.accept_ready(1, 2, b, 'cui', 'none', 'idle')
+        assert op.pending is not None
+        assert op.accept_ready(1, 1, b, 'cui', 'none', 'idle')
+        if line == 'ver':
+            assert op.pending is not None
+            adapter = sock_ns['OperatorSocket'].__new__(sock_ns['OperatorSocket'])
+            adapter.operator = op
+            replies = []
+            adapter._send = lambda client, response: replies.append(response)
+            adapter._request({'wait': None}, {'op': 'resume'})
+            assert replies[-1]['ok']
+        assert op.pending is None and ident in op.results, 'different boot not retired'
+        assert not op.accept_output(1, 1, a, ident, 0, b'> ver\nlate\n\x04', 12, 'cui')
+        assert op.accept_ready(1, 1, b, 'cui', 'none', 'idle')
+        adapter = sock_ns['OperatorSocket'].__new__(sock_ns['OperatorSocket'])
+        adapter.operator = op
+        replies = []
+        adapter._send = lambda client, response: replies.append(response)
+        adapter._request({'wait': None}, {'op': 'submit', 'mode': 'cui', 'line': 'ver'})
+        assert replies[-1]['ok'], 'socket submit after retirement failed'
+        next_id = replies[-1]['id']
+        assert next_id != ident
+        client = {'wait': ('result', ident, 0)}
+        adapter._complete_wait(client, 1)
+        assert replies[-1]['state'] == 'boot_changed' and not replies[-1]['complete']
+        assert 'status' not in replies[-1], 'retirement fabricated status'
+        client['wait'] = ('result', ident, 0)
+        adapter._complete_wait(client, 1)
+        assert replies[-1].get('error') == 'NO_SUCH_ID', 'retirement returned twice'
+        assert op.pending['id'] == next_id
+    op = op_ns['Operator'](Notify())
+    op.session_start(1)
+    op.accept_ready(1, 1, a, 'cui', 'none', 'idle')
+    op.submit('cui', 'ver', None)
+    op.unknown()
+    op.resume()
+    assert not op.results, 'same boot resume retired'
+    adapter = sock_ns['OperatorSocket'].__new__(sock_ns['OperatorSocket'])
+    adapter.operator = op
+    replies = []
+    adapter._send = lambda client, response: replies.append(response)
+    adapter._request({'wait': None}, {'op': 'submit', 'mode': 'cui', 'line': 'ver'})
+    assert replies[-1]['ok'], 'same boot resume did not release pending'
+    print('PASS boot retirement')
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     parser.add_argument('--module', default=str(ROOT / 'tools/remote_transport.py'))
     args = parser.parse_args()
+    test_boot_retirement()
     test_auto(args.module)
     test(args.module)
     if args.mutate:
+        operator_source = (ROOT / 'tools/host_rshell.py').read_text()
+        socket_source = (ROOT / 'tools/host_operator_socket.py').read_text()
+        mutations_boot = [
+            (operator_source, "if self.ready['boot'] != self.pending['boot']:", "if False:", 'different boot not retired', True),
+            (operator_source, "if self.ready['boot'] != self.pending['boot']:", "if True:", 'same boot resume retired', True),
+            (socket_source, "self.operator.results.pop(ident, None)", "pass", 'retirement returned twice', False),
+            (socket_source, "if state != 'boot_changed':", "if True:", 'retirement fabricated status', False),
+            (operator_source, "        else:\n            self.pending = None\n\n    def accept_output", "        else:\n            pass\n\n    def accept_output", 'same boot resume did not release pending', True),
+        ]
+        for source_boot, old, new, marker, is_operator in mutations_boot:
+            assert source_boot.count(old) == 1
+            try:
+                test_boot_retirement(source_boot.replace(old, new) if is_operator else None,
+                                     None if is_operator else source_boot.replace(old, new))
+            except (AssertionError, KeyError) as exc:
+                assert marker in str(exc), (marker, exc)
+                print('RED', marker)
+            else:
+                raise AssertionError('surviving mutant: ' + marker)
         source = Path(args.module).read_text()
         mutations = [
             ("if not probe.get('hello') or not ready:", "if not ready:", 'missing hello did not call port_factory'),

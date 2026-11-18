@@ -3,9 +3,12 @@
 #include "kboot_info.h"
 #include "kernel_start.h"
 #include "ppc_trap.h"
+#include "ppc_hpt.h"
+#include "ppc_pd.h"
 #include "ppc_oea.h"
 #include "ofw.h"
 #include "paging.h"
+#include "via_window.h"
 #include "kstring.h"
 void fixture_done(void) __attribute__((noreturn));
 void fixture_fail(void) __attribute__((noreturn));
@@ -36,6 +39,13 @@ void kernel_start(void)
     __asm__ volatile("mfmsr %0" : "=r"(msr));
     if ((msr & (PPC_MSR_IR | PPC_MSR_DR | PPC_MSR_EE)) !=
         (PPC_MSR_IR | PPC_MSR_DR)) fixture_fail();
+    const struct pm_via_window *window = pm_via_window();
+    const struct pm_via_boot *via = &ppc_boot_info()->via;
+    struct ppc_translation t;
+    if (via->kind != PM_VIA_CUDA || via->capture_rc || window->rc ||
+        window->va != PM_VIA_VA + (via->pa & (PAGE_SIZE - 1)) ||
+        !ppc_pd_lookup(ppc_root_current(), window->va, 1, 0, &t) ||
+        t.pa != via->pa || t.attr != 0x28) fixture_fail();
     say("PAGING:MAIN\r\n");
 #if BOOT_NEGATIVE == 1
     say("PROBE:LOW\r\n");

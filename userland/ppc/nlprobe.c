@@ -1,4 +1,5 @@
-/* Expectation origin: PPC_FP_NEWLIB_DESIGN §8 N2・N3.
+/* Expectation origin: PPC_FP_NEWLIB_DESIGN §4 N3・§8 / astra レビュー 2026-11-18.
+ * heap の回収は DEFERRED PPC-NEWLIB-HEAP-RECLAIM.
  * Acceptance-only RAM-root file; run twice to observe owner/FD reuse. */
 #include "os32api.h"
 #include <stdio.h>
@@ -65,6 +66,29 @@ static int file_probe(void)
     return errno == ENOENT ? 0 : 38;
 }
 
+static int fds[256];
+static int resources(KernelAPI *api, int retain, int fault)
+{
+    unsigned nf = 0;
+    unsigned char *held = malloc(65536);
+    if (!held) return 44;
+    for (unsigned i = 0; i < 65536; i += 4096) held[i] = 1;
+    while (nf < sizeof fds / sizeof fds[0]) {
+        int fd = api->sys_open("/tmp/newlib-probe.tmp", 0);
+        if (fd < 0) break;
+        fds[nf++] = fd;
+    }
+    if (!nf || nf == sizeof fds / sizeof fds[0]) return 44;
+    printf("N3-resources fd=%u\n", nf);
+    fflush(NULL);
+    if (fault) __asm__ volatile("trap" : : : "memory");
+    if (!retain) {
+        free(held);
+        while (nf) api->sys_close(fds[--nf]);
+    }
+    return 0;
+}
+
 int main(int argc, char **argv, KernelAPI *api)
 {
     int rc;
@@ -77,6 +101,12 @@ int main(int argc, char **argv, KernelAPI *api)
         (uintptr_t)&zero2 < (uintptr_t)__bss_start ||
         (uintptr_t)&zero2 + sizeof zero2 > (uintptr_t)__bss_end) rc = 12;
     else if ((rc = heap_probe()) == 0) rc = file_probe();
+    if (!rc && argc > 1 && !strcmp(argv[1], "resources"))
+        rc = resources(api, 0, 0);
+    if (!rc && argc > 1 && !strcmp(argv[1], "retain"))
+        rc = resources(api, 1, 0);
+    if (!rc && argc > 1 && !strcmp(argv[1], "retain-fault"))
+        rc = resources(api, 1, 1);
     if (!rc && argc > 1 && !strcmp(argv[1], "help-found")) {
         int kind, code;
         fflush(NULL);
