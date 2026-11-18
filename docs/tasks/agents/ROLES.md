@@ -37,20 +37,30 @@
 
 ## 2. 起動
 
+役の呼び名とモデル ID (2026-11-18 に `codex debug models` と実際の起動で確かめた。名前が変わったらこの表を直す):
+
+| 呼び名 | モデル ID | 一覧での位置づけ |
+|---|---|---|
+| terra | `gpt-6.1-terra` | 効率の良いモデル |
+| sol | `gpt-6.2-sol` | 普段使いのコーディングのモデル (`gpt-6.1-sol` は前の世代) |
+| astra | `gpt-6.2-astra` | 一番能力の高いモデル (`gpt-6-astra` は前の世代) |
+
+略称 (`terra` だけ) は受け付けられない。`codex exec … resume <sid>` は `-m` を付けないと `~/.codex/config.toml` の既定のモデルで続くので、resume でも `-m <元のモデル>` を付ける。
+
 ```bash
 # 実装者 (Bash の run_in_background で直接起動し、完了通知で読む。pgrep / pkill -f で待たない・止めない)
-timeout 7100 codex exec -m gpt-6.1-sol -c service_tier='"priority"' -s workspace-write -C <worktree> \
+timeout 7100 codex exec -m gpt-6.2-sol -c service_tier='"priority"' -s workspace-write -C <worktree> \
     --add-dir /home/hight/os32-v3/.git --add-dir /home/hight/os32-tmp \
     -c sandbox_workspace_write.network_access=true "<依頼文>" < /dev/null > <ログ> 2>&1
-#   上位モデルは -m gpt-6-astra。出力の `model:` 行でモデルを確かめる。`< /dev/null` と timeout は必ず付ける。
+#   上位モデルは -m gpt-6.2-astra、安い段は -m gpt-6.1-terra。出力の `model:` 行でモデルを確かめる。`< /dev/null` と timeout は必ず付ける。
 #   sandbox は .git を読み取り専用にする — 実装者はコミットせず、PM が worktree の差分をコミットする
 #   (末尾は `Co-Authored-By: Codex <モデル名> <noreply@openai.com>`)。
 
 # 差分のレビュー (既定、sol の実装) — astra の read-only。対象の worktree を -C に、依頼は §5 の書式:
-timeout 1500 codex exec -m gpt-6-astra -s read-only -C <worktree> "<依頼文>" < /dev/null > <ログ> 2>&1
+timeout 1500 codex exec -m gpt-6.2-astra -s read-only -C <worktree> "<依頼文>" < /dev/null > <ログ> 2>&1
 # 差分のレビュー (astra の実装) — Agent(subagent_type: "reviewer")、model は reviewer.md の opus。読むだけ・編集禁止。
 # 設計票の書き手 — astra。書くのは指定した一時ディレクトリの票だけ、リポジトリは読むだけ:
-timeout 7100 codex exec --skip-git-repo-check -m gpt-6-astra -s workspace-write -C ~/os32-tmp/run/<題> "<依頼文>" < /dev/null > <ログ> 2>&1
+timeout 7100 codex exec --skip-git-repo-check -m gpt-6.2-astra -s workspace-write -C ~/os32-tmp/run/<題> "<依頼文>" < /dev/null > <ログ> 2>&1
 # 設計票のレビュー — 別インスタンスの Agent(subagent_type: "reviewer")、model は opus。
 ```
 

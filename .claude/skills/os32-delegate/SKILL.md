@@ -48,6 +48,7 @@ git worktree add -q -b wt/<名> ~/wt/os32-v3/<名> <基点の SHA>
 
 ```bash
 ~/os32-tmp/bin/codex_run.sh <段> <モデル> <作業木> ~/os32-tmp/run/<段>/PACK.md   # すぐ戻る。ログは run/<段>/impl.log、最後の行が rc=N
+# <モデル> は正式なモデル ID (呼び名との対応は ROLES §2 の表: gpt-6.1-terra・gpt-6.2-sol・gpt-6.2-astra)。起動の直後に impl.log の `model:` 行を確かめる
 ~/os32-tmp/bin/watch_new.sh <段>/impl.log [<別の段>/impl.log ...]                  # 別の Bash 呼び出しで run_in_background
 ```
 
