@@ -19,7 +19,7 @@ MUTATIONS = [
 ]
 
 # Expected exit codes are defined in kboot_log_host.c.
-RX_MUTATIONS = [
+EXACT_MUTATIONS = [
     ('rx-drop', 'escc.c', 'unsigned byte = ppc_load8(s->data);',
      '(void)ppc_load8(s->data); unsigned byte = ppc_load8(s->data);', 201),
     ('rx-try-waits', 'escc.c', 'if (!s || !(ppc_load8(s->csr) & PM_RR0_RX_READY)) return -1;',
@@ -35,6 +35,12 @@ RX_MUTATIONS = [
      205),
     ('rx-parity-else-if', 'escc.c', 'if ((status & PM_RR1_PARITY) && rx_parity_errors != (u32)-1)',
      'else if ((status & PM_RR1_PARITY) && rx_parity_errors != (u32)-1)', 207),
+    ('clock-pclk', 'log.c', 'ESCC_WR14_BRG_RTXC = 0x00',
+     'ESCC_WR14_BRG_RTXC = 0x02', 208),
+    ('clock-time-constant', 'log.c', 'ESCC_BRG_RATE / baud - 2',
+     'ESCC_BRG_RATE / baud - 1', 209),
+    ('fixed-rate-status', 'log.c', 'if (baud) *baud = escc_baud;',
+     'if (baud) *baud = 9600;', 210),
 ]
 
 
@@ -47,11 +53,13 @@ def exercise(directory, name, filename=None, before=None, after=None):
             source = source.replace(before, after, 1)
         (directory / unit).write_text(source)
     binary = directory / name
-    command = ['gcc', '-m32', '-std=gnu11', '-O2', '-ffreestanding',
+    command = ['gcc', '-m32', '-std=gnu11', '-O2', '-ffreestanding', '-DKBOOT_SH=1',
                '-fno-builtin', '-fno-pie', '-no-pie', '-fno-stack-protector',
                '-nostdlib', '-static', '-Wall', '-Wextra', '-Werror',
                '-I' + str(ROOT / 'include'), '-I' + str(ROOT / 'arch/ppc'),
                '-I' + str(ROOT / 'platform/powermac'),
+               '-I' + str(ROOT / 'sdk/include/os32'),
+               str(ROOT / 'kernel/port_service.c'),
                str(ROOT / 'tools/ppc/kboot_log_host.c'),
                str(directory / 'log.c'), str(directory / 'escc.c'), '-o', str(binary)]
     subprocess.run(command, check=True, timeout=60)
@@ -72,7 +80,7 @@ def main():
                 rc = exercise(directory, *mutation)
                 assert rc > 0, f'{mutation[0]}: expected runtime assertion, got {rc}'
                 print(mutation[0] + ' runtime RED', flush=True)
-            for name, filename, before, after, expected in RX_MUTATIONS:
+            for name, filename, before, after, expected in EXACT_MUTATIONS:
                 rc = exercise(directory, name, filename, before, after)
                 assert rc == expected, f'{name}: expected runtime exit {expected}, got {rc}'
                 print(f'{name} runtime RED (exit {rc})', flush=True)

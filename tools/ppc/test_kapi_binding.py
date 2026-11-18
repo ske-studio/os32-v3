@@ -43,8 +43,7 @@ mouse_cursor_show mouse_poll mouse_set_bounds np2_check_hostdrv np2_detect
 np2_get_clock np2_get_cpu np2_get_version
 pci_bind_info pci_cfg_read32 pci_count
 pci_get pcm_close pcm_open pcm_set_volume pcm_status pcm_write rtc_read
-serial_diag serial_get_status serial_getchar serial_init serial_init_vfast
-serial_is_initialized serial_putchar serial_puts serial_trygetchar sfs_begin
+serial_diag serial_puts sfs_begin
 sfs_end snd_bgm_is_playing snd_bgm_play snd_bgm_set_persist snd_bgm_stop
 snd_focus snd_se_play snd_se_play_raw snd_set_master ssg_all_off ssg_tone
 ssg_volume sys_get_build_info
@@ -59,6 +58,8 @@ ALLOWED_UNDEFINED = frozenset("""
 surface_api_query
 surface_api_lease
 surface_api_unlease
+port_init port_init_vfast port_putchar_kapi port_getchar_kapi port_trygetchar
+port_is_initialized port_get_status
 boot_token_get
 con_sink_capture
 appmem_error_public

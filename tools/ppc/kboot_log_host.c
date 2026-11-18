@@ -1,8 +1,11 @@
 /* Freestanding 32-bit host: only MMIO is replaced, product code is linked. */
 #include "kboot_log.h"
 #include "ofw.h"
+#include "port_service.h"
 static char output[256];
 static unsigned used, reads, stalled, drain_stalled, indexed, calls, last_used;
+static unsigned char csr_writes[16];
+static unsigned capture_csr, csr_used;
 /* Independent Z8530 fixture values. Error status follows the FIFO head. */
 static const unsigned char rx_fifo[] = { 0x00, 0xff, 0x53, 0x80, 0x41, 0x50 };
 static const unsigned char rx_status[] = { 0, 0x20, 0x20, 0x40, 0x10, 0x50 };
@@ -18,6 +21,9 @@ enum {
     RX_DIAG_FRAMING,
     RX_DIAG_PARITY,
     RX_DIAG_FRAMING_AND_PARITY,
+    TX_CLOCK_SOURCE,
+    TX_TIME_CONSTANT,
+    TX_STATUS_RATE,
 };
 static void finish(int status)
 {
@@ -47,6 +53,7 @@ unsigned ppc_load8(cell a)
     /* Runtime watchdog: removal of the product bound fails, never hangs. */
     REQUIRE(reads <= PM_POLL_LIMIT + 1 + (drain_stalled ? 7 : 0));
     if (indexed) {
+        REQUIRE(indexed == 1);
         indexed = 0;
         return (drain_stalled ? 0 : 0x01) |
                (rx_head < rx_tail ? rx_status[rx_head] : 0);
@@ -56,6 +63,19 @@ unsigned ppc_load8(cell a)
 void ppc_store8(cell a, unsigned value)
 {
     if (a == 0xfe300000) {
+        if (capture_csr) {
+            REQUIRE(csr_used < sizeof(csr_writes));
+            csr_writes[csr_used++] = value;
+            if (indexed > 1) {
+                indexed = 0;
+                return;
+            }
+            if (value == 4 || (value >= 11 && value <= 14)) {
+                REQUIRE(!indexed);
+                indexed = value;
+                return;
+            }
+        }
         REQUIRE(!indexed);
         if (value == 0x30) {
             REQUIRE(rx_error);
@@ -90,6 +110,25 @@ static void expect(const char *text, unsigned n)
     REQUIRE(used == n);
     for (unsigned i = 0; i < n; i++) REQUIRE(output[i] == text[i]);
 }
+static void expect_clock(unsigned time_constant, u32 baud)
+{
+    /* RR1 select (drain), then six register/value pairs on channel A. */
+    REQUIRE(csr_used == 13 && !indexed);
+    REQUIRE(csr_writes[0] == 1 && csr_writes[1] == 14 && csr_writes[11] == 14);
+    if (csr_writes[2] != 0x00 || csr_writes[12] != 0x01)
+        finish(TX_CLOCK_SOURCE);
+    REQUIRE(csr_writes[3] == 4 && csr_writes[4] == 0x44);
+    REQUIRE(csr_writes[5] == 11 && csr_writes[6] == 0x50);
+    REQUIRE(csr_writes[7] == 12 && csr_writes[9] == 13);
+    if (csr_writes[8] != time_constant || csr_writes[10] != 0)
+        finish(TX_TIME_CONSTANT);
+    u32 mode, reported_baud, fifo;
+    REQUIRE(port_get_status(&mode, &reported_baud, &fifo) == 0);
+    REQUIRE(mode == 0 && fifo == 1);
+    if (reported_baud != baud)
+        finish(TX_STATUS_RATE);
+    csr_used = 0;
+}
 void _start(void)
 {
     struct pm_log_stats s;
@@ -103,12 +142,15 @@ void _start(void)
     REQUIRE(!pm_log_fatal_hex(0xfe300000, 0xfe300010, words, 9));
     expect("FATAL 00000000 1234abcd ffffffff 00000003 00000004 00000005 00000006 00000007\r\n", 79);
     used = reads = indexed = 0;
+    capture_csr = 1;
     REQUIRE(!pm_log_escc_init(0xfe300000, 0xfe300010));
     REQUIRE(pm_log_escc_init(1, 2) == -1);
     REQUIRE(!pm_log_add_sink(&queue));
     REQUIRE(pm_log_add_sink(&third) == -1);
     pm_log_write("AB", 2);
     expect("AB", 2);
+    REQUIRE(csr_used == 0);
+    capture_csr = 0;
     REQUIRE(calls == 1);
     REQUIRE(!pm_log_get_stats(1, &s) && s.failures == 1 && s.dropped == 2);
     stalled = 1; reads = 0;
@@ -151,5 +193,14 @@ void _start(void)
     reads = 0;
     single_poll = 1;
     REQUIRE(pm_escc_trygetchar() == -1 && reads == 1);
+    single_poll = reads = 0;
+    capture_csr = 1;
+    port_init(9600);
+    REQUIRE(port_is_initialized());
+    expect_clock(10, 9600);
+    REQUIRE(port_init_vfast(38400) == -1);
+    expect_clock(1, 38400);
+    REQUIRE(port_init_vfast(38400) == -1 && csr_used == 0);
+    REQUIRE(port_init_vfast(12345) == -2 && csr_used == 0);
     finish(0);
 }
