@@ -114,13 +114,6 @@ PROVIDER_GROUPS = {
         'sfs_begin',
         'sfs_end',
     }), frozenset(['serialfs.h'])),
-    'path': (frozenset({
-        'path_get_drive',
-        'path_get_cwd',
-        'path_set_drive',
-        'path_set_cwd',
-        'path_parse',
-    }), frozenset([])),
     'db': (frozenset({
         'db_open',
         'db_close',

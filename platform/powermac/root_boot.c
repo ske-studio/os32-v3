@@ -1,5 +1,12 @@
 #include "root_boot.h"
 #include "fs/vfs_device.h"
+#include "kernel/dev/dev.h"
+#include "lib/path.h"
+
+static int pm_path_device_present(const char *name)
+{
+    return dev_find(name) != 0;
+}
 
 int pm_root_boot(const struct boot_root_image *image)
 {
@@ -14,5 +21,9 @@ int pm_root_boot(const struct boot_root_image *image)
     vfs_device_names_register(names, sizeof(names) / sizeof(names[0]));
     rc = boot_root_fs_init();
     if (rc) return rc;
-    return boot_root_start(image);
+    rc = boot_root_start(image);
+    if (rc) return rc;
+    path_init();
+    path_set_device_validator(pm_path_device_present);
+    return path_set_drive(vfs_devname("/"));
 }

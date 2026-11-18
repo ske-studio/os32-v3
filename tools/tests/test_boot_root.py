@@ -9,8 +9,8 @@ CHECK = dict(name='boot-root-host', tier=1, budget=30, needs=['make:all'],
              covers=['build/core.yaml', 'userland/deploy.yaml', 'tools/deploy_manifests.py', 'tools/mkpkg.py', 'tools/mkfat12.py', 'build/packages.yaml', 'init/boot_root.c', 'platform/powermac/root_boot.[ch]',
                      'tools/tests/boot_root_host.c', 'tools/tests/test_boot_root.py',
                      'include/boot_root.h', 'kernel/dev/ram_ro.[ch]',
-                     'drivers/base/dev.[ch]', 'fs/vfs*', 'fs/isofs/**',
-                     'fs/ramfs/**', 'lib/kstring*', 'tools/mkroot_image.py'],
+                     'drivers/base/dev.c', 'kernel/dev/dev.h', 'fs/vfs*', 'fs/isofs/**',
+                     'fs/ramfs/**', 'lib/kstring*', 'lib/path.[ch]', 'tools/mkroot_image.py'],
     basis=['PPC_SHELL_DESIGN §3', 'PPC_SHELL_DESIGN §4', 'PPC_SHELL_DESIGN §5', 'PPC_SHELL_DESIGN §6', 'PPC_SHELL_DESIGN §7', 'PPC_SHELL_DESIGN §8', 'PPC_SHELL_DESIGN §11'],
 )
 
@@ -36,7 +36,7 @@ def main():
                    '-Wl,--wrap=vfs_register_fs', '-Wl,--wrap=vfs_mount',
                    'kernel/dev/ram_ro.c', 'drivers/base/dev.c', 'fs/vfs.c',
                    'fs/isofs/iso9660.c', 'fs/isofs/iso9660_media.c', 'fs/ramfs/ramfs.c',
-                   'lib/kstring_c.c', 'tools/tests/boot_root_host.c', '-o', str(d / 'test')]
+                   'lib/kstring_c.c', 'lib/path.c', 'tools/tests/boot_root_host.c', '-o', str(d / 'test')]
             subprocess.run(cmd, cwd=ROOT, check=True)
             result = subprocess.run([str(d / 'test'), str(d / 'root.iso')], cwd=ROOT)
             expected = 4 if mutant else 0

@@ -41,8 +41,8 @@ ime_user_delete ime_user_export ime_user_list kcg_init kcg_load_font
 kcg_read_ank kcg_read_kanji kcg_set_scale kdebug_call loop_attach loop_detach
 loop_status mem_stat mouse_available mouse_cursor_hide mouse_cursor_set_mode
 mouse_cursor_show mouse_poll mouse_set_bounds np2_check_hostdrv np2_detect
-np2_get_clock np2_get_cpu np2_get_version path_get_cwd path_get_drive
-path_parse path_set_cwd path_set_drive pci_bind_info pci_cfg_read32 pci_count
+np2_get_clock np2_get_cpu np2_get_version
+pci_bind_info pci_cfg_read32 pci_count
 pci_get pcm_close pcm_open pcm_set_volume pcm_status pcm_write rtc_read
 serial_diag serial_get_status serial_getchar serial_init serial_init_vfast
 serial_is_initialized serial_putchar serial_puts serial_trygetchar sfs_begin
@@ -165,6 +165,11 @@ tvram_reverse_cell
 tvram_scroll
 vfs_chdir
 vfs_close
+path_get_cwd_user
+path_get_drive_user
+path_set_drive
+path_set_cwd
+path_parse
 vfs_cwd_user
 vfs_dev_mount_count
 vfs_devname_user
@@ -253,7 +258,7 @@ def main():
         return 1
     entries = [api for api in json.loads((ROOT / 'sdk/kapi.json').read_text())['api']
                if api['name'] in EXPECTED_ABSENT_SLOTS]
-    assert len(entries) == 181
+    assert len(entries) == 176
     assert {'buz_on', 'buz_off', 'rtc_read'} <= ABSENT_PROVIDER_SLOTS
     assert not {'sys_reboot', 'sys_shm_alloc', 'sys_shm_lock', 'sys_shm_free'} & ABSENT_PROVIDER_SLOTS
     with tempfile.TemporaryDirectory(prefix='ppc-binding-') as directory:
