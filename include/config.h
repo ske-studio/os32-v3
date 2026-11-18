@@ -39,6 +39,7 @@
 #define SYS_SPLASH_USER_IMAGE "/boot/user.osri"
 #define SYS_NETCD_CFG         "/etc/netcd.cfg"     /* FD-only network CD boot settings */
 #define SYS_SYSTEM_CFG        "/etc/system.cfg"    /* 起動設定 (GUI=0/1、K4) */
+#define SYS_MACHINE_CFG       "/etc/machine.cfg"
 #define SYS_GFXSYNC_CFG       "/etc/gfx/sync.cfg"
 #define SYS_PROFILE_SYS       "/etc/profile"       /* システムプロファイル */
 #define SYS_FB_FONT           "/fonts/shino16.kcg"
