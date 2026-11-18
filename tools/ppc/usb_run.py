@@ -458,7 +458,11 @@ def product_accept(elf, cpu, out, mode, late=False):
                     # HOME moves to the beginning; advance to x and delete it.
                     for _ in range(6): key('right')
                     key('delete'); key('ret')
-                    wait_for(lambda: output()[start:].endswith('sh> '), 'edit prompt')
+                    # DELETE redraws the line, and redraw_line ends by printing the prompt again
+                    # (the cursor is then moved without output). The stream therefore ends with
+                    # 'sh> ' before Enter is consumed; wait for the fd1 result as well, as above.
+                    wait_for(lambda: output()[start:].endswith('sh> ') and
+                             'hi' in output()[start:].splitlines()[1:], 'edit result prompt')
                     require('hi' in output()[start:].splitlines()[1:], 'HOME/LEFT/RIGHT/DEL result')
                     start=len(output()); text_keys('echo '); key('a', hold=800); time.sleep(.15)
                     time.sleep(.15); held=output(); time.sleep(.15); require(output()==held, 'no repeat after release')
