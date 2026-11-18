@@ -123,6 +123,78 @@ SKIP の行は挙げるだけで落とさない: 試験が自分の出力とし�
 
 判定の直しの後の 10 回 (`1ee8d5090`、同じく `arch=both` で 10 回): 10 回とも success。rustup の用意は 62 ジョブで、auto-install 0・部品を新しく取った 62・壊れた toolchain を見つけて消した 0・conflict 0 (この 10 回では runner の壊れた状態は出なかった)。`ppc-sd-link`・`ppc-usb` は各回で回って通った (11 回ずつ、push の回を含む)。票の基準 (5) を満たした。
 
+## 5-3. 実測の取り直し (2026-11-18、票 TASK_CI_REWORK の段 S1)
+
+12:00 UTC 頃に API の時刻とジョブのログから取った。生データは残していない (再取得は同じ手順: スキル os32-ci-inventory)。
+
+標本 (完了した回だけ。実行中の 44298430149・44297850443 などは除外):
+- check push 20 回: 44268941385 (11-18 08:39) 〜 44293807742 (11:20)。うち main 5 回・枝 15 回
+- build push 20 回: 44253143264 (06:41) 〜 44293807601 (11:20)
+- check の dispatch (S0 以外) 20 回: **全部 11-14** (43554414223 〜 43617404157)。ppc-qemu を割る前の古い形で、今の形の dispatch は S0 の分しか無い
+- build の dispatch 20 回: 43811232447 (11-16) 〜 44290777801 (11-18)。11-16 の 12 回は古い形 (`check-fast` 6 本)、今の形 (`checks` 6 本) は 8 回
+- S0 (wt/ci-s0、check の dispatch 20 回): af58ea349 ×10 (44254897577 〜 44254929089) + 1ee8d5090 ×10 (44268976917 〜 44269022922)
+- 時刻は API の created_at / started_at / completed_at。「待ち」= started − created (キュー)、「実行」= completed − started。生データは同じ置き場の jobs/*.json・logs/*.log・sel.txt
+
+#### 1. §1 の表に差し替える形
+
+| workflow | ジョブ | 実行の所要 (中央 / 最小〜最大、push 20 回) | キューの待ち (中央 / 最大) | 結果 (push 20 回) |
+|---|---|---|---|---|
+| check | static-check | 5.2 / 2.4〜14.3 分 (n=20) | 3.1 / 19.4 分 | success 15・failure 5 (全部が文書の検査、下の 1) |
+| check | ppc-compile | 中身を回した回 4.4 / 3.3〜10.3 分 (n=13)。範囲の判定で飛ばした回 0.1〜0.2 分 (n=7) | 3.0 / 22.5 分 | success 20 |
+| check | ppc-qemu (4 シャード) | 回した回 16.3 / 8.6〜24.4 分 (n=52)。飛ばした回 0.1〜0.3 分 (n=28) | 5.5 / 19.6 分 | success 80 |
+| check | ppc-toolchain-cache (main だけ) | 0.2 / 0.2〜0.4 分 (n=5、キャッシュに当たった) | 7.2 / 18.0 分 | success 5・skipped 15 |
+| build | artifacts | 2.2 / 1.7〜3.4 分 (n=18) | 1.2 / 29.0 分 | success 18・cancelled 2 |
+| build | checks (6 シャード) | 成功した 77 本で 18.0 / 8.1〜41.8 分。シャード別の中央: (0) 25.5・(1) 11.6・(2) 15.3・(3) 23.2・(4) 24.2・(5) 14.6 | 3.4 / 28.6 分 | success 77・failure 6・cancelled 37 |
+
+push から最後のジョブが終わるまで (run の created_at → 最後の completed_at):
+- check だけ: 中央 23.2 分・最大 42.8 分 (44274645643) (n=20)。PowerPC を回した 13 回は中央 28.4 分 (17.9〜42.8)、飛ばした 7 回は 2.9〜25.4 分
+- build だけ (cancel の無い 13 回): 中央 36.1 分・最大 68.4 分 (44274576966、runner が通信を失った回)
+- check と build の両方が最後まで走った push 8 回: 中央 40.7 分・最小 34.3・最大 68.4 分
+- 待ちの分: 各 run で最後に始まったジョブの待ちは、check で中央 10.9 分 (最大 23.2)、build で中央 10.4 分 (最大 29.3)。待ちは同じ時間帯に走る枝の数で変わる (runner の同時数の上限、推測)
+
+| 区分 | run の結果 | 所要 |
+|---|---|---|
+| check の push 20 回 | success 15・failure 5・cancelled 0 | 上の表 |
+| build の push 20 回 | success 9・failure 4・cancelled 7 (同じ枝の次の push で打ち切り。build.yml の `concurrency: cancel-in-progress`) | 上の表 |
+| check の dispatch 20 回 (11-14、古い形) | success 19・cancelled 1 | static-check 4.7 (3.5〜5.7) 分、ppc-compile 1.0 (0.8〜14.6) 分、全体 中央 5.1・最大 14.7 分 |
+| build の dispatch 20 回 | success 12・failure 2・cancelled 6 | 今の形の `checks` 17.0 (9.3〜34.6) 分 (n=24)、古い形の `check-fast` 5.5 (3.4〜12.2) 分 (n=70) |
+| S0 の dispatch 20 回 (同じ SHA の揺れの確かめ) | success 20 (ジョブも 140 本全部 success、ppc-toolchain-cache は skipped) | 実行は ppc-compile 4.3 (3.2〜8.7)・ppc-qemu 15.7 (12.9〜22.5)・static-check 4.8 (3.7〜13.0) 分。20 本を同時に起動したので待ちが中央 40〜43 分・最大 95 分、全体は中央 63.4・最大 111.2 分 (所要の基準には使えない) |
+
+#### 2. failure の内訳 (1 行ずつ)
+
+check の push (static-check の 5 本。どれも「Documents」の手順で落ち、ほかのジョブは通過):
+- 44290719097 (wt/ppc-kapi-fill 1fe0bf26d): `check-docs-tree` — ticket_crosslink 1 / 基準値 0。本物の赤 (枝の文書)
+- 44289493633 (wt/ppc-kapi-fill e7d1fde36): `check-docs-orphans` — docs/tasks/ppc/TASK_PPC_KAPI_FILL.md が孤立。本物の赤
+- 44274645643・44271594377・44271211395 (wt/ppc-sqlite-stack): `check-docs-line-refs`。本物の赤 (3 回続けて同じ。次の 6ee9a56f6 で緑)
+
+build の push (failure の 6 ジョブ):
+- 44274645658 checks (4) (wt/ppc-sqlite-stack 4ca0851fa): `check-docs-line-refs`。本物の赤 (上と同じ)
+- 44274576966 checks (4) (**main** 133205ead): 検査の失敗ではない。`make check` の途中で 53 分走って「The hosted runner lost communication with the server」(注記)。基盤の失敗。ほかの 5 シャードは通過。原因 (メモリ・CPU の枯渇か) は未確認
+- 44255276200 checks (2) (wt/ppc-newlib f99c70501): `check-build-compare-host` (AssertionError、MUTATE RED orphan KILL lost)。checks (0) は `check-sep5-boot-host` (tool invoked: boot)・`check-sep5-sdk-host` ('ppc-entries','sdk')。本物の赤 (枝の変更、次の 601f392d0 で緑)
+- 44253254726 checks (2) (wt/ppc-newlib ae9f0cbc2): `check-build-compare-host`・`check-map` (arch-ctx-guest の uncovered dynamic artifact build/out/ppc-user/*.o)。本物の赤
+- 44253143264 checks (2) (wt/ppc-km-s2u 9fd5d6435): `check-ppc-input-usb-host` (ホストの gcc -m32 のコンパイルが失敗)。本物の赤 (推測: 次の push 1c7f7e6ae で緑)
+
+build の dispatch:
+- 44290777801 checks (3) (wt/ppc-kapi-fill): `check-docs-tree` (ticket_crosslink)。本物の赤
+- 43982950103 check-fast (3)・43982002500 check-fast (3)・43878949072 check-fast (4) (11-16、古い形): 落ちた検査は**未確認** (ログを取り切れなかった・make の失敗行が見つからなかった)
+
+揺れ・用意の失敗: 今回の標本では 0。ジョブが 1 分以内に落ちた例も無い。
+
+#### 3. SKIP の行
+
+- check の ppc-qemu: ジョブの要約の表 (`gate.py` が端末にも同じ表を出す) の「SKIP の行がある」は、中身を回した 13 回 × 4 シャード = 52 本で **全部 0**
+- check の static-check (ログの数え): 1 回あたり 3 行、通過した 15 回で計 45 行 (落ちた 5 回は Documents で止まり、この手順まで行かない)。`TARGET SKIP (i386-elf-gcc not in PATH)` ×2 (`check-ext2-empty-name-host`・`check-vfs-fd-path-host`)、`ERRNO SKIP (newlib headers not found)` ×1 (`check-vfs-fd-path-host`)。クロスの無いジョブで、ターゲット側の確かめが飛んでいる (G6 の対象)
+- check の ppc-compile (ログの数え): 回した 13 回で毎回 11 行 (`SKIP: PPC toolchain unavailable` ×4、`SKIP ppc-sc/ppc-sd/ppc-sh-output:` 各 ×2、`SKIP LAN socket rc=3` ×1)。前後の行が `RED: ignoring OS32_REQUIRE_PPC detected`・`PASS: PPC CI gate matrix`・`RED H:A12 skip-as-pass` なので、試験が SKIP の扱いを確かめるために自分で出す行と見る (推測。本物の SKIP の有無は、検査ごとのログが無いので未確認)
+- build の checks (ログの数え、表は無い): 44292264241 の 6 シャードで計 109 行 (16・14・15・16・28・20)、44290272004 の 5 シャードで計 86 行 ((4) は取得せず)。ほとんどが PowerPC の検査: `tools/ppc/test_*.py: unavailable: /home/hight/opt/cross-ppc/bin/powerpc-elf-gcc …` (約 35 本の台本)、`ppc-usb`・`ppc-fb`・`ppc-rh-fb`・`ppc-cpu-nap`・`ppc-link-sh`・`arch-ctx-guest`・`layers-ppc` など。PowerPC の道具の場所が手元の既定値 (`/home/hight/opt/cross-ppc`) のまま runner で探されている。x86 側の物: `lychee が無いのでリンク検査を飛ばします` (1)、`FreeType comparison: freetype-py not importable`、`BDF original comparison`・`float-raster comparison` (osN-tmp の元が無い)、SoftFloat の original hashes、`TARGET arm-none-eabi SKIP`、`SKIP AF_PACKET … fixture` (自分で出す行、gate.md §5 のとおり)。行と検査名の対応は、並列の出力が混ざるので一部しか付けられない
+- 副産物: build の checks (1) のログが 162〜333 MB (44290272004・44292264241)。GeForce の host 試験の変異の回が `FAIL !write && (prod.display…)` を 230 万行出している。ログの取得が重い (1 本数分)
+
+#### 4. main への push で PowerPC の段が中身を回すか
+
+- **回らない。** 標本の main の push 5 回 (44290201312・44290142172・44277658303・44276821812・44274576283) は 5 回とも `Select PPC scope` の出力が `skip: x86-only, documentation-only, or empty branch delta`。ppc-compile 0.1〜0.2 分、ppc-qemu 4 本 0.1〜0.3 分 (用意以降の手順は飛ぶ)。ppc-toolchain-cache だけが 0.2〜0.4 分で走る
+- 規則 (`tools/ci/ppc_scope.py`): `PPC_ARCH` は push では `auto` (dispatch だけ入力の arch)。`x86` → skip、`ppc`・`both` → 回す、枝の名前が `wt/int-` で始まれば回す。それ以外は `git merge-base origin/main HEAD` から HEAD までの差分のパスを見て、docs/・*.md は飛ばし、共通の置き場 (kernel/・lib/・include/ …)・PowerPC の置き場・`build/*.mk`・決まったファイル (Makefile・check.yml など) があれば回す、x86 だけの置き場は飛ばし、知らない置き場は控えめに回す。差分が空なら skip
+- main の push では、checkout (fetch-depth 0) の origin/main が push された SHA そのもの (かその子) なので merge-base = HEAD、差分が空になり、**中身に依らず必ず skip** (ソースから読んだ結論。例外は main で `workflow_dispatch` を arch=ppc/both で起動した時だけ)。意図どおりかは設計の判断 (票の §1 の「未確認」はこの規則による)。PowerPC の検査は、取り込む前の枝の push でだけ回る
+- 枝でも飛ぶ例: wt/ppc-kapi-fill の 2 回 (44290719097・44289493633) は差分が x86 と文書だけと判定されて skip
+
 ## 6. 範囲の外
 
 既存の workflow の書き換え、NP21/W・実機の受入、検査の中身の直し (目印のずれなどは見つけた枝で別のコミットにして直す)。

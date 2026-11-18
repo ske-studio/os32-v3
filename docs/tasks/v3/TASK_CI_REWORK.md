@@ -1,20 +1,22 @@
 # TASK_CI_REWORK — 既存の CI (check・build) を手本の形に直す
 
-> 状態: **計画 (2026-11-18)** — 本線の再開の最初の仕事 (ユーザー決定 2026-11-18「本線が再開するのは旧い CI の手直しから」)。票は特務の PM が実測から書いた。**S0 は完了** (本線の PM、2026-11-18。原因と直し、同じ SHA の 10 回の結果は [gate.md](../../design/tools/ci/gate.md) §5-2、基準 (5) を満たした)。S1 以降は未着手。
+> 状態: **計画 (2026-11-18)** — 本線の再開の最初の仕事 (ユーザー決定 2026-11-18「本線が再開するのは旧い CI の手直しから」)。票は特務の PM が実測から書いた。**S0 は完了** (本線の PM、2026-11-18。原因と直し、同じ SHA の 10 回の結果は [gate.md](../../design/tools/ci/gate.md) §5-2、基準 (5) を満たした)。**S1 は完了** (§1 の表、[gate.md](../../design/tools/ci/gate.md) §5-3)。S2 以降は未着手。
 > 完了の基準: (1) `.github/workflows/check.yml` に `make check-<名>` の手書きの行が 0 (今 31 行)、(2) workflow の中の `apt-get install` が 0 行 (今 3 行。用意は composite action だけ)、(3) わざと 2 本落とした枝で、check・build のどのジョブも残りを最後まで回し、落ちた 2 本の名前がジョブの要約の表に出る、(4) 置き換えの前後で回る検査の名前の集合が減っていない事を機械で確かめた記録がある、(5) 揺れた検査 2 本 (`ppc-sd-link`・`ppc-usb`) が同じ SHA の 10 回の実行で 10 回通り、用意の手順も 10 回落ちない、(6) 道具が無い時に SKIP で通る検査が 0。6 つを満たした SHA が main に在る。
 
 決まりは [POLICY_CI](../../POLICY_CI.md) (作る時 G1〜G12、改修する時 R1〜R8)。手本の形と、11-17 の欠点の実測は [gate.md](../../design/tools/ci/gate.md)。この票は、11-18 に関門を変異込みへ切り替えた後に残っている分を、段に切る。
 
-## 1. 今の状態 (2026-11-18 の実物と実行)
+## 1. 今の状態 (2026-11-18 の S1 の実測、push 20 回。詳細と実行の番号は [gate.md](../../design/tools/ci/gate.md) §5-3)
 
-| workflow | ジョブ | 所要 (11-18 の 3 回) | 形 |
-|---|---|---|---|
-| check | static-check | 4〜6 分 | `make check-<名>` を 31 行、手で並べている。1 行落ちると後ろは回らない |
-| check | ppc-compile | 4〜21 分 (キャッシュの有無) | `run.py --run all --env ppc-cross`。最初の失敗で止まる |
-| check | ppc-qemu (4 シャード) | 14〜22 分 (2026-11-18 に 4 本に割った後。1 本で直列の時は 53〜61 分。実測は [gate.md](../../design/tools/ci/gate.md) §5-1) | `python3 -B tools/ci/gate.py run --env qemu-ppc --shard i/4`。`needs` の鎖は無い。1 本落ちても残りを回し、表と検査ごとの所要を出す |
-| build | artifacts | 2〜3 分 | — |
-| build | checks (6 シャード) | 10〜39 分 (11-18 の最後の回は 12〜30 分。待ち時間の全体はここで決まる) | `make -k check CHECK_SHARD=i/6`。1 本落ちても残りを回す (G2 は済み) |
-| sep (`wt/sep-*` だけ) | identity・checks | 19 分・37〜57 分 | 手本 (`tools/ci/gate.py`)。結果の表・落ちた検査だけのログ・検査ごとの秒 |
+| workflow | ジョブ | 実行の所要 (中央 / 最小〜最大) | キューの待ち (中央 / 最大) | 結果 (push 20 回) | 形 |
+|---|---|---|---|---|---|
+| check | static-check | 5.2 / 2.4〜14.3 分 | 3.1 / 19.4 分 | success 15・failure 5 (全部が文書の検査の本物の赤) | `make check-<名>` を 31 行、手で並べている。1 行落ちると後ろは回らない |
+| check | ppc-compile | 回した回 4.4 / 3.3〜10.3 分 (n=13)、飛ばした回 0.1〜0.2 分 | 3.0 / 22.5 分 | success 20 | `run.py --run all --env ppc-cross`。最初の失敗で止まる |
+| check | ppc-qemu (4 シャード) | 回した回 16.3 / 8.6〜24.4 分 (n=52) | 5.5 / 19.6 分 | success 80 | `gate.py run --env qemu-ppc --shard i/4`。表と検査ごとの所要を出す |
+| build | artifacts | 2.2 / 1.7〜3.4 分 | 1.2 / 29.0 分 | success 18・cancelled 2 | — |
+| build | checks (6 シャード) | 18.0 / 8.1〜41.8 分。シャード別の中央 (0) 25.5・(1) 11.6・(2) 15.3・(3) 23.2・(4) 24.2・(5) 14.6 | 3.4 / 28.6 分 | success 77・failure 6 (本物の赤 5・runner が通信を失った 1)・cancelled 37 | `make -k check CHECK_SHARD=i/6`。1 本落ちても残りを回す |
+| sep (`wt/sep-*` だけ) | identity・checks | 19 分・37〜57 分 (11-17) | — | — | 手本 (`tools/ci/gate.py`) |
+
+push から最後のジョブが終わるまで: check と build の両方が最後まで走った 8 回で中央 40.7 分・最大 68.4 分。各回で最後に始まったジョブのキューの待ちは中央 10〜11 分・最大 23〜29 分 (同じ時間帯に走る枝の数で変わる)。揺れ・用意の失敗は S1 の標本で 0。
 
 残っている欠点と、11-18 に実際に起きた事:
 
@@ -24,12 +26,15 @@
 | G3 結果は表で | check は表が無い。落ちた検査は `gh run view --log-failed` を読んで探す | 失敗の行を探すのに、ログを 3 回取り直した |
 | G4 何を回すかは登録から | static-check は手書きの 31 行。`tools/ci/ppc_scope.py` は共通・PowerPC の置き場の一覧を自前で持つ | 新しい検査 2 本 (`archive-refs`) を手で足した。足し忘れると build でしか回らない |
 | G5 用意は 1 か所 | `apt-get install` が check.yml に 3 行、中身が違う | ppc-compile にだけ `qemu-system-ppc` が無く、変異の試験 (`tools/ppc/test_lan_p29.py`) が落ちた |
-| G6 道具が無い時に通さない | クロスコンパイラの無いジョブでは PowerPC の検査が SKIP で通る | 11-18 は出ていない |
+| G6 道具が無い時に通さない | クロスコンパイラの無いジョブでは検査が SKIP で通る | S1 の実測: build の checks は 1 回で SKIP の行 86〜109 行。大半は PowerPC の台本約 35 本が道具を手元の既定の置き場 `/home/hight/opt/cross-ppc` に探して飛ばしている。ほかに lychee・freetype-py が無くて飛ぶ行。static-check は毎回 3 行 (`check-ext2-empty-name-host`・`check-vfs-fd-path-host` のターゲット側の確かめ)。ppc-qemu の表の SKIP は 52 本とも 0 |
 | G7 CI と手元で同じ入口 | `make check-…` と `run.py --run …` の 2 つ | 11-18 は出ていない (11-17 に `r1-fixture-host` が片方だけで落ちた) |
 | 揺れる検査 | 無し (11-18 の S0 で 2 本とも原因が分かった)。`ppc-sd-link` は揺れではなかった: 11-17 の回 (枝 wt/sep-ci の手本の CI の最初の回) は用意に `qemu-system` (mac99 の VGA の ROM) が無く、PowerPC の QEMU の検査 11 本が起動直後の QMP EOF で落ちていた (`boot1 READY` の待ちには入っていない)。`50da7775f` で直っている。用意の rustup は、runner が rust-src の登録の無い同じ版の toolchain を持って始まる型 (直近 49 ジョブ中 1 本) | 用意は壊れた toolchain を消してから入れ直す形に直した (S0)。詳細は [gate.md](../../design/tools/ci/gate.md) §5-2 |
 | 揺れを直した検査 | `ppc-usb` (「HOME/LEFT/RIGHT/DEL result」、11-17 に 2 回・11-18 に 1 回) | 原因は試験の待ちの条件: DELETE で行を描き直すと出力の末尾がプロンプトになるので、Enter の結果が出る前に待ちが終わっていた (`userland/shell/ui.c` の `redraw_line` は最後にプロンプトを出し直す)。結果の行が出るまで待つ形に直した (`tools/ppc/usb_run.py`、11-18。履歴の試験と同じ型の直し) |
 
-関門の外で CI が起動しない条件 (直す対象ではなく、取り込みで踏む所): コミットの本文に CI を飛ばす印の文字列があると全部飛ぶ、文書だけ・空のコミットの push では build が起動しない、main への push の PowerPC の段は範囲の判定で中身を回さない事がある (11-18 の main の 2 回は 1 分以内で終わった。意図どおりかは未確認 — 段 S1 で確かめる)。
+| ログの大きさ | build の checks (1) のログが 162〜333 MB (S1)。GeForce の host 試験の変異の回が同じ FAIL の行を約 230 万行出す | ログの取得に 1 本数分かかる。G3 (落ちた検査だけのログ) の段 S5 で、変異の回の出力を検査ごとのログに閉じる |
+| 基盤の失敗 | main の build の checks (4) が 53 分走って「The hosted runner lost communication with the server」(run 44274576966)。原因 (メモリ・CPU の枯渇か) は未確認 | 1 回。2 回目が出たら持越し台帳に行を立てて調べる |
+
+関門の外で CI が起動しない条件 (直す対象ではなく、取り込みで踏む所): コミットの本文に CI を飛ばす印の文字列があると全部飛ぶ、文書だけ・空のコミットの push では build が起動しない、main への push では PowerPC の段は中身を回さない (S1 で確かめた: `tools/ci/ppc_scope.py` は `merge-base(origin/main, HEAD)` からの差分を見るので、main では差分が空になり必ず skip。PowerPC の検査は取り込む前の枝の push で回り、main へは同じ SHA の早送りなので関門としては欠けない。main で回すのは arch=ppc/both の dispatch だけ)。
 
 ## 2. 段
 
