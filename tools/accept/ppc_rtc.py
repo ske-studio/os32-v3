@@ -53,7 +53,12 @@ def observe(elf, machine, evidence, case):
         if case == 'rtc-absent':
             require(fields == (255,) * 7, repr((case, machine, fields)))
         elif case == 'swap-opcodes':
-            require(fields == (0,) * 7, repr((case, machine, fields)))
+            # Cuda answers the wrong opcode with a failed read (all 0); QEMU's PMU answers
+            # another command, which decodes to an unrelated date. Either way the read must
+            # not be a near miss: a single shifted field (the year mutation) is not accepted.
+            near = min(sum(a != b for a, b in zip(fields, c)) for c in candidates)
+            require(fields == (0,) * 7 or (fields != (255,) * 7 and near >= 3),
+                    repr((case, machine, fields, near)))
         else:
             require(fields in candidates, repr((case, machine, fields, first, last)))
 
