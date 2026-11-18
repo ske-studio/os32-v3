@@ -3,6 +3,11 @@
 #include "ofw.h"
 static char output[256];
 static unsigned used, reads, stalled, drain_stalled, indexed, calls, last_used;
+/* Independent Z8530 fixture values. Error status follows the FIFO head. */
+static const unsigned char rx_fifo[] = { 0x00, 0xff, 0x53, 0x80 };
+static const unsigned char rx_status[] = { 0, 0x20, 0x50, 0 };
+static unsigned rx_head, rx_tail, rx_resets, rx_error, interleave;
+static unsigned rx_arrival, single_poll;
 static void finish(int status)
 {
     __asm__ volatile("int $0x80" : : "a"(1), "b"(status));
@@ -11,21 +16,43 @@ static void finish(int status)
 #define REQUIRE(x) do { if (!(x)) finish(__LINE__); } while (0)
 unsigned ppc_load8(cell a)
 {
+    if (a == 0xfe300010) {
+        REQUIRE(!indexed && rx_head < rx_tail && !rx_error);
+        rx_error = rx_status[rx_head];
+        return rx_fifo[rx_head++];
+    }
     REQUIRE(a == 0xfe300000);
     reads++;
+    if (single_poll) REQUIRE(reads == 1);
+    if (rx_arrival && reads == rx_arrival) rx_tail = 4;
     /* Runtime watchdog: removal of the product bound fails, never hangs. */
     REQUIRE(reads <= PM_POLL_LIMIT + 1 + (drain_stalled ? 7 : 0));
-    return indexed ? (drain_stalled ? 0 : PM_RR1_ALL_SENT) :
-                     (stalled ? 0 : PM_RR0_TX_READY);
+    if (indexed) {
+        indexed = 0;
+        return (drain_stalled ? 0 : 0x01) |
+               (rx_head < rx_tail ? rx_status[rx_head] : 0);
+    }
+    return (stalled ? 0 : 0x04) | (rx_head < rx_tail ? 0x01 : 0);
 }
 void ppc_store8(cell a, unsigned value)
 {
     if (a == 0xfe300000) {
-        REQUIRE(value == PM_RR1_INDEX);
-        indexed = 1;
+        REQUIRE(!indexed);
+        if (value == 0x30) {
+            REQUIRE(rx_error);
+            rx_error = 0;
+            ++rx_resets;
+        } else {
+            REQUIRE(value == 1);
+            indexed = 1;
+        }
     } else {
         REQUIRE(a == 0xfe300010 && used < sizeof(output));
         output[used++] = (char)value;
+        if (interleave) {
+            interleave = 0;
+            REQUIRE(pm_escc_trygetchar() == 0xff);
+        }
     }
 }
 static int queued(void *ctx, const char *bytes, u32 n)
@@ -79,5 +106,26 @@ void _start(void)
     stalled = 0; drain_stalled = 1; reads = used = 0;
     REQUIRE(pm_log_fatal_hex(0xfe300000, 0xfe300010, words, 0) == -1);
     REQUIRE(reads == PM_POLL_LIMIT + 1 + 7);
+
+    drain_stalled = reads = used = last_used = 0;
+    single_poll = 1;
+    REQUIRE(pm_escc_trygetchar() == -1 && reads == 1);
+    single_poll = 0;
+    rx_arrival = reads + 3;
+    REQUIRE(pm_escc_getchar_kapi() == 0x00);
+    interleave = 1;
+    pm_log_write("LOG", 3);
+    expect("LOG", 3);
+    REQUIRE(!interleave);
+    REQUIRE(pm_escc_trygetchar() == 0x53);
+    REQUIRE(pm_escc_getchar_kapi() == 0x80);
+    REQUIRE(rx_head == rx_tail && rx_resets == 2);
+    u32 oe, fe, pe, overflow;
+    pm_escc_diag(&oe, &fe, &pe, &overflow);
+    REQUIRE(oe == 1 && fe == 1 && pe == 1 && overflow == 0);
+    pm_escc_diag(0, 0, 0, 0);
+    reads = 0;
+    single_poll = 1;
+    REQUIRE(pm_escc_trygetchar() == -1 && reads == 1);
     finish(0);
 }

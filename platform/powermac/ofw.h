@@ -1,5 +1,6 @@
 #ifndef OS32_POWERMAC_OFW_H
 #define OS32_POWERMAC_OFW_H
+#include "types.h"
 #include "ppc_boot.h"
 #include "platform_of_layout.h"
 struct ofw_env {
@@ -33,4 +34,9 @@ struct pm_escc { cell csr, data; int ih; };
 int pm_escc_prepare(const struct ofw_env *e, struct pm_escc *out);
 int pm_escc_write(const struct pm_escc *s, const char *p, unsigned n);
 int pm_escc_drain(const struct pm_escc *s);
+/* Foreground receiver on the firmware-configured LOG channel. */
+void pm_escc_rx_bind(const struct pm_escc *s);
+int pm_escc_getchar_kapi(void);
+int pm_escc_trygetchar(void);
+void pm_escc_diag(u32 *oe, u32 *fe, u32 *pe, u32 *overflow);
 #endif

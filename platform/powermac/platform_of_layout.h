@@ -49,9 +49,14 @@
 /* NetBSD oea/pte.h:96-107: PTE_I | PTE_G | PTE_RW. */
 #define PM_MAP_MODE_IO (0x20 | 0x08 | 0x02)
 #define PM_POLL_LIMIT 1000000
+#define PM_RR0_RX_READY 0x01
 #define PM_RR0_TX_READY 0x04
 #define PM_RR1_ALL_SENT 0x01
+#define PM_RR1_PARITY 0x10
+#define PM_RR1_OVERRUN 0x20
+#define PM_RR1_FRAMING 0x40
 #define PM_RR1_INDEX 1
+#define PM_WR0_RESET_ERRORS 0x30
 #define PM_PROP_CAP 4096
 #define PM_PATH_CAP 1024
 #define PM_OPTION_CAP 32
