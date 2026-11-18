@@ -1,0 +1,3 @@
+# id	kind	model	workdir	pack	deps	state	note
+# inspect	read	gpt-6.2-astra	/home/hight/os32	inspect/PACK.md		queued	調査
+# implement	build	gpt-6.2-sol	/home/hight/os32-work	implement/PACK.md	inspect	queued	実装
