@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Link-sh/RSH acceptance for shared memory and child owner reclamation."""
 import argparse
+import hashlib
 import os
 from pathlib import Path
 import shutil
@@ -13,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT / 'tools'), str(ROOT / 'tools/ppc')]
 
 EXPECTED = {
-    'normal': (b'SHM OK\n\n', b'0\n'),
+    'normal': (b'SHM locked store\nSHM OK\n\n', b'0\n'),
     'skip-free': (b'SHM capacity after free\n', b'3\n'),
     'absent': (b'SHM initial capacity\n', b'1\n'),
 }
@@ -95,19 +96,28 @@ def main():
     options = ['KBOOT_SH=1', 'KBOOT_LINK=1', 'KB_SH_OUT=' + str(user),
                'KB_ROOT_BINS=' + ' '.join(bins)]
     cases = tuple(EXPECTED) if args.mutate else ('normal',)
+    images = {}
     for case in cases:
         folder = work / case
         folder.mkdir()
         kernel = folder / 'kernel'
         mutation = []
         if case == 'skip-free':
+            # Keep the boot-time kernel SHM round trip intact. The guest
+            # must reach its own free before the mutation affects capacity.
             mutation = mutant_settings(folder, case, 'mm/shm.c',
-                                       '        shm_state[idx + i] = SHM_FREE;',
-                                       '        /* Leave the block allocated. */')
+                                       '\n        shm_state[idx + i] = SHM_FREE;',
+                                       '\n        if (ring3_call_from_user()) return 0;'
+                                       '\n        shm_state[idx + i] = SHM_FREE;')
         elif case == 'absent':
             absent_bindings(folder, kernel / 'gen')
         # Build the RAM root inputs before linking, including on a fresh tree.
         elf = build(kernel, *options, *mutation, 'kb-user', 'kernel')
+        digest = hashlib.sha256(elf.read_bytes()).hexdigest()
+        if digest in images:
+            raise RuntimeError(f'{case} image is identical to {images[digest]}: {elf}')
+        images[digest] = case
+        print(f'{case} sha256={digest} {elf}', flush=True)
         if not args.build_only:
             for cpu in ('7450', '7455'):
                 observe(elf, cpu, folder / cpu, case)

@@ -4,13 +4,17 @@ enum {
     SHM_APP_BLOCKS = 9, /* docs/09_exec.md: 14 total, five reserved */
     CHILD_BLOCKS = SHM_APP_BLOCKS - 1,
     MARKER = 0x5a,
-    CHILD_EXIT = 42,
 };
 
-static int report(KernelAPI *api, const char *text, int status)
+static void print(KernelAPI *api, const char *text)
 {
     while (*text)
         api->shell_putchar(*text++, 7);
+}
+
+static int report(KernelAPI *api, const char *text, int status)
+{
+    print(api, text);
     return status;
 }
 
@@ -27,7 +31,9 @@ int main(int argc, char **argv, KernelAPI *api)
         child[0] = MARKER;
         if (api->sys_shm_lock((void *)child) != 0 || child[0] != MARKER)
             return 11;
-        return CHILD_EXIT;
+        print(api, "SHM locked store\n");
+        child[0] = MARKER + 1;
+        return 12; /* A successful store means the lock failed to protect SHM. */
     }
 
     region = api->sys_shm_alloc(SHM_APP_BLOCKS);
@@ -50,17 +56,17 @@ int main(int argc, char **argv, KernelAPI *api)
 
     api->exec_run("/bin/shmprobe.bin child");
     if (api->exec_last_result(&kind, &code) != 0 ||
-        kind != EXEC_KIND_EXITED || code != CHILD_EXIT)
-        return report(api, "SHM child failed\n", 7);
+        kind != EXEC_KIND_FAULT || code != EXEC_ERR_FAULT)
+        return report(api, "SHM child lock did not fault\n", 7);
 
     if (api->sys_shm_alloc(SHM_APP_BLOCKS) || parent[0] != MARKER)
         return report(api, "SHM parent ownership lost\n", 8);
     volatile unsigned char *reused = api->sys_shm_alloc(CHILD_BLOCKS);
     if (!reused)
-        return report(api, "SHM capacity after child exit\n", 9);
-    if (reused[0] != 0)
-        return report(api, "SHM reused block not cleared\n", 12);
+        return report(api, "SHM capacity after child fault\n", 9);
     reused[0] = MARKER;
+    if (reused[0] != MARKER)
+        return report(api, "SHM reused block readback failed\n", 12);
     if (api->sys_shm_free((void *)reused) != 0 ||
         api->sys_shm_free((void *)parent) != 0)
         return report(api, "SHM cleanup failed\n", 13);
