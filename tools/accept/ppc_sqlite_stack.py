@@ -81,6 +81,8 @@ def compile_object(out, name, source, extra_flags=()):
 
 
 def check_type_mutations(work):
+    # The verdict matches GCC's English diagnostic; translated locales must not turn RED into an error.
+    os.environ['LC_ALL'] = 'C'
     engine = 'kernel/sqlite_engine.c'
     header = ROOT / 'arch/ppc/arch_kernel_fp.h'
     original = header.read_text()
