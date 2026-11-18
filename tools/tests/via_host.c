@@ -4,7 +4,7 @@
 #include "via.c" /* Exercise the private receive contract as well as restart. */
 
 enum { STALL = 1, PENDING = 2, COLLISION = 4, REPLY = 8, FREE_STALL = 16,
-       OVERSIZE = 32, REPEAT = 64, FAKE = 128, NO_DATA = 256 };
+       OVERSIZE = 32, REPEAT = 64, FAKE = 128, NO_DATA = 256, RTC_REPLY = 512, BAD_RTC_HEADER = 1024 };
 
 struct bus {
     u8 b, ddr, acr, ier, sr, tx[8];
@@ -12,6 +12,13 @@ struct bus {
     bool pmu, active, pending, done, armed, loaded, bad, prep_idle;
     unsigned long long ticks, frame_ended, prep_time, fake_time;
 };
+
+static const u8 rtc_bytes[] = {0xe1, 0x23, 0x45, 0x67};
+
+static unsigned cuda_reply_size(const struct bus *b)
+{
+    return b->flags & RTC_REPLY ? 3 + sizeof(rtc_bytes) : 3;
+}
 
 static u8 bus_read(void *cookie, u32 reg)
 {
@@ -40,8 +47,16 @@ static u8 bus_read(void *cookie, u32 reg)
                         b->flags &= ~COLLISION;
                 }
             } else {
-                b->sr = 0xa0 + b->bytes++;
-                if (b->bytes == 3 && !(b->flags & OVERSIZE))
+                unsigned index = b->bytes++;
+                if (b->flags & RTC_REPLY) {
+                    static const u8 header[] = {0x01, 0x00, 0x03};
+                    b->sr = index < sizeof(header) ? header[index] : rtc_bytes[index - sizeof(header)];
+                    if (index == 1 && (b->flags & BAD_RTC_HEADER))
+                        b->sr = 1;
+                } else {
+                    b->sr = 0xa0 + index;
+                }
+                if (b->bytes == cuda_reply_size(b) && !(b->flags & OVERSIZE))
                     b->pending = false;
             }
         }
@@ -68,8 +83,12 @@ static void bus_write(void *cookie, u32 reg, u8 value)
     case 0x0400: b->ddr = value; return;
     case 0x1600: b->acr = value; return;
     case 0x1c00:
-        b->bad |= value != (b->pmu ? 0x10 : 0x04);
-        b->ier &= ~value;
+        b->bad |= value != (b->pmu ? 0x10 : 0x04) &&
+                  !(b->pmu && (b->flags & RTC_REPLY) && value == 0x90);
+        if (value & 0x80)
+            b->ier |= value & 0x7f;
+        else
+            b->ier &= ~value;
         return;
     case 0x1400:
         b->done = false;
@@ -110,8 +129,16 @@ static void bus_write(void *cookie, u32 reg, u8 value)
     if (b->pmu) {
         b->bad |= !(value & 0x20);
         if ((changed & 0x10) && !(value & 0x10)) {
-            b->bad |= !b->loaded || b->acr != 0x9c;
-            b->loaded = false;
+            if (b->acr & 0x10) {
+                b->bad |= !b->loaded || b->acr != 0x9c;
+                b->loaded = false;
+            } else if ((b->flags & RTC_REPLY) && b->sent == 1 &&
+                       b->bytes < sizeof(rtc_bytes)) {
+                b->bad |= b->acr != 0x8c;
+                b->sr = rtc_bytes[b->bytes++];
+            } else {
+                b->bad = true;
+            }
             b->pending = !(b->flags & STALL);
         }
         if ((changed & value & 0x10) && !(b->flags & FREE_STALL))
@@ -135,7 +162,7 @@ static void bus_write(void *cookie, u32 reg, u8 value)
         }
         arm(b);
     } else if (changed & value & 0x20) {
-        if (b->bytes == 3 && !b->pending) {
+        if (b->bytes == cuda_reply_size(b) && !b->pending) {
             ++b->received;
             b->frame_ended = b->ticks;
             b->bytes = 0;
@@ -197,6 +224,25 @@ static int exercise(enum via_kind kind, unsigned flags, int expected,
     return (flags & (STALL | FREE_STALL)) && (elapsed < 100000 || elapsed > 102000) ? 7 : 0;
 }
 
+static int exercise_rtc(enum via_kind kind, unsigned flags, int expected)
+{
+    struct bus b = {
+        .b = 0x60, .ddr = 0x49, .acr = 0x90, .ier = 0x17, .pmu = kind == VIA_PMU,
+    };
+    struct via_controller v = {kind, {&b, bus_read, bus_write, bus_ticks, 1000000}};
+    if (via_prepare(&v))
+        return 1;
+    b.active = true;
+    b.flags = RTC_REPLY | REPLY | flags;
+    u32 seconds = 0xabcdef01;
+    if (via_read_rtc(&v, &seconds) != expected || b.bad || b.pending)
+        return 2;
+    if (b.pmu ? (b.sent != 1 || b.tx[0] != 0x38 || b.bytes != 4 || b.ier != 0x17)
+              : (b.sent != 2 || b.tx[0] != 0x01 || b.tx[1] != 0x03 || b.received != 1))
+        return 3;
+    return seconds != (expected ? 0xabcdef01u : 0xe1234567u) ? 4 : 0;
+}
+
 static int probe(void)
 {
     static const struct {
@@ -239,6 +285,15 @@ static int probe(void)
         if (via_command(&v, cmd, 2, i ? in : NULL, i ? 0 : 2, &got) ||
             got || b.received || !b.pending || b.bad) return 142 + i;
     }
+    int rc = exercise_rtc(VIA_CUDA, 0, 0);
+    if (rc)
+        return 150 + rc;
+    rc = exercise_rtc(VIA_PMU, 0, 0);
+    if (rc)
+        return 160 + rc;
+    rc = exercise_rtc(VIA_CUDA, BAD_RTC_HEADER, VIA_INVALID);
+    if (rc)
+        return 170 + rc;
     return 0;
 }
 

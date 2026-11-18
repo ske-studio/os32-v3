@@ -30,9 +30,6 @@ PROVIDER_GROUPS = {
         'gfx_hw_get',
         'gfx_osri_show',
     }), frozenset(['gfx_hal.h', 'gfx.h', 'palette.h'])),
-    'clock': (frozenset({
-        'rtc_read',
-    }), frozenset([])),
     'port': (frozenset({'serial_puts', 'serial_diag'}), frozenset()),
     'gui': (frozenset({
         'gui_call',
