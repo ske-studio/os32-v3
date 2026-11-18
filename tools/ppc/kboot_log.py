@@ -33,6 +33,8 @@ RX_MUTATIONS = [
      'if ((status & PM_RR1_PARITY) && rx_framing_errors != (u32)-1) ++rx_framing_errors;\n'
      '        if ((status & PM_RR1_FRAMING) && rx_parity_errors != (u32)-1) ++rx_parity_errors;',
      205),
+    ('rx-parity-else-if', 'escc.c', 'if ((status & PM_RR1_PARITY) && rx_parity_errors != (u32)-1)',
+     'else if ((status & PM_RR1_PARITY) && rx_parity_errors != (u32)-1)', 207),
 ]
 
 

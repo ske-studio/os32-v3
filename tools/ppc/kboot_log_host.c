@@ -4,8 +4,8 @@
 static char output[256];
 static unsigned used, reads, stalled, drain_stalled, indexed, calls, last_used;
 /* Independent Z8530 fixture values. Error status follows the FIFO head. */
-static const unsigned char rx_fifo[] = { 0x00, 0xff, 0x53, 0x80, 0x41 };
-static const unsigned char rx_status[] = { 0, 0x20, 0x20, 0x40, 0x10 };
+static const unsigned char rx_fifo[] = { 0x00, 0xff, 0x53, 0x80, 0x41, 0x50 };
+static const unsigned char rx_status[] = { 0, 0x20, 0x20, 0x40, 0x10, 0x50 };
 static unsigned rx_head, rx_tail, rx_resets, rx_error, interleave;
 static unsigned rx_arrival, single_poll;
 /* Stable exit codes used by the receive mutations in kboot_log.py. */
@@ -17,6 +17,7 @@ enum {
     RX_DIAG_SECOND_OVERRUN,
     RX_DIAG_FRAMING,
     RX_DIAG_PARITY,
+    RX_DIAG_FRAMING_AND_PARITY,
 };
 static void finish(int status)
 {
@@ -143,7 +144,9 @@ void _start(void)
     expect_diag(2, 1, 0, RX_DIAG_FRAMING);
     REQUIRE(pm_escc_trygetchar() == 0x41);
     expect_diag(2, 1, 1, RX_DIAG_PARITY);
-    REQUIRE(rx_head == rx_tail && rx_resets == 4);
+    REQUIRE(pm_escc_trygetchar() == 0x50);
+    expect_diag(2, 2, 2, RX_DIAG_FRAMING_AND_PARITY);
+    REQUIRE(rx_head == rx_tail && rx_resets == 5);
     pm_escc_diag(0, 0, 0, 0);
     reads = 0;
     single_poll = 1;
