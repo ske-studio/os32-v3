@@ -253,8 +253,6 @@ A の場合も、対象像が持つ弱い代役に解決されていないこと
 |gui|登録者に要求が一度届き、GUI 終了後に shell に入力が戻る|終了時の所有解放を省略|
 |sys|再起動前後の boot ログを別起動として観測。確定設計の PMU/Cuda ごとに送信回数を照合。buz は無動作|reset の装置呼出を外し再起動を検出できなくする|
 |clock|mac99 の Cuda と PMU を `-rtc base=2024-02-29T00:00:00` で起動し、RSH から 7 バイトの暦時刻と曜日を読む。起動から読出しまでの経過を加えた基準時刻との差は 2 秒以内|年を 1 年ずらす、Cuda と PMU の読出し命令を交換する、公開表で提供者を外す|
-
-PowerMac の暦時計は reset と同じ VIA インスタンスを使う。Apple Power Mac G4 (September 2002) Developer Note の KeyLargo / PMU99 の資料は [reset 設計 §4](PPC_RESET_DESIGN.md) に記載。通信の手本は NetBSD `sys/arch/macppc/dev/cuda.c:788–815`、`cudavar.h:45`、`pmu.c:492–558,727–729`、`pmuvar.h:41`。Cuda は `01 03` に続く応答の 3 バイトのヘッダを検証し、PMU は `38` の固定長応答を読む。どちらも時刻本体は 1904-01-01 からの秒数を表すビッグエンディアン 4 バイト。PowerMac の後端でグレゴリオ暦に変換し、公開スロットは既存の 2 桁年と日曜を 0 とする曜日を返す。
 |platform|NP2 照会は型別不在。既知イメージを loop attach、容量を照合し detach 後の状態を読む|loop_status の sector 数を1増やす|
 |ide|ATA 有効像では識別済み試験用媒体だけで sector 往復。不在像は present=0。拒否した書込後に内容が一致|先頭 LBA を1ずらし隣接 sector の番兵で検出|
 |ext2|使い捨て loop 上で format と format_at、再 mount、範囲外の前後 sector を比較|start_lba を無視させる|
@@ -268,6 +266,8 @@ PowerMac の暦時計は reset と同じ VIA インスタンスを使う。Apple
 |pcm|既知の左右別の整数波形を open/write し、status の消費量、音量、close を確認。mac99 の録音が可能ならサンプル順と振幅を照合し、観測不能なら host の転送試験と実機の対向録音で確認。|左右またはサンプル byte 順を交換|
 |boot_info|検証済み媒体と未検証の起動で valid、容量・検証値を照合。OF に架空の PC98 起動元を付けない|未検証側で valid を立てる|
 |debug|実装済み opcode を実モジュールで往復し未知番号と区別。診断の前後で shell 継続|dispatch 先を隣の opcode に替える|
+
+PowerMac の暦時計は reset と同じ VIA インスタンスを使う。Apple Power Mac G4 (September 2002) Developer Note の KeyLargo / PMU99 の資料は [reset 設計 §4](PPC_RESET_DESIGN.md) に記載。通信の手本は NetBSD `sys/arch/macppc/dev/cuda.c:788–815`、`cudavar.h:45`、`pmu.c:492–558,727–729`、`pmuvar.h:41`。Cuda は `01 03` に続く応答の 3 バイトのヘッダを検証し、PMU は `38` の固定長応答を読む。どちらも時刻本体は 1904-01-01 からの秒数を表すビッグエンディアン 4 バイト。PowerMac の後端でグレゴリオ暦に変換し、公開スロットは既存の 2 桁年と日曜を 0 とする曜日を返す。
 
 - 各組で通常 wrap が残留 stub に解決された場合に成功経路の観測が失敗すること。E は機種固有の後端呼出が0回であることも host 側で計数する。
 - make ppc-ci-image の common-compile、両機種の layer 検査、各段で §3 のパス一致・同名新規定義0の照合記録、像ごとのリンク map と nm -l を保存。map に共通本体が一つあり、PPC 後端の新規定義は機種・装置操作だけか diff で検査する。

@@ -29,13 +29,12 @@ def observe(elf, machine, evidence, case):
     # pauses, bracket the moment of the RTC read in elapsed monotonic time.
     session.qemu_clock = ['-rtc', 'base=' + BASE.isoformat() + ',clock=vm']
     try:
-        start = time.monotonic()
         session.start()
         session.wait(session.ready, 'RTC cui READY', 60)
         require(session.agent.operator.ready['mode'] == 'cui', 'RTC RSH mode')
-        before = time.monotonic() - start
+        before = time.monotonic() - session.qemu_started
         body = rsh_command(session, '/bin/rtcprob.bin')
-        after = time.monotonic() - start
+        after = time.monotonic() - session.qemu_started
         status = rsh_command(session, 'echo $?')
         match = re.fullmatch(rb'RTC ' + rb' '.join([rb'(\d{1,3})'] * 7) + rb'\n+', body)
         require(match is not None and status == b'0\n', repr((case, machine, body, status)))
@@ -54,8 +53,7 @@ def observe(elf, machine, evidence, case):
         if case == 'rtc-absent':
             require(fields == (255,) * 7, repr((case, machine, fields)))
         elif case == 'swap-opcodes':
-            require(fields != (255,) * 7 and fields not in candidates,
-                    repr((case, machine, fields)))
+            require(fields == (0,) * 7, repr((case, machine, fields)))
         else:
             require(fields in candidates, repr((case, machine, fields, first, last)))
 

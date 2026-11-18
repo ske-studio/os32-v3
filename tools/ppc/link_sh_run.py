@@ -183,6 +183,7 @@ class Session:
         (self.out/'metadata.json').write_text(json.dumps(dict(command=args,cpu=self.cpu,
             elf_sha256=hashlib.sha256(self.elf.read_bytes()).hexdigest()),indent=2))
         self.err=(self.out/'qemu.stderr').open('w'); self.frames=(self.out/'frames.log').open('w')
+        self.qemu_started = time.monotonic()
         self.p=subprocess.Popen(args,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=self.err,bufsize=0)
         self.q=(self.qmp_type or PumpQMP)(self.p,self.deadline,self.pump)
 
