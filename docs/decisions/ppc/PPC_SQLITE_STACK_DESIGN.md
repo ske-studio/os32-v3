@@ -1,0 +1,201 @@
+# PowerPC SQLite 別スタック S の実装追補 (確定)
+
+> 出所: ~/os32-tmp/run/ppc-sqlite-stack/DESIGN.final.md (設計の往復の確定版)。
+> 状態: **現行 (2026-11-18)** — 確定。 sol 起草 r1・r2、Opus 5.5 の独立レビュー 2 回、PM が第 2 回の N1 を反映。往復の版は ~/os32-tmp/run/ppc-sqlite-stack/。
+
+## r1→r2 の変更
+
+- P2-1 — PPC の包みを `set_msr` より前に置き、F3 のソース加工と FP 検査の covers を追従する。
+- P2-2 — PM 決定どおり、固定名ヘッダの PPC extern と x86 static inline を使い、共通 engine の呼出しを統一する。
+- P2-3 — 専用 ELF の object・旗・配置・開始 MSR・観測・終了値・変異コンパイルを定義する。
+- P3-1 — guard の寸法マクロと重複した寸法検査を削除する。
+- P3-2 — PPC compile-only のソース集合を common.mk に置き、選択文書にも追記する。
+- P3-3 — 確定設計の置き換え範囲と枝名を明記し、製品比較の判定を x86 と PPC で定義する。
+
+確定設計 `docs/decisions/ppc/PPC_FP_NEWLIB_DESIGN.md` の §5・§7 の S 3 行・§8 S1 を本追補で置き換える（確定設計への反映は PM）。
+基点は main `756b5b175`。枝は `wt/ppc-sqlite-stack`。FP 保護の順序は確定設計 §2 に従う。
+対象は置き場、共通口、コンパイルと試験への接続。単一 CPU・協調切替と、PowerPC のハードウェア FP を前提とする。
+
+## 1. 実物の確認
+
+| # | 確定設計との差 | main の根拠 |
+|---|---|---|
+| 1 | S guard 結線で共通が PPC 専用ヘッダを直に読む形は新しい R1 に当たる。既存の guard 処理を共通契約から呼べる形にする。 | `kernel/sqlite_engine.c:39`、`arch/ppc/kernel_fp.h:5`、`arch/ppc/kernel_fp.c:13,29`、`docs/design/tools/check_layers.md:29,41,98` |
+| 2 | §5 の `lib/sqlite3/` は共通所有。PPC 命令の trampoline は CPU 所有とする。 | `docs/decisions/ppc/PPC_FP_NEWLIB_DESIGN.md:148`、`docs/design/tools/check_layers.md:29-39` |
+| 3 | feature 内の NASM/GAS 排他選択では現行の PPC 試験に届かない。SQLite feature は PowerMac で既定 0、1 の明示指定も拒否される。 | `build/features/sqlite.mk:1-5`、`build/platform/powermac.mk:2`、`build/select.mk:158-167,274-276` |
+| 4 | 共通の engine は現在 `C_FEATURES` 所属で、PPC の未リンク共通 TU の検査対象から漏れている。単体コンパイルには SQLite ヘッダの探索パスも要る。 | `build/features/sqlite.mk:2`、`build/sources/common.mk:10`、`build/targets/ppc-powermac.mk:71-88`、`kernel/sqlite_engine.c:20-21`、`lib/sqlite3/generated/sqlite_facade.h:4` |
+
+- 現行 TU を link-sh の make が出す PPC コンパイル行で確認。既定の探索パスでは `os32_sqlite_config.h` が見つからず、対象 TU に `-Ilib/sqlite3` を足すと `-Werror` 付きでコンパイル成功。出力先は `/dev/null`。新しい口を含む版の確認は §6。
+- `build/images/ppc-flags.mk` は kboot 像と旗の対応を担う。SQLite の有効化は上記 `build/select.mk` の判定に従う。
+- 統合判断 1。同じ役目は x86 の `lib/sqlite3/sqlite_stack.asm:14-26` にある。どちらも旧 SP を保持し、整列した別スタックで callback を呼んで戻す。
+- 統合判断 2。整数 ABI の `sqlite_call_on_alt_stack` と共通の `sqlite_engine_run` を両 arch で共有する。SP/LR と非揮発レジスタの保存だけ CPU ごとの assembly が担う。PPC ではさらに共通契約越しに FP 保護を行う。
+- 統合判断 3。確定設計の §2・§5 の順序と後段の製品有効化に沿う。AC-BUILD-1 の provider/closure は両像で検査する。AC-LIBC-1 は確定設計全体の USER 側の契約で、この段の callback 境界は整数だけ。両 arch で callback への引数、SP 整列と復元、戻り先、非揮発状態、canary を観測する。FP の契約 ID は確定判断どおり追加不要。
+- 参照する手本は確定設計 §5 の N `.../setjmp.S:36-66,76-104`、F `lib/libc/powerpc/gen/_setjmp.S:59,86`、OS32 `sqlite_stack.asm:14-26` と `docs/ppc/abi.md`。
+
+## 2. 口の形
+
+`include/exec_arch.h` には次の前方宣言と説明のコメントだけを置く。原型は arch 選択後の固定名ヘッダが提供する。
+
+```c
+/* Begin returns 0 on success. End pairs with a successful begin.
+ * Keep the guard on the caller's stack through the alternate-stack call. */
+struct arch_kernel_fp_guard;
+```
+
+`arch/ppc/arch_kernel_fp.h` は既存の PPC 型を実メンバーとして保持する。両方の固定名ヘッダに include guard を付ける。
+
+```c
+#include "kernel_fp.h"
+
+struct arch_kernel_fp_guard {
+    struct ppc_kernel_fp_guard ppc;
+};
+
+extern int arch_kernel_fp_begin(struct arch_kernel_fp_guard *g);
+extern void arch_kernel_fp_end(const struct arch_kernel_fp_guard *g);
+```
+
+`arch/ppc/kernel_fp.c` の include を固定名に替え、次の包みを `static void set_msr(` より前に定義する。既存の PPC 入口・型・状態操作を使う。
+
+```c
+int arch_kernel_fp_begin(struct arch_kernel_fp_guard *g)
+{
+    return ppc_kernel_fp_begin(g ? &g->ppc : 0);
+}
+
+void arch_kernel_fp_end(const struct arch_kernel_fp_guard *g)
+{
+    ppc_kernel_fp_end(&g->ppc);
+}
+```
+
+`arch/x86/arch_kernel_fp.h` は次の型とインライン関数を提供する。製品ビルドの最適化でダミー領域と呼出しが消えることは §6 の比較で確認する。
+
+```c
+struct arch_kernel_fp_guard { char unused; };
+
+static inline int arch_kernel_fp_begin(struct arch_kernel_fp_guard *g)
+{
+    (void)g;
+    return 0;
+}
+
+static inline void arch_kernel_fp_end(const struct arch_kernel_fp_guard *g)
+{
+    (void)g;
+}
+```
+
+`kernel/sqlite_engine.c` は `exec_arch.h` と固定名 `arch_kernel_fp.h` を include し、次の位置に挿入する。
+
+```c
+    /* 既存の IRQ 保存と未準備・再入・IRQ/例外・I/O 拒否を通過 */
+    sqlite_engine_active = 1;
+    irq_restore(flags);
+    struct arch_kernel_fp_guard guard;  /* 生き残る旧 kernel stack */
+    if (arch_kernel_fp_begin(&guard)) {
+        (void)irq_save();
+        sqlite_engine_active = 0;
+        irq_restore(flags);
+        return 0;
+    }
+    sqlite_call_on_alt_stack(call, sqlite_engine_stack_top, frame);
+    arch_kernel_fp_end(&guard);
+    (void)irq_save();
+    sqlite_engine_active = 0;
+    irq_restore(flags);
+    /* STOP belongs to the caller's safe point, after output and teardown. */
+    return 1;
+```
+
+- begin 成功時の順は IRQ 停止 → 旧 MSR と全 FP 保存 → FP=1/FE=0 → init → 元の EE を復元。end は IRQ 停止 → 全 FP 復元 → 旧 MSR/isync。拒否で callback は走らず、元の IRQ 状態に復帰する。
+- callback 内のエラーは通常 return で end を通す。区間中の park/exec/longjmp/USER callback は禁止。IRQ は整数のみ。STOP は呼出し側の安全点。
+
+## 3. 置き場と選択
+
+- `arch/ppc/sqlite_stack_ppc.S` に既存と同じ公開シンボルを置く。r3=call、r4=top、r5=frame。旧 16B 整列フレームに LR と使用する非揮発 GPR (r30/r31) を保存し、r2/r13 と非揮発 CR を保持する。
+- 旧 r1 と callback を非揮発 GPR に保持 → 新 r1=`align_down(top,16)-16` → backchain に旧 r1、LR 用 linkage を予約 → r3=frame、mtctr/bctrl → 旧 r1/LR/GPR の復元、blr。予約域/guard を越えず、trampoline で FP 命令を使わない。hard-float callback は ABI に従い f14〜31 を保持する。
+- 選択の境界は `ifeq ($(FEATURE_SQLITE),1)` 配下の x86-pc98 と、専用 PPC 試験の明示ソース一覧。前者は既存の `ASM_FEATURES += lib/sqlite3/sqlite_stack.asm`、後者は GCC で .S を組む。`FEATURE_SQLITE=1` の PPC 拒否を維持し、像の `GAS_ARCH_*` や `ppc-flags.mk` への追加は不要。
+- `build/sources/common.mk` に `C_COMMON_COMPILE_ONLY_PPC := kernel/sqlite_engine.c` を置く。`build/targets/ppc-powermac.mk` の `KB_PENDING_OBJ` を `$(C_COMMON_PC98_PENDING) $(C_COMMON_COMPILE_ONLY_PPC)` から既存の変換で導き、`$(KB_OUT)/kernel/sqlite_engine.o: KB_TU_FLAGS += -Ilib/sqlite3` を加える。生成済み契約ヘッダは管理対象のファイルを使い、`-MMD -MP` の依存を生かす。
+- `C_COMMON_COMPILE_ONLY_PPC` は `common-compile` に適用する。`KB_OBJ` は既存の製品集合から求める。x86 の engine 選択は `C_FEATURES` が担う。`docs/design/build/select.md` の `common-compile` の段落にこの集合の用途を 1 行追記する。
+- 層検査は両像の違反 0 を維持する。PPC 製品外の engine/試験 TU についても専用試験で PPC の `-I` と依存を確認する。共通 → 固定名 → PPC 専用ヘッダの最後の辺は PPC 内。
+- `build-selection-host` で x86 の engine/NASM が各 1 本、全 kboot 形の engine と .S が各 0 本、PPC の `FEATURE_SQLITE=1` が拒否されることを確認する。common-compile の確認はリンク一覧と独立に行う。
+
+## 4. 部品の大きさ
+
+| 部品 | 追加の目安 | 製品像への反映 |
+|---|---|---|
+| PPC trampoline | 約 65 行 | 専用試験 ELF のみ |
+| PPC guard 接着 | 約 25 行と旧スタック上 272 B/整列 8 | 包みの定義は既存 PPC guard TU に同居。現行像からの参照はなく GC 対象。保存域は試験の呼出し時のみ |
+| 共通呼出しと選択 | 約 22 行 | engine の PPC object は compile-only、x86 は既存機械語 |
+| 試験台本・fixture・登録 | 約 250〜340 行 | 専用試験のみ |
+
+## 5. ファイルごとの変更一覧
+
+| ファイル | 差分目安 | 単独の担当範囲 |
+|---|---:|---|
+| `include/exec_arch.h` | +3 | 前方宣言と利用契約 |
+| `arch/ppc/arch_kernel_fp.h` | 新 12 | PPC 型と extern 原型 |
+| `arch/x86/arch_kernel_fp.h` | 新 18 | ダミー型と static inline |
+| `arch/ppc/kernel_fp.c` | +10 | B の既存実装を包む |
+| `kernel/sqlite_engine.c` | +15 | active と guard の接続 |
+| `arch/ppc/sqlite_stack_ppc.S` | 新 65 | S の SysV trampoline |
+| `build/sources/common.mk` | +1 | PPC compile-only ソース集合 |
+| `build/targets/ppc-powermac.mk` | 2 行 | 集合からの object 選択と TU の include |
+| `docs/design/build/select.md` | +1 | compile-only 集合の用途 |
+| `tools/tests/test_ppc_fp.py` | 1〜数行 | F3 の加工境界と固定名ヘッダの covers |
+| `tools/checks/ppc-fp-guest.py` | +1 | PPC 固定名ヘッダの covers |
+| `tools/tests/test_build_selection.py` | +10 | 各像の負の選択と明示 feature 拒否 |
+| `tools/checks/ppc-sqlite-stack-guest.py` | 新 25 | CHECK・環境・変異引数 |
+| `tools/accept/ppc_sqlite_stack.py` | 新 100〜140 | 専用 ELF の構築、起動、判定 |
+| `tools/tests/ppc_sqlite_stack_guest.c` | 新 70〜95 | 合成 callback と guard/active の観測 |
+| `tools/tests/ppc_sqlite_stack_regs.S` | 新 55〜80 | ABI sentinel と帰還の観測 |
+
+- ROLES §4-3 のソース一覧・リンク順と像の固定を点検。`build/sources/order.mk`、製品側の arch 一覧、`tools/tests/fixtures/build_profile_x86.json` の `C_KERNEL`/ASM および `build_profile_ppc.json` の `KB_C`/`KB_ASM` は現値一致が期待値。profile を実際に照合し、生成値を手で補正しない。KAPI 変更なし。
+- 呼出し・stub の棚卸しは `test_sqlite_engine.py`、`fep_host_build.py`、`test_fep_core_boot.py`、`test_sqlite_module_proto.py` のソースコピー/切出しまで行う。x86 fixture は既存の x86 include 経路を確認し、独自の `host_arch` だけで引く fixture には同名のダミー型と static inline を用意する。PPC 受入は本物の guard を使用する。
+- `test_ppc_fp.py` の F3 は `set_msr` の定義だけを模擬版に置換し、現在はその前の include と宣言も `guard.inc` に残す。包みは加工境界の前に置き、`ppc_fp_guard_host.c` から組んだ GREEN=0／no-restore RED=3／再 GREEN=0 を確認する。`test_ppc_fp.py` と `ppc-fp-guest` の covers に `arch/ppc/arch_kernel_fp.h` を加える。
+- 変更された既存 CHECK の covers/dep-dir と変異用コピーを追従する。新規 CHECK に covers、basis/kind、依存および該当する env_limit/pins を宣言する。
+- `tools/tests/test_sqlite_engine.py:28` の trampoline 呼出しアンカーは維持。reentry/STOP と他の兄弟試験の目印も grep で確認し、置換が必要なら一意な新位置で実行 RED を確認する。PM は `stale_anchor.py 756b5b17` を回す。
+
+## 6. 受入 → 試験と変異
+
+`tools/ppc/kboot_vectors.py` の単独 ELF、HFS ISO、serial と QMP を使う。既存の `tools/accept/ppc_fp.py` に合わせ、7450 と 7455、正常／変異ごとの出力分離、期限つきの起動と判定を用意する。
+
+| 項目 | 専用 ELF の作り方 |
+|---|---|
+| entry・I/O の object | `arch/ppc/{entry,ofw_note}.o`、`platform/powermac/{ofw,escc_tree,escc}.o`、`lib/kstring_c.o`。各 object は同名の製品ソースから組む。 `entry.S` の `_start` が旧 r1 と BSS を初期化し、`PPC_MMU` 無指定で fixture の `powermac_boot(ppc_ci)` を呼ぶ。fixture は既存の vectors fixture と同じ `ofw_init → ofw_setup → pm_escc_prepare` を実施する。 |
+| 検査対象の object | `kernel/sqlite_engine.o`、`arch/ppc/{sqlite_stack_ppc,kernel_fp,fp_context,mmu}.o`。IRQ の save/restore/enabled は `mmu.S` の実装を使う。 |
+| fixture の object | `tools/tests/{ppc_sqlite_stack_guest,ppc_sqlite_stack_regs}.o`。C 側が `volatile u32 kctx_irq_depth, kctx_exc_depth;` と終了値の格納先 `volatile u32 sqlite_s1_status;` を定義する。FP 命令を使う fixture（callback を含む）は `.S` に置き、製品側の FP 命令は `fp_context.S` にある。 |
+| 旗 | `CC=$PPC_CROSS_DIR/bin/powerpc-elf-gcc`（既定 `/home/hight/opt/cross-ppc`）。共通旗 `FLAGS` は `kboot_vectors.py` の `FLAGS` と同じ（`-mcpu=7450 -m32 -mbig-endian -msoft-float -mno-altivec -msdata=none -ffreestanding -fno-pie -nostdlib -O2` 等）に `-ffunction-sections -fdata-sections` を追加。engine 用 `ENGINE_INC` は `-I$ROOT/kernel -I$ROOT/init -I$ROOT/kernel/console -I$ROOT/kernel/irq -I$ROOT/kernel/time -I$ROOT/mm -I$ROOT/sdk/include -I$ROOT/sdk/include/os32 -I$ROOT/lib/sqlite3 -I$ROOT/fs -D__KERNEL_BUILD__`。全 C TU は soft-float。 |
+| リンカ | `$CC $FLAGS -no-pie -Wl,-N,--gc-sections,--no-undefined -Wl,-T,fixture.ld -Wl,-Map,fixture.map <上の objects> -o SSTACK.ELF`。vectors と同じ `elf32-powerpc` / `ENTRY(_start)` / `0x20000` / PT_LOAD と PT_NOTE。`.note.ofw` は `KEEP(*(.note.ofw))`。text/rodata/data/sdata、4B 整列の `_edata`、NOLOAD の bss/sbss/COMMON、16B 整列の旧スタック 16 KiB と `__stack_top`、`_end < 0x400000` の順。専用 NOLOAD 予約域は旧スタックの直前に置き、`_edata.._end` のゼロ初期化範囲に含める。 |
+| 別スタック | 専用予約域を 16B 整列し、下 canary 16B → 使用域 32 KiB（`SQLITE_ENGINE_STACK_SIZE`）→ 上 canary 16B の順にシンボルを置く。fixture が両 canary を既知値で埋め、使用域の末端（上 canary の先頭）を製品 TU の `sqlite_engine_stack_top` に代入する。map と `nm` で実 engine の入口、予約域境界、旧スタックとの非重複、SQLite モジュール・辞書・IME の provider の不在を確認する。 |
+| 開始 MSR | OF 呼出し中は `_start` が復元した firmware の状態を使う。ESCC 準備後、検査開始前に `sync; mtmsr; isync` で FP=0・IR=0・DR=0・EE=0・FE=0 に正規化し、readback を確認する。FPR/FPSCR sentinel の設定・採取は assembly が必要時だけ FP を有効にし、元の MSR を復元する。engine 帰還時は FP を一時有効化する前に MSR を採取する。 |
+| 起動・終了 | vectors と同じ `genisoimage -quiet -hfs -r -part -no-desktop`、mac99 / TCG / 同じ ROM、OF の `boot-device=cd:,\SSTACK.ELF`、serial A/B を個別ファイルに保存する。QMP で 30 秒以内に同じ終端 PC を連続 2 回観測し、`xp /1wx` で `sqlite_s1_status` を読む。ゲストは status を格納し、serial を drain して終端ループへ入る。QMP quit 後の QEMU rc は全受理ケースで 0。ホストは期待した対照と変異がすべて一致した場合に 0 を返す。 |
+| 正常と変異の compile 行 | 正常 engine は `$CC $FLAGS $ENGINE_INC -c "$ROOT/kernel/sqlite_engine.c" -o "$out/sqlite_engine.o"`。end 変異は一意な `    arch_kernel_fp_end(&guard);` を除いたコピーを別の出力先に書き、`$CC $FLAGS $ENGINE_INC -c "$out/sqlite_engine.mut.c" -o "$out/sqlite_engine.o"` で組む。`-I$ROOT/kernel` が元の相対 include の探索起点にもなる。旧 r1 変異は `$CC $FLAGS -c "$out/sqlite_stack_ppc.mut.S" -o "$out/sqlite_stack_ppc.o"`。各ケースで該当 object 一つだけを差し替えて同じ専用 ELF をリンクする。`KB_MUT_SRC` は製品の `KB_OBJ` 用。 |
+
+| ケース | serial A の到達印 | 診断行 | QMP 終端 PC / ゲスト終了値 |
+|---|---|---|---|
+| 正常・復元後 | `S1-BEGIN` → `S1-ABI-CALLBACK` → `S1-ENGINE-CALLBACK` | `S1-PASS` | `sqlite_s1_done` / 0 |
+| 旧 r1 復元破壊 | `S1-BEGIN` → `S1-ABI-CALLBACK` | `S1-FAIL-SP` | `sqlite_s1_bad_sp` / 1 |
+| guard end 省略 | `S1-BEGIN` → `S1-ABI-CALLBACK` → `S1-ENGINE-CALLBACK` | `S1-FAIL-FP` | `sqlite_s1_bad_fp` / 2 |
+
+各目印は独立した行に 1 回だけ出す。ゲスト終了値の初期値は `0xffffffff`、その他の検査失敗は専用診断付きで `sqlite_s1_fail` / 3。正常対照と変異は両 CPU で実行する。
+
+- S1 正常。callback 冒頭の r1 が予約した別スタック内で 16B 整列し、backchain と frame が一致することを記録。帰還後の旧 SP、LR、非揮発 GPR/CR と f14〜31、上下の canary を比較する。ABI の観測は、guard を開いてから assembly の検査関数が trampoline を直接呼び、帰還直後に f14〜31 を採取する。別ケースで実 engine を通し、end 後の全 FPR/FPSCR と MSR/EE を比べる。
+- S1 拒否と後始末。既存の未準備・再入・IRQ/例外・IRQ 禁止 I/O に加え、別 guard 保持中の begin 拒否を起こす。戻り値 0、callback 未実行、active 解除、FP/IRQ 状態維持と次の正常呼出しを観測する。正常 callback は active が立つことを確かめ、通常帰還後に解除を観測する。
+- 最初に直接 ABI ケースを実行する。旧 r1 変異では LR と GPR の復元後、末尾の `blr` の直前に一意なアンカーで `addi 1,1,16` を挿入する。assembly の呼出し側が事前に保存した期待 r1 と直後の r1 をメモリアクセス前に比較し、差があれば正しい r1 を戻して `S1-FAIL-SP` を報告する。end 変異では実 engine の最初の正常呼出しから戻った直後の FP/MSR 比較で `S1-FAIL-FP` に進む。正常 GREEN → 各変異の実行 RED → 正常 GREEN の順に、表の到達印・診断・停止 PC・ゲスト終了値・QEMU rc を照合する。ビルド失敗、別の停止点、timeout は試験失敗とする。
+- 既存 x86 の `make check-sqlite-engine-host`を使い、同じ callback 境界を NASM 側でも確認する。影響する既存検査と新規試験を変異付きで回し、`python3 -B tools/checks/run.py --lint` を実行する。
+- `PPC_CROSS_DIR=/nonexistent make check-ppc-sqlite-stack-guest` は理由つき SKIP/rc=0。同条件と `OS32_REQUIRE_PPC=1` の併用は非 0。PM が 7450/7455 の証跡を集約する。
+- 最終ソースで `make ppc-ci-image` の `common-compile`、PowerMac の link-sh 製品リンク、両像の layers、`check-build-selection-host`、x86 `make all` を確認する。比較は PM が `tools/build_compare.sh 756b5b17 HEAD --all --output <比較先>` で基点と実装作業木を同条件で組み、x86 の成果物一致と `sqlite_engine_run` を含む関数差 0 を確認する。PPC は包みの追加による `kernel_fp.o` の差を許容し、map とシンボルで製品像に残る差を確認する。現行像で包みは GC 対象であり、製品像に差が残れば PM が理由を確認する。枝は `wt/ppc-sqlite-stack` で、x86 の像変更に対する `Sep-Changes:` は不要。
+- 起草時は基点とフォントおよび現行 PPC TU の単体コンパイルを確認した。preflight の x86 成果物 2 件は未生成で、実装後のビルド、QEMU、変異、像比較は未実施。
+
+## 7. 未決
+
+- 0 件。
+
+反論 0 件。
+
+## 確定 (2026-11-18、Opus 第 2 回、PM が反映)
+- N1 (P2): §6 の `ENGINE_INC` に `-I$ROOT/fs` を足した (kernel/ime/ime.h と lib/sqlite3/os32_sqlite_vfs.h が `vfs.h` = fs/vfs.h を読む)。手で写した一覧が common-compile の make の行とずれたら、実装者は make の行に合わせて報告に書く。
+- 第 1 回 P2-1 の反例はレビュアーが撤回 (test_ppc_fp.py は set_msr の定義だけを差し替える)。r2 の置き場で F3 は組める。
+- 確定設計 PPC_FP_NEWLIB_DESIGN の §5・§7 の S 3 行・§8 S1 は本追補で置き換える (PM がリポジトリの写しに反映)。
