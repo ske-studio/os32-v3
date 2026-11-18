@@ -32,6 +32,7 @@
 |---|---|---|---|
 | INPUT-KM-DEAD | accent/dead keyの保留状態と合成の実装・試験 | H0bレビュー3のPM決定。既定PC98表にaccentなし、延期中はdead/accentを登録・交換で拒否 | INPUT_KEYMAP_DESIGN H0bのW/S3で所有者・世代・flushと試験を確定し、拒否解除前に検証 |
 | PPC-USB-RH | PowerMac 実機の USB キーボードから製品 sh への入力・修飾・行編集・抜去 | 実装段は QEMU mac99 と host のみ | PowerMac USB 入力の実機受入時に検証する。QEMU の合格を実機の合格に数えない |
+| PPC-NEWLIB-HEAP-RECLAIM | 子が fault・正常終了で持った heap の物理ページが回収されたか、親から mem_stat の phys_free_pages の前後を比較する | PowerPC の mem_stat は KAPI の提供者がない (PPC_KAPI_FILL_DESIGN の 2c) | 2c で mem_stat が PowerPC に入った後、受入に足して通ったら削る |
 | PPC-P3-QEMU | link-SH の 7450/7455・後起動 agent・USB/LAN・USER fault・heap の QEMU 受入と製品変異 | 実装 sandbox は AF_INET を使用不可 | PM が取り込み前に `python3 -B tools/ppc/link_sh_run.py --out "$TMPDIR/p3-accept" --mutate` を実行し、証拠を `/home/hight/os32-tmp/run/ppc-p3-6/RESULT.md` に記録する |
 | PPC-USB-LAN | PowerMac USB と LAN の併用・RPC stall 後の製品 sh 入力、後付け USB・抜去後 LAN 入力・USB 行の OPEN 取消 | 実装 sandbox は AF_INET を使用不可 | PM が sandbox 外で `tools/ppc/usb_run.py --lan --cpu both --mutate` と `tools/ppc/sc_run.py --cpu both` を取り込み前に実行する |
 | CI-RUSTUP-RUSTSRC-FLAKE | CI の用意 (`.github/actions/build-setup` の `rustup toolchain install`) が `failed to install component: 'rust-src', detected conflict: 'lib/rustlib/src/rust/library/Cargo.lock'` で落ち、ジョブが 45 秒で失敗した (2026-11-18、check の `ppc-qemu (0)`、run 44234810239)。検査は 1 本も始まっていない | 原因は調べていない (runner の像に入っている nightly と、取りに行く部品の食い違いか) | 票 TASK_CI_REWORK の段 S0。2 回目が出たら直す (用意の手順で `rust-src` を入れ直す前に片付ける、など) |

@@ -1,4 +1,5 @@
 /* Expectation origin: PPC_FP_NEWLIB_DESIGN §4 N3・§8 / astra レビュー 2026-11-18.
+ * heap の回収は DEFERRED PPC-NEWLIB-HEAP-RECLAIM.
  * Acceptance-only RAM-root file; run twice to observe owner/FD reuse. */
 #include "os32api.h"
 #include <stdio.h>
@@ -65,29 +66,24 @@ static int file_probe(void)
     return errno == ENOENT ? 0 : 38;
 }
 
-/* Keep the table outside the heap being measured. */
-static void *blocks[8192];
 static int fds[256];
 static int resources(KernelAPI *api, int retain, int fault)
 {
-    unsigned nf = 0, nh = 0;
+    unsigned nf = 0;
+    unsigned char *held = malloc(65536);
+    if (!held) return 44;
+    for (unsigned i = 0; i < 65536; i += 4096) held[i] = 1;
     while (nf < sizeof fds / sizeof fds[0]) {
         int fd = api->sys_open("/tmp/newlib-probe.tmp", 0);
         if (fd < 0) break;
         fds[nf++] = fd;
     }
-    while (nh < sizeof blocks / sizeof blocks[0]) {
-        void *p = malloc(4096);
-        if (!p) break;
-        blocks[nh++] = p;
-    }
-    if (!nf || !nh || nf == sizeof fds / sizeof fds[0] ||
-        nh == sizeof blocks / sizeof blocks[0]) return 44;
-    printf("N3-resources fd=%u heap=%u\n", nf, nh);
+    if (!nf || nf == sizeof fds / sizeof fds[0]) return 44;
+    printf("N3-resources fd=%u\n", nf);
     fflush(NULL);
     if (fault) __asm__ volatile("trap" : : : "memory");
     if (!retain) {
-        while (nh) free(blocks[--nh]);
+        free(held);
         while (nf) api->sys_close(fds[--nf]);
     }
     return 0;

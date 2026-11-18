@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Expectation origin: PPC_FP_NEWLIB_DESIGN §4 N3・§8 / astra レビュー 2026-11-18.
 
+heap の回収は DEFERRED PPC-NEWLIB-HEAP-RECLAIM.
+
 Real PPC CRT execution and real nano/float execution on qemu-user. System
 heap/file/exit acceptance is tools/accept/ppc_newlib.py (PM socket runner).
 """
@@ -104,6 +106,40 @@ void _start(void) {
     return subprocess.run(['qemu-ppc', str(elf)], capture_output=True).returncode
 
 
+def resource_modes(work):
+    source = (ROOT/'userland/ppc/nlprobe.c').read_text()
+    source = source[source.index('static int fds[256];'):source.index('\nint main(')]
+    source = source.replace('__asm__ volatile("trap" : : : "memory")', '(void)0')
+    fixture = work/'resources.c'
+    fixture.write_text(r"""
+#include <stdio.h>
+#include <stdlib.h>
+static unsigned allocations, releases, opens, closes;
+static unsigned char block[65536];
+static void *test_malloc(size_t n) { ++allocations; return n == sizeof block ? block : NULL; }
+static void test_free(void *p) { if (p == block) ++releases; }
+#define malloc test_malloc
+#define free test_free
+typedef struct { int (*sys_open)(const char *, int); int (*sys_close)(int); } KernelAPI;
+static int open_file(const char *p, int flags) { (void)p; (void)flags; return opens++ < 3 ? (int)opens : -1; }
+static int close_file(int fd) { (void)fd; ++closes; return 0; }
+""" + source + r"""
+int main(void) {
+    KernelAPI api = { open_file, close_file };
+    for (int mode = 0; mode < 3; ++mode) {
+        allocations = releases = opens = closes = 0;
+        if (resources(&api, mode != 0, mode == 2) || allocations != 1 ||
+            opens != 4 || closes != (mode == 0 ? 3u : 0u) ||
+            releases != (mode == 0 ? 1u : 0u)) return 1;
+    }
+    return 0;
+}
+""")
+    subprocess.run(['cc', '-std=gnu11', '-Wall', '-Werror', str(fixture), '-o', str(work/'resources')], check=True)
+    subprocess.run([str(work/'resources')], check=True)
+    print('resource modes GREEN: one 64 KiB allocation each')
+
+
 def main():
     prefix = Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc'))
     if not (prefix/'bin/powerpc-elf-gcc').is_file() or not shutil.which('qemu-ppc'):
@@ -120,6 +156,7 @@ def main():
             assert meter.verdict(case,bad,rc,diag) == 'wrong-reason'
     with tempfile.TemporaryDirectory(prefix='ppc_newlib_') as folder:
         work=Path(folder)
+        resource_modes(work)
         source=(ROOT/'sdk/crt/ppc/start.c').read_text()
         assert crt(prefix, work, source) == 0
         assert execute(prefix, work) == (0, FLOAT)
