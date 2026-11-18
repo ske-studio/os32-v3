@@ -77,8 +77,8 @@ s1_abi_call:
     stw 0,4(3)
     stw 30,8(3)
 .endm
-/* Frame: linkage, saved CR and FP output pointer, original and returned GPRs.
- * r29 carries the expected SP across the call, so recovery needs no load. */
+/* Callback on the alternate stack: capture_frame records r1, its backchain
+ * and the trampoline's r30 for the caller to compare after return. */
 .globl s1_abi_callback
 s1_abi_callback:
     capture_frame

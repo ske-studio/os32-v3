@@ -199,3 +199,8 @@ static inline void arch_kernel_fp_end(const struct arch_kernel_fp_guard *g)
 - N1 (P2): §6 の `ENGINE_INC` に `-I$ROOT/fs` を足した (kernel/ime/ime.h と lib/sqlite3/os32_sqlite_vfs.h が `vfs.h` = fs/vfs.h を読む)。手で写した一覧が common-compile の make の行とずれたら、実装者は make の行に合わせて報告に書く。
 - 第 1 回 P2-1 の反例はレビュアーが撤回 (test_ppc_fp.py は set_msr の定義だけを差し替える)。r2 の置き場で F3 は組める。
 - 確定設計 PPC_FP_NEWLIB_DESIGN の §5・§7 の S 3 行・§8 S1 は本追補で置き換える (PM がリポジトリの写しに反映)。
+
+## S-a・S-b の取り込みで後の段へ送る項目 (2026-11-18、Opus レビュー、どれも P3)
+- tools/accept/ppc_sqlite_stack.py の observe() は tools/ppc/kboot_vectors.py の QEMU の引数と QMP の stop→NIP→cont の繰り返しの写し。tools/ppc/run.py か kboot_vectors に「ELF・CPU・終端の記号の集合 → (PC, 終了値, serial)」の関数を 1 つ置いて両方から呼ぶ (QMP の競合の直し — sd_run の口の予約・build/out/ppc の固定の名前 — と同じ段でよい)。
+- ppc-sqlite-stack-guest の covers は kboot_vectors.py の import が辿る補助入力 (kboot_vectors_fixture・boot.c など) を含む。入力の監査がその module 全体を辿る作りのため。監査を関数単位にしたら外す。
+- S-a の実装は ppc-powermac.mk の engine の TU 旗に -Ifs も足した (確定 N1 の「make の行に合わせる」、59 行目の -Ifs は KB_EXEC が空でない時だけ入るため)。
