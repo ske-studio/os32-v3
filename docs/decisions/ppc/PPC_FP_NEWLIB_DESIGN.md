@@ -141,6 +141,8 @@ void ppc_kernel_fp_end(const struct ppc_kernel_fp_guard *g);
 - fopen 試験ファイルは専用の一時 FS に作り、終了/fault/kill 後の FD/heap owner 回収と同名再実行を確認。x86 は既存 newlib/allocator/CRT 試験と同一条件の生成物比較を回す。
 
 ## 5. カーネル SQLite の別スタック (今回は .S と口だけ)
+> 2026-11-18: 本節・§7 の S の 3 行・§8 の S1 は [PPC_SQLITE_STACK_DESIGN](PPC_SQLITE_STACK_DESIGN.md) (11-17 の層の規則に合わせた置き場と口の形) で置き換えた。ABI・保存するレジスタ・guard の順は本節のまま。
+
 ```c
 /* 既存口と同一。float の引数/戻り値は境界を越えない */
 void sqlite_call_on_alt_stack(void (*call)(void *), u32 top, void *frame);

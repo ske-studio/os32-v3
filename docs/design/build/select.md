@@ -158,6 +158,7 @@ legacy の式は今の `select.mk` に末尾の一覧を足しただけ (x86 の
 
 ### 段 1b — compile だけの計測を消し、`make ARCH=ppc` を製品の入口にする
 
+- `C_COMMON_COMPILE_ONLY_PPC` は PPC 製品外の共通ソースを `common-compile` で検査する。
 - compile だけの計測は持たない。共通のソースが機種のヘッダを読まないことは層の検査 `tools/check_layers.py` が、PowerPC でも組めることは `make ppc-ci-image` の `common-compile` が見る。
 - 最上位の `make ARCH=ppc PLATFORM=powermac [IMAGE=kboot-*] [旗] [kernel]` が製品の入口。最上位の `Makefile` が `build/config.mk` (→ `select.mk`) と `build/targets/ppc-powermac.mk` を 1 回ずつ読む (別の Makefile への sub-make は挟まない)。
 - root の像に入るユーザーのバイナリ (`kb-user`) は、この make の `build/ppc-user.mk` の置き場 `PPC_USER_OUT` が像の置き場 `KB_SH_OUT` と同じならそのまま組む。違う時 (link の像は置き場と profile が別) は、置き場と profile を替えて同じ `Makefile` を呼ぶ。

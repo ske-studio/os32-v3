@@ -1,7 +1,10 @@
 #include "shell.h"
+#ifndef SH_SYS_MINIMAL /* PowerPC の sh は reboot だけ (userland/ppc/sh/profile.h) */
 #include "memmap.h"
 #include "config.h"   /* SYS_GSHELL_BIN, SYS_SYSTEM_CFG (K4: os32gui) */
 #include "kbd_watch.h" /* kbdstat -w の行 (票 TASK_KBD_NAV §3) */
+#endif
+#ifndef SH_SYS_MINIMAL
 #ifndef SHELL_AS_APP
 extern void os32_resident_sbrk_stats(u32 out[3]); /* private resident CRT */
 #endif
@@ -141,6 +144,7 @@ static int cmd_mem(int argc, char **argv)
     return 0;
 }
 
+#endif /* !SH_SYS_MINIMAL */
 static int cmd_reboot(int argc, char **argv)
 {
     (void)argc; (void)argv;
@@ -148,6 +152,7 @@ static int cmd_reboot(int argc, char **argv)
     return 0;
 }
 
+#ifndef SH_SYS_MINIMAL
 static int cmd_dev(int argc, char **argv)
 {
     int i, n = g_api->dev_count();
@@ -671,10 +676,14 @@ static int cmd_kbdstat(int argc, char **argv)
 }
 
 /* 登録用テーブル */
+#endif /* !SH_SYS_MINIMAL */
 static const ShellCmd sys_cmds[] = {
+#ifndef SH_SYS_MINIMAL
     { "mem",    cmd_mem,    "",              "Show memory statistics" },
     { "heap",   cmd_mem,    "",              "Alias for mem" },
+#endif
     { "reboot", cmd_reboot, "",              "Reboot the system" },
+#ifndef SH_SYS_MINIMAL
     { "dev",    cmd_dev,    "",              "List block/char devices" },
     { "df",     cmd_dev,    "",              "Alias for dev" },
     { "ide",    cmd_ide,    "[0-3]",         "Show IDE drive geometry" },
@@ -691,6 +700,7 @@ static const ShellCmd sys_cmds[] = {
     { "recover", shell_cmd_recover, "status | now <session> | virtual begin <case> | virtual step|end <session>", "Show recovery state or recover the current session" },
     { "peek",   shell_cmd_peek, "[-k|-p|-m] [-w1|-w2|-w4] addr [len]", "Read memory via kdebug (hex, KDEBUG=1)" },
     { "kbdstat",cmd_kbdstat,"[-w]",          "Show keyboard 8251 counters (-w: log each byte, ESC/30s)" },
+#endif
     { (const char *)0, 0, 0, 0 }
 };
 

@@ -111,6 +111,7 @@ ring3_user_ranges_writable
 shell_print_utf8
 shell_putchar
 sys_get_mem_kb
+sys_reboot
 sys_time
 tick_count
 vfs_chdir
@@ -152,7 +153,7 @@ def verify(source, entries):
         expected = api['ret'] + ' __cdecl wrap_' + name + '(' + args + ')\n{\n' + body + '}\n'
         if expected not in source:
             return False
-    return True
+    return bool(re.search(r'void __cdecl wrap_sys_reboot\(void\)\s*\{[^}]*\bsys_reboot\(\);', source))
 
 
 def generate(tmp, mutation=None):
@@ -171,6 +172,9 @@ def generate(tmp, mutation=None):
             'IME_SLOTS = PROVIDER_GROUPS',
             'PROVIDER_GROUPS[' + repr(group) + '] = (frozenset(), frozenset())\nIME_SLOTS = PROVIDER_GROUPS')
         helper.write_text(text)
+    if mutation == 'reboot-absent':
+        text = helper.read_text().replace("'buz_on', 'buz_off'", "'buz_on', 'buz_off', 'sys_reboot'")
+        helper.write_text(text)
     if mutation == 'zero':
         text = generator.read_text().replace('{absent_result(api)};', '0;')
         generator.write_text(text)
@@ -184,7 +188,9 @@ def generate(tmp, mutation=None):
 def main():
     entries = [x for x in json.loads((ROOT / 'sdk/kapi.json').read_text())['api']
                if x['name'] in ABSENT_PROVIDER_SLOTS]
-    assert len(entries) == 190
+    assert len(entries) == 189
+    assert {'buz_on', 'buz_off', 'rtc_read'} <= ABSENT_PROVIDER_SLOTS
+    assert 'sys_reboot' not in ABSENT_PROVIDER_SLOTS
     with tempfile.TemporaryDirectory(prefix='ppc-binding-') as directory:
         tmp = Path(directory)
         (tmp / 'normal').mkdir()
@@ -210,12 +216,14 @@ def main():
         nm = cc.with_name('powerpc-elf-nm')
         undefined = {line.split()[-1] for line in subprocess.check_output(
             [str(nm), '-u', str(tmp / 'kapi.o')], text=True).splitlines()}
+        if 'sys_reboot' not in undefined:
+            print('missing sys_reboot provider'); return 1
         unexpected = undefined - ALLOWED_UNDEFINED
         if unexpected:
             print('unexpected providers:', sorted(unexpected)); return 1
         print('undefined providers:', len(undefined))
         if '--mutate' in sys.argv:
-            for mutation in ('empty', 'zero', 'group-empty', 'ime-empty'):
+            for mutation in ('empty', 'zero', 'group-empty', 'ime-empty', 'reboot-absent'):
                 path = tmp / mutation
                 path.mkdir()
                 mutated = generate(path, mutation)

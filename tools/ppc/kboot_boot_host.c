@@ -92,6 +92,9 @@ void ppc_root_load(u32 root)
     }
     SAY("REACHED:LAN");
 #endif
+#if defined(VIA_CASE)
+    return;
+#endif
     SAY("GREEN:ROOT"); finish(0);
 }
 static struct pm_kboot_info info;
@@ -108,6 +111,10 @@ void _start(void)
         ppc_boot_alias_plan(0xa0000004, PPC_BOOT_FB_LIMIT, PPC_BOOT_FB_VA, &a) ||
         !ppc_boot_alias_plan(0xf8000020, 4, PPC_BOOT_GMAC_CLOCK_VA, &clock_alias) ||
         ppc_boot_alias_plan(0xf8000020, PAGE_SIZE, PPC_BOOT_GMAC_CLOCK_VA, &a)) finish(21);
+    if (!ppc_boot_alias_plan(0x80016fff, PM_VIA_REG_BYTES, PM_VIA_VA, &a) ||
+        a.pa != 0x80016000 || a.bytes != 3 * PAGE_SIZE || a.va != PM_VIA_VA + 0xfff ||
+        ppc_boot_alias_plan(0xffffe000, PM_VIA_REG_BYTES, PM_VIA_VA, &a))
+        finish(22);
     SAY("REACHED:ALIAS");
     u32 args[6]={0x100000,0x2000000,3,0x32,~0U,0}, result;
     __asm__ volatile("int $0x80" : "=a"(result) : "a"(90), "b"(args) : "memory");
@@ -151,12 +158,32 @@ void _start(void)
     *leaf(MEM_FIXED_PD_BASE,info.image_first)=0;
     expect_stop=1;
 #endif
+#if defined(VIA_CASE)
+    info.via = (struct pm_via_boot){ .kind = PM_VIA_CUDA,
+        .pa = VIA_CASE == 1 ? 0x80012fff : 0x80016fff,
+        .bytes = VIA_CASE == 2 ? PM_VIA_REG_BYTES - 1 : PM_VIA_REG_BYTES,
+        .capture_rc = VIA_CASE == 3 ? PM_VIA_MISSING : 0 };
+    plan_via(&info.via);
+#endif
     SAY("REACHED:ROOT");
 #if BOOT_BAD_WALK == 2
     expect_stop=1;
     ppc_boot_load_root(MEM_FIXED_PD_BASE+PAGE_SIZE);
 #else
     ppc_boot_load_root(MEM_FIXED_PD_BASE);
+#endif
+#if defined(VIA_CASE)
+    const struct pm_via_window *window = pm_via_window();
+    const int errors[] = { 0, PM_VIA_OVERLAP, PM_VIA_BAD_PLAN, PM_VIA_MISSING };
+    if (window->rc != errors[VIA_CASE] ||
+        window->va != (VIA_CASE == 0 ? PM_VIA_VA + 0xfff : 0) ||
+        (VIA_CASE == 0 ?
+         !range_valid(MEM_FIXED_PD_BASE, PM_VIA_VA, PM_VIA_VA + 3 * PAGE_SIZE,
+                      0x80016000, PPC_BOOT_IO_ATTR) :
+         !absent(MEM_FIXED_PD_BASE, PM_VIA_VA, PM_VIA_VA + PM_VIA_BYTES))) {
+        SAY("FAIL:VIA"); finish(49);
+    }
+    SAY("GREEN:ROOT"); finish(0);
 #endif
     finish(96);
 }

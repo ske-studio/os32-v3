@@ -62,8 +62,8 @@ void pm_usb_boot(u32 tb_hz)
     pm_usb_platform_init(tb_hz);
     for (u32 root = 0; root < pm_usb_root_count && !active; root++) {
         pm_usb_root = &pm_usb_roots[root];
-        if (paging_map_phys(PPC_BOOT_USB_VA, pm_usb_root->pa + 0x800000, 1, PAGE_RW | PTE_PCD) ||
-            paging_map_phys(PPC_BOOT_USB_VA + PM_USB_PAGE, pm_usb_root->pa + 0xc00000, 1, PAGE_RW | PTE_PCD)) continue;
+        if (paging_map_phys(PPC_BOOT_USB_VA, pm_usb_root->pa + PM_USB_CFG_ADDR_OFFSET, 1, PAGE_RW | PTE_PCD) ||
+            paging_map_phys(PPC_BOOT_USB_VA + PM_USB_PAGE, pm_usb_root->pa + PM_USB_CFG_DATA_OFFSET, 1, PAGE_RW | PTE_PCD)) continue;
         pm_usb_pci = (struct pm_pci){PPC_BOOT_USB_VA, PPC_BOOT_USB_VA + PM_USB_PAGE,
                                     pm_usb_root->first, pm_usb_root->last, 0};
         for (u32 bus = pm_usb_root->first; bus <= pm_usb_root->last; bus++)
@@ -80,9 +80,11 @@ void pm_usb_boot(u32 tb_hz)
                     u32 bar = usbp_cfg_read32(&hc->pci, 0x10);
                     if ((bar & 15) || !(bar & ~15u)) continue;
                     hc->pci.bar_base[0] = bar; hc->pci.bar_size[0] = PM_USB_PAGE;
-                    if (usbp_cfg_cmd(&hc->pci, 2, 0) ||
-                        usbp_mmio_map(&hc->pci, 0, &hc->regs)) continue;
-                    if (takeover(hc)) { usbp_mmio_unmap(&hc->pci, 0); continue; }
+                    if (usbp_mmio_map(&hc->pci, 0, &hc->regs)) continue;
+                    if (usbp_cfg_cmd(&hc->pci, 2, 0) || takeover(hc)) {
+                        usbp_mmio_unmap(&hc->pci, 0);
+                        continue;
+                    }
                     hc->ops = &ohci_ops;
                     if (hc->ops->start(hc)) {
                         /* A dead HC owns quarantined DMA until reboot. */
