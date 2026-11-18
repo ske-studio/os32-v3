@@ -507,6 +507,8 @@ class HostAgent:
         elif op == OP_ACK:
             self.counts["ack"] += 1
             self.note_rid(rid)
+            if flags == 0:
+                self._advance_delivery_ack(self.ledger.get(rid), ack)
         else:
             self.counts["dropped"] += 1
 
@@ -720,17 +722,25 @@ class HostAgent:
         self._reap_tombstones()
         self._ack(rid, 0, out, flags=F_RELACK)
 
-    # --------------------------------------------------------- WINDOW
+    # ---------------------------------------------------- ACK / WINDOW
+    @staticmethod
+    def _advance_delivery_ack(ent, ack):
+        if ent is None or ent["st"] != "ACTIVE" or ent["deliver"] is None:
+            return False
+        d = ent["deliver"]
+        if not d["acked"] < ack <= d["sent"]:
+            return False
+        d["acked"] = ack
+        d["stall"] = 0
+        return True
+
     def _on_window(self, rid, ack, credit, out):
         ent = self.ledger.get(rid)
         self.note_rid(rid)
         if ent is None or ent["st"] != "ACTIVE" or ent["deliver"] is None:
             return
         d = ent["deliver"]
-        if ack > d["acked"]:
-            d["acked"] = ack
-            d["stall"] = 0
-        else:
+        if not self._advance_delivery_ack(ent, ack):
             d["stall"] += 1
             if d["stall"] >= 8 and d["sent"] > d["acked"]:
                 d["retx"] += d["sent"] - d["acked"]    # ack が進まない = 欠落
