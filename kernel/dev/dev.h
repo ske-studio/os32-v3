@@ -94,7 +94,6 @@ void dev_register_hdd(int drive);
 
 /* デバイス検索 (名前で) */
 Device *dev_find(const char *name);
-int dev_name_present(const char *name);
 
 /* デバイス取得 (インデックスで, 0〜dev_count()-1) */
 Device *dev_get(int index);

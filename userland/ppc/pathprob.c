@@ -19,11 +19,15 @@ int main(int argc, char **argv, KernelAPI *api)
     (void)argc;
     (void)argv;
     value = api->path_get_drive();
-    if (!value || strcmp(value, "rd0") || api->path_set_drive("rd0"))
+    if (!value || strcmp(value, "rd0"))
         return report(api, "PATH root drive failed\n", 1);
     value = api->path_get_cwd();
-    if (!value || strcmp(value, "/") || api->sys_chdir("/bin"))
+    if (!value || strcmp(value, "/"))
         return report(api, "PATH root cwd failed\n", 2);
+    if (api->path_set_drive("rd0"))
+        return report(api, "PATH set root drive failed\n", 1);
+    if (api->sys_chdir("/bin"))
+        return report(api, "PATH chdir failed\n", 2);
 
     /* VFS resolves relative opens against its own cwd. */
     api->path_set_cwd("/bin");

@@ -9,7 +9,7 @@ CHECK = dict(name='boot-root-host', tier=1, budget=30, needs=['make:all'],
              covers=['build/core.yaml', 'userland/deploy.yaml', 'tools/deploy_manifests.py', 'tools/mkpkg.py', 'tools/mkfat12.py', 'build/packages.yaml', 'init/boot_root.c', 'platform/powermac/root_boot.[ch]',
                      'tools/tests/boot_root_host.c', 'tools/tests/test_boot_root.py',
                      'include/boot_root.h', 'kernel/dev/ram_ro.[ch]',
-                     'drivers/base/dev.c', 'kernel/dev/dev.[ch]', 'fs/vfs*', 'fs/isofs/**',
+                     'drivers/base/dev.c', 'kernel/dev/dev.[ch]', 'kernel/dev/dev_name.h', 'fs/vfs*', 'fs/isofs/**',
                      'fs/ramfs/**', 'lib/kstring*', 'lib/path.[ch]', 'tools/mkroot_image.py'],
     basis=['PPC_SHELL_DESIGN §3', 'PPC_SHELL_DESIGN §4', 'PPC_SHELL_DESIGN §5', 'PPC_SHELL_DESIGN §6', 'PPC_SHELL_DESIGN §7', 'PPC_SHELL_DESIGN §8', 'PPC_SHELL_DESIGN §11'],
 )

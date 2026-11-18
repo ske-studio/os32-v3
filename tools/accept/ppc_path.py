@@ -14,6 +14,7 @@ sys.path[:0] = [str(ROOT / 'tools'), str(ROOT / 'tools/ppc')]
 EXPECTED = {
     'normal': (b'PATH OK\n\n', b'0\n'),
     'accept-invalid': (b'PATH invalid drive accepted\n', b'7\n'),
+    'unset-root-drive': (b'PATH root drive failed\n', b'1\n'),
     'absent': (b'PATH root drive failed\n', b'1\n'),
 }
 
@@ -91,6 +92,10 @@ def main():
             mutation = mutant_settings(folder, case, 'lib/path.c',
                                        '        if (!device_validator(name)) return -1;',
                                        '        if (!device_validator(name)) return 0;')
+        elif case == 'unset-root-drive':
+            mutation = mutant_settings(folder, case, 'platform/powermac/root_boot.c',
+                                       '    return path_set_drive(vfs_devname("/"));',
+                                       '    return 0;')
         elif case == 'absent':
             absent_bindings(folder, kernel / 'gen')
         elf = build(kernel, *options, *mutation, 'kb-user', 'kernel')

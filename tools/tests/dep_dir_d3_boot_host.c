@@ -12,6 +12,7 @@
 #include "fdc.h"
 #include "ide.h"
 #include "dev.h"
+#include "dev_name.h"
 #include "vfs.h"
 #define CHECK(c) do { if (!(c)) { fprintf(stderr, "FAIL line %d: %s\n", __LINE__, #c); exit(1); } } while (0)
 static char events[8192];

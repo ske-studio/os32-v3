@@ -1,6 +1,6 @@
 #include "root_boot.h"
 #include "fs/vfs_device.h"
-#include "kernel/dev/dev.h"
+#include "kernel/dev/dev_name.h"
 #include "lib/path.h"
 
 int pm_root_boot(const struct boot_root_image *image)

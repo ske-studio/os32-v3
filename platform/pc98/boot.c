@@ -14,6 +14,7 @@
 #include "../../drivers/video/kcg/kcg.h"
 #include "../../drivers/net/ne2000/lgy98.h"
 #include "dev.h"
+#include "dev_name.h"
 #include "path.h"
 #include "loop_dev.h"
 #include "vfs.h"
