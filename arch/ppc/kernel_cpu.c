@@ -68,7 +68,11 @@ void ppc_cpu_power_init(u32 pvr)
         return;
     u32 hid = ppc_read_hid0();
     /* Unlike OpenBSD's DOZE mask, preserve bit 8: HIGH_BAT_EN on 7455. */
-    hid = (hid & ~PPC_HID_SLEEP) | PPC_HID_NAP | PPC_HID_DPM;
+    hid = (hid & ~PPC_HID_SLEEP) | PPC_HID_DPM;
+    if (version == PPC_PVR_7455)
+        hid |= PPC_HID_NAP;
+    else
+        hid &= ~PPC_HID_NAP; /* 7450: QuickSilver hangs with NAP; MACHCFG P-R4. */
     /* SGE/BTIC/LRSTK/FOLD/BHT are unrelated to power saving; preserve them. */
     ppc_sync();
     ppc_write_hid0(hid);
