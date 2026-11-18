@@ -29,6 +29,19 @@ struct pm_kboot_device {
     enum pm_kboot_machine machine;
     struct pm_kboot_node v[PM_KBOOT_ANCESTORS];
 };
+enum pm_via_kind { PM_VIA_NONE, PM_VIA_PMU, PM_VIA_CUDA };
+enum pm_via_capture_rc {
+    PM_VIA_MISSING = -20, PM_VIA_AMBIGUOUS = -21,
+    PM_VIA_BAD_PROPERTY = -22, PM_VIA_BAD_ADDRESS = -23
+};
+struct pm_via_boot {
+    u8 kind;
+    u32 pa, bytes;
+    int capture_rc;
+    char compatible[PM_KBOOT_PROP_BYTES + 1];
+};
+void pm_via_capture(int root, struct pm_via_boot *out);
+
 struct pm_kboot_info {
     struct pm_regions ram, available;
     u32 admitted_end, image_first, image_end, hpt_pa, hpt_bytes;
@@ -37,6 +50,7 @@ struct pm_kboot_info {
     struct pm_kboot_device escc, mpic;
     struct pm_gmac_boot gmac;
     int gmac_rc;
+    struct pm_via_boot via;
 };
 /* Boot foreground, EE=0: copy CPU TB frequency before clock init. */
 void pm_clock_bind(const struct pm_kboot_info *info);

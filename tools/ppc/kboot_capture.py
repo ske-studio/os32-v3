@@ -12,7 +12,8 @@ sys.path.insert(0, str(ROOT / 'tools/tests'))
 import host32
 
 CHECK = dict(name='ppc-kboot-capture', tier=2, budget=60,
-             covers=['platform/powermac/kboot_capture.c', 'platform/powermac/kboot_info.h',
+             covers=['platform/powermac/via_tree.c', 'platform/powermac/via_window.h',
+                     'include/memmap.h', 'platform/powermac/kboot_capture.c', 'platform/powermac/kboot_info.h',
                      'tools/ppc/kboot_capture.py', 'tools/ppc/kboot_capture_fake.c',
                      'platform/powermac/ofw.h', 'platform/powermac/platform_of_layout.h',
                      'arch/ppc/ppc_boot.h', 'arch/ppc/ppc_pmap.h', 'arch/ppc/ppc_oea.h',
@@ -37,17 +38,17 @@ MUTATIONS = [
 ]
 
 
-def exercise(directory, source, expected=None):
+def exercise(directory, source, expected=None, *, cases=range(34), via_source=None):
     exe = directory / 'capture'
     argv = ['gcc', '-std=gnu11', '-m32', '-O2', '-Wall', '-Wextra', '-Werror',
             '-ffreestanding', '-fno-builtin', '-fno-pie', '-no-pie', '-fno-stack-protector',
             '-nostdlib', '-static', '-D__cdecl=',
             *['-I'+str(ROOT / p) for p in ('platform/powermac', 'arch/ppc', 'include', 'lib')],
-            str(source), str(ROOT / 'platform/powermac/gmac_tree.c'), str(ROOT / 'tools/ppc/kboot_capture_fake.c'),
+            str(source), str(ROOT / 'platform/powermac/gmac_tree.c'), str(via_source or ROOT / 'platform/powermac/via_tree.c'), str(ROOT / 'tools/ppc/kboot_capture_fake.c'),
             str(ROOT / 'lib/kstring_c.c'), '-o', str(exe)]
     subprocess.run(argv, check=True, timeout=60)
     failed = []
-    for case in range(26):
+    for case in cases:
         result = host32.run([str(exe), str(case)], capture_output=True, timeout=10)
         if expected and case == expected[0]:
             if result.returncode != expected[1] or result.stdout != expected[2]:
@@ -67,7 +68,7 @@ def main():
         failures = exercise(directory, product)
         if failures:
             raise RuntimeError(f'baseline failures: {failures}')
-        print('GREEN: 26 firmware-tree cases (ILP32 product code)')
+        print('GREEN: 34 firmware-tree cases (ILP32 product code)')
         if args.mutate:
             text = product.read_text()
             for name, old, new in MUTATIONS:

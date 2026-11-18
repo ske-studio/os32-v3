@@ -1,4 +1,4 @@
-"""Exercise the PPC shell's actual USER formatting and output adapters."""
+"""Expectation origin: PPC_FP_NEWLIB_DESIGN §4 N3・§8 / astra レビュー 2026-11-18."""
 CHECK = dict(name='ppc-sh-runtime', tier=1, needs=[], budget=10,
     covers=['userland/ppc/sh/*', 'tools/tests/ppc_sh_runtime.py','sdk/include/os32/os32api.h', 'sdk/include/os32/os32_kapi_shared.h',
             'sdk/include/os32/os32_kapi_generated.h'])
@@ -16,14 +16,14 @@ HARNESS = r'''
 #include "runtime.h"
 KernelAPI *kapi;
 static char output[4096];
-static int pos, writes, utf8_calls;
+static int pos, writes, utf8_calls, wrong_attr;
 static u8 utf8_color;
 static void utf8(const char *s, u8 attr) {
     ++utf8_calls; utf8_color = attr;
     while (*s) output[pos++] = *s++;
     output[pos] = 0;
 }
-static void put(char ch, u8 attr) { (void)attr; output[pos++] = ch; output[pos] = 0; }
+static void put(char ch, u8 attr) { if (attr != 7) ++wrong_attr; output[pos++] = ch; output[pos] = 0; }
 static int write_fd(int fd, const void *buf, u32 size) {
     (void)fd; (void)buf; ++writes; return (int)size;
 }
@@ -36,7 +36,7 @@ int main(void) {
     api = sh_runtime_init(&original);
     if (api == &original || api != kapi || memcmp(&snapshot, &original, sizeof original)) return 1;
     api->kprintf(7, "%s %u %d %02u %03u %08x %c %%", "ok", 42u, INT_MIN, 4u, 5u, 0xabu, 'Z');
-    if (writes || strcmp(output, "ok 42 -2147483648 04 005 000000ab Z %")) return 2;
+    if (writes || wrong_attr || strcmp(output, "ok 42 -2147483648 04 005 000000ab Z %")) return 2;
     if (api->shell_print_utf8 != original.shell_print_utf8) return 3;
     api->shell_print_utf8(" 日本語", 9);
     if (writes || utf8_calls != 1 || utf8_color != 9 || strcmp(output, "ok 42 -2147483648 04 005 000000ab Z % 日本語")) return 3;
@@ -53,27 +53,20 @@ int main(void) {
 
 
 def exercise(folder, mutation=None):
-    runtime = (SRC / 'runtime.c').read_text()
-    formatter = (SRC / 'format.c').read_text()
+    runtime = (SRC / 'newlib_runtime.c').read_text()
     if mutation:
-        target, old, new, expected = mutation
-        source = runtime if target == 'runtime' else formatter
-        if source.count(old) != 1:
+        old, new, expected = mutation
+        if runtime.count(old) != 1:
             raise RuntimeError('mutation anchor is not unique')
-        source = source.replace(old, new)
-        if target == 'runtime':
-            runtime = source
-        else:
-            formatter = source
+        runtime = runtime.replace(old, new)
     else:
         expected = 0
     (folder / 'runtime.c').write_text(runtime)
-    (folder / 'format.c').write_text(formatter)
     (folder / 'test.c').write_text(HARNESS)
     subprocess.run(['gcc', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
                     '-Wno-attributes', '-I' + str(SRC),
                     '-I' + str(ROOT / 'sdk/include/os32'),
-                    str(folder / 'runtime.c'), str(folder / 'format.c'),
+                    str(folder / 'runtime.c'),
                     str(folder / 'test.c'), '-o', str(folder / 'test')], check=True)
     result = subprocess.run([str(folder / 'test')], check=False)
     if result.returncode != expected:
@@ -88,14 +81,17 @@ def main():
         folder = pathlib.Path(temp)
         exercise(folder)
         if args.mutate:
-            exercise(folder, ('runtime',
-                '    /* Keep the kernel UTF-8 endpoint: bytewise putchar cannot decode glyphs. */',
-                '    runtime_api.shell_print_utf8 = 0;', 3))
-            exercise(folder, ('runtime', 'runtime_api.shell_putchar(ch, *(const u8 *)ctx);',
-                              '(void)ctx, runtime_api.sys_write(1, &ch, 1);', 2))
-            exercise(folder, ('format', "emit(k, '0');", "emit(k, ' ');", 2))
-            exercise(folder, ('format', "    k->put(k->ctx, k->count, ch);",
-                              "    if (k->count < 1023) k->put(k->ctx, k->count, ch);", 4))
+            for old, new, expected in (
+                ('    /* Keep the kernel UTF-8 endpoint: bytewise putchar cannot decode glyphs. */',
+                 '    runtime_api.shell_print_utf8 = 0;', 3),
+                ('runtime_api.shell_putchar(text[i], attr);',
+                 '(void)attr, runtime_api.sys_write(1, &text[i], 1);', 2),
+                ('runtime_api.shell_putchar(text[i], attr);',
+                 'runtime_api.shell_putchar(text[i], attr ^ 1);', 2),
+                ('i < size; ++i)', 'i < size && i < 1023; ++i)', 4),
+            ):
+                exercise(folder, (old, new, expected))
+                print('runtime RED:', old)
     print('ppc sh runtime PASS')
 
 

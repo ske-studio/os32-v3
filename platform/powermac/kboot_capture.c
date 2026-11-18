@@ -197,6 +197,7 @@ const struct pm_kboot_info *pm_kboot_capture(ppc_ci ci)
     if (!info.tb_hz || !info.escc.count || !info.mpic.count)
         fail("FAIL:KBOOT:REQUIRED-NODE\r\n");
     info.gmac_rc = pm_gmac_capture(&info.gmac);
+    pm_via_capture(root, &info.via);
 #if KBOOT_SH
     pm_usb_capture();
 #endif

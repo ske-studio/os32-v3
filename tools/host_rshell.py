@@ -70,7 +70,10 @@ class Operator:
         boot = boot.lower()
         if (self.pending is not None and self.pending['state'] not in ('done', 'truncated') and
                 self.pending['boot'] != boot):
-            self.pending['state'] = 'UNKNOWN'
+            if self.pending['mode'] == 'cui' and self.pending['line'] == 'reboot':
+                self._retire()
+            else:
+                self.pending['state'] = 'UNKNOWN'
         self.ready = dict(boot=boot, mode=mode, last_id=last_id, state=state)
         # A periodic READY may precede consumption of our notification. Its
         # previous ID/idle state is not evidence that execution was lost.
@@ -130,6 +133,11 @@ class Operator:
             raise
         return ident
 
+    def _retire(self):
+        self.pending.update(state='boot_changed', result=b'')
+        self.results[self.pending['id']] = self.pending
+        self.pending = None
+
     def expire(self, now):
         if (self.pending is not None and self.pending['state'] == 'running' and
                 now >= self.pending['deadline']):
@@ -141,9 +149,12 @@ class Operator:
 
     def resume(self):
         if (self.pending is None or self.pending['state'] != 'UNKNOWN' or
-                self.ready is None or self.ready['boot'] != self.pending['boot']):
+                self.ready is None):
             raise RuntimeError('cannot resume')
-        self.pending = None
+        if self.ready['boot'] != self.pending['boot']:
+            self._retire()
+        else:
+            self.pending = None
 
     def accept_output(self, generation, session, boot, ident, dropped, body, length, mode):
         pending = self.pending

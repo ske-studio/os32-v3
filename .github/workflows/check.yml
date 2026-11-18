@@ -45,30 +45,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Reuse successful integration checks
-        id: prior
-        env:
-          GH_TOKEN: ${{ github.token }}
-          CI_WORKFLOW: check.yml
-        run: python3 -B tools/ci/reuse_success.py
-
+      # main でも再利用せずに毎回回す (1 本・約 5 分の煙試験。main のキャッシュ (SQLite の ccache・lychee) を
+      # 育て、枝の初回を冷やさない)。build の checks だけが枝の成功を再利用する (ユーザー決定 2026-11-19)。
       - uses: actions/setup-python@v5
-        if: steps.prior.outputs.reuse != 'true'
         with:
           python-version: "3.12"
 
-      # ホスト試験の外部コマンド: gcc (build-essential)、e2fsck / mke2fs (e2fsprogs)。
-      # C AST の vendor include は libnewlib-dev のヘッダで解析する (クロス GCC は不要)。
-      # Python は tools/mkvmkernel.py 系が lz4 を使う。
-      - name: Host dependencies
-        if: steps.prior.outputs.reuse != 'true'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends ccache build-essential e2fsprogs clang libclang-dev llvm-dev python3-clang libnewlib-dev
-          python3 -m pip install --quiet PyYAML lz4
+      # 用意は 1 か所 (docs/POLICY_CI.md G5、票 TASK_CI_REWORK の段 S2c)。クロス無しのまま。
+      - uses: ./.github/actions/static-setup
 
       - name: SQLite ccache setup
-        if: steps.prior.outputs.reuse != 'true'
         id: sqlite-cache-key
         run: |
           echo "CCACHE_DIR=$RUNNER_TEMP/sqlite-ccache" >> "$GITHUB_ENV"
@@ -78,7 +64,6 @@ jobs:
           echo "compilers=host${host}-cross${cross}" >> "$GITHUB_OUTPUT"
 
       - name: Cache SQLite compilations
-        if: steps.prior.outputs.reuse != 'true'
         uses: actions/cache@v4
         with:
           path: ${{ runner.temp }}/sqlite-ccache
@@ -90,7 +75,6 @@ jobs:
       # tools/check_docs_links.py は lychee を PATH か ~/.cargo/bin に探し、無ければ SKIP (rc=0)
       # で通ってしまう。CI では必ず入れて実際に検査させる (版と sha256 を固定した prebuilt binary)。
       - name: Cache lychee archive
-        if: steps.prior.outputs.reuse != 'true'
         id: lychee-cache
         uses: actions/cache@v4
         with:
@@ -98,7 +82,6 @@ jobs:
           key: lychee-${{ env.LYCHEE_VERSION }}-${{ env.LYCHEE_SHA256 }}
 
       - name: Install lychee
-        if: steps.prior.outputs.reuse != 'true'
         run: |
           mkdir -p "$RUNNER_TEMP/lychee"
           if [ "${{ steps.lychee-cache.outputs.cache-hit }}" != "true" ]; then
@@ -113,7 +96,6 @@ jobs:
 
       # [ABI] 生成物を手で触らない: kapi.json から作り直してコミット済みと突き合わせる
       - name: KAPI (version, generated files, output guards)
-        if: steps.prior.outputs.reuse != 'true'
         run: |
           make check-kapi-version
           python3 sdk/gen_kapi.py
@@ -126,21 +108,18 @@ jobs:
           make check-kapi-out
 
       - name: Source rules (constraints, shlib table, GUI protocol)
-        if: steps.prior.outputs.reuse != 'true'
         run: |
           make check-constraints
           make check-shlib
           make check-gui-proto
 
       - name: Check map (check-changed selection table)
-        if: steps.prior.outputs.reuse != 'true'
         run: |
           make check-map
           make check-check-select-host
           make check-ci-split-host
 
       - name: Documents (links, orphans, status lines, test inventory)
-        if: steps.prior.outputs.reuse != 'true'
         run: |
           lychee --version
           make check-docs-links
@@ -156,7 +135,6 @@ jobs:
           make check-tests-inventory
 
       - name: Host tests (gcc + python3 only)
-        if: steps.prior.outputs.reuse != 'true'
         run: |
           make check-ne2000-ring
           make check-boot-splash-host
@@ -177,7 +155,7 @@ jobs:
           make check-vfs-fd-path-host
 
       - name: SQLite ccache statistics
-        if: always() && steps.prior.outputs.reuse != 'true'
+        if: always()
         run: ccache -s
 
   ppc-compile:

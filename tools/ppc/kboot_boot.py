@@ -25,7 +25,7 @@ PRODUCT = ['arch/ppc/entry.S', 'arch/ppc/kernel_entry.S', 'arch/ppc/kernel_takeo
     'platform/powermac/rh_observe.c',
     'platform/powermac/ofw.c', 'platform/powermac/escc.c',
     'platform/powermac/escc_tree.c', 'platform/powermac/kboot_capture.c',
-    'platform/powermac/gmac_tree.c',
+    'platform/powermac/gmac_tree.c', 'platform/powermac/via_tree.c',
     'platform/powermac/kboot_reserve.c', 'platform/powermac/memory.c',
     'platform/powermac/mpic_tree.c',
     'mm/memory_boot.c', 'mm/paging.c', 'mm/physmem.c', 'mm/pgalloc.c',
@@ -114,7 +114,7 @@ MUTATIONS = [
   '    (void)pvr;',1,('fixture_fail',[b'TAKEOVER',b'PAGING:MAIN',b'PROBE:LOW',b'FAIL:SURVIVED'])),
 ]
 
-def host(out, bad, mutant=False, shell=False, full_mutation=None):
+def host(out, bad, mutant=False, shell=False, full_mutation=None, via_case=None):
     out.mkdir(parents=True,exist_ok=True)
     src=(ROOT/'platform/powermac/kernel_boot.c').read_text()
     if mutant:
@@ -131,6 +131,7 @@ def host(out, bad, mutant=False, shell=False, full_mutation=None):
         '-nostdlib','-static','-ffunction-sections','-fdata-sections','-Wl,--gc-sections',
         '-D__cdecl=','-DBOOT_BAD_WALK='+str(int(bad)), '-DKBOOT_SH='+str(int(shell)), '-I'+str(out),
         '-I'+str(ROOT/'arch/ppc'),'-I'+str(ROOT/'platform/powermac'),
+        *([f'-DVIA_CASE={via_case}'] if via_case is not None else []),
         *include_flags(ROOT), ROOT/'tools/ppc/kboot_boot_host.c',
         ROOT/'arch/ppc/pd_walk.c', *([ROOT/'platform/powermac/rh_observe.c', ROOT/'platform/powermac/ofw.c', ROOT/'lib/kstring_c.c'] if shell else []), '-o',exe])
     p=subprocess.run(['qemu-i386',str(exe)],capture_output=True,text=True,timeout=30)
@@ -185,6 +186,8 @@ def main():
     host(out/'host',False)
     host(out/'host-bad',True)
     host(out/'host-order',2)
+    for via_case in range(4):
+        host(out/f'via-{via_case}', False, via_case=via_case)
     if args.mutate:
         host(out/'full-no-restore', False, shell=True, full_mutation=('if (!ppc_boot_alias_plan(band->pa, band->bytes, PPC_BOOT_FB_VA, &fb_alias))', 'if (0 && !ppc_boot_alias_plan(band->pa, band->bytes, PPC_BOOT_FB_VA, &fb_alias))', 99, 'STOP:WALK'))
         host(out/'full-no-discard', False, shell=True, full_mutation=('            pm_rh_discard_full();', '            /* mutant */', 45, 'FAIL:FULL-STATE'))

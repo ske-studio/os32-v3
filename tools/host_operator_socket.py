@@ -192,9 +192,10 @@ class OperatorSocket:
                     return
                 body = pending['result'] or b''
                 response = dict(ok=True, state='pending' if state == 'running' else state,
-                                status=pending.get('status', 0),
                                 drop=pending.get('drop', 0), body_b64=_b64(body), complete=state == 'done')
-                if state in ('done', 'truncated'):
+                if state != 'boot_changed':
+                    response['status'] = pending.get('status', 0)
+                if state in ('done', 'truncated', 'boot_changed'):
                     if pending is self.operator.pending:
                         self.operator.take_result()
                     self.operator.results.pop(ident, None)
