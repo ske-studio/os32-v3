@@ -36,7 +36,7 @@ done; echo "$out"
 ```
 
 - 待ちの終了と merge・push を 1 本のコマンドに繋げない。結論を読んでから取り込む。
-- 所要の目安 (2026-11-18): check の static-check 4〜6 分・ppc-compile 4〜21 分・ppc-qemu (4 シャード、割る前は 1 本で 53〜61 分)、build の checks 6 シャード 10〜39 分。伸びてきたらスキル os32-ci-inventory。
+- 所要の目安 (2026-11-18 の棚卸しの後): push から最後のジョブまで 30〜36 分。check は 17〜22 分 (static-check 5〜7 分・ppc-compile 4〜7 分・ppc-qemu の 4 本は 14〜22 分)、build の checks 6 本は 11〜36 分。新しい枝の最初の回で PowerPC のジョブが 15 分ほど長い時は、クロスコンパイラのキャッシュが main に無い (ログの `Cache not found`)。基準から 2 割以上伸びたらスキル os32-ci-inventory。
 - 上限に当たったら `gh api rate_limit -q '.resources.core'` の `reset` (UNIX 秒) まで待つ。
 
 ## 3. 赤を読む
@@ -49,12 +49,14 @@ gh run view <run> --json jobs -q '.jobs[] | "\(.name) \(.conclusion) \(.startedA
 |---|---|
 | build の `checks (i)` | `jid=$(gh run view <run> --json jobs -q '.jobs[] \| select(.name=="checks (i)") \| .databaseId')`、`gh api repos/<owner>/<repo>/actions/jobs/$jid/logs > log`、`grep -n '\*\*\* \[.*check-' log` (検査の名前)、その行の 30 行前までが失敗の本文 |
 | check の `static-check`・`ppc-compile` | 同じくジョブ単位でログを取り、`grep -n 'Traceback\|##\[error\]' log`。最初の失敗で止まるので、後ろの検査は回っていない |
-| check の `ppc-qemu (i)` | ジョブの要約の表 (失敗・回っていない・遅い検査)。ログは `gh run download <run> -n ppc-qemu-failed-<i>` → `results.json` と `failed-logs/<検査>.log` |
-| sep の `checks` (手動) | `gh run download <run> -n sep-checks-<i>` → `results.json` の `status: fail` の行と `failed-logs/<検査>.log` |
+| check の `ppc-qemu (i)` | ジョブの要約の表 (失敗・回っていない・遅い検査)。ログは `gh run download <run> -n ppc-qemu-failed-<i> -D <置き場>` → `results.json` と `failed-logs/<検査>.log` |
+| sep の `checks` (手動) | `gh run download <run> -n sep-checks-<i> -D <置き場>` → `results.json` の `status: fail` の行と `failed-logs/<検査>.log` |
 
 - `gh run view --log-failed` が空を返す事がある。ジョブ単位の API (`actions/jobs/<id>/logs`) で取る。
+- `gh run download` は置き場を `-D` で渡す (渡さないと `would result in path traversal` で取れない事がある)。
+- **ジョブが 1 分以内に落ちたら、検査は始まっていない** (用意の失敗)。ログの最後の `##[group]Run` の手順を見る。2026-11-18 は `rustup toolchain install` が `rust-src` の `detected conflict` で落ちた。回し直して通ったら台帳に残す (§5)。
 - ジョブの所要が 1 分以内なら、手順が飛ばされていないか `--json jobs -q '.jobs[].steps[]'` で確かめる (範囲の判定で中身が回らない事がある)。変異が回ったかは、ログの `RED` の行の数で分かる。
-- 変異込みで初めて見える赤の型: 変異の時だけ作る写しの木にディレクトリ・ヘッダが足りない、置き場の移動で走査の根 (`tools/source_roots.py`) から外れて違反を検出しなくなった、変異の試験だけが要る道具がジョブに無い、ソースを特定のコミットにバイトで固定している試験。
+- 変異込みで初めて見える赤の型: 変異の時だけ作る写しの木にディレクトリ・ヘッダが足りない、置き場の移動で走査の根 (`tools/source_roots.py`) から外れて違反を検出しなくなった、変異の試験だけが要る道具がジョブに無い、ソースを特定のコミットにバイトで固定している試験、同じシャードで並んで回る検査どうしの競合 (片方が作業木に残したファイルを、木を走査する検査が拾う)。
 
 ## 4. 手元で再現する
 
@@ -69,4 +71,12 @@ python3 -B tools/checks/run.py --select --files <触ったファイル…>   # �
 
 ## 5. 揺れる検査
 
-回し直し (`gh run rerun <run> --failed`) で通したら、検査の名前・落ち方・日付を 持越しの台帳 `docs/tasks/DEFERRED_TESTS.md` に行で残す。同じ検査の 2 回目が出たら、直すまで行を閉じない。
+回し直し (`gh run rerun <run> --failed`) で通したら、検査の名前・落ち方・日付を 持越しの台帳 `docs/tasks/DEFERRED_TESTS.md` に行で残す。同じ検査の 2 回目が出たら、直すまで行を閉じない。3 回目は、回し直さずに直す。
+
+原因の調べ方 (2026-11-18 に `ppc-usb` の揺れを直した時の手順):
+
+1. 落ちた回の失敗の文を、回ごとに並べる。毎回同じ判定で落ちているなら、負荷ではなく試験の条件を疑う。
+2. その判定の直前の「待ち」が、何を待っているかを読む。「出力の末尾がプロンプト」のように、結果が出る前にも成り立つ条件になっていないか。ゲストの側で、その条件を早く成り立たせる動き (行の描き直しがプロンプトを出し直す、など) を製品のソースで確かめる。
+3. 同じ試験の隣の場合に、同じ型の直しの前例が無いかを `git log -S` で探す。
+4. 直しは「待つ条件を、確かめたい結果そのものにする」。期限を延ばす直しはしない (何を待っているかが分からないまま通るだけになる)。
+5. 手元で `MUTATE=1 make check-<名>` を回し、変異の検出の数が前と同じ事を見る。
