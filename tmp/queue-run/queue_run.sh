@@ -12,7 +12,9 @@ import sys
 import tempfile
 import time
 
-STATES = {"queued", "running", "done", "failed", "held"}
+STATES = {"queued", "running", "returned", "accepted", "failed", "held"}
+ACCEPT_TYPES = {"none", "np21w", "g4", "qemu-local"}
+BUILD_ROOT = Path("/home/hight/wt")
 TOKEN = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*")
 BUILD_PATH = re.compile(r"/[A-Za-z0-9_./+@%-]+")
 PROMPT_END = " を読んで、その指示に従う。"
@@ -37,6 +39,10 @@ class Stage:
     def state(self):
         return self.fields[6]
 
+    @property
+    def accept(self):
+        return self.fields[7]
+
 
 def warn(message):
     print(f"警告: {message}", file=sys.stderr)
@@ -49,11 +55,11 @@ def parse_queue(lines):
         if not body.strip() or body.startswith("#"):
             continue
         fields = body.split("\t")
-        if len(fields) == 8:
-            stage_id, kind, model, workdir, pack, deps, state, _ = fields
+        if len(fields) == 9:
+            stage_id, kind, model, workdir, pack, deps, state, accept, _ = fields
             deps = deps.split(",") if deps else []
             if (TOKEN.fullmatch(stage_id) and kind in {"build", "read"}
-                    and state in STATES and TOKEN.fullmatch(model)
+                    and state in STATES and accept in ACCEPT_TYPES and TOKEN.fullmatch(model)
                     and workdir and pack and all(TOKEN.fullmatch(dep) for dep in deps)):
                 candidates.append(Stage(index, fields, deps, line[len(body):]))
                 continue
@@ -97,10 +103,26 @@ def running_processes(run_dir, stages):
             continue
         pid, parent, command = parts
         parents[pid] = parent
-        if re.match(r"^(?:\S*/)?codex exec(?:\s|$)", command):
-            commands[pid] = command
-        elif re.match(r"^(?:\S*/)?node\s+(?:\S*/)?(?:codex|codex\.js) exec(?:\s|$)", command):
-            commands[pid] = command
+        launcher = re.match(
+            r"^(?:(?:\S*/)?(?:bash|sh)\s+)?(?:\S*/)?codex_run\.sh\s+(\S+)\s+\S+\s+(\S+)",
+            command)
+        if launcher:
+            commands[pid] = (launcher[1], launcher[2])
+        elif re.match(r"^(?:(?:\S*/)?node\s+(?:\S*/)?(?:codex|codex\.js)"
+                      r"|(?:\S*/)?codex)\s+exec(?:\s|$)", command):
+            options, _, prompt = command.partition(" 最初に ")
+            workdir = re.search(r"(?:^|\s)(?:-C|--cd)(?:=|\s+)(\S+)", options)
+            stage_id = None
+            for directory in re.findall(r"(?:^|\s)--add-dir(?:=|\s+)(\S+)", options):
+                path = Path(directory)
+                if path.parent == run_dir and path.name in stages:
+                    stage_id = path.name
+                    break
+            if stage_id is None:
+                match = re.search(r"\s\(段 ([A-Za-z0-9_.-]+)\)$", prompt)
+                if match:
+                    stage_id = match[1]
+            commands[pid] = (stage_id, workdir[1] if workdir else None)
     wrappers = set()
     for pid in commands:
         parent = parents[pid]
@@ -108,26 +130,30 @@ def running_processes(run_dir, stages):
             if parent in commands:
                 wrappers.add(parent)
             parent = parents[parent]
-    for pid, command in commands.items():
+    for pid, (stage_id, workdir) in commands.items():
         if pid in wrappers:
             continue
-        options, _, prompt = command.partition(" 最初に ")
-        stage_id = None
-        for directory in re.findall(r"(?:^|\s)--add-dir(?:=|\s+)(\S+)", options):
-            path = Path(directory)
-            if path.parent == run_dir and path.name in stages:
-                stage_id = path.name
-                break
-        if stage_id is None:
-            match = re.search(r"\s\(段 ([A-Za-z0-9_.-]+)\)$", prompt)
-            if match and match[1] in stages:
-                stage_id = match[1]
-        if stage_id is not None:
+        parent = parents[pid]
+        while stage_id not in stages and parent in parents and parent != pid:
+            parent_stage, parent_workdir = commands.get(parent, (None, None))
+            stage_id = parent_stage
+            workdir = workdir or parent_workdir
+            parent = parents[parent]
+        if stage_id not in stages:
+            for fd in (1, 2):
+                try:
+                    log_dir = Path(os.readlink(f"/proc/{pid}/fd/{fd}")).parent
+                except OSError:
+                    continue
+                if log_dir.parent == run_dir and log_dir.name in stages:
+                    stage_id = log_dir.name
+                    break
+        if stage_id in stages:
             active.add(stage_id)
             counts[stages[stage_id].kind] += 1
         else:
-            read_only = re.search(r"(?:^|\s)(?:-s|--sandbox)(?:=|\s+)read-only(?:\s|$)", options)
-            counts["read" if read_only else "build"] += 1
+            is_build = workdir and BUILD_ROOT in Path(os.path.normpath(workdir)).parents
+            counts["build" if is_build else "read"] += 1
     return counts, active
 
 
@@ -139,7 +165,7 @@ def log_result(log):
         return None
     match = re.fullmatch(rb"rc=([0-9]+)\r?\n?", line)
     if match:
-        return "done" if int(match[1]) == 0 else "failed"
+        return "returned" if int(match[1]) == 0 else "failed"
     return None
 
 
@@ -233,7 +259,7 @@ def run(run_dir, dry_run):
         if unknown:
             warn(f"{stage.id}: 依存の id が見つかりません: {', '.join(unknown)}")
             continue
-        if stage.id in active or any(stages[dep].state != "done" for dep in stage.deps):
+        if stage.id in active or any(stages[dep].state != "accepted" for dep in stage.deps):
             continue
         if counts[stage.kind] >= limits[stage.kind]:
             continue
@@ -254,6 +280,13 @@ def run(run_dir, dry_run):
             continue
         update(stage, "running")
         counts[stage.kind] += 1
+
+    pending = [stage for stage in stages.values()
+               if stage.state == "returned" and stage.accept != "none"]
+    if pending:
+        print(f"{prefix}手元の受入待ち")
+        for stage in pending:
+            print(f"{prefix}{stage.id}\t{stage.accept}")
 
 
 def main():
