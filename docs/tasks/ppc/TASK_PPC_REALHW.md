@@ -75,6 +75,7 @@ PowerPC に固有の注意事項 (起動の行・BOOTP/BSDP・画面・メモリ
 - PowerPC には platform_reset が無く、`reboot` は何もしない (KAPI の sys_reboot が提供者無し)。再起動の段を設計中。
 
 ### 2026-11-18: LAN からの再起動 (PowerMac の platform_reset) と /host の調べ
+- 設計は [PPC_RESET_DESIGN](../../decisions/ppc/PPC_RESET_DESIGN.md) (PowerMac の platform_reset、2026-11-18 確定)。
 - G4 QuickSilver は VIA-PMU (起動の LOG「VIA kind=pmu pa=80016000 va=fe3c4000 rc=ok compatible=pmu」)。
 - LAN の RSH で `reboot` → 約 23 秒で TFTP の RRQ → 5 秒後に HELLO → cui → `echo x`、を 2 回 (21:37〜21:38)。ホスト側の operator の退避 (resume の一般化) で、再起動の後に pending は残らなかった。以後、G4 の像の差し替えは LAN からの reboot で行い、電源の入れ直しは要らない。
 - /host の交互の失敗 (PPC-G4-SFS-FLAP) の調べ: PHY と MAC は 100 Mb/s 全二重で合っている (G4 PHY の行)、RX FIFO は 10 KiB。GEM の受信の落ちは全部「長さが 14〜1514 の範囲の外」(G4 G の len) で、cp をしていない間も約 1 秒に 1 本。失敗の回は host の RESPONSE が G4 で受からない (no_response)。落ちた電文の正体を調べの像 4 (G4 H、生の descriptor と先頭 32 バイト) で調べている。
