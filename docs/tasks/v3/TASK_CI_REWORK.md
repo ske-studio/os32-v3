@@ -1,6 +1,6 @@
 # TASK_CI_REWORK — 既存の CI (check・build) を手本の形に直す
 
-> 状態: **計画 (2026-11-18)** — 本線の再開の最初の仕事 (ユーザー決定 2026-11-18「本線が再開するのは旧い CI の手直しから」)。票は特務の PM が実測から書いた。**S0 は完了** (本線の PM、2026-11-18。原因と直し、同じ SHA の 10 回の結果は [gate.md](../../design/tools/ci/gate.md) §5-2、基準 (5) を満たした)。**S1 は完了** (§1 の表、[gate.md](../../design/tools/ci/gate.md) §5-3)。**S2 は S2a (ppc-qemu の用意を gate-setup の 1 行に、2026-11-18) まで**。残りは S2b (ppc-compile)・S2c (static-check)。S3 以降は未着手。
+> 状態: **計画 (2026-11-18)** — 本線の再開の最初の仕事 (ユーザー決定 2026-11-18「本線が再開するのは旧い CI の手直しから」)。票は特務の PM が実測から書いた。**S0 は完了** (本線の PM、2026-11-18。原因と直し、同じ SHA の 10 回の結果は [gate.md](../../design/tools/ci/gate.md) §5-2、基準 (5) を満たした)。**S1 は完了** (§1 の表、[gate.md](../../design/tools/ci/gate.md) §5-3)。**S2 は S2a・S2b (ppc-qemu・ppc-compile の用意を gate-setup の 1 行に、2026-11-18〜19、gate.md §5-4) まで**。残りは S2c (static-check)。S3 以降は未着手。
 > 完了の基準: (1) `.github/workflows/check.yml` に `make check-<名>` の手書きの行が 0 (今 31 行)、(2) workflow の中の `apt-get install` が 0 行 (今 3 行。用意は composite action だけ)、(3) わざと 2 本落とした枝で、check・build のどのジョブも残りを最後まで回し、落ちた 2 本の名前がジョブの要約の表に出る、(4) 置き換えの前後で回る検査の名前の集合が減っていない事を機械で確かめた記録がある、(5) 揺れた検査 2 本 (`ppc-sd-link`・`ppc-usb`) が同じ SHA の 10 回の実行で 10 回通り、用意の手順も 10 回落ちない、(6) 道具が無い時に SKIP で通る検査が 0。6 つを満たした SHA が main に在る。
 
 決まりは [POLICY_CI](../../POLICY_CI.md) (作る時 G1〜G12、改修する時 R1〜R8)。手本の形と、11-17 の欠点の実測は [gate.md](../../design/tools/ci/gate.md)。この票は、11-18 に関門を変異込みへ切り替えた後に残っている分を、段に切る。

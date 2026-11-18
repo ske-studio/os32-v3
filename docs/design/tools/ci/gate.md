@@ -205,6 +205,8 @@ check の ppc-qemu の用意を、手書きの apt の行・build-setup・ppc-se
 | ppc-qemu の 4 シャードのジョブの実時間 | 18.1・16.2・16.9・15.2 分 | 16.0・14.9・16.6・12.9 分 |
 | 見つかった赤 | — | 2 つ。(1) `ppc_ci.py` が新しく読む action のファイルが ppc-compile の検査の covers に無く、`check-map` が止めた (R6 の追従の漏れ、`91d1335a9`)。(2) `gate-setup` のメタパッケージ `qemu-system` が全 arch の QEMU (約 100MB) を連れてきて、遅いミラーで用意が 600 秒を越えた (run 44307127004 の ppc-qemu (2))。要る物 (`qemu-system-ppc`・`qemu-system-data`・`seabios`) を名指しにし、apt に再試行と期限の旗 (`ad6e9c6fe`)。sep も同じ `gate-setup` を使うので sep にも効く |
 
+S2b (`b19526c84`、2026-11-19): ppc-compile の用意も `gate-setup` 1 行に。check・build とも 1 回目で success。ppc-compile の通過の行の数は前 (run 44293807742) と後 (run 44324154783) で同じ 39 (ログの行の数え)。
+
 ## 6. 範囲の外
 
 既存の workflow の書き換え、NP21/W・実機の受入、検査の中身の直し (目印のずれなどは見つけた枝で別のコミットにして直す)。
