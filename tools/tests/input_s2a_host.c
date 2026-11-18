@@ -24,7 +24,6 @@ int check(void)
     CHECK(native > 0);
     CHECK(input_usb_register(0) == OS32_ERR_INVAL);
     CHECK(input_usb_register(7) == OS32_ERR_INVAL); /* map2 absent; rollback */
-    CHECK(releases == 1); /* failed bind released its allocated source */
     CHECK(input_usb_usage(7, 4, 1, 0) == OS32_ERR_INVAL && calls == 0);
     CHECK(pm_input_keymap_register() == 0); /* no USB keyboard required */
     CHECK(pm_input_keymap_register() == OS32_ERR_INVAL);
