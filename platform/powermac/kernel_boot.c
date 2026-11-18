@@ -114,6 +114,11 @@ static int overlap(u32 a, u32 n, u32 b, u32 m)
 {
     return n && m && (a <= b ? b - a < n : a - b < m);
 }
+int pm_via_phys_overlap(u32 pa, u32 bytes)
+{
+    return via_window.rc == 0 &&
+           overlap(pa, bytes, via_alias.pa, via_alias.bytes);
+}
 static int gmac_aliases_safe(u32 root)
 {
     for (u32 i = 0; i < 3; i++) {
@@ -189,6 +194,18 @@ static void install_via(u32 root)
         via_window.rc = PM_VIA_OVERLAP;
         return;
     }
+#if KBOOT_SH
+    for (u32 i = 0; i < pm_usb_root_count; i++) {
+        u32 cfg_page = pm_usb_roots[i].pa & PTE_FRAME_MASK;
+        if (overlap(via_alias.pa, via_alias.bytes,
+                    cfg_page + PM_USB_CFG_ADDR_OFFSET, PM_USB_PAGE) ||
+            overlap(via_alias.pa, via_alias.bytes,
+                    cfg_page + PM_USB_CFG_DATA_OFFSET, PM_USB_PAGE)) {
+            via_window.rc = PM_VIA_OVERLAP;
+            return;
+        }
+    }
+#endif
     install_alias(root, &via_alias);
     if (!observe_walk_valid(root, &via_alias)) {
         u32 va = via_alias.va & PTE_FRAME_MASK;

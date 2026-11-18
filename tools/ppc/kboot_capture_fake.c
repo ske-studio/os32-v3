@@ -116,6 +116,15 @@ static int prop(int node, const char *name, unsigned char *p)
             return 20;
         }
     }
+    if (node==9 && !kstrcmp(name,"ranges") && scenario>=36 && scenario<=41) {
+        for (n=0;n<5;n++) put(p+4*n,ranges[n]);
+        /* Test matching tokens as well as the wrong BDF and wrong BAR. */
+        unsigned token = scenario==36 || scenario==39 ? 0x8010 :
+                         scenario==37 || scenario==40 ? 0x8810 : 0x8014;
+        put(p+4, (scenario>=39 ? 0x82000000 : 0x02000000) | token);
+        put(p+12, scenario>=39 ? 0x80000000 : 0);
+        return 20;
+    }
     if (!kstrcmp(name,"ranges")) {
         if (node==9) { v=ranges; count=5; }
     }
@@ -135,8 +144,8 @@ int ofw_parent(int n)
     if (n==-17) n=1;
     return n==12?11:n==11?1:n==1?0:n==6?5:n==5||n==7||n==13||n==14?9:n==9?4:n==3 && scenario!=22?8:scenario==18?-17:1;
 }
-int ofw_child(int n) { return n==11?12:n==1||n==-17?2:n==4?9:n==9?5:n==5?6:n==8 && scenario!=22?3:0; }
-int ofw_peer(int n) { return n==2?(scenario==22?3:8):n==8?4:n==3 && scenario==22?4:n==4 && scenario==23?10:n==4 && scenario==24?11:n==5?7:n==7 && scenario>=26 && scenario!=33?13:n==13 && scenario==28?14:0; }
+int ofw_child(int n) { if (n==13 && scenario==34) return -1; return n==11?12:n==1||n==-17?2:n==4?9:n==9?5:n==5?6:n==8 && scenario!=22?3:0; }
+int ofw_peer(int n) { if (n==13 && scenario==35) return -1; return n==2?(scenario==22?3:8):n==8?4:n==3 && scenario==22?4:n==4 && scenario==23?10:n==4 && scenario==24?11:n==5?7:n==7 && scenario>=26 && scenario!=33?13:n==13 && scenario==28?14:0; }
 int ofw_package_to_path(int n, char *p, unsigned cap)
 {
     if (n==-17) n=1;
@@ -193,7 +202,10 @@ static void test(void)
     if (scenario>=26) {
         const int expected[]={0,0,PM_VIA_AMBIGUOUS,PM_VIA_BAD_PROPERTY,
                               PM_VIA_BAD_ADDRESS,PM_VIA_BAD_ADDRESS,
-                              PM_VIA_MISSING,PM_VIA_MISSING};
+                              PM_VIA_MISSING,PM_VIA_MISSING,
+                              PM_VIA_BAD_PROPERTY,PM_VIA_BAD_PROPERTY,
+                              0,PM_VIA_BAD_ADDRESS,PM_VIA_BAD_ADDRESS,
+                              0,PM_VIA_BAD_ADDRESS,PM_VIA_BAD_ADDRESS};
         if (p->via.capture_rc!=expected[scenario-26] ||
             (p->via.capture_rc && (p->via.pa || p->via.bytes)) ||
             (!p->via.capture_rc &&

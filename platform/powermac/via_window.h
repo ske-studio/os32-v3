@@ -12,5 +12,6 @@ enum pm_via_window_rc {
 };
 struct pm_via_window { u32 va; int rc; };
 const struct pm_via_window *pm_via_window(void);
+int pm_via_phys_overlap(u32 pa, u32 bytes);
 void pm_via_prepare(void);
 #endif

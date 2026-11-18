@@ -8,7 +8,7 @@
 #define PCI_SPACE 0x03000000U
 #define PCI_MEMORY 0x02000000U
 #define PCI_ABSOLUTE 0x80000000U
-#define PCI_TOKEN 0x03ffffffU
+#define PCI_BAR_TOKEN 0x00ffffffU
 #define PCI_BAR0 0x10U
 
 static int prop(int node, const char *key, void *data, unsigned cap)
@@ -64,8 +64,9 @@ static int macio_bar(int node, u32 tag, u32 offset, u32 bytes, u32 *result)
         if (!address(p, 3, &hi, &base) || be32(p + 3 * PM_CELL_BYTES))
             return 0;
         size = be32(p + 4 * PM_CELL_BYTES);
-        int relative = !(tag & PCI_ABSOLUTE) && (tag & 0x00ffffffU) &&
-                       (tag & PCI_TOKEN) == (hi & PCI_TOKEN) &&
+        u32 token = tag & PCI_BAR_TOKEN;
+        if (token && token != (hi & PCI_BAR_TOKEN)) return 0;
+        int relative = !(tag & PCI_ABSOLUTE) && token &&
                        contains(base, size, base, bytes) && offset <= size - bytes;
         int assigned = contains(base, size, offset, bytes);
         if (relative && assigned && base) return 0;
@@ -157,7 +158,8 @@ static int named(const char *buf, int n, const char *name)
 static int walk(int node, int macio, int root, unsigned depth, unsigned *left,
                 int *found, struct pm_via_boot *out)
 {
-    for (; node && node != -1; node = ofw_peer(node)) {
+    for (; node; node = ofw_peer(node)) {
+        if (node == -1) return PM_VIA_BAD_PROPERTY;
         if (!*left || depth >= PM_KBOOT_ANCESTORS) return PM_VIA_BAD_PROPERTY;
         --*left;
         char name[PM_KBOOT_PROP_BYTES];
