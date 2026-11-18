@@ -190,3 +190,28 @@ G4 の設定切替を埋め込み RAM root と ELF の再生成で運用して�
 | P-R8 | 持越し台帳の PPC-LINK-G4 の「NAP 復帰 (SRR1[POW] が残らない)」は、7450 では nap7450=1 の像だけの項目にする (台帳の直しは PowerPC の PM) |
 | P-I | 段 I の差し込み位置: 確定は `platform/powermac/ppc_kernel.c` の `platform_boot_services` で `pm_root_boot()` が 0 を返した直後 (`pm_hostfs_boot` より前)。失敗の時も同じ所で finish(NULL)。KBOOT_SHELL・SH の無い像は、その `#if` の塊の外で finish(NULL)。確定の前の局面 2 の link 待ち (`platform/powermac/link_platform.c` の `pm_lan_start` が `_idle` を呼ぶ) は、power_init が先に 7450 の NAP を下ろしているので安全 |
 | P-G | 段 G を 2 つに分ける: **G-a** (`ppc_cpu_power_init` で 7450 の NAP を下ろす。設定に依らない。B〜E に依存しない) と **G-b** (`ppc_cpu_power_apply`、B に依存)。G-a と G1 は PowerPC の PM が先に出してよい (PM 決定)。F・I・N1・G-b は共通の段 (B〜B4・C・D・J) の後 |
+
+## 段 B・C の実装で埋めた設計の欠け (2026-11-19、gpt-6.2-astra の追記、PM が受け入れ)
+
+### 1. machine.cfg のファイル長（段 B・M1）
+段 B の include/machcfg_contract.h に公開上限を置く。式は `#define MACHCFG_FILE_MAX (1024 - 1)` とし、読取幅 1024 の正典は init/sysconfig.c の `#define SYSCONFIG_MAX  1024` とする。
+段 M1 の tools/checks/machcfg-host.py はその数値定義を読み、host コンパイルに -DTEST_SYSCONFIG_MAX=<読んだ数値> を渡す。段 M の tools/tests/machcfg_host.c で `_Static_assert(MACHCFG_FILE_MAX == TEST_SYSCONFIG_MAX - 1, "machine.cfg limit");` を課す。
+段 B3 で定数を移す必要はない。[C4] は tools/tests/test_mem_stat.py (CFG_READ_MAX と SYSCONFIG_MAX の照合) が userland/shell/cmd_sys.c の CFG_READ_MAX と init/sysconfig.c の SYSCONFIG_MAX を直接読むため、試験の追従も不要。
+§7 受入・変異：上限の等式が成立し、1023 B は解析、1024 B は全体を破棄する。契約式の減数を 2 に変えると host ビルドが失敗する。
+
+### 2. ppc7450.nap の採否（段 C・D・E・F）
+段 F の platform/powermac/machcfg.c は PVR version 0x8000（7450）の行だけ accepts_nap7450=1、7455 とその他は 0 とする。段 E の platform/pc98/machcfg.c も 0 とする。
+段 D の kernel/machcfg_root.c は既定のコピーに値域検査済みの候補を入れる。CPU 判定は段 C の kernel/machcfg.c に保存した seed の能力で行う。
+machcfg_finish は確定済みなら直ちに戻る。初回は次の順で採用値を決め、一括公開する。
+```c
+struct machcfg next = values ? *values : seed.defaults;
+if (!seed.accepts_nap7450)
+    next.nap7450 = seed.defaults.nap7450;
+```
+7455・PC-98 で ppc7450.nap=1 を読んでも捨てるのはこのキーだけで、同じファイルの有効な性能段は採用する。7455 の HID0 は従来の機種処理に従う。
+起動時の kprintf は選択元、機種・CPU、ファイル結果、確定した性能段と nap7450 を一度出す。対象外なら NAP の選択元は「機種既定（対象外）」とし、行別警告は出さない。PowerPC の適用後 HID0.NAP は別記する。
+§7 受入・変異（段 M・M1）：同じ nap=1 の入力で 7450 は 1、7455・PC-98 は seed の既定を保持し、有効な性能段も残る。能力判定を削ると対象外で既定 0 のケースが失敗する。
+
+### 確定本文と矛盾しない理由
+1. §2・B4・R3 の読取幅と数値定義の位置を保ち、公開上限が正典より 1 小さいことを host で検証する。
+2. §2 の対象 CPU 違いの行を捨てる規則を §3 の一括確定で実現し、§4・P-R7 の 7455 の電力制御を維持する。

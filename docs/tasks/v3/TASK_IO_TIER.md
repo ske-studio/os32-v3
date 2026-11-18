@@ -1,6 +1,6 @@
 # TASK_IO_TIER — I/O の Tier 制御 (協調点の Tier・予算・設定表・pump)
 
-> 状態: **実装中 (2026-11-16)** — 設計は確定、A0・A1・A3・A4 が済み。詳細設計は [IO_TIER_DESIGN](../../decisions/IO_TIER_DESIGN.md)。
+> 状態: **実装中 (2026-11-19 に実物に合わせて直した)** — 設計は確定、A0〜A5・T1・T2・D1〜D5・C1・C2・L1 が済み。詳細設計は [IO_TIER_DESIGN](../../decisions/IO_TIER_DESIGN.md)。
 > 関係: 最初の利用者は票 TASK_LAN_BULK (docs/tasks/network/)。時計は票 TASK_TICK_1KHZ の T1。
 
 ## 0. ユーザー決定 (2026-11-14)
@@ -22,4 +22,5 @@
 |---|---|
 | A0・A1 (契約の行・`kernel/io_work.h`) | 済 (2026-11-15) |
 | A3 (`kernel/io_work.c`)・A4 (`kernel/io_policy.c`) | 済 (2026-11-16、独立レビューの直し 1 回)。ビルドへの登録は A5。共有の口 `kernel/io_clock.h`・`kernel/io_policy.h` と PM の決定 P1〜P4 は設計の末尾 |
-| A5・T1・T2・E 系・D 系・C 系・P1・L1 | 未着手 (順は設計 §7) |
+| A5・T1・T2・D1〜D5・C1・C2・L1 | 済 (2026-11-16〜17、main の git log。この行は 2026-11-19 に本線 PM が実物に合わせて直した — 前は「未着手」のままだった) |
+| E1・E2 (`tools/tests/io_tier_host.c`・`test_io_tier.py`)・P1 (PPC の ABI adapter、必要な場合のみ) | 未確認 (E1・E2 の名前のファイルは無い。役目が `io_work_host.c`・`io_policy_host.c` で済んでいるかは未確認) |

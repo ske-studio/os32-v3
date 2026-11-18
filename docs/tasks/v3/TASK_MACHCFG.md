@@ -1,6 +1,6 @@
 # TASK_MACHCFG — 機種の固有の設定を独立した設定ファイル (/etc/machine.cfg) で切り替える
 
-> 状態: **計画 (2026-11-18)** — 設計は確定 ([MACHCFG_DESIGN](../../decisions/settings/MACHCFG_DESIGN.md))。段 G-a・G1 は完了、ほかは未着手。本線の CI の手直し (票 TASK_CI_REWORK) の後に出す。
+> 状態: **計画 (2026-11-18)** — 設計は確定 ([MACHCFG_DESIGN](../../decisions/settings/MACHCFG_DESIGN.md))。段 G-a・G1・B・B1・C・M・M1 は完了、ほかは未着手。本線の CI の手直し (票 TASK_CI_REWORK) の後に出す。
 > 完了の基準: 両機種で同一入力の設定試験が全件一致し、7450 の既定・明示 0・明示 1 の HID0 読戻しが順に 0・0・1。7455 の既定は 1。NP21/W で設定あり・なしともシェル到達。common-compile 成功、check_layers.py の新旧違反 0、起動像の既存サイズ検査合格。
 
 ## 0. ユーザー決定
@@ -24,7 +24,9 @@
 | 段 | 状態 |
 |---|---|
 | G-a・G1 | **完了 (2026-11-18、e196afb70、PowerPC の PM)**。7450 の NAP を設定に依らず下ろす。G4 実機で、設計の追記 P-R4 の順の 1 手目 (NAP=0) で固まりが無くなった (記録は票 TASK_PPC_REALHW §2) — 2 手目 (DPM と POW も外す) は要らない |
-| A〜N1 (G-a・G1 を除く) | 未着手 |
+| B・B1・C・M・M1 | **済 (2026-11-19、terra、astra のレビューの直し 1 回)**。契約 `include/machcfg_contract.h`・`include/config.h` の `SYS_MACHINE_CFG`・`kernel/machcfg.c`・host 試験 `machcfg-host`。kernel/machcfg.c はまだビルドの一覧に入れていない (段 J)。設計の欠け 2 つは設計の末尾の「段 B・C の実装で埋めた設計の欠け」 |
+| D (起動時の診断の kprintf を含む、PM 決定: 段 D を出す時に設計者に追記させる)・E・F・PVR の優先と読み超過の変異 (D・F の受入) | 未着手 |
+| A・B2〜B4・G-b・H・I・J〜L・N・N1 | 未着手 |
 
 ## 3. 改修項目の記録
 
