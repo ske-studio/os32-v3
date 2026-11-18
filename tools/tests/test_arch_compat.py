@@ -67,7 +67,9 @@ def input_kapi(root, work, vectors, mutation=None):
         (generator / name).write_text(sources.get('sdk/' + name, (root / 'sdk' / name).read_text()))
     api = json.loads((root / 'sdk/kapi.json').read_text())['api']
     slot = next(i for i, a in enumerate(api) if a['name'] == 'kbd_trygetkey')
-    names = ('kbd_trygetkey', 'path_get_drive', 'mouse_available', 'ime_is_active', 'gfx_shutdown')
+    # The absent-pointer sample must stay absent on PowerMac: path_get_drive was filled by
+    # PPC_KAPI_FILL 1c; db_last_error is filled by 7b — pick another absent pointer slot then.
+    names = ('kbd_trygetkey', 'db_last_error', 'mouse_available', 'ime_is_active', 'gfx_shutdown')
     statuses, slots = {}, []
     for provider, target in (('pc98', 'x86-pc98'), ('powermac', 'ppc-powermac')):
         output = work / target

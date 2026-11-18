@@ -65,7 +65,7 @@ int platform_clock_read_us(u32 *lo, u32 *hi) { *lo = fake_time; *hi = 0; return 
 static int hits, shutdowns;
 static int pointer_present(void) { return 1; }
 #define KAPI_HIT(slot) (hits = (slot))
-const char *path_get_drive_user(void) { return "A:"; }
+const char *kapi_db_last_error(int handle) { (void)handle; return "A:"; }
 int ime_is_active(void) { return 1; }
 void gfx_shutdown(void) { ++shutdowns; }
 #include KAPI_SOURCE
@@ -123,7 +123,7 @@ static int input_kapi(void)
     REQUIRE(input_get_modifiers() == 0);
     /* Absent pointer/query/value/void and reserved slot, from real generation. */
     REQUIRE(kapi_reserved_nosys() == OS32_ERR_NOSYS);
-    const char *drive = wrap_path_get_drive();
+    const char *drive = wrap_db_last_error(0);
 #ifdef PC98_INPUT
     REQUIRE(drive && drive[0] == 'A' && wrap_ime_is_active() == 1);
     REQUIRE(wrap_mouse_available() == 1);
