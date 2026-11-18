@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reuse only successful integration push runs of this workflow and exact SHA."""
+"""Reuse only successful branch (wt/**) push runs of this workflow and exact SHA (ユーザー決定 2026-11-19)."""
 import json
 import os
 import re
@@ -30,7 +30,7 @@ def reusable(env):
     # A bounded search is sufficient: an older/missing run simply causes execution.
     return any(r['head_sha'] == sha and r['workflow_id'] == workflow_id
                and r['status'] == 'completed' and r['conclusion'] == 'success'
-               and r['event'] == 'push' and r['head_branch'].startswith('wt/int-')
+               and r['event'] == 'push' and r['head_branch'].startswith('wt/')
                and r['head_repository']['full_name'] == repo
                and str(r['id']) != env.get('GITHUB_RUN_ID') for r in runs)
 

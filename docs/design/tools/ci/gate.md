@@ -207,6 +207,8 @@ check の ppc-qemu の用意を、手書きの apt の行・build-setup・ppc-se
 
 S2b (`b19526c84`、2026-11-19): ppc-compile の用意も `gate-setup` 1 行に。check・build とも 1 回目で success。ppc-compile の通過の行の数は前 (run 44293807742) と後 (run 44324154783) で同じ 39 (ログの行の数え)。
 
+S2c (`268404985`・`00fd03405`・`e262701b9`、2026-11-19): static-check の apt を `.github/actions/static-setup` に移し、static-check は main でも再利用せずに毎回回す (煙試験、main のキャッシュを育てる)。check・build とも success (e262701b9)。1 回目 (268404985) の build の checks (0) は `check-ppc-realhw-link` の揺れ (試験の時計の期限 10 ms、PowerPC の PM が `wt/ppc-rhlink-clock` で直す)。main へは、取り込み直しの差が文書 4 本だけだったので、決まり (PARALLEL_BRANCHES §3) で CI を省いて早送りした (0e7ee0a46)。
+
 ## 6. 範囲の外
 
 既存の workflow の書き換え、NP21/W・実機の受入、検査の中身の直し (目印のずれなどは見つけた枝で別のコミットにして直す)。
