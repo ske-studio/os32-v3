@@ -119,7 +119,9 @@ SKIP の行は挙げるだけで落とさない: 試験が自分の出力とし�
 | 用意の `rustup toolchain install` が `rust-src` の `detected conflict` で落ちる (run 44234810239 の 1 回目、`ppc-qemu (0)`) | 直近の check・build・sep の 49 ジョブのログ | 落ちた 1 本だけが `using existing install for nightly-2026-04-29` で始まった (ほかの 48 本は部品 4 つを新しく取る)。この手順より前に rustc を呼ぶ手順は無く、runner が rust-src のファイルは在るが部品として登録されていない toolchain を持っていた。手元で同じ状態 (`multirust-config.toml` と `components` から rust-src を外し、ファイルは残す) を作ると、同じ conflict で落ちる | `.github/actions/build-setup`: toolchain が在って rust-src が登録されていなければ、消してから入れる。判定はリポジトリの外で `RUSTUP_AUTO_INSTALL=0` を付けて打つ — 中で打つと `rust-toolchain.toml` を読んだ rustup が判定の前に toolchain を入れてしまう (最初の直し `af58ea349` の 10 回では 62 ジョブ全部がそうなり、判定が runner の元の状態を見ていなかった) |
 | `ppc-sd-link` の QMP EOF (run 44016465654、11-17、枝 wt/sep-ci の build の checks 2/6) | その回のログ、同じ回の `ppc-mmu` | 揺れではない。用意に `qemu-system` (mac99 の VGA の ROM = seabios) が無く、QEMU が起動直後に終わった。同じ回の PowerPC の QEMU の検査 11 本が同じ形で落ちている。QEMU の stderr は成果物に残っていなかった | `50da7775f` (gate-setup に qemu-system、`gate.py` の道具の事前確認に firmware と VGA の ROM) で直っている。PowerPC の台本に潜む競合 2 つ (`sd_run.py` の UDP の口を閉じてから QEMU に bind させる間、`mmu_run.py`・`run.py` の `build/out/ppc` の固定の名前) は、証拠は無く PowerPC の PM が平時に直す |
 
-10 回の確かめ (`af58ea349`、`gh workflow run check.yml -f arch=both` を 10 回): 10 回とも success。`ppc-sd-link`・`ppc-usb` は各回の `ppc-qemu` で回って通った (各 150〜182 秒・約 430 秒)。用意の失敗は 0。判定の直し (上の表) の後の SHA で、10 回をやり直す。
+10 回の確かめ (`af58ea349`、`gh workflow run check.yml -f arch=both` を 10 回): 10 回とも success。`ppc-sd-link`・`ppc-usb` は各回の `ppc-qemu` で回って通った (各 150〜182 秒・約 430 秒)。用意の失敗は 0。
+
+判定の直しの後の 10 回 (`1ee8d5090`、同じく `arch=both` で 10 回): 10 回とも success。rustup の用意は 62 ジョブで、auto-install 0・部品を新しく取った 62・壊れた toolchain を見つけて消した 0・conflict 0 (この 10 回では runner の壊れた状態は出なかった)。`ppc-sd-link`・`ppc-usb` は各回で回って通った (11 回ずつ、push の回を含む)。票の基準 (5) を満たした。
 
 ## 6. 範囲の外
 
