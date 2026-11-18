@@ -14,8 +14,9 @@ int main(int argc, char **argv, KernelAPI *api)
     api->serial_init(9600);
     if (!api->serial_is_initialized())
         return report(api, "PORT initialized failed\n", 1);
-    u32 mode, fifo;
-    if (api->serial_get_status(&mode, 0, &fifo) != 0 || mode != 0 || fifo != 1)
+    u32 mode, baud, fifo;
+    /* KAPI の出力の確かめ (TASK_KAPI_OUTPUT_GUARD) は NULL の欄もアプリを止める — 全欄を渡す */
+    if (api->serial_get_status(&mode, &baud, &fifo) != 0 || mode != 0 || fifo != 1)
         return report(api, "PORT status failed\n", 2);
     if (api->serial_init_vfast(38400) != -1)
         return report(api, "PORT alternate rate failed\n", 3);
