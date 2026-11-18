@@ -136,7 +136,7 @@ def settings(work, mutation=None):
 
 class Session:
     qemu_clock = USB_QEMU_CLOCK
-    qmp_type = PumpQMP
+    qmp_type = None  # None = the module-level PumpQMP at start() (tests patch link_sh_run.PumpQMP)
     machine = "mac99"
     reboot_args = ("-no-reboot",)
 
@@ -184,7 +184,7 @@ class Session:
             elf_sha256=hashlib.sha256(self.elf.read_bytes()).hexdigest()),indent=2))
         self.err=(self.out/'qemu.stderr').open('w'); self.frames=(self.out/'frames.log').open('w')
         self.p=subprocess.Popen(args,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=self.err,bufsize=0)
-        self.q=self.qmp_type(self.p,self.deadline,self.pump)
+        self.q=(self.qmp_type or PumpQMP)(self.p,self.deadline,self.pump)
 
     def send(self, frame):
         self.frames.write('> '+bytes(frame).hex()+'\n'); self.io.send(frame)
