@@ -47,7 +47,7 @@ serial_diag serial_get_status serial_getchar serial_init serial_init_vfast
 serial_is_initialized serial_putchar serial_puts serial_trygetchar sfs_begin
 sfs_end snd_bgm_is_playing snd_bgm_play snd_bgm_set_persist snd_bgm_stop
 snd_focus snd_se_play snd_se_play_raw snd_set_master ssg_all_off ssg_tone
-ssg_volume surface_lease surface_query surface_unlease sys_get_build_info
+ssg_volume sys_get_build_info
 sys_set_mtime    sys_switch_shell
 sys_time_now sys_ver_info v86_boot v86_boot2 v86_disktest
 v86_gdc_capture v86_selftest
@@ -56,6 +56,9 @@ v86_gdc_capture v86_selftest
 # Fixed allowlist: exec/*.c (including exec_*.inc), KBOOT_SHELL=1 TUs,
 # input_service, kbd_inject, con_sink, pipe_buffer, kapi_strings, kstring.
 ALLOWED_UNDEFINED = frozenset("""
+surface_api_query
+surface_api_lease
+surface_api_unlease
 boot_token_get
 con_sink_capture
 appmem_error_public
@@ -270,7 +273,7 @@ def main():
         return 1
     entries = [api for api in json.loads((ROOT / 'sdk/kapi.json').read_text())['api']
                if api['name'] in EXPECTED_ABSENT_SLOTS]
-    assert len(entries) == 172
+    assert len(entries) == len(EXPECTED_ABSENT_SLOTS)
     assert {'buz_on', 'buz_off', 'rtc_read'} <= ABSENT_PROVIDER_SLOTS
     assert not {'sys_reboot', 'sys_shm_alloc', 'sys_shm_lock', 'sys_shm_free'} & ABSENT_PROVIDER_SLOTS
     with tempfile.TemporaryDirectory(prefix='ppc-binding-') as directory:
@@ -304,7 +307,8 @@ def main():
                    'tvram_putkanji_at', 'tvram_readchar_at', 'tvram_reverse_cell',
                    'tvram_scroll', 'shm_alloc', 'shm_free', 'shm_lock',
                    'font_lease_app_open', 'font_lease_app_read_at',
-                   'font_lease_app_close', 'unicode_file_lookup'} - undefined
+                   'font_lease_app_close', 'unicode_file_lookup',
+                   'surface_api_query', 'surface_api_lease', 'surface_api_unlease'} - undefined
         if missing:
             print('missing providers:', sorted(missing)); return 1
         unexpected = undefined - ALLOWED_UNDEFINED

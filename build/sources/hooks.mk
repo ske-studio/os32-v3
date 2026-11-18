@@ -7,6 +7,7 @@ EXEC_HOOKS = gfx gfx_poll surface gui font_guard font_lease ime snd shlib legacy
 $(foreach h,$(EXEC_HOOKS),$(eval HOOK_$(h) = $$(FEATURE_PC98_PENDING)))
 # font_source.c は共通 EXEC の提供者。
 HOOK_font_lease = $(FEATURE_EXEC)
+HOOK_surface = $(FEATURE_EXEC)
 hook_macro = OS32_HOOK_$(shell echo $(1) | tr 'a-z' 'A-Z')
 HOOK_DEFS := $(foreach h,$(EXEC_HOOKS),-D$(call hook_macro,$(h))=$(HOOK_$(h)))
 C_COMMON_HOOKS_ABSENT = $(foreach h,$(EXEC_HOOKS),$(if $(filter 0,$(HOOK_$(h))),exec/absent/exec_$(h).c))

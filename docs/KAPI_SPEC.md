@@ -1606,6 +1606,9 @@ TRIDENT・OF_FB は番号だけの追加で構造体・スロットを変えな�
 - `gfx_surface_lease`: PC98 DISPLAY の 4 ref を query と同順で渡す。4 面すべて成功か巻戻し。count/欠落/重複/別束は INVAL、古い世代は STALE。
 - `surface_unlease`: 保存 USER caller の AS が持つ token のみ返却する。他人・無効・互換 token は INVAL。再 init/終了による revoke は内部処理。
 
+PowerMac の EXEC 像では、初期化済み OF FB の RAM 上の CLIENT 1 面に対して
+`surface_query` / `surface_lease` / `surface_unlease` を提供する。
+
 query/lease はどちらも次の授権表で判定する。U は保存した USER caller と**現在実行中**の slot/AS/owner/generation の一致、
 G は kernel が読んだ `hdr_flags & OS32X_FLAG_GFX`、F は GUI の `appslot_gfx_owner()==caller.app_id`。
 親や park 中の AS に代理で貸さない。user 引数の owner や sid を権限にしない。どの role も desc の最大 access 以内。
