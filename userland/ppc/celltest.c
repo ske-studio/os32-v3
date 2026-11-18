@@ -29,11 +29,13 @@ static int check_cells(KernelAPI *api)
         !cell_is(api, x + 1, y, jis, reversed) ||
         !cell_is(api, x + 2, y, jis, reversed))
         return 13;
+    const u8 next_attr = 0x81;
+    api->tvram_putchar_at(x, y + 1, 'B', next_attr);
     api->tvram_scroll();
     if (!cell_is(api, x, y - 1, 'A', reversed) ||
         !cell_is(api, x + 1, y - 1, jis, reversed) ||
         !cell_is(api, x + 2, y - 1, jis, reversed) ||
-        !cell_is(api, x, y, ' ', attr))
+        !cell_is(api, x, y, 'B', next_attr))
         return 14;
     return 0;
 }

@@ -6,7 +6,8 @@ CHECK = dict(name='ppc-console-cells', env=['ppc-cross', 'qemu-ppc', 'socket'],
             'arch/ppc/**', 'platform/powermac/**', 'userland/**', 'assets/**',
             'drivers/**', 'include/**', 'init/**', 'kernel/**', 'mm/**',
             'exec/**', 'fs/**', 'gfx/**', 'net/**', 'input/**', 'kapi/**', 'lib/**'],
-    basis=['docs/KAPI_SPEC.md §4-8'],
+    basis=['docs/KAPI_SPEC.md §4-8',
+           'origin/wt/ppc-kapi-fill:docs/decisions/ppc/PPC_KAPI_FILL_DESIGN.md §3「4a」・§5「console_font」'],
     env_limit='Requires mac99 QEMU, OpenBIOS, and AF_INET UDP/TCP.')
 
 

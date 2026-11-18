@@ -14,6 +14,46 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "sdk"))
 from kapi_target_ppc import ABSENT_PROVIDER_SLOTS, absent_result
 
+# Expected absent slots after stage 4a (PPC_KAPI_FILL_DESIGN §4 item 10).
+EXPECTED_ABSENT_SLOTS = frozenset("""
+boot_image_info buz_off buz_on db_bind_blob db_bind_int db_bind_null
+db_bind_text db_close db_column_int db_column_text db_error_code db_exec
+db_finalize db_last_error db_mem_used db_open db_open_existing db_prepare
+db_prepare_only db_step ext2_format ext2_format_at fm_note_off fm_note_on
+fm_play_mml fm_set_tone_num fm_startup_sound font_source_close font_source_open
+font_source_read_at gfx2_adapter_count gfx2_adapter_gen gfx2_adapter_info
+gfx2_caps gfx2_check_op gfx2_connector_edid gfx2_connector_info
+gfx2_cursor_image gfx2_cursor_move gfx2_cursor_show gfx2_dpms gfx2_fence_query
+gfx2_fence_wait gfx2_flip gfx2_gamma gfx2_head_info gfx2_lock gfx2_mode_count
+gfx2_mode_get gfx2_mode_set gfx2_palette gfx2_present gfx2_screen_surface
+gfx2_submit gfx2_surface_create gfx2_surface_desc gfx2_surface_free gfx2_unlock
+gfx2_vblank_wait gfx_add_dirty_rect gfx_get_framebuffer gfx_get_palette
+gfx_hardware_scroll gfx_hw_blit gfx_hw_fill_rect gfx_hw_get gfx_hw_submit
+gfx_init gfx_init_200 gfx_lease_palette gfx_osri_show gfx_present
+gfx_present_dirty gfx_present_nosync gfx_present_raster gfx_present_rect
+gfx_screen_info gfx_screen_owner gfx_set_palette gfx_shutdown gfx_stats
+gfx_surface_lease gui_call gui_register hdd_geom_info ide_drive_present
+ide_get_info ide_identify ide_init ide_read_sector ide_write_sector
+ide_write_sectors ime_dict_info ime_dict_suspend ime_feed_key ime_get_mode
+ime_getchar ime_getkey ime_is_active ime_set_mode ime_set_render
+ime_switch_dict ime_toggle ime_trygetchar ime_trygetkey ime_user_clear
+ime_user_delete ime_user_export ime_user_list kcg_init kcg_load_font
+kcg_read_ank kcg_read_kanji kcg_set_scale kdebug_call loop_attach loop_detach
+loop_status mem_stat mouse_available mouse_cursor_hide mouse_cursor_set_mode
+mouse_cursor_show mouse_poll mouse_set_bounds np2_check_hostdrv np2_detect
+np2_get_clock np2_get_cpu np2_get_version path_get_cwd path_get_drive
+path_parse path_set_cwd path_set_drive pci_bind_info pci_cfg_read32 pci_count
+pci_get pcm_close pcm_open pcm_set_volume pcm_status pcm_write rtc_read
+serial_diag serial_get_status serial_getchar serial_init serial_init_vfast
+serial_is_initialized serial_putchar serial_puts serial_trygetchar sfs_begin
+sfs_end snd_bgm_is_playing snd_bgm_play snd_bgm_set_persist snd_bgm_stop
+snd_focus snd_se_play snd_se_play_raw snd_set_master ssg_all_off ssg_tone
+ssg_volume surface_lease surface_query surface_unlease sys_get_build_info
+sys_set_mtime sys_shm_alloc sys_shm_free sys_shm_lock sys_switch_shell
+sys_time_now sys_ver_info unicode_to_jis v86_boot v86_boot2 v86_disktest
+v86_gdc_capture v86_selftest
+""".split())
+
 # Fixed allowlist: exec/*.c (including exec_*.inc), KBOOT_SHELL=1 TUs,
 # input_service, kbd_inject, con_sink, pipe_buffer, kapi_strings, kstring.
 ALLOWED_UNDEFINED = frozenset("""
@@ -181,6 +221,12 @@ def generate(tmp, mutation=None):
     if mutation == 'reboot-absent':
         text = helper.read_text().replace("'buz_on', 'buz_off'", "'buz_on', 'buz_off', 'sys_reboot'")
         helper.write_text(text)
+    if mutation == 'slot-swap':
+        old = "'font_source_open',"
+        text = helper.read_text()
+        if text.count(old) != 1 or "'tvram_putchar_at'" in text:
+            raise RuntimeError('slot-swap: expected font_source_open absent and tvram_putchar_at present')
+        helper.write_text(text.replace(old, "'tvram_putchar_at',"))
     if mutation == 'putchar-absent':
         anchor = "    'console_font': (frozenset({\n"
         text = helper.read_text()
@@ -198,13 +244,13 @@ def generate(tmp, mutation=None):
 
 
 def main():
-    entries = [x for x in json.loads((ROOT / 'sdk/kapi.json').read_text())['api']
-               if x['name'] in ABSENT_PROVIDER_SLOTS]
+    if ABSENT_PROVIDER_SLOTS != EXPECTED_ABSENT_SLOTS:
+        print('unexpected absent slots:', sorted(ABSENT_PROVIDER_SLOTS - EXPECTED_ABSENT_SLOTS))
+        print('missing absent slots:', sorted(EXPECTED_ABSENT_SLOTS - ABSENT_PROVIDER_SLOTS))
+        return 1
+    entries = [api for api in json.loads((ROOT / 'sdk/kapi.json').read_text())['api']
+               if api['name'] in EXPECTED_ABSENT_SLOTS]
     assert len(entries) == 184
-    assert {'buz_on', 'buz_off', 'rtc_read'} <= ABSENT_PROVIDER_SLOTS
-    assert 'sys_reboot' not in ABSENT_PROVIDER_SLOTS
-    assert {'font_source_open', 'font_source_read_at', 'font_source_close',
-            'unicode_to_jis'} <= ABSENT_PROVIDER_SLOTS
     with tempfile.TemporaryDirectory(prefix='ppc-binding-') as directory:
         tmp = Path(directory)
         (tmp / 'normal').mkdir()
@@ -242,7 +288,7 @@ def main():
             print('unexpected providers:', sorted(unexpected)); return 1
         print('undefined providers:', len(undefined))
         if '--mutate' in sys.argv:
-            for mutation in ('empty', 'zero', 'group-empty', 'ime-empty', 'reboot-absent'):
+            for mutation in ('empty', 'zero', 'group-empty', 'ime-empty', 'reboot-absent', 'slot-swap'):
                 path = tmp / mutation
                 path.mkdir()
                 mutated = generate(path, mutation)
