@@ -68,7 +68,7 @@ SKIP の行は挙げるだけで落とさない: 試験が自分の出力とし�
 
 ### 3-4. 用意 `gate-setup`
 
-`build-setup` (x86 のクロスコンパイラ・Rust・フォント・apt) と `ppc-setup` (PowerPC のクロスコンパイラ) を呼び、足りない apt の物 (`gcc-13`・`qemu-system-ppc`) と `requirements.txt` を入れ、`$CROSS_DIR/bin` を PATH に足す。ジョブの側には apt の行を書かない。
+`build-setup` (x86 のクロスコンパイラ・Rust・フォント・apt) と `ppc-setup` (PowerPC のクロスコンパイラ) を呼び、足りない apt の物 (`gcc-13`・`qemu-system-ppc`・`qemu-system-data`・`seabios`。メタパッケージ `qemu-system` は全 arch を連れてきて遅いので使わない) と `requirements.txt` を入れ、`$CROSS_DIR/bin` を PATH に足す。ジョブの側には apt の行を書かない。
 
 ## 4. 既存の workflow を直す時の当て方
 
@@ -194,6 +194,16 @@ build の dispatch:
 - 規則 (`tools/ci/ppc_scope.py`): `PPC_ARCH` は push では `auto` (dispatch だけ入力の arch)。`x86` → skip、`ppc`・`both` → 回す、枝の名前が `wt/int-` で始まれば回す。それ以外は `git merge-base origin/main HEAD` から HEAD までの差分のパスを見て、docs/・*.md は飛ばし、共通の置き場 (kernel/・lib/・include/ …)・PowerPC の置き場・`build/*.mk`・決まったファイル (Makefile・check.yml など) があれば回す、x86 だけの置き場は飛ばし、知らない置き場は控えめに回す。差分が空なら skip
 - main の push では、checkout (fetch-depth 0) の origin/main が push された SHA そのもの (かその子) なので merge-base = HEAD、差分が空になり、**中身に依らず必ず skip** (ソースから読んだ結論。例外は main で `workflow_dispatch` を arch=ppc/both で起動した時だけ)。意図どおりかは設計の判断 (票の §1 の「未確認」はこの規則による)。PowerPC の検査は、取り込む前の枝の push でだけ回る
 - 枝でも飛ぶ例: wt/ppc-kapi-fill の 2 回 (44290719097・44289493633) は差分が x86 と文書だけと判定されて skip
+
+## 5-4. 用意を 1 か所に (2026-11-18、票 TASK_CI_REWORK の段 S2a)
+
+check の ppc-qemu の用意を、手書きの apt の行・build-setup・ppc-setup から手本の `gate-setup` 1 行にした (`2b8097b21`・`91d1335a9`・`ad6e9c6fe`)。
+
+| 何を | 前 (run 44293807742、wt/ppc-newlib-fix 97e182cf0) | 後 (run 44313949414、ad6e9c6fe) |
+|---|---|---|
+| ppc-qemu の 4 シャードの検査の数 (表の合計) | 1・5・4・2 (12 本、全部通過、SKIP の行 0) | 1・5・4・2 (12 本、全部通過、SKIP の行 0) |
+| ppc-qemu の 4 シャードのジョブの実時間 | 18.1・16.2・16.9・15.2 分 | 16.0・14.9・16.6・12.9 分 |
+| 見つかった赤 | — | 2 つ。(1) `ppc_ci.py` が新しく読む action のファイルが ppc-compile の検査の covers に無く、`check-map` が止めた (R6 の追従の漏れ、`91d1335a9`)。(2) `gate-setup` のメタパッケージ `qemu-system` が全 arch の QEMU (約 100MB) を連れてきて、遅いミラーで用意が 600 秒を越えた (run 44307127004 の ppc-qemu (2))。要る物 (`qemu-system-ppc`・`qemu-system-data`・`seabios`) を名指しにし、apt に再試行と期限の旗 (`ad6e9c6fe`)。sep も同じ `gate-setup` を使うので sep にも効く |
 
 ## 6. 範囲の外
 

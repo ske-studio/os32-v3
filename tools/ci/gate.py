@@ -40,7 +40,7 @@ TOOLS = (
 # 道具は在ってもデータが無いと検査の途中で落ちる物 (QEMU の mac99 の firmware と VGA の ROM)。
 FILES = (
     ('/usr/share/qemu/openbios-ppc', 'apt: qemu-system-data (qemu-system-ppc が連れてくる)'),
-    ('/usr/share/seabios/vgabios-stdvga.bin', 'apt: seabios (qemu-system が連れてくる)'),
+    ('/usr/share/seabios/vgabios-stdvga.bin', 'apt: seabios (gate-setup が名指しで入れる)'),
 )
 
 
