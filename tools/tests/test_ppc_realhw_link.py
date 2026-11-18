@@ -2,6 +2,7 @@
 """Real-hardware evidence fixtures; no physical sockets or guest execution.
 
 期待の出所: 設計 ID (PPC_P5_REST_DESIGN §2 realhw_run・§5 の R の行、PM 決定 R1〜R3 2026-11-16)。
+nest の試験時計: FINDINGS / realhw_run.py の期限の契約。
 """
 CHECK = dict(name='ppc-realhw-link', tier=1, budget=10, needs=['make:all'],
              covers=['tools/ppc/realhw_run.py', 'tools/tests/test_ppc_realhw_link.py',
@@ -193,11 +194,17 @@ def main():
         args = SimpleNamespace(iface='fake0', case='nest', out=tmp/'run', image=image,
                                machine='fixture OF/PVR', peer=PEER, seconds=.01,
                                command='', expected='', list_frames=False, camera_frame=[])
+        def monotonic():
+            if client.transport.events or len(client.lines) < len(saved['rsh']):
+                return 0.0
+            return 2 * args.seconds
+
         with patch.object(rh, 'PassivePacket', return_value=FakePacket()), \
                 patch.object(rh, 'Capture', FakeCapture), \
                 patch.object(rh, 'LinkHost', return_value=client), \
                 patch.object(rh.select, 'select', return_value=([], [], [])), \
-                patch.object(rh.time, 'time', side_effect=[100, 104]):
+                patch.object(rh, 'time', SimpleNamespace(
+                    monotonic=monotonic, time=iter((100, 104)).__next__)):
             assert rh.link_main(args) == 0
         assert client.lines == ['/bin/nest.bin', 'echo $?']
         assert json.loads((args.out/'result.json').read_text())['pass']
