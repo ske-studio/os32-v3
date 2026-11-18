@@ -2,7 +2,7 @@
 """CI job independence and early artifact downloads, without GitHub access."""
 CHECK = dict(name='ci-split-host', tier=0,
              covers=['.github/workflows/check.yml', '.github/workflows/build.yml',
-                     '.github/actions/build-setup/action.yml', 'tools/ci/build_cross.sh', 'tools/fetch_fonts.py',
+                     '.github/actions/build-setup/action.yml', '.github/actions/static-setup/action.yml', 'tools/ci/build_cross.sh', 'tools/fetch_fonts.py',
                      'tools/ci/ppc_scope.py', 'tools/ci/build_cross_ppc.sh', '.github/actions/ppc-setup/action.yml', 'tools/ci_fetch.sh', 'tools/ci/reuse_success.py', 'tools/checks/weights.json',
                      'tools/checks/run.py', 'tools/tests/test_ci_split.py',
                      'CLAUDE.md', 'README.md', 'docs/INDEX.md'],
@@ -164,12 +164,15 @@ def reuse_cases(path=None):
                 event='push', head_branch='wt/int-test', head_repository=dict(full_name='fixture/repo'), id=42)
     for workflow in ('build.yml', 'check.yml'):
         with patch.object(module, 'api', side_effect=[{'id': 7}, {'workflow_runs': [good]}]) as api:
-            assert module.reusable(dict(env, CI_WORKFLOW=workflow)), 'exact successful integration push'
+            assert module.reusable(dict(env, CI_WORKFLOW=workflow)), 'exact successful branch push'
             assert api.call_args_list[0].args[0].endswith('/' + workflow)
             assert 'head_sha=' + SHA in api.call_args_list[1].args[0]
+    # 普通の枝 (wt/**) の成功も証拠にする (ユーザー決定 2026-11-19)。main の実行は証拠にしない。
+    with patch.object(module, 'api', side_effect=[{'id': 7}, {'workflow_runs': [dict(good, head_branch='wt/ci-s2a')]}]):
+        assert module.reusable(env), 'branch push success is evidence'
     for field, bad in [('head_sha', 'a'*39+'b'), ('workflow_id', 8), ('status', 'in_progress'),
                        ('conclusion', 'failure'), ('conclusion', 'skipped'), ('event', 'pull_request'),
-                       ('head_branch', 'main'), ('head_branch', 'wt/feature'),
+                       ('head_branch', 'main'), ('head_branch', 'wip/feature'), ('head_branch', 'wtx/a'),
                        ('head_repository', dict(full_name='fork/repo')), ('id', 99)]:
         with patch.object(module, 'api', side_effect=[{'id': 7}, {'workflow_runs': [dict(good, **{field: bad})]}]):
             assert not module.reusable(env), 'reject mismatch: ' + field
@@ -203,7 +206,17 @@ DOC_EXCLUSIONS = {
 
 def document_cases(source):
     workflow = yaml.safe_load(source)
-    reuse_gate_cases(workflow, 'check.yml', 'static-check')
+    # static-check は main でも再利用せずに毎回回す (煙試験、ユーザー決定 2026-11-19)。
+    assert not any(s.get('id') == 'prior' or 'steps.prior' in s.get('if', '')
+                   for s in workflow['jobs']['static-check']['steps']), 'static-check runs on main every time'
+    # 用意は composite action の 1 行だけ。workflow に apt の行を書かない (docs/POLICY_CI.md G5)。
+    static = workflow['jobs']['static-check']['steps']
+    assert [s.get('uses') for s in static if s.get('uses', '').startswith('./.github/actions/')] == ['./.github/actions/static-setup']
+    assert 'apt-get' not in source, 'apt belongs to composite actions'
+    static_setup = (ROOT / '.github/actions/static-setup/action.yml').read_text()
+    for dependency in ('build-essential', 'e2fsprogs', 'python3-clang', 'libnewlib-dev', 'PyYAML lz4'):
+        assert dependency in static_setup, dependency
+    assert 'cross' not in yaml.safe_load(static_setup)['runs']['steps'][0]['run'], 'static gate stays cross-free'
     runs = [step.get('run', '') for job in workflow['jobs'].values()
             for step in job['steps']]
     targets = set(re.findall(r'^\s*make\s+(check-[\w-]+)\s*$', '\n'.join(runs), re.M))
@@ -334,7 +347,7 @@ def main():
             ('reuse', "r['head_sha'] == sha", 'True', 'reuse wrong SHA'),
             ('reuse', "r['workflow_id'] == workflow_id", 'True', 'reuse wrong workflow'),
             ('reuse', "r['conclusion'] == 'success'", 'True', 'reuse failed run'),
-            ('reuse', "r['head_branch'].startswith('wt/int-')", 'True', 'reuse non integration run'),
+            ('reuse', "r['head_branch'].startswith('wt/')", 'True', 'reuse non branch run'),
             ('reuse', '        reuse = False', '        reuse = True', 'reuse on API failure'),
             ('check', '          make check-docs-tree\n', '', 'missing docs tree'),
             ('workflow', 'shard: [0, 1, 2, 3, 4, 5]', 'shard: [0, 1, 2, 3, 4]', 'lose shard'),

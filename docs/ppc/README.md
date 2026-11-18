@@ -64,3 +64,21 @@ MPC7455EC は電気・タイミング仕様の資料で、命令規約の代用�
 Apple の 2 文書とも QuickSilver (PowerMac3,5) の資料ではない。
 QuickSilver に外挿する箇所は必ず「MDD の資料による [推]」とする。
 QEMU-PM はローカル 8.2.2 と版が違い、その構成の証明にはしない。
+
+### ESCC の受信
+
+段 3a の受信は Open Firmware が開いた ESCC チャネル A の設定を引き継ぎ、
+カーネル起動ログと同じ CSR / data のマッピングを前景から使う。
+RR0 に受信可能ビットが立ったら RR1、data の順に読み、FIFO 先頭に
+対応するハードウェアの overrun、framing、parity を累積する。
+エラー付きのバイトも返し、読み取ったエラーは WR0 の Error Reset で解除する。
+ソフトウェア FIFO の overflow は 0。入力がないとき try は一度の RR0 読みで -1 を返す。
+RR1 の読みは CSR の選択を完結させ、受信は送信データを書き換えない。
+受信と通常の送信・drain は協調実行の前景で使う。
+
+根拠は PPC KAPI 補完計画 §5 の port 行、[Zilog SCC/ESCC User Manual](https://zilog.com/docs/serial/UM0109.pdf)
+の RR0・RR1・WR0、および NetBSD `sys/dev/ic/z8530sc.c:126-157`
+の `zs_iflush` と `sys/dev/ic/z8530reg.h:139,397-404`。
+`make check-ppc-kboot-log MUTATE=1` は FIFO と送信の共存をホストで検査する。
+QEMU の RSH からの読戻しは、既知バイトを mac99 のチャネル A に送って
+PortOps 経由で値と順序、空の try を照合できる port の組の公開の段 (PPC_KAPI_FILL_DESIGN §2 の port の行、道 B) で行う。

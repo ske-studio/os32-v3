@@ -94,6 +94,7 @@ static u32 rd(void *ctx,u32 reg) {
         return mif|GEM_MIF_FRAME_TA0|v;
     }
     if(reg==GEM_TX_COMPLETION) return completion;
+    if(reg==GEM_RX_COMPLETION) return nic_rx;
     if(reg==GEM_PCI_BANK2_OFFSET+GEM_RESET) return 0;
     return regs[reg/4];
 }

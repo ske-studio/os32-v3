@@ -79,3 +79,8 @@ PowerPC に固有の注意事項 (起動の行・BOOTP/BSDP・画面・メモリ
 - G4 QuickSilver は VIA-PMU (起動の LOG「VIA kind=pmu pa=80016000 va=fe3c4000 rc=ok compatible=pmu」)。
 - LAN の RSH で `reboot` → 約 23 秒で TFTP の RRQ → 5 秒後に HELLO → cui → `echo x`、を 2 回 (21:37〜21:38)。ホスト側の operator の退避 (resume の一般化) で、再起動の後に pending は残らなかった。以後、G4 の像の差し替えは LAN からの reboot で行い、電源の入れ直しは要らない。
 - /host の交互の失敗 (PPC-G4-SFS-FLAP) の調べ: PHY と MAC は 100 Mb/s 全二重で合っている (G4 PHY の行)、RX FIFO は 10 KiB。GEM の受信の落ちは全部「長さが 14〜1514 の範囲の外」(G4 G の len) で、cp をしていない間も約 1 秒に 1 本。失敗の回は host の RESPONSE が G4 で受からない (no_response)。落ちた電文の正体を調べの像 4 (G4 H、生の descriptor と先頭 32 バイト) で調べている。
+
+### 2026-11-18: /host の交互の失敗の原因と直し (PPC-G4-SFS-FLAP を閉じた)
+- 原因: GEM の受信で、G4 の GMAC が RX の descriptor を書き終える前に OS32 がそれを読み、OWN=0・長さ 0 (上位にハッシュだけ) の値で「長さが範囲の外」として捨てていた。捨てた中に link の RESPONSE が入ると、G4 は応答なしで約 1 秒後に打ち切る。調べの像 3・4 の LOG (G4 G・G4 H) で、落ちが全部この形と分かった。PHY と MAC は 100 Mb/s 全二重で合っていた。
+- 直し: drivers/net/gem/gem_rx.c で poll の初めに GEM_RX_COMPLETION を読み、その境界の手前までしか処理しない (FreeBSD sys/dev/gem/if_gem.c の gem_rint と同じ)。QEMU の sungem は descriptor を 1 回で書くので再現しない — host の試験 lan_p19 に実機の descriptor の値を与えて確かめる。
+- 実機の結果 (22:17〜22:20): `cp /host/big` を 10 回、全部成功・中身一致、受信の落ち 0 (直す前は 10 回中 4〜5 回失敗)。

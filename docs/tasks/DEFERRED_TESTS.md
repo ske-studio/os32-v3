@@ -100,7 +100,6 @@
 
 | ID | 何を | 種類 | 関門 |
 |---|---|---|---|
-| PPC-G4-SFS-FLAP | PowerMac G4 実機の link の /host で、64 KiB の読み書きがほぼ交互に途中で失敗する (2026-11-18、見分けの像 4c0f7ef4)。host は全部 200 で、G4 が新しい rid の RESPONSE の後に WINDOW を出さず約 1 秒で打ち切る。前の rid の最後の DATA の再送 (EOF の後に 3〜5 回) が次の REQUEST の後に届いた回だけ失敗 | QEMU mac99 では再送が次の読みに重ならず起きない。原因の調べは調査役 (~/os32-tmp/run/ppc-g4-sfsflap/) | 直しの段の後、G4 実機で `cp /host/big /host/wN` の連続と放置の後を 10 回以上、全部が 64 KiB で一致したら行を削除する |
 | PPC-G4-TMP | PowerMac G4 の link の像で /tmp に何もマウントされていない (`cp` が write failed、`rm` が Not mounted、2026-11-18) | RAM root の ISO は読み取り専用で、書ける /tmp の置き場が PowerMac の像に無い見込み (未調査) | /tmp を用意する段 (または仕様として無いと決める) の後に行を削除する |
 | HOSTSVC-RESUME-PC98 | PC-98 (NP21/W) で、要求の途中にゲストを reset → resume → 旧 ID の照会が boot_changed → 次の要求が通る (tools/host_rshell.py・host_operator_socket.py の resume の一般化、PowerMac の再起動の段 R-d) | 2026-11-18 の取り込みは host の試験 14 本 (remote-x13・x4 ほか、変異込み) と G4 実機・QEMU の PowerMac で受けた。PC-98 のゲストでは未確認 | 本線の次の NP21/W の節目の受入で確かめたら行を削除する (本線 PM の担当) |
 | PPC-BUILD-ROOT-ISO | PowerPC の像の RAM の root の ISO が、sh などの USER の bin を変えた後の 1 回の `make ARCH=ppc PLATFORM=powermac IMAGE=kboot-link-sh kernel` で作り直されない (2 回目で入る、2026-11-18 に sh の reboot の追加で踏んだ) | build/ram-root.mk の ROOT_ISO は ROOT_BINS (sh.bin) に依存するが、同じ make の中で sh.bin の作り直しが ISO より後になる順の見込み (未調査) | 原因を直して、USER の bin を変えた後の 1 回の make で ISO と ELF が変わることを試験で確かめたら行を削除する |
