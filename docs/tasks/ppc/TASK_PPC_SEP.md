@@ -42,7 +42,7 @@
 | 4 | exec のフック 14 本を、提供者が像に在る物から PowerPC で本物に (構造は「機能の有無を像が決める」形で済み。本物にするのは GUI・音・shlib などの PowerPC への移植) | PowerPC の機能の有効化ごとに QEMU の受入 |
 | 5 | contract で残った、リンクの時の装置の名前 (`geforce_foreground_poll` など) を実行時の口に | 本線の HAL の段 |
 | 6 | `C_COMMON_PC98_PENDING` の 44 本を、PowerPC の像の機能の組へ移す | PowerPC の機能の有効化ごと |
-| 7 | KAPI の名前に装置が出る関数、PowerPC のユーザーランドの newlib | 設計から |
+| 7 | KAPI の名前に装置が出る関数、PowerPC のユーザーランドの newlib | 設計から — 計画は票 [TASK_PPC_KAPI_FILL](TASK_PPC_KAPI_FILL.md) (2026-11-18 確定) |
 
 設計からの配置の変更 (残件ではない):
 
