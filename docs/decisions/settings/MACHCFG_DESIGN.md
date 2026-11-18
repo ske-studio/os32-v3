@@ -89,8 +89,8 @@ const struct machcfg *machcfg_get(void);
 
 ## 4. 最初の利用者
 
-- 7450 は早期から NAP を明示クリア（Firmware が立てていた場合も含む）。確定後に 1 の場合だけセットする。7455 は現行どおり、他の PVR は書込みなし。既存の SLEEP 解除・DPM・同期列と HIGH_BAT_EN を保存し、NAP 無効中の idle は MSR[POW] に依存せず通常待機する。早期からファイル読取まで DEC 割込みが進むことを確認する。
-- NetBSD は 7450 で NAP と DPM の両方を立てない。実機確認済みの像 4c0f7ef4 は NAP だけを外しており、DPM 維持はその実績に合う。
+- 7450 は早期から NAP を明示クリア（Firmware が立てていた場合も含む）。確定後に 1 の場合だけセットする。7455 は現行どおり、他の PVR は書込みなし。既存の SLEEP 解除・DPM・同期列と HIGH_BAT_EN を保存し、idle (`arch_cpu_idle`・`ppc_cpu_nap` の MSR[POW]) は変えない。7450 で NAP=0 の時は POW を立てても休止に入らない想定 (追記 P-R1)。早期からファイル読取まで DEC 割込みが進むことを確認する。
+- NetBSD は 7450 で NAP と DPM の両方を立てない。見分けの像 4c0f7ef4 は NAP だけを外した形で、**実機では未確認** (票 TASK_PPC_REALHW §2。追記 P-R4)。DPM を残すのはその像と同じ形にするため。
 - 両 arch に perf_request を提供。PERF_PROFILE_PLAN §5-2 の回答までは既定 0（互換）。PERF_PROFILE_PLAN の実装者は bind 時に 0/1 を直接選択し、2 は DMA NIC、CPU の段、RAM 64 MiB 以上の全条件で 1、不明・未達は 0 とする。決定は bind 中固定。今回は PC-98 でも要求値の取得まで。枠、予算、タイマー、通信路は同票の P0–P5。
 
 ## 5. 像の予算（未計測の差分見積もり）
@@ -121,9 +121,9 @@ const struct machcfg *machcfg_get(void);
 |D|新規 kernel/machcfg_root.c|45、一時読取・キー別 sysconfig_get_int・値域検査|B4,C|
 |E|新規 platform/pc98/machcfg.c|25、識別と既定表|B|
 |F|新規 platform/powermac/machcfg.c|35、識別と既定表|B|
-|G|変更 arch/ppc/kernel_cpu.c|20、早期と確定後の HID0 適用|B|
+|G|変更 arch/ppc/kernel_cpu.c|20、早期と確定後の HID0 適用 (G-a と G-b に分ける、追記 P-G)|B|
 |H|変更 platform/pc98/kernel.c|8、早期 begin と root 後の load|C,D,E|
-|G1|変更 tools/ppc/cpu_nap_host.c|20、CHECK 20・22 の 7450 早期期待値を NAP 解除に変更し、確定後の 0/1 と 7455 を検証|G|
+|G1|変更 tools/ppc/cpu_nap_host.c・tools/tests/test_ppc_cpu_nap.py|30、CHECK 20・22 の 7450 早期期待値を NAP 解除に変更し、確定後の 0/1 と 7455 を検証。試験の目印の付け直し・明示クリアを削る変異・covers (追記 P-R2)|G|
 |I|変更 platform/powermac/ppc_kernel.c|12、platform_boot_services で成功・失敗を確定後に ppc_cpu_power_apply()|C,D,F,G|
 |J|変更 build/sources/common.mk|6、sysconfig.c を C_COMMON_PC98_PENDING から C_COMMON_EXEC に移し (vfs_read を呼ぶので、fs/vfs.c の無い像に入れない。CORE に入れると PowerMac の KBOOT_LINK でリンクが落ちる)、gf_production_cfg.c は旧区分。kernel/machcfg.c は C_COMMON_CORE、machcfg_root.c は C_COMMON_EXEC|B2,B4,C,D|
 |K|変更 build/platform/pc98.mk|1、E の選択|E|
@@ -131,7 +131,7 @@ const struct machcfg *machcfg_get(void);
 |M|新規 tools/tests/machcfg_host.c|100、表駆動入力・凍結・誤り|C,D,E,F|
 |M1|新規 tools/checks/machcfg-host.py|25、両表の host 試験をビルド・実行|M|
 |N|変更 tools/gen_deploy_set.py|5、machine.cfg は optional とし指定時のみ etc/machine.cfg を配布|B1|
-|N1|変更 build/ram-root.mk|5、ROOT_MANIFEST と設定の追加・変更・除外で RAM root と ELF を再生成する依存関係を確認・補完|N|
+|N1|変更 build/targets/ppc-powermac.mk|5、`ROOT_MANIFEST`・`ROOT_DEPS` に、選んだ設定を書くスタンプ (中身が変わった時だけ更新) を足して ROOT_ISO の依存にする (追記 P-R5)|N|
 
 PC-98 は kernel_boot_cpu（kernel.c）直後に begin。局面 1 の BOOT_AUTO_MOUNT直後、kernel_gfx_config前に成功なら load、失敗・FS なしなら finish(NULL)。PowerMac の ppc_kernel_real_start（kernel_boot.c）の power_init は設定に依存せず 7450 の NAP を下ろす。PVR 取得後に begin し、局面 2 の platform_boot_services（ppc_kernel.c）で mount 成功なら load、else は finish(NULL)。FS なしでも同局面で finish(NULL) とし、確定直後に ppc_cpu_power_apply() を呼ぶ。FS なし像で読取部・未解決 vfs_read が残らないことをリンク検査する。
 ## 7. 受入と変異（変異ごとに該当検査が失敗すること）
@@ -175,3 +175,18 @@ G4 の設定切替を埋め込み RAM root と ELF の再生成で運用して�
 - R4: 厳しい検査は machine.cfg の一時読取の間だけ。system.cfg の解釈は変えない (§2)。
 - R5: gf_production_cfg.c は init/ のまま C_COMMON_PC98_PENDING に残す (PM 決定)。理由: 同じ組の gfx の保留ファイルと一緒に、分離の残件 (票 TASK_PPC_SEP) で機種の置き場へ移す方が 1 回で済む。hwdev の slot と kdebug の公開表は名前で結ばれるので、置き場に依らない。
 - sc_atoi の符号 (+/-) を §2 に 1 語足した。
+
+## 確定後の追記: PowerPC 側のレビュー (2026-11-18、claude-opus-5-5、os32powerpc が依頼、PM が反映)
+
+| ID | 決めたこと |
+|---|---|
+| P-R1 | idle は変えない。`arch/ppc/kernel_dec.c` の `ppc_cpu_nap` が立てる MSR[POW] はそのまま (AC-SYNC-2 の試験 `tools/tests/test_arch_compat.py` の anchor_nap と、`test_ppc_cpu_nap` の CHECK 10 を変えない)。POW も外すのは下の P-R4 の順の 2 手目で、その時は `kernel_dec.c` と試験 2 本の段を足す |
+| P-R2 | 段 G1 に `tools/tests/test_ppc_cpu_nap.py` を含める: G の式の変更に合わせた目印の付け直し (count==1 の assert)、§7 の変異「7450 の明示クリアを削る」を MUTATIONS に、covers に `include/machcfg_contract.h` |
+| P-R3 | 口は `void ppc_cpu_power_apply(u32 pvr, u8 nap7450)`。`arch/ppc/kernel_cpu.c` で `ppc_cpu_power_init` の直後に置き (試験が `ppc_cpu_power_init(` 〜 `ppc_cpu_load_segments(` で切り出すため)、中で `machcfg_get` を呼ばない (値は呼び手の platform が渡す) |
+| P-R4 | 手本 NetBSD (`sys/arch/powerpc/oea/cpu_subr.c` の 7450 の分岐、「XXX my quicksilver hangs if nap is enabled」) は 7450 で NAP も DPM も立てず、powersave も 0 (POW も立てない)。見分けの像 4c0f7ef4 (NAP だけ外した) は未確認で、11-18 の G4 の観測では `LAN STATE state=5 link=1`・`LINK HEAP used=383408` でプロンプトが出ずに止まっていた (/host より前。NAP だけでは説明できない恐れ)。§7 の実機の行の順: (1) NAP=0 の像で /host が通るか、(2) 通らなければ DPM と POW も外す (NetBSD と同じ形)、(3) それでも止まれば NAP 以外の原因として調べ直す |
+| P-R5 | 段 N1 の置き場は `build/targets/ppc-powermac.mk` の `ROOT_MANIFEST ?=` と `ROOT_DEPS`。`build/ram-root.mk` は mtime で依存を見るので、設定入りから無しに戻すと ISO が作り直されず `/etc/machine.cfg` が残る。選んだ設定のスタンプ (中身が変わった時だけ更新) を ROOT_ISO の依存にする |
+| P-R6 | 段 A で、ARCH_COMPAT_CONTRACT の AC-SYNC-2 の PowerPC の列 (「7450/7455 で NAP、休ませる」) に、7450 の既定 NAP=0 の例外を 1 行足す |
+| P-R7 | 識別は PVR だけで妥当 (7450 = 0x8000、7455 = 0x8001。QuickSilver はどちらも OF の model が PowerMac3,5)。キーは `ppc7450.nap` だけで、7455 の NAP を切る口は今回の外 |
+| P-R8 | 持越し台帳の PPC-LINK-G4 の「NAP 復帰 (SRR1[POW] が残らない)」は、7450 では nap7450=1 の像だけの項目にする (台帳の直しは PowerPC の PM) |
+| P-I | 段 I の差し込み位置: 確定は `platform/powermac/ppc_kernel.c` の `platform_boot_services` で `pm_root_boot()` が 0 を返した直後 (`pm_hostfs_boot` より前)。失敗の時も同じ所で finish(NULL)。KBOOT_SHELL・SH の無い像は、その `#if` の塊の外で finish(NULL)。確定の前の局面 2 の link 待ち (`platform/powermac/link_platform.c` の `pm_lan_start` が `_idle` を呼ぶ) は、power_init が先に 7450 の NAP を下ろしているので安全 |
+| P-G | 段 G を 2 つに分ける: **G-a** (`ppc_cpu_power_init` で 7450 の NAP を下ろす。設定に依らない。B〜E に依存しない) と **G-b** (`ppc_cpu_power_apply`、B に依存)。G-a と G1 は PowerPC の PM が先に出してよい (PM 決定)。F・I・N1・G-b は共通の段 (B〜B4・C・D・J) の後 |
