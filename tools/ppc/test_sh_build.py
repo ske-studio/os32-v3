@@ -47,7 +47,7 @@ def main():
         if '--mutate' in sys.argv:
             rule = root / 'build/ppc-user.mk'
             source = rule.read_text()
-            old = 'python3 sdk/link_guard.py --target $(SDK_TARGET) $(LD)'
+            old = 'python3 sdk/link_guard.py --target $(SDK_TARGET) --ar $(LD:%-ld=%-ar) $(LD)'
             assert source.count(old) == 1
             rule.write_text(source.replace(old, '$(LD)'))
             shutil.rmtree(root / 'build/out/ppc-user')

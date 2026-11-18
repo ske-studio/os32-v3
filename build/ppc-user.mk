@@ -11,7 +11,7 @@ PPC_USER_LIBC := $(shell $(CC) $(PPC_USER_ABI) -print-file-name=libc.a)
 PPC_USER_LIBGCC := $(shell $(CC) $(PPC_USER_ABI) -print-libgcc-file-name)
 PPC_USER_LIBS = -L$(dir $(PPC_USER_LIBC)) -L$(dir $(PPC_USER_LIBGCC)) $(PPC_USER_NANO) -lc -lgcc
 PPC_USER_FLOAT ?= -u _printf_float
-PPC_USER_LINK = python3 sdk/link_guard.py --target $(SDK_TARGET) $(LD) -m $(SDK_TARGET_ELF_EMULATION) --gc-sections -z noexecstack -T $(SDK_TARGET_APP_LINK) $(PPC_USER_FLOAT)
+PPC_USER_LINK = python3 sdk/link_guard.py --target $(SDK_TARGET) --ar $(LD:%-ld=%-ar) $(LD) -m $(SDK_TARGET_ELF_EMULATION) --gc-sections -z noexecstack -T $(SDK_TARGET_APP_LINK) $(PPC_USER_FLOAT)
 
 $(PPC_USER_OUT)/syscalls.o: sdk/crt/syscalls.c sdk/allocator/nano_adapter.h userland/lib/rt/ls.c $(SDK_KAPI_HDR) | $(PPC_USER_OUT)
 	$(CC) $(PPC_USER_FLAGS) -c $< -o $@
@@ -99,10 +99,6 @@ $(PPC_SH_DIR)/%.o: userland/ppc/sh/%.c $(PPC_SH_PROFILE) userland/ppc/sh/profile
 	$(CC) $(PPC_SH_FLAGS) -c $< -o $@
 
 $(PPC_SH_DIR)/ls.o: userland/lib/rt/ls.c
-	@mkdir -p $(@D)
-	$(CC) $(PPC_SH_FLAGS) -c $< -o $@
-
-$(PPC_SH_DIR)/help.o: sdk/crt/help.c
 	@mkdir -p $(@D)
 	$(CC) $(PPC_SH_FLAGS) -c $< -o $@
 
