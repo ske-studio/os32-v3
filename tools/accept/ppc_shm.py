@@ -64,6 +64,9 @@ def observe(elf, cpu, evidence, case):
 
 
 def guest_available():
+    cross = Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc'))
+    if not (cross / 'bin/powerpc-elf-gcc').is_file():
+        return False
     if any(not shutil.which(tool) for tool in ('qemu-system-ppc', 'genisoimage')):
         return False
     if not Path('/usr/share/qemu/openbios-ppc').is_file():
