@@ -62,6 +62,10 @@ def main():
     parser.add_argument('--mutate', action='store_true')
     parser.add_argument('--build-only', action='store_true')
     args = parser.parse_args()
+    cross = Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc'))
+    if not (cross / 'bin/powerpc-elf-gcc').is_file():
+        print(f'未 ppc-console-cells: PPC toolchain unavailable: {cross}')
+        return 3
     if not args.build_only:
         try:
             for kind in (socket.SOCK_DGRAM, socket.SOCK_STREAM):

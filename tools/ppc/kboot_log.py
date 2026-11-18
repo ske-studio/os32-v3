@@ -63,7 +63,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    with tempfile.TemporaryDirectory(prefix='kboot-log-', dir=os.environ['TMPDIR']) as tmp:
+    with tempfile.TemporaryDirectory(prefix='kboot-log-', dir=os.environ.get('TMPDIR')) as tmp:
         directory = Path(tmp)
         assert exercise(directory, 'baseline') == 0, 'baseline failed'
         print('baseline GREEN', flush=True)
