@@ -58,6 +58,12 @@ def check(mutate):
             anchor = 'if (i == n) {'
             assert adapter.count(anchor) == 1
             variants.append(('duplicate change', adapter.replace(anchor, 'if (i <= n) {')))
+            anchor = 'for (unsigned i = 0; i < usage_change_count[src - 1]; ++i) {'
+            assert adapter.count(anchor) == 1
+            variants.append(('reverse notifications', adapter.replace(anchor, 'for (int i = usage_change_count[src - 1] - 1; i >= 0; --i) {')))
+            anchor = '            usage_change_count[src - 1] = 0;'
+            assert adapter.count(anchor) == 1
+            variants.append(('release retains changes', adapter.replace(anchor, '            (void)src;')))
             anchor = 'usbp_input_key(src, sc, down);'
             assert adapter.count(anchor) == 1
             variants.append(('missing commit notification', adapter.replace(anchor, '(void)down;')))
