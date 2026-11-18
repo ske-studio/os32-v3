@@ -8,18 +8,24 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = [
-    ('owned', 'if (flags & GEM_RD_OWN)', 'if (!(flags & GEM_RD_OWN))', 'H:A7 rx-owned'),
+    ('completion-read', 'completion = g->io.read32(g->io.ctx, GEM_RX_COMPLETION);',
+     'completion = 0;', 'H:completed-zero'),
+    ('completion-ignore', 'while (*budget && g->rx_head != completion)',
+     'while ((void)completion, *budget)', 'H:completed-zero'),
+    ('completion-off-by-one', 'g->rx_head != completion',
+     '(g->rx_head + 1) % GEM_RING_COUNT != completion', 'H:completed-zero'),
+    ('owned', 'if (flags & GEM_RD_OWN)', 'if (!(flags & GEM_RD_OWN))', 'H:completed-zero'),
     ('producer', '(slot + GEM_RX_PUBLISHED) % GEM_RING_COUNT', 'slot', 'H:golden'),
-    ('offset', 'buf[i + 2]', 'buf[i + 0]', 'H:offset'),
+    ('offset', 'buf[i + 2]', 'buf[i + 0]', 'H:completed-1307'),
     ('crc', '(flags & GEM_RD_BAD_CRC) || ', '', 'H:bad'),
     ('budget', 'u32 b = GEM_RX_SCAN_BUDGET;', 'u32 b = GEM_RX_SCAN_BUDGET + 1;', 'H:A11 budget'),
     ('budget-decrement', '(*budget)--;', '(void)budget;', 'H:some-budget'),
-    ('kick-count', 'g->rx_head % 4 == 0', '1', 'H:kick-count'),
-    ('kick-value', '(g->rx_head + GEM_RX_PUBLISHED) & 31', 'g->rx_head', 'H:kick-value'),
-    ('postread', 'if (g->io.sync(buf, GEM_BUF_SIZE, DMA_POSTREAD)) {', 'if (0) {', 'H:buffer-read'),
-    ('kick-off-by-one', '(g->rx_head + GEM_RX_PUBLISHED) & 31', '(g->rx_head + GEM_RX_PUBLISHED + 1) & 31', 'H:kick-value'),
-    ('desc-postread', 'if (g->io.sync(desc, GEM_DESC_SIZE, DMA_POSTREAD)) {', 'if (0) {', 'H:desc-read'),
-    ('late-postread', 'if (g->io.sync(buf, GEM_BUF_SIZE, DMA_POSTREAD)) {', 'if (0) {', 'H:buffer-read'),
+    ('kick-count', 'g->rx_head % 4 == 0', '1', 'H:incomplete'),
+    ('kick-value', '(g->rx_head + GEM_RX_PUBLISHED) & 31', 'g->rx_head', 'H:completed-later'),
+    ('postread', 'if (g->io.sync(buf, GEM_BUF_SIZE, DMA_POSTREAD)) return GEM_EIO;', 'if (0) return GEM_EIO;', 'H:buffer-read'),
+    ('kick-off-by-one', '(g->rx_head + GEM_RX_PUBLISHED) & 31', '(g->rx_head + GEM_RX_PUBLISHED + 1) & 31', 'H:completed-later'),
+    ('desc-postread', 'if (g->io.sync(desc, GEM_DESC_SIZE, DMA_POSTREAD)) return GEM_EIO;', 'if (0) return GEM_EIO;', 'H:desc-read'),
+    ('late-postread', 'if (g->io.sync(buf, GEM_BUF_SIZE, DMA_POSTREAD)) return GEM_EIO;', '/* delayed sync */', 'H:buffer-read'),
 ]
 def instrument(source):
     source = source.replace('#include "gem.h"', '#include "gem.h"\nvoid observe_desc(const u8 *);\nvoid observe_buffer(const u8 *);')

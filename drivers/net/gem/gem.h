@@ -42,6 +42,7 @@
 #define GEM_RX_FIFO_RD_PTR 0x4014 /* openbsd gemreg.h:184 */
 #define GEM_RX_PAUSE_THRESH 0x4020 /* openbsd gemreg.h:188 */
 #define GEM_RX_KICK 0x4100 /* openbsd gemreg.h:193 */
+#define GEM_RX_COMPLETION 0x4104 /* OpenBSD gemreg.h:194 */
 #define GEM_RX_BLANKING 0x4108 /* openbsd gemreg.h:195 */
 #define GEM_RX_FIFO_SIZE 0x4120 /* openbsd gemreg.h:202 */
 #define GEM_RX_CONFIG_RXDMA_EN 0x00000001 /* openbsd gemreg.h:205 */

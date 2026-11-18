@@ -19,15 +19,18 @@ _Static_assert(GEM_RX_FRAME_OFFSET + GEM_RX_DIAG_BYTES <= GEM_BUF_SIZE,
 int gem_rx_some(struct gem *g, void *frame, u32 cap, u32 *bytes, u32 *budget)
 {
     u8 *base, *desc, *buf, *target;
-    u32 slot, producer, length;
+    u32 completion, slot, producer, length;
     unsigned long long flags;
     int result;
     if (!g || g->state != GEM_STATE_READY || g->ring_publish_step != 3)
         return GEM_EBUSY;
     if (!frame || !bytes || !budget) return GEM_EINVAL;
     base = g->dma.cpu;
+    /* FreeBSD sys/dev/gem/if_gem.c:1513-1542 (gem_rint):
+     * snapshot the next incomplete slot before reading descriptors. */
+    completion = g->io.read32(g->io.ctx, GEM_RX_COMPLETION);
     /* gem_rint:974-989: inspect at most eight descriptors per poll. */
-    while (*budget) {
+    while (*budget && g->rx_head != completion) {
         (*budget)--;
         slot = g->rx_head;
         desc = base + GEM_POOL_RX_RING + slot * GEM_DESC_SIZE;
