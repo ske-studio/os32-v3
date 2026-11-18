@@ -204,3 +204,119 @@ static inline void arch_kernel_fp_end(const struct arch_kernel_fp_guard *g)
 - tools/accept/ppc_sqlite_stack.py の observe() は tools/ppc/kboot_vectors.py の QEMU の引数と QMP の stop→NIP→cont の繰り返しの写し。tools/ppc/run.py か kboot_vectors に「ELF・CPU・終端の記号の集合 → (PC, 終了値, serial)」の関数を 1 つ置いて両方から呼ぶ (QMP の競合の直し — sd_run の口の予約・build/out/ppc の固定の名前 — と同じ段でよい)。
 - ppc-sqlite-stack-guest の covers は kboot_vectors.py の import が辿る補助入力 (kboot_vectors_fixture・boot.c など) を含む。入力の監査がその module 全体を辿る作りのため。監査を関数単位にしたら外す。
 - S-a の実装は ppc-powermac.mk の engine の TU 旗に -Ifs も足した (確定 N1 の「make の行に合わせる」、59 行目の -Ifs は KB_EXEC が空でない時だけ入るため)。
+
+## 確定後の追記 (2026-11-18、astra の設計レビュー rev4 への対応、astra 起草 r1・r2、Opus 2 回)
+
+astra (gpt-6.2-astra) が確定後の本文をレビューして P2 4 件を出した (起草が ROLES §0 と違い sol だったため、ユーザーの指示で読み直した)。以下の A-1〜A-4 は本文の該当する文を置き換える (各 A-n の冒頭に置き換える本文の文を書いた)。
+
+### r1→r2 の変更
+
+- P2-1　A-4 の比較基点を着手直前とし、関数差と x86 オブジェクトの逆アセンブル差を受入にした。
+- P2-2　MPIC 設定を削り、0x500 への配送を S1-FAIL-EXT とした。
+- P2-3　各追記の冒頭に本文の置換箇所を示した。
+- P3-1　契約型と静的照合を型変異より先に置いた。
+- P3-2　公開関数、SOURCES、CHECK の basis・covers と変異の目印の確認を明記した。
+- P3-3　型変異の実行条件と静的照合の前例を記した。
+- P3-4　追加ケースの位置、呼出し回数と DEC stub の退避先を指定した。
+- 参考 A-1　同期例外の監査起点を明記した。
+
+### 追記 A-1　同期例外と製品有効化（§2・§6）
+
+本文 §6 の「S1 拒否と後始末」の IRQ/例外の受入範囲を次で置き換える。
+
+S1 が証明するのは engine が受け取った深さに対する拒否である。外部 IRQ と DEC は arch/ppc/kernel_trap.c で kctx_irq_depth を増減する。通常 syscall 以外の同期例外については、SQLite 本体を PowerPC 製品像にリンクする段の開始条件とする。現段の製品像では本体が無効で、有効化時の実際の呼出し先で到達性を判定するためである。
+
+監査は arch/ppc/kernel_trap.c の ring3_fault_kill と ppc_trap_fatal_sink から続く経路を含む。有効化の受入では各同期例外の入口から直接・間接の呼出し先を列挙し、engine に到達しない根拠を残す。到達し得る経路は次の形で囲み、復帰・早期帰還・入れ子を含めて深さを元に戻す。通常 syscall は囲まない。
+
+~~~c
+++kctx_exc_depth;
+handle_sync_exception(frame);  /* 対象ハンドラの全処理を含む */
+--kctx_exc_depth;
+~~~
+
+深さを採用した経路では実際の例外から engine を呼ぶ受入で callback 0 回、復帰後に通常呼出し成功を確認する。入口の加算を除く変異は実行 RED。到達不能を採用した経路は製品リンクと呼出し先の監査を受入とする。現段は追記のみ。後段の深さ管理の候補ファイルは arch/ppc/kernel_trap.c。
+
+### 追記 A-2　EE=1 の実 engine（§6）
+
+本文 §6 の「S1 正常」「S1 拒否と後始末」の実 engine ケースと guest.c の CALL-COUNT == 2 を次で置き換える。
+
+既存 EE=0 ケースを維持し、guest.c の最後の engine_ok(start_msr) と CALL-COUNT の間に次の一回を追加し、calls == 3 を検査する。MPIC は操作しない。EE=0 で DEC に正の最大値を再装填し、選択中の例外接頭域の 0x900 と 0x500 に stub を設置する。DEC stub は作業 GPR を SPRG0（SPR 272、fixture 専用）に退避し、DEC に正の最大値を書き、GPR を復元して rfi する。外部割込み stub は S1-FAIL-EXT を報告し、sqlite_s1_status に 3 を書いて sqlite_s1_fail で停止する。この停止は全ケースで RED とする。両 stub のコピー元と長さをキャッシュライン境界に揃え、ppc_cache_copy で公開してから EE を開く。OF へ戻らず、EE 区間中に firmware や外部装置の初期化を呼ばない。
+
+~~~c
+expected_ee = PPC_MSR_EE;
+set_msr(start_msr | expected_ee);   /* sync / mtmsr / isync */
+CHECK(msr() == (start_msr | expected_ee), "EE-START");
+engine_ok(start_msr | expected_ee);
+CHECK(arch_kernel_fp_begin(&guard) == 0, "EE-HELD");
+CHECK(msr() & PPC_MSR_EE, "EE-BEFORE-REJECT");
+rejected(0, 0);                     /* guard 保持で begin 拒否 */
+CHECK(msr() & PPC_MSR_EE, "EE-REJECT");
+arch_kernel_fp_end(&guard);
+set_msr(start_msr);
+~~~
+
+s1_engine_body は再入試行より前に次を実行する。expected_ee の初期値は 0。engine_ok は帰還直後の全 MSR、rejected は callback 不発・active 解除・MSR 不変を既存の方法で照合する。正常呼出しは合計 3 回。
+
+~~~c
+CHECK((msr() & PPC_MSR_EE) == expected_ee, "CALLBACK-EE");
+~~~
+
+kernel/sqlite_engine.c の「sqlite_engine_active = 1; に続く irq_restore(flags);」だけを一意に選び、復元行を除くコピーをリンクする。7450/7455 の両方で正常 GREEN → 変異実行 RED → 正常 GREEN。変異は既存の BEGIN、ABI-CALLBACK、ENGINE-CALLBACK の各印の後、S1-FAIL-CALLBACK-EE が一度、sqlite_s1_fail、status 3、QEMU rc 0。既存の旧 r1・end 変異の判定を保つ。変更先は下表の段 2・3・5・6。
+
+### 追記 A-3　スタック観測の範囲（§1・§6）
+
+本文 §1 の「両 arch で callback への引数、SP 整列と復元、戻り先、非揮発状態、canary を観測する」のスタック観測範囲を次で置き換える。
+
+入口 SP の整列、backchain、旧 SP の復元、上下 canary の受入は PowerPC S1 に限定する。x86 の sqlite_engine_host.c は callback の局所変数が別スタック範囲内にあることを調べる。観測の対応を擬似式で示す。
+
+~~~c
+/* PPC */ aligned16(entry_r1) && old_r1 == restored_r1 && canaries_intact()
+/* x86 */ stack_low <= local_address && local_address < stack_top
+~~~
+
+PPC の旧 r1 変異は S1-FAIL-SP、x86 は既存の check-sqlite-engine-host とその変異を維持する。今回触るのは設計追記だけである。
+
+### 追記 A-4　両 provider と共通契約の型照合（§2・§6）
+
+本文 §2 の「前方宣言と説明のコメントだけを置く」と §5 の表の「include/exec_arch.h | +3 | 前方宣言と利用契約」を次で置き換える（同表は +5、前方宣言・利用契約・関数型）。
+
+include/exec_arch.h の guard 前方宣言の直後に関数型を置く。
+
+~~~c
+typedef int arch_kernel_fp_begin_fn(struct arch_kernel_fp_guard *);
+typedef void arch_kernel_fp_end_fn(const struct arch_kernel_fp_guard *);
+~~~
+
+kernel/sqlite_engine.c の exec_arch.h、arch_kernel_fp.h の include 後に次を置く。型だけを参照し、格納域も呼出しも生成しない。
+
+~~~c
+_Static_assert(__builtin_types_compatible_p(__typeof__(&arch_kernel_fp_begin),
+                                            arch_kernel_fp_begin_fn *),
+               "arch_kernel_fp_begin signature");
+_Static_assert(__builtin_types_compatible_p(__typeof__(&arch_kernel_fp_end),
+                                            arch_kernel_fp_end_fn *),
+               "arch_kernel_fp_end signature");
+~~~
+
+arch_exec_publish は固定名ヘッダのマクロも許し、arch_fp_present は cpu.h に外部関数原型を持つが、この対は x86 の空 static inline と PPC の外部関数を同じ関数型で検査する。
+
+kernel/sqlite_outer.c の _Static_assert、__builtin_types_compatible_p、__typeof__ の組合せを前例とする。他の変異と同じく --mutate 時だけ、型の変異では PPC 固定名ヘッダのコピーだけで begin の戻り型を int から long に、別ケースでは end の引数から const を除く。正常 engine TU をコンパイルし、各変異でそのヘッダを先に探索して同じ TU をコンパイルする。対応する assertion 診断と非 0 を照合し、正常ヘッダで再 GREEN。コンパイル失敗を RED に数えるのはこの型照合試験だけである。実行変異のビルド失敗は受理しない。PM は最終版を同条件で tools/build_compare.sh <A-4 着手直前の枝先（現在 6ee9a56f6）> HEAD --all --output <比較先> に通し、関数の差 0 に加え、両ビルドの x86 sqlite_engine.o に同じ objdump -d を適用して入力パス見出しを除く全逆アセンブル差 0 を受け入れる。
+
+#### 現枝に対する実装修正の段（1 ファイルにつき 1 段）
+
+行数は追加・変更行の見積り。A-1 の製品有効化と PM の成果物比較はこの段数に含めない。
+
+| 段 | ファイル | 行数 | 内容 |
+|---|---|---:|---|
+| 1 | include/exec_arch.h | 2 | begin/end の契約型 |
+| 2 | tools/tests/ppc_sqlite_stack_regs.S | 15〜30 | 再配置可能な DEC・外部割込み vector 本体と境界ラベル |
+| 3 | tools/tests/ppc_sqlite_stack_guest.c | 60〜100 | ppc_cache_copy による両 vector の設置・公開、DEC、EE 三地点の観測 |
+| 4 | kernel/sqlite_engine.c | 6 | 段 1 の関数型を使い、固定名ヘッダ直後で静的照合 |
+| 5 | tools/accept/ppc_sqlite_stack.py | 30〜50 | SOURCES に arch/ppc/cache_copy.S を追加。EE 実行変異と診断、独立した型変異のコンパイル判定 |
+| 6 | tools/checks/ppc-sqlite-stack-guest.py | 3〜6 | CHECK の basis に A-2・A-4、covers に arch/ppc/cache_copy.S と型照合・変異の入力を反映 |
+
+段 5 の前に tools/tests と tools/accept の既存変異を検索し、active 代入と irq_restore の連続 2 行、begin と end の型変異の置換元が各対象で一意に一致することを確認する。変更で古くなった目印を移し、各変異で所定の RED を確認する。
+
+#### 追記の確定 (2026-11-18、Opus 第 2 回、PM が反映)
+- P3-a (A-2 の 0x500 の stub): 写した先で動く本体なので PC 相対の b/bl は使わない。C の停止関数へは絶対番地 (lis/ori → mtctr → bctrl、または ba) で飛ぶ。例外の中では MSR の FP が落ちているので、その先は整数だけの関数 (say・finish) を呼ぶ。
+- P3-b (A-2): vector を書く前に `CHECK(!(msr() & PPC_MSR_IP), "VECTOR-PREFIX")` を置き、「選択中の例外接頭域」を「0 番地 (IP=0 を検査)」に改める。
