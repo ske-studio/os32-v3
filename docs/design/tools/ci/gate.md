@@ -68,7 +68,7 @@ SKIP の行は挙げるだけで落とさない: 試験が自分の出力とし�
 
 ### 3-4. 用意 `gate-setup`
 
-`build-setup` (x86 のクロスコンパイラ・Rust・フォント・apt) と `ppc-setup` (PowerPC のクロスコンパイラ) を呼び、足りない apt の物 (`gcc-13`・`qemu-system-ppc`) と `requirements.txt` を入れ、`$CROSS_DIR/bin` を PATH に足す。ジョブの側には apt の行を書かない。
+`build-setup` (x86 のクロスコンパイラ・Rust・フォント・apt) と `ppc-setup` (PowerPC のクロスコンパイラ) を呼び、足りない apt の物 (`gcc-13`・`qemu-system-ppc`・`qemu-system-data`・`seabios`。メタパッケージ `qemu-system` は全 arch を連れてきて遅いので使わない) と `requirements.txt` を入れ、`$CROSS_DIR/bin` を PATH に足す。ジョブの側には apt の行を書かない。
 
 ## 4. 既存の workflow を直す時の当て方
 

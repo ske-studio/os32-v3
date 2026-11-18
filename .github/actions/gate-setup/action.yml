@@ -8,9 +8,11 @@ runs:
     - name: Host packages beyond the build setup
       shell: timeout 600 bash --noprofile --norc -e -o pipefail {0}
       run: |
-        sudo apt-get update
-        # qemu-system は mac99 の VGA の ROM (seabios) を連れてくる。無いと QEMU が起動直後に終わる。
-        sudo apt-get install -y --no-install-recommends gcc-13 qemu-system-ppc qemu-system
+        sudo apt-get -o Acquire::Retries=8 -o Acquire::http::Timeout=20 update
+        # mac99 の firmware (qemu-system-data) と VGA の ROM (seabios) を名指しで入れる。無いと QEMU が
+        # 起動直後に終わる。メタパッケージ qemu-system は全 arch の QEMU (約 100MB) を連れてきて、遅い
+        # ミラーで 600 秒を越えた (2026-11-18、run 44307127004 の ppc-qemu (2)) ので使わない。
+        sudo apt-get -o Acquire::Retries=8 -o Acquire::http::Timeout=20 install -y --no-install-recommends gcc-13 qemu-system-ppc qemu-system-data seabios
     - uses: ./.github/actions/build-setup
     - uses: ./.github/actions/ppc-setup
     - name: Python requirements and cross compiler on PATH

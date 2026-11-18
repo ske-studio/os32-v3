@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Exercise the actual stage 1 gate and configure argument branches."""
 import argparse
+import re
 from pathlib import Path
 import shlex
 import subprocess
@@ -116,9 +117,12 @@ def wiring():
         assert gate_uses == ['./.github/actions/build-setup', './.github/actions/ppc-setup']
         provided = '\n'.join(s.get('run', '') for s in gate['runs']['steps'])
         provided += (ROOT / '.github/actions/build-setup/action.yml').read_text()
-        # qemu-system は mac99 の VGA の ROM (seabios) と firmware (qemu-system-data) を連れてくる。
-        for dependency in ('qemu-system-ppc', 'qemu-system ', 'genisoimage', 'qemu-user', 'gcc-13', 'ccache'):
+        # mac99 の firmware (qemu-system-data) と VGA の ROM (seabios) を名指しで。全 arch を連れてくる
+        # メタパッケージ qemu-system は使わない (遅いミラーで用意が 600 秒を越えた)。
+        for dependency in ('qemu-system-ppc', 'qemu-system-data', 'seabios', 'genisoimage', 'qemu-user', 'gcc-13', 'ccache'):
             assert dependency in provided, dependency
+        installs = '\n'.join(line for line in provided.splitlines() if 'apt-get' in line and ' install ' in line)
+        assert not re.search(r'\bqemu-system(\s|$)', installs, re.M), 'qemu-system metapackage'
     # 枝が読めるキャッシュは自分の枝と main の物だけ。main がクロスコンパイラのキャッシュを保つ。
     warm = workflow['jobs']['ppc-toolchain-cache']
     assert warm['if'] == "github.ref == 'refs/heads/main'"
