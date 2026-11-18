@@ -41,6 +41,8 @@ make OS32_SDK=../..
 
 CRT の `_start` → `_start_c` が `main` を名前で呼び、戻り値を終了コードにします
 (`sdk/crt/crt0.asm`、`sdk/crt/crt0_c.c`)。ソース内の関数の順序に制約はありません。
+newlib をリンクする x86・PowerPC アプリは、`main` の復帰とヘルプ表示成功時に
+newlib の `exit` を通り、登録した `atexit` の処理と stdio の書き出しを済ませます。
 `_start_c` の第 4 引数 (`__os32_aux` に控える) は常駐 shell 向けの内部入口で、app には 0 が渡ります。app は使いません。
 
 ```c

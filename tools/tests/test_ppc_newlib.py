@@ -17,6 +17,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT/'tools/tests'), str(ROOT/'sdk/allocator'), str(ROOT/'tools')]
+from test_crt_exit import check_exit, SYSCALLS
 import test_nano_targets as nano
 import build_nano_target as builder
 import check_nano_inputs_target as inputs
@@ -30,14 +31,38 @@ CHECK = dict(name='ppc-newlib', tier=2, env=['ppc-cross'], budget=60,
             'userland/ppc/sh/newlib_runtime.c','tools/tests/test_nano_targets.py', 'sdk/allocator/**',
             'tools/check_nano_inputs*.py', 'tools/ci/build_cross*.sh',
             'sdk/crt/**', 'sdk/include/**', 'sdk/link/ppc/app.ld', 'build/ppc-ram-root.json',
-            'userland/lib/rt/ls.c'], basis=['PPC_FP_NEWLIB_DESIGN §8 N2・N3'])
+            'userland/lib/rt/ls.c', 'tools/tests/test_crt_exit.py', 'tools/tests/crt_exit_host.c',
+            'tools/tests/host32.py'], basis=['PPC_FP_NEWLIB_DESIGN §8 N2・N3'])
 
 FLOAT = b'N3-float=1.25,-2.50,3.75\n'
 ADAPTER = ('void *malloc(size_t size) { return _malloc_r(_impure_ptr, size); }',
            'void *malloc(size_t size) { return size == 65535 ? NULL : _malloc_r(_impure_ptr, size); }')
 
 
-def execute(prefix, work, adapter=None, make_source=None):
+def execute(prefix, work, adapter=None, make_source=None, *, exit_checks=False, mutate=False):
+    if exit_checks:
+        archive = builder.build(prefix, work/'exit-nano', crt=SYSCALLS)
+        libc, libgcc = inputs.libraries(prefix)
+
+        def compile_c(source, obj, flags):
+            inputs.command(prefix, 'gcc', *inputs.ABI, '-std=gnu11', '-O2',
+                '-ffreestanding', '-fno-builtin', '-fno-pie', '-Wno-attributes',
+                '-ffunction-sections', '-fdata-sections', *flags,
+                '-I'+str(ROOT/'sdk/include'), '-I'+str(ROOT/'sdk/include/os32'),
+                '-c', source, '-o', obj)
+
+        def link(elf, objects, use_libc):
+            libs = [archive, libc, libgcc] if use_libc else []
+            return subprocess.run([prefix/'bin/powerpc-elf-ld', '-m', 'elf32ppc',
+                                   '-e', '_start', '--gc-sections', '-Map',
+                                   elf.with_suffix('.map'), '-o', elf,
+                                   *objects, *libs], capture_output=True)
+
+        check_exit(work, ROOT/'sdk/crt/ppc/start.c', compile_c, link,
+                   lambda elf: subprocess.run(['qemu-ppc', str(elf)], capture_output=True,
+                                              timeout=60), mutate)
+        return
+
     make_source = make_source or (ROOT/'build/ppc-user.mk').read_text()
     recipe=work/'flags.mk'
     recipe.write_text('SDK_TARGET_CALL_ABI := powerpc-sysv\nCC := '+str(prefix/'bin/powerpc-elf-gcc')+'\n'+make_source+
@@ -159,6 +184,7 @@ def main():
         resource_modes(work)
         source=(ROOT/'sdk/crt/ppc/start.c').read_text()
         assert crt(prefix, work, source) == 0
+        execute(prefix, work, exit_checks=True, mutate='--mutate' in sys.argv)
         assert execute(prefix, work) == (0, FLOAT)
         assert nano.sentinel(prefix, work, ROOT/'sdk/link/ppc/app.ld') == 0
         if '--mutate' in sys.argv:

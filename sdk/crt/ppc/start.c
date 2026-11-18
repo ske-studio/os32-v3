@@ -8,6 +8,7 @@ OS32_KAPI_LAYOUT_STAMP();
 extern int main(int argc, char **argv, KernelAPI *api);
 
 extern void _init(void);
+extern void __os32_libc_exit(int) __attribute__((weak));
 
 /* --help / -h / /? の簡易チェック (strcmp依存回避) */
 static int _is_help_flag(const char *s)
@@ -29,13 +30,12 @@ void os32_start_c(int argc, char **argv, KernelAPI *api, void *aux)
     kapi = api;
     __os32_aux = aux;
     _init();
-    if (argc > 1 && _is_help_flag(argv[1])) {
-        if (os32_help_show(argv[0]) == 0) {
-            kapi->sys_exit(0);
-            for (;;) {}
-        }
-    }
-    rc = main(argc, argv, kapi);
-    api->sys_exit(rc);
+    if (argc > 1 && _is_help_flag(argv[1]) && os32_help_show(argv[0]) == 0)
+        rc = 0;
+    else
+        rc = main(argc, argv, kapi);
+    if (__os32_libc_exit)
+        __os32_libc_exit(rc);
+    kapi->sys_exit(rc);
     for (;;) {}
 }

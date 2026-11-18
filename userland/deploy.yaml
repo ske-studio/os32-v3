@@ -17,6 +17,9 @@
 
 filesystem:
   files:
+    - host: userland/tests/crtexit.bin
+      guest: /usr/bin/
+      tags: [test]
     - host: userland/diag/mmtimetest.bin
       guest: /usr/bin/
       tags: [test]
