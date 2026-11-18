@@ -42,6 +42,9 @@ def main():
         shutil.copy(ROOT / 'Makefile', root)
         shutil.copytree(ROOT / 'build', root / 'build', ignore=shutil.ignore_patterns('out'))
         shutil.copytree(ROOT / 'sdk', root / 'sdk')
+        shutil.copytree(ROOT / 'tools', root / 'tools', ignore=shutil.ignore_patterns('__pycache__'))
+        (root / 'userland/lib/rt').mkdir(parents=True)
+        shutil.copy(ROOT / 'userland/lib/rt/ls.c', root / 'userland/lib/rt')
         (root / 'userland/ppc').mkdir(parents=True)
         for app in ('hello', 'fault'):
             shutil.copy(ROOT / f'userland/ppc/{app}.c', root / 'userland/ppc')
@@ -49,10 +52,10 @@ def main():
         if '--mutate' in sys.argv:
             rule = root / 'build/ppc-user.mk'
             source = rule.read_text()
-            # The app rule and the fp_probe rule share this recipe line; unguard the app rule (the first).
-            old = 'python3 sdk/link_guard.py --target $(SDK_TARGET) $(LD)'
-            assert source.count(old) == 2 and source.index(old) < source.index('fp_probe.elf:')
-            rule.write_text(source.replace(old, '$(LD)', 1))
+            # All USER links share PPC_USER_LINK (N3); unguarding it unguards hello too.
+            old = 'python3 sdk/link_guard.py --target $(SDK_TARGET) --ar $(LD:%-ld=%-ar) $(LD)'
+            assert source.count(old) == 1
+            rule.write_text(source.replace(old, '$(LD)'))
             shutil.rmtree(root / 'build/out/ppc-user')
             result, out = build(root)
             assert result.returncode != 0 and 'missing validated link inputs' in result.stderr
