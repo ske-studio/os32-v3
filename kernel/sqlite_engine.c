@@ -1,5 +1,7 @@
 #define OS32_SQLITE_OUTER_IMPL
 #include "sqlite_engine.h"
+#include "exec_arch.h"
+#include "arch_kernel_fp.h"
 #include "io.h"
 #include "irq/irq.h"
 #include "../mm/pgalloc.h"
@@ -47,7 +49,15 @@ int sqlite_engine_run(void (*call)(void *), void *frame, int io)
     }
     sqlite_engine_active = 1;
     irq_restore(flags);
+    struct arch_kernel_fp_guard guard;
+    if (arch_kernel_fp_begin(&guard)) {
+        (void)irq_save();
+        sqlite_engine_active = 0;
+        irq_restore(flags);
+        return 0;
+    }
     sqlite_call_on_alt_stack(call, sqlite_engine_stack_top, frame);
+    arch_kernel_fp_end(&guard);
     (void)irq_save();
     sqlite_engine_active = 0;
     irq_restore(flags);

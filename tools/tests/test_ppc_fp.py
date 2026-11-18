@@ -17,7 +17,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 CHECK = dict(name='ppc-fp', env=['ppc-cross'], tier=2, budget=60, needs=[],
-    covers=['tools/tests/test_ppc_fp.py', 'tools/tests/ppc_fp_guard_host.c', 'userland/ppc/fp_probe.S',
+    covers=['arch/ppc/arch_kernel_fp.h', 'tools/tests/test_ppc_fp.py', 'tools/tests/ppc_fp_guard_host.c', 'userland/ppc/fp_probe.S',
             'arch/ppc/fp_context.S', 'arch/ppc/kernel_fp.[ch]',
             'arch/ppc/arch_exec_storage.h', 'arch/ppc/ppc_oea.h',
             'arch/ppc/exec_enter.S', 'arch/ppc/exec_resume.S',
