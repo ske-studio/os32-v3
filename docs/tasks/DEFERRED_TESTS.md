@@ -99,7 +99,6 @@
 
 | ID | 何を | 種類 | 関門 |
 |---|---|---|---|
-| PPC-G4-SFS-FLAP | PowerMac G4 実機の link の /host で、64 KiB の読み書きがほぼ交互に途中で失敗する (2026-11-18、見分けの像 4c0f7ef4)。host は全部 200 で、G4 が新しい rid の RESPONSE の後に WINDOW を出さず約 1 秒で打ち切る。前の rid の最後の DATA の再送 (EOF の後に 3〜5 回) が次の REQUEST の後に届いた回だけ失敗 | QEMU mac99 では再送が次の読みに重ならず起きない。原因の調べは調査役 (~/os32-tmp/run/ppc-g4-sfsflap/) | 直しの段の後、G4 実機で `cp /host/big /host/wN` の連続と放置の後を 10 回以上、全部が 64 KiB で一致したら行を削除する |
 | PPC-G4-TMP | PowerMac G4 の link の像で /tmp に何もマウントされていない (`cp` が write failed、`rm` が Not mounted、2026-11-18) | RAM root の ISO は読み取り専用で、書ける /tmp の置き場が PowerMac の像に無い見込み (未調査) | /tmp を用意する段 (または仕様として無いと決める) の後に行を削除する |
 | PPC-USB-KANA | PowerMac USB カナ・IME入力 | PM決定で初版はASCII/JIS記号と行編集まで、カナ変換・IME契約は未実装 | PowerMacカナ・IME対応段の受入完了前に文字化・UTF-8キュー・IME接続・製品sh入力を検証する |
 | PPC-FB-NEXT | FB 文字端末の後続: 段 I (PC-98 で FB の端末を選ぶ)・複数の TEXT/console_route・PLANAR4・LZ4 の KCG1 | 初段は PowerMac の OF の INDEX8 を 1 面だけ ([PPC_FBCON_DESIGN](../decisions/ppc/PPC_FBCON_DESIGN.md) §5) | 各機能の段の取り込みの前に、その機種の画素の受入と x86 の CUI の回帰 (console-cui-route-host) |
