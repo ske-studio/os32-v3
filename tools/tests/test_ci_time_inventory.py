@@ -78,6 +78,7 @@ def suite(tool):
             self.assertFalse(action)
             self.assertIn('偏り (最大 ÷ 最小): 1.11', '\n'.join(lines))
             self.assertEqual(lines[-1], '判定: 手当ては要らない')
+            self.assertNotIn('注意:', '\n'.join(lines))      # 手当てが要らない時は注意も出さない
             skewed = {'x86': [('s0', 2, 100.0), ('s1', 2, 40.0)]}
             lines, action = tool.render(skewed, {'a': 100.0, 'b': 40.0}, [], 1.5)
             self.assertTrue(action)
@@ -88,6 +89,12 @@ def suite(tool):
             self.assertIn('| `a` | 100 | 10 |', text)
             self.assertIn('| `n` | 50 | 無い |', text)
             self.assertTrue(lines[-1].startswith('判定: 重みを作り直す'))
+            # x86 の組が在る時は、秒での作り直しの注意を判定の前に出す。QEMU の組だけなら出さない。
+            self.assertIn('注意: x86 のシャードは検査を並列に回すので', text)
+            guest = {'qemu-ppc': [('g0', 1, 100.0), ('g1', 1, 30.0)]}
+            lines, action = tool.render(guest, {'a': 100.0, 'b': 30.0}, [], 1.5)
+            self.assertTrue(action)
+            self.assertNotIn('注意:', '\n'.join(lines))
             # 重い順の表は上位だけ。
             many = {'c%02d' % i: float(100 - i) for i in range(30)}
             lines, _ = tool.render(balanced, many, [], 1.5, top=3)
@@ -110,6 +117,8 @@ def suite(tool):
 
 
 MUTANTS = [
+    ("    if action and 'x86' in sums:", "    if action:"),
+    ("    if action and 'x86' in sums:", "    if 'x86' in sums:"),
     ("return 'qemu-ppc' if QEMU_ARTIFACT in artifact else 'x86'", "return 'x86'"),
     ("and int(parts[2]) == 0:", "and True:"),
     ("if len(parts) == 3 and parts[0].startswith('check-')", "if len(parts) == 3"),

@@ -109,7 +109,10 @@ def render(sums, measured, drifted, max_imbalance, top=TOP):
         if len(drifted) > top:
             lines.append('| ほか %d 本 | | |' % (len(drifted) - top))
         lines.append('')
-    lines.append('判定: ' + ('重みを作り直す (python3 -B tools/checks/calibrate_weights.py <DIR>...)' if action
+    if action and 'x86' in sums:
+        lines += ['注意: x86 のシャードは検査を並列に回すので、記録の秒は並んで回るほかの検査に左右される。',
+                  '      作り直した後は CI のジョブの実時間で前後を比べ、縮まなければ戻す (QEMU の段は直列なので秒が重みになる)。', '']
+    lines.append('判定: ' + ('重みを作り直す (python3 -B tools/checks/calibrate_weights.py [--merge] <DIR>...)' if action
                            else '手当ては要らない'))
     return lines, action
 

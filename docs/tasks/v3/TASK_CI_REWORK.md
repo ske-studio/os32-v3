@@ -11,9 +11,9 @@
 |---|---|---|---|
 | check | static-check | 4〜6 分 | `make check-<名>` を 31 行、手で並べている。1 行落ちると後ろは回らない |
 | check | ppc-compile | 4〜21 分 (キャッシュの有無) | `run.py --run all --env ppc-cross`。最初の失敗で止まる |
-| check | ppc-qemu (4 シャード) | 1 本で直列の時は 53〜61 分。2026-11-18 に 4 本に割った (実測は [gate.md](../../design/tools/ci/gate.md) §5-1) | `python3 -B tools/ci/gate.py run --env qemu-ppc --shard i/4`。`needs` の鎖は無い。1 本落ちても残りを回し、表と検査ごとの所要を出す |
+| check | ppc-qemu (4 シャード) | 14〜22 分 (2026-11-18 に 4 本に割った後。1 本で直列の時は 53〜61 分。実測は [gate.md](../../design/tools/ci/gate.md) §5-1) | `python3 -B tools/ci/gate.py run --env qemu-ppc --shard i/4`。`needs` の鎖は無い。1 本落ちても残りを回し、表と検査ごとの所要を出す |
 | build | artifacts | 2〜3 分 | — |
-| build | checks (6 シャード) | 10〜39 分 | `make -k check CHECK_SHARD=i/6`。1 本落ちても残りを回す (G2 は済み) |
+| build | checks (6 シャード) | 10〜39 分 (11-18 の最後の回は 12〜30 分。待ち時間の全体はここで決まる) | `make -k check CHECK_SHARD=i/6`。1 本落ちても残りを回す (G2 は済み) |
 | sep (`wt/sep-*` だけ) | identity・checks | 19 分・37〜57 分 | 手本 (`tools/ci/gate.py`)。結果の表・落ちた検査だけのログ・検査ごとの秒 |
 
 残っている欠点と、11-18 に実際に起きた事:
