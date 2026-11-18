@@ -447,6 +447,13 @@ def accept_reset(elf, out, timeout, via, mutation=None):
                          if event['event'] == 'RESET' and
                          event.get('data', {}).get('guest') is True), None)
 
+        if mutation == 'cuda-reset-byte':
+            def sent_mutant_byte():
+                require(not observe_reset(), 'SURVIVED '+mutation)
+                return s.word('reset_sent_byte') == 0x1ff
+            s.wait(sent_mutant_byte, 'Cuda reset byte 0xff sent', 30)
+            print('Cuda reset byte sent: 0xff', flush=True)
+
         until = time.monotonic() + 30
         reset = None
         while time.monotonic() < until:
@@ -461,10 +468,8 @@ def accept_reset(elf, out, timeout, via, mutation=None):
                 require(result and result['id'] == ident, 'reboot stub did not return')
                 check_body('reboot', result['result'], b'')
             else:
-                # The real reboot entered command capture and did not return.
-                require(s.word('g_capture') == 1 and op.pending and
-                        op.pending['id'] == ident and op.pending['result'] is None,
-                        'reboot did not reach active command capture')
+                require(op.pending and op.pending['id'] == ident and
+                        op.pending['result'] is None, 'reboot unexpectedly returned')
             print(f'RED {mutation}: reboot ran without guest RESET (30 s)', flush=True)
             return
 

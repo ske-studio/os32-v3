@@ -1,10 +1,11 @@
 """Real link-sh reboot acceptance from PPC_RESET_DESIGN §7."""
-CHECK = dict(name='ppc-reset', env=['ppc-cross', 'qemu-ppc'], tier=2,
+CHECK = dict(name='ppc-reset', env=['ppc-cross', 'qemu-ppc', 'socket'], tier=2,
     budget=1200, needs=['make:ppc-ci-image'], full_only=True,
     covers=['Makefile', 'build/**', 'arch/ppc/**', 'platform/powermac/**',
             'drivers/**', 'include/**', 'sdk/**', 'userland/**', 'assets/**',
             'init/**', 'kernel/**', 'mm/**', 'exec/**', 'fs/**', 'gfx/**',
-            'net/**', 'input/**', 'kapi/**', 'lib/**', 'tools/ppc/**', 'tools/*.py'],
+            'net/**', 'input/**', 'kapi/**', 'lib/**', 'tools/ppc/**', 'tools/*.py',
+            'tools/gen_unicode.c'],
     basis=['docs/decisions/ppc/PPC_RESET_DESIGN.md §7'],
     env_limit='Requires mac99 QEMU, OpenBIOS, and AF_INET UDP/TCP.')
 
@@ -68,6 +69,15 @@ def run_cases(mutate, build_only=False):
             else:
                 settings = mutant_settings(folder, mutation, 'drivers/macintosh/via.c',
                                            'CUDA_RESET = 0x11', 'CUDA_RESET = 0xff')
+            if mutation == 'cuda-reset-byte':
+                source = folder/'mutant-cuda-reset-byte.c'
+                text = source.read_text()
+                anchor = '                write8(v, SR, out[i]);'
+                if text.count(anchor) != 1:
+                    raise RuntimeError('cuda-reset-byte: send anchor must be unique')
+                text = 'volatile unsigned reset_sent_byte;\n' + text.replace(
+                    anchor, anchor+'\n                reset_sent_byte = 0x100 | out[i];')
+                source.write_text(text)
             mutant = image(folder, *settings)
             if build_only:
                 print('BUILT mutation '+mutation, flush=True)
