@@ -134,6 +134,28 @@ stop sqlite_s1_bad_sp
 stop sqlite_s1_bad_fp
 stop sqlite_s1_fail
 
+/* These stubs execute from low memory after being copied out of this image. */
+.balign PPC_CACHE_LINE
+.globl s1_dec_vector, s1_dec_vector_end
+s1_dec_vector:
+    mtsprg0 0
+    lis 0,(PPC_DEC_FAR >> 16)
+    ori 0,0,(PPC_DEC_FAR & 0xffff)
+    mtdec 0
+    mfsprg0 0
+    rfi
+.balign PPC_CACHE_LINE
+s1_dec_vector_end:
+
+.globl s1_ext_vector, s1_ext_vector_end
+s1_ext_vector:
+    lis 12,s1_external_interrupt@h
+    ori 12,12,s1_external_interrupt@l
+    mtctr 12
+    bctrl
+.balign PPC_CACHE_LINE
+s1_ext_vector_end:
+
 .section .rodata
 .align 2
 .Lgpr:

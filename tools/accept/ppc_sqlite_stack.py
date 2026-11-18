@@ -18,7 +18,7 @@ SOURCES = (
     'arch/ppc/entry.S', 'arch/ppc/ofw_note.S', 'platform/powermac/ofw.c',
     'platform/powermac/escc_tree.c', 'platform/powermac/escc.c', 'lib/kstring_c.c',
     'kernel/sqlite_engine.c', 'arch/ppc/sqlite_stack_ppc.S', 'arch/ppc/kernel_fp.c',
-    'arch/ppc/fp_context.S', 'arch/ppc/mmu.S',
+    'arch/ppc/fp_context.S', 'arch/ppc/mmu.S', 'arch/ppc/cache_copy.S',
     'tools/tests/ppc_sqlite_stack_guest.c', 'tools/tests/ppc_sqlite_stack_regs.S',
 )
 ENGINE_INC = [
@@ -33,11 +33,19 @@ MUTATIONS = (
     ('bad-sp', 'arch/ppc/sqlite_stack_ppc.S', '    blr\n.size sqlite_call_on_alt_stack,',
      '    addi 1,1,16\n    blr\n.size sqlite_call_on_alt_stack,'),
     ('bad-fp', 'kernel/sqlite_engine.c', '    arch_kernel_fp_end(&guard);\n', ''),
+    ('bad-ee', 'kernel/sqlite_engine.c',
+     '    sqlite_engine_active = 1;\n    irq_restore(flags);\n',
+     '    sqlite_engine_active = 1;\n'),
+)
+TYPE_MUTATIONS = (
+    ('arch_kernel_fp_begin', 'int arch_kernel_fp_begin(', 'long arch_kernel_fp_begin('),
+    ('arch_kernel_fp_end', 'arch_kernel_fp_end(const struct', 'arch_kernel_fp_end(struct'),
 )
 VERDICTS = {
     'normal': ('sqlite_s1_done', 0, 'S1-PASS'),
     'bad-sp': ('sqlite_s1_bad_sp', 1, 'S1-FAIL-SP'),
     'bad-fp': ('sqlite_s1_bad_fp', 2, 'S1-FAIL-FP'),
+    'bad-ee': ('sqlite_s1_fail', 3, 'S1-FAIL-CALLBACK-EE'),
 }
 LINKER = '''OUTPUT_FORMAT("elf32-powerpc")
 OUTPUT_ARCH(powerpc)
@@ -61,15 +69,40 @@ SECTIONS {
 }'''
 
 
-def compile_object(out, name, source):
+def compile_object(out, name, source, extra_flags=()):
     obj = out / (Path(name).stem + '.o')
     flags = []
     if name == 'kernel/sqlite_engine.c':
         flags = ENGINE_INC
     elif name == 'tools/tests/ppc_sqlite_stack_guest.c':
         flags = ['-I' + str(ROOT / 'kernel')]
-    command([CC, *BUILD_FLAGS, *flags, '-c', source, '-o', obj])
+    command([CC, *extra_flags, *BUILD_FLAGS, *flags, '-c', source, '-o', obj])
     return obj
+
+
+def check_type_mutations(work):
+    engine = 'kernel/sqlite_engine.c'
+    header = ROOT / 'arch/ppc/arch_kernel_fp.h'
+    original = header.read_text()
+    for function, anchor, replacement in TYPE_MUTATIONS:
+        out = work / (function + '-type')
+        out.mkdir()
+        require(original.count(anchor) == 1, f'{function}: mutation anchor must be unique')
+        (out / header.name).write_text(original.replace(anchor, replacement))
+        try:
+            compile_object(out, engine, ROOT / engine, ('-I' + str(out),))
+        except RuntimeError as error:
+            diagnostic = str(error)
+            (out / 'compile.log').write_text(diagnostic + '\n')
+            require(f'error: static assertion failed: "{function} signature"' in diagnostic,
+                    f'{function}: unexpected compiler failure, evidence {out}')
+            print(f'RED {function}: signature assertion', flush=True)
+        else:
+            require(False, f'{function}: signature mutation compiled')
+    out = work / 'type-control'
+    out.mkdir()
+    compile_object(out, engine, ROOT / engine)
+    print('GREEN type control: product engine compiled', flush=True)
 
 
 def link_image(out, objects):
@@ -192,6 +225,7 @@ def main():
             for cpu in cpus:
                 observe(out / cpu, image, cpu, case)
                 observe(out / (cpu + '-control'), normal, cpu, 'normal')
+        check_type_mutations(work)
     return 0
 
 

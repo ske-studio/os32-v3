@@ -2,6 +2,14 @@
 #include "sqlite_engine.h"
 #include "exec_arch.h"
 #include "arch_kernel_fp.h"
+
+_Static_assert(__builtin_types_compatible_p(__typeof__(&arch_kernel_fp_begin),
+                                            arch_kernel_fp_begin_fn *),
+               "arch_kernel_fp_begin signature");
+_Static_assert(__builtin_types_compatible_p(__typeof__(&arch_kernel_fp_end),
+                                            arch_kernel_fp_end_fn *),
+               "arch_kernel_fp_end signature");
+
 #include "io.h"
 #include "irq/irq.h"
 #include "../mm/pgalloc.h"

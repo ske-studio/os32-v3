@@ -2,12 +2,17 @@
 #include "arch_kernel_fp.h"
 #include "ofw.h"
 #include "ppc_boot.h"
+#include "ppc_frame.h"
 #include "ppc_oea.h"
 #include "sqlite_engine.h"
+
+#define S1_VECTOR_EXT 0x500
 
 struct frame { u32 sp, chain, trampoline_sp, caller_sp; };
 struct fp_image { unsigned long long fpr[32]; u32 fpscr_high, fpscr; };
 
+extern const unsigned char s1_dec_vector[], s1_dec_vector_end[];
+extern const unsigned char s1_ext_vector[], s1_ext_vector_end[];
 extern u32 s1_low[], s1_alt[], s1_high[], s1_old[], __stack_top[];
 extern void s1_abi_callback(void *), s1_engine_callback(void *);
 extern int s1_abi_call(void (*call)(void *), u32 top, struct frame *frame,
@@ -21,6 +26,7 @@ volatile u32 sqlite_s1_status = 0xffffffff;
 static struct pm_escc serial;
 static struct fp_image seed, sampled;
 static unsigned calls;
+static u32 expected_ee;
 static struct frame engine_frame;
 
 static void say(const char *line)
@@ -39,6 +45,11 @@ static void finish(const char *line, u32 status, void (*stop)(void))
     for (;;) {}
 }
 
+void s1_external_interrupt(void)
+{
+    finish("S1-FAIL-EXT\r\n", 3, sqlite_s1_fail);
+}
+
 #define CHECK(test, name) do { if (!(test)) \
     finish("S1-FAIL-" name "\r\n", 3, sqlite_s1_fail); } while (0)
 
@@ -47,6 +58,21 @@ static u32 msr(void)
     u32 value;
     __asm__ volatile("mfmsr %0" : "=r"(value) : : "memory");
     return value;
+}
+
+static void set_msr(u32 value)
+{
+    __asm__ volatile("sync; mtmsr %0; isync" : : "r"(value) : "memory");
+}
+
+static void install_irq_vectors(void)
+{
+    CHECK(!(msr() & PPC_MSR_IP), "VECTOR-PREFIX");
+    ppc_write_dec(PPC_DEC_FAR);
+    ppc_cache_copy((void *)PPC_VECTOR_DEC, s1_dec_vector,
+                   (u32)s1_dec_vector_end - (u32)s1_dec_vector);
+    ppc_cache_copy((void *)S1_VECTOR_EXT, s1_ext_vector,
+                   (u32)s1_ext_vector_end - (u32)s1_ext_vector);
 }
 
 static int matches_seed(unsigned first, int fpscr)
@@ -98,6 +124,7 @@ void s1_engine_body(struct frame *frame)
     CHECK(frame == &engine_frame && sqlite_engine_active == 1 &&
           (msr() & PPC_MSR_FP), "ENGINE-ACTIVE");
     check_frame(frame);
+    CHECK((msr() & PPC_MSR_EE) == expected_ee, "CALLBACK-EE");
     rejected(0, 1);
 }
 
@@ -121,7 +148,7 @@ void powermac_boot(ppc_ci ci)
     if (ofw_setup(&env) || pm_escc_prepare(&env, &serial)) ppc_stop();
     const u32 clear = PPC_MSR_FP | PPC_MSR_IR | PPC_MSR_DR | PPC_MSR_EE | PPC_MSR_FE;
     u32 start_msr = msr() & ~clear;
-    __asm__ volatile("sync; mtmsr %0; isync" : : "r"(start_msr) : "memory");
+    set_msr(start_msr);
     CHECK(msr() == start_msr, "START-MSR");
     say("S1-BEGIN\r\n");
 
@@ -158,7 +185,19 @@ void powermac_boot(ppc_ci ci)
     s1_sample(&sampled);
     CHECK(matches_seed(0, 1), "HELD-FP");
     engine_ok(start_msr);
-    CHECK(calls == 2, "CALL-COUNT");
+
+    install_irq_vectors();
+    expected_ee = PPC_MSR_EE;
+    set_msr(start_msr | expected_ee);
+    CHECK(msr() == (start_msr | expected_ee), "EE-START");
+    engine_ok(start_msr | expected_ee);
+    CHECK(arch_kernel_fp_begin(&guard) == 0, "EE-HELD");
+    CHECK(msr() & PPC_MSR_EE, "EE-BEFORE-REJECT");
+    rejected(0, 0);
+    CHECK(msr() & PPC_MSR_EE, "EE-REJECT");
+    arch_kernel_fp_end(&guard);
+    set_msr(start_msr);
+    CHECK(calls == 3, "CALL-COUNT");
     for (unsigned i = 0; i < 4; ++i)
         CHECK(s1_low[i] == (0xa55aa55a ^ i) && s1_high[i] == (0x5aa55aa5 ^ i),
               "CANARY");

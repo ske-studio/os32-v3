@@ -9,6 +9,8 @@
 /* Begin returns 0 on success. End pairs with a successful begin.
  * Keep the guard on the caller's stack through the alternate-stack call. */
 struct arch_kernel_fp_guard;
+typedef int arch_kernel_fp_begin_fn(struct arch_kernel_fp_guard *);
+typedef void arch_kernel_fp_end_fn(const struct arch_kernel_fp_guard *);
 struct arch_syscall { void *native; };
 void exec_syscall_dispatch(struct arch_syscall *);
 struct arch_user_context {
