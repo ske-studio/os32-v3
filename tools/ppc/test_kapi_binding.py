@@ -14,17 +14,17 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "sdk"))
 from kapi_target_ppc import ABSENT_PROVIDER_SLOTS, absent_result
 
-# Expected absent slots after the console_font stages (PPC_KAPI_FILL_DESIGN §4 item 10).
+# Expected absent slots after the 11-19 PowerPC stages (port 7・clock・surface 3・console_font 4・gfx2 queries 9; PPC_KAPI_FILL_DESIGN §4 item 10).
 EXPECTED_ABSENT_SLOTS = frozenset("""
 boot_image_info buz_off buz_on db_bind_blob db_bind_int db_bind_null
 db_bind_text db_close db_column_int db_column_text db_error_code db_exec
 db_finalize db_last_error db_mem_used db_open db_open_existing db_prepare
 db_prepare_only db_step ext2_format ext2_format_at fm_note_off fm_note_on
 fm_play_mml fm_set_tone_num fm_startup_sound
-gfx2_adapter_count gfx2_adapter_gen gfx2_adapter_info gfx2_caps gfx2_check_op gfx2_connector_edid gfx2_connector_info
+gfx2_check_op
 gfx2_cursor_image gfx2_cursor_move gfx2_cursor_show gfx2_dpms gfx2_fence_query
-gfx2_fence_wait gfx2_flip gfx2_gamma gfx2_head_info gfx2_lock gfx2_mode_count
-gfx2_mode_get gfx2_mode_set gfx2_palette gfx2_present gfx2_screen_surface
+gfx2_fence_wait gfx2_flip gfx2_gamma gfx2_lock
+gfx2_mode_set gfx2_palette gfx2_present gfx2_screen_surface
 gfx2_submit gfx2_surface_create gfx2_surface_desc gfx2_surface_free gfx2_unlock
 gfx2_vblank_wait gfx_add_dirty_rect gfx_get_framebuffer gfx_get_palette
 gfx_hardware_scroll gfx_hw_blit gfx_hw_fill_rect gfx_hw_get gfx_hw_submit
@@ -50,6 +50,12 @@ ssg_volume sys_get_build_info
 sys_set_mtime    sys_switch_shell
 sys_time_now sys_ver_info v86_boot v86_boot2 v86_disktest
 v86_gdc_capture v86_selftest
+""".split())
+
+GFX2_QUERY_PROVIDERS = frozenset("""
+gfx2_adapter_count gfx2_adapter_info gfx2_adapter_gen
+gfx2_caps gfx2_head_info gfx2_connector_info
+gfx2_connector_edid gfx2_mode_count gfx2_mode_get
 """.split())
 
 # Fixed allowlist: exec/*.c (including exec_*.inc), KBOOT_SHELL=1 TUs,
@@ -319,7 +325,10 @@ def main():
                    'surface_api_query', 'surface_api_lease', 'surface_api_unlease'} - undefined
         if missing:
             print('missing providers:', sorted(missing)); return 1
-        unexpected = undefined - ALLOWED_UNDEFINED
+        missing = GFX2_QUERY_PROVIDERS - undefined
+        if missing:
+            print('missing gfx2 query providers:', sorted(missing)); return 1
+        unexpected = undefined - (ALLOWED_UNDEFINED | GFX2_QUERY_PROVIDERS)
         if unexpected:
             print('unexpected providers:', sorted(unexpected)); return 1
         print('undefined providers:', len(undefined))
