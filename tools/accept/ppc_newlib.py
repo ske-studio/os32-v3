@@ -84,6 +84,9 @@ def observe(elf, cpu, out, case):
             require(result != 'wrong-reason', str((case,body,status,serial)))
             print(result+' '+cpu+' repeat='+str(repeat),flush=True)
         if case == 'normal':
+            body,status=command('/bin/nlprobe.bin crt-return')
+            require(status == b'37\n', 'CRT return status')
+            require(body == b'ACB', 'CRT return output')
             body,status=command('/bin/nlprobe.bin help-missing')
             require(body == FLOAT+FLOAT+b'N3-exit=0\nN3-exit=0\n\n' and status == b'0\n','missing CRT help delegates to main')
             body,status=command('/bin/nlprobe.bin exit')

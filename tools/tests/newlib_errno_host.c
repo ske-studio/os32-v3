@@ -48,6 +48,9 @@ int *__errno(void) { return &g_errno; }
 void *memset(void *d, int c, unsigned n)
 { unsigned char *p = d; while (n--) *p++ = (unsigned char)c; return d; }
 
+void exit(int code)
+{ (void)code; (void)h_sys3(1, 99, 0, 0); for (;;) {} }
+
 KernelAPI *kapi;
 static KernelAPI g_fake;
 static int g_ret;          /* 贋の sys_* が返す値 */

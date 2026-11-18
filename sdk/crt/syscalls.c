@@ -4,6 +4,7 @@
 #include <sys/times.h>
 #include <sys/time.h>
 #include <errno.h>
+#include <stdlib.h>
 
 #undef st_atime
 #undef st_mtime
@@ -110,6 +111,8 @@ int _isatty(int fd) {
     return kapi->sys_isatty(fd);
 }
 int isatty(int fd) ALIAS(_isatty);
+
+void __os32_libc_exit(int rc) { exit(rc); }
 
 void _exit(int exit_status) {
     kapi->sys_exit(exit_status);

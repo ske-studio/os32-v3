@@ -66,6 +66,10 @@ static int file_probe(void)
     return errno == ENOENT ? 0 : 38;
 }
 
+static char exit_buffer[BUFSIZ];
+static void exit_b(void) { putchar('B'); }
+static void exit_c(void) { putchar('C'); }
+
 static int fds[256];
 static int resources(KernelAPI *api, int retain, int fault)
 {
@@ -92,6 +96,13 @@ static int resources(KernelAPI *api, int retain, int fault)
 int main(int argc, char **argv, KernelAPI *api)
 {
     int rc;
+    if (argc > 1 && !strcmp(argv[1], "crt-return")) {
+        setvbuf(stdout, exit_buffer, _IOFBF, sizeof(exit_buffer));
+        putchar('A');
+        atexit(exit_b);
+        atexit(exit_c);
+        return 37;
+    }
     /* Multiple FP arguments exercise CR1/varargs stfd before any syscall. */
     printf("N3-float=%.2f,%.2f,%.2f\n", 1.25, -2.5, 3.75);
     if (initialized != 73) rc = 11;

@@ -21,6 +21,7 @@ void *__os32_aux;
 
 extern int main(int argc, char **argv, KernelAPI *api);
 extern void _init(void);
+extern void __os32_libc_exit(int) __attribute__((weak));
 
 /* --help / -h / /? の簡易チェック (strcmp依存回避) */
 static int _is_help_flag(const char *s)
@@ -36,24 +37,19 @@ static int _is_help_flag(const char *s)
 }
 
 void _start_c(int argc, char **argv, KernelAPI *api, void *aux) {
-    int ret;
+    int rc;
 
     kapi = api;
     __os32_aux = aux;
 
     _init();
 
-    /* --help 自動ハンドリング: manページがあれば表示して終了 */
-    if (argc > 1 && _is_help_flag(argv[1])) {
-        if (os32_help_show(argv[0]) == 0) {
-            kapi->sys_exit(0);
-            while (1) {}
-        }
-        /* manページが見つからない場合は通常のmain()に処理を委譲 */
-    }
-
-    ret = main(argc, argv, kapi);
-
-    kapi->sys_exit(ret);
-    while (1) {}
+    if (argc > 1 && _is_help_flag(argv[1]) && os32_help_show(argv[0]) == 0)
+        rc = 0;
+    else
+        rc = main(argc, argv, kapi);
+    if (__os32_libc_exit)
+        __os32_libc_exit(rc);
+    kapi->sys_exit(rc);
+    for (;;) {}
 }

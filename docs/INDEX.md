@@ -68,6 +68,7 @@ PC-9821シリーズ向け 32ビット ベアメタルOS
 | 実機 Ra266 の機体構成・基準構成 (2026-10-15 のスナップショット) と実機の方針 (82557・PCI・Trident・1.44MB・しないこと) | [decisions/realhw/RA266.md](decisions/realhw/RA266.md) (2026-10-22 に realhw/PLAN の本文を節の番号のまま移した) | 実機の票の一覧は [tasks/realhw/PLAN.md](tasks/realhw/PLAN.md) (索引) |
 | 実機 Ra266 の画面ドライバ (内蔵 Trident 1023:9660) の設計・資料・段取り | [tasks/realhw/TASK_TRIDENT_DRIVER.md](tasks/realhw/TASK_TRIDENT_DRIVER.md) (設計中 — 設計票 v5 が Codex 5 回目で Approve、実装は未着手) | [decisions/realhw/RA266.md](decisions/realhw/RA266.md) §7、[ROADMAP.md](ROADMAP.md) (1 行) |
 | PCI の IRQ を機器の種類で振り直す (共通の層と PC-98・PowerMac G4 の backend) | [tasks/realhw/TASK_PCI_IRQ_ROUTE.md](tasks/realhw/TASK_PCI_IRQ_ROUTE.md) (設計中 — 設計は確定、実装を待つ) | [decisions/realhw/RA266.md](decisions/realhw/RA266.md) §1-1 |
+| アプリの終わりの約束 (main から戻った時・--help の早期終了で newlib の後始末をしてから終わる、x86 と PowerPC で同じ) | [decisions/sdk/CRT_EXIT_DESIGN.md](decisions/sdk/CRT_EXIT_DESIGN.md) (2026-11-19 確定・実装) | `sdk/README.md` のアプリの約束 |
 | GeForce の PCI の位置を起動時の列挙で見つける (決め打ち 0:13.0 の撤去) | [design/kdebug/recover_gf_locate.md](design/kdebug/recover_gf_locate.md)・[design/drivers/pci/pci_locate.md](design/drivers/pci/pci_locate.md) (受入完了 2026-11-10) | |
 | 実機 Ra266 の PCI の IDE カード HighPoint HPT370 (大きな HDD・UDMA・DVD マルチドライブ) | [tasks/realhw/TASK_HPT370.md](tasks/realhw/TASK_HPT370.md) (計画 — 調べの台本の段階) | [decisions/realhw/RA266.md](decisions/realhw/RA266.md) §1-1 |
 | ハードウェア調査の道具 HW-BASIC (PCI・I/O・MMIO の読み書きとスクリプト、許可リストなし) | [tasks/realhw/TASK_HW_BASIC.md](tasks/realhw/TASK_HW_BASIC.md) (設計中 — 設計は確定、実装はこれから) |
