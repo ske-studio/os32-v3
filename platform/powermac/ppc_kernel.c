@@ -18,6 +18,7 @@
 #include "kernel_start.h"
 #include "kernel_probe.h"
 #include "kboot_info.h"
+#include "via_window.h"
 #include "kboot_log.h"
 #include "lan_boot.h"
 #include "mpic.h"
@@ -282,6 +283,7 @@ void platform_boot_machine(void)
     pm_clock_bind(info);
     if (platform_clock_init(pm_tick_hz()) != 0) kboot_stop("clock_init");
     if (ppc_dec_start(info->tb_hz, pm_tick_hz()) != 0) kboot_stop("dec_start");
+    pm_via_prepare();
 
     if (pm_mpic_init(dev->mpic_va, dev->mpic_bytes, dev->mpic_order) != PM_MPIC_INIT_OK)
         kboot_stop("mpic_init");

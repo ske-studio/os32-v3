@@ -5,6 +5,7 @@ pmu.c:475–545,620–624,775–784; OpenBSD pm_direct.c:294–322。
 import argparse
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 
 import host32
@@ -13,8 +14,13 @@ CHECK = dict(name='powermac-reset', tier=1, needs=[], budget=20, covers=[
     'drivers/macintosh/via.c', 'drivers/macintosh/via.h',
     'include/types.h', 'include/callconv.h',
     'tools/tests/test_powermac_reset.py', 'tools/tests/via_host.c',
-    'tools/tests/host32.py',
-], basis=['docs/decisions/ppc/PPC_RESET_DESIGN.md §3・§7'])
+    'tools/tests/host32.py', 'tools/ppc/kboot_capture.py',
+    'tools/ppc/kboot_capture_fake.c', 'platform/powermac/via_tree.c',
+    'platform/powermac/via_window.h', 'platform/powermac/kboot_capture.c',
+    'platform/powermac/gmac_tree.c', 'platform/powermac/kboot_info.h',
+    'platform/powermac/*.h', 'arch/ppc/*.h', 'include/memmap.h',
+    'lib/kstring.h', 'lib/kstring_c.c',
+], basis=['docs/decisions/ppc/PPC_RESET_DESIGN.md §2・§3・§7'])
 
 ROOT = Path(__file__).resolve().parents[2]
 DRIVER = ROOT / 'drivers/macintosh'
@@ -40,6 +46,37 @@ MUTATIONS = (
     ('overall-deadline', 'current - start >= v->io.tb_hz',
      'current - start >= 2ULL * v->io.tb_hz', 117),
 )
+
+
+def of_cases(folder, mutate):
+    sys.path.insert(0, str(ROOT / 'tools/ppc'))
+    from kboot_capture import exercise
+    product = ROOT / 'platform/powermac'
+    capture = product / 'kboot_capture.c'
+    source = (product / 'via_tree.c').read_text()
+    cases = range(26, 34)
+    assert not exercise(folder, capture, cases=cases)
+    print('GREEN: VIA OF PMU/Cuda, duplicate, missing, malformed reg, range, high cell, exact name')
+    if mutate:
+        mutations = (
+            ('via-name-prefix', '(n == len || (n == len + 1 && !buf[len]))',
+             '(n >= len)', 32),
+            ('via-first-candidate', 'if (*found && *found != node) return PM_VIA_AMBIGUOUS;',
+             'if (*found && *found != node) return 0;', 28),
+            ('via-extra-reg-cell', '!= (ac + sc) * PM_CELL_BYTES)',
+             '< (ac + sc) * PM_CELL_BYTES)', 29),
+            ('via-range-length', '!contains(child, size, *a, bytes)',
+             '!contains(child, size, *a, 1)', 30),
+            ('via-address-high-cell', 'cells >= 2 && be32(p + (cells - 2) * PM_CELL_BYTES)',
+             'cells >= 2 && be32(p + (cells - 2) * PM_CELL_BYTES) == ~0U', 31),
+        )
+        mutant = folder / 'via_tree.c'
+        for name, old, new, case in mutations:
+            assert source.count(old) == 1, f'{name}: mutation point changed'
+            mutant.write_text(source.replace(old, new))
+            exercise(folder, capture, (case, 44, b'reached=A1\nH:A1 via\n'),
+                     cases=[case], via_source=mutant)
+            print(f'RED {name} (OF case {case}, rc=44)')
 
 
 def observe(folder, source):
@@ -69,6 +106,7 @@ def main():
                 rc = observe(folder, source.replace(old, new))
                 assert rc == expected, f'{name}: rc={rc}, expected runtime RED {expected}'
                 print(f'RED {name} ({CASES[rc // 10 - 1]}, rc={rc})')
+        of_cases(folder, args.mutate)
 
 
 def run(ctx):

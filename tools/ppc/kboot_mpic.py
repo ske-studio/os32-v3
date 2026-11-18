@@ -12,7 +12,8 @@ from run import command, require
 CHECK = dict(name='kboot-mpic', tier=2, budget=600, needs=[],
              covers=v.CHECK['covers']+['platform/powermac/mpic*',
                      'platform/powermac/kboot_capture.c', 'platform/powermac/kboot_info.h',
-                     'platform/powermac/gmac_tree.c',
+                     'platform/powermac/gmac_tree.c', 'platform/powermac/via_tree.c',
+                     'platform/powermac/via_window.h', 'include/memmap.h',
                      'platform/powermac/ppc_pmap.h', 'tools/ppc/kboot_mpic*'])
 # Expected exit and reach marker are both mandatory; errors are not RED.
 MUTATIONS = [
@@ -93,7 +94,7 @@ void fixture_main(void)
     old=v.PRODUCT
     v.PRODUCT=[p for p in old if p!='tools/ppc/kboot_vectors_fixture.c']+[
         str(fixture),str(source),'platform/powermac/mpic_tree.c','platform/powermac/kboot_capture.c',
-        'platform/powermac/gmac_tree.c']
+        'platform/powermac/via_tree.c', 'platform/powermac/gmac_tree.c']
     try: return v.build(out,v.ROOT/'arch/ppc/kernel_vectors.S')
     finally: v.PRODUCT=old
 

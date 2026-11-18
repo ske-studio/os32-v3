@@ -18,6 +18,13 @@
 #include "platform_memory.h"
 #include "rh_observe.h"
 #include "kstring.h"
+#include "via_window.h"
+#if KBOOT_SH
+#include "usb_boot.h"
+_Static_assert(PM_VIA_VA + PM_VIA_BYTES <= PPC_BOOT_USB_VA ||
+    PPC_BOOT_USB_VA + (2 + PM_USB_CONTROLLERS) * PM_USB_PAGE <= PM_VIA_VA,
+    "VIA and USB VA slots must be disjoint");
+#endif
 
 #define PPC_BOOT_MEM_KB 16384U
 #define PPC_BOOT_RAM_ATTR 0x10U
@@ -25,6 +32,9 @@
 static const struct pm_kboot_info *boot_info;
 static struct ppc_boot_alias escc_alias, mpic_alias, gmac_alias[3];
 static struct ppc_boot_alias fb_alias, clock_alias;
+static struct ppc_boot_alias via_alias;
+static struct pm_via_window via_window = { .rc = PM_VIA_NOT_READY };
+const struct pm_via_window *pm_via_window(void) { return &via_window; }
 static unsigned boot_root_ready;
 static struct ppc_boot_devices boot_devices;
 /* Valid after arch_boot_after_paging(): mapped I/G aliases and the snapshot. */
@@ -44,6 +54,7 @@ int ppc_boot_alias_plan(u32 pa, u32 bytes, u32 va,
         { PPC_BOOT_GMAC_VA, PPC_BOOT_GMAC_BYTES },
         { PPC_BOOT_PCI_ADDR_VA, PAGE_SIZE },
         { PPC_BOOT_PCI_DATA_VA, PAGE_SIZE },
+        { PM_VIA_VA, PM_VIA_BYTES },
     };
     u32 offset = pa & (PAGE_SIZE - 1), limit = 0;
     for (u32 i = 0; i < sizeof(slots) / sizeof(slots[0]); i++) {
@@ -157,6 +168,36 @@ static int observe_walk_valid(u32 root, const struct ppc_boot_alias *a)
     u32 va = a->va & PTE_FRAME_MASK;
     return !a->bytes || range_valid(root, va, va + a->bytes, a->pa, PPC_BOOT_IO_ATTR);
 }
+static void plan_via(const struct pm_via_boot *via)
+{
+    via_window = (struct pm_via_window){ .rc = via->capture_rc };
+    if (via_window.rc) return;
+    via_window.rc = PM_VIA_NOT_READY;
+    if ((via->kind != PM_VIA_PMU && via->kind != PM_VIA_CUDA) ||
+        via->bytes < PM_VIA_REG_BYTES ||
+        via->bytes > ~via->pa ||
+        !ppc_boot_alias_plan(via->pa, PM_VIA_REG_BYTES, PM_VIA_VA, &via_alias))
+        via_window.rc = PM_VIA_BAD_PLAN;
+}
+
+static void install_via(u32 root)
+{
+    if (via_window.rc != PM_VIA_NOT_READY || !via_alias.bytes) return;
+    if (!observe_alias_safe(root, &via_alias) ||
+        overlap(via_alias.pa, via_alias.bytes, fb_alias.pa, fb_alias.bytes) ||
+        overlap(via_alias.pa, via_alias.bytes, clock_alias.pa, clock_alias.bytes)) {
+        via_window.rc = PM_VIA_OVERLAP;
+        return;
+    }
+    install_alias(root, &via_alias);
+    if (!observe_walk_valid(root, &via_alias)) {
+        u32 va = via_alias.va & PTE_FRAME_MASK;
+        for (u32 off = 0; off < via_alias.bytes; off += PAGE_SIZE)
+            *leaf(root, va + off) = 0;
+        via_window.rc = PM_VIA_BAD_WALK;
+    }
+}
+
 static int boot_walk_valid(u32 root)
 {
     u32 image = boot_info->image_first;
@@ -212,10 +253,14 @@ void ppc_boot_load_root(u32 root)
         for (u32 a = boot_info->hpt_pa;
              a < boot_info->hpt_pa + boot_info->hpt_bytes; a += PAGE_SIZE)
             *leaf(root, a) = 0;
+        install_via(root);
         if (!boot_walk_valid(root)) ppc_boot_walk_stop();
         boot_root_ready = 1;
     }
     ppc_root_load(root);
+    if (root == MEM_FIXED_PD_BASE && boot_root_ready &&
+        via_window.rc == PM_VIA_NOT_READY && via_alias.bytes)
+        via_window = (struct pm_via_window){ .va = via_alias.va };
 }
 void arch_boot_after_paging(void)
 {
@@ -316,6 +361,7 @@ void ppc_kernel_start(ppc_ci ci)
         !ppc_boot_alias_plan(info->mpic_pa, info->mpic_bytes, PPC_BOOT_MPIC_VA, &mpic_alias))
         kb_stop(e.out, "FAIL:KB:ALIAS-ESCC-MPIC\r\n");
     plan_gmac(info);
+    plan_via(&info->via);
     const struct pm_rh_fb *fb = pm_rh_framebuffer();
 #if KBOOT_SHELL || KBOOT_SH
     boot_devices.fb_full_rc = pm_rh_capture_full();

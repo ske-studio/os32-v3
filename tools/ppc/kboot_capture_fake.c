@@ -40,6 +40,19 @@ static int prop(int node, const char *name, unsigned char *p)
         return -1;
     }
     const char *str=0;
+    if (node==9 && !kstrcmp(name,"name")) str="mac-io";
+    if (node==13 || node==14) {
+        if (!kstrcmp(name,"name"))
+            str=node==14 || scenario==26 ? "via-pmu" :
+                scenario==32 ? "via-cuda-extra" : "via-cuda";
+        if (!kstrcmp(name,"compatible")) str="via-pmu"; /* diagnostic only */
+        if (!kstrcmp(name,"reg")) {
+            put(p,0x16020);
+            put(p+4,0x2000);
+            if (scenario==29) { put(p+8,0); return 12; }
+            return 8;
+        }
+    }
     if ((node==1 || node==5) && !kstrcmp(name,"ranges")) return 0;
     if ((node==4 || node==9 || node==5) && !kstrcmp(name,"#address-cells")) {
         put(p,node==4?3:1); return 4;
@@ -80,7 +93,7 @@ static int prop(int node, const char *name, unsigned char *p)
         for (n=0;n<(3+ac+2)*4;n++) p[n]=0;
         put(p,0x02000000); put(p+8,0x80000000);
         put(p+(3+ac-1)*4,0x80000000);
-        put(p+(3+ac+1)*4,0x10000000);
+        put(p+(3+ac+1)*4,scenario==30 ? 0x17000 : 0x10000000);
         return (3+ac+2)*4;
     }
     static const unsigned macio_reg[]={0x00008000,0,0,0,0};
@@ -95,7 +108,14 @@ static int prop(int node, const char *name, unsigned char *p)
         if (node==6) { v=channel_reg; count=6; }
         if (node==7) { v=mpic_reg; count=2; }
     }
-    if (node==9 && !kstrcmp(name,"assigned-addresses")) { v=assigned; count=5; }
+    if (node==9 && !kstrcmp(name,"assigned-addresses")) {
+        v=assigned; count=5;
+        if (scenario==31) {
+            for (n=0;n<5;n++) put(p+4*n,assigned[n]);
+            put(p+4,1);
+            return 20;
+        }
+    }
     if (!kstrcmp(name,"ranges")) {
         if (node==9) { v=ranges; count=5; }
     }
@@ -113,10 +133,10 @@ int ofw_finddevice(const char *s) { return !kstrcmp(s,PM_ROOT)?(scenario==18?-17
 int ofw_parent(int n)
 {
     if (n==-17) n=1;
-    return n==12?11:n==11?1:n==1?0:n==6?5:n==5||n==7?9:n==9?4:n==3 && scenario!=22?8:scenario==18?-17:1;
+    return n==12?11:n==11?1:n==1?0:n==6?5:n==5||n==7||n==13||n==14?9:n==9?4:n==3 && scenario!=22?8:scenario==18?-17:1;
 }
 int ofw_child(int n) { return n==11?12:n==1||n==-17?2:n==4?9:n==9?5:n==5?6:n==8 && scenario!=22?3:0; }
-int ofw_peer(int n) { return n==2?(scenario==22?3:8):n==8?4:n==3 && scenario==22?4:n==4 && scenario==23?10:n==4 && scenario==24?11:n==5?7:0; }
+int ofw_peer(int n) { return n==2?(scenario==22?3:8):n==8?4:n==3 && scenario==22?4:n==4 && scenario==23?10:n==4 && scenario==24?11:n==5?7:n==7 && scenario>=26 && scenario!=33?13:n==13 && scenario==28?14:0; }
 int ofw_package_to_path(int n, char *p, unsigned cap)
 {
     if (n==-17) n=1;
@@ -170,6 +190,21 @@ static void test(void)
     REQUIRE(!expected_stop);
     if (p->gmac_rc!=(scenario==24?LAN_OK:LAN_ENODEV)) { emit("H:A1 gmac-rc\n"); quit(42); }
     if (scenario==24 && !(p->gmac.bar_pa==0x82200000 && p->gmac.mac[0]==0x52 && p->gmac.mac[5]==0x56)) { emit("H:A1 gmac-data\n"); quit(43); }
+    if (scenario>=26) {
+        const int expected[]={0,0,PM_VIA_AMBIGUOUS,PM_VIA_BAD_PROPERTY,
+                              PM_VIA_BAD_ADDRESS,PM_VIA_BAD_ADDRESS,
+                              PM_VIA_MISSING,PM_VIA_MISSING};
+        if (p->via.capture_rc!=expected[scenario-26] ||
+            (p->via.capture_rc && (p->via.pa || p->via.bytes)) ||
+            (!p->via.capture_rc &&
+             (p->via.pa!=0x80016020 || p->via.bytes!=0x2000 ||
+              p->via.kind!=(scenario==26?PM_VIA_PMU:PM_VIA_CUDA) ||
+              kstrcmp(p->via.compatible,"via-pmu")))) {
+            emit("H:A1 via\n"); quit(44);
+        }
+        quit(0);
+    }
+    REQUIRE(p->via.capture_rc==PM_VIA_MISSING);
     REQUIRE(p->ram.count==(scenario==9?PM_REGION_COUNT:1));
     REQUIRE(p->available.count==2);
     REQUIRE(p->available.v[0].start==0x1000 && p->available.v[0].size==0x4000);
