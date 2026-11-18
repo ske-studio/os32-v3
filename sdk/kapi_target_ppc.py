@@ -217,11 +217,6 @@ PROVIDER_GROUPS = {
         'gfx2_dpms',
         'gfx2_present',
     }), frozenset([])),
-    'shm': (frozenset({
-        'sys_shm_alloc',
-        'sys_shm_lock',
-        'sys_shm_free',
-    }), frozenset(['shm.h'])),
     'pointer': (frozenset({
         'mouse_poll',
         'mouse_available',

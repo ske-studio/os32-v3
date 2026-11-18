@@ -49,7 +49,7 @@ serial_is_initialized serial_putchar serial_puts serial_trygetchar sfs_begin
 sfs_end snd_bgm_is_playing snd_bgm_play snd_bgm_set_persist snd_bgm_stop
 snd_focus snd_se_play snd_se_play_raw snd_set_master ssg_all_off ssg_tone
 ssg_volume surface_lease surface_query surface_unlease sys_get_build_info
-sys_set_mtime sys_shm_alloc sys_shm_free sys_shm_lock sys_switch_shell
+sys_set_mtime    sys_switch_shell
 sys_time_now sys_ver_info unicode_to_jis v86_boot v86_boot2 v86_disktest
 v86_gdc_capture v86_selftest
 """.split())
@@ -124,6 +124,9 @@ input_trygetchar_local
 input_trygetkey
 input_trygetrawkey
 kapi_sys_exit
+shm_alloc
+shm_free
+shm_lock
 kbd_inject
 kbd_inject_pending
 kmalloc_free
@@ -250,7 +253,9 @@ def main():
         return 1
     entries = [api for api in json.loads((ROOT / 'sdk/kapi.json').read_text())['api']
                if api['name'] in EXPECTED_ABSENT_SLOTS]
-    assert len(entries) == 184
+    assert len(entries) == 181
+    assert {'buz_on', 'buz_off', 'rtc_read'} <= ABSENT_PROVIDER_SLOTS
+    assert not {'sys_reboot', 'sys_shm_alloc', 'sys_shm_lock', 'sys_shm_free'} & ABSENT_PROVIDER_SLOTS
     with tempfile.TemporaryDirectory(prefix='ppc-binding-') as directory:
         tmp = Path(directory)
         (tmp / 'normal').mkdir()
@@ -280,7 +285,7 @@ def main():
             print('missing sys_reboot provider'); return 1
         missing = {'exec_tvram_read_allowed', 'pm_console_clear', 'tvram_putchar_at',
                    'tvram_putkanji_at', 'tvram_readchar_at', 'tvram_reverse_cell',
-                   'tvram_scroll'} - undefined
+                   'tvram_scroll', 'shm_alloc', 'shm_free', 'shm_lock'} - undefined
         if missing:
             print('missing console providers:', sorted(missing)); return 1
         unexpected = undefined - ALLOWED_UNDEFINED
