@@ -126,6 +126,9 @@ int pm_gmac_dma_sync(void *cpu, u32 bytes, enum dma_sync op);
 int pm_lan_gem_io(const struct pm_gmac_boot *, struct gem_io *out);
 int pm_dma_bus(u32 pa, u32 bytes, u32 *bus);
 int pm_lan_log_register(void);
+#if KBOOT_LINK && KBOOT_SH
+void pm_lan_log_trace(const char *buf, u32 n);
+#endif
 /* Scratch remains valid until the next peek; complete only after a peek.
  * LAN_OK removes the head, LAN_AGAIN retains it. status bit 0 means saturation. */
 int pm_lan_log_peek(const u8 **data, u32 *len, u64 *seq,

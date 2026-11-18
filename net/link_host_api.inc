@@ -38,6 +38,10 @@ void link_host_deadlines(void)
         /* All bytes received means only the local reader remains. */
         if (e->state == LINK_H_RESP && e->recv_bytes >= e->length) continue;
         if ((u32)(link_platform_now() - d->progress_tick) < LINK_HOST_SILENCE_TICKS) continue;
+#if KBOOT_LINK && KBOOT_SH
+        if (e->trace_sfs)
+            link_trace_terminal(LINK_TRACE_SILENCE, "no_progress_1000ms", e->rid, e->state);
+#endif
         d->expired = 1;
         /* Keep the existing session failure detector alive after local expiry
          * (N4). RELEASE replaces request/body retransmission, and RELACK can
@@ -178,6 +182,7 @@ i32 link_host_open(const char *req, u32 len, int owner)
     f = LINK_IRQ_SAVE();
     if (link_state != LINK_S_UP) { LINK_IRQ_RESTORE(f); return OS32_ERR_HOSTDOWN; }
     if (link_next_rid >= U32_MAX) {          /* rid 枯渇 = 新セッションへ */
+        link_trace_resync(0, "rid_exhausted");
         link_resync();
         LINK_IRQ_RESTORE(f);
         return OS32_ERR_HOSTDOWN;
@@ -208,6 +213,13 @@ i32 link_host_open(const char *req, u32 len, int owner)
         e->owner = owner;
         e->rid = link_next_rid++;
         e->epoch = link_epoch;
+#if KBOOT_LINK && KBOOT_SH
+        e->trace_sfs = len >= 9 && kstrncmp((const char *)e->req_copy, "SFS CALL ", 9) == 0;
+        if (e->trace_sfs)
+            e->trace = (struct link_trace_call){
+                .rid = e->rid, .sess = link_sess, .epoch = e->epoch
+            };
+#endif
         e->req_len = (u16)len;
         e->req_acked = 0;
         e->req_due = 1;
@@ -269,20 +281,44 @@ i32 link_host_read_stage(i32 h, u32 cap, const u8 **out, int owner)
     e = link_slot(h, owner);
     if (!e) { LINK_IRQ_RESTORE(f); return OS32_ERR_INVAL; }
     if (e->state == LINK_H_STALE) { i32 rc = link_host_terminal(e); LINK_IRQ_RESTORE(f); return rc; }
-    if (e->state == LINK_H_SENT) { LINK_IRQ_RESTORE(f); return OS32_ERR_AGAIN; }
+    if (e->state == LINK_H_SENT) {
+#if KBOOT_LINK && KBOOT_SH
+        if (e->trace_sfs) e->trace.read_wait = "await_response";
+#endif
+        LINK_IRQ_RESTORE(f);
+        return OS32_ERR_AGAIN;
+    }
     if (e->length == 0 || e->read_bytes >= e->length) {
         LINK_IRQ_RESTORE(f);
         return 0;                                   /* 完了 */
     }
     if (link_ring_owner < 0) { link_ring_owner = (int)h; e->ring_owner = 1; }
-    if (link_ring_owner != (int)h) { LINK_IRQ_RESTORE(f); return OS32_ERR_AGAIN; }
+    if (link_ring_owner != (int)h) {
+#if KBOOT_LINK && KBOOT_SH
+        if (e->trace_sfs) {
+            e->trace.blocked_by = link_h[link_ring_owner].rid;
+            e->trace.read_wait = "ring_busy";
+        }
+#endif
+        LINK_IRQ_RESTORE(f);
+        return OS32_ERR_AGAIN;
+    }
 
     n = cap;
     if (n > LINK_MAX_PAYLOAD) n = LINK_MAX_PAYLOAD;
     chunk = LINK_STREAM_BUF - link_stream_head;     /* リングの連続可用 */
     if (chunk > link_stream_count) chunk = link_stream_count;
     if (n > chunk) n = chunk;
-    if (n == 0) { LINK_IRQ_RESTORE(f); return OS32_ERR_AGAIN; }
+    if (n == 0) {
+#if KBOOT_LINK && KBOOT_SH
+        if (e->trace_sfs) e->trace.read_wait = "ring_empty";
+#endif
+        LINK_IRQ_RESTORE(f);
+        return OS32_ERR_AGAIN;
+    }
+#if KBOOT_LINK && KBOOT_SH
+    if (e->trace_sfs) e->trace.read_wait = 0;
+#endif
 
     kmemcpy(e->relay, link_stream_buf + link_stream_head, n);
     link_stream_head = (link_stream_head + n) % LINK_STREAM_BUF;
@@ -392,3 +428,20 @@ void link_host_owner_exit(int owner)
     LINK_IRQ_RESTORE(f);
 }
 
+
+#if KBOOT_LINK && KBOOT_SH
+void link_trace_call_snapshot(i32 handle, struct link_trace_call *trace)
+{
+    unsigned int f = LINK_IRQ_SAVE();
+    struct link_handle *e = link_slot(handle, 0);
+    if (e && e->trace_sfs) {
+        *trace = e->trace;
+        trace->received = e->recv_bytes;
+        trace->length = e->length;
+        trace->owns_ring = e->ring_owner;
+        trace->sent = e->window_sent;
+    }
+    trace->up = link_state == LINK_S_UP;
+    LINK_IRQ_RESTORE(f);
+}
+#endif
