@@ -282,14 +282,18 @@ def test_boot_retirement(operator_source=None, socket_source=None):
         assert op.pending is None and ident in op.results, 'different boot not retired'
         assert not op.accept_output(1, 1, a, ident, 0, b'> ver\nlate\n\x04', 12, 'cui')
         assert op.accept_ready(1, 1, b, 'cui', 'none', 'idle')
-        next_id = op.submit('cui', 'ver', None)
         adapter = sock_ns['OperatorSocket'].__new__(sock_ns['OperatorSocket'])
         adapter.operator = op
         replies = []
         adapter._send = lambda client, response: replies.append(response)
+        adapter._request({'wait': None}, {'op': 'submit', 'mode': 'cui', 'line': 'ver'})
+        assert replies[-1]['ok'], 'socket submit after retirement failed'
+        next_id = replies[-1]['id']
+        assert next_id != ident
         client = {'wait': ('result', ident, 0)}
         adapter._complete_wait(client, 1)
         assert replies[-1]['state'] == 'boot_changed' and not replies[-1]['complete']
+        assert 'status' not in replies[-1], 'retirement fabricated status'
         client['wait'] = ('result', ident, 0)
         adapter._complete_wait(client, 1)
         assert replies[-1].get('error') == 'NO_SUCH_ID', 'retirement returned twice'
@@ -301,6 +305,12 @@ def test_boot_retirement(operator_source=None, socket_source=None):
     op.unknown()
     op.resume()
     assert not op.results, 'same boot resume retired'
+    adapter = sock_ns['OperatorSocket'].__new__(sock_ns['OperatorSocket'])
+    adapter.operator = op
+    replies = []
+    adapter._send = lambda client, response: replies.append(response)
+    adapter._request({'wait': None}, {'op': 'submit', 'mode': 'cui', 'line': 'ver'})
+    assert replies[-1]['ok'], 'same boot resume did not release pending'
     print('PASS boot retirement')
 
 
@@ -319,6 +329,8 @@ def main():
             (operator_source, "if self.ready['boot'] != self.pending['boot']:", "if False:", 'different boot not retired', True),
             (operator_source, "if self.ready['boot'] != self.pending['boot']:", "if True:", 'same boot resume retired', True),
             (socket_source, "self.operator.results.pop(ident, None)", "pass", 'retirement returned twice', False),
+            (socket_source, "if state != 'boot_changed':", "if True:", 'retirement fabricated status', False),
+            (operator_source, "        else:\n            self.pending = None\n\n    def accept_output", "        else:\n            pass\n\n    def accept_output", 'same boot resume did not release pending', True),
         ]
         for source_boot, old, new, marker, is_operator in mutations_boot:
             assert source_boot.count(old) == 1
