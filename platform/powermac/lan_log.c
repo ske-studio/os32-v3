@@ -94,6 +94,12 @@ static int log_write(void *ctx, const char *buf, u32 n)
     ppc_irq_restore(saved);
     return 0;
 }
+#if KBOOT_LINK && KBOOT_SH
+void pm_lan_log_trace(const char *buf, u32 n)
+{
+    if (registered) (void)log_write(0, buf, n);
+}
+#endif
 static const struct pm_log_sink sink = { log_write, 0 };
 int pm_lan_log_register(void)
 {

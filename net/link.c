@@ -30,6 +30,10 @@
 #include "le_internal.h"
 #include "os32_kapi_shared.h"   /* OS32_ERR_* ([C4] 共有定数の正典) */
 
+#if KBOOT_LINK && KBOOT_SH
+#include "link_trace_contract.h"
+#endif
+
 #define LINK_RX_BUFFER_SIZE 1520
 #define LINK_CTRL_RELEASE 0
 #define LINK_CTRL_ACK 1
@@ -78,6 +82,10 @@ static u32 link_next_rid = 1;       /* セッション内で単調増加、0 は
 
 /* ---- ハンドル (TASK_N0 §2c) ---- */
 struct link_handle {
+#if KBOOT_LINK && KBOOT_SH
+    int trace_sfs;
+    struct link_trace_call trace;
+#endif
     u8  state;
     u16 gen;
     int owner;
@@ -203,16 +211,16 @@ static void link_stream_reset(void)
 
 /* ======================================================================== */
 /*  送信 — 20B ヘッダを LE アクセサで組む                                    */
-/*  戻り値 1 = NIC が受理、0 = 受理せず (次の周回に持ち越す)。                */
+/*  link_send_raw returns the NIC result. Boolean wrappers report acceptance. */
 /* ======================================================================== */
-static int link_send_ex(u8 op, u8 flags, u16 sess, u16 epoch, u32 seq, u32 ack,
-                        u32 rid, const void *payload, unsigned int len)
+static int link_send_raw(u8 op, u8 flags, u16 sess, u16 epoch, u32 seq, u32 ack,
+                         u32 rid, const void *payload, unsigned int len)
 {
     u8 *p = link_txbuf;
     u8 *h;
     const u8 *dst;
 
-    if (len > LINK_MAX_PAYLOAD) return 1;    /* 呼び手の誤り。捨てる (再送しない) */
+    if (len > LINK_MAX_PAYLOAD) return 0;    /* 呼び手の誤り。捨てる (再送しない) */
     dst = link_hello_ok ? link_peer_mac : link_bcast;
     kmemcpy(p, dst, ETH_ALEN);
     kmemcpy(p + ETH_ALEN, link_my_mac, ETH_ALEN);
@@ -229,7 +237,13 @@ static int link_send_ex(u8 op, u8 flags, u16 sess, u16 epoch, u32 seq, u32 ack,
     le_write32(h + LINK_OFF_RID, rid);
     le_write16(h + LINK_OFF_SESS, sess);
     if (len) kmemcpy(h + LINK_HDR_LEN, payload, len);
-    return net_tx(p, LINK_ETH_HDR_LEN + LINK_HDR_LEN + len) == 0;
+    return net_tx(p, LINK_ETH_HDR_LEN + LINK_HDR_LEN + len);
+}
+
+static int link_send_ex(u8 op, u8 flags, u16 sess, u16 epoch, u32 seq, u32 ack,
+                        u32 rid, const void *payload, unsigned int len)
+{
+    return link_send_raw(op, flags, sess, epoch, seq, ack, rid, payload, len) == 0;
 }
 
 static int link_send(u8 op, u8 flags, u32 seq, u32 ack, u32 rid,
@@ -254,12 +268,41 @@ int link_notify_control(u8 op, u32 ack, u16 window)
 /* ======================================================================== */
 /*  セッション                                                              */
 /* ======================================================================== */
+#if KBOOT_LINK && KBOOT_SH
+static void link_trace_terminal(enum link_trace_event event, const char *reason,
+                                u32 rid, u8 state)
+{
+    link_trace_event(event, (struct link_trace_rx){
+        .rid = rid, .sess = link_sess, .epoch = link_epoch, .state = state,
+        .reason = reason, .tick = link_platform_now()
+    });
+}
+
+static void link_trace_resync(u32 rid, const char *reason)
+{
+    for (int i = 0; i < LINK_HANDLES; i++) {
+        if (link_h[i].trace_sfs &&
+            (link_h[i].state != LINK_H_FREE ||
+             (link_h[i].rel_pending && link_h[i].rel_rid == rid))) {
+            link_trace_terminal(LINK_TRACE_RESYNC, reason, rid, link_state);
+            return;
+        }
+    }
+}
+#else
+#define link_trace_resync(rid, reason) ((void)0)
+#endif
+
 static void link_drop_all(void)
 {
     int i;
     for (i = 0; i < LINK_HANDLES; i++) {
         struct link_handle *e = &link_h[i];
         if (e->state != LINK_H_FREE && e->state != LINK_H_STALE) {
+#if KBOOT_LINK && KBOOT_SH
+            if (e->trace_sfs)
+                link_trace_terminal(LINK_TRACE_INVALIDATE, "session_drop", e->rid, e->state);
+#endif
             e->state = LINK_H_STALE;
             link_rt_fail++;
         }
@@ -353,7 +396,11 @@ static void link_timers(void)
         if (e->rel_pending && !e->rel_due && since(e->rel_tick) >=
             (e->rel_interval ? e->rel_interval : LINK_RTO_TICKS)) {
             u32 limit = e->rel_interval == LINK_PROBE_TICKS ? LINK_PROBE_MAX : LINK_TRIES;
-            if (e->rel_tries >= limit) { link_resync(); return; }
+            if (e->rel_tries >= limit) {
+                link_trace_resync(e->rel_rid, "release_retries");
+                link_resync();
+                return;
+            }
             e->rel_due = 1;
             e->rel_tries++;
             link_retransmits++;
@@ -361,13 +408,21 @@ static void link_timers(void)
         if (e->state == LINK_H_FREE || e->state == LINK_H_STALE) continue;
 
         if (!e->req_acked && !e->req_due && since(e->last_tx_tick) >= LINK_RTO_TICKS) {
-            if (e->retries >= LINK_TRIES) { link_resync(); return; }
+            if (e->retries >= LINK_TRIES) {
+                link_trace_resync(e->rid, "request_retries");
+                link_resync();
+                return;
+            }
             e->req_due = 1;
             e->retries++;
             link_retransmits++;
         }
         if (e->wlen && !e->w_due && since(e->last_tx_tick) >= LINK_RTO_TICKS) {
-            if (e->retries >= LINK_TRIES) { link_resync(); return; }
+            if (e->retries >= LINK_TRIES) {
+                link_trace_resync(e->rid, "wdata_retries");
+                link_resync();
+                return;
+            }
             e->w_due = 1;
             e->retries++;
             link_retransmits++;
@@ -377,7 +432,11 @@ static void link_timers(void)
         if ((e->state == LINK_H_SENT && e->req_acked) ||
             (e->state == LINK_H_RESP && e->recv_bytes < e->length)) {
             if (since(e->last_rx_tick) >= LINK_PROBE_TICKS) {
-                if (e->probes >= LINK_PROBE_MAX) { link_resync(); return; }
+                if (e->probes >= LINK_PROBE_MAX) {
+                    link_trace_resync(e->rid, "status_probes");
+                    link_resync();
+                    return;
+                }
                 e->want_status = 1;
                 e->probes++;
                 e->last_rx_tick = link_platform_now();
@@ -387,8 +446,15 @@ static void link_timers(void)
          * Record only NIC acceptance, so a refused advertisement stays due. */
         if (e->ring_owner && e->state == LINK_H_RESP && e->recv_bytes < e->length &&
             (!e->window_sent || e->window_ms != tick_clock_ms() ||
-             e->window_credit != link_credit_pages()))
+             e->window_credit != link_credit_pages())) {
+#if KBOOT_LINK && KBOOT_SH
+            if (e->trace_sfs && !e->trace.planned) {
+                e->trace.planned = 1;
+                e->trace.plan_tick = link_platform_now();
+            }
+#endif
             e->want_window = 1;
+        }
     }
 }
 
@@ -445,8 +511,21 @@ static int link_tx_control(void)
                 u8 pl[LINK_WINDOW_LEN];
                 u16 credit = link_credit_pages();
                 le_write16(pl, credit);
-                if (!link_send(LINK_OP_WINDOW, 0, 0, e->ack_seq, e->rid,
-                               pl, LINK_WINDOW_LEN)) return -1;
+                int rc = link_send_raw(LINK_OP_WINDOW, 0, link_sess, link_epoch,
+                                       0, e->ack_seq, e->rid, pl, LINK_WINDOW_LEN);
+#if KBOOT_LINK && KBOOT_SH
+                if (e->trace_sfs && !e->window_sent) {
+                    e->trace.tried = 1;
+                    e->trace.tx_rc = rc;
+                    if (!rc || !e->trace.rejects) e->trace.tx_tick = link_platform_now();
+                    e->trace.credit = credit;
+                    if (rc) {
+                        if (!e->trace.rejects) e->trace.first_reject = rc;
+                        e->trace.rejects++;
+                    }
+                }
+#endif
+                if (rc) return -1;
                 e->want_window = 0;
                 e->window_sent = 1;
                 e->window_ms = tick_clock_ms();

@@ -2,6 +2,7 @@
  * SfsClient's retries must never allocate a second link request for this frame.
  * PLN1 keeps its independent transport in hostfs_io.c. */
 #include "hostfs.h"
+#include "hostfs_trace.h"
 #include "fs/serialfs/sfs_lan.h"
 #include "platform_host.h"
 #include "net/link_platform.h"
@@ -36,23 +37,28 @@ static int pm_hfs_can_wait(void *ctx)
     return kctx_irq_depth == 0 && _irq_enabled();
 }
 
-int pm_hfs_rx_frame(const u8 *frame, u32 len)
+static const char *accept_frame(const u8 *frame, u32 len)
 {
     struct pm_hfs_transport *t = &pm_hostfs_transport;
     u32 i, payload;
-    if (t->rx_pos != t->rx_end || len < SFS_HDR_LEN + SFS_CRC_LEN ||
-        len > sizeof(t->rx)) return -1;
+    if (t->rx_pos != t->rx_end) return "rx_busy";
+    if (len < SFS_HDR_LEN + SFS_CRC_LEN || len > sizeof(t->rx)) return "frame_length";
     if (frame[0] != SFS_ENQ || frame[SFS_OFF_MAGIC1] != SFS_MAGIC1 ||
-        frame[SFS_OFF_MAGIC2] != SFS_MAGIC2) return -1;
+        frame[SFS_OFF_MAGIC2] != SFS_MAGIC2) return "preamble";
     payload = sfs_get16(frame + SFS_OFF_LEN);
     if (payload > SFS_LAN_MAX_PAYLOAD ||
-        len != SFS_HDR_LEN + payload + SFS_CRC_LEN) return -1;
+        len != SFS_HDR_LEN + payload + SFS_CRC_LEN) return "frame_length";
     if (sfs_crc32(frame + SFS_OFF_TYPE, len - SFS_PREAMBLE_LEN - SFS_CRC_LEN) !=
-        sfs_get32(frame + len - SFS_CRC_LEN)) return -1;
+        sfs_get32(frame + len - SFS_CRC_LEN)) return "crc";
     for (i = 0; i < len; ++i) t->rx[i] = frame[i];
     t->rx_pos = 0;
     t->rx_end = len;
     return 0;
+}
+
+int pm_hfs_rx_frame(const u8 *frame, u32 len)
+{
+    return accept_frame(frame, len) ? -1 : 0;
 }
 
 static int pm_hfs_get(void *ctx)
@@ -61,8 +67,10 @@ static int pm_hfs_get(void *ctx)
     return t->rx_pos < t->rx_end ? t->rx[t->rx_pos++] : -1;
 }
 
-static void finish(int rc)
+static void finish(int rc, const char *reason, i32 detail)
 {
+    static const char *const names[] = { "OPEN", "WRITE", "STATUS", "READ" };
+    pm_hfs_trace_finish(handle, names[phase], reason, rc, detail, received, length);
     if (handle >= 0) (void)platform_host_close(handle, 0);
     handle = -1;
     pending = 0;
@@ -75,7 +83,7 @@ void pm_hfs_link_poll(void)
     i32 rc;
     if (!pending || !pm_hfs_can_wait(0)) return;
     if ((i32)(pm_hfs_now(0) - until) >= 0) {
-        finish(OS32_ERR_TIMEOUT);
+        finish(OS32_ERR_TIMEOUT, "timeout", 0);
         return;
     }
     switch (phase) {
@@ -89,7 +97,7 @@ void pm_hfs_link_poll(void)
         /* No WDATA has been sent: retry admission within the same deadline. */
         if (rc == OS32_ERR_AGAIN || rc == OS32_ERR_HOSTDOWN ||
             rc == OS32_ERR_FULL) return;
-        if (rc < 0) { finish(rc); return; }
+        if (rc < 0) { finish(rc, "open_rc", rc); return; }
         handle = rc;
         phase = HFS_WRITE;
         return;
@@ -97,7 +105,10 @@ void pm_hfs_link_poll(void)
     case HFS_WRITE:
         rc = platform_host_write(handle, tx + written, tx_len - written, 0);
         if (rc == OS32_ERR_AGAIN) return;
-        if (rc <= 0 || (u32)rc > tx_len - written) { finish(-1); return; }
+        if (rc <= 0 || (u32)rc > tx_len - written) {
+            finish(-1, "write_rc", rc);
+            return;
+        }
         written += (u32)rc;
         if (written == tx_len) phase = HFS_STATUS;
         return;
@@ -105,9 +116,11 @@ void pm_hfs_link_poll(void)
         u32 status;
         rc = platform_host_status(handle, &status, &length, 0);
         if (rc == OS32_ERR_AGAIN) return;
-        if (rc || status != 200 || length > sizeof(response)) { finish(-1); return; }
+        if (rc) { finish(-1, "status_rc", rc); return; }
+        if (status != 200) { finish(-1, "http_status", status); return; }
+        if (length > sizeof(response)) { finish(-1, "response_length", length); return; }
         /* BYE and other one-way frames complete with an empty 200. */
-        if (!length) { finish(0); return; }
+        if (!length) { finish(0, "empty", 0); return; }
         phase = HFS_READ;
         return;
     }
@@ -115,9 +128,15 @@ void pm_hfs_link_poll(void)
         const u8 *data;
         rc = platform_host_read_stage(handle, length - received, &data, 0);
         if (rc == OS32_ERR_AGAIN) return;
-        if (rc <= 0 || (u32)rc > length - received) { finish(-1); return; }
+        if (rc <= 0 || (u32)rc > length - received) {
+            finish(-1, "read_rc", rc);
+            return;
+        }
         for (i32 i = 0; i < rc; ++i) response[received++] = data[i];
-        if (received == length) finish(pm_hfs_rx_frame(response, length));
+        if (received == length) {
+            const char *error = accept_frame(response, length);
+            finish(error ? -1 : 0, error ? error : "ok", 0);
+        }
         return;
     }
     }

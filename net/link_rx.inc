@@ -82,6 +82,20 @@ static void link_on_response(struct link_handle *e, u8 flags, const u8 *pl)
     u16 st = le_read16(pl);
     u32 ln = le_read32(pl + LINK_RESPONSE_LENGTH_OFF);
 
+#if KBOOT_LINK && KBOOT_SH
+    if (e->trace_sfs && ((flags & LINK_F_CTRL) || e->state == LINK_H_SENT)) {
+        struct link_trace_rx *trace = flags & LINK_F_CTRL ? &e->trace.control : &e->trace.response;
+        *trace = (struct link_trace_rx){
+            .rid = e->rid, .length = ln, .status = st, .sess = link_sess,
+            .epoch = link_epoch, .flags = flags, .state = e->state,
+            .tick = link_platform_now(),
+            .reason = !(flags & LINK_F_CTRL) ? "accepted" :
+                      st == LINK_CTL_TOMBSTONE ? "tombstone" :
+                      st == LINK_CTL_PROCESSING ? "processing" :
+                      st == LINK_CTL_NO_SLOT ? "no_slot" : "unknown_control"
+        };
+    }
+#endif
     link_host_progress((i32)(e - link_h));
     e->last_rx_tick = link_platform_now();
     e->probes = 0;
@@ -125,6 +139,33 @@ static void link_on_response(struct link_handle *e, u8 flags, const u8 *pl)
     e->state = (ln == 0) ? LINK_H_DONE : LINK_H_RESP;
 }
 
+#if KBOOT_LINK && KBOOT_SH
+static void link_trace_response_drop(const u8 *h, u32 bytes, const char *reason)
+{
+    if (h[LINK_OFF_OP] != LINK_OP_RESPONSE) return;
+    u32 rid = le_read32(h + LINK_OFF_RID);
+    u8 state = LINK_H_FREE;
+    for (int i = 0; i < LINK_HANDLES; i++) {
+        struct link_handle *e = &link_h[i];
+        if (e->rid != rid) continue;
+        if (!e->trace_sfs) return; /* Never trace responses to our own LOG calls. */
+        state = e->state;
+        if (!reason && state == LINK_H_STALE) reason = "stale";
+        break;
+    }
+    const u8 *pl = h + LINK_HDR_LEN;
+    link_trace_event(LINK_TRACE_RESPONSE_DROP, (struct link_trace_rx){
+        .rid = rid, .sess = le_read16(h + LINK_OFF_SESS),
+        .epoch = le_read16(h + LINK_OFF_EPOCH), .flags = h[LINK_OFF_FLAGS],
+        .state = state, .tick = link_platform_now(), .length = bytes >= 6 ? le_read32(pl + LINK_RESPONSE_LENGTH_OFF) : 0,
+        .status = bytes >= 6 ? le_read16(pl) : 0,
+        .reason = reason ? reason : "rid_mismatch"
+    });
+}
+#else
+#define link_trace_response_drop(h, bytes, reason) ((void)0)
+#endif
+
 static void link_dispatch(const u8 *f, unsigned int flen)
 {
     const u8 *h;
@@ -143,6 +184,7 @@ static void link_dispatch(const u8 *f, unsigned int flen)
     flags = h[LINK_OFF_FLAGS];
     if (!mac_eq(f, link_my_mac) &&
         !(op == LINK_OP_HELLO && mac_eq(f, link_bcast))) {
+        link_trace_response_drop(h, flen - LINK_ETH_HDR_LEN - LINK_HDR_LEN, "destination");
         link_rx_dropped++; return;
     }
     epoch = le_read16(h + LINK_OFF_EPOCH);
@@ -152,9 +194,13 @@ static void link_dispatch(const u8 *f, unsigned int flen)
     rid = le_read32(h + LINK_OFF_RID);
     sess = le_read16(h + LINK_OFF_SESS);
     if ((unsigned int)(LINK_ETH_HDR_LEN + LINK_HDR_LEN + plen) > flen) {
+        link_trace_response_drop(h, flen - LINK_ETH_HDR_LEN - LINK_HDR_LEN, "truncated");
         link_rx_dropped++; return;
     }
-    if (!link_paylen_ok(op, flags, plen)) { link_rx_dropped++; return; }
+    if (!link_paylen_ok(op, flags, plen)) {
+        link_trace_response_drop(h, plen, "payload");
+        link_rx_dropped++; return;
+    }
     pl = h + LINK_HDR_LEN;
     link_rx_frames++;
     if (op != LINK_OP_HELLO || flags == LINK_HS_SYNACK || flags == LINK_HS_ESTAB)
@@ -167,6 +213,9 @@ static void link_dispatch(const u8 *f, unsigned int flen)
     /* HELLO 以外は sess / epoch が控えと一致し、相手が peer のものだけ。 */
     if (link_state != LINK_S_UP || sess != link_sess || epoch != link_epoch ||
         !mac_eq(f + ETH_ALEN, link_peer_mac)) {
+        link_trace_response_drop(h, plen, link_state != LINK_S_UP ? "not_up" :
+                                 sess != link_sess ? "session" :
+                                 epoch != link_epoch ? "epoch" : "peer");
         link_rx_dropped++;
         return;
     }
@@ -209,7 +258,12 @@ static void link_dispatch(const u8 *f, unsigned int flen)
 
     case LINK_OP_RESPONSE:
         e = link_by_rid(rid);
-        if (!e) { link_rx_dropped++; break; }
+        if (!e) {
+            link_trace_response_drop(h, plen, 0);
+            link_rx_dropped++; break;
+        }
+        if (!(flags & LINK_F_CTRL) && e->state != LINK_H_SENT)
+            link_trace_response_drop(h, plen, "not_sent");
         link_on_response(e, flags, pl);
         break;
 

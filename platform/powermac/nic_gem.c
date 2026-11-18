@@ -91,3 +91,23 @@ static int acquire(const struct NetNicOps **out)
 }
 static void release(void) { acquired = 0; packet_head = packet_count = 0; }
 const struct NetAdapter net_gem_adapter = { acquire, release };
+
+#if KBOOT_LINK && KBOOT_SH
+#include "net/nic_rx.h"
+
+/* The caller owns the same exclusion used by the GEM adapter and link. */
+void pm_gem_trace_snapshot(struct pm_gem_trace *out)
+{
+    struct gem *g = pm_lan_running_gem(0);
+    *out = (struct pm_gem_trace){
+        .adapter = packet_count,
+        .link_queue = net_rx_queued(NET_RX_LINK),
+        .ready = g != 0
+    };
+    if (g) {
+        out->rx_packets = g->rx_packets;
+        out->rx_drops = g->rx_drops;
+        out->tx_pending = g->tx_pending;
+    }
+}
+#endif

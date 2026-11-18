@@ -17,7 +17,8 @@ CHECK = dict(name='ppc-cpu-nap', tier=2, budget=30, needs=[], env=['ppc-cross'],
             'kernel/irq/irq.h', 'kernel/irq/irq_math.h', 'include/platform_irq.h',
             'platform/powermac/platform_irq_limits.h', 'arch/ppc/ppc_hpt.h',
             'platform/powermac/platform_of_layout.h'],
-    basis=['User decision 2026-11-16 and mainline assignment (PPC NAP)'])
+    basis=['User decision 2026-11-16 and mainline assignment (PPC NAP)',
+           'docs/decisions/settings/MACHCFG_DESIGN.md P-G, P-R2, P-R4'])
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = [
     ('ignore-ee', 'idle', '!ppc_irq_enabled() || kctx_irq_depth != 0', 'kctx_irq_depth != 0', 11),
@@ -25,7 +26,8 @@ MUTATIONS = [
     ('no-nap', 'idle', '    ppc_cpu_nap();', '    (void)0;', 10),
     ('keep-pow', 'trap', 'f->srr1 &= ~PPC_MSR_POW;', 'f->srr1 &= ~0u;', 40),
     ('clear-bit8', 'power', '(hid & ~PPC_HID_SLEEP)', '(hid & ~(PPC_HID_SLEEP | PPC_HID_HIGHBAT))', 20),
-    ('no-dpm', 'power', '| PPC_HID_NAP | PPC_HID_DPM', '| PPC_HID_NAP', 20),
+    ('keep-7450-nap', 'power', 'hid &= ~PPC_HID_NAP;', '(void)hid;', 20),
+    ('no-dpm', 'power', '| PPC_HID_DPM', '| 0u', 20),
 ]
 
 def main(argv=None):
