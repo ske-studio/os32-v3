@@ -45,16 +45,29 @@ def measurements(paths, envs=None):
                 samples={n: len(v) for n, v in sorted(samples.items())})
 
 
+def merged(stored, fresh):
+    """Fresh medians replace the stored ones check by check; unmeasured checks keep theirs."""
+    seconds = dict(stored.get('seconds', {}), **fresh['seconds'])
+    samples = dict(stored.get('samples', {}), **fresh['samples'])
+    return dict(sources=stored.get('sources', []) + fresh['sources'],
+                seconds=dict(sorted(seconds.items())), samples=dict(sorted(samples.items())))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('artifacts', nargs='+', type=Path)
     parser.add_argument('--output', type=Path, default=Path(__file__).with_name('weights.json'))
+    parser.add_argument('--merge', action='store_true',
+                        help='keep the stored weight of every check these artifacts did not measure')
     args = parser.parse_args()
     paths = [p for source in args.artifacts for p in
              ([source] if source.is_file() else source.rglob('check_times.tsv'))]
     import run
     envs = {name: check.env for name, check in run.discover(Path(__file__).resolve().parents[2]).items()}
-    args.output.write_text(json.dumps(measurements(paths, envs), indent=2) + '\n')
+    result = measurements(paths, envs)
+    if args.merge:
+        result = merged(json.loads(args.output.read_text()), result)
+    args.output.write_text(json.dumps(result, indent=2) + '\n')
 
 
 if __name__ == '__main__':

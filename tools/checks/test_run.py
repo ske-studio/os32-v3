@@ -230,6 +230,17 @@ class RunnerTest(unittest.TestCase):
             self.assertEqual((self.root / 'prepared').read_text().splitlines(), [expected])
             (self.root / 'prepared').unlink()
 
+    def test_run_leaves_no_core_files(self):
+        import resource
+        soft, hard = resource.getrlimit(resource.RLIMIT_CORE)
+        try:
+            if hard != 0:
+                resource.setrlimit(resource.RLIMIT_CORE, (min(4096, hard) if hard != resource.RLIM_INFINITY else 4096, hard))
+            R.no_core_files()
+            self.assertEqual(resource.getrlimit(resource.RLIMIT_CORE), (0, hard))
+        finally:
+            resource.setrlimit(resource.RLIMIT_CORE, (soft, hard))
+
     def test_weight_update_median_success_only(self):
         spec = importlib.util.spec_from_file_location('weights', Path(R.__file__).with_name('calibrate_weights.py'))
         updater = importlib.util.module_from_spec(spec)
@@ -253,6 +264,13 @@ class RunnerTest(unittest.TestCase):
         self.assertEqual(filtered['samples'], {'guest': 1, 'host': 1})
         self.assertEqual(updater.measurements([shard, guest])['samples'], {'guest': 2, 'host': 2})
         self.assertTrue(updater.provides_qemu('check-times-abc-ppc-qemu-0'))
+        # --merge: measured checks are replaced, the rest keep the stored weight and sample count.
+        stored = dict(sources=[dict(artifact='old', sha256='0' * 64)], seconds={'guest': 5, 'kept': 70}, samples={'guest': 9, 'kept': 3})
+        both = updater.merged(stored, filtered)
+        self.assertEqual(both['seconds'], {'guest': 600, 'host': 40, 'kept': 70})
+        self.assertEqual(both['samples'], {'guest': 1, 'host': 1, 'kept': 3})
+        self.assertEqual([s['artifact'] for s in both['sources']],
+                         ['old', 'check-times-abc-3', 'check-times-abc-ppc-qemu-1'])
         self.assertFalse(updater.provides_qemu('check-times-abc-0'))
 
     def setUp(self):

@@ -56,7 +56,8 @@ def wiring():
     check = (ROOT / '.github/workflows/check.yml').read_text()
     build = (ROOT / '.github/workflows/build.yml').read_text()
     assert 'ppc-setup' not in build
-    assert check.count('- uses: ./.github/actions/ppc-setup') == 2
+    # ppc-compile・ppc-qemu と、main のキャッシュを保つ ppc-toolchain-cache。
+    assert check.count('- uses: ./.github/actions/ppc-setup') == 3
     assert '  ppc-compile:' in check
     workflow = yaml.safe_load(check)
     triggers = workflow.get('on', workflow.get(True))
@@ -111,7 +112,14 @@ def wiring():
             assert dependency in runs
         for action_name in ('build-setup', 'ppc-setup'):
             assert any(s.get('uses') == './.github/actions/' + action_name for s in guest)
+    # 枝が読めるキャッシュは自分の枝と main の物だけ。main がクロスコンパイラのキャッシュを保つ。
+    warm = workflow['jobs']['ppc-toolchain-cache']
+    assert warm['if'] == "github.ref == 'refs/heads/main'"
+    assert [s.get('uses') for s in warm['steps']] == ['actions/checkout@v4', './.github/actions/ppc-setup']
     action = yaml.safe_load((ROOT / '.github/actions/ppc-setup/action.yml').read_text())
+    by_name = {step['name']: step for step in action['runs']['steps']}
+    for name in ('Toolchain build dependencies (cache miss only)', 'Build powerpc-elf toolchain (cache miss only)'):
+        assert by_name[name]['if'] == "steps.cache.outputs.cache-hit != 'true'"
     commands = '\n'.join(step.get('run', '') for step in action['runs']['steps'])
     assert 'sha256sum tools/ci/build_cross_ppc.sh' in commands
     assert 'tools/ci/build_cross.sh' not in commands

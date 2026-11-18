@@ -41,12 +41,14 @@ gh run view <RUN_ID> --json jobs -q '.jobs[] | "\(.name) \(.conclusion) \(.start
 ## 3. 重みを作り直す
 
 ```bash
-python3 -B tools/checks/calibrate_weights.py $D          # tools/checks/weights.json を書き直す (中央値)
+python3 -B tools/checks/calibrate_weights.py --merge $D/<check の回>    # QEMU の検査の重みだけ更新 (ほかは残す)
+python3 -B tools/checks/calibrate_weights.py $D          # 全部を書き直す (中央値)。x86 は下の注意を読んでから
 for i in 0 1 2 3 4 5; do python3 -B tools/checks/run.py --list --shard $i/6 | wc -w; done     # x86 の割り振り
 for i in 0 1 2 3; do python3 -B tools/checks/run.py --list --env qemu-ppc --shard $i/4; done    # QEMU の段の割り振り
 MUTATE=1 make check-check-select-host check-ci-time-inventory-host check-ci-gate-host
 ```
 
+- **QEMU の段と x86 のシャードで、秒の意味が違う。** QEMU の段はシャードの中が直列なので、秒がそのまま重みになる。x86 のシャードは検査を並列に回すので、秒は並んで回るほかの検査に左右される。2026-11-18 に x86 の重みを秒の中央値で全部作り直したら、偏りが 1.92 → 3.25 に悪くなって戻した。x86 を作り直す時は必ず前後の実時間で判断する (CPU 時間で測る形にするのは票 `docs/tasks/v3/TASK_CI_REWORK.md` の段 S7)。
 - QEMU を要る検査は QEMU の段の記録だけを標本にする (x86 のシャードでは名前だけ回って 1〜2 秒で終わる)。道具が宣言の `env` を見て分ける。
 - 変更は `tools/checks/weights.json` の 1 本。枝を push して CI を回し、**前と後のジョブの実時間を比べる**。縮まなければ戻す。前後の数字は `docs/design/tools/ci/gate.md` に書く ([POLICY_CI](../../../docs/POLICY_CI.md) R8)。
 - 回る検査の集合は変わらない (割り振りだけが変わる)。確かめ方: 作り直す前後で `python3 -B tools/checks/run.py --list | sort` が同じ。
@@ -58,7 +60,7 @@ MUTATE=1 make check-check-select-host check-ci-time-inventory-host check-ci-gate
 | どのシャードも長い (和が均等で、全部が遅い) | シャードの本数を増やす。`build.yml` の行列 (x86 は 6) か `check.yml` の `ppc-qemu` の行列 (4) と、道具に渡す `i/N`、それを固定している試験 (`tools/tests/test_ci_split.py`・`ppc_ci.py`) を同じ変更で直す |
 | 1 本の検査が飛び抜けて重い | その検査の変異の本数と 1 本の所要を見る (`MUTATE=1 make check-<名>` を手元で回し、ログの `RED` の行と時刻)。QEMU を 1 本ごとに立ち上げ直す・時間切れを待って検出する変異が重い |
 | QEMU の段の 1 本が長い | `tools/ppc/` の道具の待ち (期限の値・画面を流す行数) を見る。期限を延ばして通す直しはしない |
-| 用意 (道具の導入・クロスコンパイラのビルド) が長い | キャッシュの鍵が外れていないか (`actions/cache` のログの `Cache restored`)。用意の行の重複は票 `docs/tasks/v3/TASK_CI_REWORK.md` の段 S2 |
+| 用意 (道具の導入・クロスコンパイラのビルド) が長い | ジョブのログで `Cache not found` を探す。キャッシュは枝ごとで、枝が読めるのは自分の枝と main の物だけ — main に無いキャッシュは、新しい枝の最初の回で毎回作り直しになる。main で保つジョブ (`check.yml` の `ppc-toolchain-cache`) が要る物が増えていないか見る。用意の行の重複は票 `docs/tasks/v3/TASK_CI_REWORK.md` の段 S2 |
 
 関門を弱める手当て (検査を外す・変異を外す・`needs` で後ろを飛ばす) はしない ([POLICY_CI](../../../docs/POLICY_CI.md) R3)。
 

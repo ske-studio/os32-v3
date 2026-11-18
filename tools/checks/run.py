@@ -1271,6 +1271,15 @@ def dialect_variants_needed(files=None):
                "sdk/example/hello/Makefile", "tools/tests/mutpar.py")) for f in files)
 
 
+def no_core_files():
+    """Checks crash their fixtures on purpose; qemu-user would leave qemu_<name>_<time>_<pid>.core in the tree."""
+    try:
+        import resource
+        resource.setrlimit(resource.RLIMIT_CORE, (0, resource.getrlimit(resource.RLIMIT_CORE)[1]))
+    except (ImportError, ValueError, OSError):
+        pass
+
+
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     action = parser.add_mutually_exclusive_group(required=True)
@@ -1331,6 +1340,7 @@ def main(argv: list[str]) -> int:
             print(f"check-changed: {result.mode}, tier {result.tier}, {len(result.stage)} checks", file=sys.stderr)
             print(emit_shell(result), end="")
             return 0
+        no_core_files()
         names = set(checks) if args.run == ["all"] else {n.removeprefix("check-") for n in args.run}
         if names - checks.keys():
             raise ValueError("unknown check: " + " ".join(sorted(names - checks.keys())))
