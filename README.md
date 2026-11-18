@@ -200,8 +200,7 @@ make deploy        # HostDrv (C:\os32) へのデプロイ (再起動不要)
 make deploy-kernel # NHDイメージへのデプロイ (要NP21/W再起動)
 ```
 
-必要なツールチェイン: `i386-elf-gcc` (13.2.0 + newlib-nano), `nasm`, `make`, `python3` (+lz4), `rustup`
-(構築手順は [docs/08_build.md](docs/08_build.md) §8-5、CI 用のスクリプトは `tools/ci/build_cross.sh`)。
+必要なツールチェインと導入手順は [§8-5 開発環境の構築](docs/08_build.md#8-5-開発環境の構築) を参照してください。
 日本語フォント (IPAex) はリポジトリに無く、初回の `make all` (または `make fonts`) が IPA の公式配布から取得します —
 IPA Font License v1.0 への同意を聞きます (非対話は `OS32_ACCEPT_IPA_LICENSE=1`、[docs/08_build.md](docs/08_build.md) §8-1)。
 CI (GitHub Actions) は実装済みです。[現行の CI 運用](docs/08_build.md#8-6-github-actions-での本体ビルド) を参照してください。
