@@ -203,7 +203,9 @@ DOC_EXCLUSIONS = {
 
 def document_cases(source):
     workflow = yaml.safe_load(source)
-    reuse_gate_cases(workflow, 'check.yml', 'static-check')
+    # static-check は main でも再利用せずに毎回回す (煙試験、ユーザー決定 2026-11-19)。
+    assert not any(s.get('id') == 'prior' or 'steps.prior' in s.get('if', '')
+                   for s in workflow['jobs']['static-check']['steps']), 'static-check runs on main every time'
     # 用意は composite action の 1 行だけ。workflow に apt の行を書かない (docs/POLICY_CI.md G5)。
     static = workflow['jobs']['static-check']['steps']
     assert [s.get('uses') for s in static if s.get('uses', '').startswith('./.github/actions/')] == ['./.github/actions/static-setup']
