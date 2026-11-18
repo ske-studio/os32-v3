@@ -49,12 +49,12 @@ void _start(void)
             u32 before=(1u<<bit) | PPC_HID_SLEEP;
             reads=writes=order=0; hid=before;
             ppc_cpu_power_init(((cpu ? PPC_PVR_7455 : PPC_PVR_7450)<<16)|0x201);
-            CHECK(hid==((before & ~0x00200000u)|0x00500000u), 20);
+            CHECK(hid==((before & ~0x00600000u)|(cpu ? 0x00500000u : 0x00100000u)), 20);
             CHECK(reads==1 && writes==1 && order==1213, 21);
         }
         reads=writes=order=0; hid=0;
         ppc_cpu_power_init((cpu ? PPC_PVR_7455 : PPC_PVR_7450)<<16);
-        CHECK(hid==0x00500000u && order==1213, 22);
+        CHECK(hid==(cpu ? 0x00500000u : 0x00100000u) && order==1213, 22);
     }
     reads=writes=order=0; hid=0xa5a5a5a5;
     ppc_cpu_power_init(0x00080000);

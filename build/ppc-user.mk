@@ -2,9 +2,28 @@
 ifeq ($(SDK_TARGET_CALL_ABI),powerpc-sysv)
 PPC_USER_OUT ?= build/out/ppc-user
 PPC_USER_CRT := $(addprefix $(PPC_USER_OUT)/,$(notdir $(SDK_TARGET_CRT_USER)))
-PPC_USER_FLAGS := $(filter-out -mcpu=7450 -msoft-float,$(USER_CFLAGS)) $(PPC_USER_ABI) -fno-common -I sdk/include/os32 -Wno-attributes
+PPC_USER_FLAGS := $(filter-out -mcpu=7450 -msoft-float,$(USER_CFLAGS)) $(PPC_USER_ABI) -fno-common -I sdk/include -I sdk/include/os32 -Wno-attributes
 
-PPC_USER_APPS := $(addprefix $(PPC_USER_OUT)/,hello fault nest outprobe)
+# All USER links share one validated CRT/allocator closure.
+PPC_USER_CRT += $(PPC_USER_OUT)/syscalls.o $(PPC_USER_OUT)/help.o
+PPC_USER_NANO := $(PPC_USER_OUT)/nano/libos32nano.a
+# Recursive: parse must not run the compiler (unsupported targets reject with zero calls, test_sep5_boot).
+PPC_USER_LIBC = $(shell $(CC) $(PPC_USER_ABI) -print-file-name=libc.a)
+PPC_USER_LIBGCC = $(shell $(CC) $(PPC_USER_ABI) -print-libgcc-file-name)
+PPC_USER_LIBS = -L$(dir $(PPC_USER_LIBC)) -L$(dir $(PPC_USER_LIBGCC)) $(PPC_USER_NANO) -lc -lgcc
+PPC_USER_FLOAT ?= -u _printf_float
+PPC_USER_LINK = python3 sdk/link_guard.py --target $(SDK_TARGET) --ar $(LD:%-ld=%-ar) $(LD) -m $(SDK_TARGET_ELF_EMULATION) --gc-sections -z noexecstack -T $(SDK_TARGET_APP_LINK) $(PPC_USER_FLOAT)
+
+$(PPC_USER_OUT)/syscalls.o: sdk/crt/syscalls.c sdk/allocator/nano_adapter.h userland/lib/rt/ls.c $(SDK_KAPI_HDR) | $(PPC_USER_OUT)
+	$(CC) $(PPC_USER_FLAGS) -c $< -o $@
+
+$(PPC_USER_OUT)/help.o: sdk/crt/help.c sdk/include/os32/help.h $(SDK_KAPI_HDR) | $(PPC_USER_OUT)
+	$(CC) $(PPC_USER_FLAGS) -c $< -o $@
+
+$(PPC_USER_NANO) $(PPC_USER_NANO:.a=.json) &: sdk/allocator/build_nano_target.py sdk/allocator/nano_adapter.c sdk/allocator/nano_adapter.h sdk/allocator/nano_inputs.json tools/check_nano_inputs_target.py tools/check_nano_inputs.py $(PPC_USER_OUT)/syscalls.o
+	python3 -B sdk/allocator/build_nano_target.py --cross-dir $(PPC_CROSS_DIR) $(@D) --crt $(PPC_USER_OUT)/syscalls.o
+
+PPC_USER_APPS := $(addprefix $(PPC_USER_OUT)/,hello fault nest outprobe nlprobe)
 
 .PHONY: hello ppc-fault ppc-nest
 hello: $(PPC_USER_OUT)/hello.bin
@@ -19,14 +38,15 @@ $(PPC_USER_OUT)/crt0.o: sdk/crt/ppc/crt0.S sdk/os32x_hdr.py | $(PPC_USER_OUT)
 	python3 -B -c 'import sys; sys.path.insert(0,"sdk"); import os32x_hdr as h; print(".include \"sdk/crt/ppc/crt0.S\"\n.section .os32_generations,\"\",@progbits\n.long %d,%d,%d,%d" % (h.OS32X_HDR_VERSION,h.OS32_KAPI_ABI_GENERATION,h.OS32_MEMORY_LAYOUT_GENERATION,h.OS32_SHLIB_PROTOCOL))' > $(PPC_USER_OUT)/crt0-stamped.S
 	$(CC) $(PPC_USER_MACHINE) -c $(PPC_USER_OUT)/crt0-stamped.S -o $@
 
-$(PPC_USER_OUT)/crt0_c.o: sdk/crt/ppc/start.c | $(PPC_USER_OUT)
+PPC_USER_START_SRC ?= sdk/crt/ppc/start.c
+$(PPC_USER_OUT)/crt0_c.o: $(PPC_USER_START_SRC) | $(PPC_USER_OUT)
 	$(CC) $(PPC_USER_FLAGS) -c $< -o $@
 
 $(addsuffix .o,$(PPC_USER_APPS)): $(PPC_USER_OUT)/%.o: userland/ppc/%.c | $(PPC_USER_OUT)
 	$(CC) $(PPC_USER_FLAGS) -c $< -o $@
 
-$(addsuffix .elf,$(PPC_USER_APPS)): $(PPC_USER_OUT)/%.elf: $(PPC_USER_CRT) $(PPC_USER_OUT)/%.o $(SDK_TARGET_APP_LINK) sdk/link_guard.py
-	python3 sdk/link_guard.py --target $(SDK_TARGET) $(LD) -m $(SDK_TARGET_ELF_EMULATION) --gc-sections -z noexecstack -T $(SDK_TARGET_APP_LINK) -o $@ $(filter %.o,$^)
+$(addsuffix .elf,$(PPC_USER_APPS)): $(PPC_USER_OUT)/%.elf: $(PPC_USER_CRT) $(PPC_USER_OUT)/%.o $(SDK_TARGET_APP_LINK) sdk/link_guard.py sdk/allocator/check_link_target.py $(PPC_USER_NANO) $(PPC_USER_NANO:.a=.json)
+	$(PPC_USER_LINK) -o $@ $(filter %.o,$^) $(PPC_USER_LIBS)
 
 $(addsuffix .raw,$(PPC_USER_APPS)): $(PPC_USER_OUT)/%.raw: $(PPC_USER_OUT)/%.elf
 	$(OBJCOPY) -O binary $< $@
@@ -34,7 +54,7 @@ $(addsuffix .raw,$(PPC_USER_APPS)): $(PPC_USER_OUT)/%.raw: $(PPC_USER_OUT)/%.elf
 $(addsuffix .bin,$(PPC_USER_APPS)): $(PPC_USER_OUT)/%.bin: $(PPC_USER_OUT)/%.raw $(PPC_USER_OUT)/%.elf sdk/mkos32x.py
 	python3 sdk/mkos32x.py $< $@ --target $(SDK_TARGET) --elf $(PPC_USER_OUT)/$*.elf
 
-# Acceptance-only target: no addition to PPC_USER_APPS or default ROOT_BINS.
+# ISO 9660 level 1 root: bin names must be 8.3 (tools/mkroot_image.py). Acceptance-only target: no addition to PPC_USER_APPS or default ROOT_BINS.
 $(PPC_USER_OUT)/fp_probe.o: userland/ppc/fp_probe_main.c | $(PPC_USER_OUT)
 	$(CC) $(filter-out -mhard-float,$(PPC_USER_FLAGS)) -msoft-float -c $< -o $@
 
@@ -42,8 +62,8 @@ $(PPC_USER_OUT)/fp_probe_asm.o: userland/ppc/fp_probe.S sdk/os32x_hdr.py | $(PPC
 	python3 -B -c 'import sys; sys.path.insert(0,"sdk"); import os32x_hdr as h; print(".include \"userland/ppc/fp_probe.S\"\n.section .os32_generations,\"\",@progbits\n.long %d,%d,%d,%d" % (h.OS32X_HDR_VERSION,h.OS32_KAPI_ABI_GENERATION,h.OS32_MEMORY_LAYOUT_GENERATION,h.OS32_SHLIB_PROTOCOL))' > $(PPC_USER_OUT)/fp-probe-stamped.S
 	$(CC) $(PPC_USER_MACHINE) -c $(PPC_USER_OUT)/fp-probe-stamped.S -o $@
 
-$(PPC_USER_OUT)/fp_probe.elf: $(PPC_USER_CRT) $(PPC_USER_OUT)/fp_probe.o $(PPC_USER_OUT)/fp_probe_asm.o $(SDK_TARGET_APP_LINK) sdk/link_guard.py
-	python3 sdk/link_guard.py --target $(SDK_TARGET) $(LD) -m $(SDK_TARGET_ELF_EMULATION) --gc-sections -z noexecstack -T $(SDK_TARGET_APP_LINK) -o $@ $(filter %.o,$^)
+$(PPC_USER_OUT)/fp_probe.elf: $(PPC_USER_CRT) $(PPC_USER_OUT)/fp_probe.o $(PPC_USER_OUT)/fp_probe_asm.o $(SDK_TARGET_APP_LINK) sdk/link_guard.py sdk/allocator/check_link_target.py $(PPC_USER_NANO) $(PPC_USER_NANO:.a=.json)
+	$(PPC_USER_LINK) -o $@ $(filter %.o,$^) $(PPC_USER_LIBS)
 
 $(PPC_USER_OUT)/fp_probe.raw: $(PPC_USER_OUT)/fp_probe.elf
 	$(OBJCOPY) -O binary $< $@
@@ -59,10 +79,10 @@ PPC_SH_OBJ := $(patsubst userland/shell/%.c,$(PPC_SH_DIR)/shell/%.o,$(PPC_SH_SRC
 # Test copies keep USER mutations out of the product tree.
 PPC_SH_MUT_SRC ?=
 PPC_SH_MUT_FILE ?=
-PPC_SH_RUNTIME_SRC ?= userland/ppc/sh/runtime.c
-PPC_SH_RT := $(addprefix $(PPC_SH_DIR)/,runtime.o format.o stdio.o string.o ls.o help.o)
+PPC_SH_RUNTIME_SRC ?= userland/ppc/sh/newlib_runtime.c
+PPC_SH_RT := $(addprefix $(PPC_SH_DIR)/,runtime.o)
 PPC_SH_PROFILE ?= userland/ppc/sh/profile.h
-PPC_SH_FLAGS := -include $(PPC_SH_PROFILE) -Iuserland/ppc/sh/include $(PPC_USER_FLAGS) -I. -Iinclude -Isdk/include -Iuserland/lib -Iuserland/shell -Iuserland/lib/filer -Iuserland/lib/gfx -Idrivers
+PPC_SH_FLAGS := -include $(PPC_SH_PROFILE) $(PPC_USER_FLAGS) -I. -Iinclude -Isdk/include -Iuserland/lib -Iuserland/shell -Iuserland/lib/filer -Iuserland/lib/gfx -Idrivers
 
 .PHONY: sh
 sh: $(PPC_USER_OUT)/sh.bin
@@ -83,12 +103,8 @@ $(PPC_SH_DIR)/ls.o: userland/lib/rt/ls.c
 	@mkdir -p $(@D)
 	$(CC) $(PPC_SH_FLAGS) -c $< -o $@
 
-$(PPC_SH_DIR)/help.o: sdk/crt/help.c
-	@mkdir -p $(@D)
-	$(CC) $(PPC_SH_FLAGS) -c $< -o $@
-
-$(PPC_USER_OUT)/sh.elf: $(PPC_USER_CRT) $(PPC_SH_OBJ) $(PPC_SH_RT) $(SDK_TARGET_APP_LINK) sdk/link_guard.py
-	python3 sdk/link_guard.py --target ppc-powermac $(LD) -m $(SDK_TARGET_ELF_EMULATION) --gc-sections -z noexecstack -T $(SDK_TARGET_APP_LINK) -o $@ $(filter %.o,$^)
+$(PPC_USER_OUT)/sh.elf: $(PPC_USER_CRT) $(PPC_SH_OBJ) $(PPC_SH_RT) $(SDK_TARGET_APP_LINK) sdk/link_guard.py sdk/allocator/check_link_target.py $(PPC_USER_NANO) $(PPC_USER_NANO:.a=.json)
+	$(PPC_USER_LINK) -o $@ $(filter %.o,$^) $(PPC_USER_LIBS)
 
 $(PPC_USER_OUT)/sh.raw: $(PPC_USER_OUT)/sh.elf
 	$(OBJCOPY) -O binary $< $@
@@ -99,4 +115,6 @@ $(PPC_USER_OUT)/sh.bin: $(PPC_USER_OUT)/sh.raw $(PPC_USER_OUT)/sh.elf sdk/mkos32
 -include $(PPC_SH_OBJ:.o=.d) $(PPC_SH_RT:.o=.d)
 -include $(PPC_USER_OUT)/fp_probe.d $(PPC_USER_OUT)/fp_probe_asm.d
 -include $(PPC_USER_CRT:.o=.d) $(addsuffix .d,$(PPC_USER_APPS))
+# Flag/provider changes must rebuild old shell objects (notably stdout's ABI).
+$(PPC_USER_CRT) $(addsuffix .o,$(PPC_USER_APPS)) $(PPC_SH_OBJ) $(PPC_SH_RT) $(PPC_USER_OUT)/fp_probe.o $(PPC_USER_OUT)/fp_probe_asm.o: build/ppc-user.mk
 endif

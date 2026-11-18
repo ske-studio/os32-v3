@@ -59,14 +59,22 @@ def image(work, mutation):
              'SDK_TARGET=ppc-powermac', 'hello', 'ppc-fault'])
     prefix = str(Path(os.environ['PPC_CROSS_DIR'])/'bin/powerpc-elf-')
     src = work/'user.c'; src.write_text(USER)
-    command([prefix+'gcc', '-include', 'sdk/include/os32/os32_unit_stamp.h', '-std=gnu11', '-O2', '-m32', '-mcpu=7450', '-mbig-endian',
-             '-msoft-float', '-mno-altivec', '-msdata=none', '-mcall-sysv', '-mno-eabi',
+    # Same USER ABI and CRT/newlib closure as build/ppc-user.mk (PPC_USER_ABI,
+    # PPC_USER_CRT, PPC_USER_LIBS): start.c calls _init and the CRT help.
+    abi = ['-mcpu=750', '-mhard-float', '-mcall-sysv', '-mno-eabi']
+    command([prefix+'gcc', '-include', 'sdk/include/os32/os32_unit_stamp.h', '-std=gnu11', '-O2', '-m32', '-mbig-endian',
+             *abi, '-mno-altivec', '-msdata=none',
              '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-Wno-attributes',
              '-Isdk/include/os32', '-c', src, '-o', work/'user.o'])
-    command(['python3', 'sdk/link_guard.py', '--target', 'ppc-powermac', prefix+'ld',
-             '-m', 'elf32ppc', '--gc-sections', '-T', 'sdk/link/ppc/app.ld',
-             '-o', work/'ctx.elf', 'build/out/ppc-user/crt0.o',
-             'build/out/ppc-user/crt0_c.o', work/'user.o'])
+    libc = command([prefix+'gcc', *abi, '-print-file-name=libc.a']).strip()
+    libgcc = command([prefix+'gcc', *abi, '-print-libgcc-file-name']).strip()
+    out = 'build/out/ppc-user/'
+    command(['python3', 'sdk/link_guard.py', '--target', 'ppc-powermac', '--ar', prefix+'ar', prefix+'ld',
+             '-m', 'elf32ppc', '--gc-sections', '-z', 'noexecstack', '-T', 'sdk/link/ppc/app.ld',
+             '-u', '_printf_float', '-o', work/'ctx.elf', out+'crt0.o', out+'crt0_c.o',
+             out+'syscalls.o', out+'help.o', work/'user.o',
+             '-L'+str(Path(libc).parent), '-L'+str(Path(libgcc).parent),
+             out+'nano/libos32nano.a', '-lc', '-lgcc'])
     command([prefix+'objcopy', '-O', 'binary', work/'ctx.elf', work/'ctx.raw'])
     command(['python3', 'sdk/mkos32x.py', work/'ctx.raw', work/'ctx.bin',
              '--target', 'ppc-powermac', '--elf', work/'ctx.elf'])

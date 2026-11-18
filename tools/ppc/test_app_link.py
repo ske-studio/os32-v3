@@ -23,12 +23,13 @@ def build(tmp, source):
     script.write_text(source)
     main = tmp / 'main.c'
     main.write_text('#include "os32api.h"\nint initialized = 7; int zeroed;\n'
+                    'void _init(void) {} int os32_help_show(const char *s) { (void)s; return -1; }\n'
                     'int main(int argc, char **argv, KernelAPI *api) '
                     '{ (void)argv; (void)api; zeroed = initialized; return argc; }\n')
     flags = ['-m32', '-mbig-endian', '-mcall-sysv', '-mno-eabi', '-msdata=none',
              '-msoft-float', '-mno-altivec', '-ffreestanding', '-fno-pie',
              '-fno-asynchronous-unwind-tables', '-nostdlib', '-Wall', '-Wextra', '-Werror', '-Wno-attributes',
-             '-I' + str(ROOT / 'sdk/include/os32'), '-include', str(ROOT / 'sdk/include/os32/os32_unit_stamp.h')]
+             '-I' + str(ROOT / 'sdk/include'), '-I' + str(ROOT / 'sdk/include/os32'), '-include', str(ROOT / 'sdk/include/os32/os32_unit_stamp.h')]
     asm = tmp / 'crt0.S'
     asm.write_text((ROOT / 'sdk/crt/ppc/crt0.S').read_text() +
                    '\n.section .os32_generations,"",@progbits\n.long %d,%d,%d,%d\n' %
@@ -58,8 +59,8 @@ def exercise(tmp):
         call([BIN / 'powerpc-elf-gcc', *flags[:-2], '-c', src, '-o', obj])
         result = subprocess.run([str(x) for x in [*command, obj]], capture_output=True, text=True)
         assert result.returncode != 0 and diagnostic in result.stderr, result.stderr
-    result = subprocess.run([str(x) for x in [*command, '-lgcc']], capture_output=True, text=True)
-    assert result.returncode != 0 and 'does not support' in result.stderr
+    libgcc = subprocess.check_output([str(BIN / 'powerpc-elf-gcc'), '-print-libgcc-file-name'], text=True).strip()
+    call([*command, '-L'+str(Path(libgcc).parent), '-lgcc'])
     call(command)
     parsed = hdr.Elf32(elf)
     base_ok = parsed.e_entry == 0x80100000 and parsed.symbols['_start'] == 0x80100000
@@ -93,6 +94,9 @@ def main():
             print('PPC app base: RED (1)')
             (Path(td) / 'app.ld').write_text((ROOT / 'sdk/link/ppc/app.ld').read_text())
             sdk = Path(td) / 'sdk'; shutil.copytree(ROOT / 'sdk', sdk)
+            tools = Path(td) / 'tools'; tools.mkdir()
+            for name in ('check_nano_inputs.py', 'check_nano_inputs_target.py'):
+                shutil.copy(ROOT / 'tools' / name, tools / name)
             guard = sdk / 'link_guard.py'; text = guard.read_text()
             old = "pack(elf.endian + '4I'"
             assert text.count(old) == 1
