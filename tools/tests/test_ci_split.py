@@ -164,12 +164,15 @@ def reuse_cases(path=None):
                 event='push', head_branch='wt/int-test', head_repository=dict(full_name='fixture/repo'), id=42)
     for workflow in ('build.yml', 'check.yml'):
         with patch.object(module, 'api', side_effect=[{'id': 7}, {'workflow_runs': [good]}]) as api:
-            assert module.reusable(dict(env, CI_WORKFLOW=workflow)), 'exact successful integration push'
+            assert module.reusable(dict(env, CI_WORKFLOW=workflow)), 'exact successful branch push'
             assert api.call_args_list[0].args[0].endswith('/' + workflow)
             assert 'head_sha=' + SHA in api.call_args_list[1].args[0]
+    # 普通の枝 (wt/**) の成功も証拠にする (ユーザー決定 2026-11-19)。main の実行は証拠にしない。
+    with patch.object(module, 'api', side_effect=[{'id': 7}, {'workflow_runs': [dict(good, head_branch='wt/ci-s2a')]}]):
+        assert module.reusable(env), 'branch push success is evidence'
     for field, bad in [('head_sha', 'a'*39+'b'), ('workflow_id', 8), ('status', 'in_progress'),
                        ('conclusion', 'failure'), ('conclusion', 'skipped'), ('event', 'pull_request'),
-                       ('head_branch', 'main'), ('head_branch', 'wt/feature'),
+                       ('head_branch', 'main'), ('head_branch', 'wip/feature'), ('head_branch', 'wtx/a'),
                        ('head_repository', dict(full_name='fork/repo')), ('id', 99)]:
         with patch.object(module, 'api', side_effect=[{'id': 7}, {'workflow_runs': [dict(good, **{field: bad})]}]):
             assert not module.reusable(env), 'reject mismatch: ' + field
@@ -334,7 +337,7 @@ def main():
             ('reuse', "r['head_sha'] == sha", 'True', 'reuse wrong SHA'),
             ('reuse', "r['workflow_id'] == workflow_id", 'True', 'reuse wrong workflow'),
             ('reuse', "r['conclusion'] == 'success'", 'True', 'reuse failed run'),
-            ('reuse', "r['head_branch'].startswith('wt/int-')", 'True', 'reuse non integration run'),
+            ('reuse', "r['head_branch'].startswith('wt/')", 'True', 'reuse non branch run'),
             ('reuse', '        reuse = False', '        reuse = True', 'reuse on API failure'),
             ('check', '          make check-docs-tree\n', '', 'missing docs tree'),
             ('workflow', 'shard: [0, 1, 2, 3, 4, 5]', 'shard: [0, 1, 2, 3, 4]', 'lose shard'),
