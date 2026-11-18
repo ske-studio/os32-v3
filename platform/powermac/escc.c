@@ -47,3 +47,49 @@ int pm_escc_drain(const struct pm_escc *s)
     } while (!(rr1 & PM_RR1_ALL_SENT) && wait++ < PM_POLL_LIMIT);
     return (rr1 & PM_RR1_ALL_SENT) ? 0 : -1;
 }
+
+static const struct pm_escc *rx_channel;
+static u32 rx_overruns, rx_framing_errors, rx_parity_errors;
+
+void pm_escc_rx_bind(const struct pm_escc *s)
+{
+    rx_channel = s;
+    rx_overruns = rx_framing_errors = rx_parity_errors = 0;
+}
+
+int pm_escc_trygetchar(void)
+{
+    const struct pm_escc *s = rx_channel;
+    if (!s || !(ppc_load8(s->csr) & PM_RR0_RX_READY)) return -1;
+
+    /* NetBSD z8530sc.c:zs_iflush: RR1 belongs to the FIFO head.
+     * The CSR read consumes the register selection before the data read. */
+    ppc_store8(s->csr, PM_RR1_INDEX);
+    unsigned status = ppc_load8(s->csr);
+    unsigned byte = ppc_load8(s->data);
+    if (status & (PM_RR1_OVERRUN | PM_RR1_FRAMING | PM_RR1_PARITY)) {
+        if ((status & PM_RR1_OVERRUN) && rx_overruns != (u32)-1) ++rx_overruns;
+        if ((status & PM_RR1_FRAMING) && rx_framing_errors != (u32)-1) ++rx_framing_errors;
+        if ((status & PM_RR1_PARITY) && rx_parity_errors != (u32)-1) ++rx_parity_errors;
+        ppc_store8(s->csr, PM_WR0_RESET_ERRORS);
+    }
+    return (int)byte;
+}
+
+int pm_escc_getchar_kapi(void)
+{
+    if (!rx_channel) return -1;
+    int byte;
+    do {
+        byte = pm_escc_trygetchar();
+    } while (byte < 0);
+    return byte;
+}
+
+void pm_escc_diag(u32 *oe, u32 *fe, u32 *pe, u32 *overflow)
+{
+    if (oe) *oe = rx_overruns;
+    if (fe) *fe = rx_framing_errors;
+    if (pe) *pe = rx_parity_errors;
+    if (overflow) *overflow = 0; /* No software receive queue. */
+}

@@ -53,6 +53,7 @@ int pm_log_escc_init(u32 csr_alias, u32 data_alias)
     if (pm_log_add_sink(&serial_sink)) return -1;
     serial.csr = csr_alias;
     serial.data = data_alias;
+    pm_escc_rx_bind(&serial);
     return 0;
 }
 int pm_log_fatal_hex(u32 csr_alias, u32 data_alias, const u32 *words, u32 n)
