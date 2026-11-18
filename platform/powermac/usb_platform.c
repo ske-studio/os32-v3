@@ -2,6 +2,7 @@
  * DMA is remapped cache-inhibited before use, like gmac_dma.c's control page.
  * UniNorth's identity 16MB DMA window is the same as gmac_tree.c/pm_dma_bus. */
 #include "usb_boot.h"
+#include "via_window.h"
 #include "input_usb.h"
 #include "usb_platform.h"
 #include "ppc_memmap.h"
@@ -103,16 +104,23 @@ int usbp_mmio_map(const struct usb_pci_fn *f, u32 bar, volatile void **va)
         if (w->ss != 2 || bus < w->pci_base || bus - w->pci_base >= w->bytes ||
             PM_USB_PAGE > w->bytes - (bus - w->pci_base)) continue;
         u32 pa = w->cpu_base + bus - w->pci_base;
+        if (pa & (PM_USB_PAGE - 1)) return -1;
+        if (pm_via_phys_overlap(pa, PM_USB_PAGE)) {
+            usbp_log("USB SKIP bdf=%02x:%02x.%u pa=%08x reason=via-overlap",
+                     f->bus, f->dev, f->fn, pa);
+            return -1;
+        }
         u32 slot;
         for (slot = 0; slot < PM_USB_CONTROLLERS; slot++)
             if (maps[slot].used && maps[slot].bdf == bdf(f)) { *va = (volatile void *)maps[slot].va; return 0; }
         for (slot = 0; slot < PM_USB_CONTROLLERS && maps[slot].used; slot++) {}
         if (slot == PM_USB_CONTROLLERS) return -1;
         u32 address = PPC_BOOT_USB_VA + (2 + slot) * PM_USB_PAGE;
-        if (pa & (PM_USB_PAGE - 1)) return -1;
         if (paging_map_phys(address, pa, 1, PAGE_RW | PTE_PCD)) return -1;
         maps[slot].used = 1; maps[slot].bdf = bdf(f); maps[slot].va = address;
         *va = (volatile void *)address;
+        usbp_log("USB OHCI BAR0 bdf=%02x:%02x.%u pa=%08x",
+                 f->bus, f->dev, f->fn, pa);
         return 0;
     }
     return -1;

@@ -192,16 +192,9 @@ jobs:
         env:
           PPC_ARCH: ${{ github.event_name == 'workflow_dispatch' && inputs.arch || 'auto' }}
         run: python3 -B tools/ci/ppc_scope.py
-      - name: PPC build dependencies
-        if: steps.scope.outputs.scope == 'ppc'
-        run: |
-          sudo apt-get update
-          # 変異の試験には QEMU を起動する物がある (tools/ppc/test_lan_p29.py)。ppc-qemu の段と同じ道具を入れる。
-          sudo apt-get install -y --no-install-recommends build-essential gcc-13 qemu-user ccache libgmp-dev libmpfr-dev libmpc-dev texinfo bison flex genisoimage qemu-system-ppc qemu-system-data seabios
-          python3 -m pip install --quiet -r requirements.txt
-      - uses: ./.github/actions/build-setup
-        if: steps.scope.outputs.scope == 'ppc'
-      - uses: ./.github/actions/ppc-setup
+      # 用意は手本と同じ 1 か所 (docs/POLICY_CI.md G5、票 TASK_CI_REWORK の段 S2b)。変異の試験には QEMU を
+      # 起動する物がある (tools/ppc/test_lan_p29.py) ので、ppc-qemu と同じ環境にする。
+      - uses: ./.github/actions/gate-setup
         if: steps.scope.outputs.scope == 'ppc'
       - name: PPC image and host checks
         if: steps.scope.outputs.scope == 'ppc'
@@ -241,15 +234,8 @@ jobs:
         env:
           PPC_ARCH: ${{ github.event_name == 'workflow_dispatch' && inputs.arch || 'auto' }}
         run: python3 -B tools/ci/ppc_scope.py
-      - name: PPC build dependencies
-        if: steps.scope.outputs.scope == 'ppc'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends build-essential gcc-13 qemu-user ccache libgmp-dev libmpfr-dev libmpc-dev texinfo bison flex genisoimage qemu-system-ppc qemu-system-data seabios
-          python3 -m pip install --quiet -r requirements.txt
-      - uses: ./.github/actions/build-setup
-        if: steps.scope.outputs.scope == 'ppc'
-      - uses: ./.github/actions/ppc-setup
+      # 用意は手本と同じ 1 か所 (docs/POLICY_CI.md G5、票 TASK_CI_REWORK の段 S2a)。
+      - uses: ./.github/actions/gate-setup
         if: steps.scope.outputs.scope == 'ppc'
       - name: PPC QEMU guest checks
         if: steps.scope.outputs.scope == 'ppc'

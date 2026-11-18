@@ -2,7 +2,7 @@
 
 > 上位: [TASK_PPC_SHELL](TASK_PPC_SHELL.md)
 
-> 状態: **実装中 (2026-11-18 再開)** — 11-17 にユーザー指示「分離統合を先に」で止め、分離の完了 (TASK_PPC_SEP) を受けて再開した。波 A・B と N1・N2 は main、N3 と KAPI の直しは wt/ppc-newlib (§3、11-18 に main を取り込み、QEMU の受入を回し直す)。設計は確定 ([PPC_FP_NEWLIB_DESIGN](../../decisions/ppc/PPC_FP_NEWLIB_DESIGN.md))。
+> 状態: **実装中 (2026-11-18)** — 波 A・B、N1・N2・N3 (PPC の KAPI の直しを含む) は main (N3 は 133205ea)。段 S (カーネル SQLite の別スタック) は追補 [PPC_SQLITE_STACK_DESIGN](../../decisions/ppc/PPC_SQLITE_STACK_DESIGN.md) で S-a・S-b を実装、枝 wt/ppc-sqlite-stack。残りは T (全体の受入) と、SQLite 本体の PowerPC の像への有効化 (後段)。設計は確定 ([PPC_FP_NEWLIB_DESIGN](../../decisions/ppc/PPC_FP_NEWLIB_DESIGN.md))。
 
 ## 0. ユーザー決定 (2026-11-16)
 - 「sqlite ですが、newlibc が入ってないのでは？ newlibc に追加した x86 依存のアセンブラも移植して」。newlib は無改変で、x86 依存の asm に当たるのはカーネルの kstring_asm と sqlite_stack (本線の確認)。
@@ -21,7 +21,7 @@
 |---|---|
 | 波 A・B (FPU の保存・復元・初期化、USER の MSR[FP]、0x800、旗と監査) | main (int-1117b、10680c11)。QEMU の受入 tools/accept/ppc_fp.py は 7450・7455 で正像 GREEN、変異 5 本が理由どおり RED |
 | N1・N2 (nano の道具の PPC の分岐・帳簿の PPC の節・cross-ppc の記録・app.ld の小さいデータの節) | main (int-1117c、028023fa) |
-| N3 (USER を newlib に結線、crt0 の _init と help) と PPC の KAPI の直し (arch/ppc/kapi_call.c の caller と va_next) | 枝 wt/ppc-newlib。本線の統合の枝 int-1117e で CI の追従をしていた。tools/accept/ppc_newlib.py は 7450・7455 で正像 GREEN、変異 3 本 RED (sbss はゲストで見えないので host の試験に任せた) |
+| N3 (USER を newlib に結線、crt0 の _init と help) と PPC の KAPI の直し (arch/ppc/kapi_call.c の caller と va_next) | main (133205ea、11-18)。以前は枝 wt/ppc-newlib。本線の統合の枝 int-1117e で CI の追従をしていた。tools/accept/ppc_newlib.py は 7450・7455 で正像 GREEN、変異 3 本 RED (sbss はゲストで見えないので host の試験に任せた) |
 | N3 の CI の追従 (tools/accept/arch_ctx.py のリンクの閉包、halt-ee の目印) | wt/ppc-newlib a65d4e53。リンクは通ったが、QEMU の --mutate の受入は途中で止めた (未検証)。統合に入れる前に受入を回すこと |
-| S (カーネルの SQLite の別スタックの .S と口) | 止めている |
+| S (カーネルの SQLite の別スタックの .S と口) | 枝 wt/ppc-sqlite-stack (追補 PPC_SQLITE_STACK_DESIGN、S-a terra・S-b sol、Opus のレビューは両方取り込み可、QEMU 7450・7455 で S1 GREEN・変異 2 本 RED) |
 - 受入で見つけて直した物: PPC の KAPI の kprintf が caller 未初期化と va_next 未実装で kill されていた (arch/ppc/kapi_call.c)。RAM root の ISO は level 1 なので USER の bin の名前は 8.3。

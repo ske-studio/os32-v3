@@ -75,9 +75,22 @@ runs:
 
       # ② rust-toolchain.toml (nightly + rust-src) を rustup に解決させる。
       #    rustup 1.28 以降は引数なしの install で toml を読む (古い rustup は `rustup show` で入る)。
+      #    runner が同じ版の toolchain を中途半端に持って始まることがある (2026-11-18、49 ジョブ中 1 本:
+      #    rust-src のファイルは在るが部品として登録されておらず、install が `detected conflict` で落ちる。
+      #    この手順より前に rustc を呼ぶ手順は無い)。その時は toolchain を消してから入れ直す。
+      #    判定はリポジトリの外で auto-install を止めて打つ — 中で打つと rust-toolchain.toml を読んだ
+      #    rustup が判定の前に toolchain を入れてしまい、runner の元の状態を見ない (2026-11-18 の 62 ジョブ)。
       - name: Rust toolchain (rust-toolchain.toml)
         shell: timeout 300 bash --noprofile --norc -e -o pipefail {0}
         run: |
+          tc="$(sed -n 's/^channel = "\(.*\)"/\1/p' rust-toolchain.toml)"
+          probe() { (cd "$HOME" && RUSTUP_AUTO_INSTALL=0 rustup "$@"); }
+          if probe toolchain list | grep -q "^$tc-"; then
+            if ! probe component list --installed --toolchain "$tc" | grep -qx 'rust-src'; then
+              echo "::warning::$tc は在るが rust-src が登録されていない。消してから入れ直す"
+              probe toolchain uninstall "$tc"
+            fi
+          fi
           rustup toolchain install --no-self-update || rustup show
           rustup show active-toolchain
           rustc --version

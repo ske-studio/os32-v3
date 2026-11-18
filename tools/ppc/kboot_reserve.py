@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tools/tests'))
 import host32
 CHECK = dict(name='ppc-kboot-reserve', tier=2, budget=60, covers=[
+    'platform/powermac/via_tree.c', 'platform/powermac/via_window.h',
     'platform/powermac/kboot_reserve.c', 'platform/powermac/kboot_capture.c',
     'platform/powermac/gmac_tree.c',
     'platform/powermac/kboot_info.h', 'platform/powermac/platform_kboot_layout.h',
@@ -48,7 +49,7 @@ def exercise(directory, source, expected):
                     '-fno-stack-protector', '-nostdlib', '-static', '-D__cdecl=',
                     *['-I'+str(ROOT / p) for p in ('platform/powermac', 'arch/ppc', 'include', 'lib')],
                     str(source), str(ROOT / 'platform/powermac/kboot_capture.c'),
-                    str(ROOT / 'platform/powermac/gmac_tree.c'),
+                    str(ROOT / 'platform/powermac/gmac_tree.c'), str(ROOT / 'platform/powermac/via_tree.c'),
                     str(fixture), str(ROOT / 'lib/kstring_c.c'),
                     '-Wl,--defsym,__kernel_image_start=0x100000',
                     '-Wl,--defsym,__kernel_resident_end=0x300000', '-o', str(exe)],

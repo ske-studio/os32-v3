@@ -2111,6 +2111,7 @@ static void case_s14_s15_records(void)
 /* ========================================================================
  *  R2 — 実物の登録表を通っていることの確認
  * ======================================================================== */
+#ifndef SH_SYS_MINIMAL /* os32gui・gfxmode は sys の組 (PowerPC の sh は reboot だけ、userland/ppc/sh/profile.h) */
 static int gui_timeout(const char *seconds)
 {
     char *argv[] = { "os32gui", "-t", (char *)seconds };
@@ -2311,6 +2312,8 @@ static void case_sfs_lan_cfg(void)
           "sfs lan refuses changes within child");
 }
 
+#endif /* !SH_SYS_MINIMAL (sfs lan も sys の組) */
+
 static void case_hw_grammar(void)
 {
     fresh();
@@ -2401,10 +2404,14 @@ void _start(void)
     case_profile_status();
     case_s13_zero_rows();
     case_s14_s15_records();
+#ifndef SH_SYS_MINIMAL
     case_gserial_gui();
     case_sfs_lan_cfg();
+#endif
+#ifndef SH_SYS_MINIMAL
     case_gfxmode_diag();
     case_gfxmode_geforce();
+#endif
 
     if (failures) {
         report("SOME FAIL\n");

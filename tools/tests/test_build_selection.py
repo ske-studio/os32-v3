@@ -22,6 +22,8 @@ def check(root):
         root, ['-f', 'build/geforce-module.mk'])['GEFORCE_DISPLAY_STATE_SOURCES']
     for name, value in expected.items():
         assert actual[name] == value, name
+    assert actual['C_KERNEL'].count('kernel/sqlite_engine.c') == 1
+    assert actual['ASM_KERNEL'].count('lib/sqlite3/sqlite_stack.asm') == 1
     assert not any('platform/powermac/hostfs' in name for name in actual['C_KERNEL'])
     c = query(root, ['KSTRING_C_SRC=lib/kstring_c.c'])['C_KERNEL']
     assert c.count('lib/kstring_c.c') == 1
@@ -36,7 +38,7 @@ def check(root):
     assert not any(path in name for name in off['C_KERNEL'] for path in
                    ('kernel/v86/', 'platform/pc98/legacy/'))
     assert not any('geforce/' in name for name in off['C_KERNEL'])
-    for assignments in (['FEATURE_UNKNOWN=1'], ['ARCH=ppc','PLATFORM=powermac','FEATURE_V86=1'], ['FEATURE_KDEBUG=0'],
+    for assignments in (['FEATURE_UNKNOWN=1'], ['ARCH=ppc', 'PLATFORM=powermac', 'FEATURE_SQLITE=1'], ['ARCH=ppc','PLATFORM=powermac','FEATURE_V86=1'], ['FEATURE_KDEBUG=0'],
                         ['FEATURE_LINK=0'], ['IMAGE=kboot-link'], ['IMAGE=unknown'],
                         ['ARCH=ppc', 'PLATFORM=powermac', 'IMAGE=pc98']):
         try:
@@ -74,6 +76,8 @@ def check_kboot(root):
                                           stderr=subprocess.PIPE)
             actual = dict(line.split('=', 1) for line in out.splitlines() if line.startswith('KB_'))
             assert actual['KB_OUT'] == image['KB_OUT'], (name, selector)
+            assert 'kernel/sqlite_engine.c' not in actual['KB_C'].split()
+            assert 'arch/ppc/sqlite_stack_ppc.S' not in actual['KB_ASM'].split()
             for key in ('KB_ASM', 'KB_C'):
                 assert actual[key].split() == image[key], (name, key, selector)
     # 名前と旗の両方を与えて食い違えば止まる。合っていれば通る。

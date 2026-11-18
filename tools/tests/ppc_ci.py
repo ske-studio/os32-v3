@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Exercise the actual stage 1 gate and configure argument branches."""
 import argparse
+import re
 from pathlib import Path
 import shlex
 import subprocess
@@ -56,8 +57,8 @@ def wiring():
     check = (ROOT / '.github/workflows/check.yml').read_text()
     build = (ROOT / '.github/workflows/build.yml').read_text()
     assert 'ppc-setup' not in build
-    # ppc-compile・ppc-qemu と、main のキャッシュを保つ ppc-toolchain-cache。
-    assert check.count('- uses: ./.github/actions/ppc-setup') == 3
+    # main のキャッシュを保つ ppc-toolchain-cache だけ。ppc-compile・ppc-qemu は gate-setup の中で呼ぶ。
+    assert check.count('- uses: ./.github/actions/ppc-setup') == 1
     assert '  ppc-compile:' in check
     workflow = yaml.safe_load(check)
     triggers = workflow.get('on', workflow.get(True))
@@ -78,10 +79,9 @@ def wiring():
         assert f'MUTATE={mutate} ' + command in runs
         assert ('CHECK_ROUTINE=1 ' in runs) == routine
         assert 'make check-ppc-compile' not in runs
-        assert any(step.get('uses') == './.github/actions/build-setup' for step in job_steps)
-        # 変異の試験が QEMU を起動するので、ppc-qemu の段と同じ道具を入れる。
-        for dependency in ('gcc-13', 'qemu-user', 'ccache', 'qemu-system-ppc', 'qemu-system-data'):
-            assert dependency in runs
+        # 変異の試験が QEMU を起動するので、ppc-qemu と同じ gate-setup の 1 行だけ (apt の行をジョブに書かない)。
+        assert [s.get('uses') for s in job_steps if s.get('uses', '').startswith('./.github/actions/')] == ['./.github/actions/gate-setup']
+        assert 'apt-get' not in runs
     # QEMU の検査は 4 本に割って並べ、手本の道具 (tools/ci/gate.py) の 1 行で回す (変異込みが既定)。
     command = 'python3 -B tools/ci/gate.py run --env qemu-ppc --shard ${{ matrix.shard }}/4 --out "$RUNNER_TEMP/gate"'
     for flow, routine, mutate in ((workflow, False, 1),):
@@ -108,10 +108,20 @@ def wiring():
         times = [s for s in guest if s.get('name') == 'Upload check times']
         assert times and times[0]['with']['name'] == 'check-times-${{ github.sha }}-ppc-qemu-${{ matrix.shard }}'
         assert times[0]['if'] == "always() && steps.scope.outputs.scope == 'ppc'"
-        for dependency in ('qemu-system-ppc', 'qemu-system-data', 'genisoimage', 'qemu-user', 'gcc-13', 'ccache'):
-            assert dependency in runs
-        for action_name in ('build-setup', 'ppc-setup'):
-            assert any(s.get('uses') == './.github/actions/' + action_name for s in guest)
+        # 用意は手本と同じ gate-setup の 1 行だけ (docs/POLICY_CI.md G5)。apt の行をジョブに書かない。
+        assert [s.get('uses') for s in guest if s.get('uses', '').startswith('./.github/actions/')] == ['./.github/actions/gate-setup']
+        assert 'apt-get' not in runs
+        gate = yaml.safe_load((ROOT / '.github/actions/gate-setup/action.yml').read_text())
+        gate_uses = [s.get('uses') for s in gate['runs']['steps'] if s.get('uses')]
+        assert gate_uses == ['./.github/actions/build-setup', './.github/actions/ppc-setup']
+        provided = '\n'.join(s.get('run', '') for s in gate['runs']['steps'])
+        provided += (ROOT / '.github/actions/build-setup/action.yml').read_text()
+        # mac99 の firmware (qemu-system-data) と VGA の ROM (seabios) を名指しで。全 arch を連れてくる
+        # メタパッケージ qemu-system は使わない (遅いミラーで用意が 600 秒を越えた)。
+        for dependency in ('qemu-system-ppc', 'qemu-system-data', 'seabios', 'genisoimage', 'qemu-user', 'gcc-13', 'ccache'):
+            assert dependency in provided, dependency
+        installs = '\n'.join(line for line in provided.splitlines() if 'apt-get' in line and ' install ' in line)
+        assert not re.search(r'\bqemu-system(\s|$)', installs, re.M), 'qemu-system metapackage'
     # 枝が読めるキャッシュは自分の枝と main の物だけ。main がクロスコンパイラのキャッシュを保つ。
     warm = workflow['jobs']['ppc-toolchain-cache']
     assert warm['if'] == "github.ref == 'refs/heads/main'"
