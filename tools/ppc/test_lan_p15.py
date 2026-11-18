@@ -8,7 +8,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = [
-    ('fifo-units', 'g->io.read32(g->io.ctx, GEM_RX_FIFO_SIZE) * 64u', 'g->io.read32(g->io.ctx, GEM_RX_FIFO_SIZE)', 'H:publish'),
+    ('fifo-units', 'fifo = g->rx_fifo_units * 64u;', 'fifo = g->rx_fifo_units;', 'H:publish'),
     ('own', '| (u32)GEM_RD_OWN', '| 0', 'H:descriptor'),
     ('full', 'g->ring_cursor < GEM_RX_PUBLISHED', 'g->ring_cursor < GEM_RING_COUNT', 'H:sync'),
     ('sync', 'g->io.sync(base + GEM_POOL_RX_RING, GEM_RING_COUNT * GEM_DESC_SIZE, DMA_PREWRITE)', '0', 'H:sync'),

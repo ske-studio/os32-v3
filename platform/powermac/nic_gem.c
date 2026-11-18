@@ -98,13 +98,30 @@ const struct NetAdapter net_gem_adapter = { acquire, release };
 /* The caller owns the same exclusion used by the GEM adapter and link. */
 void pm_gem_trace_snapshot(struct pm_gem_trace *out)
 {
+    static const u32 registers[] = {
+        GEM_MAC_RX_CRC_ERR_CNT, GEM_MAC_RX_ALIGN_ERR, GEM_MAC_RX_LEN_ERR_CNT,
+        GEM_MAC_NORM_COLL_CNT, GEM_MAC_FIRST_COLL_CNT,
+        GEM_MAC_EXCESS_COLL_CNT, GEM_MAC_LATE_COLL_CNT
+    };
+    static u16 previous[sizeof(registers) / sizeof(registers[0])];
+    static u32 generation;
     struct gem *g = pm_lan_running_gem(0);
     *out = (struct pm_gem_trace){
         .adapter = packet_count,
         .link_queue = net_rx_queued(NET_RX_LINK),
         .ready = g != 0
     };
+    const struct gem *source = pm_lan_gem_trace_source();
+    out->rx = source->rx_counts;
+    out->mac_generation = source->mac_generation;
     if (g) {
+        for (u32 i = 0; i < sizeof(registers) / sizeof(registers[0]); i++) {
+            u16 now = g->io.read32(g->io.ctx, registers[i]);
+            /* MAC init clears the hardware counters. */
+            out->mac_delta[i] = now - (generation == g->mac_generation ? previous[i] : 0);
+            previous[i] = now;
+        }
+        generation = g->mac_generation;
         out->rx_packets = g->rx_packets;
         out->rx_drops = g->rx_drops;
         out->tx_pending = g->tx_pending;

@@ -15,6 +15,7 @@
 #define GEM_CONFIG_RXDMA_LIMIT 0x0000007c0 /* openbsd gemreg.h:82 */
 #define GEM_CONFIG_RONPAULBIT 0x000000800 /* openbsd gemreg.h:84 */
 #define GEM_CONFIG_BUG2FIX 0x000001000 /* openbsd gemreg.h:87 */
+#define GEM_INTR_RX_NOBUF 0x00000020 /* NetBSD gemreg.h:113 */
 #define GEM_INTR_RX_TAG_ERR 0x000000040 /* openbsd gemreg.h:105 */
 #define GEM_INTR_TX_MAC 0x000004000 /* openbsd gemreg.h:107 */
 #define GEM_INTR_RX_MAC 0x000008000 /* openbsd gemreg.h:108 */
@@ -202,8 +203,13 @@ struct gem_phy_sample {
     u32 port, addr, id1, id2, bmcr, bmsr, anar, anlpar, gtcr, gtsr;
     u32 gigabit_valid, link, speed, full_duplex;
 };
+struct gem_rx_counts {
+    u32 bad_crc, bad_length, cap, own, sync_eio, nobuf_polls, fifo_watch;
+};
 struct gem {
     struct gem_phy_sample phy_sample;
+    struct gem_rx_counts rx_counts;
+    u32 rx_fifo_units, mac_generation;
     struct gem_io io; /* Platform-provided register, clock and DMA access. */
     struct gem_dma dma; /* Pool retained until DMA is known to be stopped. */
     u32 ring_prepare_step, ring_cursor, ring_publish_step;
@@ -223,6 +229,7 @@ int gem_reset_step(struct gem *, unsigned long long now);
 int gem_mac_init(struct gem *, const u8 mac[6]);
 int gem_mif_init(struct gem *);
 int gem_phy_sample(struct gem *, struct gem_phy_sample *);
+int gem_phy_bcm5411_aux(struct gem *, u32 *aux);
 int gem_phy_step(struct gem *, unsigned long long now);
 int gem_ring_prepare(struct gem *, struct gem_dma *);
 int gem_ring_publish(struct gem *);

@@ -148,6 +148,14 @@ done:
     return r;
 }
 
+/* NetBSD miidevs (BCM5411) and brgphyreg.h:134: AUX status. */
+int gem_phy_bcm5411_aux(struct gem *g, u32 *aux)
+{
+    if (g->phy_id1 != 0x0020 || (g->phy_id2 & 0xfff0) != 0x6070)
+        return GEM_EUNSUPPORTED;
+    return rd(g, g->phy_addr, 0x19, aux);
+}
+
 static void next(struct gem *g, u32 step, unsigned long long now)
 { g->phy_step = step; g->phy_started = now; g->phy_polls = 0; }
 

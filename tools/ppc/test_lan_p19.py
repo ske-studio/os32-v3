@@ -16,10 +16,10 @@ MUTATIONS = [
     ('budget-decrement', '(*budget)--;', '(void)budget;', 'H:some-budget'),
     ('kick-count', 'g->rx_head % 4 == 0', '1', 'H:kick-count'),
     ('kick-value', '(g->rx_head + GEM_RX_PUBLISHED) & 31', 'g->rx_head', 'H:kick-value'),
-    ('postread', 'if (g->io.sync(buf, GEM_BUF_SIZE, DMA_POSTREAD)) return GEM_EIO;', 'if (0) return GEM_EIO;', 'H:buffer-read'),
+    ('postread', 'if (g->io.sync(buf, GEM_BUF_SIZE, DMA_POSTREAD)) {', 'if (0) {', 'H:buffer-read'),
     ('kick-off-by-one', '(g->rx_head + GEM_RX_PUBLISHED) & 31', '(g->rx_head + GEM_RX_PUBLISHED + 1) & 31', 'H:kick-value'),
-    ('desc-postread', 'if (g->io.sync(desc, GEM_DESC_SIZE, DMA_POSTREAD)) return GEM_EIO;', 'if (0) return GEM_EIO;', 'H:desc-read'),
-    ('late-postread', 'if (g->io.sync(buf, GEM_BUF_SIZE, DMA_POSTREAD)) return GEM_EIO;', '/* delayed sync */', 'H:buffer-read'),
+    ('desc-postread', 'if (g->io.sync(desc, GEM_DESC_SIZE, DMA_POSTREAD)) {', 'if (0) {', 'H:desc-read'),
+    ('late-postread', 'if (g->io.sync(buf, GEM_BUF_SIZE, DMA_POSTREAD)) {', 'if (0) {', 'H:buffer-read'),
 ]
 def instrument(source):
     source = source.replace('#include "gem.h"', '#include "gem.h"\nvoid observe_desc(const u8 *);\nvoid observe_buffer(const u8 *);')

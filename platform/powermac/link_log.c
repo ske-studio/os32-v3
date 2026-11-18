@@ -172,6 +172,47 @@ static void trace_gem(u32 rid, u32 tick, const struct pm_gem_trace *g)
             rid, tick, g->ready, packets, drops, g->adapter, g->link_queue, g->tx_pending);
 }
 
+static void trace_gem_rx(const char *when, u32 rid, u32 tick, const struct pm_gem_trace *g)
+{
+    const struct gem_rx_counts *rx = &g->rx;
+    /* CRC, alignment, length, normal/first/excessive/late collisions. */
+    const u16 *m = g->mac_delta;
+    pm_link_trace_printf(7, "G4 G %s rid=%u tick=%u ready=%u gen=%u "
+            "crc=%u len=%u cap=%u own=%u sync_eio=%u nobuf_poll=%u fifo_watch=%u "
+            "mac=%u/%u/%u/%u/%u/%u/%u\n",
+            when, rid, tick, g->ready, g->mac_generation, rx->bad_crc, rx->bad_length,
+            rx->cap, rx->own, rx->sync_eio, rx->nobuf_polls, rx->fifo_watch,
+            (u32)m[0], (u32)m[1], (u32)m[2], (u32)m[3], (u32)m[4], (u32)m[5], (u32)m[6]);
+}
+
+static void trace_gem_periodic(void)
+{
+    /* link_platform_now() is the logical 100 Hz tick. */
+    enum { INTERVAL_TICKS = 30 * 100 };
+    static u32 last_tick;
+    static int started, hello_logged;
+    u32 tick = link_platform_now();
+    if (!started) {
+        started = 1;
+        last_tick = tick;
+    }
+    if ((hello_logged || !link_hello_ok) && tick - last_tick < INTERVAL_TICKS)
+        return;
+
+    struct pm_gem_trace g;
+    unsigned int f = link_platform_lock();
+    int hello = link_hello_ok && !hello_logged;
+    if (!hello && tick - last_tick < INTERVAL_TICKS) {
+        link_platform_unlock(f);
+        return;
+    }
+    hello_logged |= hello;
+    last_tick = tick;
+    pm_gem_trace_snapshot(&g);
+    link_platform_unlock(f);
+    trace_gem_rx(hello ? "hello" : "periodic", 0, tick, &g);
+}
+
 static void trace_finish(const struct trace_record *r)
 {
     const struct link_trace_call *t = &r->finish.link;
@@ -200,7 +241,10 @@ static void trace_finish(const struct trace_record *r)
             t->rid, (u32)t->sess, (u32)t->epoch, r->finish.tick, r->finish.phase,
             r->finish.reason, (u32)r->finish.rc, (u32)r->finish.detail,
             r->finish.received, r->finish.length);
-    if (r->finish.rc) trace_gem(t->rid, r->finish.tick, &r->gem);
+    if (r->finish.rc) {
+        trace_gem(t->rid, r->finish.tick, &r->gem);
+        trace_gem_rx("finish", t->rid, r->finish.tick, &r->gem);
+    }
 }
 
 static void trace_poll(void)
@@ -225,6 +269,7 @@ static void trace_poll(void)
                 r.kind, r.event.rid, (u32)r.event.sess, (u32)r.event.epoch,
                 r.event.tick, (u32)r.event.state, r.event.reason);
         trace_gem(r.event.rid, r.event.tick, &r.gem);
+        trace_gem_rx(r.kind, r.event.rid, r.event.tick, &r.gem);
     }
 }
 #endif
@@ -241,6 +286,9 @@ static void close_request(void)
 }
 void pm_link_log_poll(void)
 {
+#if KBOOT_SH
+    trace_gem_periodic();
+#endif
     struct HostAlive alive;
     host_alive_snapshot(&alive);
     int up = link_hello_ok && alive.valid;

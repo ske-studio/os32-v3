@@ -126,6 +126,7 @@ int gem_poll(struct gem *g, unsigned long long now, u32 tx_budget)
     if (g->state == GEM_STATE_RESETTING) return gem_reset_step(g, now);
     /* gem_eint :1151-1197 and gem_rx_watchdog :1199-1235. */
     status = g->io.read32(g->io.ctx, GEM_STATUS_ALIAS);
+    if (status & GEM_INTR_RX_NOBUF) g->rx_counts.nobuf_polls++;
     if (status & (GEM_INTR_BERR | GEM_INTR_RX_TAG_ERR))
         g->error_status = g->io.read32(g->io.ctx, GEM_PCI_BANK2_OFFSET + GEM_ERROR_STATUS);
     if (status & GEM_INTR_TX_MAC) {
@@ -134,6 +135,7 @@ int gem_poll(struct gem *g, unsigned long long now, u32 tx_budget)
     if (status & GEM_INTR_RX_MAC) {
         g->rx_status = g->io.read32(g->io.ctx, GEM_MAC_RX_STATUS);
         if ((g->rx_status & GEM_MAC_RX_OVERFLOW) && !g->rx_watching) {
+            g->rx_counts.fifo_watch++;
             g->rx_watch_wr = g->io.read32(g->io.ctx, GEM_RX_FIFO_WR_PTR);
             g->rx_watch_rd = g->io.read32(g->io.ctx, GEM_RX_FIFO_RD_PTR);
             g->rx_watch_started = now; g->rx_watching = 1;

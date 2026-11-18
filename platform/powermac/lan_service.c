@@ -76,6 +76,33 @@ static void rh_log(void)
     kprintf(0x07, "RH PHY port=%u addr=%u id1=%x id2=%x bmsr=%x rc=%d\r\n",
             phy_sample.port, phy_sample.addr, phy_sample.id1, phy_sample.id2, phy_sample.bmsr, phy_rc);
 }
+#if KBOOT_LINK && KBOOT_SH
+static void g4_start_log(void)
+{
+    static const u16 aux_speed[] = {0, 10, 10, 100, 100, 100, 1000, 1000};
+    static const u8 aux_full[] = {0, 0, 1, 0, 0, 1, 0, 1};
+    struct gem *g = &s.g;
+    struct gem_phy_sample phy = {0};
+    u32 aux = 0xffff;
+    int rc = gem_phy_sample(g, &phy);
+    int aux_rc = gem_phy_bcm5411_aux(g, &aux);
+    /* NetBSD brgphy.c:515-546: AUX status bits 10:8 report the HCD. */
+    u32 hcd = (!aux_rc && aux != 0xffff && phy.link &&
+               (phy.bmcr & 0x1000) && (aux & 0x8000)) ? (aux >> 8) & 7 : 0;
+    u32 xif = g->io.read32(g->io.ctx, GEM_MAC_XIF_CONFIG);
+    u32 tx = g->io.read32(g->io.ctx, GEM_MAC_TX_CONFIG);
+    u32 rx = g->io.read32(g->io.ctx, GEM_MAC_RX_CONFIG);
+    kprintf(7, "G4 PHY rc=%d id=%x/%x bmcr=%x bmsr=%x anar=%x anlpar=%x "
+            "link=%u speed=%u fd=%u aux_rc=%d aux=%x aux_speed=%u aux_fd=%u "
+            "xif=%x tx=%x rx=%x gmii=%u fdled=%u ign_carrier=%u ign_collis=%u\r\n",
+            rc, phy.id1, phy.id2, phy.bmcr, phy.bmsr, phy.anar, phy.anlpar,
+            phy.link, phy.speed, phy.full_duplex, aux_rc, aux, (u32)aux_speed[hcd],
+            (u32)aux_full[hcd], xif, tx, rx, !!(xif & GEM_MAC_XIF_GMII_MODE),
+            !!(xif & GEM_MAC_XIF_FDPLX_LED), !!(tx & GEM_MAC_TX_IGN_CARRIER),
+            !!(tx & GEM_MAC_TX_IGN_COLLIS));
+    kprintf(7, "G4 FIFO units=%u bytes=%u\r\n", g->rx_fifo_units, g->rx_fifo_units * 64u);
+}
+#endif
 #if !KBOOT_LINK
 static int same(const u8 *a, const u8 *b, u32 n)
 {
@@ -284,6 +311,9 @@ void pm_lan_poll(u64 now)
                 /* G4 BCM5411: frames sent right after link-up never reached the
                  * switch (11-13, beacon and log 0-2 lost); records wait in the ring. */
                 s.tx_at = now + 2u * s.g.io.tb_hz;
+#if KBOOT_LINK && KBOOT_SH
+                g4_start_log();
+#endif
             }
         }
         break;
@@ -369,3 +399,11 @@ struct gem *pm_lan_running_gem(u8 mac[6])
     if (mac) for (u32 i = 0; i < 6; i++) mac[i] = s.boot->mac[i];
     return &s.g;
 }
+
+
+#if KBOOT_LINK && KBOOT_SH
+const struct gem *pm_lan_gem_trace_source(void)
+{
+    return &s.g;
+}
+#endif
