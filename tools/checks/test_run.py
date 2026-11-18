@@ -244,6 +244,16 @@ class RunnerTest(unittest.TestCase):
         one.write_text('check-a\tnan\t0\n')
         with self.assertRaises(ValueError):
             updater.measurements([one])
+        # A guest check is measured only by the job that boots the guest; a host check only elsewhere.
+        shard = self.write('check-times-abc-3/check_times.tsv', 'check-guest\t1\t0\ncheck-host\t40\t0\n')
+        guest = self.write('check-times-abc-ppc-qemu-1/check_times.tsv', 'check-guest\t600\t0\ncheck-host\t2\t0\n')
+        envs = {'guest': ('ppc-cross', 'qemu-ppc'), 'host': ()}
+        filtered = updater.measurements([shard, guest], envs)
+        self.assertEqual(filtered['seconds'], {'guest': 600, 'host': 40})
+        self.assertEqual(filtered['samples'], {'guest': 1, 'host': 1})
+        self.assertEqual(updater.measurements([shard, guest])['samples'], {'guest': 2, 'host': 2})
+        self.assertTrue(updater.provides_qemu('check-times-abc-ppc-qemu-0'))
+        self.assertFalse(updater.provides_qemu('check-times-abc-0'))
 
     def setUp(self):
         # Legacy fixtures exercise warning mode; strict mode is tested explicitly.

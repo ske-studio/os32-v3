@@ -36,7 +36,7 @@ done; echo "$out"
 ```
 
 - 待ちの終了と merge・push を 1 本のコマンドに繋げない。結論を読んでから取り込む。
-- 所要の目安 (2026-11-18): check の static-check 4〜6 分・ppc-compile 4〜21 分・ppc-qemu 53 分、build の checks 6 シャード 10〜39 分。
+- 所要の目安 (2026-11-18): check の static-check 4〜6 分・ppc-compile 4〜21 分・ppc-qemu (4 シャード、割る前は 1 本で 53〜61 分)、build の checks 6 シャード 10〜39 分。伸びてきたらスキル os32-ci-inventory。
 - 上限に当たったら `gh api rate_limit -q '.resources.core'` の `reset` (UNIX 秒) まで待つ。
 
 ## 3. 赤を読む
@@ -48,7 +48,8 @@ gh run view <run> --json jobs -q '.jobs[] | "\(.name) \(.conclusion) \(.startedA
 | ジョブ | 落ちた検査の探し方 |
 |---|---|
 | build の `checks (i)` | `jid=$(gh run view <run> --json jobs -q '.jobs[] \| select(.name=="checks (i)") \| .databaseId')`、`gh api repos/<owner>/<repo>/actions/jobs/$jid/logs > log`、`grep -n '\*\*\* \[.*check-' log` (検査の名前)、その行の 30 行前までが失敗の本文 |
-| check の `static-check`・`ppc-compile`・`ppc-qemu` | 同じくジョブ単位でログを取り、`grep -n 'Traceback\|##\[error\]' log`。最初の失敗で止まるので、後ろの検査は回っていない |
+| check の `static-check`・`ppc-compile` | 同じくジョブ単位でログを取り、`grep -n 'Traceback\|##\[error\]' log`。最初の失敗で止まるので、後ろの検査は回っていない |
+| check の `ppc-qemu (i)` | ジョブの要約の表 (失敗・回っていない・遅い検査)。ログは `gh run download <run> -n ppc-qemu-failed-<i>` → `results.json` と `failed-logs/<検査>.log` |
 | sep の `checks` (手動) | `gh run download <run> -n sep-checks-<i>` → `results.json` の `status: fail` の行と `failed-logs/<検査>.log` |
 
 - `gh run view --log-failed` が空を返す事がある。ジョブ単位の API (`actions/jobs/<id>/logs`) で取る。

@@ -81,10 +81,13 @@ def wiring():
         # 変異の試験が QEMU を起動するので、ppc-qemu の段と同じ道具を入れる。
         for dependency in ('gcc-13', 'qemu-user', 'ccache', 'qemu-system-ppc', 'qemu-system-data'):
             assert dependency in runs
-    command = 'python3 -B tools/checks/run.py --run all --env qemu-ppc'
+    # QEMU の検査は 4 本に割って並べ、手本の道具 (tools/ci/gate.py) の 1 行で回す (変異込みが既定)。
+    command = 'python3 -B tools/ci/gate.py run --env qemu-ppc --shard ${{ matrix.shard }}/4 --out "$RUNNER_TEMP/gate"'
     for flow, routine, mutate in ((workflow, False, 1),):
         job = flow['jobs']['ppc-qemu']
-        assert job['needs'] == 'ppc-compile'
+        # ppc-compile の成果物は読まないので鎖にしない (docs/POLICY_CI.md G2)。
+        assert 'needs' not in job
+        assert job['strategy'] == {'fail-fast': False, 'matrix': {'shard': [0, 1, 2, 3]}}
         assert job['timeout-minutes'] >= 60
         # The failure-only diagnostics step prints qemu.stderr; it is not part of the run.
         guest = [s for s in job['steps'] if s.get('name') != 'PPC QEMU diagnostics']
@@ -92,10 +95,18 @@ def wiring():
                    for s in job['steps'])
         assert guest[0] == flow['jobs']['ppc-compile']['steps'][0]
         assert guest[1] == steps[1]
-        assert all(s.get('if') == "steps.scope.outputs.scope == 'ppc'" for s in guest[2:])
+        # 成果物を出す手順は always()・failure() と and で繋ぐ。範囲の条件はどの手順にも要る。
+        uploads = ('Upload check times', 'Upload failed logs')
+        assert all(s.get('if') == "steps.scope.outputs.scope == 'ppc'" for s in guest[2:] if s.get('name') not in uploads)
+        assert all(s.get('if', '').endswith("&& steps.scope.outputs.scope == 'ppc'") for s in guest if s.get('name') in uploads)
         runs = '\n'.join(s.get('run', '') for s in guest)
-        assert f'OS32_REQUIRE_PPC=1 MUTATE={mutate} ' + command in runs
+        assert command in runs
+        assert '--no-mutate' not in runs and 'run.py --run' not in runs
         assert ('CHECK_ROUTINE=1 ' in runs) == routine
+        # 検査ごとの所要は成果物に出す (重みの作り直しに使う: tools/checks/calibrate_weights.py)。
+        times = [s for s in guest if s.get('name') == 'Upload check times']
+        assert times and times[0]['with']['name'] == 'check-times-${{ github.sha }}-ppc-qemu-${{ matrix.shard }}'
+        assert times[0]['if'] == "always() && steps.scope.outputs.scope == 'ppc'"
         for dependency in ('qemu-system-ppc', 'qemu-system-data', 'genisoimage', 'qemu-user', 'gcc-13', 'ccache'):
             assert dependency in runs
         for action_name in ('build-setup', 'ppc-setup'):

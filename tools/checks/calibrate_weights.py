@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Update medians from downloaded check-times artifacts (successful rows only)."""
+"""Update medians from downloaded check-times artifacts (successful rows only).
+
+A check that needs the `qemu-ppc` environment is measured only by the job that provides it
+(artifact `check-times-<sha>-ppc-qemu-<i>`). In the x86 shards the same check returns in a
+second without running the guest, so those rows are not samples of its cost.
+"""
 import argparse
 from collections import defaultdict
 import hashlib
@@ -9,7 +14,17 @@ from pathlib import Path
 import statistics
 
 
-def measurements(paths):
+QEMU_ENV = 'qemu-ppc'
+QEMU_ARTIFACT = '-ppc-qemu-'
+
+
+def provides_qemu(artifact):
+    """True when the artifact comes from the job that boots the PowerPC guest."""
+    return QEMU_ARTIFACT in artifact
+
+
+def measurements(paths, envs=None):
+    """envs maps a check name to its declared environments; None keeps every row."""
     samples = defaultdict(list)
     sources = []
     for path in sorted(set(paths)):
@@ -20,6 +35,8 @@ def measurements(paths):
             value = float(seconds)
             if not name.startswith('check-') or not math.isfinite(value) or value < 0:
                 raise ValueError(f'invalid timing row: {path}: {line}')
+            if envs is not None and (QEMU_ENV in envs.get(name[6:], ())) != provides_qemu(path.parent.name):
+                continue
             if int(rc) == 0:
                 samples[name[6:]].append(value)
     if not samples:
@@ -35,7 +52,9 @@ def main():
     args = parser.parse_args()
     paths = [p for source in args.artifacts for p in
              ([source] if source.is_file() else source.rglob('check_times.tsv'))]
-    args.output.write_text(json.dumps(measurements(paths), indent=2) + '\n')
+    import run
+    envs = {name: check.env for name, check in run.discover(Path(__file__).resolve().parents[2]).items()}
+    args.output.write_text(json.dumps(measurements(paths, envs), indent=2) + '\n')
 
 
 if __name__ == '__main__':

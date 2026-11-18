@@ -40,12 +40,15 @@ G9 (道具の試験) は `ci-gate-host`・`sep-identity-host`・`check-times-hos
 ### 3-1. 入口 `tools/ci/gate.py run`
 
     python3 -B tools/ci/gate.py run --shard <番号>/<総数> --out <置き場> [--no-mutate] [--jobs N]
+    python3 -B tools/ci/gate.py run --env qemu-ppc --shard <番号>/<総数> --out <置き場>
 
 1. 道具の事前確認 (G6): `i386-elf-gcc` (`$CROSS_DIR/bin`)・`powerpc-elf-gcc` (`$PPC_CROSS_DIR/bin`)・`nasm`・`gcc-13`・`qemu-i386`・`qemu-system-ppc`・`genisoimage`・`e2fsck`・`cargo`。足りない物を入れ方と一緒に全部挙げ、終了コード 2。
 2. このシャードの検査の名前を `tools/checks/run.py --list --shard` から取る (G4)。
 3. `make -k -jN check CHECK_SHARD=… MUTATE=1` (`--no-mutate` なら `check-fast`、`MUTATE=0`) を、`CHECK_LOG_DIR=<置き場>/logs`・`CHECK_TIMES=<置き場>/check_times.tsv`・`OS32_REQUIRE_PPC=1` で回す。前提の準備・並列・順序は make の今の仕組みのまま (検査の走らせ方をもう 1 つ作らない)。
 4. `check_times.tsv` (検査・秒・終了コード) と検査ごとのログから表を作る: 通過・失敗・回っていない・SKIP の行がある。
 5. `<置き場>/results.json`、`<置き場>/failed-logs/` (落ちた検査のログの末尾 4 MiB)、画面と `$GITHUB_STEP_SUMMARY` に表。失敗か、回っていない検査が 1 本でもあれば終了コード 1。検査は全部通ったのに make が落ちた時 (前提の準備、木が変わっていないことの照合) も 1。
+
+`--env <環境>` を付けた時は、その環境を要る検査 (`run.py --list --env`) だけをシャードに割り、手順 3 の make の代わりに、検査を 1 本ずつ順に `tools/checks/run.py --run <検査> --env <環境>` で回す (`run_each`)。1 本落ちても残りを回し、所要は同じ `check_times.tsv` に足す。QEMU で機械を丸ごと模擬する検査は、並べて回すと期限に間に合わなくなるので、シャードの中は直列にする。check.yml の `ppc-qemu` がこの入口を使う。
 
 SKIP の行は挙げるだけで落とさない: 試験が自分の出力として `SKIP` と印字する物 (飛ばす時の振る舞いを確かめる試験) と見分けられないため。環境が揃っていれば本物の SKIP は `OS32_REQUIRE_PPC=1` で失敗になる。
 
@@ -74,7 +77,8 @@ SKIP の行は挙げるだけで落とさない: 試験が自分の出力とし�
 | 既存 | 今の形 | 手本の形にするには |
 |---|---|---|
 | check.yml `static-check` | `make check-<名>` を手で並べる | クロスコンパイラ無しで回る検査に CHECK の `env` で印を付け、`gate.py run` に環境の絞り込みを足して一覧を登録から取る (G4)。道具の事前確認の表を環境ごとに持つ |
-| check.yml `ppc-compile`・`ppc-qemu` | `run.py --run all`、`needs` の鎖、`ppc_scope.py` のパスの一覧 | `gate.py run` に替える (G2・G3)。PowerPC を回すかどうかの判定は、パスの一覧ではなく所有者集合 (`build/select.mk`) から引く |
+| check.yml `ppc-compile` | `run.py --run all`、`ppc_scope.py` のパスの一覧 | `gate.py run --env ppc-cross` に替える (G2・G3)。PowerPC を回すかどうかの判定は、パスの一覧ではなく所有者集合 (`build/select.mk`) から引く |
+| check.yml `ppc-qemu` | 2026-11-18 に `gate.py run --env qemu-ppc --shard i/4` の 4 分割にし、`needs` の鎖を外した (G2・G3・G10)。検査ごとの所要を成果物 `check-times-<SHA>-ppc-qemu-<i>` に出す | 残りは `ppc_scope.py` のパスの一覧と、用意の行の重複 |
 | build.yml `checks` (6 シャード) | `make -k check CHECK_SHARD=…` (全部の検査を変異込み、2026-11-18 から) | `gate.py run --shard …` に替えると、表・検査ごとのログ・回っていない検査の検出が付く (G2・G3)。`gate-setup` にすると PowerPC の検査が SKIP にならない (G5・G6) |
 | 用意 | apt の行が 4 か所 | `gate-setup` に寄せる (G5) |
 
@@ -89,6 +93,15 @@ SKIP の行は挙げるだけで落とさない: 試験が自分の出力とし�
 | 失敗 15 本の内訳 | QEMU の検査 11 本 (用意に VGA の ROM が無く `QMP EOF` — `gate-setup` と事前確認を直した)、`check-docs-tree` (この段の文書の相互リンク)、`check-check-times-host` (この段の試験が `CHECK_LOG_DIR` を継いだ)、`check-target-toolchain-host` (既存の試験の期待値に手元のパスが直書き)、`check-np21w-ini-live-host` (main の元からの赤、変異の目印のずれ)。5 つとも直した |
 
 直した後の全シャードの緑と、1 本わざと落とした実行 (G12) は**未確認** (手動で `checks` を起動して確かめ、ここに足す)。
+
+## 5-1. 所要の棚卸し (2026-11-18)
+
+道具は [time_inventory](time_inventory.md)、手順はスキル `.claude/skills/os32-ci-inventory`。
+
+| 何を | 前 | 後 |
+|---|---|---|
+| check の `ppc-qemu` (QEMU の検査 12 本、変異込み) | 1 本のジョブで直列、53〜61 分 (`6cad7d729`・`6453f88da`・`a685b788b`)。内訳は `ppc-link-sh-run` 約 17 分・`ppc-fb` 約 11 分・`arch-ctx-guest` 約 10 分・`ppc-usb` 約 9 分・`ppc-fp-guest` 約 6 分・残り 7 本で約 6 分 (ログの時刻から。誤差は数十秒) | 4 本に割って並べる。実時間は入れた回の実測をここに足す |
+| build の `checks` 6 シャード (x86 の検査 706 本、変異込み) | 検査の秒の和は 40.8〜78.5 分、最大 ÷ 最小 1.92。ジョブの実時間は 14〜29 分 (`a685b788b`)、ほかの回は 10〜39 分。重みは変異なしの計測のままで、実測と 2 倍以上ずれた検査が 92 本 | 重みを変異込みの 5 回 (`6cad7d729`・`6453f88da`・`a685b788b` の枝と main の回) の中央値で作り直した (694 本)。実時間は入れた回の実測をここに足す |
 
 ## 6. 範囲の外
 

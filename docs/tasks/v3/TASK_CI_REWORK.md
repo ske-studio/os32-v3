@@ -11,7 +11,7 @@
 |---|---|---|---|
 | check | static-check | 4〜6 分 | `make check-<名>` を 31 行、手で並べている。1 行落ちると後ろは回らない |
 | check | ppc-compile | 4〜21 分 (キャッシュの有無) | `run.py --run all --env ppc-cross`。最初の失敗で止まる |
-| check | ppc-qemu | 53 分 | `needs: ppc-compile`。前が落ちると走らない。`run.py --run all --env qemu-ppc` |
+| check | ppc-qemu (4 シャード) | 1 本で直列の時は 53〜61 分。2026-11-18 に 4 本に割った (実測は [gate.md](../../design/tools/ci/gate.md) §5-1) | `python3 -B tools/ci/gate.py run --env qemu-ppc --shard i/4`。`needs` の鎖は無い。1 本落ちても残りを回し、表と検査ごとの所要を出す |
 | build | artifacts | 2〜3 分 | — |
 | build | checks (6 シャード) | 10〜39 分 | `make -k check CHECK_SHARD=i/6`。1 本落ちても残りを回す (G2 は済み) |
 | sep (`wt/sep-*` だけ) | identity・checks | 19 分・37〜57 分 | 手本 (`tools/ci/gate.py`)。結果の表・落ちた検査だけのログ・検査ごとの秒 |
@@ -20,7 +20,7 @@
 
 | 決まり | 今の状態 | 11-18 の実害 |
 |---|---|---|
-| G2 全部回して全部挙げる | check の 3 ジョブは最初の失敗で止まる | ppc-compile が 1 本で落ち、ppc-qemu は走らなかった。直して回し直し (1 往復 50 分) |
+| G2 全部回して全部挙げる | check の static-check・ppc-compile は最初の失敗で止まる (ppc-qemu は 11-18 に直した) | ppc-compile が 1 本で落ち、ppc-qemu は走らなかった。直して回し直し (1 往復 50 分) |
 | G3 結果は表で | check は表が無い。落ちた検査は `gh run view --log-failed` を読んで探す | 失敗の行を探すのに、ログを 3 回取り直した |
 | G4 何を回すかは登録から | static-check は手書きの 31 行。`tools/ci/ppc_scope.py` は共通・PowerPC の置き場の一覧を自前で持つ | 新しい検査 2 本 (`archive-refs`) を手で足した。足し忘れると build でしか回らない |
 | G5 用意は 1 か所 | `apt-get install` が check.yml に 3 行、中身が違う | ppc-compile にだけ `qemu-system-ppc` が無く、変異の試験 (`tools/ppc/test_lan_p29.py`) が落ちた |
@@ -41,10 +41,14 @@
 | S2 | 用意を 1 か所に: check.yml の `apt-get install` 3 行を composite action (`build-setup`・`ppc-setup`・`gate-setup`) に寄せ、PowerPC の 2 ジョブを同じ環境にする | G5 | 基準 (2)。前後で回る検査の集合が同じ |
 | S3 | 入口を 1 つに: check の 3 ジョブの `run:` を、手本と同じ道具 (`tools/ci/gate.py`) の 1 行にする。手元でも同じコマンドで回る | G7 | 手元と CI で同じ結果の表 |
 | S4 | 一覧を登録から: static-check の 31 行を、検査の宣言 (`CHECK` の tier・環境) から引く。`ppc_scope.py` の置き場の一覧を所有者集合 (`build/select.mk`) から引く | G4 | 基準 (1)・(4) |
-| S5 | 全部回して表に: check の 3 ジョブを、1 本落ちても残りを回す形に。`needs` の鎖は成果物を読む所だけ残す。落ちた検査の名前・末尾・遅い検査をジョブの要約に出す | G2・G3・G10 | 基準 (3) (G12 の実演の枝を 1 本作る) |
+| S5 | 全部回して表に: check の残りの 2 ジョブ (static-check・ppc-compile) を、1 本落ちても残りを回す形に (ppc-qemu は済み)。`needs` の鎖は成果物を読む所だけ残す。落ちた検査の名前・末尾・遅い検査をジョブの要約に出す | G2・G3・G10 | 基準 (3) (G12 の実演の枝を 1 本作る) |
 | S6 | SKIP で通さない: 道具が無ければ検査を始める前にまとめて挙げて終了コード 2。SKIP の行のある検査を結果の表に挙げる | G6 | 基準 (6) |
 
 順の理由: S0 を先にするのは、揺れがあると後の段の CI の赤が「段のせいか揺れか」を毎回調べる事になるため。S2・S3 は回る検査の集合を変えないので先に替えられる。S4 は集合を変える恐れがあるので、S3 で入口が 1 つになってから。
+
+## 2-1. 棚卸し (段とは別に、節目ごと)
+
+CI の待ち時間は、検査が増えるたび・変異が増えるたびに伸びる。スキル `.claude/skills/os32-ci-inventory` の手順で、検査ごとの所要・シャードの偏り・重みのずれを測り、重み (`tools/checks/weights.json`) を作り直す。する時: この票の段を 1 つ入れた後、検査を大きく足した後、待ち時間が前の棚卸しから 2 割以上伸びた時。結果は [gate.md](../../design/tools/ci/gate.md) §5-1 に足す。
 
 ## 3. やらない事
 

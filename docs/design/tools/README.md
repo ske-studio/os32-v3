@@ -97,6 +97,7 @@ map の LOAD 一覧・各 .o の size・最終 ELF・KMOD header を照合する
 - [tools/ci/gate](ci/gate.md)
 
 - [tools/ci/sep_identity](ci/sep_identity.md)
+- [tools/ci/time_inventory](ci/time_inventory.md)
 
 - [tools/fep_to_sqlite](fep_to_sqlite.md)
 

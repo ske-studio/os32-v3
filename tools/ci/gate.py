@@ -2,6 +2,10 @@
 """CI と手元で同じ入口: 検査の 1 シャードを最後まで回し、結果を表にする (docs/design/tools/ci/gate.md)。
 
     python3 -B tools/ci/gate.py run --shard 0/6 --out <置き場> [--no-mutate]
+    python3 -B tools/ci/gate.py run --env qemu-ppc --shard 0/4 --out <置き場>
+
+--env を付けると、その環境を要る検査だけをシャードに割り、1 本ずつ順に回す (QEMU で機械を丸ごと
+模擬する検査は、並べて回すと期限に間に合わなくなる)。
 
 検査の一覧は CHECK の登録 (tools/checks/run.py --list) だけから取る。1 本落ちても残りを回し、
 検査ごとのログ (<置き場>/logs/<検査>.log) と結果 (<置き場>/results.json) を残す。画面に出すのは
@@ -130,6 +134,18 @@ def keep_failed_logs(out, logs_dir, checks, limit=FAILED_LOG_BYTES):
             (kept / source.name).write_bytes(data[-limit:])
 
 
+def run_each(expected, timed):
+    """--env の束: 検査を 1 本ずつ順に回す。1 本落ちても残りを回し、落ちた本数を返す。
+
+    timed(検査) は終了コードを返す (所要は呼ばれた側が check_times.tsv に 1 行足す)。
+    """
+    failed = 0
+    for name in expected:
+        if timed(name) != 0:
+            failed += 1
+    return failed
+
+
 def run(args):
     env = dict(os.environ)
     missing = missing_tools(env)
@@ -147,21 +163,42 @@ def run(args):
         env.pop(name, None)
     if args.no_mutate:
         env['CHECK_ROUTINE'] = '1'  # make check-fast と同じ列 (full_only を除く)
-    listed = subprocess.run([sys.executable, '-B', 'tools/checks/run.py', '--list', '--shard', args.shard],
+    selection = ['--env', args.env] if args.env else []
+    listed = subprocess.run([sys.executable, '-B', 'tools/checks/run.py', '--list', '--shard', args.shard] + selection,
                             cwd=ROOT, env=env, capture_output=True, text=True, check=True)
     expected = listed.stdout.split()
     times = out / 'check_times.tsv'
     env.update(CHECK_LOG_DIR=str(logs_dir), OS32_REQUIRE_PPC='1')
     mutate = '0' if args.no_mutate else '1'
     target = 'check-fast' if args.no_mutate else 'check'
-    with open(out / 'make.log', 'wb') as log:
-        make = subprocess.run(['make', '-k', '-j' + str(args.jobs), target, 'CHECK_SHARD=' + args.shard,
-                               'MUTATE=' + mutate, 'CHECK_TIMES=' + str(times)],
-                              cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT)
+    if args.env:
+        # 検査の前提 (像のビルド) は run.py --run が持つ。make の並列の列は使わない。
+        sys.path.insert(0, str(ROOT / 'tools'))
+        import check_time
+        check_time.reset(times)
+        os.environ.clear()
+        os.environ.update(env, MUTATE=mutate)
+
+        def timed(name):
+            return check_time.run(times, name, [sys.executable, '-B', 'tools/checks/run.py',
+                                                '--run', name] + selection)
+        previous = os.getcwd()
+        os.chdir(ROOT)
+        try:
+            run_each(expected, timed)
+        finally:
+            os.chdir(previous)
+        make = subprocess.CompletedProcess([], 0)
+        (out / 'make.log').write_text('')
+    else:
+        with open(out / 'make.log', 'wb') as log:
+            make = subprocess.run(['make', '-k', '-j' + str(args.jobs), target, 'CHECK_SHARD=' + args.shard,
+                                   'MUTATE=' + mutate, 'CHECK_TIMES=' + str(times)],
+                                  cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT)
     rows = parse_times(times.read_text()) if times.is_file() else {}
     logs = {path.stem: path.read_text(errors='replace') for path in sorted(logs_dir.glob('*.log'))}
     checks = classify(expected, rows, logs)
-    lines, failed = render(args.shard, not args.no_mutate, checks, logs)
+    lines, failed = render(args.shard + (' (%s)' % args.env if args.env else ''), not args.no_mutate, checks, logs)
     keep_failed_logs(out, logs_dir, checks)
     if make.returncode and not failed:
         # 検査は全部通ったのに make が落ちた: 準備か、木が変わっていないことの照合。
@@ -187,6 +224,8 @@ def main(argv=None):
     runner.add_argument('--out', type=Path, required=True, help='ログと結果の置き場 (作業木の外)')
     runner.add_argument('--no-mutate', action='store_true')
     runner.add_argument('--jobs', type=int, default=4)
+    runner.add_argument('--env', choices=('ppc-cross', 'qemu-ppc', 'socket'),
+                        help='この環境を要る検査だけを割って、1 本ずつ順に回す (--jobs は使わない)')
     args = parser.parse_args(argv)
     return run(args)
 

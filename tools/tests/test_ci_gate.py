@@ -2,7 +2,7 @@
 """tools/ci/gate.py: 道具の事前確認・結果の表・回っていない検査を失敗に数えること (検査は回さない)。"""
 CHECK = dict(name='ci-gate-host', tier=1, needs=[], budget=5,
     covers=['tools/ci/gate.py', 'tools/tests/test_ci_gate.py', 'tools/checks/run.py', 'tools/check_time.py',
-            '.github/actions/gate-setup/action.yml', '.github/workflows/sep.yml'],
+            '.github/actions/gate-setup/action.yml', '.github/workflows/sep.yml', '.github/workflows/check.yml'],
     basis=['CI_GATE_DESIGN §2', 'CI_GATE_DESIGN §3'],
 )
 import argparse
@@ -76,6 +76,18 @@ def suite(tool):
             # 時間の表は遅い順。
             self.assertLess(text.index('| `check-b` | 30 |'), text.index('| `check-a` | 2 |'))
 
+        def test_run_each_runs_every_check_in_order(self):
+            # --env の束: 途中で落ちても残りを回し、落ちた本数を返す。順は一覧のまま。
+            seen = []
+
+            def timed(name):
+                seen.append(name)
+                return {'check-b': 2, 'check-d': 1}.get(name, 0)
+            self.assertEqual(tool.run_each(['check-a', 'check-b', 'check-c', 'check-d'], timed), 2)
+            self.assertEqual(seen, ['check-a', 'check-b', 'check-c', 'check-d'])
+            self.assertEqual(tool.run_each([], timed), 0)
+            self.assertEqual(tool.run_each(['check-a', 'check-c'], timed), 0)
+
         def test_keep_failed_logs(self):
             with tempfile.TemporaryDirectory(prefix='os32-ci-gate-') as directory:
                 out = Path(directory)
@@ -106,6 +118,8 @@ def suite(tool):
 
 
 MUTANTS = [
+    ("        if timed(name) != 0:\n            failed += 1", "        if timed(name) != 0:\n            return 1"),
+    ("        if timed(name) != 0:\n            failed += 1", "        if timed(name) != 0:\n            failed = 1"),
     ("found = bool(base) and os.access(os.path.join(base, 'bin', name), os.X_OK)", "found = which(name) is not None"),
     ("        if not found:\n            missing.append((name, how))", "        if not found:\n            return [(name, how)]"),
     ("missing += [(path, how) for path, how in FILES if not exists(path)]", "pass"),

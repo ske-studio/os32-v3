@@ -5,7 +5,7 @@
 対象は `.github/workflows/`・`.github/actions/`・`tools/ci/` と、検査の登録 (`tools/checks/`、試験ファイルの中の `CHECK`) を作る・直す人。
 決まりの根拠になった既存の CI の欠点の実測 (F1〜F9) と、決まりどおりに組んだ手本の形は [design/tools/ci/gate.md](design/tools/ci/gate.md)。取り込みの手順 (どの結論で main に入れるか) は [ROLES §0「検査」](tasks/agents/ROLES.md)、検査の宣言の欄は [TESTS.md](TESTS.md) が正典で、ここには写さない。
 
-結果の読み方・回し直し・CI が起動しない時の手順は、スキル `.claude/skills/os32-ci-read`。
+結果の読み方・回し直し・CI が起動しない時の手順は、スキル `.claude/skills/os32-ci-read`。待ち時間の棚卸し (検査ごとの所要・シャードの偏り・重みの作り直し) は、スキル `.claude/skills/os32-ci-inventory`。
 
 ## §1. 作る時の決まり
 

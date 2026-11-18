@@ -210,10 +210,16 @@ jobs:
         run: |
           MUTATE=1 python3 -B tools/checks/run.py --run all --env ppc-cross --exclude-env qemu-ppc
 
+  # QEMU で機械を丸ごと模擬する検査 (12 本、変異込み)。1 本のジョブで直列に回すと 53〜61 分かかるので、
+  # 4 本に割って並べる (シャードの中は 1 本ずつ)。割り方は検査の重み (tools/checks/weights.json) から。
+  # ppc-compile の成果物は読まないので needs で鎖にしない (docs/POLICY_CI.md G2)。
   ppc-qemu:
-    needs: ppc-compile
     runs-on: ubuntu-latest
-    timeout-minutes: 150
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -239,7 +245,23 @@ jobs:
           OS32_ACCEPT_IPA_LICENSE: "1"
           TMPDIR: ${{ runner.temp }}
         run: |
-          OS32_REQUIRE_PPC=1 MUTATE=1 python3 -B tools/checks/run.py --run all --env qemu-ppc
+          python3 -B tools/ci/gate.py run --env qemu-ppc --shard ${{ matrix.shard }}/4 --out "$RUNNER_TEMP/gate"
+      - name: Upload check times
+        if: always() && steps.scope.outputs.scope == 'ppc'
+        uses: actions/upload-artifact@v4
+        with:
+          name: check-times-${{ github.sha }}-ppc-qemu-${{ matrix.shard }}
+          path: ${{ runner.temp }}/gate/check_times.tsv
+          if-no-files-found: warn
+      - name: Upload failed logs
+        if: failure() && steps.scope.outputs.scope == 'ppc'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ppc-qemu-failed-${{ matrix.shard }}
+          path: |
+            ${{ runner.temp }}/gate/results.json
+            ${{ runner.temp }}/gate/failed-logs/
+          if-no-files-found: warn
       - name: PPC QEMU diagnostics
         if: failure()
         run: |

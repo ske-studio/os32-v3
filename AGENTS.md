@@ -57,6 +57,7 @@ The step-by-step playbooks live under `.claude/skills/<name>/SKILL.md`. They are
 - `os32-test-basis`: registering a check, replacing hash / commit / count pins, fixing stale mutation anchors.
 - `os32-kapi-add`: adding or changing a KernelAPI entry.
 - `os32-ci-read`: reading CI failures and re-running (PM).
+- `os32-ci-inventory`: measuring per-check time and shard balance, recalibrating `tools/checks/weights.json` (PM).
 - `os32-archive`: summarizing a finished ticket into `docs/design/` before moving it to `docs/archive/` (PM; policy in [docs/POLICY_ARCHIVE.md](docs/POLICY_ARCHIVE.md)).
 
 ## Authoritative Guidance
