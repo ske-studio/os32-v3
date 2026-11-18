@@ -1,6 +1,6 @@
 # TASK_CI_REWORK — 既存の CI (check・build) を手本の形に直す
 
-> 状態: **計画 (2026-11-18)** — 本線の再開の最初の仕事 (ユーザー決定 2026-11-18「本線が再開するのは旧い CI の手直しから」)。票は特務の PM が実測から書いた。段は未着手。
+> 状態: **計画 (2026-11-18)** — 本線の再開の最初の仕事 (ユーザー決定 2026-11-18「本線が再開するのは旧い CI の手直しから」)。票は特務の PM が実測から書いた。**S0 は完了** (本線の PM、2026-11-18。原因と直し、同じ SHA の 10 回の結果は [gate.md](../../design/tools/ci/gate.md) §5-2、基準 (5) を満たした)。S1 以降は未着手。
 > 完了の基準: (1) `.github/workflows/check.yml` に `make check-<名>` の手書きの行が 0 (今 31 行)、(2) workflow の中の `apt-get install` が 0 行 (今 3 行。用意は composite action だけ)、(3) わざと 2 本落とした枝で、check・build のどのジョブも残りを最後まで回し、落ちた 2 本の名前がジョブの要約の表に出る、(4) 置き換えの前後で回る検査の名前の集合が減っていない事を機械で確かめた記録がある、(5) 揺れた検査 2 本 (`ppc-sd-link`・`ppc-usb`) が同じ SHA の 10 回の実行で 10 回通り、用意の手順も 10 回落ちない、(6) 道具が無い時に SKIP で通る検査が 0。6 つを満たした SHA が main に在る。
 
 決まりは [POLICY_CI](../../POLICY_CI.md) (作る時 G1〜G12、改修する時 R1〜R8)。手本の形と、11-17 の欠点の実測は [gate.md](../../design/tools/ci/gate.md)。この票は、11-18 に関門を変異込みへ切り替えた後に残っている分を、段に切る。
@@ -26,7 +26,7 @@
 | G5 用意は 1 か所 | `apt-get install` が check.yml に 3 行、中身が違う | ppc-compile にだけ `qemu-system-ppc` が無く、変異の試験 (`tools/ppc/test_lan_p29.py`) が落ちた |
 | G6 道具が無い時に通さない | クロスコンパイラの無いジョブでは PowerPC の検査が SKIP で通る | 11-18 は出ていない |
 | G7 CI と手元で同じ入口 | `make check-…` と `run.py --run …` の 2 つ | 11-18 は出ていない (11-17 に `r1-fixture-host` が片方だけで落ちた) |
-| 揺れる検査 | `ppc-sd-link` (QEMU の `boot1 READY` の期限切れ、11-17 の変異込みの回で 1 回)。用意の `rustup toolchain install` (`rust-src` の `detected conflict`、11-18 に 1 回、45 秒でジョブが落ちる) | 回し直しで通した。原因は調べていない |
+| 揺れる検査 | 無し (11-18 の S0 で 2 本とも原因が分かった)。`ppc-sd-link` は揺れではなかった: 11-17 の回 (枝 wt/sep-ci の手本の CI の最初の回) は用意に `qemu-system` (mac99 の VGA の ROM) が無く、PowerPC の QEMU の検査 11 本が起動直後の QMP EOF で落ちていた (`boot1 READY` の待ちには入っていない)。`50da7775f` で直っている。用意の rustup は、runner が rust-src の登録の無い同じ版の toolchain を持って始まる型 (直近 49 ジョブ中 1 本) | 用意は壊れた toolchain を消してから入れ直す形に直した (S0)。詳細は [gate.md](../../design/tools/ci/gate.md) §5-2 |
 | 揺れを直した検査 | `ppc-usb` (「HOME/LEFT/RIGHT/DEL result」、11-17 に 2 回・11-18 に 1 回) | 原因は試験の待ちの条件: DELETE で行を描き直すと出力の末尾がプロンプトになるので、Enter の結果が出る前に待ちが終わっていた (`userland/shell/ui.c` の `redraw_line` は最後にプロンプトを出し直す)。結果の行が出るまで待つ形に直した (`tools/ppc/usb_run.py`、11-18。履歴の試験と同じ型の直し) |
 
 関門の外で CI が起動しない条件 (直す対象ではなく、取り込みで踏む所): コミットの本文に CI を飛ばす印の文字列があると全部飛ぶ、文書だけ・空のコミットの push では build が起動しない、main への push の PowerPC の段は範囲の判定で中身を回さない事がある (11-18 の main の 2 回は 1 分以内で終わった。意図どおりかは未確認 — 段 S1 で確かめる)。
