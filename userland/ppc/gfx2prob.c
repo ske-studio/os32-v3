@@ -44,7 +44,7 @@ int main(int argc, char **argv, KernelAPI *api)
     if (api->gfx2_mode_count(0, 0, GFX2_FMT_INDEX8) != 1 ||
         api->gfx2_mode_count(0, 0, GFX2_FMT_RGB565) != 0 ||
         api->gfx2_mode_get(0, 0, GFX2_FMT_INDEX8, 0, &mode) ||
-        mode.id != 1 || mode.fmt != GFX2_FMT_INDEX8)
+        mode.id != 1 || mode.fmt != GFX2_FMT_INDEX8 || head.mode_id != mode.id)
         return report(api, "GFX2 mode failed\n", 5);
     if (mode.w != FB_WIDTH || mode.h != FB_HEIGHT)
         return report(api, "GFX2 mode dimensions failed\n", 6);
