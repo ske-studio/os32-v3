@@ -8,6 +8,8 @@ enum {
     SHIFT_MODE = 0x0c, SHIFT_OUT = 0x10, SR_DONE = 0x04, PMU_IRQ = 0x10,
     CUDA_LINES = PB4 | TIP, CUDA_FRAME_MAX = 256,
     PMU_RESET_CPU = 0xd0, CUDA_PSEUDO = 0x01, CUDA_RESET = 0x11,
+    PMU_READ_RTC = 0x38, CUDA_GET_TIME = 0x03,
+    RTC_BYTES = 4, CUDA_REPLY_HEADER = 3,
     /* Delay units are 50 us. */
     DELAY_UNITS_PER_SECOND = 20000, CUDA_SETTLE = 3, CUDA_RETRY = 30,
     EDGE_INTERVALS_PER_SECOND = 10
@@ -131,21 +133,51 @@ timeout:
     return CUDA_SEND_TIMEOUT;
 }
 
-static int pmu_command(struct via_controller *v, via_ticks start, u8 cmd)
+static int pmu_transfer(struct via_controller *v, via_ticks start, u8 cmd, u8 *reply)
 {
     int rc = PMU_IDLE_TIMEOUT;
-    write8(v, IER, read8(v, IER) & PMU_IRQ);
     if (wait_bit(v, start, PORT_B, PB3, true)) {
-        update(v, ACR, 0, SHIFT_MODE | SHIFT_OUT);
-        write8(v, SR, cmd);
+        if (reply) {
+            update(v, ACR, SHIFT_OUT, SHIFT_MODE);
+            (void)read8(v, SR);
+        } else {
+            update(v, ACR, 0, SHIFT_MODE | SHIFT_OUT);
+            write8(v, SR, cmd);
+        }
         update(v, PORT_B, PB4, 0);
         rc = PMU_BUSY_TIMEOUT;
         if (wait_bit(v, start, PORT_B, PB3, false)) {
             update(v, PORT_B, 0, PB4);
-            return wait_bit(v, start, PORT_B, PB3, true) ? 0 : PMU_FREE_TIMEOUT;
+            if (!wait_bit(v, start, PORT_B, PB3, true))
+                return PMU_FREE_TIMEOUT;
+            if (reply)
+                *reply = read8(v, SR);
+            return 0;
         }
     }
     update(v, PORT_B, 0, PB4);
+    return rc;
+}
+
+/* Both PMU commands have zero request payload. Read RTC has a fixed
+ * four-byte response, with no length or command byte on the wire. */
+static int pmu_command(struct via_controller *v, via_ticks start, u8 cmd,
+                       u8 *in, u32 cap, u32 *got)
+{
+    u32 reply = cmd == PMU_RESET_CPU ? 0 : RTC_BYTES;
+    if (reply && (!in || cap < reply))
+        return VIA_INVALID;
+
+    u8 enabled = read8(v, IER) & PMU_IRQ;
+    write8(v, IER, enabled);
+    int rc = pmu_transfer(v, start, cmd, NULL);
+    while (!rc && *got < reply) {
+        rc = pmu_transfer(v, start, 0, in + *got);
+        if (!rc)
+            ++*got;
+    }
+    if (reply && enabled)
+        write8(v, IER, 0x80 | enabled);
     return rc;
 }
 
@@ -224,11 +256,12 @@ static int via_command(struct via_controller *v, const u8 *out, u32 n,
                        u8 *in, u32 cap, u32 *got)
 {
     *got = 0;
-    if (!n || (v->kind != VIA_CUDA && (v->kind != VIA_PMU || n != 1 || out[0] != PMU_RESET_CPU)))
+    if (!n || (v->kind != VIA_CUDA && (v->kind != VIA_PMU || n != 1 ||
+                                       (out[0] != PMU_RESET_CPU && out[0] != PMU_READ_RTC))))
         return VIA_INVALID;
     via_ticks start = now(v);
     if (v->kind == VIA_PMU)
-        return pmu_command(v, start, out[0]); /* Reset has zero payload and reply. */
+        return pmu_command(v, start, out[0], in, cap, got);
 
     int rc = cuda_send(v, start, out, n);
     if (rc || !in || !cap)
@@ -250,4 +283,34 @@ int via_restart(struct via_controller *v)
     if (v->kind == VIA_CUDA)
         return via_command(v, cuda, sizeof(cuda), NULL, 0, &got);
     return VIA_INVALID;
+}
+
+int via_read_rtc(struct via_controller *v, u32 *seconds)
+{
+    static const u8 pmu[] = { PMU_READ_RTC };
+    static const u8 cuda[] = { CUDA_PSEUDO, CUDA_GET_TIME };
+    /* One extra byte lets a truncated oversized Cuda frame fail validation. */
+    u8 reply[CUDA_REPLY_HEADER + RTC_BYTES + 1];
+    u32 got, offset;
+    int rc;
+
+    if (v->kind == VIA_PMU) {
+        rc = via_command(v, pmu, sizeof(pmu), reply, sizeof(reply), &got);
+        offset = 0;
+    } else if (v->kind == VIA_CUDA) {
+        rc = via_command(v, cuda, sizeof(cuda), reply, sizeof(reply), &got);
+        offset = CUDA_REPLY_HEADER;
+    } else {
+        return VIA_INVALID;
+    }
+    if (rc)
+        return rc;
+    if (got != offset + RTC_BYTES ||
+        (offset && (reply[0] != CUDA_PSEUDO || reply[1] != 0 || reply[2] != CUDA_GET_TIME)))
+        return VIA_INVALID;
+
+    *seconds = 0;
+    for (u32 i = 0; i < RTC_BYTES; ++i)
+        *seconds = (*seconds << 8) | reply[offset + i];
+    return 0;
 }

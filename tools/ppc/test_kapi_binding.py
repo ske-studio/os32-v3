@@ -43,7 +43,7 @@ loop_status mem_stat mouse_available mouse_cursor_hide mouse_cursor_set_mode
 mouse_cursor_show mouse_poll mouse_set_bounds np2_check_hostdrv np2_detect
 np2_get_clock np2_get_cpu np2_get_version
 pci_bind_info pci_cfg_read32 pci_count
-pci_get pcm_close pcm_open pcm_set_volume pcm_status pcm_write rtc_read
+pci_get pcm_close pcm_open pcm_set_volume pcm_status pcm_write
 serial_diag serial_get_status serial_getchar serial_init serial_init_vfast
 serial_is_initialized serial_putchar serial_puts serial_trygetchar sfs_begin
 sfs_end snd_bgm_is_playing snd_bgm_play snd_bgm_set_persist snd_bgm_stop
@@ -58,6 +58,7 @@ v86_gdc_capture v86_selftest
 # input_service, kbd_inject, con_sink, pipe_buffer, kapi_strings, kstring.
 ALLOWED_UNDEFINED = frozenset("""
 boot_token_get
+clock_read_legacy
 con_sink_capture
 appmem_error_public
 appmem_map
@@ -241,6 +242,13 @@ def generate(tmp, mutation=None):
         if text.count(anchor) != 1:
             raise RuntimeError('putchar-absent: expected one console_font group')
         helper.write_text(text.replace(anchor, anchor + "        'tvram_putchar_at',\n"))
+    if mutation == 'rtc-absent':
+        anchor = "    'console_font': (frozenset({\n"
+        text = helper.read_text()
+        if text.count(anchor) != 1 or "'rtc_read'" in text:
+            raise RuntimeError('rtc-absent: expected rtc_read present and one console_font group')
+        group = "    'clock': (frozenset({'rtc_read'}), frozenset()),\n"
+        helper.write_text(text.replace(anchor, group + anchor))
     if mutation == 'zero':
         text = generator.read_text().replace('{absent_result(api)};', '0;')
         generator.write_text(text)
@@ -258,8 +266,8 @@ def main():
         return 1
     entries = [api for api in json.loads((ROOT / 'sdk/kapi.json').read_text())['api']
                if api['name'] in EXPECTED_ABSENT_SLOTS]
-    assert len(entries) == 176
-    assert {'buz_on', 'buz_off', 'rtc_read'} <= ABSENT_PROVIDER_SLOTS
+    assert len(entries) == 175
+    assert {'buz_on', 'buz_off'} <= ABSENT_PROVIDER_SLOTS
     assert not {'sys_reboot', 'sys_shm_alloc', 'sys_shm_lock', 'sys_shm_free'} & ABSENT_PROVIDER_SLOTS
     with tempfile.TemporaryDirectory(prefix='ppc-binding-') as directory:
         tmp = Path(directory)
@@ -290,9 +298,9 @@ def main():
             print('missing sys_reboot provider'); return 1
         missing = {'exec_tvram_read_allowed', 'pm_console_clear', 'tvram_putchar_at',
                    'tvram_putkanji_at', 'tvram_readchar_at', 'tvram_reverse_cell',
-                   'tvram_scroll', 'shm_alloc', 'shm_free', 'shm_lock'} - undefined
+                   'tvram_scroll', 'shm_alloc', 'shm_free', 'shm_lock', 'clock_read_legacy'} - undefined
         if missing:
-            print('missing console providers:', sorted(missing)); return 1
+            print('missing required providers:', sorted(missing)); return 1
         unexpected = undefined - ALLOWED_UNDEFINED
         if unexpected:
             print('unexpected providers:', sorted(unexpected)); return 1

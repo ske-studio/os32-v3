@@ -21,5 +21,7 @@ struct via_controller {
 int via_prepare(struct via_controller *v);
 /* Caller disables CPU IRQs before invoking this terminal operation. */
 int via_restart(struct via_controller *v);
+/* Read the unsigned big-endian RTC counter as seconds since 1904-01-01. */
+int via_read_rtc(struct via_controller *v, u32 *seconds);
 
 #endif

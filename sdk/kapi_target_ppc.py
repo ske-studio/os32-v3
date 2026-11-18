@@ -30,9 +30,6 @@ PROVIDER_GROUPS = {
         'gfx_hw_get',
         'gfx_osri_show',
     }), frozenset(['gfx_hal.h', 'gfx.h', 'palette.h'])),
-    'clock': (frozenset({
-        'rtc_read',
-    }), frozenset([])),
     'console_font': (frozenset({
         'unicode_to_jis',
         'font_source_open',

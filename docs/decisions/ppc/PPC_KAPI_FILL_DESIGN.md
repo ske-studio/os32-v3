@@ -252,7 +252,9 @@ A の場合も、対象像が持つ弱い代役に解決されていないこと
 |gfx2|adapter/head/connector/mode と caps、面生成・lock・描画・present・解放。fence と非対応 EDID 等は実能力どおり|of_fb_v2 の固定モード比較を外し異寸法が通ることを検出|
 |gui|登録者に要求が一度届き、GUI 終了後に shell に入力が戻る|終了時の所有解放を省略|
 |sys|再起動前後の boot ログを別起動として観測。確定設計の PMU/Cuda ごとに送信回数を照合。buz は無動作|reset の装置呼出を外し再起動を検出できなくする|
-|clock|既知の RTC 日時で起動し年月日・時分秒と日付境界を確認|epoch 補正を1日ずらす|
+|clock|mac99 の Cuda と PMU を `-rtc base=2024-02-29T00:00:00` で起動し、RSH から 7 バイトの暦時刻と曜日を読む。起動から読出しまでの経過を加えた基準時刻との差は 2 秒以内|年を 1 年ずらす、Cuda と PMU の読出し命令を交換する、公開表で提供者を外す|
+
+PowerMac の暦時計は reset と同じ VIA インスタンスを使う。Apple Power Mac G4 (September 2002) Developer Note の KeyLargo / PMU99 の資料は [reset 設計 §4](PPC_RESET_DESIGN.md) に記載。通信の手本は NetBSD `sys/arch/macppc/dev/cuda.c:788–815`、`cudavar.h:45`、`pmu.c:492–558,727–729`、`pmuvar.h:41`。Cuda は `01 03` に続く応答の 3 バイトのヘッダを検証し、PMU は `38` の固定長応答を読む。どちらも時刻本体は 1904-01-01 からの秒数を表すビッグエンディアン 4 バイト。PowerMac の後端でグレゴリオ暦に変換し、公開スロットは既存の 2 桁年と日曜を 0 とする曜日を返す。
 |platform|NP2 照会は型別不在。既知イメージを loop attach、容量を照合し detach 後の状態を読む|loop_status の sector 数を1増やす|
 |ide|ATA 有効像では識別済み試験用媒体だけで sector 往復。不在像は present=0。拒否した書込後に内容が一致|先頭 LBA を1ずらし隣接 sector の番兵で検出|
 |ext2|使い捨て loop 上で format と format_at、再 mount、範囲外の前後 sector を比較|start_lba を無視させる|
