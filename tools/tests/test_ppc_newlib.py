@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Expectation origin: PPC_FP_NEWLIB_DESIGN §8 N2・N3.
+"""Expectation origin: PPC_FP_NEWLIB_DESIGN §4 N3・§8 / astra レビュー 2026-11-18.
 
 Real PPC CRT execution and real nano/float execution on qemu-user. System
 heap/file/exit acceptance is tools/accept/ppc_newlib.py (PM socket runner).
@@ -67,7 +67,7 @@ extern KernelAPI *kapi;
 extern void *__os32_aux;
 extern void os32_start_c(int, char **, KernelAPI *, void *);
 static KernelAPI api;
-static int initialized, mode;
+static int initialized, mode, help_calls;
 static void stop(int code) {
     register int r0 __asm__("r0")=1;
     register int r3 __asm__("r3")=code;
@@ -75,7 +75,7 @@ static void stop(int code) {
     for (;;) {}
 }
 void _init(void) { initialized = kapi == &api && __os32_aux == &mode; }
-int os32_help_show(const char *s) { (void)s; return mode == 1 ? 0 : -1; }
+int os32_help_show(const char *s) { (void)s; ++help_calls; return mode == 1 ? 0 : -1; }
 int main(int argc, char **argv, KernelAPI *p) {
     (void)argv;
     if (!initialized || p != &api || argc != 2 || mode == 1) return 11;
@@ -83,6 +83,8 @@ int main(int argc, char **argv, KernelAPI *p) {
 }
 static void finish(int code) {
     if (!initialized) stop(11);
+    if (help_calls != (mode ? 1 : 0)) stop(13);
+    help_calls = 0;
     if (code != (mode == 1 ? 0 : 7)) stop(12);
     if (++mode == 4) stop(0);
     char *flags[] = {"probe", mode == 1 ? "--help" : mode == 2 ? "-h" : "/?"};
@@ -127,6 +129,11 @@ def main():
             assert source.count(anchor) == 1
             assert crt(prefix, work, source.replace(anchor,'')) == 11
             print('runtime RED: N2 _init removed')
+            for flag in ("s[0]=='-' && s[1]=='h' && s[2]=='\\0'", "s[0]=='/' && s[1]=='?' && s[2]=='\\0'"):
+                assert source.count(flag) == 1
+                assert crt(prefix, work, source.replace(flag, '0')) == 13
+                print('runtime RED: help flag removed:', flag)
+
             assert crt(prefix, work, source) == 0
             script=(ROOT/'sdk/link/ppc/app.ld').read_text()
             anchor='        *(.sbss .sbss.* .sbss2 .sbss2.*)'

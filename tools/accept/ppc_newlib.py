@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Expectation origin: PPC_FP_NEWLIB_DESIGN §8 N2・N3.
+"""Expectation origin: PPC_FP_NEWLIB_DESIGN §4 N3・§8 / astra レビュー 2026-11-18.
 
 link-SH/RSH acceptance on 7450/7455. Only acceptance images contain the probe.
 Runtime RED requires the exact output/status/reason; crashes are errors.
@@ -92,11 +92,20 @@ def observe(elf, cpu, out, case):
             require(b'hello world\n' in body and status == b'7\n','external exec')
             body,status=command('echo N3-shell')
             require(body == b'N3-shell\n' and status == b'0\n','shell builtin')
-            # Failure cleanup must permit the same file/heap probe to run again.
-            body,status=command('/bin/nlprobe.bin fault')
-            require(status == b'139\n' and b'N3-exit=' not in body,'fault with live heap/FD')
-            body,status=command('/bin/nlprobe.bin')
-            require(body == FLOAT+b'N3-exit=0\n\n' and status == b'0\n','post-fault reuse')
+            def capacity():
+                body, status = command('/bin/nlprobe.bin resources')
+                import re
+                match = re.fullmatch(FLOAT + rb'N3-resources fd=([0-9]+) heap=([0-9]+)\nN3-exit=0\n\n', body)
+                require(match is not None and status == b'0\n', 'resource baseline: '+repr((body, status)))
+                return match.groups()
+            baseline = capacity()
+            print('resources '+cpu+' baseline='+str(baseline), flush=True)
+            body,status=command('/bin/nlprobe.bin retain')
+            require(status == b'0\n' and b'N3-resources' in body, 'normal exit with live resources')
+            require(capacity() == baseline, 'normal exit resource recovery')
+            body,status=command('/bin/nlprobe.bin retain-fault')
+            require(status == b'139\n' and b'N3-resources' in body and b'N3-exit=' not in body, 'fault with live resources')
+            require(capacity() == baseline, 'fault resource recovery')
         s.q.call('quit'); s.p.wait(timeout=5)
         require(s.p.returncode == 0,'newlib QEMU exit')
     finally: s.close()
