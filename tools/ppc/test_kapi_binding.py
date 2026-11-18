@@ -51,6 +51,7 @@ exec_run
 exec_start
 exec_stop_culprit
 exec_sys_yield
+exec_tvram_read_allowed
 ppc_kapi_wait_once
 kapi_host_open
 kapi_host_status
@@ -114,6 +115,11 @@ sys_get_mem_kb
 sys_reboot
 sys_time
 tick_count
+tvram_putchar_at
+tvram_putkanji_at
+tvram_readchar_at
+tvram_reverse_cell
+tvram_scroll
 vfs_chdir
 vfs_close
 vfs_cwd_user
@@ -175,6 +181,12 @@ def generate(tmp, mutation=None):
     if mutation == 'reboot-absent':
         text = helper.read_text().replace("'buz_on', 'buz_off'", "'buz_on', 'buz_off', 'sys_reboot'")
         helper.write_text(text)
+    if mutation == 'putchar-absent':
+        anchor = "    'console_font': (frozenset({\n"
+        text = helper.read_text()
+        if text.count(anchor) != 1:
+            raise RuntimeError('putchar-absent: expected one console_font group')
+        helper.write_text(text.replace(anchor, anchor + "        'tvram_putchar_at',\n"))
     if mutation == 'zero':
         text = generator.read_text().replace('{absent_result(api)};', '0;')
         generator.write_text(text)
@@ -188,9 +200,11 @@ def generate(tmp, mutation=None):
 def main():
     entries = [x for x in json.loads((ROOT / 'sdk/kapi.json').read_text())['api']
                if x['name'] in ABSENT_PROVIDER_SLOTS]
-    assert len(entries) == 189
+    assert len(entries) == 184
     assert {'buz_on', 'buz_off', 'rtc_read'} <= ABSENT_PROVIDER_SLOTS
     assert 'sys_reboot' not in ABSENT_PROVIDER_SLOTS
+    assert {'font_source_open', 'font_source_read_at', 'font_source_close',
+            'unicode_to_jis'} <= ABSENT_PROVIDER_SLOTS
     with tempfile.TemporaryDirectory(prefix='ppc-binding-') as directory:
         tmp = Path(directory)
         (tmp / 'normal').mkdir()
@@ -218,6 +232,11 @@ def main():
             [str(nm), '-u', str(tmp / 'kapi.o')], text=True).splitlines()}
         if 'sys_reboot' not in undefined:
             print('missing sys_reboot provider'); return 1
+        missing = {'exec_tvram_read_allowed', 'pm_console_clear', 'tvram_putchar_at',
+                   'tvram_putkanji_at', 'tvram_readchar_at', 'tvram_reverse_cell',
+                   'tvram_scroll'} - undefined
+        if missing:
+            print('missing console providers:', sorted(missing)); return 1
         unexpected = undefined - ALLOWED_UNDEFINED
         if unexpected:
             print('unexpected providers:', sorted(unexpected)); return 1

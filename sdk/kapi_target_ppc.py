@@ -34,11 +34,6 @@ PROVIDER_GROUPS = {
         'rtc_read',
     }), frozenset([])),
     'console_font': (frozenset({
-        'tvram_putchar_at',
-        'tvram_putkanji_at',
-        'tvram_scroll',
-        'tvram_readchar_at',
-        'tvram_reverse_cell',
         'unicode_to_jis',
         'font_source_open',
         'font_source_read_at',
