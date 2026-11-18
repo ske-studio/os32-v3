@@ -1,7 +1,7 @@
 CHECK = dict(env=['ppc-cross', 'qemu-ppc'], name='arch-ctx-guest', tier=2, budget=900, needs=['make:ppc-ci-image'],
              covers=['tools/accept/arch_ctx*', 'arch/ppc/**', 'platform/powermac/**', 'arch/x86/**',
                      'platform/pc98/kernel.c', 'kernel/kstack_hw.[ch]', 'tools/tests/host32.py',
-                     'tools/tests/kernel_includes.py', 'build/config.mk', 'build/out/*', 'kernel/idle_work.c',
+                     'tools/tests/kernel_includes.py', 'build/config.mk', 'build/out/*', 'build/out/ppc-user/**', 'kernel/idle_work.c',
                      'platform/pc98/tick_order.h', 'userland/tests/ring3_hello.c',
                      'userland/tests/ring3_marker.h', 'tools/np21w_mcp/*.py',
                      'exec/**', 'kernel/sys.c', 'kernel/irq/**', 'kernel/time/**',

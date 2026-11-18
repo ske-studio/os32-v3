@@ -121,7 +121,10 @@ ALLOWED_TOOL_DIFFS = {
         'b81f4292bedf5052a642d9f5b4fa37cf2e5788eaf8ffdf2bfa9f9a2a55f415e4'),
         # PowerPC シェル S-B B27: PPC の USER の guarded link (本線の承認 2026-11-12)
         ('b81f4292bedf5052a642d9f5b4fa37cf2e5788eaf8ffdf2bfa9f9a2a55f415e4',
-         '0396d6c3319deacfed94f116547d4ebcf1a7b7c9eef37bf5ec18274256c5da06'),),
+         '0396d6c3319deacfed94f116547d4ebcf1a7b7c9eef37bf5ec18274256c5da06'),
+        # PowerPC newlib N3: PPC の USER の nano の検査 (check_link_target)。x86 の分岐は不変 (Opus レビュー 2026-11-18、本線の承認 2026-11-18)
+        ('0396d6c3319deacfed94f116547d4ebcf1a7b7c9eef37bf5ec18274256c5da06',
+         '00503d8fbf08febca470e7e861e90129c27d809cedb106bf92b83bdb10ee5981'),),
     # 第 5 段 S1: SDK の選択 (CRT・link script・Rust target) を profile に足した。
     'build/sdk/bin/target_profile.py': ((
         '4f6491076f6737fa2f8fa0a80216efe1ae20a68fd80e16496a26dcb399b2d9a6',
