@@ -4,16 +4,34 @@
 static char output[256];
 static unsigned used, reads, stalled, drain_stalled, indexed, calls, last_used;
 /* Independent Z8530 fixture values. Error status follows the FIFO head. */
-static const unsigned char rx_fifo[] = { 0x00, 0xff, 0x53, 0x80 };
-static const unsigned char rx_status[] = { 0, 0x20, 0x50, 0 };
+static const unsigned char rx_fifo[] = { 0x00, 0xff, 0x53, 0x80, 0x41 };
+static const unsigned char rx_status[] = { 0, 0x20, 0x20, 0x40, 0x10 };
 static unsigned rx_head, rx_tail, rx_resets, rx_error, interleave;
 static unsigned rx_arrival, single_poll;
+/* Stable exit codes used by the receive mutations in kboot_log.py. */
+enum {
+    RX_EXTRA_POLL = 200,
+    RX_FIRST_BYTE,
+    RX_DIAG_CLEAN,
+    RX_DIAG_FIRST_OVERRUN,
+    RX_DIAG_SECOND_OVERRUN,
+    RX_DIAG_FRAMING,
+    RX_DIAG_PARITY,
+};
 static void finish(int status)
 {
     __asm__ volatile("int $0x80" : : "a"(1), "b"(status));
     __builtin_unreachable();
 }
 #define REQUIRE(x) do { if (!(x)) finish(__LINE__); } while (0)
+static void expect_diag(u32 expected_oe, u32 expected_fe, u32 expected_pe, int failure)
+{
+    u32 oe, fe, pe, overflow;
+    pm_escc_diag(&oe, &fe, &pe, &overflow);
+    if (oe != expected_oe || fe != expected_fe || pe != expected_pe || overflow)
+        finish(failure);
+}
+
 unsigned ppc_load8(cell a)
 {
     if (a == 0xfe300010) {
@@ -23,8 +41,8 @@ unsigned ppc_load8(cell a)
     }
     REQUIRE(a == 0xfe300000);
     reads++;
-    if (single_poll) REQUIRE(reads == 1);
-    if (rx_arrival && reads == rx_arrival) rx_tail = 4;
+    if (single_poll && reads != 1) finish(RX_EXTRA_POLL);
+    if (rx_arrival && reads == rx_arrival) rx_tail = sizeof(rx_fifo);
     /* Runtime watchdog: removal of the product bound fails, never hangs. */
     REQUIRE(reads <= PM_POLL_LIMIT + 1 + (drain_stalled ? 7 : 0));
     if (indexed) {
@@ -52,6 +70,7 @@ void ppc_store8(cell a, unsigned value)
         if (interleave) {
             interleave = 0;
             REQUIRE(pm_escc_trygetchar() == 0xff);
+            expect_diag(1, 0, 0, RX_DIAG_FIRST_OVERRUN);
         }
     }
 }
@@ -112,17 +131,19 @@ void _start(void)
     REQUIRE(pm_escc_trygetchar() == -1 && reads == 1);
     single_poll = 0;
     rx_arrival = reads + 3;
-    REQUIRE(pm_escc_getchar_kapi() == 0x00);
+    if (pm_escc_getchar_kapi() != 0x00) finish(RX_FIRST_BYTE);
+    expect_diag(0, 0, 0, RX_DIAG_CLEAN);
     interleave = 1;
     pm_log_write("LOG", 3);
     expect("LOG", 3);
     REQUIRE(!interleave);
     REQUIRE(pm_escc_trygetchar() == 0x53);
+    expect_diag(2, 0, 0, RX_DIAG_SECOND_OVERRUN);
     REQUIRE(pm_escc_getchar_kapi() == 0x80);
-    REQUIRE(rx_head == rx_tail && rx_resets == 2);
-    u32 oe, fe, pe, overflow;
-    pm_escc_diag(&oe, &fe, &pe, &overflow);
-    REQUIRE(oe == 1 && fe == 1 && pe == 1 && overflow == 0);
+    expect_diag(2, 1, 0, RX_DIAG_FRAMING);
+    REQUIRE(pm_escc_trygetchar() == 0x41);
+    expect_diag(2, 1, 1, RX_DIAG_PARITY);
+    REQUIRE(rx_head == rx_tail && rx_resets == 4);
     pm_escc_diag(0, 0, 0, 0);
     reads = 0;
     single_poll = 1;
