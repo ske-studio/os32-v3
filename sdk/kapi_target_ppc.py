@@ -33,12 +33,6 @@ PROVIDER_GROUPS = {
     'clock': (frozenset({
         'rtc_read',
     }), frozenset([])),
-    'console_font': (frozenset({
-        'unicode_to_jis',
-        'font_source_open',
-        'font_source_read_at',
-        'font_source_close',
-    }), frozenset([])),
     'port': (frozenset({
         'serial_init',
         'serial_puts',

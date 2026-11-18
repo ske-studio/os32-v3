@@ -246,7 +246,7 @@ A の場合も、対象像が持つ弱い代役に解決されていないこと
 |shm|確保・lock・書込・解放・再確保、終了した子の領域を回収|解放を飛ばし容量復帰で検出|
 |port|ESCC 対向と既知バイトを往復。入力なしの try、設定速度、diag と initialized を照合|送受信の1文字破棄、速度応答固定|
 |pointer|USB 相対移動、端で clamp、ボタン押下中に抜き、再接続。カーソル show/hide と位置を観測|release 配送を落として押下残りを検出|
-|console_font|指定セルの ANK/JIS、反転と scroll の画面・読戻し、既知フォント部分読取と close 後の拒否|行送りを1行ずらす、lease 範囲端をずらす|
+|console_font|指定セルの ANK/JIS、反転と scroll の画面・読戻し、既知 Unicode の JIS 変換、無圧縮の東雲16 KCG1 から字形を部分読取、EOF 境界・close 後の拒否、終了前に使い切った lease 枠の再取得|行送りを1行ずらす、lease 範囲端をずらす、提供者を外す|
 |surface|公開面を query→lease→unlease、世代変更後の再利用は STALE。束の後半失敗で先頭も未取得|世代判定を無効化|
 |gfx|画面寸法と owner を取得、既知矩形だけ更新し周囲の pixel を保存。非対応 raster/HW は能力に一致|dirty 範囲の右端を欠落させる|
 |gfx2|adapter/head/connector/mode と caps、面生成・lock・描画・present・解放。fence と非対応 EDID 等は実能力どおり|of_fb_v2 の固定モード比較を外し異寸法が通ることを検出|

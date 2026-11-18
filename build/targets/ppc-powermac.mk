@@ -97,7 +97,7 @@ $(KB_GEN)/stamp: sdk/kapi.json sdk/gen_kapi.py sdk/kapi_abi_x86.py sdk/kapi_targ
 	python3 -B sdk/gen_kapi.py --target ppc-powermac --out-dir $(KB_GEN)
 	@touch $@
 $(KB_OBJ): $(KB_GEN)/stamp
-$(KB_OUT)/gen/kapi/kapi_generated.o: $(KB_GEN)/stamp $(KB_OUT)/memmap_layout.h build/targets/ppc-powermac.mk
+$(KB_OUT)/gen/kapi/kapi_generated.o: $(KB_GEN)/stamp $(KB_OUT)/memmap_layout.h build/targets/ppc-powermac.mk build/sources/hooks.mk
 	$(KB_CC) $(KB_FLAGS) -c $(KB_GEN)/kapi/kapi_generated.c -o $@
 -include $(KB_OUT)/gen/kapi/kapi_generated.d
 endif
@@ -113,10 +113,10 @@ KB_MUT_THIRD_FILE ?=
 kb_src = $(if $(and $(KB_MUT_SRC),$(filter $(KB_MUT_SRC),$1)),$(KB_MUT_FILE) -I$(dir $1),$(if $(filter $(KB_MUT_EXTRA_SRC),$1),$(KB_MUT_EXTRA_FILE) -I$(dir $1),$(if $(filter $(KB_MUT_THIRD_SRC),$1),$(KB_MUT_THIRD_FILE) -I$(dir $1),$1)))
 $(KB_OUT)/lib/lz4.o: KB_TU_FLAGS += -O0
 $(KB_OUT)/kernel/console/console.o: KB_TU_FLAGS = -Wno-sign-compare
-$(KB_OUT)/%.o: %.c $(KB_OUT)/memmap_layout.h build/targets/ppc-powermac.mk $(KB_MUT_FILE) $(KB_MUT_EXTRA_FILE) $(KB_MUT_THIRD_FILE)
+$(KB_OUT)/%.o: %.c $(KB_OUT)/memmap_layout.h build/targets/ppc-powermac.mk build/sources/hooks.mk $(KB_MUT_FILE) $(KB_MUT_EXTRA_FILE) $(KB_MUT_THIRD_FILE)
 	@mkdir -p $(dir $@)
 	$(KB_CC) $(KB_FLAGS) $(KB_TU_FLAGS) -c $(call kb_src,$<) -o $@
-$(KB_OUT)/%.o: %.S $(KB_OUT)/memmap_layout.h build/targets/ppc-powermac.mk $(KB_MUT_FILE) $(KB_MUT_EXTRA_FILE) $(KB_MUT_THIRD_FILE)
+$(KB_OUT)/%.o: %.S $(KB_OUT)/memmap_layout.h build/targets/ppc-powermac.mk build/sources/hooks.mk $(KB_MUT_FILE) $(KB_MUT_EXTRA_FILE) $(KB_MUT_THIRD_FILE)
 	@mkdir -p $(dir $@)
 	$(KB_CC) $(KB_FLAGS) -c $(call kb_src,$<) -o $@
 $(KB_OUT)/kernel.ld: arch/ppc/kernel.ld platform/powermac/platform_kboot_layout.h $(KB_OUT)/memmap_layout.h
