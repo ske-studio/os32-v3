@@ -67,11 +67,12 @@ KB_EXTRA += $(KB_GROUP).o
 KB_SQLITE_AUDIT := --sqlite-group $(KB_GROUP).o --sqlite-inputs $(KB_HARD)
 KB_SQLITE_INC := -Ilib/sqlite3 -Ilib/softfloat
 KB_KEEP_SQLITE := -Wl,--undefined=sqlite_module_init
-$(KB_HARD) $(KB_OUT)/kernel/sqlite_engine.o $(KB_OUT)/kernel/sqlite_outer.o $(KB_OUT)/kapi/kapi_db.o: $(SQLITE_GENERATED)
+$(KB_HARD) $(KB_OUT)/kernel/sqlite_engine.o $(KB_OUT)/kernel/sqlite_outer.o $(KB_OUT)/kernel/sqlite_static.o $(KB_OUT)/kapi/kapi_db.o: $(SQLITE_GENERATED)
 $(KB_HARD) $(KB_GROUP).raw.o: build/features/sqlite-static.mk build/softfloat.mk
 $(KB_HARD): private KB_TU_FLAGS += -mhard-float -Os -Ilib/sqlite3 -Ilib/softfloat -Ifs
 $(KB_OUT)/lib/softfloat/s_roundPackToF64.o: private KB_TU_FLAGS += -Wno-unused-label
 $(KB_VFS).o $(KB_OUT)/lib/sqlite3/sqlite3.o: private KB_TU_FLAGS += -std=gnu89 -DNDEBUG -Wno-long-long -w -include lib/sqlite3/os32_sqlite_config.h
+$(KB_OUT)/kernel/sqlite_static.o: private KB_TU_FLAGS += -Ilib/sqlite3
 $(KB_OUT)/kernel/sqlite_outer.o: private KB_TU_FLAGS += -Ilib/sqlite3 -DOS32_SQLITE_STATIC
 $(KB_VFS).c: tools/gen_sqlite_imports.py lib/sqlite3/os32_sqlite_vfs.c
 	@mkdir -p $(@D)
@@ -116,7 +117,7 @@ $(KB_OUT)/config/source-date.flags: ppc-source-date-force
 	@printf '%s\n' '$(KB_CC) $(KB_FLAGS) SOURCE_DATE_EPOCH=$(SOURCE_DATE_EPOCH)' > $@.tmp
 	@if cmp -s $@.tmp $@; then rm -f $@.tmp; else mv $@.tmp $@; fi
 # The exec cleanup hook changes when SQLite is toggled in the same output tree.
-$(KB_OUT)/exec/exec.o $(KB_OUT)/kapi/kapi_sysinfo.o: $(KB_OUT)/config/source-date.flags
+$(KB_OUT)/platform/powermac/ppc_kernel.o $(KB_OUT)/exec/exec.o $(KB_OUT)/kapi/kapi_sysinfo.o: $(KB_OUT)/config/source-date.flags
 endif
 
 # 共通の置き場のソースは、PowerPC の像にまだ入っていない物 (C_COMMON_PC98_PENDING) も PowerPC の

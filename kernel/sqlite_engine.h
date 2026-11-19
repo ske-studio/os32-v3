@@ -28,6 +28,7 @@ enum services_fault {
 /* Debugger injection before services_boot; zero in normal images. */
 extern volatile u32 services_boot_fault;
 void services_boot(void);
+int sqlite_static_boot(void);
 void services_report(void);
 /* Saved diagnostic values only; no output or engine entry. */
 #define SERVICES_VER_STATE_TEXT 24

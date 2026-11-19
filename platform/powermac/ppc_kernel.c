@@ -1,3 +1,4 @@
+#include "sqlite_engine.h"
 #include "boot_token.h"
 /* PowerPC core-ready init (milestone 2, PPC_KBOOT_DESIGN sections 2 and 4).
  *
@@ -398,6 +399,9 @@ void platform_boot_run(void)
 {
 #if KBOOT_SHELL || KBOOT_SH
     if (root_ready) {
+#if OS32_HOOK_KAPI_DB
+        kprintf(KBOOT_ATTR, "[sqlite] static rc=%d\n", sqlite_static_boot());
+#endif
         pm_exec_boot();
 #if KBOOT_SH
         pm_shell_boot();
