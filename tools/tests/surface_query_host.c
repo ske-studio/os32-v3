@@ -255,3 +255,12 @@ static void caller_copy_tests(void)
     SAY("PASS: e1 query/auth/ref/B1/output/accounting/IF/CR3");
     die(0);
 }
+
+#include "display_provider.h"
+#include "pgalloc.h"
+int display_provider_bundle_ok(u32 role, u32 backend)
+{
+    (void)role;
+    (void)backend;
+    return 0;
+}

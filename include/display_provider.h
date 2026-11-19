@@ -33,6 +33,7 @@ void display_provider_boot_reserve(int pref, void (*bind_client)(void));
 
 /* 選択中の backend の DISPLAY が SURFACE の記録いくつで表されるか (1 以上) と、
  * 複数のとき plane 番目の記録の先頭 PFN。 */
+int display_provider_bundle_ok(u32 role, u32 backend);
 u32 display_provider_display_records(u32 ledger_backend);
 u32 display_provider_display_first(u32 plane);
 

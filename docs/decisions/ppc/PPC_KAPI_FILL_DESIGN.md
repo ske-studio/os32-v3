@@ -247,7 +247,7 @@ A の場合も、対象像が持つ弱い代役に解決されていないこと
 |port|ESCC 対向と既知バイトを往復。入力なしの try、設定速度、diag と initialized を照合|送受信の1文字破棄、速度応答固定|
 |pointer|USB 相対移動、端で clamp、ボタン押下中に抜き、再接続。カーソル show/hide と位置を観測|release 配送を落として押下残りを検出|
 |console_font|指定セルの ANK/JIS、反転と scroll の画面・読戻し、既知フォント部分読取と close 後の拒否|行送りを1行ずらす、lease 範囲端をずらす|
-|surface|公開面を query→lease→unlease、世代変更後の再利用は STALE。束の後半失敗で先頭も未取得|世代判定を無効化|
+|surface|公開面を query→lease→unlease、世代変更後の再利用は STALE。OF_FB CLIENT の束は 1 件。束の後半失敗で先頭も未取得であることは、共通 host の複数件 source で検証（[束の設計 §5](../display/SURFACE_LEASE_BUNDLE_DESIGN.md)）|世代判定を無効化|
 |gfx|画面寸法と owner を取得、既知矩形だけ更新し周囲の pixel を保存。非対応 raster/HW は能力に一致|dirty 範囲の右端を欠落させる|
 |gfx2|adapter/head/connector/mode と caps、面生成・lock・描画・present・解放。fence と非対応 EDID 等は実能力どおり|of_fb_v2 の固定モード比較を外し異寸法が通ることを検出|
 |gui|登録者に要求が一度届き、GUI 終了後に shell に入力が戻る|終了時の所有解放を省略|

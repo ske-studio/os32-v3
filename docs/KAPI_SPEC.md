@@ -1603,7 +1603,7 @@ TRIDENT・OF_FB は番号だけの追加で構造体・スロットを変えな�
 
 - `surface_query`: 初期化済みの選択 backend の値 snapshot を返す。lease は増やさない。
 - `surface_lease`: query の単一 ref を B1 で取り込み、授権・世代・最大 access を再検証して貸す。PC98 planar DISPLAY の単面取得は不可。
-- `gfx_surface_lease`: PC98 DISPLAY の 4 ref を query と同順で渡す。4 面すべて成功か巻戻し。count/欠落/重複/別束は INVAL、古い世代は STALE。
+- `gfx_surface_lease`: 提供者が選ぶ束の全 ref を query と同順で渡す。PC-98 は PC98 DISPLAY の 4 件、PowerMac の公開配線後は OF_FB CLIENT の 1 件。全件を一括取得し、公開に失敗したら巻き戻す。件数違い・欠落・重複・順序違い・別束は INVAL、世代だけが古ければ STALE。
 - `surface_unlease`: 保存 USER caller の AS が持つ token のみ返却する。他人・無効・互換 token は INVAL。再 init/終了による revoke は内部処理。
 
 query/lease はどちらも次の授権表で判定する。U は保存した USER caller と**現在実行中**の slot/AS/owner/generation の一致、
