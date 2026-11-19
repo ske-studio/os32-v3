@@ -1,0 +1,111 @@
+#!/usr/bin/env python3
+"""Exercise the build information and clock KAPI slots over link-sh RSH on mac99."""
+import argparse
+import hashlib
+import os
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path[:0] = [str(ROOT / 'tools'), str(ROOT / 'tools/ppc')]
+
+EXPECTED = {
+    'normal': (b'INFO OK', b'0\n'),
+    'empty-build': (b'INFO build failed', b'2\n'),
+    'swap-time': (b'INFO clock words failed', b'4\n'),
+    'absent': (b'INFO clock unavailable', b'3\n'),
+}
+
+
+def absent_bindings(folder, out):
+    source = (ROOT / 'sdk/kapi_target_ppc.py').read_text()
+    anchor = "        'mem_stat',"
+    if source.count(anchor) != 1:
+        raise RuntimeError('system_info mutation anchor must be unique')
+    (folder / 'kapi_target_ppc.py').write_text(
+        source.replace(anchor, "        'sys_time_now',\n" + anchor))
+    launcher = ('import runpy, sys; import kapi_target_ppc; '
+                'sys.path.insert(0, "sdk"); runpy.run_path(sys.argv.pop(1), run_name="__main__")')
+    subprocess.run([sys.executable, '-B', '-c', launcher, str(ROOT / 'sdk/gen_kapi.py'),
+                    '--target', 'ppc-powermac', '--out-dir', str(out)],
+                   cwd=ROOT, env=dict(os.environ, PYTHONPATH=str(folder)), check=True)
+    (out / 'stamp').touch()
+
+
+def observe(elf, cpu, evidence, case):
+    from link_sh_run import Session
+    from run import require
+    from usb_run import rsh_command
+
+    session = Session(elf, cpu, evidence, 240)
+    try:
+        session.start()
+        session.wait(session.ready, 'sysinfo cui READY', 60)
+        require(session.agent.operator.ready['mode'] == 'cui', 'sysinfo RSH mode')
+        body = rsh_command(session, '/bin/infoprob.bin')
+        status = rsh_command(session, 'echo $?')
+        require((body.rstrip(b'\n'), status) == EXPECTED[case], repr((case, body, status)))
+        session.q.call('quit')
+        session.p.wait(timeout=5)
+        require(session.p.returncode == 0, 'sysinfo QEMU exit')
+        print(('GREEN' if case == 'normal' else 'RED ' + case) + ' ' + cpu, flush=True)
+    finally:
+        session.close()
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--build-only', action='store_true')
+    parser.add_argument('--mutate', action='store_true')
+    args = parser.parse_args()
+    cross = Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc'))
+    if any(not os.access(cross / 'bin' / ('powerpc-elf-' + tool), os.X_OK)
+           for tool in ('gcc', 'ld', 'ar', 'nm', 'objcopy', 'objdump')):
+        print(f'SKIP: PowerPC toolchain unavailable at {cross}')
+        return 3
+
+    from kboot_accept import build, mutant_settings
+    from ppc_shm import guest_available
+
+    if not args.build_only and not guest_available():
+        print('SKIP: mac99 QEMU or loopback sockets unavailable')
+        return 3
+
+    work = Path(tempfile.mkdtemp(prefix='ppc-sysinfo-', dir=os.environ.get('TMPDIR') or None)).resolve()
+    print('evidence=' + str(work), flush=True)
+    user = work / 'user'
+    bins = [str(user / (app + '.bin')) for app in ('hello', 'fault', 'infoprob')]
+    options = ['IMAGE=kboot-link-sh', 'KB_SH_OUT=' + str(user),
+               'KB_ROOT_BINS=' + ' '.join(bins)]
+    images = {}
+    for case in EXPECTED if args.mutate else ('normal',):
+        folder = work / case
+        folder.mkdir()
+        kernel = folder / 'kernel'
+        mutation = []
+        if case == 'swap-time':
+            mutation = mutant_settings(folder, case, 'kapi/kapi_sysinfo.c',
+                                       'sys_time_now(&snap_lo, &snap_hi)',
+                                       'sys_time_now(&snap_hi, &snap_lo)')
+        elif case == 'empty-build':
+            mutation = mutant_settings(folder, case, 'kapi/kapi_sysinfo.c',
+                                       'kapi_sys_build_time_copy(buf, (u32)size);',
+                                       "buf[0] = 0;")
+        elif case == 'absent':
+            absent_bindings(folder, kernel / 'gen')
+        elf = build(kernel, *options, *mutation, 'kb-user', 'kernel')
+        digest = hashlib.sha256(elf.read_bytes()).hexdigest()
+        if digest in images:
+            raise RuntimeError(f'{case} ELF is identical to {images[digest]}: {elf}')
+        images[digest] = case
+        print(f'{case} sha256={digest} {elf}', flush=True)
+        if not args.build_only:
+            for cpu in ('7450', '7455'):
+                observe(elf, cpu, folder / cpu, case)
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())

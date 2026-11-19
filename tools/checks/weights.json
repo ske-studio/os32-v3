@@ -35,6 +35,38 @@
     {
       "artifact": "check-times-8078bf3495a80876e234171a2ec8c2888a01a87d-ppc-qemu-3",
       "sha256": "85707a49686cfe8494ad028e4bcd58a681989bf6f8dd9594685e5185367bf72a"
+    },
+    {
+      "artifact": "check-times-5cd873b8505afdf6c23709cfd8e6c178efea3fb0-ppc-qemu-0",
+      "sha256": "578d6a8cd485cf88e83ab76290c067cda3124e42ebe752c92afe21382ce6e2be"
+    },
+    {
+      "artifact": "check-times-5cd873b8505afdf6c23709cfd8e6c178efea3fb0-ppc-qemu-1",
+      "sha256": "db103995eee942f11df2840bacc953c33219b57700c0fd44cbb01d1bbf5cfb82"
+    },
+    {
+      "artifact": "check-times-5cd873b8505afdf6c23709cfd8e6c178efea3fb0-ppc-qemu-2",
+      "sha256": "c20ea7fc4bef0059b3fb3adae45de5cda1e6359a6baebf86d147da3038b4acb5"
+    },
+    {
+      "artifact": "check-times-5cd873b8505afdf6c23709cfd8e6c178efea3fb0-ppc-qemu-3",
+      "sha256": "0bad2a899c7782799ea9a1a7bc46d02f7e524840d3819ac42fb1cc23b493b806"
+    },
+    {
+      "artifact": "check-times-88c58ef832e20ee9e2ce32a45aa41b41ba2b4e31-ppc-qemu-0",
+      "sha256": "32d5fb720f142cb53b1a0a42caf9a4ca43cced79292a91dcd5f1dc01475d1372"
+    },
+    {
+      "artifact": "check-times-88c58ef832e20ee9e2ce32a45aa41b41ba2b4e31-ppc-qemu-1",
+      "sha256": "649cc35ca64f6e4da9872bd185c572f11c4b6b3e6eccab4d9f58d909650e3a3c"
+    },
+    {
+      "artifact": "check-times-88c58ef832e20ee9e2ce32a45aa41b41ba2b4e31-ppc-qemu-2",
+      "sha256": "6dbf3433d04a076c0e29b3b2bd485903c7e4b0c2be562085e8d0ec9b916ba0d0"
+    },
+    {
+      "artifact": "check-times-88c58ef832e20ee9e2ce32a45aa41b41ba2b4e31-ppc-qemu-3",
+      "sha256": "18f699ba2309d9d19e0eb175be2e225d59010dfba54e88ef42769fbd7847c1e0"
     }
   ],
   "seconds": {
@@ -43,7 +75,7 @@
     "appmem-host": 3.172635,
     "appmem-map-host": 5.664773,
     "arch-asm": 266.255407,
-    "arch-ctx-guest": 620.198891,
+    "arch-ctx-guest": 654.443514,
     "b8-open-host": 42.24959,
     "boot-order-host": 2.734105,
     "boot-readers-host": 3.186042,
@@ -329,17 +361,32 @@
     "pegc-mode-host": 3.4177,
     "pit-clock-host": 2.799469,
     "platform-memory-host": 2.646895,
-    "ppc-fb": 623.865231,
-    "ppc-fp-accept-host": 0.277654,
-    "ppc-fp-guest": 389.666821,
-    "ppc-link-sh-run": 1024.223467,
-    "ppc-mmu": 82.959379,
-    "ppc-rh-fb": 12.249415,
-    "ppc-sc": 107.542302,
-    "ppc-sd": 75.530835,
-    "ppc-sd-link": 166.629841,
-    "ppc-sh-output": 36.355016,
-    "ppc-usb": 498.334765,
+    "ppc-boot-info-guest": 120.591867,
+    "ppc-console-cells": 65.992329,
+    "ppc-display-guest": 194.6731,
+    "ppc-fb": 523.358177,
+    "ppc-font-guest": 79.839325,
+    "ppc-fp-accept-host": 0.215018,
+    "ppc-fp-guest": 290.902304,
+    "ppc-gfx2-guest": 125.391424,
+    "ppc-link-sh-run": 831.416682,
+    "ppc-mmu": 56.046914,
+    "ppc-mouse-guest": 125.23007,
+    "ppc-path-guest": 88.947863,
+    "ppc-pci-guest": 81.041726,
+    "ppc-port-guest": 124.622657,
+    "ppc-reset": 172.516821,
+    "ppc-rh-fb": 17.152269,
+    "ppc-rtc-guest": 84.294295,
+    "ppc-sc": 92.544637,
+    "ppc-sd": 99.144419,
+    "ppc-sd-link": 160.639577,
+    "ppc-sh-output": 36.494133,
+    "ppc-shm-guest": 74.793946,
+    "ppc-sqlite-stack-guest": 23.041937,
+    "ppc-surface-guest": 176.758702,
+    "ppc-sysinfo-guest": 84.197552,
+    "ppc-usb": 335.428091,
     "preflight-host": 4.421956,
     "privileged": 7.8109,
     "probe-host": 4.63924,
@@ -742,16 +789,31 @@
     "pegc-mode-host": 3,
     "pit-clock-host": 3,
     "platform-memory-host": 3,
+    "ppc-boot-info-guest": 1,
+    "ppc-console-cells": 1,
+    "ppc-display-guest": 1,
     "ppc-fb": 1,
+    "ppc-font-guest": 1,
     "ppc-fp-accept-host": 1,
     "ppc-fp-guest": 1,
+    "ppc-gfx2-guest": 1,
     "ppc-link-sh-run": 1,
     "ppc-mmu": 1,
+    "ppc-mouse-guest": 1,
+    "ppc-path-guest": 1,
+    "ppc-pci-guest": 1,
+    "ppc-port-guest": 1,
+    "ppc-reset": 1,
     "ppc-rh-fb": 1,
+    "ppc-rtc-guest": 1,
     "ppc-sc": 1,
     "ppc-sd": 1,
     "ppc-sd-link": 1,
     "ppc-sh-output": 1,
+    "ppc-shm-guest": 1,
+    "ppc-sqlite-stack-guest": 1,
+    "ppc-surface-guest": 1,
+    "ppc-sysinfo-guest": 1,
     "ppc-usb": 1,
     "preflight-host": 3,
     "privileged": 3,
