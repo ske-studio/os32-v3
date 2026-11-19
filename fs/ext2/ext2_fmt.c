@@ -223,12 +223,19 @@ static int ext2_format_range(const struct ext2_medium_ops *ops, int ide_drive, u
 /*  入口                                                                    */
 /* ======================================================================== */
 
+static const struct ext2_medium_ops *format_medium(int drv)
+{
+    if (drv >= 0x0600 && drv <= 0x0603 && media[EXT2_MEDIUM_LOOP])
+        return media[EXT2_MEDIUM_LOOP];
+    return media[EXT2_MEDIUM_HD];
+}
+
 int ext2_format(int ide_drive, u32 total_sectors)
 {
     u32 start, len;
     int ret;
 
-    const struct ext2_medium_ops *ops = media[EXT2_MEDIUM_HD];
+    const struct ext2_medium_ops *ops = format_medium(ide_drive);
     if (!ops || !ops->present(ide_drive)) return EXT2_ERR_IO;
     /* 区画表の OS32 区画に作る。区画が無ければ作らない (以前は LBA 1088 を
      * 仮定して書き始めた、F12)。長さは区画で頭打ち — インストーラは
@@ -246,7 +253,7 @@ int ext2_format_at(int ide_drive, u32 start_lba, u32 length)
 {
     u32 disk_sectors;
 
-    const struct ext2_medium_ops *ops = media[EXT2_MEDIUM_HD];
+    const struct ext2_medium_ops *ops = format_medium(ide_drive);
     if (!ops || !ops->present(ide_drive)) return EXT2_ERR_IO;
     if (ops->total_sectors(ide_drive, &disk_sectors) != 0) return EXT2_ERR_IO;
     /* 範囲の検査。**どれか 1 つでも外れたら 1 バイトも書かない**。

@@ -14,8 +14,10 @@ struct ext2_medium_ops {                 /* 引数 drv は KAPI から来た値�
     u32  min_lba;                                       /* format_at の開始の下限 (HD = EXT2_FMT_MIN_LBA) */
 };
 #define EXT2_MEDIUM_HD   0
-#define EXT2_MEDIUM_LOOP 1               /* 決定後の段 D1 まで未登録 */
+#define EXT2_MEDIUM_LOOP 1
 int ext2_medium_register(int kind, const struct ext2_medium_ops *ops);   /* 0 / -1 (範囲外・二重) */
 extern const struct ext2_medium_ops ext2_medium_ide_ops;                 /* fs/ext2/ext2_medium_ide.c */
+
+extern const struct ext2_medium_ops ext2_medium_loop_ops;
 
 #endif

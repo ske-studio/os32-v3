@@ -11,5 +11,9 @@ C_COMMON_PC98_PENDING = mm/dma_pool.c mm/dma_pool_math.c mm/shlib.c kernel/gui.c
 C_COMMON_EXEC += drivers/pci/pci.c drivers/pci/pci_barsize.c drivers/pci/pci_decode.c drivers/pci/pci_bind.c drivers/pci/pci_bind_match.c kernel/dev/device_pci.c
 C_COMMON_COMPILE_ONLY_PPC := kernel/sqlite_engine.c
 C_COMMON_LOOP = kernel/dev/device_loop.c drivers/block/loop_dev.c
+ifeq ($(FEATURE_PC98_PENDING)$(FEATURE_LOOP),11)
+C_COMMON_LOOP += fs/ext2/ext2_medium_loop.c
+C_ORDER_TAIL += fs/ext2/ext2_medium_loop.c
+endif
 C_COMMON = $(C_COMMON_CORE) $(foreach f,$(IMAGE_FEATURES),$(if $(filter 1,$(FEATURE_$(f))),$(C_COMMON_$(f))))
 INCLUDE_COMMON += kernel include init kernel/console kernel/irq kernel/module kernel/time mm kernel/dev fs/ext2 fs/fat fs/isofs fs/serialfs
