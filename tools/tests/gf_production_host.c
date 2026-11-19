@@ -3,6 +3,10 @@ void idle_work_run(void) { }
 /* KDEBUG=0 production path. Only PCI, MMIO, RAM, PTE and the clock are fake.
  * The real decoder, runner, bus, owner, service and required CHECK execute.
  * No recover executor/kpeek calls survive section GC in the linked test. */
+#ifdef GF_PRODUCTION_MUTANT
+static void prod_mismatch_at(const char *file, unsigned line, const char *expression);
+#define CHECK(x) do { if (!(x)) prod_mismatch_at(__FILE__, __LINE__, #x); } while (0)
+#endif
 #define GF_S2_ENTRY unused_decoder_tests
 #include "gfinit_host.c"
 #include "hwdev/gf/production.h"
@@ -13,6 +17,32 @@ void idle_work_run(void) { }
 #include "init/sysconfig.c"
 #include "gfinit_resources_ra266.h"
 #include "gf_foundation_width_host.h"
+
+#ifdef GF_PRODUCTION_MUTANT
+/* The host supplies a four-byte file on stdin. Keep the count visible even
+ * when a mutant terminates the fixture with a signal. */
+static volatile unsigned *prod_failed_checks;
+
+static void prod_map_failure_count(void)
+{
+    /* Linux i386 old_mmap: read/write, shared, fd 0, offset 0. */
+    unsigned long args[6] = {0, sizeof(*prod_failed_checks), 3, 1, 0, 0};
+    unsigned long addr;
+    __asm__ volatile("int $0x80" : "=a"(addr) : "0"(90), "b"(args) : "memory");
+    if (addr >= (unsigned long)-4095) __builtin_trap();
+    prod_failed_checks = (volatile unsigned *)addr;
+    *prod_failed_checks = 0;
+}
+
+static void prod_mismatch_at(const char *file, unsigned line, const char *expression)
+{
+    *prod_failed_checks = ++failures;
+    if (failures == 1) {
+        output("FAIL "); output(file); output(":"); number(line);
+        output(": "); output(expression); output("\n");
+    }
+}
+#endif
 
 #ifndef PROD_GF_DEV
 #define PROD_GF_DEV 13
@@ -135,6 +165,9 @@ int pci_cfg_write16(u32 b,u32 d,u32 f,u32 o,u16 v)
 {
     if(prod_sizing) {CHECK(!b && o==4);prod_cfg[d][f][1]=(prod_cfg[d][f][1]&0xffff0000U)|v;return 0;}
     if (b || d!=PROD_GF_DEV || f || (o!=4 && o!=12)) {
+#ifdef GF_PRODUCTION_MUTANT
+        prod_mismatch_at(__FILE__, __LINE__, "unexpected PCI write16 destination");
+#endif
         __asm__ volatile("int $0x80"::"a"(1),"b"(1)); __builtin_unreachable();
     }
     if (o==12) { prod_cfg[d][f][o/4]=(prod_cfg[d][f][o/4]&0xffff0000U)|v; return 0; }
@@ -735,6 +768,9 @@ static void prod_present_cases(void)
 #endif
 void _start(void)
 {
+#ifdef GF_PRODUCTION_MUTANT
+    prod_map_failure_count();
+#endif
 #ifdef PROD_ABSENT_TEST
     kmemset(prod_cfg,0xff,sizeof(prod_cfg));
     CHECK(gf_production_identify(&prod_boot)==-1);

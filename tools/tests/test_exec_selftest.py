@@ -29,7 +29,7 @@ IMPORTS = (
     'ring3_wm_leave', 'kdi_get_ring3_in_syscall', 'kdi_set_ring3_in_syscall',
     'kapi_reserved_nosys', 'kmemset', 'os32x_layout_check',
     'kdi_ptr_ring3_ls_start', 'kdi_ptr_ring3_ls_end',
-    'kdi_ptr___kernel_resident_end',
+    'kdi_ptr___kernel_resident_end', 'path_set_drive', 'path_init', 'path_set_cwd', 'kstrncpy',
 )
 
 MAIN = r'''
@@ -58,6 +58,8 @@ void _start(void) {
     CHECK(before.tramp_page == 0 && before.api == 0);
     CHECK(kst_exec_tramp_user() == 1 && kst_exec_kapi_layout() == 15);
     host_init();
+    CHECK(kst_path_set_drive() == 0);
+    CHECK(kstrcmp(path_get_drive(), "fdd0") == 0 && kstrcmp(path_get_cwd(), "/path") == 0);
     kdi_selftest_exec_view(&before);
     CHECK(before.tramp_page && before.api == (const KernelAPI *)KAPI_ADDR);
     CHECK(KDI_ADDR_kapi_reserved_nosys == host_kapi_reserved_nosys);
@@ -125,7 +127,14 @@ class ExecSelftest(unittest.TestCase):
                 self.exercise(original.replace(old, new), runtime_red=True)
                 print('product emitter mutation: compiled, selftest runtime RED: ' + old)
 
-    def exercise(self, backend=None, runtime_red=False):
+            path = (ROOT / 'lib/path.c').read_text()
+            old = 'if (!device_validator(name)) return -1;'
+            self.assertEqual(path.count(old), 1)
+            self.exercise(path_source=path.replace(old,
+                'if (!device_validator(name)) { path_set_cwd("/"); return -1; }'), runtime_red=True)
+            print('path rejection cwd mutation: compiled, selftest runtime RED')
+
+    def exercise(self, backend=None, runtime_red=False, path_source=None):
         entries = gen.load_def()
         by_name = {e['name']: e for e in entries}
         cross = Path(os.environ['CROSS_DIR']) / 'bin'
@@ -152,8 +161,9 @@ class ExecSelftest(unittest.TestCase):
             renames = ['-D' + n + '=host_' + n for n in sorted(set(IMPORTS) | definitions)]
             (out / 'code.c').write_text(backend if backend is not None else
                 (ROOT / 'arch/x86/kernel/syscall_code.c').read_text())
+            (out / 'path.c').write_text(path_source or (ROOT / 'lib/path.c').read_text())
             objects = []
-            sources = [(ROOT / 'tools/tests/exec_selftest_host.c', renames),
+            sources = [(out / 'path.c', renames), (ROOT / 'tools/tests/exec_selftest_host.c', renames),
                        (ROOT / 'arch/x86/kernel/ring3_ls.S', []),
                        (out / 'code.c', renames),
                        (ROOT / 'kdebug/selftest_exec.c', []),

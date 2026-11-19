@@ -10,9 +10,7 @@
 #include "gfx_hal.h"
 #include "bootinfo.h"
 #include "kstring.h"
-
-/* Internal implementation in kapi_sys.c, not the generated KAPI wrapper. */
-extern i32 kapi_mem_stat(i32 app_id, void *out, u32 size);
+#include "kapi_sysinfo.h"
 
 void ver_collect(VerSnapshot *s)
 {

@@ -131,7 +131,7 @@ A は共通本体を選択・初期化して通常 wrap に接続。B は既存�
 - db ［db_last_error → kapi_db_last_error @ kapi/kapi_db.c］ ［db_mem_used → kapi_db_mem_used @ kapi/kapi_db.c］ ［db_open_existing → kapi_db_open_existing @ kapi/kapi_db_v50.inc］ ［db_prepare_only → kapi_db_prepare_only @ kapi/kapi_db_v50.inc］
 - db ［db_bind_int → kapi_db_bind_int @ kapi/kapi_db_v50.inc］ ［db_bind_text → kapi_db_bind_text @ kapi/kapi_db_v50.inc］ ［db_bind_blob → kapi_db_bind_blob @ kapi/kapi_db_v50.inc］ ［db_bind_null → kapi_db_bind_null @ kapi/kapi_db_v50.inc］
 - db ［db_error_code → kapi_db_error_code @ kapi/kapi_db_v50.inc］
-- system_info ［sys_get_build_info → kapi_sys_get_build_info @ kapi/kapi_sys.c］ ［sys_set_mtime → kapi_sys_set_mtime @ kapi/kapi_sysinfo.c］ ［sys_time_now → kapi_sys_time_now @ kapi/kapi_sys.c］ ［mem_stat → kapi_mem_stat @ kapi/kapi_sys.c］
+- system_info ［sys_get_build_info → kapi_sys_get_build_info @ kapi/kapi_sys.c］ ［sys_set_mtime → kapi_sys_set_mtime @ kapi/kapi_sysinfo.c］ ［sys_time_now → kapi_sys_time_now @ kapi/kapi_sys.c］ ［mem_stat → kapi_mem_stat @ kapi/kapi_sysinfo.c］
 - system_info ［sys_ver_info → kapi_sys_ver_info @ kapi/kapi_sys.c］
 - ime ［ime_getchar → ime_getchar_kapi @ kernel/ime/fep_module.c］ ［ime_trygetchar → ime_trygetchar @ kernel/ime/fep_module.c］ ［ime_toggle → ime_toggle @ kernel/ime/fep_module.c］ ［ime_is_active → ime_is_active @ kernel/ime/fep_module.c］
 - ime ［ime_set_mode → ime_set_mode @ kernel/ime/fep_module.c］ ［ime_get_mode → ime_get_mode @ kernel/ime/fep_module.c］ ［ime_getkey → ime_getkey_kapi @ kernel/ime/fep_module.c］ ［ime_switch_dict → ime_switch_dict @ kernel/ime/fep_module.c］

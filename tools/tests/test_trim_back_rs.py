@@ -20,7 +20,7 @@ SLOT = 'exec/appslot.c'
 APP = 'userland/rust/libos32gui/src/app.rs'
 STUB = 'userland/rust/libos32gui_stub/src/lib.rs'
 TARGET_SRCS = ['exec/appslot.c', 'exec/exec.c', 'exec/exec_schedule.inc', 'kernel/gui.c', 'kdebug/kselftest/appmem.inc',
-         'kapi/kapi_sys.c', 'exec/exec_heap.c', 'exec/appmem.c', 'exec/appmem_map.c',
+         'kapi/kapi_sysinfo.c', 'exec/exec_heap.c', 'exec/appmem.c', 'exec/appmem_map.c',
          'exec/appmem_unmap.c', 'mm/paging_app.c', 'mm/physmem.c',
          CACHE, WM, APP, STUB, 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h']
 MUTANTS = [
