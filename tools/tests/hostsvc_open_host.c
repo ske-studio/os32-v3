@@ -83,17 +83,24 @@ struct VfsStdinRead *exec_stdin_state(void) { return 0; }
 int input_getchar_kapi(void) { return -1; }
 int fd_is_redirected(int fd) { (void)fd; return 0; }
 int fd_redirect_read(int fd,void *b,u32 n) { (void)fd; (void)b; (void)n; return -1; }
+static int describe(void *ctx, struct SfsTransportInfo *out)
+{
+    out->nic = ctx;
+    return 0;
+}
 #define CHECK(e) do { if (!(e)) return __LINE__; } while (0)
 static int suite(void)
 {
     static const struct vfs_device_name names[] = {
         {SERIALFS_DEVNAME, VFS_NAME_EXACT, VFS_DEV_SERIAL, 0, 1}
     };
-    struct SfsPersistentConfig cfg = {&hs_sfs_io, 0, 1};
+    struct SfsPersistentConfig cfg = {.io = &hs_sfs_io, .lan_enabled = 1, .io_ctx = "link", .describe = describe};
     hs_reset(0);
     CHECK(host_mailbox_init() == 0);
     vfs_device_names_register(names, 1);
     CHECK(serialfs_init() == 0 && sfs_persistent_start(&cfg) == 0);
+    struct SfsTransportInfo info = {"?", {0}, 0};
+    CHECK(sfs_persistent_describe(&info) == 0 && info.nic == cfg.io_ctx);
     int old_fd=vfs_open("/host/a",O_RDONLY);
     CHECK(old_fd>=3 && open_files[old_fd].size==2048);
     unknown=1; server_size=4096;

@@ -69,6 +69,20 @@ int     serialfs_session_end(int exit_code);
  * 0 = ペアの MAC を写した / -1 = ペアが無い (out は変えない)。 */
 int     sfs_lan_peer_mac(u8 *out);
 
+struct SfsSessionFg {
+    int (*begin)(void);
+    int (*end)(int exit_code);
+};
+void serialfs_session_set_fg(const struct SfsSessionFg *fg);
+void serialfs_session_owner_exit(int owner);
+extern const struct SfsSessionFg sfs_session_fg;
+
+struct SfsTransportInfo {
+    const char *nic;
+    u8 peer[6];
+    u8 peer_valid;
+};
+
 /* C1 owns the sole resident client and mount generation. cfg is copied;
  * io/ctx are borrowed for boot lifetime. start publishes /host without HELLO,
  * even with no peer response; an existing HostDrv mount returns BUSY. */
@@ -76,6 +90,7 @@ struct SfsPersistentConfig {
     const SfsIo *io;
     void *io_ctx;
     int lan_enabled;
+    int (*describe)(void *io_ctx, struct SfsTransportInfo *out);
 };
 int sfs_persistent_start(const struct SfsPersistentConfig *cfg);
 /* NULL before start, otherwise borrowed read-only (sid/seq observation).
@@ -87,6 +102,10 @@ u32 sfs_persistent_generation(void);
 void sfs_persistent_stale(void);
 int sfs_persistent_enabled(void);
 /* Paired LAN scopes; end never sends BYE or unmounts the resident /host. */
+int sfs_persistent_describe(struct SfsTransportInfo *out);
+int sfs_persistent_scope_begin_owned(int owner);
+int sfs_persistent_scope_end_owned(int owner, int exit_code);
+void sfs_persistent_scope_owner_exit(int owner);
 int sfs_persistent_scope_begin(void);
 int sfs_persistent_scope_end(int exit_code);
 

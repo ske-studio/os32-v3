@@ -131,7 +131,7 @@ static int check(u32 *gen)
 }
 static int suite(void)
 {
-    struct SfsPersistentConfig cfg = {&hs_sfs_io, 0, 1};
+    struct SfsPersistentConfig cfg = {.io = &hs_sfs_io, .lan_enabled = 1};
     u8 buf[2049];
     u32 gen, old_opens, old_hello, tick;
     hs_reset(0xffffff00u);
