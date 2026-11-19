@@ -3,7 +3,7 @@
 #include "pegc.h"
 #include "os32_gui_shared.h"
 #include "memmap.h"
-#include "../../../gfx/gfx_internal.h"
+#include "../../../gfx/gfx_dirty.h"
 #include "gfx_hal.h"
 #include "../../../gfx/v2/gfx2_int.h"
 #include "display_restore.h"
@@ -71,7 +71,7 @@ static int _present_dirty_packed(void)
      * 「present (commit) 回数」なので、この 1 回ぶんに揃える。 */
     commits_before = gfx_counters.commits;
     for (i = 0; i < dirty_queue.count; i++) {
-        GFX_Rect *r = &dirty_queue.rects[i];
+        const GFX_Rect *r = gfx_dirty_at(&dirty_queue, i);
         gfx_v1_present_rect(r->x, r->y, r->w, r->h);
     }
     gfx_counters.commits = commits_before + 1;
@@ -81,89 +81,9 @@ static int _present_dirty_packed(void)
     return 1;
 }
 
-/* ======================================================================== */
-/*  KAPI: ダーティレクタングルの追加 (OS管理)                              */
-/* ======================================================================== */
 void __cdecl gfx_add_dirty_rect(int x, int y, int w, int h)
 {
-    if (!bb_b) return;
-    int aligned_x, aligned_w;
-    int right;
-    int i;
-    GFX_Rect *r;
-
-    /* マージ判定用のギャップ閾値 (px)。
-     * この距離以内の矩形は統合する (32pxアライメントに合わせる) */
-    int gap = BITS_PER_U32;
-
-    int new_x, new_y, new_r, new_b;
-
-    if (!gfx_clip_screen(&x, &y, &w, &h, GFX_WIDTH, gfx_current_height)) return;
-    right = x + w;
-
-    /* 32ピクセル境界 (4バイト) にアライメント:
-     * xは切り捨て、幅は切り上げ
-     */
-    aligned_x = x & ~(BITS_PER_U32 - 1);
-    aligned_w = ((right + (BITS_PER_U32 - 1)) & ~(BITS_PER_U32 - 1)) - aligned_x;
-
-    /* --- マージ判定 --- */
-    new_x = aligned_x;
-    new_y = y;
-    new_r = aligned_x + aligned_w;
-    new_b = y + h;
-
-    for (i = 0; i < dirty_queue.count; i++) {
-        int ex, ey, er, eb;
-
-        r = &dirty_queue.rects[i];
-        ex = r->x;
-        ey = r->y;
-        er = ex + r->w;
-        eb = ey + r->h;
-
-        /* 完全包含チェック: 新rectが既存rectに包含されるなら何もしない */
-        if (new_x >= ex && new_y >= ey && new_r <= er && new_b <= eb) {
-            return;
-        }
-
-        /* オーバーラップ or 隣接(gap px以内)なら統合 */
-        if (new_x <= er + gap && new_r >= ex - gap &&
-            new_y <= eb + gap && new_b >= ey - gap) {
-            /* バウンディングボックスに統合 */
-            if (new_x < ex) r->x = new_x; else new_x = ex;
-            if (new_y < ey) r->y = new_y; else new_y = ey;
-            if (new_r > er) er = new_r;
-            if (new_b > eb) eb = new_b;
-            r->w = er - r->x;
-            r->h = eb - r->y;
-            return;
-        }
-    }
-
-    /* マージ対象なし → 新規追加 */
-
-    /* キューがいっぱいの場合はバウンディングボックスに圧縮 */
-    if (dirty_queue.count >= MAX_DIRTY_RECTS) {
-        int min_x = GFX_WIDTH, min_y = gfx_current_height, max_x = 0, max_y = 0;
-        for (i = 0; i < dirty_queue.count; i++) {
-            if (dirty_queue.rects[i].x < min_x) min_x = dirty_queue.rects[i].x;
-            if (dirty_queue.rects[i].y < min_y) min_y = dirty_queue.rects[i].y;
-            if (dirty_queue.rects[i].x + dirty_queue.rects[i].w > max_x) max_x = dirty_queue.rects[i].x + dirty_queue.rects[i].w;
-            if (dirty_queue.rects[i].y + dirty_queue.rects[i].h > max_y) max_y = dirty_queue.rects[i].y + dirty_queue.rects[i].h;
-        }
-        dirty_queue.count = 1;
-        dirty_queue.rects[0].x = min_x;
-        dirty_queue.rects[0].y = min_y;
-        dirty_queue.rects[0].w = max_x - min_x;
-        dirty_queue.rects[0].h = max_y - min_y;
-    }
-
-    r = &dirty_queue.rects[dirty_queue.count++];
-    r->x = new_x;
-    r->y = new_y;
-    r->w = new_r - new_x;
-    r->h = new_b - new_y;
+    if (bb_b) gfx_dirty_add(&dirty_queue, GFX_WIDTH, gfx_current_height, x, y, w, h);
 }
 
 /* ======================================================================== */
@@ -179,7 +99,7 @@ static void _flush_dirty_queue(void)
     u8 *vi_base = display_planar_plane(3);
 
     for (i = 0; i < dirty_queue.count; i++) {
-        GFX_Rect *r = &dirty_queue.rects[i];
+        const GFX_Rect *r = gfx_dirty_at(&dirty_queue, i);
         int byte_x = r->x >> GVRAM_PIXELS_PER_BYTE_SHIFT;           /* 横は何バイト目か */
         int byte_w = r->w >> GVRAM_PIXELS_PER_BYTE_SHIFT;           /* 横幅のバイト数 */
         int words  = byte_w >> 1;         /* 16bit転送するワード数 */
@@ -214,16 +134,9 @@ static void _flush_dirty_queue(void)
     dirty_queue.count = 0;
 }
 
-/* ======================================================================== */
-/*  ステイルページ対策: 前フレームのdirty rectを現フレームにマージ            */
-/* ======================================================================== */
 static void _merge_prev_dirty(void)
 {
-    int i;
-    for (i = 0; i < prev_dirty.count; i++) {
-        GFX_Rect *r = &prev_dirty.rects[i];
-        gfx_add_dirty_rect(r->x, r->y, r->w, r->h);
-    }
+    gfx_dirty_merge(&dirty_queue, &prev_dirty, GFX_WIDTH, gfx_current_height);
 }
 
 /* ======================================================================== */

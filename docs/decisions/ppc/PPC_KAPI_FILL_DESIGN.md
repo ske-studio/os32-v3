@@ -183,7 +183,7 @@ A の場合も、対象像が持つ弱い代役に解決されていないこと
 |4k-ii|本線 kernel/dev/device_kcg.c|device_kcg.c の固定名転送を純移動し両像で同じ TU と kcg.c を選ぶ|
 |4b|共通 kernel/console/font_source_kcg.c|PPC は既存 KCG1 から kcg_rom_read_ank・kanji を供給。load は両像で NOSYS。既存 KCG1 をフォント供給元に選ぶ。font lease の close と exec 終了の回収を先に受入|
 |5a-i|本線 drivers/video/pc98/gfx_vram.c（その場の変更、NP21/W で確認）|present、rect、dirty、nosync、raster のクリップ・変更矩形管理を抽出。PC98 VRAM 書込と同期は装置に保持|
-|5a-ii|本線 gfx/ の共通 TU|分離した dirty 列・矩形処理だけを純移動。flip・VSYNC 待ちは装置側。x86 関数差0|
+|5a-ii|本線 `gfx/gfx_dirty.c`|分離した dirty 列・矩形処理だけを純移動。flip・VSYNC 待ちは装置側。x86 関数差0 (変位と `gfx_add_dirty_rect` からの呼出前後のスタック整列、ret 後の実行されない整列命令のみ許容)|
 |5b|本線 gfx/gfx_core.c → PPC platform/powermac/display_provider.c|共通 present が後端へ渡す。INDEX8 の変換・pitch は既存 OF FB を使う。200行指定の実現可能範囲を照会|
 |5c|本線 exec/surface_query.c → PPC 公開表|console/graphics 所有者と世代を公開。gfx2 列挙、caps、surface、lock、submit/fence、表示 ops の順|
 |5d|本線 kernel/gui.c|表示と入力の契約成立後、該当する exec 終了フックだけを実装選択。shell→GUI→shell の寿命を確認|
