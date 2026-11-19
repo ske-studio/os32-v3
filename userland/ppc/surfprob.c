@@ -2,7 +2,7 @@
 #include <string.h>
 
 /* Private controls supplied by the acceptance image. */
-enum { PROBE_REGEN = 0x100, PROBE_LEASE_COUNT };
+enum { PROBE_REGEN = 0x100, PROBE_LEASE_COUNT, PROBE_WATCH, PROBE_COPIED };
 
 static int report(KernelAPI *api, const char *text, int status)
 {
@@ -69,5 +69,25 @@ int main(int argc, char **argv, KernelAPI *api)
     if (api->surface_lease(role, &after.desc[0].ref, OS32_SURFACE_RW, &view) ||
         api->surface_unlease(view.token))
         return report(api, "SURFACE fresh ref failed\n", 9);
+    /* The fixture watches this address at the caller-input copy boundary. */
+    union { OS32_SurfaceQueryResult watch; OS32_SurfaceRef refs[2]; } input;
+    OS32_LeaseResult bundle;
+    input.refs[0] = input.refs[1] = after.desc[0].ref;
+    if (api->surface_query(PROBE_WATCH, &input.watch))
+        return report(api, "SURFACE watch failed\n", 12);
+    rc = api->gfx_surface_lease(role, input.refs, 2, OS32_SURFACE_RW, &bundle);
+    if (rc == OS32_ERR_NOSYS)
+        return report(api, "SURFACE bundle absent\n", 13);
+    if (rc != OS32_ERR_INVAL || api->surface_query(PROBE_COPIED, &after))
+        return report(api, "SURFACE bundle count failed\n", 14);
+    if (api->gfx_surface_lease(OS32_SURFACE_DISPLAY, input.refs, 1, OS32_SURFACE_RW,
+                               &bundle) != OS32_ERR_INVAL ||
+        api->gfx_surface_lease(role, &before.desc[0].ref, 1, OS32_SURFACE_RW,
+                               &bundle) != OS32_ERR_STALE ||
+        api->gfx_surface_lease(role, input.refs, 1, OS32_SURFACE_RW, &bundle) ||
+        bundle.count != 1 || !bundle.views[0].token || !bundle.views[0].base ||
+        bundle.views[0].bytes != after.desc[0].bytes ||
+        api->surface_unlease(bundle.views[0].token))
+        return report(api, "SURFACE bundle acquisition failed\n", 15);
     return report(api, "SURFACE OK\n", 0);
 }
