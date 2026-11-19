@@ -6,6 +6,7 @@
 #include "gfx/gfx.h"
 #include "gfx/gfx_console.h"
 #include "gfx/v2/gfx2_int.h"
+#include "platform_display_fallback.h"
 #include "config.h"
 #include "console.h"
 #include "text_screen.h"
