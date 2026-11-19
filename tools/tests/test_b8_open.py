@@ -61,7 +61,7 @@ SRC = ROOT / "tools/tests/b8_open_host.c"
 
 # 票 B8 で触ったカーネル側。実ビルドと同じ素性で -Werror を通す ([C1])。
 TARGET_SRCS = ["fs/ext2/ext2_inode.c", "fs/ext2/ext2_dir.c", "fs/ext2/ext2_file.c",
-               "fs/ext2/ext2_vfs.c", "fs/ext2/ext2_super.c", "fs/vfs.c", "fs/vfs_fd.c"]
+               "fs/ext2/ext2_vfs.c", "fs/ext2/ext2_super.c", "fs/ext2/ext2_time.c", "fs/vfs.c", "fs/vfs_fd.c"]
 TARGET_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
                 "-fno-pie", "-fno-stack-protector", "-nostdlib",
                 "-mno-red-zone", "-fcommon", "-O2",

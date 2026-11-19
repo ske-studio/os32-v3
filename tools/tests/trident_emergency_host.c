@@ -61,6 +61,12 @@ static void con_sink_push_exit(int id) { (void)id; }
 static int launch_child(int id) { (void)id; return 0; }
 static void kbd_inject_discard(void) { }
 static void launch_owner_exit(int id) { (void)id; }
+#define OS32_FEATURE_USERSHELL 1
+static int scope_owner;
+static void sfs_persistent_scope_owner_exit(int id)
+{
+    if (id == scope_owner) scope_owner = -1;
+}
 static void exec_host_owner_exit(int id) { (void)id; }
 static void con_sink_owner_exit(int id) { (void)id; }
 #include "exec_gfx_exit_order_host.c"
@@ -117,9 +123,12 @@ void _start(void)
                     faults(pf, user, syscall, fail ? -72 : 0);
     for (int kind = EXEC_KIND_EXITED; kind <= EXEC_KIND_ABORTED; kind++) {
         owner = 2; device.active = true; calls = transferred = 0; rc = -73;
+        scope_owner = 2;
         exec_notify_owned(3, kind);
+        CHECK(scope_owner == 2);
         CHECK(!calls && device.active && !transferred);
         exec_notify_owned(2, kind);
+        CHECK(scope_owner == -1);
         CHECK(calls == 1 && !device.active && transferred == 1 && owner == 1);
     }
     if (!failures) emit("GREEN emergency: live owner, IF=0, recursion, both faults, exit/fault/STOP\n");

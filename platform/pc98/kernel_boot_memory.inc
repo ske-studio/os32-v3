@@ -3,6 +3,16 @@
 /* Borrowed by the resident client for the rest of boot, never stack storage. */
 static SfsLan boot_sfs_lan;
 
+static int boot_sfs_describe(void *ctx, struct SfsTransportInfo *out)
+{
+    const SfsLan *lan = ctx;
+    out->nic = "82557";
+    out->peer_valid = lan->linked || lan->peer_fixed;
+    for (unsigned i = 0; i < sizeof(out->peer); i++)
+        out->peer[i] = out->peer_valid ? lan->peer[i] : 0;
+    return 0;
+}
+
 static u32 boot_sfs_now(void *ctx)
 {
     (void)ctx;
@@ -60,7 +70,8 @@ static void kernel_boot_hostsvc(struct boot_context *boot)
         rc = sfs_lan_set_peer(&boot_sfs_lan, peer);
         if (!rc) {
             const struct SfsPersistentConfig cfg = {
-                .io = &sfs_lan_io, .io_ctx = &boot_sfs_lan, .lan_enabled = 1
+                .io = &sfs_lan_io, .io_ctx = &boot_sfs_lan, .lan_enabled = 1,
+                .describe = boot_sfs_describe
             };
             rc = sfs_persistent_start(&cfg);
         }

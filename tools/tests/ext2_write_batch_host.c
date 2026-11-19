@@ -237,6 +237,7 @@ int platform_disk_geometry_get(int drive, struct platform_disk_geometry *info)
 
 
 #include "../../fs/ext2/ext2_super.c"
+#include "../../fs/ext2/ext2_time.c"
 #include "../../fs/ext2/ext2_inode.c"
 #include "../../fs/ext2/ext2_dir.c"
 #include "../../fs/ext2/ext2_file.c"

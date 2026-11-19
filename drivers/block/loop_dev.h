@@ -11,22 +11,7 @@
 #ifndef LOOP_DEV_H
 #define LOOP_DEV_H
 
-#include "types.h"
-
-/* Numeric return codes retain each interface's existing contract. */
-#define LOOP_ERR_FORMAT (-2)
-#define LOOP_ERR_BUSY (-3)
-#define LOOP_ERR_IO (-4)
-#define LOOP_ERR_UNSUPPORTED (-2)
-#define LOOP_ERR_WRITE_PROTECTED (-3)
-
-/* ループバックデバイス初期化 (lo0..lo3 を dev_register) */
-void loop_dev_init(void);
-
-/* パスベースのアタッチ (拡張子でフォーマット判別)
- * 戻り値: 0=成功, -1=パス/スロット不正, -2=フォーマット不正,
- *         -3=スロット使用中, -4=I/Oエラー */
-int  loop_dev_attach(const char *vfs_path, int slot);
+#include "loop_contract.h"
 
 /* fd ベースのアタッチ (fmt でフォーマット指定)
  * 既に vfs_open 済みの fd を直接スロットにアタッチする。
@@ -50,24 +35,9 @@ int  loop_dev_attach_fd(int fd, int slot, int fmt);
 #define LOOP_MEDIA_2HD_144   0x30
 #define LOOP_MEDIA_HDD       0x80
 
-/* スロットをデタッチ (owns_fd の場合のみ fd をクローズ) */
-void loop_dev_detach(int slot);
-
-/* スロット状態照会
- * 戻り値: 1=アタッチ中, 0=未使用
- * out_total: 総LBA数, out_bps: セクタサイズ(bytes) */
-int  loop_dev_status(int slot, u32 *out_total, int *out_bps);
-
 /* ================================================================== */
 /*  CHS コア API                                                       */
 /* ================================================================== */
-
-/* CHS セクタ読み出し (全フォーマット共通)
- * D88: トラックテーブル走査 → セクタヘッダ照合 → データ読み出し
- * FDI/HDI/RAW: オフセット計算 → vfs_read
- * sect は 1-based (ATA/FDC 準拠)
- * 戻り値: 0=成功, -1=セクタ不在/エラー */
-int loop_dev_read_chs(int slot, u16 cyl, u8 head, u8 sect, void *buf);
 
 /* CHS セクタ書き込み (全フォーマット共通)
  * D88: loop_dev_seek_d88 → vfs_write
@@ -104,34 +74,8 @@ int loop_dev_track_id_d88(int slot, u8 trk_cyl, u8 trk_head, u16 index,
                           u8 *out_c, u8 *out_h, u8 *out_r, u8 *out_n,
                           u16 *out_spt);
 
-/* ================================================================== */
-/*  LBA API (FDI/HDI/NHD/RAW 用。D88 は対象外)                         */
-/*                                                                    */
-/*  SASI/IDE BIOS (INT 1Bh の DA=0x80/0x00) は LBA 線形アドレスで     */
-/*  読み書きしてくるため、CHS を経由しない直接の LBA 経路を公開する。  */
-/*  0 起算セクタを CHS API に流すと raw_chs_ok が正しく拒否するので、  */
-/*  SASI 側は必ずこちらを使うこと。                                   */
-/* ================================================================== */
-
-/* LBA セクタ読み出し。lba+count が総 LBA を超えたらエラー。
- * 戻り値: 0=成功, -1=範囲外/未アタッチ/I-Oエラー, -2=D88 は非対応 */
-int loop_dev_read_lba(int slot, u32 lba, u32 count, void *buf);
-
-/* LBA セクタ書き込み。書き込み不可アタッチなら -3。
- * 戻り値: 0=成功, -1=範囲外等, -2=D88 非対応, -3=ライトプロテクト */
-int loop_dev_write_lba(int slot, u32 lba, u32 count, const void *buf);
-
-/* 書き込み可能アタッチか (loop_dev_attach が O_RDWR で開けたか)
- * 戻り値: 1=書き込み可, 0=読み取り専用または未アタッチ */
-int loop_dev_is_writable(int slot);
-
 /* スロットの VFS fd を取得 (-1 = 未アタッチ) */
 int loop_dev_get_fd(int slot);
-
-/* ジオメトリ取得
- * 戻り値: 0=成功, -1=未アタッチ */
-int loop_dev_get_geometry(int slot, u16 *cyls, u8 *heads, u8 *spt,
-                          u16 *bps, u32 *total_lba);
 
 /* フォーマット種別取得 (LOOP_FMT_*)
  * 戻り値: LOOP_FMT_*, 未アタッチの場合 LOOP_FMT_NONE */

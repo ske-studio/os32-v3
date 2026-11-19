@@ -39,6 +39,7 @@ int ring3_call_from_user(void) { return 0; }
 int res_owner_get(void) { return 1; }
 #include "db_source.inc"
 #include "gfx_core_source.inc"
+#include "gfx_dirty_source.inc"
 #include "gfx_vram_source.inc"
 void gfx2_pal_set_v1(int first, int count, const u8 *rgb)
 { (void)first; (void)count; (void)rgb; }
@@ -186,6 +187,19 @@ static int test(void)
               dirty_queue.rects[0].w==GFX_WIDTH && dirty_queue.rects[0].h==GFX_HEIGHT-1,
               "dirty clipped");
         dirty_queue.count=0;
+        gfx_add_dirty_rect(0, 0, 0, 1);
+        CHECK(!dirty_queue.count, "dirty empty");
+        gfx_add_dirty_rect(-4, -2, 8, 3);
+        gfx_add_dirty_rect(64, 33, 1, 1);
+        CHECK(dirty_queue.count == 1 && dirty_queue.rects[0].x == 0 &&
+              dirty_queue.rects[0].y == 0 && dirty_queue.rects[0].w == 96 &&
+              dirty_queue.rects[0].h == 34, "dirty merge");
+        dirty_queue.count = 0;
+        for (int n = 0; n <= MAX_DIRTY_RECTS; n++)
+            gfx_dirty_add(&dirty_queue, GFX_WIDTH, 5000, 0, n * 64, 1, 1);
+        CHECK(dirty_queue.count == 2 && dirty_queue.rects[0].h == (MAX_DIRTY_RECTS-1)*64+1 &&
+              dirty_queue.rects[1].y == MAX_DIRTY_RECTS*64, "dirty full");
+        dirty_queue.count = 0;
         GFX_RasterPalTable table={0};
         u32 commits=gfx_counters.commits;
         table.count=-1;

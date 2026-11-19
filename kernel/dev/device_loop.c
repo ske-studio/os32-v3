@@ -1,5 +1,5 @@
 #include "platform_device.h"
-#include "loop_dev.h"
+#include "loop_contract.h"
 
 int platform_loop_dev_get_geometry(int slot, u16 *c, u8 *h, u8 *s,
                                    u16 *bps, u32 *total)

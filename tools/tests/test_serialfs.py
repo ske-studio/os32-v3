@@ -36,7 +36,7 @@
 壊れていないこと) も見る。
 """
 CHECK = dict(name='serialfs-host', tier=1,
-    covers=['drivers/char/serial_kapi.h', 'fs/serialfs/serialfs.h', 'net/nic.h', 'lib/le_internal.h', 'include/time_units.h', 'tools/lanfs_host.py', 'tools/lan_bridge.py', 'tools/host_image.py', 'tools/tests/mutpar.py', 'drivers/char/serial.c', 'drivers/char/serial_plan.c', 'fs/serialfs/serialfs.c', 'fs/serialfs/serialfs_session.c', 'fs/serialfs/sfs_lan.c', 'fs/serialfs/sfs_lan.h', 'drivers/net/e82557/e82557.h', 'init/sysconfig.h', 'drivers/net/e82557/lan_module.h', 'fs/serialfs/sfs_client.c', 'fs/serialfs/sfs_proto.c', 'kernel/sys.c', 'lib/crc32.c', 'lib/kstring.h', 'tools/rshell_serial.py', 'tools/rshell_peek.py', 'tools/rshell_hwb.py', 'tools/serialfs_host.py', 'tools/host_tree_manifest.py', 'tools/tests/serial_gate_host.c', 'tools/tests/serial_portc_host.c', 'tools/tests/serialfs_host.c', 'tools/tests/serialfs_session_host.c', 'tools/tests/test_serial_portc.py', 'userland/shell/serial_watchdog.c', 'tools/tests/serial_emergency_host.h', 'kernel/serial_diag.c', 'include/console_output.h', 'lib/serial_diag.h', 'include/platform_sys.h', 'platform/pc98/system.c', 'include/pci_dev_contract.h', 'include/pci_bind_contract.h', 'tools/tests/kernel_includes.py'],
+    covers=['fs/fd_redirect.h', 'platform/pc98/kernel_boot_memory.inc', 'drivers/char/serial_kapi.h', 'fs/serialfs/serialfs.h', 'net/nic.h', 'lib/le_internal.h', 'include/time_units.h', 'tools/lanfs_host.py', 'tools/lan_bridge.py', 'tools/host_image.py', 'tools/tests/mutpar.py', 'drivers/char/serial.c', 'drivers/char/serial_plan.c', 'fs/serialfs/serialfs.c', 'fs/serialfs/serialfs_session.c', 'fs/serialfs/sfs_lan.c', 'fs/serialfs/sfs_lan.h', 'drivers/net/e82557/e82557.h', 'init/sysconfig.h', 'drivers/net/e82557/lan_module.h', 'fs/serialfs/sfs_client.c', 'fs/serialfs/sfs_proto.c', 'kernel/sys.c', 'lib/crc32.c', 'lib/kstring.h', 'tools/rshell_serial.py', 'tools/rshell_peek.py', 'tools/rshell_hwb.py', 'tools/serialfs_host.py', 'tools/host_tree_manifest.py', 'tools/tests/serial_gate_host.c', 'tools/tests/serial_portc_host.c', 'tools/tests/serialfs_host.c', 'tools/tests/serialfs_session_host.c', 'tools/tests/test_serial_portc.py', 'userland/shell/serial_watchdog.c', 'tools/tests/serial_emergency_host.h', 'kernel/serial_diag.c', 'include/console_output.h', 'lib/serial_diag.h', 'include/platform_sys.h', 'platform/pc98/system.c', 'include/pci_dev_contract.h', 'include/pci_bind_contract.h', 'tools/tests/kernel_includes.py'],
     needs=[], budget=11.8,
     basis=['AC-SFS-1', 'docs/design/fs/serialfs/serialfs_persistent.md 何をするか'],
 )
@@ -177,6 +177,10 @@ def session_build(tmp, mutated=None, name="session"):
     (work / "appslot.h").write_text(
         "#ifndef APPSLOT_H\n#define APPSLOT_H\n#define APP_ID_SHELL 1\n#endif\n",
         encoding="utf-8")
+    boot_path = 'platform/pc98/kernel_boot_memory.inc'
+    boot = (mutated or {}).get(boot_path, (ROOT / boot_path).read_text())
+    describe = boot[boot.index('static int boot_sfs_describe('):boot.index('static u32 boot_sfs_now(')]
+    (work / "boot_describe.inc").write_text(describe)
     for rel in SESSION_SRCS:
         text = (mutated or {}).get(rel, (ROOT / rel).read_text(encoding="utf-8"))
         (work / pathlib.Path(rel).name).write_text(text, encoding="utf-8")
@@ -1546,23 +1550,25 @@ GATE_MUTATIONS = CHECKED_MUTATIONS + [
      "            break;", "ゲートの上げ下げで UART / FIFO の残りを読み捨てない"),
 ]
 SESSION_MUTATIONS = [
+    ("platform/pc98/kernel_boot_memory.inc", r"out->peer_valid = lan->linked \|\| lan->peer_fixed;",
+     "out->peer_valid = lan->peer_fixed;", "HELLO で得た peer を常駐の行から落とす"),
     ("fs/serialfs/serialfs_session.c",
-     r"rc = sfs_persistent_scope_begin\(\);",
+     r"rc = sfs_persistent_scope_begin_owned\(res_owner_get\(\)\);",
      "rc = OS32_ERR_INVAL;", "LAN 常駐 scope の begin 分岐を外す"),
     ("fs/serialfs/serialfs_session.c",
-     r"int rc = sfs_persistent_scope_end\(exit_code\);",
+     r"int rc = sfs_persistent_scope_end_owned\(res_owner_get\(\), exit_code\);",
      "int rc = OS32_ERR_INVAL;", "LAN 常駐 scope の end 分岐を外す"),
     ("fs/serialfs/serialfs_session.c",
-     r"rc = sfs_persistent_scope_begin\(\);",
-     "rc = sfs_persistent_scope_begin() == 0 ? 0 : OS32_ERR_IO;", "scope begin の誤りを潰す"),
+     r"rc = sfs_persistent_scope_begin_owned\(res_owner_get\(\)\);",
+     "rc = sfs_persistent_scope_begin_owned(res_owner_get()) == 0 ? 0 : OS32_ERR_IO;", "scope begin の誤りを潰す"),
     ("fs/serialfs/serialfs_session.c",
-     r"int rc = sfs_persistent_scope_end\(exit_code\);",
-     "int rc = sfs_persistent_scope_end(0);", "scope end に終了値を渡さない"),
+     r"int rc = sfs_persistent_scope_end_owned\(res_owner_get\(\), exit_code\);",
+     "int rc = sfs_persistent_scope_end_owned(res_owner_get(), 0);", "scope end に終了値を渡さない"),
     ("fs/serialfs/serialfs_session.c",
-     r'("sfs: )transport(=lan nic=82557 peer=[^\n]*\n                \(u32\)lan->peer)',
+     r'("sfs: )transport(=lan nic=%s peer=)',
      r'\1hidden\2', "常駐 transport 行を消す"),
     ("fs/serialfs/serialfs_session.c",
-     r'if \(rc == 0\) kprintf\(KLOG_LEGACY_CYAN, "sfs: exit=%d\\n", exit_code\);',
+     r'if \(rc == 0\) console_printf\(KLOG_LEGACY_CYAN, "sfs: exit=%d\\n", exit_code\);',
      ";", "常駐 exit 行を消す"),
     ("fs/serialfs/serialfs_session.c",
      r'            kprintf\(KLOG_LEGACY_LIGHT_RED, "sfs: lan.mod unavailable \(sfs lan off for serial\)\\n"\);\n',
@@ -1683,7 +1689,7 @@ def _mutate_c_one(item):
     # 含んでも変異の的ではない — 従来どおりの対応)
     if rel == "drivers/char/serial.c":
         build, cases = gate_build, GATE_CASES
-    elif rel == "fs/serialfs/serialfs_session.c":
+    elif rel in ("fs/serialfs/serialfs_session.c", "platform/pc98/kernel_boot_memory.inc"):
         build, cases = session_build, SESSION_CASES
     else:
         build, cases = c_build, C_CASES

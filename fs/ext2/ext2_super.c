@@ -17,7 +17,6 @@
 #include "bootinfo.h" /* bootinfo_part_geom — 区画表の CHS の幾何 */
 #include "pc98pt.h"   /* 区画表の共有部 (票 TASK_HDD_INSTALL 段 1-4) */
 
-#define EXT2_FALLBACK_EPOCH 0x67E8E800UL /* 2025-03-30 06:43:12 UTC */
 #define EXT2_DEVICE_NAME_CAP 8
 
 /* 共有静的バッファ (スタックオーバーフロー防止)
@@ -151,15 +150,6 @@ void ext2_path_memo_put(Ext2Ctx *ctx, const char *path, u32 ino)
     kstrncpy(ctx->memo[i].path, path, OS32_MAX_PATH);
     ctx->memo[i].ino = ino;
     ctx->memo[i].gen = ctx->ns_gen;
-}
-
-/* ======================================================================== */
-/*  タイムスタンプ                                                           */
-/* ======================================================================== */
-
-u32 ext2_current_time(void)
-{
-    return EXT2_FALLBACK_EPOCH;
 }
 
 /* ======================================================================== */
