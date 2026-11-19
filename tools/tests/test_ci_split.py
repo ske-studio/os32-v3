@@ -366,10 +366,13 @@ def routing_cases(build_source, check_source):
 
     selector = [sys.executable, '-B', 'tools/checks/run.py', '--list']
     jobs = yaml.safe_load(check_source)['jobs']
-    def ppc_selection(job, marker):
-        args = shlex.split(command(jobs[job], marker))
+    def ppc_selection(job, marker, shard=None):
+        line = command(jobs[job], marker)
+        if shard is not None:
+            line = line.replace('${{ matrix.shard }}', str(shard))
+        args = shlex.split(line)
         filters = [word for i, word in enumerate(args)
-                   if word in ('--env', '--exclude-env') or (i and args[i-1] in ('--env', '--exclude-env'))]
+                   if word in ('--env', '--exclude-env', '--shard') or (i and args[i-1] in ('--env', '--exclude-env', '--shard'))]
         return selected(*selector, *filters)
 
     build_job = yaml.safe_load(build_source)['jobs']['checks']
@@ -378,11 +381,17 @@ def routing_cases(build_source, check_source):
                      '--eval=show-routing: ; @echo $(CHECK_SHARD_TARGETS)', 'show-routing',
                      *['CHECK_EXCLUDE_ENV=' + value for value in flags])
     compile_checks = ppc_selection('ppc-compile', 'tools/checks/run.py --run')
-    guest = ppc_selection('ppc-qemu', 'tools/ci/gate.py run')
+    guest = set()
+    shards = jobs['ppc-qemu']['strategy']['matrix']['shard']
+    assert len(shards) == 5, 'expected five PPC QEMU shards'
+    for shard in shards:
+        assigned = ppc_selection('ppc-qemu', 'tools/ci/gate.py run', shard)
+        assert guest.isdisjoint(assigned), f'duplicate guest checks in shard {shard}'
+        guest.update(assigned)
     missing = selected(*selector) - (build | compile_checks | guest)
     assert not missing, f'unassigned checks: {sorted(missing)}'
     required = selected(*selector, '--env', 'qemu-ppc')
-    assert required <= guest and not required & (build | compile_checks), 'qemu-ppc requires exclusive ppc-qemu assignment'
+    assert required == guest and not required & (build | compile_checks), 'qemu-ppc requires exclusive ppc-qemu assignment'
 
 
 def main():
@@ -396,6 +405,8 @@ def main():
     if '--mutate' in sys.argv:
         mutations = [
             ('build-route', ' CHECK_EXCLUDE_ENV=qemu-ppc', '', 'restore qemu checks to build'),
+            ('guest-route', 'shard: [0, 1, 2, 3, 4]', 'shard: [0, 1, 2, 3, 3]', 'repeat guest shard'),
+            ('guest-route', 'matrix.shard }}/5', 'matrix.shard }}/6', 'omit sixth guest shard'),
             ('guest-route', 'gate.py run --env qemu-ppc', 'gate.py run --env socket', 'leave guest checks unassigned'),
             ('workflow', '      - name: make check\n        timeout-minutes: 60\n',
              '      - name: make check\n', 'remove make check deadline'),
