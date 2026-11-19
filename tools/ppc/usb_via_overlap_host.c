@@ -6,6 +6,7 @@
 #include "endian_dma.h"
 #include "kprintf.h"
 #include "tick.h"
+#include "pointer_service.h"
 
 #define VIA_FIRST_PA 0x80016000u
 #define VIA_LAST_PA  0x80018000u
@@ -127,6 +128,12 @@ int usb_hc_register(struct usb_hc *hc) { (void)hc; registrations++; return 0; }
 void usb_hc_dead(struct usb_hc *hc, u32 why) { (void)hc; (void)why; quit(99); }
 void usb_service(void) { quit(100); }
 int tick_register(unsigned int slot, tick_fn fn) { (void)slot; (void)fn; return 0; }
+/* The USB mouse wiring (stage 3c) registers PointerOps; this host only drives the OHCI/VIA overlap. */
+const PointerOps empty_pointer;
+void pointer_register(const PointerOps *ops) { (void)ops; }
+void pointer_bounds(i16 x0, i16 y0, i16 x1, i16 y1) { (void)x0; (void)y0; (void)x1; (void)y1; }
+void mouse_cursor_set_mode(int mode) { (void)mode; }
+void mouse_cursor_hide(void) { }
 
 void entry(const u32 *stack) __attribute__((noreturn, used));
 void entry(const u32 *stack)

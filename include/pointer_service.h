@@ -42,6 +42,8 @@ typedef struct PointerOps {
     void (*cursor_hide)(void);
 } PointerOps;
 
+/* Base for a resident provider that supplies a subset of the callbacks. */
+extern const PointerOps empty_pointer;
 void pointer_register(const PointerOps *ops);
 void pointer_poll(MouseState *state);
 int pointer_available(void);
