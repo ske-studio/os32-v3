@@ -1,295 +1,104 @@
-/* ========================================================================
- *  font_source.c — font の read lease 表 (T7b-b1、設計 §2-1・§2-3・§2-4・§3-2)
- *
- *  app の入口 (public KAPI font_source_open / read_at / close、v77) と
- *  常駐 shell の入口 (exec/shell_service.c の wrapper が段 A/B の後に呼ぶ
- *  段 C/D) の実体。FD の読み書きは fs/vfs_fd.c の font lease API
- *  (vfs_open_font / vfs_validate_font / vfs_font_read_at / vfs_close_font)
- *  だけで行い、FD 番号は呼び手に見せない。
- *
- *  回収: app の通常終了 / fault は exec_reclaim_resources が
- *  font_lease_close_owned(id) を vfs_close_owned(id) の直前に呼ぶ (結線は
- *  S3b)。shell の lease は shell_service_retire → font_lease_close_shell。
- *
- *  ホスト試験は tools/tests/font_source_host.c (fs/vfs_fd.c と一緒に実物で)。
- * ======================================================================== */
+/* Resident KCG1 provider for machines without a font ROM. */
+#include "font_source_kcg.h"
 #include "font_source.h"
-#include "exec.h"           /* ring3_call_from_user / ring3_fault_kill / OS32_ERR_* */
-#include "redir_access.h"   /* caller_access_get / copy_caller_cstr */
-#include "fd_redirect.h"    /* res_owner_get */
-#include "../gui.h"            /* GUI_SHELL_OWNER */
+#include "font_guard.h"
+#include "../../mm/kmalloc.h"
+#include "../../lib/kstring.h"
+#include "os32_kapi_shared.h"
+#include "../../lib/lz4.h"
 
-static FontLease g_font_leases[FONT_LEASE_SLOTS];
+#define KCG_FILE_HEADER 16u
+#define KCG_FILE_KANJI_COUNT (94u * 94u)
+#define KCG_FILE_KANJI_BYTES (KCG_FILE_KANJI_COUNT * 32u)
+#define KCG_FILE_ANK_BYTES (256u * 16u)
+#define KCG_FILE_ANK_OFFSET (KCG_FILE_KANJI_BYTES + KCG_FILE_KANJI_COUNT)
+#define KCG_FILE_PAYLOAD (KCG_FILE_ANK_OFFSET + KCG_FILE_ANK_BYTES + 256u)
+#define KCG_FILE_COMPRESSED_MAX (KCG_FILE_PAYLOAD + KCG_FILE_PAYLOAD / 255u + 16u)
 
-volatile u32 font_lease_reject_count = 0;
-volatile u32 font_lease_reject_last = 0;
+static u8 *resident;
+static KcgCacheStats counters;
 
-static i32 font_lease_reject(u32 reason, i32 rc)
+static u32 read_le32(const u8 *p)
 {
-    font_lease_reject_count++;
-    font_lease_reject_last = reason;
+    return (u32)p[0] | ((u32)p[1] << 8) | ((u32)p[2] << 16) | ((u32)p[3] << 24);
+}
+
+static int load_guarded(void *arg)
+{
+    const char *path = arg;
+    u32 id, size, i, flags, compressed;
+    u8 header[KCG_FILE_HEADER];
+    u8 *data = 0, *input = 0;
+    int rc = font_lease_resident_open(path, &id, &size);
+    if (rc) return rc;
+    rc = OS32_ERR_INVAL;
+    if (size < KCG_FILE_HEADER) goto done;
+    if (font_lease_resident_read_at(id, 0, header, sizeof(header)) != (i32)sizeof(header) ||
+        header[0] != 'K' || header[1] != 'C' || header[2] != 'G' || header[3] != '1' ||
+        read_le32(header + 4) != KCG_FILE_PAYLOAD ||
+        read_le32(header + 12) != 0) goto done;
+    flags = read_le32(header + 8);
+    compressed = size - KCG_FILE_HEADER;
+    if (flags > 1) goto done;
+    if (flags == 0 && compressed != KCG_FILE_PAYLOAD) goto done;
+    if (flags == 1 && (compressed == 0 || compressed > KCG_FILE_COMPRESSED_MAX)) goto done;
+    data = kmalloc(KCG_FILE_PAYLOAD);
+    if (!data) { rc = OS32_ERR_NOSPC; goto done; }
+    if (flags == 1) {
+        input = kmalloc(compressed);
+        if (!input) { rc = OS32_ERR_NOSPC; goto done; }
+    }
+    if (font_lease_resident_read_at(id, KCG_FILE_HEADER, input ? input : data, compressed) != (i32)compressed ||
+        font_lease_resident_validate(id)) goto done;
+    if (flags == 1 && lz4_decode(input, (int)compressed, data, KCG_FILE_PAYLOAD) != (int)KCG_FILE_PAYLOAD) goto done;
+    for (i = 0; i < KCG_FILE_KANJI_COUNT; i++)
+        if (data[KCG_FILE_KANJI_BYTES + i] != 1) goto done;
+    for (i = 0; i < 256; i++)
+        if (data[KCG_FILE_ANK_OFFSET + KCG_FILE_ANK_BYTES + i] != 1) goto done;
+    if (input) { kfree(input); input = 0; }
+    rc = font_lease_resident_close(id);
+    if (rc) { kfree(data); return rc; }
+    if (resident) kfree(resident);
+    resident = data;
+    counters.hits = counters.misses = 0;
+    return 0;
+done:
+    if (input) kfree(input);
+    if (data) kfree(data);
+    (void)font_lease_resident_close(id);
     return rc;
 }
 
-static u32 font_lease_id(u32 idx)
+int kcg_file_load(const char *path)
 {
-    return (g_font_leases[idx].id_gen << FONT_LEASE_IDX_BITS) | idx;
+    if (!path) return OS32_ERR_INVAL;
+    return font_guard_run(load_guarded, (void *)path);
 }
 
-static int font_lease_count(u8 kind, int owner, int any_owner)
+void kcg_file_unload(void)
 {
-    u32 i;
-    int n = 0;
-    for (i = 0; i < FONT_LEASE_SLOTS; i++) {
-        const FontLease *s = &g_font_leases[i];
-        if (s->kind == kind && (any_owner || s->vfs.owner == owner)) n++;
+    u8 *old = resident;
+    resident = 0;
+    if (old) kfree(old);
+}
+
+static void read_ank(u8 ch, u8 *buf)
+{
+    if (!resident) { kmemset(buf, 0, 16); counters.misses++; return; }
+    kmemcpy(buf, resident + KCG_FILE_ANK_OFFSET + (u32)ch * 16u, 16);
+    counters.hits++;
+}
+
+static void read_kanji(u16 jis, u8 *buf)
+{
+    u32 hi = jis >> 8, lo = jis & 255u;
+    if (!resident || hi < 0x21 || hi > 0x7e || lo < 0x21 || lo > 0x7e) {
+        kmemset(buf, 0, 32); counters.misses++; return;
     }
-    return n;
+    kmemcpy(buf, resident + ((hi - 0x21) * 94u + lo - 0x21) * 32u, 32);
+    counters.hits++;
 }
 
-/* 空き枠 (FREE かつ id_gen が満了していない)。無ければ -1。 */
-static int font_lease_free_slot(void)
-{
-    u32 i;
-    for (i = 0; i < FONT_LEASE_SLOTS; i++) {
-        if (g_font_leases[i].kind == FONT_LEASE_FREE &&
-            g_font_leases[i].id_gen < FONT_LEASE_GEN_MAX) return (int)i;
-    }
-    return -1;
-}
-
-/* VFS で開いて枠に載せる。成功で 0 と id / size。 */
-static i32 font_lease_install(u8 kind, const char *path, int owner, u32 flags,
-                              u32 owner_gen, u32 *out_id, u32 *out_size)
-{
-    VfsFontLease l;
-    u32 size = 0;
-    int idx = font_lease_free_slot();
-    int rc;
-    FontLease *s;
-    if (idx < 0) return OS32_ERR_NOSPC;
-    rc = vfs_open_font(path, owner, flags, &l, &size);
-    if (rc != VFS_OK) return rc;
-    s = &g_font_leases[idx];
-    if (s->id_gen == 0) s->id_gen = 1;   /* id 0 を出さない */
-    s->kind = kind;
-    s->vfs = l;
-    s->owner_gen = owner_gen;
-    s->file_size = size;
-    *out_id = font_lease_id((u32)idx);
-    *out_size = size;
-    return 0;
-}
-
-/* VFS の FD を閉じて枠を空け、id_gen を進める (旧 id は以後 3b で STALE)。
- * 戻り = vfs_close_font の値 (失効でも一致すれば OK)。INVAL (FD が lease の
- * 知らない経路で既に解放・再利用されている) でも他人の FD は閉じず、枠は
- * 空ける — 持ち主が二度と閉じられない枠を残さない。 */
-static i32 font_lease_release(FontLease *s)
-{
-    i32 rc = vfs_close_font(&s->vfs);
-    s->kind = FONT_LEASE_FREE;
-    s->vfs.fd = -1;
-    s->vfs.generation = 0;
-    s->vfs.owner = 0;
-    s->owner_gen = 0;
-    s->file_size = 0;
-    s->id_gen++;
-    return rc;
-}
-
-/* ---- app (public KAPI) ----------------------------------------------- */
-
-/* 門 1・2。通れば *c に caller を入れて 0。
- * 資源の owner は caller の app_id (= res_owner_get()、VFS FD の owner と
- * exec_reclaim_resources(id) の id と同じ番号)。caller.owner は AS の所有者の
- * 札 (paging の as->owner) で別の番号なので、照合にも lease の owner にも使わない
- * (S3b のゲストで判明: AS の札 18 と app_id 2 が違い、門 2 で全部断っていた)。 */
-static i32 font_lease_app_gate(struct caller_access *c)
-{
-    if (ring3_call_from_user() == 0)
-        return font_lease_reject(FONT_LEASE_REJ_NOT_USER, OS32_ERR_INVAL);
-    if (!caller_access_get(c) || c->origin != CALLER_USER ||
-        c->app_id != res_owner_get())
-        return font_lease_reject(FONT_LEASE_REJ_CALLER, OS32_ERR_INVAL);
-    return 0;
-}
-
-/* token の判定表 3a〜3e (設計 §2-3)。通れば *out に枠。 */
-static i32 font_lease_app_token(u32 id, const struct caller_access *c,
-                                FontLease **out)
-{
-    u32 idx = id & FONT_LEASE_IDX_MASK;
-    u32 id_gen = id >> FONT_LEASE_IDX_BITS;
-    FontLease *s;
-    if (idx >= FONT_LEASE_SLOTS)
-        return font_lease_reject(FONT_LEASE_REJ_IDX, OS32_ERR_INVAL);
-    s = &g_font_leases[idx];
-    if (s->id_gen != id_gen)
-        return font_lease_reject(FONT_LEASE_REJ_ID_GEN, OS32_ERR_STALE);
-    if (s->kind != FONT_LEASE_APP)
-        return font_lease_reject(FONT_LEASE_REJ_KIND, OS32_ERR_INVAL);
-    if (s->vfs.owner != c->app_id)
-        return font_lease_reject(FONT_LEASE_REJ_OWNER, OS32_ERR_INVAL);
-    if (s->owner_gen != c->generation)
-        return font_lease_reject(FONT_LEASE_REJ_OWNER_GEN, OS32_ERR_STALE);
-    *out = s;
-    return 0;
-}
-
-i32 font_lease_app_open(const char *path, u32 *out_id, u32 *out_size)
-{
-    struct caller_access c;
-    char kpath[VFS_MAX_PATH];
-    i32 rc = font_lease_app_gate(&c);
-    if (rc) return rc;
-    if (!out_id || !out_size) return OS32_ERR_INVAL;
-    if (!copy_caller_cstr(&c, path, kpath, sizeof(kpath))) {
-        /* USER の不正な入力ポインタ (NUL が範囲内に無い・写せない) */
-        ring3_fault_kill();
-        return font_lease_reject(FONT_LEASE_REJ_PATH, OS32_ERR_INVAL);
-    }
-    if (font_lease_count(FONT_LEASE_APP, c.app_id, 0) >= VFS_FONT_FD_MAX_APP ||
-        font_lease_count(FONT_LEASE_APP, 0, 1) >= VFS_FONT_FD_MAX_APP_TOTAL)
-        return OS32_ERR_NOSPC;
-    return font_lease_install(FONT_LEASE_APP, kpath, c.app_id,
-                              VFS_FONT_OPEN_PIN, c.generation, out_id, out_size);
-}
-
-i32 font_lease_app_read_at(u32 id, u32 offset, void *dst, u32 len)
-{
-    struct caller_access c;
-    FontLease *s = 0;
-    i32 rc = font_lease_app_gate(&c);
-    if (rc) return rc;
-    rc = font_lease_app_token(id, &c, &s);
-    if (rc) return rc;
-    return vfs_font_read_at(&s->vfs, offset, dst, len);
-}
-
-i32 font_lease_app_close(u32 id)
-{
-    struct caller_access c;
-    FontLease *s = 0;
-    i32 rc = font_lease_app_gate(&c);
-    if (rc) return rc;
-    rc = font_lease_app_token(id, &c, &s);
-    if (rc) return rc;
-    return font_lease_release(s);
-}
-
-void font_lease_close_owned(int owner)
-{
-    u32 i;
-    for (i = 0; i < FONT_LEASE_SLOTS; i++) {
-        FontLease *s = &g_font_leases[i];
-        if (s->kind == FONT_LEASE_APP && s->vfs.owner == owner)
-            (void)font_lease_release(s);
-    }
-}
-
-/* ---- 常駐 shell (段 C / 段 D) ----------------------------------------- */
-
-/* 段 C: kind==SHELL・id_gen 一致・owner_gen が現 shell 登録世代。 */
-static i32 font_lease_shell_token(u32 id, u32 shell_gen, FontLease **out)
-{
-    u32 idx = id & FONT_LEASE_IDX_MASK;
-    FontLease *s;
-    if (idx >= FONT_LEASE_SLOTS) return OS32_ERR_INVAL;
-    s = &g_font_leases[idx];
-    if (s->id_gen != (id >> FONT_LEASE_IDX_BITS)) return OS32_ERR_STALE;
-    if (s->kind != FONT_LEASE_SHELL) return OS32_ERR_INVAL;
-    if (s->owner_gen != shell_gen) return OS32_ERR_STALE;
-    *out = s;
-    return 0;
-}
-
-i32 font_lease_shell_open(const char *path, u32 shell_gen, u32 *out_id, u32 *out_size)
-{
-    if (!path || !out_id || !out_size || shell_gen == 0) return OS32_ERR_INVAL;
-    if (font_lease_count(FONT_LEASE_SHELL, 0, 1) >= VFS_FONT_FD_MAX_SHELL)
-        return OS32_ERR_NOSPC;
-    return font_lease_install(FONT_LEASE_SHELL, path, GUI_SHELL_OWNER,
-                              VFS_FONT_OPEN_PROTECT | VFS_FONT_OPEN_PIN,
-                              shell_gen, out_id, out_size);
-}
-
-i32 font_lease_shell_read_at(u32 id, u32 shell_gen, u32 offset, void *dst, u32 len)
-{
-    FontLease *s = 0;
-    i32 rc = font_lease_shell_token(id, shell_gen, &s);
-    if (rc) return rc;
-    return vfs_font_read_at(&s->vfs, offset, dst, len);
-}
-
-i32 font_lease_shell_validate(u32 id, u32 shell_gen)
-{
-    FontLease *s = 0;
-    i32 rc = font_lease_shell_token(id, shell_gen, &s);
-    if (rc) return rc;
-    return vfs_validate_font(&s->vfs);
-}
-
-i32 font_lease_shell_close(u32 id, u32 shell_gen)
-{
-    FontLease *s = 0;
-    i32 rc = font_lease_shell_token(id, shell_gen, &s);
-    if (rc) return rc;
-    return font_lease_release(s);
-}
-
-void font_lease_close_shell(void)
-{
-    u32 i;
-    for (i = 0; i < FONT_LEASE_SLOTS; i++) {
-        FontLease *s = &g_font_leases[i];
-        if (s->kind == FONT_LEASE_SHELL) (void)font_lease_release(s);
-    }
-}
-
-/* Kernel resident lease uses its own kind and owner, independent of shell. */
-static i32 font_lease_resident_token(u32 id, FontLease **out)
-{
-    u32 idx = id & FONT_LEASE_IDX_MASK;
-    FontLease *s;
-    if (idx >= FONT_LEASE_SLOTS) return OS32_ERR_INVAL;
-    s = &g_font_leases[idx];
-    if (s->id_gen != (id >> FONT_LEASE_IDX_BITS)) return OS32_ERR_STALE;
-    if (s->kind != FONT_LEASE_RESIDENT) return OS32_ERR_INVAL;
-    if (s->owner_gen != FONT_RESIDENT_GENERATION) return OS32_ERR_STALE;
-    *out = s;
-    return 0;
-}
-
-i32 font_lease_resident_open(const char *path, u32 *out_id, u32 *out_size)
-{
-    if (!path || !out_id || !out_size) return OS32_ERR_INVAL;
-    if (font_lease_count(FONT_LEASE_RESIDENT, 0, 1) >= 1) return OS32_ERR_NOSPC;
-    return font_lease_install(FONT_LEASE_RESIDENT, path, FONT_RESIDENT_OWNER,
-                              (VFS_FONT_OPEN_PROTECT | VFS_FONT_OPEN_PIN),
-                              FONT_RESIDENT_GENERATION, out_id, out_size);
-}
-
-i32 font_lease_resident_read_at(u32 id, u32 offset, void *dst, u32 len)
-{
-    FontLease *s = 0;
-    i32 rc = font_lease_resident_token(id, &s);
-    if (rc) return rc;
-    return vfs_font_read_at(&s->vfs, offset, dst, len);
-}
-
-i32 font_lease_resident_validate(u32 id)
-{
-    FontLease *s = 0;
-    i32 rc = font_lease_resident_token(id, &s);
-    if (rc) return rc;
-    return vfs_validate_font(&s->vfs);
-}
-
-i32 font_lease_resident_close(u32 id)
-{
-    FontLease *s = 0;
-    i32 rc = font_lease_resident_token(id, &s);
-    if (rc) return rc;
-    return font_lease_release(s);
-}
+static void stats(KcgCacheStats *out) { *out = counters; }
+static void invalidate(void) { counters.hits = counters.misses = 0; }
+const KcgModuleApi kcg_file_api = { read_ank, read_kanji, stats, invalidate };

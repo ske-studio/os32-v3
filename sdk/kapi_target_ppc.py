@@ -68,7 +68,7 @@ PROVIDER_GROUPS = {
         'loop_attach',
         'loop_detach',
         'loop_status',
-    }), frozenset(['platform_device.h'])),
+    }), frozenset([])),
     'ide': (frozenset({
         'ide_init',
         'ide_drive_present',
@@ -83,13 +83,6 @@ PROVIDER_GROUPS = {
         'ext2_format',
         'ext2_format_at',
     }), frozenset(['ext2.h'])),
-    'kcg': (frozenset({
-        'kcg_init',
-        'kcg_set_scale',
-        'kcg_load_font',
-        'kcg_read_ank',
-        'kcg_read_kanji',
-    }), frozenset(['kcg_contract.h'])),
     'pci': (frozenset({
         'pci_count',
         'pci_get',

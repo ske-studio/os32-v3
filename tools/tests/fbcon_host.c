@@ -42,7 +42,7 @@ static const u8 ascii[16]={0x80,0x42,0x24,0x18,0x81,0x7e};
 static const u8 kana[16]={0x20,0x40,0x80,0x02,0x01};
 static const u8 jis[32]={0x80,0x01,0x42,0x24,0x18,0x81};
 /* Load a complete synthetic KCG1 through the real resident provider. */
-#include "drivers/video/kcg/kcg_file.h"
+#include "kernel/console/font_source_kcg.h"
 static u8 fixture[295956];
 int font_guard_run(int (*call)(void *),void *arg) { return call(arg); }
 i32 font_lease_resident_open(const char *path,u32 *id,u32 *size) {

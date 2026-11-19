@@ -5,7 +5,7 @@
 # x86 のフックを 0 にする段が来たら、HOOK_DEFS は KERNEL_CFLAGS に直に足すこと。
 EXEC_HOOKS = gfx gfx_poll surface gui font_guard font_lease ime snd shlib legacy r1 reclaim kapi_db serial_diag
 $(foreach h,$(EXEC_HOOKS),$(eval HOOK_$(h) = $$(FEATURE_PC98_PENDING)))
-# font_source.c は共通 EXEC の提供者。
+# font_source_lease.c は共通 EXEC の提供者。
 HOOK_font_lease = $(FEATURE_EXEC)
 HOOK_surface = $(FEATURE_EXEC)
 hook_macro = OS32_HOOK_$(shell echo $(1) | tr 'a-z' 'A-Z')

@@ -1,7 +1,7 @@
 #ifndef OS32_KCG_FILE_H
 #define OS32_KCG_FILE_H
 
-#include "kcg_module.h"
+#include "kcg_contract.h"
 
 /* Load after the root filesystem is available; unload before freeing users. */
 int kcg_file_load(const char *path);

@@ -3,7 +3,7 @@
  *
  *  表 g_shell_service の登録 (publish / retire) と、表に載せる入口 wrapper
  *  5 本の段 A (戻り番地) / 段 B (文脈)。段 C (shell lease の registry) と
- *  段 D (VFS) は kernel/console/font_source.c の shell 側実体が持つ。version 2 の
+ *  段 D (VFS) は kernel/console/font_source_lease.c の shell 側実体が持つ。version 2 の
  *  font_guard_run (T7b-b3 S2) は段 A/B の後に kernel/console/font_guard.c へ。
  *
  *  wrapper は noinline で、このファイルは -fno-optimize-sibling-calls で

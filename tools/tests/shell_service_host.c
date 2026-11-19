@@ -21,7 +21,7 @@
  *  test_font_guard.py が見るので、ここでは贋物 (呼ばれた数・戻りを差し替え
  *  可能、既定は call(ctx) をそのまま呼ぶ) を置く。
  *
- *  段 C / D の実体 (kernel/console/font_source.c の font_lease_shell_*、S2) は
+ *  段 C / D の実体 (kernel/console/font_source_lease.c の font_lease_shell_*、S2) は
  *  別の試験 (font_source_host.c) が見るので、ここでは registry の贋物を置く
  *  (署名は kernel/console/font_source.h): lease は「使用中 + owner_gen」
  *  だけで、渡された shell_gen と違えば STALE、close_shell で全部 FREE。
@@ -69,7 +69,7 @@ char *kstrncpy(char *dst, const char *src, u32 n)
     return dst;
 }
 
-/* ---- 段 C / D の贋物 (kernel/console/font_source.c の shell 側実体の代わり) ------ */
+/* ---- 段 C / D の贋物 (kernel/console/font_source_lease.c の shell 側実体の代わり) ------ */
 #define FAKE_LEASES 4
 static struct { int used; u32 owner_gen; } fake[FAKE_LEASES];
 static u32 fake_last_gen;
