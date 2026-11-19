@@ -99,6 +99,8 @@ def main():
         (work / 'hsync_h2_host.c').write_text(fixture)
         for p in ('hsync_fep_host.c', 'ime_suspend_host.c', 'fep_suspend_owner_host.c'):
             (work / p).write_text((ROOT / 'tools/tests' / p).read_text())
+        cc = str(Path(os.environ['CROSS_DIR']) / 'bin/i386-elf-gcc')
+        gcc_include = subprocess.check_output([cc, '-print-file-name=include'], text=True).strip()
         for mutation in [None] + (MUTATIONS if args.mutate else []):
             current = dict(originals)
             if mutation:
@@ -107,15 +109,15 @@ def main():
                 current[path] = current[path].replace(old, new)
             for path, source in current.items():
                 dest = {'ime_suspend.c': 'ime_suspend_source.inc', 'fep_module.c': 'fep_module_source.inc'}.get(Path(path).name, Path(path).name)
-                (work / dest).write_text(source.replace('../../lib/', str(ROOT / 'lib') + '/').replace('../../fs/', str(ROOT / 'fs') + '/').replace('../../mm/', str(ROOT / 'mm') + '/').replace('../sqlite_engine.h', str(ROOT / 'kernel/sqlite_engine.h', 'kernel/sqlite_engine_body.h')))
+                (work / dest).write_text(source.replace('../../lib/', str(ROOT / 'lib') + '/').replace('../../fs/', str(ROOT / 'fs') + '/').replace('../../mm/', str(ROOT / 'mm') + '/').replace('../sqlite_engine.h', str(ROOT / 'kernel/sqlite_engine.h')))
             target = 'ime_suspend_host.c' if mutation and mutation[1].startswith('kernel/') else 'hsync_fep_host.c'
             if mutation and mutation[1].endswith('fep_module.c'):
                 target = 'fep_suspend_owner_host.c'
             targets = [target] if mutation else ['ime_suspend_host.c', 'hsync_fep_host.c', 'fep_suspend_owner_host.c']
             for target in targets:
                 exe = work / 'test'
-                cc = str(Path(os.environ['CROSS_DIR']) / 'bin/i386-elf-gcc')
                 host32.build([cc, '-m32', '-march=i386', '-std=gnu11', '-Os', '-nostdlib',
+                    '-ffreestanding', '-nostdinc', '-isystem', gcc_include,
                     '-fno-builtin', '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections',
                     '-Wall', '-Wextra', '-Werror', '-Werror=vla', '-D__cdecl=',
                     '-Wno-unused-function', '-Wno-unused-parameter', '-Wno-sign-compare',
