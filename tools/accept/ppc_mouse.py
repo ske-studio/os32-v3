@@ -11,7 +11,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT / 'tools'), str(ROOT / 'tools/ppc')]
 
-CASES = ('normal', 'invert-x', 'ignore-bounds', 'drop-release', 'absent')
+CASES = ('normal', 'invert-x', 'ignore-bounds', 'default-bounds', 'drop-release', 'absent')
 
 
 def absent_bindings(folder, out):
@@ -20,7 +20,7 @@ def absent_bindings(folder, out):
     if source.count(anchor) != 1:
         raise ValueError('pointer provider mutation anchor')
     group = """    'absent_mouse': (frozenset({
-        'mouse_set_bounds',
+        'mouse_poll', 'mouse_available', 'mouse_cursor_show', 'mouse_set_bounds',
         'mouse_cursor_hide', 'mouse_cursor_set_mode',
     }), frozenset()),
 """
@@ -34,6 +34,7 @@ def absent_bindings(folder, out):
 
 
 def observe(elf, cpu, evidence, case):
+    from fb_pixel import read_ppm
     from kboot_run import serial
     from link_sh_run import Session
     from run import require
@@ -55,30 +56,53 @@ def observe(elf, cpu, evidence, case):
         word = s.word(name, -offset)
         return (word >> (8 * (4 - offset - width))) & ((1 << (8 * width)) - 1)
 
+    def cursor_pixels(name):
+        path = evidence / (name + '.ppm')
+        s.q.call('screendump', {'filename': str(path.resolve())})
+        frame = read_ppm(path)
+        # Pixel (88,153) lies in column 11, row 5 below the 64 reserved lines.
+        return tuple(frame.pixel(x, y) for y in range(144, 160) for x in range(88, 96))
+
     try:
         s.start()
         s.wait(s.ready, 'RSH READY', 60)
         s.wait(lambda: 'protocol=02' in serial(log) and 'protocol=01' in serial(log),
                'mouse and keyboard enumeration', 30)
-        probe('start')
-        expected = (319, 199) if case in ('ignore-bounds', 'absent') else (80, 160)
-        require((sample('px', 2), sample('py', 2)) == expected, 'set_bounds clamps position')
+        if case == 'absent':
+            probe('present', 1)
+        else:
+            for _ in range(6):
+                s.q.call('input-send-event', {'events': [
+                    {'type': 'rel', 'data': {'axis': axis, 'value': 100}}
+                    for axis in ('x', 'y')]})
+                s.wait(lambda: serial(log).count('dx=100 dy=100') >= _ + 1, 'edge motion')
+            probe('edge', 3 if case == 'default-bounds' else 0)
+            probe('start')
+            expected = (799, 599) if case == 'ignore-bounds' else (80, 160)
+            require((sample('px', 2), sample('py', 2)) == expected, 'application bounds')
         if case in ('normal', 'invert-x', 'drop-release'):
             s.q.call('input-send-event', {'events': [
                 {'type': 'rel', 'data': {'axis': 'x', 'value': 12}},
                 {'type': 'rel', 'data': {'axis': 'y', 'value': -7}},
                 {'type': 'btn', 'data': {'button': 'left', 'down': True}}]})
             s.wait(lambda: 'dx=12 dy=-7 b=1' in serial(log), 'relative report')
-            expected = (72, 153, 0xfff4) if case == 'invert-x' else (88, 153, 12)
-            require((sample('px', 2), sample('py', 2), sample('old_x', 2)) == expected,
-                    'relative x/y and accumulated x delta')
-            require(sample('old_y', 2) == 0xfff9 and sample('buttons', 1) == 1,
-                    'relative y delta and left button')
+            probe('motion', 4 if case == 'invert-x' else 0)
         if case in ('normal', 'drop-release'):
-            probe('cursor')
-            require(s.word('cursor_display_mode') == 1, 'TEXT mode selected')
             key, _ = keyboard_actions(s.q, lambda: serial(log), s.wait)
-            probe('key', during=lambda: key('a'))
+
+            def sample_cursor():
+                s.wait(lambda: s.word('cursor_display_mode') == 1, 'TEXT mode selected')
+                before = cursor_pixels('before')
+                key('s')
+                s.wait(lambda: s.word('cursor_visible') == 1, 'cursor shown')
+                shown = cursor_pixels('shown')
+                require(all(a != b for a, b in zip(before, shown)), 'cursor reverses every cell pixel')
+                key('h')
+                s.wait(lambda: s.word('cursor_visible') == 0, 'cursor hidden')
+                require(cursor_pixels('hidden') == before, 'hide restores every cell pixel')
+                key('a')
+
+            probe('cursor', during=sample_cursor)
             s.q.call('device_del', {'id': 'mouse'})
             s.wait(lambda: 'USB RELEASE kind=1' in serial(log), 'held mouse detached')
             probe('gone')
@@ -130,10 +154,14 @@ def main():
         mutation = []
         if case == 'invert-x':
             mutation = mutant_settings(folder, case, 'platform/powermac/usb_platform.c',
-                                       'mouse_ext_move(dx, dy, 0);', 'mouse_ext_move(-dx, dy, 0);')
+                                       'if (present) mouse_legacy_snapshot(dx, dy, buttons, x, y);',
+                                       'if (present) { mouse_legacy_snapshot(dx, dy, buttons, x, y); *dx = -*dx; }')
         elif case == 'ignore-bounds':
             mutation = mutant_settings(folder, case, 'platform/powermac/usb_platform.c',
-                                       '    usb_pointer.bounds = pointer_bounds;', '')
+                                       '    usb_pointer.bounds = mouse_set_bounds;', '')
+        elif case == 'default-bounds':
+            mutation = mutant_settings(folder, case, 'platform/powermac/ppc_kernel.c',
+                                       'if (fb_w && fb_h)', 'if (0)')
         elif case == 'drop-release':
             mutation = mutant_settings(folder, case, 'platform/powermac/usb_platform.c',
                                        'pointer_button(&release);', '(void)release;')
