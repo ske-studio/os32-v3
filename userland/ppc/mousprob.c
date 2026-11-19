@@ -3,9 +3,7 @@
 
 static int check(KernelAPI *api, const char *command)
 {
-    if (!strcmp(command, "gone"))
-        return api->mouse_available() == 0 ? 0 : 1;
-    if (api->mouse_available() != 1) return 1;
+    if (api->mouse_available() != 0) return 1;
     if (!strcmp(command, "start")) {
         api->mouse_set_bounds(80, 160, 80, 160);
         api->mouse_set_bounds(72, 144, 88, 176);
@@ -17,7 +15,7 @@ static int check(KernelAPI *api, const char *command)
         return 0;
     }
     if (!strcmp(command, "key")) return api->kbd_getkey() == 'a' ? 0 : 6;
-    return !strcmp(command, "present") ? 0 : 7;
+    return (!strcmp(command, "gone") || !strcmp(command, "present")) ? 0 : 7;
 }
 
 int main(int argc, char **argv, KernelAPI *api)

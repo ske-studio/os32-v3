@@ -11,7 +11,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT / 'tools'), str(ROOT / 'tools/ppc')]
 
-CASES = ('normal', 'invert-x', 'ignore-bounds', 'absent')
+CASES = ('normal', 'invert-x', 'ignore-bounds', 'drop-release', 'absent')
 
 
 def absent_bindings(folder, out):
@@ -20,7 +20,7 @@ def absent_bindings(folder, out):
     if source.count(anchor) != 1:
         raise ValueError('pointer provider mutation anchor')
     group = """    'absent_mouse': (frozenset({
-        'mouse_available', 'mouse_poll', 'mouse_set_bounds', 'mouse_cursor_show',
+        'mouse_set_bounds',
         'mouse_cursor_hide', 'mouse_cursor_set_mode',
     }), frozenset()),
 """
@@ -60,11 +60,10 @@ def observe(elf, cpu, evidence, case):
         s.wait(s.ready, 'RSH READY', 60)
         s.wait(lambda: 'protocol=02' in serial(log) and 'protocol=01' in serial(log),
                'mouse and keyboard enumeration', 30)
-        probe('start', 1 if case == 'absent' else 0)
-        if case != 'absent':
-            expected = (319, 199) if case == 'ignore-bounds' else (80, 160)
-            require((sample('px', 2), sample('py', 2)) == expected, 'set_bounds clamps position')
-        if case in ('normal', 'invert-x'):
+        probe('start')
+        expected = (319, 199) if case in ('ignore-bounds', 'absent') else (80, 160)
+        require((sample('px', 2), sample('py', 2)) == expected, 'set_bounds clamps position')
+        if case in ('normal', 'invert-x', 'drop-release'):
             s.q.call('input-send-event', {'events': [
                 {'type': 'rel', 'data': {'axis': 'x', 'value': 12}},
                 {'type': 'rel', 'data': {'axis': 'y', 'value': -7}},
@@ -75,7 +74,7 @@ def observe(elf, cpu, evidence, case):
                     'relative x/y and accumulated x delta')
             require(sample('old_y', 2) == 0xfff9 and sample('buttons', 1) == 1,
                     'relative y delta and left button')
-        if case == 'normal':
+        if case in ('normal', 'drop-release'):
             probe('cursor')
             require(s.word('cursor_display_mode') == 1, 'TEXT mode selected')
             key, _ = keyboard_actions(s.q, lambda: serial(log), s.wait)
@@ -83,6 +82,9 @@ def observe(elf, cpu, evidence, case):
             s.q.call('device_del', {'id': 'mouse'})
             s.wait(lambda: 'USB RELEASE kind=1' in serial(log), 'held mouse detached')
             probe('gone')
+            require(sample('buttons', 1) == (1 if case == 'drop-release' else 0),
+                    'held left button state after detach')
+        if case == 'normal':
             s.q.call('device_add', {'driver': 'usb-mouse', 'id': 'mouse2'})
             s.wait(lambda: serial(log).count('protocol=02') >= 2, 'mouse reattached')
             probe('present')
@@ -130,8 +132,11 @@ def main():
             mutation = mutant_settings(folder, case, 'platform/powermac/usb_platform.c',
                                        'mouse_ext_move(dx, dy, 0);', 'mouse_ext_move(-dx, dy, 0);')
         elif case == 'ignore-bounds':
-            mutation = mutant_settings(folder, case, 'input/hal/pointer_state.c',
-                                       '    xmin = x0;', '    return;\n    xmin = x0;')
+            mutation = mutant_settings(folder, case, 'platform/powermac/usb_platform.c',
+                                       '    usb_pointer.bounds = pointer_bounds;', '')
+        elif case == 'drop-release':
+            mutation = mutant_settings(folder, case, 'platform/powermac/usb_platform.c',
+                                       'pointer_button(&release);', '(void)release;')
         elif case == 'absent':
             absent_bindings(folder, kernel / 'gen')
         elf = build(kernel, *options, *mutation, 'kb-user', 'kernel')

@@ -26,16 +26,10 @@ static struct { u32 bdf, va; int used; } maps[PM_USB_CONTROLLERS];
 void ppc_dcbf_line(void *);
 static PointerOps usb_pointer;
 
-static int usb_mouse_available(void)
-{
-    return sources[1] != 0;
-}
-
 void pm_usb_platform_init(u32 hz)
 {
     tb_frequency = hz;
     usb_pointer = empty_pointer;
-    usb_pointer.available = usb_mouse_available;
     usb_pointer.bounds = pointer_bounds;
     usb_pointer.cursor_mode = mouse_cursor_set_mode;
     usb_pointer.cursor_hide = mouse_cursor_hide;

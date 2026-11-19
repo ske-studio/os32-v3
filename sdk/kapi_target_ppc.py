@@ -185,6 +185,7 @@ PROVIDER_GROUPS = {
         'gfx2_present',
     }), frozenset([])),
     'pointer': (frozenset({
+        'mouse_available',
         'mouse_poll',
         'mouse_cursor_show',
     }), frozenset()),
