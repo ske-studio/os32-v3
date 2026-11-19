@@ -209,6 +209,11 @@ S2b (`b19526c84`、2026-11-19): ppc-compile の用意も `gate-setup` 1 行に�
 
 S2c (`268404985`・`00fd03405`・`e262701b9`、2026-11-19): static-check の apt を `.github/actions/static-setup` に移し、static-check は main でも再利用せずに毎回回す (煙試験、main のキャッシュを育てる)。check・build とも success (e262701b9)。1 回目 (268404985) の build の checks (0) は `check-ppc-realhw-link` の揺れ (試験の時計の期限 10 ms、PowerPC の PM が `wt/ppc-rhlink-clock` で直す)。main へは、取り込み直しの差が文書 4 本だけだったので、決まり (PARALLEL_BRANCHES §3) で CI を省いて早送りした (0e7ee0a46)。
 
+2026-11-19 の手順別上限は、build の `make check` が 60 分（検査本体の実測は 31 分 30 秒、ジョブの最長は §5-1 の 39 分）。前後に runner の負荷・CPU/IO pressure・ディスク使用量を記録する。
+check の PPC QEMU はシャードごとに 30 分（用意込みで 21 分 43 秒の例、30 分 18 秒の回も検査本体は 13 分 41 秒）、PPC ビルド・ホスト検査は 12 分（用意込み最長 7 分 06 秒）。
+重みを入れ直す前の 8078bf349 では QEMU の検査本体が 25.4 分かかっており、30 分の上限にはシャード間の偏りが再び生じた時の余裕を含む。
+static-check の Check map は 5 分、Host tests は 6 分（検査本体の実測は順に 1 分 32 秒、2 分 08 秒）。
+
 ## 6. 範囲の外
 
 既存の workflow の書き換え、NP21/W・実機の受入、検査の中身の直し (目印のずれなどは見つけた枝で別のコミットにして直す)。

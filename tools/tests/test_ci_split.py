@@ -71,6 +71,15 @@ def workflow_cases(source, setup_source=None):
         # differ; check-fast builds its selected needs in check-prepare.
         boundary = 'make check' if name == 'checks' else 'Build core (make all)'
         prefix = steps[:next(i for i, step in enumerate(steps) if step.get('name') == boundary)]
+        if name == 'checks':
+            assert 40 <= checks[0].get('timeout-minutes', 0) < job['timeout-minutes'], 'make check step deadline'
+            after = steps[len(prefix) + 1]
+            before = prefix.pop()
+            assert before['name'] == 'Runner load before make check', 'diagnostics immediately before make check'
+            assert after['name'] == 'Runner load after make check'
+            assert before.get('continue-on-error') is True and after.get('continue-on-error') is True
+            assert after['run'] == before['run']
+            assert 'always()' in after['if'], 'collect diagnostics after a failed check'
         prepared = []
         for step in prefix:
             if step.get('id') == 'prior':
@@ -217,6 +226,12 @@ def document_cases(source):
     for dependency in ('build-essential', 'e2fsprogs', 'python3-clang', 'libnewlib-dev', 'PyYAML lz4'):
         assert dependency in static_setup, dependency
     assert 'cross' not in yaml.safe_load(static_setup)['runs']['steps'][0]['run'], 'static gate stays cross-free'
+    for job, name in [('static-check', 'Check map (check-changed selection table)'),
+                      ('static-check', 'Host tests (gcc + python3 only)'),
+                      ('ppc-compile', 'PPC image and host checks'),
+                      ('ppc-qemu', 'PPC QEMU guest checks')]:
+        assert any(step.get('name') == name and step.get('timeout-minutes', 0) > 0
+                   for step in workflow['jobs'][job]['steps']), f'{name} needs a step deadline'
     runs = [step.get('run', '') for job in workflow['jobs'].values()
             for step in job['steps']]
     targets = set(re.findall(r'^\s*make\s+(check-[\w-]+)\s*$', '\n'.join(runs), re.M))
@@ -331,6 +346,10 @@ def main():
     print('ci-split: workflow and fetch cases GREEN', flush=True)
     if '--mutate' in sys.argv:
         mutations = [
+            ('workflow', '      - name: make check\n        timeout-minutes: 60\n',
+             '      - name: make check\n', 'remove make check deadline'),
+            ('workflow', 'Runner load after make check\n        if: always() && ',
+             'Runner load after make check\n        if: ', 'skip diagnostics after failure'),
             ('setup', '# Keep the runner\'s default mirrors and let apt handle fallback.',
              "echo 'https://archive.ubuntu.com/ubuntu' | sudo tee /etc/apt/apt-mirrors.txt", 'apt mirror override'),
             ('setup', 'timeout 1200 bash', 'timeout 300 bash', 'apt download deadline'),
