@@ -136,6 +136,8 @@
     "kernel/ver_collect.c",
     "kernel/ver_format.c",
     "kernel/console/font_source.c",
+    "kernel/console/font_source_kcg.c",
+    "lib/lz4.c",
     "kernel/sqlite_engine.c",
     "kernel/sqlite_outer.c",
     "lib/sqlite3/os32_sqlite_test.c",

@@ -86,13 +86,6 @@ PROVIDER_GROUPS = {
         'ext2_format',
         'ext2_format_at',
     }), frozenset(['ext2.h'])),
-    'kcg': (frozenset({
-        'kcg_init',
-        'kcg_set_scale',
-        'kcg_load_font',
-        'kcg_read_ank',
-        'kcg_read_kanji',
-    }), frozenset(['kcg_contract.h'])),
     'serialfs': (frozenset({
         'sfs_begin',
         'sfs_end',

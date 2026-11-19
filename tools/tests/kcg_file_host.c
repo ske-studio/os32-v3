@@ -166,7 +166,7 @@ static int test_resident_close(u32 id) {
     return fail_close ? OS32_ERR_IO : rc;
 }
 #define font_lease_resident_close test_resident_close
-#include "../../drivers/video/kcg/kcg_file.c"
+#include "../../kernel/console/font_source_kcg.c"
 #undef font_lease_resident_close
 #undef font_lease_resident_read_at
 static void fixture(void) {
@@ -176,6 +176,7 @@ static void fixture(void) {
     file_data[4]=4; file_data[5]=0x84; file_data[6]=4;
     kmemset(file_data+16+94*94*32,1,94*94);
     kmemset(file_data+RAW_FILE_SIZE-256,1,256);
+    file_data[16 + 94 * 32] = 0xa5; /* 0x217f aliases 0x2221 without bounds checking. */
     file_data[16]=0xa5;
     file_data[16+KCG_FILE_ANK_OFFSET+65*16]=0x5a;
 }
@@ -184,6 +185,12 @@ static void glyphs(void) {
     irq=1;
     kcg_file_api.read_ank(65,buf); CHECK(buf[0]==0x5a);
     kcg_file_api.read_kanji(0x2121,buf); CHECK(buf[0]==0xa5);
+    static const u16 invalid_jis[] = {0x217f, 0x7f21, 0x2020};
+    for (unsigned i = 0; i < sizeof(invalid_jis) / sizeof(invalid_jis[0]); i++) {
+        kmemset(buf, 0xa5, sizeof(buf));
+        kcg_file_api.read_kanji(invalid_jis[i], buf);
+        for (unsigned j = 0; j < sizeof(buf); j++) CHECK(buf[j] == 0);
+    }
     CHECK(read_calls==calls); irq=0;
 }
 static void no_fds(void) { int i; for(i=3;i<VFS_MAX_OPEN_FILES;i++) CHECK(!open_files[i].in_use); }

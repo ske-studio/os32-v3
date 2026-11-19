@@ -36,8 +36,8 @@ ide_get_info ide_identify ide_init ide_read_sector ide_write_sector
 ide_write_sectors ime_dict_info ime_dict_suspend ime_feed_key ime_get_mode
 ime_getchar ime_getkey ime_is_active ime_set_mode ime_set_render
 ime_switch_dict ime_toggle ime_trygetchar ime_trygetkey ime_user_clear
-ime_user_delete ime_user_export ime_user_list kcg_init kcg_load_font
-kcg_read_ank kcg_read_kanji kcg_set_scale kdebug_call loop_attach loop_detach
+ime_user_delete ime_user_export ime_user_list
+kdebug_call loop_attach loop_detach
 loop_status mem_stat mouse_available mouse_cursor_show mouse_poll np2_check_hostdrv np2_detect
 np2_get_clock np2_get_cpu np2_get_version
 pcm_close pcm_open pcm_set_volume pcm_status pcm_write
@@ -63,6 +63,8 @@ gfx2_cursor_move gfx2_cursor_show gfx2_dpms
 
 # Fixed allowlist: exec/*.c (including exec_*.inc), KBOOT_SHELL=1 TUs,
 # input_service, kbd_inject, con_sink, pipe_buffer, kapi_strings, kstring.
+KCG_PROVIDERS = frozenset("platform_kcg_init platform_kcg_set_scale platform_kcg_load_font kcg_read_ank kcg_read_kanji".split())
+
 ALLOWED_UNDEFINED = frozenset("""
 platform_pci_count platform_pci_get platform_pci_cfg_read32 kapi_pci_bind_info
 surface_api_bundle
@@ -272,6 +274,9 @@ def generate(tmp, mutation=None):
         helper.write_text(text.replace(old, "'buz_on', 'tvram_putchar_at'"))
     if mutation == 'putchar-absent':
         insert_group(helper, mutation, "    'cell_mut': (frozenset({'tvram_putchar_at'}), frozenset()),\n")
+    if mutation == 'kcg-absent':
+        insert_group(helper, mutation, "    'kcg': (frozenset({'kcg_init', 'kcg_set_scale', "
+                     "'kcg_load_font', 'kcg_read_ank', 'kcg_read_kanji'}), frozenset()),\n")
     if mutation == 'font-absent':
         group = ("    'console_font': (frozenset({"
                  "'font_source_open', 'font_source_read_at', 'font_source_close', "
@@ -341,10 +346,10 @@ def main():
         missing = GFX2_QUERY_PROVIDERS - undefined
         if missing:
             print('missing gfx2 query providers:', sorted(missing)); return 1
-        missing = DISPLAY_PROVIDERS - undefined
+        missing = (DISPLAY_PROVIDERS | KCG_PROVIDERS) - undefined
         if missing:
-            print('missing display providers:', sorted(missing)); return 1
-        unexpected = undefined - (ALLOWED_UNDEFINED | GFX2_QUERY_PROVIDERS | DISPLAY_PROVIDERS)
+            print('missing display or KCG providers:', sorted(missing)); return 1
+        unexpected = undefined - (ALLOWED_UNDEFINED | GFX2_QUERY_PROVIDERS | DISPLAY_PROVIDERS | KCG_PROVIDERS)
         if unexpected:
             print('unexpected providers:', sorted(unexpected)); return 1
         print('undefined providers:', len(undefined))
