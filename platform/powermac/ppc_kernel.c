@@ -400,7 +400,11 @@ void platform_boot_run(void)
 #if KBOOT_SHELL || KBOOT_SH
     if (root_ready) {
 #if OS32_HOOK_KAPI_DB
+        /* Keep SQLite boot diagnostics on the registered log streams. */
+        int saved_stream_only = pm_log_stream_only;
+        pm_log_stream_only = 1;
         kprintf(KBOOT_ATTR, "[sqlite] static rc=%d\n", sqlite_static_boot());
+        pm_log_stream_only = saved_stream_only;
 #endif
         pm_exec_boot();
 #if KBOOT_SH
