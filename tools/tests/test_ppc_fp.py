@@ -26,6 +26,7 @@ CHECK = dict(name='ppc-fp', env=['ppc-cross'], tier=2, budget=60, needs=[],
             'kernel/irq/irq.h', 'kernel/irq/irq_math.h',
             'platform/powermac/platform_irq_limits.h', 'build/arch/ppc.mk',
             'build/targets/ppc-powermac.mk', 'tools/ppc/kboot_audit.py',
+            'lib/sqlite3/sqlite3.c', 'lib/sqlite3/os32_sqlite_config.h',
             'tools/ppc/test_user_trap*', 'tools/ppc/test_exec_enter.py',
             'tools/accept/ppc_fp.py'],
     basis=['PPC_FP_NEWLIB_DESIGN §8 F1〜F5・B1'])
@@ -110,9 +111,13 @@ def main(argv=None):
             ordinary = work/'ordinary.o'
             call([prefix+'gcc', *flags, '-c', src, '-o', ordinary])
             elf = work/'audit.elf'
-            call([prefix+'ld', '-e', 'ordinary', ordinary, obj, '-o', elf])
+            link_map = work/'audit.map'
+            call([prefix+'ld', '-Map='+str(link_map), '-e', 'ordinary', ordinary, obj, '-o', elf])
             bad = audit.forbidden(prefix+'objdump', str(elf), str(obj))[1]
             assert bool(bad) == expected, (name, bad)
+            ranges = audit.text_ranges(link_map, str(ordinary))
+            within = audit.forbidden(prefix+'objdump', str(elf), str(obj), ranges=ranges)[1]
+            assert bool(within) == (name == 'B1-altivec'), (name, within)
             print(name+': audit '+('RED' if bad else 'GREEN'), flush=True)
         guard = (ROOT/'arch/ppc/kernel_fp.c').read_text()
         # Replace only the privileged MSR writer; FP save/restore models expose

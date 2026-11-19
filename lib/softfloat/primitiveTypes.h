@@ -37,7 +37,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef primitiveTypes_h
 #define primitiveTypes_h 1
 
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
 #define LITTLEENDIAN 1
+#endif
 #define SOFTFLOAT_FAST_INT64
 
 #include <stdint.h>

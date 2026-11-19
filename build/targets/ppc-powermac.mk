@@ -58,6 +58,36 @@ KB_INC_EXTRA += -I$(KB_GEN)/include -I$(KB_GEN)/sdk/include/os32 \
  -Igfx/sync -Igfx/v2 -Idrivers/video/geforce -Idrivers/video/kcg
 KB_INC_EXTRA += -Idrivers/ata -Ikernel/dev -Ifs -Ifs/isofs -Idrivers/block -Ikernel/cli
 endif
+ifeq ($(FEATURE_SQLITE),1)
+include build/sqlite-gen.mk
+KB_VFS := $(KB_OUT)/gen/sqlite/os32_sqlite_vfs
+KB_HARD := $(addprefix $(KB_OUT)/,$(SQLITE_HARD_C:.c=.o) arch/ppc/sqlite_restore.o) $(KB_VFS).o
+KB_GROUP := $(KB_OUT)/gen/sqlite/body
+KB_EXTRA += $(KB_GROUP).o
+KB_SQLITE_AUDIT := --sqlite-group $(KB_GROUP).o --sqlite-inputs $(KB_HARD)
+KB_SQLITE_INC := -Ilib/sqlite3 -Ilib/softfloat
+KB_KEEP_SQLITE := -Wl,--undefined=sqlite_module_init
+$(KB_HARD) $(KB_OUT)/kernel/sqlite_engine.o $(KB_OUT)/kernel/sqlite_outer.o $(KB_OUT)/kapi/kapi_db.o: $(SQLITE_GENERATED)
+$(KB_HARD) $(KB_GROUP).raw.o: build/features/sqlite-static.mk build/softfloat.mk
+$(KB_HARD): private KB_TU_FLAGS += -mhard-float -Os -Ilib/sqlite3 -Ilib/softfloat -Ifs
+$(KB_OUT)/lib/softfloat/s_roundPackToF64.o: private KB_TU_FLAGS += -Wno-unused-label
+$(KB_VFS).o $(KB_OUT)/lib/sqlite3/sqlite3.o: private KB_TU_FLAGS += -std=gnu89 -DNDEBUG -Wno-long-long -w -include lib/sqlite3/os32_sqlite_config.h
+$(KB_OUT)/kernel/sqlite_outer.o: private KB_TU_FLAGS += -Ilib/sqlite3 -DOS32_SQLITE_STATIC
+$(KB_VFS).c: tools/gen_sqlite_imports.py lib/sqlite3/os32_sqlite_vfs.c
+	@mkdir -p $(@D)
+	python3 -B $< --static-vfs $@
+$(KB_VFS).o: $(KB_VFS).c
+	$(KB_CC) $(KB_FLAGS) $(KB_TU_FLAGS) -c $(KB_VFS).c -o $@
+$(KB_GROUP).raw.o: $(KB_HARD)
+	$(PPC_CROSS_DIR)/bin/powerpc-elf-ld -r -d --fatal-warnings --gc-sections -u sqlite_module_init -Map=$@.map $(KB_HARD) -o $@
+$(KB_GROUP).o: $(KB_GROUP).raw.o tools/ppc/sqlite_attributes.py
+	$(KB_OBJCOPY) --dump-section .gnu.attributes=$(KB_GROUP).attr $< $@.tmp
+	python3 -B tools/ppc/sqlite_attributes.py $(KB_GROUP).attr $(KB_GROUP).neutral
+	$(KB_OBJCOPY) --keep-global-symbol=sqlite_module_init --update-section .gnu.attributes=$(KB_GROUP).neutral $< $@
+	@rm -f $@.tmp
+-include $(KB_HARD:.o=.d)
+endif
+
 KB_OBJ := $(addprefix $(KB_OUT)/,$(KB_ASM:.S=.o) $(KB_C:.c=.o))
 # The source lists and link order live in these files: a change there relinks the image.
 KB_SELECT_MK := build/select.mk build/sources/common.mk build/sources/order.mk build/sources/hooks.mk \
@@ -85,7 +115,8 @@ $(KB_OUT)/config/source-date.flags: ppc-source-date-force
 	@mkdir -p $(@D)
 	@printf '%s\n' '$(KB_CC) $(KB_FLAGS) SOURCE_DATE_EPOCH=$(SOURCE_DATE_EPOCH)' > $@.tmp
 	@if cmp -s $@.tmp $@; then rm -f $@.tmp; else mv $@.tmp $@; fi
-$(KB_OUT)/kapi/kapi_sysinfo.o: $(KB_OUT)/config/source-date.flags
+# The exec cleanup hook changes when SQLite is toggled in the same output tree.
+$(KB_OUT)/exec/exec.o $(KB_OUT)/kapi/kapi_sysinfo.o: $(KB_OUT)/config/source-date.flags
 endif
 
 # 共通の置き場のソースは、PowerPC の像にまだ入っていない物 (C_COMMON_PC98_PENDING) も PowerPC の
@@ -151,7 +182,7 @@ $(KB_OUT)/motd.txt:
 # Images without KAPI (KB_EXEC empty) have no sys_reboot caller; keep the shared reset provider (PPC_RESET_DESIGN §5).
 KB_KEEP_RESET := $(if $(KB_EXEC),,-Wl,--undefined=platform_reset)
 $(KB_ELF): $(KB_OBJ) $(KB_EXTRA) $(KB_OUT)/kernel.ld
-	$(KB_CC) $(KB_FLAGS) -MF $@.d -no-pie -Wl,--gc-sections -Wl,--no-undefined $(KB_KEEP_RESET) \
+	$(KB_CC) $(KB_FLAGS) -MF $@.d -no-pie -Wl,--gc-sections -Wl,--no-undefined $(KB_KEEP_RESET) $(KB_KEEP_SQLITE) \
 	 -Wl,-z,noexecstack -Wl,--defsym,kboot_tick=tick_count -Wl,-T,$(KB_OUT)/kernel.ld \
 	 -Wl,-Map,$(KB_ELF:.ELF=.map) $(KB_OBJ) $(KB_EXTRA) -o $@
 
@@ -160,9 +191,9 @@ $(KB_ELF): $(KB_OBJ) $(KB_EXTRA) $(KB_OUT)/kernel.ld
 # inside the PPC closure: common code uses OS32_TICK_HZ (design R7). Mutated sources are audited too.
 # ISO media tick-rate debt is documented in PPC_SHELL_DESIGN §8; RAM media is fixed.
 audit: $(KB_ELF)
-	@python3 -B tools/ppc/kboot_audit.py --elf $(KB_ELF) --map $(KB_ELF:.ELF=.map) --objects $(KB_OBJ) $(KB_EXTRA) --fp-object $(KB_OUT)/arch/ppc/fp_context.o --nm $(KB_NM) --objdump $(KB_OBJDUMP) \
-	 --sources $(filter-out fs/isofs/iso9660.c,$(KB_C)) $(KB_ASM) $(if $(KB_MUT_SRC),--mutant $(KB_MUT_SRC) $(KB_MUT_FILE)) $(if $(KB_MUT_EXTRA_SRC),--mutant $(KB_MUT_EXTRA_SRC) $(KB_MUT_EXTRA_FILE)) $(if $(KB_MUT_THIRD_SRC),--mutant $(KB_MUT_THIRD_SRC) $(KB_MUT_THIRD_FILE)) \
-	 -- $(KB_CC) $(KB_FLAGS)
+	@python3 -B tools/ppc/kboot_audit.py --elf $(KB_ELF) --map $(KB_ELF:.ELF=.map) --objects $(KB_OBJ) $(KB_EXTRA) $(KB_SQLITE_AUDIT) --fp-object $(KB_OUT)/arch/ppc/fp_context.o --nm $(KB_NM) --objdump $(KB_OBJDUMP) \
+	 --sources $(filter-out fs/isofs/iso9660.c,$(KB_C)) $(KB_ASM) $(SQLITE_HARD_C) $(if $(KB_VFS),$(KB_VFS).c arch/ppc/sqlite_restore.S) $(if $(KB_MUT_SRC),--mutant $(KB_MUT_SRC) $(KB_MUT_FILE)) $(if $(KB_MUT_EXTRA_SRC),--mutant $(KB_MUT_EXTRA_SRC) $(KB_MUT_EXTRA_FILE)) $(if $(KB_MUT_THIRD_SRC),--mutant $(KB_MUT_THIRD_SRC) $(KB_MUT_THIRD_FILE)) \
+	 -- $(KB_CC) $(KB_FLAGS) $(KB_SQLITE_INC)
 
 -include $(KB_OBJ:.o=.d)
 

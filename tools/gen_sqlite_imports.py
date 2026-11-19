@@ -83,9 +83,7 @@ def generate(out, definition=DEFINITION, contracts_only=False, module="sqlite"):
     else:
         generate_component_exports(out, entries, module)
     if module == "sqlite" and not contracts_only:
-        source = (ROOT / 'lib/sqlite3/os32_sqlite_vfs.c').read_text()
-        source = source.replace('static char sqlite_mem_pool[SQLITE_MEMSYS5_SIZE];',
-                                'char *sqlite_module_pool;\n#define sqlite_mem_pool sqlite_module_pool')
+        source = pool_vfs()
         source = source.replace('extern volatile u32 tick_count;', '')
         source = source.replace('tick_count', 'ktime_ticks()')
         (out / 'os32_sqlite_vfs.c').write_text('#include "sqlite_imports.h"\n' + source)
@@ -93,6 +91,13 @@ def generate(out, definition=DEFINITION, contracts_only=False, module="sqlite"):
     if not contracts_only:
         (out / f'{module}_imports.json').write_text(json.dumps(metadata, indent=2) + '\n')
     return metadata
+
+
+def pool_vfs():
+    source = (ROOT / 'lib/sqlite3/os32_sqlite_vfs.c').read_text()
+    source = source.replace('static char sqlite_mem_pool[SQLITE_MEMSYS5_SIZE];',
+                            'char *sqlite_module_pool;\n#define sqlite_mem_pool sqlite_module_pool')
+    return source
 
 
 def generate_facade(out, rows, entries):
@@ -124,6 +129,8 @@ def generate_facade(out, rows, entries):
         if fields: fields += '; '
         if ret != 'void': fields += ret + ' result;'
         else: fields += 'int unused;'
+        if name == 'vsnprintf':
+            wrappers.append('#ifndef OS32_SQLITE_STATIC')
         wrappers += [f'typedef struct {{ {fields} }} Call_{name};',
                      f'static void call_{name}(void *arg) {{', f'    Call_{name} *f = arg;', '    (void)f;']
         invocation = f'sqlite_module_api->{name}(' + ', '.join('f->'+a for a in names) + ')'
@@ -137,6 +144,8 @@ def generate_facade(out, rows, entries):
                      (f'return sqlite_module_api->{name}({callargs});' if ret != 'void' else f'{{ sqlite_module_api->{name}({callargs}); return; }}'),
                      f'    sqlite_engine_run(call_{name}, &f, {r["io"]});',
                      ('    return f.result;' if ret != 'void' else '    return;'), '}']
+        if name == 'vsnprintf':
+            wrappers.append('#endif')
         # Allocation class follows the connection/group, never the current app.
         db = 'db' if 'db' in names else '(stmt ? sqlite3_db_handle(stmt) : 0)' if 'stmt' in names else '0'
         group = 'group' if 'group' in names else '0'
@@ -182,9 +191,14 @@ def generate_component_exports(out, entries, module):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--out-dir', type=Path, required=True)
+    output = parser.add_mutually_exclusive_group(required=True)
+    output.add_argument('--out-dir', type=Path)
+    output.add_argument('--static-vfs', type=Path)
     parser.add_argument('--contracts-only', action='store_true')
     parser.add_argument('--module', choices=('sqlite', 'fep', 'cd', 'kcg', 'fm', 'pcm', 'v86', 'lan', 'cirrus', 'geforce', 'trident'), default='sqlite')
     args = parser.parse_args()
+    if args.static_vfs:
+        args.static_vfs.write_text(pool_vfs())
+        raise SystemExit(0)
     definition = ROOT / f'tools/prototypes/{args.module}_imports.def'
     generate(args.out_dir, definition, contracts_only=args.contracts_only, module=args.module)

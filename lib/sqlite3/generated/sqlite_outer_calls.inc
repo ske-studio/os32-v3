@@ -546,6 +546,7 @@ void os32_sqlite_outer_dump_vfs(void)
     sqlite_engine_run(call_dump_vfs, &f, 0);
     return;
 }
+#ifndef OS32_SQLITE_STATIC
 typedef struct { int size; char *out; const char *format; va_list args; char * result; } Call_vsnprintf;
 static void call_vsnprintf(void *arg) {
     Call_vsnprintf *f = arg;
@@ -559,6 +560,7 @@ char * os32_sqlite_outer_vsnprintf(int size, char *out, const char *format, va_l
     sqlite_engine_run(call_vsnprintf, &f, 0);
     return f.result;
 }
+#endif
 typedef struct { int result; } Call_shutdown;
 static void call_shutdown(void *arg) {
     Call_shutdown *f = arg;

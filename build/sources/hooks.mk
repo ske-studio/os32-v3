@@ -8,6 +8,7 @@ $(foreach h,$(EXEC_HOOKS),$(eval HOOK_$(h) = $$(FEATURE_PC98_PENDING)))
 # font_source.c は共通 EXEC の提供者。
 HOOK_font_lease = $(FEATURE_EXEC)
 HOOK_surface = $(FEATURE_EXEC)
+HOOK_kapi_db = $(if $(filter 1,$(FEATURE_PC98_PENDING) $(FEATURE_SQLITE)),1,0)
 HOOK_gfx = $(FEATURE_EXEC)
 hook_macro = OS32_HOOK_$(shell echo $(1) | tr 'a-z' 'A-Z')
 HOOK_DEFS := $(foreach h,$(EXEC_HOOKS),-D$(call hook_macro,$(h))=$(HOOK_$(h)))

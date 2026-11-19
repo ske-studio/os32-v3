@@ -7,6 +7,7 @@
 
 #include "../lib/sqlite3/generated/sqlite_outer_calls.inc"
 
+#ifndef OS32_SQLITE_STATIC
 char *os32_sqlite_snprintf(int size, char *out, const char *format, ...)
 {
     char *result;
@@ -16,6 +17,8 @@ char *os32_sqlite_snprintf(int size, char *out, const char *format, ...)
     va_end(args);
     return result;
 }
+
+#endif
 
 _Static_assert(sizeof(u64) == 8, "SQLite binary64 integer wire");
 
