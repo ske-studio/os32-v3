@@ -22,14 +22,15 @@ EXPECTED = {
 
 def absent_bindings(folder, out):
     source = (ROOT / 'sdk/kapi_target_ppc.py').read_text()
-    anchor = "    'pointer': (frozenset({"
+    # Anchor on the table head: provider groups disappear as slots are published.
+    anchor = "PROVIDER_GROUPS = {\n"
     if source.count(anchor) != 1:
         raise RuntimeError('absent SHM mutation anchor must be unique')
     group = """    'shm': (frozenset({
         'sys_shm_alloc', 'sys_shm_lock', 'sys_shm_free',
     }), frozenset(['shm.h'])),
 """
-    (folder / 'kapi_target_ppc.py').write_text(source.replace(anchor, group + anchor))
+    (folder / 'kapi_target_ppc.py').write_text(source.replace(anchor, anchor + group))
     generator = ROOT / 'sdk/gen_kapi.py'
     # Use the normal generator with a private provider module and object tree.
     env = dict(os.environ, PYTHONPATH=str(folder))

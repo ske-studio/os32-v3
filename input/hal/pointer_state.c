@@ -6,6 +6,7 @@ static i16 px = 639 / 2, py = 399 / 2, xmin, ymin, xmax = 639, ymax = 399;
 static i16 prev_x, prev_y;
 static int prev_valid;
 static int seamless;
+static int app_bounds_set;
 
 int pointer_seamless(void) { return seamless; }
 void mouse_ext_mode(int enabled)
@@ -69,12 +70,24 @@ int pointer_absolute_delta(i16 x, i16 y, i16 *dx, i16 *dy)
     prev_x = nx; prev_y = ny; prev_valid = 1;
     return valid;
 }
-void pointer_bounds(i16 x0, i16 y0, i16 x1, i16 y1)
+static void set_bounds_locked(i16 x0, i16 y0, i16 x1, i16 y1)
 {
-    unsigned f = irq_save();
     /* Preserve legacy bounds, including reversed ranges and clamp order. */
     xmin = x0; ymin = y0; xmax = x1; ymax = y1;
     px = clamp(px, xmin, xmax); py = clamp(py, ymin, ymax);
+}
+void pointer_set_default_bounds(i16 x_max, i16 y_max)
+{
+    unsigned f = irq_save();
+    if (!app_bounds_set)
+        set_bounds_locked(0, 0, x_max, y_max);
+    irq_restore(f);
+}
+void pointer_bounds(i16 x0, i16 y0, i16 x1, i16 y1)
+{
+    unsigned f = irq_save();
+    app_bounds_set = 1;
+    set_bounds_locked(x0, y0, x1, y1);
     irq_restore(f);
 }
 void pointer_position_locked(i16 *x, i16 *y) { *x = px; *y = py; }

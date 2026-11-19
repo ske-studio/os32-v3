@@ -6,7 +6,7 @@
 #include "endian_dma.h"
 #include "kprintf.h"
 #include "tick.h"
-#include "pointer_service.h"
+#include "mouse_pointer_contract.h"
 
 #define VIA_FIRST_PA 0x80016000u
 #define VIA_LAST_PA  0x80018000u
@@ -130,8 +130,16 @@ void usb_service(void) { quit(100); }
 int tick_register(unsigned int slot, tick_fn fn) { (void)slot; (void)fn; return 0; }
 /* The USB mouse wiring (stage 3c) registers PointerOps; this host only drives the OHCI/VIA overlap. */
 const PointerOps empty_pointer;
+u32 ppc_irq_save(void) { return 0; }
+void ppc_irq_restore(u32 flags) { (void)flags; }
 void pointer_register(const PointerOps *ops) { (void)ops; }
-void pointer_bounds(i16 x0, i16 y0, i16 x1, i16 y1) { (void)x0; (void)y0; (void)x1; (void)y1; }
+void mouse_pointer_init_position(void) {}
+void mouse_pointer_backend_register(const MousePointerBackend *b) { (void)b; }
+void mouse_poll(MouseState *s) { (void)s; }
+void mouse_cursor_show(void) {}
+void mouse_legacy_snapshot(i16 *dx, i16 *dy, u8 *buttons, i16 *x, i16 *y)
+{ (void)dx; (void)dy; (void)buttons; (void)x; (void)y; }
+void mouse_set_bounds(i16 x0, i16 y0, i16 x1, i16 y1) { (void)x0; (void)y0; (void)x1; (void)y1; }
 void mouse_cursor_set_mode(int mode) { (void)mode; }
 void mouse_cursor_hide(void) { }
 
