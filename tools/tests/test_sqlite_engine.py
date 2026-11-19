@@ -12,10 +12,29 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 TARGET_SRC = ['kernel/sqlite_engine.c', 'kernel/sqlite_outer.c', 'exec/exec.c',
               'arch/x86/kernel/isr_handlers.c', 'lib/sqlite3/sqlite_stack.asm', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h']
 
+BODY_MUTATIONS = {
+    'keep init flag': ('    init_called = 0;', ''),
+    'keep stack': ('    sqlite_engine_stack_top = 0;', ''),
+    'keep guard': ('    paging_sqlite_stack_guard = 0;', ''),
+    'keep pool': ('    pool_phys = 0;', ''),
+    'release pool before remap': ('    /* The owner reclaimer', '    pool_phys = 0;\n    /* The owner reclaimer'),
+}
+
 def run(runner, mutant=None):
     with tempfile.TemporaryDirectory(prefix='sqlite-engine-') as directory:
         tmp = pathlib.Path(directory)
-        engine = (ROOT / TARGET_SRC[0]).read_text().split('/* Boot-only adapter:')[0]
+        source = (ROOT / TARGET_SRC[0]).read_text()
+        engine = source.split('/* Boot-only adapter:')[0]
+        engine += ('static u32 pool_phys; static int init_called; volatile u32 services_boot_fault;\n'
+                   'u32 host_pool(void) { return pool_phys; }\n'
+                   'int host_init_called(void) { return init_called; }\n')
+        engine += source[source.index('struct sqlite_init_call'):source.index('static int sqlite_start')]
+        engine += source[source.index('struct sqlite_shutdown_call'):source.index('static int sqlite_module_shutdown')]
+        engine += source[source.index('int sqlite_engine_body_stop'):source.index('static int sqlite_quiesce')]
+        if mutant in BODY_MUTATIONS:
+            old, new = BODY_MUTATIONS[mutant]
+            assert engine.count(old) == 1
+            engine = engine.replace(old, new)
         # The copied guard uses host MMU/allocator seams, including after L1
         # made the product's sibling-directory includes explicit.
         for header in ('pgalloc.h', 'paging.h'):
@@ -35,9 +54,11 @@ def run(runner, mutant=None):
             'static inline void irq_restore(unsigned int f) { host_flags=f ^ 512u; }\n'
             'static inline void _disable(void) { host_flags &= ~512u; }\n'
             'static inline void _stop(void) { host_stop(); }\n')
-        (tmp / 'pgalloc.h').write_text('extern volatile u32 kctx_irq_depth, kctx_exc_depth;\n')
-        (tmp / 'memmap.h').write_text('')
-        (tmp / 'paging.h').write_text('')
+        (tmp / 'pgalloc.h').write_text('extern volatile u32 kctx_irq_depth, kctx_exc_depth; u32 pgalloc_alloc_phys(u32, int);\n')
+        (tmp / 'memmap.h').write_text('#define P2V(p) ((void *)(uptr)(p))\n#define V2P(p) ((u32)(uptr)(p))\n')
+        (tmp / 'paging.h').write_text('#define PAGE_SIZE 4096u\n#define PAGE_RW 2u\n'
+            'extern u32 paging_sqlite_stack_guard; int paging_is_present(u32);\n'
+            'int paging_set_page(u32,u32,u32); int paging_set_not_present(u32,u32);\n')
         src = exec_source(ROOT)
         a = src.index('void ring3_abort_check(void)\n{')
         (tmp / 'stop_source.c').write_text(src[a:src.index('\n}', a)+2])
@@ -127,7 +148,7 @@ def main():
             print(r.stdout+r.stderr,end='')
             assert r.returncode == 0, r.returncode
     if args.mutate:
-        for name in ['guard bypass','fault app kill','direct call','NULL stub']:
+        for name in ['guard bypass','fault app kill','direct call','NULL stub', *BODY_MUTATIONS]:
             r=run(args.runner,name)
             assert r.returncode != 0 and 'FAIL:' in r.stdout, (name,r.returncode,r.stdout,r.stderr)
             print('RED (runtime): '+name)

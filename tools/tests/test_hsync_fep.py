@@ -6,7 +6,7 @@ CHECK = dict(name='hsync-fep-host', tier=1,
             'tools/tests/hsync_shell_fixture.h', 'tools/tests/fep_boundary_runtime.h',
             'tools/tests/host32.py', 'tools/gen_sqlite_imports.py',
             'tools/gen_kdebug_imports.py', 'tools/prototypes/fep_imports.def',
-            'include/**', 'fs/fd_redirect.h', 'fs/vfs.h', 'kernel/sqlite_engine.h',
+            'include/**', 'fs/fd_redirect.h', 'fs/vfs.h', 'kernel/sqlite_engine.h', 'kernel/sqlite_engine_body.h',
             'kernel/module/**', 'exec/exec.h', 'drivers/input/kbd.h', 'drivers/char/serial.h',
             'mm/kmalloc.h', 'mm/pgalloc.h', 'lib/kstring.h', 'lib/utf8.h',
             'lib/sqlite3/os32_sqlite_outer.h', 'lib/sqlite3/os32_sqlite_vfs.c',
@@ -107,7 +107,7 @@ def main():
                 current[path] = current[path].replace(old, new)
             for path, source in current.items():
                 dest = {'ime_suspend.c': 'ime_suspend_source.inc', 'fep_module.c': 'fep_module_source.inc'}.get(Path(path).name, Path(path).name)
-                (work / dest).write_text(source.replace('../../lib/', str(ROOT / 'lib') + '/').replace('../../fs/', str(ROOT / 'fs') + '/').replace('../../mm/', str(ROOT / 'mm') + '/').replace('../sqlite_engine.h', str(ROOT / 'kernel/sqlite_engine.h')))
+                (work / dest).write_text(source.replace('../../lib/', str(ROOT / 'lib') + '/').replace('../../fs/', str(ROOT / 'fs') + '/').replace('../../mm/', str(ROOT / 'mm') + '/').replace('../sqlite_engine.h', str(ROOT / 'kernel/sqlite_engine.h', 'kernel/sqlite_engine_body.h')))
             target = 'ime_suspend_host.c' if mutation and mutation[1].startswith('kernel/') else 'hsync_fep_host.c'
             if mutation and mutation[1].endswith('fep_module.c'):
                 target = 'fep_suspend_owner_host.c'

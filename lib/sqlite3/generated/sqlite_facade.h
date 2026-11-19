@@ -6,7 +6,7 @@
 #include <stdarg.h>
 #define SQLITE_MODULE_OPS_VERSION 3u
 #define SQLITE_MODULE_POOL_SIZE SQLITE_MEMSYS5_SIZE
-typedef struct {
+typedef struct SqliteModuleApi {
     int (*close)(sqlite3 *db);
     int (*prepare_v2)(sqlite3 *db, const char *sql, int size, sqlite3_stmt **out, const char **tail);
     int (*exec)(sqlite3 *db, const char *sql, SqliteExecCallback callback, void *arg, char **error);

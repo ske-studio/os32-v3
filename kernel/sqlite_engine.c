@@ -1,5 +1,6 @@
 #define OS32_SQLITE_OUTER_IMPL
 #include "sqlite_engine.h"
+#include "sqlite_engine_body.h"
 #include "exec_arch.h"
 #include "arch_kernel_fp.h"
 
@@ -124,63 +125,90 @@ static int valid_api(const struct module_record *r)
     return 1;
 }
 
-struct sqlite_init_call { u32 entry; int rc; };
+struct sqlite_init_call { sqlite_body_init_fn *init; SqliteModuleApi *out; int rc; };
 static void call_module_init(void *arg)
 {
     struct sqlite_init_call *call = arg;
-    int (*init)(void *, SqliteModuleApi *) =
-        (int (*)(void *, SqliteModuleApi *))(uptr)call->entry;
     init_called = 1;
-    call->rc = init(P2V(pool_phys), &candidate_api);
+    call->rc = call->init(P2V(pool_phys), call->out);
 }
 
-static int sqlite_start(struct module_record *r, u32 entry, u32 *exports)
+int sqlite_engine_body_start(u32 owner, sqlite_body_init_fn *init, SqliteModuleApi *out, int *init_rc)
 {
-    (void)exports;
-    if (services_boot_fault == SERVICES_FAULT_POOL) return MODULE_NO_PAGES;
-    pool_phys = pgalloc_alloc_phys(r->owner, SQLITE_MODULE_POOL_SIZE / PAGE_SIZE);
-    if (!pool_phys) return MODULE_NO_PAGES;
-    if (services_boot_fault == SERVICES_FAULT_STACK) return MODULE_NO_PAGES;
-    u32 stack = pgalloc_alloc_phys(r->owner, SQLITE_ENGINE_STACK_SIZE / PAGE_SIZE + 1);
-    if (!stack) return MODULE_NO_PAGES;
+    *init_rc = SQLITE_MISUSE;
+    if (services_boot_fault == SERVICES_FAULT_POOL) return SQLITE_BODY_NO_POOL;
+    pool_phys = pgalloc_alloc_phys(owner, SQLITE_MODULE_POOL_SIZE / PAGE_SIZE);
+    if (!pool_phys) return SQLITE_BODY_NO_POOL;
+    if (services_boot_fault == SERVICES_FAULT_STACK) return SQLITE_BODY_NO_STACK;
+    u32 stack = pgalloc_alloc_phys(owner, SQLITE_ENGINE_STACK_SIZE / PAGE_SIZE + 1);
+    if (!stack) return SQLITE_BODY_NO_STACK;
     paging_sqlite_stack_guard = (u32)(uptr)P2V(stack);
     if (paging_set_not_present(paging_sqlite_stack_guard,
                               paging_sqlite_stack_guard + PAGE_SIZE - 1) ||
-        paging_is_present(paging_sqlite_stack_guard)) return MODULE_NO_PAGES;
+        paging_is_present(paging_sqlite_stack_guard)) return SQLITE_BODY_NO_GUARD;
     sqlite_engine_stack_top = paging_sqlite_stack_guard + PAGE_SIZE + SQLITE_ENGINE_STACK_SIZE;
     /* Fill once, before module init uses the stack. Never repaint on entry. */
     kmemset((void *)(uptr)(sqlite_engine_stack_top - SQLITE_ENGINE_STACK_SIZE),
             SQLITE_STACK_MARK, SQLITE_ENGINE_STACK_SIZE);
     sqlite_stack_peak = 0;
-    struct sqlite_init_call call = {entry, SQLITE_MISUSE};
+    struct sqlite_init_call call = {init, out, SQLITE_MISUSE};
     sqlite_engine_run(call_module_init, &call, 0);
+    *init_rc = call.rc;
+    return call.rc == SQLITE_OK ? SQLITE_BODY_OK : SQLITE_BODY_INIT;
+}
+
+static int sqlite_start(struct module_record *r, u32 entry, u32 *exports)
+{
+    (void)exports;
+    int init_rc;
+    int rc = sqlite_engine_body_start(r->owner, (sqlite_body_init_fn *)(uptr)entry,
+                                      &candidate_api, &init_rc);
+    if (rc != SQLITE_BODY_OK && rc != SQLITE_BODY_INIT) return MODULE_NO_PAGES;
     candidate_valid = valid_api(r);
-    return !candidate_valid || call.rc != SQLITE_OK ||
+    return !candidate_valid || init_rc != SQLITE_OK ||
            services_boot_fault == SERVICES_FAULT_SQLITE_INIT;
 }
 
+struct sqlite_shutdown_call { int (*shutdown)(void); int rc; };
 static void call_shutdown(void *arg)
 {
-    *(int *)arg = services_boot_fault == SERVICES_FAULT_SHUTDOWN
-               ? SQLITE_BUSY : candidate_api.shutdown();
+    struct sqlite_shutdown_call *call = arg;
+    call->rc = call->shutdown();
 }
+
+static int sqlite_module_shutdown(void)
+{
+    return services_boot_fault == SERVICES_FAULT_SHUTDOWN
+         ? SQLITE_BUSY : candidate_api.shutdown();
+}
+
+int sqlite_engine_body_stop(int (*shutdown)(void))
+{
+    if (sqlite_engine_active) return SQLITE_STOP_BUSY;
+    if (init_called) {
+        struct sqlite_shutdown_call call = {shutdown, SQLITE_MISUSE};
+        if (!sqlite_engine_run(call_shutdown, &call, 0)) return SQLITE_STOP_BUSY;
+        if (call.rc != SQLITE_OK) return SQLITE_STOP_SHUTDOWN;
+    }
+    init_called = 0;
+    /* The owner reclaimer writes freed pages; restore the guard before it runs. */
+    int remap_failed = paging_sqlite_stack_guard &&
+        paging_set_page(paging_sqlite_stack_guard,
+                        V2P((void *)(uptr)paging_sqlite_stack_guard), PAGE_RW);
+    sqlite_engine_stack_top = 0;
+    if (remap_failed) return SQLITE_STOP_REMAP;
+    paging_sqlite_stack_guard = 0;
+    pool_phys = 0;
+    return SQLITE_STOP_DONE;
+}
+
 static int sqlite_quiesce(struct module_record *r)
 {
     (void)r;
     sqlite_module_api = &sqlite_stub_api;
-    if (sqlite_engine_active || cleanup_blocked) return 0;
-    if (init_called) {
-        int rc = SQLITE_MISUSE;
-        if (!candidate_valid || !sqlite_engine_run(call_shutdown, &rc, 0) ||
-            rc != SQLITE_OK) return 0;
-    }
-    /* The owner reclaimer writes freed pages; restore the guard before it runs. */
-    if (paging_sqlite_stack_guard &&
-        paging_set_page(paging_sqlite_stack_guard,
-                        V2P((void *)(uptr)paging_sqlite_stack_guard), PAGE_RW)) return 0;
-    paging_sqlite_stack_guard = 0;
-    sqlite_engine_stack_top = pool_phys = 0;
-    init_called = candidate_valid = 0;
+    if (cleanup_blocked || (init_called && !candidate_valid)) return 0;
+    if (sqlite_engine_body_stop(sqlite_module_shutdown) != SQLITE_STOP_DONE) return 0;
+    candidate_valid = 0;
     return 1;
 }
 

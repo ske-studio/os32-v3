@@ -102,7 +102,7 @@ def generate_facade(out, rows, entries):
          '#include "os32_sqlite_config.h"', '#include "os32_sqlite_outer.h"', '#include <stdarg.h>',
          f'#define SQLITE_MODULE_OPS_VERSION {next(c for c in COMPONENTS if c["name"] == "SQLITE")["ops_version"]}u',
          '#define SQLITE_MODULE_POOL_SIZE SQLITE_MEMSYS5_SIZE',
-         'typedef struct {']
+         'typedef struct SqliteModuleApi {']
     for r in rows:
         h.append(f'    {r["result"]} (*{r["name"]})({r["args"]});')
     h += ['} SqliteModuleApi;', f'#define SQLITE_MODULE_API_SLOTS {len(rows)}u',

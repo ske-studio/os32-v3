@@ -18,7 +18,7 @@ CHECK = dict(
         'arch/ppc/sqlite_stack_ppc.S', 'arch/ppc/kernel_fp.c',
         'arch/ppc/fp_context.S', 'arch/ppc/arch_kernel_fp.h',
         'arch/x86/arch_kernel_fp.h', 'include/exec_arch.h',
-        'kernel/sqlite_engine.c', 'kernel/sqlite_engine.h',
+        'kernel/sqlite_engine.c', 'kernel/sqlite_engine.h', 'kernel/sqlite_engine_body.h',
         'lib/sqlite3/generated/sqlite_imports.h', 'lib/sqlite3/generated/sqlite_facade.h',
         'sdk/include/os32/os32_generations.h', 'sdk/gen_kapi.py',
         'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'sdk/kapi.json',
