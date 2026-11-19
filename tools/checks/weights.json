@@ -369,6 +369,7 @@
     "ppc-fp-accept-host": 0.215018,
     "ppc-fp-guest": 290.902304,
     "ppc-gfx2-guest": 125.391424,
+    "ppc-kcg-guest": 150.0,
     "ppc-link-sh-run": 831.416682,
     "ppc-mmu": 56.046914,
     "ppc-mouse-guest": 125.23007,
