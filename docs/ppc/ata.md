@@ -1,7 +1,7 @@
 # PowerMac G4 の ATA 制御器
 
 対象は QuickSilver (PowerMac3,5) と QEMU mac99。
-[N・O・F の版と資料の扱い](README.md#資料の扱い)に従う。
+N・O・F の版と資料の扱いは docs/ppc/README.md の「資料の扱い」に従う。
 BSD の略号は NetBSD `36eddebcc36c`、OpenBSD `b907757ada4d`、FreeBSD `6eae951cd51b`。
 [未] は未確認、[推] は資料からの推論。
 

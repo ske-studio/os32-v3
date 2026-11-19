@@ -1,6 +1,6 @@
 # PowerMac G4 QuickSilver と QEMU mac99 の音声装置
 
-根拠の N・O・F は [README](README.md#資料の扱い) の NetBSD・OpenBSD・FreeBSD の固定版。
+根拠の N・O・F は docs/ppc/README.md の「資料の扱い」の NetBSD・OpenBSD・FreeBSD の固定版。
 以下で `N:` と `O:` の短いファイル名は `sys/arch/macppc/dev/`、
 `F:` の短いファイル名は `sys/dev/sound/macio/` からの相対名。
 Apple と QEMU 配布文書の版も同 README の略号に従う。
