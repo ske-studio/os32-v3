@@ -79,7 +79,8 @@ def run(runner, mutation=None):
     port_selected, port_checks = [], []
     port_calls = {
         'serial_init': ('0xfedcba98u', 'port_seen == 1 && port_baud == 0xfedcba98ul', None),
-        'serial_puts': ('"port"', "port_seen == 2 && port_string[0] == 'p' && port_string[4] == 0", None),
+        'serial_puts': ('"port"', "port_seen == 10 && port_tx_count == 4 && "
+                        "port_tx[0] == 'p' && port_tx[1] == 'o' && port_tx[2] == 'r' && port_tx[3] == 't'", None),
         'serial_getchar': ('', 'port_seen == 3', '-123'),
         'serial_putchar': ("'X'", "port_seen == 4 && port_char == 'X'", None),
         'serial_trygetchar': ('', 'port_seen == 5', '-125'),
@@ -225,7 +226,9 @@ def contracts():
                             *include_flags(ROOT), '-c',
                             str(ROOT / ('kernel/time/clock_service.c' if source == 'clock_service' else 'kernel/' + source + '.c')), '-o', str(obj)], check=True)
             symbols = subprocess.check_output(['nm', '-u', str(obj)], text=True)
-            assert symbols.split() == (['U', 'emergency_output'] if source == 'serial_diag' else []), symbols
+            allowed = {'port_service': ['ring3_abort_check', 'ring3_wait_pending'],
+                       'serial_diag': ['emergency_output'], 'clock_service': []}
+            assert symbols.split() == [part for name in allowed[source] for part in ('U', name)], symbols
     assert 'clock_register(&pc98_clock);' in bind
     for name in ('kernel/sys.c', 'drivers/block/fat_diskio.c'):
         source = read_text(ROOT / name)

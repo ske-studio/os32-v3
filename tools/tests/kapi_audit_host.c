@@ -98,7 +98,7 @@ void appslot_poll_yield_reset(void) {}
 #include "../../platform/pc98/ime_display.c"
 #include "ime_source.inc"
 #include "../../kernel/input_service.c"
-#include "../../kernel/port_service.c"
+#include "port_source.inc"
 #include "../../kernel/serial_diag.c"
 #include "pointer_fixture_host.h"
 /* This fixture exercises input/serial; supply a fake calendar provider. */

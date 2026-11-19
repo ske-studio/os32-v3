@@ -5,7 +5,10 @@
 
 typedef struct PortOps {
     void (*init)(u32 baud);
-    void (*puts_kapi)(const char *str);
+    /* String TX uses a raw byte sender and optional pacing after each
+     * attempted byte (count starts at one). */
+    int (*putchar)(char c);
+    void (*puts_pace)(unsigned int count);
     int (*getchar_kapi)(void);
     int (*putchar_kapi)(char c);
     int (*trygetchar)(void);

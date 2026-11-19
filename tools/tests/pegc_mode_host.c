@@ -283,6 +283,8 @@ void kbd_inject_discard(void) { }
 u32 kstrlen(const char *s) { u32 n = 0; while (s[n]) n++; return n; }
 int kutoa_dec(u32 val, char *buf, int bufsz) { (void)val; if (bufsz > 0) buf[0] = 0; return 0; }
 #include "../../kernel/port_service.c"
+int ring3_wait_pending(void) { return 0; }
+void ring3_abort_check(void) { __builtin_trap(); }
 static int capture_putchar(char c) { (void)c; return 0; }
 static const ConOutputOps capture_output = { .putchar = capture_putchar };
 

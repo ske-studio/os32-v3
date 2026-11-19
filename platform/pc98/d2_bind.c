@@ -5,6 +5,7 @@
 #include "port_service.h"
 #include "console_output.h"
 #include "../../drivers/char/serial.h"
+#include "serial_kapi.h"
 #include "pointer_service.h"
 #include "../../drivers/input/mouse.h"
 #include "../../drivers/input/kbd.h"
@@ -42,10 +43,15 @@ static const PointerOps pc98_pointer = {
     .cursor_hide = mouse_cursor_hide,
 };
 
+/* serial.h is part of the HWDEV contract. Keep the legacy entry as a
+ * forwarding symbol so the module contract CRC stays stable. */
+void serial_puts_kapi(const char *str) { port_puts_kapi(str); }
+
 static void pc98_port_init(u32 baud) { serial_init((unsigned long)baud); }
 static int pc98_port_init_vfast(u32 baud) { return serial_init_vfast((unsigned long)baud); }
 static const PortOps pc98_port = {
-    .init = pc98_port_init, .puts_kapi = serial_puts_kapi,
+    .init = pc98_port_init, .putchar = serial_putchar,
+    .puts_pace = serial_puts_pace,
     .getchar_kapi = serial_getchar_kapi, .putchar_kapi = serial_putchar_kapi,
     .trygetchar = serial_trygetchar, .is_initialized = serial_is_initialized,
     .init_vfast = pc98_port_init_vfast, .get_status = serial_get_status,

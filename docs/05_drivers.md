@@ -117,6 +117,8 @@ YM2203 (OPN) FM音源チップ制御。FM 3ch + SSG 3ch。
 
 **フロー制御**: `serial_puts`は16バイトごとに`io_wait`を挿入し、NP21/Wのパイプバッファ溢れを防止する。
 
+KAPI の `serial_puts` は共通の port service で文字列を走査し、各バイトの送信前に共通の実行制御で USER 中断要求と GUI の STOP を確認する。送信は `serial_putchar` を使い、送信を試みた 16 バイトごとに PC-98 後端で `io_wait` を 2 回行う。
+
 ### §5-5 グラフィック (gfx/ HAL / libos32gfx)
 
 CPU直接描画＋バックバッファ方式。カーネル層 (`gfx/`) はバックバッファ管理とVRAM転送を担当し、高レベルな描画機能は外部プログラム用ライブラリ `libos32gfx` (`userland/lib/gfx/`) に分離されている。

@@ -29,6 +29,8 @@ int kbd_diag_log(u32 after_seq, KbdDiagLogEnt *out, int max)
 { seen = 19; sequence = after_seq; output = out; arg = max; return -19; }
 #include "pointer_fixture_host.h"
 #include "port_fixture_host.h"
+int ring3_wait_pending(void) { return 0; }
+void ring3_abort_check(void) { __builtin_trap(); }
 #include "../../platform/pc98/d2_bind.c"
 /* Generated wrappers retain real output guards and slot numbers. */
 static int hit;
@@ -96,6 +98,7 @@ static int test(void)
     pc98_d2_bind();
     CHECK(clock_check() == 0);
     CHECK(con_output_putchar('C') == -130 && port_seen == 10 && port_char == 'C');
+    port_tx_count = 0;
 #include "port_wrapper_checks.inc"
 #define CALL(name, id) CHECK(input_##name() == id + 100 && seen == id)
     CALL(getchar, 1); CALL(getkey, 2); CALL(trygetchar, 3);

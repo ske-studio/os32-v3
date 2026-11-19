@@ -1,5 +1,6 @@
 /* Abort requests, safe-point checks and GUI input pumping. Included by exec.c. */
 #include "exec_hwb.h"
+#include "exec_wait_contract.h"
 
 /* HW_BASIC_DESIGN §3/F: IRQ1 sets this only for the CUI shell. */
 static volatile u32 g_hwb_abort_pending = 0;
