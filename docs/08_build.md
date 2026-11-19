@@ -942,65 +942,70 @@ python3 tools/move_docs.py --map moves.tsv --rewrite-only \
 コメントだけの書き換えなら `.o` は変わらないはずで、疑わしければ `git archive HEAD` で展開した
 無垢な木と同じフラグでコンパイルして md5 を突き合わせる。
 
-### §8-5 開発環境の構築 (クロスコンパイラ)
+### §8-5 開発環境の構築
 
-OS32 の外部プログラムをビルドするためには、標準Cライブラリ (`newlib` - `libc.a`) と GCCライブラリ (`libgcc.a`) を含んだ `i386-elf` クロスコンパイラ環境が必要です。
+Ubuntu (WSL2 では Ubuntu 側のシェル) で OS32 のリポジトリのルートから実行する。
 
-> ⚠️ **コマンド名は `i386-elf-*` 固定**: `build/config.mk` は `i386-elf-gcc` /
-> `i386-elf-ld` / `i386-elf-objcopy` というコマンド名と
-> `$(CROSS_DIR)/lib/gcc/i386-elf/13.2.0` というパスをハードコードしている。
-> apt の `gcc-i686-elf` は `i686-elf-*` という名前になるうえ newlib を含まないため、
-> **ソースからの構築が必須** (バージョンも 13.2.0 固定)。
+#### ホストの道具と Python
 
-#### ソースからの構築 (必須手順)
+まず `sudo apt update` を実行し、次の CI 用 action にあるパッケージを `sudo apt install` で入れる。足りない道具と必要な版は、該当する action の導入手順で確認する。
 
-下の 4 段をそのまま実行するスクリプトが `tools/ci/build_cross.sh` にある
-(tarball の sha256 検証と、出来上がりが nano 構成であることの検査つき。
-`--src-dir` に tarball があればダウンロードしない)。GitHub Actions も同じスクリプトで
-ツールチェーンを作る (§8-6)。
+| 用途 | 道具と CI の用意 |
+|---|---|
+| 本体ビルドとホスト試験 | [build-setup](../.github/actions/build-setup/action.yml)。NASM、ISO 作成の genisoimage、ext2 の作成・検査の e2fsprogs、32 ビット試験の qemu-user を含む。 |
+| PowerPC クロスの構築 | [ppc-setup](../.github/actions/ppc-setup/action.yml) の構築依存を入れる。 |
+| 全検査 | [gate-setup](../.github/actions/gate-setup/action.yml) は上の二つに gcc-13 と PowerPC ゲスト用の qemu-system-ppc、ファームウェアの qemu-system-data、VGA ROM の seabios を加える。全機種を取得するメタパッケージ qemu-system は導入時間が長いため、この構成では個別に入れる。 |
+| 静的検査 | [static-setup](../.github/actions/static-setup/action.yml)。C の AST 検査に使う clang・libclang・python3-clang の動作確認は [§8-4 の C ソース検査](#c-ソース検査-clang) を参照。文書リンク用の lychee は [check.yml の Install lychee](../.github/workflows/check.yml) と同じ版を PATH に置き、`lychee --version` を確認する。 |
 
-```bash
-tools/ci/build_cross.sh --prefix $HOME/opt/cross --src-dir $HOME/opt/src --jobs $(nproc)
-```
-
-事前に必要な apt パッケージ:
-```bash
-sudo apt install build-essential nasm libgmp-dev libmpfr-dev libmpc-dev \
-  texinfo bison flex python3-lz4 python3-yaml genisoimage
-```
-
-binutils 2.41 / GCC 13.2.0 / newlib 4.4.0.20231231 を以下の構成でビルドする
-(インストール先の例: `$HOME/opt/cross`):
+Python の依存は [requirements.txt](../requirements.txt) から入れる。Ubuntu の `python3-venv` を用意し、apt の clang バインディングも読める仮想環境を使う。次回のビルド時も同じ環境を有効にする。
 
 ```bash
-# 1. binutils
-../binutils-2.41/configure --target=i386-elf --prefix=$HOME/opt/cross \
-    --with-sysroot --disable-nls --disable-werror
-make -j$(nproc) && make install
-
-# 2. GCC ステージ1 (libgcc まで)
-../gcc-13.2.0/configure --target=i386-elf --prefix=$HOME/opt/cross \
-    --disable-nls --enable-languages=c --without-headers
-make -j$(nproc) all-gcc all-target-libgcc
-make install-gcc install-target-libgcc
-
-# 3. newlib — ★nano構成必須★
-../newlib-4.4.0.20231231/configure --target=i386-elf --prefix=$HOME/opt/cross \
-    --disable-multilib \
-    --disable-newlib-supplied-syscalls \
-    --enable-newlib-nano-malloc \
-    --enable-newlib-nano-formatted-io
-make -j$(nproc) && make install
-
-# 4. GCC 完全ビルド
-../gcc-13.2.0/configure --target=i386-elf --prefix=$HOME/opt/cross \
-    --disable-nls --enable-languages=c --with-newlib
-make -j$(nproc) && make install
+/usr/bin/python3 -m venv --system-site-packages "$HOME/.venvs/os32"
+source "$HOME/.venvs/os32/bin/activate"
+python3 -m pip install -r requirements.txt
 ```
 
-> ⚠️ **newlib の nano オプションを省略しないこと**: 通常構成の newlib では printf
-> 系がフル実装になり、各コマンド .bin が約3倍 (14KB→40KB) に肥大化して
-> 1.2MB ブートFDが容量不足でビルド失敗する (2026-08 環境再構築時に実証済み)。
+#### i386 と PowerPC のクロスコンパイラ
+
+[PC-98 用の構築スクリプト](../tools/ci/build_cross.sh) は `i386-elf-*` と newlib の nano 構成を作る。通常構成の printf をリンクするとプログラムが大きくなり、ブート FD に収まらない。[PowerMac 用の構築スクリプト](../tools/ci/build_cross_ppc.sh) は `powerpc-elf-*` と対応する newlib を別の場所に作る。binutils・GCC・newlib の版と構築オプションは各スクリプトで確認できる。
+
+```bash
+export CROSS_DIR="$HOME/opt/cross"
+export PPC_CROSS_DIR="$HOME/opt/cross-ppc"
+tools/ci/build_cross.sh --prefix "$CROSS_DIR" --jobs "$(nproc)"
+tools/ci/build_cross_ppc.sh --prefix "$PPC_CROSS_DIR" --jobs "$(nproc)"
+export PATH="$CROSS_DIR/bin:$PATH"
+```
+
+#### Rust とフォント
+
+初回は rustup を入れ、リポジトリのルートで [rust-toolchain.toml](../rust-toolchain.toml) が指定する nightly と rust-src を入れる。Cargo は rust-src から OS32 用の core・alloc をビルドする。
+
+```bash
+curl -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain none
+source "$HOME/.cargo/env"   # ~/.cargo/bin を PATH に加える
+rustup toolchain install
+rustup show active-toolchain
+```
+
+フォントは [§8-1 のライセンスと取得手順](#8-1-ビルド手順) を確認し、端末で `make fonts` を実行する。
+
+#### 作業木の設定と NP21/W
+
+[.env.sample](../.env.sample) をルートの `.env` にコピーし、`CROSS_DIR` と `PPC_CROSS_DIR` を上で使った絶対パスに設定する (後者は行を追加する)。Make はこのファイルを自動で読む。新しい作業木には `.env` がないため、そこでは上の `export CROSS_DIR`・`export PPC_CROSS_DIR` をシェルで実行する。
+
+NP21/W を使う場合は [INSTALL.md](../INSTALL.md) に従い、`NP21W_DIR` にエミュレータのディレクトリを WSL 側の絶対パスで設定する。開発用の ai-debug 版は WSL の `~/np21w-src` で `make build && make deploy` を実行して Windows 側にミラーする。OS32 の成果物は OS32 のルートで `make deploy` を実行して HostDrv の共有先 `C:\os32` (WSL 側の `/mnt/c/os32`) に置く。配備とゲストでの確認は [デバッグ方針](POLICY_DEBUG.md) と [run-os32](../.claude/skills/run-os32/SKILL.md) を参照。
+
+#### ビルドと検査で確かめる
+
+```bash
+make all
+make check-fast
+make ppc-ci-image
+python3 -B tools/checks/run.py --select --files README.md docs/08_build.md
+```
+
+最後の行には自分が変更したファイルを渡し、表示された検査名を `make 検査名 MUTATE=1` で実行する。ここまで通れば、両機種のビルドと選んだ検査の環境が揃っている。CI の全検査は `make check` で実行する (§8-4)。PowerMac G4 の製品の像は `make ARCH=ppc PLATFORM=powermac` で作る。像の選択と出力先は本章の PowerPC 製品規則、CI の構成は [§8-6](#8-6-github-actions-での本体ビルド)、機種の技術資料は [docs/ppc/](ppc/README.md) を参照。
 
 #### nano allocator の入力台帳 (T2f f1a)
 
@@ -1018,7 +1023,7 @@ ARM Ltd (2012, 2013) のnanoファイルのBSD 3-clause表示を
 `COPYING.NEWLIB` もhashで記録した。f1bで追加のソース/patchを使う際はその入力と表示も追加する。
 
 手元の実toolchainはnewlib 4.4.0.20231231 / GCC 13.2.0、`CFLAGS=-g -O2`。
-上の4つのnewlib設定と一致し、`libc_nano.a` / `libg_nano.a` は存在しない。
+構築スクリプトのnewlib設定と一致し、`libc_nano.a` / `libg_nano.a` は存在しない。
 nanoは通常名の `libc.a` / `libg.a` に入り、両者のSHA256は
 `d7a35f3fe99d533d16dca01694a4effd7a149dd7367e610de03e8ae5441e83d8`。
 `build/config.mk` の検索順で `-lc` が `$(CROSS_DIR)/i386-elf/lib/libc.a` を選ぶ。
@@ -1081,39 +1086,6 @@ SDK節・local hash値・symbolsは除外する。OS/GCC/newlib版をキーのpr
 クロスtoolchain無しの `check.yml` の静的集合には追加しない。
 GitHub Actionsでの新規構築はf1a作業中は未実施、PMがCI runで確認する。
 システムの `libc.a` の手編集・allocator公開切替は行わない。
-
-#### Rust ツールチェーン
-
-`userland/rust/` の Rust プログラム (hello_gfx, alloc_demo, math_test_rs) のビルドには
-rustup が必要。バージョンは `rust-toolchain.toml` (nightly + rust-src) が自動解決する。
-
-```bash
-curl https://sh.rustup.rs -sSf | sh -s -- -y
-```
-カスタムターゲット `i686-os32-none.json` と build-std
-(`userland/rust/.cargo/config.toml`) により `core`/`alloc`/`compiler_builtins` を
-ソースからビルドする。
-
-#### Makefile へのパス設定 (.env)
-環境が構築できたら、OS32のソースツリー最上位の `.env` ファイルに以下を設定してください
-(`Makefile` が `-include .env` で自動読み込み):
-
-```env
-# クロスコンパイラのインストール先
-CROSS_DIR=/home/user/opt/cross
-# NP21/W 本体ディレクトリ (np21x64w.exe, os32.nhd の場所)
-NP21W_DIR=/mnt/c/Users/<user>/Documents/np21w
-# HostDrv デプロイ先 (NP21/W の HOSTDRV0 設定と一致させる)
-HOSTDRV_DIR=/mnt/c/os32
-```
-OS32の `Makefile` は、ここで指定された `$CROSS_DIR/i386-elf/include` や `$CROSS_DIR/i386-elf/lib` を参照してビルドを行います。
-なお `tools/np21w_ctl.py` (NP21/W の停止・起動、`docs/POLICY_DEBUG.md` §5) は `NP21W_DIR` を
-Windows 表記へ変換して使う。変換が合わない環境では環境変数 `WIN_NP21W_DIR` (Windowsパス形式,
-例 `C:\Users\<user>\Documents\np21w`) で上書きする。
-
-> [!NOTE]
-> **コンパイラのバージョンについて**
-> PC-98ターゲットでは新しいコンパイラの最適化やABI変更による非互換リスク（およびバグ）のほうが大きいため、一度安定動作したGCCバージョンで**完全に固定化**して開発を継続するのがセオリーです。OS32では当面GCC 13.x系の利用を推奨しています。
 
 ### §8-6 GitHub Actions での本体ビルド
 
