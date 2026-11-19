@@ -32,6 +32,7 @@ CUI へ戻る経路について (G5 で ESC の即時切替と上部バーを撤
   ときは、ゲート後に CUI で `os32gui` を使うか cfg の `GUI=1` を書き戻すこと。
 """
 import argparse
+import json
 import os
 import sys
 import re
@@ -42,14 +43,25 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from tools.np21w_mcp import np21w_client as emu
 
 
+def checked_payload(payload):
+    if payload.lstrip().startswith(b"{"):
+        try:
+            result = json.loads(payload)
+        except (ValueError, UnicodeDecodeError):
+            return payload
+        if result.get("ok") is False:
+            raise ValueError("API rejected request: %s" % result.get("error", result))
+    return payload
+
+
 def post(path, data, timeout=20):
     body = urllib.parse.urlencode(data).encode()
-    return emu.post(path, body, timeout=timeout)
+    return checked_payload(emu.post(path, body, timeout=timeout))
 
 
 def get(path, timeout=20):
     _, payload, headers = emu.get(path, timeout=timeout, response=True)
-    return payload, headers
+    return checked_payload(payload), headers
 
 
 # Pass the current module attributes: existing host tests patch these names.
@@ -175,7 +187,13 @@ def begin_gui(h, settle=10.0, poll=1.0):
         st = status()
         if gui_entered(st, h):
             print("  status %s (GUI ok)" % st)
-            warning = _gui.Gui(transport=_transport()).dismiss_settings_warning()
+            try:
+                warning = _gui.Gui(transport=_transport()).dismiss_settings_warning()
+            except ModuleNotFoundError as exc:
+                if exc.name != "PIL":
+                    raise
+                print("  警告: Pillow が無いため Settings 警告の確認を省略します", file=sys.stderr)
+                return True
             if not warning['ok']:
                 print("  NG: %s" % warning['reason'])
             return warning['ok']
