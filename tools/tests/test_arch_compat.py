@@ -67,8 +67,7 @@ def input_kapi(root, work, vectors, mutation=None):
         (generator / name).write_text(sources.get('sdk/' + name, (root / 'sdk' / name).read_text()))
     api = json.loads((root / 'sdk/kapi.json').read_text())['api']
     slot = next(i for i, a in enumerate(api) if a['name'] == 'kbd_trygetkey')
-    # The absent-pointer sample must stay absent on PowerMac: path_get_drive was filled by
-    # PPC_KAPI_FILL 1c; db_last_error is filled by 7b — pick another absent pointer slot then.
+    # All pointer slots now have providers on PowerMac.
     names = ('kbd_trygetkey', 'db_last_error', 'snd_bgm_is_playing', 'ime_is_active', 'snd_bgm_stop')
     statuses, slots = {}, []
     for provider, target in (('pc98', 'x86-pc98'), ('powermac', 'ppc-powermac')):
@@ -145,8 +144,8 @@ def check_input_kapi(root, work, vectors, mutate):
              '(void)scancode; return 0;', '(void)scancode; return down;', {'pc98': 0, 'powermac': 10}),
             ('ppc-modifiers-xpass', 'platform/powermac/input_boot.c',
              'static u32 zero32(void) { return 0; }', 'static u32 zero32(void) { return mods; }', {'pc98': 0, 'powermac': 6}),
-            ('absent-pointer', 'sdk/kapi_target_ppc.py',
-             '"*" in api["ret"]', 'False', {'pc98': 0, 'powermac': 64}),
+            ('db-pointer-absent', 'sdk/kapi_target_ppc.py',
+             'PROVIDER_GROUPS = {', "PROVIDER_GROUPS = {\n    'db': ({'db_last_error'}, set()),", {'pc98': 0, 'powermac': 64}),
             ('absent-query', 'sdk/kapi_target_ppc.py',
              "\n    'snd_bgm_is_playing',\n", "\n", {'pc98': 0, 'powermac': 64}),
             ('ime-not-zero', 'sdk/kapi_target_ppc.py',

@@ -87,6 +87,7 @@ def main():
                 ('platform/powermac/hostfs_link_peer.c', 'return fixed ? allowed : 0;', 'return 0;'),
                 ('fs/serialfs/serialfs_persistent.c', 'if (!host_valid) reconnect = 1;', 'reconnect = 1;'),
                 ('fs/serialfs/serialfs_persistent.c', 'if (host_valid && host_generation != generation)', 'if (0 && host_valid && host_generation != generation)'),
+                ('platform/powermac/hostfs_link_peer.c', '.peer_valid = peer != 0', '.peer_valid = 1'),
             ]):
                 assert exercise(work / f'integration{i}', source, extra) == 1, extra[0]
                 print('RED runtime:', extra[0], flush=True)

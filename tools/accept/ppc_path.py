@@ -21,14 +21,14 @@ EXPECTED = {
 
 def absent_bindings(folder, out):
     source = (ROOT / 'sdk/kapi_target_ppc.py').read_text()
-    anchor = "    'db': (frozenset({"
+    anchor = "PROVIDER_GROUPS = {\n"
     if source.count(anchor) != 1:
         raise RuntimeError('absent path mutation anchor must be unique')
     group = """    'path': (frozenset({
         'path_get_drive', 'path_get_cwd', 'path_set_drive', 'path_set_cwd', 'path_parse',
     }), frozenset()),
 """
-    (folder / 'kapi_target_ppc.py').write_text(source.replace(anchor, group + anchor))
+    (folder / 'kapi_target_ppc.py').write_text(source.replace(anchor, anchor + group))
     launcher = ('import runpy, sys; import kapi_target_ppc; '
                 'sys.path.insert(0, "sdk"); runpy.run_path(sys.argv.pop(1), run_name="__main__")')
     subprocess.run([sys.executable, '-B', '-c', launcher, str(ROOT / 'sdk/gen_kapi.py'),

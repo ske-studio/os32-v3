@@ -18,7 +18,7 @@ CHECK = dict(name='ime-display-boundary-host', tier=1, needs=['make:all'], budge
             'include/types.h',
             'kernel/ime/fep_module.h',
             'kernel/ime/ime_store.h',
-            'kernel/sqlite_engine.h',
+            'kernel/sqlite_engine.h', 'kernel/sqlite_engine_body.h',
             'lib/kstring.h',
             'lib/sqlite3/os32_sqlite_outer.h',
             'lib/utf8.h',

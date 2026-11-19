@@ -15,7 +15,7 @@ FEATURES = 'V86 X87 PC98_DEVICES GEFORCE TRIDENT CIRRUS PCM FM LAN KCG CD FEP SQ
 
 
 def check_sqlite(root):
-    c_units = {'kernel/sqlite_engine.c', 'kernel/sqlite_outer.c', 'lib/sqlite3/os32_sqlite_test.c'}
+    c_units = {'kernel/sqlite_engine.c', 'kernel/sqlite_outer.c'}
     x86_stack = 'lib/sqlite3/sqlite_stack.asm'
     ppc_stack = 'arch/ppc/sqlite_stack_ppc.S'
     ppc = ['ARCH=ppc', 'PLATFORM=powermac']
@@ -25,6 +25,8 @@ def check_sqlite(root):
             profile = query(root, [*options, f'FEATURE_SQLITE={enabled}'], config_only=True)
             for unit in c_units:
                 assert profile['C_KERNEL'].count(unit) == enabled
+            smoke = 'lib/sqlite3/os32_sqlite_test.c'
+            assert profile['C_KERNEL'].count(smoke) == (enabled and arch == 'x86')
             assert profile['ASM_KERNEL'].count(x86_stack) == (enabled and arch == 'x86')
             assert profile['GAS_KERNEL'].count(ppc_stack) == (enabled and arch == 'ppc')
             assert x86_stack not in profile['GAS_KERNEL'] and ppc_stack not in profile['ASM_KERNEL']
@@ -99,7 +101,11 @@ def check(root):
 
 
 KBOOT_QUERY = ('.PHONY: kboot-query\nkboot-query:\n'
-               '\t@echo "KB_ASM=$(KB_ASM)"\n\t@echo "KB_C=$(KB_C)"\n\t@echo "KB_OUT=$(KB_OUT)"\n')
+               '\t@echo "KB_ASM=$(KB_ASM)"\n\t@echo "KB_C=$(KB_C)"\n'
+               '\t@echo "KB_OUT=$(KB_OUT)"\n\t@echo "KB_VFS=$(KB_VFS)"\n'
+               '\t@echo "KB_SQLITE_INC=$(KB_SQLITE_INC)"\n'
+               '\t@echo "KB_SQLITE_AUDIT=$(KB_SQLITE_AUDIT)"\n'
+               '\t@echo "KB_MODULES=$(MODULE_FEATURES)"\n')
 
 
 def copy_kboot_names(root):
@@ -125,8 +131,16 @@ def check_kboot(root):
                                           stderr=subprocess.PIPE)
             actual = dict(line.split('=', 1) for line in out.splitlines() if line.startswith('KB_'))
             assert actual['KB_OUT'] == image['KB_OUT'], (name, selector)
-            assert 'kernel/sqlite_engine.c' not in actual['KB_C'].split()
-            assert 'arch/ppc/sqlite_stack_ppc.S' not in actual['KB_ASM'].split()
+            enabled = name in ('shell', 'sh', 'link-sh')
+            assert 'sqlite' not in actual['KB_MODULES'].split()
+            for key in ('KB_VFS', 'KB_SQLITE_INC', 'KB_SQLITE_AUDIT'):
+                assert bool(actual[key]) == enabled
+            if enabled:
+                disabled = subprocess.check_output([*command, *selector, 'FEATURE_SQLITE=0',
+                                                    'kboot-query'], cwd=root, text=True)
+                assert 'arch/ppc/sqlite_stack_ppc.S' not in disabled
+                for key in ('KB_VFS', 'KB_SQLITE_INC', 'KB_SQLITE_AUDIT'):
+                    assert key + '=\n' in disabled
             for key in ('KB_ASM', 'KB_C'):
                 assert actual[key].split() == image[key], (name, key, selector)
     # 名前と旗の両方を与えて食い違えば止まる。合っていれば通る。

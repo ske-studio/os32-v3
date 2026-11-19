@@ -2,7 +2,7 @@
 """FEP system metadata reader and caller boundary, freestanding ILP32."""
 CHECK = dict(name='fep-store-info', tier=1, needs=[], budget=3.5,
     covers=['kernel/ime/ime_dict_info.c', 'kernel/ime/ime.c',
-            'kernel/ime/ime_conn.c', 'kernel/ime/ime.h', 'kernel/ime/ime_store.h', 'kernel/sqlite_engine.h',
+            'kernel/ime/ime_conn.c', 'kernel/ime/ime.h', 'kernel/ime/ime_store.h', 'kernel/sqlite_engine.h', 'kernel/sqlite_engine_body.h',
             'tools/tests/fep_store_info_host.c', 'tools/tests/fep_store_fixture.c',
             'tools/tests/fep_store_fixture.h', 'tools/tests/host32.py',
             'tools/tests/kernel_includes.py', 'build/config.mk',

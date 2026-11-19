@@ -120,15 +120,16 @@ static int input_kapi(void)
     raw_key = -1; down = 0; mods = 0;
     REQUIRE(input_trygetrawkey() == -1 && input_is_pressed(KEY_CTRL) == 0);
     REQUIRE(input_get_modifiers() == 0);
-    /* Absent pointer/query/value/void and reserved slot, from real generation. */
+    /* Published pointer, absent query/value/void and reserved slot, from real generation. */
     REQUIRE(kapi_reserved_nosys() == OS32_ERR_NOSYS);
     const char *drive = wrap_db_last_error(0);
+    REQUIRE(drive && drive[0] == 'A');
 #ifdef PC98_INPUT
-    REQUIRE(drive && drive[0] == 'A' && wrap_ime_is_active() == 1);
+    REQUIRE(wrap_ime_is_active() == 1);
     REQUIRE(wrap_snd_bgm_is_playing() == 1);
     wrap_snd_bgm_stop(); REQUIRE(bgm_stop_calls == 1);
 #else
-    REQUIRE(drive == 0 && wrap_snd_bgm_is_playing() == 0);
+    REQUIRE(wrap_snd_bgm_is_playing() == 0);
     REQUIRE(wrap_ime_is_active() == OS32_ERR_NOSYS); /* not a ZERO_SLOTS query */
     wrap_snd_bgm_stop(); REQUIRE(bgm_stop_calls == 0);
 #endif

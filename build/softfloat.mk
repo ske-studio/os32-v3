@@ -96,3 +96,8 @@ ifeq ($(ARCH),x86)
 C_ARCH += lib/softfloat_bits.c $(SOFTFLOAT_RESIDENT_SOURCES)
 $(addprefix $(KERNEL_OBJ_PREFIX),lib/kmath.o lib/softfloat_bits.o $(SOFTFLOAT_RESIDENT_SOURCES:.c=.o)) $(addprefix $(BUILD_OUT)/r1/obj/,lib/kmath.o lib/softfloat_bits.o $(SOFTFLOAT_RESIDENT_SOURCES:.c=.o)): private KERNEL_CFLAGS += $(SOFTFLOAT_FLAGS)
 endif
+
+# Integer conversions retained by the PowerPC hardware-FP SQLite build.
+SOFTFLOAT_CONV_SOURCES := $(addprefix lib/softfloat/,f64_to_i64.c f64_to_ui64.c i64_to_f64.c \
+    s_roundToI64.c s_roundToUI64.c s_normRoundPackToF64.c s_roundPackToF64.c \
+    s_countLeadingZeros64.c s_countLeadingZeros8.c)
