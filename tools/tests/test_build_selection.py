@@ -36,6 +36,26 @@ def check_sqlite(root):
         raise AssertionError('SQLite selected without filesystem services')
 
 
+def check_fep(root):
+    x86 = ['FEATURE_' + f + '=0' for f in FEATURES if f not in ('SQLITE', 'FEP')]
+    ppc = ['ARCH=ppc', 'PLATFORM=powermac', 'IMAGE=kboot-link-sh']
+    for options in (x86, ppc):
+        profiles = [query(root, [*options, 'FEATURE_SQLITE=1', f'FEATURE_FEP={enabled}'],
+                          config_only=True) for enabled in (0, 1)]
+        unit = 'kernel/ime/fep_module.c'
+        off, on = profiles
+        assert unit not in off['C_KERNEL'] and on['C_KERNEL'].count(unit) == 1
+        assert [name for name in on['C_KERNEL'] if name != unit] == off['C_KERNEL']
+        for key in ('ASM_KERNEL', 'GAS_KERNEL'):
+            assert on[key] == off[key]
+        try:
+            query(root, [*options, 'FEATURE_SQLITE=0', 'FEATURE_FEP=1'], config_only=True)
+        except subprocess.CalledProcessError as error:
+            assert 'FEATURE_FEP requires FEATURE_SQLITE' in error.stderr
+        else:
+            raise AssertionError('FEP selected without SQLite')
+
+
 def check(root):
     expected = json.loads((ROOT / 'tools/tests/fixtures/build_profile_x86.json').read_text())
     actual = query(root)
@@ -163,11 +183,16 @@ if __name__ == '__main__':
         # No libgcc invocation is allowed by these query-only tests.
         check(root)
         check_sqlite(root)
+        check_fep(root)
         check_user_selection(root)
         copy_kboot_names(root)
         check_kboot(root)
         if args.mutate:
             for path, anchor, mutant, expected, label in (
+                    ('build/select.mk', '$(error FEATURE_FEP requires FEATURE_SQLITE)', '',
+                     AssertionError, 'missing FEP prerequisite'),
+                    ('build/features/fep.mk', 'C_FEATURES += kernel/ime/fep_module.c', '',
+                     AssertionError, 'missing FEP kernel loader'),
                     ('build/select.mk', '$(error FEATURE_SQLITE requires FEATURE_EXEC)', '',
                      AssertionError, 'missing SQLite prerequisite'),
                     ('build/features/sqlite.mk', 'ifeq ($(ARCH),ppc)', 'ifeq ($(ARCH),other)',
@@ -193,7 +218,9 @@ if __name__ == '__main__':
                 assert source.count(anchor) == 1, (path, anchor)
                 target.write_text(source.replace(anchor, mutant))
                 try:
-                    if path in ('build/select.mk', 'build/features/sqlite.mk'):
+                    if 'FEP' in label:
+                        check_fep(root)
+                    elif path in ('build/select.mk', 'build/features/sqlite.mk'):
                         check_sqlite(root)
                     else:
                         check_kboot(root)

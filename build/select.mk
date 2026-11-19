@@ -147,9 +147,6 @@ ifneq ($(words $(filter 0 1,$(FEATURE_FEP))),1)
 $(error invalid FEATURE_FEP)
 endif
 ifeq ($(FEATURE_FEP),1)
-ifneq ($(ARCH)-$(PLATFORM),x86-pc98)
-$(error unsupported FEATURE_FEP on $(ARCH)-$(PLATFORM))
-endif
 include build/features/fep.mk
 endif
 FEATURE_SQLITE ?= $(DEFAULT_FEATURE_VALUE)
@@ -231,11 +228,6 @@ endif
 ifeq ($(FEATURE_CD),1)
 ifneq ($(FEATURE_PC98_DEVICES),1)
 $(error FEATURE_CD requires FEATURE_PC98_DEVICES)
-endif
-endif
-ifeq ($(FEATURE_FEP),1)
-ifneq ($(FEATURE_PC98_DEVICES),1)
-$(error FEATURE_FEP requires FEATURE_PC98_DEVICES)
 endif
 endif
 ifeq ($(FEATURE_FEP),1)
