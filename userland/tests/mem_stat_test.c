@@ -13,7 +13,7 @@ int main(int argc, char **argv, KernelAPI *api)
     int passed = 0, total = 0, self, others[3], n = 0;
     int bad[] = {1, 99, -2};
     u32 sizes[] = {0, MEMSTAT_MIN - 1, MEMSTAT_MIN, 120, 132,
-#ifdef __powerpc__
+#ifdef __PPC__
                    133, sizeof(MemStat) + 1,
 #endif
                    sizeof(MemStat), sizeof(out)};
@@ -31,7 +31,7 @@ int main(int argc, char **argv, KernelAPI *api)
     memset(&stat, 0xa5, sizeof(stat));
     CHECK(api->mem_stat(0, &stat, sizeof(stat)) == sizeof(stat) &&
           stat.app_id == 0 && !(stat.flags & MEMSTAT_HAS_AS));
-#ifdef __powerpc__
+#ifdef __PPC__
     CHECK(stat.owner_pages == 0 && stat.phys_total_pages > 0 &&
           !stat.kstack_high_water && !stat.audit_runs && !stat.audit_fail &&
           !stat.kselftest_pass && !stat.kselftest_fail && !stat.kdebug_state &&
@@ -74,7 +74,7 @@ int main(int argc, char **argv, KernelAPI *api)
         for (u32 i = written; i < sizeof(out); i++) if (out.bytes[i] != 0xa5) unchanged = 0;
         CHECK(unchanged && (written ? rc == (int)written && out.align.size == written : rc == OS32_ERR_INVAL));
     }
-#ifndef __powerpc__
+#ifndef __PPC__
     if (passed == total)
         api->kprintf(TEST_ATTR, "mem_stat_test PASS self=%d others=%d,%d,%d\n", self, others[0], others[1], others[2]);
 done:

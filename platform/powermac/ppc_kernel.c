@@ -40,6 +40,7 @@
 #if KBOOT_SHELL || KBOOT_SH
 #include "root_boot.h"
 #include "pm_console.h"
+#include "pointer_service.h"
 #include "console_backend.h"
 #include "unicode_file.h"
 #include "display_text.h"
@@ -371,6 +372,12 @@ void platform_boot_services(void)
     if (pm_root_boot(&img) == 0) {
         (void)pm_console_text_start();
 #if KBOOT_SH
+        /* Before pm_usb_boot (mouse_init): the default must precede the cursor. */
+        u32 fb_w, fb_h;
+        pm_console_text_size(&fb_w, &fb_h);
+        if (fb_w && fb_h)
+            pointer_set_default_bounds(fb_w > 32768 ? 32767 : fb_w - 1,
+                                       fb_h > 32768 ? 32767 : fb_h - 1);
         (void)pm_hostfs_boot(info->tb_hz);
         pm_usb_boot(info->tb_hz);
 #if KBOOT_LINK

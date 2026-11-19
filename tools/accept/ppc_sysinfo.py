@@ -21,11 +21,12 @@ EXPECTED = {
 
 def absent_bindings(folder, out, slot='sys_time_now'):
     source = (ROOT / 'sdk/kapi_target_ppc.py').read_text()
-    anchor = "        'sys_ver_info',"
+    # Anchor on the table head: provider groups shrink as slots are published.
+    anchor = "PROVIDER_GROUPS = {\n"
     if source.count(anchor) != 1:
         raise RuntimeError('system_info mutation anchor must be unique')
-    (folder / 'kapi_target_ppc.py').write_text(
-        source.replace(anchor, f"        {slot!r},\n" + anchor))
+    group = f"    'accept_absent': (frozenset({{{slot!r}}}), frozenset()),\n"
+    (folder / 'kapi_target_ppc.py').write_text(source.replace(anchor, anchor + group))
     launcher = ('import runpy, sys; import kapi_target_ppc; '
                 'sys.path.insert(0, "sdk"); runpy.run_path(sys.argv.pop(1), run_name="__main__")')
     subprocess.run([sys.executable, '-B', '-c', launcher, str(ROOT / 'sdk/gen_kapi.py'),
