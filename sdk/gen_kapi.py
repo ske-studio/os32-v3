@@ -669,6 +669,13 @@ for slot, api in enumerate(data["api"]):
             c_content += f"    return ({ret}){absent_result(api)};\n"
         c_content += "}\n\n"
         continue
+    optional_db = TARGET == "ppc-powermac" and name.startswith("db_")
+    if optional_db:
+        c_content += "#if defined(OS32_HOOK_KAPI_DB) && !OS32_HOOK_KAPI_DB\n"
+        for arg in get_arg_names(api.get("args", [])):
+            c_content += f"    (void){arg};\n"
+        result = "0" if name == "db_mem_used" else absent_result(api)
+        c_content += f"    return ({ret}){result};\n#else\n"
     c_content += f"    KAPI_HIT({slot});\n"
     c_content += out_guard_c(api)
     c_content += input_guard_c(api)
@@ -687,6 +694,8 @@ for slot, api in enumerate(data["api"]):
         else:
             c_content += f"    return {target}({args_call});\n"
             
+    if optional_db:
+        c_content += "#endif\n"
     c_content += "}\n\n"
 
 Path("kapi/kapi_generated.c").write_text(c_content, encoding='utf-8')

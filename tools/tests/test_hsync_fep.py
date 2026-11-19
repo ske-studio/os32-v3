@@ -6,7 +6,7 @@ CHECK = dict(name='hsync-fep-host', tier=1,
             'tools/tests/hsync_shell_fixture.h', 'tools/tests/fep_boundary_runtime.h',
             'tools/tests/host32.py', 'tools/gen_sqlite_imports.py',
             'tools/gen_kdebug_imports.py', 'tools/prototypes/fep_imports.def',
-            'include/**', 'fs/fd_redirect.h', 'fs/vfs.h', 'kernel/sqlite_engine.h',
+            'include/**', 'fs/fd_redirect.h', 'fs/vfs.h', 'kernel/sqlite_engine.h', 'kernel/sqlite_engine_body.h',
             'kernel/module/**', 'exec/exec.h', 'drivers/input/kbd.h', 'drivers/char/serial.h',
             'mm/kmalloc.h', 'mm/pgalloc.h', 'lib/kstring.h', 'lib/utf8.h',
             'lib/sqlite3/os32_sqlite_outer.h', 'lib/sqlite3/os32_sqlite_vfs.c',
@@ -99,6 +99,8 @@ def main():
         (work / 'hsync_h2_host.c').write_text(fixture)
         for p in ('hsync_fep_host.c', 'ime_suspend_host.c', 'fep_suspend_owner_host.c'):
             (work / p).write_text((ROOT / 'tools/tests' / p).read_text())
+        cc = str(Path(os.environ['CROSS_DIR']) / 'bin/i386-elf-gcc')
+        gcc_include = subprocess.check_output([cc, '-print-file-name=include'], text=True).strip()
         for mutation in [None] + (MUTATIONS if args.mutate else []):
             current = dict(originals)
             if mutation:
@@ -114,8 +116,8 @@ def main():
             targets = [target] if mutation else ['ime_suspend_host.c', 'hsync_fep_host.c', 'fep_suspend_owner_host.c']
             for target in targets:
                 exe = work / 'test'
-                cc = str(Path(os.environ['CROSS_DIR']) / 'bin/i386-elf-gcc')
                 host32.build([cc, '-m32', '-march=i386', '-std=gnu11', '-Os', '-nostdlib',
+                    '-ffreestanding', '-nostdinc', '-isystem', gcc_include,
                     '-fno-builtin', '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections',
                     '-Wall', '-Wextra', '-Werror', '-Werror=vla', '-D__cdecl=',
                     '-Wno-unused-function', '-Wno-unused-parameter', '-Wno-sign-compare',

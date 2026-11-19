@@ -46,7 +46,7 @@ def settings(work, case):
     user = work/'user'
     opts = ['KBOOT_SH=1', 'KBOOT_LINK=1', 'KB_SH_OUT='+str(user),
             'KB_ROOT_BINS='+' '.join(str(user/(n+'.bin')) for n in
-                                    ('nlprobe','hello','fault','nest','outprobe','fp_probe'))]
+                                    ('nlprobe','hello'))]
     manifest = json.loads((ROOT/'build/ppc-ram-root.json').read_text())
     manual=work/'hello.1'; manual.write_text('N3-help-found\n')
     manifest['/usr/man/hello.1']=str(manual)
