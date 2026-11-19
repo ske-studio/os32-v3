@@ -13,7 +13,7 @@
  *    A 戻り番地が現行 shell text の範囲内 (かつ登録中)
  *    B 呼出し文脈 (open/close は shell の通常文脈だけ、read/validate/
  *      font_guard_run は通常文脈か登録済み WM 区間)
- *  を確かめてから kernel/console/font_source_lease.c の shell 側実体 (段 C registry・
+ *  を確かめてから kernel/console/font_source.c の shell 側実体 (段 C registry・
  *  段 D VFS) か kernel/console/font_guard.c の font_guard_run へ渡す。外れたら
  *  OS32_ERR_INVAL、kill はしない。
  *

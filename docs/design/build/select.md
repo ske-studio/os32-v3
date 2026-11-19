@@ -86,7 +86,7 @@ arch・platform の物は、その持ち主のファイルが機能ごとの組�
 C_PLATFORM_CORE = platform/powermac/rh_observe.c ... drivers/net/gem/gem_reset.c ... lib/lz4.c platform/powermac/ppc_kernel.c
 C_PLATFORM_LINK = platform/powermac/link_platform.c platform/powermac/nic_gem.c platform/powermac/link_log.c platform/powermac/link_diag.c
 C_PLATFORM_NOLINK = platform/powermac/lan_wire.c platform/powermac/lan_terminal.c platform/powermac/terminal_input.c platform/powermac/host_unavailable.c
-C_PLATFORM_EXEC = platform/powermac/root_boot.c ... kernel/console/fbcon.c gfx/gfx_console.c drivers/video/kcg/kcg_file.c drivers/video/of_fb/backend_of_fb.c drivers/video/of_fb/of_fb_v2.c kernel/dev/ram_ro.c fs/ramfs/ramfs.c fs/isofs/iso9660.c fs/isofs/iso9660_media.c init/boot_root.c
+C_PLATFORM_EXEC = platform/powermac/root_boot.c ... kernel/console/fbcon.c gfx/gfx_console.c kernel/console/font_source_kcg.c drivers/video/of_fb/backend_of_fb.c drivers/video/of_fb/of_fb_v2.c kernel/dev/ram_ro.c fs/ramfs/ramfs.c fs/isofs/iso9660.c fs/isofs/iso9660_media.c init/boot_root.c
 C_PLATFORM_NOEXEC = platform/powermac/kboot_console.c
 C_PLATFORM_USERSHELL = platform/powermac/shell_boot.c platform/powermac/input_boot.c platform/powermac/input_decode.c platform/powermac/hostfs_boot.c input/keymaps/hid_jp.c $(if $(filter 1,$(FEATURE_LINK)),platform/powermac/hostfs_link_io.c platform/powermac/hostfs_link_peer.c,platform/powermac/hostfs_io.c platform/powermac/hostfs_peer.c)
 C_PLATFORM_USB = platform/powermac/input_usb.c platform/powermac/input_keymap.c platform/powermac/usb_tree.c platform/powermac/usb_platform.c platform/powermac/usb_boot.c

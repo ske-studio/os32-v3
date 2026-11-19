@@ -37,7 +37,7 @@ def build_run(tmp, source):
         '-I'+str(tmp), '-I'+str(ROOT), '-I'+str(ROOT/'tools/tests'), *include_flags(ROOT),
         str(ROOT/'tools/tests/fbcon_host.c'), str(ROOT/'platform/powermac/console.c'),
         str(ROOT/'kernel/console/console.c'), str(ROOT/'lib/utf8.c'), str(ROOT/'lib/kstring_c.c'),
-        str(ROOT/'kernel/console/font_source.c'), str(ROOT/'lib/lz4.c'), '-o',str(exe)],check=True)
+        str(ROOT/'kernel/console/font_source_kcg.c'), str(ROOT/'lib/lz4.c'), '-o',str(exe)],check=True)
     return host32.run([str(exe)], runner='qemu', capture_output=True,text=True)
 def cross_compile(tmp):
     cc = Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc')) / 'bin/powerpc-elf-gcc'

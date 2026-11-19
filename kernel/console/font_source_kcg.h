@@ -1,5 +1,5 @@
-#ifndef OS32_KCG_FILE_H
-#define OS32_KCG_FILE_H
+#ifndef OS32_FONT_SOURCE_KCG_H
+#define OS32_FONT_SOURCE_KCG_H
 
 #include "kcg_contract.h"
 

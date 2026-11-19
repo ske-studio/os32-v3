@@ -1,4 +1,4 @@
-"""font の read lease (T7b-b1) — 実物の fs/vfs_fd.c と kernel/console/font_source_lease.c をホストで。
+"""font の read lease (T7b-b1) — 実物の fs/vfs_fd.c と kernel/console/font_source.c をホストで。
 
 設計: ~/os32-tmp/run/t7bb12/DESIGN.final.md §2・§5 (b1①〜⑦、b2②④ の lease 表側)。
 S1 = VFS の内部 API (vfs_open_font / validate / read_at / close_font、公開経路の
@@ -13,7 +13,7 @@ app の合計上限だけを変えた変種 (VARIANT) でも回し、owner ご�
   python3 -B tools/tests/test_font_source.py --mutate   # 否定側 (写しの上で変異)
 """
 CHECK = dict(name='font-source-host', tier=1,
-    covers=['fs/vfs_fd.c', 'fs/vfs.h', 'kernel/console/font_source_lease.c', 'kernel/console/font_source.h', 'kernel/gui.h', 'exec/exec.h', 'include/redir_access.h', 'fs/fd_redirect.h', 'exec/exec.c', 'tools/tests/font_source_host.c', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h'],
+    covers=['fs/vfs_fd.c', 'fs/vfs.h', 'kernel/console/font_source.c', 'kernel/console/font_source.h', 'kernel/gui.h', 'exec/exec.h', 'include/redir_access.h', 'fs/fd_redirect.h', 'exec/exec.c', 'tools/tests/font_source_host.c', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h'],
     needs=[], budget=4.7,
     kind='characterization',
 )
@@ -41,7 +41,7 @@ FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
 INC_DIRS = tuple(d for d in dict.fromkeys(include_dirs()) if d != '.')
 HOST = "tools/tests/font_source_host.c"
 SRC = "fs/vfs_fd.c"
-LEASE = "kernel/console/font_source_lease.c"
+LEASE = "kernel/console/font_source.c"
 EXEC = "exec/exec_finish.inc"
 # --target で kernel と同じ include の並び (build/config.mk の INC_KERNEL)
 
@@ -83,7 +83,7 @@ MUTATIONS = [
     # ---- S2 (S1 の取り込みで送られた項目) ----
     (SRC, "    open_files[fd].protect = (flags & VFS_FONT_OPEN_PROTECT) ? 1 : 0;\n",
      "    open_files[fd].protect = 0;\n", "protect=(flags&PROTECT) → 0"),
-    # ---- S2: lease 表と app の門 (kernel/console/font_source_lease.c) ----
+    # ---- S2: lease 表と app の門 (kernel/console/font_source.c) ----
     (LEASE, "    if (ring3_call_from_user() == 0)\n",
      "    if (0)\n", "門 1 (CPL=3 の dispatch 中) を外す"),
     (LEASE, "    if (!caller_access_get(c) || c->origin != CALLER_USER ||\n",
