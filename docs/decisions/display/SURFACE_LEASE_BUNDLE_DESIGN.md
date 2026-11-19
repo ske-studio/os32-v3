@@ -82,7 +82,7 @@ if (source->role == LEDGER_ROLE_DISPLAY)
 - 両機種の display_bundle.c を test_surface_bundle.py の TARGET_SRC と `extra_sources` に足し、role と backend の組合せごとの真偽表と照合する (gfx_surfaces.c・display_provider.c は加えない)。変異は各 display_bundle.c の 1 行 (制限の除去) と、surface_query.c の `display_provider_bundle_ok(` の呼び出しの除去 (確定 N3)。
 - 変異の目印の置き換え (確定 N4): 旧 `count != SURFACE_QUERY_MAX)`・`source->backend != LEDGER_SF_PC98 ||`・`source->role != LEDGER_ROLE_DISPLAY ||` → 新 surface_query.c の `display_provider_bundle_ok(` の呼び出し、lease.c の `count != source->count` とコピー長 `count * sizeof`。
 - 変異はsurface_query.c の提供者判定・提供件数照合の除去、各機種の 1 行からの role/backend 制限除去、件数一致検査除去、入力長の 4 件固定、世代検査除去、取消 1 件省略。各変異に対応する試験が落ちること。CLIENT 取得は bridge 呼出数 0。
-- NP21/W は PC98 DISPLAY の query 順で 4 token を取得・解放し、順序交換と 3 件を INVAL とする。QEMU PowerMac G4 は OF_FB CLIENT の 1 token を取得・解放、DISPLAY は INVAL。QEMU は書けない出力先で check_caller_write_range が取得前に INVAL を返し、正しい出力先で再取得できることまでを確認。取得後の巻き戻しは host だけで検証する。両方で再 query 後の世代と失敗後の再取得を確認。
+- NP21/W は PC98 DISPLAY の query 順で 4 token を取得・解放し、順序交換と 3 件を INVAL とする。QEMU PowerMac G4 は OF_FB CLIENT の 1 token を取得・解放、DISPLAY は INVAL。QEMU は書ける出力先で件数の不一致を与え、入力を読む前の INVAL と、その後の正しい CLIENT 1 面での再取得を確認。取得後の巻き戻しは host だけで検証する。両方で再 query 後の世代と失敗後の再取得を確認。
 - x86 build_compare は surface_api_bundle、surface_lease_bundle、新設後端に命令差を見込む。lease_acquire・lease_release・paging の処理差は調査対象。リンク移動と命令変更を区別して確認する。
 
 ## 6. 未決
@@ -97,3 +97,5 @@ if (source->role == LEDGER_ROLE_DISPLAY)
 - N2b: surface_query.c を組む host 試験のつなぎに定義を足す (§4 段 4)。
 - N3: 案 (a) — 両機種の 1 行を単独で組める platform/<機種>/display_bundle.c に切り出し、試験の TARGET_SRC と extra_sources に足して真偽表と変異で守る (§4 段 3・3b、§5)。
 - N4: 変異の目印の置き換えを §5 に書いた。
+
+確定後の追記: 5c の QEMU の受入を件数の不一致の INVAL に (2026-11-19、PowerPC の PM の提案、本線 PM 決定、理由は wrapper の出力先の検査)

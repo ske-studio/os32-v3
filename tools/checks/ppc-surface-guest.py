@@ -6,7 +6,8 @@ CHECK = dict(name='ppc-surface-guest', tier=2, needs=[], budget=1200,
             'platform/powermac/**', 'include/**', 'init/**', 'kernel/**',
             'kapi/**', 'lib/**', 'fs/**', 'drivers/**', 'input/**', 'net/**',
             'gfx/**', 'assets/fonts/**'],
-    basis=['docs/decisions/ppc/PPC_KAPI_FILL_DESIGN.md §5 surface'],
+    basis=['docs/decisions/ppc/PPC_KAPI_FILL_DESIGN.md §5 surface',
+           'docs/decisions/display/SURFACE_LEASE_BUNDLE_DESIGN.md §5'],
     env_limit='Requires mac99 QEMU and loopback UDP/TCP for link-sh RSH.')
 
 

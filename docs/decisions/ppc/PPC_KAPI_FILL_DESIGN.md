@@ -249,7 +249,7 @@ A の場合も、対象像が持つ弱い代役に解決されていないこと
 |pointer|USB 相対移動、端で clamp、ボタン押下中に抜き、再接続。カーソル show/hide と位置を観測|release 配送を落として押下残りを検出|
 |console_font|指定セルの ANK/JIS、反転と scroll の画面・読戻し、既知 Unicode の JIS 変換、無圧縮の東雲16 KCG1 から字形を部分読取、EOF 境界・close 後の拒否、終了前に使い切った lease 枠の再取得|行送りを1行ずらす、lease 範囲端をずらす、提供者を外す|
 |surface（単独）|OF FB の CLIENT を query→lease→書込と読戻し→unlease。解除済み token は INVAL、世代変更後の旧 ref は STALE。アプリ終了時に残した lease を回収|世代照合を無効にすると旧 ref の取得が成功。提供者を外すと query が NOSYS|
-|surface（束、本線 #18 の確定設計後）|QEMU で事前確認による INVAL と、その後の再取得を確認|束の後半で失敗した場合の巻き戻しは本線の host 受入で確認 ([束の設計 §5](../display/SURFACE_LEASE_BUNDLE_DESIGN.md))|
+|surface（束、本線 #18 の確定設計後）|QEMU で書ける出力先で件数の不一致を与え、入力を読む前の INVAL と、その後の正しい CLIENT 1 面での再取得を確認|束の後半で失敗した場合の巻き戻しは本線の host 受入で確認 ([束の設計 §5](../display/SURFACE_LEASE_BUNDLE_DESIGN.md))|
 |gfx|画面寸法と owner を取得、既知矩形だけ更新し周囲の pixel を保存。非対応 raster/HW は能力に一致|dirty 範囲の右端を欠落させる|
 |gfx2|adapter/head/connector/mode と caps、面生成・lock・描画・present・解放。fence と非対応 EDID 等は実能力どおり|of_fb_v2 の固定モード比較を外し異寸法が通ることを検出|
 |gui|登録者に要求が一度届き、GUI 終了後に shell に入力が戻る|終了時の所有解放を省略|
