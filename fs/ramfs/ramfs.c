@@ -222,7 +222,8 @@ static int ramfs_resize(void *ctx, u32 ino, u32 size)
     u32 cap = size ? (size + RAMFS_GROW - 1) / RAMFS_GROW * RAMFS_GROW : RAMFS_GROW;
     if (cap < file->cap) {
         u8 *data = kmalloc(cap);
-        if (!data) return VFS_ERR_NOSPC;
+        /* Shrinking must not fail: SQLite rolls a failed COMMIT back with it. */
+        if (!data) { file->size = size; return VFS_OK; }
         if (size) kmemcpy(data, file->data, size);
         kfree(file->data);
         file->data = data;
