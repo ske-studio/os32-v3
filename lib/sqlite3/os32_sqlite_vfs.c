@@ -14,7 +14,6 @@
 #include "sqlite3.h"
 #include "os32_sqlite_vfs.h"
 #include "vfs.h"
-#include "ramfs/ramfs.h"
 #include "types.h"
 #include "kstring.h"
 #include "kprintf.h"
@@ -524,7 +523,7 @@ static int os32VfsOpen(sqlite3_vfs *pVfs, const char *zName,
 
     backend = vfs_sqlite_backend(zName);
     if (flags & SQLITE_OPEN_MAIN_DB) {
-        if (backend != VFS_SQLITE_EXT2 && backend != VFS_SQLITE_RAMFS)
+        if (backend == VFS_SQLITE_UNSUPPORTED)  /* ext2, or ramfs (VFS_SQLITE_RAMFS in ramfs.h) */
             return SQLITE_CANTOPEN;
         if (flags & SQLITE_OPEN_READWRITE) {
             rc = vfs_sqlite_writable(zName);
