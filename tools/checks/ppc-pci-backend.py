@@ -1,0 +1,58 @@
+"""PowerMac default PCI domain and command writes (PCI_COMMON_DESIGN §3, §7)."""
+from pathlib import Path
+import subprocess
+import tempfile
+
+CHECK = dict(name='ppc-pci-backend', tier=1, needs=[], budget=10,
+    covers=['platform/powermac/pci_backend.c', 'platform/powermac/pci_config.c',
+            'platform/powermac/lan_boot.h', 'tools/ppc/pci_backend_fake.c',
+            'arch/ppc/ppc_oea.h', 'arch/ppc/ppc_boot.h', 'arch/ppc/kernel_boot.h',
+            'include/types.h', 'include/callconv.h', 'include/memmap.h',
+            'include/pci_config_contract.h', 'include/pci_bind_contract.h',
+            'include/pci_dev_contract.h', 'drivers/pci/pci.h', 'drivers/pci/pci_bind.h',
+            'drivers/pci/pci_decode.h', 'drivers/net/gem/gem.h',
+            'sdk/include/os32/*.h', 'lib/kstring_c.c', 'lib/kstring.h'],
+    basis=['docs/decisions/ppc/PPC_KAPI_FILL_DESIGN.md §3 PCI'])
+
+
+def run(ctx):
+    directory = ctx.root / 'platform/powermac'
+    sources = {name: (directory / name).read_text()
+               for name in ('pci_backend.c', 'pci_config.c')}
+    with tempfile.TemporaryDirectory() as tmp:
+        exe = Path(tmp) / 'test'
+        def check(expected, replacements):
+            for name, source in sources.items():
+                if name in replacements:
+                    old, new = replacements[name]
+                    if source.count(old) != 1:
+                        raise ValueError('mutation anchor changed: ' + old)
+                    source = source.replace(old, new)
+                (Path(tmp) / name).write_text(source)
+            subprocess.run(['gcc', '-m32', '-std=gnu11', '-O2', '-Wall', '-Wextra',
+                            '-Werror', '-ffreestanding', '-nostdlib', '-no-pie', '-static',
+                            '-ffunction-sections', '-Wl,--gc-sections', '-DPM_PCI_FAKE_MMIO',
+                            '-I.', '-Iinclude', '-Ilib', '-Iplatform/powermac', '-Iarch/ppc',
+                            '-Isdk/include/os32', 'tools/ppc/pci_backend_fake.c',
+                            'lib/kstring_c.c', *(Path(tmp) / name for name in sources),
+                            '-o', exe], cwd=ctx.root, check=True)
+            rc = subprocess.run(['qemu-i386', exe], timeout=10).returncode
+            if rc != expected:
+                raise RuntimeError(f'expected assertion {expected}, got {rc}')
+
+        check(0, {})
+        if ctx.mutate:
+            for label, name, old, new, expected in [
+                ('command status mask', 'pci_config.c', '*value &= 0xffffu;',
+                 '*value &= 0xffffffffu;', 9),
+                ('command only', 'pci_backend.c', 'if (reg == 4)', 'if (1)', 8),
+                ('root index', 'pci_backend.c', 'idx != 0', 'idx > 1', 3),
+                ('BAR writes', 'pci_backend.c', 'int pci_config_bar_measure(void)\n{\n    return 0;',
+                 'int pci_config_bar_measure(void)\n{\n    return 1;', 4),
+                ('unaligned read', 'pci_backend.c', 'reg & ~3u', 'reg', 5),
+                ('BDF range', 'pci_backend.c', 'dev > 31 || fn > 7 || ', '', 6),
+            ]:
+                check(expected, {name: (old, new)})
+                print(f'RED {label} (assertion {expected})')
+    print('PowerMac PCI backend OK' + (' (6 runtime mutants RED)' if ctx.mutate else ''))
+    return 0
