@@ -1,4 +1,5 @@
 #include "in2_int.h"
+#include "pointer_service.h"
 #include "input_unused_key_host.h"
 #define T(x) do { if (!(x)) return __LINE__; } while (0)
 unsigned test_irq = 1;
@@ -34,7 +35,16 @@ static int probe(void)
     mouse_ext_read_legacy(&dx, &dy); T(!dx && !dy);
     e.flags = INPUT_EVENT_SEAMLESS; T(!input_capture(&e));
     mouse_ext_read_legacy(&dx, &dy); T(dx == 12 && dy == 1);
+    i16 x0, y0, x1, y1;
+    pointer_get_bounds(&x0, &y0, &x1, &y1);
+    T(x0 == 0 && y0 == 0 && x1 == 639 && y1 == 399);
+    pointer_set_default_bounds(1023, 767);
+    pointer_get_bounds(&x0, &y0, &x1, &y1);
+    T(x0 == 0 && y0 == 0 && x1 == 1023 && y1 == 767);
     pointer_bounds(0, 0, 640, 400);
+    pointer_set_default_bounds(799, 599);
+    pointer_get_bounds(&x0, &y0, &x1, &y1);
+    T(x0 == 0 && y0 == 0 && x1 == 640 && y1 == 400);
     e.flags = 0; e.type = INPUT_EVENT_ABS; e.x = 32767; e.y = 0;
     T(!input_capture(&e)); pointer_position(&x, &y); T(x == 640 && y == 0);
     e.x = -1; T(input_capture(&e) < 0);

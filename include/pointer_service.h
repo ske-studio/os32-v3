@@ -45,6 +45,8 @@ typedef struct PointerOps {
 void pointer_register(const PointerOps *ops);
 void pointer_poll(MouseState *state);
 int pointer_available(void);
+/* Boot-time inclusive limits, effective until the application sets bounds. */
+void pointer_set_default_bounds(i16 x_max, i16 y_max);
 void pointer_set_bounds(i16 x_min, i16 y_min, i16 x_max, i16 y_max);
 void pointer_cursor_set_mode(int mode);
 void pointer_cursor_show(void);
