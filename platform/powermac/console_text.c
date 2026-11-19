@@ -2,7 +2,7 @@
 #include "console_backend.h"
 #include "unicode_file.h"
 #include "display_text.h"
-#include "drivers/video/kcg/kcg_file.h"
+#include "kernel/console/font_source_kcg.h"
 #include "gfx/gfx.h"
 #include "gfx/gfx_console.h"
 #include "gfx/v2/gfx2_int.h"
