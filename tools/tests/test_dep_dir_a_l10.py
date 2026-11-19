@@ -1,6 +1,6 @@
 """L10 resident KCG controls; copied ILP32 controls and one scale mutant."""
 CHECK = dict(name='dep-dir-a-l10-host', tier=1,
-    covers=['platform/pc98/gfx_surfaces.c', 'include/callconv.h', 'platform/pc98/bios_snapshot.h', 'platform/pc98/boot_capture.c', 'platform/pc98/bootinfo_wire.h', 'platform/pc98/bootinfo_native.h', 'platform/pc98/legacy/lowmap.c', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'tools/hwdev_layout.json', 'drivers/pci/pci.h', 'drivers/char/serial.h', 'hwdev/hwdev_imports.def', 'include/bootinfo.h', 'include/gf_production.h', 'include/kprintf.h', 'kdebug/kpeek.h', 'kdebug/recover.h', 'kernel/module/kdebug_imports.def', 'mm/pgalloc.h', 'lib/kstring.h', 'tools/gen_kdebug_imports.py', 'tools/mkmod.py', 'tools/module_schema.py', 'tools/tests/hwdev_contract_fixture.py', 'include/types.h', 'include/platform_device.h', 'include/kcg_contract.h', 'include/pc98.h', 'drivers/video/kcg/kcg.h', 'drivers/video/kcg/kcg.c', 'drivers/video/kcg/kcg_module.h', 'kernel/module/module_runtime.h', 'kernel/module/module_image.h', 'kernel/module/module_schema.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_host_notice.h', 'sdk/include/os32/os32_ver_info.h', 'sdk/include/os32/os32_generations.h', 'sdk/include/os32/os32_gfx2.h', 'sdk/include/os32/os32_ls.h', 'sdk/include/os32/os32_surface.h', 'sdk/include/os32/os32_kapi_generated.h', 'platform/pc98/device_kcg.c', 'tools/tests/dep_dir_a_l10_host.c', 'sdk/kapi.json', 'kapi/kapi_generated.c', 'drivers/video/kcg/kcg_module.c', 'hwdev/generated/hwdev_contract.h', 'tools/tests/test_shm_user.py', 'tools/tests/test_dep_dir_a_l05a.py', 'tools/tests/fixtures/dep_dir_a/l05a.json', 'tools/tests/fixtures/dep_dir_a/l10.json', 'exec/exec.c', 'drivers/video/pc98/backend_pegc.c', 'gfx/gfx_core.c', 'platform/pc98/kernel.c', 'mm/paging.c', 'mm/pgalloc.c', 'mm/physmem.c', 'mm/shm.c', 'platform/pc98/legacy/v86.c', 'platform/pc98/legacy/v86_mem.c', 'platform/pc98/bios_snapshot.c', 'platform/pc98/device_ide.c', 'tools/tests/dep_dir_a_l05a_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_layout.py', 'tools/tests/mutpar.py', 'tools/tests/shm_user_host.c', 'hwdev/generated/hwdev_imports.json', 'hwdev/generated/hwdev_layout.txt', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'tools/tests/paging_source.py', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h'],
+    covers=['platform/pc98/gfx_surfaces.c', 'include/callconv.h', 'platform/pc98/bios_snapshot.h', 'platform/pc98/boot_capture.c', 'platform/pc98/bootinfo_wire.h', 'platform/pc98/bootinfo_native.h', 'platform/pc98/legacy/lowmap.c', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'tools/hwdev_layout.json', 'drivers/pci/pci.h', 'drivers/char/serial.h', 'hwdev/hwdev_imports.def', 'include/bootinfo.h', 'include/gf_production.h', 'include/kprintf.h', 'kdebug/kpeek.h', 'kdebug/recover.h', 'kernel/module/kdebug_imports.def', 'mm/pgalloc.h', 'lib/kstring.h', 'tools/gen_kdebug_imports.py', 'tools/mkmod.py', 'tools/module_schema.py', 'tools/tests/hwdev_contract_fixture.py', 'include/types.h', 'include/platform_device.h', 'include/kcg_contract.h', 'include/pc98.h', 'drivers/video/kcg/kcg.h', 'drivers/video/kcg/kcg.c', 'drivers/video/kcg/kcg_module.h', 'kernel/module/module_runtime.h', 'kernel/module/module_image.h', 'kernel/module/module_schema.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_host_notice.h', 'sdk/include/os32/os32_ver_info.h', 'sdk/include/os32/os32_generations.h', 'sdk/include/os32/os32_gfx2.h', 'sdk/include/os32/os32_ls.h', 'sdk/include/os32/os32_surface.h', 'sdk/include/os32/os32_kapi_generated.h', 'kernel/dev/device_kcg.c', 'tools/tests/dep_dir_a_l10_host.c', 'sdk/kapi.json', 'kapi/kapi_generated.c', 'drivers/video/kcg/kcg_module.c', 'hwdev/generated/hwdev_contract.h', 'tools/tests/test_shm_user.py', 'tools/tests/test_dep_dir_a_l05a.py', 'tools/tests/fixtures/dep_dir_a/l05a.json', 'tools/tests/fixtures/dep_dir_a/l10.json', 'exec/exec.c', 'drivers/video/pc98/backend_pegc.c', 'gfx/gfx_core.c', 'platform/pc98/kernel.c', 'mm/paging.c', 'mm/pgalloc.c', 'mm/physmem.c', 'mm/shm.c', 'platform/pc98/legacy/v86.c', 'platform/pc98/legacy/v86_mem.c', 'platform/pc98/bios_snapshot.c', 'platform/pc98/device_ide.c', 'tools/tests/dep_dir_a_l05a_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_layout.py', 'tools/tests/mutpar.py', 'tools/tests/shm_user_host.c', 'hwdev/generated/hwdev_imports.json', 'hwdev/generated/hwdev_layout.txt', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'tools/tests/paging_source.py', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h'],
     needs=['make:all'], budget=3.1,
     basis=['[ABI]', 'KAPI_SPEC §3-1'],
 )
@@ -27,7 +27,7 @@ COPIES = ('include/callconv.h',
     'sdk/include/os32/os32_ver_info.h', 'sdk/include/os32/os32_generations.h',
     'sdk/include/os32/os32_gfx2.h', 'sdk/include/os32/os32_ls.h', 'sdk/include/os32/os32_surface.h',
     'sdk/include/os32/os32_kapi_generated.h',
-    'platform/pc98/device_kcg.c', 'tools/tests/dep_dir_a_l10_host.c',
+    'kernel/dev/device_kcg.c', 'tools/tests/dep_dir_a_l10_host.c',
 )
 OLD = '    kcg_set_scale(scale);'
 NEW = '    (void)scale;'
@@ -62,14 +62,14 @@ def build(folder, body, wrappers):
         dest = folder / rel
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(ROOT / rel, dest)
-    (folder / 'platform/pc98/device_kcg.c').write_text(body)
+    (folder / 'kernel/dev/device_kcg.c').write_text(body)
     (folder / 'wrappers.inc').write_text(wrappers)
     exe = folder / 'host-test'
     subprocess.run(['gcc', '-m32', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
                     '-ffreestanding', '-nostdlib', '-static', '-fno-pie', '-no-pie',
                     '-fno-stack-protector',
                     *include_flags(folder),
-                    str(folder / 'platform/pc98/device_kcg.c'),
+                    str(folder / 'kernel/dev/device_kcg.c'),
                     str(folder / 'drivers/video/kcg/kcg.c'),
                     str(folder / 'tools/tests/dep_dir_a_l10_host.c'), '-o', str(exe)], check=True)
     return exe
@@ -81,7 +81,7 @@ def main():
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
     wrappers = contracts()
-    body = (ROOT / 'platform/pc98/device_kcg.c').read_text()
+    body = (ROOT / 'kernel/dev/device_kcg.c').read_text()
     assert body.count(OLD) == 1
     with tempfile.TemporaryDirectory(prefix='dep-dir-a-l10-') as directory:
         folder = Path(directory)

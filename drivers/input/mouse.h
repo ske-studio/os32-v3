@@ -13,6 +13,10 @@
 
 #include "../../include/pointer_service.h"
 
+#include "mouse_pointer_contract.h"
+
+extern const MousePointerBackend pc98_mouse_backend;
+
 #define MOUSE_ABS_MAX 32767L
 
 /* ====================================================================== */

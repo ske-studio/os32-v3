@@ -4,6 +4,13 @@
 #include "kbd_contract.h"
 #include "text_screen.h"
 
+static const MousePointerBackend *backend;
+
+void mouse_pointer_backend_register(const MousePointerBackend *b)
+{
+    backend = b;
+}
+
 static i16 cursor_x;
 static i16 cursor_y;
 
@@ -24,7 +31,8 @@ void mouse_poll(MouseState *state)
 {
     i16 dx = 0, dy = 0;
     u8 buttons = 0;
-    u8 mode = mouse_pointer_snapshot(&dx, &dy, &buttons, &cursor_x, &cursor_y);
+    u8 mode = MOUSE_MODE_NONE;
+    if (backend) mode = backend->snapshot(&dx, &dy, &buttons, &cursor_x, &cursor_y);
 
     kbd_stop_mouse_sample(buttons);
 
@@ -90,9 +98,9 @@ void mouse_cursor_show(void)
 {
     int cx, cy;
 
-    if (cursor_display_mode == MOUSE_CURSOR_NONE) return;  /* NONE */
+    if (!backend || cursor_display_mode == MOUSE_CURSOR_NONE) return;  /* NONE */
 
-    mouse_pointer_text_cell(cursor_x, cursor_y, &cx, &cy);
+    backend->text_cell(cursor_x, cursor_y, &cx, &cy);
 
     if (cursor_display_mode == MOUSE_CURSOR_TEXT) {
         /* TEXT: TVRAM属性反転 */

@@ -85,6 +85,12 @@ def run(ctx):
                 assert poll_source.count(before) == 1
                 rc = build_poll(poll_source.replace(before, after)); assert 0 < rc < 128, (before, rc)
                 print('RED runtime poll: '+before, flush=True)
+            for before, after in [('backend = b;', '(void)b;'),
+                                  ('backend->text_cell(cursor_x, cursor_y, &cx, &cy);', 'cx = cy = 0;')]:
+                assert pointer_source.count(before) == 1
+                rc = build_poll(poll_source, pointer=pointer_source.replace(before, after))
+                assert 0 < rc < 128, (before, rc)
+                print('RED runtime backend: '+before, flush=True)
             before = 'pointer_bounds(x_min, y_min, x_max, y_max);'
             assert pointer_source.count(before) == 1
             rc = build_poll(poll_source, pointer=pointer_source.replace(before, '(void)0;'))

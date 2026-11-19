@@ -65,6 +65,7 @@ const EmergencyOps emergency_output = {
 void pc98_d2_bind(void)
 {
     input_register(&pc98_input);
+    mouse_pointer_backend_register(&pc98_mouse_backend);
     pointer_register(&pc98_pointer);
     port_register(&pc98_port);
     clock_register(&pc98_clock);

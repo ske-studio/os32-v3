@@ -1,11 +1,15 @@
 /* Recording mouse provider for fixtures that include the real PC98 binding. */
 #include "../../drivers/input/mouse.h"
+const MousePointerBackend pc98_mouse_backend = {0};
+static const MousePointerBackend *registered_mouse_backend;
+void mouse_pointer_backend_register(const MousePointerBackend *b) { registered_mouse_backend = b; }
+
 static int pointer_seen, pointer_mode;
 static i16 pointer_seen_bounds[4];
 static MouseState *pointer_output;
 void mouse_poll(MouseState *state)
 {
-    pointer_seen = 1;
+    pointer_seen = registered_mouse_backend == &pc98_mouse_backend;
     pointer_output = state;
     if (!state) return;
     state->x = -123; state->y = 456;

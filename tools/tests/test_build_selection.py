@@ -32,11 +32,18 @@ def check(root):
     ppc = query(root, ['ARCH=ppc', 'PLATFORM=powermac'], config_only=True)
     link = json.loads((ROOT / 'tools/tests/fixtures/build_profile_ppc.json').read_text())['link']
     assert ppc['C_KERNEL'] == link['KB_C'] and ppc['GAS_KERNEL'] == link['KB_ASM'] and not ppc['ASM_KERNEL']
+    for enabled in (0, 1):
+        profile = query(root, ['ARCH=ppc', 'PLATFORM=powermac', f'FEATURE_KCG={enabled}'], config_only=True)
+        assert profile['C_KERNEL'].count('drivers/video/kcg/kcg.c') == enabled
+        assert profile['C_KERNEL'].count('kernel/dev/device_kcg.c') == enabled
+        assert 'drivers/video/kcg/kcg_module.c' not in profile['C_KERNEL']
     assert 'exec/ring3_ls.c' in actual['C_KERNEL']
     assert actual['C_KERNEL'].index('exec/ring3_ls.c') == expected['C_KERNEL'].index('exec/ring3_ls.c')
     off = query(root, ['FEATURE_' + name + '=0' for name in FEATURES], config_only=True)
     assert not any(path in name for name in off['C_KERNEL'] for path in
                    ('kernel/v86/', 'platform/pc98/legacy/'))
+    assert off['C_KERNEL'].count('kernel/dev/device_kcg.c') == 1
+    assert 'drivers/video/kcg/kcg.c' not in off['C_KERNEL']
     assert not any('geforce/' in name for name in off['C_KERNEL'])
     for assignments in (['FEATURE_UNKNOWN=1'], ['ARCH=ppc', 'PLATFORM=powermac', 'FEATURE_SQLITE=1'], ['ARCH=ppc','PLATFORM=powermac','FEATURE_V86=1'], ['FEATURE_KDEBUG=0'],
                         ['FEATURE_LINK=0'], ['IMAGE=kboot-link'], ['IMAGE=unknown'],
