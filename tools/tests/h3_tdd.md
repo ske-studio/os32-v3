@@ -11,7 +11,7 @@
 ## 0. 正直に書く ([V4])
 
 **試験は実装のあとに書いた。** `hsync.c` / `drivers/hostdrv/hostdrv_stat_rules.inc` /
-`fs/vfs.c` / `fs/ext2/ext2_vfs.c` / `kapi/kapi_sys.c` を先に直し、そのあとで
+`fs/vfs.c` / `fs/ext2/ext2_vfs.c` / `kapi/kapi_sysinfo.c` を先に直し、そのあとで
 `tools/tests/hsync_h3_host.c` と `tools/tests/vfs_set_mtime_host.c` を書いた。
 だから「先に RED を見た」とは書けない。
 
@@ -51,7 +51,7 @@ TARGET i386-elf -Werror COMPILE PASS (fs/ext2/ext2_vfs.c)
 TARGET i386-elf -Werror COMPILE PASS (fs/fat/fatfs_vfs.c)
 TARGET i386-elf -Werror COMPILE PASS (fs/isofs/iso9660.c)
 TARGET i386-elf -Werror COMPILE PASS (fs/vfs.c)
-TARGET i386-elf -Werror COMPILE PASS (kapi/kapi_sys.c)
+TARGET i386-elf -Werror COMPILE PASS (kapi/kapi_sysinfo.c)
 ```
 
 ### A16 の基準値 (独立に出したもの)
@@ -237,7 +237,7 @@ H1 側からも押さえる形になった。時刻を使う試験は H3 側が�
 - `fs/vfs.h` / `fs/vfs.c` — `VfsOps.set_mtime` (任意実装) と `vfs_set_mtime()`、`VFS_ERR_NOSYS`
 - `fs/ext2/ext2_vfs.c` — `ext2_vfs_set_mtime()` (ext2 のみ実装)
 - `fs/fat/fatfs_vfs.c` / `fs/isofs/iso9660.c` / `drivers/hostdrv/hostdrvfs.c` — `VfsOps` に明示的な `0`
-- `kapi/kapi_sys.c` — `kapi_sys_set_mtime()` (CPL=3 のポインタ検証と写し)
+- `kapi/kapi_sysinfo.c` — `kapi_sys_set_mtime()` (CPL=3 のポインタ検証と写し)
 - `sdk/kapi.json` (v51 → v52、`api` 末尾に `sys_set_mtime`) と生成物
 - `sdk/include/os32/os32_kapi_shared.h` — `KAPI_VERSION` 52
 - `userland/system/hsync.c` — 日時の前置判定、`--verify`、`metadata_updated`

@@ -3,9 +3,9 @@
 
 #include "types.h"
 
-/* Read permission through the fixed caller's managed page walk (PDE/PTE
- * PRESENT|USER and registered backing). No CR3 switch. CPL0/WM direct calls
- * retain their explicit trusted convention. NULL/overflow/NP refuse. */
+/* Trusted kernel and window-manager direct calls are accepted. For user
+ * calls, reject a null start or a wrapping range and require every byte
+ * in a nonempty range to be readable by the current caller. */
 int ring3_user_range_ok(u32 p, u32 len);
 
 #endif

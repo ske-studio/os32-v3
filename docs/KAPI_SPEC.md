@@ -102,7 +102,7 @@ KAPI は append-only で版番号は単調増加。複数の計画が独立に�
 | v49 | **実装済み (2026-09-12、T9-K)** | GUI v1.3 T9 shell script: 起動要求表 8 本 — `launch_req` / `launch_pending` / `launch_take` / `launch_report` / `launch_poll` / `launch_cancel` / `launch_child` と `sys_yield`。GUI 中の CPL=3 は入れ子 `exec_run` を使えないので、外部プログラムの起動と kill をカーネルの表に載せ owner 1 (WM) が仲介する。同じ追記で `exec_kill` を「id と子孫を末尾から回収」に固定した (D8) | `docs/archive/gui_v13/TASK_T9_sh.md` |
 | v50 | **実装済み (2026-09-13、S0-K)** | 設定レジストリ: `db_open_existing` (RO / RW、CREATE 無し) / `db_prepare_only` / `db_bind_int` / `db_bind_text` / `db_bind_blob` / `db_bind_null` / `db_error_code` の 7 本 (slot 201〜207、data_fields は 0x348 / 0x34C へ)。既存 `db_*` 10 本は不変 | archive/settings/TASK_S0.md §1a (アーカイブ: `docs/archive/settings/TASK_S0.md`) |
 | v51 | **実装済み (2026-09-14、N1)** | ネットワーク Host Services `host_open` / `host_status` / `host_read` / `host_write` / `host_close` の 5 本 (slot 208〜212 = 0x348〜0x358、data_fields は 0x35C / 0x360 へ)。非ブロッキング (プロトコルを進めるのは 100Hz の `link_tick` だけ)、同時 2 ハンドル、ストリーム 1 本。実体は `kapi/kapi_host.c` + `net/link.c` | `docs/archive/network/TASK_N0.md` §1a |
-| v52 | **実装済み (2026-09-15、H3)** | 更新日時の保存 `sys_set_mtime` 1 本 (slot 213 = 0x35C、data_fields は 0x360 / 0x364 へ)。`VfsOps` の**任意実装フック** `set_mtime` を通し、**ext2 のみ実装**。持たない FS は `OS32_ERR_NOSYS` (失敗ではなく「持っていない」)。実体は `kapi/kapi_sys.c` + `fs/vfs.c` + `fs/ext2/ext2_vfs.c` | `docs/archive/shell/TASK_H3.md` |
+| v52 | **実装済み (2026-09-15、H3)** | 更新日時の保存 `sys_set_mtime` 1 本 (slot 213 = 0x35C、data_fields は 0x360 / 0x364 へ)。`VfsOps` の**任意実装フック** `set_mtime` を通し、**ext2 のみ実装**。持たない FS は `OS32_ERR_NOSYS` (失敗ではなく「持っていない」)。実体は `kapi/kapi_sysinfo.c` + `fs/vfs.c` + `fs/ext2/ext2_vfs.c` | `docs/archive/shell/TASK_H3.md` |
 | v53 | **実装済み (2026-09-16、H2)** | 排他的作成 `KAPI_O_EXCL` (`0x0400`)。**スロットは 1 本も増えていない** — `sys_open` のフラグが 1 つ増え、その**意味が広がった**ので版数を上げた ([ABI])。`VfsOps` の**任意実装フック** `create_excl` を通し、**ext2 のみ実装**。持たない FS は `OS32_ERR_NOSYS`。実体は `fs/vfs_fd.c` + `fs/ext2/ext2_vfs.c`。同じ票で ext2 の置き換え rename の順序も変えた (宛先の名前を消さない) | `docs/archive/shell/TASK_H2.md` |
 | v54 | **実装済み (2026-09-16、継承バグ)** | 覗くだけのキー取得 `kbd_peekkey` 1 本 (slot 214 = 0x360、data_fields は 0x364 / 0x368 へ)。キューを**1 バイトも動かさず**に 次のキーを返す (無ければ -1)。戻り値の形は `kbd_trygetkey` と同じ。`script_exec` の毎行の ESC 監視が `kbd_trygetkey` で打鍵を**取り出して捨てて**いたのを直す。実体は `drivers/input/kbd.c` (+ `drivers/char/serial.c` の `serial_peekchar` と `kernel/kbd_inject.c` の `kbd_inject_peek`) | 票 INHERITED_BUGS |
 | v55 | **実装済み (2026-09-16、$?)** | 終了コードの配線 `exec_last_result` 1 本 (slot 215 = 0x364、data_fields は 0x368 / 0x36C へ)。直前の `exec_run` の結果を**種別 + 値**で返す。種別 (`EXEC_KIND_*`) は畳んだ側が渡すので `exit(-2)` / fault / CTRL+STOP を値ではなく種別で見分けられる。`exec_run` は**すべての return 点で**記録を書くので、起動しなかった場合に前回の記録が残らない。GUI 経路 (`exec_start` / `exec_resume`) の子は記録しない。実体は `exec/exec.c` | `docs/archive/shell/TASK_EXIT_STATUS.md` |
@@ -382,7 +382,7 @@ hash・リンク入力を記録する。空の apps/game は除外と明記し�
 | `exec_run`, `exec_start`, `launch_req` | T4b-8 コマンド群、`exec/exec.c`, `exec/launch.c` | B1 接続済み。コマンド全体を写してから起動/要求登録へ |
 | `serial_puts`, `shell_print_utf8`, `fm_play_mml`, `snd_bgm_play` | T4b-8 文字列出力・MML 群、各 target | B1 接続済み。出力/音源操作前にコピー、STOP/fault の所有者回収で staging を返す |
 | `sys_ls`, `sys_ls_window` | T2e の私的 ls shim / `exec/ring3_ls.c` | USER の旧 callback 入口は拒否。window/旧 shim は B1 コピーで 256B 内の NUL を必須とし、上限で補わない |
-| `sys_set_mtime` | `kapi/kapi_sys.c` | B1 range＋1B コピー済み。256B 上限、拒否時 VFS 呼出しなし。今回変更なし |
+| `sys_set_mtime` | `kapi/kapi_sysinfo.c` | B1 range＋1B コピー済み。256B 上限、拒否時 VFS 呼出しなし。今回変更なし |
 | `db_open`, `db_open_existing`, `db_exec`, `db_prepare`, `db_prepare_only` | T4b-1 / `kapi/kapi_db.c` | B1 コピー済み。DB path/SQL の既定上限・拒否時不変を維持 |
 | `ime_user_list` (prefix) | T5a-1 / `kernel/ime/ime.c` → `kernel/ime/ime_dict.c` | B2 接続。256B NUL、NULL/空 prefix は全件、1〜64件。無効引数/copy=-1、SQL=-4、正常のみ件数。kernel staging→finalize/leave→B1 copyout |
 | `ime_user_delete` (yomi/kanji) | T5a-1 / 同上 | B2 接続。各256Bを全コピー。yomi NULL/空=-1、kanji NULL/正常な空のみ同じ読みの全候補。copy失敗=-1、SQL=-2/-3、成功0 |
@@ -926,7 +926,7 @@ v46 はそれを**カーネル内の 8KB のリング (シンク)** に溜め、
   (`OS32_Stat` に時刻の有効性ビットが無いため。不明を書けると次の同期で「証拠が無い」状態を
   自分で作ることになる)。`path` は NUL 終端で `OS32_MAX_PATH` 未満 — 溢れたら**切り詰めずに**
   `INVAL` (切り詰めた別のパスの時刻を動かさない)。CPL=3 からは 1 バイトずつ範囲を確かめながら
-  カーネル側へ写す (`kapi/kapi_sys.c`)。
+  カーネル側へ写す (`kapi/kapi_sysinfo.c`)。
 - `VfsOps.set_mtime` は**任意実装**。埋めていない FS ドライバでは `OS32_ERR_NOSYS` が返る。
   これは失敗ではなく「この FS には無い」という答えで、呼び手は内容の同期を続けたまま
   「時刻の保存を省略した」と表示する。**実装済みは ext2 だけ** (FAT / HostDrv / iso9660 は NOSYS)。

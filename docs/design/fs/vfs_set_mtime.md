@@ -1,7 +1,7 @@
 # fs/vfs.c — 更新日時の設定 (`vfs_set_mtime`、KAPI `sys_set_mtime`)
 
 > 状態: **現行 (2026-11-18)** — 出所: TASK_H3 の契約を今のソースと照らして要約
-ソース: `fs/vfs.c` (`vfs_set_mtime`)・`fs/vfs.h` (`VfsOps.set_mtime`)・`fs/ext2/ext2_vfs.c` (`ext2_vfs_set_mtime`)・`kapi/kapi_sys.c` (`kapi_sys_set_mtime`)
+ソース: `fs/vfs.c` (`vfs_set_mtime`)・`fs/vfs.h` (`VfsOps.set_mtime`)・`fs/ext2/ext2_vfs.c` (`ext2_vfs_set_mtime`)・`kapi/kapi_sysinfo.c` (`kapi_sys_set_mtime`)
 
 `sys_set_mtime(path, mtime)` (KAPI v52、`sdk/kapi.json` の末尾に追加) はファイルの mtime (UNIX 秒、UTC) を設定する。
 hsync がコピー元の日時を宛先へ写すために使う (同じ日時なら次の同期で読まずに省略できる)。

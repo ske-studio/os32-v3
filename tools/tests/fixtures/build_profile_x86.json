@@ -294,6 +294,8 @@
     "kapi/kapi_generated.c",
     "kapi/kapi_db.c",
     "kapi/kapi_sys.c",
+    "kapi/kapi_sysinfo.c",
+    "kapi/kapi_port.c",
     "kapi/kapi_osri.c",
     "kapi/kapi_host.c",
     "kapi/kapi_host_notice.c",
