@@ -64,7 +64,7 @@
     "platform/pc98/device_pci.c",
     "platform/pc98/device_host.c",
     "kernel/dev/device_host.c",
-    "platform/pc98/device_kcg.c",
+    "kernel/dev/device_kcg.c",
     "platform/pc98/pci_resources.c",
     "platform/pc98/boot_disk.c",
     "mm/memory_boot.c",

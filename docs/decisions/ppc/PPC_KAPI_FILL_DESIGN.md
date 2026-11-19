@@ -178,7 +178,7 @@ A の場合も、対象像が持つ弱い代役に解決されていないこと
 |3c|PPC platform/powermac/usb_platform.c|移動後の共有入口 pointer_move とボタン入力へ配送。抜去時の解放とキーボード同時接続を確認して公開|
 |4a|PPC 公開表だけ|セル5本を既存 console.c の con_backend_scroll・readchar・reverse 等と fbcon に結線。tvram_clear の生成分岐も照合|
 |4k-i|本線 build/select.mk|FEATURE_KCG の FEATURE_PC98_DEVICES 必須条件を解き、PC-98 の選択と無効像も確認|
-|4k-ii|本線 KCG 転送 TU|device_kcg.c の固定名転送を純移動し両像で同じ TU と kcg.c を選ぶ|
+|4k-ii|本線 kernel/dev/device_kcg.c|device_kcg.c の固定名転送を純移動し両像で同じ TU と kcg.c を選ぶ|
 |4b|装置 drivers/video/kcg/kcg_file.c → 共通 kernel/console/font_source.c|PPC は既存 KCG1 から kcg_rom_read_ank・kanji を供給。load は両像で NOSYS。既存 KCG1 をフォント供給元に選ぶ。font lease の close と exec 終了の回収を先に受入|
 |5a-i|本線 drivers/video/pc98/gfx_vram.c（その場の変更、NP21/W で確認）|present、rect、dirty、nosync、raster のクリップ・変更矩形管理を抽出。PC98 VRAM 書込と同期は装置に保持|
 |5a-ii|本線 gfx/ の共通 TU|分離した dirty 列・矩形処理だけを純移動。flip・VSYNC 待ちは装置側。x86 関数差0|
