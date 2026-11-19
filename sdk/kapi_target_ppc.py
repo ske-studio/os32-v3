@@ -5,7 +5,7 @@ Common exec, caller validation, owner, FD and heap providers remain bound.
 
 PROVIDER_GROUPS = {
     'sys': (frozenset({'buz_on', 'buz_off'}), frozenset([])),
-    'surface': (frozenset({'surface_query', 'surface_lease', 'gfx_surface_lease', 'surface_unlease'}), frozenset([])),
+    'surface': (frozenset({'gfx_surface_lease'}), frozenset([])),
     'gfx': (frozenset({
         'gfx_init',
         'gfx_init_200',
@@ -30,26 +30,7 @@ PROVIDER_GROUPS = {
         'gfx_hw_get',
         'gfx_osri_show',
     }), frozenset(['gfx_hal.h', 'gfx.h', 'palette.h'])),
-    'clock': (frozenset({
-        'rtc_read',
-    }), frozenset([])),
-    'console_font': (frozenset({
-        'unicode_to_jis',
-        'font_source_open',
-        'font_source_read_at',
-        'font_source_close',
-    }), frozenset([])),
-    'port': (frozenset({
-        'serial_init',
-        'serial_puts',
-        'serial_getchar',
-        'serial_putchar',
-        'serial_trygetchar',
-        'serial_is_initialized',
-        'serial_init_vfast',
-        'serial_get_status',
-        'serial_diag',
-    }), frozenset(['port_service.h'])),
+    'port': (frozenset({'serial_puts', 'serial_diag'}), frozenset()),
     'gui': (frozenset({
         'gui_call',
         'gui_register',
@@ -180,10 +161,6 @@ PROVIDER_GROUPS = {
         'kdebug_call',
     }), frozenset([])),
     'gfx2': (frozenset({
-        'gfx2_adapter_count',
-        'gfx2_adapter_info',
-        'gfx2_adapter_gen',
-        'gfx2_caps',
         'gfx2_check_op',
         'gfx2_surface_create',
         'gfx2_surface_free',
@@ -194,11 +171,6 @@ PROVIDER_GROUPS = {
         'gfx2_submit',
         'gfx2_fence_wait',
         'gfx2_fence_query',
-        'gfx2_head_info',
-        'gfx2_connector_info',
-        'gfx2_connector_edid',
-        'gfx2_mode_count',
-        'gfx2_mode_get',
         'gfx2_mode_set',
         'gfx2_flip',
         'gfx2_vblank_wait',
@@ -232,7 +204,6 @@ ZERO_SLOTS = frozenset({
     'pci_count',
     'mouse_available',
     'snd_bgm_is_playing',
-    'serial_is_initialized',
     'gfx2_adapter_count',
     'db_mem_used',
     'unicode_to_jis',

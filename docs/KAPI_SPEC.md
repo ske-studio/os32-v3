@@ -1606,6 +1606,9 @@ TRIDENT・OF_FB は番号だけの追加で構造体・スロットを変えな�
 - `gfx_surface_lease`: 提供者が選ぶ束の全 ref を query と同順で渡す。PC-98 は PC98 DISPLAY の 4 件、PowerMac の公開配線後は OF_FB CLIENT の 1 件。全件を一括取得し、公開に失敗したら巻き戻す。件数違い・欠落・重複・順序違い・別束は INVAL、世代だけが古ければ STALE。
 - `surface_unlease`: 保存 USER caller の AS が持つ token のみ返却する。他人・無効・互換 token は INVAL。再 init/終了による revoke は内部処理。
 
+PowerMac の EXEC 像では、初期化済み OF FB の RAM 上の CLIENT 1 面に対して
+`surface_query` / `surface_lease` / `surface_unlease` を提供する。
+
 query/lease はどちらも次の授権表で判定する。U は保存した USER caller と**現在実行中**の slot/AS/owner/generation の一致、
 G は kernel が読んだ `hdr_flags & OS32X_FLAG_GFX`、F は GUI の `appslot_gfx_owner()==caller.app_id`。
 親や park 中の AS に代理で貸さない。user 引数の owner や sid を権限にしない。どの role も desc の最大 access 以内。
@@ -2066,7 +2069,7 @@ slot 249。ひらがな U+3041..3093 とカタカナ U+30A1..30F6 は算術変�
 (kernel owner の使用頁 +7、空き −7、`other` へ重複加算しない)。
 
 **読込順序と失敗** (`kernel/console/unicode_file.c` の `unicode_file_load`):
-- 呼出しは `platform/pc98/kernel.c` の初期自己試験の終了直後。root mount・paging・memory_boot_init・初期試験に
+- PC-98 の呼出しは `platform/pc98/kernel.c` の初期自己試験の終了直後。PowerMac は `platform/powermac/ppc_kernel.c` で RAM の root の mount と KCG1 の読み込みが成功した後に呼ぶ。以下の順序は PC-98 の説明。root mount・paging・memory_boot_init・初期試験に
   よる再初期化が済み、`kaudit_boot_pages`・KAPI 構築 `exec_init`・IME より前。ここまでの起動表示は
   ASCII とし、日本語の最初の描画・外部 KAPI 呼出しの前に成否を確定する。
 - `vfs_stat` で長さ 28,252 B を確認し、確保した頁へ `vfs_read`、返却長も一致することを確認する。
@@ -2102,8 +2105,8 @@ FS に依存しない stat/read・検証・探索を共通化する。CD/HostDrv
 | 0x3F8 | font_source_close | `i32(u32 id)` |
 
 slot 250〜252。app (CPL=3) の font の read lease (T7b-b1、実体 `kernel/console/font_source.c`)。
-呼べるのは CPL=3 の dispatch 中だけで、caller の owner が資源 owner と一致すること
-(WM 中・CPL=0 の直呼び・常駐 shell は `OS32_ERR_INVAL`。shell は KAPI でなく内部入口を使う)。
+呼べるのはユーザーアプリからの syscall の処理中だけで、caller の app_id が資源 owner と一致すること
+(x86 では CPL=3 の dispatch 中。WM 中・カーネルからの直呼び・常駐 shell は `OS32_ERR_INVAL`。shell は KAPI でなく内部入口を使う)。
 open は O_RDONLY で開き、実体の unlink・置き換え rename を `OS32_ERR_BUSY` にする (pinned)。
 戻りの id は不透明な値 (FD 番号ではない)、size は開いた時点の長さ。read_at は位置を持たず
 明示 offset で 1 回読み、実読込長 (短読はそのまま) を返す。`offset > size`・`len > size - offset`

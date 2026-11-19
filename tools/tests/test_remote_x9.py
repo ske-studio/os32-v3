@@ -41,7 +41,7 @@ def main():
                 # sys_yield stays on exec_sys_yield (parks exec_start children; arch-ctx-guest lifecycle).
                 assert 'i32 __cdecl wrap_sys_yield(void)\n{\n    KAPI_HIT(200);\n    return exec_sys_yield();\n}\n' in generated
                 assert 'rshell_active = active;' in generated
-                assert 'int __cdecl wrap_serial_is_initialized(void)\n{\n    return (int)0;\n}\n' in generated
+                assert 'int __cdecl wrap_serial_is_initialized(void)\n{\n    KAPI_HIT(38);\n    return port_is_initialized();\n}\n' in generated
             # The pinned link-SH source list (checked against make by build-selection-host).
             assert 'kernel/console/con_sink.c' in json.loads(
                 (ROOT / 'tools/tests/fixtures/build_profile_ppc.json').read_text())['link-sh']['KB_C']

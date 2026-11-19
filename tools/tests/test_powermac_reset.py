@@ -28,7 +28,7 @@ CHECK = dict(name='powermac-reset', tier=1, needs=[], budget=40, env=['ppc-cross
     'drivers/usb/ohci_regs.h', 'include/endian_dma.h', 'include/usb_platform.h',
     'include/kprintf.h', 'mm/paging.h', 'mm/kmalloc.h', 'kernel/irq/tick.h',
 ], basis=['docs/decisions/ppc/PPC_RESET_DESIGN.md §2・§3・§7',
-          'PPC_RESET_DESIGN 確定後の追記'])
+          'PPC_RESET_DESIGN 確定後の追記', 'docs/decisions/ppc/PPC_KAPI_FILL_DESIGN.md §5 clock'])
 
 ROOT = Path(__file__).resolve().parents[2]
 DRIVER = ROOT / 'drivers/macintosh'
@@ -36,11 +36,14 @@ CASES = ('Cuda reset/wrap', 'PMU reset', 'Cuda pending', 'Cuda collision',
          'Cuda reply cap', 'Cuda stalled', 'PMU busy timeout', 'PMU idle timeout',
          'PMU free timeout', 'Cuda frame limit', 'Cuda overall deadline',
          'Cuda restart with unconsumed reply', 'Cuda fake start reply',
-         'Cuda receive predicate')
+         'Cuda receive predicate', 'Cuda RTC', 'PMU RTC', 'Cuda RTC invalid header')
 MUTATIONS = (
     ('cuda-pseudo', 'CUDA_PSEUDO = 0x01', 'CUDA_PSEUDO = 0x02', 15),
     ('cuda-reset', 'CUDA_RESET = 0x11', 'CUDA_RESET = 0x12', 15),
     ('pmu-reset', 'PMU_RESET_CPU = 0xd0', 'PMU_RESET_CPU = 0xd1', 25),
+    ('cuda-rtc-opcode', 'CUDA_GET_TIME = 0x03', 'CUDA_GET_TIME = 0x38', 152),
+    ('pmu-rtc-opcode', 'PMU_READ_RTC = 0x38', 'PMU_READ_RTC = 0x03', 163),
+    ('cuda-rtc-status', 'reply[1] != 0', 'false', 172),
     ('tip-before-sr', 'write8(v, SR, out[0]);\n            update(v, PORT_B, TIP, PB4);',
      'update(v, PORT_B, TIP, PB4);\n            write8(v, SR, out[0]);', 13),
     ('missing-ack', 'write8(v, SR, out[i]);\n                cuda_toggle_ack(v);',

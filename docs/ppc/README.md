@@ -80,5 +80,14 @@ RR1 の読みは CSR の選択を完結させ、受信は送信データを書�
 の RR0・RR1・WR0、および NetBSD `sys/dev/ic/z8530sc.c:126-157`
 の `zs_iflush` と `sys/dev/ic/z8530reg.h:139,397-404`。
 `make check-ppc-kboot-log MUTATE=1` は FIFO と送信の共存をホストで検査する。
-QEMU の RSH からの読戻しは、既知バイトを mac99 のチャネル A に送って
-PortOps 経由で値と順序、空の try を照合できる port の組の公開の段 (PPC_KAPI_FILL_DESIGN §2 の port の行、道 B) で行う。
+PowerPC の PortOps は同じチャネル A を登録する。
+起動ログは OF の設定を引き継ぐ。明示的な速度設定は送信完了後に BRG を変更し、
+MacIO の 3.6864 MHz RTxC と x16 非同期クロックで正確に出せる速度だけを受け付ける。
+時定数は `3686400 / (2 × 16 × baud) − 2` (Zilog UM0109 §3、NetBSD macppc
+`sys/arch/macppc/dev/zs.c:303,321,669-673`)。設定済みの速度を再指定した場合はレジスタ書き込みを省く。
+`serial_init_vfast` は ESCC の通常経路で設定できれば -1、拒否は -2。
+`serial_get_status` はモード 0、設定した実効速度、ハードウェア FIFO の有無を返す。
+ホスト検査は WR14 の RTxC 選択、9600 / 38400 baud の時定数 10 / 1、
+12345 baud を拒否したときの書き込みゼロを偽 MMIO で照合する。
+`make check-ppc-port-guest MUTATE=1` は RSH から起動し、チャネル A のバイト往復、
+空の try、初期化と状態、速度設定と拒否の戻り値を照合する。

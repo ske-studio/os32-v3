@@ -165,6 +165,9 @@ class Session:
             return service(rid, ent, parts, out)
         self.agent._service_rshell = observed
 
+    def serial_a_backend(self):
+        return 'file:'+str(self.out/'serial-a.log')
+
     def start(self):
         cd = self.out/'cd'; cd.mkdir(); shutil.copyfile(self.elf, cd/'PPCKERN.ELF')
         iso = self.out/'boot.iso'
@@ -175,7 +178,7 @@ class Session:
         args = ['qemu-system-ppc','-M',self.machine,'-cpu',self.cpu,'-m','128M','-smp','1',
             '-accel','tcg','-bios',str(ROM),'-cdrom',str(iso),'-boot','d',
             '-prom-env','boot-device=cd:,\\PPCKERN.ELF','-prom-env','auto-boot?=true',
-            '-g','800x600x8','-display','none','-serial','file:'+str(self.out/'serial-a.log'),
+            '-g','800x600x8','-display','none','-serial',self.serial_a_backend(),
             '-serial','file:'+str(self.out/'serial-b.log'),'-monitor','none','-qmp','stdio',*self.reboot_args,
             '-nic','none','-device','sungem,netdev=n0,mac=52:54:00:12:34:56','-netdev',
             f'socket,id=n0,udp=127.0.0.1:{self.io.sock.getsockname()[1]},localaddr=127.0.0.1:{port}',
@@ -183,6 +186,7 @@ class Session:
         (self.out/'metadata.json').write_text(json.dumps(dict(command=args,cpu=self.cpu,
             elf_sha256=hashlib.sha256(self.elf.read_bytes()).hexdigest()),indent=2))
         self.err=(self.out/'qemu.stderr').open('w'); self.frames=(self.out/'frames.log').open('w')
+        self.qemu_started = time.monotonic()
         self.p=subprocess.Popen(args,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=self.err,bufsize=0)
         self.q=(self.qmp_type or PumpQMP)(self.p,self.deadline,self.pump)
 
