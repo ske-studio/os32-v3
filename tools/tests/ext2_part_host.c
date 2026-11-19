@@ -265,6 +265,7 @@ int bootinfo_part_geom(int ide_drive, u16 *heads, u16 *spt)
 /*  実物のソース                                                            */
 /* ======================================================================== */
 #include "../../fs/ext2/ext2_super.c"
+#include "../../fs/ext2/ext2_time.c"
 #include "../../fs/ext2/ext2_inode.c"
 #include "../../fs/ext2/ext2_dir.c"
 #include "../../fs/ext2/ext2_file.c"
