@@ -214,7 +214,7 @@ class GfxBoot(unittest.TestCase):
         cls.texts = load()
 
     def test_present_lifecycle(self):
-        # Includes the real gfx_vram present entries alongside gfx_core.
+        # Includes the real gfx/gfx_present.c present entries alongside gfx_core.
         from test_gfx_kernel_fb import run_case as lifecycle
         out = lifecycle(None, host32.selected_runner())
         self.assertEqual(out.returncode, 0, out.stdout + out.stderr)
