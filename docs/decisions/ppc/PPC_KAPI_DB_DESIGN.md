@@ -308,3 +308,19 @@ ramfs-sqlite-host (P1。実物の `fs/vfs_fd.c`・`fs/ramfs/ramfs.c` と host �
 - 往復の記録: r1 (Fable) → REVIEW.r1 (sol、P1 8 件) → r2 → REVIEW.r2 (P1 5 件、条件付き) → r3 → REVIEW.r3 (条件付きの確定、残り 5 件を PM が反映)。
 - PM 決定: U1 = 揮発の /tmp (ramfs) で 7b を閉じる (永続の媒体は別の計画)。U2 = 今の上限 (PM_KERNEL_IMAGE_MAX・PM_KERNEL_CHAIN_LIMIT) の内で、3 像の最終の map で測ってから PM が判定。
 - 前提の段: 7b-選択 (PowerPC、wt/ppc-sqlite-select b52fa778e、Opus Approve)。7b-分割 (本線、sqlite_engine.c からその場で 2 関数を切り出す最小差分) は本線 PM に形を送る。P2 で本線の持ち物 (sqlite.mk・sqlite-proto.mk・gen_sqlite_imports.py) を触るので、出す前に本線 PM に知らせる。
+
+## P0 の計測と FP の ABI の調べで決めたこと (2026-11-19、PM 決定)
+
+出所: P0 の計測 (~/os32-tmp/run/ppc-db-p0/P0_RESULT.md、astra) と、sol の調べ (~/os32-tmp/run/ppc-db-fpabi/REPORT.md、試しのリンクと QEMU の独立の ELF で確認)。§2-1・§2-6 の本文より、この節が優先する。
+
+| ID | 決定 |
+|---|---|
+| A1 | 大きさの関門 (§3、U2): SQLite の全 TU で約 496 KB、link-sh の余り約 98 KB で、今の上限の内に収まる — **通す**。最終は P2 の 3 像の map で再判定 |
+| A2 | hard-float と soft-float の .o の混在 (Tag_GNU_Power_ABI_FP の不一致でリンクが止まる): SQLite の hard の TU 群と変換を **部分リンク** (`ld -r -d --fatal-warnings --gc-sections -u sqlite_module_init`) で 1 つの .o にまとめ、`objcopy --keep-global-symbol=sqlite_module_init` で入口を 1 つに絞り、`.gnu.attributes` の tag 4 の hard/soft の欄だけを中立 (0) にする (64-bit long double・struct-return の欄は保つ)。属性は解釈して期待の値と形式を確かめてから書き換え、固定のバイトの位置への無検証の書き込みはしない。hard の raw の .o は最終のリンクの入力から外す。`-nostdlib --no-undefined` は保つ |
+| A3 | `--no-warn-mismatch`・TU ごとの `-mno-gnu-attribute`・SQLite 側を soft と名乗らせる、は採らない (誤った soft→hard の double の呼び出しを通すか、境目の型を強制できない — sol の実測) |
+| A4 | 最適化は SQLite と変換の TU を `-mhard-float -Os` (-O2 は像に収まらない)。`-Os` が出す GPR の復元 18 名 (`_restgpr_{14..31}_x`) と FPR の復元 2 名 (`_restfpr_{30,31}_x`) は `arch/ppc/` の自前の .S (PowerPC の SysV ABI 1995 §3 の図 3-32/33、r11 基準、lmw/lfd、r11+4 の LR を戻し r1←r11) に置き、**部分リンクの中に閉じる** (FP の復元も FPU の guard の中) |
+| A5 | 64 ビットのシフト `__ashldi3`・`__lshrdi3` は `lib/shift_di.c` (新、x86 の `lib/divdi3.c` に倣う、PowerPC の選択で既定の soft・-O2、64 ビットを u32 の上下の語に分け 0・1〜31・32〜63 を扱う)。手本は LLVM compiler-rt 7.0.1 の `lib/builtins/{ashldi3,lshrdi3}.c` (MIT/UIUC の時代の版、名前と役目だけ) と ABI の仕様。GPL の実装は使わない。**カーネルに libgcc は入れない** (ユーザー決定) |
+| A6 | 境目: `kprintf` は整数とポインタの書式に限る。`va_list` は越境させず、最終の map で `os32_sqlite_snprintf` が像に無いことを確かめる |
+| A7 | 製品の監査 (`tools/ppc/kboot_audit.py`): raw の .o と最終の ELF を照合し、既存の FP context の葉と明示した SQLite の入力の実行の範囲だけ FP を許す (最終の像の許可は map の入力の節の範囲まで絞る)。AltiVec の禁止は保つ |
+| A8 | P2 の検査に足す: readelf で書き換えの前後の属性、nm と reloc で export と生きた import の許可表、map で 3 像の大きさ・provider の出所・libgcc と libc の不在。外部の double の呼び出しと許可の外の FP の負例。QEMU で SQL の REAL・変換と FP の guard の回帰 |
+- P2 は本線の持ち物 (build/features/sqlite.mk・sqlite-proto.mk・gen_sqlite_imports.py) に加えて、`tools/ppc/kboot_audit.py` と `arch/ppc/` の .S・`lib/shift_di.c` を足す。出す前に本線 PM に知らせる。
