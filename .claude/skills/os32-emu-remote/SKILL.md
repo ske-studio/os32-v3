@@ -64,6 +64,9 @@ description: NP21/W の受入 (エミュレータの試験) を、別の機械�
   - `stop` は `/api/quit` が通った後も、同じ exe の**ほかの枠のプロセスまで強制終了する** (前に応答が無い時の救済も同じ)。2 本目を止めて 1 本目が落ちた。**2 本以上動いている間は `np21w_ctl.py stop` を使わない** — 止める枠の `/api/instance` の `instance_id` を付けて `/api/quit` を送る。
   - `start` は同じ exe のプロセスが 1 つでも生きていると起動を断る。2 本目以降は Windows の `Start-Process C:\np21w\np21x64w.exe -ArgumentList '/iC:\np21w\np21x64w-iN.ini' -WorkingDirectory C:\np21w` で起こし、`NP21W_AIDEBUG_URL` を付けた `np21w_ctl.py wait-ready` で待つ (これは枠ごとに動く)。
   - `status` のプロセスの表示はほかの枠の分も出る (表示だけ)。`start` は作業木の NHD の印を消す (枠ごとでない)。
-  - 枠ごとに変えれば足りる環境変数: `NP21W_AIDEBUG_URL` と `HOSTDRV_DIR` (`NP21W_DIR` は共通)。token は `/api/instance` の `token_file` (`np21w_aidebug_<port>.token`) を道具が自分で探す。MCP の np21w は 8025 に固定 (`.mcp.json` の env が空) なので、枠 2 以降のサブエージェントは `driver.py`・`np21w_client.py` を直に使う。
-  - 枠ごとに止める・起こすように `np21w_ctl.py` を直す段は本線の待ち行列にある (直ったらこの項目を消す)。
+  - `run-os32` の `driver.py` は HostDrv の置き場が `/mnt/c/os32` に固定で `HOSTDRV_DIR` を読まない。**枠 2 以降では `cmd --wait` と `pull` を使わない** (完了の印が別の置き場に書かれて 300 秒待つ)。`--wait` の無い `cmd` は `NP21W_AIDEBUG_URL` だけで枠ごとに動く。`np21w_client.token_file()` は救済の時に別の枠の token を読み得るので、`NP21W_AIDEBUG_TOKEN_FILE` を枠の token に明示する。
+  - 枠ごとに変える環境変数: `NP21W_AIDEBUG_URL`・`NP21W_AIDEBUG_TOKEN_FILE` (と、道具が直った後は `HOSTDRV_DIR`)。`NP21W_DIR` は共通。token は `/api/instance` の `token_file` (`np21w_aidebug_<port>.token`) を道具が自分で探す。MCP の np21w は 8025 に固定 (`.mcp.json` の env が空) なので、枠 2 以降のサブエージェントは `driver.py`・`np21w_client.py` を直に使う。
+  - 枠ごとに動くように `np21w_ctl.py`・`driver.py`・`np21w_client.py` を直す段 (`wip/emu-slots`) は本線で実装中 (直ったらこの項目を消す)。
+- 新しく写した HostDrv の置き場は mtime がゲストと合わないので、最初の `hsync` は内容の比べで長くなる (1 回で揃う)。base の NHD (b81e…) は 225c257 の手前の中身なので、使う前に `hsync --no-backup` が要る。
+- 負荷 (2026-11-19 の実測、Ryzen 7 7730U・16 論理): 待機中は 1 本で 1 コアの 11〜21%、`hsync -n` 中は 40〜78% を数秒。2 本同時で全体の CPU は最大 16.8%。重い試験と NHD の同時書き込みは未測定。
 - 起動中の 1 本の写しを取ると壊れた写しになる。NHD を写す時はその枠を止める。
