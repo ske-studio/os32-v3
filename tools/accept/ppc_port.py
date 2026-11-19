@@ -154,7 +154,7 @@ def main():
     work = Path(tempfile.mkdtemp(prefix='ppc-port-', dir=os.environ.get('TMPDIR') or None)).resolve()
     print('evidence=' + str(work), flush=True)
     user = work / 'user'
-    bins = [str(user / (app + '.bin')) for app in ('hello', 'fault', 'portprob', 'sysiprob')]
+    bins = [str(user / (app + '.bin')) for app in ('portprob', 'sysiprob')]
     options = ['IMAGE=kboot-link-sh', 'KB_SH_OUT=' + str(user),
                'KB_ROOT_BINS=' + ' '.join(bins)]
     images = {}

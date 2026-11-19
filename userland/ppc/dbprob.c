@@ -3,6 +3,7 @@
 
 static KernelAPI *api;
 static const char path[] = "/tmp/T.DB";
+static const char schema[] = "CREATE TABLE t(i,a,b,x,n)";
 
 static void put(const char *s)
 {
@@ -79,9 +80,9 @@ static int names(int h)
     if (api->db_prepare(h, "PRAGMA journal_mode") != DB_STATUS_ROW ||
         !column(h, 0, "delete") || api->db_finalize(h)) return 0;
     int s = api->db_open(short_name);
-    if (s < 0 || api->db_exec(s, "CREATE TABLE t(i)") || api->db_close(s)) return 0;
+    if (s < 0 || api->db_exec(s, "CREATE TABLE name_test(i)") || api->db_close(s)) return 0;
     s = api->db_open(long_name);
-    return s >= 0 && api->db_exec(s, "CREATE TABLE t(i)") == -1 &&
+    return s >= 0 && api->db_exec(s, "CREATE TABLE name_test(i)") == -1 &&
            !api->db_close(s) && !api->sys_stat(long_name, &st) && !st.st_size &&
            count_rows(h, 2);
 }
@@ -119,7 +120,7 @@ int main(int argc, char **argv, KernelAPI *kernel)
     int h = api->db_open(path);
     CHECK("OPEN", h >= 0);
     u32 used = api->db_mem_used();
-    CHECK("CREATE", !api->db_exec(h, "CREATE TABLE t(i,a,b,x,n)"));
+    CHECK("CREATE", !api->db_exec(h, schema));
     CHECK("INSERT", !api->db_exec(h, "INSERT INTO t(i) VALUES(1)"));
     CHECK("BIND-RC", !api->db_prepare_only(h, "INSERT INTO t VALUES(?,?,?,?,?)") &&
           !api->db_bind_int(h, 1, 7) && !api->db_bind_text(h, 2, "alpha", 5) &&

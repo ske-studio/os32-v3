@@ -176,7 +176,7 @@ def check_sql(engine, rows):
         db = engine.open()
         try:
             ddl = ime_ddl if '/ime_' in path or sql == 'SELECT key,value FROM meta' else cfg_ddl
-            if path.startswith('userland/tests/'):
+            if path.startswith('userland/tests/') or path == 'userland/ppc/dbprob.c':
                 # Tests reuse table names with different schemas. Use the latest
                 # preceding declaration, without executing the application SQL.
                 tables = {}
