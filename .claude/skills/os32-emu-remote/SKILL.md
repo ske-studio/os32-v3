@@ -17,8 +17,8 @@ description: NP21/W の受入 (エミュレータの試験) を、別の機械�
 | リポジトリ | 向こうの `~/os32-v3` (読むだけ、push しない)。GitHub は**読み取りだけの権限** (Contents・Actions を Read-only の fine-grained token。push・PR・CI の起動はしない) |
 | 像 | **CI の build の配布物** (`os32-<枝>-<SHA7>`) を `gh run download` で取る。向こうではビルドしない (クロスコンパイラは入れない) |
 | NP21/W | `C:\np21w` (本線の機械から写した ai-debug 版の exe・ROM・ini)。ROM と NHD は著作権物・作業物なので**外へ出さない** (GitHub にも上げない) |
-| 枠 | 枠 N (1〜4) = デバッグの API `aidbport=8025+100(N-1)` (8025・8125・8225・8325)、LAN の口 `NP2NETSOCK=127.0.0.1:8026+100(N-1)` (8026・8126・…、host agent の待ち受けも同じ番号)、ini `np21x64w-iN.ini`、NHD・起動 FD `C:\np21w\iN\`、HostDrv `C:\os32-N`。枠 1 は `np21x64w.ini`・`C:\np21w\os32.nhd`・`C:\os32` のまま。**8025〜8028 の連番にしない** — mirrored の WSL は loopback を共有するので、枠 2 の API が 8026 で待つと枠 1 の LAN の口がそこへつながる (2026-11-19 の試しで判明)。占有は `C:\np21w\slot-N.lock` (SHA・開始の時刻・頼んだ人) |
-| 元の NHD | `os32.nhd` の写し (sha256 先頭 `b81e4d4254cc6eb6`、2026-11-19 の main 225c257 の手前)。枠の NHD はここから戻す |
+| 枠 | 枠 N (1〜8、ユーザー指示 2026-11-19「4 本でも軽いなら最大 8 枠」) = デバッグの API `aidbport=8025+100(N-1)` (8025・8125・…・8725)、LAN の口 `NP2NETSOCK=127.0.0.1:8026+100(N-1)` (8026・8126・…、host agent の待ち受けも同じ番号)、ini `np21x64w-iN.ini`、NHD・起動 FD `C:\np21w\iN\`、HostDrv `C:\os32-N`。枠 1 は `np21x64w.ini`・`C:\np21w\os32.nhd`・`C:\os32` のまま。**8025〜8028 の連番にしない** — mirrored の WSL は loopback を共有するので、枠 2 の API が 8026 で待つと枠 1 の LAN の口がそこへつながる (2026-11-19 の試しで判明)。占有は `C:\np21w\slot-N.lock` (SHA・開始の時刻・頼んだ人) |
+| 元の NHD | `C:\np21w\base\os32.nhd` (読むだけ、sha256 先頭 `b81e4d4254cc6eb6`、2026-11-19 の main 225c257 の手前)。枠の NHD はここから戻す |
 | 本線からの ssh | `ssh pc98emu` (`~/.ssh/config`、鍵 `~/.ssh/id_pc98emu`、`hight@192.168.1.23:2222` の WSL の sshd、鍵だけ) |
 
 ## 1. PM がしてよいこと・しないこと
@@ -45,7 +45,7 @@ description: NP21/W の受入 (エミュレータの試験) を、別の機械�
 ## 3. pc98emu の中の流れ (向こうの型。依頼に毎回は書かない)
 
 1. 空いている枠を選び、`slot-N.lock` を置く。無ければ待つ (待ちの行を本線に一言)。
-2. 版ごとにサブエージェントを 1 つ立て、枠の環境 (`NP21W_DIR`・`NP21W_AIDEBUG_URL=http://127.0.0.1:802(4+N)`・`HOSTDRV_DIR`) と依頼の項目だけを渡す。MCP の np21w は 8025 に固定なので、枠 2〜4 では `tools/np21w_ctl.py`・`driver.py` を環境変数で使う。
+2. 版ごとにサブエージェントを 1 つ立て、枠の環境 (`NP21W_DIR`・`NP21W_AIDEBUG_URL=http://127.0.0.1:<枠の aidbport>`・`HOSTDRV_DIR`) と依頼の項目だけを渡す。MCP の np21w は 8025 に固定なので、枠 2〜4 では `tools/np21w_ctl.py`・`driver.py` を環境変数で使う。
 3. サブエージェントの報告の「通った」を、ログの実物で pc98emu が照合する (実装者の報告の決まりと同じ: 根拠のログのパスと最後の行、無ければ未実行)。
 4. 照合の済んだ結果だけを本線へ返す。枠が固まったら、その枠だけ NHD を元の写しから戻して立て直す。
 
