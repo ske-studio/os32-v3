@@ -262,6 +262,7 @@
     "drivers/block/fat_diskio.c",
     "fs/fat/fatfs_vfs.c",
     "fs/ext2/ext2_super.c",
+    "fs/ext2/ext2_time.c",
     "fs/ext2/ext2_inode.c",
     "fs/ext2/ext2_dir.c",
     "fs/ext2/ext2_file.c",
