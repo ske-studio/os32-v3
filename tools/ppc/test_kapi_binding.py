@@ -311,11 +311,51 @@ def generate(tmp, mutation=None):
     if mutation == 'zero':
         text = generator.read_text().replace('{absent_result(api)};', '0;')
         generator.write_text(text)
+    if mutation in ('db-null-nosys', 'db-hook-inverted'):
+        if mutation == 'db-null-nosys':
+            old = 'result = "0" if name == "db_mem_used" else absent_result(api)'
+            new = old.replace('else absent_result(api)', 'else ("OS32_ERR_NOSYS" if name == "db_last_error" else absent_result(api))')
+        else:
+            old = 'defined(OS32_HOOK_KAPI_DB) && !OS32_HOOK_KAPI_DB'
+            new = old.replace('&& !', '&& ')
+        text = generator.read_text()
+        if text.count(old) != 1:
+            raise RuntimeError(mutation + ': expected one generator anchor')
+        generator.write_text(text.replace(old, new))
     out = tmp / 'gen'
     subprocess.run([sys.executable, '-B', str(generator), '--target', 'ppc-powermac',
                     '--out-dir', str(out), str(ROOT / 'sdk/kapi.json')], cwd=ROOT, check=True,
                    stdout=subprocess.DEVNULL)
     return out
+
+
+def absent_db(out, cc, dirs):
+    obj = out / 'absent.o'
+    flags = ['-ffreestanding', '-D__KERNEL_BUILD__', '-D__cdecl=', '-I' + str(out / 'include')]
+    subprocess.run([cc, *flags, *['-I' + str(ROOT / d) for d in dirs],
+                    '-DOS32_HOOK_KAPI_DB=0', '-ffunction-sections', '-c',
+                    out / 'kapi/kapi_generated.c', '-o', obj], check=True)
+    undefined = subprocess.check_output([cc.with_name('powerpc-elf-nm'), '-u', obj], text=True)
+    if re.search(r'\bkapi_db_\w+', undefined):
+        return 'provider reference'
+    # Run the three real wrapper sections with the Linux/PPC exit syscall.
+    probe = out / 'probe.c'
+    probe.write_text('''#include "os32_kapi_shared.h"
+extern const char *wrap_db_last_error(int);
+extern u32 wrap_db_mem_used(void);
+extern int wrap_db_open(const char *);
+void _start(void)
+{
+    int rc = wrap_db_last_error(0) != 0 ? 10 :
+             wrap_db_mem_used() != 0 ? 11 :
+             wrap_db_open("db") != OS32_ERR_NOSYS ? 12 : 0;
+    __asm__ volatile("mr 3,%0; li 0,1; sc" : : "r"(rc) : "r3", "r0");
+}
+''')
+    exe = out / 'probe'
+    subprocess.run([cc, *flags, '-I' + str(ROOT / 'include'), '-I' + str(ROOT / 'sdk/include/os32'),
+                    '-msdata=none', '-nostdlib', '-Wl,--gc-sections,-e,_start', probe, obj, '-o', exe], check=True)
+    return subprocess.run(['qemu-ppc', exe], timeout=5).returncode
 
 
 def main():
@@ -378,6 +418,10 @@ def main():
         if unexpected:
             print('unexpected providers:', sorted(unexpected)); return 1
         print('undefined providers:', len(undefined))
+        result = absent_db(out, cc, dirs)
+        if result != 0:
+            print('absent DB probe failed:', result)
+            return 1
         if '--mutate' in sys.argv:
             for mutation in ('empty', 'zero', 'group-empty', 'ime-empty', 'reboot-absent', 'slot-swap', 'pci-absent', 'mem-absent', 'db-absent'):
                 path = tmp / mutation
@@ -385,6 +429,14 @@ def main():
                 mutated = generate(path, mutation)
                 if verify((mutated / 'kapi/kapi_generated.c').read_text(), entries):
                     print(mutation + ': SURVIVED'); return 1
+                print(mutation + ': RED')
+            for mutation, expected in [('db-null-nosys', 10), ('db-hook-inverted', 'provider reference')]:
+                path = tmp / mutation
+                path.mkdir()
+                result = absent_db(generate(path, mutation), cc, dirs)
+                if result != expected:
+                    print(mutation, 'expected', expected, 'got', result)
+                    return 1
                 print(mutation + ': RED')
     return 0
 

@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT / 'tools'), str(ROOT / 'tools/ppc')]
 from kboot_accept import build
 from ppc_shm import guest_available
+from run import require
 
 DB = 'kapi/kapi_db.c'
 V50 = 'kapi/kapi_db_v50.inc'
@@ -63,41 +64,41 @@ def observe(elf, cpu, folder, case):
         session.start()
         session.wait(session.ready, 'db cui READY', 90)
         serial = (folder / 'serial-a.log').read_text(errors='replace')
-        assert '[sqlite] static rc=0' in serial and session.agent.operator.ready['mode'] == 'cui'
+        require('[sqlite] static rc=0' in serial and session.agent.operator.ready['mode'] == 'cui', 'db SQLite startup and CUI mode')
         command = '/bin/dbprob.bin 1'
         failure = FAILURE.get(case)
         for phase, markers in enumerate((FIRST, SECOND), 1):
             body = rsh_command(session, command)
             status = rsh_command(session, 'echo $?')
             lines = body.decode().strip().splitlines()
-            match = re.fullmatch(r'DB-BASE (\d+)', lines[0])
-            assert match, (case, lines)
+            match = re.fullmatch(r'DB-BASE (\d+)', lines[0]) if lines else None
+            require(match, repr((case, lines)))
             base = int(match[1])
             if phase == 1:
                 first = base
                 command = f'/bin/dbprob.bin 2 {first}'
             elif case == 'leak':
-                assert base > first, (case, first, base)
+                require(base > first, repr((case, first, base)))
                 markers = ['STAT', 'RECLAIM']
             else:
-                assert base == first, (case, first, base)
+                require(base == first, repr((case, first, base)))
             failed = failure in markers
             green = markers[:markers.index(failure)] if failed else markers
             expected = ['DB-' + item + ' OK' for item in green]
-            assert lines[1:1 + len(green)] == expected, (case, phase, lines)
+            require(lines[1:1 + len(green)] == expected, repr((case, phase, lines)))
             if failed:
                 red = ['DB-' + failure + ' FAIL']
                 if case == 'fp-owner':
                     # The REAL step re-enters SQLite to materialize its row.
                     # The lost guard also rejects the following sqlite3_step.
                     red.append('DB-NEXT FAIL')
-                assert lines[1 + len(green):] == red, (case, lines)
-                assert status == b'1\n', (case, status)
+                require(lines[1 + len(green):] == red, repr((case, lines)))
+                require(status == b'1\n', repr((case, status)))
                 break
-            assert lines[1:] == expected and status == b'0\n', (case, phase, lines, status)
+            require(lines[1:] == expected and status == b'0\n', repr((case, phase, lines, status)))
         session.q.call('quit')
         session.p.wait(timeout=5)
-        assert session.p.returncode == 0
+        require(session.p.returncode == 0, 'db QEMU exit')
         print('RED' if failure else 'GREEN', case, cpu, flush=True)
     finally:
         session.close()
@@ -130,7 +131,7 @@ def main():
         elf = build(folder / 'kernel', 'IMAGE=kboot-link-sh', 'KB_SH_OUT=' + str(user),
                     'KB_ROOT_BINS=' + bins, *settings[case], 'kb-user', 'kernel')
         digest = hashlib.sha256(elf.read_bytes()).hexdigest()
-        assert digest not in seen, (case, digest)
+        require(digest not in seen, repr((case, digest)))
         seen.add(digest)
         print(f'{case} sha256={digest} {elf}', flush=True)
         if not args.build_only:
