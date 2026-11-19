@@ -39,6 +39,7 @@ int ring3_call_from_user(void) { return 0; }
 int res_owner_get(void) { return 1; }
 #include "db_source.inc"
 #include "gfx_core_source.inc"
+#include "gfx_dirty_source.inc"
 #include "gfx_vram_source.inc"
 void gfx2_pal_set_v1(int first, int count, const u8 *rgb)
 { (void)first; (void)count; (void)rgb; }

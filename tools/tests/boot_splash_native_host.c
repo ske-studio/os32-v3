@@ -61,6 +61,7 @@ const u8 *v86_bios_real_lowmem(void)
 }
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-variable" /* existing bottom in gfx_vram.c */
+#include "../../gfx/gfx_dirty.c"
 #include "../../drivers/video/pc98/gfx_vram.c"
 /* OSRI is an ILP32 wire layout; keep its size assertions live on LP64. */
 #define u32 uint32_t

@@ -205,6 +205,7 @@
     "net/nic_rx.c",
     "drivers/net/ne2000/nic_lgy98.c",
     "gfx/gfx_core.c",
+    "gfx/gfx_dirty.c",
     "gfx/gfx_hw_submit.c",
     "gfx/v2/a0_weak.c",
     "gfx/sync/a0_weak.c",
