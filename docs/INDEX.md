@@ -139,7 +139,7 @@ OS の肥大化したコードを削る段 (表を詰める・カーネル常駐
 | [POLICY_DEV.md](POLICY_DEV.md) | **開発ポリシー** — コーディング規約、ビルド/デプロイ、Gitコミット、テスト、リリース |
 | [POLICY_DEBUG.md](POLICY_DEBUG.md) | **デバッグポリシー** — バイナリ反映確認、検証の制限、領域別の早見、道具箱 |
 | [POLICY_ARCHIVE.md](POLICY_ARCHIVE.md) | **アーカイブのポリシー** — 要約してから移す (移す物と時、要約する物、要約の書き方、移す順、検査) |
-| [POLICY_CI.md](POLICY_CI.md) | **CI ポリシー** — CI を作る時の決まり (G1〜G12)、既存の CI を改修する時の決まり (R1〜R8)、入れる前の確かめ |
+| [POLICY_CI.md](POLICY_CI.md) | **CI ポリシー** — CI を作る時の決まり (G1〜G13)、既存の CI を改修する時の決まり (R1〜R8)、入れる前の確かめ |
 | [POLICY_PCIDEV.md](POLICY_PCIDEV.md) | **PCI デバイス開発の注意点** — 手本のある移植で守る装置の扱い |
 | [REALHW_FORMAT_UPDATE.md](REALHW_FORMAT_UPDATE.md) | **実行形式が変わる版を実機に入れる** — 古い cp で /boot と /sys を写して再起動、新しい hsync を配備元から動かす |
 | [KAPI_SPEC.md](KAPI_SPEC.md) | KernelAPI v87 仕様書 — 304 エントリの表 (ヘッダ 2 + 関数表の容量 300 (実装 294) + データフィールド 2、データ欄は 0x4B8 に固定) + API追加手順 |
