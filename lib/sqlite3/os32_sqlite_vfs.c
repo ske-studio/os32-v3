@@ -14,7 +14,7 @@
 #include "sqlite3.h"
 #include "os32_sqlite_vfs.h"
 #include "vfs.h"
-#include "fs/ramfs/ramfs.h"
+#include "ramfs/ramfs.h"
 #include "types.h"
 #include "kstring.h"
 #include "kprintf.h"

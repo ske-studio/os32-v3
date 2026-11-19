@@ -31,11 +31,13 @@ def main(mutate):
                             'fs/vfs_fd.c', 'lib/kstring_c.c', 'lib/sqlite3/os32_sqlite_vfs.c',
                             obj, '-o', str(exe)], cwd=ROOT, check=True)
             result = subprocess.run([exe], text=True, stderr=subprocess.PIPE)
-            if mutant:
-                assert result.returncode == 1 and 'os32_sqlite_group_open(group' in result.stderr, result
-                print('RED runtime missing ramfs capability at DB open')
-            elif result.returncode:
+            # The normal control always runs; the mutant only adds its own verdict.
+            expected = 1 if mutant else 0
+            if result.returncode != expected:
                 raise RuntimeError(result.stderr)
+            if mutant:
+                assert 'os32_sqlite_group_open(group' in result.stderr, result
+                print('RED runtime missing ramfs capability at DB open')
 
 
 if __name__ == '__main__':
