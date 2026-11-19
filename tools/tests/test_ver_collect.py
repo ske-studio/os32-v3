@@ -61,7 +61,7 @@ void _start(void) {
 '''
 
 
-def build_run(fixture, runner, collector=None, calibration=None, backend=None, platform="pc98"):
+def build_run(fixture, runner, collector=None, calibration=None, backend=None, no_backend=False):
     with tempfile.TemporaryDirectory(prefix='ver-collect-') as directory:
         tmp = Path(directory)
         (tmp / 'support.h').write_text(SUPPORT)
@@ -70,9 +70,12 @@ def build_run(fixture, runner, collector=None, calibration=None, backend=None, p
         if collector is not None:
             (tmp / 'collector.c').write_text(collector)
             sources.append(str(tmp / 'collector.c'))
-            (tmp / 'platform_ver.h').write_bytes(
-                (ROOT / 'platform' / platform / 'platform_ver.h').read_bytes())
-            if platform == 'pc98':
+            if no_backend:
+                (tmp / 'platform_ver.h').write_text(
+                    '#include "ver_backend_contract.h"\n'
+                    'static inline const struct ver_backend *platform_ver_backend(void) { return 0; }\n')
+            else:
+                (tmp / 'platform_ver.h').write_bytes((ROOT / 'platform/pc98/platform_ver.h').read_bytes())
                 (tmp / 'backend.c').write_text(backend if backend is not None else
                     (ROOT / 'platform/pc98/ver_backend.c').read_text())
                 sources.extend([str(tmp / 'backend.c'), str(ROOT / 'kernel/ver_format.c')])
@@ -118,12 +121,12 @@ void _start(void) {
     die(0);
 }
 '''
-    assert build_run(null_fixture, args.runner, collector, platform='powermac').returncode == 0
+    assert build_run(null_fixture, args.runner, collector, no_backend=True).returncode == 0
     if args.mutate:
         old = 'if (backend && backend->collect)'
         assert collector.count(old) == 1
         mutant = collector.replace(old, 's->fpu_present = 1;\n    ' + old)
-        result = build_run(null_fixture, args.runner, mutant, platform='powermac')
+        result = build_run(null_fixture, args.runner, mutant, no_backend=True)
         assert result.returncode == 1 and 'FAIL: !s.fpu_present' in result.stdout
         print('RED fabricated FPU without backend')
         old = ('s->ser_ready = port_get_status(&s->ser_mode, &s->ser_baud,\n'
