@@ -55,7 +55,7 @@ PURE_CASES = ["pt_offsets", "pt_817", "pt_1663", "pt_reject", "ata_lba28",
               "ata_range", "ata_chs", "layout", "hdprep_geom", "hdprep_disk",
               "hdprep_mounts", "hdprep_plan"]
 PART_CASES = ["find_bios", "find_fail", "format_clamp", "format_at_16652",
-              "format_at_refuse", "format_io_order", "mount_bounds", "format_geom", "legacy_hint"]
+              "format_at_refuse", "format_workspace", "format_io_order", "mount_bounds", "format_geom", "legacy_hint"]
 # e2fsck にかける format_at の大きさ (開始 2016、16/63 の RAM ディスク 64,512 セクタ)
 FSCK_SIZES = [16652, 20160, 36000, 62496]
 
@@ -162,6 +162,8 @@ C_MUTATIONS = [
      "ext2_format の頭打ちの後の範囲を ATA の上限と照合しない (ラリー 2 の 3)"),
     ("fs/pc98pt.c", "            return 0;                       /* 標準配置で読める */",
      "            (void)0;", "標準配置の表を旧配置と誤認する"),
+    ("fs/ext2/ext2_fmt.c", "static u8 fmt_blk[EXT2_BLOCK_SIZE];", "#define fmt_blk ext2_g_blk",
+     "A5: formatter が下の ext2 と作業域を共有する"),
     # E03a: 抽出境界の順と失敗伝播 (format_io_order が実 I/O で検出)。
     ("fs/ext2/ext2_fmt.c", "    ret = fmt_write_groups(&fmt_ctx, &lay);\n    if (ret != 0) return EXT2_ERR_IO;\n\n    ret = fmt_write_backups(&fmt_ctx, &lay);\n    if (ret != 0) return EXT2_ERR_IO;\n",
      "    ret = fmt_write_backups(&fmt_ctx, &lay);\n    if (ret != 0) return EXT2_ERR_IO;\n\n    ret = fmt_write_groups(&fmt_ctx, &lay);\n    if (ret != 0) return EXT2_ERR_IO;\n",

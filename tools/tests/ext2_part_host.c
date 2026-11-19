@@ -139,6 +139,7 @@ int vfs_register_fs(VfsOps *ops) { (void)ops; return VFS_OK; }
 #define DISK_TOTAL   64512u
 
 static u8 g_disk[DISK_TOTAL * 512u];
+static int g_clobber_workspace;
 static u32 g_rd, g_wr;
 static u32 g_wr_min, g_wr_max;          /* 書いた LBA の範囲 */
 static u32 g_fail_read_lba = 0xFFFFFFFFu;
@@ -208,6 +209,7 @@ int dev_blk_write_lba(Device *dev, u32 lba, int count, const void *buf)
     if (!dev) return -1;
     for (i = 0; i < count; i++) {
         u32 cur = lba + (u32)i;
+        if (g_clobber_workspace) kmemset(ext2_g_blk, 0xcc, EXT2_BLOCK_SIZE);
         if (format_io('W', cur, 1) != 0) return -1;
         if (cur >= g_virtual_total) return -1;
         if (cur < DISK_TOTAL)
@@ -425,6 +427,29 @@ static void case_format_at_16652(void)
     ext2_unmount(&g_ctx);
 }
 
+/* A5: 下の ext2 が書込中に作業域を使っても媒体の内容を保つ。 */
+static void case_format_workspace(void)
+{
+    const u32 start = 2016, length = 16652;
+    u8 *before = g_disk + (start - 1) * 512u;
+    u8 *after = g_disk + (start + length) * 512u;
+    u8 *sb = g_disk + (start + 2) * 512u;
+    u32 i;
+
+    disk_reset(16, 63);
+    kmemset(before, 0xa5, 512);
+    kmemset(after, 0x5a, 512);
+    g_clobber_workspace = 1;
+    CHECK(ext2_format_at(0, start, length) == EXT2_OK);
+    g_clobber_workspace = 0;
+    CHECK(le16_rd(sb + EXT2_SB_MAGIC_OFF) == EXT2_SUPER_MAGIC);
+    CHECK(le32_rd(sb + EXT2_SB_BLOCKS_COUNT_OFF) == 8193);
+    for (i = 0; i < 512; i++) {
+        CHECK(before[i] == 0xa5);
+        CHECK(after[i] == 0x5a);
+    }
+}
+
 /* 範囲の検査で断るときは 1 セクタも書かない */
 static void case_format_at_refuse(void)
 {
@@ -627,6 +652,7 @@ int os32_main(int argc, char **argv)
     else if (streq(c, "format_clamp")) case_format_clamp();
     else if (streq(c, "format_at_16652")) case_format_at_16652();
     else if (streq(c, "format_at_refuse")) case_format_at_refuse();
+    else if (streq(c, "format_workspace")) case_format_workspace();
     else if (streq(c, "format_io_order")) case_format_io_order();
     else if (streq(c, "mount_bounds")) case_mount_bounds();
     else if (streq(c, "format_geom")) case_format_geom();
