@@ -220,7 +220,7 @@ MUTATIONS = [
      'if (pm_log_stream_only) return;', ''),
     ('colors', 'platform/powermac/rh_observe.c', '.foreground = 255, .background = 0',
      '.foreground = 0, .background = 255'),
-    ('top', 'platform/powermac/ppc_kernel.c', 'pm_console_attach(&target, &kcg_file_api, PM_RH_FB_ROWS)',
+    ('top', 'platform/powermac/console_text.c', 'pm_console_attach(&target, &kcg_file_api, PM_RH_FB_ROWS)',
      'pm_console_attach(&target, &kcg_file_api, 0)'),
     ('mirror', 'kernel/console/console.c',
      '    if (CONSOLE_PUTCHAR_MIRROR && (rshell_active || boot_serial_mirror)) con_output_putchar(ch);', ''),

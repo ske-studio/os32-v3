@@ -1,6 +1,8 @@
 /* OF keeps its firmware mode and CLUT. Legacy planar ports have no
  * equivalent on PowerMac; packed output is owned by backend_of_fb. */
 #include "display_restore.h"
+#include "pm_console.h"
+#include "display_text.h"
 
 void display_palette4_write(int index, u8 r, u8 g, u8 b)
 {
@@ -19,8 +21,12 @@ void display_scroll(int y, int height, int flip, int page)
     (void)page;
 }
 
+void display_text_hide(void)
+{
+    if (pm_console_park()) pm_console_text_state(1, 1, 0, 0);
+}
+
 /* No planar hardware on this platform. */
-void display_text_hide(void) { }
 void display_planar16(void) { }
 void display_planar_start(int legacy200) { (void)legacy200; }
 void display_flip_pages(int display, int access) { (void)display; (void)access; }
