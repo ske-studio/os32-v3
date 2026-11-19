@@ -51,7 +51,7 @@
     },
     {
       "symbol": "pci_cfg_read32",
-      "source": "drivers/pci/pci.h",
+      "source": "include/pci_contract.h",
       "context": "normal",
       "irq": false
     },

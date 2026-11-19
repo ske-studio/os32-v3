@@ -15,11 +15,20 @@ import tempfile
 import mutpar
 import host32
 ROOT = pathlib.Path(__file__).resolve().parents[2]
+RECORD = ('    if (pci_config_bar_measure())\n'
+          '        pci_barsize_record(bus, dev, fn, pci_cfg_read8(bus, dev, fn, PCI_CFG_HEADER_TYPE));')
+COUNT = '    g_pci_seen++;\n    if (g_pci_count >= PCI_MAX_DEVS) return;'
+ROOT_SCAN = ('    for (u32 i = 0, bus; i < PCI_CONFIG_MAX_ROOTS && pci_config_root_bus(i, &bus) == 0; i++)\n'
+             '        pci_scan_bus(bus, 0);')
 MUTATIONS = [
-    ('drivers/pci/pci.c', 'record_missing', '    pci_barsize_record(bus, dev, fn, pci_cfg_read8(bus, dev, fn, PCI_CFG_HEADER_TYPE));', ''),
+    ('platform/pc98/pci_config.c', 'backend_name', 'return "mech#1";', 'return "mech1";'),
+    ('platform/pc98/pci_config.c', 'extra_root', 'if (idx != 0) return -1;', '(void)idx;'),
+    ('platform/pc98/pci_config.c', 'skip_measure', 'return 1;', 'return 0;'),
+    ('drivers/pci/pci.c', 'root_limit', 'i < PCI_CONFIG_MAX_ROOTS && ', ''),
+    ('drivers/pci/pci.c', 'fixed_root', ROOT_SCAN, '    (void)pci_config_root_bus; pci_scan_bus(0, 0);'),
+    ('drivers/pci/pci.c', 'record_missing', RECORD, ''),
     ('drivers/pci/pci.c', 'reset_missing', '    pci_barsize_reset();', ''),
-    ('drivers/pci/pci.c', 'record_after_full', '    pci_barsize_record(bus, dev, fn, pci_cfg_read8(bus, dev, fn, PCI_CFG_HEADER_TYPE));\n    g_pci_seen++;\n    if (g_pci_count >= PCI_MAX_DEVS) return;',
-     '    g_pci_seen++;\n    if (g_pci_count >= PCI_MAX_DEVS) return;\n    pci_barsize_record(bus, dev, fn, pci_cfg_read8(bus, dev, fn, PCI_CFG_HEADER_TYPE));'),
+    ('drivers/pci/pci.c', 'record_after_full', RECORD + '\n' + COUNT, COUNT + '\n' + RECORD),
     ('drivers/pci/pci.c', 'scan_single', 'nfn = pci_is_multifunction(hdr0) ? PCI_FN_COUNT : 1;', 'nfn = 1; (void)hdr0;'),
     ('kdebug/gfinit_resources/bounds.inc', 'collect_single', 'return pci_is_multifunction(hdr0) ? PCI_FN_COUNT : 1;', '(void)hdr0; return 1;'),
     ('drivers/pci/pci_barsize.c', 'disabled_rom', 'd->rom_reg && (pci_cfg_read32(bus, dev, fn, d->rom_reg) & 1U)', 'd->rom_reg'),

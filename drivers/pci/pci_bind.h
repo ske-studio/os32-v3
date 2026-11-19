@@ -77,14 +77,6 @@ void pci_bind_reason_reset(void);
 /*  結線の実行 (drivers/pci/pci_bind.c)                                         */
 /* ======================================================================== */
 
-/* 列挙表の全デバイスに対して pci_bind_one を回す。
- * **memory_boot_init と dma_pool_init の後**に呼ぶ (probe が dma_alloc と
- * irq_register を使うので)。戻り値 = BOUND になった台数。 */
-int pci_bind_all(const struct pci_driver *const *table, int n);
-
-/* idx 番目 (pci_get と同じ列挙順) の記録を写す。0 = 成功 / -1 = 範囲外。 */
-int pci_bind_info_get(int idx, struct pci_bind_info *out);
-
 /* 隔離した台数 (起動後の報告用)。 */
 int pci_quarantined(void);
 

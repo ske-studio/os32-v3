@@ -4,6 +4,7 @@ Common exec, caller validation, owner, FD and heap providers remain bound.
 """
 
 PROVIDER_EXTERNS = frozenset({
+    "extern int kapi_pci_bind_info(u32 idx, void *out);",
     "extern volatile u32 tick_count;",
     "extern void kapi_sys_exit(int status);",
     "extern int kapi_serial_diag(SerialDiag *out);",
@@ -70,7 +71,7 @@ PROVIDER_GROUPS = {
         'loop_attach',
         'loop_detach',
         'loop_status',
-    }), frozenset(['platform_device.h'])),
+    }), frozenset()),
     'ide': (frozenset({
         'ide_init',
         'ide_drive_present',
@@ -92,12 +93,6 @@ PROVIDER_GROUPS = {
         'kcg_read_ank',
         'kcg_read_kanji',
     }), frozenset(['kcg_contract.h'])),
-    'pci': (frozenset({
-        'pci_count',
-        'pci_get',
-        'pci_cfg_read32',
-        'pci_bind_info',
-    }), frozenset(['pci_dev_contract.h'])),
     'serialfs': (frozenset({
         'sfs_begin',
         'sfs_end',
@@ -194,7 +189,6 @@ ZERO_SLOTS = frozenset({
     'np2_detect',
     'np2_check_hostdrv',
     'ide_drive_present',
-    'pci_count',
     'mouse_available',
     'snd_bgm_is_playing',
     'gfx2_adapter_count',

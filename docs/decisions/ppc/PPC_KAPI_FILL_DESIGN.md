@@ -293,3 +293,5 @@ PowerMac の暦時計は reset と同じ VIA インスタンスを使う。Apple
 2. **共有の登録ファイルの持ち主**: 1a (build/sources/common.mk)、4k-i・7a-選択・7b-選択 (build/select.mk) は docs/tasks/agents/PARALLEL_BRANCHES.md §2 の共有の登録ファイル。本線がこれらの段を出す時は、その時の持ち主から受け取ってから出す。select.mk の 3 段は同じファイルなので本線の列では直列。
 3. **NP21/W の受入は直列**: 「その場の変更」の段 (2a-i・3b-i・5a-i・6d-i) は NP21/W の受入が要るので、本線の列では 1 本ずつ並べる。並列にできるのは「移すだけ」の段どうしと、PowerPC の段との組だけ。
 - 本線の最初の差し込みの予定: 1a・2a-i・2b・3b-i (CI の手直しの S0 の取り込み、CRT の後始末の後。1a は wt/ppc-sqlite-stack が common.mk を手放した後)。
+
+- 追記 (2026-11-19): pci の組の本体を両機種で選べるようにする設計は [PCI_COMMON_DESIGN](PCI_COMMON_DESIGN.md) (本線の M1〜M3 と PowerPC の P1〜P5)。

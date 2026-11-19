@@ -61,7 +61,7 @@
     "platform/pc98/device_loop.c",
     "platform/pc98/device_ide.c",
     "kernel/dev/device_fs.c",
-    "platform/pc98/device_pci.c",
+    "kernel/dev/device_pci.c",
     "platform/pc98/device_host.c",
     "kernel/dev/device_host.c",
     "kernel/dev/device_kcg.c",
