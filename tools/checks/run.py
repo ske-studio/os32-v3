@@ -1284,6 +1284,7 @@ def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     action = parser.add_mutually_exclusive_group(required=True)
     action.add_argument("--list", action="store_true")
+    action.add_argument("--excluded", action="store_true", help="report checks excluded by environment")
     action.add_argument("--make", action="store_true", help="emit all make registration variables")
     action.add_argument("--select", action="store_true")
     action.add_argument("--run", nargs="+", help="check names or all (subject to environment filters)")
@@ -1299,13 +1300,37 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--exclude-env", action="append", default=[], choices=sorted(CHECK_ENVS))
     args = parser.parse_args(argv)
     try:
-        checks = indexed_discover(ROOT) if args.list or args.make or args.run else discover(ROOT)
+        checks = indexed_discover(ROOT) if args.list or args.make or args.run or args.excluded else discover(ROOT)
         # check-fast と静的 CI は full_only とその利用者を回さない (build.yml の make check が回す)。
         routine = os.environ.get("CHECK_ROUTINE") == "1" and (args.list or args.make or args.run)
         eligible = {n: c for n, c in checks.items() if not routine or not any(
             checks[dep].full_only for dep in closure(checks, (n,)))}
-        if (args.env or args.exclude_env) and not (args.list or args.run):
-            raise ValueError("environment filters require --list or --run")
+        if args.excluded:
+            if args.shard:
+                if not re.fullmatch(r"[0-9]+/[1-9][0-9]*", args.shard):
+                    raise ValueError("--shard requires index/count")
+                index, count = map(int, args.shard.split("/"))
+                if index >= count:
+                    raise ValueError("shard index must be less than count")
+                if index:
+                    return 0
+            rows = []
+            for name in sorted(eligible):
+                excluded = sorted(set(args.exclude_env).intersection(eligible[name].env))
+                if excluded:
+                    env = eligible[name].env
+                    destination = ("ppc-qemu (PPC scope)" if "qemu-ppc" in env else
+                                   "ppc-compile (PPC scope)" if "ppc-cross" in env else "—")
+                    rows.append(f"| check-{name} | {', '.join(excluded)} | {destination} |")
+            if rows:
+                report = "\n".join(["| Check | Excluded environment | Job |", "|---|---|---|", *rows])
+                print(report)
+                if os.environ.get("GITHUB_STEP_SUMMARY"):
+                    with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
+                        print(report, file=summary)
+            return 0
+        if (args.env or args.exclude_env) and not (args.list or args.run or args.make):
+            raise ValueError("environment filters require --list, --make or --run")
         eligible = {n: c for n, c in eligible.items()
                     if set(args.env) <= set(c.env) and not set(args.exclude_env) & set(c.env)}
         names = ordered(eligible)
