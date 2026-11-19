@@ -996,6 +996,10 @@ rustup show active-toolchain
 
 NP21/W を使う場合は [INSTALL.md](../INSTALL.md) に従い、`NP21W_DIR` にエミュレータのディレクトリを WSL 側の絶対パスで設定する。開発用の ai-debug 版は WSL の `~/np21w-src` で `make build && make deploy` を実行して Windows 側にミラーする。OS32 の成果物は OS32 のルートで `make deploy` を実行して HostDrv の共有先 `C:\os32` (WSL 側の `/mnt/c/os32`) に置く。配備とゲストでの確認は [デバッグ方針](POLICY_DEBUG.md) と [run-os32](../.claude/skills/run-os32/SKILL.md) を参照。
 
+#### エミュレータ専用の機械 (pc98emu)
+
+NP21/W の受入は、同じ LAN の別の Windows 機械で回せる (ユーザー決定 2026-11-19)。その機械には Windows + WSL2 (mirrored) と `gh` (読み取りだけの token) とリポジトリの clone を置き、NP21/W の ai-debug 版・ROM・NHD はこの機械から ssh で写す (ROM は外へ出さない)。像は CI の build の配布物を `gh run download` で取るので、クロスコンパイラは要らない。自前ビルドの NP21/W は無署名なので、Windows の Smart App Control を切っておく。枠 (ポート・ini・NHD・HostDrv の組) と依頼の形はスキル [os32-emu-remote](../.claude/skills/os32-emu-remote/SKILL.md)。
+
 #### ビルドと検査で確かめる
 
 ```bash

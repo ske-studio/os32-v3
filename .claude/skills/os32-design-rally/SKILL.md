@@ -5,7 +5,7 @@ description: 設計票・計画票を「起草 → 独立レビュー → 直し
 
 # os32-design-rally — 設計の往復と確定
 
-役の割り当ては [ROLES §0](../../../docs/tasks/agents/ROLES.md) を参照。 2026-11-19 からの試行で、起草は Fable (`claude-fable-5-2`、Agent の model: fable)、レビューは Opus 5.5 のサブエージェント。下の §2 の依頼の型はそのまま Fable に渡す (書く先は ~/os32-tmp/run/<名>/、リポジトリは読むだけ)。
+役の割り当ては [ROLES §0](../../../docs/tasks/agents/ROLES.md) を参照。**起草は Fable** (`claude-fable-5-2`、Agent の model: fable)、**レビューは必ず Opus 5.5 のサブエージェント** (Agent の subagent_type: reviewer。PM が自分で代わりに読まない。codex の astra・sol には回さない) (ユーザー決定 2026-11-19)。下の §2 の依頼の型はそのまま Fable に渡す (書く先は ~/os32-tmp/run/<名>/)。§3 のレビューの依頼は reviewer のサブエージェントに渡し、§4 の往復も同じ reviewer の文脈に SendMessage で続ける。
 
 ## 1. 置き場
 
