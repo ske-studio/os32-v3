@@ -18,7 +18,8 @@ CHECK = dict(name='kboot-mmu', tier=2, budget=180,
                      'tools/ppc/run.py', 'build/ppc.mk', 'include/types.h',
                      'include/callconv.h', 'mm/paging.h',
                      'lib/kstring.h', 'lib/kstring_c.c'], needs=[])
-CROSS = Path('/home/hight/opt/cross-ppc/bin/powerpc-elf-')
+PPC_CROSS_DIR = Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc'))
+CROSS = PPC_CROSS_DIR / 'bin/powerpc-elf-'
 MUTATIONS = [
     ('same-root', '    stw 3,.Lcurrent_root@l(5)',
      '    lwz 6,.Lcurrent_root@l(5)\n    cmpw 3,6\n    beq .Lfinish\n    stw 3,.Lcurrent_root@l(5)'),
@@ -147,7 +148,7 @@ def build_guest(out):
     asm=['arch/ppc/entry.S','arch/ppc/ofw_note.S','arch/ppc/takeover.S',
          'arch/ppc/mmu.S','arch/ppc/cache_copy.S','arch/ppc/vectors.S']
     elf=out/'PPCMMU.ELF'
-    command(['make','-f','build/ppc.mk','CROSS_DIR=/home/hight/opt/cross-ppc',
+    command(['make','-f','build/ppc.mk',f'CROSS_DIR={PPC_CROSS_DIR}',
              'OUT='+str(out),'MMU_C='+' '.join(c),'MMU_S='+' '.join(asm),
              'MMU_OBJECTS='+' '.join(str(out/'mmu-3-0'/Path(s).with_suffix('.o')) for s in c+asm)+' '+str(out/'root.o'),
              str(elf)],timeout=120)

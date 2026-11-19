@@ -12,7 +12,7 @@ CHECK = dict(name='ppc-kboot-root-image', tier=2, budget=60,
              covers=['platform/powermac/root_image.c', 'tools/ppc/kboot_root_image.py'],
              inputs=['arch/ppc/kernel.ld', 'platform/powermac/platform_kboot_layout.h',
                      'include/memmap.h', 'tools/gen_memmap.py', 'include/boot_root.h'])
-PREFIX = '/home/hight/opt/cross-ppc/bin/powerpc-elf-'
+PREFIX = str(Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc')) / 'bin/powerpc-elf-')
 
 
 def command(args):

@@ -71,6 +71,9 @@ AppSlot *appslot_get(int);
 ''',
 }
 
+PPC_CC = Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc')) / 'bin/powerpc-elf-gcc'
+
+
 def function(source, name):
     source = re.sub(r'/\*.*?\*/', '', source, flags=re.S)
     match = re.search(r'(?:static )?(?:void|i32) ' + name + r'\([^\n]*\)\s*\{', source)
@@ -115,7 +118,7 @@ def exercise(root, work, sources, ppc):
         'static u32 fixture_child_commit(int launcher_id) {\n'
         '(void)launcher_id; volatile u32 io_parent_depth = 0;\n' + close + '\nreturn io_parent_depth;\n}\n'
         'static void fixture_parent_return(int launcher_id, u32 io_parent_depth) {\n' + reopen + '\n}\n')
-    cc = '/home/hight/opt/cross-ppc/bin/powerpc-elf-gcc' if ppc else 'gcc'
+    cc = PPC_CC if ppc else 'gcc'
     machine = ['-mcpu=7450', '-mbig-endian', '-msoft-float', '-mno-altivec',
                '-msdata=none', '-mcall-sysv', '-mno-eabi'] if ppc else ['-no-pie']
     exe = work / ('ppc' if ppc else 'x86')
@@ -133,7 +136,7 @@ def run(ctx):
         ('sdk','kapi_rust_gen.py'), ('kernel','io_kapi.c'), ('kernel','io_policy.c'),
         ('exec','exec_finish.inc'), ('exec','exec_schedule.inc'), ('exec','exec_syscall.inc'), ('exec','exec_launch.inc')]}
     arches = [False]
-    if Path('/home/hight/opt/cross-ppc/bin/powerpc-elf-gcc').is_file() and shutil.which('qemu-ppc'):
+    if PPC_CC.is_file() and shutil.which('qemu-ppc'):
         arches.append(True)
     else: print('SKIP PPC runtime: toolchain/runner unavailable', flush=True)
     with tempfile.TemporaryDirectory(prefix='io-kapi-') as td:

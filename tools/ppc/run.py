@@ -331,7 +331,7 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--timeout',type=float,default=30)
     p.add_argument('--mutate',action='store_true')
-    p.add_argument('--cross-dir',type=Path,default=Path('/home/hight/opt/cross-ppc'))
+    p.add_argument('--cross-dir',type=Path,default=Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc')))
     p.add_argument('--runner',choices=('qemu','native'),default=os.environ.get('HOST32_RUNNERS','qemu'))
     args = p.parse_args()
     assert args.timeout > 0

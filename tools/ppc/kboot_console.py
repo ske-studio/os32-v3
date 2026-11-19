@@ -56,7 +56,7 @@ def exercise(directory, name, before=None, after=None):
 
 
 def cross_audit(directory):
-    prefix = '/home/hight/opt/cross-ppc/bin/powerpc-elf-'
+    prefix = str(Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc')) / 'bin/powerpc-elf-')
     machine = ['-mcpu=7450', '-m32', '-mbig-endian', '-msoft-float',
                '-mno-altivec', '-msdata=none', '-nostdlib', '-fcommon',
                '-fsigned-char', '-fno-short-enums', '-D__cdecl=']
