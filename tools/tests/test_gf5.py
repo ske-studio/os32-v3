@@ -457,6 +457,40 @@ def run_case(tree, case, directory, edits=None):
     return host32.run([str(exe)], cwd=tree, timeout=120).returncode
 
 
+def run_mutation(item):
+    name, rel, old, new, case = item
+    label = f'{case}/{name}'
+    original = (ROOT / rel).read_text()
+    if not old or old == new or original.count(old) != 1:
+        return [f'FAIL {label}: invalid or ambiguous anchor'], 1
+    edits = {rel: original.replace(old, new, 1)}
+    with tempfile.TemporaryDirectory(prefix='gf5-mut-') as md:
+        directory = Path(md)
+        try:
+            if case.startswith('foreground'):
+                red = run_case(ROOT, case, directory, edits)
+            else:
+                exe = directory / case
+                cmd = command(ROOT, case, exe)
+                tree = mutpar.build_in_tree(ROOT, directory, edits, [cmd])
+                red = host32.run([str(exe)], cwd=tree, timeout=120).returncode
+        except subprocess.CalledProcessError:
+            return [f'FAIL {label}: compile/link is not runtime RED'], 1
+        if red:
+            lines = [f'PASS {label}: runtime RED rc={red}']
+        else:
+            lines = [f'FAIL {label}: survived']
+        try:
+            restored = run_case(ROOT, case, directory)
+        except subprocess.CalledProcessError:
+            restored = 1
+        if restored:
+            lines.append(f'FAIL {label}: restored control')
+        else:
+            lines.append(f'PASS {label}: restored runtime GREEN')
+        return lines, int(not red) + int(bool(restored))
+
+
 def main():
     failures = 0
     parser = argparse.ArgumentParser(description=__doc__)
@@ -488,42 +522,15 @@ def main():
                 failures += 1
                 continue
             print(f'PASS {case}: runtime GREEN', flush=True)
-            for name, rel, old, new, target in (MUTATIONS if mutate else ()):
-                if target != case or (args.mutation and name not in args.mutation):
-                    continue
-                original = (ROOT / rel).read_text()
-                if not old or old == new or original.count(old) != 1:
-                    print(f'FAIL {case}/{name}: invalid or ambiguous anchor', flush=True)
-                    failures += 1
-                    continue
-                with tempfile.TemporaryDirectory(prefix='gf5-mut-') as md:
-                    exe = Path(md) / case
-                    cmd = command(ROOT, case, exe)
-                    try:
-                        edits = {rel: original.replace(old, new, 1)}
-                        if case.startswith('foreground'):
-                            red = run_case(ROOT, case, Path(md), edits)
-                        else:
-                            tree = mutpar.build_in_tree(ROOT, md, edits, [cmd])
-                            red = host32.run([str(exe)], cwd=tree, timeout=120).returncode
-                    except subprocess.CalledProcessError:
-                        print(f'FAIL {case}/{name}: compile/link is not runtime RED', flush=True)
-                        failures += 1
-                        continue
-                    if red:
-                        print(f'PASS {case}/{name}: runtime RED rc={red}', flush=True)
-                    else:
-                        print(f'FAIL {case}/{name}: survived', flush=True)
-                        failures += 1
-                try:
-                    restored = run_case(ROOT, case, directory)
-                except subprocess.CalledProcessError:
-                    restored = 1
-                if not restored:
-                    print(f'PASS {case}/{name}: restored runtime GREEN', flush=True)
-                if restored:
-                    print(f'FAIL {case}/{name}: restored control', flush=True)
-                    failures += 1
+            if mutate:
+                items = [m for m in MUTATIONS if m[4] == case and
+                         (not args.mutation or m[0] in args.mutation)]
+                # The GUI setup modifies os.environ and sys.path.
+                for lines, bad in mutpar.run_ordered(
+                        run_mutation, items, serial=(case == 'foreground-gui')):
+                    for line in lines:
+                        print(line, flush=True)
+                    failures += bad
     if args.case:
         return int(bool(failures))
     runner = subprocess.run([sys.executable, '-B', str(ROOT / 'tools/tests/test_gf_runner.py'),
