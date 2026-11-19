@@ -44,6 +44,10 @@ static int lifecycle(KernelAPI *api, const char *mode)
         snprintf(line, sizeof(line), "free tiles %u\n", count);
         return report(api, line, 0);
     }
+    if (!strcmp(mode, "shutdown")) {
+        api->gfx_shutdown();
+        return report(api, "shutdown only\n", 0);
+    }
     api->gfx_init();
     if (api->gfx2_adapter_gen(0, &gen) || gen == mark) return 21;
     int rc = create_tile(api, &sid);

@@ -6,7 +6,7 @@ CHECK = dict(name='ppc-display-lifecycle', tier=2, needs=[], budget=1200,
             'platform/powermac/**', 'include/**', 'init/**', 'kernel/**',
             'kapi/**', 'lib/**', 'fs/**', 'drivers/**', 'input/**', 'net/**',
             'gfx/**', 'assets/fonts/**'],
-    basis=['docs/decisions/ppc/PPC_KAPI_FILL_DESIGN.md §5 gfx2'],
+    basis=['docs/decisions/ppc/DISPLAY_HOOKS_DESIGN.md §6'],
     env_limit='Requires mac99 QEMU and loopback UDP/TCP for link-sh RSH.')
 
 

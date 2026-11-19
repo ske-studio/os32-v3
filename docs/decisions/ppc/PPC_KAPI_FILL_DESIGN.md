@@ -1,5 +1,7 @@
 # PowerMac の KAPI の提供者を埋める計画 (確定)
 
+表示の復帰と受入は [表示フックの確定設計](DISPLAY_HOOKS_DESIGN.md) を参照。
+
 > 出所: ~/os32-tmp/run/ppc-kapi-fill/DESIGN.r4.md (設計の往復の確定版)。
 > 状態: **現行 (2026-11-18)** — 確定。astra 起草 r1〜r4、Opus 5.5 の独立レビュー 2 回、本線 PM の確認 (同日)。段の状態は票 TASK_PPC_KAPI_FILL が持つ。
 

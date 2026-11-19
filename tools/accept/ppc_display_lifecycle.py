@@ -64,13 +64,13 @@ def observe(elf, folder, case):
             probe('draw', 30, b'child changed generation')
         else:
             modes = {'no-return': ('draw',), 'no-exit': ('leave',)}.get(
-                case, ('draw', 'leave', 'fault'))
+                case, ('shutdown', 'draw', 'leave', 'fault'))
             for mode in modes:
                 if mode == 'fault':
                     capacity = probe('capacity', 0, b'free tiles ')
                 before = generations()
                 probe(mode, 139 if mode == 'fault' else 0,
-                      {'draw': b'tile drawn', 'leave': b'tile left', 'fault': b'tile allocated'}[mode])
+                      {'shutdown': b'shutdown only', 'draw': b'tile drawn', 'leave': b'tile left', 'fault': b'tile allocated'}[mode])
                 after = generations()
                 if case == 'normal':
                     require(after[:-1] == before and after[-1] != before[-1], mode + ' recovery')

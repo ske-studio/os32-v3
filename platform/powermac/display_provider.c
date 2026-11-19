@@ -18,6 +18,9 @@ static void prepare(void)
 }
 static void shutdown(void)
 {
+    struct gfx2_adapter *a = gfx2_active();
+    /* Unbinding invalidates targets and submissions from this OF session. */
+    if (of_fb_ready() && a && a->kind == GFX2_KIND_OF_FB) a->gen++;
     (void)gfx2_sync_publish(GFX2_KIND_OF_FB, 0, 0);
     gfxsync_unbind(sync_ctx);
     sync_ctx = 0;
