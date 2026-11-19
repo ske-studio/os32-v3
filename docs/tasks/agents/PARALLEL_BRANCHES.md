@@ -27,6 +27,7 @@ GeForce・ラスタに限らず、機能の開発全般の決まり。手本が�
 
 - **取り込みの検査は全部 GitHub の CI** (メインストリームを含む、ユーザー決定 2026-11-05「取り込みの検査は GitHub の CI に一本化する (メインストリームも含む)」)。枝を push し、check と build (`make check` = 全部の検査を変異込みで、6 シャード) が通ったら main に早送りする。**`[skip ci]` を付けたコミットは取り込めない** — 関門はその SHA の check・build の success を要る。文書だけの変更 (差分が全部 `docs/**`・`**.md`・`.claude/**`) は、push で起動する check (static-check だけが走り約 4 分、build は `paths-ignore` で起動しない) の success を読んでから main に早送りする。build は手で起こさない (ユーザー決定 2026-11-19)。main の push は、同一 SHA・同一 workflow の枝 (`wt/**`) の push の成功を API で確認できれば build の検査 (checks) を省略する (ユーザー決定 2026-11-19、前は統合枝 `wt/int-*` だけ)。check の static-check と配布物 (artifacts) は main で毎回回す。取得失敗・不明な結果・dispatch の成功・打ち切りは証拠にしない (`tools/ci/reuse_success.py`)。**枝の成功を読んでから早送りする** — 先に main を進めると、枝の PowerPC の範囲の判定 (`tools/ci/ppc_scope.py` は回った時点の origin/main との差を見る) が空になり、PowerPC が飛んだまま success になる ([08_build §8-6](../../08_build.md#8-6-github-actions-での本体ビルド))。
 - **実装者**は触った像のビルドと、足した・触った試験 (`--mutate` を含む)・lint だけを回す。全体は CI が回す。関係する検査を手元でまとめて見たい時は `make check-changed` を使ってよい (関門ではない)。
+- **build の検査**は ROLES §6 の決定 (2026-11-19) に従い、指定シャードだけ ci-server の使い捨て runner に振り分ける。配布物と回し直しは常に標準で実行する。振り分けの条件と戻し方は [08_build §8-6](../../08_build.md#8-6-github-actions-での本体ビルド)。
 - **substream** (Ubuntu 24.04・gcc 13) は PowerPC (PowerMac G4) の移植の開発機 (ユーザー決定 2026-11-07、セッション os32powerpc)。GitHub Actions の runner は止めてあり、CI には使わない (GitHub より 2.5〜4 倍遅い、ユーザー決定 2026-11-05)。
 - **受入待ちの枝は統合の枝 (`wt/int-<日付><記号>`) にまとめて受け入れる** — 形は ROLES §4-2。
 - **merge は終わった順** — 後から入るブランチは、入る直前の main を取り込んで push し直し、CI を通し直す (衝突の解消を含む)。

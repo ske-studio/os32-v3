@@ -39,7 +39,20 @@ def workflow_cases(source, setup_source=None):
     for name, job in jobs.items():
         assert not job.get('needs'), 'jobs must run independently'
         runner = job['runs-on']
-        assert runner == 'ubuntu-latest', 'GitHub runner (substream not used, user decision 2026-11-05)'
+        if name == 'artifacts':
+            assert runner == 'ubuntu-latest', 'distribution requires GitHub runner'
+        else:
+            expected = (
+                '${{ fromJSON('
+                "github.event_name == 'push' && "
+                'github.run_attempt == 1 && '
+                "github.repository == 'ske-studio/os32-v3' && "
+                "github.actor == 'ske-studio' && "
+                "(github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/wt/')) && "
+                "contains(fromJSON(vars.OS32_SELFHOST_SHARDS || '[]'), matrix.shard) && "
+                '\'["self-hosted","linux","x64","os32-ci"]\' || \'"ubuntu-latest"\') }}'
+            )
+            assert runner == expected, 'checks require trusted first push and selected shard'
         assert job['timeout-minutes'] == 150
         assert job['concurrency']['cancel-in-progress'] is True
         suffix = '-${{ matrix.shard }}' if name == 'checks' else ''
@@ -383,15 +396,23 @@ def main():
             ('workflow', 'OS32_CHECK_CACHE: ${{ runner.temp }}/check-cache', 'OS32_CHECK_CACHE: off', 'disable shared cache'),
             ('fetch', 'all(s == "success" for s in states)', 'any(s == "success" for s in states)', 'accept partial shards'),
             ('workflow', '  checks:\n', '  checks:\n    needs: artifacts\n', 'serialize jobs'),
-            ('workflow', '    runs-on: ubuntu-latest', '    runs-on: [self-hosted, substream]', 'route to substream'),
+            ('workflow', 'runs-on: ubuntu-latest', 'runs-on: [self-hosted, linux, x64, os32-ci]', 'route artifacts to self-hosted'),
+            ('workflow', "github.event_name == 'push' && ", '', 'allow other events'),
+            ('workflow', 'github.run_attempt == 1 && ', '', 'allow reruns'),
+            ('workflow', "github.repository == 'ske-studio/os32-v3' && ", '', 'allow other repositories'),
+            ('workflow', "github.actor == 'ske-studio' && ", '', 'allow other actors'),
+            ('workflow', "(github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/wt/')) && ", '', 'allow other refs'),
+            ('workflow', "contains(fromJSON(vars.OS32_SELFHOST_SHARDS || '[]'), matrix.shard) && ", '', 'ignore shard selection'),
+            ('workflow', 'refs/heads/wt/', 'refs/', 'allow tags'),
+            ('workflow', "OS32_SELFHOST_SHARDS || '[]'", "OS32_SELFHOST_SHARDS || '[0,1,2,3,4,5]'", 'select all by default'),
+            ('workflow', '"os32-ci"', '"substream"', 'route to substream'),
             ('workflow', 'make -k check CHECK_SHARD', 'make -k check-fast CHECK_SHARD', 'drop mutations from the gate'),
             ('fetch', 'if [ "$ART_STATE" = success ]; then', 'if [ "$ART_STATE" != success ]; then', 'invert artifact gate'),
             ('fetch', 'if [ "$CHECK_STATE" != success ]; then', 'if [ "$CHECK_STATE" = success ]; then', 'invert check notice'),
         ]
         for kind, old, new, name in mutations:
             text = {'workflow': source, 'fetch': FETCH.read_text(), 'check': CHECK_WORKFLOW.read_text(), 'reuse': (ROOT / 'tools/ci/reuse_success.py').read_text(), 'setup': SETUP.read_text()}[kind]
-            # Runner occurs once per job; mutate only the check-fast job.
-            if name in ('route to substream', 'preparation command drift', 'unsafe ccache restore'):
+            if name in ('preparation command drift', 'unsafe ccache restore'):
                 prefix, text = text.split('  checks:\n', 1)
                 assert text.count(old) == 1, name
                 changed = prefix + '  checks:\n' + text.replace(old, new)
