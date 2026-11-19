@@ -11,3 +11,4 @@ rshell_recover の open_port/exchange を使い、受信を底の raw へ記録�
 - 単一の FilterPort.read が下位rawを保存してから final行またはEOTを抑止し、既存exchangeへ渡す。abort フレーム数は標準出力に出し、成功は既存exchangeのOKだけとする。
 
 - [gf_accel](gf_accel.md)
+- [ppc_qemu](ppc_qemu.md) — PowerPC の QEMU の受入の台本の落とし穴 (撮影の時・キー・変異の目印・期待の出所・CI の重み)

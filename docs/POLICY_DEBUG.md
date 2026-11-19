@@ -119,6 +119,7 @@ OFF の起動は `ver` の Image CRC と `boot.log` で到達を確認する。
 - 描画形式・attach・Cirrus の窓・カーソル。
   → [libos32gfx_core](design/userland/lib/gfx/libos32gfx_core.md#落とし穴)、[backend_cirrus](design/drivers/video/cirrus/backend_cirrus.md#落とし穴)、[console](design/kernel/console/console.md#落とし穴)
 - GUI の描画と計測。→ [draw](design/userland/rust/libos32gui/src/draw.md#落とし穴)
+- PowerPC の QEMU の受入の台本 (撮影の時・キー・変異の目印・CI の重み)。→ [ppc_qemu](design/tools/accept/ppc_qemu.md)
 
 ### 4-7. API timeout とハング
 
