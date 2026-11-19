@@ -44,6 +44,7 @@ u8 kbd_host_bios_shift;
 #include "drivers/input/kbd.c"
 #include "userland/shell/kbd_watch.c"
 #include "drivers/input/mouse.c"
+#include "input/hal/mouse_pointer.c"
 
 #define CHECK(x) do { if (!(x)) { \
     fprintf(stderr, "FAIL %s:%d: %s\n", __func__, __LINE__, #x); failed++; \
