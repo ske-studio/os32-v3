@@ -3,7 +3,7 @@
 CHECK = dict(name='input-pointer-host', tier=1, budget=10, needs=[], covers=['input/hal/legacy_keymap.c', 'input/keymaps/pc98_jp.c', 'input/hal/keymap_registry.c', 'input/hal/keymap_eval.c', 'input/hal/keymap_state.c', 'tools/tests/input_unused_key_host.h',
     'input/hal/in2_int.h', 'input/hal/in2_dev.c', 'input/hal/keymap.h', 'input/hal/in2_state.c',
     'input/hal/kbd_merge.c', 'input/hal/mouse_ext.c', 'input/hal/pointer_state.c',
-    'drivers/input/mouse.c', 'include/mouse_pointer_contract.h', 'include/kbd_contract.h', 'include/text_screen.h', 'drivers/input/kbd.h', 'tools/tests/input_poll_host.c',
+    'drivers/input/mouse.c', 'input/hal/mouse_pointer.c', 'include/mouse_pointer_contract.h', 'include/kbd_contract.h', 'include/text_screen.h', 'drivers/input/kbd.h', 'tools/tests/input_poll_host.c',
     'drivers/video/kcg/kcg.h', 'include/kcg_contract.h', 'drivers/char/np2sysp.h', 'include/kprintf.h',
     'tools/tests/input_pointer_host.c', 'tools/tests/test_input_pointer.py',
     'drivers/input/mouse_bus.c', 'drivers/input/mouse_hal.c', 'tools/tests/mouse_bus_host.c', 'drivers/input/mouse.h', 'include/pc98.h', 'include/pointer_service.h',
@@ -65,25 +65,31 @@ def run(ctx):
         for n, body in [('base_mouse.c', adapt_poll(base_mouse)), ('base_state.c', base_state)]:
             (tmp/n).write_text(base_prefix + body)
         poll_source = (ctx.root/'drivers/input/mouse.c').read_text()
-        def build_poll(source, state=sources[4], ext=sources[3], hal=bus_sources[1]):
+        pointer_source = (ctx.root/'input/hal/mouse_pointer.c').read_text()
+        def build_poll(source, state=sources[4], ext=sources[3], hal=bus_sources[1], pointer=pointer_source):
             for n, body in zip(names, sources): (tmp/n).write_text(body)
             (tmp/'pointer_state.c').write_text(state)
             (tmp/'mouse_ext.c').write_text(ext)
             (tmp/'mouse.c').write_text(adapt_poll(source))
+            (tmp/'mouse_pointer.c').write_text(pointer)
             (tmp/'mouse_hal.c').write_text(hal.replace('../../input/hal/in2_int.h', 'in2_int.h'))
-            files = names + ['mouse_bus.c', 'mouse_hal.c', 'mouse.c', 'ref_mouse.c', 'ref_mouse_bus.c', 'base_mouse.c', 'base_state.c']
+            files = names + ['mouse_bus.c', 'mouse_hal.c', 'mouse.c', 'mouse_pointer.c', 'ref_mouse.c', 'ref_mouse_bus.c', 'base_mouse.c', 'base_state.c']
             subprocess.run(['gcc', '-m32', '-fno-pie', '-nostdlib', '-nostdinc', '-static', '-no-pie', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-stack-protector', '-I'+str(tmp), '-I'+str(ctx.root/'include'), '-I'+str(ctx.root/'sdk/include/os32')] + [str(tmp/n) for n in files] + [str(ctx.root/'tools/tests/input_poll_host.c'), '-o', str(tmp/'poll')], check=True)
             return host32.run([str(tmp/'poll')], runner='qemu').returncode
         assert build_poll(poll_source) == 0
         if ctx.mutate:
             for before, after in [('mouse_legacy_snapshot(dx, dy, buttons, x, y);',
                                    '(void)x; (void)y; *dx = *dy = 0; *buttons = 0;'),
-                                  ('pointer_bounds(x_min, y_min, x_max, y_max);', '(void)0;'),
                                   ('mouse_ext_mode(0);', 'mouse_ext_mode(1);'),
                                   ('mouse_ext_mode(1);', 'mouse_ext_mode(0);')]:
                 assert poll_source.count(before) == 1
                 rc = build_poll(poll_source.replace(before, after)); assert 0 < rc < 128, (before, rc)
                 print('RED runtime poll: '+before, flush=True)
+            before = 'pointer_bounds(x_min, y_min, x_max, y_max);'
+            assert pointer_source.count(before) == 1
+            rc = build_poll(poll_source, pointer=pointer_source.replace(before, '(void)0;'))
+            assert 0 < rc < 128, (before, rc)
+            print('RED runtime poll: '+before, flush=True)
             for before, after in [('*dx = old_x; *dy = old_y;', '*dx = 0; *dy = 0;'),
                                   ('*buttons = pointer_buttons_locked();', '*buttons = 0;'),
                                   ('pointer_position_locked(x, y);', '*x = 0; *y = 0;')]:

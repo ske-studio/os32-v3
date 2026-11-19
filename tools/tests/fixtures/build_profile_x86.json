@@ -177,6 +177,7 @@
     "drivers/char/np2sysp.c",
     "drivers/block/loop_dev.c",
     "drivers/input/mouse.c",
+    "input/hal/mouse_pointer.c",
     "drivers/input/mouse_bus.c",
     "drivers/input/mouse_hal.c",
     "drivers/input/mouse_seamless.c",
