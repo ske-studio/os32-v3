@@ -57,22 +57,21 @@ def observe(elf, folder, case):
     def check_echo(mode):
         word = 'restored' + mode
         s.keys('echo ' + word + '\n')
-        output_row = None
+        font = Font(ROOT / 'assets/fonts/shino16.kcgfont')
 
-        def prompt_after_output():
-            nonlocal output_row
+        # Keyboard lines get no prompt on link-sh (the "> " rows mirror RSH
+        # commands), so wait until the output row's glyphs match exactly: the
+        # cursor has then left the row and the frame is fully drawn.
+        def output_drawn():
             rows = s.screen(mode).splitlines()
-            for row, (line, following) in enumerate(zip(rows, rows[1:])):
-                if line.rstrip() == word and following.rstrip() == '>':
-                    output_row = row
-                    return True
-            return False
+            matches = [row for row, line in enumerate(rows) if line.rstrip() == word]
+            if not matches:
+                return False
+            pixels = Terminal(read_ppm(folder / (mode + '.ppm')), font,
+                              (255, 255, 255), (0, 0, 0), cursor_top=14)
+            return pixels.compare_text(matches[-1], 0, word) is None
 
-        s.wait(prompt_after_output, mode + ' echo output and prompt')
-        pixels = Terminal(read_ppm(folder / (mode + '.ppm')),
-                          Font(ROOT / 'assets/fonts/shino16.kcgfont'),
-                          (255, 255, 255), (0, 0, 0), cursor_top=14)
-        require(pixels.compare_text(output_row, 0, word) is None, 'keyboard and console pixels')
+        s.wait(output_drawn, mode + ' keyboard and console pixels')
 
     try:
         s.start()
