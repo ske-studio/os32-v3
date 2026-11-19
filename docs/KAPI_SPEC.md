@@ -1317,15 +1317,18 @@ LBA28、無ければ word 53 bit0 の現在の CHS、それも無ければ既定
   ブート情報域 0x7E00 のイメージ欄 (0x30〜0x3B、自分のチェック語 `img_check` を最後に書く)
   に残し、`kernel_main` の最初の `bootinfo_capture` が写す。記録が無い (チェック語が合わない、
   主部が無効、大きさ 0) なら `crc_valid = 0`。
+- PowerMac では組み込んだ RAM ルート ISO の全バイトを対象とする。起動時に長さと CRC32 が
+  ビルド時の期待値に一致した場合に `crc_valid = 1` とし、CRC32 とバイト数を返す。
+  照合できなければ 3 項目とも 0 を返す。Open Firmware 起動時の `source` は 0。
 - `commit` はカーネルのリンク時に埋め込んだ文字列 (`tools/gen_build_id.py` の生成物
   `build/out/build_id.c`): `git rev-parse --short=7 HEAD`、追跡中のファイルに変更があれば
   `-dirty`、git が無ければ `unknown`。
 
 | Offset | 型 | フィールド | 意味 |
 |---|---|---|---|
-| 0 | `u32` | `image_crc` | VK32 v2 のファイル全体の CRC32 (ヘッダの `image_crc` 欄の値。`zlib.crc32` と同じ計算で、その欄を 0 として求めたもの) |
-| 4 | `u32` | `image_size` | ローダが読んだ長さ |
-| 8 | `u8` | `crc_valid` | 1 = ローダが記録した |
+| 0 | `u32` | `image_crc` | PC-98 は VK32 v2 ファイル全体の CRC32 (ヘッダの `image_crc` 欄を 0 として計算した値)。PowerMac は組み込んだ RAM ルート ISO 全体の CRC32。無効時は 0 |
+| 4 | `u32` | `image_size` | PC-98 はローダが読んだ VK32 v2 ファイルのバイト数。PowerMac は組み込んだ RAM ルート ISO のバイト数。無効時は 0 |
+| 8 | `u8` | `crc_valid` | PC-98 はローダが VK32 v2 の全検査を終えて記録し、カーネルが有効な主部・イメージ欄のチェック語・非ゼロの長さを確認できれば 1。PowerMac は RAM ルート ISO の長さと CRC32 がともにビルド時の期待値と一致すれば 1。それ以外は 0 |
 | 9 | `u8` | `source` | 1 = FD ローダ、2 = HDD ローダ、0 = 不明 |
 | 10 | `u16` | `reserved` | 0 |
 | 12 | `char[24]` | `commit` | NUL 終端 |

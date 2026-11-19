@@ -16,7 +16,7 @@ from kapi_target_ppc import ABSENT_PROVIDER_SLOTS, absent_result
 
 # Expected absent slots after the 11-19 PowerPC stages (port 7・clock・surface 4・console_font 4・gfx2 queries 9; PPC_KAPI_FILL_DESIGN §4 item 10).
 EXPECTED_ABSENT_SLOTS = frozenset("""
-boot_image_info buz_off buz_on db_bind_blob db_bind_int db_bind_null
+buz_off buz_on db_bind_blob db_bind_int db_bind_null
 db_bind_text db_close db_column_int db_column_text db_error_code db_exec
 db_finalize db_last_error db_mem_used db_open db_open_existing db_prepare
 db_prepare_only db_step ext2_format ext2_format_at fm_note_off fm_note_on
@@ -62,6 +62,7 @@ gfx2_connector_edid gfx2_mode_count gfx2_mode_get
 # input_service, kbd_inject, con_sink, pipe_buffer, kapi_strings, kstring.
 ALLOWED_UNDEFINED = frozenset("""
 surface_api_bundle
+boot_image_info
 surface_api_query
 surface_api_lease
 surface_api_unlease
@@ -318,7 +319,7 @@ def main():
             [str(nm), '-u', str(tmp / 'kapi.o')], text=True).splitlines()}
         if 'sys_reboot' not in undefined:
             print('missing sys_reboot provider'); return 1
-        missing = {'exec_tvram_read_allowed', 'pm_console_clear', 'tvram_putchar_at',
+        missing = {'boot_image_info', 'exec_tvram_read_allowed', 'pm_console_clear', 'tvram_putchar_at',
                    'tvram_putkanji_at', 'tvram_readchar_at', 'tvram_reverse_cell',
                    'tvram_scroll', 'shm_alloc', 'shm_free', 'shm_lock',
                    'font_lease_app_open', 'font_lease_app_read_at',

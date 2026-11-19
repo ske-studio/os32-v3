@@ -159,9 +159,6 @@ PROVIDER_GROUPS = {
         'pcm_close',
         'pcm_set_volume',
     }), frozenset(['pcm_contract.h'])),
-    'boot_info': (frozenset({
-        'boot_image_info',
-    }), frozenset([])),
     'debug': (frozenset({
         'kdebug_call',
     }), frozenset([])),
