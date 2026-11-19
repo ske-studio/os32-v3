@@ -5,7 +5,7 @@
 PowerPC P3 の確定設計 §3「KAPI → platform → link/mailbox」(docs に写すまでは設計の約束として扱う)。
 """
 CHECK = dict(env=['ppc-cross'], name='ppc-rshell-link', tier=1, needs=[], budget=20,
-    covers=['platform/powermac/device_host.c', 'platform/powermac/host_unavailable.c',
+    covers=['kernel/dev/device_host.c', 'platform/powermac/host_unavailable.c',
             'exec/absent/exec_reclaim.c', 'arch/ppc/exec_kapi.c', 'arch/ppc/arch_exec_kapi.h',
             'tools/tests/test_ppc_rshell_link.py','include/platform_host.h', 'net/link.h', 'net/host_mailbox.h',
             'kapi/kapi_host_notice.c', 'kapi/kapi_host_notice.h', 'exec/exec_reclaim.h',
@@ -26,7 +26,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def exercise(tmp, stub=False, mutation=None):
-    provider = 'platform/powermac/' + ('host_unavailable.c' if stub else 'device_host.c')
+    provider = 'platform/powermac/host_unavailable.c' if stub else 'kernel/dev/device_host.c'
     paths = [provider, 'exec/absent/exec_reclaim.c', 'arch/ppc/exec_kapi.c']
     text = '\n'.join((ROOT / p).read_text() for p in paths)
     if mutation:

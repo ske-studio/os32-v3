@@ -68,8 +68,8 @@ FEATURE_PC98_PENDING = 0
 ```make
 # build/sources/common.mk
 C_COMMON_CORE = <両 arch の全部の像に入る 18 本> lib/kstring_c.c
-C_COMMON_LINK = net/link.c net/link_notify.c net/host_mailbox.c net/nic_rx.c net/rx_work.c
-C_COMMON_EXEC = <今 C_COMMON にあり PowerPC の exec の像に入る 93 本> drivers/base/dev.c input/hal/legacy_ring.c input/hal/legacy_mode.c kernel/port_service.c kernel/serial_diag.c
+C_COMMON_LINK = kernel/dev/device_host.c net/link.c net/link_notify.c net/host_mailbox.c net/nic_rx.c net/rx_work.c
+C_COMMON_EXEC = kernel/dev/device_fs.c <今 C_COMMON にあり PowerPC の exec の像に入る 93 本> drivers/base/dev.c input/hal/legacy_ring.c input/hal/legacy_mode.c kernel/port_service.c kernel/serial_diag.c
 C_COMMON_USERSHELL = fs/serialfs/serialfs.c fs/serialfs/serialfs_persistent.c fs/serialfs/sfs_client.c fs/serialfs/sfs_proto.c lib/crc32.c
 C_COMMON_USB = $(wildcard drivers/usb/usb_*.c drivers/usb/ohci_*.c drivers/usb/hid_*.c) drivers/usb/ehci_quiesce.c
 C_COMMON_CLI = kernel/cli/resident_cli.c
@@ -84,7 +84,7 @@ arch・platform の物は、その持ち主のファイルが機能ごとの組�
 ```make
 # build/platform/powermac.mk (kboot の像の分)
 C_PLATFORM_CORE = platform/powermac/rh_observe.c ... drivers/net/gem/gem_reset.c ... lib/lz4.c platform/powermac/ppc_kernel.c
-C_PLATFORM_LINK = platform/powermac/device_host.c platform/powermac/link_platform.c platform/powermac/nic_gem.c platform/powermac/link_log.c platform/powermac/link_diag.c
+C_PLATFORM_LINK = platform/powermac/link_platform.c platform/powermac/nic_gem.c platform/powermac/link_log.c platform/powermac/link_diag.c
 C_PLATFORM_NOLINK = platform/powermac/lan_wire.c platform/powermac/lan_terminal.c platform/powermac/terminal_input.c platform/powermac/host_unavailable.c
 C_PLATFORM_EXEC = platform/powermac/root_boot.c ... kernel/console/fbcon.c gfx/gfx_console.c drivers/video/kcg/kcg_file.c drivers/video/of_fb/backend_of_fb.c drivers/video/of_fb/of_fb_v2.c kernel/dev/ram_ro.c fs/ramfs/ramfs.c fs/isofs/iso9660.c fs/isofs/iso9660_media.c init/boot_root.c
 C_PLATFORM_NOEXEC = platform/powermac/kboot_console.c

@@ -72,10 +72,10 @@ A は共通本体を選択・初期化して通常 wrap に接続。B は既存�
 |sound|16|装置 drivers/sound/fm/{fm,snd_engine,fm_module}.c|本線の AV HAL が旧 MML・snd・起動音の整理を AV0/R0a→R0b・R0c で担当。PowerMac の旧 FM/SSG 6 口は無し（E）。PC-98 は OPN 単体を含め従来の HW。PowerPC アプリはすべて再ビルドし、sndl_chip_* を使う。追記 2 の SOFT 経路は両 arch 共通で、L6 → L2 合成器 → L1 ミキサ → L3 → PCM 後端で鳴らす。|本線が AV_HAL_DESIGN.md §8 の照らし直し → lib/os32_opna（整数 fmgen）の段 A〜D → userland/lib/snd/fmvoice.c（L2）を担当。IS・L1/L2 後に L3、C3・L3 後に L6、IL で統合。PPC 専用の合成器・adapter は作らない。 両 arch のビルド入力を正規化し、コアと fmvoice.c のソースパス集合の一致、リンクマップ上の各定義元が共通ライブラリに一つだけあること、機種別コピーが無いことを照合。|
 |platform|8|機種 platform/pc98/device_{host,loop}.c、装置 drivers/block/loop_dev.c|np2_* 5本 E。loop 3本は固定名転送の C→媒体契約 D→A、VFS と同じ仮想装置を選択、PC98 取次を共有口へ|loop_dev_attach とイメージ形式解析|
 |ide|8|機種 platform/pc98/{device_ide,bootinfo_geom}.c → 装置 drivers/ata/ide.c|生 ATA 7本は固定名窓口を共有する D→B、実 ATA 媒体・権限が条件。BIOS 由来の hdd_geom_info は E。RAM/ISO を ATA として報告しない|共通 sector 範囲・書込権限|
-|ext2|2|機種 platform/pc98/device_fs.c → 共通 fs/ext2/ext2_fmt.c|固定名転送の C→D→A。書込可能な block の契約から両 format を呼ぶ。loop 媒体を先行|ext2_fmt と ext2_layout|
+|ext2|2|機種 kernel/dev/device_fs.c → 共通 fs/ext2/ext2_fmt.c|固定名転送の C→D→A。書込可能な block の契約から両 format を呼ぶ。loop 媒体を先行|ext2_fmt と ext2_layout|
 |kcg|5|機種 platform/pc98/device_kcg.c、装置 drivers/video/kcg/{kcg,kcg_file}.c|C で固定名転送を共有し、A で kcg.c を両像に選ぶ。B は KCG1 の kcg_rom_read_ank・kcg_rom_read_kanji だけ。load は両像とも NOSYS|kcg_file_load と glyph 読取|
 |pci|4|機種 platform/pc98/device_pci.c、共通 kapi/kapi_sys.c → drivers/pci/pci_bind.c|C で drivers/pci/pci.c の走査・記録と bind 台帳・固定名窓口を共有し、B は config 読み書きだけ。OF と pci_config の BDF、実際の bind 台帳を対応付ける|config 取引と bind 台帳|
-|serialfs|2|機種 platform/pc98/device_fs.c → 共通 fs/serialfs/serialfs_session.c|固定名転送の C→A/B。既存 hostfs と同じ transport 所有・deadline 契約を満たしてから begin/end|serialfs_session と sfs_proto|
+|serialfs|2|機種 kernel/dev/device_fs.c → 共通 fs/serialfs/serialfs_session.c|固定名転送の C→A/B。既存 hostfs と同じ transport 所有・deadline 契約を満たしてから begin/end|serialfs_session と sfs_proto|
 |path|5|共通 lib/path.c、exec/exec_tramp_strings.inc|A。#6 から選択、起動 mount の validator と cwd を初期化|path_parse と tramp_copy|
 |db|17|共通 kapi/kapi_db.c と SQLite エンジン、CPU 別スタック入口|A+B。段 S → エンジン/VFS・共有結果・所有者回収 → 17本。SQL の PPC 再実装は不要|SQLite TU と同じ handle 表|
 |system_info|5|共通 kapi/kapi_sys.c、kernel/ver_collect.c、kernel/time/ktime.c|build・mtime は A、time は B（TB）、mem/ver は A+B（共通集計と実測可能な機種欄）|kapi_sys_* と mem_stat の構造体|
@@ -117,11 +117,11 @@ A は共通本体を選択・初期化して通常 wrap に接続。B は既存�
 - platform ［np2_check_hostdrv → platform_np2_check_hostdrv @ platform/pc98/device_host.c］ ［loop_attach → platform_loop_dev_attach @ platform/pc98/device_loop.c］ ［loop_detach → platform_loop_dev_detach @ platform/pc98/device_loop.c］ ［loop_status → platform_loop_dev_status @ platform/pc98/device_loop.c］
 - ide ［ide_init → platform_ide_init @ platform/pc98/device_ide.c］ ［ide_drive_present → platform_ide_drive_present @ platform/pc98/device_ide.c］ ［ide_identify → platform_ide_identify @ platform/pc98/device_ide.c］ ［ide_read_sector → platform_ide_read_sector @ platform/pc98/device_ide.c］
 - ide ［ide_write_sector → platform_ide_write_sector @ platform/pc98/device_ide.c］ ［ide_write_sectors → platform_ide_write_sectors @ platform/pc98/device_ide.c］ ［ide_get_info → platform_ide_get_info @ platform/pc98/device_ide.c］ ［hdd_geom_info → hdd_geom_info @ platform/pc98/bootinfo_geom.c］
-- ext2 ［ext2_format → platform_ext2_format @ platform/pc98/device_fs.c］ ［ext2_format_at → platform_ext2_format_at @ platform/pc98/device_fs.c］
+- ext2 ［ext2_format → platform_ext2_format @ kernel/dev/device_fs.c］ ［ext2_format_at → platform_ext2_format_at @ kernel/dev/device_fs.c］
 - kcg ［kcg_init → platform_kcg_init @ platform/pc98/device_kcg.c］ ［kcg_set_scale → platform_kcg_set_scale @ platform/pc98/device_kcg.c］ ［kcg_read_ank → kcg_read_ank @ drivers/video/kcg/kcg.c］ ［kcg_read_kanji → kcg_read_kanji @ drivers/video/kcg/kcg.c］
 - kcg ［kcg_load_font → platform_kcg_load_font @ platform/pc98/device_kcg.c］
 - pci ［pci_count → platform_pci_count @ platform/pc98/device_pci.c］ ［pci_get → platform_pci_get @ platform/pc98/device_pci.c］ ［pci_cfg_read32 → platform_pci_cfg_read32 @ platform/pc98/device_pci.c］ ［pci_bind_info → kapi_pci_bind_info @ kapi/kapi_sys.c］
-- serialfs ［sfs_begin → platform_serialfs_session_begin @ platform/pc98/device_fs.c］ ［sfs_end → platform_serialfs_session_end @ platform/pc98/device_fs.c］
+- serialfs ［sfs_begin → platform_serialfs_session_begin @ kernel/dev/device_fs.c］ ［sfs_end → platform_serialfs_session_end @ kernel/dev/device_fs.c］
 - path ［path_get_drive → path_get_drive_user @ exec/exec_tramp_strings.inc］ ［path_get_cwd → path_get_cwd_user @ exec/exec_tramp_strings.inc］ ［path_set_drive → path_set_drive @ lib/path.c］ ［path_set_cwd → path_set_cwd @ lib/path.c］
 - path ［path_parse → path_parse @ lib/path.c］
 - db ［db_open → kapi_db_open @ kapi/kapi_db.c］ ［db_close → kapi_db_close @ kapi/kapi_db.c］ ［db_exec → kapi_db_exec @ kapi/kapi_db.c］ ［db_prepare → kapi_db_prepare @ kapi/kapi_db.c］
@@ -185,7 +185,7 @@ A の場合も、対象像が持つ弱い代役に解決されていないこと
 |5c|本線 exec/surface_query.c → PPC 公開表|console/graphics 所有者と世代を公開。gfx2 列挙、caps、surface、lock、submit/fence、表示 ops の順|
 |5d|本線 kernel/gui.c|表示と入力の契約成立後、該当する exec 終了フックだけを実装選択。shell→GUI→shell の寿命を確認|
 |6a|PPC drivers/macintosh/ の VIA 装置 → platform/powermac/system.c|wt/ppc-reset の 955665762、docs/decisions/ppc/PPC_RESET_DESIGN.md の順。後続の rtc_read も同じ via_command を使用。再起動1本を先に公開、時計は同一装置を登録して別段で公開|
-|6f|本線 device_fs.c・device_loop.c の固定名転送|serialfs・loop・ext2 の順に一組ずつ両像共通の TU に純移動。device_host.c の既存 PPC 転送も選択を切り替え、各固定名の定義を一つにする|
+|6f|転送先 TU は `kernel/dev/device_fs.c`・`kernel/dev/device_host.c` (2026-11-19 に移した)。loop (`kernel/dev/device_loop.c` の予定) は保留 — 転送先の loop_dev_* が装置のヘッダ drivers/block/loop_dev.h にしか無く、共通から呼ぶ契約 (include/ の宣言) ができるまで platform/pc98/device_loop.c に残す|serialfs・loop・ext2 の順に一組ずつ両像共通の TU に純移動。device_host.c の既存 PPC 転送も選択を切り替え、各固定名の定義を一つにする。PowerPC の EXEC 像は device_fs.o を選ぶが、中の転送先 (ext2_format*・serialfs_session_*) は PowerPC に無く、-ffunction-sections と --gc-sections で捨てられてリンクが通っている (6b・6c で転送先が入るまでの前提)|
 |6b|本線 fs/serialfs/serialfs_session.c → PPC hostfs_link_io.c|協調進行と session の所有を確定。既存のユーザー shell の transport を二重に初期化しない|
 |6c|本線 drivers/block/loop_dev.c → fs/ext2/ext2_fmt.c|仮想媒体の attach と書込権限を通してから formatter を選択。loop と ext2 は独立公開|
 |6d-i|本線 drivers/pci/pci.c|mech1 を config 後端に分離して NP21/W で照合。別の純移動段で pci_record・pci_scan_bus・count/get・bind 台帳と固定名転送を共有|

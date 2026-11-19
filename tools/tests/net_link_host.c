@@ -289,7 +289,7 @@ int np2_get_version(char *b, int n) { (void)b; (void)n; return 0; }
 int np2_get_cpu(char *b, int n) { (void)b; (void)n; return 0; }
 int np2_get_clock(char *b, int n) { (void)b; (void)n; return 0; }
 int np2_check_hostdrv(char *b, int n) { (void)b; (void)n; return 0; }
-#include "../../platform/pc98/device_host.c"
+#include "../../kernel/dev/device_host.c"
 #include "../../kapi/kapi_host.c"
 #include "kapi_profile.h"
 #include "generated_host_open.inc"

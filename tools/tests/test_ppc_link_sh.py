@@ -19,7 +19,7 @@ CHECK = dict(name='ppc-link-sh', env=['ppc-cross'], tier=1, needs=[], budget=60,
             'platform/powermac/hostfs_boot.c', 'platform/powermac/hostfs_link_io.c',
             'platform/powermac/hostfs_link_peer.c',
             'net/host_mailbox.c', 'net/link.c', 'net/nic.c',
-            'platform/powermac/device_host.c', 'platform/powermac/usb_boot.c',
+            'kernel/dev/device_host.c', 'platform/powermac/usb_boot.c',
             'platform/powermac/link_platform.c', 'platform/powermac/link_platform.h',
             'platform/powermac/input_boot.c', 'platform/powermac/console_stream.c',
             'platform/powermac/console_log.c', 'platform/powermac/shell_boot.c',
@@ -133,7 +133,7 @@ def selection(tmp, mutate):
         assert 'build/out/ppc-user/link-sh/sh.bin' in link[1].split()
         absent=['hostfs_io','hostfs_peer','lan_wire','lan_terminal','terminal_input']
         assert all('platform/powermac/'+name+'.c' not in link[2].split() for name in absent)
-        assert all(name in link[2].split() for name in ['net/link.c','net/host_mailbox.c','net/nic.c','platform/powermac/device_host.c','platform/powermac/usb_boot.c',
+        assert all(name in link[2].split() for name in ['net/link.c','net/host_mailbox.c','net/nic.c','kernel/dev/device_host.c','platform/powermac/usb_boot.c',
             'platform/powermac/hostfs_link_io.c','platform/powermac/hostfs_link_peer.c','platform/powermac/hostfs_boot.c'])
         for flags,out in [(['KBOOT_SH=1','KBOOT_LINK=0'],'sh'),(['KBOOT_LINK=1'],'link'),(['KBOOT_SHELL=1','KBOOT_LINK=0'],'shell')]:
             assert manifest(path,flags,['KB_OUT'])[0]=='build/out/ppc-kboot/'+out
