@@ -82,7 +82,7 @@ const SfsIo hs_sfs_io = {put, get, now, idle, can_wait, put_until};
 #define CHECK(x) do { if (!(x)) return __LINE__; } while (0)
 static int suite(void)
 {
-    struct SfsPersistentConfig cfg = {&hs_sfs_io, 0, 1};
+    struct SfsPersistentConfig cfg = {.io = &hs_sfs_io, .lan_enabled = 1};
     static const struct vfs_device_name names[] = {
         {SERIALFS_DEVNAME, VFS_NAME_EXACT, VFS_DEV_SERIAL, 0, 1}
     };
@@ -110,6 +110,8 @@ static int suite(void)
     vfs_umount(SERIALFS_PREFIX);
     serialfs_forbid();
     CHECK(sfs_persistent_start(&cfg) == 0);
+    struct SfsTransportInfo info = {"?", {0}, 0};
+    CHECK(sfs_persistent_describe(&info) < 0 && kstrcmp(info.nic, "?") == 0);
     cfg.lan_enabled = 0; cfg.io = 0; /* config is copied */
     CHECK(sfs_persistent_start(&cfg) == OS32_ERR_BUSY);
     client = sfs_persistent_client();
@@ -124,6 +126,17 @@ static int suite(void)
     CHECK(hello_count == 1 && client->sid && client->max_payload == SFS_LAN_MAX_PAYLOAD);
     gen = sfs_persistent_generation(); sid = client->sid;
     CHECK(sfs_ensure_session(hs_now() + 100) == 0 && client->sid == sid);
+    CHECK(sfs_persistent_scope_begin_owned(41) == 0);
+    CHECK(sfs_persistent_scope_begin_owned(42) == OS32_ERR_BUSY);
+    CHECK(sfs_persistent_scope_end_owned(42, 7) == OS32_ERR_INVAL);
+    sfs_persistent_scope_owner_exit(42);
+    CHECK(sfs_persistent_scope_end_owned(41, 7) == 0);
+    CHECK(sfs_persistent_scope_begin_owned(42) == 0);
+    sfs_persistent_scope_owner_exit(42);
+    CHECK(sfs_persistent_scope_begin_owned(41) == 0);
+    CHECK(sfs_persistent_scope_end_owned(41, 0) == 0);
+    CHECK(vfs_is_mounted(SERIALFS_PREFIX) && sfs_persistent_client() == client);
+    CHECK(client->sid == sid && sfs_persistent_generation() == gen && !bye_count && hello_count == 1);
     hs_advance(2999);
     CHECK(sfs_ensure_session(hs_now() + 100) == 0 && hello_count == 1);
     hs_advance(3000);

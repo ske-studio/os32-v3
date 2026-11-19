@@ -29,6 +29,7 @@
 #include "kernel/idle_work.h"
 #include "kprintf.h"
 #include "kstring.h"
+#include "fs/fd_redirect.h"
 #include "appslot.h"            /* APP_ID_SHELL */
 #include "os32_kapi_shared.h"
 #include "sfs_lan.h"
@@ -44,7 +45,6 @@
  * reports start, counters and exit directly through the serial console. */
 
 extern volatile u32 tick_count;
-extern int res_owner_get(void);
 
 /* 保留ログを生出力する際の排出バッファ容量。 */
 #define SFS_HOLD_FLUSH_BUF_SIZE 64
@@ -223,15 +223,14 @@ int serialfs_session_begin(void)
     int rc;
 
     if (sfs_persistent_enabled()) {
-        rc = sfs_persistent_scope_begin();
+        struct SfsTransportInfo ti = { "?", {0}, 0 };
+        rc = sfs_persistent_scope_begin_owned(res_owner_get());
         if (rc != 0) return rc;
-        const SfsClient *c = sfs_persistent_client();
-        /* I1 keeps the resident LAN transport alive for the boot lifetime. */
-        const SfsLan *lan = c->ctx;
-        kprintf(KLOG_LEGACY_CYAN,
-                "sfs: transport=lan nic=82557 peer=%02x:%02x:%02x:%02x:%02x:%02x sid=%u\n",
-                (u32)lan->peer[0], (u32)lan->peer[1], (u32)lan->peer[2],
-                (u32)lan->peer[3], (u32)lan->peer[4], (u32)lan->peer[5], c->sid);
+        (void)sfs_persistent_describe(&ti);
+        console_printf(KLOG_LEGACY_CYAN,
+                "sfs: transport=lan nic=%s peer=%02x:%02x:%02x:%02x:%02x:%02x sid=%u\n",
+                ti.nic, (u32)ti.peer[0], (u32)ti.peer[1], (u32)ti.peer[2],
+                (u32)ti.peer[3], (u32)ti.peer[4], (u32)ti.peer[5], sfs_persistent_client()->sid);
         return 0;
     }
 
@@ -334,12 +333,17 @@ int sfs_lan_peer_mac(u8 *out)
 int serialfs_session_end(int exit_code)
 {
     if (sfs_persistent_enabled()) {
-        int rc = sfs_persistent_scope_end(exit_code);
-        if (rc == 0) kprintf(KLOG_LEGACY_CYAN, "sfs: exit=%d\n", exit_code);
+        int rc = sfs_persistent_scope_end_owned(res_owner_get(), exit_code);
+        if (rc == 0) console_printf(KLOG_LEGACY_CYAN, "sfs: exit=%d\n", exit_code);
         return rc;
     }
 
     if (res_owner_get() != APP_ID_SHELL) return OS32_ERR_INVAL;
     if (!g_active) return OS32_ERR_INVAL;
     return sfs_finish(exit_code);
+}
+
+void serialfs_session_owner_exit(int owner)
+{
+    sfs_persistent_scope_owner_exit(owner);
 }
