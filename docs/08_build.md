@@ -1130,7 +1130,7 @@ budget は重みの2倍で、超過は警告だけ。未計測の検査は CHECK
 |---|---|
 | 起動 | `main` / `wt/**` への push、tag `v*` の push、手動 (workflow_dispatch)。同じ ref の古い run は打ち切る |
 | ビルド | `artifacts`: `make -j$(nproc) all` → `make -j$(nproc) deploy-u3 iso` (一時 `HOSTDRV_DIR` / `NP21W_DIR`) → upload。配布物の 1 呼出しで起動 FD 2 種・ISO・HostDrv を同じ build に揃え、世代表・期待表を今の成果物から再生成する。並列の `checks` 6本: `make -k check CHECK_SHARD=i/6` (全部の検査を変異込み。必要な前提だけ準備、同じ SHA の統合枝で成功済みなら検査を省略) |
-| 準備・runner | `.github/actions/build-setup/action.yml` が ccache の静的本体 (版と SHA-256 を固定)・apt・Rust・クロスツールチェーンとフォントのキャッシュ・取得を共有する。配布物と検査ジョブは `ubuntu-latest` (自前の runner substream は遅いので使わない、ユーザー決定 2026-11-05)。同じ ref の concurrency をジョブ別にも設ける |
+| 準備・runner | `.github/actions/build-setup/action.yml` が ccache の静的本体 (版と SHA-256 を固定)・apt・Rust・クロスツールチェーンとフォントのキャッシュ・取得を共有する。配布物は常に `ubuntu-latest`。検査は `ske-studio` が `ske-studio/os32-v3` の `main`・`wt/**` へ push した初回だけ、`OS32_SELFHOST_SHARDS` (番号の JSON 配列、例 `[4]`) のシャードを ci-server で実行し、ほかは標準で実行する。同じ ref の concurrency をジョブ別にも設ける |
 | submodule | **`apps/` と `game/` (private submodule) は v3 の CI では組まない** (ユーザー決定 2026-09-30: 今回の開発に要らないので `SUBMODULE_TOKEN` は登録しない)。必要になったら secret `SUBMODULE_TOKEN` (os32-apps / os32-game の Contents: read を持つ fine-grained PAT) で submodule 取得 + `make external` の step を足す (FORK_PLAN §3 d ③ (アーカイブ: `docs/archive/v3/FORK_PLAN.md`)) |
 | フォント | IPAex の TTF はリポジトリに無く `tools/fetch_fonts.py` が IPA の公式配布から取る (§8-2)。CI は `OS32_ACCEPT_IPA_LICENSE=1` で非対話に同意し (リポジトリ所有者が同意済みの前提)、取れた ttf を key `ipaex-<zip の SHA-256>` (`fetch_fonts.py --print-zip-sha256`) で `actions/cache` に置く |
 | 文書だけの push | `docs/**`・`*.md`・`.claude/**` だけの push では回さない (`paths-ignore`。文書の検査は `check.yml`)。同じ ref の run は 1 つ (`cancel-in-progress`) なので、**run の途中でその ref へ push すると打ち切られる** |
@@ -1139,6 +1139,12 @@ budget は重みの2倍で、超過は警告だけ。未計測の検査は CHECK
 | Rust | `rust-toolchain.toml` (nightly + rust-src) を `rustup toolchain install` (引数なし) で解決。`target/` のキャッシュは無し (最小構成。遅ければ `Swatinem/rust-cache` を足す) |
 | apt | `build-essential nasm genisoimage e2fsprogs qemu-user clang libclang-dev llvm-dev python3-clang` + ツールチェーン構築の `libgmp-dev libmpfr-dev libmpc-dev texinfo bison flex`。`.deb` を `actions/cache` に保存し、キーは OS の版・arch・runner image の版・パッケージ一覧の SHA-256。miss 時だけ既定ミラーから取得し、復元後は `/var/cache/apt/archives` から `--no-download` で入れる。Host dependencies の上限は 1200 秒、共通準備全体は 90 分。Python は `requirements.txt`。FD イメージは `tools/mkfat12.py` (純 Python) なので mtools は要らない |
 | 上限 | 配布物・各検査シャードとも `timeout-minutes: 150` |
+
+- 次の実行から全シャードを標準に戻すには、リポジトリ変数 `OS32_SELFHOST_SHARDS` を `[]` にする。未設定・空でもすべて標準になる。
+- 自前の runner を待っている実行は取り消し、取り消しの完了を待つ。
+- 同じ実行を回し直すと、変数の値にかかわらず全シャードが標準で動く。
+- 変数は数の JSON 配列 (`[]` か `[4]` のような形) だけにする。壊れた JSON は、信頼された push の checks の 6 本を全部赤にする。配列でない値 (`14` など) は文字列の部分一致になり、意図しないシャードが自前に乗る。
+- 自前の runner が止まっていると、そのシャードは GitHub の側で queued のまま待ち、自動では標準に戻らない (待ちは timeout-minutes に数えない)。queued が 10 分を越えたら、変数を `[]` に戻して取り消し・回し直す (スキル os32-ci-read)。
 
 **成果物** (artifact 名 `os32-<ブランチ名の / を - に>-<sha7>`、保持 30 日):
 

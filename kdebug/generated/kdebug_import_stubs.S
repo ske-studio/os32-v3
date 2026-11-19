@@ -1626,4 +1626,19 @@ v86_bios_real_lowmem:
 pci_bar_get:
     jmp *kdebug_import_slots+1296
 .size pci_bar_get, .-pci_bar_get
+.globl path_set_drive
+.type path_set_drive, @function
+path_set_drive:
+    jmp *kdebug_import_slots+1300
+.size path_set_drive, .-path_set_drive
+.globl path_set_cwd
+.type path_set_cwd, @function
+path_set_cwd:
+    jmp *kdebug_import_slots+1304
+.size path_set_cwd, .-path_set_cwd
+.globl path_init
+.type path_init, @function
+path_init:
+    jmp *kdebug_import_slots+1308
+.size path_init, .-path_init
 .section .note.GNU-stack,"",@progbits

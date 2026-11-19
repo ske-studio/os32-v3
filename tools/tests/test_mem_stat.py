@@ -5,7 +5,7 @@ Product functions are extracted verbatim; mutations must compile and fail a
 named runtime assertion (compiler failure is never RED).
 """
 CHECK = dict(name='mem-stat-host', tier=1,
-    covers=['tools/tests/font_guard_inactive.h', 'exec/exec_heap.c', 'exec/exec_heap.h', 'mm/kmalloc.c', 'mm/kmalloc.h', 'exec/redir_access.c', 'exec/access_walk.c', 'tools/tests/exec_heap_host.h', 'sdk/kapi.json', 'kapi/kapi_generated.c', 'exec/exec.c', 'exec/appslot.c', 'exec/lease.c', 'exec/appslot.h', 'exec/appmem.c', 'mm/paging_app.c', 'exec/appmem_map.c', 'exec/appmem_unmap.c', 'exec/appmem.h', 'mm/paging_app.h', 'mm/paging.c', 'mm/paging.h', 'mm/pgalloc.c', 'mm/pgalloc.h', 'mm/physmem.c', 'mm/physmem.h', 'include/appmem_types.h', 'sdk/include/os32/os32_kapi_shared.h', 'include/types.h', 'include/memmap.h', 'include/io.h', 'include/cpu.h', 'include/pc98.h', 'include/sys.h', 'include/text_screen.h', 'arch/x86/kernel/gdt.h', 'arch/x86/kernel/tss.h', 'arch/x86/arch_cpu.h', 'arch/x86/x86_flags.h', 'arch/x86/arch_io.h', 'lib/kstring.h', 'tools/tests/appmem_map_host.c', 'tools/tests/test_appmem_map.py', 'tools/tests/pgalloc_host_fixture.h', 'tools/tests/host_arch/arch_cpu.h', 'tools/tests/host_arch/arch_io.h', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'platform/pc98/platform_io.h', 'kapi/kapi_sys.c', 'kapi/kapi_sysinfo.c', 'platform/pc98/platform_build_info.h', 'kernel/sqlite_engine.c', 'kernel/sqlite_engine.h', 'userland/shell/cmd_sys.c', 'tools/tests/mem_stat_host.c', 'tools/tests/kdebug_cli_host.c', 'exec/ring3_str.c', 'userland/tests/mem_stat_test.c', 'userland/tests/mem_stat_compat_test.c', 'userland/tests/kdebug_probe.c', 'userland/shell/cmd_base.c', 'userland/shell/shell.h', 'kernel/module/module.h', 'kernel/module/module_runtime.h', 'kernel/module/module_image.h', 'init/kaudit_boot.c', 'kernel/kselftest.h', 'mm/memory_boot.c', 'mm/memory_boot.h', 'include/platform_memory.h', 'platform/pc98/platform_memory_desc.h', 'include/kprintf.h', 'init/sysconfig.c', 'exec/owner_diag.h', 'kernel/kstack_hw.c', 'kernel/kstack_hw.h', 'platform/pc98/kernel.c', 'tools/tests/kernel_layout.py', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'tools/tests/paging_source.py', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h'],
+    covers=['tools/tests/font_guard_inactive.h', 'exec/exec_heap.c', 'exec/exec_heap.h', 'mm/kmalloc.c', 'mm/kmalloc.h', 'exec/redir_access.c', 'exec/access_walk.c', 'tools/tests/exec_heap_host.h', 'sdk/kapi.json', 'kapi/kapi_generated.c', 'exec/exec.c', 'exec/appslot.c', 'exec/lease.c', 'exec/appslot.h', 'exec/appmem.c', 'mm/paging_app.c', 'exec/appmem_map.c', 'exec/appmem_unmap.c', 'exec/appmem.h', 'mm/paging_app.h', 'mm/paging.c', 'mm/paging.h', 'mm/pgalloc.c', 'mm/pgalloc.h', 'mm/physmem.c', 'mm/physmem.h', 'include/appmem_types.h', 'sdk/include/os32/os32_kapi_shared.h', 'include/types.h', 'include/memmap.h', 'include/io.h', 'include/cpu.h', 'include/pc98.h', 'include/sys.h', 'include/text_screen.h', 'arch/x86/kernel/gdt.h', 'arch/x86/kernel/tss.h', 'arch/x86/arch_cpu.h', 'arch/x86/x86_flags.h', 'arch/x86/arch_io.h', 'lib/kstring.h', 'tools/tests/appmem_map_host.c', 'tools/tests/test_appmem_map.py', 'tools/tests/pgalloc_host_fixture.h', 'tools/tests/host_arch/arch_cpu.h', 'tools/tests/host_arch/arch_io.h', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'platform/pc98/platform_io.h', 'kapi/kapi_sysinfo.c', 'platform/pc98/platform_build_info.h', 'platform/pc98/platform_mem_stat.h', 'platform/powermac/platform_mem_stat.h', 'tools/tests/mem_stat_source.py', 'kernel/sqlite_engine.c', 'kernel/sqlite_engine.h', 'userland/shell/cmd_sys.c', 'tools/tests/mem_stat_host.c', 'tools/tests/kdebug_cli_host.c', 'exec/ring3_str.c', 'userland/tests/mem_stat_test.c', 'userland/tests/mem_stat_compat_test.c', 'userland/tests/kdebug_probe.c', 'userland/shell/cmd_base.c', 'userland/shell/shell.h', 'kernel/module/module.h', 'kernel/module/module_runtime.h', 'kernel/module/module_image.h', 'init/kaudit_boot.c', 'kernel/kselftest.h', 'mm/memory_boot.c', 'mm/memory_boot.h', 'include/platform_memory.h', 'platform/pc98/platform_memory_desc.h', 'include/kprintf.h', 'init/sysconfig.c', 'exec/owner_diag.h', 'kernel/kstack_hw.c', 'kernel/kstack_hw.h', 'platform/pc98/kernel.c', 'tools/tests/kernel_layout.py', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'tools/tests/paging_source.py', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h'],
     needs=['make:all'], budget=6.6,
     basis=['KAPI_SPEC §3-3', 'KAPI_SPEC §4-12'],
 )
@@ -21,12 +21,13 @@ import subprocess
 import tempfile
 import unicodedata
 
+from mem_stat_source import mem_stat_source
 import host32
 import test_appmem_map as base
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 TARGET_SRCS = base.TARGET_SRCS + [
-    'kapi/kapi_sys.c', 'kapi/kapi_sysinfo.c', 'platform/pc98/platform_build_info.h', 'include/user_read_contract.h', 'userland/shell/cmd_sys.c', 'userland/shell/cmd_base.c', 'kernel/module/module.h',
+    'kapi/kapi_sysinfo.c', 'platform/pc98/platform_build_info.h', 'platform/pc98/platform_mem_stat.h', 'platform/powermac/platform_mem_stat.h', 'include/user_read_contract.h', 'userland/shell/cmd_sys.c', 'userland/shell/cmd_base.c', 'kernel/module/module.h',
     'tools/tests/mem_stat_host.c', 'tools/tests/kdebug_cli_host.c', 'tools/tests/test_mem_stat.py',
     'kernel/sqlite_engine.c', 'init/sysconfig.c', 'init/kaudit_boot.c', 'mm/memory_boot.c',
     'mm/memory_boot.h', 'kernel/kselftest.h', 'include/kprintf.h',
@@ -125,12 +126,16 @@ void __cdecl kprintf(u8 attr, const char *fmt, ...) {
 MUTANTS = [
     ('mem_stat prints services', 'kmemcpy(out, &snap, snap.size);',
      'kmemcpy(out, &snap, snap.size); if (!app_id) services_report();', 'mem_stat output zero'),
-    ('module state absent', 'snap.kdebug_state = kdebug.state;', '', 'module state'),
-    ('module pair absent', 'snap.kdebug_pair_crc = kdebug.pair_crc;', '', 'module pair'),
-    ('module body absent', 'snap.kdebug_pages = kdebug.pages;', '', 'module body'),
+    ('audit misses boot failures', '+\n                      boot_pages_audit_fail;', ';', 'boot pages mismatch'),
+    ('prefix scans stack', 'size > __builtin_offsetof', 'size >= __builtin_offsetof', 'prefix avoids stack scan'),
+    ('stack scanned with IRQ disabled', 'platform_mem_stat_pre(&snap, size);\n    snap.kheap_total = kmalloc_total();\n    snap.kheap_used = kmalloc_used();\n    snap.kheap_free = kmalloc_free();\n    irq = irq_save();',
+     'snap.kheap_total = kmalloc_total();\n    snap.kheap_used = kmalloc_used();\n    snap.kheap_free = kmalloc_free();\n    irq = irq_save();\n    platform_mem_stat_pre(&snap, size);', 'kstack scan IRQ enabled'),
+    ('module state absent', 'snap->kdebug_state = kdebug.state;', '', 'module state'),
+    ('module pair absent', 'snap->kdebug_pair_crc = kdebug.pair_crc;', '', 'module pair'),
+    ('module body absent', 'snap->kdebug_pages = kdebug.pages;', '', 'module body'),
     ('module owner from body', 'kdebug.state == KDEBUG_RUNNING && kdebug.owner ?\n        ledger_owner_pages(kdebug.owner) : 0', 'kdebug.pages', 'module owner ledger'),
     ('module retired owner reused', 'kdebug.state == KDEBUG_RUNNING && kdebug.owner', 'kdebug.owner', 'module owner ledger'),
-    ('module opens absent', 'snap.kdebug_open_count = kdebug.open_count;', '', 'module opens'),
+    ('module opens absent', 'snap->kdebug_open_count = kdebug.open_count;', '', 'module opens'),
     ('owner absent', 'snap.owner_pages = ledger_owner_pages(as->owner);', '', 'owner pages'),
     ('diagnostics absent', 'snap.fault_kill_count = fault_kill_count;', '', 'diagnostic system'),
     ('lease absent', 'snap.lease_active += slot->as->leases[i].token != 0;', '(void)i;', 'active leases'),
@@ -165,8 +170,7 @@ def run_body(runner, mutate):
     assert exe.index('appslot_start_commit(id, gui, need_pages);') < exe.index('if (want_ring3) exec_owner_diag(ctx, 0, 0, 0);')
     boot = (ROOT / 'platform/pc98/kernel.c').read_text()
     assert boot.count('kstack_hw_init();') == 1 and boot.index('kstack_hw_init();') < boot.index('platform_boot_capture();')
-    source = (ROOT / 'kapi/kapi_sys.c').read_text()
-    source = source[source.index('STATIC_ASSERT(sizeof(MemStat)'):source.index('/* The generated __cdecl wrapper')]
+    source = mem_stat_source((ROOT / 'kapi/kapi_sysinfo.c').read_text())
     with tempfile.TemporaryDirectory(prefix='memstat-') as directory:
         tmp = pathlib.Path(directory)
         cc = build_fixture(tmp)

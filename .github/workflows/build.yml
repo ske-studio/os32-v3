@@ -182,7 +182,7 @@ jobs:
       fail-fast: false
       matrix:
         shard: [0, 1, 2, 3, 4, 5]
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(github.event_name == 'push' && github.run_attempt == 1 && github.repository == 'ske-studio/os32-v3' && github.actor == 'ske-studio' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/wt/')) && contains(fromJSON(vars.OS32_SELFHOST_SHARDS || '[]'), matrix.shard) && '["self-hosted","linux","x64","os32-ci"]' || '"ubuntu-latest"') }}
     timeout-minutes: 150
     concurrency:
       group: build-${{ github.ref }}-checks-${{ matrix.shard }}

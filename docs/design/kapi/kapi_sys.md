@@ -6,6 +6,8 @@
 
 - `kapi_serial_diag`のNULL判定と0戻りを保ち `port_diag_get(&out->oe,...)` に変更。SerialDiagの並び・出力検査は既存どおり。
 
+- 共通の `kapi_sysinfo.c` が `kapi_mem_stat` を実装する。PowerMac では診断欄は 0 で、`kstack_high_water = 0` は未計測を含む。
+
 - ビルド日時は共通 TU の `kapi/kapi_sysinfo.c` の `__DATE__` / `__TIME__` を使う。
 
 NULL／不一致は OS32_ERR_INVAL、書込みなし。成功 0、全体ゼロ初期化、NUL 終端。
