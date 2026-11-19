@@ -2,6 +2,9 @@
 #ifndef OS32_DISPLAY_FALLBACK_H
 #define OS32_DISPLAY_FALLBACK_H
 #define DISPLAY_FALLBACK_BACKEND (&gfx_backend_pc98)
+#define DISPLAY_V1_WIDTH GFX_WIDTH
+#define DISPLAY_V1_PRESENT_OK() 1
+#define DISPLAY_V1_PUBLIC_INIT_OK() do { } while (0)
 /* PC-98 のテキスト面は別なので、表示を戻す操作は要らない。 */
 static inline void display_provider_console_return(void) { }
 
