@@ -8,6 +8,7 @@ PROVIDER_EXTERNS = frozenset({
     "extern void kapi_sys_exit(int status);",
     "extern int kapi_serial_diag(SerialDiag *out);",
     "extern int kapi_sys_set_mtime(const char *path, u32 mtime);",
+    "extern int kapi_sys_ver_info(void *out, u32 size);",
 })
 
 PROVIDER_GROUPS = {
@@ -123,7 +124,6 @@ PROVIDER_GROUPS = {
         'sys_get_build_info',
         'sys_time_now',
         'mem_stat',
-        'sys_ver_info',
     }), frozenset([])),
     'ime': (frozenset({
         'ime_getchar',

@@ -330,6 +330,7 @@
     "pit-clock-host": 2.799469,
     "platform-memory-host": 2.646895,
     "ppc-fb": 623.865231,
+    "ppc-ver-guest": 623.865231,
     "ppc-fp-accept-host": 0.277654,
     "ppc-fp-guest": 389.666821,
     "ppc-link-sh-run": 1024.223467,

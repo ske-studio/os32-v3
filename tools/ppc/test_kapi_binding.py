@@ -47,7 +47,7 @@ sfs_end snd_bgm_is_playing snd_bgm_play snd_bgm_set_persist snd_bgm_stop
 snd_focus snd_se_play snd_se_play_raw snd_set_master ssg_all_off ssg_tone
 ssg_volume sys_get_build_info
 sys_switch_shell
-sys_time_now sys_ver_info v86_boot v86_boot2 v86_disktest
+sys_time_now v86_boot v86_boot2 v86_disktest
 v86_gdc_capture v86_selftest
 """.split())
 
@@ -67,6 +67,7 @@ gfx2_cursor_move gfx2_cursor_show gfx2_dpms
 ALLOWED_UNDEFINED = frozenset("""
 surface_api_bundle
 boot_image_info
+kapi_sys_ver_info
 surface_api_query
 surface_api_lease
 surface_api_unlease
@@ -273,6 +274,8 @@ def generate(tmp, mutation=None):
                  "'font_source_open', 'font_source_read_at', 'font_source_close', "
                  "'unicode_to_jis'}), frozenset()),\n")
         insert_group(helper, mutation, group)
+    if mutation == "ver-absent":
+        insert_group(helper, mutation, "    'ver': (frozenset({'sys_ver_info'}), frozenset()),\n")
     if mutation == 'rtc-absent':
         if "'rtc_read'" in helper.read_text():
             raise RuntimeError('rtc-absent: expected rtc_read published')
@@ -324,7 +327,7 @@ def main():
             [str(nm), '-u', str(tmp / 'kapi.o')], text=True).splitlines()}
         if 'sys_reboot' not in undefined:
             print('missing sys_reboot provider'); return 1
-        missing = {'boot_image_info', 'exec_tvram_read_allowed', 'pm_console_clear', 'tvram_putchar_at',
+        missing = {'kapi_sys_ver_info', 'boot_image_info', 'exec_tvram_read_allowed', 'pm_console_clear', 'tvram_putchar_at',
                    'tvram_putkanji_at', 'tvram_readchar_at', 'tvram_reverse_cell',
                    'tvram_scroll', 'shm_alloc', 'shm_free', 'shm_lock',
                    'font_lease_app_open', 'font_lease_app_read_at',

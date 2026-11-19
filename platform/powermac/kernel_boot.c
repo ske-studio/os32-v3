@@ -19,6 +19,9 @@
 #include "rh_observe.h"
 #include "kstring.h"
 #include "via_window.h"
+#if KBOOT_SHELL || KBOOT_SH
+#include "platform_ver.h"
+#endif
 #if KBOOT_SH
 #include "usb_boot.h"
 _Static_assert(PM_VIA_VA + PM_VIA_BYTES <= PPC_BOOT_USB_VA ||
@@ -291,6 +294,9 @@ void ppc_kernel_real_start(const struct pm_kboot_info *info)
     u32 pvr;
     boot_info = info;
     if (!ppc_cpu_identify(&pvr)) ppc_stop();
+#if KBOOT_SHELL || KBOOT_SH
+    pm_ver_note_pvr(pvr);
+#endif
     ppc_cpu_disable_bats(pvr);
     ppc_cpu_power_init(pvr);
     /* IP was cleared by takeover; copy/synchronize the D1 low-vector image. */
