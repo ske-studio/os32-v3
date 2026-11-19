@@ -2,7 +2,8 @@
 #define OS32_DISPLAY_FALLBACK_H
 extern GfxBackend gfx_backend_of_fb;
 #define DISPLAY_FALLBACK_BACKEND (&gfx_backend_of_fb)
-#define DISPLAY_V1_WIDTH ((int)gfx_backend_mode(g_backend)->width)
+int display_provider_v1_width(void);
+#define DISPLAY_V1_WIDTH (display_provider_v1_width())
 int display_provider_present_ok(void);
 void display_provider_public_init_ok(void);
 #define DISPLAY_V1_PRESENT_OK() display_provider_present_ok()

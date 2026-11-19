@@ -142,6 +142,13 @@ int display_provider_present_ok(void)
 
 void display_provider_raster_reset(void) { present_owner = 0; }
 
+/* The selected mode's width; 0 when no backend or mode (e.g. the "none" backend). */
+int display_provider_v1_width(void)
+{
+    const GfxMode *m = g_backend ? gfx_backend_mode(g_backend) : 0;
+    return m ? (int)m->width : 0;
+}
+
 /* The OF framebuffer has only packed modes. */
 void gfx_planar_present_dirty(int sync) { (void)sync; }
 void gfx_planar_present_raster(GFX_RasterPalTable *t) { (void)t; }
