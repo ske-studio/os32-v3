@@ -54,6 +54,26 @@ def observe(elf, folder, case):
                 repr((mode, body, result)))
         return body
 
+    def check_echo(mode):
+        word = 'restored' + mode
+        s.keys('echo ' + word + '\n')
+        output_row = None
+
+        def prompt_after_output():
+            nonlocal output_row
+            rows = s.screen(mode).splitlines()
+            for row, (line, following) in enumerate(zip(rows, rows[1:])):
+                if line.rstrip() == word and following.rstrip() == '>':
+                    output_row = row
+                    return True
+            return False
+
+        s.wait(prompt_after_output, mode + ' echo output and prompt')
+        pixels = Terminal(read_ppm(folder / (mode + '.ppm')),
+                          Font(ROOT / 'assets/fonts/shino16.kcgfont'),
+                          (255, 255, 255), (0, 0, 0), cursor_top=14)
+        require(pixels.compare_text(output_row, 0, word) is None, 'keyboard and console pixels')
+
     try:
         s.start()
         s.wait(s.ready, 'shell ready', 60)
@@ -76,15 +96,7 @@ def observe(elf, folder, case):
                     require(after[:-1] == before and after[-1] != before[-1], mode + ' recovery')
                     if mode == 'fault':
                         require(capacity == probe('capacity', 0, b'free tiles '), 'surface recovery')
-                    word = 'restored' + mode
-                    s.keys('echo ' + word + '\n')
-                    s.settle(.5)
-                    rows = s.screen(mode).splitlines()
-                    pixels = Terminal(read_ppm(folder / (mode + '.ppm')),
-                                      Font(ROOT / 'assets/fonts/shino16.kcgfont'),
-                                      (255, 255, 255), (0, 0, 0), cursor_top=14)
-                    require(any(line.strip() == word and pixels.compare_text(row, 0, word) is None
-                                for row, line in enumerate(rows)), 'keyboard and console pixels')
+                    check_echo(mode)
                 else:
                     require(after == before, case + ' unexpectedly restored')
         s.q.call('quit')
