@@ -241,8 +241,8 @@ def main():
                  '    if (gfx_policy_blocks_map(role)) return OS32_ERR_NOSYS;\n    int rc = surface_api_source(role, &source);\n    return rc ? rc : surface_lease(',
                  '    int rc = surface_api_source(role, &source);\n    return rc ? rc : surface_lease('),
                 ('exec/surface_query.c',
-                 '    if (gfx_policy_blocks_map(role)) return OS32_ERR_NOSYS;\n    int rc = surface_api_source(role, &source);\n    return rc ? rc : surface_lease_bundle(',
-                 '    int rc = surface_api_source(role, &source);\n    return rc ? rc : surface_lease_bundle(')]),
+                 '    if (gfx_policy_blocks_map(role)) return OS32_ERR_NOSYS;\n    int rc = gfx_surface_source(role, &source);',
+                 '    int rc = gfx_surface_source(role, &source);')]),
             ('bridge-guard', [('gfx/gfx_core.c',
                 '    if (gfx_policy_blocks_map(LEDGER_ROLE_CLIENT)) goto fail;', '')])]:
             result = run_case(None, args.runner, extra_changes=changes)

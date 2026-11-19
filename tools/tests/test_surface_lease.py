@@ -1,6 +1,6 @@
 """T2e e2: real lease/query/B1/managed paging, ILP32 runtime mutations."""
 CHECK = dict(name='surface-lease-host', tier=1,
-    covers=['arch/x86/kernel/kapi_call.c', 'include/kapi_call.h', 'include/syscall_code.h', 'arch/x86/kernel/syscall_code.c', 'platform/pc98/legacy/lowmap.c', 'mm/paging_lowmap.h', 'mm/paging_lowmap.inc', 'kdebug/selftest_lease.c', 'include/kselftest_probe.h', 'kdebug/selftest_internal.h', 'userland/lib/rt/ls.c', 'sdk/include/os32/ls.h', 'exec/access_walk.c', 'exec/lease.c', 'exec/redir_access.c', 'exec/surface_query.c', 'kdebug/kselftest.c', 'kdebug/kselftest/**', 'mm/paging.c', 'platform/pc98/platform_memory_desc.h', 'include/platform_memory.h', 'mm/pgalloc.c', 'mm/physmem.c', 'mm/shlib.c', 'tools/tests/access_walk_host.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/tests/surface_lease_host.c', 'tools/tests/test_access_walk.py', 'tools/tests/kernel_layout.py', 'tools/tests/surface_bundle_host.c', 'sdk/kapi.json', 'kapi/kapi_generated.c', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_surface.h', 'sdk/include/os32/os32_ls.h', 'exec/lease.h', 'exec/surface_query.h', 'exec/ring3_ls.c', 'mm/shm.c', 'tools/tests/test_public_surface.py', 'tools/tests/public_surface_host.c', 'tools/check_kapi_version.py', 'docs/KAPI_SPEC.md', 'exec/exec.c', 'README.md', 'docs/INDEX.md', 'arch/x86/kernel/ring3_ls.S', 'fs/ext2/ext2_vfs.c', 'fs/vfs.c', 'sdk/os32x_hdr.py', 'sdk/rust/os32api/src/kapi_generated.rs', 'tools/tests/kcallback_host.c', 'tools/tests/kcallback_result_host.c', 'tools/tests/test_kcallback.py', 'userland/rust/libos32gui/src/cfgro.rs', 'userland/tests/kcallback_test.c', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'tools/tests/paging_source.py', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h'],
+    covers=['include/display_provider.h', 'arch/x86/kernel/kapi_call.c', 'include/kapi_call.h', 'include/syscall_code.h', 'arch/x86/kernel/syscall_code.c', 'platform/pc98/legacy/lowmap.c', 'mm/paging_lowmap.h', 'mm/paging_lowmap.inc', 'kdebug/selftest_lease.c', 'include/kselftest_probe.h', 'kdebug/selftest_internal.h', 'userland/lib/rt/ls.c', 'sdk/include/os32/ls.h', 'exec/access_walk.c', 'exec/lease.c', 'exec/redir_access.c', 'exec/surface_query.c', 'kdebug/kselftest.c', 'kdebug/kselftest/**', 'mm/paging.c', 'platform/pc98/platform_memory_desc.h', 'include/platform_memory.h', 'mm/pgalloc.c', 'mm/physmem.c', 'mm/shlib.c', 'tools/tests/access_walk_host.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/tests/surface_lease_host.c', 'tools/tests/test_access_walk.py', 'tools/tests/kernel_layout.py', 'tools/tests/surface_bundle_host.c', 'sdk/kapi.json', 'kapi/kapi_generated.c', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_surface.h', 'sdk/include/os32/os32_ls.h', 'exec/lease.h', 'exec/surface_query.h', 'exec/ring3_ls.c', 'mm/shm.c', 'tools/tests/test_public_surface.py', 'tools/tests/public_surface_host.c', 'tools/check_kapi_version.py', 'docs/KAPI_SPEC.md', 'exec/exec.c', 'README.md', 'docs/INDEX.md', 'arch/x86/kernel/ring3_ls.S', 'fs/ext2/ext2_vfs.c', 'fs/vfs.c', 'sdk/os32x_hdr.py', 'sdk/rust/os32api/src/kapi_generated.rs', 'tools/tests/kcallback_host.c', 'tools/tests/kcallback_result_host.c', 'tools/tests/test_kcallback.py', 'userland/rust/libos32gui/src/cfgro.rs', 'userland/tests/kcallback_test.c', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'tools/tests/paging_source.py', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h'],
     needs=['make:all'], budget=6.8,
     basis=['KAPI_SPEC §3-3'],
 )
@@ -64,6 +64,7 @@ def main(fixture_name="surface_lease_host.c", mutants=MUTANTS, extra_sources=Non
     host32.begin_control(args.mutate, args.runner, ROOT)
     files = dict(walk.FILES, lease='exec/lease.c', surface_query='exec/surface_query.c')
     files.update(extra_sources or {})
+    providers = {key for key in files if key in ("pc98_bundle", "powermac_bundle")}
     paths = [ROOT / p for p in files.values()]
     paths += [ROOT / p for p in ('exec/lease.h', 'exec/surface_query.h',
         'tools/tests/' + fixture_name, 'tools/tests/test_surface_lease.py',
@@ -75,12 +76,17 @@ def main(fixture_name="surface_lease_host.c", mutants=MUTANTS, extra_sources=Non
         if 'v86' in files:
             (tmp / 'platform_emergency.h').write_text(
                 (ROOT / 'include/platform_emergency.h').read_text())
+        def provider_source(unit, body):
+            if unit in providers:
+                return '#define display_provider_bundle_ok ' + unit + '_ok\n' + body
+            return body
+
         for key, body in sources.items():
             if key in ('lease', 'surface_query'): continue
             if key == 'v86':
                 body = body.replace('P2V(V86_REMAP_START)',
                                     'host_low').replace('P2V(MEM_AUTOPLAY_MAILBOX_BASE)', '(host_low + MEM_AUTOPLAY_MAILBOX_BASE)')
-            (tmp / (key + '_host_source.c')).write_text(body)
+            (tmp / (key + '_host_source.c')).write_text(provider_source(key, body))
         io = (ROOT / 'tools/tests/host_arch/arch_io.h').read_text().replace(
             'static unsigned int host_arch_if = 0x202U;', 'extern unsigned int host_arch_if;')
         (tmp / 'arch_io.h').write_text(io)
@@ -103,6 +109,10 @@ def main(fixture_name="surface_lease_host.c", mutants=MUTANTS, extra_sources=Non
             prefix = lease_hook + '#define copy_to_caller host_lease_copyout\n#define copy_caller_bytes host_lease_copyin\n' if key == 'lease' else ''
             src.write_text(prefix + sources[key])
             objects[key] = tmp / (key + '.o'); compile_source(src, objects[key])
+        for unit in sorted(providers):
+            src = tmp / (unit + '_host_source.c')
+            objects[unit] = tmp / (unit + '.o')
+            compile_source(src, objects[unit])
         def run(key, changed=None):
             units = [unit for unit, _ in changed or []]
             assert len(units) == len(set(units)), (key, units)
@@ -126,7 +136,7 @@ def main(fixture_name="surface_lease_host.c", mutants=MUTANTS, extra_sources=Non
                     src.write_text('unsigned int host_arch_if = 0x202U;\n' + host)
                     objs['fixture'] = obj
                 else:
-                    src.write_text((lease_hook if unit == 'lease' else '') + '#define copy_to_caller host_lease_copyout\n#define copy_caller_bytes host_lease_copyin\n' + body)
+                    src.write_text((lease_hook if unit == 'lease' else '') + '#define copy_to_caller host_lease_copyout\n#define copy_caller_bytes host_lease_copyin\n' + provider_source(unit, body))
                     objs[unit] = obj
                 compile_source(src, obj)
             exe = tmp / (key + '.elf')
@@ -149,11 +159,11 @@ def main(fixture_name="surface_lease_host.c", mutants=MUTANTS, extra_sources=Non
                 body = sources[unit]
                 tail = ''
                 if fixture_name == 'surface_lease_host.c' and unit == 'lease':
-                    body, tail = body.split('/* PC98 DISPLAY bundle;', 1)
-                    tail = '/* PC98 DISPLAY bundle;' + tail
+                    body, tail = body.split('/* Surface lease bundle;', 1)
+                    tail = '/* Surface lease bundle;' + tail
                 if fixture_name == 'surface_bundle_host.c' and unit == 'lease' and old == 'source->backend != exec_surface_backend()':
-                    head, body = body.split('/* PC98 DISPLAY bundle;', 1)
-                    body = '/* PC98 DISPLAY bundle;' + body
+                    head, body = body.split('/* Surface lease bundle;', 1)
+                    body = '/* Surface lease bundle;' + body
                 else:
                     head = ''
                 assert body.count(old) == 1, (name, body.count(old))

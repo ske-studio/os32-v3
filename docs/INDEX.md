@@ -17,6 +17,7 @@ PC-9821シリーズ向け 32ビット ベアメタルOS
 
 | 情報単位 | 正典 (ここだけ更新) | 参照側 (要約 + リンクのみ) |
 |---|---|---|
+| 表示 surface lease の束 | [SURFACE_LEASE_BUNDLE_DESIGN](decisions/display/SURFACE_LEASE_BUNDLE_DESIGN.md) | [KAPI_SPEC.md](KAPI_SPEC.md)、[ARCH_COMPAT_CONTRACT.md](decisions/ARCH_COMPAT_CONTRACT.md) |
 | 制約規則 [C/HW/ABI/V/D] | [CONSTRAINTS.md](CONSTRAINTS.md) | CLAUDE.md (ID 参照、`make check` が照合)。Hermes 用の SOUL.md は 2026-09-29 に `SOUL.md` (非公開・リポジトリ外、`.gitignore`) へ (効力なし) |
 | 引き継ぎ (次の PM への申し送り)・現在地と残件 | [tasks/agents/HANDOVER_2026-10-25.md](tasks/agents/HANDOVER_2026-10-25.md) (入口の 1 枚、50 行以内・上書き。進捗の本文は持たない) | 前回は `docs/archive/agents/HANDOVER_2026-10-08.md` |
 | 文書の書き方 (置くもの・置かないもの・正典の 1 か所) | [POLICY_DEV.md §9](POLICY_DEV.md) | CLAUDE.md (1 行) |

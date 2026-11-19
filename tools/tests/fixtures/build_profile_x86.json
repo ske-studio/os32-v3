@@ -103,6 +103,7 @@
     "platform/pc98/gfx_init.c",
     "platform/pc98/gfx_selector.c",
     "platform/pc98/gfx_surfaces.c",
+    "platform/pc98/display_bundle.c",
     "kernel/console/con_sink.c",
     "init/bootlog.c",
     "init/bootlog_save.c",
