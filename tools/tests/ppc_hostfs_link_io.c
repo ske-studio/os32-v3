@@ -2,6 +2,7 @@
  * PACK ppc-sfs-deadline PM condition C: retry only before WDATA.
  * Real transport + SfsClient, fake only host API, IRQ and foreground clock. */
 #include "types.h"
+#include "kstring.h"
 #include "os32_kapi_shared.h"
 #include "platform/powermac/hostfs.h"
 #include "platform_host.h"
@@ -131,9 +132,16 @@ static int boot_suite(void)
     CHECK(vfs_is_mounted("/host") && hellos == 0 && opens == 0 && registered_work);
     const SfsClient *borrowed = sfs_persistent_client();
     CHECK(borrowed);
+    struct SfsTransportInfo info = { .peer = {1, 2, 3, 4, 5, 6}, .peer_valid = 1 };
+    CHECK(sfs_persistent_describe(&info) == 0);
+    CHECK(info.nic && kstrcmp(info.nic, "link") == 0 && !info.peer_valid);
+    for (u32 i = 0; i < sizeof(info.peer); ++i) CHECK(info.peer[i] == 0);
     CHECK(host_mailbox_put(1, 3, 1, 0, 0, 1) == 0);
     link_hello_ok = 1;
     CHECK(pm_hfs_peer());
+    CHECK(sfs_persistent_describe(&info) == 0 && info.peer_valid);
+    CHECK(info.nic && kstrcmp(info.nic, "link") == 0);
+    for (u32 i = 0; i < sizeof(info.peer); ++i) CHECK(info.peer[i] == link_peer_mac[i]);
     int fd = vfs_open("/host/a", O_RDONLY);
     CHECK(fd >= 3 && hellos == 1 && borrowed->sid == 7);
     CHECK(vfs_seek(fd, 0, SEEK_END) == 2048);

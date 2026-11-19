@@ -9,7 +9,10 @@
 int pm_hostfs_boot(u32 tb_hz)
 {
     struct SfsPersistentConfig cfg = {
-        .io = &pm_hostfs_io, .io_ctx = &pm_hostfs_transport, .lan_enabled = 1
+        .io = &pm_hostfs_io, .io_ctx = &pm_hostfs_transport, .lan_enabled = 1,
+#if KBOOT_LINK
+        .describe = pm_hfs_describe,
+#endif
     };
     int rc = pm_hfs_set_clock(tb_hz);
 #if KBOOT_LINK

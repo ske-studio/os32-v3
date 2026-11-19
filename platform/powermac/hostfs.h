@@ -19,6 +19,8 @@ void pm_hfs_bind_peer(const u8 peer[6]);
 const u8 *pm_hfs_peer(void);
 
 #if KBOOT_LINK
+struct SfsTransportInfo;
+int pm_hfs_describe(void *ctx, struct SfsTransportInfo *out);
 void pm_hfs_link_poll(void);
 const u8 *pm_hfs_link_allowed_peer(void);
 #endif
