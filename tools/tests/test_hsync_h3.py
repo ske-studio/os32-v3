@@ -16,7 +16,7 @@ hdrv_stat_mtime) も同じ翻訳単位で直接叩く (A16)。
   python3 -B tools/tests/test_hsync_h3.py [--target] [--mutate]
 
 --target を付けると、実機と同じ i386-elf クロスコンパイラでも
-hsync.c / drivers/hostdrv/hostdrvfs.c / fs/ext2/ext2_vfs.c / kapi/kapi_sys.c が -Werror で
+hsync.c / drivers/hostdrv/hostdrvfs.c / fs/ext2/ext2_vfs.c / kapi/kapi_sysinfo.c が -Werror で
 通ることを確かめる ([C1] GNU11)。
 
 --mutate は**否定側**。この票の中心規則は
@@ -222,7 +222,7 @@ def target_compile(tmp):
         (TARGET_KERNEL, "fs/isofs/iso9660.c", []),
         (TARGET_KERNEL, "fs/vfs.c", ["-Wno-sign-compare",
                                      "-Wno-unused-parameter"]),
-        (TARGET_KERNEL, "kapi/kapi_sys.c", []),
+        (TARGET_KERNEL, "kapi/kapi_sysinfo.c", []),
     ]
     for flags, src, extra in jobs:
         out = tmp / (pathlib.Path(src).stem + ".o")

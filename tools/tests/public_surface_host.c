@@ -139,3 +139,10 @@ static void caller_copy_tests(void)
     SAY("PASS: v70 generated wraps, output guards, query/lease/bundle/identity, foreign token, authorization, STALE");
     die(0);
 }
+
+#include "display_provider.h"
+#include "pgalloc.h"
+int display_provider_bundle_ok(u32 role, u32 backend)
+{
+    return role == LEDGER_ROLE_DISPLAY && backend == LEDGER_SF_PC98;
+}

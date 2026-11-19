@@ -304,7 +304,7 @@ int surface_lease(const struct surface_query_source *source,
     return 0;
 }
 
-/* PC98 DISPLAY bundle; exposed by the v70 KAPI. No callback or AS switch between
+/* Surface lease bundle; exposed by the v70 KAPI. No callback or AS switch between
  * input copy and copyout. Validate all refs before acquire's rechecks, in one
  * IRQ-saved interval, so a later INVAL takes precedence over an earlier STALE. */
 __attribute__((section(".text.surface_lease_bundle")))
@@ -320,17 +320,18 @@ int surface_lease_bundle(const struct surface_query_source *source,
     u32 next_token, i, failed = 0;
     unsigned int saved;
     int rc;
-    if (kctx_irq_depth || kctx_exc_depth || !source ||
-        source->role != LEDGER_ROLE_DISPLAY || source->backend != LEDGER_SF_PC98 ||
-        source->count != SURFACE_QUERY_MAX || count != SURFACE_QUERY_MAX)
+    if (kctx_irq_depth || kctx_exc_depth || !source)
+        return OS32_ERR_INVAL;
+    if (!count || count > SURFACE_QUERY_MAX || count != source->count)
         return OS32_ERR_INVAL;
     saved = irq_save();
     rc = !caller_access_get(&caller) || caller.origin != CALLER_USER;
     irq_restore(saved);
-    if (rc || !copy_caller_bytes(&caller, user_refs, refs, sizeof(refs)) ||
+    if (rc || !copy_caller_bytes(&caller, user_refs, refs, count * sizeof(refs[0])) ||
         !check_caller_write_range(&caller, user_out, sizeof(result)))
         return OS32_ERR_INVAL;
-    exec_surface_bridge_begin(access);
+    if (source->role == LEDGER_ROLE_DISPLAY)
+        exec_surface_bridge_begin(access);
     saved = irq_save();
     rc = ((source->role == LEDGER_ROLE_CLIENT || source->role == LEDGER_ROLE_DISPLAY) &&
           source->backend != exec_surface_backend()) ? OS32_ERR_INVAL :

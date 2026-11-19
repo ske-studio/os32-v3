@@ -4,7 +4,10 @@ int platform_bios_ready(void) { return host_bios_ready; }
 #define HOST_CALLER_COPY_TEST
 static void bundle_root_check(unsigned long root);
 #define HOST_MMU_LOAD_CHECK(root) bundle_root_check(root)
+#define v1_bridge_begin unused_bridge_begin
 #include "access_walk_host.c"
+#undef v1_bridge_begin
+#include "display_provider.h"
 #include "surface_query.h"
 #include "v86_mem.h"
 #include "../../platform/pc98/legacy/lowmap.c"
@@ -46,6 +49,45 @@ int con_sink_is_enabled(void) { return gui; }
 int appslot_gfx_owner(void) { return gfx_owner; }
 static u32 selected_backend = LEDGER_SF_PC98;
 u32 gfx_sf_backend(void) { return selected_backend; }
+static u32 bridge_calls;
+static int use_powermac_provider;
+int v1_bridge_begin(u32 role, u32 access)
+{
+    (void)role;
+    (void)access;
+    bridge_calls++;
+    return 0;
+}
+int pc98_bundle_ok(u32 role, u32 backend);
+int powermac_bundle_ok(u32 role, u32 backend);
+int display_provider_bundle_ok(u32 role, u32 backend)
+{
+    return use_powermac_provider ? powermac_bundle_ok(role, backend) :
+                                   pc98_bundle_ok(role, backend);
+}
+int system_surface_source(u32 role, struct surface_query_source *out)
+{
+    (void)role;
+    (void)out;
+    return OS32_ERR_INVAL;
+}
+int gfx_surface_source(u32 role, struct surface_query_source *out)
+{
+    if (role != source.role) return OS32_ERR_INVAL;
+    *out = source;
+    return 0;
+}
+static void provider_truth_tables(void)
+{
+    for (u32 role = 0; role <= LEDGER_ROLE_UNICODE + 1; role++) {
+        for (u32 backend = 0; backend <= LEDGER_SF_OF_FB + 1; backend++) {
+            CHECK(pc98_bundle_ok(role, backend) ==
+                  (role == LEDGER_ROLE_DISPLAY && backend == LEDGER_SF_PC98));
+            CHECK(powermac_bundle_ok(role, backend) ==
+                  (role == LEDGER_ROLE_CLIENT && backend == LEDGER_SF_OF_FB));
+        }
+    }
+}
 void v86_bios_save_real(void) {}
 void v86_bios_restore_real(void) {}
 void v86_bios_setup(void) {}
@@ -116,7 +158,7 @@ static void native_cache(void)
         CHECK((pt[pa / PAGE_SIZE] & (PTE_PCD | PTE_PWT)) == want);
     }
 }
-static u32 get_bundle(int expected, u32 count, const void *refs, void *out)
+static u32 get_bundle_at(int expected, u32 count, const void *refs, void *out, int public)
 {
     struct addrspace before = space, other = peer;
     struct ledger_surface ledger[LEDGER_MAX_SURFACES];
@@ -126,7 +168,9 @@ static u32 get_bundle(int expected, u32 count, const void *refs, void *out)
     kmemcpy(ledger, ledger_surfaces, sizeof(ledger));
     kmemset(output, 0x55, sizeof(*output));
     armed = 1;
-    CHECK(surface_lease_bundle(&source, refs, count, requested_access, out) == expected);
+    int rc = public ? surface_api_bundle(source.role, refs, count, requested_access, out) :
+                      surface_lease_bundle(&source, refs, count, requested_access, out);
+    CHECK(rc == expected);
     CHECK(host_arch_if == flags && host_cr3 == root);
     CHECK(hash_tables(paging_kernel_pd_phys()) == master);
     CHECK(hash_tables(peer.pd_phys) == foreign);
@@ -138,28 +182,90 @@ static u32 get_bundle(int expected, u32 count, const void *refs, void *out)
         for (u32 i = 0; i < sizeof(*output); i++) CHECK(((u8 *)output)[i] == 0x55);
         return 0;
     }
-    CHECK(output->count == 4);
-    for (u32 i = 0; i < 4; i++) {
+    CHECK(output->count == count);
+    for (u32 i = 0; i < count; i++) {
         const struct lease_view *v = &output->views[i];
         const struct ledger_surface *sf = &ledger_surfaces[source.refs[i].sid];
-        CHECK(v->token && v->bytes == GVRAM_PLANE_SIZE && v->planes[0] == v->base);
+        CHECK(v->token && v->bytes == sf->npages * PAGE_SIZE && v->planes[0] == v->base);
         for (u32 j = 1; j < 4; j++) CHECK(!v->planes[j]);
-        for (u32 j = 0; j < 8; j++)
+        for (u32 j = 0; j < sf->npages; j++)
             CHECK(paging_lease_pte(&space, v->base + j * PAGE_SIZE) ==
-                  ((sf->first + j) * PAGE_SIZE | PAGE_RO | PTE_USER | PTE_PCD |
+                  ((sf->first + j) * PAGE_SIZE | PAGE_RO | PTE_USER |
+                   (sf->cache == LEDGER_CACHE_UC ? PTE_PCD : 0) |
                    (requested_access == LEDGER_PERM_RW ? PTE_RW : 0)));
         if (i) CHECK(v->token == output->views[i - 1].token + 1);
     }
+    const struct lease_view zero = {0};
+    for (u32 i = count; i < SURFACE_QUERY_MAX; i++)
+        same_bytes(&output->views[i], &zero, sizeof(zero));
     CHECK(!lease_check(&space));
     return output->views[0].token;
+}
+static u32 get_bundle(int expected, u32 count, const void *refs, void *out)
+{
+    return get_bundle_at(expected, count, refs, out, 0);
 }
 #define GET(rc) get_bundle(rc, 4, (void *)MEM_EXEC_LOAD_ADDR, (void *)out_va)
 static void release_bundle(void)
 {
     for (u32 i = 0; i < 4; i++) CHECK(!lease_release(&space, output->views[i].token));
 }
+static void public_query_refs(void *query, struct surface_ref *refs)
+{
+    CHECK(!surface_api_query(source.role, query));
+    struct surface_query_result *result = P2V(payload + (u32)query - MEM_EXEC_LOAD_ADDR);
+    CHECK(result->count == source.count);
+    for (u32 i = 0; i < result->count; i++) refs[i] = result->desc[i].ref;
+}
+static void client_bundle_tests(void)
+{
+    const struct surface_query_source display = source;
+    host_cr3 = paging_kernel_pd_phys();
+    u32 sid, backing = pgalloc_alloc_phys(space.owner, 1);
+    struct ledger_surface sf = {.first = backing / PAGE_SIZE, .npages = 1,
+        .owner = space.owner, .backing = LEDGER_SB_RAM, .backend = LEDGER_SF_OF_FB,
+        .role = LEDGER_ROLE_CLIENT, .cache = LEDGER_CACHE_WB,
+        .width = 1, .height = 1, .pitch = 1, .planes = 1, .perm_max = LEDGER_PERM_RW};
+    CHECK(backing && ledger_surface_create(&sf, &sid));
+    host_cr3 = space.pd_phys;
+    source = (struct surface_query_source){LEDGER_ROLE_CLIENT, LEDGER_SF_OF_FB, 1, 1,
+                                            {{sid, ledger_surfaces[sid].gen}}};
+    selected_backend = LEDGER_SF_OF_FB;
+    u32 calls = bridge_calls;
+    u32 offset = 2 * PAGE_SIZE - sizeof(struct surface_ref);
+    struct surface_ref *client_input = P2V(payload + offset);
+    void *client_va = (void *)(MEM_EXEC_LOAD_ADDR + offset);
+    void *query_va = (void *)MEM_EXEC_LOAD_ADDR;
+    public_query_refs(query_va, client_input);
+    /* PC-98's provider rejects an otherwise acquirable source. */
+    get_bundle_at(OS32_ERR_INVAL, 1, client_va, (void *)out_va, 1);
+    use_powermac_provider = 1;
+    u32 token = get_bundle_at(0, 1, client_va, (void *)out_va, 1);
+    CHECK(!surface_api_unlease(token));
+    reject_copy = 1;
+    get_bundle_at(OS32_ERR_INVAL, 1, client_va, (void *)out_va, 1);
+    reject_copy = 0;
+    CHECK(get_bundle_at(0, 1, client_va, (void *)out_va, 1) == token + 1);
+    CHECK(!surface_api_unlease(token + 1));
+    host_cr3 = paging_kernel_pd_phys();
+    CHECK(ledger_surface_regen(sid, 0));
+    host_cr3 = space.pd_phys;
+    source.refs[0].generation = ledger_surfaces[sid].gen;
+    get_bundle_at(OS32_ERR_STALE, 1, client_va, (void *)out_va, 1);
+    public_query_refs(query_va, client_input);
+    CHECK(get_bundle_at(0, 1, client_va, (void *)out_va, 1) == token + 2);
+    CHECK(!surface_api_unlease(token + 2));
+    CHECK(bridge_calls == calls);
+    host_cr3 = paging_kernel_pd_phys();
+    CHECK(ledger_surface_release(sid));
+    host_cr3 = space.pd_phys;
+    use_powermac_provider = 0;
+    selected_backend = LEDGER_SF_PC98;
+    source = display;
+}
 static void caller_copy_tests(void)
 {
+    provider_truth_tables();
     /* The fail-stop path writes its diagnostic directly to TVRAM. */
     u32 args[6] = {TVRAM_BASE, TVRAM_ATTR + PAGE_SIZE - TVRAM_BASE, 3, 0x32, ~0U, 0};
     u32 result;
@@ -233,6 +339,20 @@ static void caller_copy_tests(void)
     slot.hdr_flags = OS32X_FLAG_GFX;
     host_cr3 = space.pd_phys;
     CHECK(caller_access_enter(&frame, CALLER_USER));
+    public_query_refs((void *)(MEM_EXEC_LOAD_ADDR + 128), input);
+    u32 before_bridge = bridge_calls;
+    get_bundle_at(0, 4, (void *)MEM_EXEC_LOAD_ADDR, (void *)out_va, 1);
+    CHECK(bridge_calls == before_bridge + 1);
+    for (u32 i = 0; i < 4; i++) CHECK(!surface_api_unlease(output->views[i].token));
+    use_powermac_provider = 1;
+    get_bundle_at(OS32_ERR_INVAL, 4, (void *)MEM_EXEC_LOAD_ADDR, (void *)out_va, 1);
+    use_powermac_provider = 0;
+    host_cr3 = paging_kernel_pd_phys();
+    CHECK(ledger_surface_regen(source.refs[0].sid, 0));
+    host_cr3 = space.pd_phys;
+    source.refs[0].generation = ledger_surfaces[source.refs[0].sid].gen;
+    get_bundle_at(OS32_ERR_STALE, 4, (void *)MEM_EXEC_LOAD_ADDR, (void *)out_va, 1);
+    public_query_refs((void *)(MEM_EXEC_LOAD_ADDR + 128), input);
     for (u32 on = 0; on < 2; on++) {
         host_arch_if = on ? 0x202 : 2;
         u32 token = GET(0); release_bundle();
@@ -268,11 +388,6 @@ static void caller_copy_tests(void)
     selected_backend = LEDGER_SF_CIRRUS; GET(OS32_ERR_INVAL);
     selected_backend = LEDGER_SF_PC98; GET(0); release_bundle();
     source.count = 3; GET(OS32_ERR_INVAL); source.count = 4;
-    u32 before_copy = copyins;
-    source.backend = LEDGER_SF_PEGC; GET(OS32_ERR_INVAL); source.backend = LEDGER_SF_PC98;
-    CHECK(copyins == before_copy);
-    source.role = LEDGER_ROLE_CLIENT; GET(OS32_ERR_INVAL); source.role = LEDGER_ROLE_DISPLAY;
-    CHECK(copyins == before_copy);
     source.ready = 0; GET(OS32_ERR_INVAL); source.ready = 1;
     gui = 1; gfx_owner = 1; GET(OS32_ERR_INVAL);
     gfx_owner = 2; GET(0); release_bundle(); gui = 0;
@@ -293,9 +408,13 @@ static void caller_copy_tests(void)
     /* Last plane has a corrupt master alias: no earlier plane is published. */
     u32 *master_pt = P2V(((u32 *)P2V(paging_kernel_pd_phys()))[0] & ~0xfffU);
     u32 ei = GVRAM_PLANE_I / PAGE_SIZE, saved_e = master_pt[ei];
+    GET(0);
+    u32 last_token = output->views[3].token;
+    release_bundle();
     master_pt[ei] &= ~PTE_PCD; GET(OS32_ERR_INVAL); master_pt[ei] = saved_e;
     /* One preexisting filler + four bundle slots leave only three: FULL. */
-    GET(0); u32 tokens[4];
+    CHECK(GET(0) == last_token + 1);
+    u32 tokens[4];
     for (u32 i = 0; i < 4; i++) tokens[i] = output->views[i].token;
     GET(OS32_ERR_FULL);
     for (u32 i = 0; i < 4; i++) CHECK(!lease_release(&space, tokens[i]));
@@ -329,6 +448,7 @@ static void caller_copy_tests(void)
     for (u32 i = 0; i < sizeof(*output); i++) CHECK(((u8 *)output)[i] == 0x55);
     fail_release = reject_copy = 0;
     CHECK(!lease_revoke_all(&space));
+    client_bundle_tests();
     caller_access_leave(&frame);
     armed = 0; host_cr3 = paging_kernel_pd_phys();
     CHECK(!lease_revoke_all(&peer)); paging_addrspace_destroy(&peer);

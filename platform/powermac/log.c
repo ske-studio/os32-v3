@@ -107,7 +107,6 @@ static int escc_port_status(u32 *mode, u32 *baud, u32 *fifo)
 }
 
 /* PortOps requires a complete table. Keep the absent slots' default behavior. */
-static void escc_port_empty_puts(const char *s) { (void)s; }
 static void escc_port_empty_diag(u32 *oe, u32 *fe, u32 *pe, u32 *overflow)
 {
     if (oe) *oe = 0;
@@ -118,7 +117,6 @@ static void escc_port_empty_diag(u32 *oe, u32 *fe, u32 *pe, u32 *overflow)
 
 static const PortOps escc_port = {
     .init = escc_port_init,
-    .puts_kapi = escc_port_empty_puts,
     .getchar_kapi = pm_escc_getchar_kapi,
     .putchar_kapi = escc_port_putchar,
     .trygetchar = pm_escc_trygetchar,

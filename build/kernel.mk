@@ -1,15 +1,5 @@
 # x86 kernel products; source selection belongs to build/select.mk.
 
-# === コミット ID (票 TASK_SERIAL_HOSTFS A-4) ===
-# 生成器は毎回走るが、中身が変わったときだけ build_id.c を書き直す。
-# コミット ID が変わっても組み直すのは build_id.o 1 つとリンクだけ。
-BUILD_ID_SRC = $(BUILD_OUT)/build_id.c
-BUILD_ID_OBJ = $(BUILD_OUT)/build_id.o
-
-$(BUILD_ID_SRC): .FORCE
-	@mkdir -p $(BUILD_OUT)
-	@python3 tools/gen_build_id.py -o $@
-
 $(BUILD_ID_OBJ): $(BUILD_ID_SRC)
 	$(CC) $(CFLAGS_BASE) -Iinclude -c $< -o $@
 

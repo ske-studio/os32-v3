@@ -10,7 +10,7 @@ import host32
 from test_exec_r1 import function
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-SOURCES = ('kernel/console/console.c', 'drivers/sound/fm/fm.c', 'drivers/char/serial.c', 'kapi/kapi_generated.c', 'drivers/input/kbd.c', 'kernel/ime/ime.c', 'exec/exec.c', 'kernel/ime/ime_dict.c', 'kernel/input_wait.c')
+SOURCES = ('kernel/console/console.c', 'drivers/sound/fm/fm.c', 'drivers/char/serial.c', 'kapi/kapi_generated.c', 'drivers/input/kbd.c', 'kernel/ime/ime.c', 'exec/exec.c', 'kernel/ime/ime_dict.c', 'kernel/input_wait.c', 'kernel/port_service.c')
 MUTATIONS = [
     ('cursor x low', 0, 'if (x < 0) x = 0;', ''),
     ('cursor x high', 0, 'if (x >= CON_COLS) x = CON_COLS - 1;', ''),
@@ -27,7 +27,8 @@ MUTATIONS += [
     ('mml scan probe', 1, 'if (interruptible && ring3_wait_pending()) break;', ''),
     ('mml key off', 1, 'fm_play_mml_wait', 'keyoff'),
     ('serial receive probe', 2, 'if (interruptible && ring3_wait_pending())', 'if (0)'),
-    ('serial puts probe', 2, 'serial_puts_kapi', 'probe'),
+    ('serial puts probe', 9, '        if (ring3_wait_pending()) {\n'
+     '            ring3_abort_check();\n            return;\n        }\n', ''),
     ('serial char probe', 2, 'serial_putchar_kapi', 'probe'),
     ('shared TX abort regression', 2, 'static int ser_tx_byte(char c)\n{', 'static int ser_tx_byte(char c)\n{\n    if (_irq_enabled() && ring3_wait_pending()) ring3_abort_check();'),
     ('shared puts abort regression', 2, 'void serial_puts(const char *str)\n{', 'void serial_puts(const char *str)\n{\n    if (_irq_enabled() && ring3_wait_pending()) ring3_abort_check();'),
@@ -80,7 +81,7 @@ def run(runner, mutation=None, case=0, expected=None):
     sources[6] = 'static void exec_cui_display_abort(void) {}\n' + sources[6]
     if mutation:
         name, idx, old, new = mutation
-        if name in ('rshell counts wakeups', 'rshell timeout 3 seconds', 'kbd char wait', 'kbd gui wait'):
+        if name in ('serial puts probe', 'rshell counts wakeups', 'rshell timeout 3 seconds', 'kbd char wait', 'kbd gui wait'):
             assert sources[idx].count(old) == 1, name
         if new in ('ch < 0', 'ch >= OPN_CHANNEL_COUNT', 'abort', 'user-guard', 'probe', 'cleanup', 'keyoff'):
             start = sources[idx].index(old + '(')
@@ -110,7 +111,7 @@ def run(runner, mutation=None, case=0, expected=None):
     with tempfile.TemporaryDirectory(prefix='kapi-audit-') as directory:
         work = pathlib.Path(directory)
         sources[7] = function(sources[7], 'ime_dict_log_probe')
-        for inc, source in zip(('console_source.inc', 'fm_source.inc', 'serial_source.inc', 'rshell_source.inc', 'kbd_source.inc', 'ime_source.inc', 'wait_source.inc', 'ime_log_source.inc', 'input_wait_source.inc'), sources):
+        for inc, source in zip(('console_source.inc', 'fm_source.inc', 'serial_source.inc', 'rshell_source.inc', 'kbd_source.inc', 'ime_source.inc', 'wait_source.inc', 'ime_log_source.inc', 'input_wait_source.inc', 'port_source.inc'), sources):
             (work / inc).write_text(source)
         exe = work / 'fixture'
         cmd = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Werror', '-Wno-unused-variable', '-ffreestanding',

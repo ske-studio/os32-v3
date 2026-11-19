@@ -79,7 +79,8 @@ def run(runner, mutation=None):
     port_selected, port_checks = [], []
     port_calls = {
         'serial_init': ('0xfedcba98u', 'port_seen == 1 && port_baud == 0xfedcba98ul', None),
-        'serial_puts': ('"port"', "port_seen == 2 && port_string[0] == 'p' && port_string[4] == 0", None),
+        'serial_puts': ('"port"', "port_seen == 10 && port_tx_count == 4 && "
+                        "port_tx[0] == 'p' && port_tx[1] == 'o' && port_tx[2] == 'r' && port_tx[3] == 't'", None),
         'serial_getchar': ('', 'port_seen == 3', '-123'),
         'serial_putchar': ("'X'", "port_seen == 4 && port_char == 'X'", None),
         'serial_trygetchar': ('', 'port_seen == 5', '-125'),
@@ -100,8 +101,8 @@ def run(runner, mutation=None):
         call = f'wrap_{name}({call_args})'
         port_checks.append((f'CHECK({call} == {result});' if result else call + ';') +
                            f'CHECK({check} && hit == {slot});')
-    sys_source = (ROOT / 'kapi/kapi_sys.c').read_text()
-    diag_body = re.search(r'^int kapi_serial_diag\([^\n]*\)\n\{.*?^\}', sys_source, re.M | re.S)
+    port_source = (ROOT / 'kapi/kapi_port.c').read_text()
+    diag_body = re.search(r'^int kapi_serial_diag\([^\n]*\)\n\{.*?^\}', port_source, re.M | re.S)
     assert diag_body
     port_selected.insert(0, diag_body[0])
     port_checks += ['CHECK(kapi_serial_diag(0) == OS32_ERR_INVAL);',
@@ -212,7 +213,7 @@ def contracts():
     for registration in ('port_register(&pc98_port);', 'con_output_register(&pc98_console_output);'):
         assert registration in bind
     assert 'const EmergencyOps emergency_output' in bind
-    for name in ('kernel/console/console.c', 'kernel/ver_collect.c', 'kapi/kapi_sys.c',
+    for name in ('kernel/console/console.c', 'kernel/ver_collect.c', 'kapi/kapi_port.c',
                  'exec/exec.c', 'arch/x86/kernel/isr_handlers.c', 'arch/x86/kernel/double_fault.c'):
         source = read_text(ROOT / name)
         assert not re.search(r'#include[^\n]*["/]serial\.h"', source), name
@@ -225,7 +226,9 @@ def contracts():
                             *include_flags(ROOT), '-c',
                             str(ROOT / ('kernel/time/clock_service.c' if source == 'clock_service' else 'kernel/' + source + '.c')), '-o', str(obj)], check=True)
             symbols = subprocess.check_output(['nm', '-u', str(obj)], text=True)
-            assert symbols.split() == (['U', 'emergency_output'] if source == 'serial_diag' else []), symbols
+            allowed = {'port_service': ['ring3_abort_check', 'ring3_wait_pending'],
+                       'serial_diag': ['emergency_output'], 'clock_service': []}
+            assert symbols.split() == [part for name in allowed[source] for part in ('U', name)], symbols
     assert 'clock_register(&pc98_clock);' in bind
     for name in ('kernel/sys.c', 'drivers/block/fat_diskio.c'):
         source = read_text(ROOT / name)
