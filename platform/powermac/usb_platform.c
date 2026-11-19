@@ -2,6 +2,7 @@
  * DMA is remapped cache-inhibited before use, like gmac_dma.c's control page.
  * UniNorth's identity 16MB DMA window is the same as gmac_tree.c/pm_dma_bus. */
 #include "usb_boot.h"
+#include "rh_observe.h"
 #include "via_window.h"
 #include "input_usb.h"
 #include "input/hal/in2_int.h"
@@ -26,11 +27,41 @@ static struct { u32 bdf, va; int used; } maps[PM_USB_CONTROLLERS];
 void ppc_dcbf_line(void *);
 static PointerOps usb_pointer;
 
+static int usb_mouse_available(void)
+{
+    return sources[1] != 0;
+}
+
+static u8 usb_mouse_snapshot(i16 *dx, i16 *dy, u8 *buttons, i16 *x, i16 *y)
+{
+    u32 flags = ppc_irq_save();
+    int present = usb_mouse_available();
+    if (present) mouse_legacy_snapshot(dx, dy, buttons, x, y);
+    ppc_irq_restore(flags);
+    return present ? MOUSE_MODE_BUS : MOUSE_MODE_NONE;
+}
+
+static void usb_mouse_text_cell(i16 x, i16 y, int *cx, int *cy)
+{
+    *cx = x < 0 ? -1 : x / 8;
+    *cy = y < (int)PM_RH_FB_ROWS ? -1 : (y - (int)PM_RH_FB_ROWS) / 16;
+}
+
+static const MousePointerBackend usb_mouse_backend = {
+    .snapshot = usb_mouse_snapshot,
+    .text_cell = usb_mouse_text_cell,
+};
+
 void pm_usb_platform_init(u32 hz)
 {
     tb_frequency = hz;
     usb_pointer = empty_pointer;
-    usb_pointer.bounds = pointer_bounds;
+    mouse_pointer_backend_register(&usb_mouse_backend);
+    mouse_pointer_init_position();
+    usb_pointer.poll = mouse_poll;
+    usb_pointer.available = usb_mouse_available;
+    usb_pointer.cursor_show = mouse_cursor_show;
+    usb_pointer.bounds = mouse_set_bounds;
     usb_pointer.cursor_mode = mouse_cursor_set_mode;
     usb_pointer.cursor_hide = mouse_cursor_hide;
     pointer_register(&usb_pointer);

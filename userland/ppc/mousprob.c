@@ -3,7 +3,19 @@
 
 static int check(KernelAPI *api, const char *command)
 {
-    if (api->mouse_available() != 0) return 1;
+    int gone = !strcmp(command, "gone");
+    if (api->mouse_available() != !gone) return 1;
+    MouseInfo m;
+    memset(&m, 0xa5, sizeof(m));
+    api->mouse_poll(&m);
+    if (m.mode != !gone) return 2;
+    if (!strcmp(command, "edge"))
+        return m.x == 799 && m.y == 599 ? 0 : 3;
+    if (!strcmp(command, "motion"))
+        return m.x == 88 && m.y == 153 && m.dx == 12 && m.dy == -7 &&
+               m.buttons == 1 ? 0 : 4;
+    if (gone || !strcmp(command, "present"))
+        return m.dx || m.dy || m.buttons ? 5 : 0;
     if (!strcmp(command, "start")) {
         api->mouse_set_bounds(80, 160, 80, 160);
         api->mouse_set_bounds(72, 144, 88, 176);
@@ -11,11 +23,15 @@ static int check(KernelAPI *api, const char *command)
     }
     if (!strcmp(command, "cursor")) {
         api->mouse_cursor_set_mode(MOUSE_CURSOR_TEXT);
+        api->mouse_cursor_show();
+        return 0;
+    }
+    if (!strcmp(command, "hide")) {
         api->mouse_cursor_hide();
         return 0;
     }
     if (!strcmp(command, "key")) return api->kbd_getkey() == 'a' ? 0 : 6;
-    return (!strcmp(command, "gone") || !strcmp(command, "present")) ? 0 : 7;
+    return 7;
 }
 
 int main(int argc, char **argv, KernelAPI *api)

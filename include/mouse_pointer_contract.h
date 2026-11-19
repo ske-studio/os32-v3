@@ -3,6 +3,9 @@
 
 #include "pointer_service.h"
 
+void mouse_poll(MouseState *state);
+void mouse_set_bounds(i16 x_min, i16 y_min, i16 x_max, i16 y_max);
+void mouse_cursor_show(void);
 void mouse_cursor_set_mode(int mode);
 void mouse_cursor_hide(void);
 

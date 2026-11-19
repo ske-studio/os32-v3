@@ -40,6 +40,7 @@
 #if KBOOT_SHELL || KBOOT_SH
 #include "root_boot.h"
 #include "pm_console.h"
+#include "pointer_service.h"
 #include "console_backend.h"
 #include "unicode_file.h"
 #include "display_text.h"
@@ -409,6 +410,9 @@ void platform_boot_services(void)
         }
 #if KBOOT_SH
         (void)pm_hostfs_boot(info->tb_hz);
+        if (target.width && target.height)
+            pointer_set_default_bounds(target.width > 32768 ? 32767 : target.width - 1,
+                                       target.height > 32768 ? 32767 : target.height - 1);
         pm_usb_boot(info->tb_hz);
 #if KBOOT_LINK
         int work_rc = idle_work_register(pm_link_service_once);
