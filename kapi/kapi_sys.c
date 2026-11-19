@@ -6,20 +6,6 @@
 #include "exec.h"             /* CPL=3 ポインタ検証 */
 #include "pci_bind_contract.h"
 #include "platform_device.h"
-#include "ver_info.h"
-#include "kapi_sysinfo.h"
-
-/* The generated __cdecl wrapper supplies the existing output-range check. */
-int __cdecl kapi_sys_ver_info(void *out, u32 size)
-{
-    VerSnapshot s;
-
-    if (!out || size != sizeof(OS32_VerInfo)) return OS32_ERR_INVAL;
-    ver_collect(&s);
-    kapi_sys_build_time_copy(s.build, sizeof(s.build));
-    ver_format(&s, (OS32_VerInfo *)out);
-    return 0;
-}
 
 /* ======================================================================== */
 /*  pci_bind_info — 結線の診断の取得口 (票 TASK_HAL_WIRING §1-4 / KAPI v60) */

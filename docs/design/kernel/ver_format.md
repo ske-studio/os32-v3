@@ -19,7 +19,7 @@ formatter に cold 属性を付ける。
 
 ## 4. CUI と GUI の共通化
 - 正規の行順: 見出し → CPU → PIC → PIT → KBD → SER → SND → GFX → API → Build → Commit → Image CRC → kdebug（必要時は継続1行）→ sqlite stack → services。
-- kernel/ver_format.c だけが英文と順序を持つ。見出しは `PC-9821 OS32 v3.0-dev (Ring3 Native)`（版は SYS_VERSION）。
+- 共通 formatter は頭行・API・Build・Commit と行グループの順を持つ。PC-98 の devices・image・debug は platform/pc98/ver_backend.c が作り、services 行末の ver_end までを担う。後端が NULL なら共通の行だけを返す。見出しは `PC-9821 OS32 v3.0-dev (Ring3 Native)`（版は SYS_VERSION）。
 - kdebug は `off` / `on (pair %08x)` / `rejected %u %s` を先頭行にし、on は `kdebug pages: body=%u owner=%u`、rejected は `kdebug file pair: %08x` を続ける。取得失敗は `kdebug: unknown`。
 
 - formatter は機器・識別・services の kind に INDENT を付ける。CUI はその bit に従って先頭2空白、各行末に改行を追加。見出し・kdebug・sqlite stack は字下げなし。構造体内に空白接頭辞・改行は含めない。

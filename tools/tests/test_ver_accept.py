@@ -10,6 +10,7 @@ import json
 import re
 import sys
 
+from test_ver_format import pc98_format_source
 from ver_test_utils import ROOT, arguments, execute, function
 
 sys.path.insert(0, str(ROOT / 'tools'))
@@ -42,7 +43,7 @@ class Port:
 
 def reports(runner):
     files = {
-        'ver_format_source.c': (ROOT / 'kernel/ver_format.c').read_text(),
+        'ver_format_source.c': pc98_format_source() + (ROOT / 'kernel/ver_format.c').read_text(),
         'ver_state_source.c': function((ROOT / 'kdebug/kdebug_module.c').read_text(),
                                       'const char *kdebug_state_name('),
         'ver_shell_source.c': function((ROOT / 'userland/shell/cmd_base.c').read_text(),
