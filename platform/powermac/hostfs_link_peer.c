@@ -1,6 +1,8 @@
 /* HostFS shares the link's fixed peer and the common HostAlive generation.
  * No PLN1 nonce observer or duplicate host_alive_snapshot lives in this image. */
 #include "hostfs.h"
+#include "fs/serialfs/serialfs.h"
+#include "kstring.h"
 #include "net/link.h"
 #include "net/host_mailbox.h"
 
@@ -20,4 +22,13 @@ const u8 *pm_hfs_peer(void)
     struct HostAlive alive;
     host_alive_snapshot(&alive);
     return alive.valid && link_hello_ok ? link_peer_mac : 0;
+}
+
+int pm_hfs_describe(void *ctx, struct SfsTransportInfo *out)
+{
+    const u8 *peer = pm_hfs_peer();
+    (void)ctx;
+    *out = (struct SfsTransportInfo){ .nic = "link", .peer_valid = peer != 0 };
+    if (peer) kmemcpy(out->peer, peer, sizeof(out->peer));
+    return 0;
 }
