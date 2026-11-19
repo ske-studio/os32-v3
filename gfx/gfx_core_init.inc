@@ -10,11 +10,13 @@ static void gfx_init_mode(int legacy200)
     if (initialized < 0) return;
     gfx2_register_selected();
     if (initialized) {
+        const GfxMode *mode = gfx_backend_mode(g_backend);
         gfx_reinit_surfaces(1);
         gfx_started = bb[0] != 0;
+        if (gfx_started && mode) gfx_current_height = mode->height;
         if (g_backend->enter) g_backend->enter();
         gfx_diag_init();
-        return;   /* packed 系はモード設定もバックバッファも init() が済ませた */
+        return;   /* packed の高さは共通側が選択モードから取得する */
     }
 
     int plane_sz = legacy200 ? GFX_PLANE_SZ_200 : GFX_PLANE_SZ;

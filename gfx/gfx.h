@@ -55,7 +55,7 @@ void gfx_kapi_init_200(void);
 /* 画面の所有者 (KAPI v48)。1 = シェル帯 (WM) / 2〜5 = アプリ。誰でも呼べる。 */
 i32  gfx_screen_owner(void);
 void gfx_shutdown(void);   /* テキスト復帰 */
-int  gfx_get_height(void); /* 現在のGFX高さ (200/400/480)、終了後は400 */
+int  gfx_get_height(void); /* 現在のGFX高さ (planar は 200/400、packed は選択モードの高さ)、終了後は後端・機種の復帰が書く */
 
 /* ======== ハードウェアスクロール ======== */
 void gfx_hardware_scroll(int lines);

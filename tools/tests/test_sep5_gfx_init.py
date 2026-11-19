@@ -2,7 +2,7 @@
 """B3: PC-98 planar bring-up provider keeps the pre-separation I/O and memory trace."""
 CHECK = dict(name='sep5-gfx-init-host', tier=1, needs=[], budget=5,
     covers=['gfx/palette.c', 'platform/pc98/gfx_init.c', 'kernel/console/display_restore.h',
-            'gfx/gfx_core.c', 'gfx/gfx_core_init.inc', 'drivers/video/pc98/gfx_vram.c', 'gfx/gfx_internal.h', 'gfx/gfx.h',
+            'gfx/gfx_core.c', 'gfx/gfx_core_init.inc', 'gfx/gfx_core_api.inc', 'drivers/video/pc98/gfx_vram.c', 'gfx/gfx_internal.h', 'gfx/gfx.h',
             'platform/powermac/display.c', 'platform/powermac/display_provider.c', 'tools/tests/sep5_gfx_init_host.c',
             'tools/tests/test_sep5_gfx_init.py', 'tools/tests/host32.py',
             'tools/tests/kernel_includes.py', 'build/config.mk', 'include/**',
@@ -39,10 +39,11 @@ MUTATIONS = (
      'VRAM_PLANE_B, VRAM_PLANE_G, VRAM_PLANE_R, VRAM_PLANE_I\n    };\n    return'),
     ('clear-one-page', PROVIDER, '    _out(GDC_ACCESS_PAGE, GDC_PAGE_1);\n    kmemset', '    _out(GDC_ACCESS_PAGE, GDC_PAGE_0);\n    kmemset'),
 )
-CORE = {'core': 'gfx/gfx_core.c', 'init': 'gfx/gfx_core_init.inc', 'vram': 'drivers/video/pc98/gfx_vram.c'}
+CORE = {'api': 'gfx/gfx_core_api.inc', 'core': 'gfx/gfx_core.c', 'init': 'gfx/gfx_core_init.inc', 'vram': 'drivers/video/pc98/gfx_vram.c'}
 # The common callers are extracted from the product text and *executed* with
 # recording fakes; these mutants must fail that executed trace.
 CORE_MUTATIONS = (
+    ('packed-height-omitted', 'init', 'if (gfx_started && mode) gfx_current_height = mode->height;', '(void)mode;'),
     ('palette-reset-omitted', 'init', '    palette_shadow_reset();', '    (void)0;'),
     ('palette-reset-hardware', 'palette', 'void palette_shadow_reset(void)\n{',
      'void palette_shadow_reset(void)\n{\n    display_palette4_write(0, 0, 0, 0);'),
@@ -79,7 +80,7 @@ CORE_MUTATIONS = (
 
 
 def function(text, name):
-    start = re.search(r'^static void ' + name + r'\([^\n]*\)\n\{', text, re.M)
+    start = re.search(r'^(?:static void|int|void __cdecl) ' + name + r'\([^\n]*\)\n\{', text, re.M)
     assert start, name
     pos, depth = start.end(), 1
     while depth:
@@ -92,7 +93,8 @@ def execute(texts, work):
     (work / 'gfx_init_source.inc').write_text(texts['provider'])
     (work / 'palette_source.inc').write_text(texts['palette'])
     (work / 'gfx_core_slice.inc').write_text(
-        function(texts['core'], '_gfx_common_init') + function(texts['init'], 'gfx_init_mode'))
+        function(texts['core'], '_gfx_common_init') + function(texts['init'], 'gfx_init_mode') +
+        function(texts['api'], 'gfx_ver_state') + function(texts['api'], 'gfx_screen_info'))
     (work / 'gfx_vram_slice.inc').write_text(
         function(texts['vram'], '_flip_page') + function(texts['vram'], '_present_dirty'))
     exe = work / 'gfx_init'
