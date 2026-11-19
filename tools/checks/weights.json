@@ -386,6 +386,7 @@
     "ppc-shm-guest": 74.793946,
     "ppc-sqlite-stack-guest": 23.041937,
     "ppc-surface-guest": 176.758702,
+    "ppc-memstat-guest": 90,
     "ppc-sysinfo-guest": 84.197552,
     "ppc-usb": 335.428091,
     "preflight-host": 4.421956,

@@ -10,6 +10,7 @@ PROVIDER_EXTERNS = frozenset({
     "extern int kapi_serial_diag(SerialDiag *out);",
     "extern int kapi_sys_set_mtime(const char *path, u32 mtime);",
     "extern void kapi_sys_get_build_info(char *buf, int size);",
+    "extern i32 kapi_mem_stat(i32 app_id, void *out, u32 size);",
     "extern int kapi_sys_time_now(u32 *lo, u32 *hi);",
 })
 
@@ -108,7 +109,6 @@ PROVIDER_GROUPS = {
         'db_error_code',
     }), frozenset(['kapi_db.h'])),
     'system_info': (frozenset({
-        'mem_stat',
         'sys_ver_info',
     }), frozenset([])),
     'ime': (frozenset({
