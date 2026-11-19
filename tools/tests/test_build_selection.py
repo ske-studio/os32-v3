@@ -145,6 +145,8 @@ if __name__ == '__main__':
         check_kboot(root)
         if args.mutate:
             for path, anchor, mutant, expected, label in (
+                    ('build/sources/hooks.mk', 'HOOK_gfx = $(FEATURE_EXEC)', 'HOOK_gfx = $(FEATURE_PC98_PENDING)',
+                     AssertionError, 'PowerMac exec uses absent graphics hooks'),
                     ('build/platform/powermac.mk', 'platform/powermac/rh_observe.c platform/powermac/ofw.c',
                      'platform/powermac/ofw.c platform/powermac/rh_observe.c',
                      AssertionError, 'reordered kboot sources'),

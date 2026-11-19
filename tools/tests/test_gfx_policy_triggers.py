@@ -13,6 +13,7 @@ CHECK = dict(name='gfx-policy-triggers-host', tier=1, needs=[], budget=5, covers
 )
 ROOT = Path(__file__).resolve().parents[2]
 CASES = [
+    ('console-return', 'gfx/gfx_core.c', '    display_provider_console_return();'),
     ('claim', 'gfx/gfx_core.c', '        gfx_policy_reeval();'),
     ('shutdown', 'gfx/gfx_core.c', '    gfx_policy_reeval();\n    gfx_reinit_surfaces(0);'),
     ('gui-enter', 'kernel/console/console.c', '    gfx_policy_reeval();\n    if (legacy_active()) return;'),
@@ -62,8 +63,10 @@ void gf_display_owner_exit(int id) __attribute__((weak));
 int ring3_call_from_user(void) { return 0; }
 int caller_access_get_user(struct caller_access *c) { c->app_id=2; return 1; }
 void display_provider_raster_reset(void) {}
+static int reset, console_returns;
+void display_provider_console_return(void) { if (reset) console_returns++; }
 int display_provider_restore_fallback(Backend *b) { (void)b; return 0; }
-void gfx_reinit_surfaces(int n) { (void)n; }
+void gfx_reinit_surfaces(int n) { reset = n; }
 int pc98_route_safe(void) { return 0; }
 /* <platform_display_fallback.h> の PC-98 の値 (第 5 段 B4)。この fixture の型は Backend。 */
 #define DISPLAY_FALLBACK_BACKEND (&gfx_backend_pc98)
@@ -83,6 +86,7 @@ int test(void) {
   gui=0; calls=0; console_text_gdc_stop(); if (calls!=1 || observed_gui!=1) return 4;
   calls=0; console_text_gdc_start(); if (calls!=1 || observed_gui!=0) return 5;
   gfx_started=1; calls=0; gfx_shutdown(); if (calls!=1 || observed_started!=0) return 6;
+  if (console_returns != 1) return 7;
   return 0;
 }
 void _start(void) { int rc=test(); __asm__ volatile("int $0x80" : : "a"(1), "b"(rc)); __builtin_unreachable(); }
@@ -93,7 +97,7 @@ def run_case(runner, mutation):
     if mutation:
         name, path, anchor = mutation
         assert sources[path].count(anchor) == 1, name
-        sources[path] = sources[path].replace(anchor, anchor.replace('exec_surface_policy_reeval();', '(void)0;', 1).replace('gfx_policy_reeval();', '(void)0;', 1), 1)
+        sources[path] = sources[path].replace(anchor, anchor.replace('display_provider_console_return();', '(void)0;', 1).replace('exec_surface_policy_reeval();', '(void)0;', 1).replace('gfx_policy_reeval();', '(void)0;', 1), 1)
     code = PRELUDE + '\n' + function((ROOT / 'exec/exec_surface.h').read_text(), 'static inline void exec_surface_policy_reeval(') + '\n' + '\n'.join([
         function(sources['gfx/gfx_core.c'], 'static int gfx_kapi_claim(void)'),
         function(sources['gfx/gfx_core.c'], 'void gfx_shutdown(void)'),
@@ -106,7 +110,7 @@ def run_case(runner, mutation):
         src.write_text(code)
         subprocess.run(['gcc', '-Wall', '-Wextra', '-Werror', '-m32', '-std=gnu11', '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib', '-static', '-no-pie', str(src), '-o', str(exe)], check=True)
         result = host32.run([str(exe)], runner=runner)
-        expected = {'claim': 1, 'shutdown': 6, 'gui-enter': 4, 'gui-exit': 5, 'owner-exit': 3}
+        expected = {'console-return': 7, 'claim': 1, 'shutdown': 6, 'gui-enter': 4, 'gui-exit': 5, 'owner-exit': 3}
         assert result.returncode == (expected[mutation[0]] if mutation else 0), (mutation, result.returncode)
         print('RED '+mutation[0] if mutation else 'PASS policy triggers')
 

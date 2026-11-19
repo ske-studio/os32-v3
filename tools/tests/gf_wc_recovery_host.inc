@@ -131,6 +131,7 @@ void ime_set_render(void *p) { CHECK(!p);ime_reset++; }
 #include "exec_legacy.h"
 #include "exec_ime.h"
 #include "exec_reclaim.h"
+static inline void exec_gfx_owner_exit(int id) { (void)id; }
 static inline int exec_gfx_return_emergency(u32 owner, int reason) { return gfx_return_emergency(owner, reason); }
 static inline int exec_font_guard_active(void) { return font_guard_active; }
 static inline void exec_font_guard_fault(u32 v, u32 p, u32 a) { font_guard_fault(v, p, a); }

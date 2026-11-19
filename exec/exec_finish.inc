@@ -220,6 +220,7 @@ static void exec_notify_owned(int id, int kind)
     int restore_rc = exec_gfx_return_emergency((u32)id, kind);
     if (restore_rc)
         console_printf(KLOG_ATTR, "[gfx] emergency owner=%d restore rc=%d\n", id, restore_rc);
+    exec_gfx_owner_exit(id);
     appslot_gfx_owner_exit(id);
 }
 
