@@ -3,7 +3,7 @@
 CHECK = dict(name='input-pointer-host', tier=1, budget=10, needs=[], covers=['input/hal/legacy_keymap.c', 'input/keymaps/pc98_jp.c', 'input/hal/keymap_registry.c', 'input/hal/keymap_eval.c', 'input/hal/keymap_state.c', 'tools/tests/input_unused_key_host.h',
     'input/hal/in2_int.h', 'input/hal/in2_dev.c', 'input/hal/keymap.h', 'input/hal/in2_state.c',
     'input/hal/kbd_merge.c', 'input/hal/mouse_ext.c', 'input/hal/pointer_state.c',
-    'drivers/input/mouse.c', 'drivers/input/kbd.h', 'tools/tests/input_poll_host.c',
+    'drivers/input/mouse.c', 'include/mouse_pointer_contract.h', 'include/kbd_contract.h', 'include/text_screen.h', 'drivers/input/kbd.h', 'tools/tests/input_poll_host.c',
     'drivers/video/kcg/kcg.h', 'include/kcg_contract.h', 'drivers/char/np2sysp.h', 'include/kprintf.h',
     'tools/tests/input_pointer_host.c', 'tools/tests/test_input_pointer.py',
     'drivers/input/mouse_bus.c', 'drivers/input/mouse_hal.c', 'tools/tests/mouse_bus_host.c', 'drivers/input/mouse.h', 'include/pc98.h', 'include/pointer_service.h',
@@ -76,7 +76,8 @@ def run(ctx):
             return host32.run([str(tmp/'poll')], runner='qemu').returncode
         assert build_poll(poll_source) == 0
         if ctx.mutate:
-            for before, after in [('mouse_legacy_snapshot(&dx, &dy, &buttons, &cursor_x, &cursor_y);', 'dx = dy = 0; buttons = 0;'),
+            for before, after in [('mouse_legacy_snapshot(dx, dy, buttons, x, y);',
+                                   '(void)x; (void)y; *dx = *dy = 0; *buttons = 0;'),
                                   ('pointer_bounds(x_min, y_min, x_max, y_max);', '(void)0;'),
                                   ('mouse_ext_mode(0);', 'mouse_ext_mode(1);'),
                                   ('mouse_ext_mode(1);', 'mouse_ext_mode(0);')]:
