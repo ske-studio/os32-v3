@@ -200,8 +200,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/ppc-setup
 
-  # QEMU で機械を丸ごと模擬する検査 (12 本、変異込み)。1 本のジョブで直列に回すと 53〜61 分かかるので、
-  # 4 本に割って並べる (シャードの中は 1 本ずつ)。割り方は検査の重み (tools/checks/weights.json) から。
+  # QEMU で機械を丸ごと模擬する検査 (変異込み) を
+  # 5 本に割って並べる (シャードの中は 1 本ずつ)。割り方は検査の重み (tools/checks/weights.json) から。
   # ppc-compile の成果物は読まないので needs で鎖にしない (docs/POLICY_CI.md G2)。
   ppc-qemu:
     runs-on: ubuntu-latest
@@ -209,7 +209,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3]
+        shard: [0, 1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -229,7 +229,7 @@ jobs:
           OS32_ACCEPT_IPA_LICENSE: "1"
           TMPDIR: ${{ runner.temp }}
         run: |
-          python3 -B tools/ci/gate.py run --env qemu-ppc --shard ${{ matrix.shard }}/4 --out "$RUNNER_TEMP/gate"
+          python3 -B tools/ci/gate.py run --env qemu-ppc --shard ${{ matrix.shard }}/5 --out "$RUNNER_TEMP/gate"
       - name: Upload check times
         if: always() && steps.scope.outputs.scope == 'ppc'
         uses: actions/upload-artifact@v4
