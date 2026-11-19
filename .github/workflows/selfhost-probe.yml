@@ -1,0 +1,108 @@
+name: selfhost-probe
+on:
+  push:
+    branches: ["wt/selfhost-**"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: selfhost-probe
+  cancel-in-progress: false
+
+env:
+  # PM selects one shard per push for the six paired measurements.
+  SHARD: ${{ vars.OS32_PROBE_SHARD || '4' }}
+
+jobs:
+  standard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 155
+    env:
+      SIDE: standard
+    steps: &probe
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/build-setup
+        timeout-minutes: 90
+      - name: Compiler ccache setup
+        id: compiler
+        run: |
+          echo "CCACHE_DIR=$RUNNER_TEMP/compiler-ccache" >> "$GITHUB_ENV"
+          echo "CCACHE_MAXSIZE=1G" >> "$GITHUB_ENV"
+          host="$(gcc -dumpfullversion -dumpversion)"
+          cross="$("$CROSS_DIR/bin/i386-elf-gcc" -dumpfullversion -dumpversion)"
+          echo "versions=host${host}-cross${cross}" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        timeout-minutes: 5
+        env:
+          SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
+        with:
+          path: ${{ runner.temp }}/compiler-ccache
+          key: probe-${{ env.SIDE }}-${{ steps.compiler.outputs.versions }}-${{ github.sha }}-${{ env.SHARD }}
+          restore-keys: |
+            probe-${{ env.SIDE }}-${{ steps.compiler.outputs.versions }}-
+      - name: make check
+        timeout-minutes: 60
+        env:
+          OS32_ACCEPT_IPA_LICENSE: "1"
+          OS32_CLANG_CROSS_FREE: "0"
+          OS32_CHECK_CACHE: ${{ runner.temp }}/check-cache
+          CHECK_LOG_DIR: ${{ runner.temp }}/probe/logs
+          CHECK_TIMES: ${{ runner.temp }}/probe/check_times.tsv
+        run: |
+          export PATH="$CROSS_DIR/bin:$PATH"
+          test -x "$CROSS_DIR/bin/i386-elf-gcc"
+          test -f "$CROSS_DIR/i386-elf/include/stdio.h"
+          out="$RUNNER_TEMP/probe"
+          mkdir -p "$out"
+          printf '%s\n' "$GITHUB_SHA" "$SHARD/6" > "$out/identity"
+          python3 -B tools/checks/run.py --list --shard "$SHARD/6" > "$out/expected"
+          disk_used() { df -B1 --output=used . | tail -1; }
+          (while true; do disk_used; sleep 2; done) > "$out/disk-samples" &
+          sampler=$!
+          finish() {
+              kill "$sampler" || true
+              echo "$(( $(date +%s) - $(cat "$out/start") ))" > "$out/elapsed-seconds"
+              if [ -r "$peak" ]; then cat "$peak"; else echo unavailable; fi > "$out/memory-peak-bytes"
+              sort -nr "$out/disk-samples" | sed -n '1p' > "$out/disk-peak-used-bytes"
+          }
+          group=$(sed -n 's/^0:://p' /proc/self/cgroup)
+          peak="/sys/fs/cgroup${group%/}/memory.peak"
+          trap finish EXIT
+          date +%s > "$out/start"
+          make -k check CHECK_SHARD="$SHARD/6" CROSS_DIR="$CROSS_DIR" NP21W_DIR="$RUNNER_TEMP/np21w"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: probe-${{ env.SIDE }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/probe/
+          if-no-files-found: error
+          retention-days: 30
+
+  selfhost:
+    if: github.event_name == 'push' && github.run_attempt == 1 && github.repository == 'ske-studio/os32-v3' && github.actor == 'ske-studio' && startsWith(github.ref, 'refs/heads/wt/selfhost-')
+    runs-on: [self-hosted, linux, x64, os32-ci]
+    timeout-minutes: 155
+    env:
+      SIDE: selfhost
+    steps: *probe
+
+  compare:
+    needs: [standard, selfhost]
+    if: always() && !cancelled() && needs.selfhost.result != 'skipped'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: probe-*-${{ github.run_attempt }}
+          path: ${{ runner.temp }}
+      - name: Compare paired checks
+        shell: bash
+        run: |
+          python3 -B tools/ci/runner_compare.py "$RUNNER_TEMP/probe-standard-$GITHUB_RUN_ATTEMPT" \
+            "$RUNNER_TEMP/probe-selfhost-$GITHUB_RUN_ATTEMPT" | tee -a "$GITHUB_STEP_SUMMARY"
