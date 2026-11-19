@@ -3,7 +3,12 @@
 
 int main(int argc, char **argv, KernelAPI *api)
 {
-    BootImageInfo info = {0};
+    BootImageInfo info = {
+        .source = 255,
+        .crc_valid = 255,
+        .image_size = 1,
+        .image_crc = 1,
+    };
     char line[80];
 
     (void)argc;

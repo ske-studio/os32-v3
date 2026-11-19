@@ -61,7 +61,7 @@ def observe(elf, cpu, evidence, case, expected, exit_status):
         session.q.call('quit')
         session.p.wait(timeout=5)
         require(session.p.returncode == 0, 'boot info QEMU exit')
-        verdict = 'RED' if case in ('false-valid', 'absent') else 'GREEN'
+        verdict = 'RED' if case in ('false-valid', 'no-write', 'absent') else 'GREEN'
         print(f'{verdict} {case} {cpu}', flush=True)
     finally:
         session.close()
@@ -93,7 +93,7 @@ def main():
                'KB_ROOT_BINS=' + ' '.join(bins)]
     cases = ['verified', 'unverified']
     if args.mutate:
-        cases += ['false-valid', 'absent']
+        cases += ['false-valid', 'no-write', 'absent']
     images = {}
     for case in cases:
         folder = work / case
@@ -104,14 +104,23 @@ def main():
             mutation = mutant_settings(folder, case, 'platform/powermac/root_image.c',
                                        '    struct boot_common info = {0};',
                                        '    struct boot_common info = {.image_valid = 1};')
+        elif case == 'no-write':
+            mutation = mutant_settings(folder, case, 'init/bootinfo.c',
+                                       '    kmemset(out, 0, sizeof(*out));',
+                                       '    if (!s_common.image_valid) return 0;\n'
+                                       '    kmemset(out, 0, sizeof(*out));')
         elif case == 'absent':
             absent_bindings(folder, kernel / 'gen')
         elf = build(kernel, *options, *mutation, 'kb-user', 'kernel')
         iso = (kernel / 'root.iso').read_bytes()
         exit_status = b'0\n'
-        if case in ('unverified', 'false-valid'):
+        if case in ('unverified', 'false-valid', 'no-write'):
             elf = unverified_image(elf, cross / 'bin/powerpc-elf-objcopy', iso)
-            expected = b'BOOT 0 0 0 00000000' if case == 'unverified' else b'BOOT 0 1 0 00000000'
+            expected = {
+                'unverified': b'BOOT 0 0 0 00000000',
+                'false-valid': b'BOOT 0 1 0 00000000',
+                'no-write': b'BOOT 255 255 1 00000001',
+            }[case]
         elif case == 'absent':
             expected = b'BOOT info error -10'
             exit_status = b'1\n'
