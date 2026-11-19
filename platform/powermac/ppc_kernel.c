@@ -372,12 +372,13 @@ void platform_boot_services(void)
     if (pm_root_boot(&img) == 0) {
         (void)pm_console_text_start();
 #if KBOOT_SH
-        (void)pm_hostfs_boot(info->tb_hz);
+        /* Before pm_usb_boot (mouse_init): the default must precede the cursor. */
         u32 fb_w, fb_h;
         pm_console_text_size(&fb_w, &fb_h);
         if (fb_w && fb_h)
             pointer_set_default_bounds(fb_w > 32768 ? 32767 : fb_w - 1,
                                        fb_h > 32768 ? 32767 : fb_h - 1);
+        (void)pm_hostfs_boot(info->tb_hz);
         pm_usb_boot(info->tb_hz);
 #if KBOOT_LINK
         int work_rc = idle_work_register(pm_link_service_once);
