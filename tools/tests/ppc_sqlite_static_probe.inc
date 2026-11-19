@@ -34,6 +34,9 @@ static void sqlite_static_probe(void)
         if (create == SQLITE_OK) {
             commit = sqlite3_exec(db, "BEGIN; INSERT INTO t VALUES(1)", 0, 0, 0);
             if (commit == SQLITE_OK) {
+                OS32_Stat st;
+                int present = vfs_stat("/tmp/P.DB-journal", &st) == VFS_OK;
+                kprintf(KLOG_ATTR, "[sqlite] probe journal=%d\n", present);
                 sqlite_probe_commit = 1;
                 commit = sqlite3_exec(db, "COMMIT", 0, 0, 0);
                 sqlite_probe_commit = 0;

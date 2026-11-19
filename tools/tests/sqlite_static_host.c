@@ -1,3 +1,4 @@
+/* 期待の出所: PowerPC KAPI db 詳細設計 §2-2・§2-3 の表 */
 #include "sqlite_engine.h"
 #include "sqlite_engine_body.h"
 #include "pgalloc.h"

@@ -68,7 +68,7 @@ def fp_permissions(objdump, obj):
 def text_ranges(map_path, obj):
     with open(map_path) as stream:
         linked = stream.read().split('Linker script and memory map', 1)[1]
-    pattern = (r'^ [.]text(?:[.]\S+)?\s+(0x[0-9a-f]+)\s+(0x[0-9a-f]+) '
+    pattern = (r'^ [.]text(?:[.]\S+)?[ \t]*(?:\n[ \t]+)?(0x[0-9a-f]+)\s+(0x[0-9a-f]+) '
                + re.escape(obj) + r'$')
     ranges = sorted((int(addr, 16), int(size, 16)) for addr, size in
                     re.findall(pattern, linked, re.M) if int(size, 16))

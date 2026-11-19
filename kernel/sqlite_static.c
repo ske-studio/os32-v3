@@ -7,6 +7,7 @@
 extern sqlite_body_init_fn sqlite_module_init;
 static SqliteModuleApi static_api;
 
+/* A6: kprintf calls from hard-float code may pass only integers and pointers. */
 int sqlite_static_boot(void)
 {
     int init_rc;

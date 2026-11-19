@@ -25,7 +25,7 @@ CHECK = dict(name='ppc-fp', env=['ppc-cross'], tier=2, budget=60, needs=[],
             'arch/ppc/ppc_*.h', 'arch/ppc/pd_walk.c', 'include/**', 'mm/pgalloc.h',
             'kernel/irq/irq.h', 'kernel/irq/irq_math.h',
             'platform/powermac/platform_irq_limits.h', 'build/arch/ppc.mk',
-            'build/targets/ppc-powermac.mk', 'tools/ppc/kboot_audit.py',
+            'build/targets/ppc-powermac.mk', 'tools/ppc/kboot_audit.py', 'tools/ppc/sqlite_attributes.py',
             'lib/sqlite3/sqlite3.c', 'lib/sqlite3/os32_sqlite_config.h',
             'tools/ppc/test_user_trap*', 'tools/ppc/test_exec_enter.py',
             'tools/accept/ppc_fp.py'],
@@ -66,6 +66,20 @@ def main(argv=None):
     with tempfile.TemporaryDirectory(prefix='ppc-fp-') as td:
         work = Path(td)
         flags = ['-m32', '-mcpu=750', '-mbig-endian', '-mno-altivec', '-I'+str(ROOT/'arch/ppc')]
+        attributes = load('sqlite_attributes', 'tools/ppc/sqlite_attributes.py')
+        record = bytearray.fromhex('41 00000011 676e7500 01 00000009 04 09 0c 01')
+        expected = record.copy()
+        expected[-3] = 8
+        assert attributes.neutralize(record.copy()) == expected
+        if args.mutate:
+            record[-1] = 2
+            try:
+                attributes.neutralize(record)
+            except ValueError as exc:
+                assert 'unexpected PPC32 ABI attributes' in str(exc)
+                print('RED unexpected PPC32 ABI attribute')
+            else:
+                raise AssertionError('accepted unexpected PPC32 ABI attribute')
         # Real product wrapper is assembled and audited independently.
         obj = work/'fp.o'
         call([prefix+'gcc', *flags, '-c', ROOT/'arch/ppc/fp_context.S', '-o', obj])
@@ -107,7 +121,7 @@ def main(argv=None):
                                            ('B1-kernel-load', 'lfd 1,0(3)', True),
                                            ('B1-altivec', 'vxor 0,0,0', True)]:
             src = work/'ordinary.S'
-            src.write_text('.text\n.globl ordinary\nordinary:\n '+instruction+'\n blr\n')
+            src.write_text('.section .text.ordinary_wrapped_section,"ax"\n.globl ordinary\nordinary:\n '+instruction+'\n blr\n')
             ordinary = work/'ordinary.o'
             call([prefix+'gcc', *flags, '-c', src, '-o', ordinary])
             elf = work/'audit.elf'
