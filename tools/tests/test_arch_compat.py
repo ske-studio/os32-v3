@@ -148,7 +148,7 @@ def check_input_kapi(root, work, vectors, mutate):
             ('absent-pointer', 'sdk/kapi_target_ppc.py',
              '"*" in api["ret"]', 'False', {'pc98': 0, 'powermac': 64}),
             ('absent-query', 'sdk/kapi_target_ppc.py',
-             "    'pci_count',\n    'mouse_available',", "    'pci_count',", {'pc98': 0, 'powermac': 64}),
+             "    'ide_drive_present',\n    'mouse_available',", "    'ide_drive_present',", {'pc98': 0, 'powermac': 64}),
             ('ime-not-zero', 'sdk/kapi_target_ppc.py',
              'else "OS32_ERR_NOSYS"', 'else "0"', {'pc98': 0, 'powermac': 64}),
             ('absent-void', 'sdk/gen_kapi.py',
