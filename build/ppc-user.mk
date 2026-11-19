@@ -23,7 +23,7 @@ $(PPC_USER_OUT)/help.o: sdk/crt/help.c sdk/include/os32/help.h $(SDK_KAPI_HDR) |
 $(PPC_USER_NANO) $(PPC_USER_NANO:.a=.json) &: sdk/allocator/build_nano_target.py sdk/allocator/nano_adapter.c sdk/allocator/nano_adapter.h sdk/allocator/nano_inputs.json tools/check_nano_inputs_target.py tools/check_nano_inputs.py $(PPC_USER_OUT)/syscalls.o
 	python3 -B sdk/allocator/build_nano_target.py --cross-dir $(PPC_CROSS_DIR) $(@D) --crt $(PPC_USER_OUT)/syscalls.o
 
-PPC_USER_APPS := $(addprefix $(PPC_USER_OUT)/,hello fault nest outprobe nlprobe celltest shmprobe pathprob fontprob surfprob portprob rtcprob gfx2prob)
+PPC_USER_APPS := $(addprefix $(PPC_USER_OUT)/,hello fault nest outprobe nlprobe celltest shmprobe pathprob fontprob surfprob portprob rtcprob gfx2prob dispprb)
 
 .PHONY: hello ppc-fault ppc-nest
 hello: $(PPC_USER_OUT)/hello.bin
@@ -43,6 +43,7 @@ $(PPC_USER_OUT)/crt0_c.o: $(PPC_USER_START_SRC) | $(PPC_USER_OUT)
 	$(CC) $(PPC_USER_FLAGS) -c $< -o $@
 
 $(PPC_USER_OUT)/pathprob.o: lib/path.h
+$(PPC_USER_OUT)/dispprb.o: include/app_ids.h
 $(PPC_USER_OUT)/fontprob.o: include/config.h
 
 $(addsuffix .o,$(PPC_USER_APPS)): $(PPC_USER_OUT)/%.o: userland/ppc/%.c | $(PPC_USER_OUT)

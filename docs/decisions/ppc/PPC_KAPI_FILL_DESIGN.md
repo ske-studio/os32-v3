@@ -252,6 +252,7 @@ A の場合も、対象像が持つ弱い代役に解決されていないこと
 |surface（束、本線 #18 の確定設計後）|QEMU で事前確認による INVAL と、その後の再取得を確認|束の後半で失敗した場合の巻き戻しは本線の host 受入で確認 ([束の設計 §5](../display/SURFACE_LEASE_BUNDLE_DESIGN.md))|
 |gfx|画面寸法と owner を取得、既知矩形だけ更新し周囲の pixel を保存。非対応 raster/HW は能力に一致|dirty 範囲の右端を欠落させる|
 |gfx2|adapter/head/connector/mode と caps、面生成・lock・描画・present・解放。fence と非対応 EDID 等は実能力どおり|of_fb_v2 の固定モード比較を外し異寸法が通ることを検出|
+|gfx/gfx2（OF FB）|`gfx_screen_owner` と `gfx2_vblank_wait`・`gfx2_palette`・`gfx2_gamma`・`gfx2_cursor_move`・`gfx2_cursor_show`・`gfx2_dpms` を結線。link-sh でシェル owner、無効 head の INVAL、OF の vblank 未対応（HAL v2 §11-7 の NOSYS）、非所有者の表示制御の BUSY、終了後の head と owner を確認| `make check-ppc-display-guest MUTATE=1` で owner・vblank・表示制御の3組の提供者を外す |
 |gui|登録者に要求が一度届き、GUI 終了後に shell に入力が戻る|終了時の所有解放を省略|
 |sys|再起動前後の boot ログを別起動として観測。確定設計の PMU/Cuda ごとに送信回数を照合。buz は無動作|reset の装置呼出を外し再起動を検出できなくする|
 |clock|mac99 の Cuda と PMU を `-rtc base=2024-02-29T00:00:00` で起動し、RSH から 7 バイトの暦時刻と曜日を読む。起動から読出しまでの経過を加えた基準時刻との差は 2 秒以内|年を 1 年ずらす、Cuda と PMU の読出し命令を交換する、公開表で提供者を外す|
