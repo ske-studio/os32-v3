@@ -2,6 +2,8 @@
 CHECK = dict(name='machcfg-host', tier=1, needs=[], budget=5,
     covers=['include/machcfg_contract.h', 'include/types.h', 'include/callconv.h',
             'init/sysconfig.c', 'kernel/machcfg.c', 'tools/tests/machcfg_host.c',
+            'include/kprintf.h', 'include/console.h', 'sdk/include/os32/*.h',
+            'platform/pc98/platform_console.h', 'lib/kprintf.c', 'lib/kprintf_format.inc',
             'tools/tests/host32.py', 'tools/tests/cc_cache.py'],
     basis=['docs/decisions/settings/MACHCFG_DESIGN.md §2, §3, §7'])
 
@@ -24,12 +26,18 @@ def run(ctx):
     header = (root / 'include/machcfg_contract.h').read_text()
     mutations = [
         ('capability', 'if (!machine_seed.accepts_nap7450)', 'if (0)'),
+        ('report-once', 'reported = 1;', ''),
+        ('report-before-finish', '!finished || reported', 'reported'),
+        ('report-n-a', 'if (machine_seed.accepts_nap7450 == 0)', 'if (0)'),
         ('freeze', 'if (finished)', 'if (0)'),
         ('begin-defaults', 'current = seed.defaults;', 'current = (struct machcfg){0, 0};'),
         ('capability-default', 'next.nap7450 = machine_seed.defaults.nap7450;', 'next.nap7450 = 0;'),
     ]
     with tempfile.TemporaryDirectory(dir=os.environ.get('TMPDIR')) as tmp:
         tmp = Path(tmp)
+        formatter = (root / 'lib/kprintf.c').read_text().replace(
+            '#include "kprintf_format.inc"', (root / 'lib/kprintf_format.inc').read_text())
+        (tmp / 'format.c').write_text(formatter)
         def check(src, hdr):
             (tmp / 'machcfg.c').write_text(src)
             (tmp / 'machcfg_contract.h').write_text(hdr)
@@ -38,6 +46,7 @@ def run(ctx):
                    '-ffreestanding', '-fno-pie', '-no-pie', '-nostdlib',
                    '-DTEST_SYSCONFIG_MAX=' + match.group(1), '-I' + str(tmp),
                    '-I' + str(root / 'include'), str(tmp / 'machcfg.c'),
+                   '-I' + str(root / 'platform/pc98'), str(tmp / 'format.c'),
                    str(root / 'tools/tests/machcfg_host.c'), '-o', str(exe)]
             built = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             if built.returncode:

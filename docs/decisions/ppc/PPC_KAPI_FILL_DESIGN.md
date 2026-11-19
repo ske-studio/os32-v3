@@ -178,7 +178,7 @@ A の場合も、対象像が持つ弱い代役に解決されていないこと
 |3c|PPC platform/powermac/usb_platform.c|移動後の共有入口 pointer_move とボタン入力へ配送。抜去時の解放とキーボード同時接続を確認して公開|
 |4a|PPC 公開表だけ|セル5本を既存 console.c の con_backend_scroll・readchar・reverse 等と fbcon に結線。tvram_clear の生成分岐も照合|
 |4k-i|本線 build/select.mk|FEATURE_KCG の FEATURE_PC98_DEVICES 必須条件を解き、PC-98 の選択と無効像も確認|
-|4k-ii|本線 KCG 転送 TU|device_kcg.c の固定名転送を純移動し両像で同じ TU と kcg.c を選ぶ|
+|4k-ii|本線 kernel/dev/device_kcg.c|device_kcg.c の固定名転送を純移動し両像で同じ TU と kcg.c を選ぶ|
 |4b|装置 drivers/video/kcg/kcg_file.c → 共通 kernel/console/font_source.c|PPC は既存 KCG1 から kcg_rom_read_ank・kanji を供給。load は両像で NOSYS。既存 KCG1 をフォント供給元に選ぶ。font lease の close と exec 終了の回収を先に受入|
 |5a-i|本線 drivers/video/pc98/gfx_vram.c（その場の変更、NP21/W で確認）|present、rect、dirty、nosync、raster のクリップ・変更矩形管理を抽出。PC98 VRAM 書込と同期は装置に保持|
 |5a-ii|本線 gfx/ の共通 TU|分離した dirty 列・矩形処理だけを純移動。flip・VSYNC 待ちは装置側。x86 関数差0|
@@ -293,3 +293,5 @@ PowerMac の暦時計は reset と同じ VIA インスタンスを使う。Apple
 2. **共有の登録ファイルの持ち主**: 1a (build/sources/common.mk)、4k-i・7a-選択・7b-選択 (build/select.mk) は docs/tasks/agents/PARALLEL_BRANCHES.md §2 の共有の登録ファイル。本線がこれらの段を出す時は、その時の持ち主から受け取ってから出す。select.mk の 3 段は同じファイルなので本線の列では直列。
 3. **NP21/W の受入は直列**: 「その場の変更」の段 (2a-i・3b-i・5a-i・6d-i) は NP21/W の受入が要るので、本線の列では 1 本ずつ並べる。並列にできるのは「移すだけ」の段どうしと、PowerPC の段との組だけ。
 - 本線の最初の差し込みの予定: 1a・2a-i・2b・3b-i (CI の手直しの S0 の取り込み、CRT の後始末の後。1a は wt/ppc-sqlite-stack が common.mk を手放した後)。
+
+- 追記 (2026-11-19): pci の組の本体を両機種で選べるようにする設計は [PCI_COMMON_DESIGN](PCI_COMMON_DESIGN.md) (本線の M1〜M3 と PowerPC の P1〜P5)。

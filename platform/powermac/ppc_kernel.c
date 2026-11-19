@@ -220,6 +220,7 @@ void platform_boot_machine(void)
                              lan_boot.bus_first, lan_boot.bus_last, lan_boot.bdf};
         (void)pm_gmac_quiesce_setup_rh(&lan_boot, &pci, dev->clock_va);
         if (pm_gmac_early_quiesce() < 0) kboot_stop("gmac_quiesce");
+        pm_pci_boot(&pci, lan_boot.bdf);
     }
     if (!memory_boot_init(KBOOT_MEM_KB)) kboot_stop("memory_boot_init");
     shm_init();
@@ -342,6 +343,7 @@ void platform_boot_services(void)
         kboot_stop("clock_rate");
     kprintf(KBOOT_ATTR, "KBOOT CLOCK hz=%u tick=%u us=%u\r\n", OS32_TICK_HZ, ticks, us_lo);
 
+    pm_pci_enumerate();
     boot_token_init();
     boot_token_get(lan_boot.boot_id);
     if (dev->gmac_ready && lan_log_rc == 0) {

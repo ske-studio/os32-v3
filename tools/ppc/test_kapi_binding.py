@@ -40,8 +40,7 @@ ime_user_delete ime_user_export ime_user_list kcg_init kcg_load_font
 kcg_read_ank kcg_read_kanji kcg_set_scale kdebug_call loop_attach loop_detach
 loop_status mem_stat np2_check_hostdrv np2_detect
 np2_get_clock np2_get_cpu np2_get_version
-pci_bind_info pci_cfg_read32 pci_count
-pci_get pcm_close pcm_open pcm_set_volume pcm_status pcm_write
+pcm_close pcm_open pcm_set_volume pcm_status pcm_write
 sfs_begin
 sfs_end snd_bgm_is_playing snd_bgm_play snd_bgm_set_persist snd_bgm_stop
 snd_focus snd_se_play snd_se_play_raw snd_set_master ssg_all_off ssg_tone
@@ -65,6 +64,7 @@ gfx2_cursor_move gfx2_cursor_show gfx2_dpms
 # Fixed allowlist: exec/*.c (including exec_*.inc), KBOOT_SHELL=1 TUs,
 # input_service, kbd_inject, con_sink, pipe_buffer, kapi_strings, kstring.
 ALLOWED_UNDEFINED = frozenset("""
+platform_pci_count platform_pci_get platform_pci_cfg_read32 kapi_pci_bind_info
 surface_api_bundle
 boot_image_info
 surface_api_query
@@ -237,6 +237,10 @@ def verify(source, entries):
         expected = api['ret'] + ' __cdecl wrap_' + name + '(' + args + ')\n{\n' + body + '}\n'
         if expected not in source:
             return False
+    calls = ('platform_pci_count()', 'platform_pci_get(idx, out)',
+             'platform_pci_cfg_read32(bus, dev, fn, reg)', 'kapi_pci_bind_info(idx, out)')
+    if any('return ' + call + ';' not in source for call in calls):
+        return False
     return bool(re.search(r'void __cdecl wrap_sys_reboot\(void\)\s*\{[^}]*\bsys_reboot\(\);', source))
 
 
@@ -277,6 +281,8 @@ def generate(tmp, mutation=None):
         if "'rtc_read'" in helper.read_text():
             raise RuntimeError('rtc-absent: expected rtc_read published')
         insert_group(helper, mutation, "    'clock': (frozenset({'rtc_read'}), frozenset()),\n")
+    if mutation == 'pci-absent':
+        insert_group(helper, mutation, "    'pci': (frozenset({'pci_get'}), frozenset()),\n")
     if mutation == 'zero':
         text = generator.read_text().replace('{absent_result(api)};', '0;')
         generator.write_text(text)
@@ -343,7 +349,7 @@ def main():
             print('unexpected providers:', sorted(unexpected)); return 1
         print('undefined providers:', len(undefined))
         if '--mutate' in sys.argv:
-            for mutation in ('empty', 'zero', 'group-empty', 'ime-empty', 'reboot-absent', 'slot-swap'):
+            for mutation in ('empty', 'zero', 'group-empty', 'ime-empty', 'reboot-absent', 'slot-swap', 'pci-absent'):
                 path = tmp / mutation
                 path.mkdir()
                 mutated = generate(path, mutation)

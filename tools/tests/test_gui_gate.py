@@ -301,6 +301,31 @@ def case_close(mod, tmp):
     check(mod.close_rshell() is False, "close: ESC が効かないのに閉じたと言う")
 
 
+def case_api_error(mod, tmp):
+    payload = b'{"ok":false,"error":"slot busy"}'
+    with patch.object(mod.emu, "post", return_value=payload), \
+            patch.object(mod.emu, "get", return_value=(200, payload, {})):
+        for request in (lambda: mod.post("/api/key", {"seq": "ESC"}),
+                        lambda: mod.get("/api/status")):
+            try:
+                request()
+            except ValueError as exc:
+                check("slot busy" in str(exc), "API error の理由が無い")
+            else:
+                check(False, "API error を無視した")
+        check(mod.cmd("ver") == payload.decode(), "シェルの JSON 出力が変わった")
+
+
+def case_no_pillow(mod, tmp):
+    wire(mod, FakeGuest(depth=1), tmp)
+    err = io.StringIO()
+    with patch.object(mod._gui.Gui, "screen_text", side_effect=ModuleNotFoundError(name="PIL")), \
+            contextlib.redirect_stderr(err):
+        check(mod.begin_gui(480) is True, "Pillow 無しで GUI に入れない")
+    check(len(err.getvalue().splitlines()) == 1 and "Pillow" in err.getvalue(),
+          "Pillow 無しの警告が無い")
+
+
 def case_begin(mod, tmp):
     guest = FakeGuest(depth=1)
     wire(mod, guest, tmp)
@@ -411,6 +436,8 @@ def case_scenarios(mod, tmp):
 
 
 CASES = {
+    "api_error": case_api_error,
+    "no_pillow": case_no_pillow,
     "fresh": case_fresh,
     "gui_entered": case_gui_entered,
     "close": case_close,
@@ -422,6 +449,8 @@ CASES = {
 
 # 否定側。実装を 1 か所だけ壊して RED になることを見る。
 MUTATIONS = [
+    (r'if result\.get\("ok"\) is False:', 'if False:', 'API の拒否を無視する'),
+    (r'if exc\.name != "PIL":', 'if True:', 'Pillow 無しで GUI の入口が落ちる'),
     (r"    if st\.get\(\"scrn_ymax\"\) == h and st\.get\(\"grph_disp\"\) == 1:\n        return True",
      "    return True",
      "GUI に居るかを見ない (CUI のまま RESULT: OK — 元の不具合)"),

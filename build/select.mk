@@ -130,9 +130,6 @@ ifneq ($(words $(filter 0 1,$(FEATURE_KCG))),1)
 $(error invalid FEATURE_KCG)
 endif
 ifeq ($(FEATURE_KCG),1)
-ifneq ($(ARCH)-$(PLATFORM),x86-pc98)
-$(error unsupported FEATURE_KCG on $(ARCH)-$(PLATFORM))
-endif
 include build/features/kcg.mk
 endif
 FEATURE_CD ?= $(DEFAULT_FEATURE_VALUE)
@@ -228,11 +225,6 @@ endif
 ifeq ($(FEATURE_LAN),1)
 ifneq ($(FEATURE_PC98_DEVICES),1)
 $(error FEATURE_LAN requires FEATURE_PC98_DEVICES)
-endif
-endif
-ifeq ($(FEATURE_KCG),1)
-ifneq ($(FEATURE_PC98_DEVICES),1)
-$(error FEATURE_KCG requires FEATURE_PC98_DEVICES)
 endif
 endif
 ifeq ($(FEATURE_CD),1)

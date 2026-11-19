@@ -1937,7 +1937,7 @@
       "stage": "S5",
       "kind": "FUNC",
       "symbol": "pci_get",
-      "source": "drivers/pci/pci.h",
+      "source": "include/pci_contract.h",
       "context_safe": false,
       "index": 239
     },
@@ -2097,7 +2097,7 @@
       "stage": "S5",
       "kind": "FUNC",
       "symbol": "pci_cfg_read32",
-      "source": "drivers/pci/pci.h",
+      "source": "include/pci_contract.h",
       "context_safe": false,
       "index": 259,
       "retained": true
