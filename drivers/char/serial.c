@@ -17,6 +17,7 @@
 /* ======================================================================== */
 
 #include "serial.h"
+#include "serial_kapi.h"
 #include "serial_plan.h"   /* 速度と FIFO の純粋な判定 (ホストで試験する) */
 #include "io.h"
 #include "pc98.h"
@@ -961,18 +962,10 @@ int serial_putchar_kapi(char c)
     }
     return serial_putchar(c);
 }
-void serial_puts_kapi(const char *str)
+void serial_puts_pace(unsigned int count)
 {
-    int count = 0;
-    while (*str) {
-        if (ring3_wait_pending()) {
-            ring3_abort_check();
-            return;
-        }
-        serial_putchar(*str++);
-        if ((++count & (SER_PUTS_WAIT_EVERY - 1)) == 0) {
-            io_wait();
-            io_wait();
-        }
+    if ((count & (SER_PUTS_WAIT_EVERY - 1)) == 0) {
+        io_wait();
+        io_wait();
     }
 }

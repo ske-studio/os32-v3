@@ -33,6 +33,8 @@ static int fake_port_status(u32 *m, u32 *b, u32 *f)
     return serial_rc;
 }
 #include "port_service.c"
+int ring3_wait_pending(void) { return 0; }
+void ring3_abort_check(void) { __builtin_trap(); }
 static const PortOps test_port = { .get_status = fake_port_status };
 
 int pcm_present(void) { calls[3]++; return pcm; }

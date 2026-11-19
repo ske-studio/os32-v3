@@ -74,6 +74,8 @@ static int g_v86;
 #include "legacy_guest_fake.h"
 
 #include "../../kernel/port_service.c"
+int ring3_wait_pending(void) { return 0; }
+void ring3_abort_check(void) { __builtin_trap(); }
 static char copied[128];
 static u32 copied_len;
 static int capture_putchar(char c)
