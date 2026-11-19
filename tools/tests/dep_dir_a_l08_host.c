@@ -1,6 +1,8 @@
 /* ILP32 generated wrappers -> platform -> PCI substitutes. */
 #include <stddef.h>
 #include "platform_device.h"
+#include "pci_contract.h"
+int kapi_pci_bind_info(u32 idx, void *out);
 #include "pci_bind_contract.h"
 #include "os32_kapi_shared.h"
 _Static_assert(sizeof(struct pci_dev) == 40, "PCI enumeration ABI");
@@ -38,14 +40,14 @@ int pci_bind_info_get(int idx, struct pci_bind_info *out)
     for (int i = 0; i < 8; i++) ((u8 *)out)[i] = (u8)(i + 2);
     return 0;
 }
-static int ring3_user_range_ok(u32 p, u32 len)
+int ring3_user_range_ok(u32 p, u32 len)
 { CHECK(p == (u32)user_out && len == 8); return range_ok; }
-static int ring3_user_ranges_writable(u32 p, u32 len, u32 p2, u32 len2)
+int ring3_user_ranges_writable(u32 p, u32 len, u32 p2, u32 len2)
 {
     CHECK(p == (u32)user_out && p2 == 0 && len2 == 0);
     guards++; guard_len = len; return writable;
 }
-static void ring3_fault_kill(void) { die(writable ? 1 : 0); }
+void ring3_fault_kill(void) { die(writable ? 1 : 0); }
 #define KAPI_HIT(n) ((void)(n))
 #define KAPI_OUT_LEN(p, n) ((u32)(n))
 #include "wrappers.inc"

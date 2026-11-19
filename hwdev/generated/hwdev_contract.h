@@ -25,6 +25,7 @@
 #include "gfx/gfx.h"
 #include "include/gf_production.h"
 #include "include/kprintf.h"
+#include "include/pci_contract.h"
 #include "include/sys.h"
 #include "kdebug/gf5_test.h"
 #include "kdebug/gf_display_test.h"
@@ -62,7 +63,7 @@ struct hwdev_core_api {
     i32 (*kpeek_call)(u32 op, void *buf, u32 size);
     int (*recover_gf_runner_access)(struct recover *r, u32 pc, u32 bar, u32 off, u32 width, bool write, u32 *value);
 };
-#define HWDEV_CONTRACT_CRC 0x69aeff7fU
+#define HWDEV_CONTRACT_CRC 0x61668757U
 #define HWDEV_LAYOUT_CRC 0x4d4feffaU
 #define HWDEV_IMPORT_COUNT 48U
 #define HWDEV_CORE_SLOTS 26U

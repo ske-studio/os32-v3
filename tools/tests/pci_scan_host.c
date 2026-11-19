@@ -1,6 +1,7 @@
 /* Real mechanism #1, boot scan, recording, sizing and resource collection.
  * Only the I/O ports and interrupt state are fake. */
 #include "../../drivers/pci/pci.h"
+#include <stdarg.h>
 #define IO_H
 static int failed;
 static void output(const char *s) { u32 n=0;while(s[n])n++;__asm__ volatile("int $0x80"::"a"(4),"b"(1),"c"(s),"d"(n):"memory"); }
@@ -9,6 +10,9 @@ static void clear(void *p,u32 n) { u8 *b=p;while(n--)*b++=0; }
 
 static u32 cfg[32][8][16], masks[32][8][16], pending[32][8];
 static u32 writes[32][8][16], address_port, irq_state=1, transaction_state;
+static int port_present = 1;
+static const u32 *test_roots;
+static u32 busno;
 static u32 devno, fnno, regno;
 static unsigned int irq_save(void) { u32 old=irq_state;irq_state=0;return old; }
 static void irq_restore(unsigned int f)
@@ -19,20 +23,28 @@ static void irq_restore(unsigned int f)
 }
 static void select_cfg(void)
 {
-    CHECK(!irq_state && ((address_port>>16)&255)==0);
+    CHECK(!irq_state);
+    busno = (address_port >> 16) & 255;
     devno=(address_port>>11)&31;fnno=(address_port>>8)&7;regno=(address_port&255)/4;
+    if (!test_roots) CHECK(busno == 0);
     CHECK(regno<16);
 }
 static unsigned long inpd(unsigned int port)
 {
-    if(port==PCI_CFG_ADDR_PORT)return address_port;
+    if(port==PCI_CFG_ADDR_PORT)return port_present ? address_port : 0;
     CHECK(port==PCI_CFG_DATA_PORT);select_cfg();
+    /* Each additional test bus has a distinct endpoint at slot bus:bus. */
+    if (busno != 0) {
+        if (devno != busno || fnno != 0) return U32_MAX;
+        return regno == 0 ? 0x000f1000 : 0;
+    }
     return cfg[devno][fnno][regno];
 }
 static void outpd(unsigned int port,unsigned long v)
 {
     if(port==PCI_CFG_ADDR_PORT){address_port=v;return;}
     CHECK(port==PCI_CFG_DATA_PORT);select_cfg();
+    if (busno != 0) return;
     writes[devno][fnno][regno]++;
     if(v==U32_MAX || v==0xfffffffeU) {
         CHECK(regno>=4);
@@ -49,13 +61,50 @@ static void outpd(unsigned int port,unsigned long v)
 static void outpw(unsigned int port,unsigned int v)
 {
     CHECK(port==PCI_CFG_DATA_PORT);select_cfg();CHECK(regno==1);
+    if (busno != 0) return;
     if(v&3)CHECK(!pending[devno][fnno]);
     cfg[devno][fnno][1]=(cfg[devno][fnno][1]&0xffff0000U)|v;
 }
-void __cdecl kprintf(u8 attr,const char *fmt,...) { (void)attr;(void)fmt; }
+/* Capture the first diagnostic of each scan, expanding its string argument. */
+static char boot_line[80];
+void __cdecl kprintf(u8 attr, const char *fmt, ...)
+{
+    (void)attr;
+    if (boot_line[0]) return;
+    va_list args;
+    va_start(args, fmt);
+    u32 n = 0;
+    while (*fmt && n < sizeof(boot_line) - 1) {
+        if (fmt[0] == '%' && fmt[1] == 's') {
+            const char *value = va_arg(args, const char *);
+            while (*value && n < sizeof(boot_line) - 1) boot_line[n++] = *value++;
+            fmt += 2;
+        } else {
+            boot_line[n++] = *fmt++;
+        }
+    }
+    boot_line[n] = 0;
+    va_end(args);
+}
+static int line_equals(const char *expected)
+{
+    u32 i = 0;
+    while (expected[i] && expected[i] == boot_line[i]) i++;
+    return expected[i] == boot_line[i];
+}
 #include "../../drivers/pci/pci_decode.c"
 #include "../../platform/pc98/pci_config.c"
+static u32 root_count;
+static int scan_root_bus(u32 idx, u32 *bus)
+{
+    if (!test_roots) return pci_config_root_bus(idx, bus);
+    if (idx >= root_count) return -1;
+    *bus = test_roots[idx];
+    return 0;
+}
+#define pci_config_root_bus scan_root_bus
 #include "../../drivers/pci/pci.c"
+#undef pci_config_root_bus
 #include "../../drivers/pci/pci_barsize.c"
 u32 recover_gf_dev(void) { return 13; }
 #define GFINIT_RESOURCES_HOST 1
@@ -76,6 +125,32 @@ void _start(void)
 {
     struct recover_range ranges[RECOVER_RANGE_MAX];u32 n;
     struct pci_bar_resource r;struct pci_dev pub;
+    u32 bus = U32_MAX;
+    CHECK(pci_config_root_bus(0, &bus) == 0 && bus == 0);
+    CHECK(pci_config_root_bus(1, &bus) == -1);
+    CHECK(pci_config_root_bus(PCI_CONFIG_MAX_ROOTS, &bus) == -1);
+    port_present = 0;
+    CHECK(pci_init() == 0 && line_equals("[pci] mech#1 absent\n"));
+    port_present = 1;
+    boot_line[0] = 0;
+    setup();
+    CHECK(pci_init() == 1 && line_equals("[pci] mech#1 ok\n"));
+    CHECK(pci_get(0, &pub) == 0 && pub.bus == 0);
+    static const u32 single[] = {2}, multiple[] = {0, 3};
+    test_roots = single;
+    root_count = 1;
+    CHECK(pci_init() == 1 && pci_get(0, &pub) == 0 && pub.bus == 2 && pub.dev == 2);
+    test_roots = multiple;
+    root_count = 2;
+    CHECK(pci_init() == 2 && pci_get(0, &pub) == 0 && pub.bus == 0);
+    CHECK(pci_get(1, &pub) == 0 && pub.bus == 3 && pub.dev == 3);
+    static const u32 excessive[] = {1, 2, 3, 4, 5};
+    test_roots = excessive;
+    root_count = 5;
+    CHECK(pci_init() == 4);
+    for (u32 i = 0; i < 4; i++)
+        CHECK(pci_get(i, &pub) == 0 && pub.bus == excessive[i]);
+    test_roots = 0;
     setup();endpoint(2,0,0x20411000);endpoint(2,7,0x20412000);
     cfg[2][0][3]=PCI_HDR_MULTIFUNCTION<<16;
     CHECK(pci_init()==3 && irq_state==1);
