@@ -163,6 +163,7 @@
     "drivers/dma/dma8237_math.c",
     "lib/dma_contract.c",
     "drivers/pci/pci.c",
+    "platform/pc98/pci_config.c",
     "drivers/pci/pci_barsize.c",
     "drivers/pci/pci_hwb.c",
     "drivers/pci/pci_decode.c",

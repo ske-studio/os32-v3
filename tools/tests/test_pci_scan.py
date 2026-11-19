@@ -1,6 +1,6 @@
 """Run the real boot PCI enumeration and resource collector over fake ports."""
 CHECK = dict(name='pci-scan-host', tier=4,
-    covers=['drivers/pci/pci.c', 'drivers/pci/pci_barsize.c', 'drivers/pci/pci_barsize.h',
+    covers=['drivers/pci/pci.c', 'platform/pc98/pci_config.c', 'include/pci_config_contract.h', 'drivers/pci/pci_barsize.c', 'drivers/pci/pci_barsize.h',
             'drivers/pci/pci.h', 'drivers/pci/pci_decode.c', 'drivers/pci/pci_decode.h',
             'tools/tests/pci_scan_host.c', 'tools/tests/test_pci_scan.py',
             'kdebug/gfinit_resources.c', 'kdebug/gfinit_resources.h', 'kdebug/gfinit_resources/*.inc',
