@@ -34,7 +34,7 @@ static void finish(int status)
 static void expect_diag(u32 expected_oe, u32 expected_fe, u32 expected_pe, int failure)
 {
     u32 oe, fe, pe, overflow;
-    pm_escc_diag(&oe, &fe, &pe, &overflow);
+    port_diag_get(&oe, &fe, &pe, &overflow);
     if (oe != expected_oe || fe != expected_fe || pe != expected_pe || overflow)
         finish(failure);
 }

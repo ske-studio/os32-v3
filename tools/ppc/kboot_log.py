@@ -54,6 +54,7 @@ def exercise(directory, name, filename=None, before=None, after=None):
         (directory / unit).write_text(source)
     binary = directory / name
     command = ['gcc', '-m32', '-std=gnu11', '-O2', '-ffreestanding', '-DKBOOT_SH=1',
+               '-ffunction-sections', '-Wl,--gc-sections',
                '-fno-builtin', '-fno-pie', '-no-pie', '-fno-stack-protector',
                '-nostdlib', '-static', '-Wall', '-Wextra', '-Werror',
                '-I' + str(ROOT / 'include'), '-I' + str(ROOT / 'arch/ppc'),

@@ -3,6 +3,13 @@
 Common exec, caller validation, owner, FD and heap providers remain bound.
 """
 
+PROVIDER_EXTERNS = frozenset({
+    "extern volatile u32 tick_count;",
+    "extern void kapi_sys_exit(int status);",
+    "extern int kapi_serial_diag(SerialDiag *out);",
+    "extern int kapi_sys_set_mtime(const char *path, u32 mtime);",
+})
+
 PROVIDER_GROUPS = {
     'sys': (frozenset({'buz_on', 'buz_off'}), frozenset([])),
     'surface': (frozenset({'gfx_surface_lease'}), frozenset([])),
@@ -30,7 +37,6 @@ PROVIDER_GROUPS = {
         'gfx_hw_get',
         'gfx_osri_show',
     }), frozenset(['gfx_hal.h', 'gfx.h', 'palette.h'])),
-    'port': (frozenset({'serial_puts', 'serial_diag'}), frozenset()),
     'gui': (frozenset({
         'gui_call',
         'gui_register',
@@ -116,7 +122,6 @@ PROVIDER_GROUPS = {
     }), frozenset(['kapi_db.h'])),
     'system_info': (frozenset({
         'sys_get_build_info',
-        'sys_set_mtime',
         'sys_time_now',
         'mem_stat',
         'sys_ver_info',

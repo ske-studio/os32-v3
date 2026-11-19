@@ -24,10 +24,14 @@ int main(int argc, char **argv, KernelAPI *api)
         return report(api, "PORT rejection failed\n", 4);
     if (api->serial_trygetchar() != -1)
         return report(api, "PORT empty try failed\n", 5);
+    SerialDiag diag = { 1, 1, 1, 1 };
+    if (api->serial_diag(&diag) || diag.oe || diag.fe || diag.pe || diag.overflow)
+        return report(api, "PORT diag failed\n", 10);
     if (argc == 1)
         return report(api, "PORT settings OK\n", 0);
 
     /* The host waits for '?' before sending anything on channel A. */
+    api->serial_puts("ESCC string output");
     if (api->serial_putchar('?'))
         return report(api, "PORT ready TX failed\n", 6);
     const unsigned char expected[] = { 0xa5, 0x5a };
