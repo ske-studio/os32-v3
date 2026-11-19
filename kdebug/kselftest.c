@@ -210,6 +210,7 @@ int kselftest_run_post_exec(void)
     check((kstack_high_water() & 0xffffU) < MEM_KSTACK_TOP - MEM_KSTACK_BASE,
           "kstack bound");
     check(resident_heap_peak >= exec_heap_used(), "resident peak");
+    check(kst_path_set_drive() == 0, "path_set_drive validates device and preserves rejected state");
     test_tramp_user_str();
     test_kapi_layout();
     test_memmap();

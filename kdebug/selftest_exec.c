@@ -163,3 +163,22 @@ u32 kst_exec_tramp_user(void)
 
     return bad;
 }
+
+int kst_path_set_drive(void)
+{
+    char drive[PATH_DRIVE_LEN], cwd[PATH_MAX_LEN];
+    kstrncpy(drive, path_get_drive(), sizeof(drive));
+    kstrncpy(cwd, path_get_cwd(), sizeof(cwd));
+
+    int bad = path_set_drive("fd0") != 0;
+    path_set_cwd("/kst");
+    if (path_set_drive("missing") != -1 ||
+        kstrcmp(path_get_drive(), "fd0") || kstrcmp(path_get_cwd(), "/kst"))
+        bad = 1;
+
+    /* PC-98 starts on the historical default "fdd0", outside dev_find. */
+    if (path_set_drive(drive) != 0)
+        path_init();
+    path_set_cwd(cwd);
+    return bad || kstrcmp(drive, path_get_drive()) || kstrcmp(cwd, path_get_cwd());
+}
