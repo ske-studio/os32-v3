@@ -58,7 +58,7 @@
     "mm/physmem.c",
     "mm/pgalloc.c",
     "platform/pc98/lan_match.c",
-    "platform/pc98/device_loop.c",
+    "kernel/dev/device_loop.c",
     "platform/pc98/device_ide.c",
     "kernel/dev/device_fs.c",
     "kernel/dev/device_pci.c",
