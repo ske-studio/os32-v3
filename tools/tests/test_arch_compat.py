@@ -69,7 +69,7 @@ def input_kapi(root, work, vectors, mutation=None):
     slot = next(i for i, a in enumerate(api) if a['name'] == 'kbd_trygetkey')
     # The absent-pointer sample must stay absent on PowerMac: path_get_drive was filled by
     # PPC_KAPI_FILL 1c; db_last_error is filled by 7b — pick another absent pointer slot then.
-    names = ('kbd_trygetkey', 'db_last_error', 'mouse_available', 'ime_is_active', 'gfx_shutdown')
+    names = ('kbd_trygetkey', 'db_last_error', 'mouse_available', 'ime_is_active', 'snd_bgm_stop')
     statuses, slots = {}, []
     for provider, target in (('pc98', 'x86-pc98'), ('powermac', 'ppc-powermac')):
         output = work / target
@@ -92,7 +92,7 @@ def input_kapi(root, work, vectors, mutation=None):
         (work / 'input.inc').write_text(source)
         (work / 'input-vectors.c').write_text(vectors)
         exe = work / ('input-' + provider)
-        subprocess.run(['gcc', '-m32', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
+        subprocess.run(['gcc', '-m32', '-nostdinc', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
             '-ffreestanding', '-nostdlib', '-static', '-fno-pie', '-no-pie', '-fno-stack-protector',
             '-I' + str(work), '-I' + str(root), '-I' + str(root / 'include'),
             '-I' + str(root / 'sdk/include/os32'), '-I' + str(root / 'platform/powermac'),
@@ -153,7 +153,7 @@ def check_input_kapi(root, work, vectors, mutate):
              'else "OS32_ERR_NOSYS"', 'else "0"', {'pc98': 0, 'powermac': 64}),
             ('absent-void', 'sdk/gen_kapi.py',
              '        if ret != "void":',
-             '        if name == "gfx_shutdown": c_content += "    gfx_shutdown();\\n"\n        if ret != "void":',
+             '        if name == "snd_bgm_stop": c_content += "    snd_bgm_stop();\\n"\n        if ret != "void":',
              {'pc98': 0, 'powermac': 64}),
         )
         for label, path, old, new, observed in mutations:
@@ -180,7 +180,7 @@ def exercise(root, work, vectors, mpic=None, idle=None, provider_text=None):
         if provider == 'powermac' and provider_text is not None:
             source = work / 'provider.c'
             source.write_text(provider_text)
-        subprocess.run(['gcc', '-m32', '-std=gnu11', '-O2', '-Wall', '-Wextra',
+        subprocess.run(['gcc', '-m32', '-nostdinc', '-std=gnu11', '-O2', '-Wall', '-Wextra',
             '-Werror', '-ffreestanding', '-nostdlib', '-static', '-fno-pie',
             '-no-pie', '-fno-stack-protector', '-I' + str(work), '-I' + str(root),
             '-I' + str(root / 'include'), '-DPROVIDER_SOURCE="' + str(source) + '"',

@@ -62,12 +62,12 @@ int platform_clock_read_us(u32 *lo, u32 *hi) { *lo = fake_time; *hi = 0; return 
 #include "kernel/input_wait.c"
 #endif
 #include INPUT_SOURCE
-static int hits, shutdowns;
+static int hits, bgm_stop_calls;
 static int pointer_present(void) { return 1; }
 #define KAPI_HIT(slot) (hits = (slot))
 const char *kapi_db_last_error(int handle) { (void)handle; return "A:"; }
 int ime_is_active(void) { return 1; }
-void gfx_shutdown(void) { ++shutdowns; }
+void snd_bgm_stop(void) { ++bgm_stop_calls; }
 #include KAPI_SOURCE
 #define REQUIRE(expr) do { if (!(expr)) return 64; } while (0)
 static int input_kapi(void)
@@ -127,11 +127,11 @@ static int input_kapi(void)
 #ifdef PC98_INPUT
     REQUIRE(drive && drive[0] == 'A' && wrap_ime_is_active() == 1);
     REQUIRE(wrap_mouse_available() == 1);
-    wrap_gfx_shutdown(); REQUIRE(shutdowns == 1);
+    wrap_snd_bgm_stop(); REQUIRE(bgm_stop_calls == 1);
 #else
     REQUIRE(drive == 0 && wrap_mouse_available() == 0);
     REQUIRE(wrap_ime_is_active() == OS32_ERR_NOSYS); /* not a ZERO_SLOTS query */
-    wrap_gfx_shutdown(); REQUIRE(shutdowns == 0);
+    wrap_snd_bgm_stop(); REQUIRE(bgm_stop_calls == 0);
 #endif
     return failures;
 }
