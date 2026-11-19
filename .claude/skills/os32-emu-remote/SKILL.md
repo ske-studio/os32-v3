@@ -17,7 +17,7 @@ description: NP21/W の受入 (エミュレータの試験) を、別の機械�
 | リポジトリ | 向こうの `~/os32-v3` (読むだけ、push しない)。GitHub は**読み取りだけの権限** (Contents・Actions を Read-only の fine-grained token。push・PR・CI の起動はしない) |
 | 像 | **CI の build の配布物** (`os32-<枝>-<SHA7>`) を `gh run download` で取る。向こうではビルドしない (クロスコンパイラは入れない) |
 | NP21/W | `C:\np21w` (本線の機械から写した ai-debug 版の exe・ROM・ini)。ROM と NHD は著作権物・作業物なので**外へ出さない** (GitHub にも上げない) |
-| 枠 | 枠 N (1〜4) = ポート `802(4+N)`・ini `np21x64w-iN.ini`・NHD `C:\np21w\iN\os32.nhd`・HostDrv `C:\os32-N`。枠 1 は当面 `np21x64w.ini`・`C:\np21w\os32.nhd`・`C:\os32` (8025) のまま。占有は `C:\np21w\slot-N.lock` (SHA・開始の時刻・頼んだ人) |
+| 枠 | 枠 N (1〜4) = デバッグの API `aidbport=8025+100(N-1)` (8025・8125・8225・8325)、LAN の口 `NP2NETSOCK=127.0.0.1:8026+100(N-1)` (8026・8126・…、host agent の待ち受けも同じ番号)、ini `np21x64w-iN.ini`、NHD・起動 FD `C:\np21w\iN\`、HostDrv `C:\os32-N`。枠 1 は `np21x64w.ini`・`C:\np21w\os32.nhd`・`C:\os32` のまま。**8025〜8028 の連番にしない** — mirrored の WSL は loopback を共有するので、枠 2 の API が 8026 で待つと枠 1 の LAN の口がそこへつながる (2026-11-19 の試しで判明)。占有は `C:\np21w\slot-N.lock` (SHA・開始の時刻・頼んだ人) |
 | 元の NHD | `os32.nhd` の写し (sha256 先頭 `b81e4d4254cc6eb6`、2026-11-19 の main 225c257 の手前)。枠の NHD はここから戻す |
 | 本線からの ssh | `ssh pc98emu` (`~/.ssh/config`、鍵 `~/.ssh/id_pc98emu`、`hight@192.168.1.23:2222` の WSL の sshd、鍵だけ) |
 
@@ -60,4 +60,10 @@ description: NP21/W の受入 (エミュレータの試験) を、別の機械�
 - 1 回目の `hsync` は出力が途中で切れることがある (`[aidebug: timeout waiting for EOT]`)。2 回目の `copied=0 errors=0` で揃ったと見る (本線の機械でも同じ)。
 - 自前ビルドの NP21/W は署名が無い。Windows の Smart App Control が On だと起動できない (CodeIntegrity 3077)。
 - NP21/W の ai-debug 版を更新したら、本線の `~/np21w-src` で組んだ exe を ssh で `C:\np21w` に置き、pc98emu に枠の立て直しを頼む。
-- 複数の枠を同時に立てた時の道具の詰まり所は、2026-11-19 の 2 本同時の試しの結果でここに足す。
+- **複数の枠と `tools/np21w_ctl.py` (2026-11-19 の 2 本同時の試し、直すまでの決まり)**:
+  - `stop` は `/api/quit` が通った後も、同じ exe の**ほかの枠のプロセスまで強制終了する** (前に応答が無い時の救済も同じ)。2 本目を止めて 1 本目が落ちた。**2 本以上動いている間は `np21w_ctl.py stop` を使わない** — 止める枠の `/api/instance` の `instance_id` を付けて `/api/quit` を送る。
+  - `start` は同じ exe のプロセスが 1 つでも生きていると起動を断る。2 本目以降は Windows の `Start-Process C:\np21w\np21x64w.exe -ArgumentList '/iC:\np21w\np21x64w-iN.ini' -WorkingDirectory C:\np21w` で起こし、`NP21W_AIDEBUG_URL` を付けた `np21w_ctl.py wait-ready` で待つ (これは枠ごとに動く)。
+  - `status` のプロセスの表示はほかの枠の分も出る (表示だけ)。`start` は作業木の NHD の印を消す (枠ごとでない)。
+  - 枠ごとに変えれば足りる環境変数: `NP21W_AIDEBUG_URL` と `HOSTDRV_DIR` (`NP21W_DIR` は共通)。token は `/api/instance` の `token_file` (`np21w_aidebug_<port>.token`) を道具が自分で探す。MCP の np21w は 8025 に固定 (`.mcp.json` の env が空) なので、枠 2 以降のサブエージェントは `driver.py`・`np21w_client.py` を直に使う。
+  - 枠ごとに止める・起こすように `np21w_ctl.py` を直す段は本線の待ち行列にある (直ったらこの項目を消す)。
+- 起動中の 1 本の写しを取ると壊れた写しになる。NHD を写す時はその枠を止める。
