@@ -82,7 +82,8 @@ static void pci_record(u32 bus, u32 dev, u32 fn, u16 vendor, u32 id_dword)
     u32 w;
     int i;
 
-    pci_barsize_record(bus, dev, fn, pci_cfg_read8(bus, dev, fn, PCI_CFG_HEADER_TYPE));
+    if (pci_config_bar_measure())
+        pci_barsize_record(bus, dev, fn, pci_cfg_read8(bus, dev, fn, PCI_CFG_HEADER_TYPE));
     g_pci_seen++;
     if (g_pci_count >= PCI_MAX_DEVS) return;   /* 溢れても走査は続ける */
 
@@ -185,13 +186,14 @@ int pci_init(void)
 
     if (!pci_config_probe()) {
         /* NP21/W はここで止まる。**これが正しい報告**であって失敗ではない。 */
-        kprintf(ATTR_CYAN, "[pci] mech#1 absent\n");
+        kprintf(ATTR_CYAN, "[pci] %s absent\n", pci_config_name());
         return 0;
     }
     g_pci_present = 1;
-    kprintf(ATTR_GREEN, "[pci] mech#1 ok\n");
+    kprintf(ATTR_GREEN, "[pci] %s ok\n", pci_config_name());
 
-    pci_scan_bus(0, 0);
+    for (u32 i = 0, bus; i < PCI_CONFIG_MAX_ROOTS && pci_config_root_bus(i, &bus) == 0; i++)
+        pci_scan_bus(bus, 0);
 
     if (g_pci_seen > g_pci_count) {
         kprintf(ATTR_YELLOW, "[pci] %d devices (%d seen, table full)\n",
