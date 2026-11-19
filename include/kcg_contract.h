@@ -57,7 +57,7 @@ typedef struct {
     void (*stats)(KcgCacheStats *out);
     void (*invalidate)(void);
 } KcgModuleApi;
-/* 1 = 部品が読み込まれて ROM を読める。 */
+/* 1 = 字形の供給元 (PC-98: kcg.mod、PowerMac: KCG1) を読める。 */
 int kcg_module_ready(void);
 
 #endif /* KCG_CONTRACT_H */
