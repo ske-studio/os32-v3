@@ -1101,6 +1101,7 @@ GitHub Actionsでの新規構築はf1a作業中は未実施、PMがCI runで確�
 main へ入れる判定は配布物・検査6本と静的ゲートの `check.yml` がすべて合格すること
 (変異込みの `make check` は回さない)。arch-asm と le-access は build の全範囲検査に集約し、
 クロス無しの静的ゲートからは実行しない。
+`check.yml` はイベント種別と ref がともに同じ場合に古い実行を取り消す。タグの push では起動しない。手動の起動 (workflow_dispatch) は入力の arch を区別しないので、同じ ref で続けて起こすと最後の 1 本だけが残る (両方を回すなら arch=both)。
 
 main への push では `tools/ci/reuse_success.py` が `gh api` と `GITHUB_TOKEN` で
 同じ workflow の統合枝 (`wt/int-*`) の push run を調べる。SHA の40桁完全一致・workflow ID 一致・
