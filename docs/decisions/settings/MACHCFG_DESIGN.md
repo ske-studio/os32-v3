@@ -215,3 +215,214 @@ if (!seed.accepts_nap7450)
 ### 確定本文と矛盾しない理由
 1. §2・B4・R3 の読取幅と数値定義の位置を保ち、公開上限が正典より 1 小さいことを host で検証する。
 2. §2 の対象 CPU 違いの行を捨てる規則を §3 の一括確定で実現し、§4・P-R7 の 7455 の電力制御を維持する。
+
+## 段 D の追記 (2026-11-19、確定)
+
+r1→r2 の変更 (REVIEW-D.r1 と PM 決定):
+
+- D1: `machcfg_begin` で足した static 3 つ (結果 = NOFS・キー = 0・出した印 = 0) を戻す (§2・§3・§5)。
+- D2: 「一時読取の終了」の観測を、load の後の `sysconfig_get_int(SYS_MACHINE_CFG, …)` で vfs_read の回数が増えること、に替えた (system.cfg の観測は併用) (§5)。
+- D3: 一時読取中の get_int が数字なし・末尾が空白以外・あふれで def を返すことを口の注釈に書き、受入の入力に `perf.profile=x` と巨大整数を足した (§2・§5)。
+- D4: PowerMac の seed の出所として段 F に `pm_machcfg_seed` を足した (§3・§5)。
+- D5: host の kprintf の代役は `lib/kprintf_format.inc` の取り込み (vsnprintf は使えない)、covers に足す (§5)。
+- D6: PC-98 の report は load の直後で確定。未確認の項と代案を消した (§3)。
+- D7: 属性は KLOG_ATTR と同じ物 (§3)。
+- D8: seed の欄は残し、PowerMac は常に `cpu`・PC-98 は常に `plat` と注記 (§3・§5)。
+- D9: report の cpu にも `0x` を付ける (§3)。
+- ほか: D-i の依存に B2・B2t を足した (§5)。U1 は PM 決定「出す」で決着、未決は 0 件 (§6)。
+
+> 2026-11-19、設計者の追記。確定設計 MACHCFG_DESIGN §3 (kprintf)・§5 (root 読取・診断と前後の計測)・§6 段 D・末尾の追記 2 を埋める。
+> 実物は main 1f0deee6d を grep で確かめた。ビルド・計測・実行はしていない (大きさは見積もり、**未計測**)。
+
+### 1. 実物の確認
+
+| 物 | 場所 | 今の状態 |
+|---|---|---|
+| 契約 `struct machcfg`・`struct machcfg_seed`・begin/finish/get | `include/machcfg_contract.h` の `struct machcfg・struct machcfg_seed` | 済。`machcfg_load_root` の宣言は**無い** |
+| 上限 `MACHCFG_FILE_MAX` (1023)・`MACHCFG_LINE_MAX` (95) | `include/machcfg_contract.h` の `MACHCFG_FILE_MAX・MACHCFG_LINE_MAX` | 済 |
+| 状態 `machine_seed`・`current`・`finished` | `kernel/machcfg.c` の `machine_seed・current・finished` (static、外から読む口なし) | 済 |
+| `machcfg_begin` / `machcfg_finish` (対象外の NAP を既定に戻す) / `machcfg_get` | `kernel/machcfg.c` の `machcfg_begin` / `machcfg_finish` / `machcfg_get` | 済。ビルドの一覧には未登録 (段 J) |
+| パス `SYS_MACHINE_CFG` | `include/config.h` の `SYS_MACHINE_CFG` | 済 |
+| host 試験 | `tools/tests/machcfg_host.c`・`tools/checks/machcfg-host.py` (machcfg.c だけを組む。変異は文字列一致 `begin-defaults`) | 済 |
+| sysconfig の読取 | `init/sysconfig.c` の `SYSCONFIG_MAX` (1024)・`sc_buf[SYSCONFIG_MAX]`・`sc_load` (1023 B だけ読む)・`sysconfig_get_int` | **一時読取口は無い** (B3・B4 未着手)。今は 1023 B 超を見分けられない |
+| 機種の表 | `platform/pc98/machcfg.c`・`platform/powermac/machcfg.c` | **無い** (E・F 未着手) |
+| PC-98 の差し込み点 | `platform/pc98/kernel.c` の `kernel_boot_cpu`・`BOOT_AUTO_MOUNT`・`kernel_boot_serial`・`kernel_gfx_config` | 呼び出しは無い (H 未着手) |
+| PowerMac の差し込み点 | `platform/powermac/kernel_boot.c` の `ppc_kernel_real_start` (PVR はローカル変数)・`platform/powermac/ppc_kernel.c` の `platform_boot_services`・`pm_root_boot` (`pm_root_boot(&img) == 0`、else 節なし)・`pm_hostfs_boot` | 呼び出しは無い (I 未着手) |
+| HID0 の読み | `arch/ppc/ppc_oea.h` の `ppc_read_hid0`・`PPC_HID_NAP` (0x00400000)。`arch/ppc/kernel_cpu.c` の `power_init` (7450 は `power_init` で NAP を下ろす) | `ppc_cpu_power_apply` は無い (G-b 未着手) |
+
+kprintf の行き先 (実物):
+
+| 像 | 道 | 着く所 |
+|---|---|---|
+| PC-98 | `PLATFORM_KPRINTF_IS_CONSOLE 1` (`platform/pc98/platform_console.h` の `PLATFORM_KPRINTF_IS_CONSOLE`) → console_write → `bootlog_push` (`kernel/console/console.c` の `console_write`) | 画面、`/var/log/boot.log` (`platform/pc98/kernel.c` の `bootlog_save` bootlog_save)、`BOOTSERIAL=1` ならシリアル (`platform/pc98/boot_serial.inc` の `kernel_boot_serial`、 kernel_boot_serial の時点までの分をまとめて出し、以後は鏡) |
+| PowerMac の exec を持つ像 (kboot-sh・kboot-shell・kboot-link-sh) | `platform/powermac/log_printf.c` の `kprintf` → `pm_diag_write` (`platform/powermac/console_log.c` の `pm_diag_write`) | LAN のログ (`pm_log_write`)、続けてコンソール (stream_only・捕捉中は出さない) |
+| PowerMac の exec を持たない像 (kboot-core・kboot-link) | `platform/powermac/platform_console.h` の `PLATFORM_KPRINTF_IS_CONSOLE` が 1 | コンソール |
+
+実物との食い違い (5 件):
+
+| # | 設計の記述 | 実物 | 扱い |
+|---|---|---|---|
+| X1 | §3 は `machcfg_load_root()` を使う | 契約に宣言が無く、診断に要る seed・選択元を読む口も無い | 本追記 §2・§3 で契約の末尾に足す |
+| X2 | 設計 §5「root 読取・診断」「FS なし MINIMAL」 | MINIMAL は CD・FD の配布集合の名前 (`build/image.mk` の `FDD_IMAGE_DEPS`)。FS の無い像は PowerMac の kboot-core・kboot-link (`FEATURE_EXEC = 0`) だけ。PC-98 の像は 1 種 (`build/images/pc98.mk`) | 「FS なし」は kboot-core・kboot-link と読む |
+| X3 | PC-98 も「失敗・FS なしなら finish(NULL)」 | PC-98 は root の mount 失敗で停止する (`platform/pc98/kernel.c` の `platform_boot_machine`)。その道は来ない | PC-98 の H は load だけ。finish(NULL) の分岐は書かない |
+| X4 | 設計 §5「root 読取・診断」「BSS 約 1 KiB」 | `sc_buf` 1024 B は既に在る。増えるのは B4 の +1 B と本追記の 3 B | §4 |
+| X5 | §4「他の PVR は書込みなし」 | 7450・7455 以外は `platform/powermac/kernel_boot.c` の `ppc_kernel_real_start` で ppc_stop。届くのはこの 2 つだけ | HID0 の行はこの 2 つで足りる |
+
+### 2. 段 D の中身
+
+契約の末尾に足す (カーネル内部だけ、KAPI・hwdev は変えない)。
+
+```c
+/* include/machcfg_contract.h の末尾 */
+#define MACHCFG_FILE_NOFS   0   /* 読まなかった (FS なし・mount 失敗) */
+#define MACHCFG_FILE_NONE   1   /* vfs_read が 0 以下 (無い・空・読取失敗) */
+#define MACHCFG_FILE_BIG    2   /* 1023 B を超えた。全体を捨てた */
+#define MACHCFG_FILE_OK     3   /* 読めた (有効なキーが 0 個でもよい) */
+#define MACHCFG_KEY_PERF 0x01   /* ファイルの値を採ったキー */
+#define MACHCFG_KEY_NAP  0x02
+
+int  machcfg_load_root(void);                    /* kernel/machcfg_root.c。戻り値 MACHCFG_FILE_* */
+void machcfg_note_file(u8 result, u8 keys);      /* kernel/machcfg.c。finish の前に 1 回 */
+/* machcfg_begin は結果 = MACHCFG_FILE_NOFS・キー = 0・出した印 = 0 に戻す (既存の current = seed.defaults; はそのまま) */
+void machcfg_report(const char *machine, u32 cpu_id, int seed_from_cpu); /* kernel/machcfg.c */
+```
+
+一時読取口 (B3・B4 の形をここで決める。名前は B3 の実装者が変えてよいが戻り値は守る):
+
+```c
+/* init/sysconfig.h */
+int  sysconfig_temp_begin(const char *path); /* >0 保持した長さ、0 無い・空・失敗、-1 1023 B 超 */
+/* 一時読取中の sysconfig_get_int は、数字なし・末尾が空白以外・整数あふれで def を返す (B4 の厳しい検査。今の sc_atoi は数字なしで 0) */
+void sysconfig_temp_end(void);
+```
+
+```c
+/* kernel/machcfg_root.c (C_COMMON_EXEC)。読むヘッダ: machcfg_contract.h・config.h・init/sysconfig.h */
+int machcfg_load_root(void)
+{
+    struct machcfg v = *machcfg_get();           /* begin 後なので既定のコピー */
+    int n = sysconfig_temp_begin(SYS_MACHINE_CFG), x;
+    u8 keys = 0;
+    if (n <= 0) {
+        sysconfig_temp_end();
+        machcfg_note_file(n < 0 ? MACHCFG_FILE_BIG : MACHCFG_FILE_NONE, 0);
+        machcfg_finish(0);
+        return n < 0 ? MACHCFG_FILE_BIG : MACHCFG_FILE_NONE;
+    }
+    x = sysconfig_get_int(SYS_MACHINE_CFG, "perf.profile", -1);
+    if (x >= 0 && x <= 2) { v.perf_request = (u8)x; keys |= MACHCFG_KEY_PERF; }
+    x = sysconfig_get_int(SYS_MACHINE_CFG, "ppc7450.nap", -1);
+    if (x >= 0 && x <= 1) { v.nap7450 = (u8)x; keys |= MACHCFG_KEY_NAP; }
+    sysconfig_temp_end();
+    machcfg_note_file(MACHCFG_FILE_OK, keys);
+    machcfg_finish(&v);
+    return MACHCFG_FILE_OK;
+}
+```
+
+- 既定の印は **-1** (どちらのキーの値域にも無い)。無い・書式誤り・あふれは B4 の厳しい検査で def の -1 が返り、値域外は値域の検査で落ちて、既定のまま (B4 が無いと `perf.profile=x` が 0 の明示になる。D-i が B4 に依存する理由)。これで「既定の 0」と「ファイルで明示した 0」を sysconfig を変えずに見分ける。
+- 戻り値は誤りコードではなく結果の区分。どの値でも起動は止めない。呼び手は戻り値を使わなくてよい (診断は note が持つ)。
+- 読む時機は **FS が使えた後**: PC-98 は `platform/pc98/kernel.c` の `BOOT_AUTO_MOUNT` の直後 ( kernel_boot_serial の BOOTSERIAL と  kernel_gfx_config の gfx 設定より前)。PowerMac は `platform/powermac/ppc_kernel.c` の `pm_root_boot` の成功の中の先頭 (`pm_hostfs_boot` の /host より前)。
+- 既定への戻り方: FS の無い像・mount 失敗 (PowerMac だけ) は load を呼ばず `machcfg_finish(0)`。note を呼ばないので結果は begin が戻した NOFS。`pm_root_boot` に else 節を足す (P-I)。
+- 対象外の NAP を既定に戻すのは今までどおり finish (`kernel/machcfg.c` の `machcfg_finish`)。load は能力を見ない。
+
+### 3. 診断の kprintf
+
+出す行 (共通の書式、`kernel/machcfg.c` の `machcfg_report`、行末は共通のソースの慣例の `\n`、79 桁以内):
+
+```
+MACHCFG <機種> cpu=0x<16進> seed=<cpu|plat> file=<nofs|none|big|ok> perf=<0-2>/<元> nap=<0|1>/<元>
+```
+
+| 欄 | 中身 |
+|---|---|
+| 機種 | 機種が渡す文字列。`pc98`・`powermac` |
+| cpu | 機種が渡す u32 を `0x%x` (HID0 の行の pvr と同じ形)。PowerMac は PVR の生の値、PC-98 は 0 (機種 ID を持たない、設計 §2) |
+| seed | 既定の行の出所。`cpu` = PVR が一致した行、`plat` = 機種の既定の 1 行。今届く組は PowerMac が常に `cpu` (7450・7455 だけ、X5)、PC-98 が常に `plat` |
+| file | `machcfg_note_file` の結果。呼ばれていなければ `nofs` |
+| 元 | `def` = 既定の表、`file` = ファイルで明示、`n-a` = この CPU は対象外 (nap だけ。`accepts_nap7450 == 0` ならファイルに在っても `n-a`) |
+
+例:
+
+```
+MACHCFG pc98 cpu=0x0 seed=plat file=none perf=0/def nap=0/n-a
+MACHCFG pc98 cpu=0x0 seed=plat file=ok perf=2/file nap=0/n-a
+MACHCFG powermac cpu=0x80000201 seed=cpu file=ok perf=0/def nap=1/file
+MACHCFG powermac cpu=0x80010201 seed=cpu file=ok perf=2/file nap=0/n-a
+MACHCFG powermac cpu=0x80000201 seed=cpu file=nofs perf=0/def nap=0/def
+```
+
+- x86 と PowerPC で**同じ書式・同じ関数**。違うのは機種が渡す 3 つの引数だけ。採用値の並びは契約の構造体の順 (perf、nap) で固定。キーを足す時は行の末尾に足す。
+- 出すのは 1 回。`machcfg_report` は static の印で 2 回目以降を黙って戻る。印は `machcfg_begin` が戻す (host 試験は 1 プロセスで seed ごとに begin を呼ぶ、`tools/tests/machcfg_host.c` の `run`)。確定前 (finish の前) に呼ばれた時も出さずに戻る (印は立てない)。
+- PowerMac の seed の出所は段 F の `int pm_machcfg_seed(u32 pvr, struct machcfg_seed *out)` (`platform/powermac/machcfg.c`、戻り値 1 = PVR が一致、0 = 機種の既定)。begin の所と I の report の所でそれぞれ `ppc_read_pvr()` を読み直して引く (PVR は `platform/powermac/kernel_boot.c` の `ppc_kernel_real_start` のローカルで残らない)。
+- 呼ぶ所: PC-98 は load の直後 (H)。PowerMac は確定 → `ppc_cpu_power_apply` → `machcfg_report` → HID0 の行、の順 (I)。FS の無い像でも出す (既定の確認に使う)。
+- PC-98 の report は **load の直後 (`platform/pc98/kernel.c` の `BOOT_AUTO_MOUNT` の直後) で確定**。kprintf は console_printf の別名 (`lib/kprintf.c` の `kprintf`)、console_write は毎回 bootlog_push (`kernel/console/console.c` の `console_write`)、bootlog は BSS から溜める (`init/bootlog.c` の `g_bl_stopped`)。 BOOT_AUTO_MOUNT より前の `bootinfo_report` も kprintf で出している。
+- 属性は KLOG_ATTR と同じ物 (PM 決定)。ATTR_* の出所は `include/kprintf.h` の os32_kapi_shared.h の取り込み → `sdk/include/os32/os32_kapi_shared.h` の ATTR_WHITE など。KLOG_ATTR (0x07) も同じヘッダの `KLOG_ATTR` に在るので、共通のソースからその名前で書ける。
+- 未知のキー・行番号は出さない (設計 §3 のまま)。
+
+PowerPC の HID0.NAP の記録 (別の行、機種の側):
+
+```
+MACHCFG HID0 pvr=0x80000201 hid0=0x8040c0a4 nap=0
+```
+
+- 置き場は `platform/powermac/ppc_kernel.c` の `platform_boot_services` (段 I)。`arch/ppc/kernel_cpu.c` には置かない (kprintf を持たず、試験が関数の範囲を文字列で切り出す、P-R3)。
+- 書式 `kprintf(KBOOT_ATTR, "MACHCFG HID0 pvr=0x%x hid0=0x%x nap=%u\r\n", ...)`。行末はこのファイルの慣例の `\r\n`。値は適用後に `ppc_read_pvr()`・`ppc_read_hid0()` を読み直した物 (PVR は保持されていないので読み直す、`platform/powermac/ppc_kernel.c` の `bat_valid` と同じ)。
+- 7455 は `nap=0/n-a` と `HID0 ... nap=1` が並ぶ。前の行は設定の値、後の行はレジスタの実際。これが別の行にする理由。
+
+### 4. 大きさ (見積もり、未計測)
+
+| 物 | 入る像 | text+rodata | bss |
+|---|---|---|---|
+| `machcfg_note_file`・`machcfg_report` (書式 1 本と語 9 個) | 全部の像 (C_COMMON_CORE) | x86 約 0.3 KiB、PowerPC 約 0.4 KiB | 3 B (結果・キー・出した印) |
+| `machcfg_load_root` | exec を持つ像だけ (PC-98、kboot-sh・kboot-shell・kboot-link-sh) | 約 0.2 KiB | 0 |
+| HID0 の行 | PowerMac の全部の像 | 約 0.1 KiB | 0 |
+| sysconfig の一時読取 (B4 の分、参考) | sysconfig.c の入る像 | 約 0.2 KiB | 1 B |
+
+- 設計 §5「root 読取・診断」の枠 (0.5〜1 KiB) の内。BSS は枠 (約 1 KiB) より小さい (X4)。
+- kboot-core・kboot-link に machcfg_root.c と vfs_read が入らないことは設計 §6 末尾のリンク検査で見る。report は入る (読取部とは別のファイルなので切り離せる)。
+- 起動 FD・MINIMAL は PC-98 の同じカーネルを圧縮して載せる。上限に触れるかは**計測しないと言えない**。設計 §5 末尾のとおり段 J の後に前後を測る。足りなければ先に語を数字に替え (`file=3 perf=2/1`、約 60 B 減)、次に report を exec の側へ移す。
+
+### 5. 変更の一覧と段
+
+段 D を 2 つに分ける。D-ii は C だけに依存するので今出せる。D-i は B2・B2t・B3・B4 を待つ。
+
+| 段 | ファイル | 中身 | 依存 |
+|---|---|---|---|
+| D-ii | `include/machcfg_contract.h` | 定数 6 個と `machcfg_note_file`・`machcfg_report` の宣言 | C |
+| D-ii | `kernel/machcfg.c` | static 3 つ、begin での戻し 3 行、note・report (約 38 行)。既存の行は動かさない (変異の目印 `current = seed.defaults;` を保つ) | C |
+| D-ii | `tools/tests/machcfg_host.c`・`tools/checks/machcfg-host.py` | kprintf の代役は、先例 `tools/tests/test_kprintf_va.py` と同じく `lib/kprintf.c` を展開して組み (kprintf_spec・kutoa_dec・kutoa_hex を含める)、`lib/kprintf_format.inc` の `KPRINTF_WRITE` をバッファへ書く関数にする (host は `-m32 -ffreestanding -nostdlib` で vsnprintf が無い)。行の照合、変異、covers に `lib/kprintf.c` と `lib/kprintf_format.inc` | C |
+| D-i | `include/machcfg_contract.h` | `machcfg_load_root` の宣言 | D-ii |
+| D-i | `kernel/machcfg_root.c` (新規) | §2 の断片 (約 30 行) | B2・B2t・B3・B4・D-ii (B4 は B1・B2・B3 に依存、設計 §6) |
+| D-i | `tools/tests/machcfg_host.c`・`machcfg-host.py` | vfs_read の代役 (回数を数える)、sysconfig.c と組む、covers に machcfg_root.c | B4 |
+| F | `platform/powermac/machcfg.c` | 設計の表に `pm_machcfg_seed` を足す | B |
+| H | `platform/pc98/kernel.c` | begin、load、report の 3 つの呼び出し | D-i・E |
+| I | `platform/powermac/ppc_kernel.c` | load か finish(0)、apply、report、HID0 の行 | D-i・F・G-b |
+
+受入:
+
+| 項目 | 見る物 | 変異 (1 行ずつ、該当の検査が落ちること) |
+|---|---|---|
+| host: 両機種一致 | 同じ入力の表 (無い・空・1023 B・1024 B・`perf.profile=2`・`ppc7450.nap=1`・値域外・重複・`perf.profile=x`・巨大整数) を pc98・7450・7455 の seed で回し、行が機種・cpu・seed・nap の欄を除いて一致 | 既定の印 -1 を 0 に (明示なしが `file` になる) |
+| host: 値域 | `perf.profile=3`・`ppc7450.nap=2` は `def` | `x <= 2` を `x <= 3` に |
+| host: 読みすぎ | 1024 B は `file=big` で全キー既定、vfs_read は全体で 1 回 | `n < 0` の区分を NONE に固定 |
+| host: 一時読取の終了 | load の後に `sysconfig_get_int(SYS_MACHINE_CFG, "perf.profile", -1)` を呼ぶと vfs_read の回数が 1 増える (保持したバッファを使わない)。併せて system.cfg の `GUI=1 ;x` が 1 | 成功の道の `sysconfig_temp_end()` を削る |
+| host: 1 回 | report を 2 回呼んで行は 1 本。finish の前の report は 0 本 | 出した印を立てる行を削る |
+| host: 対象外 | 7455・PC-98 で `ppc7450.nap=1` を読んで `nap=<既定>/n-a` | `n-a` の判定を削る (`file` になる) |
+| NP21/W | machine.cfg なし・`perf.profile=2` の 2 回、どちらもシェル到達。boot.log に `MACHCFG pc98` の行がちょうど 1 本で §3 の例の 1・2 本目と一致 | root を読む前に確定 (設計 §7 のまま) |
+| QEMU PowerMac | 7450 で既定・明示 0・明示 1 の `MACHCFG HID0 ... nap=` が 0・0・1、7455 は 1。kboot-core は `file=nofs`。seed は `cpu` だけを期待する (`plat` は PowerMac では出ない) | 7450 の明示クリアを削る (設計 §7 のまま) |
+
+NP21/W の受入は root の `/etc/machine.cfg` を置く配備 (段 N、[D1]・[D2] の範囲の確認) が要る。
+
+### 6. 未決 (ユーザー判断が要るもの: 0 件)
+
+- r1 の U1 (PC-98 の起動画面に `MACHCFG ...` の 1 行が増える) は **PM 決定で「出す」**。PC-98 は `bootinfo_report` などですでに起動画面に kprintf の行を出しているので、ユーザー判断は要らない。
+
+PM が決めれば足りる物: 契約の末尾への追加を AC-BOOT-3 の照合 (段 A) に含めるか、一時読取口の名前、短い語 (`plat`・`def`・`n-a`) の綴り、report を FS の無い像にも入れるか (本追記は入れる)。
+
+### 反論
+
+なし (D1〜D9 と「ほか」をすべて受け入れた)。
+
+
+確定 (2026-11-19、Opus 5.5 (reviewer) の第 2 回 Approve、N1・N2 を PM が反映): N1 kprintf の代役は lib/kprintf.c を展開して組む、N2 D-i の依存を B2・B2t・B3・B4 に揃えた。

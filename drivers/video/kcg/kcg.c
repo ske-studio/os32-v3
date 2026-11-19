@@ -22,7 +22,7 @@
 /*  出典: PC9800Bible §2-6-5                                                */
 /* ======================================================================== */
 
-#include "kcg.h"
+#include "kcg_contract.h"
 #include "kcg_module.h"
 #include "os32_kapi_shared.h"
 

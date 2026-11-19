@@ -25,7 +25,8 @@
 |---|---|
 | G-a・G1 | **完了 (2026-11-18、e196afb70、PowerPC の PM)**。7450 の NAP を設定に依らず下ろす。G4 実機で、設計の追記 P-R4 の順の 1 手目 (NAP=0) で固まりが無くなった (記録は票 TASK_PPC_REALHW §2) — 2 手目 (DPM と POW も外す) は要らない |
 | B・B1・C・M・M1 | **済 (2026-11-19、terra、astra のレビューの直し 1 回)**。契約 `include/machcfg_contract.h`・`include/config.h` の `SYS_MACHINE_CFG`・`kernel/machcfg.c`・host 試験 `machcfg-host`。kernel/machcfg.c はまだビルドの一覧に入れていない (段 J)。設計の欠け 2 つは設計の末尾の「段 B・C の実装で埋めた設計の欠け」 |
-| D (起動時の診断の kprintf を含む、PM 決定: 段 D を出す時に設計者に追記させる)・E・F・PVR の優先と読み超過の変異 (D・F の受入) | 未着手 |
+| D | D-ii 実装 (2026-11-19)、D-i は B2・B2t・B3・B4 待ち |
+| E・F・PVR の優先と読み超過の変異 (D・F の受入) | 未着手 |
 | A・B2〜B4・G-b・H・I・J〜L・N・N1 | 未着手 |
 
 ## 3. 改修項目の記録

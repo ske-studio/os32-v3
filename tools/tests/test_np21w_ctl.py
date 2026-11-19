@@ -783,10 +783,18 @@ class Stop(Base):
         self.assertEqual(ops.killed, [])
         self.assertIn('別の場所', self.err.getvalue())
 
+    def test_unreadable_same_name_prevents_stopped_result(self):
+        ops = FakeOps(self.fc, running=[ctl.Proc(92, 'np21x64w.exe', None)])
+        c = self.make('down', ops=ops)
+        self.assertEqual(self.run_main(c, ['stop']), 1)
+        self.assertIn('pid=92 (exe 読めない)', self.err.getvalue())
+        self.assertEqual(ops.killed, [])
+
     def test_unknown_process_fails_closed(self):
         ops = FakeOps(self.fc, running=[ctl.Proc(77, 'np21x64w.exe', EXE)])
         c = self.make('down', ops=ops)
         self.assertEqual(self.run_main(c, ['stop']), 1)
+        self.assertIn('pid=77 (引数不明)', self.err.getvalue())
         self.assertEqual(ops.killed, [])
 
     def test_explicit_pid_requires_matching_exe(self):
@@ -812,6 +820,14 @@ class Stop(Base):
         self.assertIn('process: pid=94', self.out.getvalue())
         self.assertEqual(c.stop(), 0)
         self.assertEqual(ops.killed, [94])
+
+    def test_repeated_stop_with_other_slot_running(self):
+        ops = FakeOps(self.fc, running=[self.ours(77)] + [p for p in self.others() if p.exe])
+        c = self.make('down', ops=ops)
+        for _ in range(2):
+            self.assertEqual(self.run_main(c, ['stop']), 0, self.err.getvalue())
+        self.assertEqual(ops.killed, [77])
+        self.assertIn(94, ops.running)
 
     def test_nothing_running(self):
         c = self.make('down')
@@ -1583,6 +1599,9 @@ class SlotTools(unittest.TestCase):
 
 
 MUTATIONS = [
+    ("(unreadable or unknown_slot)", "unknown_slot", "exe が読めない同名候補でも停止成功"),
+    ("any(not self.matches_other_slot(p, slot_ini) for p in ours)", "False",
+     "所属不明の候補が残っていても停止成功"),
     ("if slot_ini and named_slot and ini.lower() != slot_ini:",
      "if slot_ini and ini.lower() != slot_ini:", "8025 で派生 ini の起動を拒む"),
     ("            if explicit:", "            if False:", "別 exe の指定 pid でも停止成功"),
