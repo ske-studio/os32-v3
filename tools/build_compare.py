@@ -171,6 +171,7 @@ H2_OBJECT_MOVES = {
 # E1 preserves the shim's position in both normal and R1 links.
 H2_OBJECT_MOVES['exec/ring3_ls_shim.o'] = 'arch/x86/kernel/ring3_ls_shim.o'
 H2_OBJECT_MOVES['platform/pc98/device_kcg.o'] = 'kernel/dev/device_kcg.o'
+H2_OBJECT_MOVES['platform/pc98/device_loop.o'] = 'kernel/dev/device_loop.o'
 
 
 def h2_object_path(rel, root):

@@ -15,6 +15,7 @@ static struct SfsPersistentConfig config;
 static u32 host_generation, nonce;
 static int enabled, scope, host_valid, reconnect;
 static int nonce_ready;
+static int scope_owner;
 
 int sfs_persistent_enabled(void) { return enabled; }
 const SfsClient *sfs_persistent_client(void)
@@ -84,7 +85,16 @@ int sfs_persistent_start(const struct SfsPersistentConfig *cfg)
     return 0;
 }
 
-int sfs_persistent_scope_begin(void)
+int sfs_persistent_describe(struct SfsTransportInfo *out)
+{
+    if (!enabled || !out || !config.describe) return OS32_ERR_INVAL;
+    struct SfsTransportInfo info = *out;
+    int rc = config.describe(config.io_ctx, &info);
+    if (rc >= 0) *out = info;
+    return rc;
+}
+
+int sfs_persistent_scope_begin_owned(int owner)
 {
     if (!enabled) return OS32_ERR_INVAL;
     if (scope) return OS32_ERR_BUSY;
@@ -93,16 +103,33 @@ int sfs_persistent_scope_begin(void)
     /* The next VFS operation accepts the ensured generation. Existing FDs
      * still compare their saved generation and remain permanently stale. */
     vfs_resource_stale_mount(&resident.client);
+    scope_owner = owner;
     scope = 1;
     return 0;
 }
 
-int sfs_persistent_scope_end(int exit_code)
+int sfs_persistent_scope_end_owned(int owner, int exit_code)
 {
     (void)exit_code;
-    if (!enabled || !scope) return OS32_ERR_INVAL;
+    if (!enabled || !scope || owner != scope_owner) return OS32_ERR_INVAL;
+    scope_owner = -1;
     scope = 0;
     return 0;
+}
+
+void sfs_persistent_scope_owner_exit(int owner)
+{
+    (void)sfs_persistent_scope_end_owned(owner, 0);
+}
+
+int sfs_persistent_scope_begin(void)
+{
+    return sfs_persistent_scope_begin_owned(-1);
+}
+
+int sfs_persistent_scope_end(int exit_code)
+{
+    return sfs_persistent_scope_end_owned(-1, exit_code);
 }
 
 int sfs_ensure_session(u32 deadline)

@@ -514,3 +514,8 @@ u8 loop_dev_get_sec_n(int slot)
     while (tmp > D88_SECTOR_BASE_BYTES && n < D88_SECTOR_N_MAX) { tmp >>= 1; n++; }
     return n;
 }
+
+int loop_dev_lba_writable(int slot)
+{
+    return loop_dev_is_writable(slot) && loop_slots[slot].fmt != LOOP_FMT_D88;
+}

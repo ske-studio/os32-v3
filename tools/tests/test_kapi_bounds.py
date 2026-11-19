@@ -10,7 +10,7 @@ import tempfile
 import host32
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-SOURCES = ('platform/pc98/console.c', 'drivers/sound/fm/fm.c', 'kapi/kapi_db.c', 'gfx/gfx_core.c', 'drivers/video/pc98/gfx_vram.c')
+SOURCES = ('platform/pc98/console.c', 'drivers/sound/fm/fm.c', 'kapi/kapi_db.c', 'gfx/gfx_core.c', 'drivers/video/pc98/gfx_vram.c', 'gfx/gfx_dirty.c')
 GUARD = '    if (x < 0 || x >= TVRAM_COLS || y < 0 || y >= TVRAM_ROWS) return;\n'
 MUTATIONS = [
     ('putchar', 0, 'con_backend_putchar', GUARD, '', 'putchar bounds'),
@@ -22,7 +22,8 @@ MUTATIONS = [
     ('db-offset', 2, 'kapi_db_column_text', 'info->data_offset <= 0 || (u32)info->data_offset >= DB_SHM_RESULT_LIMIT', 'info->data_offset == 0', 'DB offset bounds'),
     ('palette16', 3, 'gfx_lease_palette', 'first >= GFX_PAL_ENTRIES(GFX_FMT_PLANAR4_BPP) || count > GFX_PAL_ENTRIES(GFX_FMT_PLANAR4_BPP) - first', 'first + count > GFX_PAL_ENTRIES(GFX_FMT_PLANAR4_BPP)', 'palette count bounds'),
     ('palette256', 3, 'gfx_lease_palette', 'first > (int)si.lease_first + (int)si.lease_count ||\n            count > (int)si.lease_first + (int)si.lease_count - first', 'first + count > (int)si.lease_first + (int)si.lease_count', 'palette first bounds'),
-    ('dirty', 4, 'gfx_add_dirty_rect', '    if (!gfx_clip_screen(&x, &y, &w, &h, GFX_WIDTH, gfx_current_height)) return;\n', '', 'dirty outside'),
+    ('dirty', 5, 'gfx_dirty_add', '    if (!gfx_clip_screen(&x, &y, &w, &h, width, height)) return;\n', '', 'dirty outside'),
+    ('dirty-merge', 5, 'gfx_dirty_add', 'if (new_x <= er + gap', 'if (0 && new_x <= er + gap', 'dirty merge'),
     ('raster', 4, 'gfx_present_raster', 'table->count <= 0 || table->count > GFX_RASTER_MAX_ENTRIES', 'table->count == 0', 'raster negative count'),
 
 ]
@@ -39,7 +40,7 @@ def run(runner, mutation=None):
         sources[index] = before + after.replace(old, new, 1)
     with tempfile.TemporaryDirectory(prefix='tvramfix-') as directory:
         work = pathlib.Path(directory)
-        for inc, source in zip(('console_source.inc', 'fm_source.inc', 'db_source.inc', 'gfx_core_source.inc', 'gfx_vram_source.inc'), sources):
+        for inc, source in zip(('console_source.inc', 'fm_source.inc', 'db_source.inc', 'gfx_core_source.inc', 'gfx_vram_source.inc', 'gfx_dirty_source.inc'), sources):
             (work / inc).write_text(source)
         exe = work / 'fixture'
         cmd = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-O2', '-ffreestanding',

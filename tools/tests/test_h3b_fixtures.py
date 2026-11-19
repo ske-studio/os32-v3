@@ -28,6 +28,15 @@ import deploy_manifests
 
 
 LOOP_MUTATIONS = [
+    ('allow-d88-lba', 'loop_dev.c',
+     'return loop_dev_is_writable(slot) && loop_slots[slot].fmt != LOOP_FMT_D88;',
+     'return loop_dev_is_writable(slot);'),
+    ('ignore-read-only', 'loop_dev.c',
+     'return loop_dev_is_writable(slot) && loop_slots[slot].fmt != LOOP_FMT_D88;',
+     'return loop_dev_status(slot, 0, 0) && loop_slots[slot].fmt != LOOP_FMT_D88;'),
+    ('deny-writable-lba', 'loop_dev.c',
+     'return loop_dev_is_writable(slot) && loop_slots[slot].fmt != LOOP_FMT_D88;',
+     '(void)slot; return 0;'),
     ('nhd-lba-read-seek', 'loop_dev.c',
      'if (vfs_seek(s->fd, (int)offset, 0) < 0) return -1;\n    rd =',
      'vfs_seek(s->fd, (int)offset, 0);\n    rd ='),

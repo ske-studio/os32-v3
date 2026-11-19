@@ -26,6 +26,11 @@ CHECK = dict(name='hostsvc-persistent', tier=1, needs=[], budget=3.9, covers=[
 )
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
+    ('owner-record', 'scope_owner = owner;', 'scope_owner = owner + 1;'),
+    ('owner-check', ' || owner != scope_owner', ' || (owner != scope_owner && 0)'),
+    ('owner-exit', '(void)sfs_persistent_scope_end_owned(owner, 0);', '(void)owner;'),
+    ('describe-missing', 'if (!enabled || !out || !config.describe) return OS32_ERR_INVAL;',
+     'if (!enabled || !out || !config.describe) return 0;'),
     ('scope-ensure', 'int rc = sfs_ensure_session(config.io->now(config.io_ctx) + SFS_SCOPE_TICKS);',
      'int rc = 0;'),
     ('scope-generation', 'vfs_resource_stale_mount(&resident.client);',

@@ -1,6 +1,6 @@
 /* Real platform forwarding with isolated driver substitutes (ILP32). */
 #include "platform_device.h"
-#include "loop_dev.h"
+#include "loop_contract.h"
 
 static void die(int rc) __attribute__((noreturn));
 static void die(int rc)
