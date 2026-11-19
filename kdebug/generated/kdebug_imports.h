@@ -39,6 +39,7 @@
 #include "include/launch.h"
 #include "include/legacy_guest.h"
 #include "include/memmap.h"
+#include "include/pci_contract.h"
 #include "include/pcm_contract.h"
 #include "include/redir_access.h"
 #include "include/sys.h"
