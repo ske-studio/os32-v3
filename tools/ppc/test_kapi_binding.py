@@ -35,8 +35,7 @@ ide_write_sectors ime_dict_info ime_dict_suspend ime_feed_key ime_get_mode
 ime_getchar ime_getkey ime_is_active ime_set_mode ime_set_render
 ime_switch_dict ime_toggle ime_trygetchar ime_trygetkey ime_user_clear
 ime_user_delete ime_user_export ime_user_list kdebug_call
-loop_attach loop_detach loop_status mem_stat
-np2_check_hostdrv np2_detect
+loop_attach loop_detach loop_status np2_check_hostdrv np2_detect
 np2_get_clock np2_get_cpu np2_get_version
 pcm_close pcm_open pcm_set_volume pcm_status pcm_write
 sfs_begin
@@ -44,7 +43,7 @@ sfs_end snd_bgm_is_playing snd_bgm_play snd_bgm_set_persist snd_bgm_stop
 snd_focus snd_se_play snd_se_play_raw snd_set_master ssg_all_off ssg_tone
 ssg_volume
 sys_switch_shell
-sys_ver_info v86_boot v86_boot2 v86_disktest
+v86_boot v86_boot2 v86_disktest
 v86_gdc_capture v86_selftest
 """.split())
 
@@ -69,6 +68,7 @@ ALLOWED_UNDEFINED = frozenset("""
 platform_pci_count platform_pci_get platform_pci_cfg_read32 kapi_pci_bind_info
 surface_api_bundle
 boot_image_info
+kapi_sys_ver_info
 surface_api_query
 surface_api_lease
 surface_api_unlease
@@ -147,6 +147,7 @@ input_trygetchar_local
 input_trygetkey
 input_trygetrawkey
 kapi_sys_exit
+kapi_mem_stat
 shm_alloc
 shm_free
 shm_lock
@@ -239,6 +240,12 @@ def verify(source, entries):
         expected = api['ret'] + ' __cdecl wrap_' + name + '(' + args + ')\n{\n' + body + '}\n'
         if expected not in source:
             return False
+    wrapper = re.search(r'\bwrap_mem_stat\([^)]*\)\n\{(.*?)\n\}', source, re.S)
+    if not wrapper or not re.search(
+            r'KAPI_HIT\(248\).*?if \(!ring3_user_ranges_writable\(\(u32\)out, KAPI_OUT_LEN\(out, size\),'
+            r'\s*\(u32\)0, 0u\)\) \{\s*ring3_fault_kill\(\);.*?\}\s*return kapi_mem_stat\(app_id, out, size\);',
+            wrapper.group(1), re.S):
+        return False
     calls = ('platform_pci_count()', 'platform_pci_get(idx, out)',
              'platform_pci_cfg_read32(bus, dev, fn, reg)', 'kapi_pci_bind_info(idx, out)')
     if any('return ' + call + ';' not in source for call in calls):
@@ -282,10 +289,14 @@ def generate(tmp, mutation=None):
                  "'font_source_open', 'font_source_read_at', 'font_source_close', "
                  "'unicode_to_jis'}), frozenset()),\n")
         insert_group(helper, mutation, group)
+    if mutation == "ver-absent":
+        insert_group(helper, mutation, "    'ver': (frozenset({'sys_ver_info'}), frozenset()),\n")
     if mutation == 'rtc-absent':
         if "'rtc_read'" in helper.read_text():
             raise RuntimeError('rtc-absent: expected rtc_read published')
         insert_group(helper, mutation, "    'clock': (frozenset({'rtc_read'}), frozenset()),\n")
+    if mutation == 'mem-absent':
+        insert_group(helper, mutation, "    'missing_mem': (frozenset({'mem_stat'}), frozenset()),\n")
     if mutation == 'pci-absent':
         insert_group(helper, mutation, "    'pci': (frozenset({'pci_get'}), frozenset()),\n")
     if mutation == 'zero':
@@ -312,6 +323,11 @@ def main():
         tmp = Path(directory)
         (tmp / 'normal').mkdir()
         out = generate(tmp / 'normal')
+        for header in ('os32_kapi_slots.h', 'os32_kapi_generated.h'):
+            path = Path('sdk/include/os32') / header
+            if (out / path).read_bytes() != (ROOT / path).read_bytes():
+                print('target ABI mismatch:', header)
+                return 1
         source = (out / 'kapi/kapi_generated.c').read_text()
         if not verify(source, entries):
             print('binding verification failed'); return 1
@@ -326,7 +342,7 @@ def main():
             required = os.environ.get('OS32_REQUIRE_PPC') == '1'
             print(('FAIL' if required else 'SKIP') + ' ppc-kapi-binding: unavailable: ' + str(cc))
             return 1 if required else 0
-        subprocess.run([str(cc), '-std=gnu11', '-ffreestanding', '-D__KERNEL_BUILD__',
+        subprocess.run([str(cc), '-std=gnu11', '-Werror=implicit-function-declaration', '-ffreestanding', '-D__KERNEL_BUILD__',
                         '-D__cdecl=', '-I' + str(out / 'include')]
                        + ['-I' + str(ROOT / d) for d in dirs]
                        + ['-c', str(out / 'kapi/kapi_generated.c'), '-o', str(tmp / 'kapi.o')], check=True)
@@ -335,7 +351,7 @@ def main():
             [str(nm), '-u', str(tmp / 'kapi.o')], text=True).splitlines()}
         if 'sys_reboot' not in undefined:
             print('missing sys_reboot provider'); return 1
-        missing = {'boot_image_info', 'exec_tvram_read_allowed', 'pm_console_clear', 'tvram_putchar_at',
+        missing = {'kapi_mem_stat', 'kapi_sys_ver_info', 'boot_image_info', 'exec_tvram_read_allowed', 'pm_console_clear', 'tvram_putchar_at',
                    'tvram_putkanji_at', 'tvram_readchar_at', 'tvram_reverse_cell',
                    'tvram_scroll', 'shm_alloc', 'shm_free', 'shm_lock',
                    'font_lease_app_open', 'font_lease_app_read_at',
@@ -354,7 +370,7 @@ def main():
             print('unexpected providers:', sorted(unexpected)); return 1
         print('undefined providers:', len(undefined))
         if '--mutate' in sys.argv:
-            for mutation in ('empty', 'zero', 'group-empty', 'ime-empty', 'reboot-absent', 'slot-swap', 'pci-absent'):
+            for mutation in ('empty', 'zero', 'group-empty', 'ime-empty', 'reboot-absent', 'slot-swap', 'pci-absent', 'mem-absent'):
                 path = tmp / mutation
                 path.mkdir()
                 mutated = generate(path, mutation)

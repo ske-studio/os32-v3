@@ -72,7 +72,7 @@ static void geforce_leave_check(void)
         CHECK(gfx_backend_geforce.probe());
         CHECK(host_gf_leaves == safe+1);
         CHECK(g_backend == (safe ? &gfx_backend_pc98 : &gfx_backend_geforce));
-        if (safe) CHECK(gfx_current_height == GFX_HEIGHT);
+        CHECK(gfx_current_height == (safe ? GFX_HEIGHT : 480));
     }
 }
 #endif

@@ -121,7 +121,11 @@ MUT = $(if $(mut_on),--mutate)
 MUTS = $(if $(mut_on),--mutants)
 
 # 親で前提を一度準備してから、ソース保存・計時付き並列実行・照合の順。
+CHECK_EXCLUDE_FLAGS = $(foreach e,$(CHECK_EXCLUDE_ENV),--exclude-env $(e))
 check:
+ifneq ($(strip $(CHECK_EXCLUDE_ENV)),)
+	@python3 -B tools/checks/run.py --excluded $(CHECK_EXCLUDE_FLAGS) $(if $(CHECK_SHARD),--shard $(CHECK_SHARD))
+endif
 	+@$(MAKE) check-prepare
 	@python3 tools/check_tree_unchanged.py --save par
 	+@$(MAKE) check-par CHECK_NEEDS= MUTATE=1
@@ -168,7 +172,7 @@ CHECK_NAMES := $(filter check-%,$(MAKECMDGOALS))
 CHECK_ALL_NEEDS :=
 else
 CHECK_SHARD ?=
-CHECK_REGISTRATION := $(shell CHECK_ROUTINE=$(CHECK_ROUTINE) python3 -B tools/checks/run.py --make $(if $(CHECK_SHARD),--shard $(CHECK_SHARD)))
+CHECK_REGISTRATION := $(shell CHECK_ROUTINE=$(CHECK_ROUTINE) python3 -B tools/checks/run.py --make $(CHECK_EXCLUDE_FLAGS) $(if $(CHECK_SHARD),--shard $(CHECK_SHARD)))
 ifneq ($(.SHELLSTATUS),0)
 $(error tools/checks/run.py --make failed (make registration))
 endif

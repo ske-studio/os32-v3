@@ -22,6 +22,8 @@
 
 ## 3. 手順 (1 段)
 
+kernel/ver_collect.c と kernel/ver_format.c は C_COMMON_EXEC で両機種の exec 像に入る。PC-98 のリンク順は build/sources/order.mk に従う。
+
 1. **前提**: `build/config.mk` の新しいディレクトリの一覧が 1 つの変数 (`KERNEL_SRC_DIRS`) にあり、各 `INC_*` はそれを引く形になっていること (L1 では行ごとに書き足したので、L2 の最初にまとめる — 並びを変えずに、成果物のバイト一致で確かめる)。
 2. 対応表 JSON を書く (`[{"from": "kernel/paging.c", "to": "mm/paging.c"}, …]`)。名前は変えない。
 3. `python3 tools/move_files.py <表> --dry-run` → 置換の件数と「置換しきれない一覧」を見る → 適用。

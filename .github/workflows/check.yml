@@ -26,6 +26,10 @@ on:
         default: auto
         options: [auto, x86, ppc, both]
 
+concurrency:
+  group: check-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   actions: read

@@ -16,5 +16,5 @@
 - drivers/sound/cs4231/pcm_cs4231.c の検出結果は、常駐 drivers/sound/cs4231/pcm_module.c 経由で取得する。module_exports 不在なら0であり、物理的未搭載とは断定しない。個別 CS4231/A 型番の getter は増やさない。
 - drivers/sound/fm/snd_engine.c の snd_init は再生状態の初期化であり、FM 搭載検出ではない。
 
-- ver_collect はゼロ初期化後、既存 getter の保存値だけを取得。PIC/KBD/FM の構成定数は formatter が既存ヘッダから読む。
+- ver_collect はゼロ初期化後、既存 getter の保存値だけを取得。PC-98 の collect が FPU・PIT・割込みベクタ・PCM・services を記録する。後端が NULL ならこれらはゼロのまま。
 - boot_image_info と kapi_mem_stat の既存取得関数を直接呼ぶ。公開 KAPI をカーネルから再入呼出ししない。

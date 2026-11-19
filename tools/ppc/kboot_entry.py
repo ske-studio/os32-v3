@@ -21,7 +21,7 @@ CHECK = dict(name='ppc-kboot-entry', tier=2, budget=600,
                      'platform/powermac/platform_of_layout.h', 'arch/ppc/ppc_boot.h',
                      'lib/kstring_c.c', 'lib/kstring.h', 'include/types.h',
                      'include/memmap.h', 'tools/gen_memmap.py', 'build/arch/ppc.mk'])
-PREFIX = '/home/hight/opt/cross-ppc/bin/powerpc-elf-'
+PREFIX = str(Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc')) / 'bin/powerpc-elf-')
 FLAGS = ['-mcpu=7450', '-m32', '-mbig-endian', '-msoft-float', '-mno-altivec',
          '-msdata=none', '-ffreestanding', '-fno-pie', '-fno-stack-protector',
          '-nostdlib', '-fcommon', '-fsigned-char', '-fno-short-enums', '-O2',

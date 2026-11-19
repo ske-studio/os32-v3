@@ -258,7 +258,7 @@ jobs:
           export PATH="$CROSS_DIR/bin:$PATH"
           test -x "$CROSS_DIR/bin/i386-elf-gcc"
           test -f "$CROSS_DIR/i386-elf/include/stdio.h"
-          make -k check CHECK_SHARD=${{ matrix.shard }}/6 CROSS_DIR="$CROSS_DIR" NP21W_DIR="$RUNNER_TEMP/np21w"
+          make -k check CHECK_SHARD=${{ matrix.shard }}/6 CHECK_EXCLUDE_ENV=qemu-ppc CROSS_DIR="$CROSS_DIR" NP21W_DIR="$RUNNER_TEMP/np21w"
 
       - name: Runner load after make check
         if: always() && steps.prior.outputs.reuse != 'true'

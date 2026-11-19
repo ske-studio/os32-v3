@@ -18,6 +18,7 @@ typedef struct {
     GFX_ScreenInfo gfx; u32 gfx_active, gfx_kind;
     u32 api_version; char build[32];
     int boot_ok, debug_ok; BootImageInfo boot; MemStat debug;
+    u32 plat[8]; /* 機種固有の保存値 */
     ServicesVerState services; /* kernel/sqlite_engine.h の内部型 */
 } VerSnapshot;
 void ver_collect(VerSnapshot *s); /* kernel/ver_collect.c, bounded reads */

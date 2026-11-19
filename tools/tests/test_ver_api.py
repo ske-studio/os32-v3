@@ -148,8 +148,8 @@ def run(source, build_source, offsets, runner):
 def main():
     args = arguments()
     offsets = generated_layout(args.runner)
-    source = (ROOT/'kapi/kapi_sys.c').read_text()
-    build_source = (ROOT/'kapi/kapi_sysinfo.c').read_text()
+    source = (ROOT/'kapi/kapi_sysinfo.c').read_text()
+    build_source = source
     assert run(source, build_source, offsets, args.runner).returncode == 0
     if args.mutate:
         old = 'size != sizeof(OS32_VerInfo)'

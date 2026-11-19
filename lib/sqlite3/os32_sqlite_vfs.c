@@ -6,7 +6,7 @@
 /*                                                                          */
 /*  制約:                                                                   */
 /*    - single task: locks are no-op                                           */
-/*    - MAIN_DB: one connection per ext2 inode                              */
+/*    - MAIN_DB: one connection per database inode                              */
 /*    - ジャーナルモード: DELETE (デフォルト)                                 */
 /* ======================================================================== */
 
@@ -523,7 +523,7 @@ static int os32VfsOpen(sqlite3_vfs *pVfs, const char *zName,
 
     backend = vfs_sqlite_backend(zName);
     if (flags & SQLITE_OPEN_MAIN_DB) {
-        if (backend != VFS_SQLITE_EXT2)
+        if (backend == VFS_SQLITE_UNSUPPORTED)  /* ext2, or ramfs (VFS_SQLITE_RAMFS in ramfs.h) */
             return SQLITE_CANTOPEN;
         if (flags & SQLITE_OPEN_READWRITE) {
             rc = vfs_sqlite_writable(zName);

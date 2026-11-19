@@ -4,7 +4,7 @@ CHECK = dict(name='ci-split-host', tier=0,
              covers=['.github/workflows/check.yml', '.github/workflows/build.yml',
                      '.github/actions/build-setup/action.yml', '.github/actions/static-setup/action.yml', 'tools/ci/build_cross.sh', 'tools/fetch_fonts.py',
                      'tools/ci/ppc_scope.py', 'tools/ci/build_cross_ppc.sh', '.github/actions/ppc-setup/action.yml', 'tools/ci_fetch.sh', 'tools/ci/reuse_success.py', 'tools/checks/weights.json',
-                     'tools/checks/run.py', 'tools/tests/test_ci_split.py',
+                     'tools/checks/run.py', 'build/sdk.mk', 'tools/tests/test_ci_split.py',
                      'CLAUDE.md', 'README.md', 'docs/INDEX.md'],
              needs=[], budget=5.3,
     kind='characterization',
@@ -228,6 +228,9 @@ DOC_EXCLUSIONS = {
 
 def document_cases(source):
     workflow = yaml.safe_load(source)
+    concurrency = workflow.get('concurrency', {})
+    assert concurrency.get('group') == 'check-${{ github.event_name }}-${{ github.ref }}', 'isolate check runs by event and ref'
+    assert concurrency.get('cancel-in-progress') is True, 'cancel superseded check runs'
     # static-check は main でも再利用せずに毎回回す (煙試験、ユーザー決定 2026-11-19)。
     assert not any(s.get('id') == 'prior' or 'steps.prior' in s.get('if', '')
                    for s in workflow['jobs']['static-check']['steps']), 'static-check runs on main every time'
@@ -350,15 +353,50 @@ def fetch_cases(script):
     assert result.returncode == 0 and not downloaded and 'dry-run:' in result.stdout, 'dry-run'
 
 
+def routing_cases(build_source, check_source):
+    def command(job, marker):
+        return next(line for step in job['steps'] for line in step.get('run', '').splitlines()
+                    if marker in line)
+
+    env = dict(os.environ, CHECK_ROUTINE='0', MAKEFLAGS='', MFLAGS='', CHECK_TIME_CHILD='0',
+               CHECK_EXCLUDE_ENV='', CHECK_SHARD='')
+    def selected(*args):
+        output = subprocess.check_output(args, cwd=ROOT, env=env, text=True)
+        return set(output.split())
+
+    selector = [sys.executable, '-B', 'tools/checks/run.py', '--list']
+    jobs = yaml.safe_load(check_source)['jobs']
+    def ppc_selection(job, marker):
+        args = shlex.split(command(jobs[job], marker))
+        filters = [word for i, word in enumerate(args)
+                   if word in ('--env', '--exclude-env') or (i and args[i-1] in ('--env', '--exclude-env'))]
+        return selected(*selector, *filters)
+
+    build_job = yaml.safe_load(build_source)['jobs']['checks']
+    flags = re.findall(r'CHECK_EXCLUDE_ENV=([^ ]+)', command(build_job, 'make -k check'))
+    build = selected('make', '-s', '--no-print-directory',
+                     '--eval=show-routing: ; @echo $(CHECK_SHARD_TARGETS)', 'show-routing',
+                     *['CHECK_EXCLUDE_ENV=' + value for value in flags])
+    compile_checks = ppc_selection('ppc-compile', 'tools/checks/run.py --run')
+    guest = ppc_selection('ppc-qemu', 'tools/ci/gate.py run')
+    missing = selected(*selector) - (build | compile_checks | guest)
+    assert not missing, f'unassigned checks: {sorted(missing)}'
+    required = selected(*selector, '--env', 'qemu-ppc')
+    assert required <= guest and not required & (build | compile_checks), 'qemu-ppc requires exclusive ppc-qemu assignment'
+
+
 def main():
     reuse_cases()
     source = WORKFLOW.read_text()
     workflow_cases(source)
+    routing_cases(source, CHECK_WORKFLOW.read_text())
     document_cases(CHECK_WORKFLOW.read_text())
     fetch_cases(FETCH)
     print('ci-split: workflow and fetch cases GREEN', flush=True)
     if '--mutate' in sys.argv:
         mutations = [
+            ('build-route', ' CHECK_EXCLUDE_ENV=qemu-ppc', '', 'restore qemu checks to build'),
+            ('guest-route', 'gate.py run --env qemu-ppc', 'gate.py run --env socket', 'leave guest checks unassigned'),
             ('workflow', '      - name: make check\n        timeout-minutes: 60\n',
              '      - name: make check\n', 'remove make check deadline'),
             ('workflow', 'Runner load after make check\n        if: always() && ',
@@ -381,6 +419,8 @@ def main():
             ('reuse', "r['conclusion'] == 'success'", 'True', 'reuse failed run'),
             ('reuse', "r['head_branch'].startswith('wt/')", 'True', 'reuse non branch run'),
             ('reuse', '        reuse = False', '        reuse = True', 'reuse on API failure'),
+            ('check', 'concurrency:\n  group: check-${{ github.event_name }}-${{ github.ref }}\n'
+                      '  cancel-in-progress: true\n', '', 'remove check concurrency'),
             ('check', '          make check-docs-tree\n', '', 'missing docs tree'),
             ('workflow', 'shard: [0, 1, 2, 3, 4, 5]', 'shard: [0, 1, 2, 3, 4]', 'lose shard'),
             ('workflow', "}}-check-${{ matrix.shard }}\n", "}}-check-0\n", 'ccache shard collision'),
@@ -411,7 +451,7 @@ def main():
             ('fetch', 'if [ "$CHECK_STATE" != success ]; then', 'if [ "$CHECK_STATE" = success ]; then', 'invert check notice'),
         ]
         for kind, old, new, name in mutations:
-            text = {'workflow': source, 'fetch': FETCH.read_text(), 'check': CHECK_WORKFLOW.read_text(), 'reuse': (ROOT / 'tools/ci/reuse_success.py').read_text(), 'setup': SETUP.read_text()}[kind]
+            text = {'build-route': source, 'guest-route': CHECK_WORKFLOW.read_text(), 'workflow': source, 'fetch': FETCH.read_text(), 'check': CHECK_WORKFLOW.read_text(), 'reuse': (ROOT / 'tools/ci/reuse_success.py').read_text(), 'setup': SETUP.read_text()}[kind]
             if name in ('preparation command drift', 'unsafe ccache restore'):
                 prefix, text = text.split('  checks:\n', 1)
                 assert text.count(old) == 1, name
@@ -425,7 +465,11 @@ def main():
                 if kind == 'fetch':
                     subprocess.run(['bash', '-n', str(script)], check=True)
                 try:
-                    if kind == 'setup':
+                    if kind == 'build-route':
+                        routing_cases(changed, CHECK_WORKFLOW.read_text())
+                    elif kind == 'guest-route':
+                        routing_cases(source, changed)
+                    elif kind == 'setup':
                         workflow_cases(source, changed)
                     elif kind == 'reuse':
                         reuse_cases(script)

@@ -14,6 +14,7 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import mutpar
+from test_ver_format import pc98_format_source
 from ver_test_utils import ROOT, execute, function
 
 INFO_REL = 'userland/rust/about/src/info.rs'
@@ -189,7 +190,7 @@ class AboutMatchesVer(unittest.TestCase):
         if r.returncode:
             raise AssertionError(r.stderr)
         files = {
-            'ver_format_source.c': (ROOT / 'kernel/ver_format.c').read_text(),
+            'ver_format_source.c': pc98_format_source() + (ROOT / 'kernel/ver_format.c').read_text(),
             'ver_state_source.c': function((ROOT / 'kdebug/kdebug_module.c').read_text(),
                                           'const char *kdebug_state_name('),
             'ver_shell_source.c': function(CMD_BASE_C.read_text(), 'static int cmd_ver('),

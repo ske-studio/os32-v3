@@ -26,7 +26,7 @@ from run import ROM, QMP, command, require
 from ppc_lan_host import UDP
 from host_agent import HostAgent
 from host_operator_socket import OperatorSocket
-PREFIX = '/home/hight/opt/cross-ppc/bin/powerpc-elf-'
+PREFIX = str(Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc')) / 'bin/powerpc-elf-')
 
 def log_ready(logs, body):
     require([r['seq'] for r in logs] == list(range(len(logs))), 'LOG sequence from zero')

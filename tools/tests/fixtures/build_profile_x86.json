@@ -121,6 +121,7 @@
     "platform/pc98/irq_policy.c",
     "platform/pc98/irq_complete.c",
     "platform/pc98/boot_diag.c",
+    "platform/pc98/ver_backend.c",
     "init/sysconfig.c",
     "kernel/kaudit.c",
     "init/kaudit_boot.c",
