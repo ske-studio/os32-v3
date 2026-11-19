@@ -16,10 +16,7 @@ from kapi_target_ppc import ABSENT_PROVIDER_SLOTS, absent_result
 
 # Expected absent slots after the 11-19 PowerPC stages (port 7・clock・surface 4・console_font 4・gfx2 queries 9; PPC_KAPI_FILL_DESIGN §4 item 10).
 EXPECTED_ABSENT_SLOTS = frozenset("""
-buz_off buz_on db_bind_blob db_bind_int db_bind_null
-db_bind_text db_close db_column_int db_column_text db_error_code db_exec
-db_finalize db_last_error db_mem_used db_open db_open_existing db_prepare
-db_prepare_only db_step ext2_format ext2_format_at fm_note_off fm_note_on
+buz_off buz_on ext2_format ext2_format_at fm_note_off fm_note_on
 fm_play_mml fm_set_tone_num fm_startup_sound
 gfx2_check_op
 gfx2_flip
@@ -217,6 +214,14 @@ vfs_write_fd
 """.split())
 
 
+DB_PROVIDERS = {'kapi_' + name for name in '''
+db_open db_close db_exec db_prepare db_step
+db_column_int db_column_text db_finalize db_last_error db_mem_used
+db_open_existing db_prepare_only db_bind_int db_bind_text db_bind_blob
+db_bind_null db_error_code
+'''.split()}
+
+
 def insert_group(helper, mutation, group):
     """Put an extra absent group right after the table opening (stable across stages)."""
     opening = "PROVIDER_GROUPS = {\n"
@@ -245,6 +250,8 @@ def verify(source, entries):
             r'KAPI_HIT\(248\).*?if \(!ring3_user_ranges_writable\(\(u32\)out, KAPI_OUT_LEN\(out, size\),'
             r'\s*\(u32\)0, 0u\)\) \{\s*ring3_fault_kill\(\);.*?\}\s*return kapi_mem_stat\(app_id, out, size\);',
             wrapper.group(1), re.S):
+        return False
+    if any(not re.search(r'\b' + provider + r'\(', source) for provider in DB_PROVIDERS):
         return False
     calls = ('platform_pci_count()', 'platform_pci_get(idx, out)',
              'platform_pci_cfg_read32(bus, dev, fn, reg)', 'kapi_pci_bind_info(idx, out)')
@@ -297,6 +304,8 @@ def generate(tmp, mutation=None):
         insert_group(helper, mutation, "    'clock': (frozenset({'rtc_read'}), frozenset()),\n")
     if mutation == 'mem-absent':
         insert_group(helper, mutation, "    'missing_mem': (frozenset({'mem_stat'}), frozenset()),\n")
+    if mutation == 'db-absent':
+        insert_group(helper, mutation, "    'db': (frozenset({'db_step'}), frozenset()),\n")
     if mutation == 'pci-absent':
         insert_group(helper, mutation, "    'pci': (frozenset({'pci_get'}), frozenset()),\n")
     if mutation == 'zero':
@@ -362,15 +371,15 @@ def main():
         missing = GFX2_QUERY_PROVIDERS - undefined
         if missing:
             print('missing gfx2 query providers:', sorted(missing)); return 1
-        missing = (DISPLAY_PROVIDERS | KCG_PROVIDERS) - undefined
+        missing = (DISPLAY_PROVIDERS | KCG_PROVIDERS | DB_PROVIDERS) - undefined
         if missing:
             print('missing display or KCG providers:', sorted(missing)); return 1
-        unexpected = undefined - (ALLOWED_UNDEFINED | GFX2_QUERY_PROVIDERS | DISPLAY_PROVIDERS | KCG_PROVIDERS)
+        unexpected = undefined - (ALLOWED_UNDEFINED | GFX2_QUERY_PROVIDERS | DISPLAY_PROVIDERS | KCG_PROVIDERS | DB_PROVIDERS)
         if unexpected:
             print('unexpected providers:', sorted(unexpected)); return 1
         print('undefined providers:', len(undefined))
         if '--mutate' in sys.argv:
-            for mutation in ('empty', 'zero', 'group-empty', 'ime-empty', 'reboot-absent', 'slot-swap', 'pci-absent', 'mem-absent'):
+            for mutation in ('empty', 'zero', 'group-empty', 'ime-empty', 'reboot-absent', 'slot-swap', 'pci-absent', 'mem-absent', 'db-absent'):
                 path = tmp / mutation
                 path.mkdir()
                 mutated = generate(path, mutation)

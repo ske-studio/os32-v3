@@ -90,25 +90,6 @@ PROVIDER_GROUPS = {
         'sfs_begin',
         'sfs_end',
     }), frozenset(['serialfs.h'])),
-    'db': (frozenset({
-        'db_open',
-        'db_close',
-        'db_exec',
-        'db_prepare',
-        'db_step',
-        'db_column_int',
-        'db_column_text',
-        'db_finalize',
-        'db_last_error',
-        'db_mem_used',
-        'db_open_existing',
-        'db_prepare_only',
-        'db_bind_int',
-        'db_bind_text',
-        'db_bind_blob',
-        'db_bind_null',
-        'db_error_code',
-    }), frozenset(['kapi_db.h'])),
     'system_info': (frozenset({
     }), frozenset([])),
     'ime': (frozenset({
@@ -167,7 +148,6 @@ ZERO_SLOTS = frozenset({
     'ide_drive_present',
     'snd_bgm_is_playing',
     'gfx2_adapter_count',
-    'db_mem_used',
     'unicode_to_jis',
 })
 

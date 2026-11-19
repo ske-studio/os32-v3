@@ -1,0 +1,144 @@
+"""Exercise the common database KAPI across two PowerMac shell processes."""
+import argparse
+import hashlib
+import os
+from pathlib import Path
+import re
+import sys
+import tempfile
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path[:0] = [str(ROOT / 'tools'), str(ROOT / 'tools/ppc')]
+from kboot_accept import build
+from ppc_shm import guest_available
+
+DB = 'kapi/kapi_db.c'
+V50 = 'kapi/kapi_db_v50.inc'
+BIND = 'text_copy_buf, length,\n                                             SQLITE_TRANSIENT'
+MUTATIONS = {
+    'no-vfs': [('fs/ramfs/ramfs.c', None, '.sqlite = &ramfs_sqlite_ops', '.sqlite = 0 ? &ramfs_sqlite_ops : 0')],
+    'static-bind': [(DB, V50, BIND, BIND.replace('TRANSIENT', 'STATIC'))],
+    'fp-owner': [(DB, V50, 'if (handle == -1) {',
+                  'extern volatile u32 services_boot_fault; if (handle == -2) services_boot_fault = 99;\n    if (handle == -1) {'),
+                 ('kernel/sqlite_engine.c', None, 'arch_kernel_fp_end(&guard);',
+                  'if (services_boot_fault == 99) services_boot_fault = 0;\n'
+                  '    else arch_kernel_fp_end(&guard);')],
+    'empty-only': [(DB, V50, 'if (st.st_size == 0)', 'if (st.st_size != 0)')],
+    'lost-code': [(DB, 'kapi/kapi_db_helpers.inc', 'db_open_fail[owner] = code;', '(void)code;')],
+    'leak': [('exec/exec.c', 'exec/exec_finish.inc', 'exec_db_cleanup_owned(id);', ';')],
+}
+FIRST = 'OPEN CREATE INSERT BIND-RC BIND-VAL STEP CONV FP-PRE FPSCR NEXT ERR-RC ERR-CODE NAME CLOSE USED PENDING'.split()
+SECOND = ['STAT', 'REOPEN', 'RECLAIM']
+FAILURE = {'no-vfs': 'OPEN', 'static-bind': 'BIND-VAL', 'fp-owner': 'FPSCR',
+           'empty-only': 'REOPEN', 'lost-code': 'ERR-CODE', 'leak': 'RECLAIM'}
+
+
+def mutations(folder, edits):
+    settings = []
+    for index, (unit, include, before, after) in enumerate(edits):
+        source = ROOT / (include or unit)
+        text = source.read_text()
+        if text.count(before) != 1:
+            raise ValueError(f'{source}: expected one {before!r}')
+        dest = folder / source.name
+        dest.write_text(text.replace(before, after))
+        if include:
+            # Quoted includes search beside the copied translation unit first.
+            parent = ROOT / unit
+            if parent.read_text().count(f'#include "{source.name}"') != 1:
+                raise ValueError(f'{parent}: missing unique include for {source}')
+            dest = folder / parent.name
+            dest.write_bytes(parent.read_bytes())
+        prefix = 'KB_MUT_EXTRA_' if index else 'KB_MUT_'
+        settings.extend([prefix + 'SRC=' + unit, prefix + 'FILE=' + str(dest)])
+    return settings
+
+
+def observe(elf, cpu, folder, case):
+    from link_sh_run import Session
+    from usb_run import rsh_command
+
+    session = Session(elf, cpu, folder, 240)
+    try:
+        session.start()
+        session.wait(session.ready, 'db cui READY', 90)
+        serial = (folder / 'serial-a.log').read_text(errors='replace')
+        assert '[sqlite] static rc=0' in serial and session.agent.operator.ready['mode'] == 'cui'
+        command = '/bin/dbprob.bin 1'
+        failure = FAILURE.get(case)
+        for phase, markers in enumerate((FIRST, SECOND), 1):
+            body = rsh_command(session, command)
+            status = rsh_command(session, 'echo $?')
+            lines = body.decode().strip().splitlines()
+            match = re.fullmatch(r'DB-BASE (\d+)', lines[0])
+            assert match, (case, lines)
+            base = int(match[1])
+            if phase == 1:
+                first = base
+                command = f'/bin/dbprob.bin 2 {first}'
+            elif case == 'leak':
+                assert base > first, (case, first, base)
+                markers = ['STAT', 'RECLAIM']
+            else:
+                assert base == first, (case, first, base)
+            failed = failure in markers
+            green = markers[:markers.index(failure)] if failed else markers
+            expected = ['DB-' + item + ' OK' for item in green]
+            assert lines[1:1 + len(green)] == expected, (case, phase, lines)
+            if failed:
+                red = ['DB-' + failure + ' FAIL']
+                if case == 'fp-owner':
+                    # The REAL step re-enters SQLite to materialize its row.
+                    # The lost guard also rejects the following sqlite3_step.
+                    red.append('DB-NEXT FAIL')
+                assert lines[1 + len(green):] == red, (case, lines)
+                assert status == b'1\n', (case, status)
+                break
+            assert lines[1:] == expected and status == b'0\n', (case, phase, lines, status)
+        session.q.call('quit')
+        session.p.wait(timeout=5)
+        assert session.p.returncode == 0
+        print('RED' if failure else 'GREEN', case, cpu, flush=True)
+    finally:
+        session.close()
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--build-only', action='store_true')
+    parser.add_argument('--mutate', action='store_true')
+    args = parser.parse_args()
+    cross = Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc'))
+    if not (cross / 'bin/powerpc-elf-gcc').is_file() or (not args.build_only and not guest_available()):
+        print('SKIP: PowerPC toolchain, mac99 QEMU or loopback unavailable')
+        return 3
+    os.environ.setdefault('SOURCE_DATE_EPOCH', '946684800')
+    work = Path(tempfile.mkdtemp(prefix='ppc-db-')).resolve()
+    cases = {'normal': []}
+    if args.mutate:
+        cases.update(MUTATIONS)
+    settings = {}
+    for case, edits in cases.items():
+        folder = work / case
+        folder.mkdir()
+        settings[case] = mutations(folder, edits)
+    user = work / 'user'
+    bins = ' '.join(str(user / (app + '.bin')) for app in ('hello', 'fault', 'dbprob'))
+    seen = set()
+    for case in cases:
+        folder = work / case
+        elf = build(folder / 'kernel', 'IMAGE=kboot-link-sh', 'KB_SH_OUT=' + str(user),
+                    'KB_ROOT_BINS=' + bins, *settings[case], 'kb-user', 'kernel')
+        digest = hashlib.sha256(elf.read_bytes()).hexdigest()
+        assert digest not in seen, (case, digest)
+        seen.add(digest)
+        print(f'{case} sha256={digest} {elf}', flush=True)
+        if not args.build_only:
+            for cpu in ('7450', '7455'):
+                observe(elf, cpu, folder / cpu, case)
+    print(f'{len(seen)} distinct link-sh images')
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())
