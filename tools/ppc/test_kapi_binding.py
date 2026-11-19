@@ -22,15 +22,13 @@ db_finalize db_last_error db_mem_used db_open db_open_existing db_prepare
 db_prepare_only db_step ext2_format ext2_format_at fm_note_off fm_note_on
 fm_play_mml fm_set_tone_num fm_startup_sound
 gfx2_check_op
-gfx2_cursor_image gfx2_fence_query
-gfx2_fence_wait gfx2_flip gfx2_lock
-gfx2_mode_set gfx2_present gfx2_screen_surface
-gfx2_submit gfx2_surface_create gfx2_surface_desc gfx2_surface_free gfx2_unlock
+gfx2_flip
+gfx2_mode_set gfx2_present
 gfx_add_dirty_rect gfx_get_framebuffer gfx_get_palette
 gfx_hardware_scroll gfx_hw_blit gfx_hw_fill_rect gfx_hw_get gfx_hw_submit
-gfx_init gfx_init_200 gfx_lease_palette gfx_osri_show gfx_present
+gfx_init_200 gfx_lease_palette gfx_osri_show gfx_present
 gfx_present_dirty gfx_present_nosync gfx_present_raster gfx_present_rect
-gfx_screen_info gfx_set_palette gfx_shutdown gfx_stats
+gfx_screen_info gfx_set_palette gfx_stats
 gui_call gui_register hdd_geom_info ide_drive_present
 ide_get_info ide_identify ide_init ide_read_sector ide_write_sector
 ide_write_sectors ime_dict_info ime_dict_suspend ime_feed_key ime_get_mode
@@ -57,6 +55,8 @@ gfx2_connector_edid gfx2_mode_count gfx2_mode_get
 """.split())
 
 DISPLAY_PROVIDERS = frozenset("""
+gfx_kapi_init gfx_shutdown gfx2_surface_create gfx2_surface_free gfx2_surface_desc
+gfx2_screen_surface gfx2_lock gfx2_unlock gfx2_submit gfx2_fence_query gfx2_fence_wait gfx2_cursor_image
 gfx_screen_owner gfx2_vblank_wait gfx2_palette gfx2_gamma
 gfx2_cursor_move gfx2_cursor_show gfx2_dpms
 """.split())

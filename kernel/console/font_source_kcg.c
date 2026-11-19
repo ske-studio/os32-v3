@@ -75,6 +75,11 @@ int kcg_file_load(const char *path)
     return font_guard_run(load_guarded, (void *)path);
 }
 
+int kcg_file_ready(void)
+{
+    return resident != 0;
+}
+
 void kcg_file_unload(void)
 {
     u8 *old = resident;

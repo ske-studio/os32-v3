@@ -364,6 +364,7 @@
     "ppc-boot-info-guest": 120.591867,
     "ppc-console-cells": 65.992329,
     "ppc-display-guest": 194.6731,
+    "ppc-display-lifecycle": 195,
     "ppc-fb": 523.358177,
     "ppc-font-guest": 79.839325,
     "ppc-fp-accept-host": 0.215018,

@@ -1,4 +1,5 @@
 #include "display_provider.h"
+#include "display_restore.h"
 #include "drivers/video/of_fb/backend_of_fb.h"
 #include "gfx/v2/gfx2_int.h"
 #include "rh_observe.h"
@@ -100,6 +101,7 @@ void display_provider_boot_reserve(int pref, void (*bind_client)(void))
         .shadow_bytes = pages * PAGE_SIZE, .protected_rows = fb->height < PM_RH_FB_ROWS ? fb->height : PM_RH_FB_ROWS};
     gfx_backend_of_fb.prepare = prepare;
     gfx_backend_of_fb.init = init;
+    gfx_backend_of_fb.enter = display_text_hide;
     gfx_backend_of_fb.shutdown = shutdown;
     (void)of_fb_bind(&saved);
 }
