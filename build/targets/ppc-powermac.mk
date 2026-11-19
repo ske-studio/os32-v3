@@ -101,6 +101,12 @@ $(KB_OUT)/memmap_layout.h: include/memmap.h tools/gen_memmap.py
 	@mkdir -p $(dir $@)
 	python3 -B tools/gen_memmap.py --layout-header $@
 ifneq ($(KB_EXEC),)
+# Capture the exact ISO bytes consumed by the RAM-root blob rule.
+$(KB_OUT)/root_image_expected.h: $(ROOT_ISO) build/targets/ppc-powermac.mk
+	python3 -B -c 'import pathlib, sys, zlib; data = pathlib.Path(sys.argv[1]).read_bytes(); print("#define PM_ROOT_IMAGE_BYTES %du\n#define PM_ROOT_IMAGE_CRC 0x%08xu" % (len(data), zlib.crc32(data)))' $< > $@.tmp
+	mv $@.tmp $@
+$(KB_OUT)/platform/powermac/root_image.o: $(KB_OUT)/root_image_expected.h
+
 BUILD_ID_SRC := $(KB_OUT)/build_id.c
 include build/build-id.mk
 $(KB_GEN)/stamp: sdk/kapi.json sdk/gen_kapi.py sdk/kapi_abi_x86.py sdk/kapi_target_ppc.py sdk/target_profile.py

@@ -15,6 +15,7 @@ sys.path[:0] = [str(ROOT / 'tools'), str(ROOT / 'tools/ppc')]
 PAYLOAD = b'\xa5\x5a'
 EXPECTED = {
     'normal': (b'PORT echo OK\n\n', b'0\n'),
+    'drop-char': (b'PORT echo OK\n\n', b'0\n'),
     'drop-rx': (b'PORT receive failed\n\n', b'7\n'),
     'absent': (b'PORT initialized failed\n\n', b'1\n'),
 }
@@ -22,14 +23,15 @@ EXPECTED = {
 
 def absent_bindings(folder, out):
     source = (ROOT / 'sdk/kapi_target_ppc.py').read_text()
-    anchor = "frozenset({'serial_puts', 'serial_diag'}), frozenset()"
+    anchor = "    'system_info': (frozenset({"
     if source.count(anchor) != 1:
         raise RuntimeError('absent port mutation anchor must be unique')
-    group = """frozenset({
+    group = """    'port': (frozenset({
         'serial_puts', 'serial_diag', 'serial_init', 'serial_init_vfast',
         'serial_putchar', 'serial_getchar', 'serial_trygetchar',
         'serial_is_initialized', 'serial_get_status',
-    }), frozenset(['port_service.h'])"""
+    }), frozenset(['port_service.h'])),
+""" + anchor + "\n        'sys_set_mtime',"
     zero_anchor = "    'np2_detect',\n"
     # np2_detect also appears in the platform slot set with deeper indentation.
     zero_anchor = 'ZERO_SLOTS = frozenset({\n' + zero_anchor
@@ -81,7 +83,11 @@ def observe(elf, cpu, evidence, case):
 
                 session.wait(session.ready, 'port cui READY', 60)
                 require(session.agent.operator.ready['mode'] == 'cui', 'port RSH mode')
-                echo = case in ('normal', 'drop-rx')
+                sys_body = rsh_command(session, '/bin/sysiprob.bin')
+                sys_status = rsh_command(session, 'echo $?')
+                expected_sys = (b'MTIME invalid failed', b'1\n') if case == 'absent' else (b'MTIME OK', b'0\n')
+                require((sys_body.rstrip(b'\n'), sys_status) == expected_sys, repr((sys_body, sys_status)))
+                echo = case != 'absent'
                 if echo:
                     rsh_command(session, '/bin/portprob.bin', b'PORT settings OK\n\n')
                     rsh_command(session, 'echo $?', b'0\n')
@@ -104,12 +110,18 @@ def observe(elf, cpu, evidence, case):
                 want_body, want_status = EXPECTED[case]
                 require((body.rstrip(b'\n'), status) == (want_body.rstrip(b'\n'), want_status),
                         repr((case, body, status)))
-                if case == 'normal':
+                if case in ('normal', 'drop-char'):
                     def echoed():
                         receive()
                         return b'?' + PAYLOAD in stream[start:]
 
                     session.wait(echoed, 'port payload echoed in order', 5)
+                    marker = b'ESCC string output'
+                    if case == 'drop-char':
+                        marker = marker[1:]
+                    require(bytes(stream[start:]).endswith(marker + b'?' + PAYLOAD) and
+                            (case != 'drop-char' or b'ESCC string output?' not in stream[start:]),
+                            repr(stream[start:]))
                 receive()
             session.q.call('quit')
             session.p.wait(timeout=5)
@@ -142,7 +154,7 @@ def main():
     work = Path(tempfile.mkdtemp(prefix='ppc-port-', dir=os.environ.get('TMPDIR') or None)).resolve()
     print('evidence=' + str(work), flush=True)
     user = work / 'user'
-    bins = [str(user / (app + '.bin')) for app in ('hello', 'fault', 'portprob')]
+    bins = [str(user / (app + '.bin')) for app in ('hello', 'fault', 'portprob', 'sysiprob')]
     options = ['IMAGE=kboot-link-sh', 'KB_SH_OUT=' + str(user),
                'KB_ROOT_BINS=' + ' '.join(bins)]
     images = {}
@@ -157,6 +169,9 @@ def main():
                 '    int byte;\n    do {\n        byte = pm_escc_trygetchar();',
                 '    int byte;\n    while (pm_escc_trygetchar() < 0) {}\n'
                 '    do {\n        byte = pm_escc_trygetchar();')
+        elif case == 'drop-char':
+            mutation = mutant_settings(folder, case, 'kernel/port_service.c',
+                                       '    while (*str) {', '    if (*str) ++str;\n    while (*str) {')
         elif case == 'absent':
             absent_bindings(folder, kernel / 'gen')
         elf = build(kernel, *options, *mutation, 'kb-user', 'kernel')

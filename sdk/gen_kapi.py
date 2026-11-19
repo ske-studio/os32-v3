@@ -32,7 +32,7 @@ CHECK_ONLY = args.check_only
 JSON_PATH = args.json
 TARGET = args.target
 if TARGET == "ppc-powermac":
-    from kapi_target_ppc import ABSENT_PROVIDER_INCLUDES, ABSENT_PROVIDER_SLOTS, absent_result
+    from kapi_target_ppc import PROVIDER_EXTERNS, ABSENT_PROVIDER_INCLUDES, ABSENT_PROVIDER_SLOTS, absent_result
 
 with open(JSON_PATH, "r", encoding="utf-8") as f:
     data = json.load(f)
@@ -523,8 +523,7 @@ for inc in data.get("includes", []):
 
 c_content += "\n"
 for ext in data.get("externs", []):
-    if TARGET == "ppc-powermac" and ext not in {
-            "extern volatile u32 tick_count;", "extern void kapi_sys_exit(int status);"}:
+    if TARGET == "ppc-powermac" and ext not in PROVIDER_EXTERNS:
         continue
     c_content += f"{ext}\n"
 c_content += "\n"

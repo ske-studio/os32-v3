@@ -14,9 +14,9 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "sdk"))
 from kapi_target_ppc import ABSENT_PROVIDER_SLOTS, absent_result
 
-# Expected absent slots after the 11-19 PowerPC stages (port 7・clock・surface 3・console_font 4・gfx2 queries 9; PPC_KAPI_FILL_DESIGN §4 item 10).
+# Expected absent slots after the 11-19 PowerPC stages (port 7・clock・surface 4・console_font 4・gfx2 queries 9; PPC_KAPI_FILL_DESIGN §4 item 10).
 EXPECTED_ABSENT_SLOTS = frozenset("""
-boot_image_info buz_off buz_on db_bind_blob db_bind_int db_bind_null
+buz_off buz_on db_bind_blob db_bind_int db_bind_null
 db_bind_text db_close db_column_int db_column_text db_error_code db_exec
 db_finalize db_last_error db_mem_used db_open db_open_existing db_prepare
 db_prepare_only db_step ext2_format ext2_format_at fm_note_off fm_note_on
@@ -31,7 +31,7 @@ gfx_hardware_scroll gfx_hw_blit gfx_hw_fill_rect gfx_hw_get gfx_hw_submit
 gfx_init gfx_init_200 gfx_lease_palette gfx_osri_show gfx_present
 gfx_present_dirty gfx_present_nosync gfx_present_raster gfx_present_rect
 gfx_screen_info gfx_screen_owner gfx_set_palette gfx_shutdown gfx_stats
-gfx_surface_lease gui_call gui_register hdd_geom_info ide_drive_present
+gui_call gui_register hdd_geom_info ide_drive_present
 ide_get_info ide_identify ide_init ide_read_sector ide_write_sector
 ide_write_sectors ime_dict_info ime_dict_suspend ime_feed_key ime_get_mode
 ime_getchar ime_getkey ime_is_active ime_set_mode ime_set_render
@@ -43,11 +43,11 @@ mouse_cursor_show mouse_poll mouse_set_bounds np2_check_hostdrv np2_detect
 np2_get_clock np2_get_cpu np2_get_version
 pci_bind_info pci_cfg_read32 pci_count
 pci_get pcm_close pcm_open pcm_set_volume pcm_status pcm_write
-serial_diag serial_puts sfs_begin
+sfs_begin
 sfs_end snd_bgm_is_playing snd_bgm_play snd_bgm_set_persist snd_bgm_stop
 snd_focus snd_se_play snd_se_play_raw snd_set_master ssg_all_off ssg_tone
 ssg_volume sys_get_build_info
-sys_set_mtime    sys_switch_shell
+sys_switch_shell
 sys_time_now sys_ver_info v86_boot v86_boot2 v86_disktest
 v86_gdc_capture v86_selftest
 """.split())
@@ -61,11 +61,13 @@ gfx2_connector_edid gfx2_mode_count gfx2_mode_get
 # Fixed allowlist: exec/*.c (including exec_*.inc), KBOOT_SHELL=1 TUs,
 # input_service, kbd_inject, con_sink, pipe_buffer, kapi_strings, kstring.
 ALLOWED_UNDEFINED = frozenset("""
+surface_api_bundle
+boot_image_info
 surface_api_query
 surface_api_lease
 surface_api_unlease
 port_init port_init_vfast port_putchar_kapi port_getchar_kapi port_trygetchar
-port_is_initialized port_get_status
+port_is_initialized port_get_status port_puts_kapi kapi_serial_diag kapi_sys_set_mtime
 boot_token_get
 clock_read_legacy
 con_sink_capture
@@ -317,12 +319,12 @@ def main():
             [str(nm), '-u', str(tmp / 'kapi.o')], text=True).splitlines()}
         if 'sys_reboot' not in undefined:
             print('missing sys_reboot provider'); return 1
-        missing = {'exec_tvram_read_allowed', 'pm_console_clear', 'tvram_putchar_at',
+        missing = {'boot_image_info', 'exec_tvram_read_allowed', 'pm_console_clear', 'tvram_putchar_at',
                    'tvram_putkanji_at', 'tvram_readchar_at', 'tvram_reverse_cell',
                    'tvram_scroll', 'shm_alloc', 'shm_free', 'shm_lock',
                    'font_lease_app_open', 'font_lease_app_read_at',
                    'font_lease_app_close', 'unicode_file_lookup',
-                   'surface_api_query', 'surface_api_lease', 'surface_api_unlease'} - undefined
+                   'surface_api_bundle', 'surface_api_query', 'surface_api_lease', 'surface_api_unlease'} - undefined
         if missing:
             print('missing providers:', sorted(missing)); return 1
         missing = GFX2_QUERY_PROVIDERS - undefined
