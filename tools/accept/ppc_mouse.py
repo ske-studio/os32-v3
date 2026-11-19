@@ -161,7 +161,7 @@ def main():
                                        '    usb_pointer.bounds = mouse_set_bounds;', '')
         elif case == 'default-bounds':
             mutation = mutant_settings(folder, case, 'platform/powermac/ppc_kernel.c',
-                                       'if (target.width && target.height)', 'if (0)')
+                                       'if (fb_w && fb_h)', 'if (0)')
         elif case == 'drop-release':
             mutation = mutant_settings(folder, case, 'platform/powermac/usb_platform.c',
                                        'pointer_button(&release);', '(void)release;')
