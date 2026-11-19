@@ -54,6 +54,7 @@ static void outpw(unsigned int port,unsigned int v)
 }
 void __cdecl kprintf(u8 attr,const char *fmt,...) { (void)attr;(void)fmt; }
 #include "../../drivers/pci/pci_decode.c"
+#include "../../platform/pc98/pci_config.c"
 #include "../../drivers/pci/pci.c"
 #include "../../drivers/pci/pci_barsize.c"
 u32 recover_gf_dev(void) { return 13; }
