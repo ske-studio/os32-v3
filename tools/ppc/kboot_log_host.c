@@ -2,6 +2,11 @@
 #include "kboot_log.h"
 #include "ofw.h"
 #include "port_service.h"
+#include "exec_wait_contract.h"
+
+/* 共通の port_puts_kapi が各バイトの前に見る中断の口 (本線の port_puts、2026-11-19)。この試験では中断しない。 */
+int ring3_wait_pending(void) { return 0; }
+void ring3_abort_check(void) { }
 static char output[256];
 static unsigned used, reads, stalled, drain_stalled, indexed, calls, last_used;
 static unsigned char csr_writes[16];
