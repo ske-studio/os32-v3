@@ -8,6 +8,7 @@
 u32 kst_kbd_inject(void);
 int kst_lease(void);
 
+int kst_path_set_drive(void);
 u32 kst_exec_tramp_user(void);
 u32 kst_exec_kapi_layout(void);
 
