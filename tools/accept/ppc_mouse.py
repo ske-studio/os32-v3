@@ -88,7 +88,7 @@ def observe(elf, cpu, evidence, case):
             s.wait(lambda: 'dx=12 dy=-7 b=1' in serial(log), 'relative report')
             probe('motion', 4 if case == 'invert-x' else 0)
         if case in ('normal', 'drop-release'):
-            key, _ = keyboard_actions(s.q, lambda: serial(log), s.wait)
+            key, _ = keyboard_actions(s.q, lambda: serial(log), s.wait, evidence)
 
             def sample_cursor():
                 s.wait(lambda: s.word('cursor_display_mode') == 1, 'TEXT mode selected')
