@@ -3,6 +3,9 @@
 
 #include "pointer_service.h"
 
+void mouse_cursor_set_mode(int mode);
+void mouse_cursor_hide(void);
+
 /* Seed the displayed position during device initialization. */
 void mouse_pointer_init_position(void);
 

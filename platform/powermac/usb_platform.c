@@ -4,6 +4,8 @@
 #include "usb_boot.h"
 #include "via_window.h"
 #include "input_usb.h"
+#include "input/hal/in2_int.h"
+#include "mouse_pointer_contract.h"
 #include "usb_platform.h"
 #include "ppc_memmap.h"
 #include "mm/paging.h"
@@ -22,7 +24,23 @@ static u8 sources[2];
 static u32 tb_frequency;
 static struct { u32 bdf, va; int used; } maps[PM_USB_CONTROLLERS];
 void ppc_dcbf_line(void *);
-void pm_usb_platform_init(u32 hz) { tb_frequency = hz; }
+static PointerOps usb_pointer;
+
+static int usb_mouse_available(void)
+{
+    return sources[1] != 0;
+}
+
+void pm_usb_platform_init(u32 hz)
+{
+    tb_frequency = hz;
+    usb_pointer = empty_pointer;
+    usb_pointer.available = usb_mouse_available;
+    usb_pointer.bounds = pointer_bounds;
+    usb_pointer.cursor_mode = mouse_cursor_set_mode;
+    usb_pointer.cursor_hide = mouse_cursor_hide;
+    pointer_register(&usb_pointer);
+}
 u32 usbp_irq_save(void) { return ppc_irq_save(); }
 void usbp_irq_restore(u32 f) { ppc_irq_restore(f); }
 int usbp_dma_alloc(u32 bytes, u32 align, struct usb_dma *out)
@@ -172,10 +190,25 @@ void usbp_input_key_repeat(u8 src, u8 sc)
     pm_input_usb_repeat(src, sc);
     usbp_log("USB REPEAT src=%u sc=%02x", src, sc); }
 void usbp_input_mouse(u8 src, i16 dx, i16 dy, u8 buttons)
-{ usbp_log("USB MOUSE src=%u dx=%d dy=%d b=%x", src, dx, dy, buttons); }
+{
+    if (src < 1 || src > 4 || !(sources[1] & (1u << (src - 1)))) return;
+    /* USB service serializes reports and detach with interrupts masked. */
+    InputEvent event = { .src = src, .buttons = buttons };
+    mouse_ext_move(dx, dy, 0);
+    pointer_button(&event);
+    usbp_log("USB MOUSE src=%u dx=%d dy=%d b=%x", src, dx, dy, buttons);
+}
 void usbp_input_release(int kind, u8 src)
 {
     if (kind == 0) pm_input_usb_release(src);
+    if (kind == 1 && src >= 1 && src <= 4) {
+        InputEvent release = { .src = src };
+        pointer_button(&release);
+        if (sources[1] == (1u << (src - 1))) {
+            i16 dx, dy;
+            mouse_ext_read_legacy(&dx, &dy);
+        }
+    }
     usbp_log("USB RELEASE kind=%d src=%u", kind, src);
     if ((unsigned)kind < 2 && src >= 1 && src <= 4) sources[kind] &= ~(1u << (src - 1));
 }
