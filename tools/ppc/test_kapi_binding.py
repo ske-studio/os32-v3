@@ -44,9 +44,9 @@ pcm_close pcm_open pcm_set_volume pcm_status pcm_write
 sfs_begin
 sfs_end snd_bgm_is_playing snd_bgm_play snd_bgm_set_persist snd_bgm_stop
 snd_focus snd_se_play snd_se_play_raw snd_set_master ssg_all_off ssg_tone
-ssg_volume sys_get_build_info
+ssg_volume
 sys_switch_shell
-sys_time_now sys_ver_info v86_boot v86_boot2 v86_disktest
+sys_ver_info v86_boot v86_boot2 v86_disktest
 v86_gdc_capture v86_selftest
 """.split())
 
@@ -73,7 +73,7 @@ surface_api_query
 surface_api_lease
 surface_api_unlease
 port_init port_init_vfast port_putchar_kapi port_getchar_kapi port_trygetchar
-port_is_initialized port_get_status port_puts_kapi kapi_serial_diag kapi_sys_set_mtime
+port_is_initialized port_get_status port_puts_kapi kapi_serial_diag kapi_sys_set_mtime kapi_sys_get_build_info kapi_sys_time_now
 boot_token_get
 clock_read_legacy
 con_sink_capture

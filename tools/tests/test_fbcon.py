@@ -8,6 +8,8 @@ import host32
 from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 MUTANTS = [
+    ('park before attach', 'if (!c || !c->ready || !c->target) return 0;', 'if (!c) return 0;'),
+    ('park discards cells', 'c->target = NULL;', 'fbcon_detach(c);'),
     ('hidden cursor', '(((s->attr & 1) && (ink ^ inverse)) ^ cursor)', '(s->attr & 1) && (ink ^ inverse ^ cursor)'),
     ('cursor clamp', 'x = c->geometry.cols - 1;', 'x = c->geometry.cols;'),
     ('hidden move', 'if (!c->visible) return;', 'if (0) return;'),
@@ -27,14 +29,22 @@ MUTANTS = [
     ('scroll long', 'i < cols * (rows - n)', 'i < cols * rows'),
     ('old cursor', 'redraw_cursor(c, ox, oy);', '(void)ox; (void)oy;'),
 ]
-def build_run(tmp, source):
+TEXT = ROOT / 'platform/powermac/console_text.c'
+TEXT_MUTANTS = [
+    ('nonowner exit', 'id == appslot_gfx_owner()', '(void)id, 1'),
+    ('duplicate return', '!pm_text_was_up || pm_console_text_ready()', '!pm_text_was_up'),
+]
+
+def build_run(tmp, source, console_text):
+    (tmp / 'console_text.c').write_text(console_text)
     (tmp / 'fbcon_source.inc').write_text(source)
     exe = tmp / 'fbcon'
     subprocess.run(['gcc', '-m32', '-std=gnu11', '-O0', '-ffreestanding',
         '-fno-builtin', '-fno-pie', '-no-pie', '-fno-stack-protector', '-nostdlib', '-static',
         '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections',
         '-Wall', '-Wextra', '-Werror', '-Wno-sign-compare', '-D__KERNEL_BUILD__',
-        '-I'+str(tmp), '-I'+str(ROOT), '-I'+str(ROOT/'tools/tests'), *include_flags(ROOT),
+        '-I'+str(tmp), '-I'+str(ROOT/'platform/powermac'), '-I'+str(ROOT), '-I'+str(ROOT/'tools/tests'), *include_flags(ROOT),
+        str(tmp/'console_text.c'), str(ROOT/'platform/powermac/display.c'),
         str(ROOT/'tools/tests/fbcon_host.c'), str(ROOT/'platform/powermac/console.c'),
         str(ROOT/'kernel/console/console.c'), str(ROOT/'lib/utf8.c'), str(ROOT/'lib/kstring_c.c'),
         str(ROOT/'kernel/console/font_source_kcg.c'), str(ROOT/'lib/lz4.c'), '-o',str(exe)],check=True)
@@ -63,13 +73,19 @@ def main():
     with tempfile.TemporaryDirectory(prefix='fbcon-') as directory:
         tmp=Path(directory)
         cross_compile(tmp)
-        result=build_run(tmp,source)
+        result=build_run(tmp,source,TEXT.read_text())
         print(result.stdout,end='',flush=True)
         assert result.returncode==0,(result.returncode,result.stderr)
         if args.mutate:
+            for label,old,new in TEXT_MUTANTS:
+                original = TEXT.read_text()
+                assert original.count(old) == 1, label
+                result = build_run(tmp, source, original.replace(old, new))
+                assert result.returncode == 1 and 'FAIL ' in result.stdout, (label, result)
+                print('RED runtime: ' + label + ': ' + result.stdout.strip(), flush=True)
             for label,old,new in MUTANTS:
                 assert source.count(old)==1,(label,'anchor')
-                result=build_run(tmp,source.replace(old,new))
+                result=build_run(tmp,source.replace(old,new),TEXT.read_text())
                 assert result.returncode==1 and 'FAIL ' in result.stdout,(label,result.returncode,result.stdout,result.stderr)
                 print('RED runtime: '+label+': '+result.stdout.strip(),flush=True)
 if __name__=='__main__': main()

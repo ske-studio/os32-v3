@@ -86,6 +86,7 @@ static void mask(struct gfx_console_target *t,int x,int y,const u8 *data,int wid
 static void scenario(unsigned w,unsigned h) {
     struct gfx_console_target t={.width=w,.height=h,.pitch=w+13};
     for(unsigned i=0;i<sizeof(pixels);i++) pixels[i]=0x55;
+    CHECK(!pm_console_park());
     CHECK(!pm_console_attach(&t,&kcg_file_api,64));
     CHECK(con_backend_safe());
     CHECK(con_backend_printf_attr(0x07)==0xe1);
@@ -152,6 +153,20 @@ static void scenario(unsigned w,unsigned h) {
         if(y<64 || y>=64+(unsigned)rows*16 || x>=w) CHECK(pixel(&t,x,y)==0x55);
     CHECK(presents>0);
     tvram_set_scroll_reserve(0);
+    CHECK(pm_console_park());
+    CHECK(!pm_console_park());
+    before = presents;
+    con_backend_putchar(0,0,'A',0xe1);
+    CHECK(presents == before);
+    mask(&t,0,64,kana,8);
+    struct gfx_console_target next = t;
+    next.width -= 8;
+    CHECK(pm_console_retarget(&next) == -1);
+    next.width = w;
+    CHECK(!pm_console_retarget(&next));
+    CHECK(presents == before + 1);
+    mask(&next,0,64,ascii,8);
+    mask(&next,0,80,reversed_ascii,8);
     fail_lock=1; con_backend_putchar(0,0,'A',0xe1); CHECK(!con_backend_safe()); fail_lock=0;
     pm_console_detach(); CHECK(!con_backend_safe());
 }
@@ -198,4 +213,59 @@ static void scroll_counts(void) {
     CHECK(c.cells[0].code==' ');
     fbcon_detach(&c);
 }
-void _start(void) { make_font(); scenario(640,480); scenario(640,400); scenario(800,600); fake_pc98_colors(); scroll_counts(); say("PASS fbcon R1 R2\n"); finish(0); }
+#include "gfx/v2/gfx2_int.h"
+#include "platform/powermac/rh_observe.h"
+#include "platform/powermac/display_text.h"
+#include "platform/powermac/platform_display_fallback.h"
+#include "display_restore.h"
+
+static struct gfx2_adapter adapter;
+static int text_ready, state_changes, shutdowns;
+static struct pm_rh_colors colors = {.foreground = 0, .background = 255};
+const struct pm_rh_colors *pm_rh_full_colors(void) { return &colors; }
+struct gfx2_adapter *gfx2_active(void) { return &adapter; }
+void gfx_init(void) { adapter.gen++; }
+void gfx_shutdown(void) { shutdowns++; }
+void gfx_boot_reserve(void) {}
+int appslot_gfx_owner(void) { return 3; }
+void unicode_file_load(void) {}
+u32 unicode_file_debug_phys(void) { return 1; }
+void kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
+int gfx_console_open(u32 index, u32 head, struct gfx_console_target *t)
+{
+    CHECK(index == 0 && head == 0 && !t->sid);
+    *t = (struct gfx_console_target){.sid=1, .generation=adapter.gen,
+                                     .width=640, .height=480, .pitch=640};
+    return 0;
+}
+int gfx_console_close(struct gfx_console_target *t) { CHECK(t->sid); t->sid=0; return 0; }
+void pm_console_text_state(int root, int font, int live, u32 gen)
+{
+    CHECK(root && font);
+    CHECK(!live || (con_backend_safe() && gen == adapter.gen));
+    text_ready = live;
+    state_changes++;
+}
+int pm_console_text_ready(void) { return text_ready; }
+
+static void console_return_test(void)
+{
+    display_provider_console_return();
+    display_text_hide();
+    CHECK(!adapter.gen && !state_changes);
+    CHECK(!pm_console_text_start());
+    CHECK(text_ready && adapter.gen == 1 && state_changes == 1);
+    display_text_hide();
+    display_text_hide();
+    CHECK(!text_ready && state_changes == 2);
+    display_provider_owner_exit(2);
+    CHECK(!shutdowns);
+    display_provider_owner_exit(3);
+    CHECK(shutdowns == 1);
+    display_provider_console_return();
+    display_provider_console_return();
+    CHECK(text_ready && adapter.gen == 2 && state_changes == 3);
+    display_provider_owner_exit(3);
+    CHECK(shutdowns == 1);
+}
+void _start(void) { make_font(); scenario(640,480); scenario(640,400); scenario(800,600); fake_pc98_colors(); scroll_counts(); console_return_test(); say("PASS fbcon R1 R2\n"); finish(0); }

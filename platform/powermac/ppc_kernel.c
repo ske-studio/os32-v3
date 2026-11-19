@@ -369,46 +369,7 @@ void platform_boot_services(void)
     struct boot_root_image img;
     pm_root_image(&img);
     if (pm_root_boot(&img) == 0) {
-        static struct gfx_console_target target;
-        int rc = kcg_file_load(SYS_FB_FONT);
-        const char *step = "font";
-        if (!rc) {
-            step = "unicode";
-            unicode_file_load();
-            if (!unicode_file_debug_phys()) rc = -1;
-        }
-        if (!rc) {
-            step = "target";
-            gfx_boot_reserve();
-            gfx_init();
-            struct gfx2_adapter *a = gfx2_active();
-            rc = a ? gfx_console_open(a->index, 0, &target) : -1;
-        }
-        if (!rc) {
-            step = "attach";
-            rc = pm_console_attach(&target, &kcg_file_api, PM_RH_FB_ROWS);
-            if (!rc && !con_backend_safe()) rc = -1;
-        }
-        if (!rc) {
-            const struct pm_rh_colors *colors = pm_rh_full_colors();
-            pm_console_set_colors(colors->foreground, colors->background);
-            step = "clear";
-            if (con_backend_safe()) {
-                pm_console_text_state(1, 1, 1, target.generation);
-                tvram_clear();
-                console_hw_cursor_enable();
-            }
-            if (!con_backend_safe()) rc = -1;
-            else kprintf(KBOOT_ATTR, "FB text ready generation=%u fg=%u bg=%u\r\n",
-                         target.generation, colors->foreground, colors->background);
-        }
-        if (rc) {
-            pm_console_text_state(1, 0, 0, 0);
-            pm_console_detach();
-            if (target.sid) (void)gfx_console_close(&target);
-            kcg_file_unload();
-            kprintf(KBOOT_ATTR, "FB off step=%s rc=%d\r\n", step, rc);
-        }
+        (void)pm_console_text_start();
 #if KBOOT_SH
         (void)pm_hostfs_boot(info->tb_hz);
         pm_usb_boot(info->tb_hz);
