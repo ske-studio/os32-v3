@@ -27,7 +27,7 @@ int fd_is_redirected(int fd) { (void)fd; return 0; }
 int fd_redirect_read(int fd, void *p, u32 n) { (void)fd; (void)p; (void)n; return -1; }
 int fd_redirect_write(int fd, const void *p, u32 n) { (void)fd; (void)p; (void)n; return -1; }
 void console_write(const char *p, u32 n, int attr) { (void)p; (void)n; (void)attr; }
-static unsigned char heap[32768];
+static unsigned char heap[2 * RAMFS_FILE_MAX];
 static u32 used;
 void *kmalloc(u32 n) { void *p = heap + used; used += (n + 7) & ~7U; return p; }
 void *kzalloc(u32 n) { void *p = kmalloc(n); return kmemset(p, 0, n); }
@@ -41,13 +41,13 @@ static void item(const VfsDirEntry *e, void *p) {
 }
 void _start(void) {
     static const struct vfs_device_name names[] = {{"rd", VFS_NAME_DIGIT_PREFIX, 5, 0, 2}};
-    char out[1025]; int count = 0; OS32_Stat st;
+    static char out[RAMFS_FILE_MAX + 1]; int count = 0; OS32_Stat st;
     vfs_device_names_register(names, 1);
     if (vfs_register_fs(&ramfs_ops) || vfs_mount("/tmp", "rd1", "ramfs")) fail(2);
     if (vfs_write("/tmp/f", "abc", 3) != 3 || vfs_read("/tmp/f", out, sizeof(out)) != 3 || kstrncmp(out, "abc", 3)) fail(3);
     if (vfs_write("/tmp/f", "xy", 2) != 2 || vfs_read("/tmp/f", out, sizeof(out)) != 2 || kstrncmp(out, "xy", 2)) fail(4);
     if (vfs_ls("/tmp", item, &count) || count != 1 || vfs_stat("/tmp/f", &st) || st.st_size != 2) fail(6);
-    if (vfs_write("/tmp/f", out, 1025) != VFS_ERR_NOSPC || vfs_read("/tmp/f", out, sizeof(out)) != 2 || kstrncmp(out, "xy", 2)) fail(7);
+    if (vfs_write("/tmp/f", out, sizeof(out)) != VFS_ERR_NOSPC || vfs_read("/tmp/f", out, sizeof(out)) != 2 || kstrncmp(out, "xy", 2)) fail(7);
     int fd = vfs_open("/tmp/f", O_WRONLY | O_CREAT | O_TRUNC);
     if (fd < 0 || vfs_write_fd(fd, "ab", 2) != 2 || vfs_write_fd(fd, "cd", 2) != 2) fail(8);
     vfs_close(fd);
@@ -58,7 +58,7 @@ void _start(void) {
     if (fd < 0 || vfs_read_fd(fd, out, 5) != 5 || kstrncmp(out, "abcde", 5)) fail(10);
     vfs_close(fd);
     fd = vfs_open("/tmp/new", O_WRONLY | O_CREAT | O_TRUNC);
-    if (fd < 0 || vfs_write_fd(fd, out, 1024) != 1024 || vfs_write_fd(fd, out, 1) != VFS_ERR_NOSPC) fail(11);
+    if (fd < 0 || vfs_write_fd(fd, out, RAMFS_FILE_MAX) != RAMFS_FILE_MAX || vfs_write_fd(fd, out, 1) != VFS_ERR_NOSPC) fail(11);
     vfs_close(fd);
     /* A zero-length write past the end must not grow the file. */
     fd = vfs_open("/tmp/z", O_RDWR | O_CREAT | O_TRUNC);
@@ -83,17 +83,17 @@ def main():
         d = Path(tmp)
         (d / 'test.c').write_text(SOURCE)
         flags = [os.environ.get('CC', 'gcc'), '-m32', '-std=gnu11', '-ffreestanding', '-fno-pie', '-no-pie',
-                 '-fno-builtin', '-nostdlib', '-static', '-ffunction-sections', '-fdata-sections',
+                 '-fno-builtin', '-nostdinc', '-nostdlib', '-static', '-ffunction-sections', '-fdata-sections',
                  '-Wall', '-Wextra', '-Werror', '-D__cdecl=', '-D__KERNEL_BUILD__',
                  '-I.', '-Iinclude', '-Iplatform/pc98', '-Isdk/include/os32', '-Imm', '-Ilib',
                  '-Wl,--gc-sections']
         for mutant in range(1 + 2 * int(args.mutate)):
             source = original
             if mutant == 1:
-                old = 'file->size = size;'
+                old = 'file->size = size;\n    return (int)size;'
                 if source.count(old) != 1:
                     raise RuntimeError('mutation anchor is not unique')
-                source = source.replace(old, 'file->size = size - 1;')
+                source = source.replace(old, old.replace('= size;', '= size - 1;'))
             if mutant == 2:
                 old = 'kmemcpy(file->data + offset, buf, size);'
                 if source.count(old) != 1:

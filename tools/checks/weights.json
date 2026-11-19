@@ -394,6 +394,7 @@
     "probe-host": 4.63924,
     "r1-fixture-host": 143.370523,
     "raster-splash-asset-host": 3.2863325,
+    "ramfs-sqlite-host": 2,
     "raw-wait-host": 35.452636,
     "recover-cli-host": 2.726551,
     "recover-gf": 3.42954,
