@@ -24,6 +24,7 @@ MUTATIONS = [
     ('platform/pc98/pci_config.c', 'backend_name', 'return "mech#1";', 'return "mech1";'),
     ('platform/pc98/pci_config.c', 'extra_root', 'if (idx != 0) return -1;', '(void)idx;'),
     ('platform/pc98/pci_config.c', 'skip_measure', 'return 1;', 'return 0;'),
+    ('drivers/pci/pci.c', 'root_limit', 'i < PCI_CONFIG_MAX_ROOTS && ', ''),
     ('drivers/pci/pci.c', 'fixed_root', ROOT_SCAN, '    (void)pci_config_root_bus; pci_scan_bus(0, 0);'),
     ('drivers/pci/pci.c', 'record_missing', RECORD, ''),
     ('drivers/pci/pci.c', 'reset_missing', '    pci_barsize_reset();', ''),

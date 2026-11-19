@@ -7,7 +7,8 @@
 const char *pci_config_name(void);
 #define PCI_CONFIG_MAX_ROOTS 4
 /* After a successful probe, return 0 and the indexed root bus, or -1 at
- * the end of the list (including every index outside the limit). */
+ * the end of the list (including every index outside the limit).
+ * The bus ranges beneath distinct roots must not overlap. */
 int pci_config_root_bus(u32 idx, u32 *bus);
 /* 1 permits BAR sizing writes during enumeration, 0 permits reads only. */
 int pci_config_bar_measure(void);

@@ -11,6 +11,7 @@ static void clear(void *p,u32 n) { u8 *b=p;while(n--)*b++=0; }
 static u32 cfg[32][8][16], masks[32][8][16], pending[32][8];
 static u32 writes[32][8][16], address_port, irq_state=1, transaction_state;
 static int port_present = 1;
+static const u32 *test_roots;
 static u32 busno;
 static u32 devno, fnno, regno;
 static unsigned int irq_save(void) { u32 old=irq_state;irq_state=0;return old; }
@@ -25,6 +26,7 @@ static void select_cfg(void)
     CHECK(!irq_state);
     busno = (address_port >> 16) & 255;
     devno=(address_port>>11)&31;fnno=(address_port>>8)&7;regno=(address_port&255)/4;
+    if (!test_roots) CHECK(busno == 0);
     CHECK(regno<16);
 }
 static unsigned long inpd(unsigned int port)
@@ -92,7 +94,6 @@ static int line_equals(const char *expected)
 }
 #include "../../drivers/pci/pci_decode.c"
 #include "../../platform/pc98/pci_config.c"
-static const u32 *test_roots;
 static u32 root_count;
 static int scan_root_bus(u32 idx, u32 *bus)
 {
@@ -143,6 +144,12 @@ void _start(void)
     root_count = 2;
     CHECK(pci_init() == 2 && pci_get(0, &pub) == 0 && pub.bus == 0);
     CHECK(pci_get(1, &pub) == 0 && pub.bus == 3 && pub.dev == 3);
+    static const u32 excessive[] = {1, 2, 3, 4, 5};
+    test_roots = excessive;
+    root_count = 5;
+    CHECK(pci_init() == 4);
+    for (u32 i = 0; i < 4; i++)
+        CHECK(pci_get(i, &pub) == 0 && pub.bus == excessive[i]);
     test_roots = 0;
     setup();endpoint(2,0,0x20411000);endpoint(2,7,0x20412000);
     cfg[2][0][3]=PCI_HDR_MULTIFUNCTION<<16;
