@@ -39,9 +39,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 | primitives aggressively.  These primitives dominate extended-precision add,
 | divide, normalize, and conversion paths.
 *----------------------------------------------------------------------------*/
-#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
 #define LITTLEENDIAN 1
-#endif
 #define SOFTFLOAT_FAST_INT64
 #define INLINE_LEVEL 5
 

@@ -58,22 +58,62 @@ KB_INC_EXTRA += -I$(KB_GEN)/include -I$(KB_GEN)/sdk/include/os32 \
  -Igfx/sync -Igfx/v2 -Idrivers/video/geforce -Idrivers/video/kcg
 KB_INC_EXTRA += -Idrivers/ata -Ikernel/dev -Ifs -Ifs/isofs -Idrivers/block -Ikernel/cli
 endif
+# Same machine flags as build/arch/ppc.mk:8 for every kernel TU (design section 4).
+KB_MACHINE := -mcpu=7450 -m32 -mbig-endian -msoft-float -mno-altivec -msdata=none \
+ -ffreestanding -fno-pie -fno-stack-protector -nostdlib -fcommon -fsigned-char \
+ -fno-short-enums
+KB_INC := $(if $(KB_EXEC),-I$(KB_GEN)/include -I$(KB_GEN)/sdk/include/os32) -I$(KB_OUT) -I. -Iinclude -Iarch/ppc -Iplatform/powermac -Isdk/include \
+ -Isdk/include/os32 -Ikernel -Iinit -Ikernel/console -Ikernel/irq -Ikernel/time \
+ -Imm -Ilib $(KB_INC_EXTRA)
+KB_FLAGS := -std=gnu11 $(KB_MACHINE) -fno-builtin -fno-asynchronous-unwind-tables \
+ -O2 -Wall -Wextra -Werror -Werror=vla -Werror=implicit-int \
+ -Werror=implicit-function-declaration -ffunction-sections -fdata-sections \
+ -D__cdecl= -D__KERNEL_BUILD__ $(HOOK_DEFS) -DKBOOT_NEGATIVE=$(NEGATIVE) -DKBOOT_SHELL=$(KBOOT_SHELL) -DKBOOT_SH=$(KBOOT_SH) -DKBOOT_LINK=$(KBOOT_LINK) -MMD -MP $(KB_INC)
+
 ifeq ($(FEATURE_SQLITE),1)
 include build/sqlite-gen.mk
-KB_VFS := $(KB_OUT)/gen/sqlite/os32_sqlite_vfs
-KB_HARD := $(addprefix $(KB_OUT)/,$(SQLITE_HARD_C:.c=.o) arch/ppc/sqlite_restore.o) $(KB_VFS).o
-KB_GROUP := $(KB_OUT)/gen/sqlite/body
+# Keep one dependency-tracked body for each compiler/flag configuration.
+# Body mutations use the image's own output and source substitution rules.
+KB_BODY_OUT := $(KB_OUT)
+ifeq ($(filter $(SQLITE_HARD_C) arch/ppc/sqlite_restore.S,$(KB_MUT_SRC) $(KB_MUT_EXTRA_SRC) $(KB_MUT_THIRD_SRC)),)
+KB_BODY_KEY := $(shell printf '%s\n' '$(KB_CC) $(subst -I$(KB_OUT),-I@out,$(KB_FLAGS)) $(KB_TU_FLAGS)' | sha256sum | cut -d' ' -f1)
+KB_BODY_OUT := build/out/ppc-kboot/sqlite-cache/$(KB_BODY_KEY)
+endif
+KB_VFS := $(KB_BODY_OUT)/gen/sqlite/os32_sqlite_vfs
+KB_HARD := $(addprefix $(KB_BODY_OUT)/,$(SQLITE_HARD_C:.c=.o) arch/ppc/sqlite_restore.o) $(KB_VFS).o
+KB_GROUP := $(KB_BODY_OUT)/gen/sqlite/body
 KB_EXTRA += $(KB_GROUP).o
 KB_SQLITE_AUDIT := --sqlite-group $(KB_GROUP).o --sqlite-inputs $(KB_HARD)
 KB_SQLITE_INC := -Ilib/sqlite3 -Ilib/softfloat
 KB_KEEP_SQLITE := -Wl,--undefined=sqlite_module_init
-$(KB_HARD) $(KB_OUT)/kernel/sqlite_engine.o $(KB_OUT)/kernel/sqlite_outer.o $(KB_OUT)/kernel/sqlite_static.o $(KB_OUT)/kapi/kapi_db.o: $(SQLITE_GENERATED)
+$(KB_OUT)/kernel/sqlite_engine.o $(KB_OUT)/kernel/sqlite_outer.o $(KB_OUT)/kernel/sqlite_static.o $(KB_OUT)/kapi/kapi_db.o: $(SQLITE_GENERATED)
+$(KB_OUT)/kernel/sqlite_static.o: private KB_TU_FLAGS += -Ilib/sqlite3
+$(KB_OUT)/kernel/sqlite_outer.o: private KB_TU_FLAGS += -Ilib/sqlite3 -DOS32_SQLITE_STATIC
+# The bundled port hard-codes LITTLEENDIAN in three headers. Select the
+# upstream big-endian branches in a PPC-only quote include directory.
+KB_SF_INC := $(KB_OUT)/gen/softfloat
+KB_SF_HEADERS := $(addprefix $(KB_SF_INC)/,platform.h primitiveTypes.h softfloat_types.h)
+$(KB_SF_INC)/%.h: lib/softfloat/%.h
+	@mkdir -p $(@D)
+	sed 's/^#define LITTLEENDIAN 1$$/#undef LITTLEENDIAN/' $< > $@
+KB_SF_OBJS := $(addprefix $(KB_OUT)/,$(SOFTFLOAT_RESIDENT_SOURCES:.c=.o) lib/softfloat_bits.o)
+ifeq ($(KB_BODY_OUT),$(KB_OUT))
+KB_SF_OBJS += $(addprefix $(KB_OUT)/,$(SOFTFLOAT_CONV_SOURCES:.c=.o) lib/softfloat_abi.o)
+endif
+$(KB_SF_OBJS): $(KB_SF_HEADERS)
+$(KB_SF_OBJS): private KB_QUOTE_FLAGS := -I- -iquote $(KB_SF_INC) -iquote lib/softfloat
+
+ifneq ($(KB_BODY_OUT),$(KB_OUT))
+.PHONY: ppc-sqlite-refresh
+$(KB_GROUP).o: ppc-sqlite-refresh $(SQLITE_GENERATED)
+	@mkdir -p $(KB_BODY_OUT)
+	+@flock $(KB_BODY_OUT)/build.lock $(MAKE) KB_OUT=$(KB_BODY_OUT) KB_BODY_OUT=$(KB_BODY_OUT) KB_MUT_SRC= KB_MUT_FILE= KB_MUT_EXTRA_SRC= KB_MUT_EXTRA_FILE= KB_MUT_THIRD_SRC= KB_MUT_THIRD_FILE= $@
+else
+$(KB_HARD): $(SQLITE_GENERATED)
 $(KB_HARD) $(KB_GROUP).raw.o: build/features/sqlite-static.mk build/softfloat.mk
 $(KB_HARD): private KB_TU_FLAGS += -mhard-float -Os -Ilib/sqlite3 -Ilib/softfloat -Ifs
 $(KB_OUT)/lib/softfloat/s_roundPackToF64.o: private KB_TU_FLAGS += -Wno-unused-label
 $(KB_VFS).o $(KB_OUT)/lib/sqlite3/sqlite3.o: private KB_TU_FLAGS += -std=gnu89 -DNDEBUG -Wno-long-long -w -include lib/sqlite3/os32_sqlite_config.h
-$(KB_OUT)/kernel/sqlite_static.o: private KB_TU_FLAGS += -Ilib/sqlite3
-$(KB_OUT)/kernel/sqlite_outer.o: private KB_TU_FLAGS += -Ilib/sqlite3 -DOS32_SQLITE_STATIC
 $(KB_VFS).c: tools/gen_sqlite_imports.py lib/sqlite3/os32_sqlite_vfs.c
 	@mkdir -p $(@D)
 	python3 -B $< --static-vfs $@
@@ -88,24 +128,13 @@ $(KB_GROUP).o: $(KB_GROUP).raw.o tools/ppc/sqlite_attributes.py
 	@rm -f $@.tmp
 -include $(KB_HARD:.o=.d)
 endif
+endif
 
 KB_OBJ := $(addprefix $(KB_OUT)/,$(KB_ASM:.S=.o) $(KB_C:.c=.o))
 # The source lists and link order live in these files: a change there relinks the image.
 KB_SELECT_MK := build/select.mk build/sources/common.mk build/sources/order.mk build/sources/hooks.mk \
  build/arch/ppc-sources.mk build/platform/powermac.mk build/images/$(IMAGE).mk
 $(KB_OBJ) $(KB_ELF): $(KB_SELECT_MK)
-
-# Same machine flags as build/arch/ppc.mk:8 for every kernel TU (design section 4).
-KB_MACHINE := -mcpu=7450 -m32 -mbig-endian -msoft-float -mno-altivec -msdata=none \
- -ffreestanding -fno-pie -fno-stack-protector -nostdlib -fcommon -fsigned-char \
- -fno-short-enums
-KB_INC := $(if $(KB_EXEC),-I$(KB_GEN)/include -I$(KB_GEN)/sdk/include/os32) -I$(KB_OUT) -I. -Iinclude -Iarch/ppc -Iplatform/powermac -Isdk/include \
- -Isdk/include/os32 -Ikernel -Iinit -Ikernel/console -Ikernel/irq -Ikernel/time \
- -Imm -Ilib $(KB_INC_EXTRA)
-KB_FLAGS := -std=gnu11 $(KB_MACHINE) -fno-builtin -fno-asynchronous-unwind-tables \
- -O2 -Wall -Wextra -Werror -Werror=vla -Werror=implicit-int \
- -Werror=implicit-function-declaration -ffunction-sections -fdata-sections \
- -D__cdecl= -D__KERNEL_BUILD__ $(HOOK_DEFS) -DKBOOT_NEGATIVE=$(NEGATIVE) -DKBOOT_SHELL=$(KBOOT_SHELL) -DKBOOT_SH=$(KBOOT_SH) -DKBOOT_LINK=$(KBOOT_LINK) -MMD -MP $(KB_INC)
 
 .PHONY: all kernel audit
 all: kernel
@@ -168,7 +197,7 @@ $(KB_OUT)/lib/lz4.o: KB_TU_FLAGS += -O0
 $(KB_OUT)/kernel/console/console.o: KB_TU_FLAGS = -Wno-sign-compare
 $(KB_OUT)/%.o: %.c $(KB_OUT)/memmap_layout.h build/targets/ppc-powermac.mk build/sources/hooks.mk $(KB_MUT_FILE) $(KB_MUT_EXTRA_FILE) $(KB_MUT_THIRD_FILE)
 	@mkdir -p $(dir $@)
-	$(KB_CC) $(KB_FLAGS) $(KB_TU_FLAGS) -c $(call kb_src,$<) -o $@
+	$(KB_CC) $(KB_QUOTE_FLAGS) $(KB_FLAGS) $(KB_TU_FLAGS) -c $(call kb_src,$<) -o $@
 $(KB_OUT)/%.o: %.S $(KB_OUT)/memmap_layout.h build/targets/ppc-powermac.mk build/sources/hooks.mk $(KB_MUT_FILE) $(KB_MUT_EXTRA_FILE) $(KB_MUT_THIRD_FILE)
 	@mkdir -p $(dir $@)
 	$(KB_CC) $(KB_FLAGS) -c $(call kb_src,$<) -o $@
