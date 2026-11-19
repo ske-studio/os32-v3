@@ -184,7 +184,6 @@ ZERO_SLOTS = frozenset({
     'np2_detect',
     'np2_check_hostdrv',
     'ide_drive_present',
-    'mouse_available',
     'snd_bgm_is_playing',
     'gfx2_adapter_count',
     'db_mem_used',
