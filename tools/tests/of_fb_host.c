@@ -11,6 +11,8 @@
 #include "paging.h"
 #include "platform/powermac/display_text.h"
 
+static int current_app = 2;
+int appslot_cur(void) { return current_app; }
 static int failed;
 #define EXPECT(x) do { if (!(x)) { const char msg[] = "FAIL " #x "\n"; failed = 1; \
     __asm__ volatile("int $0x80" : : "a"(4), "b"(1), "c"(msg), "d"(sizeof(msg)-1) : "memory"); } } while (0)
@@ -263,9 +265,25 @@ static void provider(void)
     adapter.state = GFX2_AD_LOST;
     EXPECT(display_dual_outputs(&out, 1) == 1 && !out.live);
     adapter.state = GFX2_AD_OK;
+    EXPECT(!DISPLAY_V1_PRESENT_OK());
+    DISPLAY_V1_PUBLIC_INIT_OK();
+    EXPECT(DISPLAY_V1_PRESENT_OK());
+    current_app++;
+    EXPECT(!DISPLAY_V1_PRESENT_OK());
+    current_app--;
+    adapter.gen++;
+    EXPECT(!DISPLAY_V1_PRESENT_OK());
+    DISPLAY_V1_PUBLIC_INIT_OK();
+    EXPECT(DISPLAY_V1_PRESENT_OK());
+    display_provider_raster_reset();
+    EXPECT(!DISPLAY_V1_PRESENT_OK());
     gfx_backend_of_fb.shutdown(); EXPECT(!of_fb_ready() && !sync.used);
     gfx_backend_of_fb.prepare(); EXPECT(of_fb_ready());
     gfx_backend_of_fb.init(); EXPECT(sync.used);
+    pm_console_text_state(1, 1, 1, adapter.gen);
+    EXPECT(!DISPLAY_V1_PRESENT_OK());
+    pm_console_text_state(1, 1, 0, 0);
+    EXPECT(!DISPLAY_V1_PRESENT_OK());
     EXPECT(display_provider_init_failed(&gfx_backend_of_fb) < 0 && !of_fb_ready());
 }
 void _start(void)
