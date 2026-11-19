@@ -119,6 +119,9 @@ def mutation_test_sources(root):
 # The following helpers accept mutant data, not the suite's mutation-mode flag;
 # their callers run a normal fixture before calling the helper with each mutant.
 CONTROL_SKIP_ALLOW = {
+    ('tools/tests/' + 'test_gf_production.py', 'not mutant', 1):
+        'run_fixture runs the same fixture on both branches; the mutant branch only adds the '
+        'mismatch counter on stdin (gf-production-host log reduction, wip/gf5-log).',
     ('tools/tests/' + 'test_sqlite_vfs_identity.py', "os.environ.get('MUTATE', '0') != '1' and '--mutate' not in sys.argv", 1):
         'Returns after compiling and running every normal case; only mutations follow.',
     ('tools/checks/' + 'run.py', 'not ctx.mutate and elapsed > check.budget', 1):

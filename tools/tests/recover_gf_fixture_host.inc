@@ -12,7 +12,9 @@ static void print(const char *s)
     u32 result;
     __asm__ volatile("int $0x80" : "=a"(result) : "0"(4), "b"(1), "c"(s), "d"(n) : "memory");
 }
+#ifndef CHECK
 #define CHECK(x) do { if (!(x)) { print("FAIL " #x "\n"); failures++; } } while (0)
+#endif
 static struct gfinit_plan gf_fixture_buffer;
 static struct recover_profile gf_fixture_profile;
 static void gf_fixture_init(void)

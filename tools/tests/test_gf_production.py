@@ -25,6 +25,22 @@ def production_symbols_ok(symbols):
             all(line.split()[-1] in ('recover_gf_dev', 'recover_gf_second')
                 for line in symbols.splitlines() if ' recover_' in line))
 
+def run_fixture(exe, mutant):
+    if not mutant:
+        return host32.run([str(exe)], cwd=ROOT, timeout=180).returncode
+    with tempfile.TemporaryFile() as counter:
+        counter.write(b'\xff' * 4)
+        counter.seek(0)
+        rc = host32.run([str(exe)], cwd=ROOT, stdin=counter, timeout=180).returncode
+        counter.seek(0)
+        count = int.from_bytes(counter.read(4), 'little')
+        if count == 0xffffffff:
+            raise RuntimeError('production fixture did not initialize the mismatch counter')
+        if rc:
+            print(f'Failed checks: {count}', flush=True)
+        return rc
+
+
 def main(override=None, dev=13):
     flags = ['-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra',
              '-Werror', '-Werror=vla', '-ffreestanding', '-fno-pie',
@@ -67,6 +83,8 @@ def main(override=None, dev=13):
         backend=Path(tmp)/'backend.o'
         cc_cache.build(['gcc',*flags,'-Igfx','-DOS32_GEFORCE_MODULE','-c',
                         str(ROOT/'drivers/video/geforce/backend_geforce.c'),'-o',str(backend)],check=True)
+        if override:
+            flags.append('-DGF_PRODUCTION_MUTANT')
         sources = ['tools/tests/gf_accel_unbound_stubs.c', 'tools/tests/gf_production_host.c', 'kernel/sys.c',
                    'hwdev/gf/bus.c', 'hwdev/gf/resources.c', 'hwdev/gf/master.c',
                    'drivers/pci/pci_locate.c', 'kdebug/recover_gf_locate.c',
@@ -94,17 +112,17 @@ def main(override=None, dev=13):
                         '-o', str(contaminated)], check=True)
         contaminated_symbols = subprocess.check_output(['nm', '--defined-only', str(contaminated)], text=True)
         assert not production_symbols_ok(contaminated_symbols)
-        rc=host32.run([str(exe)], cwd=ROOT, timeout=180).returncode
+        rc=run_fixture(exe, override)
         if rc: return rc
         print('PASS production prepare -> foundation MMIO: byte/word/dword width/address/count, adjacent bytes and CR index/data', flush=True)
         cc_cache.build(['gcc', *flags, '-DPROD_ABSENT_TEST', '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
                         *[str(override[1] if override and p==override[0] else ROOT / p) for p in sources], str(native), str(devinit), str(mode), str(gamma), '-o', str(exe)], check=True)
-        if host32.run([str(exe)], cwd=ROOT, timeout=180).returncode: return 1
+        if run_fixture(exe, override): return 1
         print('PASS absent GPU: no PCI writes', flush=True)
         cc_cache.build(['gcc',*flags,'-Igfx','-I'+tmp,'-DGF_HAL_TEST','-nostdlib','-static','-no-pie',
                         '-Wl,--gc-sections',*[str(override[1] if override and p==override[0] else ROOT / p) for p in sources],str(native),str(devinit),str(mode),str(gamma),str(backend),
                         '-o',str(exe)],check=True)
-        return host32.run([str(exe)],cwd=ROOT,timeout=180).returncode
+        return run_fixture(exe, override)
 
 
 def mutations():
@@ -153,6 +171,16 @@ def mutations():
         ('hwdev/gf/devinit.c', 'if (width==2) *(volatile u16 *)(f->bar0+off)=(u16)value;', 'if (width==2) *(volatile u32 *)(f->bar0+off)=(u32)value;', 'resident u16 write widened'),
     ]
     with tempfile.TemporaryDirectory(prefix='gf-cw-production-mut-') as td:
+        # 正常対照 (ROLES §4-1): 変異の回と同じ組み方 (GF_PRODUCTION_MUTANT) で、手を入れていない写しが GREEN になること。
+        import re
+        rel0 = rows[0][0]
+        src0 = ROOT / rel0
+        copy0 = Path(td) / ('control-' + src0.name)
+        copy0.write_text(re.sub(r'#include "([^"\n]+)"',
+                                lambda m: '#include "' + str((src0.parent / m[1]).resolve()) + '"',
+                                src0.read_text()))
+        assert main((rel0, copy0)) == 0, 'mutant-build control must be GREEN'
+        print('CONTROL mutant build: GREEN')
         for rel, old, new, label in rows:
             source = ROOT / rel
             original = source.read_text()

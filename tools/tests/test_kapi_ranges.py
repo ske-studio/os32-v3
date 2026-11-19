@@ -3,13 +3,14 @@ Only private generated/source copies are mutated; compiler failure is not RED.
 """
 TARGET_SRC = ['sdk/gen_kapi.py', 'sdk/kapi.json', 'exec/exec.c', 'exec/ring3_str.c',
               'net/host_mailbox.c', 'kapi/kapi_host_notice.c',
-              'exec/access_walk.c', 'exec/redir_access.c', 'kapi/kapi_sys.c', 'tools/tests/kapi_ranges_host.c', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h']
+              'exec/access_walk.c', 'exec/redir_access.c', 'kapi/kapi_sysinfo.c', 'platform/pc98/platform_mem_stat.h', 'tools/tests/kapi_ranges_host.c', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h']
 from exec_source import exec_source
 import argparse
 import json
 import pathlib
 import subprocess
 import tempfile
+from mem_stat_source import mem_stat_source
 import test_access_walk as walk
 import test_kapi_out as generator
 
@@ -73,8 +74,8 @@ def run(runner, mutant=None, fixture_name="kapi_ranges_host.c"):
                               'int vfs_resource_prepare(VfsOps *ops, void *ctx)\n'
                               '{ (void)ops; (void)ctx; return VFS_OK; }\n' +
                               'static char cwd[VFS_MAX_PATH] = "/";\n' + vfs[start:end])
-        memstat = (ROOT / 'kapi/kapi_sys.c').read_text()
-        sources['memstat'] = memstat[memstat.index('STATIC_ASSERT(sizeof(MemStat)'):memstat.index('/* The generated __cdecl wrapper')].replace('i32 kapi_mem_stat(', 'static i32 mem_stat_body(')
+        memstat = (ROOT / 'kapi/kapi_sysinfo.c').read_text()
+        sources['memstat'] = mem_stat_source(memstat).replace('i32 kapi_mem_stat(', 'static i32 mem_stat_body(')
         if mutant and not no_out:
             name, key, old, new, expected = mutant
             assert old in sources[key], name
