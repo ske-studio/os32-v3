@@ -228,7 +228,7 @@ int input_legacy_wait(int mode, int interruptible);
 - SH は link 接続・TERM_OPEN・USB 初回打鍵を待たず起動し、agent 後起動にも既存の 2 秒 READY 再試行で対応する。同ID/古ID拒否・世代更新・FREEZE→OUT→END・失敗後の `echo $?` を維持する。
 - `shell_boot.c` は link-SH だけ開始待ちを外し、正常終了・fault の両方で owner/capture 回収済みの exec 復帰後に結果を報告して再起動する。異常時の break と pm_terminal_poll の永久ループには入らない。PLN1 の挙動は保持する。
 ### KAPI → platform → link/mailbox
-- 新 `platform/powermac/device_host.c` で platform_host の open/write/read_stage/status/close/owner_exit を同名 link_host_* へ委譲する。status は非待機で AGAIN を返す。これらの口では前景処理を行わない。
+- `kernel/dev/device_host.c`（6f で共通化） で platform_host の open/write/read_stage/status/close/owner_exit を同名 link_host_* へ委譲する。status は非待機で AGAIN を返す。これらの口では前景処理を行わない。
 - copy/owner は共通 kapi_host.c、notice の stage→copy→commit は共通 kapi_host_notice.c をそのまま使う。**kapi/kapi_host_notice.c は変更しない**。owner は res_owner_get、LOG/診断 owner=0 と SH owner を混ぜない。
 - 同じ TARGET の PLN1 SH では platform_host_* を NOSYS（void 回収は無処理）、host_mailbox_stage/commit を NOSYS、host_mailbox_latest_serial を 0 とする platform stub をリンクする。共通層へ KBOOT_LINK 判定を入れない。
 - exec_host_owner_exit は platform_host_owner_exit へ結ぶ。既存 con_sink_owner_exit の正常/異常終了で両 flag と reader を回収することを確認する。
