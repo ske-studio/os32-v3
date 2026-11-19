@@ -22,15 +22,15 @@ db_finalize db_last_error db_mem_used db_open db_open_existing db_prepare
 db_prepare_only db_step ext2_format ext2_format_at fm_note_off fm_note_on
 fm_play_mml fm_set_tone_num fm_startup_sound
 gfx2_check_op
-gfx2_cursor_image gfx2_cursor_move gfx2_cursor_show gfx2_dpms gfx2_fence_query
-gfx2_fence_wait gfx2_flip gfx2_gamma gfx2_lock
-gfx2_mode_set gfx2_palette gfx2_present gfx2_screen_surface
+gfx2_cursor_image gfx2_fence_query
+gfx2_fence_wait gfx2_flip gfx2_lock
+gfx2_mode_set gfx2_present gfx2_screen_surface
 gfx2_submit gfx2_surface_create gfx2_surface_desc gfx2_surface_free gfx2_unlock
-gfx2_vblank_wait gfx_add_dirty_rect gfx_get_framebuffer gfx_get_palette
+gfx_add_dirty_rect gfx_get_framebuffer gfx_get_palette
 gfx_hardware_scroll gfx_hw_blit gfx_hw_fill_rect gfx_hw_get gfx_hw_submit
 gfx_init gfx_init_200 gfx_lease_palette gfx_osri_show gfx_present
 gfx_present_dirty gfx_present_nosync gfx_present_raster gfx_present_rect
-gfx_screen_info gfx_screen_owner gfx_set_palette gfx_shutdown gfx_stats
+gfx_screen_info gfx_set_palette gfx_shutdown gfx_stats
 gui_call gui_register hdd_geom_info ide_drive_present
 ide_get_info ide_identify ide_init ide_read_sector ide_write_sector
 ide_write_sectors ime_dict_info ime_dict_suspend ime_feed_key ime_get_mode
@@ -38,8 +38,7 @@ ime_getchar ime_getkey ime_is_active ime_set_mode ime_set_render
 ime_switch_dict ime_toggle ime_trygetchar ime_trygetkey ime_user_clear
 ime_user_delete ime_user_export ime_user_list kcg_init kcg_load_font
 kcg_read_ank kcg_read_kanji kcg_set_scale kdebug_call loop_attach loop_detach
-loop_status mem_stat mouse_available mouse_cursor_hide mouse_cursor_set_mode
-mouse_cursor_show mouse_poll mouse_set_bounds np2_check_hostdrv np2_detect
+loop_status mem_stat mouse_available mouse_cursor_show mouse_poll np2_check_hostdrv np2_detect
 np2_get_clock np2_get_cpu np2_get_version
 pci_bind_info pci_cfg_read32 pci_count
 pci_get pcm_close pcm_open pcm_set_volume pcm_status pcm_write
@@ -56,6 +55,11 @@ GFX2_QUERY_PROVIDERS = frozenset("""
 gfx2_adapter_count gfx2_adapter_info gfx2_adapter_gen
 gfx2_caps gfx2_head_info gfx2_connector_info
 gfx2_connector_edid gfx2_mode_count gfx2_mode_get
+""".split())
+
+DISPLAY_PROVIDERS = frozenset("""
+gfx_screen_owner gfx2_vblank_wait gfx2_palette gfx2_gamma
+gfx2_cursor_move gfx2_cursor_show gfx2_dpms
 """.split())
 
 # Fixed allowlist: exec/*.c (including exec_*.inc), KBOOT_SHELL=1 TUs,
@@ -127,6 +131,7 @@ fd_redirect_get_buf_len
 fd_redirect_reset
 fd_redirect_to_buffer
 fd_redirect_to_file
+pointer_set_bounds pointer_cursor_set_mode pointer_cursor_hide
 input_diag
 input_diag_log
 input_dropped_count
@@ -330,7 +335,10 @@ def main():
         missing = GFX2_QUERY_PROVIDERS - undefined
         if missing:
             print('missing gfx2 query providers:', sorted(missing)); return 1
-        unexpected = undefined - (ALLOWED_UNDEFINED | GFX2_QUERY_PROVIDERS)
+        missing = DISPLAY_PROVIDERS - undefined
+        if missing:
+            print('missing display providers:', sorted(missing)); return 1
+        unexpected = undefined - (ALLOWED_UNDEFINED | GFX2_QUERY_PROVIDERS | DISPLAY_PROVIDERS)
         if unexpected:
             print('unexpected providers:', sorted(unexpected)); return 1
         print('undefined providers:', len(undefined))
