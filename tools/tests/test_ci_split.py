@@ -228,6 +228,9 @@ DOC_EXCLUSIONS = {
 
 def document_cases(source):
     workflow = yaml.safe_load(source)
+    concurrency = workflow.get('concurrency', {})
+    assert concurrency.get('group') == 'check-${{ github.event_name }}-${{ github.ref }}', 'isolate check runs by event and ref'
+    assert concurrency.get('cancel-in-progress') is True, 'cancel superseded check runs'
     # static-check は main でも再利用せずに毎回回す (煙試験、ユーザー決定 2026-11-19)。
     assert not any(s.get('id') == 'prior' or 'steps.prior' in s.get('if', '')
                    for s in workflow['jobs']['static-check']['steps']), 'static-check runs on main every time'
@@ -381,6 +384,8 @@ def main():
             ('reuse', "r['conclusion'] == 'success'", 'True', 'reuse failed run'),
             ('reuse', "r['head_branch'].startswith('wt/')", 'True', 'reuse non branch run'),
             ('reuse', '        reuse = False', '        reuse = True', 'reuse on API failure'),
+            ('check', 'concurrency:\n  group: check-${{ github.event_name }}-${{ github.ref }}\n'
+                      '  cancel-in-progress: true\n', '', 'remove check concurrency'),
             ('check', '          make check-docs-tree\n', '', 'missing docs tree'),
             ('workflow', 'shard: [0, 1, 2, 3, 4, 5]', 'shard: [0, 1, 2, 3, 4]', 'lose shard'),
             ('workflow', "}}-check-${{ matrix.shard }}\n", "}}-check-0\n", 'ccache shard collision'),
