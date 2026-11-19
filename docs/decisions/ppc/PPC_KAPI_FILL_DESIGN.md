@@ -1,5 +1,7 @@
 # PowerMac の KAPI の提供者を埋める計画 (確定)
 
+表示の復帰と受入は [表示フックの確定設計](DISPLAY_HOOKS_DESIGN.md) を参照。
+
 > 出所: ~/os32-tmp/run/ppc-kapi-fill/DESIGN.r4.md (設計の往復の確定版)。
 > 状態: **現行 (2026-11-18)** — 確定。astra 起草 r1〜r4、Opus 5.5 の独立レビュー 2 回、本線 PM の確認 (同日)。段の状態は票 TASK_PPC_KAPI_FILL が持つ。
 
@@ -179,7 +181,7 @@ A の場合も、対象像が持つ弱い代役に解決されていないこと
 |4a|PPC 公開表だけ|セル5本を既存 console.c の con_backend_scroll・readchar・reverse 等と fbcon に結線。tvram_clear の生成分岐も照合|
 |4k-i|本線 build/select.mk|FEATURE_KCG の FEATURE_PC98_DEVICES 必須条件を解き、PC-98 の選択と無効像も確認|
 |4k-ii|本線 kernel/dev/device_kcg.c|device_kcg.c の固定名転送を純移動し両像で同じ TU と kcg.c を選ぶ|
-|4b|装置 drivers/video/kcg/kcg_file.c → 共通 kernel/console/font_source.c|PPC は既存 KCG1 から kcg_rom_read_ank・kanji を供給。load は両像で NOSYS。既存 KCG1 をフォント供給元に選ぶ。font lease の close と exec 終了の回収を先に受入|
+|4b|共通 kernel/console/font_source_kcg.c|PPC は既存 KCG1 から kcg_rom_read_ank・kanji を供給。load は両像で NOSYS。既存 KCG1 をフォント供給元に選ぶ。font lease の close と exec 終了の回収を先に受入|
 |5a-i|本線 drivers/video/pc98/gfx_vram.c（その場の変更、NP21/W で確認）|present、rect、dirty、nosync、raster のクリップ・変更矩形管理を抽出。PC98 VRAM 書込と同期は装置に保持|
 |5a-ii|本線 gfx/ の共通 TU|分離した dirty 列・矩形処理だけを純移動。flip・VSYNC 待ちは装置側。x86 関数差0|
 |5b|本線 gfx/gfx_core.c → PPC platform/powermac/display_provider.c|共通 present が後端へ渡す。INDEX8 の変換・pitch は既存 OF FB を使う。200行指定の実現可能範囲を照会|

@@ -23,6 +23,62 @@ static int report_head(KernelAPI *api, const GFX2_HeadInfo *head)
     return report(api, line, 0);
 }
 
+static int create_tile(KernelAPI *api, u32 *sid)
+{
+    return api->gfx2_surface_create(0, 8, 2, GFX2_FMT_INDEX8,
+                                    GFX2_POOL_SYSMEM, GFX2_USE_RENDER2D, sid);
+}
+
+static int lifecycle(KernelAPI *api, const char *mode)
+{
+    const u32 mark = 0xa5a5a5a5;
+    u32 sid = mark, gen = mark, pitch = mark, done = mark, fence = mark;
+    u32 completed = mark, failed = mark, after = mark;
+    void *va = (void *)mark;
+    if (!strcmp(mode, "capacity")) {
+        unsigned count = 0;
+        int rc;
+        while (!(rc = create_tile(api, &sid))) count++;
+        if (!count || rc != OS32_ERR_NOSPC) return 20;
+        char line[48];
+        snprintf(line, sizeof(line), "free tiles %u\n", count);
+        return report(api, line, 0);
+    }
+    if (!strcmp(mode, "shutdown")) {
+        api->gfx_shutdown();
+        return report(api, "shutdown only\n", 0);
+    }
+    api->gfx_init();
+    if (api->gfx2_adapter_gen(0, &gen) || gen == mark) return 21;
+    int rc = create_tile(api, &sid);
+    if (rc == OS32_ERR_NOSYS) return report(api, "tile provider absent\n", 22);
+    if (rc || sid == mark) return 23;
+    if (!strcmp(mode, "fault")) {
+        report(api, "tile allocated\n", 0);
+        __asm__ volatile("trap" : : : "memory");
+        return 24;
+    }
+    if (!strcmp(mode, "leave")) return report(api, "tile left\n", 0);
+    GFX2_Op fill = {.op = GFX2_OP_FILL, .dst = sid, .dw = 8, .dh = 2,
+                    .rop = GFX2_ROP_PATCOPY, .fg = {.v = 7}};
+    if (api->gfx2_submit(0, &fill, 1, gen, &done, &fence) || done != 1 ||
+        fence == mark || api->gfx2_fence_wait(0, fence, 1000) ||
+        api->gfx2_fence_query(0, &completed, &failed) ||
+        completed == mark || failed == mark || (i32)(completed - fence) < 0 ||
+        (failed && (i32)(failed - fence) >= 0)) return 25;
+    if (api->gfx2_lock(sid, GFX2_LOCK_READONLY, &va, &pitch) ||
+        !va || va == (void *)mark || pitch == mark || pitch < 8) return 26;
+    int drawn = ((u8 *)va)[pitch + 7] == 7;
+    if (api->gfx2_unlock(sid) || !drawn || api->gfx2_surface_free(sid)) return 27;
+    api->exec_run("/bin/hello.bin ok");
+    int kind = -1, code = -1;
+    if (api->exec_last_result(&kind, &code) || kind != EXEC_KIND_EXITED || code != 7) return 28;
+    if (api->gfx2_adapter_gen(0, &after)) return 29;
+    if (after != gen) return report(api, "child changed generation\n", 30);
+    api->gfx_shutdown();
+    return report(api, "tile drawn\n", 0);
+}
+
 int main(int argc, char **argv, KernelAPI *api)
 {
     const u32 marker = 0xa5a5a5a5u;
@@ -31,6 +87,7 @@ int main(int argc, char **argv, KernelAPI *api)
     static const u16 gamma[768] = {0};
     GFX2_HeadInfo before, after;
 
+    if (argc == 2 && strcmp(argv[1], "head")) return lifecycle(api, argv[1]);
     if (api->gfx_screen_owner() != APP_ID_SHELL)
         return report(api, "DISPLAY owner failed\n", 1);
     if (api->gfx2_head_info(0, 0, &before) || !before.attached)

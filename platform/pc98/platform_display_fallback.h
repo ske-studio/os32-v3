@@ -2,4 +2,10 @@
 #ifndef OS32_DISPLAY_FALLBACK_H
 #define OS32_DISPLAY_FALLBACK_H
 #define DISPLAY_FALLBACK_BACKEND (&gfx_backend_pc98)
+/* PC-98 のテキスト面は別なので、表示を戻す操作は要らない。 */
+static inline void display_provider_console_return(void) { }
+
+/* exec の終了通知の通常文脈専用。割り込み・例外からは呼ばない。
+ * id は終了するアプリ。所有の返却前に呼び、確保・描画・ログが可能。 */
+static inline void display_provider_owner_exit(int id) { (void)id; }
 #endif

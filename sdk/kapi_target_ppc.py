@@ -17,9 +17,7 @@ PROVIDER_GROUPS = {
     'sys': (frozenset({'buz_on', 'buz_off'}), frozenset([])),
     'surface': (frozenset(), frozenset([])),
     'gfx': (frozenset({
-        'gfx_init',
         'gfx_init_200',
-        'gfx_shutdown',
         'gfx_present',
         'gfx_hardware_scroll',
         'gfx_present_rect',
@@ -86,13 +84,6 @@ PROVIDER_GROUPS = {
         'ext2_format',
         'ext2_format_at',
     }), frozenset(['ext2.h'])),
-    'kcg': (frozenset({
-        'kcg_init',
-        'kcg_set_scale',
-        'kcg_load_font',
-        'kcg_read_ank',
-        'kcg_read_kanji',
-    }), frozenset(['kcg_contract.h'])),
     'serialfs': (frozenset({
         'sfs_begin',
         'sfs_end',
@@ -159,18 +150,8 @@ PROVIDER_GROUPS = {
     # OF uses the shared display entry points for resource-free operations.
     'gfx2': (frozenset({
         'gfx2_check_op',
-        'gfx2_surface_create',
-        'gfx2_surface_free',
-        'gfx2_surface_desc',
-        'gfx2_screen_surface',
-        'gfx2_lock',
-        'gfx2_unlock',
-        'gfx2_submit',
-        'gfx2_fence_wait',
-        'gfx2_fence_query',
         'gfx2_mode_set',
         'gfx2_flip',
-        'gfx2_cursor_image',
         'gfx2_present',
     }), frozenset([])),
 }

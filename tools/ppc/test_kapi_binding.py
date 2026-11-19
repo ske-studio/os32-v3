@@ -22,23 +22,21 @@ db_finalize db_last_error db_mem_used db_open db_open_existing db_prepare
 db_prepare_only db_step ext2_format ext2_format_at fm_note_off fm_note_on
 fm_play_mml fm_set_tone_num fm_startup_sound
 gfx2_check_op
-gfx2_cursor_image gfx2_fence_query
-gfx2_fence_wait gfx2_flip gfx2_lock
-gfx2_mode_set gfx2_present gfx2_screen_surface
-gfx2_submit gfx2_surface_create gfx2_surface_desc gfx2_surface_free gfx2_unlock
+gfx2_flip
+gfx2_mode_set gfx2_present
 gfx_add_dirty_rect gfx_get_framebuffer gfx_get_palette
 gfx_hardware_scroll gfx_hw_blit gfx_hw_fill_rect gfx_hw_get gfx_hw_submit
-gfx_init gfx_init_200 gfx_lease_palette gfx_osri_show gfx_present
+gfx_init_200 gfx_lease_palette gfx_osri_show gfx_present
 gfx_present_dirty gfx_present_nosync gfx_present_raster gfx_present_rect
-gfx_screen_info gfx_set_palette gfx_shutdown gfx_stats
+gfx_screen_info gfx_set_palette gfx_stats
 gui_call gui_register hdd_geom_info ide_drive_present
 ide_get_info ide_identify ide_init ide_read_sector ide_write_sector
 ide_write_sectors ime_dict_info ime_dict_suspend ime_feed_key ime_get_mode
 ime_getchar ime_getkey ime_is_active ime_set_mode ime_set_render
 ime_switch_dict ime_toggle ime_trygetchar ime_trygetkey ime_user_clear
-ime_user_delete ime_user_export ime_user_list kcg_init kcg_load_font
-kcg_read_ank kcg_read_kanji kcg_set_scale kdebug_call loop_attach loop_detach
-loop_status mem_stat np2_check_hostdrv np2_detect
+ime_user_delete ime_user_export ime_user_list kdebug_call
+loop_attach loop_detach loop_status mem_stat
+np2_check_hostdrv np2_detect
 np2_get_clock np2_get_cpu np2_get_version
 pcm_close pcm_open pcm_set_volume pcm_status pcm_write
 sfs_begin
@@ -57,12 +55,16 @@ gfx2_connector_edid gfx2_mode_count gfx2_mode_get
 """.split())
 
 DISPLAY_PROVIDERS = frozenset("""
+gfx_kapi_init gfx_shutdown gfx2_surface_create gfx2_surface_free gfx2_surface_desc
+gfx2_screen_surface gfx2_lock gfx2_unlock gfx2_submit gfx2_fence_query gfx2_fence_wait gfx2_cursor_image
 gfx_screen_owner gfx2_vblank_wait gfx2_palette gfx2_gamma
 gfx2_cursor_move gfx2_cursor_show gfx2_dpms
 """.split())
 
 # Fixed allowlist: exec/*.c (including exec_*.inc), KBOOT_SHELL=1 TUs,
 # input_service, kbd_inject, con_sink, pipe_buffer, kapi_strings, kstring.
+KCG_PROVIDERS = frozenset("platform_kcg_init platform_kcg_set_scale platform_kcg_load_font kcg_read_ank kcg_read_kanji".split())
+
 ALLOWED_UNDEFINED = frozenset("""
 platform_pci_count platform_pci_get platform_pci_cfg_read32 kapi_pci_bind_info
 surface_api_bundle
@@ -272,6 +274,9 @@ def generate(tmp, mutation=None):
         helper.write_text(text.replace(old, "'buz_on', 'tvram_putchar_at'"))
     if mutation == 'putchar-absent':
         insert_group(helper, mutation, "    'cell_mut': (frozenset({'tvram_putchar_at'}), frozenset()),\n")
+    if mutation == 'kcg-absent':
+        insert_group(helper, mutation, "    'kcg': (frozenset({'kcg_init', 'kcg_set_scale', "
+                     "'kcg_load_font', 'kcg_read_ank', 'kcg_read_kanji'}), frozenset()),\n")
     if mutation == 'font-absent':
         group = ("    'console_font': (frozenset({"
                  "'font_source_open', 'font_source_read_at', 'font_source_close', "
@@ -341,10 +346,10 @@ def main():
         missing = GFX2_QUERY_PROVIDERS - undefined
         if missing:
             print('missing gfx2 query providers:', sorted(missing)); return 1
-        missing = DISPLAY_PROVIDERS - undefined
+        missing = (DISPLAY_PROVIDERS | KCG_PROVIDERS) - undefined
         if missing:
-            print('missing display providers:', sorted(missing)); return 1
-        unexpected = undefined - (ALLOWED_UNDEFINED | GFX2_QUERY_PROVIDERS | DISPLAY_PROVIDERS)
+            print('missing display or KCG providers:', sorted(missing)); return 1
+        unexpected = undefined - (ALLOWED_UNDEFINED | GFX2_QUERY_PROVIDERS | DISPLAY_PROVIDERS | KCG_PROVIDERS)
         if unexpected:
             print('unexpected providers:', sorted(unexpected)); return 1
         print('undefined providers:', len(undefined))

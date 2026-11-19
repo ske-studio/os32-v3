@@ -1,11 +1,11 @@
 /* Resident KCG1 provider for machines without a font ROM. */
-#include "kcg_file.h"
-#include "../../../kernel/console/font_source.h"
-#include "../../../kernel/console/font_guard.h"
-#include "../../../mm/kmalloc.h"
-#include "../../../lib/kstring.h"
+#include "font_source_kcg.h"
+#include "font_source.h"
+#include "font_guard.h"
+#include "../../mm/kmalloc.h"
+#include "../../lib/kstring.h"
 #include "os32_kapi_shared.h"
-#include "../../../lib/lz4.h"
+#include "../../lib/lz4.h"
 
 #define KCG_FILE_HEADER 16u
 #define KCG_FILE_KANJI_COUNT (94u * 94u)
@@ -73,6 +73,11 @@ int kcg_file_load(const char *path)
 {
     if (!path) return OS32_ERR_INVAL;
     return font_guard_run(load_guarded, (void *)path);
+}
+
+int kcg_file_ready(void)
+{
+    return resident != 0;
 }
 
 void kcg_file_unload(void)

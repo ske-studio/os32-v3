@@ -28,10 +28,10 @@ ABSENT = {
 }
 
 
-def absent_bindings(folder, out, case):
+def absent_bindings(folder, out, case, slots=None):
     source = (ROOT / 'sdk/kapi_target_ppc.py').read_text()
     anchor = 'PROVIDER_GROUPS = {\n'
-    slots = ABSENT[case]
+    slots = ABSENT[case] if slots is None else slots
     if source.count(anchor) != 1 or any(repr(name) in source for name in slots):
         raise RuntimeError(f'{case}: expected unique provider table and published slots')
     group = f"    'display_mut': (frozenset({slots!r}), frozenset()),\n"
@@ -120,16 +120,10 @@ def main():
             absent_bindings(folder, kernel / 'gen', case)
         mutation = []
         if case == EXIT_MODE_CASE:
-            anchor = 'int exec_gfx_owner_release(struct addrspace *as) { (void)as; return 0; }'
-            mutation = mutant_settings(folder, case, 'exec/absent/exec_gfx.c', anchor,
-                '#include "../../gfx/v2/gfx2_int.h"\n'
-                'int exec_gfx_owner_release(struct addrspace *as)\n'
-                '{\n'
-                '    struct gfx2_adapter *a = gfx2_adapter_get(0);\n'
-                '    (void)as;\n'
-                '    if (a) a->head[0].mode_id ^= 1u;\n'
-                '    return 0;\n'
-                '}')
+            anchor = '    int poison = 0;'
+            mutation = mutant_settings(folder, case, 'gfx/v2/owner_release.c', anchor,
+                anchor + '\n    struct gfx2_adapter *active = gfx2_active();'
+                         '\n    if (active) active->head[0].mode_id ^= 1u;')
         elf = build(kernel, *options, *mutation, 'kb-user', 'kernel')
         if case == 'normal':
             normal_elf = elf

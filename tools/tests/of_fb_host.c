@@ -38,6 +38,9 @@ int gfx2_heap_init(struct gfx2_heap *h, u32 base, u32 size)
 void gfx2_head_detach(struct gfx2_adapter *a, u32 h) { (void)a; (void)h; }
 void gfx2_adapter_recovered(struct gfx2_adapter *a) { a->state = GFX2_AD_OK; }
 void v1_bridge_rebind(void) { }
+/* P6: OF enter stops the text terminal through display_text_hide; no terminal is attached here. */
+int pm_console_park(void);
+int pm_console_park(void) { return 0; }
 static struct pm_rh_colors colors;
 const struct pm_rh_colors *pm_rh_full_colors(void) { return &colors; }
 void *kmemcpy(void *dst, const void *src, u32 n)

@@ -390,6 +390,7 @@ void gfx_shutdown(void)
     struct gfx2_adapter *a = gfx2_active();
     if (a) for (u32 h = 0; h < a->heads; h++) gfx2_head_detach(a, h);
     gfx_reinit_surfaces(1);
+    display_provider_console_return();
 }
 
 void geforce_display_stopped(void)
