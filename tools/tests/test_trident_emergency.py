@@ -79,6 +79,7 @@ MUTATIONS = [
      '    if (restore_rc) return;\n    /* #PF recovery failure must not suppress TVRAM fault output. */', 'entries'),
     ('owner-hook-late', EXIT, '    exec_gfx_owner_exit(id);\n    appslot_gfx_owner_exit(id);',
      '    appslot_gfx_owner_exit(id);\n    exec_gfx_owner_exit(id);', 'entries'),
+    ('sfs-owner-exit', EXIT, '    sfs_persistent_scope_owner_exit(id);', '', 'entries'),
     ('owner-hook-missing', EXIT, '    exec_gfx_owner_exit(id);', '', 'entries'),
     ('exit-order', EXIT,
      '    int restore_rc = exec_gfx_return_emergency((u32)id, kind);',

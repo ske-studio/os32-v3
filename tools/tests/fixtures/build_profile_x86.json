@@ -557,6 +557,7 @@
     "-O2",
     "-Wall",
     "-D__KERNEL_BUILD__",
+    "-DOS32_FEATURE_USERSHELL=1",
     "-DOS32_HOOK_GFX=1",
     "-DOS32_HOOK_GFX_POLL=1",
     "-DOS32_HOOK_SURFACE=1",
