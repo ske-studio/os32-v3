@@ -244,7 +244,7 @@ static u32 g_ata_limit = DISK_TOTAL;
 
 int platform_ide_range_ok(int drive, u32 lba, u32 count)
 {
-    if ((drive & 3) != 0) return 0;
+    if (drive != 0) return 0;
     if (count == 0) return 1;
     if (lba >= g_ata_limit) return 0;
     return count <= g_ata_limit - lba ? 1 : 0;
@@ -271,6 +271,7 @@ int bootinfo_part_geom(int ide_drive, u16 *heads, u16 *spt)
 #include "../../fs/ext2/ext2_inode.c"
 #include "../../fs/ext2/ext2_dir.c"
 #include "../../fs/ext2/ext2_file.c"
+#include "../../fs/ext2/ext2_medium_ide.c"
 #include "../../fs/ext2/ext2_fmt.c"
 
 /* ======================================================================== */
@@ -463,7 +464,14 @@ static void case_format_at_refuse(void)
     CHECK(ext2_format_at(0, DISK_TOTAL, 1u) == EXT2_ERR_INVAL);
     CHECK(ext2_format_at(0, 0xFFFFFFF0u, 0x20u) == EXT2_ERR_INVAL); /* 足すと 0 付近 */
     CHECK(ext2_format_at(0, 2016u, 0xFFFFFFFFu) == EXT2_ERR_INVAL);
-    CHECK(ext2_format_at(1, 2016, 16384) == EXT2_ERR_IO);            /* ドライブが無い */
+    pt_write(2016, 20160, 16, 63);
+    const int invalid_drives[] = {1, 2, 3, 0x10000, 0x0600, -1};
+    for (unsigned int i = 0; i < sizeof(invalid_drives) / sizeof(invalid_drives[0]); i++) {
+        int drive = invalid_drives[i];
+        int expected = (drive & 3) ? EXT2_ERR_IO : EXT2_ERR_INVAL;
+        CHECK(ext2_format(drive, 16384) == expected);
+        CHECK(ext2_format_at(drive, 2016, 16384) == expected);
+    }
     g_ide_total = 0;                                                 /* 総数の申告が無い */
     CHECK(ext2_format_at(0, 2016, 16384) == EXT2_ERR_INVAL);
     g_ide_total = DISK_TOTAL;
@@ -647,6 +655,10 @@ static u32 atou(const char *s)
 
 int os32_main(int argc, char **argv)
 {
+    CHECK(ext2_format(0, 16384) == EXT2_ERR_IO);
+    CHECK(ext2_format_at(0, 2016, 16384) == EXT2_ERR_IO);
+    CHECK(ext2_medium_register(EXT2_MEDIUM_HD, &ext2_medium_ide_ops) == 0);
+    CHECK(ext2_medium_register(EXT2_MEDIUM_HD, &ext2_medium_ide_ops) == -1);
     const char *c = argc > 1 ? argv[1] : "";
     if (streq(c, "find_bios")) case_find_bios();
     else if (streq(c, "find_fail")) case_find_fail();

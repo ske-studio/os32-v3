@@ -12,7 +12,7 @@ from ext2_oracle_cache import OracleCache, check_cache
 from kernel_includes import include_flags
 
 CHECK = dict(name='ext2-write-batch-host', tier=1, budget=171.2,
-             covers=['fs/ext2/**', 'tools/tests/ext2_write_batch_host.c',
+             covers=['include/ext2_medium_contract.h', 'fs/ext2/ext2_medium_ide.c', 'fs/ext2/**', 'tools/tests/ext2_write_batch_host.c',
                      'tools/tests/test_ext2_write_batch.py', 'tools/tests/host32.py',
                      'tools/tests/kernel_includes.py', 'tools/tests/hdd_pt_fake.h',
                      'tools/tests/b8_e2fsck.py', 'tools/tests/ext2_oracle_cache.py',

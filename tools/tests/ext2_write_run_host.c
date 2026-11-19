@@ -251,6 +251,7 @@ static void case_run_faults(int op)
 
 void start_c(long *sp)
 {
+    CHECK(ext2_medium_register(EXT2_MEDIUM_HD, &ext2_medium_ide_ops) == 0);
     const char *name = ((char **)&sp[1])[1];
     CHECK(sp[0] >= 2);
     if (sp[0] >= 3) dump_dir = ((char **)&sp[1])[2];
