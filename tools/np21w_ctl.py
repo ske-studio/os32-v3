@@ -4,13 +4,13 @@ np21w_ctl.py — NP21/W の停止・起動・起動完了待ち・FD / CD の出
 
 停止は NP21/W 自身に頼む (ai-debug フォークの `/api/instance` → `/api/quit`)。
 API が応答しないときだけ強制終了に落とし、その対象は **NP21W_DIR の exe と
-ExecutablePath が一致するプロセス**に限る。名前に np21 を含むだけのものや、別の
+ExecutablePath が一致し、対象枠の pid または ini 引数で特定できるプロセス**に限る。名前に np21 を含むだけのものや、別の
 場所に入っている NP21/W には触らない。
 
 起動は、媒体のロックで起動が途中で止まる事故 (.claude/skills/run-os32/SKILL.md#配備) を
 避けるため、次の順を必ず踏む。ini は**読むだけ**で書き換えない ([D2])。
 
-  1. この exe のプロセスが無いことを確かめる (残っていれば待ち、時間切れで失敗)
+  1. 対象枠のポートが HTTP に応答すれば起動を拒む
   2. 使う媒体が Windows 側から排他で**続けて --stable 秒** (既定 5、1 秒おき) 開ける
      まで待つ。安定した媒体も起動まで毎回プローブし続け、1 回でもロックされたら
      その媒体は数え直す。全部安定したら 2 秒置き、**起動の直前に全部をもう一度**
@@ -23,7 +23,7 @@ ExecutablePath が一致するプロセス**に限る。名前に np21 を含む
      渡し、期限を過ぎてから届いた応答は成功に数えない
 
 使い方:
-  python3 tools/np21w_ctl.py stop [--exe np21x64w.exe] [--timeout 60]
+  python3 tools/np21w_ctl.py stop [--pid N] [--exe np21x64w.exe] [--timeout 60]
   python3 tools/np21w_ctl.py start --ini np21x64w.ini [--fd os32_boot.d88]
                                    [--exe np21x64w.exe] [--timeout 60] [--wait-ready]
                                    [--stable 5] [--alive 10] [--api-timeout 60]
@@ -32,9 +32,10 @@ ExecutablePath が一致するプロセス**に限る。名前に np21 を含む
   python3 tools/np21w_ctl.py cd (<iso の名前 or パス> | --eject) [--drive N] [--ready-wait 15]
   python3 tools/np21w_ctl.py status [--ini np21x64w.ini] [--exe np21x64w.exe]
 
+  status は --ini 省略時に対象ポートの枠の ini から媒体を拾う。読めなければ既定媒体を使う。
   --ini / --fd / --exe / --insert は NP21W_DIR 直下の**名前**で渡す (パスは不可)。
   --api-timeout 0 は「API を待たない」(プロセスの生存だけを --alive 秒見る。
-  /api/dialog も含めて HTTP を 1 回も呼ばない)。
+  起動後は HTTP を呼ばない)。
   --timeout は --stable 以上であること (満たさなければ引数の誤り)。
 
 トークン (`/api/quit`・`/api/fdd`・`/api/cd` に必須):
@@ -83,6 +84,7 @@ import base64
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 import time
@@ -358,7 +360,7 @@ PROC_SCRIPT = r"""
 $ErrorActionPreference = 'Stop'
 function b64($s) { if ($s) { [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($s)) } else { '-' } }
 Get-CimInstance Win32_Process -Filter "Name LIKE '%np21%'" | ForEach-Object {
-  "proc`t$($_.ProcessId)`t$(b64 $_.Name)`t$(b64 $_.ExecutablePath)"
+  "proc`t$($_.ProcessId)`t$(b64 $_.Name)`t$(b64 $_.ExecutablePath)`t$(b64 $_.CommandLine)"
 }
 'end'
 """
@@ -381,7 +383,8 @@ def start_script(exe, args, cwd):
 
 
 class Proc(object):
-    def __init__(self, pid, name, exe):
+    def __init__(self, pid, name, exe, command=None):
+        self.command = command
         self.pid = pid
         self.name = name
         self.exe = exe       # None = 読めなかった (他ユーザー・権限)
@@ -431,9 +434,9 @@ class WinOps(object):
         procs = []
         for line in lines:
             parts = line.split('\t')
-            if len(parts) == 4 and parts[0] == 'proc' and parts[1].isdigit():
+            if len(parts) == 5 and parts[0] == 'proc' and parts[1].isdigit():
                 procs.append(Proc(int(parts[1]), _b64s(parts[2]) or '',
-                                  _b64s(parts[3])))
+                                  _b64s(parts[3]), _b64s(parts[4])))
         return procs
 
     def kill(self, pid):
@@ -665,33 +668,68 @@ class Ctl(object):
         for p in others:
             self.say('対象外: %s pid=%d exe=%s' % (p.name, p.pid, p.exe or '(読めない)'))
 
-    def wait_ours_gone(self, exe, deadline, pids=None):
+    def wait_ours_gone(self, exe, deadline, pid):
         def gone():
             ours, _ = self.split_procs(exe)
-            return not [p for p in ours if pids is None or p.pid in pids]
+            return all(p.pid != pid for p in ours)
         if self._until(deadline, gone):
             return
-        ours, _ = self.split_procs(exe)
-        raise CtlError('NP21/W (%s) のプロセスが期限までに消えない: %s'
-                       % (self.expected_exe(exe),
-                          ', '.join('pid=%d' % p.pid for p in ours)))
+        raise CtlError('NP21/W (%s) のプロセスが期限までに消えない: pid=%d'
+                       % (self.expected_exe(exe), pid))
 
-    def force_kill(self, exe, deadline):
+    def slot_ini(self):
+        offset = aidebug_port(getattr(self.http, 'base', None)) - 8025
+        if offset == 0:
+            return 'np21x64w.ini'
+        if offset in range(100, 701, 100):
+            return 'np21x64w-i%d.ini' % (1 + offset // 100)
+        return None
+
+    def ini_args(self, proc):
+        try:
+            args = shlex.split(proc.command or '', posix=False)[1:]
+        except ValueError:
+            return []
+        args = [arg.strip('"') for arg in args]
+        return [arg for arg in args if arg[:2].lower() == '/i']
+
+    def matches_ini(self, proc, ini):
+        if not ini:
+            return False
+        wanted = {win_norm(ini), win_norm(self.paths.win_of(ini))}
+        return any(win_norm(arg[2:]) in wanted for arg in self.ini_args(proc))
+
+    def force_kill(self, exe, deadline, pid, explicit=False):
         ours, others = self.split_procs(exe)
         self.note_others(others)
+        if pid is None and (ours or any(not p.exe and p.name.lower() == exe.lower()
+                                        for p in others)):
+            matches = [p for p in ours if self.matches_ini(p, self.slot_ini())]
+            if len(matches) != 1:
+                candidates = ['pid=%d %s' % (p.pid, ' '.join(self.ini_args(p)) or
+                                               ('(/i なし)' if p.command else '(引数不明)'))
+                              for p in ours]
+                raise CtlError('対象枠の pid を特定できない。%s の候補: %s。stop --pid N で指定'
+                               % (self.expected_exe(exe), ', '.join(candidates) or 'なし'))
+            pid = matches[0].pid
+        ours = [p for p in ours if p.pid == pid]
         if not ours:
-            self.say('stopped (この exe のプロセスは無い)')
+            if explicit:
+                raise CtlError('pid=%d の exe 一致を確認できない' % pid)
+            self.say('stopped (対象枠のプロセスは無い)')
             return 0
         for p in ours:
             self.say('taskkill /F %s pid=%d' % (p.exe, p.pid))
             self.ops.kill(p.pid)
-        self.wait_ours_gone(exe, deadline)
+        self.wait_ours_gone(exe, deadline, pid)
         self.say('stopped (強制終了)')
         return 0
 
-    def stop(self, exe=DEFAULT_EXE, timeout=60):
+    def stop(self, exe=DEFAULT_EXE, timeout=60, pid=None):
         check_name(exe, '--exe')
         deadline = self.clock() + timeout
+        if pid is not None:
+            return self.force_kill(exe, deadline, pid, explicit=True)
         want = win_norm(self.expected_exe(exe))
         state, inst = self.instance()
         if state == 'ok' and win_norm(inst.get('exe')) != want:
@@ -705,7 +743,7 @@ class Ctl(object):
                 headers = self.token_headers(inst)
             except CtlError as exc:
                 self.warn('%s — 強制終了に落とす' % exc)
-                return self.force_kill(exe, max(deadline, self.clock() + 10))
+                return self.force_kill(exe, max(deadline, self.clock() + 10), pid)
             st, js = self.api('POST', '/api/quit', body, timeout=10, headers=headers)
             if st == 409 and (js or {}).get('error', '').startswith('quit already requested'):
                 # 先に別の方針 (save=1) で受け付けられている。方針は最初のものに固定
@@ -717,12 +755,8 @@ class Ctl(object):
                 self.say('quit 要求 (save=0) pid=%d instance=%s'
                          % (pid, inst['instance_id']))
                 try:
-                    self.wait_ours_gone(exe, deadline, pids={pid})
+                    self.wait_ours_gone(exe, deadline, pid)
                     self.say('stopped (/api/quit)')
-                    ours, others = self.split_procs(exe)
-                    self.note_others(others)
-                    if ours:
-                        return self.force_kill(exe, deadline)
                     return 0
                 except CtlError:
                     self.warn('quit を受けたが pid=%d が期限までに消えない — 強制終了に落とす'
@@ -731,12 +765,12 @@ class Ctl(object):
                 self.warn('/api/quit が失敗した (HTTP %s %s) — 強制終了に落とす'
                           % (st, (js or {}).get('error', '')))
         elif state == 'old':
-            self.warn(OLD_FORK + ' — 強制終了に落とす (exe パスが一致するものだけ)')
+            self.warn(OLD_FORK + ' — 強制終了に落とす (対象枠の ini 引数で特定)')
         elif state == 'down':
-            self.say('aidebug が応答しない — 強制終了に落とす (exe パスが一致するものだけ)')
+            self.say('aidebug が応答しない — 強制終了に落とす (対象枠の ini 引数で特定)')
         else:
             self.warn('/api/instance が想定外の応答 (HTTP %s) — 強制終了に落とす' % inst)
-        return self.force_kill(exe, max(deadline, self.clock() + 10))
+        return self.force_kill(exe, max(deadline, self.clock() + 10), pid)
 
     # -- 媒体のロック ----------------------------------------------------------
     def _probe(self, paths, deadline):
@@ -841,19 +875,24 @@ class Ctl(object):
             raise CtlError('ini が無い: %s' % self.paths.wsl_of(ini), 2)
 
         deadline = self.clock() + timeout
-        ours, others = self.split_procs(exe)
-        self.note_others(others)
-        if ours:
-            self.say('この exe のプロセスが残っている — 消えるのを待つ: %s'
-                     % ', '.join('pid=%d' % p.pid for p in ours))
-            self.wait_ours_gone(exe, deadline)
+        slot_ini = self.slot_ini()
+        named_slot = re.fullmatch(r'np21x64w(-i[2-8])?\.ini', ini.lower())
+        if slot_ini and named_slot and ini.lower() != slot_ini:
+            raise CtlError('対象ポートの ini は %s (--ini %s)' % (slot_ini, ini), 2)
+        if self.instance()[0] != 'down':
+            raise CtlError('対象枠の aidebug ポートは使用中')
+        ours, _ = self.split_procs(exe)
+        for proc in ours:
+            if self.matches_ini(proc, ini):
+                raise CtlError('%s は既に起動中 (pid=%d)' % (ini, proc.pid))
         targets, _source = media_targets(self.paths, ini, fd, self.warn)
         self.wait_media(targets, deadline, stable)
         args = ['/i' + self.paths.win_of(ini)]
         if fd:
             args.append(self.paths.win_of(fd))
-        from nhd_profile import mark_guest_started
-        mark_guest_started()
+        if ini.lower() == 'np21x64w.ini':
+            from nhd_profile import mark_guest_started
+            mark_guest_started()
         pid = self.ops.start(self.expected_exe(exe), args, self.paths.win)
         self.say('started %s pid=%d (%s)' % (exe, pid, ' '.join(args)))
         self.verify_started(pid, exe, ini, alive, api_timeout)
@@ -1198,12 +1237,19 @@ class Ctl(object):
         if ini:
             check_name(ini, '--ini')
         ours, others = self.split_procs(exe)
+        state, inst = self.instance()
+        pid = int(inst['pid']) if state == 'ok' else None
+        ini = ini or self.slot_ini()
+        slot = [p for p in ours if p.pid == pid or self.matches_ini(p, ini)]
+        other_slots = [str(p.pid) for p in ours if p not in slot]
+        if other_slots:
+            self.say('ほかの枠: pid ' + ', '.join(other_slots))
+        ours = slot
         for p in ours:
             self.say('process: pid=%d %s' % (p.pid, p.exe))
         if not ours:
             self.say('process: none (%s)' % self.expected_exe(exe))
         self.note_others(others)
-        state, inst = self.instance()
         if state == 'ok':
             self.say('aidebug: up pid=%s id=%s started=%s'
                      % (inst.get('pid'), inst.get('instance_id'), inst.get('started_at')))
@@ -1256,10 +1302,11 @@ def build_parser():
                     '起動完了待ち・FD / CD の出し入れ・状態')
     sub = ap.add_subparsers(dest='cmd')
     sub.required = True
-    p = sub.add_parser('stop', help='/api/quit で止める。API が無ければ exe 一致のものだけ強制終了')
+    p = sub.add_parser('stop', help='/api/quit で止める。API が無ければ 対象枠だけ強制終了')
+    p.add_argument('--pid', type=int, help='exe の一致を確認し、指定 pid を強制終了')
     p.add_argument('--exe', default=DEFAULT_EXE)
     p.add_argument('--timeout', type=float, default=60)
-    p = sub.add_parser('start', help='プロセス 0・媒体の解放を確かめてから起動する')
+    p = sub.add_parser('start', help='対象ポート・媒体の解放を確かめてから起動する')
     p.add_argument('--ini', required=True, help='NP21W_DIR 直下の ini の名前')
     p.add_argument('--fd', help='FD 引数で渡すイメージの名前')
     p.add_argument('--exe', default=DEFAULT_EXE)
@@ -1295,7 +1342,7 @@ def build_parser():
     p.add_argument('--ready-wait', type=float, default=15,
                    help='/api/instance に反映されるまで待つ秒数 (既定 15、0 = 待たない)')
     p = sub.add_parser('status', help='プロセス・aidebug・ダイアログ・媒体のロック状態')
-    p.add_argument('--ini', default=None, help='媒体を拾う ini (既定: 既定の 3 つ)')
+    p.add_argument('--ini', default=None, help='媒体を拾う ini (既定: ポートに対応する ini)')
     p.add_argument('--exe', default=DEFAULT_EXE)
     return ap
 
@@ -1305,7 +1352,7 @@ def main(argv=None, ctl_factory=None):
     ctl = (ctl_factory or (lambda: Ctl(paths_from_env())))()
     try:
         if args.cmd == 'stop':
-            return ctl.stop(args.exe, args.timeout)
+            return ctl.stop(args.exe, args.timeout, args.pid)
         if args.cmd == 'start':
             return ctl.start(args.ini, args.fd, args.exe, args.timeout,
                              args.wait_ready, args.ready_timeout, args.stable,

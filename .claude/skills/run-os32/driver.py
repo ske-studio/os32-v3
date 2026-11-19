@@ -25,6 +25,7 @@ HostDrv 経由 (`make deploy` → ゲストの `hsync`) だけ。再起動は要
 
 import json
 import os
+import secrets
 import subprocess
 import sys
 import time
@@ -39,7 +40,7 @@ T_CMD = 60            # ゲストのシェル 1 行
 POLL_EVERY = 5        # --wait の見張りの間隔 (秒)
 POLL_MAX = 3600       # --wait の上限 (秒)
 # ゲスト → ホストの持ち出し口。ゲストの /host がホストのここに見える。
-HOSTDRV = "/mnt/c/os32"
+HOSTDRV = os.environ.get("HOSTDRV_DIR", "/mnt/c/os32")
 
 sys.path.insert(0, os.path.join(ROOT, "tools", "np21w_mcp"))
 import np21w_client  # noqa: E402
@@ -59,7 +60,7 @@ def _http(path, body=None, timeout=T_SHORT, raw=False):
             blob = np21w_client.post(path, body, timeout=timeout)
     except np21w_client.EmuError as exc:
         die("%s%s に届かない (%s)。NP21/W が動いているか、ini の "
-            "aidebug=true / aidbport=8025 を確かめる" % (BASE, path, exc))
+            "aidebug=true / aidbport の設定 を確かめる" % (BASE, path, exc))
     return blob if raw else blob.decode("utf-8", "replace")
 
 
@@ -104,7 +105,7 @@ def run_waited(line, quiet=False):
     ゲストの /host はホストの HOSTDRV にそのまま見えるので、ホスト側は
     ファイルの出現を待てばよい。
     """
-    tok = "drv%d" % (int(time.time() * 1000) % 1000000000)
+    tok = "drv%x-%s" % (os.getpid(), secrets.token_hex(8))
     done_guest = "/host/%s.done" % tok
     done_host = os.path.join(HOSTDRV, "%s.done" % tok)
     try:

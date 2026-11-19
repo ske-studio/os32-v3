@@ -193,7 +193,7 @@ def _np21w_dir():
     return None
 
 
-def token_file():
+def token_file(base=None):
     """WSL path of the token file: NP21W_AIDEBUG_TOKEN_FILE, then the
     token_file reported by GET /api/instance (C: path -> /mnt/c/...), then
     NP21W_DIR/np21w_aidebug_<port>.token."""
@@ -201,7 +201,7 @@ def token_file():
     if env:
         return env
     try:
-        inst = json.loads(get("/api/instance", timeout=5))
+        inst = json.loads(get("/api/instance", timeout=5, base=base))
         m = re.match(r"^([A-Za-z]):[\\/](.*)$", inst.get("token_file") or "")
         if m:
             return "/mnt/%s/%s" % (m.group(1).lower(),
@@ -212,14 +212,14 @@ def token_file():
     if not d:
         raise EmuError("cannot locate the aidebug token file: set "
                        "NP21W_AIDEBUG_TOKEN_FILE or NP21W_DIR")
-    m = re.search(r":(\d+)/*$", BASE)
+    m = re.search(r":(\d+)/*$", base or BASE)
     port = int(m.group(1)) if m else 8025
     return os.path.join(d.rstrip("/"), "np21w_aidebug_%d.token" % port)
 
 
-def token_headers():
+def token_headers(base=None):
     """{TOKEN_HEADER: token} for /api/quit, /api/fdd, /api/state/save."""
-    path = token_file()
+    path = token_file(base)
     try:
         with open(path, "r", errors="replace") as f:
             tok = f.read().strip()
