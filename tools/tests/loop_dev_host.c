@@ -26,6 +26,7 @@ static u8 image[1500000];
 static u32 file_size, position, last_read, last_write;
 static int reads, writes, read_limit, fail_read_at;
 static u32 fail_position;
+static int read_only;
 
 static void fill(void *p, u8 value, u32 n)
 { u8 *b = p; while (n--) *b++ = value; }
@@ -45,7 +46,7 @@ static void reset(u32 size)
 }
 int dev_register(Device *dev) { (void)dev; return 0; }
 void kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
-int vfs_open(const char *path, int mode) { (void)path; (void)mode; return 3; }
+int vfs_open(const char *path, int mode) { (void)path; return read_only && mode == O_RDWR ? -1 : 3; }
 void vfs_close(int fd) { (void)fd; }
 int vfs_fd_set_pinned(int fd, int on) { (void)fd; (void)on; return 0; }
 u32 vfs_get_size(int fd) { (void)fd; return file_size; }
@@ -128,7 +129,14 @@ static void test_raw_reads(void)
 {
     u8 buf[512];
     reset(655360);
+    CHECK(loop_dev_lba_writable(0) == 0);
+    read_only = 1;
     CHECK(loop_dev_attach("disk.img", 0) == 0);
+    CHECK(loop_dev_lba_writable(0) == 0);
+    loop_dev_detach(0);
+    read_only = 0;
+    CHECK(loop_dev_attach("disk.img", 0) == 0);
+    CHECK(loop_dev_lba_writable(0) == 1);
     const int limits[] = {-1, 0, 511, 512};
     for (u32 i = 0; i < 4; i++) {
         read_limit = limits[i]; fill(buf, 0xcc, sizeof(buf));
@@ -271,6 +279,10 @@ static void test_d88(void)
     off = d88_sector(off, 1, 2, 512, 0x55);
     d88_sector(off, 1, 3, 512, 0x66);
     CHECK(loop_dev_attach("disk.d88", 0) == 0);
+    int bps;
+    CHECK(loop_dev_status(0, 0, &bps) == 1 && bps == 512);
+    CHECK(loop_dev_is_writable(0) && !loop_dev_lba_writable(0));
+    CHECK(writes == 0);
     for (int i = 0; i < 6; i++) compare_d88(i, 0);
     u8 multi[4 * 512], expected[4 * 512];
     CHECK(loop_slots[0].dev.blk_read(&loop_slots[0].dev, 1, 4, multi) == 0);
