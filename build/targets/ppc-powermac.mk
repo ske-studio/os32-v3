@@ -48,7 +48,7 @@ endif
 ifneq ($(filter-out $(KB_C),$(RAM_ROOT_C)),)
 $(error RAM root sources are not selected: $(filter-out $(KB_C),$(RAM_ROOT_C)))
 endif
-KB_EXTRA := $(KB_OUT)/root_image_blob.o $(KB_OUT)/gen/kapi/kapi_generated.o
+KB_EXTRA := $(KB_OUT)/root_image_blob.o $(KB_OUT)/gen/kapi/kapi_generated.o $(KB_OUT)/build_id.o
 KB_GEN := $(KB_OUT)/gen
 KB_INC_EXTRA += -I$(KB_GEN)/include -I$(KB_GEN)/sdk/include/os32 \
  -Ikapi -Idrivers -Inet -Igfx -Iexec \
@@ -92,13 +92,19 @@ $(KB_OUT)/memmap_layout.h: include/memmap.h tools/gen_memmap.py
 	@mkdir -p $(dir $@)
 	python3 -B tools/gen_memmap.py --layout-header $@
 ifneq ($(KB_EXEC),)
+BUILD_ID_SRC := $(KB_OUT)/build_id.c
+include build/build-id.mk
 $(KB_GEN)/stamp: sdk/kapi.json sdk/gen_kapi.py sdk/kapi_abi_x86.py sdk/kapi_target_ppc.py sdk/target_profile.py
 	@mkdir -p $(KB_GEN)
 	python3 -B sdk/gen_kapi.py --target ppc-powermac --out-dir $(KB_GEN)
 	@touch $@
 $(KB_OBJ): $(KB_GEN)/stamp
+$(KB_OUT)/build_id.o: $(BUILD_ID_SRC)
+	@mkdir -p $(dir $@)
+	$(KB_CC) $(KB_FLAGS) -c $< -o $@
 $(KB_OUT)/gen/kapi/kapi_generated.o: $(KB_GEN)/stamp $(KB_OUT)/memmap_layout.h build/targets/ppc-powermac.mk
 	$(KB_CC) $(KB_FLAGS) -c $(KB_GEN)/kapi/kapi_generated.c -o $@
+-include $(KB_OUT)/build_id.d
 -include $(KB_OUT)/gen/kapi/kapi_generated.d
 endif
 # Mutation testing (tools/ppc/kboot_accept.py): compile KB_MUT_FILE in place of

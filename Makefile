@@ -42,6 +42,8 @@ endif
 # === サブ Makefile のインクルード ===
 include build/config.mk
 ifeq ($(ARCH),x86)
+BUILD_ID_SRC = $(BUILD_OUT)/build_id.c
+include build/build-id.mk
 ABI_CONTRACT_ORDER := abi-contract-probe
 endif
 # 製品の規則。TARGET_MK は試験が写しを差し替える時だけ与える。
