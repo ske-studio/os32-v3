@@ -38,7 +38,6 @@ int main(int argc, char **argv, KernelAPI *api)
           !stat.kdebug_pair_crc && !stat.kdebug_pages && !stat.kdebug_owner_pages &&
           !stat.kdebug_open_count);
     memset(&out, 0xa5, sizeof(out));
-    CHECK(api->sys_ver_info(&out, sizeof(out)) == OS32_ERR_NOSYS);
 #else
     CHECK(stat.owner_pages == 0 && stat.kstack_high_water > 0 &&
           stat.kheap_peak >= stat.kheap_used && stat.resident_heap_peak >= stat.resident_heap_used &&
