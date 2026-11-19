@@ -29,6 +29,41 @@ static int column(int h, int col, const char *wanted)
     return value && !strcmp(value, wanted);
 }
 
+static void signed_number(int value)
+{
+    if (value < 0) put("-");
+    number(value < 0 ? 0u - (u32)value : (u32)value);
+}
+
+static int conversion(int h, const char *name, const char *sql,
+                      const char *expected_text, int expected_int)
+{
+    int rc = api->db_prepare(h, sql);
+    const char *text = 0;
+    int value = 0;
+    if (rc == DB_STATUS_ROW) {
+        if (expected_text) {
+            text = api->db_column_text(h, 0);
+            if (text && !strcmp(text, expected_text)) return report(name, 1);
+        } else {
+            value = api->db_column_int(h, 0);
+            if (value == expected_int) return report(name, 1);
+        }
+    }
+
+    put("DB-"); put(name); put(" FAIL prepare="); signed_number(rc);
+    if (rc != DB_STATUS_ROW) {
+        const char *error = api->db_last_error(h);
+        put(" error="); put(error ? error : "(null)");
+    } else {
+        put(" value=");
+        if (expected_text) put(text ? text : "(null)");
+        else signed_number(value);
+    }
+    put("\n");
+    return 0;
+}
+
 static int count_rows(int h, int n)
 {
     return api->db_prepare(h, "SELECT count(*) FROM t") == DB_STATUS_ROW &&
@@ -96,11 +131,12 @@ int main(int argc, char **argv, KernelAPI *kernel)
     CHECK("STEP", !api->db_prepare_only(h, "SELECT i,a FROM t WHERE i=7") &&
           api->db_step(h) == DB_STATUS_ROW && api->db_column_int(h, 0) == 7 &&
           column(h, 1, "alpha") && api->db_step(h) == DB_STATUS_DONE);
-    CHECK("CONV", api->db_prepare(h, "SELECT CAST(3000000000*1.0 AS TEXT),"
-          "CAST(-3000000000*1.0 AS TEXT),3000000000.5%7,-3000000000.5%7,"
-          "CAST(0.1+0.2 AS TEXT)") == DB_STATUS_ROW && column(h, 0, "3000000000.0") &&
-          column(h, 1, "-3000000000.0") && api->db_column_int(h, 2) == 4 &&
-          api->db_column_int(h, 3) == -4 && column(h, 4, "0.3"));
+    int conv_ok = conversion(h, "CONV-POS", "SELECT printf('%!.15g', 3000000000*1.0)", "3000000000.0", 0);
+    conv_ok &= conversion(h, "CONV-NEG", "SELECT printf('%!.15g', -3000000000*1.0)", "-3000000000.0", 0);
+    conv_ok &= conversion(h, "CONV-MOD-POS", "SELECT 3000000000.5%7", 0, 4);
+    conv_ok &= conversion(h, "CONV-MOD-NEG", "SELECT -3000000000.5%7", 0, -4);
+    conv_ok &= conversion(h, "CONV-SUM", "SELECT printf('%!.15g', 0.1+0.2)", "0.3", 0);
+    if (!conv_ok) return 1;
     CHECK("FP-PRE", api->db_prepare(h, "SELECT 1.5") == DB_STATUS_ROW &&
           !api->db_prepare_only(h, "SELECT 2.5"));
     api->db_error_code(-2);

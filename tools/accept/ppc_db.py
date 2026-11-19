@@ -28,7 +28,7 @@ MUTATIONS = {
     'lost-code': [(DB, 'kapi/kapi_db_helpers.inc', 'db_open_fail[owner] = code;', '(void)code;')],
     'leak': [('exec/exec.c', 'exec/exec_finish.inc', 'exec_db_cleanup_owned(id);', ';')],
 }
-FIRST = 'OPEN CREATE INSERT BIND-RC BIND-VAL STEP CONV FP-PRE FPSCR NEXT ERR-RC ERR-CODE NAME CLOSE USED PENDING'.split()
+FIRST = 'OPEN CREATE INSERT BIND-RC BIND-VAL STEP CONV-POS CONV-NEG CONV-MOD-POS CONV-MOD-NEG CONV-SUM FP-PRE FPSCR NEXT ERR-RC ERR-CODE NAME CLOSE USED PENDING'.split()
 SECOND = ['STAT', 'REOPEN', 'RECLAIM']
 FAILURE = {'no-vfs': 'OPEN', 'static-bind': 'BIND-VAL', 'fp-owner': 'FPSCR',
            'empty-only': 'REOPEN', 'lost-code': 'ERR-CODE', 'leak': 'RECLAIM'}
