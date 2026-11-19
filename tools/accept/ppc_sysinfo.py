@@ -19,13 +19,13 @@ EXPECTED = {
 }
 
 
-def absent_bindings(folder, out):
+def absent_bindings(folder, out, slot='sys_time_now'):
     source = (ROOT / 'sdk/kapi_target_ppc.py').read_text()
-    anchor = "        'mem_stat',"
+    anchor = "        'sys_ver_info',"
     if source.count(anchor) != 1:
         raise RuntimeError('system_info mutation anchor must be unique')
     (folder / 'kapi_target_ppc.py').write_text(
-        source.replace(anchor, "        'sys_time_now',\n" + anchor))
+        source.replace(anchor, f"        {slot!r},\n" + anchor))
     launcher = ('import runpy, sys; import kapi_target_ppc; '
                 'sys.path.insert(0, "sdk"); runpy.run_path(sys.argv.pop(1), run_name="__main__")')
     subprocess.run([sys.executable, '-B', '-c', launcher, str(ROOT / 'sdk/gen_kapi.py'),
@@ -34,7 +34,7 @@ def absent_bindings(folder, out):
     (out / 'stamp').touch()
 
 
-def observe(elf, cpu, evidence, case):
+def observe(elf, cpu, evidence, case, app='infoprob', expected=EXPECTED):
     from link_sh_run import Session
     from run import require
     from usb_run import rsh_command
@@ -44,9 +44,9 @@ def observe(elf, cpu, evidence, case):
         session.start()
         session.wait(session.ready, 'sysinfo cui READY', 60)
         require(session.agent.operator.ready['mode'] == 'cui', 'sysinfo RSH mode')
-        body = rsh_command(session, '/bin/infoprob.bin')
+        body = rsh_command(session, f'/bin/{app}.bin')
         status = rsh_command(session, 'echo $?')
-        require((body.rstrip(b'\n'), status) == EXPECTED[case], repr((case, body, status)))
+        require((body.rstrip(b'\n'), status) == expected[case], repr((case, body, status)))
         session.q.call('quit')
         session.p.wait(timeout=5)
         require(session.p.returncode == 0, 'sysinfo QEMU exit')
@@ -59,7 +59,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--build-only', action='store_true')
     parser.add_argument('--mutate', action='store_true')
+    parser.add_argument('--memstat', action='store_true')
     args = parser.parse_args()
+    app = 'memstat' if args.memstat else 'infoprob'
+    expected = ({'normal': (b'MEMSTAT OK', b'0\n'),
+                 **{case: (b'MEMSTAT FAIL', b'1\n') for case in ('diag', 'boundary', 'absent')}}
+                if args.memstat else EXPECTED)
     cross = Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc'))
     if any(not os.access(cross / 'bin' / ('powerpc-elf-' + tool), os.X_OK)
            for tool in ('gcc', 'ld', 'ar', 'nm', 'objcopy', 'objdump')):
@@ -76,11 +81,11 @@ def main():
     work = Path(tempfile.mkdtemp(prefix='ppc-sysinfo-', dir=os.environ.get('TMPDIR') or None)).resolve()
     print('evidence=' + str(work), flush=True)
     user = work / 'user'
-    bins = [str(user / (app + '.bin')) for app in ('hello', 'fault', 'infoprob')]
+    bins = [str(user / (app + '.bin')) for app in ('hello', 'fault', app)]
     options = ['IMAGE=kboot-link-sh', 'KB_SH_OUT=' + str(user),
                'KB_ROOT_BINS=' + ' '.join(bins)]
     images = {}
-    for case in EXPECTED if args.mutate else ('normal',):
+    for case in expected if args.mutate else ('normal',):
         folder = work / case
         folder.mkdir()
         kernel = folder / 'kernel'
@@ -93,8 +98,19 @@ def main():
             mutation = mutant_settings(folder, case, 'kapi/kapi_sysinfo.c',
                                        'kapi_sys_build_time_copy(buf, (u32)size);',
                                        "buf[0] = 0;")
+        elif case == 'boundary':
+            mutation = mutant_settings(folder, case, 'kapi/kapi_sysinfo.c',
+                                       'size < MEMSTAT_MIN', 'size <= MEMSTAT_MIN')
+        elif case == 'diag':
+            header = 'platform/powermac/platform_mem_stat.h'
+            before = 'platform_mem_stat_diag(MemStat *snap)\n{\n    (void)snap;'
+            settings = mutant_settings(folder, case, header, before,
+                                       before.replace('(void)snap;', 'snap->kdebug_state = 1;'))
+            mutated_header = settings[1].split('=', 1)[1]
+            mutation = mutant_settings(folder, 'include-diag', 'kapi/kapi_sysinfo.c',
+                                       '"platform_mem_stat.h"', f'"{mutated_header}"')
         elif case == 'absent':
-            absent_bindings(folder, kernel / 'gen')
+            absent_bindings(folder, kernel / 'gen', 'mem_stat' if args.memstat else 'sys_time_now')
         elf = build(kernel, *options, *mutation, 'kb-user', 'kernel')
         digest = hashlib.sha256(elf.read_bytes()).hexdigest()
         if digest in images:
@@ -103,7 +119,7 @@ def main():
         print(f'{case} sha256={digest} {elf}', flush=True)
         if not args.build_only:
             for cpu in ('7450', '7455'):
-                observe(elf, cpu, folder / cpu, case)
+                observe(elf, cpu, folder / cpu, case, app, expected)
     return 0
 
 
