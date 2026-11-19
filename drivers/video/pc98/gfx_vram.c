@@ -10,19 +10,10 @@
 #include "os32_kapi_shared.h"
 #include "splash_raster.h"
 #include "io.h"
-
-/* Present reads the CLIENT and writes the DISPLAY synchronously. */
-static void gfx_v1_present_rect(int x, int y, int w, int h)
-{
-    (void)v1_bridge_begin(GFX2_ROLE_CLIENT, GFX2_CPU_R);
-    (void)v1_bridge_begin(GFX2_ROLE_DISPLAY, GFX2_CPU_W);
-    g_backend->present_rect(x, y, w, h);
-    v1_bridge_end(GFX2_ROLE_DISPLAY, GFX2_CPU_W, 0);
-    v1_bridge_end(GFX2_ROLE_CLIENT, GFX2_CPU_R, 0);
-}
+#include "gfx_present_contract.h"
 
 /* Compare with the last printed sample; a closed serial gate cannot consume it. */
-static void __attribute__((cold)) gfx_diag_px(void)
+void __attribute__((cold)) gfx_present_diag(void)
 {
     static u32 previous;
     static u32 generation;
@@ -45,46 +36,6 @@ static void __attribute__((cold)) gfx_diag_px(void)
 static void _flush_dirty_queue(void);
 static void _merge_prev_dirty(void);
 static void _flip_page(void);
-
-/* ======================================================================== */
-/*  パックド系バックエンド (PEGC 256 色 / H2) 用のダーティ転送               */
-/*                                                                          */
-/*  _flush_dirty_queue 以下は 4 プレーンの VRAM (0xA8000 系) を前提にした    */
-/*  9801 専用の転送エンジン。パックド 8bpp ではプレーンが無く、しかも        */
-/*  拡張グラフィックモードでは 0xA8000 が 32KB のバンク窓に化けているので、  */
-/*  同じ経路を走らせると画面が壊れる。gdi_test / gshell の WM は            */
-/*  gfx_present_dirty() を直接呼ぶ (KAPI) ため、ここで受けてバックエンドの   */
-/*  present_rect へ流す。                                                    */
-/*                                                                          */
-/*  戻り値: 1 = パックド系だったので処理した (呼び出し元は即 return)。       */
-/* ======================================================================== */
-static int _present_dirty_packed(void)
-{
-    u32 commits_before;
-    int i;
-
-    if (!g_backend || g_backend->bb_format == GFX_BB_PLANAR4) return 0;
-    if (!g_backend->present_rect) return 1;
-    if (dirty_queue.count == 0) return 1;
-
-    /* present_rect は 1 回ごとに commits を数えるが、契約 G7 の commits は
-     * 「present (commit) 回数」なので、この 1 回ぶんに揃える。 */
-    commits_before = gfx_counters.commits;
-    for (i = 0; i < dirty_queue.count; i++) {
-        const GFX_Rect *r = gfx_dirty_at(&dirty_queue, i);
-        gfx_v1_present_rect(r->x, r->y, r->w, r->h);
-    }
-    gfx_counters.commits = commits_before + 1;
-
-    dirty_queue.count = 0;
-    prev_dirty.count = 0;   /* ページフリップが無いのでステイルページも無い */
-    return 1;
-}
-
-void __cdecl gfx_add_dirty_rect(int x, int y, int w, int h)
-{
-    if (bb_b) gfx_dirty_add(&dirty_queue, GFX_WIDTH, gfx_current_height, x, y, w, h);
-}
 
 /* ======================================================================== */
 /*  ダーティレクタングルのVRAM転送 (VSYNC同期内等で呼ばれる)              */
@@ -151,10 +102,8 @@ static void _flip_page(void)
     gfx_counters.io_accesses += 2;   /* OUT ×2 (表示ページ + 描画ページ) */
 }
 
-static void _present_dirty(int sync)
+void gfx_planar_present_dirty(int sync)
 {
-    if (!bb_b) return;
-    if (_present_dirty_packed()) return;
     if (gfx_flip_enabled) {
         DirtyRectQueue snapshot;
         if (dirty_queue.count == 0 && prev_dirty.count == 0) return;
@@ -176,75 +125,8 @@ static void _present_dirty(int sync)
     }
 }
 
-/* ======================================================================== */
-/*  KAPI: 強制でダーティ領域をVSYNC同期転送する                           */
-/*  フリップモード時はVSYNC待ちなしで転送してページ切替。                 */
-/* ======================================================================== */
-void __cdecl gfx_present_dirty(void)
+void gfx_planar_present_raster(GFX_RasterPalTable *table)
 {
-    u32 before = gfx_counters.present_bytes;
-    _present_dirty(1);
-    gfx_diag_first_present(before);
-    gfx_diag_px();
-}
-
-/* ======================================================================== */
-/*  KAPI: VSYNC待ちなしでダーティ領域を即座にVRAM転送する                  */
-/*                                                                          */
-/*  フリップモード時: gfx_present_dirty()と同じ動作 (元々VSYNC不要)。    */
-/*  従来モード時: VSYNC待ちなしで即座に転送 (従来動作維持)。           */
-/* ======================================================================== */
-void __cdecl gfx_present_nosync(void)
-{
-    u32 before = gfx_counters.present_bytes;
-    _present_dirty(0);
-    gfx_diag_first_present(before);
-}
-
-/* ======================================================================== */
-/*  互換KAPI実装 (OS管理に寄せる)                                          */
-/* ======================================================================== */
-void __cdecl gfx_present(void)
-{
-    u32 before = gfx_counters.present_bytes;
-    if (!bb_b) goto diag;
-    /* HAL バックエンド経由 (契約 G4 の present_rect)。全画面 present。 */
-    if (g_backend && g_backend->present_rect)
-        gfx_v1_present_rect(0, 0, GFX_WIDTH, gfx_current_height);
-diag:
-    gfx_diag_first_present(before);
-    gfx_diag_px();
-}
-
-void __cdecl gfx_present_rect(int rx, int ry, int rw, int rh)
-{
-    u32 before = gfx_counters.present_bytes;
-    if (!bb_b) goto diag;
-    if (g_backend && g_backend->present_rect)
-        gfx_v1_present_rect(rx, ry, rw, rh);
-diag:
-    gfx_diag_first_present(before);
-    gfx_diag_px();
-}
-
-/* ======================================================================== */
-/*  KAPI: ラスタパレット付きVRAM転送                                        */
-/*                                                                          */
-/*  dirty は先に一括転送し、flip 後の次の VSYNC から共通再生器へ渡す。       */
-/*  line=0 は初期色、以後は可視行の絶対位置 (異なる行の間隔は 2 行以上)。   */
-/*  再生器が目標の 1 行前から HBLANK の 4 OUT までだけ IF=0 にし、           */
-/*  各保護区間後は IF=1 を 1 行以上確保する。VRAM 転送は保護しない。        */
-/*  入口 IF=0・判定不可・同期失敗・予算違反では転送済み像を静止提示する。   */
-/* ======================================================================== */
-void __cdecl gfx_present_raster(GFX_RasterPalTable *table)
-{
-    u32 before = gfx_counters.present_bytes;
-    if (!bb_b) goto diag;
-    if (!table || table->count <= 0 || table->count > GFX_RASTER_MAX_ENTRIES) goto diag;
-
-    /* packed 系は通常の dirty present に委譲する。 */
-    if (_present_dirty_packed()) goto diag;
-
     gfx_counters.commits++;
     if (gfx_flip_enabled) {
         if (dirty_queue.count > 0 || prev_dirty.count > 0) {
@@ -259,6 +141,4 @@ void __cdecl gfx_present_raster(GFX_RasterPalTable *table)
     }
 
     (void)pc98_splash_raster_table(pc98_splash_raster_state(), table);
-diag:
-    gfx_diag_first_present(before);
 }
