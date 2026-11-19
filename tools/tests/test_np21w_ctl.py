@@ -11,7 +11,8 @@ FakeHttp、時計と sleep は FakeClock に差し替える。実プロセス・
 `make check-tools-host` の discover からは除外して二重実行を避ける。
 """
 CHECK = dict(name='np21w-ctl-host', tier=1,
-    covers=['tools/np21w_ctl.py', 'tools/nhd_profile.py'],
+    covers=['tools/np21w_ctl.py', 'tools/nhd_profile.py', '.claude/skills/run-os32/driver.py',
+            'tools/np21w_mcp/np21w_client.py'],
     needs=[], budget=3.2,
     basis=['[D1]', '[D2]'],
     full_only=True,
@@ -35,6 +36,8 @@ SRC = HERE.parents[1] / 'np21w_ctl.py'
 sys.path.insert(0, str(HERE.parents[1]))
 import np21w_ctl as ctl  # noqa: E402  (--mutate が写しに差し替える)
 
+
+DRIVER = HERE.parents[2] / '.claude/skills/run-os32/driver.py'
 
 WIN = 'C:\\NP21'
 EXE = WIN + '\\np21x64w.exe'
@@ -398,6 +401,8 @@ INI_TEXT = (
 
 
 class Base(unittest.TestCase):
+    port = 8025
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.dir = self.tmp.name
@@ -425,6 +430,7 @@ class Base(unittest.TestCase):
     def make(self, http_mode='new', ops=None, **hk):
         self.ops = ops or FakeOps(self.fc)
         self.http = FakeHttp(self.ops, http_mode, **hk)
+        self.http.base = 'http://127.0.0.1:%d' % self.port
         return ctl.Ctl(ctl.Paths(self.dir, WIN), ops=self.ops, http=self.http,
                        sleep=self.fc.sleep, clock=self.fc.clock,
                        out=self.out, err=self.err, poll=1.0, settle=2.0)
@@ -433,7 +439,7 @@ class Base(unittest.TestCase):
         return ctl.main(argv, ctl_factory=lambda: c)
 
     def ours(self, pid=77):
-        return ctl.Proc(pid, 'np21x64w.exe', EXE)
+        return ctl.Proc(pid, 'np21x64w.exe', EXE, r'"C:\NP21\np21x64w.exe" "/iC:/NP21/NP21X64W.INI"')
 
 
 # ---------------------------------------------------------------------------
@@ -487,6 +493,8 @@ class IniParse(Base):
 
 # ---------------------------------------------------------------------------
 class LockWait(Base):
+    port = 9000  # test.ini を使う枠外のポート
+
     def test_waits_until_lock_is_released_then_starts(self):
         c = self.make(ops=FakeOps(self.fc, locks={NHD: 3}))
         rc = self.run_main(c, ['start', '--ini', 'test.ini', '--fd', 'os32_boot.d88'])
@@ -601,6 +609,8 @@ class LockWait(Base):
 
 # ---------------------------------------------------------------------------
 class ProbeBroken(Base):
+    port = 9000  # test.ini を使う枠外のポート
+
     PATHS = [NHD, ISO]
 
     def test_rc_nonzero_is_probe_error_with_stderr(self):
@@ -690,7 +700,7 @@ class Scripts(unittest.TestCase):
 
         def b(s):
             return base64.b64encode(s.encode('utf-8')).decode()
-        o = self.ops('proc\t10\t%s\t%s\nproc\t11\t%s\t-\nend\n'
+        o = self.ops('proc\t10\t%s\t%s\t-\nproc\t11\t%s\t-\t-\nend\n'
                      % (b('np21x64w.exe'), b(exe), b('np21w.exe')))
         procs = o.list_processes()
         self.assertEqual([(p.pid, p.name, p.exe) for p in procs],
@@ -705,13 +715,14 @@ class Scripts(unittest.TestCase):
 # ---------------------------------------------------------------------------
 class Stop(Base):
     def others(self):
-        return [ctl.Proc(90, 'np21x64w_helper.exe', WIN + '\\np21x64w_helper.exe'),
+        return [ctl.Proc(94, 'np21x64w.exe', EXE, r'"C:\NP21\np21x64w.exe" "/iC:\NP21\np21x64w-i2.ini"'),
+                ctl.Proc(90, 'np21x64w_helper.exe', WIN + '\\np21x64w_helper.exe'),
                 ctl.Proc(91, 'np21x64w.exe', 'D:\\Other\\np21x64w.exe'),
                 ctl.Proc(92, 'np21x64w.exe', None),
                 ctl.Proc(93, 'np21x64w.exe', WIN + '\\sub\\np21x64w.exe')]
 
     def test_quit_via_api(self):
-        ops = FakeOps(self.fc, running=[self.ours(77)])
+        ops = FakeOps(self.fc, running=[self.ours(77)] + self.others())
         c = self.make(ops=ops)
         self.assertEqual(self.run_main(c, ['stop']), 0, self.err.getvalue())
         quit_calls = [x for x in self.http.calls if x[1] == '/api/quit']
@@ -772,6 +783,36 @@ class Stop(Base):
         self.assertEqual(ops.killed, [])
         self.assertIn('別の場所', self.err.getvalue())
 
+    def test_unknown_process_fails_closed(self):
+        ops = FakeOps(self.fc, running=[ctl.Proc(77, 'np21x64w.exe', EXE)])
+        c = self.make('down', ops=ops)
+        self.assertEqual(self.run_main(c, ['stop']), 1)
+        self.assertEqual(ops.killed, [])
+
+    def test_explicit_pid_requires_matching_exe(self):
+        custom = ctl.Proc(76, 'np21x64w.exe', EXE, EXE + ' /itest.ini')
+        bare = ctl.Proc(77, 'np21x64w.exe', EXE, EXE)
+        ops = FakeOps(self.fc, running=[custom, bare] + self.others())
+        c = self.make('down', ops=ops)
+        self.assertEqual(self.run_main(c, ['stop']), 1)
+        for item in ('pid=76 /itest.ini', 'pid=77 (/i なし)', 'stop --pid'):
+            self.assertIn(item, self.err.getvalue())
+        self.http.calls.clear()
+        self.assertEqual(self.run_main(c, ['stop', '--pid', '91']), 1)
+        self.assertEqual(self.run_main(c, ['stop', '--pid', '76']), 0)
+        self.assertEqual(ops.killed, [76])
+        self.assertEqual(self.http.calls, [])
+
+    def test_second_port_ini_and_status(self):
+        ops = FakeOps(self.fc, running=[self.ours(77)] + self.others())
+        c = self.make('down', ops=ops)
+        self.http.base = 'http://localhost:8125'
+        c.status()
+        self.assertIn('ほかの枠: pid 77', self.out.getvalue())
+        self.assertIn('process: pid=94', self.out.getvalue())
+        self.assertEqual(c.stop(), 0)
+        self.assertEqual(ops.killed, [94])
+
     def test_nothing_running(self):
         c = self.make('down')
         self.assertEqual(self.run_main(c, ['stop']), 0)
@@ -786,28 +827,57 @@ class Stop(Base):
 
 # ---------------------------------------------------------------------------
 class StartProcesses(Base):
-    def test_waits_for_our_process_to_disappear(self):
-        ops = FakeOps(self.fc, running=[self.ours(77)], vanish={77: 3})
-        c = self.make(ops=ops)
-        self.assertEqual(self.run_main(c, ['start', '--ini', 'test.ini']), 0, self.err.getvalue())
-        self.assertEqual(len(ops.started), 1)
-
-    def test_refuses_while_our_process_remains(self):
+    def test_other_slot_does_not_block(self):
         ops = FakeOps(self.fc, running=[self.ours(77)])
         c = self.make('down', ops=ops)
-        rc = self.run_main(c, ['start', '--ini', 'test.ini', '--timeout', '5'])
-        self.assertEqual(rc, 1)
-        self.assertIn('pid=77', self.err.getvalue())
-        self.assertEqual(ops.probes, [])
+        self.http.base = 'http://localhost:8125'
+        self.write_ini(INI_TEXT, 'np21x64w-i2.ini')
+        self.assertEqual(c.start('np21x64w-i2.ini', api_timeout=0), 0)
+        self.assertIn(77, ops.running)
 
-    def test_other_location_does_not_block(self):
-        ops = FakeOps(self.fc, running=[ctl.Proc(91, 'np21x64w.exe', 'D:\\Other\\np21x64w.exe')])
-        c = self.make(ops=ops, inst_pid=PID)
-        self.assertEqual(self.run_main(c, ['start', '--ini', 'test.ini']), 0, self.err.getvalue())
-        self.assertIn('対象外', self.out.getvalue())
+    def test_unresponsive_same_ini_blocks(self):
+        ops = FakeOps(self.fc, running=[self.ours()])
+        c = self.make('down', ops=ops)
+        self.write_ini(INI_TEXT, 'np21x64w.ini')
+        with mock.patch('nhd_profile.mark_guest_started'):
+            self.assertEqual(self.run_main(c, ['start', '--ini', 'np21x64w.ini']), 1)
+        self.assertIn('pid=77', self.err.getvalue())
+        self.assertEqual(ops.started, [])
+
+    def test_derived_ini_starts_on_default_port(self):
+        c = self.make('down')
+        self.write_ini(INI_TEXT, 'crt31k.ini')
+        self.assertEqual(self.run_main(c, ['start', '--ini', 'crt31k.ini', '--api-timeout', '0']), 0)
+        self.assertEqual(self.ops.started[0][1], ['/i' + c.paths.win_of('crt31k.ini')])
+
+    def test_wrong_slot_ini_blocks(self):
+        c = self.make('down')
+        self.write_ini(INI_TEXT, 'np21x64w-i3.ini')
+        self.assertEqual(self.run_main(c, ['start', '--ini', 'np21x64w-i3.ini']), 2)
+        self.assertEqual(self.ops.started, [])
+
+    def test_occupied_port_blocks(self):
+        ops = FakeOps(self.fc, running=[self.ours(77)])
+        c = self.make(ops=ops)
+        self.write_ini(INI_TEXT, 'np21x64w.ini')
+        with mock.patch('nhd_profile.mark_guest_started'):
+            self.assertEqual(self.run_main(c, ['start', '--ini', 'np21x64w.ini']), 1)
+        self.assertEqual(ops.started, [])
+
+    def test_only_default_ini_invalidates_profile(self):
+        for ini in ('np21x64w.ini', 'np21x64w-i2.ini'):
+            Path(self.dir, ini).touch()
+            c = self.make('down')
+            if ini == 'np21x64w-i2.ini':
+                self.http.base = 'http://localhost:8125'
+            with mock.patch('nhd_profile.mark_guest_started') as mark:
+                c.start(ini, api_timeout=0)
+                self.assertEqual(mark.called, ini == 'np21x64w.ini')
 
 
 class AfterStart(Base):
+    port = 9000  # test.ini を使う枠外のポート
+
     def test_success_checks_instance_pid_and_exe(self):
         c = self.make()
         self.assertEqual(self.run_main(c, ['start', '--ini', 'test.ini']), 0, self.err.getvalue())
@@ -868,16 +938,16 @@ class AfterStart(Base):
         c = self.make('down')
         rc = self.run_main(c, ['start', '--ini', 'test.ini', '--api-timeout', '0'])
         self.assertEqual(rc, 0, self.err.getvalue())
-        self.assertEqual([x for x in self.http.calls if x[1] == '/api/instance'], [])
+        self.assertEqual([x[1] for x in self.http.calls], ['/api/instance'])
         self.assertIn('API は待たない', self.out.getvalue())
 
-    def test_api_timeout_zero_makes_no_http_call_at_all(self):
+    def test_api_timeout_zero_only_checks_port_before_start(self):
         # Codex P2: 0 なら /api/dialog も呼ばない (ダイアログが出ていても知らない)
         dlg = {'modal': True, 'title': 'T', 'text': ['stuck'], 'buttons': []}
         c = self.make(dialog=dlg)
         rc = self.run_main(c, ['start', '--ini', 'test.ini', '--api-timeout', '0'])
         self.assertEqual(rc, 0, self.err.getvalue())
-        self.assertEqual(self.http.calls, [])
+        self.assertEqual([x[1] for x in self.http.calls], ['/api/instance'])
 
     def test_instance_answer_after_api_deadline_is_not_success(self):
         # Codex P2: 各 HTTP が 4 秒かかり、API の期限は 3 秒。最初の応答は t=4 に
@@ -893,7 +963,7 @@ class AfterStart(Base):
         c = self.make(api_up_after=3)
         rc = self.run_main(c, ['start', '--ini', 'test.ini', '--api-timeout', '4'])
         self.assertEqual(rc, 0, self.err.getvalue())
-        inst_calls = [x for x in self.http.calls if x[1] == '/api/instance']
+        inst_calls = [x for x in self.http.calls[1:] if x[1] == '/api/instance']
         self.assertGreaterEqual(len(inst_calls), 2)
         # 1 秒おきに呼ぶので、渡す timeout は 5 → 残り時間 (4, 3, 2, ...) へ切り詰まる
         self.assertLessEqual(inst_calls[0][3], 4)
@@ -1157,10 +1227,11 @@ class Status(Base):
 
     def test_default_media_and_instance_and_dialog(self):
         ops = FakeOps(self.fc, running=[ctl.Proc(PID, 'np21x64w.exe', EXE)])
-        c = self.make(ops=ops, dialog={'modal': True, 'title': 'T', 'text': ['msg'],
+        c = self.make(ops=ops, inst_pid=str(PID), dialog={'modal': True, 'title': 'T', 'text': ['msg'],
                                        'buttons': [{'id': 1, 'text': 'OK'}]})
         self.assertEqual(self.run_main(c, ['status']), 0)
         out = self.out.getvalue()
+        self.assertIn('process: pid=%d' % PID, out)
         self.assertIn('媒体 (default):', out)
         self.assertIn('aidebug: up pid=%d' % PID, out)
         self.assertIn('dialog: open (modal)', out)
@@ -1484,7 +1555,43 @@ IDENTITY = ('# -----------------------------------------------------------------
             '# ---------------------------------------------------------------------------\n# パス (identity)\n',
             '恒等の対照 (コメントだけ変える — GREEN でなければ仕掛けが壊れている)')
 
+class SlotTools(unittest.TestCase):
+    def test_driver_host_and_completion_names(self):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(os.environ, HOSTDRV_DIR=tmp):
+            driver = _load(DRIVER)
+            self.assertEqual(driver.HOSTDRV, tmp)
+            names = []
+
+            def complete(path, body, timeout):
+                name = body.split()[-1]
+                self.assertTrue(name.startswith('/host/drv'))
+                names.append(name)
+                Path(tmp, Path(name).name).write_text('done 0')
+                return ''
+
+            with mock.patch.object(driver, '_http', complete):
+                for _ in range(2):
+                    self.assertEqual(driver.run_waited('ver', quiet=True), (0, 0))
+            self.assertNotEqual(*names)
+
+    def test_token_instance_uses_requested_base(self):
+        url = 'http://localhost:8125'
+        with mock.patch.dict(os.environ, NP21W_AIDEBUG_TOKEN_FILE=''), mock.patch.object(
+                ctl.emu, 'get', return_value=b'{"token_file":"C:/slot.token"}') as get:
+            self.assertEqual(ctl.emu.token_file(url), '/mnt/c/slot.token')
+            get.assert_called_once_with('/api/instance', timeout=5, base=url)
+
+
 MUTATIONS = [
+    ("if slot_ini and named_slot and ini.lower() != slot_ini:",
+     "if slot_ini and ini.lower() != slot_ini:", "8025 で派生 ini の起動を拒む"),
+    ("            if explicit:", "            if False:", "別 exe の指定 pid でも停止成功"),
+    ("            if self.matches_ini(proc, ini):", "            if False:",
+     "API 無応答の同一 ini でも起動する"),
+    ("        ours = [p for p in ours if p.pid == pid]", "        pass",
+     "別の枠も強制終了する"),
+    ("        if self.instance()[0] != 'down':",
+     "        if self.split_procs(exe)[0]:", "同じ exe の別枠でも起動を拒む"),
     ("                    free_since.pop(p, None)\n                    last_free.pop(p, None)",
      "                    pass",
      "ロックされても数え直さない (Codex 1 / Fable M1)"),
@@ -1677,10 +1784,27 @@ def _suite_failures(mod):
 
 
 def mutate():
+    global DRIVER
     original = SRC.read_text(encoding='utf-8')
     bad = 0
     red = green = uncounted = 0
     with tempfile.TemporaryDirectory(prefix='np21w-ctl-mut-') as tmp:
+        saved_driver = DRIVER
+        source = DRIVER.read_text()
+        anchor = 'os.environ.get("HOSTDRV_DIR", "/mnt/c/os32")'
+        if source.count(anchor) != 1:
+            raise ValueError('HOSTDRV mutation point changed')
+        DRIVER = Path(tmp) / 'driver_mut.py'
+        try:
+            DRIVER.write_text(source.replace(anchor, '"/mnt/c/os32"'))
+            result = unittest.TestResult()
+            SlotTools('test_driver_host_and_completion_names').run(result)
+            if len(result.failures) == 1 and not result.errors:
+                print('MUTATION HOSTDRV RED')
+            else:
+                bad += 1
+        finally:
+            DRIVER = saved_driver
         for i, (old, new, why) in enumerate([IDENTITY] + MUTATIONS):
             if original.count(old) != 1:
                 print('MUTATION %d NOT APPLICABLE (%d 箇所): %s' % (i, original.count(old), why))
