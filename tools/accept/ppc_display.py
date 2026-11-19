@@ -35,7 +35,11 @@ def absent_bindings(folder, out, case, slots=None):
     if source.count(anchor) != 1 or any(repr(name) in source for name in slots):
         raise RuntimeError(f'{case}: expected unique provider table and published slots')
     group = f"    'display_mut': (frozenset({slots!r}), frozenset()),\n"
-    (folder / 'kapi_target_ppc.py').write_text(source.replace(anchor, anchor + group))
+    generate_bindings(folder, out, source.replace(anchor, anchor + group))
+
+
+def generate_bindings(folder, out, source):
+    (folder / 'kapi_target_ppc.py').write_text(source)
     launcher = ('import runpy, sys; import kapi_target_ppc; '
                 'sys.path.insert(0, "sdk"); runpy.run_path(sys.argv.pop(1), run_name="__main__")')
     subprocess.run([sys.executable, '-B', '-c', launcher, str(ROOT / 'sdk/gen_kapi.py'),
@@ -52,7 +56,92 @@ def read_head(body, status, suffix):
     return tuple(map(int, match[1].split()))
 
 
-def observe(elf, cpu, evidence, case):
+# Provider-side mutations keep the public probe and its pixel oracle identical.
+PROVIDER = 'platform/powermac/display_provider.c'
+WIDTH = 'return m ? (int)m->width : 0;'
+GATE = ('return present_owner && present_owner == appslot_cur() &&\n'
+        '           a && present_generation == a->gen;')
+PRESENT_MUTATIONS = {
+    'width-768': (PROVIDER, WIDTH, 'return m ? (int)m->width - 32 : 0;'),
+    'width-640': (PROVIDER, WIDTH, 'return m ? 640 : 0;'),
+    'gate-open': (PROVIDER, GATE, 'return a != 0;'),
+    'owner-unchecked': (PROVIDER, 'present_owner == appslot_cur() &&', ''),
+}
+TARGET_FAILURE = ('platform/powermac/console_text.c', '\n    rc = open_target();',
+                  '\n    rc = -1;')
+PROBES = {'width-768': ('edge',), 'width-640': ('dirty', 'full'),
+          'gate-open': ('shutdown',), 'target-failure': ('shutdown',),
+          'target-gate-open': ('shutdown',), 'owner-unchecked': ('owner',),
+          'init-absent': ('init',), 'normal': ('edge', 'dirty', 'full', 'init',
+                                                'owner', 'shutdown')}
+
+
+def present_pixels(s, evidence, case, serial, modes):
+    from fb_pixel import Font, Terminal, read_ppm
+    from run import require
+    from usb_run import keyboard_actions, rsh_command
+
+    read_log = lambda: (evidence / 'serial-a.log').read_text(errors='replace')
+    fg = int(re.search(r'FB text ready generation=\d+ fg=(\d+)', serial)[1])
+    require(fg in (0, 255), 'OF palette endpoints')
+    s.wait(lambda: 'protocol=01' in read_log(), 'USB keyboard')
+    key, _ = keyboard_actions(s.q, read_log, s.wait, evidence)
+    black, white = bytes(3), bytes([255]) * 3
+    for mode in modes:
+        line = f'/bin/dispprb.bin v1-{mode} {fg}'
+        if case == 'init-absent':
+            rsh_command(s, line, b'DISPLAY init absent\n')
+            rsh_command(s, 'echo $?', b'42\n')
+            continue
+
+        def sample():
+            for phase in ('b', 'e'):
+                def waiting():
+                    base = s.word('bb_b')
+                    return base and s.word('bb_b', base - s.symbols['bb_b']) == (
+                        0x50524200 + ord(phase))
+                s.wait(waiting, f'{mode} checkpoint {phase}')
+                name = f'{mode}-{phase}'
+                path = evidence / (name + '.ppm')
+                if mode == 'shutdown' and not case.startswith('target-'):
+                    rows = s.screen(name).splitlines()
+                    prefix = '> ' + line
+                    row = next(i for i, text in enumerate(rows) if text.startswith(prefix))
+                    terminal = Terminal(read_ppm(path), Font(ROOT / 'assets/fonts/shino16.kcgfont'),
+                                        white, black, cursor_top=14)
+                    require(terminal.compare_text(row, 0, prefix) is None, 'restored command glyphs')
+                else:
+                    s.q.call('screendump', {'filename': str(path)})
+                frame = read_ppm(path)
+                require((frame.width, frame.height) == (800, 600), 'OF dimensions')
+                spans = {'edge': (768, 800), 'dirty': (704, 768), 'full': (704, 800),
+                         'init': (704, 712)}
+                left, right = spans.get(mode, (704, 704))
+                if mode == 'shutdown' and phase == 'b':
+                    message = ('FB off step=target rc=-1' if case.startswith('target-')
+                               else 'FB text ready generation=')
+                    require(message in read_log()[start:], 'console recovery path ' + case)
+                    baseline = frame
+                    require(any(frame.pixel(x, y) != white for y in range(560, 576)
+                                for x in range(704, 712)), 'shadow poison must be visible')
+                if phase == 'b' or case.startswith('width-'):
+                    right = left
+                elif case in ('gate-open', 'target-gate-open', 'owner-unchecked'):
+                    left, right = 704, 800
+                for y in range(560, 576):
+                    for x in range(704, 800):
+                        wanted = white if left <= x < right else black
+                        if mode == 'shutdown' and not left <= x < right:
+                            wanted = baseline.pixel(x, y)
+                        require(frame.pixel(x, y) == wanted, repr((case, mode, phase, x, y)))
+                key(phase)
+
+        start = len(read_log())
+        rsh_command(s, line, during=sample)
+        rsh_command(s, 'echo $?', b'0\n')
+
+
+def observe(elf, cpu, evidence, case, modes=()):
     from link_sh_run import Session
     from run import require
     from usb_run import rsh_command
@@ -78,10 +167,12 @@ def observe(elf, cpu, evidence, case):
             if case == EXIT_MODE_CASE:
                 expected = (before[0] ^ 1, *before[1:])
             require(after == expected, repr((case, 'head before/after exit', before, after)))
+        if modes:
+            present_pixels(session, evidence, case, serial, modes)
         session.q.call('quit')
         session.p.wait(timeout=5)
         require(session.p.returncode == 0, 'gfx2 QEMU exit')
-        print(('GREEN' if case == 'normal' else 'RED ' + case) + ' ' + cpu, flush=True)
+        print(('GREEN ' + case if case in ('normal', 'target-failure') else 'RED ' + case) + ' ' + cpu, flush=True)
     finally:
         session.close()
 
@@ -90,6 +181,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--build-only', action='store_true')
     parser.add_argument('--mutate', action='store_true')
+    parser.add_argument('--present', action='store_true', help='5b-C1 public present slots')
     args = parser.parse_args()
     cross = Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc'))
     if any(not os.access(cross / 'bin' / ('powerpc-elf-' + tool), os.X_OK)
@@ -110,20 +202,50 @@ def main():
     bins = [str(user / (app + '.bin')) for app in ('hello', 'fault', 'dispprb')]
     options = ['IMAGE=kboot-link-sh', 'KB_SH_OUT=' + str(user),
                'KB_ROOT_BINS=' + ' '.join(bins)]
+    os.environ.setdefault('SOURCE_DATE_EPOCH', '946684800')
     images = {}
+    unpublished = "'gfx_init_200'" in (ROOT / 'sdk/kapi_target_ppc.py').read_text()
+    if args.present and args.build_only and unpublished:
+        # 5b-B has no consumers on this base. Retain the two providers in
+        # every staging ELF so --gc-sections cannot discard their mutations.
+        options.append('KB_KEEP_RESET=-Wl,-u,display_provider_v1_width,-u,display_provider_present_ok')
     cases = ('normal', *EXPECTED, EXIT_MODE_CASE) if args.mutate else ('normal',)
+    if args.present and args.mutate:
+        cases += (*PRESENT_MUTATIONS, 'target-failure', 'target-gate-open')
+        # Before C1 the ordinary image already is the init-absent mutant.
+        # Build its positive control with just this slot temporarily bound.
+        cases += ('init-bound-control' if args.build_only and unpublished else 'init-absent',)
     for case in cases:
         folder = work / case
         folder.mkdir()
         kernel = folder / 'kernel'
         if case in ABSENT:
             absent_bindings(folder, kernel / 'gen', case)
+        if case == 'init-absent':
+            absent_bindings(folder, kernel / 'gen', case, ('gfx_init_200',))
+        if case == 'init-bound-control':
+            source = (ROOT / 'sdk/kapi_target_ppc.py').read_text()
+            slot = "        'gfx_init_200',\n"
+            if source.count(slot) != 1:
+                raise RuntimeError('expected one absent gfx_init_200 slot')
+            generate_bindings(folder, kernel / 'gen', source.replace(slot, ''))
         mutation = []
+        if case in PRESENT_MUTATIONS:
+            mutation = mutant_settings(folder, case, *PRESENT_MUTATIONS[case])
+        if case in ('target-failure', 'target-gate-open'):
+            mutation = mutant_settings(folder, case, *TARGET_FAILURE)
+            if case == 'target-gate-open':
+                extra = mutant_settings(folder, 'gate-open', *PRESENT_MUTATIONS['gate-open'])
+                mutation.extend(arg.replace('KB_MUT_', 'KB_MUT_EXTRA_', 1) for arg in extra)
         if case == EXIT_MODE_CASE:
             anchor = '    int poison = 0;'
             mutation = mutant_settings(folder, case, 'gfx/v2/owner_release.c', anchor,
                 anchor + '\n    struct gfx2_adapter *active = gfx2_active();'
                          '\n    if (active) active->head[0].mode_id ^= 1u;')
+        # Compare identical RAM-root bytes even when the ISO builder timestamps files.
+        if args.present and case != 'normal':
+            iso = str(normal_elf.parent / 'root.iso')
+            mutation.extend(['ROOT_ISO=' + iso, '--old-file=' + iso])
         elf = build(kernel, *options, *mutation, 'kb-user', 'kernel')
         if case == 'normal':
             normal_elf = elf
@@ -134,9 +256,11 @@ def main():
         print(f'{case} sha256={digest} {elf}', flush=True)
         if not args.build_only:
             for cpu in ('7450', '7455'):
-                observe(elf, cpu, folder / cpu, case)
+                modes = PROBES.get(case, ()) if args.present else ()
+                observe(elf, cpu, folder / cpu, case, modes)
                 if case != 'normal':
-                    observe(normal_elf, cpu, folder / (cpu + '-control'), 'normal')
+                    observe(normal_elf, cpu, folder / (cpu + '-control'), 'normal', modes)
+    print(f'{len(images)} distinct link-sh ELF images', flush=True)
     return 0
 
 

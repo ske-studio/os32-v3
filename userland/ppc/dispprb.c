@@ -79,6 +79,88 @@ static int lifecycle(KernelAPI *api, const char *mode)
     return report(api, "tile drawn\n", 0);
 }
 
+/* The CLIENT lease maps the INDEX8 RAM shadow. The host reads the first
+ * word as a rendezvous in the reserved band, and samples pixels by QMP. */
+static void checkpoint(KernelAPI *api, volatile u8 *shadow, int key)
+{
+    volatile u32 *word = (volatile u32 *)shadow;
+    u32 saved = *word;
+    *word = 0x50524200u + key;
+    while (api->kbd_getkey() != key) {}
+    *word = saved;
+}
+
+static void present_six(KernelAPI *api)
+{
+    static GFX_RasterPalTable raster = {.count = 1};
+    api->gfx_add_dirty_rect(704, 560, 8, 16);
+    api->gfx_present_dirty();
+    api->gfx_present_rect(704, 560, 8, 16);
+    api->gfx_present_nosync();
+    api->gfx_present_raster(&raster);
+    api->gfx_present();
+}
+
+static int present_probe(KernelAPI *api, const char *mode, u8 white)
+{
+    OS32_SurfaceQueryResult q;
+    OS32_LeaseView view;
+    GFX2_SurfaceDesc desc;
+    u32 sid = 0xa5a5a5a5, app, owner, generation;
+    int child = !strcmp(mode, "v1-child");
+    if (api->caller_identity(&app, &owner, &generation)) return 40;
+    if (child) {
+        if (api->gfx_screen_owner() == (int)app ||
+            api->gfx_screen_owner() == APP_ID_SHELL) return 41;
+        present_six(api);
+        return 0;
+    }
+    int shutdown = !strcmp(mode, "v1-shutdown");
+    if (!strcmp(mode, "v1-init")) api->gfx_init_200();
+    else api->gfx_init();
+    if (api->gfx_screen_owner() != (int)app)
+        return report(api, "DISPLAY init absent\n", 42);
+    if (api->gfx2_screen_surface(0, 0, GFX2_ROLE_CLIENT, &sid) ||
+        api->gfx2_surface_desc(sid, &desc) || desc.w != 800 || desc.h != 600)
+        return 43;
+    if (api->surface_query(OS32_SURFACE_CLIENT, &q) || q.count != 1 ||
+        q.desc[0].pitch < 800 || q.desc[0].height != 600 ||
+        api->surface_lease(OS32_SURFACE_CLIENT, &q.desc[0].ref, OS32_SURFACE_RW, &view))
+        return 44;
+    u32 pitch = q.desc[0].pitch;
+    u8 *shadow = (u8 *)view.planes[0];
+    for (int y = 560; y < 576; y++)
+        memset(shadow + y * pitch + 704, white ^ 255, 96);
+    api->gfx_present_rect(704, 560, 96, 16);
+    if (shutdown) {
+        if (api->surface_unlease(view.token)) return 45;
+        api->gfx_shutdown();
+        if (api->surface_query(OS32_SURFACE_CLIENT, &q) || q.count != 1 ||
+            api->surface_lease(OS32_SURFACE_CLIENT, &q.desc[0].ref, OS32_SURFACE_RW, &view))
+            return 46;
+        shadow = (u8 *)view.planes[0];
+        pitch = q.desc[0].pitch;
+    }
+    checkpoint(api, shadow, 'b');
+    for (int y = 560; y < 576; y++)
+        memset(shadow + y * pitch + 704, white, 96);
+    if (shutdown) present_six(api);
+    else if (!strcmp(mode, "v1-owner")) {
+        int kind, code;
+        api->exec_run("/bin/dispprb.bin v1-child");
+        if (api->exec_last_result(&kind, &code) || kind != EXEC_KIND_EXITED || code)
+            return 47;
+    } else if (!strcmp(mode, "v1-init")) api->gfx_present_rect(704, 560, 8, 16);
+    else if (!strcmp(mode, "v1-full")) api->gfx_present();
+    else {
+        int edge = !strcmp(mode, "v1-edge");
+        api->gfx_add_dirty_rect(edge ? 799 : 704, 560, edge ? 1 : 64, 16);
+        api->gfx_present_dirty();
+    }
+    checkpoint(api, shadow, 'e');
+    return api->surface_unlease(view.token) ? 48 : 0;
+}
+
 int main(int argc, char **argv, KernelAPI *api)
 {
     const u32 marker = 0xa5a5a5a5u;
@@ -87,6 +169,8 @@ int main(int argc, char **argv, KernelAPI *api)
     static const u16 gamma[768] = {0};
     GFX2_HeadInfo before, after;
 
+    if ((argc == 2 || argc == 3) && !strncmp(argv[1], "v1-", 3))
+        return present_probe(api, argv[1], argc == 3 && !strcmp(argv[2], "255") ? 255 : 0);
     if (argc == 2 && strcmp(argv[1], "head")) return lifecycle(api, argv[1]);
     if (api->gfx_screen_owner() != APP_ID_SHELL)
         return report(api, "DISPLAY owner failed\n", 1);
