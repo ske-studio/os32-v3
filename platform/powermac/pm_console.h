@@ -8,6 +8,8 @@ int pm_console_attach(struct gfx_console_target *, const KcgModuleApi *, unsigne
 int pm_console_park(void);
 int pm_console_retarget(struct gfx_console_target *);
 int pm_console_text_start(void);
+/* Size of the attached text target in pixels; 0 when none was opened. */
+void pm_console_text_size(u32 *width, u32 *height);
 void pm_console_detach(void);
 void pm_console_set_colors(u8 fg, u8 bg);
 void pm_console_stream_init(void);

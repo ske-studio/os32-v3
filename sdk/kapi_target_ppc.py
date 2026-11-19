@@ -154,11 +154,6 @@ PROVIDER_GROUPS = {
         'gfx2_flip',
         'gfx2_present',
     }), frozenset([])),
-    'pointer': (frozenset({
-        'mouse_available',
-        'mouse_poll',
-        'mouse_cursor_show',
-    }), frozenset()),
 }
 
 IME_SLOTS = PROVIDER_GROUPS['ime'][0]
@@ -170,7 +165,6 @@ ZERO_SLOTS = frozenset({
     'np2_detect',
     'np2_check_hostdrv',
     'ide_drive_present',
-    'mouse_available',
     'snd_bgm_is_playing',
     'gfx2_adapter_count',
     'db_mem_used',

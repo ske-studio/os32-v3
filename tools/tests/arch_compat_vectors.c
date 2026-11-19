@@ -63,7 +63,9 @@ int platform_clock_read_us(u32 *lo, u32 *hi) { *lo = fake_time; *hi = 0; return 
 #endif
 #include INPUT_SOURCE
 static int hits, bgm_stop_calls;
-static int pointer_present(void) { return 1; }
+#ifdef PC98_INPUT
+int snd_bgm_is_playing(void) { return 1; }
+#endif
 #define KAPI_HIT(slot) (hits = (slot))
 const char *kapi_db_last_error(int handle) { (void)handle; return "A:"; }
 int ime_is_active(void) { return 1; }
@@ -72,9 +74,6 @@ void snd_bgm_stop(void) { ++bgm_stop_calls; }
 #define REQUIRE(expr) do { if (!(expr)) return 64; } while (0)
 static int input_kapi(void)
 {
-    PointerOps pointer = empty_pointer;
-    pointer.available = pointer_present;
-    pointer_register(&pointer);
 #ifdef PC98_INPUT
     input_register(&pc98_input);
 #else
@@ -126,10 +125,10 @@ static int input_kapi(void)
     const char *drive = wrap_db_last_error(0);
 #ifdef PC98_INPUT
     REQUIRE(drive && drive[0] == 'A' && wrap_ime_is_active() == 1);
-    REQUIRE(wrap_mouse_available() == 1);
+    REQUIRE(wrap_snd_bgm_is_playing() == 1);
     wrap_snd_bgm_stop(); REQUIRE(bgm_stop_calls == 1);
 #else
-    REQUIRE(drive == 0 && wrap_mouse_available() == 0);
+    REQUIRE(drive == 0 && wrap_snd_bgm_is_playing() == 0);
     REQUIRE(wrap_ime_is_active() == OS32_ERR_NOSYS); /* not a ZERO_SLOTS query */
     wrap_snd_bgm_stop(); REQUIRE(bgm_stop_calls == 0);
 #endif

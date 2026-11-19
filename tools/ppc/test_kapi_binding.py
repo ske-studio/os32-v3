@@ -34,9 +34,9 @@ ide_get_info ide_identify ide_init ide_read_sector ide_write_sector
 ide_write_sectors ime_dict_info ime_dict_suspend ime_feed_key ime_get_mode
 ime_getchar ime_getkey ime_is_active ime_set_mode ime_set_render
 ime_switch_dict ime_toggle ime_trygetchar ime_trygetkey ime_user_clear
-ime_user_delete ime_user_export ime_user_list
-kdebug_call loop_attach loop_detach
-loop_status mem_stat mouse_available mouse_cursor_show mouse_poll np2_check_hostdrv np2_detect
+ime_user_delete ime_user_export ime_user_list kdebug_call
+loop_attach loop_detach loop_status mem_stat
+np2_check_hostdrv np2_detect
 np2_get_clock np2_get_cpu np2_get_version
 pcm_close pcm_open pcm_set_volume pcm_status pcm_write
 sfs_begin
@@ -133,7 +133,7 @@ fd_redirect_get_buf_len
 fd_redirect_reset
 fd_redirect_to_buffer
 fd_redirect_to_file
-pointer_set_bounds pointer_cursor_set_mode pointer_cursor_hide
+pointer_poll pointer_available pointer_cursor_show pointer_set_bounds pointer_cursor_set_mode pointer_cursor_hide
 input_diag
 input_diag_log
 input_dropped_count

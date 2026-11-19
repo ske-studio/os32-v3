@@ -111,7 +111,7 @@ def run(ctx):
             print('RED runtime split snapshot', flush=True)
             before = 'xmin = x0; ymin = y0; xmax = x1; ymax = y1;'
             assert sources[4].count(before) == 1
-            rc = build_poll(poll_source, sources[4].replace(before, 'if (x0 > x1 || y0 > y1) { irq_restore(f); return; } '+before))
+            rc = build_poll(poll_source, sources[4].replace(before, 'if (x0 > x1 || y0 > y1) { return; } '+before))
             assert 0 < rc < 128, rc
             print('RED runtime reversed bounds', flush=True)
             for before, after in [('mouse_ext_sample(seamless_hal_src, seamless_hal_generation, x, y, time_ms);', '(void)0;'),
@@ -138,6 +138,9 @@ def run(ctx):
                 print('RED runtime: '+old, flush=True)
             assert build_bus(bus_sources) == 0
             for index, old, new in [
+                (4, 'xmax = 639, ymax = 399', 'xmax = 640, ymax = 400'),
+                (4, 'set_bounds_locked(0, 0, x_max, y_max);', 'set_bounds_locked(0, 0, y_max, x_max);'),
+                (4, 'app_bounds_set = 1;', 'app_bounds_set = 0;'),
                 (4, 'seamless = !!enabled;', 'seamless = !enabled;'),
                 (4, 'mask |= buttons[i]', 'mask ^= buttons[i]'),
                 (4, 'buttons[e->src - 1] ^ e->buttons', 'buttons[e->src - 1] & e->buttons'),

@@ -69,7 +69,7 @@ def input_kapi(root, work, vectors, mutation=None):
     slot = next(i for i, a in enumerate(api) if a['name'] == 'kbd_trygetkey')
     # The absent-pointer sample must stay absent on PowerMac: path_get_drive was filled by
     # PPC_KAPI_FILL 1c; db_last_error is filled by 7b — pick another absent pointer slot then.
-    names = ('kbd_trygetkey', 'db_last_error', 'mouse_available', 'ime_is_active', 'snd_bgm_stop')
+    names = ('kbd_trygetkey', 'db_last_error', 'snd_bgm_is_playing', 'ime_is_active', 'snd_bgm_stop')
     statuses, slots = {}, []
     for provider, target in (('pc98', 'x86-pc98'), ('powermac', 'ppc-powermac')):
         output = work / target
@@ -148,7 +148,7 @@ def check_input_kapi(root, work, vectors, mutate):
             ('absent-pointer', 'sdk/kapi_target_ppc.py',
              '"*" in api["ret"]', 'False', {'pc98': 0, 'powermac': 64}),
             ('absent-query', 'sdk/kapi_target_ppc.py',
-             "    'ide_drive_present',\n    'mouse_available',", "    'ide_drive_present',", {'pc98': 0, 'powermac': 64}),
+             "\n    'snd_bgm_is_playing',\n", "\n", {'pc98': 0, 'powermac': 64}),
             ('ime-not-zero', 'sdk/kapi_target_ppc.py',
              'else "OS32_ERR_NOSYS"', 'else "0"', {'pc98': 0, 'powermac': 64}),
             ('absent-void', 'sdk/gen_kapi.py',
