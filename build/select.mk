@@ -157,8 +157,9 @@ ifneq ($(words $(filter 0 1,$(FEATURE_SQLITE))),1)
 $(error invalid FEATURE_SQLITE)
 endif
 ifeq ($(FEATURE_SQLITE),1)
-ifneq ($(ARCH)-$(PLATFORM),x86-pc98)
-$(error unsupported FEATURE_SQLITE on $(ARCH)-$(PLATFORM))
+# The SQLite VFS needs the filesystem services owned by EXEC.
+ifneq ($(FEATURE_EXEC),1)
+$(error FEATURE_SQLITE requires FEATURE_EXEC)
 endif
 include build/features/sqlite.mk
 endif
@@ -240,11 +241,6 @@ endif
 ifeq ($(FEATURE_FEP),1)
 ifneq ($(FEATURE_SQLITE),1)
 $(error FEATURE_FEP requires FEATURE_SQLITE)
-endif
-endif
-ifeq ($(FEATURE_SQLITE),1)
-ifneq ($(FEATURE_PC98_DEVICES),1)
-$(error FEATURE_SQLITE requires FEATURE_PC98_DEVICES)
 endif
 endif
 ifeq ($(FEATURE_HWDEV),1)

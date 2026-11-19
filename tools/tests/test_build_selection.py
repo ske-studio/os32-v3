@@ -14,6 +14,28 @@ ROOT = Path(__file__).resolve().parents[2]
 FEATURES = 'V86 X87 PC98_DEVICES GEFORCE TRIDENT CIRRUS PCM FM LAN KCG CD FEP SQLITE HWDEV KDEBUG'.split()
 
 
+def check_sqlite(root):
+    c_units = {'kernel/sqlite_engine.c', 'kernel/sqlite_outer.c', 'lib/sqlite3/os32_sqlite_test.c'}
+    x86_stack = 'lib/sqlite3/sqlite_stack.asm'
+    ppc_stack = 'arch/ppc/sqlite_stack_ppc.S'
+    ppc = ['ARCH=ppc', 'PLATFORM=powermac']
+    for arch, options in [('x86', ['FEATURE_' + f + '=0' for f in FEATURES if f != 'SQLITE']),
+                          ('ppc', [*ppc, 'IMAGE=kboot-link-sh'])]:
+        for enabled in (0, 1):
+            profile = query(root, [*options, f'FEATURE_SQLITE={enabled}'], config_only=True)
+            for unit in c_units:
+                assert profile['C_KERNEL'].count(unit) == enabled
+            assert profile['ASM_KERNEL'].count(x86_stack) == (enabled and arch == 'x86')
+            assert profile['GAS_KERNEL'].count(ppc_stack) == (enabled and arch == 'ppc')
+            assert x86_stack not in profile['GAS_KERNEL'] and ppc_stack not in profile['ASM_KERNEL']
+    try:
+        query(root, [*ppc, 'IMAGE=kboot-link', 'FEATURE_SQLITE=1'], config_only=True)
+    except subprocess.CalledProcessError as error:
+        assert 'FEATURE_SQLITE requires FEATURE_EXEC' in error.stderr
+    else:
+        raise AssertionError('SQLite selected without filesystem services')
+
+
 def check(root):
     expected = json.loads((ROOT / 'tools/tests/fixtures/build_profile_x86.json').read_text())
     actual = query(root)
@@ -45,7 +67,7 @@ def check(root):
     assert off['C_KERNEL'].count('kernel/dev/device_kcg.c') == 1
     assert 'drivers/video/kcg/kcg.c' not in off['C_KERNEL']
     assert not any('geforce/' in name for name in off['C_KERNEL'])
-    for assignments in (['FEATURE_UNKNOWN=1'], ['ARCH=ppc', 'PLATFORM=powermac', 'FEATURE_SQLITE=1'], ['ARCH=ppc','PLATFORM=powermac','FEATURE_V86=1'], ['FEATURE_KDEBUG=0'],
+    for assignments in (['FEATURE_UNKNOWN=1'], ['ARCH=ppc','PLATFORM=powermac','FEATURE_V86=1'], ['FEATURE_KDEBUG=0'],
                         ['FEATURE_LINK=0'], ['IMAGE=kboot-link'], ['IMAGE=unknown'],
                         ['ARCH=ppc', 'PLATFORM=powermac', 'IMAGE=pc98']):
         try:
@@ -140,11 +162,16 @@ if __name__ == '__main__':
         (root / 'Makefile').write_text('include build/config.mk\n-include build/kernel-objects.mk\ninclude build/kernel.mk\n')
         # No libgcc invocation is allowed by these query-only tests.
         check(root)
+        check_sqlite(root)
         check_user_selection(root)
         copy_kboot_names(root)
         check_kboot(root)
         if args.mutate:
             for path, anchor, mutant, expected, label in (
+                    ('build/select.mk', '$(error FEATURE_SQLITE requires FEATURE_EXEC)', '',
+                     AssertionError, 'missing SQLite prerequisite'),
+                    ('build/features/sqlite.mk', 'ifeq ($(ARCH),ppc)', 'ifeq ($(ARCH),other)',
+                     AssertionError, 'x86 SQLite stack on PowerPC'),
                     ('build/sources/hooks.mk', 'HOOK_gfx = $(FEATURE_EXEC)', 'HOOK_gfx = $(FEATURE_PC98_PENDING)',
                      AssertionError, 'PowerMac exec uses absent graphics hooks'),
                     ('build/platform/powermac.mk', 'platform/powermac/rh_observe.c platform/powermac/ofw.c',
@@ -166,7 +193,10 @@ if __name__ == '__main__':
                 assert source.count(anchor) == 1, (path, anchor)
                 target.write_text(source.replace(anchor, mutant))
                 try:
-                    check_kboot(root)
+                    if path in ('build/select.mk', 'build/features/sqlite.mk'):
+                        check_sqlite(root)
+                    else:
+                        check_kboot(root)
                 except expected:
                     print('RED: ' + label + ' rejected at runtime')
                 else:
