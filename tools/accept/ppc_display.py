@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tempfile
@@ -12,11 +13,12 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT / 'tools'), str(ROOT / 'tools/ppc')]
 
 EXPECTED = {
-    'normal': (b'DISPLAY OK\n\n', b'0\n'),
     'owner-absent': (b'DISPLAY owner failed\n', b'1\n'),
     'vblank-absent': (b'DISPLAY vblank validation failed\n', b'3\n'),
     'controls-absent': (b'DISPLAY ownership checks failed\n', b'5\n'),
 }
+
+EXIT_MODE_CASE = 'exit-mode-changed'
 
 ABSENT = {
     'owner-absent': ('gfx_screen_owner',),
@@ -42,6 +44,14 @@ def absent_bindings(folder, out, case):
     (out / 'stamp').touch()
 
 
+def read_head(body, status, suffix):
+    from run import require
+
+    match = re.fullmatch(rb'DISPLAY HEAD ((?:-?\d+ ){12}-?\d+)\n' + suffix, body)
+    require(match is not None and status == b'0\n', repr((body, status)))
+    return tuple(map(int, match[1].split()))
+
+
 def observe(elf, cpu, evidence, case):
     from link_sh_run import Session
     from run import require
@@ -54,11 +64,20 @@ def observe(elf, cpu, evidence, case):
         require(session.agent.operator.ready['mode'] == 'cui', 'display RSH mode')
         serial = (evidence / 'serial-a.log').read_text(errors='replace')
         require('FB text ready' in serial, 'INDEX8 framebuffer console attached')
-        # Re-run after child exit to check the shell still owns the OF head.
-        for _ in range(2 if case == 'normal' else 1):
-            body = rsh_command(session, '/bin/dispprb.bin')
-            status = rsh_command(session, 'echo $?')
+        body = rsh_command(session, '/bin/dispprb.bin')
+        status = rsh_command(session, 'echo $?')
+        if case in EXPECTED:
             require((body, status) == EXPECTED[case], repr((case, body, status)))
+        else:
+            before = read_head(body, status, b'DISPLAY OK\n\n')
+            # This child reads the OF head after the first child's teardown.
+            body = rsh_command(session, '/bin/dispprb.bin head')
+            status = rsh_command(session, 'echo $?')
+            after = read_head(body, status, b'\n')
+            expected = before
+            if case == EXIT_MODE_CASE:
+                expected = (before[0] ^ 1, *before[1:])
+            require(after == expected, repr((case, 'head before/after exit', before, after)))
         session.q.call('quit')
         session.p.wait(timeout=5)
         require(session.p.returncode == 0, 'gfx2 QEMU exit')
@@ -78,7 +97,7 @@ def main():
         print(f'SKIP: PowerPC toolchain unavailable at {cross}')
         return 3
 
-    from kboot_accept import build
+    from kboot_accept import build, mutant_settings
     from ppc_shm import guest_available
 
     if not args.build_only and not guest_available():
@@ -92,13 +111,26 @@ def main():
     options = ['IMAGE=kboot-link-sh', 'KB_SH_OUT=' + str(user),
                'KB_ROOT_BINS=' + ' '.join(bins)]
     images = {}
-    for case in EXPECTED if args.mutate else ('normal',):
+    cases = ('normal', *EXPECTED, EXIT_MODE_CASE) if args.mutate else ('normal',)
+    for case in cases:
         folder = work / case
         folder.mkdir()
         kernel = folder / 'kernel'
         if case in ABSENT:
             absent_bindings(folder, kernel / 'gen', case)
-        elf = build(kernel, *options, 'kb-user', 'kernel')
+        mutation = []
+        if case == EXIT_MODE_CASE:
+            anchor = 'int exec_gfx_owner_release(struct addrspace *as) { (void)as; return 0; }'
+            mutation = mutant_settings(folder, case, 'exec/absent/exec_gfx.c', anchor,
+                '#include "../../gfx/v2/gfx2_int.h"\n'
+                'int exec_gfx_owner_release(struct addrspace *as)\n'
+                '{\n'
+                '    struct gfx2_adapter *a = gfx2_adapter_get(0);\n'
+                '    (void)as;\n'
+                '    if (a) a->head[0].mode_id ^= 1u;\n'
+                '    return 0;\n'
+                '}')
+        elf = build(kernel, *options, *mutation, 'kb-user', 'kernel')
         if case == 'normal':
             normal_elf = elf
         digest = hashlib.sha256(elf.read_bytes()).hexdigest()
