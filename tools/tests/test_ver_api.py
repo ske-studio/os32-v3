@@ -52,6 +52,7 @@ static int ring3_user_ranges_writable(u32 p, u32 n, u32 p2, u32 n2) {
 static void ring3_fault_kill(void) { CHECK(0); }
 #define KAPI_HIT(n) CHECK((n) == 254)
 #define KAPI_OUT_LEN(p, n) ((u32)(n))
+#include "platform_build_info.h"
 #include "api.inc"
 #include "wrapper.inc"
 static void legacy(void) {
