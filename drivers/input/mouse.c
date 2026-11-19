@@ -49,7 +49,7 @@ void mouse_init(void)
 }
 
 __attribute__((noipa))
-u8 mouse_pointer_snapshot(i16 *dx, i16 *dy, u8 *buttons, i16 *x, i16 *y)
+static u8 mouse_pointer_snapshot(i16 *dx, i16 *dy, u8 *buttons, i16 *x, i16 *y)
 {
     if (mouse_mode_current == MOUSE_MODE_SEAMLESS) mouse_hal_seamless_poll();
     if (mouse_mode_current != MOUSE_MODE_NONE) {
@@ -64,10 +64,15 @@ int mouse_available(void)
 }
 
 __attribute__((noipa))
-void mouse_pointer_text_cell(i16 x, i16 y, int *cx, int *cy)
+static void mouse_pointer_text_cell(i16 x, i16 y, int *cx, int *cy)
 {
     *cx = x / KCG_ANK_W;
     *cy = y / KCG_ANK_H;
     if (*cx > TVRAM_COLS - 1) *cx = TVRAM_COLS - 1;
     if (*cy > TVRAM_ROWS - 1) *cy = TVRAM_ROWS - 1;
 }
+
+const MousePointerBackend pc98_mouse_backend = {
+    .snapshot = mouse_pointer_snapshot,
+    .text_cell = mouse_pointer_text_cell,
+};
