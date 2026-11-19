@@ -12,8 +12,7 @@ static int host_bad_string;
 u32 paging_pte_flags(u32 addr) { (void)addr; return host_flags; }
 const char *vfs_cwd(void) { return host_bad_string ? 0 : "/cwd"; }
 const char *vfs_devname(const char *p) { (void)p; return "hd0"; }
-const char *path_get_drive(void) { return "hd0"; }
-const char *path_get_cwd(void) { return "/path"; }
+static int host_device_present(const char *name) { return kstrcmp(name, "fd0") == 0; }
 void shell_service_wm_mark(void) { ring3_wm_shell_gen = 17; }
 volatile u32 ring3_wm_shell_gen;
 void *kmemset(void *p, int v, u32 n)
@@ -51,6 +50,9 @@ u32 *kdi_ptr___kernel_resident_end(void) { return &__kernel_resident_end; }
 
 void host_init(void)
 {
+    path_init();
+    path_set_device_validator(host_device_present);
+    path_set_cwd("/path");
     kapi = (KernelAPI *)KAPI_ADDR;
     kmemset(kapi, 0, sizeof(*kapi));
     kapi->shm_base = MEM_SHM_BASE;

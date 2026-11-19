@@ -2649,6 +2649,30 @@
       "context_safe": false,
       "index": 324,
       "retained": true
+    },
+    {
+      "stage": "S6",
+      "kind": "FUNC",
+      "symbol": "path_set_drive",
+      "source": "lib/path.h",
+      "context_safe": false,
+      "index": 325
+    },
+    {
+      "stage": "S6",
+      "kind": "FUNC",
+      "symbol": "path_set_cwd",
+      "source": "lib/path.h",
+      "context_safe": false,
+      "index": 326
+    },
+    {
+      "stage": "S6",
+      "kind": "FUNC",
+      "symbol": "path_init",
+      "source": "lib/path.h",
+      "context_safe": false,
+      "index": 327
     }
   ]
 }

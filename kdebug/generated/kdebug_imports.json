@@ -1,7 +1,7 @@
 {
-  "module_abi_gen": 4175674243,
+  "module_abi_gen": 1203884307,
   "stage": "S6",
-  "count": 325,
+  "count": 328,
   "imports": [
     {
       "stage": "S1",
@@ -4924,6 +4924,51 @@
       "type_ver": 1,
       "signature": "int pci_bar_get(u32 bus, u32 dev, u32 fn, u32 reg, void *out);",
       "source_declaration": "int pci_bar_get(u32 bus, u32 dev, u32 fn, u32 reg, void *out);",
+      "dtype": null,
+      "array": false
+    },
+    {
+      "stage": "S6",
+      "kind": 1,
+      "symbol": "path_set_drive",
+      "source": "lib/path.h",
+      "context_safe": false,
+      "index": 325,
+      "name": "path_set_drive",
+      "kind_name": "FUNC",
+      "type_ver": 1,
+      "signature": "int path_set_drive(const char *name);",
+      "source_declaration": "int path_set_drive(const char *name);",
+      "dtype": null,
+      "array": false
+    },
+    {
+      "stage": "S6",
+      "kind": 1,
+      "symbol": "path_set_cwd",
+      "source": "lib/path.h",
+      "context_safe": false,
+      "index": 326,
+      "name": "path_set_cwd",
+      "kind_name": "FUNC",
+      "type_ver": 1,
+      "signature": "void path_set_cwd(const char *p);",
+      "source_declaration": "void path_set_cwd(const char *p);",
+      "dtype": null,
+      "array": false
+    },
+    {
+      "stage": "S6",
+      "kind": 1,
+      "symbol": "path_init",
+      "source": "lib/path.h",
+      "context_safe": false,
+      "index": 327,
+      "name": "path_init",
+      "kind_name": "FUNC",
+      "type_ver": 1,
+      "signature": "void path_init(void);",
+      "source_declaration": "void path_init(void);",
       "dtype": null,
       "array": false
     }
