@@ -5,7 +5,7 @@ arithmetic execute the actual source. The collector is compiled as a whole TU.
 No probe, printing, allocation or scheduler symbols are provided to the link.
 """
 CHECK = dict(name='ver-collect-host', tier=4,
-    covers=['arch/x86/kernel/x87.h', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'platform/pc98/bootinfo_wire.h', 'platform/pc98/bootinfo_native.h', 'platform/pc98/boot_diag.c', 'include/boot_diag.h', 'kernel/ver_collect.c', 'kernel/ver_info.h', 'kernel/time/cpu_calibrate.c', 'kernel/time/cpu_calibrate.h', 'kernel/time/cpu_calibrate_math.c', 'kernel/time/cpu_calibrate_math.h', 'platform/pc98/pit_math.h', 'arch/x86/kernel/idt.h', 'platform/pc98/pit.h', 'include/kernel_tick.h', 'kernel/sqlite_engine.h', 'drivers/char/serial.h', 'drivers/sound/cs4231/pcm_cs4231.h', 'include/bootinfo.h', 'include/gfx_hal.h', 'include/types.h', 'lib/kstring.h', 'lib/kstring_asm.asm', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_ver_info.h', 'tools/tests/ver_collect_host.c', 'tools/tests/ver_test_utils.py', 'tools/tests/host32.py', 'include/port_service.h', 'include/console_output.h', 'kernel/port_service.c', 'tools/tests/kernel_includes.py'],
+    covers=['kernel/ver_format.c', 'arch/x86/kernel/x87.h', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'platform/pc98/bootinfo_wire.h', 'platform/pc98/bootinfo_native.h', 'platform/pc98/boot_diag.c', 'platform/pc98/ver_backend.c', 'platform/pc98/platform_ver.h', 'platform/powermac/platform_ver.h', 'include/ver_backend_contract.h', 'include/boot_diag.h', 'kernel/ver_collect.c', 'kernel/ver_info.h', 'kernel/time/cpu_calibrate.c', 'kernel/time/cpu_calibrate.h', 'kernel/time/cpu_calibrate_math.c', 'kernel/time/cpu_calibrate_math.h', 'platform/pc98/pit_math.h', 'arch/x86/kernel/idt.h', 'platform/pc98/pit.h', 'include/kernel_tick.h', 'kernel/sqlite_engine.h', 'drivers/char/serial.h', 'drivers/sound/cs4231/pcm_cs4231.h', 'include/bootinfo.h', 'include/gfx_hal.h', 'include/types.h', 'lib/kstring.h', 'lib/kstring_asm.asm', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_ver_info.h', 'tools/tests/ver_collect_host.c', 'tools/tests/ver_test_utils.py', 'tools/tests/host32.py', 'include/port_service.h', 'include/console_output.h', 'kernel/port_service.c', 'tools/tests/kernel_includes.py'],
     needs=[], budget=2.8,
     kind='characterization',
 )
@@ -61,7 +61,7 @@ void _start(void) {
 '''
 
 
-def build_run(fixture, runner, collector=None, calibration=None):
+def build_run(fixture, runner, collector=None, calibration=None, backend=None, platform="pc98"):
     with tempfile.TemporaryDirectory(prefix='ver-collect-') as directory:
         tmp = Path(directory)
         (tmp / 'support.h').write_text(SUPPORT)
@@ -70,6 +70,12 @@ def build_run(fixture, runner, collector=None, calibration=None):
         if collector is not None:
             (tmp / 'collector.c').write_text(collector)
             sources.append(str(tmp / 'collector.c'))
+            (tmp / 'platform_ver.h').write_bytes(
+                (ROOT / 'platform' / platform / 'platform_ver.h').read_bytes())
+            if platform == 'pc98':
+                (tmp / 'backend.c').write_text(backend if backend is not None else
+                    (ROOT / 'platform/pc98/ver_backend.c').read_text())
+                sources.extend([str(tmp / 'backend.c'), str(ROOT / 'kernel/ver_format.c')])
         if calibration is not None:
             (tmp / 'calibration.inc').write_text(calibration)
             (tmp / 'calibration_math.c').write_text(
@@ -100,7 +106,26 @@ def main():
         ('void cpu_calibrate(', 'u32 cpu_loops_per_tick(', 'int cpu_calibrate_used_fallback('))
     assert build_run(fixture, args.runner, collector=collector).returncode == 0
     assert build_run(CALIBRATION_FIXTURE, args.runner, calibration=calibration).returncode == 0
+    null_fixture = fixture[:fixture.index('void _start(void)')] + r'''
+void _start(void) {
+    VerSnapshot s;
+    fp = pcm = 1;
+    kmemset(&s, 0xcc, sizeof(s));
+    ver_collect(&s);
+    CHECK(!s.fpu_present && !s.pcm_present && !s.pit_valid);
+    CHECK(!s.pit_hz && !s.pit_input && !s.timer_kind);
+    CHECK(!s.irq_master_vector && !s.irq_slave_vector);
+    die(0);
+}
+'''
+    assert build_run(null_fixture, args.runner, collector, platform='powermac').returncode == 0
     if args.mutate:
+        old = 'if (backend && backend->collect)'
+        assert collector.count(old) == 1
+        mutant = collector.replace(old, 's->fpu_present = 1;\n    ' + old)
+        result = build_run(null_fixture, args.runner, mutant, platform='powermac')
+        assert result.returncode == 1 and 'FAIL: !s.fpu_present' in result.stdout
+        print('RED fabricated FPU without backend')
         old = ('s->ser_ready = port_get_status(&s->ser_mode, &s->ser_baud,\n'
                '                                     &s->ser_fifo) >= 0;')
         assert collector.count(old) == 1
@@ -109,8 +134,9 @@ def main():
         assert result.returncode == 1 and 'FAIL: s->ser_ready ==' in result.stdout
         print('RED serial ready always 1')
         old_vector = 's->irq_master_vector = diag.irq_master_vector;'
-        assert collector.count(old_vector) == 1
-        result = build_run(fixture, args.runner, collector=collector.replace(old_vector, 's->irq_master_vector = 0;'))
+        backend = (ROOT / 'platform/pc98/ver_backend.c').read_text()
+        assert backend.count(old_vector) == 1
+        result = build_run(fixture, args.runner, collector=collector, backend=backend.replace(old_vector, 's->irq_master_vector = 0;'))
         assert result.returncode == 1 and 'FAIL:' in result.stdout
         print('RED snapshot vector lost')
         old = 's_used_fallback = ticks == 0 || total / ticks < (u32)CALIBRATE_MIN_LPT;'

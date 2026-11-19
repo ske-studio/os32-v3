@@ -3,6 +3,9 @@
 #include "ver_info.h"
 #include "../lib/kstring.h"
 u32 input_irq(void) { return 1; }
+#include "platform_ver.h"
+static int no_backend;
+#define platform_ver_backend() (no_backend ? NULL : &pc98_ver_backend)
 #include "ver_format_source.c"
 #include "ver_state_source.c"
 
@@ -239,6 +242,13 @@ void _start(void)
     VerLineBuilder b = ver_line(&report, DBG, "test");
     ver_text(&b, "012345678901234567890123456789012345678901234567890123456789");
     CHECK(b.overflow); ver_end(&b); CHECK(equal(b.line->text, "test: unknown"));
+    no_backend = 1;
+    baseline(); formatted(4);
+    line(0, "OS32 v3.0-dev"); line(1, expected[8].text);
+    line(2, expected[9].text); line(3, expected[10].text);
+    CHECK(report.lines[0].kind == OS32_VER_HEAD);
+    for (u32 i = 1; i < 4; i++) CHECK(report.lines[i].kind == ID);
+    s.boot_ok = 0; formatted(3);
     say("PASS formatter: exact rows/kinds, all states, maxima, CRC, local fallback\n");
     die(0);
 }

@@ -11,6 +11,10 @@
 #include "bootinfo.h"
 #include "bootinfo_native.h"
 #include "kstring.h"
+#include "module/module.h"
+
+u32 input_irq(void) { return 1; }
+const char *kdebug_state_name(int state) { (void)state; return "UNKNOWN"; }
 
 static struct pit_setup saved_pit;
 static u32 calls[8];

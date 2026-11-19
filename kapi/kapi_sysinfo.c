@@ -6,6 +6,7 @@
 #include "sys.h"
 #include "exec.h"
 #include "kapi_sysinfo.h"
+#include "ver_info.h"
 #include "appslot.h"
 #include "redir_access.h"
 #include "exec_heap.h"
@@ -243,5 +244,17 @@ int kapi_sys_time_now(u32 *lo, u32 *hi)
     if (rc != 0) return rc;                 /* 負のときは出力を書かない */
     *lo = snap_lo;
     *hi = snap_hi;
+    return 0;
+}
+
+/* The generated __cdecl wrapper supplies the existing output-range check. */
+int __cdecl kapi_sys_ver_info(void *out, u32 size)
+{
+    VerSnapshot s;
+
+    if (!out || size != sizeof(OS32_VerInfo)) return OS32_ERR_INVAL;
+    ver_collect(&s);
+    kapi_sys_build_time_copy(s.build, sizeof(s.build));
+    ver_format(&s, (OS32_VerInfo *)out);
     return 0;
 }
