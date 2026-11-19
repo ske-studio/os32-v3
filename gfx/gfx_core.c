@@ -35,7 +35,7 @@ extern int appslot_gfx_owner(void);
 /* ======================================================================== */
 u8 *bb_b, *bb_r, *bb_g, *bb_i;
 
-int gfx_current_height = GFX_HEIGHT;  /* current display: 200/400/480 */
+int gfx_current_height = GFX_HEIGHT;  /* current display: planar 200/400, packed = selected mode height */
 
 u8 *bb[SURFACE_QUERY_MAX];
 

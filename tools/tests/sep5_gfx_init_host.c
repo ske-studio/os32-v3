@@ -82,11 +82,14 @@ void gfx2_pal_reset16(void) { }
 static int gfx_started;
 static u8 planes_ok;
 static void backend_enter(void) { event(EV_CALL, F_ENTER, 0); }
+static int host_query(GFX_ScreenInfo *info) { info->height = 0; return 0; }
+u32 display_provider_ver_kind(const GfxBackend *backend) { (void)backend; return GFX_VER_UNKNOWN; }
 static GfxMode host_mode = { .height = 400 };
-static GfxBackend host_backend = { .enter = backend_enter, .selected_mode = &host_mode };
+static GfxBackend host_backend = { .query = host_query, .enter = backend_enter, .selected_mode = &host_mode };
 GfxBackend *g_backend = &host_backend;
 void display_provider_raster_reset(void) { event(EV_CALL, F_SPLASH, 0); }
 static int select_packed;
+static int packed_buffer = 1;
 static int palette_writes;
 void display_palette4_write(int idx, u8 r, u8 g, u8 b)
 { (void)idx; (void)r; (void)g; (void)b; palette_writes++; }
@@ -107,7 +110,7 @@ static int gfx_select_and_init_backend(int legacy200)
         expect(palette_writes == 0);
         for (int i = 0; i < 16; i++)
             expect(colors[i].r == expected[i].r && colors[i].g == expected[i].g && colors[i].b == expected[i].b);
-        bb[0] = &planes_b[0];
+        bb[0] = packed_buffer ? &planes_b[0] : 0;
         return 1;
     }
     return 0;
@@ -201,7 +204,10 @@ static void init_case(int legacy200)
     bb_b = bb_r = bb_g = bb_i = bb[0] = 0; planes_ok = 1; gfx_started = 0;
     for (unsigned c = 0; c < CELLS; c++) { text_chars[1 + c] = 0x1234; text_attrs[2 + c * 2] = 0xE1; }
     count = 0; text_hidden_at_bb_clear = -1;
+    host_mode.height = legacy200 ? 200 : 400;
     gfx_init_mode(legacy200);
+    expect(gfx_current_height == host_mode.height);
+    host_mode.height = 400;
     expect(text_hidden_at_bb_clear == 1);
     is(i++, EV_CALL, F_SPLASH, 0); is(i++, EV_CALL, F_SELECT, legacy200);
     is(i++, EV_CALL, F_BIND, 0);
@@ -242,9 +248,31 @@ static void packed_palette_case(int legacy200)
     expect(gfx_started && palette_writes == 0);
     select_packed = 0;
 }
+static void packed_height_case(int legacy200, int height, int buffer)
+{
+    GFX_ScreenInfo info = {0};
+    u32 kind, active;
+    host_mode.height = height;
+    gfx_current_height = GFX_HEIGHT;
+    packed_buffer = buffer;
+    select_packed = 1;
+    count = 0;
+    gfx_init_mode(legacy200);
+    expect(gfx_started == buffer);
+    expect(gfx_current_height == (buffer ? height : GFX_HEIGHT));
+    gfx_screen_info(&info);
+    expect(info.height == height);
+    expect(gfx_ver_state(&info, &kind, &active) == 0);
+    expect(active == (u32)buffer && info.height == height);
+    host_mode.height = GFX_HEIGHT;
+    select_packed = 0;
+    packed_buffer = 1;
+}
 void _start(void)
 {
     packed_palette_case(0); packed_palette_case(1);
+    packed_height_case(0, 480, 1); packed_height_case(1, 600, 1);
+    packed_height_case(0, 600, 0);
     init_case(0); init_case(1); no_plane_case();
     present_case();
     start_case(0); start_case(1);
