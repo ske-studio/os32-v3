@@ -5,8 +5,6 @@
 #include "os32_kapi_shared.h"
 #include "lib/kstring.h"
 #include "exec.h"             /* CPL=3 ポインタ検証 */
-#include "range_internal.h"
-#include "sys.h"              /* sys_time_now (票 TASK_HAL_WIRING §1-5) */
 #include "pci_bind_contract.h"
 #include "platform_device.h"
 #include "appslot.h"
@@ -16,9 +14,9 @@
 #include "pgalloc.h"
 #include "io.h"
 #include "kstack_hw.h"
-#include "platform_build_info.h"
 #include "module.h"
 #include "ver_info.h"
+#include "kapi_sysinfo.h"
 extern u32 exec_as_leftover_pages;
 extern volatile u32 fault_kill_count;
 extern u32 memmap_audit_runs, as_audit_runs, v86_return_audit_runs;
@@ -150,21 +148,6 @@ done:
     return result;
 }
 
-/* Copy this translation unit's kernel build time without diagnostic output. */
-static void build_time_copy(char *buf, u32 size)
-{
-    kstrncpy(buf, __DATE__ " " __TIME__, size);
-}
-
-/* カーネルビルド時の日時文字列を返す */
-void kapi_sys_get_build_info(char *buf, int size)
-{
-    /* int の size を無検証で u32 に渡すと負値が巨大長に化ける */
-    if (!buf || size <= 0) return;
-    build_time_copy(buf, (u32)size);
-    platform_build_info_report();
-}
-
 /* The generated __cdecl wrapper supplies the existing output-range check. */
 int __cdecl kapi_sys_ver_info(void *out, u32 size)
 {
@@ -172,64 +155,8 @@ int __cdecl kapi_sys_ver_info(void *out, u32 size)
 
     if (!out || size != sizeof(OS32_VerInfo)) return OS32_ERR_INVAL;
     ver_collect(&s);
-    build_time_copy(s.build, sizeof(s.build));
+    kapi_sys_build_time_copy(s.build, sizeof(s.build));
     ver_format(&s, (OS32_VerInfo *)out);
-    return 0;
-}
-
-/* ======================================================================== */
-/*  sys_time_now — µs 時計 (票 TASK_HAL_WIRING §1-5 / KAPI v59)             */
-/*                                                                          */
-/*  生成される __cdecl ラッパ (`wrap_sys_time_now`) がここを呼ぶ ([ABI])。    */
-/*  本体 (スナップショットの採り方) は kernel/time/ktime.c、判定と算数は          */
-/*  kernel/time/time_math.c。ここの仕事は CPL=3 のポインタ検証だけ。             */
-/*                                                                          */
-/*  **検証の範囲は限定** (往復 9 の中継 1)。帯の外の番地はディスパッチャの   */
-/*  早期検査 (`kapi_argptr` + `ring3_ptr_ok`) が他の KAPI と同じく           */
-/*  `ring3_fault_kill` する。非 present / 書けないページへの書き込みで出る    */
-/*  #PF も既存のフォールトガードがアプリの死として扱う — この KAPI だけ      */
-/*  特別扱いしない。ここが「負を返して出力を 1 バイトも書かない」と          */
-/*  約束するのは、早期検査を通った後に**この関数自身が判定できる**3 つだけ:  */
-/*    (1) lo / hi が NULL                                                   */
-/*    (2) どちらかの 4 バイトが帯の境界を跨ぐ                                */
-/*    (3) 2 本の 4 バイト範囲が**交差する** (lo == hi だけでなく差 1〜3 も。  */
-/*        重なっていると「上下が同じスナップショット」が壊れる)             */
-/* ======================================================================== */
-
-int kapi_sys_time_now(u32 *lo, u32 *hi)
-{
-    u32 a, b, diff;
-    u32 snap_lo = 0, snap_hi = 0;
-    int rc;
-
-    if (!lo || !hi) return OS32_ERR_INVAL;
-
-    a = (u32)lo;
-    b = (u32)hi;
-    diff = (a < b) ? (b - a) : (a - b);
-    if (diff < (u32)sizeof(u32)) return OS32_ERR_INVAL;   /* 交差 (lo == hi 込み) */
-
-    /* **書く前に 2 本とも検証する。** 2 本目だけ不正なときに 1 本目を
-     * 書いてしまうと、呼び手は「負が返ったのに片方だけ新しい」を見る。 */
-    if (!kapi_user_range_ok(lo, (u32)sizeof(u32))) return OS32_ERR_INVAL;
-    if (!kapi_user_range_ok(hi, (u32)sizeof(u32))) return OS32_ERR_INVAL;
-
-    /* **読み取り専用の USER ページ (共有ライブラリの .text) は kill** —
-     * 負ではない (往復 10)。OS32 は CR0.WP = 0 なので、ここで止めないと
-     * 全アプリ共有のコードをカーネルが書き換える。出力引数にコード番地を
-     * 渡すのはアプリのバグで、他の KAPI の帯違反と同じ扱いにする。
-     * `ring3_fault_kill()` は戻らない (longjmp)。 */
-    if (!ring3_user_ranges_writable((u32)lo, (u32)sizeof(u32),
-                                    (u32)hi, (u32)sizeof(u32))) {
-        ring3_fault_kill();
-    }
-
-    /* ローカルの 1 スナップショットへ受けてから 2 本へ写す
-     * (途中で時計が進んでも上下が食い違わない)。 */
-    rc = sys_time_now(&snap_lo, &snap_hi);
-    if (rc != 0) return rc;                 /* 負のときは出力を書かない */
-    *lo = snap_lo;
-    *hi = snap_hi;
     return 0;
 }
 

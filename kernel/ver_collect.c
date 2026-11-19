@@ -40,5 +40,5 @@ void ver_collect(VerSnapshot *s)
     s->boot_ok = boot_image_info(&s->boot) >= 0;
     s->debug_ok = kapi_mem_stat(0, &s->debug, sizeof(s->debug)) >= 0;
     services_ver_state(&s->services);
-    /* Build is filled by build_time_copy in kapi_sys.c (V9), without reports. */
+    /* Build is filled by kapi_sys_build_time_copy (V9), without reports. */
 }

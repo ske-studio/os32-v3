@@ -74,7 +74,7 @@ $(R1_OBJ)/build_id.o: $(R1_OUT)/build_id.c
 
 $(R1_OBJ)/exec/exec.o $(R1_OBJ)/kapi/kapi_generated.o: kapi/kapi_generated.c
 $(R1_OBJ)/drivers/net/ne2000/lgy98.o: $(BUILD_OUT)/config/lgy98.flags
-$(R1_OBJ)/kapi/kapi_sys.o: $(BUILD_OUT)/config/source-date.flags
+$(R1_OBJ)/kapi/kapi_sysinfo.o: $(BUILD_OUT)/config/source-date.flags
 
 endif
 
@@ -105,7 +105,7 @@ $(KERNEL_OBJ_PREFIX)arch/x86/kernel/ring3_ls_shim.o: arch/x86/kernel/ring3_ls.S 
 $(addprefix $(KERNEL_OBJ_PREFIX),exec/ring3_ls.o exec/exec.o): exec/ring3_ls.h
 $(addprefix $(KERNEL_OBJ_PREFIX),$(filter exec/%.o kapi/%.o,$(C_KERNEL:.c=.o))): kapi/kapi_generated.c
 $(KERNEL_OBJ_PREFIX)drivers/net/ne2000/lgy98.o: $(BUILD_OUT)/config/lgy98.flags
-$(KERNEL_OBJ_PREFIX)kapi/kapi_sys.o: $(BUILD_OUT)/config/source-date.flags
+$(KERNEL_OBJ_PREFIX)kapi/kapi_sysinfo.o: $(BUILD_OUT)/config/source-date.flags
 $(KERNEL_OBJ_PREFIX)fs/fat/fatfs/ff.o: fs/fat/fatfs/ffconf.h fs/fat/fatfs/string.h
 $(KERNEL_OBJ_PREFIX)drivers/block/fat_diskio.o: fs/fat/fatfs/ff.h fs/fat/fatfs/diskio.h
 

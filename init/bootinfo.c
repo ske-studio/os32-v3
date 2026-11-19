@@ -14,7 +14,7 @@ void boot_common_set(const struct boot_common *info, u8 source)
     s_common = *info;
     s_source = source;
 }
-/* kapi/kapi_sys.c (__DATE__ __TIME__ はそこだけが毎回組み直される) */
+/* Build time is compiled into kapi/kapi_sysinfo.c. */
 extern void kapi_sys_get_build_info(char *buf, int size);
 
 int boot_image_info(void *out_v)

@@ -15,7 +15,7 @@
 #include "build_id.h"
 #include "kernel_tick.h"
 
-extern void kapi_sys_get_build_info(char *buf, int size);   /* kapi/kapi_sys.c */
+extern void kapi_sys_get_build_info(char *buf, int size);   /* kapi/kapi_sysinfo.c */
 
 /* vfs_write の戻りは FS ごとに違う (ext2 は 0、FAT はバイト数、負は失敗)。
  * 種別を知る bootlog_save_with が bootlog_write_ok で揃えるので、ここは

@@ -131,10 +131,10 @@ def generated_layout(runner):
     return '\n'.join(lines)
 
 
-def run(source, offsets, runner):
-    code = ''.join(function(source, sig) for sig in
-                   ('static void build_time_copy(', 'void kapi_sys_get_build_info(',
-                    'int __cdecl kapi_sys_ver_info('))
+def run(source, build_source, offsets, runner):
+    code = ''.join(function(build_source, sig) for sig in
+                   ('void kapi_sys_build_time_copy(', 'void kapi_sys_get_build_info('))
+    code += function(source, 'int __cdecl kapi_sys_ver_info(')
     wrapper = function((ROOT/'kapi/kapi_generated.c').read_text(),
                        'int __cdecl wrap_sys_ver_info(')
     try:
@@ -149,11 +149,12 @@ def main():
     args = arguments()
     offsets = generated_layout(args.runner)
     source = (ROOT/'kapi/kapi_sys.c').read_text()
-    assert run(source, offsets, args.runner).returncode == 0
+    build_source = (ROOT/'kapi/kapi_sysinfo.c').read_text()
+    assert run(source, build_source, offsets, args.runner).returncode == 0
     if args.mutate:
         old = 'size != sizeof(OS32_VerInfo)'
         assert source.count(old) == 1
-        result = run(source.replace(old, 'size == sizeof(OS32_VerInfo)'), offsets, args.runner)
+        result = run(source.replace(old, 'size == sizeof(OS32_VerInfo)'), build_source, offsets, args.runner)
         assert result.returncode == 1 and 'FAIL:' in result.stdout
         print('RED ver API: exact-size condition inverted (compiled runtime failure)')
 

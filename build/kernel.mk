@@ -13,7 +13,7 @@ KAPI_GENERATED := include/kapi_call_generated.h kapi/kapi_generated.c exec/exec_
 $(KAPI_GENERATED) &: sdk/kapi.json sdk/gen_kapi.py sdk/kapi_abi_x86.py sdk/target_profile.py
 	python3 sdk/gen_kapi.py
 
-# GCC honors SOURCE_DATE_EPOCH for __DATE__/__TIME__ in kapi_sys.c.
+# GCC honors SOURCE_DATE_EPOCH for __DATE__/__TIME__ in kapi_sysinfo.c.
 # Without that environment variable the normal wall-clock build date remains.
 .FORCE:
 

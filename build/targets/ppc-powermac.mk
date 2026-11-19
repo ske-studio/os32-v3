@@ -79,6 +79,15 @@ KB_FLAGS := -std=gnu11 $(KB_MACHINE) -fno-builtin -fno-asynchronous-unwind-table
 .PHONY: all kernel audit
 all: kernel
 kernel: $(KB_ELF) audit
+ifneq ($(KB_EXEC),)
+.PHONY: ppc-source-date-force
+$(KB_OUT)/config/source-date.flags: ppc-source-date-force
+	@mkdir -p $(@D)
+	@printf '%s\n' '$(KB_CC) $(KB_FLAGS) SOURCE_DATE_EPOCH=$(SOURCE_DATE_EPOCH)' > $@.tmp
+	@if cmp -s $@.tmp $@; then rm -f $@.tmp; else mv $@.tmp $@; fi
+$(KB_OUT)/kapi/kapi_sysinfo.o: $(KB_OUT)/config/source-date.flags
+endif
+
 # 共通の置き場のソースは、PowerPC の像にまだ入っていない物 (C_COMMON_PC98_PENDING) も PowerPC の
 # コンパイラを通す。機種の名前 (PC-98 の定数など) を間接に使っていれば、ここで未宣言になって止まる。
 # リンクはしない (像には入れない)。
