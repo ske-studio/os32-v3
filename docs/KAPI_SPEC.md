@@ -1877,7 +1877,7 @@ v28で追加。PC-98バスマウスおよびNP21/Wシームレスマウスに対
 - `x`, `y` — 現在の画面座標
 - `dx`, `dy` — 前回poll以降の差分
 - `buttons` — ボタンビットマスク (`MOUSE_BTN_LEFT`=0x01, `MOUSE_BTN_RIGHT`=0x02, `MOUSE_BTN_MIDDLE`=0x04)
-- `mode` — 動作モード (0=なし, 1=バス, 2=シームレス)
+- `mode` — 動作モード (0=なし, 1=相対 (バス・USB), 2=シームレス)
 
 ### §4-8 TVRAM読取・反転API
 

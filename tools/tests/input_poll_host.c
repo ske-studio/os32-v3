@@ -39,7 +39,8 @@ int seamless_mouse_poll(i16 *x, i16 *y) { if (poll_check_io && !test_irq) ++poll
 void irq_enable(u8 irq) { (void)irq; }
 void kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
 void kbd_stop_mouse_sample(u8 buttons) { poll_stop = buttons; }
-int tvram_reverse_cell(int x, int y) { (void)x; (void)y; return 1; }
+static int cell_x = -1, cell_y = -1;
+int tvram_reverse_cell(int x, int y) { cell_x = x; cell_y = y; return 1; }
 static void poll_sample(i8 x, i8 y, u8 raw)
 {
     poll_samples[0] = raw | ((u8)x & 15); poll_samples[1] = (u8)x >> 4;
@@ -56,7 +57,17 @@ static int probe(void)
 {
     MouseState a, b; i16 x, y, rx, ry; i32 ax, ay;
     ref_mouse_init(); mouse_init();
+    mouse_poll(&b);
+    T(b.mode == MOUSE_MODE_NONE && b.x == 319 && b.y == 199 && !b.dx && !b.dy && !b.buttons);
+    mouse_cursor_set_mode(MOUSE_CURSOR_TEXT);
+    mouse_cursor_show();
+    T(cell_x == -1 && cell_y == -1);
+    mouse_pointer_backend_register(&pc98_mouse_backend);
     ref_mouse_poll(&a); mouse_poll(&b);
+    T(b.mode == MOUSE_MODE_BUS);
+    mouse_cursor_show();
+    T(cell_x == 39 && cell_y == 12);
+    mouse_cursor_hide();
     T(poll_equal(a, b) && b.x == 319 && b.y == 199 && !b.dx && !b.dy);
     poll_sample(5, -3, MOUSE_RIGHT | MOUSE_MIDDLE);
     poll_sample(7, 4, MOUSE_RIGHT | MOUSE_MIDDLE);
