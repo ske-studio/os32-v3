@@ -179,13 +179,10 @@ PROVIDER_GROUPS = {
         'gfx2_present',
     }), frozenset([])),
     'pointer': (frozenset({
-        'mouse_poll',
         'mouse_available',
-        'mouse_set_bounds',
-        'mouse_cursor_set_mode',
+        'mouse_poll',
         'mouse_cursor_show',
-        'mouse_cursor_hide',
-    }), frozenset(['pointer_service.h'])),
+    }), frozenset()),
 }
 
 IME_SLOTS = PROVIDER_GROUPS['ime'][0]

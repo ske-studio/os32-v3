@@ -38,8 +38,7 @@ ime_getchar ime_getkey ime_is_active ime_set_mode ime_set_render
 ime_switch_dict ime_toggle ime_trygetchar ime_trygetkey ime_user_clear
 ime_user_delete ime_user_export ime_user_list kcg_init kcg_load_font
 kcg_read_ank kcg_read_kanji kcg_set_scale kdebug_call loop_attach loop_detach
-loop_status mem_stat mouse_available mouse_cursor_hide mouse_cursor_set_mode
-mouse_cursor_show mouse_poll mouse_set_bounds np2_check_hostdrv np2_detect
+loop_status mem_stat mouse_available mouse_cursor_show mouse_poll np2_check_hostdrv np2_detect
 np2_get_clock np2_get_cpu np2_get_version
 pci_bind_info pci_cfg_read32 pci_count
 pci_get pcm_close pcm_open pcm_set_volume pcm_status pcm_write
@@ -132,6 +131,7 @@ fd_redirect_get_buf_len
 fd_redirect_reset
 fd_redirect_to_buffer
 fd_redirect_to_file
+pointer_set_bounds pointer_cursor_set_mode pointer_cursor_hide
 input_diag
 input_diag_log
 input_dropped_count

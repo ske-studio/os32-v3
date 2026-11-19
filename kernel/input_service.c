@@ -79,7 +79,7 @@ static void empty_pointer_bounds(i16 x_min, i16 y_min, i16 x_max, i16 y_max)
 static void empty_pointer_mode(int mode) { (void)mode; }
 static void empty_pointer_show(void) { }
 static void empty_pointer_hide(void) { }
-static const PointerOps empty_pointer = {
+const PointerOps empty_pointer = {
     .poll = empty_pointer_poll,
     .available = empty_pointer_available,
     .bounds = empty_pointer_bounds,

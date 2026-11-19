@@ -153,6 +153,7 @@ A は共通本体を選択・初期化して通常 wrap に接続。B は既存�
 - shm ［sys_shm_alloc → shm_alloc @ mm/shm.c］ ［sys_shm_lock → shm_lock @ mm/shm.c］ ［sys_shm_free → shm_free @ mm/shm.c］
 - pointer ［mouse_poll → pointer_poll @ kernel/input_service.c］ ［mouse_available → pointer_available @ kernel/input_service.c］ ［mouse_set_bounds → pointer_set_bounds @ kernel/input_service.c］ ［mouse_cursor_set_mode → pointer_cursor_set_mode @ kernel/input_service.c］
 - pointer ［mouse_cursor_show → pointer_cursor_show @ kernel/input_service.c］ ［mouse_cursor_hide → pointer_cursor_hide @ kernel/input_service.c］
+- pointer の公開の順 (PowerPC の PM 決定 2026-11-19、Opus のレビューの指摘): 段 3c は mouse_set_bounds・mouse_cursor_set_mode・mouse_cursor_hide の 3 本を先に出す。mouse_available・mouse_poll・mouse_cursor_show は、本線の後端の ops (#27) と既定の範囲 (#28) の後に一緒に出す (available だけを先に出すと、poll が無いまま 1 を返し、アプリが初期化していない MouseInfo を読むため)。
 
 ### 3. 実施順と担当
 
