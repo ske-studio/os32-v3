@@ -157,7 +157,7 @@ def source():
                             ('service', 12), ('kind', 14), ('length', 16),
                             ('reserved', 18), ('data', 20)]),
         'struct HostAlive': (12, [('host_generation', 0), ('observation', 4), ('valid', 8)]),
-        'struct SfsPersistentConfig': (12, [('io', 0), ('io_ctx', 4), ('lan_enabled', 8)]),
+        'struct SfsPersistentConfig': (16, [('io', 0), ('io_ctx', 4), ('lan_enabled', 8), ('describe', 12)]),
         'struct SfsReply': (8, [('data', 0), ('capacity', 4), ('length', 6)]),
         'struct SfsBlock': (24, [('sid', 0), ('handle', 4), ('size', 8), ('mtime', 16)]),
         'struct NetCd': (32, [('handle', 0), ('media_gen', 4), ('last_use', 8),

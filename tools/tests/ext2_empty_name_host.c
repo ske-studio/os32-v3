@@ -233,6 +233,7 @@ int res_owner_get(void) { return 0; }
 /* ======================================================================== */
 
 #include "ext2_super.c"
+#include "ext2_time.c"
 #include "ext2_inode.c"
 #include "ext2_dir.c"
 #include "ext2_file.c"

@@ -478,6 +478,7 @@ int res_owner_get(void) { return 0; }
 #include "../../drivers/hostdrv/hostdrv_stat_rules.inc"
 
 #include "../../fs/ext2/ext2_super.c"
+#include "../../fs/ext2/ext2_time.c"
 #include "../../fs/ext2/ext2_inode.c"
 #include "ext2_dir.c"
 #include "../../fs/ext2/ext2_file.c"

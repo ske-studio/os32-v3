@@ -72,26 +72,32 @@ static int g_nic_calls;
 static int g_resident, g_scope, g_scope_begins, g_scope_ends, g_scope_exit;
 static int g_scope_begin_error, g_scope_end_error;
 
-static SfsLan resident_lan = {.peer = {2, 0, 0, 0, 0, 1}};
+#include "serialfs.h"
+#include "boot_describe.inc"
+static int scope_owner;
+static SfsLan resident_lan = {.peer_fixed = 1, .peer = {2, 0, 0, 0, 0, 1}};
 static SfsClient resident_client = {.sid = 123, .ctx = &resident_lan};
 const SfsClient *sfs_persistent_client(void) { return g_resident ? &resident_client : 0; }
 
 /* C1 owns pairing and errors; C2 only dispatches through serialfs.h. */
 int sfs_persistent_enabled(void) { return g_resident; }
-int sfs_persistent_scope_begin(void)
+int sfs_persistent_describe(struct SfsTransportInfo *out)
+{ return boot_sfs_describe(&resident_lan, out); }
+int sfs_persistent_scope_begin_owned(int owner)
 {
     g_scope_begins++;
     if (g_scope_begin_error) return g_scope_begin_error;
     if (g_scope) return OS32_ERR_BUSY;
+    scope_owner = owner;
     g_scope = 1;
     return 0;
 }
-int sfs_persistent_scope_end(int code)
+int sfs_persistent_scope_end_owned(int owner, int code)
 {
     g_scope_ends++;
     g_scope_exit = code;
     if (g_scope_end_error) return g_scope_end_error;
-    if (!g_scope) return OS32_ERR_INVAL;
+    if (!g_scope || owner != scope_owner) return OS32_ERR_INVAL;
     g_scope = 0;
     return 0;
 }
@@ -262,6 +268,11 @@ void __cdecl kprintf(u8 attr, const char *fmt, ...)
     g_kout[g_kout_n] = '\0';
 }
 
+void __cdecl console_printf(u8 attr, const char *fmt, ...) __attribute__((alias("kprintf")));
+void sfs_persistent_scope_owner_exit(int owner)
+{
+    if (owner == scope_owner) g_scope = 0;
+}
 #include "serialfs_session.c"
 
 void lan_module_session_release(void)
@@ -671,6 +682,22 @@ static void resident_scope(void)
     CHECK(strstr(g_kout, "sfs: exit=-7\n"));
     CHECK(strstr(g_kout, "sfs: exit=12\n"));
     CHECK(tick_count == start);
+
+    reset();
+    g_resident = 1;
+    sfs_lan_init(&resident_lan, &g_nic, &g_sio, 0);
+    sfs_client_init(&resident_client, &sfs_lan_io, &resident_lan, SFS_LAN_BAUD);
+    CHECK(!resident_lan.linked && !resident_lan.peer_fixed);
+    CHECK(sfs_client_hello(&resident_client, 123) == 0);
+    CHECK(serialfs_session_begin() == 0 && scope_owner == g_owner);
+    CHECK(strstr(g_kout, "sfs: transport=lan nic=82557 peer=02:00:00:00:00:01 sid=305441741\n"));
+    g_owner++;
+    CHECK(serialfs_session_end(0) == OS32_ERR_INVAL);
+    serialfs_session_owner_exit(g_owner);
+    CHECK(serialfs_session_begin() == OS32_ERR_BUSY);
+    serialfs_session_owner_exit(--g_owner);
+    CHECK(serialfs_session_begin() == 0);
+
 }
 
 static void lan_session(void)

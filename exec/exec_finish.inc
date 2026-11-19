@@ -22,6 +22,9 @@ u32 exec_entry_calls; /* D35: rejected images leave this counter unchanged. */
 
 #include "owner_diag.h"
 #include "io_kapi.h"
+#if OS32_FEATURE_USERSHELL
+#include "fs/serialfs/serialfs.h"
+#endif
 
 static void exec_teardown_app(AppSlot *a)
 {
@@ -208,6 +211,9 @@ static void exec_notify_owned(int id, int kind)
      * (ACTIVE は rid ごと 2 件) が埋まったままにならない。公開 API を通さず
      * ID を指定して解放する。 */
     exec_host_owner_exit(id);
+#if OS32_FEATURE_USERSHELL
+    sfs_persistent_scope_owner_exit(id);
+#endif
     /* (10) console シンクの読み手 (票 K6C)。読み手は 1 本だけなので、畳んだ
      * のがその 1 本なら所有を返す — 返さないと次の端末アプリが永久に
      * OS32_ERR_EXIST を食う。リングの中身は捨てない (GUI は続いており、

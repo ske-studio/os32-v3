@@ -21,6 +21,7 @@ import host32
 from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
+    ('describe-nic', 'out->nic = "82557";', 'out->nic = "?";'),
     ('mailbox-init', 'int rc = host_mailbox_init();', 'int rc = 0;'),
     ('mailbox-log', 'if (rc) kprintf(KLOG_ATTR, "[hostsvc] mailbox init rc=%d\\n", rc);',
      '(void)rc;'),

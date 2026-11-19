@@ -96,7 +96,7 @@ static int suite(void)
     static const struct vfs_device_name names[] = {
         {SERIALFS_DEVNAME, VFS_NAME_EXACT, VFS_DEV_SERIAL, 0, 1}
     };
-    struct SfsPersistentConfig cfg = {&hs_sfs_io, 0, 1};
+    struct SfsPersistentConfig cfg = {.io = &hs_sfs_io, .lan_enabled = 1};
     OS32_Stat st;
     static u8 data[65536];
     u32 gen, before;

@@ -123,6 +123,10 @@ static int suite(void)
     CHECK(mounts==1 && initialized==1 && saved.io_ctx==&boot_sfs_lan);
     /* Use borrowed objects after the entire boot helper's stack has returned. */
     SfsLan *lan=saved.io_ctx;
+    struct SfsTransportInfo info = {0};
+    CHECK(saved.describe && saved.describe(lan, &info) == 0);
+    CHECK(same(info.nic, "82557") && info.peer_valid == (mode != 1));
+    for (int i = 0; i < 6; i++) CHECK(info.peer[i] == (mode == 1 ? 0 : expected[i]));
     tick_count=1234;
     CHECK(lan->clock->now(lan->clock_ctx)==1234);
     CHECK(lan->clock->can_wait(lan->clock_ctx));
