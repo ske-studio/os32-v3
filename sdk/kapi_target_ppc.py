@@ -4,10 +4,13 @@ Common exec, caller validation, owner, FD and heap providers remain bound.
 """
 
 PROVIDER_EXTERNS = frozenset({
+    "extern int kapi_pci_bind_info(u32 idx, void *out);",
     "extern volatile u32 tick_count;",
     "extern void kapi_sys_exit(int status);",
     "extern int kapi_serial_diag(SerialDiag *out);",
     "extern int kapi_sys_set_mtime(const char *path, u32 mtime);",
+    "extern void kapi_sys_get_build_info(char *buf, int size);",
+    "extern int kapi_sys_time_now(u32 *lo, u32 *hi);",
 })
 
 PROVIDER_GROUPS = {
@@ -32,11 +35,10 @@ PROVIDER_GROUPS = {
         'gfx_hw_blit',
         'gfx_stats',
         'gfx_lease_palette',
-        'gfx_screen_owner',
         'gfx_hw_submit',
         'gfx_hw_get',
         'gfx_osri_show',
-    }), frozenset(['gfx_hal.h', 'gfx.h', 'palette.h'])),
+    }), frozenset(['gfx_hal.h', 'palette.h'])),
     'gui': (frozenset({
         'gui_call',
         'gui_register',
@@ -69,7 +71,7 @@ PROVIDER_GROUPS = {
         'loop_attach',
         'loop_detach',
         'loop_status',
-    }), frozenset(['platform_device.h'])),
+    }), frozenset()),
     'ide': (frozenset({
         'ide_init',
         'ide_drive_present',
@@ -91,12 +93,6 @@ PROVIDER_GROUPS = {
         'kcg_read_ank',
         'kcg_read_kanji',
     }), frozenset(['kcg_contract.h'])),
-    'pci': (frozenset({
-        'pci_count',
-        'pci_get',
-        'pci_cfg_read32',
-        'pci_bind_info',
-    }), frozenset(['pci_dev_contract.h'])),
     'serialfs': (frozenset({
         'sfs_begin',
         'sfs_end',
@@ -121,8 +117,6 @@ PROVIDER_GROUPS = {
         'db_error_code',
     }), frozenset(['kapi_db.h'])),
     'system_info': (frozenset({
-        'sys_get_build_info',
-        'sys_time_now',
         'mem_stat',
         'sys_ver_info',
     }), frozenset([])),
@@ -162,6 +156,7 @@ PROVIDER_GROUPS = {
     'debug': (frozenset({
         'kdebug_call',
     }), frozenset([])),
+    # OF uses the shared display entry points for resource-free operations.
     'gfx2': (frozenset({
         'gfx2_check_op',
         'gfx2_surface_create',
@@ -175,23 +170,14 @@ PROVIDER_GROUPS = {
         'gfx2_fence_query',
         'gfx2_mode_set',
         'gfx2_flip',
-        'gfx2_vblank_wait',
-        'gfx2_palette',
-        'gfx2_gamma',
         'gfx2_cursor_image',
-        'gfx2_cursor_move',
-        'gfx2_cursor_show',
-        'gfx2_dpms',
         'gfx2_present',
     }), frozenset([])),
     'pointer': (frozenset({
-        'mouse_poll',
         'mouse_available',
-        'mouse_set_bounds',
-        'mouse_cursor_set_mode',
+        'mouse_poll',
         'mouse_cursor_show',
-        'mouse_cursor_hide',
-    }), frozenset(['pointer_service.h'])),
+    }), frozenset()),
 }
 
 IME_SLOTS = PROVIDER_GROUPS['ime'][0]
@@ -203,7 +189,6 @@ ZERO_SLOTS = frozenset({
     'np2_detect',
     'np2_check_hostdrv',
     'ide_drive_present',
-    'pci_count',
     'mouse_available',
     'snd_bgm_is_playing',
     'gfx2_adapter_count',

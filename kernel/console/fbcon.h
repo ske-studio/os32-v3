@@ -18,6 +18,8 @@ struct fbcon {
 };
 int fbcon_attach(struct fbcon *, struct gfx_console_target *, const KcgModuleApi *, unsigned);
 void fbcon_set_colors(struct fbcon *, u8, u8);
+int fbcon_park(struct fbcon *);
+int fbcon_retarget(struct fbcon *, struct gfx_console_target *);
 void fbcon_detach(struct fbcon *);
 void fbcon_clear(struct fbcon *);
 void fbcon_scroll(struct fbcon *, int);

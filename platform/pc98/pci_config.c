@@ -3,6 +3,23 @@
 #include "pci/pci_decode.h"
 #include "io.h"
 
+const char *pci_config_name(void)
+{
+    return "mech#1";
+}
+
+int pci_config_root_bus(u32 idx, u32 *bus)
+{
+    if (idx != 0) return -1;
+    *bus = 0;
+    return 0;
+}
+
+int pci_config_bar_measure(void)
+{
+    return 1;
+}
+
 /* ======================================================================== */
 /*  メカニズム #1 の有無                                                    */
 /*                                                                          */

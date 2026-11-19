@@ -541,6 +541,7 @@ static void case_stop_mouse(void)
     kbd_set_gui_mode(1);
     stub_abort_requests = 0;
     stub_mouse_buttons = MOUSE_BTN_LEFT;
+    mouse_pointer_backend_register(&pc98_mouse_backend);
     mouse_init();
     mouse_poll(NULL);
     irq(KBD_STAT_RXRDY, KEY_CTRL);

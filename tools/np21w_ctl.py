@@ -699,19 +699,30 @@ class Ctl(object):
         wanted = {win_norm(ini), win_norm(self.paths.win_of(ini))}
         return any(win_norm(arg[2:]) in wanted for arg in self.ini_args(proc))
 
+    def matches_other_slot(self, proc, slot_ini):
+        args = self.ini_args(proc)
+        if not slot_ini or len(args) != 1:
+            return False
+        name = win_norm(args[0][2:]).split('\\')[-1]
+        return (name != slot_ini and re.fullmatch(r'np21x64w(-i[2-8])?\.ini', name)
+                and self.matches_ini(proc, name))
+
     def force_kill(self, exe, deadline, pid, explicit=False):
         ours, others = self.split_procs(exe)
         self.note_others(others)
-        if pid is None and (ours or any(not p.exe and p.name.lower() == exe.lower()
-                                        for p in others)):
-            matches = [p for p in ours if self.matches_ini(p, self.slot_ini())]
-            if len(matches) != 1:
+        if pid is None:
+            slot_ini = self.slot_ini()
+            matches = [p for p in ours if self.matches_ini(p, slot_ini)]
+            unreadable = [p for p in others if not p.exe and p.name.lower() == exe.lower()]
+            unknown_slot = any(not self.matches_other_slot(p, slot_ini) for p in ours)
+            if len(matches) > 1 or (not matches and (unreadable or unknown_slot)):
                 candidates = ['pid=%d %s' % (p.pid, ' '.join(self.ini_args(p)) or
                                                ('(/i なし)' if p.command else '(引数不明)'))
                               for p in ours]
+                candidates.extend('pid=%d (exe 読めない)' % p.pid for p in unreadable)
                 raise CtlError('対象枠の pid を特定できない。%s の候補: %s。stop --pid N で指定'
                                % (self.expected_exe(exe), ', '.join(candidates) or 'なし'))
-            pid = matches[0].pid
+            pid = matches[0].pid if matches else None
         ours = [p for p in ours if p.pid == pid]
         if not ours:
             if explicit:

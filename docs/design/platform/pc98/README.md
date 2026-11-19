@@ -114,8 +114,7 @@ const struct pci_driver *platform_lan_driver(void) { return &e82557_driver; }
 
 ### device_pci
 
-device_pci.cへ4転送。
-bind_infoは既存kapi_pci_bind_infoを維持、その内部だけplatform照会へ。
+2026-11-19 の PCI の共通化 段 M3 で、転送 4 本と kapi_pci_bind_info は共通の kernel/dev/device_pci.c に移った (この機種の置き場には残っていない)。
 
 ### device_host
 

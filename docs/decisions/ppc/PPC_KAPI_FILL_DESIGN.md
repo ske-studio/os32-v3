@@ -153,6 +153,7 @@ A は共通本体を選択・初期化して通常 wrap に接続。B は既存�
 - shm ［sys_shm_alloc → shm_alloc @ mm/shm.c］ ［sys_shm_lock → shm_lock @ mm/shm.c］ ［sys_shm_free → shm_free @ mm/shm.c］
 - pointer ［mouse_poll → pointer_poll @ kernel/input_service.c］ ［mouse_available → pointer_available @ kernel/input_service.c］ ［mouse_set_bounds → pointer_set_bounds @ kernel/input_service.c］ ［mouse_cursor_set_mode → pointer_cursor_set_mode @ kernel/input_service.c］
 - pointer ［mouse_cursor_show → pointer_cursor_show @ kernel/input_service.c］ ［mouse_cursor_hide → pointer_cursor_hide @ kernel/input_service.c］
+- pointer の公開の順 (PowerPC の PM 決定 2026-11-19、Opus のレビューの指摘): 段 3c は mouse_set_bounds・mouse_cursor_set_mode・mouse_cursor_hide の 3 本を先に出す。mouse_available・mouse_poll・mouse_cursor_show は、本線の後端の ops (#27) と既定の範囲 (#28) の後に一緒に出す (available だけを先に出すと、poll が無いまま 1 を返し、アプリが初期化していない MouseInfo を読むため)。
 
 ### 3. 実施順と担当
 
@@ -252,6 +253,7 @@ A の場合も、対象像が持つ弱い代役に解決されていないこと
 |surface（束、本線 #18 の確定設計後）|QEMU で書ける出力先で件数の不一致を与え、入力を読む前の INVAL と、その後の正しい CLIENT 1 面での再取得を確認|束の後半で失敗した場合の巻き戻しは本線の host 受入で確認 ([束の設計 §5](../display/SURFACE_LEASE_BUNDLE_DESIGN.md))|
 |gfx|画面寸法と owner を取得、既知矩形だけ更新し周囲の pixel を保存。非対応 raster/HW は能力に一致|dirty 範囲の右端を欠落させる|
 |gfx2|adapter/head/connector/mode と caps、面生成・lock・描画・present・解放。fence と非対応 EDID 等は実能力どおり|of_fb_v2 の固定モード比較を外し異寸法が通ることを検出|
+|gfx/gfx2（OF FB）|`gfx_screen_owner` と `gfx2_vblank_wait`・`gfx2_palette`・`gfx2_gamma`・`gfx2_cursor_move`・`gfx2_cursor_show`・`gfx2_dpms` を結線。link-sh でシェル owner、無効 head の INVAL、OF の vblank 未対応（HAL v2 §11-7 の NOSYS）、非所有者の表示制御の BUSY、終了後の head と owner を確認| `make check-ppc-display-guest MUTATE=1` で owner・vblank・表示制御の3組の提供者を外す |
 |gui|登録者に要求が一度届き、GUI 終了後に shell に入力が戻る|終了時の所有解放を省略|
 |sys|再起動前後の boot ログを別起動として観測。確定設計の PMU/Cuda ごとに送信回数を照合。buz は無動作|reset の装置呼出を外し再起動を検出できなくする|
 |clock|mac99 の Cuda と PMU を `-rtc base=2024-02-29T00:00:00` で起動し、RSH から 7 バイトの暦時刻と曜日を読む。起動から読出しまでの経過を加えた基準時刻との差は 2 秒以内|年を 1 年ずらす、Cuda と PMU の読出し命令を交換する、公開表で提供者を外す|
@@ -291,3 +293,5 @@ PowerMac の暦時計は reset と同じ VIA インスタンスを使う。Apple
 2. **共有の登録ファイルの持ち主**: 1a (build/sources/common.mk)、4k-i・7a-選択・7b-選択 (build/select.mk) は docs/tasks/agents/PARALLEL_BRANCHES.md §2 の共有の登録ファイル。本線がこれらの段を出す時は、その時の持ち主から受け取ってから出す。select.mk の 3 段は同じファイルなので本線の列では直列。
 3. **NP21/W の受入は直列**: 「その場の変更」の段 (2a-i・3b-i・5a-i・6d-i) は NP21/W の受入が要るので、本線の列では 1 本ずつ並べる。並列にできるのは「移すだけ」の段どうしと、PowerPC の段との組だけ。
 - 本線の最初の差し込みの予定: 1a・2a-i・2b・3b-i (CI の手直しの S0 の取り込み、CRT の後始末の後。1a は wt/ppc-sqlite-stack が common.mk を手放した後)。
+
+- 追記 (2026-11-19): pci の組の本体を両機種で選べるようにする設計は [PCI_COMMON_DESIGN](PCI_COMMON_DESIGN.md) (本線の M1〜M3 と PowerPC の P1〜P5)。

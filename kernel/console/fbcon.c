@@ -47,7 +47,7 @@ static void redraw(struct fbcon *c, int x, int y, int w, int h)
 {
     u8 *pixels;
     int xx, yy;
-    if (!c->ready) return;
+    if (!c->ready || !c->target) return;
     if (gfx_console_lock(c->target, &pixels)) { c->ready = 0; return; }
     for (yy = y; yy < y + h; yy++)
         for (xx = x; xx < x + w; xx++) paint(c, xx, yy, pixels);
@@ -77,6 +77,24 @@ int fbcon_attach(struct fbcon *c, struct gfx_console_target *t,
     fbcon_clear(c);
     if (!c->ready) { fbcon_detach(c); return -1; }
     return 0;
+}
+
+int fbcon_park(struct fbcon *c)
+{
+    if (!c || !c->ready || !c->target) return 0;
+    c->target = NULL;
+    return 1;
+}
+
+int fbcon_retarget(struct fbcon *c, struct gfx_console_target *t)
+{
+    if (!c || !c->cells || !t || t->pitch < t->width || t->height <= c->top ||
+        t->width / 8 != (unsigned)c->geometry.cols ||
+        (t->height - c->top) / 16 != (unsigned)c->geometry.rows) return -1;
+    c->target = t;
+    c->ready = 1;
+    redraw(c, 0, 0, c->geometry.cols, c->geometry.rows);
+    return c->ready ? 0 : -1;
 }
 
 void fbcon_set_colors(struct fbcon *c, u8 fg, u8 bg)
@@ -110,6 +128,7 @@ void fbcon_scroll_n(struct fbcon *c, int rows, int n)
     for (i = 0; i < cols * (rows - n); i++) c->cells[i] = c->cells[i + cols * n];
     for (; i < cols * rows; i++)
         c->cells[i] = (struct fbcon_cell){' ', FBCON_DEFAULT_ATTR, 0};
+    if (!c->target) return;
     for (y = 0; y < rows; y++) for (x = 0; x < cols; x++) {
         struct fbcon_cell next = rendered(c, x, y);
         struct fbcon_cell old = c->drawn[y * cols + x];

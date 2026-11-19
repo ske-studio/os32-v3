@@ -114,6 +114,7 @@ jobs:
           make check-gui-proto
 
       - name: Check map (check-changed selection table)
+        timeout-minutes: 5
         run: |
           make check-map
           make check-check-select-host
@@ -135,6 +136,7 @@ jobs:
           make check-tests-inventory
 
       - name: Host tests (gcc + python3 only)
+        timeout-minutes: 6
         run: |
           make check-ne2000-ring
           make check-boot-splash-host
@@ -175,6 +177,7 @@ jobs:
       - uses: ./.github/actions/gate-setup
         if: steps.scope.outputs.scope == 'ppc'
       - name: PPC image and host checks
+        timeout-minutes: 12
         if: steps.scope.outputs.scope == 'ppc'
         env:
           OS32_ACCEPT_IPA_LICENSE: "1"
@@ -216,6 +219,7 @@ jobs:
       - uses: ./.github/actions/gate-setup
         if: steps.scope.outputs.scope == 'ppc'
       - name: PPC QEMU guest checks
+        timeout-minutes: 30
         if: steps.scope.outputs.scope == 'ppc'
         env:
           OS32_ACCEPT_IPA_LICENSE: "1"
