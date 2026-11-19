@@ -8,4 +8,4 @@ def mem_stat_source(source):
     header = (ROOT / 'platform/pc98/platform_mem_stat.h').read_text()
     start = source.index('STATIC_ASSERT(sizeof(MemStat)')
     end = source.index('/* =====', start)
-    return header[header.index('static inline void platform_mem_stat_pre'):header.index('#endif')] + source[start:end]
+    return header[header.index('static inline void platform_mem_stat_pre'):header.rindex('#endif')] + source[start:end]
