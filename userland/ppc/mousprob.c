@@ -22,15 +22,18 @@ static int check(KernelAPI *api, const char *command)
         return 0;
     }
     if (!strcmp(command, "cursor")) {
+        int key;
         api->mouse_cursor_set_mode(MOUSE_CURSOR_TEXT);
+        /* Hold each frame until the host has sampled it, before RSH output. */
+        /* A doubled or repeated key from the previous step is skipped. */
+        if (api->kbd_getkey() != 's') return 6;
         api->mouse_cursor_show();
-        return 0;
-    }
-    if (!strcmp(command, "hide")) {
+        while ((key = api->kbd_getkey()) == 's') {}
+        if (key != 'h') return 6;
         api->mouse_cursor_hide();
-        return 0;
+        while ((key = api->kbd_getkey()) == 'h') {}
+        return key == 'a' ? 0 : 6;
     }
-    if (!strcmp(command, "key")) return api->kbd_getkey() == 'a' ? 0 : 6;
     return 7;
 }
 
