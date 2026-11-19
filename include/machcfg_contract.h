@@ -13,4 +13,14 @@ void machcfg_begin(struct machcfg_seed seed);
 void machcfg_finish(const struct machcfg *values);
 const struct machcfg *machcfg_get(void);
 
+#define MACHCFG_FILE_NOFS 0
+#define MACHCFG_FILE_NONE 1
+#define MACHCFG_FILE_BIG  2
+#define MACHCFG_FILE_OK   3
+#define MACHCFG_KEY_PERF  0x01
+#define MACHCFG_KEY_NAP   0x02
+
+void machcfg_note_file(u8 result, u8 keys);
+void machcfg_report(const char *machine, u32 cpu_id, int seed_from_cpu);
+
 #endif
