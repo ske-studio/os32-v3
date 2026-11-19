@@ -127,6 +127,7 @@ static void pc98_boot_dev_fs(const struct boot_context *ctx)
     fs_registration_failed |= fatfs_init() != VFS_OK;
     fs_registration_failed |= hostdrvfs_init() != VFS_OK;
     fs_registration_failed |= serialfs_init() != VFS_OK;
+    serialfs_session_set_fg(&sfs_session_fg);
     path_set_device_validator(dev_name_present);
     tvram_print(64, 1, fs_registration_failed ? "NG" : "OK", TATTR_WHITE);
     if (fs_registration_failed)
