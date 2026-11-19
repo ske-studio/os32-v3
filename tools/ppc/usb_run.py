@@ -328,28 +328,42 @@ def product_settings(work, mode, late=False):
     return opts
 
 
-def keyboard_actions(q, read_serial, wait_for):
-    """Share guest-observed press/repeat/release and text entry steps."""
+def keyboard_actions(q, read_serial, wait_for, evidence):
+    """Send short taps atomically and observe each USB report after dispatch."""
+    def send(events):
+        with (evidence/'qmp-keys.jsonl').open('a') as trace:
+            record = dict(monotonic_ns=time.monotonic_ns(), events=events)
+            try:
+                q.call('input-send-event', {'events': events})
+            finally:
+                trace.write(json.dumps(record)+'\n')
+
     def key(code, mods=(), hold=100):
-        # Hold is measured in guest time. QEMU's send-key hold-time runs on the
-        # virtual clock, which under -icount drifts from real time while the
-        # guest naps (PPC_NOTES §3); release after the guest has seen every
-        # press, and for a long hold after its first typematic repeat.
-        releases = len(re.findall(r'USB KEY src=1 sc=[0-9a-f]+ down=0', read_serial()))
-        presses = len(re.findall(r'USB KEY src=1 sc=[0-9a-f]+ down=1', read_serial()))
+        start = len(read_serial())
         keys = [*mods, code]
-        q.call('input-send-event', {'events': [
-            {'type': 'key', 'data': {'down': True, 'key': {'type': 'qcode', 'data': c}}} for c in keys]})
-        wait_for(lambda: len(re.findall(r'USB KEY src=1 sc=[0-9a-f]+ down=1', read_serial()))
-                 >= presses+len(keys), 'key press '+code)
+        def events(codes, down):
+            return [{'type': 'key', 'data': {'down': down, 'key': {'type': 'qcode', 'data': c}}}
+                    for c in codes]
+        def scans(down):
+            return re.findall(r'USB KEY src=1 sc=([0-9a-f]+) down='+down, read_serial()[start:])
+        press = events(keys, True)
+        release = events(reversed(keys), False)
         if hold > 100:
-            repeats = len(re.findall(r'USB REPEAT src=1 sc=', read_serial()))
-            wait_for(lambda: len(re.findall(r'USB REPEAT src=1 sc=', read_serial())) > repeats,
+            send(press)
+            wait_for(lambda: len(scans('1')) >= len(keys), 'key press '+code)
+            repeats = read_serial()[start:].count('USB REPEAT src=1 sc=')
+            wait_for(lambda: read_serial()[start:].count('USB REPEAT src=1 sc=') > repeats,
                      'key repeat '+code)
-        q.call('input-send-event', {'events': [
-            {'type': 'key', 'data': {'down': False, 'key': {'type': 'qcode', 'data': c}}} for c in reversed(keys)]})
-        wait_for(lambda: len(re.findall(r'USB KEY src=1 sc=[0-9a-f]+ down=0', read_serial()))
-                 >= releases+len(mods)+1, 'key release '+code)
+            send(release)
+        else:
+            send(press + release)
+        wait_for(lambda: len(scans('0')) >= len(keys), 'key release '+code)
+        if hold <= 100:
+            pressed, released = scans('1'), scans('0')
+            require(len(pressed) == len(set(pressed)) == len(keys)
+                    and sorted(pressed) == sorted(released)
+                    and 'USB REPEAT src=1 sc=' not in read_serial()[start:],
+                    'short USB key '+code+': '+read_serial()[start:])
         time.sleep(.03)
     def text_keys(text):
         for c in text:
@@ -381,8 +395,6 @@ def product_accept(elf, cpu, out, mode, late=False):
     (out/'argv.json').write_text(json.dumps(argv, indent=2))
     # The live FB renders the full editing/hotplug transcript as well as ESCC.
     started = time.monotonic()
-    # Each key now waits for the guest to see the press before releasing it, so
-    # a loaded CI runner needs ~55 s for the transcript (local 1-CPU: 46 s).
     deadline = started+(180 if os.environ.get('PPC_FB') == '1' else 120)
     q = None
     with (out/'qemu.stderr').open('w') as err:
@@ -403,7 +415,7 @@ def product_accept(elf, cpu, out, mode, late=False):
                 print('product USB timeout '+label+' after %.1fs; serial tail:\n' % (time.monotonic()-started) +
                       tail, flush=True)
                 raise RuntimeError('product USB timeout: '+label+' evidence='+str(out))
-            key, text_keys = keyboard_actions(q, lambda: serial(a), wait_for)
+            key, text_keys = keyboard_actions(q, lambda: serial(a), wait_for, out)
             def execute(text, expected):
                 previous = output().count('sh> ')
                 start = len(output())
@@ -412,8 +424,7 @@ def product_accept(elf, cpu, out, mode, late=False):
                 wait_for(lambda: output().count('sh> ') >= count and output().endswith('sh> '), 'prompt after '+text)
                 block = output()[start:output().rfind('sh> ')]
                 if not previous: block = block[block.index('sh> ')+4:]
-                lines = block.splitlines()[1:]  # discard the echoed command line
-                require(expected in lines, 'product command output '+repr((text, block, expected)))
+                require(block == text+'\n'+expected+'\n', 'product command output '+repr((text, block, expected)))
                 return block
             if late:
                 wait_for(lambda: 'USB MOUSE WAIT END' in serial(a), 'three-second mouse-only wait')
@@ -705,7 +716,7 @@ def link_lan_accept(elf, cpu, out, mode='normal'):
         s.wait(lambda: 'protocol=01' in serial(a), 'keyboard enumeration', 30)
         s.wait(s.ready, 'RSH READY', 60)
         key, text_keys = keyboard_actions(s.q, lambda: serial(a),
-                                         lambda predicate, label: s.wait(predicate, label, 30))
+                                         lambda predicate, label: s.wait(predicate, label, 30), s.out)
         rsh_command(s, 'echo warm', b'warm\n')
         # Warm /host too (as sd_run.link_accept does): the SFS session starts on
         # first use, so a suppressed first CALL would only report Host is down.

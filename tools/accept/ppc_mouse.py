@@ -77,7 +77,7 @@ def observe(elf, cpu, evidence, case):
         if case in ('normal', 'drop-release'):
             probe('cursor')
             require(s.word('cursor_display_mode') == 1, 'TEXT mode selected')
-            key, _ = keyboard_actions(s.q, lambda: serial(log), s.wait)
+            key, _ = keyboard_actions(s.q, lambda: serial(log), s.wait, evidence)
             probe('key', during=lambda: key('a'))
             s.q.call('device_del', {'id': 'mouse'})
             s.wait(lambda: 'USB RELEASE kind=1' in serial(log), 'held mouse detached')
