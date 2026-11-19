@@ -373,9 +373,11 @@ void platform_boot_services(void)
         (void)pm_console_text_start();
 #if KBOOT_SH
         (void)pm_hostfs_boot(info->tb_hz);
-        if (target.width && target.height)
-            pointer_set_default_bounds(target.width > 32768 ? 32767 : target.width - 1,
-                                       target.height > 32768 ? 32767 : target.height - 1);
+        u32 fb_w, fb_h;
+        pm_console_text_size(&fb_w, &fb_h);
+        if (fb_w && fb_h)
+            pointer_set_default_bounds(fb_w > 32768 ? 32767 : fb_w - 1,
+                                       fb_h > 32768 ? 32767 : fb_h - 1);
         pm_usb_boot(info->tb_hz);
 #if KBOOT_LINK
         int work_rc = idle_work_register(pm_link_service_once);

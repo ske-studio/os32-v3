@@ -19,6 +19,12 @@
 static struct gfx_console_target target;
 static int pm_text_was_up;
 
+void pm_console_text_size(u32 *width, u32 *height)
+{
+    *width = target.width;
+    *height = target.height;
+}
+
 static int open_target(void)
 {
     struct gfx2_adapter *a = gfx2_active();
