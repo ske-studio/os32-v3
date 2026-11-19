@@ -23,6 +23,7 @@
 | 検査を足す・試験の固定を直す | スキル `.claude/skills/os32-test-basis`、[POLICY_DEV §6](POLICY_DEV.md)、[TESTS.md](TESTS.md) | `tools/checks/<名>.py` (宣言)・`tools/tests/` | `python3 tools/checks/run.py --lint`、`MUTATE=1 make check-<名>` |
 | CI が遅い・検査を大きく足した後 | スキル `.claude/skills/os32-ci-inventory`、[棚卸しの道具](design/tools/ci/time_inventory.md) | `tools/checks/weights.json` (重み)、workflow の行列 | `python3 tools/ci/time_inventory.py <成果物の置き場>`、前後のジョブの実時間 |
 | CI の赤を読む・回し直す | スキル `.claude/skills/os32-ci-read`、[POLICY_CI.md](POLICY_CI.md) | — | `gh run list` (数分おきに 1 回) |
+| NP21/W の受入を別の機械で回す | スキル `.claude/skills/os32-emu-remote`、[08_build §8-5](08_build.md) | 枠 (ポート・ini・NHD・HostDrv) は pc98emu の機械の `C:\np21w`・`C:\os32-N` | 配布物の BUILD_INFO・manifest の `build=`・ゲストの `ver` の照合 |
 | 票を完了にする・文書を減らす | スキル `.claude/skills/os32-archive`、[POLICY_ARCHIVE.md](POLICY_ARCHIVE.md) | 要約は `docs/design/<ソースと同じパス>.md`、移動は `tools/move_docs.py` | 文書の検査 5 本と `check-archive-refs`、`run.py --lint` |
 | ユーザーの決定を残す | スキル `.claude/skills/os32-decision-fold` | [POLICY_DEV §10](POLICY_DEV.md)・[ROLES §6](tasks/agents/ROLES.md) の表 | 文書の検査 |
 | 資料を直す | INDEX.md の正典表で更新先を 1 つに決める | その 1 か所 + 参照側は要約のみ | [08_build §8-4](08_build.md)・[ROLES §0「検査」](tasks/agents/ROLES.md) |
