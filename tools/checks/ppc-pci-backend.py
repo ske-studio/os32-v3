@@ -10,9 +10,9 @@ CHECK = dict(name='ppc-pci-backend', tier=1, needs=[], budget=10,
             'include/types.h', 'include/callconv.h', 'include/memmap.h',
             'include/pci_config_contract.h', 'include/pci_bind_contract.h',
             'include/pci_dev_contract.h', 'drivers/pci/pci.h', 'drivers/pci/pci_bind.h',
-            'drivers/pci/pci_decode.h', 'drivers/net/gem/gem.h',
+            'include/pci_contract.h', 'include/kprintf.h', 'drivers/pci/*.c', 'drivers/pci/*.h', 'drivers/net/gem/gem.h',
             'sdk/include/os32/*.h', 'lib/kstring_c.c', 'lib/kstring.h'],
-    basis=['docs/decisions/ppc/PPC_KAPI_FILL_DESIGN.md §3 PCI'])
+    basis=['docs/decisions/ppc/PCI_COMMON_DESIGN.md §3・§7'])
 
 
 def run(ctx):
@@ -34,6 +34,8 @@ def run(ctx):
                             '-ffunction-sections', '-Wl,--gc-sections', '-DPM_PCI_FAKE_MMIO',
                             '-I.', '-Iinclude', '-Ilib', '-Iplatform/powermac', '-Iarch/ppc',
                             '-Isdk/include/os32', 'tools/ppc/pci_backend_fake.c',
+                            'drivers/pci/pci.c', 'drivers/pci/pci_decode.c', 'drivers/pci/pci_barsize.c',
+                            'drivers/pci/pci_bind.c', 'drivers/pci/pci_bind_match.c',
                             'lib/kstring_c.c', *(Path(tmp) / name for name in sources),
                             '-o', exe], cwd=ctx.root, check=True)
             rc = subprocess.run(['qemu-i386', exe], timeout=10).returncode
@@ -50,9 +52,10 @@ def run(ctx):
                 ('BAR writes', 'pci_backend.c', 'int pci_config_bar_measure(void)\n{\n    return 0;',
                  'int pci_config_bar_measure(void)\n{\n    return 1;', 4),
                 ('unaligned read', 'pci_backend.c', 'reg & ~3u', 'reg', 5),
+                ('byte order', 'pci_backend.c', 'return value;', 'return __builtin_bswap32(value);', 5),
                 ('BDF range', 'pci_backend.c', 'dev > 31 || fn > 7 || ', '', 6),
             ]:
                 check(expected, {name: (old, new)})
                 print(f'RED {label} (assertion {expected})')
-    print('PowerMac PCI backend OK' + (' (6 runtime mutants RED)' if ctx.mutate else ''))
+    print('PowerMac PCI backend OK' + (' (7 runtime mutants RED)' if ctx.mutate else ''))
     return 0
