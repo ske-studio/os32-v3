@@ -202,14 +202,23 @@ def observe(elf, cpu, evidence, case, modes=()):
             key, _ = keyboard_actions(session.q, read_log, session.wait, evidence)
             marker = 'GFX2 display restored'
 
-            def check_glyphs(name, text, visible=True):
+            def glyphs_match(name, text):
                 rows = session.screen(name).splitlines()
-                row = next(i for i, line in enumerate(rows) if text in line)
+                row = next((i for i, line in enumerate(rows) if text in line), None)
+                if row is None:
+                    return False
                 terminal = Terminal(read_ppm(evidence / (name + '.ppm')),
                                     Font(ROOT / 'assets/fonts/shino16.kcgfont'),
                                     bytes([255]) * 3, bytes(3), cursor_top=14)
-                require((terminal.compare_text(row, rows[row].index(text), text) is None) == visible,
-                        'console glyphs for ' + text)
+                return terminal.compare_text(row, rows[row].index(text), text) is None
+
+            def check_glyphs(name, text, visible=True):
+                # The cells can be ahead of the pixels (the last glyph may still
+                # be under the cursor): wait for the drawn glyphs, bounded.
+                if visible:
+                    session.wait(lambda: glyphs_match(name, text), 'console glyphs for ' + text, 10)
+                else:
+                    require(not glyphs_match(name, text), 'console glyphs for ' + text)
 
             def release():
                 def printed():
