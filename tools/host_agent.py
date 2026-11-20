@@ -584,7 +584,7 @@ class HostAgent:
             self._print_failed(job["ent"], "session changed")
         self.pending = {}
         new_sess = c["sess"] != self.sess
-        self.operator.session_reset()
+        self.operator.session_reset(keep_pending=not new_sess)
         self.sess, self.epoch, self.peer = c["sess"], c["epoch"], c["mac"]
         self.operator.session_start((self.sess, self.epoch))
         self.established = True
@@ -929,9 +929,13 @@ class HostAgent:
         elif len(parts) == 6 and parts[0] in ("RSH", "GS", "PDIAG") and parts[1] == "OUT":
             if DECL_RE.fullmatch(parts[4]) and DECL_RE.fullmatch(parts[5]):
                 length = int(parts[5])
-                if length == len(ent["got"]) and self.operator.accept_output(
+                if parts[0] == "RSH":
+                    if self.operator.accept_rsh_out(self.host_generation, session, parts[2], parts[3],
+                                                    int(parts[4]), ent["got"], length):
+                        status = HTTP_OK
+                elif length == len(ent["got"]) and self.operator.accept_output(
                         self.host_generation, session, parts[2], parts[3], int(parts[4]),
-                        ent["got"], length, {"RSH": "cui", "GS": "gui", "PDIAG": "diag"}[parts[0]]):
+                        ent["got"], length, {"GS": "gui", "PDIAG": "diag"}[parts[0]]):
                     status = HTTP_OK
         elif len(parts) == 5 and parts[:2] == ["RSH", "ACCEPT"]:
             if (DECL_RE.fullmatch(parts[4]) and self.operator.accept_handoff(
