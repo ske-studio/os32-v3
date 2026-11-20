@@ -16,6 +16,7 @@ CHECK = dict(env=['ppc-cross'], name='kcg-file-host', tier=1, needs=[], budget=1
             'kernel/console/font_source*', 'kernel/console/font_guard.h', 'kernel/gui.h',
             'kernel/module/module_runtime.h', 'kernel/module/module_image.h',
             'kernel/module/module_schema.h',
+            'platform/powermac/kcg.c', 'drivers/video/kcg/kcg.c', 'drivers/video/kcg/kcg_read_provider.inc',
             'kernel/console/font_source_kcg*', 'drivers/video/kcg/kcg_module.h',
             'fs/**', 'exec/*.h', 'mm/*.h', 'lib/kstring.h', 'lib/lz4.c', 'lib/lz4.h'],
     basis=['PPC_FBCON_DESIGN §2', 'PPC_KCG_LZ4_DESIGN §3', 'AC-GLYPH-1'],
@@ -54,8 +55,10 @@ MUTATIONS = [
 
 def build_run(root, tmp):
     exe = tmp / 'kcg-host'
-    subprocess.run(['gcc', *FLAGS, '-DHOST_GUI_SHELL_OWNER=' + re.search(r'^#define\s+GUI_SHELL_OWNER\s+(\d+)', (root / 'kernel/gui.h').read_text(), re.M)[1], '-I' + str(tmp), *include_flags(root),
-                    str(root / 'tools/tests/kcg_file_host.c'), '-o', str(exe)], check=True)
+    subprocess.run(['gcc', '-nostdinc', '-isystem', subprocess.check_output(
+                        ['gcc', '-print-file-name=include'], text=True).strip(), *FLAGS, '-DHOST_GUI_SHELL_OWNER=' + re.search(r'^#define\s+GUI_SHELL_OWNER\s+(\d+)', (root / 'kernel/gui.h').read_text(), re.M)[1], '-I' + str(tmp), *include_flags(root),
+                    str(root / 'tools/tests/kcg_file_host.c'), str(root / 'platform/powermac/kcg.c'),
+                    str(root / 'drivers/video/kcg/kcg.c'), '-o', str(exe)], check=True)
     return host32.run([str(exe)], runner='qemu').returncode
 
 

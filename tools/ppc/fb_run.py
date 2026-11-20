@@ -2,7 +2,8 @@
 """Real INDEX8 sh acceptance: USB startup, UTF-8 script input and QMP pixels.
 
 All expected positions come from the fixed script, never from the screenshot.
-Only stream framing is instrumented; renderer, shell and input remain real.
+Recovery follows the display lifecycle contract: owner exit advances the target
+generation and the same KCG1 cells reappear at the same pixel coordinates.
 """
 import argparse
 import hashlib
@@ -115,7 +116,7 @@ def accept(elf, cpu, out, mode):
         for c in text:
             key({'\n': 'ret', ' ': 'spc', '.': 'dot', '/': 'slash'}.get(c, c))
 
-    def usb_command(text, wanted):
+    def usb_command(text, wanted, *, external=False):
         start = len(stream())
         previous = stream().count('sh> ')
         usb(text+'\n')
@@ -131,6 +132,11 @@ def accept(elf, cpu, out, mode):
         block = stream()[start:]
         banner = ('================================\n OS32 External Shell Started\n'
                   '================================\nsh> ') if not previous else ''
+        if external:
+            # The shell may add a blank separator after a foreground program.
+            lines = [line for line in block.splitlines() if line]
+            check(lines == [text, *wanted.splitlines(), 'sh> '], 'tile leave/status: '+repr(block))
+            return
         check(block == banner+text+'\n'+wanted+'sh> ', 'USB exact echo/fd1: '+repr(block))
 
     def before_open():
@@ -199,6 +205,24 @@ def accept(elf, cpu, out, mode):
         t = shot('lan-result')
         check(t.compare_text(1, 0, '日本語の表示') is None, 'UTF-8 fd1 result control')
         shot('lan-utf8', ['sh> '+text, '日本語の表示', 'sh> '], [(2, 4)])
+        # Display lifecycle contract: leaving the tile returns a new text target.
+        def generations():
+            return re.findall(r'FB text ready generation=(\d+)', serial(a))
+
+        before = generations()
+        usb_command('source /leave.sh', 'tile left\n0\n', external=True)
+        after = generations()
+        check(bool(before) and after[:-1] == before and after[-1] != before[-1],
+              'tile owner exit restores a new generation')
+        usb_command('clear', '\x1b[2J\x1b[H')
+        start = len(stream())
+        key('z')
+        wait(lambda: stream()[start:].endswith('sh> '), 10, 'restored UTF-8 completion')
+        check(stream()[start:] == wanted, 'restored UTF-8 stream')
+        restored = shot('restored', ['sh> '+text, '日本語の表示', 'sh> '], [(2, 4)])
+        for y in range(t.top + 16, t.top + 32):
+            for x in range(len('日本語の表示') * 16):
+                check(t.image.pixel(x, y) == restored.image.pixel(x, y), 'restored glyph pixels')
         (out/'stream.txt').write_text(stream())
         q.call('quit'); process.wait(timeout=2)
         require(process.returncode == 0, 'QEMU quit rc=0')
@@ -235,30 +259,41 @@ MUTATIONS = [
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--mutate', action='store_true')
+    p.add_argument('--build-only', action='store_true')
     p.add_argument('--cpu', choices=['7450', '7455', 'both'], default='both')
     args = p.parse_args()
     cross = Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc'))
-    if not (cross/'bin/powerpc-elf-gcc').is_file() or not ROM.is_file() or any(
-            shutil.which(x) is None for x in ['qemu-system-ppc', 'genisoimage']):
+    if not (cross/'bin/powerpc-elf-gcc').is_file() or (not args.build_only and (not ROM.is_file() or any(
+            shutil.which(x) is None for x in ['qemu-system-ppc', 'genisoimage']))):
         missing = 'PPC toolchain' if not (cross/'bin/powerpc-elf-gcc').is_file() else 'QEMU/OpenBIOS/genisoimage'
         print('SKIP ppc-fb: ' + missing + ' unavailable')
         return int(os.environ.get('OS32_REQUIRE_PPC') == '1')
     os.environ['PPC_FB'] = '1'
     work = Path(tempfile.mkdtemp(prefix='fb-run-', dir=os.environ['TMPDIR']))
     print('evidence='+str(work), flush=True)
+    os.environ.setdefault('SOURCE_DATE_EPOCH', '946684800')
+    digests = set()
     for mode, source, old, new in [('normal', None, None, None)] + (MUTATIONS if args.mutate else []):
         script = work/'fb.sh'; script.write_text('echo ASCII ｶﾅ 日本語\n')
         manifest = json.loads((ROOT/'build/ppc-ram-root.json').read_text())
+        leave = work/'leave.sh'
+        leave.write_text('/bin/dispprb.bin leave\necho $?\n')
+        manifest['/leave.sh'] = str(leave)
         manifest['/fb.sh'] = str(script)
         manifest_path = work/'root.json'; manifest_path.write_text(json.dumps(manifest))
+        user = work / ('user-bytewise' if mode == 'utf8-bytewise' else 'user')
         opts = product_settings(work, mode) + ['KBOOT_LINK=0', 'ROOT_MANIFEST='+str(manifest_path),
-            'ROOT_DEPS=assets/fonts/shino16.kcgfont assets/fonts/JF-Dot-Shinonome16-LICENSE.txt build/out/unicode.bin '+str(script)]
+            'KB_SH_OUT='+str(user), 'PPC_USER_OUT='+str(user),
+            'KB_ROOT_BINS='+str(user/'dispprb.bin'),
+            'ROOT_DEPS=assets/fonts/shino16.kcgfont assets/fonts/JF-Dot-Shinonome16-LICENSE.txt build/out/unicode.bin '+str(script)+' '+str(leave)]
         # Every mode feeds the fixed UTF-8 line at the LAN terminal decoder on USB 'z'.
         src = 'platform/powermac/input_boot.c'
         inp = (ROOT/src).read_text()
         literal = ''.join('\\x%02x' % c for c in 'echo 日本語の表示\n'.encode())
         helper = ('static int fb_usb(void) { int c = pm_input_usb_take(); '
-                  'if (c == \'z\') { static const u8 text[] = "'+literal+'"; '
+                  # pm_input_keymap returns bare ASCII for letters; accept the packed key too.
+                  "if (c == 'z' || c == ((0x29 << 8) | 'z')) { "
+                  'static const u8 text[] = "'+literal+'"; '
                   'pm_terminal_feed(text, sizeof(text)-1); return -1; } return c; }\n')
         anchor = 'pm_input_usb_take()'
         require(inp.count(anchor) == 1, 'unique FB input boundary')
@@ -276,8 +311,6 @@ def main():
         elif source:
             opts += [x.replace('KB_MUT_', 'KB_MUT_EXTRA_') for x in
                      mutant_settings(work, mode, source, old, new)]
-        if mode in ('utf8-bytewise', 'trace-screen'):
-            (ROOT/'build/out/ppc-user/sh/runtime.o').unlink(missing_ok=True)
         elf = build(work/mode, 'PPC_CROSS_DIR='+str(cross), *opts)
         hashes = {str(path.relative_to(ROOT)) if path.is_relative_to(ROOT) else str(path):
                   dict(size=path.stat().st_size, sha256=hashlib.sha256(path.read_bytes()).hexdigest())
@@ -286,6 +319,12 @@ def main():
                                ROOT/'assets/fonts/JF-Dot-Shinonome16-LICENSE.txt',
                                ROOT/'build/out/unicode.bin']}
         (work/(mode+'-inputs.json')).write_text(json.dumps(hashes, indent=2))
+        digest = hashlib.sha256(elf.read_bytes()).hexdigest()
+        require(digest not in digests, 'duplicate FB ELF '+mode)
+        digests.add(digest)
+        print(f'{mode} sha256={digest} {elf}', flush=True)
+        if args.build_only:
+            continue
         for cpu in (['7450', '7455'] if args.cpu == 'both' else [args.cpu]) if mode == 'normal' else ['7450']:
             try:
                 accept(elf, cpu, work/(mode+'-'+cpu), mode)

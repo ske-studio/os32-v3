@@ -1,6 +1,6 @@
 """T5c-1: real KCG body, typed adapter/runtime, paired product and runtime RED."""
 CHECK = dict(name='kcg-module-host', tier=1,
-    covers=['tools/tests/recover_gf_dev_stub.c', 'platform/pc98/bootinfo_wire.h', 'platform/pc98/bootinfo_native.h', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'gfx/gfx_emergency.c', 'gfx/gfx_emergency.h', 'tools/tests/paging_source.py', 'kdebug/kselftest.c', 'tools/tests/kcg_display_host.c', 'mm/paging.h', 'gfx/gfx.h', 'kernel/module/module_runtime.c', 'kernel/module/module_runtime.h', 'kernel/module/module_image.c', 'kernel/module/module_image.h', 'kernel/module/module_schema.h', 'mm/pgalloc.h', 'include/types.h', 'include/memmap.h', 'fs/vfs.c', 'fs/vfs.h', 'drivers/base/dev.c', 'kernel/dev/dev.h', 'drivers/block/disk.h', 'drivers/video/kcg/kcg.h', 'drivers/video/kcg/kcg.c', 'tools/tests/kcg_body_host.c', 'drivers/block/fdc.h', 'include/console.h', 'include/kbd.h', 'drivers/input/kbd.h', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'lib/kstring.h', 'tools/tests/module_runtime_host.c', 'tools/tests/test_module_runtime.py', 'tools/tests/module_runtime_tdd.md', 'tools/tests/test_module_image.py', 'tools/tests/module_image_host.c', 'tools/tests/host32.py', 'drivers/video/kcg/kcg_body.c', 'drivers/video/kcg/kcg_module.c', 'platform/pc98/kernel.c', 'drivers/video/kcg/kcg_module.h', 'include/config.h', 'sdk/include/os32/os32_generations.h', 'include/bootinfo.h', 'tools/prototypes/kcg_imports.def', 'tools/gen_sqlite_imports.py', 'tools/tests/kcg_module_host.c', 'tools/tests/test_gfx_kernel_fb.py', 'tools/tests/gfx_kernel_fb_host.c', 'gfx/gfx_core.c', 'exec/access_walk.c', 'exec/lease.c', 'exec/redir_access.c', 'exec/surface_query.c', 'drivers/video/cirrus/backend_cirrus.c', 'drivers/video/cirrus/cirrus_identify.c', 'drivers/video/pc98/backend_pc98.c', 'drivers/video/pc98/backend_pegc.c', 'gfx/gfx_scroll.c', 'platform/pc98/gfx_scroll.c', 'platform/pc98/gfx_init.c', 'platform/pc98/gfx_selector.c', 'platform/pc98/gfx_surfaces.c', 'kernel/console/display_restore.h', 'drivers/video/pc98/gfx_vram.c', 'gfx/gfx_dirty.c', 'gfx/gfx_present.c', 'mm/paging.c', 'mm/pgalloc.c', 'mm/physmem.c', 'mm/shlib.c', 'kernel/sys.c', 'tools/tests/mutpar.py', 'tools/tests/kernel_layout.py', 'lib/serial_diag.h', 'tools/tests/serial_diag_host.h', 'gfx/gfx_internal.h', 'build/kcg-module.ld', 'tools/mkmod.py', 'tools/gen_kdebug_imports.py', 'sdk/kapi.json', 'build/out/kcg/*', 'build/out/kcg.mod', 'build/out/vmkernel.lz4', 'build/out/kernel.elf', 'fs/pc98pt.c', 'drivers/pci/pci_decode.c', 'tools/tests/sh_truncation_host.c', 'tools/tests/test_sh_truncation.py', 'userland/shell/cmd_base.c', 'userland/shell/cmd_dir.c', 'userland/shell/cmd_env.c', 'userland/shell/cmd_file.c', 'userland/shell/cmd_filer.c', 'userland/shell/cmd_fs_shared.c', 'userland/shell/cmd_hdprep.c', 'userland/shell/cmd_mnt.c', 'userland/shell/cmd_pci.c', 'userland/shell/cmd_script.c', 'userland/shell/cmd_sys.c', 'userland/shell/cmd_gf1.c', 'userland/shell/cmd_gf2.c', 'userland/shell/cmd_tri.c', 'kdebug/tri_command_wire.h', 'kdebug/gf_foundation_wire.h', 'kdebug/gf_command_wire.h', 'userland/shell/hdprep_plan.c', 'userland/shell/kbd_watch.c', 'userland/shell/main.c', 'userland/shell/pci_verbose.c', 'userland/shell/rshell.c', 'userland/shell/serial_watchdog.c', 'userland/shell/ui.c', 'exec/exec.h', 'include/pc98.h', 'include/io.h', 'platform/pc98/platform_io.h', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'platform/pc98/boot.c', 'include/platform_display.h', 'platform/pc98/display.c', 'include/kcg_contract.h', 'tools/tests/kernel_includes.py', 'kernel/module/kdebug_imports.def', 'lib/sqlite3/os32_sqlite_vfs.c', 'tools/prototypes/sqlite_imports.def'],
+    covers=['tools/tests/recover_gf_dev_stub.c', 'platform/pc98/bootinfo_wire.h', 'platform/pc98/bootinfo_native.h', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'gfx/gfx_emergency.c', 'gfx/gfx_emergency.h', 'tools/tests/paging_source.py', 'kdebug/kselftest.c', 'tools/tests/kcg_display_host.c', 'mm/paging.h', 'gfx/gfx.h', 'kernel/module/module_runtime.c', 'kernel/module/module_runtime.h', 'kernel/module/module_image.c', 'kernel/module/module_image.h', 'kernel/module/module_schema.h', 'mm/pgalloc.h', 'include/types.h', 'include/memmap.h', 'fs/vfs.c', 'fs/vfs.h', 'drivers/base/dev.c', 'kernel/dev/dev.h', 'drivers/block/disk.h', 'drivers/video/kcg/kcg.h', 'drivers/video/kcg/kcg.c', 'tools/tests/kcg_body_host.c', 'drivers/block/fdc.h', 'include/console.h', 'include/kbd.h', 'drivers/input/kbd.h', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'lib/kstring.h', 'tools/tests/module_runtime_host.c', 'tools/tests/test_module_runtime.py', 'tools/tests/module_runtime_tdd.md', 'tools/tests/test_module_image.py', 'tools/tests/module_image_host.c', 'tools/tests/host32.py', 'drivers/video/kcg/kcg_body.c', 'drivers/video/kcg/kcg_module.c', 'drivers/video/kcg/kcg_read_provider.inc', 'platform/pc98/kernel.c', 'drivers/video/kcg/kcg_module.h', 'include/config.h', 'sdk/include/os32/os32_generations.h', 'include/bootinfo.h', 'tools/prototypes/kcg_imports.def', 'tools/gen_sqlite_imports.py', 'tools/tests/kcg_module_host.c', 'tools/tests/test_gfx_kernel_fb.py', 'tools/tests/gfx_kernel_fb_host.c', 'gfx/gfx_core.c', 'exec/access_walk.c', 'exec/lease.c', 'exec/redir_access.c', 'exec/surface_query.c', 'drivers/video/cirrus/backend_cirrus.c', 'drivers/video/cirrus/cirrus_identify.c', 'drivers/video/pc98/backend_pc98.c', 'drivers/video/pc98/backend_pegc.c', 'gfx/gfx_scroll.c', 'platform/pc98/gfx_scroll.c', 'platform/pc98/gfx_init.c', 'platform/pc98/gfx_selector.c', 'platform/pc98/gfx_surfaces.c', 'kernel/console/display_restore.h', 'drivers/video/pc98/gfx_vram.c', 'gfx/gfx_dirty.c', 'gfx/gfx_present.c', 'mm/paging.c', 'mm/pgalloc.c', 'mm/physmem.c', 'mm/shlib.c', 'kernel/sys.c', 'tools/tests/mutpar.py', 'tools/tests/kernel_layout.py', 'lib/serial_diag.h', 'tools/tests/serial_diag_host.h', 'gfx/gfx_internal.h', 'build/kcg-module.ld', 'tools/mkmod.py', 'tools/gen_kdebug_imports.py', 'sdk/kapi.json', 'build/out/kcg/*', 'build/out/kcg.mod', 'build/out/vmkernel.lz4', 'build/out/kernel.elf', 'fs/pc98pt.c', 'drivers/pci/pci_decode.c', 'tools/tests/sh_truncation_host.c', 'tools/tests/test_sh_truncation.py', 'userland/shell/cmd_base.c', 'userland/shell/cmd_dir.c', 'userland/shell/cmd_env.c', 'userland/shell/cmd_file.c', 'userland/shell/cmd_filer.c', 'userland/shell/cmd_fs_shared.c', 'userland/shell/cmd_hdprep.c', 'userland/shell/cmd_mnt.c', 'userland/shell/cmd_pci.c', 'userland/shell/cmd_script.c', 'userland/shell/cmd_sys.c', 'userland/shell/cmd_gf1.c', 'userland/shell/cmd_gf2.c', 'userland/shell/cmd_tri.c', 'kdebug/tri_command_wire.h', 'kdebug/gf_foundation_wire.h', 'kdebug/gf_command_wire.h', 'userland/shell/hdprep_plan.c', 'userland/shell/kbd_watch.c', 'userland/shell/main.c', 'userland/shell/pci_verbose.c', 'userland/shell/rshell.c', 'userland/shell/serial_watchdog.c', 'userland/shell/ui.c', 'exec/exec.h', 'include/pc98.h', 'include/io.h', 'platform/pc98/platform_io.h', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'platform/pc98/boot.c', 'include/platform_display.h', 'platform/pc98/display.c', 'include/kcg_contract.h', 'tools/tests/kernel_includes.py', 'kernel/module/kdebug_imports.def', 'lib/sqlite3/os32_sqlite_vfs.c', 'tools/prototypes/sqlite_imports.def'],
     needs=['make:all'], budget=8.6,
     kind='characterization',
 )
@@ -18,6 +18,7 @@ import host32
 from test_module_runtime import FLAGS, INCLUDES, image
 from test_module_image import build_validator, validate, fnv, crc, word
 
+compiler_headers = subprocess.check_output(['gcc', '-print-file-name=include'], text=True).strip()
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -28,7 +29,7 @@ def display_diagnostic(folder, blank_line=False):
         source = source.replace('DIAG_LINE = 4', 'DIAG_LINE = 0')
     (folder / 'kcg_display_source.inc').write_text(source)
     exe = folder / 'display'
-    result = subprocess.run(['gcc', *FLAGS, *INCLUDES, '-I'+str(folder),
+    result = subprocess.run(['gcc', *FLAGS, '-nostdinc', '-isystem', compiler_headers, *INCLUDES, '-I'+str(folder),
                              '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
                              ROOT / 'tools/tests/kcg_display_host.c', '-o', exe],
                             capture_output=True, text=True)
@@ -206,7 +207,15 @@ def main():
         (folder / 'kcg_display_code.inc').write_text(display[start:end] + '\n')
         body = (ROOT / 'drivers/video/kcg/kcg_body.c').read_text()
 
-        def run(source, kind, modes, expected=0):
+        # AC-GLYPH-1: cdecl providers fill 16 ANK or 32 JIS bytes in module text.
+        payload_image = bytearray(image())
+        # push count/pop ecx; mov al,value; jump/fall through to rep stosb.
+        writers = bytes.fromhex('6a 10 59 b0 41 eb 05 6a 20 59 b0 62 '
+                                '57 8b 7c 24 0c fc f3 aa 5f c3')
+        payload_image[4096:4096+len(writers)] = writers
+        payload_image = crc(payload_image)
+
+        def run(source, kind, modes, expected=0, failure=b'FAIL '):
             path = folder / ('kcg_body_source.inc' if kind == 'body' else 'adapter.c')
             path.write_text(source)
             if kind == 'body':
@@ -215,19 +224,19 @@ def main():
             extra = ([f'-DKCG_ADAPTER="{path}"', ROOT / 'kernel/module/module_runtime.c',
                       ROOT / 'kernel/module/module_image.c', ROOT / 'fs/vfs.c', ROOT / 'drivers/base/dev.c']
                      if kind == 'module' else [f'-DKCG_ADAPTER="{folder / "adapter.c"}"'])
-            result = subprocess.run(['gcc', *FLAGS, '-Wno-unused-parameter', *INCLUDES,
-                                     '-I'+str(ROOT/'build/out/kcg'), '-I'+str(folder),
+            result = subprocess.run(['gcc', *FLAGS, '-nostdinc', '-isystem', compiler_headers, '-Wno-unused-parameter', *INCLUDES,
+                                     '-I'+str(ROOT/'drivers/video/kcg'), '-I'+str(ROOT/'build/out/kcg'), '-I'+str(folder),
                                      '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
                                      ROOT / f'tools/tests/kcg_{kind}_host.c', *extra,
                                      '-o', exe], capture_output=True, text=True)
             if result.returncode:
                 raise RuntimeError('compile failure is not runtime RED\n'+result.stdout+result.stderr)
             for mode in modes:
-                payload = struct.pack('<2I', 10 if mode == 3 else 0, mode) + image()
+                payload = struct.pack('<2I', 10 if mode == 3 else 0, mode) + payload_image
                 for runner in os.environ.get('HOST32_RUNNERS', 'qemu').split():
                     result = host32.run([str(exe)], input=payload, runner=runner, capture_output=True)
                     assert result.returncode == expected, (kind, mode, result)
-                    if expected: assert b'FAIL ' in result.stdout, result
+                    if expected: assert failure in result.stdout, result
                     else: print(result.stdout.decode().strip(), flush=True)
 
         run(adapter, 'module', range(6))
@@ -240,6 +249,16 @@ def main():
             graphics_boundary(('if (!kcg_module_ready()) {', 'if (0) {'))
             graphics_boundary(('kapi_sys_exit(1);', 'appslot_abort_request();'))
             boot_notice(folder, remove_notice=True)
+            provider = ROOT / 'drivers/video/kcg/kcg_read_provider.inc'
+            local = folder / provider.name
+            for call, pattern in (('public_api()->read_ank(ch, buf);', b'0x41'),
+                                  ('public_api()->read_kanji(jis, buf);', b'0x62')):
+                original = provider.read_text()
+                assert original.count(call) == 1
+                local.write_text(original.replace(call, 'if (!kcg_module_ready()) '+call))
+                run(adapter, 'module', [0], expected=1, failure=pattern)
+                print('RED omitted '+call, flush=True)
+            local.unlink()
             saved_adapter = adapter
             for old in ('platform_display_kcg_code();', 'public_api()->invalidate();'):
                 assert adapter.count(old) == 1

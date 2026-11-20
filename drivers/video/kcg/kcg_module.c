@@ -25,8 +25,7 @@ static const KcgModuleApi *public_api(void)
 {
     return kcg_module_ready() ? &candidate : &stub_api;
 }
-void kcg_rom_read_ank(u8 ch, u8 *buf) { public_api()->read_ank(ch, buf); }
-void kcg_rom_read_kanji(u16 jis, u8 *buf) { public_api()->read_kanji(jis, buf); }
+#include "kcg_read_provider.inc"
 void kcg_cache_stats(KcgCacheStats *out) { public_api()->stats(out); }
 int kcg_module_ready(void) { return module_exports(kcg_handle) != 0; }
 
