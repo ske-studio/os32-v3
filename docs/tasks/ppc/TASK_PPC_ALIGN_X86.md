@@ -1,6 +1,6 @@
 # TASK_PPC_ALIGN_X86 — PowerPC の作りを x86 に寄せる (2 重の実装を取り除く)
 
-> 状態: **計画 (2026-11-20)** — 洗い出しは [ARCH_DRIFT_AUDIT](../../decisions/ppc/ARCH_DRIFT_AUDIT.md) (A 物理の違い 13・B 揃えられる 2 重 15・C 片方にしか無い 15)。前提は [POLICY_DEV §10](../../POLICY_DEV.md)「x86 に揃える」。PPC KAPI の埋め ([TASK_PPC_KAPI_FILL](TASK_PPC_KAPI_FILL.md)) を先に終え、その後に本格に進める。
+> 状態: **計画 (2026-11-20)** — 洗い出しは [ARCH_DRIFT_AUDIT](../../decisions/ppc/ARCH_DRIFT_AUDIT.md) (A 物理の違い 13・B 揃えられる 2 重 15・C 片方にしか無い 15)。前提は [POLICY_DEV §10](../../POLICY_DEV.md)「x86 に揃える」。PPC KAPI の埋め (票 TASK_PPC_KAPI_FILL) を先に終え、その後に本格に進める。
 > 完了の基準: 下の表の B の 15 行が全部「済み」(x86 の形に寄せた、または物理の理由つきで ARCH_COMPAT_CONTRACT §9 の「残す」に移した) になり、C の行は各々「x86 に足す / PowerPC に足す / 片方のままでよい理由」が決まっている。
 
 ## 0. ユーザー決定 (2026-11-20)
@@ -25,7 +25,7 @@
 | 4 | B12 | SFS の scope の実行の包み | 90–240 行、4–8 ファイル | 未着手 |
 | 5 | B11 | ver/sysinfo とメモリの内訳 | 110–270 行、5–9 ファイル | 未着手 |
 | 6 | B10 | ログの経路と起動の診断の出力 | 160–360 行、6–11 ファイル | 未着手 |
-| 7 | B09 | シェルの libc の接着・登録のコマンドと既定値 | 170–420 行、7–13 ファイル | 未着手 (5d の受入で見つけた: PowerPC の sh は SHELL_AS_APP・SH_SYS_MINIMAL で os32gui を断る — userland/shell/sh_exec.inc:308・cmd_sys.c:686。共通のシェルで有効にするのはこの行で) |
+| 7 | B09 | シェルの libc の接着・登録のコマンドと既定値 | 170–420 行、7–13 ファイル | 未着手 (5d の受入で見つけた: PowerPC の sh は SHELL_AS_APP・SH_SYS_MINIMAL で os32gui を断る — userland/shell/sh_exec.inc・cmd_sys.c。共通のシェルで有効にするのはこの行で) |
 | 8 | B08 | SQLite の初期化とリンク (module か静的か) | 210–450 行、6–11 ファイル | 未着手 (PowerPC の module の読み込みを作るかの決めが先) |
 | 9 | B07 | ビルド・配布・試験の像の作り方 | 240–520 行、8–15 ファイル | 未着手 |
 | 10 | B06 | 端末・入力の接続の方針 | 250–560 行、7–12 ファイル | 未着手 |
