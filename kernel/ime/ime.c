@@ -89,7 +89,11 @@ u32 ime_boot_bytes(void)
     return ime_display_bytes();
 }
 
+#ifdef OS32_FEP_STATIC
+static int ime_boot_open_dict(void)
+#else
 int ime_dict_boot(void)
+#endif
 {
     if (g_ime.dict_loaded) return 0;
     if (ime_display_boot(services_boot_fault)) return -1;
@@ -108,6 +112,18 @@ int ime_dict_boot(void)
     g_ime.dict_loaded = 1;
     return 0;
 }
+
+#ifdef OS32_FEP_STATIC
+int ime_dict_boot(void)
+{
+    int rc = fep_static_gate();
+    if (rc) return rc;
+    if (g_ime.dict_loaded) return 0;
+    rc = fep_static_prepare();
+    if (rc) return rc;
+    return fep_static_commit(ime_boot_open_dict());
+}
+#endif
 
 int ime_boot_abort(void)
 {

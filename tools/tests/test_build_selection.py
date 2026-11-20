@@ -55,6 +55,8 @@ def check_fep(root):
         profiles = [query(root, [*options, 'FEATURE_SQLITE=1', f'FEATURE_FEP={enabled}'],
                           config_only=True) for enabled in (0, 1)]
         units = ('kernel/ime/fep_module.c', 'kernel/ime/fep_suspend_owner.c')
+        if options == x86:
+            units += ('kernel/ime/fep_static.c',)
         off, on = profiles
         for unit in units:
             assert unit not in off['C_KERNEL'] and on['C_KERNEL'].count(unit) == 1
@@ -147,6 +149,7 @@ def check_kboot(root):
             formatter = {ext2 + stem for stem in ('fmt', 'layout', 'time')}
             pending = set(actual['KB_PENDING'].split())
             assert actual['KB_OUT'] + '/kernel/ime/fep_boot_config.o' in pending, name
+            assert actual['KB_OUT'] + '/kernel/ime/fep_static.o' in pending, name
             for unit in formatter:
                 assert actual['KB_OUT'] + '/' + unit + '.o' in pending, (name, unit)
             ide = ext2 + 'medium_ide'

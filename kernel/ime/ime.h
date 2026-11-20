@@ -15,6 +15,13 @@
 #include "vfs.h"
 
 /* 既定の辞書。boot coordinator の存在確認と FEP の open で共有する。 */
+#ifdef OS32_FEP_STATIC
+int fep_static_gate(void);
+int fep_static_prepare(void);
+int fep_static_commit(int open_rc);
+void fep_static_boot(void);
+#endif
+
 #define IME_DICT_PATH  "/db/fep.db"
 
 /* ======================================================================== */

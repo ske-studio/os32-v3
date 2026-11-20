@@ -3,6 +3,10 @@
 /* 辞書バリアント切り替え */
 int ime_switch_dict(int variant)
 {
+#ifdef OS32_FEP_STATIC
+    int gate_rc = fep_static_gate();
+    if (gate_rc) return gate_rc;
+#endif
     if (!services_public) return OS32_ERR_NOSYS;
     const char *path;
     if (variant == 0) {

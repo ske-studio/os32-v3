@@ -15,7 +15,9 @@ static char saved_user_path[OS32_MAX_PATH];
 static int suspend_dictionary(int on);
 int ime_dict_suspend(int on)
 {
-    int rc = suspend_dictionary(on);
+    int rc = fep_static_gate();
+    if (rc) return rc;
+    rc = suspend_dictionary(on);
     fep_suspend_owner_note(on, rc, res_owner_get());
     return rc;
 }

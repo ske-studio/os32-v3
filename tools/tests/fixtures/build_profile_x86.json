@@ -151,6 +151,7 @@
     "kernel/console/unicode_file.c",
     "kernel/ime/fep_module.c",
     "kernel/ime/fep_suspend_owner.c",
+    "kernel/ime/fep_static.c",
     "drivers/ata/cd_module.c",
     "drivers/video/kcg/kcg_module.c",
     "drivers/sound/fm/fm_module.c",

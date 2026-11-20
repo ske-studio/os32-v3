@@ -552,12 +552,12 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
         spec = json.loads((ROOT / 'sdk/kapi.json').read_text())
         original_offsets = (folder / 'fep_host_offsets.h').read_text()
         for label, name, old, new, mode in (
-            ('learn-required-MINIMAL', 'ime', '    g_ime.dict_loaded = 1;',
-             '    if (!g_ime.store.user_enabled) return -1;\n    g_ime.dict_loaded = 1;', 32),
+            ('learn-required-MINIMAL', 'ime', '    g_ime.dict_loaded = 1;\n    return 0;',
+             '    if (!g_ime.store.user_enabled) return -1;\n    g_ime.dict_loaded = 1;\n    return 0;', 32),
             ('close-fault-after-ready', 'ime_conn',
              'services_stage < SERVICES_READY &&\n        ', '', 33)):
             source = (ROOT / ('kernel/ime' if name in ('ime', 'ime_dict', 'ime_conn') else 'kernel') / (name + '.c')).read_text()
-            scope = function(source, 'ime_dict_boot' if name == 'ime' else 'fep_conn_close')
+            scope = source if name == 'ime' else function(source, 'fep_conn_close')
             assert scope.count(old) == 1, label
             source_path = mutated_dir / (name + '.c')
             source_path.write_text(source.replace(scope, scope.replace(old, new)))

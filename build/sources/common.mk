@@ -13,7 +13,7 @@ C_EXT2_FORMATTER := fs/ext2/ext2_fmt.c fs/ext2/ext2_layout.c fs/ext2/ext2_time.c
 ifeq ($(PLATFORM),pc98)
 C_COMMON_PC98_PENDING += $(C_EXT2_FORMATTER)
 endif
-C_COMMON_COMPILE_ONLY_PPC := kernel/ime/fep_boot_config.c kernel/ime/fep_suspend_owner.c kernel/sqlite_engine.c $(C_EXT2_FORMATTER)
+C_COMMON_COMPILE_ONLY_PPC := kernel/ime/fep_boot_config.c kernel/ime/fep_suspend_owner.c kernel/ime/fep_static.c kernel/sqlite_engine.c $(C_EXT2_FORMATTER)
 C_COMMON_LOOP = kernel/dev/device_loop.c drivers/block/loop_dev.c
 ifeq ($(FEATURE_PC98_PENDING)$(FEATURE_LOOP),11)
 C_COMMON_LOOP += fs/ext2/ext2_medium_loop.c

@@ -65,6 +65,18 @@ GNU11・libc なしで組める形にしてある (host 試験も libc なしで
 | `fep_store_info` | `kernel/ime/ime_dict_info.c` | KAPI `ime_dict_info` の本体 |
 | `hsp_set_fep_user_path` | `userland/system/hsync_protect.inc` | 宣言だけここに置く (契約の試験用)。hsync はこのヘッダを読まない |
 
+## 静的 FEP の辞書起動
+
+静的構成の `ime_dict_boot` は隔離を検査してからロード済みかを判定する。準備、辞書の open、予約の確定を順に行う。
+準備では `/db` の ramfs と SQLite 能力を確認し、アプリ DB の使用中は写しや予約の前に AGAIN を返す。
+主辞書を probe してから切替版を写す。宛先の経路と作成した fd の mount 世代を照合する。
+途中で HOSTDOWN・STALE になった版は fd を閉じて削除し、次回はその版から再開する。
+主辞書の probe が INVAL のときは、自分が写して確かめ待ちの世代・inode と一致した場合にだけ削除する。
+予約の失敗には巻き戻しが要らない。open または予約確定の失敗では辞書を閉じて予約を解除する。
+
+削除できなければ FEP を隔離し、SQLite の公開を保つ。接続の終了や予約の解除を確認できなければ SQLite も隔離する。
+どちらも再起動まで辞書の起動・suspend・切替は BUSY を返す。媒体が無い場合と SQLite が未起動の場合は FEP を IDLE に戻し、SQLite の公開状態を保つ。
+
 ## 検査
 
 - `fep-store-contracts` (`tools/tests/test_fep_store_contracts.py`): 宣言が libc なしで組めること、試験の土台 (`tools/tests/fep_store_fixture.h`)。
