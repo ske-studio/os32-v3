@@ -384,3 +384,20 @@ exec 終了 hook は `exec/exec_abort.inc` に内部 adapter として定義し�
 - exec/exec_abort.inc・exec/appslot.c: CUI で診断の enter のあと、CPL3 の CUI 描画アプリが claim して世代が子へ移り、その子が終わって組が 0 になってから shell で STOP を押すと、以前は診断を畳んでいたが今は capture が空振りして診断が残る (leave では戻れる)。設計の帰結として記録する。直すなら claim の取得時に display_cui_owner が別の owner なら先に gf_display_owner_exit を呼ぶ。NP21/W の受入で診断と STOP を回すときに確かめる。
 - gfx/gfx_core.c: KAPI の gfx_init で drain が -1 (IF=0) を返すと黙って戻る。今の入口は int80 の後に sti するので届かない。直すなら -1 のとき appslot_abort_request() を呼ぶ。
 - 試験: drain の IF の検査と、drain の後に印を消す処理への変異を足す。test_kstop は capture と drain を空の stub にしているので、STOP の表示の扱いは exec_hwb_abort だけで見ている。
+
+## M7 の小段の割り方 (実装者の案)
+
+各段は製品機能 1 ファイル、追加・削除合計 350 行以内。像への登録は別段、未結線の段は内部試験で受け入れる。
+
+|小段|担当と受入|
+|---|---|
+|M7[1]|`input/hal/input_ime_gate.c`: IME の active/owner/command_gen を原子的に公開・snapshot。割り込み状態の保持と各値の更新を内部試験|
+|M7[2]|`input/hal/input_ime_gate.c`: PC98 の STOP/ETX 取消 pending、満杯時も取消を失わず FG1 で一回消費することを試験|
+|M7[3]|`kernel/ime/ime.c`: 変換開始/終了の状態公開と FG1 の取消接続。既存の XFER、STOP、辞書・学習、UTF-8 配送を試験|
+|B|像への登録を独立して行い、両 arch のリンクを検証|
+|S4 → S4i|追補 2 の S4 (`input/hal/input_ime_gate.c`)・S4i (`kernel/ime/ime.c`) は M7 全小段と S3 の後にこの順で直列実施。IME_ON/OFF の順序配送と絶対 ON/OFF adapter|
+
+### M7 の段で PM が決めたこと (2026-11-17)
+
+- IME snapshot に exec_gen を足す。採取時に M5 snapshot の owner と exec_gen を取り、消費時に owner と exec_gen の両方が一致したときだけ効かせる。世代は u32、0 は無し、一致だけで比較する。
+- 取消 pending があるとき、同じ owner・exec_gen の新要求は既存を保って一つにまとめ、数を記録する。別の宛先なら新しい宛先に置き換え、置換数を記録する。取消は今の前景にだけ意味がある。
