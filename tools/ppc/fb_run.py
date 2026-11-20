@@ -73,25 +73,31 @@ def observe(elf, out, cpu, case):
             check('[Remote shell closed]' in s.screen('preloaded'), 'start-consumed')
         s.close_rshell(preloaded=True)
         prompt = 'OS32:/$ '
+        def finished(text, result):
+            # The command is done when its whole result line is on screen
+            # and a fresh prompt follows it (no snapshot mid-output).
+            lines = [l.rstrip() for l in text.splitlines()]
+            rows = [i for i, l in enumerate(lines) if re.fullmatch(result, l)]
+            return bool(rows) and any(l.startswith(prompt) for l in lines[rows[-1]+1:])
         initial, baseline = shot('boot')
         check('[sqlite] static rc=0' not in initial, 'trace-screen')
         local('clear')
         local('echo first')
-        s.wait(lambda: re.search(r'(?m)^first *$', s.screen('first')), 'USB first line', 30)
+        s.wait(lambda: finished(s.screen('first'), r'first'), 'USB first line', 30)
         text, pixels = shot('first')
         check(prompt+'echo first' in text, 'start-consumed')
         check(pixels.compare_text(0, 0, prompt+'echo first') is None, 'colors/top')
         check(pixels.compare_text(1, 0, 'first') is None, 'USB output')
         local('clear')
         local('cat /bin/sample.txt')
-        s.wait(lambda: 'ASCII' in s.screen('text'), 'fd1 output', 30)
+        s.wait(lambda: finished(s.screen('text'), r'ASCII ｶﾅ 日本語'), 'fd1 output', 30)
         _, pixels = shot('text')
         check(pixels.compare_text(1, 0, 'ASCII ｶﾅ 日本語') is None, 'utf8-bytewise')
         check(reserved_unchanged(baseline.image, pixels.image), 'top')
         local('clear')
         for i in range(35):
             local(f'echo l{i:02d}')
-        s.wait(lambda: 'l34' in s.screen('scroll'), 'USB scroll completion', 30)
+        s.wait(lambda: finished(s.screen('scroll'), r'l34'), 'USB scroll completion', 30)
         _, pixels = shot('scroll')
         for i in range(19, 35):
             row = (i - 19) * 2
@@ -108,7 +114,7 @@ def observe(elf, out, cpu, case):
         s.key('backspace')
         s.wait(lambda: prompt+'echo a ' in s.screen('backspace'), 'backspace', 30)
         s.key('ret')
-        s.wait(lambda: 'a' in s.screen('edited').splitlines()[1].strip(), 'edited result', 30)
+        s.wait(lambda: finished(s.screen('edited'), r'a'), 'edited result', 30)
     finally:
         s.close()
 
