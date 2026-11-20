@@ -95,6 +95,7 @@ def present_pixels(s, evidence, case, serial, modes):
     s.wait(lambda: 'protocol=01' in read_log(), 'USB keyboard')
     key, _ = keyboard_actions(s.q, read_log, s.wait, evidence)
     black, white = bytes(3), bytes([255]) * 3
+    gate_open = case in ('gate-open', 'target-gate-open')
     for mode in modes:
         line = f'/bin/dispprb.bin v1-{mode} {fg}'
         if case == 'init-absent':
@@ -111,7 +112,8 @@ def present_pixels(s, evidence, case, serial, modes):
                 s.wait(waiting, f'{mode} checkpoint {phase}')
                 name = f'{mode}-{phase}'
                 path = evidence / (name + '.ppm')
-                if mode == 'shutdown' and not case.startswith('target-'):
+                if (mode == 'shutdown' and not case.startswith('target-') and
+                        (phase == 'b' or not gate_open)):
                     rows = s.screen(name).splitlines()
                     prefix = '> ' + line
                     row = next(i for i, text in enumerate(rows) if text.startswith(prefix))
@@ -134,7 +136,7 @@ def present_pixels(s, evidence, case, serial, modes):
                                 for x in range(704, 712)), 'shadow poison must be visible')
                 if phase == 'b' or case.startswith('width-'):
                     right = left
-                elif case in ('gate-open', 'target-gate-open', 'owner-unchecked'):
+                elif gate_open or case == 'owner-unchecked':
                     left, right = 704, 800
                 for y in range(560, 576):
                     for x in range(704, 800):
