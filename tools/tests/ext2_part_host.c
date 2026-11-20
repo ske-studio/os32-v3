@@ -18,6 +18,7 @@
  *  ext2_write_io_host.c と同じ様式 — ホスト ILP32 GNU89、-nostdlib。
  * ======================================================================== */
 
+#include "os32_kapi_shared.h"
 #include "ext2_priv.h"
 #include "ide_contract.h"
 #include "platform_device.h"
@@ -472,7 +473,7 @@ static void case_format_at_refuse(void)
     CHECK(ext2_format_at(0, 0xFFFFFFF0u, 0x20u) == EXT2_ERR_INVAL); /* 足すと 0 付近 */
     CHECK(ext2_format_at(0, 2016u, 0xFFFFFFFFu) == EXT2_ERR_INVAL);
     pt_write(2016, 20160, 16, 63);
-    const int invalid_drives[] = {1, 2, 3, 0x10000, 0x0600, -1};
+    const int invalid_drives[] = {1, 2, 3, 0x10000, OS32_DRV_LOOP(0), -1};
     for (unsigned int i = 0; i < sizeof(invalid_drives) / sizeof(invalid_drives[0]); i++) {
         int drive = invalid_drives[i];
         int expected = (drive & 3) ? EXT2_ERR_IO : EXT2_ERR_INVAL;
