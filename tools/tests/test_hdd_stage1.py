@@ -54,7 +54,7 @@ PY_NHD = ROOT / "tools/nhd_deploy.py"
 PURE_CASES = ["pt_offsets", "pt_817", "pt_1663", "pt_reject", "ata_lba28",
               "ata_range", "ata_chs", "layout", "hdprep_geom", "hdprep_disk",
               "hdprep_mounts", "hdprep_plan"]
-PART_CASES = ["find_bios", "find_fail", "format_clamp", "format_at_16652",
+PART_CASES = ["medium", "find_bios", "find_fail", "format_clamp", "format_at_16652",
               "format_at_refuse", "format_workspace", "format_io_order", "mount_bounds", "format_geom", "legacy_hint"]
 # e2fsck にかける format_at の大きさ (開始 2016、16/63 の RAM ディスク 64,512 セクタ)
 FSCK_SIZES = [16652, 20160, 36000, 62496]
@@ -162,6 +162,11 @@ C_MUTATIONS = [
      "ext2_format の頭打ちの後の範囲を ATA の上限と照合しない (ラリー 2 の 3)"),
     ("fs/pc98pt.c", "            return 0;                       /* 標準配置で読める */",
      "            (void)0;", "標準配置の表を旧配置と誤認する"),
+    ("fs/ext2/ext2_fmt.c", "return media[EXT2_MEDIUM_LOOP];", "return media[EXT2_MEDIUM_HD];", "A9: always use HD"),
+    ("fs/ext2/ext2_fmt.c", "drv >= 0x0600 && drv <= 0x0603", "(drv & 0xffff) >= 0x0600 && (drv & 0xffff) <= 0x0603", "A3: ignore high bits"),
+    ("fs/ext2/ext2_fmt.c", "drv >= 0x0600", "drv >= 0x05ff", "A3: include slot below lower bound"),
+    ("fs/ext2/ext2_medium_loop.c", " || !loop_dev_lba_writable(slot)", "", "A4b: accept read-only media"),
+    ("fs/ext2/ext2_fmt.c", "ops, ide_drive, start_lba, length, length", "ops, ide_drive, 0, length, length", "A9: ignore start LBA"),
     ("fs/ext2/ext2_fmt.c", "    u32 disk_sectors;", "    u32 disk_sectors;\n    ide_drive &= 0xff;", "A6: HD の drv を切り出す"),
     ("fs/ext2/ext2_fmt.c", "    if (media[kind]) return -1;", "", "A7: 二重登録を許す"),
     ("fs/ext2/ext2_fmt.c", "static u8 fmt_blk[EXT2_BLOCK_SIZE];", "#define fmt_blk ext2_g_blk",
@@ -877,7 +882,7 @@ def build_target(tmp):
 #  変異                                                                     #
 # ======================================================================== #
 
-MIRROR = ["fs/ext2/ext2_medium_ide.c", "include/ext2_medium_contract.h", "include/platform_device.h", "include/ide_contract.h", "drivers/ata/ide.h", "fs/pc98pt.c", "fs/pc98pt.h", "drivers/ata/ide_addr.c",
+MIRROR = ["tools/tests/ext2_medium_host.c", "include/loop_contract.h", "fs/ext2/ext2_medium_loop.c", "fs/ext2/ext2_medium_ide.c", "include/ext2_medium_contract.h", "include/platform_device.h", "include/ide_contract.h", "drivers/ata/ide.h", "fs/pc98pt.c", "fs/pc98pt.h", "drivers/ata/ide_addr.c",
           "drivers/ata/ide_addr.h", "fs/ext2/ext2_layout.c", "fs/ext2/ext2_layout.h",
           "userland/shell/hdprep_plan.c", "userland/shell/hdprep_plan.h",
           "fs/ext2/ext2_super.c", "fs/ext2/ext2_time.c", "fs/ext2/ext2_super_block_io.inc", "fs/ext2/ext2_fmt.c", "fs/ext2/ext2_inode.c", "fs/ext2/ext2_dir.c",
@@ -919,6 +924,7 @@ REBUILD = {
     "userland/shell/hdprep_plan.c": ("pure",),
     "fs/ext2/ext2_super.c": ("part",),
     "fs/ext2/ext2_super_block_io.inc": ("part",),
+    "fs/ext2/ext2_medium_loop.c": ("part",),
     "fs/ext2/ext2_medium_ide.c": ("part",),
     "fs/ext2/ext2_fmt.c": ("part",),
 }

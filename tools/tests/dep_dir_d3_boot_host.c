@@ -73,11 +73,13 @@ static unsigned int inp(unsigned int port) { CHECK(port == FDC_IO_3MODE); event(
 void dev_init(void) { event("dev;"); }
 static void loop_dev_init(void) { event("loop;"); }
 static void path_init(void) { event("path;"); }
+const struct ext2_medium_ops ext2_medium_loop_ops = {0};
 const struct ext2_medium_ops ext2_medium_ide_ops = {0};
 int ext2_medium_register(int kind, const struct ext2_medium_ops *ops)
 {
-    CHECK(kind == EXT2_MEDIUM_HD && ops == &ext2_medium_ide_ops);
-    event("medium;");
+    CHECK((kind == EXT2_MEDIUM_HD && ops == &ext2_medium_ide_ops) ||
+          (kind == EXT2_MEDIUM_LOOP && ops == &ext2_medium_loop_ops));
+    event(kind == EXT2_MEDIUM_HD ? "hd;" : "medium-loop;");
     return 0;
 }
 static int ext2_init(void) { event("ext2;"); return failing == 1 ? -1 : VFS_OK; }
@@ -169,7 +171,7 @@ int main(void)
         snprintf(want, sizeof(want), "T60,1,%u:FDC...;enable;fdc;T66,1,%u:%s;fdc-status;T0,%d,%u:FDC rc=%d st0=12 0439h=34->56;L%u:[fdc] FDC rc=%d st0=12 0439h=34->56\n;media;inp;T69,1,%u:144;T72,1,%u:M;", TATTR_GREEN, failing?TATTR_RED:TATTR_WHITE, failing?"ER":"OK", TVRAM_ROWS-1, failing?TATTR_YELLOW:TATTR_WHITE, failing?-1:0, TATTR_WHITE, failing?-1:0, TATTR_GREEN, TATTR_WHITE);
         expect(want);
         boot_platform_run(BOOT_DEV_FS, &ctx);
-        snprintf(want, sizeof(want), "T58,1,%u:DEV...;dev;loop;path;medium;ext2;fat;hostfs;serialfs;validator;T64,1,%u:%s;%s", TATTR_GREEN, TATTR_WHITE, failing?"NG":"OK", failing?"L225:VFS: filesystem registration failed\n;":"");
+        snprintf(want, sizeof(want), "T58,1,%u:DEV...;dev;loop;path;hd;medium-loop;ext2;fat;hostfs;serialfs;validator;T64,1,%u:%s;%s", TATTR_GREEN, TATTR_WHITE, failing?"NG":"OK", failing?"L225:VFS: filesystem registration failed\n;":"");
         expect(want);
     }
     boot_platform_run(BOOT_PCI_ENUM, &ctx); expect("pci;");

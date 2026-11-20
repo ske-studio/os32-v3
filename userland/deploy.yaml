@@ -238,6 +238,9 @@ filesystem:
     - host: userland/tests/mem_stat_compat_test.bin
       guest: /usr/bin/
       tags: [test]
+    - host: userland/tests/loopfmt_test.bin
+      guest: /usr/bin/
+      tags: [test]
     - host: userland/tests/kdebug_probe.bin
       guest: /usr/bin/
       tags: [test]

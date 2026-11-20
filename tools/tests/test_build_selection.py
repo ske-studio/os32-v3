@@ -38,6 +38,15 @@ def check_sqlite(root):
         raise AssertionError('SQLite selected without filesystem services')
 
 
+def check_loop(root):
+    for image in ('pc98', 'kboot-core', 'kboot-link', 'kboot-shell', 'kboot-sh', 'kboot-link-sh'):
+        options = [] if image == 'pc98' else ['ARCH=ppc', 'PLATFORM=powermac']
+        units = query(root, [*options, 'IMAGE=' + image], config_only=True)['C_KERNEL']
+        enabled = image in ('pc98', 'kboot-sh', 'kboot-link-sh')
+        for unit in ('kernel/dev/device_loop.c', 'drivers/block/loop_dev.c'):
+            assert units.count(unit) == enabled, (image, unit)
+
+
 def check_fep(root):
     x86 = ['FEATURE_' + f + '=0' for f in FEATURES if f not in ('SQLITE', 'FEP')]
     ppc = ['ARCH=ppc', 'PLATFORM=powermac', 'IMAGE=kboot-link-sh']
@@ -198,11 +207,16 @@ if __name__ == '__main__':
         check(root)
         check_sqlite(root)
         check_fep(root)
+        check_loop(root)
         check_user_selection(root)
         copy_kboot_names(root)
         check_kboot(root)
         if args.mutate:
             for path, anchor, mutant, expected, label in (
+                    ('build/images/kboot-sh.mk', 'FEATURE_LOOP = 1', 'FEATURE_LOOP = 0',
+                     AssertionError, 'loop disabled on kboot-sh'),
+                    ('build/images/kboot-shell.mk', 'FEATURE_LOOP = 0', 'FEATURE_LOOP = 1',
+                     AssertionError, 'loop enabled on kboot-shell'),
                     ('build/select.mk', '$(error FEATURE_FEP requires FEATURE_SQLITE)', '',
                      AssertionError, 'missing FEP prerequisite'),
                     ('build/features/fep.mk', 'C_FEATURES += kernel/ime/fep_module.c', '',
@@ -232,7 +246,9 @@ if __name__ == '__main__':
                 assert source.count(anchor) == 1, (path, anchor)
                 target.write_text(source.replace(anchor, mutant))
                 try:
-                    if 'FEP' in label:
+                    if label.startswith('loop '):
+                        check_loop(root)
+                    elif 'FEP' in label:
                         check_fep(root)
                     elif path in ('build/select.mk', 'build/features/sqlite.mk'):
                         check_sqlite(root)

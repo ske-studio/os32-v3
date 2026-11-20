@@ -389,6 +389,7 @@
     "platform/pc98/tsc_math.c",
     "platform/pc98/tsc_clock.c",
     "net/rx_work.c",
+    "fs/ext2/ext2_medium_loop.c",
     "fs/ext2/ext2_medium_ide.c"
   ],
   "ASM_KERNEL": [
