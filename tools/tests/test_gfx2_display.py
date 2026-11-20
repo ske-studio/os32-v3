@@ -13,13 +13,9 @@ def observe(work, source, machine="pc98"):
     exe = work / 'display'
     flags = ['-I' + str(ROOT / 'platform' / machine)]
     if machine == 'powermac':
-        # B4 also runs before A2 supplies this PowerMac hook.
-        header = work / 'provider.h'
-        header.write_text('#include "display_provider.h"\n'
-                          '#ifndef DISPLAY_V2_SHADOW_PUSH\n'
-                          'int display_provider_shadow_push(int,int,int,int);\n'
-                          '#define DISPLAY_V2_SHADOW_PUSH display_provider_shadow_push\n#endif\n')
-        flags += ['-DTEST_POWERMAC', '-include', str(header)]
+        # DISPLAY_V2_SHADOW_PUSH comes from 5c-A2 (platform_display_fallback.h);
+        # no fallback here, so a missing A2 fails the build (B4 review R2).
+        flags += ['-DTEST_POWERMAC']
     host32.build(['gcc', '-m32', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
         '-O0', '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections', '-ffreestanding', '-fno-pie', '-no-pie', '-nostdlib', '-static',
         *flags, '-I' + str(ROOT / 'gfx'), '-I' + str(ROOT / 'include'), '-I' + str(ROOT / 'gfx/v2'),
