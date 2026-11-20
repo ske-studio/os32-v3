@@ -1,0 +1,103 @@
+run: d6ffafa78 check-ppc-display-guest (single run, rc=2, 493s)
+image: owner-unchecked, CPU 7455 (evidence owner-unchecked/7455/frames.log, 324 lines)
+waiting for: RSH id 00000005 = '/bin/dispprb.bin v1-owner 255' (stuck rid=19 LOG 11 at line 173; epoch 2 first READY done rid=22 at line 212)
+ 143 G>H ACK      fl=0 sess=1 ep=1 rid=0 seq=0 ack=6 plen=0
+ 144 G>H WINDOW   fl=0 sess=1 ep=1 rid=0 seq=0 ack=6 plen=2 0400
+ 145 G>H REQUEST  fl=0 sess=1 ep=1 rid=15 seq=0 ack=0 plen=47 'LOG 00000000054947855254001234560302 7 0 0 0 55'
+ 146 H>G ACK      fl=0 sess=1 ep=1 rid=15 seq=0 ack=0 plen=0
+ 147 G>H WDATA    fl=0 sess=1 ep=1 rid=15 seq=1 ack=0 plen=55 b'[gfx] init gen=2 be=of_fb started=1 bb=00d86000 '
+ 148 H>G ACK      fl=0 sess=1 ep=1 rid=15 seq=0 ack=1 plen=0
+ 149 H>G RESPONSE fl=0 sess=1 ep=1 rid=15 seq=0 ack=0 plen=6 status=200(c8 00 00 00 00 00)
+ 150 G>H RELEASE  fl=0 sess=1 ep=1 rid=15 seq=0 ack=0 plen=0
+ 151 H>G ACK      fl=1 sess=1 ep=1 rid=15 seq=0 ack=0 plen=0
+ 152 G>H REQUEST  fl=0 sess=1 ep=1 rid=16 seq=0 ack=0 plen=47 'LOG 00000000054947855254001234560302 8 0 0 0 35'
+ 153 H>G ACK      fl=0 sess=1 ep=1 rid=16 seq=0 ack=0 plen=0
+ 154 G>H WDATA    fl=0 sess=1 ep=1 rid=16 seq=1 ack=0 plen=35 b'[gfx] first present gen=2 bytes=0\r\n'
+ 155 H>G ACK      fl=0 sess=1 ep=1 rid=16 seq=0 ack=1 plen=0
+ 156 H>G RESPONSE fl=0 sess=1 ep=1 rid=16 seq=0 ack=0 plen=6 status=200(c8 00 00 00 00 00)
+ 157 G>H RELEASE  fl=0 sess=1 ep=1 rid=16 seq=0 ack=0 plen=0
+ 158 H>G ACK      fl=1 sess=1 ep=1 rid=16 seq=0 ack=0 plen=0
+ 159 G>H REQUEST  fl=0 sess=1 ep=1 rid=17 seq=0 ack=0 plen=47 'LOG 00000000054947855254001234560302 9 0 0 0 27'
+ 160 H>G ACK      fl=0 sess=1 ep=1 rid=17 seq=0 ack=0 plen=0
+ 161 G>H WDATA    fl=0 sess=1 ep=1 rid=17 seq=1 ack=0 plen=27 b'USB KEY src=1 sc=2d down=1\n'
+ 162 H>G ACK      fl=0 sess=1 ep=1 rid=17 seq=0 ack=1 plen=0
+ 163 H>G RESPONSE fl=0 sess=1 ep=1 rid=17 seq=0 ack=0 plen=6 status=200(c8 00 00 00 00 00)
+ 164 G>H RELEASE  fl=0 sess=1 ep=1 rid=17 seq=0 ack=0 plen=0
+ 165 H>G ACK      fl=1 sess=1 ep=1 rid=17 seq=0 ack=0 plen=0
+ 166 G>H REQUEST  fl=0 sess=1 ep=1 rid=18 seq=0 ack=0 plen=48 'LOG 00000000054947855254001234560302 10 0 0 0 27'
+ 167 H>G ACK      fl=0 sess=1 ep=1 rid=18 seq=0 ack=0 plen=0
+ 168 G>H WDATA    fl=0 sess=1 ep=1 rid=18 seq=1 ack=0 plen=27 b'USB KEY src=1 sc=2d down=0\n'
+ 169 H>G ACK      fl=0 sess=1 ep=1 rid=18 seq=0 ack=1 plen=0
+ 170 H>G RESPONSE fl=0 sess=1 ep=1 rid=18 seq=0 ack=0 plen=6 status=200(c8 00 00 00 00 00)
+ 171 G>H RELEASE  fl=0 sess=1 ep=1 rid=18 seq=0 ack=0 plen=0
+ 172 H>G ACK      fl=1 sess=1 ep=1 rid=18 seq=0 ack=0 plen=0
+ 173 G>H REQUEST  fl=0 sess=1 ep=1 rid=19 seq=0 ack=0 plen=48 'LOG 00000000054947855254001234560302 11 0 0 0 27'
+ 174 H>G ACK      fl=0 sess=1 ep=1 rid=19 seq=0 ack=0 plen=0
+ 175 G>H WDATA    fl=0 sess=1 ep=1 rid=19 seq=1 ack=0 plen=27 b'USB KEY src=1 sc=12 down=1\n'
+ 176 H>G ACK      fl=0 sess=1 ep=1 rid=19 seq=0 ack=1 plen=0
+ 177 H>G RESPONSE fl=0 sess=1 ep=1 rid=19 seq=0 ack=0 plen=6 status=200(c8 00 00 00 00 00)
+ 178 G>H WDATA    fl=0 sess=1 ep=1 rid=19 seq=1 ack=0 plen=27 b'USB KEY src=1 sc=12 down=1\n'
+ 179 H>G ACK      fl=0 sess=1 ep=1 rid=19 seq=0 ack=1 plen=0
+ 180 G>H WDATA    fl=0 sess=1 ep=1 rid=19 seq=1 ack=0 plen=27 b'USB KEY src=1 sc=12 down=1\n'
+ 181 H>G ACK      fl=0 sess=1 ep=1 rid=19 seq=0 ack=1 plen=0
+ 182 G>H WDATA    fl=0 sess=1 ep=1 rid=19 seq=1 ack=0 plen=27 b'USB KEY src=1 sc=12 down=1\n'
+ 183 H>G ACK      fl=0 sess=1 ep=1 rid=19 seq=0 ack=1 plen=0
+ 184 G>H WDATA    fl=0 sess=1 ep=1 rid=19 seq=1 ack=0 plen=27 b'USB KEY src=1 sc=12 down=1\n'
+ 185 H>G ACK      fl=0 sess=1 ep=1 rid=19 seq=0 ack=1 plen=0
+ 186 G>H RELEASE  fl=0 sess=1 ep=1 rid=19 seq=0 ack=0 plen=0
+ 187 H>G ACK      fl=1 sess=1 ep=1 rid=19 seq=0 ack=0 plen=0
+ 188 G>H HELLO    fl=0 sess=1 ep=2 rid=0 seq=385 ack=0 plen=0
+ 189 H>G HELLO    fl=1 sess=1 ep=2 rid=0 seq=385 ack=2473524421 plen=12 e8150100020021eb
+ 190 G>H HELLO    fl=0 sess=1 ep=2 rid=0 seq=386 ack=0 plen=0
+ 191 H>G HELLO    fl=1 sess=1 ep=2 rid=0 seq=386 ack=2853373765 plen=12 e8150100020021eb
+ 192 G>H HELLO    fl=2 sess=1 ep=2 rid=0 seq=386 ack=2853373765 plen=0
+ 193 H>G HELLO    fl=3 sess=1 ep=2 rid=0 seq=2853373765 ack=386 plen=8 e81521ebb8fb0100
+ 194 G>H WINDOW   fl=0 sess=1 ep=2 rid=0 seq=0 ack=0 plen=2 0400
+ 195 G>H REQUEST  fl=0 sess=1 ep=2 rid=20 seq=0 ack=0 plen=49 'LOG 00000000054947855254001234560302 11 1 27 0 27'
+ 196 H>G ACK      fl=0 sess=1 ep=2 rid=20 seq=0 ack=0 plen=0
+ 197 H>G NOTIFY   fl=0 sess=1 ep=2 rid=0 seq=1 ack=0 plen=16 21ebb8fb01000100
+ 198 G>H WDATA    fl=0 sess=1 ep=2 rid=20 seq=1 ack=0 plen=27 b'USB KEY src=1 sc=12 down=1\n'
+ 199 H>G ACK      fl=0 sess=1 ep=2 rid=20 seq=0 ack=1 plen=0
+ 200 H>G RESPONSE fl=0 sess=1 ep=2 rid=20 seq=0 ack=0 plen=6 status=200(c8 00 00 00 00 00)
+ 201 G>H ACK      fl=0 sess=1 ep=2 rid=0 seq=0 ack=1 plen=0
+ 202 G>H WINDOW   fl=0 sess=1 ep=2 rid=0 seq=0 ack=1 plen=2 0400
+ 203 G>H RELEASE  fl=0 sess=1 ep=2 rid=20 seq=0 ack=0 plen=0
+ 204 H>G ACK      fl=1 sess=1 ep=2 rid=20 seq=0 ack=0 plen=0
+ 205 G>H REQUEST  fl=0 sess=1 ep=2 rid=21 seq=0 ack=0 plen=50 'LOG 00000000054947855254001234560302 12 1 27 0 122'
+ 206 H>G ACK      fl=0 sess=1 ep=2 rid=21 seq=0 ack=0 plen=0
+ 207 G>H WDATA    fl=0 sess=1 ep=2 rid=21 seq=1 ack=0 plen=122 b'USB KEY src=1 sc=12 down=0\n[gfx] init gen=3 be=o'
+ 208 H>G ACK      fl=0 sess=1 ep=2 rid=21 seq=0 ack=1 plen=0
+ 209 H>G RESPONSE fl=0 sess=1 ep=2 rid=21 seq=0 ack=0 plen=6 status=200(c8 00 00 00 00 00)
+ 210 G>H RELEASE  fl=0 sess=1 ep=2 rid=21 seq=0 ack=0 plen=0
+ 211 H>G ACK      fl=1 sess=1 ep=2 rid=21 seq=0 ack=0 plen=0
+ 212 G>H REQUEST  fl=0 sess=1 ep=2 rid=22 seq=0 ack=0 plen=62 'RSH READY 00000000054947855254001234560302 cui 1 00000005 done'
+ 213 H>G ACK      fl=0 sess=1 ep=2 rid=22 seq=0 ack=0 plen=0
+ 214 H>G RESPONSE fl=0 sess=1 ep=2 rid=22 seq=0 ack=0 plen=6 status=200 body=25(c8 00 19 00 00 00)
+ 215 G>H WINDOW   fl=0 sess=1 ep=2 rid=22 seq=0 ack=0 plen=2 0b00
+ 216 H>G DATA     fl=0 sess=1 ep=2 rid=22 seq=1 ack=0 plen=25 67656e2034323233
+ 217 H>G EOF      fl=0 sess=1 ep=2 rid=22 seq=2 ack=0 plen=0
+ 218 G>H WINDOW   fl=0 sess=1 ep=2 rid=22 seq=0 ack=0 plen=2 0b00
+ 219 G>H WINDOW   fl=0 sess=1 ep=2 rid=22 seq=0 ack=0 plen=2 0b00
+ 220 G>H WINDOW   fl=0 sess=1 ep=2 rid=22 seq=0 ack=0 plen=2 0b00
+ 221 G>H ACK      fl=0 sess=1 ep=2 rid=22 seq=0 ack=1 plen=0
+ 222 G>H RELEASE  fl=0 sess=1 ep=2 rid=22 seq=0 ack=0 plen=0
+ 223 H>G ACK      fl=1 sess=1 ep=2 rid=22 seq=0 ack=0 plen=0
+ 224 G>H REQUEST  fl=0 sess=1 ep=2 rid=23 seq=0 ack=0 plen=62 'RSH READY 00000000054947855254001234560302 cui 1 00000005 done'
+ 225 H>G ACK      fl=0 sess=1 ep=2 rid=23 seq=0 ack=0 plen=0
+ 226 H>G RESPONSE fl=0 sess=1 ep=2 rid=23 seq=0 ack=0 plen=6 status=200 body=25(c8 00 19 00 00 00)
+ 227 G>H WINDOW   fl=0 sess=1 ep=2 rid=23 seq=0 ack=0 plen=2 0b00
+ 228 H>G DATA     fl=0 sess=1 ep=2 rid=23 seq=1 ack=0 plen=25 67656e2034323233
+ 229 H>G EOF      fl=0 sess=1 ep=2 rid=23 seq=2 ack=0 plen=0
+ 230 G>H WINDOW   fl=0 sess=1 ep=2 rid=23 seq=0 ack=0 plen=2 0b00
+ 231 G>H WINDOW   fl=0 sess=1 ep=2 rid=23 seq=0 ack=0 plen=2 0b00
+ 232 G>H WINDOW   fl=0 sess=1 ep=2 rid=23 seq=0 ack=0 plen=2 0b00
+ 233 G>H ACK      fl=0 sess=1 ep=2 rid=23 seq=0 ack=1 plen=0
+ 234 G>H RELEASE  fl=0 sess=1 ep=2 rid=23 seq=0 ack=0 plen=0
+ 235 H>G ACK      fl=1 sess=1 ep=2 rid=23 seq=0 ack=0 plen=0
+ 236 H>G NOTIFY   fl=0 sess=1 ep=2 rid=0 seq=2 ack=0 plen=16 21ebb8fb01000100
+ 237 G>H ACK      fl=0 sess=1 ep=2 rid=0 seq=0 ack=2 plen=0
+ 238 G>H WINDOW   fl=0 sess=1 ep=2 rid=0 seq=0 ack=2 plen=2 0400
+ 239 G>H REQUEST  fl=0 sess=1 ep=2 rid=24 seq=0 ack=0 plen=62 'RSH READY 00000000054947855254001234560302 cui 1 00000005 done'
+ 240 H>G ACK      fl=0 sess=1 ep=2 rid=24 seq=0 ack=0 plen=0
+ 241 H>G RESPONSE fl=0 sess=1 ep=2 rid=24 seq=0 ack=0 plen=6 status=200 body=25(c8 00 19 00 00 00)
+ 242 G>H WINDOW   fl=0 sess=1 ep=2 rid=24 seq=0 ack=0 plen=2 0b00
