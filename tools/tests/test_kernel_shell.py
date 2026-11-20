@@ -4,7 +4,7 @@ Only device/exec boundaries are faked; product control flow is compiled intact.
 Mutation compile failures and signals are errors, never runtime RED evidence.
 """
 CHECK = dict(name='kernel-shell-host', tier=1,
-    covers=['platform/pc98/kernel.c', 'tools/tests/kernel_shell_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'tools/tests/host_arch/arch_cpu.h', 'tools/tests/kernel_shell_arch/arch_io.h', 'platform/pc98/kernel_*.inc', 'include/config.h', 'include/pc98.h', 'include/types.h', 'exec/exec.h', 'mm/shlib.h', 'mm/paging.h', 'sdk/include/os32/os32_kapi_shared.h'],
+    covers=['init/shell_loop.c', 'include/shell_loop.h', 'kernel/gui.h', 'platform/pc98/kernel.c', 'tools/tests/kernel_shell_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'tools/tests/host_arch/arch_cpu.h', 'tools/tests/kernel_shell_arch/arch_io.h', 'platform/pc98/kernel_*.inc', 'include/config.h', 'include/pc98.h', 'include/types.h', 'exec/exec.h', 'mm/shlib.h', 'mm/paging.h', 'sdk/include/os32/os32_kapi_shared.h'],
     needs=[], budget=3.1,
     kind='characterization',
 )
@@ -26,7 +26,7 @@ CASES = ('cui', 'gui', 'gui-probed', 'kcg', 'shlib-layout', 'shlib-api',
 
 
 def product_source():
-    paths = [ROOT / 'platform/pc98/kernel.c', *sorted((ROOT / 'platform/pc98').glob('kernel_*.inc'))]
+    paths = [ROOT / 'init/shell_loop.c', ROOT / 'platform/pc98/kernel.c', *sorted((ROOT / 'platform/pc98').glob('kernel_*.inc'))]
     return {path.name: path.read_text() for path in paths}
 
 
@@ -43,7 +43,7 @@ def build(work, sources):
                   '-I' + str(work), '-I' + str(ROOT / 'tools/tests/kernel_shell_arch'),
                   '-I' + str(ROOT / 'tools/tests/host_arch'), '-I' + str(ROOT / 'init'),
                   *include_flags(ROOT),
-                  str(ROOT / 'tools/tests/kernel_shell_host.c'), '-o', str(exe)],
+                  str(work / 'shell_loop.c'), str(ROOT / 'tools/tests/kernel_shell_host.c'), '-o', str(exe)],
                  check=True)
     return exe
 
@@ -70,6 +70,8 @@ def main():
             mutations = [
                 ('load-fail-waits', 'continue;   /* ウェイト無しで即 CUI を起動 */',
                  ';   /* mutation: fall through to wait */'),
+                ('skip-consume', 'if (gui_take_next_shell', 'if (0 && gui_take_next_shell'),
+                ('success-reset', 'gui_fault_streak = 0;   /* 正常終了', ';   /* 正常終了'),
                 ('fault-streak', 'gui_fault_streak++;', 'gui_fault_streak += 2;'),
                 ('layout-or', 'layout_bad |= exec_layout_rejected();',
                  'layout_bad = exec_layout_rejected();'),

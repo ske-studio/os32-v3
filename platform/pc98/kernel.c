@@ -9,7 +9,7 @@
  * Phase 2+: IDT/PIC/PIT + キーボード + ミニシェル
  * ============================================================ */
 
-#define GUI_FAULT_STREAK_MAX 3
+#include "shell_loop.h"
 #include "serial_diag.h"
 #include "boot_cpu.h"
 #include "platform_boot.h"
@@ -90,11 +90,6 @@ extern void console_text_gdc_start(void);     /* console.c (K4): CUI 復帰で�
 #include "boot.h"
 #include "boot_platform.h"
 #include "boot_display.h"
-
-/* 次に起動するシェルのパス (契約 T9)。実体は kernel/gui.c (K1)。
- * gui.h を丸ごと取り込むと os32_gui_shared.h まで引くので、
- * 起動ループが使う 1 本だけを extern 宣言する。 */
-extern int gui_take_next_shell(char *out, int cap);
 
 /* 文字列表示 */
 static void __attribute__((cold)) boot_diag_exec(const char *path, int rc, int gui, int streak)
@@ -385,132 +380,97 @@ static inline void kernel_mount_children(const char *root_dev)
 #include "kernel_gui_shlib.inc"
 #include "kernel_shell_fdd.inc"
 
-/* シェルの起動ループ。戻らない (kernel_main の後ろの停止ループは保険)。 */
-static inline void kernel_shell_loop(void)
+static int pc98_gui_default(void)
 {
-    /* 外部シェル起動 — CUI(shell.bin) と GUI(gshell.bin) を同じシェル帯
-     * (MEM_SHELL_LOAD_ADDR, Level 1) で入れ替えながら回す (契約 T9)。両者は同時に
-     * 載らない。終了/クラッシュ時のフォールバックとして再起動ループにする。
-     *
-     * 起動シェルの決定順:
-     *   1. シェルが sys_switch_shell() で残した切替要求 (gui_take_next_shell
-     *      で取り出して消す。consume 方式、レビュー #3 ④)。
-     *   2. 記録が無ければ、起動時に読んだ /etc/system.cfg の GUI= に従う
-     *      (GUI=1 → gshell、既定 → shell)。 */
-    {
-        const char *cur_shell = SYS_SHELL_BIN;
-        char consumed[OS32_MAX_PATH];   /* 取り出した切替パス (cur_shell が指す) */
-        int gui_fault_streak = 0;       /* gshell 連続クラッシュ回数 */
-        consumed[0] = '\0';
+    return sysconfig_get_int(SYS_SYSTEM_CFG, "GUI", 0) == 1;
+}
 
-        /* 起動時: system.cfg の GUI=1 なら gshell を既定にする */
-        if (sysconfig_get_int(SYS_SYSTEM_CFG, "GUI", 0) == 1) {
-            cur_shell = SYS_GSHELL_BIN;
-        }
+static int pc98_shell_prepare(int is_gui)
+{
+    if (is_gui && !kcg_module_ready()) return 1;
+    if (is_gui && !kernel_gui_shlib_ready()) return 2;
+    return 0;
+}
 
-        for (;;) {
-            int rc;
-            int is_gui;
-            int kcg_unavailable = 0;
-
-            /* 切替要求を取り出して消す (consume 方式、レビュー #3 ④)。
-             * 取り出した後は要求が空になるので、gshell のロード失敗や連続
-             * fault で CUI に落ちた後でも、次の os32gui が普通に採用される。 */
-            if (gui_take_next_shell(consumed, OS32_MAX_PATH)) {
-                cur_shell = consumed;
-                gui_fault_streak = 0;   /* 別シェルへ切替 → 連続失敗をリセット */
-            }
-
-            is_gui = (kstrcmp(cur_shell, SYS_GSHELL_BIN) == 0);
-            if (is_gui && !kcg_module_ready()) {
-                kcg_unavailable = 1;
-                cur_shell = SYS_SHELL_BIN;
-                is_gui = 0;
-            }
-
-
-            if (is_gui && !kernel_gui_shlib_ready()) {
-                cur_shell = SYS_SHELL_BIN;
-                is_gui = 0;
-            }
-
-            /* GUI は全画面 GFX を握るのでテキストカーソルを消す。CUI は出す。 */
-            if (is_gui) {
-                /* Graphics boundary, master PD; all windows were mapped by ⑥. */
-                if (!gfx_cirrus_probed()) gfx_prepare_backend();
-                /* ⑨ 選択中 backend の CLIENT を boot → gshell へ (2 回目以降は
-                 * 無操作) → ledger_selfcheck("gui")。TASK_T1_LEDGER §3-3 ⑨。 */
-                gfx_client_to_gshell();
-                if (con_dual_cfg())
-                    shell_print("Loading gshell...\n", TATTR_GRAY);
-                console_text_gdc_stop();
-                if (!con_dual_cfg())
-                    tvram_print(0, 0, "Loading gshell...", TATTR_GRAY);
-            } else {
-                /* prepare が TVRAM を消さなくなった (PEGC、2026-09-24) ので、
-                 * 0 行目には起動ログが残っている。文言の後ろを空白で消す。 */
-                static const char loading[] = "Loading shell...";
-                int col;
-                console_text_gdc_start();
-                if (con_dual_cfg()) {
-                    shell_print("Loading shell...\n", TATTR_GRAY);
-                } else {
-                    tvram_print(0, 0, loading, TATTR_GRAY);
-                    for (col = (int)sizeof(loading) - 1; col < TVRAM_COLS; col++)
-                        tvram_putchar_at(col, 0, ' ', TATTR_GRAY);
-                }
-            }
-
-            if (!is_gui) geforce_heat_notice();
-            boot_diag_exec(cur_shell, 0, 0, 0);
-            /* CUI の初期表示・profile の後、プロンプトの前に理由を出す。 */
-            rc = exec_run(kcg_unavailable
-                          ? SYS_SHELL_BIN " --kcg-unavailable" : cur_shell);
-            boot_diag_exec(0, rc, is_gui, gui_fault_streak);
-
-            /* gshell がロードできない (未存在、不正バイナリ等) → 警告して CUI に
-             * 落ちる。fault (実行後のクラッシュ) は別扱い。要求は取り出し済みで
-             * 空なので、修復後の os32gui は普通に採用される。 */
-            if (is_gui && rc < 0 && rc != EXEC_ERR_FAULT) {
-                console_text_gdc_start();
-                tvram_clear();
-                tvram_print(0, 0, exec_layout_rejected()
-                            ? "gshell: rebuild required (KAPI data layout) -> CUI shell"
-                            : "gshell load failed -> CUI shell", TATTR_RED);
-                cur_shell = SYS_SHELL_BIN;
-                gui_fault_streak = 0;
-                continue;   /* ウェイト無しで即 CUI を起動 */
-            }
-
-            /* gshell がクラッシュ (fault_kill) を繰り返すなら CUI に落とす保険。
-             * 連続 3 回で CUI へ (完了条件: gshell 再起動の無限ループ回避)。 */
-            if (is_gui) {
-                if (rc == EXEC_ERR_FAULT) {
-                    gui_fault_streak++;
-                    if (gui_fault_streak >= GUI_FAULT_STREAK_MAX) {
-                        tvram_print(0, 0, "gshell crashed 3x -> CUI shell", TATTR_RED);
-                        cur_shell = SYS_SHELL_BIN;
-                        gui_fault_streak = 0;
-                    }
-                } else {
-                    gui_fault_streak = 0;   /* 正常終了なら連続失敗をリセット */
-                }
-            } else if (rc < 0 && rc != EXEC_ERR_FAULT) {
-                /* CUI シェルのロード自体が失敗 — FDD フォールバックを試す */
-                kernel_shell_fdd_fallback(exec_layout_rejected());
-            }
-
-            /* シェルが終了 (切替 or exit) またはクラッシュ復帰。
-             * FDD負荷軽減用ウェイト (約100ms) の後、画面クリアして再起動。
-             * tick_count は 100Hz で回る u32 で 497 日で一周する。差分を
-             * 符号付きで見れば一周しても正しい (待ち << 2^31 tick である限り)。 */
-            {
-                u32 start = tick_count;
-                while ((i32)(tick_count - start) < (i32)SHELL_RELOAD_DELAY) {
-                    _halt();
-                }
-            }
-            console_session_clear();
+static void pc98_shell_loading(const char *cur_shell, int is_gui)
+{
+    /* GUI は全画面 GFX を握るのでテキストカーソルを消す。CUI は出す。 */
+    if (is_gui) {
+        /* Graphics boundary, master PD; all windows were mapped by ⑥. */
+        if (!gfx_cirrus_probed()) gfx_prepare_backend();
+        /* ⑨ 選択中 backend の CLIENT を boot → gshell へ (2 回目以降は
+         * 無操作) → ledger_selfcheck("gui")。TASK_T1_LEDGER §3-3 ⑨。 */
+        gfx_client_to_gshell();
+        if (con_dual_cfg())
+            shell_print("Loading gshell...\n", TATTR_GRAY);
+        console_text_gdc_stop();
+        if (!con_dual_cfg())
+            tvram_print(0, 0, "Loading gshell...", TATTR_GRAY);
+    } else {
+        /* prepare が TVRAM を消さなくなった (PEGC、2026-09-24) ので、
+         * 0 行目には起動ログが残っている。文言の後ろを空白で消す。 */
+        static const char loading[] = "Loading shell...";
+        int col;
+        console_text_gdc_start();
+        if (con_dual_cfg()) {
+            shell_print("Loading shell...\n", TATTR_GRAY);
+        } else {
+            tvram_print(0, 0, loading, TATTR_GRAY);
+            for (col = (int)sizeof(loading) - 1; col < TVRAM_COLS; col++)
+                tvram_putchar_at(col, 0, ' ', TATTR_GRAY);
         }
     }
+
+    if (!is_gui) geforce_heat_notice();
+    boot_diag_exec(cur_shell, 0, 0, 0);
+}
+
+static void pc98_shell_result(const char *path, int rc, int gui, int streak)
+{
+    (void)path;
+    boot_diag_exec(0, rc, gui, streak);
+}
+
+static void pc98_shell_failure(int gui, int rc, int streak)
+{
+    (void)streak;
+    if (!gui) {
+        kernel_shell_fdd_fallback(exec_layout_rejected());
+    } else if (rc == EXEC_ERR_FAULT) {
+        tvram_print(0, 0, "gshell crashed 3x -> CUI shell", TATTR_RED);
+    } else {
+        console_text_gdc_start();
+        tvram_clear();
+        tvram_print(0, 0, exec_layout_rejected()
+                    ? "gshell: rebuild required (KAPI data layout) -> CUI shell"
+                    : "gshell load failed -> CUI shell", TATTR_RED);
+    }
+}
+
+static void pc98_shell_delay_clear(void)
+{
+    /* シェルが終了 (切替 or exit) またはクラッシュ復帰。
+     * FDD負荷軽減用ウェイト (約100ms) の後、画面クリアして再起動。
+     * tick_count は 100Hz で回る u32 で 497 日で一周する。差分を
+     * 符号付きで見れば一周しても正しい (待ち << 2^31 tick である限り)。 */
+    {
+        u32 start = tick_count;
+        while ((i32)(tick_count - start) < (i32)SHELL_RELOAD_DELAY) {
+            _halt();
+        }
+    }
+    console_session_clear();
+}
+
+static inline void kernel_shell_loop(void)
+{
+    static const struct shell_loop_ops ops = {
+        .gui_default = pc98_gui_default,
+        .prepare = pc98_shell_prepare,
+        .loading = pc98_shell_loading,
+        .result = pc98_shell_result,
+        .failure = pc98_shell_failure,
+        .delay_clear = pc98_shell_delay_clear,
+    };
+    shell_loop_run(&ops);
 }

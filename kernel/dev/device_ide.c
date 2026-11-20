@@ -1,5 +1,5 @@
 #include "platform_device.h"
-#include "ide.h"
+#include "ide_contract.h"
 
 void platform_ide_init(void)
 {

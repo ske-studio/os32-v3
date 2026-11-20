@@ -14,6 +14,7 @@
 /* ======================================================================== */
 
 #include "atapi.h"
+#include "platform_ide_ports.h"
 
 #include "io.h"
 #include "pc98.h"

@@ -48,7 +48,7 @@ MUTANTS = [
     ('CUI clear', 'console.c', 'was_gui && !con_dual_was_live()', 'was_gui', 'A3'),
     ('clear gate', 'console.c', 'if (con_sink_is_enabled()) return;', 'if (con_sink_is_enabled() && !con_dual_active()) return;', 'A3'),
     ('session cfg', 'console.c', 'con_dual_was_live() || con_dual_cfg()', 'con_dual_was_live()', 'A3'),
-    ('loading cfg', 'kernel.c', 'if (con_dual_cfg())\n                    shell_print("Loading gshell...\\n", TATTR_GRAY);', 'if (0)\n                    shell_print("Loading gshell...\\n", TATTR_GRAY);', 'A3'),
+    ('loading cfg', 'kernel.c', 'if (con_dual_cfg())\n            shell_print("Loading gshell...\\n", TATTR_GRAY);', 'if (0)\n            shell_print("Loading gshell...\\n", TATTR_GRAY);', 'A3'),
     ('session CLEAR', 'console.c',
      '    if (con_dual_was_live() || con_dual_cfg()) {\n        con_sink_push_clear();\n        return;',
      '    if (con_dual_was_live() || con_dual_cfg()) {\n        return;', 'A3'),
@@ -77,11 +77,11 @@ def build_run(tmp, sources, runner):
         function(sources['route.c'], 'static int route_set(u8 value)') +
         function(sources['route.c'], 'int pc98_route_to_gf(void)'))
     source = sources['kernel.c']
-    start = source.rindex('                if (', 0, source.index('                    shell_print("Loading gshell'))
-    end = source.index('            } else {', start)
+    start = source.rindex('        if (', 0, source.index('            shell_print("Loading gshell'))
+    end = source.index('    } else {', start)
     (tmp / 'loading.inc').write_text(source[start:end])
-    start = source.index('                static const char loading[] = "Loading shell...";')
-    end = source.index('\n            }', start)
+    start = source.index('        static const char loading[] = "Loading shell...";')
+    end = source.index('\n    }', start)
     (tmp / 'loading_cui.inc').write_text(source[start:end])
     fixture = ROOT / 'tools/tests/console_dual_host.c'
     exe = tmp / 'console-dual'
