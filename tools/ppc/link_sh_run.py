@@ -296,7 +296,8 @@ class Session:
         self.settle(.18)
 
     def keys(self, text):
-        for c in text: self.key('ret' if c=='\n' else 'spc' if c==' ' else c)
+        names={'\n':'ret',' ':'spc','-':'minus','.':'dot','/':'slash'}
+        for c in text: self.key(names.get(c,c))
 
     def screen(self, name):
         # PPC fbcon's cell shadow is the input to the framebuffer renderer.
