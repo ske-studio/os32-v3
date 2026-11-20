@@ -219,8 +219,7 @@ ifneq ($(KB_EXEC),)
 KB_KEEP_PAIR := -Wl,--undefined=platform_module_pair
 KB_PAIR_TOOL := tools/ppc/root_pair.py
 KB_PAIR_OUTPUT := $(KB_OUT)/root.iso
-$(KB_ELF) $(KB_PAIR_OUTPUT) &: $(ROOT_ISO) $(KB_PAIR_TOOL) tools/module_schema.py tools/mkmod.py tools/ppc/root_lz4_layout.py sdk/target_profile.py $(KB_OBJ) $(KB_EXTRA) $(KB_OUT)/kernel.ld $(KB_SELECT_MK)
-	$(KB_LINK_COMMAND)
+include build/ppc-root-pair.mk
 KB_LINK_PREFIX = python3 -B $(KB_PAIR_TOOL) $(ROOT_ISO) $(KB_ELF) --
 else
 $(KB_ELF): $(KB_OBJ) $(KB_EXTRA) $(KB_OUT)/kernel.ld

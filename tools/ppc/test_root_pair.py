@@ -99,6 +99,54 @@ def paired_iso(work, gcc, module):
 
 
 
+def make_pair_recovery(work):
+    # Exercise the production grouped rule with a counting stand-in for the linker.
+    out = work/'make-pair'
+    out.mkdir()
+    (out/'kernel.ld').touch()
+    elf = out/'kernel.elf'
+    iso = out/'root.iso'
+    makefile = out/'Makefile'
+    makefile.write_text(f"""KB_OUT := {out}
+KB_ELF := {elf}
+KB_PAIR_OUTPUT := {iso}
+KB_LINK_COMMAND = touch $(KB_ELF) $(KB_PAIR_OUTPUT) && echo link >> {out}/calls
+include build/ppc-root-pair.mk
+""")
+    calls = out/'calls'
+    for missing, count in [(None, 1), (None, 1), (iso, 2), (elf, 3)]:
+        if missing:
+            missing.unlink()
+        subprocess.run(['make', '-f', makefile, iso if missing == elf else elf], cwd=ROOT, check=True)
+        assert elf.exists() and iso.exists() and calls.read_text().splitlines() == ['link'] * count
+
+
+def root_image_failures(work, mutate):
+    source = (ROOT/'platform/powermac/root_image.c').read_text()
+    variants = [('normal', source, 0)]
+    if mutate:
+        for name, old, new, status in [
+            ('allocation', 'return -2;', 'return -1;', 10),
+            ('short output', '== (int)length', '>= 0', 12),
+            ('data CRC', 'if (crc == le32_rd(__root_record_start + 4))', 'if (1)', 13),
+        ]:
+            assert source.count(old) == 1
+            variants.append((name, source.replace(old, new), status))
+    for name, body, status in variants:
+        src = work/'root_image.c'
+        src.write_text(body)
+        binary = work/'root-test'
+        subprocess.run(['gcc', '-std=gnu11', '-O0', '-no-pie', '-ffunction-sections',
+                        '-Wl,--gc-sections', '-D__cdecl=', '-I.', '-Iinclude', '-Ilib',
+                        '-Imm', '-Iplatform/powermac', '-Isdk/include/os32', src,
+                        'tools/tests/ppc_root_image_host.c', 'lib/crc32.c', 'lib/lz4.c',
+                        '-o', binary], cwd=ROOT, check=True)
+        result = subprocess.run([binary])
+        assert result.returncode == status, (name, result.returncode, status)
+        if status:
+            print('RED root image', name)
+
+
 def test(work, mutate):
     prefix = Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc'))/'bin/powerpc-elf-'
     gcc = str(prefix)+'gcc'
@@ -121,11 +169,13 @@ def test(work, mutate):
     struct.pack_into('<I', paired, 128, 0)
     assert result == CRC and checksum == zlib.crc32(paired)
     paired_iso(work, gcc, mod)
+    make_pair_recovery(work)
+    root_image_failures(work, mutate)
     source = ROOT/'platform/powermac/module_pair.c'
     digests = set()
-    def guest(src, rc):
+    def guest(src, rc, fixture='bytes.o', *flags):
         run([gcc, '-O2', '-msdata=none', '-ffreestanding', '-nostdinc', '-nostdlib',
-             '-I'+str(ROOT/'include'), '-I'+str(ROOT/'lib'), src, FIX/'check.c', 'bytes.o',
+             '-I'+str(ROOT/'include'), '-I'+str(ROOT/'lib'), src, FIX/'check.c', fixture, *flags,
              f'-DPAIR_CRC={CRC}U',
              f'-Wl,--section-start=.pair_low=0x100000,--section-start=.pair_high={STAGING_BASE:#x}',
              '-Wl,-Ttext=0x200000,-e,_start', '-o', 'check.elf'])
@@ -136,6 +186,11 @@ def test(work, mutate):
         assert subprocess.run(['qemu-ppc', binary]).returncode == rc
         print(f'{src.name} SHA256 {digest}')
     guest(source, 0)
+    # Keep the recorded pair but substitute a different low LOAD.
+    foreign = work/'foreign.S'
+    foreign.write_text((FIX/'bytes.S').read_text().replace('0x55667788', '0x55667789'))
+    run([gcc, f'-DPAIR_CRC={CRC}', '-c', foreign, '-o', 'foreign.o'])
+    guest(source, 0, 'foreign.o', '-DEXPECT_FOREIGN')
     if mutate:
         for old, new in [('high, frame, record, record_size','frame, high, record, record_size'),
                          ('zeros(state, record_size)', 'crc32_core_update(state, __root_record_start, record_size)'),
