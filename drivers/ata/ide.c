@@ -10,14 +10,9 @@
 
 #include "ide.h"
 #include "ide_addr.h"
-#include "io.h"
-#include "pc98.h"
+#include "ide_bus.h"
 #include "kprintf.h"
 #include "memmap.h"
-
-/* 外部: irq_disable (arch/x86/kernel/idt.c で定義)。drivers/ は -Ikernel を
- * 持たないため、kbd.c の irq_enable と同じ扱いでここに宣言する。 */
-extern void irq_disable(unsigned int irq);
 
 /* ドライブ検出フラグ (4ドライブ対応)
  * drive 0 = バンク0 Master (NP21/W IDE #0)
@@ -40,9 +35,7 @@ static IdeGeom drive_geom[IDE_MAX_DRIVES];
 /* バンク選択 (0=プライマリ, 無効化しない) */
 static void ide_select_bank(int bank)
 {
-    /* NP21/Wではgetidedev()がセカンダリバンク(IDE_BANK1)を参照するため、
-       明示的に書き込む必要がある。値0x00=プライマリ, 0x01=セカンダリ */
-    outp(IDE_BANK1, (unsigned)(bank ? 0x01 : 0x00));
+    ide_bus_select(bank);
 }
 
 /* ステータス待ち (BSY=0になるまで) */
@@ -50,7 +43,7 @@ static int ide_wait_bsy(void)
 {
     int timeout = IDE_TIMEOUT_BSY;
     while (timeout-- > 0) {
-        u8 st = (u8)inp(IDE_ALT_STATUS);
+        u8 st = ide_bus_alt();
         if (!(st & IDE_ST_BSY)) return IDE_OK;
     }
     return IDE_ERR_TIMEOUT;
@@ -64,20 +57,20 @@ static int ide_wait_drq(void)
 
     /* まずBSYが落ちるのを待つ */
     while (timeout-- > 0) {
-        st = (u8)inp(IDE_ALT_STATUS);
+        st = ide_bus_alt();
         if (!(st & IDE_ST_BSY)) break;
     }
     if (timeout <= 0) return IDE_ERR_TIMEOUT;
 
     /* DRQチェック */
-    st = (u8)inp(IDE_ALT_STATUS);
+    st = ide_bus_alt();
     if (st & IDE_ST_ERR) return IDE_ERR_IO;
     if (st & IDE_ST_DRQ) return IDE_OK;
 
     /* DRQが来るまで追加待ち */
     timeout = IDE_TIMEOUT_BSY;
     while (timeout-- > 0) {
-        st = (u8)inp(IDE_ALT_STATUS);
+        st = ide_bus_alt();
         if (st & IDE_ST_DRQ) return IDE_OK;
         if (st & IDE_ST_ERR) return IDE_ERR_IO;
     }
@@ -92,11 +85,11 @@ static void ide_select_drive(int drive)
     int bank = drive / IDE_DRIVES_PER_BANK;        /* 0 or 1 */
     int slave = drive % IDE_DRIVES_PER_BANK;       /* 0=Master, 1=Slave */
     ide_select_bank(bank);
-    outp(IDE_DRV_HEAD, IDE_DRVHEAD_BASE | (slave ? IDE_DRVHEAD_SLAVE : 0x00));
+    ide_bus_out(IDE_REG_DRV_HEAD, IDE_DRVHEAD_BASE | (slave ? IDE_DRVHEAD_SLAVE : 0x00));
     /* ドライブ選択後、400ns待ち（ダミーリード） */
     {
         int i;
-        for (i = 0; i < IDE_SEL_SETTLE; i++) inp(IDE_ALT_STATUS);
+        for (i = 0; i < IDE_SEL_SETTLE; i++) ide_bus_alt();
     }
 }
 
@@ -105,11 +98,11 @@ static void ide_select_drive(int drive)
  * (LBA28 なら bit6 と LBA[27:24]、CHS ならヘッド) をそのまま出す。 */
 static void ide_set_addr(const IdeAddr *a, u8 count)
 {
-    outp(IDE_SECT_CNT, (unsigned)count);
-    outp(IDE_SECT_NUM, (unsigned)a->sect_num);
-    outp(IDE_CYL_LO,   (unsigned)a->cyl_lo);
-    outp(IDE_CYL_HI,   (unsigned)a->cyl_hi);
-    outp(IDE_DRV_HEAD, (unsigned)a->drv_head);
+    ide_bus_out(IDE_REG_SECT_CNT, count);
+    ide_bus_out(IDE_REG_SECT_NUM, a->sect_num);
+    ide_bus_out(IDE_REG_CYL_LO, a->cyl_lo);
+    ide_bus_out(IDE_REG_CYL_HI, a->cyl_hi);
+    ide_bus_out(IDE_REG_DRV_HEAD, a->drv_head);
 }
 
 /* CHS をそのまま IdeAddr にする (ide_read_sector_chs 系の入口) */
@@ -137,10 +130,7 @@ int ide_init(void)
     int found = 0;
     int bank, drv;
 
-    /* PC-98スレーブPICでIRQ9をマスク。
-       IRQ9 = スレーブPIC bit1。未処理IRQによるシステム破壊を防止。
-       手書きの IMR RMW は割り込みに分断されると危険なので共通 API を使う。 */
-    irq_disable(PC98_IRQ_IDE);
+    ide_bus_init();
 
     ide_multiple_init();
     for (drv = 0; drv < IDE_MAX_DRIVES; drv++) {
@@ -157,12 +147,12 @@ int ide_init(void)
         /* フローティングバス検出: 存在しないバンクでは全ビット1 (0xFF)
          * が返る → 即スキップ
          * 注: 0x00 はスレーブドライブ選択前の正常値なのでスキップしない */
-        probe = (u8)inp(IDE_ALT_STATUS);
+        probe = ide_bus_alt();
         kprintf(KLOG_ATTR, "[ide] bank%d probe=0x%02x\n", bank, probe);
-        if (probe == PC98_IO_OPEN_BUS8) continue;
+        if (probe == IDE_BUS_OPEN8) continue;
 
         /* 割り込み無効 (nIEN=1) — ポーリングモード */
-        outp(IDE_DEV_CTRL, IDE_NIEN);
+        ide_bus_ctl(IDE_NIEN);
 
         for (drv = 0; drv < IDE_DRIVES_PER_BANK; drv++) {
             int idx = bank * IDE_DRIVES_PER_BANK + drv; /* 0-3 */
@@ -206,7 +196,7 @@ int ide_identify(int drive, IdeInfo *info)
     if (ret != IDE_OK) return ret;
 
     /* IDENTIFYコマンド発行 */
-    outp(IDE_COMMAND, IDE_CMD_IDENTIFY);
+    ide_bus_out(IDE_REG_STATUS, IDE_CMD_IDENTIFY);
 
     /* DRQ待ち */
     ret = ide_wait_drq();
@@ -216,12 +206,12 @@ int ide_identify(int drive, IdeInfo *info)
     {
         int w;
         for (w = 0; w < IDE_IDENTIFY_WORDS; w++) {
-            buf[w] = (u16)inpw(IDE_DATA);
+            buf[w] = ide_bus_data_word();
         }
     }
 
     /* IRQクリア: Statusレジスタ読み出し */
-    { u8 st = (u8)inp(IDE_STATUS); (void)st; }
+    { u8 st = ide_bus_in(IDE_REG_STATUS); (void)st; }
     ide_wait_bsy();
 
     /* 幾何の生の語。I/O の指定の方式 (LBA28 / 現在の CHS / 既定の CHS) は

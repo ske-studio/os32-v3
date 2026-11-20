@@ -11,9 +11,10 @@ C_COMMON_PC98_PENDING = mm/dma_pool.c mm/dma_pool_math.c mm/shlib.c kernel/gui.c
 C_COMMON_EXEC += drivers/pci/pci.c drivers/pci/pci_barsize.c drivers/pci/pci_decode.c drivers/pci/pci_bind.c drivers/pci/pci_bind_match.c kernel/dev/device_pci.c
 C_EXT2_FORMATTER := fs/ext2/ext2_fmt.c fs/ext2/ext2_layout.c fs/ext2/ext2_time.c
 ifeq ($(PLATFORM),pc98)
-C_COMMON_PC98_PENDING += $(C_EXT2_FORMATTER)
+C_COMMON_PC98_PENDING += init/shell_loop.c $(C_EXT2_FORMATTER)
 endif
-C_COMMON_COMPILE_ONLY_PPC := kernel/sqlite_engine.c $(C_EXT2_FORMATTER)
+C_COMMON_COMPILE_ONLY_PPC := kernel/sqlite_engine.c $(C_EXT2_FORMATTER) kernel/dev/device_ide.c drivers/ata/ide_addr.c
+C_COMMON_IDE = kernel/dev/device_ide.c drivers/ata/ide.c drivers/ata/ide_addr.c
 C_COMMON_LOOP = kernel/dev/device_loop.c drivers/block/loop_dev.c
 ifeq ($(FEATURE_PC98_PENDING)$(FEATURE_LOOP),11)
 C_COMMON_LOOP += fs/ext2/ext2_medium_loop.c

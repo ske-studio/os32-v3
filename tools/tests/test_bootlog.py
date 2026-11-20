@@ -188,7 +188,7 @@ def check_wiring():
     n = k.count("bootlog_save();")
     root = k.find('vfs_mount("/", boot.root_dev, boot.root_fs)')
     call = k.find("bootlog_save();")
-    shell = k.find("rc = exec_run(kcg_unavailable")
+    shell = k.find("shell_loop_run(&ops);")
     selftest = k.find("kdebug.ops.selftest_run();")
     print(f"WIRING kernel.c bootlog_save x{n}", flush=True)
     if n != 1 or not (0 <= root < selftest < call < shell):

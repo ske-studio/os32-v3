@@ -101,7 +101,7 @@ def conformance():
     # registration is earlier; actual serial/rshell service starts in shell ui.
     kernel = (ROOT / 'platform/pc98/kernel.c').read_text()
     assert kernel.count('    boot_splash();') == 1
-    assert kernel.index('    boot_splash();') < kernel.index('rc = exec_run(kcg_unavailable')
+    assert kernel.index('    boot_splash();') < kernel.index('shell_loop_run(&ops);')
     ui = (ROOT / 'userland/shell/ui.c').read_text()
     assert ui.index('g_api->serial_init(SYS_SERIAL_BAUD);') < ui.index('execute_command("rshell")') < ui.index('        show_prompt();')
     print('PASS module policy consumers and splash -> shell serial/rshell -> prompt')

@@ -3,7 +3,7 @@
 static void ide_pio_settle(void)
 {
     int i;
-    for (i = 0; i < IDE_SEL_SETTLE; i++) inp(IDE_ALT_STATUS);
+    for (i = 0; i < IDE_SEL_SETTLE; i++) ide_bus_alt();
 }
 
 /* BSY masks all other bits. Return the stable status so READ can drain an
@@ -12,7 +12,7 @@ static int ide_pio_wait_phase(u8 *status)
 {
     int timeout = IDE_TIMEOUT_LOOP;
     while (timeout-- > 0) {
-        u8 st = (u8)inp(IDE_ALT_STATUS);
+        u8 st = ide_bus_alt();
         if (st & IDE_ST_BSY) continue;
         *status = st;
         if (st & (IDE_ST_ERR | IDE_ST_DF)) return IDE_ERR_IO;
@@ -26,7 +26,7 @@ static int ide_pio_finish(void)
     int timeout = IDE_TIMEOUT_BSY;
     while (timeout-- > 0) {
         /* Regular status also acknowledges the command's interrupt. */
-        u8 st = (u8)inp(IDE_STATUS);
+        u8 st = ide_bus_in(IDE_REG_STATUS);
         if (st & IDE_ST_BSY) continue;
         if (st & (IDE_ST_ERR | IDE_ST_DF)) return IDE_ERR_IO;
         if (!(st & IDE_ST_DRQ)) return IDE_OK;
@@ -37,8 +37,8 @@ static int ide_pio_finish(void)
 static int ide_pio_command(int drive, const IdeAddr *a, u32 sectors,
                            void *read_buf, const void *write_buf)
 {
-    u16 *dst = (u16 *)read_buf;
-    const u16 *src = (const u16 *)write_buf;
+    u8 *dst = read_buf;
+    const u8 *src = write_buf;
     u32 done, multiple;
     int ret;
 
@@ -52,7 +52,7 @@ static int ide_pio_command(int drive, const IdeAddr *a, u32 sectors,
     if (multiple <= 1) multiple = 1;
     /* sectors is 1..256 here; only the register encodes 256 as zero. */
     ide_set_addr(a, (u8)(sectors == IDE_COMMAND_MAX_SECTORS ? 0 : sectors));
-    outp(IDE_COMMAND, multiple > 1
+    ide_bus_out(IDE_REG_STATUS, multiple > 1
          ? (src ? IDE_CMD_WRITE_MULTIPLE : IDE_CMD_READ_MULTIPLE)
          : (src ? IDE_CMD_WRITE : IDE_CMD_READ));
     ide_pio_settle();
@@ -66,15 +66,17 @@ static int ide_pio_command(int drive, const IdeAddr *a, u32 sectors,
         if (ret != IDE_OK) {
             if (!src && ret == IDE_ERR_IO && (st & IDE_ST_ERR) && (st & IDE_ST_DRQ)) {
                 /* ATA/ATAPI-6 §8.30.8: discard the entire failed DRQ block. */
-                for (w = 0; w < phase_words; w++) (void)inpw(IDE_DATA);
+                for (w = 0; w < phase_words; w++) (void)ide_bus_data_word();
                 ide_pio_settle();
             }
             return ret;
         }
         if (src) {
-            for (w = 0; w < phase_words; w++) outpw(IDE_DATA, (unsigned)*src++);
+            ide_bus_data_write(src, phase_words);
+            src += 2 * phase_words;
         } else {
-            for (w = 0; w < phase_words; w++) *dst++ = (u16)inpw(IDE_DATA);
+            ide_bus_data_read(dst, phase_words);
+            dst += 2 * phase_words;
         }
         done += n;
         /* Let the previous DRQ phase retire before sampling the next status. */
