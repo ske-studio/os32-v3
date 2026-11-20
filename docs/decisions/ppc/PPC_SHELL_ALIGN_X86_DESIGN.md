@@ -283,3 +283,4 @@ void shell_loop_run(const struct shell_loop_ops *ops); /* 新設 */
 以下は本文に優先する。
 - **P2 (§5・§9) busy の語の型**: arch/ppc/ppc_frame.h で、フレームの先頭から 164 B の busy の語を `u32 *busy` として取れる型付きの道を共有し (struct ppc_frame の 160 B の vector の後ろ)、アセンブリの定数 KFRAME_BUSY とのオフセットの一致を静的に検査する。PR=0 の回復の分岐だけで読み、その jump context に渡す。
 - **P2 (§7・§9) 旧い旗の正規化の負例**: 製品の像へ正規化される入力は、旧名・旧旗を含めて NEGATIVE=0 の時だけに限る。旧旗の組 LINK/SH/SHELL=0/0/1 と NEGATIVE が非 0 の組み合わせを拒否する試験を足す (build/images/ppc-flags.mk の旗の検査の順に依らない)。
+- **段の入れ替え (2026-11-20 夜、PowerPC の PM の決定を本線の PM が受けた)**: C2 (build/ppc-ram-root.json に /sys/shell.bin) を段 E に移し、起動を切り替える取り込みで旧い /bin/sh.bin・hello・fault を外すのと同時に入れる — 両方を置くと常駐の終端 0x396000・chain 0x401000 で上限を 135,168 B 超えるため (sol の C の P1)。段 C は「/sys/shell.bin を成果物として組める」まで (製品の像の中身は main と同じ)。段 E の受入に、新しい shell.bin (raw 218,544 B、旧 165,440 B より +53 KB) を入れた後の像の予算 (常駐の終端・chain・ISO の丸め) の照合を足す。
