@@ -117,7 +117,7 @@ static int suite(void)
     /* The resident sid expires while idle; the first manifest open/read
      * must reconnect and use the new generation. H4 tests the hsync retry. */
     restarts=0; unknown=0;
-    CHECK(sfs_persistent_scope_begin()==0);
+    CHECK(sfs_persistent_scope_begin_owned(-1)==0);
     unknown=1;
     int manifest=vfs_open("/host/.deploy/manifest.txt",O_RDONLY);
     CHECK(manifest>=3);
@@ -125,19 +125,19 @@ static int suite(void)
     char text[10]={0};
     CHECK(vfs_read_fd(manifest,text,9)==9 && kstrcmp(text,"format=2\n")==0);
     vfs_close(manifest);
-    CHECK(sfs_persistent_scope_end(0)==0);
+    CHECK(sfs_persistent_scope_end_owned(-1, 0)==0);
     /* Known generation changes are absorbed before the first child open. */
     u32 value=1;
     CHECK(host_mailbox_put(1,1,1,&value,sizeof(value),1)==0);
-    CHECK(sfs_persistent_scope_begin()==0);
+    CHECK(sfs_persistent_scope_begin_owned(-1)==0);
     value=2;
-    CHECK(sfs_persistent_scope_end(0)==0);
+    CHECK(sfs_persistent_scope_end_owned(-1, 0)==0);
     CHECK(host_mailbox_put(2,1,1,&value,sizeof(value),1)==0);
-    CHECK(sfs_persistent_scope_begin()==0);
+    CHECK(sfs_persistent_scope_begin_owned(-1)==0);
     manifest=vfs_open("/host/.deploy/manifest.txt",O_RDONLY);
     CHECK(manifest>=3);
     vfs_close(manifest);
-    CHECK(sfs_persistent_scope_end(0)==0);
+    CHECK(sfs_persistent_scope_end_owned(-1, 0)==0);
     return 0;
 }
 void _start(void)

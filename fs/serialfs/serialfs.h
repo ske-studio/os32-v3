@@ -6,7 +6,7 @@
 /*  KAPI sfs_begin / sfs_end は LAN では scope の開始 / 終了になる。        */
 /*                                                                          */
 /*  fs/serialfs/serialfs.c        … VfsOps (ホスト試験でもそのまま組む)              */
-/*  fs/serialfs/serialfs_session.c … セッション (ゲート・HELLO・マウント・隔離・     */
+/*  fs/serialfs/sfs_session_fg.c … 前景セッション (ゲート・HELLO・マウント・隔離・     */
 /*                          ログのフレーム)。カーネルだけ                    */
 /*  fs/serialfs/serialfs_persistent.c … LAN 常駐 client・mount 世代          */
 /* ======================================================================== */
@@ -106,7 +106,5 @@ int sfs_persistent_describe(struct SfsTransportInfo *out);
 int sfs_persistent_scope_begin_owned(int owner);
 int sfs_persistent_scope_end_owned(int owner, int exit_code);
 void sfs_persistent_scope_owner_exit(int owner);
-int sfs_persistent_scope_begin(void);
-int sfs_persistent_scope_end(int exit_code);
 
 #endif /* FS_SERIALFS_H */

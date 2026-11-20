@@ -15,7 +15,7 @@
  "exec/launch.c": 1,
  "exec/ring3_str.h": 1,
  "fs/fd_redirect.h": 1,
- "fs/serialfs/serialfs_session.c": 1,
+ "fs/serialfs/sfs_session_fg.c": 1,
  "fs/serialfs/sfs_proto.h": 1,
  "fs/vfs_name_rules.inc": 1,
  "include/build_id.h": 1,

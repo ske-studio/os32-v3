@@ -278,6 +278,7 @@
     "fs/serialfs/sfs_proto.c",
     "fs/serialfs/sfs_client.c",
     "fs/serialfs/serialfs.c",
+    "fs/serialfs/sfs_session_fg.c",
     "fs/serialfs/serialfs_session.c",
     "fs/serialfs/serialfs_persistent.c",
     "exec/exec.c",
@@ -613,7 +614,7 @@
     "drivers/net/ne2000/ne2000.o",
     "drivers/net/ne2000/lgy98.o",
     "drivers/block/fdc.o",
-    "fs/serialfs/serialfs_session.o",
+    "fs/serialfs/sfs_session_fg.o",
     "lib/sqlite3/os32_sqlite_test.o"
   ],
   "GEFORCE_DISPLAY_STATE_SOURCES": [

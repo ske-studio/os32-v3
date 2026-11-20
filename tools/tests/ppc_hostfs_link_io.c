@@ -151,7 +151,7 @@ static int boot_suite(void)
     CHECK(sfs_persistent_generation() == generation);
     CHECK(host_mailbox_put(2, 3, 1, 0, 0, 1) == 0);
     CHECK(vfs_open("/host/a", O_RDONLY) == VFS_ERR_STALE);
-    CHECK(sfs_persistent_scope_begin() == 0);
+    CHECK(sfs_persistent_scope_begin_owned(-1) == 0);
     int new_fd = vfs_open("/host/a", O_RDONLY);
     CHECK(new_fd >= 3);
     CHECK(hellos == 2);
@@ -160,7 +160,7 @@ static int boot_suite(void)
     CHECK(vfs_seek(new_fd, 0, SEEK_END) == 2048);
     CHECK(vfs_is_mounted("/host") && borrowed->sid == 7);
     vfs_close(fd); vfs_close(new_fd);
-    CHECK(sfs_persistent_scope_end(0) == 0);
+    CHECK(sfs_persistent_scope_end_owned(-1, 0) == 0);
     return 0;
 }
 static int suite(void)

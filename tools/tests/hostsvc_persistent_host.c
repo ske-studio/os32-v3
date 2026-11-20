@@ -94,8 +94,8 @@ static int suite(void)
     hs_reset(0xFFFFFFF0u);
     CHECK(!sfs_persistent_client() && !sfs_persistent_enabled());
     CHECK(sfs_ensure_session(hs_now() + 100) == OS32_ERR_HOSTDOWN);
-    CHECK(sfs_persistent_scope_begin() == OS32_ERR_INVAL);
-    CHECK(sfs_persistent_scope_end(0) == OS32_ERR_INVAL);
+    CHECK(sfs_persistent_scope_begin_owned(-1) == OS32_ERR_INVAL);
+    CHECK(sfs_persistent_scope_end_owned(-1, 0) == OS32_ERR_INVAL);
     CHECK(sfs_persistent_start(0) == OS32_ERR_INVAL);
     CHECK(host_mailbox_init() == 0);
     vfs_device_names_register(names, 1);
@@ -117,10 +117,10 @@ static int suite(void)
     client = sfs_persistent_client();
     CHECK(client && !client->sid && hello_count == 0);
     CHECK(vfs_route("/host/a", rel, sizeof(rel), &ctx) && ctx == client);
-    CHECK(sfs_persistent_scope_begin() == 0);
-    CHECK(sfs_persistent_scope_begin() == OS32_ERR_BUSY);
-    CHECK(sfs_persistent_scope_end(23) == 0);
-    CHECK(sfs_persistent_scope_end(0) == OS32_ERR_INVAL);
+    CHECK(sfs_persistent_scope_begin_owned(-1) == 0);
+    CHECK(sfs_persistent_scope_begin_owned(-1) == OS32_ERR_BUSY);
+    CHECK(sfs_persistent_scope_end_owned(-1, 23) == 0);
+    CHECK(sfs_persistent_scope_end_owned(-1, 0) == OS32_ERR_INVAL);
     CHECK(vfs_is_mounted(SERIALFS_PREFIX) && !bye_count && hello_count == 1);
     CHECK(sfs_ensure_session(hs_now() + 100) == 0);
     CHECK(hello_count == 1 && client->sid && client->max_payload == SFS_LAN_MAX_PAYLOAD);
@@ -193,17 +193,17 @@ static int suite(void)
     CHECK(vfs_resource_prepare(before, ctx) == 0);
     value = 10;
     CHECK(host_mailbox_put(10, 1, 1, &value, sizeof(value), 1) == 0);
-    CHECK(sfs_persistent_scope_begin() == 0);
+    CHECK(sfs_persistent_scope_begin_owned(-1) == 0);
     VfsOps *ops = vfs_route("/host/a", rel, sizeof(rel), &ctx);
     CHECK(vfs_resource_prepare(ops, ctx) == 0);
     CHECK(sfs_persistent_generation() == gen + 4);
-    CHECK(sfs_persistent_scope_end(0) == 0);
+    CHECK(sfs_persistent_scope_end_owned(-1, 0) == 0);
     /* A failed ensure must leave the scope available for the next command. */
     sfs_persistent_stale();
     hs_fail("sfs.reply", OS32_ERR_HOSTDOWN);
-    CHECK(sfs_persistent_scope_begin() == OS32_ERR_HOSTDOWN);
-    CHECK(sfs_persistent_scope_begin() == 0);
-    CHECK(sfs_persistent_scope_end(0) == 0);
+    CHECK(sfs_persistent_scope_begin_owned(-1) == OS32_ERR_HOSTDOWN);
+    CHECK(sfs_persistent_scope_begin_owned(-1) == 0);
+    CHECK(sfs_persistent_scope_end_owned(-1, 0) == 0);
     return 0;
 }
 void _start(void)
