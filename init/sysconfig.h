@@ -9,6 +9,12 @@
 #ifndef __SYSCONFIG_H
 #define __SYSCONFIG_H
 
+/* Hold path for successive lookups during single-threaded boot. Keep path valid
+ * until end. Returns the length, 0 for missing/empty/error, -1 for oversize.
+ * Integer lookups in this scope return def for malformed or overflowing values. */
+int sysconfig_temp_begin(const char *path);
+void sysconfig_temp_end(void);
+
 /* path の設定ファイルから key の整数値を返す。
  *   - 1 行 1 エントリ、"KEY=VALUE" 形式 (KEY の前後・= の前後の空白は許容)。
  *   - '#' または ';' で始まる行、空行はコメントとして無視。

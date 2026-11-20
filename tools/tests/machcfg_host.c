@@ -1,5 +1,7 @@
 #include "machcfg_contract.h"
 #include "kprintf.h"
+#include "sysconfig.h"
+#include "vfs.h"
 
 _Static_assert(MACHCFG_FILE_MAX == TEST_SYSCONFIG_MAX - 1, "machine.cfg limit");
 
@@ -73,8 +75,46 @@ static int reports(void)
     return 0;
 }
 
+static char config[MACHCFG_LINE_MAX + 2];
+static int config_size;
+
+int vfs_read(const char *path, void *buf, u32 max)
+{
+    (void)path;
+    if ((u32)config_size > max) return -1;
+    for (int i = 0; i < config_size; i++) ((char *)buf)[i] = config[i];
+    return config_size;
+}
+
+static int line_endings(void)
+{
+    const char *path = "machine.cfg";
+    char value[2];
+    config[0] = 'K';
+    config[1] = '=';
+    config[2] = '2';
+    for (int i = 3; i < MACHCFG_LINE_MAX; i++) config[i] = ' ';
+    config[MACHCFG_LINE_MAX] = '\r';
+    config[MACHCFG_LINE_MAX + 1] = '\n';
+    config_size = sizeof(config);
+    sysconfig_temp_begin(path);
+    int valid = sysconfig_get_int(path, "K", -1) == 2;
+    sysconfig_temp_end();
+    config_size--;
+    sysconfig_temp_begin(path);
+    valid &= sysconfig_get_str(path, "K", value, sizeof(value)) == -1;
+    sysconfig_temp_end();
+    config[3] = '\r';
+    config_size = 4;
+    sysconfig_temp_begin(path);
+    valid &= sysconfig_get_int(path, "K", -1) == -1;
+    sysconfig_temp_end();
+    return valid;
+}
+
 static int run(void)
 {
+    if (!line_endings()) return 20;
     const struct machcfg_seed seeds[] = {
         {{0, 0}, 1}, {{0, 0}, 0}, {{0, 0}, 0}
     };

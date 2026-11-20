@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 CHECK = dict(name='machcfg-host', tier=1, needs=[], budget=5,
     covers=['include/machcfg_contract.h', 'include/types.h', 'include/callconv.h',
-            'init/sysconfig.c', 'kernel/machcfg.c', 'tools/tests/machcfg_host.c',
+            'init/sysconfig.c', 'init/sysconfig.h', 'fs/vfs.h', 'lib/kstring_c.c',
+            'tools/tests/kernel_includes.py', 'kernel/machcfg.c', 'tools/tests/machcfg_host.c',
             'include/kprintf.h', 'include/console.h', 'sdk/include/os32/*.h',
             'platform/pc98/platform_console.h', 'lib/kprintf.c', 'lib/kprintf_format.inc',
             'tools/tests/host32.py', 'tools/tests/cc_cache.py'],
@@ -16,6 +17,7 @@ def run(ctx):
     import tempfile
     from pathlib import Path
     sys.path.insert(0, str(ctx.root / 'tools/tests'))
+    import kernel_includes
     import host32
     root = Path(ctx.root)
     match = re.search(r'^#define\s+SYSCONFIG_MAX\s+(\d+)\s*$',
@@ -38,7 +40,9 @@ def run(ctx):
         formatter = (root / 'lib/kprintf.c').read_text().replace(
             '#include "kprintf_format.inc"', (root / 'lib/kprintf_format.inc').read_text())
         (tmp / 'format.c').write_text(formatter)
-        def check(src, hdr):
+        parser = (root / 'init/sysconfig.c').read_text()
+        def check(src, hdr, cfg=parser):
+            (tmp / 'sysconfig.c').write_text(cfg)
             (tmp / 'machcfg.c').write_text(src)
             (tmp / 'machcfg_contract.h').write_text(hdr)
             exe = tmp / 'test'
@@ -47,7 +51,8 @@ def run(ctx):
                    '-DTEST_SYSCONFIG_MAX=' + match.group(1), '-I' + str(tmp),
                    '-I' + str(root / 'include'), str(tmp / 'machcfg.c'),
                    '-I' + str(root / 'platform/pc98'), str(tmp / 'format.c'),
-                   str(root / 'tools/tests/machcfg_host.c'), '-o', str(exe)]
+                   *kernel_includes.include_flags(root), str(tmp / 'sysconfig.c'),
+                   str(root / 'lib/kstring_c.c'), str(root / 'tools/tests/machcfg_host.c'), '-o', str(exe)]
             built = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             if built.returncode:
                 return 'compile', built.stderr.decode()
@@ -60,6 +65,18 @@ def run(ctx):
             return 1
         print('normal control: GREEN')
         if ctx.mutate:
+            for name, old, new in [
+                ('bare-cr-length', 'end < n && length', 'length'),
+                ('bare-cr-integer', r"end - s >= 2 && *s == '\r' && s[1] == '\n'",
+                 r"s < end && *s == '\r'"),
+            ]:
+                if parser.count(old) != 1:
+                    raise RuntimeError('mutation point changed: ' + name)
+                phase, result = check(source, header, parser.replace(old, new))
+                if (phase, result) != ('run', 20):
+                    print(name, phase, result)
+                    return 1
+                print(name, 'runtime RED')
             for name, old, new in mutations:
                 if source.count(old) != 1:
                     raise RuntimeError('mutation point changed: ' + name)

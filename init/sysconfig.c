@@ -12,44 +12,57 @@
 #include "vfs.h"
 #include "kstring.h"
 #include "sysconfig.h"
-#include "gf_production.h"
-
-static int gf_selected;
-static int gf_configured;
-void gf_production_configure(const char *gfx, int gui)
-{
-    if (gf_configured) return;
-    gf_configured = 1;
-    gf_selected = gfx && !kstrcmp(gfx, "geforce") && gui != 1;
-}
-int gf_production_selected(void)
-{
-    return gf_selected;
-}
+#include "machcfg_contract.h"
 
 /* 設定ファイルの読み込み上限 (十分に小さい前提)。 */
 #define SYSCONFIG_MAX  1024
 
 /* 起動ループ専用・単一スレッド。get_int / get_str が交互に使う。 */
-static char sc_buf[SYSCONFIG_MAX];
+static char sc_buf[SYSCONFIG_MAX + 1];
+static const char *sc_temp_path;
+static int sc_temp_size;
+
+int sysconfig_temp_begin(const char *path)
+{
+    int n = vfs_read(path, sc_buf, SYSCONFIG_MAX);
+    sc_temp_path = path;
+    sc_temp_size = n <= 0 ? 0 : n > MACHCFG_FILE_MAX ? -1 : n;
+    sc_buf[sc_temp_size > 0 ? sc_temp_size : 0] = '\0';
+    return sc_temp_size;
+}
+
+void sysconfig_temp_end(void)
+{
+    sc_temp_path = 0;
+}
 
 /* 符号付き十進を最低限だけ解釈する (先頭の +/- と連続する数字)。 */
-static int sc_atoi(const char *s)
+static int sc_atoi(const char *s, const char *end, int def)
 {
-    int v = 0;
+    unsigned int v = 0;
     int neg = 0;
     if (*s == '-') { neg = 1; s++; }
     else if (*s == '+') { s++; }
+    unsigned int limit = (unsigned int)__INT_MAX__ + neg;
+    if (sc_temp_path && (*s < '0' || *s > '9')) return def;
     while (*s >= '0' && *s <= '9') {
-        v = v * 10 + (int)(*s - '0');
-        s++;
+        unsigned int digit = *s++ - '0';
+        if (sc_temp_path && v > (limit - digit) / 10) return def;
+        v = v * 10 + digit;
     }
-    return neg ? -v : v;
+    if (sc_temp_path) {
+        while (s < end && (*s == ' ' || *s == '\t')) s++;
+        if (end - s >= 2 && *s == '\r' && s[1] == '\n') s++;
+        if (s < end && *s != '\n') return def;
+    }
+    return (int)(neg ? -v : v);
 }
 
 /* path を sc_buf へ読む。読めたバイト数 (NUL 終端済み)、失敗で 0。 */
 static int sc_load(const char *path)
 {
+    if (sc_temp_path)
+        return !kstrcmp(sc_temp_path, path) ? sc_temp_size : 0;
     int n = vfs_read(path, sc_buf, (u32)(SYSCONFIG_MAX - 1));
     if (n <= 0) {
         sc_buf[0] = '\0';
@@ -68,6 +81,17 @@ static int sc_find_value(int n, const char *key)
 
     while (i < n) {
         int j;
+
+        if (sc_temp_path) {
+            int end = i;
+            while (end < n && sc_buf[end] != '\n') end++;
+            int length = end - i;
+            if (end < n && length && sc_buf[end - 1] == '\r') length--;
+            if (length > MACHCFG_LINE_MAX) {
+                i = end + 1;
+                continue;
+            }
+        }
 
         /* 行頭の空白を飛ばす */
         while (i < n && (sc_buf[i] == ' ' || sc_buf[i] == '\t')) {
@@ -126,7 +150,7 @@ int sysconfig_get_int(const char *path, const char *key, int def)
     if (v < 0) {
         return def;
     }
-    return sc_atoi(&sc_buf[v]);
+    return sc_atoi(&sc_buf[v], &sc_buf[n], def);
 }
 
 int sysconfig_get_str(const char *path, const char *key, char *out, int outsz)
