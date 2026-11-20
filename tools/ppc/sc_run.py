@@ -44,14 +44,6 @@ BINS = 'KB_ROOT_BINS=' + ' '.join('build/out/ppc-user/'+n+'.bin'
                                 for n in ('hello', 'fault', 'nest'))
 
 
-def serial_image(shell):
-    # Exercise the pre-link serial fixtures even after their public names
-    # became aliases for the product. Supply the complete fixture selection.
-    return ['PPC_FLAGS_MK=', 'KBOOT_LINK=0', 'NEGATIVE=0',
-            'IMAGE=kboot-sh' if shell else 'IMAGE=kboot-shell',
-            'KBOOT_SH=' + str(int(shell)), 'KBOOT_SHELL=' + str(int(not shell))]
-
-
 def lan_accept(elf, cpu, out, shell=False):
     """Same mac99/UDP terminal transport as S-B; exact N01 transcript."""
     out.mkdir()
@@ -148,7 +140,7 @@ def nest_main(args):
     cpus = ['7450', '7455'] if args.cpu == 'both' else [args.cpu]
     base = Path(os.environ['TMPDIR'])/'sc-run'; base.mkdir(exist_ok=True)
     work = Path(tempfile.mkdtemp(prefix='run-', dir=base))
-    settings = [*serial_image(shell=False), BINS]
+    settings = ['KBOOT_SHELL=1', 'KBOOT_LINK=0', BINS]
     if args.serial:
         source = 'platform/powermac/cli_boot.c'
         text = (ROOT/source).read_text()
@@ -283,7 +275,7 @@ static int sc_connected(void)
     (void)pm_escc_write(&serial, frame, sizeof(frame)-1);
     (void)pm_escc_write(&serial, bytes, len);''')
     for name in ['normal'] + (['fd1-log', 'no-restart'] if mutate else []):
-        settings = serial_image(shell=True)
+        settings = ['KBOOT_SH=1', 'KBOOT_LINK=0']
         for slot, src, text in [('', boot_src, boot), ('EXTRA_', input_src, inp),
                                 ('THIRD_', stream_src, stream)]:
             if name == 'fd1-log' and src == stream_src:
@@ -466,7 +458,7 @@ def main():
     shell_serial(work, cpus, args.mutate)
     print('PASS S-C serial evidence='+str(work), flush=True)
     if not args.serial:
-        elf = build(work/'product', *serial_image(shell=True))
+        elf = build(work/'product', 'KBOOT_SH=1', 'KBOOT_LINK=0')
         symbols = command([str(cross/'bin/powerpc-elf-nm'), elf])
         require('resident_cli_run' not in symbols and 'pm_cli_boot' not in symbols, 'CLI in product')
         for cpu in cpus:

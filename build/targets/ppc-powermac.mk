@@ -46,6 +46,14 @@ build/out/unicode.bin: tools/gen_unicode.c lib/unicode_jis_table.h kernel/consol
 
 include build/ram-root.mk
 
+# Record the optional ISO input so removing it also rebuilds an existing ISO.
+$(ROOT_ISO): $(KB_OUT)/root-shell.config
+.PHONY: force-root-shell-config
+$(KB_OUT)/root-shell.config: force-root-shell-config
+	@mkdir -p $(@D)
+	@printf '%s\n' '$(ROOT_SYS_BIN)' > $@.tmp
+	@if cmp -s $@.tmp $@; then rm $@.tmp; else mv $@.tmp $@; fi
+
 # Entry objects first (kernel.ld keeps .text.entry at the image start).
 KB_ASM := $(GAS_KERNEL)
 KB_C := $(C_KERNEL)

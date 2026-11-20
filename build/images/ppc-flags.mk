@@ -2,15 +2,12 @@
 # 像は名前 (IMAGE=kboot-*) でも、道具の旗 (KBOOT_LINK・KBOOT_SH・KBOOT_SHELL) でも選べる。
 # 両方をコマンドラインで与えて食い違えば止める。旗は規則 (build/targets/ppc-powermac.mk) が
 # 出力の置き場や -D に使う。設計は docs/design/build/select.md §3-1。
-# An omitted selector picks the product. Explicit legacy flags retain their defaults.
-ifeq ($(strip $(KBOOT_LINK)$(KBOOT_SH)$(KBOOT_SHELL)),)
-ifneq ($(IMAGE),)
+ifneq ($(findstring command,$(origin IMAGE)),)
+ifeq ($(findstring command,$(origin KBOOT_LINK))$(findstring command,$(origin KBOOT_SH))$(findstring command,$(origin KBOOT_SHELL)),)
 # 名前だけで選んだ時は、旗を名前から決める。
 KBOOT_LINK := $(if $(filter kboot-link kboot-link-sh,$(IMAGE)),1,0)
 KBOOT_SH := $(if $(filter kboot-sh kboot-link-sh,$(IMAGE)),1,0)
 KBOOT_SHELL := $(if $(filter kboot-shell,$(IMAGE)),1,0)
-else
-KBOOT_SH := 1
 endif
 endif
 NEGATIVE ?= 0
@@ -34,18 +31,8 @@ $(error KBOOT_SH does not support NEGATIVE)
 endif
 endif
 KB_IMAGE := $(if $(filter 1,$(KBOOT_SH)),$(if $(filter 1,$(KBOOT_LINK)),kboot-link-sh,kboot-sh),$(if $(filter 1,$(KBOOT_SHELL)),kboot-shell,$(if $(filter 1,$(KBOOT_LINK)),kboot-link,kboot-core)))
-ppc_image = $(if $(filter kboot-shell kboot-sh kboot-link-sh,$(1)),kboot-link-sh,$(1))
-ifeq ($(call ppc_image,$(KB_IMAGE)),kboot-link-sh)
-ifneq ($(NEGATIVE),0)
-$(error product shell does not support NEGATIVE)
-endif
-KB_IMAGE := kboot-link-sh
-override KBOOT_LINK := 1
-override KBOOT_SH := 1
-override KBOOT_SHELL := 0
-endif
 ifneq ($(findstring command,$(origin IMAGE)),)
-ifneq ($(call ppc_image,$(IMAGE)),$(KB_IMAGE))
+ifneq ($(IMAGE),$(KB_IMAGE))
 $(error IMAGE $(IMAGE) disagrees with the KBOOT_* flags, which select $(KB_IMAGE))
 endif
 endif
