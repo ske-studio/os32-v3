@@ -18,7 +18,7 @@ def run(ctx):
     for key in ('BUILD_OUT', 'KERNEL_CFLAGS', 'INC_KERNEL', 'C_STD',
                 'SQLITE_PROTO_OUT', 'MAKEFLAGS', 'MFLAGS', 'MAKELEVEL'):
         env.pop(key, None)
-    rc = subprocess.call(['python3', '-B', 'tools/accept/ppc_display.py'] +
+    rc = subprocess.call(['python3', '-B', 'tools/accept/ppc_display.py', '--present'] +
                          (['--mutate'] if ctx.mutate else []), cwd=ctx.root, env=env)
     # rc 3 = toolchain/QEMU/socket absent; only a failure when the PPC environment is required.
     return 0 if rc == 3 and os.environ.get('OS32_REQUIRE_PPC') != '1' else rc

@@ -21,10 +21,9 @@ fm_play_mml fm_set_tone_num fm_startup_sound
 gfx2_check_op
 gfx2_flip
 gfx2_mode_set gfx2_present
-gfx_add_dirty_rect gfx_get_framebuffer gfx_get_palette
+gfx_get_framebuffer gfx_get_palette
 gfx_hardware_scroll gfx_hw_blit gfx_hw_fill_rect gfx_hw_get gfx_hw_submit
-gfx_init_200 gfx_lease_palette gfx_osri_show gfx_present
-gfx_present_dirty gfx_present_nosync gfx_present_raster gfx_present_rect
+gfx_lease_palette gfx_osri_show
 gfx_screen_info gfx_set_palette gfx_stats
 gui_call gui_register hdd_geom_info ide_drive_present
 ide_get_info ide_identify ide_init ide_read_sector ide_write_sector
@@ -44,6 +43,11 @@ v86_boot v86_boot2 v86_disktest
 v86_gdc_capture v86_selftest
 """.split())
 
+PRESENT_SLOTS = frozenset("""
+gfx_init_200 gfx_present gfx_present_rect gfx_add_dirty_rect
+gfx_present_dirty gfx_present_nosync gfx_present_raster
+""".split())
+
 GFX2_QUERY_PROVIDERS = frozenset("""
 gfx2_adapter_count gfx2_adapter_info gfx2_adapter_gen
 gfx2_caps gfx2_head_info gfx2_connector_info
@@ -51,10 +55,11 @@ gfx2_connector_edid gfx2_mode_count gfx2_mode_get
 """.split())
 
 DISPLAY_PROVIDERS = frozenset("""
-gfx_kapi_init gfx_shutdown gfx2_surface_create gfx2_surface_free gfx2_surface_desc
+gfx_kapi_init_200 gfx_kapi_init gfx_shutdown gfx2_surface_create gfx2_surface_free gfx2_surface_desc
 gfx2_screen_surface gfx2_lock gfx2_unlock gfx2_submit gfx2_fence_query gfx2_fence_wait gfx2_cursor_image
 gfx_screen_owner gfx2_vblank_wait gfx2_palette gfx2_gamma
 gfx2_cursor_move gfx2_cursor_show gfx2_dpms
+gfx_present gfx_present_rect gfx_add_dirty_rect gfx_present_dirty gfx_present_nosync gfx_present_raster
 """.split())
 
 # Fixed allowlist: exec/*.c (including exec_*.inc), KBOOT_SHELL=1 TUs,
@@ -232,6 +237,13 @@ def insert_group(helper, mutation, group):
 
 
 def verify(source, entries):
+    if any('#include "' + header + '"' in source for header in ('gfx_hal.h', 'palette.h')):
+        return False
+    reference = (ROOT / 'kapi/kapi_generated.c').read_text()
+    for slot in PRESENT_SLOTS:
+        wrapper = re.search(r'void __cdecl wrap_' + slot + r'\([^)]*\)\n\{.*?\n\}', reference, re.S)
+        if not wrapper or wrapper.group() not in source:
+            return False
     for api in entries:
         name = api['name']
         target = api.get('target', name)
@@ -286,6 +298,8 @@ def generate(tmp, mutation=None):
         if text.count(old) != 1 or "'tvram_putchar_at'" in text:
             raise RuntimeError('slot-swap: expected buz_off absent and tvram_putchar_at present')
         helper.write_text(text.replace(old, "'buz_on', 'tvram_putchar_at'"))
+    if mutation == 'present-absent':
+        insert_group(helper, mutation, "    'present_mut': (frozenset({'gfx_present'}), frozenset()),\n")
     if mutation == 'putchar-absent':
         insert_group(helper, mutation, "    'cell_mut': (frozenset({'tvram_putchar_at'}), frozenset()),\n")
     if mutation == 'kcg-absent':
@@ -358,6 +372,27 @@ void _start(void)
     return subprocess.run(['qemu-ppc', exe], timeout=5).returncode
 
 
+def check_planar_link(tmp, cc, dirs):
+    flags = ['-ffreestanding', '-D__KERNEL_BUILD__', '-D__cdecl=']
+    flags += ['-I' + str(ROOT / d) for d in dirs]
+    provider = ROOT / 'platform/powermac/display_provider.c'
+    anchor = 'void gfx_planar_present_dirty(int sync) { (void)sync; }'
+    source = provider.read_text()
+    if source.count(anchor) != 1:
+        raise RuntimeError('planar-missing: expected one empty implementation')
+    mutant = tmp / 'display_provider.c'
+    mutant.write_text(source.replace(anchor, ''))
+    for path in (provider, mutant):
+        obj = tmp / 'present.o'
+        subprocess.run([cc, *flags, '-nostdlib', '-r', ROOT / 'gfx/gfx_present.c',
+                        path, '-o', obj], check=True)
+        undefined = subprocess.check_output([cc.with_name('powerpc-elf-nm'), '-u', obj],
+                                            text=True).split()
+        if ('gfx_planar_present_dirty' in undefined) != (path == mutant):
+            raise RuntimeError('planar-missing: unexpected link dependency')
+    print('planar-missing: RED')
+
+
 def main():
     if ABSENT_PROVIDER_SLOTS != EXPECTED_ABSENT_SLOTS:
         print('unexpected absent slots:', sorted(ABSENT_PROVIDER_SLOTS - EXPECTED_ABSENT_SLOTS))
@@ -423,7 +458,8 @@ def main():
             print('absent DB probe failed:', result)
             return 1
         if '--mutate' in sys.argv:
-            for mutation in ('empty', 'zero', 'group-empty', 'ime-empty', 'reboot-absent', 'slot-swap', 'pci-absent', 'mem-absent', 'db-absent'):
+            check_planar_link(tmp, cc, dirs)
+            for mutation in ('empty', 'zero', 'group-empty', 'ime-empty', 'reboot-absent', 'slot-swap', 'present-absent', 'pci-absent', 'mem-absent', 'db-absent'):
                 path = tmp / mutation
                 path.mkdir()
                 mutated = generate(path, mutation)
