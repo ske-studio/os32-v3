@@ -189,13 +189,14 @@ T1 は試験土台の作成であり適合完了ではない。fake では単位
 
 ## 9. 機種の作りの違いの一覧 (x86 に揃える前提の例外)
 
-POLICY_DEV §10「x86 に揃える」(ユーザー決定 2026-11-20、動作実績は x86 だけ) の例外と、まだ揃えていない違いを 1 か所に並べる。新しく違いを作る段は、ここに行を足すことを完了条件にする。揃えたら行を消す (経緯は git)。
+POLICY_DEV §10「x86 に揃える」(ユーザー決定 2026-11-20、動作実績は x86 だけ) の例外と、まだ揃えていない違いを 1 か所に並べる。 **順 (ユーザー決定 2026-11-20「とりあえず x86 前提でまず KAPI の機能を揃えましょう。そのうえで 2 重実装を取り除きます」)**: PPC KAPI の埋めを先に終え、その後にこの一覧の「未揃え」と 2 重の実装を取り除く段を起こす。埋めの段は今の形で進めてよいが、新しく作った違いはここに行を足す。新しく違いを作る段は、ここに行を足すことを完了条件にする。揃えたら行を消す (経緯は git)。
 
 | 項目 | x86 (PC-98) | PowerPC (PowerMac) | 状態 | 揃える段・残す理由 |
 |---|---|---|---|---|
 | シェルの枠 (実行の枠の ID 1) | カーネルの起動のループ (`platform/pc98/kernel.c` の外部シェル起動) が外部シェル (`shell.bin`・`gshell.bin`) をシェルの枠 ID 1 (`MEM_SHELL_LOAD_ADDR`) に `exec_run` し、終わったら `gui_take_next_shell` を見て起こし直す | `platform/powermac/exec_boot.c` の `pm_exec_boot` が `exec_nest_level = 1` にして起動の文脈を ID 1 に見立て、`sh` は ID 2 以降の普通の枠で動く | **未揃え** (2026-11-20 に見つけた) | 揃える範囲 (シェルの CPL・常駐 CLI の位置) はユーザーに確かめ中。入った段は PowerPC の B30 (900d4674d)、確定設計 docs/decisions/ppc/PPC_SHELL_EXEC_DESIGN.md・PPC_SHELL_SC_DESIGN.md |
 | シェルの特権 | 外部シェルはシェルの枠で CPL=0、AS を作らない (`exec/exec.c` の注) | `sh` は USER の SDK で組んだ PR=1 のアプリ、アプリごとの AS | **未揃え** | 上の行と一緒に決める |
 | 起動の文脈 | 起動から外部シェルのループ | 常駐 CLI (`kernel/cli/resident_cli.c`、LAN の端末の入口) が起動の文脈で、そこから `sh` を起こす | **未揃え** | 上の行と一緒に決める |
+| sys_switch_shell の呼び手の門 | 門は「owner 1 (シェルの枠)」 | 段 5d で機種が答える `SESSION_SHELL_CALLER()` (`platform/powermac/platform_session_shell.h`、ID 1 の直下のアプリ) — シェルの枠を揃えるまでの吸収 | **未揃え (2 重)** | シェルの枠を揃える段でマクロを消して owner 1 に戻す |
 | 部品の読み込み | FEP・SQLite は module (`fep.mod` ほか) | 静的に結ぶ (PowerPC に module の読み込みが無い、段 7a・db 7b の確定設計) | 違いを残す (今の決定) | module の読み込みを PowerPC に作るかは未決 |
 | root と /host | FAT/ext2 のディスク、HostDrv、生の LAN の SFS | RAM の ISO (読み取り専用)、/tmp・/db・/dbu は ramfs、/host は link の SFS CALL | 違いを残す | 「root は RAM の読み取り専用の像」(POLICY_DEV §10、2026-11-11・12) — PC-98 の FD 起動も最終的にこの方式 |
 | 端末と入力 | TVRAM、PC-98 の鍵盤 | LAN の link (RSH) と FB の文字端末、USB の HID | 違いを残す (物理) | 装置が違う |
