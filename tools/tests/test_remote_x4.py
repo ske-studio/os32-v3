@@ -251,6 +251,19 @@ def test(path):
         op.pending.update(accepted=accepted, execute=Delivery(line != 'ver'))
         op.session_reset(keep_pending=True)
         assert op.pending['state'] == 'UNKNOWN', 'ineligible operation retained'
+    op = mod.Operator(n)
+    op.session_start(1)
+    assert op.accept_ready(42, 1, BOOT, 'cui', 'none', 'idle')
+    ident = op.submit('cui', 'ver', None)
+    op.pending['execute'] = Delivery(True)
+    op.session_reset(keep_pending=True)
+    op.session_start(1)
+    assert op.ready is None and op.pending['state'] == 'running'
+    for gen, boot, out_id in [(41, BOOT, ident), (42, 'a' * 32, ident), (42, BOOT, '00000002')]:
+        assert not op.accept_rsh_out(gen, 1, boot, out_id, 0, body, len(body))
+    assert op.accept_rsh_out(42, 1, BOOT, ident, 0, body, len(body)), 'retained OUT before READY rejected'
+    assert op.take_result()['result'] == body
+
     print('PASS remote-x4')
 
 
@@ -263,6 +276,8 @@ def main():
     if args.mutate:
         source = Path(args.module).read_text()
         mutations = [
+            ("pending['state'] in ('running', 'UNKNOWN') and", "pending['state'] == 'UNKNOWN' and",
+             'retained OUT before READY rejected'),
             (" and pending['mode'] == 'cui'", "", 'ineligible operation retained'),
             ("and pending['line'] != 'exit' and not", "and not", 'ineligible operation retained'),
             (" and not pending.get('accepted')", "", 'ineligible operation retained'),
@@ -274,7 +289,7 @@ def main():
             ('            self.unknown()\n\n    def unknown', '            pass\n\n    def unknown', 'deadline did not become UNKNOWN'),
             ("if (not body.startswith(b'gs:! ')", "if (dropped or not body.startswith(b'gs:! ')", 'dropped notice rejected'),
             ("self.pending['state'] = 'UNKNOWN'\n\n    def resume", "self.pending['state'] = 'UNKNOWN'\n            self.ready = None\n\n    def resume", 'UNKNOWN cleared READY'),
-            ('(self.ready is None and not late)', '(self.ready is None)', 'late OUT without READY rejected'),
+            ('(self.ready is None and not matches_pending)', '(self.ready is None)', 'late OUT without READY rejected'),
             ('self.notice_drop += dropped', 'pass', 'notice drop not recorded'),
             ("# previous ID/idle state is not evidence that execution was lost.",
              "# previous ID/idle state is not evidence that execution was lost.\n        if self.pending is not None and last_id != self.pending['id']:\n            self.pending['state'] = 'UNKNOWN'", 'stale READY lost operation'),

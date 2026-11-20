@@ -221,11 +221,12 @@ class Operator:
 
     def _valid_output(self, generation, session, boot, ident, dropped, body, length, mode):
         pending = self.pending
-        late = (pending is not None and pending['state'] == 'UNKNOWN' and
-                pending['generation'] == generation and pending['boot'] == boot.lower() and
-                pending['id'] == ident and pending['mode'] == mode)
+        matches_pending = (
+            pending is not None and pending['state'] in ('running', 'UNKNOWN') and
+            pending['generation'] == generation and pending['boot'] == boot.lower() and
+            pending['id'] == ident and pending['mode'] == mode)
         if (generation != self.generation or session != self.session or session is None or
-                (self.ready is None and not late) or
+                (self.ready is None and not matches_pending) or
                 (self.ready is not None and boot.lower() != self.ready['boot'])):
             return False
         if dropped < 0 or length != len(body) or length > RESULT_MAX:
