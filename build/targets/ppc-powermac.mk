@@ -10,8 +10,8 @@ KB_OBJCOPY := $(PPC_CROSS_DIR)/bin/powerpc-elf-objcopy
 KB_NM := $(PPC_CROSS_DIR)/bin/powerpc-elf-nm
 KB_OBJDUMP := $(PPC_CROSS_DIR)/bin/powerpc-elf-objdump
 KBOOT_TERM ?= lan
-# Extra applications belong to an explicitly separate test image.
-KB_ROOT_BINS ?=
+# Keep the current boot shell and its children until the stage E switch.
+KB_ROOT_BINS ?= $(KB_SH_OUT)/hello.bin $(KB_SH_OUT)/fault.bin
 KB_EXEC := $(filter 1,$(KBOOT_SHELL) $(KBOOT_SH))
 KB_OUT ?= build/out/ppc-kboot$(if $(filter 1,$(KBOOT_LINK)),/$(if $(filter 1,$(KBOOT_SH)),link-sh,link),$(if $(filter 1,$(KBOOT_SHELL)),/shell,$(if $(filter 1,$(KBOOT_SH)),/sh,$(if $(filter-out 0,$(NEGATIVE)),/neg$(NEGATIVE)))))
 KB_ELF := $(KB_OUT)/PPCKERN.ELF
@@ -20,14 +20,15 @@ ROOT_ISO := $(KB_OUT)/root.iso
 ROOT_BLOB := $(KB_OUT)/root_image_blob.o
 ROOT_MOTD := $(KB_OUT)/motd.txt
 KB_SH_OUT := build/out/ppc-user$(if $(filter 1,$(KBOOT_LINK)),/link-sh)
-ROOT_BINS = $(KB_ROOT_BINS)
-KB_ROOT_SHELL = $(if $(KB_EXEC),$(KB_SH_OUT)/shell.bin)
+ROOT_BINS = $(KB_ROOT_BINS) $(if $(filter 1,$(KBOOT_SH)),$(KB_SH_OUT)/sh.bin)
+# Stage E can enable the resident shell at the same time it removes the old one.
+KB_ROOT_SHELL = $(if $(filter 1,$(KB_INSTALL_RESIDENT_SHELL)),$(KB_SH_OUT)/shell.bin)
 ROOT_OBJCOPY := $(KB_OBJCOPY)
 ROOT_ELF_FORMAT := elf32-powerpc
 ROOT_CPU := powerpc
 ROOT_MANIFEST ?= build/ppc-ram-root.json
 ROOT_DEPS ?= assets/fonts/shino16.kcgfont assets/fonts/JF-Dot-Shinonome16-LICENSE.txt build/out/unicode.bin
-override ROOT_DEPS += $(KB_ROOT_SHELL)
+ROOT_SYS_BIN = $(KB_ROOT_SHELL)
 
 # RAW fixture: byte at offset i is i modulo 256 (320 sectors of 512 bytes).
 PPC_LOOP_SAMPLE ?= build/out/ppc-loop/sample.img
@@ -259,7 +260,7 @@ ifeq ($(KB_SH_OUT),$(PPC_USER_OUT))
 kb-user: $(ROOT_BINS) $(KB_ROOT_SHELL)
 else
 kb-user:
-	$(MAKE) ARCH=ppc PLATFORM=powermac PPC_USER_OUT=$(KB_SH_OUT) $(ROOT_BINS) $(KB_ROOT_SHELL)
+	$(MAKE) ARCH=ppc PLATFORM=powermac PPC_USER_OUT=$(KB_SH_OUT)$(if $(filter 1,$(KBOOT_LINK)), PPC_SH_PROFILE=userland/ppc/sh/link_profile.h) $(ROOT_BINS) $(KB_ROOT_SHELL)
 
 $(ROOT_BINS) $(KB_ROOT_SHELL): kb-user
 endif

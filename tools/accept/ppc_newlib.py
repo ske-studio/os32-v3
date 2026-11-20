@@ -47,10 +47,9 @@ def settings(work, case):
     opts = ['KBOOT_SH=1', 'KBOOT_LINK=1', 'KB_SH_OUT='+str(user),
             'KB_ROOT_SHELL=', 'PPC_SH_PROFILE=userland/ppc/sh/link_profile.h',
             'KB_ROOT_BINS='+' '.join(str(user/(n+'.bin')) for n in
-                                    ('sh','nlprobe','hello'))]
+                                    ('nlprobe','hello'))]
     manifest = json.loads((ROOT/'build/ppc-ram-root.json').read_text())
     # The current RSH boot path launches /bin/sh.bin.
-    del manifest['/sys/shell.bin']
     manual=work/'hello.1'; manual.write_text('N3-help-found\n')
     manifest['/usr/man/hello.1']=str(manual)
     path=work/'root.json'; path.write_text(json.dumps(manifest))

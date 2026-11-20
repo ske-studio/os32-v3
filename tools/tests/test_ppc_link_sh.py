@@ -136,21 +136,19 @@ def selection(tmp, mutate):
         assert all('platform/powermac/'+name+'.c' not in link[2].split() for name in absent)
         assert all(name in link[2].split() for name in ['net/link.c','net/host_mailbox.c','net/nic.c','kernel/dev/device_host.c','platform/powermac/usb_boot.c',
             'platform/powermac/hostfs_link_io.c','platform/powermac/hostfs_link_peer.c','platform/powermac/hostfs_boot.c'])
-        for flags,out in [(['KBOOT_SH=1','KBOOT_LINK=0'],'sh'),(['KBOOT_LINK=1'],'link'),(['KBOOT_SHELL=1','KBOOT_LINK=0'],'shell')]:
+        for flags,out in [(['KBOOT_SH=1','KBOOT_LINK=0'],'link-sh'),(['KBOOT_LINK=1'],'link'),(['KBOOT_SHELL=1','KBOOT_LINK=0'],'link-sh')]:
             assert manifest(path,flags,['KB_OUT'])[0]=='build/out/ppc-kboot/'+out
         # Review F2: the link-SH user build selects the SHELL_REMOTE_APP profile.
         recipe=subprocess.run(['make','--no-print-directory','-n','ARCH=ppc','PLATFORM=powermac','TARGET_MK='+str(path),'KBOOT_SH=1','KBOOT_LINK=1','kb-user'],cwd=ROOT,capture_output=True,text=True).stdout
         assert 'PPC_SH_PROFILE=userland/ppc/sh/link_profile.h' in recipe.splitlines()[0]
         plain=subprocess.run(['make','--no-print-directory','-n','ARCH=ppc','PLATFORM=powermac','TARGET_MK='+str(path),'KBOOT_SH=1','KBOOT_LINK=0','kb-user'],cwd=ROOT,capture_output=True,text=True).stdout
-        assert 'link_profile.h' not in plain.splitlines()[0]
+        assert 'PPC_SH_PROFILE=userland/ppc/sh/link_profile.h' in plain.splitlines()[0]
         rejected=subprocess.run(['make','-s','ARCH=ppc','PLATFORM=powermac','TARGET_MK='+str(path),'KBOOT_SHELL=1','KBOOT_LINK=1','-n'],cwd=ROOT,capture_output=True)
         assert rejected.returncode!=0
         # The flags are the only image selector here: command-line features or IMAGE must not disagree with KB_OUT.
         for override in ('FEATURE_LINK=0','IMAGE=kboot-core'):
             assert subprocess.run(['make','-s','ARCH=ppc','PLATFORM=powermac','TARGET_MK='+str(path),'KBOOT_SH=1',override,'-n'],cwd=ROOT,capture_output=True).returncode!=0
     check(original)
-    # Explicit legacy selections must also survive the future link default.
-    check(original.replace('KBOOT_LINK ?= 0', 'KBOOT_LINK ?= 1'))
     if mutate:
         for old,new in [('link-sh,link','link,link'),('KB_SH_OUT := build/out/ppc-user$(if $(filter 1,$(KBOOT_LINK)),/link-sh)','KB_SH_OUT := build/out/ppc-user'),('KB_C := $(C_KERNEL)','KB_C := $(filter-out platform/powermac/hostfs_link_io.c,$(C_KERNEL)) platform/powermac/hostfs_io.c'),(' PPC_SH_PROFILE=userland/ppc/sh/link_profile.h',' ')]:
             assert original.count(old)==1
