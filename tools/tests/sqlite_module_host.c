@@ -792,6 +792,25 @@ static void core_boot_transaction(void)
     char path[OS32_MAX_PATH] = "untouched";
     CHECK(fep_boot_config_get(&meta, &kb) == OS32_ERR_AGAIN && kb == 7);
     CHECK(fep_boot_user_path_get(path, sizeof(path)) == OS32_ERR_AGAIN);
+    char saved[OS32_MAX_PATH];
+    char limit[OS32_MAX_PATH + 1];
+    kmemset(limit, 'x', sizeof(limit));
+    limit[OS32_MAX_PATH - 1] = 0;
+    CHECK(!fep_boot_user_path_set(limit));
+    CHECK(fep_boot_user_path_get(saved, sizeof(saved)) == OS32_ERR_AGAIN);
+    fep_boot_user_rc_set(0);
+    CHECK(fep_boot_user_path_set(0) == OS32_ERR_INVAL);
+    limit[OS32_MAX_PATH - 1] = 'x';
+    limit[OS32_MAX_PATH] = 0;
+    CHECK(fep_boot_user_path_set(limit) == OS32_ERR_INVAL);
+    limit[OS32_MAX_PATH - 1] = 0;
+    CHECK(!fep_boot_user_path_get(saved, sizeof(saved)) && !kstrcmp(saved, limit));
+    fep_boot_user_rc_set(1);
+    CHECK(fep_boot_user_path_get(saved, sizeof(saved)) == OS32_ERR_IO);
+    fep_boot_config_clear();
+    fep_boot_user_rc_set(0);
+    CHECK(!fep_boot_user_path_get(saved, sizeof(saved)) && !kstrcmp(saved, limit));
+    fep_boot_config_clear();
     services_stage = SERVICES_UNICODE;
     services_boot();
     int good = input[0] == 61 || input[0] == 62 || input[0] == 63 ||
