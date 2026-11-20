@@ -83,12 +83,16 @@ def main():
         kernel.mkdir(parents=True)
         settings = []
         if case in ('invalid-crc', 'ignore-crc'):
-            settings = mutant_settings(folder, 'invalid-crc', 'platform/powermac/root_image.c',
-                                       'info.image_valid = 1;', 'info.image_valid = 0;')
+            settings = mutant_settings(folder, 'invalid-crc', 'platform/powermac/ver_backend.c',
+                                       's->pvr = saved_pvr;',
+                                       's->boot = (BootImageInfo){0}; s->pvr = saved_pvr;')
             if case == 'ignore-crc':
-                extra = mutant_settings(folder, case, 'platform/powermac/ver_backend.c',
-                                        'if (!s->boot.crc_valid) return;', '')
-                settings.extend(item.replace('KB_MUT_', 'KB_MUT_EXTRA_', 1) for item in extra)
+                source = next(Path(arg.split('=', 1)[1]) for arg in settings
+                              if arg.startswith('KB_MUT_FILE='))
+                body = source.read_text()
+                anchor = 'if (!s->boot.crc_valid) return;'
+                assert body.count(anchor) == 1
+                source.write_text(body.replace(anchor, ''))
         elif case == 'drop-pvr':
             settings = mutant_settings(folder, case, 'platform/powermac/kernel_boot.c',
                                        '    pm_ver_note_pvr(pvr);', '')

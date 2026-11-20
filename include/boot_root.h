@@ -14,6 +14,7 @@ int boot_root_mount(const struct boot_root_image *image);
 /* Register ISO9660 once after VFS initialization. */
 int boot_root_fs_init(void);
 /* ISO9660 and device names must already be registered. */
+int boot_root_start_registered(const struct boot_root_image *image, int *registered);
 int boot_root_start(const struct boot_root_image *image);
 
 #endif

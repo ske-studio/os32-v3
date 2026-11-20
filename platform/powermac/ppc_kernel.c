@@ -15,6 +15,7 @@
 #include "kernel/time/tick_clock.h"
 #include "types.h"
 #include "memmap.h"
+#include "platform_kboot_layout.h"
 #include "kprintf.h"
 #include "kernel_boot.h"
 #include "kernel_start.h"
@@ -68,7 +69,7 @@
 #include "exec_boot.h"
 #include "exec.h"
 extern u32 sys_mem_kb;
-int pm_root_image(const struct boot_root_image *image);
+int pm_root_image(struct boot_root_image *image, u32 frame_bytes);
 #endif
 
 #ifndef KBOOT_NEGATIVE
@@ -225,6 +226,15 @@ void platform_boot_machine(void)
         pm_pci_boot(&pci, lan_boot.bdf);
     }
     if (!memory_boot_init(KBOOT_MEM_KB)) kboot_stop("memory_boot_init");
+    if (info->root_frame_bytes) {
+        u32 first = PM_ROOT_FRAME_BASE / PAGE_SIZE;
+        u32 pages = info->root_frame_bytes / PAGE_SIZE;
+        u32 pfn;
+        if (!paging_verify_identity(first, pages, P2V(PM_ROOT_FRAME_BASE)) ||
+            !pgalloc_alloc_n_owner(LEDGER_OWNER_BOOT, pages, first, first + pages,
+                                   LEDGER_BOTTOM_UP, &pfn))
+            kboot_stop("root frame reservation");
+    }
     shm_init();
     /* Same contract as x86 kernel_boot_memory(): shm_free/shm_lock toggle RW
      * on the *shared USER* mapping that paging_boot_user_shared() establishes
@@ -372,7 +382,20 @@ void platform_boot_services(void)
     /* Stage 4 supplies the expanded ISO after the allocator is online. */
     struct boot_root_image img = {0};
     if (!info->root_frame_bytes) return;
-    if (pm_root_image(&img) && pm_root_boot(&img) == 0) {
+    u32 owned_before = ledger_owner_pages(LEDGER_OWNER_BOOT);
+    int registered = 0;
+    int rc = pm_root_image(&img, info->root_frame_bytes);
+    if (!rc) rc = pm_root_boot(&img, &registered);
+    u32 pages = info->root_frame_bytes / PAGE_SIZE;
+    u32 free_before, free_after;
+    if (pm_root_release(&img, registered, PM_ROOT_FRAME_BASE / PAGE_SIZE, pages,
+                        &free_before, &free_after))
+        kboot_stop("root page release");
+    kprintf(KBOOT_ATTR, "KBOOT ROOT rc=%d registered=%d bytes=%u frame_pages=%u\r\n",
+            rc, registered, img.bytes, pages);
+    kprintf(KBOOT_ATTR, "KBOOT ROOT owner_before=%u owner_after=%u free_before=%u free_after=%u\r\n",
+            owned_before, ledger_owner_pages(LEDGER_OWNER_BOOT), free_before, free_after);
+    if (!rc) {
         pm_loop_boot();
         (void)pm_console_text_start();
 #if KBOOT_SH

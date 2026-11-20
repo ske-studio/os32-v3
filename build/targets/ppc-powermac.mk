@@ -148,7 +148,7 @@ $(KB_OBJ) $(KB_ELF): $(KB_SELECT_MK)
 
 .PHONY: all kernel audit
 all: kernel
-kernel: $(KB_ELF) audit
+kernel: $(KB_ELF) $(if $(KB_EXEC),$(KB_OUT)/root.iso) audit
 ifneq ($(KB_EXEC),)
 .PHONY: ppc-source-date-force
 $(KB_OUT)/config/source-date.flags: ppc-source-date-force
@@ -218,13 +218,17 @@ KB_KEEP_RESET := $(if $(KB_EXEC),,-Wl,--undefined=platform_reset)
 ifneq ($(KB_EXEC),)
 KB_KEEP_PAIR := -Wl,--undefined=platform_module_pair
 KB_PAIR_TOOL := tools/ppc/root_pair.py
-$(KB_ELF): $(ROOT_ISO) $(KB_PAIR_TOOL) tools/module_schema.py tools/mkmod.py tools/ppc/root_lz4_layout.py sdk/target_profile.py
-KB_LINK_PREFIX = python3 -B $(KB_PAIR_TOOL) $(ROOT_ISO) $@ --
-endif
+KB_PAIR_OUTPUT := $(KB_OUT)/root.iso
+$(KB_ELF) $(KB_PAIR_OUTPUT) &: $(ROOT_ISO) $(KB_PAIR_TOOL) tools/module_schema.py tools/mkmod.py tools/ppc/root_lz4_layout.py sdk/target_profile.py $(KB_OBJ) $(KB_EXTRA) $(KB_OUT)/kernel.ld $(KB_SELECT_MK)
+	$(KB_LINK_COMMAND)
+KB_LINK_PREFIX = python3 -B $(KB_PAIR_TOOL) $(ROOT_ISO) $(KB_ELF) --
+else
 $(KB_ELF): $(KB_OBJ) $(KB_EXTRA) $(KB_OUT)/kernel.ld
-	$(KB_LINK_PREFIX) $(KB_CC) $(KB_FLAGS) -MF $@.d -no-pie -Wl,--gc-sections -Wl,--no-undefined $(KB_KEEP_RESET) $(KB_KEEP_SQLITE) $(KB_KEEP_PAIR) \
+	$(KB_LINK_COMMAND)
+endif
+KB_LINK_COMMAND = $(KB_LINK_PREFIX) $(KB_CC) $(KB_FLAGS) -MF $(KB_ELF).d -no-pie -Wl,--gc-sections -Wl,--no-undefined $(KB_KEEP_RESET) $(KB_KEEP_SQLITE) $(KB_KEEP_PAIR) \
 	 -Wl,-z,noexecstack -Wl,--defsym,kboot_tick=tick_count -Wl,-T,$(KB_OUT)/kernel.ld \
-	 -Wl,-Map,$(KB_ELF:.ELF=.map) $(KB_OBJ) $(KB_EXTRA) -o $@
+	 -Wl,-Map,$(KB_ELF:.ELF=.map) $(KB_OBJ) $(KB_EXTRA) -o $(KB_ELF)
 
 # H3 audits (tools/ppc/kboot_audit.py): nothing unresolved, integer-only code by
 # decoded mnemonic, and no direct or macro-mediated user of the 100 Hz PIT_HZ

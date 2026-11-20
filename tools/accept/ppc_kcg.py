@@ -101,9 +101,19 @@ def main():
                                 mutant_settings(folder, case, 'platform/powermac/kcg.c',
                                                 'return kcg_file_ready();', 'return 1;'))
         elif case == 'offset':
+            # Inject the wrong offset byte order into the font consumer only.
+            # The same decoder must first expand the root containing the font.
+            core = (ROOT / 'lib/lz4_decode_core.inc').read_text()
+            offset = 'offset = (int)ip[0] | ((int)ip[1] << 8);'
+            if core.count(offset) != 1:
+                raise RuntimeError('KCG offset mutation anchor')
+            (folder / 'kcg_offset.inc').write_text(core.replace(offset,
+                'extern const u8 __root_image_start[];\n'
+                '        if (src == __root_image_start) ' + offset +
+                ' else offset = (int)ip[1] | ((int)ip[0] << 8);'))
             mutation = mutant_settings(folder, case, 'lib/lz4.c',
-                                       'offset = (int)ip[0] | ((int)ip[1] << 8);',
-                                       'offset = (int)ip[1] | ((int)ip[0] << 8);')
+                                       '#include "lz4_decode_core.inc"',
+                                       '#include "kcg_offset.inc"')
         elif case == 'absent':
             from test_kapi_binding import generate
             kernel.mkdir()

@@ -61,8 +61,23 @@ int pm_kboot_reserve(struct pm_kboot_info *info)
         if (r->start>end && r->start-end<=PM_IMAGE_SLACK) window=r->start;
         break;
     }
+    if (info->root_frame_bytes) {
+        u32 bytes = info->root_frame_bytes;
+        if (window != end || end > PM_ROOT_FRAME_BASE ||
+            bytes > MEM_BOOT_BUNDLE_BASE - PM_ROOT_FRAME_BASE ||
+            bytes % PM_KERNEL_PAGE_SIZE ||
+            !covered(&info->available, end, PM_ROOT_FRAME_BASE))
+            return PM_KBOOT_RESERVE_WINDOW;
+        for (unsigned i = 0; i < info->available.count; i++) {
+            const struct pm_region *r = &info->available.v[i];
+            if (r->start < PM_ROOT_FRAME_BASE + bytes &&
+                r->start + r->size > PM_ROOT_FRAME_BASE)
+                return PM_KBOOT_RESERVE_IMAGE_AVAILABLE;
+        }
+    }
+    u32 tail = info->root_frame_bytes ? PM_ROOT_FRAME_BASE + info->root_frame_bytes : window;
     if (!covered(&info->ram,PM_KERNEL_BASE,PM_WINDOW_END) ||
-        !covered(&info->available,window,PM_WINDOW_END))
+        !covered(&info->available,tail,PM_WINDOW_END))
         return PM_KBOOT_RESERVE_WINDOW;
     u32 hpt=0;
     for (unsigned i=0; i<info->available.count; i++) {

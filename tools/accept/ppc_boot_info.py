@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
-"""Exercise boot_image_info over link-sh RSH on mac99."""
+"""PowerMac root pair design, stage 4: CRC precedes rd0 registration.
+A failed decode releases its output and stops before the shell. Returning the frame increases the free pool by its page count.
+Only registered rd0 output remains charged to the boot owner.
+"""
 import argparse
 import hashlib
 import os
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -51,13 +55,34 @@ def observe(elf, cpu, evidence, case, expected, exit_status):
 
     session = Session(elf, cpu, evidence, 240)
     try:
+        if case == 'overlap':
+            session.reboot_args += ('-prom-env', 'output-device=ttya')
         session.start()
-        session.wait(session.ready, 'boot info cui READY', 60)
-        require(session.agent.operator.ready['mode'] == 'cui', 'boot info RSH mode')
-        body = rsh_command(session, '/bin/bootprob.bin')
-        status = rsh_command(session, 'echo $?')
-        require((body.rstrip(b'\n'), status) == (expected, exit_status),
-                repr((case, body, status)))
+        if case in ('unverified', 'truncated', 'decode-failed', 'release-skipped', 'release-twice', 'overlap'):
+            log = evidence / 'serial-a.log'
+            session.wait(lambda: log.exists() and expected in log.read_bytes(),
+                         f'{case} pre-mount boot observation', 60)
+        else:
+            session.wait(session.ready, 'boot info cui READY', 60)
+            require(session.agent.operator.ready['mode'] == 'cui', 'boot info RSH mode')
+            body = rsh_command(session, '/bin/bootprob.bin')
+            status = rsh_command(session, 'echo $?')
+            require((body.rstrip(b'\n'), status) == (expected, exit_status),
+                    repr((case, body, status)))
+        if case in ('verified', 'unverified', 'truncated', 'decode-failed'):
+            log = evidence / 'serial-a.log'
+            session.wait(lambda: log.exists() and re.search(rb'free_after=\d+\r?\n', log.read_bytes()),
+                         'root page accounting', 10)
+            raw = log.read_bytes()
+            boot = re.search(rb'KBOOT ROOT rc=(-?\d+) registered=(\d+) bytes=(\d+) frame_pages=(\d+)', raw)
+            account = re.search(rb'KBOOT ROOT owner_before=(\d+) owner_after=(\d+) free_before=(\d+) free_after=(\d+)', raw)
+            require(boot and account, 'missing root observations')
+            rc, registered, length, frame = map(int, boot.groups())
+            before, after, free_before, free_after = map(int, account.groups())
+            require(frame == free_after - free_before and frame > 0 and registered == (case == 'verified'),
+                    'root frame or registration')
+            require(after == before - frame + registered * ((length + 4095) // 4096),
+                    f'root owner pages {before} -> {after}')
         session.q.call('quit')
         session.p.wait(timeout=5)
         require(session.p.returncode == 0, 'boot info QEMU exit')
@@ -93,7 +118,7 @@ def main():
                'KB_ROOT_BINS=' + ' '.join(bins)]
     cases = ['verified', 'unverified']
     if args.mutate:
-        cases += ['false-valid', 'no-write', 'absent']
+        cases += ['false-valid', 'no-write', 'absent', 'truncated', 'decode-failed', 'release-skipped', 'release-twice', 'overlap']
     images = {}
     for case in cases:
         folder = work / case
@@ -107,20 +132,41 @@ def main():
         elif case == 'no-write':
             mutation = mutant_settings(folder, case, 'init/bootinfo.c',
                                        '    kmemset(out, 0, sizeof(*out));',
-                                       '    if (!s_common.image_valid) return 0;\n'
-                                       '    kmemset(out, 0, sizeof(*out));')
+                                       '    return 0;')
+        elif case in ('truncated', 'decode-failed'):
+            mutation = mutant_settings(folder, case, 'platform/powermac/root_image.c',
+                                       'lz4_decode(__root_image_start, packed, dst, length)',
+                                       ('lz4_decode(__root_image_start, packed - 1, dst, length)'
+                                        if case == 'truncated' else
+                                        'lz4_decode(__root_image_start, packed, dst, 1)'))
+        elif case in ('release-skipped', 'release-twice'):
+            call = 'pgalloc_free_n_owner(LEDGER_OWNER_BOOT, frame_pfn, pages)'
+            mutation = mutant_settings(folder, case, 'platform/powermac/root_image.c',
+                                       call, '((void)frame_pfn, 1)' if case == 'release-skipped' else
+                                       '(' + call + ' && ' + call + ')')
+        elif case == 'overlap':
+            mutation = mutant_settings(folder, case, 'platform/powermac/kboot_capture.c',
+                                       '(u32)__root_file_end - (u32)__root_image_start;',
+                                       '(u32)__root_file_end - (u32)__root_image_start + 4096;')
         elif case == 'absent':
             absent_bindings(folder, kernel / 'gen')
         elf = build(kernel, *options, *mutation, 'kb-user', 'kernel')
         iso = (kernel / 'root.iso').read_bytes()
         exit_status = b'0\n'
-        if case in ('unverified', 'false-valid', 'no-write'):
+        if case in ('unverified', 'false-valid'):
             elf = unverified_image(elf, cross / 'bin/powerpc-elf-objcopy', iso)
             expected = {
-                'unverified': b'BOOT 0 0 0 00000000',
+                'unverified': b'KBOOT ROOT rc=-4 registered=0 bytes=0',
                 'false-valid': b'BOOT 0 1 0 00000000',
-                'no-write': b'BOOT 255 255 1 00000001',
             }[case]
+        elif case == 'no-write':
+            expected = b'BOOT 255 255 1 00000001'
+        elif case in ('truncated', 'decode-failed'):
+            expected = b'KBOOT ROOT rc=-3 registered=0 bytes=0'
+        elif case in ('release-skipped', 'release-twice'):
+            expected = b'root page release'
+        elif case == 'overlap':
+            expected = b'FAIL:KB:RESERVE'
         elif case == 'absent':
             expected = b'BOOT info error -10'
             exit_status = b'1\n'

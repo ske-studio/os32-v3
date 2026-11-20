@@ -5,9 +5,11 @@ import os
 from pathlib import Path
 import struct
 import subprocess
+from unittest.mock import patch
 import tempfile
 import zlib
 
+import root_pair
 from root_pair import bind_module, build, wire
 import lz4.block
 
@@ -23,13 +25,20 @@ CRC = 0x66aa040c
 
 def paired_iso(work, gcc, module):
     # Construct a real ISO independently of the product packaging rules.
-    staging = work/'staging'
-    staging.mkdir()
-    (staging/'module.bin').write_bytes(module)
-    iso = work/'input.iso'
-    subprocess.run(['xorriso', '-as', 'mkisofs', '--norock', '-no-pad',
-                    '--modification-date=2000010100000000', '--set_all_file_dates',
-                    '2000010100000000', '-o', iso, staging], check=True)
+    inputs = []
+    for index, names in enumerate([('module.bin', 'motd'), ('motd', 'module.bin')]):
+        staging = work/f'staging-{index}'
+        staging.mkdir()
+        for name in names:
+            dest = staging/name
+            dest.write_bytes(module if name == 'module.bin' else b'hello')
+            os.utime(dest, (1000000000 + index*86400,) * 2)
+        iso = work/f'input-{index}.iso'
+        subprocess.run(['xorriso', '-as', 'mkisofs', '--norock', '-no-pad',
+                        '--modification-date=2000010100000000', '--set_all_file_dates',
+                        '2000010100000000', '-o', iso, staging], check=True)
+        inputs.append(iso.read_bytes())
+    assert inputs[0] == inputs[1]
     before = iso.read_bytes()
     text = (FIX/'bytes.S').read_text().split('.section .pair_high')[0]
     (work/'low.S').write_text(text)
@@ -55,6 +64,38 @@ def paired_iso(work, gcc, module):
     assert before.count(module) == 1 and before.replace(module, bind_module(module, pair)) == raw
     build(iso, elf, link)
     assert elf.read_bytes() == final
+    replace = Path.replace
+    def fail_elf_publish(path, target):
+        if target == elf:
+            raise OSError('ELF publish failed')
+        return replace(path, target)
+    with patch.object(Path, 'replace', fail_elf_publish):
+        try:
+            build(iso, elf, link)
+        except OSError as error:
+            assert str(error) == 'ELF publish failed' and not elf.exists()
+        else:
+            raise AssertionError('expected ELF publication failure')
+
+    # Model a final compression that crosses the first frame boundary.
+    encoder = root_pair.compress
+    attempts = []
+    def overflow_once(data):
+        attempts.append(bytes(data))
+        block = encoder(data)
+        return block.ljust(frame + 1, b'x') if len(attempts) == 2 else block
+    with patch.object(root_pair, 'compress', overflow_once):
+        build(iso, elf, link)
+    rebuilt = elf.read_bytes()
+    payload, rec, off, bigger = wire(rebuilt)
+    new_pair, crc, packed, length = struct.unpack_from('<4I', rebuilt, rec)
+    assert bigger == root_pair.round_page(frame + 1) + root_pair.PAGE
+    assert new_pair == zlib.crc32(payload) and new_pair != pair
+    rebound = before.replace(module, bind_module(module, new_pair))
+    assert attempts == [before.replace(module, bind_module(module, 0)), raw, rebound]
+    assert (work/'root.iso').read_bytes() == rebound and zlib.crc32(rebound) == crc
+    assert lz4.block.decompress(rebuilt[off:off+packed], uncompressed_size=length) == rebound
+
 
 
 def test(work, mutate):

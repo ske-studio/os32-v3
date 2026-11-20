@@ -146,6 +146,8 @@ def build(iso, output, link):
             path.write_bytes(data)
             final_iso = Path(work)/'root.iso'
             final_iso.write_bytes(raw)
+            # Withdraw the old ELF before either verified output changes.
+            output.unlink(missing_ok=True)
             final_iso.replace(output.parent/'root.iso')
             path.replace(output)
             return
