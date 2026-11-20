@@ -64,7 +64,7 @@ int pm_kboot_reserve(struct pm_kboot_info *info)
     if (info->root_frame_bytes) {
         u32 bytes = info->root_frame_bytes;
         if (window != end || end > PM_ROOT_FRAME_BASE ||
-            bytes > MEM_BOOT_BUNDLE_BASE - PM_ROOT_FRAME_BASE ||
+            bytes > MEM_BOOT_STAGING_SIZE ||
             bytes % PM_KERNEL_PAGE_SIZE ||
             !covered(&info->available, end, PM_ROOT_FRAME_BASE))
             return PM_KBOOT_RESERVE_WINDOW;

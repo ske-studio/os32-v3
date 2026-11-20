@@ -41,6 +41,9 @@ void pm_kboot_refresh_available(struct pm_kboot_info *info)
     info->available.v[0].start=0x261000;
     info->available.v[0].size=0x2000000-0x261000;
 }
+/* The firmware reported one page of still-compressed input. */
+int platform_boot_staging_in_use(void) { return 1; }
+
 void _start(void)
 {
     struct pm_kboot_info info={0};
@@ -83,5 +86,10 @@ void _start(void)
     u32 p;
     while (pgalloc_alloc_n_owner(LEDGER_OWNER_KERNEL,1,0,0x1020,LEDGER_BOTTOM_UP,&p))
         EXPECT(p>=0x100 && p<0xf00, "FAIL:ALLOC",38);
+    u32 first = MEM_BOOT_STAGING_BASE / PAGE_SIZE;
+    u32 count = MEM_BOOT_STAGING_SIZE / PAGE_SIZE;
+    EXPECT(pgalloc_free_n_owner(LEDGER_OWNER_BOOT, first, count), "FAIL:STAGING", 39);
+    EXPECT(pgalloc_alloc_n_owner(LEDGER_OWNER_KERNEL, count, first, first + count,
+                                 LEDGER_BOTTOM_UP, &p) && p == first, "FAIL:STAGING", 39);
     SAY("GREEN:MEMORY"); finish(0);
 }

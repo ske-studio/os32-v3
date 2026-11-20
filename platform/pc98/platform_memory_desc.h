@@ -5,6 +5,8 @@
 #include "memmap.h"
 #include "pc98.h"
 
+static inline int platform_boot_staging_in_use(void) { return 0; }
+
 static const struct platform_memory_geometry platform_memory_geometry = {
     MEM_SYSTEM_SPACE_BASE, MEM_SYSTEM_SPACE_BASE, MEM_SYSTEM_SPACE_END,
     MEM_HIGH_RAM_BASE, MEM_PHYS_RAM_CEILING

@@ -21,6 +21,8 @@ CHECK = dict(name='ppc-kboot-memory', tier=2, budget=60, covers=[
     'tools/tests/kernel_includes.py'])
 # Product mutations, expected runtime exit, diagnostic, and reached marker.
 MUTATIONS = [
+    ('staging-unreserved', 'mm/memory_boot.c',
+     'if (platform_boot_staging_in_use())', 'if (0)', 39, 'FAIL:STAGING', 'REACHED:INIT'),
     ('geometry-16', 'platform/powermac/platform_memory_desc.h',
      '#define PM_MEMORY_LEGACY_END 0x00f00000UL',
      '#define PM_MEMORY_LEGACY_END 0x01000000UL', 32, 'FAIL:INIT', 'REACHED:INIT'),
@@ -58,7 +60,8 @@ def exercise(directory, mutation=None):
             dest = directory / 'kernel' / (Path(rel).stem + '_host_source.c')
         dest.write_text(source)
     exe = directory / 'memory'
-    cmd = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra',
+    builtin = subprocess.check_output(['gcc', '-print-file-name=include'], text=True).strip()
+    cmd = ['gcc', '-nostdinc', '-isystem', builtin, '-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra',
            '-Werror', '-ffreestanding', '-fno-builtin', '-fno-pie', '-no-pie',
            '-fno-stack-protector', '-nostdlib', '-static', '-ffunction-sections',
            '-fdata-sections', '-Wl,--gc-sections', '-D__cdecl=',

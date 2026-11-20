@@ -11,10 +11,9 @@ import lz4.block
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from mkmod import Elf, require, span
 from module_schema import CONSTANTS, HEADER_FIELDS, MODULE_FORMATS
-from root_lz4_layout import PAGE, round_page, segments
+from root_lz4_layout import PAGE, STAGING_BASE, STAGING_SIZE, round_page, segments
 
-# Largest frame measured and probed on both 32 MiB and 128 MiB mac99.
-MAX_FRAME = 0x53000
+MAX_FRAME = STAGING_SIZE
 
 
 def wire(data):
@@ -23,6 +22,7 @@ def wire(data):
     loads = sorted((p for p in segments(data) if p[0] == 1), key=lambda p: p[2])
     require(len(loads) == 2 and elf.entry == sym('ppc_kernel_entry'), 'pair ELF entry/LOADs')
     low, high = loads
+    require(high[2] == STAGING_BASE, 'root staging address')
     fields = [elf.entry]
     for p, names in zip(loads, [('__kernel_image_start', '__kernel_file_end', '__kernel_load_mem_end'),
                                 ('__root_image_start', '__root_file_end', '__root_load_end')]):
@@ -151,7 +151,7 @@ def build(iso, output, link):
             final_iso.replace(output.parent/'root.iso')
             path.replace(output)
             return
-    raise ValueError(f'root frame {size:#x} exceeds measured maximum {MAX_FRAME:#x}')
+    raise ValueError(f'root frame {size:#x} exceeds staging capacity {MAX_FRAME:#x}')
 
 
 if __name__ == '__main__':

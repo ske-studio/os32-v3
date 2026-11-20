@@ -9,6 +9,7 @@ from unittest.mock import patch
 import tempfile
 import zlib
 
+from root_lz4_layout import STAGING_BASE
 import root_pair
 from root_pair import bind_module, build, wire
 import lz4.block
@@ -16,11 +17,11 @@ import lz4.block
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 FIX = HERE/'pair_fixture'
-WIRE = bytes.fromhex('04001000 00001000 18000000 20000000 00005800 08000000 '
-                     '08000000 00005800 08000000 04001000 10000000 11223344 '
-                     '00000000 00000000 00000000 00000000 55667788 00000000 00000000')
+WIRE = bytes.fromhex('04001000 00001000 18000000 20000000 {high} 08000000 '
+                     '08000000 {high} 08000000 04001000 10000000 11223344 '
+                     '00000000 00000000 00000000 00000000 55667788 00000000 00000000'.format(high=struct.pack('<I', STAGING_BASE).hex()))
 # CRC computed by shifting each bit LSB first, polynomial 0xedb88320.
-CRC = 0x66aa040c
+CRC = zlib.crc32(WIRE)
 
 
 def paired_iso(work, gcc, module):
@@ -42,7 +43,7 @@ def paired_iso(work, gcc, module):
     before = iso.read_bytes()
     text = (FIX/'bytes.S').read_text().split('.section .pair_high')[0]
     (work/'low.S').write_text(text)
-    subprocess.run([gcc, '-c', work/'low.S', '-o', work/'low.o'], check=True)
+    subprocess.run([gcc, f'-DPAIR_CRC={CRC}', '-c', work/'low.S', '-o', work/'low.o'], check=True)
     script = (FIX/'fixture.ld').read_text().replace('*(.pair_high)', """
         __root_image_start = .;
         BYTE(0)
@@ -52,7 +53,7 @@ def paired_iso(work, gcc, module):
     """)
     (work/'build.ld').write_text(script)
     elf = work/'paired.elf'
-    link = [gcc, '-nostdlib', '-Wl,-T,'+str(work/'build.ld'), str(work/'low.o'), '-o', str(elf)]
+    link = [gcc, '-nostdlib', f'-Wl,--defsym,staging_base={STAGING_BASE}', '-Wl,-T,'+str(work/'build.ld'), str(work/'low.o'), '-o', str(elf)]
     build(iso, elf, link)
     final = elf.read_bytes()
     payload, rec, off, frame = wire(final)
@@ -103,8 +104,8 @@ def test(work, mutate):
     gcc = str(prefix)+'gcc'
     def run(args):
         subprocess.run(args, check=True, cwd=work)
-    run([gcc, '-c', FIX/'bytes.S', '-o', 'bytes.o'])
-    run([str(prefix)+'ld', '-T', FIX/'fixture.ld', 'bytes.o', '-o', 'fixture.elf'])
+    run([gcc, f'-DPAIR_CRC={CRC}', '-c', FIX/'bytes.S', '-o', 'bytes.o'])
+    run([str(prefix)+'ld', '--defsym', f'staging_base={STAGING_BASE}', '-T', FIX/'fixture.ld', 'bytes.o', '-o', 'fixture.elf'])
     image = (work/'fixture.elf').read_bytes()
     actual, rec, off, frame = wire(image)
     assert actual == WIRE and zlib.crc32(actual) == CRC
@@ -125,7 +126,8 @@ def test(work, mutate):
     def guest(src, rc):
         run([gcc, '-O2', '-msdata=none', '-ffreestanding', '-nostdinc', '-nostdlib',
              '-I'+str(ROOT/'include'), '-I'+str(ROOT/'lib'), src, FIX/'check.c', 'bytes.o',
-             '-Wl,--section-start=.pair_low=0x100000,--section-start=.pair_high=0x580000',
+             f'-DPAIR_CRC={CRC}U',
+             f'-Wl,--section-start=.pair_low=0x100000,--section-start=.pair_high={STAGING_BASE:#x}',
              '-Wl,-Ttext=0x200000,-e,_start', '-o', 'check.elf'])
         binary = work/'check.elf'
         digest = hashlib.sha256(binary.read_bytes()).hexdigest()

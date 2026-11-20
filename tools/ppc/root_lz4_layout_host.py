@@ -12,7 +12,8 @@ import sys
 import tempfile
 import zlib
 
-from root_lz4_inventory import COLUMNS, envelope, image_table, measure
+from root_lz4_layout import PAGE, STAGING_BASE, STAGING_SIZE
+from root_lz4_inventory import COLUMNS, check_staging_size, envelope, image_table, measure
 from root_lz4_layout_run import LOW, check_before, verify
 
 
@@ -29,14 +30,23 @@ def fixture(folder, high):
     if row['resident_end'] != LOW + 8192:
         raise ValueError('BSS omitted from resident size')
     rows = [dict(zip(COLUMNS, fields)) for fields in
-            [(LOW+8192, LOW+12288, 16384, 7), (LOW+4096, LOW+8192, 32768, 3)]]
+            [(LOW+8192, LOW+12288, 16384, 15000, 7), (LOW+4096, LOW+8192, 32768, 30000, 3)]]
     for name, row in zip(('largest-low', 'largest-frame'), rows):
         row['names'] = [name]
     rows = image_table(rows)
     if {r['names'][0] for r in rows} != {'largest-low', 'largest-frame'}:
         raise ValueError('largest frame image omitted')
-    if tuple(envelope(rows).values()) != (LOW+8192, LOW+12288, 32768, 7):
+    if tuple(envelope(rows).values()) != (LOW+8192, LOW+12288, 32768, 30000, 7):
         raise ValueError('largest frame image omitted')
+
+    check_staging_size(STAGING_SIZE, STAGING_SIZE)
+    try:
+        check_staging_size(STAGING_SIZE + 1, STAGING_SIZE + PAGE)
+    except ValueError as error:
+        if str(error) != 'compressed root does not fit boot staging area':
+            raise
+    else:
+        raise ValueError('oversized compressed root accepted')
 
     lo = (1, 0, LOW, LOW, 4, 8192, 7, 4096)
     hi = (1, 4, high, high, 4, 4096, 4, 4096)
@@ -86,10 +96,11 @@ def main():
     here = Path(__file__).resolve().parent
     with tempfile.TemporaryDirectory() as tmp:
         folder = Path(tmp)
-        for high in (0x580000, 0xd00000):
-            fixture(folder, high)
+        fixture(folder, STAGING_BASE)
         if args.mutate:
             mutations = [
+                ('root_lz4_inventory.py', 'packed <= frame <= STAGING_SIZE',
+                 'packed <= frame', 'oversized compressed root accepted'),
                 ('root_lz4_inventory.py', "return sorted(rows, key=lambda row: (row['frame'], row['names'][0]))",
                  "return sorted(rows, key=lambda row: (row['frame'], row['names'][0]))[:-1]",
                  'largest frame image omitted'),

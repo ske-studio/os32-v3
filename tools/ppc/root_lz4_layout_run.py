@@ -4,8 +4,7 @@ compare memory before boot and at the final guest query, then observe reset.
 Apple's Power Mac G4 Developer Note (January 2002), pp. 55, 57, allows
 one DIMM and lists 32 MB in Table 4-1. Test it and the existing 128 MiB
 mac99 configuration independently. Never boot into a known collision.
-Candidate ranges [0x580000,0x5d3000) and [0xd00000,0xd53000) leave room
-after the shell and before the 15 MiB window end. NetBSD ofwboot links
+The high LOAD starts at the shared boot staging area. NetBSD ofwboot links
 at 0xe00000, OpenBSD at 0x20000 (PPC_BOOT_DESIGN §2). Apple TN2001 lists
 load-base 0x800000 and real-base -1; the latter delegates placement to OF.
 The actual staging extent and firmware reservations are queried before boot.
@@ -31,6 +30,7 @@ import time
 import zlib
 
 from lan_probe import PROMPT, ROM, cells as property_cells, properties
+from root_lz4_layout import STAGING_BASE, STAGING_SIZE
 from root_lz4_inventory import PAGE, ROOT, envelope, segments
 
 LOW = 0x100000
@@ -48,7 +48,7 @@ def build(out, sizes, candidate):
     end, frame = sizes['resident_end'], sizes['frame']
     require(LOW < end < sizes['chain_end'] <= WINDOW and end % PAGE == frame % PAGE == 0
             and frame > 0, 'invalid measured envelope')
-    require(candidate % PAGE == 0 and max(0x500000, sizes['chain_end']) <= candidate
+    require(candidate % PAGE == 0 and sizes['chain_end'] <= candidate == STAGING_BASE and frame <= STAGING_SIZE
             and candidate + frame <= WINDOW, 'candidate outside page-aligned pool')
     # A distinct big-endian word at every offset in each patterned region.
     def pattern(base, size):
@@ -271,7 +271,7 @@ def capture(out, cpu, ram_mib, data, loads):
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('--inventory', type=Path, required=True)
-    ap.add_argument('--candidate', type=lambda value: int(value, 0), required=True)
+    ap.add_argument('--candidate', type=lambda value: int(value, 0), default=STAGING_BASE)
     ap.add_argument('--out', type=Path, required=True)
     ap.add_argument('--build-only', action='store_true')
     args = ap.parse_args()

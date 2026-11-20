@@ -5,7 +5,7 @@ __kernel_image_start:
 .long 0x11223344
 ppc_kernel_entry:
 __root_record_start:
-.byte 0x0c,0x04,0xaa,0x66
+.byte PAIR_CRC & 255,(PAIR_CRC >> 8) & 255,(PAIR_CRC >> 16) & 255,(PAIR_CRC >> 24) & 255
 .byte 1,2,3,4,5,6,7,8,9,10,11,12
 __root_record_end:
 .long 0x55667788

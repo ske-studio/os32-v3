@@ -78,6 +78,7 @@ SECTIONS
            "entry stack must be outside BSS and ABI aligned")
     __kernel_load_mem_end = __kernel_resident_end;
 #if PM_ROOT_FRAME
+    ASSERT(root_frame_size <= LAYOUT_MEM_BOOT_STAGING_SIZE, "root exceeds boot staging area")
     .root_frame PM_ROOT_FRAME_BASE (READONLY) : {
         __root_image_start = .;
         BYTE(0)

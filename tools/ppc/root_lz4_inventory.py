@@ -16,7 +16,7 @@ import shutil
 from unittest.mock import patch
 
 import lz4.block
-from root_lz4_layout import PAGE, round_page, segments
+from root_lz4_layout import PAGE, STAGING_BASE, STAGING_SIZE, round_page, segments
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -44,7 +44,12 @@ RUNNERS = {
     'usb-legacy': ('usb_run', '--legacy', '--lan'),
 }
 SHELL_RUNNERS = ('sb_run', 'sc_run', 'sd_run', 'usb_run', 'ppc_sh_output')
-COLUMNS = ('resident_end', 'chain_end', 'frame', 'iso_pages')
+COLUMNS = ('resident_end', 'chain_end', 'frame', 'packed', 'iso_pages')
+
+
+def check_staging_size(packed, frame):
+    if not 0 < packed <= frame <= STAGING_SIZE:
+        raise ValueError('compressed root does not fit boot staging area')
 
 
 def measure(path, fixture=False, iso=None):
@@ -55,7 +60,7 @@ def measure(path, fixture=False, iso=None):
     iso = iso or path.parent / 'root.iso'
     if len(loads) != 1 + iso.exists() or va != pa:
         raise ValueError(f'{path}: unexpected LOADs')
-    chain, frame, pages = 0, 0, 0
+    chain = frame = packed = pages = 0
     if not fixture:
         prefix = Path(os.environ['PPC_CROSS_DIR']) / 'bin/powerpc-elf-nm'
         symbols = {f[2]:int(f[0], 16) for line in subprocess.check_output(
@@ -70,8 +75,11 @@ def measure(path, fixture=False, iso=None):
             raise ValueError(f'{path}: misplaced root')
         record = loads[0][1] + symbols['__root_record_start'] - loads[0][2]
         packed, length = struct.unpack_from('<II', data, record+8)
+        check_staging_size(packed, size)
+        if va != STAGING_BASE or chain > STAGING_BASE:
+            raise ValueError(f'{path}: misplaced boot staging area')
         frame = size
-        if (not 0 < packed <= frame or any(data[off+packed:off+size]) or
+        if (any(data[off+packed:off+size]) or
                 length != len(raw) or
                 lz4.block.decompress(data[off:off+packed], uncompressed_size=length) != raw):
             raise ValueError(f'{path}: wrong compressed root')
@@ -82,7 +90,7 @@ def measure(path, fixture=False, iso=None):
         _, off, *fields = header
         digest.update(struct.pack('>6I', *fields))
         digest.update(data[off:off+header[4]])
-    values = dict(zip(COLUMNS, (end, chain, frame, pages)))
+    values = dict(zip(COLUMNS, (end, chain, frame, packed, pages)))
     values['low_memsz'] = memsz
     values['low_filesz'] = loads[0][4]
     return values, digest.hexdigest()
@@ -374,7 +382,7 @@ def collect(out, suites):
         raise ValueError('missing measured images: ' + ', '.join(sorted(set(plans) - recorded)))
     (out/'plans.json').write_text(json.dumps(plans, indent=2))
     (out/'inventory.json').write_text(json.dumps(result, indent=2))
-    print('image resident_end chain_end frame iso_pages')
+    print('image resident_end chain_end frame packed iso_pages')
     for row in result:
         print(','.join(row['names']), *(hex(row[c]) for c in COLUMNS[:-1]), row['iso_pages'])
     maxima = envelope(result)

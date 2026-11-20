@@ -11,7 +11,7 @@ void _start(void)
     info.image_valid = 1;
     info.image_crc = 0x04030201;
     info.image_size = 0x0c0b0a09;
-    ok = ok && platform_module_pair(&value) && value == 0x66aa040c;
+    ok = ok && platform_module_pair(&value) && value == PAIR_CRC;
     ++info.image_crc;
     ok = ok && !platform_module_pair(&value);
     register int status __asm__("r3") = ok ? 0 : 7;

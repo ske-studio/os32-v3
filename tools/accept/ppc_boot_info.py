@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """PowerMac root pair design, stage 4: CRC precedes rd0 registration.
-A failed decode releases its output and stops before the shell. Returning the frame increases the free pool by its page count.
+A failed decode releases its output and stops before the shell. Returning the staging area increases the free pool by its page count.
 Only registered rd0 output remains charged to the boot owner.
 """
 import argparse
@@ -15,6 +15,9 @@ import zlib
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT / 'tools'), str(ROOT / 'tools/ppc')]
+
+
+from root_lz4_layout import PAGE, STAGING_SIZE
 
 
 def absent_bindings(folder, out):
@@ -74,12 +77,12 @@ def observe(elf, cpu, evidence, case, expected, exit_status):
             session.wait(lambda: log.exists() and re.search(rb'free_after=\d+\r?\n', log.read_bytes()),
                          'root page accounting', 10)
             raw = log.read_bytes()
-            boot = re.search(rb'KBOOT ROOT rc=(-?\d+) registered=(\d+) bytes=(\d+) frame_pages=(\d+)', raw)
+            boot = re.search(rb'KBOOT ROOT rc=(-?\d+) registered=(\d+) bytes=(\d+) staging_pages=(\d+)', raw)
             account = re.search(rb'KBOOT ROOT owner_before=(\d+) owner_after=(\d+) free_before=(\d+) free_after=(\d+)', raw)
             require(boot and account, 'missing root observations')
             rc, registered, length, frame = map(int, boot.groups())
             before, after, free_before, free_after = map(int, account.groups())
-            require(frame == free_after - free_before and frame > 0 and registered == (case == 'verified'),
+            require(frame == free_after - free_before and frame == STAGING_SIZE // PAGE and registered == (case == 'verified'),
                     'root frame or registration')
             require(after == before - frame + registered * ((length + 4095) // 4096),
                     f'root owner pages {before} -> {after}')

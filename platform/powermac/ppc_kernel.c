@@ -72,6 +72,11 @@ extern u32 sys_mem_kb;
 int pm_root_image(struct boot_root_image *image, u32 frame_bytes);
 #endif
 
+int platform_boot_staging_in_use(void)
+{
+    return ppc_boot_info()->root_frame_bytes != 0;
+}
+
 #ifndef KBOOT_NEGATIVE
 #define KBOOT_NEGATIVE 0
 #endif
@@ -226,15 +231,6 @@ void platform_boot_machine(void)
         pm_pci_boot(&pci, lan_boot.bdf);
     }
     if (!memory_boot_init(KBOOT_MEM_KB)) kboot_stop("memory_boot_init");
-    if (info->root_frame_bytes) {
-        u32 first = PM_ROOT_FRAME_BASE / PAGE_SIZE;
-        u32 pages = info->root_frame_bytes / PAGE_SIZE;
-        u32 pfn;
-        if (!paging_verify_identity(first, pages, P2V(PM_ROOT_FRAME_BASE)) ||
-            !pgalloc_alloc_n_owner(LEDGER_OWNER_BOOT, pages, first, first + pages,
-                                   LEDGER_BOTTOM_UP, &pfn))
-            kboot_stop("root frame reservation");
-    }
     shm_init();
     /* Same contract as x86 kernel_boot_memory(): shm_free/shm_lock toggle RW
      * on the *shared USER* mapping that paging_boot_user_shared() establishes
@@ -386,12 +382,12 @@ void platform_boot_services(void)
     int registered = 0;
     int rc = pm_root_image(&img, info->root_frame_bytes);
     if (!rc) rc = pm_root_boot(&img, &registered);
-    u32 pages = info->root_frame_bytes / PAGE_SIZE;
+    u32 pages = MEM_BOOT_STAGING_SIZE / PAGE_SIZE;
     u32 free_before, free_after;
     if (pm_root_release(&img, registered, PM_ROOT_FRAME_BASE / PAGE_SIZE, pages,
                         &free_before, &free_after))
         kboot_stop("root page release");
-    kprintf(KBOOT_ATTR, "KBOOT ROOT rc=%d registered=%d bytes=%u frame_pages=%u\r\n",
+    kprintf(KBOOT_ATTR, "KBOOT ROOT rc=%d registered=%d bytes=%u staging_pages=%u\r\n",
             rc, registered, img.bytes, pages);
     kprintf(KBOOT_ATTR, "KBOOT ROOT owner_before=%u owner_after=%u free_before=%u free_after=%u\r\n",
             owned_before, ledger_owner_pages(LEDGER_OWNER_BOOT), free_before, free_after);
