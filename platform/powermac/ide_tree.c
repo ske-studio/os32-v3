@@ -2,6 +2,7 @@
 #include "ofw.h"
 #include "kboot_info.h"
 #include "ide_boot.h"
+#include "ide_compatible.h"
 #include "kstring.h"
 
 static int prop(int node, const char *key, void *data, unsigned cap)
@@ -26,12 +27,7 @@ static int ata_node(int node, const char *name)
         if (!kstrcmp(buf, "ata") || !kstrcmp(buf, "ide")) return 1;
     }
     n = prop(node, "compatible", buf, sizeof(buf) - 1);
-    if (n <= 0) return 0;
-    buf[n] = 0;
-    for (int i = 0; i < n; i += kstrlen(buf + i) + 1)
-        if (!kstrcmp(buf + i, "keylargo-ata") || !kstrcmp(buf + i, "heathrow-ata") ||
-            !kstrcmp(buf + i, "ohare-ata")) return 1;
-    return 0;
+    return pm_ide_compatible(buf, n);
 }
 
 static int value(int node, const char *name, u32 expected)

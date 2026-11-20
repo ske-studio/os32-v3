@@ -351,8 +351,14 @@ static void errors(void)
 #include "ide_pio_host_multiple.inc"
 
 #ifdef TEST_BE_BUS
+#include "ide_compatible.h"
+
 static void be_bus(void)
 {
+    static const char compatible[] = "other\0keylargo-ata";
+    CHECK(pm_ide_compatible(compatible, sizeof(compatible)));
+    CHECK(!pm_ide_compatible(compatible, sizeof(compatible) - 1));
+
     _Alignas(2) u8 storage[2 * IDE_PIO_WORDS + 2];
     u8 *bytes = storage + 1;
     memset(storage, 0xa5, sizeof(storage));
