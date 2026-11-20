@@ -117,6 +117,28 @@ static int translate(int bus, int macio, int ac, int sc, int pac,
     return 0;
 }
 
+/* Convert an assigned PCI memory address through its host bridge ranges. */
+#if OS32_FEATURE_IDE
+#include "ide_boot.h"
+u32 pm_ide_pci_phys(int device, u32 address, u32 bytes)
+{
+    int bus = ofw_parent(device), root = ofw_finddevice("/");
+    u32 tag = PCI_MEMORY;
+    for (unsigned depth = 0; bus != root; ++depth) {
+        int parent = ofw_parent(bus);
+        if (!bus || bus == -1 || !parent || parent == -1 || depth >= PM_KBOOT_ANCESTORS)
+            return 0;
+        int ac = width(bus, "#address-cells", 2, 3);
+        int sc = width(bus, "#size-cells", 1, 2);
+        int pac = width(parent, "#address-cells", 2, 3);
+        if (!ac || !sc || !pac || translate(bus, 0, ac, sc, pac, &address, &tag, bytes))
+            return 0;
+        bus = parent;
+    }
+    return tag ? 0 : address;
+}
+#endif
+
 static int resolve(int node, int macio, int root, struct pm_via_boot *out)
 {
     u8 reg[(3 + 2) * PM_CELL_BYTES];

@@ -1,3 +1,4 @@
+#include "ide_boot.h"
 /* OF-PPC 4.2.4/8.2; OpenBSD macppc/locore0.S:87; FreeBSD
  * aim/mmu_oea.c:685-695. Plan D uses software tables, never RAM BATs.
  * Static MMIO slots belong to the platform, outside the device ledger. */
@@ -35,6 +36,9 @@ _Static_assert(PM_VIA_VA + PM_VIA_BYTES <= PPC_BOOT_USB_VA ||
 static const struct pm_kboot_info *boot_info;
 static struct ppc_boot_alias escc_alias, mpic_alias, gmac_alias[3];
 static struct ppc_boot_alias fb_alias, clock_alias;
+#if OS32_FEATURE_IDE
+static struct ppc_boot_alias ide_alias[PM_IDE_BANKS];
+#endif
 static struct ppc_boot_alias via_alias;
 static struct pm_via_window via_window = { .rc = PM_VIA_NOT_READY };
 const struct pm_via_window *pm_via_window(void) { return &via_window; }
@@ -58,6 +62,10 @@ int ppc_boot_alias_plan(u32 pa, u32 bytes, u32 va,
         { PPC_BOOT_PCI_ADDR_VA, PAGE_SIZE },
         { PPC_BOOT_PCI_DATA_VA, PAGE_SIZE },
         { PM_VIA_VA, PM_VIA_BYTES },
+#if OS32_FEATURE_IDE
+        { PM_IDE_VA, PAGE_SIZE },
+        { PM_IDE_VA + PAGE_SIZE, PAGE_SIZE },
+#endif
     };
     u32 offset = pa & (PAGE_SIZE - 1), limit = 0;
     for (u32 i = 0; i < sizeof(slots) / sizeof(slots[0]); i++) {
@@ -274,6 +282,19 @@ void ppc_boot_load_root(u32 root)
              a < boot_info->hpt_pa + boot_info->hpt_bytes; a += PAGE_SIZE)
             *leaf(root, a) = 0;
         install_via(root);
+#if OS32_FEATURE_IDE
+        for (unsigned i = 0; i < PM_IDE_BANKS; i++) {
+            struct ppc_boot_alias *a = &ide_alias[i];
+            if (!a->bytes || !observe_alias_safe(root, a) ||
+                overlap(a->pa, a->bytes, via_alias.pa, via_alias.bytes) ||
+                overlap(a->pa, a->bytes, fb_alias.pa, fb_alias.bytes) ||
+                overlap(a->pa, a->bytes, clock_alias.pa, clock_alias.bytes) ||
+                (i && overlap(a->pa, a->bytes, ide_alias[0].pa, ide_alias[0].bytes))) continue;
+            install_alias(root, a);
+            if (observe_walk_valid(root, a)) pm_ide_base[i] = a->va;
+            else *leaf(root, a->va & PTE_FRAME_MASK) = 0;
+        }
+#endif
         if (!boot_walk_valid(root)) ppc_boot_walk_stop();
         boot_root_ready = 1;
     }
@@ -383,6 +404,13 @@ void ppc_kernel_start(ppc_ci ci)
     if (!ppc_boot_alias_plan(info->escc_pa, PM_ESCC_WINDOW, PPC_BOOT_ESCC_VA, &escc_alias) ||
         !ppc_boot_alias_plan(info->mpic_pa, info->mpic_bytes, PPC_BOOT_MPIC_VA, &mpic_alias))
         kb_stop(e.out, "FAIL:KB:ALIAS-ESCC-MPIC\r\n");
+#if OS32_FEATURE_IDE
+    u32 ata_pa[PM_IDE_BANKS] = {0};
+    pm_ide_capture(ata_pa);
+    for (unsigned i = 0; i < PM_IDE_BANKS; i++)
+        if (ata_pa[i] && !ppc_boot_alias_plan(ata_pa[i], PM_IDE_CTL + 1,
+                PM_IDE_VA + i * PAGE_SIZE, &ide_alias[i])) ide_alias[i].bytes = 0;
+#endif
     plan_gmac(info);
     plan_via(&info->via);
     const struct pm_rh_fb *fb = pm_rh_framebuffer();
