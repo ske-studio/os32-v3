@@ -269,6 +269,8 @@ def document_cases(source):
                    for s in workflow['jobs']['static-check']['steps']), 'static-check runs on main every time'
     # 用意は composite action の 1 行だけ。workflow に apt の行を書かない (docs/POLICY_CI.md G5)。
     static = workflow['jobs']['static-check']['steps']
+    assert any('make check-ci-land-gate-host' in step.get('run', '').splitlines()
+               for step in static), 'static-check verifies the landing gate'
     assert [s.get('uses') for s in static if s.get('uses', '').startswith('./.github/actions/')] == ['./.github/actions/static-setup']
     assert 'apt-get' not in source, 'apt belongs to composite actions'
     static_setup = (ROOT / '.github/actions/static-setup/action.yml').read_text()
@@ -442,6 +444,7 @@ def main():
             ('scope', "if ref == 'refs/heads/main':", 'if False:', 'remove main scope'),
             ('scope', "and os.environ.get('PUSH_FORCED') != 'true'", '', 'ignore forced push'),
             ('scope', ", '.claude/**'", '', 'drop skill docs'),
+            ('check', 'make check-ci-land-gate-host', ':', 'drop landing gate test'),
             ('build-route', ' CHECK_EXCLUDE_ENV=qemu-ppc', '', 'restore qemu checks to build'),
             ('guest-route', 'shard: [0, 1, 2, 3, 4]', 'shard: [0, 1, 2, 3, 3]', 'repeat guest shard'),
             ('guest-route', 'matrix.shard }}/5', 'matrix.shard }}/6', 'omit sixth guest shard'),

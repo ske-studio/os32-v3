@@ -36,6 +36,7 @@ for i in $(seq 1 40); do
 done; echo "$out"
 ```
 
+- コードを含む SHA は単独の段でも `wt/int-<日付><記号>` に push し、早送り前に `python3 -B tools/ci/land_gate.py <SHA>` の成功とその SHA の受入 PASS を確かめる。
 - 待ちの終了と merge・push を 1 本のコマンドに繋げない。結論を読んでから取り込む。
 - 所要の目安 (2026-11-18 の棚卸しの後): push から最後のジョブまで 30〜36 分。check は 17〜22 分 (static-check 5〜7 分・ppc-compile 4〜7 分・ppc-qemu の 4 本は 14〜22 分)、build の checks 6 本は 11〜36 分。新しい枝の最初の回で PowerPC のジョブが 15 分ほど長い時は、クロスコンパイラのキャッシュが main に無い (ログの `Cache not found`)。基準から 2 割以上伸びたらスキル os32-ci-inventory。
 - 上限に当たったら `gh api rate_limit -q '.resources.core'` の `reset` (UNIX 秒) まで待つ。
