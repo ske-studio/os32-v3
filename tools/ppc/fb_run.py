@@ -112,10 +112,17 @@ def observe(elf, out, cpu, case):
         local('clear')
         s.wait(lambda: prompt in s.screen('prompt'), 'local prompt', 30)
         s.keys('echo ax')
-        s.wait(lambda: prompt+'echo ax' in s.screen('cursor'), 'edited command', 30)
-        _, pixels = shot('cursor')
-        col = len(prompt+'echo ax')
-        check(pixels.cursor_positions(0, len(prompt), 'echo ax  ') == [(0, col)], 'cursor')
+        edited = prompt + 'echo ax'
+        col = len(edited)
+
+        def cursor_drawn():
+            # shell_putchar updates the cell before it moves the fbcon underline.
+            # Require both in the same stopped frame, including the blank tail.
+            shadow, pixels = shot('cursor')
+            return (shadow.splitlines()[0].startswith(edited)
+                    and pixels.compare_text(0, 0, edited + '  ', ((0, col),)) is None)
+
+        s.wait(cursor_drawn, 'edited command and cursor', 30)
         s.key('backspace')
         s.wait(lambda: prompt+'echo a ' in s.screen('backspace'), 'backspace', 30)
         s.key('ret')
