@@ -7,6 +7,8 @@
 
 ユーザー決定 (2026-11-18、原文): 「KAPI の提供者無し 190 本を埋める計画を、先に作ってよいか。先に。ただし、x86 と重複するような実装はだめです」。音について: 「そもそも FM 音源がない機種は HAL のソフトウェア FM 音源の部分でつなぐ計画では？」→ PowerMac は「新しい口だけ」(旧 FM 6 口は E、アプリは sndl_chip_* → AV HAL のソフトウェア FM 音源 → PCM)。PM 決定: kcg_load_font は両像とも NOSYS、buz は当面 E (AV HAL の後に判定し直す)。
 
+ユーザー決定 (2026-11-20 夕): 段 6c の U1 を見直し、PowerMac の ext2 の作成 2 本 (`ext2_format`・`ext2_format_at`) を実装対象に戻す (G4 に ATA の HDD)。前提として段 8 の「ATA の block 契約」(本線) を PowerPC の ATA の装置の前に置く。受入は QEMU (mac99 の IDE) が先、G4 は後。
+
 ## 往復の変更の記録
 
 r3→r4 の変更

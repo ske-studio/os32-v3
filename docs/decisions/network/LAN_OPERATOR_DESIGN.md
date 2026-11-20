@@ -130,6 +130,7 @@ pub fn emit(id: &[u8], bytes: &[u8]); // 有界enqueue、serial_putsを呼ばな
 - SFS CALLはhost_agent内backendで既存SFS sid/seqの重複cacheの内側へdispatchする（新たなファイル実装を作らない）。BYE等の片道もlinkでは空本文200を返す。CRC/最大frame1044B、LEのSFSとlink、BEの診断payloadを明示codecで扱う。
 - link ridをFSの再実行キーにしない。同一sid/seqの同内容だけ再送、write結果不明は新sidで再実行禁止。ALIVE変更で旧FD失効、/hostの常駐寿命・RO既定・allow-write・HOSTDOWN/STALEを維持。
 - PPCのput_untilはSFS frameを1つ保留し、待機pollがhost_open/write/status/read/closeを進め、完成frameだけ既存rxへ渡す。SFS frame 1つ (CALL 1往復) ごとに入口の1000ms絶対期限を取り、open/write/status/readの全段で共有し、AGAINで取り直さない。VFSのread/writeの各chunk・listの各頁と、事前のensure/HELLOはそれぞれ直前に期限を取る。失敗したCALLをVFSで再実行しない。openのHOSTDOWN/FULLはWDATA送信前に限って同じ期限内でopenから再試行し、WDATA送信後は開き直さない。
+- host_agent は古い SFS CALL を受付から壁時計の 3 秒で打ち切る。TCG 負荷でゲストの TB が遅れるため、ゲストの 1000ms より長く取る。
 - x86 raw SFSは現状維持。SFS CALLはPPCから先に実証し、x86全利用者/FD導入を載せ替えてraw SFSを廃止する作業はdocs/design/net/README.md「共通の決まり」と TASK_LAN_BULK の後続関門。
 ```c
 /* net/link_platform.h: 機械依存をこの境界へ。x86動作は既存実体で保持。 */

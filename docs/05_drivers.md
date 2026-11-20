@@ -325,7 +325,7 @@ IDEセカンダリバンクに接続されたATAPI CD-ROMデバイスをPIOモ�
 - **ドライブとの相性で困ったら `ATAPI_READ_MAX_SECTORS` を 1 にする** (`drivers/ata/atapi.h` の 1 か所、旧来の 1 セクタずつに戻る)
 - **NP21/W は READ(10) で UNIT ATTENTION を返さない** (媒体の交換は TEST UNIT READY だけが報告する)。
   世代の経路は実機でしか踏まない。NP21/W の DRQ は 2048 バイトずつ
-- 試験: `make check-cd-read-host` (`tools/tests/test_cd_read.py`、記録 `tools/tests/cd_read_tdd.md`)
+- 試験: CD の読みの host 試験 `cd-read-host` は CI から外した (ユーザー決定 2026-11-20、持越し台帳 CI-DROP-CDREAD-1。組の C の `tools/tests/cd_read_host.c`・`cd_pkg_host.c` と記録 `tools/tests/cd_read_tdd.md` は戻す時のために残す)
 
 ### §5-7 マウス (mouse.c / mouse.h / mouse_bus.c / mouse_seamless.c)
 

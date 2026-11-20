@@ -46,7 +46,6 @@
 - [cd_read_host](cd_read_host.md)
 - [cd_read_host_dir](cd_read_host_dir.md)
 - [cd_read_host_pio](cd_read_host_pio.md)
-- [test_cd_read](test_cd_read.md)
 
 - [ext2_read_cache_host](ext2_read_cache_host.md)
 - [test_ext2_read_cache](test_ext2_read_cache.md)
