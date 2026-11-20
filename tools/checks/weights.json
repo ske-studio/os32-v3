@@ -364,7 +364,7 @@
     "ppc-boot-info-guest": 133,
     "ppc-console-cells": 73,
     "ppc-db-guest": 220,
-    "ppc-display-guest": 499,
+    "ppc-display-guest": 720,
     "ppc-display-lifecycle": 214,
     "ppc-fb": 564,
     "ppc-font-guest": 91,
