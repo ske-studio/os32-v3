@@ -68,6 +68,15 @@ static void reserve_test(void)
         tuple(avail+8,1,1,0x310001,0x7aeffff);
         expected=PM_KBOOT_RESERVE_WINDOW;
     }
+    if (which >= 16) {
+        /* Exercise the actual PT_LOAD end and every byte of the shell guard. */
+        tuple(avail+8,1,1,RESIDENT_END,0x7e00000-RESIDENT_END);
+        if (which == 17) {
+            tuple(avail+8,1,1,RESIDENT_END,0x4f5fff-RESIDENT_END);
+            tuple(avail+16,1,1,0x4f6000,0x7e00000-0x4f6000); an=24;
+            expected=PM_KBOOT_RESERVE_WINDOW;
+        }
+    }
     const struct pm_kboot_info *captured=pm_kboot_capture(0);
     reserve_mark('C');
     struct pm_kboot_info copy=*captured;
@@ -85,7 +94,7 @@ static void reserve_test(void)
     if (result!=expected) quit(77);
     if (result==PM_KBOOT_RESERVE_OK) {
         if (copy.admitted_end!=0x1000000 || copy.image_first!=0x100000 ||
-            copy.image_end!=(which==14?0x308000:0x300000) || copy.hpt_bytes!=0x20000 ||
+            copy.image_end!=(which==14?0x308000:RESIDENT_END) || copy.hpt_bytes!=0x20000 ||
             copy.hpt_pa!=(which==5?0x1020000:0x1000000)) quit(78);
     } else if (copy.admitted_end || copy.image_first || copy.image_end ||
                copy.hpt_pa || copy.hpt_bytes) quit(79);

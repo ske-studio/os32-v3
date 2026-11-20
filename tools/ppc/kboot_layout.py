@@ -15,7 +15,7 @@ CHECK = dict(name='ppc-kboot-layout', tier=2, budget=60,
                      'include/memmap.h', 'tools/gen_memmap.py',
                      'tools/ppc/kboot_layout.py', 'lib/kstring_c.c', 'lib/kstring.h',
                      'lib/crc32.c', 'lib/crc32_core.inc', 'lib/crc32.h',
-                     'include/types.h'])
+                     'include/types.h', 'tools/ppc/kboot_root_image.py'])
 
 
 def command(args):
@@ -24,6 +24,50 @@ def command(args):
     if result.returncode:
         raise RuntimeError(result.stderr)
     return result.stdout
+
+
+def report_product(path):
+    from kboot_root_image import verify_embedded
+    elf = path.read_bytes()
+    hdr = struct.unpack_from('>16sHHIIIIIHHHHHH', elf)
+    assert hdr[0][:6] == b'\x7fELF\x01\x02' and hdr[2] == 20
+    ph = [struct.unpack_from('>8I', elf, hdr[5]+i*hdr[9]) for i in range(hdr[10])]
+    load, = [p for p in ph if p[0] == 1]
+    symbols = {name: int(value, 16) for value, name in re.findall(
+        r'^\s*(0x[0-9a-f]+)\s+(__\w+) =', path.with_suffix('.map').read_text(), re.M)}
+    _, _, va, pa, raw, memory, _, _ = load
+    end = symbols['__kernel_resident_end']
+    chain = symbols['__kernel_chain_end']
+    assert va == pa == symbols['__kernel_image_start']
+    assert va + raw == symbols['__kernel_file_end'] and va + memory == end
+    layout = {name: int(value, 16) for name, value in re.findall(
+        r'#define LAYOUT_(\w+) (0x[0-9A-Fa-f]+)', (path.parent/'memmap_layout.h').read_text())}
+    shell = layout['MEM_SHELL_LOAD_ADDR']
+    guard = layout['MEM_SHELL_GUARD']
+    rows = [
+        (va, end, 'kernel PT_LOAD', 'kernel.ld'),
+        (end, chain, 'heap/KAPI/guards/SHM', 'kernel.ld'),
+        (chain, layout['MEM_FIXED_PAGING_GUARD_BASE'], 'chain slack', 'kernel.ld'),
+        (0x3e0000, layout['MEM_FIXED_PAGING_BASE'], 'paging guard', 'memmap.h'),
+        (0x3e1000, layout['MEM_FIXED_PAGING_FRAME_END'], 'page tables', 'memmap.h'),
+        (layout['MEM_STACK_GUARD'], layout['MEM_KSTACK_BASE'], 'kernel guard', 'memmap.h'),
+        (0x3fc000, shell, 'kernel stack', 'memmap.h'),
+        (0x400000, shell + layout['MEM_SHELL_MAX_SIZE'], 'shell image', 'memmap.h'),
+        (0x4a5000, layout['MEM_SHELL_HEAP_BASE'], 'libc headroom', 'memmap.h'),
+        (0x4b5000, guard, 'exec heap', 'memmap.h'),
+        (0x4f5000, guard + layout['MEM_PAGE_SIZE'], 'shell guard', 'paging_boot.inc'),
+        (0x4f6000, layout['MEM_SHELL_STACK_TOP'], 'shell stack', 'memmap.h')]
+    cursor = 0x100000
+    for first, stop, use, basis in rows:
+        assert first == cursor and first <= stop, use
+        print(f'{first:#08x} {stop:#08x} {use:22} {basis}')
+        cursor = stop
+    assert cursor == layout['MEM_POOL_BASE'] == 0x500000
+    root = verify_embedded(elf, load, symbols, (path.parent/'root.iso').read_bytes())
+    bss = symbols['__bss_end'] - symbols['__bss_start']
+    print(f'PT_LOAD raw={raw} memory={memory} BSS={bss} root={root} '
+          f'resident_end={end} chain_slack={0x3e0000-chain}')
+    return end
 
 
 def verify(work, script, cc, prefix):
@@ -95,7 +139,11 @@ const unsigned layout[] = {PM_KERNEL_BASE, PM_KERNEL_IMAGE_MAX,
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
+    parser.add_argument('--product', type=Path, help='inspect linked PPCKERN.ELF and adjacent map/ISO')
     args = parser.parse_args()
+    if args.product:
+        report_product(args.product)
+        return
     prefix = str(Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc')) / 'bin/powerpc-elf-')
     started = time.monotonic()
     with tempfile.TemporaryDirectory(prefix='kboot-layout-', dir=os.environ.get('TMPDIR')) as tmp:
