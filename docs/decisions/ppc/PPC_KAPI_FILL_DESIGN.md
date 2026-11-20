@@ -47,7 +47,7 @@ r2→r3 の変更：PowerMac の FM/SSG を共通のソフト合成器から PCM
 
 依頼の前提と基点との差は次の4件。数え方は独立した前提につき1件とした。
 
-1. 組数は25。sdk/kapi_target_ppc.py のキーを数え、同:241 の和集合を sdk/kapi.json の api 名と照合すると、重複なしの190本、全298本中の残り108本となる。残りには予約・特殊経路を含み得る。
+1. 組数は25。sdk/kapi_target_ppc.py のキーを数え、ABSENT_PROVIDER_SLOTS の和集合を sdk/kapi.json の api 名と照合すると、重複なしの190本、全298本中の残り108本となる。残りには予約・特殊経路を含み得る。
 2. 空の wrap の戻り方は一様でない。sdk/gen_kapi.py と sdk/kapi_target_ppc.py により、void は無動作、ポインタは NULL、指定の10照会は 0、その他は戻り型へ変換した NOSYS。公開前からこれを利用するアプリがある前提で扱う。
 3. 44ソースの定義位置は build/sources/common.mk。build/select.mk が選択をまとめ、build/targets/ppc-powermac.mk が未選択分もコンパイルする。コンパイル合格だけでは提供の証明にならない。
 4. 指定の docs/decisions/ppc/PPC_SQLITE_STACK_DESIGN.md はこの基点の非アーカイブ木に無い。段 S は作業記録 ppc-sqlite-stack/DESIGN.final.md の旧スタック上の FP guard と別スタック呼出を参照。kapi/kapi_db.c のエンジン準備・所有者取得まで含めて別途受入する。
@@ -189,8 +189,8 @@ A の場合も、対象像が持つ弱い代役に解決されていないこと
 |5a-i|本線 drivers/video/pc98/gfx_vram.c（その場の変更、NP21/W で確認）|present、rect、dirty、nosync、raster のクリップ・変更矩形管理を抽出。PC98 VRAM 書込と同期は装置に保持|
 |5a-ii|本線 `gfx/gfx_dirty.c`|分離した dirty 列・矩形処理だけを純移動。flip・VSYNC 待ちは装置側。x86 関数差0 (変位と `gfx_add_dirty_rect` からの呼出前後のスタック整列、ret 後の実行されない整列命令のみ許容)|
 |5b|本線 gfx/gfx_core.c → PPC platform/powermac/display_provider.c|共通 present が後端へ渡す。INDEX8 の変換・pitch は既存 OF FB を使う。200行指定の実現可能範囲を照会|
-|5c|共通 HAL → OF FB 後端|B1〜B4 と 5c-A は実装済み。所有・世代・転送範囲は共通 HAL、固定モード・pitch・画素形式は後端が返す。既存の表示の門は B02 で整理する。|
-|5d|PPC_SHELL_ALIGN_X86_DESIGN → kernel/gui.c|owner 1 の起動・切替・回収と共通表示所有を先に揃え、通常の製品シェルから sys_switch_shell で shell → GUI → shell を確認して公開する。|
+|5c|共通 HAL → OF FB 後端|所有・世代・転送範囲は共通 HAL、固定モード・pitch・画素形式は後端が返す。既存の表示の門は B02 で整理する。|
+|5d|PPC_SHELL_ALIGN_X86_DESIGN → kernel/gui.c|段 E で製品シェルを owner 1 の起動ループに接続する。段 F で通常の wrapper から共通の sys_switch_shell を通して shell → GUI → shell と回収を確認し、子からの切替要求が拒否されることを確かめて公開する。|
 |6a|PPC drivers/macintosh/ の VIA 装置 → platform/powermac/system.c|wt/ppc-reset の 955665762、docs/decisions/ppc/PPC_RESET_DESIGN.md の順。後続の rtc_read も同じ via_command を使用。再起動1本を先に公開、時計は同一装置を登録して別段で公開|
 |6f|転送先 TU は `kernel/dev/device_fs.c`・`kernel/dev/device_host.c` (2026-11-19 に移した)。loop (`kernel/dev/device_loop.c` の予定) は保留 — 転送先の loop_dev_* が装置のヘッダ drivers/block/loop_dev.h にしか無く、共通から呼ぶ契約 (include/ の宣言) ができるまで platform/pc98/device_loop.c に残す|serialfs・loop・ext2 の順に一組ずつ両像共通の TU に純移動。device_host.c の既存 PPC 転送も選択を切り替え、各固定名の定義を一つにする。PowerPC の EXEC 像は device_fs.o を選ぶが、中の転送先 (ext2_format*・serialfs_session_*) は PowerPC に無く、-ffunction-sections と --gc-sections で捨てられてリンクが通っている (6b・6c で転送先が入るまでの前提)|
 |6b|本線 fs/serialfs/serialfs_session.c → PPC hostfs_link_io.c|協調進行と session の所有を確定。既存のユーザー shell の transport を二重に初期化しない|
@@ -199,9 +199,9 @@ A の場合も、対象像が持つ弱い代役に解決されていないこと
 |6d-ii|PPC platform/powermac/pci_config.c（pm_pci_read32 等の config 読み書きだけ）|BDF と項目順を確定。列挙から外れる装置を既存 GMAC への固定応答で代用しない|
 |6e|本線 init/bootinfo.c → PPC platform/powermac/root_image.c|捕捉した検証結果の発行順を決め、boot_info と ver の根拠を共有|
 |7a-選択|本線 build/select.mk|FEATURE_FEP の FEATURE_PC98_DEVICES 依存を実際の前提機能に置換。両像の有効・無効構成を照合|
-|7a|module の読み込み L1 → L2 → FEP → KCG|入力の P1〜P4b は実装済み。fep.mod の起動と回収を x86 に揃える。辞書・学習は HDD の後、x86 と同じ VFS パスで公開する。|
+|7a|module の読み込み L1 → L2 → FEP → KCG|fep.mod の起動と回収を x86 に揃える。辞書・学習は HDD の後、x86 と同じ VFS パスで公開する。|
 |7b-選択|本線 build/select.mk|FEATURE_SQLITE の FEATURE_PC98_DEVICES 依存を実際の前提機能に置換。両像の有効・無効構成を照合|
-|7b|共通 module loader・段 S → SQLite module → kapi/kapi_db.c|x86 と同じ module と VFS 上の DB を使う。段 S の CPU 別スタック入口、FP 保存復帰・guard、SHM と bind の寿命を確認して公開する。|
+|7b|静的 SQLite → kapi/kapi_db.c|公開済みの db 17 本を維持する。製品経路で VFS 上の DB、段 S のスタック・FP 保存復帰・guard、SHM と bind の寿命を確認する。SQLite の module 化は任意の B08。|
 |7c|本線 kernel/module/kdebug_call.c|module ローダの有効化後、許可された診断コマンドを選ぶ。CPU 固有の採取は独立段|
 |8|本線 AV HAL の音声契約 → 装置後端、ATA の block 契約 → 装置後端|HAL 票の依存（音は A0・1kHz tick）を待つ。契約確定後に PowerPC 担当が各後端を接続する|
 |8-音|本線 AV HAL の合成器の照らし直し → os32_opna A〜D → L2、IS → L1、L1・L2 → L3、C3・L3 → L6|その後、PowerPC 担当が PowerMac の PCM 後端 drivers/sound/powermac/pcm_powermac.c（新設）を接続する。装置候補は Screamer（NetBSD awacs.c）や snapper（同 snapper.c）。G4 QuickSilver の実機搭載品は未確認。|
@@ -213,10 +213,10 @@ A の場合も、対象像が持つ弱い代役に解決されていないこと
 |1a、2a-i→ii・2b|1b→1c、2c。1d は独立|
 |3b-i→ii|3c。3a は独立|
 |4k-i→ii|4b。4a は独立|
-|5a-i→ii、5b → 5c → 5d|共通表示所有と shell 枠を揃えた後に切替を公開。既存の二重実装の整理は KAPI の機能を揃えてから行う。|
+|5a-i→ii、5b → 5c → 5d|段 E・F のシェル接続と共通の切替の門の受入後に切替を公開。既存の二重実装の整理は KAPI の機能を揃えてから行う。|
 |6f の各転送、6b・6c の媒体・通信契約|serialfs、loop、ext2 の各公開。6a は reset 設計の装置を待つ|
 |6d-i、6e の発行口|6d-ii、root_image|
-|7a・7b の選択|L1 → L2 の後に FEP → KCG。辞書・学習には HDD、DB の公開には module・VFS・段 S が要る。7c は debug module の後。|
+|7a・7b の選択|L1 → L2 の後に FEP → KCG。辞書・学習には HDD、DB は静的結線を維持して製品 VFS で受け入れる。7c は debug module の後。|
 |8 の PCM 常駐窓口分離・AV HAL、ATA の共通窓口|実音声・ATA 後端、buz 再判定|
 
 **全段の完了条件**　表の各行とその分割段で §4 の追従を確認する。両像のリンク map とデバッグ情報付き ELF の nm -l から、対象 slot → wrap の直接呼出先 → 定義元ソースのリポジトリ相対パスを突き合わせる。通常 wrap は両像でパス一致、未公開段は共通にした定義を先に照合し公開段で wrap から再照合する。不在 slot は生成された不在経路を確認する。差分で arch/ppc・platform/powermac に加わる関数定義名と x86 の定義名の積集合は空であること。パス不明は合格に数えない。純移動は毎回 docs/SRC_MOVE.md と x86 build_compare 関数差0、共通の口は両機種の呼出経路と check_layers 違反0を受入記録に残す。
@@ -229,7 +229,7 @@ A の場合も、対象像が持つ弱い代役に解決されていないこと
 ### 4. 公開表、生成物、ABI
 
 1. 段の開始時に slot 名と現 wrap、前提機能、ユーザー出力・資源所有者を対応付ける。AC-KAPI-1 の通常・欠如両方を試験する。
-2. sdk/kapi_target_ppc.py の該当 frozenset から受入済み名だけを外す。空集合になった組を消す際は IME_SLOTS の直接参照（同:240）とその利用者も点検する。
+2. sdk/kapi_target_ppc.py の該当 frozenset から受入済み名だけを外す。空集合になった組を消す際は IME_SLOTS の直接参照とその利用者も点検する。
 3. include 除外は全不在組の和集合である。一部だけ有効にした時点で必要になったヘッダを除外から外す。同じヘッダが他組に残っていないことを確認する。
 4. ZERO_SLOTS は absent_result 用。部分公開後も残りの不在物の型別値を保ち、IME の不在照会は NOSYS のまま。通常 wrap は KAPI_HIT と生成済み引数検査を通る。
 5. sdk/gen_kapi.py --target ppc-powermac --out-dir と --target x86-pc98 --out-dir を各々独立の出力先で基点と候補に対して実行する（起動は python3 -B）。
@@ -259,7 +259,7 @@ A の場合も、対象像が持つ弱い代役に解決されていないこと
 |surface（束、本線 #18 の確定設計後）|QEMU で書ける出力先で件数の不一致を与え、入力を読む前の INVAL と、その後の正しい CLIENT 1 面での再取得を確認|束の後半で失敗した場合の巻き戻しは本線の host 受入で確認 ([束の設計 §5](../display/SURFACE_LEASE_BUNDLE_DESIGN.md))|
 |gfx|画面寸法と owner を取得、既知矩形だけ更新し周囲の pixel を保存。非対応 raster/HW は能力に一致|dirty 範囲の右端を欠落させる|
 |gfx2|adapter/head/connector/mode と caps、面生成・lock・描画・present・解放。fence と非対応 EDID 等は実能力どおり|of_fb_v2 の固定モード比較を外し異寸法が通ることを検出|
-|gfx/gfx2（OF FB）|`gfx_screen_owner` と `gfx2_vblank_wait`・`gfx2_palette`・`gfx2_gamma`・`gfx2_cursor_move`・`gfx2_cursor_show`・`gfx2_dpms` を結線。link-sh でシェル owner、無効 head の INVAL、OF の vblank 未対応（HAL v2 §11-7 の NOSYS）、非所有者の表示制御の BUSY、終了後の head と owner を確認| `make check-ppc-display-guest MUTATE=1` で owner・vblank・表示制御の3組の提供者を外す |
+|gfx/gfx2（OF FB）|`gfx_screen_owner` と `gfx2_vblank_wait`・`gfx2_palette`・`gfx2_gamma`・`gfx2_cursor_move`・`gfx2_cursor_show`・`gfx2_dpms` を結線。旧 link-sh の試験を製品起動へ移し、owner 1 のシェルで表示所有、無効 head の INVAL、OF の vblank 未対応（HAL v2 §11-7 の NOSYS）、非所有者の表示制御の BUSY、終了後の head と owner を確認| `make check-ppc-display-guest MUTATE=1` で owner・vblank・表示制御の3組の提供者を外す |
 |gui|登録者に要求が一度届き、GUI 終了後に shell に入力が戻る|終了時の所有解放を省略|
 |sys|再起動前後の boot ログを別起動として観測。確定設計の PMU/Cuda ごとに送信回数を照合。buz は無動作|reset の装置呼出を外し再起動を検出できなくする|
 |clock|mac99 の Cuda と PMU を `-rtc base=2024-02-29T00:00:00` で起動し、RSH から 7 バイトの暦時刻と曜日を読む。起動から読出しまでの経過を加えた基準時刻との差は 2 秒以内|年を 1 年ずらす、Cuda と PMU の読出し命令を交換する、公開表で提供者を外す|

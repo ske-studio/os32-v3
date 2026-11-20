@@ -10,7 +10,7 @@
 
 - 2026-11-20 夕: 「最初の PowerPC での動作確認に作った実装です。破棄して x86 に寄せてください。まだ前提が渡っていないようです」— 5d (シェルの切り替え) の前提として、**B03・B09・B15 (と要る分の B01) を KAPI の埋めの後でなく今** 進める (シェルを x86 のシェルに寄せてから 5d を公開する)。仮の作りに合わせた分岐を足す案 (5d の受入の (a)) は取り消し。
 
-- 2026-11-20 夕: 「今から実装するものはよせて」— 新しく実装する段は x86 の形で作る (新しい 2 重を作らない)。段 7a の S1 (FEP を x86 は module・PowerPC は静的に分けるビルド) は止めた — PowerPC でも x86 と同じ module の読み込みで FEP・SQLite を使う形 (B08・C04) に設計し直す。
+- 2026-11-20 夕: 「今から実装するものはよせて」— 新しく実装する段は x86 の形で作る (新しい 2 重を作らない)。段 7a の S1 (FEP を x86 は module・PowerPC は静的に分けるビルド) は止めた — PowerPC でも x86 と同じ module の読み込みで FEP を使う形（SQLite は静的を維持し、module 化は任意） (B08・C04) に設計し直す。
 
 ## 1. 進め方
 - **空いた時の取り方**: PowerPC の PM の手が本線の段の待ちで空いた時は、下の表の **重さの軽い順** に、状態が「未着手」の行を 1 つ取る。取ったら状態を「設計中 (担当・日付)」に書き換えてから始める (同じ行を 2 人が取らない)。
@@ -27,13 +27,13 @@
 | 4 | B12 | SFS の scope の実行の包み | 90–240 行、4–8 ファイル | 後回し (シェルの寄せ B03・B09 の設計の後、rshell_lan.c の SHELL_REMOTE_SFS) |
 | 5 | B11 | ver/sysinfo とメモリの内訳 | 110–270 行、5–9 ファイル | 設計中 (os32powerpc・2026-11-20) |
 | 6 | B10 | ログの経路と起動の診断の出力 | 160–360 行、6–11 ファイル | 未着手 |
-| 7 | B09 | シェルの libc の接着・登録のコマンドと既定値 | 170–420 行、7–13 ファイル | 未着手 (5d の受入で見つけた: PowerPC の sh は SHELL_AS_APP・SH_SYS_MINIMAL で os32gui を断る — userland/shell/sh_exec.inc・cmd_sys.c。共通のシェルで有効にするのはこの行で) |
-| 8 | B08 | SQLite の初期化とリンク (module か静的か) | 210–450 行、6–11 ファイル | 未着手 (PowerPC の module の読み込みを作るかの決めが先) |
+| 7 | B09 | シェルの libc の接着・登録のコマンドと既定値 | 170–420 行、7–13 ファイル | 製品シェルの接続は main 未収録（§5） |
+| 8 | B08 | SQLite の初期化とリンク (module か静的か) | 210–450 行、6–11 ファイル | 任意。静的 SQLite を維持する |
 | 9 | B07 | ビルド・配布・試験の像の作り方 | 240–520 行、8–15 ファイル | 未着手 |
 | 10 | B06 | 端末・入力の接続の方針 | 250–560 行、7–12 ファイル | 未着手 |
 | 11 | B05 | root と /host・装置の名前と mount の手続き | 260–600 行、7–13 ファイル | 未着手 |
 | 12 | B04 | LAN の運用・link の poll・rshell | 320–680 行、8–14 ファイル | 未着手 |
-| 13 | B03 | シェルの枠・再起動 (PowerPC の sh を ID 1 に) | 350–700 行、6–12 ファイル | 未着手 (シェルの特権 CPL の決めが先、ユーザー判断) |
+| 13 | B03 | シェルの枠・再起動 (PowerPC の sh を ID 1 に) | 350–700 行、6–12 ファイル | 共通起動ループ D1〜D3 は main 844839af0。PowerPC の製品接続は未収録 |
 | 14 | B02 | 表示の選択・予約・描画の持ち主 | 400–850 行、8–15 ファイル | 未着手 |
 | 15 | B01 | 起動の段取りと exec の初期化 | 450–950 行、9–18 ファイル | 未着手 |
 
@@ -58,8 +58,8 @@ C01〜C15 (ARCH_DRIFT_AUDIT の C の表)。各行で「x86 に足す / PowerPC 
 止めるべき (置き換え先):
 | 文書 | 置き換え先 | 状態 |
 |---|---|---|
-| PPC_KAPI_GUI_SWITCH_DESIGN (5d) | シェルを x86 に寄せる設計 (B03・B09・B15、~/os32-tmp/run/ppc-shell-align/) の後に 5d を出し直す | 寄せの設計 r2 中 |
-| PPC_KAPI_FEP_INPUT_DESIGN (7a) | module の読み込みを PowerPC に (B08・C04、~/os32-tmp/run/ppc-module-align/) の後に、x86 の fep.mod の形で 7a を出し直す | module の設計 r1 中 |
-| PPC_KAPI_GFX_REST_DESIGN (5c) | ユーザー決定で入れる (上) | 取り込み待ち |
+| PPC_KAPI_GUI_SWITCH_DESIGN (5d) | シェルを x86 に寄せる設計 (B03・B09・B15、~/os32-tmp/run/ppc-shell-align/) の後に 5d を出し直す | PPC_SHELL_ALIGN_X86_DESIGN は origin/wip/kfill-designs で確定。段 A・B・C・E は main 未収録 |
+| PPC_KAPI_FEP_INPUT_DESIGN (7a) | module の読み込みを PowerPC に (B08・C04、~/os32-tmp/run/ppc-module-align/) の後に、x86 の fep.mod の形で 7a を出し直す | PPC_MODULE_ALIGN_X86_DESIGN は origin/wip/kfill-designs で確定。本線側の L1 は main 779942989、L2 は e4d84e711。PowerPC 側の接続は main 未収録 |
+| PPC_KAPI_GFX_REST_DESIGN (5c) | ユーザー決定で入れる (上) | B1〜B4 と 5c-A は実装済み |
 
 直しが要る 12 件 (文書の直しの段で、各々を x86 の形に書き換える): PPC_KAPI_FILL_DESIGN・TASK_PPC_KAPI_FILL・TASK_PPC_SHELL・PPC_SHELL_DESIGN・ARCH_BRINGUP_ORDER・LAN_OPERATOR_DESIGN・TASK_LAN_OPERATOR・PPC_P3_DESIGN・PPC_P5_REST_DESIGN・TASK_PPC_LAN・ARCH_COMPAT_CONTRACT (§9 の「新しく作った違いを追記」を「物理差と既存の未整合だけ」に)・PPC_RESET_DESIGN。状態: 直した (2026-11-20、本線のレビュー待ち 4 件)。

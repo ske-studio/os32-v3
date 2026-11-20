@@ -53,7 +53,7 @@ PM 決定 (2026-11-10、設計の往復の中で。ユーザーに報告済み):
 | P30・H30・H31・H32・H33 | やめた (2026-11-11、ユーザーの「過剰に防御してませんか？」を受けた PM 決定。故障の道筋は host の模型 H14・H17・H24 が持ち、QEMU で重ねない。設計 PPC_LAN_MARKS_DESIGN の末尾) |
 | link への移行の P1 の節目 (P1a〜P1g・P2c・P5-t・P5-log、TASK_LAN_OPERATOR §2) | 統合の枝 wt/int-ppc-1114p (2026-11-14)。`make ARCH=ppc PLATFORM=powermac KBOOT_LINK=1` の診断像 (shell 無し) で PLN1 の wire を外し、link・nic・GEM adapter (4 枠の保留、credit は空き枠×1514B) を組む。HELLO・ALIVE・TIME・LOG が往復し、FB の帯に HELLO の送信 (16)・確立 (17) の印。受入は `tools/ppc/link_run.py --require-ack` (7450・7455)。当時の既定は PLN1 |
 | P3 (製品シェルの端末) | [PPC_P3_DESIGN](../../decisions/ppc/PPC_P3_DESIGN.md)。②・③a は main 620c5237・0ab4a885、③d/⑤ は main 585dbbdb4。残る⑥は PPC_SHELL_ALIGN_X86_DESIGN の owner 1 の枠で RSH の結果と終了後の READY を確認する。 |
-| LAN 操作口 P5 | [PPC_P5_REST_DESIGN](../../decisions/ppc/PPC_P5_REST_DESIGN.md)。P5-t・P5-sd/fs は main c798c2d8。残る台本は製品の起動入口と共通 link transport で LOG・端末・保存を一巡する。QEMU の後に G4、cp の速度は記録のみ。 |
+| LAN 操作口 P5 | [PPC_P5_REST_DESIGN](../../decisions/ppc/PPC_P5_REST_DESIGN.md)。P5-t は main 87d1cb919、P5-sd/fs は main 5212da21f（統合 c798c2d8）。残る台本は製品の起動入口と共通 link transport で LOG・端末・保存を一巡する。QEMU の後に G4、cp の速度は記録のみ。 |
 
 link の時計の約束 (ARCH_COMPAT_CONTRACT の「link_platform_now は論理 100Hz の jiffy」) の PowerPC の実測 (2026-11-14、QEMU mac99、TB 100MHz との比):
 - 7450 単体 (ネット無し): 99.97/s。

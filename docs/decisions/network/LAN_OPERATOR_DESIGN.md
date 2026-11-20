@@ -141,7 +141,7 @@ u32 link_platform_lock(void); void link_platform_unlock(u32 saved);
 void link_platform_idle(void); /* 前景専用、再入禁止。IRQ/送信内から待たない */
 /* platform/powermac/nic_gem.c: GEMをNetNicOpsへ、既存DMA/reset/PHYを再利用 */
 /* PPCもPC98_TICK_LINKと同じtick枠へtick_registerでnet_jiffyを登録し、そこからlink_tickを駆動。
- * USBのusb_platform.c:132と同じ基盤を使う。共通 NIC は `idle_work_run` の FG1 の地点 (待ち・syscall 入口・`net_tx` の後) からも poll と link_tick を1msに1回まで行う。
+ * USB の usbp_tick_attachと同じ基盤を使う。共通 NIC は `idle_work_run` の FG1 の地点 (待ち・syscall 入口・`net_tx` の後) からも poll と link_tick を1msに1回まで行う。
  * link像ではGEM RX/TXもx86のnet_jiffyと同じtick枠で汲む(1回TX回収8/RX8の上限は維持)。
  * 前景のpm_lan_pollはlink像のRXに触らない(A1)。 */
 ```
@@ -230,7 +230,7 @@ P1 系列を含む main `4e0e8b1e` の実物を確認した。契約 ID は `doc
 |P4 結線試験|hostsvc-init: `tools/tests/hostsvc_init_host.c`|試験|pointer 一致に代え /host 常駐・borrowed 寿命を振る舞いで検証|
 |P4a 試験|lanfs-host: `tools/tests/test_lanfs.py`|試験|新経路を検証し serial SFS・netcd を維持|
 - 結線小差分も別依頼: con_sink.h、shellヘッダ、gshell module宣言、x86 build、PPC build、PPC mailboxのlock/heap結線、PPC boot/hostfs_boot、console stream口、host_agentのLOG重複記録をそれぞれ1ファイル・各150行以下。共通tick予算のarch口も1ファイルずつP1へ含め、無制限stubで完了にしない。
-- 最初のlink像はP1＋LOG（P2cまで）を合わせる。FB帯に「HELLO送信」「HELLO確立」の段階印を追加し、ログ・診断のない像を出さない。P1＋LOG/P2はlink診断像、P3はlink CLI像、P4はlink HostFS像として独立受入。機能不足の像で既定PLN1像を置換しない。P5後、PPC buildの既定をlinkへ変更する1ファイル段（100行以下、**PPC生成物変更**）で旧wireを廃止。
+- P1/P2 の診断像、P3 の link CLI 像、P4 の HostFS 像は初期移植の個別検証に使った。製品の P3/P5 は既存の共通 rshell/capture を使い、X/G の受入、wire と Host Services の契約を引き継ぐ。製品シェルから端末・保存を一巡し、診断像では起動と診断を回帰確認する。
 - X0→X1–X9→X10–X14→G1–G4を先に出してx86受入。P1→X6のLOG受け口/P5-logの表示→P2c→P2a/b→P3→P4→既定切替。P5-tと各台本は対応節目の前に完了。共通ファイルは直列、PPC設計の正典3票とnetwork正典への契約更新はPMが各1ファイル段で行う。
 - 各段の試験は `tools/tests/test_remote_<段>.py`、台本は `tools/accept/remote_<節目>.py` に各400行以下で別依頼。CHECKには現行のcovers等で入力を宣言、変更行の既存mutation anchorを検索して移設。対象build/触った試験--mutate/lint、ABI段clean→all、取り込みCIとfull-checkの役割はROLES §0どおり。
 - 旧 transport の試験は旧像の回帰として保持し、新しい像の必須合否から外す。対応する新 transport の期待は上表の各段で検証する。
@@ -252,11 +252,11 @@ H=host製品コード試験、N=NP21/W LGY-98/NE2K **上のlink**、R=Ra266 e825
 |gui引渡し G|H/N/R: ACCEPTの200前にGUI未起動、readyで移行、起動失敗/結果喪失で再実行なし、GSERIAL→CUI復帰。|200確認前にGUI起動。|
 |GSERIAL G|H/N/R: SOH/id8/end N・keys/watchdog/gs:!、他アプリHOST_NOTICE・前景なし・FIFO溢れ。serial版同台本も合格。|通知を65535で読む、またはLAN replyをUARTに出す。|
 |帯域/共存 X/G|H/N/R: TIME/CLIP/既存SFSと1.5KiB peek併走、ACK遅延/AGAINでも有界進行。Rはserial/LAN時間・TX呼出数・T1c遅延採取、200ms目標（未達は原因記録）。|host_writeのAGAINでbusy loop、またはserial mirror抑止解除。|
-|P1＋LOG基盤|H/Q: HELLO/ALIVE/TIME、BE CPUのLE wire golden、link断復帰、tick登録/tick_count・1poll予算/再入なし、旧PLN1選択像も起動。PPCでlinkをビルド、heap高水位≤1MiBとPLN1静的TX/RX不在をmapに記録。lan_service.c/:251のreset/PHY/pollが同じ関数の流用であることをdiffで示す。FBのHELLO送信/確立印と初期LOG受信を観測。|tick登録を外す、またはRX二重drain。|
+|P1＋LOG基盤|H/Q: HELLO/ALIVE/TIME、BE CPUのLE wire golden、link断復帰、tick登録/tick_count・1poll予算/再入なし、旧PLN1選択像も起動。PPCでlinkをビルド、heap高水位≤1MiBとPLN1静的TX/RX不在をmapに記録。lan_service.c の reset・pm_lan_start・pm_lan_pollが同じ関数の流用であることをdiffで示す。FBのHELLO送信/確立印と初期LOG受信を観測。|tick登録を外す、またはRX二重drain。|
 |P2診断/log|H/Q: 5診断・PEEK境界/DSI・cache競合、初期ログ・drop・末尾喪失を表示、shell無しlink像でも成立。|PEEK PA範囲照合またはlog drop報告を削除。|
 |P3端末|製品シェルで echo、失敗 rc、出力超過、ESCC との行分離、終了後の次の READY を確認。|ID 重複実行、LAN 中の ESCC 複写。|
 |P4 HostFS|H/Q: /host read/write/RO・CRC・1044B最大・1000ms期限・再起動旧FD STALE、WDATA/応答喪失時write一回。|新ridごとSFS重複cacheを消す。|
-|P5切替/像|H/Q: linkのみでLOG/診断/端末/HostFS一巡、0x88B6 TX0、生成像/map/サイズ記録、旧バイナリのCLI/FS利用契約維持。共通変更はN/R最小回帰へ相乗り。|PPC buildをPLN1既定へ戻す。|
+|P5切替/像|H/Q: 製品経路で LOG/端末/HostFS 一巡、診断像で5診断、0x88B6 TX0、生成像/map/サイズ記録、旧バイナリのCLI/FS利用契約維持。共通変更はN/R最小回帰へ相乗り。|採取記録にゲスト送信の PLN1 を混入させ TX0 の判定を落とす。|
 - x86はX/G統合→CI成果物→main直前N、Rはノート担当へ依頼。PPCはP1/P2/P3/P4/既定切替の各節目にH/Q、各節目の小段はまとめてよい。
 - R1専用受入は通常不要（CPU/paging/exec/配置を変更しない）。PPC像の増大で配置変更が必要ならその段を別設計・R1相当受入へ分ける。像不変のhostのみ段はguest再配備不要、最終統合台本は省かない。
 

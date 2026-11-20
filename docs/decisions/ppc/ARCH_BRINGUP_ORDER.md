@@ -4,7 +4,7 @@
 
 出所: PowerPC の S-A・S-B・S-C と W6 の設計および QEMU 受入 (2026-11-12)。
 
-> 状態: **現行 (2026-11-20)** — 製品受入の基準は x86 のシェル枠と起動ループ。PPC_SHELL_ALIGN_X86_DESIGN の段 A・B・C は済み、E は実装中。
+> 状態: **現行 (2026-11-20)** — 製品受入の基準は x86 のシェル枠と起動ループ。段の状態は票 TASK_PPC_ALIGN_X86、段の定義は PPC_SHELL_ALIGN_X86_DESIGN の表を参照する。
 
 ## 順と受入
 
@@ -12,12 +12,12 @@
 
 | 段 | 次へ進む条件 | 受入の試験 | PowerPC の例 |
 |---|---|---|---|
-| 起動 | kboot の印が出て LAN の診断が通る | `tools/ppc/kboot_all.py` | kboot・LAN |
+| 起動 | 機種の初期化を終え、診断出力を観測できる | `tools/ppc/kboot_all.py` | kboot・LAN |
 | インストール用 RAM root | 読み取り専用 ISO の `rd0` を root、ramfs の `rd1` を `/tmp` に mount し読み書きできる | `tools/ppc/shell_run.py` | W2〜W3、共通化は W6 |
 | USER アプリ 1 本 | hello を起動し出力と exit 値を観測、fault 後も復帰する | `tools/ppc/sb_run.py` | W5、S-B |
 | USER の入れ子 | USER の親から子を起動し終了して親へ戻る | `tools/ppc/sc_run.py` の N01 | W7、N01 (`nest`) |
 | 製品シェル | owner 1 の枠で起動し、子の終了から復帰、シェルの終了後に回収して次のシェルを起動する | 通常の端末で終了値・次の prompt を確認 | PPC_SHELL_ALIGN_X86_DESIGN |
-| 保存先 | HDD の ext2 root と共通 VFS/link の /host で再起動後に保存を読める | 製品シェルで書込みと読み戻し | W8、S-D |
+| 保存先 | HDD の ext2 root と共通 VFS/link の /host で再起動後に保存を読める | 製品シェルで書込みと読み戻し | W8、S-D は /host の保存のみ |
 
 ## 各段で用意するもの
 
@@ -57,5 +57,5 @@ S-D は CD 切離し後の作成・追記・短い上書き・64KiB 複写・列
 入口は `tools/ppc/sd_run.py --cpu both --mutate`。AF_INET の無い環境は SKIP とし、実行済みとは数えない。
 境界の単体検査は T02/T03 `ppc-hostfs-io`、T04 `ppc-hostfs-server`、T01 `ppc-hostfs-wire`。
 開発用 CLI の端末と poll は platform 側に閉じ、CPU 依存を共通 CLI に持ち込まない。
-USER の入れ子は sh の起動前に確認し、子終了後の親の継続を観測する。
+PowerPC では kboot の印と LAN 診断で起動を確認した。USER の入れ子は sh の起動前に確認し、子終了後の親の継続を観測した。
 製品のシェルの受入では owner 1 の資源回収と次のシェルの READY まで確認する。

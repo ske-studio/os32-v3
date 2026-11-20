@@ -2,14 +2,14 @@
 
 > 2026-11-20 の見直しで x86 の形に改めた ([DESIGN_X86_AUDIT](DESIGN_X86_AUDIT.md))。
 
-> 状態: **実装中 (2026-11-20)** — ③d/⑤ は実装済み。⑥ の製品受入は §5・§6。関連する契約は [ARCH_CTX_DESIGN](../ARCH_CTX_DESIGN.md)、[INPUT_HAL_DESIGN](../INPUT_HAL_DESIGN.md)、[LAN_OPERATOR_DESIGN](../network/LAN_OPERATOR_DESIGN.md)。
+> 状態: **現行 (2026-11-20)** — ⑥ の製品受入は §5・§6。関連する契約は [ARCH_CTX_DESIGN](../ARCH_CTX_DESIGN.md)、[INPUT_HAL_DESIGN](../INPUT_HAL_DESIGN.md)、[LAN_OPERATOR_DESIGN](../network/LAN_OPERATOR_DESIGN.md)。
 > §1〜4 と付録 A は初期実装の記録。残る製品受入は §5・§6 に従う。
 
 ## r3→r4 の変更
 - N1: link-SH と PLN1 の像別に USB/LAN 前景 work の登録関数を明記。
 - N2: peek の有限採取を許し、完成 key の消費と交互選択の更新だけを禁止。
 - N3: provider に GUI 状態の照会口を追加し、bridge の参照元を明記。
-- N4: HAL 1p・1a・1b・4c を P3③ の厳密な前提とし、P3 先行案を削除。
+- N4: HAL 1p・1a・1b・4c を 入力を扱う③b 以降の前提とし、P3 先行案を削除。
 - N5: ③を a〜d に分割し、各小段を 1〜3 ファイル・400 行以下に制限。
 - N6: capture 期限を wait 開始起点に統一し、通知・BEGIN 起点 profile を削除。
 - N7: 入口と endpoint の 2 周の根拠、poll 間引き、周別の計数を明記。
@@ -17,7 +17,6 @@
 - N9: usb_boot.c の古い EE 注釈の修正と新規ソース一覧の追従を③の完了条件に追加。
 
 ## 1. 範囲と実物の確認
-- 基準は main `4adf1a4a`（HEAD 一致を確認）。作業木は読み取りのみ、出力は本票だけ。
 - 材料は `in/P3_DESIGN.final.md` と `in/INPUT_HAL_DESIGN.r2.md`、同レビュー r1・r2 依頼。以下「final」「HAL r2」はこれらを指す。
 - 案 B、専用 link-SH、共通 rshell_lan.c/rshell.c、PLN1 退避像、HostFS 未提供、既定切替の条件、公開 ABI 不変更は final のとおり。
 - final §1 の E1〜E9、§2 の採用理由は維持。ただし EE=0 の syscall という根拠を本節で置換する。
@@ -50,7 +49,7 @@ i32 ppc_kapi_wait_once(void)
 - close 保留 ACK、link_platform_idle を呼ばない方針は final のとおり。IO_TIER と AC-NET-3 の文書は AC-CTX を参照し、P3 に N4 窓を作らせる記述を残さない。
 
 ## 3. bridge の境界と状態所有
-- **bridge 先行を必須とする**。HAL の 1p・1a・1b・4c の完了を P3③全体の厳密な前提にする。in2 公開 ABI・mouse・pad の完了は待たない。
+- **bridge 先行を必須とする**。HAL の 1p・1a・1b・4c の完了を 入力を扱う③b 以降の前提にする。in2 公開 ABI・mouse・pad の完了は待たない。
 - HAL r2 の InputLegacyProvider は terminal/注入/park の口であり、USB local の口はまだ宣言されていない。PPC の文字キューを移す前には下記の一時的な local provider が必要。
 - 下の追加宣言と mode は内部契約案。HAL 側で同名相当を確定し、P3 と別々の型を作らない。InputOps と SDK の署名は不変。
 ```c
@@ -103,7 +102,7 @@ int input_legacy_wait(int mode, int interruptible);
 
 ## 5. 実装と残る受入
 
-② の host/KAPI provider は main 620c5237、③a の前景 work は main 0ab4a885、③d/⑤ の出力・起動の結線は main 585dbbdb4 に入った。
+② の host/KAPI provider、③a の前景 work、③d/⑤ の出力・起動を製品経路で組み合わせる。
 ⑥ は PPC_SHELL_ALIGN_X86_DESIGN の製品シェル枠で行う。x86 の rshell がコマンドを一度実行し、終了値・出力・欠落数を既存の RSH OUT で返す。機種側は NIC と端末の後端を供給する。
 7450・7455 で入力途中の LAN 到着、重複 ID、出力超過、子の終了値を検査する。シェルの終了後は capture と owner の資源を回収し、起動ループが選んだ次のシェルの READY と新しい要求への応答を確認する。
 
@@ -124,7 +123,7 @@ int input_legacy_wait(int mode, int interruptible);
 - 本回は N1〜N9 の関連箇所の照合・差分・行数・出力確認のみ。読み取り指定を優先し preflight --fix-fonts、build、lint、host/変異、QEMU、実機、map/heap 実測は未実施。実装受入済みとは扱わない。
 
 ## 7. 未決
-- ユーザー判断が必要な未決は 0 件。HAL 1p・1a・1b・4c の完了後に P3③へ進む。HAL 側への契約補足は次節の技術調整とし、案 B 等の承認済み範囲を再審議しない。
+- ユーザー判断が必要な未決は 0 件。HAL 側への契約補足は次節の技術調整とし、案 B 等の承認済み範囲を再審議しない。
 
 ## 入力の HAL への意見
 - H1: local try/peek・IL_CHAR/KEY/LOCAL_CHAR・共通 peek に加え、provider.gui_active() を補う。HAL 3c 前の x86 は kbd_gui_mode の照会 adapter とする。
@@ -142,9 +141,9 @@ int input_legacy_wait(int mode, int interruptible);
 - 第 2 回 §3: 待ちの開始を起点にすることによる、全体の上限の振る舞いを §4 に書いた。
 
 ## 確定の後に決めたこと (2026-11-15、PowerPC PM)
-- 段の順と HAL 4c: ③a は HAL 4c より先に出した (ユーザー決定 11-15、本線 PM の休止を受けて)。§5 の段の順を正とし、§3 と §7 の「HAL の 1p・1a・1b・4c は P3 ③ の厳密な前提」は、入力に触る ③b 以降の前提と読む。
-- ② (main 620c5237): PLN1 の像の host_mailbox_commit は、void の宣言のまま無処理にした (stage が NOSYS を返し、kapi_host_notice の本体が先に戻るので commit は呼ばれない)。
-- ③a (main 0ab4a885): pm_link_service_once (link-SH の前景の仕事) は段 ⑤ に移した。今の link 像は shell の無い診断像で、USB を組まない (build/targets/ppc-powermac.mk の KBOOT_LINK と KBOOT_SH の排他)。⑤ で link-SH の像に USB を入れるときに、一緒に作って登録する。③a は、PLN1 の像 (KBOOT_SH=1) の terminal_service_once の登録 (platform/powermac/ppc_kernel.c、再入防止つき) と、usb_boot.c の注釈だけを入れた。各像の idle_work の登録数は、PLN1 の像が 1/4 (terminal_service_once)、link の診断像が 1/4 (net_rx_idle)。
+- 段の順と HAL 4c: ③a は HAL 4c より先に出した (ユーザー決定 11-15、本線 PM の休止を受けて)。入力に触る③b 以降に HAL 4c を先行させる。
+- ②: PLN1 の像の host_mailbox_commit は、void の宣言のまま無処理にした (stage が NOSYS を返し、kapi_host_notice の本体が先に戻るので commit は呼ばれない)。
+- ③a: pm_link_service_once (link-SH の前景の仕事) は段 ⑤ に移した。今の link 像は shell の無い診断像で、USB を組まない (build/targets/ppc-powermac.mk の KBOOT_LINK と KBOOT_SH の排他)。⑤ で link-SH の像に USB を入れるときに、一緒に作って登録する。③a は、PLN1 の像 (KBOOT_SH=1) の terminal_service_once の登録 (platform/powermac/ppc_kernel.c、再入防止つき) と、usb_boot.c の注釈だけを入れた。各像の idle_work の登録数は、PLN1 の像が 1/4 (terminal_service_once)、link の診断像が 1/4 (net_rx_idle)。
 
 - **sys_yield の訂正 (2026-11-15):** §2 の「sys_halt は返値を捨て、sys_yield は返す」(両方を ppc_kapi_wait_once に結ぶ) は誤り。② でそのとおり結んだところ、arch-ctx-guest の lifecycle (exec_start の子が sys_yield で park して state 4 になる) が壊れた (② の a12d0ec8 から、CI の段 2 の準備で発見)。sys_yield は x86 と同じ exec_sys_yield (park の点、idle_work_run を自分で呼ぶ) に戻し、ppc_kapi_wait_once は sys_halt だけに結ぶ。
 - **HAL 4c の順の入れ替えで決めたこと (2026-11-15、本線 PM の依頼と Opus のレビュー F3・F4 を受けて PowerPC PM が反映):**

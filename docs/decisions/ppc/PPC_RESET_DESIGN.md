@@ -212,7 +212,7 @@ Apple の Power Mac G4 (September 2002) Developer Note、vendor/text/apple-pmg4-
 | tools/tests/test_remote_x13.py | socket と operator の別 boot、遅着、次の submit | 30 |
 | tools/tests/via_host.c | MMIO/timebase の模擬、正常・競合・期限 | 120 |
 | tools/tests/test_powermac_reset.py | host 実行、OF fixture、変異と CHECK/covers | 90 |
-| tools/ppc/link_sh_run.py | 実 shell を使う reset 専用ケースと QMP 観測 | 45 |
+| tools/ppc/link_sh_run.py | 旧 link-sh の reset ケースを製品起動へ移し、RSH と QMP で観測 | 45 |
 | tools/checks/ppc-reset.py | 両 mac99 ケースと入力の宣言 | 15 |
 
 既存 host 側の確認・変更箇所（tools/ppc/ 配下）
@@ -233,7 +233,7 @@ Apple の Power Mac G4 (September 2002) Developer Note、vendor/text/apple-pmg4-
 - 変異は個別にコマンド置換、TIP と SR の逆順、PB4 反転省略、PB3 極性反転、期限無効化。各変異を実行し trace/結果/外部 watchdog のいずれかで RED を示す。
 - QEMU は製品経路を mac99 既定と mac99,via=pmu で別々に起動し、このケースでは -no-reboot を外す。
 - それぞれ LOG の cuda/pmu、OF-OFF、CUI READY を確認。QMP 接続時・初回起動のイベントを排出し、serial の末尾位置を記録してから RSH で reboot を一度送る。
-- 送信後の guest RESET event または新しい OF 起動行を期限内に得る。QMP system_reset は使わない。exit、切断、既存バナーの再読は失敗。空ラッパ変異で期限切れ RED。
+- 送信後の guest RESET event または新しい OF 起動行を期限内に得る。さらに別 boot ID の CUI READY を待ち、次の RSH 要求 ver の応答まで確認する。QMP system_reset は使わない。exit、切断、既存バナーの再読は失敗。空ラッパ変異で期限切れ RED。
 - mac99,via=pmu の 0xd0 実装有無を使用版の QEMU ソースで確認する。未実装なら版・根拠・代替試験を docs/tasks/DEFERRED_TESTS.md に記録し、PMU は host 試験と PMU 搭載 G4 実機で受ける。実装済みの場合の timeout は試験失敗。
 - 新規 PPC 試験は PPC_CROSS_DIR=/nonexistent で SKIP・rc=0、同条件に OS32_REQUIRE_PPC=1 を加えると FAIL・非ゼロを確認。
 - QuickSilver は実機ノートの tftpd で初回 RRQ の送信元・ファイル・時刻を記録。VIA の一行、OF-OFF、製品シェルの READY と boot ID を保存。

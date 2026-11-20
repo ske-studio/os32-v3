@@ -4,12 +4,12 @@
 
 > 上位: [TASK_PPC_KBOOT](TASK_PPC_KBOOT.md)
 
-> 状態: **実装中 (2026-11-20)** — W7 の USER 実行は main 2d102e30。製品シェルの統合は PPC_SHELL_ALIGN_X86_DESIGN に従う。
+> 状態: **実装中 (2026-11-20)** — W7 の USER sh 起動は main 1a136abc8、2d102e306 は stdio 試験の修正。製品シェルの統合は PPC_SHELL_ALIGN_X86_DESIGN に従う。
 
 ## 0. 製品の起動と媒体
 
 W7 で USER アプリとしての sh.bin の起動を確認した。製品では 起動ループが外部シェルを owner 1 のシェル枠にロードする。終了時に資源を回収し、gui_take_next_shell で次のシェルを選んで同じ枠で起動する。
-PPC_SHELL_ALIGN_X86_DESIGN の段 A・B・C は済み、E は実装中。 常駐 CLI と旧 kboot の 5 像は、x86 に寄せる作業の最後に外す。
+PPC_SHELL_ALIGN_X86_DESIGN の段 A・B・C・E は main 未収録。共通起動ループ D1〜D3 は main 844839af0。常駐 CLI と旧 kboot の 5 像は、x86 に寄せる作業の最後に外す。
 
 ## 1. W8 と W9
 
@@ -32,7 +32,7 @@ W9 は子の終了値、シェル終了時の回収、次のシェルの起動�
 | W5 (S-B) | 全段 (facade F01〜F21・生成器 F10/F14/F15・B01〜B36、B21 はやめた) 実装・独立レビュー済 (2026-11-12)。**QEMU で受入に到達** (sb_run.py、7450・7455、LAN 込み)。B36 で docs/09_exec.md に PowerPC の USER の ABI |
 | W7 (S-C、既存のシェルを USER の sh.bin として起動) | 済 (QEMU、sc_run.py、7450・7455 の LAN)。設計は [PPC_SHELL_SC_DESIGN](../../decisions/ppc/PPC_SHELL_SC_DESIGN.md) |
 | W6 (PC-98 の FD 起動から共通の RAM root) | 計画確定 (2026-11-12、[PPC_RAM_ROOT_W6_PLAN](../../decisions/ppc/PPC_RAM_ROOT_W6_PLAN.md))。**ユーザー決定 (2026-11-12): 案 B** (kernel は ISO の中に 1 回だけ)。共通の部品の段 C1〜C4 は PowerPC 側が先に出す、PC-98 の FD 側の段は本線が起こす |
-| W8 (保存先) | 初期の S-D は QEMU で確認済み。共通 VFS/link 上の /host を製品シェルで受け入れる。 |
+| W8 (保存先) | 初期の S-D は /host の保存を QEMU で確認済み。HDD の ext2 root からの製品起動・保存は未受入。共通 VFS/link 上の /host を製品シェルで受け入れる。 |
 | W9 (製品起動) | [ARCH_BRINGUP_ORDER](../../decisions/ppc/ARCH_BRINGUP_ORDER.md) に従い、owner 1 の起動・回収・再起動を確認する。 |
 | FB 文字端末 (G4 の画面に sh、共通の部品) | **QEMU で受入、main e74a0cf1 (2026-11-13)**。設計 [PPC_FBCON_DESIGN](../../decisions/ppc/PPC_FBCON_DESIGN.md)。段 A (x86 CUI の回帰の試験)・B (resident のフォント・KCG1 の本体)・C (全画面の採取)・D (gfx_console・OF_FB=6)・E (of_fb の後端・provider・color@/color!)・F (共通の fbcon)・G (東雲 16 の KCG1・RAM root)・H (PPC の像への結線・shell_putchar の mirror)・J (QEMU mac99 `-g 800x600x8` の画素の受入 `ppc-fb`、7450・7455) 。x86 の生成物は段 D の分だけ変わる (本線 PM 承認 11-13)。H の shell_putchar の写しは PowerPC だけ (CONSOLE_PUTCHAR_MIRROR、x86 の console.o は main と同じ)。G4 実機 (R9) は未。台帳の PPC-USB-LAN-FLAKE は 2026-11-13 に閉じた: 台本 tools/ppc/usb_run.py が `echo discarded` の全字の echo を待たずに LAN OPEN していた競合 (ゲストは各字 1 回ずつ配達、取り消しの後に届いた字が次の行に残った)、OPEN の前に全字の echo を待つ形に直した。`usb_run.py --lan --mutate` を PPC_FB=0・1 とも 3 回続けて GREEN、待ちを外すと 2 回とも `eecho`・`decho` で RED (証拠 `~/os32-tmp/run/usb-flake/`) |
 | フォントの LZ4 (KCG1 flags=1) | **QEMU で受入、main 0f115f53 (2026-11-14)**。製品フォント: flags=1・187,980B・SHA-256 `36eb1719dd6c0c18824c5746c69bcff27ac1f93d04a72c6ab8907d529dff9451`、生成: Python lz4 4.0.2+dfsg。設計 [PPC_KCG_LZ4_DESIGN](../../decisions/ppc/PPC_KCG_LZ4_DESIGN.md)。console_route は段 I へ送った (本線 PM 決定 11-13) |

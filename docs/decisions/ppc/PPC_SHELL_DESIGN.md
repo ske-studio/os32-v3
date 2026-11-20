@@ -2,9 +2,9 @@
 
 > 2026-11-20 の見直しで x86 の形に改めた ([DESIGN_X86_AUDIT](DESIGN_X86_AUDIT.md))。
 
-> 状態: **実装中 (2026-11-20)** — W0〜W7 は初期移植の記録。PPC_SHELL_ALIGN_X86_DESIGN の段 A・B・C は済み、E は実装中。
+> 状態: **現行 (2026-11-20)** — W0〜W7 は初期移植の記録。§3〜12 の PLN1 と常駐 CLI の手順は S-A の再現用。製品起動には PPC_SHELL_ALIGN_X86_DESIGN を適用する。
 
-> 出所: ~/os32-tmp/run/ppc-shell/DESIGN.final.md (棚卸し gpt-6.1-sol の SURVEY.md、gpt-6-astra 起草 r1→r2、Opus 5.5 の第 1 回 Request changes・第 2 回 条件付き Approve、PM が残りを反映)。中身は変えていない。
+> 出所: ~/os32-tmp/run/ppc-shell/DESIGN.final.md (棚卸し gpt-6.1-sol の SURVEY.md、gpt-6-astra 起草 r1→r2、Opus 5.5 の第 1 回 Request changes・第 2 回 条件付き Approve、PM が残りを反映)。2026-11-20 に製品シェルの受入を改訂した。
 
 
 S-A の詳細設計と S-B 以後の計画。ユーザー判断の未決は0件。

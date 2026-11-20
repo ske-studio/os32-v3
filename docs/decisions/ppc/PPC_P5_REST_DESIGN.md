@@ -5,9 +5,9 @@
 > 状態: **現行 (2026-11-16)** — 確定設計の写し。sol 起草 r1・r2、Opus 5.5 の独立レビュー 2 回、PowerPC PM が第 2 回の N1〜N4 を反映。ユーザー決定 2 件は §6。出所は ~/os32-tmp/run/ppc-p5-rest/DESIGN.final.md。段の状態は票 TASK_PPC_LAN が持つ。上位の確定設計は [LAN_OPERATOR_DESIGN](../network/LAN_OPERATOR_DESIGN.md) §5 (P5 の行)。
 
 
-## 1. 移行済みの部分
+## 1. 共通 transport
 
-P5-t・P5-sd/fs は main c798c2d8。共通 link transport から host agent に接続し、LOG・RSH・SFS CALL を使う。
+P5-t・P5-sd/fs では共通 link transport から host agent に接続し、LOG・RSH・SFS CALL を使う。
 
 ## 2. 台本の入口
 
@@ -23,28 +23,28 @@ K は起動時の LOG と診断を採取し、R は実機の HELLO/ALIVE と連�
 
 ## 3. 製品経路の選択
 
-PPC_SHELL_ALIGN_X86_DESIGN の起動入口から各台本を開始する。旧像を選ぶ KBOOT_SH・KBOOT_LINK の指定を呼び出し元へ追加する準備段は取り消す。常駐 CLI と旧 kboot の 5 像は、x86 に寄せる作業の最後に外す。
+PPC_SHELL_ALIGN_X86_DESIGN の起動入口から R・C・O・U と製品一巡 D を開始する。K の 5 診断は PDIAG を備えた診断像で別に実行する。旧像を選ぶ KBOOT_SH・KBOOT_LINK の指定を呼び出し元へ追加する準備段は取り消す。常駐 CLI と旧 kboot の 5 像は、x86 に寄せる作業の最後に外す。
 
 ## 4. 統合の受入
 
-同じ起動で LOG、診断、製品シェルの RSH、/host の読み書きを観測する。再起動後は新しい boot の READY を待ち、保存した内容を読む。
+D には K の診断回帰と R（host fixture）・C・O・U の個別受入後に進む。製品像の同じ起動で LOG、製品シェルの RSH、/host の読み書きを観測する。再起動後は新しい boot の READY を待ち、保存した内容を読む。両 CPU（7450・7455）でこの一巡、ゲストの PLN1 送信 0 件、像・map・heap の照合が揃ってから製品経路を既定とし、G4 の受入へ進む。
 
 ## 5. 受入項目 → 試験と変異
 |受入・期待の出所|試験|変異 (正常判定が対象理由で落ち、到達・後続生存も確認)|
 |---|---|---|
 |OF/READY継続、既存kboot観測ABI|KのQMP TB/EE/tickとserial milestone|記録fixtureのREADY欠落/順序違反・tick停止を拒否|
-|初期LOG・drop、設計:253|KとRのLOG生記録/欠落判定|drop報告消去、末尾欠落fixtureでRED|
-|5診断、設計:253 / 旧lan_judgeの値根拠|KのOF/map/entryとの値照合|PEEK応答1byte破損、clock不一致fixtureでRED|
-|USER入れ子・旧CLI契約、sc EXPECTED|C旧serialとlinkの二重子結果/親復帰|既存parent-result、第二結果のみ破壊|
+|初期LOG・drop、§2 K/R|KとRのLOG生記録/欠落判定|drop報告消去、末尾欠落fixtureでRED|
+|5診断、§2 K/R / 旧lan_judgeの値根拠|KのOF/map/entryとの値照合|PEEK応答1byte破損、clock不一致fixtureでRED|
+|USER入れ子・旧CLI契約、sc EXPECTED|製品入口の C で二重子結果/親復帰|既存parent-result、第二結果のみ破壊|
 |USER fd1、outprobe/既存sh-output|OのOUT/LOGの正負両判定|fd1-logを本物のlink像で実行|
-|CLI redirect/pipe/再起動、check_shell/P3|C + 既存link_sh_run|既存fd1-log/no-restart、P3 END/重複ID変異|
-|HostFS永続/RO/期限/世代、設計:255|既存sd_run --link --mutateを統合で必須実行|既存tmp-target/fixed-nonce等、永続値・STALEの実観測|
+|CLI redirect/pipe/再起動、check_shell/P3|旧 link_sh_run の判定を製品入口の C に移す|既存fd1-log/no-restart、P3 END/重複ID変異|
+|HostFS永続/RO/期限/世代、§4 保存|旧 sd_run --link の判定と変異を製品入口の D に移す|既存tmp-target/fixed-nonce等、永続値・STALEの実観測|
 |RPC停止後USB、usb_run --lan/PPC_NOTES §3|UのCALL到達/ゲスト期限/打鍵/復帰|no-service/syscall-ee、打鍵invert-key/no-forwardも維持|
 |打鍵がゲスト時計基準、PPC_NOTES §3|Uのpress/repeat/releaseとFB|release待ち省略の試験刺激で余分な文字を検出|
 |実機記録の完結性、realhw run_rh|R host fixture + G4 pcap/LOG/RSH|世代途中変更/未完了OUT/欠落記録を拒否|
-|linkのみ全一巡、設計:256|Dの同一runでLOG→5診断→RSH→SFS|各イベント欠落fixtureで統合判定RED|
-|0x88B6 TX0、設計:256|Dの起動から停止までguest送信集計|guest PLN1 frameを1本挿入、空captureも拒否|
-|像/map/サイズ、設計:231/256|Dの成果物・heapと旧新差分|mapへ旧TX/RX領域混入fixture、成果物欠落を拒否|
+|linkのみ全一巡、§4 D|Dの同一runでLOG→RSH→SFS|各イベント欠落fixtureで統合判定RED|
+|0x88B6 TX0、§4 D|Dの起動から停止までguest送信集計|guest PLN1 frameを1本挿入、空captureも拒否|
+|像/map/サイズ、§4 D|Dの成果物・heapと旧新差分|mapへ旧TX/RX領域混入fixture、成果物欠落を拒否|
 |外部アプリ・FS|製品シェルから hello/nest/outprobe と保存操作を実行|既存 parent-result/fd1-log/tmp-target を利用|
 |欠如環境、PPC_NOTES §6|全対象のcross/socket/QEMU欠如fixtureとrequire=1|常時成功/常時SKIPへ判定変更してRED|
 - 表のfixture変異は判定入力を一箇所だけ壊す。製品の変異は既存一意anchorを使い、timeout/一般例外だけをREDにしない。
@@ -68,5 +68,5 @@ PPC_SHELL_ALIGN_X86_DESIGN の起動入口から各台本を開始する。旧�
 ## U の実装で決めたこと (2026-11-16、PM 決定)
 - U-c1: link の `--link --lan --mutate` の変異は no-service だけ。RED は「USB の列挙か打鍵が進まない」と「link の LOG・RSH が生きている」の両方を要し、片方は wrong-reason。syscall-ee は従来の `--cpu both --mutate` (PROBE の私用の写しで USB STALL ticks=0 を観測) に残す。初期の link-SH の像には syscall の入口の EE を観測する口が無く、差し込みは N2 に反するため。
 - U-b の直し: 抑止した SFS CALL では、host_agent の壁時計 1.0s (受付と本文の後の両方、tools/host_agent.py) を止める。-icount のゲスト時計は壁時計と食い違う (先走りと凍結) ので、区間はゲストの期限で終わらせる。期限切れの文は `Host is down` (fs/serialfs/sfs_client.c (sfs_exchange_deadline()))。
-- 受入の揺れのうち、受信が 1 件目で断られる誤りは共通の net/rx_work.c で本線が直した (main 44f2a83f)。
+- 受入の揺れのうち、受信が 1 件目で断られる誤りは共通の net/rx_work.c で本線が直した。
 

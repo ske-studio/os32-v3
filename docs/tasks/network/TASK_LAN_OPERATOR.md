@@ -27,7 +27,7 @@
 | 受ける側 | 段 (設計 §6 の行) |
 |---|---|
 | 本線 | X 系 (X7・X8 を含む)、G 系、U5、P4b (host_agent.py の SFS CALL の結線、X6・U5d と同じファイルを直列に触る) |
-| PowerPC | P1・P2 の NIC/link、P3 の端末後端、P4 の SFS CALL と P5 の共通 link transport を接続。P3③d/⑤ は main 585dbbdb4、P5-t・P5-sd/fs は main c798c2d8。残る P3⑥ と P5 は PPC_SHELL_ALIGN_X86_DESIGN に従い、製品シェルでコマンドの結果・再起動後の READY・保存を受け入れる。 |
+| PowerPC | P1・P2 の NIC/link、P3 の端末後端、P4 の SFS CALL と P5 の共通 link transport を接続。P3③d/⑤ は main 585dbbdb4、P5-t は main 87d1cb919、P5-sd/fs は main 5212da21f（統合 c798c2d8）。残る P3⑥ と P5 は PPC_SHELL_ALIGN_X86_DESIGN に従い、製品シェルでコマンドの結果・再起動後の READY・保存を受け入れる。 |
 
 - 順: PowerPC の P1 は、x86 の受入 (X・G) の後に始める。共通のファイル (link.c・nic.c) を触る段は、出す前に相手に知らせる。
 - X7・X8 は、PowerPC PM が PowerPC の build と QEMU の ppc-fb・sc_run で回帰を確かめる。
