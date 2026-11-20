@@ -144,6 +144,7 @@ def check_kboot(root):
             ext2 = 'fs/ext2/ext2_'
             formatter = {ext2 + stem for stem in ('fmt', 'layout', 'time')}
             pending = set(actual['KB_PENDING'].split())
+            assert actual['KB_OUT'] + '/kernel/gui.o' not in pending, name
             for unit in formatter:
                 assert actual['KB_OUT'] + '/' + unit + '.o' in pending, (name, unit)
             ide = ext2 + 'medium_ide'
