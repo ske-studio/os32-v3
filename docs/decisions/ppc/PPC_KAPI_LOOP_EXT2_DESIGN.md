@@ -208,3 +208,7 @@ NP21/W の受入は直列 (本線の取り決め 3): N5 → N7+N8 の 2 回。
 - U1: **当面 E** — PowerMac の ext2 の 2 本 (format 系) は型ごとの不在のまま。loop の 3 本を先に公開し、書き込める媒体で両 format の成功を確かめられた時に再判定。
 - U3: **広げる** — KAPI の drv に 0x0600|slot (loop) を足し、同じ口で loop を選ぶ。drv の意味と SDK の定数を KAPI 仕様に書き、loop は 0x0600..0x0603 の完全一致だけ、既存の HD の値の結果は試験で固定。
 これで D1〜D3 (U1 の公開は E のまま) に進める。D3 の前提は D1 の完了 (確定の C6)。
+
+## ユーザー決定 (2026-11-20 夕) — U1 の見直し
+- U1: **公開する (実装対象に戻す)** — G4 の実機に 6.4 GB の ATA の HDD をつないだので、書ける媒体の条件が来た (ユーザーが PowerPC のセッションで決め、本線の PM がユーザーに確かめた)。
+- 前提の順: (1) 本線の ATA の block の HAL の口 (計画 PPC_KAPI_FILL の段 8「ATA の block 契約」、未設計) → (2) PowerPC の ATA の装置 (KeyLargo の Ultra ATA/66、docs/ppc/ata.md) をその口の実装として → (3) ext2 の formatter の提供者 (段 6c の N7 の ext2_medium_contract の口) に PowerMac の ATA を登録し、段 D3 (common.mk の formatter の選択・提供者の登録・公開表の ext2 2 本) を出す。受入は QEMU (mac99 の IDE) が先、G4 の実機は後 (ユーザー指示 2026-11-18)。G4 の HDD への書き込みは中身を確かめてユーザーの承認の後 ([D2])。
