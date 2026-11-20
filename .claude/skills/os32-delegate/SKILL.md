@@ -70,6 +70,8 @@ git worktree add -q -b wt/<名> ~/wt/os32-v3/<名> <基点の SHA>
 
 ## 4. レビューの依頼の型
 
+レビュアーは **sol** (`gpt-6.2-sol` を codex の read-only で、`~/os32-tmp/bin/codex_run.sh <名>-rv gpt-6.2-sol /home/hight/os32-v3 <PACK>` — 2026-11-20 夕から、ユーザー決定「実装のレビューも sol に」。前は Opus 5.5 のサブエージェント)。sol は作業木を読めるので、依頼に作業木のパスと基点を書く。codex の sandbox は GitHub に出られないので、CI の実物の照合が要る時は PM が取って置く。
+
 ```
 OS32 (/home/hight/os32-v3) の <書き手> 実装 <段> を読み取りだけでレビューしてください。対象 `git -C /home/hight/wt/os32-v3/<名> diff <基点>..HEAD` (<生成物・試験は流し見>)。設計は <所在> (<節>)、報告 ~/os32-tmp/run/<名>/report.md (逸脱 N 件・未決 M 件)。トークン節約: <中心に読むファイル>。試験は回さない。
 前提 (指摘しない): シングルタスク、9801 互換なし、過剰防御は不要。<範囲外の段>。
