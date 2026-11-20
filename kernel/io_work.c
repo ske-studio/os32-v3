@@ -314,11 +314,10 @@ int io_dispatch(u32 budget_us)
     }
 finish:
     if (idle_work_compat_count()) {
-        int timed = !clock_failed && token_read(&pass, &now);
         compat_run();
         calls += (int)idle_work_compat_count();
         stats.callbacks += idle_work_compat_count();
-        if (timed && token_read(&pass, &now)) elapsed = now - pass.start_count;
+        if (!clock_failed && token_read(&pass, &now)) elapsed = now - pass.start_count;
     }
     if (!clock_failed) for (unsigned int t = 0; t < 2; ++t) {
         if (served & (1u << t)) rounds[t] = 0;

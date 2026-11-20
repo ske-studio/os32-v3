@@ -1,17 +1,24 @@
 #include "types.h"
-static unsigned int irq_depth, irq_calls, compat_hits, compat_count;
+static unsigned int irq_depth, irq_calls, compat_hits;
 static unsigned int irq_save(void) { unsigned int old = irq_depth; ++irq_depth; ++irq_calls; return old; }
 static void irq_restore(unsigned int old) { irq_depth = old; }
 #include "io_work.c"
-unsigned int idle_work_compat_count(void) { return compat_count; }
-void idle_work_compat_run(void) { ++compat_hits; }
+static u32 ticks, waits;
+static int _irq_enabled(void) { return !irq_depth; }
+static void _idle(void) { ++waits; ticks += 10; }
+int net_rx_recent(u32 window_ms) { (void)window_ms; return 0; }
+volatile u32 kctx_irq_depth;
+#include "idle_work.c"
+#include "platform/pc98/platform_link_inline.h"
+#define LINK_IDLE() link_platform_idle()
+static void compat(void) { ++compat_hits; ticks += 17; }
 
-static u32 ticks, read_cost, source, generation, factor, reads, conversions, fail_read, fail_convert;
+static u32 read_cost, source, generation, factor, reads, conversions, fail_read, fail_convert;
 static u32 pg, lookups, trace[128], traced, cost[18], units[18], mode[18];
 static u8 tiers[18];
 static u32 budgets[18], observed[18], taken[18];
 static int results[18];
-enum { REQUEST = 1, NEST = 2, CHANGE = 4, FAIL_TAKE = 8, FAIL_POST = 16, POLICY = 32, LIMIT = 64, REGISTER = 128 };
+enum { REQUEST = 1, NEST = 2, CHANGE = 4, FAIL_TAKE = 8, FAIL_POST = 16, POLICY = 32, LIMIT = 64, REGISTER = 128, LINK_WAIT = 256 };
 static void finish(int rc) { __asm__ volatile("int $0x80" : : "a"(1), "b"(rc) : "memory"); __builtin_unreachable(); }
 static void fail(unsigned int line)
 {
@@ -62,6 +69,10 @@ static int step(void *state, struct io_slice *s)
         mode[id] &= ~NEST;
         u32 before = reads; CHECK(io_dispatch(500) == 0); CHECK(reads == before);
     }
+    if (flags & LINK_WAIT) {
+        CHECK(io_slice_take(s)); ++taken[id];
+        LINK_IDLE();
+    }
     if (flags & CHANGE) ++generation;
     if (flags & FAIL_TAKE) fail_read = reads + 1;
     for (u32 n = 0; n < units[id] && io_slice_take(s); ++n) { ++taken[id]; ticks += cost[id]; }
@@ -79,7 +90,7 @@ static struct io_desc desc(u32 id)
 static void add(u32 id) { struct io_desc d = desc(id); CHECK(io_register(&d) == 0); io_request(id); }
 static void reset(void)
 {
-    count = running = compat_count = cache_valid = policy_valid = clock_failed = 0;
+    count = running = work_count = waits = cache_valid = policy_valid = clock_failed = 0;
     pending[0] = pending[1] = pending[2] = 0;
     rounds[0] = rounds[1] = cursor[0] = cursor[1] = fair_next = 0;
     stats = (__typeof__(stats)){0};
@@ -131,9 +142,10 @@ static void slices(void)
         CHECK(io_slice_begin(&s, 10, 2) == 0); ++source; CHECK(!io_slice_take(&s));
     }
     fail_convert = 1; CHECK(io_slice_begin(&s, 10, 1) == OS32_ERR_AGAIN);
-    reset(); compat_count = 1; io_clock_set_ops(0);
+    reset(); CHECK(idle_work_register(compat) == 0); io_clock_set_ops(0);
     CHECK(io_dispatch(500) == 1 && compat_hits == 1 && !running);
     io_clock_set_ops(&ops); CHECK(io_dispatch(500) == 1 && compat_hits == 2);
+    CHECK(reads == 2 && io_dispatch_total_count() == 17 && stats.max_count == 17);
 }
 static void slice_limits(void)
 {
@@ -218,6 +230,11 @@ static void scheduling(void)
 }
 static void requests_and_failures(void)
 {
+    reset(); add(1); add(2); mode[1] = LINK_WAIT; units[1] = 3;
+    CHECK(io_dispatch(30) == 1 && waits == 1 && taken[1] == 3 && ticks == 30);
+    CHECK(traced == 1 && trace[0] == 1 && io_dispatch_total_count() == 30);
+    mode[1] = 0; results[1] = IO_DONE; units[1] = 1;
+    CHECK(io_dispatch(30) == 2 && trace[1] == 1 && trace[2] == 2 && observed[2] == 20);
     reset(); add(1); add(2); mode[1] = REQUEST | NEST; results[1] = IO_DONE;
     CHECK(io_dispatch(500) == 2 && (pending[0] & 1));
     mode[1] = 0; results[2] = IO_WAIT; CHECK(io_dispatch(500) == 2 && !any_pending());
