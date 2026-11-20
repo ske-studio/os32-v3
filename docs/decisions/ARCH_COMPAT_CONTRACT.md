@@ -199,6 +199,8 @@ POLICY_DEV §10「x86 に揃える」(ユーザー決定 2026-11-20、動作実�
 | 部品の読み込み | FEP・SQLite は module (`fep.mod` ほか) | 静的に結ぶ (PowerPC に module の読み込みが無い、段 7a・db 7b の確定設計) | 違いを残す (今の決定) | module の読み込みを PowerPC に作るかは未決 |
 | root と /host | FAT/ext2 のディスク、HostDrv、生の LAN の SFS | RAM の ISO (読み取り専用)、/tmp・/db・/dbu は ramfs、/host は link の SFS CALL | 違いを残す | 「root は RAM の読み取り専用の像」(POLICY_DEV §10、2026-11-11・12) — PC-98 の FD 起動も最終的にこの方式 |
 | 端末と入力 | TVRAM、PC-98 の鍵盤 | LAN の link (RSH) と FB の文字端末、USB の HID | 違いを残す (物理) | 装置が違う |
+| ATA Data のバイト順 (D8) | LE の 16 bit ポート | BE の窓。IDENTIFY の語はバイト交換し、セクタは媒体の並びを保つ | 残す (物理) | CPU のバイト順が違う。語の値とセクタのバイト列を別の窓口で渡す |
+| BIOS 由来のディスク幾何 (D9) | BIOS の幾何を区画表の位置の決定に使う | BIOS 由来の幾何が無く、`hdd_geom_info` は不在 | 残す (物理) | ファームウェアが違う。PowerMac の ATA はこの幾何による区画探索を行わない |
 | KAPI の不在 | 全部ある | 型ごとの不在 (`sdk/kapi_target_ppc.py`) | 埋めている途中 | PPC KAPI の埋め (PPC_KAPI_FILL_DESIGN) |
 
 ## 確定 (2026-11-14、Opus 5.5 第 2 回は「確定してよい」、P3 の 4 件を PM が反映)

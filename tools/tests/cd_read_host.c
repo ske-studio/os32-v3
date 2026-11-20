@@ -27,6 +27,7 @@
 #include "lib/kstring.h"
 #include "cpu_calibrate.h"
 #include "pc98.h"
+#include "platform_ide_ports.h"
 
 /* ---- 境界の贋物 (kstring / kmalloc / tick) ---- */
 volatile u32 tick_count;

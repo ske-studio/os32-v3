@@ -16,7 +16,7 @@ include build/images/$(IMAGE).mk
 ifneq ($(ARCH)-$(PLATFORM),$(IMAGE_TARGET))
 $(error IMAGE $(IMAGE) is for $(IMAGE_TARGET), not $(ARCH)-$(PLATFORM))
 endif
-IMAGE_FEATURES = LINK EXEC USERSHELL USB CLI PC98_PENDING LOOP
+IMAGE_FEATURES = LINK EXEC USERSHELL USB CLI PC98_PENDING LOOP IDE
 # 像の機能は像のファイルだけが決める。組み方を変える時は IMAGE を選ぶ。
 $(foreach f,$(IMAGE_FEATURES),$(if $(findstring command,$(origin FEATURE_$(f))),$(error FEATURE_$(f) is fixed by IMAGE $(IMAGE); choose another IMAGE)))
 $(foreach f,$(IMAGE_FEATURES),$(if $(filter-out 1,$(words $(filter 0 1,$(FEATURE_$(f))))),$(error invalid FEATURE_$(f))))

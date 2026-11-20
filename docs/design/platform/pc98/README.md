@@ -73,7 +73,7 @@ CPUのPTEビット生成・CR3・TLB操作はkernel所有。
 ### device_ide
 
 ```c
-/* platform/pc98/device_ide.c: 状態なし、KAPIの検査は呼出側に残す */
+/* kernel/dev/device_ide.c: 状態なし、KAPIの検査は呼出側に残す */
 void platform_ide_init(void) { (void)ide_init(); }
 int platform_ide_read_sector(int d, u32 l, void *b)
 { return ide_read_sector(d, l, b); }

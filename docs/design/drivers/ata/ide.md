@@ -7,6 +7,14 @@
 [ide_multiple](ide_multiple.md) が担当する。
 `ide.h` は 1 コマンド最大 256 セクタと失敗契約を定義する。
 
+デバイス層の窓口は `kernel/dev/device_ide.c` に置き、共通の宣言は
+`include/ide_contract.h` に置く。像の機能 `IDE` が窓口・検出・番地計算を選ぶ。
+`include/ide_bus.h` はバンク選択、taskfile、Alt Status、Device Control、Data の契約を定める。
+PC-98 の窓は `platform/pc98/platform_ide_bus.h`、ATAPI と共有する番地は同じ場所の
+`platform_ide_ports.h` に置く。窓の無いバンクは Alt Status が 0xFF となり、検出を飛ばす。
+IDENTIFY は `ide_bus_data_word` の ATA 語の値から容量とモデル名を読む。
+セクタは奇数番地でも媒体のバイト順で読み書きする。
+
 転送は [ide_pio](ide_pio.md)、要求分割と公開入口は
 [ide_request](ide_request.md) に分け、同じ翻訳単位へ include する。
 IDENTIFY の待機・語読取りは従来の独立した経路を保つ。

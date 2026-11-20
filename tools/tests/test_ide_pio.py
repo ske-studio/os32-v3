@@ -7,23 +7,24 @@ import tempfile
 from kernel_includes import include_flags
 
 CHECK = dict(name='ide-pio-host', tier=1, budget=4.3,
-             covers=['drivers/ata/ide.c', 'drivers/ata/ide.h',
+             covers=['include/ide_bus.h', 'platform/pc98/platform_ide_bus.h', 'platform/pc98/platform_ide_ports.h',
+                     'drivers/ata/ide.c', 'drivers/ata/ide.h',
                      'drivers/ata/ide_addr.c', 'drivers/ata/ide_addr.h',
                      'drivers/ata/ide_multiple.inc', 'drivers/ata/ide_pio.inc', 'drivers/ata/ide_request.inc',
                      'tools/tests/ide_pio_host.c', 'tools/tests/ide_pio_host_multiple.inc', 'tools/tests/ide_hostshim/io.h',
-                     'tools/tests/test_ide_pio.py', 'tools/tests/kernel_includes.py'], needs=[],
-    kind='characterization',
+                     'tools/tests/ide_be_hostshim/platform_ide_bus.h', 'tools/tests/test_ide_pio.py', 'tools/tests/kernel_includes.py'], needs=[],
+    basis=['docs/design/drivers/ata/ide.md'],
 )
 ROOT = Path(__file__).resolve().parents[2]
 FLAGS = ['-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
          '-Wno-sign-compare', '-D__cdecl=']
 MUTANTS = [
-    ('multiple-opcode', 'ide_pio.inc', 'outp(IDE_COMMAND, multiple > 1',
-     'outp(IDE_COMMAND, multiple > IDE_COMMAND_MAX_SECTORS', 'multiple'),
+    ('multiple-opcode', 'ide_pio.inc', 'ide_bus_out(IDE_REG_STATUS, multiple > 1',
+     'ide_bus_out(IDE_REG_STATUS, multiple > IDE_COMMAND_MAX_SECTORS', 'multiple'),
     ('multiple-phase', 'ide_pio.inc', 'u32 n = sectors - done < multiple ? sectors - done : multiple;',
      'u32 n = 1;', 'multiple'),
-    ('multiple-drain', 'ide_pio.inc', 'for (w = 0; w < phase_words; w++) (void)inpw(IDE_DATA);',
-     'for (w = 0; w < IDE_PIO_WORDS; w++) (void)inpw(IDE_DATA);', 'multiple-errors'),
+    ('multiple-drain', 'ide_pio.inc', 'for (w = 0; w < phase_words; w++) (void)ide_bus_data_word();',
+     'for (w = 0; w < IDE_PIO_WORDS; w++) (void)ide_bus_data_word();', 'multiple-errors'),
     ('multiple-valid', 'ide_multiple.inc', '!(current & IDE_ID_MULTI_VALID)',
      '0', 'multiple-identify'),
     ('multiple-current', 'ide_multiple.inc', '(current & IDE_ID_MULTI_COUNT_MASK) != drive_multiple[drive].active',
@@ -47,9 +48,9 @@ MUTANTS = [
     ('sasi', 'ide_request.inc', 'n = 1;', 'n = n;', 'boundaries'),
     ('phase-bsy', 'ide_pio.inc', 'if (st & IDE_ST_BSY) continue;\n        *status',
      '/* mutation: inspect busy status */\n        *status', 'errors'),
-    ('settle', 'ide_pio.inc', 'for (i = 0; i < IDE_SEL_SETTLE; i++) inp(IDE_ALT_STATUS);',
-     'for (i = 0; i < 0; i++) inp(IDE_ALT_STATUS);', 'errors'),
-    ('read-drain', 'ide_pio.inc', 'for (w = 0; w < phase_words; w++) (void)inpw(IDE_DATA);',
+    ('settle', 'ide_pio.inc', 'for (i = 0; i < IDE_SEL_SETTLE; i++) ide_bus_alt();',
+     'for (i = 0; i < 0; i++) ide_bus_alt();', 'errors'),
+    ('read-drain', 'ide_pio.inc', 'for (w = 0; w < phase_words; w++) (void)ide_bus_data_word();',
      'for (w = 0; w < phase_words; w++) (void)0;', 'errors'),
     ('finish-fault', 'ide_pio.inc',
      'if (st & (IDE_ST_ERR | IDE_ST_DF)) return IDE_ERR_IO;\n        if (!(st & IDE_ST_DRQ))',
@@ -57,8 +58,8 @@ MUTANTS = [
 ]
 
 
-def build(directory, exe):
-    subprocess.run(['gcc', *FLAGS, '-I' + str(ROOT / 'tools/tests/ide_hostshim'),
+def build(directory, exe, be=False):
+    subprocess.run(['gcc', *FLAGS, *(['-DTEST_BE_BUS'] if be else []), '-I' + str(ROOT / 'tools/tests/ide_hostshim'),
                     '-I' + str(directory), *include_flags(ROOT),
                     str(ROOT / 'tools/tests/ide_pio_host.c'), str(directory / 'ide.c'),
                     str(directory / 'ide_addr.c'), '-o', str(exe)], check=True)
@@ -69,19 +70,40 @@ def main(args):
         exe = Path(tmp) / 'ide-pio'
         build(ROOT / 'drivers/ata', exe)
         subprocess.run([str(exe), *[a for a in args if a != '--mutate']], check=True)
+        be_tree = Path(tmp) / 'be'
+        shutil.copytree(ROOT / 'drivers/ata', be_tree)
+        shutil.copy2(ROOT / 'include/ide_bus.h', be_tree)
+        shutil.copy2(ROOT / 'tools/tests/ide_be_hostshim/platform_ide_bus.h', be_tree)
+        build(be_tree, exe, be=True)
+        subprocess.run([str(exe), 'be'], check=True)
         if '--mutate' in args:
             mirror = Path(tmp) / 'ata'
             shutil.copytree(ROOT / 'drivers/ata', mirror)
+            for header in ('include/ide_bus.h', 'platform/pc98/platform_ide_bus.h',
+                           'platform/pc98/platform_ide_ports.h'):
+                shutil.copy2(ROOT / header, mirror)
             # An unchanged copy must pass before runtime failures count as kills.
             build(mirror, exe)
             subprocess.run([str(exe)], check=True, stdout=subprocess.DEVNULL)
-            for name, file, old, new, case in MUTANTS:
-                path = mirror / file
+            be_mutants = [
+                ('identify-order', 'platform_ide_bus.h', 'return __builtin_bswap16(raw_be_data());', 'return raw_be_data();', 'be'),
+                ('sector-read-order', 'platform_ide_bus.h', 'u16 raw = raw_be_data();', 'u16 raw = ide_bus_data_word();', 'be'),
+                ('sector-write-order', 'platform_ide_bus.h', 'outpw(IDE_DATA, __builtin_bswap16(raw))', 'outpw(IDE_DATA, raw)', 'be'),
+                ('sector-as-words', 'ide_pio.inc', 'ide_bus_data_read(dst, phase_words);',
+                 'for (w = 0; w < phase_words; w++) { u16 v = ide_bus_data_word(); '
+                 '__builtin_memcpy(dst + 2 * w, &v, 2); }', 'be'),
+                ('absent-ctl-write', 'platform_ide_bus.h', 'absent_ctl++;\n        return;',
+                 'absent_ctl++;', 'be'),
+                ('absent-probe', 'ide.c', 'probe == IDE_BUS_OPEN8', 'probe == 0', 'be'),
+            ]
+            for name, file, old, new, case in MUTANTS + be_mutants:
+                tree = be_tree if case == 'be' else mirror
+                path = tree / file
                 original = path.read_text()
                 if original.count(old) != 1:
                     raise RuntimeError(f'{name}: mutation anchor is not unique')
                 path.write_text(original.replace(old, new))
-                build(mirror, exe)
+                build(tree, exe, be=case == 'be')
                 result = subprocess.run([str(exe), case], capture_output=True, text=True)
                 path.write_text(original)
                 if result.returncode != 1 or 'FAIL ' not in result.stderr:
