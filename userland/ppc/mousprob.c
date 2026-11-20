@@ -26,13 +26,13 @@ static int check(KernelAPI *api, const char *command)
         api->mouse_cursor_set_mode(MOUSE_CURSOR_TEXT);
         /* Hold each frame until the host has sampled it, before RSH output. */
         /* A doubled or repeated key from the previous step is skipped. */
-        if (api->kbd_getkey() != 's') return 6;
+        if ((api->kbd_getkey() & 0xff) != 's') return 6;
         api->mouse_cursor_show();
-        while ((key = api->kbd_getkey()) == 's') {}
-        if (key != 'h') return 6;
+        while (((key = api->kbd_getkey()) & 0xff) == 's') {}
+        if ((key & 0xff) != 'h') return 6;
         api->mouse_cursor_hide();
-        while ((key = api->kbd_getkey()) == 'h') {}
-        return key == 'a' ? 0 : 6;
+        while (((key = api->kbd_getkey()) & 0xff) == 'h') {}
+        return (key & 0xff) == 'a' ? 0 : 6;
     }
     return 7;
 }

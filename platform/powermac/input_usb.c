@@ -1,10 +1,13 @@
 /* Producer: USB service (EE=0). Consumer: the cooperative foreground. */
 #include "input_usb.h"
 #include "io.h"
+#include "kbd.h"
 
 static u8 down[PM_INPUT_SOURCES][128];
 static u8 caps;
 static u16 keys[PM_INPUT_KEYS];
+static u8 mods[PM_INPUT_KEYS];
+static u8 last_local, last_shift;
 static unsigned head, tail, count;
 static u32 dropped;
 
@@ -20,9 +23,11 @@ static u8 modifiers(void)
 }
 static void enqueue(u8 sc)
 {
-    int key = pm_input_keymap(sc, modifiers());
+    u8 state = modifiers();
+    int key = pm_input_keymap(sc, state);
     if (key < 0) return;
     if (count == PM_INPUT_KEYS) { dropped++; return; }
+    mods[head] = state;
     keys[head] = (u16)key;
     head = (head + 1) % PM_INPUT_KEYS;
     count++;
@@ -48,12 +53,27 @@ void pm_input_usb_release(u8 src)
     if (src < 1 || src > PM_INPUT_SOURCES) return;
     for (unsigned sc = 0; sc < 128; sc++) down[src - 1][sc] = 0;
 }
+static u8 fep_shift(u8 state)
+{
+    return ((state & PM_INPUT_SHIFT) ? SHIFT_SHIFT : 0)
+         | ((state & PM_INPUT_CAPS) ? SHIFT_CAPS : 0)
+         | ((state & PM_INPUT_CTRL) ? SHIFT_CTRL : 0)
+         | ((state & PM_INPUT_GRPH) ? SHIFT_GRPH : 0);
+}
+int platform_fep_key_local(void) { return last_local; }
+u8 platform_fep_key_shift(void) { return last_shift; }
+void pm_input_usb_note_remote(void)
+{
+    last_local = last_shift = 0;
+}
 int pm_input_usb_take(void)
 {
     u32 flags = irq_save();
     int key = -1;
     if (count) {
         key = keys[tail];
+        last_local = 1;
+        last_shift = fep_shift(mods[tail]);
         tail = (tail + 1) % PM_INPUT_KEYS;
         count--;
     }

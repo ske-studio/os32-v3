@@ -53,7 +53,7 @@ jobs:
       - name: Compiler ccache setup
         timeout-minutes: 1
         id: compiler-cache-key
-        run: |
+        run: &compiler_setup |
           echo "CCACHE_DIR=$RUNNER_TEMP/compiler-ccache" >> "$GITHUB_ENV"
           echo "CCACHE_MAXSIZE=1G" >> "$GITHUB_ENV"
           host="$(gcc -dumpfullversion -dumpversion)"
@@ -68,7 +68,7 @@ jobs:
         with:
           path: ${{ runner.temp }}/compiler-ccache
           key: c-v2-${{ runner.os }}-${{ steps.compiler-cache-key.outputs.compilers }}-${{ github.sha }}-artifacts
-          restore-keys: |
+          restore-keys: &compiler_restore |
             c-v2-${{ runner.os }}-${{ steps.compiler-cache-key.outputs.compilers }}-${{ github.sha }}-
             c-v2-${{ runner.os }}-${{ steps.compiler-cache-key.outputs.compilers }}-
 
@@ -178,6 +178,8 @@ jobs:
         run: ccache -s
 
   checks:
+    outputs:
+      warm: ${{ steps.dialect-owner.outputs.warm }}
     strategy:
       fail-fast: false
       matrix:
@@ -201,6 +203,17 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           CI_WORKFLOW: build.yml
         run: python3 -B tools/ci/reuse_success.py
+
+      - name: Locate c-dialect shard
+        id: dialect-owner
+        run: |
+          checks="$(python3 -B tools/checks/run.py --list --exclude-env qemu-ppc --shard ${{ matrix.shard }}/6)"
+          if grep -Fxq check-c-dialect <<< "$checks"; then
+            echo "owner=true" >> "$GITHUB_OUTPUT"
+            if [[ "${{ steps.prior.outputs.reuse }}" == true ]]; then
+              echo "warm=true" >> "$GITHUB_OUTPUT"
+            fi
+          fi
 
       - uses: ./.github/actions/build-setup
         timeout-minutes: 90
@@ -230,6 +243,16 @@ jobs:
             c-v2-${{ runner.os }}-${{ steps.compiler-cache-key.outputs.compilers }}-${{ github.sha }}-
             c-v2-${{ runner.os }}-${{ steps.compiler-cache-key.outputs.compilers }}-
 
+      - name: Restore c-dialect results
+        id: dialect-cache
+        if: steps.dialect-owner.outputs.owner == 'true' && steps.prior.outputs.reuse != 'true'
+        uses: actions/cache/restore@v4
+        continue-on-error: true
+        with: &dialect_restore
+          path: &dialect_path .ci-cache/check-cache/v1/c-dialect
+          key: &dialect_key check-cache/v1/c-dialect-${{ runner.os }}-${{ runner.arch }}-${{ steps.compiler-cache-key.outputs.compilers }}-${{ github.sha }}
+          restore-keys: check-cache/v1/c-dialect-${{ runner.os }}-${{ runner.arch }}-${{ steps.compiler-cache-key.outputs.compilers }}-
+
       - name: Runner load before make check
         if: steps.prior.outputs.reuse != 'true'
         continue-on-error: true
@@ -250,10 +273,10 @@ jobs:
       - name: make check
         timeout-minutes: 60
         if: steps.prior.outputs.reuse != 'true'
-        env:
+        env: &check_env
           OS32_ACCEPT_IPA_LICENSE: "1"
           OS32_CLANG_CROSS_FREE: "0"
-          OS32_CHECK_CACHE: ${{ runner.temp }}/check-cache
+          OS32_CHECK_CACHE: ${{ github.workspace }}/.ci-cache/check-cache
         run: |
           export PATH="$CROSS_DIR/bin:$PATH"
           test -x "$CROSS_DIR/bin/i386-elf-gcc"
@@ -264,6 +287,14 @@ jobs:
         if: always() && steps.prior.outputs.reuse != 'true'
         continue-on-error: true
         run: *runner_load
+
+      - name: Save c-dialect results
+        if: steps.dialect-owner.outputs.owner == 'true' && steps.prior.outputs.reuse != 'true' && github.ref == 'refs/heads/main' && github.event_name == 'push' && steps.dialect-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        continue-on-error: true
+        with: &dialect_save
+          path: *dialect_path
+          key: *dialect_key
 
       # 検査ごとの実時間 (tools/check_time.py: 検査名・経過秒数・終了コード) を残し、
       # budget の棚卸の材料にする (2026-11-08、budget 超えは警告だけで結果は落とさない)。
@@ -288,3 +319,40 @@ jobs:
       - name: Compiler ccache statistics
         if: always() && steps.prior.outputs.reuse != 'true'
         run: ccache -s
+
+  warm-c-dialect:
+    needs: checks
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && needs.checks.outputs.warm == 'true'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/build-setup
+        timeout-minutes: 90
+      - name: Compiler ccache setup
+        id: compiler-cache-key
+        run: *compiler_setup
+      - name: Restore C compilations
+        uses: actions/cache/restore@v4
+        timeout-minutes: 5
+        env:
+          SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
+        with:
+          path: ${{ runner.temp }}/compiler-ccache
+          key: c-v2-${{ runner.os }}-${{ steps.compiler-cache-key.outputs.compilers }}-${{ github.sha }}-warm
+          restore-keys: *compiler_restore
+      - uses: actions/cache/restore@v4
+        id: dialect-cache
+        continue-on-error: true
+        with: *dialect_restore
+      - name: Warm c-dialect results
+        env: *check_env
+        run: |
+          export PATH="$CROSS_DIR/bin:$PATH"
+          make check-c-dialect CROSS_DIR="$CROSS_DIR" NP21W_DIR="$RUNNER_TEMP/np21w"
+      - uses: actions/cache/save@v4
+        if: steps.dialect-cache.outputs.cache-hit != 'true'
+        with: *dialect_save

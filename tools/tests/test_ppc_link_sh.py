@@ -48,6 +48,7 @@ void input_register(const InputOps *p) { registered_ops=p; }
 int input_legacy_wait(int mode, int interruptible) { (void)mode; (void)interruptible; return -1; }
 int input_legacy_try(int mode) { (void)mode; return -1; }
 int input_legacy_peek(int mode) { (void)mode; return -1; }
+u8 platform_fep_key_shift(void) { return 0; }
 int pm_input_usb_take(void) { return 42; }
 int pm_input_usb_peek(void) { return 43; }
 u32 pm_input_usb_dropped(void) { return 0; }
@@ -111,7 +112,7 @@ void _start(void) {
 
 def execute(tmp, source, harness):
     (tmp/'test.c').write_text(PREFIX+source+harness)
-    subprocess.run(['gcc','-m32','-std=gnu11','-D__cdecl=','-DKBOOT_SH=1','-DKBOOT_LINK=1',
+    subprocess.run(['gcc','-m32', '-nostdinc', '-std=gnu11','-D__cdecl=','-DKBOOT_SH=1','-DKBOOT_LINK=1',
         '-ffreestanding','-fno-builtin','-fno-pie','-no-pie','-nostdlib','-static',
         '-ffunction-sections','-fdata-sections','-Wl,--gc-sections',
         '-I.','-Iinclude','-Ikernel','-Ikernel/console','-Iplatform/powermac','-Iarch/ppc',

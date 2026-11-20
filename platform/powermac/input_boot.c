@@ -8,9 +8,8 @@
 #include "con_sink.h"
 #include "exec/exec.h"
 #include "kernel/idle_work.h"
-#include "arch_io.h"
-
 #if !KBOOT_LINK
+#include "io.h"
 static PmInputDecoder decoder = { .pending = -1 };
 static int lan_lookahead = -1;
 
@@ -44,8 +43,14 @@ static int peek(void)
 static int try_key(void)
 {
     int key = lan_peek();
-    lan_lookahead = -1;
-    return key >= 0 ? key : pm_input_usb_take();
+    if (key >= 0) {
+        u32 flags = irq_save();
+        lan_lookahead = -1;
+        pm_input_usb_note_remote();
+        irq_restore(flags);
+        return key;
+    }
+    return pm_input_usb_take();
 }
 #endif
 static u32 wait_ticks(void) { u32 lo = 0, hi; platform_clock_read_us(&lo, &hi); return lo; }
@@ -84,7 +89,6 @@ static int has_key(void) { return peek_key() >= 0; }
 static int pressed(int scancode) { (void)scancode; return 0; }
 static int raw(void) { return -1; }
 static u32 zero32(void) { return 0; }
-static u8 zero8(void) { return 0; }
 static void gui(int on) { (void)on; }
 static void discard(void) { }
 static int diag(KbdDiag *out) { (void)out; return OS32_ERR_NOSYS; }
@@ -95,7 +99,7 @@ static const InputOps ops = {
     .trygetkey = try_key_bridge, .peekkey = peek_key, .trygetchar_local = try_local_char,
     .getchar_kapi = character_kapi, .getkey_kapi = key_kapi, .getkey_wait = wait_key,
     .has_key = has_key, .is_pressed = pressed, .trygetrawkey = raw,
-    .modifiers = zero32, .dropped_count = pm_input_usb_dropped, .shift_state = zero8,
+    .modifiers = zero32, .dropped_count = pm_input_usb_dropped, .shift_state = platform_fep_key_shift,
     .gui_mode = gui, .discard_stop = discard, .diag = diag, .diag_log = diag_log,
 };
 void pm_input_boot(void)
