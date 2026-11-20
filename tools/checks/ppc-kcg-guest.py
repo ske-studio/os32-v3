@@ -1,6 +1,6 @@
 CHECK = dict(name='ppc-kcg-guest', tier=2, needs=[], budget=1200,
     env=['ppc-cross', 'qemu-ppc', 'socket'], full_only=True,
-    covers=['tools/checks/ppc-kcg-guest.py', 'tools/accept/ppc_kcg.py', 'tools/accept/ppc_shm.py',
+    covers=['tools/checks/ppc-kcg-guest.py', 'lib/lz4_decode_core.inc', 'tools/accept/ppc_kcg.py', 'tools/accept/ppc_shm.py',
             'tools/ppc/**', 'tools/*.py', 'userland/ppc/**', 'userland/shell/**',
             'Makefile', 'build/**', 'sdk/**', 'mm/**', 'exec/**', 'arch/ppc/**',
             'platform/powermac/**', 'include/**', 'init/**', 'kernel/**',

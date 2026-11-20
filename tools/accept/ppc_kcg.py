@@ -101,9 +101,15 @@ def main():
                                 mutant_settings(folder, case, 'platform/powermac/kcg.c',
                                                 'return kcg_file_ready();', 'return 1;'))
         elif case == 'offset':
+            # The loop body lives in lib/lz4_decode_core.inc and the mutant
+            # mechanism replaces .c files only: inline the mutated body.
+            core = (ROOT / 'lib/lz4_decode_core.inc').read_text()
+            good = 'offset = (int)ip[0] | ((int)ip[1] << 8);'
+            if core.count(good) != 1:
+                raise RuntimeError('offset: mutation anchor must be unique in lib/lz4_decode_core.inc')
             mutation = mutant_settings(folder, case, 'lib/lz4.c',
-                                       'offset = (int)ip[0] | ((int)ip[1] << 8);',
-                                       'offset = (int)ip[1] | ((int)ip[0] << 8);')
+                                       '#include "lz4_decode_core.inc"',
+                                       core.replace(good, 'offset = (int)ip[1] | ((int)ip[0] << 8);'))
         elif case == 'absent':
             from test_kapi_binding import generate
             kernel.mkdir()
