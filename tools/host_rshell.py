@@ -1,4 +1,5 @@
 """Generation-local LAN operator state (LAN_OPERATOR_DESIGN sections 2-3)."""
+import logging
 import re
 import struct
 import time
@@ -48,15 +49,22 @@ class Operator:
         self.notices = []
         self.notice_drop = 0
         self.results = {}
+        self.last_out = None
+        self.dup_out = 0
 
     def session_start(self, session):
         self.session = session
         self.ready = None
 
-    def session_reset(self):
+    def session_reset(self, keep_pending=False):
         self.session = None
         self.ready = None
         if self.pending is not None and self.pending['state'] not in ('done', 'truncated'):
+            pending = self.pending
+            if (keep_pending and pending['state'] == 'running' and pending['mode'] == 'cui'
+                    and pending['line'] != 'exit' and not pending.get('accepted')
+                    and pending['execute'].may_have_arrived()):
+                return
             self.pending['state'] = 'UNKNOWN'
 
     def accept_ready(self, generation, session, boot, mode, last_id, state):
@@ -127,7 +135,8 @@ class Operator:
                             line=line, client=client, generation=self.generation,
                             state='running', result=None, deadline=deadline)
         try:
-            self.notify.notify_number({'cui': RSHELL, 'gui': GSERIAL, 'diag': PPC_DIAG}[mode], EXECUTE, data)
+            service = {'cui': RSHELL, 'gui': GSERIAL, 'diag': PPC_DIAG}[mode]
+            self.pending['execute'] = self.notify.notify_number(service, EXECUTE, data)
         except Exception:
             self.unknown()
             raise
@@ -157,15 +166,7 @@ class Operator:
             self.pending = None
 
     def accept_output(self, generation, session, boot, ident, dropped, body, length, mode):
-        pending = self.pending
-        late = (pending is not None and pending['state'] == 'UNKNOWN' and
-                pending['generation'] == generation and pending['boot'] == boot.lower() and
-                pending['id'] == ident and pending['mode'] == mode)
-        if (generation != self.generation or session != self.session or session is None or
-                (self.ready is None and not late) or
-                (self.ready is not None and boot.lower() != self.ready['boot'])):
-            return False
-        if dropped < 0 or length != len(body) or length > RESULT_MAX:
+        if not self._valid_output(generation, session, boot, ident, dropped, body, length, mode):
             return False
         if mode == 'gui' and ident == '!':
             if (not body.startswith(b'gs:! ') or not body.endswith(b'\n') or
@@ -217,3 +218,35 @@ class Operator:
         self.pending = None
         self.results[result['id']] = result
         return result
+
+    def _valid_output(self, generation, session, boot, ident, dropped, body, length, mode):
+        pending = self.pending
+        late = (pending is not None and pending['state'] == 'UNKNOWN' and
+                pending['generation'] == generation and pending['boot'] == boot.lower() and
+                pending['id'] == ident and pending['mode'] == mode)
+        if (generation != self.generation or session != self.session or session is None or
+                (self.ready is None and not late) or
+                (self.ready is not None and boot.lower() != self.ready['boot'])):
+            return False
+        if dropped < 0 or length != len(body) or length > RESULT_MAX:
+            return False
+        return True
+
+    def accept_rsh_out(self, generation, session, boot, ident, dropped, body, length):
+        args = generation, session, boot, ident, dropped, body, length, 'cui'
+        key = generation, boot.lower(), ident
+        if self.last_out and self.last_out[0] == key:
+            if not self._valid_output(*args):
+                return False
+            if self.last_out[1:] != (dropped, body):
+                logging.warning('conflicting RSH OUT for %s', ident)
+                return False
+            self.dup_out += 1
+        else:
+            if not self.accept_output(*args):
+                return False
+            self.last_out = key, dropped, bytes(body)
+        if (self.ready and self.ready['boot'] == boot.lower()
+                and self.ready['mode'] == 'cui' and self.ready['last_id'] == ident):
+            self.ready['state'] = 'done'
+        return True

@@ -52,9 +52,6 @@ def test(path):
     bad = dict(req=b'', got=b'abc')
     agent._service_log(4, bad, ['LOG', boot, '1', '0', '0', '0', '2'], sink)
     assert bad['resp'][0] == 400, 'length guard removed'
-    agent.operator.pending = dict(state='running')
-    agent._switch_to(dict(sess=2, epoch=1, mac=b'\x02\0\0\0\0\2'))
-    assert agent.operator.pending['state'] == 'UNKNOWN', 'reset removed'
     # Configured peer selects the guest for HELLO, before allocating a session.
     peer = b'\x02\0\0\0\0\2'
     agent = mod.HostAgent(b'\x02\0\0\0\0\1', quiet=True, peer=peer)
@@ -67,6 +64,70 @@ def test(path):
     agent._on_hello(b'\x02\0\0\0\0\3', mod.HS_CONFIRM, 1, 10,
                     candidate['agent_nonce'], candidate['sess'], b'', sink)
     assert not agent.established and agent.cand == candidate, 'wrong peer CONFIRM accepted'
+    def confirm(epoch, session):
+        agent._on_hello(peer, mod.HS_SYN, epoch, 10, 0, session, b'', sink)
+        cand = agent.cand
+        agent._on_hello(peer, mod.HS_CONFIRM, epoch, 10, cand['agent_nonce'],
+                        cand['sess'], b'', sink)
+        assert agent.established and agent.epoch == epoch
+
+    from host_notify import QUEUE_MAX
+    confirm(1, 0)
+    sess = agent.sess
+    assert request(1, f'RSH READY {boot} cui 1 none idle')['resp'][0] == 200
+    ident = agent.operator.submit('cui', 'ver', None)
+    notify = agent.notifier
+    notify.ack(sess, 1, 0, 4)
+    frames = notify.tick(agent.now())
+    assert frames[-1][-1].endswith(ident.encode() + b' ver\n')
+    notify.ack(sess, 1, frames[-1][2], 4)
+    confirm(1, 0)
+    assert agent.sess != sess
+    assert agent.operator.pending['state'] == 'UNKNOWN', 'reset removed'
+    sess = agent.sess
+    assert request(1, f'RSH READY {boot} cui 1 {ident} done')['resp'][0] == 200
+    agent.operator.resume()
+    for delivery in ('acked', 'sent', 'evicted', 'silent', 'unsent'):
+        epoch = agent.epoch + 1
+        notify = agent.notifier
+        if delivery == 'silent':
+            notify.silent = True
+        ident = agent.operator.submit('cui', 'ver', None)
+        rid = epoch * 10
+        if delivery == 'evicted':
+            for _ in range(QUEUE_MAX):
+                notify._alive()
+        if delivery in ('acked', 'sent'):
+            notify.ack(sess, epoch - 1, 0, 4)
+            frames = notify.tick(agent.now())
+            assert frames[-1][-1].endswith(ident.encode() + b' ver\n')
+            if delivery == 'acked':
+                notify.ack(sess, epoch - 1, frames[-1][2], 4)
+            notify._alive()
+        confirm(epoch, sess)
+        if delivery in ('evicted', 'silent', 'unsent'):
+            assert agent.operator.pending['state'] == 'UNKNOWN', 'unsent execute retained'
+            assert request(rid, f'RSH READY {boot} cui 1 {ident} done')['resp'][0] == 200
+            agent.operator.resume()
+            continue
+        assert agent.operator.pending['state'] == 'running', 'delivered execute lost'
+        def running_ready(rid):
+            return request(rid, f'RSH READY {boot} cui 1 {ident} running')
+        assert running_ready(rid)['resp'][0] == 200
+        line = f'RSH OUT {boot} {ident} 0 {len(body)}'
+        if delivery == 'acked':
+            assert request(rid + 1, line, body)['resp'][0] == 200
+            # Lose this 200, confirm another epoch and replay with a fresh rid.
+            confirm(epoch + 1, sess)
+            assert running_ready(rid + 2)['resp'][0] == 200
+            assert request(rid + 3, line, body)['resp'][0] == 200
+            assert agent.operator.take_result()['result'] == body
+            assert agent.operator.take_result() is None and agent.operator.dup_out == 1
+        else:
+            agent.operator.expire(agent.operator.pending['deadline'])
+            assert agent.operator.pending['state'] == 'UNKNOWN'
+            assert request(rid + 1, line, body)['resp'][0] == 200
+            assert agent.operator.take_result()['result'] == body
     print('PASS remote-x6')
 
 
@@ -80,8 +141,10 @@ def main():
         source = Path(args.module).read_text()
         mutations = [('if self.configured_peer is not None and src != self.configured_peer:',
                       'if False:', 'wrong peer HELLO accepted'),
+                     ('keep_pending=not new_sess', 'keep_pending=True', 'reset removed'),
+                     ('keep_pending=not new_sess', 'keep_pending=False', 'delivered execute lost'),
                      ('int(parts[6]) != len(ent["got"])', 'False', 'length guard removed'),
-                     ('        self.operator.session_reset()\n        self.sess,',
+                     ('        self.operator.session_reset(keep_pending=not new_sess)\n        self.sess,',
                       '        self.sess,', 'reset removed')]
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'host_agent.py'
