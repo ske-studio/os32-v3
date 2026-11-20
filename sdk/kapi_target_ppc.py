@@ -61,9 +61,6 @@ PROVIDER_GROUPS = {
         'np2_get_cpu',
         'np2_get_clock',
         'np2_check_hostdrv',
-        'loop_attach',
-        'loop_detach',
-        'loop_status',
     }), frozenset()),
     'ide': (frozenset({
         'ide_init',

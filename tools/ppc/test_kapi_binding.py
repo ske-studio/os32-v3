@@ -31,7 +31,7 @@ ide_write_sectors ime_dict_info ime_dict_suspend ime_feed_key ime_get_mode
 ime_getchar ime_getkey ime_is_active ime_set_mode ime_set_render
 ime_switch_dict ime_toggle ime_trygetchar ime_trygetkey ime_user_clear
 ime_user_delete ime_user_export ime_user_list kdebug_call
-loop_attach loop_detach loop_status np2_check_hostdrv np2_detect
+np2_check_hostdrv np2_detect
 np2_get_clock np2_get_cpu np2_get_version
 pcm_close pcm_open pcm_set_volume pcm_status pcm_write
 sfs_begin
@@ -65,6 +65,8 @@ gfx_present gfx_present_rect gfx_add_dirty_rect gfx_present_dirty gfx_present_no
 # Fixed allowlist: exec/*.c (including exec_*.inc), KBOOT_SHELL=1 TUs,
 # input_service, kbd_inject, con_sink, pipe_buffer, kapi_strings, kstring.
 KCG_PROVIDERS = frozenset("platform_kcg_init platform_kcg_set_scale platform_kcg_load_font kcg_read_ank kcg_read_kanji".split())
+
+LOOP_PROVIDERS = frozenset({"platform_loop_dev_attach", "platform_loop_dev_detach", "platform_loop_dev_status"})
 
 ALLOWED_UNDEFINED = frozenset("""
 platform_pci_count platform_pci_get platform_pci_cfg_read32 kapi_pci_bind_info
@@ -312,6 +314,8 @@ def generate(tmp, mutation=None):
         insert_group(helper, mutation, group)
     if mutation == "ver-absent":
         insert_group(helper, mutation, "    'ver': (frozenset({'sys_ver_info'}), frozenset()),\n")
+    if mutation == 'loop-absent':
+        insert_group(helper, mutation, "    'loop': (frozenset({'loop_attach', 'loop_detach', 'loop_status'}), frozenset()),\n")
     if mutation == 'rtc-absent':
         if "'rtc_read'" in helper.read_text():
             raise RuntimeError('rtc-absent: expected rtc_read published')
@@ -446,10 +450,10 @@ def main():
         missing = GFX2_QUERY_PROVIDERS - undefined
         if missing:
             print('missing gfx2 query providers:', sorted(missing)); return 1
-        missing = (DISPLAY_PROVIDERS | KCG_PROVIDERS | DB_PROVIDERS) - undefined
+        missing = (DISPLAY_PROVIDERS | KCG_PROVIDERS | DB_PROVIDERS | LOOP_PROVIDERS) - undefined
         if missing:
             print('missing display or KCG providers:', sorted(missing)); return 1
-        unexpected = undefined - (ALLOWED_UNDEFINED | GFX2_QUERY_PROVIDERS | DISPLAY_PROVIDERS | KCG_PROVIDERS | DB_PROVIDERS)
+        unexpected = undefined - (ALLOWED_UNDEFINED | LOOP_PROVIDERS | GFX2_QUERY_PROVIDERS | DISPLAY_PROVIDERS | KCG_PROVIDERS | DB_PROVIDERS)
         if unexpected:
             print('unexpected providers:', sorted(unexpected)); return 1
         print('undefined providers:', len(undefined))

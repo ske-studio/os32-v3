@@ -10,4 +10,5 @@ C_PLATFORM_EXEC = platform/powermac/ver_backend.c platform/powermac/pci_backend.
 C_PLATFORM_NOEXEC = platform/powermac/pci_unavailable.c platform/powermac/kboot_console.c
 C_PLATFORM_USERSHELL = platform/powermac/shell_boot.c platform/powermac/input_boot.c platform/powermac/input_decode.c platform/powermac/hostfs_boot.c input/keymaps/hid_jp.c $(if $(filter 1,$(FEATURE_LINK)),platform/powermac/hostfs_link_io.c platform/powermac/hostfs_link_peer.c,platform/powermac/hostfs_io.c platform/powermac/hostfs_peer.c)
 C_PLATFORM_USB = platform/powermac/input_usb.c platform/powermac/input_keymap.c platform/powermac/usb_tree.c platform/powermac/usb_platform.c platform/powermac/usb_boot.c
+C_PLATFORM_LOOP = platform/powermac/loop_boot.c
 C_PLATFORM_CLI = platform/powermac/cli_boot.c

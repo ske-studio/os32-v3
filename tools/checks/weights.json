@@ -381,6 +381,7 @@
     "ppc-port-guest": 137,
     "ppc-reset": 189,
     "ppc-rh-fb": 17.152269,
+    "ppc-loop-guest": 103,
     "ppc-rtc-guest": 103,
     "ppc-sc": 102,
     "ppc-sd": 105,
