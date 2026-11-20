@@ -107,37 +107,14 @@ int ide_get_geom(int drive, IdeGeom *out);
 /* Internal reset notification: invalidate the bank's two HDD settings before SRST. */
 void ide_multiple_reset_bank(int bank);
 
-/* IDE初期化 (ドライブ検出) */
-int ide_init(void);
-
-/* ドライブ情報取得 */
-int ide_identify(int drive, IdeInfo *info);
-
 /* CHS ネイティブ 1セクタ読み書き */
 int ide_read_sector_chs(int drive, u16 cyl, u8 head, u8 sect, void *buf);
 int ide_write_sector_chs(int drive, u16 cyl, u8 head, u8 sect,
                          const void *buf);
 
-/* LBA の読み書き (KAPI slot ide_read_sector / ide_write_sector(s) と
- * drivers/base/dev.c の hd0-3)。範囲外は 1 セクタも読み書きせずに IDE_ERR_RANGE。
- * 最初の失敗で停止し、負の既存エラーを返す。再試行・部分成功数は返さない。
- * 失敗時の読取り先は未定義、書込みは一部変更済みになり得る。 */
-int ide_read_sector(int drive, u32 lba, void *buf);
-int ide_write_sector(int drive, u32 lba, const void *buf);
 int ide_read_sectors(int drive, u32 lba, u32 count, void *buf);
-int ide_write_sectors(int drive, u32 lba, u32 count, const void *buf);
 
 /* そのドライブのセクタ指定の方式 (IDE_AMODE_*、drivers/ata/ide_addr.h)。 */
 int ide_addr_mode_of(int drive);
-/* [lba, lba+count) がそのドライブの指定の方式で指せる範囲か (LBA28 の上限・総数・
- * CHS のシリンダ 16 ビット・桁あふれ)。1 = 収まる / 0 = 収まらないかドライブが無い。
- * 書き込みの**前に**範囲全体を照合するため (ext2_format_at、Codex C4)。 */
-int ide_range_ok(int drive, u32 lba, u32 count);
-
-/* ドライブ存在チェック */
-int ide_drive_present(int drive);
-
-/* キャッシュされたドライブ情報の取得 */
-int ide_get_info(int drive, IdeInfo *info);
 
 #endif /* IDE_H */
