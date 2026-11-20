@@ -20,6 +20,7 @@ from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 CASES = ('cui', 'gui', 'gui-probed', 'kcg', 'shlib-layout', 'shlib-api',
          'cui-ignores-shlib', 'load-fail', 'load-layout', 'request-again',
+         'gui-fdd', 'dual-gui-fdd', 'dual-load-fail', 'dual-load-layout', 'dual-three-faults',
          'three-faults', 'success-resets', 'request-resets', 'cui-fault',
          'fdd-success', 'fdd-fault', 'fdd-fail', 'layout-first',
          'layout-second', 'layout-both', 'tick-wrap')
@@ -68,6 +69,10 @@ def main():
         print(f'GREEN {len(results)} real shell-loop cases (runner={host32.selected_runner()})', flush=True)
         if '--mutate' in sys.argv:
             mutations = [
+                ('warning-overwritten', 'tvram_print(0, 1, gshell_warning',
+                 'tvram_print(0, 0, gshell_warning'),
+                ('stale-warning', 'while (x > 0) tvram_putchar_at',
+                 'while (x < 0) tvram_putchar_at'),
                 ('load-fail-waits', 'continue;   /* ウェイト無しで即 CUI を起動 */',
                  ';   /* mutation: fall through to wait */'),
                 ('skip-consume', 'if (gui_take_next_shell', 'if (0 && gui_take_next_shell'),
