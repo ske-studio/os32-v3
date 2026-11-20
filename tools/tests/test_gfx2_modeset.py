@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Exercise mode transition failure atomicity."""
 CHECK = dict(name='gfx2-modeset-host', tier=1, needs=[], budget=5,
-    covers=['gfx/v2/modeset.c', 'gfx/v2/gfx2_int.h',
+    covers=['platform/pc98/platform_display_fallback.h', 'platform/powermac/platform_display_fallback.h',
+            'include/display_provider.h', 'gfx/v2/modeset.c', 'gfx/v2/gfx2_int.h',
             'tools/tests/gfx2_modeset_host.c', 'tools/tests/test_gfx2_modeset.py',
             'tools/tests/host32.py'],
     basis=['HAL_V2_DESIGN §9-3'],
@@ -17,7 +18,7 @@ def observe(work, source):
     path = work / 'modeset.c'
     path.write_text(source.replace('#include "../gfx_policy.h"', '#include "gfx/gfx_policy.h"').replace('#include "../gfx.h"', '#include "gfx/gfx.h"'))
     exe = work / 'test'
-    flags = ['-I' + str(ROOT / p) for p in ('.', 'include', 'sdk/include', 'sdk/include/os32', 'mm', 'gfx/v2')]
+    flags = ['-I' + str(ROOT / p) for p in ('.', 'platform/pc98', 'include', 'sdk/include', 'sdk/include/os32', 'mm', 'gfx/v2')]
     host32.build(['gcc', '-m32', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-O0', '-ffreestanding', '-fno-pie', '-no-pie', '-nostdlib', '-static', *flags, str(path), str(ROOT / 'tools/tests/gfx2_modeset_host.c'), '-o', str(exe)], check=True)
     return host32.run([str(exe)]).returncode
 

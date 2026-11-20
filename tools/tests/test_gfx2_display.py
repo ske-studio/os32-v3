@@ -14,7 +14,7 @@ def observe(work, source):
     exe = work / 'display'
     host32.build(['gcc', '-m32', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
         '-O0', '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections', '-ffreestanding', '-fno-pie', '-no-pie', '-nostdlib', '-static',
-        '-I' + str(ROOT / 'gfx'), '-I' + str(ROOT / 'include'), '-I' + str(ROOT / 'gfx/v2'),
+        '-I' + str(ROOT / 'platform/pc98'), '-I' + str(ROOT / 'gfx'), '-I' + str(ROOT / 'include'), '-I' + str(ROOT / 'gfx/v2'),
         '-I' + str(ROOT / 'mm'), '-I' + str(ROOT / 'lib'),
         '-I' + str(ROOT / 'arch/x86'), '-I' + str(ROOT / 'sdk/include/os32'),
         str(path), str(ROOT / 'tools/tests/gfx2_display_host.c'), '-o', str(exe)], check=True)
@@ -29,7 +29,7 @@ def main():
     mutations = [
         ('pending reference', 'gfx2_scan_ref_get(s);\n    a->head[head].pend_sid = sid;', 'a->head[head].pend_sid = sid;'),
         ('palette bounds', 'count > 256 - first', 'count > 257 - first'),
-        ('dirty retained on failure', 'if (rc) return OS32_ERR_IO;\n    s->dirty', 'if (rc) { s->dirty.w = 0; return OS32_ERR_IO; }\n    s->dirty'),
+        ('dirty retained on failure', 'if (rc) return OS32_ERR_IO;\n        s->dirty', 'if (rc) { s->dirty.w = 0; return OS32_ERR_IO; }\n        s->dirty'),
     ]
     with tempfile.TemporaryDirectory() as td:
         work = Path(td)

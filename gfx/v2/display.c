@@ -1,5 +1,6 @@
 /* HAL v2 display operations (HAL_V2_DESIGN §§7-3, 9-2). */
 #include "gfx2_int.h"
+#include "display_provider.h"
 #include "gfx_policy.h"
 
 #define DISPLAY_DL_US 1000000u
@@ -55,6 +56,7 @@ int gfx2_flip(u32 id, u32 head, u32 sid, u32 flags, u32 deadline_ms)
     int rc = context(id, head, 1, &a, &c);
     u32 dl = deadline_ms > U32_MAX / 1000u ? U32_MAX : deadline_ms * 1000u;
     if (rc) return rc;
+    if (!DISPLAY_V1_PRESENT_OK()) return OS32_ERR_BUSY;
     gfx2_flip_poll(a);
     if (a->head[head].pend_sid) return OS32_ERR_BUSY;
     if (flags & ~GFX2_FLIP_VBLANK) return OS32_ERR_INVAL;
@@ -145,6 +147,7 @@ int gfx2_present(u32 id, u32 head, i16 x, i16 y, u16 w, u16 h)
     GfxSyncCtx *ctx; u32 mode, cpp; i32 l, t, r, b;
     int rc = context(id, head, 0, &a, &c);
     if (rc) return rc;
+    if (!DISPLAY_V1_PRESENT_OK()) return OS32_ERR_BUSY;
     for (u32 i = 0; i < GFX2_MAX_SURFACES; i++) {
         struct gfx2_surf *p = &gfx2_surfs[i];
         if (p->state != GFX2_ST_FREE && (p->flags & GFX2_SF_ALIAS) &&
@@ -165,9 +168,17 @@ int gfx2_present(u32 id, u32 head, i16 x, i16 y, u16 w, u16 h)
     if (r <= l || b <= t) return 0;
     cpp = s->fmt == GFX2_FMT_XRGB8888 || s->fmt == GFX2_FMT_ARGB8888 ? 4 :
           s->fmt == GFX2_FMT_INDEX8 || s->fmt == GFX2_FMT_A8 || s->fmt == GFX2_FMT_L8 ? 1 : 2;
-    rc = gfxsync_write_rows(ctx, l, t, r - l, b - t, s->kva + t * s->pitch + l * cpp, s->pitch);
-    if (rc) return OS32_ERR_IO;
-    s->dirty = (struct gfx2_rect){0};
+    rc = DISPLAY_V2_SHADOW_PUSH(l, t, r - l, b - t);
+    if (rc == OS32_ERR_NOSYS) {
+        rc = gfxsync_write_rows(ctx, l, t, r - l, b - t, s->kva + t * s->pitch + l * cpp, s->pitch);
+        if (rc) return OS32_ERR_IO;
+        s->dirty = (struct gfx2_rect){0};
+        return 0;
+    }
+    if (rc) return rc;
+    if (l == s->dirty.x && t == s->dirty.y &&
+        r == s->dirty.x + s->dirty.w && b == s->dirty.y + s->dirty.h)
+        s->dirty = (struct gfx2_rect){0};
     return 0;
 }
 
