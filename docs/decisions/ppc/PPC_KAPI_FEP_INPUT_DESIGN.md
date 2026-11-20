@@ -1,4 +1,4 @@
-> 出所: ~/os32-tmp/run/kfill-7a/DESIGN.final.md (設計ラリー 3 回、起草 Fable・レビュー sol、2026-11-20 確定)
+> 出所: ~/os32-tmp/run/kfill-7a/DESIGN.final.md (設計ラリー 3 回 + 失敗の表の往復 3 回、2026-11-20 確定)
 > 状態: **現行 (2026-11-20)** — 段 7a の確定設計。末尾の「確定」の節は本文に優先する
 
 # 段 7a 詳細設計 r3 — FEP を PowerPC の像で動かし、IME の 17 本を小分けに公開する
@@ -331,3 +331,102 @@ PM の範囲 (参考): `rd2`・`rd3` の名前と mount、fixture の作り方�
 - **§2-1・§2-5 (P1)**: `/db`・`/dbu` の mount の失敗は pm_root_boot から返さず FEP の側で扱い、既存の root の起動 (root_ready) を通す。`/dbu` の失敗の時は学習を無効にする。P7e の受入では両方の mount の成功を必須にする。
 - **§2-7 (P2)**: 後続の段の契約に、公開中の像を host の側で固定する条件と、suspend の後の開き直しの経路を書く (attach の時の CRC だけでは同じ長さの上書きを検知できない)。
 - **実装の後の受入の条件 (sol 第 3 回の確認表)**: ramfs の実ヒープ (通常 1 MiB、失敗時 192 KiB) と既存の使用分込みのピーク、SQLite の pool (512 KiB) の予約と接続を開いた後のアプリ DB との併用は、S2・P6・P7e で実測する。選択の変数は FEATURE_EXEC・FEATURE_USERSHELL・FEATURE_USB。書き出しの受入先は /tmp。
+- **§2-2 (M5 の実装で、PM 決定 2026-11-20)**: 静的の像の辞書を開く本体の名前は `ime_dict_open` でなく `ime_boot_open_dict(void)` (static)。ime.h の公開の `ime_dict_open(IME_Dict *, const char *)` と型がぶつかるため。
+- **§2-2・§2-3 (M5 の実装で、PM 決定 2026-11-20)**: 写しの途中のファイルの削除は `vfs_rm`。HOSTDOWN・STALE の後に途中のファイルを消せなかった時は QUARANTINED に移して BUSY (再試行しない)。消せた時は AGAIN。
+- **§2-2・§2-3 の失敗の経路 (M5 の実装の前の補い、2026-11-20)**: 下の「§2-2b 失敗の表」が §2-2 の prepare の手順 2・3 と §2-3 の巻き戻しの文に優先する。
+
+### §2-2b 失敗の表 (M5 の実装の前の補い) — 第 3 版 (2026-11-20、sol の 2 回目の確かめの「保留」を受けて置き換え。行番号は付け直した)
+
+基点 main 9d99c1b64 の実コードで確かめた関数 (読んだだけ、ビルドと試験は未実施):
+
+| 関数 | 所在 | 返り値の意味 (この表で使う分) |
+|---|---|---|
+| `vfs_find_mount` (中の経路の振り分け) | `fs/vfs.c:303-` | 一致する prefix が無い経路は `/` の mount に落ちる。`/db` の mount が無いと `/db/fep.db` は root の媒体を指す |
+| `vfs_is_mounted(prefix)` | `fs/vfs.c:546-554` | prefix が**完全に一致する** mount が在り、その FS が mount 済みなら非 0。無ければ 0 |
+| `vfs_sqlite_backend(path)` | `fs/vfs_fd.c:831-841` | その経路が落ちる媒体の SQLite の種別。`VFS_SQLITE_UNSUPPORTED` (0、`fs/vfs.h:102`) = 能力なし、正 = ext2 (1)・ramfs (2)、負 = 解決の失敗・`VFS_ERR_NOMOUNT` |
+| `vfs_sqlite_fd_identity(fd, out)` | `fs/vfs_fd.c:856-869`、型は `fs/vfs.h:109-114` | 0 で `mount_generation`・`file_id` (inode)・`kind` を返す。`VFS_ERR_STALE`・`VFS_ERR_NOSYS` (inode か mount の世代が無い)・`VFS_ERR_INVAL` |
+| ramfs の inode | `fs/ramfs/ramfs.c:92-93` | `++next_ino` で振り、使い回さない |
+| ramfs の作成の失敗 | `fs/ramfs/ramfs.c:79-91` | 空きが無い・確保できない時はファイルを登録せずに負で戻る |
+| `vfs_stat` | `fs/vfs.c:856-892` | 0 = 在る。`VFS_ERR_NOTFOUND` = 無い。`VFS_ERR_STALE`・`OS32_ERR_HOSTDOWN` はそのまま (`:883`)。ほかの負 |
+| `vfs_open` | `fs/vfs_fd.c:312` → `:175-` | fd か負。`VFS_ERR_NOSPC` = FD の空きが無い (`:197`)。`O_EXCL` で既に在れば `VFS_ERR_EXIST`。作った後で失敗した時は中で `ops->unlink` を呼ぶ (`:265`) |
+| `O_CREAT`・`O_EXCL`・`O_WRONLY`・`O_RDONLY` | `sdk/include/os32/os32_kapi_shared.h:878-897` | ramfs は `create_excl` を持つ (`fs/ramfs/ramfs.c:287`) |
+| `vfs_read_fd` / `vfs_write_fd` / `vfs_close` | `fs/vfs_fd.c:486` / `:518` / `:442` | 長さか負 / 長さか負 / void |
+| `vfs_rm` | `fs/vfs.c:663-691` | 0 = 消した。`VFS_ERR_NOTFOUND` = 元から無い。ほかの負 = 消していない |
+| `fep_meta_probe` | `kernel/sqlite_engine.c:299-417` | `OS32_ERR_NOTFOUND`・`OS32_ERR_IO`・`OS32_ERR_INVAL`。`OS32_ERR_BUSY` は 2 通り (枠を取れなかった `:323` / 接続の終了の失敗 `:277-284,413-414`) で、戻り値では見分けられない |
+| `os32_sqlite_outer_boot_check` | `lib/sqlite3/generated/sqlite_outer_calls.inc:583-589` | 本体の値、SQLite が未起動なら stub の値 (`OS32_ERR_NOSYS` = -10)、実行を断られたら `SQLITE_MISUSE`。失敗の時に予約を書き換えない |
+| `os32_sqlite_boot_check` (本体) | `lib/sqlite3/os32_sqlite_vfs.c:259-285` | `SQLITE_BUSY` = 常駐でない組が在る・数が合わない。`SQLITE_NOMEM` = 予約が入らない (代入の前に戻る)。0 = 入れた |
+| `ime_boot_abort` | `kernel/ime/ime.c:111-118` | 0 = 閉じて `dict_loaded = 0`。-1 = 閉じられない |
+| `fep_store_close` → `fep_conn_close` | `kernel/ime/ime_dict.c:857-864` → `ime_conn.c:11-42` | 0 か `OS32_ERR_BUSY` (接続を残す) |
+| `services_public` の門 | `ime.c:122,156,162,192,284,339,365`、`ime_dict_api.inc:6,35,67,82,91` | `ime_suspend.c` には無い |
+
+#### 決まり
+
+- **媒体の確かめ (毎回の prepare の最初、どのファイル操作よりも前)**: `vfs_is_mounted("/db")` が非 0、かつ `vfs_sqlite_backend(IME_DICT_PATH)` が正。どちらかが満たされなければ、**stat も写しも削除もせず**に戻る (行 3)。root に落ちた経路は `/` の iso9660 が能力なしなので 2 つ目の条件でも止まる。以後の「消す」は、この確かめが同じ呼び出しの中で通っていることが前提。
+- **版ごとの覚え** (fep_static.c の static、主 `fep.db`・`fep_s.db`・`fep_l.db`): `done` と `skip`。prepare は毎回 3 版を順に見て、`done` でも `skip` でもない版だけ扱う。`/db` の媒体を替える段 (§2-7) は覚えを全部消す。
+- **1 版の写しの手順**: (a) 写し先を `vfs_stat` → (b) 搬送元を `vfs_open(O_RDONLY)` → (c) 写し先を `vfs_open(O_WRONLY | O_CREAT | O_EXCL)` → (d) 読み書きの輪 → (e) 主の版だけ写し先の fd で `vfs_sqlite_fd_identity` を取る → 両方 `vfs_close` → `done`。
+- **消してよいのは写し先の fd を得た後だけ**。(c) が負なら搬送元を閉じるだけで、削除はしない (今の ramfs は作成の失敗でファイルを登録しない)。(d) 以降の失敗は、開いている fd を全部閉じてから `vfs_rm(写し先)`。**「消せた」** = その戻りが 0 か `VFS_ERR_NOTFOUND`、ほかの負は **「消せない」**。
+- **主の辞書の「確かめ待ち」** (static、試行をまたいで残す): (e) で取れた `mount_generation` と `file_id` を控えて `pending = 1`。(e) が失敗したら控えない (その辞書は既設として扱い、INVAL でも消さない)。probe が 0 を返したら `pending = 0` (確かめ済み)。消した時も 0。
+- **probe の INVAL で消すかどうか**: `pending` が 1 で、`vfs_open(IME_DICT_PATH, O_RDONLY)` → `vfs_sqlite_fd_identity` → `vfs_close` の結果が控えと**同じ `mount_generation`・`file_id`** の時だけ「自分が写した、確かめ待ちの辞書」として消す。開けない・取れない・違う時は `pending = 0` にして既設として扱う (消さない)。
+- **prepare の順**: 0 媒体の確かめ → 1 `boot_check(0, 0)` → 2 主の版の写し → 3 主の版の probe → 4 切替の版の写し → 5 予約 → 6 控え。
+- **probe の BUSY の見分け**: `fep_meta_probe` が `OS32_ERR_BUSY` を返したら、続けて `os32_sqlite_outer_boot_check(0, 0)` を呼ぶ。0 = 組は残っていない (枠を取れなかっただけ)。`SQLITE_BUSY` = probe の組が残った (**終了の失敗**)。そのほかの 0 でない値 (`SQLITE_MISUSE`・`OS32_ERR_NOSYS`) = 組を見られなかった (**確かめの失敗**)。後の 2 つはどちらも Q(接続)。
+- **「閉じられた」** = `ime_boot_abort()` が 0、かつ続く `os32_sqlite_outer_boot_check(0, 0)` が 0。接続の終了の失敗も予約の解除の失敗も Q(接続)。
+- **予約の失敗では巻き戻しを呼ばない (確定)**。
+- QUARANTINED は 2 種。**Q(ファイル)**: 予約も接続も取る前にだけ起きる。services は `SERVICES_SQLITE_ONLY`・public=1 のまま、FEP だけ gate で止める。**Q(接続)**: `SERVICES_MINIMAL_QUARANTINED`・public=0・`sqlite_stub_api`。どちらも `OS32_ERR_BUSY`、再起動まで再試行しない。
+- **gate を通る入口** (静的の像だけ): `ime_dict_boot` の先頭、`ime_dict_suspend` の先頭 (`ime_suspend.c:11`)、`ime_switch_dict` の先頭 (`ime_dict_api.inc:4`)。
+- どの失敗の行でも、戻る前に `fep_boot_config_clear()` を呼ぶ。戻り値 `OS32_ERR_AGAIN` の行の状態は IDLE。
+
+#### 表
+
+| # | 段 | 原因 | 後始末 | 戻り値 | 次の状態 | 再試行 |
+|---|---|---|---|---|---|---|
+| 1 | gate | QUARANTINED (どちらの種でも) | 無し | `OS32_ERR_BUSY` | QUARANTINED | 不可 |
+| 2 | gate の後 | `dict_loaded` が 1 | 無し | 0 | READY | 不要 |
+| 3 | 0 媒体の確かめ | `/db` が mount 点でない・能力なし・経路が解決できない | 無し (stat・写し・削除をしない) | `OS32_ERR_NOMOUNT` | IDLE | 可 |
+| 4 | 1 `boot_check(0,0)` | `SQLITE_BUSY` (アプリの DB が開いている) | 無し | `OS32_ERR_AGAIN` | IDLE | 可 |
+| 5 | 1 | `SQLITE_MISUSE` (実行を断られた) | 無し | `OS32_ERR_AGAIN` | IDLE | 可 |
+| 6 | 1 | `OS32_ERR_NOSYS` (SQLite が未起動) ほか 0 でない値 | 無し | `OS32_ERR_NOSYS` | IDLE | 可 |
+| 7 | 2 主 (a) stat | `HOSTDOWN`・`STALE` | 未着手、消さない | `OS32_ERR_AGAIN` | IDLE | 可 |
+| 8 | 2 主 (a) stat | 不在以外のほかの負 | 未着手、消さない | 元の負値 | IDLE | 可 |
+| 9 | 2 主 (b) 搬送元の open | `NOTFOUND`・`HOSTDOWN`・`STALE` | 未着手、消さない | `OS32_ERR_AGAIN` | IDLE | 可 |
+| 10 | 2 主 (b) | `NOSPC` (FD の空きが無い)・`IO`・ほかの負 | 未着手、消さない | 元の負値 | IDLE | 可 |
+| 11 | 2 主 (c) 写し先の open | 負の全部 (`EXIST`・`NOSPC`・`NOSYS`・`ROFS` ほか) | 搬送元を閉じるだけ。**消さない** | 元の負値 | IDLE | 可 |
+| 12 | 2 主 (d) 輪 | `HOSTDOWN`・`STALE` | 両方閉じて、消せた | `OS32_ERR_AGAIN` | IDLE | 可 |
+| 13 | 2 主 (d) | `NOSPC` | 消せた | `OS32_ERR_NOSPC` | IDLE | 可 (同じ結果になり得る) |
+| 14 | 2 主 (d) | `IO` (読み書きの `VFS_ERR_IO`、書けた長さが足りない) | 消せた | `OS32_ERR_IO` | IDLE | 可 |
+| 15 | 2 主 (d) | ほかの負 | 消せた | 元の負値 | IDLE | 可 |
+| 16 | 2 主 (d) | どの原因でも | 消せない | `OS32_ERR_BUSY` | Q(ファイル) | 不可 |
+| 17 | 2 主 (e) | identity が取れない | 無し (`pending` を立てずに続ける) | (続ける) | — | — |
+| 18 | 3 probe | `NOTFOUND`・`IO` | 無し (辞書は残す、`pending` はそのまま) | 元の負値 | IDLE | 可 (次の回も確かめ待ち) |
+| 19 | 3 probe | `BUSY`、続く `boot_check(0,0)` が 0 (枠を取れなかった) | 無し (`pending` はそのまま) | `OS32_ERR_AGAIN` | IDLE | 可 |
+| 20 | 3 probe | `BUSY`、続く `boot_check(0,0)` が `SQLITE_BUSY` (終了の失敗) | 無し | `OS32_ERR_BUSY` | Q(接続) | 不可 |
+| 21 | 3 probe | `BUSY`、続く `boot_check(0,0)` がそのほかの 0 でない値 (確かめの失敗) | 無し | `OS32_ERR_BUSY` | Q(接続) | 不可 |
+| 22 | 3 probe | `INVAL`、`pending` が 0 (既設・確かめ済み・identity を取れなかった辞書) | 消さない | `OS32_ERR_INVAL` | IDLE | 可 (同じ結果) |
+| 23 | 3 probe | `INVAL`、`pending` が 1 だが今の辞書の identity が控えと違う・取れない | 消さない、`pending = 0` | `OS32_ERR_INVAL` | IDLE | 可 (同じ結果) |
+| 24 | 3 probe | `INVAL`、`pending` が 1 で identity が控えと同じ (この回に写したか、前の回に写して確かめ待ち) | 消せた、`done = 0`・`pending = 0` | `OS32_ERR_INVAL` | IDLE | 可 (搬送元を直せば通る) |
+| 25 | 3 probe | 同上 | 消せない | `OS32_ERR_BUSY` | Q(ファイル) | 不可 |
+| 26 | 4 切替の版 (a)(b) | 写し先に在る / 搬送元に無い | — | (`done` / 覚えを変えずに続ける) | — | 次の prepare でまた見る |
+| 27 | 4 切替の版 (a)(b) | `HOSTDOWN`・`STALE` | 未着手、消さない | `OS32_ERR_AGAIN` | IDLE | 可 (主は `done` のまま、この版から続き) |
+| 28 | 4 切替の版 (a)(b) | ほかの負 | 未着手、消さない | (覚えを変えずに続ける。ログ 1 行) | — | 次の prepare でまた見る |
+| 29 | 4 切替の版 (c) | 負の全部 | 搬送元を閉じるだけ。消さない | (その版を `skip` にして続ける。ログ 1 行) | — | この起動ではしない |
+| 30 | 4 切替の版 (d) | `HOSTDOWN`・`STALE` | 消せた | `OS32_ERR_AGAIN` | IDLE | 可 (この版から続き) |
+| 31 | 4 切替の版 (d) | `HOSTDOWN`・`STALE` 以外の負の全部 | 消せた | (その版を `skip` にして続ける。ログ 1 行) | — | この起動ではしない |
+| 32 | 4 切替の版 (d) | どの原因でも | 消せない | `OS32_ERR_BUSY` | Q(ファイル) | 不可 |
+| 33 | 5 予約 `boot_check(0,reserve)` | `SQLITE_BUSY`・`SQLITE_MISUSE` | 無し (巻き戻しを呼ばない) | `OS32_ERR_AGAIN` | IDLE | 可 |
+| 34 | 5 予約 | `SQLITE_NOMEM` | 無し (同上) | `OS32_ERR_NOSPC` | IDLE | 可 |
+| 35 | 5 予約 | ほかの 0 でない値 | 無し (同上) | `OS32_ERR_IO` | IDLE | 可 |
+| 36 | open | `ime_boot_open_dict()` が 0 でない | 閉じられた | open の値 (正の SQLite の値は `OS32_ERR_IO` に直す) | IDLE | 可 |
+| 37 | open | 同上 | 接続を閉じられない (`ime_boot_abort` が -1) | `OS32_ERR_BUSY` | Q(接続) | 不可 |
+| 38 | open | 同上 | 閉じたが予約を解除できない (`boot_check(0,0)` が 0 でない) | `OS32_ERR_BUSY` | Q(接続) | 不可 |
+| 39 | commit | `boot_check(接続の数, reserve)` が 0 | — | 0 | READY (`SERVICES_READY`) | 不要 |
+| 40 | commit | 0 でない | 閉じられた | `OS32_ERR_IO` | IDLE | 可 |
+| 41 | commit | 0 でない | 接続を閉じられない | `OS32_ERR_BUSY` | Q(接続) | 不可 |
+| 42 | commit | 0 でない | 閉じたが予約を解除できない | `OS32_ERR_BUSY` | Q(接続) | 不可 |
+
+- 切替の版の probe はしない (切替の時に本体が開いて確かめる)。
+- host 試験 (fep_static_host.c) は表の 1〜42 を行ごとに 1 件ずつ持つ。加えて「3 の時に root の媒体に何も作られず、何も消されない」「18 か 19 の後の次の prepare で probe が INVAL → 24 (消える)」「同じ場面で辞書を別の inode に置き換えておく → 23 (消えない)」「27 か 30 の後の次の prepare で、主を写し直さずにその版だけ写す」「20・21 の後は db の slot も不在の側」「Q(接続) で `ime_dict_suspend(0)`・`ime_switch_dict` が BUSY」。
+- 変異: 媒体の確かめを外す (3 が RED) / 11 で `vfs_rm` を呼ぶ / 「消せない」を「消せた」として扱う (16・25・32 が RED) / `pending` を呼び出しの中だけの旗にする (18 の後の 24 が RED) / identity の比べを外す (23 が RED) / 21 を IDLE に戻す / 主が `done` なら切替の版を見ない / 33〜35 で巻き戻しを呼ぶ / 37 の `ime_boot_abort` の戻りを見ない。
+- **§2-2b 第 3 版の未確認 (PM が確かめた、2026-11-20)**: (1) ramfs は `.ino = &ramfs_ino_ops` (fs/ramfs/ramfs.c:288) を持ち、vfs_fd.c:302 で has_ino=1 になるので vfs_sqlite_fd_identity は file_id を返す。(2) ramfs は `.is_mounted = ramfs_is_mounted` (ramfs.c:283) を持つ。
+- **§2-2b の最後の確かめの条件 (sol 第 3 回、PM が反映 2026-11-20)**: (1) 宛先ごとの媒体の確かめ — 各宛先 (主・切替の版) の fd を得たら vfs_sqlite_fd_identity の mount_generation を取り、主の辞書の fd の mount_generation と一致しなければその宛先を写さず (作った物は閉じてから消す) OS32_ERR_NOMOUNT・IDLE。主の辞書の mount は `/db` そのもの (vfs_fstype("/db") が "ramfs" — M5 の時点。後続の段で ext2 に替える時はこの条件を直す) であることを行 3 で確かめる (最長一致で /db/fep_s.db などに別の媒体が mount されていても写さない)。(2) M5 の変更のファイルに `kernel/ime/ime_suspend.c` と `kernel/ime/ime_dict_api.inc` を明記。gate は `OS32_FEP_STATIC` の中で関数の先頭、switch では services_public の判定より前に置く。
+- **宛先ごとの媒体の確かめの出口 (M5 の実装で、PM 決定 2026-11-20)**: 比べる元は `vfs_path_mount_generation("/db")` (fs/vfs.c:990、0 なら行 3 と同じく NOMOUNT・IDLE で何もしない)。各宛先は `vfs_path_mount_generation(<宛先のパス>)` を open の前に比べ、違えば開かずに NOMOUNT・IDLE (/db/fep.db そのものに別の媒体が mount された場合もここで止まる)。open の後に vfs_sqlite_fd_identity が失敗した時、または mount_generation が違った時は、作った宛先の fd を閉じてから vfs_rm — 消せたら NOMOUNT・IDLE、消せなければ方針どおり BUSY・Q(ファイル) (再試行しない)。既設・done の主の辞書を開き直して比べることはしない (比べる元は /db の mount の世代)。
+- **行 3・行 6 の IDLE の意味 (M5 の実装で、PM 決定 2026-11-20)**: FEP の状態だけを IDLE に戻し、SQLite の公開状態 (services の段・services_public) には触らない — SQLite の起動の失敗の時はその時の値のまま。§2-3 の「IDLE = SQLITE_ONLY・public=1」は SQLite が起動できている時の組み合わせ。
+- **宛先の世代の比べの範囲 (M5 のレビュー A、PM 決定 2026-11-20)**: done・skip の版も prepare のたびに比べる (止める側に倒す。今の実装どおり)。
