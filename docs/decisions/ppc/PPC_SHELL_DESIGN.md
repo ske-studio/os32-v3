@@ -1,6 +1,8 @@
 # PPC_SHELL_DESIGN — PowerPC でシェルが動くまで (計画と中間の到達点 S-A の詳細設計)
 
-> 状態: **確定 (2026-11-11)** — 中間 S-A (開発用の小さな CLI が LAN の端末でプロンプト・内蔵コマンド・/tmp への書き込みを行う) の詳細設計と、最終 S-B (外部の USER アプリ) から製品のシェル sh.bin までの計画の輪郭。S-B の USER ABI・syscall・exec は別の往復で詳細設計する。段の状態は票 TASK_PPC_SHELL が持つ。
+> 2026-11-20 の見直しで x86 の形に改めた ([DESIGN_X86_AUDIT](DESIGN_X86_AUDIT.md))。
+
+> 状態: **実装中 (2026-11-20)** — W0〜W7 は初期移植の記録。PPC_SHELL_ALIGN_X86_DESIGN の段 A・B・C は済み、E は実装中。
 
 > 出所: ~/os32-tmp/run/ppc-shell/DESIGN.final.md (棚卸し gpt-6.1-sol の SURVEY.md、gpt-6-astra 起草 r1→r2、Opus 5.5 の第 1 回 Request changes・第 2 回 条件付き Approve、PM が残りを反映)。中身は変えていない。
 
@@ -32,10 +34,10 @@ S-A の詳細設計と S-B 以後の計画。ユーザー判断の未決は0件�
 |---|---|
 |S-A：常駐 CLI|LAN 端末で echo→次prompt、RO root の読取り、`echo text > /tmp/f`→cat による読み戻し|
 |S-B：外部 USER|root 内の PPC USER アプリを起動し、終了値を受けて呼び手へ戻る。S-B の受入は開発用の小さな CLI (KBOOT_SHELL=1) から行ってよい|
-|後続|既存 shell の USER 化、永続保存、FB・鍵盤、実ディスク、動的 module、GUI|
+|後続|製品シェル、永続保存、FB・鍵盤、実ディスク、動的 module、GUI|
 
-**不変条件：起動の後は起動媒体を読まない。FD・CD を抜いても動く。**
-kernel に入るまでに kernel・root の全量を RAM に写す。後から明示的に mount する保存媒体は別の利用経路とする。
+**インストール時は FD・CD を起動後に抜ける。** インストール媒体は読み取り専用の RAM root、製品の root は HDD の ext2 とする。
+インストール時は kernel と root を RAM に読み込む。
 
 |波|内容|前提・並列|大きさ|
 |---|---|---|---|
@@ -46,9 +48,9 @@ kernel に入るまでに kernel・root の全量を RAM に写す。後から�
 |W4|USER ABI・SDK・exec 詳細設計|S-A 後、別の往復で詳細設計|大|
 |W5|USER 最小実装→外部 hello→終了→呼び手 (開発用 CLI) へ復帰|W4 後、複数波へ再分解|大|
 |W6|PC-98 FD loader から共通 RAM root へ接続|全量読込み・容量・boot 情報を別設計|中〜大|
-|W7|既存 OS32 shell を PPC USER の sh.bin として組み、製品の起動は root を mount した後 kernel が sh.bin を直接起動 (x86 の `platform/pc98/kernel.c` と同じ形、小さな CLI を挟まない)|S-B 後。`SHELL_AS_APP` と USER 入出力を接続。前提: InputOps の登録 (19 本すべて) と USER の stdout を stream へ|大、再分解|
-|W8|書ける媒体を後から mount して保存|PPC は Host Services の LAN 版 `/host`、PC-98 は既存 FD/HDD/Host Services|輪郭のみ|
-|W9|docs/tasks/agents/PORT_FLOW.md に新しいアーキテクチャの立ち上げの順 (起動 → RAM root → 開発用の小さな CLI (resident_cli_ops をつなぐ) → USER アプリ → 本物のシェル) を短く足す|W7 後|小 (文書)|
+|W7|USER sh.bin の起動を確認した|S-B 後|済み|
+|W8|製品シェルで HDD と共通 VFS/link の /host に保存し、再起動後に読む|媒体の mount 後|保存の受入|
+|W9|起動ループが外部シェルを owner 1 のシェル枠にロードする。終了時に資源を回収し、gui_take_next_shell で次のシェルを選んで同じ枠で起動する。|PPC_SHELL_ALIGN_X86_DESIGN|製品の起動・回収の受入|
 
 - S-A は小さな CLI を kernel に静的リンクする。PPC resident OS32X/CRT/KAPI を先行実装しない。
 - 一段は主ファイル一つ・一機能・一実装者。小＝約50〜150行、中＝150〜300行。工数確約ではない。
@@ -58,7 +60,7 @@ kernel に入るまでに kernel・root の全量を RAM に写す。後から�
 - OS32X の LE wire と CPU の BE を分離。ELF は EI_DATA に従い、CPU/ABI 識別を確定する。
 - `docs/09_exec.md` の親への復帰を維持。暫定保存域を ABI 承認としない。
 - ③の負債は `PPC_KBOOT_DESIGN.md:165,244–246`。S-A 完了を USER 基盤の完成とは数えない。
-- 製品の起動は小さな CLI を通らない。小さな CLI は KBOOT_SHELL=1 のときだけリンクされる開発用の経路 (新しいアーキテクチャの立ち上げ用)。`SHELL_AS_APP` は `kbd_getkey()` 経路を使う。
+- 常駐 CLI と旧 kboot の 5 像は、x86 に寄せる作業の最後に外す。
 - `/tmp` は揮発性。残す物は W8 の媒体へ書く。S-A に保存プロトコルを足さない。
 
 ### 3. LAN 端末：線上形式と所有
@@ -224,7 +226,7 @@ void resident_cli_run(const struct resident_cli_ops *ops);
 - 書込み構文は `echo text > /tmp/f` の一形だけ。末尾の `> ファイル` を解釈し、text＋LF を一括上書きする。
 - 出力先は `/tmp/` 直下の一ファイル。`>>`、`<`、FD 指定、複数 redirect、他コマンドの redirect は未対応。
 - `cat /etc/motd` と `cat /tmp/f` を使う。S-A の cat は最大1024B。profile/history 保存は行わない。
-- S-B で外部起動口を追加する。W7 の後の製品の起動は kernel が sh.bin を直接起動し、この CLI は開発用の経路としてだけ残る。
+- S-B の外部起動口は初期診断に使った。
 - `kernel/cli/` は CPU・機種に依らず、resident_cli_ops 以外 (platform・arch のヘッダ) を include しない。KBOOT_SHELL を付けないときはリンクに入らない (A23 で選ぶ)。新しいアーキテクチャは resident_cli_ops に自分の端末と poll をつなぐだけで同じ立ち上げの順を取れる。
 
 ### 8. 小さな ramfs と mount 境界
@@ -353,17 +355,17 @@ VfsOps ramfs_ops = {
 
 ### 12. 未決と PM の確定事項
 
-- ユーザー判断が必要な未決は0件。書込みの一形と S-B 後の sh.bin、小さな CLI は製品の経路を通らない開発用の経路 (他のアーキテクチャの立ち上げにも使う) はユーザー決定済み。
+- 製品の起動・シェルの特権と回収は PPC_SHELL_ALIGN_X86_DESIGN に従う。
 - ISO・像同梱・cd0・専用静的CLI・256B行・4KiB出力FIFO、小さな `/tmp` ramfs を本案とする。
 - PM が確定するもの：端末型番号、ISO作成ツール、試験ファイル名、実測後の容量予算。
 - 実サイズ、ESCC RX 手順、OF load-base と拡大image末尾の関係は実装段で確認する。
 - 実機作業の個別承認は実機段で扱う。今回の設計を止める確認事項にはしない。
 
 ## 確定 (2026-11-11、Opus 5.5 の第 2 回の条件付き Approve を PM が反映)
-- ユーザー決定「小さなCLIの経路は最終的に通らないように。ただし、他のアーキテクチャ開発時に同じ開発経路を取れるようにはしておきたい。」を反映: 製品の起動は W7 の後に kernel が sh.bin を直接起動、小さな CLI は KBOOT_SHELL=1 のときだけ組む開発用の経路。
+
 - P2-a: cli_boot.c から root_boot.c (名前の表と mount の順、常に組む) を分けた (A22a・A22b)。
-- 文言 5 か所 (§2 S-B の行、W5、W7、§2 の保守の窓口の行、§7 の常駐 CLI を残す行、§12) を書き換え、kernel/cli の独立と KBOOT_SHELL の選択を 1 行足した。
-- W9 (PORT_FLOW の立ち上げの順) を足し、W7 に InputOps (19 本) と USER の stdout の前提を書いた。
+
+
 
 ## 確定の後の追記 1 (2026-11-11、本線の独立レビュー (PC-98 の FD 起動の観点、Opus) と段 C1 の結果を PM が反映。本文と食い違う所はこの節が優先)
 - **P1-1 cd0 を使わない**: PC-98 では root の mount が cd.mod より先で、RAM root が cd0 を取ると ATAPI が cd1 になり cdinst (userland/system/cdinst.c) と netcd (drivers/block/netcd.c) と kernel_mount_children が壊れる。→ PowerPC の S-A の暫定にも cd0 を使わない。RAM の装置は種別 `VFS_DEV_RAM` に揃え、名前の表の 1 行 `{"rd",VFS_NAME_DIGIT_PREFIX,VFS_DEV_RAM,0,2}` で `rd0` = RAM root (ISO9660)、`rd1` = /tmp の ramfs。ram_ro は `dev_register_cd` ではなく名前 `rd0` で dev_register する (§5 の P2-2 の形を置き換える)。iso9660_mount (fs/isofs/iso9660.c、今は VFS_DEV_CD と "cdN" の決め打ち) が `VFS_DEV_RAM` の `rdN` も受けるようにする段を足す (**★ x86 の生成物 (cd.mod) が変わる**、本線の受入が要る)。§8 の `{"ram",...}` の行と `ram0` は `rd1` に置き換える。

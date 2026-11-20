@@ -1,5 +1,7 @@
 # PowerMac の KAPI の提供者を埋める計画 (確定)
 
+> 2026-11-20 の見直しで x86 の形に改めた ([DESIGN_X86_AUDIT](DESIGN_X86_AUDIT.md))。
+
 表示の復帰と受入は [表示フックの確定設計](DISPLAY_HOOKS_DESIGN.md) を参照。
 
 > 出所: ~/os32-tmp/run/ppc-kapi-fill/DESIGN.r4.md (設計の往復の確定版)。
@@ -187,8 +189,8 @@ A の場合も、対象像が持つ弱い代役に解決されていないこと
 |5a-i|本線 drivers/video/pc98/gfx_vram.c（その場の変更、NP21/W で確認）|present、rect、dirty、nosync、raster のクリップ・変更矩形管理を抽出。PC98 VRAM 書込と同期は装置に保持|
 |5a-ii|本線 `gfx/gfx_dirty.c`|分離した dirty 列・矩形処理だけを純移動。flip・VSYNC 待ちは装置側。x86 関数差0 (変位と `gfx_add_dirty_rect` からの呼出前後のスタック整列、ret 後の実行されない整列命令のみ許容)|
 |5b|本線 gfx/gfx_core.c → PPC platform/powermac/display_provider.c|共通 present が後端へ渡す。INDEX8 の変換・pitch は既存 OF FB を使う。200行指定の実現可能範囲を照会|
-|5c|本線 exec/surface_query.c → PPC 公開表|console/graphics 所有者と世代を公開。gfx2 列挙、caps、surface、lock、submit/fence、表示 ops の順|
-|5d|本線 kernel/gui.c|表示と入力の契約成立後、該当する exec 終了フックだけを実装選択。shell→GUI→shell の寿命を確認|
+|5c|共通 HAL → OF FB 後端|B1〜B4 と 5c-A は実装済み。所有・世代・転送範囲は共通 HAL、固定モード・pitch・画素形式は後端が返す。既存の表示の門は B02 で整理する。|
+|5d|PPC_SHELL_ALIGN_X86_DESIGN → kernel/gui.c|owner 1 の起動・切替・回収と共通表示所有を先に揃え、通常の製品シェルから sys_switch_shell で shell → GUI → shell を確認して公開する。|
 |6a|PPC drivers/macintosh/ の VIA 装置 → platform/powermac/system.c|wt/ppc-reset の 955665762、docs/decisions/ppc/PPC_RESET_DESIGN.md の順。後続の rtc_read も同じ via_command を使用。再起動1本を先に公開、時計は同一装置を登録して別段で公開|
 |6f|転送先 TU は `kernel/dev/device_fs.c`・`kernel/dev/device_host.c` (2026-11-19 に移した)。loop (`kernel/dev/device_loop.c` の予定) は保留 — 転送先の loop_dev_* が装置のヘッダ drivers/block/loop_dev.h にしか無く、共通から呼ぶ契約 (include/ の宣言) ができるまで platform/pc98/device_loop.c に残す|serialfs・loop・ext2 の順に一組ずつ両像共通の TU に純移動。device_host.c の既存 PPC 転送も選択を切り替え、各固定名の定義を一つにする。PowerPC の EXEC 像は device_fs.o を選ぶが、中の転送先 (ext2_format*・serialfs_session_*) は PowerPC に無く、-ffunction-sections と --gc-sections で捨てられてリンクが通っている (6b・6c で転送先が入るまでの前提)|
 |6b|本線 fs/serialfs/serialfs_session.c → PPC hostfs_link_io.c|協調進行と session の所有を確定。既存のユーザー shell の transport を二重に初期化しない|
@@ -197,9 +199,9 @@ A の場合も、対象像が持つ弱い代役に解決されていないこと
 |6d-ii|PPC platform/powermac/pci_config.c（pm_pci_read32 等の config 読み書きだけ）|BDF と項目順を確定。列挙から外れる装置を既存 GMAC への固定応答で代用しない|
 |6e|本線 init/bootinfo.c → PPC platform/powermac/root_image.c|捕捉した検証結果の発行順を決め、boot_info と ver の根拠を共有|
 |7a-選択|本線 build/select.mk|FEATURE_FEP の FEATURE_PC98_DEVICES 依存を実際の前提機能に置換。両像の有効・無効構成を照合|
-|7a|本線 kernel/ime/fep_module.c → PPC 入力登録|辞書、文字、キーを小分けに公開。GUI 専用 render は GUI 後|
+|7a|module の読み込み L1 → L2 → FEP → KCG|入力の P1〜P4b は実装済み。fep.mod の起動と回収を x86 に揃える。辞書・学習は HDD の後、x86 と同じ VFS パスで公開する。|
 |7b-選択|本線 build/select.mk|FEATURE_SQLITE の FEATURE_PC98_DEVICES 依存を実際の前提機能に置換。両像の有効・無効構成を照合|
-|7b|本線 kernel/sqlite_engine.c → CPU 別スタック入口 → kapi/kapi_db.c|段 S の取り込み状態を照合。FP 所有者の保存復帰、guard、module/VFS、SHM 結果、bind の寿命まで通して公開|
+|7b|共通 module loader・段 S → SQLite module → kapi/kapi_db.c|x86 と同じ module と VFS 上の DB を使う。段 S の CPU 別スタック入口、FP 保存復帰・guard、SHM と bind の寿命を確認して公開する。|
 |7c|本線 kernel/module/kdebug_call.c|module ローダの有効化後、許可された診断コマンドを選ぶ。CPU 固有の採取は独立段|
 |8|本線 AV HAL の音声契約 → 装置後端、ATA の block 契約 → 装置後端|HAL 票の依存（音は A0・1kHz tick）を待つ。契約確定後に PowerPC 担当が各後端を接続する|
 |8-音|本線 AV HAL の合成器の照らし直し → os32_opna A〜D → L2、IS → L1、L1・L2 → L3、C3・L3 → L6|その後、PowerPC 担当が PowerMac の PCM 後端 drivers/sound/powermac/pcm_powermac.c（新設）を接続する。装置候補は Screamer（NetBSD awacs.c）や snapper（同 snapper.c）。G4 QuickSilver の実機搭載品は未確認。|
@@ -211,10 +213,10 @@ A の場合も、対象像が持つ弱い代役に解決されていないこと
 |1a、2a-i→ii・2b|1b→1c、2c。1d は独立|
 |3b-i→ii|3c。3a は独立|
 |4k-i→ii|4b。4a は独立|
-|5a-i→ii、5b の共通口、5c・5d の共通選択|表示後端→surface/gfx2→GUI|
+|5a-i→ii、5b → 5c → 5d|共通表示所有と shell 枠を揃えた後に切替を公開。既存の二重実装の整理は KAPI の機能を揃えてから行う。|
 |6f の各転送、6b・6c の媒体・通信契約|serialfs、loop、ext2 の各公開。6a は reset 設計の装置を待つ|
 |6d-i、6e の発行口|6d-ii、root_image|
-|7a-選択、7b-選択と段 S、7c の module|IME、DB、debug の順に各前提成立後|
+|7a・7b の選択|L1 → L2 の後に FEP → KCG。辞書・学習には HDD、DB の公開には module・VFS・段 S が要る。7c は debug module の後。|
 |8 の PCM 常駐窓口分離・AV HAL、ATA の共通窓口|実音声・ATA 後端、buz 再判定|
 
 **全段の完了条件**　表の各行とその分割段で §4 の追従を確認する。両像のリンク map とデバッグ情報付き ELF の nm -l から、対象 slot → wrap の直接呼出先 → 定義元ソースのリポジトリ相対パスを突き合わせる。通常 wrap は両像でパス一致、未公開段は共通にした定義を先に照合し公開段で wrap から再照合する。不在 slot は生成された不在経路を確認する。差分で arch/ppc・platform/powermac に加わる関数定義名と x86 の定義名の積集合は空であること。パス不明は合格に数えない。純移動は毎回 docs/SRC_MOVE.md と x86 build_compare 関数差0、共通の口は両機種の呼出経路と check_layers 違反0を受入記録に残す。

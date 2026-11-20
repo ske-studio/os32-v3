@@ -1,30 +1,22 @@
-# TASK_PPC_SHELL — PowerPC 移植: シェルが動くまで (LAN の端末、RAM の root、開発用の小さな CLI → USER アプリ → 製品のシェル)
+# TASK_PPC_SHELL — PowerPC の製品シェルの起動と保存先
+
+> 2026-11-20 の見直しで x86 の形に改めた ([DESIGN_X86_AUDIT](../../decisions/ppc/DESIGN_X86_AUDIT.md))。
 
 > 上位: [TASK_PPC_KBOOT](TASK_PPC_KBOOT.md)
 
-> 状態: **実装中 (2026-11-12)** — S-C (W7) は QEMU で受入に到達し main (2d102e30)、W6 の共通部品は main (170723d0)。PC-98 の FD 側は本線、W8 (S-D) は QEMU で受入に到達し取り込み待ち (枝 wt/ppc-w8e)、W9 は [ARCH_BRINGUP_ORDER](../../decisions/ppc/ARCH_BRINGUP_ORDER.md) に記録。
+> 状態: **実装中 (2026-11-20)** — W7 の USER 実行は main 2d102e30。製品シェルの統合は PPC_SHELL_ALIGN_X86_DESIGN に従う。
 
-## 0. ユーザー決定 (2026-11-11)
+## 0. 製品の起動と媒体
 
-- 目標: 「シェルが動くまでの計画と詳細設計を作りましょう」。
-- PM の 4 問への回答:
-  1. 受入は 2 段 — 中間 S-A = カーネル側の CLI がプロンプトを出し内蔵コマンドを 1 行実行して戻る、最終 S-B = 外部の USER アプリを起動し終了して戻る。
-  2. 入出力は LAN が主 (ホストの道具から LAN 越しの双方向の端末)、ESCC の serial は QEMU の補助。画面 (FB) とキーボードは後の段。
-  3. root はメモリ上の読み取り専用 image (起動像に同梱)。「これは最終的にPC98のFDブートでもこの方式にしたい。これはメインのPMに伝えて」— image の形式・RAM の block device・mount の口は CPU・機種に依らない共通の部品にする (本線の PM に伝達済み)。
-  4. 最初の版は soft-float・AltiVec なし、module は静的 link、コマンドは最小で PC-98 固有は外す。
-- 追加: 起動の後は起動媒体を読まない (FD・CD を抜いても動く)。書き込みが要る — メモリ上の書き込み用の領域 (/tmp の小さな ramfs、再起動で消える) を S-A に入れ、残す物は書ける媒体を後から mount する (PowerPC は Host Services の LAN 版、PC-98 は既存の FD/HDD/Host Services)。
-- S-A の書き込みは `echo text > /tmp/f` の 1 形 (「> ファイル」以外の redirect・パイプなし) と cat の読み戻し。
-- S-B の後、既存の OS32 のシェルを USER アプリ sh.bin として PowerPC 向けに組む。「小さなCLIの経路は最終的に通らないように。ただし、他のアーキテクチャ開発時に同じ開発経路を取れるようにはしておきたい。」— 製品の起動は root の mount の後に kernel が sh.bin を直接起動する。小さな CLI は make 変数 KBOOT_SHELL=1 のときだけ組む開発用の経路で、kernel/cli/ は CPU・機種に依らない。
+W7 で USER アプリとしての sh.bin の起動を確認した。製品では 起動ループが外部シェルを owner 1 のシェル枠にロードする。終了時に資源を回収し、gui_take_next_shell で次のシェルを選んで同じ枠で起動する。
+PPC_SHELL_ALIGN_X86_DESIGN の段 A・B・C は済み、E は実装中。 常駐 CLI と旧 kboot の 5 像は、x86 に寄せる作業の最後に外す。
 
-## 1. 詳細設計 (確定) の要約
+## 1. W8 と W9
 
-全文は [PPC_SHELL_DESIGN](../../decisions/ppc/PPC_SHELL_DESIGN.md)。最終の到達点 S-B (USER の ABI・exec の facade) は [PPC_SHELL_EXEC_DESIGN](../../decisions/ppc/PPC_SHELL_EXEC_DESIGN.md)。
+インストール媒体は読み取り専用の RAM root、製品の root は HDD の ext2 とする。 W8 の保存先 /host は共通 VFS と link の SFS CALL に接続し、再起動後の読み戻しを確認する。
+W9 は子の終了値、シェル終了時の回収、次のシェルの起動を製品のループから確認する。
 
-- LAN の端末: PLN1 に端末の型 4 つ (OPEN・IN・OUT・STATE)。出力は「届く分だけ + 欠落数」、入力の欠落はその行を実行しない。所有は lan_terminal.c、送信予算は LOG と OUT で計 4、STATE は枠の外。
-- root: ISO9660 の読み取り専用 image を起動像に同梱 (tools/mkroot_image.py)、共通の口 include/boot_root.h と RAM の block device kernel/dev/ram_ro.c (cd0 として登録)。名前の表は platform/powermac/root_boot.c が mount の前に登録。/tmp に新しい小さな ramfs (fs/ramfs/)。
-- 開発用の小さな CLI: kernel/cli/resident_cli.c (help・echo・cat と `> ファイル`)、端末と poll は resident_cli_ops の口で受ける。
-- 段: W0 (宣言) → W1 (部品) → W2 (接続) → W3 (PPC の起動に結線・閉包リンク・S-A の通し受入) → W4 (S-B の詳細設計) → W5 (S-B) → W6 (PC-98 の FD 起動から共通 RAM root、本線) → W7 (sh.bin、製品の起動) → W8 (書ける媒体の後 mount) → W9 (移植の手順書 PORT_FLOW に立ち上げの順)。
-- 共通の場所の部品 (include/・fs/・drivers/block/・init/・kernel/) に触る段は、出す前に本線の PM に知らせる。include/memmap.h と include/config.h は変えない。
+初期の設計は [PPC_SHELL_DESIGN](../../decisions/ppc/PPC_SHELL_DESIGN.md)、USER ABI は [PPC_SHELL_EXEC_DESIGN](../../decisions/ppc/PPC_SHELL_EXEC_DESIGN.md)、W8 の媒体の検証は [PPC_SHELL_W8_DESIGN](../../decisions/ppc/PPC_SHELL_W8_DESIGN.md) に記録した。
 
 ## 2. 段の状態
 
@@ -40,7 +32,7 @@
 | W5 (S-B) | 全段 (facade F01〜F21・生成器 F10/F14/F15・B01〜B36、B21 はやめた) 実装・独立レビュー済 (2026-11-12)。**QEMU で受入に到達** (sb_run.py、7450・7455、LAN 込み)。B36 で docs/09_exec.md に PowerPC の USER の ABI |
 | W7 (S-C、既存のシェルを USER の sh.bin として起動) | 済 (QEMU、sc_run.py、7450・7455 の LAN)。設計は [PPC_SHELL_SC_DESIGN](../../decisions/ppc/PPC_SHELL_SC_DESIGN.md) |
 | W6 (PC-98 の FD 起動から共通の RAM root) | 計画確定 (2026-11-12、[PPC_RAM_ROOT_W6_PLAN](../../decisions/ppc/PPC_RAM_ROOT_W6_PLAN.md))。**ユーザー決定 (2026-11-12): 案 B** (kernel は ISO の中に 1 回だけ)。共通の部品の段 C1〜C4 は PowerPC 側が先に出す、PC-98 の FD 側の段は本線が起こす |
-| W8 (書ける媒体の後 mount、S-D) | **QEMU で受入 (2026-11-12)**、取り込み待ち (枝 wt/ppc-w8e)。設計 [PPC_SHELL_W8_DESIGN](../../decisions/ppc/PPC_SHELL_W8_DESIGN.md)。PowerPC は LAN の `/host` (既存の SerialFS を PLN1 に載せる)。段 A (wire)・C (ホスト)・B (SfsIo・割り込みの深さ)・D (観測・結線)・E (受入 `tools/ppc/sd_run.py`、7450・7455 PASS、変異 2 件 RED)。共通の場所の変更は fs/serialfs/sfs_proto.h の SFS_TICK_MS=10u だけ (本線 PM 了承)。G4 実機は後追い。PC-98 の側は本線 |
-| W9 (立ち上げの順) | 済 ([ARCH_BRINGUP_ORDER](../../decisions/ppc/ARCH_BRINGUP_ORDER.md)) |
+| W8 (保存先) | 初期の S-D は QEMU で確認済み。共通 VFS/link 上の /host を製品シェルで受け入れる。 |
+| W9 (製品起動) | [ARCH_BRINGUP_ORDER](../../decisions/ppc/ARCH_BRINGUP_ORDER.md) に従い、owner 1 の起動・回収・再起動を確認する。 |
 | FB 文字端末 (G4 の画面に sh、共通の部品) | **QEMU で受入、main e74a0cf1 (2026-11-13)**。設計 [PPC_FBCON_DESIGN](../../decisions/ppc/PPC_FBCON_DESIGN.md)。段 A (x86 CUI の回帰の試験)・B (resident のフォント・KCG1 の本体)・C (全画面の採取)・D (gfx_console・OF_FB=6)・E (of_fb の後端・provider・color@/color!)・F (共通の fbcon)・G (東雲 16 の KCG1・RAM root)・H (PPC の像への結線・shell_putchar の mirror)・J (QEMU mac99 `-g 800x600x8` の画素の受入 `ppc-fb`、7450・7455) 。x86 の生成物は段 D の分だけ変わる (本線 PM 承認 11-13)。H の shell_putchar の写しは PowerPC だけ (CONSOLE_PUTCHAR_MIRROR、x86 の console.o は main と同じ)。G4 実機 (R9) は未。台帳の PPC-USB-LAN-FLAKE は 2026-11-13 に閉じた: 台本 tools/ppc/usb_run.py が `echo discarded` の全字の echo を待たずに LAN OPEN していた競合 (ゲストは各字 1 回ずつ配達、取り消しの後に届いた字が次の行に残った)、OPEN の前に全字の echo を待つ形に直した。`usb_run.py --lan --mutate` を PPC_FB=0・1 とも 3 回続けて GREEN、待ちを外すと 2 回とも `eecho`・`decho` で RED (証拠 `~/os32-tmp/run/usb-flake/`) |
 | フォントの LZ4 (KCG1 flags=1) | **QEMU で受入、main 0f115f53 (2026-11-14)**。製品フォント: flags=1・187,980B・SHA-256 `36eb1719dd6c0c18824c5746c69bcff27ac1f93d04a72c6ab8907d529dff9451`、生成: Python lz4 4.0.2+dfsg。設計 [PPC_KCG_LZ4_DESIGN](../../decisions/ppc/PPC_KCG_LZ4_DESIGN.md)。console_route は段 I へ送った (本線 PM 決定 11-13) |

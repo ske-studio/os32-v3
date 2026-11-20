@@ -1,5 +1,7 @@
 # ARCH_COMPAT_CONTRACT — アーキテクチャ間の互換契約
 
+> 2026-11-20 の見直しで x86 の形に改めた ([DESIGN_X86_AUDIT](ppc/DESIGN_X86_AUDIT.md))。
+
 > 状態: **確定 (2026-11-14)** — アーキ間の互換契約の正典 (ユーザーの提案「最大公約数と最小公倍数の互換層」、astra 起草・Opus 5.5 の独立レビュー 2 回・PowerPC PM の見直し)。契約の確定と実装の適合は分け、適合は §4 の各項目と W3 で更新する。
 
 ## 1. 方針と参照の正
@@ -137,7 +139,7 @@ N4 に従い I/O 専用 adapter は追加しない。上表は arch 入口全体
 |AC-HOST-1|G: owner・handle の寿命、部分 write、借用 read buffer は次操作前にコピー。C: transport。A: HOSTDOWN/STALE を保存、不在は型別。文脈は Host API の既存契約を継承し IRQ 待機を導入しない|`platform_host_*` (`include/platform_host.h`)、`host_alive_snapshot` (`net/host_mailbox.h`)|`platform/pc98/device_host.c`|main の公開 Host 群は不在。PLN1 は代替 ABI ではない。LAN 移行で `platform/powermac/hostfs_peer.c` の世代実体を共通化し二重リンクを防ぐ|`AC-HOST-1/owner-buffer-generation`（T1 で作る） / LAN §5・ABI|
 |AC-SFS-1|G: can_wait は IRQ 外かつ期限時計と transport が協調して進められること。絶対期限を全段で共有し、新 sid で write を再実行しない。C: IRQ 駆動/poll。A: can_wait=0 は要求を出さず IO。FG0/FG1 の可否は provider ごとに判定|`SfsIo.now/idle/can_wait` (`fs/serialfs/sfs_client.h`)、deadline 契約 (`sfs_client_call()`)|UART/LAN の既存 IF 条件を保持 (`fs/serialfs/serialfs_session.c`、`fs/serialfs/sfs_lan.c`)|`pm_hfs_can_wait` は IRQ 外、TB 時計と poll により FG0 でも進行 (`platform/powermac/hostfs_io.c`)。現実装を保ち F1 は注釈・試験だけ|`AC-SFS-1/fg0-timeout-irq-reject-no-replay`（T1 で作る） / LAN §5|
 |AC-LIBC-1|G: ユーザーランドの C ライブラリはどのアーキも newlib nano (x86 と同じ版・configure・無改変)。syscall は KAPI の関数表、sbrk は nano の adapter。C: アーキごとの crt0・syscalls.c・allocator の adapter・浮動小数点の旗。A: 自前の libc やアプリごとの代用の関数で置き換えない。カーネルは newlib とリンクしない (ユーザー決定 2026-11-16、POLICY_DEV §1)|`tools/ci/build_cross.sh` の NEWLIB_VER・configure、`sdk/allocator/nano_inputs.json`、`sdk/crt/syscalls.c`|i386-elf の newlib nano 4.4.0 を `-lc -lgcc` で静的にリンク (`build/programs.mk`)|**未** (ユーザーランドは libc なし、`build/ppc-user.mk`)。PowerPC の段で入れる|共通の試験は移植の段で決める / POLICY_DEV §1|
-|AC-BUILD-1|G: 共通口の provider と共通ソースの closure を両像で検査。C: 像の profile・能力一覧。A: 不在は明示 manifest、未解決参照を成功 stub で埋めない。実行文脈は対象外|`C_KERNEL` 等のソース選択 (`build/sources/common.mk`)、順序 (`build/sources/order.mk`)、PPC 選択 (`build/targets/ppc-powermac.mk`)|`build/config.mk` の arch/platform 選択|PPC SH 像もリンク。KBOOT_SH/SHELL は像の選択であり CPU 能力ではない。BE/ILP32 を含む ABI 検査を保つ|`AC-BUILD-1/closure-profiles`（T1 で作る） / BUILD・PPC_IMPL_RULES §1|
+|AC-BUILD-1|G: 共通口の provider と共通ソースの closure を両像で検査。C: 像の profile・能力一覧。A: 不在は明示 manifest、未解決参照を成功 stub で埋めない。実行文脈は対象外|`C_KERNEL` 等のソース選択 (`build/sources/common.mk`)、順序 (`build/sources/order.mk`)、PPC 選択 (`build/targets/ppc-powermac.mk`)|`build/config.mk` の arch/platform 選択|製品シェル経路の closure を照合する。BE/ILP32 を含む ABI 検査を保つ|`AC-BUILD-1/closure-profiles`（T1 で作る） / BUILD・PPC_IMPL_RULES §1|
 
 ## 5. W2 で確定した NIC・link の契約
 
@@ -173,7 +175,7 @@ P1 系列と link-closeack を含む main `4e0e8b1e` の実物で確定した。
 |F9b (任意)|本線、PowerPC が PPC 実体担当|`platform/pc98/clock_source.c`、`platform/powermac/clock.c`、対応する時計試験 / 250 行|F9a。能力を実際の源に一致させ、counter_hz の既存意味を保持。両実体の登録が済むまで利用側を結線しない|
 |B1|本線、PowerPC 照合|`build/targets/ppc-powermac.mk`、`build/sources/common.mk`、T1 試験 / 250 行|T1a、対象の共通変更後。差分 manifest と両像リンクで closure を検査、大規模な一覧移動は行わない|
 |W4|本線、PowerPC 確認|[ARCH_CTX_DESIGN](ARCH_CTX_DESIGN.md) の各段|実行文脈の契約と実装を受け入れる。適合は受入まで未|
-|W3|本線、PowerPC 確認|本書、`PPC_NOTES.md`、`ARCH_BRINGUP_ORDER.md` / 150 行|各担当段の受入後。W4 の受入後は AC-CTX も結線対象に含め、適合 ID と能力差を結線、未実機項目は延期台帳の関門へ。試験ログを契約本文へ複製しない|
+|W3|本線、PowerPC 確認|本書、`PPC_NOTES.md`、`ARCH_BRINGUP_ORDER.md` / 150 行|各担当段の受入後。5d の適合には owner 1 の通常シェルで切替・回収・再起動を確認する。W4 の受入後は AC-CTX も結線対象に含め、適合 ID と能力差を結線、未実機項目は延期台帳の関門へ。試験ログを契約本文へ複製しない|
 
 T1 は試験土台の作成であり適合完了ではない。fake では単位・周回・返値・容量境界を検証し、idle と割り込み進行は NP21/W と mac99 の guest probe で同じ契約 ID を記録する。ホスト時計だけの一致で実機時計精度を主張せず、NIC 飽和と G4 入力は実機の受入に残す。
 実装段は対象像をビルドし、共通変更では PPC SH 像もリンク、追加・変更試験の変異が実行時 RED になることと lint を確認する。全体検査は GitHub CI、全変異は full-check。最後のソース変更後のログだけを受入に使い、未実施は `docs/tasks/DEFERRED_TESTS.md` の関門と結ぶ。W1 自体の成果物は設計稿のみ。
@@ -189,15 +191,15 @@ T1 は試験土台の作成であり適合完了ではない。fake では単位
 
 ## 9. 機種の作りの違いの一覧 (x86 に揃える前提の例外)
 
-POLICY_DEV §10「x86 に揃える」(ユーザー決定 2026-11-20、動作実績は x86 だけ) の例外と、まだ揃えていない違いを 1 か所に並べる。 **順 (ユーザー決定 2026-11-20「とりあえず x86 前提でまず KAPI の機能を揃えましょう。そのうえで 2 重実装を取り除きます」)**: PPC KAPI の埋めを先に終え、その後にこの一覧の「未揃え」と 2 重の実装を取り除く段を起こす。新しく実装する物は x86 に寄せ、新しい違いは作らない (ユーザー 2026-11-20「今から実装するものはよせて」)。既に実装されている違いにはわざわざ手を付けない (手が余っている時はこの限りでない)。この表には物理の違いと、既にある違いだけを書く。物理の理由で違いを残す段は、ここに行を足すことを完了条件にする。揃えたら行を消す (経緯は git)。
+POLICY_DEV §10「x86 に揃える」(ユーザー決定 2026-11-20、動作実績は x86 だけ) の例外と、まだ揃えていない違いを 1 か所に並べる。 **順 (ユーザー決定 2026-11-20「とりあえず x86 前提でまず KAPI の機能を揃えましょう。そのうえで 2 重実装を取り除きます」)**: PPC KAPI の埋めを先に終え、その後にこの一覧の「未揃え」と 2 重の実装を取り除く段を起こす。新しく実装する物は x86 に寄せ、新しい違いは作らない (ユーザー 2026-11-20「今から実装するものはよせて」)。既に実装されている違いにはわざわざ手を付けない (手が余っている時はこの限りでない)。この表に記録するのは物理差と既存の未整合だけとする。物理の理由で違いを残す段は、ここに行を足すことを完了条件にする。揃えたら行を消す (経緯は git)。
 
 | 項目 | x86 (PC-98) | PowerPC (PowerMac) | 状態 | 揃える段・残す理由 |
 |---|---|---|---|---|
-| シェルの枠 (実行の枠の ID 1) | カーネルの起動のループ (`platform/pc98/kernel.c` の外部シェル起動) が外部シェル (`shell.bin`・`gshell.bin`) をシェルの枠 ID 1 (`MEM_SHELL_LOAD_ADDR`) に `exec_run` し、終わったら `gui_take_next_shell` を見て起こし直す | `platform/powermac/exec_boot.c` の `pm_exec_boot` が `exec_nest_level = 1` にして起動の文脈を ID 1 に見立て、`sh` は ID 2 以降の普通の枠で動く | **未揃え** (2026-11-20 に見つけた) | 揃える範囲 (シェルの CPL・常駐 CLI の位置) はユーザーに確かめ中。入った段は PowerPC の B30 (900d4674d)、確定設計 docs/decisions/ppc/PPC_SHELL_EXEC_DESIGN.md・PPC_SHELL_SC_DESIGN.md |
-| シェルの特権 | 外部シェルはシェルの枠で CPL=0、AS を作らない (`exec/exec.c` の注) | `sh` は USER の SDK で組んだ PR=1 のアプリ、アプリごとの AS | **未揃え** | 上の行と一緒に決める |
-| 起動の文脈 | 起動から外部シェルのループ | 常駐 CLI (`kernel/cli/resident_cli.c`、LAN の端末の入口) が起動の文脈で、そこから `sh` を起こす | **未揃え** | 上の行と一緒に決める |
-| 部品の読み込み | FEP・SQLite は module (`fep.mod` ほか) | 静的に結ぶ (PowerPC に module の読み込みが無い、段 7a・db 7b の確定設計) | 違いを残す (今の決定) | module の読み込みを PowerPC に作るかは未決 |
-| root と /host | FAT/ext2 のディスク、HostDrv、生の LAN の SFS | RAM の ISO (読み取り専用)、/tmp・/db・/dbu は ramfs、/host は link の SFS CALL | 違いを残す | 「root は RAM の読み取り専用の像」(POLICY_DEV §10、2026-11-11・12) — PC-98 の FD 起動も最終的にこの方式 |
+| シェルの枠 (実行の枠の ID 1) | カーネルの起動のループ (`platform/pc98/kernel.c` の外部シェル起動) が外部シェル (`shell.bin`・`gshell.bin`) をシェルの枠 ID 1 (`MEM_SHELL_LOAD_ADDR`) に `exec_run` し、終わったら `gui_take_next_shell` を見て起こし直す | `platform/powermac/exec_boot.c` の `pm_exec_boot` が `exec_nest_level = 1` にして起動の文脈を ID 1 に見立て、`sh` は ID 2 以降の普通の枠で動く | **未揃え** (2026-11-20 に見つけた) | PPC_SHELL_ALIGN_X86_DESIGN の段 A・B・C は済み、E は実装中。 5d の公開前に owner 1 の製品シェルと切替ループを揃える。 |
+| シェルの特権 | 外部シェルはシェルの枠で CPL=0、AS を作らない (`exec/exec.c` の注) | `sh` は USER の SDK で組んだ PR=1 のアプリ、アプリごとの AS | **未揃え** | 製品シェルの枠と一緒に揃える |
+| 起動の文脈 | 起動から外部シェルのループ | 常駐 CLI (`kernel/cli/resident_cli.c`、LAN の端末の入口) が起動の文脈で、そこから `sh` を起こす | **未揃え** | 製品シェルの枠と一緒に揃える |
+| 部品の読み込み | FEP・SQLite は module | 初期移植では静的に結線 | 未揃え | 共通 loader の L1 → L2 → FEP → KCG。SQLite も共通 module と VFS を使う。 |
+| root と /host | ディスクと共通 VFS | インストール媒体は RO RAM root、/host は link の SFS CALL | 製品媒体は未揃え | HDD の ext2 root を整え、辞書・学習を x86 と同じパスで公開する。 |
 | 端末と入力 | TVRAM、PC-98 の鍵盤 | LAN の link (RSH) と FB の文字端末、USB の HID | 違いを残す (物理) | 装置が違う |
 | KCG の字形の読み出し | CG ROM/CG RAM を `drivers/video/kcg/kcg_module.c` (kcg.mod の提供者の口) が読む | 常駐の KCG1 ファイル (`platform/powermac/kcg.c`) | ANK・漢字の読み出しの転送は共有した (`drivers/video/kcg/kcg_read_provider.inc`、B14 2026-11-20)。字形の出所の違いは残す (物理) | 部品のロードは B08 (module の読み込み) の段で揃える |
 | ATA Data のバイト順 (D8) | LE の 16 bit ポート | BE の窓。IDENTIFY の語はバイト交換し、セクタは媒体の並びを保つ | 残す (物理) | CPU のバイト順が違う。語の値とセクタのバイト列を別の窓口で渡す |

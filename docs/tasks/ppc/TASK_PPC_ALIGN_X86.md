@@ -62,4 +62,4 @@ C01〜C15 (ARCH_DRIFT_AUDIT の C の表)。各行で「x86 に足す / PowerPC 
 | PPC_KAPI_FEP_INPUT_DESIGN (7a) | module の読み込みを PowerPC に (B08・C04、~/os32-tmp/run/ppc-module-align/) の後に、x86 の fep.mod の形で 7a を出し直す | module の設計 r1 中 |
 | PPC_KAPI_GFX_REST_DESIGN (5c) | ユーザー決定で入れる (上) | 取り込み待ち |
 
-直しが要る 12 件 (文書の直しの段で、各々を x86 の形に書き換える): PPC_KAPI_FILL_DESIGN・TASK_PPC_KAPI_FILL・TASK_PPC_SHELL・PPC_SHELL_DESIGN・ARCH_BRINGUP_ORDER・LAN_OPERATOR_DESIGN・TASK_LAN_OPERATOR・PPC_P3_DESIGN・PPC_P5_REST_DESIGN・TASK_PPC_LAN・ARCH_COMPAT_CONTRACT (§9 の「新しく作った違いを追記」を「物理差と既存の未整合だけ」に)・PPC_RESET_DESIGN。状態: 未着手。
+直しが要る 12 件 (文書の直しの段で、各々を x86 の形に書き換える): PPC_KAPI_FILL_DESIGN・TASK_PPC_KAPI_FILL・TASK_PPC_SHELL・PPC_SHELL_DESIGN・ARCH_BRINGUP_ORDER・LAN_OPERATOR_DESIGN・TASK_LAN_OPERATOR・PPC_P3_DESIGN・PPC_P5_REST_DESIGN・TASK_PPC_LAN・ARCH_COMPAT_CONTRACT (§9 の「新しく作った違いを追記」を「物理差と既存の未整合だけ」に)・PPC_RESET_DESIGN。状態: 直した (2026-11-20、本線のレビュー待ち 4 件)。

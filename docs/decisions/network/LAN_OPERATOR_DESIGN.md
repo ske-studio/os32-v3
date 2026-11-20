@@ -1,5 +1,7 @@
 # LAN_OPERATOR_DESIGN — 操作口 (rshell・gshell) を LAN が既定・serial が退避先に、PowerPC の PLN1 を link に統合
 
+> 2026-11-20 の見直しで x86 の形に改めた ([DESIGN_X86_AUDIT](../ppc/DESIGN_X86_AUDIT.md))。
+
 > 状態: **現行 (2026-11-14)** — 確定 (astra 起草 r1〜r4、Opus 5.5 の独立レビュー 3 回と PowerPC PM の見直し、条件付き Approve を PM が反映)。段の状態は票 TASK_LAN_OPERATOR が持つ。
 > 出所: 往復の版は `~/os32-tmp/run/lan-rshell*/` (DESIGN.r1〜r4、REVIEW.r1・r2・REVIEW_PPC.r2)。
 
@@ -124,7 +126,7 @@ pub fn emit(id: &[u8], bytes: &[u8]); // 有界enqueue、serial_putsを呼ばな
 |BEACON/生存|HELLO/ALIVEが接続・ホスト世代、ゲストboot-token付きREADYが再起動識別。統計は診断STATUSへ。初回ログはHELLO待ちで捨てず既存リングに保持。|
 |LOG|`LOG <boot> <seq> <drop_records> <drop_bytes> <flags> <len>` + WDATA。`lan_log.c` のregister/peek/stats/completeを流用。host_agentの`_service_log`が受信しCLIで表示。PPC専用名/os32.予約名を使わず、x86 bootlogも同じ形式で送れる共通サービスとする。200受信まで同chunk保持。ただし4xxの恒久的な拒否は同chunkを破棄し、欠落chunk数・bytesを計数して次へ進む。session断も欠落を計数し完全配送と称さない。|
 |REQ/RSP診断|番号65532のNOTIFY(kind=1、id8+opcode+既存BE引数のhex)→`PDIAG OUT <boot> <id> <status> <len>`+WDATA。`lan_monitor.c` のprobe・5命令/範囲検査・cacheを流用、MAC+nonceをlink peer+host世代由来の内部キーに置換。副作用なし・PEEK256B/READ_DIAG128B維持。|
-|TERM_OPEN/IN/OUT/STATE|READY/NOTIFY/RSH OUTへ。`terminal_input.c` の `pm_terminal_line_lost()` の行取消/feedを流用、旧seq/dropはlinkと結果dropへ。`lan_terminal.c` の `pm_term_receive()` のPLN1状態は廃止、CLI解釈器は維持。|
+|TERM_OPEN/IN/OUT/STATE|READY/NOTIFY/RSH OUTへ。`terminal_input.c` の `pm_terminal_line_lost()` の行取消/feedを流用、旧seq/dropはlinkと結果dropへ。`lan_terminal.c` の `pm_term_receive()` のPLN1状態は廃止、行実行は共通 rshell が所有。|
 |FS_OPEN/REQ/RSP|**SFS on link**を選択。`SFS CALL <len>`+WDATAでSFS frameを渡し、200+DATAにSFS応答frame。`hostfs_io.c` のCRC/長さ検査、`pm_hfs_put_until()` の絶対期限、既存SfsClient/VFSを流用。|
 |HostFS peer/世代|`hostfs_peer.c` の固定peer検査・世代変化の意図を維持し、PLN1 nonce観測を共通HostAliveへ置換。同ファイル内 の重複host_alive_snapshot実体は削除、共通実体を使う。|
 - SFS CALLはhost_agent内backendで既存SFS sid/seqの重複cacheの内側へdispatchする（新たなファイル実装を作らない）。BYE等の片道もlinkでは空本文200を返す。CRC/最大frame1044B、LEのSFSとlink、BEの診断payloadを明示codecで扱う。
@@ -143,9 +145,9 @@ void link_platform_idle(void); /* 前景専用、再入禁止。IRQ/送信内か
  * link像ではGEM RX/TXもx86のnet_jiffyと同じtick枠で汲む(1回TX回収8/RX8の上限は維持)。
  * 前景のpm_lan_pollはlink像のRXに触らない(A1)。 */
 ```
-- tick_budgetは共通tick枠の予算と既存回数上限を守り、PPCで無制限成功stubにしない。mailbox・NICのirq保存はPPCのMSR保存/復元、所有者は既存resident CLIのowner規約を使い、ring3のx86命令依存を持ち込まない。
+- tick_budgetは共通tick枠の予算と既存回数上限を守り、PPCで無制限成功stubにしない。mailbox・NICのirq保存はPPCのMSR保存/復元、所有者は製品シェル枠の owner 規約を使い、ring3のx86命令依存を持ち込まない。
 - `lan_service.c` のreset/PHY/GEM poll、`lan_gem_io.c` とDMA処理は流用。RXを旧serviceとnetが二重drainしない。移行中はビルド選択でPLN1かlinkのどちらか1つのみ、既存PLN1像を戻り先として保存する。
-- PPC CLIは行頭でLAN完全行を受けるadapterを足し、既存CLIを呼ぶ。LANコマンド中のstream出力を8KiB captureに向けESCC複写を抑止、終了後RSH OUT。ESCCの対話・Ctrl-C・行取消は退避先として維持、入力待ちを必要とする対話プログラムはserial選択で使う。
+- x86 の rshell がコマンドを一度実行し、終了値・出力・欠落数を既存の RSH OUT で返す。機種側は NIC と端末の後端を供給する。 行頭で完全行を受け、半行の入力を保護する。LAN 実行中は既存の capture を使う。
 - PPCの早期診断・LOGはshell無し像でも動く。NOTIFYからIRQで診断を実行せず、前景pollの後に1件だけ処理。PPCにgshellが存在するとは仮定せず、GSERIAL移植は含めない。
 
 ### W2: credit・RX 予算・link 進行の確定
@@ -206,9 +208,9 @@ P1 系列を含む main `4e0e8b1e` の実物を確認した。契約 ID は `doc
 |P2a|新 `platform/powermac/link_diag.c`、NOTIFY診断adapter|280|P2c／**PPC像変更**|
 |P2b|`platform/powermac/lan_monitor.c`、cacheキー/診断分離|120|P2a／**PPC像変更**|
 |P2c|新 `platform/powermac/link_log.c`、既存logリング送信|220|P1g/X6/P5-log／**PPC像変更**|
-|P3a|新 `platform/powermac/rshell_link.c`、CLI入力/結果adapter|360|P2／**PPC像変更**|
-|P3b|`platform/powermac/cli_boot.c`、行実行前後の結線|120|P3a／**PPC像変更**|
-|P3c|`platform/powermac/shell_putchar.c`、capture/ESCC出力選択|140|P3a／**PPC像変更**|
+|P3a|共通 rshell で行実行・終了値を扱う|共通|製品シェル枠の後|
+|P3b|NIC と端末の後端を共通の入力へ接続|PowerPC|P3a|
+|P3c|共通 capture から RSH OUT を送信|共通|P3a|
 |P4a|新 `tools/host_sfs_link.py`、既存backendへのSFS adapter|300|X6／hostのみ|
 |P4b|`tools/host_agent.py`、SFS CALL宣言/応答結線|100|P4a／hostのみ、X6後に直列|
 |P4c|`platform/powermac/hostfs_io.c`、SfsIo→host_*|300|P1/P4b／**PPC像変更**|
@@ -252,7 +254,7 @@ H=host製品コード試験、N=NP21/W LGY-98/NE2K **上のlink**、R=Ra266 e825
 |帯域/共存 X/G|H/N/R: TIME/CLIP/既存SFSと1.5KiB peek併走、ACK遅延/AGAINでも有界進行。Rはserial/LAN時間・TX呼出数・T1c遅延採取、200ms目標（未達は原因記録）。|host_writeのAGAINでbusy loop、またはserial mirror抑止解除。|
 |P1＋LOG基盤|H/Q: HELLO/ALIVE/TIME、BE CPUのLE wire golden、link断復帰、tick登録/tick_count・1poll予算/再入なし、旧PLN1選択像も起動。PPCでlinkをビルド、heap高水位≤1MiBとPLN1静的TX/RX不在をmapに記録。lan_service.c/:251のreset/PHY/pollが同じ関数の流用であることをdiffで示す。FBのHELLO送信/確立印と初期LOG受信を観測。|tick登録を外す、またはRX二重drain。|
 |P2診断/log|H/Q: 5診断・PEEK境界/DSI・cache競合、初期ログ・drop・末尾喪失を表示、shell無しlink像でも成立。|PEEK PA範囲照合またはlog drop報告を削除。|
-|P3端末|H/Q: ver相当の既存CLI/echo/失敗rc/出力超過、ESCCとの行分離・Ctrl-C退避、旧PLN1 CLI像の基準と機能照合。|LAN中ESCC複写を有効化、またはID重複実行。|
+|P3端末|製品シェルで echo、失敗 rc、出力超過、ESCC との行分離、終了後の次の READY を確認。|ID 重複実行、LAN 中の ESCC 複写。|
 |P4 HostFS|H/Q: /host read/write/RO・CRC・1044B最大・1000ms期限・再起動旧FD STALE、WDATA/応答喪失時write一回。|新ridごとSFS重複cacheを消す。|
 |P5切替/像|H/Q: linkのみでLOG/診断/端末/HostFS一巡、0x88B6 TX0、生成像/map/サイズ記録、旧バイナリのCLI/FS利用契約維持。共通変更はN/R最小回帰へ相乗り。|PPC buildをPLN1既定へ戻す。|
 - x86はX/G統合→CI成果物→main直前N、Rはノート担当へ依頼。PPCはP1/P2/P3/P4/既定切替の各節目にH/Q、各節目の小段はまとめてよい。

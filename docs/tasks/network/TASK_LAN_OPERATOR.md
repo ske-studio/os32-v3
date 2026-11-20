@@ -1,5 +1,7 @@
 # TASK_LAN_OPERATOR — 操作口を LAN が既定・serial が退避先に、PowerPC の PLN1 を link に統合
 
+> 2026-11-20 の見直しで x86 の形に改めた ([DESIGN_X86_AUDIT](../../decisions/ppc/DESIGN_X86_AUDIT.md))。
+
 > 状態: **設計中 (2026-11-14)** — 設計は確定して実装を待つ。詳細設計は [LAN_OPERATOR_DESIGN](../../decisions/network/LAN_OPERATOR_DESIGN.md)。
 > 上位: [HOST_SERVICES_PLAN](HOST_SERVICES_PLAN.md)、[TASK_NET_HOSTSVC](TASK_NET_HOSTSVC.md) (§0 の「link と SFS の 2 本を共存し、最後は 1 本を目指す」)。
 
@@ -25,7 +27,7 @@
 | 受ける側 | 段 (設計 §6 の行) |
 |---|---|
 | 本線 | X 系 (X7・X8 を含む)、G 系、U5、P4b (host_agent.py の SFS CALL の結線、X6・U5d と同じファイルを直列に触る) |
-| PowerPC | P1a〜P1g (arch の口の切り出しを含む。x86 の生成物は build_compare で MATCH を目標にし、差が出たら関数ごとの理由を付けて本線 PM が承認する。P1b・P1c・P1e の差分は取り込みの前に本線 PM に見せる)、X8b、P2・P3、P4a (実装済・検査結果: `/home/hight/os32-tmp/run/ppc-p4a/RESULT.md`)・P4c・P4d、P5 (P5-t・P5-log・各台本・既定の切り替え) |
+| PowerPC | P1・P2 の NIC/link、P3 の端末後端、P4 の SFS CALL と P5 の共通 link transport を接続。P3③d/⑤ は main 585dbbdb4、P5-t・P5-sd/fs は main c798c2d8。残る P3⑥ と P5 は PPC_SHELL_ALIGN_X86_DESIGN に従い、製品シェルでコマンドの結果・再起動後の READY・保存を受け入れる。 |
 
 - 順: PowerPC の P1 は、x86 の受入 (X・G) の後に始める。共通のファイル (link.c・nic.c) を触る段は、出す前に相手に知らせる。
 - X7・X8 は、PowerPC PM が PowerPC の build と QEMU の ppc-fb・sc_run で回帰を確かめる。
