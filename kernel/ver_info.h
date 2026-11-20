@@ -17,7 +17,7 @@ typedef struct {
     int boot_ok, debug_ok; BootImageInfo boot; MemStat debug;
     ServicesVerState services;
     u32 fpu_present; /* private: 1=hw, 0=none(emu); B16 fills, B17 displays */
-    u32 plat[8];
+    u32 pvr, pvr_valid, mpic_sources;
 } VerSnapshot;
 
 void ver_collect(VerSnapshot *s);
