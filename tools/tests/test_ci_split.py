@@ -3,7 +3,7 @@
 CHECK = dict(name='ci-split-host', tier=0,
              covers=['.github/workflows/check.yml', '.github/workflows/build.yml',
                      '.github/actions/build-setup/action.yml', '.github/actions/static-setup/action.yml', 'tools/ci/build_cross.sh', 'tools/fetch_fonts.py',
-                     'tools/ci/ppc_scope.py', 'tools/ci/build_cross_ppc.sh', '.github/actions/ppc-setup/action.yml', 'tools/ci_fetch.sh', 'tools/ci/reuse_success.py', 'tools/checks/weights.json',
+                     'tools/ci/gate.py', 'tools/check_time.py', 'tools/ci/ppc_scope.py', 'tools/ci/build_cross_ppc.sh', '.github/actions/ppc-setup/action.yml', 'tools/ci_fetch.sh', 'tools/ci/reuse_success.py', 'tools/checks/weights.json',
                      'tools/checks/run.py', 'build/sdk.mk', 'tools/tests/test_ci_split.py',
                      'CLAUDE.md', 'README.md', 'docs/INDEX.md'],
              needs=[], budget=5.3,
@@ -27,6 +27,7 @@ ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW = ROOT / '.github/workflows/build.yml'
 CHECK_WORKFLOW = ROOT / '.github/workflows/check.yml'
 SETUP = ROOT / '.github/actions/build-setup/action.yml'
+STATIC_SETUP = ROOT / '.github/actions/static-setup/action.yml'
 FETCH = ROOT / 'tools/ci_fetch.sh'
 SHA = 'a' * 40
 
@@ -237,6 +238,11 @@ def document_cases(source):
     # 用意は composite action の 1 行だけ。workflow に apt の行を書かない (docs/POLICY_CI.md G5)。
     static = workflow['jobs']['static-check']['steps']
     assert [s.get('uses') for s in static if s.get('uses', '').startswith('./.github/actions/')] == ['./.github/actions/static-setup']
+    setup_index = next(i for i, step in enumerate(static) if step.get('uses') == './.github/actions/static-setup')
+    for i, step in enumerate(static):
+        if 'make check-' in step.get('run', ''):
+            assert i > setup_index and step.get('if', 'success()') == 'success()', step['name']
+    assert not static[setup_index].get('continue-on-error')
     assert 'apt-get' not in source, 'apt belongs to composite actions'
     static_setup = (ROOT / '.github/actions/static-setup/action.yml').read_text()
     for dependency in ('build-essential', 'e2fsprogs', 'python3-clang', 'libnewlib-dev', 'PyYAML lz4'):
@@ -394,7 +400,55 @@ def routing_cases(build_source, check_source):
     assert required == guest and not required & (build | compile_checks), 'qemu-ppc requires exclusive ppc-qemu assignment'
 
 
+def static_setup_cases(source):
+    steps = yaml.safe_load(source)['runs']['steps']
+    for phase, rc in [('update', 124), ('install', 100), ('ccache', 2), ('ready', 0)]:
+        with tempfile.TemporaryDirectory(prefix='static-setup-') as directory:
+            root = Path(directory)
+            summary = root / 'summary'
+            summary.touch()
+            for name in ('make', 'gcc', 'e2fsck', 'mke2fs', 'clang'):
+                (root / name).symlink_to('/bin/true')
+            if phase != 'ccache':
+                (root / 'ccache').symlink_to('/bin/true')
+            modules = root / 'modules'
+            modules.mkdir()
+            for module in ('clang/cindex', 'yaml', 'lz4/block'):
+                path = modules / (module + '.py')
+                path.parent.mkdir(exist_ok=True)
+                path.touch()
+                (path.parent / '__init__.py').touch()
+            scripts = {
+                'timeout': ('test "$1 $2" = "-k 30" || exit 99\n'
+                            'export APT_DEADLINE="$3"\nshift 3\nexec "$@"'),
+                'sudo': 'exec "$@"',
+                'apt-get': ('case " $* " in *" update "*) deadline=300;; *" install "*) deadline=600;; *) exit 99;; esac\n'
+                            'test "$APT_DEADLINE" = "$deadline" || exit 98\n'
+                            'for arg do [ "$arg" != "$PHASE" ] || exit "$APT_RC"; done\nexit 0'),
+                'python3': 'if [ "$1" = -m ]; then exit 0; fi\nexec "$PYTHON" "$@"',
+            }
+            for name, body in scripts.items():
+                path = root / name
+                path.write_text('#!/bin/sh\n' + body + '\n')
+                path.chmod(0o755)
+            env = dict(os.environ, PATH=directory, APT_DEADLINE='', PYTHONPATH=str(modules), PYTHON=sys.executable,
+                       GITHUB_STEP_SUMMARY=str(summary), PHASE=phase if phase in ('update', 'install') else '', APT_RC=str(rc))
+            for step in steps:
+                assert step['shell'] == 'bash' and 'continue-on-error' not in step
+                result = subprocess.run(['/bin/bash', '-eo', 'pipefail', '-c', step['run']],
+                                        env=env, cwd=ROOT, capture_output=True, text=True)
+                if result.returncode:
+                    break
+            assert result.returncode == rc, (phase, result)
+            if phase in ('update', 'install'):
+                assert '::error::' in result.stdout and f'rc={rc}' in result.stdout
+                assert f'apt-get rc={rc}' in summary.read_text()
+            if phase == 'ccache':
+                assert 'ccache' in result.stdout and '検査は始めていない' in summary.read_text()
+
+
 def main():
+    static_setup_cases(STATIC_SETUP.read_text())
     reuse_cases()
     source = WORKFLOW.read_text()
     workflow_cases(source)
@@ -404,6 +458,10 @@ def main():
     print('ci-split: workflow and fetch cases GREEN', flush=True)
     if '--mutate' in sys.argv:
         mutations = [
+            ('static', 'timeout -k 30 300 sudo', 'sudo', 'remove update timeout'),
+            ('static', 'timeout -k 30 600 sudo', 'sudo', 'remove install timeout'),
+            ('static', 'exit "$rc"', 'exit 0', 'hide apt failure'),
+            ('static', 'run: python3 -B tools/ci/gate.py preflight --env static', 'run: "true"', 'omit preflight'),
             ('build-route', ' CHECK_EXCLUDE_ENV=qemu-ppc', '', 'restore qemu checks to build'),
             ('guest-route', 'shard: [0, 1, 2, 3, 4]', 'shard: [0, 1, 2, 3, 3]', 'repeat guest shard'),
             ('guest-route', 'matrix.shard }}/5', 'matrix.shard }}/6', 'omit sixth guest shard'),
@@ -462,7 +520,7 @@ def main():
             ('fetch', 'if [ "$CHECK_STATE" != success ]; then', 'if [ "$CHECK_STATE" = success ]; then', 'invert check notice'),
         ]
         for kind, old, new, name in mutations:
-            text = {'build-route': source, 'guest-route': CHECK_WORKFLOW.read_text(), 'workflow': source, 'fetch': FETCH.read_text(), 'check': CHECK_WORKFLOW.read_text(), 'reuse': (ROOT / 'tools/ci/reuse_success.py').read_text(), 'setup': SETUP.read_text()}[kind]
+            text = {'static': STATIC_SETUP.read_text(), 'build-route': source, 'guest-route': CHECK_WORKFLOW.read_text(), 'workflow': source, 'fetch': FETCH.read_text(), 'check': CHECK_WORKFLOW.read_text(), 'reuse': (ROOT / 'tools/ci/reuse_success.py').read_text(), 'setup': SETUP.read_text()}[kind]
             if name in ('preparation command drift', 'unsafe ccache restore'):
                 prefix, text = text.split('  checks:\n', 1)
                 assert text.count(old) == 1, name
@@ -476,7 +534,9 @@ def main():
                 if kind == 'fetch':
                     subprocess.run(['bash', '-n', str(script)], check=True)
                 try:
-                    if kind == 'build-route':
+                    if kind == 'static':
+                        static_setup_cases(changed)
+                    elif kind == 'build-route':
                         routing_cases(changed, CHECK_WORKFLOW.read_text())
                     elif kind == 'guest-route':
                         routing_cases(source, changed)

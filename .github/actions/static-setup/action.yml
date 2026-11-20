@@ -9,8 +9,17 @@ runs:
     # C AST の vendor include は libnewlib-dev のヘッダで解析する (クロス GCC は不要)。
     # Python は tools/mkvmkernel.py 系が lz4 を使う。
     - name: Host dependencies
-      shell: timeout 600 bash --noprofile --norc -e -o pipefail {0}
+      shell: bash
       run: |
-        sudo apt-get -o Acquire::Retries=8 -o Acquire::http::Timeout=20 update
-        sudo apt-get -o Acquire::Retries=8 -o Acquire::http::Timeout=20 install -y --no-install-recommends ccache build-essential e2fsprogs clang libclang-dev llvm-dev python3-clang libnewlib-dev
+        rc=0
+        timeout -k 30 300 sudo apt-get -o Acquire::Retries=8 -o Acquire::http::Timeout=20 update &&
+        timeout -k 30 600 sudo apt-get -o Acquire::Retries=8 -o Acquire::http::Timeout=20 install -y --no-install-recommends ccache build-essential e2fsprogs clang libclang-dev llvm-dev python3-clang libnewlib-dev || rc=$?
+        if [ "$rc" -ne 0 ]; then
+          echo "::error::static-setup: apt-get が rc=$rc (124 = 時間切れ)"
+          echo "### 用意の失敗: apt-get rc=$rc (検査は始めていない)" >> "$GITHUB_STEP_SUMMARY"
+          exit "$rc"
+        fi
         python3 -m pip install --quiet PyYAML lz4
+    - name: Preflight (static)
+      shell: bash
+      run: python3 -B tools/ci/gate.py preflight --env static

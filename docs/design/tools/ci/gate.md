@@ -39,6 +39,11 @@ G9 (道具の試験) は `ci-gate-host`・`sep-identity-host`・`check-times-hos
 
 ### 3-1. 入口 `tools/ci/gate.py run`
 
+apt は update を 300 秒、install を 600 秒で打ち切り、TERM の 30 秒後も残るプロセスには KILL を送る。失敗時は rc を summary に残す。
+static-setup の最後の `gate.py preflight --env static` はホストの道具と Python モジュールを確認し、
+不足をすべて入れ方とともに表示して rc=2 で止まる。そろえば rc=0 で検査へ進む。2026-11-20 の導入前は apt の時間切れが 2 件あり、
+どちらも検査は始まらず、終了時の統計だけが rc=127 を返した。導入後は summary の rc 別に数える。
+
     python3 -B tools/ci/gate.py run --shard <番号>/<総数> --out <置き場> [--no-mutate] [--jobs N]
     python3 -B tools/ci/gate.py run --env qemu-ppc --shard <番号>/<総数> --out <置き場>
 
@@ -76,7 +81,7 @@ SKIP の行は挙げるだけで落とさない: 試験が自分の出力とし�
 
 | 既存 | 今の形 | 手本の形にするには |
 |---|---|---|
-| check.yml `static-check` | `make check-<名>` を手で並べる | クロスコンパイラ無しで回る検査に CHECK の `env` で印を付け、`gate.py run` に環境の絞り込みを足して一覧を登録から取る (G4)。道具の事前確認の表を環境ごとに持つ |
+| check.yml `static-check` | `make check-<名>` を手で並べる | クロスコンパイラ無しで回る検査に CHECK の `env` で印を付け、`gate.py run` に環境の絞り込みを足して一覧を登録から取る (G4)。static の事前確認は §3-1 |
 | check.yml `ppc-compile` | `run.py --run all`、`ppc_scope.py` のパスの一覧 | `gate.py run --env ppc-cross` に替える (G2・G3)。PowerPC を回すかどうかの判定は、パスの一覧ではなく所有者集合 (`build/select.mk`) から引く |
 | check.yml `ppc-qemu` | 2026-11-18 に `gate.py run --env qemu-ppc --shard i/4` の 4 分割にし、`needs` の鎖を外した (G2・G3・G10)。検査ごとの所要を成果物 `check-times-<SHA>-ppc-qemu-<i>` に出す | 残りは `ppc_scope.py` のパスの一覧と、用意の行の重複 |
 | build.yml `checks` (6 シャード) | `make -k check CHECK_SHARD=…` (全部の検査を変異込み、2026-11-18 から) | `gate.py run --shard …` に替えると、表・検査ごとのログ・回っていない検査の検出が付く (G2・G3)。`gate-setup` にすると PowerPC の検査が SKIP にならない (G5・G6) |
