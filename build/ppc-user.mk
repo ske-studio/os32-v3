@@ -12,7 +12,8 @@ PPC_USER_LIBC = $(shell $(CC) $(PPC_USER_ABI) -print-file-name=libc.a)
 PPC_USER_LIBGCC = $(shell $(CC) $(PPC_USER_ABI) -print-libgcc-file-name)
 PPC_USER_LIBS = -L$(dir $(PPC_USER_LIBC)) -L$(dir $(PPC_USER_LIBGCC)) $(PPC_USER_NANO) -lc -lgcc
 PPC_USER_FLOAT ?= -u _printf_float
-PPC_USER_LINK = python3 sdk/link_guard.py --target $(SDK_TARGET) --ar $(LD:%-ld=%-ar) $(LD) -m $(SDK_TARGET_ELF_EMULATION) --gc-sections -z noexecstack -T $(SDK_TARGET_APP_LINK) $(PPC_USER_FLOAT)
+PPC_GUARDED_LD = python3 sdk/link_guard.py --target $(SDK_TARGET) --ar $(LD:%-ld=%-ar) $(LD)
+PPC_USER_LINK = $(PPC_GUARDED_LD) -m $(SDK_TARGET_ELF_EMULATION) --gc-sections -z noexecstack -T $(SDK_TARGET_APP_LINK) $(PPC_USER_FLOAT)
 
 $(PPC_USER_OUT)/syscalls.o: sdk/crt/syscalls.c sdk/allocator/nano_adapter.h userland/lib/rt/ls.c $(SDK_KAPI_HDR) | $(PPC_USER_OUT)
 	$(CC) $(PPC_USER_FLAGS) -c $< -o $@
@@ -79,6 +80,37 @@ $(PPC_USER_OUT)/fp_probe.raw: $(PPC_USER_OUT)/fp_probe.elf
 
 $(PPC_USER_OUT)/fp_probe.bin: $(PPC_USER_OUT)/fp_probe.raw $(PPC_USER_OUT)/fp_probe.elf sdk/mkos32x.py
 	python3 sdk/mkos32x.py $< $@ --target $(SDK_TARGET) --elf $(PPC_USER_OUT)/fp_probe.elf
+
+# The resident shell uses the fixed break backend and the complete command set.
+PPC_RES_DIR := $(PPC_USER_OUT)/resident
+PPC_RES_SRC := $(wildcard userland/shell/*.c userland/lib/save/*.c) \
+ drivers/pci/pci_decode.c fs/pc98pt.c userland/lib/filer/filer_draw.c \
+ userland/lib/filer/filer_core.c sdk/crt/syscalls.c sdk/allocator/nano_adapter.c
+PPC_RES_OBJ := $(addprefix $(PPC_RES_DIR)/,$(PPC_RES_SRC:.c=.o))
+$(PPC_RES_OBJ): $(PPC_RES_DIR)/%.o: %.c build/ppc-user.mk $(SDK_KAPI_HDR)
+	@mkdir -p $(@D)
+	$(CC) $(PPC_USER_FLAGS) -DOS32_CRT_RESIDENT -I. -Iinclude -Iuserland/lib -Iuserland/shell -Iuserland/lib/filer -Iuserland/lib/gfx -Iuserland/lib/save -Idrivers -c $< -o $@
+
+$(PPC_RES_DIR)/memmap_layout.h: include/memmap.h tools/gen_memmap.py
+	@mkdir -p $(@D)
+	python3 -B tools/gen_memmap.py --layout-header $@
+
+$(PPC_RES_DIR)/app_sys.ld: sdk/link/ppc/app_sys.ld $(PPC_RES_DIR)/memmap_layout.h
+	$(CC) -E -P -x c -I$(@D) $< -o $@
+
+.PHONY: shell
+shell: $(PPC_USER_OUT)/shell.bin
+
+$(PPC_USER_OUT)/shell.elf: $(filter-out $(PPC_USER_OUT)/syscalls.o,$(PPC_USER_CRT)) $(PPC_RES_OBJ) $(PPC_RES_DIR)/app_sys.ld sdk/link_guard.py
+	$(PPC_GUARDED_LD) -m $(SDK_TARGET_ELF_EMULATION) --no-undefined --gc-sections -z noexecstack -T $(PPC_RES_DIR)/app_sys.ld -Map=$(@:.elf=.map) -o $@ $(filter %.o,$^) -L$(dir $(PPC_USER_LIBC)) -L$(dir $(PPC_USER_LIBGCC)) -lc -lgcc
+
+$(PPC_USER_OUT)/shell.raw: $(PPC_USER_OUT)/shell.elf
+	$(OBJCOPY) -O binary $< $@
+
+$(PPC_USER_OUT)/shell.bin: $(PPC_USER_OUT)/shell.raw $(PPC_USER_OUT)/shell.elf sdk/mkos32x.py
+	python3 sdk/mkos32x.py $< $@ --target $(SDK_TARGET) --elf $(PPC_USER_OUT)/shell.elf --heap 0
+
+-include $(PPC_RES_OBJ:.o=.d)
 
 # The shell uses a private profile and object tree, isolated from x86 artifacts.
 PPC_SH_DIR := $(PPC_USER_OUT)/sh
