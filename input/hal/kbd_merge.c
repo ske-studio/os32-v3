@@ -16,6 +16,22 @@ u8 input_held_key(u8 src, u16 keycode)
     return (held[src - 1][keycode >> 3] >> (keycode & 7)) & 1;
 }
 
+/* W: stable native mechanical Caps/Kana positions alone do not block set.
+ * All other held keys, including USB locks and unmapped usages, do. */
+int input_policy_pressed(void)
+{
+    for (unsigned src = 0; src < IN2_MAX_DEV; ++src)
+        for (unsigned byte = 0; byte < 32; ++byte) {
+            u8 bits = held[src][byte];
+            if (byte == KEY_CAPS / 8 && (mechanical[src] & SHIFT_CAPS))
+                bits &= (u8)~(1u << (KEY_CAPS & 7));
+            if (byte == KEY_KANA / 8 && (mechanical[src] & SHIFT_KANA))
+                bits &= (u8)~(1u << (KEY_KANA & 7));
+            if (bits) return 1;
+        }
+    return 0;
+}
+
 static void set_held(u8 src, u16 keycode, u8 down)
 {
     u8 bit = 1u << (keycode & 7);
