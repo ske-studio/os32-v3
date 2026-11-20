@@ -53,11 +53,16 @@ def ppc_relocations(elf, payload: bytes, mem_size: int, policy) -> bytes:
             require(0 < idx < len(elf.sections) and elf.sections[idx]['flags'] & 2,
                     'relocation symbol outside allocated body')
             owner = elf.sections[idx]
-            require(owner['addr'] <= symbol['value'] <= owner['addr'] + owner['size'],
+            module_end = symbol['name'] == '__module_end'
+            if module_end:
+                require(owner['name'] == '.bss' and symbol['value'] == mem_size
+                        and mem_size == (owner['addr'] + owner['size'] + 4095) & ~4095,
+                        'invalid module end marker')
+            require(module_end or owner['addr'] <= symbol['value'] <= owner['addr'] + owner['size'],
                     'relocation symbol outside defining section')
             goal = symbol['value'] + addend
             require(0 <= goal < mem_size or
-                    (goal == mem_size and symbol['name'] == '__module_end'),
+                    (goal == mem_size and module_end),
                     'relocation target outside body')
             require(kind in (1, 4, 5, 6, 10, 11, 26), 'unsupported PPC relocation')
             width = 2 if kind in (4, 5, 6) else 4
@@ -82,12 +87,22 @@ def ppc_relocations(elf, payload: bytes, mem_size: int, policy) -> bytes:
             else:
                 require(place % width == 0, 'unaligned absolute relocation')
                 records.append((place, kind, goal))
+    # Without any retained body RELA, a fully resolved ET_EXEC cannot prove
+    # that its absolute references survived the final link as relocations.
+    require(writes, 'missing allocated PPC relocations (--emit-relocs required)')
     writes.sort()
     require(all(end <= right for (_, end), (right, _) in zip(writes, writes[1:])),
             'overlapping PPC relocations')
     require(len(records) <= policy['reloc_max'], 'too many PPC relocations')
     ops = elf.symbols.get(policy['ops_symbol'])
     if ops:
+        first = ops['value'] + 4
+        end = first + 4 * policy['ops_slots']
+        for place, kind, _ in records:
+            width = 4 if kind == 1 else 2
+            if place < end and first < place + width:
+                require(kind == 1 and (place - first) % 4 == 0,
+                        'partial relocation in export slot')
         pointers = {p: goal for p, kind, goal in records if kind == 1}
         for slot in range(policy['ops_slots']):
             p = ops['value'] + 4 * (1 + slot)

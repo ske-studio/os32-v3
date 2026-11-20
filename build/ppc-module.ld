@@ -12,7 +12,7 @@ SECTIONS
         KEEP(*(.data.*_import_slots))
         *(.data .data.*)
     }
-    .bss ALIGN(4) (NOLOAD) : { *(.bss .bss.*) *(COMMON) }
+    .bss ALIGN(4) (NOLOAD) : { *(.bss .bss.*) *(COMMON) __module_end = ALIGN(4096); }
     .os32_generations 0 (INFO) : { KEEP(*(.os32_generations)) }
     .os32_generation_ref 0 (INFO) : { KEEP(*(.os32_generation_ref)) }
     /DISCARD/ : { *(.comment) *(.note.GNU-stack) *(.eh_frame) }
