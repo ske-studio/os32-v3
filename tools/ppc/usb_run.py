@@ -584,11 +584,26 @@ def rsh_command(s, line, expected=None, during=None):
     start = len(s.events)
     ident = op.submit('cui', line, 'usb-accept', timeout_ms=20000)
     if during: during()
-    s.wait(lambda: ident in op.results or (op.pending is not None and
-           op.pending['id'] == ident and op.pending['state'] in ('done', 'truncated')),
-           'RSH result '+line, 20)
+    label = 'RSH result '+line
+    try:
+        s.wait(lambda: ident in op.results or (op.pending is not None and
+               op.pending['id'] == ident and op.pending['state'] in ('done', 'truncated')),
+               label, 20)
+    except RuntimeError as exc:
+        if not str(exc).startswith('deadline '+label+' evidence='):
+            raise
+        lines = serial(s.out/'serial-a.log').splitlines()
+        link_lines = [entry for entry in lines if 'link' in entry.lower()]
+        raise RuntimeError(
+            f'{exc}\nRSH id={ident} session={op.session} ready={op.ready}'
+            + '\nlink lines:\n' + '\n'.join(link_lines[-5:])
+            + '\nserial tail:\n' + '\n'.join(lines[-20:])) from exc
     result = op.results.get(ident) or op.take_result()
-    require((op.generation, op.session) == (generation, session) and
+    # The link may re-HELLO mid-command (same sess, next epoch); the guest then
+    # re-delivers the OUT (LAN_OPERATOR R1/R2). Same generation and sess id only.
+    same_sess = (op.session is not None and session is not None and
+                 op.session[0] == session[0])
+    require(op.generation == generation and same_sess and
             result['generation'] == generation and result['state'] == 'done' and
             result['drop'] == 0, 'RSH generation/completion '+line)
     events = [e for e in s.events[start:] if e['parts'][:2] == ['RSH', 'OUT'] and

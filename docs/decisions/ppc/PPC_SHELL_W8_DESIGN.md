@@ -31,7 +31,7 @@
 - `serialfs_persistent.c` はpermit→vfs_mountを実装済み。開始時にHELLOを待たない。
 - PC-98のLAN常駐 `/host` とhsyncの受入は `TASK_NET_HOSTSVC.md:3` にある。
 - N1の100Hz IRQ駆動状態機械は移植せず、PowerPCのGMAC pollを使う。
-- KAPIのsfs_begin/end・host_*不在指定は維持し、既存FSとplatformの間で閉じる。
+- 6b で kboot-link-sh の sfs_begin/end を常駐の /host に公開する。kboot-sh・kboot-shell の同じスロットは NOSYS。
 
 **2. S-D の到達点と受入の形**
 
@@ -282,6 +282,7 @@ if reply is not None:
 
 - #2の再見積りはP02=45→80、P03=45→140、P06=100→150、T01=230→330行。
 - 共通serialfsの4実装をリンクし、UART session・旧LAN輸送は組まない。VFS・kernel・SDK・shell共通部は変更しない。
+- 6b の例外は rshell_lan.c の SHELL_REMOTE_SFS 分岐と gen_kapi.py の FEATURE_LINK 引数。
 - ★PC-98後続段は本線が起動後mountを結線し、FD/HDD/Host Servicesの保存・再起動をNP21/Wで受け入れる。
 - ★既存HostDrvとの `/host` 競合は常駐所有者のBUSY契約を保ち、二重mountしない。
 

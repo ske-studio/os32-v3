@@ -1,3 +1,4 @@
+#include "loop_boot.h"
 #include "sqlite_engine.h"
 #include "boot_token.h"
 /* PowerPC core-ready init (milestone 2, PPC_KBOOT_DESIGN sections 2 and 4).
@@ -371,6 +372,7 @@ void platform_boot_services(void)
     struct boot_root_image img;
     pm_root_image(&img);
     if (pm_root_boot(&img) == 0) {
+        pm_loop_boot();
         (void)pm_console_text_start();
 #if KBOOT_SH
         /* Before pm_usb_boot (mouse_init): the default must precede the cursor. */
