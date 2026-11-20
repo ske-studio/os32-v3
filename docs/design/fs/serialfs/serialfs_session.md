@@ -1,10 +1,12 @@
 # fs/serialfs/serialfs_session.c — 設計
 > 状態: **現行 (2026-11-18)** — 出所: TASK_SERIAL_HOSTFS 部品 B (§1-v2 B-4'・B-6'、§1-v3、ユーザー決裁 1〜3) の契約を今のソースと照らして要約
-ソース: `fs/serialfs/serialfs_session.c` (`serialfs_session_begin`・`serialfs_session_end`・`sfs_finish`)・ゲート `drivers/char/serial.c` (`serial_gate_set`・`serial_gate_put`・`serial_gate_get`・`serial_hold_take`・`serial_hold_dropped`)・`sfs run` `userland/shell/rshell.c`・`userland/shell/serial_watchdog.c` (`rsh_sfs_child`・`rsh_esc_classify`)
+ソース: `fs/serialfs/serialfs_session.c` (`serialfs_session_begin`・`serialfs_session_end`)・PC-98 前景 `fs/serialfs/sfs_session_fg.c` (`sfs_finish`)・ゲート `drivers/char/serial.c` (`serial_gate_set`・`serial_gate_put`・`serial_gate_get`・`serial_hold_take`・`serial_hold_dropped`)・`sfs run` `userland/shell/rshell.c`・`userland/shell/serial_watchdog.c` (`rsh_sfs_child`・`rsh_esc_classify`)
 
 UART の SerialFS のセッションは常駐シェルの組込み **`sfs run <コマンド行>`** の 1 行の中でだけ開く (KAPI `sfs_begin` / `sfs_end`)。
 `mount /host COM1 serialfs` の単独実行は断る (`userland/shell/cmd_mnt.c`)。自動マウントはしない。LAN の常駐のときの
 scope は `docs/design/fs/serialfs/serialfs_persistent.md`。
+
+PowerMac の USERSHELL 像は前景を登録しない。常駐 LAN が無効なら begin と end はともに `OS32_ERR_NOSYS` を返す。
 
 ## 流れ
 

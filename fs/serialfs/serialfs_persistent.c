@@ -122,16 +122,6 @@ void sfs_persistent_scope_owner_exit(int owner)
     (void)sfs_persistent_scope_end_owned(owner, 0);
 }
 
-int sfs_persistent_scope_begin(void)
-{
-    return sfs_persistent_scope_begin_owned(-1);
-}
-
-int sfs_persistent_scope_end(int exit_code)
-{
-    return sfs_persistent_scope_end_owned(-1, exit_code);
-}
-
 int sfs_ensure_session(u32 deadline)
 {
     SfsClient *c = &resident.client;

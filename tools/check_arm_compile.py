@@ -117,7 +117,7 @@ CORE_INC_KERNEL = [
     "drivers/net/ne2000/ne2000.c",
     "drivers/net/ne2000/lgy98.c",
     "drivers/block/fdc.c",
-    "fs/serialfs/serialfs_session.c",
+    "fs/serialfs/sfs_session_fg.c",
     "lib/sqlite3/os32_sqlite_test.c",
 ]
 DRIVERS_INC_GFX = [
