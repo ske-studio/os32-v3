@@ -44,7 +44,7 @@ PowerPC に固有の注意事項 (起動の行・BOOTP/BSDP・画面・メモリ
 
 | 項目 | 結果 |
 |---|---|
-| RN | NVRAM の `boot-device` を `enet:192.168.2.12,os32-sh.elf,192.168.2.201,192.168.2.12`、`auto-boot?` を true (ユーザーが設定)。電源だけで TFTP 起動した |
+| RN | NVRAM の `boot-device` を `enet:192.168.2.12,os32-sh.elf,192.168.2.201,192.168.2.12`、`auto-boot?` を true (ユーザーが設定)。電源だけで TFTP 起動した。固定名の像を更新・保管する手順は [PPC_NOTES §2](../../decisions/ppc/PPC_NOTES.md#2-g4-実機-powermac35of-421f2) |
 | FB 文字端末 (PPC-FB-RH) | 待機の案内 → sh、白黒 (fg=255 bg=0)、段の印の帯、日本語 (東雲 16)、長い出力のスクロールと最下行、BS、clear (帯は残る) を確認。USB のキーボードの入力もユーザーが確認 |
 | LAN | beacon・5 診断 (status・clock・memory・read-diag・peek) が往復、LAN 端末の sh (echo・ls・日本語)、`/host` の読み・書き・追記 |
 
