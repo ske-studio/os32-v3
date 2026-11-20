@@ -5,10 +5,10 @@ CHECK = dict(name='input-w34', tier=1, budget=60, needs=[], kind='contract',
             'input/hal/keymap*.c', 'input/hal/keymap.h', 'input/hal/kbd_merge.c',
             'input/hal/in2_dev.c', 'input/hal/in2_int.h', 'input/hal/legacy_keymap.c',
             'input/keymaps/*.c', 'platform/pc98/input_keymap.c',
-            'include/types.h', 'include/kbd.h', 'include/app_ids.h', 'include/io.h',
+            'include/types.h', 'include/callconv.h', 'include/kbd.h', 'include/legacy_guest.h', 'include/app_ids.h', 'include/io.h',
             'sdk/include/os32/os32_kapi_shared.h', 'tools/tests/host32.py',
             'tools/tests/input_w34_host.c', 'tools/tests/test_input_w34.py'],
-    basis=['INPUT_KEYMAP_DESIGN §5 §6 §8 W[2] W[3] W[4], PM 2026-11-17'])
+    basis=['docs/decisions/INPUT_KEYMAP_DESIGN.md §5・§8・W の小段の割り方・IKM1 v2 の列挙の数値'])
 from pathlib import Path
 from types import SimpleNamespace
 import os

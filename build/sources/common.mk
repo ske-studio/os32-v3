@@ -14,6 +14,7 @@ ifeq ($(PLATFORM),pc98)
 C_COMMON_PC98_PENDING += init/shell_loop.c $(C_EXT2_FORMATTER)
 endif
 C_COMMON_COMPILE_ONLY_PPC := kernel/sqlite_engine.c $(C_EXT2_FORMATTER) kernel/dev/device_ide.c drivers/ata/ide_addr.c
+C_COMMON_COMPILE_ONLY_PPC += input/hal/input_policy.c
 C_COMMON_IDE = kernel/dev/device_ide.c drivers/ata/ide.c drivers/ata/ide_addr.c
 C_COMMON_LOOP = kernel/dev/device_loop.c drivers/block/loop_dev.c
 ifeq ($(FEATURE_PC98_PENDING)$(FEATURE_LOOP),11)

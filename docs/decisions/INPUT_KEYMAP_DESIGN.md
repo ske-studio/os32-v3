@@ -570,9 +570,9 @@ PM決定 (2026-11-17): S0aは`km_source_release`の空inlineを維持し、別�
 |row.kind (u8)|1 META、2 KEYSYM、3 EXACT、4 ACCENT、5 TERM、6 EXT/COMPAT、7 FLAGS、8 KEY_ACTION|0は無効、9..255予約。§5の既定番号を維持。in2のevent/typeやdevice kindとは別|
 |row.profile (u8)|0 配列共通、1 PC98-CUI、2 PC98-GUI、3 Mac-CUI、4 Mac-GUI|0は「無し」ではない。5..255予約。B§4を維持。kind1..4/7は0、kind5/6/8は1..4。PC98機では1/2、PowerMacでは3/4だけ受理 (USBでも変えない)|
 |端末context (u8)|0 共通、1 LINE_EDIT、2 RUNNING、3 BYTE_INPUT、4 GUI|0は文脈共通、5..255予約。B§4を維持。kind5/6/8に使用。runtimeのcontext_setでは共通0を指定せず1..4|
-|map_id|1 PC98 (128キー)、2 HID (256キー)|0は無効、3..65535予約。`input/hal/keymap.h:30`、`input/hal/keymap_registry.c:28-29`。kind1..4/7のcontext (u8) とkind8のselector (u16) に載せる。map1はPC98機だけ、map2は両機種|
+|map_id|1 PC98 (128キー)、2 HID (256キー)|0は無効、3..65535予約。`input/hal/keymap.h` の `KM_MAP_PC98 / KM_MAP_HID`、`input/hal/keymap_registry.c` の `valid_map`。kind1..4/7のcontext (u8) とkind8のselector (u16) に載せる。map1はPC98機だけ、map2は両機種|
 
-`legacy_mode.c` のGUI真偽値 (`input/hal/legacy_mode.c:23,39-41`) をprofile/contextの番号に転用しない。`input/hal/in2_int.h:37-40,53-54` のevent・flags・origin・kindも独立。ゲームのINPUT_CTXはB§3のとおり独立。外枠のLE16B/16Bは `input/hal/input_policy.h:5-9`、v2・header.flags=0・count≤8192は `input/hal/input_policy.c:14-24` と一致する。`kernel/io_policy.c:9-10,38-49` には同じ大きさとLE処理があるが、I/Oのservice ID (`kernel/io_policy.h:7-12`) は入力IDへ流用しない。
+`legacy_mode.c` のGUI真偽値 (`input/hal/legacy_mode.c` の `kbd_set_gui_mode`) をprofile/contextの番号に転用しない。`input/hal/in2_int.h` の `InputEvent / INPUT_ORIGIN_* / INPUT_KIND_*` のevent・flags・origin・kindも独立。ゲームのINPUT_CTXはB§3のとおり独立。外枠のLE16B/16Bは `input/hal/input_policy.h` の `IKM_HEADER_SIZE / IKM_ROW_SIZE`、v2・header.flags=0・count≤8192は `input/hal/input_policy.c` の `ikm_wire_header` と一致する。`kernel/io_policy.c` の `read_le / write_le` には同じ大きさとLE処理があるが、I/Oのservice ID (`kernel/io_policy.h` の `IO_SVC_*`) は入力IDへ流用しない。
 
 ### 2. 操作ID (1列挙)
 
@@ -581,7 +581,7 @@ kind6のEXT.value・kind8のvalue・評価済みイベント/action通知は同�
 |値|操作|由来・意味|
 |---|---|---|
 |0|NONE|既存の「操作なし」。明示行で指定可、既定操作を抑止する。欠落行による補完とは別|
-|1|IME_ON|既存。`input/hal/keymap.h:56,87`、S1hの決定|
+|1|IME_ON|既存。`input/hal/keymap.h` の `KmHidExtensions.actions / KmEvalResult.action`、S1hの決定|
 |2|IME_OFF|既存。同上。ON/OFFを新番号へ移さない|
 |3|INTERRUPT|新規採番。実行中断 (LINE_EDITでの中断意味はCANCEL_LINE)|
 |4|CANCEL_LINE|新規採番。行の取り消し|
@@ -600,7 +600,7 @@ kind6のEXT.value・kind8のvalue・評価済みイベント/action通知は同�
 |17|CLOSE|新規採番|
 |18|BSD_SPECIAL|新規採番。BSD特殊IDとは別。特殊IDは評価由来の値として通知|
 
-19..0xffffffffは予約。受け手の未実装はB§3のUNSUPPORTEDであり、番号を削除しない。kind6/8にはBSD特殊IDを別途格納する欄を追加しない (kind6.aux=0、kind8.aux=修飾mask)。BSD特殊値そのものを表に載せるのはEXACTのopである。HID descriptorの疎なactions表は現契約どおり1/2のみ (`input/hal/keymap_registry.c:52-55`)。wireの操作値域をその内部表の検査で代用しない。
+19..0xffffffffは予約。受け手の未実装はB§3のUNSUPPORTEDであり、番号を削除しない。kind6/8にはBSD特殊IDを別途格納する欄を追加しない (kind6.aux=0、kind8.aux=修飾mask)。BSD特殊値そのものを表に載せるのはEXACTのopである。HID descriptorの疎なactions表は現契約どおり1/2のみ (`input/hal/keymap_registry.c` の `valid_map`)。wireの操作値域をその内部表の検査で代用しない。
 
 ### 3. TERMの編集制御ID (1列挙)
 
@@ -614,9 +614,9 @@ kind6のEXT.value・kind8のvalue・評価済みイベント/action通知は同�
 |3|VEOF|PC98は1a、Macは04。SUB+Enter・空行条件はB§3のとおり編集側|
 |4|KILL_TO_EOL|Macの0b (Ctrl+K)|
 |5|REDRAW|Macの0c (Ctrl+L)|
-|6|ERASE_PREV|既存BS=08による直前文字削除 (`userland/shell/ui.c:661`)|
-|7|ACCEPT_LINE|既存CR=0dによる行確定 (`userland/shell/ui.c:660`)|
-|8|COMPLETE|既存HT=09による補完 (`userland/shell/ui.c:757`)|
+|6|ERASE_PREV|既存BS=08による直前文字削除 (`userland/shell/ui.c` の `shell_run`)|
+|7|ACCEPT_LINE|既存CR=0dによる行確定 (`userland/shell/ui.c` の `shell_run`)|
+|8|COMPLETE|既存HT=09による補完 (`userland/shell/ui.c` の `shell_run`)|
 
 有効上限8、9..65535は予約。1..5の意味はB§3・§5、6..8は既存byte編集の名前を付けたもの (新しい操作ID/機能の追加ではない)。編集制御はICANON/文脈に従い、VINTRだけはISIGによる。MacのESCをVKILLの既定にせず、Cmd+KはCLEAR_VIEWのEXT/KEY_ACTIONで扱う。STOPも物理キーのEXTでありTERMのbyteを捏造しない。ID重複をbyte重複と混同しない。VINTR/編集制御の適用はB§3の文脈・IME優先に従う。
 
@@ -624,20 +624,20 @@ kind6のEXT.value・kind8のvalue・評価済みイベント/action通知は同�
 
 |名前空間|各bit/値|有効上限・予約・出典|
 |---|---|---|
-|操作照合mask|bit0=SHIFT (0x01)、bit1=CTRL (0x02)、bit2=ALT/GRPH (0x04)、bit4=COMMAND (0x10)|0は修飾なし。有効bit集合0x17、他bitは0。`input/hal/keymap.h:68-70` に揃える。kind6.selectorおよびkind8.auxに使用。B§4に従いMODE (0x08)、META (0x20)、Caps/Num/Kana等のlockは含めない。完全一致はこの4bitに投影してから比較|
+|操作照合mask|bit0=SHIFT (0x01)、bit1=CTRL (0x02)、bit2=ALT/GRPH (0x04)、bit4=COMMAND (0x10)|0は修飾なし。有効bit集合0x17、他bitは0。`input/hal/keymap.h` の `KmEffect / KM_MOD_*` に揃える。kind6.selectorおよびkind8.auxに使用。B§4に従いMODE (0x08)、META (0x20)、Caps/Num/Kana等のlockは含めない。完全一致はこの4bitに投影してから比較|
 |runtime context flags|bit0=ISIG (1)、bit1=ICANON (2)|今回新規採番。0は両方無効、上限3、bit2以上予約0。LINE_EDIT既定3、RUNNING既定1、BYTE_INPUT既定0。IKM1のrow.flagsには載せない|
-|EXACT用FLAGS.value|bit0=C (Caps対象)、bit1=N (Num対象)。O=0、C=1、N=2、B=3|0は対象lockなし、上限3、bit2..31予約0。`input/hal/keymap.h:48`、`tools/kbd_import.py:54-56`。C/Nが同時に該当してもShift列の反転は1回|
+|EXACT用FLAGS.value|bit0=C (Caps対象)、bit1=N (Num対象)。O=0、C=1、N=2、B=3|0は対象lockなし、上限3、bit2..31予約0。`input/hal/keymap.h` の `KmPc98Extensions.flags`、`tools/kbd_import.py` の `parse`。C/Nが同時に該当してもShift列の反転は1回|
 
-header.flags (u32) のbit0..31とrow.flags (u8) のbit0..7は**全部予約0** (有効bit無し)。runtime flags、in2のSEAMLESS、BSDのspclを混ぜない。旧rawのSHIFT_CTRL=0x10等 (`include/kbd.h:65-69`) と操作maskは異なるので明示変換する。kind6.selector=0xffffはmaskではなくCOMPATの別形式であり、mask検査の前に分岐する。
+header.flags (u32) のbit0..31とrow.flags (u8) のbit0..7は**全部予約0** (有効bit無し)。runtime flags、in2のSEAMLESS、BSDのspclを混ぜない。旧rawのSHIFT_CTRL=0x10等 (`include/kbd.h` の `SHIFT_*`) と操作maskは異なるので明示変換する。kind6.selector=0xffffはmaskではなくCOMPATの別形式であり、mask検査の前に分岐する。
 
 ### 5. セルkind・BSD特殊ID・META添字・セルselector (4列挙)
 
 |名前空間|数値と意味|0・上限・予約・出典|
 |---|---|---|
-|EXACT.aux低8bitのkind|0 CHAR、1 BSD_SPECIAL|0は文字 (NULも有効)。wireは上限1。2 LEGACY_CONTROLは出口専用、255 INHERITは内部bank1専用でwire拒否、3..254予約。`input/hal/keymap.h:31-34`、H0b|
-|EXACT.aux次8bitのop|BSD特殊ID (下表)。CHARでは0のみ|BSD_SPECIALの0はNOP。「無し」として捨てない。aux上位16bit予約0。valueはCHARならkeysym、BSD_SPECIALならKS_voidSymbol=0xf500 (`tools/kbd_import.py:10,15-21`)|
+|EXACT.aux低8bitのkind|0 CHAR、1 BSD_SPECIAL|0は文字 (NULも有効)。wireは上限1。2 LEGACY_CONTROLは出口専用、255 INHERITは内部bank1専用でwire拒否、3..254予約。`input/hal/keymap.h` の `KmExactCell / KM_CHAR / KM_BSD_SPECIAL`、H0b|
+|EXACT.aux次8bitのop|BSD特殊ID (下表)。CHARでは0のみ|BSD_SPECIALの0はNOP。「無し」として捨てない。aux上位16bit予約0。valueはCHARならkeysym、BSD_SPECIALならKS_voidSymbol=0xf500 (`tools/kbd_import.py` の `VOID / SPECIAL`)|
 |META.index|0 N_KEYS、1 N_ACCS|0はキー数の宣言。2..65535予約。§5。selector/auxは0|
-|KEYSYM.selector|0 command、1 group1[0]、2 group1[1]、3 group2[0]、4 group2[1]|0はcommandセル。5..65535予約。§5、配置は `input/hal/keymap.h:8-12`|
+|KEYSYM.selector|0 command、1 group1[0]、2 group1[1]、3 group2[0]、4 group2[1]|0はcommandセル。5..65535予約。§5、配置は `input/hal/keymap.h` の `KmEntry`|
 
 BSD特殊IDはB§1のFreeBSD値をそのまま使う。最大既知値0xa3、穴は0x01・0x7b..0x7f、0xa4..0xffは予約で全て拒否。通常文字の同じ数値と区別する。
 
@@ -658,7 +658,7 @@ BSD特殊IDはB§1のFreeBSD値をそのまま使う。最大既知値0xa3、穴
 
 B§3のCHAR_ETXはCHARで通常文字の評価が03になった由来を指す判定であり、新しいwireのセルkindを割り当てない (LEGACY_CONTROLの03とは区別)。
 
-既存実装の対応は `tools/kbd_import.py:15-21,38-44`、修飾作用は `input/hal/keymap_eval.c:7-20`。残りもB§1で既に定義済みで、新規採番ではない。受理して無視する値を、実装が無いという理由で予約値へ変更しない。
+既存実装の対応は `tools/kbd_import.py` の `SPECIAL / cell`、修飾作用は `input/hal/keymap_eval.c` の `cell_effect`。残りもB§1で既に定義済みで、新規採番ではない。受理して無視する値を、実装が無いという理由で予約値へ変更しない。
 
 ### 6. W[2]の行ごとの判定 (上の13列挙を使う)
 
