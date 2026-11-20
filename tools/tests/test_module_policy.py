@@ -57,6 +57,8 @@ def conformance():
     assert gen_module_schema.OUTPUT.read_text() == gen_module_schema.render(), 'stale schema'
     config = (ROOT / 'include/config.h').read_text()
     deployed = yaml.safe_load((ROOT / 'build/core.yaml').read_text())['filesystem']['files']
+    assert schema.MODULE_FORMATS['x86-pc98'] == (1, 3, 1, 0, 4)
+    assert schema.MODULE_FORMATS['ppc-powermac'] == (2, 20, 2, 20, 12)
     distributed = schema.COMPONENTS
     expected = [row['path'].split('/')[-1] for row in distributed]
     build = (ROOT / 'build/kernel.mk').read_text()

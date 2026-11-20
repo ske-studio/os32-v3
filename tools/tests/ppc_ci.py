@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """Exercise the actual stage 1 gate and configure argument branches."""
 import argparse
+import importlib.util
+import os
+import sys
+import tempfile
 import re
 from pathlib import Path
 import shlex
@@ -192,10 +196,68 @@ def scope_matrix(source):
             'git', 'diff', '--name-only', '--no-renames', '-z', 'base', 'HEAD']
 
 
+def ppc_imports(directory, mutate):
+    sys.path.insert(0, str(ROOT / "tools"))
+    import gen_sqlite_imports as generator
+
+    cross = Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc')) / 'bin'
+    if not (cross / 'powerpc-elf-gcc').is_file():
+        if os.environ.get('OS32_REQUIRE_PPC') == '1':
+            raise AssertionError('required PowerPC compiler missing')
+        print('SKIP PPC import stubs: PowerPC compiler unavailable')
+        return
+
+    def command(argv):
+        return subprocess.check_output(argv, text=True, cwd=ROOT)
+
+    definition = ROOT / 'tools/prototypes/fep_imports.def'
+    cc = [cross / 'powerpc-elf-gcc', '-m32', '-mbig-endian', '-msoft-float',
+          '-msdata=none', '-ffreestanding', '-D__cdecl=', '-D__KERNEL_BUILD__',
+          '-Wall', '-Werror', '-I.', '-Iinclude', '-Iarch/ppc', '-Iplatform/powermac',
+          '-Isdk/include', '-Isdk/include/os32', '-Ikernel', '-Ikernel/module',
+          '-Ikernel/irq', '-Ikernel/time', '-Imm', '-Ilib', '-Ifs', '-Iexec']
+
+    def verify_stubs(subject):
+        meta = subject.generate(directory, definition, module='fep', target='ppc-powermac')
+        for stem, suffix in [('import_stubs', 'S'), ('provider_types', 'c'), ('import_slots', 'c')]:
+            command([*cc, '-c', directory / f'fep_{stem}.{suffix}',
+                     '-o', directory / f'{stem}.o'])
+        obj = directory / 'import_stubs.o'
+        binary = directory / 'text.bin'
+        command([cross / 'powerpc-elf-objcopy', '-O', 'binary', '-j', '.text.fep_imports',
+                 obj, binary])
+        # lis r12,0 / lwz r12,0(r12) / mtctr r12 / bctr, before final link.
+        assert binary.read_bytes() == bytes.fromhex(
+            '3d800000 818c0000 7d8903a6 4e800420') * len(meta['imports'])
+        relocs = command([cross / 'powerpc-elf-readelf', '-rW', obj])
+        rows = re.findall(r'^([0-9a-f]+)\s+\S+\s+R_PPC_ADDR16_(HA|LO)\s+'
+                          r'\S+\s+fep_import_slots \+ ([0-9a-f]+)$', relocs, re.M)
+        assert [(int(off, 16), kind, int(addend, 16)) for off, kind, addend in rows] == [
+            (16*i + delta, kind, 4*i) for i in range(len(meta['imports']))
+            for delta, kind in ((2, 'HA'), (6, 'LO'))]
+
+    verify_stubs(generator)
+    if mutate:
+        source = Path(generator.__file__).read_text()
+        anchor = "'    bctr'"
+        assert source.count(anchor) == 1
+        mutant = importlib.util.module_from_spec(generator.__spec__)
+        exec(compile(source.replace(anchor, "'    bctrl'"), generator.__file__, 'exec'),
+             mutant.__dict__)
+        try:
+            verify_stubs(mutant)
+        except AssertionError:
+            print('MUTATE ppc-tail-call RED')
+        else:
+            raise AssertionError('PPC stub linked the return address')
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
+    with tempfile.TemporaryDirectory() as temp:
+        ppc_imports(Path(temp), args.mutate)
     source = SOURCE.read_text()
     matrix(source)
     configure()
