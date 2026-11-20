@@ -78,7 +78,7 @@ SKIP の行は挙げるだけで落とさない: 試験が自分の出力とし�
 |---|---|---|
 | check.yml `static-check` | `make check-<名>` を手で並べる | クロスコンパイラ無しで回る検査に CHECK の `env` で印を付け、`gate.py run` に環境の絞り込みを足して一覧を登録から取る (G4)。道具の事前確認の表を環境ごとに持つ |
 | check.yml `ppc-compile` | `run.py --run all`、`ppc_scope.py` のパスの一覧 | `gate.py run --env ppc-cross` に替える (G2・G3)。PowerPC を回すかどうかの判定は、パスの一覧ではなく所有者集合 (`build/select.mk`) から引く |
-| check.yml `ppc-qemu` | 2026-11-18 に `gate.py run --env qemu-ppc --shard i/4` の 4 分割にし、`needs` の鎖を外した (G2・G3・G10)。検査ごとの所要を成果物 `check-times-<SHA>-ppc-qemu-<i>` に出す | 残りは `ppc_scope.py` のパスの一覧と、用意の行の重複 |
+| check.yml `ppc-qemu` | 2026-11-18 に `gate.py run --env qemu-ppc --shard i/4` の 4 分割にし、`needs` の鎖を外した (G2・G3・G10)。現在は i/5 の 5 分割。検査ごとの所要を成果物 `check-times-<SHA>-ppc-qemu-<i>` に出す | 残りは `ppc_scope.py` のパスの一覧と、用意の行の重複 |
 | build.yml `checks` (6 シャード) | `make -k check CHECK_SHARD=…` (全部の検査を変異込み、2026-11-18 から) | `gate.py run --shard …` に替えると、表・検査ごとのログ・回っていない検査の検出が付く (G2・G3)。`gate-setup` にすると PowerPC の検査が SKIP にならない (G5・G6) |
 | 用意 | apt の行が 4 か所 | `gate-setup` に寄せる (G5) |
 
@@ -190,9 +190,9 @@ build の dispatch:
 
 #### 4. main への push で PowerPC の段が中身を回すか
 
-- **回らない。** 標本の main の push 5 回 (44290201312・44290142172・44277658303・44276821812・44274576283) は 5 回とも `Select PPC scope` の出力が `skip: x86-only, documentation-only, or empty branch delta`。ppc-compile 0.1〜0.2 分、ppc-qemu 4 本 0.1〜0.3 分 (用意以降の手順は飛ぶ)。ppc-toolchain-cache だけが 0.2〜0.4 分で走る
+- **変更前の実測。** 標本の main の push 5 回 (44290201312・44290142172・44277658303・44276821812・44274576283) は 5 回とも `Select PPC scope` の出力が `skip: x86-only, documentation-only, or empty branch delta`。ppc-compile 0.1〜0.2 分、ppc-qemu 4 本 0.1〜0.3 分 (用意以降の手順は飛ぶ)。ppc-toolchain-cache だけが 0.2〜0.4 分で走る
 - 規則 (`tools/ci/ppc_scope.py`): `PPC_ARCH` は push では `auto` (dispatch だけ入力の arch)。`x86` → skip、`ppc`・`both` → 回す、枝の名前が `wt/int-` で始まれば回す。それ以外は `git merge-base origin/main HEAD` から HEAD までの差分のパスを見て、docs/・*.md は飛ばし、共通の置き場 (kernel/・lib/・include/ …)・PowerPC の置き場・`build/*.mk`・決まったファイル (Makefile・check.yml など) があれば回す、x86 だけの置き場は飛ばし、知らない置き場は控えめに回す。差分が空なら skip
-- main の push では、checkout (fetch-depth 0) の origin/main が push された SHA そのもの (かその子) なので merge-base = HEAD、差分が空になり、**中身に依らず必ず skip** (ソースから読んだ結論。例外は main で `workflow_dispatch` を arch=ppc/both で起動した時だけ)。意図どおりかは設計の判断 (票の §1 の「未確認」はこの規則による)。PowerPC の検査は、取り込む前の枝の push でだけ回る
+- main の push は before→HEAD が文書だけなら PowerPC を省く。コードを含む場合は同じ SHA の `wt/int-*` の check の push が成功していれば省き、それ以外は x86 だけの変更でも compile と QEMU 5 本を回す。強制 push・before の欠落時も全部回す。 導入後の main push 20 回で、省略と実行の本数・所要を測る。
 - 枝でも飛ぶ例: wt/ppc-kapi-fill の 2 回 (44290719097・44289493633) は差分が x86 と文書だけと判定されて skip
 
 ## 5-4. 用意を 1 か所に (2026-11-18、票 TASK_CI_REWORK の段 S2a)

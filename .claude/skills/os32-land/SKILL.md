@@ -71,7 +71,7 @@ git merge --ff-only origin/wt/<名>                   # ff できなければ me
 git push -q origin main
 ```
 
-- main への push では、同じ SHA の統合の枝 (`wt/int-*`) の成功を `tools/ci/reuse_success.py` が確かめて検査を省く (配布物は毎回作る)。統合の枝から ff した main は検査を回し直さない。
+- main への push では、同じ SHA の push の成功を `tools/ci/reuse_success.py` が確かめる。build の checks は `wt/**` の build の成功を使える。check の PowerPC の証拠には `wt/int-*` の check の成功だけを使える。配布物と static-check は毎回作る・回す。
 - main の CI の build が赤なら最優先で直す。
 - 実機に入れる SHA は artifacts のジョブが成功したものを選ぶ (os32-realhw-update)。
 
