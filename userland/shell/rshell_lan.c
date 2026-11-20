@@ -19,17 +19,31 @@ static const char *state = REMOTE_STATE_IDLE;
 static u8 result[REMOTE_RESULT_BODY_MAX];
 static u32 result_len;
 static int accepting;
+#define RSH_HOLD_TICKS (30u * OS32_TICK_HZ)
+#define RSH_HOLD_TRIES 12u
+static struct { int held, rc; u32 gen, id, dropped, tick, tries; } hold;
+static u32 out_status;
+
+static u32 exchange_limit(void)
+{
+    if (!hold.held) return RSH_TOTAL_TICKS;
+    u32 age = g_api->get_tick() - hold.tick;
+    if (age >= RSH_HOLD_TICKS) return 0;
+    u32 left = RSH_HOLD_TICKS - age;
+    return left < RSH_TOTAL_TICKS ? left : RSH_TOTAL_TICKS;
+}
 
 #define LANTRACE_MAX 32
 #define LANTRACE_SAVE_PATH "/tmp/lantrace_rs.txt"
 #define LANTRACE_GS_PATH "/tmp/lantrace_gs.txt"
-static struct { const char *name; u32 tick; } trace[LANTRACE_MAX];
+static struct { const char *name; u32 tick, status; int rc, outcome; } trace[LANTRACE_MAX];
 static unsigned int trace_count;
 static int trace_active;
 
 static void trace_add(const char *name)
 {
     if (trace_active && trace_count < LANTRACE_MAX) {
+        trace[trace_count].outcome = 0;
         trace[trace_count].name = name;
         trace[trace_count++].tick = g_api->get_tick();
     }
@@ -40,14 +54,33 @@ static u32 trace_delta(unsigned int i)
     return i ? trace[i].tick - trace[i - 1].tick : 0;
 }
 
+static void trace_outcome(const char *name, int rc)
+{
+    unsigned int i = trace_count;
+    trace_add(name);
+    if (i < trace_count) {
+        trace[i].outcome = 1;
+        trace[i].rc = rc;
+        trace[i].status = out_status;
+    }
+}
+
+static int trace_line(char *line, unsigned int cap, unsigned int i)
+{
+    if (trace[i].outcome)
+        return snprintf(line, cap, "%s tick=%u delta=%u rc=%d status=%u\n", trace[i].name,
+                        (unsigned int)trace[i].tick, (unsigned int)trace_delta(i), trace[i].rc, (unsigned int)trace[i].status);
+    return snprintf(line, cap, "%s tick=%u delta=%u\n", trace[i].name,
+                    (unsigned int)trace[i].tick, (unsigned int)trace_delta(i));
+}
+
 static void trace_save(void)
 {
     char line[128];
     int fd = g_api->sys_open(LANTRACE_SAVE_PATH, KAPI_O_WRONLY | KAPI_O_CREAT | KAPI_O_TRUNC);
     if (fd < 0) return;
     for (unsigned int i = 0; i < trace_count; i++) {
-        int n = snprintf(line, sizeof(line), "%s tick=%u delta=%u\n", trace[i].name,
-                         (unsigned int)trace[i].tick, (unsigned int)trace_delta(i));
+        int n = trace_line(line, sizeof(line), i);
         if (n > 0 && (unsigned int)n < sizeof(line)) g_api->sys_write(fd, line, n);
     }
     g_api->sys_close(fd);
@@ -68,9 +101,11 @@ static void trace_file(const char *path)
 
 void rsh_lan_trace_show(void)
 {
-    for (unsigned int i = 0; i < trace_count; i++)
-        g_api->kprintf(ATTR_WHITE, "%s tick=%u delta=%u\n", trace[i].name,
-                       (unsigned int)trace[i].tick, (unsigned int)trace_delta(i));
+    char line[128];
+    for (unsigned int i = 0; i < trace_count; i++) {
+        trace_line(line, sizeof(line), i);
+        g_api->kprintf(ATTR_WHITE, "%s", line);
+    }
     if (!trace_count) trace_file(LANTRACE_SAVE_PATH);
     trace_file(LANTRACE_GS_PATH);
 }
@@ -88,12 +123,12 @@ static void boot_text(char *out)
     out[2 * sizeof(token)] = 0;
 }
 
-static int wait_again(int rc, u32 start, u32 progress)
+static int wait_again(int rc, u32 start, u32 progress, u32 limit)
 {
     if (rc != 0 && rc != OS32_ERR_AGAIN) return rc;
     u32 now = g_api->get_tick();
     if ((u32)(now - progress) >= RSH_STALL_TICKS ||
-        (u32)(now - start) >= RSH_TOTAL_TICKS) return OS32_ERR_TIMEOUT;
+        (u32)(now - start) >= limit) return OS32_ERR_TIMEOUT;
     g_api->sys_yield();
     return 0;
 }
@@ -104,6 +139,9 @@ static int exchange(const char *req, const u8 *body, u32 len,
 {
     u32 start = g_api->get_tick(), progress = start;
     u32 sent = 0, got = 0, status = 0, length = 0;
+    u32 limit = exchange_limit();
+    out_status = 0;
+    if (!limit) return OS32_ERR_TIMEOUT;
     int h = g_api->host_open(req, (u32)strlen(req)), rc;
     if (h < 0) return h;
     while (sent < len) {
@@ -115,10 +153,10 @@ static int exchange(const char *req, const u8 *body, u32 len,
             progress = g_api->get_tick();
         } else {
             if (rc > 0) rc = OS32_ERR_IO;
-            rc = wait_again(rc, start, progress);
+            rc = wait_again(rc, start, progress, limit);
             if (rc) goto close;
         }
-        if ((u32)(g_api->get_tick() - start) >= RSH_TOTAL_TICKS) {
+        if ((u32)(g_api->get_tick() - start) >= limit) {
             rc = OS32_ERR_TIMEOUT;
             goto close;
         }
@@ -126,9 +164,10 @@ static int exchange(const char *req, const u8 *body, u32 len,
     for (;;) {
         rc = g_api->host_status(h, &status, &length);
         if (!rc) break;
-        rc = wait_again(rc, start, progress);
+        rc = wait_again(rc, start, progress, limit);
         if (rc) goto close;
     }
+    out_status = status;
     if (status != 200 || length >= cap) { rc = OS32_ERR_IO; goto close; }
     progress = g_api->get_tick();
     while (got < length) {
@@ -138,10 +177,10 @@ static int exchange(const char *req, const u8 *body, u32 len,
             progress = g_api->get_tick();
         } else {
             if (!rc || rc > 0) rc = OS32_ERR_IO;
-            rc = wait_again(rc, start, progress);
+            rc = wait_again(rc, start, progress, limit);
             if (rc) goto close;
         }
-        if ((u32)(g_api->get_tick() - start) >= RSH_TOTAL_TICKS) {
+        if ((u32)(g_api->get_tick() - start) >= limit) {
             rc = OS32_ERR_TIMEOUT;
             goto close;
         }
@@ -192,6 +231,10 @@ static int send_ready(void)
     p += 5;
     if (decimal(&p, &svc) || svc != REMOTE_SVC_RSHELL || (*p && strcmp(p, "\n"))) goto bad;
     if (generation != gen) {
+        if (hold.held && hold.gen != gen) {
+            trace_add("out_drop");
+            hold.held = 0;
+        }
         generation = gen;
         have_id = 0;
         state = REMOTE_STATE_IDLE;
@@ -218,7 +261,8 @@ int rsh_lan_flush(unsigned int id, unsigned int dropped)
                     boot, id, dropped, (unsigned int)result_len);
     trace_add(accepting ? "accept_send" : "out_send");
     int rc = exchange(req, result, result_len, reply, sizeof(reply));
-    trace_add(accepting ? "accept_done" : "out_done");
+    if (accepting) trace_add("accept_done");
+    else trace_outcome(hold.held && hold.tries ? "out_retry" : "out_done", rc);
     return rc;
 }
 
@@ -231,6 +275,11 @@ void rsh_lan_reset(void)
     if (generation && g_api->host_notice_read) {
         while (!g_api->host_notice_read(generation, REMOTE_SVC_RSHELL, &notice))
             discarded++;
+    }
+    if (hold.held) {
+        trace_add("out_drop");
+        hold.held = 0;
+        state = REMOTE_STATE_DONE;
     }
     ready = attempted = 0;
     if (discarded)
@@ -291,18 +340,45 @@ static int collect(void)
     }
 }
 
+static int deliver(void)
+{
+    int rc = rsh_lan_flush(hold.id, hold.dropped);
+    if (rc) ready = 0;
+    if (!rc || out_status == 400) {
+        hold.held = 0;
+        state = REMOTE_STATE_DONE;
+        if (hold.tries) attempted = 0;
+    }
+    hold.rc = rc;
+    return rc;
+}
+
 int rsh_lan_poll(void)
 {
     HostNotice notice;
     char line[REMOTE_RSHELL_COMMAND_MAX + 1];
     u32 id, before, after;
     int rc, handoff = 0, exit_requested = 0;
+    int captured = 0;
+    u32 dropped;
     accepting = 0;
+    if (hold.held && (!exchange_limit() || hold.tries >= RSH_HOLD_TRIES)) {
+        trace_add("out_drop");
+        g_api->kprintf(ATTR_YELLOW, "rshell: LAN result %08x abandoned (rc=%d)\n",
+                       (unsigned int)hold.id, hold.rc);
+        hold.held = 0;
+        state = REMOTE_STATE_DONE;
+    }
     if (!attempted || (u32)(g_api->get_tick() - ready_tick) >= RSH_READY_TICKS) {
         rc = send_ready();
         if (rc) return rc;
+        if (hold.held) {
+            ++hold.tries;
+            rc = deliver();
+            return rc ? rc : 1;
+        }
     }
-    if (!ready) return OS32_ERR_AGAIN;
+    if (!ready || hold.held) return OS32_ERR_AGAIN;
     rc = g_api->host_notice_read(generation, REMOTE_SVC_RSHELL, &notice);
     if (rc) {
         if (rc == OS32_ERR_STALE || rc == OS32_ERR_INVAL) ready = 0;
@@ -319,12 +395,13 @@ int rsh_lan_poll(void)
     if (trace_active) { trace_count = 0; trace_add("notify_consumed"); }
     rc = g_api->con_sink_capture(CON_SINK_CAPTURE_BEGIN);
     if (rc) return rc;
-    rc = g_api->con_sink_stat(&sink_pending, &before);
-    if (rc) goto end;
+    captured = 1;
     last_id = id;
     have_id = 1;
     state = REMOTE_STATE_RUNNING;
     exit_requested = str_eq(line, "exit");
+    rc = g_api->con_sink_stat(&sink_pending, &before);
+    if (rc) goto missing;
     if (!exit_requested) {
         g_api->buz_off();
         g_api->kprintf(ATTR_YELLOW, "%s", "> ");
@@ -335,24 +412,42 @@ int rsh_lan_poll(void)
         trace_add("execute_end");
         (void)sh_refused_take();
     }
-    state = REMOTE_STATE_DONE;
 finish:
     rc = g_api->con_sink_capture(CON_SINK_CAPTURE_FREEZE);
-    if (rc && rc != OS32_ERR_NOSPC) goto end;
+    if (rc && rc != OS32_ERR_NOSPC) goto missing;
     int frozen = rc;
     rc = g_api->con_sink_stat(&sink_pending, &after);
-    if (rc) goto end;
-    u32 dropped = after - before;
+    if (rc) goto missing;
+    dropped = after - before;
     if (frozen == OS32_ERR_NOSPC && !dropped) dropped = 1;
     rc = collect();
-    if (rc) goto end;
+    if (rc) goto missing;
+    goto send;
+missing:
+    accepting = 0;
+    result_len = 0;
+    dropped = 1;
+send:
     result[result_len++] = 0x04;
-    rc = rsh_lan_flush((unsigned int)id, (unsigned int)dropped);
-    if (rc) ready = 0;
-    else handoff = accepting;
-end:
-    g_api->con_sink_capture(CON_SINK_CAPTURE_END);
-    trace_add("capture_end");
+    if (accepting || exit_requested) {
+        rc = rsh_lan_flush(id, dropped);
+        if (rc) ready = 0;
+        else handoff = accepting;
+        state = REMOTE_STATE_DONE;
+    } else {
+        hold.held = 1;
+        hold.gen = generation;
+        hold.id = id;
+        hold.dropped = dropped;
+        hold.tick = g_api->get_tick();
+        hold.tries = 0;
+        rc = deliver();
+    }
+    if (captured) {
+        g_api->con_sink_capture(CON_SINK_CAPTURE_END);
+        trace_add("capture_end");
+        captured = 0;
+    }
     if (handoff) {
         trace_add("execute_start");
         trace_save();
@@ -364,9 +459,11 @@ end:
         /* A successful switch exits the shell. A return reports failure via
          * the existing OUT contract, without submitting/executing gui again. */
         rc = g_api->con_sink_capture(CON_SINK_CAPTURE_BEGIN);
-        if (rc) return rc;
+        state = REMOTE_STATE_RUNNING;
+        if (rc) goto missing;
+        captured = 1;
         rc = g_api->con_sink_stat(&sink_pending, &before);
-        if (rc) goto end;
+        if (rc) goto missing;
         g_api->kprintf(ATTR_WHITE, "> %s\n", line);
         g_api->kprintf(ATTR_RED, "os32gui: launch failed (rc=%d)\n", status);
         goto finish;

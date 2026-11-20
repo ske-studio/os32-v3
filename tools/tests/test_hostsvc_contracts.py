@@ -206,8 +206,8 @@ def source():
      'sfs_persistent_generation': 'u32 (*)(void)',
      'sfs_persistent_stale': 'void (*)(void)',
      'sfs_persistent_enabled': 'int (*)(void)',
-     'sfs_persistent_scope_begin': 'int (*)(void)',
-     'sfs_persistent_scope_end': 'int (*)(int)',
+     'sfs_persistent_scope_begin_owned': 'int (*)(int)',
+     'sfs_persistent_scope_end_owned': 'int (*)(int, int)',
      'sfs_client_call_deadline': 'int (*)(SfsClient *, u8, const void *, u16, struct '
                                  'SfsReply *, u32)',
      'sfs_client_hello_deadline': 'int (*)(SfsClient *, u32, u32)',

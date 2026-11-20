@@ -7,7 +7,7 @@
 
 - 起動の設定 `/etc/netcd.cfg` に `SFS_LAN=1` (と `SFS_LAN_PEER=<MAC>`) があれば、起動時に `/host` を SerialFS で mount し、電源を切るまで載せたままにする。HELLO は最初の操作の時まで送らない。相手がいなくても mount は消さない。
 - `/etc/netcd.cfg` は起動 FD 用の設定で、install は HDD へ写さない ([drivers/block/netcd](../../drivers/block/netcd.md))。起動時は root の `/etc/netcd.cfg` を読むだけなので、HDD 起動で常駐させるには HDD 側に手で置く。
-- 常駐でない時の `sfs run` (常駐シェルの中だけ /host を開く) は従来どおり。LAN か UART かは `/etc/system.cfg` の `SFS_LAN`・`SFS_LAN_PEER` で選ぶ (`serialfs_session.c`)。
+- 常駐でない時の `sfs run` (常駐シェルの中だけ /host を開く) は従来どおり。LAN か UART かは `/etc/system.cfg` の `SFS_LAN`・`SFS_LAN_PEER` で選ぶ (`sfs_session_fg.c`)。
 - NP21/W は既定で HostDrv が `/host` を持つ。既に `/host` が載っていれば `sfs_persistent_start` は `BUSY` で、HostDrv を上書きしない。
 
 ## 誰が状態を持つか
@@ -35,13 +35,13 @@
 
 ## `sfs run` との関係 (LAN の scope)
 
-- 常駐している時、KAPI の `sfs_begin`/`sfs_end` (`serialfs_session_begin`/`_end`) は scope の開始・終了になる。開始で ensure (1 秒) し、終了で BYE も unmount もしない。開始と終了の表示 (`sfs: transport=lan … sid=`・`sfs: exit=N`) は常駐でない時と同じ形。
+- 常駐している時、KAPI の `sfs_begin`/`sfs_end` (`serialfs_session_begin`/`_end`) は scope の開始・終了になる。`sfs_persistent_scope_begin_owned` は呼び元の owner を記録し、`sfs_persistent_scope_end_owned` は同じ owner の scope を閉じる。開始で ensure (1 秒) し、終了で BYE も unmount もしない。開始と終了の表示 (`sfs: transport=lan … sid=`・`sfs: exit=N`) は常駐でない時と同じ形。
 - 常駐の間も `sfs run hsync` が使える。
 
 ## 落とし穴
 
 - ホストの `SFS_T_ERR` は理由を問わず全部 `STALE` に扱う (知らない sid 以外の拒否も)。未整理の P3。
-- scope の開始に失敗した時の表示が無い。開始の表示の NIC 名は `82557` に固定 (LGY-98 でも)。未整理の P3。
+- scope の開始に失敗した時の表示が無い。成功時は transport の describe が返す NIC 名を表示する。
 - ホストの再起動の後は FD が `STALE` になる。アプリは開き直す。
 
 ## 確かめ

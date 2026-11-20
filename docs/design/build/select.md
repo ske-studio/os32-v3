@@ -24,6 +24,9 @@
 
 ## 2. 到達点
 
+SerialFS の入口 `serialfs_session.c` は USERSHELL で共有する。前景の UART・82557 を持つ `sfs_session_fg.c` は PC98_PENDING で選ぶ。
+
+
 1. ソースの持ち主の一覧は 1 か所。x86 も PowerPC もそこから選ぶ。
 2. 像の構成は `IMAGE` の値 1 つで決まる。arch・platform と独立の軸。
 3. `make ARCH=ppc PLATFORM=powermac IMAGE=<名>` が PowerPC の製品の像を組む。手書きの一覧と compile だけの計測は無い。

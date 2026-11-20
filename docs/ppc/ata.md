@@ -33,6 +33,9 @@ Apple Developer Note [July 2001 PMG40701.pdf](https://leopard-adc.pepas.com/docu
 Exploded View「QuickSilver 2002」pp. 12–13 が根拠。両年式の標準基板図は
 KeyLargo の 2 系統を示す。基板改版ごとの OF 値・IRQ・大容量対応は [未]。
 
+手元の G4 (PowerMac3,5) には 6.4 GB の ATA の HDD がつないである (2026-11-20、ユーザー)。
+実機の受入で使う。系統と device 番号は [未] — 状態は票 TASK_PPC_REALHW の §0 が持つ。
+
 MDD の APPLE-MDD02・APPLE-MDD は U2 の ATA/100 に HDD、KeyLargo の
 ATA/66 に別の HDD、EIDE に光学という 3 系統を記載する。
 ATA/100 の接続先を示す根拠は U2 節とブロック図を採る。
