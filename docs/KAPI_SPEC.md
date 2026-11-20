@@ -137,7 +137,7 @@ KAPI は append-only で版番号は単調増加。複数の計画が独立に�
 | v84 | **宣言・仮実体 (HAL v2 A0)** | `gfx2_adapter_count`〜`gfx2_present` 29 本 (slot 263〜291、offset 0x424〜0x494)。A0 はすべて NOSYS、実装と受入は C/G/Y/I 各段 | [確定設計 §11](decisions/gui/HAL_V2_DESIGN.md#11-今の版との関係と-a0-宣言だけを先に置く段) |
 | v86 | **実装 (LAN 操作口 X9b)** | `boot_token_get` (slot 293、offset 0x49C)。起動中一定の識別子 16 バイトを写す | 本書 §4 |
 | v85 | **宣言追加 (LAN 操作口 X9)** | `con_sink_capture` (slot 292、offset 0x498)。capture の開始・固定・終了を既存 owner 契約で行う | [設計 §3](decisions/network/LAN_OPERATOR_DESIGN.md) |
-| v87 | **実装 (I/O の Tier C1・C2・L1)** | `io_policy_set` / `io_policy_get` / `io_policy_reset` / `io_pump` (slot 294〜297) | [TASK_IO_TIER](tasks/v3/TASK_IO_TIER.md) |
+| v87 | **実装 (I/O の Tier C1・C2・L1)** | `io_policy_set` / `io_policy_get` / `io_policy_reset` / `io_pump` (slot 294〜297) | 票 TASK_IO_TIER |
 | v88 | **実装 (段 6c の D2)** | slot の追加なし。`ext2_format` / `ext2_format_at` の `drv` に loop の `0x0600..0x0603` (`OS32_DRV_LOOP(slot)`) を足す。v87 の出荷版以前はこの範囲を拒否する | 本書 [ext2 の loop の drv](#ext2-loop-drv) |
 
 調停 (2026-09-06、同日改訂): GUI (K1〜W2) を先に実装するので **v42 = GUI、v43 = ネットワーク Host Services**
