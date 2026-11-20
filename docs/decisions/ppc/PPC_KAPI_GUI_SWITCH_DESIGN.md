@@ -242,9 +242,5 @@ x86 の build_compare: M1・M2 (ヘッダだけ)、M3 (展開後が同じ式)、
 - **P2 (§2-3、§3 E1・E6、§5-4 A9)**: E1 は「呼び手の文脈の取得の失敗」に改める (固定引数は保存済みの GPR から読む、arch/ppc/kapi_call.c:30)。kboot-shell の INVAL は文字列の共通の写しを通った入力に限る (不正な文字列はその前に FAULT)。A9 のゲストの確かめは常駐の CLI 経由の swprobe で (platform/powermac/cli_boot.c:18)。
 - **P2 (§5-4 A4・A10)**: 取り出しを消す変異は実体を通る A7 で RED を取る。A10 には ime_set_render 単独の公開の変異を足す (sdk/kapi_target_ppc.py:35 の ime の組)。
 
-## 確定の追記 (2026-11-20、P3〜P5 の着手で見つけた前提の欠け、本線 PM 決定 (a))
-- 前提の欠け: PowerPC の sh は USB・LAN とも SHELL_AS_APP と SH_SYS_MINIMAL (userland/ppc/sh/profile.h)。`os32gui` は SHELL_AS_APP で「sh: cui only」(userland/shell/sh_exec.inc の拒否) で断られ、SH_SYS_MINIMAL で組み込みの表 (userland/shell/cmd_sys.c) からも外れる。LAN の APP の rsh_lan_handoff() は常に OS32_ERR_NOSYS。よって §5-4 の A6〜A8 の「sh → os32gui → …」の道は PowerPC の sh に無い。
-- A6〜A8 の手順の直し: 受入の像だけの設定 (KB の変数か起動の引数) で、起動のループの最初の 1 回だけ swprobe をセッションのシェル (parent = APP_ID_SHELL) として起こす。swprobe が sys_switch_shell を呼び (A6 の文字列の契約・A7 の往復の要求・A8 の切替先が無い要求)、exit → ループが切替先 (か既定) を起こす。その後の既定は sh で、A7 の「USB の打鍵 (kboot-sh)・LAN のつなぎ直し (kboot-link-sh) で sh に入力が戻る」を sh の行で取る。
-- 条件: 製品の像の既定の sh と起動のループの道は同じ — 製品の像で swprobe の分岐 (差し替えの変数の読み) が組まれないことを fixture か map で固定する。共通のシェルは変えない。
-- (b) 共通のシェルの os32gui を SHELL_AS_APP・SH_SYS_MINIMAL で有効にする件は TASK_PPC_ALIGN_X86 の B09 (本線が注記)。
-- 本線の M4 の受入の追加 (sol のレビュー): P2〜P5 を積んだ統合の枝で、P5 の公開の設定のまま EXEC の 3 像をリンクし、sys_switch_shell が残り pm_session_shell_caller が platform/powermac/session_shell.c の実体に結ばれることを map か nm で確かめる (P2 が無い木では --gc-sections が両方を捨ててリンクが通るため)。
+## 止める (2026-11-20 夕、ユーザー)
+「(PowerPC の SHELL_AS_APP・SH_SYS_MINIMAL の sh は) 最初の PowerPC での動作確認に作った実装です。破棄して x86 に寄せてください」。この設計は PowerPC の仮の sh (ID 1 の直下の USER のアプリ) を前提にしていたので止める。本線の M1〜M4 (機種が答える SESSION_SHELL_CALLER()、wip/kfill-5d-m・m4) と PowerPC の P2 (platform/powermac/session_shell.c) は main に入れない。先に PowerPC のシェルを x86 のシェルの枠・起動のループに寄せ (票 TASK_PPC_ALIGN_X86 の B03・B09・B15)、その後 sys_switch_shell の公開を x86 と同じ門 (owner 1) で出し直す。

@@ -430,3 +430,6 @@ PM の範囲 (参考): `rd2`・`rd3` の名前と mount、fixture の作り方�
 - **宛先ごとの媒体の確かめの出口 (M5 の実装で、PM 決定 2026-11-20)**: 比べる元は `vfs_path_mount_generation("/db")` (fs/vfs.c:990、0 なら行 3 と同じく NOMOUNT・IDLE で何もしない)。各宛先は `vfs_path_mount_generation(<宛先のパス>)` を open の前に比べ、違えば開かずに NOMOUNT・IDLE (/db/fep.db そのものに別の媒体が mount された場合もここで止まる)。open の後に vfs_sqlite_fd_identity が失敗した時、または mount_generation が違った時は、作った宛先の fd を閉じてから vfs_rm — 消せたら NOMOUNT・IDLE、消せなければ方針どおり BUSY・Q(ファイル) (再試行しない)。既設・done の主の辞書を開き直して比べることはしない (比べる元は /db の mount の世代)。
 - **行 3・行 6 の IDLE の意味 (M5 の実装で、PM 決定 2026-11-20)**: FEP の状態だけを IDLE に戻し、SQLite の公開状態 (services の段・services_public) には触らない — SQLite の起動の失敗の時はその時の値のまま。§2-3 の「IDLE = SQLITE_ONLY・public=1」は SQLite が起動できている時の組み合わせ。
 - **宛先の世代の比べの範囲 (M5 のレビュー A、PM 決定 2026-11-20)**: done・skip の版も prepare のたびに比べる (止める側に倒す。今の実装どおり)。
+
+## 止める (2026-11-20 夕、ユーザー)
+「今から実装するものはよせて」(新しい 2 重を作らない)。この設計の静的の FEP (OS32_FEP_STATIC、本線の M1〜M5・S3 は wip のまま main に未入) は x86 の fep.mod と違う道なので止める。PowerPC の module の読み込みを x86 の形で入れてから、x86 の fep.mod の形で 7a を出し直す (票 TASK_PPC_ALIGN_X86 の B08・C04)。辞書と学習は x86 と同じパスで、書ける媒体 (ATA) が整うまで学習の公開は待つ (ユーザー決定)。PowerPC の P1〜P4b (main 1c9ed35c5) のうち USB のキーの値の形と修飾の記録は x86 の形なので残す。/db・/dbu の ramfs は module の設計で扱う (使わない方向)。
