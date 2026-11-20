@@ -85,3 +85,10 @@ lib/crc32_core.inc と同じ配置で lib に共通 include を置く。boot/lz4
 - **P2 (第 3〜4 段、root の無い像)**: RAM の root を持つのは KB_EXEC の像だけ (build/targets/ppc-powermac.mk:15,52–59,219–225)。root の無い像は単一の LOAD と従来の道のまま — 二段の生成・高い LOAD の検証・予約の検査・一時写像はしない。選択は build の側の 1 か所 (KB_EXEC) で決め、ppc_kernel.c の起動の道は root の区画の有無を kboot の情報から読む (機種のマクロを足さない)。root の無い像も受入の像の一覧に入れ、単一の LOAD であることを host の検査で照らす。
 - **P2 (第 4 段、登録の前の失敗)**: pm_root_boot (platform/powermac/root_boot.c:23–30) は boot_root_fs_init の失敗でも登録の前に戻る。展開の入口から boot_root_mount (init/boot_root.c:7–28) まで「rd0 に登録したか」の旗を戻り値で最上位まで返し、初期値は偽。旗が偽なら展開先の頁を返し、真なら rd0 が借りたまま (解放しない)。両方の道を host の試験で照らす。
 - 両 OF の配置と最小の RAM は第 1 段の採用の条件 (第 1 段で解けなければ再レビューへ戻す)。G4 (QuickSilver) の実機の物理の操作はユーザーの承認を得てから (実機ノートへの依頼、[D2])。
+
+## 本線のレビュー (2026-11-20 夜、本線 PM、可 — 第 1 段から)
+- 可: 第 2 段の build_compare --all のバイト一致 (boot/lz4_mini.c は PC-98 の起動の LDR なので、一致しない時は直すまで出さない)、LOAD の範囲・予約・機器との照合を PowerMac に閉じる、共通の LZ4 の本体は機種・装置のヘッダに依存ゼロ、L2 の pair は本線の口 `int platform_module_pair(u32 *out)` を変えずに PowerPC の中の wire を 2 つの LOAD に広げる (単一 LOAD の版を先に出さない)。
+- 記録 (1): L2 の確定設計は docs/decisions/ppc/PPC_MODULE_ALIGN_X86_DESIGN.md (wip/kfill-designs、末尾の確定の節に L2 の口の寄せの範囲・L1 の接続の PM 決定)、本線の側は main 87741a727 — 第 3 段の参照はこれ。
+- 記録 (2): 第 1 段の 5 の再レビュー案 (低位の物理の終端を別の記号にし __kernel_resident_end を予約込みに、共通の ASSERT を予約込みで当てる) を取る時は、共通の memmap の意味に触るので本線のレビューに戻す。
+- 記録 (3): 第 4 段の「共通コードの機種選択には include/platform_module_pair.h を使う」は取り消す。root の区画の有無は確定の P2 のとおり build の 1 か所 (KB_EXEC) と kboot の情報で決め、pair のヘッダには入れない。
+- PM の段の分け方: 第 1 段を 1a (QEMU の OpenBIOS — 像の一覧と最大、診断の像、配置の採取の台本) と 1b (G4 の OF 4.x — ユーザーの承認の後、実機ノートへの依頼、診断の像は自分で起こし直す作り) に分ける。
