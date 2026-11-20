@@ -15,6 +15,7 @@ static void prod_mismatch_at(const char *file, unsigned line, const char *expres
 #include "mm/paging.h"
 #include "include/gf_production.h"
 #include "init/sysconfig.c"
+#include "init/gf_production_cfg.c"
 #include "gfinit_resources_ra266.h"
 #include "gf_foundation_width_host.h"
 
