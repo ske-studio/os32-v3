@@ -149,3 +149,7 @@ PC-98 実装は kernel/sqlite_engine.c:219–226 と同じ boot 情報を返す�
 - **P1 (§1) 学習のパスの設定**: load の前に M3 の `fep_boot_user_path_set()` と `fep_boot_user_rc_set()` で学習のパスと取得の結果を設定し、失敗の時は snapshot と同時に消す。
 - **P1 (§3) 辞書の供給**: 上のユーザー決定で決まり (HDD の root の上の x86 と同じパス)。受入は HDD の root での固定のパスでの変換・学習の読み直しと、読み取り専用の時の変換。
 - **P2 大きさ**: ATA・ext2・HDD の root を含む最終の構成で、FEP の追加の前後の resident/chain と ISO の丸め込みの差を測り、両方のリンカの制約を受入の条件にする。
+- **P2 大きさ**: ATA・ext2・HDD の root を含む最終の構成で、FEP の追加の前後の resident/chain と ISO の丸め込みの差を測り、両方のリンカの制約を受入の条件にする。
+- **L1 の本線と PowerPC の合わせ目 (PM 決定 2026-11-20 夜、PowerPC の PM の案を採る)**:
+  - ホスト (tools/mkmod.py → tools/ppc/module_rela.py): `ppc_relocations(elf, payload: bytes, mem_size: int, policy) -> bytes` — 12 B の記録 (§「pack と loader の境界」の形式) を連ねた bytes を返す。誤りは例外 (mkmod.py が既存の i386 の誤りと同じ形で報告)。
+  - カーネル (kernel/module/module_image.c → kernel/module/module_fixup_ppc.inc): `static int module_fixup_ppc_validate(const u8 *rec, u32 count, u32 body_size, u32 text_size)` (0 で全件が正しい、負で既存の KMOD の検証の誤り値) と `static void module_fixup_ppc_apply(u8 *body, u32 base, const u8 *rec, u32 count)`。全件の検証の後にだけ apply を呼ぶ。
