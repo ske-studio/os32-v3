@@ -78,7 +78,7 @@ def observe(elf, out, cpu, case):
             # and a fresh prompt follows it (no snapshot mid-output).
             lines = [l.rstrip() for l in text.splitlines()]
             rows = [i for i, l in enumerate(lines) if re.fullmatch(result, l)]
-            return bool(rows) and any(l.startswith(prompt) for l in lines[rows[-1]+1:])
+            return bool(rows) and any(l.startswith(prompt.rstrip()) for l in lines[rows[-1]+1:])
         initial, baseline = shot('boot')
         check('[sqlite] static rc=0' not in initial, 'trace-screen')
         local('clear')
