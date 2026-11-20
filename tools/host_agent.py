@@ -126,6 +126,7 @@ CLIP_GET_MAX = 65536      # CLIP GET は 64KB を UTF-8 境界で切って返す
 DEFAULT_LINES_PER_PAGE = 60
 FORMFEED = b"\f"
 UTF16_BOM = b"\xff\xfe"   # clip.exe へ渡す UTF-16LE のバイト順マーク
+SFS_CALL_TIMEOUT = 3.0    # TCG 負荷でゲストの TB が遅れても、ホストの壁時計で先に CALL を打ち切らないため。
 SUBPROC_TIMEOUT = 4.0     # CLIP の子プロセスの期限 (秒)。超過で kill + 503
 GET_TIMEOUT = 25.0        # GET http(s) の子プロセスの期限 (秒、§7 B4)。
                           # ライブラリの無進捗期限 30 秒より短くして、利用者が
@@ -830,7 +831,7 @@ class HostAgent:
                 self._answer(rid, ent, HTTP_BAD, b"", None, out)
             else:
                 ent["decl"] = decl
-                ent["sfs_deadline"] = self.now() + 1.0
+                ent["sfs_deadline"] = self.now() + SFS_CALL_TIMEOUT
             return
         if verb == "ECHO":
             decl = self._decl(parts[1] if len(parts) > 1 else "", DECL_MAX_BYTES)

@@ -88,7 +88,7 @@ class Route:
             ent = dict(req=('SFS CALL %d' % len(wire)).encode(), got=wire)
             out = agent.ListSink()
             self.agent._serve(self.seq, ent, out)
-            assert ent['sfs_deadline'] == self.now + 1.0
+            assert ent['sfs_deadline'] == self.now + 3.0
             self.now += self.delay
             self.agent._service_sfs(self.seq, ent, out)
             status, _ = ent['resp']
@@ -308,7 +308,7 @@ def suite():
             original = backend.call
             def slow(*args):
                 body = original(*args)
-                r.now += 1.01
+                r.now += 3.01
                 return body
             with patch.object(backend, 'call', side_effect=slow):
                 try:
@@ -318,7 +318,7 @@ def suite():
                 else:
                     raise AssertionError('deadline accepted')
             assert r.busy == 0 and r.unavail == 1
-            print('link slow CALL BUSY=0 503=1 (unchanged 1.0s deadline)')
+            print('link slow CALL BUSY=0 503=1 (3.0s deadline)')
 
 
 def mutations():
