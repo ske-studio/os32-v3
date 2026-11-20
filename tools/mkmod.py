@@ -17,7 +17,7 @@ import struct
 import sys
 import zlib
 
-from module_schema import CONSTANTS, HEADER_FIELDS, KDEBUG_OPS_NAMES, POLICIES
+from module_schema import CONSTANTS, HEADER_FIELDS, KDEBUG_OPS_NAMES, MODULE_FORMATS, POLICIES
 
 HEADER_SIZE = CONSTANTS['HEADER_SIZE']
 PAGE_SIZE = CONSTANTS['PAGE_SIZE']
@@ -54,21 +54,34 @@ def cstring(data, offset):
     return data[offset:end].decode('ascii')
 
 
+def select_format(data, target):
+    fmt = MODULE_FORMATS.get(target)
+    require(fmt is not None, 'unknown module target')
+    ident = span(data, 0, 52)
+    require(ident[:7] == b'\x7fELF\x01' + bytes((fmt.encoding, 1)),
+            'ELF32 encoding does not match module target')
+    order = '<' if fmt.encoding == 1 else '>'
+    kind, machine, version = struct.unpack_from(order + 'HHI', ident, 16)
+    require((kind, machine, version) == (2, fmt.machine, 1),
+            'ELF32 ET_EXEC machine does not match module target')
+    return fmt
+
+
 class Elf:
     """Strict ELF32 section/symbol reader; no external parsing dependencies."""
-    def __init__(self, data):
+    def __init__(self, data, target='x86-pc98'):
+        self.format = select_format(data, target)
+        order = '<' if self.format.encoding == 1 else '>'
         self.data = data
-        header = struct.unpack('<16sHHIIIIIHHHHHH', span(data, 0, 52))
+        header = struct.unpack(order + '16sHHIIIIIHHHHHH', span(data, 0, 52))
         ident, kind, machine, version, self.entry, _, shoff, _, ehsize, _, _, shsize, count, strings = header
-        require(ident[:7] == b'\x7fELF\x01\x01\x01' and kind == 2 and
-                machine == 3 and version == 1 and ehsize == 52,
-                'requires linked ELF32 little-endian i386 ET_EXEC')
+        require(ehsize == 52, 'invalid ELF32 header size')
         require(shsize == 40 and count > 0 and 0 < strings < count,
                 'invalid ELF section table (extended indexes unsupported)')
         raw = span(data, shoff, count * shsize)
         self.sections = []
         for i in range(count):
-            values = struct.unpack_from('<10I', raw, i * shsize)
+            values = struct.unpack_from(order + '10I', raw, i * shsize)
             section = dict(zip(('name_off', 'type', 'flags', 'addr', 'offset',
                                 'size', 'link', 'info', 'align', 'entsize'), values))
             if section['type'] != 8:
@@ -91,7 +104,7 @@ class Elf:
             symbols = []
             for offset in range(0, section['size'], 16):
                 name, value, size, info, other, shndx = struct.unpack_from(
-                    '<IIIBBH', self.section_data(section), offset)
+                    order + 'IIIBBH', self.section_data(section), offset)
                 symbol = dict(name=cstring(strings_data, name), value=value,
                               size=size, info=info, shndx=shndx)
                 require(shndx == 0 or shndx < count or shndx == 0xfff1,
@@ -215,10 +228,11 @@ def name_bytes(name):
 
 
 def build(elf_data, metadata, vmkernel, kapi_abi_gen, layout_gen, *,
-          module_id=CONSTANTS['ID_KDEBUG']):
+          module_id=CONSTANTS['ID_KDEBUG'], target='x86-pc98'):
     require(module_id in POLICIES, 'unknown module ID')
     policy = POLICIES[module_id]
-    elf = Elf(elf_data)
+    elf = Elf(elf_data, target)
+    require(elf.format.version == CONSTANTS['FORMAT_VERSION'], 'unsupported relocation format')
     payload, mem_size, ranges = elf.body(policy)
     relocs = elf.relocations(payload, mem_size, policy)
     text_off, text_size = ranges[0]
@@ -294,7 +308,7 @@ def build(elf_data, metadata, vmkernel, kapi_abi_gen, layout_gen, *,
     require(all(isinstance(v, int) and 0 <= v <= 0xffffffff
                 for v in (abi, kapi_abi_gen, layout_gen)), 'invalid ABI generation')
     pair = pair_crc(vmkernel) if policy['required_flags'] & CONSTANTS['FLAG_PAIR'] else 0
-    header = dict(MAGIC=CONSTANTS['MAGIC'], FORMAT=CONSTANTS['FORMAT_VERSION'],
+    header = dict(MAGIC=CONSTANTS['MAGIC'], FORMAT=elf.format.version,
                   HEADER_SIZE=HEADER_SIZE, IMAGE_SIZE=image_size,
                   KAPI=kapi_abi_gen, LAYOUT=layout_gen, ABI=abi, ID=module_id,
                   PHASE=policy['phase'], FLAGS=policy['required_flags'], MEM_SIZE=mem_size,
@@ -303,7 +317,7 @@ def build(elf_data, metadata, vmkernel, kapi_abi_gen, layout_gen, *,
                   IMPORT_OFF=offsets[1], IMPORT_COUNT=len(imports),
                   EXPORT_OFF=offsets[2], EXPORT_COUNT=len(export_table) // CONSTANTS['RECORD_SIZE'],
                   NAMES_OFF=offsets[3], NAMES_SIZE=len(names), INIT=init, STOP=0,
-                  PAIR_CRC=pair, IMAGE_CRC=0, OPS_VERSION=ops_version, RESERVED0=0, RESERVED1=0)
+                  PAIR_CRC=pair, IMAGE_CRC=0, OPS_VERSION=ops_version, RESERVED0=elf.format.tag, RESERVED1=0)
     for section, (offset, size) in zip(('TEXT', 'RO', 'DATA', 'BSS'), ranges):
         header[section + '_OFF'], header[section + '_SIZE'] = offset, size
     image = bytearray(struct.pack('<' + 'I' * len(HEADER_FIELDS),
@@ -333,7 +347,7 @@ def main():
         require_target(args.target, 'module_codec')
         image, stats = build(args.elf.read_bytes(), json.loads(args.metadata.read_text()),
                              args.vmkernel.read_bytes() if args.vmkernel else b'',
-                             args.kapi_abi_gen, args.layout_gen, module_id=args.module_id)
+                             args.kapi_abi_gen, args.layout_gen, module_id=args.module_id, target=args.target)
         temporary = args.output.with_name(args.output.name + '.tmp')
         temporary.write_bytes(image)
         temporary.replace(args.output)

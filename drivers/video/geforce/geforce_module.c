@@ -5,7 +5,7 @@
 #include "geforce_imports.h"
 #include "geforce_tick.h"
 #include "../../../hwdev/gf/production.h"
-#include "bootinfo.h"
+#include "platform_module_pair.h"
 #include "config.h"
 #include "os32_generations.h"
 #include "gfx_internal.h"
@@ -376,11 +376,12 @@ int geforce_module_load(void)
     int rc=gf4_data_bind(&context.display_data, &context.display_state);
     if (rc) return rc;
     context.platform=geforce_platform_get();
-    const struct boot_common *bi=boot_common_get();
+    u32 pair = 0;
+    int pair_valid = platform_module_pair(&pair);
     const struct module_request request = {
         .path = SYS_GEFORCE_MOD, .name="geforce",
         .policy={KAPI_VERSION, OS32_MEMORY_LAYOUT_GENERATION, GEFORCE_MODULE_ABI_GEN,
-            bi->image_crc, GEFORCE_MODULE_OPS_VERSION, bi->image_valid,
+            pair, GEFORCE_MODULE_OPS_VERSION, pair_valid,
             GEFORCE_IMPORT_COUNT, geforce_import_contracts, geforce_export_contracts, MODULE_ID_GEFORCE},
         .imports=geforce_kexports, .lifecycle={.start=geforce_start, .detach=geforce_detach}
     };
@@ -395,7 +396,7 @@ int geforce_module_load(void)
         foundation_slot=0;accel_slot=0;
         display_slot=0;display_restore_slot=0;feature5_slot=0;
     }
-    kprintf(KLOG_ATTR, "[geforce] module rc=%d pair=%08x registered=%d\n", rc, bi->image_crc, registered);
+    kprintf(KLOG_ATTR, "[geforce] module rc=%d pair=%08x registered=%d\n", rc, pair, registered);
     return rc;
 }
 int geforce_module_abort(void)

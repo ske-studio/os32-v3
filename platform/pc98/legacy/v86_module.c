@@ -2,7 +2,7 @@
 #include "v86_module.h"
 #include "v86_imports.h"
 #include "v86_mem.h"
-#include "bootinfo.h"
+#include "platform_module_pair.h"
 #include "config.h"
 #include "os32_generations.h"
 #include "os32_kapi_shared.h"
@@ -179,12 +179,13 @@ int v86_module_load(void)
 {
     if (v86_handle.generation) return MODULE_BUSY;
     if (!v86_call_init()) return MODULE_NO_PAGES;
-    const struct boot_common *bi = boot_common_get();
+    u32 pair = 0;
+    int pair_valid = platform_module_pair(&pair);
     const struct module_request request = {
         .path = SYS_V86_MOD, .name = "v86",
         .policy = {
             KAPI_VERSION, OS32_MEMORY_LAYOUT_GENERATION, V86_MODULE_ABI_GEN,
-            bi->image_crc, V86_MODULE_OPS_VERSION, bi->image_valid,
+            pair, V86_MODULE_OPS_VERSION, pair_valid,
             V86_IMPORT_COUNT, v86_import_contracts, v86_export_contracts,
             MODULE_ID_V86
         },
@@ -194,7 +195,7 @@ int v86_module_load(void)
     int rc = module_load(&request, &v86_handle);
     if (!rc) rc = module_start(v86_handle);
     if (!rc && !module_exports(v86_handle)) rc = MODULE_INIT_FAILED;
-    kprintf(KLOG_ATTR, "[v86] module rc=%d pair=%08x\n", rc, bi->image_crc);
+    kprintf(KLOG_ATTR, "[v86] module rc=%d pair=%08x\n", rc, pair);
     return rc;
 }
 

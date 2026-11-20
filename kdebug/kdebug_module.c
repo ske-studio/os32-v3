@@ -3,7 +3,7 @@
 #include "../hwdev/hwdev_module.h"
 #include "../kernel/module/module_runtime.h"
 #include "kdebug_imports.h"
-#include "bootinfo.h"
+#include "platform_module_pair.h"
 #include "config.h"
 #include "../init/sysconfig.h"
 #include "vfs.h"
@@ -44,13 +44,14 @@ void kdebug_load(void)
     if (kdebug.open_count ||
         sysconfig_get_int(SYS_SYSTEM_CFG, "KDEBUG", 0) != 1) return;
     kdebug.open_count++;
-    const struct boot_common *bi = boot_common_get();
+    u32 pair = 0;
+    int pair_valid = platform_module_pair(&pair);
     const struct module_request request = {
         .path = SYS_KDEBUG_BIN,
         .name = "kdebug",
         .policy = {
             KAPI_VERSION, OS32_MEMORY_LAYOUT_GENERATION, KDEBUG_ABI_GEN,
-            bi->image_crc, KDEBUG_OPS_VERSION, bi->image_valid, KDEBUG_IMPORT_COUNT,
+            pair, KDEBUG_OPS_VERSION, pair_valid, KDEBUG_IMPORT_COUNT,
             kdebug_import_contracts, kdebug_export_contracts, MODULE_ID_KDEBUG
         },
         .imports = (const u32 *)kdebug_kexports,

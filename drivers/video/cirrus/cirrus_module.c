@@ -1,6 +1,6 @@
 #include "cirrus_module.h"
 #include "cirrus_imports.h"
-#include "bootinfo.h"
+#include "platform_module_pair.h"
 #include "config.h"
 #include "os32_generations.h"
 #include "gfx_internal.h"
@@ -61,12 +61,13 @@ static int cirrus_detach(struct module_record *r)
 int cirrus_module_load(void)
 {
     if (cirrus_handle.generation) return MODULE_BUSY;
-    const struct boot_common *bi = boot_common_get();
+    u32 pair = 0;
+    int pair_valid = platform_module_pair(&pair);
     const struct module_request request = {
         .path = SYS_CIRRUS_MOD, .name = "cirrus",
         .policy = {
             KAPI_VERSION, OS32_MEMORY_LAYOUT_GENERATION, CIRRUS_MODULE_ABI_GEN,
-            bi->image_crc, CIRRUS_MODULE_OPS_VERSION, bi->image_valid,
+            pair, CIRRUS_MODULE_OPS_VERSION, pair_valid,
             CIRRUS_IMPORT_COUNT, cirrus_import_contracts, cirrus_export_contracts,
             MODULE_ID_CIRRUS
         },
@@ -78,7 +79,7 @@ int cirrus_module_load(void)
     if (!rc && !module_exports(cirrus_handle)) rc = MODULE_INIT_FAILED;
     if (!rc) gfx_backend_cirrus = candidate;
     kprintf(KLOG_ATTR, "[cirrus] module rc=%d pair=%08x registered=%d\n",
-            rc, bi->image_crc, registered);
+            rc, pair, registered);
     return rc;
 }
 int cirrus_module_abort(void) { return module_abort(cirrus_handle); }

@@ -131,7 +131,7 @@ void _start(void)
     read_input(input, sizeof(input));
     CHECK(input[1] <= sizeof(file));
     read_input(file, input[1]);
-    bi.img_valid = 1;
+    bi.img_valid = input[0] != 14;
     bi.img_crc = ((u32 *)file)[MI_PAIR_CRC];
     if (input[0] == 9) bi.img_crc ^= 1;
     fixture_core.abi = HWDEV_ABI;
@@ -268,6 +268,8 @@ int kstrcmp(const char *a, const char *b)
 { while (*a && *a==*b) { a++; b++; } return (u8)*a-(u8)*b; }
 char *kstrncpy(char *d, const char *s, u32 n)
 { u32 i=0; if (!n) return d; while (i+1<n && s[i]) { d[i]=s[i]; i++; } d[i]=0; return d; }
+
+#include "../../platform/pc98/module_pair.c"
 
 const struct boot_common *boot_common_get(void) {
     static struct boot_common info;

@@ -158,6 +158,7 @@ PM は着地の前に worktree の `git log -1` を確かめる。参照先が�
 | NP21/W の上の試験 | 要らない | いつ実行してもよい。本 NHD を使う ini への配備・本 NHD の作り直しも確認なし ([D1] の停止 → 配備 → 起動の順は守る)。開発中は NHD のバックアップを取らなくてよい | 2026-10-09、2026-10-14、2026-10-18 |
 | NP21/W の受入を別の機械 (pc98emu) で回す | 要らない | 本線の NP21/W の受入は、別の機械のセッション `pc98emu` に CI の配布物の SHA と項目を渡して頼む。pc98emu は版ごとにサブエージェントを立て、NP21/W の枠 (最大 8) を 1 つずつ使わせ、ログの実物で照合して返す。向こうの GitHub の権限は読み取りだけ、ROM と NHD は外へ出さない。PM が ssh でしてよいのはファイルを置くことと状態を見ることまで (スキル [os32-emu-remote](../../../.claude/skills/os32-emu-remote/SKILL.md)) | 2026-11-19 |
 | CI の自前の runner (ci-server の機械) | 要らない (段ごとの受入で PM が判断) | 2026-11-05 の決定「CI に自前の runner を使わない」(substream は GitHub より 2.5〜4 倍遅い) を、この機械に限って上書きする: substream は使わないまま、ci-server の機械 (Ubuntu の LXD のコンテナの中の使い捨ての runner) だけを、build の最長のシャードから GitHub の標準と混ぜて使う。取り込みの関門が GitHub の CI の結論であることは変えない。確定設計は ~/os32-tmp/run/ci-runner/DESIGN.final.md (Fable 起草・sol レビュー 3 回)、段 0b・段 5 の完了条件を満たせない時は自前への振り分けを有効にせずユーザーに上げる。生成 AI を動かす時はユーザーが一言伝え、PM が振り分けを止める | 2026-11-19 |
+| ci-server の runner の像で OS の自動更新を止める | 承認済み (ユーザー 2026-11-20「承認」) | runner の像で unattended-upgrades と apt-daily・apt-daily-upgrade の timer を mask して作り直す — 試験の最中に apt の lock を取られて CI が落ちたため (2026-11-20)。OS の更新は像の作り直しの時にまとめて入れる。作業は ci-server のセッション | 2026-11-20 |
 | 隔離 NHD (`--profile t2h`) の上書き・復元 | 要らない | 結果だけ報告する | 2026-10-10 |
 | NP21/W の ini の一時の書き換え | 要らない | 原本を残す経路 (`tools/np21w_ini_live.py --live-apply`・`np21w_trial.py`) で、終わったら戻す。変えてよいのは PM だけ | 2026-09-30 |
 | `rm -rf`・`git reset --hard`・ini の直接の編集・像の原本の削除 | 要る ([D2]) | 個別に承認を取る | — |

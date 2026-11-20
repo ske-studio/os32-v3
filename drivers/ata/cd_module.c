@@ -1,6 +1,6 @@
 #include "cd_module.h"
 #include "cd_imports.h"
-#include "bootinfo.h"
+#include "platform_module_pair.h"
 #include "config.h"
 #include "os32_generations.h"
 #include "kprintf.h"
@@ -72,12 +72,13 @@ static int cd_detach(struct module_record *r)
 int cd_module_load(void)
 {
     if (cd_handle.generation) return MODULE_BUSY;
-    const struct boot_common *bi = boot_common_get();
+    u32 pair = 0;
+    int pair_valid = platform_module_pair(&pair);
     const struct module_request request = {
         .path = SYS_CD_MOD, .name = "cd",
         .policy = {
             KAPI_VERSION, OS32_MEMORY_LAYOUT_GENERATION, CD_MODULE_ABI_GEN,
-            bi->image_crc, CD_MODULE_OPS_VERSION, bi->image_valid,
+            pair, CD_MODULE_OPS_VERSION, pair_valid,
             CD_IMPORT_COUNT, cd_import_contracts, cd_export_contracts,
             MODULE_ID_ATAPI_ISO
         },
@@ -88,7 +89,7 @@ int cd_module_load(void)
     if (!rc) rc = module_start(cd_handle);
     if (!rc && !module_exports(cd_handle)) rc = MODULE_INIT_FAILED;
     kprintf(KLOG_ATTR, "[cd] module rc=%d pair=%08x fs=%d device=%d\n",
-            rc, bi->image_crc, fs_registered, device_registered);
+            rc, pair, fs_registered, device_registered);
     return rc;
 }
 

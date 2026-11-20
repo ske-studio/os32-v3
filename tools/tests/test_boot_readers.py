@@ -13,7 +13,7 @@ PATHS = ['include/bootinfo.h', 'platform/pc98/bootinfo_wire.h',
          'platform/pc98/bootinfo_check.c', 'platform/pc98/bios_snapshot.c',
          'platform/pc98/bios_snapshot.h', 'platform/pc98/boot_capture.c',
          'platform/powermac/boot_capture.c', 'init/bootinfo.c']
-CHECK = dict(name='boot-readers-host', tier=1, covers=['tools/tests/test_module_image.py', 'tools/tests/module_image_host.c',
+CHECK = dict(name='boot-readers-host', tier=1, covers=['platform/pc98/module_pair.c', 'include/platform_module_pair.h', 'tools/tests/test_module_image.py', 'tools/tests/module_image_host.c',
          'kernel/module/module_image.c', 'kernel/module/module_image.h',
          'kernel/module/module_schema.h', 'tools/module_schema.py',
          'tools/gen_module_schema.py', 'include/bootinfo.h', 'platform/pc98/bootinfo_wire.h',
@@ -69,7 +69,9 @@ static int test(void) {
     BootImageInfo out;
     REQUIRE(!boot_image_info(&out) && out.crc_valid && out.source==BOOTINFO_SRC_HDD);
     REQUIRE(out.image_crc==b->image_crc && out.image_size==b->image_size);
-    u32 pair[2]={out.crc_valid,out.image_crc};
+    u32 pair[2]={0,0xfeedface};
+    pair[0]=platform_module_pair(&pair[1]);
+    REQUIRE(pair[0]==out.crc_valid && pair[1]==(pair[0] ? out.image_crc : 0xfeedface));
     __asm__ volatile("int $0x80"::"a"(4),"b"(1),"c"(pair),"d"(sizeof(pair)));
     for(unsigned i=0;i<PAGE_SIZE;i++) REQUIRE(v86_bios_real_lowmem()[i]==(u8)(i^(i>>8)));
     page0[0]=99; platform_boot_capture();
@@ -89,7 +91,7 @@ def run_case(mutation=None, none=False, bad_image=False, pair_probe=False):
             body=BODY[BODY.index('void _start'):]
             body='__asm__(".globl __kernel_image_start\\n.set __kernel_image_start, 0x100000\\n.globl __kernel_file_end\\n.set __kernel_file_end, 0x170000\\n");\nstatic int test(void) { const struct boot_common value={1,2,3}; boot_common_set(&value,1); platform_boot_capture(); REQUIRE(!boot_common_get()->image_valid && !boot_common_get()->image_crc && boot_common_get()->image_size==0x70000); return 0; }\n'+body
         else:
-            paths+=['platform/pc98/bootinfo_check.c','platform/pc98/bootinfo_capture.c',
+            paths+=['platform/pc98/module_pair.c','platform/pc98/bootinfo_check.c','platform/pc98/bootinfo_capture.c',
                     'platform/pc98/bios_snapshot.c','platform/pc98/boot_capture.c']
             body=BODY
         if bad_image:
@@ -157,13 +159,16 @@ def main():
     print('GREEN native image/ABI, immutable page0, capture order, feature-off and none')
     if '--mutate' in sys.argv:
         mutations=[
+            ('platform/pc98/module_pair.c', '*out = boot->image_crc;', '*out = 0;'),
+            ('platform/pc98/module_pair.c', 'if (!boot->image_valid) return 0;',
+             'if (!boot->image_valid) { *out = 0; return 0; }'),
             ('platform/pc98/bootinfo_check.c', 'out->magic = le_read32(raw + BI_OFF_MAGIC);', 'out->magic = __builtin_bswap32(le_read32(raw + BI_OFF_MAGIC));'),
             ('platform/pc98/bootinfo_check.c', 'le_read32(raw + BI_OFF_IMG_CHECK) == BOOTINFO_IMG_CHECK_OF(crc, size)', '1'),
             ('platform/pc98/boot_capture.c', '    bootinfo_capture();\n    v86_bios_save_real();', '    v86_bios_save_real();\n    bootinfo_capture();'),
             ('platform/pc98/boot_capture.c', '    v86_bios_save_real();', '    /* optional guest disabled */'),
         ]
         for m in mutations:
-            assert run_case(m, bad_image='IMG_CHECK' in m[1])==1, m
+            assert run_case(m, bad_image='IMG_CHECK' in m[1] or '!boot->image_valid' in m[1])==1, m
             print('RED',m[0],m[1].splitlines()[0])
 
 
