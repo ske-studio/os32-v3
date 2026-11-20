@@ -135,3 +135,5 @@ tools/emu_agent/logs/
 # Local splash image and generation record (never publish)
 /assets/splash/splash.osri
 /assets/splash/splash.manifest.json
+
+/.ci-cache/
