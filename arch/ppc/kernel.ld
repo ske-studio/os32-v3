@@ -9,6 +9,9 @@ ENTRY(ppc_kernel_entry)
 PHDRS
 {
     image PT_LOAD FLAGS(7);
+#if PM_ROOT_FRAME
+    root PT_LOAD FLAGS(4);
+#endif
     ofw PT_NOTE FLAGS(4);
 }
 SECTIONS
@@ -16,11 +19,19 @@ SECTIONS
     . = PM_KERNEL_BASE;
     __kernel_image_start = .;
     .text : { KEEP(*(.text.entry)) *(.text .text.*) } :image
+#if PM_ROOT_FRAME
+    .root_record ALIGN(4) (READONLY) : {
+        __root_record_start = .;
+        LONG(0) LONG(0) LONG(0) LONG(0)
+        __root_record_end = .;
+    } :image
+#else
     .rodata.boot_root : {
         __root_image_start = .;
         KEEP(*(.rodata.boot_root))
         __root_image_end = .;
     } :image
+#endif
     .rodata : { *(.rodata .rodata.*) } :image
     .data : { *(.data .data.* .sdata .sdata.*) } :image
     /* OF-PPC binding:333-346: these describe firmware memory, not the
@@ -65,6 +76,16 @@ SECTIONS
     ASSERT(__bss_end <= __kernel_stack_bottom &&
            __kernel_stack_top % PM_KERNEL_STACK_ALIGN == 0,
            "entry stack must be outside BSS and ABI aligned")
+    __kernel_load_mem_end = __kernel_resident_end;
+#if PM_ROOT_FRAME
+    .root_frame PM_ROOT_FRAME_BASE (READONLY) : {
+        __root_image_start = .;
+        BYTE(0)
+        . += root_frame_size - 1;
+        __root_file_end = .;
+        __root_load_end = .;
+    } :root
+#endif
     .os32_generations 0 (INFO) : { KEEP(*(.os32_generations)) }
     .os32_generation_ref 0 (INFO) : { KEEP(*(.os32_generation_ref)) }
     /DISCARD/ : { *(.comment .eh_frame .note.GNU-stack .note.gnu.build-id) }

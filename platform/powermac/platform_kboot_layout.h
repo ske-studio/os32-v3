@@ -3,6 +3,7 @@
  * Preprocess kernel.ld with -I<generated directory> -I. . */
 #ifndef OS32_KBOOT_LAYOUT_H
 #define OS32_KBOOT_LAYOUT_H
+#define PM_ROOT_FRAME_BASE 0x580000
 #if defined(PM_KBOOT_LINKER) || defined(__ASSEMBLER__)
 #include "memmap_layout.h"
 #define PM_KERNEL_BASE LAYOUT_KERNEL_LOAD_ADDR

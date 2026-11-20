@@ -8,7 +8,6 @@ import hashlib
 import importlib
 import json
 import os
-import re
 from pathlib import Path
 import struct
 import subprocess
@@ -17,6 +16,7 @@ import shutil
 from unittest.mock import patch
 
 import lz4.block
+from root_lz4_layout import PAGE, round_page, segments
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -44,21 +44,7 @@ RUNNERS = {
     'usb-legacy': ('usb_run', '--legacy', '--lan'),
 }
 SHELL_RUNNERS = ('sb_run', 'sc_run', 'sd_run', 'usb_run', 'ppc_sh_output')
-PAGE = 4096
-HIGH = 0x04800000
 COLUMNS = ('resident_end', 'chain_end', 'frame', 'iso_pages')
-
-
-def segments(data):
-    if data[:6] != b'\x7fELF\x01\x02':
-        raise ValueError('expected a big-endian ELF32')
-    start, = struct.unpack_from('>I', data, 28)
-    stride, count = struct.unpack_from('>HH', data, 42)
-    return [struct.unpack_from('>8I', data, start + i * stride) for i in range(count)]
-
-
-def round_page(size):
-    return (size + PAGE - 1) // PAGE * PAGE
 
 
 def measure(path, fixture=False, iso=None):
@@ -80,10 +66,15 @@ def measure(path, fixture=False, iso=None):
     if iso.exists():
         raw = iso.read_bytes()
         _, off, va, pa, size, mem, flags, _ = loads[1]
-        if (va, pa, size, mem, flags) != (HIGH, HIGH, len(raw), len(raw), 4) or data[off:off+size] != raw:
+        if (va, size, flags) != (pa, mem, 4) or va != symbols['__root_image_start']:
             raise ValueError(f'{path}: misplaced root')
-        block = lz4.block.compress(raw, mode='high_compression', compression=12, store_size=False)
-        frame = round_page(len(block)) + PAGE
+        record = loads[0][1] + symbols['__root_record_start'] - loads[0][2]
+        packed, length = struct.unpack_from('<II', data, record+8)
+        frame = size
+        if (not 0 < packed <= frame or any(data[off+packed:off+size]) or
+                length != len(raw) or
+                lz4.block.decompress(data[off:off+packed], uncompressed_size=length) != raw):
+            raise ValueError(f'{path}: wrong compressed root')
         pages = round_page(len(raw)) // PAGE
     # Ignore non-loadable debug/symbol information when merging equivalent images.
     digest = hashlib.sha256(data[24:28])
@@ -95,25 +86,6 @@ def measure(path, fixture=False, iso=None):
     values['low_memsz'] = memsz
     values['low_filesz'] = loads[0][4]
     return values, digest.hexdigest()
-
-
-def measurement_script(path, has_root):
-    script = path.read_text()
-    # These two budget assertions are evaluated on the finished inventory.
-    # Keep the layout, stack and ledger assertions active in the private link.
-    for diagnostic in ('kernel image exceeds MEM_KERNEL_IMAGE_MAX',
-                       'resident chain exceeds fixed paging guard'):
-        script, count = re.subn(r'    ASSERT\([^,]+,\s*"' + diagnostic + r'"\)', '', script)
-        if count != 1:
-            raise ValueError('missing budget assertion: ' + diagnostic)
-    if has_root:
-        start = script.index('    .rodata.boot_root')
-        stop = script.index('    .rodata :', start)
-        section = script[start:stop].replace(':image', ':root')
-        script = (script[:start] + f'    __resume = .; . = {HIGH};\n' + section +
-                  '    . = __resume;\n' + script[stop:])
-        script = script.replace('    ofw PT_NOTE', '    root PT_LOAD FLAGS(4);\n    ofw PT_NOTE')
-    path.write_text(script)
 
 
 def image_table(rows):
@@ -287,7 +259,6 @@ def collect(out, suites):
     os.environ.setdefault('SOURCE_DATE_EPOCH', '946684800')
     rows = {}
     plans = {}
-    roots = {}
 
     def record(elf, name, fixture=False, iso=None):
         values, digest = measure(elf, fixture, iso)
@@ -316,30 +287,14 @@ def collect(out, suites):
             helper.write_text('.PHONY: layout-inputs\n'
                               'layout-inputs: $(if $(KB_EXEC),$(ROOT_ISO))\n'
                               '\t@$(file >$(KB_OUT)/layout.inputs,$(IMAGE))'
-                              '$(file >>$(KB_OUT)/layout.inputs,$(if $(KB_EXEC),$(ROOT_ISO),-))'
-                              '$(file >>$(KB_OUT)/layout.inputs,$(ROOT_MOTD))'
-                              '$(file >>$(KB_OUT)/layout.inputs,$(ROOT_BINS))'
-                              '$(file >>$(KB_OUT)/layout.inputs,$(ROOT_MANIFEST)):\n')
+                              '$(file >>$(KB_OUT)/layout.inputs,$(if $(KB_EXEC),$(ROOT_ISO),-)):\n')
             make(str(linker))
             make('-f', 'Makefile', '-f', str(helper), 'layout-inputs')
-            image, iso_path, motd, bins, manifest = info.read_text().splitlines()
+            image, iso_path = info.read_text().splitlines()
             iso = None
-            measurement_script(linker, iso_path != '-')
             if iso_path != '-':
-                iso = Path(iso_path)
-                # The product ISO writer timestamps files and directories. Reuse
-                # the first real ISO for exactly the same ordered guest files.
-                # This makes equivalent make invocations share a load identity.
-                if iso == folder/'root.iso':
-                    files = [('/etc/motd', motd), *(('/bin/'+Path(f).name, f) for f in bins.split())]
-                    if manifest:
-                        files.extend(json.loads(Path(manifest).read_text()).items())
-                    key = tuple((n, hashlib.sha256(Path(f).read_bytes()).digest()) for n,f in files)
-                    if key in roots:
-                        iso.write_bytes(roots[key])
-                    else:
-                        roots[key] = iso.read_bytes()
-                cmd.append('--old-file='+str(iso))
+                iso = folder/'root.iso'
+                cmd.append('--old-file='+iso_path)
             # A recursive kb-user make reads the outer tree's dependency
             # files. Finish it before compiler jobs start rewriting those files.
             prerequisites = [s for s in settings if '=' not in s and s != 'kernel']
@@ -403,7 +358,7 @@ def collect(out, suites):
         # boot_info applies objcopy after make to the image actually booted.
         if name.startswith('boot_info/') and elf.with_name('unverified.elf').exists():
             elf = elf.with_name('unverified.elf')
-            iso = elf.with_name('embedded.iso')
+            iso = elf.with_name('root.iso')
             plan.update(elf=str(elf), iso=str(iso))
         record(elf, name, iso=iso)
     # Equivalence across suites is expected. Within these shell/USB suites

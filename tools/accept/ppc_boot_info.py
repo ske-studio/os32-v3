@@ -29,17 +29,17 @@ def absent_bindings(folder, out):
 
 
 def unverified_image(elf, objcopy, iso):
-    """Flip a byte in the ISO system area, outside the filesystem metadata."""
-    embedded = elf.with_name('embedded.iso')
-    subprocess.run([objcopy, '--dump-section', f'.rodata.boot_root={embedded}',
+    """Invalidate the expected ISO CRC, keeping the normalized entry pair."""
+    record = elf.with_name('record.bin')
+    subprocess.run([objcopy, '--dump-section', f'.root_record={record}',
                     elf, elf.with_name('dump.elf')], check=True)
-    if embedded.read_bytes() != iso:
-        raise RuntimeError('linked root image differs from the source ISO')
-    damaged = bytearray(iso)
-    damaged[0] ^= 1
-    embedded.write_bytes(damaged)
+    damaged = bytearray(record.read_bytes())
+    if int.from_bytes(damaged[4:8], 'little') != zlib.crc32(iso):
+        raise RuntimeError('linked record differs from the source ISO')
+    damaged[4] ^= 1
+    record.write_bytes(damaged)
     target = elf.with_name('unverified.elf')
-    subprocess.run([objcopy, '--update-section', f'.rodata.boot_root={embedded}',
+    subprocess.run([objcopy, '--update-section', f'.root_record={record}',
                     elf, target], check=True)
     return target
 

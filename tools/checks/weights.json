@@ -443,6 +443,7 @@
     "ppc-loop-guest": 103,
     "ppc-root-lz4-layout-host": 1200,
     "ppc-root-lz4-layout-run": 120,
+    "ppc-root-pair-host": 2,
     "ppc-rtc-guest": 103,
     "ppc-sc": 102,
     "ppc-sd": 105,

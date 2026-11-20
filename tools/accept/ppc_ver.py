@@ -6,6 +6,7 @@ from pathlib import Path
 import re
 import sys
 import tempfile
+import zlib
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT / 'tools'), str(ROOT / 'tools/ppc')]
@@ -40,9 +41,8 @@ def observe(elf, cpu, folder, case):
                              '257 SER: ESCC baud=9600',
                              '257 GFX: OF-fb 800x600x8 bpp; (active|GUI target)',
                              r'258 API: v[1-9]\d*', '258 Build: .+', '258 Commit: .+'])
-            header = (elf.parent / 'root_image_expected.h').read_text()
-            size = int(re.search(r'PM_ROOT_IMAGE_BYTES (\d+)u', header)[1])
-            crc = int(re.search(r'PM_ROOT_IMAGE_CRC (0x[0-9a-fA-F]+)u', header)[1], 16)
+            iso = (elf.parent / 'root.iso').read_bytes()
+            size, crc = len(iso), zlib.crc32(iso)
             if case == 'ignore-crc':
                 expected.append(r'258 Root image CRC: 00000000 \(0 bytes\)')
             elif case != 'invalid-crc':

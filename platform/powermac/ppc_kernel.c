@@ -68,7 +68,7 @@
 #include "exec_boot.h"
 #include "exec.h"
 extern u32 sys_mem_kb;
-void pm_root_image(struct boot_root_image *out);
+int pm_root_image(const struct boot_root_image *image);
 #endif
 
 #ifndef KBOOT_NEGATIVE
@@ -369,9 +369,10 @@ void platform_boot_services(void)
 #if KBOOT_SHELL || KBOOT_SH
     kprintf(KBOOT_ATTR, "FB full_rc=%d color_rc=%d\r\n",
             dev->fb_full_rc, dev->fb_color_rc);
-    struct boot_root_image img;
-    pm_root_image(&img);
-    if (pm_root_boot(&img) == 0) {
+    /* Stage 4 supplies the expanded ISO after the allocator is online. */
+    struct boot_root_image img = {0};
+    if (!info->root_frame_bytes) return;
+    if (pm_root_image(&img) && pm_root_boot(&img) == 0) {
         pm_loop_boot();
         (void)pm_console_text_start();
 #if KBOOT_SH
