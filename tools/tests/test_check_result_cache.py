@@ -156,7 +156,7 @@ class CacheTests(unittest.TestCase):
         good = path.read_bytes()
         broken = [b'', b'{', b'[]']
         entry = json.loads(good)
-        for field, wrong in [('format', '1'), ('tool', 'p2v'), ('key', 'wrong'),
+        for field, wrong in [('format', '1'), ('format', cache.FORMAT + 1), ('tool', 'p2v'), ('key', 'wrong'),
                              ('result', 'wrong'), ('digest', 'wrong')]:
             broken.append(json.dumps(dict(entry, **{field: wrong})).encode())
         for field in entry:
@@ -168,6 +168,7 @@ class CacheTests(unittest.TestCase):
             calls = self.calls
             self.assertEqual(self.get(), value)
             self.assertEqual(self.calls, calls + 1)
+            self.assertEqual(path.read_bytes(), good)
 
     def test_off_and_ci_do_no_cache_work(self):
         for env in ({'OS32_CHECK_CACHE': 'off'}, {'CI': '1'}):
@@ -287,6 +288,7 @@ MUTATIONS = [
      '[], _checker_source_digest(tool)'),
     ('expanded output', 'inputs.append(hashlib.sha256(expanded).hexdigest())',
      "inputs.append('ignored')"),
+    ('format verification', "entry['format'] != FORMAT", 'False'),
     ('digest verification', "entry['digest'] != _digest(entry['result'])", 'False'),
     ('cache hit', 'if result is not None:\n        return result',
      'if result is not None:\n        return compute()'),
