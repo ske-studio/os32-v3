@@ -36,6 +36,11 @@ endif
 
 .DEFAULT_GOAL := all
 
+# The disposable probe has its own OF entry and output directory.
+ifeq ($(IMAGE),kboot-ata-probe)
+include tools/ppc/ata_probe.mk
+else
+
 # 環境変数を .env ファイルから読み込み (存在する場合)
 -include .env
 
@@ -77,3 +82,4 @@ docs-win:
 
 # D35: retain the checked link inputs and final ELF for packaging/manifest.
 .PRECIOUS: %.elf
+endif
