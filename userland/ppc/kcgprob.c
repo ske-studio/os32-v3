@@ -13,19 +13,21 @@ static const u8 kanji[32] = {
     0x02, 0x20, 0x02, 0x20, 0x7f, 0xff, 0x00, 0x00,
 };
 
-static int glyphs(KernelAPI *api)
+static int glyphs(KernelAPI *api, int missing)
 {
+    static const u8 blank[32];
     u8 buf[32];
     memset(buf, 0xa5, sizeof(buf));
     api->kcg_read_ank(0x41, buf);
-    if (memcmp(buf, ank, sizeof(ank))) return 1;
+    if (memcmp(buf, missing ? blank : ank, sizeof(ank))) return 1;
     memset(buf, 0xa5, sizeof(buf));
     api->kcg_read_kanji(0x3021, buf);
-    return memcmp(buf, kanji, sizeof(kanji)) != 0;
+    return memcmp(buf, missing ? blank : kanji, sizeof(kanji)) != 0;
 }
 
 int main(int argc, char **argv, KernelAPI *api)
 {
+    int missing = argc == 2 && !strcmp(argv[1], "missing");
     if (argc == 2 && !strcmp(argv[1], "reset")) {
         api->kcg_init();
         api->shell_putchar('I', 7);
@@ -33,14 +35,14 @@ int main(int argc, char **argv, KernelAPI *api)
         return 0;
     }
     api->kcg_init();
-    if (glyphs(api)) {
+    if (glyphs(api, missing)) {
         api->shell_putchar('G', 7);
         api->shell_putchar('\n', 7);
         return 1;
     }
     api->kcg_set_scale(3);
     if (api->kcg_load_font("/fonts/shino16.kcg") != OS32_ERR_NOSYS) return 2;
-    if (glyphs(api)) return 3;
+    if (glyphs(api, missing)) return 3;
     api->shell_putchar('K', 7);
     api->shell_putchar('\n', 7);
     return 0;

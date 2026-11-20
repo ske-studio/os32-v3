@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
-"""Exercise the five KCG KAPI slots over link-sh RSH on mac99."""
+"""Exercise the five KCG KAPI slots over link-sh RSH on mac99.
+AC-GLYPH-1 defines blank cells for unavailable glyphs. KCG1 absence also
+disables the font-backed console and leaves the resident provider unready.
+"""
 import argparse
 import hashlib
+import json
 import os
 from pathlib import Path
 import sys
@@ -10,7 +14,13 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT / 'tools'), str(ROOT / 'tools/ppc')]
 
-EXPECTED = {'normal': (b'K\n\n', b'0\n'), 'offset': (b'G\n', b'1\n'), 'absent': (b'G\n', b'1\n')}
+EXPECTED = {
+    'normal': (b'K\n\n', b'0\n'),
+    'missing': (b'K\n\n', b'0\n'),
+    'ready': (b'K\n\n', b'0\n'),
+    'offset': (b'G\n', b'1\n'),
+    'absent': (b'G\n', b'1\n'),
+}
 
 
 def observe(elf, cpu, evidence, case):
@@ -23,9 +33,16 @@ def observe(elf, cpu, evidence, case):
         session.start()
         session.wait(session.ready, 'KCG cui READY', 60)
         require(session.agent.operator.ready['mode'] == 'cui', 'KCG RSH mode')
-        body = rsh_command(session, '/bin/kcgprob.bin')
+        missing = case in ('missing', 'ready')
+        body = rsh_command(session, '/bin/kcgprob.bin' + (' missing' if missing else ''))
         status = rsh_command(session, 'echo $?')
         require((body, status) == EXPECTED[case], repr((case, body, status)))
+        if missing:
+            log = (evidence / 'serial-a.log').read_bytes()
+            require(b'FB off step=font' in log, 'KCG1 missing at font load')
+            readings = [line.strip() for line in log.splitlines() if b'KCG ready=' in line]
+            wanted = b'KCG ready=' + (b'1' if case == 'ready' else b'0')
+            require(len(readings) == 1 and readings[0].endswith(wanted), repr(readings))
         if case == 'normal':
             require(session.word('kcg_scale') == 3, 'scale after NOSYS')
             rsh_command(session, '/bin/kcgprob.bin reset', b'I\n\n')
@@ -33,7 +50,7 @@ def observe(elf, cpu, evidence, case):
         session.q.call('quit')
         session.p.wait(timeout=5)
         require(session.p.returncode == 0, 'KCG QEMU exit')
-        print(('GREEN' if case == 'normal' else 'RED ' + case) + ' ' + cpu, flush=True)
+        print(('GREEN ' if case in ('normal', 'missing') else 'RED ') + case + ' ' + cpu, flush=True)
     finally:
         session.close()
 
@@ -63,12 +80,27 @@ def main():
     options = ['IMAGE=kboot-link-sh', 'KB_SH_OUT=' + str(user),
                'KB_ROOT_BINS=' + ' '.join(bins)]
     images = {}
-    for case in EXPECTED if args.mutate else ('normal',):
+    os.environ.setdefault('SOURCE_DATE_EPOCH', '946684800')
+    for case in EXPECTED if args.mutate else ('normal', 'missing'):
         folder = work / case
         folder.mkdir()
         kernel = folder / 'kernel'
         mutation = []
-        if case == 'offset':
+        if case in ('missing', 'ready'):
+            manifest = json.loads((ROOT / 'build/ppc-ram-root.json').read_text())
+            del manifest['/fonts/shino16.kcg']
+            path = folder / 'root.json'
+            path.write_text(json.dumps(manifest))
+            hook = '    kcg_file_unload();'
+            mutation = mutant_settings(folder, 'observe', 'platform/powermac/console_text.c',
+                                       hook, hook + '\n    extern int kcg_module_ready(void);'
+                                       '\n    kprintf(KBOOT_ATTR, "KCG ready=%d\\r\\n", kcg_module_ready());')
+            mutation.append('ROOT_MANIFEST=' + str(path))
+            if case == 'ready':
+                mutation.extend(item.replace('KB_MUT_', 'KB_MUT_EXTRA_') for item in
+                                mutant_settings(folder, case, 'platform/powermac/kcg.c',
+                                                'return kcg_file_ready();', 'return 1;'))
+        elif case == 'offset':
             mutation = mutant_settings(folder, case, 'lib/lz4.c',
                                        'offset = (int)ip[0] | ((int)ip[1] << 8);',
                                        'offset = (int)ip[1] | ((int)ip[0] << 8);')

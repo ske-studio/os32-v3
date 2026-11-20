@@ -28,10 +28,20 @@ static int init_kcg(KcgModuleApi *out)
     CHECK(r->state == MODULE_STARTING && !module_exports(kcg_handle));
     ++initialized;
     out->read_ank = (void *)(uptr)r->text;
-    out->read_kanji = (void *)(uptr)(r->text + (mode == 1 ? r->text_size : 0));
-    out->stats = (void *)(uptr)r->text;
-    out->invalidate = (void *)(uptr)r->text;
+    out->read_kanji = (void *)(uptr)(r->text + (mode == 1 ? r->text_size : 7));
+    out->stats = (void *)(uptr)(r->text + 20);
+    out->invalidate = (void *)(uptr)(r->text + 20);
     return mode == 2 ? -1 : 0;
+}
+static void check_glyphs(int published)
+{
+    u8 buf[32];
+    kmemset(buf, 0xa5, sizeof(buf));
+    kcg_rom_read_ank('A', buf);
+    for (unsigned i = 0; i < 16; i++) CHECK(buf[i] == (published ? 0x41 : 0));
+    kmemset(buf, 0xa5, sizeof(buf));
+    kcg_rom_read_kanji(0x3021, buf);
+    for (unsigned i = 0; i < 32; i++) CHECK(buf[i] == (published ? 0x62 : 0));
 }
 void _start(void)
 {
@@ -61,6 +71,7 @@ void _start(void)
     CHECK(!module_load(&q, &kcg_handle));
     struct module_record *r = module_record_get(kcg_handle);
     r->init = (u32)(uptr)init_kcg;
+    check_glyphs(0);
     int rc = module_start(kcg_handle);
     CHECK(initialized == 1);
     if (mode == 1 || mode == 2 || mode == 3) {
@@ -73,9 +84,19 @@ void _start(void)
         empty(); finish(0);
     }
     CHECK(!rc && module_exports(kcg_handle));
+    /* The module loader placed the fixture text in a page-aligned host pool. */
+    int prot_rc;
+    __asm__ volatile("int $0x80" : "=a"(prot_rc) : "0"(125), "b"(r->text),
+                     "c"(PAGE_SIZE), "d"(5) : "memory");
+    CHECK(!prot_rc);
+    check_glyphs(1);
+    __asm__ volatile("int $0x80" : "=a"(prot_rc) : "0"(125), "b"(r->text),
+                     "c"(PAGE_SIZE), "d"(3) : "memory");
+    CHECK(!prot_rc);
     CHECK(kcg_module_load() == MODULE_BUSY && initialized == 1);
     CHECK(module_start(kcg_handle) == MODULE_BUSY && initialized == 1);
     CHECK(!kcg_module_abort() && !module_exports(kcg_handle));
+    check_glyphs(0);
     CHECK(!candidate.read_ank && !candidate.read_kanji && !candidate.stats);
     CHECK(!kcg_module_abort());
     empty(); finish(0);
