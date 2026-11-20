@@ -237,7 +237,6 @@ class Session:
         ended=self.word('p3_end_count')
         # A new agent generation restarts IDs at 1: look only at events after this submit.
         start=len(self.events)
-        self.wait(self.ready,'RSH READY before '+line,20)  # see usb_run.rsh_command
         ident=op.submit('cui',line,'accept',timeout_ms=max(20000,seconds*1000))
         def outputs():
             return [e for e in self.events[start:] if e['parts'][:2]==['RSH','OUT'] and e['parts'][3]==ident]
