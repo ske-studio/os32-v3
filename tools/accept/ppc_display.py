@@ -81,6 +81,14 @@ def present_pixels(s, evidence, case, serial, modes):
     from run import require
     from usb_run import keyboard_actions, rsh_command
 
+    # The kernel symbol and the INDEX8 RAM shadow's P2V alias are both
+    # identity-mapped. Read physical RAM even while the probe's root is active.
+    def physical_word(address):
+        reply = s.q.call('human-monitor-command', {'command-line': f'xp /1wx {address:#x}'})
+        match = re.search(r':\s*0x([0-9a-fA-F]+)', reply)
+        require(match is not None, f'unreadable physical word at {address:#x}: {reply}')
+        return int(match[1], 16)
+
     read_log = lambda: (evidence / 'serial-a.log').read_text(errors='replace')
     fg = int(re.search(r'FB text ready generation=\d+ fg=(\d+)', serial)[1])
     require(fg in (0, 255), 'OF palette endpoints')
@@ -97,8 +105,8 @@ def present_pixels(s, evidence, case, serial, modes):
         def sample():
             for phase in ('b', 'e'):
                 def waiting():
-                    base = s.word('bb_b')
-                    return base and s.word('bb_b', base - s.symbols['bb_b']) == (
+                    base = physical_word(s.symbols['bb_b'])
+                    return base and physical_word(base) == (
                         0x50524200 + ord(phase))
                 s.wait(waiting, f'{mode} checkpoint {phase}')
                 name = f'{mode}-{phase}'
