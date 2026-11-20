@@ -59,7 +59,7 @@ C01〜C15 (ARCH_DRIFT_AUDIT の C の表)。各行で「x86 に足す / PowerPC 
 | 文書 | 置き換え先 | 状態 |
 |---|---|---|
 | PPC_KAPI_GUI_SWITCH_DESIGN (5d) | シェルを x86 に寄せる設計 (B03・B09・B15、~/os32-tmp/run/ppc-shell-align/) の後に 5d を出し直す | PPC_SHELL_ALIGN_X86_DESIGN は origin/wip/kfill-designs で確定。段 A・B・C・E は main 未収録 |
-| PPC_KAPI_FEP_INPUT_DESIGN (7a) | module の読み込みを PowerPC に (B08・C04、~/os32-tmp/run/ppc-module-align/) の後に、x86 の fep.mod の形で 7a を出し直す | PPC_MODULE_ALIGN_X86_DESIGN は origin/wip/kfill-designs で確定。本線側の L1 は main 779942989、L2 は e4d84e711。PowerPC 側の接続は main 未収録 |
+| PPC_KAPI_FEP_INPUT_DESIGN (7a) | module の読み込みの PowerPC の接続 (C04: L1 → L2) の後に、x86 の fep.mod の形で 7a を出し直す (B08 は SQLite の任意の module 化で、7a の前提ではない) | PPC_MODULE_ALIGN_X86_DESIGN は origin/wip/kfill-designs で確定。本線側の L1 は main 779942989、L2 は e4d84e711。PowerPC 側の接続は main 未収録 |
 | PPC_KAPI_GFX_REST_DESIGN (5c) | ユーザー決定で入れる (上) | B1〜B4 と 5c-A は実装済み |
 
 直しが要る 12 件 (文書の直しの段で、各々を x86 の形に書き換える): PPC_KAPI_FILL_DESIGN・TASK_PPC_KAPI_FILL・TASK_PPC_SHELL・PPC_SHELL_DESIGN・ARCH_BRINGUP_ORDER・LAN_OPERATOR_DESIGN・TASK_LAN_OPERATOR・PPC_P3_DESIGN・PPC_P5_REST_DESIGN・TASK_PPC_LAN・ARCH_COMPAT_CONTRACT (§9 の「新しく作った違いを追記」を「物理差と既存の未整合だけ」に)・PPC_RESET_DESIGN。状態: 直した (2026-11-20、本線のレビュー待ち 4 件)。

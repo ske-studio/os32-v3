@@ -200,7 +200,7 @@ A の場合も、対象像が持つ弱い代役に解決されていないこと
 |6e|本線 init/bootinfo.c → PPC platform/powermac/root_image.c|捕捉した検証結果の発行順を決め、boot_info と ver の根拠を共有|
 |7a-選択|本線 build/select.mk|FEATURE_FEP の FEATURE_PC98_DEVICES 依存を実際の前提機能に置換。両像の有効・無効構成を照合|
 |7a|module の読み込み L1 → L2 → FEP → KCG|fep.mod の起動と回収を x86 に揃える。辞書・学習は HDD の後、x86 と同じ VFS パスで公開する。|
-|7b-選択|本線 build/select.mk|FEATURE_SQLITE の FEATURE_PC98_DEVICES 依存を実際の前提機能に置換。両像の有効・無効構成を照合|
+|7b-選択|本線 build/select.mk|実装済み (build/select.mk の FEATURE_SQLITE は FEATURE_EXEC を前提に置き換わっている)。残りは製品の道 (/sys/shell.bin の起動) での両像の有効・無効構成の受入だけ|
 |7b|静的 SQLite → kapi/kapi_db.c|公開済みの db 17 本を維持する。製品経路で VFS 上の DB、段 S のスタック・FP 保存復帰・guard、SHM と bind の寿命を確認する。SQLite の module 化は任意の B08。|
 |7c|本線 kernel/module/kdebug_call.c|module ローダの有効化後、許可された診断コマンドを選ぶ。CPU 固有の採取は独立段|
 |8|本線 AV HAL の音声契約 → 装置後端、ATA の block 契約 → 装置後端|HAL 票の依存（音は A0・1kHz tick）を待つ。契約確定後に PowerPC 担当が各後端を接続する|
@@ -296,7 +296,7 @@ PowerMac の暦時計は reset と同じ VIA インスタンスを使う。Apple
 
 ## 本線の取り決め (2026-11-18、本線 PM の確認で追加)
 1. **移す先のファイル名**: 2a-ii「kapi/ の共通 TU」、3b-ii「input/hal/」、4k-ii「KCG 転送 TU」、5a-ii「gfx/ の共通 TU」、6f「両像共通の TU」の移す先は、**本線が各段の着手の時に docs/SRC_MOVE.md §3 の対応表で決める** (1 機能 1 ファイル)。決めたら票に書き戻す。
-2. **共有の登録ファイルの持ち主**: 1a (build/sources/common.mk)、4k-i・7a-選択・7b-選択 (build/select.mk) は docs/tasks/agents/PARALLEL_BRANCHES.md §2 の共有の登録ファイル。本線がこれらの段を出す時は、その時の持ち主から受け取ってから出す。select.mk の 3 段は同じファイルなので本線の列では直列。
+2. **共有の登録ファイルの持ち主**: 1a (build/sources/common.mk)、4k-i・7a-選択 (build/select.mk、7b-選択は実装済み) は docs/tasks/agents/PARALLEL_BRANCHES.md §2 の共有の登録ファイル。本線がこれらの段を出す時は、その時の持ち主から受け取ってから出す。select.mk の残りの 2 段は同じファイルなので本線の列では直列。
 3. **NP21/W の受入は直列**: 「その場の変更」の段 (2a-i・3b-i・5a-i・6d-i) は NP21/W の受入が要るので、本線の列では 1 本ずつ並べる。並列にできるのは「移すだけ」の段どうしと、PowerPC の段との組だけ。
 - 本線の最初の差し込みの予定: 1a・2a-i・2b・3b-i (CI の手直しの S0 の取り込み、CRT の後始末の後。1a は wt/ppc-sqlite-stack が common.mk を手放した後)。
 
