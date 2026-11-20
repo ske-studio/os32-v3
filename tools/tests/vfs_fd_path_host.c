@@ -265,6 +265,7 @@ int res_owner_get(void) { return 0; }
 #include "ext2_inode.c"
 #include "ext2_dir.c"
 #include "ext2_file.c"
+#include "ext2_medium_ide.c"
 #include "ext2_fmt.c"
 #include "ext2_vfs.c"
 #include "../platform/pc98/boot_names.c"
@@ -2318,6 +2319,7 @@ __asm__(".text\n"
 
 void fdp_start_c(long *sp)
 {
+    CHECK(ext2_medium_register(EXT2_MEDIUM_HD, &ext2_medium_ide_ops) == 0);
     input_fixture_init();
 #ifndef FDP_RED
     clock_register(&fat_clock);

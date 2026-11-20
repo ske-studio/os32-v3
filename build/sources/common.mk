@@ -10,5 +10,10 @@ C_COMMON_CLI = kernel/cli/resident_cli.c
 C_COMMON_PC98_PENDING = mm/dma_pool.c mm/dma_pool_math.c mm/shlib.c kernel/gui.c init/bootlog_save.c init/sysconfig.c kernel/kaudit.c init/kaudit_boot.c kernel/kselftest_report.c kernel/irq/irq.c kernel/irq/irq_math.c kernel/module/module_image.c kernel/module/module_runtime.c kernel/module/debug_probe.c lib/dma_contract.c gfx/gfx_hw_submit.c gfx/v2/a0_weak.c gfx/sync/a0_weak.c gfx/gfx_hw_mono_cpu.c gfx/gfx_osri.c gfx/gfx_osri_view.c fs/fat/fatfs/ff.c fs/fat/fatfs_vfs.c fs/ext2/ext2_super.c fs/ext2/ext2_time.c fs/ext2/ext2_inode.c fs/ext2/ext2_dir.c fs/ext2/ext2_file.c fs/ext2/ext2_fmt.c fs/ext2/ext2_layout.c fs/ext2/ext2_vfs.c fs/serialfs/serialfs_session.c kapi/kapi_generated.c kapi/kapi_db.c kapi/kapi_sys.c kapi/kapi_osri.c lib/kutf16.c lib/kmath.c
 C_COMMON_EXEC += drivers/pci/pci.c drivers/pci/pci_barsize.c drivers/pci/pci_decode.c drivers/pci/pci_bind.c drivers/pci/pci_bind_match.c kernel/dev/device_pci.c
 C_COMMON_COMPILE_ONLY_PPC := kernel/sqlite_engine.c
+C_COMMON_LOOP = kernel/dev/device_loop.c drivers/block/loop_dev.c
+ifeq ($(FEATURE_PC98_PENDING)$(FEATURE_LOOP),11)
+C_COMMON_LOOP += fs/ext2/ext2_medium_loop.c
+C_ORDER_TAIL += fs/ext2/ext2_medium_loop.c
+endif
 C_COMMON = $(C_COMMON_CORE) $(foreach f,$(IMAGE_FEATURES),$(if $(filter 1,$(FEATURE_$(f))),$(C_COMMON_$(f))))
 INCLUDE_COMMON += kernel include init kernel/console kernel/irq kernel/module kernel/time mm kernel/dev fs/ext2 fs/fat fs/isofs fs/serialfs

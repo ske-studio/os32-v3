@@ -241,6 +241,7 @@ int platform_disk_geometry_get(int drive, struct platform_disk_geometry *info)
 #include "../../fs/ext2/ext2_inode.c"
 #include "../../fs/ext2/ext2_dir.c"
 #include "../../fs/ext2/ext2_file.c"
+#include "../../fs/ext2/ext2_medium_ide.c"
 #include "../../fs/ext2/ext2_fmt.c"
 #include "../../fs/ext2/ext2_vfs.c"
 
@@ -605,6 +606,7 @@ __asm__(".text\n.globl _start\n_start:\n"
         "movl %esp, %eax\nandl $-16, %esp\npushl %eax\ncall start_c\nhlt\n");
 void start_c(long *sp)
 {
+    CHECK(ext2_medium_register(EXT2_MEDIUM_HD, &ext2_medium_ide_ops) == 0);
     const char *name = ((char **)&sp[1])[1];
     CHECK(sp[0] >= 2);
     if (sp[0] >= 3) dump_dir = ((char **)&sp[1])[2];

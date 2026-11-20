@@ -56,7 +56,7 @@ FEATURE_PC98_PENDING = 0
 
 像の機能の値は像のファイルだけが決める。コマンドラインで `FEATURE_LINK=0` のように上書きすると `select.mk` が止める (組み方を変える時は `IMAGE` を選ぶ)。PowerPC の像は名前 (`IMAGE=kboot-*`) でも旗 (`KBOOT_LINK`・`KBOOT_SH`・`KBOOT_SHELL`) でも選べる。対応は `build/images/ppc-flags.mk` が持ち、`select.mk` が ARCH=ppc の時に像のファイルより先に読む: 名前だけなら旗を名前から決め、旗だけなら像を旗から決め、両方をコマンドラインで与えて食い違えば止める (出力の置き場と中身が食い違わないように)。
 
-- 像の機能は `IMAGE_FEATURES = LINK EXEC USERSHELL USB CLI PC98_PENDING` として、今の 15 個 (`FEATURES`) と別の一覧に持つ。値の検査 (0 か 1)・未知の `FEATURE_*` の検査は両方を見る。`build/targets/x86-pc98.mk` の「0 があれば止める」は今の 15 個だけを見る (下の `KNOWN_FEATURE_VARIABLES` の項)。
+- 像の機能は `IMAGE_FEATURES = LINK EXEC USERSHELL USB CLI LOOP PC98_PENDING` として、今の 15 個 (`FEATURES`) と別の一覧に持つ。値の検査 (0 か 1)・未知の `FEATURE_*` の検査は両方を見る。`build/targets/x86-pc98.mk` の「0 があれば止める」は今の 15 個だけを見る (下の `KNOWN_FEATURE_VARIABLES` の項)。
 - 依存: `USERSHELL`・`CLI` は `EXEC` が要る。`USERSHELL` と `CLI` は同時に 1 にできない。`select.mk` の今の依存の検査と同じ書き方で足す。
 - `IMAGE` の既定は `select.mk` の冒頭で決める: `IMAGE ?= $(if $(filter powermac,$(PLATFORM)),kboot-link,pc98)`。`build/images/$(IMAGE).mk` が無ければ `$(error unknown IMAGE ...)`。
 - `KNOWN_FEATURE_VARIABLES` は今の 15 個のまま変えない (`build/targets/x86-pc98.mk` の「0 があれば止める」が読む。このファイルは `tools/tests/test_sep5_boot.py` が基点 `3ebbd208` とバイト単位で固定しているので触らない)。像の機能は `IMAGE_FEATURE_VARIABLES` に持ち、未知の `FEATURE_*` の検査は両方を見る。`kernel-objects.mk` の SELECTION_STAMP には `IMAGE=<名>` を足す。

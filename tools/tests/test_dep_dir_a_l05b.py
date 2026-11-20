@@ -3,7 +3,7 @@
 --prepare builds the substituted copy with -Werror, without running a mutant.
 """
 CHECK = dict(name='dep-dir-a-l05b-host', tier=1,
-    covers=['include/callconv.h', 'include/types.h', 'include/config.h', 'include/ide_contract.h', 'include/platform_device.h', 'drivers/ata/ide.h', 'platform/pc98/device_ide.c', 'tools/tests/dep_dir_a_l05b_host.c', 'fs/ext2/ext2_super.c', 'fs/ext2/ext2_fmt.c', 'fs/ext2/ext2_fmt_*.inc', 'fs/fat/fatfs_vfs.c', 'drivers/block/fat_diskio.c', 'fs/fat/fatfs/diskio_os32.h', 'fs/ide_limits.h', 'tools/tests/kernel_includes.py'],
+    covers=['include/callconv.h', 'include/types.h', 'include/config.h', 'include/ide_contract.h', 'include/platform_device.h', 'drivers/ata/ide.h', 'platform/pc98/device_ide.c', 'tools/tests/dep_dir_a_l05b_host.c', 'fs/ext2/ext2_super.c', 'fs/ext2/ext2_medium_ide.c', 'fs/ext2/ext2_fmt_*.inc', 'fs/fat/fatfs_vfs.c', 'drivers/block/fat_diskio.c', 'fs/fat/fatfs/diskio_os32.h', 'fs/ide_limits.h', 'tools/tests/kernel_includes.py'],
     needs=[], budget=2.8,
     basis=['ARCH_COMPAT_CONTRACT §4.3'],
 )
@@ -21,7 +21,7 @@ COPIES = ('include/callconv.h', 'include/types.h', 'include/config.h', 'include/
           'tools/tests/dep_dir_a_l05b_host.c')
 OLD = 'out->phys_sector_size = info.phys_sector_size;'
 NEW = 'out->phys_sector_size = info.phys_sector_size ^ 1u;'
-FS = ('fs/ext2/ext2_super.c', 'fs/ext2/ext2_fmt.c', 'fs/fat/fatfs_vfs.c', 'drivers/block/fat_diskio.c')
+FS = ('fs/ext2/ext2_super.c', 'fs/ext2/ext2_medium_ide.c', 'fs/fat/fatfs_vfs.c', 'drivers/block/fat_diskio.c')
 
 
 def contracts():
