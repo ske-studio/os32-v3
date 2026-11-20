@@ -1,11 +1,10 @@
 /* B acceptance image. The fixture binds its observer to a reserved slot of the real table. */
 #include "os32api.h"
-#include "exec/shell_service.h"
+#include "arch_ctx_observer.h"
 #include "memmap.h"
 #if GENERATION != 4
 OS32_KAPI_LAYOUT_STAMP();
 #endif
-typedef u32 (*observer)(unsigned, unsigned, char **, KernelAPI *, void *, unsigned, int (*)(int), u32);
 static int fp(int seed)
 {
     static const unsigned long long two = 0x4000000000000000ULL;
@@ -20,9 +19,15 @@ static int fp(int seed)
 }
 void entry(unsigned argc, char **argv, KernelAPI *api, void *aux, unsigned sp)
 {
-    if (argc != 2) __builtin_trap();
-    observer check = (observer)api->kapi_reserved[0];
+    extern unsigned ctx_linkage[4];
+    if (argc != 2 || (sp & 15) || ctx_linkage[0] || ctx_linkage[1] ||
+        ctx_linkage[2] || ctx_linkage[3]) __builtin_trap();
+    ctx_observer *check = (ctx_observer *)api->kapi_reserved[0];
     api->kprintf(7, "CTX resident %s %u\n", "generation", (unsigned)GENERATION);
+    if (!aux) {
+        api->kprintf(7, "CTX mismatch resident-aux gen=%u aux=0\n", (unsigned)GENERATION);
+        for (;;) __asm__ volatile("" ::: "memory");
+    }
     ShellService *service = aux;
     u32 id, size;
     unsigned char byte;
@@ -41,16 +46,23 @@ void entry(unsigned argc, char **argv, KernelAPI *api, void *aux, unsigned sp)
     __asm__ volatile("trap");
 #endif
 }
+/* Record before either C or the SDK CRT can reuse the caller linkage. */
+unsigned ctx_initial_sp, ctx_linkage[4];
+__asm__(".section .text.startup,\"ax\"\n.globl _start\n_start:\n"
+        "lis 7,ctx_linkage@ha\naddi 7,7,ctx_linkage@l\n"
+        ".irp off,0,4,8,12\nlwz 8,\\off(1)\nstw 8,\\off(7)\n.endr\n"
+        "lis 7,ctx_initial_sp@ha\nstw 1,ctx_initial_sp@l(7)\nmr 7,1\n"
+#if GENERATION == 4
+        "b ctx_crt_entry\n"
+#else
+        "b entry\n"
+#endif
+        ".previous");
 #if GENERATION == 4
 extern void *__os32_aux;
 int main(int argc, char **argv, KernelAPI *api)
 {
-    unsigned sp;
-    __asm__ volatile("mr %0,1" : "=r"(sp));
-    entry(argc, argv, api, __os32_aux, sp);
+    entry(argc, argv, api, __os32_aux, ctx_initial_sp);
     return 17;
 }
-#else
-__asm__(".section .text.startup,\"ax\"\n"
-        ".globl _start\n_start:\n mr 7,1\n b entry\n.previous");
 #endif

@@ -16,7 +16,7 @@
 #include "arch_exec_kapi.h"
 #include "kapi_table.h"
 #include "exec/appslot.h"
-#include "exec/shell_service.h"
+#include "arch_ctx_observer.h"
 #include "fs/fd_redirect.h"
 #include "memmap.h"
 
@@ -38,6 +38,29 @@ static void check(int ok)
     ppc_disable();
     for (;;) __asm__ volatile("" ::: "memory");
 }
+static void mismatch(const char *reason)
+{
+    kprintf(7, "CTX mismatch %s\n", reason);
+    check(0);
+}
+void ctx_depth_mismatch(void)
+{
+    mismatch("depth irq-return depth=1");
+}
+static volatile u32 dec_writes;
+void __real_ppc_write_dec(u32);
+void __wrap_ppc_write_dec(u32 value)
+{
+    ++dec_writes;
+    __real_ppc_write_dec(value);
+}
+void __real_arch_cpu_halt(void);
+void __wrap_arch_cpu_halt(void)
+{
+    if (sentinel && !kctx_irq_depth && !(msr() & PPC_MSR_EE))
+        mismatch("halt-ee poll=1 ee=0");
+    __real_arch_cpu_halt();
+}
 static void ipi(struct ppc_frame *f) { (void)f; ++ipis; }
 void ctx_irq(struct ppc_frame *f, void (*handler)(struct ppc_frame *))
 {
@@ -49,21 +72,51 @@ void ctx_irq(struct ppc_frame *f, void (*handler)(struct ppc_frame *))
     if (ctx_exit_phase) {
         /* The first possible delivery is after rfi to USER. */
         kprintf(7, "CTX delivery pc=%x msr=%x vector=%x\n", f->srr0, f->srr1, f->vector);
+        if (!(f->srr1 & PPC_MSR_PR) && f->vector == PPC_VECTOR_DEC)
+            mismatch("exit-ee pending-dec pr=0");
         check((f->srr1 & (PPC_MSR_PR | PPC_MSR_EE)) ==
               (PPC_MSR_PR | PPC_MSR_EE));
         ctx_exit_phase = 0;
         ++ctx_exit_delivered;
     }
     if (f->vector == PPC_VECTOR_DEC) ++decs;
+    u32 writes = dec_writes;
     handler(f);
+    if (ctx_started && f->vector == PPC_VECTOR_DEC && dec_writes == writes)
+        mismatch("dec-rearm handler writes=0");
     check(kctx_irq_depth == 1);
+}
+static void child_state(struct ppc_frame *f)
+{
+    AppSlot *child = appslot_get(2);
+    check(appslot_cur() == 2 && child && child->state == APP_STATE_RUNNING && child->parent == APP_ID_SHELL &&
+          child->cpl3 && child->as && child->as->pd_phys != kernel_root &&
+          ppc_root_current() == child->as->pd_phys && (f->srr1 & PPC_MSR_PR) &&
+          exec_nest_level == 2 && res_owner_get() == 2);
+}
+static int expecting_user_fault, saw_user_fault;
+void ctx_user_fault(struct ppc_frame *f)
+{
+    struct arch_fp_context fp;
+    unsigned long long reg, status;
+    check(expecting_user_fault && !saw_user_fault && !kctx_irq_depth &&
+          f->vector == 0x700 && f->srr0 == CTX_USER_TRAP &&
+          (f->srr1 & 0x001e0000) == 0x20000 && (f->srr1 & PPC_MSR_FP));
+    child_state(f);
+    arch_fp_save(&fp);
+    kmemcpy(&reg, fp.opaque + 31 * 8, sizeof(reg));
+    kmemcpy(&status, fp.opaque + PPC_FP_FPSCR_OFFSET, sizeof(status));
+    check(reg == 0x4022000000000000ULL && (status & 3) == 2);
+    saw_user_fault = 1;
 }
 void ctx_syscall(struct arch_syscall *call)
 {
-    check((msr() & PPC_MSR_EE) && !kctx_irq_depth);
+    if (!(msr() & PPC_MSR_EE) && !kctx_irq_depth)
+        mismatch("enable syscall ee=0");
     struct ppc_frame *user = call->native;
-    check((user->srr1 & PPC_MSR_PR) && ppc_root_current() != kernel_root &&
-          exec_nest_level == 2 && res_owner_get() == 2);
+    child_state(user);
+    check(!user->busy);
+    check((msr() & PPC_MSR_EE) && !kctx_irq_depth);
     if (arch_syscall_slot(call) == __builtin_offsetof(KernelAPI, sys_exit)/sizeof(u32)-2)
         exit_code = ((struct ppc_frame *)call->native)->gpr[3];
     if (!polled) {
@@ -110,10 +163,11 @@ void ctx_fault(struct ppc_frame *f)
           (expected_gen == 3 && f->vector == 0x700 && (f->srr1 & 0x20000)));
     fault_gen = expected_gen;
 }
-static u32 resident(unsigned gen, unsigned argc, char **argv, const u32 *api,
+static ctx_observer resident;
+static u32 resident(unsigned gen, unsigned argc, char **argv, KernelAPI *api,
                      ShellService *aux, unsigned sp, int (*fp)(int), u32 lease_id)
 {
-    check(gen == expected_gen && argc == 2 && argv && !kstrcmp(argv[1], "probe") && api == exec_kapi_table() &&
+    check(gen == expected_gen && argc == 2 && argv && !kstrcmp(argv[1], "probe") && (const void *)api == exec_kapi_table() &&
           aux == &g_shell_service && aux->generation == gen);
     check(sp > MEM_SHELL_GUARD && sp < MEM_SHELL_STACK_TOP && !(sp & 15) &&
           !(msr() & PPC_MSR_PR) && (msr() & PPC_MSR_FP) &&
@@ -137,16 +191,27 @@ static u32 resident(unsigned gen, unsigned argc, char **argv, const u32 *api,
     kprintf(7, "CTX exit boundaries=3 restored=1\n");
     con_sink_enable();
     int id = exec_start("/bin/ctx.bin child");
-    check(id > 0 && exec_app_state(id) == 4);
+    check(id == 2 && exec_app_state(id) == APP_STATE_WAIT_POLL);
+    AppSlot *parked = appslot_get(id);
+    check(parked && parked->as && parked->as->pd_phys != kernel_root);
+    if (ppc_root_current() == parked->as->pd_phys) {
+        kprintf(7, "CTX mismatch parent-root parked=2 root=child\n");
+        check(0);
+    }
     state();
-    check(exec_resume(id, 0) == 0 && exit_code == 9);
+    check(exec_resume(id, 0) == 0);
+    if (exit_code == 90) mismatch("resume-result yield=1");
+    check(exit_code == 9);
     state();
     id = exec_start("/bin/ctx.bin child");
-    check(id > 0 && exec_app_state(id) == 4 && exec_kill(id) == 0);
+    check(id == 2 && exec_app_state(id) == APP_STATE_WAIT_POLL && exec_kill(id) == 0);
     state();
     con_sink_disable();
     check(fp(1));
+    expecting_user_fault = 1;
     (void)exec_run("/bin/ctx.bin fault");
+    expecting_user_fault = 0;
+    check(saw_user_fault);
     check((msr() & PPC_MSR_FP) && fp(0));
     check(!exec_last_result(&kind, &code) && kind == EXEC_KIND_FAULT);
     state();

@@ -6,7 +6,7 @@
 .globl __wrap_arch_entry_enter
 __wrap_arch_entry_enter:
     cmpwi 4,0
-    bne __real_arch_entry_enter
+    bne ctx_measured_entry
     mflr 0
     stw 0,4(1)
     stwu 1,-112(1)
@@ -24,7 +24,7 @@ __wrap_arch_entry_enter:
     .irp reg,2,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31
     li \reg,\reg
     .endr
-    bl __real_arch_entry_enter
+    bl ctx_measured_entry
 .Lreturned:
     mfcr 7
     mflr 8
@@ -60,3 +60,15 @@ __wrap_arch_entry_enter:
     blr
 .Lbad_parent:
     trap
+
+/* Stable NIPs distinguish an observed mismatch from an unrelated hang. */
+.macro ctx_stop name
+.globl ctx_bad_\name
+ctx_bad_\name:
+    b ctx_bad_\name
+.endm
+ctx_stop pr_frame
+ctx_stop parent_link
+ctx_stop root_branch
+ctx_stop child_return
+ctx_stop srr

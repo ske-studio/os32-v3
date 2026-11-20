@@ -32,22 +32,26 @@ COLUMNS = {
 X86_EXPECTED = dict(COLUMNS, irq=r'cpl=0 if=1 depth=1/0 sentinel=1 irq=\d+ poll=\d+', stack=r'used=\d+ size=\d+ guard=1')
 USER = r'''
 #include "os32api.h"
-unsigned initial[5];
+unsigned initial[9];
 __asm__(".section .text.startup,\"ax\"\n.globl _start\n_start:\n"
         "lis 7,initial@ha\naddi 7,7,initial@l\nstw 1,0(7)\nstw 3,4(7)\n"
-        "stw 4,8(7)\nstw 5,12(7)\nstw 6,16(7)\nb ctx_crt_entry\n.previous");
+        "stw 4,8(7)\nstw 5,12(7)\nstw 6,16(7)\n"
+        ".irp off,0,4,8,12\nlwz 8,\\off(1)\nstw 8,20+\\off(7)\n.endr\nb ctx_crt_entry\n.previous");
 int main(int argc, char **argv, KernelAPI *api)
 {
     if ((initial[0] & 15) || initial[1] != (unsigned)argc ||
-        initial[2] != (unsigned)argv || initial[3] != (unsigned)api || initial[4])
+        initial[2] != (unsigned)argv || initial[3] != (unsigned)api || initial[4] ||
+        initial[5] || initial[6] || initial[7] || initial[8])
         return 93;
     volatile unsigned sentinel = 0x13579bdf;
     /* Leave a distinct nonvolatile FP register and rounding mode at syscall exit. */
     __asm__ volatile("lfd 31,0(%0); mtfsfi 7,2" :: "r"(&(const double){9.0}) : "memory");
     unsigned expected = api->sys_get_mem_kb();
-    if (argc > 1 && argv[1][0] == 'f') __asm__ volatile("trap");
+    if (argc > 1 && argv[1][0] == 'f') __asm__ volatile(".globl ctx_user_trap\nctx_user_trap: trap" ::: "memory");
     if (argc > 1) {
-        if (api->sys_yield() || sentinel != 0x13579bdf) return 90;
+        int result = api->sys_yield();
+        if (result == 1) return 90;
+        if (result || sentinel != 0x13579bdf) return 92;
         return 9;
     }
     (void)argv;
@@ -102,7 +106,7 @@ def image(work, mutation):
                  '-c', 'tools/accept/arch_ctx_resident.c', '-o', base.with_suffix('.o')])
         inputs = [base.with_suffix('.o')]
         if gen == 4:
-            inputs += [out+'crt0.o', out+'crt0_c.o', out+'help.o', out+'syscalls.o',
+            inputs += [work/'crt0.o', out+'crt0_c.o', out+'help.o', out+'syscalls.o',
                        '-L'+str(Path(libc).parent), '-L'+str(Path(libgcc).parent),
                        out+'nano/libos32nano.a', '-lc', '-lgcc']
         command(['python3', 'sdk/link_guard.py', '--target', 'ppc-powermac', '--ar',
@@ -115,6 +119,9 @@ def image(work, mutation):
     trap = (ROOT/'arch/ppc/kernel_trap.c').read_text()
     trap = '#include "ppc_trap.h"\n#include "exec_arch.h"\nvoid ctx_irq(struct ppc_frame *, void (*)(struct ppc_frame *));\nvoid ctx_syscall(struct arch_syscall *);\nvoid ctx_exit_arm(void);\nextern volatile u32 ctx_started;\n'+trap
     trap = 'struct ppc_frame; void ctx_fault(struct ppc_frame *);\n'+trap
+    trap = once(trap, '        ring3_fault_kill();',
+                '        extern void ctx_user_fault(struct ppc_frame *);\n'
+                '        ctx_user_fault(f); ring3_fault_kill();')
     trap = once(trap, '        resident_fault(f);', '        { ctx_fault(f); resident_fault(f); }')
     trap = once(trap, '            handler(f);', '            ctx_irq(f, handler);')
     trap = once(trap, '            exec_syscall_dispatch(&call);', '            ctx_syscall(&call);')
@@ -166,20 +173,74 @@ def image(work, mutation):
         target, old, new = mutations[mutation]
         if target == 'trap': trap = once(trap, old, new)
         else: vectors = once(vectors, old, new)
+    trap = once(trap, '            return;\n        }\n        reason = PPC_TRAP_UNREGISTERED;',
+                '            if (ctx_started && kctx_irq_depth == 1) {\n'
+                '                extern void ctx_depth_mismatch(void); ctx_depth_mismatch();\n'
+                '            }\n            return;\n        }\n        reason = PPC_TRAP_UNREGISTERED;')
+    # r30 still contains saved SRR1[PR] at the supervisor fall-through.
+    vectors = once(vectors, '    mfsprg3 30\n    cmpwi 30,PPC_VECTOR_DSI',
+                   '    cmpwi 30,0\n    bne ctx_bad_pr_frame\n'
+                   '    mfsprg3 30\n    cmpwi 30,PPC_VECTOR_DSI')
+    vectors = once(vectors, '    mfsprg1 0\n    mfsprg2 1\n    rfi', """
+    mfcr 0
+    mtsprg3 0
+    mfsrr1 0
+    cmpw 0,1
+    bne ctx_bad_srr
+    mfsprg3 0
+    mtcr 0
+    mfsprg1 0
+    mfsprg2 1
+    rfi""")
     outside = {'outside-dsi': 2, 'outside-program': 3}.get(mutation, 0)
-    shell = work/'boot.c'; shell.write_text(f'#define CTX_OUTSIDE {outside}\n#include "'+str(ROOT/'tools/accept/arch_ctx_probe.c')+'"\n')
+    user_trap = next(int(line.split()[0], 16) for line in
+                     command([prefix+'nm', work/'ctx.elf']).splitlines()
+                     if line.endswith(' ctx_user_trap'))
+    shell = work/'boot.c'
+    shell.write_text(f'#define CTX_USER_TRAP {user_trap:#x}U\n#define CTX_OUTSIDE {outside}\n#include "'+str(ROOT/'tools/accept/arch_ctx_probe.c')+'"\n')
     t = work/'trap.c'; t.write_text(trap)
-    vectors_file = work/'vectors.S'; vectors_file.write_text(vectors+'\n'+(ROOT/'tools/accept/arch_ctx_parent.S').read_text())
-    opts = ['-j6', 'KB_KEEP_RESET=-Wl,--wrap=arch_entry_enter', 'KBOOT_SH=1', 'KBOOT_LINK=0',
+    # Link the same measured entry and longjmp bodies in every fixture.
+    entry = (ROOT/'arch/ppc/exec_enter.S').read_text()
+    jump = (ROOT/'arch/ppc/setjmp.S').read_text()
+    jump = jump[jump.index('    .globl exec_longjmp'):]
+    entry = once(entry, '    mr 30,3',
+                 '    cmpwi 4,0\n    beq ctx_bad_root_branch\n    mr 30,3')
+    entry = once(entry, '    bctrl', """
+    lis 8,.Lparent_sp@ha
+    lwz 8,.Lparent_sp@l(8)
+    lwz 9,0(31)
+    cmpw 9,8
+    bne ctx_bad_parent_link
+    lwz 9,4(8)
+    lis 10,.Lreturned@ha
+    addi 10,10,.Lreturned@l
+    cmpw 9,10
+    bne ctx_bad_parent_link
+    bctrl""")
+    jump = once(jump, '.Lland:\n', """.Lland:
+    mflr 4
+    cmpw 4,0
+    bne ctx_bad_child_return
+""")
+    if mutation == 'root-branch':
+        entry = once(entry, '    beq .Lresident', '    bne .Lresident')
+    if mutation == 'resident-aux':
+        entry = once(entry, '    lwz 6,20(7)', '    li 6,0')
+    if mutation == 'child-return':
+        jump = once(jump, '    mtlr 0', '    mtctr 0')
+    wrapper = (ROOT/'tools/accept/arch_ctx_parent.S').read_text()
+    vectors_file = work/'vectors.S'
+    vectors_file.write_text(vectors + '\n' + wrapper +
+        '\n#define arch_entry_enter ctx_measured_entry\n' + entry +
+        '\n#include "arch_jmp_storage.h"\n#define exec_longjmp __wrap_exec_longjmp\n' + jump)
+    opts = ['-j6', 'KB_KEEP_RESET=-Wl,--wrap=arch_entry_enter,--wrap=exec_longjmp,'
+                    '--wrap=arch_cpu_halt,--wrap=ppc_write_dec', 'KBOOT_SH=1', 'KBOOT_LINK=0',
                  'KB_ROOT_BINS='+' '.join(residents+[str(work/'ctx.bin'), 'build/out/ppc-user/fault.bin']),
                  'KB_MUT_SRC=platform/powermac/shell_boot.c', 'KB_MUT_FILE='+str(shell),
                  'KB_MUT_EXTRA_SRC=arch/ppc/kernel_trap.c', 'KB_MUT_EXTRA_FILE='+str(t),
                  'KB_MUT_THIRD_SRC=arch/ppc/kernel_vectors.S', 'KB_MUT_THIRD_FILE='+str(vectors_file)]
     elf = build(work/'image', *opts)
     changes = {
-        'root-branch': ('arch/ppc/exec_enter.S', '    beq .Lresident', '    bne .Lresident'),
-        'resident-aux': ('arch/ppc/exec_enter.S', '    lwz 6,20(7)', '    li 6,0'),
-        'child-return': ('arch/ppc/setjmp.S', '    mtlr 0', '    mtctr 0'),
         'parent-root': ('exec/exec.c', '#include "exec_finish.inc"', None),
         'dec-rearm': ('arch/ppc/kernel_dec.c', '    ppc_write_dec((u32)remaining);', '    extern volatile u32 ctx_started;\n    if (!ctx_started) ppc_write_dec((u32)remaining);'),
         'halt-ee': ('kernel/idle_work.c', '    idle_work_run();\n    if (!net_rx_recent(NET_RX_ACTIVE_MS)) _idle();',
@@ -214,6 +275,25 @@ def image(work, mutation):
         elf = build(work/'image', *opts)
     return elf
 
+# Serial witnesses are complete lines. Assembly witnesses stop at a symbol
+# reached only by the corresponding register comparison.
+SERIAL_RED = {
+    'resident-aux': 'resident-aux gen=1 aux=0',
+    'parent-root': 'parent-root parked=2 root=child',
+    'enable': 'enable syscall ee=0',
+    'depth': 'depth irq-return depth=1',
+    'exit-ee': 'exit-ee pending-dec pr=0',
+    'dec-rearm': 'dec-rearm handler writes=0',
+    'halt-ee': 'halt-ee poll=1 ee=0',
+    'resume-result': 'resume-result yield=1',
+}
+STOP_RED = {
+    'root-branch': ('ctx_bad_root_branch', 'CTX BEGIN'),
+    'child-return': ('ctx_bad_child_return', 'CTX irq '),
+    'srr': ('ctx_bad_srr', 'CTX entry gen=1 '),
+    'pr-frame': ('ctx_bad_pr_frame', 'CTX entry gen=1 '),
+}
+
 def observe(elf, cpu, out, mode):
     out.mkdir()
     cd = out/'cd'; cd.mkdir(); shutil.copyfile(elf, cd/'PPCKERN.ELF')
@@ -227,16 +307,17 @@ def observe(elf, cpu, out, mode):
             '-monitor', 'none', '-qmp', 'stdio', '-no-reboot', '-nic', 'none']
     (out/'argv.json').write_text(json.dumps(argv))
     prefix = str(Path(os.environ['PPC_CROSS_DIR'])/'bin/powerpc-elf-')
-    done = next(int(l.split()[0], 16) for l in command([prefix+'nm', '-n', elf]).splitlines()
-                if l.endswith(' ctx_done'))
-    stop = next(int(l.split()[0], 16) for l in command([prefix+'nm', '-n', elf]).splitlines()
-                if l.endswith(' ppc_trap_stop'))
+    symbols = {parts[-1]: int(parts[0], 16)
+               for line in command([prefix+'nm', '-n', elf]).splitlines()
+               if len(parts := line.split()) == 3}
+    done, stop = symbols['ctx_done'], symbols['ppc_trap_stop']
     deadline = time.monotonic()+45
     q = None
     with (out/'stderr').open('w') as err:
         p = subprocess.Popen(argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=err, bufsize=0)
         try:
             q = QMP(p, deadline)
+            next_sample = 0
             while time.monotonic() < deadline:
                 text = serial(a).replace('\r', '')
                 if mode.startswith('outside-') and 'FATAL' in text:
@@ -249,9 +330,25 @@ def observe(elf, cpu, out, mode):
                     if pc and int(pc[1], 16) == stop: return None
                     q.call('cont')
                     continue
-                if 'CTX FAIL' in text or 'FATAL' in text:
-                    require('CTX BEGIN' in text, 'failure before probe entry')
-                    return 'state mismatch'
+                if 'CTX mismatch ' in text:
+                    reports = re.findall(r'^CTX mismatch (.*)\n', text, re.M)
+                    if reports:
+                        require('CTX BEGIN\n' in text and 'FATAL' not in text and
+                                'CTX FAIL' not in text.split('CTX mismatch ', 1)[0] and
+                                reports == [SERIAL_RED.get(mode)], 'unexpected mismatch: '+str(reports))
+                        return reports[0]
+                require('CTX FAIL' not in text and 'FATAL' not in text,
+                        'unexpected guest failure in '+mode)
+                if mode in STOP_RED and time.monotonic() >= next_sample:
+                    symbol, marker = STOP_RED[mode]
+                    if 'CTX BEGIN\n' in text and marker in text:
+                        q.call('stop')
+                        regs = q.call('human-monitor-command', {'command-line':'info registers'})
+                        pc = re.search(r'NIP\s+([0-9a-fA-F]+)', regs)
+                        if pc and int(pc[1], 16) == symbols[symbol]:
+                            return symbol
+                        q.call('cont')
+                    next_sample = time.monotonic() + .25
                 if 'CTX PASS\n' in text:
                     require(not mode.startswith('outside-'), 'outside fault did not stop')
                     q.call('stop')
@@ -271,8 +368,7 @@ def observe(elf, cpu, out, mode):
                     return None
                 if p.poll() is not None: raise RuntimeError('QEMU exited '+str(p.returncode))
                 time.sleep(.02)
-            require('CTX BEGIN' in serial(a), 'watchdog before probe entry')
-            return 'watchdog expired'
+            raise CriterionFailure('watchdog expired in '+mode)
         finally:
             if q and p.poll() is None:
                 q.deadline = time.monotonic()+3
