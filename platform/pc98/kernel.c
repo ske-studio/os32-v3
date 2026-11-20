@@ -392,8 +392,31 @@ static int pc98_shell_prepare(int is_gui)
     return 0;
 }
 
+/* 3 回目の fault の後にも session clear があるので、次の起動で表示する。 */
+static const char *gshell_warning;
+
 static void pc98_shell_loading(const char *cur_shell, int is_gui)
 {
+    /* dual のテキスト面はセッションを越えて残り、出力でスクロールもする。 */
+    static const char *previous_warning;
+    if (previous_warning) {
+        for (int y = 0; y < TVRAM_ROWS; y++) {
+            int x = 0;
+            while (previous_warning[x]) {
+                u16 code = 0;
+                u8 attr = 0;
+                tvram_readchar_at(x, y, &code, &attr);
+                if (code != (u8)previous_warning[x] || attr != TATTR_RED) break;
+                x++;
+            }
+            if (!previous_warning[x]) {
+                while (x > 0) tvram_putchar_at(--x, y, ' ', TATTR_GRAY);
+                break;
+            }
+        }
+    }
+    previous_warning = is_gui ? NULL : gshell_warning;
+
     /* GUI は全画面 GFX を握るのでテキストカーソルを消す。CUI は出す。 */
     if (is_gui) {
         /* Graphics boundary, master PD; all windows were mapped by ⑥. */
@@ -413,14 +436,24 @@ static void pc98_shell_loading(const char *cur_shell, int is_gui)
         int col;
         console_text_gdc_start();
         if (con_dual_cfg()) {
+            if (gshell_warning) {
+                if (console_get_cursor_x()) shell_print("\n", TATTR_GRAY);
+                shell_print(gshell_warning, TATTR_RED);
+                shell_print("\n", TATTR_RED);
+            }
             shell_print("Loading shell...\n", TATTR_GRAY);
         } else {
+            if (gshell_warning) {
+                tvram_print(0, 1, gshell_warning, TATTR_RED);
+                console_set_cursor(0, 2);
+            }
             tvram_print(0, 0, loading, TATTR_GRAY);
             for (col = (int)sizeof(loading) - 1; col < TVRAM_COLS; col++)
                 tvram_putchar_at(col, 0, ' ', TATTR_GRAY);
         }
     }
 
+    gshell_warning = NULL;
     if (!is_gui) geforce_heat_notice();
     boot_diag_exec(cur_shell, 0, 0, 0);
 }
@@ -437,13 +470,13 @@ static void pc98_shell_failure(int gui, int rc, int streak)
     if (!gui) {
         kernel_shell_fdd_fallback(exec_layout_rejected());
     } else if (rc == EXEC_ERR_FAULT) {
-        tvram_print(0, 0, "gshell crashed 3x -> CUI shell", TATTR_RED);
+        gshell_warning = "gshell crashed 3x -> CUI shell";
     } else {
         console_text_gdc_start();
         tvram_clear();
-        tvram_print(0, 0, exec_layout_rejected()
+        gshell_warning = exec_layout_rejected()
                     ? "gshell: rebuild required (KAPI data layout) -> CUI shell"
-                    : "gshell load failed -> CUI shell", TATTR_RED);
+                    : "gshell load failed -> CUI shell";
     }
 }
 

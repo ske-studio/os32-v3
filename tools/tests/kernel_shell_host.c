@@ -58,6 +58,10 @@ static int expected_kcg, expected_reject, expected_gui, diag_count, expected_dia
 static int diagnostic_pending;
 static const char *case_name, *expected_text = "", *forbidden_text = "FATAL:";
 static char messages[8192];
+static char screen[TVRAM_ROWS][TVRAM_COLS + 1];
+static u8 colors[TVRAM_ROWS][TVRAM_COLS];
+static int dual, cursor_col, cursor_row;
+static const char *expected_warning;
 static void *done[5];
 volatile u32 tick_count;
 
@@ -108,16 +112,34 @@ void kprintf(u8 attr, const char *fmt, ...)
 
 void console_text_gdc_start(void) { cursor_gui = 0; }
 void console_text_gdc_stop(void) { cursor_gui = 1; }
-void tvram_clear(void) { clears++; }
+int console_get_cursor_x(void) { return cursor_col; }
+void console_set_cursor(int x, int y) { cursor_col = x; cursor_row = y; }
+void tvram_clear(void)
+{
+    clears++;
+    for (int y = 0; y < TVRAM_ROWS; y++)
+        for (int x = 0; x < TVRAM_COLS; x++) screen[y][x] = ' ';
+    console_set_cursor(0, 0);
+}
 void tvram_print(int x, int y, const char *s, u8 attr)
 {
-    (void)x; (void)y; (void)attr;
+    REQUIRE(y >= 0 && y < TVRAM_ROWS && x >= 0);
+    for (int i = 0; s[i] && x < TVRAM_COLS; i++, x++) {
+        colors[y][x] = attr;
+        screen[y][x] = s[i];
+    }
     append(s);
     if (!fixture_strncmp(s, "FATAL:", 6)) fatal = 1;
 }
+void tvram_readchar_at(int x, int y, u16 *code, u8 *attr)
+{
+    *code = screen[y][x];
+    *attr = colors[y][x];
+}
 void tvram_putchar_at(int x, int y, char ch, u8 attr)
 {
-    REQUIRE(x >= 16 && x < TVRAM_COLS && y == 0 && ch == ' ' && attr == TATTR_GRAY);
+    REQUIRE(x >= 0 && x < TVRAM_COLS && y >= 0 && y < TVRAM_ROWS && ch == ' ' && attr == TATTR_GRAY);
+    screen[y][x] = ch;
 }
 int gfx_cirrus_probed(void) { return probed; }
 void gfx_prepare_backend(void) { prepare_calls++; probed = 1; }
@@ -168,6 +190,30 @@ int exec_run(const char *path)
     /* Refusal diagnostics must precede the CUI load, not appear afterward. */
     if (config_gui && reject_reason && kcg_ready && step_index == 1)
         REQUIRE(fixture_strstr(messages, expected_text));
+    if (!s->gui && expected_warning) {
+        int retry_case = !fixture_strcmp(case_name, "gui-fdd");
+        if (s->rc == 0) {
+            shell_print("================================\n OS32 External Shell Started\n"
+                        "================================\n", TATTR_GRAY);
+        }
+        int warning_row = -1, loading_row = -1;
+        for (int y = 0; y < TVRAM_ROWS; y++) {
+            if (fixture_strstr(screen[y], expected_warning)) warning_row = y;
+            if (fixture_strstr(screen[y], "Loading shell...")) loading_row = y;
+        }
+        if (retry_case && step_index == 4) {
+            REQUIRE(warning_row < 0);
+            if (dual) {
+                int len = fixture_strlen(expected_warning);
+                REQUIRE(screen[0][len] == '#');
+                for (int x = 0; x < len; x++) REQUIRE(screen[0][x] == ' ');
+            }
+        } else {
+            REQUIRE(loading_row >= 0 && warning_row >= 0 && cursor_row > warning_row);
+            if (retry_case && step_index == 3 && dual)
+                tvram_print(fixture_strlen(expected_warning), warning_row, "#", TATTR_GRAY);
+        }
+    }
     return s->rc;
 }
 
@@ -200,6 +246,8 @@ int main(int argc, char **argv)
 {
     REQUIRE(argc == 2);
     case_name = argv[1];
+    dual = !fixture_strncmp(case_name, "dual-", 5);
+    if (dual) case_name += 5;
     if (!fixture_strcmp(case_name, "cui") || !fixture_strcmp(case_name, "tick-wrap") ||
         !fixture_strcmp(case_name, "cui-ignores-shlib")) {
         PLAN(10, 1, C(0, 0, 0, 0));
@@ -232,17 +280,24 @@ int main(int argc, char **argv)
         PLAN(10, 2, G(EXEC_ERR_NOT_FOUND, layout, 0, 0, 0), C(0, 0, 0, 1));
         expected_text = layout ? "gshell: rebuild required (KAPI data layout) -> CUI shell"
                                : "gshell load failed -> CUI shell";
+        expected_warning = expected_text;
         if (!fixture_strcmp(case_name, "request-again")) {
             config_gui = 0; requests[0] = requests[2] = SYS_GSHELL_BIN;
             PLAN(20, 3, G(EXEC_ERR_NOT_FOUND, 0, 0, 0, 0), C(0, 0, 0, 1),
                  G(0, 0, 10, 2, 0));
             expected_kcg = expected_gui = 2; expected_reject = 4;
         }
+    } else if (!fixture_strcmp(case_name, "gui-fdd")) {
+        config_gui = expected_gui = expected_kcg = 1; expected_reject = 2;
+        PLAN(20, 3, G(EXEC_ERR_NOT_FOUND, 0, 0, 0, 0), C(EXEC_ERR_NOT_FOUND, 0, 0, 1),
+             C(0, 0, 0, 1), C(0, 0, 10, 2));
+        expected_diag = 3;
+        expected_warning = "gshell load failed -> CUI shell";
     } else if (!fixture_strcmp(case_name, "three-faults")) {
         config_gui = 1; expected_kcg = expected_gui = 3; expected_reject = 6;
         PLAN(40, 4, G(EXEC_ERR_FAULT, 0, 0, 0, 0), G(EXEC_ERR_FAULT, 0, 10, 1, 1),
              G(EXEC_ERR_FAULT, 0, 20, 2, 2), C(0, 0, 30, 3));
-        expected_text = "gshell crashed 3x -> CUI shell";
+        expected_warning = expected_text = "gshell crashed 3x -> CUI shell";
     } else if (!fixture_strcmp(case_name, "success-resets") || !fixture_strcmp(case_name, "request-resets")) {
         config_gui = 1; expected_kcg = expected_gui = 4; expected_reject = 8;
         if (!fixture_strcmp(case_name, "success-resets")) {
@@ -290,7 +345,21 @@ __asm__(".global _start\n_start:\nmov %esp, %eax\nand $-16, %esp\n"
 
 int con_dual_active(void) { return 0; }
 int con_dual_was_live(void) { return 0; }
-int con_dual_cfg(void) { return 0; }
+int con_dual_cfg(void) { return dual; }
 void con_dual_configure(int on) { (void)on; }
-void console_session_clear(void) { tvram_clear(); }
-void shell_print(const char *str, u8 color) { (void)str; (void)color; }
+void console_session_clear(void) { if (dual) clears++; else tvram_clear(); }
+void shell_print(const char *str, u8 color)
+{
+    append(str);
+    while (*str) {
+        REQUIRE(cursor_row >= 0 && cursor_row < TVRAM_ROWS);
+        if (*str == '\n') {
+            console_set_cursor(0, cursor_row + 1);
+        } else {
+            REQUIRE(cursor_col >= 0 && cursor_col < TVRAM_COLS);
+            colors[cursor_row][cursor_col] = color;
+            screen[cursor_row][cursor_col++] = *str;
+        }
+        str++;
+    }
+}
