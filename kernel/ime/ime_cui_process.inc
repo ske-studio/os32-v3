@@ -1,6 +1,9 @@
 /* Convert one newly fetched CUI key; readers retain wait/filter/owner policy. */
 static int ime_cui_process(int keydata)
 {
+#ifdef OS32_FEP_STATIC
+    if (!platform_fep_key_local()) return keydata;
+#endif
     /* Shift+Space is recognized both ON and OFF. */
     if (((keydata >> 8) & SCANCODE_KEY) == KEY_SPACE &&
         (kbd_shift_state & SHIFT_SHIFT)) {

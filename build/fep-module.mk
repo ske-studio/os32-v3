@@ -9,6 +9,7 @@ FEP_OBJS := $(addprefix $(FEP_OUT)/,fep_body.o ime.o ime_dict.o ime_conn.o ime_u
 FEP_INC := $(INC_KERNEL) -I. -I$(FEP_OUT)
 $(FEP_OUT)/fep_body.o $(FEP_OUT)/ime.o $(FEP_OUT)/ime_dict.o $(FEP_OUT)/ime_conn.o $(FEP_OUT)/ime_user_store.o $(FEP_OUT)/ime_dict_info.o $(FEP_OUT)/ime_suspend.o $(FEP_OUT)/ime_romkana.o: $(FEP_OUT)/%.o: kernel/ime/%.c $(FEP_GEN) build/config.mk build/fep-module.mk
 	$(CC) $(CFLAGS_BASE) -Os -DOS32_FEP_MODULE $(FEP_INC) -c $< -o $@
+$(FEP_OUT)/ime.o: kernel/ime/fep_input.h include/platform_fep_input.h
 # Display implementation remains private to the FEP module, with its basename.
 $(FEP_OUT)/ime_render_tvram.o $(FEP_OUT)/ime_display.o: $(FEP_OUT)/%.o: platform/$(PLATFORM)/%.c $(FEP_GEN) build/config.mk build/fep-module.mk
 	$(CC) $(CFLAGS_BASE) -Os -DOS32_FEP_MODULE $(FEP_INC) -c $< -o $@

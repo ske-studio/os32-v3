@@ -39,6 +39,7 @@ extern void ring3_abort_check(void);
 #define services_boot_fault fep_services_boot_fault()
 #define kbd_shift_state fep_kbd_shift_state()
 #endif
+#include "fep_input.h"
 
 
 /* ======================================================================== */

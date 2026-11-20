@@ -25,8 +25,13 @@
 #define FEP_DICT_PATH_S "/db/fep_s.db"
 #define FEP_DICT_PATH_M IME_DICT_PATH
 #define FEP_DICT_PATH_L "/db/fep_l.db"
+#ifdef OS32_FEP_STATIC
+#define FEP_USER_PATH "/dbu/fep_user.db"
+#define FEP_USER_DIR "/dbu/"
+#else
 #define FEP_USER_PATH "/etc/fep_user.db"
 #define FEP_USER_DIR "/etc/"
+#endif
 #define FEP_USER_JOURNAL_SUFFIX "-journal"
 /* settings table keys (scope=system), not dotted configuration labels. */
 #define FEP_SETTING_RESERVE "fep_mem_reserve_kb"
