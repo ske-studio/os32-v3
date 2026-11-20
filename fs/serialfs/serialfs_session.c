@@ -330,7 +330,7 @@ const struct SfsSessionFg sfs_session_fg = {
     .end = sfs_fg_end
 };
 
-static const struct SfsSessionFg *g_fg = &sfs_session_fg;
+static const struct SfsSessionFg *g_fg = NULL;
 
 void serialfs_session_set_fg(const struct SfsSessionFg *fg)
 {

@@ -855,6 +855,9 @@ static void lan_lifetime(void)
 int main(int argc, char **argv)
 {
     const char *c = argc > 1 ? argv[1] : "";
+    CHECK(serialfs_session_begin() == OS32_ERR_NOSYS);
+    CHECK(serialfs_session_end(0) == OS32_ERR_NOSYS);
+    serialfs_session_set_fg(&sfs_session_fg);
     if (!strcmp(c, "flow")) flow();
     else if (!strcmp(c, "hello_fail_quiet")) hello_fail_quiet();
     else if (!strcmp(c, "hello_fail_flood")) hello_fail_flood();

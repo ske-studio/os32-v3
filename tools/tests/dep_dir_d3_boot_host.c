@@ -88,7 +88,10 @@ static int fatfs_init(void) { event("fat;"); return failing == 2 ? -1 : VFS_OK; 
 static int hostdrvfs_init(void) { event("hostfs;"); return failing == 3 ? -1 : VFS_OK; }
 int serialfs_init(void) { event("serialfs;"); return failing == 4 ? -1 : VFS_OK; }
 const struct SfsSessionFg sfs_session_fg = {0};
-void serialfs_session_set_fg(const struct SfsSessionFg *fg) { CHECK(fg == &sfs_session_fg); }
+void serialfs_session_set_fg(const struct SfsSessionFg *fg) {
+    CHECK(fg == &sfs_session_fg);
+    event("sfs_fg;");
+}
 static Device children[] = {
     {.name="fd0", .type=DEV_BLOCK, .sect_size=512, .total_sects=1, .blk_read_u32 = 0, .media_check = 0},
     {.name="hd0", .type=DEV_BLOCK, .sect_size=512, .total_sects=1, .blk_read_u32 = 0, .media_check = 0},
@@ -174,7 +177,7 @@ int main(void)
         snprintf(want, sizeof(want), "T60,1,%u:FDC...;enable;fdc;T66,1,%u:%s;fdc-status;T0,%d,%u:FDC rc=%d st0=12 0439h=34->56;L%u:[fdc] FDC rc=%d st0=12 0439h=34->56\n;media;inp;T69,1,%u:144;T72,1,%u:M;", TATTR_GREEN, failing?TATTR_RED:TATTR_WHITE, failing?"ER":"OK", TVRAM_ROWS-1, failing?TATTR_YELLOW:TATTR_WHITE, failing?-1:0, TATTR_WHITE, failing?-1:0, TATTR_GREEN, TATTR_WHITE);
         expect(want);
         boot_platform_run(BOOT_DEV_FS, &ctx);
-        snprintf(want, sizeof(want), "T58,1,%u:DEV...;dev;loop;path;hd;medium-loop;ext2;fat;hostfs;serialfs;validator;T64,1,%u:%s;%s", TATTR_GREEN, TATTR_WHITE, failing?"NG":"OK", failing?"L225:VFS: filesystem registration failed\n;":"");
+        snprintf(want, sizeof(want), "T58,1,%u:DEV...;dev;loop;path;hd;medium-loop;ext2;fat;hostfs;serialfs;sfs_fg;validator;T64,1,%u:%s;%s", TATTR_GREEN, TATTR_WHITE, failing?"NG":"OK", failing?"L225:VFS: filesystem registration failed\n;":"");
         expect(want);
     }
     boot_platform_run(BOOT_PCI_ENUM, &ctx); expect("pci;");
