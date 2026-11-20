@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 CHECK = dict(name='machcfg-host', tier=1, needs=[], budget=5,
     covers=['include/machcfg_contract.h', 'include/types.h', 'include/callconv.h',
+            'kernel/machcfg_root.c', 'include/config.h', 'lib/kstring.h',
             'init/sysconfig.c', 'init/sysconfig.h', 'fs/vfs.h', 'lib/kstring_c.c',
             'tools/tests/kernel_includes.py', 'kernel/machcfg.c', 'platform/pc98/machcfg.c', 'tools/tests/machcfg_host.c',
             'include/kprintf.h', 'include/console.h', 'sdk/include/os32/*.h',
-            'platform/pc98/platform_console.h', 'lib/kprintf.c', 'lib/kprintf_format.inc',
+            'platform/pc98/kernel.c', 'platform/pc98/platform_console.h', 'lib/kprintf.c', 'lib/kprintf_format.inc',
             'tools/tests/host32.py', 'tools/tests/cc_cache.py'],
     basis=['docs/decisions/settings/MACHCFG_DESIGN.md §2, §3, §7'])
 
@@ -27,6 +28,23 @@ def run(ctx):
     source = (root / 'kernel/machcfg.c').read_text()
     header = (root / 'include/machcfg_contract.h').read_text()
     pc98 = (root / 'platform/pc98/machcfg.c').read_text()
+    loader = (root / 'kernel/machcfg_root.c').read_text()
+    boot = (root / 'platform/pc98/kernel.c').read_text()
+    calls = ('kernel_boot_cpu(mem_kb, &boot);', 'machcfg_begin(platform_machcfg_seed());',
+             'vfs_mount("/", boot.root_dev, boot.root_fs);', 'boot_platform_run(BOOT_AUTO_MOUNT, &boot);',
+             'machcfg_load_root();', 'machcfg_report("pc98", 0, 0);', 'boot_platform_run(BOOT_CLOCK, &boot);')
+
+    def boot_order(body):
+        positions = [body.find(call) for call in calls]
+        return all(body.count(call) == 1 for call in calls) and positions == sorted(positions)
+
+    if not boot_order(boot):
+        raise RuntimeError('PC-98 boot configuration call order')
+    if ctx.mutate:
+        early = boot.replace(calls[4], '').replace('rc = ' + calls[2], calls[4] + '\n        rc = ' + calls[2])
+        if boot_order(early):
+            raise RuntimeError('load before mount survived')
+        print('load before mount RED')
     mutations = [
         ('capability', 'if (!machine_seed.accepts_nap7450)', 'if (0)'),
         ('report-once', 'reported = 1;', ''),
@@ -42,7 +60,8 @@ def run(ctx):
             '#include "kprintf_format.inc"', (root / 'lib/kprintf_format.inc').read_text())
         (tmp / 'format.c').write_text(formatter)
         parser = (root / 'init/sysconfig.c').read_text()
-        def check(src, hdr, cfg=parser, platform=pc98):
+        def check(src, hdr, cfg=parser, platform=pc98, root_src=loader):
+            (tmp / 'machcfg_root.c').write_text(root_src)
             (tmp / 'sysconfig.c').write_text(cfg)
             (tmp / 'pc98.c').write_text(platform)
             (tmp / 'machcfg.c').write_text(src)
@@ -52,6 +71,7 @@ def run(ctx):
                    '-ffreestanding', '-fno-pie', '-no-pie', '-nostdlib',
                    '-DTEST_SYSCONFIG_MAX=' + match.group(1), '-I' + str(tmp),
                    '-I' + str(root / 'include'), str(tmp / 'machcfg.c'), str(tmp / 'pc98.c'),
+                   str(tmp / 'machcfg_root.c'),
                    '-I' + str(root / 'platform/pc98'), str(tmp / 'format.c'),
                    *kernel_includes.include_flags(root), str(tmp / 'sysconfig.c'),
                    str(root / 'lib/kstring_c.c'), str(root / 'tools/tests/machcfg_host.c'), '-o', str(exe)]
@@ -67,6 +87,21 @@ def run(ctx):
             return 1
         print('normal control: GREEN')
         if ctx.mutate:
+            for name, old, new in [
+                ('perf-default', '"perf.profile", -1', '"perf.profile", 0'),
+                ('nap-default', '"ppc7450.nap", -1', '"ppc7450.nap", 0'),
+                ('perf-range', 'x <= 2', 'x <= 3'),
+                ('nap-range', 'x <= 1', 'x <= 2'),
+                ('oversize', 'n < 0 ? MACHCFG_FILE_BIG : MACHCFG_FILE_NONE', 'MACHCFG_FILE_NONE'),
+                ('temp-end', '\n    sysconfig_temp_end();', ''),
+            ]:
+                if loader.count(old) != 1:
+                    raise RuntimeError('mutation point changed: ' + name)
+                phase, result = check(source, header, root_src=loader.replace(old, new))
+                if (phase, result) != ('run', 21):
+                    print(name, phase, result)
+                    return 1
+                print(name, 'runtime RED')
             for name, old, new in [
                 ('bare-cr-length', 'end < n && length', 'length'),
                 ('bare-cr-integer', r"end - s >= 2 && *s == '\r' && s[1] == '\n'",

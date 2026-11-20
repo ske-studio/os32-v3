@@ -59,6 +59,7 @@
 #include "memmap.h"
 #include "config.h"
 #include "../../init/sysconfig.h"
+#include "machcfg_contract.h"
 #include "kstring.h"
 #include "kprintf.h"   /* kutoa_dec / kutoa_hex (状態行の数値) */
 #include "sys.h"
@@ -156,6 +157,7 @@ void platform_boot_machine(void)
     sys_mem_kb = mem_kb;
     
     kernel_boot_cpu(mem_kb, &boot);
+    machcfg_begin(platform_machcfg_seed());
 
     boot_platform_run(BOOT_INPUT, &boot);
 
@@ -202,6 +204,8 @@ void platform_boot_machine(void)
         tvram_print(23, 3, "root OK", TATTR_WHITE);
 
         boot_platform_run(BOOT_AUTO_MOUNT, &boot);
+        machcfg_load_root();
+        machcfg_report("pc98", 0, 0);
     }
 
     boot_platform_run(BOOT_CLOCK, &boot);
