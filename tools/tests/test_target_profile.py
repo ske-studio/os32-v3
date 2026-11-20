@@ -28,9 +28,10 @@ def check(root):
                for key in ('crt_resident', 'app_sys_link', 'shlib_link', 'rust'))
     assert T.require('x86-pc98', 'module_codec')['elf_identity'] == (1,1,3)
     assert T.require('ppc-powermac', 'link_guard')['elf_identity'] == (1,2,20)
+    assert T.require('ppc-powermac', 'module_codec')['elf_identity'] == (1,2,20)
     for name in ('ppc-powermac', 'unknown'):
         for capability in ('module_codec','layout','link_guard'):
-            if name == 'ppc-powermac' and capability == 'link_guard':
+            if name == 'ppc-powermac' and capability in ('link_guard', 'module_codec'):
                 continue
             try:
                 T.require(name,capability)
@@ -42,7 +43,11 @@ def check(root):
         result = command(ROOT/'tools/mkmod.py', '--target',name,'--elf','absent',
                          '--metadata','absent','--vmkernel','absent','--kapi-abi-gen','1',
                          '--layout-gen','1','-o',output)
-        assert result.returncode and 'target' in result.stderr and 'No such file' not in result.stderr
+        assert result.returncode
+        if name == 'ppc-powermac':
+            assert 'No such file' in result.stderr
+        else:
+            assert 'unknown target' in result.stderr
         result = command(ROOT/'tools/gen_memmap.py','--target',name,'--layout-header',output)
         assert result.returncode and 'target' in result.stderr
         if name != 'ppc-powermac':  # B27: PPC USER links are guarded

@@ -2,7 +2,7 @@
 記録: tools/tests/module_image_tdd.md
 """
 CHECK = dict(name='module-image-host', tier=1,
-    covers=['kernel/module/module_schema.h', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'include/types.h', 'kernel/module/module_image.c', 'kernel/module/module_image.h', 'lib/le_internal.h', 'tools/tests/host32.py', 'tools/tests/module_image_host.c', 'tools/tests/module_image_tdd.md', 'tools/tests/kernel_includes.py'],
+    covers=['kernel/module/module_fixup_ppc.inc', 'include/endian_le.h', 'kernel/module/module_schema.h', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'include/types.h', 'kernel/module/module_image.c', 'kernel/module/module_image.h', 'lib/le_internal.h', 'tools/tests/host32.py', 'tools/tests/module_image_host.c', 'tools/tests/module_image_tdd.md', 'tools/tests/kernel_includes.py'],
     needs=[], budget=6.7,
     kind='characterization',
 )
@@ -27,7 +27,7 @@ FLAGS = ["-m32", "-march=i386", "-std=gnu11", "-O2", "-Wall", "-Wextra", "-Werro
 
 def build_validator(directory, source=None, extra_flags=()):
     exe = Path(directory) / "module-validator"
-    subprocess.run(["gcc", *FLAGS, *extra_flags, "-nostdlib", "-static", "-no-pie",
+    subprocess.run(["gcc", *FLAGS, *extra_flags, "-nostdinc", "-nostdlib", "-static", "-no-pie",
                      *include_flags(ROOT),
                     str(HARNESS), str(source or TARGET_SRC), "-o", str(exe)], check=True)
     return exe
@@ -215,14 +215,23 @@ def powerpc_cases(directory, runner):
     # Exercise the PPC wire policy using the ILP32 host runner.
     exe = build_validator(directory, extra_flags=("-D__powerpc__",))
     def check(image, expected):
-        run = validate(exe, crc(image), runner=runner, relocate_base=0, **POLICY)
-        assert run.returncode == 1 and run.stdout == f"RED {expected:02}\n".encode()
+        run = validate(exe, crc(image), runner=runner, relocate_base=0x12348000, **POLICY)
+        assert run.returncode == bool(expected)
+        assert run.stdout == (f"RED {expected:02}\n".encode() if expected else b"GREEN\n")
     check(fixture(), 3)
     image = fixture()
     for field, value in ((1, 2), (34, 20), (22, 0), (29, 0)):
         word(image, field, value)
     struct.pack_into("<I", image, 172, 8)  # aligned export in text
-    check(image, 11)  # shared validation passed, PPC fixups not yet available
+    check(image, 0)
+    records = bytearray(image)
+    word(records, 21, 256)
+    word(records, 22, 2)
+    struct.pack_into("<6I", records, 256, 0, 1, 80, 6, 6, 4096)
+    check(records, 0)
+    for off, kind in ((6, 99), (64, 4), (34, 4), (2, 4)):
+        struct.pack_into("<III", records, 268, off, kind, 80)
+        check(records, 11)
     for field, value in ((34, 0), (29, 2), (29, 24), (22, 1)):
         check(word(bytearray(image), field, value), 3)
     struct.pack_into("<I", image, 172, 9)

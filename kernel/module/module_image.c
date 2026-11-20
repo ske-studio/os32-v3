@@ -7,6 +7,7 @@ STATIC_ASSERT(sizeof(u32) == 4, module_u32_is_four_bytes);
 STATIC_ASSERT(MI_WORDS * MODULE_WORD_BYTES == MODULE_HEADER_SIZE, module_header_words);
 
 #ifdef __powerpc__
+#include "module_fixup_ppc.inc"
 #define IMAGE_VERSION MODULE_PPC_FORMAT_VERSION
 #define IMAGE_TARGET MODULE_PPC_TARGET_TAG
 #define IMAGE_RELOC_BYTES MODULE_PPC_RELOC_ENTRY_SIZE
@@ -233,13 +234,22 @@ int module_image_validate(const u8 *image, u32 size,
             if (overlap(off, MODULE_WORD_BYTES, slot, MODULE_WORD_BYTES)) return MODULE_RELOC_INVALID;
         }
     }
+#else
+    const u8 *records = image + h[MI_RELOC_OFF];
+    if (module_fixup_ppc_validate(records, h[MI_RELOC_COUNT], h[MI_MEM_SIZE], h[MI_TEXT_SIZE]))
+        return MODULE_RELOC_INVALID;
+    for (u32 i = 0; i < h[MI_RELOC_COUNT]; i++) {
+        const u8 *rec = records + i * IMAGE_RELOC_BYTES;
+        u32 off = le_read32(rec), width = le_read32(rec + 4) == 1 ? 4 : 2;
+        if (!within(off, width, h[MI_PAYLOAD_SIZE])) return MODULE_RELOC_INVALID;
+        for (u32 j = 0; j < h[MI_IMPORT_COUNT]; j++) {
+            u32 slot = le_read32(image + h[MI_IMPORT_OFF] + j * MODULE_RECORD_SIZE + MODULE_IMPORT_SLOT_OFF);
+            if (overlap(off, width, slot, MODULE_WORD_BYTES)) return MODULE_RELOC_INVALID;
+        }
+    }
+#endif
     if (out) *out = plan;
     return MODULE_IMAGE_OK;
-#else
-    /* PPC fixup validation joins here when its implementation is available. */
-    (void)out;
-    return MODULE_RELOC_INVALID;
-#endif
 }
 
 /* Validate every write and base addition before changing even BSS. The owned
@@ -255,11 +265,15 @@ int module_image_relocate(u8 *image, u32 size,
     if (base > U32_MAX - h[MI_MEM_SIZE]) return MODULE_RELOC_INVALID;
     u8 *body = image + h[MI_PAYLOAD_OFF];
     for (u32 i = h[MI_PAYLOAD_SIZE]; i < h[MI_MEM_SIZE]; i++) body[i] = 0;
+#ifdef __powerpc__
+    module_fixup_ppc_apply(body, base, image + h[MI_RELOC_OFF], h[MI_RELOC_COUNT]);
+#else
     for (u32 i = 0; i < h[MI_RELOC_COUNT]; i++) {
         u32 off = le_read32(image + h[MI_RELOC_OFF] + MODULE_RELOC_ENTRY_SIZE * i);
         u32 value = base + le_read32(body + off);
         for (u32 j = 0; j < MODULE_WORD_BYTES; j++) body[off + j] = (u8)(value >> (8 * j));
     }
+#endif
     if (out) *out = plan;
     return MODULE_IMAGE_OK;
 }

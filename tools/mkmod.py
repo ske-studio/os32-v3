@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build an uncompressed KMOD v1 container from a VA-zero i386 --emit-relocs ELF.
+"""Build an uncompressed KMOD container from a VA-zero --emit-relocs ELF.
 
 The product build packages kdebug separately from the resident kernel. Metadata
 comes from gen_kdebug_imports.py; exports come from the linked kdebug_ops
@@ -232,9 +232,19 @@ def build(elf_data, metadata, vmkernel, kapi_abi_gen, layout_gen, *,
     require(module_id in POLICIES, 'unknown module ID')
     policy = POLICIES[module_id]
     elf = Elf(elf_data, target)
-    require(elf.format.version == CONSTANTS['FORMAT_VERSION'], 'unsupported relocation format')
     payload, mem_size, ranges = elf.body(policy)
-    relocs = elf.relocations(payload, mem_size, policy)
+    if target == 'ppc-powermac':
+        from ppc.module_rela import ppc_relocations
+        reloc_table = ppc_relocations(elf, payload, mem_size, policy)
+        writes = [(off, 4 if kind == 1 else 2)
+                  for off, kind, _ in struct.iter_unpack('<III', reloc_table)]
+        order = '>'
+    else:
+        relocs = elf.relocations(payload, mem_size, policy)
+        reloc_table = b''.join(struct.pack('<I', off) for off in relocs)
+        writes = [(off, 4) for off in relocs]
+        order = '<'
+    pointers = {off for off, width in writes if width == 4}
     text_off, text_size = ranges[0]
     data_off, data_size = ranges[2]
     init = elf.symbol(policy['init_symbol'])['value']
@@ -259,7 +269,7 @@ def build(elf_data, metadata, vmkernel, kapi_abi_gen, layout_gen, *,
         require(fnv1a(name) not in seen_hashes, 'module name hash collision')
         seen_hashes.add(fnv1a(name))
         slot_off = data_off + 4 * index
-        require(not any(r < slot_off + 4 and slot_off < r + 4 for r in relocs),
+        require(not any(r < slot_off + 4 and slot_off < r + width for r, width in writes),
                 'relocation overlaps import slot')
         require(struct.unpack_from('<I', payload, slot_off)[0] == 0,
                 'import slot must be initially zero')
@@ -273,13 +283,13 @@ def build(elf_data, metadata, vmkernel, kapi_abi_gen, layout_gen, *,
         require(any(off <= ops['value'] and ops['value'] - off <= size and
                     ops['size'] <= size - (ops['value'] - off) for off, size in ranges[:3]),
                 'kdebug_ops outside payload sections')
-        values = struct.unpack_from('<' + 'I' * (policy['ops_slots'] + 1), payload, ops['value'])
+        values = struct.unpack_from(order + 'I' * (policy['ops_slots'] + 1), payload, ops['value'])
         require(values[0] == ops_version, 'unsupported kdebug_ops version')
         for slot, (name, entry) in enumerate(zip(ops_names, values[1:]), 1):
             pointer_off = ops['value'] + slot * 4
             # A function at text VA zero is non-null in the relocated image.
-            if pointer_off not in relocs:
-                require(entry == 0, 'export pointer lacks R_386_32 relocation')
+            if pointer_off not in pointers:
+                require(entry == 0, 'export pointer lacks absolute word relocation')
                 continue
             require(text_off <= entry < text_off + text_size, 'export outside text')
             encoded = name_bytes(name)
@@ -289,7 +299,6 @@ def build(elf_data, metadata, vmkernel, kapi_abi_gen, layout_gen, *,
             seen_hashes.add(fnv1a(encoded))
             export_table += struct.pack('<IHHI', fnv1a(encoded), slot, 1, entry)
             names += encoded + b'\0'
-    reloc_table = b''.join(struct.pack('<I', r) for r in relocs)
     tables = (reloc_table, import_table, export_table, names)
     offsets = []
     offset = HEADER_SIZE
@@ -313,7 +322,7 @@ def build(elf_data, metadata, vmkernel, kapi_abi_gen, layout_gen, *,
                   KAPI=kapi_abi_gen, LAYOUT=layout_gen, ABI=abi, ID=module_id,
                   PHASE=policy['phase'], FLAGS=policy['required_flags'], MEM_SIZE=mem_size,
                   PAYLOAD_OFF=payload_offset, PAYLOAD_SIZE=len(payload),
-                  RELOC_OFF=offsets[0], RELOC_COUNT=len(relocs),
+                  RELOC_OFF=offsets[0], RELOC_COUNT=len(writes),
                   IMPORT_OFF=offsets[1], IMPORT_COUNT=len(imports),
                   EXPORT_OFF=offsets[2], EXPORT_COUNT=len(export_table) // CONSTANTS['RECORD_SIZE'],
                   NAMES_OFF=offsets[3], NAMES_SIZE=len(names), INIT=init, STOP=0,
@@ -325,7 +334,7 @@ def build(elf_data, metadata, vmkernel, kapi_abi_gen, layout_gen, *,
     image += bytes(payload_offset - len(image)) + payload
     struct.pack_into('<I', image, HEADER_FIELDS.index('IMAGE_CRC') * 4, zlib.crc32(image))
     stats = dict(prefix_size=prefix_size, prefix_alloc=payload_offset,
-                 reloc_count=len(relocs), import_count=len(imports),
+                 reloc_count=len(writes), import_count=len(imports),
                  export_count=len(export_table) // 12, names_size=len(names),
                  pair_image_crc=pair, payload_size=len(payload), mem_size=mem_size,
                  image_size=image_size, load_span=payload_offset + mem_size)

@@ -16,7 +16,7 @@ PROFILES = {
     'x86-pc98': dict(elf_identity=(1, 1, 3), module_codec=True,
                      layout=True, link_guard=True, ar='i386-elf-ar',
                      sdk=True, sdk_user=True, **_X86_SDK),
-    'ppc-powermac': dict(elf_identity=(1, 2, 20), module_codec=False,
+    'ppc-powermac': dict(elf_identity=(1, 2, 20), module_codec=True,
                          layout=False, link_guard=True, ar='powerpc-elf-ar',
                          sdk=False, **dict.fromkeys(SDK_FIELDS)),
 }
