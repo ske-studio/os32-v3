@@ -2,7 +2,7 @@
 #include "hwdev_module.h"
 #include "../kernel/module/module.h"
 #include "hwdev/generated/hwdev_imports.h"
-#include "bootinfo.h"
+#include "platform_module_pair.h"
 #include "config.h"
 #include "os32_generations.h"
 #include "kprintf.h"
@@ -114,11 +114,12 @@ int hwdev_module_load(struct module_handle core_handle)
         if (hwdev_core_import[i] && !contains(core->text, core->text_size, imports[i], 1))
             return MODULE_IMPORT_INVALID;
     }
-    const struct boot_common *bi = boot_common_get();
+    u32 pair = 0;
+    int pair_valid = platform_module_pair(&pair);
     const struct module_request request = {
         .path = SYS_HWDEV_MOD, .name = "hwdev",
         .policy = {KAPI_VERSION, OS32_MEMORY_LAYOUT_GENERATION, HWDEV_CONTRACT_CRC,
-                   bi->image_crc, HWDEV_MODULE_OPS_VERSION, bi->image_valid, HWDEV_IMPORT_COUNT,
+                   pair, HWDEV_MODULE_OPS_VERSION, pair_valid, HWDEV_IMPORT_COUNT,
                    hwdev_import_contracts, hwdev_export_contracts, MODULE_ID_HWDEV},
         .imports = imports,
         .dependencies = &core_handle, .dependency_count = 1,

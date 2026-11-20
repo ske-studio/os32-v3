@@ -299,6 +299,8 @@ void _start(void)
     finish(0);
 }
 
+#include "../../platform/pc98/module_pair.c"
+
 const struct boot_common *boot_common_get(void) {
     static struct boot_common info;
     const struct bootinfo *bi = bootinfo_get();

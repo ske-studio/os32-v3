@@ -1,3 +1,4 @@
+#include "arch_exec_cache.h"
 #include "le_internal.h"
 #include "module_runtime.h"
 #include "../../mm/pgalloc.h"
@@ -104,6 +105,7 @@ int module_load(const struct module_request *q, struct module_handle *out)
     r->ro = r->base + h[MI_RO_OFF];
     r->ro_size = h[MI_RO_SIZE];
     r->image_crc = h[MI_IMAGE_CRC];
+    arch_exec_publish(body + h[MI_TEXT_OFF], r->text_size);
     r->init = r->base + h[MI_INIT];
     r->state = MODULE_RELOCATED;
     return 0;

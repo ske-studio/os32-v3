@@ -32,6 +32,7 @@ def vk32():
 
 
 MUTATIONS = [
+    ('ignore-getter-failure', 'HWDEV_MODULE_OPS_VERSION, pair_valid,', 'HWDEV_MODULE_OPS_VERSION, (pair_valid || 1),'),
     ('probe-registration', 'debug_probe_register(hwdev_handle, probe_table, probe_count)', '0'),
     ('probe-unregister', 'if (debug_probe_unregister(hwdev_handle)) return 0;', '(void)0;'),
     ('core-image-crc', 'm->identity.core_image_crc != core->image_crc ||', ''),
@@ -67,7 +68,7 @@ def fixtures(folder):
              ('core-contract', 5, 6, image), ('core-layout', 6, 6, image), ('core-size', 7, 6, image),
              ('core-missing-function', 8, 12, image), ('kernel-pair', 9, 4, image),
              ('core-missing-getter', 10, 6, image), ('core-ro-span', 11, 6, image),
-             ('core-version', 12, 6, image), ('core-callback-range', 13, 12, image)]
+             ('getter-failed', 14, 5, image), ('core-version', 12, 6, image), ('core-callback-range', 13, 12, image)]
 
     def change(label, offset, value, rc=10, seal=True):
         b = bytearray(image)
