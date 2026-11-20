@@ -3,4 +3,5 @@
 #define PPC_SH_LINK_PROFILE_H
 #include "profile.h"
 #define SHELL_REMOTE_APP 1
+#define SHELL_REMOTE_SFS 1
 #endif

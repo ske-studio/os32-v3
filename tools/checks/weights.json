@@ -393,6 +393,7 @@
     "ppc-surface-guest": 191,
     "ppc-sysinfo-guest": 93,
     "ppc-usb": 367,
+    "ppc-sfs-guest": 180,
     "ppc-ver-guest": 205,
     "preflight-host": 4.421956,
     "privileged": 7.8109,

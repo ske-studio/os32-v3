@@ -274,7 +274,7 @@ def verify(source, entries):
     return bool(re.search(r'void __cdecl wrap_sys_reboot\(void\)\s*\{[^}]*\bsys_reboot\(\);', source))
 
 
-def generate(tmp, mutation=None):
+def generate(tmp, mutation=None, *, link=True):
     sdk = tmp / 'sdk'
     sdk.mkdir()
     for name in ('gen_kapi.py', 'kapi_abi_x86.py', 'target_profile.py', 'kapi_target_ppc.py'):
@@ -342,7 +342,7 @@ def generate(tmp, mutation=None):
         generator.write_text(text.replace(old, new))
     out = tmp / 'gen'
     subprocess.run([sys.executable, '-B', str(generator), '--target', 'ppc-powermac',
-                    '--out-dir', str(out), str(ROOT / 'sdk/kapi.json')], cwd=ROOT, check=True,
+                    '--feature-link', str(int(link)), '--out-dir', str(out), str(ROOT / 'sdk/kapi.json')], cwd=ROOT, check=True,
                    stdout=subprocess.DEVNULL)
     return out
 
@@ -410,10 +410,12 @@ def main():
     with tempfile.TemporaryDirectory(prefix='ppc-binding-') as directory:
         tmp = Path(directory)
         (tmp / 'normal').mkdir()
-        out = generate(tmp / 'normal')
+        out = generate(tmp / 'normal', link=False)
+        (tmp / 'link').mkdir()
+        linked = generate(tmp / 'link')
         for header in ('os32_kapi_slots.h', 'os32_kapi_generated.h'):
             path = Path('sdk/include/os32') / header
-            if (out / path).read_bytes() != (ROOT / path).read_bytes():
+            if any((profile / path).read_bytes() != (ROOT / path).read_bytes() for profile in (out, linked)):
                 print('target ABI mismatch:', header)
                 return 1
         source = (out / 'kapi/kapi_generated.c').read_text()
@@ -430,10 +432,14 @@ def main():
             required = os.environ.get('OS32_REQUIRE_PPC') == '1'
             print(('FAIL' if required else 'SKIP') + ' ppc-kapi-binding: unavailable: ' + str(cc))
             return 1 if required else 0
+        sfs_slots = {'sfs_begin', 'sfs_end'}
+        linked_source = (linked / 'kapi/kapi_generated.c').read_text()
+        if not verify(linked_source, [api for api in entries if api['name'] not in sfs_slots]):
+            return 1
         subprocess.run([str(cc), '-std=gnu11', '-Werror=implicit-function-declaration', '-ffreestanding', '-D__KERNEL_BUILD__',
                         '-D__cdecl=', '-I' + str(out / 'include')]
                        + ['-I' + str(ROOT / d) for d in dirs]
-                       + ['-c', str(out / 'kapi/kapi_generated.c'), '-o', str(tmp / 'kapi.o')], check=True)
+                       + ['-c', str(linked / 'kapi/kapi_generated.c'), '-o', str(tmp / 'kapi.o')], check=True)
         nm = cc.with_name('powerpc-elf-nm')
         undefined = {line.split()[-1] for line in subprocess.check_output(
             [str(nm), '-u', str(tmp / 'kapi.o')], text=True).splitlines()}
@@ -453,7 +459,11 @@ def main():
         missing = (DISPLAY_PROVIDERS | KCG_PROVIDERS | DB_PROVIDERS | LOOP_PROVIDERS) - undefined
         if missing:
             print('missing display or KCG providers:', sorted(missing)); return 1
-        unexpected = undefined - (ALLOWED_UNDEFINED | LOOP_PROVIDERS | GFX2_QUERY_PROVIDERS | DISPLAY_PROVIDERS | KCG_PROVIDERS | DB_PROVIDERS)
+        sfs_providers = {'platform_serialfs_session_begin', 'platform_serialfs_session_end'}
+        if not sfs_providers <= undefined:
+            print('missing link SFS providers:', sorted(sfs_providers - undefined))
+            return 1
+        unexpected = undefined - (sfs_providers | ALLOWED_UNDEFINED | LOOP_PROVIDERS | GFX2_QUERY_PROVIDERS | DISPLAY_PROVIDERS | KCG_PROVIDERS | DB_PROVIDERS)
         if unexpected:
             print('unexpected providers:', sorted(unexpected)); return 1
         print('undefined providers:', len(undefined))
@@ -466,7 +476,7 @@ def main():
             for mutation in ('empty', 'zero', 'group-empty', 'ime-empty', 'reboot-absent', 'slot-swap', 'present-absent', 'pci-absent', 'mem-absent', 'db-absent'):
                 path = tmp / mutation
                 path.mkdir()
-                mutated = generate(path, mutation)
+                mutated = generate(path, mutation, link=False)
                 if verify((mutated / 'kapi/kapi_generated.c').read_text(), entries):
                     print(mutation + ': SURVIVED'); return 1
                 print(mutation + ': RED')
