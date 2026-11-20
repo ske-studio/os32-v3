@@ -105,7 +105,7 @@ def main():
 #include <platform_ime_render.h>
 #include "platform/powermac/ime_display.c"
 void _start(void) {
-    int bad = IME_DEFAULT_RENDER != 0 || ime_display_boot(0) != -1 ||
+    int bad = IME_DEFAULT_RENDER != 0 || ime_display_boot(0) != 0 ||
         ime_display_bytes() != 0 || ime_display_save(0, 3) || ime_display_restore(0, 3);
     ime_display_abort();
     __asm__ volatile("int $0x80" : : "a"(1), "b"(bad));
@@ -113,13 +113,13 @@ void _start(void) {
 }
 ''')
         exe = work / 'provider'
-        host32.build(['gcc', '-m32', '-std=gnu11', '-ffreestanding', '-fno-pie',
+        host32.build(['gcc', '-m32', '-nostdinc', '-std=gnu11', '-ffreestanding', '-fno-pie',
             '-fno-stack-protector', '-nostdlib', '-static', '-no-pie', '-Wall', '-Wextra', '-Werror',
             '-I' + str(ROOT), '-I' + str(ROOT / 'include'),
             '-I' + str(ROOT / 'platform/powermac'), str(source), '-o', str(exe)], check=True)
         result = host32.run([str(exe)], capture_output=True)
         assert result.returncode == 0, result
-        print('GREEN unsupported provider and narrow facade', flush=True)
+        print('GREEN headless provider and narrow facade', flush=True)
     return 0
 
 

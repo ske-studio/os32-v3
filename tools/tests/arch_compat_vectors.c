@@ -52,6 +52,10 @@ void _idle(void);
 void idle_wait_step(void) { idle_work_run(); _idle(); }
 void idle_work_run(void) {}
 void _idle(void) { fake_time += 1000000; }
+u8 platform_fep_key_shift(void) { return 0; }
+void pm_input_usb_note_remote(void) {}
+u32 irq_save(void) { return 0; }
+void irq_restore(u32 flags) { (void)flags; }
 int pm_input_usb_take(void) { return take(); }
 int pm_input_usb_peek(void) { return queued; }
 u32 pm_input_usb_dropped(void) { return 0; }

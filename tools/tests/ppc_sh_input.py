@@ -25,6 +25,10 @@ static void message(const char *s) { unsigned n=0; while(s[n]) n++; __asm__ vola
 #include "input_boot.h"
 #include "input_service.h"
 #include "lan_boot.h"
+u8 platform_fep_key_shift(void) { return 0; }
+void pm_input_usb_note_remote(void) {}
+u32 ppc_irq_save(void) { return 0; }
+void ppc_irq_restore(u32 flags) { (void)flags; }
 int pm_input_usb_take(void) { return -1; }
 int pm_input_usb_peek(void) { return -1; }
 u32 pm_input_usb_dropped(void) { return 0; }
@@ -88,7 +92,7 @@ def main():
         (d / 'harness.c').write_text(HARNESS)
         for name, code, expected, marker in cases:
             (d / 'decode.c').write_text(code)
-            subprocess.run(['gcc', '-m32', '-ffreestanding', '-fno-builtin', '-fno-pie', '-no-pie', '-nostdlib', '-static', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-DPM_TERMINAL_TEST',
+            subprocess.run(['gcc', '-m32', '-nostdinc', '-ffreestanding', '-fno-builtin', '-fno-pie', '-no-pie', '-nostdlib', '-static', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-DPM_TERMINAL_TEST',
                             '-I.', '-Iinclude', '-Iarch/ppc', '-Isdk/include/os32', '-Idrivers/input', '-Iplatform/powermac',
                             str(d / 'harness.c'), str(d / 'decode.c'), 'platform/powermac/input_boot.c',
                             'platform/powermac/terminal_input.c', 'kernel/input_legacy.c', 'kernel/input_wait.c', '-o', str(d / 'test')], cwd=ROOT, check=True)
