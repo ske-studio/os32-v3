@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 CHECK = dict(env=['ppc-cross'], name='fbcon-host', tier=1, needs=[], budget=20,
-    covers=[
+    covers=['lib/lz4_decode_core.inc', 
         'platform/powermac/console_text.c', 'platform/powermac/display.c',
         'platform/powermac/*.h', 'gfx/v2/gfx2_int.h', 'exec/appslot.h',
         'build/config.mk',

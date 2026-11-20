@@ -380,6 +380,8 @@ def case_boundary(script, work):
 
 def check_vectors(exe):
     prefix = bytes(range(256))
+    # 正常の 2 本はマッチで終わる (LZ4 Block Format の末尾のリテラル列の規則は満たさない):
+    # 現行のデコーダが受け入れる振る舞いを固定する入力 (期待の出所: 今の振る舞い)。
     cases = [
         (b"\xf0\xf1" + prefix + b"\x00\x01", None, 260, 260, prefix + prefix[:4]),
         (b"\x24ab\x02\x00", None, 10, 10, b"ababababab"),
