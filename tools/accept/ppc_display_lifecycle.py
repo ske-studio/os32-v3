@@ -8,6 +8,7 @@ import re
 import tempfile
 
 from ppc_display import ROOT, absent_bindings
+import ppc_resource_owner
 from fb_pixel import Font, Terminal, read_ppm
 from kboot_accept import build, mutant_settings
 from link_sh_run import Session
@@ -19,7 +20,11 @@ from usb_run import rsh_command
 def image(folder, user, case):
     kernel = folder / 'kernel'
     changes = []
-    if case == 'no-return':
+    if case == 'normal':
+        changes = ppc_resource_owner.instrument(
+            folder, 'gfx/gfx_core.c', 'if (appslot_gfx_claim(con_sink_is_enabled()) >= 0) {',
+            'appslot_gfx_owner()')
+    elif case == 'no-return':
         changes = mutant_settings(folder, case, 'gfx/gfx_core.c',
                                   '    display_provider_console_return();', '')
     elif case == 'no-exit':
@@ -36,7 +41,7 @@ def image(folder, user, case):
     elif case == 'absent':
         absent_bindings(folder, kernel / 'gen', case, ('gfx2_surface_create',))
     bins = [str(user / (app + '.bin')) for app in ('hello', 'dispprb')]
-    return build(kernel, 'IMAGE=kboot-link-sh', 'KB_SH_OUT=' + str(user),
+    return build(kernel, 'IMAGE=kboot-link-sh', 'PPC_USER_FLOAT=', 'KB_SH_OUT=' + str(user),
                  'KB_ROOT_BINS=' + ' '.join(bins), *changes, 'kb-user', 'kernel')
 
 
@@ -98,6 +103,8 @@ def observe(elf, folder, case):
                     check_echo(mode)
                 else:
                     require(after == before, case + ' unexpectedly restored')
+        if case == 'normal':
+            ppc_resource_owner.verify(s)
         s.q.call('quit')
         s.p.wait(timeout=5)
         require(s.p.returncode == 0, 'QEMU exit')

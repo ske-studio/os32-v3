@@ -1,6 +1,6 @@
 """PowerMac USB serial acceptance and optional LAN RPC-stall regression."""
 CHECK = dict(env=['ppc-cross', 'qemu-ppc'], name='ppc-usb', tier=2, budget=900, needs=['make:ppc-ci-image'],
-             covers=['tools/host_tree_manifest.py', 'tools/ppc/link_diag_run.py',
+             covers=['exec/exec.c', 'tools/accept/ppc_shell_flow.inc', 'platform/powermac/shell_loop_ops.c', 'userland/shell/main.c', 'userland/shell/rshell.c', 'tools/host_tree_manifest.py', 'tools/ppc/link_diag_run.py',
         'fs/serialfs/serialfs_persistent.c',
         'kernel/console/con_sink.c',
         'kernel/console/console.c',

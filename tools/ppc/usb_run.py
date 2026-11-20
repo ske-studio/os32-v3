@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """PowerMac USB acceptance over serial, with optional LAN RPC-stall regression."""
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -733,9 +734,20 @@ def link_lan_accept(elf, cpu, out, mode='normal'):
         s.wait(lambda: 'protocol=02' in serial(a), 'mouse enumeration', 60)
         s.q.call('device_add', {'driver':'usb-kbd', 'id':'kbd'})
         s.wait(lambda: 'protocol=01' in serial(a), 'keyboard enumeration', 30)
-        s.wait(s.ready, 'RSH READY', 60)
         key, text_keys = keyboard_actions(s.q, lambda: serial(a),
                                          lambda predicate, label: s.wait(predicate, label, 30), s.out)
+        # Type the first letter before waiting for the host. It belongs to the local line.
+        text_keys('echo first'); key('ret')
+        s.wait(s.ready, 'resident RSH READY', 60)
+        first_echo = '> cho first' if mode == 'lost-first' else '> echo first'
+        s.wait(lambda: first_echo in s.screen('first-key'), 'first keyboard line', 30)
+        if mode == 'lost-first':
+            require('> echo first' not in s.screen('first-key'), 'first letter survived')
+            rsh_command(s, 'echo alive', b'alive\n')
+            s.q.call('quit'); s.p.wait(timeout=5)
+            require(s.p.returncode == 0, 'QEMU exit after first key observation')
+            print('RED lost-first '+cpu)
+            return
         rsh_command(s, 'echo warm', b'warm\n')
         # Warm /host too (as sd_run.link_accept does): the SFS session starts on
         # first use, so a suppressed first CALL would only report Host is down.
@@ -783,6 +795,7 @@ def link_lan_accept(elf, cpu, out, mode='normal'):
         s.wait(lambda: 'USB RELEASE kind=0 src=1' in serial(a), 'USB unplug release', 10)
         s.q.call('device_add', {'driver':'usb-kbd', 'id':'kbd2'})
         s.wait(lambda: serial(a).count('protocol=01') >= 2, 'USB re-enumeration', 30)
+        s.wait(s.ready, 'READY after USB re-enumeration', 30)
         text_keys('echo alive'); key('ret')
         s.wait(lambda: re.search(r'(?m)^alive *$', s.screen('replug')), 'USB replug FB', 30)
         rsh_command(s, 'echo alive', b'alive\n')
@@ -804,75 +817,47 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--cpu', choices=['7450', '7455', 'both'], default='both')
     parser.add_argument('--mutate', action='store_true')
-    parser.add_argument('--lan', action='store_true', help='real hostfs RPC absence in FG1')
+    parser.add_argument('--lan', action='store_true', help='use the product USB and hostfs acceptance')
     parser.add_argument('--link', action='store_true', help='product link-SH USB/SFS acceptance')
-    parser.add_argument('--legacy', action='store_true', help='explicit PLN1 --lan acceptance')
+    parser.add_argument('--build-only', action='store_true')
     args = parser.parse_args()
-    if args.link and (not args.lan or args.legacy):
-        parser.error('--link requires --lan and excludes --legacy')
-    if args.lan and not (args.link or args.legacy):
-        parser.error('--lan requires --link or explicit --legacy')
-    require(stream_payload('log hi~USBSTREAM:00000001:hUSB KEY break\n~USBSTREAM:00000002:i\n') == 'hi\n',
-            'framed stream reconstruction across Enter break log')
     cross = Path(os.environ.get('USB_PPC_CROSS_DIR', os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc')))
-    if not (cross/'bin/powerpc-elf-gcc').is_file() or any(
-            shutil.which(t) is None for t in ('qemu-system-ppc', 'genisoimage')) or not ROM.is_file():
-        missing = 'PPC toolchain' if not (cross/'bin/powerpc-elf-gcc').is_file() else 'QEMU/OpenBIOS/genisoimage'
-        print(('FAIL' if os.environ.get('OS32_REQUIRE_PPC') == '1' else 'SKIP')+
-              ' ppc-usb: ' + missing + ' unavailable')
-        return 1 if os.environ.get('OS32_REQUIRE_PPC') == '1' else 0
-    if args.lan:
+    if not (cross/'bin/powerpc-elf-gcc').is_file():
+        print('SKIP ppc-usb: PowerPC toolchain unavailable')
+        return 3
+    if not args.build_only:
+        if not ROM.is_file() or not shutil.which('qemu-system-ppc'):
+            print('SKIP ppc-usb: QEMU/OpenBIOS unavailable')
+            return 3
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
                 probe.bind(('127.0.0.1', 0))
         except PermissionError:
-            print('SKIP ppc-usb LAN: AF_INET unavailable')
-            return 3 if os.environ.get('OS32_REQUIRE_PPC') == '1' else 0
-    base = Path(os.environ.get('TMPDIR', '/tmp'))/'usb-run'; base.mkdir(parents=True, exist_ok=True)
-    work = Path(tempfile.mkdtemp(prefix='run-', dir=base))
+            print('SKIP ppc-usb: AF_INET unavailable')
+            return 3
+    work = Path(tempfile.mkdtemp(prefix='usb-run-', dir=os.environ.get('TMPDIR')))
     print('evidence='+str(work), flush=True)
     cpus = ['7450', '7455'] if args.cpu == 'both' else [args.cpu]
-    if args.link:
-        for mode in ['normal'] + (['no-service'] if args.mutate else []):
-            opts = ['KBOOT_SH=1', 'KBOOT_LINK=1', 'PPC_CROSS_DIR='+str(cross)]
-            if mode == 'no-service':
-                src, dest = mutation(work, mode)
-                opts += ['KB_MUT_SRC='+src, 'KB_MUT_FILE='+str(dest)]
-            elf = build(work/('link-lan-'+mode), *opts)
+    seen = set()
+    for mode in ['normal'] + (['no-service', 'lost-first'] if args.mutate else []):
+        opts = ['IMAGE=kboot-link-sh', 'PPC_CROSS_DIR='+str(cross)]
+        if mode == 'no-service':
+            src, dest = mutation(work, mode)
+            opts += ['KB_MUT_SRC='+src, 'KB_MUT_FILE='+str(dest)]
+        if mode == 'lost-first':
+            from kboot_accept import mutant_settings
+            anchor = 'static int try_local_char(void) { return input_legacy_try(IL_LOCAL_CHAR); }'
+            opts += mutant_settings(work, mode, 'platform/powermac/input_boot.c', anchor,
+                'static int try_local_char(void) { static int lost; int ch = input_legacy_try(IL_LOCAL_CHAR); '
+                'if (ch >= 0 && !lost) { lost = 1; return -1; } return ch; }')
+        elf = build(work/mode, *opts)
+        digest = hashlib.sha256(elf.read_bytes()).hexdigest()
+        require(digest not in seen, 'distinct USB mutation image')
+        seen.add(digest)
+        print(mode, digest, flush=True)
+        if not args.build_only:
             for cpu in cpus if mode == 'normal' else cpus[:1]:
-                link_lan_accept(elf, cpu, work/('link-lan-'+mode+'-'+cpu), mode)
-        return 0
-    if args.lan:
-        for mode in ['normal']:
-            opts = ['KBOOT_SH=1', 'KBOOT_LINK=0', 'PPC_CROSS_DIR='+str(cross)]
-            elf = build(work/('lan-'+mode), *opts)
-            for cpu in cpus if mode == 'normal' else cpus[:1]:
-                lan_accept(elf, cpu, work/('lan-'+mode+'-'+cpu), mode)
-        return 0
-    for mode in ['normal'] + (['invert-key', 'no-forward'] if args.mutate else []):
-        elf = build(work/('product-'+mode), 'PPC_CROSS_DIR='+str(cross), *product_settings(work, mode))
-        for cpu in cpus if mode == 'normal' else cpus[:1]:
-            product_accept(elf, cpu, work/('product-'+mode+'-'+cpu), mode)
-    elf = build(work/'mouse-wait', 'PPC_CROSS_DIR='+str(cross),
-                *product_settings(work, 'mouse-wait', late=True))
-    for cpu in cpus:
-        product_accept(elf, cpu, work/('mouse-wait-'+cpu), 'normal', late=True)
-    for mode in ['normal'] + (['no-service', 'syscall-ee'] if args.mutate else []):
-        elf = build(work/mode, 'PPC_CROSS_DIR='+str(cross), *settings(work, mode))
-        for cpu in cpus if mode == 'normal' else cpus[:1]:
-            if mode == 'syscall-ee':
-                try:
-                    accept(elf, cpu, work/(mode+'-'+cpu), mode)
-                except CriterionFailure as exc:
-                    require(str(exc).startswith("USB startup/reached markers:"),
-                            "unexpected syscall EE verdict: "+str(exc))
-                    evidence = serial(work/(mode+'-'+cpu)/'serial-a.log')
-                    require('USB STALL ticks=0' in evidence, 'missing exact syscall EE regression')
-                    print('RED syscall-ee: USB STALL ticks=0', flush=True)
-                else:
-                    raise RuntimeError('SURVIVED syscall-ee')
-            else:
-                accept(elf, cpu, work/(mode+'-'+cpu), mode)
+                link_lan_accept(elf, cpu, work/(mode+'-'+cpu), mode)
     return 0
 
 

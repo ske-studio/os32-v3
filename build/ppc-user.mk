@@ -87,9 +87,9 @@ PPC_RES_SRC := $(wildcard userland/shell/*.c userland/lib/save/*.c) \
  drivers/pci/pci_decode.c fs/pc98pt.c userland/lib/filer/filer_draw.c \
  userland/lib/filer/filer_core.c sdk/crt/syscalls.c sdk/allocator/nano_adapter.c
 PPC_RES_OBJ := $(addprefix $(PPC_RES_DIR)/,$(PPC_RES_SRC:.c=.o))
-$(PPC_RES_OBJ): $(PPC_RES_DIR)/%.o: %.c build/ppc-user.mk $(SDK_KAPI_HDR)
+$(PPC_RES_OBJ): $(PPC_RES_DIR)/%.o: %.c build/ppc-user.mk $(SDK_KAPI_HDR) $(PPC_SH_MUT_FILE) $(PPC_RES_MUT_FILE)
 	@mkdir -p $(@D)
-	$(CC) $(PPC_USER_FLAGS) -DOS32_CRT_RESIDENT -I. -Iinclude -Iuserland/lib -Iuserland/shell -Iuserland/lib/filer -Iuserland/lib/gfx -Iuserland/lib/save -Idrivers -c $< -o $@
+	$(CC) $(PPC_USER_FLAGS) -DOS32_CRT_RESIDENT -I. -Iinclude -Iuserland/lib -Iuserland/shell -Iuserland/lib/filer -Iuserland/lib/gfx -Iuserland/lib/save -Idrivers -c $(if $(filter $<,$(PPC_RES_MUT_SRC)),$(PPC_RES_MUT_FILE),$(if $(filter $<,$(PPC_SH_MUT_SRC)),$(PPC_SH_MUT_FILE),$<)) -o $@
 
 $(PPC_RES_DIR)/memmap_layout.h: include/memmap.h tools/gen_memmap.py
 	@mkdir -p $(@D)

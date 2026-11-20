@@ -143,7 +143,7 @@ def main():
     work = Path(tempfile.mkdtemp(prefix='ppc-mouse-', dir=os.environ.get('TMPDIR') or None)).resolve()
     print('evidence=' + str(work), flush=True)
     user = work / 'user'
-    bins = [str(user / (app + '.bin')) for app in ('hello', 'fault', 'mousprob')]
+    bins = [str(user / 'mousprob.bin')]
     options = ['IMAGE=kboot-link-sh', 'KB_SH_OUT=' + str(user),
                'KB_ROOT_BINS=' + ' '.join(bins)]
     images = {}

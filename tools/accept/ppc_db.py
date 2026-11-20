@@ -9,6 +9,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT / 'tools'), str(ROOT / 'tools/ppc')]
+import ppc_resource_owner
 from kboot_accept import build
 from ppc_shm import guest_available
 from run import require
@@ -96,6 +97,8 @@ def observe(elf, cpu, folder, case):
                 require(status == b'1\n', repr((case, status)))
                 break
             require(lines[1:] == expected and status == b'0\n', repr((case, phase, lines, status)))
+        if case == 'normal':
+            ppc_resource_owner.verify(session)
         session.q.call('quit')
         session.p.wait(timeout=5)
         require(session.p.returncode == 0, 'db QEMU exit')
@@ -124,7 +127,9 @@ def main():
         folder.mkdir()
         settings[case] = mutations(folder, edits)
     user = work / 'user'
-    bins = ' '.join(str(user / (app + '.bin')) for app in ('hello', 'fault', 'dbprob'))
+    bins = ' '.join(str(user / (app + '.bin')) for app in ('dbprob',))
+    settings['normal'] = ppc_resource_owner.instrument(
+        work / 'normal', DB, 'db_slots[i].owner = res_owner_get();', 'db_slots[i].owner')
     seen = set()
     for case in cases:
         folder = work / case

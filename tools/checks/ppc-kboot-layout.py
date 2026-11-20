@@ -1,7 +1,7 @@
 """Check the PowerMac kernel linker and fixed memory layout."""
 import subprocess
 
-CHECK = dict(name='ppc-kboot-layout', tier=2, budget=60, needs=[], env=['ppc-cross'],
+CHECK = dict(name='ppc-kboot-layout', tier=2, budget=60, needs=['make:ppc-ci-image'], env=['ppc-cross'],
              covers=['tools/checks/ppc-kboot-layout.py', 'tools/ppc/kboot_layout.py',
                      'arch/ppc/kernel.ld', 'platform/powermac/platform_kboot_layout.h',
                      'include/memmap.h', 'tools/gen_memmap.py', 'lib/kstring_c.c',
@@ -24,4 +24,8 @@ def run(ctx):
     args = ['python3', '-B', 'tools/ppc/kboot_layout.py']
     if ctx.mutate:
         args.append('--mutate')
-    return subprocess.call(args, cwd=ctx.root)
+    rc = subprocess.call(args, cwd=ctx.root)
+    if rc:
+        return rc
+    return subprocess.call(['python3', '-B', 'tools/ppc/kboot_layout.py', '--product',
+                            'build/out/ppc-kboot/link-sh/PPCKERN.ELF'], cwd=ctx.root)

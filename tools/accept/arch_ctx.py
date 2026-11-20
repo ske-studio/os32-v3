@@ -235,8 +235,8 @@ def image(work, mutation):
         '\n#include "arch_jmp_storage.h"\n#define exec_longjmp __wrap_exec_longjmp\n' + jump)
     opts = ['-j6', 'KB_KEEP_RESET=-Wl,--wrap=arch_entry_enter,--wrap=exec_longjmp,'
                     '--wrap=arch_cpu_halt,--wrap=ppc_write_dec', 'KBOOT_SH=1', 'KBOOT_LINK=0',
-                 'KB_ROOT_BINS='+' '.join(residents+[str(work/'ctx.bin'), 'build/out/ppc-user/fault.bin']),
-                 'KB_MUT_SRC=platform/powermac/shell_boot.c', 'KB_MUT_FILE='+str(shell),
+                 'KB_ROOT_BINS='+' '.join(residents+[str(work/'ctx.bin')]),
+                 'KB_MUT_SRC=platform/powermac/shell_loop_ops.c', 'KB_MUT_FILE='+str(shell),
                  'KB_MUT_EXTRA_SRC=arch/ppc/kernel_trap.c', 'KB_MUT_EXTRA_FILE='+str(t),
                  'KB_MUT_THIRD_SRC=arch/ppc/kernel_vectors.S', 'KB_MUT_THIRD_FILE='+str(vectors_file)]
     elf = build(work/'image', *opts)

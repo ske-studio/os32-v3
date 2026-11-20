@@ -1,6 +1,7 @@
-/* W4e test-image observer, included only by substituted shell_boot.c.
+/* W4e test-image observer, entered from the acceptance shell loop.
  * The real trap, DEC, MPIC, exec and syscall providers remain linked. */
 #include "ppc_trap.h"
+#include "shell_loop_ops.h"
 #include "ppc_hpt.h"
 #include "exec_arch.h"
 #include "exec.h"
@@ -221,7 +222,7 @@ static u32 resident(unsigned gen, unsigned argc, char **argv, KernelAPI *api,
     return old;
 }
 
-void pm_shell_boot(void)
+static int run_context_probes(void)
 {
     /* Paint only unused stack below our current frame. A guard margin keeps
      * this observer's calls off the paint; later deeper frames overwrite it. */
@@ -235,7 +236,7 @@ void pm_shell_boot(void)
     ((KernelAPI *)exec_kapi_table())->kapi_reserved[0] = (void *)resident;
     kernel_root = ppc_root_current();
     ctx_started = 1;
-    exec_nest_level = 0; /* Fixture boot starts the first actual resident image. */
+    check(exec_nest_level == 0);
 #if CTX_OUTSIDE == 2
     kprintf(7, "CTX outside 300\n");
     *(volatile u32 *)MEM_SHELL_GUARD = 1;
@@ -271,3 +272,5 @@ void pm_shell_boot(void)
     __asm__ volatile(".globl ctx_done\nctx_done: b ctx_done");
     __builtin_unreachable();
 }
+
+const struct shell_loop_ops pm_shell_loop_ops = { .gui_default = run_context_probes };

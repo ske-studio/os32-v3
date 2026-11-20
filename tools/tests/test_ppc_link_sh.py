@@ -22,9 +22,9 @@ CHECK = dict(name='ppc-link-sh', env=['ppc-cross'], tier=1, needs=[], budget=60,
             'kernel/dev/device_host.c', 'platform/powermac/usb_boot.c',
             'platform/powermac/link_platform.c', 'platform/powermac/link_platform.h',
             'platform/powermac/input_boot.c', 'platform/powermac/console_stream.c',
-            'platform/powermac/console_log.c', 'platform/powermac/shell_boot.c',
+            'platform/powermac/console_log.c', 'platform/powermac/shell_loop_ops.c',
             'platform/powermac/*.h', 'include/*.h', 'kernel/console/*.h',
-            'lib/kstring_c.c', 'input/hal/in2_int.h', 'exec/exec.h', 'kernel/idle_work.h',
+            'init/shell_loop.c', 'lib/kstring_c.c', 'input/hal/in2_int.h', 'exec/exec.h', 'kernel/idle_work.h',
             'arch/ppc/*.h', 'sdk/include/os32/*.h', 'net/link_platform.h'],
     basis=['LAN_OPERATOR_DESIGN §5/§8 P4c', 'PPC_P3_DESIGN v2 §2/§3; appendix A-1 E5/E6/E7, A-3/A-4'])
 
@@ -68,29 +68,23 @@ void _start(void) {
 }
 '''
 BOOT = r'''
-static int calls, result, reports;
-static int different(const char *a,const char *b) { while (*a && *a==*b) { a++;b++; } return *a!=*b; }
-int pm_term_connected(void) { finish(1); return 0; }
-int pm_input_usb_has_key(void) { finish(1); return 0; }
-int pm_console_text_ready(void) { return 0; }
-void shell_print(const char *s,u8 c) { (void)s;(void)c; }
-void pm_terminal_poll(void) { finish(1); }
-int pm_terminal_trygetkey(void) { finish(1); return -1; }
-int exec_run(const char *cmd) {
-    CHECK(!different(cmd,"/bin/sh.bin --rshell-lan"));
-    CHECK(calls==result && calls==reports);
-    CHECK(++calls<=3);
-    return 0;
+int rshell_active;
+static int calls, waits, failures;
+int gui_take_next_shell(char *path, int cap) { (void)path; (void)cap; return 0; }
+int exec_run(const char *cmd)
+{
+    CHECK(!kstrcmp(cmd, "/sys/shell.bin") && ++calls <= 3);
+    rshell_active = 1;
+    return calls == 1 ? 0 : calls == 2 ? EXEC_ERR_FAULT : -1;
 }
-/* Review F1: exit and fault restart; any other result (sh.bin unloadable) stops in idle work. */
-int exec_last_result(int *kind,int *code) { CHECK(calls==result+1); result++; *kind=calls==2 ? EXEC_KIND_FAULT : calls==3 ? 0 : EXEC_KIND_EXITED; *code=3; return 0; }
-void idle_work_run(void) { CHECK(calls==3 && reports==3); finish(0); }
-void idle_wait_step(void) { idle_work_run(); }
-void arch_cpu_idle(void) { finish(1); } /* _idle (arch_io.h) is never reached */
-void kprintf(u8 color,const char *fmt,...) { (void)color;(void)fmt; CHECK(result==calls); reports++; }
-int kutoa_dec(u32 v,char *s,int n) { (void)v;(void)n; *s='3'; return 1; }
-void console_stream_write(const void *p,u32 n) { (void)p;(void)n; CHECK(result==calls); }
-void _start(void) { pm_shell_boot(); finish(1); }
+void shell_print(const char *s, u8 c) { (void)c; CHECK(calls == 3 && s[0]); failures++; }
+void idle_wait_step(void)
+{
+    CHECK(++waits == calls && !rshell_active);
+    if (calls == 3) finish(failures != 1);
+}
+void kprintf(u8 c, const char *fmt, ...) { (void)c; (void)fmt; }
+void _start(void) { shell_loop_run(&pm_shell_loop_ops); finish(1); }
 '''
 OUTPUT = r'''
 static int writes, logs, capture=1, clears;
@@ -121,7 +115,7 @@ def execute(tmp, source, harness):
 
 
 def manifest(makefile, flags, fields):
-    rule='p3-manifest:;@echo '+ ' END '.join('$('+f+')' for f in fields)
+    rule='p3-manifest:;@echo "'+ ' END '.join('$('+f+')' for f in fields)+'"'
     return subprocess.check_output(['make','-s','ARCH=ppc','PLATFORM=powermac','TARGET_MK='+str(makefile),*flags,'--eval='+rule,'p3-manifest'],cwd=ROOT,text=True).strip().split(' END ')
 
 
@@ -129,20 +123,15 @@ def selection(tmp, mutate):
     original=(ROOT/'build/targets/ppc-powermac.mk').read_text()
     def check(text):
         path=tmp/'image.mk'; path.write_text(text)
-        link=manifest(path,['KBOOT_SH=1','KBOOT_LINK=1'],['KB_OUT','ROOT_BINS','KB_C'])
+        link=manifest(path,['KBOOT_SH=1','KBOOT_LINK=1'],['KB_OUT','ROOT_BINS','KB_C','KB_ROOT_SHELL'])
         assert link[0]=='build/out/ppc-kboot/link-sh'
-        assert 'build/out/ppc-user/link-sh/sh.bin' in link[1].split()
+        assert not link[1].strip() and link[3] == 'build/out/ppc-user/link-sh/shell.bin'
         absent=['hostfs_io','hostfs_peer','lan_wire','lan_terminal','terminal_input']
         assert all('platform/powermac/'+name+'.c' not in link[2].split() for name in absent)
         assert all(name in link[2].split() for name in ['net/link.c','net/host_mailbox.c','net/nic.c','kernel/dev/device_host.c','platform/powermac/usb_boot.c',
             'platform/powermac/hostfs_link_io.c','platform/powermac/hostfs_link_peer.c','platform/powermac/hostfs_boot.c'])
-        for flags,out in [(['KBOOT_SH=1','KBOOT_LINK=0'],'sh'),(['KBOOT_LINK=1'],'link'),(['KBOOT_SHELL=1','KBOOT_LINK=0'],'shell')]:
+        for flags,out in [(['KBOOT_SH=1','KBOOT_LINK=0'],'link-sh'),(['KBOOT_LINK=1'],'link'),(['KBOOT_SHELL=1','KBOOT_LINK=0'],'link-sh')]:
             assert manifest(path,flags,['KB_OUT'])[0]=='build/out/ppc-kboot/'+out
-        # Review F2: the link-SH user build selects the SHELL_REMOTE_APP profile.
-        recipe=subprocess.run(['make','--no-print-directory','-n','ARCH=ppc','PLATFORM=powermac','TARGET_MK='+str(path),'KBOOT_SH=1','KBOOT_LINK=1','kb-user'],cwd=ROOT,capture_output=True,text=True).stdout
-        assert 'PPC_SH_PROFILE=userland/ppc/sh/link_profile.h' in recipe.splitlines()[0]
-        plain=subprocess.run(['make','--no-print-directory','-n','ARCH=ppc','PLATFORM=powermac','TARGET_MK='+str(path),'KBOOT_SH=1','KBOOT_LINK=0','kb-user'],cwd=ROOT,capture_output=True,text=True).stdout
-        assert 'link_profile.h' not in plain.splitlines()[0]
         rejected=subprocess.run(['make','-s','ARCH=ppc','PLATFORM=powermac','TARGET_MK='+str(path),'KBOOT_SHELL=1','KBOOT_LINK=1','-n'],cwd=ROOT,capture_output=True)
         assert rejected.returncode!=0
         # The flags are the only image selector here: command-line features or IMAGE must not disagree with KB_OUT.
@@ -152,7 +141,7 @@ def selection(tmp, mutate):
     # Explicit legacy selections must also survive the future link default.
     check(original.replace('KBOOT_LINK ?= 0', 'KBOOT_LINK ?= 1'))
     if mutate:
-        for old,new in [('link-sh,link','link,link'),('KB_SH_OUT := build/out/ppc-user$(if $(filter 1,$(KBOOT_LINK)),/link-sh)','KB_SH_OUT := build/out/ppc-user'),('KB_C := $(C_KERNEL)','KB_C := $(filter-out platform/powermac/hostfs_link_io.c,$(C_KERNEL)) platform/powermac/hostfs_io.c'),(' PPC_SH_PROFILE=userland/ppc/sh/link_profile.h',' ')]:
+        for old,new in [('link-sh,link','link,link'),('KB_SH_OUT := build/out/ppc-user$(if $(filter 1,$(KBOOT_LINK)),/link-sh)','KB_SH_OUT := build/out/ppc-user'),('KB_C := $(C_KERNEL)','KB_C := $(filter-out platform/powermac/hostfs_link_io.c,$(C_KERNEL)) platform/powermac/hostfs_io.c'),('KB_ROOT_SHELL = $(KB_SH_OUT)/shell.bin','KB_ROOT_SHELL = $(KB_SH_OUT)/sh.bin')]:
             assert original.count(old)==1
             try: check(original.replace(old,new))
             except AssertionError: print('RED selection',old)
@@ -181,11 +170,11 @@ def main():
         ('int work_rc = idle_work_register(pm_link_service_once);','int work_rc = -1;')]),
         ('provider',(ROOT/'platform/powermac/input_boot.c').read_text(),PROVIDER,[
             ('.try_key = pm_input_usb_take, .peek_key = pm_input_usb_peek,','.try_key = pm_input_usb_peek, .peek_key = pm_input_usb_take,')]),
-        ('boot',(ROOT/'platform/powermac/shell_boot.c').read_text(),BOOT,[
-            ('#if !KBOOT_LINK\n    if (pm_console_text_ready())','#if KBOOT_LINK\n    if (pm_console_text_ready())'),
-            ('#if !KBOOT_LINK\n        if (kind != EXEC_KIND_EXITED) break;','#if KBOOT_LINK\n        if (kind != EXEC_KIND_EXITED) break;'),
-            ('/bin/sh.bin --rshell-lan','/bin/sh.bin'),
-            ('if (kind != EXEC_KIND_EXITED && kind != EXEC_KIND_FAULT) break;','(void)0;')]),
+        ('boot',(ROOT/'platform/powermac/shell_loop_ops.c').read_text()+(ROOT/'init/shell_loop.c').read_text(),BOOT,[
+            ('    return gui ? 2 : 0;', '    return gui ? 2 : 1;'),
+            ('    shell_print("Cannot load', '    if (0) shell_print("Cannot load'),
+            ('rshell_active = 0;', 'rshell_active = 1;'),
+            ('rc != EXEC_ERR_FAULT','rc == EXEC_ERR_FAULT')]),
         ('output',(ROOT/'platform/powermac/console_stream.c').read_text()+(ROOT/'platform/powermac/console_log.c').read_text(),OUTPUT,[
             ('    if (con_sink_capture_active()) return;','    ;'),
             ('    console_write(bytes, len, 1);','    console_write(bytes, len, 1); console_write(bytes, len, 1);')])]

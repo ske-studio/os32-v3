@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PPC P3 A-6: link-SH acceptance; existing HostAgent, RSHELL and QMP only.
+"""Resident shell observations follow shell_service.h, exec_launch.inc and exec_finish.inc.
 
 Evidence is isolated below --out. Socket denial returns 3 (未), never PASS.
 The normal control precedes every mutation. Unexpected timeout/build/QEMU
@@ -34,15 +34,17 @@ from usb_run import USB_QEMU_CLOCK
 USER = 'userland/shell/rshell_lan.c'
 SINK = 'kernel/console/con_sink.c'
 HEAP = 'mm/kmalloc.c'
-BOOT = 'platform/powermac/shell_boot.c'
+BOOT = 'platform/powermac/shell_loop_ops.c'
 # 110 lines x 81 bytes = 8910 B, just past the 8 KiB sink; each line scrolls the
 # OF framebuffer (~2.7 s under -icount), so allow ~5 minutes plus margin.
 OVERFLOW_LINES = 110
 OVERFLOW_SECONDS = 480
 # Each anchor is checked against the complete source, before observation hooks.
 MUTATIONS = {
-    'term-wait': (BOOT, '#if !KBOOT_LINK\n    if (pm_console_text_ready())',
-                  '#if KBOOT_LINK\n    if (pm_console_text_ready())', 'autostart'),
+    'command-group': ('userland/shell/main.c', '    shell_cmd_pci_init();', '', 'resident command groups'),
+    'line-buffer': ('userland/shell/main.c', '    setvbuf(stdout, (char *)0, _IOLBF, BUFSIZ);',
+                    '    setvbuf(stdout, (char *)0, _IOFBF, BUFSIZ);', 'line buffering'),
+    'term-wait': (BOOT, '    return gui ? 2 : 0;', '    if (!gui) { for (;;) idle_wait_step(); } return 2;', 'autostart'),
     'ready-retry': (USER, 'if (!attempted || (u32)(g_api->get_tick() - ready_tick) >= RSH_READY_TICKS)',
                     'if (!attempted)', 'ready-retry'),
     'duplicate': (USER, 'if (have_id && id <= last_id) return OS32_ERR_EXIST;',
@@ -55,9 +57,9 @@ MUTATIONS = {
              '    /* END removed */', 'end'),
     'owner': (SINK, '    if (g_reader == id) {',
                '    if (0) {', 'owner'),
-    'fault-break': (BOOT, 'if (kind != EXEC_KIND_EXITED && kind != EXEC_KIND_FAULT) break;',
-                     'if (kind != EXEC_KIND_EXITED) break;', 'fault-restart'),
-    'half-line': (USER, '        if (ln.bytes == 0) {', '        if (1) {', 'half-line'),
+    'fault-break': (BOOT, '    kprintf(0x07, "%s returned %d\\n", path, rc);', '    kprintf(0x07, "%s returned %d\\n", path, rc);\n    if (rc < 0) for (;;) idle_wait_step();', 'fault-restart'),
+    'half-line': ('userland/shell/rshell.c', '    return rsh_getch(from_serial);',
+                  '    (void)rsh_lan_poll(); return rsh_getch(from_serial);', 'half-line'),
 }
 
 
@@ -80,7 +82,7 @@ def check_heap(peak, failures):
     require(0 < peak < 1024*1024 and failures == 0, 'heap')
 
 
-def settings(work, mutation=None):
+def settings(work, mutation=None, *, observe_flow=False):
     """Private copies add read-only meters and USER-only fault/output stimuli.
 
     The meters do not send new protocol messages or change capture ownership.
@@ -90,21 +92,18 @@ def settings(work, mutation=None):
     if mutation:
         path, before, after, _ = MUTATIONS[mutation]
         sources[path] = replace_once(sources.get(path, (ROOT/path).read_text()), before, after)
-    if mutation == 'term-wait':
-        sources[BOOT] = ('int pm_term_connected(void) { return 0; }\n'
-            'int pm_terminal_trygetkey(void) { return -1; }\n'
-            + sources[BOOT])
-        sources[BOOT] = sources[BOOT].replace('pm_terminal_poll();', 'idle_work_run();')
-    sources[USER] = replace_once(sources[USER], '    (void)execute_command(line);', r'''
+    sources[USER] = replace_once(sources[USER], '        accepting = rsh_lan_execute(line);', r'''
     /* Acceptance stimuli live only in this generated USER copy. */
     if (!strcmp(line, "p3-fault")) { __asm__ volatile("trap"); }
-    if (!strcmp(line, "p3-output")) {
+    if (!strcmp(line, "p3-buffer")) {
+        printf("buffered line\n");
+    } else if (!strcmp(line, "p3-output")) {
         const char text[] = "FD1 UTF8 \xe3\x81\x82\n";
         g_api->tvram_clear();
         g_api->sys_write(1, text, sizeof(text)-1);
     } else if (!strcmp(line, "p3-overflow")) {
         for (int i=0; i<P3_OVERFLOW_LINES; i++) g_api->kprintf(7, "%s", "01234567890123456789012345678901234567890123456789012345678901234567890123456789\n");
-    } else (void)execute_command(line);'''.replace('P3_OVERFLOW_LINES', str(OVERFLOW_LINES)))
+    } else accepting = rsh_lan_execute(line);'''.replace('P3_OVERFLOW_LINES', str(OVERFLOW_LINES)))
     sources[SINK] = replace_once(sources[SINK], 'int con_sink_capture(unsigned int op)',
         'volatile int p3_freeze_rc;\nvolatile unsigned p3_end_count;\nint con_sink_capture(unsigned int op)')
     # This return belongs to capture, not another sink operation.
@@ -120,13 +119,23 @@ def settings(work, mutation=None):
                                  'volatile unsigned p3_alloc_failures;\nvoid *kmalloc(u32 size)')
     sources[HEAP] = replace_once(sources[HEAP], '    void *p = kheap_alloc(&kernel_heap, size);',
         '    void *p = kheap_alloc(&kernel_heap, size);\n    if (!p && size) p3_alloc_failures++;')
-    user = work/'rshell_lan.c'; user.write_text(sources.pop(USER))
+    user = work/'rshell_lan.c'; user.write_text('#include <stdio.h>\n' + sources.pop(USER))
     user_out = work/'user'
     # kb-user recursively uses these command-line variables. Separate object
     # trees ensure no mutant can reuse a normal USER object (or vice versa).
     opts = ['KBOOT_SH=1', 'KBOOT_LINK=1', 'KB_SH_OUT='+str(user_out),
             'PPC_SH_MUT_SRC='+USER, 'PPC_SH_MUT_FILE='+str(user),
             'KB_ROOT_BINS='+str(user_out/'hello.bin')+' '+str(user_out/'fault.bin')]
+    for extra_user in ('userland/shell/rshell.c', 'userland/shell/main.c'):
+        if extra_user not in sources: continue
+        source = work/Path(extra_user).name
+        source.write_text(sources.pop(extra_user))
+        opts.extend(['PPC_RES_MUT_SRC='+extra_user, 'PPC_RES_MUT_FILE='+str(source)])
+    if observe_flow:
+        source = 'exec/exec.c'
+        observer = ROOT/'tools/accept/ppc_shell_flow.inc'
+        sources[source] = (ROOT/source).read_text() + '\n#include "'+str(observer)+'"\n'
+        opts.append('KB_KEEP_RESET=-Wl,--wrap=arch_entry_enter,--wrap=ppc_trap_dispatch,--wrap=exec_run')
     require(len(sources) <= 3, 'kernel mutation slots')
     for slot, (path, content) in zip(('', 'EXTRA_', 'THIRD_'), sources.items()):
         dest = work/(Path(path).stem+'-meter.c'); dest.write_text(content)
@@ -230,7 +239,10 @@ class Session:
         return int(match[1],16)
 
     def ready(self):
-        return self.agent.established and self.agent.operator.ready is not None
+        return (self.agent.established and self.agent.operator.ready is not None
+                and self.word('g_shell_service', 8) != 0
+                and self.word('exec_nest_level') == 1 and self.word('cur_res_owner') == 1
+                and self.word('g_cur_app') == 0)
 
     def cmd(self, line, expected=None, seconds=20):
         op=self.agent.operator
@@ -252,10 +264,8 @@ class Session:
         events=outputs()
         require(len(events)==1,'one OUT')
         if expected is not None: check_body(line,result['result'],expected)
-        # rshell_set_active is ignored for CPL=3 callers (wrap_rshell_set_active:
-        # ring3_call_from_user), so the APP shell leaves the kernel flag at 0.
         require(self.word('g_capture')==0 and self.word('g_reader')==0xffffffff and
-                self.word('rshell_active')==0 and self.word('boot_serial_mirror')==0 and
+                self.word('rshell_active')==1 and self.word('boot_serial_mirror')==0 and
                 self.word('p3_end_count')==ended+1,'end')
         return result
 
@@ -299,18 +309,30 @@ def cross(tool):
     return str(Path(os.environ.get('PPC_CROSS_DIR','/home/hight/opt/cross-ppc'))/'bin'/('powerpc-elf-'+tool))
 
 
+def flow_point(s, index, expected):
+    words = [s.word('shell_flow', 4*(9*index+field)) for field in range(9)]
+    generation, *fields = words
+    require(generation > 0 and tuple(fields[:5]) == expected,
+            f'resident flow point {index}: {words}')
+    return generation, *fields[5:]
+
+
 def accept(elf,cpu,out,timeout,late=False,verdict=None):
     # The 7450 non-late VM also runs the overflow observation.
-    s=Session(elf,cpu,out,timeout+(OVERFLOW_SECONDS if cpu=='7450' and not late else 0),late)
+    check_help = verdict in (None, 'resident command groups')
+    check_overflow = cpu == '7450' and not late and verdict in (None, 'freeze-drop')
+    extra = OVERFLOW_SECONDS * (int(check_help) + int(check_overflow))
+    s=Session(elf,cpu,out,timeout+extra,late)
     try:
         s.start()
         if late:
-            # The CPL=3 APP shell cannot set rshell_active; a running app slot shows it started.
+            # shell_service_publish follows the resident slot commit.
             def app_started():
                 # Early in boot the kernel VA may not be readable yet: keep waiting.
-                try: return s.word('g_cur_app')!=0
+                try: return (s.word('g_shell_service',8)!=0 and s.word('exec_nest_level')==1 and
+                             s.word('cur_res_owner')==1 and s.word('g_cur_app')==0)
                 except CriterionFailure: return False
-            s.wait(app_started,'APP before delayed agent',60)
+            s.wait(app_started,'resident before delayed agent',60)
             first=s.word('tick_count')
             s.wait(lambda: s.word('tick_count')-first>=300,'late agent wait',30)
             s.agent_enabled=True
@@ -321,6 +343,18 @@ def accept(elf,cpu,out,timeout,late=False,verdict=None):
             require(s.ready(),verdict)
         else: s.wait(s.ready,'HELLO to cui READY',60)
         require(s.agent.operator.ready['mode']=='cui','autostart')
+        # include/config.h and cmd_env.c define the initial resident environment.
+        s.cmd('pwd', b'/\n')
+        s.cmd('echo $PATH', b'/bin:/sbin:/usr/bin\n')
+        s.cmd('echo $HOME', b'/home/user\n')
+        s.cmd('echo $SHELL', b'/shell\n')
+        s.cmd('echo "two words" | cat', b'two words\n')
+        s.cmd('echo 日本語 > /tmp/rsh', b'')
+        s.cmd('cat /tmp/rsh', '日本語\n'.encode())
+        if check_help:
+            help_text=s.cmd('help', seconds=OVERFLOW_SECONDS)['result']
+            require(all(name in help_text for name in (b'rshell', b'echo', b'lspci')), 'resident command groups')
+        require(s.cmd('p3-buffer')['result'] == b'> p3-buffer\nbuffered line\n\x04', 'line buffering')
         s.cmd('echo hello',b'hello\n')
         ready_count=lambda: sum(e['parts'][:2]==['RSH','READY'] for e in s.events)
         count=ready_count(); first=s.word('tick_count')
@@ -329,7 +363,19 @@ def accept(elf,cpu,out,timeout,late=False,verdict=None):
         s.cmd('cat /no-such-file')
         failed=s.cmd('echo $?')['result']
         require(re.fullmatch(rb'> echo \$\?\n[1-9][0-9]*\n\x04',failed) is not None,'failure status')
-        s.cmd('exit 3',b''); s.cmd('echo afterexit',b'afterexit\n')
+        if verdict is None:
+            generation, root, api, aux = flow_point(s, 0, (1, 0, 1, 1, 0))
+            require(root == 0 and aux == s.symbols['g_shell_service'] and api == s.symbols['ppc_kapi_table'], 'resident API/aux')
+        s.cmd('/bin/hello.bin ok', b'hello ok\n')
+        s.cmd('echo $?', b'7\n')
+        s.cmd('echo afterexit', b'afterexit\n')
+        if verdict is None:
+            _, child_root, child_api, child_aux = flow_point(s, 1, (2, 1, 2, 2, 2))
+            require(child_root and child_api == s.word('ring3_tramp_page') and child_aux == 0, 'USER API/aux')
+            flow_point(s, 2, (1, 0, 1, 1, 0))
+            s.cmd('/bin/fault.bin')
+            s.cmd('echo $?', b'139\n')
+            flow_point(s, 3, (1, 0, 1, 1, 0))
         # Bypass host line validation: the guest must reject these notices too.
         before=len(s.events); ident=s.agent.operator.next_id-1
         for data in (f'{ident:08x} echo duplicate\n'.encode(),b'00000001 echo old\n',
@@ -362,21 +408,26 @@ def accept(elf,cpu,out,timeout,late=False,verdict=None):
         screen=s.screen('deferred')
         require('> echo half' in screen and '> echo deferred' in screen and
                 screen.index('> echo half') < screen.index('> echo deferred'),'USB before LAN')
-        if cpu=='7450' and not late:
+        if check_overflow:
             # Every overflow line scrolls the OF framebuffer, which is slow under
             # -icount (~2.7 s per scroll in QEMU 8.2), so one VM per run covers it.
             overflow=s.cmd('p3-overflow',seconds=OVERFLOW_SECONDS)
             require(overflow['state']=='truncated' and overflow['drop']>0,'result drop')
             require(s.word('p3_freeze_rc')!=0,'freeze-drop')
             s.cmd('echo recovered',b'recovered\n')
-        # A fault in the APP itself is distinct from a child fault.
+        previous=s.word('g_shell_service',8)
         s.agent.notifier.notify_number(RSHELL,EXECUTE,b'00001000 p3-fault\n')
         count=ready_count(); s.settle(4)
         serial=(s.out/'serial-a.log').read_text(errors='replace')
-        require('sh result kind=2' in serial,'USER fault reached')
+        require('/sys/shell.bin returned ' in serial,'resident fault reached')
         require(s.word('g_capture')==0 and s.word('g_reader')==0xffffffff,'owner')
-        require(ready_count()>count,'fault-restart')
+        require(ready_count()>count and s.word('g_shell_service',8)>previous,'fault-restart')
         s.cmd('echo afterfault',b'afterfault\n')
+        if verdict is None:
+            flow_point(s, 4, (0, 0, 0, 0, 0))
+            restarted, root, new_api, new_aux = flow_point(s, 5, (1, 0, 1, 1, 0))
+            require(restarted > previous and not root and new_api == api and new_aux == aux,
+                    'new resident generation')
         generation=s.agent.host_generation
         s.new_agent()
         s.wait(s.ready,'new agent generation',30)
@@ -522,15 +573,19 @@ def main():
         except OSError as exc:
             print('未 ppc-link-sh-run: AF_INET unavailable: '+str(exc)); return 3
     control=work/'normal'; control.mkdir()
-    elf=build(control/'kernel',*settings(control))
+    elf=build(control/'kernel',*settings(control, observe_flow=True))
     check_map(elf.with_suffix('.map'))
     if args.build_only:
+        hashes={hashlib.sha256(elf.read_bytes()).digest()}
         if args.mutate:
             for name in MUTATIONS:
                 folder=work/name; folder.mkdir()
                 mutant=build(folder/'kernel',*settings(folder,name))
                 check_map(mutant.with_suffix('.map'))
-                print('BUILT mutation '+name,flush=True)
+                digest=hashlib.sha256(mutant.read_bytes()).digest()
+                require(digest not in hashes, 'distinct image '+name)
+                hashes.add(digest)
+                print(name, digest.hex(), flush=True)
         return 0
     for cpu in ('7450','7455'):
         for late in (False,True):

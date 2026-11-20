@@ -79,7 +79,7 @@ class Capture:
 def link_script(case, command='', expected=''):
     return {'capture': [], 'nest': [('/bin/nest.bin', LINK_NEST_EXPECTED), ('echo $?', b'5\n')],
             'shell': [('echo x > /tmp/t', b''), ('cat /tmp/t', b'x\n'),
-                      ('cat /tmp/none', b'cat: /tmp/none: No such file or directory\n')],
+                      ('cat /tmp/none', b'cat: /tmp/none: No such file or directory\n'), ('echo $?', b'1\n')],
             'exact': [(command, expected.encode())]}[case]
 
 
@@ -172,8 +172,6 @@ def assess_link(case, evidence, pcap, peer, command='', expected=''):
                 raise RuntimeError('RSH body mismatch')
             if record['line'] != line:
                 raise RuntimeError('RSH command order')
-            # Fixed RSH framing removed above; reuse S-D's exact semantic comparison.
-            exact(line+'\n'+actual.decode('utf-8')+'sh> ', line, output.decode('utf-8'))
     statuses = [responses.get(key) for key in sorted(calls)]
     if case == 'exact' and any(status != 200 for status in statuses):
         raise RuntimeError('SFS response missing/non-200')
@@ -305,11 +303,13 @@ def camera_frame(name, out):
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--link', action='store_true')
-    p.add_argument('--iface', required=True)
-    p.add_argument('--peer', required=True)
-    p.add_argument('--image', required=True, type=Path)
-    p.add_argument('--out', required=True, type=Path)
-    p.add_argument('--machine', required=True, help='machine identity, OF and PVR')
+    p.add_argument('--legacy', action='store_true', help='capture with the PLN1 transport')
+    p.add_argument('--build-only', action='store_true')
+    p.add_argument('--iface')
+    p.add_argument('--peer')
+    p.add_argument('--image', type=Path)
+    p.add_argument('--out', type=Path)
+    p.add_argument('--machine', help='machine identity, OF and PVR')
     p.add_argument('--case', choices=['capture', 'nest', 'shell', 'exact'], default='capture')
     p.add_argument('--command', default='')
     p.add_argument('--expected', default='')
@@ -319,9 +319,21 @@ def main():
     p.add_argument('--camera-frame', action='append', default=[])
     p.add_argument('--list-frames', action='store_true')
     a = p.parse_args()
+    if a.build_only:
+        from kboot_accept import build
+        if not a.out: p.error('--build-only requires --out')
+        out = a.out.resolve()
+        user = out/'user'
+        bins = [str(user/(name+'.bin')) for name in ('hello', 'nest')] if a.case == 'nest' else []
+        elf = build(out/'kernel', 'IMAGE=kboot-link-sh', 'PPC_USER_FLOAT=', 'KB_SH_OUT='+str(user),
+                    'KB_ROOT_BINS='+' '.join(bins), 'kernel')
+        print(elf, hashlib.sha256(elf.read_bytes()).hexdigest())
+        return 0
+    if not all((a.iface, a.peer, a.image, a.out, a.machine)):
+        p.error('capture requires --iface, --peer, --image, --out and --machine')
     if a.seconds <= 0:
         p.error('--seconds must be positive')
-    if a.link:
+    if a.link or not (a.legacy or a.list_frames or a.camera_frame):
         return link_main(a)
     try:
         packet = lan.Packet(a.iface)

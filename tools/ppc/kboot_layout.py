@@ -74,10 +74,20 @@ def report_product(path):
         print(f'{first:#08x} {stop:#08x} {use:22} {basis}')
         cursor = stop
     assert cursor == layout['MEM_POOL_BASE'] == 0x500000
-    root = verify_embedded(elf, load, symbols, (path.parent/'root.iso').read_bytes())
+    iso = path.parent/'root.iso'
+    contents = iso.read_bytes()
+    root = verify_embedded(elf, load, symbols, contents)
+    sectors, = struct.unpack_from('<I', contents, 16 * 2048 + 80)
+    assert sectors * 2048 == root
+    names = command(['isoinfo', '-i', iso, '-f']).splitlines()
+    assert '/SYS/SHELL.BIN;1' in names
+    assert all('/BIN/'+name+'.BIN;1' not in names for name in ('SH', 'HELLO', 'FAULT'))
+    shell_bytes = subprocess.check_output(['isoinfo', '-i', iso, '-x', '/SYS/SHELL.BIN;1'])
+    assert shell_bytes == (ROOT/'build/out/ppc-user/link-sh/shell.bin').read_bytes()
+
     bss = symbols['__bss_end'] - symbols['__bss_start']
     print(f'PT_LOAD raw={raw} memory={memory} BSS={bss} root={root} '
-          f'resident_end={end} chain_slack={0x3e0000-chain}')
+          f'resident_end={end:#x} chain={chain:#x} chain_slack={0x3e0000-chain} ISO_sectors={sectors}')
     return end
 
 

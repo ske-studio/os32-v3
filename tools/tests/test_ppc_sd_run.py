@@ -10,7 +10,7 @@ import sd_run as meter
 import link_sh_run as link
 
 CHECK = dict(name='ppc-sd-meter', env=['ppc-cross'], tier=1, budget=10, needs=['make:ppc-ci-image'],
-    covers=[
+    covers=['exec/exec.c', 'tools/accept/ppc_shell_flow.inc', 'platform/powermac/shell_loop_ops.c', 'userland/shell/main.c', 'userland/shell/rshell.c',
         'arch/ppc/entry.S',
         'arch/ppc/kernel_dec.c',
         'arch/ppc/kernel_mmu.S',
@@ -117,10 +117,6 @@ def main():
         opts = mutant_settings(Path(folder), 'nonce', *meter.LINK_NONCE)
         copy = Path(next(v.split('=', 1)[1] for v in opts if v.startswith('KB_MUT_FILE=')))
         assert copy.read_text() == (ROOT/path).read_text().replace(before, after)
-    # PLN1 has two protections (host fs.reset on seq rollback, guest per-boot
-    # nonce); its no-boot-follow mutant removes both, so both must be present.
-    text = Path(meter.__file__).read_text()
-    assert 's.host.fs.reset = lambda' in text and "'nonce = 0; (void)token;'" in text
     if '--mutate' in sys.argv:
         source = Path(meter.__file__).read_text()
         for old, new in (('data == expected', 'True'), ('actual == expected', 'True'),

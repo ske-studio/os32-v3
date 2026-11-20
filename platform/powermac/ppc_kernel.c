@@ -54,7 +54,7 @@
 #include "console.h"
 #include "text_screen.h"
 #if KBOOT_SH
-#include "shell_boot.h"
+#include "shell_loop_ops.h"
 #include "input_boot.h"
 #include "hostfs.h"
 #include "usb_boot.h"
@@ -62,8 +62,6 @@
 #include "platform/powermac/link_platform.h"
 #include "kernel/idle_work.h"
 #endif
-#else
-#include "cli_boot.h"
 #endif
 #include "exec_boot.h"
 #include "exec.h"
@@ -464,11 +462,7 @@ void platform_boot_run(void)
         pm_log_stream_only = saved_stream_only;
 #endif
         pm_exec_boot();
-#if KBOOT_SH
-        pm_shell_boot();
-#else
-        pm_cli_boot();
-#endif
+        shell_loop_run(&pm_shell_loop_ops);
     }
 #endif
     for (;;) pm_lan_poll(tb_now());

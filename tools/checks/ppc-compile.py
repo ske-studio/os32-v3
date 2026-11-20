@@ -1,6 +1,6 @@
 """Compile the complete PPC shell image on hosts with a PPC toolchain."""
 CHECK = dict(env=['ppc-cross'], name='ppc-compile', tier=1, budget=180, needs=['make:ppc-ci-image'],
-             covers=[
+             covers=['exec/exec.c', 'tools/accept/ppc_shell_flow.inc', 'userland/shell/main.c', 'userland/shell/rshell.c',
         'userland/shell/rshell_lan.c',
         'tools/ppc/**',
         'tools/*.py',

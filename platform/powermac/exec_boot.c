@@ -8,8 +8,7 @@
 
 void exec_fault_recover(void);
 
-/* Only the exec image supplies this dispatcher. The bootstrap parent has
- * owner/depth 1 before any shell image has been published. */
+/* Recover only a committed resident shell. */
 static void resident_fault(struct ppc_frame *frame)
 {
     if (!g_shell_service.generation || exec_nest_level != 1 ||
@@ -30,6 +29,4 @@ void pm_exec_boot(void)
     pipe_buffer_init();
     exec_init();
     ppc_trap_set_resident_fault(resident_fault);
-    /* The kernel boot context is the parent (ID 1). */
-    exec_nest_level = 1;
 }

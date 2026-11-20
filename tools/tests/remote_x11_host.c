@@ -132,8 +132,10 @@ int main(void)
         api.host_notice_read = (mask & 2) ? read_notice : 0;
         resident_active = boot_runs = init_calls = 0;
         boot_remote = mask != 0;
+        int eots_before_start = serial_eot;
         boot_terminal("startup");
         CHECK(boot_runs == boot_remote && init_calls == uart_available);
+        CHECK(resident_active == boot_remote && serial_eot == eots_before_start);
     }
     boot_check = resident_active = 0;
     char *argv[] = { "rshell" };

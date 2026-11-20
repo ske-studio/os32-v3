@@ -11,9 +11,18 @@ KBOOT_SHELL := $(if $(filter kboot-shell,$(IMAGE)),1,0)
 endif
 endif
 NEGATIVE ?= 0
-KBOOT_SHELL ?= 0
+# An explicit legacy selector keeps its historical defaults. With no selector
+# the product includes both the link transport and the resident shell.
+ifeq ($(origin KBOOT_LINK)$(origin KBOOT_SHELL),undefinedundefined)
+KBOOT_SH ?= 1
+else
 KBOOT_SH ?= 0
+endif
+KBOOT_SHELL ?= 0
 KBOOT_LINK ?= 1
+ifneq ($(words $(filter 0 1,$(KBOOT_LINK) $(KBOOT_SH) $(KBOOT_SHELL))),3)
+$(error KBOOT_LINK, KBOOT_SH and KBOOT_SHELL must be 0 or 1)
+endif
 ifeq ($(KBOOT_LINK),1)
 ifeq ($(KBOOT_SHELL),1)
 $(error KBOOT_LINK requires the diagnostic image)
@@ -30,9 +39,19 @@ ifneq ($(NEGATIVE),0)
 $(error KBOOT_SH does not support NEGATIVE)
 endif
 endif
+ifeq ($(KBOOT_SHELL),1)
+ifneq ($(NEGATIVE),0)
+$(error KBOOT_SHELL does not support NEGATIVE)
+endif
+endif
+ifneq ($(filter 1,$(KBOOT_SH) $(KBOOT_SHELL)),)
+override KBOOT_LINK := 1
+override KBOOT_SH := 1
+override KBOOT_SHELL := 0
+endif
 KB_IMAGE := $(if $(filter 1,$(KBOOT_SH)),$(if $(filter 1,$(KBOOT_LINK)),kboot-link-sh,kboot-sh),$(if $(filter 1,$(KBOOT_SHELL)),kboot-shell,$(if $(filter 1,$(KBOOT_LINK)),kboot-link,kboot-core)))
 ifneq ($(findstring command,$(origin IMAGE)),)
-ifneq ($(IMAGE),$(KB_IMAGE))
+ifneq ($(if $(filter kboot-sh kboot-shell,$(IMAGE)),kboot-link-sh,$(IMAGE)),$(KB_IMAGE))
 $(error IMAGE $(IMAGE) disagrees with the KBOOT_* flags, which select $(KB_IMAGE))
 endif
 endif

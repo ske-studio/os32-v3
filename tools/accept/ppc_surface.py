@@ -127,7 +127,7 @@ def main():
     work = Path(tempfile.mkdtemp(prefix='ppc-surface-', dir=os.environ.get('TMPDIR') or None)).resolve()
     print('evidence=' + str(work), flush=True)
     user = work / 'user'
-    bins = [str(user / (app + '.bin')) for app in ('hello', 'fault', 'surfprob')]
+    bins = [str(user / 'surfprob.bin')]
     options = ['IMAGE=kboot-link-sh', 'KB_SH_OUT=' + str(user),
                'KB_ROOT_BINS=' + ' '.join(bins)]
     images = {}

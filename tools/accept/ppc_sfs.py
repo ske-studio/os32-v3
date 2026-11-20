@@ -1,4 +1,4 @@
-"""6b A5/A8/A10 (PPC_KAPI_FILL_DESIGN, serialfs): verify RSH OUT and resident scope lifetime."""
+"""Check /sys/shell.bin against rshell.c sfs_run_child and the serialfs scope contract."""
 import argparse
 import hashlib
 import os
@@ -27,6 +27,8 @@ def observe(elf, cpu, folder, case):
         s.agent.configured_peer = bytes.fromhex('525400123456')
         s.start()
         s.wait(s.ready, 'scope probe READY', 60)
+        assert s.word('g_shell_service', 8) and s.word('exec_nest_level') == 1
+        assert s.word('cur_res_owner') == 1 and s.word('g_cur_app') == 0
         command = 'sfs run /bin/sfsprob.bin'
         # A plain external .bin run ends with one empty line (as dispprb's
         # "...\n\n"); under sfs run the begin and exit lines are adjacent.
@@ -83,7 +85,7 @@ def main():
     os.environ.setdefault('SOURCE_DATE_EPOCH', '946684800')
     work = Path(tempfile.mkdtemp(prefix='ppc-sfs-', dir=os.environ.get('TMPDIR'))).resolve()
     user = work / 'user'
-    bins = ' '.join(str(user / (name + '.bin')) for name in ('hello', 'fault', 'sfsprob'))
+    bins = ' '.join(str(user / (name + '.bin')) for name in ('fault', 'sfsprob'))
     seen = set()
     cases = ('normal', 'unmounted', 'absent', 'drop-exit')
     for case in cases if args.mutate else ('normal',):
