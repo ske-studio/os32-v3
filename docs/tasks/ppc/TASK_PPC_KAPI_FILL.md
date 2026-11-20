@@ -1,6 +1,8 @@
 # TASK_PPC_KAPI_FILL — PowerMac の KAPI の「提供者無し」190 本を埋める
 
-> 状態: **実装中 (2026-11-18)** — 計画は確定 ([PPC_KAPI_FILL_DESIGN](../../decisions/ppc/PPC_KAPI_FILL_DESIGN.md))。本線の差し込みは CI の手直しの S0 と CRT の後始末の後 (1a・2a-i・2b・3b-i から)。PowerPC が本線を待たずに進める段は 1d (shm)・3a (ESCC)・4a (セル 5 本)・6a (再起動、wt/ppc-reset で実装中)。
+> 2026-11-20 の見直しで x86 の形に改めた ([DESIGN_X86_AUDIT](../../decisions/ppc/DESIGN_X86_AUDIT.md))。
+
+> 状態: **実装中 (2026-11-20)** — [段の計画](../../decisions/ppc/PPC_KAPI_FILL_DESIGN.md) に従い、共通の提供者で KAPI の機能を揃える。既存の二重実装はその後に整理する。
 > 完了の基準: sdk/kapi_target_ppc.py の PROVIDER_GROUPS に残るのが計画の §2 で E (PowerMac に無くて正しい) とした slot だけになり、各段で「両像のリンク map と nm -l で slot → wrap の呼ぶ先 → 定義元のソースのパスが同じ」「arch/ppc・platform/powermac に x86 と同じ名前の新しい定義が 0」を確かめ、tools/ppc/test_kapi_binding.py の本数がその数に一致する。
 
 ## 0. ユーザー決定 (2026-11-18)
@@ -16,7 +18,11 @@
 ## 2. 段の状態
 | 段 | 担当 | 状態 |
 |---|---|---|
-| 6a 再起動 (sys_reboot) | PowerPC | 実装中 (wt/ppc-reset、確定設計 PPC_RESET_DESIGN) |
-| 1d・3a・4a | PowerPC | 未着手 (本線を待たない) |
+| 6a 再起動 (sys_reboot) | PowerPC | 装置手順・受入台本は実装済み (2d2736837)。製品シェルの reboot と再起動後の READY は PPC_RESET_DESIGN に従う |
+| 1d・3a・4a | PowerPC | 実装済み (b1437a4a3・720abc8ce・290c0e1eb) |
 | 1a・2a-i・2b・3b-i | 本線 | 未着手 (CI の手直しと CRT の後始末の後) |
-| ほか | 計画の §3 の順 | 未着手 |
+| 5b | 共通表示・PowerPC | A〜C 実装済み (e407702a0・caa544473・0227413b7) |
+| 5c・5d | 共通 HAL・シェル | 5c の B1〜B4 と 5c-A は実装済み。5d は PPC_SHELL_ALIGN_X86_DESIGN で owner 1 の起動・回収を揃え、通常のシェルで切替を受け入れる。|
+| 6b | SFS | 実装済み (2964a2003・2f4ed7d73)。既存の SHELL_REMOTE_SFS はシェル統合で整理する。|
+| 6c | filesystem・ATA | N/P/D1/D2 実装済み (D2 は 40a3e273c)。D3 は段 8 の ATA block provider の後、製品シェルで HDD の ext2 作成を確認する。|
+| 7a・7b | module・VFS | 7a P1〜P4b 実装済み (1c9ed35c5)。静的結線の残段は取り消す。L1 → L2 → FEP → KCG。辞書・学習は HDD の後に x86 と同じパスで公開する。SQLite の静的結線と db 17 本は main 28960a384 までに公開済み。製品シェルから VFS 上の DB を受け入れる。SQLite の module 化は任意（B08）。|

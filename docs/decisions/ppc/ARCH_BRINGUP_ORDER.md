@@ -1,8 +1,10 @@
 # ARCH_BRINGUP_ORDER — 新しいアーキテクチャの立ち上げ順
 
+> 2026-11-20 の見直しで x86 の形に改めた ([DESIGN_X86_AUDIT](DESIGN_X86_AUDIT.md))。
+
 出所: PowerPC の S-A・S-B・S-C と W6 の設計および QEMU 受入 (2026-11-12)。
 
-> 状態: **現行 (2026-11-12)** — 起動から USER シェルまでの順と開発用 CLI の扱い。
+> 状態: **現行 (2026-11-20)** — 製品受入の基準は x86 のシェル枠と起動ループ。段の状態は票 TASK_PPC_ALIGN_X86、段の定義は PPC_SHELL_ALIGN_X86_DESIGN の表を参照する。
 
 ## 順と受入
 
@@ -10,36 +12,30 @@
 
 | 段 | 次へ進む条件 | 受入の試験 | PowerPC の例 |
 |---|---|---|---|
-| 起動 | kboot の印が出て LAN の診断が通る | `tools/ppc/kboot_all.py` | kboot・LAN |
-| RAM root | 読み取り専用 ISO の `rd0` を root、ramfs の `rd1` を `/tmp` に mount し読み書きできる | `tools/ppc/shell_run.py` | W2〜W3、共通化は W6 |
-| 開発用 CLI | 端末で prompt・内蔵コマンドと root の読書きが通る | `tools/ppc/shell_run.py` | W1〜W3、S-A |
+| 起動 | 機種の初期化を終え、診断出力を観測できる | `tools/ppc/kboot_all.py` | kboot・LAN |
+| インストール用 RAM root | 読み取り専用 ISO の `rd0` を root、ramfs の `rd1` を `/tmp` に mount し読み書きできる | `tools/ppc/shell_run.py` | W2〜W3、共通化は W6 |
 | USER アプリ 1 本 | hello を起動し出力と exit 値を観測、fault 後も復帰する | `tools/ppc/sb_run.py` | W5、S-B |
 | USER の入れ子 | USER の親から子を起動し終了して親へ戻る | `tools/ppc/sc_run.py` の N01 | W7、N01 (`nest`) |
-| USER の sh | root mount 後、kernel から sh を製品の経路で直接起動し端末で使える | `tools/ppc/sc_run.py` | W7、S-C (`KBOOT_SH=1`) |
-| 保存先の後 mount | ホスト稼働のままゲスト再起動後も保存を読め、root は書込み拒否、tmp は消える | `tools/ppc/sd_run.py` | W8、S-D (`KBOOT_SH=1`) |
+| 製品シェル | owner 1 の枠で起動し、子の終了から復帰、シェルの終了後に回収して次のシェルを起動する | 通常の端末で終了値・次の prompt を確認 | PPC_SHELL_ALIGN_X86_DESIGN |
+| 保存先 | HDD の ext2 root と共通 VFS/link の /host で再起動後に保存を読める | 製品シェルで書込みと読み戻し | W8、S-D は /host の保存のみ |
 
 ## 各段で用意するもの
 
 | 段 | 新しいアーキテクチャ側の用意 |
 |---|---|
 | 起動 | arch の入口・例外・割込み・時計と、platform の起動・診断出力・LAN provider を結ぶ。 |
-| RAM root | root image の受渡しと装置名・FS の登録を platform に用意し、共通の `init/boot_root.c`・`build/ram-root.mk` を使う。 |
-| 開発用 CLI | `kernel/cli/resident_cli.c` の `resident_cli_ops` に端末と poll をつなぎ、`KBOOT_SHELL=1` の像だけに組む。 |
+| インストール用 RAM root | root image の受渡しと装置名・FS の登録を platform に用意し、共通の `init/boot_root.c`・`build/ram-root.mk` を使う。 |
 | USER アプリ 1 本 | arch の USER 遷移・例外・syscall・実行像の公開と platform の exec provider を用意する。 |
 | USER の入れ子 | arch の実行 context の保存・復帰と、子の資源・終了値を返す経路を通す。 |
-| USER の sh | platform の端末入力・fd1 出力・直接起動を結び、必要な KAPI provider を用意する。 |
+| 製品シェル | 端末の後端をつなぎ、外部シェルを共通の起動ループで選ぶ。 |
 
 KAPI binding は provider のない slot を型に応じた不在として扱う。
 PowerPC の `sdk/kapi_target_ppc.py` の不在群を手本にし、成功を偽る stub で埋めない。
 USER の ABI と不在値は [09_exec](../../09_exec.md) を参照する。
 
-## 小さな CLI を凍結して残す
+## 開発用 CLI の扱い
 
-ユーザー了承 (2026-11-12「それでOK」) により、機能は help・echo・cat・外部起動 (`run`) で止める。
-製品の起動経路には入れず、新しいアーキテクチャの立ち上げ、USER 実行の足場、実機の初期確認に使う。
-`sh.bin` が QEMU と実機で安定したら hello・fault の受入を sh 上へ移す。
-その後の CLI 像の試験は prompt と外部起動の最小限にする。
-CLI を消すかは次のアーキテクチャの着手時に決める。
+PowerPC では S-A の端末と S-B の USER 実行の診断に常駐 CLI を使った。常駐 CLI と旧 kboot の 5 像は、x86 に寄せる作業の最後に外す。
 
 ## 教訓
 
@@ -61,5 +57,5 @@ S-D は CD 切離し後の作成・追記・短い上書き・64KiB 複写・列
 入口は `tools/ppc/sd_run.py --cpu both --mutate`。AF_INET の無い環境は SKIP とし、実行済みとは数えない。
 境界の単体検査は T02/T03 `ppc-hostfs-io`、T04 `ppc-hostfs-server`、T01 `ppc-hostfs-wire`。
 開発用 CLI の端末と poll は platform 側に閉じ、CPU 依存を共通 CLI に持ち込まない。
-USER の入れ子は sh の起動前に確認し、子終了後の親の継続を観測する。
-製品の sh の受入では、直接起動と端末入出力に加え子の終了からの復帰を確認する。
+PowerPC では kboot の印と LAN 診断で起動を確認した。USER の入れ子は sh の起動前に確認し、子終了後の親の継続を観測した。
+製品のシェルの受入では owner 1 の資源回収と次のシェルの READY まで確認する。
