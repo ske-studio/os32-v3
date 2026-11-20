@@ -31,7 +31,7 @@
 - `serialfs_persistent.c` はpermit→vfs_mountを実装済み。開始時にHELLOを待たない。
 - PC-98のLAN常駐 `/host` とhsyncの受入は `TASK_NET_HOSTSVC.md:3` にある。
 - N1の100Hz IRQ駆動状態機械は移植せず、PowerPCのGMAC pollを使う。
-- KAPIのsfs_begin/end・host_*不在指定は維持し、既存FSとplatformの間で閉じる。
+- 6b で kboot-link-sh の sfs_begin/end を常駐の /host に公開する。kboot-sh・kboot-shell の同じスロットは NOSYS。
 
 **2. S-D の到達点と受入の形**
 

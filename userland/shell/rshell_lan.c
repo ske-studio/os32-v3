@@ -401,6 +401,24 @@ void rsh_lan_app_init(void)
 
 int rsh_lan_execute(const char *line)
 {
+#ifdef SHELL_REMOTE_SFS
+    const char *child = rsh_sfs_child(line);
+    if (child) {
+        int rc = g_api->sfs_begin();
+        if (rc) {
+            g_api->kprintf(ATTR_RED, "sfs: session not started (%d)\n", rc);
+            sh_status_set(SH_STATUS_ERROR);
+        } else {
+            sh_in_sfs = 1;
+            int status = execute_command(child);
+            sh_in_sfs = 0;
+            rc = g_api->sfs_end(status);
+            sh_status_set(rc ? SH_STATUS_ERROR : status);
+        }
+        sh_exit_flag = 0;
+        return 0;
+    }
+#endif
     (void)execute_command(line);
     /* A LAN `exit N` does not end the APP shell (the host ends it with EXIT,
      * as in the resident rshell); drop the flag so later lines are not cut. */

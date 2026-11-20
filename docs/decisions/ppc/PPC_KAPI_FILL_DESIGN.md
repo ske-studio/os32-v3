@@ -264,7 +264,7 @@ A の場合も、対象像が持つ弱い代役に解決されていないこと
 |ext2|使い捨て loop 上で format と format_at、再 mount、範囲外の前後 sector を比較|start_lba を無視させる|
 |kcg|KCG1 の既知 ANK/JIS を読み字形と照合、両像で kcg_load_font が NOSYS を返した後の有効フォントと倍率を確認|LE offset の解釈を反転|
 |pci|列挙した index の vendor/device を BDF の config 値と照合し、bind 情報の同じ index を確認|cfg の byte swap を落とす|
-|serialfs|既存 peer と begin、ファイル読取、end の exit code を対向側で取得。切断・再開も試す|EXIT frame の送信抑止|
+|serialfs|既存 peer と begin、ファイル読取、link の結果 RSH OUT の `sfs: exit=N` で end の結果を取得。切断・再開も試す|exit の行を落とす|
 |db|書込可 VFS で create/insert、int/text/blob/null の bind、step、column、finalize、close、再 open。失敗コード・使用量・終了回収を観測|別スタック復帰時の所有者復元、または bind 値の複製を欠落させる|
 |ime|登録済み辞書で変換、切替・編集・export・suspend、キー未入力の try と未提供時 NOSYS を区別|辞書切替を無視し既知の異なる候補で検出|
 |v86|5本それぞれ不在を確認、画面と起動状態は保持|不在の値付き応答を成功に替える|
