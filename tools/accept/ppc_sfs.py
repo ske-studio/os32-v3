@@ -28,7 +28,9 @@ def observe(elf, cpu, folder, case):
         s.start()
         s.wait(s.ready, 'scope probe READY', 60)
         command = 'sfs run /bin/sfsprob.bin'
-        begin = rb'sfs: transport=lan nic=link peer=02:00:5e:00:00:01 sid=([1-9][0-9]*)\n'
+        # An external .bin's output ends with one empty line from the exec
+        # path (as dispprb's "...\n\n"); builtins such as cd add none.
+        begin = rb'(sfs: transport=lan nic=link peer=02:00:5e:00:00:01 sid=[1-9][0-9]*\n)\n'
         assert s.word('sfs_probe_starts') == 1
         if case == 'absent':
             rsh_command(s, command, b'sfs: session not started (-10)\n')
@@ -43,7 +45,7 @@ def observe(elf, cpu, folder, case):
                 assert s.word('sfs_probe_starts') == 1
             if case == 'normal':
                 rsh_command(s, 'cd /bin', b'')
-                rsh_command(s, 'sfs run cd /host', scope + b'sfs: exit=0\n')
+                rsh_command(s, 'sfs run cd /host', match.group(1) + b'sfs: exit=0\n')
                 rsh_command(s, 'pwd', b'/bin\n')
         s.q.call('quit')
         s.p.wait(timeout=5)
