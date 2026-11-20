@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """C2: real FEP generator contracts and unsupported display provider."""
 CHECK = dict(name='ime-display-boundary-host', tier=1, needs=['make:all'], budget=2,
-    covers=['platform/pc98/kernel.c', 'include/ime_boot.h', 'kernel/ime/ime.h', 'tools/tests/kernel_includes.py', 'tools/tests/test_ime_display_boundary.py', 'kernel/ime/ime_display_private.h',
+    covers=['tools/ppc/module_rela.py', 'platform/pc98/kernel.c', 'include/ime_boot.h', 'kernel/ime/ime.h', 'tools/tests/kernel_includes.py', 'tools/tests/test_ime_display_boundary.py', 'kernel/ime/ime_display_private.h',
             'include/ime_control.h', 'platform/*/platform_ime_render.h',
             'platform/powermac/ime_display.c', 'kernel/ime/ime_render.h',
             'tools/prototypes/fep_imports.def', 'tools/gen_sqlite_imports.py',

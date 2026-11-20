@@ -93,11 +93,22 @@ void _start(void)
             u8 *body = before + h[MI_PAYLOAD_OFF];
             for (u32 i = h[MI_PAYLOAD_SIZE]; i < h[MI_MEM_SIZE]; i++) body[i] = 0;
             for (u32 i = 0; i < h[MI_RELOC_COUNT]; i++) {
+#ifdef __powerpc__
+                u32 record[3];
+                __builtin_memcpy(record, before + h[MI_RELOC_OFF] + 12 * i, sizeof(record));
+                u32 value = input[10] + record[2];
+                u32 width = record[1] == 1 ? 4 : 2;
+                if (record[1] == 6) value += 0x8000;
+                if (record[1] == 5 || record[1] == 6) value >>= 16;
+                for (u32 j = 0; j < width; j++)
+                    body[record[0] + width - 1 - j] = value >> (8 * j);
+#else
                 const u8 *p = before + h[MI_RELOC_OFF] + 4 * i;
                 u32 off = p[0] | (u32)p[1] << 8 | (u32)p[2] << 16 | (u32)p[3] << 24;
                 p = body + off;
                 u32 value = (p[0] | (u32)p[1] << 8 | (u32)p[2] << 16 | (u32)p[3] << 24) + input[10];
                 for (u32 j = 0; j < 4; j++) body[off + j] = (u8)(value >> (8 * j));
+#endif
             }
         }
         /* Includes prefix, non-target payload, BSS, padding and tail guards.

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """H4 host decoding/gates and x86 bytes; real PPC probes live in check_layout.py."""
 CHECK = dict(name='hwdev-target-layout', tier=1, needs=['make:all'], budget=15,
-    covers=['tools/tests/test_hwdev_target_layout.py', 'tools/gen_hwdev_contract.py',
+    covers=['tools/ppc/module_rela.py', 'tools/tests/test_hwdev_target_layout.py', 'tools/gen_hwdev_contract.py',
             'tools/hwdev_layout.json', 'tools/gen_kdebug_imports.py',
             'tools/module_schema.py', 'tools/build_profile.py', 'build/arch/*.mk',
             'build/kdebug.mk', 'docs/design/hwdev/hwdev_imports.md',

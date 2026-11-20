@@ -130,9 +130,9 @@ def verify(module, elf, metadata, kernel, pair, validator):
 def verify_format(codec):
     # ELF32 BE executable at VA zero: a text word and its SHT_RELA.
     ident = b'\x7fELF\x01\x02\x01' + bytes(9)
-    names = b'\0.text\0.rela.text\0.symtab\0.strtab\0'
+    names = b'\0.text\0.rela.text\0.symtab\0.strtab\0kdebug_init\0'
     body = bytes(4) + struct.pack('>IIi', 0, 257, 0)
-    symbols = bytes(16) + struct.pack('>IIIBBH', 0, 0, 0, 3, 0, 1)
+    symbols = bytes(16) + struct.pack('>IIIBBH', names.index(b'kdebug_init'), 0, 4, 0x12, 0, 1)
     shoff = (52 + len(body) + len(symbols) + len(names) + 3) & ~3
     header = struct.pack('>16sHHIIIIIHHHHHH', ident, 2, 20, 1, 0, 0, shoff,
                          0, 52, 0, 0, 40, 5, 4)
@@ -147,6 +147,10 @@ def verify_format(codec):
     assert parsed.body({'mem_max': 4096})[0] == bytes(4)
     fmt = codec.select_format(elf, 'ppc-powermac')
     assert (fmt.version, fmt.tag, fmt.reloc_bytes) == (2, 20, 12)
+    image, stats = codec.build(elf, {'imports': [], 'module_abi_gen': 1}, vk32()[0],
+                               KAPI, LAYOUT, target='ppc-powermac')
+    assert stats['reloc_count'] == 1
+    assert struct.unpack_from('<III', image, 144) == (0, 1, 0)
     rejected(lambda: codec.select_format(elf, 'x86-pc98'), 'ELF32')
     wrong = bytearray(elf)
     struct.pack_into('>H', wrong, 18, 3)

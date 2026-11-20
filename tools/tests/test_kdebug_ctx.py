@@ -9,7 +9,7 @@ Other indirect call sites are rejected and require an explicit model update.
 --mutate checks direct, transitive, callback, missing-mark and missing-slot REDs.
 """
 CHECK = dict(name='kdebug-ctx-host', tier=1,
-    covers=['tools/module_schema.py', 'sdk/kapi.json', 'kdebug/v86_gcap.c', 'kdebug/v86_gcap_math.c', 'kdebug/v86_gcap_diag.h', 'kdebug/kdebug_main.c', 'kdebug/generated/**', 'platform/pc98/legacy/v86_gcap.c', 'platform/pc98/legacy/v86_gcap.h', 'platform/pc98/legacy/v86_gcap_math.h', 'kernel/module/module.h', 'kernel/module/kdebug_imports.def', 'tools/gen_kdebug_imports.py', 'tools/mkmod.py', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
+    covers=['tools/ppc/module_rela.py', 'tools/module_schema.py', 'sdk/kapi.json', 'kdebug/v86_gcap.c', 'kdebug/v86_gcap_math.c', 'kdebug/v86_gcap_diag.h', 'kdebug/kdebug_main.c', 'kdebug/generated/**', 'platform/pc98/legacy/v86_gcap.c', 'platform/pc98/legacy/v86_gcap.h', 'platform/pc98/legacy/v86_gcap_math.h', 'kernel/module/module.h', 'kernel/module/kdebug_imports.def', 'tools/gen_kdebug_imports.py', 'tools/mkmod.py', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
     needs=['make:all'], budget=3.1,
     basis=['KDBG_PROBE_DESIGN'],
 )

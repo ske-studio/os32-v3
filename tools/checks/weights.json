@@ -433,6 +433,7 @@
     "ppc-link-sh-run": 908,
     "ppc-memstat-guest": 99,
     "ppc-mmu": 56.046914,
+    "ppc-module-rela-host": 3,
     "ppc-mouse-guest": 137,
     "ppc-path-guest": 102,
     "ppc-pci-guest": 87,

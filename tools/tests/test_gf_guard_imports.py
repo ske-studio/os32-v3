@@ -1,6 +1,6 @@
 """M5 generated import slots, provider exports and private contract pins."""
 CHECK = dict(name='gf-guard-imports-host', tier=1,
-    covers=['tools/tests/test_gf_guard_imports.py', 'tools/tests/gf_guard_imports_host.c',
+    covers=['tools/ppc/module_rela.py', 'tools/tests/test_gf_guard_imports.py', 'tools/tests/gf_guard_imports_host.c',
             'tools/prototypes/geforce_imports.def', 'tools/gen_sqlite_imports.py',
             'tools/gen_kdebug_imports.py', 'tools/gen_hwdev_contract.py',
             'hwdev/hwdev_imports.def', 'kernel/module/kdebug_imports.def',
