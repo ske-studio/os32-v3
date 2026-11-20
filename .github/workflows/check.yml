@@ -122,6 +122,7 @@ jobs:
         run: |
           make check-map
           make check-check-select-host
+          make check-ci-land-gate-host
           make check-ci-split-host
 
       - name: Documents (links, orphans, status lines, test inventory)
@@ -162,7 +163,7 @@ jobs:
 
       - name: SQLite ccache statistics
         if: always()
-        run: ccache -s
+        run: command -v ccache >/dev/null && ccache -s || echo "ccache なし (用意の失敗)"
 
   ppc-compile:
     runs-on: ubuntu-latest
@@ -174,15 +175,24 @@ jobs:
       - name: Select PPC scope
         id: scope
         env:
+          PUSH_BEFORE: ${{ github.event.before }}
+          PUSH_FORCED: ${{ github.event.forced }}
           PPC_ARCH: ${{ github.event_name == 'workflow_dispatch' && inputs.arch || 'auto' }}
         run: python3 -B tools/ci/ppc_scope.py
+      - name: Reuse successful integration checks
+        id: prior
+        if: steps.scope.outputs.can_reuse == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CI_WORKFLOW: check.yml
+        run: python3 -B tools/ci/reuse_success.py
       # 用意は手本と同じ 1 か所 (docs/POLICY_CI.md G5、票 TASK_CI_REWORK の段 S2b)。変異の試験には QEMU を
       # 起動する物がある (tools/ppc/test_lan_p29.py) ので、ppc-qemu と同じ環境にする。
       - uses: ./.github/actions/gate-setup
-        if: steps.scope.outputs.scope == 'ppc'
+        if: steps.prior.outputs.reuse != 'true' && steps.scope.outputs.scope == 'ppc'
       - name: PPC image and host checks
         timeout-minutes: 12
-        if: steps.scope.outputs.scope == 'ppc'
+        if: steps.prior.outputs.reuse != 'true' && steps.scope.outputs.scope == 'ppc'
         env:
           OS32_ACCEPT_IPA_LICENSE: "1"
         run: |
@@ -217,28 +227,37 @@ jobs:
       - name: Select PPC scope
         id: scope
         env:
+          PUSH_BEFORE: ${{ github.event.before }}
+          PUSH_FORCED: ${{ github.event.forced }}
           PPC_ARCH: ${{ github.event_name == 'workflow_dispatch' && inputs.arch || 'auto' }}
         run: python3 -B tools/ci/ppc_scope.py
+      - name: Reuse successful integration checks
+        id: prior
+        if: steps.scope.outputs.can_reuse == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CI_WORKFLOW: check.yml
+        run: python3 -B tools/ci/reuse_success.py
       # 用意は手本と同じ 1 か所 (docs/POLICY_CI.md G5、票 TASK_CI_REWORK の段 S2a)。
       - uses: ./.github/actions/gate-setup
-        if: steps.scope.outputs.scope == 'ppc'
+        if: steps.prior.outputs.reuse != 'true' && steps.scope.outputs.scope == 'ppc'
       - name: PPC QEMU guest checks
         timeout-minutes: 30
-        if: steps.scope.outputs.scope == 'ppc'
+        if: steps.prior.outputs.reuse != 'true' && steps.scope.outputs.scope == 'ppc'
         env:
           OS32_ACCEPT_IPA_LICENSE: "1"
           TMPDIR: ${{ runner.temp }}
         run: |
           python3 -B tools/ci/gate.py run --env qemu-ppc --shard ${{ matrix.shard }}/5 --out "$RUNNER_TEMP/gate"
       - name: Upload check times
-        if: always() && steps.scope.outputs.scope == 'ppc'
+        if: always() && steps.prior.outputs.reuse != 'true' && steps.scope.outputs.scope == 'ppc'
         uses: actions/upload-artifact@v4
         with:
           name: check-times-${{ github.sha }}-ppc-qemu-${{ matrix.shard }}
           path: ${{ runner.temp }}/gate/check_times.tsv
           if-no-files-found: warn
       - name: Upload failed logs
-        if: failure() && steps.scope.outputs.scope == 'ppc'
+        if: failure() && steps.prior.outputs.reuse != 'true' && steps.scope.outputs.scope == 'ppc'
         uses: actions/upload-artifact@v4
         with:
           name: ppc-qemu-failed-${{ matrix.shard }}

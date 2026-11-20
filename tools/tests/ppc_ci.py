@@ -70,7 +70,12 @@ def wiring():
     assert steps[1]['id'] == 'scope'
     assert steps[1]['run'] == 'python3 -B tools/ci/ppc_scope.py'
     assert steps[1]['env']['PPC_ARCH'] == "${{ github.event_name == 'workflow_dispatch' && inputs.arch || 'auto' }}"
-    assert all(s.get('if') == "steps.scope.outputs.scope == 'ppc'" for s in steps[2:])
+    assert steps[2]['id'] == 'prior'
+    assert steps[2]['if'] == "steps.scope.outputs.can_reuse == 'true'"
+    assert steps[2]['env']['CI_WORKFLOW'] == 'check.yml'
+    assert steps[1]['env']['PUSH_BEFORE'] == '${{ github.event.before }}'
+    assert steps[1]['env']['PUSH_FORCED'] == '${{ github.event.forced }}'
+    assert all(s.get('if') == "steps.prior.outputs.reuse != 'true' && steps.scope.outputs.scope == 'ppc'" for s in steps[3:])
     # Origin: mainline PM's PACK.md decision, documented in docs/TESTS.md.
     command = 'python3 -B tools/checks/run.py --run all --env ppc-cross --exclude-env qemu-ppc'
     for job_steps, routine, mutate in ((steps, False, 1),):   # 関門は変異込み (docs/POLICY_CI.md G1)
@@ -95,11 +100,11 @@ def wiring():
         assert any(s.get('name') == 'PPC QEMU diagnostics' and s.get('if') == 'failure()'
                    for s in job['steps'])
         assert guest[0] == flow['jobs']['ppc-compile']['steps'][0]
-        assert guest[1] == steps[1]
+        assert guest[1:3] == steps[1:3]
         # 成果物を出す手順は always()・failure() と and で繋ぐ。範囲の条件はどの手順にも要る。
         uploads = ('Upload check times', 'Upload failed logs')
-        assert all(s.get('if') == "steps.scope.outputs.scope == 'ppc'" for s in guest[2:] if s.get('name') not in uploads)
-        assert all(s.get('if', '').endswith("&& steps.scope.outputs.scope == 'ppc'") for s in guest if s.get('name') in uploads)
+        assert all(s.get('if') == "steps.prior.outputs.reuse != 'true' && steps.scope.outputs.scope == 'ppc'" for s in guest[3:] if s.get('name') not in uploads)
+        assert all(s.get('if', '').endswith("&& steps.prior.outputs.reuse != 'true' && steps.scope.outputs.scope == 'ppc'") for s in guest if s.get('name') in uploads)
         runs = '\n'.join(s.get('run', '') for s in guest)
         assert command in runs
         assert '--no-mutate' not in runs and 'run.py --run' not in runs
@@ -107,7 +112,7 @@ def wiring():
         # 検査ごとの所要は成果物に出す (重みの作り直しに使う: tools/checks/calibrate_weights.py)。
         times = [s for s in guest if s.get('name') == 'Upload check times']
         assert times and times[0]['with']['name'] == 'check-times-${{ github.sha }}-ppc-qemu-${{ matrix.shard }}'
-        assert times[0]['if'] == "always() && steps.scope.outputs.scope == 'ppc'"
+        assert times[0]['if'] == "always() && steps.prior.outputs.reuse != 'true' && steps.scope.outputs.scope == 'ppc'"
         # 用意は手本と同じ gate-setup の 1 行だけ (docs/POLICY_CI.md G5)。apt の行をジョブに書かない。
         assert [s.get('uses') for s in guest if s.get('uses', '').startswith('./.github/actions/')] == ['./.github/actions/gate-setup']
         assert 'apt-get' not in runs
