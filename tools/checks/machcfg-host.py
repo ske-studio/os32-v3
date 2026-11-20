@@ -41,7 +41,12 @@ def run(ctx):
     if not boot_order(boot):
         raise RuntimeError('PC-98 boot configuration call order')
     if ctx.mutate:
-        early = boot.replace(calls[4], '').replace('rc = ' + calls[2], calls[4] + '\n        rc = ' + calls[2])
+        mount = 'rc = ' + calls[2]
+        if boot.count(mount) != 1:
+            raise RuntimeError('mount mutation point changed')
+        early = boot.replace(calls[4], '').replace(mount, calls[4] + '\n        ' + mount)
+        if early.count(calls[4]) != 1:
+            raise RuntimeError('relocated load count changed')
         if boot_order(early):
             raise RuntimeError('load before mount survived')
         print('load before mount RED')

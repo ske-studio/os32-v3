@@ -88,6 +88,19 @@ class DeploySet(unittest.TestCase):
                 "\n".join(rows) + "\n")
         return expected, hostdrv, text
 
+    def test_optional_machine_cfg(self):
+        host = "assets/machine.cfg"
+        data = b"perf.profile=2\n"
+        (self.root / host).write_bytes(data)
+        baseline = self.generate()["files"]
+        guest = "/etc/machine.cfg"
+        self.assertFalse(any(row["guest"] == guest for row in baseline))
+        files = gs.generate(self.root, self.merged, GENERATION, host)["files"]
+        self.assertEqual([row for row in files if row["guest"] != guest], baseline)
+        self.assertEqual([row for row in files if row["guest"] == guest],
+                         [{"guest": guest, "host": host, "size": len(data),
+                           "sha256": hashlib.sha256(data).hexdigest()}])
+
     def test_scope_hashes_and_determinism(self):
         result = self.generate()
         self.assertEqual(result, self.generate())
@@ -552,6 +565,9 @@ manifest.write_text('format=1\\nbuild=fixture\\ngenerated=fixture\\ncount={}\\n-
 
 def mutate():
     mutations = [
+        ("gen_deploy_set.py", "if machine_cfg is not None:", "if False:"),
+        ("gen_deploy_set.py", "if machine_cfg is not None:",
+         'if machine_cfg is None and (root / "assets/machine.cfg").is_file():\n        machine_cfg = "assets/machine.cfg"\n    if machine_cfg is not None:'),
         ("check_manifests.py", "sorted(deployed - recorded)", "[]"),
         ("check_manifests.py", "sorted(recorded - deployed)", "[]"),
         ("check_manifests.py", 'and "/target/" not in path', ""),

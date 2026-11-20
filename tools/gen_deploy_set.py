@@ -3,6 +3,7 @@
 import argparse
 import hashlib
 import json
+from itertools import chain
 from pathlib import Path, PurePosixPath
 import sys
 
@@ -29,26 +30,28 @@ def valid_path(path, absolute=False):
             path not in (".", "/"))
 
 
-def generate(root, merged, generation):
+def generate(root, merged, generation, machine_cfg=None):
     root = Path(root).resolve()
     files = []
     guests = set()
-    for entry in merged["filesystem"]["files"]:
-        for host, guest in resolve_entry(entry, str(root)):
-            if not valid_path(host) or not valid_path(guest, absolute=True):
-                raise ValueError("不正な配備パス: {} -> {}".format(host, guest))
-            # ゲストが書く設定は任意存在の別欄。初期内容を期待 hash にしない。
-            if any(PurePosixPath(guest).match(item["guest"]) for item in ALLOW_LIST):
-                continue
-            if guest in guests:
-                raise ValueError("ゲストパス重複: " + guest)
-            guests.add(guest)
-            path = root / host
-            if not path.resolve().is_relative_to(root) or not path.is_file():
-                raise ValueError("配備元ファイルなし/範囲外: " + host)
-            data = path.read_bytes()
-            files.append({"host": host, "guest": guest, "size": len(data),
-                          "sha256": hashlib.sha256(data).hexdigest()})
+    entries = (pair for entry in merged["filesystem"]["files"] for pair in resolve_entry(entry, str(root)))
+    if machine_cfg is not None:
+        entries = chain(entries, [(machine_cfg, "/etc/machine.cfg")])
+    for host, guest in entries:
+        if not valid_path(host) or not valid_path(guest, absolute=True):
+            raise ValueError("不正な配備パス: {} -> {}".format(host, guest))
+        # ゲストが書く設定は任意存在の別欄。初期内容を期待 hash にしない。
+        if any(PurePosixPath(guest).match(item["guest"]) for item in ALLOW_LIST):
+            continue
+        if guest in guests:
+            raise ValueError("ゲストパス重複: " + guest)
+        guests.add(guest)
+        path = root / host
+        if not path.resolve().is_relative_to(root) or not path.is_file():
+            raise ValueError("配備元ファイルなし/範囲外: " + host)
+        data = path.read_bytes()
+        files.append({"host": host, "guest": guest, "size": len(data),
+                      "sha256": hashlib.sha256(data).hexdigest()})
     if not files:
         raise ValueError("配備集合が空")
     files.sort(key=lambda item: (item["guest"], item["host"]))
@@ -64,6 +67,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=ROOT, help="ビルド済みのソース木")
     parser.add_argument("--output", type=Path, help="既定: <root>/build/out/deploy-set.json")
+    parser.add_argument("--machine-cfg", help="配布する設定ファイル (root 相対)")
     args = parser.parse_args()
     root = args.root.resolve()
     output = args.output or root / "build/out/deploy-set.json"
@@ -73,7 +77,7 @@ def main():
                 raise ValueError("配備定義なし: " + rel)
         merged = load_merged([str(root / rel) for rel in CORE_MANIFEST_RELPATHS])
         generation = json.loads((root / "build/out/generations-manifest.json").read_text())
-        result = generate(root, merged, generation)
+        result = generate(root, merged, generation, args.machine_cfg)
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
     except (OSError, ValueError, KeyError, TypeError) as exc:
