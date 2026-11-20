@@ -196,9 +196,23 @@ static u32 layout_read(u32 pa, void *unused)
     return *(const u32 *)P2V(pa);
 }
 
+static void report_regions(const char *name, const struct pm_regions *regions)
+{
+    for (unsigned i = 0; i < regions->count; i++) {
+        const struct pm_region *r = &regions->v[i];
+        kprintf(KBOOT_ATTR, "KBOOT OF-RANGE %s %u %u\r\n",
+                name, r->start, r->start + r->size);
+    }
+}
+
 static void shell_layout_report(const struct pm_kboot_info *info)
 {
     u32 root = arch_mmu_current_root();
+    u32 resident_end = (u32)&__kernel_resident_end;
+    report_regions("reg", &info->ram);
+    report_regions("available", &info->available);
+    kprintf(KBOOT_ATTR, "KBOOT OF-IMAGE end=%u reserved=%u reg=%u available=%u\r\n",
+            resident_end, info->image_end - resident_end, info->ram.count, info->available.count);
     unsigned image = 0, heap = 0, stack = 0, guard = 0, available = 0;
     for (u32 va = MEM_SHELL_LOAD_ADDR; va < MEM_SHELL_STACK_TOP; va += PAGE_SIZE) {
         struct ppc_translation t;

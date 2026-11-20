@@ -26,6 +26,22 @@ def command(args):
     return result.stdout
 
 
+def fixed_layout(header):
+    layout = {name: int(value, 16) for name, value in re.findall(
+        r'#define LAYOUT_(\w+) (0x[0-9A-Fa-f]+)', header.read_text())}
+    # Fixed band boundaries and budgets from the shell alignment design, section 4.
+    expected = dict(KERNEL_LOAD_ADDR=0x100000, MEM_KERNEL_IMAGE_MAX=0x275000,
+                    MEM_FIXED_PAGING_GUARD_BASE=0x3e0000, MEM_SHELL_LOAD_ADDR=0x400000,
+                    MEM_SHELL_MAX_SIZE=0xa5000, MEM_SHELL_IMAGE_HEADROOM=0x10000,
+                    MEM_SHELL_HEAP_BASE=0x4b5000, MEM_SHELL_HEAP_END=0x4f5000,
+                    MEM_SHELL_EXEC_HEAP_SIZE=0x40000, MEM_SHELL_HEAP_SIZE=0x40000,
+                    MEM_SHELL_GUARD=0x4f5000, MEM_PAGE_SIZE=0x1000,
+                    MEM_SHELL_STACK_TOP=0x500000, MEM_SHELL_STACK_SIZE=0xa000)
+    for name, value in expected.items():
+        assert layout[name] == value, name
+    return layout
+
+
 def report_product(path):
     from kboot_root_image import verify_embedded
     elf = path.read_bytes()
@@ -40,8 +56,8 @@ def report_product(path):
     chain = symbols['__kernel_chain_end']
     assert va == pa == symbols['__kernel_image_start']
     assert va + raw == symbols['__kernel_file_end'] and va + memory == end
-    layout = {name: int(value, 16) for name, value in re.findall(
-        r'#define LAYOUT_(\w+) (0x[0-9A-Fa-f]+)', (path.parent/'memmap_layout.h').read_text())}
+    layout = fixed_layout(path.parent/'memmap_layout.h')
+    assert memory <= layout['MEM_KERNEL_IMAGE_MAX'] and chain <= 0x3e0000
     shell = layout['MEM_SHELL_LOAD_ADDR']
     guard = layout['MEM_SHELL_GUARD']
     rows = [
@@ -150,11 +166,26 @@ def main():
         work = Path(tmp)
         command(['python3', '-B', 'tools/gen_memmap.py', '--layout-header', work/'memmap_layout.h'])
         script = (ROOT/'arch/ppc/kernel.ld').read_text()
+        fixed_layout(work/'memmap_layout.h')
         verify(work, script, prefix+'gcc', prefix)
         destination = Path(os.environ.get('TMPDIR', str(work)))
         (destination/'kboot-layout-readelf.txt').write_text((work/'readelf.txt').read_text())
         print('PASS product link / ELF / note / BSS / stack / ledger / oversize')
         if args.mutate:
+            header = (ROOT/'include/memmap.h').read_text()
+            anchor = '#define MEM_SHELL_MAX_SIZE 0x0A5000UL'
+            assert header.count(anchor) == 1
+            (work/'include').mkdir()
+            (work/'include/memmap.h').write_text(header.replace(anchor, anchor.replace('A5000', 'A4000')))
+            mutant = work/'smaller.h'
+            command(['python3', '-B', 'tools/gen_memmap.py', '--root', work, '--layout-header', mutant])
+            try:
+                fixed_layout(mutant)
+            except AssertionError as error:
+                assert str(error) == 'MEM_SHELL_MAX_SIZE'
+                print('RED shell-image-minus-page')
+            else:
+                raise AssertionError('SURVIVED shell-image-minus-page')
             mutations = {
                 'remove-budget-asserts': re.sub(r'    ASSERT\(__kernel_(?:resident_end - __kernel_image_start|chain_end).*?\)\n', '', script, flags=re.S),
                 'shift-base': script.replace('. = PM_KERNEL_BASE;', '. = PM_KERNEL_BASE + PM_KERNEL_PAGE_SIZE;'),

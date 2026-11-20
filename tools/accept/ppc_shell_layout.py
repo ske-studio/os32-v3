@@ -3,6 +3,7 @@
 import argparse
 import hashlib
 import os
+import re
 from pathlib import Path
 import sys
 import tempfile
@@ -10,11 +11,49 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT / 'tools'), str(ROOT / 'tools/ppc')]
 from kboot_accept import build, mutant_settings
+from kboot_layout import report_product
 from link_sh_run import Session
 from ppc_shm import guest_available
 
 
-def observe(elf, cpu, folder, expected):
+def verify_handoff(lines, resident_end):
+    def fields(pattern):
+        match, = [m for line in lines if (m := re.fullmatch(pattern, line))]
+        return match.groups()
+
+    end, gap, regs, avail = map(int, fields(
+        r'KBOOT OF-IMAGE end=(\d+) reserved=(\d+) reg=(\d+) available=(\d+)'))
+    ranges = {}
+    for name, count in [('reg', regs), ('available', avail)]:
+        intervals = [tuple(map(int, line.split()[3:])) for line in lines
+                     if line.startswith('KBOOT OF-RANGE ' + name + ' ')]
+        assert len(intervals) == count and count > 0, name
+        previous = 0
+        for first, stop in intervals:
+            assert previous <= first < stop, name
+            previous = stop
+        ranges[name] = intervals
+
+    def covered(name, first, stop):
+        for start, end in ranges[name]:
+            if start > first:
+                break
+            first = max(first, end)
+            if first >= stop:
+                return True
+        return False
+
+    assert end == resident_end and covered('reg', 0x100000, 0xf00000)
+    assert all(b <= 0x100000 or a >= end for a, b in ranges['available'])
+    assert min(a for a, b in ranges['available'] if a >= end) == end + gap
+    assert gap <= 0x10000 and covered('available', end + gap, 0xf00000)
+    pa, size = fields(r'KBOOT MMU-D root=0x[0-9a-fA-F]+ hpt=0x([0-9a-fA-F]+) bytes=(\d+) ram_bat=\d+')
+    hpt, size = int(pa, 16), int(size)
+    assert size == 0x20000 and hpt % size == 0 and 0x1000000 <= hpt <= 0x2000000 - size
+    assert all(covered(name, hpt, hpt + size) for name in ranges)
+
+
+def observe(elf, cpu, folder, expected, resident_end):
     session = Session(elf, cpu, folder, 90)
     serial = folder / 'serial-a.log'
     try:
@@ -25,6 +64,7 @@ def observe(elf, cpu, folder, expected):
                      'shell layout', 60)
         output = lines()
         index = output.index('KBOOT SHELL-LAYOUT ' + expected)
+        verify_handoff(output[:index], resident_end)
         if not any(line.startswith('KBOOT OF-OFF calls=') for line in output[:index]):
             raise RuntimeError('missing preceding detach milestone')
     finally:
@@ -46,6 +86,8 @@ def main():
                    normal.replace('guard=1', 'guard=0')),
                   ('heap-alias', 'MEM_SHELL_HEAP_BASE, MEM_SHELL_LOAD_ADDR | PAGE_RW',
                    normal.replace('heap=64', 'heap=63'))]
+    product = build(work / 'product', '-j4', 'IMAGE=kboot-link-sh', 'kernel')
+    report_product(product)
     hashes = set()
     for name, change, expected in cases:
         folder = work / name
@@ -57,6 +99,7 @@ def main():
                                        anchor, f'    paging_pte_restore({change});\n' + anchor)
         elf = build(folder / 'kernel', '-j4', 'IMAGE=kboot-link-sh',
                     'KBOOT_SHELL_LAYOUT_DIAG=1', *settings, 'kernel')
+        resident_end = report_product(elf)
         digest = hashlib.sha256(elf.read_bytes()).hexdigest()
         if digest in hashes:
             raise RuntimeError(f'duplicate image {elf}')
@@ -64,7 +107,7 @@ def main():
         print(f'{name} sha256={digest} {elf}', flush=True)
         if not args.build_only:
             for cpu in ('7450', '7455'):
-                observe(elf, cpu, folder / cpu, expected)
+                observe(elf, cpu, folder / cpu, expected, resident_end)
                 print(f'{"RED" if change else "GREEN"} {cpu} {name} {expected}')
     print(f'PASS distinct images={len(hashes)}')
     return 0
