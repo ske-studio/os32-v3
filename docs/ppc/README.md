@@ -19,7 +19,9 @@ OS32 がどの機能をどう使うかの設計決定は `docs/decisions/ppc/`�
 | ELF の再配置 | [ELF32 の再配置](elf.md) |
 | client interface とデバイスツリー | [Open Firmware](open-firmware.md) |
 | 装置の発見・初期化と画面 | [PowerMac のハードウェア](powermac.md) |
+| 音声装置・I2S・DBDMA | [PowerMac G4 と mac99 の音声装置](audio.md) |
 | 資料だけで確認できる機能と限界 | [QEMU mac99 と実機](qemu-mac99.md) |
+| ATA 制御器・タイミング・DBDMA | [PowerMac G4 の ATA 制御器](ata.md) |
 
 ## 資料の扱い
 
