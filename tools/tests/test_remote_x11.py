@@ -30,6 +30,7 @@ CHECK = dict(name='remote-x11', tier=1, needs=[], budget=15,
         'tools/tests/test_remote_x10.py',
         'tools/tests/host32.py',
         'userland/shell/rshell.c',
+        'userland/shell/ui.c',
         'userland/shell/serial_watchdog.c',
         'userland/shell/serial_watchdog.h',
         'include/config.h',
@@ -52,13 +53,16 @@ CHECK = dict(name='remote-x11', tier=1, needs=[], budget=15,
 def guest_test(folder, mutation=None):
     rshell = (ROOT / 'userland/shell/rshell.c').read_text()
     lan = (ROOT / 'userland/shell/rshell_lan.c').read_text()
+    ui = (ROOT / 'userland/shell/ui.c').read_text()
+    startup = ui.split('    hist_load();', 1)[1].split('    for (;;) {', 1)[0]
     if mutation:
         target, old, new = mutation
-        text = rshell if target == 'rshell' else lan
+        text = {'rshell': rshell, 'lan': lan, 'ui': startup}[target]
         assert text.count(old) == 1, old
         text = text.replace(old, new)
         if target == 'rshell': rshell = text
-        else: lan = text
+        elif target == 'lan': lan = text
+        else: startup = text
     rshell = rshell.replace('"save/libos32save.h"', '"' + str(ROOT / 'userland/lib/save/libos32save.h') + '"')
     lan = lan.replace('"../../include/', '"' + str(ROOT / 'include') + '/')
     lan = lan.replace('"../lib/host/', '"' + str(ROOT / 'userland/lib/host') + '/')
@@ -67,6 +71,7 @@ def guest_test(folder, mutation=None):
     fixture = (ROOT / 'tools/tests/remote_x11_host.c').read_text()
     fixture = fixture.replace('"../../userland/shell/rshell.c"', '"rshell.c"')
     fixture = fixture.replace('"remote_x10_host.c"', '"' + str(ROOT / 'tools/tests/remote_x10_host.c') + '"')
+    fixture = fixture.replace('/* startup from ui.c */', startup)
     (folder / 'host.c').write_text(fixture)
     exe = folder / 'test'
     subprocess.run(['cc', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-D__cdecl=',
@@ -192,15 +197,27 @@ def main():
     with tempfile.TemporaryDirectory(prefix='remote-x11-') as td:
         folder = Path(td); guest_test(folder); declaration_test(folder); agent_test()
         if args.mutate:
+            init_uart = '    if (uart) g_api->serial_init(SYS_SERIAL_BAUD);'
+            set_active = '    if (remote) g_api->rshell_set_active(1);'
+            ui = (ROOT / 'userland/shell/ui.c').read_text()
+            startup_init_block = ui[ui.index(init_uart):ui.index(set_active) + len(set_active)]
             for name, mutation in [
                 ('serial read during LAN execution', ('lan', 'accepting = rsh_lan_execute(line);',
                     '(void)g_api->serial_trygetchar(); accepting = rsh_lan_execute(line);')),
                 ('GUI starts without acceptance', ('lan', 'if (handoff) {', 'if (handoff || accepting) {')),
                 ('entry stale notices retained', ('rshell', '    rsh_lan_reset();\n    g_api->rshell_set_active(1);', '    g_api->rshell_set_active(1);')),
                 ('exit stale notices retained', ('rshell', '    rsh_lan_reset();\n    rsh_in_rshell = 0;', '    rsh_in_rshell = 0;')),
-                ('stale drain disabled', ('lan', 'while (!g_api->host_notice_read(generation, REMOTE_SVC_RSHELL, &notice))', 'while (0 && !g_api->host_notice_read(generation, REMOTE_SVC_RSHELL, &notice))')),
+                ('stale drain disabled', ('lan', 'while (!read_rshell_notice(&notice))', 'while (0 && !read_rshell_notice(&notice))')),
                 ('LAN exit return discarded', ('rshell', 'rsh_lan_poll() == RSH_LAN_EXIT',
                     'rsh_lan_poll() == 999')),
+                ('boot initializes absent UART', ('ui', 'if (uart) g_api->serial_init', 'g_api->serial_init')),
+                ('UART initialized after active', ('ui',
+                    startup_init_block, startup_init_block.replace(init_uart, '').replace(
+                        set_active, set_active + '\n' + init_uart))),
+                ('LAN-only boot skipped', ('ui', ' || g_api->host_notice_read', '')),
+                ('notice NOSYS polled again', ('lan', 'notice_unavailable = 1;', 'notice_unavailable = 0;')),
+                ('missing UART read', ('rshell', 'rsh_uart ? g_api->serial_trygetchar() : -1', 'g_api->serial_trygetchar()')),
+                ('child status lost', ('rshell', 'g_api->sfs_end(status)', 'g_api->sfs_end(0)')),
                 ('UART SFS allowed', ('rshell', 'if (!g_api->sys_is_mounted(RSHELL_HOST_PREFIX)) {', 'if (0) {'))]:
                 guest_test(folder, mutation); print('RED runtime:', name)
             try:
