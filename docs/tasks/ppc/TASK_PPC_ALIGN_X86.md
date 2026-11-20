@@ -46,3 +46,20 @@ C01〜C15 (ARCH_DRIFT_AUDIT の C の表)。各行で「x86 に足す / PowerPC 
 | 2026-11-20 | B14 | os32powerpc | 設計中 (astra 起草・sol レビュー、PowerPC の機械の ~/os32-tmp/run/ppc-align-b14/) |
 | 2026-11-20 | B14 | os32powerpc | 実装済み、sol のレビュー中 |
 | 2026-11-20 | B11 | os32powerpc | 設計中 (B13・B12 はシェルの寄せの後に回した) |
+
+## 5. 設計書の見直し (2026-11-20、[DESIGN_X86_AUDIT](../../decisions/ppc/DESIGN_X86_AUDIT.md))
+ユーザー指示「未着手の設計書をすべて見直しして」。144 件のうち、止めるべき 3・直しが要る 12。
+
+ユーザー決定 (2026-11-20):
+- 5c (gfx の残り): **入れる** — 本線の B1〜B4 と PowerPC の 5c-A は実装済みで CI も通っている (既に実装されている物にわざわざ手を付けない)。表示の門のマクロは B02 で後に取り除く。
+- 7a の辞書と学習: **書ける媒体が整うまで学習は待つ** — パスは x86 と同じ。今日入った ramfs の /db・/dbu は使わない方向。ATA (G4 の HDD) の後に学習の操作を公開。
+- PowerPC の開発用の常駐 CLI と旧い kboot の 5 像: **最後に外す** (x86 に寄せる作業の終わりに)。
+
+止めるべき (置き換え先):
+| 文書 | 置き換え先 | 状態 |
+|---|---|---|
+| PPC_KAPI_GUI_SWITCH_DESIGN (5d) | シェルを x86 に寄せる設計 (B03・B09・B15、~/os32-tmp/run/ppc-shell-align/) の後に 5d を出し直す | 寄せの設計 r2 中 |
+| PPC_KAPI_FEP_INPUT_DESIGN (7a) | module の読み込みを PowerPC に (B08・C04、~/os32-tmp/run/ppc-module-align/) の後に、x86 の fep.mod の形で 7a を出し直す | module の設計 r1 中 |
+| PPC_KAPI_GFX_REST_DESIGN (5c) | ユーザー決定で入れる (上) | 取り込み待ち |
+
+直しが要る 12 件 (文書の直しの段で、各々を x86 の形に書き換える): PPC_KAPI_FILL_DESIGN・TASK_PPC_KAPI_FILL・TASK_PPC_SHELL・PPC_SHELL_DESIGN・ARCH_BRINGUP_ORDER・LAN_OPERATOR_DESIGN・TASK_LAN_OPERATOR・PPC_P3_DESIGN・PPC_P5_REST_DESIGN・TASK_PPC_LAN・ARCH_COMPAT_CONTRACT (§9 の「新しく作った違いを追記」を「物理差と既存の未整合だけ」に)・PPC_RESET_DESIGN。状態: 未着手。
