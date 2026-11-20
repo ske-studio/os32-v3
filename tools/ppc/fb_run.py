@@ -149,7 +149,7 @@ def accept(elf, cpu, out, mode):
              30, 'waiting message')
         require('FB text ready' in serial(a), 'real INDEX8 attach')
         require('FB full_rc=0 color_rc=4' in serial(a), 'color! recorded before detach')
-        match = re.search(r'FB text ready generation=1 fg=(\d+) bg=(\d+)', serial(a))
+        match = re.search(r'FB text ready generation=(?:[^\n]*\n)??1 fg=(\d+) bg=(\d+)', serial(a))
         require(match is not None, 'guest color indices recorded')
         # The oracle follows the color! contract; swapping the recorded indices
         # must still disagree with the expected white foreground pixels.
@@ -212,7 +212,9 @@ def accept(elf, cpu, out, mode):
         shot('lan-utf8', ['sh> '+text, '日本語の表示', 'sh> '], [(2, 4)])
         # Display lifecycle contract: leaving the tile returns a new text target.
         def generations():
-            return re.findall(r'FB text ready generation=(\d+)', serial(a))
+            # Other kprintf lines (e.g. USB KEY) can land inside this one on the
+            # serial log; skip whole interjected lines between '=' and the digits.
+            return re.findall(r'FB text ready generation=(?:[^\n]*\n)??(\d+) fg=', serial(a))
 
         before = generations()
         usb_command('source /leave.sh', 'tile left\n0\n', external=True)
