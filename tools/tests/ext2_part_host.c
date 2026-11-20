@@ -161,12 +161,13 @@ static struct FormatSectorIO { char op; u32 lba; } g_fmt_io[2048];
 static u32 g_fmt_io_count, g_fmt_io_pos, g_fmt_fail_at;
 static int g_fmt_trace;
 static unsigned g_pending_resets;
+static u32 g_fmt_io_base; /* format() は区画表の読み 1 回を先に足すので、書き込みの偶奇はその分ずらす */
 
 static int format_io(char op, u32 lba, int count)
 {
     int i;
     if (!g_fmt_trace) return 0;
-    CHECK(g_pending_resets == (unsigned)(op == 'W' && !(g_fmt_io_pos % 2)));
+    CHECK(g_pending_resets == (unsigned)(op == 'W' && !((g_fmt_io_pos - g_fmt_io_base) % 2)));
     g_pending_resets = 0;
     /* Compare the fixed sector sequence, including failure at either
      * sector of a grouped request. */
@@ -544,7 +545,9 @@ static void case_format_io_order(void)
         g_fmt_io[0] = (struct FormatSectorIO){'R', PC98PT_LBA};
         g_fmt_fail_at = ++g_fmt_io_count;
         g_fmt_io_pos = 0;
+        g_fmt_io_base = 1;
         CHECK(ext2_format(test_hd_drive, 62496) == EXT2_OK);
+        g_fmt_io_base = 0;
         CHECK(g_fmt_io_pos == g_fmt_io_count);
         g_fmt_io_count--;
         for (i = 0; i < g_fmt_io_count; i++) g_fmt_io[i] = g_fmt_io[i + 1];
