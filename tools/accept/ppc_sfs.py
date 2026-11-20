@@ -28,8 +28,8 @@ def observe(elf, cpu, folder, case):
         s.start()
         s.wait(s.ready, 'scope probe READY', 60)
         command = 'sfs run /bin/sfsprob.bin'
-        # An external .bin's output ends with one empty line from the exec
-        # path (as dispprb's "...\n\n"); builtins such as cd add none.
+        # A plain external .bin run ends with one empty line (as dispprb's
+        # "...\n\n"); under sfs run the begin and exit lines are adjacent.
         begin = rb'(sfs: transport=lan nic=link peer=02:00:5e:00:00:01 sid=[1-9][0-9]*\n)\n'
         assert s.word('sfs_probe_starts') == 1
         if case == 'absent':
@@ -38,14 +38,15 @@ def observe(elf, cpu, folder, case):
             scope = rsh_command(s, '/bin/sfsprob.bin leave')
             match = re.fullmatch(begin, scope)
             assert match, scope
-            expected = scope if case == 'drop-exit' else scope + b'sfs: exit=7\n'
+            line = match.group(1)
+            expected = line if case == 'drop-exit' else line + b'sfs: exit=7\n'
             for _ in range(3):
                 rsh_command(s, command, expected)
                 rsh_command(s, 'echo $?', b'7\n')
                 assert s.word('sfs_probe_starts') == 1
             if case == 'normal':
                 rsh_command(s, 'cd /bin', b'')
-                rsh_command(s, 'sfs run cd /host', match.group(1) + b'sfs: exit=0\n')
+                rsh_command(s, 'sfs run cd /host', line + b'sfs: exit=0\n')
                 rsh_command(s, 'pwd', b'/bin\n')
         s.q.call('quit')
         s.p.wait(timeout=5)
