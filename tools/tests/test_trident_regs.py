@@ -60,9 +60,9 @@ MUTATIONS = (
 )
 
 
-def build(work, tree):
+def build(work, tree, extra=()):
     exe = work / 'regs-host'
-    subprocess.run(['gcc', *FLAGS, '-I' + str(tree), '-I' + str(ROOT),
+    subprocess.run(['gcc', *FLAGS, *extra, '-I' + str(tree), '-I' + str(ROOT),
                     '-I' + str(ROOT / 'drivers/video/trident'),
                     *include_flags(ROOT), '-nostdlib', '-static', '-no-pie',
                     str(ROOT / HOST), str(ROOT / 'tools/tests/trident_device_fake.c'),
@@ -97,7 +97,11 @@ def main():
             for name, old, new in MUTATIONS:
                 assert original.count(old) == 1, (name, original.count(old))
                 target.write_text(original.replace(old, new))
-                exe = build(work, tree)  # compile failure is never runtime RED
+                # propagate-rc deliberately leaves the out-value unset on a failed read;
+                # older gcc (13) reports maybe-uninitialized there, which is the mutant's
+                # intent, not a build defect of the product.
+                extra = ('-Wno-maybe-uninitialized',) if name == 'propagate-rc' else ()
+                exe = build(work, tree, extra)  # compile failure is never runtime RED
                 for runner in runners:
                     result = host32.run([str(exe)], runner=runner, capture_output=True)
                     assert result.returncode == 1 and result.stdout.startswith(b'RED line '), (name, result)
