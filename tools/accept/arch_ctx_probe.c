@@ -47,6 +47,7 @@ void ctx_depth_mismatch(void)
 {
     mismatch("depth irq-return depth=1");
 }
+extern void ctx_bad_dec_rearm(void), ctx_bad_halt_ee(void);
 static volatile u32 dec_writes;
 void __real_ppc_write_dec(u32);
 void __wrap_ppc_write_dec(u32 value)
@@ -58,7 +59,7 @@ void __real_arch_cpu_halt(void);
 void __wrap_arch_cpu_halt(void)
 {
     if (sentinel && !kctx_irq_depth && !(msr() & PPC_MSR_EE))
-        mismatch("halt-ee poll=1 ee=0");
+        ctx_bad_halt_ee();
     __real_arch_cpu_halt();
 }
 static void ipi(struct ppc_frame *f) { (void)f; ++ipis; }
@@ -72,8 +73,6 @@ void ctx_irq(struct ppc_frame *f, void (*handler)(struct ppc_frame *))
     if (ctx_exit_phase) {
         /* The first possible delivery is after rfi to USER. */
         kprintf(7, "CTX delivery pc=%x msr=%x vector=%x\n", f->srr0, f->srr1, f->vector);
-        if (!(f->srr1 & PPC_MSR_PR) && f->vector == PPC_VECTOR_DEC)
-            mismatch("exit-ee pending-dec pr=0");
         check((f->srr1 & (PPC_MSR_PR | PPC_MSR_EE)) ==
               (PPC_MSR_PR | PPC_MSR_EE));
         ctx_exit_phase = 0;
@@ -83,7 +82,7 @@ void ctx_irq(struct ppc_frame *f, void (*handler)(struct ppc_frame *))
     u32 writes = dec_writes;
     handler(f);
     if (ctx_started && f->vector == PPC_VECTOR_DEC && dec_writes == writes)
-        mismatch("dec-rearm handler writes=0");
+        ctx_bad_dec_rearm();
     check(kctx_irq_depth == 1);
 }
 static void child_state(struct ppc_frame *f)
@@ -117,8 +116,10 @@ void ctx_syscall(struct arch_syscall *call)
     child_state(user);
     check(!user->busy);
     check((msr() & PPC_MSR_EE) && !kctx_irq_depth);
-    if (arch_syscall_slot(call) == __builtin_offsetof(KernelAPI, sys_exit)/sizeof(u32)-2)
+    if (arch_syscall_slot(call) == __builtin_offsetof(KernelAPI, sys_exit)/sizeof(u32)-2) {
         exit_code = ((struct ppc_frame *)call->native)->gpr[3];
+        if (exit_code == 90) mismatch("resume-result yield=1");
+    }
     if (!polled) {
         polled = 1;
         sentinel = call->native;
@@ -200,7 +201,6 @@ static u32 resident(unsigned gen, unsigned argc, char **argv, KernelAPI *api,
     }
     state();
     check(exec_resume(id, 0) == 0);
-    if (exit_code == 90) mismatch("resume-result yield=1");
     check(exit_code == 9);
     state();
     id = exec_start("/bin/ctx.bin child");

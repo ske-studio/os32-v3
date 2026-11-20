@@ -72,3 +72,5 @@ ctx_stop parent_link
 ctx_stop root_branch
 ctx_stop child_return
 ctx_stop srr
+ctx_stop dec_rearm
+ctx_stop halt_ee

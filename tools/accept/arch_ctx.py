@@ -282,9 +282,6 @@ SERIAL_RED = {
     'parent-root': 'parent-root parked=2 root=child',
     'enable': 'enable syscall ee=0',
     'depth': 'depth irq-return depth=1',
-    'exit-ee': 'exit-ee pending-dec pr=0',
-    'dec-rearm': 'dec-rearm handler writes=0',
-    'halt-ee': 'halt-ee poll=1 ee=0',
     'resume-result': 'resume-result yield=1',
 }
 STOP_RED = {
@@ -292,6 +289,9 @@ STOP_RED = {
     'child-return': ('ctx_bad_child_return', 'CTX irq '),
     'srr': ('ctx_bad_srr', 'CTX entry gen=1 '),
     'pr-frame': ('ctx_bad_pr_frame', 'CTX entry gen=1 '),
+    'dec-rearm': ('ctx_bad_dec_rearm', 'CTX BEGIN'),
+    'halt-ee': ('ctx_bad_halt_ee', 'CTX entry gen=1 '),
+    'exit-ee': ('ppc_kernel_vector_stop', 'CTX irq '),
 }
 
 def observe(elf, cpu, out, mode):
@@ -339,15 +339,26 @@ def observe(elf, cpu, out, mode):
                         return reports[0]
                 require('CTX FAIL' not in text and 'FATAL' not in text,
                         'unexpected guest failure in '+mode)
-                if mode in STOP_RED and time.monotonic() >= next_sample:
-                    symbol, marker = STOP_RED[mode]
-                    if 'CTX BEGIN\n' in text and marker in text:
-                        q.call('stop')
-                        regs = q.call('human-monitor-command', {'command-line':'info registers'})
-                        pc = re.search(r'NIP\s+([0-9a-fA-F]+)', regs)
-                        if pc and int(pc[1], 16) == symbols[symbol]:
-                            return symbol
-                        q.call('cont')
+                candidates = STOP_RED if mode == 'normal' else (mode,) if mode in STOP_RED else ()
+                if candidates and 'CTX BEGIN\n' in text and time.monotonic() >= next_sample:
+                    q.call('stop')
+                    regs = q.call('human-monitor-command', {'command-line':'info registers'})
+                    pc = re.search(r'NIP\s+([0-9a-fA-F]+)', regs)
+                    msr = re.search(r'MSR\s+([0-9a-fA-F]+)', regs)
+                    stopped_text = serial(a).replace('\r', '')
+                    for candidate in candidates:
+                        symbol, marker = STOP_RED[candidate]
+                        if not pc or int(pc[1], 16) != symbols[symbol]:
+                            continue
+                        require(marker in stopped_text, 'missing stop context for '+candidate)
+                        if candidate == 'exit-ee':
+                            lines = re.findall(r'^CTX [^\n]*', stopped_text, re.M)
+                            require(lines and re.fullmatch('CTX irq '+COLUMNS['irq'], lines[-1])
+                                    and msr and int(msr[1], 16) == 0x1000,
+                                    'unexpected exit-ee vector stop')
+                        require(mode == candidate, 'unexpected stop in '+mode+' at '+symbol)
+                        return symbol
+                    q.call('cont')
                     next_sample = time.monotonic() + .25
                 if 'CTX PASS\n' in text:
                     require(not mode.startswith('outside-'), 'outside fault did not stop')
@@ -602,8 +613,7 @@ def main():
     modes = ['normal', 'outside-dsi', 'outside-program']
     if args.mutate:
         modes += ['root-branch', 'resident-aux', 'child-return', 'parent-root']
-        if not args.build_only:
-            modes += ['enable', 'depth', 'exit-ee', 'srr', 'pr-frame', 'dec-rearm',
+        modes += ['enable', 'depth', 'exit-ee', 'srr', 'pr-frame', 'dec-rearm',
                       'halt-ee', 'resume-result']
     for mode in modes:
         elf = image(work/mode, mode)
