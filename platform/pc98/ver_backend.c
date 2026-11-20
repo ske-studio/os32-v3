@@ -85,15 +85,7 @@ static void __attribute__((cold)) pc98_ver_devices(const VerSnapshot *s, OS32_Ve
     ver_text(&b, s->pcm_present ? "CS4231-family" : "none");
     ver_end(&b);
     b = ver_line(out, VER_DEVICE, "GFX");
-    if (!backend || !s->gfx.width || !s->gfx.height || !s->gfx.bpp)
-        ver_text(&b, "unknown");
-    else {
-        ver_text(&b, backend); ver_text(&b, " ");
-        ver_number(&b, s->gfx.width, 0); ver_text(&b, "x");
-        ver_number(&b, s->gfx.height, 0); ver_text(&b, "x");
-        ver_number(&b, s->gfx.bpp, 0); ver_text(&b, " bpp");
-    }
-    ver_text(&b, s->gfx_active ? "; active" : "; GUI target");
+    ver_gfx_value(&b, s, backend);
     ver_end(&b);
 }
 
