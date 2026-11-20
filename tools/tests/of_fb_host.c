@@ -1,3 +1,4 @@
+/* PPC_KAPI_GFX_REST_DESIGN 5c §2-5, A3 and A8: transfer accounting and fixed mode. */
 /* Expectations: characterization of the original word-copy behavior and
  * ppc-offb-fast PACK (2026-11-15): alignment must not change any output byte. */
 /* R3: real OF backend/provider, with ledger/firmware dependencies replaced. */
@@ -11,6 +12,7 @@
 #include "paging.h"
 #include "platform/powermac/display_text.h"
 
+GfxCounters gfx_counters;
 static int current_app = 2;
 int appslot_cur(void) { return current_app; }
 static int failed;
@@ -154,11 +156,27 @@ static void raster(void)
     EXPECT(!gfx_backend_of_fb.direct_ok && !gfx_backend_of_fb.direct_ops &&
            !gfx_backend_of_fb.fill_rect && !gfx_backend_of_fb.blit && !gfx_backend_of_fb.put);
     EXPECT(!gfx_backend_of_fb.query(&info) && info.bpp == 8 && !info.flags);
+    gfx_counters = (GfxCounters){0};
     gfx_backend_of_fb.present_rect(3, 1, 2, 1);
+    EXPECT(gfx_counters.present_bytes == 8 && gfx_counters.commits == 1);
+    EXPECT(!DISPLAY_V2_SHADOW_PUSH(3, 0, 2, 1));
+    EXPECT(gfx_counters.present_bytes == 8 && gfx_counters.commits == 2);
+    EXPECT(of_fb_present(0, 1, 0, 1) == OS32_ERR_INVAL);
+    EXPECT(of_fb_copy(0, 16, 64, 0, 1, 1, 1) == OS32_ERR_INVAL);
+    EXPECT(gfx_counters.present_bytes == 8 && gfx_counters.commits == 2);
     for (u32 i = 0; i < 80; i++) EXPECT(screen[i] == (i >= 20 && i < 28 ? ram[16+i-20] : 0xa5));
     gfx_backend_of_fb.present_rect(-3, -2, 100, 100);
     for (u32 y = 0; y < 4; y++) for (u32 x = 0; x < 20; x++)
         EXPECT(screen[y*20+x] == (y && x < 12 ? ram[y*16+x] : 0xa5));
+    EXPECT(gfx_counters.present_bytes == 44 && gfx_counters.commits == 3);
+    EXPECT(!of_fb_copy(ram, 16, 64, 9, 0, 20, 8));
+    EXPECT(gfx_counters.present_bytes == 56 && gfx_counters.commits == 3);
+    of_fb_unbind();
+    EXPECT(of_fb_present(0, 1, 1, 1) == OS32_ERR_STALE);
+    EXPECT(DISPLAY_V2_SHADOW_PUSH(0, 1, 1, 1) == OS32_ERR_IO);
+    EXPECT(gfx_counters.present_bytes == 56 && gfx_counters.commits == 3);
+    EXPECT(!gfx_counters.hw_ops && !gfx_counters.io_accesses);
+    EXPECT(!of_fb_bind(&d));
     u8 saved = screen[20];
     gfx_backend_of_fb.present_rect(0x7fffffff, 0, 0x7fffffff, 1);
     gfx_backend_of_fb.present_rect(-2147483647-1, 0, 1, 1);
@@ -193,6 +211,8 @@ static void raster(void)
     EXPECT(screen[20] == pixels[16] && screen[0] == 0xa5 && screen[32] == 0xa5);
     pixels[16] = 55; EXPECT(!adapter.be->flip(adapter.ctx, 0, &s, 0, 0) && screen[20] == 55);
     EXPECT(adapter.be->flip(adapter.ctx, 0, &s, GFX2_FLIP_VBLANK, 0) == OS32_ERR_NOSYS);
+    m.id++; EXPECT(adapter.be->mode_set(adapter.ctx, 0, 1, &m, &s) == OS32_ERR_NOSYS); m.id--;
+    m.h++; EXPECT(adapter.be->mode_set(adapter.ctx, 0, 1, &m, &s) == OS32_ERR_NOSYS); m.h--;
     m.w++; EXPECT(adapter.be->mode_set(adapter.ctx, 0, 1, &m, &s) == OS32_ERR_NOSYS); m.w--;
     s.state = GFX2_ST_LOST; pixels[16] = 77;
     EXPECT(adapter.be->flip(adapter.ctx, 0, &s, 0, 0) != 0 && screen[20] == 55);

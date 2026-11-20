@@ -140,6 +140,11 @@ int display_provider_present_ok(void)
            a && present_generation == a->gen;
 }
 
+int display_provider_shadow_push(int x, int y, int w, int h)
+{
+    return of_fb_present(x, y, w, h) ? OS32_ERR_IO : 0;
+}
+
 void display_provider_raster_reset(void) { present_owner = 0; }
 
 /* The selected mode's width; 0 when no backend or mode (e.g. the "none" backend). */
