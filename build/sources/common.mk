@@ -7,9 +7,13 @@ C_COMMON_USERSHELL = fs/serialfs/sfs_proto.c fs/serialfs/sfs_client.c fs/serialf
 C_COMMON_USB = $(wildcard drivers/usb/usb_*.c drivers/usb/ohci_*.c drivers/usb/hid_*.c) drivers/usb/ehci_quiesce.c
 C_COMMON_CLI = kernel/cli/resident_cli.c
 # 共通の場所にあるが PowerPC の像にまだ入っていない物。include を直した順に本来の組へ移し、空になったら消す。
-C_COMMON_PC98_PENDING = mm/dma_pool.c mm/dma_pool_math.c mm/shlib.c kernel/gui.c init/bootlog_save.c init/sysconfig.c kernel/kaudit.c init/kaudit_boot.c kernel/kselftest_report.c kernel/irq/irq.c kernel/irq/irq_math.c kernel/module/module_image.c kernel/module/module_runtime.c kernel/module/debug_probe.c lib/dma_contract.c gfx/gfx_hw_submit.c gfx/v2/a0_weak.c gfx/sync/a0_weak.c gfx/gfx_hw_mono_cpu.c gfx/gfx_osri.c gfx/gfx_osri_view.c fs/fat/fatfs/ff.c fs/fat/fatfs_vfs.c fs/ext2/ext2_super.c fs/ext2/ext2_time.c fs/ext2/ext2_inode.c fs/ext2/ext2_dir.c fs/ext2/ext2_file.c fs/ext2/ext2_fmt.c fs/ext2/ext2_layout.c fs/ext2/ext2_vfs.c fs/serialfs/sfs_session_fg.c kapi/kapi_generated.c kapi/kapi_db.c kapi/kapi_sys.c kapi/kapi_osri.c lib/kutf16.c lib/kmath.c
+C_COMMON_PC98_PENDING = mm/dma_pool.c mm/dma_pool_math.c mm/shlib.c kernel/gui.c init/bootlog_save.c init/sysconfig.c kernel/kaudit.c init/kaudit_boot.c kernel/kselftest_report.c kernel/irq/irq.c kernel/irq/irq_math.c kernel/module/module_image.c kernel/module/module_runtime.c kernel/module/debug_probe.c lib/dma_contract.c gfx/gfx_hw_submit.c gfx/v2/a0_weak.c gfx/sync/a0_weak.c gfx/gfx_hw_mono_cpu.c gfx/gfx_osri.c gfx/gfx_osri_view.c fs/fat/fatfs/ff.c fs/fat/fatfs_vfs.c fs/ext2/ext2_super.c fs/ext2/ext2_inode.c fs/ext2/ext2_dir.c fs/ext2/ext2_file.c fs/ext2/ext2_vfs.c fs/serialfs/sfs_session_fg.c kapi/kapi_generated.c kapi/kapi_db.c kapi/kapi_sys.c kapi/kapi_osri.c lib/kutf16.c lib/kmath.c
 C_COMMON_EXEC += drivers/pci/pci.c drivers/pci/pci_barsize.c drivers/pci/pci_decode.c drivers/pci/pci_bind.c drivers/pci/pci_bind_match.c kernel/dev/device_pci.c
-C_COMMON_COMPILE_ONLY_PPC := kernel/sqlite_engine.c
+C_EXT2_FORMATTER := fs/ext2/ext2_fmt.c fs/ext2/ext2_layout.c fs/ext2/ext2_time.c
+ifeq ($(PLATFORM),pc98)
+C_COMMON_PC98_PENDING += $(C_EXT2_FORMATTER)
+endif
+C_COMMON_COMPILE_ONLY_PPC := kernel/sqlite_engine.c $(C_EXT2_FORMATTER)
 C_COMMON_LOOP = kernel/dev/device_loop.c drivers/block/loop_dev.c
 ifeq ($(FEATURE_PC98_PENDING)$(FEATURE_LOOP),11)
 C_COMMON_LOOP += fs/ext2/ext2_medium_loop.c
