@@ -4,6 +4,8 @@ extern GfxBackend gfx_backend_of_fb;
 #define DISPLAY_FALLBACK_BACKEND (&gfx_backend_of_fb)
 int display_provider_v1_width(void);
 #define DISPLAY_V1_WIDTH (display_provider_v1_width())
+int display_provider_shadow_push(int x, int y, int w, int h);
+#define DISPLAY_V2_SHADOW_PUSH(x, y, w, h) display_provider_shadow_push(x, y, w, h)
 int display_provider_present_ok(void);
 void display_provider_public_init_ok(void);
 #define DISPLAY_V1_PRESENT_OK() display_provider_present_ok()
