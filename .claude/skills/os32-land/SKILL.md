@@ -72,6 +72,7 @@ git push -q origin main
 ```
 
 - main への push では、同じ SHA の push の成功を `tools/ci/reuse_success.py` が確かめる。build の checks は `wt/**` の build の成功を使える。check の PowerPC の証拠には `wt/int-*` の check の成功だけを使える。配布物と static-check は毎回作る・回す。
+- main の run が取り消された (cancelled) 時も結論として読む。取り消しは成功に数えず、次の取り込みより先にその SHA の main を回し直す (後の文書だけの push が PowerPC を飛ばすと、取り消された回のコードが PowerPC を通らないまま main が緑に見えるため)。
 - main の CI の build が赤なら最優先で直す。
 - 実機に入れる SHA は artifacts のジョブが成功したものを選ぶ (os32-realhw-update)。
 

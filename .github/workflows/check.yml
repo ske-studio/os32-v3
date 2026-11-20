@@ -163,7 +163,7 @@ jobs:
 
       - name: SQLite ccache statistics
         if: always()
-        run: ccache -s
+        run: command -v ccache >/dev/null && ccache -s || echo "ccache なし (用意の失敗)"
 
   ppc-compile:
     runs-on: ubuntu-latest
