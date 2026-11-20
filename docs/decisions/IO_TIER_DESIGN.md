@@ -153,7 +153,7 @@ int io_pump(unsigned int budget_us); /* callback数、負=失敗 */
 - dispatcher内の予算は巡回入口で1回、OS巡回上限・当巡のreadyサービス予算を生countへ整数換算し、sliceはその値と残countの小さい方を使う。LANがdispatcher外で直接stepを呼ぶ場合はio_slice_beginで1回換算する。callback/フレーム境界で換算し直さない。
 - 時計providerはsource/generation・単調raw count・µs→count係数を提供。x86はTSCまたはPITの周期込みcount、PPCはTB count。低位差の有効範囲は半周未満。源変更は今回のtoken失敗として次巡で再取得し、異なる単位を差し引かない。
 - 係数は時計準備時に算出し、予算換算は部分積とshiftで上限を超えない側に丸める。ホットパスに64bit除算を入れない。PITの周期込みsnapshotは既存tick/PIT読出と整合させ、µsへ変換してからcountへ戻す道は作らない。
-- 時計読出は非空巡回の入口1回、各callback直前/直後各1回、単位開始判定1回。callback数K・単位判定数Mなら最大1+2K+M回（通常の成功時）。終了時刻を次の残予算計算に再利用。io_clock_usの明示呼出や既存NIC計測は別に数える。
+- 時計読出は非空巡回の入口1回、各callback直前/直後各1回、単位開始判定1回。callback数K・単位判定数Mなら最大1+2K+M回（通常の成功時）。終了時刻を次の残予算計算に再利用。ただし互換枠だけの巡 (要求なし) は、時計が正常なら入口と互換処理の後の計 2 回 (互換の callback の直前は読まない — 末尾の E1・E2 の PM 決定)。io_clock_usの明示呼出や既存NIC計測は別に数える。
 - 初期調整値[推]: FG1巡上限500µs、公平枠8巡。LAN予算初期値はLAN設計だけで定義。固定CPU配分率は設けない。
 - 上限より長い単位は分割するか保証外の互換枠と明示。小予算で装置処理を途中停止させない。
 
@@ -246,3 +246,5 @@ int io_pump(unsigned int budget_us); /* callback数、負=失敗 */
 - P9 (D5 の要求の源と時計の失敗、2026-11-16): tick の 7 枠は全部使われているので、新しい枠は作らない。TSC の校正の provider は、CALIBRATING と READY (監視) の間は step の最後で IO_MORE を返して自分で再要求する (今の互換枠が毎巡呼ばれていたのと同じ頻度で、next_work_ms の間引きも今のまま)。OFF・FAILED になったら IO_DONE で止める。登録 (io_register) は pc98_tsc_init で行い、そのとき io_request を 1 回立てる。時計の失敗の巡では dispatcher が provider を呼ばないが、pending は残るので次の巡で続く。§3 の「時計未準備の有限例外」は、x86 では T1 の PIT の源が platform_clock_init で準備されるので、互換枠に残す道は取らない。timer からの要求に替えるのは、tick の枠を見直す段で行う。
 - P8 の補足 (D1・D2 の取り込み、2026-11-16): io_work.c の refresh_counts は、P1 の表と一緒に io_slice_limit 用の限度の count の表も、token・policy の generation の組が変わった巡の入口で埋める (毎巡の換算を増やさないため)。
 - P10 (D3・D4 の予算の共有、2026-11-16): ne2k_bh の provider は、step の入口で io_slice_limit(s, NET_RX_WORK_LIMIT_US, ~0u) として時間だけを狭め、件数は狭めない。PIO・復旧・回収の 1 手ごとに io_slice_take で時間 (と slice の件数) を判定する。ne2k_bh の中で net の demux を呼ぶときは、同じ slice の時間を共有しつつ、demux の 8 件 (NET_RX_SCAN_MAX) は rx_work_budget の側の局所の数で数える (rx_work に「時間は渡された slice、件数は自分の 8 件」で始める口を足す)。D2 の dispatcher 経由の net_rx_idle は今のまま (P8)。既存の試験の「1 回の BH で NIC から 9 枚回収し、demux は 8 件以下」の期待は保つ。仕事を立てる所のうち割り込み・tick から要求が立たない物 (rx_backlog・OVW_WAIT・need_tx など) がある間は、稼働中は IO_MORE で毎巡進める (D2 と同じ)。
+
+E1・E2 の PM 決定 (2026-11-21): 互換枠あり・要求なしの時の時計の読み出しは 2 回 (P2 の計測を残すため)、LAN の一括転送に依る受入の項目は TASK_LAN_BULK の着手の時に。

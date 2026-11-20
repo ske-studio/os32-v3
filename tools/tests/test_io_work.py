@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """IO_TIER_DESIGN §8 rows 1–4: execute the actual dispatcher, including mutants."""
 CHECK = dict(name='io-work-host', tier=3, budget=20, needs=[], covers=[
-    'kernel/idle_work.h', 'kernel/io_work.c', 'kernel/io_work.h', 'kernel/io_clock.h', 'kernel/io_policy.h',
+    'kernel/idle_work.c', 'net/nic.h', 'kernel/irq/irq.h', 'kernel/irq/irq_math.h',
+    'platform/pc98/platform_link_inline.h', 'platform/pc98/tick_order.h', 'net/link_platform.h',
+    'include/platform_irq.h', 'platform/pc98/platform_irq_limits.h', 'include/kernel_tick.h', 'kernel/irq/tick.h', 'kernel/idle_work.h', 'kernel/io_work.c', 'kernel/io_work.h', 'kernel/io_clock.h', 'kernel/io_policy.h',
     'tools/tests/io_work_host.c', 'tools/tests/test_io_work.py', 'tools/tests/host32.py',
             'include/types.h', 'include/callconv.h',
             'sdk/include/os32/os32_kapi_shared.h'],
@@ -32,6 +34,8 @@ MUTANTS = [
     ('Tier fair cursor', 'fair_next = (unsigned int)fair ^ 1u;', 'fair_next = 0;'),
     ('carry right', 'rounds[t] = minimum(rounds[t] + 1, IO_FAIR_ROUNDS);',
      'rounds[t] = (rounds[t] + 1) % IO_FAIR_ROUNDS;'),
+    ('extra compat clock read', '        compat_run();',
+     '        if (!clock_failed) token_read(&pass, &now);\n        compat_run();'),
     ('compat empty', 'idle_work_compat_count() == 0 && !any_pending()', '!any_pending()'),
     ('begin count', 'convert(budget_us, next.clock_source', 'convert(budget_us + 1, next.clock_source'),
     ('empty clock', 'if (idle_work_compat_count() == 0 && !any_pending()) return 0;',
@@ -61,7 +65,7 @@ def exercise(root, work, product):
     subprocess.run(['gcc', '-m32', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
         '-Werror=vla', '-ffreestanding', '-fno-pie', '-fno-stack-protector',
         '-nostdlib', '-static', '-no-pie', '-I' + str(work),
-        '-I' + str(root / 'kernel'), '-I' + str(root / 'include'),
+        '-I' + str(root), '-I' + str(root / 'platform/pc98'), '-I' + str(root / 'kernel/irq'), '-I' + str(root / 'kernel'), '-I' + str(root / 'include'),
         '-I' + str(root / 'sdk/include/os32'),
         str(root / 'tools/tests/io_work_host.c'), '-o', str(exe)], check=True)
     return host32.run([str(exe)]).returncode
