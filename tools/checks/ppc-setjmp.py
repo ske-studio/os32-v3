@@ -6,7 +6,7 @@ CHECK = dict(env=['ppc-cross'],
     needs=[],
     covers=['tools/ppc/test_setjmp.py',
      'arch/ppc/setjmp.S',
-     'arch/ppc/arch_jmp_storage.h',
+     'arch/ppc/arch_jmp_storage.h', 'arch/ppc/ppc_oea.h',
      'tools/checks/ppc_registered.py'],
     basis=['PPC_SHELL_EXEC_DESIGN§5'],
     env_limit='ホストの模型・コンパイル検査であり実機の MMIO・DMA・割込みのタイミング障害は保証しない。',
@@ -15,4 +15,4 @@ CHECK = dict(env=['ppc-cross'],
 
 def run(ctx):
     from ppc_registered import run_test
-    return run_test(ctx, 'tools/ppc/test_setjmp.py', ['gcc', 'qemu-i386'])
+    return run_test(ctx, 'tools/ppc/test_setjmp.py', ['qemu-ppc'])
