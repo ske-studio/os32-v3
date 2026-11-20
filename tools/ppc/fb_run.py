@@ -90,7 +90,7 @@ def observe(elf, out, cpu, case):
         check(pixels.compare_text(1, 0, 'first') is None, 'USB output')
         local('clear')
         local('cat /bin/sample.txt')
-        s.wait(lambda: finished(s.screen('text'), r'ASCII ｶﾅ 日本語'), 'fd1 output', 30)
+        s.wait(lambda: finished(s.screen('text'), r'ASCII .+'), 'fd1 output', 30)
         _, pixels = shot('text')
         check(pixels.compare_text(1, 0, 'ASCII ｶﾅ 日本語') is None, 'utf8-bytewise')
         check(reserved_unchanged(baseline.image, pixels.image), 'top')
