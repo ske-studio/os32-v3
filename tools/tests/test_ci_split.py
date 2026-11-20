@@ -35,6 +35,10 @@ SHA = 'a' * 40
 def workflow_cases(source, setup_source=None):
     workflow = yaml.safe_load(source)
     jobs = workflow['jobs']
+    warm = jobs.pop('warm-c-dialect')
+    assert warm['needs'] == 'checks' and warm['continue-on-error'] is True
+    assert warm['if'] == "github.ref == 'refs/heads/main' && github.event_name == 'push' && needs.checks.outputs.warm == 'true'"
+    assert any('make check-c-dialect ' in step.get('run', '') for step in warm['steps'])
     assert set(jobs) == {'artifacts', 'checks'}, 'artifact job and check matrix'
     prefixes = []
     for name, job in jobs.items():
@@ -67,11 +71,25 @@ def workflow_cases(source, setup_source=None):
         uploads = [s for s in steps if s.get('uses') == 'actions/upload-artifact@v4']
         assert bool(checks) == (name == 'checks'), 'check placement'
         if name == 'checks':
+            owner = next(step for step in steps if step.get('id') == 'dialect-owner')
+            assert job['outputs']['warm'] == '${{ steps.dialect-owner.outputs.warm }}'
+            assert 'echo "warm=true" >> "$GITHUB_OUTPUT"' in owner['run'], "owner emits warm output"
+            warm_step = next(step for step in warm['steps'] if step.get('name') == 'Warm c-dialect results')
+            assert warm_step['env']['OS32_CHECK_CACHE'] == checks[0]['env']['OS32_CHECK_CACHE']
             assert job['strategy'] == {'fail-fast': False, 'matrix': {'shard': [0, 1, 2, 3, 4, 5]}}, 'all six shards must finish'
-            assert checks[0]['env']['OS32_CHECK_CACHE'] == '${{ runner.temp }}/check-cache', 'job-local result cache'
+            assert checks[0]['env']['OS32_CHECK_CACHE'] == '${{ github.workspace }}/.ci-cache/check-cache', 'job-local result cache'
             assert 'CHECK_SHARD=${{ matrix.shard }}/6' in checks[0]['run'], 'make receives shard'
             assert 'make -k check CHECK_SHARD=' in checks[0]['run'], 'every check runs with mutation in the gate'
-            assert not any('check-cache' in str(s.get('with', {})) for s in steps), 'result cache never persists'
+            restore, save = [s for s in steps if s.get('uses', '').startswith('actions/cache/')]
+            assert restore['uses'] == 'actions/cache/restore@v4' and save['uses'] == 'actions/cache/save@v4'
+            assert restore['with']['path'] == save['with']['path'] == '.ci-cache/check-cache/v1/c-dialect'
+            assert restore['with']['key'] == save['with']['key'] == restore['with']['restore-keys'] + '${{ github.sha }}'
+            assert "github.ref == 'refs/heads/main' && github.event_name == 'push'" in save['if'], "save requires main push"
+            for step in (restore, save):
+                assert "steps.dialect-owner.outputs.owner == 'true'" in step['if']
+                assert "steps.prior.outputs.reuse != 'true'" in step['if']
+                assert any(w.get('with') == step['with'] and w.get('uses') == step['uses'] for w in warm['steps'])
+            assert steps.index(restore) < steps.index(checks[0]) < steps.index(save)
             # 検査ごとの実時間だけを上げる (budget の棚卸、2026-11-08)。
             assert [u['with']['name'] for u in uploads] == ['check-times-${{ github.sha }}-${{ matrix.shard }}'], 'check-fast uploads only check times'
             reuse_gate_cases(workflow, 'build.yml', name)
@@ -96,7 +114,7 @@ def workflow_cases(source, setup_source=None):
             assert 'always()' in after['if'], 'collect diagnostics after a failed check'
         prepared = []
         for step in prefix:
-            if step.get('id') == 'prior':
+            if step.get('id') in ('prior', 'dialect-owner', 'dialect-cache'):
                 continue  # reuse_gate_cases validates this whole step separately
             if name == 'artifacts':
                 assert 'if' not in step, 'artifact preparation always runs'
@@ -173,6 +191,8 @@ def reuse_gate_cases(workflow, filename, job):
     assert steps[gate]['env'] == {'GH_TOKEN': '${{ github.token }}', 'CI_WORKFLOW': filename}
     assert steps[gate]['run'] == 'python3 -B tools/ci/reuse_success.py'
     for step in steps[gate + 1:]:
+        if filename == 'build.yml' and (step.get('id') in ('dialect-owner', 'dialect-cache') or step.get('uses') == 'actions/cache/save@v4'):
+            continue
         assert step.get('if') in ("steps.prior.outputs.reuse != 'true'",
                                   "always() && steps.prior.outputs.reuse != 'true'"), 'all expensive steps gated'
 
@@ -544,11 +564,14 @@ def main():
             ('workflow', 'fail-fast: false', 'fail-fast: true', 'cancel sibling shards'),
             ('workflow', 'CHECK_SHARD=${{ matrix.shard }}/6', 'CHECK_SHARD=0/6', 'repeat first shard'),
             ('workflow', 'name: check-times-${{ github.sha }}-${{ matrix.shard }}', 'name: check-times-${{ github.sha }}', 'artifact collision'),
-            ('workflow', 'OS32_CHECK_CACHE: ${{ runner.temp }}/check-cache', 'OS32_CHECK_CACHE: off', 'disable shared cache'),
+            ('workflow', 'echo "warm=true" >> "$GITHUB_OUTPUT"', ':', 'drop warm output'),
+            ('workflow', "github.ref == 'refs/heads/main' && github.event_name == 'push' && steps.dialect-cache",
+             "github.ref == 'refs/heads/main' || github.event_name == 'push' && steps.dialect-cache", 'save on branch push'),
+            ('workflow', 'OS32_CHECK_CACHE: ${{ github.workspace }}/.ci-cache/check-cache', 'OS32_CHECK_CACHE: off', 'disable shared cache'),
             ('fetch', 'all(s == "success" for s in states)', 'any(s == "success" for s in states)', 'accept partial shards'),
             ('workflow', '  checks:\n', '  checks:\n    needs: artifacts\n', 'serialize jobs'),
-            ('workflow', 'runs-on: ubuntu-latest', 'runs-on: [self-hosted, linux, x64, os32-ci]', 'route artifacts to self-hosted'),
-            ('workflow', "github.event_name == 'push' && ", '', 'allow other events'),
+            ('workflow', '  artifacts:\n    runs-on: ubuntu-latest', '  artifacts:\n    runs-on: [self-hosted, linux, x64, os32-ci]', 'route artifacts to self-hosted'),
+            ('workflow', "fromJSON(github.event_name == 'push' && ", 'fromJSON(', 'allow other events'),
             ('workflow', 'github.run_attempt == 1 && ', '', 'allow reruns'),
             ('workflow', "github.repository == 'ske-studio/os32-v3' && ", '', 'allow other repositories'),
             ('workflow', "github.actor == 'ske-studio' && ", '', 'allow other actors'),
