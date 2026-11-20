@@ -697,6 +697,9 @@ for slot, api in enumerate(data["api"]):
             c_content += f"    {line}\n"
     else:
         target = api.get("target", name)
+        # Match the resident FEP adapter when no FEP module is available.
+        if TARGET == "ppc-powermac" and name == "ime_getkey":
+            target = "input_getkey_kapi"
         arg_names = get_arg_names(api.get("args", []))
         args_call = ", ".join(arg_names)
         

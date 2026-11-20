@@ -28,7 +28,7 @@ gfx_screen_info gfx_set_palette gfx_stats
 gui_call gui_register hdd_geom_info ide_drive_present
 ide_get_info ide_identify ide_init ide_read_sector ide_write_sector
 ide_write_sectors ime_dict_info ime_dict_suspend ime_feed_key ime_get_mode
-ime_getchar ime_getkey ime_is_active ime_set_mode ime_set_render
+ime_getchar ime_is_active ime_set_mode ime_set_render
 ime_switch_dict ime_toggle ime_trygetchar ime_trygetkey ime_user_clear
 ime_user_delete ime_user_export ime_user_list kdebug_call
 np2_check_hostdrv np2_detect
@@ -362,6 +362,8 @@ def absent_db(out, cc, dirs):
 extern const char *wrap_db_last_error(int);
 extern u32 wrap_db_mem_used(void);
 extern int wrap_db_open(const char *);
+extern int wrap_ime_getkey(void);
+int input_getkey_kapi(void) { return 0x2b65; }
 extern i32 wrap_mem_stat(i32, void *, u32);
 static u32 output;
 static int user_call;
@@ -389,6 +391,7 @@ void _start(void)
              wrap_db_mem_used() != 0 ? 11 :
              wrap_db_open("db") != OS32_ERR_NOSYS ? 12 : 0;
     if (rc) finish(rc);
+    if (wrap_ime_getkey() != 0x2b65) finish(18);
     if (wrap_mem_stat(-1, &output, sizeof(output)) != 7) finish(16);
     user_call = 1;
     wrap_mem_stat(-1, &output, sizeof(output));
