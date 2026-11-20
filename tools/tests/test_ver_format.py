@@ -29,7 +29,7 @@ def main():
     if args.mutate:
         call = '    if (backend && backend->devices) backend->devices(s, out);'
         after = '    if (backend && backend->debug)'
-        for old, new in [('Hz input=', 'Hz '), ('backend && backend->head', 'backend->head')]:
+        for old, new in [('; active', '; inactive'), ('Hz input=', 'Hz '), ('backend && backend->head', 'backend->head')]:
             assert source.count(old) == 1
             result = run(source.replace(old, new), args.runner)
             assert result.returncode != 0

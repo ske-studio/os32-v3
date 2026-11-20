@@ -14,25 +14,25 @@ void pm_ver_note_pvr(u32 pvr)
 
 static void pm_ver_collect(VerSnapshot *s)
 {
-    s->plat[0] = saved_pvr;
-    s->plat[1] = pvr_valid;
-    s->plat[2] = pm_mpic_source_count();
+    s->pvr = saved_pvr;
+    s->pvr_valid = pvr_valid;
+    s->mpic_sources = pm_mpic_source_count();
 }
 
 static void pm_ver_devices(const VerSnapshot *s, OS32_VerInfo *out)
 {
     const u32 kind = OS32_VER_DEVICE | OS32_VER_INDENT;
     VerLineBuilder b;
-    if (s->plat[1]) {
+    if (s->pvr_valid) {
         b = ver_line(out, kind, "CPU");
         ver_text(&b, "PowerPC PVR=");
-        ver_number(&b, s->plat[0], HEX32_DIGITS);
+        ver_number(&b, s->pvr, HEX32_DIGITS);
         ver_end(&b);
     }
-    if (s->plat[2]) {
+    if (s->mpic_sources) {
         b = ver_line(out, kind, "IRQ");
         ver_text(&b, "MPIC sources=");
-        ver_number(&b, s->plat[2], 0);
+        ver_number(&b, s->mpic_sources, 0);
         ver_end(&b);
     }
     b = ver_line(out, kind, "DEC");
@@ -48,13 +48,7 @@ static void pm_ver_devices(const VerSnapshot *s, OS32_VerInfo *out)
     }
     if (s->gfx.width && s->gfx.height && s->gfx.bpp) {
         b = ver_line(out, kind, "GFX");
-        ver_text(&b, "OF-fb ");
-        ver_number(&b, s->gfx.width, 0);
-        ver_text(&b, "x");
-        ver_number(&b, s->gfx.height, 0);
-        ver_text(&b, "x");
-        ver_number(&b, s->gfx.bpp, 0);
-        ver_text(&b, s->gfx_active ? " bpp; active" : " bpp; GUI target");
+        ver_gfx_value(&b, s, "OF-fb");
         ver_end(&b);
     }
 }

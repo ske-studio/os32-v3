@@ -48,6 +48,10 @@ def observe(elf, cpu, evidence, case, app='infoprob', expected=EXPECTED):
         body = rsh_command(session, f'/bin/{app}.bin')
         status = rsh_command(session, 'echo $?')
         require((body.rstrip(b'\n'), status) == expected[case], repr((case, body, status)))
+        if app == 'memstat' and case == 'normal':
+            used = rsh_command(session, '/bin/memstat.bin kheap-used').strip()
+            require(used.isdigit() and int(used) > 0, repr(('system kheap_used', used)))
+            print('system kheap_used=' + used.decode(), flush=True)
         session.q.call('quit')
         session.p.wait(timeout=5)
         require(session.p.returncode == 0, 'sysinfo QEMU exit')
@@ -64,7 +68,7 @@ def main():
     args = parser.parse_args()
     app = 'memstat' if args.memstat else 'infoprob'
     expected = ({'normal': (b'MEMSTAT OK', b'0\n'),
-                 **{case: (b'MEMSTAT FAIL', b'1\n') for case in ('diag', 'boundary', 'absent')}}
+                 **{case: (b'MEMSTAT FAIL', b'1\n') for case in ('diag', 'boundary', 'size133', 'peak', 'absent')}}
                 if args.memstat else EXPECTED)
     cross = Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc'))
     if any(not os.access(cross / 'bin' / ('powerpc-elf-' + tool), os.X_OK)
@@ -102,6 +106,12 @@ def main():
         elif case == 'boundary':
             mutation = mutant_settings(folder, case, 'kapi/kapi_sysinfo.c',
                                        'size < MEMSTAT_MIN', 'size <= MEMSTAT_MIN')
+        elif case == 'size133':
+            mutation = mutant_settings(folder, case, 'kapi/kapi_sysinfo.c',
+                                       'snap.size = size <', 'snap.size = size == 133 ? 132 : size <')
+        elif case == 'peak':
+            mutation = mutant_settings(folder, case, 'kapi/kapi_sysinfo.c',
+                                       'snap.kheap_peak = kmalloc_peak_bytes;', 'snap.kheap_peak = 0;')
         elif case == 'diag':
             header = 'platform/powermac/platform_mem_stat.h'
             before = 'platform_mem_stat_diag(MemStat *snap)\n{\n    (void)snap;'
