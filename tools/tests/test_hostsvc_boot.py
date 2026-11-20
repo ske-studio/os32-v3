@@ -22,6 +22,7 @@ CHECK = dict(name='hostsvc-boot', tier=1, needs=['make:all'], budget=5.2, covers
     'net/rx_work.h',
     'drivers/net/e82557/nic_e82557.c',
     'drivers/net/ne2000/nic_lgy98.c',
+    'platform/pc98/module_pair.c',
     'net/link.h', 'net/link_platform.h', 'platform/pc98/platform_link_inline.h', 'platform/pc98/link_platform.c', 'net/link.c', 'net/link_notify.h', 'net/link_host_api.inc',
     'net/link_rx.inc', 'net/link_selftest.inc', 'lib/le_internal.h',
     'kernel/irq/tick.h',
@@ -107,7 +108,7 @@ def build_run(work, sources):
                     '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
                     str(ROOT / 'tools/tests/hostsvc_boot_host.c'), str(paths[2]),
                     str(paths[3]), str(ROOT / 'drivers/net/e82557/nic_e82557.c'),
-                    str(ROOT / 'drivers/net/ne2000/nic_lgy98.c'), str(ROOT / 'tools/tests/hostsvc_fixture.c'),
+                    str(ROOT / 'drivers/net/ne2000/nic_lgy98.c'), str(ROOT / 'platform/pc98/module_pair.c'), str(ROOT / 'tools/tests/hostsvc_fixture.c'),
                     str(ROOT / 'net/rx_work.c'), *idle_io_sources(ROOT, work, compat=False), '-o', str(exe)], check=True)
     return [host32.run([str(exe)], input=bytes([mode]), capture_output=True).returncode
             for mode in (1, 2, 3, 4, 5, 6, 7)]
