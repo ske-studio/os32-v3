@@ -6,7 +6,7 @@ retain it across ALL link handles/rids. call(frame, source) takes exactly the
 An empty body means no SFS response, including BYE and ignored/stale replays;
 P4b must still send 200. ValueError means malformed framing or wrong peer;
 P4b must report a failed call, not retry a filesystem operation. The caller
-validates the SFS CALL declaration/WDATA length and owns the 1000ms deadline.
+validates the SFS CALL declaration/WDATA length and owns the host wall-clock deadline.
 Construct a new instance on host generation change; never reset per rid.
 
 HostFS, Server and LanServer are the raw LAN backend, with their existing

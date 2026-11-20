@@ -10,4 +10,4 @@
 
 既存の 4KiB/32KiB/奇数位置のファイル全バイト照合、交互パスの `dir_lru`、
 窓なしの再入、UA と待ち・reset の回帰も同じ製品コードを通す。
-実行入口は [test_cd_read.py](test_cd_read.md)。
+実行入口だった `tools/tests/test_cd_read.py` は CI から外した (ユーザー決定 2026-11-20、持越し台帳 CI-DROP-CDREAD-1)。

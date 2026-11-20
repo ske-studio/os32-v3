@@ -239,4 +239,4 @@
   - 既にある物: `HostFS._comps(wire) -> list[bytes]`、`HostFS._stat_raw(comps) -> os.stat_result`、`HostFS._kind(st) -> (kind, size)` (静的)、`HostFS._entries(comps)` (list() と同じ飛ばし方の列挙)。
   - C が足す物: `HostFS.wire_mtime(st) -> int` (`m = int(st.st_mtime); return m if 0 <= m <= 0xFFFFFFFF else 0`、stat() もこれを使う)、`HostFS.open_read_fd(comps) -> int` (読み専用の fd。secure は今の read() と同じ dir_fd と O_NOFOLLOW、非 secure は resolve() の道。ディレクトリなら SfsError(ERR_ISDIR)。閉じるのは呼んだ側の os.close。read() もこれを使う)。
   - B は serialfs_host を import せず、渡された fs の上の 6 つの名前だけを呼ぶ。B の単体の試験は、同じ 6 つの名前を持つ試験用の FS で行う。
-- 注 3 (os32powerpc): host_agent の SFS の 1.0s の期限は壁時計 (host_agent.py:820・1082-1084) で、受付から数える。QEMU の -icount ではゲストの時計が先走り・凍る (0.5〜0.75s)。一覧の生成の 500ms と重なると 503 になり得る。受入は BUSY の数と 503 (HTTP_UNAVAIL) の数を分けて記録し、台本で期限を延ばさない。
+- 注 3 (os32powerpc): 当時の host_agent の SFS の期限 (`SFS_CALL_TIMEOUT`、現行値は LAN_OPERATOR_DESIGN §5) は壁時計 (tools/host_agent.py) で、受付から数える。QEMU の -icount ではゲストの時計が先走り・凍る (0.5〜0.75s)。一覧の生成の 500ms と重なると 503 になり得る。受入は BUSY の数と 503 (HTTP_UNAVAIL) の数を分けて記録し、台本で期限を延ばさない。

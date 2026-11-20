@@ -86,17 +86,19 @@ def test(path):
             assert not call.called, 'length guard removed'
             short = request(hello[:-1], len(hello))
             assert short['resp'] is None
-            clock[0] += 0.5
+            clock[0] += 1.0  # Guest CALL budget, measured here on the fake host clock.
+            agent.tick(sink)
+            assert short['resp'] is None, 'host expired within guest budget'
             agent._on_request(rid, 0, ('SFS CALL %d' % len(hello)).encode(), sink)
-            clock[0] += 0.5
+            clock[0] += 2.0
             agent.tick(sink)
             assert short['resp'][0] == 503 and not call.called, 'deadline removed'
             late = request(b'', len(hello))
-            clock[0] += 1.0
+            clock[0] += 3.0
             agent._on_wdata(rid, 1, hello, sink)
             assert late['resp'][0] == 503 and not call.called, 'deadline removed'
         def slow(frame, source):
-            clock[0] += 1.0
+            clock[0] += 3.0
             return b'late'
         with patch.object(backend, 'call', side_effect=slow):
             assert request(hello)['resp'][0] == 503, 'deadline removed'
@@ -168,6 +170,7 @@ def main():
             ('len(ent["got"]) != ent["decl"]:', 'False:', 'length guard removed'),
             ('        except ValueError:\n            self._answer(rid, ent, HTTP_BAD, b"", None, out)',
              '        except ValueError:\n            try:\n                self._sfs_backend().call(ent["got"], self.peer)\n            except ValueError:\n                pass\n            self._answer(rid, ent, HTTP_BAD, b"", None, out)', 'ValueError retried'),
+            ('SFS_CALL_TIMEOUT = 3.0', 'SFS_CALL_TIMEOUT = 0.5', 'host expired within guest budget'),
             ('now >= ent["sfs_deadline"]', 'False', 'deadline removed'),
             ('self.now() >= ent["sfs_deadline"]', 'False', 'deadline removed')]
         with tempfile.TemporaryDirectory() as tmp:
