@@ -273,6 +273,7 @@ void sfs_persistent_scope_owner_exit(int owner)
 {
     if (owner == scope_owner) g_scope = 0;
 }
+#include "sfs_session_fg.c"
 #include "serialfs_session.c"
 
 void lan_module_session_release(void)
