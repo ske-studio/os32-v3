@@ -55,7 +55,7 @@ PURE_CASES = ["pt_offsets", "pt_817", "pt_1663", "pt_reject", "ata_lba28",
               "ata_range", "ata_chs", "layout", "hdprep_geom", "hdprep_disk",
               "hdprep_mounts", "hdprep_plan"]
 PART_CASES = ["find_bios", "find_fail", "format_clamp", "format_at_16652",
-              "format_at_refuse", "format_io_order", "mount_bounds", "format_geom", "legacy_hint"]
+              "format_at_refuse", "format_workspace", "format_io_order", "mount_bounds", "format_geom", "legacy_hint"]
 # e2fsck にかける format_at の大きさ (開始 2016、16/63 の RAM ディスク 64,512 セクタ)
 FSCK_SIZES = [16652, 20160, 36000, 62496]
 
@@ -137,9 +137,9 @@ C_MUTATIONS = [
     ("fs/ext2/ext2_super.c", "    if (dev_blk_read_lba(dev, PC98PT_LBA, 1, pt_sect) != 0) return EXT2_ERR_IO;\n",
      "    (void)dev_blk_read_lba(dev, PC98PT_LBA, 1, pt_sect);\n",
      "区画表が読めなくても続ける"),
-    ("fs/ext2/ext2_fmt.c", "    if (length > info.total_sectors - start_lba) return EXT2_ERR_INVAL;\n", "",
+    ("fs/ext2/ext2_fmt.c", "    if (length > disk_sectors - start_lba) return EXT2_ERR_INVAL;\n", "",
      "format_at がディスクの外まで書く"),
-    ("fs/ext2/ext2_fmt.c", "    if (start_lba < (u32)EXT2_FMT_MIN_LBA) return EXT2_ERR_INVAL;\n", "",
+    ("fs/ext2/ext2_fmt.c", "    if (start_lba < ops->min_lba) return EXT2_ERR_INVAL;\n", "",
      "format_at が IPL / 区画表 / ローダを潰す"),
     ("fs/ext2/ext2_fmt.c", "    if (sectors > part_len) sectors = part_len;\n", "",
      "ext2_format が区画の長さで頭打ちにしない"),
@@ -149,19 +149,29 @@ C_MUTATIONS = [
      "現在の CHS の容量を計画の上限にしない (C4)"),
     ("userland/shell/hdprep_plan.c", "        if (limit > HDPREP_LBA28_LIMIT) limit = HDPREP_LBA28_LIMIT;",
      "        (void)0;", "LBA28 の上限を計画の上限にしない (C4)"),
-    ("fs/ext2/ext2_fmt.c", "    if (!platform_ide_range_ok(ide_drive, start_lba, length)) return EXT2_ERR_INVAL;\n", "",
+    ("fs/ext2/ext2_fmt.c", "    if (!ops->range_ok(ide_drive, start_lba, length)) return EXT2_ERR_INVAL;\n", "",
      "format_at が ATA の方式の上限を見ない (C4)"),
-    ("fs/ext2/ext2_fmt.c", "        if (src != BOOTINFO_GEOM_BIOS) {", "        if (0) {",
+    ("fs/ext2/ext2_medium_ide.c", "    if (src != BOOTINFO_GEOM_BIOS) {", "        if (0) {",
      "ext2_format が IDENTIFY の幾何で見つけた区画に書く (m3)"),
     ("fs/ext2/ext2_fmt.c", "    if (total_sectors > EXT2L_MAX_SECTORS(EXT2_MAX_GROUPS))\n", "    if (0)\n",
      "ext2_format が 32 グループを超える区画で頭打ちにせず断る (m2)"),
     ("fs/pc98pt.c", "        return 1;\n    }\n    return 0;\n}\n\nint pc98pt_make_os32(",
      "        return 0;\n    }\n    return 0;\n}\n\nint pc98pt_make_os32(",
      "旧配置を検出しない (カーネルが移行の案内を出せない、M2)"),
-    ("fs/ext2/ext2_fmt.c", "    if (!platform_ide_range_ok(ide_drive, base_lba, lay.total_blocks * (unsigned long)EXT2_SECTORS_PER_BLOCK))\n        return EXT2_ERR_INVAL;\n", "",
+    ("fs/ext2/ext2_fmt.c", "    if (!ops->range_ok(ide_drive, base_lba, lay.total_blocks * (unsigned long)EXT2_SECTORS_PER_BLOCK))\n        return EXT2_ERR_INVAL;\n", "",
      "ext2_format の頭打ちの後の範囲を ATA の上限と照合しない (ラリー 2 の 3)"),
     ("fs/pc98pt.c", "            return 0;                       /* 標準配置で読める */",
      "            (void)0;", "標準配置の表を旧配置と誤認する"),
+    ("fs/ext2/ext2_fmt.c", "    u32 disk_sectors;", "    u32 disk_sectors;\n    ide_drive &= 0xff;", "A6: HD の drv を切り出す"),
+    ("fs/ext2/ext2_fmt.c", "    if (media[kind]) return -1;", "", "A7: 二重登録を許す"),
+    ("fs/ext2/ext2_fmt.c", "static u8 fmt_blk[EXT2_BLOCK_SIZE];", "#define fmt_blk ext2_g_blk",
+     "A5: formatter が下の ext2 と作業域を共有する"),
+    ("fs/ext2/ext2_fmt.c", "    if (ctx->ops->after_write) ctx->ops->after_write();", "",
+     "A8: 書き込み前の破棄を省く"),
+    ("fs/ext2/ext2_fmt.c", "        ctx->ops->after_write(); /* raw read failure */", "",
+     "A8: 読み込み失敗時の破棄を省く"),
+    ("fs/ext2/ext2_fmt.c", "    if (ret && ctx->ops->after_write) ctx->ops->after_write();", "",
+     "A8: 書き込み失敗時の破棄を省く"),
     # E03a: 抽出境界の順と失敗伝播 (format_io_order が実 I/O で検出)。
     ("fs/ext2/ext2_fmt.c", "    ret = fmt_write_groups(&fmt_ctx, &lay);\n    if (ret != 0) return EXT2_ERR_IO;\n\n    ret = fmt_write_backups(&fmt_ctx, &lay);\n    if (ret != 0) return EXT2_ERR_IO;\n",
      "    ret = fmt_write_backups(&fmt_ctx, &lay);\n    if (ret != 0) return EXT2_ERR_IO;\n\n    ret = fmt_write_groups(&fmt_ctx, &lay);\n    if (ret != 0) return EXT2_ERR_IO;\n",
@@ -867,7 +877,7 @@ def build_target(tmp):
 #  変異                                                                     #
 # ======================================================================== #
 
-MIRROR = ["include/platform_device.h", "include/ide_contract.h", "drivers/ata/ide.h", "fs/pc98pt.c", "fs/pc98pt.h", "drivers/ata/ide_addr.c",
+MIRROR = ["fs/ext2/ext2_medium_ide.c", "include/ext2_medium_contract.h", "include/platform_device.h", "include/ide_contract.h", "drivers/ata/ide.h", "fs/pc98pt.c", "fs/pc98pt.h", "drivers/ata/ide_addr.c",
           "drivers/ata/ide_addr.h", "fs/ext2/ext2_layout.c", "fs/ext2/ext2_layout.h",
           "userland/shell/hdprep_plan.c", "userland/shell/hdprep_plan.h",
           "fs/ext2/ext2_super.c", "fs/ext2/ext2_time.c", "fs/ext2/ext2_super_block_io.inc", "fs/ext2/ext2_fmt.c", "fs/ext2/ext2_inode.c", "fs/ext2/ext2_dir.c",
@@ -909,6 +919,7 @@ REBUILD = {
     "userland/shell/hdprep_plan.c": ("pure",),
     "fs/ext2/ext2_super.c": ("part",),
     "fs/ext2/ext2_super_block_io.inc": ("part",),
+    "fs/ext2/ext2_medium_ide.c": ("part",),
     "fs/ext2/ext2_fmt.c": ("part",),
 }
 C_HARNESS = {"pure": (_pure_cmd, PURE_CASES), "part": (_part_cmd, PART_CASES)}

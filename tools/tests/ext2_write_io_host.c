@@ -281,6 +281,7 @@ int platform_disk_geometry_get(int drive, struct platform_disk_geometry *info)
 #include "../../fs/ext2/ext2_inode.c"
 #include "../../fs/ext2/ext2_dir.c"
 #include "../../fs/ext2/ext2_file.c"
+#include "../../fs/ext2/ext2_medium_ide.c"
 #include "../../fs/ext2/ext2_fmt.c"
 #include "../../fs/ext2/ext2_vfs.c"
 
@@ -844,6 +845,7 @@ static int str_eq(const char *a, const char *b) { return kstrcmp(a, b) == 0; }
 
 int ext2_write_io_main(const char *sel)
 {
+    CHECK(ext2_medium_register(EXT2_MEDIUM_HD, &ext2_medium_ide_ops) == 0);
     g_failures = 0;
 
     if (str_eq(sel, "all") || str_eq(sel, "w512_new"))        case_w512_new();

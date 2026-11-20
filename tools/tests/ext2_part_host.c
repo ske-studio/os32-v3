@@ -139,6 +139,7 @@ int vfs_register_fs(VfsOps *ops) { (void)ops; return VFS_OK; }
 #define DISK_TOTAL   64512u
 
 static u8 g_disk[DISK_TOTAL * 512u];
+static int g_clobber_workspace;
 static u32 g_rd, g_wr;
 static u32 g_wr_min, g_wr_max;          /* 書いた LBA の範囲 */
 static u32 g_fail_read_lba = 0xFFFFFFFFu;
@@ -159,11 +160,14 @@ static void io_reset(void)
 static struct FormatSectorIO { char op; u32 lba; } g_fmt_io[2048];
 static u32 g_fmt_io_count, g_fmt_io_pos, g_fmt_fail_at;
 static int g_fmt_trace;
+static unsigned g_pending_resets;
 
 static int format_io(char op, u32 lba, int count)
 {
     int i;
     if (!g_fmt_trace) return 0;
+    CHECK(g_pending_resets == (unsigned)(op == 'W' && !(g_fmt_io_pos % 2)));
+    g_pending_resets = 0;
     /* Compare the fixed sector sequence, including failure at either
      * sector of a grouped request. */
     CHECK(count == 1 || count == 2);
@@ -208,6 +212,7 @@ int dev_blk_write_lba(Device *dev, u32 lba, int count, const void *buf)
     if (!dev) return -1;
     for (i = 0; i < count; i++) {
         u32 cur = lba + (u32)i;
+        if (g_clobber_workspace) kmemset(ext2_g_blk, 0xcc, EXT2_BLOCK_SIZE);
         if (format_io('W', cur, 1) != 0) return -1;
         if (cur >= g_virtual_total) return -1;
         if (cur < DISK_TOTAL)
@@ -242,7 +247,7 @@ static u32 g_ata_limit = DISK_TOTAL;
 
 int platform_ide_range_ok(int drive, u32 lba, u32 count)
 {
-    if ((drive & 3) != 0) return 0;
+    if (drive != 0) return 0;
     if (count == 0) return 1;
     if (lba >= g_ata_limit) return 0;
     return count <= g_ata_limit - lba ? 1 : 0;
@@ -269,6 +274,7 @@ int bootinfo_part_geom(int ide_drive, u16 *heads, u16 *spt)
 #include "../../fs/ext2/ext2_inode.c"
 #include "../../fs/ext2/ext2_dir.c"
 #include "../../fs/ext2/ext2_file.c"
+#include "../../fs/ext2/ext2_medium_ide.c"
 #include "../../fs/ext2/ext2_fmt.c"
 
 /* ======================================================================== */
@@ -426,6 +432,29 @@ static void case_format_at_16652(void)
     ext2_unmount(&g_ctx);
 }
 
+/* A5: 下の ext2 が書込中に作業域を使っても媒体の内容を保つ。 */
+static void case_format_workspace(void)
+{
+    const u32 start = 2016, length = 16652;
+    u8 *before = g_disk + (start - 1) * 512u;
+    u8 *after = g_disk + (start + length) * 512u;
+    u8 *sb = g_disk + (start + 2) * 512u;
+    u32 i;
+
+    disk_reset(16, 63);
+    kmemset(before, 0xa5, 512);
+    kmemset(after, 0x5a, 512);
+    g_clobber_workspace = 1;
+    CHECK(ext2_format_at(0, start, length) == EXT2_OK);
+    g_clobber_workspace = 0;
+    CHECK(le16_rd(sb + EXT2_SB_MAGIC_OFF) == EXT2_SUPER_MAGIC);
+    CHECK(le32_rd(sb + EXT2_SB_BLOCKS_COUNT_OFF) == 8193);
+    for (i = 0; i < 512; i++) {
+        CHECK(before[i] == 0xa5);
+        CHECK(after[i] == 0x5a);
+    }
+}
+
 /* 範囲の検査で断るときは 1 セクタも書かない */
 static void case_format_at_refuse(void)
 {
@@ -438,7 +467,14 @@ static void case_format_at_refuse(void)
     CHECK(ext2_format_at(0, DISK_TOTAL, 1u) == EXT2_ERR_INVAL);
     CHECK(ext2_format_at(0, 0xFFFFFFF0u, 0x20u) == EXT2_ERR_INVAL); /* 足すと 0 付近 */
     CHECK(ext2_format_at(0, 2016u, 0xFFFFFFFFu) == EXT2_ERR_INVAL);
-    CHECK(ext2_format_at(1, 2016, 16384) == EXT2_ERR_IO);            /* ドライブが無い */
+    pt_write(2016, 20160, 16, 63);
+    const int invalid_drives[] = {1, 2, 3, 0x10000, 0x0600, -1};
+    for (unsigned int i = 0; i < sizeof(invalid_drives) / sizeof(invalid_drives[0]); i++) {
+        int drive = invalid_drives[i];
+        int expected = (drive & 3) ? EXT2_ERR_IO : EXT2_ERR_INVAL;
+        CHECK(ext2_format(drive, 16384) == expected);
+        CHECK(ext2_format_at(drive, 2016, 16384) == expected);
+    }
     g_ide_total = 0;                                                 /* 総数の申告が無い */
     CHECK(ext2_format_at(0, 2016, 16384) == EXT2_ERR_INVAL);
     g_ide_total = DISK_TOTAL;
@@ -493,6 +529,7 @@ static void case_format_io_order(void)
     g_fmt_fail_at = g_fmt_io_count;           /* 正常の列を先に確かめる */
     CHECK(ext2_format_at(0, 2016, 62496) == EXT2_OK);
     CHECK(g_fmt_io_pos == g_fmt_io_count);
+    CHECK(g_pending_resets == 0);
     /* free blocks = 31,247 - (249 + 249 + 247 + 249) - root 1。
      * backup に仮値 0 を写していないことも、媒体の内容で確かめる。 */
     CHECK(le32_rd(g_disk + (2016 + 2) * 512u + EXT2_SB_FREE_BLOCKS_COUNT_OFF) == 30252);
@@ -508,6 +545,8 @@ static void case_format_io_order(void)
         g_fmt_fail_at = at;
         CHECK(ext2_format_at(0, 2016, 62496) == EXT2_ERR_IO);
         CHECK(g_fmt_io_pos == at + 1);
+        CHECK(g_pending_resets == (g_fmt_io[at].op == 'R' ? 2u : 1u));
+        g_pending_resets = 0;
     }
     g_fmt_trace = 0;
 }
@@ -620,14 +659,28 @@ static u32 atou(const char *s)
     return v;
 }
 
+static void observe_reset(void)
+{
+    if (g_fmt_trace) g_pending_resets++;
+    ext2_medium_ide_ops.after_write();
+}
+
 int os32_main(int argc, char **argv)
 {
+    CHECK(ext2_format(0, 16384) == EXT2_ERR_IO);
+    CHECK(ext2_format_at(0, 2016, 16384) == EXT2_ERR_IO);
+    struct ext2_medium_ops hd = ext2_medium_ide_ops;
+    CHECK(hd.after_write == ext2_read_cache_reset);
+    hd.after_write = observe_reset;
+    CHECK(ext2_medium_register(EXT2_MEDIUM_HD, &hd) == 0);
+    CHECK(ext2_medium_register(EXT2_MEDIUM_HD, &ext2_medium_ide_ops) == -1);
     const char *c = argc > 1 ? argv[1] : "";
     if (streq(c, "find_bios")) case_find_bios();
     else if (streq(c, "find_fail")) case_find_fail();
     else if (streq(c, "format_clamp")) case_format_clamp();
     else if (streq(c, "format_at_16652")) case_format_at_16652();
     else if (streq(c, "format_at_refuse")) case_format_at_refuse();
+    else if (streq(c, "format_workspace")) case_format_workspace();
     else if (streq(c, "format_io_order")) case_format_io_order();
     else if (streq(c, "mount_bounds")) case_mount_bounds();
     else if (streq(c, "format_geom")) case_format_geom();

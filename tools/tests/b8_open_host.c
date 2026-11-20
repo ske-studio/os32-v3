@@ -482,6 +482,7 @@ int res_owner_get(void) { return 0; }
 #include "../../fs/ext2/ext2_inode.c"
 #include "ext2_dir.c"
 #include "../../fs/ext2/ext2_file.c"
+#include "../../fs/ext2/ext2_medium_ide.c"
 #include "../../fs/ext2/ext2_fmt.c"
 #include "../../fs/ext2/ext2_vfs.c"
 #include "../platform/pc98/boot_names.c"
@@ -5592,6 +5593,7 @@ static int env_int(const char **envp, const char *key, int dflt)
 
 void b8_start_c(long *sp)
 {
+    CHECK(ext2_medium_register(EXT2_MEDIUM_HD, &ext2_medium_ide_ops) == 0);
     input_fixture_init();
     long argc = sp[0];
     const char **envp = (const char **)&sp[argc + 2];
