@@ -91,7 +91,8 @@ void harness_main(void)
     mode = rd32(in_buf);
     csz  = rd32(in_buf + 4);
     raw  = rd32(in_buf + 8);
-    if (csz != got - 12 || raw > OUT_MAX) sys_exit(2);
+    if (((int)csz < 0 ? got != 12 : csz != got - 12) ||
+        ((int)raw >= 0 && raw > OUT_MAX)) sys_exit(2);
 
     for (i = 0; i < OUT_MAX + GUARD; i++) out_buf[i] = 0xCC;
 
@@ -104,6 +105,7 @@ void harness_main(void)
     else
         sys_exit(2);
 
+    if ((int)raw < 0) raw = 0;
     for (i = raw; i < raw + GUARD; i++)
         if (out_buf[i] != 0xCC) sys_exit(3);
 

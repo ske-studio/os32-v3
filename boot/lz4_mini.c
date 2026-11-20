@@ -6,6 +6,9 @@
 
 #include "boot_defs.h"
 
+#define LZ4_TOKEN_MASK LZ4_LENGTH_MASK
+#define LZ4_LEN_EXT LZ4_LENGTH_MASK
+#define LZ4_ERR_OUTPUT BOOT_LZ4_ERR_OUTPUT
 #define LZ4_MINMATCH  4
 
 int boot_lz4_decode(const u8 *src, int compressed_size,
@@ -19,56 +22,5 @@ int boot_lz4_decode(const u8 *src, int compressed_size,
     if (!src || !dst || compressed_size < 0 || dst_capacity < 0)
         return -1;
 
-    for (;;) {
-        int token, lit_len, match_len, offset, i;
-        const u8 *match_src;
-
-        if (ip >= ip_end) break;
-        token = *ip++;
-
-        /* リテラル */
-        lit_len = (token >> LZ4_TOKEN_BITS) & LZ4_LENGTH_MASK;
-        if (lit_len == LZ4_LENGTH_MASK) {
-            int s;
-            do {
-                if (ip >= ip_end) return -1;
-                s = *ip++;
-                lit_len += s;
-                /* 壊れた入力での長さ累積 (int オーバーフロー) を止める。
-                 * 出力容量を超えた時点で正当なストリームではない */
-                if (lit_len > dst_capacity) return -1;
-            } while (s == 255);
-        }
-        /* ip + lit_len 形式はポインタが上位アドレスでラップすると
-         * すり抜けるので、差分 (ip_end - ip) と比較する */
-        if (lit_len > (int)(ip_end - ip)) return -1;
-        if (lit_len > (int)(op_end - op)) return BOOT_LZ4_ERR_OUTPUT;
-        for (i = 0; i < lit_len; i++) *op++ = *ip++;
-
-        if (ip >= ip_end) break;
-
-        /* オフセット (2B LE) */
-        if (ip + LZ4_OFFSET_BYTES > ip_end) return -1;
-        offset = (int)ip[0] | ((int)ip[1] << 8);
-        ip += LZ4_OFFSET_BYTES;
-        if (offset == 0) return -1;
-        if (op - dst < offset) return -1;
-
-        /* マッチ */
-        match_len = (token & LZ4_LENGTH_MASK) + LZ4_MINMATCH;
-        if ((token & LZ4_LENGTH_MASK) == LZ4_LENGTH_MASK) {
-            int s;
-            do {
-                if (ip >= ip_end) return -1;
-                s = *ip++;
-                match_len += s;
-                if (match_len > dst_capacity) return -1;
-            } while (s == 255);
-        }
-        if (match_len > (int)(op_end - op)) return BOOT_LZ4_ERR_OUTPUT;
-        match_src = op - offset;
-        for (i = 0; i < match_len; i++) *op++ = match_src[i];
-    }
-
-    return (int)(op - dst);
+#include "../lib/lz4_decode_core.inc"
 }

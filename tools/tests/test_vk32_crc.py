@@ -163,8 +163,11 @@ def build(work, srcs, target, geom):
     gen.write_layout_header(ROOT, str(work / "memmap_layout.h"))
     inc = ["-I" + str(work), "-I" + str(ROOT / "boot"),
            "-include", str(work / "memmap_layout.h")]
+    (work / "boot").mkdir()
+    (work / "lib").mkdir()
+    shutil.copy(srcs.get("core", ROOT / "lib/lz4_decode_core.inc"), work / "lib")
     for key, obj in (("vk32", "vk32.o"), ("mini", "mini.o")):
-        src = work / pathlib.Path(srcs[key]).name
+        src = work / "boot" / pathlib.Path(srcs[key]).name
         shutil.copy(srcs[key], src)
         sh([cc] + common + ["-Os"] + inc + ["-c", str(src), "-o", str(work / obj)])
 
@@ -751,9 +754,9 @@ MUTATIONS = [
     ("vk32", "s = crc32_core_update(s, zero4, VK32_WORD_BYTES);",
      "(void)zero4; s = crc32_core_update(s, file + crc_off, VK32_WORD_BYTES);", 0,
      "C: CRC の欄を 0 として計算しない"),
-    ("mini", "if (lit_len > (int)(op_end - op)) return BOOT_LZ4_ERR_OUTPUT;", ";", 0,
+    ("core", "if (lit_len > (int)(op_end - op)) return LZ4_ERR_OUTPUT;", ";", 0,
      "lz4_mini: リテラルの出力境界を見ない"),
-    ("mini", "if (match_len > (int)(op_end - op)) return BOOT_LZ4_ERR_OUTPUT;", ";", 0,
+    ("core", "if (match_len > (int)(op_end - op)) return LZ4_ERR_OUTPUT;", ";", 0,
      "lz4_mini: マッチの出力境界を見ない (エントリの外を書く)"),
     ("asm", "jne     .e_file_crc", "nop", 0, "ASM: ファイル全体の CRC を見ない"),
     ("asm", "jne     .e_entry_crc", "nop", 0, "ASM: 展開後の CRC を見ない"),
@@ -836,7 +839,7 @@ def _mutation_one(item):
     """変異 1 本を自分専用の一時ディレクトリで組んで回す。run_all は最初の Fail で
     止まる (= 最初に落ちたところで打ち切り)。並列に呼ばれる。(種別, 行) を返す。"""
     target, (key, pat, rep, nth, desc) = item
-    base = {"vk32": VK32_SRC, "mini": MINI_SRC, "asm": ASM_SRC, "script": SCRIPT}
+    base = {"core": ROOT / "lib/lz4_decode_core.inc", "vk32": VK32_SRC, "mini": MINI_SRC, "asm": ASM_SRC, "script": SCRIPT}
     with tempfile.TemporaryDirectory(prefix="vk32_mut_") as mw:
         srcs = dict(base)
         script = SCRIPT

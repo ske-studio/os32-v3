@@ -1,5 +1,6 @@
 """vmkernel.lz4 の高圧縮 (LZ4 HC) と展開側 3 実装の一致、生成時の上限検査。
 
+ベクトルの期待値は LZ4 Block Format の offset と match copy、および lib/lz4.h の戻り値による。
 記録: tools/tests/vmkernel_lz4_tdd.md
 票  : docs/archive/realhw_v21/TASK_SERIAL_HOSTFS.md 部品 A-1 (N8 の生成側は TASK_HDD_INSTALL)
 
@@ -21,7 +22,7 @@ tools/tests/vmkernel_lz4_host.c は libc なしの 32bit 静的 ELF で、ASM �
   python3 -B tools/tests/test_vmkernel_lz4.py --mutate   # 否定側 (写しの上で変異 → RED)
 """
 CHECK = dict(name='vmkernel-lz4-host', tier=1,
-    covers=['boot/boot_defs.h', 'include/memmap.h', 'sdk/link/app_sys.ld', 'tools/tests/host32.py', 'boot/loader_fat_new.asm', 'boot/lz4_mini.c', 'lib/lz4.c', 'tools/mkvmkernel.py', 'tools/gen_memmap.py', 'tools/tests/vmkernel_lz4_host.c', 'tools/check_artifacts.py', 'build/os32.ld', 'fs/fd_redirect.c', 'fs/pipe_buffer.c', 'arch/x86/kernel/kentry.asm', 'mm/shm.c', 'sdk/kapi.json', 'sdk/link/app.ld', 'sdk/link/shlib.ld', 'sdk/os32x_hdr.py', 'sdk/rust/os32api/src/gui/proto.rs', 'sdk/rust/os32api/src/gui/stub.rs', 'tools/mkshlib.py', 'tools/tests/owner_reclaim_host.c', 'tools/tests/test_owner_reclaim.py', 'userland/rust/libos32gui/src/shlib.rs', 'boot/vk32_defs.inc', 'boot/crc32_defs.inc', 'boot/fat12_defs.inc', 'boot/pc98_defs.inc', 'tools/tests/kernel_includes.py'],
+    covers=['boot/boot_defs.h', 'include/memmap.h', 'sdk/link/app_sys.ld', 'tools/tests/host32.py', 'boot/loader_fat_new.asm', 'boot/lz4_mini.c', 'lib/lz4.c', 'lib/lz4_decode_core.inc', 'tools/mkvmkernel.py', 'tools/gen_memmap.py', 'tools/tests/vmkernel_lz4_host.c', 'tools/check_artifacts.py', 'build/os32.ld', 'fs/fd_redirect.c', 'fs/pipe_buffer.c', 'arch/x86/kernel/kentry.asm', 'mm/shm.c', 'sdk/kapi.json', 'sdk/link/app.ld', 'sdk/link/shlib.ld', 'sdk/os32x_hdr.py', 'sdk/rust/os32api/src/gui/proto.rs', 'sdk/rust/os32api/src/gui/stub.rs', 'tools/mkshlib.py', 'tools/tests/owner_reclaim_host.c', 'tools/tests/test_owner_reclaim.py', 'userland/rust/libos32gui/src/shlib.rs', 'boot/vk32_defs.inc', 'boot/crc32_defs.inc', 'boot/fat12_defs.inc', 'boot/pc98_defs.inc', 'tools/tests/kernel_includes.py'],
     needs=['make:all'], budget=5.1,
     kind='characterization',
 )
@@ -97,7 +98,7 @@ def extract_asm(text):
 def build(work, srcs, target):
     """srcs: {'mini': path, 'lz4c': path, 'asm': path}。exe の path を返す。"""
     work = pathlib.Path(work)
-    common = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
+    common = ["-std=gnu11", "-m32", "-nostdinc", "-march=i386", "-ffreestanding",
               "-fno-stack-protector", "-fno-pie", "-Wall", "-Werror"]
     if target:
         cc = "i386-elf-gcc"
@@ -107,13 +108,16 @@ def build(work, srcs, target):
         cc = "gcc"
         common = common + ["-fno-pic"]
 
-    mini = work / "lz4_mini.c"
+    (work / "lib").mkdir()
+    (work / "boot").mkdir()
+    shutil.copy(srcs.get("core", ROOT / "lib/lz4_decode_core.inc"), work / "lib")
+    mini = work / "boot/lz4_mini.c"
     shutil.copy(srcs["mini"], mini)
     # ローダと同じ -Os (build/boot.mk CFLAGS_BOOT)
     sh([cc] + common + ["-Os", "-I" + str(ROOT / "boot"), "-c", str(mini),
                         "-o", str(work / "mini.o")])
 
-    lz4c = work / "lz4.c"
+    lz4c = work / "lib/lz4.c"
     shutil.copy(srcs["lz4c"], lz4c)
     # lz4 コマンドと同じ -O0 (build/programs.mk lib/lz4_prog.o)
     sh([cc] + common + ["-O0", "-I" + str(ROOT / "lib"), "-I" + str(ROOT / "include"),
@@ -124,7 +128,7 @@ def build(work, srcs, target):
                    encoding="utf-8")
     sh(["nasm", "-f", "elf32", str(asm), "-o", str(work / "asm.o")])
 
-    sh(["gcc", "-std=gnu11", "-m32", "-ffreestanding", "-fno-pic", "-fno-pie",
+    sh(["gcc", "-std=gnu11", "-m32", "-nostdinc", "-ffreestanding", "-fno-pic", "-fno-pie",
         "-fno-stack-protector", "-fno-builtin", "-O2", "-Wall", "-Wextra",
         "-Werror", 
         "-c", str(HARNESS), "-o", str(work / "harness.o")])
@@ -136,8 +140,8 @@ def build(work, srcs, target):
     return exe
 
 
-def decode(exe, mode, comp, raw):
-    data = struct.pack("<3I", mode, len(comp), raw) + comp
+def decode(exe, mode, comp, raw, size=None):
+    data = struct.pack("<Iii", mode, len(comp) if size is None else size, raw) + comp
     r = host32.run([str(exe)], input=data, capture_output=True, timeout=60)
     if r.returncode == 3:
         return None, "展開先の後ろ (番兵) を書き越した"
@@ -374,10 +378,31 @@ def case_boundary(script, work):
     return out
 
 
+def check_vectors(exe):
+    prefix = bytes(range(256))
+    cases = [
+        (b"\xf0\xf1" + prefix + b"\x00\x01", None, 260, 260, prefix + prefix[:4]),
+        (b"\x24ab\x02\x00", None, 10, 10, b"ababababab"),
+        (b"", -1, 4, -1, b""), (b"", 0, -1, -1, b""),
+        (b"\xf0", None, 32, -1, b""), (b"\x10", None, 4, -1, b""),
+        (b"\x10a\x01", None, 8, -1, b""),
+        (b"\x10a\x00\x00", None, 8, -1, b""),
+        (b"\x10a\x02\x00", None, 8, -1, b""),
+        (b"\x1fa\x01\x00", None, 32, -1, b""),
+        (b"\x10a", None, 0, -2, b""),
+        (b"\x10a\x01\x00", None, 4, -2, b""),
+    ]
+    for mode, name in MODES:
+        for i, (data, size, capacity, ret, output) in enumerate(cases):
+            if decode(exe, mode, data, capacity, size) != (ret, output):
+                raise Fail(f"{name}: vector {i} expected return {ret}")
+
+
 def run_all(srcs, script, target, real):
     with tempfile.TemporaryDirectory(prefix="vmk_lz4_") as work:
         exe = build(work, srcs, target)
-        lines = []
+        check_vectors(exe)
+        lines = ["LZ4 vectors PASS (HDD, lib, FD)"]
         k, s = synthetic()
         lines += check_image(exe, script, work, k, s, "synthetic", True)[1]
         if real:
@@ -398,12 +423,11 @@ def run_all(srcs, script, target, real):
 
 MUTATIONS = [
     # (対象キー, パターン, 置換, 何回目 (0 始まり), 説明)
-    ("mini", "} while (s == 255);", "} while (0);", 0, "lz4_mini: リテラル長の延長を 1 バイトで打ち切る"),
-    ("mini", "} while (s == 255);", "} while (0);", 1, "lz4_mini: マッチ長の延長を 1 バイトで打ち切る"),
-    ("mini", "((int)ip[1] << 8)", "0", 0, "lz4_mini: offset の上位バイトを捨てる"),
-    ("lz4c", "} while (s == 255);", "} while (0);", 0, "lib/lz4.c: リテラル長の延長を打ち切る"),
-    ("lz4c", "} while (s == 255);", "} while (0);", 1, "lib/lz4.c: マッチ長の延長を打ち切る"),
-    ("lz4c", "((int)ip[1] << 8)", "0", 0, "lib/lz4.c: offset の上位バイトを捨てる"),
+    ("core", "lit_len > dst_capacity) return -1;\n            } while (s == 255);", "lit_len > dst_capacity) return -1;\n            } while (0);", 0, "literal extension"),
+    ("core", "match_len > dst_capacity) return -1;\n            } while (s == 255);", "match_len > dst_capacity) return -1;\n            } while (0);", 0, "match extension"),
+    ("core", "((int)ip[1] << 8)", "0", 0, "LE offset"),
+    ("core", "match_src[i]", "match_src[0]", 0, "overlapping match"),
+    ("core", "return LZ4_ERR_OUTPUT;\n        match_src", "return -1;\n        match_src", 0, "match output error"),
     ("asm", "je      .lz4_lit_ext", "nop", 0, "asm: リテラル長の延長を打ち切る"),
     ("asm", "je      .lz4_match_ext", "nop", 0, "asm: マッチ長の延長を打ち切る"),
     ("asm", "movzx   eax, word [esi]", "movzx   eax, byte [esi]", 0, "asm: offset を 1 バイトで読む"),
@@ -425,7 +449,7 @@ def replace_nth(text, pat, rep, nth):
 
 
 def run_mutations(target):
-    base = {"mini": MINI_SRC, "lz4c": LZ4C_SRC, "asm": ASM_SRC, "script": SCRIPT}
+    base = {"core": ROOT / "lib/lz4_decode_core.inc", "mini": MINI_SRC, "lz4c": LZ4C_SRC, "asm": ASM_SRC, "script": SCRIPT}
     bad = 0
     for key, pat, rep, nth, desc in MUTATIONS:
         with tempfile.TemporaryDirectory(prefix="vmk_mut_") as mw:

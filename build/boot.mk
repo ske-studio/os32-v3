@@ -49,7 +49,7 @@ $(BOOT_OUT)/ext2_mini.o: boot/ext2_mini.c boot/boot_defs.h
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS_BOOT) -c -o $@ $<
 
-$(BOOT_OUT)/lz4_mini.o: boot/lz4_mini.c boot/boot_defs.h
+$(BOOT_OUT)/lz4_mini.o: boot/lz4_mini.c boot/boot_defs.h lib/lz4_decode_core.inc
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS_BOOT) -c -o $@ $<
 

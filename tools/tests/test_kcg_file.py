@@ -18,7 +18,7 @@ CHECK = dict(env=['ppc-cross'], name='kcg-file-host', tier=1, needs=[], budget=1
             'kernel/module/module_schema.h',
             'platform/powermac/kcg.c', 'drivers/video/kcg/kcg.c', 'drivers/video/kcg/kcg_read_provider.inc',
             'kernel/console/font_source_kcg*', 'drivers/video/kcg/kcg_module.h',
-            'fs/**', 'exec/*.h', 'mm/*.h', 'lib/kstring.h', 'lib/lz4.c', 'lib/lz4.h'],
+            'fs/**', 'exec/*.h', 'mm/*.h', 'lib/kstring.h', 'lib/lz4.c', 'lib/lz4.h', 'lib/lz4_decode_core.inc'],
     basis=['PPC_FBCON_DESIGN §2', 'PPC_KCG_LZ4_DESIGN §3', 'AC-GLYPH-1'],
 )
 FLAGS = ['-m32', '-std=gnu11', '-ffreestanding', '-fno-builtin', '-fno-pie',
@@ -44,13 +44,13 @@ MUTATIONS = [
  ('kernel/console/font_source_kcg.c', 'if (data) kfree(data);', 'if (data) { }', 'output cleanup'),
  ('kernel/console/font_source_kcg.c', 'const char *path = arg;', 'const char *path = arg; if (resident) return OS32_ERR_BUSY;', 'reload'),
  ('kernel/console/font_source_kcg.c', 'if (rc) { kfree(data); return rc; }', 'if (0) { kfree(data); return rc; }', 'close before publish'),
- ('lib/lz4.c', 'if (lit_len > (int)(ip_end - ip)) return -1;', 'if (0) return -1;', 'literal input bound'),
- ('lib/lz4.c', 'if (ip + LZ4_OFFSET_BYTES > ip_end) return -1;', 'if (0) return -1;', 'truncated offset'),
- ('lib/lz4.c', 'if (match_len > (int)(op_end - op)) return LZ4_ERR_OUTPUT;', 'if (0) return LZ4_ERR_OUTPUT;', 'match output bound'),
- ('lib/lz4.c', 'if (lit_len > (int)(op_end - op)) return LZ4_ERR_OUTPUT;', 'if (0) return LZ4_ERR_OUTPUT;', 'literal output bound'),
- ('lib/lz4.c', '*op++ = match_src[i];', '*op++ = match_src[0];', 'overlap copy'),
- ('lib/lz4.c', 'if (offset == 0) return -1;', 'if (0) return -1;', 'offset zero'),
- ('lib/lz4.c', 'if (op - dst < offset) return -1;', 'if (0) return -1;', 'offset range'),
+ ('lib/lz4_decode_core.inc', 'if (lit_len > (int)(ip_end - ip)) return -1;', 'if (0) return -1;', 'literal input bound'),
+ ('lib/lz4_decode_core.inc', 'if (ip + LZ4_OFFSET_BYTES > ip_end) return -1;', 'if (0) return -1;', 'truncated offset'),
+ ('lib/lz4_decode_core.inc', 'if (match_len > (int)(op_end - op)) return LZ4_ERR_OUTPUT;', 'if (0) return LZ4_ERR_OUTPUT;', 'match output bound'),
+ ('lib/lz4_decode_core.inc', 'if (lit_len > (int)(op_end - op)) return LZ4_ERR_OUTPUT;', 'if (0) return LZ4_ERR_OUTPUT;', 'literal output bound'),
+ ('lib/lz4_decode_core.inc', '*op++ = match_src[i];', '*op++ = match_src[0];', 'overlap copy'),
+ ('lib/lz4_decode_core.inc', 'if (offset == 0) return -1;', 'if (0) return -1;', 'offset zero'),
+ ('lib/lz4_decode_core.inc', 'if (op - dst < offset) return -1;', 'if (0) return -1;', 'offset range'),
 ]
 
 def build_run(root, tmp):

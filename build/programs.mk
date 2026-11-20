@@ -207,7 +207,7 @@ lib/utf8_prog.o: lib/utf8.c lib/utf8.h $(SDK_KAPI_HDR) | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -Ilib -c $< -o $@
 
 # === LZ4 Command ===
-lib/lz4_prog.o: lib/lz4.c lib/lz4.h | $(ABI_CONTRACT_ORDER)
+lib/lz4_prog.o: lib/lz4.c lib/lz4.h lib/lz4_decode_core.inc | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -Ilib -c $< -o $@
 
 userland/system/lz4.o: userland/system/lz4.c | $(ABI_CONTRACT_ORDER)
