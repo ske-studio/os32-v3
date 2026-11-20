@@ -51,6 +51,7 @@ static struct serial_watchdog ser_wd;
  * `g_api->rshell_set_active()` と同じ値をこちら側にも持つ (KAPI に読み口が
  * 無いため)。cmd_serial と cmd_rshell は同じ翻訳単位なので static で足りる。 */
 static int rsh_in_rshell;
+static int rsh_uart;
 
 /* ------------------------------------------------------------------------ */
 /*  rsh_getch — rshell の入力読み出しは **必ずここを通す**                   */
@@ -62,7 +63,7 @@ static int rsh_in_rshell;
 /* ------------------------------------------------------------------------ */
 static int rsh_getch(int *from_serial)
 {
-    int ch = g_api->serial_trygetchar();
+    int ch = rsh_uart ? g_api->serial_trygetchar() : -1;
 
     if (ch >= 0) {                       /* シリアル由来 */
         *from_serial = 1;
@@ -322,6 +323,7 @@ static int cmd_terminal(int argc, char **argv)
  * 以後のコマンドが全滅する (票 §2-2)。 */
 static void rshell_end_reply(void)
 {
+    if (!rsh_uart) return;
     g_api->buz_off();
     {
         u32 wait_start = g_api->get_tick();
@@ -442,7 +444,9 @@ static int __attribute__((unused)) cmd_rshell_resident(int argc, char **argv)
     int ch, fs, r;
     (void)argc; (void)argv;
 
-    if (!g_api->serial_is_initialized()) {
+    rsh_uart = g_api->serial_get_status(0, 0, 0) != OS32_ERR_NOSYS &&
+               g_api->serial_is_initialized();
+    if (!rsh_uart && !g_api->host_notice_read) {
         g_api->kprintf(ATTR_RED, "%s", "Serial not initialized. Run 'serial 9600' first.\n");
         return SH_STATUS_ERROR;
     }
@@ -451,8 +455,10 @@ static int __attribute__((unused)) cmd_rshell_resident(int argc, char **argv)
     g_api->rshell_set_active(1);
     rsh_in_rshell = 1;
     g_api->kprintf(ATTR_GREEN, "%s", "Remote shell active (ESC to exit)\n");
-    g_api->kprintf(ATTR_CYAN, "%s", "Waiting for commands via serial...\n");
-    g_api->serial_putchar(0x04);
+    if (rsh_uart) {
+        g_api->kprintf(ATTR_CYAN, "%s", "Waiting for commands via serial...\n");
+        g_api->serial_putchar(0x04);
+    }
 
     rsh_line_begin(&ln, rbuf, (int)sizeof(rbuf));
     for (;;) {

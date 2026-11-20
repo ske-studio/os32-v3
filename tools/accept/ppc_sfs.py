@@ -32,7 +32,10 @@ def observe(elf, cpu, folder, case):
         # "...\n\n"); under sfs run the begin and exit lines are adjacent.
         begin = rb'(sfs: transport=lan nic=link peer=02:00:5e:00:00:01 sid=[1-9][0-9]*\n)\n'
         assert s.word('sfs_probe_starts') == 1
-        if case == 'absent':
+        if case == 'unmounted':
+            rsh_command(s, command, b'sfs: LAN rshell requires --sfs-lan resident /host\n')
+            rsh_command(s, 'echo $?', b'2\n')
+        elif case == 'absent':
             rsh_command(s, command, b'sfs: session not started (-10)\n')
         else:
             scope = rsh_command(s, '/bin/sfsprob.bin leave')
@@ -45,6 +48,12 @@ def observe(elf, cpu, folder, case):
                 rsh_command(s, 'echo $?', b'7\n')
                 assert s.word('sfs_probe_starts') == 1
             if case == 'normal':
+                fault = rsh_command(s, 'sfs run /bin/fault.bin')
+                assert fault.startswith(line) and fault.endswith(b'sfs: exit=139\n'), fault
+                rsh_command(s, 'echo $?', b'139\n')
+                rsh_command(s, command, expected)
+                rsh_command(s, 'echo $?', b'7\n')
+                assert s.word('sfs_probe_starts') == 1
                 rsh_command(s, 'cd /bin', b'')
                 before = rsh_command(s, 'pwd')
                 assert before.startswith(b'/bin') and before.endswith(b'\n'), before
@@ -76,7 +85,7 @@ def main():
     user = work / 'user'
     bins = ' '.join(str(user / (name + '.bin')) for name in ('hello', 'fault', 'sfsprob'))
     seen = set()
-    cases = ('normal', 'absent', 'drop-exit')
+    cases = ('normal', 'unmounted', 'absent', 'drop-exit')
     for case in cases if args.mutate else ('normal',):
         folder = work / case
         kernel = folder / 'kernel'
@@ -84,7 +93,8 @@ def main():
         anchor = 'int sfs_persistent_start(const struct SfsPersistentConfig *cfg)\n{'
         settings = mutant_settings(folder, 'init-meter', 'fs/serialfs/serialfs_persistent.c',
                                    anchor, 'volatile unsigned sfs_probe_starts;\n' +
-                                   anchor + '\n    ++sfs_probe_starts;')
+                                   anchor + '\n    ++sfs_probe_starts;' +
+                                   ('\n    return OS32_ERR_NOSYS;' if case == 'unmounted' else ''))
         if case == 'drop-exit':
             extra = mutant_settings(folder, case, 'fs/serialfs/serialfs_session.c',
                                     'if (rc == 0) console_printf(KLOG_LEGACY_CYAN, "sfs: exit=%d\\n", exit_code);', '')

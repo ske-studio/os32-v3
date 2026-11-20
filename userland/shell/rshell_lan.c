@@ -266,14 +266,26 @@ int rsh_lan_flush(unsigned int id, unsigned int dropped)
     return rc;
 }
 
+static int notice_unavailable;
+
+static int read_rshell_notice(HostNotice *notice)
+{
+    int rc = g_api->host_notice_read(generation, REMOTE_SVC_RSHELL, notice);
+    if (rc == OS32_ERR_NOSYS) {
+        notice_unavailable = 1;
+        return OS32_ERR_AGAIN;
+    }
+    return rc;
+}
+
 /* Only our reserved service is consumed. The known generation survives exit;
  * a changed generation already discards its old mailbox entries in the kernel. */
 void rsh_lan_reset(void)
 {
     HostNotice notice;
     unsigned int discarded = 0;
-    if (generation && g_api->host_notice_read) {
-        while (!g_api->host_notice_read(generation, REMOTE_SVC_RSHELL, &notice))
+    if (!notice_unavailable && generation && g_api->host_notice_read) {
+        while (!read_rshell_notice(&notice))
             discarded++;
     }
     if (hold.held) {
@@ -361,6 +373,7 @@ int rsh_lan_poll(void)
     int rc, handoff = 0, exit_requested = 0;
     int captured = 0;
     u32 dropped;
+    if (notice_unavailable) return OS32_ERR_AGAIN;
     accepting = 0;
     if (hold.held && (!exchange_limit() || hold.tries >= RSH_HOLD_TRIES)) {
         trace_add("out_drop");
@@ -379,7 +392,7 @@ int rsh_lan_poll(void)
         }
     }
     if (!ready || hold.held) return OS32_ERR_AGAIN;
-    rc = g_api->host_notice_read(generation, REMOTE_SVC_RSHELL, &notice);
+    rc = read_rshell_notice(&notice);
     if (rc) {
         if (rc == OS32_ERR_STALE || rc == OS32_ERR_INVAL) ready = 0;
         return rc;
@@ -498,33 +511,6 @@ void rsh_lan_app_init(void)
 
 int rsh_lan_execute(const char *line)
 {
-#ifdef SHELL_REMOTE_SFS
-    const char *child = rsh_sfs_child(line);
-    if (child) {
-        /* Follow the resident sfs_run_child sequence (rshell.c). */
-        char saved[OS32_MAX_PATH] = "";
-        const char *cwd = g_api->sys_getcwd();
-        if (cwd && strlen(cwd) < sizeof(saved)) strcpy(saved, cwd);
-
-        int rc = g_api->sfs_begin();
-        if (saved[0]) (void)g_api->sys_chdir(saved);
-        if (rc) {
-            g_api->kprintf(ATTR_RED, "sfs: session not started (%d%s)\n", rc,
-                           rc == OS32_ERR_BUSY ? ": /host in use or session active" :
-                           rc == OS32_ERR_IO ? ": no host answered" : "");
-            sh_status_set(SH_STATUS_ERROR);
-        } else {
-            sh_in_sfs = 1;
-            int status = execute_command(child);
-            sh_in_sfs = 0;
-            (void)g_api->sfs_end(status);
-            if (saved[0]) (void)g_api->sys_chdir(saved);
-            sh_status_set(status);
-        }
-        sh_exit_flag = 0;
-        return 0;
-    }
-#endif
     (void)execute_command(line);
     /* A LAN `exit N` does not end the APP shell (the host ends it with EXIT,
      * as in the resident rshell); drop the flag so later lines are not cut. */
