@@ -30,7 +30,8 @@ def check(condition, detail):
 MUTATIONS = {
     'utf8-bytewise': ('kernel/console/console.c', '        cp = dec.codepoint;\n        p += dec.bytes_used;\n        remaining -= dec.bytes_used;',
                       '        cp = *p;\n        p += dec.bytes_used;\n        remaining -= dec.bytes_used;'),
-    'trace-screen': ('platform/powermac/console_log.c', 'if (pm_log_stream_only) return;', ''),
+    'trace-screen': ('platform/powermac/console_log.c', '    pm_log_write(bytes, n);',
+                     '    pm_log_write(bytes, n);\n    console_write(bytes, n, color);'),
     'colors': ('platform/powermac/rh_observe.c', '.foreground = 255, .background = 0',
                '.foreground = 0, .background = 255'),
     'top': ('platform/powermac/console_text.c', 'pm_console_attach(&target, &kcg_file_api, PM_RH_FB_ROWS)',

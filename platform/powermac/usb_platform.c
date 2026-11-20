@@ -14,7 +14,6 @@
 #include "kernel/irq/tick.h"
 #include "kernel/time/tick_clock.h"
 #include "kprintf.h"
-#include "kboot_log.h"
 #include <stdarg.h>
 
 struct pm_pci pm_usb_pci;
@@ -252,9 +251,6 @@ void usbp_log(const char *fmt, ...)
         if (!*p) break;
     }
     va_end(ap);
-    int saved = pm_log_stream_only;
-    pm_log_stream_only = 1;
     kvprintf(7, fmt, words);
     kprintf(7, "\n");
-    pm_log_stream_only = saved;
 }

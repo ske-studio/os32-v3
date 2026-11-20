@@ -88,7 +88,7 @@ void _start(void) { shell_loop_run(&pm_shell_loop_ops); finish(1); }
 '''
 OUTPUT = r'''
 static int writes, logs, capture=1, clears;
-int boot_serial_mirror,rshell_active=1,pm_log_stream_only;
+int boot_serial_mirror,rshell_active=1;
 void con_output_register(const ConOutputOps *ops) { CHECK(ops->putchar('x')==0); }
 void console_write(const char *s,u32 n,u8 c) { (void)c; CHECK(s && n); writes++; }
 void pm_log_write(const char *s,u32 n) { (void)s;(void)n; logs++; }
@@ -99,8 +99,8 @@ void _start(void) {
     console_stream_write("a",1); CHECK(writes==1);
     pm_fd1_write("b",1,2); CHECK(writes==2);
     pm_diag_write("log",3,1); CHECK(logs==1 && writes==2);
-    capture=0; pm_diag_write("log",3,1); CHECK(logs==2 && writes==3 && rshell_active==1);
-    pm_console_clear(); CHECK(clears==1 && writes==3); finish(0);
+    capture=0; pm_diag_write("log",3,1); CHECK(logs==2 && writes==2 && rshell_active==1);
+    pm_console_clear(); CHECK(clears==1 && writes==2); finish(0);
 }
 '''
 
@@ -176,7 +176,7 @@ def main():
             ('rshell_active = 0;', 'rshell_active = 1;'),
             ('rc != EXEC_ERR_FAULT','rc == EXEC_ERR_FAULT')]),
         ('output',(ROOT/'platform/powermac/console_stream.c').read_text()+(ROOT/'platform/powermac/console_log.c').read_text(),OUTPUT,[
-            ('    if (con_sink_capture_active()) return;','    ;'),
+            ('    pm_log_write(bytes, n);','    pm_log_write(bytes, n); console_write(bytes, n, color);'),
             ('    console_write(bytes, len, 1);','    console_write(bytes, len, 1); console_write(bytes, len, 1);')])]
     with tempfile.TemporaryDirectory(prefix='ppc-link-sh-') as d:
         tmp=Path(d); selection(tmp,mutate)

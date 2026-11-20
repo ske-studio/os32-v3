@@ -11,11 +11,11 @@ SOURCES = {'stream.inc':'platform/powermac/console_stream.c',
            'platform_console.h':'platform/powermac/platform_console.h'}
 MUTANTS = [('UTF-8 byte length','utf8.inc','console_write(utf8_str, kstrlen(utf8_str), color);', 'console_write(utf8_str, 1, color);'),
            ('UTF-8 leaves the stream path','platform_console.h','#define CONSOLE_UTF8_AS_STREAM 1','#define CONSOLE_UTF8_AS_STREAM 0'),('poll removed','stream.inc','    pm_terminal_poll();',''),
-           ('diagnostic mirrored','log.inc','    boot_serial_mirror = rshell_active = 0;','')]
+           ('diagnostic routed to terminal','log.inc','    pm_log_write(bytes, n);','    console_write(bytes, n, color);')]
 def run(tmp, sources):
     for name,text in sources.items(): (tmp/name).write_text(text)
     exe=tmp/'stream'
-    subprocess.run(['gcc','-m32','-std=gnu11','-ffreestanding','-fno-builtin',
+    subprocess.run(['gcc','-m32','-nostdinc','-std=gnu11','-ffreestanding','-fno-builtin',
         '-fno-pie','-no-pie','-fno-stack-protector','-nostdlib','-static',
         '-ffunction-sections','-fdata-sections','-Wl,--gc-sections',
         '-D__KERNEL_BUILD__','-I'+str(tmp),'-I'+str(ROOT),

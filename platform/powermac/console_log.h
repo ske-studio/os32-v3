@@ -1,4 +1,4 @@
-/* 診断の出力先 (LAN のログ + 画面)。console_log.c が持ち、log_printf.c が使う。 */
+/* 診断の出力先 (ESCC と LAN のログ)。console_log.c が持ち、log_printf.c が使う。 */
 #ifndef PM_CONSOLE_LOG_H
 #define PM_CONSOLE_LOG_H
 

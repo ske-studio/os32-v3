@@ -26,7 +26,6 @@ static u32 table[PAGE_SIZE / sizeof(u32)] __attribute__((aligned(PAGE_SIZE)));
 static const struct pm_kboot_info info;
 struct pm_usb_root pm_usb_roots[PM_USB_ROOTS];
 u32 pm_usb_root_count;
-int pm_log_stream_only;
 
 static __attribute__((noreturn)) void quit(int status)
 {
