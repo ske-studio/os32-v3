@@ -1,0 +1,6 @@
+#ifndef PC98_PLATFORM_SESSION_SHELL_H
+#define PC98_PLATFORM_SESSION_SHELL_H
+
+#define SESSION_SHELL_CALLER() (res_owner_get() == GUI_SHELL_OWNER)
+
+#endif

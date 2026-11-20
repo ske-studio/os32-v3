@@ -579,6 +579,19 @@ static void pf_diagnostic(void) {
 #define INPUT_FIXTURE_SETUP fixture_input.gui_mode = kbd_set_gui_mode;
 #include "input_fixture_host.h"
 
+static void case_switch_shell(void)
+{
+    char next[8];
+    res_owner_set(GUI_SHELL_OWNER);
+    check(sys_switch_shell("a") == 0, "shell may request a switch");
+    check(sys_switch_shell("b") == 0, "shell may replace the request");
+    res_owner_set(2);
+    check(sys_switch_shell("c") == OS32_ERR_INVAL, "application cannot switch shells");
+    check(gui_take_next_shell(next, sizeof(next)) == 1 && next[0] == 'b' && !next[1],
+          "last accepted request survives rejection");
+    check(gui_take_next_shell(next, sizeof(next)) == 0, "request consumed once");
+}
+
 int main(void)
 {
     input_fixture_init();
@@ -589,6 +602,7 @@ int main(void)
     case_registered_ptr();
     case_ime_render();
     case_register_gate();
+    case_switch_shell();
     if (failures) {
         report("ring3_guard_host: FAIL\n");
         die(1);

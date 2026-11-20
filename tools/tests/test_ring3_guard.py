@@ -48,6 +48,10 @@ KERNEL_SRCS = [ROOT / "exec/ring3_str.c", ROOT / "kernel/gui.c", ROOT / "fs/fd_r
 
 # 否定側: 実物の 1 行を壊すと RED になることを見る (写しの上で。ソースは触らない)。
 MUTATIONS = [
+    ("platform/pc98/platform_session_shell.h", "(res_owner_get() == GUI_SHELL_OWNER)", "1",
+     "sys_switch_shell accepts an application owner"),
+    ("kernel/gui.c", r"    g_next_shell[0] = '\0';", "",
+     "gui_take_next_shell retains the request"),
     ("arch/x86/kernel/isr_handlers.c", '        sputs(" err="); sput_hex32(error_code);\n', '', "PF error code absent"),
     ("kernel/gui.c", "    if (op == GUI_OP_OWNER_EXIT) return OS32_ERR_INVAL;", "",
      "OWNER_EXIT public forgery allowed"),

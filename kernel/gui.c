@@ -8,6 +8,7 @@
 
 #include "serial_diag.h"
 #include "gui.h"
+#include "session_shell.h"
 #include "gfx.h"
 #include "kstring.h"
 #include "input_service.h"      /* input_set_gui_mode (K2-B) */
@@ -195,13 +196,13 @@ void *gui_get_pump(void)
 /* ======================================================================== */
 /*  sys_switch_shell — 次シェルのパスを記録する (契約 T9、K4 の入口)         */
 /*                                                                          */
-/*  shell 帯 (owner 1) からのみ。実際の入れ替えはカーネルのシェル起動ループ  */
-/*  (K4) が gui_take_next_shell() で行う。呼んだシェルは自分で後始末して    */
+/*  SESSION_SHELL_CALLER() が真の呼び手 (機種が決める) だけ。入れ替えは    */
+/*  シェル起動ループ (K4) が gui_take_next_shell() で行う。呼んだシェルは自分で後始末して    */
 /*  exit する。                                                              */
 /* ======================================================================== */
 i32 sys_switch_shell(const char *path)
 {
-    if (res_owner_get() != GUI_SHELL_OWNER) {
+    if (!SESSION_SHELL_CALLER()) {
         return OS32_ERR_INVAL;
     }
     if (path == 0 || path[0] == '\0') {
