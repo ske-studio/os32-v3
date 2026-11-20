@@ -1,7 +1,7 @@
 #include "kcg_module.h"
 #include "kcg_imports.h"
 #include "kcg_contract.h"
-#include "bootinfo.h"
+#include "platform_module_pair.h"
 #include "config.h"
 #include "os32_generations.h"
 #include "os32_kapi_shared.h"
@@ -62,12 +62,13 @@ static int kcg_detach(struct module_record *r)
 int kcg_module_load(void)
 {
     if (kcg_handle.generation) return MODULE_BUSY;
-    const struct boot_common *bi = boot_common_get();
+    u32 pair = 0;
+    int pair_valid = platform_module_pair(&pair);
     const struct module_request request = {
         .path = SYS_KCG_MOD, .name = "kcg",
         .policy = {
             KAPI_VERSION, OS32_MEMORY_LAYOUT_GENERATION, KCG_MODULE_ABI_GEN,
-            bi->image_crc, KCG_MODULE_OPS_VERSION, bi->image_valid,
+            pair, KCG_MODULE_OPS_VERSION, pair_valid,
             KCG_IMPORT_COUNT, kcg_import_contracts, kcg_export_contracts,
             MODULE_ID_KCG
         },
@@ -78,7 +79,7 @@ int kcg_module_load(void)
     if (!rc) rc = module_start(kcg_handle);
     if (!rc && !module_exports(kcg_handle)) rc = MODULE_INIT_FAILED;
     kprintf(KLOG_ATTR, "[KCG] ROM module rc=%d pair=%08x cache=%u\n",
-            rc, bi->image_crc, KCG_ROM_CACHE_BYTES);
+            rc, pair, KCG_ROM_CACHE_BYTES);
     if (rc) kprintf(KLOG_ATTR, "[KCG] ROM stub; TVRAM CUI retained\n");
     return rc;
 }

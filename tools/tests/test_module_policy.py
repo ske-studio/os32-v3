@@ -1,11 +1,18 @@
 """T5c-6 table validation and conformance of existing policy consumers."""
 CHECK = dict(name='module-policy-host', tier=1,
-    covers=['exec/os32x_hdr.c', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'kernel/module/module_schema.h', 'include/config.h', 'build/core.yaml', 'platform/pc98/kernel.c', 'kernel/sqlite_engine.c', 'userland/system/hsync.c', 'userland/shell/ui.c', 'kdebug/kdebug_module.c', 'kernel/ime/fep_module.c', 'drivers/ata/cd_module.c', 'drivers/video/kcg/kcg_module.c', 'drivers/sound/fm/fm_module.c', 'drivers/sound/cs4231/pcm_module.c', 'platform/pc98/legacy/v86_module.c', 'drivers/net/e82557/lan_module.c', 'drivers/video/cirrus/cirrus_module.c', 'drivers/video/trident/trident_module.c', 'build/kernel.*', 'build/out/*'],
+    covers=['drivers/video/geforce/geforce_module.c', 'hwdev/hwdev_module.c', 'tools/tests/module_pair_request_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'include/platform_module_pair.h', 'exec/os32x_hdr.c', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'kernel/module/module_schema.h', 'include/config.h', 'build/core.yaml', 'platform/pc98/kernel.c', 'kernel/sqlite_engine.c', 'userland/system/hsync.c', 'userland/shell/ui.c', 'kdebug/kdebug_module.c', 'kernel/ime/fep_module.c', 'drivers/ata/cd_module.c', 'drivers/video/kcg/kcg_module.c', 'drivers/sound/fm/fm_module.c', 'drivers/sound/cs4231/pcm_module.c', 'platform/pc98/legacy/v86_module.c', 'drivers/net/e82557/lan_module.c', 'drivers/video/cirrus/cirrus_module.c', 'drivers/video/trident/trident_module.c', 'build/kernel.*', 'build/out/*'],
     needs=['make:all'], budget=4.3,
     kind='characterization',
 )
 
 import copy
+import os
+import struct
+import subprocess
+import tempfile
+
+import host32
+from kernel_includes import include_flags
 from pathlib import Path
 import re
 import sys
@@ -53,6 +60,41 @@ def fixtures(validator=schema.validate_components):
     assert rejected((*rows, extra), validator), 'fourteenth ID accepted'
 
 
+def check_pair_request(stem, adapter):
+    # HWDEV needs a live kdebug dependency and uses its own real runtime fixture.
+    if stem == 'hwdev':
+        return
+    entry = {'sqlite': 'os32_sqlite_start()', 'kdebug': 'kdebug_load()',
+             'fep': 'fep_module_load((struct module_handle){0})'}.get(stem, stem + '_module_load()')
+    with tempfile.TemporaryDirectory(prefix='pair-request-') as tmp:
+        exe = Path(tmp) / 'adapter'
+        flags = ['gcc', '-m32', '-O2', '-fno-ipa-pure-const', '-ffreestanding', '-fno-pie', '-fno-stack-protector',
+                 '-ffunction-sections', '-fdata-sections', '-D__KERNEL_BUILD__',
+                 '-DPAIR_' + stem.upper(),
+                 '-DPAIR_ENTRY=' + entry, '-Ikdebug/generated', '-Ibuild/out/' + stem, *include_flags(ROOT)]
+
+        def exercise(path, expected):
+            subprocess.run([*flags, '-DPAIR_ADAPTER="' + str(path) + '"',
+                            '-iquote', str(adapter.parent), '-nostdlib', '-static', '-no-pie',
+                            '-Wl,--gc-sections', 'tools/tests/module_pair_request_host.c',
+                            '-o', exe], check=True, cwd=ROOT)
+            for runner in os.environ.get('HOST32_RUNNERS', 'qemu').split():
+                for valid, rc in enumerate(expected):
+                    result = host32.run([str(exe)], input=struct.pack('<I', valid), runner=runner)
+                    assert result.returncode == rc, (stem, valid, result.returncode, rc)
+
+        exercise(adapter, (0, 0))
+        if '--mutate' in sys.argv:
+            source = adapter.read_text()
+            mutant = Path(tmp) / adapter.name
+            old = 'platform_module_pair(&pair);'
+            assert source.count(old) == 1
+            for change, expected in [('pair_valid = 1;', (1, 0)), ('pair = 0;', (0, 1))]:
+                mutant.write_text(source.replace(old, old + '\n    ' + change))
+                exercise(mutant, expected)
+                print(f'RED {stem} {change}')
+
+
 def conformance():
     assert gen_module_schema.OUTPUT.read_text() == gen_module_schema.render(), 'stale schema'
     config = (ROOT / 'include/config.h').read_text()
@@ -79,7 +121,9 @@ def conformance():
             'cirrus_module': 'drivers/video/cirrus', 'trident_module': 'drivers/video/trident',
             'geforce_module': 'drivers/video/geforce', 'kcg_module': 'drivers/video/kcg',
         }.get(adapter, 'kernel')
-        source = (ROOT / directory / (adapter + '.c')).read_text()
+        path = ROOT / directory / (adapter + '.c')
+        check_pair_request(stem, path)
+        source = path.read_text()
         path_macro = re.search(r'\.path\s*=\s*(SYS_\w+)', source)[1]
         assert re.search(r'^#define ' + path_macro + r'\s+"' + re.escape(row['path']) + '"', config, re.M), row
         assert 'MODULE_ID_' + row['name'] in source, row

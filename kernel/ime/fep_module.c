@@ -3,7 +3,7 @@
 #include "fep_imports.h"
 #include "../../fs/fd_redirect.h"
 #include "../sqlite_engine.h"
-#include "bootinfo.h"
+#include "platform_module_pair.h"
 #include "config.h"
 #include "os32_generations.h"
 #include "input_service.h"
@@ -162,12 +162,13 @@ static int fep_quiesce(struct module_record *r)
 int fep_module_load(struct module_handle sqlite)
 {
     if (fep_handle.generation) return MODULE_BUSY;
-    const struct boot_common *bi = boot_common_get();
+    u32 pair = 0;
+    int pair_valid = platform_module_pair(&pair);
     const struct module_request request = {
         .path = SYS_FEP_MOD, .name = "fep",
         .policy = {
             KAPI_VERSION, OS32_MEMORY_LAYOUT_GENERATION, FEP_MODULE_ABI_GEN,
-            bi->image_crc, FEP_MODULE_OPS_VERSION, bi->image_valid,
+            pair, FEP_MODULE_OPS_VERSION, pair_valid,
             FEP_IMPORT_COUNT, fep_import_contracts, fep_export_contracts,
             MODULE_ID_FEP
         },
@@ -179,7 +180,7 @@ int fep_module_load(struct module_handle sqlite)
     if (!rc) rc = module_start(fep_handle);
     if (!rc && !module_exports(fep_handle)) rc = MODULE_INIT_FAILED;
     kprintf(KLOG_ATTR, "[fep] module rc=%d pair=%08x pages=%u\n",
-            rc, bi->image_crc, fep_module_pages());
+            rc, pair, fep_module_pages());
     return rc;
 }
 
