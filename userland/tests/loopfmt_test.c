@@ -54,18 +54,18 @@ int main(int argc, char **argv, KernelAPI *api)
     const char *path = argv[1];
     if (!read_image(api, path, 0) || !filled(image, sizeof(image)) ||
         api->loop_status(0, &total, &bps) != 0 || api->loop_attach(path, 0) != 0) goto done;
-    int rc = api->ext2_format_at(0x0600, 7, 256);
+    int rc = api->ext2_format_at(OS32_DRV_LOOP(0), 7, 256);
     api->loop_detach(0);
     if (rc || !read_image(api, path, 0) || !filled(image + 6 * SECTOR, SECTOR) ||
         !filled(image + 263 * SECTOR, SECTOR) || !super_ok(9, 128)) goto done;
     passed++;
     if (api->loop_attach(path, 0) != 0) goto done;
-    rc = api->ext2_format(0x0600, 321);
+    rc = api->ext2_format(OS32_DRV_LOOP(0), 321);
     api->loop_detach(0);
     if (rc || !read_image(api, path, 0) || !super_ok(2, 160)) goto done;
     passed++;
-    if (api->ext2_format(0x0600, 256) != -1 ||
-        api->ext2_format_at(0x0600, 7, 256) != -1 || !read_image(api, path, 1)) goto done;
+    if (api->ext2_format(OS32_DRV_LOOP(0), 256) != -1 ||
+        api->ext2_format_at(OS32_DRV_LOOP(0), 7, 256) != -1 || !read_image(api, path, 1)) goto done;
     passed++;
 done:
     printf("readonly RAW / 512B D88: SKIP need samples\n");

@@ -299,7 +299,7 @@ extern int __cdecl wrap_io_pump(unsigned int budget_us);
 extern i32 __cdecl kapi_reserved_nosys(void);
 
 kapi->magic = 0x4B415049UL;
-kapi->version = 87;
+kapi->version = 88;
 
     kapi->gfx_init = wrap_gfx_init;
     kapi->gfx_init_200 = wrap_gfx_init_200;

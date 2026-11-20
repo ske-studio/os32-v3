@@ -46,7 +46,7 @@ static void case_medium(void)
     attached = writable = 1;
     sector_bytes = 512;
     for (active_slot = 0; active_slot < 4; active_slot++) {
-        int drv = 0x0600 + active_slot;
+        int drv = OS32_DRV_LOOP(active_slot);
         io_reset();
         kmemset(g_disk, 0xab, 320 * 512);
         CHECK(ext2_format_at(drv, 7, 256) == EXT2_OK);
@@ -70,14 +70,14 @@ static void case_medium(void)
     }
     CHECK(status_calls == 0 && g_wr == 0);
     writable = 0; /* Both read-only and 512-byte D88 report LBA writes unavailable. */
-    CHECK(ext2_format(0x0600, 256) == EXT2_ERR_INVAL);
-    CHECK(ext2_format_at(0x0600, 20, 256) == EXT2_ERR_INVAL);
+    CHECK(ext2_format(OS32_DRV_LOOP(0), 256) == EXT2_ERR_INVAL);
+    CHECK(ext2_format_at(OS32_DRV_LOOP(0), 20, 256) == EXT2_ERR_INVAL);
     writable = 1;
     sector_bytes = 1024;
-    CHECK(ext2_format(0x0600, 256) == EXT2_ERR_INVAL);
-    CHECK(ext2_format_at(0x0600, 20, 256) == EXT2_ERR_INVAL);
+    CHECK(ext2_format(OS32_DRV_LOOP(0), 256) == EXT2_ERR_INVAL);
+    CHECK(ext2_format_at(OS32_DRV_LOOP(0), 20, 256) == EXT2_ERR_INVAL);
     attached = 0;
-    CHECK(ext2_format(0x0600, 256) == EXT2_ERR_IO);
-    CHECK(ext2_format_at(0x0600, 20, 256) == EXT2_ERR_IO);
+    CHECK(ext2_format(OS32_DRV_LOOP(0), 256) == EXT2_ERR_IO);
+    CHECK(ext2_format_at(OS32_DRV_LOOP(0), 20, 256) == EXT2_ERR_IO);
     CHECK(g_wr == 0);
 }
