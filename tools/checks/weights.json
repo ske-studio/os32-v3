@@ -446,6 +446,7 @@
     "ppc-sc": 102,
     "ppc-sd": 105,
     "ppc-sd-link": 176,
+    "ppc-session-shell-host": 1,
     "ppc-sh-output": 40,
     "ppc-shm-guest": 82,
     "ppc-sqlite-stack-guest": 23.041937,
