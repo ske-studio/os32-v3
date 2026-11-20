@@ -102,7 +102,13 @@ def observe(elf, out, cpu, case):
         local('clear')
         for i in range(35):
             local(f'echo l{i:02d}')
-        s.wait(lambda: finished(s.screen('scroll'), r'l34'), 'USB scroll completion', 30)
+        # A broken scroll never shows 'l34' followed by a prompt; do not turn
+        # that into a timeout — photograph after the deadline and let the
+        # pixel comparison below decide (positive mismatch evidence).
+        try:
+            s.wait(lambda: finished(s.screen('scroll'), r'l34'), 'USB scroll completion', 30)
+        except RuntimeError:
+            pass
         _, pixels = shot('scroll')
         for i in range(19, 35):
             row = (i - 19) * 2
