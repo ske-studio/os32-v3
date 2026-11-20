@@ -113,6 +113,7 @@ int platform_disk_geometry_get(int drive, struct platform_disk_geometry *info)
 #include "../../fs/ext2/ext2_inode.c"
 #include "../../fs/ext2/ext2_dir.c"
 #include "../../fs/ext2/ext2_file.c"
+#include "../../fs/ext2/ext2_medium_ide.c"
 #include "../../fs/ext2/ext2_fmt.c"
 #include "../../fs/ext2/ext2_vfs.c"
 #include "../platform/pc98/boot_names.c"
@@ -378,6 +379,7 @@ static void learning(IME_Dict *dict)
 
 int main(int argc, char **argv)
 {
+    CHECK(ext2_medium_register(EXT2_MEDIUM_HD, &ext2_medium_ide_ops) == 0);
     input_fixture_init();
     IME_Dict dict = {0};
     CHECK(argc == 2);

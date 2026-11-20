@@ -19,6 +19,7 @@
 #include "loop_dev.h"
 #include "vfs.h"
 #include "ext2.h"
+#include "ext2_medium_contract.h"
 #include "hostdrvfs.h"
 #include "serialfs.h"
 #include "io.h"
@@ -123,10 +124,13 @@ static void pc98_boot_dev_fs(const struct boot_context *ctx)
     dev_init();
     loop_dev_init();  /* lo0..lo3 ループバックデバイス登録 */
     path_init();
+    ext2_medium_register(EXT2_MEDIUM_HD, &ext2_medium_ide_ops);
+    ext2_medium_register(EXT2_MEDIUM_LOOP, &ext2_medium_loop_ops);
     int fs_registration_failed = ext2_init() != VFS_OK;
     fs_registration_failed |= fatfs_init() != VFS_OK;
     fs_registration_failed |= hostdrvfs_init() != VFS_OK;
     fs_registration_failed |= serialfs_init() != VFS_OK;
+    serialfs_session_set_fg(&sfs_session_fg);
     path_set_device_validator(dev_name_present);
     tvram_print(64, 1, fs_registration_failed ? "NG" : "OK", TATTR_WHITE);
     if (fs_registration_failed)

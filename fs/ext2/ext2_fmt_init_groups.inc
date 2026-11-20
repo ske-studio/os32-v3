@@ -1,5 +1,5 @@
 /* ext2_fmt.c から同じ翻訳単位に取り込む。 */
-static int fmt_init_groups(Ext2Ctx *ctx, const Ext2Layout *lay)
+static int fmt_init_groups(const FormatIO *ctx, const Ext2Layout *lay)
 {
     u32 g, i;
     int ret;
@@ -31,43 +31,43 @@ static int fmt_init_groups(Ext2Ctx *ctx, const Ext2Layout *lay)
         }
 
         /* ブロックビットマップ */
-        ext2_mem_zero(ext2_g_blk, EXT2_BLOCK_SIZE);
+        ext2_mem_zero(fmt_blk, EXT2_BLOCK_SIZE);
         /* オーバーヘッドブロックをマーク */
         for (i = 0; i < overhead; i++) {
-            ext2_g_blk[i / BITS_PER_BYTE] |= (u8)(1 << (i % BITS_PER_BYTE));
+            fmt_blk[i / BITS_PER_BYTE] |= (u8)(1 << (i % BITS_PER_BYTE));
         }
         /* グループ0: ルートディレクトリ用データブロック1つ */
         if (g == 0) {
-            ext2_g_blk[overhead / BITS_PER_BYTE] |= (u8)(1 << (overhead % BITS_PER_BYTE));
+            fmt_blk[overhead / BITS_PER_BYTE] |= (u8)(1 << (overhead % BITS_PER_BYTE));
         }
         /* グループ内のブロック数以降のビットを全て使用不可にマーク
          * (ext2仕様: ビットマップのパディング部分は1) */
         for (i = gl.blocks_in_group; i < EXT2_BLOCKS_PER_GROUP_MAX; i++) {
-            ext2_g_blk[i / BITS_PER_BYTE] |= (u8)(1 << (i % BITS_PER_BYTE));
+            fmt_blk[i / BITS_PER_BYTE] |= (u8)(1 << (i % BITS_PER_BYTE));
         }
-        ret = ext2_write_block(ctx, bmap_blk, ext2_g_blk);
+        ret = fmt_wr(ctx, bmap_blk, fmt_blk);
         if (ret != 0) return EXT2_ERR_IO;
 
         /* inodeビットマップ */
-        ext2_mem_zero(ext2_g_blk, EXT2_BLOCK_SIZE);
+        ext2_mem_zero(fmt_blk, EXT2_BLOCK_SIZE);
         if (g == 0) {
             /* inode 1-10は予約 (ビット0-9) */
             for (i = 0; i < EXT2_RESERVED_INODES; i++) {
-                ext2_g_blk[i / BITS_PER_BYTE] |= (u8)(1 << (i % BITS_PER_BYTE));
+                fmt_blk[i / BITS_PER_BYTE] |= (u8)(1 << (i % BITS_PER_BYTE));
             }
         }
         /* inodes_per_group以降のビットを全て使用不可にマーク
          * (ext2仕様: ビットマップのパディング部分は1) */
         for (i = lay->inodes_per_group; i < EXT2_BLOCKS_PER_GROUP_MAX; i++) {
-            ext2_g_blk[i / BITS_PER_BYTE] |= (u8)(1 << (i % BITS_PER_BYTE));
+            fmt_blk[i / BITS_PER_BYTE] |= (u8)(1 << (i % BITS_PER_BYTE));
         }
-        ret = ext2_write_block(ctx, imap_blk, ext2_g_blk);
+        ret = fmt_wr(ctx, imap_blk, fmt_blk);
         if (ret != 0) return EXT2_ERR_IO;
 
         /* inodeテーブル (ゼロクリア) */
-        ext2_mem_zero(ext2_g_blk, EXT2_BLOCK_SIZE);
+        ext2_mem_zero(fmt_blk, EXT2_BLOCK_SIZE);
         for (i = 0; i < lay->itable_blocks; i++) {
-            ret = ext2_write_block(ctx, itable_blk + i, ext2_g_blk);
+            ret = fmt_wr(ctx, itable_blk + i, fmt_blk);
             if (ret != 0) return EXT2_ERR_IO;
         }
     }

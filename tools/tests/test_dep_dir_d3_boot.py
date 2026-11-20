@@ -177,7 +177,11 @@ def main():
             else:
                 raise AssertionError(label + ': boot boundary swap escaped order check')
 
+        init = '    fs_registration_failed |= serialfs_init() != VFS_OK;'
+        register = '    serialfs_session_set_fg(&sfs_session_fg);'
         for mutation in (
+            ('platform/pc98/boot.c', register, ''),
+            ('platform/pc98/boot.c', init + '\n' + register, register + '\n' + init),
             ('platform/pc98/boot.c',
              'drive == BOOT_DRIVE_FDD || drive == BOOT_DRIVE_FDD_144',
              '(drive & BIOS_DA_TYPE_MASK) == BOOT_DRIVE_FDD || (drive & BIOS_DA_TYPE_MASK) == BOOT_DRIVE_FDD_144'),

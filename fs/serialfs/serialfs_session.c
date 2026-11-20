@@ -217,22 +217,10 @@ static int sfs_finish(int code)
     return quiet ? 0 : 1;
 }
 
-int serialfs_session_begin(void)
+static int sfs_fg_begin(void)
 {
     u32 mode = 0, baud = 0, fifo = 0;
     int rc;
-
-    if (sfs_persistent_enabled()) {
-        struct SfsTransportInfo ti = { "?", {0}, 0 };
-        rc = sfs_persistent_scope_begin_owned(res_owner_get());
-        if (rc != 0) return rc;
-        (void)sfs_persistent_describe(&ti);
-        console_printf(KLOG_LEGACY_CYAN,
-                "sfs: transport=lan nic=%s peer=%02x:%02x:%02x:%02x:%02x:%02x sid=%u\n",
-                ti.nic, (u32)ti.peer[0], (u32)ti.peer[1], (u32)ti.peer[2],
-                (u32)ti.peer[3], (u32)ti.peer[4], (u32)ti.peer[5], sfs_persistent_client()->sid);
-        return 0;
-    }
 
     /* 常駐シェルの `sfs run` だけ (sh.bin・外部プログラムは断る) */
     if (res_owner_get() != APP_ID_SHELL) return OS32_ERR_INVAL;
@@ -330,6 +318,41 @@ int sfs_lan_peer_mac(u8 *out)
     return 0;
 }
 
+static int sfs_fg_end(int exit_code)
+{
+    if (res_owner_get() != APP_ID_SHELL) return OS32_ERR_INVAL;
+    if (!g_active) return OS32_ERR_INVAL;
+    return sfs_finish(exit_code);
+}
+
+const struct SfsSessionFg sfs_session_fg = {
+    .begin = sfs_fg_begin,
+    .end = sfs_fg_end
+};
+
+static const struct SfsSessionFg *g_fg = NULL;
+
+void serialfs_session_set_fg(const struct SfsSessionFg *fg)
+{
+    g_fg = fg;
+}
+
+int serialfs_session_begin(void)
+{
+    if (sfs_persistent_enabled()) {
+        struct SfsTransportInfo ti = { "?", {0}, 0 };
+        int rc = sfs_persistent_scope_begin_owned(res_owner_get());
+        if (rc != 0) return rc;
+        (void)sfs_persistent_describe(&ti);
+        console_printf(KLOG_LEGACY_CYAN,
+                "sfs: transport=lan nic=%s peer=%02x:%02x:%02x:%02x:%02x:%02x sid=%u\n",
+                ti.nic, (u32)ti.peer[0], (u32)ti.peer[1], (u32)ti.peer[2],
+                (u32)ti.peer[3], (u32)ti.peer[4], (u32)ti.peer[5], sfs_persistent_client()->sid);
+        return 0;
+    }
+    return g_fg ? g_fg->begin() : OS32_ERR_NOSYS;
+}
+
 int serialfs_session_end(int exit_code)
 {
     if (sfs_persistent_enabled()) {
@@ -337,10 +360,7 @@ int serialfs_session_end(int exit_code)
         if (rc == 0) console_printf(KLOG_LEGACY_CYAN, "sfs: exit=%d\n", exit_code);
         return rc;
     }
-
-    if (res_owner_get() != APP_ID_SHELL) return OS32_ERR_INVAL;
-    if (!g_active) return OS32_ERR_INVAL;
-    return sfs_finish(exit_code);
+    return g_fg ? g_fg->end(exit_code) : OS32_ERR_NOSYS;
 }
 
 void serialfs_session_owner_exit(int owner)
