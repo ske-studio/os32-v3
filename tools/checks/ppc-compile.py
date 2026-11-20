@@ -2,7 +2,8 @@
 CHECK = dict(env=['ppc-cross'], name='ppc-compile', tier=1, budget=180, needs=['make:ppc-ci-image'],
              covers=[
         'userland/shell/rshell_lan.c',
-        'tools/ppc/**',
+        'tools/ppc/**', 'tools/prototypes/fep_imports.def',
+        'tools/prototypes/sqlite_imports.def', 'exec/**',
         'tools/*.py',
         'build/out/ppc-user/**',
         'tools/checks/ppc-sc.py',

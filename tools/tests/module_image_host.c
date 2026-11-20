@@ -66,6 +66,8 @@ void _start(void)
     int rc = module_image_validate(image, input[7], &policy, &plan);
     if (module_image_validate(image, input[7], &policy, 0) != rc) finish(2);
     for (u32 i = 0; i < input[7]; i++) if (before[i] != image[i]) finish(2);
+    if (rc == MODULE_RELOC_INVALID && header_rc != MODULE_IMAGE_OK) finish(2);
+    if (header_rc && rc != header_rc) finish(2);
     if (rc) {
         check_unchanged(&plan, sizeof(plan), 0xa5);
     } else {
