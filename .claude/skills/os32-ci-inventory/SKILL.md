@@ -7,6 +7,8 @@ description: CI の待ち時間の棚卸し。検査ごとの所要・シャー�
 
 決まりは [POLICY_CI](../../../docs/POLICY_CI.md) G10 (時間を割り、測り、見えるようにする)、道具の設計は [time_inventory](../../../docs/design/tools/ci/time_inventory.md)。待ち時間は一番遅いジョブで決まる。シャードの割り振りは検査ごとの重み (`tools/checks/weights.json`) で釣り合いを取るので、重みが実態とずれると遅くなる。
 
+> 検査を外す・軽くする・戻すかはユーザーが決める (POLICY_CI G14、ユーザー決定 2026-11-20)。PM は重い順の表と、各々が確かめている物・外した時に失う物を出して選んでもらう。
+
 ## 0. 基準 (前の棚卸しの値)
 
 比べる相手は `docs/design/tools/ci/gate.md` §5-1 の最後の行。2026-11-18 の棚卸しの後の値:

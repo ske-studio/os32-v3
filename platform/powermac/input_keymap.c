@@ -30,37 +30,37 @@ int pm_input_keymap(u8 sc, u8 state)
     if (sc >= 128) return -1;
     c = letters[sc];
     if (c) {
-        if (state & PM_INPUT_CTRL) return c == 'c' ? 27 : c - 'a' + 1;
+        if (state & PM_INPUT_CTRL) return (sc << 8) | (c == 'c' ? 27 : c - 'a' + 1);
         if (!!(state & PM_INPUT_SHIFT) ^ !!(state & PM_INPUT_CAPS)) c -= 'a' - 'A';
-        return c;
+        return (sc << 8) | c;
     }
     c = (state & PM_INPUT_SHIFT) ? shifted[sc] : plain[sc];
-    if (c) return c;
+    if (c) return (sc << 8) | c;
     switch (sc) {
     case 0x00: return 27;
-    case 0x0e: return 8;
-    case 0x0f: return 9;
-    case 0x1c: return 13;
-    case 0x34: return 32;
+    case 0x0e: return (sc << 8) | 8;
+    case 0x0f: return (sc << 8) | 9;
+    case 0x1c: return (sc << 8) | 13;
+    case 0x34: return (sc << 8) | 32;
     case 0x39: case 0x3a: case 0x3b: case 0x3c: case 0x3d: case 0x3e:
         return sc << 8;
-    case 0x40: return '-';
-    case 0x41: return '/';
-    case 0x42: return '7';
-    case 0x43: return '8';
-    case 0x44: return '9';
-    case 0x45: return '*';
-    case 0x46: return '4';
-    case 0x47: return '5';
-    case 0x48: return '6';
-    case 0x49: return '+';
-    case 0x4a: return '1';
-    case 0x4b: return '2';
-    case 0x4c: return '3';
-    case 0x4d: return '=';
-    case 0x4e: return '0';
-    case 0x4f: return ',';
-    case 0x50: return '.';
+    case 0x40: return (sc << 8) | '-';
+    case 0x41: return (sc << 8) | '/';
+    case 0x42: return (sc << 8) | '7';
+    case 0x43: return (sc << 8) | '8';
+    case 0x44: return (sc << 8) | '9';
+    case 0x45: return (sc << 8) | '*';
+    case 0x46: return (sc << 8) | '4';
+    case 0x47: return (sc << 8) | '5';
+    case 0x48: return (sc << 8) | '6';
+    case 0x49: return (sc << 8) | '+';
+    case 0x4a: return (sc << 8) | '1';
+    case 0x4b: return (sc << 8) | '2';
+    case 0x4c: return (sc << 8) | '3';
+    case 0x4d: return (sc << 8) | '=';
+    case 0x4e: return (sc << 8) | '0';
+    case 0x4f: return (sc << 8) | ',';
+    case 0x50: return (sc << 8) | '.';
     default: return -1;
     }
 }

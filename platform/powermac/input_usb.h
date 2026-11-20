@@ -10,6 +10,10 @@ void pm_input_usb_repeat(u8 src, u8 sc);
 void pm_input_usb_release(u8 src);
 /* Foreground queries preserve the caller's interrupt state. */
 int pm_input_usb_take(void);
+void pm_input_usb_note_remote(void);
+/* Switch to the common platform_fep_input.h declarations when M1 lands. */
+int platform_fep_key_local(void);
+u8 platform_fep_key_shift(void);
 int pm_input_usb_has_key(void);
 /* Oldest cooked key without consuming it; -1 when empty (P3 ③b-1). */
 int pm_input_usb_peek(void);

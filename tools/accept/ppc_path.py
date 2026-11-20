@@ -94,8 +94,8 @@ def main():
                                        '        if (!device_validator(name)) return 0;')
         elif case == 'unset-root-drive':
             mutation = mutant_settings(folder, case, 'platform/powermac/root_boot.c',
-                                       '    return path_set_drive(vfs_devname("/"));',
-                                       '    return 0;')
+                                       '    rc = path_set_drive(vfs_devname("/"));',
+                                       '    rc = 0;')
         elif case == 'absent':
             absent_bindings(folder, kernel / 'gen')
         elf = build(kernel, *options, *mutation, 'kb-user', 'kernel')
