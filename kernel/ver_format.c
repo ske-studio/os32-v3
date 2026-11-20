@@ -89,3 +89,16 @@ void __attribute__((cold)) ver_format(const VerSnapshot *s, OS32_VerInfo *out)
     }
     if (backend && backend->debug) backend->debug(s, out);
 }
+
+void ver_gfx_value(VerLineBuilder *b, const VerSnapshot *s, const char *backend_name)
+{
+    if (!backend_name || !s->gfx.width || !s->gfx.height || !s->gfx.bpp)
+        ver_text(b, "unknown");
+    else {
+        ver_text(b, backend_name); ver_text(b, " ");
+        ver_number(b, s->gfx.width, 0); ver_text(b, "x");
+        ver_number(b, s->gfx.height, 0); ver_text(b, "x");
+        ver_number(b, s->gfx.bpp, 0); ver_text(b, " bpp");
+    }
+    ver_text(b, s->gfx_active ? "; active" : "; GUI target");
+}
