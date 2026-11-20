@@ -78,4 +78,3 @@
 
 - [tools/tests/splash_probe_host.c](splash_probe_host.c.md)
 
-- [tools/tests/test_splash_probe.py](test_splash_probe.py.md)
