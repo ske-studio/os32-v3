@@ -87,6 +87,7 @@ static void loading(void)
 }
 static void loading_cui(void)
 {
+    static const char *gshell_warning; /* Normal CUI startup has no pending warning. */
 #include "loading_cui.inc"
 }
 static void say(const char *s)
