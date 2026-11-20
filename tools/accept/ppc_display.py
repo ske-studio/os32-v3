@@ -251,14 +251,15 @@ def observe(elf, cpu, evidence, case, modes=()):
             rsh_command(session, 'echo $?', b'0\n')
         if modes and case not in ('redraw-gated', 'lease-kept'):
             present_pixels(session, evidence, case, serial, modes)
-        if case == 'target-failure' and modes:
-            rsh_command(session, '/bin/gfx2prob.bin shutdown-off')
-            rsh_command(session, 'echo $?', b'0\n')
+        # target-failure / target-gate-open: the display target cannot be
+        # re-acquired, so gfx_init in a gfx2 probe fails before the gates
+        # ("KCG unavailable -> CUI", exit 1). Their gate RED stays on the v1
+        # present pixels; the gfx2 gate RED is taken by gate-open below.
         # A9a/A9c (5c confirmed P2): the gfx2 gates' RED is taken with gfx2 calls,
         # not only the v1 present. shutdown-off returns 34 when mode_set, flip
         # or present is not BUSY after shutdown; owned-child returns 36 when a
         # non-owner child's gfx2_present is not BUSY.
-        if case in ('gate-open', 'target-gate-open') and modes:
+        if case == 'gate-open' and modes:
             rsh_command(session, '/bin/gfx2prob.bin shutdown-off')
             rsh_command(session, 'echo $?', b'34\n')
         if case == 'owner-unchecked' and modes:
