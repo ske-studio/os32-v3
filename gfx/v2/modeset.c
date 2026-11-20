@@ -1,5 +1,6 @@
 /* HAL v2 mode transition, HAL_V2_DESIGN §9-3. */
 #include "gfx2_int.h"
+#include "display_provider.h"
 #include "../gfx_policy.h"
 #include "../gfx.h"
 
@@ -38,6 +39,7 @@ int gfx2_mode_set(u32 index, u32 head, u32 conn_mask, u32 mode_id, u32 sid)
     if (!a || gfx2_caller_get(&caller)) return OS32_ERR_INVAL;
     if (!(a->flags & GFX2_AF_ACTIVE)) return OS32_ERR_NOSYS;
     if (caller.app_id != gfx_screen_owner()) return OS32_ERR_BUSY;
+    if (!DISPLAY_V1_PRESENT_OK()) return OS32_ERR_BUSY;
     if (head >= a->heads || !conn_mask) return OS32_ERR_INVAL;
     rc = connectors_ok(a, head, conn_mask);
     if (rc) return rc;
