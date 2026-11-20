@@ -1,5 +1,6 @@
 /* Resident FEP adapter. The implementation and its state live in fep.mod. */
 #include "fep_module.h"
+#include "fep_suspend_owner.h"
 #include "fep_imports.h"
 #include "../../fs/fd_redirect.h"
 #include "../sqlite_engine.h"
@@ -110,19 +111,16 @@ int ime_user_export_facade(const char *path) { return public_api()->user_export(
 int ime_user_clear_facade(void) { return public_api()->user_clear(); }
 int ime_dict_info_facade(int key, int offset, char *out, int capacity)
 { return public_api()->dict_info(key, offset, out, capacity); }
-static int suspend_owner;
 int ime_dict_suspend(int on)
 {
     int rc = public_api()->dict_suspend(on);
-    if (!on) suspend_owner = 0;
-    else if (!rc) suspend_owner = res_owner_get();
+    fep_suspend_owner_note(on, rc, res_owner_get());
     return rc;
 }
 void ime_owner_exit(int owner)
 {
     /* STOP/fault can leave hsync through a syscall without returning to main. */
-    if (owner > 0 && owner == suspend_owner) {
-        suspend_owner = 0;
+    if (fep_suspend_owner_take(owner)) {
         (void)public_api()->dict_suspend(0); /* The body logs reopen failure. */
     }
     public_api()->owner_exit(owner);

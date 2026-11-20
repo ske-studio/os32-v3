@@ -8,7 +8,22 @@ static int saved_mode;
 static char saved_path[OS32_MAX_PATH];
 static char saved_user_path[OS32_MAX_PATH];
 
+#ifdef OS32_FEP_STATIC
+#include "fep_suspend_owner.h"
+#include "fd_redirect.h"
+
+static int suspend_dictionary(int on);
 int ime_dict_suspend(int on)
+{
+    int rc = suspend_dictionary(on);
+    fep_suspend_owner_note(on, rc, res_owner_get());
+    return rc;
+}
+
+static int suspend_dictionary(int on)
+#else
+int ime_dict_suspend(int on)
+#endif
 {
     IME_State *ime = ime_suspend_state();
     int rc;
