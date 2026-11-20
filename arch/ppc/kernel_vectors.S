@@ -37,7 +37,6 @@
  */
 #include "ppc_frame.h"
 #include "ppc_oea.h"
-#define KFRAME_BUSY 164
 .section .rodata.vectors,"a"
 .balign 32
 .globl ppc_kernel_vector_source
@@ -343,6 +342,7 @@ ppc_kernel_vector_entry:
     addi 1,1,-(PPC_FRAME_SIZE+PPC_CALL_SIZE)
     li 29,0
     stw 29,0(1)
+    stw 29,PPC_CALL_SIZE+KFRAME_BUSY(1)
 .Lsave_frame:
     stw 0,PPC_CALL_SIZE(1)
     mfsprg1 30

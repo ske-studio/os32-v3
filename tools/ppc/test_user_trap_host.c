@@ -20,6 +20,18 @@ void exec_syscall_dispatch(struct arch_syscall *call)
 }
 void ring3_fault_kill(void) { seen = 2; __builtin_longjmp(escape, 1); }
 static void irq(struct ppc_frame *f) { (void)f; seen = 4; }
+static void resident(struct ppc_frame *f)
+{
+    (void)f;
+    seen = 5;
+    __builtin_longjmp(escape, 1);
+}
+static void fault_in_irq(struct ppc_frame *f)
+{
+    struct ppc_frame nested = { .vector = 0x700 };
+    (void)f;
+    ppc_trap_dispatch(&nested);
+}
 int main(void)
 {
     struct ppc_frame f = { .vector = 0xc00, .srr1 = PPC_MSR_PR, .srr0 = 0x104 };
@@ -45,6 +57,16 @@ int main(void)
     seen = 0; diagnostic = 0; f.srr1 = 0;
     if (!__builtin_setjmp(escape)) ppc_trap_dispatch(&f);
     if (seen != 3 || diagnostic != PPC_TRAP_FP_UNAVAILABLE) return 15;
+    ppc_trap_set_resident_fault(resident);
+    f.vector = 0x700;
+    if (!__builtin_setjmp(escape)) ppc_trap_dispatch(&f);
+    if (seen != 5) return 16;
+    f.vector = 0x500;
+    if (!__builtin_setjmp(escape)) ppc_trap_dispatch(&f);
+    if (seen != 3 || diagnostic != PPC_TRAP_UNREGISTERED) return 17;
+    ppc_trap_set_handler(0x500, fault_in_irq);
+    if (!__builtin_setjmp(escape)) ppc_trap_dispatch(&f);
+    if (seen != 3 || kctx_irq_depth != 1) return 18;
     return 0;
 }
 void _start(void) { int rc = main(); __asm__ volatile("int $0x80" : : "a"(1), "b"(rc)); __builtin_unreachable(); }

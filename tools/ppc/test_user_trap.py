@@ -12,7 +12,7 @@ def check(source, expected):
         path = Path(directory)
         (path / 'trap.c').write_text(source)
         subprocess.run(['gcc', '-m32', '-ffreestanding', '-fno-pie', '-no-pie',
-                        '-nostdlib', '-static', '-std=gnu11', '-O2', '-Wall',
+                        '-nostdlib', '-nostdinc', '-static', '-std=gnu11', '-O2', '-Wall',
                         '-Wextra', '-Werror', '-DPPC_TRAP_HOST_TEST',
                         '-I' + str(ROOT / 'arch/ppc'), '-I' + str(ROOT / 'include'),
                         '-I' + str(ROOT), '-I' + str(ROOT / 'platform/powermac'),
@@ -42,6 +42,10 @@ def main():
         assert source.count(old) == 1
         check(source.replace(old, '        if (f->vector == 0xc00) { reason = PPC_TRAP_SC | PPC_TRAP_UNSUPPORTED; goto fatal; }'), 10)
         print('SC unsupported: runtime RED (1)')
+        guard = '&& !kctx_irq_depth && resident_fault'
+        assert source.count(guard) == 1
+        check(source.replace(guard, '&& resident_fault'), 18)
+        print('fault in IRQ admitted: runtime RED')
     print('USER trap PASS')
 
 if __name__ == '__main__':

@@ -33,19 +33,19 @@ static int store(void *owner, u32 addr, const void *src, u32 len) {
 static void message(const char *s, int n) {
     __asm__ volatile("int $0x80" : : "a"(4), "b"(1), "c"(s), "d"(n) : "memory");
 }
-static int check(void) {
+static int check(int user) {
     struct arch_entry_context out, before;
     struct exec_entry_args args = {3, 0x1234, 0x5678, 0x9abc};
     struct view v;
     for (unsigned i = 0; i < sizeof(out.opaque); i++) out.opaque[i] = 0xa5;
     before = out;
-    if (arch_entry_prepare(&out, 15, 42, 1, &args, store, 0) == 0 ||
+    if (arch_entry_prepare(&out, 15, 42, user, &args, store, 0) == 0 ||
         __builtin_memcmp(&out, &before, sizeof(out))) return 2;
     fail_store = 1;
-    if (arch_entry_prepare(&out, 0x100f, 42, 1, &args, store, 0) == 0 ||
+    if (arch_entry_prepare(&out, 0x100f, 42, user, &args, store, 0) == 0 ||
         __builtin_memcmp(&out, &before, sizeof(out))) return 3;
     fail_store = 0;
-    if (arch_entry_prepare(&out, 0x100f, 42, 1, &args, store, 0)) return 4;
+    if (arch_entry_prepare(&out, 0x100f, 42, user, &args, store, 0)) return 4;
     __builtin_memcpy(&v, out.opaque, sizeof(v));
     message("reached=entry\n", 14);
     if (v.sp != 0xff0 || address != v.sp) { message("FAIL: alignment\n", 16); return 5; }
@@ -54,7 +54,8 @@ static int check(void) {
     return 0;
 }
 void _start(void) {
-    int rc = check();
+    int rc = check(1);
+    if (!rc) rc = check(0);
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc) : "memory");
     __builtin_unreachable();
 }
@@ -66,7 +67,7 @@ def execute(source):
         (tmp / 'entry.c').write_text(source)
         (tmp / 'test.c').write_text(HARNESS)
         cmd = ['gcc', '-m32', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
-               '-ffreestanding', '-fno-pie', '-no-pie', '-nostdlib', '-static', '-fno-stack-protector',
+               '-ffreestanding', '-fno-pie', '-no-pie', '-nostdlib', '-nostdinc', '-static', '-fno-stack-protector',
                '-I' + str(ROOT / 'arch/ppc'), '-I' + str(ROOT / 'include'),
                str(tmp / 'entry.c'), str(tmp / 'test.c'), '-o', str(tmp / 'test')]
         subprocess.run(cmd, check=True)

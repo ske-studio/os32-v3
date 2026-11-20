@@ -135,7 +135,7 @@
     "appmem-host": 3.172635,
     "appmem-map-host": 5.664773,
     "arch-asm": 706.863658,
-    "arch-ctx-guest": 661,
+    "arch-ctx-guest": 1050,
     "b8-open-host": 42.24959,
     "boot-order-host": 2.734105,
     "boot-readers-host": 3.186042,
