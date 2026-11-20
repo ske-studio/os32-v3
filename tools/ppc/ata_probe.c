@@ -12,7 +12,7 @@ enum {
     ATA_READ_SECTORS = 0x20, ATA_IDENTIFY = 0xec,
     ATA_WORDS = 256, ATA_DUMP_BYTES = 64,
     KEYLARGO_FCR1 = 0x3c, CHANNEL_WAIT_SECONDS = 30,
-    ATA_WAIT_SECONDS = 5, ATA_MAX_TB_HZ = 400000000,
+    ATA_WAIT_SECONDS = 5, ATA_RESET_DELAY_SECONDS = 60, ATA_MAX_TB_HZ = 400000000,
     OF_PAGE = 4096, OF_TREE_DEPTH = 32, OF_TREE_NODES = 4096,
     PCI_ENTRY_CELLS = 5, PCI_BAR0 = 0x10, PCI_MEM32 = 0x02000000,
     PCI_SPACE_MASK = 0x03000000
@@ -460,5 +460,20 @@ void powermac_boot(ppc_ci ci)
     if (valid_node(root)) walk(&env, ofw_child(root), 0);
     put("ATA probe done channels=0x"); hex(channels, 4); put("\r\n");
     if (serial_ok) pm_escc_drain(&serial);
+    /* Leave the result on screen, then restart through Open Firmware so the
+     * machine does not need a manual power cycle (user rule 2026-11-20). */
+    put("ATA probe: reset-all in 60 s\r\n");
+    if (serial_ok) pm_escc_drain(&serial);
+    u32 second = wait_ticks ? wait_ticks / ATA_WAIT_SECONDS : 25000000U;
+    for (unsigned s = 0; s < ATA_RESET_DELAY_SECONDS; ++s) {
+        u32 start = timebase();
+        while (timebase() - start < second) {}
+    }
+    put("ATA probe: reset-all\r\n");
+    if (serial_ok) pm_escc_drain(&serial);
+    static const char cmd[] = "reset-all";
+    cell args[3] = { (cell)(unsigned long)cmd, 0, 0 };
+    ofw_call("interpret", 1, 1, args);
+    ofw_exit();
     ppc_stop();
 }

@@ -14,6 +14,7 @@ DISK_BYTES = 1024 * 1024
 SECTOR_BYTES = 512
 PREFIX = bytes(range(64))
 SIGNATURE = bytes.fromhex("55aa")
+RESET = b"ATA probe: reset-all\r\n"
 DONE = rb"(?m)^ATA probe done channels=0x[0-9a-f]{4}\r?$"
 
 
@@ -60,17 +61,23 @@ def run_cpu(work, iso, cpu, bios, timeout):
             argv, stdin=subprocess.DEVNULL, stdout=err, stderr=err
         ) as guest:
             deadline = time.monotonic() + timeout
+            checked = False
             try:
                 while time.monotonic() < deadline:
                     if serial.exists():
                         data = serial.read_bytes()
-                        if re.search(DONE, data):
+                        done = re.search(DONE, data)
+                        if done and not checked:
                             check_serial(data)
-                            return
+                            checked = True
                     if guest.poll() is not None:
-                        raise RuntimeError(f"QEMU exited before completion ({guest.returncode})")
+                        data = serial.read_bytes() if serial.exists() else b""
+                        # -no-reboot turns the probe's OF reset-all into a QEMU exit.
+                        if checked and RESET in data and guest.returncode == 0:
+                            return
+                        raise RuntimeError(f"QEMU exited before completion and reset ({guest.returncode})")
                     time.sleep(0.1)
-                raise RuntimeError(f"no completion marker within {timeout}s")
+                raise RuntimeError(f"no completion and reset within {timeout}s (checked={checked})")
             finally:
                 if guest.poll() is None:
                     guest.terminate()
@@ -90,7 +97,7 @@ def main():
     parser.add_argument("--out", type=Path, required=True,
                         help="parent directory for a new run and its serial logs")
     parser.add_argument("--bios", type=Path, default=Path("/usr/share/qemu/openbios-ppc"))
-    parser.add_argument("--timeout", type=int, default=75, metavar="SECONDS")
+    parser.add_argument("--timeout", type=int, default=180, metavar="SECONDS")
     args = parser.parse_args()
     if args.timeout < 1:
         parser.error("--timeout must be positive")
