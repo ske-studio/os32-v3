@@ -124,7 +124,7 @@ def settings(work, mode):
                           'if ((u32)(now - returned) >= 10000)')
     require(inp.count('pm_terminal_trygetkey()') == 1, 'unique USB input anchor')
     inp = inp.replace('pm_terminal_trygetkey()', 'usb_probe_input()')
-    result = ['KBOOT_SH=1', 'KBOOT_LINK=0']
+    result = ['KBOOT_SH=1', 'KBOOT_LINK=0', 'KBOOT_USB_KEY_TRACE=1']
     for slot, src, content in [('', 'platform/powermac/shell_boot.c', boot),
                                 ('EXTRA_', 'platform/powermac/input_boot.c', inp)]:
         dest = work/(mode+'-'+Path(src).name)
@@ -299,7 +299,7 @@ def product_settings(work, mode, late=False):
     ppc_irq_restore(frame_irq);'''
     text = text.replace(anchor, mirror)
     file = work/(mode+'-stream.c'); file.write_text(text)
-    opts = ['KBOOT_SH=1', 'KBOOT_LINK=0', 'KB_MUT_SRC='+src, 'KB_MUT_FILE='+str(file)]
+    opts = ['KBOOT_SH=1', 'KBOOT_LINK=0', 'KBOOT_USB_KEY_TRACE=1', 'KB_MUT_SRC='+src, 'KB_MUT_FILE='+str(file)]
     if mode in ('invert-key', 'no-forward'):
         src = 'platform/powermac/usb_platform.c'
         text = (ROOT/src).read_text()
@@ -858,7 +858,7 @@ def main():
     cpus = ['7450', '7455'] if args.cpu == 'both' else [args.cpu]
     seen = set()
     for mode in ['normal'] + (['no-service', 'lost-first'] if args.mutate else []):
-        opts = ['IMAGE=kboot-link-sh', 'PPC_CROSS_DIR='+str(cross)]
+        opts = ['IMAGE=kboot-link-sh', 'KBOOT_USB_KEY_TRACE=1', 'PPC_CROSS_DIR='+str(cross)]
         if mode != 'no-service':
             opts += before_shell_input(work)
         if mode == 'no-service':

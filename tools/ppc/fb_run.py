@@ -7,6 +7,7 @@ cmd_rshell in userland/shell/rshell.c. Captured LAN output has its own sink.
 import argparse
 import hashlib
 import os
+import re
 from pathlib import Path
 import shutil
 import tempfile
@@ -76,7 +77,7 @@ def observe(elf, out, cpu, case):
         check('[sqlite] static rc=0' not in initial, 'trace-screen')
         local('clear')
         local('echo first')
-        s.wait(lambda: 'first' in s.screen('first'), 'USB first line', 30)
+        s.wait(lambda: re.search(r'(?m)^first *$', s.screen('first')), 'USB first line', 30)
         text, pixels = shot('first')
         check(prompt+'echo first' in text, 'start-consumed')
         check(pixels.compare_text(0, 0, prompt+'echo first') is None, 'colors/top')

@@ -205,14 +205,36 @@ int usbp_input_src_alloc(int kind)
         if (!(sources[kind] & (1u << i))) { sources[kind] |= 1u << i; return i + 1; }
     return -1;
 }
+#ifdef KBOOT_USB_KEY_TRACE
+#include "port_service.h"
+/* The acceptance driver synchronizes QMP input with ESCC, independently of LAN. */
+static void key_trace(const char *prefix, u8 src, u8 sc, const char *suffix)
+{
+    static const char hex[] = "0123456789abcdef";
+    while (*prefix) port_putchar_kapi(*prefix++);
+    port_putchar_kapi('0' + src); /* source slots are 1..4 */
+    const char *field = " sc=";
+    while (*field) port_putchar_kapi(*field++);
+    port_putchar_kapi(hex[sc >> 4]);
+    port_putchar_kapi(hex[sc & 15]);
+    while (*suffix) port_putchar_kapi(*suffix++);
+}
+#endif
+
 void usbp_input_key(u8 src, u8 sc, int down)
 {
     pm_input_usb_key(src, sc, down);
-    usbp_log("USB KEY src=%u sc=%02x down=%u", src, sc, down); }
+#ifdef KBOOT_USB_KEY_TRACE
+    key_trace("USB KEY src=", src, sc, down ? " down=1\n" : " down=0\n");
+#endif
+}
 void usbp_input_key_repeat(u8 src, u8 sc)
 {
     pm_input_usb_repeat(src, sc);
-    usbp_log("USB REPEAT src=%u sc=%02x", src, sc); }
+#ifdef KBOOT_USB_KEY_TRACE
+    key_trace("USB REPEAT src=", src, sc, "\n");
+#endif
+}
 void usbp_input_mouse(u8 src, i16 dx, i16 dy, u8 buttons)
 {
     if (src < 1 || src > 4 || !(sources[1] & (1u << (src - 1)))) return;

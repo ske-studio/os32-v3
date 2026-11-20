@@ -144,7 +144,7 @@ def main():
     print('evidence=' + str(work), flush=True)
     user = work / 'user'
     bins = [str(user / 'mousprob.bin')]
-    options = ['IMAGE=kboot-link-sh', 'KB_SH_OUT=' + str(user),
+    options = ['IMAGE=kboot-link-sh', 'KBOOT_USB_KEY_TRACE=1', 'KB_SH_OUT=' + str(user),
                'KB_ROOT_BINS=' + ' '.join(bins)]
     images = {}
     for case in CASES if args.mutate else ('normal',):

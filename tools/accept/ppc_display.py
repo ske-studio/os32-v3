@@ -213,7 +213,7 @@ def main():
     print('evidence=' + str(work), flush=True)
     user = work / 'user'
     bins = [str(user / (app + '.bin')) for app in ('hello', 'dispprb')]
-    options = ['IMAGE=kboot-link-sh', 'PPC_USER_FLOAT=', 'KB_SH_OUT=' + str(user),
+    options = ['IMAGE=kboot-link-sh', 'KBOOT_USB_KEY_TRACE=1', 'PPC_USER_FLOAT=', 'KB_SH_OUT=' + str(user),
                'KB_ROOT_BINS=' + ' '.join(bins)]
     os.environ.setdefault('SOURCE_DATE_EPOCH', '946684800')
     images = {}
