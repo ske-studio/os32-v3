@@ -18,13 +18,8 @@ from kapi_target_ppc import ABSENT_PROVIDER_SLOTS, absent_result
 EXPECTED_ABSENT_SLOTS = frozenset("""
 buz_off buz_on ext2_format ext2_format_at fm_note_off fm_note_on
 fm_play_mml fm_set_tone_num fm_startup_sound
-gfx2_check_op
-gfx2_flip
-gfx2_mode_set gfx2_present
-gfx_get_framebuffer gfx_get_palette
-gfx_hardware_scroll gfx_hw_blit gfx_hw_fill_rect gfx_hw_get gfx_hw_submit
-gfx_lease_palette gfx_osri_show
-gfx_screen_info gfx_set_palette gfx_stats
+gfx2_check_op gfx_get_palette gfx_hardware_scroll gfx_hw_get gfx_hw_submit
+gfx_lease_palette gfx_osri_show gfx_set_palette
 gui_call gui_register hdd_geom_info ide_drive_present
 ide_get_info ide_identify ide_init ide_read_sector ide_write_sector
 ide_write_sectors ime_dict_info ime_dict_suspend ime_feed_key ime_get_mode
@@ -43,6 +38,12 @@ v86_boot v86_boot2 v86_disktest
 v86_gdc_capture v86_selftest
 """.split())
 
+# PPC_KAPI_FILL stage 5c, A11. Each wrapper calls the provider of the same name.
+PUBLISHED_GFX = frozenset("""
+gfx_get_framebuffer gfx_screen_info gfx_hw_fill_rect gfx_hw_blit gfx_stats
+gfx2_mode_set gfx2_flip gfx2_present
+""".split())
+
 PRESENT_SLOTS = frozenset("""
 gfx_init_200 gfx_present gfx_present_rect gfx_add_dirty_rect
 gfx_present_dirty gfx_present_nosync gfx_present_raster
@@ -54,7 +55,7 @@ gfx2_caps gfx2_head_info gfx2_connector_info
 gfx2_connector_edid gfx2_mode_count gfx2_mode_get
 """.split())
 
-DISPLAY_PROVIDERS = frozenset("""
+DISPLAY_PROVIDERS = PUBLISHED_GFX | frozenset("""
 gfx_kapi_init_200 gfx_kapi_init gfx_shutdown gfx2_surface_create gfx2_surface_free gfx2_surface_desc
 gfx2_screen_surface gfx2_lock gfx2_unlock gfx2_submit gfx2_fence_query gfx2_fence_wait gfx2_cursor_image
 gfx_screen_owner gfx2_vblank_wait gfx2_palette gfx2_gamma
@@ -242,8 +243,8 @@ def verify(source, entries):
     if any('#include "' + header + '"' in source for header in ('gfx_hal.h', 'palette.h')):
         return False
     reference = (ROOT / 'kapi/kapi_generated.c').read_text()
-    for slot in PRESENT_SLOTS:
-        wrapper = re.search(r'void __cdecl wrap_' + slot + r'\([^)]*\)\n\{.*?\n\}', reference, re.S)
+    for slot in PRESENT_SLOTS | PUBLISHED_GFX:
+        wrapper = re.search(r'(?:void|int) __cdecl wrap_' + slot + r'\([^)]*\)\n\{.*?\n\}', reference, re.S)
         if not wrapper or wrapper.group() not in source:
             return False
     for api in entries:
@@ -300,6 +301,14 @@ def generate(tmp, mutation=None, *, link=True):
         if text.count(old) != 1 or "'tvram_putchar_at'" in text:
             raise RuntimeError('slot-swap: expected buz_off absent and tvram_putchar_at present')
         helper.write_text(text.replace(old, "'buz_on', 'tvram_putchar_at'"))
+    if mutation == 'gfx2-present-absent':
+        insert_group(helper, mutation, "    'present_mut': (frozenset({'gfx2_present'}), frozenset()),\n")
+    if mutation == 'check-op-bound':
+        anchor = "        'gfx2_check_op',\n"
+        source = helper.read_text()
+        if source.count(anchor) != 1:
+            raise RuntimeError('check-op-bound: expected one absent slot')
+        helper.write_text(source.replace(anchor, ''))
     if mutation == 'present-absent':
         insert_group(helper, mutation, "    'present_mut': (frozenset({'gfx_present'}), frozenset()),\n")
     if mutation == 'putchar-absent':
@@ -473,7 +482,7 @@ def main():
             return 1
         if '--mutate' in sys.argv:
             check_planar_link(tmp, cc, dirs)
-            for mutation in ('empty', 'zero', 'group-empty', 'ime-empty', 'reboot-absent', 'slot-swap', 'present-absent', 'pci-absent', 'mem-absent', 'db-absent'):
+            for mutation in ('empty', 'zero', 'group-empty', 'ime-empty', 'reboot-absent', 'slot-swap', 'present-absent', 'gfx2-present-absent', 'check-op-bound', 'pci-absent', 'mem-absent', 'db-absent'):
                 path = tmp / mutation
                 path.mkdir()
                 mutated = generate(path, mutation, link=False)
