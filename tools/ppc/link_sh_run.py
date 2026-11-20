@@ -27,6 +27,7 @@ from run import ROM, command, require, CriterionFailure
 from link_run import PumpQMP
 from kboot_accept import build
 from ppc_lan_host import UDP
+import host_agent as wire
 from host_agent import HostAgent
 from host_operator_socket import OperatorSocket
 from host_rshell import RSHELL, EXECUTE
@@ -89,7 +90,7 @@ def text_fixture(work):
     return str(text.resolve())
 
 
-def settings(work, mutation=None, *, observe_flow=False):
+def settings(work, mutation=None, *, observe_flow=False, overflow="lines"):
     """Private copies add read-only meters and USER-only fault/output stimuli.
 
     The meters do not send new protocol messages or change capture ownership.
@@ -99,6 +100,12 @@ def settings(work, mutation=None, *, observe_flow=False):
     if mutation:
         path, before, after, _ = MUTATIONS[mutation]
         sources[path] = replace_once(sources.get(path, (ROOT/path).read_text()), before, after)
+    if overflow == 'cr':
+        stimulus = r'''        for (int i = 0; i < 512; i++)
+            g_api->kprintf(7, "%s", "0123456789abcdef\r");
+        g_api->kprintf(7, "%s", "p3-cr-tail");'''
+    else:
+        stimulus = r'''        for (int i=0; i<P3_OVERFLOW_LINES; i++) g_api->kprintf(7, "%s", "01234567890123456789012345678901234567890123456789012345678901234567890123456789\n");'''.replace('P3_OVERFLOW_LINES', str(OVERFLOW_LINES))
     sources[USER] = replace_once(sources[USER], '        accepting = rsh_lan_execute(line);', r'''
     /* Acceptance stimuli live only in this generated USER copy. */
     if (!strcmp(line, "p3-fault")) { __asm__ volatile("trap"); }
@@ -109,8 +116,8 @@ def settings(work, mutation=None, *, observe_flow=False):
         g_api->tvram_clear();
         g_api->sys_write(1, text, sizeof(text)-1);
     } else if (!strcmp(line, "p3-overflow")) {
-        for (int i=0; i<P3_OVERFLOW_LINES; i++) g_api->kprintf(7, "%s", "01234567890123456789012345678901234567890123456789012345678901234567890123456789\n");
-    } else accepting = rsh_lan_execute(line);'''.replace('P3_OVERFLOW_LINES', str(OVERFLOW_LINES)))
+P3_STIMULUS
+    } else accepting = rsh_lan_execute(line);'''.replace('P3_STIMULUS', stimulus))
     sources[SINK] = replace_once(sources[SINK], 'int con_sink_capture(unsigned int op)',
         'volatile int p3_freeze_rc;\nvolatile unsigned p3_end_count;\nint con_sink_capture(unsigned int op)')
     # This return belongs to capture, not another sink operation.
@@ -148,6 +155,45 @@ def settings(work, mutation=None, *, observe_flow=False):
         dest = work/(Path(path).stem+'-meter.c'); dest.write_text(content)
         opts += ['KB_MUT_'+slot+'SRC='+path, 'KB_MUT_'+slot+'FILE='+str(dest)]
     return opts
+
+
+def overflow_frames(path, offset, ident):
+    events = []
+    tracked = set()
+    with path.open('rb') as stream:
+        position = 0
+        for line in stream:
+            before_submit = position < offset
+            position += len(line)
+            sent = line.startswith(b'> ')
+            frame = bytes.fromhex(line.removeprefix(b'> ').decode())
+            start = wire.ETH_HDR + wire.LINK_HDR
+            if len(frame) < start or int.from_bytes(frame[12:14], 'big') != wire.LINK_ETHERTYPE:
+                continue
+            op, flags, epoch, seq, ack, size, rid, sess = wire.hdr_unpack(frame[wire.ETH_HDR:])
+            if before_submit and op != wire.OP_HELLO:
+                continue
+            payload = frame[start:start+size]
+            key = (sess, epoch, rid)
+            event = dict(op=wire.OPNAME.get(op), direction='host' if sent else 'guest',
+                         sess=sess, epoch=epoch, rid=rid, flags=flags, seq=seq, ack=ack)
+            if op == wire.OP_REQUEST:
+                parts = payload.decode('ascii', 'replace').split()
+                if parts[:2] == ['RSH', 'READY'] or (
+                        parts[:2] == ['RSH', 'OUT'] and parts[3:4] == [ident]):
+                    tracked.add(key)
+                    event['request'] = parts
+                    if parts[:2] == ['RSH', 'OUT'] and len(parts) == 6:
+                        event['declared_length'] = parts[5]
+            if op != wire.OP_HELLO and key not in tracked:
+                continue
+            if op == wire.OP_RESPONSE and len(payload) == 6:
+                event['status'], event['length'] = struct.unpack('<HI', payload)
+            if op == wire.OP_DATA:
+                event['data'] = payload.decode('ascii', 'replace')
+            event['bytes'] = size
+            events.append(event)
+    return events
 
 
 class Session:
@@ -246,19 +292,40 @@ class Session:
         until=time.monotonic()+seconds
         self.wait(lambda: time.monotonic()>=until,'settle',seconds+1)
 
-    def word(self, name, offset=0):
+    def word(self, name, offset=0, unit="w"):
         require(name in self.symbols,'missing symbol '+name)
         # The monitor reads through the current translation; a sample taken
         # while the CPU runs with translation off (OF calls, early boot,
         # exception entry) cannot see kernel VAs. Retry briefly before failing.
         until=time.monotonic()+2
         while True:
-            value=self.q.call('human-monitor-command',{'command-line':f'x /1wx 0x{self.symbols[name]+offset:x}'})
+            value=self.q.call('human-monitor-command',{'command-line':f'x /1{unit}x 0x{self.symbols[name]+offset:x}'})
             match=re.search(r':\s*0x([0-9a-fA-F]+)',value)
             if match is not None or time.monotonic()>=until: break
             time.sleep(.02)
         require(match is not None,'unreadable '+name)
         return int(match[1],16)
+
+    def overflow_probe(self, ident, until, phase, samples):
+        now = time.monotonic()
+        sample = dict(phase=phase, remaining=until-now, vm_remaining=self.deadline-now)
+        samples.append(sample)
+        path = self.out/'diag.json'
+        try:
+            registers = self.q.call('human-monitor-command', {'command-line': 'info registers'})
+            for key, pattern in [('pc', 'NIP|PC'), ('msr', 'MSR')]:
+                match = re.search(rf'\b(?:{pattern})\s*[:=]?\s*(?:0x)?([0-9a-f]+)', registers, re.I)
+                sample[key] = match[1] if match else registers
+            for name in ('tick_count', 'g_capture', 'con_sink_drop_count', 'p3_freeze_rc',
+                         'p3_end_count', 'link_state', 'link_epoch', 'link_retransmits',
+                         'link_resyncs', 'link_tx_deferred'):
+                if name in self.symbols:
+                    try:
+                        sample[name] = self.word(name, unit='h' if name == 'link_epoch' else 'w')
+                    except CriterionFailure as exc:
+                        sample[name] = str(exc)
+        finally:
+            path.write_text(json.dumps(dict(id=ident, samples=samples), indent=2))
 
     def ready(self):
         return (self.agent.established and self.agent.operator.ready is not None
@@ -277,7 +344,32 @@ class Session:
             return [e for e in self.events[start:] if e['parts'][:2]==['RSH','OUT'] and e['parts'][3]==ident]
         # Inspect the wire result even when Operator rejects its command echo.
         # Otherwise PRINT duplication would become a generic result timeout.
-        self.wait(lambda: bool(outputs()),'OUT '+line,seconds)
+        if line == 'p3-overflow':
+            now = time.monotonic()
+            until = min(self.deadline, now + seconds)
+            span = until - now
+            probes = iter([(now + span / 2, 'mid'), (until - min(3, span / 4), 'deadline')])
+            pending = next(probes)
+            samples = []
+            self.frames.flush()
+            offset = self.frames.tell()
+            def observed_output():
+                nonlocal pending
+                if outputs():
+                    return True
+                if pending and time.monotonic() >= pending[0]:
+                    self.overflow_probe(ident, until, pending[1], samples)
+                    pending = next(probes, None)
+                return bool(outputs())
+            try:
+                self.wait(observed_output, 'OUT '+line, until-time.monotonic())
+            finally:
+                self.frames.flush()
+                frames = overflow_frames(self.out/'frames.log', offset, ident)
+                (self.out/'diag.json').write_text(json.dumps(
+                    dict(id=ident, samples=samples, frames=frames), indent=2))
+        else:
+            self.wait(lambda: bool(outputs()),'OUT '+line,seconds)
         if expected is not None: check_body(line,bytes.fromhex(outputs()[0]['body']),expected)
         self.wait(lambda: ident in op.results or (op.pending is not None and
                   op.pending['state'] in ('done','truncated')),'result '+line,seconds)
@@ -402,7 +494,7 @@ class LineSession(Session):
                 self.uart.close()
 
 
-def accept(elf,cpu,out,timeout,late=False,verdict=None):
+def accept(elf,cpu,out,timeout,late=False,verdict=None,overflow_mode="lines"):
     # The 7450 non-late VM also runs the overflow observation.
     check_help = verdict in (None, 'resident command groups')
     check_overflow = cpu == '7450' and not late and verdict in (None, 'freeze-drop')
@@ -498,6 +590,8 @@ def accept(elf,cpu,out,timeout,late=False,verdict=None):
             # -icount (~2.7 s per scroll in QEMU 8.2), so one VM per run covers it.
             overflow=s.cmd('p3-overflow',seconds=OVERFLOW_SECONDS)
             require(overflow['state']=='truncated' and overflow['drop']>0,'result drop')
+            if overflow_mode == 'cr':
+                require(overflow['result'].endswith(b'0123456789abcdef\rp3-cr-tail\x04'), 'overflow tail')
             require(s.word('p3_freeze_rc')!=0,'freeze-drop')
             s.cmd('echo recovered',b'recovered\n')
         previous=s.word('g_shell_service',8)
@@ -748,6 +842,7 @@ def main():
     ap.add_argument('--timeout',type=int,default=180)
     ap.add_argument('--mutate',action='store_true')
     ap.add_argument('--build-only',action='store_true')
+    ap.add_argument('--overflow', choices=('lines', 'cr'), default='lines')
     args=ap.parse_args()
     required=tuple(cross(tool) for tool in ('gcc','nm','objdump','ld','objcopy'))
     if not args.build_only: required+=('qemu-system-ppc','genisoimage')
@@ -766,7 +861,7 @@ def main():
         except OSError as exc:
             print('未 ppc-link-sh-run: AF_INET unavailable: '+str(exc)); return 3
     control=work/'normal'; control.mkdir()
-    elf=build(control/'kernel',*settings(control, observe_flow=True))
+    elf=build(control/'kernel',*settings(control, observe_flow=True, overflow=args.overflow))
     check_map(elf.with_suffix('.map'))
     failures = []
 
@@ -792,9 +887,17 @@ def main():
                 flow_accept(image, folder/'guest', case)
     if args.build_only:
         if args.mutate:
+            other = 'cr' if args.overflow == 'lines' else 'lines'
+            folder = work/('normal-'+other)
+            folder.mkdir()
+            image = build(folder/'kernel', *settings(folder, observe_flow=True, overflow=other))
+            digest = hashlib.sha256(image.read_bytes()).digest()
+            require(digest not in hashes, 'distinct overflow image '+other)
+            hashes.add(digest)
+            print('normal-'+other, digest.hex(), flush=True)
             for name in MUTATIONS:
                 folder=work/name; folder.mkdir()
-                mutant=build(folder/'kernel',*settings(folder,name))
+                mutant=build(folder/'kernel',*settings(folder,name,overflow=args.overflow))
                 check_map(mutant.with_suffix('.map'))
                 digest=hashlib.sha256(mutant.read_bytes()).digest()
                 require(digest not in hashes, 'distinct image '+name)
@@ -806,14 +909,14 @@ def main():
     for cpu in ('7450','7455'):
         for late in (False,True):
             with record_case(f'{cpu} late={late}'):
-                accept(elf,cpu,work/(cpu+('-late' if late else '-normal')),args.timeout,late)
+                accept(elf,cpu,work/(cpu+('-late' if late else '-normal')),args.timeout,late,overflow_mode=args.overflow)
                 print('GREEN '+cpu+' late='+str(late),flush=True)
     if args.mutate:
         for name,(_,_,_,expected) in MUTATIONS.items():
             with record_case(name):
                 folder=work/name; folder.mkdir()
-                mutant=build(folder/'kernel',*settings(folder,name))
-                try: accept(mutant,'7450',folder/'guest',args.timeout,verdict=expected)
+                mutant=build(folder/'kernel',*settings(folder,name,overflow=args.overflow))
+                try: accept(mutant,'7450',folder/'guest',args.timeout,verdict=expected,overflow_mode=args.overflow)
                 except CriterionFailure as exc:
                     require(str(exc)==expected,'unexpected mutation verdict '+name+': '+str(exc))
                     print('RED '+name+': '+str(exc),flush=True)
