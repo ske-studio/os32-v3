@@ -5,7 +5,7 @@ CHECK = dict(name='machcfg-host', tier=1, needs=[], budget=5,
             'init/sysconfig.c', 'init/sysconfig.h', 'fs/vfs.h', 'lib/kstring_c.c',
             'tools/tests/kernel_includes.py', 'kernel/machcfg.c', 'platform/pc98/machcfg.c', 'tools/tests/machcfg_host.c',
             'include/kprintf.h', 'include/console.h', 'sdk/include/os32/*.h',
-            'platform/pc98/platform_console.h', 'lib/kprintf.c', 'lib/kprintf_format.inc',
+            'platform/pc98/kernel.c', 'platform/pc98/platform_console.h', 'lib/kprintf.c', 'lib/kprintf_format.inc',
             'tools/tests/host32.py', 'tools/tests/cc_cache.py'],
     basis=['docs/decisions/settings/MACHCFG_DESIGN.md §2, §3, §7'])
 
@@ -29,6 +29,22 @@ def run(ctx):
     header = (root / 'include/machcfg_contract.h').read_text()
     pc98 = (root / 'platform/pc98/machcfg.c').read_text()
     loader = (root / 'kernel/machcfg_root.c').read_text()
+    boot = (root / 'platform/pc98/kernel.c').read_text()
+    calls = ('kernel_boot_cpu(mem_kb, &boot);', 'machcfg_begin(platform_machcfg_seed());',
+             'vfs_mount("/", boot.root_dev, boot.root_fs);', 'boot_platform_run(BOOT_AUTO_MOUNT, &boot);',
+             'machcfg_load_root();', 'machcfg_report("pc98", 0, 0);', 'boot_platform_run(BOOT_CLOCK, &boot);')
+
+    def boot_order(body):
+        positions = [body.find(call) for call in calls]
+        return all(body.count(call) == 1 for call in calls) and positions == sorted(positions)
+
+    if not boot_order(boot):
+        raise RuntimeError('PC-98 boot configuration call order')
+    if ctx.mutate:
+        early = boot.replace(calls[4], '').replace('rc = ' + calls[2], calls[4] + '\n        rc = ' + calls[2])
+        if boot_order(early):
+            raise RuntimeError('load before mount survived')
+        print('load before mount RED')
     mutations = [
         ('capability', 'if (!machine_seed.accepts_nap7450)', 'if (0)'),
         ('report-once', 'reported = 1;', ''),
