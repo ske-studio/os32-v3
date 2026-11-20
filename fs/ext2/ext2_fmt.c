@@ -17,10 +17,6 @@ int ext2_medium_register(int kind, const struct ext2_medium_ops *ops)
 /*  マルチブロックグループ対応、1KBブロック、128バイトinode。                 */
 /*  SPARSE_SUPER対応: Linux mkfs.ext2/e2fsck互換のレイアウトを生成する。     */
 /*                                                                          */
-/*  マルチインスタンス対応:                                                  */
-/*    フォーマットは一時的なExt2Ctxを使用 (既存マウントとは独立)。           */
-/*    呼び出し側でExt2Ctxをスタック上に確保するか、kmalloc/kfreeする。       */
-/*                                                                          */
 /*  スパースグループ規則:                                                    */
 /*    グループ 0, 1, 3^n, 5^n, 7^n にのみSBバックアップ+GDTコピーを配置。  */
 /*    それ以外のグループはビットマップから開始する。                          */
@@ -34,6 +30,46 @@ int ext2_medium_register(int kind, const struct ext2_medium_ops *ops)
 
 /* formatter 専用の作業域: 下の媒体が ext2 の上の像だと、その inode の I/O が ext2_g_blk を作業域に使い、書く途中で潰すため共有しない (段 6c の N5・試験 A5)。 */
 static u8 fmt_blk[EXT2_BLOCK_SIZE];
+
+typedef struct {
+    const struct ext2_medium_ops *ops;
+    Device *dev;
+    u32 base_lba, part_len;
+} FormatIO;
+
+static int fmt_sector(const FormatIO *ctx, u32 block, u32 *sector)
+{
+    if (block >= ctx->part_len / EXT2_SECTORS_PER_BLOCK) return 0;
+    u32 offset = block * EXT2_SECTORS_PER_BLOCK;
+    if (ctx->base_lba > U32_MAX - offset) return 0;
+    *sector = ctx->base_lba + offset;
+    return *sector <= U32_MAX - (EXT2_SECTORS_PER_BLOCK - 1);
+}
+
+static int fmt_wr(const FormatIO *ctx, u32 block, const void *buf)
+{
+    u32 sector;
+    int ret = EXT2_ERR_IO;
+    if (ctx->ops->after_write) ctx->ops->after_write();
+    if (fmt_sector(ctx, block, &sector))
+        ret = dev_blk_write_lba(ctx->dev, sector, EXT2_SECTORS_PER_BLOCK, buf);
+    /* ext2_fs_error used to invalidate even for the temporary context. */
+    if (ret && ctx->ops->after_write) ctx->ops->after_write();
+    return ret;
+}
+
+static int fmt_rd(const FormatIO *ctx, u32 block, void *buf)
+{
+    u32 sector;
+    int ret = EXT2_ERR_IO;
+    if (fmt_sector(ctx, block, &sector))
+        ret = dev_blk_read_lba(ctx->dev, sector, EXT2_SECTORS_PER_BLOCK, buf);
+    if (ret && ctx->ops->after_write) {
+        ctx->ops->after_write(); /* raw read failure */
+        ctx->ops->after_write(); /* ext2_fs_error for the temporary context */
+    }
+    return ret;
+}
 
 /* グループごとのメタデータ情報 */
 typedef struct {
@@ -55,9 +91,9 @@ typedef struct {
 
 /* ===== Block 1: スーパーブロック =====
  * lay (ext2_layout_plan の結果) から SB を組んで block 1 に書く。
- * ext2_write_block の結果をそのまま返し、EXT2_ERR_IO への変換は呼び手がする。
+ * fmt_wr の結果をそのまま返し、EXT2_ERR_IO への変換は呼び手がする。
  * s_free_blocks_count はここでは仮値 0 (fmt_write_groups が後で埋める)。 */
-static inline int fmt_write_super(Ext2Ctx *ctx, const Ext2Layout *lay)
+static inline int fmt_write_super(const FormatIO *ctx, const Ext2Layout *lay)
 {
     ext2_mem_zero(fmt_blk, EXT2_BLOCK_SIZE);
     le32_wr(&fmt_blk[EXT2_SB_INODES_COUNT_OFF], lay->inodes_count);         /* s_inodes_count */
@@ -98,14 +134,14 @@ static inline int fmt_write_super(Ext2Ctx *ctx, const Ext2Layout *lay)
     fmt_blk[EXT2_SB_VOLUME_NAME_OFF] = 'O'; fmt_blk[EXT2_SB_VOLUME_NAME_OFF + 1] = 'S'; fmt_blk[EXT2_SB_VOLUME_NAME_OFF + 2] = '3'; fmt_blk[EXT2_SB_VOLUME_NAME_OFF + 3] = '2';
     fmt_blk[EXT2_SB_VOLUME_NAME_OFF + 4] = '_'; fmt_blk[EXT2_SB_VOLUME_NAME_OFF + 5] = 'H'; fmt_blk[EXT2_SB_VOLUME_NAME_OFF + 6] = 'D'; fmt_blk[EXT2_SB_VOLUME_NAME_OFF + 7] = 'D';
 
-    return ext2_write_block(ctx, 1, fmt_blk);
+    return fmt_wr(ctx, 1, fmt_blk);
 }
 
 /* ===== グループ0: inode 2 (ルートディレクトリ) =====
  * inode テーブルの inode 2 を読み書きして root を作り、直後のデータブロックに
  * "." と ".." を書く。fmt_blk を作業域に使う。I/O が失敗したら EXT2_ERR_IO、
  * 成功で EXT2_OK。 */
-static inline int fmt_write_root(Ext2Ctx *ctx, u32 gdt_blocks,
+static inline int fmt_write_root(const FormatIO *ctx, u32 gdt_blocks,
                                  u32 inode_tbl_blocks_per_group)
 {
     int ret;
@@ -116,7 +152,7 @@ static inline int fmt_write_root(Ext2Ctx *ctx, u32 gdt_blocks,
     ino_offset = (1 * EXT2L_INODE_SIZE) % EXT2_BLOCK_SIZE;
     root_data_blk = itable_g0 + inode_tbl_blocks_per_group; /* オーバーヘッド直後 */
 
-    ret = ext2_read_block(ctx, ino_block, fmt_blk);
+    ret = fmt_rd(ctx, ino_block, fmt_blk);
     if (ret != 0) return EXT2_ERR_IO;
 
     le16_wr(&fmt_blk[ino_offset + EXT2_INODE_MODE_OFF], (u16)(EXT2_S_IFDIR | OS32_DEFAULT_DIR_PERM));
@@ -132,7 +168,7 @@ static inline int fmt_write_root(Ext2Ctx *ctx, u32 gdt_blocks,
     le32_wr(&fmt_blk[ino_offset + EXT2_INODE_BLOCKS_OFF], EXT2_SECTORS_PER_BLOCK);   /* blocks (512B単位) */
     le32_wr(&fmt_blk[ino_offset + EXT2_INODE_BLOCK_OFF], root_data_blk); /* block[0] */
 
-    ret = ext2_write_block(ctx, ino_block, fmt_blk);
+    ret = fmt_wr(ctx, ino_block, fmt_blk);
     if (ret != 0) return EXT2_ERR_IO;
 
     /* ルートディレクトリデータブロック */
@@ -148,7 +184,7 @@ static inline int fmt_write_root(Ext2Ctx *ctx, u32 gdt_blocks,
     fmt_blk[EXT2_DOT_RECLEN + EXT2_DIRENT_TYPE_OFF] = EXT2_FT_DIR;
     fmt_blk[EXT2_DOT_RECLEN + EXT2_DIRENT_NAME_OFF] = '.'; fmt_blk[EXT2_DOT_RECLEN + EXT2_DIRENT_NAME_OFF + 1] = '.';
 
-    ret = ext2_write_block(ctx, root_data_blk, fmt_blk);
+    ret = fmt_wr(ctx, root_data_blk, fmt_blk);
     if (ret != 0) return EXT2_ERR_IO;
 
     return EXT2_OK;
@@ -167,11 +203,7 @@ static int ext2_format_range(const struct ext2_medium_ops *ops, int ide_drive, u
 {
     int ret;
     Ext2Layout lay;
-    /* フォーマット用一時コンテキスト。
-     * static — Ext2Ctx は解決済み経路の記憶 (票 S6-P) で 1.7KB 余りあり、
-     * 16KB のカーネルスタックへ丸ごと積みたくない。シングルタスクなので
-     * フォーマットが同時に 2 本走ることはない。 */
-    static Ext2Ctx fmt_ctx;
+    FormatIO fmt_ctx;
 
     if (!ops->present(ide_drive)) return EXT2_ERR_IO;
     if (sectors > part_len) sectors = part_len;
@@ -185,12 +217,7 @@ static int ext2_format_range(const struct ext2_medium_ops *ops, int ide_drive, u
     if (!ops->range_ok(ide_drive, base_lba, lay.total_blocks * (unsigned long)EXT2_SECTORS_PER_BLOCK))
         return EXT2_ERR_INVAL;
 
-    /* 一時コンテキストを初期化
-     * ext2_read_block/ext2_write_block は ctx->dev (Device API) 経由で
-     * I/O するため、dev を必ず解決してから使うこと。part_len で区画の
-     * 外への書き込みはブロック I/O の層でも断る。 */
-    ext2_mem_zero(&fmt_ctx, sizeof(fmt_ctx));
-    fmt_ctx.drive_num = ide_drive;
+    fmt_ctx.ops = ops;
     fmt_ctx.dev = ops->dev(ide_drive);
     if (!fmt_ctx.dev) return EXT2_ERR_IO;
     fmt_ctx.base_lba = base_lba;
@@ -198,7 +225,7 @@ static int ext2_format_range(const struct ext2_medium_ops *ops, int ide_drive, u
 
     /* ===== Block 0: ブートブロック (ゼロクリア) ===== */
     ext2_mem_zero(fmt_blk, EXT2_BLOCK_SIZE);
-    ret = ext2_write_block(&fmt_ctx, 0, fmt_blk);
+    ret = fmt_wr(&fmt_ctx, 0, fmt_blk);
     if (ret != 0) return EXT2_ERR_IO;
 
     ret = fmt_write_super(&fmt_ctx, &lay);

@@ -1,5 +1,5 @@
 /* ext2_fmt.c から同じ翻訳単位に取り込む。 */
-static int fmt_init_groups(Ext2Ctx *ctx, const Ext2Layout *lay)
+static int fmt_init_groups(const FormatIO *ctx, const Ext2Layout *lay)
 {
     u32 g, i;
     int ret;
@@ -45,7 +45,7 @@ static int fmt_init_groups(Ext2Ctx *ctx, const Ext2Layout *lay)
         for (i = gl.blocks_in_group; i < EXT2_BLOCKS_PER_GROUP_MAX; i++) {
             fmt_blk[i / BITS_PER_BYTE] |= (u8)(1 << (i % BITS_PER_BYTE));
         }
-        ret = ext2_write_block(ctx, bmap_blk, fmt_blk);
+        ret = fmt_wr(ctx, bmap_blk, fmt_blk);
         if (ret != 0) return EXT2_ERR_IO;
 
         /* inodeビットマップ */
@@ -61,13 +61,13 @@ static int fmt_init_groups(Ext2Ctx *ctx, const Ext2Layout *lay)
         for (i = lay->inodes_per_group; i < EXT2_BLOCKS_PER_GROUP_MAX; i++) {
             fmt_blk[i / BITS_PER_BYTE] |= (u8)(1 << (i % BITS_PER_BYTE));
         }
-        ret = ext2_write_block(ctx, imap_blk, fmt_blk);
+        ret = fmt_wr(ctx, imap_blk, fmt_blk);
         if (ret != 0) return EXT2_ERR_IO;
 
         /* inodeテーブル (ゼロクリア) */
         ext2_mem_zero(fmt_blk, EXT2_BLOCK_SIZE);
         for (i = 0; i < lay->itable_blocks; i++) {
-            ret = ext2_write_block(ctx, itable_blk + i, fmt_blk);
+            ret = fmt_wr(ctx, itable_blk + i, fmt_blk);
             if (ret != 0) return EXT2_ERR_IO;
         }
     }

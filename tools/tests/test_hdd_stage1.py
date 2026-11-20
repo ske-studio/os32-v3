@@ -166,6 +166,12 @@ C_MUTATIONS = [
     ("fs/ext2/ext2_fmt.c", "    if (media[kind]) return -1;", "", "A7: 二重登録を許す"),
     ("fs/ext2/ext2_fmt.c", "static u8 fmt_blk[EXT2_BLOCK_SIZE];", "#define fmt_blk ext2_g_blk",
      "A5: formatter が下の ext2 と作業域を共有する"),
+    ("fs/ext2/ext2_fmt.c", "    if (ctx->ops->after_write) ctx->ops->after_write();", "",
+     "A8: 書き込み前の破棄を省く"),
+    ("fs/ext2/ext2_fmt.c", "        ctx->ops->after_write(); /* raw read failure */", "",
+     "A8: 読み込み失敗時の破棄を省く"),
+    ("fs/ext2/ext2_fmt.c", "    if (ret && ctx->ops->after_write) ctx->ops->after_write();", "",
+     "A8: 書き込み失敗時の破棄を省く"),
     # E03a: 抽出境界の順と失敗伝播 (format_io_order が実 I/O で検出)。
     ("fs/ext2/ext2_fmt.c", "    ret = fmt_write_groups(&fmt_ctx, &lay);\n    if (ret != 0) return EXT2_ERR_IO;\n\n    ret = fmt_write_backups(&fmt_ctx, &lay);\n    if (ret != 0) return EXT2_ERR_IO;\n",
      "    ret = fmt_write_backups(&fmt_ctx, &lay);\n    if (ret != 0) return EXT2_ERR_IO;\n\n    ret = fmt_write_groups(&fmt_ctx, &lay);\n    if (ret != 0) return EXT2_ERR_IO;\n",

@@ -1,5 +1,5 @@
 /* ext2_fmt.c から同じ翻訳単位に取り込む。 */
-static int fmt_write_groups(Ext2Ctx *ctx, const Ext2Layout *lay)
+static int fmt_write_groups(const FormatIO *ctx, const Ext2Layout *lay)
 {
     u32 g;
     int ret;
@@ -66,16 +66,16 @@ static int fmt_write_groups(Ext2Ctx *ctx, const Ext2Layout *lay)
         /* GDTブロック末尾 or 最後のグループ → 書き込み */
         if (gd_offset + EXT2L_GD_SIZE >= EXT2_BLOCK_SIZE || g == lay->num_groups - 1) {
             u32 gd_block = EXT2_GDT_FIRST_BLOCK + (g * EXT2L_GD_SIZE) / EXT2_BLOCK_SIZE;
-            ret = ext2_write_block(ctx, gd_block, fmt_blk);
+            ret = fmt_wr(ctx, gd_block, fmt_blk);
             if (ret != 0) return EXT2_ERR_IO;
         }
     }
 
     /* スーパーブロックのfree_blocks_countを更新 */
-    ret = ext2_read_block(ctx, 1, fmt_blk);
+    ret = fmt_rd(ctx, 1, fmt_blk);
     if (ret != 0) return EXT2_ERR_IO;
     le32_wr(&fmt_blk[EXT2_SB_FREE_BLOCKS_COUNT_OFF], total_free_blocks);
-    ret = ext2_write_block(ctx, 1, fmt_blk);
+    ret = fmt_wr(ctx, 1, fmt_blk);
     if (ret != 0) return EXT2_ERR_IO;
 
     return EXT2_OK;
