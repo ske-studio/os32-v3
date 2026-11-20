@@ -6,12 +6,17 @@
 #include <stdlib.h>
 #include <stdarg.h>
 
+static char previous_out[REMOTE_NOTIFY_DATA_MAX];
+static int retry_out;
+static int expect_unfrozen_fallback;
 static KernelAPI api;
 KernelAPI *g_api = &api;
 static u32 tick, gen = 7, drops, body_len, reply_pos;
 static unsigned int ready_count, out_count, executes, begins, ends, closes, yields;
 static int active, frozen, pending, handle, is_out, open_error, notice_error;
 static unsigned int writes;
+static int out_error, out_status = 200, write_stale, read_error, abandoned, epoch, handle_epoch;
+static int gui, handoffs, stall_out_only;
 static int accept_status = 200, accept_ack;
 static int is_accept;
 static int stall, partial, freeze_error, stat_error, bad_reply, begin_error;
@@ -34,6 +39,12 @@ static i32 open_host(const char *req, u32 len)
     handle = 1;
     is_accept = !strncmp(req, REMOTE_REQ_RSH_ACCEPT, strlen(REMOTE_REQ_RSH_ACCEPT));
     is_out = is_accept || !strncmp(req, REMOTE_REQ_RSH_OUT, strlen(REMOTE_REQ_RSH_OUT));
+    if (is_out) {
+        retry_out = !strcmp(previous_out, request);
+        strcpy(previous_out, request);
+    }
+    if (is_out && out_error) { handle = 0; return out_error; }
+    handle_epoch = epoch;
     reply_pos = 0;
     if (is_out) { ++out_count; body_len = 0; response[0] = 0; }
     else {
@@ -48,8 +59,8 @@ static i32 close_host(i32 h) { CHECK(h == 3 && handle); handle = 0; ++closes; re
 static i32 status_host(i32 h, u32 *st, u32 *len)
 {
     CHECK(h == 3 && handle);
-    if (stall == 2) return OS32_ERR_AGAIN;
-    *st = is_accept ? (u32)accept_status : 200;
+    if (stall == 2 && (!stall_out_only || is_out)) return OS32_ERR_AGAIN;
+    *st = is_accept ? (u32)accept_status : is_out ? (u32)out_status : 200;
     if (is_accept && *st == 200) accept_ack = 1;
     *len = strlen(response); return 0;
 }
@@ -65,8 +76,11 @@ static i32 read_host(i32 h, void *buf, u32 cap)
 }
 static i32 write_host(i32 h, const void *buf, u32 len)
 {
-    CHECK(h == 3 && handle && active && frozen && is_out);
+    CHECK(h == 3 && handle && is_out);
+    if (!retry_out && !expect_unfrozen_fallback && !begin_error) CHECK(active && frozen);
     CHECK(len <= 1400);
+    if (write_stale && body_len) { ++epoch; write_stale = 0; }
+    if (handle_epoch != epoch) return OS32_ERR_STALE;
     if (stall == 1) return OS32_ERR_AGAIN;
     if (partial && (++writes % 2 == 0)) return OS32_ERR_AGAIN;
     if (partial && len > 3) len = 3;
@@ -84,6 +98,7 @@ static int read_notice(u32 generation, u32 service, HostNotice *out)
 static int capture_op(u32 op)
 {
     if (op == CON_SINK_CAPTURE_BEGIN) {
+        previous_out[0] = 0;
         if (begin_error) return begin_error;
         CHECK(!active && !handle); active = 1; frozen = 0;
         capture_len = capture_pos = 0; ++begins;
@@ -100,12 +115,13 @@ static int capture_op(u32 op)
 static i32 stat_sink(u32 *count, u32 *dropped)
 {
     (void)count;
-    if (stat_error) return OS32_ERR_IO;
+    if (stat_error && --stat_error == 0) return OS32_ERR_IO;
     *dropped = frozen ? drops : 0; return 0;
 }
 static i32 read_sink(void *buf, u32 cap)
 {
     CHECK(active && frozen && cap >= CON_SINK_REC_MAX);
+    if (read_error) return OS32_ERR_IO;
     if (capture_pos == capture_len) return 0;
     /* Each call returns a single complete PRINT record. */
     u32 n = capture_len - capture_pos;
@@ -117,6 +133,7 @@ static i32 read_sink(void *buf, u32 cap)
 static void print(u8 attr, const char *fmt, ...)
 {
     (void)attr;
+    if (!active && strstr(fmt, "abandoned")) { ++abandoned; return; }
     CHECK(active && !frozen);
     va_list args; va_start(args, fmt);
     int n = vsnprintf(capture + capture_len, sizeof(capture) - capture_len, fmt, args);
@@ -132,8 +149,8 @@ int execute_command(const char *line)
     } else print(7, "%s", "ok\n");
     return 0;
 }
-int rsh_lan_execute(const char *line) { (void)execute_command(line); return 0; }
-int rsh_lan_handoff(const char *line) { (void)line; CHECK(0); return 1; }
+int rsh_lan_execute(const char *line) { (void)execute_command(line); return gui; }
+int rsh_lan_handoff(const char *line) { (void)line; ++handoffs; begin_error = OS32_ERR_BUSY; return 1; }
 int sh_refused_take(void) { return 0; }
 static void queue(unsigned int id, const char *line)
 {
@@ -152,6 +169,7 @@ static void output(unsigned int id, unsigned int drop)
     CHECK(body_len && body[body_len - 1] == 4);
     CHECK(!active && !handle && begins == ends);
 }
+static int no_trace_file(const char *path, int flags) { (void)path; (void)flags; return -1; }
 int main(void)
 {
     api.get_tick = now; api.sys_yield = yield; api.boot_token_get = boot;
@@ -160,12 +178,14 @@ int main(void)
     api.host_notice_read = read_notice; api.con_sink_capture = capture_op;
     api.con_sink_stat = stat_sink; api.con_sink_read = read_sink;
     api.kprintf = print; api.buz_off = quiet;
+    api.sys_open = no_trace_file;
     partial = 1;
     queue(1, "echo hi"); CHECK(rsh_lan_poll() == 1); output(1, 0);
     CHECK(!strcmp(ready_request, "RSH READY 00112233445566778899aabbccddeeff cui 1 none idle"));
     CHECK(body_len == 14 && !memcmp(body, "> echo hi\nok\n\004", body_len));
     /* Above includes exact echo/body/EOT, not a terminating NUL. */
-    queue(1, "echo twice"); CHECK(rsh_lan_poll() == OS32_ERR_EXIST); CHECK(executes == 1);
+    CHECK(ready_count == 1);
+    queue(1, "echo twice"); CHECK(rsh_lan_poll() == OS32_ERR_EXIST); CHECK(executes == 1 && ready_count == 1);
     queue(0, "echo old"); CHECK(rsh_lan_poll() == OS32_ERR_EXIST); CHECK(executes == 1);
     queue(2, "echo drop"); drops = 5;
     CHECK(rsh_lan_poll() == 1); output(2, 5); drops = 0;
@@ -203,7 +223,9 @@ int main(void)
     queue(3, "timeout"); stall = 1;
     u32 start = tick; CHECK(rsh_lan_poll() == OS32_ERR_TIMEOUT);
     CHECK(tick - start == OS32_TICK_HZ && !active && !handle && begins == ends);
-    stall = 0; next_ready(); queue(3, "again"); CHECK(rsh_lan_poll() == OS32_ERR_EXIST);
+    stall = 0; next_ready(); queue(3, "again"); CHECK(rsh_lan_poll() == 1 && pending);
+    CHECK(strstr(ready_request, "00000003 running"));
+    CHECK(rsh_lan_poll() == OS32_ERR_EXIST);
     for (int mode = 2; mode <= 3; ++mode) {
         next_ready(); stall = mode; start = tick;
         CHECK(rsh_lan_poll() == OS32_ERR_TIMEOUT);
@@ -213,9 +235,72 @@ int main(void)
     next_ready(); queue(4, "exit"); CHECK(rsh_lan_poll() == RSH_LAN_EXIT); output(4, 0);
     CHECK(body_len == 1 && !active && !handle && begins == ends);
     queue(5, "freeze error"); freeze_error = OS32_ERR_IO;
-    CHECK(rsh_lan_poll() == OS32_ERR_IO && !active && begins == ends); freeze_error = 0;
-    queue(6, "stat error"); stat_error = 1;
-    CHECK(rsh_lan_poll() == OS32_ERR_IO && !active && begins == ends); stat_error = 0;
+    CHECK(rsh_lan_poll() == 1); output(5, 1); CHECK(body_len == 1); freeze_error = 0;
+    queue(6, "stat error"); stat_error = 1; expect_unfrozen_fallback = 1;
+    CHECK(rsh_lan_poll() == 1); output(6, 1); CHECK(body_len == 1); expect_unfrozen_fallback = 0;
+    queue(7, "read error"); read_error = 1;
+    CHECK(rsh_lan_poll() == 1); output(7, 1); CHECK(body_len == 1); read_error = 0;
+    for (unsigned int i = 0; i < 3; ++i) {
+        unsigned int id = 8 + i, ran = executes;
+        drops = 4;
+        queue(id, "retry");
+        if (i == 0) out_error = OS32_ERR_HOSTDOWN;
+        if (i == 1) write_stale = 1;
+        if (i == 2) stall = 2;
+        int expected = i == 0 ? OS32_ERR_HOSTDOWN : i == 1 ? OS32_ERR_STALE : OS32_ERR_TIMEOUT;
+        CHECK(rsh_lan_poll() == expected);
+        char original[sizeof(request)];
+        strcpy(original, request);
+        out_error = stall = 0; drops = 0; next_ready(); queue(id, "again");
+        CHECK(rsh_lan_poll() == 1 && pending && executes == ran + 1);
+        CHECK(strstr(ready_request, " running") && !strcmp(request, original));
+        output(id, 4); CHECK(body_len == 12 && !memcmp(body, "> retry\nok\n\004", 12));
+        CHECK(rsh_lan_poll() == OS32_ERR_EXIST && strstr(ready_request, " done"));
+    }
+    queue(11, "reject"); out_status = 503;
+    CHECK(rsh_lan_poll() == OS32_ERR_IO); next_ready(); out_status = 400;
+    CHECK(rsh_lan_poll() == OS32_ERR_IO && strstr(ready_request, " running"));
+    out_status = 200;
+    CHECK(rsh_lan_poll() == OS32_ERR_AGAIN && strstr(ready_request, " done"));
+
+    queue(12, "generation"); out_error = OS32_ERR_HOSTDOWN;
+    CHECK(rsh_lan_poll() == OS32_ERR_HOSTDOWN); out_error = 0; ++gen; next_ready();
+    queue(1, "fresh"); CHECK(rsh_lan_poll() == 1 && strstr(ready_request, "none idle")); output(1, 0);
+
+    queue(2, "deadline"); start = tick; out_error = OS32_ERR_HOSTDOWN;
+    CHECK(rsh_lan_poll() == OS32_ERR_HOSTDOWN); out_error = 0;
+    tick = start + 30 * OS32_TICK_HZ - 1; stall = 2;
+    CHECK(rsh_lan_poll() == OS32_ERR_TIMEOUT && tick == start + 30 * OS32_TICK_HZ);
+    stall = 0; CHECK(rsh_lan_poll() == OS32_ERR_AGAIN && abandoned == 1);
+    next_ready(); CHECK(rsh_lan_poll() == OS32_ERR_AGAIN && strstr(ready_request, " done"));
+
+    queue(3, "attempts"); out_error = OS32_ERR_HOSTDOWN;
+    CHECK(rsh_lan_poll() == OS32_ERR_HOSTDOWN);
+    for (int i = 0; i < 12; i++) {
+        next_ready(); CHECK(rsh_lan_poll() == OS32_ERR_HOSTDOWN && strstr(ready_request, " running"));
+    }
+    CHECK(rsh_lan_poll() == OS32_ERR_AGAIN && abandoned == 2); out_error = 0;
+    next_ready(); queue(4, "local stop"); out_status = 503; CHECK(rsh_lan_poll() == OS32_ERR_IO);
+    rsh_lan_reset(); out_status = 200; queue(5, "after restart");
+    CHECK(rsh_lan_poll() == 1 && strstr(ready_request, "00000004 done")); output(5, 0);
+    gui = 1; queue(6, "gui"); out_status = 503;
+    CHECK(rsh_lan_poll() == OS32_ERR_IO && handoffs == 1 && begins == ends);
+    next_ready(); out_status = 200; begin_error = gui = 0;
+    CHECK(rsh_lan_poll() == 1 && handoffs == 1); output(6, 1); CHECK(body_len == 1);
+    queue(7, "deadline in OUT"); start = tick; out_error = OS32_ERR_HOSTDOWN;
+    CHECK(rsh_lan_poll() == OS32_ERR_HOSTDOWN); out_error = 0;
+    tick = start + 30 * OS32_TICK_HZ - 1; stall = 2; stall_out_only = 1;
+    CHECK(rsh_lan_poll() == OS32_ERR_TIMEOUT && tick == start + 30 * OS32_TICK_HZ);
+    stall = 0; CHECK(rsh_lan_poll() == OS32_ERR_AGAIN && abandoned == 3);
+
+    next_ready(); gui = 1; accept_status = 503; queue(8, "gui");
+    CHECK(rsh_lan_poll() == OS32_ERR_IO); gui = 0; next_ready(); queue(9, "after accept");
+    CHECK(rsh_lan_poll() == 1 && handoffs == 1); output(9, 0);
+    queue(10, "exit"); out_error = OS32_ERR_HOSTDOWN;
+    CHECK(rsh_lan_poll() == RSH_LAN_EXIT); out_error = 0; next_ready(); queue(11, "after exit");
+    CHECK(rsh_lan_poll() == 1 && strstr(ready_request, "0000000a done")); output(11, 0);
+    queue(12, "stat after freeze"); stat_error = 2;
+    CHECK(rsh_lan_poll() == 1); output(12, 1); CHECK(body_len == 1 && !stat_error);
     CHECK(yields && closes);
     puts("PASS remote X10 fake KAPI lifecycle");
     return 0;
