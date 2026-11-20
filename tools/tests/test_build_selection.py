@@ -114,6 +114,7 @@ KBOOT_QUERY = ('.PHONY: kboot-query\nkboot-query:\n'
                '\t@echo "KB_OUT=$(KB_OUT)"\n\t@echo "KB_VFS=$(KB_VFS)"\n'
                '\t@echo "KB_SQLITE_INC=$(KB_SQLITE_INC)"\n'
                '\t@echo "KB_SQLITE_AUDIT=$(KB_SQLITE_AUDIT)"\n'
+               '\t@echo "KB_PENDING=$(KB_PENDING_OBJ)"\n'
                '\t@echo "KB_MODULES=$(MODULE_FEATURES)"\n')
 
 
@@ -140,6 +141,14 @@ def check_kboot(root):
                                           stderr=subprocess.PIPE)
             actual = dict(line.split('=', 1) for line in out.splitlines() if line.startswith('KB_'))
             assert actual['KB_OUT'] == image['KB_OUT'], (name, selector)
+            ext2 = 'fs/ext2/ext2_'
+            formatter = {ext2 + stem for stem in ('fmt', 'layout', 'time')}
+            pending = set(actual['KB_PENDING'].split())
+            for unit in formatter:
+                assert actual['KB_OUT'] + '/' + unit + '.o' in pending, (name, unit)
+            ide = ext2 + 'medium_ide'
+            assert actual['KB_OUT'] + '/' + ide + '.o' not in pending, name
+            assert {unit + '.c' for unit in formatter | {ide}}.isdisjoint(actual['KB_C'].split()), name
             enabled = name in ('shell', 'sh', 'link-sh')
             assert 'sqlite' not in actual['KB_MODULES'].split()
             for key in ('KB_VFS', 'KB_SQLITE_INC', 'KB_SQLITE_AUDIT'):
@@ -213,6 +222,10 @@ if __name__ == '__main__':
         check_kboot(root)
         if args.mutate:
             for path, anchor, mutant, expected, label in (
+                    ('build/sources/common.mk', 'kernel/sqlite_engine.c $(C_EXT2_FORMATTER)',
+                     'kernel/sqlite_engine.c', AssertionError, 'formatter omitted from PowerPC compile'),
+                    ('build/sources/common.mk', 'C_COMMON_CORE = ', 'C_COMMON_CORE = $(C_EXT2_FORMATTER) ',
+                     AssertionError, 'formatter linked into PowerMac'),
                     ('build/images/kboot-sh.mk', 'FEATURE_LOOP = 1', 'FEATURE_LOOP = 0',
                      AssertionError, 'loop disabled on kboot-sh'),
                     ('build/images/kboot-shell.mk', 'FEATURE_LOOP = 0', 'FEATURE_LOOP = 1',
