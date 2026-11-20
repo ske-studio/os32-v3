@@ -9,6 +9,7 @@ import argparse
 import hashlib
 import json
 import os
+from contextlib import contextmanager
 from pathlib import Path
 import re
 import select
@@ -645,7 +646,7 @@ FLOW_CASES = ('root-branch', 'missing-aux', 'restore-root', 'return-target')
 def flow_settings(folder, case):
     """Observe child teardown and exercise the selected entry or return decision."""
     source = (ROOT/'exec/exec.c').read_text()
-    source = 'volatile unsigned shell_flow_error, shell_child_returning;\n' + source
+    source = 'volatile unsigned shell_flow_error, shell_child_returning, shell_return_target, shell_valid_root;\n' + source
     guard = 'do { shell_flow_error = %d; for (;;) __asm__ volatile("" ::: "memory"); } while (0);'
     for fragment in ('exec_launch.inc', 'exec_finish.inc'):
         text = (ROOT/'exec'/fragment).read_text()
@@ -656,10 +657,15 @@ def flow_settings(folder, case):
                 '        if (is_shell && args.aux != (u32)(uptr)&g_shell_service) ' + guard % 2)
         else:
             anchor = 'appslot_switch_to(parent);'
-            text = replace_once(text, anchor, '++shell_child_returning;\n        ' + anchor)
+            text = replace_once(text, anchor, 'shell_valid_root = 0;\n        shell_return_target = parent;\n'
+                                '        ++shell_child_returning;\n        ' + anchor)
+            # Publish the argument before installing it, while memory is accessible.
+            root = '0' if case == 'restore-root' else 'paging_kernel_pd_phys()'
             original = 'g_cur_app = 0;\n        paging_load_cr3(paging_kernel_pd_phys());'
-            if case == 'restore-root':
-                text = replace_once(text, original, 'g_cur_app = 0;\n        paging_load_cr3(0);')
+            text = replace_once(text, original, 'g_cur_app = 0;\n'
+                                f'        u32 root = {root};\n'
+                                '        shell_valid_root = root == paging_kernel_pd_phys() ? 1 : 2;\n'
+                                '        paging_load_cr3(root);')
             if case == 'return-target':
                 text = replace_once(text, 'parent = appslot_return_target(id);', 'parent = id;')
         (folder/fragment).write_text(text)
@@ -693,12 +699,23 @@ def flow_accept(elf, folder, case):
             s.agent.operator.submit('cui', '/bin/hello.bin ok', 'flow')
             # The kernel image is identity-loaded. Sample physical memory so
             # a broken return root cannot hide the completed child teardown.
-            address = s.symbols['shell_child_returning']
-            def returning():
+            def physical(name):
+                address = s.symbols[name]
                 result = s.q.call('human-monitor-command', {'command-line': f'xp /1wx 0x{address:x}'})
                 value = re.search(r':\s*0x([0-9a-fA-F]+)', result)
-                return value and int(value[1], 16) == previous + 1
-            s.wait(returning, 'child reached parent restoration', 30)
+                return int(value[1], 16) if value else None
+            s.wait(lambda: physical('shell_child_returning') == previous + 1, 'child reached parent restoration', 30)
+            target = physical('shell_return_target')
+            if case == 'return-target':
+                require(target == 2, f'expected child return target 2, got {target}')
+                print('RED flow-return-target: shell_return_target=2', flush=True)
+                return
+            require(target == 1, f'expected shell return target 1, got {target}')
+            valid = 2 if case == 'restore-root' else 1
+            s.wait(lambda: physical('shell_valid_root') == valid, f'parent root decision {valid}', 10)
+            if case == 'restore-root':
+                print('RED flow-restore-root: shell_valid_root=2', flush=True)
+                return
             start = len(s.events)
             ident = '00002000'
             execute = s.agent.notifier.notify_number(RSHELL, EXECUTE, ident.encode()+b' echo next $?\n')
@@ -707,15 +724,12 @@ def flow_accept(elf, folder, case):
             replies = [bytes.fromhex(e['body']) for e in s.events[start:]
                        if e['parts'][:2] == ['RSH', 'OUT'] and e['parts'][3] == ident]
             expected = b'> echo next $?\nnext 7\n\x04'
-            if case == 'control':
-                require(expected in replies, 'control command after child return')
-                flow_point(s, 1, (2, 1, 2, 2, 2))
-                flow_point(s, 2, (1, 0, 1, 1, 0))
-                result = s.agent.operator.take_result()
-                check_body('/bin/hello.bin ok', result['result'], b'hello ok\n')
-                require(s.word('shell_flow_error') == 0, 'clean entry and return')
-            else:
-                require(all(b'next 7' not in body.splitlines() for body in replies), 'SURVIVED '+case)
+            require(expected in replies, 'control command after child return')
+            flow_point(s, 1, (2, 1, 2, 2, 2))
+            flow_point(s, 2, (1, 0, 1, 1, 0))
+            result = s.agent.operator.take_result()
+            check_body('/bin/hello.bin ok', result['result'], b'hello ok\n')
+            require(s.word('shell_flow_error') == 0, 'clean entry and return')
             return
         def stopped():
             try:
@@ -754,17 +768,28 @@ def main():
     control=work/'normal'; control.mkdir()
     elf=build(control/'kernel',*settings(control, observe_flow=True))
     check_map(elf.with_suffix('.map'))
+    failures = []
+
+    @contextmanager
+    def record_case(name):
+        try:
+            yield
+        except Exception as exc:
+            failures.append(f'{name}: {exc}')
+            print('FAIL '+failures[-1], flush=True)
+
     hashes = {hashlib.sha256(elf.read_bytes()).digest()}
     for case in ('control', *FLOW_CASES) if args.mutate else ('control',):
-        folder = work/('flow-'+case)
-        folder.mkdir()
-        image = build(folder/'kernel', *flow_settings(folder, case), 'kb-user', 'kernel')
-        digest = hashlib.sha256(image.read_bytes()).digest()
-        require(digest not in hashes, 'distinct flow image '+case)
-        hashes.add(digest)
-        print('flow-'+case, digest.hex(), flush=True)
-        if not args.build_only:
-            flow_accept(image, folder/'guest', case)
+        with record_case('flow-'+case):
+            folder = work/('flow-'+case)
+            folder.mkdir()
+            image = build(folder/'kernel', *flow_settings(folder, case), 'kb-user', 'kernel')
+            digest = hashlib.sha256(image.read_bytes()).digest()
+            require(digest not in hashes, 'distinct flow image '+case)
+            hashes.add(digest)
+            print('flow-'+case, digest.hex(), flush=True)
+            if not args.build_only:
+                flow_accept(image, folder/'guest', case)
     if args.build_only:
         if args.mutate:
             for name in MUTATIONS:
@@ -775,20 +800,25 @@ def main():
                 require(digest not in hashes, 'distinct image '+name)
                 hashes.add(digest)
                 print(name, digest.hex(), flush=True)
+        require(not failures, '\n'.join(failures))
+        print(f'Built {len(hashes)} distinct images', flush=True)
         return 0
     for cpu in ('7450','7455'):
         for late in (False,True):
-            accept(elf,cpu,work/(cpu+('-late' if late else '-normal')),args.timeout,late)
-            print('GREEN '+cpu+' late='+str(late),flush=True)
+            with record_case(f'{cpu} late={late}'):
+                accept(elf,cpu,work/(cpu+('-late' if late else '-normal')),args.timeout,late)
+                print('GREEN '+cpu+' late='+str(late),flush=True)
     if args.mutate:
         for name,(_,_,_,expected) in MUTATIONS.items():
-            folder=work/name; folder.mkdir()
-            mutant=build(folder/'kernel',*settings(folder,name))
-            try: accept(mutant,'7450',folder/'guest',args.timeout,verdict=expected)
-            except CriterionFailure as exc:
-                require(str(exc)==expected,'unexpected mutation verdict '+name+': '+str(exc))
-                print('RED '+name+': '+str(exc),flush=True)
-            else: raise RuntimeError('SURVIVED '+name)
+            with record_case(name):
+                folder=work/name; folder.mkdir()
+                mutant=build(folder/'kernel',*settings(folder,name))
+                try: accept(mutant,'7450',folder/'guest',args.timeout,verdict=expected)
+                except CriterionFailure as exc:
+                    require(str(exc)==expected,'unexpected mutation verdict '+name+': '+str(exc))
+                    print('RED '+name+': '+str(exc),flush=True)
+                else: raise RuntimeError('SURVIVED '+name)
+    require(not failures, '\n'.join(failures))
     return 0
 
 
