@@ -426,3 +426,4 @@ PM が決めれば足りる物: 契約の末尾への追加を AC-BOOT-3 の照�
 
 
 確定 (2026-11-19、Opus 5.5 (reviewer) の第 2 回 Approve、N1・N2 を PM が反映): N1 kprintf の代役は lib/kprintf.c を展開して組む、N2 D-i の依存を B2・B2t・B3・B4 に揃えた。
+- **段 E・F の入口 (PM 決定 2026-11-21、段 E の astra の止まりを受けて)**: 機種の既定の表の入口は固定名 `struct machcfg_seed platform_machcfg_seed(void);` を include/machcfg_contract.h に宣言し、段 E (platform/pc98/machcfg.c) と段 F (platform/powermac/machcfg.c) が同じ名前で実装する (機種名の付いた名前にしない — 層の決まりの固定名)。既定の 1 行を返すだけで共通のコードを呼ばない。段 H・I がこれを machcfg_begin に渡す。host 試験 machcfg-host は試験の中で seed を組み立てる代わりに各機種の実装を組んで、実の表の既定値 (PC-98 は NAP 非対応) を照合する。

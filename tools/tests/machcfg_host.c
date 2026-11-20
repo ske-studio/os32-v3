@@ -50,10 +50,12 @@ static int reports(void)
     };
     for (unsigned m = 0; m < sizeof(machines)/sizeof(machines[0]); ++m) {
         const typeof(*machines) *mch = &machines[m];
+        struct machcfg_seed seed = mch->cpu ? (struct machcfg_seed){{0, 0}, mch->accepts}
+                                           : platform_machcfg_seed();
         for (unsigned i = 0; i < sizeof(cases)/sizeof(cases[0]); ++i) {
             const typeof(*cases) *c = &cases[i];
             used = 0;
-            machcfg_begin((struct machcfg_seed){{0, 0}, mch->accepts});
+            machcfg_begin(seed);
             machcfg_report(mch->machine, mch->cpu, mch->cpu != 0);
             if (used) return 8;
             if (c->result != MACHCFG_FILE_NOFS)
@@ -76,7 +78,7 @@ static int reports(void)
 static int run(void)
 {
     const struct machcfg_seed seeds[] = {
-        {{0, 0}, 1}, {{0, 0}, 0}, {{0, 0}, 0}
+        {{0, 0}, 1}, {{0, 0}, 0}, platform_machcfg_seed()
     };
     struct machcfg values = {2, 1};
     unsigned int i;

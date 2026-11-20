@@ -9,6 +9,7 @@
 struct machcfg { u8 perf_request, nap7450; };
 struct machcfg_seed { struct machcfg defaults; u8 accepts_nap7450; };
 
+struct machcfg_seed platform_machcfg_seed(void);
 void machcfg_begin(struct machcfg_seed seed);
 void machcfg_finish(const struct machcfg *values);
 const struct machcfg *machcfg_get(void);

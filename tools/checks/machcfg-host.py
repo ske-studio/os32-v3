@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 CHECK = dict(name='machcfg-host', tier=1, needs=[], budget=5,
     covers=['include/machcfg_contract.h', 'include/types.h', 'include/callconv.h',
-            'init/sysconfig.c', 'kernel/machcfg.c', 'tools/tests/machcfg_host.c',
+            'init/sysconfig.c', 'kernel/machcfg.c', 'platform/pc98/machcfg.c', 'tools/tests/machcfg_host.c',
             'include/kprintf.h', 'include/console.h', 'sdk/include/os32/*.h',
             'platform/pc98/platform_console.h', 'lib/kprintf.c', 'lib/kprintf_format.inc',
             'tools/tests/host32.py', 'tools/tests/cc_cache.py'],
@@ -24,6 +24,7 @@ def run(ctx):
         raise RuntimeError('SYSCONFIG_MAX definition missing')
     source = (root / 'kernel/machcfg.c').read_text()
     header = (root / 'include/machcfg_contract.h').read_text()
+    pc98 = (root / 'platform/pc98/machcfg.c').read_text()
     mutations = [
         ('capability', 'if (!machine_seed.accepts_nap7450)', 'if (0)'),
         ('report-once', 'reported = 1;', ''),
@@ -38,14 +39,15 @@ def run(ctx):
         formatter = (root / 'lib/kprintf.c').read_text().replace(
             '#include "kprintf_format.inc"', (root / 'lib/kprintf_format.inc').read_text())
         (tmp / 'format.c').write_text(formatter)
-        def check(src, hdr):
+        def check(src, hdr, platform=pc98):
+            (tmp / 'pc98.c').write_text(platform)
             (tmp / 'machcfg.c').write_text(src)
             (tmp / 'machcfg_contract.h').write_text(hdr)
             exe = tmp / 'test'
             cmd = ['gcc', '-m32', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
                    '-ffreestanding', '-fno-pie', '-no-pie', '-nostdlib',
                    '-DTEST_SYSCONFIG_MAX=' + match.group(1), '-I' + str(tmp),
-                   '-I' + str(root / 'include'), str(tmp / 'machcfg.c'),
+                   '-I' + str(root / 'include'), str(tmp / 'machcfg.c'), str(tmp / 'pc98.c'),
                    '-I' + str(root / 'platform/pc98'), str(tmp / 'format.c'),
                    str(root / 'tools/tests/machcfg_host.c'), '-o', str(exe)]
             built = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -68,6 +70,15 @@ def run(ctx):
                     print(name, 'did not fail at runtime:', phase, result)
                     return 1
                 print(name, 'RED')
+            for field in ('perf_request', 'nap7450', 'accepts_nap7450'):
+                old = '.' + field + ' = 0'
+                if pc98.count(old) != 1:
+                    raise RuntimeError('PC-98 mutation point changed: ' + field)
+                phase, result = check(source, header, pc98.replace(old, '.' + field + ' = 1'))
+                if phase != 'run' or result == 0:
+                    print(field, 'did not fail at runtime:', phase, result)
+                    return 1
+                print('pc98-' + field, 'RED')
             old = '#define MACHCFG_FILE_MAX (1024 - 1)'
             if header.count(old) != 1:
                 raise RuntimeError('limit mutation point changed')
