@@ -47,6 +47,7 @@
     "platform/pc98/timer.c",
     "platform/pc98/pit_math.c",
     "init/bootinfo.c",
+    "platform/pc98/module_pair.c",
     "platform/pc98/bootinfo_capture.c",
     "platform/pc98/bootinfo_geom.c",
     "platform/pc98/bootinfo_report.c",

@@ -2,7 +2,7 @@
 記録: tools/tests/module_runtime_tdd.md
 """
 CHECK = dict(name='module-runtime-host', tier=1,
-    covers=['kernel/module/module_runtime.c', 'kernel/module/module_runtime.h', 'kernel/module/module_image.c', 'kernel/module/module_image.h', 'kernel/module/module_schema.h', 'mm/pgalloc.h', 'include/types.h', 'include/memmap.h', 'fs/vfs.c', 'fs/vfs.h', 'drivers/base/dev.c', 'kernel/dev/dev.h', 'drivers/block/disk.h', 'drivers/ata/atapi.h', 'drivers/block/fdc.h', 'include/console.h', 'include/kbd.h', 'drivers/input/kbd.h', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'lib/kstring.h', 'lib/le_internal.h', 'tools/tests/module_runtime_host.c', 'tools/tests/module_runtime_tdd.md', 'tools/tests/test_module_image.py', 'tools/tests/module_image_host.c', 'tools/tests/host32.py', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'tools/tests/kernel_includes.py'],
+    covers=['arch/x86/arch_exec_cache.h', 'arch/ppc/arch_exec_cache.h', 'kernel/module/module_runtime.c', 'kernel/module/module_runtime.h', 'kernel/module/module_image.c', 'kernel/module/module_image.h', 'kernel/module/module_schema.h', 'mm/pgalloc.h', 'include/types.h', 'include/memmap.h', 'fs/vfs.c', 'fs/vfs.h', 'drivers/base/dev.c', 'kernel/dev/dev.h', 'drivers/block/disk.h', 'drivers/ata/atapi.h', 'drivers/block/fdc.h', 'include/console.h', 'include/kbd.h', 'drivers/input/kbd.h', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'lib/kstring.h', 'lib/le_internal.h', 'tools/tests/module_runtime_host.c', 'tools/tests/module_runtime_tdd.md', 'tools/tests/test_module_image.py', 'tools/tests/module_image_host.c', 'tools/tests/host32.py', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'tools/tests/kernel_includes.py'],
     needs=[], budget=4.8,
     kind='characterization',
 )
@@ -47,7 +47,7 @@ CASES += [(f'registered-start-failure-{i}', 11, i) for i in range(6)]
 CASES += [('registry-full-unmount-reuse', 12, 0)]
 REJECTIONS = [(name, 9, rc) for _, name, _, rc, _ in image_cases()
               if name in ('export-slot-21', 'export-duplicate', 'crc')]
-CASES += REJECTIONS
+CASES += REJECTIONS + [('getter-failed', 13, 5), ('wrong-pair', 13, 4)]
 
 
 def main():
@@ -55,15 +55,24 @@ def main():
         folder = Path(td)
         exe = folder / 'runtime'
 
-        def build(source, vfs=ROOT / 'fs/vfs.c', dev=ROOT / 'drivers/base/dev.c'):
-            subprocess.run(['gcc', *FLAGS, '-Werror=vla', '-Wno-unused-parameter', *INCLUDES,
+        (folder / 'arch_exec_cache.h').write_text(
+            '#include "types.h"\nvoid arch_exec_publish(void *dst, u32 bytes);\n')
+
+        def build(source, vfs=ROOT / 'fs/vfs.c', dev=ROOT / 'drivers/base/dev.c',
+                  validator=ROOT / 'kernel/module/module_image.c'):
+            subprocess.run(['gcc', *FLAGS, '-Werror=vla', '-Wno-unused-parameter', '-DMODULE_CACHE_SPY', '-I' + str(folder), *INCLUDES,
                             '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
                             ROOT / 'tools/tests/module_runtime_host.c', source,
-                            ROOT / 'kernel/module/module_image.c', vfs, dev, '-o', exe], check=True)
+                            validator, vfs, dev, '-o', exe], check=True)
 
         def run(cases, expected=0):
             for label, mode, arg in cases:
                 data = image()
+                # Relocate an unused word in text, leaving the executable probes intact.
+                word(data, 22, 1)
+                struct.pack_into('<I', data, 144, 16)
+                struct.pack_into('<I', data, 4096 + 16, 10)
+                crc(data)
                 if mode == 9:
                     data = next(data for _, name, data, _, _ in image_cases() if name == label)
                 payload = struct.pack('<2I', mode, arg) + data
@@ -80,6 +89,11 @@ def main():
         if '--mutate' in sys.argv:
             source = SOURCE.read_text()
             for label, old, new, cases in (
+                ('cache-omitted', 'arch_exec_publish(body + h[MI_TEXT_OFF], r->text_size);',
+                 '(void)body;', [CASES[0]]),
+                ('cache-short', 'r->text_size);\n    r->init', 'r->text_size - 1);\n    r->init', [CASES[0]]),
+                ('cache-early', '    rc = module_image_relocate(',
+                 '    arch_exec_publish(body + h[MI_TEXT_OFF], h[MI_TEXT_SIZE]);\n    rc = module_image_relocate(', [CASES[0]]),
                 ('prefix-failure-success', 'return rc ? rc : MODULE_INIT_FAILED;',
                  'return rc;', [('prefix-return-reclaimed', 10, 0)]),
                 ('early-publication', 'r->state == MODULE_RUNNING ? r->exports : 0',
@@ -108,10 +122,23 @@ def main():
                 ('export-copy-slot', 'r->exports[slot] =', 'r->exports[slot - 1] =', [CASES[0]])):
                 assert source.count(old) == 1, label
                 mutant = folder / (label + '.c')
-                mutant.write_text(source.replace(old, new))
+                changed = source.replace(old, new)
+                if label == 'cache-early':
+                    changed = changed.replace('    arch_exec_publish(body + h[MI_TEXT_OFF], r->text_size);\n', '')
+                mutant.write_text(changed)
                 build(mutant)
                 run(cases, expected=1)
                 print(f'MUTATE {label} RED (runtime assertions)', flush=True)
+            validator = (ROOT / 'kernel/module/module_image.c').read_text()
+            for label, condition, case in (
+                    ('missing-pair-accepted', '!policy->img_valid', ('getter-failed', 13, 5)),
+                    ('wrong-pair-accepted', 'h[MI_PAIR_CRC] != policy->pair_image_crc',
+                     ('wrong-pair', 13, 4))):
+                assert validator.count(condition) == 1
+                mutant = folder / (label + '.c')
+                mutant.write_text(validator.replace(condition, '0'))
+                build(SOURCE, validator=mutant)
+                run([case], expected=1)
             for label, path, old, new, cases in (
                 ('fs-full-silent', ROOT / 'fs/vfs.c',
                  'if (num_fs == VFS_MAX_FS) return VFS_ERR_FULL;',

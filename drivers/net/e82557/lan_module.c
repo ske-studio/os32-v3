@@ -6,7 +6,7 @@ _Static_assert(PC98_TICK_COUNT <= TICK_SLOT_COUNT, "PC98 tick slots exceed table
 #include "lan_imports.h"
 #include "pci_bind_contract.h"
 #include "pci_bind.h"
-#include "bootinfo.h"
+#include "platform_module_pair.h"
 #include "config.h"
 #include "os32_generations.h"
 #include "../../../kernel/module/module.h"
@@ -221,12 +221,13 @@ int lan_module_load(void)
 {
     if (tick_register(PC98_TICK_E82557, e82557_tick) != 0) return MODULE_INIT_FAILED;
     if (lan_handle.generation) return MODULE_BUSY;
-    const struct boot_common *bi = boot_common_get();
+    u32 pair = 0;
+    int pair_valid = platform_module_pair(&pair);
     const struct module_request request = {
         .path = SYS_LAN_MOD, .name = "lan",
         .policy = {
             KAPI_VERSION, OS32_MEMORY_LAYOUT_GENERATION, LAN_MODULE_ABI_GEN,
-            bi->image_crc, LAN_MODULE_OPS_VERSION, bi->image_valid,
+            pair, LAN_MODULE_OPS_VERSION, pair_valid,
             LAN_IMPORT_COUNT, lan_import_contracts, lan_export_contracts, MODULE_ID_LAN
         },
         .imports = lan_kexports,
@@ -245,7 +246,7 @@ int lan_module_load(void)
         rc = net_adapter_register(NET_NIC_E82557, candidate.adapter);
         if (!rc) rc = net_start(NET_NIC_AUTO, NULL);
     }
-    kprintf(KLOG_ATTR, "[lan] module rc=%d pair=%08x tick=%d\n", rc, bi->image_crc, tick_target != 0);
+    kprintf(KLOG_ATTR, "[lan] module rc=%d pair=%08x tick=%d\n", rc, pair, tick_target != 0);
     return rc;
 }
 /* Preserve a completed bind, including quarantine, when start failed later. */

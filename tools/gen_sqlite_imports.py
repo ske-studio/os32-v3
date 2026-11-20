@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFINITION = ROOT / 'tools/prototypes/sqlite_imports.def'
 
 
-def generate(out, definition=DEFINITION, contracts_only=False, module="sqlite"):
+def generate(out, definition=DEFINITION, contracts_only=False, module="sqlite", target="x86-pc98"):
     prefix = module.upper()
     doc = json.loads(Path(definition).read_text())
     if doc['schema'] != 1:
@@ -59,12 +59,24 @@ def generate(out, definition=DEFINITION, contracts_only=False, module="sqlite"):
         (out / f'{module}_import_slots.c').write_text(
             f'#include "{module}_imports.h"\nunsigned long {module}_import_slots[{prefix}_IMPORT_COUNT]\n'
             f'__attribute__((section(".data.{module}_import_slots"), aligned(4))) = {{0}};\n')
-        asm = ['/* Generated i386 cdecl tail jumps, including variadic kprintf. */',
-               f'.section .text.{module}_imports,"ax",@progbits', '.code32']
+        section = f'.section .text.{module}_imports,"ax",@progbits'
+        if target == 'ppc-powermac':
+            asm = [section, '.balign 4']
+        elif target == 'x86-pc98':
+            asm = ['/* Generated i386 cdecl tail jumps, including variadic kprintf. */',
+                   section, '.code32']
+        else:
+            raise ValueError('unknown import stub target ' + target)
         for e in entries:
             n = e['name']
-            asm += [f'.globl {n}', f'.type {n}, @function', f'{n}:',
-                    f'    jmp *{module}_import_slots+{4*e["index"]}', f'.size {n}, .-{n}']
+            slot = f'{module}_import_slots+{4*e["index"]}'
+            asm += [f'.globl {n}', f'.type {n}, @function', f'{n}:']
+            if target == 'ppc-powermac':
+                asm += [f'    lis 12,({slot})@ha', f'    lwz 12,({slot})@l(12)',
+                        '    mtctr 12', '    bctr']
+            else:
+                asm.append(f'    jmp *{slot}')
+            asm.append(f'.size {n}, .-{n}')
         asm += ['.section .note.GNU-stack,"",@progbits']
         (out / f'{module}_import_stubs.S').write_text('\n'.join(asm) + '\n')
         # Compile-only provider type check; deliberately not a resident kernel input.
@@ -196,9 +208,10 @@ if __name__ == '__main__':
     output.add_argument('--static-vfs', type=Path)
     parser.add_argument('--contracts-only', action='store_true')
     parser.add_argument('--module', choices=('sqlite', 'fep', 'cd', 'kcg', 'fm', 'pcm', 'v86', 'lan', 'cirrus', 'geforce', 'trident'), default='sqlite')
+    parser.add_argument('--target', choices=('x86-pc98', 'ppc-powermac'), default='x86-pc98')
     args = parser.parse_args()
     if args.static_vfs:
         args.static_vfs.write_text(pool_vfs())
         raise SystemExit(0)
     definition = ROOT / f'tools/prototypes/{args.module}_imports.def'
-    generate(args.out_dir, definition, contracts_only=args.contracts_only, module=args.module)
+    generate(args.out_dir, definition, contracts_only=args.contracts_only, module=args.module, target=args.target)

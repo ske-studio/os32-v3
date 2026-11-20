@@ -215,9 +215,29 @@ static int stop_dma(struct module_record *r)
         while (r->dma_refs) CHECK(module_ref_release(current, MODULE_REF_DMA));
     return fail_cleanup != 3;
 }
+static u32 publications;
+#ifdef MODULE_CACHE_SPY
+void arch_exec_publish(void *dst, u32 bytes)
+{
+    u8 *body = dst;
+    CHECK(bytes == 24 && publications == starts);
+    u32 i = 0;
+    while (i < MODULE_RECORD_CAP && module_records[i].state != MODULE_VALIDATED) i++;
+    CHECK(i < MODULE_RECORD_CAP && body == pool[i] + PAGE_SIZE);
+    CHECK(!memcmp(body, file + PAGE_SIZE, 16));
+    CHECK(*(u32 *)(body + 16) == (u32)(uptr)(body + 10));
+    CHECK(!memcmp(body + 20, file + PAGE_SIZE + 20, bytes - 20));
+    CHECK(*(u32 *)(body + 32) == 0x12345678U);
+    publications++;
+}
+#endif
+
 static int start(struct module_record *r, u32 entry, u32 *ops)
 {
     starts++;
+#ifdef MODULE_CACHE_SPY
+    CHECK(publications == starts);
+#endif
     current.slot = (u32)(r - module_records); current.generation = r->generation;
     CHECK(r->state == MODULE_STARTING && !module_exports(current));
     CHECK(entry == r->init && ops[0] == 4 && ops[5] == r->base + 10);
@@ -338,6 +358,14 @@ void _start(void)
     struct module_handle h = {0, 0};
     fail_at = input[0] == 1 ? input[1] : 0;
     if (input[0] == 10) fail_cleanup = input[1];
+    if (input[0] == 13) {
+        if (input[1] == MODULE_NO_IMAGE_CRC) q.policy.img_valid = 0;
+        else q.policy.pair_image_crc++;
+        CHECK(module_load(&q, &h) == (int)input[1]);
+        CHECK(!allocations && !starts && !publications && !module_exports(h));
+        CHECK(module_record_get(h)->state == MODULE_ABSENT);
+        empty(); finish(0);
+    }
     rc = module_load(&q, &h);
     if (input[0] == 9) {
         CHECK(rc == (int)input[1] && !starts && !module_exports(h));

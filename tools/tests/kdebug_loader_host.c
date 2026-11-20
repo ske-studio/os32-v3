@@ -255,6 +255,8 @@ int hwdev_module_load(struct module_handle core)
 { CHECK(kdebug.state == KDEBUG_RUNNING && module_exports(core) != 0);
   hwdev_loads++; return MODULE_NOT_FOUND; }
 
+#include "../../platform/pc98/module_pair.c"
+
 const struct boot_common *boot_common_get(void) {
     static struct boot_common info;
     const struct bootinfo *bi = bootinfo_get();

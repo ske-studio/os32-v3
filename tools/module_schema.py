@@ -4,6 +4,23 @@ gen_module_schema.py emits the C view; mkmod consumes this source directly.
 SQLite prototype limits are measured by tools/sqlite_module_proto.py.
 """
 
+# (ELF data encoding, ELF machine, KMOD version, target tag, fixup bytes)
+from typing import NamedTuple
+
+
+class ModuleFormat(NamedTuple):
+    encoding: int
+    machine: int
+    version: int
+    tag: int
+    reloc_bytes: int
+
+
+MODULE_FORMATS = {
+    'x86-pc98': ModuleFormat(1, 3, 1, 0, 4),
+    'ppc-powermac': ModuleFormat(2, 20, 2, 20, 12),
+}
+
 HEADER_FIELDS = (
     'MAGIC', 'FORMAT', 'HEADER_SIZE', 'IMAGE_SIZE',
     'KAPI', 'LAYOUT', 'ABI', 'ID', 'PHASE', 'FLAGS',
@@ -18,14 +35,17 @@ HEADER_FIELDS = (
 SYMBOL_KINDS = {'FUNC': 1, 'GETTER': 2, 'SETTER': 3, 'PTR': 4, 'OP': 5}
 CONSTANTS = dict(
     HEADER_SIZE=144, PAGE_SIZE=4096, NAME_MAX=63, RECORD_SIZE=12,
-    WORD_BYTES=4, RELOC_ENTRY_SIZE=4,
+    WORD_BYTES=4, RELOC_ENTRY_SIZE=MODULE_FORMATS['x86-pc98'].reloc_bytes,
+    PPC_RELOC_ENTRY_SIZE=MODULE_FORMATS['ppc-powermac'].reloc_bytes,
+    PPC_FORMAT_VERSION=MODULE_FORMATS['ppc-powermac'].version,
+    PPC_TARGET_TAG=MODULE_FORMATS['ppc-powermac'].tag,
     IMPORT_HASH_OFF=0, IMPORT_VERSION_OFF=4, IMPORT_KIND_OFF=6, IMPORT_SLOT_OFF=8,
     EXPORT_HASH_OFF=0, EXPORT_SLOT_OFF=4, EXPORT_VERSION_OFF=6, EXPORT_ADDR_OFF=8,
     SYM_KIND_MIN=min(SYMBOL_KINDS.values()), SYM_KIND_MAX=max(SYMBOL_KINDS.values()),
     SECTION_COUNT=4, SECTION_BSS=3,
     TABLE_COUNT=4, RECORD_TABLES=3, TABLE_NAMES=3,
     NAME_HASH_BASIS=2166136261, NAME_HASH_PRIME=16777619,
-    MAGIC=0x444f4d4b, FORMAT_VERSION=1,
+    MAGIC=0x444f4d4b, FORMAT_VERSION=MODULE_FORMATS['x86-pc98'].version,
     PHASE_POST_ROOT=2, FLAG_PAIR=1,
 )
 # Consecutive section/table descriptors are (offset, size/count) word pairs.

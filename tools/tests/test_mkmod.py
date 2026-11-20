@@ -127,6 +127,32 @@ def verify(module, elf, metadata, kernel, pair, validator):
     return image, stats
 
 
+def verify_format(codec):
+    # ELF32 BE executable at VA zero: a text word and its SHT_RELA.
+    ident = b'\x7fELF\x01\x02\x01' + bytes(9)
+    names = b'\0.text\0.rela.text\0.symtab\0.strtab\0'
+    body = bytes(4) + struct.pack('>IIi', 0, 257, 0)
+    symbols = bytes(16) + struct.pack('>IIIBBH', 0, 0, 0, 3, 0, 1)
+    shoff = (52 + len(body) + len(symbols) + len(names) + 3) & ~3
+    header = struct.pack('>16sHHIIIIIHHHHHH', ident, 2, 20, 1, 0, 0, shoff,
+                         0, 52, 0, 0, 40, 5, 4)
+    sections = [(0,) * 10, (1, 1, 6, 0, 52, 4, 0, 0, 4, 0),
+                (7, 4, 0, 0, 56, 12, 3, 1, 4, 12),
+                (18, 2, 0, 0, 68, 32, 4, 2, 4, 16),
+                (26, 3, 0, 0, 100, len(names), 0, 0, 1, 0)]
+    elf = (header + body + symbols + names).ljust(shoff, b'\0')
+    elf += b''.join(struct.pack('>10I', *row) for row in sections)
+    parsed = codec.Elf(elf, 'ppc-powermac')
+    assert parsed.sections[2]['type'] == 4 and parsed.sections[2]['name'] == '.rela.text'
+    assert parsed.body({'mem_max': 4096})[0] == bytes(4)
+    fmt = codec.select_format(elf, 'ppc-powermac')
+    assert (fmt.version, fmt.tag, fmt.reloc_bytes) == (2, 20, 12)
+    rejected(lambda: codec.select_format(elf, 'x86-pc98'), 'ELF32')
+    wrong = bytearray(elf)
+    struct.pack_into('>H', wrong, 18, 3)
+    rejected(lambda: codec.select_format(wrong, 'ppc-powermac'), 'machine')
+
+
 def negative_cases(elf, metadata, kernel):
     def build(data=elf, meta=metadata, vk=kernel, module_id=1):
         return mkmod.build(data, meta, vk, KAPI, LAYOUT, module_id=module_id)
@@ -180,6 +206,7 @@ def negative_cases(elf, metadata, kernel):
 
 
 MUTATIONS = (
+    ('wrong-machine', '(2, fmt.machine, 1)', '(2, machine, 1)'),
     ('drop-absolute', 'relocs.append(where)', 'pass'),
     ('keep-pc32', 'if kind == 2:', 'if False:'),
     ('pair-zero', "pair_crc(vmkernel) if policy['required_flags'] & CONSTANTS['FLAG_PAIR'] else 0", '0'),
@@ -200,6 +227,7 @@ def main():
         elf = elf_path.read_bytes()
         kernel, pair = vk32()
         image, stats = verify(mkmod, elf, metadata, kernel, pair, validator)
+        verify_format(mkmod)
         negative_cases(elf, metadata, kernel)
         imports_gen.check_nm(imports_gen.load_def())
         (directory / 'vmkernel.lz4').write_bytes(kernel)
@@ -239,6 +267,7 @@ def main():
                 mutant = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(mutant)
                 try:
+                    verify_format(mutant)
                     verify(mutant, elf, metadata, kernel, pair, validator)
                 except (AssertionError, ValueError):
                     print('MUTATE ' + name + ' RED')

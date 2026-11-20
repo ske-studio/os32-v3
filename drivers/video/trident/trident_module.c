@@ -4,7 +4,7 @@
 #include "trident_module.h"
 #include "trident_imports.h"
 #include "kernel/module/module_runtime.h"
-#include "bootinfo.h"
+#include "platform_module_pair.h"
 #include "config.h"
 #include "os32_generations.h"
 #include "gfx_internal.h"
@@ -197,11 +197,12 @@ int trident_module_load(void)
         return TRI_E_RESOURCE;
     }
     context.write_gap_lpt = cpu_loops_per_tick();
-    const struct boot_common *bi = boot_common_get();
+    u32 pair = 0;
+    int pair_valid = platform_module_pair(&pair);
     const struct module_request request = {
         .path=SYS_TRIDENT_MOD, .name="trident",
         .policy={KAPI_VERSION, OS32_MEMORY_LAYOUT_GENERATION, TRIDENT_MODULE_ABI_GEN,
-            bi->image_crc, TRIDENT_MODULE_OPS_VERSION, bi->image_valid,
+            pair, TRIDENT_MODULE_OPS_VERSION, pair_valid,
             TRIDENT_IMPORT_COUNT, trident_import_contracts, trident_export_contracts,
             MODULE_ID_TRIDENT},
         .imports=trident_kexports, .lifecycle={.start=start, .detach=detach}
@@ -214,7 +215,7 @@ int trident_module_load(void)
         context.backend = &gfx_backend_trident;
     }
     else diagnostic_candidate = diagnostic_slot = NULL;
-    kprintf(KLOG_ATTR, "[trident] stage=module rc=%d pair=%08x pinned=%d\n", rc, bi->image_crc, pinned);
+    kprintf(KLOG_ATTR, "[trident] stage=module rc=%d pair=%08x pinned=%d\n", rc, pair, pinned);
     return rc;
 }
 int trident_module_abort(void)
