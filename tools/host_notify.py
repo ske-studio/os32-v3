@@ -17,6 +17,14 @@ def new_generation():
     return secrets.randbelow(0xffffffff) + 1
 
 
+class Notification(bytes):
+    """Wire payload and local delivery evidence for its submitter."""
+    delivery = 'queued'
+
+    def may_have_arrived(self):
+        return self.delivery in ('sent', 'acked')
+
+
 class Notify:
     def __init__(self, registry, generation):
         if not 0 < generation <= 0xffffffff:
@@ -29,6 +37,8 @@ class Notify:
     def reset(self):
         self.sess = None
         self.epoch = None
+        for payload in getattr(self, 'pending', ()):
+            payload.delivery = 'dropped'
         self.pending = deque()
         self.inflight = deque()
         self.next_seq = 1
@@ -56,16 +66,19 @@ class Notify:
         data = bytes(data)
         if not 1 <= service <= 65534 or not 0 <= kind <= 65535 or len(data) > DATA_MAX:
             raise ValueError('invalid notification')
+        payload = Notification(struct.pack('<IHHHH', self.generation, service, kind, len(data), 0) + data)
         if self.silent:
+            payload.delivery = 'dropped'
             self.dropped += 1
-            return
-        payload = struct.pack('<IHHHH', self.generation, service, kind, len(data), 0) + data
+            return payload
         if len(self.pending) + len(self.inflight) == QUEUE_MAX:
             self.dropped += 1
             if not self.pending:
-                return
-            self.pending.popleft()
+                payload.delivery = 'dropped'
+                return payload
+            self.pending.popleft().delivery = 'dropped'
         self.pending.append(payload)
+        return payload
 
     def _alive(self):
         self.notify('os32.alive', 1, struct.pack('<I', self.generation))
@@ -81,7 +94,8 @@ class Notify:
             self.silent = False
             self.deadline = 0
         while self.inflight and self.inflight[0][0] <= ack:
-            self.inflight.popleft()
+            _, payload = self.inflight.popleft()
+            payload.delivery = 'acked'
         self.window = min(max(window, 0), WINDOW_MAX)
         if not self.inflight:
             self.deadline = None
@@ -94,6 +108,8 @@ class Notify:
         if self.inflight and not self.silent and now - self.progress >= SILENCE_SECONDS:
             self.silent = True
             self.dropped += len(self.pending)
+            for payload in self.pending:
+                payload.delivery = 'dropped'
             self.pending.clear()
             self.deadline = now + SILENCE_SECONDS
         if now >= self.next_alive:
@@ -112,6 +128,7 @@ class Notify:
             self.deadline = now + RETRANSMIT_SECONDS
         while self.pending and len(self.inflight) < self.window:
             payload = self.pending.popleft()
+            payload.delivery = 'sent'
             seq = self.next_seq
             self.next_seq += 1
             if not self.inflight:
