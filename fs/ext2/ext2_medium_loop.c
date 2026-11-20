@@ -32,18 +32,20 @@ static int loop_range(int drv, u32 lba, u32 count)
 
 static int loop_read(Device *dev, int lba, int count, void *buf)
 {
-    return loop_dev_read_lba((int)dev->priv, lba, count, buf);
+    return loop_dev_read_lba(*(const int *)dev->priv, lba, count, buf);
 }
 
 static int loop_write(Device *dev, int lba, int count, const void *buf)
 {
-    return loop_dev_write_lba((int)dev->priv, lba, count, buf);
+    return loop_dev_write_lba(*(const int *)dev->priv, lba, count, buf);
 }
 
 static Device *loop_device(int drv)
 {
+    /* priv は slot の番号を指す (整数を void * に詰めない — check_p2v の physical-cast を避ける) */
+    static const int slots[4] = { 0, 1, 2, 3 };  /* lo0〜lo3 (drv 0x0600..0x0603) */
     static Device dev = { .blk_read = loop_read, .blk_write = loop_write };
-    dev.priv = (void *)(drv - 0x0600);
+    dev.priv = (void *)&slots[drv - 0x0600];
     return &dev;
 }
 
