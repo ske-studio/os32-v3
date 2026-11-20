@@ -259,7 +259,7 @@ def capture(out, cpu, ram_mib, data, loads):
             log.write(tail)
             require(proc.returncode == 0, 'reset exit status')
             after = {}
-            for name,a,b in re.findall(rb'(?m)^([A-Z-]+) ([0-9a-f]{8}) ([0-9a-f]{8})\r?$',tail):
+            for name,a,b in re.findall(rb'(?m)^([A-Z-]+) ([0-9a-f]{8}) ([0-9a-f]{8})\r*$',tail):
                 after.setdefault(name.decode(),[]).append((int(a,16),int(b,16)))
             (out/f'{cpu}-{ram_mib}M-after.json').write_text(json.dumps(after, indent=2))
             verify(before, after, data, loads)
