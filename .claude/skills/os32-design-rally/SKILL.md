@@ -5,7 +5,7 @@ description: 設計票・計画票を「起草 → 独立レビュー → 直し
 
 # os32-design-rally — 設計の往復と確定
 
-役の割り当ては [ROLES §0](../../../docs/tasks/agents/ROLES.md) を参照。**起草は Fable** (`claude-fable-5-2`、Agent の model: fable)、**レビューは sol** (`gpt-6.2-sol` を codex の read-only で。実装の astra と別のモデルにするため。PM が自分で代わりに読まない) (ユーザー決定 2026-11-19、Opus → astra → sol と決め直した最後)。下の §2 の依頼の型はそのまま Fable に渡す (書く先は ~/os32-tmp/run/<名>/)。§3 のレビューの依頼は sol に渡し、§4 の往復は前回のレビューの返答と差分を添えて sol を起こし直す (codex は文脈を持ち越さない)。
+役の割り当ては [ROLES §0](../../../docs/tasks/agents/ROLES.md) を参照。**起草は astra** (`gpt-6.2-astra` を codex で、`~/os32-tmp/bin/codex_run.sh <名> gpt-6.2-astra <主の作業木> <PACK>`、書き込みは ~/os32-tmp/run/<名>/ の設計の版だけでリポジトリは読むだけ — 2026-11-20 夕から、前は Fable、ユーザー決定「fable が枯渇してきたので」)、**レビューは sol** (`gpt-6.2-sol` を codex の read-only で。実装の astra と別のモデルにするため。PM が自分で代わりに読まない) (ユーザー決定 2026-11-19、Opus → astra → sol と決め直した最後)。下の §2 の依頼の型はそのまま起草者 (astra) に渡す (書く先は ~/os32-tmp/run/<名>/)。§3 のレビューの依頼は sol に渡し、§4 の往復は前回のレビューの返答と差分を添えて sol を起こし直す (codex は文脈を持ち越さない)。
 
 ## 1. 置き場
 
