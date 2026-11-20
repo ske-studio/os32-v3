@@ -43,6 +43,24 @@ int main(void)
     require(ime_dict_suspend(0) == -10, "reopen failure preserved");
     ime_owner_exit(2);
     require(reopen_calls == 3, "failed reopen stays disabled without cleanup retry");
+    body_rc = 0;
+    require(!ime_dict_suspend(1), "prepare owner transfer failure");
+    owner = 3;
+    body_rc = -9;
+    require(ime_dict_suspend(1) == -9, "second suspend fails");
+    ime_owner_exit(3);
+    require(reopen_calls == 3, "failed suspend does not transfer ownership");
+    int before_exit = exit_calls;
+    ime_owner_exit(2);
+    require(reopen_calls == 4 && exit_calls == before_exit + 1,
+            "previous owner reopens once and releases reader despite failure");
+    ime_owner_exit(2);
+    require(reopen_calls == 4, "failed owner exit reopen consumed");
+    body_rc = 0;
+    owner = 0;
+    require(!ime_dict_suspend(1), "top-level suspend");
+    ime_owner_exit(0);
+    require(reopen_calls == 4, "top-level exit does not reopen");
     puts("GREEN FEP owner cleanup");
     return 0;
 }

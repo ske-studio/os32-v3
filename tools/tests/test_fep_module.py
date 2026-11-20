@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Freestanding ILP32 production FEP facade validation and boot count relay."""
 CHECK = dict(name='fep-module', tier=1, needs=[], budget=3.3,
-    covers=['kernel/ime/fep_module.c', 'kernel/ime/fep_module.h',
+    covers=['kernel/ime/fep_suspend_owner.h', 'kernel/ime/fep_suspend_owner.c', 'kernel/ime/fep_module.c', 'kernel/ime/fep_module.h',
             'kernel/ime/fep_body.c', 'kernel/ime/ime.h', 'kernel/ime/ime_store.h',
             'tools/tests/fep_module_host.c',
             'tools/tests/host32.py',
@@ -52,7 +52,7 @@ def main():
             unit.write_text(harness.replace('#include "kernel/ime/fep_module.c"', code))
             exe = work / label
             subprocess.run([*flags, '-nostdlib', '-static', '-no-pie',
-                            '-Wl,--gc-sections', str(unit), str(body),
+                            '-Wl,--gc-sections', str(unit), str(body), str(ROOT / 'kernel/ime/fep_suspend_owner.c'),
                             str(ROOT / 'lib/kstring_c.c'), '-o', str(exe)], check=True)
             rc = host32.run([str(exe)], cwd=ROOT).returncode
             if label == 'normal' and rc != 0:

@@ -431,8 +431,14 @@ int ime_getkey_kapi(void)
 
 /* Also covers abort/fault at a syscall boundary after input became ready.
  * A child that never read IME input must not cancel its parent's preedit. */
+#ifdef OS32_FEP_STATIC
+#include "fep_suspend_owner.h"
+#endif
 void ime_owner_exit(int owner)
 {
+#ifdef OS32_FEP_STATIC
+    if (fep_suspend_owner_take(owner)) (void)ime_dict_suspend(0);
+#endif
     if (owner <= 0 || owner != g_ime_reader_owner) return;
     g_ime_reader_owner = 0;
     if (!con_sink_is_enabled()) ime_cancel_input();

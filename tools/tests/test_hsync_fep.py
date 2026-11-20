@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Run real FEP suspension and hsync main on freestanding ILP32 fixtures."""
 CHECK = dict(name='hsync-fep-host', tier=1,
-    covers=['exec/os32x_hdr.c', 'tools/tests/test_hsync_fep.py', 'tools/tests/hsync_fep_host.c',
+    covers=['kernel/ime/fep_suspend_owner.h', 'kernel/ime/fep_suspend_owner.c', 'exec/os32x_hdr.c', 'tools/tests/test_hsync_fep.py', 'tools/tests/hsync_fep_host.c',
             'tools/tests/ime_suspend_host.c', 'tools/tests/fep_suspend_owner_host.c', 'tools/tests/hsync_h2_host.c',
             'tools/tests/hsync_shell_fixture.h', 'tools/tests/fep_boundary_runtime.h',
             'tools/tests/host32.py', 'tools/gen_sqlite_imports.py',
@@ -47,7 +47,13 @@ MUTATIONS = [
      '            hsp_fep_all_db = 1;', '            hsp_fep_all_db = 1; return 1;',
      'settings failure warns protects continues'),
 
-    ('failed-reopen-retried-at-exit', 'kernel/ime/fep_module.c',
+    ('failed-suspend-transfers-owner', 'kernel/ime/fep_suspend_owner.c',
+     'else if (!rc) suspend_owner = owner;', 'else suspend_owner = owner;',
+     'failed suspend not owned'),
+    ('zero-owner-reopens', 'kernel/ime/fep_suspend_owner.c',
+     'owner <= 0 || owner != suspend_owner', 'owner != suspend_owner',
+     'top-level exit does not reopen'),
+    ('failed-reopen-retried-at-exit', 'kernel/ime/fep_suspend_owner.c',
      '    if (!on) suspend_owner = 0;',
      '    if (!on && !rc) suspend_owner = 0;',
      'failed reopen stays disabled without cleanup retry'),
@@ -80,7 +86,7 @@ def main():
     parser.add_argument('--mutate', action='store_true')
     parser.add_argument('--runner', choices=('qemu', 'native'), default='qemu')
     args = parser.parse_args()
-    paths = ['kernel/ime/fep_module.c', 'kernel/ime/ime_suspend.c', 'userland/system/hsync.c', 'userland/system/hsync_fep.inc']
+    paths = ['kernel/ime/fep_suspend_owner.c', 'kernel/ime/fep_module.c', 'kernel/ime/ime_suspend.c', 'userland/system/hsync.c', 'userland/system/hsync_fep.inc']
     originals = {p: (ROOT / p).read_text() for p in paths}
     with tempfile.TemporaryDirectory(prefix='hsync-fep-') as td:
         work = Path(td)
@@ -111,7 +117,7 @@ def main():
                 dest = {'ime_suspend.c': 'ime_suspend_source.inc', 'fep_module.c': 'fep_module_source.inc'}.get(Path(path).name, Path(path).name)
                 (work / dest).write_text(source.replace('../../lib/', str(ROOT / 'lib') + '/').replace('../../fs/', str(ROOT / 'fs') + '/').replace('../../mm/', str(ROOT / 'mm') + '/').replace('../sqlite_engine.h', str(ROOT / 'kernel/sqlite_engine.h')))
             target = 'ime_suspend_host.c' if mutation and mutation[1].startswith('kernel/') else 'hsync_fep_host.c'
-            if mutation and mutation[1].endswith('fep_module.c'):
+            if mutation and mutation[1].endswith(('fep_module.c', 'fep_suspend_owner.c')):
                 target = 'fep_suspend_owner_host.c'
             targets = [target] if mutation else ['ime_suspend_host.c', 'hsync_fep_host.c', 'fep_suspend_owner_host.c']
             for target in targets:
@@ -124,7 +130,7 @@ def main():
                     '-I' + str(work), '-I' + str(ROOT / 'tools/tests'),
                     *include_flags(ROOT), '-I' + str(ROOT / 'userland/lib'),
                     '-I' + str(ROOT / 'userland/system'),
-                    str(work / target),
+                    str(work / target), str(work / 'fep_suspend_owner.c'),
                     str(ROOT / 'lib/kstring.c'), str(ROOT / 'lib/kstring_c.c'),
                     '-o', str(exe)], check=True)
                 result = host32.run([str(exe)], runner=args.runner, capture_output=True, text=True, timeout=30)
