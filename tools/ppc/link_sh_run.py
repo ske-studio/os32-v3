@@ -700,7 +700,8 @@ def flow_accept(elf, folder, case):
             s.wait(returning, 'child reached parent restoration', 30)
             start = len(s.events)
             ident = '00002000'
-            s.agent.notifier.notify_number(RSHELL, EXECUTE, ident.encode()+b' echo next $?\n')
+            execute = s.agent.notifier.notify_number(RSHELL, EXECUTE, ident.encode()+b' echo next $?\n')
+            s.wait(lambda: execute.delivery == 'acked', 'guest ACK for post-child EXECUTE '+ident, 10)
             s.settle(20)
             replies = [bytes.fromhex(e['body']) for e in s.events[start:]
                        if e['parts'][:2] == ['RSH', 'OUT'] and e['parts'][3] == ident]
@@ -713,7 +714,7 @@ def flow_accept(elf, folder, case):
                 check_body('/bin/hello.bin ok', result['result'], b'hello ok\n')
                 require(s.word('shell_flow_error') == 0, 'clean entry and return')
             else:
-                require(expected not in replies, 'SURVIVED '+case)
+                require(all(b'next 7' not in body.splitlines() for body in replies), 'SURVIVED '+case)
             return
         def stopped():
             try:
