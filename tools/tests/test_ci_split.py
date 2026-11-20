@@ -176,6 +176,37 @@ def reuse_gate_cases(workflow, filename, job):
                                   "always() && steps.prior.outputs.reuse != 'true'"), 'all expensive steps gated'
 
 
+def scope_cases(source):
+    scope = {}
+    exec(compile(source, 'ppc_scope.py', 'exec'), scope)
+    decide = scope['decide']
+    patterns = yaml.safe_load(WORKFLOW.read_text())[True]['push']['paths-ignore']
+    assert set(scope['DOC_PATTERNS']) == set(patterns), 'main docs must match build exclusions'
+    for paths, expected in ((['docs/raw', '.claude/config', 'notes.md'], 'skip'),
+                            (['docs/raw', 'kernel/a.c'], 'ppc'), (['arch/x86/a.c'], 'ppc'),
+                            (None, 'ppc')):
+        assert decide([], 'refs/heads/main', before_paths=paths)[0] == expected, str(paths)
+    assert decide(['arch/x86/a.c'], 'wt/stage')[0] == 'skip', 'stage scope'
+    assert decide([], 'wt/int-test')[0] == 'ppc', 'integration scope'
+    env = dict(GITHUB_EVENT_NAME='push', GITHUB_REF='refs/heads/main', PUSH_BEFORE=SHA)
+    for names, forced, ancestor, expected, reuse in (
+            (b'arch/x86/a.c\0', 'false', 0, 'ppc', 'true'),
+            (b'docs/raw\0', 'false', 0, 'skip', 'false'),
+            (b'docs/raw\0', 'true', 0, 'ppc', 'false'),
+            (b'docs/raw\0', 'false', 1, 'ppc', 'false')):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / 'output'
+            with patch.dict(os.environ, dict(env, GITHUB_OUTPUT=str(out), PUSH_FORCED=forced), clear=True), \
+                    patch.object(subprocess, 'run', return_value=subprocess.CompletedProcess([], ancestor)), \
+                    patch.object(subprocess, 'check_output', return_value=names) as diff:
+                scope['main']()
+            if diff.called:
+                assert diff.call_args.args[0][-2:] == [SHA, 'HEAD'], 'main push delta'
+            assert set(out.read_text().splitlines()) == {'scope=' + expected, 'can_reuse=' + reuse}, 'push routing'
+    for before in ('', '0' * 40):
+        assert scope['push_paths'](before) is None, 'missing before'
+
+
 def reuse_cases(path=None):
     spec = importlib.util.spec_from_file_location('reuse', path or ROOT / 'tools/ci/reuse_success.py')
     module = importlib.util.module_from_spec(spec)
@@ -192,6 +223,8 @@ def reuse_cases(path=None):
     # 普通の枝 (wt/**) の成功も証拠にする (ユーザー決定 2026-11-19)。main の実行は証拠にしない。
     with patch.object(module, 'api', side_effect=[{'id': 7}, {'workflow_runs': [dict(good, head_branch='wt/ci-s2a')]}]):
         assert module.reusable(env), 'branch push success is evidence'
+    with patch.object(module, 'api', side_effect=[{'id': 7}, {'workflow_runs': [dict(good, head_branch='wt/ci-s2a')]}]):
+        assert not module.reusable(dict(env, CI_WORKFLOW='check.yml')), 'stage can skip PPC'
     for field, bad in [('head_sha', 'a'*39+'b'), ('workflow_id', 8), ('status', 'in_progress'),
                        ('conclusion', 'failure'), ('conclusion', 'skipped'), ('event', 'pull_request'),
                        ('head_branch', 'main'), ('head_branch', 'wip/feature'), ('head_branch', 'wtx/a'),
@@ -395,6 +428,8 @@ def routing_cases(build_source, check_source):
 
 
 def main():
+    scope_source = (ROOT / 'tools/ci/ppc_scope.py').read_text()
+    scope_cases(scope_source)
     reuse_cases()
     source = WORKFLOW.read_text()
     workflow_cases(source)
@@ -404,6 +439,9 @@ def main():
     print('ci-split: workflow and fetch cases GREEN', flush=True)
     if '--mutate' in sys.argv:
         mutations = [
+            ('scope', "if ref == 'refs/heads/main':", 'if False:', 'remove main scope'),
+            ('scope', "and os.environ.get('PUSH_FORCED') != 'true'", '', 'ignore forced push'),
+            ('scope', ", '.claude/**'", '', 'drop skill docs'),
             ('build-route', ' CHECK_EXCLUDE_ENV=qemu-ppc', '', 'restore qemu checks to build'),
             ('guest-route', 'shard: [0, 1, 2, 3, 4]', 'shard: [0, 1, 2, 3, 3]', 'repeat guest shard'),
             ('guest-route', 'matrix.shard }}/5', 'matrix.shard }}/6', 'omit sixth guest shard'),
@@ -428,7 +466,8 @@ def main():
             ('reuse', "r['head_sha'] == sha", 'True', 'reuse wrong SHA'),
             ('reuse', "r['workflow_id'] == workflow_id", 'True', 'reuse wrong workflow'),
             ('reuse', "r['conclusion'] == 'success'", 'True', 'reuse failed run'),
-            ('reuse', "r['head_branch'].startswith('wt/')", 'True', 'reuse non branch run'),
+            ('reuse', "r['head_branch'].startswith(prefix)", 'True', 'reuse non branch run'),
+            ('reuse', "'wt/int-' if workflow == 'check.yml' else 'wt/'", "'wt/'", 'reuse stage check'),
             ('reuse', '        reuse = False', '        reuse = True', 'reuse on API failure'),
             ('check', 'concurrency:\n  group: check-${{ github.event_name }}-${{ github.ref }}\n'
                       '  cancel-in-progress: true\n', '', 'remove check concurrency'),
@@ -462,7 +501,7 @@ def main():
             ('fetch', 'if [ "$CHECK_STATE" != success ]; then', 'if [ "$CHECK_STATE" = success ]; then', 'invert check notice'),
         ]
         for kind, old, new, name in mutations:
-            text = {'build-route': source, 'guest-route': CHECK_WORKFLOW.read_text(), 'workflow': source, 'fetch': FETCH.read_text(), 'check': CHECK_WORKFLOW.read_text(), 'reuse': (ROOT / 'tools/ci/reuse_success.py').read_text(), 'setup': SETUP.read_text()}[kind]
+            text = {'scope': scope_source, 'build-route': source, 'guest-route': CHECK_WORKFLOW.read_text(), 'workflow': source, 'fetch': FETCH.read_text(), 'check': CHECK_WORKFLOW.read_text(), 'reuse': (ROOT / 'tools/ci/reuse_success.py').read_text(), 'setup': SETUP.read_text()}[kind]
             if name in ('preparation command drift', 'unsafe ccache restore'):
                 prefix, text = text.split('  checks:\n', 1)
                 assert text.count(old) == 1, name
@@ -476,7 +515,9 @@ def main():
                 if kind == 'fetch':
                     subprocess.run(['bash', '-n', str(script)], check=True)
                 try:
-                    if kind == 'build-route':
+                    if kind == 'scope':
+                        scope_cases(changed)
+                    elif kind == 'build-route':
                         routing_cases(changed, CHECK_WORKFLOW.read_text())
                     elif kind == 'guest-route':
                         routing_cases(source, changed)
