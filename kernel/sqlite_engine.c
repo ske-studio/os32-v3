@@ -249,31 +249,6 @@ int os32_sqlite_start(void)
     return rc;
 }
 
-/* Core owns the immutable boot snapshot; a switch probe never updates it. */
-static FepMeta boot_meta;
-static u32 boot_reserve_kb;
-static int boot_config_saved, boot_user_rc = OS32_ERR_AGAIN;
-static char boot_user_path[OS32_MAX_PATH];
-
-int fep_boot_config_get(FepMeta *out, u32 *reserve_kb)
-{
-    if (!out || !reserve_kb) return OS32_ERR_INVAL;
-    if (!boot_config_saved) return OS32_ERR_AGAIN;
-    *out = boot_meta;
-    *reserve_kb = boot_reserve_kb;
-    return 0;
-}
-
-int fep_boot_user_path_get(char *out, u32 capacity)
-{
-    if (!out || !capacity) return OS32_ERR_INVAL;
-    if (boot_user_rc) return boot_user_rc;
-    u32 n = kstrlen(boot_user_path);
-    if (n >= capacity) return OS32_ERR_INVAL;
-    kmemcpy(out, boot_user_path, n + 1);
-    return 0;
-}
-
 static int probe_close(Os32SqliteGroup *group, sqlite3 *db, sqlite3_stmt *stmt)
 {
     int rc = os32_sqlite_outer_group_begin_close(group);
@@ -424,10 +399,10 @@ static int services_settings(int *reserve, int *present)
     Os32SqliteGroup group;
     sqlite3 *db = 0;
     sqlite3_stmt *stmt = 0;
-    boot_user_rc = 0;
-    kstrncpy(boot_user_path, FEP_USER_PATH, sizeof(boot_user_path));
+    fep_boot_user_path_set(FEP_USER_PATH);
+    fep_boot_user_rc_set(0);
     int rc = os32_sqlite_outer_group_acquire(OS32_SQLITE_RESIDENT, 0, &group);
-    if (rc) { boot_user_rc = OS32_ERR_IO; return rc; }
+    if (rc) { fep_boot_user_rc_set(OS32_ERR_IO); return rc; }
     rc = os32_sqlite_outer_group_open(&group, SYS_SETTINGS_DB, SQLITE_OPEN_READONLY, &db);
     int has_settings = 0;
     if (rc) {
@@ -467,13 +442,13 @@ static int services_settings(int *reserve, int *present)
         if (step == SQLITE_ROW) {
             const char *text = (const char *)os32_sqlite_column_text(stmt, 0);
             int bytes = os32_sqlite_column_bytes(stmt, 0);
-            if (!text || bytes < 0 || (u32)bytes >= sizeof(boot_user_path) ||
+            if (!text || bytes < 0 || (u32)bytes >= OS32_MAX_PATH ||
                 kstrlen(text) != (u32)bytes) rc = OS32_ERR_INVAL;
-            else kmemcpy(boot_user_path, text, bytes + 1);
+            else fep_boot_user_path_set(text);
         } else if (step != SQLITE_DONE) rc = OS32_ERR_IO;
     }
     if (stmt && os32_sqlite_finalize(stmt)) rc = OS32_ERR_IO;
-    boot_user_rc = rc > 0 ? OS32_ERR_IO : rc;
+    fep_boot_user_rc_set(rc);
     rc = os32_sqlite_outer_group_begin_close(&group);
     if (rc) return rc;
     rc = services_boot_fault == SERVICES_FAULT_SETTINGS_CLOSE ? SQLITE_BUSY
@@ -536,9 +511,7 @@ void services_boot(void)
     if (services_boot_fault == SERVICES_FAULT_RESERVE) reserve = SQLITE_MODULE_POOL_SIZE;
     rc = os32_sqlite_outer_boot_check(0, reserve);
     if (rc) goto rollback;
-    boot_meta = meta;
-    boot_reserve_kb = (u32)reserve / KIB;
-    boot_config_saved = 1;
+    fep_boot_config_set(&meta, (u32)reserve / KIB);
     rc = fep_module_load(sqlite_handle);
     kprintf(KLOG_ATTR, "[IME] boot dictionary rc=%d\n", rc);
     if (rc) goto rollback;
@@ -558,8 +531,7 @@ void services_boot(void)
 rollback:;
     enum services_stage failed_stage = services_stage;
     services_public = 0;
-    boot_config_saved = 0;
-    boot_user_rc = OS32_ERR_AGAIN;
+    fep_boot_config_clear();
     /* FEP statements/groups must disappear while internal exports still work. */
     cleanup_blocked = fep_module_abort() != 0;
     if (sqlite_module_ready() && os32_sqlite_outer_boot_check(0, 0))

@@ -25,6 +25,7 @@ def check_sqlite(root):
             profile = query(root, [*options, f'FEATURE_SQLITE={enabled}'], config_only=True)
             for unit in c_units:
                 assert profile['C_KERNEL'].count(unit) == enabled
+            assert profile['C_KERNEL'].count('kernel/ime/fep_boot_config.c') == (enabled and arch == 'x86')
             smoke = 'lib/sqlite3/os32_sqlite_test.c'
             assert profile['C_KERNEL'].count(smoke) == (enabled and arch == 'x86')
             assert profile['ASM_KERNEL'].count(x86_stack) == (enabled and arch == 'x86')
@@ -144,6 +145,7 @@ def check_kboot(root):
             ext2 = 'fs/ext2/ext2_'
             formatter = {ext2 + stem for stem in ('fmt', 'layout', 'time')}
             pending = set(actual['KB_PENDING'].split())
+            assert actual['KB_OUT'] + '/kernel/ime/fep_boot_config.o' in pending, name
             for unit in formatter:
                 assert actual['KB_OUT'] + '/' + unit + '.o' in pending, (name, unit)
             ide = ext2 + 'medium_ide'

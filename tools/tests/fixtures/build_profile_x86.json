@@ -141,6 +141,7 @@
     "lib/lz4.c",
     "kernel/sqlite_engine.c",
     "kernel/sqlite_outer.c",
+    "kernel/ime/fep_boot_config.c",
     "lib/sqlite3/os32_sqlite_test.c",
     "kdebug/kdebug_module.c",
     "hwdev/hwdev_module.c",
