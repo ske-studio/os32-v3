@@ -122,6 +122,7 @@ jobs:
         run: |
           make check-map
           make check-check-select-host
+          make check-ci-land-gate-host
           make check-ci-split-host
 
       - name: Documents (links, orphans, status lines, test inventory)
