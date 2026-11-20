@@ -58,6 +58,10 @@ STRINGS = {
 }
 SIGNATURES = {
     'fep_meta_probe': 'int (*)(const char *, FepMeta *)',
+    'fep_boot_config_set': 'void (*)(const FepMeta *, u32)',
+    'fep_boot_config_clear': 'void (*)(void)',
+    'fep_boot_user_path_set': 'int (*)(const char *)',
+    'fep_boot_user_rc_set': 'void (*)(int)',
     'fep_boot_config_get': 'int (*)(FepMeta *, u32 *)',
     'fep_boot_user_path_get': 'int (*)(char *, u32)',
     'fep_store_open': 'int (*)(FepStore *, const char *, const char *)',

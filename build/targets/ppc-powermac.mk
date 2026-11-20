@@ -153,6 +153,7 @@ endif
 # コンパイラを通す。機種の名前 (PC-98 の定数など) を間接に使っていれば、ここで未宣言になって止まる。
 # リンクはしない (像には入れない)。
 KB_PENDING_OBJ := $(addprefix $(KB_OUT)/,$(patsubst %.c,%.o,$(filter %.c,$(C_COMMON_PC98_PENDING) $(C_COMMON_COMPILE_ONLY_PPC))))
+$(KB_OUT)/kernel/ime/fep_boot_config.o: KB_TU_FLAGS += -Ifs
 $(KB_OUT)/kernel/sqlite_engine.o: KB_TU_FLAGS += -Ilib/sqlite3 -Ifs
 $(KB_OUT)/kapi/kapi_db.o: KB_TU_FLAGS += -Ilib/sqlite3
 .PHONY: common-compile

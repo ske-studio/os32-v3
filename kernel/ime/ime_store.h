@@ -80,6 +80,10 @@ int fep_boot_config_get(FepMeta *out, u32 *reserve_kb);
  * missing DB/table/row uses the default; other read failures return OS32_ERR_IO. Only fep_user_open (D) checks
  * the normalized /etc direct-child restriction. */
 int fep_boot_user_path_get(char *out, u32 capacity);
+void fep_boot_config_set(const FepMeta *meta, u32 reserve_kb);
+void fep_boot_config_clear(void);
+int fep_boot_user_path_set(const char *path);
+void fep_boot_user_rc_set(int rc);
 int fep_store_open(FepStore *s, const char *path, const char *user_path);
 int fep_store_switch(FepStore *s, const char *path);
 int fep_user_open(FepStore *s);
