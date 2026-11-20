@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'sdk'))
 from target_profile import require as require_target
 
 import argparse
+from importlib import import_module
 import json
 from pathlib import Path
 import struct
@@ -233,13 +234,15 @@ def build(elf_data, metadata, vmkernel, kapi_abi_gen, layout_gen, *,
     policy = POLICIES[module_id]
     elf = Elf(elf_data, target)
     payload, mem_size, ranges = elf.body(policy)
-    if target == 'ppc-powermac':
-        from ppc.module_rela import ppc_relocations
-        reloc_table = ppc_relocations(elf, payload, mem_size, policy)
+    if elf.format.version == CONSTANTS['PPC_FORMAT_VERSION']:
+        # Load the target-specific codec only for a PPC pack.
+        codec = import_module('ppc.module_rela')
+        reloc_table = codec.ppc_relocations(elf, payload, mem_size, policy)
         writes = [(off, 4 if kind == 1 else 2)
                   for off, kind, _ in struct.iter_unpack('<III', reloc_table)]
         order = '>'
     else:
+        require(elf.format.version == CONSTANTS['FORMAT_VERSION'], 'unsupported relocation format')
         relocs = elf.relocations(payload, mem_size, policy)
         reloc_table = b''.join(struct.pack('<I', off) for off in relocs)
         writes = [(off, 4) for off in relocs]

@@ -211,12 +211,11 @@ def cases():
     return result
 
 
-def powerpc_cases(directory, runner):
+def powerpc_cases(exe, runner):
     # Exercise the PPC wire policy using the ILP32 host runner.
-    exe = build_validator(directory, extra_flags=("-D__powerpc__",))
     def check(image, expected):
         run = validate(exe, crc(image), runner=runner, relocate_base=0x12348000, **POLICY)
-        assert run.returncode == bool(expected)
+        assert run.returncode == bool(expected), run.returncode
         assert run.stdout == (f"RED {expected:02}\n".encode() if expected else b"GREEN\n")
     check(fixture(), 3)
     image = fixture()
@@ -327,7 +326,7 @@ MUTATIONS = [
 def main():
     runners = os.environ.get("HOST32_RUNNERS", "native qemu").split()
     with tempfile.TemporaryDirectory(prefix="module-image-") as td:
-        powerpc_cases(td, runners[0])
+        powerpc_cases(build_validator(td, extra_flags=("-D__powerpc__",)), runners[0])
         exe = build_validator(td)
         for runner in runners:
             ok, name, run = run_suite(exe, runner)
@@ -350,6 +349,20 @@ def main():
                 if ok or run.returncode not in (0, 1):
                     raise AssertionError((label, "survived or invalid detection", name, run))
                 print(f"MUTATE {label} RED ({name})")
+            for label, old, new, expected_rc in (
+                ("ppc-validate", "if (module_fixup_ppc_validate(", "if (0 && module_fixup_ppc_validate(", 0),
+                ("ppc-apply", "    module_fixup_ppc_apply(", "    if (0) module_fixup_ppc_apply(", 2),
+            ):
+                assert source.count(old) == 1, label
+                changed.write_text(source.replace(old, new))
+                mutant = build_validator(td, changed, extra_flags=("-D__powerpc__",))
+                try:
+                    powerpc_cases(mutant, runners[0])
+                except AssertionError as error:
+                    assert error.args == (expected_rc,), (label, error)
+                else:
+                    raise AssertionError((label, "survived"))
+                print(f"MUTATE {label} RED")
     return 0
 
 
