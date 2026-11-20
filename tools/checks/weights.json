@@ -67,6 +67,66 @@
     {
       "artifact": "check-times-88c58ef832e20ee9e2ce32a45aa41b41ba2b4e31-ppc-qemu-3",
       "sha256": "18f699ba2309d9d19e0eb175be2e225d59010dfba54e88ef42769fbd7847c1e0"
+    },
+    {
+      "artifact": "check-times-c35f16a6aac326f274369d321991459fc04cdefd-1",
+      "sha256": "ee2ca834ad4b702d618ad9b0eb12b489431260f8020aef71072a9a4dcd2055e1"
+    },
+    {
+      "artifact": "check-times-c35f16a6aac326f274369d321991459fc04cdefd-2",
+      "sha256": "9bfb021a532895a66dbe0f8d021fde68bced85842de7cbacec04f6083b33d9a2"
+    },
+    {
+      "artifact": "check-times-c35f16a6aac326f274369d321991459fc04cdefd-3",
+      "sha256": "1d80e40eedbf440dcee008f7526584a6e36affee23b88dfc486a744ae360eb61"
+    },
+    {
+      "artifact": "check-times-c35f16a6aac326f274369d321991459fc04cdefd-4",
+      "sha256": "e6e7717cfb125498dd70bada70d13fdf542cead17b1ad6abe7c1291f220d5b2b"
+    },
+    {
+      "artifact": "check-times-c35f16a6aac326f274369d321991459fc04cdefd-5",
+      "sha256": "1ff131e09063afbbe68dd8d59958582cc8c2afd8a60907d1ae81cc0472f5f03e"
+    },
+    {
+      "artifact": "check-times-0683e23ab292e12a49dcc1bde337491ea9387495-1",
+      "sha256": "dbf0ecef97647931a09e05791216ebc38824d31f030678c730f023a442971b01"
+    },
+    {
+      "artifact": "check-times-0683e23ab292e12a49dcc1bde337491ea9387495-2",
+      "sha256": "1ce146df4a64cd58faa444f69afecb9deef17a075e9b748c894c17519571566e"
+    },
+    {
+      "artifact": "check-times-0683e23ab292e12a49dcc1bde337491ea9387495-3",
+      "sha256": "b8a18f517199bc2f0298db39675f00af605d80b2b47903575dae53133fa79d91"
+    },
+    {
+      "artifact": "check-times-0683e23ab292e12a49dcc1bde337491ea9387495-4",
+      "sha256": "701c9f112749ea3df01b68546202e997414ffdd4da3443ed4e9ff014650e965c"
+    },
+    {
+      "artifact": "check-times-0683e23ab292e12a49dcc1bde337491ea9387495-5",
+      "sha256": "bde65a7189e149af20f1e0f97804184d973cead064d82f90ccb493bfdfcb7741"
+    },
+    {
+      "artifact": "check-times-9d99c1b649b60d6ccf1acd8d91a0a19fd25e208e-1",
+      "sha256": "5f9169c736516fcbe8f3e2fdb3d12353ba8d8cf77e9743ee4cbcaa49980a08d8"
+    },
+    {
+      "artifact": "check-times-9d99c1b649b60d6ccf1acd8d91a0a19fd25e208e-2",
+      "sha256": "35eb40220b6ac5f225003be715b9ed3604f581b36e5d9f04585f195bee26fcb7"
+    },
+    {
+      "artifact": "check-times-9d99c1b649b60d6ccf1acd8d91a0a19fd25e208e-3",
+      "sha256": "6b76ab617e594bdba662d47e0fc5a8a74c4128cd508f6bbbdd3ced4105f750b9"
+    },
+    {
+      "artifact": "check-times-9d99c1b649b60d6ccf1acd8d91a0a19fd25e208e-4",
+      "sha256": "ac1a2091910b8f140551568df21f3de30271042f318478be6edd11ef8d663142"
+    },
+    {
+      "artifact": "check-times-9d99c1b649b60d6ccf1acd8d91a0a19fd25e208e-5",
+      "sha256": "8189b8770ca662c9c4804d0b46e1165accfa3ba4c1ddd15be58810b6ca9281c8"
     }
   ],
   "seconds": {
@@ -74,7 +134,7 @@
     "allocator-bench-host": 5.380422,
     "appmem-host": 3.172635,
     "appmem-map-host": 5.664773,
-    "arch-asm": 266.255407,
+    "arch-asm": 706.863658,
     "arch-ctx-guest": 661,
     "b8-open-host": 42.24959,
     "boot-order-host": 2.734105,
@@ -91,7 +151,7 @@
     "c-dialect-host": 712.501804,
     "cat-linenum-host": 3.129186,
     "cd-module-host": 4.723252,
-    "cd-read-host": 20.205779,
+    "cd-read-host": 473.204648,
     "cfg-host": 13.406583999999999,
     "check-select-host": 11.456384,
     "check-times-host": 25.190968,
@@ -183,7 +243,7 @@
     "gf-command-host": 31.189638,
     "gf-copy-case-host": 3.56596,
     "gf-cui-host": 2.7997055,
-    "gf-display-host": 204.512459,
+    "gf-display-host": 753.885753,
     "gf-guard-imports-host": 3.307446,
     "gf-objwait-host": 6.122437,
     "gf-prim-bench-host": 2.632673,
@@ -207,7 +267,7 @@
     "gf5-display-lifetime-host": 16.391832,
     "gf5-fancheck": 4.0862265,
     "gf5-gpio-diag": 3.28931,
-    "gf5-host": 83.626923,
+    "gf5-host": 529.28675,
     "gf5-observe": 3.346841,
     "gf5-service-live-host": 16.767686,
     "gf5-therm-t1": 4.775159,
@@ -216,7 +276,7 @@
     "gfx-host": 13.137311,
     "gfx-modes-format-host": 2.754414,
     "gserial-host": 2.525704,
-    "gshell-host": 11.9728,
+    "gshell-host": 404.984298,
     "guest-acceptance-host": 9.804908,
     "guest-host": 3.971294,
     "gui-desc-host": 7.797341,
@@ -326,7 +386,7 @@
     "mem-stat-host": 6.310956,
     "memmap": 7.572005,
     "memmap-audit-host": 10.045831,
-    "memmap-host": 109.659482,
+    "memmap-host": 736.845007,
     "memory-host": 78.778355,
     "mkmod-host": 17.552446,
     "module-image-host": 6.263,
@@ -417,6 +477,8 @@
     "rshell-serial-host": 2.650067,
     "rust-alloc-host": 3.044312,
     "sbrk-crt-host": 8.834413,
+    "sep5-sdk-host": 211.76532,
+    "sep5-trace-host": 282.821173,
     "serial-portc-host": 2.8224695,
     "serial-vfast-host": 3.026827,
     "serialfs-host": 11.80311,
@@ -844,6 +906,8 @@
     "rshell-serial-host": 3,
     "rust-alloc-host": 3,
     "sbrk-crt-host": 3,
+    "sep5-sdk-host": 3,
+    "sep5-trace-host": 3,
     "serial-portc-host": 2,
     "serial-vfast-host": 3,
     "serialfs-host": 2,
