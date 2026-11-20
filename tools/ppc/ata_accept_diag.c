@@ -4,9 +4,16 @@ static void ata_accept_report(void)
 {
     IdeInfo info;
     Device *disk = dev_find("hd0");
+    unsigned present = 0, registered = 0;
+    char name[] = "hd0";
+    for (int i = 0; i < IDE_MAX_DRIVES; ++i) {
+        name[2] = '0' + i;
+        if (ide_drive_present(i)) present |= 1U << i;
+        if (dev_find(name)) registered |= 1U << i;
+    }
+    kprintf(7, "ATA-TEST present=%u registered=%u\r\n", present, registered);
     if (!disk || ide_get_info(0, &info)) {
-        kprintf(7, "ATA-TEST absent=%u registered=%u\r\n",
-                !ide_drive_present(0), !!disk);
+        kprintf(7, "ATA-TEST done\r\n");
         return;
     }
     kprintf(7, "ATA-TEST model=%s sectors=%u\r\n", info.model, info.total_sectors);

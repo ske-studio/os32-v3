@@ -4,16 +4,46 @@
 #include "ide_boot.h"
 #include "kstring.h"
 
+static int prop(int node, const char *key, void *data, unsigned cap)
+{
+    cell args[3] = { (cell)node, ppc_ptr_cell(key), 0 };
+    if (ofw_call("getproplen", 2, 1, args)) return -1;
+    int n = (int)args[2];
+    if (n < 0 || (unsigned)n > cap || ofw_getprop(node, key, data, cap) != n)
+        return -1;
+    return n;
+}
+
+static int ata_node(int node, const char *name)
+{
+    if (!kstrcmp(name, "ATA") || !kstrcmp(name, "ide") ||
+        !kstrcmp(name, "ata") || !kstrcmp(name, "ata0") ||
+        !kstrncmp(name, "ata-", 4)) return 1;
+    char buf[PM_KBOOT_PROP_BYTES + 1];
+    int n = prop(node, "device_type", buf, sizeof(buf) - 1);
+    if (n > 0) {
+        buf[n] = 0;
+        if (!kstrcmp(buf, "ata") || !kstrcmp(buf, "ide")) return 1;
+    }
+    n = prop(node, "compatible", buf, sizeof(buf) - 1);
+    if (n <= 0) return 0;
+    buf[n] = 0;
+    for (int i = 0; i < n; i += kstrlen(buf + i) + 1)
+        if (!kstrcmp(buf + i, "keylargo-ata") || !kstrcmp(buf + i, "heathrow-ata") ||
+            !kstrcmp(buf + i, "ohare-ata")) return 1;
+    return 0;
+}
+
 static int value(int node, const char *name, u32 expected)
 {
     cell v;
-    return ofw_getprop(node, name, &v, sizeof(v)) == sizeof(v) && v == expected;
+    return prop(node, name, &v, sizeof(v)) == sizeof(v) && v == expected;
 }
 
 static u32 bar_window(int node, u32 offset, u32 bytes)
 {
     cell entries[5 * 8];
-    int n = ofw_getprop(node, "assigned-addresses", entries, sizeof(entries));
+    int n = prop(node, "assigned-addresses", entries, sizeof(entries));
     if (n <= 0 || n > (int)sizeof(entries) || n % 20) return 0;
     u32 base = 0;
     for (int i = 0; i < n / 4; i += 5) {
@@ -31,7 +61,7 @@ static int kauai(int node)
 {
     cell id;
     if (!value(node, "vendor-id", 0x106b) ||
-        ofw_getprop(node, "device-id", &id, sizeof(id)) != sizeof(id)) return 0;
+        prop(node, "device-id", &id, sizeof(id)) != sizeof(id)) return 0;
     return id == 0x33 || id == 0x3b || id == 0x43 || id == 0x50 || id == 0x69;
 }
 
@@ -42,12 +72,11 @@ static void walk(int node, int parent, int macio, unsigned depth, unsigned *left
          node = ofw_peer(node)) {
         --*left;
         char name[32] = {0};
-        int n = ofw_getprop(node, "name", name, sizeof(name)-1);
-        if (n < 0 || n >= (int)sizeof(name)) continue;
-        if (macio && (!kstrncmp(name, "ata-", 4) || !kstrcmp(name, "ata") ||
-                      !kstrcmp(name, "ATA") || !kstrcmp(name, "ide"))) {
+        int n = prop(node, "name", name, sizeof(name)-1);
+        if (n < 0) name[0] = 0;
+        if (macio && ata_node(node, name)) {
             cell reg[8];
-            int size = ofw_getprop(node, "reg", reg, sizeof(reg));
+            int size = prop(node, "reg", reg, sizeof(reg));
             if (size >= 8 && size <= (int)sizeof(reg) && !(size % 8) &&
                 !(reg[0] & 1) && reg[1] > PM_IDE_CTL &&
                 value(parent, "#address-cells", 1) && value(parent, "#size-cells", 1))
