@@ -6,6 +6,7 @@ from pathlib import Path
 import re
 import struct
 import subprocess
+import sys
 import tempfile
 import time
 
@@ -37,8 +38,7 @@ def fixed_layout(header):
     return layout
 
 
-def report_product(path):
-    from kboot_root_image import verify_embedded
+def linked_layout(path):
     elf = path.read_bytes()
     hdr = struct.unpack_from('>16sHHIIIIIHHHHHH', elf)
     assert hdr[0][:6] == b'\x7fELF\x01\x02' and hdr[2] == 20
@@ -52,7 +52,45 @@ def report_product(path):
     assert va == pa == symbols['__kernel_image_start']
     assert va + raw == symbols['__kernel_file_end'] and va + memory == end
     layout = fixed_layout(path.parent/'memmap_layout.h')
-    assert memory <= layout['MEM_KERNEL_IMAGE_MAX'] and chain <= 0x3e0000
+    assert memory <= layout['MEM_KERNEL_IMAGE_MAX'], f'{path}: PT_LOAD size {memory:#x}'
+    assert chain <= layout['MEM_FIXED_PAGING_GUARD_BASE'], f'{path}: chain end {chain:#x}'
+    return elf, load, symbols, layout
+
+
+def report_acceptance(paths):
+    largest_end = largest_chain = 0
+    for path in paths:
+        _, _, symbols, _ = linked_layout(path)
+        end, chain = symbols['__kernel_resident_end'], symbols['__kernel_chain_end']
+        print(f'{path}: resident_end={end:#x} chain={chain:#x}')
+        largest_end = max(largest_end, end)
+        largest_chain = max(largest_chain, chain)
+    print(f'acceptance maximum resident_end={largest_end:#x} chain={largest_chain:#x}')
+
+
+def check_acceptance_controls(work):
+    # Link the large instrumented RSH image and the font lease regression
+    # with the acceptance recipes, including their real embedded roots.
+    sys.path.insert(0, str(ROOT / 'tools/accept'))
+    from kboot_accept import build
+    import link_sh_run
+    import ppc_font
+
+    images = []
+    for name in ('link-sh', 'font'):
+        folder = work / name
+        folder.mkdir()
+        options = (link_sh_run.settings(folder, observe_flow=True) if name == 'link-sh'
+                   else ppc_font.settings(folder))
+        images.append(build(folder / 'kernel', '-j4', *options, 'kb-user', 'kernel'))
+    report_acceptance(images)
+
+
+def report_product(path):
+    from kboot_root_image import verify_embedded
+    elf, load, symbols, layout = linked_layout(path)
+    _, _, va, _, raw, memory, _, _ = load
+    end, chain = symbols['__kernel_resident_end'], symbols['__kernel_chain_end']
     shell = layout['MEM_SHELL_LOAD_ADDR']
     guard = layout['MEM_SHELL_GUARD']
     rows = [
@@ -161,7 +199,12 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     parser.add_argument('--product', type=Path, help='inspect linked PPCKERN.ELF and adjacent map/ISO')
+    parser.add_argument('--acceptance-controls', action='store_true')
+    parser.add_argument('--acceptance', type=Path, nargs='+', help='inspect linked guest acceptance images')
     args = parser.parse_args()
+    if args.acceptance:
+        report_acceptance(args.acceptance)
+        return
     if args.product:
         report_product(args.product)
         return
@@ -176,6 +219,8 @@ def main():
         destination = Path(os.environ.get('TMPDIR', str(work)))
         (destination/'kboot-layout-readelf.txt').write_text((work/'readelf.txt').read_text())
         print('PASS product link / ELF / note / BSS / stack / ledger / oversize')
+        if args.acceptance_controls:
+            check_acceptance_controls(work)
         if args.mutate:
             header = (ROOT/'include/memmap.h').read_text()
             anchor = '#define MEM_SHELL_MAX_SIZE 0x0A5000UL'

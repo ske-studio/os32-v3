@@ -85,18 +85,23 @@ def observe(elf, folder, case):
             probe('draw', 22, b'tile provider absent')
         elif case == 'any-owner':
             probe('draw', 30, b'child changed generation')
+        elif case == 'no-exit':
+            probe('child-exit', 31, b'child left display active')
         else:
-            modes = {'no-return': ('draw',), 'no-exit': ('leave',)}.get(
-                case, ('shutdown', 'draw', 'leave', 'fault'))
+            modes = {'no-return': ('draw',)}.get(
+                case, ('shutdown', 'draw', 'child-exit', 'leave', 'fault'))
             for mode in modes:
                 if mode == 'fault':
                     capacity = probe('capacity', 0, b'free tiles ')
                 before = generations()
                 probe(mode, 139 if mode == 'fault' else 0,
-                      {'shutdown': b'shutdown only', 'draw': b'tile drawn', 'leave': b'tile left', 'fault': b'tile allocated'}[mode])
+                      {'child-exit': b'child display restored', 'shutdown': b'shutdown only', 'draw': b'tile drawn', 'leave': b'tile left', 'fault': b'tile allocated'}[mode])
                 after = generations()
                 if case == 'normal':
-                    require(after[:-1] == before and after[-1] != before[-1], mode + ' recovery')
+                    if mode == 'shutdown':
+                        require(after == before, 'shutdown preserves live text console')
+                    else:
+                        require(after[:-1] == before and after[-1] != before[-1], mode + ' recovery')
                     if mode == 'fault':
                         require(capacity == probe('capacity', 0, b'free tiles '), 'surface recovery')
                     check_echo(mode)

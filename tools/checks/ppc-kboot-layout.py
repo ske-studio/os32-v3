@@ -3,6 +3,12 @@ import subprocess
 
 CHECK = dict(name='ppc-kboot-layout', tier=2, budget=60, needs=['make:ppc-ci-image'], env=['ppc-cross'],
              covers=['tools/checks/ppc-kboot-layout.py', 'tools/ppc/kboot_layout.py',
+                     'tools/accept/ppc_font.py', 'tools/accept/ppc_shm.py',
+                     'tools/ppc/**', 'tools/*.py', 'assets/fonts/**', 'Makefile',
+                     'build/**', 'sdk/**', 'mm/**', 'exec/**', 'arch/ppc/**',
+                     'platform/powermac/**', 'include/**', 'init/**', 'kernel/**',
+                     'kapi/**', 'lib/**', 'fs/**', 'drivers/**', 'input/**', 'net/**',
+                     'gfx/**', 'userland/ppc/**', 'userland/shell/**',
                      'arch/ppc/kernel.ld', 'platform/powermac/platform_kboot_layout.h',
                      'include/memmap.h', 'tools/gen_memmap.py', 'lib/kstring_c.c',
                      'lib/kstring.h', 'lib/crc32.c', 'lib/crc32_core.inc', 'lib/crc32.h',
@@ -21,10 +27,15 @@ CHECK = dict(name='ppc-kboot-layout', tier=2, budget=60, needs=['make:ppc-ci-ima
 
 
 def run(ctx):
-    args = ['python3', '-B', 'tools/ppc/kboot_layout.py']
+    args = ['python3', '-B', 'tools/ppc/kboot_layout.py', '--acceptance-controls']
     if ctx.mutate:
         args.append('--mutate')
-    rc = subprocess.call(args, cwd=ctx.root)
+    import os
+    env = os.environ.copy()
+    for key in ('BUILD_OUT', 'KERNEL_CFLAGS', 'INC_KERNEL', 'C_STD',
+                'SQLITE_PROTO_OUT', 'MAKEFLAGS', 'MFLAGS', 'MAKELEVEL'):
+        env.pop(key, None)
+    rc = subprocess.call(args, cwd=ctx.root, env=env)
     if rc:
         return rc
     return subprocess.call(['python3', '-B', 'tools/ppc/kboot_layout.py', '--product',
