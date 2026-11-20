@@ -94,7 +94,7 @@ static const CirrusModuleContext fixture_context = {
                               'static void run(void)\n{\n    cirrus_module_init(&gfx_backend_cirrus, &fixture_context);')
     # Compile the actual kernel GUI boundary statement into the real HAL fixture.
     boot = (ROOT / 'platform/pc98/kernel.c').read_text()
-    start = boot.index('            if (is_gui) {\n                /* Graphics boundary')
+    start = boot.index('static void pc98_shell_loading(')
     boundary = boot[start:boot.index('gfx_client_to_gshell();', start)]
     boundary = next(line.strip() for line in boundary.splitlines()
                     if 'gfx_prepare_backend();' in line)
@@ -162,7 +162,7 @@ def main():
         boot = (ROOT / 'platform/pc98/kernel.c').read_text()
         assert boot.index('    gfx_boot_reserve();') < boot.index('    exec_init();')
         assert boot.index('    gfx_prepare_backend();') < boot.index('    cirrus_module_load();')
-        boundary = boot.index('            if (is_gui) {\n                /* Graphics boundary')
+        boundary = boot.index('static void pc98_shell_loading(')
         assert boot.index('gfx_prepare_backend();', boundary) < boot.index('gfx_client_to_gshell();', boundary)
         exe = folder / 'cirrus-module'
         def build(source):
