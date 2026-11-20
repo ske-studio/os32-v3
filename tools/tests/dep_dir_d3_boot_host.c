@@ -15,6 +15,7 @@
 #include "dev_name.h"
 #include "vfs.h"
 #include "ext2_medium_contract.h"
+#include "serialfs/serialfs.h"
 #define CHECK(c) do { if (!(c)) { fprintf(stderr, "FAIL line %d: %s\n", __LINE__, #c); exit(1); } } while (0)
 static char events[8192];
 static int used, irq_on, failing, disk_count;
@@ -85,7 +86,9 @@ int ext2_medium_register(int kind, const struct ext2_medium_ops *ops)
 static int ext2_init(void) { event("ext2;"); return failing == 1 ? -1 : VFS_OK; }
 static int fatfs_init(void) { event("fat;"); return failing == 2 ? -1 : VFS_OK; }
 static int hostdrvfs_init(void) { event("hostfs;"); return failing == 3 ? -1 : VFS_OK; }
-static int serialfs_init(void) { event("serialfs;"); return failing == 4 ? -1 : VFS_OK; }
+int serialfs_init(void) { event("serialfs;"); return failing == 4 ? -1 : VFS_OK; }
+const struct SfsSessionFg sfs_session_fg = {0};
+void serialfs_session_set_fg(const struct SfsSessionFg *fg) { CHECK(fg == &sfs_session_fg); }
 static Device children[] = {
     {.name="fd0", .type=DEV_BLOCK, .sect_size=512, .total_sects=1, .blk_read_u32 = 0, .media_check = 0},
     {.name="hd0", .type=DEV_BLOCK, .sect_size=512, .total_sects=1, .blk_read_u32 = 0, .media_check = 0},
