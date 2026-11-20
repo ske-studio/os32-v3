@@ -1,5 +1,7 @@
 > 「リブートは先に入れないと先に進みにくいです。アーキテクチャをきちんと分離して実装してくださいね。」（2026-11-18）
 
+> 2026-11-20 の見直しで x86 の形に改めた ([DESIGN_X86_AUDIT](DESIGN_X86_AUDIT.md))。
+
 # PowerMac の platform_reset 設計 (確定)
 
 > 出所: ~/os32-tmp/run/ppc-reset/DESIGN.final.md (設計の往復の確定版)。
@@ -33,7 +35,7 @@ POLICY_DEV §1 の HAL 中心期における「新装置に着手しない」の
 | 機種の口 | include/platform_sys.h は復帰可。PC-98 は platform/pc98/system.c の I/O 列。PPC は build/platform/powermac.mk に相当する提供者がない。 |
 
 依頼の略記と実物の食い違いは次の 4 件。
-1. 「link の RSH」には像の指定が要る。build/images/kboot-link.mk は EXEC/USERSHELL 無効。受入には build/images/kboot-link-sh.mk の link-sh を使う。
+1. 製品シェルの reboot を共通 RSH から一度実行し、再起動後に別 boot の READY と ver の応答を確認する。起動経路は PPC_SHELL_ALIGN_X86_DESIGN に従う。
 2. docs/ppc/qemu-mac99.md は VIA-CUDA の文書記載まで。既定と via=pmu の選択は同資料では未確認。両起動の識別 LOG で確定する。
 3. OpenBSD の写しで Cuda の restart は指定された cuda.c でなく sys/arch/macppc/dev/adb.c。FreeBSD の入口名も cuda.c と pmu.c の shutdown 系。
 4. host_agent.py はホスト子プロセスの pending。RSH の実体は host_rshell.py。socket 側だけを直しても別 boot の要求が残る。
@@ -184,7 +186,7 @@ Apple の Power Mac G4 (September 2002) Developer Note、vendor/text/apple-pmg4-
 
 ## 5. 部品の大きさ（差分の概算）
 
-- C_PLATFORM_CORE に置くため core/link/shell/sh/link-sh の各 kboot 像が識別と reset を共有。RSH から shell を使う受入は link-sh。
+- reset の識別と装置手順は C_PLATFORM_CORE で共有する。
 - 装置 C 約 200 行、機種 C 約 150 行、宣言・ビルド約 40 行。動的割当なし、受信は cap まで in に保存し超過分は捨てる (§3 via_command)、MMIO の窓は 3 ページ (§2 via_window.h)。
 - PPC の増分はリンク後に各像の text/data/bss と map を基点と比較して報告。PC-98 に入る新規ソース数は 0。
 
@@ -210,7 +212,7 @@ Apple の Power Mac G4 (September 2002) Developer Note、vendor/text/apple-pmg4-
 | tools/tests/test_remote_x13.py | socket と operator の別 boot、遅着、次の submit | 30 |
 | tools/tests/via_host.c | MMIO/timebase の模擬、正常・競合・期限 | 120 |
 | tools/tests/test_powermac_reset.py | host 実行、OF fixture、変異と CHECK/covers | 90 |
-| tools/ppc/link_sh_run.py | 実 shell を使う reset 専用ケースと QMP 観測 | 45 |
+| tools/ppc/link_sh_run.py | 旧 link-sh の reset ケースを製品起動へ移し、RSH と QMP で観測 | 45 |
 | tools/checks/ppc-reset.py | 両 mac99 ケースと入力の宣言 | 15 |
 
 既存 host 側の確認・変更箇所（tools/ppc/ 配下）
@@ -229,12 +231,12 @@ Apple の Power Mac G4 (September 2002) Developer Note、vendor/text/apple-pmg4-
 - host の模擬 VIA は方向・データ・制御線の各遷移を観測し、正しい順でのみ相手側の辺を進める。独立した期待列は Cuda [01,11]、PMU [d0]。
 - Cuda の古い IFR、送信前受信と途中競合、PMU の PB3 固着 high/low、時間 wrap を含める。期限切れ後に余分な SR 書込みがないことを確認。
 - 変異は個別にコマンド置換、TIP と SR の逆順、PB4 反転省略、PB3 極性反転、期限無効化。各変異を実行し trace/結果/外部 watchdog のいずれかで RED を示す。
-- QEMU は link-sh を mac99 既定と mac99,via=pmu で別々に起動。通常の tools/ppc/link_sh_run.py は -no-reboot を付けるため、このケースだけ外す。
+- QEMU は製品経路を mac99 既定と mac99,via=pmu で別々に起動し、このケースでは -no-reboot を外す。
 - それぞれ LOG の cuda/pmu、OF-OFF、CUI READY を確認。QMP 接続時・初回起動のイベントを排出し、serial の末尾位置を記録してから RSH で reboot を一度送る。
-- 送信後の guest RESET event または新しい OF 起動行を期限内に得る。QMP system_reset は使わない。exit、切断、既存バナーの再読は失敗。空ラッパ変異で期限切れ RED。
+- 送信後の guest RESET event または新しい OF 起動行を期限内に得る。さらに別 boot ID の CUI READY を待ち、次の RSH 要求 ver の応答まで確認する。QMP system_reset は使わない。exit、切断、既存バナーの再読は失敗。空ラッパ変異で期限切れ RED。
 - mac99,via=pmu の 0xd0 実装有無を使用版の QEMU ソースで確認する。未実装なら版・根拠・代替試験を docs/tasks/DEFERRED_TESTS.md に記録し、PMU は host 試験と PMU 搭載 G4 実機で受ける。実装済みの場合の timeout は試験失敗。
 - 新規 PPC 試験は PPC_CROSS_DIR=/nonexistent で SKIP・rc=0、同条件に OS32_REQUIRE_PPC=1 を加えると FAIL・非ゼロを確認。
-- QuickSilver は実機ノートの tftpd で初回 RRQ の送信元・ファイル・時刻を記録。VIA の一行、OF-OFF、link-sh の READY と boot ID を保存。
+- QuickSilver は実機ノートの tftpd で初回 RRQ の送信元・ファイル・時刻を記録。VIA の一行、OF-OFF、製品シェルの READY と boot ID を保存。
 - 同じノートの RSH から reboot を一度送り、送信後に同じ実機から対象像の新規 RRQ、再ロード、別 boot の READY、次の ver 応答を確認。初回 RRQ の再送と区別する。
 - USB 入力、GEM 経由の再接続も記録。結果欠落だけで合格にしない。実機の装置種別と PA はこのログで確定する。
 - x86 は基点と同一条件の clean build_compare と x86 KAPI 全生成物の byte 比較。PPC の差だけを申告。layers、build-selection、ppc-kapi-binding、追加・変更試験 --mutate、run.py --lint を実施。
