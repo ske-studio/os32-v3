@@ -15,6 +15,9 @@
 #include "appslot.h"
 #include "io.h"
 #include "exec_surface.h"
+#include "gfx.h"
+#include "gfx_osri_view.h"
+#include "con_sink.h"
 #include "pgalloc.h"       /* §6 ownership/mapping management target sizeof */
 #include "os32_kapi_shared.h"   /* OS32_ERR_* / EXEC_ERR_* */
 #include "fd_redirect.h"       /* T9 §12 T1: リダイレクト表を ID の文脈にする */
@@ -611,6 +614,8 @@ int appslot_gfx_owner_exit_if(int owner, u32 resource_gen)
     gfx_resource_reserve(owner);
     irq_restore(irq);
     gfx_owner_cleanup(owner);
+    if (owner == APP_ID_SHELL && !con_sink_is_enabled() && gfx_is_started())
+        gfx_shutdown();
     return 1;
 }
 

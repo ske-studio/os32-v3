@@ -1,5 +1,5 @@
 #include "app_ids.h"
-int input_display_restore_drain(void);
+int input_display_restore_lock(unsigned int *flags);
 void appslot_gfx_resource_acquire(int owner);
 /* Device and current-slot stubs; gfx_init and ownership use product code. */
 #include "display_provider.h"
@@ -51,5 +51,5 @@ void display_palette4_write(int i, u8 r, u8 g, u8 b)
 extern volatile u32 gfx_reinit_fail_count;
 int gfx_is_started(void);
 
-int input_display_restore_drain(void) { return 0; }
+int input_display_restore_lock(unsigned int *flags) { *flags = 0; return 0; }
 void appslot_gfx_resource_acquire(int owner) { (void)owner; }

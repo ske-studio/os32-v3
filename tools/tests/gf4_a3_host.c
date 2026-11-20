@@ -370,6 +370,7 @@ void gfx_init(void)
     gfx_backend_geforce.bb_base = image;
     enter_call();
 }
+int gfx_is_started(void) { return host.ctx.ready; }
 void gfx_shutdown(void)
 {
     ++core_shutdowns;
@@ -1375,6 +1376,12 @@ void _start(void)
     assert(!display_restore_pending.resource_gen);
     assert(!display_cui_owner && !display_session.valid);
     assert(!input_display_restore_drain());
+    reset_cold_cui(); current_owner = APP_ID_SHELL;
+    gfx_init();
+    assert(!display_cui_owner && host.ctx.ready);
+    assert(!input_display_restore_capture(APP_ID_SHELL));
+    assert(!input_display_restore_drain() && !host.ctx.ready && leaves == 1);
+    assert(!input_display_restore_drain() && leaves == 1);
     gf2_host_exit(0);
 #endif
     cui_controls(); wire_and_admission(); start_failures(); restore_retries();

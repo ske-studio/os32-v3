@@ -2,8 +2,10 @@
 static void gfx_init_mode(int legacy200)
 {
     if (!con_sink_is_enabled() && res_owner_get() == APP_ID_SHELL) {
-        if (input_display_restore_drain() < 0) return;
+        unsigned int flags;
+        if (input_display_restore_lock(&flags) < 0) return;
         appslot_gfx_resource_acquire(APP_ID_SHELL);
+        irq_restore(flags);
     }
     palette_shadow_reset();
     gfx2_pal_reset16();

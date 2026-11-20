@@ -1,5 +1,5 @@
 #include "app_ids.h"
-int input_display_restore_drain(void) { return 0; }
+int input_display_restore_lock(unsigned int *flags) { *flags = 0; return 0; }
 void appslot_gfx_resource_acquire(int owner) { (void)owner; }
 int con_sink_is_enabled(void) { return 0; }
 int res_owner_get(void) { return 0; }

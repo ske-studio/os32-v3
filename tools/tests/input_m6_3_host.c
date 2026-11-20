@@ -20,6 +20,9 @@ static void init_attempt(void)
 }
 void fd_redirect_clear_state(FdRedirectState *s) { __builtin_memset(s, 0, sizeof(*s)); }
 void gfx_policy_reeval(void) { CHECK(_irq_enabled()); ++policy_calls; }
+static int graphics_active;
+int gfx_is_started(void) { return graphics_active; }
+void gfx_shutdown(void) { graphics_active = 0; }
 void gf_display_owner_exit(int id)
 {
     u32 gen;
@@ -27,6 +30,11 @@ void gf_display_owner_exit(int id)
     CHECK(appslot_gfx_resource_snapshot(id, &gen) == -1);
     ++returns;
 }
+int kcg_module_ready(void) { return 1; }
+#define shell_print(s, attr) ((void)0)
+#define kapi_sys_exit(rc) CHECK(0)
+#include "m6_gfx_claim.inc"
+
 static void boundary_restore(unsigned int flags)
 {
     irq_restore(flags);
@@ -147,6 +155,20 @@ static void test(void)
     res_owner_set(1); init_attempt(); CHECK(next_resource_gen == a && !_irq_enabled());
     _enable(); init_attempt(); CHECK(next_resource_gen != a && generation(1));
     CHECK(appslot_gfx_owner() == GFX_OWNER_WM);
+    HWB_TEST("10 STOP after empty drain and before shell acquisition");
+    a = generation(1); injection = 1; n = returns;
+    init_attempt();
+    CHECK(returns == n + 1 && generation(1) != a);
+    HWB_TEST("11 STOP restores ordinary CUI drawing");
+    graphics_active = 1;
+    CHECK(!input_display_restore_capture(1));
+    CHECK(!input_display_restore_drain() && !graphics_active);
+    HWB_TEST("12 STOP after empty drain and before application claim");
+    gui_mode = 1; slot->cpl3 = 1; slot->hdr_flags = OS32X_FLAG_GFX;
+    claim(2); a = generation(2); injection = 1; n = returns;
+    CHECK(!gfx_kapi_claim() && returns == n + 1 && generation(2) != a);
+    CHECK(!input_display_restore_capture(2) && !input_display_restore_drain());
+    CHECK(returns == n + 2 && appslot_gfx_owner() == GFX_OWNER_WM);
     CHECK(policy_calls && returns);
 }
-void _start(void) { test(); hwb_test_write("PASS M6[3] resources/exec 1-9\n"); hwb_test_exit(0); }
+void _start(void) { test(); hwb_test_write("PASS M6[3] resources/exec 1-12\n"); hwb_test_exit(0); }

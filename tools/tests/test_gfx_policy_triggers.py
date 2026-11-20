@@ -35,7 +35,7 @@ PRELUDE = r'''
 static unsigned int irq_save(void) { return 0; }
 static void irq_restore(unsigned int f) { (void)f; }
 static void gfx_resource_reserve(int id) { (void)id; }
-int input_display_restore_drain(void) { return 0; }
+int input_display_restore_lock(unsigned int *flags) { *flags = 0; return 0; }
 
 #define ATTR_RED 1
 #define GFX_OWNER_WM 1

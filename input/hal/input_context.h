@@ -44,6 +44,7 @@ u32 input_interrupt_coalesced_count(void);
 
 int input_display_restore_capture(u32 owner);
 int input_display_restore_drain(void);
+int input_display_restore_lock(unsigned int *flags);
 void input_interrupt_exec_exit(u32 owner, u32 exec_gen);
 
 #endif

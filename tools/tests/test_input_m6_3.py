@@ -9,7 +9,7 @@ CHECK = dict(name='input-m6-3-host', tier=1, budget=8, needs=['make:all'],
             'tools/tests/hwb_fake.h', 'tools/tests/host_arch/**', 'userland/shell/hwb.h',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'include/**',
             'mm/pgalloc.h', 'exec/exec_surface.h', 'fs/fd_redirect.h',
-            'gfx/gfx_core_init.inc', 'kdebug/gf_display_test.c',
+            'gfx/gfx_core_init.inc', 'gfx/gfx_core.c', 'gfx/gfx.h', 'gfx/gfx_osri_view.h', 'kdebug/gf_display_test.c',
             'tools/tests/gf4_a3_host.c', 'tools/tests/gf4_display_fake.h',
             'tools/tests/gf_accel_unbound_stubs.c',
             'tools/tests/gf_command_runtime_host.h', 'hwdev/gf/**',
@@ -22,6 +22,8 @@ import host32
 from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = [
+    ('skip-pending-recheck', 'interrupt', 'if (!display_restore_pending.resource_gen) return 0;', 'return 0;'),
+    ('skip-cui-shutdown', 'appslot', '        gfx_shutdown();', '        (void)0;'),
     ('owner-only', 'appslot', 'gfx_resource_gen != resource_gen', '0'),
     ('no-issue', 'appslot', 'if (++next_resource_gen == 0) ++next_resource_gen;', 'if (!next_resource_gen) ++next_resource_gen;'),
     ('zero-wrap', 'appslot', 'if (++next_resource_gen == 0) ++next_resource_gen;', '++next_resource_gen;'),
@@ -42,6 +44,9 @@ def run(ctx):
         tmp = Path(td)
         prefix = (ctx.root/'gfx/gfx_core_init.inc').read_text().split('    palette_shadow_reset();', 1)[0]
         (tmp/'m6_gfx_acquire.inc').write_text(prefix.split('{\n', 1)[1])
+        core = (ctx.root/'gfx/gfx_core.c').read_text()
+        start = core.index('static int gfx_kapi_claim(void)')
+        (tmp/'m6_gfx_claim.inc').write_text(core[start:core.index('void gfx_kapi_init(void)', start)])
         def execute(edits):
             for key, code in edits.items():
                 (tmp/('appslot_copy.c' if key == 'appslot' else 'exec_adapter.inc' if key == 'adapter' else key+'.c')).write_text(code)

@@ -330,8 +330,11 @@ static int gfx_kapi_claim(void)
         kapi_sys_exit(1);
         return -1;
     }
-    if (input_display_restore_drain() < 0) return -1;
-    if (appslot_gfx_claim(con_sink_is_enabled()) >= 0) {
+    unsigned int flags;
+    if (input_display_restore_lock(&flags) < 0) return -1;
+    int rc = appslot_gfx_claim(con_sink_is_enabled());
+    irq_restore(flags);
+    if (rc >= 0) {
         gfx_policy_reeval();
         return 0;
     }

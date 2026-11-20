@@ -123,3 +123,14 @@ int input_display_restore_drain(void)
     irq_restore(irq);
     return 0;
 }
+
+/* Hold off STOP from the final empty check through generation publication. */
+int input_display_restore_lock(unsigned int *flags)
+{
+    for (;;) {
+        if (input_display_restore_drain() < 0) return -1;
+        *flags = irq_save();
+        if (!display_restore_pending.resource_gen) return 0;
+        irq_restore(*flags);
+    }
+}
