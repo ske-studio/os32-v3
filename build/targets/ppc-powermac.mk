@@ -170,7 +170,7 @@ $(KB_OUT)/platform/powermac/root_image.o: $(KB_OUT)/root_image_expected.h
 
 BUILD_ID_SRC := $(KB_OUT)/build_id.c
 include build/build-id.mk
-$(KB_GEN)/stamp: sdk/kapi.json sdk/gen_kapi.py sdk/kapi_abi_x86.py sdk/kapi_target_ppc.py sdk/target_profile.py
+$(KB_GEN)/stamp: build/images/$(IMAGE).mk sdk/kapi.json sdk/gen_kapi.py sdk/kapi_abi_x86.py sdk/kapi_target_ppc.py sdk/target_profile.py
 	@mkdir -p $(KB_GEN)
 	python3 -B sdk/gen_kapi.py --target ppc-powermac --feature-link $(FEATURE_LINK) --out-dir $(KB_GEN)
 	@touch $@

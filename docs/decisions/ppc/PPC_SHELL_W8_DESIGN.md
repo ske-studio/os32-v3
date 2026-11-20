@@ -282,6 +282,7 @@ if reply is not None:
 
 - #2の再見積りはP02=45→80、P03=45→140、P06=100→150、T01=230→330行。
 - 共通serialfsの4実装をリンクし、UART session・旧LAN輸送は組まない。VFS・kernel・SDK・shell共通部は変更しない。
+- 6b の例外は rshell_lan.c の SHELL_REMOTE_SFS 分岐と gen_kapi.py の FEATURE_LINK 引数。
 - ★PC-98後続段は本線が起動後mountを結線し、FD/HDD/Host Servicesの保存・再起動をNP21/Wで受け入れる。
 - ★既存HostDrvとの `/host` 競合は常駐所有者のBUSY契約を保ち、二重mountしない。
 

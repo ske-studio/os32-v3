@@ -41,6 +41,10 @@ def observe(elf, cpu, folder, case):
                 rsh_command(s, command, expected)
                 rsh_command(s, 'echo $?', b'7\n')
                 assert s.word('sfs_probe_starts') == 1
+            if case == 'normal':
+                rsh_command(s, 'cd /bin', b'')
+                rsh_command(s, 'sfs run cd /host', scope + b'sfs: exit=0\n')
+                rsh_command(s, 'pwd', b'/bin\n')
         s.q.call('quit')
         s.p.wait(timeout=5)
         assert s.p.returncode == 0
