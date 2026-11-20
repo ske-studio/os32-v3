@@ -71,14 +71,14 @@ def accept(elf, cpu, out, mode):
     def stream():
         return stream_payload(a.read_bytes().decode('latin1')).encode('latin1').decode('utf-8', errors='replace').replace('\r', '')
 
-    def shot(name, lines=None, cursor=()):
+    def shot(name, lines=None, cursor=(), *, await_pixels=None):
         nonlocal baseline
         q.deadline = time.monotonic()+30
         path = out/(name+'.ppm')
         previous, stable = None, 0
         end = time.monotonic()+10
-        while stable < 2:
-            require(time.monotonic() < end, 'frame did not settle: '+name)
+        while True:
+            require(time.monotonic() < end, 'frame deadline: '+name)
             q.call('stop')
             try:
                 q.call('screendump', {'filename': str(path.resolve())})
@@ -86,6 +86,11 @@ def accept(elf, cpu, out, mode):
             finally:
                 q.call('cont')
             stable = stable+1 if img == previous else 0
+            if await_pixels is not None:
+                if await_pixels(Terminal(img, font, fg, bg, cursor_top=14)):
+                    break
+            elif stable >= 2:
+                break
             previous = img
             time.sleep(.1)
         check((img.width, img.height) == (800, 600), '800x600 geometry')
@@ -211,15 +216,20 @@ def accept(elf, cpu, out, mode):
 
         before = generations()
         usb_command('source /leave.sh', 'tile left\n0\n', external=True)
-        after = generations()
-        check(bool(before) and after[:-1] == before and after[-1] != before[-1],
-              'tile owner exit restores a new generation')
+        def generation_advanced():
+            after = generations()
+            return bool(before) and after[:-1] == before and after[-1] != before[-1]
+
+        wait(generation_advanced, 10, 'tile owner exit restores a new generation')
         usb_command('clear', '\x1b[2J\x1b[H')
         start = len(stream())
         key('z')
         wait(lambda: stream()[start:].endswith('sh> '), 10, 'restored UTF-8 completion')
         check(stream()[start:] == wanted, 'restored UTF-8 stream')
-        restored = shot('restored', ['sh> '+text, '日本語の表示', 'sh> '], [(2, 4)])
+        restored = shot('restored', ['sh> '+text, '日本語の表示', 'sh> '], [(2, 4)],
+                        await_pixels=lambda frame: frame.compare_text(0, 0, 'sh> '+text) is None
+                        and frame.compare_text(1, 0, '日本語の表示') is None
+                        and frame.compare_text(2, 0, 'sh>  ', [(2, 4)]) is None)
         for y in range(t.top + 16, t.top + 32):
             for x in range(len('日本語の表示') * 16):
                 check(t.image.pixel(x, y) == restored.image.pixel(x, y), 'restored glyph pixels')
@@ -254,6 +264,20 @@ MUTATIONS = [
      '(void)pm_terminal_trygetkey(); /* Consume the first OPEN cancellation. */',
      '(void)pm_terminal_trygetkey(); (void)pm_input_usb_take();'),
 ]
+
+
+EXPECTED_FAILURE = {
+    'utf8-bytewise': 'lan-utf8: Mismatch(row=0, column=9,',
+    'trace-screen': 'waiting: fixed guide row 1',
+    'colors': 'waiting: fixed guide row 1',
+    'top': 'waiting: fixed guide row 1',
+    'mirror': 'USB exact echo/fd1: '+repr('hi\n'),
+    'scroll-minus': 'scroll: Mismatch(row=0, column=0,',
+    'scroll-plus': 'scroll: Mismatch(row=0, column=10,',
+    'start-consumed': 'USB exact echo/fd1: '+repr(
+        '================================\n OS32 External Shell Started\n'
+        '================================\nsh> cho hi\ncho: command not found\nsh> '),
+}
 
 
 def main():
@@ -297,6 +321,7 @@ def main():
                   'pm_terminal_feed(text, sizeof(text)-1); return -1; } return c; }\n')
         anchor = 'pm_input_usb_take()'
         require(inp.count(anchor) == 1, 'unique FB input boundary')
+        require(inp.count('static PmInputDecoder') == 1, 'unique FB helper insertion')
         inp = inp.replace(anchor, 'fb_usb()').replace('static PmInputDecoder', helper+'static PmInputDecoder')
         path = work/(mode+'-input.c'); path.write_text(inp)
         opts += ['KB_MUT_THIRD_SRC='+src, 'KB_MUT_THIRD_FILE='+str(path)]
@@ -305,6 +330,7 @@ def main():
             require(source_text.count(old) == 1, 'unique UTF-8 reversion anchor')
             helper = ('static void runtime_print_utf8(const char *text, u8 color) { '
                       '(void)color; while (*text) runtime_api.shell_putchar(*text++, 0); }\n')
+            require(source_text.count('KernelAPI *sh_runtime_init') == 1, 'unique UTF-8 helper insertion')
             source_text = source_text.replace('KernelAPI *sh_runtime_init', helper+'KernelAPI *sh_runtime_init').replace(old, new)
             path = work/'reverted-runtime.c'; path.write_text(source_text)
             opts += ['PPC_SH_RUNTIME_SRC='+str(path)]
@@ -330,9 +356,8 @@ def main():
                 accept(elf, cpu, work/(mode+'-'+cpu), mode)
             except VerdictError as exc:
                 if mode == 'normal': raise
-                if mode == 'utf8-bytewise':
-                    require(str(exc).startswith('lan-utf8: Mismatch(row=0, column=9,'),
-                            'UTF-8 mutant must lose the input glyph, not another control: '+str(exc))
+                require(str(exc).startswith(EXPECTED_FAILURE[mode]),
+                        f'unexpected failure for {mode}: {exc}')
                 print('RED runtime '+mode+': '+str(exc), flush=True)
             else:
                 require(mode == 'normal', 'mutant survived: '+mode)
