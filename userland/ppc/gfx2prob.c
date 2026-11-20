@@ -12,7 +12,7 @@ enum {
 static int report(KernelAPI *api, const char *text, int status)
 {
     while (*text)
-        api->shell_putchar(*text++, 7);
+        api->shell_putchar(*text++, ATTR_WHITE);
     return status;
 }
 
@@ -109,7 +109,7 @@ int main(int argc, char **argv, KernelAPI *api)
         volatile u32 *plane = (volatile u32 *)fb.planes[0];
         api->gfx_shutdown();
         if (!plane) return 1;
-        while (*marker) api->shell_putchar(*marker++, 7);
+        while (*marker) api->shell_putchar(*marker++, ATTR_WHITE);
         *plane = 0;
         return 0;
     }
