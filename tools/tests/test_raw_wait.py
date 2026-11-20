@@ -72,7 +72,7 @@ def late_stop(mutate=False):
         for name, body, slot_source, expected in variants:
             (tmp / 'late_stop_appslot.inc').write_text(slot_source)
             hwb_flag = re.search(r'^static volatile u32 g_hwb_abort_pending = 0;', ex, re.M)[0]
-            hwb_flag += '\n' + re.search(r'^static volatile u32 g_cui_display_abort_pending;', ex, re.M)[0]
+            hwb_flag += '\nint input_display_restore_capture(u32 owner) { (void)owner; return 0; }\nint input_display_restore_drain(void) { return 0; }\n'
             (tmp / 'late_stop_exec.inc').write_text(hwb_flag + '\n' + body + '\n' + '\n'.join(
                 lifecycle.function(ex, n) for n in ('ring3_abort_request', 'ring3_abort_check')))
             exe = tmp / 'test'

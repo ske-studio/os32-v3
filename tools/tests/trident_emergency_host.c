@@ -1,3 +1,4 @@
+int input_display_restore_drain(void) { return 0; }
 /* IF=0 dispatcher and actual exception/exit prefixes, libc-free ILP32.
  * No device sequence oracle here: tri-life owns the real regs assembly test.
  * The shared device fake starts cold; the recovery callback models vtSema. */

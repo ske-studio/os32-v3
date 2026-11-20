@@ -27,6 +27,18 @@ static u32 heat_clear_calls;
 static int heat_clear_rc;
 int geforce_heat_latch_clear(void) { heat_clear_calls++; return heat_clear_rc; }
 static int current_owner = 2;
+#ifdef INPUT_M6_3_REAL
+#include "io.h"
+#include "../../exec/appslot.c"
+#include "../../input/hal/input_context.c"
+#include "../../input/hal/input_interrupt.c"
+volatile u32 kctx_irq_depth, kctx_exc_depth;
+static int stop_during_enter;
+void res_owner_set(int id) { current_owner = id; }
+void gfx_policy_reeval(void) { assert(_irq_enabled()); }
+int con_sink_is_enabled(void) { return 0; }
+void fd_redirect_clear_state(FdRedirectState *s) { __builtin_memset(s, 0, sizeof(*s)); }
+#endif
 int res_owner_get(void) { return current_owner; }
 static struct gf4_host host;
 static struct gf4_state state;
@@ -344,11 +356,21 @@ GfxBackend gfx_backend_geforce = {.enter=enter_call, .leave=leave_call};
 void gfx_init(void)
 {
     ++core_inits;
+#ifdef INPUT_M6_3_REAL
+    if (stop_during_enter) {
+        stop_during_enter = 0;
+        kctx_irq_depth = 1;
+        assert(!input_display_restore_capture(current_owner));
+        kctx_irq_depth = 0;
+    }
+    #include "m6_gfx_acquire.inc"
+#endif
     if (core_reject) return; /* Core admission failed before backend init. */
     gfx_backend_geforce.selected_mode = &core_mode;
     gfx_backend_geforce.bb_base = image;
     enter_call();
 }
+int gfx_is_started(void) { return host.ctx.ready; }
 void gfx_shutdown(void)
 {
     ++core_shutdowns;
@@ -1337,6 +1359,31 @@ static void cui_controls(void)
 
 void _start(void)
 {
+#ifdef INPUT_M6_3_REAL
+    input_interrupt_init();
+    reset_cold_cui(); current_owner = APP_ID_SHELL;
+    assert(!gf_display_test(GF4_CUI_ENTER));
+    u32 old_gen; assert(!appslot_gfx_resource_snapshot(1, &old_gen));
+    assert(!gf_display_test(GF4_CUI_LEAVE));
+    assert(!input_display_restore_capture(1));
+    assert(!gf_display_test(GF4_CUI_ENTER));
+    u32 new_gen; assert(!appslot_gfx_resource_snapshot(1, &new_gen));
+    assert(old_gen != new_gen && !appslot_gfx_owner_exit_if(1, old_gen));
+    assert(!gf_display_test(GF4_CUI_LEAVE));
+    /* Inject IRQ between entry drain and acquire, with existing init failure. */
+    stop_during_enter = 1; core_reject = true;
+    assert(gf_display_test(GF4_CUI_ENTER) == GF4_ESTATE);
+    assert(!display_restore_pending.resource_gen);
+    assert(!display_cui_owner && !display_session.valid);
+    assert(!input_display_restore_drain());
+    reset_cold_cui(); current_owner = APP_ID_SHELL;
+    gfx_init();
+    assert(!display_cui_owner && host.ctx.ready);
+    assert(!input_display_restore_capture(APP_ID_SHELL));
+    assert(!input_display_restore_drain() && !host.ctx.ready && leaves == 1);
+    assert(!input_display_restore_drain() && leaves == 1);
+    gf2_host_exit(0);
+#endif
     cui_controls(); wire_and_admission(); start_failures(); restore_retries();
     mode_steps(); dpms_steps(); enumeration(); edid_diagnostics(); enumeration_ports();
     skipped_modes(); case_failures();
@@ -1344,3 +1391,7 @@ void _start(void)
     gamma_steps(); output_budgets(); outputs_steps(); outputs_failures(); lifecycle_steps();
     gf2_host_exit(0);
 }
+
+#ifndef INPUT_M6_3_REAL
+int input_display_restore_drain(void) { return 0; }
+#endif

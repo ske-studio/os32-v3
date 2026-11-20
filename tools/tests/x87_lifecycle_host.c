@@ -202,3 +202,8 @@ int shlib_loaded(void) { return 0; }
 u32 shlib_data_pages(void) { return 0; }
 
 int gfx2_owner_release(struct addrspace *as) { (void)as; return 0; }
+
+/* Input lifetime is verified by M6; nesting retains its existing FP oracle. */
+void input_interrupt_exec_exit(u32 owner, u32 gen) { (void)owner; (void)gen; }
+int input_context_owner_release(u32 owner, u32 gen) { (void)owner; (void)gen; return 0; }
+int input_display_restore_drain(void) { return 0; }

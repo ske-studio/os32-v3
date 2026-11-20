@@ -710,6 +710,7 @@ void pcm_reclaim(int id) { (void)id; reclaim_steps++; }
 #include "exec_snd.h"
 #include "exec_kapi_db.h"
 #include "exec_reclaim.h"
+static void exec_input_owner_exit(int id) { (void)id; }
 #include "exec_reclaim.inc"
 
 static void lease_reclaim(void)

@@ -1,3 +1,8 @@
+static void irq_restore(unsigned int flags) { (void)flags; }
+int res_owner_get(void) { return 0; }
+#include "app_ids.h"
+int input_display_restore_lock(unsigned int *flags);
+void appslot_gfx_resource_acquire(int owner);
 /* C1 dependency fakes; no other HAL v2 stage is linked. */
 #include "gfx/v2/gfx2_int.h"
 #include "module_runtime.h"
@@ -517,3 +522,6 @@ void _start(void)
     __asm__ volatile("int $0x80" : : "a"(1), "b"(failed) : "memory");
     __builtin_unreachable();
 }
+
+int input_display_restore_lock(unsigned int *flags) { *flags = 0; return 0; }
+void appslot_gfx_resource_acquire(int owner) { (void)owner; }

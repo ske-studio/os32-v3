@@ -202,6 +202,8 @@ static void launch_owner_exit(int id) { CHECK(id == 2); }
 static void exec_host_owner_exit(int id) { CHECK(id == 2); }
 static void con_sink_owner_exit(int id) { CHECK(id == 2); }
 void appslot_gfx_owner_exit(int id) { CHECK(id == 2); }
+static void exec_input_owner_exit(int id) { CHECK(id == 2); }
+int input_display_restore_drain(void) { return 0; }
 static void poison_landing(void);
 static void check_invalid_caller(void);
 void asm_longjmp(k_jmpbuf buf);

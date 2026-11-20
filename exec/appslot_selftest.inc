@@ -85,6 +85,8 @@ u32 appslot_gfx_owner_selftest(void)
     int saved_cur = g_cur;
     int saved_owner = res_owner_get();
     int saved_gfx = g_gfx_owner;
+    u32 saved_resource_owner = gfx_resource_owner;
+    u32 saved_resource_gen = gfx_resource_gen, saved_next_gen = next_resource_gen;
     u32 saved_reject = gfx_init_reject_count;
 
     saved = g_slot[id];
@@ -131,6 +133,9 @@ u32 appslot_gfx_owner_selftest(void)
     g_cur = saved_cur;
     res_owner_set(saved_owner);
     g_gfx_owner = saved_gfx;
+    gfx_resource_owner = saved_resource_owner;
+    gfx_resource_gen = saved_resource_gen;
+    next_resource_gen = saved_next_gen;
     gfx_init_reject_count = saved_reject;
     return bad;
 }

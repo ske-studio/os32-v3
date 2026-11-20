@@ -39,6 +39,7 @@ static u32 budget(void) { u32 b = 0; io_policy_lookup(1, 0, &b); return b; }
 /* Execute the real finish/kill/common-resource bodies; unrelated resources
  * and address-space destruction are fixture dependencies. */
 #define NOOP_ID(name) static void name(int id) { (void)id; }
+NOOP_ID(exec_input_owner_exit)
 NOOP_ID(kapi_strings_cleanup_owned)
 NOOP_ID(exec_db_cleanup_owned)
 NOOP_ID(fd_redirect_reset_owned)

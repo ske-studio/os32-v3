@@ -28,7 +28,7 @@ REVIEWED_S6_FUNCTION_TAIL = ('gf_production_selected', 'geforce_foundation_ops',
                              'gf5_test', 'pci_hwb_read', 'pci_hwb_write', 'exec_hwb_abort_take',
                              'geforce_resource_lookup', 'paging_device_map', 'paging_device_unmap',
                              'trident_diagnostic_ops', 'debug_probe_control', 'legacy_lowmap_busy', 'v86_bios_real_lowmem', 'pci_bar_get',
-                             'path_set_drive', 'path_set_cwd', 'path_init')
+                             'path_set_drive', 'path_set_cwd', 'path_init', 'input_display_restore_drain')
 REVIEWED_S6_KINDS = ('FUNC',) * 38 + ('GETTER',) + ('SETTER',) * 2 + ('PTR',) * 3 + ('FUNC',) * len(REVIEWED_S6_FUNCTION_TAIL)
 
 class ImportsTests(unittest.TestCase):
