@@ -580,6 +580,10 @@ def lan_accept(elf, cpu, out, mode):
 def rsh_command(s, line, expected=None, during=None):
     """Product RSH only: one complete OUT in the submitted generation/ID."""
     op = s.agent.operator
+    # After a mid-command re-HELLO the operator has no READY until the guest
+    # sends one on the new epoch, even when the re-delivered OUT already
+    # arrived (R1/R2). Wait for it rather than submit into "not ready".
+    s.wait(s.ready, 'RSH READY before '+line, 20)
     generation, session = op.generation, op.session
     start = len(s.events)
     ident = op.submit('cui', line, 'usb-accept', timeout_ms=20000)
