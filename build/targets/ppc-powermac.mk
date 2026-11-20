@@ -201,6 +201,15 @@ KB_MUT_EXTRA_FILE ?=
 KB_MUT_THIRD_SRC ?=
 KB_MUT_THIRD_FILE ?=
 kb_src = $(if $(and $(KB_MUT_SRC),$(filter $(KB_MUT_SRC),$1)),$(KB_MUT_FILE) -I$(dir $1),$(if $(filter $(KB_MUT_EXTRA_SRC),$1),$(KB_MUT_EXTRA_FILE) -I$(dir $1),$(if $(filter $(KB_MUT_THIRD_SRC),$1),$(KB_MUT_THIRD_FILE) -I$(dir $1),$1)))
+.PHONY: ppc-layout-force
+$(KB_OUT)/config/shell-layout.flags: ppc-layout-force
+	@mkdir -p $(@D)
+	@echo '$(filter 1,$(KBOOT_SHELL_LAYOUT_DIAG))' > $@.tmp
+	@if cmp -s $@.tmp $@; then rm -f $@.tmp; else mv $@.tmp $@; fi
+$(KB_OUT)/platform/powermac/ppc_kernel.o: $(KB_OUT)/config/shell-layout.flags
+ifeq ($(KBOOT_SHELL_LAYOUT_DIAG),1)
+$(KB_OUT)/platform/powermac/ppc_kernel.o: private KB_TU_FLAGS += -DKBOOT_SHELL_LAYOUT_DIAG=1
+endif
 $(KB_OUT)/lib/lz4.o: KB_TU_FLAGS += -O0
 $(KB_OUT)/kernel/console/console.o: KB_TU_FLAGS = -Wno-sign-compare
 $(KB_OUT)/%.o: %.c $(KB_OUT)/memmap_layout.h build/targets/ppc-powermac.mk build/sources/hooks.mk $(KB_MUT_FILE) $(KB_MUT_EXTRA_FILE) $(KB_MUT_THIRD_FILE)
