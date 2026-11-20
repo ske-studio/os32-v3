@@ -316,7 +316,7 @@ def generate(tmp, mutation=None):
             old = 'result = "0" if name == "db_mem_used" else absent_result(api)'
             new = old.replace('else absent_result(api)', 'else ("OS32_ERR_NOSYS" if name == "db_last_error" else absent_result(api))')
         else:
-            old = 'defined(OS32_HOOK_KAPI_DB) && !OS32_HOOK_KAPI_DB'
+            old = 'defined({optional_hook}) && !{optional_hook}'
             new = old.replace('&& !', '&& ')
         text = generator.read_text()
         if text.count(old) != 1:

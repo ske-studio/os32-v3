@@ -31,6 +31,7 @@ args = parser.parse_args()
 CHECK_ONLY = args.check_only
 JSON_PATH = args.json
 TARGET = args.target
+OPTIONAL_HOOKS = {"db_": "OS32_HOOK_KAPI_DB", "ime_": "OS32_HOOK_IME"}
 if TARGET == "ppc-powermac":
     from kapi_target_ppc import PROVIDER_EXTERNS, ABSENT_PROVIDER_INCLUDES, ABSENT_PROVIDER_SLOTS, absent_result
 
@@ -669,9 +670,12 @@ for slot, api in enumerate(data["api"]):
             c_content += f"    return ({ret}){absent_result(api)};\n"
         c_content += "}\n\n"
         continue
-    optional_db = TARGET == "ppc-powermac" and name.startswith("db_")
-    if optional_db:
-        c_content += "#if defined(OS32_HOOK_KAPI_DB) && !OS32_HOOK_KAPI_DB\n"
+    optional_hook = None
+    if TARGET == "ppc-powermac":
+        prefix, separator, _ = name.partition("_")
+        optional_hook = OPTIONAL_HOOKS.get(prefix + separator)
+    if optional_hook:
+        c_content += f"#if defined({optional_hook}) && !{optional_hook}\n"
         for arg in get_arg_names(api.get("args", [])):
             c_content += f"    (void){arg};\n"
         result = "0" if name == "db_mem_used" else absent_result(api)
@@ -694,7 +698,7 @@ for slot, api in enumerate(data["api"]):
         else:
             c_content += f"    return {target}({args_call});\n"
             
-    if optional_db:
+    if optional_hook:
         c_content += "#endif\n"
     c_content += "}\n\n"
 
