@@ -25,13 +25,16 @@ int main(int argc, char **argv, KernelAPI *api)
     CHECK(api->mem_stat(self, &stat, sizeof(stat)) == sizeof(stat) && stat.app_id == self &&
           (stat.flags & MEMSTAT_HAS_AS));
     memset(&stat, 0xa5, sizeof(stat));
-    CHECK(api->mem_stat(0, &stat, sizeof(stat)) == sizeof(stat) &&
+    rc = api->mem_stat(0, &stat, sizeof(stat));
+    CHECK(rc == sizeof(stat) && stat.size == sizeof(stat) &&
           stat.app_id == 0 && !(stat.flags & MEMSTAT_HAS_AS));
     int accounting_ok = stat.owner_pages == 0 && stat.phys_total_pages > 0 &&
         stat.kheap_peak >= stat.kheap_used && stat.resident_heap_peak >= stat.resident_heap_used;
 #ifdef __PPC__
     if (argc == 2 && strcmp(argv[1], "kheap-used") == 0) {
         char value[16];
+        if (passed != total || !stat.kheap_used || stat.kheap_used == 0xa5a5a5a5U ||
+            stat.kheap_used > stat.kheap_total) return 1;
         snprintf(value, sizeof(value), "%u\n", stat.kheap_used);
         for (char *c = value; *c; c++) api->shell_putchar(*c, TEST_ATTR);
         return 0;
@@ -72,7 +75,13 @@ int main(int argc, char **argv, KernelAPI *api)
             u32 written = size < MEMSTAT_MIN ? 0 :
                 (size < sizeof(stat) ? size : sizeof(stat));
             for (u32 i = 0; i < sizeof(out); i++) out.bytes[i] = 0xa5;
+            if (size == 133) {
+                if (api->mem_stat(self, &stat, sizeof(stat)) != sizeof(stat)) ok = 0;
+                stat.size = size;
+                for (u32 i = 0; i < size; i++) out.bytes[i] = ~((u8 *)&stat)[i];
+            }
             rc = api->mem_stat(-1, &out, size);
+            if (size == 133 && memcmp(out.bytes, &stat, size) != 0) ok = 0;
             int unchanged = 1;
             for (u32 i = written; i < sizeof(out); i++) if (out.bytes[i] != 0xa5) unchanged = 0;
             if (!unchanged || (written ? rc != (int)written || out.align.size != written : rc != OS32_ERR_INVAL)) ok = 0;
