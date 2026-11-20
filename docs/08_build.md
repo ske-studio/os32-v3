@@ -1103,8 +1103,10 @@ main へ入れる判定は配布物・検査6本と静的ゲートの `check.yml
 クロス無しの静的ゲートからは実行しない。
 `check.yml` はイベント種別と ref がともに同じ場合に古い実行を取り消す。タグの push では起動しない。手動の起動 (workflow_dispatch) は入力の arch を区別しないので、同じ ref で続けて起こすと最後の 1 本だけが残る (両方を回すなら arch=both)。
 
+main の push は before→HEAD が文書だけなら PowerPC を省く。コードを含む場合は同じ SHA の `wt/int-*` の check の push が成功していれば省き、それ以外は x86 だけの変更でも compile と QEMU 5 本を回す。強制 push・before の欠落時も全部回す。
+
 main への push では `tools/ci/reuse_success.py` が `gh api` と `GITHUB_TOKEN` で
-同じ workflow の統合枝 (`wt/int-*`) の push run を調べる。SHA の40桁完全一致・workflow ID 一致・
+同じ workflow の枝の push run を調べる (build は `wt/**`、check は統合枝 `wt/int-*` だけ)。SHA の40桁完全一致・workflow ID 一致・
 同一リポジトリ・completed・conclusion=success が揃った場合だけ、検査とその準備を省略する。
 取得失敗・不明な応答・該当 run 無しでは通常どおり実行する。手動・PR・main 以外の push は
 省略しない。配布物は main でも必ず作るため、`tools/ci_fetch.sh` の既定の取得先は変わらない。

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reuse only successful branch (wt/**) push runs of this workflow and exact SHA (ユーザー決定 2026-11-19)."""
+"""Reuse only successful branch push runs of this workflow and exact SHA (build: wt/**, check: wt/int-* only; ユーザー決定 2026-11-19・2026-11-20)."""
 import json
 import os
 import re
@@ -28,9 +28,10 @@ def reusable(env):
     query = urlencode(dict(head_sha=sha, event='push', status='success', per_page=100))
     runs = api(f'repos/{repo}/actions/workflows/{workflow_id}/runs?{query}')['workflow_runs']
     # A bounded search is sufficient: an older/missing run simply causes execution.
+    prefix = 'wt/int-' if workflow == 'check.yml' else 'wt/'
     return any(r['head_sha'] == sha and r['workflow_id'] == workflow_id
                and r['status'] == 'completed' and r['conclusion'] == 'success'
-               and r['event'] == 'push' and r['head_branch'].startswith('wt/')
+               and r['event'] == 'push' and r['head_branch'].startswith(prefix)
                and r['head_repository']['full_name'] == repo
                and str(r['id']) != env.get('GITHUB_RUN_ID') for r in runs)
 

@@ -5,6 +5,8 @@ CHECK = dict(name='ci-gate-host', tier=1, needs=[], budget=5,
             '.github/actions/gate-setup/action.yml', '.github/workflows/sep.yml', '.github/workflows/check.yml'],
     basis=['CI_GATE_DESIGN §2', 'CI_GATE_DESIGN §3'],
 )
+from contextlib import redirect_stdout
+from unittest.mock import patch
 import argparse
 import importlib.util
 import io
@@ -44,6 +46,19 @@ def suite(tool):
             self.assertEqual([name for name, _ in tool.missing_tools({}, which=lambda name: '/x',
                                                                      exists=lambda path: True)],
                              ['i386-elf-gcc', 'powerpc-elf-gcc'])
+
+        def test_static_preflight(self):
+            with tempfile.TemporaryDirectory() as directory:
+                summary = Path(directory) / 'summary'
+                with (patch.dict(tool.os.environ, GITHUB_STEP_SUMMARY=str(summary)),
+                      patch.object(tool.shutil, 'which', return_value=None),
+                      patch.object(tool.importlib, 'import_module', side_effect=ImportError),
+                      redirect_stdout(io.StringIO()) as output):
+                    self.assertEqual(tool.main(['preflight', '--env', 'static']), 2)
+                self.assertEqual(summary.read_text(), output.getvalue())
+                for name in ('ccache', 'make', 'gcc', 'e2fsck', 'mke2fs', 'clang',
+                             'clang.cindex', 'yaml', 'lz4.block'):
+                    self.assertRegex(output.getvalue(), '- ' + name + ' — (apt|pip): ')
 
         def test_parse_times(self):
             text = 'check-a\t1.500000\t0\ngarbage\ncheck-b\t0.250000\t2\ncheck-a\t3.000000\t1\n'
@@ -118,6 +133,8 @@ def suite(tool):
 
 
 MUTANTS = [
+    ("('ccache', 'apt: ccache'), ", ""),
+    ("    return 2\n\n\ndef parse_times", "    return 0\n\n\ndef parse_times"),
     ("        if timed(name) != 0:\n            failed += 1", "        if timed(name) != 0:\n            return 1"),
     ("        if timed(name) != 0:\n            failed += 1", "        if timed(name) != 0:\n            failed = 1"),
     ("found = bool(base) and os.access(os.path.join(base, 'bin', name), os.X_OK)", "found = which(name) is not None"),

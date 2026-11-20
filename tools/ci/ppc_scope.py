@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
-"""Select PPC checks from the entire branch delta, never push before/after."""
+"""Select PPC checks from the main push delta or the entire feature branch delta."""
+import fnmatch
 import os
+import re
 from pathlib import Path
 import subprocess
 
@@ -16,13 +18,22 @@ EXACT = ('Makefile', 'tools/ci/build_cross_ppc.sh', 'tools/ci/ppc_scope.py',
 X86 = ('arch/x86/', 'platform/pc98/')
 
 
-def decide(paths, ref, arch='auto'):
+DOC_PATTERNS = ('docs/**', '**.md', '.claude/**')
+
+
+def decide(paths, ref, arch='auto', before_paths=None):
     if arch == 'x86':
         return 'skip', 'arch=x86 が選ばれたので PPC は回さない'
     if arch in ('ppc', 'both'):
         return 'ppc', 'arch=' + arch
     if arch != 'auto':
         raise ValueError('unknown arch: ' + arch)
+    if ref == 'refs/heads/main':
+        if before_paths is None:
+            return 'ppc', 'main: before unavailable'
+        if all(any(fnmatch.fnmatchcase(p, pattern) for pattern in DOC_PATTERNS) for p in before_paths):
+            return 'skip', 'main: documentation only'
+        return 'ppc', 'main: code changed'
     if ref.removeprefix('refs/heads/').startswith('wt/int-'):
         return 'ppc', 'integration branch: ' + ref
     for path in paths:
@@ -46,13 +57,30 @@ def changed_paths():
     ).decode().rstrip('\0').split('\0') if base else []
 
 
+def push_paths(before):
+    if not re.fullmatch('[0-9a-f]{40}', before) or before == '0' * 40:
+        return None
+    if subprocess.run(['git', 'merge-base', '--is-ancestor', before, 'HEAD']).returncode:
+        return None
+    try:
+        names = subprocess.check_output(['git', 'diff', '--name-only', '--no-renames', '-z', before, 'HEAD'])
+    except subprocess.CalledProcessError:
+        return None
+    return os.fsdecode(names).split('\0')[:-1]
+
+
 def main():
     arch = os.environ.get('PPC_ARCH', 'auto') or 'auto'
     ref = os.environ.get('GITHUB_HEAD_REF') or os.environ.get('GITHUB_REF', '')
-    paths = changed_paths() if arch == 'auto' else []
-    scope, reason = decide([p for p in paths if p], ref, arch)
+    main_push = (ref == 'refs/heads/main' and os.environ.get('GITHUB_EVENT_NAME') == 'push'
+                 and 'PUSH_BEFORE' in os.environ)
+    before_paths = push_paths(os.environ['PUSH_BEFORE']) if main_push and os.environ.get('PUSH_FORCED') != 'true' else None
+    paths = changed_paths() if arch == 'auto' and not main_push else []
+    scope_ref = 'main' if ref == 'refs/heads/main' and not main_push else ref
+    scope, reason = decide([p for p in paths if p], scope_ref, arch, before_paths)
     print(scope + ': ' + reason.replace('\n', '\\n'))
     with Path(os.environ['GITHUB_OUTPUT']).open('a') as out:
+        out.write('can_reuse=' + ('true' if before_paths is not None and scope == 'ppc' else 'false') + '\n')
         out.write('scope=' + scope + '\n')
 
 
