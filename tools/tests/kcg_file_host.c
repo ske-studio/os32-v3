@@ -1,3 +1,4 @@
+#include "kcg_contract.h"
 /* libc-free R5: real VFS FD and lease implementation, synthetic RAM backend. */
 #include "types.h"
 static void die(int rc) { __asm__ volatile("int $0x80" : : "a"(1), "b"(rc)); __builtin_unreachable(); }
@@ -180,9 +181,20 @@ static void fixture(void) {
     file_data[16]=0xa5;
     file_data[16+KCG_FILE_ANK_OFFSET+65*16]=0x5a;
 }
+/* AC-GLYPH-1: the fixture defines A and JIS 2121, unload blanks both cells. */
+static void public_glyphs(u8 ank, u8 jis) {
+    u8 buf[32];
+    kmemset(buf, 0xcc, sizeof(buf));
+    kcg_read_ank(65, buf);
+    for (unsigned i=0; i<16; i++) CHECK(buf[i] == (i ? 0 : ank));
+    kmemset(buf, 0xcc, sizeof(buf));
+    kcg_read_kanji(0x2121, buf);
+    for (unsigned i=0; i<32; i++) CHECK(buf[i] == (i ? 0 : jis));
+}
 static void glyphs(void) {
     u8 buf[32]; int calls=read_calls;
     irq=1;
+    public_glyphs(0x5a, 0xa5);
     kcg_file_api.read_ank(65,buf); CHECK(buf[0]==0x5a);
     kcg_file_api.read_kanji(0x2121,buf); CHECK(buf[0]==0xa5);
     static const u16 invalid_jis[] = {0x217f, 0x7f21, 0x2020};
@@ -303,6 +315,13 @@ void _start(void) {
     file_data[RAW_FILE_SIZE-1]=2; CHECK(kcg_file_load("/fonts/test.kcg")<0); fixture();
     size_rc=VFS_ERR_NOTFOUND; CHECK(kcg_file_load("/fonts/missing.kcg")<0); size_rc=VFS_OK;
     irq=1; CHECK(kcg_file_load("/fonts/test.kcg")==OS32_ERR_BUSY); irq=0;
+    public_glyphs(0, 0);
+    fixture();
+    file_data[16] = 0x78;
+    file_data[16+KCG_FILE_ANK_OFFSET+65*16] = 0x34;
+    CHECK(kcg_file_load("/fonts/test.kcg")==0);
+    public_glyphs(0x34, 0x78);
+    kcg_file_unload();
     decoder_bounds_tests();
     compressed_tests();
     CHECK(guards>0); no_fds(); CHECK(!allocated); die(0);
