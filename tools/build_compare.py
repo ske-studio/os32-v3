@@ -134,7 +134,10 @@ ALLOWED_TOOL_DIFFS = {
          'ed85b1dda69dd3c885035781ec3daa86be8b724bfc941e8253ee719cec8593a9'),
         # PowerPC シェル S-B B27: ppc-powermac の link_guard を有効に
         ('ed85b1dda69dd3c885035781ec3daa86be8b724bfc941e8253ee719cec8593a9',
-         '320df99981648c9b8d8140d9b4f9e1c98d9eed3404e8a121baca98a89f55a31d'),),
+         '320df99981648c9b8d8140d9b4f9e1c98d9eed3404e8a121baca98a89f55a31d'),
+        # PowerPC module L1: ppc-powermac の module_codec を有効に、x86 の分岐は不変 (本線の承認 2026-11-20)
+        ('320df99981648c9b8d8140d9b4f9e1c98d9eed3404e8a121baca98a89f55a31d',
+         '7fa6153d7c16c2b20ad980ac0b804ffcfef6a3f485b9ddcf9a09bd52378fb8a6'),),
     # 第 5 段 S2: Rust の wrapper が SDK の target を rustc の起動より前に確かめる。
     'build/sdk/bin/rustc_stamp.py': ((
         'd5e0f249c10662334532b964a3c167e5f21fb189677520dbd9463f17307ecee7',
