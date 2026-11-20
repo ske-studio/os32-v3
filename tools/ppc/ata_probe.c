@@ -18,6 +18,8 @@ enum {
 };
 
 static struct pm_escc serial;
+static int serial_ok;
+static int screen_out;   /* OF stdout ihandle: the G4 screen (read by camera) */
 static cell prop[PM_PROP_CAP / sizeof(cell)];
 static char path[PM_PATH_CAP];
 static u16 data[ATA_WORDS];
@@ -27,7 +29,9 @@ static unsigned channels;
 
 static void put(const char *text)
 {
-    if (pm_escc_write(&serial, text, kstrlen(text))) ppc_stop();
+    u32 n = kstrlen(text);
+    if (screen_out) ofw_write(screen_out, text, n);
+    if (serial_ok && pm_escc_write(&serial, text, n)) serial_ok = 0;
 }
 
 static void hex(u32 value, unsigned digits)
@@ -374,11 +378,9 @@ void powermac_boot(ppc_ci ci)
     struct ofw_env env;
     ofw_init(ci);
     if (ofw_setup(&env)) ppc_stop();
-    if (pm_escc_prepare(&env, &serial)) {
-        static const char fail[] = "ATA probe: ESCC unavailable\r\n";
-        ofw_write(env.out, fail, sizeof(fail) - 1);
-        ppc_stop();
-    }
+    screen_out = env.out;
+    serial_ok = !pm_escc_prepare(&env, &serial);
+    if (!serial_ok) put("ATA probe: ESCC unavailable, screen only\r\n");
     int cpus = ofw_finddevice("/cpus");
     for (int cpu = valid_node(cpus) ? ofw_child(cpus) : 0;
          valid_node(cpu); cpu = ofw_peer(cpu)) {
@@ -393,6 +395,6 @@ void powermac_boot(ppc_ci ci)
     int root = ofw_finddevice(PM_ROOT);
     if (valid_node(root)) walk(&env, ofw_child(root), 0);
     put("ATA probe done channels=0x"); hex(channels, 4); put("\r\n");
-    pm_escc_drain(&serial);
+    if (serial_ok) pm_escc_drain(&serial);
     ppc_stop();
 }
