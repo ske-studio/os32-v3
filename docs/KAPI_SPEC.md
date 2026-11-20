@@ -1,4 +1,4 @@
-# KernelAPI v87 仕様書
+# KernelAPI v88 仕様書
 
 外部プログラム (OS32X) がカーネル機能を利用するためのAPIテーブル仕様。
 
@@ -16,8 +16,8 @@
 | 最大プログラムサイズ | 仮想配置で決まる: image・BSS・libc の初期域は 0x80100000 から、exec_heap の予約起点 0x88000000 の手前まで (配置と検査は [09_exec.md](09_exec.md)「Ring3 の USER 写像」) |
 | プログラム専用ヒープ | exec_heap 0x88000000〜 (既定 64KB だけ map、`mem_map` で伸長) と libc の sbrk |
 | プログラム専用スタック | 0x90000000 の直下に可変量 (既定 256KiB、OS32X ヘッダの `stack_size`)、その下に guard 1 ページ |
-| 現在のバージョン | **87** |
-| 合計エントリ数 | **304** (ヘッダ 2 + 関数表の容量 300 (うち実装 294・予約 6) + データフィールド 2)。データ欄は **0x4B8 に固定** (§4-0) |
+| 現在のバージョン | **88** |
+| 合計エントリ数 | **304** (ヘッダ 2 + 関数表の容量 300 (うち実装 298・予約 2) + データフィールド 2)。データ欄は **0x4B8 に固定** (§4-0) |
 
 ---
 
@@ -137,6 +137,8 @@ KAPI は append-only で版番号は単調増加。複数の計画が独立に�
 | v84 | **宣言・仮実体 (HAL v2 A0)** | `gfx2_adapter_count`〜`gfx2_present` 29 本 (slot 263〜291、offset 0x424〜0x494)。A0 はすべて NOSYS、実装と受入は C/G/Y/I 各段 | [確定設計 §11](decisions/gui/HAL_V2_DESIGN.md#11-今の版との関係と-a0-宣言だけを先に置く段) |
 | v86 | **実装 (LAN 操作口 X9b)** | `boot_token_get` (slot 293、offset 0x49C)。起動中一定の識別子 16 バイトを写す | 本書 §4 |
 | v85 | **宣言追加 (LAN 操作口 X9)** | `con_sink_capture` (slot 292、offset 0x498)。capture の開始・固定・終了を既存 owner 契約で行う | [設計 §3](decisions/network/LAN_OPERATOR_DESIGN.md) |
+| v87 | **実装 (I/O の Tier C1・C2・L1)** | `io_policy_set` / `io_policy_get` / `io_policy_reset` / `io_pump` (slot 294〜297) | 票 TASK_IO_TIER |
+| v88 | **実装 (段 6c の D2)** | slot の追加なし。`ext2_format` / `ext2_format_at` の `drv` に loop の `0x0600..0x0603` (`OS32_DRV_LOOP(slot)`) を足す。v87 の出荷版以前はこの範囲を拒否する | 本書 [ext2 の loop の drv](#ext2-loop-drv) |
 
 調停 (2026-09-06、同日改訂): GUI (K1〜W2) を先に実装するので **v42 = GUI、v43 = ネットワーク Host Services**
 に確定。実装順が入れ替わるときは、着手前にこの表を更新してから版番号を取ること。
@@ -164,6 +166,7 @@ Host Services (2026-11-05) は **-18 `HOSTDOWN`** (ホストに届かない・�
 `ext2_format` (58) / `ext2_format_at` (230) は、授権のない
 呼出しを既存の失敗値 `-1` で拒否し、デバイスを呼ばない。公開の型・slot・版・
 OS32X flag は変えない。読み取りの契約は変わらない。
+`ext2_format` と `ext2_format_at` のドライブ指定は [v88 の drv](#ext2-loop-drv) を参照。
 wrap 内では授権をバッファ範囲検査より先に判定するため、無授権なら不正バッファでも kill せず `-1` を返す。
 `ide_write_sectors(drv, lba, 0, NULL)` は授権なしで `-1`、ありで `0` を返す
 問い合わせでもある。0 セクタ時は drv/lba によらずデバイスを呼ばない。
@@ -1254,7 +1257,7 @@ v46 はそれを**カーネル内の 8KB のリング (シンク)** に溜め、
 票 TASK_HDD_INSTALL (アーカイブ: `docs/archive/realhw_v21/TASK_HDD_INSTALL.md`) 段 1。シェルの `hdprep`
 (空の hd0 に OS32 の一時置き場を作る) が使う。インストーラは段 2 でこれに乗る。
 
-- **`ext2_format_at`** — 区画表を**読まずに** `[start_lba, start_lba + length)` だけに
+- **`ext2_format_at`** — loop の選択は [v88 の drv](#ext2-loop-drv) を参照。HD では区画表を**読まずに** `[start_lba, start_lba + length)` だけに
   ext2 を作る。長さ 0・`start_lba < 18` (IPL / 区画表 / ローダ)・IDENTIFY の総数が 0・
   開始 + 長さがディスクの外 (足し算の桁あふれも)・ATA の指定の方式で指せない範囲
   (LBA28 の上限 2^28・現在の CHS の容量、`ide_range_ok`) は **1 バイトも書かずに**
@@ -2194,3 +2197,11 @@ slot 294〜297。設定は IOT1 の LE byte 列で、公開構造体への cast 
 owner は資源 owner のアプリ ID。通常アプリは AS 生存世代、常駐シェルは
 shell 登録世代を既存の寿命 token として使い、AS 破棄前の共通回収で復元する。
 公開引数は既存 C89 基本型、エラーは既存 OS32_ERR_* を共用する。
+
+<a id="ext2-loop-drv"></a>
+
+### ext2 の loop ドライブ指定 (v88)
+
+`ext2_format` と `ext2_format_at` の `drv` に `OS32_DRV_LOOP(slot)` を指定すると、
+`0x0600..0x0603` の完全一致で lo0〜lo3 を選ぶ。v87 の出荷版以前はこの範囲を拒否する。
+ほかの値はそのまま HD の提供者に渡し、従来の HD 番号を受け付け、無効な番号を拒否する。
