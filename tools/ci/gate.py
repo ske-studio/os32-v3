@@ -12,6 +12,7 @@
 結果の表と、落ちた検査のログの末尾だけ。回っていない検査 (結果の行が無い) は失敗に数える。
 """
 import argparse
+import importlib
 import json
 import os
 from pathlib import Path
@@ -37,6 +38,13 @@ TOOLS = (
     ('e2fsck', None, 'apt: e2fsprogs'),
     ('cargo', None, 'Rust (rust-toolchain.toml)'),
 )
+STATIC_TOOLS = (
+    ('ccache', 'apt: ccache'), ('make', 'apt: build-essential'), ('gcc', 'apt: build-essential'),
+    ('e2fsck', 'apt: e2fsprogs'), ('mke2fs', 'apt: e2fsprogs'), ('clang', 'apt: clang'),
+)
+STATIC_MODULES = (
+    ('clang.cindex', 'apt: python3-clang'), ('yaml', 'pip: PyYAML'), ('lz4.block', 'pip: lz4'),
+)
 # 道具は在ってもデータが無いと検査の途中で落ちる物 (QEMU の mac99 の firmware と VGA の ROM)。
 FILES = (
     ('/usr/share/qemu/openbios-ppc', 'apt: qemu-system-data (qemu-system-ppc が連れてくる)'),
@@ -57,6 +65,35 @@ def missing_tools(env, which=shutil.which, exists=os.path.isfile):
             missing.append((name, how))
     missing += [(path, how) for path, how in FILES if not exists(path)]
     return missing
+
+
+def preflight_static():
+    missing = [(name, how) for name, how in STATIC_TOOLS if shutil.which(name) is None]
+    for name, how in STATIC_MODULES:
+        try:
+            importlib.import_module(name)
+        except ImportError:
+            # setup-python からも apt の clang を読む (tools/clang_ast と同じ探索先)。
+            if name == 'clang.cindex':
+                sys.path.append('/usr/lib/python3/dist-packages')
+                try:
+                    importlib.import_module(name)
+                    continue
+                except ImportError:
+                    pass
+                finally:
+                    sys.path.pop()
+            missing.append((name, how))
+    if not missing:
+        return 0
+    lines = ['### 環境が足りない (検査は始めていない)', '']
+    lines.extend('- %s — %s' % item for item in missing)
+    report = '\n'.join(lines) + '\n'
+    print(report, end='')
+    if summary := os.environ.get('GITHUB_STEP_SUMMARY'):
+        with open(summary, 'a', encoding='utf-8') as handle:
+            handle.write(report)
+    return 2
 
 
 def parse_times(text):
@@ -219,6 +256,8 @@ def run(args):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest='command', required=True)
+    preflight = sub.add_parser('preflight')
+    preflight.add_argument('--env', choices=('static',), required=True)
     runner = sub.add_parser('run')
     runner.add_argument('--shard', required=True, help='番号/総数 (例 0/6)')
     runner.add_argument('--out', type=Path, required=True, help='ログと結果の置き場 (作業木の外)')
@@ -227,6 +266,8 @@ def main(argv=None):
     runner.add_argument('--env', choices=('ppc-cross', 'qemu-ppc', 'socket'),
                         help='この環境を要る検査だけを割って、1 本ずつ順に回す (--jobs は使わない)')
     args = parser.parse_args(argv)
+    if args.command == 'preflight':
+        return preflight_static()
     return run(args)
 
 

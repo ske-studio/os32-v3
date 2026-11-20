@@ -56,6 +56,7 @@ gh run view <run> --json jobs -q '.jobs[] | "\(.name) \(.conclusion) \(.startedA
 
 - `gh run view --log-failed` が空を返す事がある。ジョブ単位の API (`actions/jobs/<id>/logs`) で取る。
 - `gh run download` は置き場を `-D` で渡す (渡さないと `would result in path traversal` で取れない事がある)。
+- apt は update を 300 秒、install を 600 秒で打ち切り、TERM の 30 秒後も残るプロセスには KILL を送る。static-check の summary で「用意の失敗」は apt の rc (124 は時間切れ)、「環境が足りない」は preflight が挙げた道具と入れ方を見る。後続の統計 `ccache -s` は `always()` で動くため、その rc=127 より先の準備失敗を読む。
 - **ジョブが 1 分以内に落ちたら、検査は始まっていない** (用意の失敗)。ログの最後の `##[group]Run` の手順を見る。2026-11-18 は `rustup toolchain install` が `rust-src` の `detected conflict` で落ちた。回し直して通ったら台帳に残す (§5)。
 - ジョブの所要が 1 分以内なら、手順が飛ばされていないか `--json jobs -q '.jobs[].steps[]'` で確かめる (範囲の判定で中身が回らない事がある)。変異が回ったかは、ログの `RED` の行の数で分かる。
 - 変異込みで初めて見える赤の型: 変異の時だけ作る写しの木にディレクトリ・ヘッダが足りない、置き場の移動で走査の根 (`tools/source_roots.py`) から外れて違反を検出しなくなった、変異の試験だけが要る道具がジョブに無い、ソースを特定のコミットにバイトで固定している試験、同じシャードで並んで回る検査どうしの競合 (片方が作業木に残したファイルを、木を走査する検査が拾う)。
