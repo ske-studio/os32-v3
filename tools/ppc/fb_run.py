@@ -14,8 +14,8 @@ import tempfile
 from fb_pixel import Font, Terminal, read_ppm, reserved_unchanged
 from kboot_accept import build, mutant_settings
 from kboot_run import ROOT, ROM, require
-from link_sh_run import Session
-from usb_run import before_shell_input, rsh_command
+from link_sh_run import Session, text_fixture
+from usb_run import before_shell_input
 
 
 class PixelMismatch(AssertionError):
@@ -64,43 +64,39 @@ def observe(elf, out, cpu, case):
         s.start()
         from kboot_run import serial
         s.wait(lambda: 'protocol=01' in serial(out/'serial-a.log'), 'keyboard enumeration', 60)
-        s.key('e')
+        s.key('esc')
         s.agent_enabled = True
-        local('cho first')
-        s.wait(lambda: 'cho first' in s.screen('preloaded'), 'preloaded command', 30)
-        check('> echo first' in s.screen('preloaded'), 'start-consumed')
-        s.wait(s.ready, 'resident RSH READY', 90)
+        if case == 'start-consumed':
+            s.wait(s.ready, 'RSH READY after consumed ESC', 60)
+            check('[Remote shell closed]' in s.screen('preloaded'), 'start-consumed')
+        s.close_rshell(preloaded=True)
+        prompt = 'OS32:/$ '
         initial, baseline = shot('boot')
         check('[sqlite] static rc=0' not in initial, 'trace-screen')
-        rsh_command(s, 'clear', b'')
+        local('clear')
         local('echo first')
         s.wait(lambda: 'first' in s.screen('first'), 'USB first line', 30)
         text, pixels = shot('first')
-        check('> echo first' in text, 'start-consumed')
-        check(pixels.compare_text(0, 0, '> echo first') is None, 'colors/top')
+        check(prompt+'echo first' in text, 'start-consumed')
+        check(pixels.compare_text(0, 0, prompt+'echo first') is None, 'colors/top')
         check(pixels.compare_text(1, 0, 'first') is None, 'USB output')
-        rsh_command(s, 'echo ASCII ｶﾅ 日本語 > /tmp/fb', b'')
-        rsh_command(s, 'clear', b'')
-        local('cat /tmp/fb')
+        local('clear')
+        local('cat /bin/sample.txt')
         s.wait(lambda: 'ASCII' in s.screen('text'), 'fd1 output', 30)
         _, pixels = shot('text')
         check(pixels.compare_text(1, 0, 'ASCII ｶﾅ 日本語') is None, 'utf8-bytewise')
         check(reserved_unchanged(baseline.image, pixels.image), 'top')
-        rsh_command(s, 'clear', b'')
+        local('clear')
         for i in range(35):
             local(f'echo l{i:02d}')
         s.wait(lambda: 'l34' in s.screen('scroll'), 'USB scroll completion', 30)
         _, pixels = shot('scroll')
         for i in range(19, 35):
             row = (i - 19) * 2
-            check(pixels.compare_text(row, 0, f'> echo l{i:02d}') is None, 'scroll')
+            check(pixels.compare_text(row, 0, prompt+f'echo l{i:02d}') is None, 'scroll')
             check(pixels.compare_text(row+1, 0, f'l{i:02d}') is None, 'scroll')
         check(reserved_unchanged(baseline.image, pixels.image), 'scroll')
-        # Exit RSH locally. The resident prompt supports editing and displays CWD.
-        s.key('esc')
-        s.wait(lambda: s.word('rshell_active') == 0, 'RSH exit', 30)
         local('clear')
-        prompt = 'OS32:/$ '
         s.wait(lambda: prompt in s.screen('prompt'), 'local prompt', 30)
         s.keys('echo ax')
         s.wait(lambda: prompt+'echo ax' in s.screen('cursor'), 'edited command', 30)
@@ -128,7 +124,7 @@ def main():
     seen = set()
     for case in ['normal'] + (list(MUTATIONS) if args.mutate else []):
         opts = mutant_settings(work, case, *MUTATIONS[case]) if case != 'normal' else []
-        elf = build(work/case, 'IMAGE=kboot-link-sh', *before_shell_input(work), *opts)
+        elf = build(work/case, 'IMAGE=kboot-link-sh', 'KB_ROOT_BINS='+text_fixture(work), *before_shell_input(work), *opts)
         digest = hashlib.sha256(elf.read_bytes()).hexdigest()
         require(digest not in seen, 'distinct framebuffer image')
         seen.add(digest)

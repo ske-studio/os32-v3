@@ -82,6 +82,12 @@ def check_heap(peak, failures):
     require(0 < peak < 1024*1024 and failures == 0, 'heap')
 
 
+def text_fixture(work):
+    text = work/'sample.txt'
+    text.write_text('ASCII ｶﾅ 日本語\n', encoding='utf-8')
+    return str(text.resolve())
+
+
 def settings(work, mutation=None, *, observe_flow=False):
     """Private copies add read-only meters and USER-only fault/output stimuli.
 
@@ -125,7 +131,7 @@ def settings(work, mutation=None, *, observe_flow=False):
     # trees ensure no mutant can reuse a normal USER object (or vice versa).
     opts = ['KBOOT_SH=1', 'KBOOT_LINK=1', 'KB_SH_OUT='+str(user_out),
             'PPC_SH_MUT_SRC='+USER, 'PPC_SH_MUT_FILE='+str(user),
-            'KB_ROOT_BINS='+str(user_out/'hello.bin')+' '+str(user_out/'fault.bin')]
+            'KB_ROOT_BINS='+str(user_out/'hello.bin')+' '+str(user_out/'fault.bin')+' '+text_fixture(work)]
     for extra_user in ('userland/shell/rshell.c', 'userland/shell/main.c'):
         if extra_user not in sources: continue
         source = work/Path(extra_user).name
@@ -177,6 +183,21 @@ class Session:
     def serial_a_backend(self):
         return 'file:'+str(self.out/'serial-a.log')
 
+    def serial_args(self):
+        return ['-serial', self.serial_a_backend()]
+
+    def close_rshell(self, *, preloaded=False):
+        if not preloaded:
+            self.key('esc')
+        self.wait(lambda: self.word('rshell_active') == 0 and
+                  '[Remote shell closed]' in self.screen('closed'), 'local shell prompt', 30)
+
+    def open_rshell(self):
+        start = len(self.events)
+        self.keys('rshell\n')
+        self.wait(lambda: self.ready() and any(e['parts'][:2] == ['RSH', 'READY']
+                  for e in self.events[start:]), 'new resident RSH READY', 30)
+
     def start(self):
         cd = self.out/'cd'; cd.mkdir(); shutil.copyfile(self.elf, cd/'PPCKERN.ELF')
         iso = self.out/'boot.iso'
@@ -187,7 +208,7 @@ class Session:
         args = ['qemu-system-ppc','-M',self.machine,'-cpu',self.cpu,'-m','128M','-smp','1',
             '-accel','tcg','-bios',str(ROM),'-cdrom',str(iso),'-boot','d',
             '-prom-env','boot-device=cd:,\\PPCKERN.ELF','-prom-env','auto-boot?=true',
-            '-g','800x600x8','-display','none','-serial',self.serial_a_backend(),
+            '-g','800x600x8','-display','none',*self.serial_args(),
             '-serial','file:'+str(self.out/'serial-b.log'),'-monitor','none','-qmp','stdio',*self.reboot_args,
             '-nic','none','-device','sungem,netdev=n0,mac=52:54:00:12:34:56','-netdev',
             f'socket,id=n0,udp=127.0.0.1:{self.io.sock.getsockname()[1]},localaddr=127.0.0.1:{port}',
@@ -317,12 +338,27 @@ def flow_point(s, index, expected):
     return generation, *fields[5:]
 
 
+class LineSession(Session):
+    def serial_args(self):
+        return ['-chardev', 'ringbuf,id=uart,logfile='+str(self.out/'serial-a.log'),
+                '-serial', 'chardev:uart']
+
+    def hold_serial_line(self):
+        # A serial ESC followed by another byte holds the rejected line until CR.
+        # Ordinary printable fragments complete on idle in the x86 resident shell.
+        self.q.call('ringbuf-write', {'device': 'uart', 'data': '\x1bx'})
+        self.settle(.5)
+
+    def end_serial_line(self):
+        self.q.call('ringbuf-write', {'device': 'uart', 'data': '\r'})
+
+
 def accept(elf,cpu,out,timeout,late=False,verdict=None):
     # The 7450 non-late VM also runs the overflow observation.
     check_help = verdict in (None, 'resident command groups')
     check_overflow = cpu == '7450' and not late and verdict in (None, 'freeze-drop')
     extra = OVERFLOW_SECONDS * (int(check_help) + int(check_overflow))
-    s=Session(elf,cpu,out,timeout+extra,late)
+    s=LineSession(elf,cpu,out,timeout+extra,late)
     try:
         s.start()
         if late:
@@ -349,8 +385,8 @@ def accept(elf,cpu,out,timeout,late=False,verdict=None):
         s.cmd('echo $HOME', b'/home/user\n')
         s.cmd('echo $SHELL', b'/shell\n')
         s.cmd('echo "two words" | cat', b'two words\n')
-        s.cmd('echo 日本語 > /tmp/rsh', b'')
-        s.cmd('cat /tmp/rsh', '日本語\n'.encode())
+        s.cmd('cat /bin/sample.txt > /tmp/rsh', b'')
+        s.cmd('cat /tmp/rsh', 'ASCII ｶﾅ 日本語\n'.encode())
         if check_help:
             help_text=s.cmd('help', seconds=OVERFLOW_SECONDS)['result']
             require(all(name in help_text for name in (b'rshell', b'echo', b'lspci')), 'resident command groups')
@@ -389,25 +425,27 @@ def accept(elf,cpu,out,timeout,late=False,verdict=None):
         require('> p3-output' not in screen and 'FD1 UTF8' in screen,'clear/FB')
         require(chr(0x2422) in screen,'UTF8 FB glyph')
         require('KBOOT' not in screen,'LOG mixed into FB')
+        s.close_rshell()
         s.keys('echo usb\n')
         # The last key only queues the line; the APP loop runs it on a later pass.
-        usb_seen=lambda text: '> echo usb' in text and re.search(r'(?m)^usb *$',text)
+        usb_seen=lambda text: 'OS32:/$ echo usb' in text and re.search(r'(?m)^usb *$',text)
         deadline=time.monotonic()+5
         screen=s.screen('usb')
         while not usb_seen(screen) and time.monotonic()<deadline:
             s.settle(.25); screen=s.screen('usb')
         require(usb_seen(screen),'USB line screen')
-        s.keys('echo half')
+        s.open_rshell()
+        s.hold_serial_line()
         op=s.agent.operator; op.submit('cui','echo deferred','accept')
         s.settle(1)
         require(op.pending['result'] is None,'half-line')
-        s.key('ret')
+        s.end_serial_line()
         s.wait(lambda: op.pending['state']=='done','deferred command')
         result=op.take_result(); check_body('echo deferred',result['result'],b'deferred\n')
         s.wait(lambda: s.word('g_capture')==0,'deferred END',5)
         screen=s.screen('deferred')
-        require('> echo half' in screen and '> echo deferred' in screen and
-                screen.index('> echo half') < screen.index('> echo deferred'),'USB before LAN')
+        require('rshell: line with ESC not executed' in screen and '> echo deferred' in screen,
+                'serial line rejection and deferred LAN command')
         if check_overflow:
             # Every overflow line scrolls the OF framebuffer, which is slow under
             # -icount (~2.7 s per scroll in QEMU 8.2), so one VM per run covers it.

@@ -61,12 +61,10 @@ def observe(elf, folder, case):
 
     def check_echo(mode):
         word = 'restored' + mode
+        s.close_rshell()
         s.keys('echo ' + word + '\n')
         font = Font(ROOT / 'assets/fonts/shino16.kcgfont')
 
-        # Keyboard lines get no prompt on link-sh (the "> " rows mirror RSH
-        # commands), so wait until the output row's glyphs match exactly: the
-        # cursor has then left the row and the frame is fully drawn.
         def output_drawn():
             rows = s.screen(mode).splitlines()
             matches = [row for row, line in enumerate(rows) if line.rstrip() == word]
@@ -77,6 +75,7 @@ def observe(elf, folder, case):
             return pixels.compare_text(matches[-1], 0, word) is None
 
         s.wait(output_drawn, mode + ' keyboard and console pixels')
+        s.open_rshell()
 
     try:
         s.start()

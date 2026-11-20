@@ -10,6 +10,9 @@
 #include "mpic.h"
 #include "platform_kboot_layout.h"
 #include "kprintf.h"
+#include "console.h"
+#include "console_output.h"
+#include "kboot_log.h"
 #include "kstring.h"
 #include "con_sink.h"
 #include "sys.h"
@@ -222,6 +225,13 @@ static u32 resident(unsigned gen, unsigned argc, char **argv, KernelAPI *api,
     return old;
 }
 
+/* Observe the real resident console formatter on the diagnostic UART. */
+static int ctx_putchar(char c)
+{
+    pm_log_write(&c, 1);
+    return 0;
+}
+
 static int run_context_probes(void)
 {
     /* Paint only unused stack below our current frame. A guard margin keeps
@@ -230,6 +240,9 @@ static int run_context_probes(void)
     __asm__ volatile("mr %0,1" : "=r"(sp));
     u32 *bottom = (u32 *)__kernel_stack_bottom;
     for (u32 *p = bottom; (u32)p < sp - 512; ++p) *p = 0xa55aa55a;
+    static const ConOutputOps observation = { .putchar = ctx_putchar };
+    con_output_register(&observation);
+    boot_serial_mirror = 1;
     start_tick = tick_count;
     pm_mpic_set_ipi_handler(ipi);
     kprintf(7, "CTX BEGIN\n");

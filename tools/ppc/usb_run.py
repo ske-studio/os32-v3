@@ -647,7 +647,7 @@ def link_lan_accept(elf, cpu, out, mode='normal'):
     import link_sh_run as link
     from host_agent import HostAgent, hdr_unpack, LINK_HDR, OP_RELEASE
 
-    class UsbLink(link.Session):
+    class UsbLink(link.LineSession):
         def new_agent(self):
             if self.operator: self.operator.close()
             directory = self.out/'agent'; directory.mkdir()
@@ -747,20 +747,22 @@ def link_lan_accept(elf, cpu, out, mode='normal'):
         s.wait(lambda: 'protocol=01' in serial(a), 'keyboard enumeration', 30)
         key, text_keys = keyboard_actions(s.q, lambda: serial(a),
                                          lambda predicate, label: s.wait(predicate, label, 30), s.out)
-        # Type the first letter before waiting for the host. It belongs to the local line.
-        text_keys('e')
+        key('esc')
         s.agent_enabled = True
-        text_keys('cho first'); key('ret')
-        s.wait(s.ready, 'resident RSH READY', 60)
-        first_echo = '> cho first' if mode == 'lost-first' else '> echo first'
-        s.wait(lambda: first_echo in s.screen('first-key'), 'first keyboard line', 30)
         if mode == 'lost-first':
-            require('> echo first' not in s.screen('first-key'), 'first letter survived')
+            s.wait(s.ready, 'RSH READY after consumed ESC', 60)
+            screen = s.screen('first-key')
+            require(s.word('rshell_active') and '[Remote shell closed]' not in screen,
+                    'preloaded ESC unexpectedly closed RSH')
             rsh_command(s, 'echo alive', b'alive\n')
             s.q.call('quit'); s.p.wait(timeout=5)
             require(s.p.returncode == 0, 'QEMU exit after first key observation')
             print('RED lost-first '+cpu)
             return
+        s.close_rshell(preloaded=True)
+        text_keys('echo first'); key('ret')
+        s.wait(lambda: 'OS32:/$ echo first' in s.screen('first-key'), 'first keyboard line', 30)
+        s.open_rshell()
         rsh_command(s, 'echo warm', b'warm\n')
         # Warm /host too (as sd_run.link_accept does): the SFS session starts on
         # first use, so a suppressed first CALL would only report Host is down.
@@ -783,34 +785,39 @@ def link_lan_accept(elf, cpu, out, mode='normal'):
         # An expired CALL ends as OS32_ERR_HOSTDOWN (fs/serialfs/sfs_client.c:237-253).
         require(failed == b'cat: /host/f: Host is down\n' and
                 80 <= ticks <= 200, 'guest SFS deadline near 1000ms: '+repr((failed, ticks)))
+        s.close_rshell()
         text_keys('echo hi'); key('ret')
         def usb_seen():
             screen = s.screen('screen')
             (s.out/'screen.txt').write_text(screen)
-            return '> echo hi' in screen and re.search(r'(?m)^hi *$', screen)
+            return 'OS32:/$ echo hi' in screen and re.search(r'(?m)^hi *$', screen)
         s.wait(usb_seen, 'USB echo hi FB evidence', 30)
         require(s.word('tick_count') != first and 'USB KEY src=1' in serial(a),
                 'tick and USB progress after SFS suppression')
         require('usb: HC dead' not in serial(a), 'healthy HC after SFS suppression')
         s.drop = False
+        s.open_rshell()
         rsh_command(s, 'cat /host/f', b'usb-rpc\n')
+        s.hold_serial_line()
         text_keys('echo half')
         def finish_half():
             s.settle(1)
-            require(s.agent.operator.pending['result'] is None, 'RSH deferred by USB half-line')
+            require(s.agent.operator.pending['result'] is None, 'RSH deferred by serial line')
             key('ret')
         rsh_command(s, 'echo resumed', b'resumed\n', during=finish_half)
         screen = s.screen('resumed')
-        require('> echo half' in screen and '> echo resumed' in screen and
-                screen.index('> echo half') < screen.index('> echo resumed'), 'USB before RSH')
+        require('rshell: line with ESC not executed' in screen and '> echo resumed' in screen,
+                'serial line rejection and resumed RSH')
         key('shift')
         s.q.call('device_del', {'id':'kbd'})
         s.wait(lambda: 'USB RELEASE kind=0 src=1' in serial(a), 'USB unplug release', 10)
         s.q.call('device_add', {'driver':'usb-kbd', 'id':'kbd2'})
         s.wait(lambda: serial(a).count('protocol=01') >= 2, 'USB re-enumeration', 30)
         s.wait(s.ready, 'READY after USB re-enumeration', 30)
+        s.close_rshell()
         text_keys('echo alive'); key('ret')
         s.wait(lambda: re.search(r'(?m)^alive *$', s.screen('replug')), 'USB replug FB', 30)
+        s.open_rshell()
         rsh_command(s, 'echo alive', b'alive\n')
         validate(serial(a), serial(b), True)
         (s.out/'sfs-calls.json').write_text(json.dumps(s.calls, indent=2))
