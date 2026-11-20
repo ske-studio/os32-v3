@@ -245,6 +245,16 @@ def observe(elf, cpu, evidence, case, modes=()):
         if case == 'target-failure' and modes:
             rsh_command(session, '/bin/gfx2prob.bin shutdown-off')
             rsh_command(session, 'echo $?', b'0\n')
+        # A9a/A9c (5c confirmed P2): the gfx2 gates' RED is taken with gfx2 calls,
+        # not only the v1 present. shutdown-off returns 34 when mode_set, flip
+        # or present is not BUSY after shutdown; owned-child returns 36 when a
+        # non-owner child's gfx2_present is not BUSY.
+        if case in ('gate-open', 'target-gate-open') and modes:
+            rsh_command(session, '/bin/gfx2prob.bin shutdown-off')
+            rsh_command(session, 'echo $?', b'34\n')
+        if case == 'owner-unchecked' and modes:
+            rsh_command(session, '/bin/gfx2prob.bin owned-child')
+            rsh_command(session, 'echo $?', b'36\n')
         session.q.call('quit')
         session.p.wait(timeout=5)
         require(session.p.returncode == 0, 'gfx2 QEMU exit')
