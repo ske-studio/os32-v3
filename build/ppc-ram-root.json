@@ -1,5 +1,6 @@
 {
   "/fonts/shino16.kcg": "assets/fonts/shino16.kcgfont",
   "/fonts/shino16.txt": "assets/fonts/JF-Dot-Shinonome16-LICENSE.txt",
-  "/sys/unicode.bin": "build/out/unicode.bin"
+  "/sys/unicode.bin": "build/out/unicode.bin",
+  "/sys/shell.bin": "build/out/ppc-user/link-sh/shell.bin"
 }

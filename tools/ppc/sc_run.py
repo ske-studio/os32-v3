@@ -206,12 +206,12 @@ def check_shell(text, fd1=True, restart=True):
     require(registered <= names, 'help registered commands')
     require(not names.intersection('ver uname date beep np2 mnt sys pci hdprep filer rshell'.split()),
             'help excluded commands')
-    outputs('echo $PATH', ['/bin\n'])
-    outputs('echo $HOME', ['/tmp\n'])
-    outputs('echo $SHELL', ['/bin/sh.bin\n'])
+    outputs('echo $PATH', ['/bin:/sbin:/usr/bin\n'])
+    outputs('echo $HOME', ['/home/user\n'])
+    outputs('echo $SHELL', ['/shell\n'])
     outputs('pwd', ['/\n', '/tmp/\n'])
     listing = results.get('ls /bin', [''])[0].upper().split()
-    require('SH.BIN' in listing and 'HELLO.BIN' in listing, 'bin listing')
+    require('HELLO.BIN' in listing, 'bin listing')
     outputs('echo sc-ok > /tmp/sc', [''])
     outputs('cat /tmp/sc', ['sc-ok\n'] if fd1 else [''])
     diagnostic = results.get('cat /nofile > /tmp/e', [''])[0]

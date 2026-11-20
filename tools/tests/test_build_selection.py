@@ -42,7 +42,7 @@ def check_loop(root):
     for image in ('pc98', 'kboot-core', 'kboot-link', 'kboot-shell', 'kboot-sh', 'kboot-link-sh'):
         options = [] if image == 'pc98' else ['ARCH=ppc', 'PLATFORM=powermac']
         units = query(root, [*options, 'IMAGE=' + image], config_only=True)['C_KERNEL']
-        enabled = image in ('pc98', 'kboot-sh', 'kboot-link-sh')
+        enabled = image in ('pc98', 'kboot-shell', 'kboot-sh', 'kboot-link-sh')
         for unit in ('kernel/dev/device_loop.c', 'drivers/block/loop_dev.c'):
             assert units.count(unit) == enabled, (image, unit)
 
@@ -81,9 +81,9 @@ def check(root):
     c = query(root, ['KSTRING_C_SRC=lib/kstring_c.c'])['C_KERNEL']
     assert c.count('lib/kstring_c.c') == 1
     assert c.index('lib/kstring_c.c') == c.index('lib/divdi3.c') + 1
-    # Top-level ARCH=ppc selects the product default image (kboot-link) from the same owner sets.
+    # Top-level ARCH=ppc selects the product default image (kboot-link-sh) from the same owner sets.
     ppc = query(root, ['ARCH=ppc', 'PLATFORM=powermac'], config_only=True)
-    link = json.loads((ROOT / 'tools/tests/fixtures/build_profile_ppc.json').read_text())['link']
+    link = json.loads((ROOT / 'tools/tests/fixtures/build_profile_ppc.json').read_text())['link-sh']
     assert ppc['C_KERNEL'] == link['KB_C'] and ppc['GAS_KERNEL'] == link['KB_ASM'] and not ppc['ASM_KERNEL']
     for enabled in (0, 1):
         profile = query(root, ['ARCH=ppc', 'PLATFORM=powermac', f'FEATURE_KCG={enabled}'], config_only=True)
@@ -161,6 +161,8 @@ def check_kboot(root):
                     assert key + '=\n' in disabled
             for key in ('KB_ASM', 'KB_C'):
                 assert actual[key].split() == image[key], (name, key, selector)
+    assert subprocess.run([*command, 'KBOOT_LINK=0', 'KBOOT_SH=0', 'KBOOT_SHELL=1',
+                           'NEGATIVE=1', 'kboot-query'], cwd=root, capture_output=True).returncode != 0
     # 名前と旗の両方を与えて食い違えば止まる。合っていれば通る。
     assert subprocess.run([*command, 'IMAGE=kboot-core', 'KBOOT_SH=1', 'kboot-query'], cwd=root,
                           capture_output=True).returncode != 0
@@ -211,6 +213,7 @@ if __name__ == '__main__':
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
         copy_build_tree(root)
+        copy_kboot_names(root)
         (root / 'Makefile').write_text('include build/config.mk\n-include build/kernel-objects.mk\ninclude build/kernel.mk\n')
         # No libgcc invocation is allowed by these query-only tests.
         check(root)
@@ -218,7 +221,6 @@ if __name__ == '__main__':
         check_fep(root)
         check_loop(root)
         check_user_selection(root)
-        copy_kboot_names(root)
         check_kboot(root)
         if args.mutate:
             for path, anchor, mutant, expected, label in (
@@ -226,10 +228,10 @@ if __name__ == '__main__':
                      'kernel/sqlite_engine.c', AssertionError, 'formatter omitted from PowerPC compile'),
                     ('build/sources/common.mk', 'C_COMMON_CORE = ', 'C_COMMON_CORE = $(C_EXT2_FORMATTER) ',
                      AssertionError, 'formatter linked into PowerMac'),
-                    ('build/images/kboot-sh.mk', 'FEATURE_LOOP = 1', 'FEATURE_LOOP = 0',
+                    ('build/images/kboot-link-sh.mk', 'FEATURE_LOOP = 1', 'FEATURE_LOOP = 0',
                      AssertionError, 'loop disabled on kboot-sh'),
-                    ('build/images/kboot-shell.mk', 'FEATURE_LOOP = 0', 'FEATURE_LOOP = 1',
-                     AssertionError, 'loop enabled on kboot-shell'),
+                    ('build/images/kboot-link.mk', 'FEATURE_LOOP = 0', 'FEATURE_LOOP = 1',
+                     subprocess.CalledProcessError, 'loop enabled on kboot-link'),
                     ('build/select.mk', '$(error FEATURE_FEP requires FEATURE_SQLITE)', '',
                      AssertionError, 'missing FEP prerequisite'),
                     ('build/features/fep.mk', 'C_FEATURES += kernel/ime/fep_module.c', '',
@@ -245,14 +247,14 @@ if __name__ == '__main__':
                      AssertionError, 'reordered kboot sources'),
                     ('build/platform/powermac.mk', ' platform/powermac/nic_gem.c', '',
                      AssertionError, 'dropped kboot owner entry'),
-                    ('build/sources/common.mk', 'C_COMMON_CLI = kernel/cli/resident_cli.c',
-                     'C_COMMON_CLI = kernel/cli/resident_cli.c kernel/cli/unordered.c',
+                    ('build/sources/common.mk', 'C_COMMON_LOOP = kernel/dev/device_loop.c',
+                     'C_COMMON_LOOP = kernel/dev/device_loop.c kernel/dev/unordered.c',
                      AssertionError, 'kboot source added to an owner set'),
                     ('build/images/kboot-link.mk', 'FEATURE_LINK = 1', 'FEATURE_LINK = 0',
                      AssertionError, 'kboot image feature value'),
                     ('build/images/ppc-flags.mk', 'KBOOT_SH := $(if $(filter kboot-sh kboot-link-sh,$(IMAGE)),1,0)',
                      'KBOOT_SH := 0', subprocess.CalledProcessError, 'image name no longer sets its flags'),
-                    ('build/images/ppc-flags.mk', 'ifneq ($(IMAGE),$(KB_IMAGE))', 'ifneq ($(IMAGE),$(IMAGE))',
+                    ('build/images/ppc-flags.mk', 'ifneq ($(call ppc_image,$(IMAGE)),$(KB_IMAGE))', 'ifneq ($(IMAGE),$(IMAGE))',
                      AssertionError, 'image name and flags may disagree')):
                 target = root / path
                 source = target.read_text()
@@ -267,7 +269,9 @@ if __name__ == '__main__':
                         check_sqlite(root)
                     else:
                         check_kboot(root)
-                except expected:
+                except expected as error:
+                    if label == 'loop enabled on kboot-link':
+                        assert 'FEATURE_LOOP requires FEATURE_EXEC' in error.stderr, error.stderr
                     print('RED: ' + label + ' rejected at runtime')
                 else:
                     raise SystemExit(label + ' mutation survived')
