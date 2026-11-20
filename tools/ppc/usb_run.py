@@ -599,7 +599,11 @@ def rsh_command(s, line, expected=None, during=None):
             + '\nlink lines:\n' + '\n'.join(link_lines[-5:])
             + '\nserial tail:\n' + '\n'.join(lines[-20:])) from exc
     result = op.results.get(ident) or op.take_result()
-    require((op.generation, op.session) == (generation, session) and
+    # The link may re-HELLO mid-command (same sess, next epoch); the guest then
+    # re-delivers the OUT (LAN_OPERATOR R1/R2). Same generation and sess id only.
+    same_sess = (op.session is not None and session is not None and
+                 op.session[0] == session[0])
+    require(op.generation == generation and same_sess and
             result['generation'] == generation and result['state'] == 'done' and
             result['drop'] == 0, 'RSH generation/completion '+line)
     events = [e for e in s.events[start:] if e['parts'][:2] == ['RSH', 'OUT'] and
