@@ -24,6 +24,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument("--check", "--check-only", dest="check_only", action="store_true",
                     help="validate KAPI declarations without writing generated files")
 parser.add_argument("--target", default="x86-pc98")
+parser.add_argument("--feature-link", type=int, choices=(0, 1), default=0)
 parser.add_argument("--out-dir", help="root directory for generated files")
 parser.add_argument("json", nargs="?", default="sdk/kapi.json",
                     help="KAPI JSON input (default: sdk/kapi.json)")
@@ -32,7 +33,11 @@ CHECK_ONLY = args.check_only
 JSON_PATH = args.json
 TARGET = args.target
 if TARGET == "ppc-powermac":
-    from kapi_target_ppc import PROVIDER_EXTERNS, ABSENT_PROVIDER_INCLUDES, ABSENT_PROVIDER_SLOTS, absent_result
+    from kapi_target_ppc import PROVIDER_EXTERNS, ABSENT_PROVIDER_INCLUDES, ABSENT_PROVIDER_SLOTS, PROVIDER_GROUPS, absent_result
+    if args.feature_link:
+        slots, includes = PROVIDER_GROUPS["serialfs"]
+        ABSENT_PROVIDER_SLOTS -= slots
+        ABSENT_PROVIDER_INCLUDES -= includes
 
 with open(JSON_PATH, "r", encoding="utf-8") as f:
     data = json.load(f)
@@ -662,13 +667,19 @@ for slot, api in enumerate(data["api"]):
     if TARGET == "ppc-powermac" and name == "tvram_clear":
         c_content += "    extern void pm_console_clear(void);\n    pm_console_clear();\n}\n\n"
         continue
-    if TARGET == "ppc-powermac" and name in ABSENT_PROVIDER_SLOTS:
+    absent = TARGET == "ppc-powermac" and name in ABSENT_PROVIDER_SLOTS
+    optional_loop = TARGET == "ppc-powermac" and name in ("loop_attach", "loop_detach", "loop_status")
+    if absent or optional_loop:
+        if not absent:
+            c_content += "#if defined(OS32_FEATURE_LOOP) && !OS32_FEATURE_LOOP\n"
         for arg in get_arg_names(api.get("args", [])):
             c_content += f"    (void){arg};\n"
         if ret != "void":
             c_content += f"    return ({ret}){absent_result(api)};\n"
-        c_content += "}\n\n"
-        continue
+        if absent:
+            c_content += "}\n\n"
+            continue
+        c_content += "#else\n"
     optional_db = TARGET == "ppc-powermac" and name.startswith("db_")
     if optional_db:
         c_content += "#if defined(OS32_HOOK_KAPI_DB) && !OS32_HOOK_KAPI_DB\n"
@@ -694,7 +705,7 @@ for slot, api in enumerate(data["api"]):
         else:
             c_content += f"    return {target}({args_call});\n"
             
-    if optional_db:
+    if optional_db or optional_loop:
         c_content += "#endif\n"
     c_content += "}\n\n"
 

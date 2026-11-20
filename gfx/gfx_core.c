@@ -346,12 +346,14 @@ void gfx_kapi_init(void)
 {
     if (gfx_kapi_claim() < 0) return;
     gfx_init();
+    if (gfx_started) DISPLAY_V1_PUBLIC_INIT_OK();
 }
 
 void gfx_kapi_init_200(void)
 {
     if (gfx_kapi_claim() < 0) return;
     gfx_init_200();
+    if (gfx_started) DISPLAY_V1_PUBLIC_INIT_OK();
 }
 
 i32 gfx_screen_owner(void)

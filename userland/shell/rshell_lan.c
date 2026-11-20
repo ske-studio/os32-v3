@@ -498,6 +498,33 @@ void rsh_lan_app_init(void)
 
 int rsh_lan_execute(const char *line)
 {
+#ifdef SHELL_REMOTE_SFS
+    const char *child = rsh_sfs_child(line);
+    if (child) {
+        /* Follow the resident sfs_run_child sequence (rshell.c). */
+        char saved[OS32_MAX_PATH] = "";
+        const char *cwd = g_api->sys_getcwd();
+        if (cwd && strlen(cwd) < sizeof(saved)) strcpy(saved, cwd);
+
+        int rc = g_api->sfs_begin();
+        if (saved[0]) (void)g_api->sys_chdir(saved);
+        if (rc) {
+            g_api->kprintf(ATTR_RED, "sfs: session not started (%d%s)\n", rc,
+                           rc == OS32_ERR_BUSY ? ": /host in use or session active" :
+                           rc == OS32_ERR_IO ? ": no host answered" : "");
+            sh_status_set(SH_STATUS_ERROR);
+        } else {
+            sh_in_sfs = 1;
+            int status = execute_command(child);
+            sh_in_sfs = 0;
+            (void)g_api->sfs_end(status);
+            if (saved[0]) (void)g_api->sys_chdir(saved);
+            sh_status_set(status);
+        }
+        sh_exit_flag = 0;
+        return 0;
+    }
+#endif
     (void)execute_command(line);
     /* A LAN `exit N` does not end the APP shell (the host ends it with EXIT,
      * as in the resident rshell); drop the flag so later lines are not cut. */

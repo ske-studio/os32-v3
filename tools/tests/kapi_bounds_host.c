@@ -41,6 +41,7 @@ int res_owner_get(void) { return 1; }
 #include "gfx_core_source.inc"
 #include "gfx_dirty_source.inc"
 #include "gfx_vram_source.inc"
+#include "gfx_present_source.inc"
 void gfx2_pal_set_v1(int first, int count, const u8 *rgb)
 { (void)first; (void)count; (void)rgb; }
 /* Only the palette boundary is hardware-independent here. */

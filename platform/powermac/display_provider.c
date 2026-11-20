@@ -1,5 +1,7 @@
 #include "display_provider.h"
 #include "display_restore.h"
+#include "gfx_present_contract.h"
+#include "exec/appslot.h"
 #include "drivers/video/of_fb/backend_of_fb.h"
 #include "gfx/v2/gfx2_int.h"
 #include "rh_observe.h"
@@ -120,6 +122,36 @@ int display_provider_client_before_init(const GfxBackend *b) { return b == &gfx_
 int display_provider_init_failed(GfxBackend *b) { (void)b; shutdown(); return -1; }
 int display_provider_idle_safe(int pref) { (void)pref; return 0; }
 void display_provider_prepare_failed(GfxBackend *b) { (void)b; shutdown(); }
-void display_provider_raster_reset(void) { }
+/* App IDs start at one. Only a successful public init grants permission. */
+static int present_owner;
+static u32 present_generation;
+
+void display_provider_public_init_ok(void)
+{
+    struct gfx2_adapter *a = gfx2_active();
+    present_owner = a ? appslot_cur() : 0;
+    if (a) present_generation = a->gen;
+}
+
+int display_provider_present_ok(void)
+{
+    struct gfx2_adapter *a = gfx2_active();
+    return present_owner && present_owner == appslot_cur() &&
+           a && present_generation == a->gen;
+}
+
+void display_provider_raster_reset(void) { present_owner = 0; }
+
+/* The selected mode's width; 0 when no backend or mode (e.g. the "none" backend). */
+int display_provider_v1_width(void)
+{
+    const GfxMode *m = g_backend ? gfx_backend_mode(g_backend) : 0;
+    return m ? (int)m->width : 0;
+}
+
+/* The OF framebuffer has only packed modes. */
+void gfx_planar_present_dirty(int sync) { (void)sync; }
+void gfx_planar_present_raster(GFX_RasterPalTable *t) { (void)t; }
+void gfx_present_diag(void) { }
 int display_provider_restore_fallback(GfxBackend *b) { (void)b; return 0; }
 u32 display_provider_ver_kind(const GfxBackend *b) { (void)b; return GFX_VER_UNKNOWN; }

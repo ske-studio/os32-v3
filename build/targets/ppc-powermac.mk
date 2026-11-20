@@ -26,6 +26,14 @@ ROOT_ELF_FORMAT := elf32-powerpc
 ROOT_CPU := powerpc
 ROOT_MANIFEST ?= build/ppc-ram-root.json
 ROOT_DEPS ?= assets/fonts/shino16.kcgfont assets/fonts/JF-Dot-Shinonome16-LICENSE.txt build/out/unicode.bin
+
+# RAW fixture: byte at offset i is i modulo 256 (320 sectors of 512 bytes).
+PPC_LOOP_SAMPLE ?= build/out/ppc-loop/sample.img
+$(PPC_LOOP_SAMPLE): build/targets/ppc-powermac.mk
+	@mkdir -p $(@D)
+	python3 -c 'import sys; sys.stdout.buffer.write(bytes(range(256)) * 640)' > $@.tmp
+	mv $@.tmp $@
+
 include build/font-fetch.mk
 
 build/out/unicode.bin: tools/gen_unicode.c lib/unicode_jis_table.h kernel/console/unicode_file.h include/endian_le.h include/types.h include/callconv.h
@@ -68,7 +76,7 @@ KB_INC := $(if $(KB_EXEC),-I$(KB_GEN)/include -I$(KB_GEN)/sdk/include/os32) -I$(
 KB_FLAGS := -std=gnu11 $(KB_MACHINE) -fno-builtin -fno-asynchronous-unwind-tables \
  -O2 -Wall -Wextra -Werror -Werror=vla -Werror=implicit-int \
  -Werror=implicit-function-declaration -ffunction-sections -fdata-sections \
- -D__cdecl= -D__KERNEL_BUILD__ $(HOOK_DEFS) -DOS32_FEATURE_USERSHELL=$(FEATURE_USERSHELL) -DKBOOT_NEGATIVE=$(NEGATIVE) -DKBOOT_SHELL=$(KBOOT_SHELL) -DKBOOT_SH=$(KBOOT_SH) -DKBOOT_LINK=$(KBOOT_LINK) -MMD -MP $(KB_INC)
+ -D__cdecl= -D__KERNEL_BUILD__ $(HOOK_DEFS) -DOS32_FEATURE_LOOP=$(FEATURE_LOOP) -DOS32_FEATURE_USERSHELL=$(FEATURE_USERSHELL) -DKBOOT_NEGATIVE=$(NEGATIVE) -DKBOOT_SHELL=$(KBOOT_SHELL) -DKBOOT_SH=$(KBOOT_SH) -DKBOOT_LINK=$(KBOOT_LINK) -MMD -MP $(KB_INC)
 
 ifeq ($(FEATURE_SQLITE),1)
 include build/sqlite-gen.mk
@@ -170,9 +178,9 @@ $(KB_OUT)/platform/powermac/root_image.o: $(KB_OUT)/root_image_expected.h
 
 BUILD_ID_SRC := $(KB_OUT)/build_id.c
 include build/build-id.mk
-$(KB_GEN)/stamp: sdk/kapi.json sdk/gen_kapi.py sdk/kapi_abi_x86.py sdk/kapi_target_ppc.py sdk/target_profile.py
+$(KB_GEN)/stamp: build/images/$(IMAGE).mk sdk/kapi.json sdk/gen_kapi.py sdk/kapi_abi_x86.py sdk/kapi_target_ppc.py sdk/target_profile.py
 	@mkdir -p $(KB_GEN)
-	python3 -B sdk/gen_kapi.py --target ppc-powermac --out-dir $(KB_GEN)
+	python3 -B sdk/gen_kapi.py --target ppc-powermac --feature-link $(FEATURE_LINK) --out-dir $(KB_GEN)
 	@touch $@
 $(KB_OBJ): $(KB_GEN)/stamp
 $(KB_OUT)/build_id.o: $(BUILD_ID_SRC)

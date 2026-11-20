@@ -126,14 +126,15 @@ void palette_init(void) { event(EV_CALL, F_PALETTE, 0); }
 void gfx_scroll_init(void) { event(EV_CALL, F_SCROLL, 0); }
 #include "gfx_core_slice.inc"
 
-/* B6: the common present path (drivers/video/pc98/gfx_vram.c _flip_page and _present_dirty),
+/* B6: the common present path (gfx/gfx_present.c present_dirty, drivers/video/pc98/gfx_vram.c _flip_page),
  * extracted from the product text; transfer steps are recording fakes. */
 enum { F_MERGE = 20, F_FLUSH };
 GfxCounters gfx_counters;
 static int packed;
-static int _present_dirty_packed(void) { return packed; }
+static int present_dirty_packed(void) { return packed; }
 static void _merge_prev_dirty(void) { event(EV_CALL, F_MERGE, 0); }
 static void _flush_dirty_queue(void) { event(EV_CALL, F_FLUSH, 0); dirty_queue.count = 0; }
+#include "platform_display_fallback.h"
 #include "gfx_vram_slice.inc"
 static void is(unsigned i, unsigned kind, unsigned a, unsigned b);
 static void present_case(void)
@@ -143,7 +144,7 @@ static void present_case(void)
     for (int start = 0; start < 2; start++) {
         gfx_flip_enabled = 1; gfx_display_page = start; dirty_queue.count = 1; prev_dirty.count = 0;
         count = 0; gfx_counters.io_accesses = 0;
-        _present_dirty(1);
+        present_dirty(1);
         expect(count == 4 && gfx_display_page == (start ^ 1));
         expect(gfx_counters.io_accesses == 2);          /* the two page writes are counted */
         is(0, EV_CALL, F_MERGE, 0); is(1, EV_CALL, F_FLUSH, 0);
@@ -152,16 +153,16 @@ static void present_case(void)
     /* No flip, sync: wait on the text GDC status until VSYNC, then transfer. */
     gfx_flip_enabled = 0; dirty_queue.count = 1; vsync_misses = 2;
     count = 0; gfx_counters.io_accesses = 0;
-    _present_dirty(1);
+    present_dirty(1);
     expect(count == 4 && gfx_counters.io_accesses == 0); /* no page write without flip */
     for (unsigned i = 0; i < 3; i++) is(i, EV_IN, 0x60, 0);
     is(3, EV_CALL, F_FLUSH, 0);
     /* No flip, no sync: transfer at once. Nothing dirty: nothing at all. */
     dirty_queue.count = 1; count = 0;
-    _present_dirty(0);
+    present_dirty(0);
     expect(count == 1); is(0, EV_CALL, F_FLUSH, 0);
     count = 0;
-    _present_dirty(1);
+    present_dirty(1);
     expect(count == 0);
     /* The provider's own primitives. */
     vsync_misses = 0; count = 0;
