@@ -25,7 +25,7 @@
 | 2 | B14 | KCG の提供者の接続 | 45–150 行、4–7 ファイル | 済み (2026-11-20、main 50691f607 — ANK・JIS の読み出しを drivers/video/kcg/kcg_read_provider.inc で x86 と PowerMac が共有、x86 の vmkernel.lz4・kcg.mod は一致、ARCH_COMPAT_CONTRACT §9 に行) |
 | 3 | B13 | exec の回収とカーネルの親の形 | 85–220 行、5–9 ファイル | 後回し (シェルの寄せ B03・B09 の設計の後、exec_nest_level を含む) |
 | 4 | B12 | SFS の scope の実行の包み | 90–240 行、4–8 ファイル | 後回し (シェルの寄せ B03・B09 の設計の後、rshell_lan.c の SHELL_REMOTE_SFS) |
-| 5 | B11 | ver/sysinfo とメモリの内訳 | 110–270 行、5–9 ファイル | 設計中 (os32powerpc・2026-11-20) |
+| 5 | B11 | ver/sysinfo とメモリの内訳 | 110–270 行、5–9 ファイル | 済み (2026-11-20、main fe906b179 — 共通の ver_info・ver_format・ver_backend_contract、x86 の関数差は許容の 4 つ、QEMU 3 本・NP21/W の mem_stat と互換の受入 PASS) |
 | 6 | B10 | ログの経路と起動の診断の出力 | 160–360 行、6–11 ファイル | 未着手 |
 | 7 | B09 | シェルの libc の接着・登録のコマンドと既定値 | 170–420 行、7–13 ファイル | 製品シェルの接続は main 未収録（§5） |
 | 8 | B08 | SQLite の初期化とリンク (module か静的か) | 210–450 行、6–11 ファイル | 任意。静的 SQLite を維持する |
