@@ -58,7 +58,11 @@ def check_fep(root):
         off, on = profiles
         for unit in units:
             assert unit not in off['C_KERNEL'] and on['C_KERNEL'].count(unit) == 1
-        assert [name for name in on['C_KERNEL'] if name not in units] == off['C_KERNEL']
+        absent = 'exec/absent/exec_ime.c'
+        assert off['C_KERNEL'].count(absent) == (options == ppc)
+        assert absent not in on['C_KERNEL']
+        assert [name for name in on['C_KERNEL'] if name not in units] == [
+            name for name in off['C_KERNEL'] if name != absent]
         for key in ('ASM_KERNEL', 'GAS_KERNEL'):
             assert on[key] == off[key]
         try:
@@ -235,6 +239,8 @@ if __name__ == '__main__':
                      AssertionError, 'loop enabled on kboot-shell'),
                     ('build/select.mk', '$(error FEATURE_FEP requires FEATURE_SQLITE)', '',
                      AssertionError, 'missing FEP prerequisite'),
+                    ('build/sources/hooks.mk', 'HOOK_ime = $(if $(filter 1,$(FEATURE_PC98_PENDING) $(FEATURE_FEP)),1,0)',
+                     'HOOK_ime = $(FEATURE_PC98_PENDING)', AssertionError, 'FEP exit hook missing on PowerPC'),
                     ('build/features/fep.mk', 'C_FEATURES += kernel/ime/fep_module.c kernel/ime/fep_suspend_owner.c', '',
                      AssertionError, 'missing FEP kernel loader'),
                     ('build/select.mk', '$(error FEATURE_SQLITE requires FEATURE_EXEC)', '',
