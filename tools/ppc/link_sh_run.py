@@ -267,6 +267,7 @@ class Session:
 
     def cmd(self, line, expected=None, seconds=20):
         op=self.agent.operator
+        self.wait(self.ready, 'RSH READY before '+line, seconds)
         ended=self.word('p3_end_count')
         # A new agent generation restarts IDs at 1: look only at events after this submit.
         start=len(self.events)

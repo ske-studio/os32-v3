@@ -2,7 +2,7 @@
 #include <string.h>
 
 /* Private controls supplied by the acceptance image. */
-enum { PROBE_REGEN = 0x100, PROBE_LEASE_COUNT, PROBE_WATCH, PROBE_COPIED };
+enum { PROBE_REGEN = 0x100, PROBE_LEASE_COUNT, PROBE_WATCH, PROBE_COPIED, PROBE_SAVED_COUNT };
 
 static int report(KernelAPI *api, const char *text, int status)
 {
@@ -18,6 +18,16 @@ int main(int argc, char **argv, KernelAPI *api)
     OS32_LeaseView view;
     int rc;
 
+    if (argc == 2 && !strcmp(argv[1], "reclaimed")) {
+        if (api->surface_query(PROBE_SAVED_COUNT, &after))
+            return report(api, "SURFACE exit leak\n", 2);
+        return report(api, "SURFACE reclaimed\n", 0);
+    }
+    if (argc == 2 && !strcmp(argv[1], "leave")) {
+        if (api->surface_query(role, &before) != OS32_ERR_INVAL)
+            return report(api, "SURFACE still published after exit\n", 1);
+        api->gfx_init();
+    }
     rc = api->surface_query(role, &before);
     if (rc == OS32_ERR_NOSYS)
         return report(api, "SURFACE provider absent\n", 10);
@@ -27,11 +37,6 @@ int main(int argc, char **argv, KernelAPI *api)
         before.desc[0].planes != 1 || !before.desc[0].ref.generation ||
         before.desc[0].access_max != OS32_SURFACE_RW)
         return report(api, "SURFACE query failed\n", 1);
-    if (argc == 2 && !strcmp(argv[1], "reclaimed")) {
-        if (api->surface_query(PROBE_LEASE_COUNT, &after))
-            return report(api, "SURFACE exit leak\n", 2);
-        return report(api, "SURFACE reclaimed\n", 0);
-    }
     rc = api->surface_lease(role, &before.desc[0].ref, OS32_SURFACE_RW, &view);
     if (rc || !view.token || !view.base || view.bytes != before.desc[0].bytes ||
         before.desc[0].plane_offset[0] >= view.bytes ||

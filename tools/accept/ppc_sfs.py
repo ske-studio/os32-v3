@@ -110,9 +110,12 @@ def main():
             extra = mutant_settings(folder, case, source, anchor, replacement)
             settings.extend(item.replace('KB_MUT_', 'PPC_RES_MUT_', 1) for item in extra)
         elif case == 'leak-owner':
-            extra = mutant_settings(folder, case, 'fs/serialfs/serialfs_session.c',
-                                    'sfs_persistent_scope_owner_exit(owner);', '(void)owner;')
-            settings.extend(item.replace('KB_MUT_', 'KB_MUT_EXTRA_', 1) for item in extra)
+            # exec_finish calls the persistent owner-exit hook directly.
+            meter = Path(settings[1].split('=', 1)[1])
+            anchor = '(void)sfs_persistent_scope_end_owned(owner, 0);'
+            source = meter.read_text()
+            assert source.count(anchor) == 1
+            meter.write_text(source.replace(anchor, '(void)owner;'))
         elif case == 'absent':
             (generate(kernel, link=False) / 'stamp').touch()
         elf = build(kernel, 'IMAGE=kboot-link-sh', 'KB_SH_OUT=' + str(user),
