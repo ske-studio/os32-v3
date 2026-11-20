@@ -11,7 +11,16 @@
 #define MAX_SECTORS 257u
 #define LOG_CAP 300
 static u16 identify_words[IDE_IDENTIFY_WORDS];
-static unsigned bank, head, sect, cyl_lo, cyl_hi, count_reg;
+#ifdef TEST_BE_BUS
+#include "ide_bus.h"
+unsigned bank, mapped_banks, absent_ctl, scalar_reads;
+static unsigned absent_ctl_writes;
+#define CHECK_MAPPED() CHECK(mapped_banks & (1u << bank))
+#else
+static unsigned bank;
+#define CHECK_MAPPED() ((void)0)
+#endif
+static unsigned head, sect, cyl_lo, cyl_hi, count_reg;
 static unsigned identifying, id_word, active, writing, phase, word, chunk;
 static unsigned settle, busy, ready, commands, phases, words, addr_writes;
 static u32 start_lba, seed;
@@ -44,6 +53,7 @@ void kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
 
 unsigned int inp(unsigned int port)
 {
+    CHECK_MAPPED();
     CHECK(port == IDE_ALT_STATUS || port == IDE_STATUS);
     if (identify_error) return IDE_ST_ERR;
     if (identifying) return IDE_ST_DRQ;
@@ -78,6 +88,13 @@ unsigned int inp(unsigned int port)
 
 void outp(unsigned int port, unsigned int value)
 {
+#ifdef TEST_BE_BUS
+    if (port == IDE_DEV_CTRL && !mapped()) {
+        absent_ctl_writes++;
+        return;
+    }
+#endif
+    CHECK_MAPPED();
     switch (port) {
     case IDE_BANK1: bank = value; break;
     case IDE_DEV_CTRL: break;
@@ -144,6 +161,7 @@ static void transferred(void)
 
 unsigned int inpw(unsigned int port)
 {
+    CHECK_MAPPED();
     u16 value;
     CHECK(port == IDE_DATA);
     if (identifying) {
@@ -164,6 +182,7 @@ unsigned int inpw(unsigned int port)
 
 void outpw(unsigned int port, unsigned int value)
 {
+    CHECK_MAPPED();
     CHECK(port == IDE_DATA && writing && phase < chunk);
     CHECK(value == pattern(start_lba + phase, word));
     transferred();
@@ -194,6 +213,7 @@ static void configure(int mode, int sasi, u32 total)
         identify_words[IDE_ID_CUR_HEADS_WORD] = 2;
         identify_words[IDE_ID_CUR_SPT_WORD] = 5;
     }
+    identify_words[IDE_ID_MODEL_WORD] = 0x417a;
     identify_words[IDE_ID_TOTAL_WORD] = (u16)total;
     identify_words[IDE_ID_TOTAL_WORD + 1] = (u16)(total >> 16);
     CHECK(ide_init() == __builtin_popcount(present_mask));
@@ -330,8 +350,55 @@ static void errors(void)
 
 #include "ide_pio_host_multiple.inc"
 
+#ifdef TEST_BE_BUS
+static void be_bus(void)
+{
+    _Alignas(2) u8 storage[2 * IDE_PIO_WORDS + 2];
+    u8 *bytes = storage + 1;
+    memset(storage, 0xa5, sizeof(storage));
+    for (mapped_banks = 0; mapped_banks <= 2; mapped_banks++) {
+        present_mask = mapped_banks == 2 ? 4 : mapped_banks;
+        absent_ctl = absent_ctl_writes = 0;
+        configure(IDE_AMODE_LBA28, 0, 0x01234567);
+        CHECK(absent_ctl == 0);
+        for (int drive = 0; drive < IDE_MAX_DRIVES; drive++)
+            CHECK(!!ide_drive_present(drive) == ((present_mask >> drive) & 1));
+
+        ide_bus_select(mapped_banks == 1 ? 1 : 0);
+        CHECK(ide_bus_in(IDE_REG_STATUS) == 0xff && ide_bus_alt() == 0xff);
+        CHECK(ide_bus_data_word() == 0xffff);
+        ide_bus_data_read(bytes, 1);
+        CHECK(bytes[0] == 0xff && bytes[1] == 0xff);
+        ide_bus_out(IDE_REG_STATUS, 0);
+        ide_bus_ctl(0);
+        CHECK(absent_ctl == 1);
+        CHECK(absent_ctl_writes == 0);
+        ide_bus_data_write(bytes, 1);
+        if (!mapped_banks) continue;
+
+        int drive = mapped_banks == 1 ? 0 : 2;
+        IdeInfo info;
+        CHECK(ide_get_info(drive, &info) == IDE_OK);
+        CHECK(info.total_sectors == 0x01234567 && !strcmp(info.model, "Az"));
+        scalar_reads = 0;
+        CHECK(ide_read_sector(drive, 19, bytes) == IDE_OK);
+        CHECK(scalar_reads == 0);
+        for (unsigned i = 0; i < IDE_PIO_WORDS; i++) {
+            u16 value = pattern(19, i);
+            CHECK(bytes[2 * i] == (u8)value && bytes[2 * i + 1] == value >> 8);
+        }
+        CHECK(ide_write_sector(drive, 19, bytes) == IDE_OK);
+        CHECK(words == 2 * IDE_PIO_WORDS);
+        CHECK(storage[0] == 0xa5 && storage[sizeof(storage) - 1] == 0xa5);
+    }
+}
+#endif
+
 int main(int argc, char **argv)
 {
+#ifdef TEST_BE_BUS
+    if (argc == 2 && !strcmp(argv[1], "be")) be_bus();
+#endif
     if (argc == 1 || !strcmp(argv[1], "sizes")) sizes();
     if (argc == 1 || !strcmp(argv[1], "boundaries")) boundaries();
     if (argc == 1 || !strcmp(argv[1], "errors")) errors();
