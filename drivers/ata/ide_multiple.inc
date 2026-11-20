@@ -54,15 +54,15 @@ static int ide_multiple_prepare(int drive)
 
     if (drive_multiple[drive].max <= 1) return IDE_OK;
     /* A failed C6h may still own the bus on a subsequent request. */
-    st = (u8)inp(IDE_ALT_STATUS);
+    st = ide_bus_alt();
     if (st & IDE_ST_BSY) return IDE_ERR_TIMEOUT;
     if (st & IDE_ST_DRQ) return IDE_ERR_IO;
     if (!drive_multiple[drive].pending) return IDE_OK;
 
     drive_multiple[drive].active = 0;
     drive_multiple[drive].pending = 0;
-    outp(IDE_SECT_CNT, drive_multiple[drive].max);
-    outp(IDE_COMMAND, IDE_CMD_SET_MULTIPLE);
+    ide_bus_out(IDE_REG_SECT_CNT, drive_multiple[drive].max);
+    ide_bus_out(IDE_REG_STATUS, IDE_CMD_SET_MULTIPLE);
     ide_pio_settle();
     ret = ide_pio_finish();
     if (ret == IDE_OK) {
@@ -70,7 +70,7 @@ static int ide_multiple_prepare(int drive)
         return IDE_OK;
     }
     /* Clean rejection falls back once. Never overlay a still-active command. */
-    st = (u8)inp(IDE_ALT_STATUS);
+    st = ide_bus_alt();
     if (st & (IDE_ST_BSY | IDE_ST_DRQ)) return ret;
     return IDE_OK;
 }

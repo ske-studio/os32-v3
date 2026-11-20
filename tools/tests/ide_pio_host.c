@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "ide.h"
+#include "platform_ide_ports.h"
 #include "ide_addr.h"
 #include "kprintf.h"
 
