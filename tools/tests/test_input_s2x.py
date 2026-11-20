@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """S2x pinned old/new capture trace comparison with fixed BSD deltas and startup fault injection."""
 CHECK = dict(name='input-s2x-host', tier=1, budget=45, needs=[], kind='characterization',
-    basis=['INPUT_KEYMAP_DESIGN §7 S2x, S2x へ送る項目'], covers=['tools/tests/input_s3_differences.tsv', 'docs/decisions/INPUT_BIND_DESIGN.md', 'tools/tests/input_pc98_compat_host.c', 'tools/tests/kernel_includes.py',
+    basis=['INPUT_KEYMAP_DESIGN §7 S2x/S3x, S2x へ送る項目'], covers=['tools/tests/input_s3_differences.tsv', 'docs/decisions/INPUT_BIND_DESIGN.md', 'tools/tests/input_pc98_compat_host.c', 'tools/tests/kernel_includes.py',
     'drivers/input/kbd_hal.c', 'drivers/input/kbd.c', 'drivers/input/*.h',
     'platform/pc98/input_keymap.c', 'input/keymaps/*.c', 'input/hal/*.c', 'input/hal/*.h',
     'include/**', 'sdk/include/os32/**', 'tools/tests/host_arch/**', 'platform/pc98/platform_io.h',
@@ -65,6 +65,7 @@ def run(ctx):
             return r.returncode, r.stdout
         previous = build(old, 'old', True)
         current = build(sources, 'new')
+        assert trace(current, 0, 5) == (0, b'')
         expected = {}
         for lock in (0, 2, 4, 6):  # SHIFT_CAPS=2, SHIFT_KANA=4
             rc, expected[lock] = trace(previous, lock, 0)
@@ -77,6 +78,17 @@ def run(ctx):
                     next((i for i, (a,b) in enumerate(zip(actual, expected[lock])) if a != b), None))
         print('PASS S2x: 304 fixed byte deltas (49 keys, Kana invariant); 128 keys x 32 modifiers x 4 boot locks; CUI/raw/repeat/V86/STOP; both backend, source, bind failures', flush=True)
         if ctx.mutate:
+            deliver = tmp / 's2x_deliver.inc'
+            original = deliver.read_text()
+            anchor = 'input_key_pressed(KEY_CTRL)'
+            assert original.count(anchor) == 1
+            for predicate in ('({ KmState s; km_state_snapshot(&s); s.mods & KM_MOD_CTRL; })',
+                              '!input_key_pressed(KEY_CTRL)'):
+                deliver.write_text(original.replace(anchor, predicate))
+                rc, _ = trace(build(sources, 'mutant'), 0, 5)
+                assert 0 < rc < 128, rc
+                print('RED runtime S3x:', predicate, 'rc=', rc, flush=True)
+            deliver.write_text(original)
             mutations = [
                 ('.keycode = scancode & SCANCODE_KEY', '.keycode = scancode'),
                 ('.keycode = scancode & SCANCODE_KEY, .down = !(scancode & SCANCODE_BREAK)',

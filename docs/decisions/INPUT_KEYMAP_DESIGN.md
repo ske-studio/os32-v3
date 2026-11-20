@@ -201,7 +201,7 @@ legacy_cooked_push(((u16)sc << 8) | byte);
 |H-usb-clean|`include/usb_platform.h` 変|os32powerpc、S2m有効化後→旧sc口の宣言を除去、H-usbと直列|
 |S3|`input/hal/legacy_keymap.c` 新|S0b→由来付きkeysymから互換keydata|
 |S3d|`input/hal/kbd_merge.c` 変|S0d/S3→共通出口へ切替、旧文字表撤去。S0dと直列|
-|S3x|`drivers/input/kbd.c` 変|S3d/S2x/親3a,3c完了→X-cooked接続と物理救済|
+|S3x|`drivers/input/kbd.c` 変|S3d/S2x/親3a,3c完了。X-cooked 接続を確認し、CTRL+STOP の救済を物理押下で判定|
 |S3m|`platform/powermac/input_usb.c` 変|S3d/S2m→独自ring/held/Caps撤去、共通出口wrapper|
 |S3b|`platform/powermac/input_boot.c` 変|S3m→provider raw/pressed/mods、LAN優先保持|
 |S4|`input/hal/input_ime_gate.c` 変|M7全小段完了・S3後に直列→IME_ON/OFF順序配送|
@@ -547,3 +547,8 @@ PM決定 (2026-11-17): S0aは`km_source_release`の空inlineを維持し、別�
 - no_keydata の判定と、kbd_merge.c の capture_state の boot_locks の上乗せを消す変異を 1 本ずつ足す。
 - legacy_keymap.c: 静的な表が不正 (km_eval の INVAL) なら予備の経路も全キーを捨てる。今の表では起きない。S3x の段で、起動時に km_eval を 1 回試して boot.log に残すかを決める。
 - userland/gshell/src/input.rs の旧い表の写しは G 段で更新する。
+
+## S3x の実装判断
+
+- X-cooked は `kbd_deliver → kbd_hal_capture → input_capture_key → input_emit_keymap → legacy_cooked_take` に接続済み。救済と cooked STOP の抑止はともに `input_key_pressed(KEY_CTRL)` を使う。GUI の STOP 抑止と V86 の配信優先順を保つ。
+- 起動時の `km_eval` は追加しない。登録時に全セルを検証し、登録失敗は boot.log に残る。全キーと修飾の組み合わせはホスト試験で照合する。予備経路は INVAL の入力を捨てる。

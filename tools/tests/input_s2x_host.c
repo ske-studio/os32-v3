@@ -36,8 +36,27 @@ void bootlog_push(const char *s, u32 n)
     logs++;
 }
 int __real_km_backend_register(const KmBackend *map);
+static KmBackend remapped;
+static KmPc98Extensions ext;
+static KmExactCell cells[128][8];
+static int register_remapped(const KmBackend *map)
+{
+    if (map->id != KM_MAP_PC98) return __real_km_backend_register(map);
+    remapped = *map;
+    ext = *(const KmPc98Extensions *)map->extensions;
+    for (int sc = 0; sc < 128; sc++)
+        for (int col = 0; col < 8; col++) cells[sc][col] = ext.bank0[sc][col];
+    for (int col = 0; col < 8; col++) {
+        cells[KEY_CAPS][col] = (KmExactCell){0xf103, KM_CHAR, 0};
+        cells[KEY_CTRL][col] = (KmExactCell){'a', KM_CHAR, 0};
+    }
+    ext.bank0 = cells;
+    remapped.extensions = &ext;
+    return __real_km_backend_register(&remapped);
+}
 int __wrap_km_backend_register(const KmBackend *map)
 {
+    if (config[1] == 5) return register_remapped(map);
     backend_calls++;
     if ((config[1] == 1 && backend_calls == 1) ||
         (config[1] == 2 && backend_calls == 2)) return -1;
@@ -94,12 +113,59 @@ static void step(u8 scan)
     }
     record(0xfffffffd);
 }
+static int rescue(void)
+{
+    for (int gui = 0; gui < 2; gui++) {
+        KmState state;
+        kbd_set_gui_mode(gui);
+        kbd_deliver(KEY_CAPS); /* logical Ctrl, no physical Ctrl */
+        km_state_snapshot(&state);
+        T(state.mods & KM_MOD_CTRL);
+        T(!input_key_pressed(KEY_CTRL));
+        unsigned before = aborts;
+        kbd_deliver(KEY_STOP);
+        T(aborts == before);
+        if (!gui) T(legacy_cooked_take() == 0x6000);
+        kbd_deliver(KEY_STOP | 128);
+        kbd_deliver(KEY_CAPS | 128);
+        legacy_raw_flush(); legacy_cooked_flush();
+        kbd_deliver(KEY_CTRL); /* physical Ctrl, remapped to a */
+        km_state_snapshot(&state);
+        T(!(state.mods & KM_MOD_CTRL));
+        T(input_key_pressed(KEY_CTRL));
+        kbd_deliver(KEY_STOP);
+        T(aborts == before + 1);
+        T(legacy_cooked_take() == -1);
+        kbd_deliver(KEY_STOP | 128);
+        if (gui) {
+            kbd_discard_stop();
+            kbd_deliver(KEY_STOP);
+            T(aborts == before + 1);
+            kbd_deliver(KEY_STOP | 128);
+            tick_count += 50;
+            kbd_deliver(KEY_STOP);
+            T(aborts == before + 2);
+            kbd_deliver(KEY_STOP | 128);
+        }
+        kbd_deliver(KEY_CTRL | 128);
+        legacy_raw_flush();
+    }
+    guest = 1;
+    unsigned before = aborts;
+    kbd_deliver(KEY_CTRL); kbd_deliver(KEY_STOP);
+    T(aborts == before && guests == 4);
+    kbd_deliver(KEY_STOP | 128); kbd_deliver(KEY_CTRL | 128);
+    guest = 0;
+    T(legacy_cooked_take() == -1);
+    return 0;
+}
 static int probe(void)
 {
     int n;
     __asm__ volatile("int $0x80" : "=a"(n) : "a"(3), "b"(0), "c"(config), "d"(2) : "memory");
     T(n == 2);
     kbd_hal_init(config[0]);
+    if (config[1] == 5) return rescue();
     T(input_key_mods() == config[0]);
 #ifndef S2X_OLD
     T(logs == !!config[1]);
