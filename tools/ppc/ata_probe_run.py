@@ -29,7 +29,8 @@ def check_serial(data):
     for record in re.split(rb"(?m)^(?=ATA node=|device=|ATA probe done)", data):
         lines = record.splitlines()
         if lines and lines[0] == b"device=0" and all(
-            line in lines for line in (b"presence=ata", b"model=QEMU HARDDISK", expected)
+            line in lines for line in (b"select status=0x50 [DRDY DSC]", b"presence=ata",
+                                       b"model=QEMU HARDDISK", expected)
         ):
             return
     raise RuntimeError("missing QEMU HARDDISK and expected LBA 0 on device 0")
@@ -51,7 +52,7 @@ def run_cpu(work, iso, cpu, bios, timeout):
         "-drive", drive(disk, 0, "disk") + ",snapshot=on",
         "-drive", drive(iso, 2, "cdrom"), "-boot", "d",
         "-prom-env", r"boot-device=cd:,\BOOT.ELF", "-prom-env", "auto-boot?=true",
-        "-nographic", "-serial", f"file:{serial}", "-serial", "null",
+        "-display", "none", "-serial", f"file:{serial}", "-serial", "null",
         "-monitor", "none", "-no-reboot",
     ]
     try:

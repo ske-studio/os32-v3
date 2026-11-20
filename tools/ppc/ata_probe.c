@@ -11,6 +11,7 @@ enum {
     ATA_DRDY = 0x40, ATA_BSY = 0x80,
     ATA_READ_SECTORS = 0x20, ATA_IDENTIFY = 0xec,
     ATA_WORDS = 256, ATA_DUMP_BYTES = 64,
+    KEYLARGO_FCR1 = 0x3c, CHANNEL_WAIT_SECONDS = 30,
     ATA_WAIT_SECONDS = 5, ATA_MAX_TB_HZ = 400000000,
     OF_PAGE = 4096, OF_TREE_DEPTH = 32, OF_TREE_NODES = 4096,
     PCI_ENTRY_CELLS = 5, PCI_BAR0 = 0x10, PCI_MEM32 = 0x02000000,
@@ -44,6 +45,24 @@ static void hex(u32 value, unsigned digits)
         value >>= 4;
     }
     put(text);
+}
+
+static void decimal(u32 value)
+{
+    char text[11];
+    char *end = text + sizeof(text) - 1;
+    *end = 0;
+    do {
+        *--end = '0' + value % 10;
+        value /= 10;
+    } while (value);
+    put(end);
+}
+
+static void address_line(const char *name, cell value)
+{
+    put(name); put("=0x"); hex(value, 8);
+    put(" ("); decimal(value); put(")\r\n");
 }
 
 static int get(int node, const char *key)
@@ -112,7 +131,7 @@ static void property(int node, const char *key, int strings)
     put("\r\n");
 }
 
-static cell taskfile(int node)
+static cell taskfile(int node, cell *fcr)
 {
     int parent = ofw_parent(node);
     if (!valid_node(parent) || !matches(get(parent, "name"), "mac-io"))
@@ -120,6 +139,8 @@ static cell taskfile(int node)
     int n = get(node, "reg");
     if (n < 2 * (int)sizeof(cell) || n % (2 * sizeof(cell))) return 0;
     cell offset = prop[0], size = prop[1];
+    if (n >= 4 * (int)sizeof(cell))
+        address_line("dbdma_offset", prop[2]);
     if ((offset & 1) || size <= ATA_ALT_STATUS) return 0;
 
     n = get(parent, "assigned-addresses");
@@ -134,14 +155,18 @@ static cell taskfile(int node)
             return 0;
         base = prop[i + 2];
     }
+    if (base && !(base & 3) &&
+        get(parent, "vendor-id") == sizeof(cell) && prop[0] == 0x106b &&
+        get(parent, "device-id") == sizeof(cell) && prop[0] == 0x22)
+        *fcr = base + KEYLARGO_FCR1;
     return base ? base + offset : 0;
 }
 
-static int map_taskfile(const struct ofw_env *env, cell base)
+static int map_io(const struct ofw_env *env, cell base, cell last_offset)
 {
     if (env->real_mode) return 0;
     cell first = base & ~(OF_PAGE - 1U);
-    cell last = (base + ATA_ALT_STATUS) & ~(OF_PAGE - 1U);
+    cell last = (base + last_offset) & ~(OF_PAGE - 1U);
     cell args[5], *p = args;
     if (env->ac == 2) *p++ = 0;
     *p++ = first;
@@ -184,7 +209,20 @@ static unsigned wait_status(cell base, unsigned mask, unsigned want, int command
 
 static void status_line(const char *phase, unsigned status)
 {
-    put(phase); put(" status=0x"); hex(status, 2); put("\r\n");
+    static const char *const names[] = {
+        "ERR", "IDX", "CORR", "DRQ", "DSC", "DF", "DRDY", "BSY"
+    };
+    put(phase); put(" status=0x"); hex(status, 2); put(" [");
+    int first = 1;
+    for (int bit = 7; bit >= 0; --bit) {
+        if (status & (1U << bit)) {
+            if (!first) put(" ");
+            put(names[bit]);
+            first = 0;
+        }
+    }
+    if (!status) put("none");
+    put("]\r\n");
 }
 
 /* MacIO data is LE16. IDENTIFY strings store the first character in the
@@ -340,7 +378,8 @@ static void probe_channel(const struct ofw_env *env, int node)
     property(node, "reg", 0);
     property(node, "interrupts", 0);
     property(node, "AAPL,interrupts", 0);
-    cell base = taskfile(node);
+    cell fcr = 0;
+    cell base = taskfile(node, &fcr);
     if (!base) {
         put("channel=skipped unsupported-window\r\n");
         return;
@@ -349,15 +388,40 @@ static void probe_channel(const struct ofw_env *env, int node)
         put("channel=skipped timebase-unavailable\r\n");
         return;
     }
-    if (map_taskfile(env, base)) {
+    if (map_io(env, base, ATA_ALT_STATUS)) {
         put("channel=skipped of-map-failed\r\n");
         return;
     }
     ppc_disable();
     ++channels;
-    put("taskfile=0x"); hex(base, 8); put("\r\n");
-    unsigned status = wait_status(base, ATA_BSY | ATA_DRQ, 0, 0);
+    address_line("taskfile", base);
+    if (fcr && !map_io(env, fcr, 3)) {
+        u32 word;
+        __asm__ volatile("lwbrx %0,0,%1; eieio" : "=r"(word) : "r"(fcr) : "memory");
+        put("keylargo fcr1=0x"); hex(word, 8);
+        put(" EIDE0_ENABLE="); decimal((word >> 23) & 1);
+        put(" EIDE0_RESET="); decimal((word >> 24) & 1); put("\r\n");
+    }
+    u32 second_ticks = wait_ticks / ATA_WAIT_SECONDS;
+    u32 start = timebase();
+    unsigned status = ppc_load8(base + ATA_ALT_STATUS);
     status_line("channel", status);
+    for (unsigned sec = 1; sec <= CHANNEL_WAIT_SECONDS &&
+         status != 0xff && (status & ATA_BSY); ++sec) {
+        while (timebase() - start < second_ticks) {}
+        start += second_ticks;
+        unsigned previous = status;
+        status = ppc_load8(base + ATA_ALT_STATUS);
+        if (previous != status || sec % 5 == 0) {
+            put("t="); decimal(sec); status_line("", status);
+        }
+    }
+    if (status != 0xff && (status & ATA_BSY)) {
+        put("BSY stuck\r\n");
+        return;
+    }
+    if (status != 0xff && (status & ATA_DRQ))
+        status = wait_status(base, ATA_BSY | ATA_DRQ, 0, 0);
     if (status != 0xff && (status & (ATA_BSY | ATA_DRQ))) return;
     ppc_store8(base + ATA_ALT_STATUS, ATA_NIEN);
     if (probe_device(base, 0)) probe_device(base, 1);
