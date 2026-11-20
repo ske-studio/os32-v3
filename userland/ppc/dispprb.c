@@ -86,7 +86,7 @@ static void checkpoint(KernelAPI *api, volatile u8 *shadow, int key)
     volatile u32 *word = (volatile u32 *)shadow;
     u32 saved = *word;
     *word = 0x50524200u + key;
-    while (api->kbd_getkey() != key) {}
+    while ((api->kbd_getkey() & 0xff) != key) {}
     *word = saved;
 }
 

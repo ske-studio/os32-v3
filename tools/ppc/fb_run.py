@@ -315,9 +315,7 @@ def main():
         inp = (ROOT/src).read_text()
         literal = ''.join('\\x%02x' % c for c in 'echo 日本語の表示\n'.encode())
         helper = ('static int fb_usb(void) { int c = pm_input_usb_take(); '
-                  # pm_input_keymap returns bare ASCII for letters; accept the packed key too.
-                  "if (c == 'z' || c == ((0x29 << 8) | 'z')) { "
-                  'static const u8 text[] = "'+literal+'"; '
+                  'if ((c & 0xff) == \'z\') { static const u8 text[] = "'+literal+'"; '
                   'pm_terminal_feed(text, sizeof(text)-1); return -1; } return c; }\n')
         anchor = 'pm_input_usb_take()'
         require(inp.count(anchor) == 1, 'unique FB input boundary')
