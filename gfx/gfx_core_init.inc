@@ -1,6 +1,10 @@
 /* 400/200 行の初期化。packed 系はどちらの入口でも native 解像度を使う。 */
 static void gfx_init_mode(int legacy200)
 {
+    if (!con_sink_is_enabled() && res_owner_get() == APP_ID_SHELL) {
+        if (input_display_restore_drain() < 0) return;
+        appslot_gfx_resource_acquire(APP_ID_SHELL);
+    }
     palette_shadow_reset();
     gfx2_pal_reset16();
     display_provider_raster_reset();

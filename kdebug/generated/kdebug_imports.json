@@ -1,7 +1,7 @@
 {
-  "module_abi_gen": 1203884307,
+  "module_abi_gen": 296650503,
   "stage": "S6",
-  "count": 328,
+  "count": 329,
   "imports": [
     {
       "stage": "S1",
@@ -4969,6 +4969,22 @@
       "type_ver": 1,
       "signature": "void path_init(void);",
       "source_declaration": "void path_init(void);",
+      "dtype": null,
+      "array": false
+    },
+    {
+      "index": 328,
+      "symbol": "input_display_restore_drain",
+      "source": "input/hal/input_context.h",
+      "kind": 1,
+      "stage": "S6",
+      "context_safe": false,
+      "retained": true,
+      "name": "input_display_restore_drain",
+      "kind_name": "FUNC",
+      "type_ver": 1,
+      "signature": "int input_display_restore_drain(void);",
+      "source_declaration": "int input_display_restore_drain(void);",
       "dtype": null,
       "array": false
     }

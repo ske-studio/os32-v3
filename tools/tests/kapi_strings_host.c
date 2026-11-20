@@ -59,6 +59,7 @@ u32 kapi_invoke(void *target, const void *words, u32 bytes)
 }
 #include "strings_host_source.c"
 #include "ls_host_source.c"
+static void exec_input_owner_exit(int id) { (void)id; }
 #include "cleanup_host_source.c"
 
 void ring3_fault_kill(void) { __builtin_longjmp(killed, 1); }

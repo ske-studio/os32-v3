@@ -1,3 +1,6 @@
+#include "types.h"
+#include "io.h"
+volatile u32 kctx_irq_depth, kctx_exc_depth;
 #include "host_exec_context.h"
 /* Policy transitions are exercised separately by test_gfx_policy_triggers. */
 void gfx_policy_reeval(void) {}

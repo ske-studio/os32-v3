@@ -116,9 +116,8 @@ u32 kapi_invoke(void *fn, const void *args, u32 n) {
 }
 int kbd_inject_peek_for(int id, u8 *ch) { (void)id; *ch='X'; return 1; }
 int kbd_inject_take_for(int id, u8 *ch) { (void)id; *ch='X'; injected++; return 1; }
-static int host_if=1;
-static u32 irq_save(void) { int old=host_if; host_if=0; return old; }
-static void irq_restore(u32 f) { host_if=f; }
+#include "io.h"
+#define host_if (_irq_enabled())
 static u16 kbd_raw_buf[KBD_BUF_SIZE];
 static int kbd_raw_count, kbd_raw_head, kbd_raw_tail;
 static u32 kbd_raw_dropped;
@@ -451,7 +450,7 @@ def run(overrides=None):
     transition = read('exec/appslot_transition.inc').replace(
         '#include "appslot_park.inc"', read('exec/appslot_park.inc'))
     hwb_flag = re.search(r'^static volatile u32 g_hwb_abort_pending = 0;', ex, re.M)[0]
-    hwb_flag += '\n' + re.search(r'^static volatile u32 g_cui_display_abort_pending;', ex, re.M)[0]
+    hwb_flag += '\nint input_display_restore_capture(u32 owner) { (void)owner; return 0; }\nint input_display_restore_drain(void) { return 0; }\n'
     code = PRE + constants + hwb_flag + '\n' + read('exec/appslot.c').replace(
         '#include "appslot_transition.inc"', transition) + '\n' + syscall_providers(ROOT, read) + '\n'.join(function(ex,n) for n in (
         'exec_cui_display_abort','ring3_abort_request','ring3_abort_check','exec_park_transfer','exec_park_stop','exec_syscall_dispatch')) + '\n' + resume + '\n'

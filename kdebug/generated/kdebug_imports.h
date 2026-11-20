@@ -45,6 +45,7 @@
 #include "include/sys.h"
 #include "include/text_screen.h"
 #include "include/user_read_contract.h"
+#include "input/hal/input_context.h"
 #include "kapi/kapi_db.h"
 #include "kdebug/gf5_test.h"
 #include "kdebug/gf_display_test.h"
@@ -151,8 +152,8 @@ void kdi_set_kbd_inject_drop_count(u32 value);
 const u8 *kdi_ptr_ring3_ls_start(void);
 const u8 *kdi_ptr_ring3_ls_end(void);
 u32 *kdi_ptr___kernel_resident_end(void);
-#define KDEBUG_IMPORT_COUNT 328
-#define KDEBUG_ABI_GEN 0x47c1d113u
+#define KDEBUG_IMPORT_COUNT 329
+#define KDEBUG_ABI_GEN 0x11ae8707u
 #include "kernel/module/module_image.h"
 extern void (*const kdebug_kexports[])(void);
 extern const struct module_symbol_contract kdebug_import_contracts[];

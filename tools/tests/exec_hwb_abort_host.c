@@ -13,6 +13,8 @@ static void observed_restore(unsigned int flags);
 #undef irq_save
 #undef irq_restore
 #include "exec/appslot.c"
+#include "input/hal/input_context.c"
+#include "input/hal/input_interrupt.c"
 #include "exec/ring3_str.c"
 volatile u32 kctx_irq_depth, kctx_exc_depth;
 
@@ -92,7 +94,8 @@ static void test(void)
 
     /* Independent expectations from §3/F and existing GUI STOP contract. */
     HWB_TEST("display-return");
-    g_cui_display_abort_pending = 0; display_returns = 0;
+    input_interrupt_init(); appslot_gfx_resource_acquire(APP_ID_SHELL);
+    display_returns = 0;
     exec_cui_display_abort(); CHECK(!display_returns);
     ring3_abort_request(); CHECK(!display_returns);
     kctx_irq_depth = 1;

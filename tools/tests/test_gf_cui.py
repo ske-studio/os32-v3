@@ -45,14 +45,18 @@ def run_case(root, directory):
         return result
     # Execute the shipped notification body with an observable GF callback.
     text = (root/'exec/appslot.c').read_text()
-    body = text.split('void appslot_gfx_owner_exit(int id)\n', 1)[1].split('\n}\n', 1)[0]+'\n}\n'
+    body = text.split('static void gfx_resource_reserve(int id)\n', 1)[1].split('int appslot_gfx_owner_exit_if', 1)[0]
     source = directory/'cleanup.c'
     source.write_text('''#include "tools/tests/gf_command_runtime_host.h"
 static int calls, last_id, g_gfx_owner;
+typedef unsigned long u32;
+static u32 gfx_resource_owner, gfx_resource_gen;
+static unsigned int irq_save(void) { return 0; }
+static void irq_restore(unsigned int flags) { (void)flags; }
 #define GFX_OWNER_WM 1
 void gf_display_owner_exit(int id) { ++calls; last_id = id; }
 void gfx_policy_reeval(void) {}
-'''+'static inline void exec_surface_policy_reeval' + (root/'exec/exec_surface.h').read_text().split('static inline void exec_surface_policy_reeval', 1)[1].split('\n', 1)[0] + '\n'+'''void appslot_gfx_owner_exit(int id)
+'''+'static inline void exec_surface_policy_reeval' + (root/'exec/exec_surface.h').read_text().split('static inline void exec_surface_policy_reeval', 1)[1].split('\n', 1)[0] + '\n'+'''static void gfx_resource_reserve(int id)
 '''+body+'''
 void _start(void) {
     g_gfx_owner=2;appslot_gfx_owner_exit(3);
