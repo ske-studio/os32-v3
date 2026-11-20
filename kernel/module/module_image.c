@@ -6,6 +6,16 @@
 STATIC_ASSERT(sizeof(u32) == 4, module_u32_is_four_bytes);
 STATIC_ASSERT(MI_WORDS * MODULE_WORD_BYTES == MODULE_HEADER_SIZE, module_header_words);
 
+#ifdef __powerpc__
+#define IMAGE_VERSION MODULE_PPC_FORMAT_VERSION
+#define IMAGE_TARGET MODULE_PPC_TARGET_TAG
+#define IMAGE_RELOC_BYTES MODULE_PPC_RELOC_ENTRY_SIZE
+#else
+#define IMAGE_VERSION MODULE_FORMAT_VERSION
+#define IMAGE_TARGET 0
+#define IMAGE_RELOC_BYTES MODULE_RELOC_ENTRY_SIZE
+#endif
+
 static const struct module_component_policy components[] = MODULE_COMPONENT_POLICIES;
 
 static const struct module_component_policy *component_policy(u32 id)
@@ -35,6 +45,10 @@ static int overlap(u32 a, u32 an, u32 b, u32 bn)
 
 static int in_text(u32 off, const u32 *h)
 {
+#ifdef __powerpc__
+    if (off % MODULE_WORD_BYTES || !within(off - h[MI_TEXT_OFF], MODULE_WORD_BYTES, h[MI_TEXT_SIZE]))
+        return 0;
+#endif
     return off >= h[MI_TEXT_OFF] && off - h[MI_TEXT_OFF] < h[MI_TEXT_SIZE];
 }
 
@@ -46,21 +60,21 @@ int module_image_header(const u8 *header, u32 header_bytes, u32 file_size,
     u32 *h = plan.word;
     u32 table_off[MODULE_TABLE_COUNT], table_len[MODULE_TABLE_COUNT];
     static const u32 record_size[MODULE_RECORD_TABLES] = {
-        MODULE_RELOC_ENTRY_SIZE, MODULE_RECORD_SIZE, MODULE_RECORD_SIZE
+        IMAGE_RELOC_BYTES, MODULE_RECORD_SIZE, MODULE_RECORD_SIZE
     };
     if (!header || !policy || header_bytes < MODULE_HEADER_SIZE)
         return MODULE_BAD_HEADER;
     const struct module_component_policy *component = component_policy(policy->module_id);
     if (!component) return MODULE_BAD_HEADER;
     for (u32 i = 0; i < MI_WORDS; i++) h[i] = le_read32(header + MODULE_WORD_BYTES * i);
-    if (h[MI_MAGIC] != MODULE_MAGIC || h[MI_FORMAT] != MODULE_FORMAT_VERSION ||
+    if (h[MI_MAGIC] != MODULE_MAGIC || h[MI_FORMAT] != IMAGE_VERSION ||
         h[MI_HEADER_SIZE] != MODULE_HEADER_SIZE || h[MI_IMAGE_SIZE] != file_size ||
         file_size > component->image_max || h[MI_ID] != component->module_id ||
         h[MI_PHASE] != component->phase ||
         (h[MI_FLAGS] & component->required_flags) != component->required_flags ||
         (h[MI_FLAGS] & ~component->allowed_flags) ||
         (!component->stop_allowed && h[MI_STOP]) ||
-        h[MI_RESERVED0] != 0 || h[MI_RESERVED1] != 0)
+        h[MI_RESERVED0] != IMAGE_TARGET || h[MI_RESERVED1] != 0)
         return MODULE_BAD_HEADER;
     if (h[MI_PAYLOAD_OFF] < MODULE_PAGE_SIZE ||
         h[MI_PAYLOAD_OFF] % MODULE_PAGE_SIZE ||
@@ -198,6 +212,7 @@ int module_image_validate(const u8 *image, u32 size,
         seen |= 1U << slot;
     }
     if (name_pos != h[MI_NAMES_SIZE]) return MODULE_BAD_HEADER;
+#if IMAGE_VERSION == MODULE_FORMAT_VERSION
     /* Generated tables are sorted: a high-water mark makes those linear.
      * For unsorted input compare earlier intervals, preserving immutable input
      * and bounded stack use. Counts are capped in header validation. */
@@ -220,6 +235,11 @@ int module_image_validate(const u8 *image, u32 size,
     }
     if (out) *out = plan;
     return MODULE_IMAGE_OK;
+#else
+    /* PPC fixup validation joins here when its implementation is available. */
+    (void)out;
+    return MODULE_RELOC_INVALID;
+#endif
 }
 
 /* Validate every write and base addition before changing even BSS. The owned

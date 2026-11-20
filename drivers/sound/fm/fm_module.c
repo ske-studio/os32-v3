@@ -4,7 +4,7 @@ _Static_assert(PC98_TICK_COUNT <= TICK_SLOT_COUNT, "PC98 tick slots exceed table
 /* Resident facade and tick registration; all playback state is in fm.mod. */
 #include "fm_module.h"
 #include "fm_imports.h"
-#include "bootinfo.h"
+#include "platform_module_pair.h"
 #include "config.h"
 #include "os32_generations.h"
 #include "os32_kapi_shared.h"
@@ -189,12 +189,13 @@ int fm_module_load(void)
 {
     if (tick_register(PC98_TICK_SND, snd_tick) != 0) return MODULE_INIT_FAILED;
     if (fm_handle.generation) return MODULE_BUSY;
-    const struct boot_common *bi = boot_common_get();
+    u32 pair = 0;
+    int pair_valid = platform_module_pair(&pair);
     const struct module_request request = {
         .path = SYS_FM_MOD, .name = "fm",
         .policy = {
             KAPI_VERSION, OS32_MEMORY_LAYOUT_GENERATION, FM_MODULE_ABI_GEN,
-            bi->image_crc, FM_MODULE_OPS_VERSION, bi->image_valid,
+            pair, FM_MODULE_OPS_VERSION, pair_valid,
             FM_IMPORT_COUNT, fm_import_contracts, fm_export_contracts,
             MODULE_ID_FM
         },
@@ -205,7 +206,7 @@ int fm_module_load(void)
     if (!rc) rc = module_start(fm_handle);
     if (!rc && !module_exports(fm_handle)) rc = MODULE_INIT_FAILED;
     kprintf(KLOG_ATTR, "[fm] module rc=%d pair=%08x tick=%d\n",
-            rc, bi->image_crc, tick_target != 0);
+            rc, pair, tick_target != 0);
     return rc;
 }
 

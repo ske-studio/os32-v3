@@ -4,7 +4,7 @@ _Static_assert(PC98_TICK_COUNT <= TICK_SLOT_COUNT, "PC98 tick slots exceed table
 /* Resident facade and IRQ/tick/DMA references, using the T5c-0 record. */
 #include "pcm_module.h"
 #include "pcm_imports.h"
-#include "bootinfo.h"
+#include "platform_module_pair.h"
 #include "config.h"
 #include "os32_generations.h"
 #include "kstring.h"
@@ -185,12 +185,13 @@ int pcm_module_load(void)
 {
     if (tick_register(PC98_TICK_PCM, pcm_tick) != 0) return MODULE_INIT_FAILED;
     if (pcm_handle.generation) return MODULE_BUSY;
-    const struct boot_common *bi = boot_common_get();
+    u32 pair = 0;
+    int pair_valid = platform_module_pair(&pair);
     const struct module_request request = {
         .path = SYS_PCM_MOD, .name = "pcm",
         .policy = {
             KAPI_VERSION, OS32_MEMORY_LAYOUT_GENERATION, PCM_MODULE_ABI_GEN,
-            bi->image_crc, PCM_MODULE_OPS_VERSION, bi->image_valid,
+            pair, PCM_MODULE_OPS_VERSION, pair_valid,
             PCM_IMPORT_COUNT, pcm_import_contracts, pcm_export_contracts,
             MODULE_ID_PCM
         },
@@ -202,7 +203,7 @@ int pcm_module_load(void)
     if (!rc) rc = module_start(pcm_handle);
     if (!rc && !module_exports(pcm_handle)) rc = MODULE_INIT_FAILED;
     kprintf(KLOG_ATTR, "[pcm] module rc=%d pair=%08x tick=%d\n",
-            rc, bi->image_crc, tick_target != 0);
+            rc, pair, tick_target != 0);
     return rc;
 }
 

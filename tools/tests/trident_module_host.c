@@ -319,6 +319,8 @@ void _start(void)
 }
 
 u32 cpu_loops_per_tick(void) { return 1000000; }
+#include "../../platform/pc98/module_pair.c"
+
 const struct boot_common *boot_common_get(void) {
     static struct boot_common info;
     const struct bootinfo *bi = bootinfo_get();

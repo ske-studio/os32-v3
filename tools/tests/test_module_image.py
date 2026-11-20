@@ -25,9 +25,9 @@ FLAGS = ["-m32", "-march=i386", "-std=gnu11", "-O2", "-Wall", "-Wextra", "-Werro
          "-Werror=vla", "-ffreestanding", "-fno-pie", "-fno-stack-protector"]
 
 
-def build_validator(directory, source=None):
+def build_validator(directory, source=None, extra_flags=()):
     exe = Path(directory) / "module-validator"
-    subprocess.run(["gcc", *FLAGS, "-nostdlib", "-static", "-no-pie",
+    subprocess.run(["gcc", *FLAGS, *extra_flags, "-nostdlib", "-static", "-no-pie",
                      *include_flags(ROOT),
                     str(HARNESS), str(source or TARGET_SRC), "-o", str(exe)], check=True)
     return exe
@@ -99,6 +99,11 @@ def cases():
         result.append((group, name, image, expected, dict(POLICY, **(policy or {}))))
 
     add("future-version", "future", lambda b: word(b, 1, 2))
+    add("format", "v1-foreign-tag", lambda b: word(b, 34, 20))
+    def powerpc_header(image):
+        word(image, 1, 2)
+        word(image, 34, 20)
+    add("format", "powerpc-v2", powerpc_header)
     add("id-policy", "known-image-wrong-policy", lambda b: None, policy={"module_id": 2})
     add("id-policy", "unknown-policy", lambda b: None, policy={"module_id": 0})
     add("id-policy", "wrong-image-id", lambda b: word(b, 7, 2))
@@ -206,6 +211,24 @@ def cases():
     return result
 
 
+def powerpc_cases(directory, runner):
+    # Exercise the PPC wire policy using the ILP32 host runner.
+    exe = build_validator(directory, extra_flags=("-D__powerpc__",))
+    def check(image, expected):
+        run = validate(exe, crc(image), runner=runner, relocate_base=0, **POLICY)
+        assert run.returncode == 1 and run.stdout == f"RED {expected:02}\n".encode()
+    check(fixture(), 3)
+    image = fixture()
+    for field, value in ((1, 2), (34, 20), (22, 0), (29, 0)):
+        word(image, field, value)
+    struct.pack_into("<I", image, 172, 8)  # aligned export in text
+    check(image, 11)  # shared validation passed, PPC fixups not yet available
+    for field, value in ((34, 0), (29, 2), (29, 24), (22, 1)):
+        check(word(bytearray(image), field, value), 3)
+    struct.pack_into("<I", image, 172, 9)
+    check(image, 3)
+
+
 def run_suite(exe, runner, verbose=True):
     positives = [fixture()]
     unsorted = fixture()
@@ -269,7 +292,8 @@ def run_suite(exe, runner, verbose=True):
 
 
 MUTATIONS = [
-    ("future", "h[MI_FORMAT] != MODULE_FORMAT_VERSION", "0"),
+    ("target-tag", "h[MI_RESERVED0] != IMAGE_TARGET", "0"),
+    ("future", "h[MI_FORMAT] != IMAGE_VERSION", "0"),
     ("header-size", "h[MI_HEADER_SIZE] != MODULE_HEADER_SIZE", "0"),
     ("image-size", "h[MI_IMAGE_SIZE] != file_size", "0"),
     ("table-range", "off < MODULE_HEADER_SIZE || off > h[MI_PAYLOAD_OFF]", "off > h[MI_PAYLOAD_OFF]"),
@@ -294,6 +318,7 @@ MUTATIONS = [
 def main():
     runners = os.environ.get("HOST32_RUNNERS", "native qemu").split()
     with tempfile.TemporaryDirectory(prefix="module-image-") as td:
+        powerpc_cases(td, runners[0])
         exe = build_validator(td)
         for runner in runners:
             ok, name, run = run_suite(exe, runner)
