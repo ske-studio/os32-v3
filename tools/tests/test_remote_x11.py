@@ -210,6 +210,8 @@ def main():
                 ('stale drain disabled', ('lan', 'while (!read_rshell_notice(&notice))', 'while (0 && !read_rshell_notice(&notice))')),
                 ('LAN exit return discarded', ('rshell', 'rsh_lan_poll() == RSH_LAN_EXIT',
                     'rsh_lan_poll() == 999')),
+                ('startup consumes queued local key', ('ui', '    if (startup_notice)',
+                    '    (void)g_api->kbd_trygetchar_local();\n    if (startup_notice)')),
                 ('boot initializes absent UART', ('ui', 'if (uart) g_api->serial_init', 'g_api->serial_init')),
                 ('UART initialized after active', ('ui',
                     startup_init_block, startup_init_block.replace(init_uart, '').replace(

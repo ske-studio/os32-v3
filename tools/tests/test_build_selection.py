@@ -114,6 +114,8 @@ KBOOT_QUERY = ('.PHONY: kboot-query\nkboot-query:\n'
                '\t@echo "KB_OUT=$(KB_OUT)"\n\t@echo "KB_VFS=$(KB_VFS)"\n'
                '\t@echo "KB_SQLITE_INC=$(KB_SQLITE_INC)"\n'
                '\t@echo "KB_SQLITE_AUDIT=$(KB_SQLITE_AUDIT)"\n'
+               '\t@echo "KB_EXEC=$(KB_EXEC)"\n\t@echo "KB_ROOT_BINS=$(ROOT_BINS)"\n'
+               '\t@echo "KB_ROOT_DEPS=$(ROOT_DEPS)"\n'
                '\t@echo "KB_PENDING=$(KB_PENDING_OBJ)"\n'
                '\t@echo "KB_MODULES=$(MODULE_FEATURES)"\n')
 
@@ -136,11 +138,23 @@ def check_kboot(root):
     for name, image in expected.items():
         # 像は旗でも名前でも選べる (build/images/ppc-flags.mk)。NEGATIVE の像は旗だけ。
         selectors = [image['flags']] + ([] if 'NEGATIVE=1' in image['flags'] else [['IMAGE=kboot-' + name]])
+        if name != 'neg1':
+            legacy_flags = {'core': (0, 0, 0), 'link': (1, 0, 0),
+                            'shell': (0, 0, 1), 'sh': (0, 1, 0), 'link-sh': (1, 1, 0)}
+            selectors.append([f'{flag}={value}' for flag, value in zip(
+                ('KBOOT_LINK', 'KBOOT_SH', 'KBOOT_SHELL'), legacy_flags[name])])
         for selector in selectors:
             out = subprocess.check_output([*command, *selector, 'kboot-query'], cwd=root, text=True,
                                           stderr=subprocess.PIPE)
             actual = dict(line.split('=', 1) for line in out.splitlines() if line.startswith('KB_'))
             assert actual['KB_OUT'] == image['KB_OUT'], (name, selector)
+            enabled = name in ('shell', 'sh', 'link-sh')
+            assert actual['KB_EXEC'] == ('1' if enabled else ''), (name, selector)
+            assert actual['KB_ROOT_BINS'] == '', (name, selector)
+            user = 'build/out/ppc-user' + ('/link-sh' if enabled or name == 'link' else '')
+            assert actual['KB_ROOT_DEPS'].split() == [
+                'assets/fonts/shino16.kcgfont', 'assets/fonts/JF-Dot-Shinonome16-LICENSE.txt',
+                'build/out/unicode.bin', user + '/shell.bin'], (name, selector)
             ext2 = 'fs/ext2/ext2_'
             formatter = {ext2 + stem for stem in ('fmt', 'layout', 'time')}
             pending = set(actual['KB_PENDING'].split())
@@ -149,7 +163,6 @@ def check_kboot(root):
             ide = ext2 + 'medium_ide'
             assert actual['KB_OUT'] + '/' + ide + '.o' not in pending, name
             assert {unit + '.c' for unit in formatter | {ide}}.isdisjoint(actual['KB_C'].split()), name
-            enabled = name in ('shell', 'sh', 'link-sh')
             assert 'sqlite' not in actual['KB_MODULES'].split()
             for key in ('KB_VFS', 'KB_SQLITE_INC', 'KB_SQLITE_AUDIT'):
                 assert bool(actual[key]) == enabled

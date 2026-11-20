@@ -421,6 +421,12 @@ def accept(elf,cpu,out,timeout,late=False,verdict=None):
         serial=(s.out/'serial-a.log').read_text(errors='replace')
         require('/sys/shell.bin returned ' in serial,'resident fault reached')
         require(s.word('g_capture')==0 and s.word('g_reader')==0xffffffff,'owner')
+        if verdict == 'fault-restart' and s.word('g_shell_service',8) == previous:
+            before = len(s.events)
+            s.agent.notifier.notify_number(RSHELL, EXECUTE, b'00001001 echo afterfault\n')
+            s.settle(2)
+            require(not any(e['parts'][:2] == ['RSH','OUT'] for e in s.events[before:]),
+                    'command completed after stopped restart')
         require(ready_count()>count and s.word('g_shell_service',8)>previous,'fault-restart')
         s.cmd('echo afterfault',b'afterfault\n')
         if verdict is None:
@@ -549,6 +555,87 @@ def accept_reset(elf, out, timeout, via, mutation=None):
         s.close()
 
 
+FLOW_CASES = ('root-branch', 'missing-aux', 'restore-root', 'return-target')
+
+
+def flow_settings(folder, case):
+    """Use the same entry/return guards on the control and each changed decision."""
+    source = (ROOT/'exec/exec.c').read_text()
+    source = 'volatile unsigned shell_flow_error;\n' + source
+    guard = 'do { shell_flow_error = %d; for (;;) __asm__ volatile("" ::: "memory"); } while (0);'
+    for fragment in ('exec_launch.inc', 'exec_finish.inc'):
+        text = (ROOT/'exec'/fragment).read_text()
+        if fragment == 'exec_launch.inc':
+            original = 'args.aux = is_shell ? (u32)(uptr)&g_shell_service : 0;'
+            assignment = 'args.aux = 0;' if case == 'missing-aux' else original
+            text = replace_once(text, original, assignment + '\n'
+                '        if (is_shell && args.aux != (u32)(uptr)&g_shell_service) ' + guard % 2)
+        else:
+            original = 'g_cur_app = 0;\n        paging_load_cr3(paging_kernel_pd_phys());'
+            root = '0' if case == 'restore-root' else 'paging_kernel_pd_phys()'
+            text = replace_once(text, original, 'g_cur_app = 0;\n'
+                '        u32 root = ' + root + ';\n'
+                '        if (root != paging_kernel_pd_phys()) ' + guard % 3 +
+                '\n        paging_load_cr3(root);')
+            original = 'parent = appslot_return_target(id);'
+            target = 'parent = id;' if case == 'return-target' else original
+            text = replace_once(text, original, target + '\n        if (parent == id) ' + guard % 4)
+        (folder/fragment).write_text(text)
+    observer = ROOT/'tools/accept/ppc_shell_flow.inc'
+    (folder/'exec.c').write_text(source + '\n#include "' + str(observer) + '"\n')
+    entry = (ROOT/'arch/ppc/exec_enter.S').read_text()
+    # Record the actual branch before an invalid root can be used by the MMU.
+    branch = 'bne' if case == 'root-branch' else 'beq'
+    entry = replace_once(entry, 'beq .Lresident', branch + ' .Lresident\n'
+                         '    cmpwi 4,0\n    beq .Lwrong_root')
+    entry = replace_once(entry, '.Lresident:\n', '.Lwrong_root:\n'
+                         '    lis 8,shell_flow_error@ha\n    li 9,1\n'
+                         '    stw 9,shell_flow_error@l(8)\n1:  b 1b\n'
+                         '.Lresident:\n    cmpwi 4,0\n    bne .Lwrong_root\n')
+    (folder/'exec_enter.S').write_text(entry)
+    user = folder/'user'
+    return ['IMAGE=kboot-link-sh', 'KB_SH_OUT='+str(user), 'KB_ROOT_BINS='+str(user/'hello.bin'),
+            'KB_MUT_SRC=exec/exec.c', 'KB_MUT_FILE='+str(folder/'exec.c'),
+            'KB_MUT_EXTRA_SRC=arch/ppc/exec_enter.S', 'KB_MUT_EXTRA_FILE='+str(folder/'exec_enter.S'),
+            'KB_KEEP_RESET=-Wl,--wrap=arch_entry_enter,--wrap=ppc_trap_dispatch,--wrap=exec_run']
+
+
+def flow_accept(elf, folder, case):
+    from usb_run import rsh_command
+    s = Session(elf, '7450', folder, 180)
+    try:
+        s.start()
+        if case in ('control', 'restore-root', 'return-target'):
+            s.wait(s.ready, 'resident before child', 60)
+            flow_point(s, 0, (1, 0, 1, 1, 0))
+            if case == 'control':
+                rsh_command(s, '/bin/hello.bin ok', b'hello ok\n')
+                flow_point(s, 1, (2, 1, 2, 2, 2))
+                flow_point(s, 2, (1, 0, 1, 1, 0))
+                rsh_command(s, 'echo $?', b'7\n')
+                rsh_command(s, 'echo next', b'next\n')
+                require(s.word('shell_flow_error') == 0, 'clean entry and return')
+                return
+            s.agent.operator.submit('cui', '/bin/hello.bin ok', 'flow')
+        def stopped():
+            try:
+                return s.word('shell_flow_error') == FLOW_CASES.index(case) + 1
+            except CriterionFailure:
+                return False
+        s.wait(stopped, 'specific rejected decision '+case, 60)
+        if case in ('restore-root', 'return-target'):
+            flow_point(s, 1, (2, 1, 2, 2, 2))
+            start = len(s.events)
+            s.agent.notifier.notify_number(RSHELL, EXECUTE, b'00002000 echo next\n')
+            s.settle(1)
+            require(not any(e['parts'][:2] == ['RSH', 'OUT'] for e in s.events[start:]),
+                    'command completed past invalid return')
+        else:
+            require(not s.ready(), 'READY after invalid resident entry')
+    finally:
+        s.close()
+
+
 def main():
     ap=argparse.ArgumentParser(description=__doc__)
     ap.add_argument('--out',type=Path,required=True)
@@ -575,8 +662,18 @@ def main():
     control=work/'normal'; control.mkdir()
     elf=build(control/'kernel',*settings(control, observe_flow=True))
     check_map(elf.with_suffix('.map'))
+    hashes = {hashlib.sha256(elf.read_bytes()).digest()}
+    for case in ('control', *FLOW_CASES) if args.mutate else ('control',):
+        folder = work/('flow-'+case)
+        folder.mkdir()
+        image = build(folder/'kernel', *flow_settings(folder, case), 'kb-user', 'kernel')
+        digest = hashlib.sha256(image.read_bytes()).digest()
+        require(digest not in hashes, 'distinct flow image '+case)
+        hashes.add(digest)
+        print('flow-'+case, digest.hex(), flush=True)
+        if not args.build_only:
+            flow_accept(image, folder/'guest', case)
     if args.build_only:
-        hashes={hashlib.sha256(elf.read_bytes()).digest()}
         if args.mutate:
             for name in MUTATIONS:
                 folder=work/name; folder.mkdir()

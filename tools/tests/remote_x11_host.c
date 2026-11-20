@@ -18,6 +18,7 @@ static char serial_echo[1024];
 static unsigned int echo_len;
 static int lan_exit, resident_active;
 static int boot_check, boot_remote, boot_runs, init_calls;
+static int queued_key = -1;
 static int uart_available = 1, local_escape, child_status, begin_rc;
 static int port_status(u32 *mode, u32 *baud, u32 *fifo)
 {
@@ -75,7 +76,12 @@ static int serial_get(void)
     if (serial_phase == 1) { CHECK(!pending); serial_phase = 2; serial_pos = 0; }
     return "exit\n"[serial_pos++];
 }
-static int local_get(void) { return local_escape ? 27 : -1; }
+static int local_get(void)
+{
+    int key = queued_key;
+    queued_key = -1;
+    return key >= 0 ? key : local_escape ? 27 : -1;
+}
 static int serial_ok(void) { CHECK(uart_available); return 1; }
 static void rs_active(int n)
 {
@@ -133,7 +139,9 @@ int main(void)
         resident_active = boot_runs = init_calls = 0;
         boot_remote = mask != 0;
         int eots_before_start = serial_eot;
+        queued_key = 'e';
         boot_terminal("startup");
+        CHECK(local_get() == 'e' && local_get() == -1);
         CHECK(boot_runs == boot_remote && init_calls == uart_available);
         CHECK(resident_active == boot_remote && serial_eot == eots_before_start);
     }

@@ -44,10 +44,16 @@ def observe(elf, cpu, folder, case):
             match = re.fullmatch(begin, scope)
             assert match, scope
             line = match.group(1)
-            expected = line if case == 'drop-exit' else line + b'sfs: exit=7\n'
-            for _ in range(3):
-                rsh_command(s, command, expected)
-                rsh_command(s, 'echo $?', b'7\n')
+            busy = b'sfs: session not started (-17: /host in use or session active)\n'
+            status = 0 if case == 'fixed-exit' else 7
+            expected = line + f'sfs: exit={status}\n'.encode()
+            for attempt in range(3):
+                if case == 'leak-owner' or (case == 'skip-end' and attempt):
+                    rsh_command(s, command, busy)
+                    rsh_command(s, 'echo $?', b'1\n')
+                else:
+                    rsh_command(s, command, line if case == 'skip-end' else expected)
+                    rsh_command(s, 'echo $?', f'{status}\n'.encode())
                 assert s.word('sfs_probe_starts') == 1
             if case == 'normal':
                 fault = rsh_command(s, 'sfs run /bin/fault.bin')
@@ -84,12 +90,12 @@ def main():
         return 3
     os.environ.setdefault('SOURCE_DATE_EPOCH', '946684800')
     work = Path(tempfile.mkdtemp(prefix='ppc-sfs-', dir=os.environ.get('TMPDIR'))).resolve()
-    user = work / 'user'
-    bins = ' '.join(str(user / (name + '.bin')) for name in ('fault', 'sfsprob'))
     seen = set()
-    cases = ('normal', 'unmounted', 'absent', 'drop-exit')
+    cases = ('normal', 'unmounted', 'absent', 'fixed-exit', 'skip-end', 'leak-owner')
     for case in cases if args.mutate else ('normal',):
         folder = work / case
+        user = folder / 'user'
+        bins = ' '.join(str(user / (name + '.bin')) for name in ('fault', 'sfsprob'))
         kernel = folder / 'kernel'
         kernel.mkdir(parents=True)
         anchor = 'int sfs_persistent_start(const struct SfsPersistentConfig *cfg)\n{'
@@ -97,9 +103,15 @@ def main():
                                    anchor, 'volatile unsigned sfs_probe_starts;\n' +
                                    anchor + '\n    ++sfs_probe_starts;' +
                                    ('\n    return OS32_ERR_NOSYS;' if case == 'unmounted' else ''))
-        if case == 'drop-exit':
+        if case in ('fixed-exit', 'skip-end'):
+            source = 'userland/shell/rshell.c'
+            anchor = '(void)g_api->sfs_end(status);'
+            replacement = 'status = 0; ' + anchor if case == 'fixed-exit' else ''
+            extra = mutant_settings(folder, case, source, anchor, replacement)
+            settings.extend(item.replace('KB_MUT_', 'PPC_RES_MUT_', 1) for item in extra)
+        elif case == 'leak-owner':
             extra = mutant_settings(folder, case, 'fs/serialfs/serialfs_session.c',
-                                    'if (rc == 0) console_printf(KLOG_LEGACY_CYAN, "sfs: exit=%d\\n", exit_code);', '')
+                                    'sfs_persistent_scope_owner_exit(owner);', '(void)owner;')
             settings.extend(item.replace('KB_MUT_', 'KB_MUT_EXTRA_', 1) for item in extra)
         elif case == 'absent':
             (generate(kernel, link=False) / 'stamp').touch()

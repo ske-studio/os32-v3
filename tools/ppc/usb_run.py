@@ -633,6 +633,16 @@ def link_usb_verdict(reason, text, log_alive, rsh_alive):
     return 'SURVIVED' if reason is None else 'wrong-reason'
 
 
+def before_shell_input(work):
+    """Hold the acceptance kernel before shell_loop until the real USB FIFO has a key."""
+    from kboot_accept import mutant_settings
+    anchor = '        shell_loop_run(&pm_shell_loop_ops);'
+    settings = mutant_settings(work, 'preloaded-key', 'platform/powermac/ppc_kernel.c',
+        anchor, '        extern int pm_input_usb_peek(void);\n'
+        '        while (pm_input_usb_peek() < 0) idle_wait_step();\n' + anchor)
+    return [item.replace('KB_MUT_', 'KB_MUT_EXTRA_', 1) for item in settings]
+
+
 def link_lan_accept(elf, cpu, out, mode='normal'):
     import link_sh_run as link
     from host_agent import HostAgent, hdr_unpack, LINK_HDR, OP_RELEASE
@@ -701,6 +711,7 @@ def link_lan_accept(elf, cpu, out, mode='normal'):
     s.root, s.drop, s.calls, s.releases = root, False, [], []
     UsbLink.__init__(s, elf, cpu, out/'guest', 180)
     a, b = s.out/'serial-a.log', s.out/'serial-b.log'
+    s.agent_enabled = mode == 'no-service'
     try:
         s.start()
         if mode == 'no-service':
@@ -737,7 +748,9 @@ def link_lan_accept(elf, cpu, out, mode='normal'):
         key, text_keys = keyboard_actions(s.q, lambda: serial(a),
                                          lambda predicate, label: s.wait(predicate, label, 30), s.out)
         # Type the first letter before waiting for the host. It belongs to the local line.
-        text_keys('echo first'); key('ret')
+        text_keys('e')
+        s.agent_enabled = True
+        text_keys('cho first'); key('ret')
         s.wait(s.ready, 'resident RSH READY', 60)
         first_echo = '> cho first' if mode == 'lost-first' else '> echo first'
         s.wait(lambda: first_echo in s.screen('first-key'), 'first keyboard line', 30)
@@ -841,6 +854,8 @@ def main():
     seen = set()
     for mode in ['normal'] + (['no-service', 'lost-first'] if args.mutate else []):
         opts = ['IMAGE=kboot-link-sh', 'PPC_CROSS_DIR='+str(cross)]
+        if mode != 'no-service':
+            opts += before_shell_input(work)
         if mode == 'no-service':
             src, dest = mutation(work, mode)
             opts += ['KB_MUT_SRC='+src, 'KB_MUT_FILE='+str(dest)]

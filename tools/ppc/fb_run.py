@@ -15,7 +15,7 @@ from fb_pixel import Font, Terminal, read_ppm, reserved_unchanged
 from kboot_accept import build, mutant_settings
 from kboot_run import ROOT, ROM, require
 from link_sh_run import Session
-from usb_run import rsh_command
+from usb_run import before_shell_input, rsh_command
 
 
 class PixelMismatch(AssertionError):
@@ -60,7 +60,15 @@ def observe(elf, out, cpu, case):
         s.key('ret')
 
     try:
+        s.agent_enabled = False
         s.start()
+        from kboot_run import serial
+        s.wait(lambda: 'protocol=01' in serial(out/'serial-a.log'), 'keyboard enumeration', 60)
+        s.key('e')
+        s.agent_enabled = True
+        local('cho first')
+        s.wait(lambda: 'cho first' in s.screen('preloaded'), 'preloaded command', 30)
+        check('> echo first' in s.screen('preloaded'), 'start-consumed')
         s.wait(s.ready, 'resident RSH READY', 90)
         initial, baseline = shot('boot')
         check('[sqlite] static rc=0' not in initial, 'trace-screen')
@@ -120,7 +128,7 @@ def main():
     seen = set()
     for case in ['normal'] + (list(MUTATIONS) if args.mutate else []):
         opts = mutant_settings(work, case, *MUTATIONS[case]) if case != 'normal' else []
-        elf = build(work/case, 'IMAGE=kboot-link-sh', *opts)
+        elf = build(work/case, 'IMAGE=kboot-link-sh', *before_shell_input(work), *opts)
         digest = hashlib.sha256(elf.read_bytes()).hexdigest()
         require(digest not in seen, 'distinct framebuffer image')
         seen.add(digest)
