@@ -10,6 +10,8 @@ import sys
 import tempfile
 import time
 
+from kboot_accept import fixed_layout, linked_image
+
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -22,50 +24,32 @@ def command(args):
     return result.stdout
 
 
-def fixed_layout(header):
-    layout = {name: int(value, 16) for name, value in re.findall(
-        r'#define LAYOUT_(\w+) (0x[0-9A-Fa-f]+)', header.read_text())}
-    # Fixed band boundaries and budgets from the shell alignment design, section 4.
-    expected = dict(KERNEL_LOAD_ADDR=0x100000, MEM_KERNEL_IMAGE_MAX=0x275000,
-                    MEM_FIXED_PAGING_GUARD_BASE=0x3e0000, MEM_SHELL_LOAD_ADDR=0x400000,
-                    MEM_SHELL_MAX_SIZE=0xa5000, MEM_SHELL_IMAGE_HEADROOM=0x10000,
-                    MEM_SHELL_HEAP_BASE=0x4b5000, MEM_SHELL_HEAP_END=0x4f5000,
-                    MEM_SHELL_EXEC_HEAP_SIZE=0x40000, MEM_SHELL_HEAP_SIZE=0x40000,
-                    MEM_SHELL_GUARD=0x4f5000, MEM_PAGE_SIZE=0x1000,
-                    MEM_SHELL_STACK_TOP=0x500000, MEM_SHELL_STACK_SIZE=0xa000)
-    for name, value in expected.items():
-        assert layout[name] == value, name
-    return layout
+def acceptance_extent(path):
+    _, _, symbols, _ = linked_image(path)
+    end, chain = symbols['__kernel_resident_end'], symbols['__kernel_chain_end']
+    print(f'{path}: resident_end={end:#x} chain={chain:#x}', flush=True)
+    return end, chain
 
 
-def linked_layout(path):
-    elf = path.read_bytes()
-    hdr = struct.unpack_from('>16sHHIIIIIHHHHHH', elf)
-    assert hdr[0][:6] == b'\x7fELF\x01\x02' and hdr[2] == 20
-    ph = [struct.unpack_from('>8I', elf, hdr[5]+i*hdr[9]) for i in range(hdr[10])]
-    load, = [p for p in ph if p[0] == 1]
-    symbols = {name: int(value, 16) for value, name in re.findall(
-        r'^\s*(0x[0-9a-f]+)\s+(__\w+) =', path.with_suffix('.map').read_text(), re.M)}
-    _, _, va, pa, raw, memory, _, _ = load
-    end = symbols['__kernel_resident_end']
-    chain = symbols['__kernel_chain_end']
-    assert va == pa == symbols['__kernel_image_start']
-    assert va + raw == symbols['__kernel_file_end'] and va + memory == end
-    layout = fixed_layout(path.parent/'memmap_layout.h')
-    assert memory <= layout['MEM_KERNEL_IMAGE_MAX'], f'{path}: PT_LOAD size {memory:#x}'
-    assert chain <= layout['MEM_FIXED_PAGING_GUARD_BASE'], f'{path}: chain end {chain:#x}'
-    return elf, load, symbols, layout
+def report_acceptance(paths, label='selected images'):
+    extents = [acceptance_extent(path) for path in paths]
+    print(f'{label} maximum resident_end={max(end for end, _ in extents):#x} '
+          f'chain={max(chain for _, chain in extents):#x}')
 
 
-def report_acceptance(paths):
-    largest_end = largest_chain = 0
-    for path in paths:
-        _, _, symbols, _ = linked_layout(path)
-        end, chain = symbols['__kernel_resident_end'], symbols['__kernel_chain_end']
-        print(f'{path}: resident_end={end:#x} chain={chain:#x}')
-        largest_end = max(largest_end, end)
-        largest_chain = max(largest_chain, chain)
-    print(f'acceptance maximum resident_end={largest_end:#x} chain={largest_chain:#x}')
+def acceptance_images(inputs):
+    for path in inputs:
+        if path.is_file():
+            yield path
+            continue
+        # The map belongs to the link, including for boot_info's post-link
+        # ISO mutation. CD staging copies have no map and are not links.
+        maps = sorted(path.rglob('PPCKERN.map'))
+        if not maps:
+            raise ValueError(f'no linked acceptance images under {path}')
+        for link_map in maps:
+            boot_image = link_map.with_name('unverified.elf')
+            yield boot_image if boot_image.is_file() else link_map.with_suffix('.ELF')
 
 
 def check_acceptance_controls(work):
@@ -83,12 +67,12 @@ def check_acceptance_controls(work):
         options = (link_sh_run.settings(folder, observe_flow=True) if name == 'link-sh'
                    else ppc_font.settings(folder))
         images.append(build(folder / 'kernel', '-j4', *options, 'kb-user', 'kernel'))
-    report_acceptance(images)
+    report_acceptance(images, 'control images')
 
 
 def report_product(path):
     from kboot_root_image import verify_embedded
-    elf, load, symbols, layout = linked_layout(path)
+    elf, load, symbols, layout = linked_image(path)
     _, _, va, _, raw, memory, _, _ = load
     end, chain = symbols['__kernel_resident_end'], symbols['__kernel_chain_end']
     shell = layout['MEM_SHELL_LOAD_ADDR']
@@ -200,10 +184,11 @@ def main():
     parser.add_argument('--mutate', action='store_true')
     parser.add_argument('--product', type=Path, help='inspect linked PPCKERN.ELF and adjacent map/ISO')
     parser.add_argument('--acceptance-controls', action='store_true')
-    parser.add_argument('--acceptance', type=Path, nargs='+', help='inspect linked guest acceptance images')
+    parser.add_argument('--acceptance', type=Path, nargs='+',
+                        help='inspect actual acceptance ELF files or complete suite output trees')
     args = parser.parse_args()
     if args.acceptance:
-        report_acceptance(args.acceptance)
+        report_acceptance(acceptance_images(args.acceptance), 'acceptance')
         return
     if args.product:
         report_product(args.product)

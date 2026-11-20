@@ -129,6 +129,17 @@ def copy_kboot_names(root):
             target.touch()
 
 
+def image_selectors(name, image):
+    selectors = [image['flags']]
+    if 'NEGATIVE=1' not in image['flags']:
+        selectors.append(['IMAGE=kboot-' + name])
+        flags = {'core': (0, 0, 0), 'link': (1, 0, 0), 'shell': (0, 0, 1),
+                 'sh': (0, 1, 0), 'link-sh': (1, 1, 0)}
+        selectors.append([f'{flag}={value}' for flag, value in zip(
+            ('KBOOT_LINK', 'KBOOT_SH', 'KBOOT_SHELL'), flags[name])])
+    return selectors
+
+
 def check_kboot(root):
     """Every PowerPC image selects exactly the pinned sources, in owner-set order (no link-order list)."""
     expected = json.loads((ROOT / 'tools/tests/fixtures/build_profile_ppc.json').read_text())
@@ -136,14 +147,7 @@ def check_kboot(root):
     command = ['make', '-s', '-f', 'build/config.mk', '-f', 'build/targets/ppc-powermac.mk', '-f', 'kboot-query.mk',
                'ARCH=ppc', 'PLATFORM=powermac']
     for name, image in expected.items():
-        # 像は旗でも名前でも選べる (build/images/ppc-flags.mk)。NEGATIVE の像は旗だけ。
-        selectors = [image['flags']] + ([] if 'NEGATIVE=1' in image['flags'] else [['IMAGE=kboot-' + name]])
-        if name != 'neg1':
-            legacy_flags = {'core': (0, 0, 0), 'link': (1, 0, 0),
-                            'shell': (0, 0, 1), 'sh': (0, 1, 0), 'link-sh': (1, 1, 0)}
-            selectors.append([f'{flag}={value}' for flag, value in zip(
-                ('KBOOT_LINK', 'KBOOT_SH', 'KBOOT_SHELL'), legacy_flags[name])])
-        for selector in selectors:
+        for selector in image_selectors(name, image):
             out = subprocess.check_output([*command, *selector, 'kboot-query'], cwd=root, text=True,
                                           stderr=subprocess.PIPE)
             actual = dict(line.split('=', 1) for line in out.splitlines() if line.startswith('KB_'))
@@ -181,6 +185,33 @@ def check_kboot(root):
                           capture_output=True).returncode != 0
     assert subprocess.run([*command, 'IMAGE=kboot-sh', 'KBOOT_SH=1', 'KBOOT_LINK=0', 'kboot-query'], cwd=root,
                           capture_output=True).returncode == 0
+
+
+def check_product_selectors():
+    # shell, sh and their old flag combinations select the resident link-sh product.
+    # Force ISO generation and linking on each invocation, even with a warm build.
+    out = Path('build/out/ppc-kboot/link-sh')
+    shell = Path('build/out/ppc-user/link-sh/shell.bin')
+    profiles = json.loads((ROOT/'tools/tests/fixtures/build_profile_ppc.json').read_text())
+    selectors = [['IMAGE=kboot-link-sh']]
+    for name in ('shell', 'sh', 'link-sh'):
+        selectors.extend(s for s in image_selectors(name, profiles[name]) if s not in selectors)
+    canonical_map = canonical_shell = None
+    for selector in selectors:
+        command = ['make', '-s', '--no-print-directory', '-f', 'Makefile', '-f', '-',
+                   'ARCH=ppc', 'PLATFORM=powermac', *selector, '-W', str(out/'motd.txt'), 'selection']
+        recipe = '.PHONY: selection\nselection: $(KB_ELF)\n\t@echo SELECTED=$(KB_OUT)\n'
+        output = subprocess.check_output(command, input=recipe, cwd=ROOT, text=True)
+        assert output.splitlines()[-1] == 'SELECTED='+str(out), selector
+        image = subprocess.check_output(['isoinfo', '-i', out/'root.iso',
+                                        '-x', '/SYS/SHELL.BIN;1'], cwd=ROOT)
+        link_map = (ROOT/out/'PPCKERN.map').read_bytes()
+        if canonical_map is None:
+            canonical_shell = (ROOT/shell).read_bytes()
+            canonical_map = link_map
+        assert image and image == canonical_shell, ('ISO shell', selector)
+        assert link_map == canonical_map, ('kernel map', selector)
+    print('PASS product ISO shell and link map for resident selectors')
 
 
 def check_user_selection(root):
@@ -221,7 +252,11 @@ def check_archives(root):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
+    parser.add_argument('--product-selectors', action='store_true')
     args = parser.parse_args()
+    if args.product_selectors:
+        check_product_selectors()
+        sys.exit(0)
     # Copy only make inputs; compiler and generated products are unnecessary.
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)

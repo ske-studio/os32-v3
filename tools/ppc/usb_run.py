@@ -801,13 +801,11 @@ def link_lan_accept(elf, cpu, out, mode='normal'):
         s.hold_serial_line()
         text_keys('echo half')
         def finish_half():
-            s.settle(1)
-            require(s.agent.operator.pending['result'] is None, 'RSH deferred by serial line')
+            s.check_deferred('RSH deferred by serial line')
             key('ret')
         rsh_command(s, 'echo resumed', b'resumed\n', during=finish_half)
         screen = s.screen('resumed')
-        require('rshell: line with ESC not executed' in screen and '> echo resumed' in screen,
-                'serial line rejection and resumed RSH')
+        s.check_serial_rejection(screen, 'echo resumed')
         key('shift')
         s.q.call('device_del', {'id':'kbd'})
         s.wait(lambda: 'USB RELEASE kind=0 src=1' in serial(a), 'USB unplug release', 10)

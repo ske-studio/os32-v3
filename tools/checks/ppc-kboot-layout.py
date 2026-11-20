@@ -3,7 +3,7 @@ import subprocess
 
 CHECK = dict(name='ppc-kboot-layout', tier=2, budget=60, needs=['make:ppc-ci-image'], env=['ppc-cross'],
              covers=['tools/checks/ppc-kboot-layout.py', 'tools/ppc/kboot_layout.py',
-                     'tools/accept/ppc_font.py', 'tools/accept/ppc_shm.py',
+                     'tools/tests/test_build_selection.py', 'tools/tests/build_fixture.py', 'tools/tests/fixtures/build_profile_*.json', 'tools/accept/ppc_font.py', 'tools/accept/ppc_shm.py',
                      'tools/ppc/**', 'tools/*.py', 'assets/fonts/**', 'Makefile',
                      'build/**', 'sdk/**', 'mm/**', 'exec/**', 'arch/ppc/**',
                      'platform/powermac/**', 'include/**', 'init/**', 'kernel/**',
@@ -38,5 +38,7 @@ def run(ctx):
     rc = subprocess.call(args, cwd=ctx.root, env=env)
     if rc:
         return rc
+    subprocess.run(['python3', '-B', 'tools/tests/test_build_selection.py', '--product-selectors'],
+                   cwd=ctx.root, env=env, check=True)
     return subprocess.call(['python3', '-B', 'tools/ppc/kboot_layout.py', '--product',
                             'build/out/ppc-kboot/link-sh/PPCKERN.ELF'], cwd=ctx.root)

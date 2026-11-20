@@ -339,18 +339,64 @@ def flow_point(s, index, expected):
 
 
 class LineSession(Session):
+    uart = None
+
+    def start(self):
+        with socket.socket() as listener:
+            listener.bind(('127.0.0.1', 0))
+            listener.listen(1)
+            listener.settimeout(10)
+            self.serial_port = listener.getsockname()[1]
+            super().start()
+            self.uart, _ = listener.accept()
+
     def serial_args(self):
-        return ['-chardev', 'ringbuf,id=uart,logfile='+str(self.out/'serial-a.log'),
-                '-serial', 'chardev:uart']
+        return ['-chardev', f'socket,id=uart,host=127.0.0.1,port={self.serial_port},'
+                f'logfile={self.out / "serial-a.log"}', '-serial', 'chardev:uart',
+                '-trace', 'enable=escc_mem_readb_data,file='+str(self.out/'uart.trace')]
+
+    def pump(self):
+        super().pump()
+        if self.uart:
+            while select.select([self.uart], [], [], 0)[0]:
+                if not self.uart.recv(65536):
+                    self.uart.close()
+                    self.uart = None
+                    break
 
     def hold_serial_line(self):
-        # A serial ESC followed by another byte holds the rejected line until CR.
-        # Ordinary printable fragments complete on idle in the x86 resident shell.
-        self.q.call('ringbuf-write', {'device': 'uart', 'data': '\x1bx'})
-        self.settle(.5)
+        trace = self.out/'uart.trace'
+        with trace.open() as stream:
+            stream.seek(0, 2)
+            received = []
+            def consumed():
+                received.extend(int(value) for value in re.findall(
+                    r'escc_mem_readb_data Read channel [Aa], ch (\d+)', stream.read()))
+                return received == [27, 120]
+            self.uart.sendall(b'\x1bx')
+            self.wait(consumed, 'guest read ESC and x from UART A', 10)
+
+    def check_deferred(self, verdict):
+        pending = self.agent.operator.pending
+        self.wait(lambda: pending['execute'].delivery == 'acked', 'guest queued LAN command', 10)
+        self.settle(1)
+        require(pending['state'] == 'running' and pending['result'] is None, verdict)
+
+    def check_serial_rejection(self, screen, command):
+        lines = [line.rstrip() for line in screen.splitlines()]
+        rejected = 'rshell: line with ESC not executed'
+        require(any(rejected in line and any('> '+command in later for later in lines[i+1:])
+                    for i, line in enumerate(lines)), 'serial rejection before '+command)
 
     def end_serial_line(self):
-        self.q.call('ringbuf-write', {'device': 'uart', 'data': '\r'})
+        self.uart.sendall(b'\r')
+
+    def close(self):
+        try:
+            super().close()
+        finally:
+            if self.uart:
+                self.uart.close()
 
 
 def accept(elf,cpu,out,timeout,late=False,verdict=None):
@@ -437,15 +483,13 @@ def accept(elf,cpu,out,timeout,late=False,verdict=None):
         s.open_rshell()
         s.hold_serial_line()
         op=s.agent.operator; op.submit('cui','echo deferred','accept')
-        s.settle(1)
-        require(op.pending['result'] is None,'half-line')
+        s.check_deferred('half-line')
         s.end_serial_line()
         s.wait(lambda: op.pending['state']=='done','deferred command')
         result=op.take_result(); check_body('echo deferred',result['result'],b'deferred\n')
         s.wait(lambda: s.word('g_capture')==0,'deferred END',5)
         screen=s.screen('deferred')
-        require('rshell: line with ESC not executed' in screen and '> echo deferred' in screen,
-                'serial line rejection and deferred LAN command')
+        s.check_serial_rejection(screen, 'echo deferred')
         if check_overflow:
             # Every overflow line scrolls the OF framebuffer, which is slow under
             # -icount (~2.7 s per scroll in QEMU 8.2), so one VM per run covers it.
@@ -597,9 +641,9 @@ FLOW_CASES = ('root-branch', 'missing-aux', 'restore-root', 'return-target')
 
 
 def flow_settings(folder, case):
-    """Use the same entry/return guards on the control and each changed decision."""
+    """Observe child teardown and exercise the selected entry or return decision."""
     source = (ROOT/'exec/exec.c').read_text()
-    source = 'volatile unsigned shell_flow_error;\n' + source
+    source = 'volatile unsigned shell_flow_error, shell_child_returning;\n' + source
     guard = 'do { shell_flow_error = %d; for (;;) __asm__ volatile("" ::: "memory"); } while (0);'
     for fragment in ('exec_launch.inc', 'exec_finish.inc'):
         text = (ROOT/'exec'/fragment).read_text()
@@ -609,15 +653,13 @@ def flow_settings(folder, case):
             text = replace_once(text, original, assignment + '\n'
                 '        if (is_shell && args.aux != (u32)(uptr)&g_shell_service) ' + guard % 2)
         else:
+            anchor = 'appslot_switch_to(parent);'
+            text = replace_once(text, anchor, '++shell_child_returning;\n        ' + anchor)
             original = 'g_cur_app = 0;\n        paging_load_cr3(paging_kernel_pd_phys());'
-            root = '0' if case == 'restore-root' else 'paging_kernel_pd_phys()'
-            text = replace_once(text, original, 'g_cur_app = 0;\n'
-                '        u32 root = ' + root + ';\n'
-                '        if (root != paging_kernel_pd_phys()) ' + guard % 3 +
-                '\n        paging_load_cr3(root);')
-            original = 'parent = appslot_return_target(id);'
-            target = 'parent = id;' if case == 'return-target' else original
-            text = replace_once(text, original, target + '\n        if (parent == id) ' + guard % 4)
+            if case == 'restore-root':
+                text = replace_once(text, original, 'g_cur_app = 0;\n        paging_load_cr3(0);')
+            if case == 'return-target':
+                text = replace_once(text, 'parent = appslot_return_target(id);', 'parent = id;')
         (folder/fragment).write_text(text)
     observer = ROOT/'tools/accept/ppc_shell_flow.inc'
     (folder/'exec.c').write_text(source + '\n#include "' + str(observer) + '"\n')
@@ -639,37 +681,46 @@ def flow_settings(folder, case):
 
 
 def flow_accept(elf, folder, case):
-    from usb_run import rsh_command
     s = Session(elf, '7450', folder, 180)
     try:
         s.start()
         if case in ('control', 'restore-root', 'return-target'):
             s.wait(s.ready, 'resident before child', 60)
             flow_point(s, 0, (1, 0, 1, 1, 0))
+            previous = s.word('shell_child_returning')
+            s.agent.operator.submit('cui', '/bin/hello.bin ok', 'flow')
+            # The kernel image is identity-loaded. Sample physical memory so
+            # a broken return root cannot hide the completed child teardown.
+            address = s.symbols['shell_child_returning']
+            def returning():
+                result = s.q.call('human-monitor-command', {'command-line': f'xp /1wx 0x{address:x}'})
+                value = re.search(r':\s*0x([0-9a-fA-F]+)', result)
+                return value and int(value[1], 16) == previous + 1
+            s.wait(returning, 'child reached parent restoration', 30)
+            start = len(s.events)
+            ident = '00002000'
+            s.agent.notifier.notify_number(RSHELL, EXECUTE, ident.encode()+b' echo next $?\n')
+            s.settle(20)
+            replies = [bytes.fromhex(e['body']) for e in s.events[start:]
+                       if e['parts'][:2] == ['RSH', 'OUT'] and e['parts'][3] == ident]
+            expected = b'> echo next $?\nnext 7\n\x04'
             if case == 'control':
-                rsh_command(s, '/bin/hello.bin ok', b'hello ok\n')
+                require(expected in replies, 'control command after child return')
                 flow_point(s, 1, (2, 1, 2, 2, 2))
                 flow_point(s, 2, (1, 0, 1, 1, 0))
-                rsh_command(s, 'echo $?', b'7\n')
-                rsh_command(s, 'echo next', b'next\n')
+                result = s.agent.operator.take_result()
+                check_body('/bin/hello.bin ok', result['result'], b'hello ok\n')
                 require(s.word('shell_flow_error') == 0, 'clean entry and return')
-                return
-            s.agent.operator.submit('cui', '/bin/hello.bin ok', 'flow')
+            else:
+                require(expected not in replies, 'SURVIVED '+case)
+            return
         def stopped():
             try:
                 return s.word('shell_flow_error') == FLOW_CASES.index(case) + 1
             except CriterionFailure:
                 return False
         s.wait(stopped, 'specific rejected decision '+case, 60)
-        if case in ('restore-root', 'return-target'):
-            flow_point(s, 1, (2, 1, 2, 2, 2))
-            start = len(s.events)
-            s.agent.notifier.notify_number(RSHELL, EXECUTE, b'00002000 echo next\n')
-            s.settle(1)
-            require(not any(e['parts'][:2] == ['RSH', 'OUT'] for e in s.events[start:]),
-                    'command completed past invalid return')
-        else:
-            require(not s.ready(), 'READY after invalid resident entry')
+        require(not s.ready(), 'READY after invalid resident entry')
     finally:
         s.close()
 
