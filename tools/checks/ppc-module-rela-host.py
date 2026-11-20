@@ -2,7 +2,7 @@
 import subprocess
 
 CHECK = dict(name='ppc-module-rela-host', tier=1, budget=3, needs=[],
-             covers=['tools/tests/test_module_rela_ppc.py', 'tools/tests/host32.py',
+             covers=['build/ppc-module.ld', 'tools/tests/test_module_rela_ppc.py', 'tools/tests/host32.py',
                      'tools/tests/cc_cache.py', 'tools/ppc/module_rela.py',
                      'tools/tests/module_fixup_ppc_host.c', 'kernel/module/module_fixup_ppc.inc',
                      'kernel/module/module_image.h', 'kernel/module/module_schema.h',

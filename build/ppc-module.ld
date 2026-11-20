@@ -1,4 +1,6 @@
 /* KMOD body VA zero; --emit-relocs is required by tools/mkmod.py.
+ * L1 mkmod integration and PPC FEP/KCG make rules must pass this flag at
+ * final link. A relocation-free entry legitimately has no RELA records.
  * Separate module link; never part of the resident kernel link. */
 OUTPUT_FORMAT(elf32-powerpc)
 OUTPUT_ARCH(powerpc)

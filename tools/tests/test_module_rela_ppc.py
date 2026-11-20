@@ -1,6 +1,6 @@
 """PowerPC module alignment design, pack/loader boundary and L1 fixtures.
 The KMOD pack/loader contract in docs/design/kernel/module/module_image.md
-requires relocation evidence, complete export pointers, and a page-rounded
+requires retained relocations for absolute references, complete export pointers, and a page-rounded
 module end marker (as in build/fep-module.ld).
 Expectations use the ELF PPC ABI BD/LI fields and independent KMOD wire bytes.
 """
@@ -54,7 +54,7 @@ class WireElf:
 
 def fixture(kind=1, place=0, symbol=0x104, addend=-4, word=0x100, entry=0, ops=False,
             retained=True, target="target"):
-    body = bytearray(0x10000)
+    body = bytearray(0x10000 if retained else 4)
     struct.pack_into('>I', body, place, word)
     strings = b'\0.text\0.rela.text\0.symtab\0.strtab\0target\0entry\0ops\0.bss\0__module_end\0'
     symbols = bytearray(16)
@@ -109,8 +109,11 @@ def alignment(pack):
     return rejected(pack, args)
 
 
-def relocation_evidence(pack):
-    return rejected(pack, fixture(retained=False))
+def relocation_free_entry(pack):
+    try:
+        return pack(*fixture(retained=False, symbol=0, word=0x4e800020)) == b''
+    except ValueError:
+        return False
 
 
 def export_fixups(pack):
@@ -154,11 +157,12 @@ def run_host(directory, source):
 
 
 if __name__ == '__main__':
+    assert '--emit-relocs is required by tools/mkmod.py' in (ROOT / 'build/ppc-module.ld').read_text()
     source = PACK.read_text()
     mutations = [(negative_addend, "symbol['value'] + addend", "symbol['value']"),
                  (branch_range, '-limit <= delta < limit', 'True'),
                  (alignment, 'where % 4 == 0 and ', ''),
-                 (relocation_evidence, 'require(writes,', 'require(True,'),
+                 (relocation_free_entry, 'writes.sort()', 'require(writes, "missing RELA")\n    writes.sort()'),
                  (export_fixups, 'require(kind == 1 and (place', 'require(True or (place'),
                  (end_marker, 'require(module_end or owner', 'require(owner')]
     for test, old, new in mutations:

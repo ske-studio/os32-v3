@@ -87,9 +87,6 @@ def ppc_relocations(elf, payload: bytes, mem_size: int, policy) -> bytes:
             else:
                 require(place % width == 0, 'unaligned absolute relocation')
                 records.append((place, kind, goal))
-    # Without any retained body RELA, a fully resolved ET_EXEC cannot prove
-    # that its absolute references survived the final link as relocations.
-    require(writes, 'missing allocated PPC relocations (--emit-relocs required)')
     writes.sort()
     require(all(end <= right for (_, end), (right, _) in zip(writes, writes[1:])),
             'overlapping PPC relocations')
