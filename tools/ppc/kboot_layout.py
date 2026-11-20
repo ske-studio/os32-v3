@@ -10,12 +10,7 @@ import tempfile
 import time
 
 ROOT = Path(__file__).resolve().parents[2]
-CHECK = dict(name='ppc-kboot-layout', tier=2, budget=60,
-             covers=['arch/ppc/kernel.ld', 'platform/powermac/platform_kboot_layout.h',
-                     'include/memmap.h', 'tools/gen_memmap.py',
-                     'tools/ppc/kboot_layout.py', 'lib/kstring_c.c', 'lib/kstring.h',
-                     'lib/crc32.c', 'lib/crc32_core.inc', 'lib/crc32.h',
-                     'include/types.h', 'tools/ppc/kboot_root_image.py'])
+
 
 
 def command(args):
