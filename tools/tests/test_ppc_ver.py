@@ -13,12 +13,16 @@ def main():
              'mpic.h': 'u32 pm_mpic_source_count(void);\n'}
     cases = [(None, None, None)]
     if args.mutate:
-        cases += [('if (s->plat[1])', 'if (1)', 'out.count == 4'),
-                  ('if (!s->boot.crc_valid) return;', '', 'out.count == 5')]
+        cases += [('if (s->pvr_valid)', 'if (1)', 'out.count == 4'),
+                  ('if (!s->boot.crc_valid) return;', '', 'out.count == 5'),
+                  ('; active', '; inactive', 'equal(out->lines[index].text, text)')]
     for old, new, failure in cases:
+        files['backend.c'] = source
+        files['formatter.c'] = (ROOT / 'kernel/ver_format.c').read_text()
         if old:
-            assert source.count(old) == 1
-        files['backend.c'] = source.replace(old, new) if old else source
+            target = 'formatter.c' if old == '; active' else 'backend.c'
+            assert files[target].count(old) == 1
+            files[target] = files[target].replace(old, new)
         try:
             result = execute((ROOT / 'tools/tests/ppc_ver_host.c').read_text(),
                              args.runner, files, assembly='lib/kstring_asm.asm')

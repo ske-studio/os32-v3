@@ -14,6 +14,7 @@ VerLineBuilder ver_line(OS32_VerInfo *out, u32 kind, const char *label);
 void ver_text(VerLineBuilder *b, const char *text);
 void ver_saved_text(VerLineBuilder *b, const char *text, u32 size);
 void ver_number(VerLineBuilder *b, u32 value, int hex_digits);
+void ver_gfx_value(VerLineBuilder *b, const VerSnapshot *s, const char *backend_name);
 void ver_end(VerLineBuilder *b);
 
 struct ver_backend {
