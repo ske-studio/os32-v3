@@ -10,6 +10,14 @@ void pm_rh_stage(unsigned stage) {
     if (stage == PM_RH_LINK_HELLO_SENT) hello_marks++;
 }
 #endif
+/* OpenBSD gemvar.h selects 128 RX slots. Exercise the high bits of each
+ * diagnostic index independently (PowerMac GEM observation layout). */
+#define KBOOT_GEM_RX_DIAG
+volatile u32 gem_rx_last_kick;
+static u32 read_completion(void *ctx, u32 reg) {
+    (void)ctx;
+    return reg == GEM_RX_COMPLETION ? 95 : 0;
+}
 static struct gem device;
 static int running, calls, tx_budget, tx_rc, rx_rc, rx_calls;
 static u32 good, bad, inspected, delivered;
@@ -75,8 +83,11 @@ void _start(void) {
     CHECK(op->rx_credit_bytes() == 4 * 1514);
     CHECK(op->rx(frame, sizeof(frame), &n) == OS32_ERR_AGAIN && !rx_calls);
     /* 本線 PM 決定 2026-11-15 B の条件 1, 3: fill only free slots, FIFO. */
+    device.io.read32 = read_completion; device.rx_head = 127; gem_rx_last_kick = 124;
     good = 6; inspected = 0;
     op->poll(); CHECK(calls == 1 && tx_budget == 8 && rx_calls == 4);
+    CHECK(gem_rx_diag == (1ull | (4ull << 16) | (127ull << 19) |
+                          (95ull << 26) | (124ull << 33)));
     CHECK(inspected == 4 && good == 2 && op->rx_credit_bytes() == 0);
     op->poll(); CHECK(calls == 2 && rx_calls == 4);
     CHECK(op->rx(frame, 1, &n) == OS32_ERR_NOSPC && n == 14);

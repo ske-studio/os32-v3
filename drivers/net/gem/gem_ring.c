@@ -17,7 +17,7 @@ int gem_ring_prepare(struct gem *g, struct gem_dma *d)
     u8 *base, *desc;
     u32 i;
     if (!g || !d || !d->cpu || !g->io.sync || d->bytes < GEM_POOL_SIZE ||
-        (d->bus & 0xfffu) || d->bus > 0xffffffffu - (GEM_POOL_SIZE - 1))
+        (d->bus & 0xffffu) || d->bus > 0xffffffffu - (GEM_POOL_SIZE - 1))
         return GEM_EINVAL;
     if (g->ring_prepare_step && (g->dma.cpu != d->cpu || g->dma.bus != d->bus))
         return GEM_EINVAL;
@@ -25,13 +25,13 @@ int gem_ring_prepare(struct gem *g, struct gem_dma *d)
     if (!g->ring_prepare_step) {
         g->dma = *d;
         /* OpenBSD gem_meminit:685-709: zero and sync TX and RX rings. */
-        for (i = 0; i < GEM_RING_COUNT * GEM_DESC_SIZE; i++) {
-            base[i] = 0; base[GEM_POOL_RX_RING + i] = 0;
-        }
+        for (i = 0; i < GEM_TX_RING_COUNT * GEM_DESC_SIZE; i++) base[i] = 0;
+        for (i = 0; i < GEM_RX_RING_COUNT * GEM_DESC_SIZE; i++)
+            base[GEM_POOL_RX_RING + i] = 0;
         g->ring_prepare_step = 1;
     }
     if (g->ring_prepare_step == 1) {
-        if (g->io.sync(base, GEM_RING_COUNT * GEM_DESC_SIZE, DMA_PREWRITE)) return GEM_EIO;
+        if (g->io.sync(base, GEM_TX_RING_COUNT * GEM_DESC_SIZE, DMA_PREWRITE)) return GEM_EIO;
         g->ring_prepare_step = 2;
     }
     /* gem_meminit:704-709; gemvar.h:260-271: buffer, address, OWN, sync. */
@@ -45,7 +45,7 @@ int gem_ring_prepare(struct gem *g, struct gem_dma *d)
     }
     if (g->ring_prepare_step == 2) g->ring_prepare_step = 3;
     if (g->ring_prepare_step == 3) {
-        if (g->io.sync(base + GEM_POOL_RX_RING, GEM_RING_COUNT * GEM_DESC_SIZE, DMA_PREWRITE)) return GEM_EIO;
+        if (g->io.sync(base + GEM_POOL_RX_RING, GEM_RX_RING_COUNT * GEM_DESC_SIZE, DMA_PREWRITE)) return GEM_EIO;
         g->ring_prepare_step = 4;
     }
     return GEM_OK;
@@ -75,7 +75,7 @@ int gem_ring_publish(struct gem *g)
     if (g->ring_publish_step == 2) {
         g->io.write32(g->io.ctx, GEM_TX_CONFIG, GEM_RING_SZ_32 | ((0x04ffu << 10) & GEM_TX_CONFIG_TXFIFO_TH) | GEM_TX_CONFIG_TXDMA_EN);
         g->io.write32(g->io.ctx, GEM_TX_KICK, 0);
-        g->io.write32(g->io.ctx, GEM_RX_CONFIG, GEM_RING_SZ_32 | (GEM_THRSH_1024 << GEM_RX_CONFIG_FIFO_THRS_SHIFT) | (2u << GEM_RX_CONFIG_FBOFF_SHFT) | GEM_RX_CONFIG_RXDMA_EN);
+        g->io.write32(g->io.ctx, GEM_RX_CONFIG, GEM_RING_SZ_128 | (GEM_THRSH_1024 << GEM_RX_CONFIG_FIFO_THRS_SHIFT) | (2u << GEM_RX_CONFIG_FBOFF_SHFT) | GEM_RX_CONFIG_RXDMA_EN);
         fifo = g->io.read32(g->io.ctx, GEM_RX_FIFO_SIZE) * 64u;
         g->io.write32(g->io.ctx, GEM_RX_PAUSE_THRESH, (3 * fifo / 256) | ((fifo / 256) << 12));
         g->io.write32(g->io.ctx, GEM_RX_BLANKING, (6 << 12) | 6);

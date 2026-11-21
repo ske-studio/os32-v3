@@ -203,11 +203,11 @@ def gem_assessment(previous, current):
     if previous['poll'] == current['poll']:
         return 'poll drive'
     def full(v):
-        return v['packet_count'] == 4 and v['kick'] == (v['done'] + 1) & 31
+        return v['packet_count'] == 4 and v['kick'] == (v['done'] + 1) & 127
     if full(previous) and full(current):
         return 'foreground demux'
     if current['done'] == previous['done']:
-        if all(v['head'] == v['done'] and v['kick'] != (v['done'] + 1) & 31
+        if all(v['head'] == v['done'] and v['kick'] != (v['done'] + 1) & 127
                for v in (previous, current)):
             return 'QEMU/UDP'
     elif current['head'] == previous['head']:
@@ -358,7 +358,7 @@ class Session:
             try:
                 raw = self.word('gem_rx_diag', unit='g')
                 current = dict(poll=raw & 65535, packet_count=(raw >> 16) & 7,
-                               head=(raw >> 19) & 31, done=(raw >> 24) & 31, kick=(raw >> 29) & 31)
+                               head=(raw >> 19) & 127, done=(raw >> 26) & 127, kick=(raw >> 33) & 127)
                 sample['gem_rx_diag'] = current
                 previous = samples[-2].get('gem_rx_diag') if len(samples) > 1 else None
                 sample['assessment'] = gem_assessment(previous, current)

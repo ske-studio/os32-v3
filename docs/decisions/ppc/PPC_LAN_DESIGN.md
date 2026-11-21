@@ -75,8 +75,8 @@ int ppc_probe_copy8(u32 va, u8 *out); /* kernel_probe.S: load成功0/onfault復�
 - すべてsupervisor RW、PCD→I/G。aperture先頭4MiBの既存PT内。offset保持・丸め後長さ・PA/VA加算overflow・ESCC/MPIC/gfx予約/相互非重複を検査。RAM/像/HPTとMMIO PAが重なる個体は拒否。恒等WB aliasは残さない。
 - kernel_boot.cのplan/install/検証を表駆動に拡張、IR/DR開始前にwalk。IRQからGEMを触らず、fatal MMIOのDR=1規則は維持。kernel_hpt.c/ppc_pmap.hは変更不要。
 ### (d) DMA [M1,M2]
-- `gmac_dma.c`に192KiB/64KiB整列の静的BSS pool。既存image_first..image_end予約に含め、image_endが既存固定領域/arenaに届かないことをlink mapとreserveで検査。収まらなければ配置再設計をPMへ返し、15–16MiBの除外域へ逃がさない。
-- pool+0x00000：descriptor用64KiB、TX32×16Bを+0、RX32×16Bを+0x1000（両base 4KiB整列）。+0x10000：TX32×2048B、+0x20000：RX32×2048B。個々のbuffer/ringは64KiBをまたがない。RXの同時公開は28枚、残り4枚を常に空ける。
+- `gmac_dma.c`に384KiB/64KiB整列の静的BSS pool。既存image_first..image_end予約に含め、image_endが既存固定領域/arenaに届かないことをlink mapとreserveで検査。収まらなければ配置再設計をPMへ返し、15–16MiBの除外域へ逃がさない。
+- pool+0x00000：descriptor用64KiB、TX32×16Bを+0、RX128×16Bを+0x1000（両base 4KiB整列）。+0x10000：TX32×2048B、+0x20000：RX128×2048B。個々のbuffer/ringは64KiBをまたがない。RXの同時公開は124枚、残り4枚を常に空ける。
 - CPU PAはP2V/V2P集約口で得る。bus=`dma_bus_base+(pa-dma_cpu_base)`、全長がprofileのDMA窓内/32bit内であることを検査。OF rangesはMMIO用でありDMAへ転用しない。PA=busはDMA資料で許可したprofileだけで暫定使用し、自前driverの往復で受入する（P0はDMA未確認）。
 - descriptor区画64KiBはI/Gの恒等mapのみ。gmac_dma.cのpm_gmac_dma_initがmemory_boot_init後、Master=0/reset完了後、ring準備前に全dirty lineをdcbf→sync→`paging_map_range(base,base+0x10000,base,PAGE_RW|PTE_PCD)`→戻り値/全page walkを検査する。root導入時のimage属性検査（kernel_boot.c）には触れない。mm/paging.hの範囲APIでHPT/TLBを最後にflush、arch/ppc/pd_walk.cのPCD→I|Gを試験。buffer区画はM属性、2048B単位でcache lineを専有。
 - 同期口：TX PREWRITE=各32B dcbst→sync、RX PREREAD=dcbf→sync、POSTREAD=dcbi→sync、POSTWRITE=sync。I/G descriptorはsyncだけ。CPUはNIC所有中にbufferへ触らず、invalidateで他のdirtyデータを失わない。32B幅/PVRはCPU資料で照合してprofile化。BSDのcoherent control/bus_dmamap_sync（O/gem.c:146–175,977–988,1082）を実現するarch providerであり、BSDにこのOS32固定pool配置は無い。
@@ -129,18 +129,18 @@ int ppc_probe_copy8(u32 va, u8 *out); /* kernel_probe.S: load成功0/onfault復�
 |停止 / gem_reset_step|O/gem.c:486–501 gem_reset→583–607 gem_reset_rx→647–659 gem_disable_rx。MAC_RX_CONFIG.ENABLEを落とし待つ→RX_CONFIG=0待つ→5ms→bank2 RESET.RX待つ|各bit待ち1秒（gem_bitwait :470–482、10000×100us）、失敗即隔離|
 |TX停止/全reset / 同上|O/gem.c:615–640,666–678 gem_reset_tx/disable_tx。同じ列でMAC_TX_CONFIG→TX_CONFIG→5ms→RESET.TX、最後RESET.RX\|TX→self-clear確認。GEM_INTMASK=全1を先行/完了後再設定[M1]|各1秒、失敗後のDMA領域再利用なし|
 |MIF / gem_mif_init|O/gem.c:1260–1268 gem_mifinitのBB_ENA解除→:249–293 gem_configのMDI1/PHY_SEL探索→Apple側MDI0候補。MIF_FRAME read/writeは:1286–1344、TA0完了判定|各transaction100us、32addr×2portを有限走査。0/ffff ID除外|
-|host ring準備 / gem_ring_prepare|O/gem.c:685–709 gem_meminit、O/gemvar.h:260–271。TX zero/sync、RX buffer PREREAD→addr→capacity/OWN→descriptor sync。MAC設定より先に実施|32枚有限、公開前失敗はEIO|
+|host ring準備 / gem_ring_prepare|O/gem.c:685–709 gem_meminit、O/gemvar.h:260–271。TX zero/sync、RX buffer PREREAD→addr→capacity/OWN→descriptor sync。MAC設定より先に実施|RX 124枚を準備、公開前失敗はEIO|
 |MAC基本 / gem_mac_init|O/gem.c:865–910 gem_init_regs：IPG0/1/2=0/8/4、MIN=64/MAX=1522\|(0x2000<<16)、PREAMBLE=7/JAM=4/ATTEMPT=16/CONTROL_TYPE=0x8088、RANDOM_SEED=((mac[5]<<8)|mac[4])&0x3ff、ADDR3..5=0、ADDR6..8=1/c200/180、FILTER0..2/MASK1_2/MASK0=0 [M1]|DMA/MAC停止中、有限書込み、失敗LAN無効|
 |MAC残り / 同上|O/gem.c:913–952 gem_init_regs：NORM/FIRST/EXCESS/LATE_COLL、DEFER_TMR/PEAK_ATTEMPTS、RX_FRAME/LEN_ERR/ALIGN_ERR/CRC_ERR/CODE_VIOLを0→SEND_PAUSE_CMD=1bf0→CONFIG=TXDMA_LIMIT\|RXDMA_LIMIT\|PCI BURST_INF（AppleのみRONPAULBIT/BUG2FIX）→ADDR0=mac[4:5],1=[2:3],2=[0:1] [M1]|variant照合必須、未知なら書かない|
 |filter / 同上|O/gem.c:1579–1639 gem_iffの空multicast分岐：RX_CONFIGのPROMISC/PROMISC_GRP/HASHをclear→HASH enable→HASH0..15=0→RX_CONFIG。自MAC+broadcastだけ|有限、softwareでもdstを検査|
-|ring公開 / gem_ring_publish|O/gem.c:787–834 gem_init：TX/RX_RING_PTR_HI→LO（HI=0）→INTMASK→MAC_RX_MASK=DONE\|FRAME_CNT/TX_MASK=ffff/CONTROL_MASK=0→TX_CONFIG=size32\|((04ff<<10)&FIFO_TH)\|EN→TX_KICK=0→RX_CONFIG=size32\|THRSH1024\|FBOFF2\|EN、CXM_START0→PAUSE_THRESH=FIFO由来3/4,1/4→BLANKING=(6<<12)\|6 [M1]|base/sync成功→PCI Master再設定/readback後のみenable。INTMASKはBSDの選択解除と異なり全1、packet pollingのため|
+|ring公開 / gem_ring_publish|O/gem.c:787–834 gem_init：TX/RX_RING_PTR_HI→LO（HI=0）→INTMASK→MAC_RX_MASK=DONE\|FRAME_CNT/TX_MASK=ffff/CONTROL_MASK=0→TX_CONFIG=size32\|((04ff<<10)&FIFO_TH)\|EN→TX_KICK=0→RX_CONFIG=size128\|THRSH1024\|FBOFF2\|EN、CXM_START0→PAUSE_THRESH=FIFO由来3/4,1/4→BLANKING=(6<<12)\|6 [M1]|base/sync成功→PCI Master再設定/readback後のみenable。INTMASKはBSDの選択解除と異なり全1、packet pollingのため|
 |PHY交渉 / gem_phy_step|O/gem.c:837 gem_initはmii_mediachgへ委譲。**指定GEMファイルにはBMCR/ANAR/PHY固有resetの実体は無い**。P0で[M3]と対応BSD MII関数/行を追加採取することをこの行の実装ゲートにする|reset最大500ms、交渉5秒、その後DOWNで1秒間隔監視。未知PHYはEUNSUPPORTED|
 |PHY設定候補 [M3]|profile確認後BMCR.RESET待ち→ANAR=selector+100TX fullのみ（pauseなし）→1000T control広告0→BMCR.AN_ENABLE\|AN_RESTART→BMSR2回読みによるlink/AN完了→ANLPARと一致確認。初版100Mbps fullで固定、別速度/halfはDOWN|gigabit/PHY固有page書込みは採らない。これらのPHYレジスタ列は上記資料が揃うまで確定しない|
-|MAC有効 / gem_mac_enable_step|O/gem.c:1348–1404 gem_mii_statchg：MAC_TX_CONFIG=0→10ms→ENA_IPG0\|NGU\|NGU_LIMIT\|ENABLE\|IGN_CARRIER\|IGN_COLLIS→XIF_CONFIG=TX_MII_ENA\|LINK_LED\|FDPLX_LED（100MでGMII clear）→CONTROL_CONFIGのRX/TX_PAUSE clear。:839–851 gem_init：RX_CONFIGへMAC_RX_ENABLE\|STRIP_CRC→RX_KICK=28|10msはstepで待つ。link変化は送信停止→停止列→再準備|
+|MAC有効 / gem_mac_enable_step|O/gem.c:1348–1404 gem_mii_statchg：MAC_TX_CONFIG=0→10ms→ENA_IPG0\|NGU\|NGU_LIMIT\|ENABLE\|IGN_CARRIER\|IGN_COLLIS→XIF_CONFIG=TX_MII_ENA\|LINK_LED\|FDPLX_LED（100MでGMII clear）→CONTROL_CONFIGのRX/TX_PAUSE clear。:839–851 gem_init：RX_CONFIGへMAC_RX_ENABLE\|STRIP_CRC→RX_KICK=124|10msはstepで待つ。link変化は送信停止→停止列→再準備|
 |送信 / gem_tx|O/gem.c:1710–1802 gem_start：空き確認→buffer PREWRITE→addr/len\|SOP\|EOP→descriptor同期→TX_KICK=次index。1frame=1descriptor、31枚まで。NO_CRC/INTME/checksumなし、60Bへzero pad|AGAINは非待機。完了5秒停止でreset、線上成功を推測しない|
 |完了 / gem_poll|O/gem.c:1646–1668 gem_tintはstatus>>19からconsumer更新/POSTWRITE。OS32はGEM_TX_COMPLETION（O/gemreg.h:149,174）を直接読み、未完了数を越える進行をEIO|IRQ status依存を外すための差。最大8枚回収|
-|受信 / gem_rx|O/gem.c:959–1034 gem_rint：descriptor POSTREAD/WRITE→OWN=0確認→buffer POSTREAD→BAD_CRC/len検査→offset2からcopy→:1040–1087 fill/add_rxbufで再公開→RX_KICK。O/gemvar.h:260–271のOWN公開順を維持|14..1514Bのみ、badはdrop。再arm後rxptrを進め、rxptr%4==0のとき同期→RX_KICK=(rxptr+32-4)&31（F/if_gem.c:1581–1589）。28枚上限、最大8枚。OWN中はdata不読|
-- BSDとの差：resetエラー時BSDはprintf後に進む箇所もあるがOS32は即隔離。固定pool/1descriptor/32枚/4枚補充/100M限定/状態機械は②の有界化による変更。[M1]でring最小/align/4枚fetch/offset/CRC長さを照合する。
+|受信 / gem_rx|O/gem.c:959–1034 gem_rint：descriptor POSTREAD/WRITE→OWN=0確認→buffer POSTREAD→BAD_CRC/len検査→offset2からcopy→:1040–1087 fill/add_rxbufで再公開→RX_KICK。O/gemvar.h:260–271のOWN公開順を維持|14..1514Bのみ、badはdrop。再arm後rxptrを進め、rxptr%4==0のとき同期→RX_KICK=(rxptr+128-4)%128（F/if_gem.c:1581–1589）。124枚上限、最大8枚。OWN中はdata不読|
+- BSDとの差：resetエラー時BSDはprintf後に進む箇所もあるがOS32は即隔離。固定pool/1descriptor/TX32枚・RX128枚/4枚補充/100M限定/状態機械は②の有界化による変更。[M1]でring最小/align/4枚fetch/offset/CRC長さを照合する。
 - TX公開同期はbuffer PREWRITE→descriptor PREWRITE→sync→KICKとする。O/gem.c:1788–1790の末尾POSTWRITE表記をそのまま移さず、NG/gem.c:1589のPREREAD|PREWRITEと公開前可視化契約に沿う。
 - gem_pollはSTATUS_ALIAS（O/gemreg.h:49）を読み、BERR/TAG_ERR/TX_MAC/RX_MACを検出したら対応status（O/gem.c:1151–1187）を採取。TX underrun/長過大は送信停止→reset。RX overflowはFIFO WR/RDを保存しTB400ms後にMAC_STATEを確認、overflow継続かつWR=RDまたは両pointer不変だけreset、進捗ありなら保存値更新→400ms再検査、overflow解消なら解除（O/gem.c:1172–1235 gem_eint/gem_rx_watchdog）。監視中の追加overflowで期限を先延ばししない。IRQ ackの代用に無目的なstatus readをしない。
 - MIF_CONFIG.POLL_ENAもclearする（O/gemreg.h:411）。gem_mifinit自身はBB_ENAだけclearするため追加差分：FWが残したPHY自動監視を止め、frame transactionを専有する。根拠は同レジスタ定義、挙動は[M1]待ち。
@@ -151,7 +151,7 @@ int ppc_probe_copy8(u32 va, u8 *out); /* kernel_probe.S: load成功0/onfault復�
 |DMA descriptor|LE64 flags+addr各8B、O/gemreg.h:530、O/gemvar.h:213–216、NG/gemvar.h:242–245、F/if_gemvar.h:225–226|
 |Ethernet / PLN1|EtherType BE16、PLN1数値BE、MAC/raw logはbyte列|
 ## 6. サイズ・ファイル単位の段（各0.5〜1日、1ファイル=1段=1担当）
-- 概算増分：text 16–28KiB、rodata/data 2–4KiB、BSS通常28–44KiB＋DMA192KiB＋整列padding最大64KiB。合計RAM増分222–304KiB程度。測定前の見積りでありlink mapを受入証拠にする。
+- 概算増分：text 16–28KiB、rodata/data 2–4KiB、BSS通常28–44KiB＋DMA384KiB＋整列padding最大64KiB。合計RAM増分414–496KiB程度。測定前の見積りでありlink mapを受入証拠にする。
 - 16MiB managed枠内のimage予約にpool/queueを置き、allocatorの空きから二重払い出ししない。HPTは従来通り16–32MiB内/管理外、15–16MiB除外は維持。image境界の検証を緩めない。
 - 全段I（x86生成物不変目標）。以下の表は変更台帳と段表を兼ねる。＋新規、Δ既存。定数/宣言も独立段、実装者が他の段のファイルを同時編集しない。依存のない行を並列配布できる。
 - 各行のQ欄は追加meter `LAN <項目> ...`（KBOOTの固定9行へ混ぜない）。H欄は§7の試験ID、R欄は実機初確認。宣言/選択段の単独像には印を偽造せず、指定後続段の同じ観測を統合時に要求する。
@@ -183,7 +183,7 @@ int ppc_probe_copy8(u32 va, u8 *out); /* kernel_probe.S: load成功0/onfault復�
 |H13|＋tools/ppc/test_lan_p13.py 60–160|P13|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
 |P14|＋drivers/net/gem/gem_reset.c 150|P2,P13|RESET done / A5 / reset時間|
 |H14|＋tools/ppc/test_lan_p14.py 60–160|P14|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
-|P15|＋drivers/net/gem/gem_ring.c 180|P2,P12,P14|RING tx=32 rx=28 / A5 / alignment|
+|P15|＋drivers/net/gem/gem_ring.c 180|P2,P12,P14|RING tx=32 rx=124 / A5 / alignment|
 |H15|＋tools/ppc/test_lan_p15.py 60–160|P15|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
 |P16|＋drivers/net/gem/gem_mac.c 170|P2,P14|MAC/filter/enable / A5 / revision|
 |H16|＋tools/ppc/test_lan_p16.py 60–160|P16|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
@@ -295,11 +295,11 @@ int ppc_probe_copy8(u32 va, u8 *out); /* kernel_probe.S: load成功0/onfault復�
 - DMA の pool は BSS (image の予約の中)。実際の像での収容の確認は段 P26 の link map。
 
 ## 実装で決めたこと (2026-11-11、段 P15〜P19 の取り込みで PM が決定)
-- pool の配置の名前は gem.h の `GEM_POOL_TX_RING` 0・`GEM_POOL_RX_RING` 0x1000・`GEM_POOL_TX_BUF` 0x10000・`GEM_POOL_RX_BUF` 0x20000・`GEM_BUF_SIZE` 2048・`GEM_POOL_SIZE` 0x30000 (§3(d) の値)。gem_ring.c・gem_tx.c・gem_rx.c が共有する。
+- pool の配置の名前は gem.h の `GEM_POOL_TX_RING` 0・`GEM_POOL_RX_RING` 0x1000・`GEM_POOL_TX_BUF` 0x10000・`GEM_POOL_RX_BUF` 0x20000・`GEM_BUF_SIZE` 2048・`GEM_POOL_SIZE` 0x60000 (§3(d) の値)。gem_ring.c・gem_tx.c・gem_rx.c が共有する。
 - TX の完了の回収は gem_tx.c の `int gem_tx_reclaim(struct gem *, u64 now, u32 budget)` で、gem_poll の末尾から呼ぶ。
 - reset の入口は gem_reset.c の `void gem_enter_reset(struct gem *)` 1 つ (TX の誤り・RX の overflow の停止・TX の 5 秒の停止)。ここで `uncertain_tx += tx_pending` を 1 回だけ行い、tx_head・tx_tail・tx_pending を 0 に戻す (reset で NIC の TX の位置も 0 に戻り、ring を準備し直すため)。
 - 段 P24 の service の契約: ring を準備し直すときは ring_prepare_step・ring_cursor・ring_publish_step と rx_head を 0 に戻してから gem_ring_prepare を呼ぶ。gem_rx・gem_tx_reclaim の GEM_EIO は gem_enter_reset で reset に回す (gem_rx は EIO の後に RX_KICK を出さない)。
-- RX の準備し直しは OpenBSD gem_fill_rx_ring/gem_add_rxbuf の形: P15 は 0..27 の 28 枚だけ準備して RX_KICK=28 なので、使った枠 i ではなく枠 (i+28)%32 (生産側) をその枠の buffer で準備する。§5 の RX_KICK=(rxptr+32-4)&31 はこの形で OpenBSD の sc_rx_prod と同じ値になる (FreeBSD のように使った枠を戻すと、未準備の addr=0 の枠が NIC に渡る)。
+- RX の準備し直しは OpenBSD gem_fill_rx_ring/gem_add_rxbuf の形: P15 は 0..123 の 124 枚だけ準備して RX_KICK=124 なので、使った枠 i ではなく枠 (i+124)%128 (生産側) をその枠の buffer で準備する。§5 の RX_KICK=(rxptr+128-4)%128 はこの形で OpenBSD の sc_rx_prod と同じ値になる (FreeBSD のように使った枠を戻すと、未準備の addr=0 の枠が NIC に渡る)。
 - PHY: QEMU の sungem の PHY を PM が採取した (QEMU 8.2.2 mac99 -cpu 7450、OpenBIOS の prompt で Forth の l!/l@ を使い BAR0 0x82200000 の MIF_FRAME を叩く。l@ は BE なので byte を入れ替える)。MIF_CONFIG の LE 値は 0x100 (MDI0 だけ)、MDI0 の address 0 だけが応え PHYID1=0x0040・PHYID2=0x6210・BMSR=0x402c。openbsd miivar.h:236-238 で OUI 0x001018 (miidevs:46 BROADCOM)・model 0x21 (miidevs:178 BCM5201)・rev 0、bmtphy.c:67-68 が扱い BCM5221 以外は mii_phy_reset だけ。gem_phy.c の対応の PHY の表はこの 1 行で始め、表に無い ID は何も書かずに EUNSUPPORTED (§8「未知IDを汎用PHYとみなさない」)。QuickSilver の PHY は §8 の順 2 で採ってから足す。
 - PHY の交渉の判定は BMSR の 2 回目 (今の状態、NetBSD ukphy_status) を使う。gem_phy_step が誤りを返すときは PHY_START に戻り、次の呼び出し (呼び手が 1 秒おき) で reset からやり直す。reset の待ちは NetBSD の 500ms (OpenBSD は 100ms)。
 
