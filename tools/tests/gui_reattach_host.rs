@@ -56,7 +56,7 @@ fn return_gate_and_painter() {
     let mut api=os32api::mock_api();api.gfx_screen_info=screen;api.gui_call=wait;
     api.kbd_getchar=key_wait;api.kbd_trygetchar=key_poll;
     api.gfx_present_dirty=present;api.tvram_clear=clear;
-    api.version=os32api::OS32X_HDR_V3_MIN_API;
+    api.version=os32api::KAPI_VERSION;
     os32api::os32_init(&mut api);
     let mut pixels=[0u8;16];
     unsafe { gfx_fb.planes[0]=pixels.as_mut_ptr(); }
