@@ -164,7 +164,7 @@ int av_abi_probe(void)
         api.in2_mouse_state((IN2_MouseState *)sentinel) != OS32_ERR_BUSY) return 25;
     if (__builtin_offsetof(KernelAPI, in2_acquire) != 1300 ||
         api.in2_acquire != wrap_in2_acquire ||
-        api.in2_acquire(1) != OS32_ERR_BUSY) return 26;
+        api.in2_acquire(1) != OS32_ERR_NOSYS) return 26;
     if (__builtin_offsetof(KernelAPI, in2_unacquire) != 1304 ||
         api.in2_unacquire != wrap_in2_unacquire ||
         api.in2_unacquire() != OS32_ERR_BUSY) return 27;

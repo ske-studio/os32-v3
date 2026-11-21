@@ -63,7 +63,14 @@ def run(ctx):
         ])
     with tempfile.TemporaryDirectory() as td:
         folder = Path(td)
-        for name, old, new in [('', '', ''), *cases]:
+        gate = '    if (!IN2_PUBLIC_EXCLUSIVE) return OS32_ERR_NOSYS;'
+        closed = [('', '', '')]
+        if ctx.mutate:
+            closed.append(('kapi_in2.c', gate, ''))
+        for flags, (name, old, new) in [
+            *[(['-DTEST_CLOSED_ACQUIRE'], case) for case in closed],
+            *[(['-DIN2_PUBLIC_EXCLUSIVE=1'], case) for case in [('', '', ''), *cases]],
+        ]:
             units = []
             for path in sources:
                 src = ctx.root / path
@@ -74,12 +81,12 @@ def run(ctx):
                     src.write_text(text.replace(old, new))
                 units.append(src)
             binary = folder / 'test'
-            subprocess.run(['gcc', '-m32', '-DHOST_ARCH_SHARED_IF', '-ffreestanding', '-DOS32_HOOK_GUI=0', '-fno-pie', '-no-pie',
+            subprocess.run(['gcc', *flags, '-m32', '-DHOST_ARCH_SHARED_IF', '-ffreestanding', '-DOS32_HOOK_GUI=0', '-fno-pie', '-no-pie',
                 '-nostdlib', '-static', '-ffunction-sections', '-Wl,--gc-sections', '-Wl,--wrap=in2_on_focus',
                 '-Werror=implicit-function-declaration', '-Itools/tests/host_arch',
                 '-Ikapi', '-Iinput/hal', '-Iinclude', '-Iexec', '-Iplatform/pc98', '-Ikernel', '-Isdk/include/os32',
                 *units, 'tools/tests/input_focus_host.c', '-o', binary], cwd=ctx.root, check=True)
             rc = subprocess.run(['qemu-i386', binary]).returncode
-            assert (0 < rc <= 36) if name else rc == 0, (name, old, rc)
+            assert (0 < rc <= 39) if name else rc == 0, (name, old, rc)
             print('RED runtime' if name else 'PASS', name, old.splitlines()[0] if old else '', flush=True)
     return 0

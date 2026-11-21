@@ -76,8 +76,14 @@ int in2_mouse_state(IN2_MouseState *o)
     return 0;
 }
 
+/* Enable with the 7d gshell exclusive-input handling. */
+#ifndef IN2_PUBLIC_EXCLUSIVE
+#define IN2_PUBLIC_EXCLUSIVE 0
+#endif
+
 int in2_acquire(u32 flags)
 {
+    if (!IN2_PUBLIC_EXCLUSIVE) return OS32_ERR_NOSYS;
     return in2_excl_acquire(res_owner_get(), flags);
 }
 

@@ -204,10 +204,32 @@ static int public_api(void)
     if (in2_wm_state(&state) != OS32_ERR_INVAL) return 36;
     return 0;
 }
+static int closed_acquire(void)
+{
+    IN2_WmState before, after;
+    IN2_Status status;
+    IN2_Event event;
+    av_focus_set(caller);
+    if (!lost(IN2_LOST_FOCUS) || !lost(IN2_LOST_EXCL) || in2_wm_state(&before)) return 37;
+    u32 gen = in2_focus_generation();
+    legacy_raw_push(2, 0, 0);
+    int rc = in2_acquire(IN2_EXCL_KBD | IN2_EXCL_MOUSE);
+    legacy_raw_push(2, 1, 0);
+    if (legacy_raw_take() != (2 | KBD_RAW_MAKE) || legacy_raw_take() != 2) return 38;
+    if (rc != OS32_ERR_NOSYS || in2_status(&status) || status.acquired ||
+        status.focus_gen != gen || in2_wm_state(&after) || after.excl || after.owner ||
+        after.gen != before.gen || in2_read(&event, 1) != 0) return 39;
+    return 0;
+}
+
 void _start(void)
 {
+#ifdef TEST_CLOSED_ACQUIRE
+    int rc = closed_acquire();
+#else
     int rc = test();
     if (!rc) rc = public_api();
+#endif
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc));
     __builtin_unreachable();
 }
