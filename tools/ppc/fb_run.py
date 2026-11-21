@@ -2,7 +2,9 @@
 """Check the resident terminal against the KCG glyphs and the INDEX8 geometry.
 
 The first 64 scanlines belong to the boot display. Local command echo follows
-cmd_rshell in userland/shell/rshell.c. Captured LAN output has its own sink.
+cmd_rshell in userland/shell/rshell.c. Per docs/design/lib/kprintf.md,
+PowerMac kernel diagnostics go to the log sinks. The text-ready diagnostic
+on console restoration must reach serial while staying off the local screen.
 """
 import argparse
 import hashlib
@@ -31,8 +33,9 @@ def check(condition, detail):
 MUTATIONS = {
     'utf8-bytewise': ('kernel/console/console.c', '        cp = dec.codepoint;\n        p += dec.bytes_used;\n        remaining -= dec.bytes_used;',
                       '        cp = *p;\n        p += dec.bytes_used;\n        remaining -= dec.bytes_used;'),
-    'trace-screen': ('platform/powermac/console_log.c', '    pm_log_write(bytes, n);',
-                     '    pm_log_write(bytes, n);\n    console_write(bytes, n, color);'),
+    'trace-screen': ('platform/powermac/console_text.c', '\n    kprintf(KBOOT_ATTR, "FB text ready',
+                     '\n    console_printf(KBOOT_ATTR, "FB text ready generation=%u\\n", target.generation);'
+                     '\n    kprintf(KBOOT_ATTR, "FB text ready'),
     'colors': ('platform/powermac/rh_observe.c', '.foreground = 255, .background = 0',
                '.foreground = 0, .background = 255'),
     'top': ('platform/powermac/console_text.c', 'pm_console_attach(&target, &kcg_file_api, PM_RH_FB_ROWS)',
@@ -144,6 +147,7 @@ def observe(elf, out, cpu, case):
         s.wait(lambda: generations()[:-1] == before and generations()[-1] != before[-1],
                'tile owner exit restores a new generation', 30)
         s.wait(lambda: finished(s.screen('leave'), r'0'), 'tile leave status and prompt', 30)
+        check('FB text ready generation=' not in s.screen('leave'), 'trace-screen')
         local('clear')
         local('cat /bin/sample.txt')
 
