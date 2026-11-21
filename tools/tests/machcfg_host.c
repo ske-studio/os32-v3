@@ -1,5 +1,9 @@
 #include "machcfg_contract.h"
 #include "kprintf.h"
+#include "config.h"
+#include "kstring.h"
+#include "sysconfig.h"
+#include "vfs.h"
 
 _Static_assert(MACHCFG_FILE_MAX == TEST_SYSCONFIG_MAX - 1, "machine.cfg limit");
 
@@ -50,10 +54,12 @@ static int reports(void)
     };
     for (unsigned m = 0; m < sizeof(machines)/sizeof(machines[0]); ++m) {
         const typeof(*machines) *mch = &machines[m];
+        struct machcfg_seed seed = mch->cpu ? (struct machcfg_seed){{0, 0}, mch->accepts}
+                                           : platform_machcfg_seed();
         for (unsigned i = 0; i < sizeof(cases)/sizeof(cases[0]); ++i) {
             const typeof(*cases) *c = &cases[i];
             used = 0;
-            machcfg_begin((struct machcfg_seed){{0, 0}, mch->accepts});
+            machcfg_begin(seed);
             machcfg_report(mch->machine, mch->cpu, mch->cpu != 0);
             if (used) return 8;
             if (c->result != MACHCFG_FILE_NOFS)
@@ -73,10 +79,119 @@ static int reports(void)
     return 0;
 }
 
+static char config[MACHCFG_FILE_MAX + 1];
+static int config_size;
+static unsigned reads;
+
+int vfs_read(const char *path, void *buf, u32 max)
+{
+    reads++;
+    if (!kstrcmp(path, SYS_SYSTEM_CFG)) {
+        static const char system_cfg[] = "GUI=1 ;x";
+        if (max < sizeof(system_cfg) - 1) return -1;
+        kmemcpy(buf, system_cfg, sizeof(system_cfg) - 1);
+        return sizeof(system_cfg) - 1;
+    }
+    if (kstrcmp(path, SYS_MACHINE_CFG) || config_size < 0) return -1;
+    if ((u32)config_size > max) return -1;
+    for (int i = 0; i < config_size; i++) ((char *)buf)[i] = config[i];
+    return config_size;
+}
+
+static int line_endings(void)
+{
+    const char *path = SYS_MACHINE_CFG;
+    char value[2];
+    config[0] = 'K';
+    config[1] = '=';
+    config[2] = '2';
+    for (int i = 3; i < MACHCFG_LINE_MAX; i++) config[i] = ' ';
+    config[MACHCFG_LINE_MAX] = '\r';
+    config[MACHCFG_LINE_MAX + 1] = '\n';
+    config_size = MACHCFG_LINE_MAX + 2;
+    sysconfig_temp_begin(path);
+    int valid = sysconfig_get_int(path, "K", -1) == 2;
+    sysconfig_temp_end();
+    config_size--;
+    sysconfig_temp_begin(path);
+    valid &= sysconfig_get_str(path, "K", value, sizeof(value)) == -1;
+    sysconfig_temp_end();
+    config[3] = '\r';
+    config_size = 4;
+    sysconfig_temp_begin(path);
+    valid &= sysconfig_get_int(path, "K", -1) == -1;
+    sysconfig_temp_end();
+    return valid;
+}
+
+static int root_loads(void)
+{
+    static const struct {
+        const char *text;
+        int pad_to, result, perf, nap;
+        const char *perf_field, *nap_field;
+    } cases[] = {
+        {0, 0, MACHCFG_FILE_NONE, 0, 0, "none perf=0/def", "0/def"},
+        {"", 0, MACHCFG_FILE_NONE, 0, 0, "none perf=0/def", "0/def"},
+        {"perf.profile=2\nppc7450.nap=1\n", MACHCFG_FILE_MAX, MACHCFG_FILE_OK,
+         2, 1, "ok perf=2/file", "1/file"},
+        {"perf.profile=2\nppc7450.nap=1\n", MACHCFG_FILE_MAX + 1, MACHCFG_FILE_BIG,
+         0, 0, "big perf=0/def", "0/def"},
+        {"perf.profile=3\nppc7450.nap=2", 0, MACHCFG_FILE_OK, 0, 0, "ok perf=0/def", "0/def"},
+        {"perf.profile=0\nperf.profile=2\nppc7450.nap=0", 0, MACHCFG_FILE_OK,
+         0, 0, "ok perf=0/file", "0/file"},
+        {"perf.profile=x\nppc7450.nap=1", 0, MACHCFG_FILE_OK, 0, 1, "ok perf=0/def", "1/file"},
+        {"perf.profile=4294967296", 0, MACHCFG_FILE_OK, 0, 0, "ok perf=0/def", "0/def"},
+    };
+    static const struct {
+        u32 cpu;
+        int accepts;
+        const char *prefix;
+    } machines[] = {
+        {0, 0, "MACHCFG pc98 cpu=0x0 seed=plat file="},
+        {0x80000201, 1, "MACHCFG powermac cpu=0x80000201 seed=cpu file="},
+        {0x80010201, 0, "MACHCFG powermac cpu=0x80010201 seed=cpu file="},
+    };
+    for (unsigned m = 0; m < sizeof(machines)/sizeof(machines[0]); m++) {
+        const typeof(*machines) *machine = &machines[m];
+        struct machcfg_seed seed = machine->cpu ? (struct machcfg_seed){{0, 0}, machine->accepts}
+                                                : platform_machcfg_seed();
+        for (unsigned i = 0; i < sizeof(cases)/sizeof(cases[0]); i++) {
+            const typeof(*cases) *c = &cases[i];
+            config_size = -1;
+            if (c->text) {
+                config_size = kstrlen(c->text);
+                kmemcpy(config, c->text, config_size);
+                while (config_size < c->pad_to) config[config_size++] = ' ';
+            }
+            used = reads = 0;
+            machcfg_begin(seed);
+            if (machcfg_load_root() != c->result || reads != 1 ||
+                machcfg_get()->perf_request != c->perf ||
+                machcfg_get()->nap7450 != (machine->accepts ? c->nap : 0)) return 0;
+            machcfg_report(machine->cpu ? "powermac" : "pc98", machine->cpu, machine->cpu != 0);
+            const char *parts[] = {machine->prefix, c->perf_field, " nap=",
+                                   machine->accepts ? c->nap_field : "0/n-a", "\n"};
+            const char *actual = line;
+            for (unsigned j = 0; j < sizeof(parts)/sizeof(parts[0]); j++) {
+                unsigned len = kstrlen(parts[j]);
+                if (kstrncmp(actual, parts[j], len)) return 0;
+                actual += len;
+            }
+            if (bad || *actual) return 0;
+            sysconfig_get_int(SYS_MACHINE_CFG, "perf.profile", -1);
+            if (reads != 2 || sysconfig_get_int(SYS_SYSTEM_CFG, "GUI", -1) != 1) return 0;
+        }
+    }
+    return 1;
+}
+
 static int run(void)
 {
+    if (!root_loads()) return 21;
+    if (!line_endings()) return 20;
     const struct machcfg_seed seeds[] = {
-        {{0, 0}, 1}, {{0, 0}, 0}, {{0, 0}, 0}
+        {{0, 0}, 1}, {{0, 0}, 0}, platform_machcfg_seed()
     };
     struct machcfg values = {2, 1};
     unsigned int i;

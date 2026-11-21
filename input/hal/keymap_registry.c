@@ -4,6 +4,12 @@
 #include "os32_kapi_shared.h"
 
 static const KmBackend *maps[2];
+static void (*policy_lookup)(const KmBackend *, KmSource *);
+
+void km_policy_lookup_install(void (*lookup)(const KmBackend *, KmSource *))
+{
+    policy_lookup = lookup;
+}
 static struct {
     u16 generation, map_id;
 } bindings[IN2_MAX_DEV];
@@ -96,6 +102,7 @@ int km_source_lookup(u8 src, u16 generation, KmSource *out)
     }
     out->map = maps[bindings[src - 1].map_id - 1];
     out->map_generation = 1;
+    if (policy_lookup) policy_lookup(out->map, out);
     irq_restore(flags);
     return 0;
 }

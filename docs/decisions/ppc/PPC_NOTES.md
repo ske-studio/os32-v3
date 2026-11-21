@@ -13,7 +13,9 @@
 ## 2. G4 実機 (PowerMac3,5、OF 4.2.1f2)
 
 - 起動の行は `boot enet:192.168.2.12,os32-sh.elf,192.168.2.201,192.168.2.12`。この OF は `;` も区切りに数え、4 つ目がゲートウェイ、5 つ目が bootp-retries (`;mask,;gw` は通らない)。
-- 引数を付けても OF は先にサーバへユニキャストの DHCPDISCOVER (送り元 0.0.0.0) と BSDP (LIST/SELECT) を出す。Linux の dnsmasq は martian として捨てるので、ノートでは AF_PACKET の返事役 (G4 の MAC だけに答える) を使う。返事役の期限切れに注意。
+- 引数を付けても OF は先にサーバへユニキャストの DHCPDISCOVER (送り元 0.0.0.0) と BSDP (LIST/SELECT) を出す。Linux の dnsmasq は martian として捨てるので、ノートでは AF_PACKET の返事役 (G4 の MAC だけに答える) を使う。
+- NVRAM の起動名は `os32-sh.elf` に固定する。更新時はノートで前版を `os32-sh.<中身>-<日付>.elf` として保管し、`/srv/tftp/os32-sh.elf` を新版に置き換える。両方を読み取り専用にする。
+- G4 の電源を入れる前に、ノートで常駐の BSDP 応答サービス `os32-g4-bootp` が稼働していることを確かめる。
 - OF の画面は 8bpp・640x480・linebytes 768 (Apple の CLUT、0 白・0xff 黒)。load-base は 0x800000。
 - `/memory` の reg は空の DIMM を size 0 で並べる (飛ばす)。OF は読み込んだ像の直後の 32KiB を available に戻さない (64KiB までの隙間を許す)。RAM 1.5GiB、TB 33.29MHz、MPIC 64 本、PHY は BCM5411 (ID 0x0020/0x6071)。
 - リンク確立の直後に送ったフレームは届かない。lan_service は RUNNING の後 2 秒は送らない。

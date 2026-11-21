@@ -222,6 +222,9 @@ if __name__ == '__main__':
         check_kboot(root)
         if args.mutate:
             for path, anchor, mutant, expected, label in (
+                    ('build/sources/common.mk', 'C_COMMON_EXEC = kernel/machcfg_root.c init/sysconfig.c',
+                     'C_COMMON_CORE += kernel/machcfg_root.c init/sysconfig.c\nC_COMMON_EXEC =',
+                     AssertionError, 'root reader linked into FS-less PowerMac'),
                     ('build/sources/common.mk', 'kernel/sqlite_engine.c $(C_EXT2_FORMATTER)',
                      'kernel/sqlite_engine.c', AssertionError, 'formatter omitted from PowerPC compile'),
                     ('build/sources/common.mk', 'C_COMMON_CORE = ', 'C_COMMON_CORE = $(C_EXT2_FORMATTER) ',

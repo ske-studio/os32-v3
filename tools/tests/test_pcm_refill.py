@@ -35,6 +35,7 @@ MUTATIONS = (
      'return pcm_advance(PCM_FROM_TICK);'),
     (DRIVER, '(void)pcm_advance(PCM_FROM_TICK);',
      '(void)pcm_advance(PCM_FROM_IRQ10);'),
+    (DRIVER, '(void)pcm_advance(PCM_FROM_TICK);', '(void)0;'),
     (DRIVER, 'have = dma_chan_remaining(PCM_DMA_CHAN, &left, &tc) == 0;',
      'have = 1;'),
     (DRIVER, '(u32)(now - g_pcm.now) <\n'
