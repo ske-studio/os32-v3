@@ -1,3 +1,4 @@
+import re
 """T5c-3: actual module runtime and core return order, ILP32.
 No CPU exception is simulated by a host signal stack. Hardware entry is PM's
 NP21/W check; shm-user covers exact PTE/caller/ESP0 restoration separately.
@@ -31,7 +32,7 @@ def product_image(folder):
                            if (e['name'].startswith('loop_dev_') and e['name'] not in
                                ('loop_dev_attach', 'loop_dev_detach')) or
                            e['name'] in ('vfs_read_fd', 'vfs_seek', 'kmemcpy',
-                               'console_hw_cursor_enable', 'palette_init', 'snd_set_master',
+                               'console_hw_cursor_enable', 'palette_init', 'fm_all_off', 'ssg_all_off',
                                'tss_iomap_deny_all', 'v86_last_gp_cs', 'v86_last_gp_ip',
                                'v86_debug_ops', 'v86_cui_display_restore')}
     data = (ROOT / 'build/out/v86.mod').read_bytes()
@@ -77,9 +78,36 @@ def product_image(folder):
     print('PASS product V86: paired POST_ROOT, relocate, truncated/corrupt rejection, core dependencies', flush=True)
 
 
+def sound_handoff(folder, mutate):
+    """Observe the two real handoff functions with recording FM and SSG outputs."""
+    source = (ROOT / 'platform/pc98/legacy/v86_io.c').read_text()
+    functions = [re.search(r'static void snd_state_for_' + side + r'\(void\)\n\{.*?\n\}',
+                           source, re.S)[0] for side in ('guest', 'os32')]
+    cases = [('both directions', functions, 0)]
+    if mutate:
+        for index, side in enumerate(('guest', 'os32')):
+            for call in ('fm_all_off();', 'ssg_all_off();'):
+                changed = functions.copy()
+                assert changed[index].count(call) == 1
+                changed[index] = changed[index].replace(call, '')
+                cases.append((side + ' ' + call, changed, index + 1))
+    for label, bodies, expected in cases:
+        path = folder / 'handoff.c'
+        path.write_text('static int fm, ssg;\nvoid fm_all_off(void){fm++;}\n'
+            'void ssg_all_off(void){ssg++;}\n' + '\n'.join(bodies) +
+            '\nint main(void){snd_state_for_guest(); if(fm!=1 || ssg!=1)return 1;'
+            'snd_state_for_os32(); return (fm!=2 || ssg!=2) ? 2 : 0;}\n')
+        exe = folder / 'handoff'
+        subprocess.run(['gcc', '-std=gnu11', '-Wall', '-Werror', path, '-o', exe], check=True)
+        rc = subprocess.run([exe]).returncode
+        assert rc == expected, (label, rc, expected)
+        print('RED' if rc else 'PASS', label, flush=True)
+
+
 def main():
     with tempfile.TemporaryDirectory(prefix='v86-module-') as td:
         folder = Path(td)
+        sound_handoff(folder, '--mutate' in sys.argv)
         product_image(folder)
         exe = folder / 'v86-module'
         source = (ROOT / 'platform/pc98/legacy/v86_mem.c').read_text()

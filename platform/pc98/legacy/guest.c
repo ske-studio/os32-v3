@@ -1,5 +1,8 @@
 /* x86 V86 service adapter; native frames and session state stay here. */
 #include "legacy_guest.h"
+#include "av_contract.h"
+#include "kapi_call.h"
+#include "os32_kapi_slots.h"
 #include "v86.h"
 #include "v86_mem.h"
 #include "v86_module.h"
@@ -27,5 +30,14 @@ int legacy_trap(void *native_frame)
 int legacy_call_dispatch(u32 slot, void *fn, struct kapi_arg_source *src, unsigned count,
                          u32 *result)
 {
+    if (slot >= KAPI_SLOT_V86S_BEGIN && slot <= KAPI_SLOT_V86S_FM_DRAIN) {
+        struct kapi_values args;
+        if (!arch_kapi_read_block(src, 0, count, &args)) return -1;
+        int rc = kapi_v86s_check(slot, args.value);
+        if (rc) {
+            *result = (u32)rc;
+            return 1;
+        }
+    }
     return v86_call_dispatch(slot, fn, src, count, result);
 }

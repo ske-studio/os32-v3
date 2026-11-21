@@ -109,6 +109,10 @@ static void caller_copy_tests(void)
     u8 *data = P2V(payload);
     u32 *words = (u32 *)data;
     CHECK(caller_access_enter(&previous, CALLER_USER));
+    u32 ignored;
+    words[0] = 0x100000;
+    CHECK(forward_strings(KAPI_SLOT_FM_PLAY_MML, 0, (void *)va, 4, 0, &ignored) == 0);
+    CHECK(forward_strings(KAPI_SLOT_SND_BGM_PLAY, 0, (void *)va, 4, 0, &ignored) == 0);
     u32 map_args[6] = {va, PAGE_SIZE * 2, 3, 0x32, ~0U, 0}, mapped;
     __asm__ volatile("int $0x80" : "=a"(mapped) : "a"(90), "b"(map_args) : "memory");
     CHECK(mapped == va);

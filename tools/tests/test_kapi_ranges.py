@@ -1,7 +1,7 @@
 """Compile real generated wrappers with the real B1 managed walk (ILP32).
 Only private generated/source copies are mutated; compiler failure is not RED.
 """
-TARGET_SRC = ['sdk/gen_kapi.py', 'sdk/kapi.json', 'exec/exec.c', 'exec/ring3_str.c',
+TARGET_SRC = ['platform/pc98/legacy/guest.c', 'sdk/gen_kapi.py', 'sdk/kapi.json', 'exec/exec.c', 'exec/ring3_str.c',
               'net/host_mailbox.c', 'kapi/kapi_host_notice.c',
               'exec/access_walk.c', 'exec/redir_access.c', 'kapi/kapi_sysinfo.c', 'platform/pc98/platform_mem_stat.h', 'tools/tests/kapi_ranges_host.c', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h']
 from exec_source import exec_source
@@ -16,6 +16,13 @@ import test_kapi_out as generator
 
 ROOT = walk.ROOT
 MUTANTS = (
+    ('legacy dispatch guard', 'legacy', 'int rc = kapi_v86s_check(slot, args.value);',
+     'int rc = 0;', 'AV legacy sequence tail'),
+    ('retired FM pointer mask', 'generated', '0x0000,  /* fm_play_mml */', '0x0001,  /* fm_play_mml */', 'retired FM returns'),
+    ('retired BGM pointer mask', 'generated', '0x0000,  /* snd_bgm_play */', '0x0001,  /* snd_bgm_play */', 'retired BGM returns'),
+    ('retired BGM result', 'generated', 'wrap_snd_bgm_is_playing(void)\n{\n    return 0;', 'wrap_snd_bgm_is_playing(void)\n{\n    return OS32_ERR_NOSYS;', 'retired BGM idle'),
+    ('retired focus result', 'generated', 'wrap_snd_focus(int app_id)\n{\n    (void)app_id;\n    return OS32_ERR_NOSYS;', 'wrap_snd_focus(int app_id)\n{\n    (void)app_id;\n    return 0;', 'retired focus'),
+    ('session sequence guard', 'generated', '\n                                        (u32)last_seq, KAPI_OUT_LEN(last_seq, sizeof(u32))', '\n                                        (u32)last_seq, 0', 'AV legacy sequence tail'),
     ('notice copy skipped', 'notice',
      'copy_to_caller(&caller, out, &notice, sizeof(notice))', '1', 'notice output bytes'),
     ('notice not consumed', 'notice',
@@ -51,6 +58,9 @@ def run(runner, mutant=None, fixture_name="kapi_ranges_host.c"):
         sources['mailbox'] = (ROOT / 'net/host_mailbox.c').read_text().replace(
             '#include "host_mailbox.h"', '#include "' + str(ROOT / 'net/host_mailbox.h') + '"')
         sources['generated'] = (generated / 'kapi/kapi_generated.c').read_text()
+        guest = (ROOT / 'platform/pc98/legacy/guest.c').read_text()
+        start = guest.index('int legacy_call_dispatch(')
+        sources['legacy'] = guest[start:guest.index('\n}', start) + 2]
         source = exec_source(ROOT)
         sources['exec'] = source[source.index('int ring3_ptr_ok('):source.index('\n#include "ksetjmp.h"')]
         # Keep every range guard, excluding the unrelated g1 DONE function.

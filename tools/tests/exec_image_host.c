@@ -316,7 +316,6 @@ UNREACHABLE_STUB(pcm_reclaim);
 UNREACHABLE_STUB(pipe_free_owned);
 UNREACHABLE_STUB(res_owner_set);
 UNREACHABLE_STUB(shm_free_owned);
-UNREACHABLE_STUB(snd_owner_exit);
 UNREACHABLE_STUB(tss_set_esp0);
 
 

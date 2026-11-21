@@ -39,6 +39,7 @@ TYPE_MAP = {
     "const GFX_Cmd *": "*const u8",
     "u16 *":           "*mut u16",
     "int *":           "*mut i32",
+    "const i32 *":     "*const i32",
     "i32 *":           "*mut i32",
     "u32 *":           "*mut u32",
     "OS32_Stat *":     "*mut u8",
@@ -50,6 +51,10 @@ def c_type_to_rust(c_type):
     c_type = c_type.strip()
     if c_type in TYPE_MAP:
         return TYPE_MAP[c_type]
+    av = re.fullmatch(r"(const )?((?:SND2|IN2|V86)_\w+) \*", c_type)
+    if av:
+        qualifier = "const" if av[1] else "mut"
+        return f"*{qualifier} crate::av::{av[2]}"
     # ポインタ型の汎用処理
     if c_type.endswith("*"):
         return "*mut u8"

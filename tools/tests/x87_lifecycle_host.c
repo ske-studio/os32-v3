@@ -124,7 +124,6 @@ CLEANUP(font_lease_close_owned)
 CLEANUP(vfs_close_owned)
 CLEANUP(pipe_free_owned)
 CLEANUP(shm_free_owned)
-CLEANUP(snd_owner_exit)
 CLEANUP(pcm_reclaim)
 #undef CLEANUP
 #define NOTICE(name) void name(int id) { (void)id; }

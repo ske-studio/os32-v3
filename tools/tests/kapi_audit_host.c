@@ -112,6 +112,7 @@ const ClockOps pc98_clock = {
     .read_date = clock_empty_date, .read_legacy = clock_empty_legacy,
 };
 #include "../../platform/pc98/d2_bind.c"
+void old_mml_target(const char *mml) { (void)mml; ports++; }
 #include "rshell_source.inc"
 #include "kstring.c"
 #include "kstring_c.c"
@@ -404,15 +405,17 @@ static int test(void)
             ports=0; ssg_tone(ch,100); CHECK(!ports,"ssg tone channel");
             ports=0; ssg_volume(ch,15); CHECK(!ports,"ssg volume channel");
         }
+        ports=0; wrap_fm_play_mml((const char *)1); CHECK(!ports,"retired MML side effect");
+        wrap_ssg_all_off(); CHECK(ports,"ssg all off valid");
         ports=0; fm_set_tone_num(0,-1); CHECK(!ports,"tone number low");
         fm_set_tone_num(0,NUM_TONES); fm_set_tone_num(0,0x7fffffff);
         CHECK(!ports,"tone number high");
         for (i=0;i<3;i++) {
-            ports=0; fm_set_tone_num(i,NUM_TONES-1); CHECK(ports,"fm tone valid");
-            ports=0; fm_note_on(i,48); CHECK(ports,"fm on valid");
-            ports=0; fm_note_off(i); CHECK(ports,"fm off valid");
-            ports=0; ssg_tone(i,100); CHECK(ports,"ssg tone valid");
-            ports=0; ssg_volume(i,15); CHECK(ports,"ssg volume valid");
+            ports=0; wrap_fm_set_tone_num(i,NUM_TONES-1); CHECK(ports,"fm tone valid");
+            ports=0; wrap_fm_note_on(i,48); CHECK(ports,"fm on valid");
+            ports=0; wrap_fm_note_off(i); CHECK(ports,"fm off valid");
+            ports=0; wrap_ssg_tone(i,100); CHECK(ports,"ssg tone valid");
+            ports=0; wrap_ssg_volume(i,15); CHECK(ports,"ssg volume valid");
         }
     }
     if (AUDIT_CASE == 0 || AUDIT_CASE == 4) {
@@ -422,43 +425,6 @@ static int test(void)
         CHECK(rshell_active==1,"rshell user disable");
         user=0; wrap_rshell_set_active(0); CHECK(!rshell_active,"rshell trusted disable");
         boot_serial_mirror=1; wrap_rshell_set_active(1); CHECK(rshell_active==1 && !boot_serial_mirror,"rshell trusted enable and boot handoff");
-    }
-    if (AUDIT_CASE == 0 || AUDIT_CASE == 3) {
-        /* STOP arrives during a sustained note/rest, or while scanning non-notes.
-         * A bounded fake device wait detects a removed check without timeout. */
-        user=1; waits=abort_checks=0; escaped=abort_requested=0;
-        if (!__builtin_setjmp(jump)) wrap_fm_play_mml("C");
-        CHECK(escaped==1 && waits==3,"mml wait abort");
-        waits=abort_checks=0; escaped=0; abort_requested=1;
-        ports=0;
-        if (!__builtin_setjmp(jump)) wrap_fm_play_mml("");
-        empty_mml_ports=ports; ports=0; escaped=0;
-        if (!__builtin_setjmp(jump)) wrap_fm_play_mml("xxxxxxxxC");
-        CHECK(ports==empty_mml_ports, "MML scan stops before next note");
-        CHECK(escaped==1 && !waits,"mml scan abort");
-        waits=abort_checks=0; escaped=abort_requested=0;
-        if (!__builtin_setjmp(jump)) wrap_fm_play_mml("R");
-        CHECK(escaped==1 && waits==3,"mml rest abort");
-        user=1; stop_on_wait=1; stop_requested=abort_requested=0; waits=0;
-        wrap_fm_play_mml("CDEFG");
-        CHECK(stop_requested && waits==3,"mml wait stop");
-        stop_requested=1; waits=abort_checks=0; wrap_fm_play_mml("xxxxxxx");
-        CHECK(!waits && abort_checks==1,"mml scan stop");
-        stop_requested=0; waits=0; wrap_fm_play_mml("R");
-        CHECK(stop_requested && waits==3,"mml rest stop");
-        stop_requested=0; waits=0; request_wait=10;
-        wrap_fm_play_mml("CDEFG");
-        CHECK(stop_requested && waits==10 && last_key==0,"mml sustained stop key off");
-        stop_requested=stop_on_wait=abort_requested=escaped=0; waits=0;
-        if (!__builtin_setjmp(jump)) wrap_fm_play_mml("CDEFG");
-        CHECK(escaped==1 && waits==10 && last_key==0,"CUI sustained abort key off");
-        request_wait=3; stop_requested=stop_on_wait=0;
-        /* No request: a full note completes and still sends final Key-OFF. */
-        request_wait=400; escaped=abort_requested=0; waits=abort_checks=0;
-        wrap_fm_play_mml("C");
-        CHECK(waits==22 && !abort_checks && !escaped && last_key==0,
-              "raw normal MML completes with Key-OFF");
-        request_wait=3;
     }
     if (AUDIT_CASE == 0 || AUDIT_CASE == 5) {
         user=1; waits=abort_checks=0; escaped=abort_requested=0;
@@ -486,16 +452,6 @@ static int test(void)
         if (!__builtin_setjmp(jump)) CHECK(serial_getchar()=='Z', "internal receive value");
         CHECK(!escaped && !abort_checks && waits==3, "internal receive does not abort USER syscall");
         wait_hook=0;
-    }
-    if (AUDIT_CASE == 0 || AUDIT_CASE == 3) {
-        /* Trusted callers remain usable even with an outstanding request. */
-        user=0; stop_requested=abort_requested=1; escaped=0; waits=abort_checks=0;
-        if (!__builtin_setjmp(jump)) wrap_fm_play_mml("R");
-        CHECK(!escaped && !abort_checks && waits==20,"trusted mml");
-        user=1; waits=abort_checks=0; escaped=0;
-        if (!__builtin_setjmp(jump)) fm_play_mml("R");
-        CHECK(!escaped && !abort_checks && waits==20, "internal MML does not abort USER syscall");
-        stop_requested=0;
     }
     if (AUDIT_CASE == 0 || AUDIT_CASE == 7) {
         const char *long_text="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";

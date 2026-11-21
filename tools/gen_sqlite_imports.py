@@ -56,9 +56,10 @@ def generate(out, definition=DEFINITION, contracts_only=False, module="sqlite", 
                f'extern unsigned long {module}_import_slots[{prefix}_IMPORT_COUNT];', '#endif']
     (out / f'{module}_imports.h').write_text('\n'.join(header) + '\n')
     if not contracts_only:
+        initializer = "0" if entries else ""
         (out / f'{module}_import_slots.c').write_text(
             f'#include "{module}_imports.h"\nunsigned long {module}_import_slots[{prefix}_IMPORT_COUNT]\n'
-            f'__attribute__((section(".data.{module}_import_slots"), aligned(4))) = {{0}};\n')
+            f'__attribute__((section(".data.{module}_import_slots"), aligned(4))) = {{{initializer}}};\n')
         section = f'.section .text.{module}_imports,"ax",@progbits'
         if target == 'ppc-powermac':
             asm = [section, '.balign 4']

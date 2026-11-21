@@ -255,7 +255,10 @@ def verify(source, entries):
         args = ', '.join(api.get('args', [])) or 'void'
         body = ''.join('    (void)' + re.search(r'([a-zA-Z0-9_]+)(?:\[[0-9]*\])?$', arg).group(1) + ';\n'
                        for arg in api.get('args', []))
-        if api['ret'] != 'void':
+        if 'retired' in api:
+            if api['ret'] != 'void':
+                body += '    return ' + str(api['retired']['result']) + ';\n'
+        elif api['ret'] != 'void':
             body += '    return (' + api['ret'] + ')' + absent_result(api) + ';\n'
         expected = api['ret'] + ' __cdecl wrap_' + name + '(' + args + ')\n{\n' + body + '}\n'
         if expected not in source:
@@ -472,7 +475,12 @@ def main():
         if not sfs_providers <= undefined:
             print('missing link SFS providers:', sorted(sfs_providers - undefined))
             return 1
-        unexpected = undefined - (sfs_providers | ALLOWED_UNDEFINED | LOOP_PROVIDERS | GFX2_QUERY_PROVIDERS | DISPLAY_PROVIDERS | KCG_PROVIDERS | DB_PROVIDERS)
+        av_providers = {line.split()[1] for line in (ROOT / 'tools/checks/av_wiring.txt').read_text().splitlines()
+                        if line and not line.startswith('#')}
+        if av_providers - undefined:
+            print('missing AV providers:', sorted(av_providers - undefined))
+            return 1
+        unexpected = undefined - (av_providers | sfs_providers | ALLOWED_UNDEFINED | LOOP_PROVIDERS | GFX2_QUERY_PROVIDERS | DISPLAY_PROVIDERS | KCG_PROVIDERS | DB_PROVIDERS)
         if unexpected:
             print('unexpected providers:', sorted(unexpected)); return 1
         print('undefined providers:', len(undefined))

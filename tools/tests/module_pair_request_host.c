@@ -31,7 +31,7 @@ inline __attribute__((always_inline)) int module_load(const struct module_reques
 #endif
 #include PAIR_ADAPTER
 
-#if defined(PAIR_FM) || defined(PAIR_PCM) || defined(PAIR_LAN)
+#if defined(PAIR_PCM) || defined(PAIR_LAN)
 int tick_register(unsigned int slot, tick_fn fn) { return 0; }
 #elif defined(PAIR_V86)
 int v86_call_init(void) { return 1; }

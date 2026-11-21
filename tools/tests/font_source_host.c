@@ -705,9 +705,7 @@ void pipe_free_owned(int id)
     if (id == reclaim_target && slot_of(reclaim_watch)->kind == FONT_LEASE_FREE) reclaim_mid_ok++;
 }
 void shm_free_owned(int id) { (void)id; reclaim_steps++; }
-void snd_owner_exit(int id) { (void)id; reclaim_steps++; }
 void pcm_reclaim(int id) { (void)id; reclaim_steps++; }
-#include "exec_snd.h"
 #include "exec_kapi_db.h"
 #include "exec_reclaim.h"
 static void exec_input_owner_exit(int id) { (void)id; }
@@ -729,7 +727,7 @@ static void lease_reclaim(void)
     reclaim_watch = a;
     reclaim_mid_ok = reclaim_steps = 0;
     exec_reclaim_resources(APP_OWNER);
-    CHECK(reclaim_steps == 7 && reclaim_mid_ok == 2);
+    CHECK(reclaim_steps == 6 && reclaim_mid_ok == 2);
     CHECK(slot_of(a)->kind == FONT_LEASE_FREE && !open_files[afd].in_use);
     CHECK(slot_of(b)->kind == FONT_LEASE_APP && open_files[bfd].in_use);
     CHECK(slot_of(sid)->kind == FONT_LEASE_SHELL);

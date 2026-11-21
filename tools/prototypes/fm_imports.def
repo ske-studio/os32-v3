@@ -3,33 +3,7 @@
   "contracts": [
     "include/fm_contract.h",
     "drivers/sound/fm/fm_module.h",
-    "drivers/sound/fm/fm.h",
-    "drivers/sound/fm/snd_engine.h"
+    "drivers/sound/fm/fm.h"
   ],
-  "imports": [
-    {
-      "symbol": "ktime_ticks",
-      "context": "normal",
-      "irq": true,
-      "declaration": "u32 ktime_ticks(void);"
-    },
-    {
-      "symbol": "res_owner_get",
-      "context": "normal",
-      "irq": false,
-      "declaration": "int res_owner_get(void);"
-    },
-    {
-      "symbol": "ring3_wait_pending",
-      "context": "normal",
-      "irq": false,
-      "declaration": "int ring3_wait_pending(void);"
-    },
-    {
-      "symbol": "ring3_abort_check",
-      "context": "normal",
-      "irq": false,
-      "declaration": "void ring3_abort_check(void);"
-    }
-  ]
+  "imports": []
 }

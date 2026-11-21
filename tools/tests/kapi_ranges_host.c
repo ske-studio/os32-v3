@@ -33,6 +33,8 @@ VfsOps *vfs_route(const char *path, char *rel_out, int max_rel, void **ctx_out)
 }
 #include "disk_host_source.c"
 #include "generated_host_source.c"
+#include "../../input/hal/a0_weak.c"
+#include "../../sound/hal/a0_weak.c"
 static HostNotice notice_heap[64];
 void *kmemset(void *d, int v, u32 n)
 { u8 *p = d; while (n--) *p++ = (u8)v; return d; }
@@ -102,6 +104,26 @@ static void named(int ok, const char *name)
     else named((killed) && !reached, case_name); \
 } while (0)
 
+#include "kapi_call.h"
+static struct kapi_values drain_args;
+int arch_kapi_read_block(struct kapi_arg_source *src, unsigned first, unsigned count,
+                         struct kapi_values *out)
+{
+    (void)src;
+    if (first || count != 4) return 0;
+    *out = drain_args;
+    return 1;
+}
+int v86_call_dispatch(u32 slot_nr, void *fn, struct kapi_arg_source *src, unsigned count,
+                      u32 *result)
+{
+    (void)slot_nr; (void)fn; (void)src; (void)count;
+    *result = 0;
+    touch();
+    return 1;
+}
+#include "legacy_host_source.c"
+
 static void dispatch_early(u32 slot, const u32 *args_src)
 {
     unsigned count = kapi_argsize[slot] / sizeof(u32);
@@ -121,6 +143,39 @@ static void caller_copy_tests(void)
     u32 *pt = P2V(space.app_pt_phys[0]);
     u32 index = (va >> PAGE_SHIFT) % PTE_COUNT, saved = pt[index];
     named(caller_access_enter(&previous, CALLER_USER), "caller frame");
+    u32 bad_mml = 0x100000;
+    EXPECT("retired FM returns", 0, (dispatch_early(KAPI_SLOT_FM_PLAY_MML, &bad_mml),
+                                      wrap_fm_play_mml((const char *)bad_mml), touch()));
+    EXPECT("retired BGM returns", 0, (dispatch_early(KAPI_SLOT_SND_BGM_PLAY, &bad_mml),
+                                       wrap_snd_bgm_play((const char *)bad_mml), touch()));
+    named(wrap_snd_bgm_is_playing() == 0, "retired BGM idle");
+    named(wrap_snd_focus(1) == OS32_ERR_NOSYS, "retired focus");
+    EXPECT("AV key state tail", 1, (wrap_in2_key_state((u8 *)(tail - 126)), touch()));
+    EXPECT("AV FM sequence tail", 1, (wrap_v86s_fm_drain(0, 0, 0, (u32 *)tail), touch()));
+    u32 result;
+    struct kapi_arg_source src = {0};
+    drain_args.value[3] = va;
+    EXPECT("AV legacy handled", 0, named(legacy_call_dispatch(KAPI_SLOT_V86S_FM_DRAIN,
+           0, &src, 4, &result) == 1 && result == 0, "V5 handled"));
+    drain_args.value[3] = tail;
+    EXPECT("AV legacy sequence tail", 1, legacy_call_dispatch(KAPI_SLOT_V86S_FM_DRAIN,
+           0, &src, 4, &result));
+    named(wrap_snd2_caps(0, 0, 260) == OS32_ERR_INVAL, "AV caps too long");
+    named(wrap_snd2_caps(0, 0, 3) == OS32_ERR_INVAL, "AV caps alignment");
+    named(wrap_snd2_caps(0, (SND2_Caps *)va, 256) == OS32_ERR_NOSYS, "AV caps limit");
+    named(wrap_snd2_caps(0, 0, 0) == OS32_ERR_INVAL, "AV zero caps");
+    named(wrap_snd2_chip_caps(0, (SND2_ChipCaps *)va, 64) == OS32_ERR_NOSYS, "AV chip cap limit");
+    named(wrap_snd2_chip_caps(0, 0, 68) == OS32_ERR_INVAL, "AV chip cap too long");
+    named(wrap_snd2_dsp_insert(0, 0, (const i32 *)va, 16) == OS32_ERR_NOSYS, "AV insert limit");
+    named(wrap_snd2_dsp_insert(0, 0, 0, 17) == OS32_ERR_INVAL, "AV insert too long");
+    named(wrap_snd2_dsp_process(0, 0, 0, 17, 0, 0, 0, 0) == OS32_ERR_INVAL, "AV DSP too long");
+    named(wrap_snd2_chip_write(0, (SND2_RegW *)va, 256) == OS32_ERR_NOSYS, "AV chip write limit");
+    named(wrap_snd2_chip_write(0, 0, 257) == OS32_ERR_INVAL, "AV chip write too long");
+    named(wrap_in2_read((IN2_Event *)va, 128) == OS32_ERR_NOSYS, "AV read maximum");
+    named(wrap_v86s_fm_drain(0, 0, 513, 0) == OS32_ERR_INVAL, "AV drain too long");
+    named(wrap_in2_read(0, 129) == OS32_ERR_INVAL, "AV read limit");
+    named(wrap_snd2_dsp_process(0, 0, (const i32 *)va, 16, 0, 0, ~0u, 0) == OS32_ERR_NOSYS,
+          "AV DSP target range deferred");
     /* Real USER caller frame, page tables, generated wrapper and mailbox.
      * Every rejected output must leave the same queued notice available. */
     named(host_mailbox_init() == 0, "notice init");
@@ -196,6 +251,8 @@ static void caller_copy_tests(void)
     space.generation = generation;
     named(!paging_addrspace_map_user(&space, va + PAGE_SIZE, payload + PAGE_SIZE,
                                     PAGE_RW | PTE_USER), "map second page");
+    named(wrap_v86s_fm_drain(0, (SND2_FmEv *)va, 512, (u32 *)(va + 6144)) == OS32_ERR_NOSYS,
+          "AV drain maximum spans pages");
     /* Linux VA mapping supplies the host copyout destination. Product PTEs
      * above independently drive the real USER/RW range gate. */
     u32 map_args[6] = {va, 2 * PAGE_SIZE, 3, 0x32, ~0U, 0}, mapped;
