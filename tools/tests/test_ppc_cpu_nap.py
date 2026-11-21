@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""User decision 2026-11-16 and mainline assignment (PPC NAP)."""
+"""MACHCFG_DESIGN §4, §7, P-R3. User decision 2026-11-16 and mainline assignment (PPC NAP)."""
 import argparse
 import os
 from pathlib import Path
@@ -13,7 +13,7 @@ CHECK = dict(name='ppc-cpu-nap', tier=2, budget=30, needs=[], env=['ppc-cross'],
             'platform/powermac/kernel_boot.c', 'arch/ppc/mmu.S', 'arch/ppc/ppc_oea.h',
             'arch/ppc/ppc_trap.h', 'arch/ppc/ppc_frame.h', 'arch/ppc/pd_walk.c',
             'arch/ppc/ppc_pd.h', 'arch/ppc/ppc_boot.h', 'arch/ppc/arch_exec_storage.h',
-            'include/exec_arch.h', 'include/types.h', 'include/callconv.h',
+            'include/machcfg_contract.h', 'include/exec_arch.h', 'include/types.h', 'include/callconv.h',
             'kernel/irq/irq.h', 'kernel/irq/irq_math.h', 'include/platform_irq.h',
             'platform/powermac/platform_irq_limits.h', 'arch/ppc/ppc_hpt.h',
             'platform/powermac/platform_of_layout.h'],
@@ -27,6 +27,8 @@ MUTATIONS = [
     ('keep-pow', 'trap', 'f->srr1 &= ~PPC_MSR_POW;', 'f->srr1 &= ~0u;', 40),
     ('clear-bit8', 'power', '(hid & ~PPC_HID_SLEEP)', '(hid & ~(PPC_HID_SLEEP | PPC_HID_HIGHBAT))', 20),
     ('keep-7450-nap', 'power', 'hid &= ~PPC_HID_NAP;', '(void)hid;', 20),
+    ('ignore-final-nap', 'power', 'if (nap7450)', 'if (!nap7450)', 24),
+    ('apply-to-7455', 'power', '(pvr >> 16) != PPC_PVR_7450', '(pvr >> 16) < PPC_PVR_7450', 26),
     ('no-dpm', 'power', '| PPC_HID_DPM', '| 0u', 20),
 ]
 

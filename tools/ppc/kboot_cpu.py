@@ -191,8 +191,8 @@ def main():
     elf=build(out/'normal',src)
     for cpu in ['7450','7455']: observe(out/'normal'/cpu,elf,cpu)
     if a.mutate:
-        changes=[('ram-bat','    ppc_sync();\n    ppc_isync();\n}\n\nvoid ppc_cpu_load_segments',
-                  '    ppc_bat_set(0, 0x12, 0x1ffe);\n    ppc_sync();\n    ppc_isync();\n}\n\nvoid ppc_cpu_load_segments'),
+        changes=[('ram-bat','CPU_SPR(PPC_SPR_DBAT7U, 0);\n    }',
+                  'CPU_SPR(PPC_SPR_DBAT7U, 0);\n    }\n    ppc_bat_set(0, 0x12, 0x1ffe);'),
                  ('upper-bats','if (version == PPC_PVR_7455 && (hid & PPC_HID_HIGHBAT))',
                   'if (version == PPC_PVR_7450 && (hid & PPC_HID_HIGHBAT))'),
                  ('sr-keys','PPC_SR_KP | ppc_hpt_vsid(n)','0x40000000U | ppc_hpt_vsid(n)'),

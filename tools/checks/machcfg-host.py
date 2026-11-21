@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
+"""Expected machine defaults: MACHCFG_DESIGN §3 and §7."""
 CHECK = dict(name='machcfg-host', tier=1, needs=[], budget=5,
     covers=['include/machcfg_contract.h', 'include/types.h', 'include/callconv.h',
-            'kernel/machcfg_root.c', 'include/config.h', 'lib/kstring.h',
+            'platform/powermac/machcfg.c', 'platform/powermac/platform_machcfg.h',
+            'arch/ppc/ppc_oea.h', 'arch/ppc/ppc_boot.h', 'kernel/machcfg_root.c', 'include/config.h', 'lib/kstring.h',
             'init/sysconfig.c', 'init/sysconfig.h', 'fs/vfs.h', 'lib/kstring_c.c',
             'tools/tests/kernel_includes.py', 'kernel/machcfg.c', 'platform/pc98/machcfg.c', 'tools/tests/machcfg_host.c',
             'include/kprintf.h', 'include/console.h', 'sdk/include/os32/*.h',
@@ -28,6 +30,7 @@ def run(ctx):
     source = (root / 'kernel/machcfg.c').read_text()
     header = (root / 'include/machcfg_contract.h').read_text()
     pc98 = (root / 'platform/pc98/machcfg.c').read_text()
+    powermac = (root / 'platform/powermac/machcfg.c').read_text()
     loader = (root / 'kernel/machcfg_root.c').read_text()
     boot = (root / 'platform/pc98/kernel.c').read_text()
     calls = ('kernel_boot_cpu(mem_kb, &boot);', 'machcfg_begin(platform_machcfg_seed());',
@@ -59,18 +62,21 @@ def run(ctx):
         formatter = (root / 'lib/kprintf.c').read_text().replace(
             '#include "kprintf_format.inc"', (root / 'lib/kprintf_format.inc').read_text())
         (tmp / 'format.c').write_text(formatter)
+        gcc_headers = subprocess.check_output(['gcc', '-print-file-name=include'], text=True).strip()
         parser = (root / 'init/sysconfig.c').read_text()
-        def check(src, hdr, cfg=parser, platform=pc98, root_src=loader):
+        def check(src, hdr, cfg=parser, platform=pc98, root_src=loader, pm=False):
             (tmp / 'machcfg_root.c').write_text(root_src)
             (tmp / 'sysconfig.c').write_text(cfg)
-            (tmp / 'pc98.c').write_text(platform)
+            (tmp / 'platform.c').write_text(platform)
             (tmp / 'machcfg.c').write_text(src)
             (tmp / 'machcfg_contract.h').write_text(hdr)
             exe = tmp / 'test'
             cmd = ['gcc', '-m32', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
-                   '-ffreestanding', '-fno-pie', '-no-pie', '-nostdlib',
+                   '-ffreestanding', '-nostdinc', '-isystem', gcc_headers, '-fno-pie', '-no-pie', '-nostdlib',
+                   *(['-DTEST_POWERMAC', '-I' + str(root / 'arch/ppc'),
+                      '-I' + str(root / 'platform/pc98'), '-I' + str(root / 'platform/powermac')] if pm else []),
                    '-DTEST_SYSCONFIG_MAX=' + match.group(1), '-I' + str(tmp),
-                   '-I' + str(root / 'include'), str(tmp / 'machcfg.c'), str(tmp / 'pc98.c'),
+                   '-I' + str(root / 'include'), str(tmp / 'machcfg.c'), str(tmp / 'platform.c'),
                    str(tmp / 'machcfg_root.c'),
                    '-I' + str(root / 'platform/pc98'), str(tmp / 'format.c'),
                    *kernel_includes.include_flags(root), str(tmp / 'sysconfig.c'),
@@ -84,6 +90,10 @@ def run(ctx):
         phase, result = check(source, header)
         if phase != 'run' or result != 0:
             print('normal control failed:', phase, result)
+            return 1
+        phase, result = check(source, header, platform=powermac, pm=True)
+        if (phase, result) != ('run', 0):
+            print('PowerMac control failed:', phase, result)
             return 1
         print('normal control: GREEN')
         if ctx.mutate:
@@ -122,6 +132,14 @@ def run(ctx):
                     print(name, 'did not fail at runtime:', phase, result)
                     return 1
                 print(name, 'RED')
+            old = 'rows[i].version == (pvr >> 16)'
+            if powermac.count(old) != 1:
+                raise RuntimeError('PowerMac PVR mutation point changed')
+            phase, result = check(source, header, platform=powermac.replace(old, 'rows[i].version == pvr'), pm=True)
+            if (phase, result) != ('run', 22):
+                print('PowerMac fallback', phase, result)
+                return 1
+            print('PowerMac fallback runtime RED')
             for field in ('perf_request', 'nap7450', 'accepts_nap7450'):
                 old = '.' + field + ' = 0'
                 if pc98.count(old) != 1:

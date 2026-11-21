@@ -1,9 +1,35 @@
+/* Expected seeds and overrides: MACHCFG_DESIGN §3, §7, P-R7. */
 #include "machcfg_contract.h"
 #include "kprintf.h"
 #include "config.h"
 #include "kstring.h"
 #include "sysconfig.h"
 #include "vfs.h"
+
+#ifdef TEST_POWERMAC
+#include "platform_machcfg.h"
+static u32 host_pvr;
+u32 ppc_read_pvr(void) { return host_pvr; }
+
+static int check_powermac_seeds(void)
+{
+    static const struct { u32 pvr; int matched, accepts; } cases[] = {
+        {0x80000201, 1, 1}, {0x80010201, 1, 0}, {0x00088000, 0, 0}
+    };
+    for (unsigned i = 0; i < sizeof(cases)/sizeof(cases[0]); ++i) {
+        struct machcfg_seed row;
+        host_pvr = cases[i].pvr;
+        if (pm_machcfg_seed(host_pvr, &row) != cases[i].matched)
+            return 0;
+        struct machcfg_seed seed = platform_machcfg_seed();
+        if (row.accepts_nap7450 != cases[i].accepts || row.defaults.perf_request ||
+            row.defaults.nap7450 || seed.accepts_nap7450 != cases[i].accepts ||
+            seed.defaults.perf_request || seed.defaults.nap7450)
+            return 0;
+    }
+    return 1;
+}
+#endif
 
 _Static_assert(MACHCFG_FILE_MAX == TEST_SYSCONFIG_MAX - 1, "machine.cfg limit");
 
@@ -54,8 +80,14 @@ static int reports(void)
     };
     for (unsigned m = 0; m < sizeof(machines)/sizeof(machines[0]); ++m) {
         const typeof(*machines) *mch = &machines[m];
+#ifdef TEST_POWERMAC
+        if (!mch->cpu) continue;
+        host_pvr = mch->cpu;
+        struct machcfg_seed seed = platform_machcfg_seed();
+#else
         struct machcfg_seed seed = mch->cpu ? (struct machcfg_seed){{0, 0}, mch->accepts}
-                                           : platform_machcfg_seed();
+                                            : platform_machcfg_seed();
+#endif
         for (unsigned i = 0; i < sizeof(cases)/sizeof(cases[0]); ++i) {
             const typeof(*cases) *c = &cases[i];
             used = 0;
@@ -154,8 +186,14 @@ static int root_loads(void)
     };
     for (unsigned m = 0; m < sizeof(machines)/sizeof(machines[0]); m++) {
         const typeof(*machines) *machine = &machines[m];
+#ifdef TEST_POWERMAC
+        if (!machine->cpu) continue;
+        host_pvr = machine->cpu;
+        struct machcfg_seed seed = platform_machcfg_seed();
+#else
         struct machcfg_seed seed = machine->cpu ? (struct machcfg_seed){{0, 0}, machine->accepts}
-                                                : platform_machcfg_seed();
+                                            : platform_machcfg_seed();
+#endif
         for (unsigned i = 0; i < sizeof(cases)/sizeof(cases[0]); i++) {
             const typeof(*cases) *c = &cases[i];
             config_size = -1;
@@ -188,6 +226,9 @@ static int root_loads(void)
 
 static int run(void)
 {
+#ifdef TEST_POWERMAC
+    if (!check_powermac_seeds()) return 22;
+#endif
     if (!root_loads()) return 21;
     if (!line_endings()) return 20;
     const struct machcfg_seed seeds[] = {
