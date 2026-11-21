@@ -93,7 +93,7 @@
     "input/hal/in2_excl.c",
     "input/hal/in2_reclaim.c",
     "input/hal/in2_time.c",
-    "input/hal/a0_weak.c",
+    "kapi/kapi_in2.c",
     "sound/hal/a0_weak.c",
     "kernel/av_focus.c",
     "kernel/input_legacy.c",

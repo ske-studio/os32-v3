@@ -1,5 +1,6 @@
 /* AV0 v90 public table and untouched output contract (ILP32). */
 #include "av_contract.h"
+#include "in2_int.h"
 #include "os32_kapi_slots.h"
 
 volatile int ring3_wm_depth;
@@ -14,6 +15,12 @@ void in2_on_focus(int old, int owner)
     last_old = old;
     last_new = owner;
 }
+
+/* Hardware-facing leaves in the ABI probe have no input producers. */
+int input_key_pressed(u8 sc) { (void)sc; return 0; }
+u8 pointer_buttons_locked(void) { return 0; }
+u32 in2_time_ms(void) { return 0; }
+void kbd_raw_purge_keep(void) {}
 
 static unsigned char sentinel[8192] __attribute__((aligned(4)));
 #define ABI_SIZE(type, size) typedef char size_of_##type[(sizeof(type) == (size)) ? 1 : -1]
@@ -133,40 +140,42 @@ int av_abi_probe(void)
     if (av_focus_owner() != 0) return 60;
     if (__builtin_offsetof(KernelAPI, in2_pad_state) != 1268 ||
         api.in2_pad_state != wrap_in2_pad_state ||
-        api.in2_pad_state(1, (IN2_PadState *)sentinel) != OS32_ERR_NOSYS) return 18;
+        api.in2_pad_state(1, (IN2_PadState *)sentinel) != OS32_ERR_NOTFOUND) return 18;
     if (__builtin_offsetof(KernelAPI, in2_pad_caps) != 1272 ||
         api.in2_pad_caps != wrap_in2_pad_caps ||
-        api.in2_pad_caps(1, (IN2_PadCaps *)sentinel) != OS32_ERR_NOSYS) return 19;
+        api.in2_pad_caps(1, (IN2_PadCaps *)sentinel) != OS32_ERR_NOTFOUND) return 19;
     if (__builtin_offsetof(KernelAPI, in2_pad_vibrate) != 1276 ||
         api.in2_pad_vibrate != wrap_in2_pad_vibrate ||
-        api.in2_pad_vibrate(1, (const IN2_Vibration *)sentinel) != OS32_ERR_NOSYS) return 20;
+        api.in2_pad_vibrate(1, (const IN2_Vibration *)sentinel) != OS32_ERR_BUSY) return 20;
     if (__builtin_offsetof(KernelAPI, in2_dev_count) != 1280 ||
         api.in2_dev_count != wrap_in2_dev_count ||
-        api.in2_dev_count() != OS32_ERR_NOSYS) return 21;
+        api.in2_dev_count() != 0) return 21;
     if (__builtin_offsetof(KernelAPI, in2_dev_info) != 1284 ||
         api.in2_dev_info != wrap_in2_dev_info ||
-        api.in2_dev_info(1, (IN2_DevInfo *)sentinel) != OS32_ERR_NOSYS) return 22;
+        api.in2_dev_info(1, (IN2_DevInfo *)sentinel) != OS32_ERR_INVAL) return 22;
     if (__builtin_offsetof(KernelAPI, in2_read) != 1288 ||
         api.in2_read != wrap_in2_read ||
-        api.in2_read((IN2_Event *)sentinel, 1) != OS32_ERR_NOSYS) return 23;
+        api.in2_read((IN2_Event *)sentinel, 1) != OS32_ERR_BUSY) return 23;
     if (__builtin_offsetof(KernelAPI, in2_key_state) != 1292 ||
         api.in2_key_state != wrap_in2_key_state ||
-        api.in2_key_state((u8 *)sentinel) != OS32_ERR_NOSYS) return 24;
+        api.in2_key_state((u8 *)sentinel) != OS32_ERR_BUSY) return 24;
     if (__builtin_offsetof(KernelAPI, in2_mouse_state) != 1296 ||
         api.in2_mouse_state != wrap_in2_mouse_state ||
-        api.in2_mouse_state((IN2_MouseState *)sentinel) != OS32_ERR_NOSYS) return 25;
+        api.in2_mouse_state((IN2_MouseState *)sentinel) != OS32_ERR_BUSY) return 25;
     if (__builtin_offsetof(KernelAPI, in2_acquire) != 1300 ||
         api.in2_acquire != wrap_in2_acquire ||
-        api.in2_acquire(1) != OS32_ERR_NOSYS) return 26;
+        api.in2_acquire(1) != OS32_ERR_BUSY) return 26;
     if (__builtin_offsetof(KernelAPI, in2_unacquire) != 1304 ||
         api.in2_unacquire != wrap_in2_unacquire ||
-        api.in2_unacquire() != OS32_ERR_NOSYS) return 27;
+        api.in2_unacquire() != OS32_ERR_BUSY) return 27;
+    IN2_Status status;
+    IN2_WmState wm_state;
     if (__builtin_offsetof(KernelAPI, in2_status) != 1308 ||
         api.in2_status != wrap_in2_status ||
-        api.in2_status((IN2_Status *)sentinel) != OS32_ERR_NOSYS) return 28;
+        api.in2_status(&status) != 0 || status.size != sizeof(status)) return 28;
     if (__builtin_offsetof(KernelAPI, in2_wm_state) != 1312 ||
         api.in2_wm_state != wrap_in2_wm_state ||
-        api.in2_wm_state((IN2_WmState *)sentinel) != OS32_ERR_NOSYS) return 29;
+        api.in2_wm_state(&wm_state) != 0 || wm_state.size != sizeof(wm_state)) return 29;
     if (__builtin_offsetof(KernelAPI, v86s_begin) != 1316 ||
         api.v86s_begin != wrap_v86s_begin ||
         api.v86s_begin((const V86_Begin *)sentinel, (u32 *)sentinel) != OS32_ERR_NOSYS) return 30;
