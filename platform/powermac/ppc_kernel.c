@@ -1,3 +1,4 @@
+#include "ide_boot.h"
 #include "loop_boot.h"
 #include "sqlite_engine.h"
 #include "boot_token.h"
@@ -393,6 +394,7 @@ void platform_boot_services(void)
             owned_before, ledger_owner_pages(LEDGER_OWNER_BOOT), free_before, free_after);
     if (!rc) {
         pm_loop_boot();
+        pm_ide_boot();
         (void)pm_console_text_start();
 #if KBOOT_SH
         /* Before pm_usb_boot (mouse_init): the default must precede the cursor. */
