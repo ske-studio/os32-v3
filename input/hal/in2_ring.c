@@ -108,12 +108,19 @@ void in2_ring_lost(u8 reason)
     InputEvent e = { .time_ms = in2_time_ms(), .type = INPUT_EVENT_LOST, .sc = reason };
     if (count == IN2_RING_CAPACITY) {
         /* Evict the newest ordinary event, keeping the suffix in order.
-         * If every slot is protected, the oldest gives way. */
+         * Prefer a duplicate notification over a reserved STOP at the head. */
         unsigned int tail = (head + count - 1) % IN2_RING_CAPACITY;
         unsigned int i = tail;
-        while (i != head && (ctrl_stop_make(&events[i]) ||
-               (events[i].type == INPUT_EVENT_LOST && events[i].sc == reason)))
+        unsigned int duplicate = head;
+        while (i != head) {
+            if (events[i].type == INPUT_EVENT_LOST && events[i].sc == reason)
+                duplicate = i;
+            else if (!ctrl_stop_make(&events[i]))
+                break;
             i = (i + IN2_RING_CAPACITY - 1) % IN2_RING_CAPACITY;
+        }
+        if (i == head && ctrl_stop_make(&events[head]))
+            i = duplicate;
         while (i != tail) {
             unsigned int next = (i + 1) % IN2_RING_CAPACITY;
             events[i] = events[next];

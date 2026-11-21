@@ -42,6 +42,7 @@ def run(ctx):
             ('legacy_ring.c', ' || sc == KEY_TAB', ''),
             ('in2_ring.c', 'head = count = 0;\n    pending = 0;', 'head = count = 0;'),
             ('in2_ring.c', 'ctrl_stop_make(&events[i])', '0'),
+            ('in2_ring.c', 'i = duplicate;', 'i = head;'),
             ('in2_ring.c', '        --count;\n        ++dropped;', '        return;'),
         ]
     with tempfile.TemporaryDirectory() as td:
@@ -63,6 +64,6 @@ def run(ctx):
                 '-Iinput/hal', '-Iinclude', '-Iexec', '-Iplatform/pc98', '-Ikernel', '-Isdk/include/os32',
                 *units, 'tools/tests/input_focus_host.c', '-o', binary], cwd=ctx.root, check=True)
             rc = subprocess.run(['qemu-i386', binary]).returncode
-            assert (0 < rc <= 20) if name else rc == 0, (name, old, rc)
+            assert (0 < rc <= 21) if name else rc == 0, (name, old, rc)
             print('RED runtime' if name else 'PASS', name, old, flush=True)
     return 0

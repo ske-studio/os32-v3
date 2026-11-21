@@ -125,6 +125,17 @@ static int test(void)
     if (in2_ring_push(&e)) return 19;
     in2_reclaim(7);
     if (!in2_ring_push(&e) || !in2_ring_pop(&e, &seq) || e.type != INPUT_EVENT_KEY) return 19;
+    /* STOP is oldest. Repeated exclusive transitions fill every other slot. */
+    u16 stop_seq = (u16)(seq + 1);
+    if (!in2_ring_push(&stop)) return 21;
+    for (int i = 0; i < IN2_RING_CAPACITY; ++i)
+        if (in2_excl_acquire(7, i % 2 ? IN2_EXCL_MOUSE : IN2_EXCL_KBD)) return 21;
+    if (!in2_ring_pop(&e, &seq) || seq != stop_seq || e.type != INPUT_EVENT_KEY ||
+        e.sc != KEY_STOP || !e.down || e.buttons != SHIFT_CTRL) return 21;
+    for (int i = 2; i <= IN2_RING_CAPACITY; ++i)
+        if (!in2_ring_pop(&e, &seq) || seq != (u16)(stop_seq + i) ||
+            e.type != INPUT_EVENT_LOST || e.sc != IN2_LOST_EXCL) return 21;
+    if (in2_ring_pop(&e, &seq)) return 21;
     wm = 0;
     if (in2_excl_wm_state(&state) != OS32_ERR_INVAL) return 15;
     return unmasked_boundary || !_irq_enabled() ? 20 : 0;
