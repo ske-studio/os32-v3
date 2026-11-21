@@ -90,3 +90,21 @@ u32 in2_ring_dropped(void)
     irq_restore(flags);
     return result;
 }
+
+/* Foreground caller holds IRQ exclusion through the whole transition. */
+void in2_ring_clear(void)
+{
+    head = count = 0;
+    pending = 0;
+}
+
+void in2_ring_lost(u8 reason)
+{
+    InputEvent e = { .time_ms = in2_time_ms(), .type = INPUT_EVENT_LOST, .sc = reason };
+    if (count == IN2_RING_CAPACITY) {
+        --count;
+        ++dropped;
+        ++pending;
+    }
+    append(&e);
+}

@@ -705,6 +705,7 @@ void pipe_free_owned(int id)
     if (id == reclaim_target && slot_of(reclaim_watch)->kind == FONT_LEASE_FREE) reclaim_mid_ok++;
 }
 void shm_free_owned(int id) { (void)id; reclaim_steps++; }
+void in2_reclaim(int id) { (void)id; }
 void pcm_reclaim(int id) { (void)id; reclaim_steps++; }
 #include "exec_kapi_db.h"
 #include "exec_reclaim.h"

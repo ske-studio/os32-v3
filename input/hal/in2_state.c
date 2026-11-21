@@ -35,6 +35,7 @@ int input_capture(const InputEvent *event)
             break;
         case INPUT_EVENT_WHEEL:
             if (e.y || e.sc || e.buttons) goto out;
+            if (!legacy_active()) mouse_ext_wheel(e.x);
             break;
         default: goto out;
         }

@@ -17,12 +17,18 @@ static void select_owner(int owner)
     in2_on_focus(old, owner);
 }
 
-int av_focus_set(int owner)
+int av_focus_is_wm(void)
 {
     if (!exec_gui_registered() ||
         (ring3_wm_depth <= 0 &&
          (res_owner_get() != APP_ID_SHELL || ring3_call_from_user())))
-        return OS32_ERR_INVAL;
+        return 0;
+    return 1;
+}
+
+int av_focus_set(int owner)
+{
+    if (!av_focus_is_wm()) return OS32_ERR_INVAL;
     select_owner(owner);
     return 0;
 }

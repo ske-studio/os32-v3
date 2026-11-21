@@ -457,6 +457,8 @@ def run(overrides=None):
     deliver = function(read('input/hal/legacy_keymap.c'), 'input_emit_keymap')
     raw = deliver[deliver.index('    if (kbd_gui_mode) {'):deliver.index('    if (consumed')]
     raw = raw.replace('sc != 0xff && raw_due', '1').replace('sc != 0xff && ', '').replace('physical_mods', 'mods').replace('!down', 'is_break').replace('sc,', 'keycode,').replace('mods', 'kbd_shift_state')
+    code += 'int in2_excl_keyboard(void) { return 0; }\n'
+    code += function(read('input/hal/legacy_ring.c'), 'keep_raw') + '\n'
     code += function(read('input/hal/legacy_ring.c'), 'legacy_raw_push') + '\n'
     mode = read('input/hal/legacy_mode.c')
     code += function(mode, 'legacy_stop_filter') + '\n'

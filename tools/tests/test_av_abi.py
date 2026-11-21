@@ -112,7 +112,7 @@ def run(ctx):
     for row in (ctx.root / 'tools/checks/av_wiring.txt').read_text().splitlines():
         if row and not row.startswith('#'):
             name = row.split()[1]
-            binding = 'T' if name in ('av_focus_set', 'av_focus_get') else 'W'
+            binding = 'T' if name in ('av_focus_set', 'av_focus_get', 'in2_on_focus') else 'W'
             assert re.search(r'^[0-9a-f]+ ' + binding + ' ' + name + r'$', symbols, re.M), name
     with tempfile.TemporaryDirectory() as td:
         for machine in ('i386', 'ppc'):

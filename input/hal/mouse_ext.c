@@ -4,6 +4,7 @@
 #include "os32_kapi_shared.h"
 
 static i32 in2_x, in2_y;
+static i32 wheel;
 static i16 old_x, old_y;
 
 static i32 add32(i32 a, i16 b)
@@ -12,6 +13,20 @@ static i32 add32(i32 a, i16 b)
     if (b < 0 && a < (-S32_MAX - 1) - b) return -S32_MAX - 1;
     return a + b;
 }
+void mouse_ext_wheel(i16 delta)
+{
+    wheel = add32(wheel, delta);
+}
+
+i32 mouse_ext_read_wheel(void)
+{
+    unsigned f = irq_save();
+    i32 delta = wheel;
+    wheel = 0;
+    irq_restore(f);
+    return delta;
+}
+
 static i16 add16(i16 a, i16 b)
 {
     int n = (int)a + b;

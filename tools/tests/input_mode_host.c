@@ -74,3 +74,5 @@ void _start(void) {
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc) : "memory");
     __builtin_unreachable();
 }
+
+int in2_excl_keyboard(void) { return 0; }
