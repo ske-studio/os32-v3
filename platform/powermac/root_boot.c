@@ -10,7 +10,7 @@ int pm_root_dict_ready(void) { return dict_ready; }
 int pm_root_learning_enabled(void) { return learning_enabled; }
 #endif
 
-int pm_root_boot(const struct boot_root_image *image)
+int pm_root_boot(const struct boot_root_image *image, int *registered)
 {
     static const struct vfs_device_name names[] = {
         {"rd", VFS_NAME_DIGIT_PREFIX, VFS_DEV_RAM, 0, 4},
@@ -20,10 +20,11 @@ int pm_root_boot(const struct boot_root_image *image)
     };
     int rc;
 
+    *registered = 0;
     vfs_device_names_register(names, sizeof(names) / sizeof(names[0]));
     rc = boot_root_fs_init();
     if (rc) return rc;
-    rc = boot_root_start(image);
+    rc = boot_root_start_registered(image, registered);
     if (rc) return rc;
     path_init();
     path_set_device_validator(dev_name_present);

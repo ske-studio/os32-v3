@@ -5,6 +5,48 @@ import os
 import re
 from pathlib import Path
 import subprocess
+import sys
+
+# Layout inputs of arch/ppc/kernel.ld and build/targets/ppc-powermac.mk,
+# including ram-root.mk, the ELF/root pair and the acceptance image recipes.
+# sdk/kapi.json carries the fixed KAPI data fields that move with the KAPI
+# table version (mainline plan v89), so its push must measure every image.
+LAYOUT_PATTERNS = """
+    arch/ppc/*.ld sdk/link/ppc/*.ld include/memmap.h platform/*/platform_*_layout.h
+    build/images/* build/targets/ppc-powermac.mk Makefile build/select.mk build/sources/*
+    build/ppc* build/ram-root.mk build/font-fetch.mk assets/fonts/* tools/gen_font16.py
+    tools/gen_unicode.c lib/unicode_jis_table.h tools/mkroot_image.py tools/gen_memmap.py
+    tools/ppc/root_pair.py tools/ppc/kboot*.py tools/ppc/*_run.py tools/accept/ppc_*.py
+    tools/ppc/root_lz4_*.py tools/ci/ppc_scope.py .github/workflows/check.yml
+    sdk/kapi.json sdk/gen_kapi.py sdk/kapi_target_ppc.py
+""".split()
+
+
+def layout_scope(paths):
+    if paths is None:
+        return True, 'push delta unavailable'
+    for path in paths:
+        if any(fnmatch.fnmatchcase(path, pattern) for pattern in LAYOUT_PATTERNS):
+            return True, path
+    return False, 'no image layout inputs changed'
+
+
+def select_inventory():
+    if os.environ.get('GITHUB_EVENT_NAME') == 'push':
+        before = os.environ.get('PUSH_BEFORE', '')
+        if before == '0' * 40:
+            paths = changed_paths()
+        elif os.environ.get('PUSH_FORCED') == 'true':
+            paths = None
+        else:
+            paths = push_paths(before)
+    else:
+        paths = changed_paths()
+    selected, reason = layout_scope(paths)
+    print(('RUN' if selected else 'SKIP') + ' full PPC image inventory: ' + repr(reason))
+    with Path(os.environ['GITHUB_OUTPUT']).open('a') as out:
+        print('inventory=' + str(selected).lower(), file=out)
+
 
 # KB_C, KB_INC and generators in build/targets/ppc-powermac.mk / ram-root.mk; the owner sets in build/select.mk.
 COMMON = ('kernel/', 'lib/', 'include/', 'net/', 'fs/', 'mm/', 'exec/',
@@ -85,4 +127,7 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    if sys.argv[1:] == ['--inventory']:
+        select_inventory()
+    else:
+        main()

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 CHECK = dict(name='gfx2-display-host', tier=1, needs=[], budget=10,
-    covers=['gfx/v2/display.c', 'gfx/v2/gfx2_int.h', 'include/gfx_hal.h',
+    covers=['platform/pc98/platform_display_fallback.h', 'platform/powermac/platform_display_fallback.h',
+            'include/display_provider.h', 'gfx/v2/display.c', 'gfx/v2/gfx2_int.h', 'include/gfx_hal.h',
             'include/gfx_hal2.h', 'include/gfx_sync.h', 'include/types.h',
             'include/type_contract.h', 'include/callconv.h', 'include/abi.h',
             'arch/x86/arch_abi.h', 'include/memmap.h',

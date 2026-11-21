@@ -24,6 +24,14 @@ ppc_kernel_entry:
     addi 8,8,1
     b .Lkernel_clear
 .Lkernel_c:
+#if PM_ROOT_FRAME
+    stw 3,16(1)
+    bl pm_verify_entry_pair
+    cmpwi 3,0
+    beq ppc_kernel_entry_stop
+    lwz 5,16(1)
+    mr 3,5
+#endif
     bl ppc_kernel_start
     .globl ppc_kernel_entry_stop
 ppc_kernel_entry_stop:

@@ -12,7 +12,7 @@ import tempfile
 import time
 
 from kboot_accept import build, mutant_settings
-from kboot_run import ROM, QMP, command, require, serial, validate, lan
+from kboot_run import ROM, QMP, command, require, serial, validate_root as validate, lan
 
 CHECK = dict(name='ppc-sd', tier=2, budget=900, needs=[],
              covers=['tools/ppc/sd_run.py', 'platform/powermac/hostfs*',

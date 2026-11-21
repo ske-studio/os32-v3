@@ -10,7 +10,7 @@ import tempfile
 import time
 
 from kboot_accept import build, mutant_settings
-from kboot_run import ROOT, ROM, QMP, command, require, serial, validate, PREFIX
+from kboot_run import ROOT, ROM, QMP, command, require, serial, validate_root as validate, PREFIX
 import shell_run
 
 CHECK = dict(name='ppc-sb', tier=2, budget=900, needs=[],

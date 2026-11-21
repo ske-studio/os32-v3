@@ -19,7 +19,7 @@ import time
 
 from fb_pixel import Font, Terminal, read_ppm, reserved_unchanged
 from kboot_accept import build, mutant_settings
-from kboot_run import ROOT, ROM, QMP, command, require, serial, validate
+from kboot_run import ROOT, ROM, QMP, command, require, serial, validate_root as validate
 
 from usb_run import product_settings, stream_payload, USB_QEMU_CLOCK
 

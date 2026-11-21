@@ -168,8 +168,8 @@ int memory_boot_dma_available(void)
 /*  0, 0 = 申告なし。申告があれば同梱域 MEM_BOOT_BUNDLE_* を丸ごと owner =    */
 /*  bundle で押さえ、BUNDLE の区間を登録する (中身は後で ledger_transfer で  */
 /*  モジュールへ、R7)。申告が同梱域の外にかかれば拒否 (何も変えない)。       */
-/*  集積域 MEM_BOOT_STAGING_* はカーネルが走る時点で展開済みなので池へ返す   */
-/*  = 何もしない。T1 の時点ではローダがどちらも使わない (bootinfo に申告の欄 */
+/*  集積域は memory_boot_init で未展開のときだけ予約する。   */
+/*  T1 の時点ではローダがどちらも使わない (bootinfo に申告の欄 */
 /*  が無い) ので、起動では常に申告なし。規則はホスト試験で見る。1 = 成功。   */
 /* ======================================================================== */
 int memory_boot_boot_areas(u32 first, u32 end)
@@ -300,6 +300,13 @@ int memory_boot_init(u32 mem_kb)
     if (!sys_memory_bootstrap_model(&boot_memory, &layout, paging_verify_identity))
         return 0;
     if (!sys_memory_stage_online()) return 0;
+    if (platform_boot_staging_in_use()) {
+        u32 first = MEM_BOOT_STAGING_BASE / PAGE_SIZE;
+        u32 pages = MEM_BOOT_STAGING_SIZE / PAGE_SIZE;
+        u32 pfn;
+        if (!pgalloc_alloc_n_owner(LEDGER_OWNER_BOOT, pages, first, first + pages,
+                                   LEDGER_BOTTOM_UP, &pfn)) return 0;
+    }
     return memory_boot_regions(top, layout.kind == PGALLOC_BACKING_ARENA_TOP ?
                                     layout.workspace_first : 0);
 }

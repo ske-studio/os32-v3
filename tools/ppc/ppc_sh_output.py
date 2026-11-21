@@ -14,7 +14,7 @@ import tempfile
 import time
 from kboot_accept import build, mutant_settings
 from sb_run import INPUT, serial_accept
-from kboot_run import ROOT, ROM, QMP, command, require, serial, validate, lan
+from kboot_run import ROOT, ROM, QMP, command, require, serial, validate_root as validate, lan
 
 CHECK = dict(name='ppc-sh-output', tier=2, budget=900, needs=[],
              covers=['tools/ppc/ppc_sh_output.py', 'userland/ppc/outprobe.c'],
