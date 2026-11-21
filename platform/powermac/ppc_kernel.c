@@ -15,6 +15,7 @@
 #include "kernel/time/tick_clock.h"
 #include "types.h"
 #include "memmap.h"
+#include "platform_kboot_layout.h"
 #include "kprintf.h"
 #include "kernel_boot.h"
 #include "kernel_start.h"
@@ -68,8 +69,13 @@
 #include "exec_boot.h"
 #include "exec.h"
 extern u32 sys_mem_kb;
-void pm_root_image(struct boot_root_image *out);
+int pm_root_image(struct boot_root_image *image, u32 frame_bytes);
 #endif
+
+int platform_boot_staging_in_use(void)
+{
+    return ppc_boot_info()->root_frame_bytes != 0;
+}
 
 #ifndef KBOOT_NEGATIVE
 #define KBOOT_NEGATIVE 0
@@ -369,9 +375,23 @@ void platform_boot_services(void)
 #if KBOOT_SHELL || KBOOT_SH
     kprintf(KBOOT_ATTR, "FB full_rc=%d color_rc=%d\r\n",
             dev->fb_full_rc, dev->fb_color_rc);
-    struct boot_root_image img;
-    pm_root_image(&img);
-    if (pm_root_boot(&img) == 0) {
+    /* Stage 4 supplies the expanded ISO after the allocator is online. */
+    struct boot_root_image img = {0};
+    if (!info->root_frame_bytes) return;
+    u32 owned_before = ledger_owner_pages(LEDGER_OWNER_BOOT);
+    int registered = 0;
+    int rc = pm_root_image(&img, info->root_frame_bytes);
+    if (!rc) rc = pm_root_boot(&img, &registered);
+    u32 pages = MEM_BOOT_STAGING_SIZE / PAGE_SIZE;
+    u32 free_before, free_after;
+    if (pm_root_release(&img, registered, PM_ROOT_FRAME_BASE / PAGE_SIZE, pages,
+                        &free_before, &free_after))
+        kboot_stop("root page release");
+    kprintf(KBOOT_ATTR, "KBOOT ROOT rc=%d registered=%d bytes=%u staging_pages=%u\r\n",
+            rc, registered, img.bytes, pages);
+    kprintf(KBOOT_ATTR, "KBOOT ROOT owner_before=%u owner_after=%u free_before=%u free_after=%u\r\n",
+            owned_before, ledger_owner_pages(LEDGER_OWNER_BOOT), free_before, free_after);
+    if (!rc) {
         pm_loop_boot();
         (void)pm_console_text_start();
 #if KBOOT_SH

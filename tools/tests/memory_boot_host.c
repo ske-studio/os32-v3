@@ -64,6 +64,9 @@ static void *host_boot_ptr(u32 addr)
 }
 #endif
 #include "memory_host_source.c"
+#ifdef TEST_STAGING
+#define platform_boot_staging_in_use() 1
+#endif
 #include "memory_boot_host_source.c"
 #undef sys_memory_bootstrap_model
 #undef sys_memory_stage_online
@@ -520,6 +523,26 @@ void _start(void)
     die(0);
 #endif
     CHECK(memory_boot_init(TEST_KB));
+#ifdef TEST_STAGING
+    {
+        u32 first = MEM_BOOT_STAGING_BASE / PAGE_SIZE;
+        u32 count = MEM_BOOT_STAGING_SIZE / PAGE_SIZE;
+        u32 pfn, free_before = pgalloc_free_pages();
+        CHECK(KHEAP_BASE + KHEAP_SIZE <= MEM_BOOT_STAGING_BASE);
+        CHECK(MEM_SHM_RESV_START <= MEM_BOOT_STAGING_BASE);
+        CHECK(MEM_SHELL_BAND_END < MEM_BOOT_STAGING_BASE);
+        for (u32 i = first; i < first + count; i++)
+            CHECK(owner_map[i] == LEDGER_OWNER_BOOT);
+        CHECK(pgalloc_alloc_n_owner(LEDGER_OWNER_KERNEL, 1, MEM_POOL_BASE / PAGE_SIZE,
+                                    pgalloc_arena_end(), LEDGER_BOTTOM_UP, &pfn));
+        CHECK(pfn >= first + count);
+        CHECK(pgalloc_free_n_owner(LEDGER_OWNER_KERNEL, pfn, 1));
+        CHECK(pgalloc_free_n_owner(LEDGER_OWNER_BOOT, first, count));
+        CHECK(pgalloc_free_pages() == free_before + count);
+        CHECK(paging_verify_identity(first, count, P2V(MEM_BOOT_STAGING_BASE)));
+        die(0);
+    }
+#endif
     check_v5_ledger();
 #ifdef TEST_ACCOUNT
     check_page_accounting();

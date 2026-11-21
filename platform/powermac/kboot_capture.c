@@ -181,6 +181,10 @@ const struct pm_kboot_info *pm_kboot_capture(ppc_ci ci)
 {
     struct ofw_env env;
     info=(struct pm_kboot_info){0};
+#if PM_ROOT_FRAME
+    extern const u8 __root_image_start[], __root_file_end[];
+    info.root_frame_bytes = (u32)__root_file_end - (u32)__root_image_start;
+#endif
     visited=0; output=-1;
     ofw_init(ci);
     if (ofw_setup(&env)) fail("FAIL:KBOOT:SETUP\r\n");

@@ -1,9 +1,17 @@
 #!/usr/bin/env python3
-"""Exercise boot_image_info over link-sh RSH on mac99."""
+"""PowerMac root pair design, stage 4: CRC precedes rd0 registration.
+docs/design/platform/powermac/root_pair.md: entry rejects a foreign kernel pair.
+Allocation failure, invalid offset, short decode and damaged ISO data must leave
+rd0 unregistered and release every reserved page (PPC_RAM_ROOT_W6_PLAN).
+A failed decode releases its output and stops before the shell. Returning the staging area increases the free pool by its page count.
+Only registered rd0 output remains charged to the boot owner.
+"""
 import argparse
 import hashlib
 import os
+import re
 from pathlib import Path
+import struct
 import subprocess
 import sys
 import tempfile
@@ -11,6 +19,9 @@ import zlib
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT / 'tools'), str(ROOT / 'tools/ppc')]
+
+
+from root_lz4_layout import PAGE, STAGING_SIZE
 
 
 def absent_bindings(folder, out):
@@ -29,18 +40,61 @@ def absent_bindings(folder, out):
 
 
 def unverified_image(elf, objcopy, iso):
-    """Flip a byte in the ISO system area, outside the filesystem metadata."""
-    embedded = elf.with_name('embedded.iso')
-    subprocess.run([objcopy, '--dump-section', f'.rodata.boot_root={embedded}',
+    """Invalidate the expected ISO CRC, keeping the normalized entry pair."""
+    record = elf.with_name('record.bin')
+    subprocess.run([objcopy, '--dump-section', f'.root_record={record}',
                     elf, elf.with_name('dump.elf')], check=True)
-    if embedded.read_bytes() != iso:
-        raise RuntimeError('linked root image differs from the source ISO')
-    damaged = bytearray(iso)
-    damaged[0] ^= 1
-    embedded.write_bytes(damaged)
+    damaged = bytearray(record.read_bytes())
+    if int.from_bytes(damaged[4:8], 'little') != zlib.crc32(iso):
+        raise RuntimeError('linked record differs from the source ISO')
+    damaged[4] ^= 1
+    record.write_bytes(damaged)
     target = elf.with_name('unverified.elf')
-    subprocess.run([objcopy, '--update-section', f'.rodata.boot_root={embedded}',
+    subprocess.run([objcopy, '--update-section', f'.root_record={record}',
                     elf, target], check=True)
+    return target
+
+
+ROOT_FAILURES = {
+    'allocation-failed': -2,
+    'invalid-offset': -3,
+    'short-output': -3,
+    'data-crc': -4,
+    'unverified': -4,
+    'truncated': -3,
+    'decode-failed': -3,
+}
+
+
+def negative_image(case, original, target, iso, donor):
+    from root_pair import compress, wire
+
+    data = bytearray(original.read_bytes())
+    payload, rec, off, frame = wire(data)
+    pair, crc, packed, length = struct.unpack_from('<4I', data, rec)
+    assert pair == zlib.crc32(payload) and crc == zlib.crc32(iso) and length == len(iso)
+    if case == 'foreign-pair':
+        foreign, *_ = wire(donor.read_bytes())
+        other = zlib.crc32(foreign)
+        assert other != pair
+        struct.pack_into('<I', data, rec, other)
+    elif case == 'allocation-failed':
+        # Valid signed length, larger than the entire guest RAM.
+        struct.pack_into('<I', data, rec + 12, 256 << 20)
+    elif case == 'invalid-offset':
+        block = bytes.fromhex('10 41 00 00')
+        struct.pack_into('<I', data, rec + 8, len(block))
+        data[off:off + len(block)] = block
+    elif case == 'short-output':
+        struct.pack_into('<I', data, rec + 12, length + 1)
+    elif case == 'data-crc':
+        damaged = bytearray(iso)
+        damaged[-1] ^= 1
+        block = compress(bytes(damaged))
+        assert len(block) <= frame
+        data[off:off + frame] = block.ljust(frame, b'\0')
+        struct.pack_into('<I', data, rec + 8, len(block))
+    target.write_bytes(data)
     return target
 
 
@@ -51,13 +105,40 @@ def observe(elf, cpu, evidence, case, expected, exit_status):
 
     session = Session(elf, cpu, evidence, 240)
     try:
+        if case == 'overlap':
+            session.reboot_args += ('-prom-env', 'output-device=ttya')
         session.start()
-        session.wait(session.ready, 'boot info cui READY', 60)
-        require(session.agent.operator.ready['mode'] == 'cui', 'boot info RSH mode')
-        body = rsh_command(session, '/bin/bootprob.bin')
-        status = rsh_command(session, 'echo $?')
-        require((body.rstrip(b'\n'), status) == (expected, exit_status),
-                repr((case, body, status)))
+        if case == 'foreign-pair':
+            def at_entry_stop():
+                regs = session.q.call('human-monitor-command', {'command-line': 'info registers'})
+                pc = re.search(r'NIP\s+([0-9a-fA-F]+)', regs)
+                return pc and int(pc[1], 16) == session.symbols['ppc_kernel_entry_stop']
+            session.wait(at_entry_stop, 'foreign pair stopped at entry', 60)
+        elif case in ROOT_FAILURES or case in ('release-skipped', 'release-twice', 'overlap'):
+            log = evidence / 'serial-a.log'
+            session.wait(lambda: log.exists() and expected in log.read_bytes(),
+                         f'{case} pre-mount boot observation', 60)
+        else:
+            session.wait(session.ready, 'boot info cui READY', 60)
+            require(session.agent.operator.ready['mode'] == 'cui', 'boot info RSH mode')
+            body = rsh_command(session, '/bin/bootprob.bin')
+            status = rsh_command(session, 'echo $?')
+            require((body.rstrip(b'\n'), status) == (expected, exit_status),
+                    repr((case, body, status)))
+        if case == 'verified' or case in ROOT_FAILURES:
+            log = evidence / 'serial-a.log'
+            session.wait(lambda: log.exists() and re.search(rb'free_after=\d+\r?\n', log.read_bytes()),
+                         'root page accounting', 10)
+            raw = log.read_bytes()
+            boot = re.search(rb'KBOOT ROOT rc=(-?\d+) registered=(\d+) bytes=(\d+) staging_pages=(\d+)', raw)
+            account = re.search(rb'KBOOT ROOT owner_before=(\d+) owner_after=(\d+) free_before=(\d+) free_after=(\d+)', raw)
+            require(boot and account, 'missing root observations')
+            rc, registered, length, frame = map(int, boot.groups())
+            before, after, free_before, free_after = map(int, account.groups())
+            require(frame == free_after - free_before and frame == STAGING_SIZE // PAGE and registered == (case == 'verified'),
+                    'root frame or registration')
+            require(after == before - frame + registered * ((length + 4095) // 4096),
+                    f'root owner pages {before} -> {after}')
         session.q.call('quit')
         session.p.wait(timeout=5)
         require(session.p.returncode == 0, 'boot info QEMU exit')
@@ -93,7 +174,8 @@ def main():
                'KB_ROOT_BINS=' + ' '.join(bins)]
     cases = ['verified', 'unverified']
     if args.mutate:
-        cases += ['false-valid', 'no-write', 'absent']
+        cases += ['false-valid', 'no-write', 'absent', 'truncated', 'decode-failed', 'release-skipped', 'release-twice', 'overlap']
+        cases += ['allocation-failed', 'invalid-offset', 'short-output', 'data-crc', 'foreign-pair']
     images = {}
     for case in cases:
         folder = work / case
@@ -107,20 +189,52 @@ def main():
         elif case == 'no-write':
             mutation = mutant_settings(folder, case, 'init/bootinfo.c',
                                        '    kmemset(out, 0, sizeof(*out));',
-                                       '    if (!s_common.image_valid) return 0;\n'
-                                       '    kmemset(out, 0, sizeof(*out));')
+                                       '    return 0;')
+        elif case in ('truncated', 'decode-failed'):
+            mutation = mutant_settings(folder, case, 'platform/powermac/root_image.c',
+                                       'lz4_decode(__root_image_start, packed, dst, length)',
+                                       ('lz4_decode(__root_image_start, packed - 1, dst, length)'
+                                        if case == 'truncated' else
+                                        'lz4_decode(__root_image_start, packed, dst, 1)'))
+        elif case in ('release-skipped', 'release-twice'):
+            call = 'pgalloc_free_n_owner(LEDGER_OWNER_BOOT, frame_pfn, pages)'
+            mutation = mutant_settings(folder, case, 'platform/powermac/root_image.c',
+                                       call, '((void)frame_pfn, 1)' if case == 'release-skipped' else
+                                       '(' + call + ' && ' + call + ')')
+        elif case == 'overlap':
+            mutation = mutant_settings(folder, case, 'platform/powermac/kboot_capture.c',
+                                       '(u32)__root_file_end - (u32)__root_image_start;',
+                                       '(u32)__root_file_end - (u32)__root_image_start + 4096;')
         elif case == 'absent':
             absent_bindings(folder, kernel / 'gen')
-        elf = build(kernel, *options, *mutation, 'kb-user', 'kernel')
+        derived = case in ('allocation-failed', 'invalid-offset', 'short-output', 'data-crc', 'foreign-pair')
+        if derived:
+            kernel = work / 'verified/kernel'
+            elf = kernel / 'PPCKERN.ELF'
+        else:
+            elf = build(kernel, *options, *mutation, 'kb-user', 'kernel')
         iso = (kernel / 'root.iso').read_bytes()
         exit_status = b'0\n'
-        if case in ('unverified', 'false-valid', 'no-write'):
+        if derived:
+            elf = negative_image(case, elf, folder / (case + '.elf'), iso,
+                                 work / 'no-write/kernel/PPCKERN.ELF')
+            expected = None
+            if case in ROOT_FAILURES:
+                expected = f'KBOOT ROOT rc={ROOT_FAILURES[case]} registered=0 bytes=0'.encode()
+        elif case in ('unverified', 'false-valid'):
             elf = unverified_image(elf, cross / 'bin/powerpc-elf-objcopy', iso)
             expected = {
-                'unverified': b'BOOT 0 0 0 00000000',
+                'unverified': b'KBOOT ROOT rc=-4 registered=0 bytes=0',
                 'false-valid': b'BOOT 0 1 0 00000000',
-                'no-write': b'BOOT 255 255 1 00000001',
             }[case]
+        elif case == 'no-write':
+            expected = b'BOOT 255 255 1 00000001'
+        elif case in ('truncated', 'decode-failed'):
+            expected = b'KBOOT ROOT rc=-3 registered=0 bytes=0'
+        elif case in ('release-skipped', 'release-twice'):
+            expected = b'root page release'
+        elif case == 'overlap':
+            expected = b'FAIL:KB:RESERVE'
         elif case == 'absent':
             expected = b'BOOT info error -10'
             exit_status = b'1\n'
@@ -134,6 +248,7 @@ def main():
         if not args.build_only:
             for cpu in ('7450', '7455'):
                 observe(elf, cpu, folder / cpu, case, expected, exit_status)
+    print(f'{len(images)} distinct boot-info ELF images')
     return 0
 
 

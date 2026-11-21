@@ -16,8 +16,9 @@ KB_EXEC := $(filter 1,$(KBOOT_SHELL) $(KBOOT_SH))
 KB_OUT ?= build/out/ppc-kboot$(if $(filter 1,$(KBOOT_LINK)),/$(if $(filter 1,$(KBOOT_SH)),link-sh,link),$(if $(filter 1,$(KBOOT_SHELL)),/shell,$(if $(filter 1,$(KBOOT_SH)),/sh,$(if $(filter-out 0,$(NEGATIVE)),/neg$(NEGATIVE)))))
 KB_ELF := $(KB_OUT)/PPCKERN.ELF
 
-ROOT_ISO := $(KB_OUT)/root.iso
-ROOT_BLOB := $(KB_OUT)/root_image_blob.o
+ROOT_ISO := $(KB_OUT)/root-input.iso
+ROOT_BLOB :=
+ROOT_ISO_FLAGS := --fixed-dates
 ROOT_MOTD := $(KB_OUT)/motd.txt
 KB_SH_OUT := build/out/ppc-user$(if $(filter 1,$(KBOOT_LINK)),/link-sh)
 ROOT_BINS = $(KB_ROOT_BINS) $(if $(filter 1,$(KBOOT_SH)),$(KB_SH_OUT)/sh.bin)
@@ -56,7 +57,8 @@ endif
 ifneq ($(filter-out $(KB_C),$(RAM_ROOT_C)),)
 $(error RAM root sources are not selected: $(filter-out $(KB_C),$(RAM_ROOT_C)))
 endif
-KB_EXTRA := $(KB_OUT)/root_image_blob.o $(KB_OUT)/gen/kapi/kapi_generated.o $(KB_OUT)/build_id.o
+export SOURCE_DATE_EPOCH ?= 946684800
+KB_EXTRA := $(KB_OUT)/gen/kapi/kapi_generated.o $(KB_OUT)/build_id.o
 KB_GEN := $(KB_OUT)/gen
 KB_INC_EXTRA += -I$(KB_GEN)/include -I$(KB_GEN)/sdk/include/os32 \
  -Ikapi -Idrivers -Inet -Igfx -Iexec \
@@ -73,7 +75,7 @@ KB_MACHINE := -mcpu=7450 -m32 -mbig-endian -msoft-float -mno-altivec -msdata=non
 KB_INC := $(if $(KB_EXEC),-I$(KB_GEN)/include -I$(KB_GEN)/sdk/include/os32) -I$(KB_OUT) -I. -Iinclude -Iarch/ppc -Iplatform/powermac -Isdk/include \
  -Isdk/include/os32 -Ikernel -Iinit -Ikernel/console -Ikernel/irq -Ikernel/time \
  -Imm -Ilib $(KB_INC_EXTRA)
-KB_FLAGS := -std=gnu11 $(KB_MACHINE) -fno-builtin -fno-asynchronous-unwind-tables \
+KB_FLAGS := -DPM_ROOT_FRAME=$(if $(KB_EXEC),1,0) -std=gnu11 $(KB_MACHINE) -fno-builtin -fno-asynchronous-unwind-tables \
  -O2 -Wall -Wextra -Werror -Werror=vla -Werror=implicit-int \
  -Werror=implicit-function-declaration -ffunction-sections -fdata-sections \
  -D__cdecl= -D__KERNEL_BUILD__ $(HOOK_DEFS) -DOS32_FEATURE_LOOP=$(FEATURE_LOOP) -DOS32_FEATURE_USERSHELL=$(FEATURE_USERSHELL) -DKBOOT_NEGATIVE=$(NEGATIVE) -DKBOOT_SHELL=$(KBOOT_SHELL) -DKBOOT_SH=$(KBOOT_SH) -DKBOOT_LINK=$(KBOOT_LINK) -MMD -MP $(KB_INC)
@@ -146,7 +148,7 @@ $(KB_OBJ) $(KB_ELF): $(KB_SELECT_MK)
 
 .PHONY: all kernel audit
 all: kernel
-kernel: $(KB_ELF) audit
+kernel: $(KB_ELF) $(if $(KB_EXEC),$(KB_OUT)/root.iso) audit
 ifneq ($(KB_EXEC),)
 .PHONY: ppc-source-date-force
 $(KB_OUT)/config/source-date.flags: ppc-source-date-force
@@ -170,12 +172,6 @@ $(KB_OUT)/memmap_layout.h: include/memmap.h tools/gen_memmap.py
 	@mkdir -p $(dir $@)
 	python3 -B tools/gen_memmap.py --layout-header $@
 ifneq ($(KB_EXEC),)
-# Capture the exact ISO bytes consumed by the RAM-root blob rule.
-$(KB_OUT)/root_image_expected.h: $(ROOT_ISO) build/targets/ppc-powermac.mk
-	python3 -B -c 'import pathlib, sys, zlib; data = pathlib.Path(sys.argv[1]).read_bytes(); print("#define PM_ROOT_IMAGE_BYTES %du\n#define PM_ROOT_IMAGE_CRC 0x%08xu" % (len(data), zlib.crc32(data)))' $< > $@.tmp
-	mv $@.tmp $@
-$(KB_OUT)/platform/powermac/root_image.o: $(KB_OUT)/root_image_expected.h
-
 BUILD_ID_SRC := $(KB_OUT)/build_id.c
 include build/build-id.mk
 $(KB_GEN)/stamp: build/images/$(IMAGE).mk sdk/kapi.json sdk/gen_kapi.py sdk/kapi_abi_x86.py sdk/kapi_target_ppc.py sdk/target_profile.py
@@ -219,10 +215,19 @@ $(KB_OUT)/motd.txt:
 # kboot_tick is the acceptance meter's name for the logical 100 Hz tick_count (physical DEC is 1 kHz).
 # Images without KAPI (KB_EXEC empty) have no sys_reboot caller; keep the shared reset provider (PPC_RESET_DESIGN §5).
 KB_KEEP_RESET := $(if $(KB_EXEC),,-Wl,--undefined=platform_reset)
+ifneq ($(KB_EXEC),)
+KB_KEEP_PAIR := -Wl,--undefined=platform_module_pair
+KB_PAIR_TOOL := tools/ppc/root_pair.py
+KB_PAIR_OUTPUT := $(KB_OUT)/root.iso
+include build/ppc-root-pair.mk
+KB_LINK_PREFIX = python3 -B $(KB_PAIR_TOOL) $(ROOT_ISO) $(KB_ELF) --
+else
 $(KB_ELF): $(KB_OBJ) $(KB_EXTRA) $(KB_OUT)/kernel.ld
-	$(KB_CC) $(KB_FLAGS) -MF $@.d -no-pie -Wl,--gc-sections -Wl,--no-undefined $(KB_KEEP_RESET) $(KB_KEEP_SQLITE) \
+	$(KB_LINK_COMMAND)
+endif
+KB_LINK_COMMAND = $(KB_LINK_PREFIX) $(KB_CC) $(KB_FLAGS) -MF $(KB_ELF).d -no-pie -Wl,--gc-sections -Wl,--no-undefined $(KB_KEEP_RESET) $(KB_KEEP_SQLITE) $(KB_KEEP_PAIR) \
 	 -Wl,-z,noexecstack -Wl,--defsym,kboot_tick=tick_count -Wl,-T,$(KB_OUT)/kernel.ld \
-	 -Wl,-Map,$(KB_ELF:.ELF=.map) $(KB_OBJ) $(KB_EXTRA) -o $@
+	 -Wl,-Map,$(KB_ELF:.ELF=.map) $(KB_OBJ) $(KB_EXTRA) -o $(KB_ELF)
 
 # H3 audits (tools/ppc/kboot_audit.py): nothing unresolved, integer-only code by
 # decoded mnemonic, and no direct or macro-mediated user of the 100 Hz PIT_HZ
