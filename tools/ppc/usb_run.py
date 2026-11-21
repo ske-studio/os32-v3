@@ -747,6 +747,9 @@ def link_lan_accept(elf, cpu, out, mode='normal'):
         s.wait(lambda: 'protocol=01' in serial(a), 'keyboard enumeration', 30)
         key, text_keys = keyboard_actions(s.q, lambda: serial(a),
                                          lambda predicate, label: s.wait(predicate, label, 30), s.out)
+        # Shell transitions also send ESC. Consume its ESCC release before
+        # starting the next short tap, including after keyboard reattachment.
+        s.key = key
         key('esc')
         s.agent_enabled = True
         if mode == 'lost-first':

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Inspect the assembled USER exception path and its busy-word mutation."""
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -29,12 +30,12 @@ def inspect(source):
     tail = restore.split('mtsrr0', 1)[1] if 'mtsrr0' in restore else ''
     spill = text.split('<ppc_kernel_frame_complete>:', 1)[1].split('<test_dispatch>:', 1)[0]
     return (all(x in entry for x in ('andi.', '16384', '<test_user_frame>'))
-            and 'ppc_exec_kernel_sp' in user and user.count('stw ') == 1
-            and '0(r1)' in user and '<test_dispatch>' in spill
+            and 'ppc_exec_kernel_sp' in user and re.findall(r'\bstw\s+([^\n]+)', user)
+            == ['r29,0(r1)', 'r29,196(r1)']  # back chain and frame-local busy pointer
+            and re.search(r'\bli\s+r29,0\b', user) and '<test_dispatch>' in spill
             and 'andi.' in spill and '<test_restore_user>' in ret and 'andi.' in ret
             and 'mtsrr1' in tail and 'rfi' in tail
-            and not any(line.split('\t')[-1].strip().startswith(('lw', 'lm', 'lh', 'lb'))
-                        for line in tail.splitlines()))
+            and not re.search(r'\t(?:lw|lm|lh|lb)\w*\s', tail))
 
 
 def main():

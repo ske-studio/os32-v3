@@ -35,6 +35,12 @@ def run(ctx):
     for key in ('BUILD_OUT', 'KERNEL_CFLAGS', 'INC_KERNEL', 'C_STD',
                 'SQLITE_PROTO_OUT', 'MAKEFLAGS', 'MFLAGS', 'MAKELEVEL'):
         env.pop(key, None)
+    from pathlib import Path
+    cross = Path(env.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc'))
+    if not os.access(cross / 'bin/powerpc-elf-gcc', os.X_OK):
+        required = env.get('OS32_REQUIRE_PPC') == '1'
+        print(('FAIL' if required else 'SKIP') + ' ppc-kboot-layout: PPC toolchain unavailable')
+        return int(required)
     rc = subprocess.call(args, cwd=ctx.root, env=env)
     if rc:
         return rc

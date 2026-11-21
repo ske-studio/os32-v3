@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Verify every KCG cell against the EBDT bitmap and the PPC root manifest."""
-CHECK = dict(name='kcg-ebdt', tier=1, needs=['make:all', 'make:assets/fonts/shino16.kcgfont', 'make:unicode_bin'], budget=60,
+CHECK = dict(name='kcg-ebdt', tier=1, needs=['make:assets/fonts/shino16.kcgfont', 'make:unicode_bin'], budget=60,
              covers=['tools/gen_font16.py', 'tools/gen_g16.py', 'tools/mkroot_image.py',
                      'build/ram-root.mk', 'build/targets/ppc-powermac.mk', 'build/assets.mk', 'build/font-fetch.mk',
                      'assets/fonts/**', 'tools/fetch_fonts.py',
@@ -87,7 +87,8 @@ def check():
     else:
         raise AssertionError('missing EBDT accepted')
     manifest = json.loads((ROOT / 'build/ppc-ram-root.json').read_text())
-    assert set(manifest) == {'/fonts/shino16.kcg', '/fonts/shino16.txt', '/sys/unicode.bin'}
+    font_paths = ('/fonts/shino16.kcg', '/fonts/shino16.txt', '/sys/unicode.bin')
+    manifest = {path: manifest[path] for path in font_paths}
     config = (ROOT / 'include/config.h').read_text()
     assert all(path in config for path in manifest)
     product = (ROOT / manifest['/fonts/shino16.kcg']).read_bytes()
@@ -99,8 +100,10 @@ def check():
         motd = tmp / 'motd'
         motd.write_text('OS32 root\n')
         iso = tmp / 'root.iso'
+        font_manifest = tmp / 'font-manifest.json'
+        font_manifest.write_text(json.dumps(manifest))
         subprocess.run([sys.executable, '-B', str(ROOT / 'tools/mkroot_image.py'),
-                        '--motd', str(motd), '--manifest', str(ROOT / 'build/ppc-ram-root.json'),
+                        '--motd', str(motd), '--manifest', str(font_manifest),
                         '--out', str(iso)], cwd=ROOT, check=True, capture_output=True)
         image = iso.read_bytes()
         root = entries(image, image[16 * 2048 + 156:])

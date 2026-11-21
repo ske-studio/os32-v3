@@ -23,7 +23,7 @@ def exercise(work, mutate):
     def selection(source):
         mk = work/'default.mk'; mk.write_text(source)
         rule = 'selection:;@echo $(KBOOT_LINK) $(KB_OUT)'
-        for flags, suffix in [([], 'link'), (['KBOOT_SH=1'], 'link-sh')]:
+        for flags, suffix in [([], 'link-sh'), (['KBOOT_SH=0'], 'link'), (['KBOOT_SH=1'], 'link-sh')]:
             result = subprocess.check_output(['make', '-s', 'ARCH=ppc', 'PLATFORM=powermac', 'PPC_FLAGS_MK='+str(mk), *flags,
                 '--eval='+rule, 'selection'], cwd=ROOT, text=True).strip()
             assert result == '1 build/out/ppc-kboot/'+suffix, result
