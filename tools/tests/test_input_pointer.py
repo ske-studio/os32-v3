@@ -138,6 +138,8 @@ def run(ctx):
                 print('RED runtime: '+old, flush=True)
             assert build_bus(bus_sources) == 0
             for index, old, new in [
+                (1, 'if (!legacy_active()) mouse_ext_wheel(e.x);', '(void)0;'),
+                (1, 'if (!legacy_active()) mouse_ext_wheel(e.x);', 'mouse_ext_wheel(e.x);'),
                 (4, 'xmax = 639, ymax = 399', 'xmax = 640, ymax = 400'),
                 (4, 'set_bounds_locked(0, 0, x_max, y_max);', 'set_bounds_locked(0, 0, y_max, x_max);'),
                 (4, 'app_bounds_set = 1;', 'app_bounds_set = 0;'),

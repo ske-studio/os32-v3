@@ -99,3 +99,5 @@ void _start(void) { int rc = probe(); __asm__ volatile("int $0x80" : : "a"(1), "
 void bootlog_push(const char *s, u32 n) { (void)s; (void)n; }
 int pc98_input_keymap_register(u16 *generation)
 { (void)generation; return -1; }
+
+int in2_excl_keyboard(void) { return 0; }

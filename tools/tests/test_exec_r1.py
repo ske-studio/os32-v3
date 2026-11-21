@@ -154,12 +154,12 @@ static void exec_restore_context(int id) {
     CHECK(exec_heap_used() == resident_used);
 }
 static void exec_teardown_app(AppSlot *a) {
-    CHECK(a == &slots[2] && cleanup == 6 && cr3 == 1 && host_if);
+    CHECK(a == &slots[2] && cleanup == 7 && cr3 == 1 && host_if);
     CHECK(!kctx_irq_depth && !kctx_exc_depth);
     CHECK(g_pending_id == 0 && g_longjmp_reason == EXEC_LJ_EXIT);
     teardown++;
 }
-/* db -> redirects -> FD -> pipe -> SHM -> sound -> PCM -> private AS ->
+/* db -> redirects -> FD -> pipe -> SHM -> PCM -> input -> private AS ->
  * parent CR3/owner/heap -> WM notification. 他 owner を回収しない。 */
 static void check_invalid_caller(void);
 static void resource(int id, int step) {
@@ -178,15 +178,16 @@ static void vfs_close_owned(int id) { resource(id, 2); }
 static void pipe_free_owned(int id) { resource(id, 3); }
 static void shm_free_owned(int id) { resource(id, 4); }
 static void exec_pcm_reclaim(int id) { resource(id, 5); }
+static void in2_reclaim(int id) { resource(id, 6); }
 static int stop_discards;
 static void input_discard_stop(void) { stop_discards++; }
 static int ime_clean;
-void exec_ime_owner_exit(int id) { CHECK(id == 2 && cleanup == 6 && teardown == 1); ime_clean = 1; }
+void exec_ime_owner_exit(int id) { CHECK(id == 2 && cleanup == 7 && teardown == 1); ime_clean = 1; }
 static void av_focus_exec_leave(int id, int parent) { CHECK(id == 2 && parent == cur); }
 static void exec_gui_owner_exit(int id, int kind) {
     CHECK(ime_clean); ime_clean = 0;
     CHECK(kind == (host_wm_kill ? EXEC_KIND_ABORTED : phase == 3 ? EXEC_KIND_EXITED : scheduled_kind));
-    CHECK(id == 2 && cleanup == 6 && teardown == 1);
+    CHECK(id == 2 && cleanup == 7 && teardown == 1);
     CHECK(stop_discards == (kind == EXEC_KIND_ABORTED));
     CHECK(cur == (host_wm_kill ? 1 : 3) && owner == cur && cr3 == cur);
     CHECK(host_if && !kctx_irq_depth && !kctx_exc_depth); notices++;
@@ -407,7 +408,7 @@ static int test(void) {
         phase = 1;
         CHECK((resumed ? resume_landing() : launch_landing()) ==
               (resumed || gui ? 0 : EXEC_ERR_FAULT));
-        CHECK(cleanup == 6 && teardown == 1 && notices == 1 && transfers == 1);
+        CHECK(cleanup == 7 && teardown == 1 && notices == 1 && transfers == 1);
         CHECK(!g_pending_id && !kctx_irq_depth && !kctx_exc_depth && host_if);
         CHECK(!ring3_in_syscall && !ring3_wm_depth && fault_kill_count == 1);
         CHECK(ring3_wm_fault_count == (kind == EXEC_KIND_FAULT));
@@ -417,7 +418,7 @@ static int test(void) {
             CHECK(exec_last_result(&k, &c) == 0 && k == EXEC_KIND_EXITED && c == 314);
         }
         exec_pending_finish(); /* 一度消費した pending を二重回収しない */
-        CHECK(cleanup == 6 && teardown == 1 && notices == 1);
+        CHECK(cleanup == 7 && teardown == 1 && notices == 1);
     }
     for (resumed = 0; resumed < 2; resumed++) {
         setup(1, EXEC_KIND_ABORTED); phase = 8;
@@ -431,14 +432,14 @@ static int test(void) {
     }
     setup(0, EXEC_KIND_EXITED); phase = 3;
     CHECK(launch_landing() == 17);
-    CHECK(cleanup == 6 && teardown == 1 && notices == 1 && !transfers);
+    CHECK(cleanup == 7 && teardown == 1 && notices == 1 && !transfers);
     CHECK(!ring3_in_syscall && !ring3_wm_depth);
     setup(0, EXEC_KIND_ABORTED); phase = 4;
     CHECK(launch_landing() == EXEC_ERR_FAULT);
-    CHECK(cleanup == 6 && notices == 1 && !transfers);
+    CHECK(cleanup == 7 && notices == 1 && !transfers);
     setup(0, EXEC_KIND_FAULT); phase = 2;
     CHECK(launch_landing() == EXEC_ERR_FAULT);
-    CHECK(cleanup == 6 && notices == 1 && transfers == 1);
+    CHECK(cleanup == 7 && notices == 1 && transfers == 1);
     /* Both real landing blocks restore a surviving parent's exact values. */
     for (resumed = 0; resumed <= 1; resumed++)
     for (int action = 0; action <= 8; action++)
@@ -485,7 +486,7 @@ static int test(void) {
         x87_saves = x87_restores = 0; x87_last = 0;
         CHECK(exec_kill(2) == 0);
         CHECK(x87_saves == 0 && x87_restores == 0 && x87_last == 0);
-        CHECK(cleanup == 6 && teardown == 1 && notices == 1 && !transfers);
+        CHECK(cleanup == 7 && teardown == 1 && notices == 1 && !transfers);
         CHECK(slots[2].state == APP_STATE_FREE && slots[3].state == APP_STATE_RUNNING);
         CHECK(cur == 1 && owner == 1 && cr3 == 1 && ring3_transition_count == 1);
     }
@@ -675,6 +676,7 @@ class ExecR1(unittest.TestCase):
 
 
 MUTATIONS = (
+    ('input reclaim omitted', '    in2_reclaim(id);', '    (void)id;'),
     ('x87-kill-restore', '    exec_reclaim_resources(id);\n    exec_teardown_app(a);\n    appslot_reclaim(id);\n    exec_notify_owned(id, EXEC_KIND_ABORTED);',
      '    arch_fp_restore(&a->fp_state);\n    exec_reclaim_resources(id);\n    exec_teardown_app(a);\n    appslot_reclaim(id);\n    exec_notify_owned(id, EXEC_KIND_ABORTED);'),
     ('x87-launch-landing', '        exec_pending_finish();\n        arch_fp_restore(&fp_parent[fp_depth]);\n        ring3_context_restore(&caller_context);\n        _enable();\n        io_syscall_resume(launcher_id, io_parent_depth); /* IO_SYSCALL_PARENT */\n        /* 畳み',

@@ -48,6 +48,7 @@ NOOP_ID(vfs_close_owned)
 NOOP_ID(pipe_free_owned)
 NOOP_ID(shm_free_owned)
 NOOP_ID(exec_pcm_reclaim)
+NOOP_ID(in2_reclaim)
 static AppSlot *g_cur_app;
 static int exec_exit_status, g_last_kind, g_last_code, exec_nest_level;
 static u32 ring3_transition_count;

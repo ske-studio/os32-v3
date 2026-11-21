@@ -24,3 +24,6 @@ void mouse_ext_move(i16 x, i16 y, int m) { (void)x; (void)y; (void)m; __builtin_
 /* Keep legacy merge mutations exercised; S2x tests the real registration. */
 int pc98_input_keymap_register(u16 *generation)
 { (void)generation; return OS32_ERR_INVAL; }
+
+int in2_excl_keyboard(void) { return 0; }
+void mouse_ext_wheel(i16 delta) { (void)delta; __builtin_trap(); }

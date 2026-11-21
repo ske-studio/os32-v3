@@ -159,6 +159,7 @@ static void exec_reclaim_resources(int id)
      * (票 TASK_PCM_CS4231 §2-1「所有と回収」)。保存した owner と id だけを
      * 照合する — 現在 owner に依存せず、私有ページ返却の前に止める。 */
     exec_pcm_reclaim(id);
+    in2_reclaim(id); /* (6c) Before focus moves to the parent. */
 }
 
 static void exec_notify_owned(int id, int kind)
