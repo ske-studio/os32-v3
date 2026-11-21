@@ -29,6 +29,8 @@ def run(ctx):
             ('in2_reclaim.c', '    mouse_ext_read_wheel();', ''),
             ('in2_reclaim.c', '        in2_reclaim_generation();', ''),
             ('in2_reclaim.c', '    in2_ring_lost(IN2_LOST_FOCUS);', ''),
+            ('in2_reclaim.c', '    in2_excl_focus(old);',
+             '    legacy_cooked_flush(); in2_excl_focus(old);'),
             ('in2_excl.c', 'if (!in2_excl_release(old)) boundary();\n    ++focus_gen;',
              'if (!in2_excl_release(old)) boundary();'),
             ('in2_reclaim.c', 'unsigned f = irq_save();\n    clear_input();',

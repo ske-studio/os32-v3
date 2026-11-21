@@ -73,7 +73,11 @@ static int test(void)
     mouse_ext_move(7, 9, 0);
     mouse_ext_wheel(8);
     in2_ring_push(&e);
+    legacy_cooked_push('x');
+    legacy_raw_push(KEY_STOP, 1, SHIFT_CTRL);
     av_focus_set(6);
+    if (legacy_cooked_take() != 'x' ||
+        legacy_raw_take() != (KEY_STOP | (SHIFT_CTRL << KBD_RAW_MOD_SHIFT))) return 7;
     if (notified_old != 5 || notified_new != 6) return 7;
     if (!lost(IN2_LOST_FOCUS) || !lost(IN2_LOST_EXCL) ||
         in2_ring_pop(&e, &seq)) return 7;
