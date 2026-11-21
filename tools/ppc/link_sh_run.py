@@ -282,8 +282,8 @@ class Session:
             '-nic','none','-device','sungem,netdev=n0,mac=52:54:00:12:34:56','-netdev',
             f'socket,id=n0,udp=127.0.0.1:{self.io.sock.getsockname()[1]},localaddr=127.0.0.1:{port}',
             '-usb','-device','usb-kbd,id=kbd',*self.qemu_clock,
-            # Diagnosis only (e.g. OS32_QEMU_EXTRA="-trace sungem_rx*,file=…"): QEMU's own
-            # documented trace events, never set by CI.
+            # Diagnosis only, never set by CI (trace events go through
+            # OS32_QEMU_TRACE so they share the per-run trace file).
             *shlex.split(os.environ.get('OS32_QEMU_EXTRA', ''))]
         (self.out/'metadata.json').write_text(json.dumps(dict(command=args,cpu=self.cpu,
             elf_sha256=hashlib.sha256(self.elf.read_bytes()).hexdigest()),indent=2))
@@ -507,7 +507,19 @@ class LineSession(Session):
     def serial_args(self):
         return ['-chardev', f'socket,id=uart,host=127.0.0.1,port={self.serial_port},'
                 f'logfile={self.out / "serial-a.log"}', '-serial', 'chardev:uart',
-                '-trace', 'enable=escc_mem_readb_data,file='+str(self.out/'uart.trace')]
+                *self.trace_args()]
+
+    def trace_args(self):
+        # One QEMU trace sink per run: the UART reader always needs
+        # escc_mem_readb_data; diagnosis may add documented events through
+        # OS32_QEMU_TRACE="name,name" (never set by CI). Extra events share the
+        # same per-run file so later options cannot redirect the UART trace.
+        extra = [n for n in os.environ.get('OS32_QEMU_TRACE', '').split(',') if n.strip()]
+        if not extra:
+            return ['-trace', 'enable=escc_mem_readb_data,file='+str(self.out/'uart.trace')]
+        events = self.out/'trace-events'
+        events.write_text('\n'.join(['escc_mem_readb_data', *[n.strip() for n in extra]])+'\n')
+        return ['-trace', 'events='+str(events)+',file='+str(self.out/'uart.trace')]
 
     def pump(self):
         super().pump()
