@@ -414,6 +414,7 @@ impl Timer {
 /*  GuiState — 単一グローバル状態                                    */
 /* ================================================================ */
 pub struct GuiState {
+    pub excl: crate::excl::State,
     pub inited: bool,
     pub screen_w: i32,
     pub screen_h: i32,
@@ -512,6 +513,7 @@ pub struct GuiState {
 
 impl GuiState {
     pub const NEW: GuiState = GuiState {
+        excl: crate::excl::State::NEW,
         inited: false,
         screen_w: 640,
         screen_h: 400,
@@ -1199,6 +1201,7 @@ fn deliver_host_notice(st: &mut GuiState) {
 /// その上に FEP が乗る (逆順にすると「描く → 次の周で消される → また描く」で
 /// ちらつく)。
 pub fn wm_cycle(st: &mut GuiState, ctx: input::Ctx) {
+    crate::excl::observe(st);
     let gfx_ok = unsafe { libos32gfx_check() } >= 0;
     if gfx_ok {
         let regen = unsafe { libos32gfx_take_regen() } != 0;

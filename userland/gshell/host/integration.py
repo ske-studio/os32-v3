@@ -14,7 +14,8 @@ import subprocess
 import sys
 import tempfile
 ROOT = Path(__file__).resolve().parents[3]
-OUT = ROOT / 'userland/gshell/target/gshell-host'
+EXCL_ONLY = '--excl' in sys.argv
+OUT = ROOT / 'userland/gshell/target' / ('gshell-excl' if EXCL_ONLY else 'gshell-host')
 OUT.mkdir(parents=True, exist_ok=True)
 def run(args):
     subprocess.run(args, cwd=ROOT, check=True)
@@ -685,8 +686,9 @@ def mutate() -> int:
 
 
 exe = build(ROOT / 'userland/gshell', 'integration')
-run([str(exe), '--test-threads=1'])
-typical_exe = build(ROOT / 'userland/gshell', 'typical-ops', typical=True)
-run([str(typical_exe), '--test-threads=1', 'p0a_'])
+run([str(exe), '--test-threads=1', *(['excl_'] if EXCL_ONLY else [])])
+if not EXCL_ONLY:
+    typical_exe = build(ROOT / 'userland/gshell', 'typical-ops', typical=True)
+    run([str(typical_exe), '--test-threads=1', 'p0a_'])
 if '--mutate' in sys.argv[1:]:
     sys.exit(1 if mutate() else 0)

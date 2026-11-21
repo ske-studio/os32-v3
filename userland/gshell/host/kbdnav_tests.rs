@@ -407,6 +407,16 @@ fn k1_4_numpad5_is_a_click_with_two_edges_in_one_cycle() {
         "+ がダブルクリックにならない"
     );
     assert!(keys(&st, 0).is_empty());
+
+    // A mouse-key make consumed in X3 also owns its break. The pump must
+    // defer both that break and the following ordinary key to the next X3.
+    clear_rings(&st);
+    run(&mut st, &[NP_5 | DOWN | KANA]);
+    mocks::push_rawkeys(&[NP_5 | KANA, SC_A | DOWN | KANA]);
+    input::capture(&mut st, input::Ctx::Pump);
+    assert!(keys(&st, 0).is_empty());
+    input::capture(&mut st, input::Ctx::Wait);
+    assert!(keys(&st, 0).iter().any(|&(down, sc, _, _)| down && sc == SC_A as u8));
 }
 
 #[test]
@@ -1983,3 +1993,81 @@ fn s6_fep_cells_use_ank_route_and_keep_the_grid() {
 #[cfg(test)]
 #[path = "kbdnav_tests_imetab.rs"]
 mod imetab;
+
+#[test]
+fn excl_release_after_full_ring_uses_old_coordinates_once() {
+    use crate::{excl, ring};
+    mocks::init();
+    let shm = mocks::Shm::new();
+    let mut st = one_window(&shm);
+    let id = st.front_id();
+    input::capture_keyboard(&mut st, input::Ctx::Wait);
+    assert!(excl::append(&mut st, 0, &ring::ev_pointer(id, -3, 9, 2, 1)));
+    let filler = ring::ev_text(id, [0; 8], 1, 0);
+    while ring::space(&st, 0) > 0 { assert!(ring::append(&st, 0, &filler)); }
+    assert!(!excl::append(&mut st, 0, &ring::ev_key(true, id, 7, 0, 8, 1)));
+    *mocks::WM_STATE.lock().unwrap() = (1, 0, 0);
+    input::capture_keyboard(&mut st, input::Ctx::Pump);
+    assert_ne!(st.excl.observed, st.excl.settled);
+    input::capture_keyboard(&mut st, input::Ctx::Wait);
+    assert_ne!(st.excl.observed, st.excl.settled);
+    let mut h = slot::read_header(&st, 0);
+    h.ring_head += 1;
+    slot::write_header(&st, 0, &h);
+    st.windows[0].x += 30;
+    input::capture_keyboard(&mut st, input::Ctx::Standalone);
+    let ev = events(&st, 0).pop().unwrap();
+    assert_eq!((ev.kind, ev.sub, ev.window, ev.payload[4]), (GUI_EV_BUTTON, 0, id, 2));
+    assert_eq!(&ev.payload[..4], &[253,255,9,0]);
+    assert_ne!(st.excl.observed, st.excl.settled);
+    clear_rings(&st);
+    input::capture_keyboard(&mut st, input::Ctx::Wait);
+    input::capture_keyboard(&mut st, input::Ctx::Wait);
+    let ev = events(&st, 0);
+    assert_eq!(ev.len(), 1);
+    assert_eq!((ev[0].kind, ev[0].sub, ev[0].window), (GUI_EV_POINTER, 0, id));
+    assert_eq!(&ev[0].payload[..4], &[253,255,9,0]);
+}
+
+#[test]
+fn excl_old_window_identity_and_independent_rings() {
+    use crate::{excl, ring};
+    mocks::init();
+    let shm = mocks::Shm::new();
+    let mut st = windows(&shm, &[(10,10,80,60), (110,10,80,60)]);
+    excl::observe(&mut st);
+    for i in 0..2 {
+        let id = st.windows[i].id(i);
+        assert!(excl::append(&mut st, i, &ring::ev_key(true, id, 0x1d, 65, 1, 0)));
+    }
+    let old = st.windows[0].id(0);
+    let other = st.windows[1].id(1);
+    let filler = ring::ev_text(old, [0; 8], 1, 0);
+    while ring::space(&st, 0) > 0 { ring::append(&st, 0, &filler); }
+    *mocks::WM_STATE.lock().unwrap() = (1, 1, 0);
+    input::capture_keyboard(&mut st, input::Ctx::Wait);
+    let release = events(&st, 1).pop().unwrap();
+    assert_eq!((release.kind, release.sub, release.window), (GUI_EV_KEY, 0, other));
+    assert_eq!(&release.payload[..3], &[0x1d, 0, 1]);
+    assert_ne!(st.excl.observed, st.excl.settled);
+    st.windows[0].gen += 1;
+    clear_rings(&st);
+    input::capture_keyboard(&mut st, input::Ctx::Wait);
+    assert!(events(&st, 0).is_empty());
+    assert!(events(&st, 1).is_empty());
+    assert_eq!(st.excl.observed, st.excl.settled);
+}
+
+#[test]
+fn excl_query_error_closes_both_devices_and_recovers() {
+    use crate::excl;
+    mocks::init();
+    let shm = mocks::Shm::new();
+    let mut st = one_window(&shm);
+    for (flags, rc, keyboard, mouse) in [(0,0,true,true), (0,-1,false,false),
+                                           (1,0,false,true), (2,0,true,false)] {
+        *mocks::WM_STATE.lock().unwrap() = (0, flags, rc);
+        input::capture_keyboard(&mut st, input::Ctx::Wait);
+        assert_eq!((st.excl.open(excl::KBD), st.excl.open(excl::MOUSE)), (keyboard, mouse));
+    }
+}

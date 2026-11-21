@@ -60,6 +60,7 @@ pub fn discard_stop(st: &mut GuiState) {
 
 /* 修飾ビット (drivers/input/kbd.h の SHIFT_* と一致)。 */
 const MOD_SHIFT: u32 = 0x01;
+const MOD_GRPH: u32 = 0x08;
 const MOD_CAPS: u32 = 0x02;
 const MOD_CTRL: u32 = 0x10;
 
@@ -70,6 +71,7 @@ const SC_CTRL: u8 = 0x74;
  * (`crate::DEBUG_SHORTCUTS`、既定 false)。F1〜F4 = `crate::LAUNCH_APPS` の起動、
  * F5 = ファイル選択ダイアログ。製品ではどれも横取りしない。 */
 const SC_ESC: u8 = 0x00;
+const SC_TAB: u8 = 0x0f;
 const SC_F1: u8 = 0x62;
 const SC_F4: u8 = 0x65;
 const SC_F5: u8 = 0x66;
@@ -178,8 +180,6 @@ struct Capture {
     active: bool,
     slot: usize,
     win_id: u32,
-    cox: i32,
-    coy: i32,
 }
 
 impl Capture {
@@ -187,8 +187,6 @@ impl Capture {
         active: false,
         slot: 0,
         win_id: 0,
-        cox: 0,
-        coy: 0,
     };
 }
 
@@ -213,19 +211,18 @@ fn release_capture(st: &mut GuiState, mx: i32, my: i32, button: u8) -> bool {
         return false;
     }
     /* 捕捉した窓がもう無ければ捨てる。 */
-    if st.win_by_id(c.win_id).is_none() {
+    let Some((cox, coy)) = crate::excl::button_origin(st, c.win_id, button) else {
         return false;
-    }
+    };
     let ev = ring::ev_button(
         false,
         c.win_id,
-        (mx - c.cox) as i16,
-        (my - c.coy) as i16,
+        (mx - cox) as i16,
+        (my - coy) as i16,
         button,
         next_serial(st, c.slot),
     );
-    ring::append(st, c.slot, &ev);
-    true
+    crate::excl::append(st, c.slot, &ev)
 }
 
 /// 完全な id の窓への配送先 (窓が消えていれば None)。
@@ -316,6 +313,12 @@ pub fn standalone_key(st: &mut GuiState, scan: u8) {
 ///   3. 押下は先に FEP へ通し、FEP が消費したら `Key` を配送しない。
 ///      確定文字列は取り込みの最後に `Text` でまとめて流す。
 pub(crate) fn capture_keyboard(st: &mut GuiState, ctx: Ctx) -> bool {
+    crate::excl::observe(st);
+    capture_keyboard_observed(st, ctx)
+}
+
+pub(crate) fn capture_keyboard_observed(st: &mut GuiState, ctx: Ctx) -> bool {
+    if ctx.wm_ui() { crate::excl::settle(st); }
     let mut captured = false;
     /* X4 で見た SHIFT+SPACE をここで実行する (契約 T8: 辞書を開く重い処理は X3)。 */
     if ctx.wm_ui() {
@@ -452,6 +455,13 @@ pub(crate) fn capture_keyboard(st: &mut GuiState, ctx: Ctx) -> bool {
             continue;
         }
 
+        if !st.excl.open(crate::excl::KBD) {
+            if ctx.wm_ui() && scan == SC_TAB && mods & MOD_GRPH != 0 {
+                kbdnav::on_key(st, scan, down, mods);
+            }
+            continue;
+        }
+
         /* Serial-only diagnostics also work without a fullscreen launcher's
          * window. X4 already deferred this chord; on_key dumps only on make.
          * Keep every other WM shortcut behind the fullscreen injection path. */
@@ -561,7 +571,7 @@ pub(crate) fn capture_keyboard(st: &mut GuiState, ctx: Ctx) -> bool {
         };
         let serial = next_serial(st, t.slot);
         let ev = ring::ev_key(down, t.win_id, scan, ch, mods as u8, serial);
-        ring::append(st, t.slot, &ev);
+        crate::excl::append(st, t.slot, &ev);
 
         /* 印字可能キーは Text も配送 (契約 U2a。FEP が消費していれば上で
          * continue しているので二重にはならない)。 */
@@ -600,7 +610,7 @@ fn capture_mouse(st: &mut GuiState, ctx: Ctx) {
      * Start / 窓を含めて無視)。位置と押下だけ同期しておき、復帰した最初の
      * 周期で古いエッジが「クリック」に化けるのを防ぐ。カーソルも描かない
      * (画面はプログラムのもの)。 */
-    if crate::fullscreen::active() {
+    if !st.excl.open(crate::excl::MOUSE) || crate::fullscreen::active() {
         st.mouse_x = mi.x as i32;
         st.mouse_y = mi.y as i32;
         st.real_x = st.mouse_x;
@@ -1057,7 +1067,7 @@ fn forward_pointer(st: &mut GuiState, mx: i32, my: i32, btn: u8) {
     let cy = (my - t.coy) as i16;
     let serial = next_serial(st, t.slot);
     let ev = ring::ev_pointer(t.win_id, cx, cy, btn, serial);
-    ring::append(st, t.slot, &ev);
+    crate::excl::append(st, t.slot, &ev);
 }
 
 /// `Button` をフォーカス窓へ配る。`button` は `MOUSE_BTN_LEFT` (1) /
@@ -1067,21 +1077,18 @@ fn forward_button(st: &mut GuiState, mx: i32, my: i32, button: u8, down: bool) {
         Some(t) => t,
         None => return,
     };
-    if down {
+    let cx = (mx - t.cox) as i16;
+    let cy = (my - t.coy) as i16;
+    let serial = next_serial(st, t.slot);
+    let ev = ring::ev_button(down, t.win_id, cx, cy, button, serial);
+    if crate::excl::append(st, t.slot, &ev) && down {
         /* 対になる離しは、どこで離してもこの相手へ返す。 */
         *cap(button) = Capture {
             active: true,
             slot: t.slot,
             win_id: t.win_id,
-            cox: t.cox,
-            coy: t.coy,
         };
     }
-    let cx = (mx - t.cox) as i16;
-    let cy = (my - t.coy) as i16;
-    let serial = next_serial(st, t.slot);
-    let ev = ring::ev_button(down, t.win_id, cx, cy, button, serial);
-    ring::append(st, t.slot, &ev);
 }
 
 /* ---- Focus / Configure ---- */

@@ -4,11 +4,17 @@ use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Mutex,
 };
+pub static INPUT_ORDER: Mutex<Vec<&'static str>> = Mutex::new(Vec::new());
+unsafe extern "C" fn dropped_count() -> u32 {
+    lk(&INPUT_ORDER).push("keyboard");
+    0
+}
 pub static REGEN_RC: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(0);
 pub static REGEN_VALUE: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(0);
 pub static REGEN_LOG: Mutex<Vec<&'static str>> = Mutex::new(Vec::new());
 #[no_mangle]
 pub extern "C" fn libos32gfx_check() -> i32 {
+    lk(&INPUT_ORDER).push("gfx");
     lk(&REGEN_LOG).push("check"); REGEN_RC.load(Ordering::SeqCst)
 }
 #[no_mangle]
@@ -908,6 +914,16 @@ pub mod focus_kernel {
     extern "C" fn in2_on_focus(_old: i32, _owner: i32) {}
 }
 
+pub static WM_STATE: std::sync::Mutex<(u32, u32, i32)> = std::sync::Mutex::new((0, 0, 0));
+
+unsafe extern "C" fn wm_state(out: *mut os32api::av::IN2_WmState) -> i32 {
+    lk(&INPUT_ORDER).push("observe");
+    let (gen, excl, rc) = *lk(&WM_STATE);
+    (*out).gen = gen;
+    (*out).excl = excl;
+    rc
+}
+
 unsafe extern "C" fn av_focus_set(app_id: i32) -> i32 {
     lk(&AV_FOCUS).push(app_id);
     #[cfg(av_focus_kernel)]
@@ -983,6 +999,8 @@ unsafe extern "C" fn host_notice_serial() -> u32 { HOST_NOTICE_SERIAL.load(Order
 unsafe extern "C" fn time_now_unavailable(_: *mut u32, _: *mut u32) -> i32 { -1 }
 
 pub fn init() {
+    lk(&INPUT_ORDER).clear();
+    *lk(&WM_STATE) = (0, 0, 0);
     REGEN_RC.store(0, Ordering::SeqCst);
     REGEN_VALUE.store(0, Ordering::SeqCst);
     lk(&REGEN_LOG).clear();
@@ -1000,7 +1018,7 @@ pub fn init() {
     lk(&SERIAL_IN).clear(); lk(&SERIAL_OUT).clear(); lk(&RSHELL_ACTIVE).clear(); lk(&SWITCHES).clear();
     SERIAL_INITIALIZED.store(0, Ordering::SeqCst);
     a.sys_time = sys_time;
-    a.kbd_dropped_count = zero;
+    a.kbd_dropped_count = dropped_count;
     a.kbd_trygetrawkey = raw_key;
     a.kbd_get_modifiers = kbd_mods;
     KBD_MODS.store(0, Ordering::SeqCst);
@@ -1037,6 +1055,7 @@ pub fn init() {
     a.exec_kill = exec_kill;
     a.exec_abort_clear = exec_abort_clear;
     a.exec_stop_culprit = exec_stop_culprit;
+    a.in2_wm_state = wm_state;
     a.av_focus_set = av_focus_set;
     a.kbd_inject = kbd_inject;
     lk(&INJECTED).clear(); INJECT_CALLS.store(0, Ordering::SeqCst);

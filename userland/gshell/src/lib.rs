@@ -72,6 +72,7 @@ mod fixture;
 mod fullscreen;
 mod handler;
 mod input;
+mod excl;
 mod kbdnav;
 mod lease;
 mod modal;
