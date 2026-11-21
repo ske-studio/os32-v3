@@ -15,6 +15,8 @@
 extern crate alloc;
 // host.rs now also exposes KAPI-backed helpers. These ABI wrapper tests must
 // never call those slots; the SDK runtime test supplies an actual fake table.
+#[path = "../../../../../sdk/rust/os32api/src/av.rs"]
+pub mod av;
 #[path = "../../../../../sdk/rust/os32api/src/kapi_generated.rs"]
 mod host_kapi;
 unsafe fn api() -> &'static host_kapi::KernelAPI { panic!("unexpected SDK KAPI call") }

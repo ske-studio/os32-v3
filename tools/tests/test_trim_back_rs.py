@@ -97,7 +97,7 @@ def rust_library(tmp, sources):
         src += f'fn {name}();\n'
     src += '}\nfn host_api() -> os32api::KernelAPI { unsafe { os32api::KernelAPI {\n'
     for name, ty in fields:
-        value = f'core::mem::transmute::<*const (), {ty}>({targets.get(name, "g4_unexpected")} as *const ())' if ty.startswith('unsafe ') else 'core::mem::zeroed()'
+        value = f'core::mem::transmute::<*const (), _>({targets.get(name, "g4_unexpected")} as *const ())' if ty.startswith('unsafe ') else 'core::mem::zeroed()'
         src += f'{name}: {value},\n'
     src += '} } }\n#[no_mangle] pub extern "C" fn g4_rust_raw_map() { check(cache::raw_map(4096, core::ptr::null_mut(), 0).is_null(), b"raw failure returned\\0"); }\n'
     (work / 'lib.rs').write_text(src)
