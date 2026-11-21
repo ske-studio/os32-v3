@@ -187,6 +187,78 @@
     {
       "artifact": "check-times-60fe9c7e2265a2978c902c452b190982f7f3ed40-ppc-qemu-4",
       "sha256": "c1df3adc18e959ef7ac8dfbfe6a5c7cc5a158c0a47d114078e106b0f743a3630"
+    },
+    {
+      "artifact": "check-times-09eb7d0486893166ae1c45adaff44e4b750dbf2a-ppc-qemu-0",
+      "sha256": "d1b2fa38696a095cd330ceff8c7aa4b4a5fc5dadc713e557efe0d52563c06596"
+    },
+    {
+      "artifact": "check-times-09eb7d0486893166ae1c45adaff44e4b750dbf2a-ppc-qemu-1",
+      "sha256": "4e3d130325f7ee96b6635b2d2e12f7a3001fc32490011a4ba914593332212721"
+    },
+    {
+      "artifact": "check-times-09eb7d0486893166ae1c45adaff44e4b750dbf2a-ppc-qemu-2",
+      "sha256": "2ef594de9b2798161ff7eb43cd97d929f8ba9cda5d2c2c876d444b7f2afc7185"
+    },
+    {
+      "artifact": "check-times-09eb7d0486893166ae1c45adaff44e4b750dbf2a-ppc-qemu-3",
+      "sha256": "af637ca44a68f2b9143a26467b6b43221e507bfb643f3c66c4519f5b6f3d3065"
+    },
+    {
+      "artifact": "check-times-09eb7d0486893166ae1c45adaff44e4b750dbf2a-ppc-qemu-4",
+      "sha256": "da748d5cedf389623037b54443008192d358b73a7041f87a0408d78252a2ead5"
+    },
+    {
+      "artifact": "check-times-09eb7d0486893166ae1c45adaff44e4b750dbf2a-ppc-qemu-5",
+      "sha256": "36365bcfb0e39748cf81957f5da8fe6edf4a024b4b042d5dbfae7dfb0765fe4f"
+    },
+    {
+      "artifact": "check-times-ddffc1696c2f4952f3cc64cd03c0d99b002f61ef-ppc-qemu-0",
+      "sha256": "6937c8cd25b67c2af457d4e2369d0c19cfb0294abe5afd45cde2948b9490583c"
+    },
+    {
+      "artifact": "check-times-ddffc1696c2f4952f3cc64cd03c0d99b002f61ef-ppc-qemu-1",
+      "sha256": "9dd2e8147d1c7340c1524a5e3ba2431e57641d463e5c39bc8800eadbf3823c31"
+    },
+    {
+      "artifact": "check-times-ddffc1696c2f4952f3cc64cd03c0d99b002f61ef-ppc-qemu-2",
+      "sha256": "b5e496432716f38d2c469351f0b57842f883fb26613f752fac7bcd00118e41ff"
+    },
+    {
+      "artifact": "check-times-ddffc1696c2f4952f3cc64cd03c0d99b002f61ef-ppc-qemu-3",
+      "sha256": "46215525d7cb65abef1c184411ec96280f0958476259afb7845d25582bea59d7"
+    },
+    {
+      "artifact": "check-times-ddffc1696c2f4952f3cc64cd03c0d99b002f61ef-ppc-qemu-4",
+      "sha256": "b95995997723f8cad4fe37c2e964375fe560674e1401ad3b6fed9056037d0fa3"
+    },
+    {
+      "artifact": "check-times-ddffc1696c2f4952f3cc64cd03c0d99b002f61ef-ppc-qemu-5",
+      "sha256": "c7f48166691b84f9d728534d6245e3d229ca4de287c57abda7677cfffbec9d6a"
+    },
+    {
+      "artifact": "check-times-5f5d4e50c729a8b5f0ab54213e4ac4f3019687ec-ppc-qemu-0",
+      "sha256": "ec326fb675f8adea78662b972d1950f8d88c4725f5c75ab4fe0c0430ac59ac91"
+    },
+    {
+      "artifact": "check-times-5f5d4e50c729a8b5f0ab54213e4ac4f3019687ec-ppc-qemu-1",
+      "sha256": "d00d2ab7aaa7548202ab7aca1bd939b8f0fe7bb9984c0b3c2dbaeff89c5645a5"
+    },
+    {
+      "artifact": "check-times-5f5d4e50c729a8b5f0ab54213e4ac4f3019687ec-ppc-qemu-2",
+      "sha256": "1225baf446ca90049f4f14ae9972205ad6675668ae867387038a44478dde2cd0"
+    },
+    {
+      "artifact": "check-times-5f5d4e50c729a8b5f0ab54213e4ac4f3019687ec-ppc-qemu-3",
+      "sha256": "7e51dfcfbf34b04d8fe72db001267c057bd27d031eb20f3439ec37c9d5d9d0ef"
+    },
+    {
+      "artifact": "check-times-5f5d4e50c729a8b5f0ab54213e4ac4f3019687ec-ppc-qemu-4",
+      "sha256": "e38211c050c17390585b068d3a2070e0ffde18b6bfefd8ad87c601a8c0b27051"
+    },
+    {
+      "artifact": "check-times-5f5d4e50c729a8b5f0ab54213e4ac4f3019687ec-ppc-qemu-5",
+      "sha256": "bb1c5ee6f19d6f253a2b63546abab888986097f2eaddc6d80facafb9457a4f78"
     }
   ],
   "seconds": {
@@ -195,7 +267,7 @@
     "appmem-host": 3.172635,
     "appmem-map-host": 5.664773,
     "arch-asm": 706.863658,
-    "arch-ctx-guest": 676.882219,
+    "arch-ctx-guest": 660.964151,
     "b8-open-host": 42.24959,
     "boot-order-host": 2.734105,
     "boot-readers-host": 3.186042,
@@ -479,42 +551,45 @@
     "pegc-mode-host": 3.4177,
     "pit-clock-host": 2.799469,
     "platform-memory-host": 2.646895,
-    "ppc-ata-guest": 300,
-    "ppc-boot-info-guest": 137.863593,
-    "ppc-console-cells": 73.481194,
-    "ppc-db-guest": 281.599723,
-    "ppc-display-guest": 714.742693,
-    "ppc-display-lifecycle": 120.350211,
-    "ppc-fb": 641.201759,
-    "ppc-font-guest": 102.75547,
-    "ppc-fp-accept-host": 0.277322,
-    "ppc-fp-guest": 404.684707,
-    "ppc-gfx2-guest": 132.732211,
-    "ppc-kcg-guest": 161.170482,
-    "ppc-link-sh-run": 882.205222,
-    "ppc-loop-guest": 99.897746,
-    "ppc-memstat-guest": 189.764063,
-    "ppc-mmu": 89.544934,
+    "ppc-ata-guest": 132.1696605,
+    "ppc-boot-info-guest": 338.599723,
+    "ppc-console-cells": 79.807346,
+    "ppc-db-guest": 280.747928,
+    "ppc-display-guest": 957.3764,
+    "ppc-display-lifecycle": 143.8133,
+    "ppc-fb": 617.456764,
+    "ppc-font-guest": 105.943672,
+    "ppc-fp-accept-host": 0.245744,
+    "ppc-fp-guest": 465.749277,
+    "ppc-gfx2-guest": 204.343573,
+    "ppc-kcg-guest": 135.731426,
+    "ppc-link-sh-run": 972.754241,
+    "ppc-loop-guest": 80.775128,
+    "ppc-memstat-guest": 190.506132,
+    "ppc-mmu": 61.11988,
     "ppc-module-rela-host": 3,
-    "ppc-mouse-guest": 185.832251,
-    "ppc-path-guest": 115.645907,
-    "ppc-pci-guest": 91.897763,
-    "ppc-port-guest": 141.452327,
-    "ppc-reset": 199.232249,
-    "ppc-rh-fb": 18.356648,
-    "ppc-rtc-guest": 132.292174,
-    "ppc-sc": 119.942986,
-    "ppc-sd": 101.564781,
-    "ppc-sd-link": 191.007228,
-    "ppc-sfs-guest": 108.440838,
-    "ppc-sh-output": 100.656738,
-    "ppc-shm-guest": 102.408067,
-    "ppc-sqlite-stack-guest": 18.320509,
-    "ppc-sqlite-static-guest": 96.096743,
-    "ppc-surface-guest": 201.68543,
-    "ppc-sysinfo-guest": 131.11693,
-    "ppc-usb": 381.684449,
-    "ppc-ver-guest": 194.360119,
+    "ppc-mouse-guest": 218.335748,
+    "ppc-path-guest": 108.081123,
+    "ppc-pci-guest": 110.121225,
+    "ppc-port-guest": 119.084671,
+    "ppc-reset": 167.841063,
+    "ppc-rh-fb": 23.36311,
+    "ppc-root-lz4-layout-host": 40.638215,
+    "ppc-root-lz4-layout-run": 120,
+    "ppc-root-pair-host": 2,
+    "ppc-rtc-guest": 111.494602,
+    "ppc-sc": 128.05048,
+    "ppc-sd": 100.983787,
+    "ppc-sd-link": 206.197196,
+    "ppc-sfs-guest": 99.931278,
+    "ppc-sh-output": 53.339735,
+    "ppc-shm-guest": 80.676363,
+    "ppc-sqlite-stack-guest": 17.529148,
+    "ppc-sqlite-static-guest": 79.123384,
+    "ppc-surface-guest": 181.335088,
+    "ppc-sysinfo-guest": 134.690074,
+    "ppc-usb": 337.884212,
+    "ppc-ver-guest": 190.635703,
     "preflight-host": 4.421956,
     "privileged": 7.8109,
     "probe-host": 4.63924,
@@ -624,10 +699,7 @@
     "vmkernel-lz4-host": 5.095719,
     "x11-shared-host": 4.6934425,
     "x87-host": 2.564676,
-    "x87-lifecycle-host": 3.708318,
-    "ppc-root-lz4-layout-host": 120,
-    "ppc-root-lz4-layout-run": 120,
-    "ppc-root-pair-host": 2
+    "x87-lifecycle-host": 3.708318
   },
   "samples": {
     "access-host": 2,
@@ -919,6 +991,7 @@
     "pegc-mode-host": 3,
     "pit-clock-host": 3,
     "platform-memory-host": 3,
+    "ppc-ata-guest": 2,
     "ppc-boot-info-guest": 3,
     "ppc-console-cells": 3,
     "ppc-db-guest": 3,
@@ -940,6 +1013,7 @@
     "ppc-port-guest": 3,
     "ppc-reset": 3,
     "ppc-rh-fb": 3,
+    "ppc-root-lz4-layout-host": 2,
     "ppc-rtc-guest": 3,
     "ppc-sc": 3,
     "ppc-sd": 3,
