@@ -10,6 +10,11 @@ ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = [
     ("length", "d->bytes < GEM_POOL_SIZE", "d->bytes < 0x30000u", "H:length"),
     ("boundary", "d->bus & 0xffffu", "d->bus & 0x3ffu", "H:boundary"),
+    ("rx-clear-32", "i < GEM_RX_RING_COUNT * GEM_DESC_SIZE",
+     "i < 32u * GEM_DESC_SIZE", "H:descriptor"),
+    ("rx-buffer-crossing", '#include "gem.h"',
+     '#include "gem.h"\n#undef GEM_POOL_RX_BUF\n#define GEM_POOL_RX_BUF 0x1fc00u',
+     "H:dma-span"),
     ('fifo-units', 'g->io.read32(g->io.ctx, GEM_RX_FIFO_SIZE) * 64u', 'g->io.read32(g->io.ctx, GEM_RX_FIFO_SIZE)', 'H:publish'),
     ('own', '| (u32)GEM_RD_OWN', '| 0', 'H:descriptor'),
     ('full', 'g->ring_cursor < GEM_RX_PUBLISHED', 'g->ring_cursor < GEM_RX_RING_COUNT', 'H:sync'),
