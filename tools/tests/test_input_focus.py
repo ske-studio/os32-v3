@@ -31,8 +31,17 @@ def run(ctx):
             ('in2_reclaim.c', '    in2_ring_lost(IN2_LOST_FOCUS);', ''),
             ('in2_excl.c', 'if (!in2_excl_release(old)) boundary();\n    ++focus_gen;',
              'if (!in2_excl_release(old)) boundary();'),
+            ('in2_reclaim.c', 'unsigned f = irq_save();\n    clear_input();',
+             'unsigned f = host_arch_if;\n    clear_input();'),
+            ('in2_reclaim.c', 'unsigned f = irq_save();\n    in2_excl_release(owner);',
+             'unsigned f = host_arch_if;\n    in2_excl_release(owner);'),
+            ('in2_excl.c', 'unsigned f = irq_save();\n    if (in2_excl_release(owner))',
+             'unsigned f = host_arch_if;\n    if (in2_excl_release(owner))'),
+            ('in2_excl.c', 'unsigned f = irq_save();\n    if (owner != acq_owner',
+             'unsigned f = host_arch_if;\n    if (owner != acq_owner'),
             ('legacy_ring.c', ' || sc == KEY_TAB', ''),
             ('in2_ring.c', 'head = count = 0;\n    pending = 0;', 'head = count = 0;'),
+            ('in2_ring.c', 'ctrl_stop_make(&events[i])', '0'),
             ('in2_ring.c', '        --count;\n        ++dropped;', '        return;'),
         ]
     with tempfile.TemporaryDirectory() as td:
@@ -48,12 +57,12 @@ def run(ctx):
                     src.write_text(text.replace(old, new))
                 units.append(src)
             binary = folder / 'test'
-            subprocess.run(['gcc', '-m32', '-ffreestanding', '-DOS32_HOOK_GUI=0', '-fno-pie', '-no-pie',
+            subprocess.run(['gcc', '-m32', '-DHOST_ARCH_SHARED_IF', '-ffreestanding', '-DOS32_HOOK_GUI=0', '-fno-pie', '-no-pie',
                 '-nostdlib', '-static', '-ffunction-sections', '-Wl,--gc-sections', '-Wl,--wrap=in2_on_focus',
                 '-Werror=implicit-function-declaration', '-Itools/tests/host_arch',
                 '-Iinput/hal', '-Iinclude', '-Iexec', '-Iplatform/pc98', '-Ikernel', '-Isdk/include/os32',
                 *units, 'tools/tests/input_focus_host.c', '-o', binary], cwd=ctx.root, check=True)
             rc = subprocess.run(['qemu-i386', binary]).returncode
-            assert (0 < rc <= 19) if name else rc == 0, (name, old, rc)
+            assert (0 < rc <= 20) if name else rc == 0, (name, old, rc)
             print('RED runtime' if name else 'PASS', name, old, flush=True)
     return 0

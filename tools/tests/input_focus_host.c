@@ -1,6 +1,7 @@
 #include "av_contract.h"
 #include "in2_int.h"
 #include "kbd.h"
+#include "io.h"
 
 static int wm = 1;
 static int notified_old, notified_new;
@@ -21,7 +22,14 @@ int exec_gui_registered(void) { return wm; }
 int pointer_seamless(void) { return 0; }
 int legacy_active(void) { return 0; }
 void pointer_move(i16 x, i16 y) { (void)x; (void)y; }
-u32 in2_time_ms(void) { return 42; }
+unsigned int host_arch_if = 0x202U;
+static int unmasked_boundary;
+
+u32 in2_time_ms(void)
+{
+    if (_irq_enabled()) unmasked_boundary = 1;
+    return 42;
+}
 
 static int lost(int reason)
 {
@@ -90,13 +98,26 @@ static int test(void)
         !lost(IN2_LOST_EXCL) || !lost(IN2_LOST_EXCL)) return 15;
     /* Fill the ring across an exclusive boundary. The old owner's pending
      * overflow must not be delivered after focus or foreground teardown. */
-    e.type = INPUT_EVENT_KEY;
+    InputEvent key = { .type = INPUT_EVENT_KEY };
+    InputEvent stop = { .type = INPUT_EVENT_KEY, .sc = KEY_STOP,
+                        .down = 1, .buttons = SHIFT_CTRL };
+    const u16 first = 0xffff - IN2_RING_CAPACITY;
+    /* Put the reserved STOP at seq 65535 and the boundary at seq 0. */
+    for (unsigned i = 0; ; ++i) {
+        if (i == 65536 || !in2_ring_push(&key) || !in2_ring_pop(&e, &seq)) return 16;
+        if (seq == first - 1) break;
+    }
     for (int i = 0; i < IN2_RING_CAPACITY; ++i)
-        if (!in2_ring_push(&e)) return 16;
-    if (in2_ring_push(&e) || in2_excl_acquire(6, IN2_EXCL_MOUSE)) return 16;
-    for (int i = 0; i < IN2_RING_CAPACITY - 1; ++i)
-        if (!in2_ring_pop(&e, &seq) || e.type != INPUT_EVENT_KEY) return 17;
-    if (!lost(IN2_LOST_EXCL)) return 17;
+        if (!in2_ring_push(&key)) return 16;
+    if (!in2_ring_push(&stop) || in2_excl_acquire(6, IN2_EXCL_MOUSE)) return 16;
+    for (int i = 0; i < IN2_RING_CAPACITY - 2; ++i)
+        if (!in2_ring_pop(&e, &seq) || e.type != INPUT_EVENT_KEY || e.sc ||
+            seq != first + i) return 17;
+    if (!in2_ring_pop(&e, &seq) || e.type != INPUT_EVENT_KEY || e.sc != KEY_STOP ||
+        !e.down || e.buttons != SHIFT_CTRL || seq != 0xffff) return 17;
+    if (!in2_ring_pop(&e, &seq) || e.type != INPUT_EVENT_LOST ||
+        e.sc != IN2_LOST_EXCL || seq != 0) return 17;
+    e = key;
     av_focus_set(7);
     if (!lost(IN2_LOST_FOCUS) || !lost(IN2_LOST_EXCL)) return 18;
     if (!in2_ring_push(&e) || !in2_ring_pop(&e, &seq) || e.type != INPUT_EVENT_KEY) return 18;
@@ -106,7 +127,7 @@ static int test(void)
     if (!in2_ring_push(&e) || !in2_ring_pop(&e, &seq) || e.type != INPUT_EVENT_KEY) return 19;
     wm = 0;
     if (in2_excl_wm_state(&state) != OS32_ERR_INVAL) return 15;
-    return 0;
+    return unmasked_boundary || !_irq_enabled() ? 20 : 0;
 }
 void _start(void)
 {
