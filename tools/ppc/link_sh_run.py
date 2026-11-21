@@ -337,16 +337,13 @@ class Session:
 
     def word(self, name, offset=0, unit="w"):
         require(name in self.symbols,'missing symbol '+name)
-        # The monitor reads through the current translation; a sample taken
-        # while the CPU runs with translation off (OF calls, early boot,
-        # exception entry) cannot see kernel VAs. Retry briefly before failing.
-        until=time.monotonic()+2
-        while True:
-            value=self.q.call('human-monitor-command',{'command-line':f'x /1{unit}x 0x{self.symbols[name]+offset:x}'})
-            match=re.search(r':\s*0x([0-9a-fA-F]+)',value)
-            if match is not None or time.monotonic()>=until: break
-            time.sleep(.02)
-        require(match is not None,'unreadable '+name)
+        # Resident ELF symbols are identity-loaded. Read their physical
+        # storage independently of the guest's currently active translation.
+        address = self.symbols[name] + offset
+        command = f'xp /1{unit}x 0x{address:x}'
+        value = self.q.call('human-monitor-command', {'command-line': command})
+        match = re.search(r':\s*0x([0-9a-fA-F]+)', value)
+        require(match is not None, f'unreadable {name} ({command}): {value!r}')
         return int(match[1],16)
 
     def overflow_probe(self, ident, until, phase, samples):
