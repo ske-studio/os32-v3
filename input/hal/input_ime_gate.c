@@ -6,20 +6,20 @@ static KbdPolicyImeSnapshot ime_snapshot;
 void kbd_policy_ime_state(u32 active, u32 owner, u32 command_gen)
 {
     unsigned int irq = irq_save();
-    ime_snapshot.active = active;
-    ime_snapshot.owner = owner;
-    ime_snapshot.command_gen = command_gen;
+    KbdPolicySnapshot current;
+    if (active && !input_context_snapshot(&current) && owner == current.owner &&
+        command_gen == current.command_gen) {
+        ime_snapshot = (KbdPolicyImeSnapshot){active, owner, current.exec_gen, command_gen};
+    } else {
+        ime_snapshot = (KbdPolicyImeSnapshot){0};
+    }
     irq_restore(irq);
 }
 
 void input_ime_snapshot(KbdPolicyImeSnapshot *out)
 {
     unsigned int irq = irq_save();
-    KbdPolicySnapshot current;
     *out = ime_snapshot;
-    out->exec_gen = 0;
-    if (!input_context_snapshot(&current) && current.owner == out->owner)
-        out->exec_gen = current.exec_gen;
     irq_restore(irq);
 }
 
@@ -77,3 +77,51 @@ u32 input_ime_cancel_replaced_count(void)
     irq_restore(irq);
     return count;
 }
+
+int input_ime_cancel_pending(void) { return cancel_owner != 0; }
+
+/* Action queue operations share the caller's capture/read IRQ exclusion. */
+static struct ImeAction {
+    u32 action, owner, exec_gen, command_gen, after;
+} actions[8];
+static unsigned head, count;
+static u32 dropped;
+
+int input_ime_action_capture(u32 action, const KbdPolicySnapshot *dst, u32 after)
+{
+    if ((action != INPUT_IME_ON && action != INPUT_IME_OFF) ||
+        !dst || !dst->owner || !dst->exec_gen) return -1;
+    if (count == 8) {
+        ++dropped;
+        return -2;
+    }
+    actions[(head + count) % 8] = (struct ImeAction){
+        action, dst->owner, dst->exec_gen, dst->command_gen, after
+    };
+    ++count;
+    return 0;
+}
+
+int input_ime_action_due(u32 popped)
+{
+    return count && actions[head].after == popped;
+}
+
+int input_ime_action_take(const KbdPolicySnapshot *now, u32 popped, u32 *action)
+{
+    if (!now || !action) return -1;
+    while (input_ime_action_due(popped)) {
+        struct ImeAction entry = actions[head];
+        head = (head + 1) % 8;
+        --count;
+        if (entry.owner == now->owner && entry.exec_gen == now->exec_gen &&
+            entry.command_gen == now->command_gen) {
+            *action = entry.action;
+            return 1;
+        }
+    }
+    return 0;
+}
+
+void input_ime_action_flush(void) { count = 0; }
+u32 input_ime_action_dropped(void) { return dropped; }

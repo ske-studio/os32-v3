@@ -22,7 +22,23 @@ static int probe(void)
     if (input_ime_cancel_take(&foreground) || input_ime_cancel_take(&foreground) != -1 || _irq_enabled()) return 1;
     foreground.owner = 7;
     input_ime_snapshot(&s);
-    if (s.exec_gen || input_ime_cancel_capture(&s) != -1) return 1;
+    if (s.exec_gen != 11 || s.owner != 6) return 1;
+    u32 action = 99;
+    for (unsigned i = 0; i < 8; ++i)
+        if (input_ime_action_capture(1 + (i & 1), &foreground, i)) return 1;
+    if (input_ime_action_capture(2, &foreground, 0) != -2 || input_ime_action_dropped() != 1)
+        return 1;
+    kbd_policy_ime_state(1, foreground.owner, foreground.command_gen);
+    input_ime_snapshot(&s);
+    if (input_ime_cancel_capture(&s) || input_ime_cancel_take(&foreground) ||
+        !input_ime_cancel_take(&foreground)) return 1;
+    if (input_ime_action_take(&foreground, 1, &action) || action != 99) return 1;
+    for (unsigned i = 0; i < 8; ++i)
+        if (input_ime_action_take(&foreground, i, &action) != 1 || action != 1 + (i & 1))
+            return 1;
+    if (input_ime_action_capture(1, &foreground, 0)) return 1;
+    foreground.command_gen++;
+    if (input_ime_action_take(&foreground, 0, &action) || input_ime_action_due(0)) return 1;
     _enable();
     return 0;
 }

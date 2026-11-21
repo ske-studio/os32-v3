@@ -157,7 +157,7 @@ def pc98_bsd_check_legacy_columns(root, tmp, mutate):
     old = old[old.index('static const u8 scancode_to_ascii['):old.index('void input_emit_legacy_repeat')]
     old = '#include "in2_int.h"\n#include "drivers/input/kbd.h"\n' + old.replace('input_emit_legacy_key(', 'pc98_old_emit(')
     (tmp/'old.c').write_text(old)
-    (tmp/'current.c').write_text(source)
+    (tmp/'current.c').write_text('void input_emit_legacy_key(unsigned char, unsigned char, unsigned char);\nvoid input_emit_legacy_repeat(unsigned char, unsigned char);\n' + source)
     def execute(code):
         (tmp/'host.c').write_text(code)
         cmd = ['gcc', '-m32', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-ffreestanding',

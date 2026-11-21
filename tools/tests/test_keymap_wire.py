@@ -69,7 +69,7 @@ def run(ctx):
         if ctx.mutate:
             for path, anchor, replacement in [
                 ('input/hal/kbd_merge.c', 'if (sc < 128 && old != key->down) cnt[sc] += key->down ? 1 : -1;', 'if (sc < 128 && old != key->down) cnt[sc] += key->down ? 1 : 0;'),
-                ('input/hal/kbd_merge.c', 'if (!legacy_active()) {', 'if (1) {'),
+                ('input/hal/kbd_merge.c', 'if (legacy_active()) return 1;', 'if (0) return 1;'),
                 ('input/hal/keymap_registry.c', '    km_release_keys(src, generation);', '    (void)src;'),
                 ('input/hal/kbd_merge.c', 'old = input_held_key(key->src, key->keycode);', 'old = 0;')]:
                 assert sources[path].count(anchor) == 1

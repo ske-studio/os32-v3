@@ -456,6 +456,18 @@
       "context": "normal",
       "irq": false,
       "source": "input/hal/input_context.h"
+    },
+    {
+      "symbol": "fep_read_wait",
+      "context": "normal",
+      "irq": false,
+      "declaration": "int fep_read_wait(int interruptible, int *key, u32 *start_tick, int resume);"
+    },
+    {
+      "symbol": "fep_read_try",
+      "context": "normal",
+      "irq": false,
+      "declaration": "int fep_read_try(int *key);"
     }
   ]
 }

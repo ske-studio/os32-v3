@@ -27,7 +27,11 @@ def run(ctx):
             return host32.run([str(tmp/'test')], runner='qemu', timeout=10).returncode
         assert execute(source) == 0
         if ctx.mutate:
-            for old, new in [('                  cancel_exec_gen == current->exec_gen;', '                  1;'),
+            for old, new in [('    if (count == 8)', '    if (count) count = 0;\n    if (count == 8)'),
+                             ('        ++dropped;', '        ++dropped; ++head; head %= 8;'),
+                             ('actions[head].after == popped', '((void)popped, 1)'),
+                             ('entry.command_gen == now->command_gen', '1'),
+                             ('                  cancel_exec_gen == current->exec_gen;', '                  1;'),
                              ('        ++cancel_coalesced;', '        cancel_coalesced += 2;'),
                              ('        cancel_owner = destination->owner;', '        cancel_owner = destination->owner + 1;')]:
                 assert source.count(old) == 1

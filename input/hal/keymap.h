@@ -12,7 +12,7 @@ typedef struct {
 } KmEntry;
 STATIC_ASSERT(sizeof(KmEntry) == 10, km_entry_size);
 
-typedef struct {
+typedef struct KmKey {
     u8 src, down, repeat;
     u16 generation;
     u16 keycode;
@@ -80,7 +80,7 @@ typedef struct {
     const KmBackend *map;
     u32 map_generation;          /* active table revision, not source generation */
 } KmSource;
-typedef struct {
+typedef struct KmEvalResult {
     keysym_t sym, command;
     KmEffect effect;
     u8 kind, op;                 /* op: BSD ID or legacy byte, else zero */
@@ -120,6 +120,8 @@ int km_source_bind(u8 src, u16 generation, u16 map_id);
 int input_capture_key(const KmKey *key);
 
 /* S3: COMPAT annotates DOS bytes before any policy/legacy projection. */
+int input_capture_delivery(const KmKey *key, u8 old, const KmEvalResult *result, u8 raw_due);
+int input_capture_ime(const KmKey *key, u8 old, const KmEvalResult *result);
 void km_legacy_compat(KmEvalResult *result);
 void input_emit_keymap(const KmEvalResult *result, u8 down, u8 raw_due,
                        u8 physical_mods, u8 consumed);

@@ -19,6 +19,7 @@ from test_exec_r1 import function
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SOURCES = {
+    'wait_source.inc': 'kernel/input_wait.c',
     'ime_gate_source.inc': 'input/hal/input_ime_gate.c',
     'kbd_source.inc': 'drivers/input/kbd.c',
     'kbd_merge_source.inc': 'input/hal/kbd_merge.c',
@@ -63,6 +64,7 @@ def run(mutation=None, fg1=False):
         sources[source] = sources[source].replace(old, new)
     sources['slot_source.inc'] += (ROOT / 'exec/appslot_transition.inc').read_text().replace(
         '#include "appslot_park.inc"', (ROOT / 'exec/appslot_park.inc').read_text())
+    sources['wait_source.inc'] = sources['wait_source.inc'].replace('../input/hal/', 'input/hal/')
     exec_sources(sources)
     with tempfile.TemporaryDirectory(prefix='x11-shared-') as directory:
         work = pathlib.Path(directory)
@@ -78,7 +80,7 @@ def run(mutation=None, fg1=False):
         subprocess.run(['nasm', '-f', 'elf32', str(ROOT / 'arch/x86/kernel/setjmp.asm'),
                         '-o', str(work / 'setjmp.o')], check=True)
         subprocess.run(['gcc', '-m32', '-march=i386', '-std=gnu11', '-O2',
-                        '-Wall', '-Wextra', '-Werror', '-Wno-unused-variable',
+                        '-DOS32_HOOK_IME=1', '-Wall', '-Wextra', '-Werror', '-Wno-unused-variable',
                         '-ffreestanding', '-fno-pie', '-fno-stack-protector',
                         '-ffunction-sections', '-fdata-sections', '-nostdlib',
                         '-static', '-no-pie', '-Wl,--gc-sections',

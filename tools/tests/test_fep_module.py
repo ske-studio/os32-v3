@@ -47,11 +47,12 @@ def main():
         cases = [('normal', product, 0)]
         if args.mutate:
             for label, old, new, expected_rc in [
+                    ('stop-keeps-action', '    input_ime_action_flush();', '', 14),
                     ('boot-relay-zero', OLD, NEW, 4),
                     ('stop-keeps-pending', '(void)input_ime_cancel_take(&invalid);', '(void)invalid;', 13),
                     ('stop-takes-after-cleanup', '    fep_close_input();\n    return module_abort(fep_handle);',
                      '    const KbdPolicySnapshot invalid = {0};\n'
-                     '    fep_closed = 1;\n    kbd_policy_ime_state(0, 0, 0);\n'
+                     '    fep_closed = 1;\n    input_ime_action_flush();\n    kbd_policy_ime_state(0, 0, 0);\n'
                      '    int rc = module_abort(fep_handle);\n'
                      '    (void)input_ime_cancel_take(&invalid);\n    return rc;', 13)]:
                 if product.count(old) != 1:

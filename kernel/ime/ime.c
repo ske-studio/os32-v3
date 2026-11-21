@@ -31,6 +31,9 @@
 #include "redir_access.h"
 #include "io.h"
 #include "input/hal/input_context.h"
+#include "input/hal/in2_int.h"
+int fep_read_wait(int interruptible, int *key, u32 *start_tick, int resume);
+int fep_read_try(int *key);
 extern int ring3_call_from_user(void);
 extern void ring3_abort_check(void);
 
@@ -182,6 +185,15 @@ int ime_is_active(void)
     return g_ime.mode != IME_MODE_OFF;
 }
 
+int ime_apply_absolute(u32 action)
+{
+    if (!services_public || !_irq_enabled() ||
+        (action != INPUT_IME_ON && action != INPUT_IME_OFF)) return -1;
+    int target = action == INPUT_IME_ON;
+    if (ime_is_active() != target) ime_toggle();
+    return ime_is_active() == target ? 0 : -1;
+}
+
 void ime_set_mode(int mode)
 {
     if (!services_public) return;
@@ -230,6 +242,8 @@ static void ime_prepare_cui_input(void)
 
 static int ime_getchar_wait(int interruptible, int *cancelled)
 {
+    u32 start_tick;
+    int resume = 0;
     int keydata;
     int result;
 
@@ -246,7 +260,10 @@ static int ime_getchar_wait(int interruptible, int *cancelled)
             continue;
         }
 
-        keydata = kbd_getkey_wait(interruptible);
+        int step = fep_read_wait(interruptible, &keydata, &start_tick, resume);
+        resume = step == IR_RECHECK;
+        if (resume) continue;
+        if (step != IR_KEY) keydata = -1;
         int taken = ime_take_cancel();
         if (keydata < 0) {
             if (cancelled) *cancelled = taken;
@@ -276,6 +293,7 @@ int ime_trygetchar(void)
     int result;
 
     if (con_sink_is_enabled()) return kbd_trygetchar();
+retry:
     ime_take_cancel();
     ime_prepare_cui_input();
 
@@ -286,8 +304,9 @@ int ime_trygetchar(void)
         return a != 0 ? (int)a : -1;
     }
 
-    keydata = kbd_trygetkey();
-    if (keydata < 0) return -1;
+    int step = fep_read_try(&keydata);
+    if (step == IR_RECHECK) goto retry;
+    if (step != IR_KEY) return -1;
     ime_note_cui_reader();
 
     result = ime_cui_process(keydata);
@@ -373,6 +392,8 @@ void ime_set_render(void *table)
 static int ime_getkey_wait(int interruptible, int *cancelled)
 {
     if (!services_public) return kbd_getkey_wait(interruptible);
+    u32 start_tick;
+    int resume = 0;
     int keydata;
     int result;
 
@@ -386,7 +407,10 @@ static int ime_getkey_wait(int interruptible, int *cancelled)
             return keydata;
         }
 
-        keydata = kbd_getkey_wait(interruptible);
+        int step = fep_read_wait(interruptible, &keydata, &start_tick, resume);
+        resume = step == IR_RECHECK;
+        if (resume) continue;
+        if (step != IR_KEY) keydata = -1;
         int taken = ime_take_cancel();
         if (keydata < 0) {
             if (cancelled) *cancelled = taken;
@@ -408,6 +432,7 @@ int ime_trygetkey(void)
     int keydata;
 
     if (con_sink_is_enabled()) return kbd_trygetkey();
+retry:
     ime_take_cancel();
     ime_prepare_cui_input();
 
@@ -417,8 +442,9 @@ int ime_trygetkey(void)
         return keydata;
     }
 
-    keydata = kbd_trygetkey();
-    if (keydata < 0) return -1;
+    int step = fep_read_try(&keydata);
+    if (step == IR_RECHECK) goto retry;
+    if (step != IR_KEY) return -1;
     ime_note_cui_reader();
 
     int result = ime_cui_process(keydata);

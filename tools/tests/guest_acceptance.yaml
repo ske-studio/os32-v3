@@ -2775,3 +2775,15 @@
     time_checks: 4
     kselftest_fail: 0
   evidence: ~/os32-tmp/evidence/<日付>/e08-time-now/
+- id: ime-stop-delivery-guest
+  gate: S4 / U2-x0
+  contract: docs/decisions/INPUT_BIND_DESIGN.md
+  mode: manual
+  prereq: NP21/W、U2-x0 統合済み、前景アプリと対応する kernel・fep.mod
+  entry: CUI で変換中に本体 STOP を押す。前編集を作り直して Ctrl+C でも別に試す。
+  observe:
+  - 各試行で未確定表示、アプリの生存、続けて入力した一字と UTF-8 の全 byte を記録する。
+  expect:
+    STOP: 未確定表示が消え、アプリが生存し、次字に欠落・重複がなく UTF-8 末尾が一致する。
+    Ctrl+C: 同じ四条件を独立して判定する。
+  evidence: ~/os32-tmp/evidence/<日付>/ime-stop-delivery-guest/

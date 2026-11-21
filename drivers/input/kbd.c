@@ -19,6 +19,9 @@
 
 #include "kbd.h"
 #include "../../input/hal/in2_int.h"
+#include "../../input/hal/keymap.h"
+#include "../../input/hal/input_context.h"
+int fep_services_public(void);
 #include "con_sink.h"
 #include "../../platform/pc98/legacy/v86_bios.h"
 #include "io.h"
@@ -423,7 +426,20 @@ static void kbd_legacy_wait_step(void)
 {
     idle_wait_step();
 }
+#if OS32_HOOK_IME
+static int kbd_capture_ime(const KmKey *key, u8 old, const KmEvalResult *result)
+{
+    if (!fep_services_public()) return result->action != 0;
+    return input_capture_ime(key, old, result);
+}
+
+#endif
+
 static const struct InputLegacyProvider kbd_legacy_provider = {
+#if OS32_HOOK_IME
+    .capture_ime = kbd_capture_ime, .flush_actions = input_ime_action_flush,
+    .read_cooked = input_read_cooked,
+#endif
     .terminal_try = serial_trygetchar, .terminal_peek = serial_peekchar,
     .inject_try = kbd_gui_trygetbyte, .inject_peek = kbd_legacy_inject_peek,
     .try_key = kbd_local_trykey, .peek_key = kbd_local_peekkey,

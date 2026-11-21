@@ -66,8 +66,10 @@ static int test(void)
     kbd_policy_ime_state(1, foreground.owner, foreground.command_gen);
     KbdPolicyImeSnapshot state;
     input_ime_snapshot(&state);
+    if (input_ime_action_capture(1, &foreground, 0)) return 14;
     if (input_ime_cancel_capture(&state) || fep_module_abort() || !cleanup_saw_closed)
         return 11;
+    if (input_ime_action_due(0)) return 14;
     if (cleanup_saw_pending) return 13;
     /* Simulate the next publication with exactly the same owner and generation. */
     fep_closed = 0;

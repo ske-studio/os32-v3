@@ -74,6 +74,20 @@ typedef struct {
 } ContextOwner;
 static ContextOwner context_owners[APP_SLOT_COUNT];
 static u32 foreground_owner;
+static void (*flush_focus)(void);
+
+void input_context_focus_register(void (*flush)(void))
+{
+    unsigned flags = irq_save();
+    flush_focus = flush;
+    irq_restore(flags);
+}
+
+static void select_foreground(u32 owner)
+{
+    if (foreground_owner != owner && flush_focus) flush_focus();
+    foreground_owner = owner;
+}
 
 /* Call only with interrupts disabled. Generation zero means unregistered. */
 static int context_owner_valid(u32 owner, u32 exec_gen)
@@ -110,7 +124,7 @@ int input_context_first_shell(u32 exec_gen)
     }
     input_context_set(&context_owners[APP_ID_SHELL].policy, INPUT_CONTEXT_LINE_EDIT,
                       INPUT_CONTEXT_ISIG | INPUT_CONTEXT_ICANON);
-    foreground_owner = APP_ID_SHELL;
+    select_foreground(APP_ID_SHELL);
     irq_restore(irq);
     return 0;
 }
@@ -122,7 +136,7 @@ int input_context_owner_select(u32 owner, u32 exec_gen)
         irq_restore(irq);
         return -1;
     }
-    foreground_owner = owner;
+    select_foreground(owner);
     irq_restore(irq);
     return 0;
 }
@@ -144,11 +158,12 @@ int input_context_owner_release(u32 owner, u32 exec_gen)
         }
     }
     if (foreground_owner == owner) {
-        foreground_owner = context_owner_valid(entry->parent, entry->parent_gen)
+        u32 next = context_owner_valid(entry->parent, entry->parent_gen)
                          ? entry->parent : 0;
-        if (!foreground_owner && owner != APP_ID_SHELL &&
+        if (!next && owner != APP_ID_SHELL &&
             context_owners[APP_ID_SHELL].exec_gen)
-            foreground_owner = APP_ID_SHELL;
+            next = APP_ID_SHELL;
+        select_foreground(next);
     }
     entry->exec_gen = 0;
     irq_restore(irq);

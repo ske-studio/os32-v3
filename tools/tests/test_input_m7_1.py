@@ -27,8 +27,9 @@ def run(ctx):
             return host32.run([str(tmp/'test')], runner='qemu', timeout=10).returncode
         assert execute(source) == 0
         if ctx.mutate:
-            for old, new in [('    ime_snapshot.owner = owner;', '    ime_snapshot.owner = owner + 1;'),
-                             ('    ime_snapshot.command_gen = command_gen;', '    ime_snapshot.command_gen = command_gen + 1;')]:
+            for old, new in [('active, owner, current.exec_gen, command_gen', 'active, owner + 1, current.exec_gen, command_gen'),
+                             ('*out = ime_snapshot;', '*out = ime_snapshot; if (out->active) out->exec_gen = generation;'),
+                             ('active && !input_context_snapshot(&current)', 'active && (input_context_snapshot(&current), 1)')]:
                 assert source.count(old) == 1
                 assert execute(source.replace(old, new, 1)) == 1
                 print('RED runtime: ' + old, flush=True)

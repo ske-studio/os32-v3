@@ -4,7 +4,7 @@ CHECK = dict(name='input-wait-host', tier=1, budget=5, needs=[], covers=[
     'input/hal/in2_int.h', 'include/types.h', 'kernel/input_legacy.c',
     'kernel/input_wait.c', 'tools/tests/input_wait_host.c',
     'tools/tests/test_input_wait.py', 'tools/tests/host32.py',
-    'drivers/input/kbd.c'], kind='contract',
+    'drivers/input/kbd.c', 'input/hal/keymap.h', 'input/hal/input_context.h'], kind='contract',
     basis=['INPUT_HAL_DESIGN §5', 'INPUT_HAL_DESIGN H7'])
 import os
 from pathlib import Path
@@ -90,10 +90,11 @@ def run(ctx):
         for name in ('kbd_getchar_wait', 'kbd_getkey_wait'):
             a = kbd.index(('int ' if name == 'kbd_getkey_wait' else 'static int ') + name + '(int interruptible)\n{')
             current += kbd[a:kbd.index('\n}', a)+2] + '\n'
+        (tmp / 'io.h').write_text('static inline int _irq_enabled(void) { return 1; }\nstatic inline unsigned irq_save(void) { return 0; }\nstatic inline void irq_restore(unsigned f) { (void)f; }\n')
         def execute(code, adapter=current):
             (tmp / 'current_wait.inc').write_text(adapter)
-            (tmp / 'wait.c').write_text(code.replace('../input/hal/in2_int.h', 'in2_int.h'))
-            cmd = ['gcc','-m32','-std=gnu11','-Wall','-Wextra','-Werror',
+            (tmp / 'wait.c').write_text(code.replace('../input/hal/', ''))
+            cmd = ['gcc','-m32','-std=gnu11','-DOS32_HOOK_IME=1','-Wall','-Wextra','-Werror',
                    '-ffreestanding','-fno-pie','-fno-stack-protector','-nostdlib',
                    '-static','-no-pie','-I'+str(tmp),'-I'+str(ctx.root/'input/hal'),
                    '-I'+str(ctx.root/'include'),str(ctx.root/'tools/tests/input_wait_host.c'),
@@ -105,7 +106,7 @@ def run(ctx):
         cc = Path(os.environ.get('PPC_CROSS_DIR','/home/hight/opt/cross-ppc')) / 'bin/powerpc-elf-gcc'
         if cc.is_file() and os.access(cc, os.X_OK):
             for src in [ctx.root/'tools/tests/input_wait_host.c', ctx.root/'kernel/input_wait.c']:
-                subprocess.run([str(cc),'-std=gnu11','-Wall','-Wextra','-Werror','-ffreestanding',
+                subprocess.run([str(cc),'-std=gnu11','-DOS32_HOOK_IME=1','-Wall','-Wextra','-Werror','-ffreestanding',
                     '-DPPC_COMPILE','-I'+str(tmp),'-I'+str(ctx.root/'input/hal'),'-I'+str(ctx.root/'include'),
                     '-c',str(src),'-o',str(tmp/(src.stem+'.o'))],check=True)
             print('PASS PowerPC compile', flush=True)
@@ -116,6 +117,7 @@ def run(ctx):
             for old,new in [
                 ('gui = p->gui_active && p->gui_active();', 'gui = 0;'),
                 ('if (gui) {', 'if (p->gui_active && p->gui_active()) {'),
+                ('if (resume) start = *start_tick;', 'if (0) start = *start_tick;'),
                 ('start = p->wait_ticks ? p->wait_ticks() : 0;', 'start = 100;'),
                 ("mode == IL_KEY ? 0x1b : (p->capture_active && p->capture_active() ? '\\r' : ' ')", "mode == IL_KEY ? '\\r' : (capture ? 0x1b : ' ')"),
                 ('if (timed && timeout && p->wait_ticks &&', 'if ((mode != IL_KEY ? timed : (p->capture_active && p->capture_active())) && timeout && p->wait_ticks &&'),

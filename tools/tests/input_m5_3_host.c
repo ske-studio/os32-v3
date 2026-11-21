@@ -1,5 +1,6 @@
 #include "context.c"
-static int calls;
+static int calls, focus_changes;
+static void focus_changed(void) { ++focus_changes; }
 static void discard(void) { calls++; }
 static int probe(void)
 {
@@ -9,6 +10,8 @@ static int probe(void)
     if (input_context_first_shell(7) || !input_context_first_shell(8)) return 1;
     if (input_context_snapshot(&s) || s.owner != 1 || s.exec_gen != 7 ||
         s.command_gen || s.context != INPUT_CONTEXT_LINE_EDIT || s.flags != 3) return 1;
+    input_context_focus_register(focus_changed);
+    if (input_context_owner_select(1, 7) || focus_changes) return 1;
     /* shell -> A -> C; C parks, shell kills A, then C exits. */
     if (input_context_owner_register(2, 50, 1, 7) ||
         input_context_owner_register(3, 60, 2, 50) ||
@@ -17,6 +20,7 @@ static int probe(void)
         input_context_owner_release(3, 60) || input_context_snapshot(&s) ||
         s.owner != 1 || s.exec_gen != 7 || s.context != INPUT_CONTEXT_LINE_EDIT ||
         s.flags != (INPUT_CONTEXT_ISIG | INPUT_CONTEXT_ICANON)) return 1;
+    if (focus_changes != 4) return 1;
     if (input_context_owner_register(2, 11, 1, 7)) return 1;
     if (input_context_snapshot(&t) || t.owner != 1) return 1;
     if (input_context_owner_select(2, 12) == 0 || input_context_owner_select(2, 11)) return 1;

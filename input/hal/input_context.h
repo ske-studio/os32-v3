@@ -18,6 +18,7 @@ void input_context_init(KbdPolicyContext *state);
 int input_context_set(KbdPolicyContext *state, u32 context, u32 flags);
 
 /* The registered M6 callback runs with interrupts disabled. */
+void input_context_focus_register(void (*flush)(void));
 void input_context_discard_register(void (*discard)(void));
 void input_interrupt_init(void);
 int input_context_command_begin(KbdPolicyContext *state);
@@ -56,5 +57,13 @@ int input_ime_cancel_capture(const KbdPolicyImeSnapshot *destination);
 int input_ime_cancel_take(const KbdPolicySnapshot *current);
 u32 input_ime_cancel_coalesced_count(void);
 u32 input_ime_cancel_replaced_count(void);
+
+int input_ime_cancel_pending(void);
+enum { INPUT_IME_ON = 1, INPUT_IME_OFF = 2 };
+int input_ime_action_capture(u32 action, const KbdPolicySnapshot *dst, u32 after);
+int input_ime_action_take(const KbdPolicySnapshot *now, u32 popped, u32 *action);
+int input_ime_action_due(u32 popped);
+void input_ime_action_flush(void);
+u32 input_ime_action_dropped(void);
 
 #endif

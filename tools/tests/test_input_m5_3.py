@@ -24,11 +24,12 @@ def run(ctx):
             return host32.run([str(tmp/'test')], runner='qemu', timeout=10).returncode
         assert execute(source) == 0
         if ctx.mutate:
-            for old, new in [('context_owners[owner].exec_gen == exec_gen;', 'context_owners[owner].exec_gen != 0;'),
+            for old, new in [('if (foreground_owner != owner && flush_focus) flush_focus();', 'if (0 && flush_focus) flush_focus();'),
+                             ('context_owners[owner].exec_gen == exec_gen;', 'context_owners[owner].exec_gen != 0;'),
                              ('next->parent = entry->parent;', 'next->parent = 0;'),
                              ('? entry->parent : 0;', '? 0 : 0;'),
                              ('out->command_gen = entry->policy.command_gen;', 'out->command_gen = 0;'),
-                             ('INPUT_CONTEXT_ISIG | INPUT_CONTEXT_ICANON);\n    foreground_owner = APP_ID_SHELL;', 'INPUT_CONTEXT_ISIG | INPUT_CONTEXT_ICANON);\n    foreground_owner = 0;')]:
+                             ('INPUT_CONTEXT_ISIG | INPUT_CONTEXT_ICANON);\n    select_foreground(APP_ID_SHELL);', 'INPUT_CONTEXT_ISIG | INPUT_CONTEXT_ICANON);\n    select_foreground(0);')]:
                 assert source.count(old) == 1
                 assert execute(source.replace(old, new, 1)) == 1
                 print('RED runtime: ' + old, flush=True)

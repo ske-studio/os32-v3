@@ -1,4 +1,17 @@
 #include "in2_int.h"
+#include "keymap.h"
+#include "input_context.h"
+int fep_services_public(void) { return 0; }
+int input_capture_ime(const KmKey *k, u8 old, const KmEvalResult *r)
+{ (void)k; (void)old; (void)r; return 0; }
+void input_ime_action_flush(void) {}
+u32 legacy_cooked_popped(void) { return 0; }
+int input_ime_action_due(u32 popped) { (void)popped; return 0; }
+int input_ime_cancel_pending(void) { return 0; }
+int input_context_snapshot(KbdPolicySnapshot *dst) { (void)dst; return -1; }
+int input_ime_action_take(const KbdPolicySnapshot *dst, u32 n, u32 *action)
+{ (void)dst; (void)n; (void)action; return 0; }
+int ime_apply_absolute(u32 action) { (void)action; return -1; }
 static u32 now, command_start;
 static int capture, frozen, pending, serial_reads, steps, ready_at, value, toggle_at;
 volatile int kbd_gui_mode;
@@ -135,6 +148,27 @@ static int compare(void) {
     return 0;
 }
 #ifndef PPC_COMPILE
+static enum InputReadStep recheck(int cancel, int *key)
+{
+    (void)cancel; (void)key;
+    return IR_RECHECK;
+}
+static int freeze_rechecks(void)
+{
+    struct InputLegacyProvider retry = provider;
+    retry.read_cooked = recheck;
+    input_legacy_register(&retry);
+    capture = frozen = 1;
+    kbd_gui_mode = 0;
+    now = 123;
+    u32 start;
+    int key;
+    if (fep_read_wait(1, &key, &start, 0) != IR_RECHECK) return 14;
+    now += 2900;
+    if (fep_read_wait(1, &key, &start, 1) != IR_RECHECK) return 15;
+    now += 100;
+    return fep_read_wait(1, &key, &start, 1) == IR_KEY && key == 27 ? 0 : 16;
+}
 void _start(void) {
     int rc=probe(1);
     if (!rc) rc=probe(0);
@@ -142,6 +176,7 @@ void _start(void) {
     if (!rc) rc=compare();
     kbd_gui_mode=1; ready_at=0;
     if (!rc && kbd_getkey_wait(1)!=(value & 0xff)) rc=12;
+    if (!rc) rc=freeze_rechecks();
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc) : "memory");
     __builtin_unreachable();
 }
