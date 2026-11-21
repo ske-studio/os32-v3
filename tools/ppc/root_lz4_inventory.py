@@ -44,6 +44,18 @@ RUNNERS = {
     'usb-legacy': ('usb_run', '--legacy', '--lan'),
 }
 SHELL_RUNNERS = ('sb_run', 'sc_run', 'sd_run', 'usb_run', 'ppc_sh_output')
+# CI partitions the complete inventory across the weighted PPC jobs.
+GROUPS = {
+    'boot': ('boot_info',),
+    'display': ('display', 'display_lifecycle'),
+    'shell': ('sb-serial', 'sc', 'sc-serial', 'sc-link', 'sd', 'sd-link', 'sh-output', 'sh-output-serial', 'sh-output-link'),
+    'usb': ('usb', 'usb-link', 'usb-legacy', 'product', 'kboot'),
+    'link': ('p3', 'fb'),
+    'storage': ('db', 'sfs', 'shm', 'sqlite_stack', 'sqlite_static'),
+    'console': ('console_cells', 'font', 'fp', 'gfx2', 'kcg', 'loop', 'mouse'),
+    'system': ('sysinfo', 'sysinfo-memstat', 'ver'),
+    'devices': ('newlib', 'path', 'pci', 'port', 'rtc', 'surface'),
+}
 COLUMNS = ('resident_end', 'chain_end', 'frame', 'packed', 'iso_pages')
 
 
@@ -52,7 +64,7 @@ def check_staging_size(packed, frame):
         raise ValueError('compressed root does not fit boot staging area')
 
 
-def measure(path, fixture=False, iso=None):
+def measure(path, fixture=False, iso=None, damaged_root=False):
     data = path.read_bytes()
     loads = [s for s in segments(data) if s[0] == 1]
     _, _, va, pa, _, memsz, _, _ = loads[0]
@@ -79,7 +91,7 @@ def measure(path, fixture=False, iso=None):
         if va != STAGING_BASE or chain > STAGING_BASE:
             raise ValueError(f'{path}: misplaced boot staging area')
         frame = size
-        if (any(data[off+packed:off+size]) or
+        if not damaged_root and (any(data[off+packed:off+size]) or
                 length != len(raw) or
                 lz4.block.decompress(data[off:off+packed], uncompressed_size=length) != raw):
             raise ValueError(f'{path}: wrong compressed root')
@@ -268,8 +280,8 @@ def collect(out, suites):
     rows = {}
     plans = {}
 
-    def record(elf, name, fixture=False, iso=None):
-        values, digest = measure(elf, fixture, iso)
+    def record(elf, name, fixture=False, iso=None, damaged_root=False):
+        values, digest = measure(elf, fixture, iso, damaged_root)
         row = rows.setdefault(digest, dict(**values, names=[], sha256=digest))
         row['names'].append(name)
         print(name, *(hex(values[c]) for c in COLUMNS), digest, flush=True)
@@ -358,17 +370,18 @@ def collect(out, suites):
         with patch.object(kboot_accept, 'build', build), patch.object(
                 sys, 'argv', [module_name, '--build-only', *([] if suite == 'sc' else ['--mutate']), *extra]):
             module = importlib.reload(importlib.import_module(module_name))
-            if module.main() or not any(n.startswith(suite+'/') for n in plans):
+            def boot_image(case, elf, iso):
+                name = suite+'/'+case
+                plans.setdefault(name, {}).update(elf=str(elf), iso=str(iso),
+                    damaged_root=case in ('invalid-offset', 'short-output', 'data-crc', 'allocation-failed'))
+
+            status = module.main(on_image=boot_image) if suite == 'boot_info' else module.main()
+            if status or not any(n.startswith(suite+'/') for n in plans):
                 raise RuntimeError('incomplete suite '+suite)
     for name, plan in plans.items():
         elf = Path(plan['elf'])
         iso = Path(plan['iso']) if plan['iso'] else None
-        # boot_info applies objcopy after make to the image actually booted.
-        if name.startswith('boot_info/') and elf.with_name('unverified.elf').exists():
-            elf = elf.with_name('unverified.elf')
-            iso = elf.with_name('root.iso')
-            plan.update(elf=str(elf), iso=str(iso))
-        record(elf, name, iso=iso)
+        record(elf, name, iso=iso, damaged_root=plan.get('damaged_root', False))
     # Equivalence across suites is expected. Within these shell/USB suites
     # each enumerated case changes product code or embedded input.
     for row in rows.values():
@@ -386,6 +399,10 @@ def collect(out, suites):
     for row in result:
         print(','.join(row['names']), *(hex(row[c]) for c in COLUMNS[:-1]), row['iso_pages'])
     maxima = envelope(result)
+    # Comparing each group's maxima with the common limits also bounds their union.
+    from root_lz4_layout import layout_constant
+    if maxima['chain_end'] > layout_constant('MEM_FIXED_PAGING_GUARD_BASE'):
+        raise ValueError('kernel chain exceeds fixed paging guard')
     (out/'maxima.json').write_text(json.dumps({
         col: dict(value=value, images=[name for row in result if row[col] == value for name in row['names']])
         for col, value in maxima.items()}, indent=2))
@@ -399,7 +416,13 @@ if __name__ == '__main__':
     parser.add_argument('--out', type=Path, required=True)
     choices = list(dict.fromkeys(['product', *SUITES, *RUNNERS, 'kboot']))
     parser.add_argument('--suite', action='append', choices=choices, help='measure one family (repeatable)')
+    parser.add_argument('--group', choices=GROUPS)
     args = parser.parse_args()
+    if args.group:
+        assigned = [suite for group in GROUPS.values() for suite in group]
+        if sorted(assigned) != sorted(choices) or args.suite:
+            parser.error('inventory groups must partition all suites exactly once')
+        args.suite = GROUPS[args.group]
     args.out.mkdir(parents=True, exist_ok=True)
     os.environ.setdefault('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc')
     collect(args.out.resolve(), args.suite or choices)

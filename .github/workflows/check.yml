@@ -191,8 +191,7 @@ jobs:
       - uses: ./.github/actions/gate-setup
         if: steps.prior.outputs.reuse != 'true' && steps.scope.outputs.scope == 'ppc'
       - name: PPC image and host checks
-        # The root layout inventory relinks each distinct acceptance configuration.
-        timeout-minutes: 45
+        timeout-minutes: 12
         if: steps.prior.outputs.reuse != 'true' && steps.scope.outputs.scope == 'ppc'
         env:
           OS32_ACCEPT_IPA_LICENSE: "1"
@@ -212,7 +211,7 @@ jobs:
       - uses: ./.github/actions/ppc-setup
 
   # QEMU で機械を丸ごと模擬する検査 (変異込み) を
-  # 5 本に割って並べる (シャードの中は 1 本ずつ)。割り方は検査の重み (tools/checks/weights.json) から。
+  # 6 本に割って並べる (シャードの中は 1 本ずつ)。割り方は検査の重み (tools/checks/weights.json) から。
   # ppc-compile の成果物は読まないので needs で鎖にしない (docs/POLICY_CI.md G2)。
   ppc-qemu:
     runs-on: ubuntu-latest

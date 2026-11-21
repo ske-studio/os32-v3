@@ -148,7 +148,7 @@ def observe(elf, cpu, evidence, case, expected, exit_status):
         session.close()
 
 
-def main():
+def main(on_image=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--build-only', action='store_true')
     parser.add_argument('--mutate', action='store_true')
@@ -245,6 +245,8 @@ def main():
             raise RuntimeError(f'{case} ELF is identical to {images[digest]}: {elf}')
         images[digest] = case
         print(f'{case} sha256={digest} {elf}', flush=True)
+        if on_image is not None:
+            on_image(case, elf, kernel / 'root.iso')
         if not args.build_only:
             for cpu in ('7450', '7455'):
                 observe(elf, cpu, folder / cpu, case, expected, exit_status)
