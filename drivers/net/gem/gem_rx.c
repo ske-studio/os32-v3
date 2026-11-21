@@ -51,7 +51,7 @@ int gem_rx_some(struct gem *g, void *frame, u32 cap, u32 *bytes, u32 *budget)
         }
         /* gem_fill_rx_ring/add_rxbuf:1040-1087: refill producer, not consumer;
          * unlike BSD's mbufs, each fixed pool slot owns its own buffer. */
-        producer = (slot + GEM_RX_PUBLISHED) % GEM_RING_COUNT;
+        producer = (slot + GEM_RX_PUBLISHED) % GEM_RX_RING_COUNT;
         target = base + GEM_POOL_RX_BUF + producer * GEM_BUF_SIZE;
         if (g->io.sync(target, GEM_BUF_SIZE, DMA_PREREAD)) return GEM_EIO;
         desc = base + GEM_POOL_RX_RING + producer * GEM_DESC_SIZE;
@@ -59,11 +59,11 @@ int gem_rx_some(struct gem *g, void *frame, u32 cap, u32 *bytes, u32 *budget)
         put64(desc + GEM_DESC_ADDR_OFFSET, g->dma.bus + GEM_POOL_RX_BUF + producer * GEM_BUF_SIZE);
         put64(desc + GEM_DESC_FLAGS_OFFSET, (GEM_BUF_SIZE << GEM_RD_BUFSHIFT) | GEM_RD_OWN);
         if (g->io.sync(desc, GEM_DESC_SIZE, DMA_PREWRITE)) return GEM_EIO;
-        g->rx_head = (slot + 1) % GEM_RING_COUNT;
+        g->rx_head = (slot + 1) % GEM_RX_RING_COUNT;
         /* FreeBSD if_gem.c:1581-1589: fetches and kicks in groups of four. */
         if (g->rx_head % 4 == 0) {
-            if (g->io.sync(base + GEM_POOL_RX_RING, GEM_RING_COUNT * GEM_DESC_SIZE, DMA_PREWRITE)) return GEM_EIO;
-            g->io.write32(g->io.ctx, GEM_RX_KICK, (g->rx_head + GEM_RX_PUBLISHED) & 31);
+            if (g->io.sync(base + GEM_POOL_RX_RING, GEM_RX_RING_COUNT * GEM_DESC_SIZE, DMA_PREWRITE)) return GEM_EIO;
+            g->io.write32(g->io.ctx, GEM_RX_KICK, (g->rx_head + GEM_RX_PUBLISHED) % GEM_RX_RING_COUNT);
         }
         if (result != GEM_AGAIN) return result;
     }

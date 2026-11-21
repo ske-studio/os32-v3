@@ -5,16 +5,15 @@
 #include "mm/paging.h"
 
 #define DMA_BLOCK 0x10000u
-#define DMA_BYTES (3u * DMA_BLOCK)
-#define DMA_BUFFER 2048u
-#define TX_RING 0u
-#define RX_RING 0x1000u
+#define DMA_BYTES GEM_POOL_SIZE
 
-_Static_assert(GEM_RING_COUNT * GEM_DESC_SIZE <= DMA_BLOCK, "TX ring boundary");
-_Static_assert(RX_RING + GEM_RING_COUNT * GEM_DESC_SIZE <= DMA_BLOCK, "RX ring boundary");
-_Static_assert(DMA_BLOCK % DMA_BUFFER == 0, "buffer boundary");
-_Static_assert(GEM_RING_COUNT * DMA_BUFFER == DMA_BLOCK, "buffer region");
-_Static_assert(TX_RING % 4096 == 0 && RX_RING % 4096 == 0, "ring alignment");
+_Static_assert(GEM_POOL_TX_RING + GEM_TX_RING_COUNT * GEM_DESC_SIZE <= GEM_POOL_RX_RING, "TX ring boundary");
+_Static_assert(GEM_POOL_RX_RING + GEM_RX_RING_COUNT * GEM_DESC_SIZE <= DMA_BLOCK, "RX ring boundary");
+_Static_assert(GEM_POOL_TX_RING % 4096 == 0 && GEM_POOL_RX_RING % 4096 == 0, "ring alignment");
+_Static_assert(DMA_BLOCK % GEM_BUF_SIZE == 0, "buffer boundary");
+_Static_assert(GEM_POOL_TX_BUF == DMA_BLOCK && GEM_POOL_RX_BUF % DMA_BLOCK == 0, "buffer alignment");
+_Static_assert(GEM_POOL_TX_BUF + GEM_TX_RING_COUNT * GEM_BUF_SIZE == GEM_POOL_RX_BUF, "TX region");
+_Static_assert(GEM_POOL_RX_BUF + GEM_RX_RING_COUNT * GEM_BUF_SIZE == DMA_BYTES, "RX region");
 static u8 pool[DMA_BYTES] __attribute__((aligned(DMA_BLOCK)));
 static struct pm_gmac_boot saved;
 static struct gem_dma result;

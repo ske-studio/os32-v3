@@ -21,7 +21,7 @@ MUTATIONS = [
 
 def check(source, temp, case):
     exe = temp / 'test'
-    cmd = ['gcc', '-m32', '-std=gnu11', '-ffreestanding', '-fno-pie', '-no-pie',
+    cmd = ['gcc', '-m32', '-nostdinc', '-isystem', subprocess.check_output(['gcc', '-print-file-name=include'], text=True).strip(), '-std=gnu11', '-ffreestanding', '-fno-pie', '-no-pie',
            '-nostdlib', '-static', '-fno-stack-protector', '-Wall', '-Wextra', '-Werror',
            '-DCASE='+str(case), '-I.', '-Iinclude', '-Iarch/ppc', '-Iplatform/powermac',
            '-Imm', '-Ibuild/out', str(source), 'tools/ppc/lan_p12_fake.c', '-o', str(exe)]

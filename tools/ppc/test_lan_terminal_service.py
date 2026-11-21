@@ -28,7 +28,7 @@ def main():
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
     original = SOURCE.read_text()
-    flags = ['gcc', '-DTERM_TEST', '-m32', '-std=gnu11', '-ffreestanding', '-fno-pie',
+    flags = ['gcc', '-DTERM_TEST', '-m32', '-nostdinc', '-isystem', subprocess.check_output(['gcc', '-print-file-name=include'], text=True).strip(), '-std=gnu11', '-ffreestanding', '-fno-pie',
              '-fno-stack-protector', '-fno-builtin', '-ffunction-sections',
              '-fdata-sections', '-Wall', '-Wextra', '-Werror',
              '-I.', '-Iinclude', '-Iplatform/powermac', '-Iarch/ppc']

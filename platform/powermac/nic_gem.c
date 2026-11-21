@@ -63,9 +63,9 @@ static void mac(u8 *out) { (void)pm_lan_running_gem(out); }
 /* Field           shift   width
  * poll serial         0      16
  * packet_count       16       3
- * rx_head            19       5
- * RX_COMPLETION      24       5
- * last RX_KICK       29       5
+ * rx_head            19       7
+ * RX_COMPLETION      26       7
+ * last RX_KICK       33       7
  */
 extern volatile u32 gem_rx_last_kick;
 volatile unsigned long long gem_rx_diag;
@@ -74,8 +74,8 @@ static void observe_poll(struct gem *g)
     static unsigned short serial;
     u32 done = g ? g->io.read32(g->io.ctx, GEM_RX_COMPLETION) : 0;
     u32 head = g ? g->rx_head : 0;
-    gem_rx_diag = ++serial | (packet_count << 16) | ((head & 31u) << 19) |
-        ((done & 31u) << 24) | ((unsigned long long)(gem_rx_last_kick & 31u) << 29);
+    gem_rx_diag = ++serial | (packet_count << 16) | ((head & 127u) << 19) |
+        ((unsigned long long)(done & 127u) << 26) | ((unsigned long long)(gem_rx_last_kick & 127u) << 33);
 }
 #endif
 static void poll(void)

@@ -32,6 +32,7 @@
 #define GEM_TX_CONFIG_TXDMA_EN 0x00000001 /* openbsd gemreg.h:159 */
 #define GEM_TX_CONFIG_TXRING_SZ 0x0000001e /* openbsd gemreg.h:160 */
 #define GEM_TX_CONFIG_TXFIFO_TH 0x001ffc00 /* openbsd gemreg.h:161 */
+#define GEM_RING_SZ_128 (2<<1) /* OpenBSD gemreg.h:166 */
 #define GEM_RING_SZ_32 (0<<1) /* openbsd gemreg.h:164 */
 #define GEM_TX_COMPLETION_MASK 0x00001fff /* openbsd gemreg.h:175 */
 #define GEM_RX_CONFIG 0x4000 /* openbsd gemreg.h:178 */
@@ -173,9 +174,10 @@
 #define GEM_POOL_TX_BUF 0x10000u
 #define GEM_POOL_RX_BUF 0x20000u
 #define GEM_BUF_SIZE 2048u
-#define GEM_POOL_SIZE 0x30000u
-#define GEM_RING_COUNT 32
-#define GEM_RX_PUBLISHED 28
+#define GEM_POOL_SIZE 0x60000u
+#define GEM_TX_RING_COUNT 32
+#define GEM_RX_RING_COUNT 128
+#define GEM_RX_PUBLISHED (GEM_RX_RING_COUNT - 4)
 /* Descriptors are little-endian bytes, never cast to a C structure. */
 #define GEM_DESC_FLAGS_OFFSET 0
 #define GEM_DESC_ADDR_OFFSET 8

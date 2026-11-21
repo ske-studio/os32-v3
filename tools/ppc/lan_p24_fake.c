@@ -1,3 +1,5 @@
+/* PowerMac GEM layout (2026-11-21): OpenBSD gemvar.h RX count,
+ * four reserved descriptors, and OS32 HW2 64 KiB DMA boundaries. */
 /* Whole service TU, with only hardware/clock/serial boundaries modeled.
  * Including it preserves its static state for assertions; no body is extracted. */
 #include "lan_service.c"
@@ -138,7 +140,7 @@ static void inject(const struct lan_message *m,u32 bad,u32 filter) {
     CHECK(d[3]&0x80,"rx-owned-model");
     memcpy(pool+GEM_POOL_RX_BUF+nic_rx*GEM_BUF_SIZE+2,f,n);
     memset(d,0,8); d[2]=(u8)n; d[3]=(u8)(n>>8); if(bad) d[7]=0x40;
-    nic_rx=(nic_rx+1)&31;
+    nic_rx=(nic_rx+1)&127;
 }
 static struct lan_message request(u32 op) {
     static u32 id;
@@ -229,11 +231,11 @@ static void scenario(void) {
     out("reached=rx-budget\n");
     for(u32 i=0;i<9;i++) inject(&q,1,0);
     u32 head=s.g.rx_head; u64 bad=s.g.rx_drops; poll_once();
-    CHECK(s.g.rx_head==((head+8)&31) && s.g.rx_drops==bad+8,"A11 budget");
+    CHECK(s.g.rx_head==((head+8)&127) && s.g.rx_drops==bad+8,"A11 budget");
     poll_once(); CHECK(s.g.rx_drops==bad+9,"rx-remainder");
     for(u32 i=0;i<9;i++) inject(&q,i!=7,0);
     head=s.g.rx_head; bad=s.g.rx_drops; poll_once();
-    CHECK(s.g.rx_head==((head+8)&31) && s.g.rx_drops==bad+7,"A11 mixed-budget");
+    CHECK(s.g.rx_head==((head+8)&127) && s.g.rx_drops==bad+7,"A11 mixed-budget");
     poll_once(); CHECK(s.g.rx_drops==bad+8,"mixed-remainder");
     out("reached=budgets\n");
     hold=0; completion=s.g.tx_head; u32 reclaimed=postwrites, responses=sends[4]; poll_once();
@@ -257,7 +259,7 @@ static void scenario(void) {
     CHECK(sends[1]==beacons && sends[2]==sent,"reconnect-hold");
     now=s.poll_at; clock_tb=now; pm_lan_poll(now);
     CHECK(sends[1]==beacons || last[1].seq>0,"beacon-reconnect");
-    CHECK(dma_calls==2 && dma_first==1 && cache_lines==2048 && s.g.rx_head==0 && s.g.ring_cursor==28,"dma-reuse");
+    CHECK(dma_calls==2 && dma_first==1 && cache_lines==2048 && s.g.rx_head==0 && s.g.ring_cursor==124,"dma-reuse");
     CHECK(sends[2]>sent,"reconnect-log");
     u64 next,records,bytes; u32 flags; pm_lan_log_stats(&next,&records,&bytes,&flags);
     now=s.beacon_at; clock_tb=now; pm_lan_poll(now);
