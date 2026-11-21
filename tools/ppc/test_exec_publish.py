@@ -19,6 +19,7 @@ typedef struct { u32 pd_phys; } Space;
 typedef struct { u32 load_addr; int cpl3; Space *as; } AppSlot;
 typedef struct { u32 header_size, text_size, bss_size; } OS32Header;
 static u32 reads, pubs;
+static int resident;
 static int vfs_open(const char *p, int m) { (void)p; (void)m; return 1; }
 static int vfs_seek(int fd, int o, int w) { (void)fd; (void)o; (void)w; return 0; }
 static void vfs_close(int fd) { (void)fd; }
@@ -27,7 +28,8 @@ static int vfs_read_fd(int fd, void *p, u32 n) { (void)fd; (void)p; reads++; ret
 void arch_exec_publish(void *p, u32 n) {
     static const u32 addr[] = {0x5100, 0x7000, 0x9000};
     static const u32 size[] = {3840, 4096, 64};
-    if (pubs >= 3 || reads != pubs + 1 || (uintptr_t)p != addr[pubs] || n != size[pubs]) __builtin_trap();
+    static const u32 fixed[] = {0x400100, 0x401000, 0x402000};
+    if (pubs >= 3 || reads != pubs + 1 || (uintptr_t)p != (resident ? fixed[pubs] : addr[pubs]) || n != size[pubs]) __builtin_trap();
     pubs++;
 }
 static void *kmemset(void *p, int c, u32 n) { (void)c; (void)n; return p; }
@@ -35,6 +37,9 @@ static void *kmemset(void *p, int c, u32 n) { (void)c; (void)n; return p; }
 int main(void) {
     Space as = {1}; AppSlot slot = {0x1100, 1, &as};
     OS32Header hdr = {64, 8000, 0};
+    if (exec_load_image(&slot, "user", &hdr) || reads != 3 || pubs != 3) return 1;
+    resident = 1; reads = pubs = 0;
+    slot = (AppSlot){0x400100, 0, 0};
     return exec_load_image(&slot, "x", &hdr) || reads != 3 || pubs != 3;
 }
 '''

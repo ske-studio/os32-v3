@@ -56,12 +56,13 @@ def main():
     parser.add_argument('--fd', action='store_true')
     parser.add_argument('--base', type=Path, default=Path('.'))
     parser.add_argument('--bin', type=Path, action='append', default=[])
+    parser.add_argument('--sys-bin', type=Path)
     parser.add_argument('--manifest', type=Path)
     parser.add_argument('--out', type=Path, required=True)
     args = parser.parse_args()
     if args.manifest and args.motd is None:
         parser.error('--manifest requires --motd')
-    if args.bin and args.motd is None:
+    if (args.bin or args.sys_bin) and args.motd is None:
         parser.error("--bin requires --motd")
     if bool(args.plan) != args.fd:
         parser.error('--plan and --fd must be used together')
@@ -119,8 +120,13 @@ def main():
                     (staging / 'bin').mkdir()
                     for app in args.bin:
                         shutil.copyfile(app, staging / 'bin' / app.name)
+                seen = {'ETC/MOTD'} | {'BIN/' + app.name.upper() for app in args.bin}
+                if args.sys_bin:
+                    target = 'SYS/' + args.sys_bin.name.upper()
+                    check_collision(target, seen)
+                    (staging / 'SYS').mkdir()
+                    shutil.copyfile(args.sys_bin, staging / target)
                 if args.manifest:
-                    seen = {'ETC/MOTD'} | {'BIN/' + app.name.upper() for app in args.bin}
                     for guest, host in json.loads(args.manifest.read_text(), object_pairs_hook=unique_object).items():
                         target = guest.strip('/').upper()
                         check_collision(target, seen)

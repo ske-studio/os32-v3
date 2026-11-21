@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """RH1: real mac99 display through OF capture, detach and plan-D aliases."""
 import argparse
+import hashlib
 import os
 from pathlib import Path
 import re
@@ -80,10 +81,12 @@ def guest(work, elf, mutant):
 
 def main():
     parser = argparse.ArgumentParser(); parser.add_argument('--mutate', action='store_true')
+    parser.add_argument('--build-only', action='store_true')
     args = parser.parse_args()
     cross = Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc'))
-    if not (cross/'bin/powerpc-elf-gcc').is_file() or not Path(ROM).is_file() or any(
-            shutil.which(t) is None for t in ('qemu-system-ppc', 'genisoimage')):
+    if not (cross/'bin/powerpc-elf-gcc').is_file() or (not args.build_only and
+            (not Path(ROM).is_file() or any(shutil.which(t) is None
+             for t in ('qemu-system-ppc', 'genisoimage')))):
         print('SKIP ppc-rh-fb: PPC compiler/QEMU/OpenBIOS/genisoimage unavailable')
         return int(os.environ.get('OS32_REQUIRE_PPC') == '1')
     started = time.monotonic()
@@ -95,13 +98,22 @@ def main():
     boot.PRODUCT = [str(fixture) if p == 'tools/ppc/kboot_boot_guest.c' else p for p in boot.PRODUCT]
     boot.CROSS = str(cross/'bin/powerpc-elf-')
     control = out/'control'; control.mkdir(exist_ok=True)
-    guest(control, boot.build(control), False)
+    elf = boot.build(control)
+    digest = hashlib.sha256(elf.read_bytes()).hexdigest()
+    print('control sha256=' + digest)
+    if not args.build_only:
+        guest(control, elf, False)
     if args.mutate:
         mutation = ('rh-stage-write', 'platform/powermac/rh_observe.c',
                     '    if (!pixels) return;\n    u32 cell', '    return;\n    u32 cell')
         work = out/'no-stage'; work.mkdir(exist_ok=True)
-        guest(work, boot.build(work, mutation=mutation), True)
-    print(f'PASS ppc-rh-fb {time.monotonic()-started:.2f}s')
+        elf = boot.build(work, mutation=mutation)
+        changed = hashlib.sha256(elf.read_bytes()).hexdigest()
+        require(changed != digest, 'distinct stage raster image')
+        print('no-stage sha256=' + changed)
+        if not args.build_only:
+            guest(work, elf, True)
+    print(f'{"BUILT" if args.build_only else "PASS"} ppc-rh-fb {time.monotonic()-started:.2f}s')
     return 0
 
 

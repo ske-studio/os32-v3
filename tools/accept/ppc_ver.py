@@ -74,7 +74,7 @@ def main():
     os.environ.setdefault('SOURCE_DATE_EPOCH', '946684800')
     work = Path(tempfile.mkdtemp(prefix='ppc-ver-', dir=os.environ.get('TMPDIR'))).resolve()
     user = work / 'user'
-    bins = ' '.join(str(user / (name + '.bin')) for name in ('hello', 'fault', 'verprob'))
+    bins = str(user / 'verprob.bin')
     seen = set()
     cases = ('normal', 'invalid-crc', 'ignore-crc', 'drop-pvr', 'absent')
     for case in cases if args.mutate else ('normal',):

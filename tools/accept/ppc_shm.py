@@ -12,6 +12,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT / 'tools'), str(ROOT / 'tools/ppc')]
+import ppc_resource_owner
 
 EXPECTED = {
     'normal': (b'SHM locked store\nSHM OK\n\n', b'0\n'),
@@ -56,6 +57,8 @@ def observe(elf, cpu, evidence, case):
             body = rsh_command(session, '/bin/shmprobe.bin')
             status = rsh_command(session, 'echo $?')
             require((body, status) == EXPECTED[case], repr((case, body, status)))
+        if case == 'normal':
+            ppc_resource_owner.verify(session)
         session.q.call('quit')
         session.p.wait(timeout=5)
         require(session.p.returncode == 0, 'SHM QEMU exit')
@@ -96,7 +99,7 @@ def main():
     work = Path(tempfile.mkdtemp(prefix='ppc-shm-', dir=os.environ.get('TMPDIR')))
     print('evidence=' + str(work), flush=True)
     user = work / 'user'
-    bins = [str(user / (app + '.bin')) for app in ('hello', 'fault', 'shmprobe')]
+    bins = [str(user / (app + '.bin')) for app in ('shmprobe',)]
     options = ['KBOOT_SH=1', 'KBOOT_LINK=1', 'KB_SH_OUT=' + str(user),
                'KB_ROOT_BINS=' + ' '.join(bins)]
     cases = tuple(EXPECTED) if args.mutate else ('normal',)
@@ -106,7 +109,11 @@ def main():
         folder.mkdir()
         kernel = folder / 'kernel'
         mutation = []
-        if case == 'skip-free':
+        if case == 'normal':
+            mutation = ppc_resource_owner.instrument(
+                folder, 'mm/shm.c', 'shm_block_owner[start + i] = res_owner_get();',
+                'shm_block_owner[start + i]')
+        elif case == 'skip-free':
             # Keep the boot-time kernel SHM round trip intact. The guest
             # must reach its own free before the mutation affects capacity.
             mutation = mutant_settings(folder, case, 'mm/shm.c',

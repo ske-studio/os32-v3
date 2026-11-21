@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the PowerPC USER shell and verify its guarded OS32X image."""
+"""Build the PowerPC resident shell and verify its guarded OS32X image."""
 import os
 from pathlib import Path
 import shutil
@@ -14,7 +14,7 @@ import os32x_hdr as hdr
 
 
 def build(root):
-    result = subprocess.run(['make', '-j1', 'ARCH=ppc', 'PLATFORM=powermac', 'sh'],
+    result = subprocess.run(['make', '-j1', 'ARCH=ppc', 'PLATFORM=powermac', 'shell'],
                             cwd=root, capture_output=True, text=True)
     out = root / 'build/out/ppc-user'
     return result, out
@@ -23,14 +23,14 @@ def build(root):
 def exercise(root):
     result, out = build(root)
     assert result.returncode == 0, result.stdout + result.stderr
-    elf = hdr.Elf32(out / 'sh.elf')
-    fields = struct.unpack('<16I', (out / 'sh.bin').read_bytes()[:64])
-    assert fields[3] & 0x40 and fields[10] == 0x80100000
+    elf = hdr.Elf32(out / 'shell.elf')
+    fields = struct.unpack('<16I', (out / 'shell.bin').read_bytes()[:64])
+    assert fields[3] & 0x40 and fields[10] == hdr.OS32X_SHELL_LOAD_ADDR
     assert fields[10] + fields[4] == elf.e_entry == elf.symbols['_start']
-    nm = subprocess.run([(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc') + '/bin/powerpc-elf-nm'), '-u', out / 'sh.elf'],
+    nm = subprocess.run([(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc') + '/bin/powerpc-elf-nm'), '-u', out / 'shell.elf'],
                         capture_output=True, text=True, check=True)
     assert not nm.stdout.strip(), nm.stdout
-    assert (out / 'sh.inputs.json').is_file()
+    assert (out / 'shell.inputs.json').is_file()
 
 
 def main():
@@ -53,8 +53,8 @@ def main():
             shutil.rmtree(root / 'build/out/ppc-user')
             result, out = build(root)
             assert result.returncode != 0 and 'missing validated link inputs' in result.stderr
-            assert (out / 'sh.elf').is_file() and (out / 'sh.raw').is_file()
-            assert not (out / 'sh.inputs.json').exists()
+            assert (out / 'shell.elf').is_file() and (out / 'shell.raw').is_file()
+            assert not (out / 'shell.inputs.json').exists()
             print('PPC sh unguarded link: RED (1)')
     print('PPC sh build: OK')
 

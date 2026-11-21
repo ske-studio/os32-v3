@@ -10,7 +10,7 @@ CHECK = dict(env=['ppc-cross', 'qemu-ppc'], name='arch-ctx-guest', tier=2, budge
                      'tools/ppc/kboot_run.py', 'tools/ppc/run.py',
                      'tools/checks/arch-ctx-guest.py', 'platform/powermac/ppc_kernel.c', 'mm/**', 'lib/**', 'build/arch/ppc.mk', 'tools/*.py', 'tools/ppc/**'],
              # Origin: ARCH_CTX_DESIGN AC-CTX-1..7 and its W4e acceptance row (PPC QEMU; x86 は NP21/W で PASS 2026-11-15).
-             basis=['AC-CTX-1', 'AC-CTX-2', 'AC-CTX-5', 'AC-CTX-6', 'AC-CTX-7'])
+             basis=['docs/tasks/ppc/TASK_PPC_ALIGN_X86.md B03/B09/B15', 'AC-CTX-1', 'AC-CTX-2', 'AC-CTX-5', 'AC-CTX-6', 'AC-CTX-7'])
 def run(ctx):
     import os
     import subprocess

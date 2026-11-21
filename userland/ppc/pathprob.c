@@ -31,8 +31,8 @@ int main(int argc, char **argv, KernelAPI *api)
 
     /* VFS resolves relative opens against its own cwd. */
     api->path_set_cwd("/bin");
-    api->path_parse("hello.bin", &parsed);
-    if (strcmp(parsed.drive, "rd0") || strcmp(parsed.path, "hello.bin"))
+    api->path_parse("pathprob.bin", &parsed);
+    if (strcmp(parsed.drive, "rd0") || strcmp(parsed.path, "pathprob.bin"))
         return report(api, "PATH parse failed\n", 3);
     fd = api->sys_open(parsed.path, O_RDONLY);
     if (fd < 0)

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """S-D: persistent /host, bounded absence and guest-only restart on mac99."""
 import argparse
+import hashlib
 import io
 import os
 from pathlib import Path
@@ -232,7 +233,7 @@ def link_settings(work, mutation=False):
     text = user.read_text()
     text = link.replace_once(text, '    if (!strcmp(line, "p3-fault"))',
                              '    static int p5_fd = -1;\n    if (!strcmp(line, "p3-fault"))')
-    text = link.replace_once(text, '    } else (void)execute_command(line);', r'''    } else if (!strcmp(line, "p5-hold")) {
+    text = link.replace_once(text, '    } else accepting = rsh_lan_execute(line);', r'''    } else if (!strcmp(line, "p5-hold")) {
         p5_fd = g_api->sys_open("/host/rw/f", KAPI_O_RDONLY);
         g_api->kprintf(7, "%s\n", p5_fd >= 0 ? "held" : "open failed");
     } else if (!strcmp(line, "p5-stale")) {
@@ -252,7 +253,7 @@ def link_settings(work, mutation=False):
         if (src >= 0) g_api->sys_close(src);
         if (dst >= 0) g_api->sys_close(dst);
         g_api->kprintf(7, "%s\n", ok && n == 0 ? "copied" : "copy failed");
-    } else (void)execute_command(line);''')
+    } else accepting = rsh_lan_execute(line);''')
     user.write_text(text)
     if mutation:
         path, before, after = LINK_NONCE
@@ -401,7 +402,8 @@ def link_accept(elf, cpu, out, mutation='normal'):
 def link_main(args):
     import link_sh_run as link
     missing = [x for x in (link.cross('gcc'), link.cross('nm'), 'qemu-system-ppc', 'genisoimage') if not shutil.which(x)]
-    if not link.ROM.is_file(): missing.append(str(link.ROM))
+    if args.build_only: missing = [x for x in missing if x not in ('qemu-system-ppc', 'genisoimage')]
+    elif not link.ROM.is_file(): missing.append(str(link.ROM))
     if missing:
         print('SKIP link S-D: unavailable '+', '.join(missing))
         return int(os.environ.get('OS32_REQUIRE_PPC') == '1')
@@ -411,7 +413,7 @@ def link_main(args):
                 with socket.socket(socket.AF_INET, kind) as probe: probe.bind(('127.0.0.1', 0))
         except OSError as exc:
             print('未 link S-D: AF_INET unavailable: '+str(exc)); return 3
-    base = Path(os.environ['TMPDIR'])/'sd-link'; base.mkdir(parents=True, exist_ok=True)
+    base = Path(tempfile.gettempdir())/'sd-link'; base.mkdir(parents=True, exist_ok=True)
     work = Path(tempfile.mkdtemp(prefix='run-', dir=base)); print('evidence='+str(work), flush=True)
     control = work/'normal'; control.mkdir()
     elf = build(control/'kernel', *link_settings(control))
@@ -424,6 +426,7 @@ def link_main(args):
         mutant = work/'no-boot-follow'; mutant.mkdir()
         changed = build(mutant/'kernel', *link_settings(mutant, True))
         link.check_map(changed.with_suffix('.map'))
+        assert hashlib.sha256(changed.read_bytes()).digest() != hashlib.sha256(elf.read_bytes()).digest()
         if not args.build_only:
             for name, image, expected in (('no-boot-follow', changed, 'restart write'),
                                            ('tmp-target', elf, 'restart persistence')):
@@ -438,37 +441,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--cpu', choices=['7450', '7455', 'both'], default='both')
     parser.add_argument('--mutate', action='store_true')
-    parser.add_argument('--link', action='store_true', help='use link-SH; retain PLN1 default')
+    parser.add_argument('--link', action='store_true', help='use the product RSH transport')
     parser.add_argument('--build-only', action='store_true', help='build link acceptance copies without sockets')
     args = parser.parse_args()
-    if args.link:
-        return link_main(args)
-    if args.build_only: parser.error('--build-only requires --link')
-    try:
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
-            probe.bind(('127.0.0.1', 0))
-    except PermissionError:
-        print('SKIP LAN S-D: AF_INET unavailable (normal and mutations)')
-        return 3 if os.environ.get('OS32_REQUIRE_PPC') == '1' else 0
-    base = Path(os.environ['TMPDIR'])/'sd-run'; base.mkdir(parents=True, exist_ok=True)
-    work = Path(tempfile.mkdtemp(prefix='run-', dir=base))
-    print('evidence='+str(work), flush=True)
-    elf = build(work/'product', 'KBOOT_SH=1', 'KBOOT_LINK=0')
-    cpus = ['7450', '7455'] if args.cpu == 'both' else [args.cpu]
-    for cpu in cpus: accept(elf, cpu, work/cpu)
-    if args.mutate:
-        # The guest's per-boot SFS nonce (boot_token CRC32) is the protection
-        # now; the host's PLN1 fs.reset is a second one. no-boot-follow removes
-        # both: the host keeps boot1 FS state (accept) and this private product
-        # copy restarts the nonce at 1 every boot, as before 41728e43.
-        follow = work/'no-boot-follow'; follow.mkdir()
-        fixed_nonce = build(follow/'kernel', 'KBOOT_SH=1', 'KBOOT_LINK=0', *mutant_settings(
-            follow, 'fixed-nonce', 'fs/serialfs/serialfs_persistent.c',
-            'nonce = sfs_crc32(token, sizeof(token));',
-            'nonce = 0; (void)token;'))
-        accept(fixed_nonce, cpus[0], follow/'guest', 'no-boot-follow')
-        accept(elf, cpus[0], work/'tmp-target', 'tmp-target')
-    return 0
+    return link_main(args)
 
 
 if __name__ == '__main__':

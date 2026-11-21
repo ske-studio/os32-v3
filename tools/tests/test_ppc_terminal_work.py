@@ -142,9 +142,9 @@ def main():
     for image, expected in [(['KBOOT_SH=1', 'KBOOT_LINK=0'], True), (['KBOOT_LINK=1'], False)]:
         manifest = subprocess.check_output(['make', '-s', 'ARCH=ppc', 'PLATFORM=powermac', *image,
             '--eval=work-manifest:;@echo $(KB_C)', 'work-manifest'], cwd=ROOT, text=True).split()
-        assert ('platform/powermac/terminal_input.c' in manifest) == expected
+        assert 'platform/powermac/terminal_input.c' not in manifest
         assert 'net/nic.c' in manifest  # idle_wait_step uses the common RX predicate.
-        assert ('net/link.c' in manifest) != expected
+        assert 'net/link.c' in manifest
         assert ('platform/powermac/usb_boot.c' in manifest) == expected
     boot = (ROOT / 'platform/powermac/ppc_kernel.c').read_text()
     # Select the PLN1 branch, then match the complete ordered startup block.

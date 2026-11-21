@@ -14,6 +14,7 @@ enum ppc_trap_reason {
     PPC_TRAP_FP_UNAVAILABLE,
     PPC_TRAP_UNSUPPORTED = 0x100
 };
+void ppc_trap_set_resident_fault(void (*handler)(struct ppc_frame *));
 void ppc_trap_set_handler(u32 vector, void (*handler)(struct ppc_frame *));
 #define PM_DEC_HZ 1000u   /* Physical DEC rate (1ms). */
 /* Boot CPU, EE=0. Success arms DEC before the caller may enable EE.

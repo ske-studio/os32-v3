@@ -11,6 +11,7 @@ void display_provider_public_init_ok(void);
 /* Called at the end of gfx_shutdown to put the text console back on the OF framebuffer.
  * Normal context only. Allocation, drawing and logging are permitted. */
 void display_provider_console_return(void);
+int display_provider_console_owns_scanout(void);
 /* Called from exec exit notification before returning display ownership.
  * Normal context only. Allocation, drawing and logging are permitted. */
 void display_provider_owner_exit(int id);

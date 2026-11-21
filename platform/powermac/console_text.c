@@ -79,6 +79,13 @@ int pm_console_text_start(void)
     return rc;
 }
 
+int display_provider_console_owns_scanout(void)
+{
+    struct gfx2_adapter *a = gfx2_active();
+    return pm_console_text_ready() && a && target.sid && target.head < a->heads &&
+           a->head[target.head].scan_sid == target.sid;
+}
+
 void display_provider_console_return(void)
 {
     if (!pm_text_was_up || pm_console_text_ready()) return;

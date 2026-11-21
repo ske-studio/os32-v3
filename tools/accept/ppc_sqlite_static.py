@@ -65,7 +65,6 @@ def main():
     os.environ.setdefault('SOURCE_DATE_EPOCH', '946684800')
     work = Path(tempfile.mkdtemp(prefix='ppc-sqlite-static-', dir=os.environ.get('TMPDIR'))).resolve()
     user = work / 'user'
-    bins = ' '.join(str(user / (name + '.bin')) for name in ('hello', 'fault'))
     seen = set()
     cases = ['normal', 'probe']
     if args.mutate:
@@ -86,7 +85,7 @@ def main():
             extra = mutant_settings(folder, case, 'fs/ramfs/ramfs.c', anchor, failure)
             settings.extend(item.replace('KB_MUT_', 'KB_MUT_EXTRA_', 1) for item in extra)
         elf = build(kernel, 'IMAGE=kboot-link-sh', 'KB_SH_OUT=' + str(user),
-                    'KB_ROOT_BINS=' + bins, *settings, 'kb-user', 'kernel')
+                    *settings, 'kb-user', 'kernel')
         digest = hashlib.sha256(elf.read_bytes()).hexdigest()
         assert digest not in seen, (case, digest)
         seen.add(digest)

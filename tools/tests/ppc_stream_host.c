@@ -7,7 +7,7 @@
 #include "arch/ppc/kernel_boot.h"
 static struct ppc_boot_devices devices;
 static const ConOutputOps *output;
-int boot_serial_mirror, rshell_active, pm_log_stream_only;
+int boot_serial_mirror, rshell_active;
 static unsigned delivered, serial_bytes, log_bytes, depth, max_depth, clears;
 static int bad;
 static char tail[7];

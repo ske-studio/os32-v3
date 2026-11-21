@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """PPC MMU acceptance; artifacts only below build/out/ppc, no BSD checkout needed."""
 import argparse
+import hashlib
 import os
 from pathlib import Path
 import re
@@ -99,12 +100,17 @@ def main():
     p=argparse.ArgumentParser()
     p.add_argument('--stage',choices=['A','B','C'],default='C')
     p.add_argument('--mutate',action='store_true')
+    p.add_argument('--build-only', action='store_true')
     p.add_argument('--mode',type=int,default=0)
     p.add_argument('--timeout',type=int,default=30)
     p.add_argument('--cross-dir',type=Path,default=Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc')))
     a=p.parse_args()
     out=ROOT/'build/out/ppc';out.mkdir(parents=True,exist_ok=True)
     (out/'mmu-build.log').write_text(build(ROOT,a.cross_dir,a.stage,a.mode))
+    if a.build_only:
+        print('control', *image_hashes(ROOT))
+        if a.mutate: mutate(a)
+        return
     print(host(ROOT),end='')
     print(static(ROOT,a.cross_dir),end='')
     print(api_rejection(ROOT,a.cross_dir),end='')
@@ -236,13 +242,20 @@ def detector(root,a,kind):
     return qemu(root,a.cross_dir,a.timeout,'C')
 
 
+def image_hashes(root):
+    return tuple(hashlib.sha256((root/'build/out/ppc'/name).read_bytes()).hexdigest()
+                 for name in ('PPCBOOT.ELF', 'PPCMMU.ELF'))
+
+
 def mutate(a):
     import json
     out=ROOT/'build/out/ppc/mmu-mutations'
     results=[]
+    seen = {image_hashes(ROOT)} if a.build_only else set()
     for name,file,before,after,kind in MUTATIONS:
-        print('mutation '+name+': GREEN control',flush=True)
-        detector(ROOT,a,kind)
+        if not a.build_only:
+            print('mutation '+name+': GREEN control',flush=True)
+            detector(ROOT,a,kind)
         dest=out/name;dest.mkdir(parents=True,exist_ok=True)
         for directory in ('arch/ppc','platform/powermac','tools/ppc','include','lib'):
             shutil.copytree(ROOT/directory,dest/directory,dirs_exist_ok=True,ignore=shutil.ignore_patterns('__pycache__'))
@@ -253,12 +266,19 @@ def mutate(a):
         product.write_text(source.replace(before,after))
         (dest/'mutation.json').write_text(json.dumps((name,file,before,after,kind),indent=2))
         (dest/'build.log').write_text(build(dest,a.cross_dir))
+        if a.build_only:
+            digests = image_hashes(dest)
+            require(digests not in seen, 'duplicate MMU mutation: '+name)
+            seen.add(digests)
+            print(name, *digests, flush=True)
+            continue
         try: detector(dest,a,kind)
         except CriterionFailure as exc: (dest/'red.log').write_text(str(exc)+'\n')
         else: raise RuntimeError('mutation survived '+name)
         detector(ROOT,a,kind)
         results.append((name,file,before,after,kind,'GREEN/RED/GREEN'))
         print('mutation '+name+': GREEN/RED/GREEN (build rc=0)',flush=True)
-    (out/'mutations.json').write_text(json.dumps(results,indent=2))
+    if not a.build_only:
+        (out/'mutations.json').write_text(json.dumps(results,indent=2))
 
 if __name__=="__main__": main()

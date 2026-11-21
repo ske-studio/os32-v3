@@ -62,9 +62,11 @@ def observe(elf, cpu, evidence, case):
         if case == 'normal':
             require(b'PCI OK\n' in body and status == b'0\n', repr((body, status)))
             check_domain(session, body)
+            session.close_rshell()
             session.keys('echo usb\n')
             session.wait(lambda: re.search(r'(?m)^usb *$', session.screen('usb')),
                          'USB keyboard after PCI probe', 15)
+            session.open_rshell()
             rsh_command(session, 'echo lan', b'lan\n')
         else:
             marker, code = ((b'PCI config failed\n', b'3\n') if case == 'bus-shift'
@@ -99,7 +101,7 @@ def main():
     work = Path(tempfile.mkdtemp(prefix='ppc-pci-', dir=os.environ.get('TMPDIR') or None)).resolve()
     print('evidence=' + str(work), flush=True)
     user = work / 'user'
-    bins = [str(user / (app + '.bin')) for app in ('hello', 'fault', 'pciprob')]
+    bins = [str(user / 'pciprob.bin')]
     options = ['IMAGE=kboot-link-sh', 'KB_SH_OUT=' + str(user),
                'KB_ROOT_BINS=' + ' '.join(bins)]
     images = {}

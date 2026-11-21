@@ -10,7 +10,7 @@ sys.path[:0] = [str(ROOT/'tools/ppc'), str(ROOT/'tools')]
 import usb_run
 
 CHECK = dict(name='ppc-usb-link-meter', tier=1, budget=10, needs=['make:ppc-ci-image'],
-    covers=['tools/tests/test_ppc_usb_link.py', 'tools/ppc/usb_run.py',
+    covers=['exec/exec.c', 'tools/accept/ppc_shell_flow.inc', 'userland/shell/main.c', 'userland/shell/rshell.c', 'tools/tests/test_ppc_usb_link.py', 'tools/ppc/usb_run.py',
             'tools/ppc/kboot_accept.py', 'tools/ppc/kboot_run.py',
             'tools/ppc/run.py', 'tools/ppc/kboot_mutations.py',
             'platform/powermac/**', 'arch/ppc/**', 'platform/powermac/ppc_kernel.c',

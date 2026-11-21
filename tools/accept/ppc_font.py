@@ -5,7 +5,6 @@ import hashlib
 import json
 import os
 from pathlib import Path
-import subprocess
 import sys
 import tempfile
 
@@ -43,6 +42,30 @@ def observe(elf, cpu, evidence, case):
         session.close()
 
 
+def settings(work):
+    # Keep the product font for fbcon. The lease fixture only needs the two
+    # JIS rows spanning the nonzero offset of the reference glyph.
+    from gen_font16 import build_ebdt_payload
+    payload = build_ebdt_payload(ROOT / 'assets/fonts/JF-Dot-Shinonome16.ttf')
+    row_bytes = 94 * 32
+    first_row = (0x2f - 0x21) * row_bytes
+    font = work / 'jisrows.bin'
+    font.write_bytes(payload[first_row:first_row + 2 * row_bytes])
+    manifest = json.loads((ROOT / 'build/ppc-ram-root.json').read_text())
+    # The image rule tracks the resident shell selected by KB_SH_OUT.
+    del manifest['/sys/shell.bin']
+    manifest['/fonts/jisrows.bin'] = str(font)
+    manifest_path = work / 'root.json'
+    manifest_path.write_text(json.dumps(manifest))
+
+    user = work / 'user'
+    # The probe formats integer status codes only.
+    return ['IMAGE=kboot-link-sh', 'PPC_USER_FLOAT=', f'KB_SH_OUT={user}',
+            f'KB_ROOT_BINS={user / "fontprob.bin"}',
+            f'ROOT_MANIFEST={manifest_path}',
+            'ROOT_DEPS=' + ' '.join(manifest.values())]
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--build-only', action='store_true')
@@ -58,20 +81,7 @@ def main():
 
     work = Path(tempfile.mkdtemp(prefix='ppc-font-')).resolve()
     print(f'evidence={work}', flush=True)
-    font = work / 'shino16.kcg'
-    subprocess.run([sys.executable, '-B', 'tools/gen_font16.py', '--ebdt',
-                    'assets/fonts/JF-Dot-Shinonome16.ttf', str(font), '--no-lz4'],
-                   cwd=ROOT, check=True)
-    manifest = json.loads((ROOT / 'build/ppc-ram-root.json').read_text())
-    manifest['/fonts/shino16.kcg'] = str(font)
-    manifest_path = work / 'root.json'
-    manifest_path.write_text(json.dumps(manifest))
-
-    user = work / 'user'
-    options = ['IMAGE=kboot-link-sh', f'KB_SH_OUT={user}',
-               f'KB_ROOT_BINS={user / "fontprob.bin"}',
-               f'ROOT_MANIFEST={manifest_path}',
-               'ROOT_DEPS=' + ' '.join(manifest.values())]
+    options = settings(work)
     images = {}
     for case in CASES if args.mutate else ('normal',):
         folder = work / case

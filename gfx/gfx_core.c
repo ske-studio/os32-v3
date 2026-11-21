@@ -375,6 +375,8 @@ void gfx_shutdown(void)
     gfx_started = 0;
     gfx_policy_reeval();
     gfx_reinit_surfaces(0);
+    /* Revoke v1 leases even when the console already owns the live scanout. */
+    if (display_provider_console_owns_scanout()) goto rebind;
     /* 表示出力を戻し (leave)、バックエンドのハードウェア終了処理へ。
      * 9801 では leave は空、shutdown がフリップ解除 + GDC 表示停止を行う
      * (旧 gfx_shutdown の本体は backend_pc98.c の pc98_shutdown に移設)。 */
@@ -391,6 +393,7 @@ void gfx_shutdown(void)
     }
     struct gfx2_adapter *a = gfx2_active();
     if (a) for (u32 h = 0; h < a->heads; h++) gfx2_head_detach(a, h);
+rebind:
     gfx_reinit_surfaces(1);
     display_provider_console_return();
 }

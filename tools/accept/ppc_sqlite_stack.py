@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """期待の出所: PPC_SQLITE_STACK_DESIGN §6 / PPC_FP_NEWLIB_DESIGN §8 S1."""
 import argparse
+import hashlib
 import os
 from pathlib import Path
 import re
@@ -195,9 +196,12 @@ def observe(out, image, cpu, case):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--mutate', action='store_true')
+    parser.add_argument('--build-only', action='store_true')
     args = parser.parse_args()
     missing = [t for t in (CC, str(CROSS) + 'nm', 'qemu-system-ppc', 'genisoimage') if not shutil.which(t)]
-    if not ROM.is_file():
+    if args.build_only:
+        missing = [tool for tool in missing if tool != 'qemu-system-ppc']
+    elif not ROM.is_file():
         missing.append(str(ROM))
     if missing:
         required = os.environ.get('OS32_REQUIRE_PPC') == '1'
@@ -213,7 +217,9 @@ def main():
     objects = {name: compile_object(normal_out, name, ROOT / name) for name in SOURCES}
     normal = link_image(normal_out, objects)
     cpus = ('7450', '7455')
-    for cpu in cpus:
+    digests = {hashlib.sha256((normal_out/'SSTACK.ELF').read_bytes()).hexdigest()}
+    print('normal', next(iter(digests)), flush=True)
+    for cpu in (() if args.build_only else cpus):
         observe(normal_out / cpu, normal, cpu, 'normal')
     if args.mutate:
         for case, name, anchor, replacement in MUTATIONS:
@@ -224,7 +230,11 @@ def main():
             require(original.count(anchor) == 1, f'{case}: mutation anchor must be unique')
             source.write_text(original.replace(anchor, replacement))
             image = link_image(out, {**objects, name: compile_object(out, name, source)})
-            for cpu in cpus:
+            digest = hashlib.sha256((out/'SSTACK.ELF').read_bytes()).hexdigest()
+            require(digest not in digests, 'distinct sqlite stack image')
+            digests.add(digest)
+            print(case, digest, flush=True)
+            for cpu in (() if args.build_only else cpus):
                 observe(out / cpu, image, cpu, case)
                 observe(out / (cpu + '-control'), normal, cpu, 'normal')
         check_type_mutations(work)

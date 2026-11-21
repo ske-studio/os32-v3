@@ -88,7 +88,7 @@ def main():
     work = Path(tempfile.mkdtemp(prefix='ppc-boot-info-', dir=os.environ.get('TMPDIR') or None)).resolve()
     print('evidence=' + str(work), flush=True)
     user = work / 'user'
-    bins = [str(user / (app + '.bin')) for app in ('hello', 'fault', 'bootprob')]
+    bins = [str(user / 'bootprob.bin')]
     options = ['IMAGE=kboot-link-sh', 'KB_SH_OUT=' + str(user),
                'KB_ROOT_BINS=' + ' '.join(bins)]
     cases = ['verified', 'unverified']

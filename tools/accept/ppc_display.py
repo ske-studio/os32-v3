@@ -110,6 +110,9 @@ def present_pixels(s, evidence, case, serial, modes):
                     return base and physical_word(base) == (
                         0x50524200 + ord(phase))
                 s.wait(waiting, f'{mode} checkpoint {phase}')
+                require(s.word('g_cur') == 2 and s.word('cur_res_owner') == 2 and
+                        s.word('exec_nest_level') == 2 and s.word('g_cur_app') != 0,
+                        'running display child owns slot 2')
                 name = f'{mode}-{phase}'
                 path = evidence / (name + '.ppm')
                 if (mode == 'shutdown' and not case.startswith('target-') and
@@ -209,8 +212,8 @@ def main():
     work = Path(tempfile.mkdtemp(prefix='ppc-display-', dir=os.environ.get('TMPDIR') or None)).resolve()
     print('evidence=' + str(work), flush=True)
     user = work / 'user'
-    bins = [str(user / (app + '.bin')) for app in ('hello', 'fault', 'dispprb')]
-    options = ['IMAGE=kboot-link-sh', 'KB_SH_OUT=' + str(user),
+    bins = [str(user / (app + '.bin')) for app in ('hello', 'dispprb')]
+    options = ['IMAGE=kboot-link-sh', 'KBOOT_USB_KEY_TRACE=1', 'PPC_USER_FLOAT=', 'KB_SH_OUT=' + str(user),
                'KB_ROOT_BINS=' + ' '.join(bins)]
     os.environ.setdefault('SOURCE_DATE_EPOCH', '946684800')
     images = {}

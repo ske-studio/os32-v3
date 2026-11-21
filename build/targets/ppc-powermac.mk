@@ -10,8 +10,7 @@ KB_OBJCOPY := $(PPC_CROSS_DIR)/bin/powerpc-elf-objcopy
 KB_NM := $(PPC_CROSS_DIR)/bin/powerpc-elf-nm
 KB_OBJDUMP := $(PPC_CROSS_DIR)/bin/powerpc-elf-objdump
 KBOOT_TERM ?= lan
-# Extra applications belong to an explicitly separate test image.
-KB_ROOT_BINS ?= $(KB_SH_OUT)/hello.bin $(KB_SH_OUT)/fault.bin
+KB_ROOT_BINS ?=
 KB_EXEC := $(filter 1,$(KBOOT_SHELL) $(KBOOT_SH))
 KB_OUT ?= build/out/ppc-kboot$(if $(filter 1,$(KBOOT_LINK)),/$(if $(filter 1,$(KBOOT_SH)),link-sh,link),$(if $(filter 1,$(KBOOT_SHELL)),/shell,$(if $(filter 1,$(KBOOT_SH)),/sh,$(if $(filter-out 0,$(NEGATIVE)),/neg$(NEGATIVE)))))
 KB_ELF := $(KB_OUT)/PPCKERN.ELF
@@ -20,12 +19,22 @@ ROOT_ISO := $(KB_OUT)/root.iso
 ROOT_BLOB := $(KB_OUT)/root_image_blob.o
 ROOT_MOTD := $(KB_OUT)/motd.txt
 KB_SH_OUT := build/out/ppc-user$(if $(filter 1,$(KBOOT_LINK)),/link-sh)
-ROOT_BINS = $(KB_ROOT_BINS) $(if $(filter 1,$(KBOOT_SH)),$(KB_SH_OUT)/sh.bin)
+ROOT_BINS = $(KB_ROOT_BINS)
+KB_ROOT_SHELL = $(KB_SH_OUT)/shell.bin
 ROOT_OBJCOPY := $(KB_OBJCOPY)
 ROOT_ELF_FORMAT := elf32-powerpc
 ROOT_CPU := powerpc
 ROOT_MANIFEST ?= build/ppc-ram-root.json
-ROOT_DEPS ?= assets/fonts/shino16.kcgfont assets/fonts/JF-Dot-Shinonome16-LICENSE.txt build/out/unicode.bin
+ROOT_DEPS ?= assets/fonts/shino16.kcgfont assets/fonts/JF-Dot-Shinonome16-LICENSE.txt build/out/unicode.bin $(KB_ROOT_SHELL)
+# Acceptance builds use a private resident binary (including source mutants).
+ifneq ($(KB_SH_OUT),build/out/ppc-user/link-sh)
+KB_ROOT_TEMPLATE := $(ROOT_MANIFEST)
+override ROOT_MANIFEST := $(KB_OUT)/root-manifest.json
+$(ROOT_MANIFEST): $(KB_ROOT_TEMPLATE) $(KB_ROOT_SHELL) build/targets/ppc-powermac.mk
+	@mkdir -p $(@D)
+	python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); d["/sys/shell.bin"]=sys.argv[2]; print(json.dumps(d))' "$<" "$(KB_ROOT_SHELL)" > $@.tmp
+	mv $@.tmp $@
+endif
 
 # RAW fixture: byte at offset i is i modulo 256 (320 sectors of 512 bytes).
 PPC_LOOP_SAMPLE ?= build/out/ppc-loop/sample.img
@@ -42,6 +51,14 @@ build/out/unicode.bin: tools/gen_unicode.c lib/unicode_jis_table.h kernel/consol
 	$(dir $@)gen_unicode --pairs $@
 
 include build/ram-root.mk
+
+# Rebuild when changing which application paths are installed.
+$(ROOT_ISO): $(KB_ROOT_SHELL) $(KB_OUT)/root-shell.config
+.PHONY: force-root-shell-config
+$(KB_OUT)/root-shell.config: force-root-shell-config
+	@mkdir -p $(@D)
+	@printf '%s\n' '$(ROOT_MANIFEST) $(KB_ROOT_SHELL) $(ROOT_BINS)' > $@.tmp
+	@if cmp -s $@.tmp $@; then rm $@.tmp; else mv $@.tmp $@; fi
 
 # Entry objects first (kernel.ld keeps .text.entry at the image start).
 KB_ASM := $(GAS_KERNEL)
@@ -201,6 +218,31 @@ KB_MUT_EXTRA_FILE ?=
 KB_MUT_THIRD_SRC ?=
 KB_MUT_THIRD_FILE ?=
 kb_src = $(if $(and $(KB_MUT_SRC),$(filter $(KB_MUT_SRC),$1)),$(KB_MUT_FILE) -I$(dir $1),$(if $(filter $(KB_MUT_EXTRA_SRC),$1),$(KB_MUT_EXTRA_FILE) -I$(dir $1),$(if $(filter $(KB_MUT_THIRD_SRC),$1),$(KB_MUT_THIRD_FILE) -I$(dir $1),$1)))
+.PHONY: ppc-layout-force
+$(KB_OUT)/config/shell-layout.flags: ppc-layout-force
+	@mkdir -p $(@D)
+	@echo '$(filter 1,$(KBOOT_SHELL_LAYOUT_DIAG))' > $@.tmp
+	@if cmp -s $@.tmp $@; then rm -f $@.tmp; else mv $@.tmp $@; fi
+$(KB_OUT)/platform/powermac/ppc_kernel.o: $(KB_OUT)/config/shell-layout.flags
+ifeq ($(KBOOT_SHELL_LAYOUT_DIAG),1)
+$(KB_OUT)/platform/powermac/ppc_kernel.o: private KB_TU_FLAGS += -DKBOOT_SHELL_LAYOUT_DIAG=1
+endif
+$(KB_OUT)/config/usb-key-trace.flags: ppc-layout-force
+	@mkdir -p $(@D)
+	@echo '$(filter 1,$(KBOOT_USB_KEY_TRACE))' > $@.tmp
+	@if cmp -s $@.tmp $@; then rm -f $@.tmp; else mv $@.tmp $@; fi
+$(KB_OUT)/platform/powermac/usb_platform.o: $(KB_OUT)/config/usb-key-trace.flags
+ifeq ($(KBOOT_USB_KEY_TRACE),1)
+$(KB_OUT)/platform/powermac/usb_platform.o: private KB_TU_FLAGS += -DKBOOT_USB_KEY_TRACE=1
+endif
+$(KB_OUT)/config/gem-rx-diag.flags: ppc-layout-force
+	@mkdir -p $(@D)
+	@echo '$(filter 1,$(KBOOT_GEM_RX_DIAG))' > $@.tmp
+	@if cmp -s $@.tmp $@; then rm -f $@.tmp; else mv $@.tmp $@; fi
+$(KB_OUT)/platform/powermac/nic_gem.o $(KB_OUT)/platform/powermac/lan_gem_io.o: $(KB_OUT)/config/gem-rx-diag.flags
+ifeq ($(KBOOT_GEM_RX_DIAG),1)
+$(KB_OUT)/platform/powermac/nic_gem.o $(KB_OUT)/platform/powermac/lan_gem_io.o: private KB_TU_FLAGS += -DKBOOT_GEM_RX_DIAG=1
+endif
 $(KB_OUT)/lib/lz4.o: KB_TU_FLAGS += -O0
 $(KB_OUT)/kernel/console/console.o: KB_TU_FLAGS = -Wno-sign-compare
 $(KB_OUT)/%.o: %.c $(KB_OUT)/memmap_layout.h build/targets/ppc-powermac.mk build/sources/hooks.mk $(KB_MUT_FILE) $(KB_MUT_EXTRA_FILE) $(KB_MUT_THIRD_FILE)
@@ -254,10 +296,10 @@ include build/ppc-user.mk
 # 替えて同じ Makefile を呼ぶ (呼ばれた側は置き場が一致するので、そのまま組む)。
 .PHONY: kb-user
 ifeq ($(KB_SH_OUT),$(PPC_USER_OUT))
-kb-user: $(ROOT_BINS)
+kb-user: $(ROOT_BINS) $(KB_ROOT_SHELL)
 else
 kb-user:
-	$(MAKE) ARCH=ppc PLATFORM=powermac PPC_USER_OUT=$(KB_SH_OUT)$(if $(filter 1,$(KBOOT_LINK)), PPC_SH_PROFILE=userland/ppc/sh/link_profile.h) $(ROOT_BINS)
+	$(MAKE) ARCH=ppc PLATFORM=powermac PPC_USER_OUT=$(KB_SH_OUT) $(ROOT_BINS) $(KB_ROOT_SHELL)
 
-$(ROOT_BINS): kb-user
+$(ROOT_BINS) $(KB_ROOT_SHELL): kb-user
 endif

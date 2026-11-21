@@ -28,7 +28,7 @@ gfx_screen_info gfx_set_palette gfx_stats
 gui_call gui_register hdd_geom_info ide_drive_present
 ide_get_info ide_identify ide_init ide_read_sector ide_write_sector
 ide_write_sectors ime_dict_info ime_dict_suspend ime_feed_key ime_get_mode
-ime_getchar ime_getkey ime_is_active ime_set_mode ime_set_render
+ime_getchar ime_is_active ime_set_mode ime_set_render
 ime_switch_dict ime_toggle ime_trygetchar ime_trygetkey ime_user_clear
 ime_user_delete ime_user_export ime_user_list kdebug_call
 np2_check_hostdrv np2_detect
@@ -356,18 +356,46 @@ def absent_db(out, cc, dirs):
     undefined = subprocess.check_output([cc.with_name('powerpc-elf-nm'), '-u', obj], text=True)
     if re.search(r'\bkapi_db_\w+', undefined):
         return 'provider reference'
-    # Run the three real wrapper sections with the Linux/PPC exit syscall.
+    # Run the DB wrappers and the output guard with the Linux/PPC exit syscall.
     probe = out / 'probe.c'
     probe.write_text('''#include "os32_kapi_shared.h"
 extern const char *wrap_db_last_error(int);
 extern u32 wrap_db_mem_used(void);
 extern int wrap_db_open(const char *);
+extern int wrap_ime_getkey(void);
+int input_getkey_kapi(void) { return 0x2b65; }
+extern i32 wrap_mem_stat(i32, void *, u32);
+static u32 output;
+static int user_call;
+static void finish(int rc) __attribute__((noreturn));
+static void finish(int rc)
+{
+    __asm__ volatile("mr 3,%0; li 0,1; sc" : : "r"(rc) : "r3", "r0");
+    __builtin_unreachable();
+}
+int ring3_user_ranges_writable(u32 addr, u32 size, u32 other, u32 length)
+{
+    if (addr != (u32)&output || size != sizeof(output) || other || length) finish(13);
+    return !user_call;
+}
+void ring3_fault_kill(void) { finish(user_call && output == 1 ? 0 : 14); }
+i32 kapi_mem_stat(i32 id, void *out, u32 size)
+{
+    if (id != -1 || out != &output || size != sizeof(output) || user_call) finish(15);
+    ++output;
+    return 7;
+}
 void _start(void)
 {
     int rc = wrap_db_last_error(0) != 0 ? 10 :
              wrap_db_mem_used() != 0 ? 11 :
              wrap_db_open("db") != OS32_ERR_NOSYS ? 12 : 0;
-    __asm__ volatile("mr 3,%0; li 0,1; sc" : : "r"(rc) : "r3", "r0");
+    if (rc) finish(rc);
+    if (wrap_ime_getkey() != 0x2b65) finish(18);
+    if (wrap_mem_stat(-1, &output, sizeof(output)) != 7) finish(16);
+    user_call = 1;
+    wrap_mem_stat(-1, &output, sizeof(output));
+    finish(17);
 }
 ''')
     exe = out / 'probe'

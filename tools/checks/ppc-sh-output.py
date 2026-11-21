@@ -1,6 +1,6 @@
 """Register the PowerPC fd1 stream acceptance."""
 CHECK = dict(env=['ppc-cross', 'qemu-ppc'], name='ppc-sh-output', tier=2, budget=900, needs=['make:ppc-ci-image'],
-             covers=['tools/ppc/link_diag_run.py', 'tools/ppc/link_run.py', 'tools/host_*.py', 'tools/ppc_link_transport.py', 'tools/remote_transport.py', 'tools/host_agent_config.py','tools/ppc_hostfs.py', 'tools/lanfs_host.py', 'tools/serialfs_host.py', 'tools/lan_bridge.py', 'tools/host_image.py', 'build/core.yaml', 'platform/powermac/input_boot.c', 'platform/powermac/shell_boot.c', 'tools/deploy_manifests.py', 'tools/mkpkg.py', 'userland/deploy.yaml', 'platform/powermac/input_decode.c',
+             covers=['arch/ppc/exec_enter.S', 'exec/exec.c', 'tools/accept/ppc_shell_flow.inc', 'platform/powermac/shell_loop_ops.c', 'userland/shell/main.c', 'userland/shell/rshell.c', 'tools/ppc/link_diag_run.py', 'tools/ppc/link_run.py', 'tools/host_*.py', 'tools/ppc_link_transport.py', 'tools/remote_transport.py', 'tools/host_agent_config.py','tools/ppc_hostfs.py', 'tools/lanfs_host.py', 'tools/serialfs_host.py', 'tools/lan_bridge.py', 'tools/host_image.py', 'build/core.yaml', 'platform/powermac/input_boot.c', 'platform/powermac/shell_boot.c', 'tools/deploy_manifests.py', 'tools/mkpkg.py', 'userland/deploy.yaml', 'platform/powermac/input_decode.c',
                      'tools/ppc/sc_run.py', 'userland/ppc/nest.c',
                      'tools/ppc/ppc_sh_output.py', 'userland/ppc/outprobe.c',
                      'platform/powermac/kboot_console.c', 'platform/powermac/console_stream.c',

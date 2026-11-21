@@ -6,6 +6,7 @@
 #define DISPLAY_V1_PRESENT_OK() 1
 #define DISPLAY_V1_PUBLIC_INIT_OK() do { } while (0)
 /* PC-98 のテキスト面は別なので、表示を戻す操作は要らない。 */
+static inline int display_provider_console_owns_scanout(void) { return 0; }
 static inline void display_provider_console_return(void) { }
 
 /* exec の終了通知の通常文脈専用。割り込み・例外からは呼ばない。
