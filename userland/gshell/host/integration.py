@@ -21,6 +21,10 @@ def run(args):
 sys.path.insert(0, str(ROOT / 'tools/tests'))
 import os32api_host
 os32api_host.build(OUT)
+focus_obj = OUT / 'av_focus.o'
+run(['cc', '-std=gnu11', '-Wno-attributes', '-DOS32_HOOK_GUI=0',
+     '-Iexec', '-Ikernel', '-Iinclude', '-Isdk/include/os32',
+     '-c', 'kernel/av_focus.c', '-o', str(focus_obj)])
 # Use the guest build's shared-header reader for the host tests as well.
 run(['rustc', '--edition=2021', str(ROOT/'userland/gshell/build.rs'), '-o', str(OUT/'diag-build')])
 os.environ['OUT_DIR'] = str(OUT)
@@ -62,6 +66,7 @@ def build(gshell: Path, name: str, quiet: bool = False, typical: bool = False) -
     exe = OUT / (name + '-tests')
     args = ['rustc', '--edition=2021', '--test', str(rs), '-L', str(OUT), '--extern', 'os32api='+str(OUT/'libos32api.rlib'),
             '-L', 'dependency='+str(FONT_DEPS), '--extern', 'os32_font='+str(FONT_RLIB), '-o', str(exe)]
+    args += ['--cfg', 'av_focus_kernel', '-C', 'link-arg=' + str(focus_obj)]
     if typical:
         args += ['--cfg', 'feature="gf_accel_accept"']
         os.environ['GF_ACCEPT_ID'] = 'host'
@@ -76,6 +81,10 @@ def build(gshell: Path, name: str, quiet: bool = False, typical: bool = False) -
 # 票 KBD_NAV (docs/tasks/gui/TASK_KBD_NAV.md) の受け入れ K1 の変異。
 # (名前, ファイル, 置き換え前 (ちょうど 1 か所), 置き換え後, RED になるべき試験の絞り込み)
 MUTATIONS = [
+    ('record rejected foreground', 'src/multiapp.rs',
+     'if unsafe { (os32api::api().av_focus_set)(target) } == 0',
+     'if { unsafe { (os32api::api().av_focus_set)(target); } true }',
+     'av_focus_is_called_once_per_focus_change'),
     ('remote-g2 serial startup sent to LAN', 'src/gserial.rs',
      'reply_to(false, b"!", format_args!("ready v1"));',
      'reply_to(true, b"!", format_args!("ready v1"));', 'remote_g2_startup_'),

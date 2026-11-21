@@ -233,6 +233,7 @@ void exec_heap_init_at(u32 base, u32 size) { (void)base; (void)size; if (argv_mo
 void appslot_shell_commit(void) { CHECK(0); }
 void shell_service_retire(void) { CHECK(0); }
 void shell_service_publish(u32 base, u32 size) { (void)base; (void)size; CHECK(0); }
+void av_focus_exec_enter(int id) { (void)id; }
 void appslot_start_commit(int id, int gui, u32 pages) {
     (void)id; (void)gui; (void)pages;
     CHECK(x87_entry_depth && x87_calls == 2 && x87_init_after_save && x87_saved == &fp_parent[x87_entry_depth]);

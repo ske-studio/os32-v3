@@ -167,7 +167,7 @@ static int try_exec(const char *bin_path, int argc, char **argv,
     /* 引数を追加。
      * parse_args_and_glob が剥がしたクォートをここで復元する。
      * 復元せずに空白区切りで再結合すると、exec_run 側の再トークナイズで
-     * 空白入り引数 (例: sndctl play "T120 O4 ...") がばらばらに割れる。 */
+     * 空白入り引数 (例: echo "a b") がばらばらに割れる。 */
     for (i = 1; i < argc; i++) {
         int need_quote = 0;
         const char *q;
@@ -314,10 +314,6 @@ static int sh_is_cui_only(int argc, char **argv)
      * sh.bin では枠を作る / 使う経路をまとめて断る。 */
     if (str_eq(name, "losetup")) return 1;
 
-    /* T2: `play` は drivers/sound/fm/fm.c の io_wait で**同期に**鳴らし終わるまで
-     * CPL=0 で待つ。GUI 中は協調型全体が止まり、CTRL+STOP でも回収できない
-     * (`C` を 100 個で 22 秒)。`beep` は一瞬なので残す。 */
-    if (str_eq(name, "play")) return 1;
     if (str_eq(name, "dd") && argc > 1) {
         const char *d = argv[1];
         if (d[0] == 'l' && d[1] == 'o' && d[2] >= '0' && d[2] <= '9') return 1;

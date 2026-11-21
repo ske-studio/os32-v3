@@ -116,17 +116,6 @@ __attribute__((weak)) int snd2_stream_close(u32 stream, u32 how)
     return OS32_ERR_NOSYS;
 }
 
-__attribute__((weak)) int av_focus_set(int owner)
-{
-    (void)owner;
-    return OS32_ERR_NOSYS;
-}
-
-__attribute__((weak)) int av_focus_get(void)
-{
-    return OS32_ERR_NOSYS;
-}
-
 __attribute__((weak)) int v86s_begin(const V86_Begin *b, u32 *sid)
 {
     (void)b;

@@ -138,13 +138,6 @@ static int cmd_date(int argc, char **argv)
     return 0;
 }
 
-static int cmd_beep(int argc, char **argv)
-{
-    (void)argc; (void)argv;
-    g_api->fm_startup_sound();
-    return 0;
-}
-
 #endif
 
 static int cmd_uptime(int argc, char **argv)
@@ -253,7 +246,6 @@ static const ShellCmd base_cmds[] = {
     { "ver",    cmd_ver,    "",      "Show OS version" },
     { "uname",  cmd_ver,    "",      "Alias for ver" },
     { "date",   cmd_date,   "",      "Show RTC date/time" },
-    { "beep",   cmd_beep,   "",      "Play startup beep" },
 #endif
     { "uptime", cmd_uptime, "",      "Show sys uptime" },
 #ifndef SH_BASE_MINIMAL

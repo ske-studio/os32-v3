@@ -88,7 +88,7 @@ MINIMAL_BASE_CMDS = ['less', 'grep', 'hexdump', 'cfg']
 MINIMAL_SBIN = ['install', 'cdinst', 'hsync']
 # 2026-09-25 に MINIMAL (= 起動 FD) から NORMAL へ移したコマンド。2HD の FD の空きのため
 MOVED_TO_NORMAL_CMDS = ['more', 'find', 'sort', 'head', 'tail', 'wc', 'tee', 'touch',
-                        'sleep', 'diff', 'du', 'cal', 'man', 'sndctl']
+                        'sleep', 'diff', 'du', 'cal', 'man']
 FONT_GUEST = '/sys/font/default.kcgfont'
 GUI_FILES = ['/boot/trident.mod', '/bin/gshell.bin', '/sys/lib/libos32gui.shlib',
              '/etc/gfx/sync.cfg',

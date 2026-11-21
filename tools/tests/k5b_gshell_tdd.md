@@ -34,7 +34,7 @@
 | `derived_ready` | `false` |
 | `pick` | `0` (誰も起こさない) |
 | `should_park` | `false` (誰も譲らない) |
-| `sync_snd_focus` | 何もしない |
+| `sync_av_focus` | 何もしない |
 
 配線 (`op_wait` のループ先頭からの `maybe_park`、`GUI_OP_OWNER_EXIT` からの
 `on_owner_exit`、`run_program` の `exec_start`、top-level の `resume_one`、
@@ -55,7 +55,7 @@ FAILED  resume_one_wakes_a_single_app_with_the_unread_count_as_the_wait_result
 FAILED  op_wait_parks_when_another_app_is_ready                      (相手が ready でも譲らない)
 FAILED  a_single_app_never_parks_and_keeps_the_old_wm_cycle_halt_loop
         op_wait のループが 1 周も回っていない (試験が空振り)  left: []  right: [2]
-FAILED  snd_focus_is_called_once_per_focus_change
+FAILED  av_focus_is_called_once_per_focus_change
         初回が違う  left: []  right: [5]
 ```
 
@@ -74,7 +74,7 @@ FAILED  snd_focus_is_called_once_per_focus_change
 2. `assert!(*MUTEX.lock().unwrap() == ..)` がガードを握ったまま落ちるので、
    RED の失敗が Mutex を中毒させて**次の試験まで巻き添え**にしていた
    (既存の `taskbar_press_release_...` まで FAILED になった)。
-   `mocks` 側に複製を返す覗き口 (`snd_focus_calls()` 等) を足し、`init()` の
+   `mocks` 側に複製を返す覗き口 (`av_focus_calls()` 等) を足し、`init()` の
    ロックを `unwrap_or_else(|e| e.into_inner())` に変えた。
 
 ## 回 2 — GREEN
@@ -193,7 +193,7 @@ make check-kapi-version  → KAPI バージョン一致: v44 (4 箇所)
 | 切替は `op_wait` の中でだけ (`exec_park` の呼び出し点 1 点) | `exec_park_has_exactly_one_call_site_and_it_is_the_op_wait_loop_head` (ソース走査。`exec_park` / `exec_resume` / `maybe_park` が各 1 点、`maybe_park` は `handler.rs` の `op_wait` の中で `wm_cycle` より前) |
 | 1 本のときは `exec_park` 0 回 | `a_single_app_never_parks_and_keeps_the_old_wm_cycle_halt_loop` (空振り防止に「`wm_cycle` が 1 周は回った」も同時に検査) |
 | 自分の 2 窓で `set_focus` を交互に呼ぶアプリが他を飢えさせない (最悪 30 以内) | 15b/15c/15d (`N`=2 で 10、定数上限 30 の内側) と 16 系 |
-| フォーカス切替で `snd_focus` が 1 回だけ | `snd_focus_is_called_once_per_focus_change` |
+| フォーカス切替で `av_focus_set` が 1 回だけ | `av_focus_is_called_once_per_focus_change` |
 | (票の S2 読み替え) `LAUNCH` は 1 本増やす | `launch_no_longer_quits_the_running_apps_but_switch_cui_still_does` |
 | (D11-3 の (2)) top-level は 1 周に 1 本だけ起こす | `resume_one_wakes_a_single_app_with_the_unread_count_as_the_wait_result` |
 | (D4) 止めてあるアプリの Quit は `exec_kill` | `a_parked_app_is_folded_with_exec_kill_from_the_top_level` |
@@ -315,7 +315,7 @@ make check-gshell-host   → 29 passed / 0 failed
 ## 直したこと 3 つ
 
 1. **型の追随 (A2 の余波)**: K5c で `exec_start` / `exec_resume` / `exec_park` /
-   `exec_kill` / `exec_app_state` / `snd_focus` の Rust 束縛が `i32` になった。
+   `exec_kill` / `exec_app_state` / `av_focus_set` の Rust 束縛が `i32` になった。
    `multiapp.rs` の `exec_resume(k as u32, wait_ret as u32)` / `exec_kill(id as u32)` が
    E0308。`as u32` と、対になっていた `as i32` の往復キャストを 4 か所
    (`multiapp.rs` の park / resume / kill、`lib.rs` の `exec_start`) から落とした。

@@ -87,10 +87,10 @@ impl Demo {
         widget::add(name_row, tb, SizeSpec::Flex(1))?;
         widget::add(root, name_row, SizeSpec::Fixed(20))?;
 
-        let cb = widget::checkbox(b"Enable sound", false)?;
+        let cb = widget::checkbox(b"Enable option", false)?;
         widget::add(root, cb, SizeSpec::Fixed(18))?;
 
-        let lbl_cb = widget::label(b"sound: OFF")?;
+        let lbl_cb = widget::label(b"option: OFF")?;
         widget::add(root, lbl_cb, SizeSpec::Fixed(16))?;
 
         let mid = widget::row(0, 8)?;
@@ -194,9 +194,8 @@ impl App for Demo {
 
     fn on_toggled(&mut self, _ui: &mut Ui, w: WidgetId, on: bool) {
         if w == self.cb {
-            let msg: &[u8] = if on { b"sound: ON" } else { b"sound: OFF" };
+            let msg: &[u8] = if on { b"option: ON" } else { b"option: OFF" };
             let _ = widget::set_text(self.lbl_cb, msg);
-            set_bgm(on);
         }
     }
 
@@ -236,26 +235,6 @@ impl App for Demo {
     fn on_key(&mut self, ui: &mut Ui, _window: u32, scan: u8, _ch: u8, _mods: u8, down: bool) {
         if down && scan == SCAN_ESC {
             ui.quit();
-        }
-    }
-}
-
-/* ================================================================ */
-/*  BGM (受入 G10 の観測手段)                                        */
-/* ================================================================ */
-
-/* `[...]` が無限ループなので、止めるまで鳴り続ける。フォーカスが外れたとき
- * に止まる / 戻ったとき鳴り直すのは WM 側 (音のフォーカス排他) の領分。 */
-static BGM_MML: &[u8] = b"T120 O4 L8 [CEGE DFAF]\0";
-
-/// チェックボックスに合わせて BGM を鳴らす / 止める。
-fn set_bgm(on: bool) {
-    unsafe {
-        let a = os32api::api();
-        if on {
-            (a.snd_bgm_play)(BGM_MML.as_ptr());
-        } else {
-            (a.snd_bgm_stop)();
         }
     }
 }

@@ -5,7 +5,6 @@
 #include <string.h>
 
 #define RAW_USER_BYTES (96u * 1024u)
-#define RAW_MML_NOTES 128
 #define RAW_CHILD "/usr/bin/raw_wait_test.bin "
 #define RAW_COMMAND_BYTES 128
 #define RAW_DB_CREATE "CREATE TABLE probe(x)"
@@ -38,7 +37,7 @@ int main(int argc, char **argv, KernelAPI *api)
         return parent_run(api, argv[2], argv[3]);
     if (argc == 3) return probe(api, argv[1], argv[2]);
     api->kprintf(ATTR_WHITE, "%s",
-        "usage: raw_wait_test [parent] kbdchar|kbdkey|imechar|imekey|serial|fm|db|log done|stop\n"
+        "usage: raw_wait_test [parent] kbdchar|kbdkey|imechar|imekey|serial|db|log done|stop\n"
         "       raw_wait_test parent fault done\n"
         "done: send Q to keyboard/IME or serial after READY; FM/DB/log finish themselves\n"
         "stop: CTRL+STOP after READY; GUI: select and kill this app in WM\n");
@@ -50,11 +49,11 @@ static int probe(KernelAPI *api, const char *entry, const char *end)
     int stop = !strcmp(end, "stop"), value = 'Q', rc = 0;
     int kbdchar = !strcmp(entry, "kbdchar"), kbdkey = !strcmp(entry, "kbdkey");
     int imechar = !strcmp(entry, "imechar"), imekey = !strcmp(entry, "imekey");
-    int serial = !strcmp(entry, "serial"), fm = !strcmp(entry, "fm");
+    int serial = !strcmp(entry, "serial");
     int dbmode = !strcmp(entry, "db"), logmode = !strcmp(entry, "log");
     int fault = !strcmp(entry, "fault");
     if ((!stop && strcmp(end, "done")) ||
-        !(kbdchar || kbdkey || imechar || imekey || serial || fm || dbmode || logmode || fault))
+        !(kbdchar || kbdkey || imechar || imekey || serial || dbmode || logmode || fault))
         return 1;
     /* Allocate USER memory and a live SQLite group before every wait. Leave
      * both owned by this app: normal exit and STOP must reclaim them alike.
@@ -75,13 +74,7 @@ static int probe(KernelAPI *api, const char *entry, const char *end)
     else if (imechar) value = api->ime_getchar();
     else if (imekey) value = api->ime_getkey();
     else if (serial) value = api->serial_getchar();
-    else if (fm) {
-        static char mml[RAW_MML_NOTES + 1];
-        int count = stop ? RAW_MML_NOTES : 1;
-        for (int i = 0; i < count; i++) mml[i] = 'C';
-        mml[count] = 0;
-        api->fm_play_mml(mml);
-    } else if (dbmode) rc = api->db_exec(db, RAW_SLOW_SQL);
+    else if (dbmode) rc = api->db_exec(db, RAW_SLOW_SQL);
     else if (logmode) {
         /* Build the kernel with OS32_RAW_WAIT_LOG_TICKS (see raw_wait_tdd.md).
          * Its LOG BEGIN/END enclose repeated internal serial_puts in this

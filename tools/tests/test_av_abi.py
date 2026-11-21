@@ -1,12 +1,12 @@
-"""Exercise the v90 table and shared stubs on both native target ABIs."""
+"""Exercise the v90 table, foreground transitions and remaining weak providers on both target ABIs."""
 CHECK = dict(name='av-kapi-abi-host', tier=1, needs=['make:all'], budget=120,
     covers=['tools/tests/test_av_abi.py', 'tools/tests/av_abi_host.c', 'tools/tests/av_abi_host.rs',
             'sdk/rust/os32api/src/av.rs', 'sdk/rust/os32api/src/kapi_generated.rs',
             'tools/check_av_portable.py', 'tools/checks/av_wiring.txt',
             'tools/checks/av_no_weak.sh', 'exec/exec_kapi_init.inc',
-            'build/out/kernel.elf', 'include/av_contract.h', 'input/hal/*.[ch]', 'sound/hal/*.[ch]',
+            'build/out/kernel.elf', 'kernel/av_focus.c', 'kernel/gui.h', 'include/app_ids.h', 'exec/exec_gui.h', 'exec/exec_hooks.h', 'include/av_contract.h', 'input/hal/*.[ch]', 'sound/hal/*.[ch]',
             'sdk/include/os32/*.h', 'kapi/kapi_generated.c'],
-    basis=['docs/decisions/sound/AV0_V90_ADDENDUM.md §4'])
+    basis=['docs/decisions/sound/AV0_V90_ADDENDUM.md §4', 'docs/decisions/sound/AV_HAL_DESIGN.md §4'])
 
 import os
 from pathlib import Path
@@ -22,7 +22,7 @@ def exercise(root, folder, machine, mutate):
     cc = str(Path(cross) / 'bin' / (elf + '-gcc'))
     api = (root / 'exec/exec_kapi_init.inc').read_text().splitlines()
     names = [line.split()[1] for line in (root / 'tools/checks/av_wiring.txt').read_text().splitlines()
-             if line and not line.startswith('#')]
+             if line and not line.startswith('#') and len(line.split()) == 2]
     decl = [line for line in api if any('wrap_' + n + '(' in line for n in names)]
     bind = [line for line in api if any('kapi->' + n + ' =' in line for n in names)]
     wrappers = (root / 'kapi/kapi_generated.c').read_text()
@@ -49,6 +49,23 @@ def exercise(root, folder, machine, mutate):
         cases += [('adjacent providers', [s.replace('= wrap_snd2_stream_start;', '= wrap_snd2_stream_pause;') for s in bind], defaults, 10),
                   ('successful stub', bind, change_stub('snd2_dev_count', 'return OS32_ERR_NOSYS;', 'return 0;'), 1),
                   ('modified output', bind, change_stub('snd2_dev_info', '(void)o;', '((u8 *)o)[0] = 0;'), 40)]
+    focus = (root / 'kernel/av_focus.c').read_text()
+    focus_cases = {}
+    if mutate:
+        for label, anchor, replacement, code in [
+            ('notification omitted', 'in2_on_focus(old, owner);', '', 50),
+            ('old and new swapped', 'in2_on_focus(old, owner);', 'in2_on_focus(owner, old);', 50),
+            ('unchanged owner notified', 'if (old == owner) return;', '', 53),
+            ('CUI return loses parent', 'select_owner(parent);', 'select_owner(0);', 58),
+            ('background exit clears focus', 'else if (av_fg_owner == id)', 'else', 59),
+            ('WM denied', 'ring3_wm_depth <= 0', '1', 51),
+            ('owner gate omitted', 'res_owner_get() != APP_ID_SHELL', '0', 54),
+            ('user gate omitted', 'ring3_call_from_user()', '0', 55),
+            ('registration gate omitted', '!exec_gui_registered() ||', '0 ||', 56),
+        ]:
+            assert focus.count(anchor) == 1
+            focus_cases[label] = focus.replace(anchor, replacement)
+            cases.append((label, bind, defaults, code))
     # Build core for each target from the installed nightly rust-src.
     (folder / 'Cargo.toml').write_text('[package]\nname="av_probe"\nversion="0.1.0"\nedition="2021"\n'
         '[lib]\npath="lib.rs"\n[profile.release]\npanic="abort"\n')
@@ -63,10 +80,11 @@ def exercise(root, folder, machine, mutate):
     for label, assignments, source, expected in cases:
         (folder / 'av_wrappers.inc').write_text('\n'.join(decl + ['static void av_bind(KernelAPI *kapi) {'] + assignments + ['}']))
         (folder / 'stub.c').write_text(source)
+        (folder / 'focus.c').write_text(focus_cases.get(label, focus))
         binary = folder / 'probe'
         subprocess.run([cc, '-std=gnu89', '-ffreestanding', '-nostdlib', '-static', '-O1',
             '-ffunction-sections', '-Wl,--gc-sections', '-Werror=implicit-function-declaration', '-Wno-attributes', '-I' + str(folder),
-            '-Isdk/include/os32', '-Iinclude', '-Isound/hal', 'tools/tests/av_abi_host.c',
+            '-Isdk/include/os32', '-Iinclude', '-Isound/hal', '-Iexec', '-Ikernel', '-DOS32_HOOK_GUI=0', folder / 'focus.c', 'tools/tests/av_abi_host.c',
             rust_obj, folder / 'wrap.c', folder / 'stub.c', 'input/hal/a0_weak.c', folder / 'start.S',
             '-o', binary], cwd=root, check=True)
         rc = subprocess.run(['qemu-' + ('i386' if machine == 'i386' else 'ppc'), binary]).returncode
@@ -80,7 +98,8 @@ def run(ctx):
     for row in (ctx.root / 'tools/checks/av_wiring.txt').read_text().splitlines():
         if row and not row.startswith('#'):
             name = row.split()[1]
-            assert re.search(r'^[0-9a-f]+ W ' + name + r'$', symbols, re.M), name
+            binding = 'T' if name in ('av_focus_set', 'av_focus_get') else 'W'
+            assert re.search(r'^[0-9a-f]+ ' + binding + ' ' + name + r'$', symbols, re.M), name
     with tempfile.TemporaryDirectory() as td:
         for machine in ('i386', 'ppc'):
             exercise(ctx.root, Path(td), machine, ctx.mutate)

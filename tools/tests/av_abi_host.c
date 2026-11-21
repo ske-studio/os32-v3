@@ -2,6 +2,19 @@
 #include "av_contract.h"
 #include "os32_kapi_slots.h"
 
+volatile int ring3_wm_depth;
+static int registered = 1, caller = 1, user_call;
+static int notifications, last_old, last_new;
+int exec_gui_registered(void) { return registered; }
+int res_owner_get(void) { return caller; }
+int ring3_call_from_user(void) { return user_call; }
+void in2_on_focus(int old, int owner)
+{
+    notifications++;
+    last_old = old;
+    last_new = owner;
+}
+
 static unsigned char sentinel[8192] __attribute__((aligned(4)));
 #define ABI_SIZE(type, size) typedef char size_of_##type[(sizeof(type) == (size)) ? 1 : -1]
 ABI_SIZE(SND2_DevInfo, 64);
@@ -89,10 +102,35 @@ int av_abi_probe(void)
         api.snd2_stream_close(1, 1) != OS32_ERR_NOSYS) return 15;
     if (__builtin_offsetof(KernelAPI, av_focus_set) != 1260 ||
         api.av_focus_set != wrap_av_focus_set ||
-        api.av_focus_set(1) != OS32_ERR_NOSYS) return 16;
+        api.av_focus_set(1) != 0) return 16;
     if (__builtin_offsetof(KernelAPI, av_focus_get) != 1264 ||
         api.av_focus_get != wrap_av_focus_get ||
-        api.av_focus_get() != OS32_ERR_NOSYS) return 17;
+        api.av_focus_get() != 1) return 17;
+    if (notifications != 1 || last_old != 0 || last_new != 1) return 50;
+    caller = 2;
+    ring3_wm_depth = 1;
+    if (api.av_focus_set(2) || api.av_focus_get() != 2) return 51;
+    if (notifications != 2 || last_old != 1 || last_new != 2) return 52;
+    if (api.av_focus_set(2) || notifications != 2) return 53;
+    ring3_wm_depth = 0;
+    if (api.av_focus_set(3) != OS32_ERR_INVAL) return 54;
+    caller = 1;
+    user_call = 1;
+    if (api.av_focus_set(3) != OS32_ERR_INVAL) return 55;
+    user_call = 0;
+    registered = 0;
+    if (api.av_focus_set(3) != OS32_ERR_INVAL || notifications != 2) return 56;
+    av_focus_exec_enter(3);
+    av_focus_exec_enter(4);
+    if (av_focus_owner() != 4) return 57;
+    av_focus_exec_leave(4, 3);
+    if (av_focus_owner() != 3) return 58;
+    registered = 1;
+    av_focus_exec_enter(5);
+    av_focus_exec_leave(5, 1);
+    if (av_focus_owner() != 3) return 59;
+    av_focus_exec_leave(3, 1);
+    if (av_focus_owner() != 0) return 60;
     if (__builtin_offsetof(KernelAPI, in2_pad_state) != 1268 ||
         api.in2_pad_state != wrap_in2_pad_state ||
         api.in2_pad_state(1, (IN2_PadState *)sentinel) != OS32_ERR_NOSYS) return 18;

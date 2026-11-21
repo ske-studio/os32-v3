@@ -93,6 +93,7 @@
     "input/hal/in2_time.c",
     "input/hal/a0_weak.c",
     "sound/hal/a0_weak.c",
+    "kernel/av_focus.c",
     "kernel/input_legacy.c",
     "kernel/input_wait.c",
     "kernel/input_service.c",

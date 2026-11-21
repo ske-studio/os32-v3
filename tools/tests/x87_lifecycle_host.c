@@ -115,6 +115,9 @@ void __cdecl kprintf(u8 a,const char *s,...) { (void)a; (void)s; CHECK(0); }
 
 
 void font_guard_fault(u32 a,u32 b,u32 c) { (void)a; (void)b; (void)c; CHECK(0); }
+int res_owner_get(void) { return cur; }
+void av_focus_exec_enter(int id) { CHECK(id == cur); }
+void av_focus_exec_leave(int id, int parent) { (void)id; CHECK(parent == cur); }
 void res_owner_set(int id) { (void)id; }
 #define CLEANUP(name) void name(int id) { CHECK(id==cur); }
 CLEANUP(kapi_strings_cleanup_owned)

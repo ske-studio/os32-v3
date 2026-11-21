@@ -167,6 +167,7 @@ static void exec_notify_owned(int id, int kind)
      * サーフェス・タイマ・スロットを回収する。畳む 3 経路すべてが
      * ここを通るので、WM は 1 か所で回収できる。 */
     if (kind == EXEC_KIND_ABORTED) input_discard_stop();
+    av_focus_exec_leave(id, res_owner_get());
     exec_ime_owner_exit(id);
     exec_gui_owner_exit(id, kind);
     /* (8) 打鍵の注入リング (票 K7 D5)。注ぎ手は con_sink の読み手 1 本なので、

@@ -330,8 +330,9 @@ pub static STARTS: Mutex<Vec<Vec<u8>>> = Mutex::new(Vec::new());
 pub static START_SCRIPT: Mutex<Vec<i32>> = Mutex::new(Vec::new());
 /// `exec_kill(app_id)` の呼び出し列。
 pub static KILLS: Mutex<Vec<i32>> = Mutex::new(Vec::new());
-/// `snd_focus(app_id)` の呼び出し列。
-pub static SND_FOCUS: Mutex<Vec<i32>> = Mutex::new(Vec::new());
+/// `av_focus_set(app_id)` の呼び出し列。
+pub static AV_FOCUS_RESULT: Mutex<i32> = Mutex::new(0);
+pub static AV_FOCUS: Mutex<Vec<i32>> = Mutex::new(Vec::new());
 /// `exec_abort_clear()` が呼ばれた回数 (KAPI v45、決裁 A1)。
 pub static STOP_CULPRIT: Mutex<i32> = Mutex::new(0);
 /// STOP に関係する KAPI の順序。
@@ -750,9 +751,9 @@ fn lk<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
     m.lock().unwrap_or_else(|e| e.into_inner())
 }
 
-/// `snd_focus` へ渡した owner の列 (複製。ロックを持ったまま assert しない)。
-pub fn snd_focus_calls() -> Vec<i32> {
-    lk(&SND_FOCUS).clone()
+/// `av_focus_set` へ渡した owner の列 (複製。ロックを持ったまま assert しない)。
+pub fn av_focus_calls() -> Vec<i32> {
+    lk(&AV_FOCUS).clone()
 }
 /// `exec_resume(app_id, wait_ret)` の呼び出し列 (複製)。
 pub fn resume_calls() -> Vec<(i32, i32)> {
@@ -886,9 +887,32 @@ unsafe extern "C" fn exec_kill(app_id: i32) -> i32 {
     }
     0
 }
-unsafe extern "C" fn snd_focus(app_id: i32) -> i32 {
-    lk(&SND_FOCUS).push(app_id);
-    0
+#[cfg(av_focus_kernel)]
+pub mod focus_kernel {
+    extern "C" {
+        pub fn av_focus_set(owner: i32) -> i32;
+        pub fn av_focus_get() -> i32;
+    }
+    #[no_mangle]
+    extern "C" fn exec_gui_registered() -> i32 {
+        (*super::lk(&super::AV_FOCUS_RESULT) == 0) as i32
+    }
+    #[no_mangle]
+    static ring3_wm_depth: i32 = 1;
+    #[no_mangle]
+    extern "C" fn res_owner_get() -> i32 { 2 }
+    #[no_mangle]
+    extern "C" fn ring3_call_from_user() -> i32 { 0 }
+    #[no_mangle]
+    extern "C" fn in2_on_focus(_old: i32, _owner: i32) {}
+}
+
+unsafe extern "C" fn av_focus_set(app_id: i32) -> i32 {
+    lk(&AV_FOCUS).push(app_id);
+    #[cfg(av_focus_kernel)]
+    { focus_kernel::av_focus_set(app_id) }
+    #[cfg(not(av_focus_kernel))]
+    { *lk(&AV_FOCUS_RESULT) }
 }
 /* KAPI v45 (K5c、決裁 A1)。owner 1 (WM top-level) からしか呼べないので、
  * ゲストでは `op_wait` の中から呼ぶと `OS32_ERR_INVAL`。ここは回数を数える
@@ -1012,7 +1036,7 @@ pub fn init() {
     a.exec_kill = exec_kill;
     a.exec_abort_clear = exec_abort_clear;
     a.exec_stop_culprit = exec_stop_culprit;
-    a.snd_focus = snd_focus;
+    a.av_focus_set = av_focus_set;
     a.kbd_inject = kbd_inject;
     lk(&INJECTED).clear(); INJECT_CALLS.store(0, Ordering::SeqCst);
     a.kbd_inject_pending = kbd_inject_pending;
@@ -1047,7 +1071,8 @@ pub fn init() {
     lk(&STARTS).clear();
     lk(&START_SCRIPT).clear();
     lk(&KILLS).clear();
-    lk(&SND_FOCUS).clear();
+    lk(&AV_FOCUS).clear();
+    *lk(&AV_FOCUS_RESULT) = 0;
     ABORT_CLEARS.store(0, Ordering::SeqCst);
     *lk(&STOP_CULPRIT) = 0;
     lk(&STOP_CALLS).clear();

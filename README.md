@@ -99,7 +99,7 @@ v3 の最低条件は **8MB 機で GUI + 私有 2MB のアプリ** (目標、[V3
 `ls` `cat` `cp` `mv` `rm` `mkdir` `rmdir` `touch` `head` `tail` `more` `grep` `wc` `tee` `hexdump` `find` `sort` `diff` `du`
 
 #### システム
-`ver` `date` `uptime` `tick` `time` `sleep` `cal` `mem` `env` `echo` `beep` `clear` `reboot` `np2`
+`ver` `date` `uptime` `tick` `time` `sleep` `cal` `mem` `env` `echo` `clear` `reboot` `np2`
 
 #### ストレージ
 `mount` `umount` `sync` `format` `ide` `dev`
@@ -112,9 +112,6 @@ v3 の最低条件は **8MB 機で GUI + 私有 2MB のアプリ** (目標、[V3
 
 #### グラフィックス
 `gfx_demo` `vbzview` `vdpview` `spr_test` `raster` `ekakiuta` `demo1`
-
-#### サウンド
-`sndctl` `play`
 
 ### GUI シェル (1.1〜1.4、GUI の版は 1.4 で閉じた)
 
