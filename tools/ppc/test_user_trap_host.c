@@ -18,7 +18,7 @@ void exec_syscall_dispatch(struct arch_syscall *call)
     seen = 1;
     f->gpr[3] = 42;
 }
-void ring3_fault_kill(void) { seen = 2; __builtin_longjmp(escape, 1); }
+void ppc_user_fault_kill(void) { seen = 2; __builtin_longjmp(escape, 1); }
 static void irq(struct ppc_frame *f) { (void)f; seen = 4; }
 static void resident(struct ppc_frame *f)
 {

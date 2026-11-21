@@ -52,7 +52,7 @@ void ppc_trap_fatal_sink(const struct ppc_frame *f, u32 reason)
 { (void)f; (void)reason; finish(1); }
 void ppc_trap_stop(void) __attribute__((noreturn));
 void ppc_trap_stop(void) { stopped++; __builtin_longjmp(escape, 1); }
-void ring3_fault_kill(void) { finish(1); }
+void ppc_user_fault_kill(void) { finish(1); }
 #include CTX_TRAP_SOURCE
 u32 ppc_irq_save(void)
 {

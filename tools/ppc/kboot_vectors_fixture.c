@@ -155,4 +155,4 @@ void powermac_boot(ppc_ci ci)
 /* The fixture never enters an exec user context. */
 struct arch_syscall;
 void exec_syscall_dispatch(struct arch_syscall *call) { (void)call; }
-void ring3_fault_kill(void) { }
+void ppc_user_fault_kill(void) { }

@@ -119,9 +119,9 @@ def image(work, mutation):
     trap = (ROOT/'arch/ppc/kernel_trap.c').read_text()
     trap = '#include "ppc_trap.h"\n#include "exec_arch.h"\nvoid ctx_irq(struct ppc_frame *, void (*)(struct ppc_frame *));\nvoid ctx_syscall(struct arch_syscall *);\nvoid ctx_exit_arm(void);\nextern volatile u32 ctx_started;\n'+trap
     trap = 'struct ppc_frame; void ctx_fault(struct ppc_frame *);\n'+trap
-    trap = once(trap, '        ring3_fault_kill();',
+    trap = once(trap, '        ppc_user_fault_kill();',
                 '        extern void ctx_user_fault(struct ppc_frame *);\n'
-                '        ctx_user_fault(f); ring3_fault_kill();')
+                '        ctx_user_fault(f); ppc_user_fault_kill();')
     trap = once(trap, '        resident_fault(f);', '        { ctx_fault(f); resident_fault(f); }')
     trap = once(trap, '            handler(f);', '            ctx_irq(f, handler);')
     trap = once(trap, '            exec_syscall_dispatch(&call);', '            ctx_syscall(&call);')

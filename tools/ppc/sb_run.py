@@ -32,7 +32,7 @@ def main():
              '    return ppc_kapi_invoke(&api, current_slot, &changed);',
             ),
             ('fault-exit', 'arch/ppc/kernel_trap.c',
-             '        ring3_fault_kill();',
+             '        ppc_user_fault_kill();',
              '        extern void kapi_sys_exit(int);\n        kapi_sys_exit(0);',
             )
 

@@ -23,7 +23,7 @@ u32 ppc_trap_msr(void) { return PPC_MSR_IR | PPC_MSR_DR; }
 u32 ppc_root_current(void) { return 0; }
 void ppc_trap_stop(void) { finish(90); }
 void ppc_trap_fatal_sink(const struct ppc_frame *f, u32 r) { (void)f; (void)r; finish(91); }
-void ring3_fault_kill(void) { finish(92); }
+void ppc_user_fault_kill(void) { finish(92); }
 u32 ppc_irq_save(void) { ee=0; return 0; }
 void exec_syscall_dispatch(struct arch_syscall *c) { (void)c; }
 static u32 expected, delivered;
