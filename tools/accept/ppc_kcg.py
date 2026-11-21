@@ -59,6 +59,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--build-only', action='store_true')
     parser.add_argument('--mutate', action='store_true')
+    parser.add_argument('--case', choices=EXPECTED)
     args = parser.parse_args()
     cross = Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc'))
     if any(not os.access(cross / 'bin' / ('powerpc-elf-' + tool), os.X_OK)
@@ -81,7 +82,8 @@ def main():
                'KB_ROOT_BINS=' + ' '.join(bins)]
     images = {}
     os.environ.setdefault('SOURCE_DATE_EPOCH', '946684800')
-    for case in EXPECTED if args.mutate else ('normal', 'missing'):
+    cases = EXPECTED if args.mutate else ('normal', 'missing')
+    for case in ((args.case,) if args.case else cases):
         folder = work / case
         folder.mkdir()
         kernel = folder / 'kernel'

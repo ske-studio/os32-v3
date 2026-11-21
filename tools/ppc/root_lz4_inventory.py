@@ -44,18 +44,8 @@ RUNNERS = {
     'usb-legacy': ('usb_run', '--legacy', '--lan'),
 }
 SHELL_RUNNERS = ('sb_run', 'sc_run', 'sd_run', 'usb_run', 'ppc_sh_output')
-# CI partitions the complete inventory across the weighted PPC jobs.
-GROUPS = {
-    'boot': ('boot_info',),
-    'display': ('display', 'display_lifecycle'),
-    'shell': ('sb-serial', 'sc', 'sc-serial', 'sc-link', 'sd', 'sd-link', 'sh-output', 'sh-output-serial', 'sh-output-link'),
-    'usb': ('usb', 'usb-link', 'usb-legacy', 'product', 'kboot'),
-    'link': ('p3', 'fb'),
-    'storage': ('db', 'sfs', 'shm', 'sqlite_stack', 'sqlite_static'),
-    'console': ('console_cells', 'font', 'fp', 'gfx2', 'kcg', 'loop', 'mouse'),
-    'system': ('sysinfo', 'sysinfo-memstat', 'ver'),
-    'devices': ('newlib', 'path', 'pci', 'port', 'rtc', 'surface'),
-}
+# Limiting acceptance cases measured by the complete stage-1 inventory.
+REPRESENTATIVES = {'kcg': 'missing', 'port': 'absent', 'font': 'font-absent'}
 COLUMNS = ('resident_end', 'chain_end', 'frame', 'packed', 'iso_pages')
 
 
@@ -273,7 +263,7 @@ def usb_images(suite, work, build):
             build(work/mode, cross, *settings(work, mode))
 
 
-def collect(out, suites):
+def collect(out, suites, representative=False):
     sys.path[:0] = [str(ROOT / 'tools/accept'), str(ROOT / 'tools/ppc')]
     import kboot_accept
     os.environ.setdefault('SOURCE_DATE_EPOCH', '946684800')
@@ -367,6 +357,8 @@ def collect(out, suites):
                 mod.link_image(folder, {**objects, src: mod.compile_object(folder, src, source)})
                 record(folder/'SSTACK.ELF', suite+'/'+case, True)
             continue
+        if representative:
+            extra.extend(['--case', REPRESENTATIVES[suite]])
         with patch.object(kboot_accept, 'build', build), patch.object(
                 sys, 'argv', [module_name, '--build-only', *([] if suite == 'sc' else ['--mutate']), *extra]):
             module = importlib.reload(importlib.import_module(module_name))
@@ -399,9 +391,9 @@ def collect(out, suites):
     for row in result:
         print(','.join(row['names']), *(hex(row[c]) for c in COLUMNS[:-1]), row['iso_pages'])
     maxima = envelope(result)
-    # Comparing each group's maxima with the common limits also bounds their union.
+    # Reserve one more 64 KiB alignment step for unmeasured acceptance images.
     from root_lz4_layout import layout_constant
-    if maxima['chain_end'] > layout_constant('MEM_FIXED_PAGING_GUARD_BASE'):
+    if maxima['chain_end'] + (0x10000 if representative else 0) > layout_constant('MEM_FIXED_PAGING_GUARD_BASE'):
         raise ValueError('kernel chain exceeds fixed paging guard')
     (out/'maxima.json').write_text(json.dumps({
         col: dict(value=value, images=[name for row in result if row[col] == value for name in row['names']])
@@ -416,13 +408,11 @@ if __name__ == '__main__':
     parser.add_argument('--out', type=Path, required=True)
     choices = list(dict.fromkeys(['product', *SUITES, *RUNNERS, 'kboot']))
     parser.add_argument('--suite', action='append', choices=choices, help='measure one family (repeatable)')
-    parser.add_argument('--group', choices=GROUPS)
+    parser.add_argument('--representative', action='store_true')
     args = parser.parse_args()
-    if args.group:
-        assigned = [suite for group in GROUPS.values() for suite in group]
-        if sorted(assigned) != sorted(choices) or args.suite:
-            parser.error('inventory groups must partition all suites exactly once')
-        args.suite = GROUPS[args.group]
+    if args.representative and args.suite:
+        parser.error('--representative selects its own suites')
     args.out.mkdir(parents=True, exist_ok=True)
     os.environ.setdefault('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc')
-    collect(args.out.resolve(), args.suite or choices)
+    suites = ['product', *REPRESENTATIVES] if args.representative else args.suite or choices
+    collect(args.out.resolve(), suites, args.representative)

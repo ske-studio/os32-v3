@@ -201,6 +201,16 @@ def reuse_gate_cases(workflow, filename, job):
 def scope_cases(source):
     scope = {}
     exec(compile(source, 'ppc_scope.py', 'exec'), scope)
+    select = scope['layout_scope']
+    layout_changes = """
+        arch/ppc/kernel.ld include/memmap.h platform/powermac/platform_kboot_layout.h
+        build/images/kboot-sh.mk build/targets/ppc-powermac.mk tools/mkroot_image.py
+        build/ppc-ram-root.json tools/ppc/root_pair.py
+    """.split()
+    for path in layout_changes:
+        assert select(['docs/notes.md', path]) == (True, path)
+    assert select(None)[0]
+    assert not select(['docs/layout.md', 'kernel/time/timer.c', 'arch/x86/entry.S'])[0]
     decide = scope['decide']
     patterns = yaml.safe_load(WORKFLOW.read_text())[True]['push']['paths-ignore']
     assert set(scope['DOC_PATTERNS']) == set(patterns), 'main docs must match build exclusions'
