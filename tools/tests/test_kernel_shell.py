@@ -19,7 +19,7 @@ from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
 CASES = ('cui', 'gui', 'gui-probed', 'kcg', 'shlib-layout', 'shlib-api',
-         'cui-ignores-shlib', 'load-fail', 'load-layout', 'request-again',
+         'gated-shlib-layout', 'gated-shlib-api', 'dual-shlib-layout', 'dual-shlib-api', 'cui-ignores-shlib', 'load-fail', 'load-layout', 'request-again',
          'gui-fdd', 'dual-gui-fdd', 'dual-load-fail', 'dual-load-layout', 'dual-three-faults',
          'three-faults', 'success-resets', 'request-resets', 'cui-fault',
          'fdd-success', 'fdd-fault', 'fdd-fail', 'layout-first',
@@ -69,6 +69,12 @@ def main():
         print(f'GREEN {len(results)} real shell-loop cases (runner={host32.selected_runner()})', flush=True)
         if '--mutate' in sys.argv:
             mutations = [
+                ('shlib-layout-warning-lost', 'gshell_warning = "GUI shlib: rebuild required (KAPI data layout) -> CUI shell";',
+                 'gshell_warning = NULL;'),
+                ('shlib-help-lost', 'tvram_print(0, 2, gshell_warning_help', 'tvram_print(0, 2, ""'),
+                ('shlib-gate-ignored', 'if (!serial_gate_active()) {', 'if (1) {'),
+                ('dual-warning-mirrored', 'tvram_print(0, 0, gshell_warning, TATTR_RED);',
+                 'shell_print(gshell_warning, TATTR_RED);'),
                 ('warning-overwritten', 'tvram_print(0, 1, gshell_warning',
                  'tvram_print(0, 0, gshell_warning'),
                 ('stale-warning', 'while (x > 0) tvram_putchar_at',
