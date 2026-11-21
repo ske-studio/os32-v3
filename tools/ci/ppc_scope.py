@@ -54,7 +54,7 @@ COMMON = ('kernel/', 'lib/', 'include/', 'net/', 'fs/', 'mm/', 'exec/',
           'assets/fonts/', 'platform/none/', 'userland/lib/')
 PPC = ('arch/ppc/', 'platform/powermac/', 'build/ppc', 'build/targets/ppc-', 'build/images/',
        'build/select.mk', 'build/sources/', 'build/arch/ppc', 'build/platform/powermac', 'userland/ppc/',
-       'tools/ppc/', 'tools/checks/', 'tools/tests/', '.github/actions/ppc-setup/')
+       'tools/ppc/', 'tools/accept/', 'tools/checks/', 'tools/tests/', '.github/actions/ppc-setup/')
 EXACT = ('Makefile', 'tools/ci/build_cross_ppc.sh', 'tools/ci/ppc_scope.py',
          '.github/workflows/check.yml')
 X86 = ('arch/x86/', 'platform/pc98/')

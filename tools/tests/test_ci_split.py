@@ -456,10 +456,13 @@ def routing_cases(build_source, check_source):
     guest = set()
     shards = jobs['ppc-qemu']['strategy']['matrix']['shard']
     assert len(shards) == 6, 'expected six PPC QEMU shards'
+    link_shell = {'check-ppc-link-sh-run', 'check-ppc-link-sh-flow'}
     for shard in shards:
         assigned = ppc_selection('ppc-qemu', 'tools/ci/gate.py run', shard)
         assert guest.isdisjoint(assigned), f'duplicate guest checks in shard {shard}'
+        assert len(link_shell & assigned) <= 1, 'link-shell suites share a shard'
         guest.update(assigned)
+    assert link_shell <= guest, 'missing link-shell suite'
     missing = selected(*selector) - (build | compile_checks | guest)
     assert not missing, f'unassigned checks: {sorted(missing)}'
     required = selected(*selector, '--env', 'qemu-ppc')

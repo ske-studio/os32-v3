@@ -907,14 +907,38 @@ def flow_accept(elf, folder, case):
         s.close()
 
 
+# These protocol mutations exercise the product-shell session alongside its
+# entry/return controls. The remaining mutations follow the transport controls.
+FLOW_MUTATIONS = ('command-group', 'line-buffer', 'ready-retry', 'drop-compare', 'owner')
+
+
 def main():
     ap=argparse.ArgumentParser(description=__doc__)
-    ap.add_argument('--out',type=Path,required=True)
+    ap.add_argument('--out',type=Path)
+    ap.add_argument('--suite', choices=('all', 'run', 'flow'), default='all')
+    ap.add_argument('--list-cases', action='store_true')
     ap.add_argument('--timeout',type=int,default=180)
     ap.add_argument('--mutate',action='store_true')
     ap.add_argument('--build-only',action='store_true')
     ap.add_argument('--overflow', choices=('lines', 'cr'), default='lines')
     args=ap.parse_args()
+    controls = [(cpu, late) for cpu in ('7450', '7455') for late in (False, True)
+                if args.suite != 'flow']
+    flows = ('control', *FLOW_CASES) if args.mutate else ('control',)
+    if args.suite == 'run':
+        flows = ()
+    mutations = [name for name in MUTATIONS if args.mutate and
+                 (args.suite == 'all' or (name in FLOW_MUTATIONS) == (args.suite == 'flow'))]
+    if args.list_cases:
+        for case in flows:
+            print('flow-' + case)
+        for cpu, late in controls:
+            print(cpu + ('-late' if late else '-normal'))
+        for name in mutations:
+            print(name)
+        return 0
+    if args.out is None:
+        ap.error('--out is required to build or run')
     required=tuple(cross(tool) for tool in ('gcc','nm','objdump','ld','objcopy'))
     if not args.build_only: required+=('qemu-system-ppc','genisoimage')
     missing=[p for p in required if not shutil.which(p)]
@@ -931,9 +955,14 @@ def main():
                 with socket.socket(socket.AF_INET,kind) as probe: probe.bind(('127.0.0.1',0))
         except OSError as exc:
             print('未 ppc-link-sh-run: AF_INET unavailable: '+str(exc)); return 3
-    control=work/'normal'; control.mkdir()
-    elf=build(control/'kernel',*settings(control, observe_flow=True, overflow=args.overflow))
-    check_map(elf.with_suffix('.map'))
+    hashes = set()
+    if controls:
+        control=work/'normal'; control.mkdir()
+        elf=build(control/'kernel',*settings(control, observe_flow=True, overflow=args.overflow))
+        check_map(elf.with_suffix('.map'))
+        digest = hashlib.sha256(elf.read_bytes()).digest()
+        hashes.add(digest)
+        print('normal-'+args.overflow, digest.hex(), flush=True)
     failures = []
 
     @contextmanager
@@ -944,8 +973,7 @@ def main():
             failures.append(f'{name}: {exc}')
             print('FAIL '+failures[-1], flush=True)
 
-    hashes = {hashlib.sha256(elf.read_bytes()).digest()}
-    for case in ('control', *FLOW_CASES) if args.mutate else ('control',):
+    for case in flows:
         with record_case('flow-'+case):
             folder = work/('flow-'+case)
             folder.mkdir()
@@ -957,7 +985,7 @@ def main():
             if not args.build_only:
                 flow_accept(image, folder/'guest', case)
     if args.build_only:
-        if args.mutate:
+        if args.mutate and controls:
             other = 'cr' if args.overflow == 'lines' else 'lines'
             folder = work/('normal-'+other)
             folder.mkdir()
@@ -966,24 +994,24 @@ def main():
             require(digest not in hashes, 'distinct overflow image '+other)
             hashes.add(digest)
             print('normal-'+other, digest.hex(), flush=True)
-            for name in MUTATIONS:
-                folder=work/name; folder.mkdir()
-                mutant=build(folder/'kernel',*settings(folder,name,overflow=args.overflow))
-                check_map(mutant.with_suffix('.map'))
-                digest=hashlib.sha256(mutant.read_bytes()).digest()
-                require(digest not in hashes, 'distinct image '+name)
-                hashes.add(digest)
-                print(name, digest.hex(), flush=True)
+        for name in mutations:
+            folder=work/name; folder.mkdir()
+            mutant=build(folder/'kernel',*settings(folder,name,overflow=args.overflow))
+            check_map(mutant.with_suffix('.map'))
+            digest=hashlib.sha256(mutant.read_bytes()).digest()
+            require(digest not in hashes, 'distinct image '+name)
+            hashes.add(digest)
+            print(name, digest.hex(), flush=True)
         require(not failures, '\n'.join(failures))
         print(f'Built {len(hashes)} distinct images', flush=True)
         return 0
-    for cpu in ('7450','7455'):
-        for late in (False,True):
-            with record_case(f'{cpu} late={late}'):
-                accept(elf,cpu,work/(cpu+('-late' if late else '-normal')),args.timeout,late,overflow_mode=args.overflow)
-                print('GREEN '+cpu+' late='+str(late),flush=True)
+    for cpu, late in controls:
+        with record_case(f'{cpu} late={late}'):
+            accept(elf,cpu,work/(cpu+('-late' if late else '-normal')),args.timeout,late,overflow_mode=args.overflow)
+            print('GREEN '+cpu+' late='+str(late),flush=True)
     if args.mutate:
-        for name,(_,_,_,expected) in MUTATIONS.items():
+        for name in mutations:
+            expected = MUTATIONS[name][3]
             with record_case(name):
                 folder=work/name; folder.mkdir()
                 mutant=build(folder/'kernel',*settings(folder,name,overflow=args.overflow))
