@@ -158,3 +158,10 @@ tools/build_compare.sh の build/out 全対象（.o/.elf/.bin/.mod/.lz4/.a、kde
 - **P1 V5 への引き渡し**: PC-98 の exec_legacy_call_dispatch が処理済みを返すと通常の wrapper に進まないので、V5 の CPL3 の道でも同じ生成のガードを通す。slot 329 の last_seq だけが範囲外の場合を、実体化の後にも確かめる。
 - **P1 R0b のリンクの単位**: FM の側で snd_set_master の提供を外す変更と、V86 の import と往復の呼び出しの切り替えを、同じリンクの単位 (同じ段) にまとめる。
 - **P1 R0c と入力の順**: 初回の配備に要る F1 は原設計 §12 で N 系の in2_on_focus に依存する。R0c の前景の切り替えと初回の配備は、M5〜S4 の着地の後の F1・in2_on_focus の接続に従属させる (R0c は M5〜S4 と N の F1 の後)。AV0 の宣言・R0a・R0b は M5〜S4 を待たない。
+
+## F1・R0c・7b の実装で PM が決めたこと (2026-11-21〜22)
+以下は本文と上の「確定」の読み替え。実装者が設計の欠けで止まった所を、既存の型と後で決まった入力の HAL の設計に合わせて PM が決めた。
+- **in2_on_focus の受け口 (F1)**: F1 の段では N 系 (独占・リング) がまだ無いので、AV0 の不在の提供と同じ流儀で input/hal/a0_weak.c に何もしない弱い実体を置いた。強い実体は入力の段 7b (N3・N7) で入る。上の「P1 R0c と入力の順」の「in2_on_focus の接続」は、F1 が in2_on_focus を呼ぶことで満たし、強い実体は R0c の初回の配備の条件に含めない。
+- **av_focus_set の門 (§4)**: 「res_owner_get()==GUI_SHELL_OWNER かつ gui_register 済み」は、kernel/kbd_inject.c と同じ型に読み替える — gui_register 済み かつ (ring3_wm_depth > 0 (gui_call の中の WM、アプリの OP_WAIT の中を含む) または (owner 1 かつ ring3_call_from_user() が偽))。アプリの CPL3 の syscall から直は INVAL。gshell は av_focus_set が成功した時だけ通知済みを更新する。
+- **kbd_raw_purge_keep の置き場 (§5-3)**: 「kbd.c 経由」は、入力の HAL の設計 (raw のリングは共通層の所有、共通から装置のシンボルを使わない) に従い、共通層の raw リングの持ち主 (legacy_ring.c) に置いて in2_excl.c から直に呼ぶ。パッドの振動の停止 (§5-6) はパッドの段で入る。
+- **受入の「机で前景 0」(F1)**: 今の WM には窓を残したまま机へ前景を移す操作が無く、前景が 0 になるのは窓が 1 枚も無い時 (wm_tests.rs と同じ)。v90 の受入 (2026-11-22、NP21/W 依頼 26) は「窓が無い時 0・窓の切り替えで前景の id が替わる」で合格とした。
