@@ -9,6 +9,8 @@ import sys
 
 # Layout inputs of arch/ppc/kernel.ld and build/targets/ppc-powermac.mk,
 # including ram-root.mk, the ELF/root pair and the acceptance image recipes.
+# sdk/kapi.json carries the fixed KAPI data fields that move with the KAPI
+# table version (mainline plan v89), so its push must measure every image.
 LAYOUT_PATTERNS = """
     arch/ppc/*.ld sdk/link/ppc/*.ld include/memmap.h platform/*/platform_*_layout.h
     build/images/* build/targets/ppc-powermac.mk Makefile build/select.mk build/sources/*
@@ -16,6 +18,7 @@ LAYOUT_PATTERNS = """
     tools/gen_unicode.c lib/unicode_jis_table.h tools/mkroot_image.py tools/gen_memmap.py
     tools/ppc/root_pair.py tools/ppc/kboot*.py tools/ppc/*_run.py tools/accept/ppc_*.py
     tools/ppc/root_lz4_*.py tools/ci/ppc_scope.py .github/workflows/check.yml
+    sdk/kapi.json sdk/gen_kapi.py sdk/kapi_target_ppc.py
 """.split()
 
 
