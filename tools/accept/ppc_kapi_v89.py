@@ -48,9 +48,12 @@ def fixture(folder, case, gate):
     if case == 'map-failure':
         edit(boot, stop, r'''    if (!shared_user) {
         extern u32 exec_entry_calls;
-        u32 pte = paging_pte_raw(exec_tramp_page_addr());
-        kprintf(7, "V89 partial-user=%u\r\n",
-                !!(pte & PTE_PRESENT && pte & PTE_USER));
+        u32 user_pages = 0;
+        for (u32 i = 0; i < 2; ++i)
+            user_pages += !!(paging_pte_raw(exec_tramp_page_addr() + i * PAGE_SIZE) & PTE_USER);
+        for (u32 off = 0; off < MEM_SHM_SIZE; off += PAGE_SIZE)
+            user_pages += !!(paging_pte_raw(MEM_SHM_BASE + off) & PTE_USER);
+        kprintf(7, "V89 user-pages=%u\r\n", user_pages);
         kprintf(7, "V89 entries=%u\r\n", exec_entry_calls);
         kboot_stop("KAPI trampoline");
     }''')
@@ -60,9 +63,14 @@ def fixture(folder, case, gate):
         edit(boot, '(u32)user_gate, 1)', '(u32)user_gate, 2)')
     if case in ('missing-page', 'map-failure'):
         path = 'mm/paging_map.inc'
-        anchor = '        set_page_noflush(frame, frame, PAGE_RO | PTE_USER);'
-        edit(path, anchor, ('        if (i == 1) return -1;\n' if case == 'map-failure'
-                            else '        if (i == 1) continue;\n') + anchor)
+        if case == 'map-failure':
+            anchor = 'static int prepare_tables(u32 first, u32 count)\n{'
+            edit(path, anchor, anchor + """
+    if (first == MEM_SHM_BASE >> PAGE_SHIFT && count == MEM_SHM_SIZE / PAGE_SIZE)
+        return -1;""")
+        else:
+            anchor = '        set_page_noflush(frame, frame, PAGE_RO | PTE_USER);'
+            edit(path, anchor, '        if (i == 1) continue;\n' + anchor)
         edit('mm/paging.c', '#include "paging_map.inc"', '#include "v89-map.inc"')
         (folder / 'v89-map.inc').write_text(sources.pop(path))
     if not gate:
@@ -97,7 +105,6 @@ def fixture(folder, case, gate):
         anchor = '    wrapptr = exec_kapi_table()'
         edit('exec/exec_syscall.inc', anchor, r"""    if (slot >= KAPI_FUNC_COUNT) {
         kprintf(7, "V89 past-bound=%u\r\n", slot);
-        ring3_fault_kill();
         result = OS32_ERR_INVAL;
         goto syscall_complete;
     }
@@ -170,8 +177,7 @@ def observe(elf, folder, case, cpu):
                 return pc and addr <= int(pc[1], 16) < end
             session.wait(stopped, 'KAPI boot failure stop', 60)
             lines = serial().splitlines()
-            # Characterize the current partial publication pending the PM decision.
-            require(lines.count(b'V89 partial-user=1') == 1, 'first PTE after failure')
+            require(lines.count(b'V89 user-pages=0') == 1, 'USER PTE after prepare failure')
             require(lines.count(b'FATAL kboot KAPI trampoline') == 1 and
                     lines.count(b'V89 entries=0') == 1 and b'V89 enter' not in lines, 'mapping failure diagnostic or user entry')
         else:
@@ -207,9 +213,10 @@ def observe(elf, folder, case, cpu):
                     body = rsh_command(session, '/bin/v89probe.bin ' + argument)
                     lines = serial()[start:].splitlines()
                     rejected = f'V89 rejected={slot}'.encode() in lines
-                    require(rejected or f'V89 past-bound={slot}'.encode() in lines,
+                    past_bound = f'V89 past-bound={slot}'.encode() in lines
+                    require(rejected or past_bound,
                             f'missing dispatch evidence for slot {slot}')
-                    expect(rejected,
+                    expect(rejected and not past_bound,
                            f'slot {slot} rejection')
                     require(b'[Process crashed]' in body.splitlines(), repr(body))
                     rsh_command(session, 'echo $?', b'139\n')
