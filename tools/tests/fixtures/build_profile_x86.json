@@ -158,6 +158,7 @@
     "drivers/ata/cd_module.c",
     "drivers/video/kcg/kcg_module.c",
     "drivers/sound/fm/fm_module.c",
+    "drivers/sound/snd_wake_tick.c",
     "input/hal/legacy_ring.c",
     "input/hal/legacy_mode.c",
     "drivers/input/kbd.c",
