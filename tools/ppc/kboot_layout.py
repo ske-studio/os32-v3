@@ -18,6 +18,24 @@ CHECK = dict(name='ppc-kboot-layout', tier=2, budget=60,
                      'include/types.h'])
 
 
+# GMAC: platform/powermac/gmac_dma.c:7,18. USB: usb_boot.h:10,
+# usb_platform.c:22. ld honors the input alignments in arch/ppc/kernel.ld:51.
+ALIGNMENT_STEP = 0x10000
+
+
+def budget_margins(resident_end, chain_end, resident_limit, chain_limit):
+    resident = resident_limit - resident_end
+    chain = chain_limit - chain_end
+    return dict(resident_free=resident, resident_after_step=resident - ALIGNMENT_STEP,
+                chain_free=chain, chain_after_step=chain - ALIGNMENT_STEP)
+
+
+def check_budget(margins):
+    for name in ('resident_after_step', 'chain_after_step'):
+        if margins[name] < 0:
+            raise ValueError(f'{name} short by {-margins[name]} bytes')
+
+
 def command(args):
     result = subprocess.run([str(a) for a in args], cwd=ROOT, text=True,
                             capture_output=True)
@@ -71,8 +89,9 @@ const unsigned layout[] = {PM_KERNEL_BASE, PM_KERNEL_IMAGE_MAX,
     assert syms['__ledger_fixed_end']-syms['__ledger_fixed_start'] == ledger
     assert syms['__kernel_stack_top']-syms['__kernel_stack_bottom'] == stack
     assert syms['__bss_end'] <= syms['__kernel_stack_bottom']
-    assert syms['__kernel_resident_end']-base <= budget
-    assert syms['__kernel_chain_end'] <= limit == 0x3e0000
+    assert limit == 0x3e0000
+    check_budget(budget_margins(syms['__kernel_resident_end'], syms['__kernel_chain_end'],
+                                base + budget, limit))
     ph = [struct.unpack_from('>8I', elf, hdr[5]+i*hdr[9]) for i in range(hdr[10])]
     loads = [p for p in ph if p[0] == 1]
     assert len(loads) == 1

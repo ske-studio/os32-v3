@@ -12,6 +12,7 @@ import sys
 import tempfile
 import zlib
 
+from kboot_layout import budget_margins, check_budget
 from root_lz4_layout import PAGE, STAGING_BASE, STAGING_SIZE
 from root_lz4_inventory import COLUMNS, check_staging_size, envelope, image_table, measure
 from root_lz4_layout_run import LOW, check_before, verify
@@ -38,6 +39,23 @@ def fixture(folder, high):
         raise ValueError('largest frame image omitted')
     if tuple(envelope(rows).values()) != (LOW+8192, LOW+12288, 32768, 30000, 7):
         raise ValueError('largest frame image omitted')
+
+    # Different images own the resident and chain maxima. Equality is legal.
+    resident_limit, chain_limit = 0x280000, 0x3e0000
+    for resident_growth, chain_growth, failure in (
+            (0, 0, None), (PAGE, 0, 'resident_after_step'), (0, PAGE, 'chain_after_step')):
+        images = [dict(rows[0], resident_end=resident_limit-65536+resident_growth),
+                  dict(rows[1], chain_end=chain_limit-65536+chain_growth)]
+        maxima = envelope(images)
+        try:
+            check_budget(budget_margins(maxima['resident_end'], maxima['chain_end'],
+                                        resident_limit, chain_limit))
+        except ValueError as error:
+            if str(error) != f'{failure} short by {PAGE} bytes':
+                raise
+        else:
+            if failure:
+                raise ValueError(f'{failure} overflow accepted')
 
     check_staging_size(STAGING_SIZE, STAGING_SIZE)
     try:
@@ -99,6 +117,10 @@ def main():
         fixture(folder, STAGING_BASE)
         if args.mutate:
             mutations = [
+                ('kboot_layout.py', 'resident - ALIGNMENT_STEP', 'resident',
+                 'resident_after_step overflow accepted'),
+                ('kboot_layout.py', 'chain - ALIGNMENT_STEP', 'chain',
+                 'chain_after_step overflow accepted'),
                 ('root_lz4_inventory.py', 'packed <= frame <= STAGING_SIZE',
                  'packed <= frame', 'oversized compressed root accepted'),
                 ('root_lz4_inventory.py', "return sorted(rows, key=lambda row: (row['frame'], row['names'][0]))",
@@ -109,7 +131,7 @@ def main():
                 ('root_lz4_layout_run.py', 'require(not overlap(avail, pa, pa+mem)',
                  'require(p == loads[1] or not overlap(avail, pa, pa+mem)', 'unreserved high LOAD accepted')]
             for filename, old, new, reason in mutations:
-                for p in ('root_lz4_layout_host.py','root_lz4_inventory.py','root_lz4_layout_run.py'):
+                for p in ('kboot_layout.py','root_lz4_layout_host.py','root_lz4_inventory.py','root_lz4_layout_run.py'):
                     shutil.copy(here/p, folder/p)
                 target = folder/filename
                 source = target.read_text()

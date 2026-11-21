@@ -15,6 +15,8 @@ import sys
 import shutil
 from unittest.mock import patch
 
+from kboot_layout import budget_margins, check_budget
+
 import lz4.block
 from root_lz4_layout import PAGE, STAGING_BASE, STAGING_SIZE, round_page, segments
 
@@ -382,16 +384,24 @@ def collect(out, suites):
         raise ValueError('missing measured images: ' + ', '.join(sorted(set(plans) - recorded)))
     (out/'plans.json').write_text(json.dumps(plans, indent=2))
     (out/'inventory.json').write_text(json.dumps(result, indent=2))
-    print('image resident_end chain_end frame packed iso_pages')
-    for row in result:
-        print(','.join(row['names']), *(hex(row[c]) for c in COLUMNS[:-1]), row['iso_pages'])
+    sys.path.insert(0, str(ROOT/'tools'))
+    from gen_memmap import Macros, read_defines
+    layout = Macros(read_defines(ROOT/'include/memmap.h'), {})
+    limits = (layout.get('KERNEL_LOAD_ADDR') + layout.get('MEM_KERNEL_IMAGE_MAX'),
+              layout.get('MEM_FIXED_PAGING_GUARD_BASE'))
     maxima = envelope(result)
+    margins = budget_margins(maxima['resident_end'], maxima['chain_end'], *limits)
+    print('image', *COLUMNS, *margins)
+    for row in result:
+        print(','.join(row['names']), *(hex(row[c]) for c in COLUMNS[:-1]), row['iso_pages'],
+              *budget_margins(row['resident_end'], row['chain_end'], *limits).values())
     (out/'maxima.json').write_text(json.dumps({
         col: dict(value=value, images=[name for row in result if row[col] == value for name in row['names']])
         for col, value in maxima.items()}, indent=2))
 
     print('MAX', ' '.join(f"{col}={maxima[col]:#x}({next(r['names'][0] for r in result if r[col] == maxima[col])})"
-                          for col in COLUMNS))
+                          for col in COLUMNS), *(f'{key}={value}' for key, value in margins.items()))
+    check_budget(margins)
 
 
 if __name__ == '__main__':
