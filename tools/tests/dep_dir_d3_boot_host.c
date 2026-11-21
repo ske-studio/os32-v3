@@ -145,6 +145,10 @@ static void pc98_boot_pci_resources(void) { event("resources;"); }
 static int lgy98_init(void) { event("lgy;"); return -1; }
 #include "boot_platform_source.inc"
 #include "pc98_boot_source.inc"
+#include "machcfg_contract.h"
+int machcfg_load_root(void) { return 0; }
+void machcfg_report(const char *machine, u32 cpu_id, int seed_from_cpu)
+{ (void)machine; (void)cpu_id; (void)seed_from_cpu; }
 #include "kernel_mount_source.inc"
 
 static void expect(const char *s) { if (strcmp(events, s)) fprintf(stderr, "got: %s\nwant: %s\n", events, s); CHECK(!strcmp(events, s)); used=0; events[0]=0; }
