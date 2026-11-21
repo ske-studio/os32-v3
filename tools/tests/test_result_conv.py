@@ -598,7 +598,7 @@ def run_target(tmp):
                 "userland/tests/shm_reuse_child.c", "userland/tests/audit_test.c",
                 "userland/tests/blit_test.c", "userland/tests/heap_test.c",
                 "userland/tests/kout_test.c", "userland/tests/pcm_test.c",
-                "userland/tests/time_test.c"):
+                "userland/tests/av_test.c", "userland/tests/time_test.c"):
         subprocess.run(["i386-elf-gcc", *TARGET_FLAGS, "-c", src,
                         "-o", str(tmp / (pathlib.Path(src).stem + ".o"))],
                        cwd=ROOT, check=True)
