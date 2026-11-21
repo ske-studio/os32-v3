@@ -6,6 +6,18 @@ volatile u32 tick_count = 0;
 static u32 tick_hi, raw_lo, raw_hi;
 static u32 jif_phase, ms_phase, ms_now, step_jif, step_ms, clk;
 
+static unsigned char fast_enabled;
+static void (*fast_fn)(u32);
+
+int tick_fast_set(void (*fn)(u32))
+{
+    if (fn && fast_fn && fn != fast_fn)
+        return OS32_ERR_BUSY;
+    fast_fn = fn;
+    fast_enabled = fn != 0;
+    return 0;
+}
+
 int tick_clock_config(u32 num, u32 den)
 {
     if (!num || !den || num > 0xffffffffu / TICK_CLOCK_MS_HZ)
@@ -19,6 +31,13 @@ int tick_clock_config(u32 num, u32 den)
     clk = den;
     jif_phase = ms_phase = ms_now = 0;
     return 0;
+}
+
+static __attribute__((noinline)) u32 notify_step(u32 result)
+{
+    if (fast_fn)
+        fast_fn(ms_now);
+    return result;
 }
 
 u32 tick_clock_step(void)
@@ -40,6 +59,8 @@ u32 tick_clock_step(void)
         if (!++tick_count) ++tick_hi;
         result = TICK_STEP_JIFFY;
     }
+    if (__builtin_expect(fast_enabled, 0))
+        return notify_step(result);
     return result;
 }
 
