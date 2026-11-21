@@ -981,5 +981,5 @@ int display_provider_bundle_ok(u32 role, u32 backend)
 {
     return role == LEDGER_ROLE_DISPLAY && backend == LEDGER_SF_PC98;
 }
-int input_display_restore_lock(unsigned int *flags) { *flags = 0; return 0; }
+int input_display_restore_lock(unsigned int *flags) { *flags = irq_save(); return 0; }
 void appslot_gfx_resource_acquire(int owner) { (void)owner; }

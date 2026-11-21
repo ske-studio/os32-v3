@@ -56,6 +56,9 @@ void fd_redirect_clear_state(FdRedirectState *st)   { (void)st; }
 #endif
 #include LAUNCH_SOURCE
 
+int gfx_is_started(void) { return 0; }
+void gfx_shutdown(void) {}
+
 /* ---- 最小の報告系 (libc 無し) ------------------------------------------ */
 
 static void die(int code)
