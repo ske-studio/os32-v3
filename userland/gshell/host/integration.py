@@ -81,6 +81,8 @@ def build(gshell: Path, name: str, quiet: bool = False, typical: bool = False) -
 # 票 KBD_NAV (docs/tasks/gui/TASK_KBD_NAV.md) の受け入れ K1 の変異。
 # (名前, ファイル, 置き換え前 (ちょうど 1 か所), 置き換え後, RED になるべき試験の絞り込み)
 MUTATIONS = [
+    ('retain exited foreground', 'src/multiapp.rs',
+     'mm.av_owner = -1;', '', 'reused_foreground_owner_is_notified_again'),
     ('record rejected foreground', 'src/multiapp.rs',
      'if unsafe { (os32api::api().av_focus_set)(target) } == 0',
      'if { unsafe { (os32api::api().av_focus_set)(target); } true }',

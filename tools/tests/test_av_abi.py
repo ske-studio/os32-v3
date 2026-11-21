@@ -1,5 +1,5 @@
 """Exercise the v90 table, foreground transitions and remaining weak providers on both target ABIs."""
-CHECK = dict(name='av-kapi-abi-host', tier=1, needs=['make:all'], budget=120,
+CHECK = dict(name='av-kapi-abi-host', tier=1, needs=['make:all', 'check:x87-lifecycle-host'], budget=120,
     covers=['tools/tests/test_av_abi.py', 'tools/tests/av_abi_host.c', 'tools/tests/av_abi_host.rs',
             'sdk/rust/os32api/src/av.rs', 'sdk/rust/os32api/src/kapi_generated.rs',
             'tools/check_av_portable.py', 'tools/checks/av_wiring.txt',

@@ -1833,6 +1833,32 @@ fn av_focus_is_called_once_per_focus_change() {
     assert_eq!(unsafe { mocks::focus_kernel::av_focus_get() }, 0);
 }
 
+#[test]
+fn reused_foreground_owner_is_notified_again() {
+    use crate::{handler, mocks, multiapp, wm};
+    use os32api::gui::proto::{GuiWinSpec, GUI_OP_OWNER_EXIT};
+
+    let shm = mocks::Shm::new();
+    b5_setup(&shm);
+    multiapp::sync_av_focus(wm::g());
+    #[cfg(av_focus_kernel)]
+    unsafe {
+        mocks::focus_kernel::av_focus_exec_leave(5, 1);
+        assert_eq!(mocks::focus_kernel::av_focus_get(), 0);
+    }
+    assert_eq!(handler::gshell_gui_handler(GUI_OP_OWNER_EXIT, 0, 5), 0);
+
+    multiapp::on_start(5);
+    let spec: GuiWinSpec = unsafe { core::mem::zeroed() };
+    assert!(wm::create_window(wm::g(), 5, &spec) >= 0);
+    multiapp::sync_av_focus(wm::g());
+    multiapp::sync_av_focus(wm::g());
+    assert_eq!(mocks::av_focus_calls(), vec![5, 5]);
+    #[cfg(av_focus_kernel)]
+    assert_eq!(unsafe { mocks::focus_kernel::av_focus_get() }, 5);
+    wm::g().inited = false;
+}
+
 /* ---- 票の追加検査 7: `LAUNCH` は「1 本増やす」(契約 S2 の読み替え) ---- */
 #[test]
 fn launch_no_longer_quits_the_running_apps_but_switch_cui_still_does() {

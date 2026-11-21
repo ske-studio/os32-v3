@@ -892,6 +892,7 @@ pub mod focus_kernel {
     extern "C" {
         pub fn av_focus_set(owner: i32) -> i32;
         pub fn av_focus_get() -> i32;
+        pub fn av_focus_exec_leave(id: i32, parent: i32);
     }
     #[no_mangle]
     extern "C" fn exec_gui_registered() -> i32 {
