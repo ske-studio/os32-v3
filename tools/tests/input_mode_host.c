@@ -1,11 +1,18 @@
 #define legacy_cooked_flush real_cooked_flush
 #define legacy_raw_flush real_raw_flush
+#define kbd_raw_purge_keep real_raw_purge_keep
 #include "../../input/hal/legacy_ring.c"
 #undef legacy_cooked_flush
 #undef legacy_raw_flush
+#undef kbd_raw_purge_keep
 static int flush_irq_bad;
 void legacy_cooked_flush(void) { if (_irq_enabled()) flush_irq_bad++; real_cooked_flush(); }
 void legacy_raw_flush(void) { if (_irq_enabled()) flush_irq_bad++; real_raw_flush(); }
+void kbd_raw_purge_keep(void)
+{
+    if (_irq_enabled()) flush_irq_bad++;
+    real_raw_purge_keep();
+}
 volatile u32 tick_count;
 static int resets;
 void appslot_poll_yield_reset(void) { resets++; }

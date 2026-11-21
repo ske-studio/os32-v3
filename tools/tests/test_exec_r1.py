@@ -181,6 +181,14 @@ static void exec_pcm_reclaim(int id) { resource(id, 5); }
 static void in2_reclaim(int id) { resource(id, 6); }
 #include "input/hal/in2_int.h"
 #include "kbd_contract.h"
+/* One unread FEP action in the resident provider at child return. */
+static int pending_fep_action;
+static void flush_fep_actions(void) { pending_fep_action = 0; }
+const struct InputLegacyProvider *input_legacy_provider(void)
+{
+    static const struct InputLegacyProvider provider = { .flush_actions = flush_fep_actions };
+    return &provider;
+}
 static int stop_discards;
 static void input_discard_stop(void) { stop_discards++; kbd_discard_stop(); }
 static int ime_clean;
@@ -192,6 +200,7 @@ static void exec_gui_owner_exit(int id, int kind) {
     CHECK(id == 2 && cleanup == 7 && teardown == 1);
     CHECK(stop_discards == (kind == EXEC_KIND_ABORTED));
     if (!host_gui) {
+        CHECK(pending_fep_action == (kind == EXEC_KIND_ABORTED ? 0 : 'z'));
         if (kind != EXEC_KIND_ABORTED) {
             CHECK(legacy_cooked_take() == 'x');
             CHECK(legacy_cooked_take() == 'y');
@@ -364,6 +373,7 @@ static void setup(int gui, int kind) {
     if (!gui) {
         legacy_cooked_push('x');
         legacy_cooked_push('y');
+        pending_fep_action = 'z';
     }
     cleanup = teardown = notices = transfers = stop_discards = 0;
     ring3_context_clear(); nested_parent = 0;
@@ -598,7 +608,7 @@ static void test_stdin_resume(void) {
 '''
 
 
-def run(source=None, irq=None, provider=None):
+def run(source=None, irq=None, provider=None, ring=None):
     source = source or exec_source(ROOT)
     irq = irq or (ROOT / 'kernel/irq/irq.c').read_text()
     constants = '\n'.join(l for l in source.splitlines() if
@@ -621,6 +631,10 @@ def run(source=None, irq=None, provider=None):
             function(irq, 'irq_register') + '\n' + function(irq, 'irq_unregister') + STDIN_PRE + function(source, 'exec_resume') + STDIN_POST + END)
     with tempfile.TemporaryDirectory(prefix='os32-exec-r1-') as tmp:
         tmp = pathlib.Path(tmp)
+        ring_path = ROOT / 'input/hal/legacy_ring.c'
+        if ring is not None:
+            ring_path = tmp / 'legacy_ring.c'
+            ring_path.write_text(ring)
         if provider is not None:
             (tmp / 'provider.c').write_text(provider)
             code = '#define HOST_EXEC_CONTEXT_SOURCE "' + str(tmp / 'provider.c') + '"\n' + code
@@ -635,8 +649,8 @@ def run(source=None, irq=None, provider=None):
         r = subprocess.run(['gcc', '-m32', '-std=gnu11', '-O0', '-Wall', '-Wextra', '-Werror',
                             '-Wno-unused-function', '-ffreestanding', '-fno-pie',
                             '-fno-stack-protector', '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections', '-nostdlib', '-static', '-no-pie',
-                            *inc, str(tmp / 't.c'), str(tmp / 's.o'),
-                            str(ROOT / 'input/hal/legacy_ring.c'), str(ROOT / 'input/hal/legacy_mode.c'),
+                            '-DOS32_HOOK_IME=1', '-I' + str(ROOT / 'input/hal'), *inc, str(tmp / 't.c'), str(tmp / 's.o'),
+                            str(ring_path), str(ROOT / 'input/hal/legacy_mode.c'),
                             str(ROOT / 'kernel/irq/irq_math.c'), str(ROOT / 'platform/pc98/irq_policy.c'), str(ROOT / 'exec/exec_heap.c'), str(ROOT / 'mm/kmalloc.c'), str(ROOT / 'gfx/gfx_emergency.c'), '-o', str(tmp / 't')],
                            capture_output=True, text=True)
         if r.returncode:
@@ -767,6 +781,13 @@ if __name__ == '__main__':
             print(name + ': ' + status)
             if status != 'runtime':
                 raise SystemExit(log or 'mutation must fail at runtime')
+        ring = (ROOT / 'input/hal/legacy_ring.c').read_text()
+        old = 'if (p && p->flush_actions) p->flush_actions();'
+        assert ring.count(old) == 1
+        status, log = run(ring=ring.replace(old, '(void)p;'))
+        if status != 'runtime':
+            raise SystemExit(log or 'retained FEP action must fail at runtime')
+        print('aborted-fep-action-retained: runtime RED')
         inject = (ROOT / 'kernel/kbd_inject.c').read_text()
         old = '    got = inj_read(out, id, 0);'
         assert inject.count(old) == 1

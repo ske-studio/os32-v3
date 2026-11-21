@@ -28,6 +28,8 @@ def run(ctx):
         if ctx.mutate:
             for old,new in [('    legacy_cooked_flush();\n    /* raw', '    /* raw'),
                             ('        legacy_cooked_flush();', ''),
+                            ('        kbd_raw_purge_keep();\n        legacy_cooked_flush();\n    }\n    irq_restore(flags);',
+                             '        legacy_cooked_flush();\n        irq_restore(flags);\n        kbd_raw_purge_keep();\n        return;\n    }\n    irq_restore(flags);'),
                             ('        kbd_raw_purge_keep();', ''),
                             ('        kbd_raw_purge_keep();', '        legacy_raw_flush();'), ('legacy_raw_flush();', ';'),
                             ('legacy_cooked_reset_dropped();', ';'), ('legacy_raw_reset_dropped();', ';'),
