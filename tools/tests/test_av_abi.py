@@ -49,22 +49,36 @@ def exercise(root, folder, machine, mutate):
         cases += [('adjacent providers', [s.replace('= wrap_snd2_stream_start;', '= wrap_snd2_stream_pause;') for s in bind], defaults, 10),
                   ('successful stub', bind, change_stub('snd2_dev_count', 'return OS32_ERR_NOSYS;', 'return 0;'), 1),
                   ('modified output', bind, change_stub('snd2_dev_info', '(void)o;', '((u8 *)o)[0] = 0;'), 40)]
-    # Build core for each target from the installed nightly rust-src.
-    (folder / 'Cargo.toml').write_text('[package]\nname="av_probe"\nversion="0.1.0"\nedition="2021"\n'
-        '[lib]\npath="lib.rs"\n[profile.release]\npanic="abort"\n')
     (folder / 'lib.rs').write_text('#![no_std]\n' + ''.join(
         f'#[path="{root}/sdk/rust/os32api/src/{m}.rs"] pub mod {m};\n'
         for m in ('av', 'kapi_generated')) + f'#[path="{root}/tools/tests/av_abi_host.rs"] mod probe;\n')
     target = 'i686-unknown-linux-gnu' if machine == 'i386' else 'powerpc-unknown-linux-gnu'
-    subprocess.run(['cargo', 'rustc', '--manifest-path', folder / 'Cargo.toml', '--offline', '-Zbuild-std=core', '--release',
-                    '--target', target, '--', '--emit=obj', '-C', 'relocation-model=static'],
-                   cwd=root, env=dict(os.environ, CARGO_TARGET_DIR=str(folder / 'target')), check=True)
-    rust_obj, = (folder / 'target' / target / 'release/deps').glob('av_probe-*.o')
+    # The build runner installs rust-src, but has no registry for Cargo's sysroot graph.
+    sysroot = Path(subprocess.check_output(['rustc', '--print', 'sysroot'], text=True).strip())
+    library = sysroot / 'lib/rustlib/src/rust/library'
+    rustc = ['rustc', '--target', target, '--crate-type=rlib', '-Cpanic=abort', '-Copt-level=2']
+    externs = []
+    for crate, source in [('core', 'core/src/lib.rs'),
+                          ('compiler_builtins', 'compiler-builtins/compiler-builtins/src/lib.rs')]:
+        metadata = folder / f'lib{crate}.rmeta'
+        subprocess.run([*rustc, '--edition=2024', '--emit=metadata', '-Zalways-encode-mir', '--crate-name', crate,
+                        *(['--cfg', 'feature="compiler-builtins"'] if crate == 'compiler_builtins' else []),
+                        *externs, library / source, '-o', metadata], check=True)
+        externs.extend(['--extern', f'{crate}={metadata}'])
+    rust_obj = folder / 'av_probe.o'
+    subprocess.run([*rustc, '--edition=2021', '--emit=obj', '-Crelocation-model=static',
+                    *externs, folder / 'lib.rs', '-o', rust_obj], check=True)
+    compiler = [cc]
+    if machine == 'ppc' and not Path(cc).is_file():
+        host = next(line.split()[1] for line in subprocess.check_output(
+            ['rustc', '-vV'], text=True).splitlines() if line.startswith('host:'))
+        linker = sysroot / 'lib/rustlib' / host / 'bin/gcc-ld/ld.lld'
+        compiler = ['clang', '--target=powerpc-unknown-linux-gnu', '-fuse-ld=' + str(linker)]
     for label, assignments, source, expected in cases:
         (folder / 'av_wrappers.inc').write_text('\n'.join(decl + ['static void av_bind(KernelAPI *kapi) {'] + assignments + ['}']))
         (folder / 'stub.c').write_text(source)
         binary = folder / 'probe'
-        subprocess.run([cc, '-std=gnu89', '-ffreestanding', '-nostdlib', '-static', '-O1',
+        subprocess.run([*compiler, '-std=gnu89', '-ffreestanding', '-nostdlib', '-static', '-O1',
             '-ffunction-sections', '-Wl,--gc-sections', '-Werror=implicit-function-declaration', '-Wno-attributes', '-I' + str(folder),
             '-Isdk/include/os32', '-Iinclude', '-Isound/hal', 'tools/tests/av_abi_host.c',
             rust_obj, folder / 'wrap.c', folder / 'stub.c', 'input/hal/a0_weak.c', folder / 'start.S',
