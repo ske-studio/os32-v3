@@ -14,9 +14,10 @@ from kboot_accept import build, mutant_settings
 from kboot_layout import report_product
 from link_sh_run import Session
 from ppc_shm import guest_available
+from root_lz4_layout import STAGING_BASE, segments
 
 
-def verify_handoff(lines, resident_end):
+def verify_handoff(lines, resident_end, frame_end):
     def fields(pattern):
         match, = [m for line in lines if (m := re.fullmatch(pattern, line))]
         return match.groups()
@@ -45,15 +46,18 @@ def verify_handoff(lines, resident_end):
 
     assert end == resident_end and covered('reg', 0x100000, 0xf00000)
     assert all(b <= 0x100000 or a >= end for a, b in ranges['available'])
-    assert min(a for a, b in ranges['available'] if a >= end) == end + gap
-    assert gap <= 0x10000 and covered('available', end + gap, 0xf00000)
+    # OF reports the loaded frame as claimed. Its pages return to the pool
+    # after expansion, while this snapshot still describes the handoff.
+    assert gap == 0 and covered('available', end, STAGING_BASE)
+    assert all(b <= STAGING_BASE or a >= frame_end for a, b in ranges['available'])
+    assert covered('available', frame_end, 0xf00000)
     pa, size = fields(r'KBOOT MMU-D root=0x[0-9a-fA-F]+ hpt=0x([0-9a-fA-F]+) bytes=(\d+) ram_bat=\d+')
     hpt, size = int(pa, 16), int(size)
     assert size == 0x20000 and hpt % size == 0 and 0x1000000 <= hpt <= 0x2000000 - size
     assert all(covered(name, hpt, hpt + size) for name in ranges)
 
 
-def observe(elf, cpu, folder, expected, resident_end):
+def observe(elf, cpu, folder, expected, resident_end, frame_end):
     session = Session(elf, cpu, folder, 90)
     serial = folder / 'serial-a.log'
     try:
@@ -64,7 +68,7 @@ def observe(elf, cpu, folder, expected, resident_end):
                      'shell layout', 60)
         output = lines()
         index = output.index('KBOOT SHELL-LAYOUT ' + expected)
-        verify_handoff(output[:index], resident_end)
+        verify_handoff(output[:index], resident_end, frame_end)
         if not any(line.startswith('KBOOT OF-OFF calls=') for line in output[:index]):
             raise RuntimeError('missing preceding detach milestone')
     finally:
@@ -100,14 +104,17 @@ def main():
         elf = build(folder / 'kernel', '-j4', 'IMAGE=kboot-link-sh',
                     'KBOOT_SHELL_LAYOUT_DIAG=1', *settings, 'kernel')
         resident_end = report_product(elf)
-        digest = hashlib.sha256(elf.read_bytes()).hexdigest()
+        data = elf.read_bytes()
+        frame, = [p for p in segments(data) if p[0] == 1 and p[3] == STAGING_BASE]
+        frame_end = STAGING_BASE + frame[5]
+        digest = hashlib.sha256(data).hexdigest()
         if digest in hashes:
             raise RuntimeError(f'duplicate image {elf}')
         hashes.add(digest)
         print(f'{name} sha256={digest} {elf}', flush=True)
         if not args.build_only:
             for cpu in ('7450', '7455'):
-                observe(elf, cpu, folder / cpu, expected, resident_end)
+                observe(elf, cpu, folder / cpu, expected, resident_end, frame_end)
                 print(f'{"RED" if change else "GREEN"} {cpu} {name} {expected}')
     print(f'PASS distinct images={len(hashes)}')
     return 0

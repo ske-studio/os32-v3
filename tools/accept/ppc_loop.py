@@ -89,8 +89,8 @@ def main():
         elif disabled:
             # Keep the product shell and select the absent provider in this control only.
             profile = folder / 'loop-disabled.mk'
-            profile.write_text('override FEATURE_LOOP := 0\n')
-            settings = ['-f', str(profile), '-f', 'Makefile']
+            profile.write_text('include build/images/ppc-flags.mk\noverride FEATURE_LOOP := 0\n')
+            settings = ['PPC_FLAGS_MK=' + str(profile)]
         elf = build(kernel, *options, *settings, 'kb-user', 'kernel')
         if case == 'normal':
             shutil.copyfile(sample, host_root / 'loop.img')
