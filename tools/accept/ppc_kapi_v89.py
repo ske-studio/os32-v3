@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""KAPI-V89-PPC — KAPI_CAPACITY_V89_DESIGN §1 and §4.4–5, boot mapping and USER ABI."""
+"""KAPI-V89-PPC — KAPI_CAPACITY_V89_DESIGN §1, §2 and §4 items 4–5, boot mapping and USER ABI."""
 import argparse
 import hashlib
 import os
@@ -48,6 +48,9 @@ def fixture(folder, case, gate):
     if case == 'map-failure':
         edit(boot, stop, r'''    if (!shared_user) {
         extern u32 exec_entry_calls;
+        u32 pte = paging_pte_raw(exec_tramp_page_addr());
+        kprintf(7, "V89 partial-user=%u\r\n",
+                !!(pte & PTE_PRESENT && pte & PTE_USER));
         kprintf(7, "V89 entries=%u\r\n", exec_entry_calls);
         kboot_stop("KAPI trampoline");
     }''')
@@ -66,16 +69,19 @@ def fixture(folder, case, gate):
         launch = '        arch_entry_enter(&ctx->entry, want_ring3 ? ctx->as->pd_phys : 0);'
         edit('exec/exec_launch.inc', launch, r'''        kprintf(7, "V89 enter\r\n");
         if (want_ring3) {
-            u32 reads = 0, writes = 0;
+            u32 reads = 0, writes = 0, identity = 0;
             unsigned flags = irq_save();
             for (int i = 0; i < 4; ++i) {
                 u32 va = ring3_tramp_page + (i - 1) * PAGE_SIZE;
                 u32 pa;
-                if (as_access_page(ctx->as, va, 0, &pa) && pa == va) reads |= 1u << i;
-                if (as_access_page(ctx->as, va, 1, &pa)) writes |= 1u << i;
+                if (!as_va_to_pa_read(ctx->as->pd_phys, va, &pa)) {
+                    reads |= 1u << i;
+                    if (pa == va) identity |= 1u << i;
+                }
+                if (!as_va_to_pa(ctx->as->pd_phys, va, &pa)) writes |= 1u << i;
             }
             irq_restore(flags);
-            kprintf(7, "V89 child read=%u write=%u\r\n", reads, writes);
+            kprintf(7, "V89 child read=%u write=%u identity=%u\r\n", reads, writes, identity);
         }
 ''' + launch)
         bound = '    if (slot >= (u32)KAPI_FUNC_COUNT) {'
@@ -86,11 +92,16 @@ def fixture(folder, case, gate):
             check = bound.replace('>=', '>')
         edit('exec/exec_syscall.inc', bound, check + '\n' +
              r'        kprintf(7, "V89 rejected=%u\r\n", slot);')
-        if case == 'accept-first':
-            anchor = '    wrapptr = exec_kapi_table()'
-            edit('exec/exec_syscall.inc', anchor,
-                 '    if (slot == KAPI_FUNC_COUNT) {\n'
-                 '        result = 42;\n        goto syscall_complete;\n    }\n' + anchor)
+        # Keep reserved slots away from argument metadata even when the tested
+        # comparison is relaxed. Only the product rejection emits the marker.
+        anchor = '    wrapptr = exec_kapi_table()'
+        edit('exec/exec_syscall.inc', anchor, r"""    if (slot >= KAPI_FUNC_COUNT) {
+        kprintf(7, "V89 past-bound=%u\r\n", slot);
+        ring3_fault_kill();
+        result = OS32_ERR_INVAL;
+        goto syscall_complete;
+    }
+""" + anchor)
         done = '    arch_syscall_result(&call, result);'
         edit('exec/exec_syscall.inc', done, done + '''
     static int v89_follow;
@@ -108,6 +119,9 @@ def fixture(folder, case, gate):
                 (folder / ('v89-' + name)).write_text(sources.pop(path))
     if case == 'wrong-stub':
         edit('arch/ppc/syscall_code.c', '0x38000000u | i)', '0x38000000u | (i == 297 ? 7 : i))')
+    if case == 'wrong-branch':
+        edit('arch/ppc/syscall_code.c', '(l.ls_off + 8u) -',
+             '(l.ls_off + (i == 297 ? 12u : 8u)) -')
     settings = []
     for key, (path, source) in zip(('KB_MUT', 'KB_MUT_EXTRA', 'KB_MUT_THIRD'), sources.items(), strict=False):
         target = folder / Path(path).name
@@ -117,6 +131,26 @@ def fixture(folder, case, gate):
     return settings
 
 
+class Mismatch(Exception):
+    pass
+
+
+def expect(condition, observation):
+    if not condition:
+        raise Mismatch(observation)
+
+
+EXPECTED_RED = {
+    'missing-page': 'page 1',
+    'gate-count': 'page 1',
+    'wrong-stub': 'stub immediate',
+    'wrong-branch': 'stub branch',
+    'wrong-data': 'published data',
+    'reject-last': 'slot 297 rejected',
+    'accept-first': 'slot 298 rejection',
+}
+
+
 def observe(elf, folder, case, cpu):
     session = Session(elf, cpu, folder, 150)
     log = folder / 'serial-a.log'
@@ -124,6 +158,7 @@ def observe(elf, folder, case, cpu):
     def serial():
         return log.read_bytes().replace(b'\r', b'') if log.exists() else b''
 
+    verdict = None
     try:
         session.start()
         if case == 'map-failure':
@@ -135,61 +170,67 @@ def observe(elf, folder, case, cpu):
                 return pc and addr <= int(pc[1], 16) < end
             session.wait(stopped, 'KAPI boot failure stop', 60)
             lines = serial().splitlines()
+            # Characterize the current partial publication pending the PM decision.
+            require(lines.count(b'V89 partial-user=1') == 1, 'first PTE after failure')
             require(lines.count(b'FATAL kboot KAPI trampoline') == 1 and
                     lines.count(b'V89 entries=0') == 1 and b'V89 enter' not in lines, 'mapping failure diagnostic or user entry')
         else:
             session.wait(lambda: b'V89 page=2 ' in serial() and
                          re.search(rb'V89 page=2 .*?\n', serial()), 'KAPI page observations', 60)
             pages = re.findall(rb'^V89 page=(-?\d+) user=(\d) rw=(\d) identity=(\d)$', serial(), re.M)
-            count = 1 if case in ('gate', 'missing-page') else 2
+            count = 1 if case in ('gate', 'gate-count') else 2
             require(len(pages) == 4, 'four surrounding PTEs')
             for offset, row in zip(range(-1, 3), pages):
                 index, user, writable, identity = map(int, row)
                 public = 0 <= offset < count
-                require(index == offset and user == public and
-                        (not public or (identity and not writable)), repr(row))
-            if case in ('exec', 'wrong-data', 'wrong-stub', 'accept-first', 'reject-last'):
+                require(index == offset, 'page observation order')
+                expect(user == public and (not public or (identity and not writable)),
+                       f'page {offset}')
+            if count == 2:
                 session.wait(session.ready, 'CUI shell ready', 60)
                 start = len(serial())
                 body = rsh_command(session, '/bin/v89probe.bin')
-                if case == 'reject-last':
-                    require(b'[Process crashed]' in body.splitlines() and
-                            b'V89 rejected=297' in serial()[start:].splitlines(), repr(body))
+                trace = serial()[start:]
+                require(b'V89 child read=6 write=0 identity=6\n' in trace, 'child AS permissions or frame')
+                for reason in ('stub immediate', 'stub branch', 'stub entry', 'common sc'):
+                    expect(body.strip() != reason.encode(), reason)
+                expect(b'V89 rejected=297' not in trace.splitlines(), 'slot 297 rejected')
+                result = re.fullmatch(rb'V89 return=(-?\d+) heap=(\d+) shm=(\d+)\n+', body)
+                require(result and rsh_command(session, 'echo $?') == b'0\n', repr(body))
+                pair = re.search(rb'V89 slot=0 [^\n]+\nV89 slot=297 result=(-?\d+) heap=(\d+) shm=(\d+)\n', trace)
+                require(pair, 'first and last dispatch results')
+                value, heap, shm = map(int, pair.groups())
+                require(value == -9 and heap and shm and heap != shm, repr(pair.groups()))
+                expect(tuple(map(int, result.groups())) == (value, heap, shm), 'published data')
+                for argument, slot in (('a', 298), ('b', 383)):
+                    start = len(serial())
+                    body = rsh_command(session, '/bin/v89probe.bin ' + argument)
+                    lines = serial()[start:].splitlines()
+                    rejected = f'V89 rejected={slot}'.encode() in lines
+                    require(rejected or f'V89 past-bound={slot}'.encode() in lines,
+                            f'missing dispatch evidence for slot {slot}')
+                    expect(rejected,
+                           f'slot {slot} rejection')
+                    require(b'[Process crashed]' in body.splitlines(), repr(body))
                     rsh_command(session, 'echo $?', b'139\n')
-                else:
-                    result = re.fullmatch(rb'V89 return=(-?\d+) heap=(\d+) shm=(\d+)\n+', body)
-                    require(result and rsh_command(session, 'echo $?') == b'0\n', repr(body))
-                    trace = serial()[start:]
-                    require(b'V89 child read=6 write=0\n' in trace, 'child AS access policy')
-                    slot = 7 if case == 'wrong-stub' else 297
-                    pair = re.search(rb'V89 slot=0 [^\n]+\nV89 slot=' + str(slot).encode() +
-                                     rb' result=(-?\d+) heap=(\d+) shm=(\d+)\n', trace)
-                    require(pair, 'first and last dispatch results')
-                    value, heap, shm = map(int, pair.groups())
-                    require(tuple(map(int, result.groups())) ==
-                            (value, heap, heap if case == 'wrong-data' else shm), repr(body))
-                    require(heap and shm and heap != shm and (slot == 7 or value == -9), repr(pair.groups()))
-                if case in ('exec', 'accept-first'):
-                    for argument, slot in (('a', 298), ('b', 383)):
-                        start = len(serial())
-                        body = rsh_command(session, '/bin/v89probe.bin ' + argument)
-                        if case == 'accept-first' and slot == 298:
-                            require(body.strip() == b'V89 slot=298 result=42', repr(body))
-                            rsh_command(session, 'echo $?', b'1\n')
-                        else:
-                            require(b'[Process crashed]' in body.splitlines() and
-                                    f'V89 rejected={slot}'.encode() in serial()[start:].splitlines(),
-                                    repr(body))
-                            rsh_command(session, 'echo $?', b'139\n')
-                        follow = rsh_command(session, '/bin/v89probe.bin')
-                        require(re.fullmatch(rb'V89 return=-9 heap=\d+ shm=\d+\n+', follow), repr(follow))
-                        rsh_command(session, 'echo $?', b'0\n')
-        session.q.call('quit')
-        session.p.wait(timeout=5)
-        require(session.p.returncode == 0, 'QEMU exit')
-        print(('GREEN' if case in ('exec', 'gate', 'map-failure') else 'RED'), case, cpu, flush=True)
+                    follow = rsh_command(session, '/bin/v89probe.bin')
+                    require(re.fullmatch(rb'V89 return=-9 heap=\d+ shm=\d+\n+', follow), repr(follow))
+                    rsh_command(session, 'echo $?', b'0\n')
+    except Mismatch as exc:
+        if exc.args != (EXPECTED_RED.get(case),):
+            raise
+        verdict = f'RED {exc}'
+    else:
+        require(case not in EXPECTED_RED, 'mutation survived: ' + case)
+        verdict = 'GREEN'
     finally:
-        session.close()
+        try:
+            if verdict:
+                session.q.call('quit')
+                require(session.p.wait(timeout=5) == 0, 'QEMU exit')
+        finally:
+            session.close()
+    print(verdict, case, cpu, flush=True)
 
 
 def main():
@@ -206,7 +247,7 @@ def main():
     bins = ' '.join(str(user / (name + '.bin')) for name in ('hello', 'fault', 'v89probe'))
     cases = ['exec', 'gate', 'map-failure']
     if args.mutate:
-        cases += ['missing-page', 'gate-count', 'wrong-stub', 'wrong-data', 'reject-last', 'accept-first']
+        cases += list(EXPECTED_RED)
     seen = set()
     for case in cases:
         folder = work / case

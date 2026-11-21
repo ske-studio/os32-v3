@@ -14,6 +14,24 @@ int main(int argc, char **argv, KernelAPI *api)
         for (char *p = line; *p; ++p) api->shell_putchar(*p, 7);
         return 1; /* The range check should terminate this child. */
     }
+    u32 base = (u32)api;
+    const char *error = 0;
+    for (unsigned slot = 0; slot <= 297; slot += 297) {
+        u32 entry = base + 0x1000 + 8 * slot;
+        if (table[2 + slot] != entry) { error = "stub entry"; break; }
+        volatile const u32 *stub = (volatile const u32 *)entry;
+        if (stub[0] != (0x38000000u | slot)) { error = "stub immediate"; break; }
+        if (stub[1] != (0x48000000u | ((base + 0x1c08) - (entry + 4)))) {
+            error = "stub branch";
+            break;
+        }
+    }
+    if (!error && table[0x1c08 / 4] != 0x44000002u) error = "common sc";
+    if (error) {
+        while (*error) api->shell_putchar(*error++, 7);
+        api->shell_putchar('\n', 7);
+        return 1;
+    }
     api->gfx_init();
     int result = api->io_pump(0);
     snprintf(line, sizeof(line), "V89 return=%d heap=%u shm=%u\n",
