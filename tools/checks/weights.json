@@ -589,6 +589,7 @@
     "ppc-surface-guest": 181.335088,
     "ppc-sysinfo-guest": 134.690074,
     "ppc-usb": 337.884212,
+    "ppc-kapi-v89-guest": 300,
     "ppc-ver-guest": 190.635703,
     "preflight-host": 4.421956,
     "privileged": 7.8109,
