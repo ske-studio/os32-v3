@@ -5,6 +5,8 @@
 #include "ide_contract.h"
 #include "kstring.h"
 
+unsigned ata_write_provider_calls;
+
 static void ata_write_report(int child)
 {
     const KernelAPI *api = (const KernelAPI *)exec_kapi_table();
@@ -17,8 +19,9 @@ static void ata_write_report(int child)
         return;
     }
     if (child) {
+        ata_write_provider_calls = 0;
         int status = api->exec_run("/sys/shell.bin");
-        kprintf(7, "ATA-TEST child=%d\r\n", status);
+        kprintf(7, "ATA-TEST child=%d provider_calls=%u\r\n", status, ata_write_provider_calls);
         return;
     }
     for (unsigned i = 0; i < 1024; ++i)

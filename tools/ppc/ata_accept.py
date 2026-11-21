@@ -48,6 +48,15 @@ def make_write_image(out, case):
                          ('ide_write_sectors(drv, lba, cnt,', 'ide_write_sectors(drv, lba, cnt > 1 ? cnt - 1 : cnt,'))
         settings += mutant_settings(out, case, device, before, after)
     if case == 'deny':
+        device = 'kernel/dev/device_ide.c'
+        provider = (ROOT / device).read_text()
+        for name in ('ide_write_sector', 'ide_write_sectors'):
+            call = '    return ' + name + '('
+            assert provider.count(call) == 1
+            provider = provider.replace(call, '    ++ata_write_provider_calls;\n' + call)
+        path = out / 'device_ide.c'
+        path.write_text('extern unsigned ata_write_provider_calls;\n' + provider)
+        settings += ['KB_MUT_SRC=' + device, 'KB_MUT_FILE=' + str(path)]
         # Depth zero must first load a resident image in the shell band.
         # Its exec_run then gives the probe an ordinary USER child slot.
         resident = 'userland/shell/main.c'
@@ -206,7 +215,7 @@ def main():
             if case in WRITE_CASES:
                 expected = bytearray(disk.read_bytes())
                 if case == 'deny':
-                    assert 'ATA-TEST child=73' in lines, lines[-10:]
+                    assert 'ATA-TEST child=73 provider_calls=0' in lines, lines[-10:]
                 else:
                     range_rc = 0 if case == 'write-count' else -4
                     assert f'ATA-TEST writes=0,0 range={range_rc}' in lines, lines[-10:]

@@ -477,6 +477,15 @@ def main():
         ide_providers = {'platform_' + slot for slot in ide_slots}
         if any(provider + '(' in source for provider in ide_providers):
             return 1
+        for link, ide in ((True, False), (False, True)):
+            profile = tmp / ('link-only' if link else 'ide-only')
+            profile.mkdir()
+            generated = generate(profile, link=link, ide=ide)
+            present = sfs_slots if link else ide_slots
+            absent = [api for api in entries if api['name'] not in present]
+            if not verify((generated / 'kapi/kapi_generated.c').read_text(), absent, present):
+                print(f'binding verification failed: LINK={int(link)} IDE={int(ide)}')
+                return 1
         linked_source = (linked / 'kapi/kapi_generated.c').read_text()
         absent = [api for api in entries if api['name'] not in sfs_slots | ide_slots]
         if not verify(linked_source, absent, ide_slots):
