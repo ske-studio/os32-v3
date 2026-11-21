@@ -47,8 +47,22 @@ static int stop_probe(void)
     if (kbd_stop_suppressed) return 1;
     kbd_discard_stop(); kbd_stop_mouse_sample(1);
     if (!kbd_stop_suppressed) return 1;
-    kbd_gui_mode = 0; kbd_discard_stop();
-    return kbd_stop_suppressed != 0;
+    kbd_set_gui_mode(0);
+    const int rescue[] = { KEY_CTRL, KEY_GRPH, KEY_TAB, KEY_STOP };
+    for (unsigned i = 0; i < sizeof(rescue)/sizeof(rescue[0]); i++) {
+        legacy_raw_push(rescue[i], 0, SHIFT_CTRL);
+        legacy_raw_push(1, 0, 0);
+        legacy_raw_push(rescue[i], 1, SHIFT_GRPH);
+    }
+    legacy_cooked_push('x');
+    legacy_cooked_push('y');
+    kbd_discard_stop();
+    for (unsigned i = 0; i < sizeof(rescue)/sizeof(rescue[0]); i++) {
+        if (legacy_raw_take() != (rescue[i] | KBD_RAW_MAKE | (SHIFT_CTRL << KBD_RAW_MOD_SHIFT)) ||
+            legacy_raw_take() != (rescue[i] | (SHIFT_GRPH << KBD_RAW_MOD_SHIFT))) return 1;
+    }
+    return kbd_stop_suppressed || legacy_raw_take() != -1 || legacy_cooked_take() != -1 ||
+           flush_irq_bad || !_irq_enabled();
 }
 static int probe(void)
 {

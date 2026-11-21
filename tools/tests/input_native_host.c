@@ -92,6 +92,14 @@ static int probe(void)
     T(!in2_ring_pop(&out, &seq));
     kbd_hal_capture(KEY_CAPS | 128); kbd_hal_capture(KEY_KANA | 128);
     T(!input_key_mods() && !in2_ring_pop(&out, &seq) && legacy_raw_take() == -1);
+    kbd_set_gui_mode(0);
+    kbd_hal_capture(0x1d);
+    kbd_hal_capture(KEY_CTRL);
+    T(legacy_cooked_pending() && input_key_pressed(KEY_CTRL));
+    kbd_discard_stop();
+    T(!legacy_cooked_pending() && input_key_mods() == SHIFT_CTRL && input_key_pressed(KEY_CTRL));
+    kbd_hal_capture(KEY_CTRL | 128);
+    T(!input_key_mods() && !input_key_pressed(KEY_CTRL));
     return 0;
 }
 void _start(void) { int rc = probe(); __asm__ volatile("int $0x80" : : "a"(1), "b"(rc) : "memory"); __builtin_unreachable(); }

@@ -179,8 +179,10 @@ static void pipe_free_owned(int id) { resource(id, 3); }
 static void shm_free_owned(int id) { resource(id, 4); }
 static void exec_pcm_reclaim(int id) { resource(id, 5); }
 static void in2_reclaim(int id) { resource(id, 6); }
+#include "input/hal/in2_int.h"
+#include "kbd_contract.h"
 static int stop_discards;
-static void input_discard_stop(void) { stop_discards++; }
+static void input_discard_stop(void) { stop_discards++; kbd_discard_stop(); }
 static int ime_clean;
 void exec_ime_owner_exit(int id) { CHECK(id == 2 && cleanup == 7 && teardown == 1); ime_clean = 1; }
 static void av_focus_exec_leave(int id, int parent) { CHECK(id == 2 && parent == cur); }
@@ -189,6 +191,13 @@ static void exec_gui_owner_exit(int id, int kind) {
     CHECK(kind == (host_wm_kill ? EXEC_KIND_ABORTED : phase == 3 ? EXEC_KIND_EXITED : scheduled_kind));
     CHECK(id == 2 && cleanup == 7 && teardown == 1);
     CHECK(stop_discards == (kind == EXEC_KIND_ABORTED));
+    if (!host_gui) {
+        if (kind != EXEC_KIND_ABORTED) {
+            CHECK(legacy_cooked_take() == 'x');
+            CHECK(legacy_cooked_take() == 'y');
+        }
+        CHECK(legacy_cooked_take() == -1);
+    }
     CHECK(cur == (host_wm_kill ? 1 : 3) && owner == cur && cr3 == cur);
     CHECK(host_if && !kctx_irq_depth && !kctx_exc_depth); notices++;
 }
@@ -247,7 +256,7 @@ static void poison_landing(void) {
 static void simulate_action(void);
 static void _halt(void) { die(__LINE__); }
 volatile u32 ring3_caller_reject_count, ring3_wm_depth_underflow, ring3_park_reject_count;
-static u32 tick_count;
+volatile u32 tick_count;
 static u32 host_kapi_table[KAPI_FUNC_COUNT + 2];
 #define KAPI_ADDR host_kapi_table
 static inline const u32 *exec_kapi_table(void) { return (const u32 *)KAPI_ADDR; }
@@ -350,6 +359,12 @@ static void setup(int gui, int kind) {
     exec_heap_init_at((u32)child_heap_bytes, sizeof(child_heap_bytes));
     CHECK(exec_heap_alloc(64));
     cur = owner = cr3 = 2; host_if = 1; host_gui = gui;
+    kbd_gui_mode = gui;
+    legacy_cooked_flush();
+    if (!gui) {
+        legacy_cooked_push('x');
+        legacy_cooked_push('y');
+    }
     cleanup = teardown = notices = transfers = stop_discards = 0;
     ring3_context_clear(); nested_parent = 0;
     for (int id = 2; id <= 3; id++) {
@@ -620,7 +635,9 @@ def run(source=None, irq=None, provider=None):
         r = subprocess.run(['gcc', '-m32', '-std=gnu11', '-O0', '-Wall', '-Wextra', '-Werror',
                             '-Wno-unused-function', '-ffreestanding', '-fno-pie',
                             '-fno-stack-protector', '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections', '-nostdlib', '-static', '-no-pie',
-                            *inc, str(tmp / 't.c'), str(tmp / 's.o'), str(ROOT / 'kernel/irq/irq_math.c'), str(ROOT / 'platform/pc98/irq_policy.c'), str(ROOT / 'exec/exec_heap.c'), str(ROOT / 'mm/kmalloc.c'), str(ROOT / 'gfx/gfx_emergency.c'), '-o', str(tmp / 't')],
+                            *inc, str(tmp / 't.c'), str(tmp / 's.o'),
+                            str(ROOT / 'input/hal/legacy_ring.c'), str(ROOT / 'input/hal/legacy_mode.c'),
+                            str(ROOT / 'kernel/irq/irq_math.c'), str(ROOT / 'platform/pc98/irq_policy.c'), str(ROOT / 'exec/exec_heap.c'), str(ROOT / 'mm/kmalloc.c'), str(ROOT / 'gfx/gfx_emergency.c'), '-o', str(tmp / 't')],
                            capture_output=True, text=True)
         if r.returncode:
             return 'compile', r.stderr
@@ -693,6 +710,8 @@ MUTATIONS = (
     ('stdin-ignore-empty', '            if (!kbd_inject_peek_for((int)app_id, &ch)) return OS32_ERR_AGAIN;',
      '            (void)kbd_inject_peek_for((int)app_id, &ch);'),
     ('aborted-raw-retained', '    if (kind == EXEC_KIND_ABORTED) input_discard_stop();', ''),
+    ('ordinary-exit-flushed', '    if (kind == EXEC_KIND_ABORTED) input_discard_stop();',
+     '    if (kind != EXEC_KIND_FAULT) input_discard_stop();'),
     ('ime-owner-exit', '    exec_ime_owner_exit(id);', ''),
     ('exit-kind-lost', '    exec_gui_owner_exit(id, kind);', '    exec_gui_owner_exit(id, 0);'),
     ('launch-save-missing', '    ring3_context_save(&caller_context);\n    if (exec_setjmp(ctx->jmpbuf) != 0) {',
