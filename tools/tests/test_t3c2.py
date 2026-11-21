@@ -22,11 +22,11 @@ def audit_cases(tmp):
     # Independent symbols; addresses in the observer must follow this layout.
     symbols = {'__bss_end': 0x140000, '__kernel_resident_end': 0x140000,
                '__ledger_fixed_start': 0x13e000, '__ledger_fixed_end': 0x140000,
-               'ring3_tramp_raw': 0x135123}
+               'ring3_tramp_raw': 0x136000}
     macros = Macros(read_defines(ROOT / 'include/memmap.h'), symbols)
     k = {name: macros.get(name) for name in macros.defines}
     checks = live.checks(k, symbols, 0)
-    assert ('KAPI trampoline', 0x136000, 0x136fff, 1, 1) in checks
+    assert ('KAPI trampoline', 0x136000, 0x137fff, 1, 1) in checks
     shell = [c for c in checks if c[0].startswith('shell')]
     assert shell[-1][2] == k['MEM_SHELL_BAND_END']
     assert shell[0][1] == k['MEM_SHELL_LOAD_ADDR']

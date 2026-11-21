@@ -44,6 +44,7 @@ with tempfile.TemporaryDirectory(prefix='os32-paging-') as tmp:
     if args.mutate:
         assert not args.rebuild
         mutants = [
+            ('gate exposes second page', 'for (u32 i = 0; i < pages; ++i)', 'for (u32 i = 0; i < 2; ++i)'),
             ('mixed free below allowed', '(PDE_INDEX(vstart)) < as->app_pde ||', '0 ||'),
             ('mixed free allowed', '((vend - 1) >> PDE_SHIFT) >= as->app_pde + as->app_pde_count) return 0;', '0) return 0;'),
             ('shared single page allowed', 'return -1; /* Shared PTs are immutable through ordinary AS mapping. */', 'if (!page_tables[pdi] || !(pd[pdi] & PTE_PRESENT)) return -1;\n        pt = page_tables[pdi];'),

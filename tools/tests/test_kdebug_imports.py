@@ -29,7 +29,7 @@ REVIEWED_S6_FUNCTION_TAIL = ('gf_production_selected', 'geforce_foundation_ops',
                              'geforce_resource_lookup', 'paging_device_map', 'paging_device_unmap',
                              'trident_diagnostic_ops', 'debug_probe_control', 'legacy_lowmap_busy', 'v86_bios_real_lowmem', 'pci_bar_get',
                              'path_set_drive', 'path_set_cwd', 'path_init')
-REVIEWED_S6_KINDS = ('FUNC',) * 38 + ('GETTER',) + ('SETTER',) * 2 + ('PTR',) * 3 + ('FUNC',) * len(REVIEWED_S6_FUNCTION_TAIL)
+REVIEWED_S6_KINDS = ('FUNC',) * 37 + ('GETTER',) + ('SETTER',) * 2 + ('PTR',) * 3 + ('FUNC',) * len(REVIEWED_S6_FUNCTION_TAIL)
 
 class ImportsTests(unittest.TestCase):
     @classmethod
@@ -47,7 +47,7 @@ class ImportsTests(unittest.TestCase):
     def test_legacy_audit_append_preserves_v86_slot(self):
         self.assertEqual(self.entries[106]['name'], 'paging_v86_session_open')
         self.assertFalse(self.entries[106].get('retained', False))
-        entry = self.entries[322]
+        entry = self.entries[321]
         self.assertEqual((entry['name'], entry['signature']),
                          ('legacy_lowmap_busy', 'int legacy_lowmap_busy(void);'))
         self.assertTrue(entry['retained'])
@@ -333,7 +333,7 @@ class ImportsTests(unittest.TestCase):
             with patch.dict(gen.STAGE_KINDS, S6=gen.STAGE_KINDS['S6'] + tuple(row[0] for row in additions)), \
                  patch.dict(gen.STAGES, S6=len(document['imports'])):
                 entries = gen.load_def(definition)
-                entries[303].pop('retained')  # Active in this synthetic contract.
+                entries[302].pop('retained')  # Active in this synthetic contract.
                 meta = gen.generate(entries, out, 'S6')
                 self.assertEqual(meta['count'], len(self.entries) + len(additions))
                 macros = (out / 'kdebug_import_macros.h').read_text()
@@ -404,7 +404,7 @@ class ImportsTests(unittest.TestCase):
             'kdi_selftest_exec_view', 'vfs_cwd_user', 'vfs_cwd',
             'vfs_devname_user', 'vfs_devname', 'path_get_drive_user',
             'path_get_drive', 'path_get_cwd_user', 'path_get_cwd',
-            'kapi_reserved_nosys', 'os32x_layout_check',
+            'os32x_layout_check',
             'kdi_get_kbd_inject_drop_count',
             'kdi_set_con_sink_drop_count', 'kdi_set_kbd_inject_drop_count',
             'kdi_ptr_ring3_ls_start', 'kdi_ptr_ring3_ls_end',
@@ -433,7 +433,7 @@ class ImportsTests(unittest.TestCase):
         names = ('con_sink_push_print', 'con_sink_push_clear', 'con_sink_push_cursor',
                  'con_sink_push_exit', 'con_sink_stat', 'con_sink_read',
                  'con_sink_owner_exit', 'kdi_set_con_sink_drop_count')
-        indices = (*range(264, 271), 303)
+        indices = (*range(264, 271), 302)
         original = gen.symbols
         callers = [ROOT / p for p in re.findall(
             r'^LOAD (.+\.o)$', (ROOT / 'build/out/kdebug/kdebug.map').read_text(),
@@ -493,26 +493,26 @@ class ImportsTests(unittest.TestCase):
         self.assertTrue({'kst_exec_tramp_user', 'kst_exec_kapi_layout'} <= module)
         self.assertIn('kdi_selftest_exec_view', kernel)
         self.assertEqual(gen.symbols(nm, [obj], True) - {gen.ABI_SYMBOL},
-                         set(IMPORTS) - {'kapi_reserved_nosys'} | {'kdebug_import_slots'})
+                         set(IMPORTS))
         self.assertEqual(gen.address_references(self.entries, [obj], ROOT),
-                         {'kapi_reserved_nosys'})
+                         set())
 
     def test_address_manifest_uses_only_linked_moved_sources(self):
         entries = [dict(name=name, kind_name='FUNC') for name in gen.ADDRESS_IMPORTS]
         with tempfile.TemporaryDirectory(prefix='kdebug-address-') as folder:
             root = Path(folder)
             (root / 'kdebug').mkdir()
-            source = root / 'kdebug/selftest_exec.c'
-            source.write_text('return KDI_ADDR_kapi_reserved_nosys;\n')
-            obj = root / 'build/out/kdebug/selftest_exec.o'
-            self.assertEqual(gen.address_references(entries, [obj], root), {'kapi_reserved_nosys'})
+            source = root / 'kdebug/selftest_lease.c'
+            source.write_text('return KDI_ADDR_shlib_read_page;\n')
+            obj = root / 'build/out/kdebug/selftest_lease.o'
+            self.assertEqual(gen.address_references(entries, [obj], root), {'shlib_read_page'})
             self.assertEqual(gen.address_references(entries, [], root), set())
             with self.assertRaisesRegex(ValueError, 'invalid address import'):
                 gen.address_references([], [obj], root)
-            source.write_text('return kapi_reserved_nosys;\n')
+            source.write_text('return shlib_read_page;\n')
             with self.assertRaisesRegex(ValueError, 'missing address import'):
                 gen.address_references(entries, [obj], root)
-            source.write_text('return KDI_ADDR_shlib_read_page;\n')
+            source.write_text('return KDI_ADDR_kprintf;\n')
             with self.assertRaisesRegex(ValueError, 'invalid address import'):
                 gen.address_references(entries, [obj], root)
 

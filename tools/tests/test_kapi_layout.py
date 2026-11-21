@@ -134,9 +134,10 @@ def case_capacity(tmp):
     r = try_cap(0, drop=True)
     check(r.returncode != 0, "func_capacity が無ければ拒否する")
     case_capacity_full(tmp, kj)
-    check(kj["func_capacity"] == 300, "いまの容量は R = 300 (票の決定)")
-    check(12 * kj["func_capacity"] + 272 <= 4096,
-          "容量 R はトランポリン 1 ページに収まる (12R + 272 <= 4096)")
+    cap = kj["func_capacity"]
+    check(8 + 4 * cap + 8 + 256 <= 4096, "表と文字列は第 1 頁に収まる")
+    check(8 * cap + 192 <= 4096, "スタブと shim は第 2 頁に収まる")
+
 
 
 KERNEL_CFLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
@@ -255,8 +256,8 @@ def case_mkos32x(tmp):
     check(h["version"] == H.OS32X_HDR_VERSION and h["header_size"] == H.OS32X_HDR_SIZE, "ヘッダ v5 / 64 バイト")
     sec = H.Elf32(str(elf)).section(".os32_kapi_layout")
     val = struct.unpack_from("<I", H.Elf32(str(elf)).section_bytes(sec), 0)[0]
-    check(h.get("kapi_data_off") == val == 0x4B8,
-          "kapi_data_off (0x%X) = ELF の .os32_kapi_layout (0x%X) = 0x4B8"
+    check(h.get("kapi_data_off") == val == H.KAPI_DATA_FIELDS_OFF,
+          "kapi_data_off (0x%X) = ELF の .os32_kapi_layout (0x%X)"
           % (h.get("kapi_data_off", 0), val))
     check(not (sec["flags"] & H.SHF_ALLOC), "刻印のセクションは非ロード (alloc でない)")
     check(h["min_api_ver"] == H.OS32X_MIN_API, f"--api 39 は {H.OS32X_MIN_API} に引き上がる (旧カーネルが受け入れない)")
@@ -321,12 +322,12 @@ def case_mkos32x(tmp):
                                        str((vendor / 'libgcc.a').resolve())},
               'vendor免除はldが選択した正確なarchive pathを記録')
     note = tmp / 'old.note'
-    note.write_bytes(struct.pack('<4I', H.OS32X_HDR_VERSION - 1, H.OS32_KAPI_ABI_GENERATION,
+    note.write_bytes(struct.pack('<4I', H.OS32X_HDR_VERSION, H.OS32_KAPI_ABI_GENERATION - 1,
                                  H.OS32_MEMORY_LAYOUT_GENERATION, H.OS32_SHLIB_PROTOCOL))
     stale = tmp / 'stale.o'
     run([TOBJCOPY, '--update-section', '.os32_generations=' + str(note), tmp / 'stamped.o', stale])
     check(guarded([stale, tmp / 'fresh.o'], 'mixed_generation').returncode != 0,
-          "形式世代の旧値と新単位の混在を拒否")
+          "KAPI ABI 世代の旧値と新単位の混在を拒否")
     # rustc wrapper must reject legacy metadata before launching the compiler/LTO.
     dep = tmp / 'old.rlib'; dep.write_bytes(b'old bitcode')
     r = run([sys.executable, 'sdk/rustc_stamp.py', '/bin/true', '--crate-name', 'test',
@@ -344,13 +345,13 @@ def case_mkos32x(tmp):
 
     # 刻印が 2 つで値が違う (古いオブジェクトの混入) → 失敗
     elf3, raw3 = build_elf(tmp, "mixed", extra_asm=(
-        '.pushsection .os32_kapi_layout,"",@progbits\n.p2align 2\n.long 0x4B4\n.popsection\n'))
+        '.pushsection .os32_kapi_layout,"",@progbits\n.p2align 2\n.long 0x7FC\n.popsection\n'))
     r = mkos32x(raw3, tmp / "mixed.bin", elf3)
     check(r.returncode != 0, "刻印の値が食い違えば失敗する")
 
     # 刻印が 2 つで同じ値 (crt0 + os32api) → 通る
     elf4, raw4 = build_elf(tmp, "twin", extra_asm=(
-        '.pushsection .os32_kapi_layout,"",@progbits\n.p2align 2\n.long 0x4B8\n.popsection\n'))
+        f'.pushsection .os32_kapi_layout,"",@progbits\n.p2align 2\n.long {H.KAPI_DATA_FIELDS_OFF}\n.popsection\n'))
     r = mkos32x(raw4, tmp / "twin.bin", elf4)
     check(r.returncode == 0, "刻印が 2 つでも同じ値なら通る (crt0 + os32api)")
 
@@ -384,12 +385,26 @@ def case_mkos32x(tmp):
     r = mkos32x(tmp / "flip_first.raw", tmp / "flip_first.bin", elf6)
     check(r.returncode != 0, ".raw の最初の 1 バイトが違えば失敗する")
 
+    check_old_stamps(tmp, elf, lambda old, dest: mkos32x(raw, dest, old))
+
     # --elf が無い → 失敗
     r = mkos32x(raw, tmp / "noelf.bin", None)
     check(r.returncode != 0, "--elf が無ければ失敗する")
 
 
-def patch_elf(tmp, elf_path, name, symbol=None, value=None, section=None, field=None):
+def check_old_stamps(tmp, elf, wrap):
+    for label, note, reason in (
+        ('v88_offset', ('.os32_kapi_layout', 0, 4, 0x4b8), 'KAPI 配置'),
+        ('v88_generation', ('.os32_generations', 1, 16, 1), 'incompatible per-unit generations'),
+    ):
+        old = patch_elf(tmp, elf, elf.stem + label, note=note)
+        dest = old.with_suffix('.bin')
+        result = wrap(old, dest)
+        check(result.returncode != 0 and reason in result.stderr and not dest.exists(),
+              elf.stem + ': reject ' + label)
+
+
+def patch_elf(tmp, elf_path, name, symbol=None, value=None, section=None, field=None, note=None):
     """Patch a real ELF while keeping its validated input hash current."""
     import hashlib
     elf = H.Elf32(elf_path)
@@ -409,6 +424,12 @@ def patch_elf(tmp, elf_path, name, symbol=None, value=None, section=None, field=
     if section:
         index = next(i for i, sec in enumerate(elf.sections) if sec['name'] == section)
         struct.pack_into('<I', body, elf.e_shoff + index * elf.e_shentsize + field[0], field[1])
+    if note:
+        sec_name, word_index, stride, replacement = note
+        section_data = elf.section(sec_name)
+        for off in range(0, section_data['size'], stride):
+            struct.pack_into(elf.endian + 'I', body, section_data['offset'] + off + word_index * 4,
+                             replacement)
     out = tmp / (name + '.elf')
     out.write_bytes(body)
     inputs = json.loads(elf_path.with_suffix('.inputs.json').read_text())
@@ -477,7 +498,7 @@ def case_code_range(tmp):
                     field=(0, parsed.section('.data')['name_off'] + 1))
     r = mkos32x(raw, tmp / 'orphan.bin', bad)
     check(r.returncode != 0 and 'orphan alloc' in r.stderr, 'reject orphan alloc section')
-    h = H.build_header(0, 0, 4096, 0, 0, 0, base, 0x4b8, code_size=4096)
+    h = H.build_header(0, 0, 4096, 0, 0, 0, base, H.KAPI_DATA_FIELDS_OFF, code_size=4096)
     check(len(h) == 64 and H.parse_header(h)['code_size'] == 4096, 'v5 final word round trip')
     old = bytearray(h[:60])
     struct.pack_into('<II', old, 4, 60, 4)
@@ -509,10 +530,12 @@ def case_mkshlib(tmp):
     if r.returncode != 0:
         print(r.stdout, r.stderr)
         return
+    check_old_stamps(tmp, elf, lambda old, dest: run(
+        [sys.executable, '-B', 'tools/mkshlib.py', rawtmp, dest, '--elf', old]))
     h = H.parse_header(out.read_bytes())
     check(h["version"] == H.OS32X_HDR_VERSION and h["header_size"] == H.OS32X_HDR_SIZE, "shlib もヘッダ v5")
-    check(h.get("kapi_data_off") == H.read_kapi_layout(H.Elf32(str(elf))) == 0x4B8,
-          "shlib の kapi_data_off = os32api の刻印 = 0x4B8")
+    check(h.get("kapi_data_off") == H.read_kapi_layout(H.Elf32(str(elf))) == H.KAPI_DATA_FIELDS_OFF,
+          "shlib の kapi_data_off = os32api の刻印")
     code = H.Elf32(elf).symbols['__shlib_data_start'] - 0x80000000
     check(h.get('code_size') == code == struct.unpack_from('<I', out.read_bytes(), 64 + 20)[0] * 4096,
           'shlib OS32X code_size agrees with jump-table text_pages')
@@ -568,8 +591,8 @@ void _start(void) { for (;;) { } }
 STALE_C = r'''
 /* v62 以前の SDK でコンパイルしたオブジェクトの代わり: ヘッダの
  * `#define kapi os32_kapi_v63` を通っていないので `kapi` を参照する。 */
-extern void *kapi;
-void *use_kapi(void) { return kapi; }
+extern void *os32_kapi_v63;
+void *use_kapi(void) { return os32_kapi_v63; }
 '''
 
 FRESH_C = r'''
@@ -647,7 +670,8 @@ MUTATIONS = [
      "    if False:"),
     ("sdk/os32x_hdr.py", "missing_stamp_defaulted",
      "    if s is None or s['size'] == 0:\n        raise HeaderError(",
-     "    if s is None or s['size'] == 0:\n        return 0x4B8\n        raise HeaderError("),
+     "    if s is None or s['size'] == 0:\n        return KAPI_DATA_FIELDS_OFF\n        raise HeaderError("),
+    ("sdk/os32x_hdr.py", "stale_offset_allowed", "if uniq[0] != KAPI_DATA_FIELDS_OFF:", "if False:"),
     ("sdk/os32x_hdr.py", "mixed_stamps_allowed",
      "    if len(uniq) != 1:",
      "    if False:"),

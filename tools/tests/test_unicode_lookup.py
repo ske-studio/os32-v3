@@ -173,7 +173,7 @@ def run_case(runner, mutation=None):
         assert len(pointers) == 1 and pointers[0][2] == 'b' and int(pointers[0][1], 16) == 4, nm
         sdk_nm = subprocess.check_output(['nm', '-u', objects[1]], text=True)
         if not mutation or mutation[0] != 'sdk-bypass':
-            assert sdk_nm.split() == ['U', 'os32_kapi_v63'], sdk_nm
+            assert sdk_nm.split() == ['U', 'os32_kapi_v89'], sdk_nm
         exe = tmp / 'fixture'
         subprocess.run(['gcc', '-m32', '-nostdlib', '-static', '-no-pie',
                         '-Wl,-z,noexecstack', *objects, '-o', str(exe)], check=True)

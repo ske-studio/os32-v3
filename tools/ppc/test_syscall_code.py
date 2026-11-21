@@ -13,7 +13,7 @@ PPC = (os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc') + '/bin/powe
 HARNESS = r'''
 #include "syscall_code.h"
 #include "ring3_str.h"
-static unsigned char page[4096];
+static unsigned char page[RING3_TRAMP_BYTES];
 void arch_exec_publish(void *p, u32 n) { (void)p; (void)n; }
 void _start(void) {
     struct syscall_layout l;
@@ -43,11 +43,13 @@ def inspect(source, d):
              '-Iinclude', '-Imm', '-Iexec', '-Iarch/ppc', '-Isdk/include/os32',
              str(src), str(harness), '-o', str(exe)])
     data = command(['qemu-i386', str(exe)])
-    if len(data) != 32 + 4096:
+    if len(data) < 32:
         raise RuntimeError('host output size')
     fields = [int.from_bytes(data[i:i + 4], 'little') for i in range(0, 32, 4)]
-    off, stride, count, scratch, scratch_len, ls, _, _ = fields
+    off, stride, count, scratch, scratch_len, ls, _, total = fields
     page = data[32:]
+    if len(page) != total:
+        raise RuntimeError('trampoline size differs from layout')
     binary.write_bytes(page)
     dis = command([PPC, '-D', '-b', 'binary', '-m', 'powerpc:common', '-EB', str(binary)]).decode()
     instructions = {}

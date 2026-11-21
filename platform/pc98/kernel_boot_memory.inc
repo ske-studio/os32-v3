@@ -115,7 +115,8 @@ static void kernel_boot_memory(u32 mem_kb, struct boot_context *boot)
 
     /* 共有メモリ初期化 (ガードページ設定 + R/W設定) */
     shm_init();
-    if (paging_boot_user_shared(exec_tramp_page_addr()) != 0) {
+    exec_kapi_init();
+    if (ring3_trampoline_init() || paging_boot_user_shared(exec_tramp_page_addr(), 2) != 0) {
         kprintf(KLOG_ATTR, "[MEM] shared USER boot failed; boot halted\n");
         for (;;) { _stop(); }
     }

@@ -35,13 +35,17 @@ int os32x_layout_check(const OS32Header *hdr, u32 read_len, u32 kernel_off)
         hdr->header_size != OS32X_HDR_SIZE || (hdr->flags & ~known) ||
         !arch_exec_image_accept(hdr->flags))
         return OS32X_LAYOUT_OLD;
-    if (hdr->kapi_data_off != kernel_off ||
-        hdr->kapi_abi_generation != OS32_KAPI_ABI_GENERATION ||
-        hdr->memory_layout_generation != OS32_MEMORY_LAYOUT_GENERATION ||
-        (hdr->shlib_protocol && hdr->shlib_protocol != OS32_SHLIB_PROTOCOL) ||
-        ((hdr->flags & OS32X_FLAG_SHLIB) && hdr->shlib_protocol != OS32_SHLIB_PROTOCOL) ||
-        hdr->min_api_ver > KAPI_VERSION)
+    if (hdr->kapi_data_off != kernel_off)
         return OS32X_LAYOUT_MISMATCH;
+    if (hdr->kapi_abi_generation != OS32_KAPI_ABI_GENERATION)
+        return OS32X_LAYOUT_ABI;
+    if (hdr->memory_layout_generation != OS32_MEMORY_LAYOUT_GENERATION)
+        return OS32X_LAYOUT_MEMORY;
+    if ((hdr->shlib_protocol && hdr->shlib_protocol != OS32_SHLIB_PROTOCOL) ||
+        ((hdr->flags & OS32X_FLAG_SHLIB) && hdr->shlib_protocol != OS32_SHLIB_PROTOCOL))
+        return OS32X_LAYOUT_PROTOCOL;
+    if (hdr->min_api_ver > KAPI_VERSION)
+        return OS32X_LAYOUT_MIN_API;
     return OS32X_LAYOUT_OK;
 }
 
@@ -51,7 +55,11 @@ const char *os32x_layout_reason(int rc)
     case OS32X_LAYOUT_OK: return "ok";
     case OS32X_LAYOUT_SHORT: return "short header";
     case OS32X_LAYOUT_OLD: return "unknown format or flags";
-    case OS32X_LAYOUT_MISMATCH: return "generation or KAPI layout mismatch";
+    case OS32X_LAYOUT_MISMATCH: return "KAPI data layout mismatch";
+    case OS32X_LAYOUT_ABI: return "KAPI ABI generation mismatch";
+    case OS32X_LAYOUT_MEMORY: return "memory layout generation mismatch";
+    case OS32X_LAYOUT_PROTOCOL: return "shared library protocol mismatch";
+    case OS32X_LAYOUT_MIN_API: return "required KAPI version is newer than kernel";
     default: return "invalid header";
     }
 }

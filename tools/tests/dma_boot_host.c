@@ -49,8 +49,11 @@ static int memory_boot_init(u32 kb)
 }
 static int memory_boot_dma_available(void) { CHECK(reserved); return available; }
 static void shm_init(void) { CHECK(reserved); untouched(); }
-int paging_boot_user_shared(u32 addr) { (void)addr; return 0; }
-static u32 exec_tramp_page_addr(void) { return 0; }
+static int boot_step, fail_build, fail_map;
+static void exec_kapi_init(void) { CHECK(boot_step++ == 0); }
+static int ring3_trampoline_init(void) { CHECK(boot_step++ == 1); return -fail_build; }
+int paging_boot_user_shared(u32 addr, u32 pages) { CHECK(boot_step++ == 2 && pages == 2 && addr == 0x170000); return -fail_map; }
+static u32 exec_tramp_page_addr(void) { return 0x170000; }
 static void selftest(void)
 {
     struct dma_buf b;
@@ -161,17 +164,20 @@ int main(int argc, char **argv)
     struct dma_buf b = {123, (void *)456, 789};
     CHECK(argc == 2);
     available = strcmp(argv[1], "short") != 0;
+    fail_build = strcmp(argv[1], "build-failure") == 0;
+    fail_map = strcmp(argv[1], "map-failure") == 0;
     conflict = strcmp(argv[1], "conflict") == 0;
     debug_enabled = strcmp(argv[1], "nodebug") != 0;
     CHECK(dma_alloc(4096, 0, DMA_PHYS_LIMIT, &b) == DMA_POOL_ERR_STATE);
     CHECK(b.pa == 123 && b.va == (void *)456 && b.size == 789);
     if (!setjmp(halt)) {
         host_kernel_dma(available ? 8192 : 8088);
-        CHECK(!conflict && loaded == 1 && unicode_loads == 1);
+        CHECK(!conflict && !fail_build && !fail_map && loaded == 1 && unicode_loads == 1);
         if (available) CHECK(tested == 1 && bound == 1 && pcm == 1 && !diag);
         else { CHECK(!s_pool.ready && !bound && !pcm && tested == 1 && diag == 1); }
     } else {
-        CHECK(conflict && !loaded && !diag && !unicode_loads);
+        CHECK((conflict || fail_build || fail_map) && !loaded && !diag && !unicode_loads);
+        CHECK(boot_step == (conflict ? 0 : fail_build ? 2 : 3));
         untouched();
     }
     return 0;

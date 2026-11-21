@@ -98,6 +98,17 @@ def cases():
             crc(image)
         result.append((group, name, image, expected, dict(POLICY, **(policy or {}))))
 
+    for component, module_id, ops in (("kdebug", 1, 4), ("fep", 3, 4), ("hwdev", 11, 2)):
+        for label, field, value, expected in (("v88", 4, 88, 6), ("contract", 6, 0, 6),
+                                               ("other-pair", 31, 0, 4), ("unpaired", 9, 0, 3)):
+            def mixed(b, field=field, value=value):
+                word(b, 7, module_id)
+                word(b, 33, ops)
+                word(b, 4, 89)
+                word(b, 5, 4)
+                word(b, field, value)
+            add("component-mix", component + "-" + label, mixed, expected,
+                {"kapi": 89, "layout": 4, "ops": ops, "module_id": module_id})
     add("future-version", "future", lambda b: word(b, 1, 2))
     add("format", "v1-foreign-tag", lambda b: word(b, 34, 20))
     def powerpc_header(image):
@@ -314,6 +325,8 @@ MUTATIONS = [
     ("crc", "crc32_core_final(crc) != h[MI_IMAGE_CRC]", "crc32_core_final(crc) != h[MI_IMAGE_CRC] && 0"),
     ("pair", "h[MI_PAIR_CRC] != policy->pair_image_crc", "0"),
     ("img-valid", "!policy->img_valid", "0"),
+    ("kapi", "h[MI_KAPI] != policy->kapi_abi_gen", "0"),
+    ("contract", "h[MI_ABI] != policy->module_abi_gen", "0"),
     ("abi-ops", "h[MI_OPS_VERSION] != policy->ops_version", "0"),
     ("import-count", "h[MI_IMPORT_COUNT] != policy->import_count", "0"),
     ("policy-ops", "h[MI_OPS_VERSION] != component->ops_version", "0"),

@@ -109,6 +109,14 @@ void _start(void) {
     for (i = MEM_SHM_RESV_START / PAGE_SIZE + 1; i < MEM_SHM_RESV_START / PAGE_SIZE + 32; i += 2)
         CHECK(ledger_claim_fixed(LEDGER_OWNER_BOOT, i, i + 1));
     before = used_pages; make_file();
+    OS32Header *header = (OS32Header *)file_bytes;
+    header->min_api_ver++;
+    CHECK(shlib_init() == -1 && shlib_reject_reason() == SHLIB_REJECT_MIN_API);
+    CHECK(shlib_reject_min_api() == header->min_api_ver && !alloc_calls);
+    header->shlib_protocol++;
+    CHECK(shlib_init() == -1 && shlib_reject_reason() == SHLIB_REJECT_LAYOUT);
+    CHECK(!g_loaded && !alloc_calls);
+    make_file();
     for (i = 0; i < 4; i++) {
         static const u32 bad[] = {0, PAGE_SIZE - 1, 5 * PAGE_SIZE, PAGE_SIZE};
         ((OS32Header *)file_bytes)->code_size = bad[i];

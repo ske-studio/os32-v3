@@ -1,8 +1,6 @@
 /* KAPI trampoline layout checks and initialization. Included by exec.c. */
 #include "syscall_code.h"
-/* 写し場 (票 T9 §12 R1) はスタブの後ろに置く。KAPI が増えて 1 ページに
- * 収まらなくなったら **ここでビルドが落ちる** — 実機では「cd の直後に
- * pwd が化ける」としか見えないので、静的に止める。 */
+/* 写し場は第 1 頁、スタブと ls シムは第 2 頁に収める。 */
 STATIC_ASSERT(MEM_PHYS_RAM_CEILING <= MEM_APP_BAND_BASE, ram_below_app_band);
 STATIC_ASSERT((MEM_EXEC_HEAP_BASE >> PDE_SHIFT) >= APP_BAND_PDE &&
               (MEM_EXEC_HEAP_BASE >> PDE_SHIFT) < (MEM_APP_BAND_MAX_TOP >> PDE_SHIFT), heap_pde_in_app_band);
@@ -10,13 +8,10 @@ STATIC_ASSERT(((MEM_APP_STACK_TOP - 1) >> PDE_SHIFT) >= APP_BAND_PDE &&
               ((MEM_APP_STACK_TOP - 1) >> PDE_SHIFT) < (MEM_APP_BAND_MAX_TOP >> PDE_SHIFT), stack_pde_in_app_band);
 STATIC_ASSERT(RING3_USTR_OFF + RING3_USTR_CAP <= (u32)PAGE_SIZE,
               ring3_ustr_fits_in_trampoline_page);
-STATIC_ASSERT(RING3_LS_SHIM_OFF + RING3_LS_SHIM_CAP <= PAGE_SIZE,
+STATIC_ASSERT(RING3_LS_SHIM_OFF + RING3_LS_SHIM_CAP <= RING3_TRAMP_BYTES,
               ring3_ls_fits_in_trampoline_page);
 
-/* データ欄の固定配置 (票 TASK_KAPI_DATA_FIELDS、KAPI v63)。生成器
- * (sdk/gen_kapi.py) の KAPI_DATA_FIELDS_OFF と構造体の実際の並びが一致し、
- * 1 ページの容量 (表 + スタブ 8B × 容量 + 写し場) を越えないことを静的に見る。
- * ここが落ちたら関数表の容量 (kapi.json の func_capacity) を見直す票を起こす。 */
+/* 生成したデータ変位と C のメンバー配置を照合する。 */
 STATIC_ASSERT(__builtin_offsetof(KernelAPI, sbrk_heap_limit) ==
               (u32)KAPI_DATA_FIELDS_OFF, kapi_data_fields_fixed);
 STATIC_ASSERT(__builtin_offsetof(KernelAPI, shm_base) ==
@@ -26,24 +21,22 @@ STATIC_ASSERT((u32)KAPI_DATA_IDX_SBRK_HEAP_LIMIT * 4u == (u32)KAPI_DATA_FIELDS_O
 STATIC_ASSERT((u32)KAPI_DATA_IDX_SHM_BASE * 4u == (u32)KAPI_DATA_FIELDS_OFF + 4u,
               kapi_data_idx_shm);
 STATIC_ASSERT((u32)KAPI_FUNC_COUNT <= (u32)KAPI_FUNC_CAPACITY, kapi_func_capacity);
-STATIC_ASSERT(sizeof(KernelAPI) + (u32)KAPI_FUNC_CAPACITY * KAPI_STUB_SIZE + RING3_USTR_CAP
-              <= (u32)PAGE_SIZE, kapi_trampoline_one_page);
 /* 本物の表は KAPI_ADDR からの 4KB (MEM_KAPI_SIZE) に置く (include/memmap.h)。 */
 STATIC_ASSERT(sizeof(KernelAPI) <= (u32)MEM_KAPI_SIZE, kapi_table_fits_reserve);
 
 /* ======================================================================== */
 /*  ring3_trampoline_init — トランポリンページの構築 (v2 M2b)               */
 /* ======================================================================== */
-static void ring3_trampoline_init(void)
+int ring3_trampoline_init(void)
 {
     u32 page = exec_tramp_page_addr();
     u32 *tbl = (u32 *)P2V(page);
     struct syscall_layout layout;
     u32 i;
 
-    if (!arch_syscall_layout(KAPI_FUNC_CAPACITY, &layout)) return;
-    if (!arch_syscall_emit(P2V(page), page, PAGE_SIZE, KAPI_FUNC_CAPACITY)) return;
-    arch_syscall_publish(P2V(page), layout.total_bytes);
+    if (!arch_syscall_layout(KAPI_FUNC_CAPACITY, &layout)) return -1;
+    kmemset(tbl, 0, RING3_TRAMP_BYTES);
+    if (!arch_syscall_emit(P2V(page), page, RING3_TRAMP_BYTES, KAPI_FUNC_CAPACITY)) return -1;
 
     /* magic / version は本物と同じ値 */
     tbl[0] = kapi->magic;
@@ -61,12 +54,13 @@ static void ring3_trampoline_init(void)
     /* データフィールド (値): KernelAPI 表と同一オフセット。v63 から
      * KAPI_DATA_FIELDS_OFF に固定 (関数の数ではなく容量の後ろ)。
      * sbrk_heap_limit は exec_run が launch 時に上書きする。 */
-    tbl[KAPI_DATA_IDX_SBRK_HEAP_LIMIT] = 0;
-    tbl[KAPI_DATA_IDX_SHM_BASE] = (u32)MEM_SHM_BASE;
+    tbl[KAPI_DATA_IDX_SBRK_HEAP_LIMIT] = kapi->sbrk_heap_limit;
+    tbl[KAPI_DATA_IDX_SHM_BASE] = kapi->shm_base;
+    arch_syscall_publish(P2V(page), RING3_TRAMP_BYTES);
     ring3_tramp_page = page;
-    arch_exec_publish(P2V(page), PAGE_SIZE);
 
     /* boot 口が確定した全 PD 共有 RO+USER (kernel band PDE0)。i386 は NX なしなので
      * RO でも実行可能 (スタブ実行 OK)。ユーザは書けない = スタブ改竄不可。
      * CR0.WP=0 により、この初期化と per-launch のデータ更新も RO に書ける。 */
+    return 0;
 }

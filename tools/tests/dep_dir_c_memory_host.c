@@ -180,7 +180,12 @@ static void check_platform_attributes(void)
     REQUIRE(memmap_want_at(0x000f0000UL, 0) == MM_RO);
     REQUIRE(memmap_want_at(0x000fffffUL, 0) == MM_RO);
     REQUIRE(memmap_want_at(0, 0) == MM_NP);
-    REQUIRE(memmap_want_at(0x000f0000UL, 0x000f0000UL) == MM_ROU);
+    boot_user_base = 0x000f0000UL;
+    boot_user_pages = 2;
+    REQUIRE(memmap_want_at(boot_user_base, boot_user_base) == MM_ROU);
+    REQUIRE(memmap_want_at(boot_user_base + PAGE_SIZE, boot_user_base) == MM_ROU);
+    REQUIRE(memmap_want_at(boot_user_base + 2 * PAGE_SIZE, boot_user_base) == MM_RO);
+    boot_user_base = boot_user_pages = 0;
 }
 #endif
 

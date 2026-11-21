@@ -31,6 +31,7 @@ static void die(void)
 enum { OK, OPEN_FAIL, SEEK_FAIL, SHORT_FIRST, SHORT_LAST, MAP_FIRST, MAP_LAST, READ_ERROR, PROTECT_FAIL };
 static int failure, is_user, opened, closed, aborted, reads, maps, jump_ready;
 static int last_slot_id;
+static u32 required_api, required_protocol;
 static int x87_calls, x87_entry_depth, x87_init_after_save;
 static struct arch_fp_context *x87_saved;
 void arch_fp_save(struct arch_fp_context *p) { x87_saved = p; x87_calls++; }
@@ -103,6 +104,8 @@ int vfs_read(const char *path, void *buf, u32 n)
     hdr->memory_layout_generation = OS32_MEMORY_LAYOUT_GENERATION;
     hdr->load_addr = is_user ? MEM_EXEC_LOAD_ADDR : MEM_SHELL_LOAD_ADDR;
     hdr->text_size = image_size;
+    hdr->min_api_ver = required_api;
+    hdr->shlib_protocol = required_protocol;
     hdr->code_size = PAGE_SIZE;
     hdr->bss_size = bss_size;
     return n;
@@ -195,10 +198,21 @@ void paging_load_cr3(u32 pd)
         aborted++; event('A');
     } else if (jump_ready) CHECK(last_slot_id == 1); /* restore the caller */
 }
-void shell_print(const char *s, u8 a) { (void)s; (void)a; CHECK(0); }
+void shell_print(const char *s, u8 a)
+{
+    (void)a;
+    CHECK(required_protocol && (!kstrcmp(s, "shared library protocol mismatch") ||
+                                !kstrcmp(s, "; rebuild required\n")));
+}
 void shell_print_dec(u32 n, u8 a) { (void)n; (void)a; CHECK(0); }
 void __cdecl kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; CHECK(0); }
-void __cdecl console_printf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; CHECK(0); }
+void __cdecl console_printf(u8 attr, const char *fmt, ...)
+{
+    (void)attr;
+    CHECK(required_api);
+    CHECK(!kstrcmp(fmt, required_protocol ? "[exec] %s: %s (bin=%x kernel=%x)\n" :
+                  "[exec] %s: requires KAPI %u, kernel %u; update kernel\n"));
+}
 int appslot_cur(void) { return argv_mode && is_user ? 3 : 1; }
 AppSlot *appslot_at(int id) { CHECK(id >= 0 && id < APP_SLOT_COUNT); last_slot_id = id; return &slots[id]; }
 int appslot_start_admit(int gui, u32 pages, u32 free_pages) { (void)gui; (void)pages; (void)free_pages; return 2; }
@@ -493,6 +507,13 @@ static void image_range_tests(void)
 void _start(void)
 {
     image_range_tests();
+    required_api = KAPI_VERSION + 1;
+    CHECK(exec_launch("/fixture", 0) == EXEC_ERR_INVALID);
+    CHECK(exec_layout_rejected() == EXEC_REJECT_MIN_API && !opened);
+    required_protocol = OS32_SHLIB_PROTOCOL + 1;
+    CHECK(exec_launch("/fixture", 0) == EXEC_ERR_INVALID);
+    CHECK(exec_layout_rejected() == 1 && !opened);
+    required_api = required_protocol = 0;
     u32 result, args[6] = {MEM_SHELL_LOAD_ADDR, 3 * PAGE_SIZE, 3, 0x32, 0xffffffffu, 0};
     __asm__ volatile("int $0x80" : "=a"(result) : "a"(90), "b"(args) : "memory");
     CHECK(result == MEM_SHELL_LOAD_ADDR);

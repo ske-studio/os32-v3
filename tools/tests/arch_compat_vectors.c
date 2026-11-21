@@ -125,7 +125,6 @@ static int input_kapi(void)
     REQUIRE(input_trygetrawkey() == -1 && input_is_pressed(KEY_CTRL) == 0);
     REQUIRE(input_get_modifiers() == 0);
     /* Published pointer, absent query/value/void and reserved slot, from real generation. */
-    REQUIRE(kapi_reserved_nosys() == OS32_ERR_NOSYS);
     const char *drive = wrap_db_last_error(0);
     REQUIRE(drive && drive[0] == 'A');
 #ifdef PC98_INPUT

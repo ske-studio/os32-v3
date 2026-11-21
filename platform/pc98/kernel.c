@@ -478,7 +478,9 @@ static void pc98_shell_failure(int gui, int rc, int streak)
     } else {
         console_text_gdc_start();
         tvram_clear();
-        gshell_warning = exec_layout_rejected()
+        gshell_warning = exec_layout_rejected() == EXEC_REJECT_MIN_API
+                    ? "gshell requires newer kernel -> CUI shell"
+                    : exec_layout_rejected()
                     ? "gshell: rebuild required (KAPI data layout) -> CUI shell"
                     : "gshell load failed -> CUI shell";
     }

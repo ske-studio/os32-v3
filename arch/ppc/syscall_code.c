@@ -7,7 +7,7 @@
 
 STATIC_ASSERT(KAPI_STUB_SIZE == 8u, ppc_syscall_stub_size);
 STATIC_ASSERT(RING3_LS_SHIM_CAP >= 16, ppc_syscall_shim_size);
-STATIC_ASSERT(RING3_LS_SHIM_OFF + RING3_LS_SHIM_CAP <= PAGE_SIZE, ppc_syscall_page_size);
+STATIC_ASSERT(RING3_LS_SHIM_OFF + RING3_LS_SHIM_CAP <= RING3_TRAMP_BYTES, ppc_syscall_page_size);
 STATIC_ASSERT(KAPI_FUNC_CAPACITY <= 32767, ppc_syscall_slot_immediate);
 
 int arch_syscall_layout(unsigned capacity, struct syscall_layout *out)
@@ -21,12 +21,13 @@ int arch_syscall_layout(unsigned capacity, struct syscall_layout *out)
     l.scratch_bytes = RING3_USTR_CAP;
     l.ls_off = RING3_LS_SHIM_OFF;
     l.ls_bytes = RING3_LS_SHIM_CAP;
-    if (l.stub_off < sizeof(KernelAPI) || l.stub_off > l.scratch_off ||
-        l.stub_count > (l.scratch_off - l.stub_off) / l.stub_stride ||
-        l.scratch_off > l.ls_off ||
-        l.scratch_bytes > l.ls_off - l.scratch_off ||
-        l.ls_off > PAGE_SIZE || l.ls_bytes > PAGE_SIZE - l.ls_off) return 0;
-    l.total_bytes = l.ls_off + l.ls_bytes;
+    if (sizeof(KernelAPI) > l.scratch_off || l.scratch_off > PAGE_SIZE ||
+        l.scratch_bytes > PAGE_SIZE - l.scratch_off ||
+        l.stub_off < PAGE_SIZE || l.stub_off > l.ls_off ||
+        l.stub_count > (l.ls_off - l.stub_off) / l.stub_stride ||
+        l.ls_off > RING3_TRAMP_BYTES ||
+        l.ls_bytes > RING3_TRAMP_BYTES - l.ls_off) return 0;
+    l.total_bytes = RING3_TRAMP_BYTES;
     *out = l;
     return 1;
 }

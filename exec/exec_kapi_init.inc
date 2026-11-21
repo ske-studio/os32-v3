@@ -296,10 +296,9 @@ extern int __cdecl wrap_io_policy_set(const void *bytes, unsigned int len);
 extern int __cdecl wrap_io_policy_get(void *bytes, unsigned int cap, unsigned int *needed);
 extern int __cdecl wrap_io_policy_reset(void);
 extern int __cdecl wrap_io_pump(unsigned int budget_us);
-extern i32 __cdecl kapi_reserved_nosys(void);
 
 kapi->magic = 0x4B415049UL;
-kapi->version = 88;
+kapi->version = 89;
 
     kapi->gfx_init = wrap_gfx_init;
     kapi->gfx_init_200 = wrap_gfx_init_200;
@@ -602,7 +601,7 @@ kapi->version = 88;
     {
         u32 _kr;
         for (_kr = 0; _kr < (u32)KAPI_FUNC_RESERVED; _kr++)
-            kapi->kapi_reserved[_kr] = kapi_reserved_nosys;
+            kapi->kapi_reserved[_kr] = 0;
     }
     kapi->sbrk_heap_limit = 0;
     kapi->shm_base = 0;

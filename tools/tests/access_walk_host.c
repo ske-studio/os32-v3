@@ -199,7 +199,7 @@ static void host_start(void)
     host_map_fixed_paging();
     paging_init(16384);
     host_pool_boot_ws(16384, HOST_WS_FIRST, HOST_WS_END);
-    CHECK(!paging_boot_user_shared(exec_tramp_page_addr()));
+    CHECK(!paging_boot_user_shared(exec_tramp_page_addr(), 2));
     /* Synthetic fixed RAM surface outside V86_LOW exercises the generic contract. */
     CHECK(ledger_register_region(LEDGER_R_SURFACE_BACKING, LEDGER_OWNER_KERNEL,
           MEM_LEDGER_META_BASE / PAGE_SIZE, MEM_LEDGER_META_BASE / PAGE_SIZE + 1, LEDGER_CACHE_WB, 0));
@@ -302,6 +302,8 @@ static void host_start(void)
     probe(MEM_SHM_BASE + 7, 1, 1, MEM_SHM_BASE + 7);
     probe(exec_tramp_page_addr() + 17, 0, 1, exec_tramp_page_addr() + 17);
     probe(exec_tramp_page_addr(), 1, 0, 0);
+    probe(exec_tramp_page_addr() + PAGE_SIZE, 0, 1, exec_tramp_page_addr() + PAGE_SIZE);
+    probe(exec_tramp_page_addr() + PAGE_SIZE, 1, 0, 0);
     probe(0xA0000, 0, 0, 0);
     original = pd[0]; pd[0] = fake | PAGE_RW | PTE_USER;
     probe(MEM_SHM_BASE, 0, 0, 0); pd[0] = original;

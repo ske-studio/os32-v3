@@ -10,6 +10,11 @@
 #define OS32X_LAYOUT_OLD       2   /* unknown format/header size/flags */
 #define OS32X_LAYOUT_MISMATCH  3   /* generation/layout/feature mismatch */
 
+#define OS32X_LAYOUT_ABI       4
+#define OS32X_LAYOUT_MEMORY    5
+#define OS32X_LAYOUT_PROTOCOL  6
+#define OS32X_LAYOUT_MIN_API   7
+
 /* Decode a complete little-endian wire header into native fields. */
 int os32x_decode(OS32Header *h, const u8 *wire, u32 len);
 

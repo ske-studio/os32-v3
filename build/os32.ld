@@ -118,7 +118,7 @@ SECTIONS
     .os32_generations 0 (INFO) : { KEEP(*(.os32_generations)) }
     .os32_generation_ref 0 (INFO) : { KEEP(*(.os32_generation_ref)) }
     /* GENERATED GENERATION REF BEGIN */
-__os32_abi_1_mem_4_fmt_5 = 0;
+__os32_abi_2_mem_4_fmt_5 = 0;
 /* GENERATED GENERATION REF END */
 
     /DISCARD/ : {

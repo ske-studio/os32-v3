@@ -27,12 +27,13 @@ int shlib_init(void)
     if (fd < 0) return -1;
     if (vfs_read_fd(fd, wire, sizeof(wire)) != sizeof(wire)) goto fail;
     if (os32x_decode(&oh, wire, sizeof(wire)) != OS32X_LAYOUT_OK) goto fail;
-    if (oh.min_api_ver > KAPI_VERSION) {
+    int layout = os32x_layout_check(&oh, sizeof(oh), KAPI_DATA_FIELDS_OFF);
+    if (layout == OS32X_LAYOUT_MIN_API) {
         g_reject = SHLIB_REJECT_MIN_API;
         g_reject_min_api = oh.min_api_ver;
         goto fail;
     }
-    if (os32x_layout_check(&oh, sizeof(oh), KAPI_DATA_FIELDS_OFF)) {
+    if (layout != OS32X_LAYOUT_OK) {
         g_reject = SHLIB_REJECT_LAYOUT;
         goto fail;
     }

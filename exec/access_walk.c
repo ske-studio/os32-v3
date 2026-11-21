@@ -67,7 +67,7 @@ shared:
     if (result != va) return 0;
     if (va >= (u32)MEM_SHM_BASE && va - (u32)MEM_SHM_BASE < MEM_SHM_SIZE)
         goto allowed;
-    if (!write && frame && frame == exec_tramp_page_addr() &&
+    if (!write && paging_boot_user_page(frame) &&
         !(((const u32 *)P2V(table))[(va >> PAGE_SHIFT) % PTE_COUNT] & PTE_RW))
         goto allowed;
     return 0;

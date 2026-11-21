@@ -16,18 +16,18 @@ def verify_init(text, data):
     expected += ['kapi_reserved'] + [f['name'] for f in data['data_fields']]
     return (actual == expected and
             'for (_kr = 0; _kr < (u32)KAPI_FUNC_RESERVED; _kr++)' in text and
-            'kapi->kapi_reserved[_kr] = kapi_reserved_nosys;' in text and
+            'kapi->kapi_reserved[_kr] = 0;' in text and
             all(('kapi->' + a['name'] + ' = ' +
                  (('(void *)' + a.get('target', a['name'])) if a.get('direct')
                   else ('wrap_' + a['name'])) + ';') in text for a in data['api']))
 
 
-def table_ok(nm, obj):
+def table_ok(nm, obj, capacity):
     line = next(x for x in subprocess.check_output([str(nm), '-S', str(obj)], text=True).splitlines()
                 if x.endswith(' ppc_kapi_table'))
     address, size, kind, _ = line.split()
     sections = subprocess.check_output([str(nm.with_name('powerpc-elf-objdump')), '-h', str(obj)], text=True)
-    return kind in 'BbDd' and int(size, 16) >= 0x4c0 and int(address, 16) % 4096 == 0 and bool(re.search(r'\.bss\s+\S+.*\n\s*\S+.*', sections)) and '2**12' in sections
+    return kind in 'BbDd' and int(size, 16) == 16 + 4 * capacity and int(address, 16) % 4096 == 0 and bool(re.search(r'\.bss\s+\S+.*\n\s*\S+.*', sections)) and '2**12' in sections
 
 
 def main():
@@ -49,7 +49,7 @@ def main():
         undefined = set(re.findall(r'\b(wrap_\w+)$', subprocess.check_output([str(nm), '-u', str(tmp / 'exec.o')], text=True), re.M))
         defined = set(re.findall(r'\b(wrap_\w+)$', subprocess.check_output([str(nm), '--defined-only', str(tmp / 'kapi.o')], text=True), re.M))
         assert undefined and undefined <= defined
-        assert table_ok(nm, tmp / 'table.o')
+        assert table_ok(nm, tmp / 'table.o', data['func_capacity'])
         print('slots:', len(data['api']), 'wrappers resolved:', len(undefined))
         if '--mutate' in sys.argv:
             assert not verify_init(init.replace('    kapi->' + data['api'][0]['name'] + ' = wrap_' + data['api'][0]['name'] + ';\n', '', 1), data)
@@ -59,7 +59,7 @@ def main():
             mutant.write_text(source)
             (tmp / 'kapi_table.h').write_text((ROOT / 'arch/ppc/kapi_table.h').read_text().replace('extern KernelAPI', 'extern const KernelAPI'))
             subprocess.run([str(cc)] + flags + ['-c', str(mutant), '-o', str(tmp / 'mutant.o')], check=True)
-            assert not table_ok(nm, tmp / 'mutant.o')
+            assert not table_ok(nm, tmp / 'mutant.o', data['func_capacity'])
             print('const table: RED')
     return 0
 

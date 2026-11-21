@@ -251,6 +251,9 @@ def main():
     for n in range(maximum+1):
         slot=next(i for i,a in enumerate(data) if len(a.get('args',[]))==n and '...' not in a.get('args',[]) and i!=4)
         cases.append(f'reset({n}); table[KAPI_FN_TABLE_FIRST+{slot}]=(u32)wrappers[{n}]; dispatch({slot}); CHECK(!kills && calls==1 && copies==1 && frame[7]==0x87654321 && parks==1 && !g_cur_frame && !ring3_in_syscall);')
+    last = len(data) - 1
+    argc = len(data[last]['args'])
+    cases.append(f'reset({argc}); table[KAPI_FN_TABLE_FIRST+{last}]=(u32)wrappers[{argc}]; dispatch({last}); CHECK(!kills && calls==1 && frame[7]==0x87654321);')
     # A non-string explicit pointer slot, and a non-string fixed call.
     slot=next(i for i,a in enumerate(data) if a['name']=='sys_ls')
     cases.append(f'reset(1); words[1]=1; words[2]=1; words[3]=1; table[KAPI_FN_TABLE_FIRST+{slot}]=(u32)wrappers[1]; dispatch({slot}); CHECK(kills==1 && !calls);')

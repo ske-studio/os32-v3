@@ -199,8 +199,8 @@ def read_kapi_layout(elf):
             f"{elf.path}: KAPI 配置の刻印が食い違う "
             f"({', '.join('0x%X' % v for v in uniq)}) — 古いオブジェクトが混ざっている。"
             "make clean で作り直す")
-    if uniq[0] == 0:
-        raise HeaderError(f"{elf.path}: KAPI 配置の刻印が 0")
+    if uniq[0] != KAPI_DATA_FIELDS_OFF:
+        raise HeaderError(f"{elf.path}: KAPI 配置の刻印が不一致 — rebuild required")
     from link_guard import check_note
     check_note(elf)
     from pathlib import Path

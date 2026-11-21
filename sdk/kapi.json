@@ -1,8 +1,8 @@
 {
-  "generations": {"os32x_format": 5, "kapi_abi": 1, "memory_layout": 4, "shlib_protocol": 2},
-  "version": 88,
-  "func_capacity": 300,
-  "crt_kapi_symbol": "os32_kapi_v63",
+  "generations": {"os32x_format": 5, "kapi_abi": 2, "memory_layout": 4, "shlib_protocol": 2},
+  "version": 89,
+  "func_capacity": 384,
+  "crt_kapi_symbol": "os32_kapi_v89",
   "data_fields": [
     {
       "name": "sbrk_heap_limit",

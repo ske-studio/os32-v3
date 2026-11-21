@@ -543,9 +543,9 @@ static int wrote_nothing(void)
 
 /* ---- 足場: /host に 2 ファイル、/ 側は空 (= 全部 new_file) ---- */
 
-/* 名札の KAPI 行 (票 TASK_KAPI_DATA_FIELDS)。値は v63 の配置 0x4B8 = 1208 と
- * 版 63 — main() の先頭で KAPI_DATA_FIELDS_OFF / KAPI_VERSION と突き合わせる。 */
-#define KL "kapi=1208\nkapi_version=63\n"
+/* 配備名札は配置オフセットを十進数で持つ。 */
+#define MANIFEST_OFF "1544"
+#define KL "kapi=" MANIFEST_OFF "\nkapi_version=89\n"
 
 #define MAN_DIR  "/host/.deploy"
 #define MAN_PATH "/host/.deploy/manifest.txt"
@@ -1193,16 +1193,15 @@ static void case_kapi(void)
     g_inject_force_kapi = 0;
     g_fake.version = KAPI_VERSION;
 
-    /* K0: 試験の KL が v63 の配置と一致している (ずれたら全段が嘘になる) */
-    check(KAPI_DATA_FIELDS_OFF == 1208, "K0 KL の kapi=1208 は KAPI_DATA_FIELDS_OFF");
-    check(KAPI_VERSION >= 63, "K0 KL の kapi_version=63 はこの SDK 以下");
+    check(strtoul(MANIFEST_OFF, 0, 10) == off, "K0 名札の配置が SDK と一致する");
+    check(KAPI_VERSION >= 89, "K0 名札の版を SDK が受け付ける");
 
     /* K1: 一致 → 同期する */
     setup_tree();
     put_kapi_manifest(off, ver);
     check(run0() == 0, "K1 配置・版が一致すれば同期する");
     check(!log_has("reason=kapi") && !log_has("KAPI reason"), "K1 KAPI の門で断らない");
-    check(log_has("kapi=1208/v"), "K1 DEPLOY 行に kapi を出す");
+    check(log_has("kapi=" MANIFEST_OFF "/v"), "K1 DEPLOY 行に kapi を出す");
     check(fs_find("/bin/a.bin") >= 0, "K1 宛先に届く");
 
     /* K1b: 配備物の版がカーネルより古い → 通す (v63 以降は配置が固定) */

@@ -27,7 +27,7 @@ STAGE_KINDS = {
     'S4': ('FUNC',) * 25,
     'S5': ('FUNC',) * 30,
     # S3e: all five moved selftests.
-    'S6': ('FUNC',) * 38 + ('GETTER',) + ('SETTER',) * 2 + ('PTR',) * 3 + ('FUNC',) * 20,
+    'S6': ('FUNC',) * 37 + ('GETTER',) + ('SETTER',) * 2 + ('PTR',) * 3 + ('FUNC',) * 20,
 }
 STAGES = {}
 for _stage, _kinds in STAGE_KINDS.items():
@@ -39,8 +39,7 @@ GF_ONLY_SYMBOLS = frozenset(('pci_cfg_read32', 'pci_cfg_read16',
                              'pci_cfg_write32', 'pci_cfg_write16', 'gf_production_selected'))
 # Raw function addresses do not create an nm -u reference to the function.
 # This manifest also fixes which moved object may consume each address.
-ADDRESS_IMPORTS = {'kapi_reserved_nosys': 'selftest_exec',
-                   'shlib_read_page': 'selftest_lease'}
+ADDRESS_IMPORTS = {'shlib_read_page': 'selftest_lease'}
 SELFTEST_OBJECTS = ('selftest_kbd_inject',
                     'selftest_lease', 'selftest_exec')
 ABI_SYMBOL = '__os32_abi_{kapi_abi}_mem_{memory_layout}_fmt_{os32x_format}'.format(**GENERATIONS)

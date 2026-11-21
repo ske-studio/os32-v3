@@ -6,17 +6,6 @@
 #include "kstring.h"
 
 STATIC_ASSERT(KAPI_STUB_SIZE == 8u, syscall_stub_instruction_bytes);
-STATIC_ASSERT(RING3_USTR_STUB_OFF >= sizeof(KernelAPI), syscall_table_before_code);
-STATIC_ASSERT(RING3_USTR_STUB_OFF <= RING3_USTR_OFF &&
-              KAPI_FUNC_CAPACITY <=
-              (RING3_USTR_OFF - RING3_USTR_STUB_OFF) / KAPI_STUB_SIZE,
-              syscall_stubs_before_scratch);
-STATIC_ASSERT(RING3_USTR_OFF <= RING3_LS_SHIM_OFF &&
-              RING3_USTR_CAP <= RING3_LS_SHIM_OFF - RING3_USTR_OFF,
-              syscall_scratch_before_ls);
-STATIC_ASSERT(RING3_LS_SHIM_OFF <= PAGE_SIZE &&
-              RING3_LS_SHIM_CAP <= PAGE_SIZE - RING3_LS_SHIM_OFF,
-              syscall_code_one_page);
 STATIC_ASSERT(RING3_LS_SHIM_CAP == 192, syscall_ls_capacity);
 
 int arch_syscall_layout(unsigned capacity, struct syscall_layout *out)
@@ -31,12 +20,13 @@ int arch_syscall_layout(unsigned capacity, struct syscall_layout *out)
     l.ls_off = RING3_LS_SHIM_OFF;
     l.ls_bytes = RING3_LS_SHIM_CAP;
     /* Subtractions bound every addition/multiplication, including capacity=0. */
-    if (l.stub_off < sizeof(KernelAPI) || l.stub_off > l.scratch_off ||
-        l.stub_count > (l.scratch_off - l.stub_off) / l.stub_stride ||
-        l.scratch_off > l.ls_off ||
-        l.scratch_bytes > l.ls_off - l.scratch_off ||
-        l.ls_off > PAGE_SIZE || l.ls_bytes > PAGE_SIZE - l.ls_off) return 0;
-    l.total_bytes = l.ls_off + l.ls_bytes;
+    if (sizeof(KernelAPI) > l.scratch_off || l.scratch_off > PAGE_SIZE ||
+        l.scratch_bytes > PAGE_SIZE - l.scratch_off ||
+        l.stub_off < PAGE_SIZE || l.stub_off > l.ls_off ||
+        l.stub_count > (l.ls_off - l.stub_off) / l.stub_stride ||
+        l.ls_off > RING3_TRAMP_BYTES ||
+        l.ls_bytes > RING3_TRAMP_BYTES - l.ls_off) return 0;
+    l.total_bytes = RING3_TRAMP_BYTES;
     *out = l;
     return 1;
 }

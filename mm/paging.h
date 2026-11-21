@@ -133,7 +133,8 @@ int paging_device_map(u32 owner, u32 rid, u32 first, u32 end);
 int paging_device_unmap(u32 owner, u32 rid, u32 first, u32 end);
 
 /* boot は shm_init 後・最初の AS 前の一度だけ。共有 USER は WB。 */
-int paging_boot_user_shared(u32 tramp_page);
+int paging_boot_user_shared(u32 tramp_page, u32 pages);
+int paging_boot_user_page(u32 frame);
 /* 既存 SHM の恒等 present/USER と登録共有 PT を検査し、RW だけを変更。 */
 int paging_shm_set_rw(u32 base, u32 end, int writable);
 extern u32 paging_shm_user_missing_count;
