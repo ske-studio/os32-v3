@@ -243,7 +243,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3, 4, 5]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -272,7 +272,7 @@ jobs:
           OS32_ACCEPT_IPA_LICENSE: "1"
           TMPDIR: ${{ runner.temp }}
         run: |
-          python3 -B tools/ci/gate.py run --env qemu-ppc --shard ${{ matrix.shard }}/6 --out "$RUNNER_TEMP/gate"
+          python3 -B tools/ci/gate.py run --env qemu-ppc --shard ${{ matrix.shard }}/8 --out "$RUNNER_TEMP/gate"
       - name: Upload check times
         if: always() && steps.prior.outputs.reuse != 'true' && steps.scope.outputs.scope == 'ppc'
         uses: actions/upload-artifact@v4
