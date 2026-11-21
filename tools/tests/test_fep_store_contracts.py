@@ -86,6 +86,7 @@ SIGNATURES = {
     'fep_test_resident_finish': 'void (*)(FepTestFixture *, int)',
 }
 MUTATIONS = (
+    ('old-ops', 'kernel/ime/fep_module.h', 'FEP_MODULE_OPS_VERSION 6u', 'FEP_MODULE_OPS_VERSION 5u'),
     ('reader', HEADER, 'FEP_DICT_READER_VERSION 1u', 'FEP_DICT_READER_VERSION 2u'),
     ('format', HEADER, 'FEP_DICT_FORMAT_VERSION 1u', 'FEP_DICT_FORMAT_VERSION 2u'),
     ('page', HEADER, 'FEP_DICT_PAGE_SIZE 1024u', 'FEP_DICT_PAGE_SIZE 2048u'),
@@ -118,10 +119,11 @@ def source():
                           ('boot_reserve_kb', 668), ('user_enabled', 672)]),
     }
     body = '#include "tools/tests/fep_store_fixture.h"\n#include "kernel/ime/fep_module.h"\n'
-    checks += [('FEP_MODULE_API_SLOTS', '23'), ('sizeof(FepModuleApi)', '92'),
+    checks += [('FEP_MODULE_API_SLOTS', '24'), ('sizeof(FepModuleApi)', '96'),
                ('__builtin_offsetof(FepModuleApi, dict_suspend)', '84'),
                ('__builtin_offsetof(FepModuleApi, boot_connections)', '88'),
-               ('FEP_MODULE_OPS_VERSION', '4')]
+               ('__builtin_offsetof(FepModuleApi, apply_absolute)', '92'),
+               ('FEP_MODULE_OPS_VERSION', '6')]
     for name, sig in SIGNATURES.items():
         body += (f'_Static_assert(__builtin_types_compatible_p(__typeof__(&{name}), '
                  f'{sig}), "{name}");\n')
@@ -135,7 +137,8 @@ def source():
         'FepConn': dict.fromkeys(('db', 'exact', 'prefix', 'learn'), 'void *'),
         'IME_State': {'store': 'FepStore'},
         'FepModuleApi': {'dict_suspend': 'int (*)(int)',
-                         'boot_connections': 'u32 (*)(void)'},
+                         'boot_connections': 'u32 (*)(void)',
+                         'apply_absolute': 'int (*)(u32)'},
         'FepStore': {'system': 'FepConn', 'user': 'FepConn', 'meta': 'FepMeta',
                      'boot_reserve_kb': 'u32', 'user_enabled': 'int'},
     }

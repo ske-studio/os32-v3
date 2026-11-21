@@ -8,6 +8,7 @@ u32 ime_boot_connections(void)
 }
 
 static const FepModuleApi api = {
+    .apply_absolute = ime_apply_absolute,
     .boot_abort = ime_boot_abort,
     .boot_bytes = ime_boot_bytes,
     .toggle = ime_toggle,

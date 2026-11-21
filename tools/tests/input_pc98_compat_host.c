@@ -1,9 +1,18 @@
 #include "in2_int.h"
 #include "drivers/input/kbd.h"
 #include "input_pc98_compat_fixture.h"
-#ifndef PC98_HISTORIC_ONLY
+#ifdef PC98_HISTORIC_ONLY
+void input_emit_legacy_key(u8 sc, u8 down, u8 mods);
+#else
 #include "keymap.h"
 #include "s3_expected.h"
+int input_capture_delivery(const KmKey *key, u8 old, const KmEvalResult *result, u8 raw_due)
+{ (void)key; (void)old; (void)result; (void)raw_due; return 0; }
+static void input_emit_legacy_key(u8 sc, u8 down, u8 mods)
+{
+    InputEvent event = {.sc=sc, .down=down, .buttons=mods, .src=1};
+    input_emit_legacy_event(&event, 0, 1);
+}
 static u8 test_mods;
 int input_key_pressed(u8 sc) { return sc == KEY_CTRL && (test_mods & SHIFT_CTRL); }
 #endif

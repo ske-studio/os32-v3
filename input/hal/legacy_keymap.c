@@ -1,12 +1,17 @@
 #include "keymap.h"
 #include "in2_int.h"
 #include "kbd.h"
+#include "io.h"
 
 static const KmBackend *legacy_map;
 
 void input_legacy_keymap_set(const KmBackend *map)
 {
+    unsigned flags = irq_save();
+    const struct InputLegacyProvider *p = input_ime_provider();
+    if (p && p->flush_actions) p->flush_actions();
     legacy_map = map;
+    irq_restore(flags);
 }
 
 void km_legacy_compat(KmEvalResult *result)
@@ -52,8 +57,11 @@ void input_emit_keymap(const KmEvalResult *result, u8 down, u8 raw_due,
 
 /* The unbound sc entrance uses its physical snapshot as local km state.
  * It never asks the registry, nor modifies the bound-source state machine. */
-void input_emit_legacy_key(u8 sc, u8 down, u8 mods)
+void input_emit_legacy_event(const InputEvent *event, u8 old, u8 raw_due)
 {
+    u8 sc = event->sc, mods = event->buttons;
+    KmKey key = { .src = event->src, .generation = event->generation,
+                  .keycode = sc, .down = event->down, .repeat = event->down && old };
     KmState state = {0};
     KmEvalResult result = { .compat_sc = sc };
     if (mods & SHIFT_SHIFT) state.mods |= KM_MOD_SHIFT;
@@ -66,10 +74,6 @@ void input_emit_legacy_key(u8 sc, u8 down, u8 mods)
         if (km_eval(legacy_map, sc, &state, &result)) return;
     } else if (!kbd_gui_mode) return;
     km_legacy_compat(&result);
-    input_emit_keymap(&result, down, 1, mods, 0);
-}
-
-void input_emit_legacy_repeat(u8 sc, u8 mods)
-{
-    input_emit_legacy_key(sc, 1, mods);
+    if (!input_capture_delivery(&key, old, &result, raw_due))
+        input_emit_keymap(&result, key.down, raw_due, mods, 0);
 }

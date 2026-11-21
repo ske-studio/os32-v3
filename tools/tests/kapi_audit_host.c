@@ -1,3 +1,8 @@
+#include "input/hal/input_context.h"
+int input_context_snapshot(KbdPolicySnapshot *out) { (void)out; return -1; }
+void kbd_policy_ime_state(u32 active, u32 owner, u32 gen)
+{ (void)active; (void)owner; (void)gen; }
+int input_ime_cancel_take(const KbdPolicySnapshot *current) { (void)current; return -1; }
 #include "kbd_capture_fixture_host.h"
 #include "../../input/hal/legacy_ring.c"
 #include "../../input/hal/legacy_mode.c"

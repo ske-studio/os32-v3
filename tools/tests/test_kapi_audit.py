@@ -36,7 +36,9 @@ MUTATIONS += [
      '        if (ring3_wait_pending()) ring3_abort_check();\n        serial_puts(".");'),
     ('extended log drops STOP', 7, '        serial_puts(".");',
      '        appslot_get(appslot_cur())->abort_req = 0;\n        serial_puts(".");'),
-    ('rshell counts wakeups', 8, '(u32)(p->wait_ticks() - start)', '(waits + 0 * start)'),
+    ('rshell counts wakeups', 8,
+     'if (timed && timeout && p->wait_ticks &&\n            (u32)(p->wait_ticks() - start) >= timeout)',
+     'if (timed && timeout && p->wait_ticks && waits >= timeout)'),
     ('rshell timeout 3 seconds', 4, 'return KBD_RSHELL_TIMEOUT_SEC * PIT_HZ;', 'return 3 * PIT_HZ;'),
     ('kbd char wait', 8, 'if (interruptible && p->wait_pending && p->wait_pending())', 'if (gui && interruptible && p->wait_pending && p->wait_pending())'),
     ('kbd key wait', 8, 'if (interruptible && p->wait_pending && p->wait_pending())', 'if (mode != IL_KEY && interruptible && p->wait_pending && p->wait_pending())'),
@@ -94,7 +96,9 @@ def run(runner, mutation=None, case=0, expected=None):
             elif new == 'probe':
                 old_text, replacement = 'ring3_wait_pending()', '0'
             elif new == 'cleanup':
-                old_text, replacement = 'if (!con_sink_is_enabled()) ime_cancel_input();', ''
+                old_text = ('if (!con_sink_is_enabled())' if old == 'ime_owner_exit' else
+                            'if (!cancelled && !con_sink_is_enabled())') + ' ime_cancel_input();'
+                replacement = ''
             elif new == 'abort':
                 old_text, replacement = 'ring3_abort_check();', ''
             elif new == 'user-guard':

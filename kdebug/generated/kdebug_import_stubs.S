@@ -1636,4 +1636,9 @@ path_set_cwd:
 path_init:
     jmp *kdebug_import_slots+1304
 .size path_init, .-path_init
+.globl input_display_restore_drain
+.type input_display_restore_drain, @function
+input_display_restore_drain:
+    jmp *kdebug_import_slots+1308
+.size input_display_restore_drain, .-input_display_restore_drain
 .section .note.GNU-stack,"",@progbits

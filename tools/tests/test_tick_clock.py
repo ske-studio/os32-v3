@@ -1,11 +1,12 @@
 """Exercise the common physical-to-logical clock without libc."""
 CHECK = dict(name='tick-clock-host', tier=4,
-    covers=['kernel/time/tick.c', 'kernel/time/tick_clock.h',
+    covers=['drivers/sound/snd_wake_tick.c', 'drivers/sound/snd_wake_tick.h',
+            'kernel/time/tick.c', 'kernel/time/tick_clock.h',
             'include/kernel_tick.h', 'sdk/include/os32/os32_kapi_shared.h',
             'tools/tests/tick_clock_host.c', 'tools/tests/test_tick_clock.py',
             'tools/tests/kernel_includes.py', 'tools/tests/host32.py'],
     needs=[], budget=3.0,
-    basis=['TICK_ARCH_DESIGN §2'],
+    basis=['TICK_ARCH_DESIGN §2', 'TICK_1KHZ_NEXT_DESIGN §3-5・§6'],
 )
 from pathlib import Path
 import subprocess
@@ -16,6 +17,13 @@ from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
+    ('(i32)(now - due_ms) >= 0', 'now >= due_ms'),
+    ('(i32)(now - due_ms) >= 0', '(i32)(now - due_ms) > 0'),
+    ('armed = 0;\n        wake_notify', 'wake_notify'),
+    ('if (!after_us) {\n        armed = 0;', 'if (!after_us) {'),
+    ('fn && fast_fn && fn != fast_fn', '0'),
+    ('fast_fn(ms_now);', 'fast_fn(ms_now - 1);'),
+    ('return notify_step(result);\n    return result;', 'return notify_step(result);\n    return TICK_STEP_JIFFY;'),
     ('while (ms_phase >= clk)', 'if (ms_phase >= clk)'),
     ('if (!clk) {', 'if (0) {'),
     ('if (num * OS32_TICK_HZ > den)', 'if (0)'),
@@ -24,14 +32,15 @@ MUTATIONS = (
 
 
 def verify(work, mutation=None):
-    source = (ROOT / 'kernel/time/tick.c').read_text()
+    paths = ['kernel/time/tick.c', 'kernel/time/tick_clock.h',
+             'drivers/sound/snd_wake_tick.c', 'drivers/sound/snd_wake_tick.h']
+    sources = {path: (ROOT / path).read_text() for path in paths}
     if mutation:
-        assert source.count(mutation[0]) == 1
-        source = source.replace(*mutation)
-    dest = work / 'kernel/time'
-    dest.mkdir(parents=True, exist_ok=True)
-    (dest / 'tick.c').write_text(source)
-    (dest / 'tick_clock.h').write_text((ROOT / 'kernel/time/tick_clock.h').read_text())
+        assert sum(source.count(mutation[0]) for source in sources.values()) == 1
+    for path, source in sources.items():
+        dest = work / path
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(source.replace(*mutation) if mutation else source)
     exe = work / 'test'
     subprocess.run(['gcc', '-m32', '-march=i386', '-std=gnu11', '-Wall', '-Wextra',
                     '-Werror', '-ffreestanding', '-fno-pie', '-fno-stack-protector',

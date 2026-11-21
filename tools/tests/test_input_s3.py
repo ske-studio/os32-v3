@@ -2,7 +2,7 @@
 """S3 byte/provenance exit, including unmapped HID and non-byte boundaries."""
 CHECK = dict(name='input-s3-host', tier=1, budget=10, needs=[], kind='contract',
     basis=['INPUT_KEYMAP_DESIGN §2 §4 §7 S3/S3d §8 K10', 'INPUT_BIND_DESIGN §2a'],
-    covers=['input/hal/legacy_keymap.c', 'input/hal/keymap_eval.c', 'input/hal/keymap.h',
+    covers=['input/hal/input_context.h', 'input/hal/legacy_keymap.c', 'input/hal/keymap_eval.c', 'input/hal/keymap.h',
             'input/hal/in2_int.h', 'input/hal/kbd_merge.c', 'input/hal/in2_dev.c', 'input/hal/keymap_registry.c', 'input/hal/keymap_state.c', 'tools/tests/input_s3_capture_host.c', 'input/keymaps/hid_jp.c', 'tools/tests/input_s3_host.c',
             'tools/tests/test_input_s3.py', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
             'tools/tests/host_arch/**', 'platform/pc98/platform_io.h', 'include/**', 'drivers/input/*.h', 'sdk/include/os32/**', 'build/config.mk'])
@@ -23,8 +23,8 @@ def run(ctx):
             (tmp/'exit.c').write_text(code)
             exe = tmp/'test'
             subprocess.run(['gcc', '-m32', '-O2', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
-                '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdinc', '-nostdlib',
-                '-static', '-no-pie', '-I'+str(ctx.root/'input/hal'), *include_flags(ctx.root),
+                '-ffreestanding', '-ffunction-sections', '-fdata-sections', '-fno-pie', '-fno-stack-protector', '-nostdinc', '-nostdlib',
+                '-static', '-Wl,--gc-sections', '-no-pie', '-I'+str(ctx.root/'input/hal'), *include_flags(ctx.root),
                 str(tmp/'exit.c'), str(ctx.root/'input/hal/keymap_eval.c'),
                 str(ctx.root/'input/keymaps/hid_jp.c'), str(ctx.root/'tools/tests/input_s3_host.c'),
                 '-o', str(exe)], check=True)
@@ -55,8 +55,8 @@ def run(ctx):
             files = [str(tmp/'merge.c') if p == 'input/hal/kbd_merge.c' else str(ctx.root/p) for p in paths]
             exe = tmp/'capture'
             subprocess.run(['gcc', '-m32', '-O2', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
-                '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdinc', '-nostdlib',
-                '-static', '-no-pie', '-I'+str(tmp), '-I'+str(ctx.root/'input/hal'),
+                '-ffreestanding', '-ffunction-sections', '-fdata-sections', '-fno-pie', '-fno-stack-protector', '-nostdinc', '-nostdlib',
+                '-static', '-Wl,--gc-sections', '-no-pie', '-I'+str(tmp), '-I'+str(ctx.root/'input/hal'),
                 *include_flags(ctx.root), *files, str(ctx.root/'tools/tests/input_s3_capture_host.c'),
                 '-o', str(exe)], check=True)
             return host32.run([str(exe)], runner='qemu').returncode

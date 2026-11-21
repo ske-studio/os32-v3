@@ -23,7 +23,7 @@ import subprocess
 import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
+FLAGS = ["-I"+str(ROOT / "tools/tests/host_arch"), "-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
          "-fno-stack-protector", "-ffunction-sections", "-fdata-sections", "-Wall", "-Wextra", "-Werror"]
 INC = include_flags(ROOT)
 SRC = ROOT / "tools/tests/multiapp_impl_host.c"

@@ -1,3 +1,5 @@
+#include "types.h"
+volatile u32 kctx_irq_depth, kctx_exc_depth;
 /* Policy transitions are exercised separately by test_gfx_policy_triggers. */
 void gfx_policy_reeval(void) {}
 /* ========================================================================
@@ -53,6 +55,9 @@ void fd_redirect_clear_state(FdRedirectState *st)   { (void)st; }
 #define LAUNCH_SOURCE "launch.c"
 #endif
 #include LAUNCH_SOURCE
+
+int gfx_is_started(void) { return 0; }
+void gfx_shutdown(void) {}
 
 /* ---- 最小の報告系 (libc 無し) ------------------------------------------ */
 

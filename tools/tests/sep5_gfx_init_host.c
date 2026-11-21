@@ -1,3 +1,8 @@
+#include "app_ids.h"
+int input_display_restore_lock(unsigned int *flags) { *flags = 0; return 0; }
+void appslot_gfx_resource_acquire(int owner) { (void)owner; }
+int con_sink_is_enabled(void) { return 0; }
+int res_owner_get(void) { return 0; }
 #include "../../gfx/v2/gfx2_int.h"
 #include "gfx2_bridge_fake.h"
 /* B3: real PC-98 planar bring-up provider; replace only port I/O and the

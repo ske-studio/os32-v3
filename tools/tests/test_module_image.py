@@ -98,7 +98,7 @@ def cases():
             crc(image)
         result.append((group, name, image, expected, dict(POLICY, **(policy or {}))))
 
-    for component, module_id, ops in (("kdebug", 1, 4), ("fep", 3, 4), ("hwdev", 11, 2)):
+    for component, module_id, ops in (("kdebug", 1, 4), ("fep", 3, 6), ("hwdev", 11, 2)):
         for label, field, value, expected in (("v88", 4, 88, 6), ("contract", 6, 0, 6),
                                                ("other-pair", 31, 0, 4), ("unpaired", 9, 0, 3)):
             def mixed(b, field=field, value=value):

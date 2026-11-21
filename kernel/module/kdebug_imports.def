@@ -2665,6 +2665,15 @@
       "source": "lib/path.h",
       "context_safe": false,
       "index": 326
+    },
+    {
+      "index": 327,
+      "symbol": "input_display_restore_drain",
+      "source": "input/hal/input_context.h",
+      "kind": "FUNC",
+      "stage": "S6",
+      "context_safe": false,
+      "retained": true
     }
   ]
 }

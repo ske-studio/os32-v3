@@ -1,5 +1,20 @@
 /* Actual relocated SQLite body, full resident adapter and NASM stack switch. */
 #define OS32_SQLITE_OUTER_IMPL
+#include "input/hal/input_context.h"
+#include "input/hal/in2_int.h"
+void input_ime_action_flush(void) {}
+void input_context_focus_register(void (*flush)(void)) { (void)flush; }
+int input_context_snapshot(KbdPolicySnapshot *out) { (void)out; return -1; }
+void kbd_policy_ime_state(u32 active, u32 owner, u32 gen)
+{ (void)active; (void)owner; (void)gen; }
+extern int fep_services_public(void);
+static unsigned cancel_takes;
+int input_ime_cancel_take(const KbdPolicySnapshot *current)
+{
+    (void)current;
+    cancel_takes++;
+    return -1;
+}
 #include "sqlite_engine.h"
 #include "lib/sqlite3/os32_sqlite_config.h"
 #include "module_runtime.h"
@@ -159,6 +174,17 @@ int kbd_trygetchar(void) { int key = kbd_trygetkey(); return key < 0 ? -1 : key 
 int kbd_getkey_wait(int interruptible) { if (interruptible && host_stop_pending) return -1; return kbd_trygetkey(); }
 int kbd_getchar(void) { return kbd_trygetchar(); }
 int kbd_getkey(void) { return kbd_trygetkey(); }
+int fep_read_wait(int interruptible, int *key, u32 *start_tick, int resume)
+{
+    (void)start_tick; (void)resume;
+    *key = kbd_getkey_wait(interruptible);
+    return *key < 0 ? IR_INTERRUPTED : IR_KEY;
+}
+int fep_read_try(int *key)
+{
+    *key = kbd_trygetkey();
+    return *key < 0 ? IR_EMPTY : IR_KEY;
+}
 int kbd_getchar_kapi(void) { int c = kbd_getkey_wait(1); if (c < 0) ring3_abort_check(); return c < 0 ? c : c & 255; }
 int kbd_getkey_kapi(void) { int c = kbd_getkey_wait(1); if (c < 0) ring3_abort_check(); return c; }
 int con_sink_is_enabled(void) { return host_sink; }
@@ -876,6 +902,7 @@ static void boot_transaction(void)
     if (input[0] == 59) services_boot_fault = SERVICES_FAULT_SETTINGS_CLOSE;
     u32 unicode_before = unicode_pages;
     services_boot();
+    if (input[0] == 51) CHECK(!fep_allocs && !services_public);
     if (input[0] == 60) CHECK(!services_public);
     CHECK(dictionary_stats == 1);
     CHECK(dictionary_missing_messages == (input[0] == 55));
@@ -942,6 +969,9 @@ static void boot_transaction(void)
         CHECK(!kstrcmp(g_ime.store.user.path, FEP_USER_PATH));
         CHECK(module_records[1].state == MODULE_RUNNING && fep_module_pages());
         CHECK(module_records[1].dependency_count == 1 && module_records[1].dependencies[0].slot == 0);
+        unsigned previous_takes = cancel_takes;
+        CHECK(fep_module_load(module_records[1].dependencies[0]) == MODULE_BUSY);
+        CHECK(cancel_takes == previous_takes && fep_services_public());
         input_paths();
         void *resident_db = g_ime.store.system.db;
         host_user = 1; host_key = 0x1e61;

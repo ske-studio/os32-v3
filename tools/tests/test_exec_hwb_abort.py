@@ -5,7 +5,7 @@ Cover CUI shell state preservation, coalescing/consumption, IF=0/1 and a new
 IRQ at restore; CUI app and GUI cooperative/wait/runaway controls stay live.
 """
 CHECK = dict(name='exec-hwb-abort-host', tier=1,
-    covers=['exec/ring3_str.c', 'exec/exec.c', 'exec/exec_*.inc', 'exec/exec_hwb.h',
+    covers=['input/hal/input_context.c', 'input/hal/input_interrupt.c', 'input/hal/input_context.h', 'exec/ring3_str.c', 'exec/exec.c', 'exec/exec_*.inc', 'exec/exec_hwb.h',
             'exec/appslot.c', 'exec/appslot*.inc', 'exec/appslot.h',
             'tools/tests/exec_hwb_abort_host.c', 'tools/tests/hwb_fake.h',
             'tools/tests/hwb_host.py', 'tools/tests/host32.py',
@@ -35,16 +35,16 @@ FLAGS = ('-Itools/tests/host_arch',
          '-D__KERNEL_BUILD__', '-Wno-unused-but-set-variable')
 MUTATIONS = [
     ('display-stop-record', 'exec/exec_abort.inc',
-     '        g_cui_display_abort_pending = 1;',
-     '        g_cui_display_abort_pending = 0;', 'display-return'),
+     '        (void)input_display_restore_capture(APP_ID_SHELL);',
+     '        (void)input_display_restore_capture(0);', 'display-return'),
     ('display-stop-owner', 'exec/exec_abort.inc',
-     'if (pending) appslot_gfx_owner_exit(APP_ID_SHELL);',
-     'if (pending) appslot_gfx_owner_exit(APP_ID_SHELL + 1);', 'display-return'),
+     '(void)input_display_restore_drain();',
+     '(void)0;', 'display-return'),
 
     ('shell-flag-disabled', 'exec/exec_abort.inc',
      '        g_hwb_abort_pending = 1;', '        g_hwb_abort_pending = 0;', 'take-clear'),
     ('take-not-cleared', 'exec/exec_abort.inc',
-     '    g_hwb_abort_pending = 0;', '    /* retain pending request */', 'take-clear'),
+     '    u32 pending = g_hwb_abort_pending;\n    g_hwb_abort_pending = 0;', '    u32 pending = g_hwb_abort_pending;', 'take-clear'),
     ('no-irq-save', 'exec/exec_abort.inc',
      '    unsigned int flags = irq_save();', '    unsigned int flags = 0;', 'cui-shell'),
     ('no-irq-restore', 'exec/exec_abort.inc',

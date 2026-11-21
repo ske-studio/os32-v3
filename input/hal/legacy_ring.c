@@ -5,12 +5,16 @@
 static volatile u16 kbd_buf[KBD_BUF_SIZE];
 static volatile int kbd_head, kbd_tail, kbd_count;
 static volatile u32 kbd_dropped;
+static u32 pushed, popped;
+u32 legacy_cooked_pushed(void) { return pushed; }
+u32 legacy_cooked_popped(void) { return popped; }
 void legacy_cooked_push(u16 entry)
 {
     if (kbd_count < KBD_BUF_SIZE) {
         kbd_buf[kbd_tail] = entry;
         kbd_tail = (kbd_tail + 1) % KBD_BUF_SIZE;
         kbd_count++;
+        ++pushed;
     } else {
         kbd_dropped++;
     }
@@ -20,6 +24,7 @@ int legacy_cooked_take(void)
     u16 entry;
     if (kbd_count == 0) return -1;
     RING_DEQUEUE(entry, kbd_buf, kbd_head, kbd_count, KBD_BUF_SIZE);
+    ++popped;
     return (int)entry;
 }
 int legacy_cooked_peek(void)
@@ -33,7 +38,12 @@ int legacy_cooked_peek(void)
     return (int)entry;
 }
 int legacy_cooked_pending(void) { return kbd_count; }
-void legacy_cooked_flush(void) { kbd_head = kbd_tail = kbd_count = 0; }
+void legacy_cooked_flush(void) {
+    const struct InputLegacyProvider *p = input_ime_provider();
+    kbd_head = kbd_tail = kbd_count = 0;
+    popped = pushed;
+    if (p && p->flush_actions) p->flush_actions();
+}
 void legacy_cooked_reset_dropped(void) { kbd_dropped = 0; }
 u32 legacy_cooked_dropped(void) { return kbd_dropped; }
 

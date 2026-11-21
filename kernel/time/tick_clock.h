@@ -11,6 +11,8 @@
  * before changing the device. Invalid values leave all state unchanged.
  * Success resets phases and milliseconds, preserving raw and jiffy counts. */
 int tick_clock_config(u32 period_num, u32 period_den);
+/* With IRQs disabled, install one owner or pass NULL to release it. */
+int tick_fast_set(void (*fn)(u32 now_ms));
 /* Once per physical period, with IF/EE clear and IRQ depth >= 1.
  * Bit 0 signals a jiffy; before configuration every step advances one. */
 u32 tick_clock_step(void);
