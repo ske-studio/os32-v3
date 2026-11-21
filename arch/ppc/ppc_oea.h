@@ -79,6 +79,7 @@ struct ppc_vector_image;
 int ppc_cpu_identify(u32 *pvr);
 void ppc_cpu_disable_bats(u32 pvr);
 void ppc_cpu_power_init(u32 pvr);
+void ppc_cpu_power_apply(u32 pvr, u8 nap7450);
 void ppc_cpu_load_segments(void);
 void ppc_cpu_load_sdr1(u32 sdr1);
 /* Foreground wait requires EE=1; preserves EE. */

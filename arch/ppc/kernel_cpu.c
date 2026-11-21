@@ -80,6 +80,19 @@ void ppc_cpu_power_init(u32 pvr)
     ppc_isync();
 }
 
+void ppc_cpu_power_apply(u32 pvr, u8 nap7450)
+{
+    if ((pvr >> 16) != PPC_PVR_7450)
+        return;
+    u32 hid = ppc_read_hid0() & ~PPC_HID_NAP;
+    if (nap7450)
+        hid |= PPC_HID_NAP;
+    ppc_sync();
+    ppc_write_hid0(hid);
+    ppc_sync();
+    ppc_isync();
+}
+
 void ppc_cpu_load_segments(void)
 {
     ppc_sync();

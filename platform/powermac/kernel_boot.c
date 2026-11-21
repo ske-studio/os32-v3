@@ -1,3 +1,4 @@
+#include "machcfg_contract.h"
 #include "ide_boot.h"
 /* OF-PPC 4.2.4/8.2; OpenBSD macppc/locore0.S:87; FreeBSD
  * aim/mmu_oea.c:685-695. Plan D uses software tables, never RAM BATs.
@@ -320,6 +321,7 @@ void ppc_kernel_real_start(const struct pm_kboot_info *info)
 #endif
     ppc_cpu_disable_bats(pvr);
     ppc_cpu_power_init(pvr);
+    machcfg_begin(platform_machcfg_seed());
     /* IP was cleared by takeover; copy/synchronize the D1 low-vector image. */
     ppc_cache_copy((void *)0, ppc_kernel_vectors.src, ppc_kernel_vectors.size);
     ppc_cpu_load_segments();
