@@ -25,6 +25,7 @@ parser.add_argument("--check", "--check-only", dest="check_only", action="store_
                     help="validate KAPI declarations without writing generated files")
 parser.add_argument("--target", default="x86-pc98")
 parser.add_argument("--feature-link", type=int, choices=(0, 1), default=0)
+parser.add_argument("--feature-ide", type=int, choices=(0, 1), default=0)
 parser.add_argument("--out-dir", help="root directory for generated files")
 parser.add_argument("json", nargs="?", default="sdk/kapi.json",
                     help="KAPI JSON input (default: sdk/kapi.json)")
@@ -34,8 +35,10 @@ JSON_PATH = args.json
 TARGET = args.target
 if TARGET == "ppc-powermac":
     from kapi_target_ppc import PROVIDER_EXTERNS, ABSENT_PROVIDER_INCLUDES, ABSENT_PROVIDER_SLOTS, PROVIDER_GROUPS, absent_result
-    if args.feature_link:
-        slots, includes = PROVIDER_GROUPS["serialfs"]
+    for enabled, group in ((args.feature_link, "serialfs"), (args.feature_ide, "ide")):
+        if not enabled:
+            continue
+        slots, includes = PROVIDER_GROUPS[group]
         ABSENT_PROVIDER_SLOTS -= slots
         ABSENT_PROVIDER_INCLUDES -= includes
 

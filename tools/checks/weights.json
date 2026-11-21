@@ -479,7 +479,7 @@
     "pegc-mode-host": 3.4177,
     "pit-clock-host": 2.799469,
     "platform-memory-host": 2.646895,
-    "ppc-ata-guest": 300,
+    "ppc-ata-guest": 600,
     "ppc-boot-info-guest": 137.863593,
     "ppc-console-cells": 73.481194,
     "ppc-db-guest": 281.599723,

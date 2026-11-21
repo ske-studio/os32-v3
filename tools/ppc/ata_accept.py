@@ -1,6 +1,7 @@
 """ATA IDENTIFY words 27–46/60–61, docs/ppc/ata.md §3. The 1 MiB raw disk
 defines the sector count and every byte independently of the guest driver.
-QEMU mac99's IDE disk model is QEMU HARDDISK (read-only ATA probe)."""
+ATA_HAL_DESIGN §6-4 P2 requires odd-address public KAPI writes, range and
+child denial, and unchanged neighbouring sectors. The host checks every byte."""
 import argparse
 import hashlib
 import os
@@ -17,12 +18,55 @@ BOOT = 'platform/powermac/ide_boot.c'
 BUS = 'platform/powermac/platform_ide_bus.h'
 TREE = 'platform/powermac/ide_tree.c'
 DRIVER = 'drivers/ata/ide.c'
+WRITE_MUTANTS = ('write-word', 'write-lba', 'write-count')
+WRITE_CASES = ('write', 'deny', *WRITE_MUTANTS)
 MUTANTS = ('word', 'bar', 'wait', 'lba')
+
+
+def make_write_image(out, case):
+    kernel = 'platform/powermac/ppc_kernel.c'
+    diag = (ROOT / 'tools/ppc/ata_write_diag.c').read_text()
+    source = (ROOT / kernel).read_text()
+    entry = 'void platform_boot_run(void)'
+    anchor = '        pm_exec_boot();'
+    assert source.count(entry) == source.count(anchor) == 1
+    source = source.replace(entry, diag + '\n' + entry)
+    call = f'        ata_write_report({int(case == "deny")});'
+    kernel_copy = out / 'boot.c'
+    kernel_copy.write_text(source.replace(anchor, '\n'.join((anchor, call,
+                           '        kprintf(7, "ATA-TEST done\\r\\n");'))))
+    settings = ['KB_MUT_EXTRA_SRC=' + kernel, 'KB_MUT_EXTRA_FILE=' + str(kernel_copy)]
+    if case == 'write-word':
+        header = (ROOT / BUS).read_text()
+        word = '((u16)p[0] << 8) | p[1]'
+        assert header.count(word) == 1
+        (out / 'platform_ide_bus.h').write_text(header.replace(word, '((u16)p[1] << 8) | p[0]'))
+    if case in ('write-lba', 'write-count'):
+        device = 'kernel/dev/device_ide.c'
+        before, after = (('ide_write_sector(drv, lba,', 'ide_write_sector(drv, lba + 1,')
+                         if case == 'write-lba' else
+                         ('ide_write_sectors(drv, lba, cnt,', 'ide_write_sectors(drv, lba, cnt > 1 ? cnt - 1 : cnt,'))
+        settings += mutant_settings(out, case, device, before, after)
+    if case == 'deny':
+        # Depth zero must first load a resident image in the shell band.
+        # Its exec_run then gives the probe an ordinary USER child slot.
+        resident = 'userland/shell/main.c'
+        entry = 'int main(int argc, char **argv, KernelAPI *api)\n{'
+        launcher = (ROOT / resident).read_text()
+        assert launcher.count(entry) == 1
+        path = out / 'launcher.c'
+        path.write_text(launcher.replace(entry, entry + '\n    return api->exec_run("/bin/atadeny.bin");'))
+        user = out / 'user'
+        settings += ['KB_SH_OUT=' + str(user), 'KB_ROOT_BINS=' + str(user / 'atadeny.bin'),
+                     'PPC_RES_MUT_SRC=' + resident, 'PPC_RES_MUT_FILE=' + str(path)]
+    return build(out, '-j6', 'IMAGE=kboot-sh', *settings)
 
 
 def make_image(work, case):
     out = work / case
     out.mkdir()
+    if case in WRITE_CASES:
+        return make_write_image(out, case)
     source = (ROOT / BOOT).read_text()
     diag = (ROOT / 'tools/ppc/ata_accept_diag.c').read_text()
     source = source.replace('void pm_ide_boot(void)', diag + '\nvoid pm_ide_boot(void)')
@@ -116,7 +160,9 @@ def guest(elf, cpu, disk, absent=False):
             '-drive', f'file={iso},format=raw,if=ide,index=2,media=cdrom', '-boot', 'd',
             '-prom-env', r'boot-device=cd:,\PPCKERN.ELF', '-prom-env', 'auto-boot?=true']
     if not absent:
-        args += ['-drive', f'file={disk},format=raw,if=ide,index=0,media=disk,snapshot=on']
+        media = work / 'disk.raw'
+        shutil.copyfile(disk, media)
+        args += ['-drive', f'file={media},format=raw,if=ide,index=0,media=disk,cache=writethrough']
     with (work / 'qemu.log').open('wb') as log, subprocess.Popen(args, stderr=log, stdout=log) as proc:
         try:
             deadline = time.monotonic() + 90
@@ -144,7 +190,10 @@ def main():
     disk = work / 'disk.raw'
     disk.write_bytes(b''.join(sector(i) for i in range(2048)))
     hashes = set()
-    for case in ('normal', *(MUTANTS if args.mutate or args.build_only else ())):
+    cases = ('normal', 'write', 'deny')
+    if args.mutate or args.build_only:
+        cases += MUTANTS + WRITE_MUTANTS
+    for case in cases:
         elf = make_image(work, case)
         sha = hashlib.sha256(elf.read_bytes()).hexdigest()
         assert sha not in hashes, case
@@ -154,6 +203,28 @@ def main():
             continue
         for cpu in ('7450', '7455'):
             lines = guest(elf, cpu, disk)
+            if case in WRITE_CASES:
+                expected = bytearray(disk.read_bytes())
+                if case == 'deny':
+                    assert 'ATA-TEST child=73' in lines, lines[-10:]
+                else:
+                    range_rc = 0 if case == 'write-count' else -4
+                    assert f'ATA-TEST writes=0,0 range={range_rc}' in lines, lines[-10:]
+                    payload = bytes((i * 37 + (i >> 8) + 13) & 255 for i in range(1024))
+                    if case == 'write-word':
+                        payload = bytes(payload[i ^ 1] for i in range(1024))
+                    first = 33 if case == 'write-lba' else 32
+                    count = 1 if case == 'write-count' else 2
+                    expected[first*512:(first+1)*512] = payload[:512]
+                    expected[64*512:(64+count)*512] = payload[:count*512]
+                    if case == 'write-count':
+                        expected[-512:] = payload[:512]
+                    for n in range(3):
+                        equal = (case != 'write-word' and not (case == 'write-lba' and n == 0)
+                                 and not (case == 'write-count' and n == 2))
+                        assert f'ATA-TEST read={n} equal={int(equal)}' in lines
+                assert (elf.parent / cpu / 'disk.raw').read_bytes() == expected, case
+                continue
             ident = 'ATA-TEST model=QEMU HARDDISK sectors=2048' in lines
             if case in ('normal', 'bar'):
                 # mac99 probe: BAR0 0x80000000, first ata-3 reg offset 0x20000.
