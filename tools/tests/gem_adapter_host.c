@@ -1,3 +1,6 @@
+/* The e82557 demux path and the 2026-11-21 GEM decision require direct RX
+ * during TX AGAIN. gem_rint publishes refills in groups of four, and the
+ * OS32 poll budget includes discarded descriptors. */
 #include "types.h"
 #include "platform/powermac/lan_boot.h"
 #include "drivers/net/gem/gem.h"
@@ -11,14 +14,27 @@ void pm_rh_stage(unsigned stage) {
 }
 #endif
 static struct gem device;
-static int running, calls, tx_budget, tx_rc, rx_rc, rx_calls;
-static u32 good, bad, inspected, delivered;
+static int running, calls, tx_budget, tx_rc;
 static u8 expected[6] = {1,2,3,4,5,6};
 static void finish(int rc) {
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc));
     for (;;) {}
 }
 #define CHECK(x) do { if (!(x)) finish(__LINE__); } while (0)
+static u8 pool[GEM_POOL_SIZE];
+static u32 completion, kick = GEM_RX_PUBLISHED;
+static u32 read_reg(void *ctx, u32 reg) {
+    CHECK(ctx == &device && reg == GEM_RX_COMPLETION);
+    return completion;
+}
+static void write_reg(void *ctx, u32 reg, u32 value) {
+    CHECK(ctx == &device && reg == GEM_RX_KICK);
+    kick = value;
+}
+static int sync_dma(void *addr, u32 size, enum dma_sync direction) {
+    (void)addr; (void)size; (void)direction;
+    return 0;
+}
 struct gem *pm_lan_running_gem(u8 mac[6]) {
     if (!running) return 0;
     if (mac) for (u32 i = 0; i < 6; i++) mac[i] = expected[i];
@@ -32,23 +48,6 @@ int gem_tx(struct gem *g, const void *p, u32 n) {
 int gem_poll(struct gem *g, unsigned long long now, u32 budget) {
     CHECK(g == &device && now == 123);
     calls++; tx_budget = budget; return 0;
-}
-/* 本線 PM 決定 2026-11-15 B の条件 1, 2, 3: shared descriptor budget. */
-int gem_rx_some(struct gem *g, void *p, u32 cap, u32 *n, u32 *budget) {
-    CHECK(g == &device && cap == 1514);
-    CHECK(*budget == 8u - inspected);
-    rx_calls++;
-    while (*budget) {
-        (*budget)--; inspected++;
-        CHECK(*budget <= 8);
-        if (bad) { bad--; continue; }
-        if (!good) return GEM_AGAIN; /* OWN is inspected too. */
-        good--; delivered++;
-        ((u8 *)p)[0] = 42; ((u8 *)p)[1] = (u8)delivered;
-        ((u8 *)p)[12] = 0x86; ((u8 *)p)[13] = 0xdd;
-        *n = 14; return rx_rc;
-    }
-    return GEM_AGAIN;
 }
 #include GEM_ADAPTER_SOURCE
 void _start(void) {
@@ -71,38 +70,40 @@ void _start(void) {
 #endif
     tx_rc = GEM_AGAIN; CHECK(op->tx(frame, 14) == OS32_ERR_AGAIN);
     tx_rc = GEM_EIO; CHECK(op->tx(frame, 14) == OS32_ERR_IO);
-    CHECK(op->rx_credit_bytes() / LINK_PAGE_BYTES > LINK_CREDIT_MARGIN);
-    CHECK(op->rx_credit_bytes() == 4 * 1514);
-    CHECK(op->rx(frame, sizeof(frame), &n) == OS32_ERR_AGAIN && !rx_calls);
-    /* 本線 PM 決定 2026-11-15 B の条件 1, 3: fill only free slots, FIFO. */
-    good = 6; inspected = 0;
-    op->poll(); CHECK(calls == 1 && tx_budget == 8 && rx_calls == 4);
-    CHECK(inspected == 4 && good == 2 && op->rx_credit_bytes() == 0);
-    op->poll(); CHECK(calls == 2 && rx_calls == 4);
-    CHECK(op->rx(frame, 1, &n) == OS32_ERR_NOSPC && n == 14);
-    CHECK(op->rx_credit_bytes() == 0);
-    for (int i = 1; i <= 2; i++) {
-        CHECK(op->rx(frame, sizeof(frame), &n) == 0 && frame[1] == i);
+    device.io.read32 = read_reg; device.io.write32 = write_reg;
+    device.io.sync = sync_dma; device.dma.cpu = pool;
+    device.state = GEM_STATE_READY; device.ring_publish_step = 3;
+    CHECK(op->rx_credit_bytes() == 28 * 1514);
+    tx_rc = GEM_AGAIN;
+    for (u32 round = 0; round < 5; round++) {
+        u32 first = device.rx_head;
+        for (u32 i = 0; i < 9; i++) {
+            u32 slot = (first + i) % GEM_RING_COUNT;
+            u8 *flags = pool + GEM_POOL_RX_RING + slot * GEM_DESC_SIZE;
+            for (u32 j = 0; j < 8; j++) flags[j] = 0;
+            flags[2] = 14;
+            if (!i) flags[7] = 0x40; /* bad CRC consumes one inspection */
+            pool[GEM_POOL_RX_BUF + slot * GEM_BUF_SIZE + 2] = (u8)slot;
+        }
+        completion = (first + 9) % GEM_RING_COUNT;
+        op->poll();
+        CHECK(device.rx_head == first && tx_budget == 8);
+        CHECK(op->rx_credit_bytes() == (28 - first % 4 - 9) * 1514);
+        for (u32 i = 1; i < 8; i++) {
+            frame[0] = 42;
+            CHECK(op->tx(frame, 14) == OS32_ERR_AGAIN);
+            CHECK(op->rx(frame, sizeof(frame), &n) == 0 && n == 14);
+            CHECK(frame[0] == (first + i) % GEM_RING_COUNT);
+            u32 head = (first + i + 1) % GEM_RING_COUNT;
+            CHECK(device.rx_head == head);
+            CHECK(kick == ((head - head % 4 + 28) % GEM_RING_COUNT));
+            CHECK(op->rx_credit_bytes() == ((kick - completion) & 31) * 1514);
+        }
+        CHECK(op->rx(frame, sizeof(frame), &n) == OS32_ERR_AGAIN);
+        op->poll();
+        CHECK(op->rx(frame, sizeof(frame), &n) == 0);
+        CHECK(op->rx(frame, sizeof(frame), &n) == OS32_ERR_AGAIN);
     }
-    CHECK(op->rx_credit_bytes() == 2 * 1514);
-    inspected = 0; op->poll();
-    CHECK(inspected == 2 && rx_calls == 6 && op->rx_credit_bytes() == 0);
-    for (int i = 3; i <= 6; i++) {
-        CHECK(op->rx(frame, sizeof(frame), &n) == 0 && n == 14);
-        CHECK(frame[0] == 42 && frame[1] == i && frame[12] == 0x86);
-    }
-    CHECK(op->rx_credit_bytes() / LINK_PAGE_BYTES > LINK_CREDIT_MARGIN);
-    /* Seven bad descriptors leave room in the budget for only one good. */
-    bad = 7; good = 3; inspected = 0; op->poll();
-    CHECK(inspected == 8 && good == 2 && op->rx_credit_bytes() == 3 * 1514);
-    CHECK(op->rx(frame, sizeof(frame), &n) == 0 && frame[1] == 7);
-    good = 0; inspected = 0; op->poll();
-    CHECK(inspected == 1 && op->rx_credit_bytes() == 4 * 1514);
-    CHECK(op->rx(frame, sizeof(frame), &n) == OS32_ERR_AGAIN);
-    good = 1; rx_rc = GEM_EIO; inspected = 0; op->poll();
-    CHECK(inspected == 1 && op->rx_credit_bytes() == 4 * 1514);
-    rx_rc = GEM_OK; good = 1; inspected = 0; op->poll();
-    CHECK(op->rx_credit_bytes() == 3 * 1514);
     running = 0; op->poll();
     int old_calls = calls;
     CHECK(op->tx(frame, 14) == OS32_ERR_HOSTDOWN);
@@ -111,6 +112,6 @@ void _start(void) {
     op->poll(); CHECK(calls == old_calls);
     CHECK(net_gem_adapter.acquire(&op) == 0);
     CHECK(op->rx(frame, sizeof(frame), &n) == OS32_ERR_AGAIN);
-    CHECK(op->rx_credit_bytes() == 4 * 1514);
+    CHECK(op->rx_credit_bytes() == (28 - device.rx_head % 4) * 1514);
     net_gem_adapter.release(); finish(0);
 }

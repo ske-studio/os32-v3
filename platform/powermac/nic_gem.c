@@ -10,13 +10,8 @@
 #include "drivers/net/gem/gem.h"
 #include "os32/os32_kapi_shared.h"
 
-/* link subtracts twelve 256-byte pages before advertising WINDOW. A single
- * frame can never cover that reserve. Four slots match the shared RX queues;
- * credit describes actual free storage, without reading DMA in the query. */
-#define GEM_RX_SLOTS 4u
 #define GEM_FRAME_BYTES 1514u
-static u8 packet[GEM_RX_SLOTS][GEM_FRAME_BYTES];
-static u32 packet_len[GEM_RX_SLOTS], packet_head, packet_count;
+static u32 rx_budget;
 static int acquired;
 
 static int result(int rc)
@@ -48,21 +43,25 @@ static int tx(const void *frame, u32 len)
 static int rx(void *frame, u32 cap, u32 *len)
 {
     if (!frame || !len) return OS32_ERR_INVAL;
-    if (!acquired || !pm_lan_running_gem(0)) return OS32_ERR_HOSTDOWN;
-    if (!packet_count) return OS32_ERR_AGAIN;
-    *len = packet_len[packet_head];
-    if (cap < *len) return OS32_ERR_NOSPC;
-    for (u32 i = 0; i < *len; i++) ((u8 *)frame)[i] = packet[packet_head][i];
-    packet_head = (packet_head + 1) % GEM_RX_SLOTS;
-    packet_count--;
-    return 0;
+    struct gem *g = acquired ? pm_lan_running_gem(0) : 0;
+    if (!g) return OS32_ERR_HOSTDOWN;
+    if (!rx_budget) return OS32_ERR_AGAIN;
+    return result(gem_rx_some(g, frame, cap, len, &rx_budget));
 }
 
 static void mac(u8 *out) { (void)pm_lan_running_gem(out); }
+/* Only whole groups of four have been kicked back to the device. */
+static u32 free_slots(struct gem *g, u32 done)
+{
+    u32 pending = (done - g->rx_head) & (GEM_RING_COUNT - 1);
+    u32 published = GEM_RX_PUBLISHED - g->rx_head % 4;
+    return pending < published ? published - pending : 0;
+}
+
 #ifdef KBOOT_GEM_RX_DIAG
 /* Field           shift   width
  * poll serial         0      16
- * packet_count       16       3
+ * free DMA slots     34       5
  * rx_head            19       5
  * RX_COMPLETION      24       5
  * last RX_KICK       29       5
@@ -74,7 +73,7 @@ static void observe_poll(struct gem *g)
     static unsigned short serial;
     u32 done = g ? g->io.read32(g->io.ctx, GEM_RX_COMPLETION) : 0;
     u32 head = g ? g->rx_head : 0;
-    gem_rx_diag = ++serial | (packet_count << 16) | ((head & 31u) << 19) |
+    gem_rx_diag = ++serial | ((unsigned long long)(g ? free_slots(g, done) : 0) << 34) | ((head & 31u) << 19) |
         ((done & 31u) << 24) | ((unsigned long long)(gem_rx_last_kick & 31u) << 29);
 }
 #endif
@@ -83,29 +82,21 @@ static void poll(void)
     struct gem *g = acquired ? pm_lan_running_gem(0) : 0;
     if (!g || gem_poll(g, g->io.tb(g->io.ctx), 8u) < 0 ||
         !pm_lan_running_gem(0)) {
-        packet_head = packet_count = 0;
+        rx_budget = 0;
 #ifdef KBOOT_GEM_RX_DIAG
         observe_poll(0);
 #endif
         return;
     }
-    /* All receive calls share eight descriptor inspections, including bad
-     * frames and OWN, while filling the available packet slots. */
-    u32 budget = GEM_RX_SCAN_BUDGET;
-    while (packet_count < GEM_RX_SLOTS && budget) {
-        u32 tail = (packet_head + packet_count) % GEM_RX_SLOTS, n = 0;
-        if (gem_rx_some(g, packet[tail], GEM_FRAME_BYTES, &n, &budget) != GEM_OK) break;
-        packet_len[tail] = n;
-        packet_count++;
-    }
+    rx_budget = GEM_RX_SCAN_BUDGET;
 #ifdef KBOOT_GEM_RX_DIAG
     observe_poll(g);
 #endif
 }
 static u32 credit(void)
 {
-    return acquired && pm_lan_running_gem(0) ?
-        (GEM_RX_SLOTS - packet_count) * GEM_FRAME_BYTES : 0;
+    struct gem *g = acquired ? pm_lan_running_gem(0) : 0;
+    return g ? free_slots(g, g->io.read32(g->io.ctx, GEM_RX_COMPLETION)) * GEM_FRAME_BYTES : 0;
 }
 static const struct NetNicOps ops = { tx, rx, mac, poll, credit };
 static int acquire(const struct NetNicOps **out)
@@ -113,8 +104,8 @@ static int acquire(const struct NetNicOps **out)
     if (!out) return OS32_ERR_INVAL;
     if (!pm_lan_running_gem(0)) return OS32_ERR_NOSYS;
     if (acquired) return OS32_ERR_BUSY;
-    acquired = 1; packet_head = packet_count = 0; *out = &ops;
+    acquired = 1; rx_budget = 0; *out = &ops;
     return 0;
 }
-static void release(void) { acquired = 0; packet_head = packet_count = 0; }
+static void release(void) { acquired = 0; rx_budget = 0; }
 const struct NetAdapter net_gem_adapter = { acquire, release };
