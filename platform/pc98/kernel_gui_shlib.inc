@@ -8,24 +8,26 @@
 static int kernel_gui_shlib_ready(void)
 {
     if (shlib_reject_reason() == SHLIB_REJECT_LAYOUT) {
-        kprintf(ATTR_YELLOW, "[boot] %s: rebuild required (KAPI data layout)"
-                " -> CUI shell. rebuild /sys and deploy\n", SYS_SHLIB_GUI);
-        console_text_gdc_start();
-        tvram_clear();
-        tvram_print(0, 0, "GUI shlib: rebuild required (KAPI data layout) -> CUI shell",
-                    TATTR_RED);
-        return 0;
+        gshell_warning = "GUI shlib: rebuild required (KAPI data layout) -> CUI shell";
+        if (!serial_gate_active())
+            serial_puts_polled("[boot] " SYS_SHLIB_GUI ": rebuild required (KAPI data layout)"
+                               " -> CUI shell. rebuild /sys and deploy\n");
     } else if (shlib_reject_reason() == SHLIB_REJECT_MIN_API) {
-        kprintf(ATTR_YELLOW, "[boot] %s: needs KAPI v%u > kernel v%u -> CUI shell."
-                " update the kernel first\n", SYS_SHLIB_GUI,
-                shlib_reject_min_api(), (u32)KAPI_VERSION);
-        console_text_gdc_start();
-        tvram_clear();
-        tvram_print(0, 0, "GUI shlib: needs a newer kernel -> CUI shell",
-                    TATTR_RED);
-        tvram_print(0, 1, "  update the kernel first (hsync boot / deploy-kernel)",
-                    TATTR_RED);
-        return 0;
+        gshell_warning = "GUI shlib: needs a newer kernel -> CUI shell";
+        gshell_warning_help = "  update the kernel first (hsync boot / deploy-kernel)";
+        if (!serial_gate_active()) {
+            serial_puts_polled("[boot] " SYS_SHLIB_GUI ": needs KAPI v");
+            serial_diag_u32(shlib_reject_min_api());
+            serial_puts_polled(" > kernel v");
+            serial_diag_u32(KAPI_VERSION);
+            serial_puts_polled(" -> CUI shell.");
+            serial_puts_polled(gshell_warning_help);
+            serial_puts_polled("\n");
+        }
+    } else {
+        return 1;
     }
-    return 1;
+    console_text_gdc_start();
+    tvram_clear();
+    return 0;
 }

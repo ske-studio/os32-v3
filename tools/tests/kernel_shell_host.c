@@ -96,10 +96,13 @@ int kcg_module_ready(void) { kcg_calls++; return kcg_ready; }
 int shlib_reject_reason(void) { reject_calls++; return reject_reason; }
 u32 shlib_reject_min_api(void) { return KAPI_VERSION + 1; }
 
+int boot_serial_mirror, rshell_active;
+
 void kprintf(u8 attr, const char *fmt, ...)
 {
     va_list ap;
     REQUIRE(attr == ATTR_YELLOW);
+    REQUIRE(!boot_serial_mirror);
     va_start(ap, fmt);
     if (fixture_strstr(fmt, "needs KAPI")) {
         REQUIRE(!fixture_strcmp(va_arg(ap, const char *), SYS_SHLIB_GUI));
@@ -147,11 +150,20 @@ void gfx_client_to_gshell(void) { client_calls++; }
 void geforce_heat_notice(void) {}
 
 static char serial_line[256];
-int serial_gate_active(void) { return 0; }
+static int shlib_lines, gated;
+int serial_gate_active(void) { return gated && !clears; }
 void serial_puts_polled(const char *s)
 {
     REQUIRE(fixture_strlen(serial_line) + fixture_strlen(s) < sizeof(serial_line));
     fixture_strcat(serial_line, s);
+    if (fixture_strstr(serial_line, SYS_SHLIB_GUI) && fixture_strstr(s, "\n")) {
+        REQUIRE(!serial_gate_active());
+        REQUIRE(fixture_strstr(serial_line, reject_reason == SHLIB_REJECT_LAYOUT
+                               ? "rebuild /sys and deploy" : "hsync boot / deploy-kernel"));
+        shlib_lines++;
+        serial_line[0] = 0;
+        return;
+    }
     if (fixture_strcmp(s, "\r\n")) return;
     if (!fixture_strncmp(serial_line, "[boot] exec ret rc=", 19)) {
         REQUIRE(diagnostic_pending && step_index > 0);
@@ -186,11 +198,17 @@ int exec_run(const char *path)
     const struct step *s = &steps[step_index++];
     REQUIRE(!fixture_strcmp(path, s->path));
     REQUIRE(waits == s->waits && clears == s->clears);
-    REQUIRE(cursor_gui == s->gui);
+    REQUIRE(cursor_gui == s->gui && !boot_serial_mirror);
     /* Refusal diagnostics must precede the CUI load, not appear afterward. */
     if (config_gui && reject_reason && kcg_ready && step_index == 1)
         REQUIRE(fixture_strstr(messages, expected_text));
     if (!s->gui && expected_warning) {
+        if (reject_reason == SHLIB_REJECT_MIN_API) {
+            int found = 0;
+            for (int y = 0; y < TVRAM_ROWS; y++)
+                if (fixture_strstr(screen[y], "hsync boot / deploy-kernel")) found++;
+            REQUIRE(found == (step_index == 1));
+        }
         int retry_case = !fixture_strcmp(case_name, "gui-fdd");
         if (s->rc == 0) {
             shell_print("================================\n OS32 External Shell Started\n"
@@ -201,9 +219,9 @@ int exec_run(const char *path)
             if (fixture_strstr(screen[y], expected_warning)) warning_row = y;
             if (fixture_strstr(screen[y], "Loading shell...")) loading_row = y;
         }
-        if (retry_case && step_index == 4) {
+        if ((retry_case && step_index == 4) || (reject_reason && step_index == 2)) {
             REQUIRE(warning_row < 0);
-            if (dual) {
+            if (dual && retry_case) {
                 int len = fixture_strlen(expected_warning);
                 REQUIRE(screen[0][len] == '#');
                 for (int x = 0; x < len; x++) REQUIRE(screen[0][x] == ' ');
@@ -246,8 +264,11 @@ int main(int argc, char **argv)
 {
     REQUIRE(argc == 2);
     case_name = argv[1];
+    gated = !fixture_strncmp(case_name, "gated-", 6);
+    if (gated) case_name += 6;
     dual = !fixture_strncmp(case_name, "dual-", 5);
     if (dual) case_name += 5;
+    rshell_active = dual;
     if (!fixture_strcmp(case_name, "cui") || !fixture_strcmp(case_name, "tick-wrap") ||
         !fixture_strcmp(case_name, "cui-ignores-shlib")) {
         PLAN(10, 1, C(0, 0, 0, 0));
@@ -266,13 +287,15 @@ int main(int argc, char **argv)
         if (!fixture_strcmp(case_name, "shlib-layout")) {
             reject_reason = SHLIB_REJECT_LAYOUT; expected_reject = 1;
             expected_text = "GUI shlib: rebuild required (KAPI data layout) -> CUI shell";
+            expected_warning = expected_text;
             forbidden_text = "update the kernel first";
         } else {
             reject_reason = SHLIB_REJECT_MIN_API; expected_reject = 2;
             expected_text = "update the kernel first (hsync boot / deploy-kernel)";
+            expected_warning = "GUI shlib: needs a newer kernel -> CUI shell";
             forbidden_text = "rebuild /sys";
         }
-        PLAN(10, 2, C(0, 0, 0, 1));
+        PLAN(20, 3, C(0, 0, 0, 1), C(0, 0, 10, 2));
     } else if (!fixture_strcmp(case_name, "load-fail") || !fixture_strcmp(case_name, "load-layout") ||
                !fixture_strcmp(case_name, "request-again")) {
         config_gui = expected_kcg = expected_gui = 1; expected_reject = 2;
@@ -330,6 +353,7 @@ int main(int argc, char **argv)
     int initially_probed = probed;
     if (!__builtin_setjmp(done)) kernel_shell_loop();
     REQUIRE(step_index == step_count && waits == expected_waits && clears == expected_clears);
+    REQUIRE(shlib_lines == (config_gui && reject_reason && !gated));
     REQUIRE(kcg_calls == expected_kcg && reject_calls == expected_reject);
     REQUIRE(client_calls == expected_gui && prepare_calls == (expected_gui > 0 && !initially_probed));
     REQUIRE(diag_count == expected_diag && !diagnostic_pending);
@@ -350,6 +374,9 @@ void con_dual_configure(int on) { (void)on; }
 void console_session_clear(void) { if (dual) clears++; else tvram_clear(); }
 void shell_print(const char *str, u8 color)
 {
+    /* A stalled remote UART would wait in the mirrored output path. */
+    if (rshell_active && reject_reason && !step_index)
+        REQUIRE(0);
     append(str);
     while (*str) {
         REQUIRE(cursor_row >= 0 && cursor_row < TVRAM_ROWS);

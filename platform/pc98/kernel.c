@@ -380,6 +380,10 @@ static inline void kernel_mount_children(const char *root_dev)
     }
 }
 
+/* 次の CUI 起動で表示する診断。 */
+static const char *gshell_warning;
+static const char *gshell_warning_help;
+
 #include "kernel_gui_shlib.inc"
 #include "kernel_shell_fdd.inc"
 
@@ -395,30 +399,33 @@ static int pc98_shell_prepare(int is_gui)
     return 0;
 }
 
-/* 3 回目の fault の後にも session clear があるので、次の起動で表示する。 */
-static const char *gshell_warning;
+static void clear_shell_warning(const char *previous_warning)
+{
+    if (!previous_warning) return;
+    for (int y = 0; y < TVRAM_ROWS; y++) {
+        int x = 0;
+        while (previous_warning[x]) {
+            u16 code = 0;
+            u8 attr = 0;
+            tvram_readchar_at(x, y, &code, &attr);
+            if (code != (u8)previous_warning[x] || attr != TATTR_RED) break;
+            x++;
+        }
+        if (!previous_warning[x]) {
+            while (x > 0) tvram_putchar_at(--x, y, ' ', TATTR_GRAY);
+            break;
+        }
+    }
+}
 
 static void pc98_shell_loading(const char *cur_shell, int is_gui)
 {
     /* dual のテキスト面はセッションを越えて残り、出力でスクロールもする。 */
-    static const char *previous_warning;
-    if (previous_warning) {
-        for (int y = 0; y < TVRAM_ROWS; y++) {
-            int x = 0;
-            while (previous_warning[x]) {
-                u16 code = 0;
-                u8 attr = 0;
-                tvram_readchar_at(x, y, &code, &attr);
-                if (code != (u8)previous_warning[x] || attr != TATTR_RED) break;
-                x++;
-            }
-            if (!previous_warning[x]) {
-                while (x > 0) tvram_putchar_at(--x, y, ' ', TATTR_GRAY);
-                break;
-            }
-        }
-    }
+    static const char *previous_warning, *previous_help;
+    clear_shell_warning(previous_warning);
+    clear_shell_warning(previous_help);
     previous_warning = is_gui ? NULL : gshell_warning;
+    previous_help = is_gui ? NULL : gshell_warning_help;
 
     /* GUI は全画面 GFX を握るのでテキストカーソルを消す。CUI は出す。 */
     if (is_gui) {
@@ -440,15 +447,20 @@ static void pc98_shell_loading(const char *cur_shell, int is_gui)
         console_text_gdc_start();
         if (con_dual_cfg()) {
             if (gshell_warning) {
-                if (console_get_cursor_x()) shell_print("\n", TATTR_GRAY);
-                shell_print(gshell_warning, TATTR_RED);
-                shell_print("\n", TATTR_RED);
+                tvram_print(0, 0, gshell_warning, TATTR_RED);
+                int row = 1;
+                if (gshell_warning_help)
+                    tvram_print(0, row++, gshell_warning_help, TATTR_RED);
+                tvram_print(0, row++, loading, TATTR_GRAY);
+                console_set_cursor(0, row);
+            } else {
+                shell_print("Loading shell...\n", TATTR_GRAY);
             }
-            shell_print("Loading shell...\n", TATTR_GRAY);
         } else {
             if (gshell_warning) {
                 tvram_print(0, 1, gshell_warning, TATTR_RED);
-                console_set_cursor(0, 2);
+                if (gshell_warning_help) tvram_print(0, 2, gshell_warning_help, TATTR_RED);
+                console_set_cursor(0, gshell_warning_help ? 3 : 2);
             }
             tvram_print(0, 0, loading, TATTR_GRAY);
             for (col = (int)sizeof(loading) - 1; col < TVRAM_COLS; col++)
@@ -457,6 +469,7 @@ static void pc98_shell_loading(const char *cur_shell, int is_gui)
     }
 
     gshell_warning = NULL;
+    gshell_warning_help = NULL;
     if (!is_gui) geforce_heat_notice();
     boot_diag_exec(cur_shell, 0, 0, 0);
 }
