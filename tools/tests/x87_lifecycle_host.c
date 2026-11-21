@@ -119,7 +119,7 @@ void font_guard_fault(u32 a,u32 b,u32 c) { (void)a; (void)b; (void)c; CHECK(0); 
 int res_owner_get(void) { return cur; }
 static int gui_active, child_fault;
 int gui_registered(void) { return gui_active; }
-void in2_reclaim(int owner) { (void)owner; }
+void in2_reclaim(int owner) { CHECK(av_focus_get() == owner); }
 void in2_on_focus(int old, int owner) { (void)old; (void)owner; }
 int appslot_kill_check(int id) { CHECK(slots[id].state == APP_STATE_PARKED); return 0; }
 int launch_chain(int head, int *out, int max) { (void)head; (void)out; (void)max; return 0; }

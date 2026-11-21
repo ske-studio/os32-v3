@@ -183,6 +183,10 @@ static void caller_copy_tests(void)
     named(wrap_snd2_chip_write(0, 0, 257) == OS32_ERR_INVAL, "AV chip write too long");
     named(wrap_in2_read((IN2_Event *)va, 128) == 7, "AV read maximum");
     named(wrap_v86s_fm_drain(0, 0, 513, 0) == OS32_ERR_INVAL, "AV drain too long");
+    named(wrap_in2_read((IN2_Event *)(va + 1), 1) == OS32_ERR_INVAL, "in2 read alignment");
+    EXPECT("in2 alignment before range", 0,
+           (named(wrap_in2_read((IN2_Event *)tail, 1) == OS32_ERR_INVAL,
+                  "in2 alignment before range"), touch()));
     named(wrap_in2_read(0, 129) == OS32_ERR_INVAL, "AV read limit");
     named(wrap_snd2_dsp_process(0, 0, (const i32 *)va, 16, 0, 0, ~0u, 0) == OS32_ERR_NOSYS,
           "AV DSP target range deferred");
@@ -239,7 +243,7 @@ static void caller_copy_tests(void)
     EXPECT("in2 pad_caps tail", 1, wrap_in2_pad_caps(0, (IN2_PadCaps *)tail));
     EXPECT("in2 pad_vibrate tail", 1, wrap_in2_pad_vibrate(0, (IN2_Vibration *)tail));
     EXPECT("in2 dev_info tail", 1, wrap_in2_dev_info(0, (IN2_DevInfo *)tail));
-    EXPECT("in2 read tail", 1, wrap_in2_read((IN2_Event *)tail, 1));
+    EXPECT("in2 read tail", 1, wrap_in2_read((IN2_Event *)(tail + 1 - __alignof__(IN2_Event)), 1));
     EXPECT("in2 mouse_state tail", 1, wrap_in2_mouse_state((IN2_MouseState *)tail));
     EXPECT("in2 status tail", 1, wrap_in2_status((IN2_Status *)tail));
     EXPECT("in2 wm_state tail", 1, wrap_in2_wm_state((IN2_WmState *)tail));

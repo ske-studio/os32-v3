@@ -16,6 +16,7 @@ import test_kapi_out as generator
 
 ROOT = walk.ROOT
 MUTANTS = (
+    ('in2 read alignment', 'generated', ' || (u32)out % __alignof__(IN2_Event)', '', 'in2 read alignment'),
     ('legacy dispatch guard', 'legacy', 'int rc = kapi_v86s_check(slot, args.value);',
      'int rc = 0;', 'AV legacy sequence tail'),
     ('retired FM pointer mask', 'generated', '0x0000,  /* fm_play_mml */', '0x0001,  /* fm_play_mml */', 'retired FM returns'),
