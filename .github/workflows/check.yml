@@ -187,7 +187,7 @@ jobs:
           OS32_ACCEPT_IPA_LICENSE: "1"
         run: |
           make sdk/include/os32/os32_generations.h
-          python3 -B tools/ppc/root_lz4_inventory.py --out "$RUNNER_TEMP/root-layout"
+          TMPDIR="$RUNNER_TEMP" python3 -B tools/ppc/root_lz4_inventory.py --out "$RUNNER_TEMP/root-layout"
 
   ppc-compile:
     runs-on: ubuntu-latest

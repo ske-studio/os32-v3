@@ -105,16 +105,15 @@ def observe(elf, cpu, evidence, case, expected, exit_status):
 
     session = Session(elf, cpu, evidence, 240)
     try:
-        if case == 'overlap':
-            session.reboot_args += ('-prom-env', 'output-device=ttya')
         session.start()
-        if case == 'foreign-pair':
+        if case in ('foreign-pair', 'overlap'):
+            stop = 'ppc_kernel_entry_stop' if case == 'foreign-pair' else 'overlap_rejected'
             def at_entry_stop():
                 regs = session.q.call('human-monitor-command', {'command-line': 'info registers'})
                 pc = re.search(r'NIP\s+([0-9a-fA-F]+)', regs)
-                return pc and int(pc[1], 16) == session.symbols['ppc_kernel_entry_stop']
-            session.wait(at_entry_stop, 'foreign pair stopped at entry', 60)
-        elif case in ROOT_FAILURES or case in ('release-skipped', 'release-twice', 'overlap'):
+                return pc and int(pc[1], 16) == session.symbols[stop]
+            session.wait(at_entry_stop, f'{case} stopped at {stop}', 60)
+        elif case in ROOT_FAILURES or case in ('release-skipped', 'release-twice'):
             log = evidence / 'serial-a.log'
             session.wait(lambda: log.exists() and expected in log.read_bytes(),
                          f'{case} pre-mount boot observation', 60)
@@ -202,9 +201,12 @@ def main(on_image=None):
                                        call, '((void)frame_pfn, 1)' if case == 'release-skipped' else
                                        '(' + call + ' && ' + call + ')')
         elif case == 'overlap':
-            mutation = mutant_settings(folder, case, 'platform/powermac/kboot_capture.c',
-                                       '(u32)__root_file_end - (u32)__root_image_start;',
-                                       '(u32)__root_file_end - (u32)__root_image_start + 4096;')
+            mutation = mutant_settings(folder, case, 'platform/powermac/kernel_boot.c',
+                                       'int reserve_rc = pm_kboot_reserve(info);',
+                                       'info->root_frame_bytes += 4096;\n'
+                                       '    int reserve_rc = pm_kboot_reserve(info);\n'
+                                       '    if (reserve_rc == PM_KBOOT_RESERVE_IMAGE_AVAILABLE)\n'
+                                       '        __asm__ volatile("overlap_rejected: b overlap_rejected");')
         elif case == 'absent':
             absent_bindings(folder, kernel / 'gen')
         derived = case in ('allocation-failed', 'invalid-offset', 'short-output', 'data-crc', 'foreign-pair')
@@ -234,7 +236,7 @@ def main(on_image=None):
         elif case in ('release-skipped', 'release-twice'):
             expected = b'root page release'
         elif case == 'overlap':
-            expected = b'FAIL:KB:RESERVE'
+            expected = None  # Observed by stop PC before firmware detaches.
         elif case == 'absent':
             expected = b'BOOT info error -10'
             exit_status = b'1\n'

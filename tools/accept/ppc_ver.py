@@ -85,7 +85,7 @@ def main():
         if case in ('invalid-crc', 'ignore-crc'):
             settings = mutant_settings(folder, 'invalid-crc', 'platform/powermac/ver_backend.c',
                                        's->pvr = saved_pvr;',
-                                       's->boot = (BootImageInfo){0}; s->pvr = saved_pvr;')
+                                       's->boot.crc_valid = 0; s->boot.image_size = 0; s->boot.image_crc = 0; s->pvr = saved_pvr;')
             if case == 'ignore-crc':
                 source = next(Path(arg.split('=', 1)[1]) for arg in settings
                               if arg.startswith('KB_MUT_FILE='))
