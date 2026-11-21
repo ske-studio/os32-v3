@@ -1501,149 +1501,144 @@ path_get_cwd_user:
 path_get_cwd:
     jmp *kdebug_import_slots+1196
 .size path_get_cwd, .-path_get_cwd
-.globl kapi_reserved_nosys
-.type kapi_reserved_nosys, @function
-kapi_reserved_nosys:
-    jmp *kdebug_import_slots+1200
-.size kapi_reserved_nosys, .-kapi_reserved_nosys
 .globl os32x_layout_check
 .type os32x_layout_check, @function
 os32x_layout_check:
-    jmp *kdebug_import_slots+1204
+    jmp *kdebug_import_slots+1200
 .size os32x_layout_check, .-os32x_layout_check
 .globl kdi_get_kbd_inject_drop_count
 .type kdi_get_kbd_inject_drop_count, @function
 kdi_get_kbd_inject_drop_count:
-    jmp *kdebug_import_slots+1208
+    jmp *kdebug_import_slots+1204
 .size kdi_get_kbd_inject_drop_count, .-kdi_get_kbd_inject_drop_count
 .globl kdi_set_con_sink_drop_count
 .type kdi_set_con_sink_drop_count, @function
 kdi_set_con_sink_drop_count:
-    jmp *kdebug_import_slots+1212
+    jmp *kdebug_import_slots+1208
 .size kdi_set_con_sink_drop_count, .-kdi_set_con_sink_drop_count
 .globl kdi_set_kbd_inject_drop_count
 .type kdi_set_kbd_inject_drop_count, @function
 kdi_set_kbd_inject_drop_count:
-    jmp *kdebug_import_slots+1216
+    jmp *kdebug_import_slots+1212
 .size kdi_set_kbd_inject_drop_count, .-kdi_set_kbd_inject_drop_count
 .globl kdi_ptr_ring3_ls_start
 .type kdi_ptr_ring3_ls_start, @function
 kdi_ptr_ring3_ls_start:
-    jmp *kdebug_import_slots+1220
+    jmp *kdebug_import_slots+1216
 .size kdi_ptr_ring3_ls_start, .-kdi_ptr_ring3_ls_start
 .globl kdi_ptr_ring3_ls_end
 .type kdi_ptr_ring3_ls_end, @function
 kdi_ptr_ring3_ls_end:
-    jmp *kdebug_import_slots+1224
+    jmp *kdebug_import_slots+1220
 .size kdi_ptr_ring3_ls_end, .-kdi_ptr_ring3_ls_end
 .globl kdi_ptr___kernel_resident_end
 .type kdi_ptr___kernel_resident_end, @function
 kdi_ptr___kernel_resident_end:
-    jmp *kdebug_import_slots+1228
+    jmp *kdebug_import_slots+1224
 .size kdi_ptr___kernel_resident_end, .-kdi_ptr___kernel_resident_end
 .globl gf_production_selected
 .type gf_production_selected, @function
 gf_production_selected:
-    jmp *kdebug_import_slots+1232
+    jmp *kdebug_import_slots+1228
 .size gf_production_selected, .-gf_production_selected
 .globl geforce_foundation_ops
 .type geforce_foundation_ops, @function
 geforce_foundation_ops:
-    jmp *kdebug_import_slots+1236
+    jmp *kdebug_import_slots+1232
 .size geforce_foundation_ops, .-geforce_foundation_ops
 .globl geforce_accel_ops
 .type geforce_accel_ops, @function
 geforce_accel_ops:
-    jmp *kdebug_import_slots+1240
+    jmp *kdebug_import_slots+1236
 .size geforce_accel_ops, .-geforce_accel_ops
 .globl gfx_present
 .type gfx_present, @function
 gfx_present:
-    jmp *kdebug_import_slots+1244
+    jmp *kdebug_import_slots+1240
 .size gfx_present, .-gfx_present
 .globl gf_display_test
 .type gf_display_test, @function
 gf_display_test:
-    jmp *kdebug_import_slots+1248
+    jmp *kdebug_import_slots+1244
 .size gf_display_test, .-gf_display_test
 .globl gf5_test
 .type gf5_test, @function
 gf5_test:
-    jmp *kdebug_import_slots+1252
+    jmp *kdebug_import_slots+1248
 .size gf5_test, .-gf5_test
 .globl pci_hwb_read
 .type pci_hwb_read, @function
 pci_hwb_read:
-    jmp *kdebug_import_slots+1256
+    jmp *kdebug_import_slots+1252
 .size pci_hwb_read, .-pci_hwb_read
 .globl pci_hwb_write
 .type pci_hwb_write, @function
 pci_hwb_write:
-    jmp *kdebug_import_slots+1260
+    jmp *kdebug_import_slots+1256
 .size pci_hwb_write, .-pci_hwb_write
 .globl exec_hwb_abort_take
 .type exec_hwb_abort_take, @function
 exec_hwb_abort_take:
-    jmp *kdebug_import_slots+1264
+    jmp *kdebug_import_slots+1260
 .size exec_hwb_abort_take, .-exec_hwb_abort_take
 .globl geforce_resource_lookup
 .type geforce_resource_lookup, @function
 geforce_resource_lookup:
-    jmp *kdebug_import_slots+1268
+    jmp *kdebug_import_slots+1264
 .size geforce_resource_lookup, .-geforce_resource_lookup
 .globl paging_device_map
 .type paging_device_map, @function
 paging_device_map:
-    jmp *kdebug_import_slots+1272
+    jmp *kdebug_import_slots+1268
 .size paging_device_map, .-paging_device_map
 .globl paging_device_unmap
 .type paging_device_unmap, @function
 paging_device_unmap:
-    jmp *kdebug_import_slots+1276
+    jmp *kdebug_import_slots+1272
 .size paging_device_unmap, .-paging_device_unmap
 .globl trident_diagnostic_ops
 .type trident_diagnostic_ops, @function
 trident_diagnostic_ops:
-    jmp *kdebug_import_slots+1280
+    jmp *kdebug_import_slots+1276
 .size trident_diagnostic_ops, .-trident_diagnostic_ops
 .globl debug_probe_control
 .type debug_probe_control, @function
 debug_probe_control:
-    jmp *kdebug_import_slots+1284
+    jmp *kdebug_import_slots+1280
 .size debug_probe_control, .-debug_probe_control
 .globl legacy_lowmap_busy
 .type legacy_lowmap_busy, @function
 legacy_lowmap_busy:
-    jmp *kdebug_import_slots+1288
+    jmp *kdebug_import_slots+1284
 .size legacy_lowmap_busy, .-legacy_lowmap_busy
 .globl v86_bios_real_lowmem
 .type v86_bios_real_lowmem, @function
 v86_bios_real_lowmem:
-    jmp *kdebug_import_slots+1292
+    jmp *kdebug_import_slots+1288
 .size v86_bios_real_lowmem, .-v86_bios_real_lowmem
 .globl pci_bar_get
 .type pci_bar_get, @function
 pci_bar_get:
-    jmp *kdebug_import_slots+1296
+    jmp *kdebug_import_slots+1292
 .size pci_bar_get, .-pci_bar_get
 .globl path_set_drive
 .type path_set_drive, @function
 path_set_drive:
-    jmp *kdebug_import_slots+1300
+    jmp *kdebug_import_slots+1296
 .size path_set_drive, .-path_set_drive
 .globl path_set_cwd
 .type path_set_cwd, @function
 path_set_cwd:
-    jmp *kdebug_import_slots+1304
+    jmp *kdebug_import_slots+1300
 .size path_set_cwd, .-path_set_cwd
 .globl path_init
 .type path_init, @function
 path_init:
-    jmp *kdebug_import_slots+1308
+    jmp *kdebug_import_slots+1304
 .size path_init, .-path_init
 .globl input_display_restore_drain
 .type input_display_restore_drain, @function
 input_display_restore_drain:
-    jmp *kdebug_import_slots+1312
+    jmp *kdebug_import_slots+1308
 .size input_display_restore_drain, .-input_display_restore_drain
 .section .note.GNU-stack,"",@progbits

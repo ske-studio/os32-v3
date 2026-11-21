@@ -75,7 +75,7 @@ int ring3_user_ranges_writable(u32 a, u32 n, u32 b, u32 m)
 
 STATIC_ASSERT(PAGE_SIZE == 4096u, callback_fixture_page_size);
 #define P2V(p) ((void *)(p))
-static u8 tramp[PAGE_SIZE] __attribute__((aligned(PAGE_SIZE)));
+static u8 tramp[RING3_TRAMP_BYTES] __attribute__((aligned(PAGE_SIZE)));
 /* Layout symbols are supplied by kernel_layout.linker_flags(). */
 static KernelAPI real_kapi;
 static KernelAPI *kapi = &real_kapi;
@@ -194,9 +194,9 @@ int main(void)
     ring3_trampoline_init();
     assert(ring3_tramp_page == (u32)tramp);
     assert((u32)(ring3_ls_end - ring3_ls_start) <= RING3_LS_SHIM_CAP);
-    assert(RING3_LS_SHIM_OFF + RING3_LS_SHIM_CAP <= PAGE_SIZE);
+    assert(RING3_LS_SHIM_OFF + RING3_LS_SHIM_CAP <= RING3_TRAMP_BYTES);
     int protect;
-    __asm__ volatile("int $0x80" : "=a"(protect) : "a"(125), "b"(tramp), "c"(PAGE_SIZE), "d"(7) : "memory");
+    __asm__ volatile("int $0x80" : "=a"(protect) : "a"(125), "b"(tramp), "c"(RING3_TRAMP_BYTES), "d"(5) : "memory");
     assert(!protect);
     for (total = 0; total <= 100; total++) {
         int before = fs_calls;

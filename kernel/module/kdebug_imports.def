@@ -2435,18 +2435,10 @@
     {
       "stage": "S6",
       "kind": "FUNC",
-      "symbol": "kapi_reserved_nosys",
-      "source": "exec/exec.c",
-      "context_safe": false,
-      "index": 300
-    },
-    {
-      "stage": "S6",
-      "kind": "FUNC",
       "symbol": "os32x_layout_check",
       "source": "exec/os32x_hdr.h",
       "context_safe": false,
-      "index": 301
+      "index": 300
     },
     {
       "stage": "S6",
@@ -2454,7 +2446,7 @@
       "symbol": "kbd_inject_drop_count",
       "source": "include/kbd_inject.h",
       "context_safe": false,
-      "index": 302
+      "index": 301
     },
     {
       "stage": "S6",
@@ -2462,7 +2454,7 @@
       "symbol": "con_sink_drop_count",
       "source": "include/con_sink.h",
       "context_safe": false,
-      "index": 303,
+      "index": 302,
       "retained": true
     },
     {
@@ -2471,7 +2463,7 @@
       "symbol": "kbd_inject_drop_count",
       "source": "include/kbd_inject.h",
       "context_safe": false,
-      "index": 304
+      "index": 303
     },
     {
       "stage": "S6",
@@ -2479,7 +2471,7 @@
       "symbol": "ring3_ls_start",
       "source": "exec/ring3_ls.h",
       "context_safe": false,
-      "index": 305
+      "index": 304
     },
     {
       "stage": "S6",
@@ -2487,7 +2479,7 @@
       "symbol": "ring3_ls_end",
       "source": "exec/ring3_ls.h",
       "context_safe": false,
-      "index": 306
+      "index": 305
     },
     {
       "stage": "S6",
@@ -2495,7 +2487,7 @@
       "symbol": "__kernel_resident_end",
       "source": "include/memmap.h",
       "context_safe": false,
-      "index": 307
+      "index": 306
     },
     {
       "stage": "S6",
@@ -2503,11 +2495,11 @@
       "symbol": "gf_production_selected",
       "source": "include/gf_production.h",
       "context_safe": false,
-      "index": 308,
+      "index": 307,
       "retained": true
     },
     {
-      "index": 309,
+      "index": 308,
       "symbol": "geforce_foundation_ops",
       "source": "drivers/video/geforce/geforce_module.h",
       "kind": "FUNC",
@@ -2516,7 +2508,7 @@
       "retained": true
     },
     {
-      "index": 310,
+      "index": 309,
       "symbol": "geforce_accel_ops",
       "source": "drivers/video/geforce/geforce_module.h",
       "kind": "FUNC",
@@ -2525,7 +2517,7 @@
       "retained": true
     },
     {
-      "index": 311,
+      "index": 310,
       "symbol": "gfx_present",
       "source": "gfx/gfx.h",
       "kind": "FUNC",
@@ -2534,7 +2526,7 @@
       "retained": true
     },
     {
-      "index": 312,
+      "index": 311,
       "symbol": "gf_display_test",
       "source": "kdebug/gf_display_test.h",
       "kind": "FUNC",
@@ -2543,7 +2535,7 @@
       "retained": true
     },
     {
-      "index": 313,
+      "index": 312,
       "symbol": "gf5_test",
       "source": "kdebug/gf5_test.h",
       "kind": "FUNC",
@@ -2552,7 +2544,7 @@
       "retained": true
     },
     {
-      "index": 314,
+      "index": 313,
       "symbol": "pci_hwb_read",
       "source": "drivers/pci/pci_hwb.h",
       "kind": "FUNC",
@@ -2561,7 +2553,7 @@
       "retained": false
     },
     {
-      "index": 315,
+      "index": 314,
       "symbol": "pci_hwb_write",
       "source": "drivers/pci/pci_hwb.h",
       "kind": "FUNC",
@@ -2570,7 +2562,7 @@
       "retained": false
     },
     {
-      "index": 316,
+      "index": 315,
       "symbol": "exec_hwb_abort_take",
       "source": "exec/exec_hwb.h",
       "kind": "FUNC",
@@ -2579,7 +2571,7 @@
       "retained": false
     },
     {
-      "index": 317,
+      "index": 316,
       "symbol": "geforce_resource_lookup",
       "source": "drivers/video/geforce/geforce_module.h",
       "kind": "FUNC",
@@ -2588,7 +2580,7 @@
       "retained": true
     },
     {
-      "index": 318,
+      "index": 317,
       "symbol": "paging_device_map",
       "source": "mm/paging.h",
       "kind": "FUNC",
@@ -2597,7 +2589,7 @@
       "retained": true
     },
     {
-      "index": 319,
+      "index": 318,
       "symbol": "paging_device_unmap",
       "source": "mm/paging.h",
       "kind": "FUNC",
@@ -2606,7 +2598,7 @@
       "retained": true
     },
     {
-      "index": 320,
+      "index": 319,
       "symbol": "trident_diagnostic_ops",
       "source": "drivers/video/trident/trident_module.h",
       "kind": "FUNC",
@@ -2620,7 +2612,7 @@
       "symbol": "debug_probe_control",
       "source": "include/debug_probe.h",
       "context_safe": false,
-      "index": 321,
+      "index": 320,
       "retained": true
     },
     {
@@ -2629,7 +2621,7 @@
       "symbol": "legacy_lowmap_busy",
       "source": "include/legacy_guest.h",
       "context_safe": false,
-      "index": 322,
+      "index": 321,
       "retained": true
     },
     {
@@ -2638,7 +2630,7 @@
       "symbol": "v86_bios_real_lowmem",
       "source": "platform/pc98/bios_snapshot.h",
       "context_safe": true,
-      "index": 323,
+      "index": 322,
       "retained": true
     },
     {
@@ -2647,7 +2639,7 @@
       "symbol": "pci_bar_get",
       "source": "drivers/pci/pci.h",
       "context_safe": false,
-      "index": 324,
+      "index": 323,
       "retained": true
     },
     {
@@ -2656,7 +2648,7 @@
       "symbol": "path_set_drive",
       "source": "lib/path.h",
       "context_safe": false,
-      "index": 325
+      "index": 324
     },
     {
       "stage": "S6",
@@ -2664,7 +2656,7 @@
       "symbol": "path_set_cwd",
       "source": "lib/path.h",
       "context_safe": false,
-      "index": 326
+      "index": 325
     },
     {
       "stage": "S6",
@@ -2672,10 +2664,10 @@
       "symbol": "path_init",
       "source": "lib/path.h",
       "context_safe": false,
-      "index": 327
+      "index": 326
     },
     {
-      "index": 328,
+      "index": 327,
       "symbol": "input_display_restore_drain",
       "source": "input/hal/input_context.h",
       "kind": "FUNC",

@@ -34,23 +34,17 @@
 #include "cpu.h"          /* ABI_WORD_ALIGN */
 #include "os32_kapi_shared.h"   /* KernelAPI / KAPI_FUNC_COUNT / OS32_MAX_PATH */
 
-/* 表の直後 (4B 整列) からスタブ。`ring3_trampoline_init` の stub_base と
- * **同じ式**でなければならない。 */
+/* 表と文字列は第 1 頁、命令は第 2 頁に置く。 */
 #define KAPI_FN_TABLE_FIRST 2
 #define KAPI_STUB_SIZE 8u
-#define RING3_USTR_STUB_OFF  ((u32)((sizeof(KernelAPI) + \
-                                     (u32)(ABI_WORD_ALIGN - 1)) & \
-                                     ~(u32)(ABI_WORD_ALIGN - 1)))
-/* スタブの終わり = 写し場の先頭 (4B 整列)。 */
-#define RING3_USTR_OFF       ((u32)((RING3_USTR_STUB_OFF + \
-                                     (u32)KAPI_FUNC_CAPACITY * KAPI_STUB_SIZE + \
-                                     (u32)(ABI_WORD_ALIGN - 1)) & \
-                                     ~(u32)(ABI_WORD_ALIGN - 1)))
+#define RING3_USTR_STUB_OFF 4096u
+#define RING3_TRAMP_BYTES (2u * RING3_USTR_STUB_OFF)
+#define RING3_USTR_OFF ((u32)sizeof(KernelAPI))
 /* 写し場の大きさ。パス 1 本が入れば足りる。いま写しを返すのは 4 本
  * (sys_getcwd = vfs_cwd_user、vfs_devname_user、path_get_drive_user、
  * path_get_cwd_user — exec/exec.c の tramp_copy)。どれも OS32_MAX_PATH 以内。 */
 #define RING3_USTR_CAP       ((u32)OS32_MAX_PATH)
-#define RING3_LS_SHIM_OFF (RING3_USTR_OFF + RING3_USTR_CAP)
+#define RING3_LS_SHIM_OFF (RING3_USTR_STUB_OFF + KAPI_FUNC_CAPACITY * KAPI_STUB_SIZE)
 
 /* カーネル帯の文字列を CPL=3 の呼び手へ返してよい形に直す。
  *   in_syscall : `ring3_in_syscall` (1 = int 0x80 ディスパッチ中 = CPL=3 由来)

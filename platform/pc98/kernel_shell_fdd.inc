@@ -4,6 +4,10 @@ static void kernel_shell_fdd_fallback(int layout_bad)
     int rc = exec_run(SYS_SHELL_BIN_FDD);
     if (rc < 0 && rc != EXEC_ERR_FAULT) {
         layout_bad |= exec_layout_rejected();
+        if (layout_bad & EXEC_REJECT_MIN_API) {
+            tvram_print(0, 0, "FATAL: shell.bin requires a newer kernel", TATTR_RED);
+            for (;;) _halt();
+        }
         if (layout_bad) {
             /* 常駐シェルが KAPI データ欄の配置違い (票
              * TASK_KAPI_DATA_FIELDS)。走らせても malloc が壊れる

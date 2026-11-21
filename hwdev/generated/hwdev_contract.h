@@ -63,8 +63,8 @@ struct hwdev_core_api {
     i32 (*kpeek_call)(u32 op, void *buf, u32 size);
     int (*recover_gf_runner_access)(struct recover *r, u32 pc, u32 bar, u32 off, u32 width, bool write, u32 *value);
 };
-#define HWDEV_CONTRACT_CRC 0x61668757U
-#define HWDEV_LAYOUT_CRC 0x4d4feffaU
+#define HWDEV_CONTRACT_CRC 0xfc103f1fU
+#define HWDEV_LAYOUT_CRC 0x5fcea1abU
 #define HWDEV_IMPORT_COUNT 48U
 #define HWDEV_CORE_SLOTS 26U
 STATIC_ASSERT((u32)(sizeof(BootImageInfo)) == 40U, hwdev_layout_0);
@@ -695,7 +695,7 @@ STATIC_ASSERT((u32)(__builtin_offsetof(KdebugPeek, tag)) == 28U, hwdev_layout_62
 STATIC_ASSERT((u32)(sizeof(((KdebugPeek *)0)->tag)) == 4U, hwdev_layout_625);
 STATIC_ASSERT((u32)(__builtin_offsetof(KdebugPeek, width)) == 8U, hwdev_layout_626);
 STATIC_ASSERT((u32)(sizeof(((KdebugPeek *)0)->width)) == 4U, hwdev_layout_627);
-STATIC_ASSERT((u32)(sizeof(KernelAPI)) == 1216U, hwdev_layout_628);
+STATIC_ASSERT((u32)(sizeof(KernelAPI)) == 1552U, hwdev_layout_628);
 STATIC_ASSERT((u32)(__alignof__(KernelAPI)) == 4U, hwdev_layout_629);
 STATIC_ASSERT((u32)(__builtin_offsetof(KernelAPI, boot_image_info)) == 944U, hwdev_layout_630);
 STATIC_ASSERT((u32)(sizeof(((KernelAPI *)0)->boot_image_info)) == 4U, hwdev_layout_631);
@@ -986,7 +986,7 @@ STATIC_ASSERT((u32)(sizeof(((KernelAPI *)0)->io_policy_set)) == 4U, hwdev_layout
 STATIC_ASSERT((u32)(__builtin_offsetof(KernelAPI, io_pump)) == 1196U, hwdev_layout_916);
 STATIC_ASSERT((u32)(sizeof(((KernelAPI *)0)->io_pump)) == 4U, hwdev_layout_917);
 STATIC_ASSERT((u32)(__builtin_offsetof(KernelAPI, kapi_reserved)) == 1200U, hwdev_layout_918);
-STATIC_ASSERT((u32)(sizeof(((KernelAPI *)0)->kapi_reserved)) == 8U, hwdev_layout_919);
+STATIC_ASSERT((u32)(sizeof(((KernelAPI *)0)->kapi_reserved)) == 344U, hwdev_layout_919);
 STATIC_ASSERT((u32)(__builtin_offsetof(KernelAPI, kbd_diag)) == 924U, hwdev_layout_920);
 STATIC_ASSERT((u32)(sizeof(((KernelAPI *)0)->kbd_diag)) == 4U, hwdev_layout_921);
 STATIC_ASSERT((u32)(__builtin_offsetof(KernelAPI, kbd_diag_log)) == 960U, hwdev_layout_922);
@@ -1125,7 +1125,7 @@ STATIC_ASSERT((u32)(__builtin_offsetof(KernelAPI, rshell_set_active)) == 260U, h
 STATIC_ASSERT((u32)(sizeof(((KernelAPI *)0)->rshell_set_active)) == 4U, hwdev_layout_1055);
 STATIC_ASSERT((u32)(__builtin_offsetof(KernelAPI, rtc_read)) == 76U, hwdev_layout_1056);
 STATIC_ASSERT((u32)(sizeof(((KernelAPI *)0)->rtc_read)) == 4U, hwdev_layout_1057);
-STATIC_ASSERT((u32)(__builtin_offsetof(KernelAPI, sbrk_heap_limit)) == 1208U, hwdev_layout_1058);
+STATIC_ASSERT((u32)(__builtin_offsetof(KernelAPI, sbrk_heap_limit)) == 1544U, hwdev_layout_1058);
 STATIC_ASSERT((u32)(sizeof(((KernelAPI *)0)->sbrk_heap_limit)) == 4U, hwdev_layout_1059);
 STATIC_ASSERT((u32)(__builtin_offsetof(KernelAPI, serial_diag)) == 956U, hwdev_layout_1060);
 STATIC_ASSERT((u32)(sizeof(((KernelAPI *)0)->serial_diag)) == 4U, hwdev_layout_1061);
@@ -1153,7 +1153,7 @@ STATIC_ASSERT((u32)(__builtin_offsetof(KernelAPI, shell_print_utf8)) == 284U, hw
 STATIC_ASSERT((u32)(sizeof(((KernelAPI *)0)->shell_print_utf8)) == 4U, hwdev_layout_1083);
 STATIC_ASSERT((u32)(__builtin_offsetof(KernelAPI, shell_putchar)) == 280U, hwdev_layout_1084);
 STATIC_ASSERT((u32)(sizeof(((KernelAPI *)0)->shell_putchar)) == 4U, hwdev_layout_1085);
-STATIC_ASSERT((u32)(__builtin_offsetof(KernelAPI, shm_base)) == 1212U, hwdev_layout_1086);
+STATIC_ASSERT((u32)(__builtin_offsetof(KernelAPI, shm_base)) == 1548U, hwdev_layout_1086);
 STATIC_ASSERT((u32)(sizeof(((KernelAPI *)0)->shm_base)) == 4U, hwdev_layout_1087);
 STATIC_ASSERT((u32)(__builtin_offsetof(KernelAPI, snd_bgm_is_playing)) == 488U, hwdev_layout_1088);
 STATIC_ASSERT((u32)(sizeof(((KernelAPI *)0)->snd_bgm_is_playing)) == 4U, hwdev_layout_1089);

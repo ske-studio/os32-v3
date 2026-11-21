@@ -23,6 +23,7 @@ FILES = {
     'boot': 'kdebug/kselftest/caller_boot.inc',
 }
 MUTANTS = [
+    ('paging', 'i < pages; ++i', 'i + 1 < pages; ++i', 'second trampoline page missing'),
     ('paging', 'pt[PTE_INDEX(va)] &= ~PTE_RW;', 'pt[PTE_INDEX(va)] |= PTE_RW;', 'code RW unchanged'),
     ('paging', 'for (va = base; va < end; va += PAGE_SIZE) {\n        u32 *pt', 'for (va = base + PAGE_SIZE; va < end; va += PAGE_SIZE) {\n        u32 *pt', 'code start plus page'),
     ('paging', 'for (va = base; va < end; va += PAGE_SIZE) {\n        u32 *pt', 'for (va = base; va < end - PAGE_SIZE; va += PAGE_SIZE) {\n        u32 *pt', 'code end minus page'),

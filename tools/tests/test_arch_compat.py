@@ -78,7 +78,7 @@ def input_kapi(root, work, vectors, mutation=None):
         slots.append((output / 'sdk/include/os32/os32_kapi_slots.h').read_bytes())
         generated = (output / 'kapi/kapi_generated.c').read_text()
         selected = []
-        for name in ('kapi_reserved_nosys', *('wrap_' + n for n in names)):
+        for name in ('wrap_' + n for n in names):
             match = re.search(r'^[^\n]*\b' + name + r'\([^\n]*\)\n\{.*?^\}', generated, re.M | re.S)
             assert match, name
             selected.append(match[0])

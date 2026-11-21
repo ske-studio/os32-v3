@@ -412,7 +412,7 @@ void _start(void)
     paging_reclaim_conventional();
     paging_set_not_present(MEM_SHM_GUARD_LO, MEM_SHM_GUARD_LO + PAGE_SIZE - 1);
     paging_set_not_present(MEM_SHM_GUARD_HI, MEM_SHM_GUARD_HI + PAGE_SIZE - 1);
-    CHECK(!paging_boot_user_shared(0x170000));
+    CHECK(!paging_boot_user_shared(0x170000, 2));
     CHECK(paging_master_audit(0x170000) == 0);
 
     /* 順序 */

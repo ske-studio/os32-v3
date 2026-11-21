@@ -626,7 +626,7 @@ offset	KdebugPeek.tag	28
 member_size	KdebugPeek.tag	4
 offset	KdebugPeek.width	8
 member_size	KdebugPeek.width	4
-size	KernelAPI	1216
+size	KernelAPI	1552
 align	KernelAPI	4
 offset	KernelAPI.boot_image_info	944
 member_size	KernelAPI.boot_image_info	4
@@ -917,7 +917,7 @@ member_size	KernelAPI.io_policy_set	4
 offset	KernelAPI.io_pump	1196
 member_size	KernelAPI.io_pump	4
 offset	KernelAPI.kapi_reserved	1200
-member_size	KernelAPI.kapi_reserved	8
+member_size	KernelAPI.kapi_reserved	344
 offset	KernelAPI.kbd_diag	924
 member_size	KernelAPI.kbd_diag	4
 offset	KernelAPI.kbd_diag_log	960
@@ -1056,7 +1056,7 @@ offset	KernelAPI.rshell_set_active	260
 member_size	KernelAPI.rshell_set_active	4
 offset	KernelAPI.rtc_read	76
 member_size	KernelAPI.rtc_read	4
-offset	KernelAPI.sbrk_heap_limit	1208
+offset	KernelAPI.sbrk_heap_limit	1544
 member_size	KernelAPI.sbrk_heap_limit	4
 offset	KernelAPI.serial_diag	956
 member_size	KernelAPI.serial_diag	4
@@ -1084,7 +1084,7 @@ offset	KernelAPI.shell_print_utf8	284
 member_size	KernelAPI.shell_print_utf8	4
 offset	KernelAPI.shell_putchar	280
 member_size	KernelAPI.shell_putchar	4
-offset	KernelAPI.shm_base	1212
+offset	KernelAPI.shm_base	1548
 member_size	KernelAPI.shm_base	4
 offset	KernelAPI.snd_bgm_is_playing	488
 member_size	KernelAPI.snd_bgm_is_playing	4

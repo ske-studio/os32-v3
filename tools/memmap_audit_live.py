@@ -32,12 +32,12 @@ def pte_all(directory, count):
 def checks(k, symbols, sqlite_guard):
     """Inclusive intervals; every changing address comes from this build."""
     page_end = PAGE - 1
-    # exec_tramp_page_addr(): the one USER/RO page inside kernel BSS.
-    tramp = (symbols['ring3_tramp_raw'] + page_end) & ~page_end
+    # Page-aligned array containing the USER table and syscall code.
+    tramp = symbols['ring3_tramp_raw']
     ranges = [
         ("カーネル (trampoline 前)", k['KERNEL_LOAD_ADDR'], tramp - 1, 1, 0),
-        ("KAPI trampoline", tramp, tramp + page_end, 1, 1),
-        ("カーネル (trampoline 後)", tramp + PAGE, symbols['__bss_end'] - 1, 1, 0),
+        ("KAPI trampoline", tramp, tramp + 2 * PAGE - 1, 1, 1),
+        ("カーネル (trampoline 後)", tramp + 2 * PAGE, symbols['__bss_end'] - 1, 1, 0),
         ("カーネルヒープ", k['KHEAP_BASE'], k['KHEAP_BASE'] + k['KHEAP_SIZE'] - 1, 1, 0),
         ("KAPI テーブル", k['KHEAP_BASE'] + k['KHEAP_SIZE'], k['MEM_SHM_GUARD_LO'] - 1, 1, 0),
         ("SHM 前方 guard", k['MEM_SHM_GUARD_LO'], k['MEM_SHM_GUARD_LO'] + page_end, 0, None),

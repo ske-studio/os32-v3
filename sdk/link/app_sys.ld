@@ -1,6 +1,6 @@
 #include "memmap_layout.h"
 /* GENERATED GENERATION REF BEGIN */
-__os32_abi_1_mem_4_fmt_5 = 0;
+__os32_abi_2_mem_4_fmt_5 = 0;
 /* GENERATED GENERATION REF END */
 __os32_shell_load_addr = LAYOUT_MEM_SHELL_LOAD_ADDR;
 __os32_shell_sbrk_limit = LAYOUT_MEM_SHELL_HEAP_BASE; /* private CRT diagnostic */

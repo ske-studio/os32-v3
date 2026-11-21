@@ -129,7 +129,7 @@ static void run(void)
     paging_reclaim_conventional();
     paging_set_not_present(MEM_SHM_GUARD_LO, MEM_SHM_GUARD_LO + PAGE_SIZE - 1);
     paging_set_not_present(MEM_SHM_GUARD_HI, MEM_SHM_GUARD_HI + PAGE_SIZE - 1);
-    CHECK(!paging_boot_user_shared(exec_tramp_page_addr()));
+    CHECK(!paging_boot_user_shared(exec_tramp_page_addr(), 2));
     CHECK(!ledger_surface_find(LEDGER_SF_PEGC, LEDGER_ROLE_DISPLAY));
     CHECK(!paging_master_audit(exec_tramp_page_addr()));
     gfx_prepare_backend();
@@ -148,7 +148,7 @@ static void run(void)
     paging_reclaim_conventional();
     paging_set_not_present(MEM_SHM_GUARD_LO, MEM_SHM_GUARD_LO + PAGE_SIZE - 1);
     paging_set_not_present(MEM_SHM_GUARD_HI, MEM_SHM_GUARD_HI + PAGE_SIZE - 1);
-    CHECK(!paging_boot_user_shared(exec_tramp_page_addr()));
+    CHECK(!paging_boot_user_shared(exec_tramp_page_addr(), 2));
     CHECK(!paging_master_audit(exec_tramp_page_addr()));
     device_windows();
     u32 *pt = page_tables[TVRAM_CHAR_BASE >> 22];

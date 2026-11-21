@@ -161,20 +161,18 @@ static int exec_launch(const char *cmdline, int gui_arg)
         int lrc = decode_rc != OS32X_LAYOUT_OK ? decode_rc :
                   os32x_layout_check(hdr, (u32)sz, (u32)KAPI_DATA_FIELDS_OFF);
         if (lrc != OS32X_LAYOUT_OK) {
+            if (lrc == OS32X_LAYOUT_MIN_API) {
+                if (is_shell) g_layout_reject = EXEC_REJECT_MIN_API;
+                console_printf(ATTR_YELLOW, "[exec] %s: requires KAPI %u, kernel %u; update kernel\n",
+                               path, hdr->min_api_ver, (u32)KAPI_VERSION);
+                return EXEC_ERR_INVALID;
+            }
             if (is_shell) g_layout_reject = 1;
             console_printf(ATTR_YELLOW, "[exec] %s: %s (bin=%x kernel=%x)\n", path,
                     os32x_layout_reason(lrc),
                     (lrc == OS32X_LAYOUT_MISMATCH) ? hdr->kapi_data_off : 0u,
                     (u32)KAPI_DATA_FIELDS_OFF);
-            const char *reason = os32x_layout_reason(lrc);
-            if (lrc == OS32X_LAYOUT_MISMATCH) {
-                if (hdr->kapi_data_off != KAPI_DATA_FIELDS_OFF) reason = "KAPI data layout mismatch";
-                else if (hdr->kapi_abi_generation != OS32_KAPI_ABI_GENERATION) reason = "KAPI ABI generation mismatch";
-                else if (hdr->memory_layout_generation != OS32_MEMORY_LAYOUT_GENERATION) reason = "memory layout generation mismatch";
-                else if (hdr->min_api_ver > KAPI_VERSION) reason = "required KAPI version is newer than kernel";
-                else reason = "shared library protocol mismatch";
-            }
-            shell_print(reason, ATTR_RED);
+            shell_print(os32x_layout_reason(lrc), ATTR_RED);
             shell_print("; rebuild required\n", ATTR_RED);
             return EXEC_ERR_INVALID;
         }

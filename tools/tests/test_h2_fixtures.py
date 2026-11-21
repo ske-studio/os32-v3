@@ -109,17 +109,19 @@ def test_fixtures(tmp):
         'old-shell.fixture': 2,
         'old-shlib.fixture': 2,
         'unknown-format.fixture': 2,
-        'bad-abi-generation.fixture': 3,
-        'bad-memory-generation.fixture': 3,
-        'prev-memory-generation-app.fixture': 3,
-        'prev-memory-generation-shlib.fixture': 3,
+        'bad-abi-generation.fixture': 4,
+        'bad-memory-generation.fixture': 5,
+        'prev-memory-generation-app.fixture': 5,
+        'prev-memory-generation-shlib.fixture': 5,
         'old-cpl0-flag.fixture': 2,
-        'bad-shlib-generation.fixture': 3,
-        'bad-shell-generation.fixture': 3,
+        'bad-shlib-generation.fixture': 6,
+        'bad-shell-generation.fixture': 4,
     }
     require(records.keys() == expected.keys(), 'exact fixture names')
     reasons = {'valid control': 0, 'unknown format or flags': 2,
-               'generation or KAPI layout mismatch': 3}
+               'KAPI ABI generation mismatch': 4,
+               'memory layout generation mismatch': 5,
+               'shared library protocol mismatch': 6}
     manifest = json.loads((out / 'manifest.json').read_text())
     require(manifest.keys() == expected.keys(), 'exact manifest fixture names')
     require({name: reasons[record['expected']] for name, record in manifest.items()} == expected,

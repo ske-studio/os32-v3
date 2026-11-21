@@ -96,7 +96,7 @@ int ppc_dec_start(u32 tb_hz, u32 tick_hz)
      '    int guard = probe_dsi((u32)flush_a);',
      'milestone 5 order/format', TRAP % ('pass', 'pass', 'bad', 'pass')),
     ('shm-no-shared-user', 'platform/powermac/ppc_kernel.c',
-     '    int shared_user = paging_boot_user_shared((u32)user_gate) == 0;',
+     '    int shared_user = paging_boot_user_shared((u32)user_gate, 1) == 0;',
      '    int shared_user = 1; (void)user_gate;',
      'milestone 4 order/format', r'^KBOOT MEMORY online=1 heap=1 shm=0$'),
     ('clock-half-scale', 'platform/powermac/clock.c',

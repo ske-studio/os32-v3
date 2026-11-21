@@ -15,6 +15,8 @@ from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 
 MUTATIONS = (
+    ('protocol-misreported-as-min-api', 'source', 'if (lrc == OS32X_LAYOUT_MIN_API)',
+     'if (hdr->min_api_ver > KAPI_VERSION)'),
     ('ppc-accepted', 'layout', '!arch_exec_image_accept(hdr->flags)', '0'),
     ('decode-bypassed', 'source', 'int decode_rc = os32x_decode(hdr, hdrbuf, (u32)sz);',
      'int decode_rc = OS32X_LAYOUT_OK; hdr = (OS32Header *)hdrbuf;'),

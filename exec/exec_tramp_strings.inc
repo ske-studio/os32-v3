@@ -56,5 +56,5 @@ const char *path_get_cwd_user(void)   { return tramp_copy(path_get_cwd()); }
 
 u32 exec_tramp_page_addr(void)
 {
-    return (V2P(ring3_tramp_raw) + PAGE_SIZE - 1) & ~(u32)(PAGE_SIZE - 1);
+    return V2P(ring3_tramp_raw);
 }

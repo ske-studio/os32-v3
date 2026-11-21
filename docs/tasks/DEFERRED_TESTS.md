@@ -30,6 +30,14 @@
 
 | ID | 何を残したか | 理由 | 渡し先 |
 |---|---|---|---|
+| INPUT-REPEAT | 押し続けたキーのリピート配送 | NP21/W の hold はメイクを繰り返さない | TASK_INPUT_HAL。メイクを反復する鍵盤で確認 |
+| INPUT-V86 | V86 ゲストへのキー配送 | ゲストで配送を確認する手順が無い | TASK_INPUT_HAL。V86 の受入手順を整えた時 |
+| IO-TIER-LOAD | 音・LAN・入力の同時負荷を 30 回かけて応答を測る | 前景のシェル 1 本では同時に負荷をかけられない | TASK_LAN_BULK 着手時 |
+| INPUT-CUI-BYTES | CUI で GRPH+A・KANA+A が返す生のバイトを前の版と比べる | 前の版との実測比較が残る | TASK_INPUT_HAL の CUI 受入 |
+| INPUT-S4-CANCEL | 実機で S4 の取消が届くことを確認 | 実機の配送確認は U2-x0 に依る | TASK_INPUT_HAL の U2-x0 の後 |
+| USB-LANG | USB 鍵盤で LANG1・LANG2 の実際の HID report を採取して確認 | 実機での採取は USB の段 1E に依る | TASK_USB の 1E の後 |
+| KAPI-V89-PPC | PowerPC ゲストで 1 頁・2 頁の写像、失敗時の停止、先頭・末尾のスタブの往復を確認 | PowerPC ゲストの受入は後続の段で行う | KAPI v89 の PowerPC の後続段 |
+| TICK-S1-RA266 | 負荷と遅延を Ra266 で測る。未登録・登録済みで期限待ち・期限到達の各条件で IRQ0 の最悪時間を取り、登録による 60 秒間の最悪時間の増分が 2 µs 以下か確認 | S1 は実装・レビュー済み、実機測定が残る | TASK_TICK_1KHZ 段 B の S1 受入 |
 | INPUT-KM-DEAD | accent/dead keyの保留状態と合成の実装・試験 | H0bレビュー3のPM決定。既定PC98表にaccentなし、延期中はdead/accentを登録・交換で拒否 | INPUT_KEYMAP_DESIGN H0bのW/S3で所有者・世代・flushと試験を確定し、拒否解除前に検証 |
 | PPC-USB-RH | PowerMac 実機の USB キーボードから製品 sh への入力・修飾・行編集・抜去 | 実装段は QEMU mac99 と host のみ | PowerMac USB 入力の実機受入時に検証する。QEMU の合格を実機の合格に数えない |
 | PPC-NEWLIB-HEAP-RECLAIM | 子が fault・正常終了で持った heap の物理ページが回収されたか、親から mem_stat の phys_free_pages の前後を比較する | PowerPC の mem_stat は KAPI の提供者がない (PPC_KAPI_FILL_DESIGN の 2c) | 2c で mem_stat が PowerPC に入った後、受入に足して通ったら削る |
@@ -170,3 +178,5 @@ SKIP の登録は閉鎖台帳の S-2・S-3・S-5〜S-8 (T2h で閉鎖) と上の
 | ID | 対象 | 手順 | 未実施理由 | 担当 | 解除条件 |
 |---|---|---|---|---|---|
 | HWB-REALHW | HW-BASIC 実機受入 (§7) | Ra266 で lspci/pcidump → SR09 → Enable → Disable と窓の連続 read、シリアルと映像往復・PTE/IF 復元を照合 | 実装段は host のみ、実機未実施 | HW-BASIC 機能 PM | 実機の記録と映像往復・連続 read の成功確認で解除 |
+| PPC-P3OVF-QEMU | PowerPC の link-sh-run の p3-overflow (7450 で大きな RSH の出力の間に LAN の受けが止まる) | CI の ppc-qemu の link-sh-run (7450 late=False で出やすい) | QEMU 10.2.1 の sungem が受信の枠の満杯 (Check RX 0) の後に rx_check を呼ばず受け取りを再開しない (公開のトレース sungem_rx_* で確認、QEMU のソースは未読)。ユーザー決定 (2026-11-21): QEMU の不具合として扱い製品の受けは今のまま、CI で落ちたら回し直し。CI の ppc-qemu の組の時間切れの元 | PowerPC の PM | GEM の RX を 128 にする段 (ユーザー承認 2026-11-21、段 E の後) で発生が減るか測る — 満杯までの余裕は 28 → 124 枠で短い山は減るが、長い山で満杯になれば QEMU の再開の漏れは残る。QEMU が直れば解除 |
+| XFER-IME-NP21W | NP21/W の CUI で XFER の二打で IME が on にならない | CUI の「echo 」の後で XFER を 2 回 (対照: Shift+Space は効く) | 前からの振る舞い (v89 09eb7d0 でも同じ、2026-11-21 依頼 23)。XFER を IME の切り替えに割り当てていないのか、NP21/W の XFER の入力が届いていないのかは未確認 | 本線 PM | XFER の割り当て (入力の keymap の既定) と NP21/W の XFER のスキャンコードを確かめ、意図どおりなら記録して解除 |

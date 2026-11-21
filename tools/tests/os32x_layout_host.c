@@ -64,14 +64,14 @@ int main(void)
 #else
     h.shlib_protocol = 2; /* app 2 x shlib 1 */
 #endif
-    CHECK(os32x_layout_check(&h, sizeof(h), KAPI_DATA_FIELDS_OFF) == OS32X_LAYOUT_MISMATCH);
+    CHECK(os32x_layout_check(&h, sizeof(h), KAPI_DATA_FIELDS_OFF) == OS32X_LAYOUT_PROTOCOL);
     h.flags = OS32X_FLAG_SHLIB;
-    CHECK(os32x_layout_check(&h, sizeof(h), KAPI_DATA_FIELDS_OFF) == OS32X_LAYOUT_MISMATCH);
+    CHECK(os32x_layout_check(&h, sizeof(h), KAPI_DATA_FIELDS_OFF) == OS32X_LAYOUT_PROTOCOL);
     h = valid();
     h.memory_layout_generation = OS32_MEMORY_LAYOUT_GENERATION - 1;
-    CHECK(os32x_layout_check(&h, sizeof(h), KAPI_DATA_FIELDS_OFF) == OS32X_LAYOUT_MISMATCH);
+    CHECK(os32x_layout_check(&h, sizeof(h), KAPI_DATA_FIELDS_OFF) == OS32X_LAYOUT_MEMORY);
     h.flags = OS32X_FLAG_SHLIB;
-    CHECK(os32x_layout_check(&h, sizeof(h), KAPI_DATA_FIELDS_OFF) == OS32X_LAYOUT_MISMATCH);
+    CHECK(os32x_layout_check(&h, sizeof(h), KAPI_DATA_FIELDS_OFF) == OS32X_LAYOUT_MEMORY);
     h = valid();
     CHECK(sizeof(h) / sizeof(u32) == OS32X_HDR_SIZE / 4);
     CHECK(!os32x_layout_check(&h, sizeof(h), KAPI_DATA_FIELDS_OFF));

@@ -323,6 +323,15 @@ void _start(void)
         CHECK(paging_addrspace_create(&as, LEDGER_OWNER_KERNEL) == -1);
         CHECK(as.pd_phys == 0);
     }
+    /* Exec-disabled boot shares exactly the gate page. */
+    u32 gate = 0x170000;
+    CHECK(paging_boot_user_shared(gate + 1, 1) < 0);
+    CHECK(paging_boot_user_shared(gate, 0) < 0);
+    CHECK(paging_boot_user_shared(KHEAP_BASE - PAGE_SIZE, 2) < 0);
+    CHECK(!paging_boot_user_shared(gate, 1));
+    CHECK(paging_pte_raw(gate) == (gate | PAGE_RO | PTE_USER));
+    CHECK(!(paging_pte_flags(gate - PAGE_SIZE) & PTE_USER));
+    CHECK(!(paging_pte_flags(gate + PAGE_SIZE) & PTE_USER));
     SAY("PASS: one-shot init preserves dynamic PT, live AS, CR3, allocator");
     SAY("PASS: final-page, virtual/physical overflow, range preflight");
     SAY("PASS: sparse NP, attribute flags, USER/PCD, user-range preflight");

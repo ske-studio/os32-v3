@@ -14,24 +14,24 @@ ROOT = Path(__file__).resolve().parents[2]
 PPC = Path((os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc') + '/bin'))
 
 
+sys.path.insert(0, str(ROOT / "sdk"))
+import os32x_hdr as h
+
+
 def call(args, **kwargs):
     return subprocess.run([str(x) for x in args], check=True, capture_output=True, **kwargs)
 
 
 def package(tmp, sdk):
     src = tmp / 'app.c'
-    src.write_text('__attribute__((section(".text.startup"))) void start(void) {}\n'
-                   'int data = 7; int bss;\n'
-                   '__attribute__((section(".os32_kapi_layout"),used)) const unsigned stamp=0x1234;\n'
-                   '__attribute__((section(".os32_generations"),used)) const unsigned char note[] = {' +
-                   ','.join(str(x) for x in struct.pack('>4I', 5, 1, 1, 2)) + '};\n')
-    # Obtain the current generation values instead of assuming their versions.
-    sys.path.insert(0, str(ROOT / 'sdk'))
-    import os32x_hdr as h
     note = struct.pack('>4I', h.OS32X_HDR_VERSION, h.OS32_KAPI_ABI_GENERATION,
                        h.OS32_MEMORY_LAYOUT_GENERATION, h.OS32_SHLIB_PROTOCOL)
-    s = src.read_text(); s = s[:s.index('__attribute__((section(".os32_generations"),used))')]
-    src.write_text(s + '__attribute__((section(".os32_generations"),used)) const unsigned char note[] = {' + ','.join(str(x) for x in note) + '};\n')
+    src.write_text('__attribute__((section(".text.startup"))) void start(void) {}\n'
+                   'int data = 7; int bss;\n'
+                   '__attribute__((section(".os32_kapi_layout"),used)) '
+                   f'const unsigned stamp={h.KAPI_DATA_FIELDS_OFF};\n'
+                   '__attribute__((section(".os32_generations"),used)) const unsigned char note[] = {' +
+                   ','.join(str(x) for x in note) + '};\n')
     script = tmp / 'app.ld'
     script.write_text('ENTRY(start)\nSECTIONS { . = 0x80100000; .text : { *(.text*) . = ALIGN(4096); } __text_end = .; .data : { *(.data*) . = ALIGN(4); } __bss_start = .; .bss : { *(.bss*) *(COMMON) } __bss_end = .; .os32_kapi_layout 0 (INFO) : { *(.os32_kapi_layout) } .os32_generations 0 (INFO) : { *(.os32_generations) } /DISCARD/ : { *(.comment) *(.eh_frame*) } }\n')
     elf = tmp / 'app.elf'; raw = tmp / 'app.raw'; out = tmp / 'app.bin'
@@ -48,7 +48,7 @@ def exercise(tmp, sdk):
     result, out, raw, elf, cmd = package(tmp, sdk)
     assert result.returncode == 0, result.stderr
     fields = struct.unpack('<16I', out.read_bytes()[:64])
-    assert fields[3] & 0x40 and fields[4] == 0 and fields[10] == 0x80100000 and fields[11] == 0x1234
+    assert fields[3] & 0x40 and fields[4] == 0 and fields[10] == 0x80100000 and fields[11] == h.KAPI_DATA_FIELDS_OFF
     assert out.read_bytes()[64:] == raw.read_bytes()
     src = tmp / 'app.c'
     x86 = tmp / 'x86.elf'

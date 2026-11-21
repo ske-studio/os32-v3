@@ -708,11 +708,6 @@ static int kapi_in_range(u32 p, u32 len)
 
 /* 予約スロット (KAPI_FUNC_COUNT..KAPI_FUNC_CAPACITY-1) の中身。
  * CPL=0 の呼び手 (常駐シェル・--cpl0) は NULL ではなくここへ来る。 */
-i32 __cdecl kapi_reserved_nosys(void)
-{
-    return OS32_ERR_NOSYS;
-}
-
 void __cdecl wrap_gfx_init(void)
 {
     KAPI_HIT(0);
