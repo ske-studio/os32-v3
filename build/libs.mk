@@ -25,7 +25,6 @@ INC_libos32math     = -Iuserland/lib/math
 INC_libos32db       = -Iuserland/lib/db
 INC_libos32asset    = -Iuserland/lib/asset
 INC_libos32save     = -Iuserland/lib/save
-INC_libos32snd      = -Iuserland/lib/snd
 INC_libos32mgx      = -Iuserland/lib/mgx -Ilib/zlib
 # ランタイム小物 (pkg, dbgserial)。"rt/xxx.h" 形式で引くので -Iuserland/lib。
 INC_libos32rt       = -Iuserland/lib
@@ -225,19 +224,6 @@ $(LIBDIR)/libzinflate.a: $(ZLIB_INFLATE_OBJ)
 $(eval $(call DEFINE_LIB,libos32mgx,userland/lib/mgx,,))
 LIBMGX_OBJ = $(LIBDIR)/libos32mgx.a $(LIBDIR)/libzinflate.a
 
-# libos32snd — サウンドライブラリ
-LIBSND_ARCHIVE_OBJ = userland/lib/snd/libos32snd.o
-LIBSND_OBJ = $(LIBDIR)/libos32snd.a
-
-$(LIBDIR)/libos32snd.a: $(LIBSND_ARCHIVE_OBJ)
-	@rm -f $@
-	$(AR) rcs $@ $^
-
-userland/lib/snd/libos32snd.o: userland/lib/snd/libos32snd.c userland/lib/snd/libos32snd.h | $(ABI_CONTRACT_ORDER)
-	$(CC) $(PROGRAM_FLAGS) $(INC_libos32snd) -c $< -o $@
-
-ALL_LIB_OBJ += $(LIBSND_ARCHIVE_OBJ)
-
 # libos32md — Markdownパーサー + レンダラー
 userland/lib/md/md_parse.o: userland/lib/md/md_parse.c userland/lib/md/libos32md.h | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) $(INC_libos32md) -c $< -o $@
@@ -280,7 +266,6 @@ ALL_LIB_ARCHIVES = $(LIBDIR)/libmmtime.a $(LIBDIR)/libos32math.a \
                    $(LIBDIR)/libos32db.a \
                    $(LIBDIR)/libos32asset.a \
                    $(LIBDIR)/libos32save.a \
-                   $(LIBDIR)/libos32snd.a \
                    $(LIBDIR)/libos32mgx.a \
                    $(LIBDIR)/libzinflate.a \
                    $(LIBDIR)/libos32ui.a \
@@ -304,7 +289,7 @@ clean-libs:
 	rm -f userland/lib/gfx/draw/*.o userland/lib/gfx/text/*.o userland/lib/gfx/geom/*.o
 	rm -f userland/lib/gfx/v2/*.o gfx/v2/format.o
 	rm -f userland/lib/tilemap/*.o
-	rm -f userland/lib/db/*.o userland/lib/snd/*.o
+	rm -f userland/lib/db/*.o
 	rm -f userland/lib/md/*.o userland/lib/filer/*.o
 	rm -f userland/lib/save/*.o
 	rm -f userland/lib/mgx/*.o lib/zlib/*.o

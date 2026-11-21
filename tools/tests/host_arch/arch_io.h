@@ -2,7 +2,11 @@
 #ifndef ARCH_IO_H
 #define ARCH_IO_H
 #define X86_EFLAGS_IF 0x200U
+#ifdef HOST_ARCH_SHARED_IF
+extern unsigned int host_arch_if;
+#else
 static unsigned int host_arch_if = 0x202U;
+#endif
 static inline void _enable(void) { host_arch_if |= X86_EFLAGS_IF; }
 static inline void _disable(void) { host_arch_if &= ~X86_EFLAGS_IF; }
 static inline unsigned int irq_save(void) {

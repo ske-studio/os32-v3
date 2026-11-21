@@ -1,6 +1,6 @@
 {
   "generations": {"os32x_format": 5, "kapi_abi": 2, "memory_layout": 4, "shlib_protocol": 2},
-  "version": 89,
+  "version": 90,
   "func_capacity": 384,
   "crt_kapi_symbol": "os32_kapi_v89",
   "data_fields": [
@@ -28,6 +28,7 @@
     "clock_service.h",
     "exec.h",
     "fm_contract.h",
+    "av_contract.h",
     "ide_contract.h",
     "path.h",
     "text_screen.h",
@@ -44,7 +45,6 @@
     "ime.h",
     "fd_redirect.h",
     "pipe_buffer.h",
-    "snd_contract.h",
     "pointer_service.h",
     "kapi_db.h",
     "platform_device.h",
@@ -381,11 +381,13 @@
     },
     {
       "name": "fm_startup_sound",
+      "retired": {"since": 90, "result": null},
       "ret": "void",
       "args": []
     },
     {
       "name": "fm_play_mml",
+      "retired": {"since": 90, "result": null},
       "ret": "void",
       "args": [
         "const char *mml"
@@ -983,6 +985,7 @@
     },
     {
       "name": "snd_bgm_play",
+      "retired": {"since": 90, "result": null},
       "ret": "void",
       "args": [
         "const char *mml"
@@ -990,16 +993,19 @@
     },
     {
       "name": "snd_bgm_stop",
+      "retired": {"since": 90, "result": null},
       "ret": "void",
       "args": []
     },
     {
       "name": "snd_bgm_is_playing",
+      "retired": {"since": 90, "result": 0},
       "ret": "int",
       "args": []
     },
     {
       "name": "snd_se_play",
+      "retired": {"since": 90, "result": null},
       "ret": "void",
       "args": [
         "int se_id"
@@ -1007,6 +1013,7 @@
     },
     {
       "name": "snd_se_play_raw",
+      "retired": {"since": 90, "result": null},
       "ret": "void",
       "args": [
         "int note",
@@ -1016,6 +1023,7 @@
     },
     {
       "name": "snd_set_master",
+      "retired": {"since": 90, "result": null},
       "ret": "void",
       "args": [
         "int enable"
@@ -1023,6 +1031,7 @@
     },
     {
       "name": "snd_bgm_set_persist",
+      "retired": {"since": 90, "result": null},
       "ret": "void",
       "args": [
         "int persist"
@@ -1419,6 +1428,7 @@
     },
     {
       "name": "snd_focus",
+      "retired": {"since": 90, "result": "OS32_ERR_NOSYS"},
       "ret": "i32",
       "args": ["int app_id"]
     },
@@ -2042,6 +2052,45 @@
     {"name": "io_policy_set", "target": "kapi_io_policy_set", "ret": "int", "args": ["const void *bytes", "unsigned int len"], "in": [{"arg": "bytes", "len": "len"}]},
     {"name": "io_policy_get", "target": "kapi_io_policy_get", "ret": "int", "args": ["void *bytes", "unsigned int cap", "unsigned int *needed"], "out": [{"arg": "bytes", "len": "cap"}, {"arg": "needed", "size": "sizeof(unsigned int)"}]},
     {"name": "io_policy_reset", "target": "kapi_io_policy_reset", "ret": "int", "args": []},
-    {"name": "io_pump", "target": "kapi_io_pump", "ret": "int", "args": ["unsigned int budget_us"]}
+    {"name": "io_pump", "target": "kapi_io_pump", "ret": "int", "args": ["unsigned int budget_us"]},
+    {"name": "snd2_dev_count", "target": "snd2_dev_count", "ret": "int", "args": []},
+    {"name": "snd2_dev_info", "target": "snd2_dev_info", "ret": "int", "args": ["u32 dev", "SND2_DevInfo *o"], "out": [{"arg": "o", "size": "sizeof(SND2_DevInfo)"}]},
+    {"name": "snd2_caps", "target": "snd2_caps", "ret": "int", "args": ["u32 dev", "SND2_Caps *o", "u32 size"], "out": [{"arg": "o", "len": "size"}], "invalid_length": "!size || size > 256 || (size & 3)"},
+    {"name": "snd2_dsp_unit", "target": "snd2_dsp_unit", "ret": "int", "args": ["u32 dev", "u32 unit", "SND2_DspUnit *o"], "out": [{"arg": "o", "size": "sizeof(SND2_DspUnit)"}]},
+    {"name": "snd2_dsp_param", "target": "snd2_dsp_param", "ret": "int", "args": ["u32 dev", "u32 unit", "u32 i", "SND2_DspParam *o"], "out": [{"arg": "o", "size": "sizeof(SND2_DspParam)"}]},
+    {"name": "snd2_dsp_insert", "target": "snd2_dsp_insert", "ret": "int", "args": ["u32 stream", "u32 unit", "const i32 *params", "u32 n"], "in": [{"arg": "params", "len": "n", "unit": 4}], "invalid_length": "n > 16"},
+    {"name": "snd2_dsp_process", "target": "snd2_dsp_process", "ret": "int", "args": ["u32 dev", "u32 unit", "const i32 *params", "u32 n", "const void *in", "void *out", "u32 frames", "u32 fmt_index"], "in": [{"arg": "params", "len": "n", "unit": 4}, {"arg": "in", "target": true}], "out": "target", "invalid_length": "n > 16"},
+    {"name": "snd2_stream_open", "target": "snd2_stream_open", "ret": "int", "args": ["const SND2_StreamDesc *d", "u32 *stream"], "in": [{"arg": "d", "size": "sizeof(SND2_StreamDesc)"}], "out": [{"arg": "stream", "size": "sizeof(u32)"}]},
+    {"name": "snd2_stream_write", "target": "snd2_stream_write", "ret": "int", "args": ["u32 stream", "const void *buf", "u32 bytes"], "in": [{"arg": "buf", "target": true}]},
+    {"name": "snd2_stream_start", "target": "snd2_stream_start", "ret": "int", "args": ["u32 stream"]},
+    {"name": "snd2_stream_pause", "target": "snd2_stream_pause", "ret": "int", "args": ["u32 stream"]},
+    {"name": "snd2_stream_pos", "target": "snd2_stream_pos", "ret": "int", "args": ["u32 stream", "SND2_Pos *o"], "out": [{"arg": "o", "size": "sizeof(SND2_Pos)"}]},
+    {"name": "snd2_stream_wait", "target": "snd2_stream_wait", "ret": "int", "args": ["u32 stream", "u32 frame", "u32 timeout_ms"]},
+    {"name": "snd2_stream_volume", "target": "snd2_stream_volume", "ret": "int", "args": ["u32 stream", "u32 left", "u32 right"]},
+    {"name": "snd2_stream_close", "target": "snd2_stream_close", "ret": "int", "args": ["u32 stream", "u32 how"]},
+    {"name": "av_focus_set", "target": "av_focus_set", "ret": "int", "args": ["int owner"]},
+    {"name": "av_focus_get", "target": "av_focus_get", "ret": "int", "args": []},
+    {"name": "in2_pad_state", "target": "in2_pad_state", "ret": "int", "args": ["u32 slot", "IN2_PadState *o"], "out": [{"arg": "o", "size": "sizeof(IN2_PadState)"}]},
+    {"name": "in2_pad_caps", "target": "in2_pad_caps", "ret": "int", "args": ["u32 slot", "IN2_PadCaps *o"], "out": [{"arg": "o", "size": "sizeof(IN2_PadCaps)"}]},
+    {"name": "in2_pad_vibrate", "target": "in2_pad_vibrate", "ret": "int", "args": ["u32 slot", "const IN2_Vibration *v"], "in": [{"arg": "v", "size": "sizeof(IN2_Vibration)"}]},
+    {"name": "in2_dev_count", "target": "in2_dev_count", "ret": "int", "args": []},
+    {"name": "in2_dev_info", "target": "in2_dev_info", "ret": "int", "args": ["u32 i", "IN2_DevInfo *o"], "out": [{"arg": "o", "size": "sizeof(IN2_DevInfo)"}]},
+    {"name": "in2_read", "target": "in2_read", "ret": "int", "args": ["IN2_Event *out", "u32 max"], "out": [{"arg": "out", "len": "max", "unit": 16}], "invalid_length": "max > 128"},
+    {"name": "in2_key_state", "target": "in2_key_state", "ret": "int", "args": ["u8 *out"], "out": [{"arg": "out", "size": 128}]},
+    {"name": "in2_mouse_state", "target": "in2_mouse_state", "ret": "int", "args": ["IN2_MouseState *o"], "out": [{"arg": "o", "size": "sizeof(IN2_MouseState)"}]},
+    {"name": "in2_acquire", "target": "in2_acquire", "ret": "int", "args": ["u32 flags"]},
+    {"name": "in2_unacquire", "target": "in2_unacquire", "ret": "int", "args": []},
+    {"name": "in2_status", "target": "in2_status", "ret": "int", "args": ["IN2_Status *o"], "out": [{"arg": "o", "size": "sizeof(IN2_Status)"}]},
+    {"name": "in2_wm_state", "target": "in2_wm_state", "ret": "int", "args": ["IN2_WmState *o"], "out": [{"arg": "o", "size": "sizeof(IN2_WmState)"}]},
+    {"name": "v86s_begin", "target": "v86s_begin", "ret": "int", "args": ["const V86_Begin *b", "u32 *sid"], "in": [{"arg": "b", "size": "sizeof(V86_Begin)"}], "out": [{"arg": "sid", "size": "sizeof(u32)"}]},
+    {"name": "v86s_run", "target": "v86s_run", "ret": "int", "args": ["u32 sid", "const V86_RunIn *in", "V86_Exit *ex"], "in": [{"arg": "in", "size": "sizeof(V86_RunIn)"}], "out": [{"arg": "ex", "size": "sizeof(V86_Exit)"}]},
+    {"name": "v86s_fm_drain", "target": "v86s_fm_drain", "ret": "int", "args": ["u32 sid", "SND2_FmEv *out", "u32 max", "u32 *last_seq"], "out": [{"arg": "out", "len": "max", "unit": 12}, {"arg": "last_seq", "size": "sizeof(u32)"}], "invalid_length": "max > 512"},
+    {"name": "v86s_end", "target": "v86s_end", "ret": "int", "args": ["u32 sid"]},
+    {"name": "snd2_chip_caps", "target": "snd2_chip_caps", "ret": "int", "args": ["u32 dev", "SND2_ChipCaps *o", "u32 size"], "out": [{"arg": "o", "len": "size"}], "invalid_length": "!size || size > 64 || (size & 3)"},
+    {"name": "snd2_chip_open", "target": "snd2_chip_open", "ret": "int", "args": ["u32 dev", "u32 *h"], "out": [{"arg": "h", "size": "sizeof(u32)"}]},
+    {"name": "snd2_chip_write", "target": "snd2_chip_write", "ret": "int", "args": ["u32 h", "const SND2_RegW *w", "u32 n"], "in": [{"arg": "w", "len": "n", "unit": 4}], "invalid_length": "n > 256"},
+    {"name": "snd2_chip_read", "target": "snd2_chip_read", "ret": "int", "args": ["u32 h", "u32 bank", "u32 what", "u32 reg"]},
+    {"name": "snd2_chip_reset", "target": "snd2_chip_reset", "ret": "int", "args": ["u32 h"]},
+    {"name": "snd2_chip_close", "target": "snd2_chip_close", "ret": "int", "args": ["u32 h"]}
   ]
 }

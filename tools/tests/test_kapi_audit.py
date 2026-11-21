@@ -23,9 +23,6 @@ for func in ('fm_set_tone', 'fm_note_on', 'fm_note_off', 'ssg_tone', 'ssg_volume
 MUTATIONS += [
     ('tone low', 1, 'tone_num >= 0 && ', ''),
     ('tone high', 1, 'tone_num < NUM_TONES', '1'),
-    ('mml wait probe', 1, 'if (interruptible && ring3_wait_pending()) return 0;', ''),
-    ('mml scan probe', 1, 'if (interruptible && ring3_wait_pending()) break;', ''),
-    ('mml key off', 1, 'fm_play_mml_wait', 'keyoff'),
     ('serial receive probe', 2, 'if (interruptible && ring3_wait_pending())', 'if (0)'),
     ('serial puts probe', 9, '        if (ring3_wait_pending()) {\n'
      '            ring3_abort_check();\n            return;\n        }\n', ''),
@@ -64,14 +61,22 @@ for old, new in (('port_putchar_kapi', 'serial_putchar'),
                  ('input_getchar_kapi', 'input_getchar'),
                  ('input_getkey_kapi', 'input_getkey'),
                  ('ime_getchar_kapi', 'ime_getchar'),
-                 ('ime_getkey_kapi', 'ime_getkey'),
-                 ('fm_play_mml_kapi', 'fm_play_mml')):
+                 ('ime_getkey_kapi', 'ime_getkey')):
     MUTATIONS.append((old + ' public target', 3, old + '(', new + '('))
+
+# raw-wait shares the input, STOP and direct-chip probes. The retired MML
+# wrapper's no-side-effect assertion belongs to the KAPI audit.
+RAW_WAIT_MUTATIONS = tuple(MUTATIONS)
+MUTATIONS += [
+    ('retired MML invokes target', 3, '    (void)mml;', '    old_mml_target(mml);'),
+]
+
 
 def run(runner, mutation=None, case=0, expected=None):
     sources = [read_text(ROOT / p) for p in SOURCES]
     names = ('rshell_set_active', 'serial_putchar', 'serial_puts', 'serial_getchar',
-             'kbd_getchar', 'kbd_getkey', 'ime_getchar', 'ime_getkey', 'fm_play_mml')
+             'kbd_getchar', 'kbd_getkey', 'ime_getchar', 'ime_getkey', 'fm_play_mml',
+             'fm_set_tone_num', 'fm_note_on', 'fm_note_off', 'ssg_tone', 'ssg_volume', 'ssg_all_off')
     wrappers = []
     for name in names:
         match = re.search(r'(?:void|int) __cdecl wrap_' + name + r'\([^\n]*\)\n\{.*?\n\}', sources[3], re.S)

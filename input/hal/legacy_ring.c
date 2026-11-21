@@ -60,8 +60,27 @@ static volatile int kbd_raw_count = 0;
  * kbd_dropped_count() へ合算する。break を落とすと WM の修飾状態がずれるため必須。 */
 static volatile u32 kbd_raw_dropped = 0;
 
+static int keep_raw(int sc)
+{
+    return sc == KEY_STOP || sc == KEY_CTRL || sc == KEY_GRPH || sc == KEY_TAB;
+}
+
+void kbd_raw_purge_keep(void)
+{
+    int n = kbd_raw_count;
+    while (n--) {
+        int raw = legacy_raw_take();
+        if (keep_raw(raw & 0xff)) {
+            kbd_raw_buf[kbd_raw_tail] = raw;
+            kbd_raw_tail = (kbd_raw_tail + 1) % KBD_BUF_SIZE;
+            ++kbd_raw_count;
+        }
+    }
+}
+
 void legacy_raw_push(int keycode, int is_break, int mods)
 {
+    if (in2_excl_keyboard() && !keep_raw(keycode)) return;
     if (kbd_raw_count < KBD_BUF_SIZE) {
         kbd_raw_buf[kbd_raw_tail] = (u16)keycode
                                   | (is_break ? 0 : KBD_RAW_MAKE)

@@ -159,7 +159,7 @@ static void exec_teardown_app(AppSlot *a) {
     CHECK(g_pending_id == 0 && g_longjmp_reason == EXEC_LJ_EXIT);
     teardown++;
 }
-/* db -> redirects -> FD -> pipe -> SHM -> sound -> PCM -> private AS ->
+/* db -> redirects -> FD -> pipe -> SHM -> PCM -> input -> private AS ->
  * parent CR3/owner/heap -> WM notification. 他 owner を回収しない。 */
 static void check_invalid_caller(void);
 static void resource(int id, int step) {
@@ -177,13 +177,13 @@ static void fd_redirect_reset_owned(int id) { resource(id, 1); }
 static void vfs_close_owned(int id) { resource(id, 2); }
 static void pipe_free_owned(int id) { resource(id, 3); }
 static void shm_free_owned(int id) { resource(id, 4); }
-void snd_owner_exit(int id) { resource(id, 5); }
-#include "exec_snd.h"
-static void exec_pcm_reclaim(int id) { resource(id, 6); }
+static void exec_pcm_reclaim(int id) { resource(id, 5); }
+static void in2_reclaim(int id) { resource(id, 6); }
 static int stop_discards;
 static void input_discard_stop(void) { stop_discards++; }
 static int ime_clean;
 void exec_ime_owner_exit(int id) { CHECK(id == 2 && cleanup == 7 && teardown == 1); ime_clean = 1; }
+static void av_focus_exec_leave(int id, int parent) { CHECK(id == 2 && parent == cur); }
 static void exec_gui_owner_exit(int id, int kind) {
     CHECK(ime_clean); ime_clean = 0;
     CHECK(kind == (host_wm_kill ? EXEC_KIND_ABORTED : phase == 3 ? EXEC_KIND_EXITED : scheduled_kind));
@@ -676,6 +676,7 @@ class ExecR1(unittest.TestCase):
 
 
 MUTATIONS = (
+    ('input reclaim omitted', '    in2_reclaim(id);', '    (void)id;'),
     ('x87-kill-restore', '    exec_reclaim_resources(id);\n    exec_teardown_app(a);\n    appslot_reclaim(id);\n    exec_notify_owned(id, EXEC_KIND_ABORTED);',
      '    arch_fp_restore(&a->fp_state);\n    exec_reclaim_resources(id);\n    exec_teardown_app(a);\n    appslot_reclaim(id);\n    exec_notify_owned(id, EXEC_KIND_ABORTED);'),
     ('x87-launch-landing', '        exec_pending_finish();\n        arch_fp_restore(&fp_parent[fp_depth]);\n        ring3_context_restore(&caller_context);\n        _enable();\n        io_syscall_resume(launcher_id, io_parent_depth); /* IO_SYSCALL_PARENT */\n        /* 畳み',

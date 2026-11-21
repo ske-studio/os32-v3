@@ -555,7 +555,7 @@ for _slot, _api in enumerate(data["api"]):
     for _a in _api.get("args", []):
         if _a == "...":
             continue
-        if "*" in _a and get_arg_names([_a])[0] not in guarded_args(_api):
+        if "retired" not in _api and "*" in _a and get_arg_names([_a])[0] not in guarded_args(_api):
             _mask |= (1 << _k)
         _k += 1
     _pnames = [get_arg_names([a])[0] for a in _api.get("args", []) if a != "..." and "*" in a]
@@ -634,6 +634,31 @@ c_content += "static int kapi_in_range(u32 p, u32 len)\n{\n"
 c_content += "    return !len || ring3_user_range_ok(p, len);\n}\n\n"
 
 
+def argument_guard_c(api):
+    text = ""
+    if "invalid_length" in api:
+        text += f'    if ({api["invalid_length"]}) return OS32_ERR_INVAL;\n'
+    return text + out_guard_c(api) + input_guard_c(api)
+
+
+# Legacy dispatch may consume a session call before its ordinary wrapper.
+c_content += "int kapi_v86s_check(u32 slot, const u32 *words)\n{\n    switch (slot) {\n"
+for slot, api in enumerate(data["api"]):
+    if not api["name"].startswith("v86s_"):
+        continue
+    guard = argument_guard_c(api)
+    if not guard:
+        continue
+    c_content += f"    case {slot}: {{ /* {api['name']} */\n"
+    for index, (arg, decl) in enumerate(_arg_decl_map(api["args"]).items()):
+        if re.search(r"\b" + arg + r"\b", guard):
+            arg_type = decl[:-len(arg)].strip()
+            c_content += f"        {decl} = ({arg_type})words[{index}];\n"
+    c_content += "".join("    " + line for line in guard.splitlines(True))
+    c_content += "        break;\n    }\n"
+c_content += "    }\n    return 0;\n}\n\n"
+
+
 # 予約スロットの「未実装」(CPL=0 の呼び手向け。CPL=3 はトランポリンの
 # スタブ → ディスパッチャが slot >= KAPI_FUNC_COUNT で kill)。
 c_content += "/* 予約スロット (KAPI_FUNC_COUNT..KAPI_FUNC_CAPACITY-1) の中身。\n"
@@ -649,6 +674,14 @@ for slot, api in enumerate(data["api"]):
     if not args_str: args_str = "void"
 
     c_content += f"{ret} __cdecl wrap_{name}({args_str})\n{{\n"
+    if "retired" in api:
+        for arg in get_arg_names(api.get("args", [])):
+            c_content += f"    (void){arg};\n"
+        result = api["retired"]["result"]
+        if result is not None:
+            c_content += f"    return {result};\n"
+        c_content += "}\n\n"
+        continue
     # sys_yield stays on the common exec_sys_yield: it parks an exec_start child
     # (arch-ctx-guest lifecycle) and runs idle_work itself.
     if TARGET == "ppc-powermac" and name == "sys_halt":
@@ -680,8 +713,7 @@ for slot, api in enumerate(data["api"]):
         result = "0" if name == "db_mem_used" else absent_result(api)
         c_content += f"    return ({ret}){result};\n#else\n"
     c_content += f"    KAPI_HIT({slot});\n"
-    c_content += out_guard_c(api)
-    c_content += input_guard_c(api)
+    c_content += argument_guard_c(api)
 
     if "body" in api:
         lines = api["body"].split("\n")

@@ -155,13 +155,11 @@ static void exec_reclaim_resources(int id)
     pipe_free_owned(id);
     /* (5) 共有メモリ (P3: 所有者付きになった) */
     shm_free_owned(id);
-    /* (6) サウンド: この ID の退避済み音だけを捨てる (D9-4)。
-     * 鳴っているのがこの ID なら止める。他のアプリの音は無事。 */
-    exec_snd_owner_exit(id);
     /* (6b) PCM: この ID が鳴らしていれば待たずに止めて資源を返す
      * (票 TASK_PCM_CS4231 §2-1「所有と回収」)。保存した owner と id だけを
      * 照合する — 現在 owner に依存せず、私有ページ返却の前に止める。 */
     exec_pcm_reclaim(id);
+    in2_reclaim(id); /* (6c) Before focus moves to the parent. */
 }
 
 static void exec_notify_owned(int id, int kind)
@@ -170,6 +168,7 @@ static void exec_notify_owned(int id, int kind)
      * サーフェス・タイマ・スロットを回収する。畳む 3 経路すべてが
      * ここを通るので、WM は 1 か所で回収できる。 */
     if (kind == EXEC_KIND_ABORTED) input_discard_stop();
+    av_focus_exec_leave(id, res_owner_get());
     exec_ime_owner_exit(id);
     exec_gui_owner_exit(id, kind);
     /* (8) 打鍵の注入リング (票 K7 D5)。注ぎ手は con_sink の読み手 1 本なので、

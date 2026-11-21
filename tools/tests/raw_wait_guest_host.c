@@ -57,11 +57,9 @@ static int __cdecl read1(void) { selected=1; reads++; return returned; }
 static int __cdecl read2(void) { selected=2; reads++; if (ime_parent) sqlite_bytes=12288; return returned; }
 static int __cdecl read3(void) { selected=3; reads++; if (ime_parent) sqlite_bytes=12288; return returned; }
 static int __cdecl read4(void) { selected=4; reads++; return returned; }
-static void __cdecl mml(const char *s)
-{ selected=5; reads++; if (kstrlen(s) != 1 && kstrlen(s) != RAW_MML_NOTES) bad++; }
 static int __cdecl variant(int v)
 {
-    selected=7; reads++; switches++;
+    selected=6; reads++; switches++;
     if (v != 1) bad++;
     if (switch_failure) return -1;
     if (log_parent) sqlite_bytes=16384;
@@ -106,20 +104,20 @@ static void reset(void)
 }
 static int test(void)
 {
-    const char *entries[] = {"kbdchar","kbdkey","imechar","imekey","serial","fm","db","log"};
+    const char *entries[] = {"kbdchar","kbdkey","imechar","imekey","serial","db","log"};
     table.kprintf=output; table.mem_alloc=alloc; table.mem_free=release;
     table.db_open=open_db; table.db_close=close_db; table.db_exec=sql;
     table.db_mem_used=db_bytes; table.mem_stat=stat;
     table.kbd_getchar=read0; table.kbd_getkey=read1;
     table.ime_getchar=read2; table.ime_getkey=read3; table.serial_getchar=read4;
-    table.fm_play_mml=mml; table.ime_switch_dict=variant;
+    table.ime_switch_dict=variant;
     table.exec_run=child; table.exec_last_result=result;
-    for (int i=0; i<8; i++) {
+    for (int i=0; i<7; i++) {
         reset();
         char *argv[]={"raw_wait_test",(char *)entries[i],"done"};
         CHECK(raw_guest_main(3,argv,&table)==0 && saw_pass==1 && !bad);
         CHECK(stats==2 && opens==1 && !closes && !frees);
-        CHECK(i==6 ? sql_calls==4 && !reads : reads==1 && selected==i && sql_calls==3);
+        CHECK(i==5 ? sql_calls==4 && !reads : reads==1 && selected==i && sql_calls==3);
     }
     reset(); returned='X';
     char *wrong[]={"raw_wait_test","kbdkey","done"};
@@ -162,7 +160,7 @@ static int test(void)
     CHECK(raw_guest_main(4,log,&table)==1 && !stats && !children);
     say("PASS guest fixture: log pre-switch before baseline, failure rejected, child leak still rejected\n");
     say("PASS guest fixture: settled resident FEP baseline, child SQLite leak rejected, separate CREATE/INSERT errors rejected\n");
-    say("PASS guest fixture: eight raw entries, unexpected return/input rejected; parent rejects double reclaim/pool/USER/SQLite/sentinel/result mismatch\n");
+    say("PASS guest fixture: seven raw entries, unexpected return/input rejected; parent rejects double reclaim/pool/USER/SQLite/sentinel/result mismatch\n");
     return 0;
 }
 void _start(void)

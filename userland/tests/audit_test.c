@@ -6,7 +6,6 @@
 #include <string.h>
 #include <stdlib.h>
 
-#define AUDIT_MML_NOTES 1024
 #define AUDIT_SENTINEL_CODE 0x5A5A
 #define AUDIT_SENTINEL_ATTR 0xA5
 #define AUDIT_GUARD 0x19573246UL
@@ -133,11 +132,20 @@ int main(int argc, char **argv, KernelAPI *api)
         return 0;
     }
     if (strcmp(argv[1], "mml") == 0) {
-        static char mml[AUDIT_MML_NOTES + 1];
-        for (i = 0; i < AUDIT_MML_NOTES; i++) mml[i] = 'C';
-        mml[AUDIT_MML_NOTES] = '\0';
-        api->kprintf(ATTR_WHITE, "audit_test: waiting mml\n");
-        api->fm_play_mml(mml);
+        api->fm_startup_sound();
+        api->fm_play_mml((const char *)1);
+        api->snd_bgm_play((const char *)1);
+        api->snd_bgm_stop();
+        api->snd_se_play(0);
+        api->snd_se_play_raw(60, 1, 0);
+        api->snd_set_master(1);
+        api->snd_bgm_set_persist(1);
+        if (api->snd_bgm_is_playing() != 0 || api->snd_focus(1) != OS32_ERR_NOSYS) {
+            api->kprintf(ATTR_RED, "audit_test: retired MML result mismatch\n");
+            return 1;
+        }
+        api->kprintf(ATTR_GREEN, "audit_test: retired MML PASS\n");
+        return 0;
     } else if (strcmp(argv[1], "serial") == 0) {
         api->kprintf(ATTR_WHITE, "audit_test: waiting serial\n");
         i = api->serial_getchar();

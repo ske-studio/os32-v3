@@ -29,8 +29,6 @@ SQLite guard と実代替 stack、実 exec の launch/resume 着地を ILP32/qem
 | GUI fallback の取消削除 | `input GUI fallback STOP` |
 | IME getchar / getkey の候補取消削除 (2) | `IME char/key STOP cancels composition` |
 | serial 受信の取消削除 | `serial abort` |
-| FM 待機の取消削除 | `mml wait abort` |
-| FM 最後の Key-OFF 削除 | `mml sustained stop key off` |
 | 内部 TX / puts に取消混入 (2) | `USER internal logs and frames never abort` |
 | SQLite leave 前に STOP を消費 | `!sqlite_engine_active && !kills ...` |
 | 終了処理中の要求を回収済み slot に残す | `reclaimed slot request cleared` |
@@ -75,7 +73,6 @@ GUI でも読みは「か」に固定する。辞書切替で学習内容を削�
 | `kbdchar`, `kbdkey` | `raw_wait_test parent <entry> done` / `stop` | GUI 端末内で `raw_wait_test <entry> done` / `stop` |
 | `imechar`, `imekey` | 同上。候補表示中の STOP も両口で行う | 同上。WM の FEP 配送と raw cooked 待ちを区別 |
 | `serial` | 同上。done は READY 後に受信線へ `Q` | 同上。done は受信線へ `Q` |
-| `fm` | 同上。done は 1 音、stop は約 28 秒の連音列中 | 同上。Key-ON 中に STOP |
 | `db` | 同上。4^9 × 2^3 = 2,097,152 行の直積集計 SELECT 中に STOP | 同上 |
 | `log` | 同上。既定辞書への reopen 成功ログ中に STOP | 同上 |
 
@@ -113,8 +110,6 @@ GUI は親がないので、`raw_wait_test log done` を事前に一度完了さ
   `db_mem_used()` は全 SQLite の量なので、それだけで子の group の消滅を判定しない。
   IME の事前検索後を基準とし、子 group の回収と常駐 FEP の接続・保持 statement/cache の
   生存を別々に採取する。
-- FM は STOP 直前に `fm_note_on` 到達を確認し、最後の `fm_note_off(0)` の実 OPN
-  KEY_ONOFF 書込を I/O trace で確認する。無音だけを Key-OFF の証拠にしない。
 - IME は `g_ime` の kana/result/commit/rk と候補表示を確認する。CUI 読み手の終了で取消、
   mode/辞書は保持。GUI の raw 待ちは WM 所有の composition を取り消さない契約なので、
   別の WM textbox の候補を誤って消していないことも確認する ([X-11](../../docs/KAPI_SPEC.md#共有サービス12口の契約-x-11--t4b-5))。

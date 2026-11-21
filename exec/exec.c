@@ -1,3 +1,4 @@
+#include "av_contract.h"
 #include "kernel/idle_work.h"
 #include "exec_legacy.h"
 #include "exec_font_guard.h"
@@ -34,7 +35,6 @@
 #include "pipe_buffer.h"
 #include "shm.h"
 #include "exec_gui.h"
-#include "exec_snd.h"
 #include "exec_reclaim.h"
 #include "con_sink.h"
 #include "kbd_inject.h"   /* K7: GUI 中の kbd 待ちを満たす注入リング */

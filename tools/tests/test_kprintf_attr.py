@@ -16,7 +16,7 @@
   python3 -B tools/tests/test_kprintf_attr.py --mutate   # 否定側 (変異が RED か)
 """
 CHECK = dict(name='kprintf-attr-host', tier=4,
-    covers=['include/callconv.h', 'lib/kprintf.c', 'lib/kprintf_attr.c', 'include/console_attr.h', 'platform/pc98/console_attr.c', 'tools/tests/kprintf_attr_host.c', 'include/types.h', 'include/pc98.h', 'include/kprintf.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_host_notice.h', 'sdk/include/os32/os32_ver_info.h', 'sdk/include/os32/os32_generations.h', 'sdk/include/os32/os32_surface.h', 'sdk/include/os32/os32_gfx2.h', 'sdk/include/os32/os32_ls.h', 'sdk/include/os32/os32_kapi_generated.h'],
+    covers=['include/callconv.h', 'lib/kprintf.c', 'lib/kprintf_attr.c', 'include/console_attr.h', 'platform/pc98/console_attr.c', 'tools/tests/kprintf_attr_host.c', 'include/types.h', 'include/pc98.h', 'include/kprintf.h', 'sdk/include/os32/*.h'],
     needs=[], budget=3.0,
     basis=['KAPI_SPEC'],
 )
@@ -71,12 +71,9 @@ def host_build(tmp, source_text=None):
     # Copy the complete closure, also for mutants; no original include paths.
     files = ('include/callconv.h', "tools/tests/kprintf_attr_host.c", "lib/kprintf_attr.c",
              "platform/pc98/console_attr.c", "include/console_attr.h",
-             "include/types.h", "include/pc98.h", "include/kprintf.h",
-             "sdk/include/os32/os32_kapi_shared.h", "sdk/include/os32/os32_host_notice.h",
-             "sdk/include/os32/os32_ver_info.h", "sdk/include/os32/os32_generations.h",
-             "sdk/include/os32/os32_surface.h", "sdk/include/os32/os32_gfx2.h", "sdk/include/os32/os32_ls.h",
-             "sdk/include/os32/os32_kapi_generated.h")
-    for rel in files:
+             "include/types.h", "include/pc98.h", "include/kprintf.h")
+    sdk_headers = (ROOT / "sdk/include/os32").glob("*.h")
+    for rel in (*files, *(header.relative_to(ROOT) for header in sdk_headers)):
         dest = src_dir / rel
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_bytes((ROOT / rel).read_bytes())

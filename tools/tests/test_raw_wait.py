@@ -38,8 +38,6 @@ CASES = {
     'serial receive probe': 'FAIL serial abort',
     'serial puts probe': 'FAIL serial puts scan abort',
     'serial char probe': 'FAIL serial TX boundary abort',
-    'mml wait probe': 'FAIL mml wait abort',
-    'mml key off': 'FAIL mml sustained stop key off',
     'shared TX abort regression': 'FAIL USER internal logs and frames never abort',
     'shared puts abort regression': 'FAIL USER internal logs and frames never abort',
     'extended log early abort': 'FAIL extended internal log retains STOP until end',
@@ -224,15 +222,16 @@ def main():
         for mutation in ('skip FEP warmup', 'combined SQL', 'ignore INSERT error',
                          'skip log warmup', 'ignore log warmup error'):
             guest_fixture(mutation)
-        assert len({m[0] for m in audit.MUTATIONS}) == len(audit.MUTATIONS)
-        assert set(CASES) <= {m[0] for m in audit.MUTATIONS}
-        for mutation in audit.MUTATIONS:
+        mutations = audit.RAW_WAIT_MUTATIONS
+        assert len({m[0] for m in mutations}) == len(mutations)
+        assert set(CASES) <= {m[0] for m in mutations}
+        for mutation in mutations:
             audit.run('qemu', mutation, expected=CASES.get(mutation[0]))
         result = engine.run('qemu', 'early STOP')
         assert result.returncode == 1 and 'FAIL: !sqlite_engine_active && !kills' in result.stdout, (
             result.returncode, result.stdout, result.stderr)
         print('RED runtime: SQLite STOP before leave')
-        print(f'PASS {len(audit.MUTATIONS) + 12} raw-wait mutations: named runtime RED, compile failures 0')
+        print(f'PASS {len(mutations) + 12} raw-wait mutations: named runtime RED, compile failures 0')
 
 
 if __name__ == '__main__':

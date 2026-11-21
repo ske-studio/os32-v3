@@ -66,7 +66,9 @@ int platform_clock_read_us(u32 *lo, u32 *hi) { *lo = fake_time; *hi = 0; return 
 #include "kernel/input_wait.c"
 #endif
 #include INPUT_SOURCE
-static int hits, bgm_stop_calls;
+static int hits, bgm_stop_calls, ide_init_calls;
+void platform_ide_init(void) { ++ide_init_calls; }
+int platform_np2_detect(void) { return 1; }
 #ifdef PC98_INPUT
 int snd_bgm_is_playing(void) { return 1; }
 #endif
@@ -127,14 +129,17 @@ static int input_kapi(void)
     /* Published pointer, absent query/value/void and reserved slot, from real generation. */
     const char *drive = wrap_db_last_error(0);
     REQUIRE(drive && drive[0] == 'A');
+    /* AV0 §5 retires MML on both targets. */
+    REQUIRE(wrap_snd_bgm_is_playing() == 0);
+    wrap_snd_bgm_stop(); REQUIRE(bgm_stop_calls == 0);
 #ifdef PC98_INPUT
     REQUIRE(wrap_ime_is_active() == 1);
-    REQUIRE(wrap_snd_bgm_is_playing() == 1);
-    wrap_snd_bgm_stop(); REQUIRE(bgm_stop_calls == 1);
+    REQUIRE(wrap_np2_detect() == 1);
+    wrap_ide_init(); REQUIRE(ide_init_calls == 1);
 #else
-    REQUIRE(wrap_snd_bgm_is_playing() == 0);
+    REQUIRE(wrap_np2_detect() == 0);
     REQUIRE(wrap_ime_is_active() == OS32_ERR_NOSYS); /* not a ZERO_SLOTS query */
-    wrap_snd_bgm_stop(); REQUIRE(bgm_stop_calls == 0);
+    wrap_ide_init(); REQUIRE(ide_init_calls == 0);
 #endif
     return failures;
 }

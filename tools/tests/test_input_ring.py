@@ -38,7 +38,7 @@ def run(ctx):
             print('SKIP PowerPC cross compile: toolchain unavailable', flush=True)
             if os.environ.get('OS32_REQUIRE_PPC') == '1': return 1
         if ctx.mutate:
-            mutations = [ ('count == IN2_RING_CAPACITY', 'count == IN2_RING_CAPACITY - 1'), ('++dropped;', '(void)0;'), ('events[i].src == e->src', '1'), ('e->sc == KEY_STOP', 'e->sc != KEY_STOP') ]
+            mutations = [ ('if (count == IN2_RING_CAPACITY) {\n        ++pending;', 'if (count == IN2_RING_CAPACITY - 1) {\n        ++pending;'), ('++pending;\n        ++dropped;', '++pending;'), ('events[i].src == e->src', '1'), ('e->sc == KEY_STOP', 'e->sc != KEY_STOP') ]
             mutations.append(('events[i].generation == e->generation', '1'))
             for old, new in mutations:
                 assert ring.count(old) == 1

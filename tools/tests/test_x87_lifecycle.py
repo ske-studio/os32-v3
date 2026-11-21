@@ -11,6 +11,12 @@ from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 RESTORE = '        arch_fp_restore(&fp_parent[fp_depth]);\n        ring3_context_restore(&caller_context);\n        _enable();\n        io_syscall_resume(launcher_id, io_parent_depth); /* IO_SYSCALL_PARENT */\n        /* 畳み'
 MUTATIONS = (
+    ('focus-enter-omitted', 'av_focus_exec_enter(id);', ''),
+    ('focus-leave-omitted', 'av_focus_exec_leave(id, res_owner_get());', ''),
+    ('focus-fault-omitted', 'av_focus_exec_leave(id, res_owner_get());',
+     'if (kind != EXEC_KIND_FAULT) av_focus_exec_leave(id, res_owner_get());'),
+    ('focus-kill-omitted', 'av_focus_exec_leave(id, res_owner_get());',
+     'if (kind != EXEC_KIND_ABORTED) av_focus_exec_leave(id, res_owner_get());'),
     ('nested-restore-zero', RESTORE, RESTORE.replace('[fp_depth]', '[0]')),
     ('nested-restore-previous', RESTORE,
      RESTORE.replace('[fp_depth]', '[fp_depth ? fp_depth - 1 : 0]')),
@@ -41,7 +47,8 @@ def run(source):
             '-fno-stack-protector', '-nostdlib', '-static', '-no-pie',
             '-I' + str(tmp), '-I' + str(ROOT / 'tools/tests/host_arch'),
             '-I' + str(ROOT / 'exec'), *include_flags(ROOT),
-            str(ROOT / 'tools/tests/x87_lifecycle_host.c'), str(obj), '-o', str(exe),
+            str(ROOT / 'tools/tests/x87_lifecycle_host.c'), str(ROOT / 'kernel/av_focus.c'),
+            str(obj), '-o', str(exe),
         ], capture_output=True, text=True)
         if result.returncode:
             return 'compile', result.stderr

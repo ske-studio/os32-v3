@@ -23,6 +23,12 @@ static i16 add_sat(i16 a, i16 b)
     return (i16)n;
 }
 
+static int ctrl_stop_make(const InputEvent *e)
+{
+    return e->type == INPUT_EVENT_KEY && e->sc == KEY_STOP && e->down &&
+           (e->buttons & SHIFT_CTRL);
+}
+
 int in2_ring_push(const InputEvent *e)
 {
     unsigned int flags = irq_save();
@@ -50,8 +56,7 @@ int in2_ring_push(const InputEvent *e)
     if (count == IN2_RING_CAPACITY) {
         ++pending;
         ++dropped;
-        if (e->type == INPUT_EVENT_KEY && e->sc == KEY_STOP && e->down &&
-            (e->buttons & SHIFT_CTRL)) {
+        if (ctrl_stop_make(e)) {
             unsigned int i = (head + count - 1) % IN2_RING_CAPACITY;
             events[i] = *e;
             sequences[i] = next_seq++;
@@ -89,4 +94,42 @@ u32 in2_ring_dropped(void)
     u32 result = dropped;
     irq_restore(flags);
     return result;
+}
+
+/* Foreground caller holds IRQ exclusion through the whole transition. */
+void in2_ring_clear(void)
+{
+    head = count = 0;
+    pending = 0;
+}
+
+void in2_ring_lost(u8 reason)
+{
+    InputEvent e = { .time_ms = in2_time_ms(), .type = INPUT_EVENT_LOST, .sc = reason };
+    if (count == IN2_RING_CAPACITY) {
+        /* Evict the newest ordinary event, keeping the suffix in order.
+         * Prefer a duplicate notification over a reserved STOP at the head. */
+        unsigned int tail = (head + count - 1) % IN2_RING_CAPACITY;
+        unsigned int i = tail;
+        unsigned int duplicate = head;
+        while (i != head) {
+            if (events[i].type == INPUT_EVENT_LOST && events[i].sc == reason)
+                duplicate = i;
+            else if (!ctrl_stop_make(&events[i]))
+                break;
+            i = (i + IN2_RING_CAPACITY - 1) % IN2_RING_CAPACITY;
+        }
+        if (i == head && ctrl_stop_make(&events[head]))
+            i = duplicate;
+        while (i != tail) {
+            unsigned int next = (i + 1) % IN2_RING_CAPACITY;
+            events[i] = events[next];
+            sequences[i] = sequences[next];
+            i = next;
+        }
+        --count;
+        ++dropped;
+        ++pending;
+    }
+    append(&e);
 }

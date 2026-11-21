@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 CHECK = dict(name='gshell-host', tier=1,
-    covers=['include/callconv.h', 'include/abi.h', 'arch/x86/arch_abi.h', 'userland/gshell/**', 'sdk/rust/os32api/**', 'sdk/rust/os32api/src/ls.rs', 'tools/tests/os32api_host.py', 'exec/shell_service.h', 'userland/lib/font/**', 'sdk/include/os32/os32_kapi_shared.h', 'tools/fetch_fonts.py', 'tools/tests/g16_fixture.py', 'tools/gen_g16.py', 'tools/g16/**', 'assets/ipadic/*.csv', 'tools/tests/test_stop_culprit_wm.py'],
+    covers=['kernel/av_focus.c', 'include/av_contract.h', 'exec/exec_gui.h', 'exec/exec_hooks.h', 'input/hal/in2_int.h', 'include/app_ids.h', 'include/callconv.h', 'include/abi.h', 'arch/x86/arch_abi.h', 'userland/gshell/**', 'sdk/rust/os32api/**', 'sdk/rust/os32api/src/ls.rs', 'tools/tests/os32api_host.py', 'exec/shell_service.h', 'userland/lib/font/**', 'sdk/include/os32/os32_kapi_shared.h', 'tools/fetch_fonts.py', 'tools/tests/g16_fixture.py', 'tools/gen_g16.py', 'tools/g16/**', 'assets/ipadic/*.csv', 'tools/tests/test_stop_culprit_wm.py'],
     needs=[], budget=12.5,
     kind='characterization',
 )

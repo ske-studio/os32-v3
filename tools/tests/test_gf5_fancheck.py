@@ -68,7 +68,7 @@ CHECK = dict(name='gf5-fancheck', tier=1, needs=['make:build/out/geforce/geforce
                  'tools/tests/gf4*',
                  'tools/tests/serial_diag_host.h',
                  'tools/tests/host_arch/*',
-                 'tools/tests/os32api_host.py',
+                 'sdk/rust/os32api/src/av.rs', 'tools/tests/os32api_host.py',
                  'tools/tests/g16_fixture.py',
                  'drivers/video/geforce/*',
                  'exec/*',

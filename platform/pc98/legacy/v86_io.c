@@ -14,7 +14,7 @@
 #include "gfx.h"        /* PAL_IDX_PORT / PAL_G_PORT / PAL_R_PORT / PAL_B_PORT */
 #include "palette.h"    /* palette_init() — セッション終了時の復帰 */
 #include "console.h"    /* console_hw_cursor_enable() — DOS が変えた CSRFORM を戻す */
-#include "../../../drivers/sound/fm/snd_engine.h" /* snd_set_master() — FM をゲストに明け渡す */
+#include "fm_contract.h"
 #include "../../../kernel/module/module.h"     /* v86_debug_ops()->gcap_* — `v86 -g` の採取 (票 TASK_PEGC480_REALHW §3 段 1) */
 
 /* GDC はコマンドとパラメータの間に I/O ウェイトが要る (gfx_internal.h と同じ) */
@@ -242,29 +242,17 @@ static void gfx_state_for_os32(void)
 }
 
 /* ------------------------------------------------------------------------ */
-/*  FM 音源をゲストに明け渡す                                               */
-/*                                                                          */
-/*  OPN のポート (0x188-0x18F) は素通しなので、OS32 の音源エンジンが        */
-/*  動いたままだとゲストの音楽ドライバと同じチップを取り合う。              */
-/*  `snd_tick()` は IRQ0 から毎回呼ばれ、BGM 再生中なら OPN に書く。        */
-/*  しかも `bgm_persist` があるのでプログラムを跨いで鳴り続ける。            */
-/*                                                                          */
-/*  `snd_set_master(0)` は全チャンネルをキーオフしてから停止するので、      */
-/*  鳴りっぱなしの音を残さずに明け渡せる。                                  */
-/* ------------------------------------------------------------------------ */
+/* Silence both generators on each ownership transition. */
 static void snd_state_for_guest(void)
 {
-    snd_set_master(0);
+    fm_all_off();
+    ssg_all_off();
 }
 
-/* ゲストが鳴らしっぱなしにした音を消してから OS32 に戻す。
- * `snd_set_master(0)` が全チャンネルのキーオフを兼ねているので、
- * 0 を経由してから 1 に戻す。これをやらないとセッション終了後も
- * ゲームの最後の和音が鳴り続ける (実測: 終了後も ch0-2 が発音中だった)。 */
 static void snd_state_for_os32(void)
 {
-    snd_set_master(0);
-    snd_set_master(1);
+    fm_all_off();
+    ssg_all_off();
 }
 
 /* ------------------------------------------------------------------------ */

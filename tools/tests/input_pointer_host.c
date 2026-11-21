@@ -49,6 +49,7 @@ static int probe(void)
     T(!input_capture(&e)); pointer_position(&x, &y); T(x == 640 && y == 0);
     e.x = -1; T(input_capture(&e) < 0);
     e.type = INPUT_EVENT_WHEEL; e.x = -3; e.y = 0; T(!input_capture(&e) && last.x == -3);
+    T(mouse_ext_read_wheel() == -3 && mouse_ext_read_wheel() == 0);
     unsigned n = count; e.src = 0; T(input_capture(&e) < 0); e.src = 17; T(input_capture(&e) < 0 && n == count);
     e.src = 1; e.generation = g1; e.flags = 0; e.buttons = 0; e.type = INPUT_EVENT_MOVE;
     mouse_ext_mode(0); mouse_ext_read(&ax, &ay); e.x = 32767; e.y = -32768;
@@ -92,6 +93,7 @@ static int probe(void)
     e.x = e.y = 0; e.type = INPUT_EVENT_BUTTON; e.buttons = 3;
     T(!input_capture(&e) && input_buttons() == 3);
     e.buttons = 0; e.type = INPUT_EVENT_WHEEL; e.x = -2; T(!input_capture(&e));
+    T(mouse_ext_read_wheel() == 0);
     input_src_release(1, g1); T(!input_buttons() && count == n);
     v86 = 0; mouse_ext_read(&ax, &ay); mouse_ext_read_legacy(&dx, &dy);
     T(!ax && !ay && !dx && !dy);

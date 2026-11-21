@@ -29,9 +29,6 @@
 #define FM_TONE_SL_RR_OFF 20
 #define FM_TONE_FB_CON_OFF 24
 
-/* drivers/ does not include exec headers (same boundary as kbd.c). */
-extern void ring3_abort_check(void);
-extern int ring3_wait_pending(void);
 
 /* ======================================================================== */
 /*  OPN低レベルI/O — snddrv/src/opn.c 移植                                 */
@@ -39,8 +36,10 @@ extern int ring3_wait_pending(void);
 
 /* BUSY 待ちの上限。1 周 ≈ 1µs (inp) なので 10000 回 ≈ 10ms。
  * OPN の BUSY は通常数µs で落ちる。落ちないのは音源が居ない/固まって
- * いる場合で、無期限スピンだと ISR (snd_tick) ごとカーネルがハングする。 */
+ * いる場合で、無期限スピンだとカーネルがハングする。 */
 #define OPN_BUSY_TIMEOUT  10000UL
+
+static uchar ssg_mixer_state = SSG_MIXER_ALL_OFF;
 
 /* OPNレジスタ書込み
  * PC9800Bible推奨手順:
@@ -49,8 +48,7 @@ extern int ring3_wait_pending(void);
  * 3. データ送信 + ウェイト20回
  *
  * アドレスラッチ→データ送信の 2 段階なので、途中で割り込まれて別の
- * opn_write が走るとレジスタ番号が化ける。通常コンテキストと ISR
- * (snd_tick) の両方から呼ばれるため、全体を irq_save で保護する。 */
+ * opn_write が走るとレジスタ番号が化ける。レジスタ選択からデータ転送までを irq_save で保護する。 */
 static int opn_write_checked(uchar reg, uchar val)
 {
     unsigned int flags;
@@ -75,6 +73,7 @@ static int opn_write_checked(uchar reg, uchar val)
 
     /* データ送信 */
     outp(OPN_DATA, val);
+    if (reg == SSG_REG_MIXER) ssg_mixer_state = val;
 
     /* データ書込み後のウェイト: 約 12μs */
     io_wait_n(OPN_DATA_WAIT_COUNT);
@@ -308,7 +307,12 @@ void ssg_volume(int ch, uchar vol)
 {
     if (ch < 0 || ch >= OPN_CHANNEL_COUNT) return;
 
-    opn_write(SSG_REG_VOL_A + (uchar)ch, vol & SSG_VOLUME_MASK);
+    unsigned int flags = irq_save();
+    vol &= SSG_VOLUME_MASK;
+    if (vol && (ssg_mixer_state & (1u << ch)))
+        ssg_mixer((uchar)(ssg_mixer_state & ~(1u << ch)));
+    opn_write(SSG_REG_VOL_A + (uchar)ch, vol);
+    irq_restore(flags);
 }
 
 void ssg_noise(uchar period)
@@ -327,132 +331,4 @@ void ssg_all_off(void)
     ssg_volume(1, 0);
     ssg_volume(2, 0);
     ssg_mixer(SSG_MIXER_ALL_OFF);
-}
-
-/* ======================================================================== */
-/*  高レベルAPI                                                            */
-/* ======================================================================== */
-
-/* ウェイト (tickカウンタ使用)。GUI STOP は完了した syscall の出口で
- * WM へ譲るので、途中で park せず 0 を返して MML の Key-OFF へ進む。 */
-#ifdef OS32_FM_MODULE
-extern u32 ktime_ticks(void);
-#define tick_count ktime_ticks()
-#else
-extern volatile u32 tick_count;
-#endif
-static int wait_ms(u32 ms, int interruptible)
-{
-    u32 ticks = ms / TICK_MS;   /* 100Hz → 10ms/tick */
-    u32 start = tick_count;
-    if (ticks == 0) ticks = 1;
-    while ((tick_count - start) < ticks) {
-        if (interruptible && ring3_wait_pending()) return 0;
-        io_wait(); /* PC-98エミュレータ固有のhltハング対策 */
-    }
-    return 1;
-}
-
-#define FM_BELL_NOTE_MS 120
-#define FM_BELL_GAP_MS 30
-#define FM_BELL_LAST_MS 400
-#define FM_MML_NOTE_MS 200
-#define FM_MML_REST_MS 200
-#define FM_MML_GAP_MS 20
-
-/* 起動ジングル — ベル音色でC-E-G-C(上) アルペジオ */
-void fm_startup_sound(void)
-{
-    opn_init();
-
-    /* Ch1にベル音色設定 */
-    fm_set_tone_num(0, 1);  /* ベル */
-
-    /* C5 */
-    fm_note_on(0, NOTE(5, N_C));
-    wait_ms(FM_BELL_NOTE_MS, 0);
-    fm_note_off(0);
-    wait_ms(FM_BELL_GAP_MS, 0);
-
-    /* E5 */
-    fm_note_on(0, NOTE(5, N_E));
-    wait_ms(FM_BELL_NOTE_MS, 0);
-    fm_note_off(0);
-    wait_ms(FM_BELL_GAP_MS, 0);
-
-    /* G5 */
-    fm_note_on(0, NOTE(5, N_G));
-    wait_ms(FM_BELL_NOTE_MS, 0);
-    fm_note_off(0);
-    wait_ms(FM_BELL_GAP_MS, 0);
-
-    /* C6 (長め) */
-    fm_note_on(0, NOTE(6, N_C));
-    wait_ms(FM_BELL_LAST_MS, 0);
-    fm_note_off(0);
-}
-
-/* 簡易MML再生 — "CDEFGAB" + 数字(オクターブ) + "+#"(シャープ)
- * Ch1/ピアノ音色で単音再生 */
-static void fm_play_mml_wait(const char *mml, int interruptible)
-{
-    int octave = 4;
-    int note_map[7] = { N_A, N_B, N_C, N_D, N_E, N_F, N_G };
-    /*                   A     B    C     D    E    F    G  */
-    const char *p = mml;
-
-    opn_init();
-    fm_set_tone_num(0, 0);  /* ピアノ */
-
-    while (*p) {
-        if (interruptible && ring3_wait_pending()) break;
-        char ch = *p++;
-        int note_idx = -1;
-        int sharp = 0;
-
-        /* オクターブ指定 (O1-O8 or 数字) */
-        if (ch == 'O' || ch == 'o') {
-            if (*p >= '1' && *p <= '8') {
-                octave = *p - '0';
-                p++;
-            }
-            continue;
-        }
-
-        /* 音名 */
-        if (ch >= 'A' && ch <= 'G') {
-            note_idx = ch - 'A';
-        } else if (ch >= 'a' && ch <= 'g') {
-            note_idx = ch - 'a';
-        } else if (ch == 'R' || ch == 'r') {
-            /* 休符 */
-            if (!wait_ms(FM_MML_REST_MS, interruptible)) break;
-            continue;
-        } else if (ch == ' ' || ch == ',') {
-            continue;  /* 区切り文字 */
-        } else {
-            continue;
-        }
-
-        /* シャープ */
-        if (*p == '+' || *p == '#') {
-            sharp = 1;
-            p++;
-        }
-
-        /* Key-OFF → Key-ON */
-        fm_note_off(0);
-        if (!wait_ms(FM_MML_GAP_MS, interruptible)) break;
-        fm_note_on(0, NOTE(octave, note_map[note_idx] + sharp));
-        if (!wait_ms(FM_MML_NOTE_MS, interruptible)) break;
-    }
-
-    fm_note_off(0);
-}
-
-void fm_play_mml(const char *mml) { fm_play_mml_wait(mml, 0); }
-void fm_play_mml_kapi(const char *mml)
-{
-    fm_play_mml_wait(mml, 1); /* includes Key-OFF before a nonlocal exit */
-    if (ring3_wait_pending()) ring3_abort_check();
 }

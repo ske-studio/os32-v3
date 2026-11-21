@@ -303,15 +303,54 @@ typedef struct {
     int (__cdecl *io_policy_get)(void *bytes, unsigned int cap, unsigned int *needed);
     int (__cdecl *io_policy_reset)(void);
     int (__cdecl *io_pump)(unsigned int budget_us);
-    /* 予約 (KAPI_FUNC_COUNT..KAPI_FUNC_CAPACITY-1、86 本)。末尾追記はここを削って使う */
-    i32 (__cdecl *kapi_reserved[86])(void);
+    int (__cdecl *snd2_dev_count)(void);
+    int (__cdecl *snd2_dev_info)(u32 dev, SND2_DevInfo *o);
+    int (__cdecl *snd2_caps)(u32 dev, SND2_Caps *o, u32 size);
+    int (__cdecl *snd2_dsp_unit)(u32 dev, u32 unit, SND2_DspUnit *o);
+    int (__cdecl *snd2_dsp_param)(u32 dev, u32 unit, u32 i, SND2_DspParam *o);
+    int (__cdecl *snd2_dsp_insert)(u32 stream, u32 unit, const i32 *params, u32 n);
+    int (__cdecl *snd2_dsp_process)(u32 dev, u32 unit, const i32 *params, u32 n, const void *in, void *out, u32 frames, u32 fmt_index);
+    int (__cdecl *snd2_stream_open)(const SND2_StreamDesc *d, u32 *stream);
+    int (__cdecl *snd2_stream_write)(u32 stream, const void *buf, u32 bytes);
+    int (__cdecl *snd2_stream_start)(u32 stream);
+    int (__cdecl *snd2_stream_pause)(u32 stream);
+    int (__cdecl *snd2_stream_pos)(u32 stream, SND2_Pos *o);
+    int (__cdecl *snd2_stream_wait)(u32 stream, u32 frame, u32 timeout_ms);
+    int (__cdecl *snd2_stream_volume)(u32 stream, u32 left, u32 right);
+    int (__cdecl *snd2_stream_close)(u32 stream, u32 how);
+    int (__cdecl *av_focus_set)(int owner);
+    int (__cdecl *av_focus_get)(void);
+    int (__cdecl *in2_pad_state)(u32 slot, IN2_PadState *o);
+    int (__cdecl *in2_pad_caps)(u32 slot, IN2_PadCaps *o);
+    int (__cdecl *in2_pad_vibrate)(u32 slot, const IN2_Vibration *v);
+    int (__cdecl *in2_dev_count)(void);
+    int (__cdecl *in2_dev_info)(u32 i, IN2_DevInfo *o);
+    int (__cdecl *in2_read)(IN2_Event *out, u32 max);
+    int (__cdecl *in2_key_state)(u8 *out);
+    int (__cdecl *in2_mouse_state)(IN2_MouseState *o);
+    int (__cdecl *in2_acquire)(u32 flags);
+    int (__cdecl *in2_unacquire)(void);
+    int (__cdecl *in2_status)(IN2_Status *o);
+    int (__cdecl *in2_wm_state)(IN2_WmState *o);
+    int (__cdecl *v86s_begin)(const V86_Begin *b, u32 *sid);
+    int (__cdecl *v86s_run)(u32 sid, const V86_RunIn *in, V86_Exit *ex);
+    int (__cdecl *v86s_fm_drain)(u32 sid, SND2_FmEv *out, u32 max, u32 *last_seq);
+    int (__cdecl *v86s_end)(u32 sid);
+    int (__cdecl *snd2_chip_caps)(u32 dev, SND2_ChipCaps *o, u32 size);
+    int (__cdecl *snd2_chip_open)(u32 dev, u32 *h);
+    int (__cdecl *snd2_chip_write)(u32 h, const SND2_RegW *w, u32 n);
+    int (__cdecl *snd2_chip_read)(u32 h, u32 bank, u32 what, u32 reg);
+    int (__cdecl *snd2_chip_reset)(u32 h);
+    int (__cdecl *snd2_chip_close)(u32 h);
+    /* 予約 (KAPI_FUNC_COUNT..KAPI_FUNC_CAPACITY-1、47 本)。末尾追記はここを削って使う */
+    i32 (__cdecl *kapi_reserved[47])(void);
     u32 sbrk_heap_limit;  /* newlib _sbrk用ヒープ上限アドレス (exec_runでセットされる) */
     u32 shm_base;  /* 共有メモリ (MEM_SHM_BASE) の先頭アドレス。DB結果受け渡しに使用 (exec_initでセット) */
 } KernelAPI;
 
-#define KAPI_FUNC_COUNT 298
+#define KAPI_FUNC_COUNT 337
 #define KAPI_FUNC_CAPACITY 384
-#define KAPI_FUNC_RESERVED 86
+#define KAPI_FUNC_RESERVED 47
 #define KAPI_DATA_FIELDS_OFF 0x608
 #define KAPI_DATA_IDX_SBRK_HEAP_LIMIT 386
 #define KAPI_DATA_IDX_SHM_BASE 387

@@ -219,16 +219,6 @@ static int cmd_format(int argc, char **argv)
     return 0;
 }
 
-static int cmd_play(int argc, char **argv)
-{
-    if (argc < 2) {
-        shell_print_help(argv[0]);
-        return SH_STATUS_USAGE;
-    }
-    g_api->fm_play_mml(argv[1]);
-    return 0;
-}
-
 /* ------------------------------------------------------------------------ */
 /*  os32gui — CUI ⇄ GUI シェル切替 (契約 T9 / TASK_K4 作業 0・3)             */
 /* ------------------------------------------------------------------------ */
@@ -688,7 +678,6 @@ static const ShellCmd sys_cmds[] = {
     { "df",     cmd_dev,    "",              "Alias for dev" },
     { "ide",    cmd_ide,    "[0-3]",         "Show IDE drive geometry" },
     { "format", cmd_format, "[0-3] [sects]", "Format a drive to ext2" },
-    { "play",   cmd_play,   "MML",           "Play MML via FM synth" },
     { "os32gui",cmd_os32gui,"[on|off|-t seconds]", "Switch to GUI shell now, or set GUI at boot" },
     { "gfxmode",cmd_gfxmode,"pc98|pegc|cirrus|geforce|trident|auto|diag stripes|altwin|off","Force the graphics backend at next boot" },
     { "kdebug", cmd_kdebug, "[on|off]",       "Show debug module state or set it at next boot" },

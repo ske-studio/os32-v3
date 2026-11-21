@@ -12,6 +12,7 @@
 #include "clock_service.h"
 #include "exec.h"
 #include "fm_contract.h"
+#include "av_contract.h"
 #include "ide_contract.h"
 #include "path.h"
 #include "text_screen.h"
@@ -28,7 +29,6 @@
 #include "ime.h"
 #include "fd_redirect.h"
 #include "pipe_buffer.h"
-#include "snd_contract.h"
 #include "pointer_service.h"
 #include "kapi_db.h"
 #include "platform_device.h"
@@ -68,7 +68,7 @@ extern int kapi_osri_show(const char *path, u32 duration_ms);
 #include "kapi_profile.h"
 
 #ifdef KAPI_PROFILE
-volatile u32 kapi_hits[298];
+volatile u32 kapi_hits[337];
 #endif
 
 /* 各スロットの cdecl 引数バイト数 (固定分)。int 0x80 ディスパッチャが
@@ -372,6 +372,45 @@ const u16 kapi_argsize[KAPI_FUNC_COUNT] = {
     12,  /* io_policy_get */
     0,  /* io_policy_reset */
     4,  /* io_pump */
+    0,  /* snd2_dev_count */
+    8,  /* snd2_dev_info */
+    12,  /* snd2_caps */
+    12,  /* snd2_dsp_unit */
+    16,  /* snd2_dsp_param */
+    16,  /* snd2_dsp_insert */
+    32,  /* snd2_dsp_process */
+    8,  /* snd2_stream_open */
+    12,  /* snd2_stream_write */
+    4,  /* snd2_stream_start */
+    4,  /* snd2_stream_pause */
+    8,  /* snd2_stream_pos */
+    12,  /* snd2_stream_wait */
+    12,  /* snd2_stream_volume */
+    8,  /* snd2_stream_close */
+    4,  /* av_focus_set */
+    0,  /* av_focus_get */
+    8,  /* in2_pad_state */
+    8,  /* in2_pad_caps */
+    8,  /* in2_pad_vibrate */
+    0,  /* in2_dev_count */
+    8,  /* in2_dev_info */
+    8,  /* in2_read */
+    4,  /* in2_key_state */
+    4,  /* in2_mouse_state */
+    4,  /* in2_acquire */
+    0,  /* in2_unacquire */
+    4,  /* in2_status */
+    4,  /* in2_wm_state */
+    8,  /* v86s_begin */
+    12,  /* v86s_run */
+    16,  /* v86s_fm_drain */
+    4,  /* v86s_end */
+    12,  /* snd2_chip_caps */
+    8,  /* snd2_chip_open */
+    12,  /* snd2_chip_write */
+    16,  /* snd2_chip_read */
+    4,  /* snd2_chip_reset */
+    4,  /* snd2_chip_close */
 };
 
 /* 各スロットの固定引数のうち早期検査するポインタのビットマスク (bit k = 引数 k)。
@@ -420,7 +459,7 @@ const u16 kapi_argptr[KAPI_FUNC_COUNT] = {
     0x0000,  /* dev_count */
     0x0000,  /* dev_get_info */
     0x0000,  /* fm_startup_sound */
-    0x0001,  /* fm_play_mml: mml */
+    0x0000,  /* fm_play_mml */
     0x0000,  /* np2_detect */
     0x0000,  /* np2_get_version */
     0x0000,  /* np2_get_cpu */
@@ -495,7 +534,7 @@ const u16 kapi_argptr[KAPI_FUNC_COUNT] = {
     0x0000,  /* sys_redirect_fd_buf */
     0x0000,  /* sys_redirect_get_buf_len */
     0x0000,  /* paging_is_present */
-    0x0001,  /* snd_bgm_play: mml */
+    0x0000,  /* snd_bgm_play */
     0x0000,  /* snd_bgm_stop */
     0x0000,  /* snd_bgm_is_playing */
     0x0000,  /* snd_se_play */
@@ -675,6 +714,45 @@ const u16 kapi_argptr[KAPI_FUNC_COUNT] = {
     0x0000,  /* io_policy_get */
     0x0000,  /* io_policy_reset */
     0x0000,  /* io_pump */
+    0x0000,  /* snd2_dev_count */
+    0x0000,  /* snd2_dev_info */
+    0x0000,  /* snd2_caps */
+    0x0000,  /* snd2_dsp_unit */
+    0x0000,  /* snd2_dsp_param */
+    0x0000,  /* snd2_dsp_insert */
+    0x0000,  /* snd2_dsp_process */
+    0x0000,  /* snd2_stream_open */
+    0x0000,  /* snd2_stream_write */
+    0x0000,  /* snd2_stream_start */
+    0x0000,  /* snd2_stream_pause */
+    0x0000,  /* snd2_stream_pos */
+    0x0000,  /* snd2_stream_wait */
+    0x0000,  /* snd2_stream_volume */
+    0x0000,  /* snd2_stream_close */
+    0x0000,  /* av_focus_set */
+    0x0000,  /* av_focus_get */
+    0x0000,  /* in2_pad_state */
+    0x0000,  /* in2_pad_caps */
+    0x0000,  /* in2_pad_vibrate */
+    0x0000,  /* in2_dev_count */
+    0x0000,  /* in2_dev_info */
+    0x0000,  /* in2_read */
+    0x0000,  /* in2_key_state */
+    0x0000,  /* in2_mouse_state */
+    0x0000,  /* in2_acquire */
+    0x0000,  /* in2_unacquire */
+    0x0000,  /* in2_status */
+    0x0000,  /* in2_wm_state */
+    0x0000,  /* v86s_begin */
+    0x0000,  /* v86s_run */
+    0x0000,  /* v86s_fm_drain */
+    0x0000,  /* v86s_end */
+    0x0000,  /* snd2_chip_caps */
+    0x0000,  /* snd2_chip_open */
+    0x0000,  /* snd2_chip_write */
+    0x0000,  /* snd2_chip_read */
+    0x0000,  /* snd2_chip_reset */
+    0x0000,  /* snd2_chip_close */
 };
 
 /* ---- 出力ポインタの書き込み可検査 (票 TASK_KAPI_OUTPUT_GUARD) --------
@@ -704,6 +782,53 @@ static u32 kapi_out_mul(u32 n, u32 unit)
 static int kapi_in_range(u32 p, u32 len)
 {
     return !len || ring3_user_range_ok(p, len);
+}
+
+int kapi_v86s_check(u32 slot, const u32 *words)
+{
+    switch (slot) {
+    case 327: { /* v86s_begin */
+        const V86_Begin *b = (const V86_Begin *)words[0];
+        u32 *sid = (u32 *)words[1];
+        /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */
+        if (!ring3_user_ranges_writable((u32)sid, KAPI_OUT_LEN(sid, sizeof(u32)),
+                                        (u32)0, 0u)) {
+            ring3_fault_kill();   /* 戻らない */
+        }
+        /* 入力の全範囲を B1 で検査 (USER/read)。 */
+        if (!kapi_in_range((u32)b, KAPI_OUT_LEN(b, sizeof(V86_Begin)))) {
+            ring3_fault_kill();
+        }
+        break;
+    }
+    case 328: { /* v86s_run */
+        const V86_RunIn *in = (const V86_RunIn *)words[1];
+        V86_Exit *ex = (V86_Exit *)words[2];
+        /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */
+        if (!ring3_user_ranges_writable((u32)ex, KAPI_OUT_LEN(ex, sizeof(V86_Exit)),
+                                        (u32)0, 0u)) {
+            ring3_fault_kill();   /* 戻らない */
+        }
+        /* 入力の全範囲を B1 で検査 (USER/read)。 */
+        if (!kapi_in_range((u32)in, KAPI_OUT_LEN(in, sizeof(V86_RunIn)))) {
+            ring3_fault_kill();
+        }
+        break;
+    }
+    case 329: { /* v86s_fm_drain */
+        SND2_FmEv *out = (SND2_FmEv *)words[1];
+        u32 max = (u32)words[2];
+        u32 *last_seq = (u32 *)words[3];
+        if (max > 512) return OS32_ERR_INVAL;
+        /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */
+        if (!ring3_user_ranges_writable((u32)out, kapi_out_mul(KAPI_OUT_LEN(out, max), 12u),
+                                        (u32)last_seq, KAPI_OUT_LEN(last_seq, sizeof(u32)))) {
+            ring3_fault_kill();   /* 戻らない */
+        }
+        break;
+    }
+    }
+    return 0;
 }
 
 /* 予約スロット (KAPI_FUNC_COUNT..KAPI_FUNC_CAPACITY-1) の中身。
@@ -975,14 +1100,11 @@ int __cdecl wrap_dev_get_info(int idx, char *name, int nm, int *type, u32 *sects
 
 void __cdecl wrap_fm_startup_sound(void)
 {
-    KAPI_HIT(42);
-    fm_startup_sound();
 }
 
 void __cdecl wrap_fm_play_mml(const char *mml)
 {
-    KAPI_HIT(43);
-    fm_play_mml_kapi(mml);
+    (void)mml;
 }
 
 int __cdecl wrap_np2_detect(void)
@@ -1533,44 +1655,38 @@ int __cdecl wrap_paging_is_present(u32 addr)
 
 void __cdecl wrap_snd_bgm_play(const char *mml)
 {
-    KAPI_HIT(118);
-    snd_bgm_play(mml);
+    (void)mml;
 }
 
 void __cdecl wrap_snd_bgm_stop(void)
 {
-    KAPI_HIT(119);
-    snd_bgm_stop();
 }
 
 int __cdecl wrap_snd_bgm_is_playing(void)
 {
-    KAPI_HIT(120);
-    return snd_bgm_is_playing();
+    return 0;
 }
 
 void __cdecl wrap_snd_se_play(int se_id)
 {
-    KAPI_HIT(121);
-    snd_se_play(se_id);
+    (void)se_id;
 }
 
 void __cdecl wrap_snd_se_play_raw(int note, int duration_ticks, int tone)
 {
-    KAPI_HIT(122);
-    snd_se_play_raw(note, duration_ticks, tone);
+    (void)note;
+    (void)duration_ticks;
+    (void)tone;
 }
 
 void __cdecl wrap_snd_set_master(int enable)
 {
-    KAPI_HIT(123);
-    snd_set_master(enable);
+    (void)enable;
 }
 
 void __cdecl wrap_snd_bgm_set_persist(int persist)
 {
-    KAPI_HIT(124);
-    snd_bgm_set_persist(persist);
+    (void)persist;
 }
 
 int __cdecl wrap_kbd_is_pressed(int scancode)
@@ -1976,8 +2092,8 @@ i32 __cdecl wrap_exec_app_state(i32 app_id)
 
 i32 __cdecl wrap_snd_focus(int app_id)
 {
-    KAPI_HIT(185);
-    return snd_focus(app_id);
+    (void)app_id;
+    return OS32_ERR_NOSYS;
 }
 
 i32 __cdecl wrap_exec_abort_clear(void)
@@ -2918,5 +3034,369 @@ int __cdecl wrap_io_pump(unsigned int budget_us)
 {
     KAPI_HIT(297);
     return kapi_io_pump(budget_us);
+}
+
+int __cdecl wrap_snd2_dev_count(void)
+{
+    KAPI_HIT(298);
+    return snd2_dev_count();
+}
+
+int __cdecl wrap_snd2_dev_info(u32 dev, SND2_DevInfo *o)
+{
+    KAPI_HIT(299);
+    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */
+    if (!ring3_user_ranges_writable((u32)o, KAPI_OUT_LEN(o, sizeof(SND2_DevInfo)),
+                                    (u32)0, 0u)) {
+        ring3_fault_kill();   /* 戻らない */
+    }
+    return snd2_dev_info(dev, o);
+}
+
+int __cdecl wrap_snd2_caps(u32 dev, SND2_Caps *o, u32 size)
+{
+    KAPI_HIT(300);
+    if (!size || size > 256 || (size & 3)) return OS32_ERR_INVAL;
+    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */
+    if (!ring3_user_ranges_writable((u32)o, KAPI_OUT_LEN(o, size),
+                                    (u32)0, 0u)) {
+        ring3_fault_kill();   /* 戻らない */
+    }
+    return snd2_caps(dev, o, size);
+}
+
+int __cdecl wrap_snd2_dsp_unit(u32 dev, u32 unit, SND2_DspUnit *o)
+{
+    KAPI_HIT(301);
+    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */
+    if (!ring3_user_ranges_writable((u32)o, KAPI_OUT_LEN(o, sizeof(SND2_DspUnit)),
+                                    (u32)0, 0u)) {
+        ring3_fault_kill();   /* 戻らない */
+    }
+    return snd2_dsp_unit(dev, unit, o);
+}
+
+int __cdecl wrap_snd2_dsp_param(u32 dev, u32 unit, u32 i, SND2_DspParam *o)
+{
+    KAPI_HIT(302);
+    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */
+    if (!ring3_user_ranges_writable((u32)o, KAPI_OUT_LEN(o, sizeof(SND2_DspParam)),
+                                    (u32)0, 0u)) {
+        ring3_fault_kill();   /* 戻らない */
+    }
+    return snd2_dsp_param(dev, unit, i, o);
+}
+
+int __cdecl wrap_snd2_dsp_insert(u32 stream, u32 unit, const i32 *params, u32 n)
+{
+    KAPI_HIT(303);
+    if (n > 16) return OS32_ERR_INVAL;
+    /* 入力の全範囲を B1 で検査 (USER/read)。 */
+    if (!kapi_in_range((u32)params, kapi_out_mul(KAPI_OUT_LEN(params, n), 4u))) {
+        ring3_fault_kill();
+    }
+    return snd2_dsp_insert(stream, unit, params, n);
+}
+
+int __cdecl wrap_snd2_dsp_process(u32 dev, u32 unit, const i32 *params, u32 n, const void *in, void *out, u32 frames, u32 fmt_index)
+{
+    KAPI_HIT(304);
+    if (n > 16) return OS32_ERR_INVAL;
+    /* 入力の全範囲を B1 で検査 (USER/read)。 */
+    if (!kapi_in_range((u32)params, kapi_out_mul(KAPI_OUT_LEN(params, n), 4u))) {
+        ring3_fault_kill();
+    }
+    return snd2_dsp_process(dev, unit, params, n, in, out, frames, fmt_index);
+}
+
+int __cdecl wrap_snd2_stream_open(const SND2_StreamDesc *d, u32 *stream)
+{
+    KAPI_HIT(305);
+    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */
+    if (!ring3_user_ranges_writable((u32)stream, KAPI_OUT_LEN(stream, sizeof(u32)),
+                                    (u32)0, 0u)) {
+        ring3_fault_kill();   /* 戻らない */
+    }
+    /* 入力の全範囲を B1 で検査 (USER/read)。 */
+    if (!kapi_in_range((u32)d, KAPI_OUT_LEN(d, sizeof(SND2_StreamDesc)))) {
+        ring3_fault_kill();
+    }
+    return snd2_stream_open(d, stream);
+}
+
+int __cdecl wrap_snd2_stream_write(u32 stream, const void *buf, u32 bytes)
+{
+    KAPI_HIT(306);
+    return snd2_stream_write(stream, buf, bytes);
+}
+
+int __cdecl wrap_snd2_stream_start(u32 stream)
+{
+    KAPI_HIT(307);
+    return snd2_stream_start(stream);
+}
+
+int __cdecl wrap_snd2_stream_pause(u32 stream)
+{
+    KAPI_HIT(308);
+    return snd2_stream_pause(stream);
+}
+
+int __cdecl wrap_snd2_stream_pos(u32 stream, SND2_Pos *o)
+{
+    KAPI_HIT(309);
+    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */
+    if (!ring3_user_ranges_writable((u32)o, KAPI_OUT_LEN(o, sizeof(SND2_Pos)),
+                                    (u32)0, 0u)) {
+        ring3_fault_kill();   /* 戻らない */
+    }
+    return snd2_stream_pos(stream, o);
+}
+
+int __cdecl wrap_snd2_stream_wait(u32 stream, u32 frame, u32 timeout_ms)
+{
+    KAPI_HIT(310);
+    return snd2_stream_wait(stream, frame, timeout_ms);
+}
+
+int __cdecl wrap_snd2_stream_volume(u32 stream, u32 left, u32 right)
+{
+    KAPI_HIT(311);
+    return snd2_stream_volume(stream, left, right);
+}
+
+int __cdecl wrap_snd2_stream_close(u32 stream, u32 how)
+{
+    KAPI_HIT(312);
+    return snd2_stream_close(stream, how);
+}
+
+int __cdecl wrap_av_focus_set(int owner)
+{
+    KAPI_HIT(313);
+    return av_focus_set(owner);
+}
+
+int __cdecl wrap_av_focus_get(void)
+{
+    KAPI_HIT(314);
+    return av_focus_get();
+}
+
+int __cdecl wrap_in2_pad_state(u32 slot, IN2_PadState *o)
+{
+    KAPI_HIT(315);
+    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */
+    if (!ring3_user_ranges_writable((u32)o, KAPI_OUT_LEN(o, sizeof(IN2_PadState)),
+                                    (u32)0, 0u)) {
+        ring3_fault_kill();   /* 戻らない */
+    }
+    return in2_pad_state(slot, o);
+}
+
+int __cdecl wrap_in2_pad_caps(u32 slot, IN2_PadCaps *o)
+{
+    KAPI_HIT(316);
+    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */
+    if (!ring3_user_ranges_writable((u32)o, KAPI_OUT_LEN(o, sizeof(IN2_PadCaps)),
+                                    (u32)0, 0u)) {
+        ring3_fault_kill();   /* 戻らない */
+    }
+    return in2_pad_caps(slot, o);
+}
+
+int __cdecl wrap_in2_pad_vibrate(u32 slot, const IN2_Vibration *v)
+{
+    KAPI_HIT(317);
+    /* 入力の全範囲を B1 で検査 (USER/read)。 */
+    if (!kapi_in_range((u32)v, KAPI_OUT_LEN(v, sizeof(IN2_Vibration)))) {
+        ring3_fault_kill();
+    }
+    return in2_pad_vibrate(slot, v);
+}
+
+int __cdecl wrap_in2_dev_count(void)
+{
+    KAPI_HIT(318);
+    return in2_dev_count();
+}
+
+int __cdecl wrap_in2_dev_info(u32 i, IN2_DevInfo *o)
+{
+    KAPI_HIT(319);
+    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */
+    if (!ring3_user_ranges_writable((u32)o, KAPI_OUT_LEN(o, sizeof(IN2_DevInfo)),
+                                    (u32)0, 0u)) {
+        ring3_fault_kill();   /* 戻らない */
+    }
+    return in2_dev_info(i, o);
+}
+
+int __cdecl wrap_in2_read(IN2_Event *out, u32 max)
+{
+    KAPI_HIT(320);
+    if (max > 128) return OS32_ERR_INVAL;
+    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */
+    if (!ring3_user_ranges_writable((u32)out, kapi_out_mul(KAPI_OUT_LEN(out, max), 16u),
+                                    (u32)0, 0u)) {
+        ring3_fault_kill();   /* 戻らない */
+    }
+    return in2_read(out, max);
+}
+
+int __cdecl wrap_in2_key_state(u8 *out)
+{
+    KAPI_HIT(321);
+    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */
+    if (!ring3_user_ranges_writable((u32)out, KAPI_OUT_LEN(out, 128u),
+                                    (u32)0, 0u)) {
+        ring3_fault_kill();   /* 戻らない */
+    }
+    return in2_key_state(out);
+}
+
+int __cdecl wrap_in2_mouse_state(IN2_MouseState *o)
+{
+    KAPI_HIT(322);
+    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */
+    if (!ring3_user_ranges_writable((u32)o, KAPI_OUT_LEN(o, sizeof(IN2_MouseState)),
+                                    (u32)0, 0u)) {
+        ring3_fault_kill();   /* 戻らない */
+    }
+    return in2_mouse_state(o);
+}
+
+int __cdecl wrap_in2_acquire(u32 flags)
+{
+    KAPI_HIT(323);
+    return in2_acquire(flags);
+}
+
+int __cdecl wrap_in2_unacquire(void)
+{
+    KAPI_HIT(324);
+    return in2_unacquire();
+}
+
+int __cdecl wrap_in2_status(IN2_Status *o)
+{
+    KAPI_HIT(325);
+    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */
+    if (!ring3_user_ranges_writable((u32)o, KAPI_OUT_LEN(o, sizeof(IN2_Status)),
+                                    (u32)0, 0u)) {
+        ring3_fault_kill();   /* 戻らない */
+    }
+    return in2_status(o);
+}
+
+int __cdecl wrap_in2_wm_state(IN2_WmState *o)
+{
+    KAPI_HIT(326);
+    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */
+    if (!ring3_user_ranges_writable((u32)o, KAPI_OUT_LEN(o, sizeof(IN2_WmState)),
+                                    (u32)0, 0u)) {
+        ring3_fault_kill();   /* 戻らない */
+    }
+    return in2_wm_state(o);
+}
+
+int __cdecl wrap_v86s_begin(const V86_Begin *b, u32 *sid)
+{
+    KAPI_HIT(327);
+    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */
+    if (!ring3_user_ranges_writable((u32)sid, KAPI_OUT_LEN(sid, sizeof(u32)),
+                                    (u32)0, 0u)) {
+        ring3_fault_kill();   /* 戻らない */
+    }
+    /* 入力の全範囲を B1 で検査 (USER/read)。 */
+    if (!kapi_in_range((u32)b, KAPI_OUT_LEN(b, sizeof(V86_Begin)))) {
+        ring3_fault_kill();
+    }
+    return v86s_begin(b, sid);
+}
+
+int __cdecl wrap_v86s_run(u32 sid, const V86_RunIn *in, V86_Exit *ex)
+{
+    KAPI_HIT(328);
+    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */
+    if (!ring3_user_ranges_writable((u32)ex, KAPI_OUT_LEN(ex, sizeof(V86_Exit)),
+                                    (u32)0, 0u)) {
+        ring3_fault_kill();   /* 戻らない */
+    }
+    /* 入力の全範囲を B1 で検査 (USER/read)。 */
+    if (!kapi_in_range((u32)in, KAPI_OUT_LEN(in, sizeof(V86_RunIn)))) {
+        ring3_fault_kill();
+    }
+    return v86s_run(sid, in, ex);
+}
+
+int __cdecl wrap_v86s_fm_drain(u32 sid, SND2_FmEv *out, u32 max, u32 *last_seq)
+{
+    KAPI_HIT(329);
+    if (max > 512) return OS32_ERR_INVAL;
+    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */
+    if (!ring3_user_ranges_writable((u32)out, kapi_out_mul(KAPI_OUT_LEN(out, max), 12u),
+                                    (u32)last_seq, KAPI_OUT_LEN(last_seq, sizeof(u32)))) {
+        ring3_fault_kill();   /* 戻らない */
+    }
+    return v86s_fm_drain(sid, out, max, last_seq);
+}
+
+int __cdecl wrap_v86s_end(u32 sid)
+{
+    KAPI_HIT(330);
+    return v86s_end(sid);
+}
+
+int __cdecl wrap_snd2_chip_caps(u32 dev, SND2_ChipCaps *o, u32 size)
+{
+    KAPI_HIT(331);
+    if (!size || size > 64 || (size & 3)) return OS32_ERR_INVAL;
+    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */
+    if (!ring3_user_ranges_writable((u32)o, KAPI_OUT_LEN(o, size),
+                                    (u32)0, 0u)) {
+        ring3_fault_kill();   /* 戻らない */
+    }
+    return snd2_chip_caps(dev, o, size);
+}
+
+int __cdecl wrap_snd2_chip_open(u32 dev, u32 *h)
+{
+    KAPI_HIT(332);
+    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */
+    if (!ring3_user_ranges_writable((u32)h, KAPI_OUT_LEN(h, sizeof(u32)),
+                                    (u32)0, 0u)) {
+        ring3_fault_kill();   /* 戻らない */
+    }
+    return snd2_chip_open(dev, h);
+}
+
+int __cdecl wrap_snd2_chip_write(u32 h, const SND2_RegW *w, u32 n)
+{
+    KAPI_HIT(333);
+    if (n > 256) return OS32_ERR_INVAL;
+    /* 入力の全範囲を B1 で検査 (USER/read)。 */
+    if (!kapi_in_range((u32)w, kapi_out_mul(KAPI_OUT_LEN(w, n), 4u))) {
+        ring3_fault_kill();
+    }
+    return snd2_chip_write(h, w, n);
+}
+
+int __cdecl wrap_snd2_chip_read(u32 h, u32 bank, u32 what, u32 reg)
+{
+    KAPI_HIT(334);
+    return snd2_chip_read(h, bank, what, reg);
+}
+
+int __cdecl wrap_snd2_chip_reset(u32 h)
+{
+    KAPI_HIT(335);
+    return snd2_chip_reset(h);
+}
+
+int __cdecl wrap_snd2_chip_close(u32 h)
+{
+    KAPI_HIT(336);
+    return snd2_chip_close(h);
 }
 

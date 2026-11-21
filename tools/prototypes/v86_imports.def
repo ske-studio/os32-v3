@@ -18,8 +18,14 @@
       "irq": true
     },
     {
-      "symbol": "snd_set_master",
-      "source": "include/snd_contract.h",
+      "symbol": "fm_all_off",
+      "source": "include/fm_contract.h",
+      "context": "normal,exception",
+      "irq": true
+    },
+    {
+      "symbol": "ssg_all_off",
+      "source": "include/fm_contract.h",
       "context": "normal,exception",
       "irq": true
     },

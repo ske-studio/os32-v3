@@ -45,11 +45,4 @@ void ssg_noise(uchar period);
 void ssg_mixer(uchar mask);
 void ssg_all_off(void);
 
-/* 高レベル */
-void fm_startup_sound(void);       /* 起動ジングル */
-void fm_play_mml(const char *mml); /* 簡易MML再生 */
-
-void fm_play_mml_kapi(const char *mml);
-
-
 #endif

@@ -12,6 +12,7 @@
 #define FM_ADAPTER "../../drivers/sound/fm/fm_module.c"
 #endif
 #include FM_ADAPTER
+#include "tick_order.h"
 #include "../../kernel/irq/tick.c"
 volatile u32 kctx_irq_depth;
 const u32 fm_kexports[] = {0};
@@ -23,10 +24,8 @@ void __cdecl kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
 
 static u32 ticks, silence, mode, public_calls;
 static void body_tick(void) { ticks++; }
-static void body_stop(int enable) { CHECK(!enable); }
 static int body_quiet(void)
 {
-    CHECK(!tick_target); /* no new Key-ON after the final silence */
     silence++;
     return mode != 2;
 }
@@ -37,9 +36,7 @@ static int init_fm(FmModuleApi *out)
     u32 entries[FM_MODULE_API_SLOTS];
     for (u32 i = 0; i < FM_MODULE_API_SLOTS; i++) entries[i] = (u32)(uptr)body_tick;
     kmemcpy(out, entries, sizeof(entries));
-    out->tick = body_tick;
     out->quiet = body_quiet;
-    out->snd_set_master = body_stop;
     out->fm_note_on = body_note;
     return 0;
 }
@@ -47,38 +44,31 @@ static int start_then_fail(struct module_record *r, u32 entry, u32 *ops)
 {
     int rc = fm_start(r, entry, ops);
     if (!rc && mode == 1) {
-        CHECK(r->tick_refs == 1 && !module_exports(fm_handle));
+        CHECK(!r->tick_refs && !module_exports(fm_handle));
         tick_dispatch();
         fm_note_on(0, 60);
-        CHECK(ticks == 1 && !public_calls);
+        CHECK(!ticks && !public_calls);
         return MODULE_INIT_FAILED;
     }
     return rc;
 }
 void _start(void)
 {
-    kctx_irq_depth = 1;
-    CHECK(fm_module_load() == MODULE_INIT_FAILED);
-    CHECK(!fm_handle.generation && !slots[PC98_TICK_SND].fn);
-    CHECK(tick_register(PC98_TICK_SND, snd_tick) == TICK_ERR_CTX);
-    kctx_irq_depth = 0;
-    /* The retry reaches the existing busy check after publishing the facade. */
+    CHECK(FM_MODULE_OPS_VERSION == 2);
     fm_handle.generation = 1;
     CHECK(fm_module_load() == MODULE_BUSY);
     fm_handle.generation = 0;
-    CHECK(slots[PC98_TICK_SND].fn == snd_tick);
-    CHECK(!tick_register(PC98_TICK_SND, snd_tick));
-    CHECK(!tick_register(PC98_TICK_SND, snd_tick));
+    CHECK(!slots[PC98_TICK_SND].fn);
     read_input(input, sizeof(input)); read_input(file, sizeof(file));
     mode = input[1];
     kmemcpy(&imports[0].name_hash, file + 152, 4);
     kmemcpy(&exports[4].name_hash, file + 164, 4);
     exports[4].version = 1;
     struct module_request q = request();
-    q.lifecycle = (struct module_lifecycle){.start = start_then_fail, .quiesce = fm_quiesce, .detach = fm_detach};
+    q.lifecycle = (struct module_lifecycle){.start = start_then_fail, .quiesce = fm_quiesce};
     /* Facade stubs must be harmless before load. */
     fm_note_on(0, 60); tick_dispatch();
-    CHECK(!ticks && !public_calls && !snd_bgm_is_playing());
+    CHECK(!ticks && !public_calls);
     CHECK(!module_load(&q, &fm_handle));
     struct module_record *r = module_record_get(fm_handle);
     r->init = (u32)(uptr)init_fm;
@@ -89,20 +79,20 @@ void _start(void)
     int rc = module_start(fm_handle);
     if (mode == 1 || mode == 3) {
         CHECK(rc == MODULE_INIT_FAILED);
-        CHECK(!tick_target && !r->tick_refs && silence == 1);
+        CHECK(!r->tick_refs && silence == 1);
         CHECK(r->state == MODULE_ABSENT);
         tick_dispatch(); fm_note_on(0, 60);
-        CHECK(ticks == (mode == 1 ? 1U : 0U) && !public_calls);
+        CHECK(!ticks && !public_calls);
         empty(); finish(0);
     }
-    CHECK(!rc && r->tick_refs == 1 && tick_target);
+    CHECK(!rc && !r->tick_refs);
     tick_dispatch(); fm_note_on(0, 60);
-    CHECK(ticks == 1 && public_calls == 1);
+    CHECK(!ticks && public_calls == 1);
     u32 before = returned;
     rc = fm_module_abort();
-    CHECK(!tick_target && !r->tick_refs && silence == 1);
+    CHECK(!r->tick_refs && silence == 1);
     tick_dispatch(); fm_note_on(0, 60);
-    CHECK(ticks == 1 && public_calls == 1);
+    CHECK(!ticks && public_calls == 1);
     if (mode == 2) {
         CHECK(rc == MODULE_ISOLATED && r->state == MODULE_QUARANTINED);
         CHECK(returned == before && mask[0] == 2 && live[0] && !retired);

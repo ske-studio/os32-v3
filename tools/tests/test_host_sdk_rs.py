@@ -3,7 +3,7 @@ CHECK = dict(name='host-sdk-rs-host', tier=1,
     covers=['sdk/rust/os32api/src/host.rs', 'sdk/rust/os32api/src/kapi_generated.rs',
             'sdk/rust/os32api/src/lib.rs', 'sdk/rust/os32api/src/gui/**',
             'sdk/rust/os32api/src/cfg.rs', 'sdk/rust/os32api/src/ls.rs',
-            'tools/tests/os32api_host.py', 'tools/tests/host_sdk_rs_host.rs',
+            'sdk/rust/os32api/src/av.rs', 'tools/tests/os32api_host.py', 'tools/tests/host_sdk_rs_host.rs',
             'tools/tests/test_host_sdk_rs.py'], needs=[], budget=3.5,
     basis=['docs/design/userland/lib/host/host_call.md 口'],
 )

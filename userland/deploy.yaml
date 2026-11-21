@@ -331,6 +331,9 @@ filesystem:
     - host: userland/tests/pcm_test.bin
       guest: /usr/bin/
       tags: [test]
+    - host: userland/tests/av_test.bin
+      guest: /usr/bin/
+      tags: [test]
     - host: userland/tests/pcm_play.bin
       guest: /usr/bin/
       tags: [test]
@@ -405,19 +408,6 @@ filesystem:
     # --- LZ4 圧縮/展開コマンド → /bin/ ---
     - host: userland/system/lz4.bin
       guest: /bin/lz4.bin
-      tags: [programs]
-    # --- サウンド制御/テスト → /bin/ ---
-    # deploy.yaml に無いバイナリは NHD 上で stale 化し、KAPI レイアウトが
-    # 変わった時に旧バイナリが別関数へ飛んでハングする (2026-08-13 実測)。
-    # PKG 配布物でも起動対象になるものは必ずここに載せること。
-    - host: userland/system/sndctl.bin
-      guest: /bin/sndctl.bin
-      tags: [programs]
-    - host: userland/system/sndtest.bin
-      guest: /bin/sndtest.bin
-      tags: [programs]
-    - host: userland/system/sndtest2.bin
-      guest: /bin/sndtest2.bin
       tags: [programs]
     # --- MINIMAL のコマンド (タグ base → CD の MINIMAL = 起動 FD) ---
     # MINIMAL は「起動して、HDD に入れて、壊れたときに直して、残りを取ってこられる」

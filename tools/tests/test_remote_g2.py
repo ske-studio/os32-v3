@@ -8,7 +8,7 @@ import sys
 
 from test_remote_g3b import LAN, SERIAL, check
 
-CHECK = dict(name='remote-g2', tier=1, needs=[], budget=20, covers=[
+CHECK = dict(name='remote-g2', tier=1, needs=[], budget=20, covers=['kernel/av_focus.c', 'include/av_contract.h', 'exec/exec_gui.h', 'exec/exec_hooks.h', 'input/hal/in2_int.h', 'include/app_ids.h',
     'userland/gshell/**', 'sdk/rust/os32api/**', 'userland/lib/font/**',
     'tools/tests/os32api_host.py', 'tools/tests/g16_fixture.py',
     'tools/fetch_fonts.py', 'tools/gen_g16.py', 'tools/g16/**',

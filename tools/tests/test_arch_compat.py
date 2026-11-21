@@ -30,7 +30,7 @@ CHECK = dict(env=['ppc-cross'], name='arch-compat-host', tier=2, budget=30, need
     'sdk/gen_kapi.py', 'sdk/kapi_target_ppc.py', 'sdk/kapi_abi_x86.py',
     'sdk/target_profile.py', 'sdk/kapi.json', 'kapi/kapi_generated.c',
     'sdk/include/os32/os32_kapi_slots.h'],
-    pins=['input-hal/4b'], basis=['ARCH_COMPAT_CONTRACT §4'],
+    pins=['input-hal/4b'], basis=['ARCH_COMPAT_CONTRACT §4', 'docs/decisions/sound/AV0_V90_ADDENDUM.md §5'],
 )
 import json
 import os
@@ -68,7 +68,7 @@ def input_kapi(root, work, vectors, mutation=None):
     api = json.loads((root / 'sdk/kapi.json').read_text())['api']
     slot = next(i for i, a in enumerate(api) if a['name'] == 'kbd_trygetkey')
     # All pointer slots now have providers on PowerMac.
-    names = ('kbd_trygetkey', 'db_last_error', 'snd_bgm_is_playing', 'ime_is_active', 'snd_bgm_stop')
+    names = ('kbd_trygetkey', 'db_last_error', 'snd_bgm_is_playing', 'ime_is_active', 'snd_bgm_stop', 'np2_detect', 'ide_init')
     statuses, slots = {}, []
     for provider, target in (('pc98', 'x86-pc98'), ('powermac', 'ppc-powermac')):
         output = work / target
@@ -147,12 +147,12 @@ def check_input_kapi(root, work, vectors, mutate):
             ('db-pointer-absent', 'sdk/kapi_target_ppc.py',
              'PROVIDER_GROUPS = {', "PROVIDER_GROUPS = {\n    'db': ({'db_last_error'}, set()),", {'pc98': 0, 'powermac': 64}),
             ('absent-query', 'sdk/kapi_target_ppc.py',
-             "\n    'snd_bgm_is_playing',\n", "\n", {'pc98': 0, 'powermac': 64}),
+             "\n    'np2_detect',\n", "\n", {'pc98': 0, 'powermac': 64}),
             ('ime-not-zero', 'sdk/kapi_target_ppc.py',
              'else "OS32_ERR_NOSYS"', 'else "0"', {'pc98': 0, 'powermac': 64}),
             ('absent-void', 'sdk/gen_kapi.py',
              '        if ret != "void":',
-             '        if name == "snd_bgm_stop": c_content += "    snd_bgm_stop();\\n"\n        if ret != "void":',
+             '        if name == "ide_init": c_content += "    platform_ide_init();\\n"\n        if ret != "void":',
              {'pc98': 0, 'powermac': 64}),
         )
         for label, path, old, new, observed in mutations:

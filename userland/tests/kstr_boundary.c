@@ -38,8 +38,9 @@ int main(int argc, char **argv, KernelAPI *api)
         api->shell_print_utf8("KSTR console UTF-8: \xe3\x81\x82\n", 7);
         api->shell_print_utf8(edge, 7);
         api->shell_print_utf8("\n", 7);
-        api->fm_play_mml(end - 1); /* empty MML, page-final NUL */
-        api->snd_bgm_play(end - 1);
+        /* Retired pointers must be ignored, including unmapped pages. */
+        api->fm_play_mml(end);
+        api->snd_bgm_play(end);
         api->snd_bgm_stop();
         /* Exact fixed-word copy: return address + two arguments, no padding. */
         u32 *frame = (u32 *)(end - 3 * sizeof(u32));
@@ -50,11 +51,11 @@ int main(int argc, char **argv, KernelAPI *api)
         api->kprintf(7, "kstr_boundary: PASS 1/1\n");
         return 0;
     }
-    if (!strcmp(mode, "stop")) {
-        /* Run under the GUI launcher; press CTRL+STOP during playback. */
-        api->kprintf(7, "KSTR STOP armed\n");
-        api->fm_play_mml("C1D1E1F1G1A1B1C1D1E1F1G1A1B1");
-        api->kprintf(7, "KSTR STOP completed\n");
+    if (!strcmp(mode, "fm") || !strcmp(mode, "bgm")) {
+        /* This address is outside the caller's allowed address band. */
+        if (!strcmp(mode, "fm")) api->fm_play_mml((const char *)1);
+        else api->snd_bgm_play((const char *)1);
+        api->kprintf(7, "KSTR retired %s returned\n", mode);
         return 0;
     }
 
@@ -75,8 +76,6 @@ int main(int argc, char **argv, KernelAPI *api)
     else if (!strcmp(mode, "launch")) api->launch_req(bad);
     else if (!strcmp(mode, "output")) api->shell_print_utf8(bad, 7);
     else if (!strcmp(mode, "serial")) api->serial_puts(bad);
-    else if (!strcmp(mode, "fm")) api->fm_play_mml(bad);
-    else if (!strcmp(mode, "bgm")) api->snd_bgm_play(bad);
     else if (!strcmp(mode, "unterminated")) {
         memset(pages, 'x', OS32_PAGE_SIZE);
         api->shell_print_utf8(pages, 7);

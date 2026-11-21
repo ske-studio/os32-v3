@@ -10,6 +10,7 @@ static void resident_main(void);
 #define ARCH_ENTRY_CALL(saved, sp, entry) do { (void)(saved); (void)(sp); (void)(entry); resident_main(); } while (0)
 #include "host_exec_entry.h"
 #include "exec.c"
+#include "ring3_str.c"
 
 static void say(const char *s) { u32 n=0; while(s[n]) n++; __asm__ volatile("int $0x80"::"a"(4),"b"(1),"c"(s),"d"(n):"memory"); }
 static void die(void) __attribute__((noreturn));
@@ -68,7 +69,7 @@ void appslot_shell_commit(void) { cur=APP_ID_SHELL; slots[cur].depth=SHELL_DEPTH
 void appslot_mark_scheduled(int id,u32 t) { (void)t; CHECK(id==cur); }
 int appslot_return_target(int id) { CHECK(id==cur); return slots[id].parent; }
 void appslot_switch_to(int id) { cur=id; }
-u32 appslot_reclaim(int id) { CHECK(id==cur); slots[id].state=APP_STATE_FREE; return 0; }
+u32 appslot_reclaim(int id) { CHECK(id==cur || slots[id].state==APP_STATE_PARKED); slots[id].state=APP_STATE_FREE; return 0; }
 int os32x_decode(OS32Header *h,const u8 *wire,u32 n) { if (n < OS32X_HDR_SIZE) return OS32X_LAYOUT_SHORT; kmemcpy(h,wire,OS32X_HDR_SIZE); return OS32X_LAYOUT_OK; }
 int os32x_layout_check(const OS32Header *h,u32 n,u32 off) { (void)h; (void)n; (void)off; return OS32X_LAYOUT_OK; }
 const char *os32x_layout_reason(int rc) { (void)rc; CHECK(0); return 0; }
@@ -103,7 +104,7 @@ void paging_addrspace_destroy(struct addrspace *as) { as->pd_phys=0; }
 void paging_addrspace_poison(struct addrspace *as) { (void)as; CHECK(0); }
 int ledger_reclaim_owner(u32 owner,u32 *pages) { (void)owner; *pages=0; return 1; }
 void serial_puts_polled(const char *s) { (void)s; }
-volatile u32 kctx_irq_depth,kctx_exc_depth,font_guard_active,tick_count,ring3_wm_shell_gen;
+volatile u32 ring3_transition_count,kctx_irq_depth,kctx_exc_depth,font_guard_active,tick_count,ring3_wm_shell_gen;
 ShellService g_shell_service;
 void shell_service_retire(void) {}
 void shell_service_publish(u32 b,u32 n) { (void)b; (void)n; }
@@ -115,8 +116,15 @@ void __cdecl kprintf(u8 a,const char *s,...) { (void)a; (void)s; CHECK(0); }
 
 
 void font_guard_fault(u32 a,u32 b,u32 c) { (void)a; (void)b; (void)c; CHECK(0); }
+int res_owner_get(void) { return cur; }
+static int gui_active, child_fault;
+int gui_registered(void) { return gui_active; }
+void in2_reclaim(int owner) { (void)owner; }
+void in2_on_focus(int old, int owner) { (void)old; (void)owner; }
+int appslot_kill_check(int id) { CHECK(slots[id].state == APP_STATE_PARKED); return 0; }
+int launch_chain(int head, int *out, int max) { (void)head; (void)out; (void)max; return 0; }
 void res_owner_set(int id) { (void)id; }
-#define CLEANUP(name) void name(int id) { CHECK(id==cur); }
+#define CLEANUP(name) void name(int id) { CHECK(id==cur || slots[id].state==APP_STATE_PARKED); }
 CLEANUP(kapi_strings_cleanup_owned)
 CLEANUP(db_cleanup_owned)
 CLEANUP(fd_redirect_reset_owned)
@@ -124,7 +132,6 @@ CLEANUP(font_lease_close_owned)
 CLEANUP(vfs_close_owned)
 CLEANUP(pipe_free_owned)
 CLEANUP(shm_free_owned)
-CLEANUP(snd_owner_exit)
 CLEANUP(pcm_reclaim)
 #undef CLEANUP
 #define NOTICE(name) void name(int id) { (void)id; }
@@ -138,22 +145,29 @@ void io_syscall_resume(int owner, u32 depth) { (void)owner; (void)depth; }
 NOTICE(con_sink_owner_exit)
 NOTICE(appslot_gfx_owner_exit)
 #undef NOTICE
-int gfx_return_emergency(u32 owner,int reason) { CHECK(owner>=1 && owner<=3 && reason==EXEC_KIND_EXITED); return 0; }
-void gui_owner_exit(int id,int kind) { CHECK(id>=1 && id<=3 && kind==EXEC_KIND_EXITED); cleanup_count++; }
+static int expected_kind(int id)
+{
+    if (gui_active) return EXEC_KIND_ABORTED;
+    return child_fault && id == 3 ? EXEC_KIND_FAULT : EXEC_KIND_EXITED;
+}
+int gfx_return_emergency(u32 owner,int reason) { CHECK(owner>=1 && owner<=3 && reason==expected_kind(owner)); return 0; }
+void gui_owner_exit(int id,int kind) { CHECK(id>=1 && id<=3 && kind==expected_kind(id)); cleanup_count++; }
 int con_sink_is_enabled(void) { return 0; }
 int con_sink_reader_get(void) { CHECK(0); return 0; }
 void con_sink_push_exit(int id) { (void)id; CHECK(0); }
 i32 launch_child(i32 id) { (void)id; CHECK(0); return 0; }
 void kbd_inject_discard(void) { CHECK(0); }
-void input_discard_stop(void) { CHECK(0); }
+void input_discard_stop(void) { CHECK(gui_active); }
 
 static void user_main(void)
 {
+    CHECK(av_focus_get() == cur);
     if (cur==2) {
         CHECK(exec_nest_level==A_DEPTH);
         expect(1,'I',0); CHECK(trace_op[0]=='S' && trace_state[0]==&fp_parent[SHELL_DEPTH]);
         /* A calls the real loader while its own launch frame remains live. */
-        CHECK(exec_launch("/B",0)==EXEC_SUCCESS);
+        CHECK(exec_launch("/B",0)==(child_fault ? EXEC_ERR_FAULT : EXEC_SUCCESS));
+        CHECK(av_focus_get() == 2);
         CHECK(cur==2 && exec_nest_level==A_DEPTH && cleanup_count==1);
         expect(4,'R',&fp_parent[A_DEPTH]);
         CHECK(return_count==1);
@@ -161,6 +175,7 @@ static void user_main(void)
         CHECK(cur==3 && exec_nest_level==B_DEPTH);
         expect(3,'I',0); CHECK(trace_op[2]=='S' && trace_state[2]==&fp_parent[A_DEPTH]);
         return_count++;
+        if (child_fault) ring3_fault_kill();
     }
     exec_exit(EXEC_SUCCESS,EXEC_KIND_EXITED);
     CHECK(0); for (;;) {}
@@ -189,6 +204,16 @@ void _start(void)
     CHECK(cur==APP_ID_SHELL && exec_nest_level==SHELL_DEPTH && cleanup_count==2);
     expect(5,'R',&fp_parent[SHELL_DEPTH]);
     say("PASS x87 nested: shell -> A -> B -> A -> shell, parent[2] then parent[1]\n");
+    CHECK(av_focus_get() == APP_ID_SHELL);
+    trace_count=return_count=cleanup_count=0;
+    child_fault=1;
+    CHECK(exec_launch("/A",0)==EXEC_SUCCESS);
+    CHECK(av_focus_get() == APP_ID_SHELL);
+    gui_active=1;
+    slots[2].state=APP_STATE_PARKED;
+    CHECK(av_focus_set(2)==0 && av_focus_get()==2);
+    CHECK(exec_kill(2)==0 && av_focus_get()==0);
+    gui_active=child_fault=0;
     trace_count=return_count=cleanup_count=0; exec_nest_level=0;
     CHECK(exec_launch("/shell",0)==EXEC_SUCCESS);
     CHECK(return_count==1 && cleanup_count==1 && exec_nest_level==0);

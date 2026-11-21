@@ -48,7 +48,7 @@ static int ring3_user_ranges_writable(u32 p,u32 n,u32 q,u32 m) {
  return (!n || ring3_user_range_ok(p,n)) && (!m || ring3_user_range_ok(q,m));
 }
 '''
-    code += generated[generated.index('#define KAPI_OUT_LEN('):generated.index('/* 予約スロット')]
+    code += generated[generated.index('#define KAPI_OUT_LEN('):generated.index('\n}', generated.index('static int kapi_in_range(')) + 2]
     tests = []
     for entry in spec['api']:
         name = entry['name']

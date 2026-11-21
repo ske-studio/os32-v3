@@ -13,7 +13,6 @@ OS32カーネルは内蔵シェルを持たず、起動時に外部プログラ�
 | `tick` | `tick` | タイマカウンタ表示 |
 | `ver` / `uname` | `ver` | OS バージョン表示 |
 | `date` | `date` | RTC日時表示 |
-| `beep` | `beep` | 起動ジングル再生 |
 | `uptime` | `uptime` | 稼働時間表示 |
 | `np2` | `np2` | NP21/W エミュレータ検出 |
 | `time` | `time CMD` | コマンドの実行時間を計測 |
@@ -32,7 +31,6 @@ OS32カーネルは内蔵シェルを持たず、起動時に外部プログラ�
 | `ide` | `ide [0-3]` | IDEドライブのCH/S・LBA情報 |
 | `format` | `format [0-3] [sects]` | 区画表 (LBA 1、PC-98 標準配置) の OS32 区画に ext2 を作る。区画が無ければ断る (KAPI v64 以降、以前は LBA 1088 を仮定した)。長さは区画で頭打ち |
 | `hdprep` | `hdprep [MB]` | **空の** hd0 (= BIOS DA 80h) に OS32 の一時置き場 (ext2、8〜256MiB、既定 256) を作る。BIOS 幾何・BX=512・LBA か現在の CHS・LBA 1 に区画項目が無い・LBA 0 に 55AA が無い・hd0 がルートでない、を全部見てから表示と `yes` の入力 → 探りの書き込み → `ext2_format_at` → 区画表を書いて読み戻し → `/hd0` にマウントして確認。後半の失敗は `INCOMPLETE`。KAPI v64 (TASK_HDD_INSTALL (アーカイブ: `docs/archive/realhw_v21/TASK_HDD_INSTALL.md`) 段 1) |
-| `play` | `play MML` | MML文字列をFM音源で再生 |
 | `os32gui` | `os32gui [on\|off]` | GUI シェル (/bin/gshell.bin) へ切り替え / 起動時 GUI の既定を `/etc/system.cfg` に書く (GUI v1.1 K4) |
 | `gfxmode` | `gfxmode pc98\|pegc\|cirrus\|auto` | 次回起動のグラフィクスバックエンドを `/etc/system.cfg` の `GFX=` に書く (GUI v1.1 H2b) |
 | `kdebug` | `kdebug [on\|off]` | 設定値と部品の実状態を表示 / 次回起動の `KDEBUG=1`・`0` を `/etc/system.cfg` に書く (KAPI v75) |

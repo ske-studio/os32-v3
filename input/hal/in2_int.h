@@ -3,6 +3,21 @@
 
 #include "types.h"
 
+/* Foreground boundary helpers run with interrupts masked. */
+int in2_excl_acquire(int owner, u32 flags);
+int in2_excl_unacquire(int owner);
+u32 in2_focus_generation(void);
+void in2_reclaim_generation(void);
+int in2_excl_keyboard(void);
+int in2_excl_release(int owner);
+void in2_excl_focus(int old);
+void in2_ring_clear(void);
+void in2_ring_lost(u8 reason);
+void kbd_raw_purge_keep(void);
+void mouse_ext_wheel(i16 delta);
+i32 mouse_ext_read_wheel(void);
+void in2_on_focus(int old, int owner);
+
 #define IN2_MAX_DEV 16
 
 /* Internal native-endian event. Producers zero fields unused by the type. */

@@ -167,16 +167,6 @@ static void test_vfs(void) {
     log_result("VFS Test Done", end - start, "Create, Write, Read, Unlink");
 }
 
-static void test_fm(void) {
-    u32 start, end;
-
-    kapi->kprintf(COL_WHITE, "--- FM Sound Test ---\r\n");
-    start = kapi->get_tick();
-    kapi->fm_play_mml("t120l4cdefg a b >c<");
-    end = kapi->get_tick();
-    log_result("FM Sound Init Done", end - start, "MML processing");
-}
-
 int main(int argc, char *argv[], KernelAPI *api) {
     int i;
     void (*tests[])(void) = {
@@ -184,7 +174,6 @@ int main(int argc, char *argv[], KernelAPI *api) {
         test_gfx,
         test_kcg,
         test_vfs,
-        test_fm,
         NULL
     };
 

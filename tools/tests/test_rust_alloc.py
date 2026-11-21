@@ -2,7 +2,7 @@
 段: T2f f8
 """
 CHECK = dict(name='rust-alloc-host', tier=1,
-    covers=['sdk/rust/os32api/src/lib.rs', 'tools/tests/rust_alloc_host.rs', 'tools/tests/os32api_host.py'],
+    covers=['sdk/rust/os32api/src/lib.rs', 'tools/tests/rust_alloc_host.rs', 'sdk/rust/os32api/src/av.rs', 'tools/tests/os32api_host.py'],
     needs=[], budget=3.3,
     kind='characterization',
 )

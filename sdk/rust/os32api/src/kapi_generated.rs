@@ -307,17 +307,56 @@ pub struct KernelAPI {
     /* idx 297 */ pub io_policy_get: unsafe extern "C" fn(bytes: *mut u8, cap: u32, needed: *mut u32) -> i32,
     /* idx 298 */ pub io_policy_reset: unsafe extern "C" fn() -> i32,
     /* idx 299 */ pub io_pump: unsafe extern "C" fn(budget_us: u32) -> i32,
-    /* idx 300..385 予約 (C の kapi_reserved[]) */ pub kapi_reserved: [u32; 86],
+    /* idx 300 */ pub snd2_dev_count: unsafe extern "C" fn() -> i32,
+    /* idx 301 */ pub snd2_dev_info: unsafe extern "C" fn(dev: u32, o: *mut crate::av::SND2_DevInfo) -> i32,
+    /* idx 302 */ pub snd2_caps: unsafe extern "C" fn(dev: u32, o: *mut crate::av::SND2_Caps, size: u32) -> i32,
+    /* idx 303 */ pub snd2_dsp_unit: unsafe extern "C" fn(dev: u32, unit: u32, o: *mut crate::av::SND2_DspUnit) -> i32,
+    /* idx 304 */ pub snd2_dsp_param: unsafe extern "C" fn(dev: u32, unit: u32, i: u32, o: *mut crate::av::SND2_DspParam) -> i32,
+    /* idx 305 */ pub snd2_dsp_insert: unsafe extern "C" fn(stream: u32, unit: u32, params: *const i32, n: u32) -> i32,
+    /* idx 306 */ pub snd2_dsp_process: unsafe extern "C" fn(dev: u32, unit: u32, params: *const i32, n: u32, r#in: *const u8, out: *mut u8, frames: u32, fmt_index: u32) -> i32,
+    /* idx 307 */ pub snd2_stream_open: unsafe extern "C" fn(d: *const crate::av::SND2_StreamDesc, stream: *mut u32) -> i32,
+    /* idx 308 */ pub snd2_stream_write: unsafe extern "C" fn(stream: u32, buf: *const u8, bytes: u32) -> i32,
+    /* idx 309 */ pub snd2_stream_start: unsafe extern "C" fn(stream: u32) -> i32,
+    /* idx 310 */ pub snd2_stream_pause: unsafe extern "C" fn(stream: u32) -> i32,
+    /* idx 311 */ pub snd2_stream_pos: unsafe extern "C" fn(stream: u32, o: *mut crate::av::SND2_Pos) -> i32,
+    /* idx 312 */ pub snd2_stream_wait: unsafe extern "C" fn(stream: u32, frame: u32, timeout_ms: u32) -> i32,
+    /* idx 313 */ pub snd2_stream_volume: unsafe extern "C" fn(stream: u32, left: u32, right: u32) -> i32,
+    /* idx 314 */ pub snd2_stream_close: unsafe extern "C" fn(stream: u32, how: u32) -> i32,
+    /* idx 315 */ pub av_focus_set: unsafe extern "C" fn(owner: i32) -> i32,
+    /* idx 316 */ pub av_focus_get: unsafe extern "C" fn() -> i32,
+    /* idx 317 */ pub in2_pad_state: unsafe extern "C" fn(slot: u32, o: *mut crate::av::IN2_PadState) -> i32,
+    /* idx 318 */ pub in2_pad_caps: unsafe extern "C" fn(slot: u32, o: *mut crate::av::IN2_PadCaps) -> i32,
+    /* idx 319 */ pub in2_pad_vibrate: unsafe extern "C" fn(slot: u32, v: *const crate::av::IN2_Vibration) -> i32,
+    /* idx 320 */ pub in2_dev_count: unsafe extern "C" fn() -> i32,
+    /* idx 321 */ pub in2_dev_info: unsafe extern "C" fn(i: u32, o: *mut crate::av::IN2_DevInfo) -> i32,
+    /* idx 322 */ pub in2_read: unsafe extern "C" fn(out: *mut crate::av::IN2_Event, max: u32) -> i32,
+    /* idx 323 */ pub in2_key_state: unsafe extern "C" fn(out: *mut u8) -> i32,
+    /* idx 324 */ pub in2_mouse_state: unsafe extern "C" fn(o: *mut crate::av::IN2_MouseState) -> i32,
+    /* idx 325 */ pub in2_acquire: unsafe extern "C" fn(flags: u32) -> i32,
+    /* idx 326 */ pub in2_unacquire: unsafe extern "C" fn() -> i32,
+    /* idx 327 */ pub in2_status: unsafe extern "C" fn(o: *mut crate::av::IN2_Status) -> i32,
+    /* idx 328 */ pub in2_wm_state: unsafe extern "C" fn(o: *mut crate::av::IN2_WmState) -> i32,
+    /* idx 329 */ pub v86s_begin: unsafe extern "C" fn(b: *const crate::av::V86_Begin, sid: *mut u32) -> i32,
+    /* idx 330 */ pub v86s_run: unsafe extern "C" fn(sid: u32, r#in: *const crate::av::V86_RunIn, ex: *mut crate::av::V86_Exit) -> i32,
+    /* idx 331 */ pub v86s_fm_drain: unsafe extern "C" fn(sid: u32, out: *mut crate::av::SND2_FmEv, max: u32, last_seq: *mut u32) -> i32,
+    /* idx 332 */ pub v86s_end: unsafe extern "C" fn(sid: u32) -> i32,
+    /* idx 333 */ pub snd2_chip_caps: unsafe extern "C" fn(dev: u32, o: *mut crate::av::SND2_ChipCaps, size: u32) -> i32,
+    /* idx 334 */ pub snd2_chip_open: unsafe extern "C" fn(dev: u32, h: *mut u32) -> i32,
+    /* idx 335 */ pub snd2_chip_write: unsafe extern "C" fn(h: u32, w: *const crate::av::SND2_RegW, n: u32) -> i32,
+    /* idx 336 */ pub snd2_chip_read: unsafe extern "C" fn(h: u32, bank: u32, what: u32, reg: u32) -> i32,
+    /* idx 337 */ pub snd2_chip_reset: unsafe extern "C" fn(h: u32) -> i32,
+    /* idx 338 */ pub snd2_chip_close: unsafe extern "C" fn(h: u32) -> i32,
+    /* idx 339..385 予約 (C の kapi_reserved[]) */ pub kapi_reserved: [u32; 47],
     pub sbrk_heap_limit: u32,  /* newlib _sbrk用ヒープ上限アドレス (exec_runでセットされる) */
     pub shm_base: u32,  /* 共有メモリ (MEM_SHM_BASE) の先頭アドレス。DB結果受け渡しに使用 (exec_initでセット) */
 }
 
 /* KernelAPI マジックナンバー */
 pub const KAPI_MAGIC: u32 = 0x4B415049;  /* "KAPI" */
-pub const KAPI_VERSION: u32 = 89;
+pub const KAPI_VERSION: u32 = 90;
 
 /* 関数表の容量とデータ欄の固定配置 (票 TASK_KAPI_DATA_FIELDS、v63) */
-pub const KAPI_FUNC_COUNT: u32 = 298;
+pub const KAPI_FUNC_COUNT: u32 = 337;
 pub const KAPI_FUNC_CAPACITY: u32 = 384;
 pub const KAPI_DATA_FIELDS_OFF: u32 = 0x608;
 /// データ欄が固定になった KAPI 版 (= C の OS32X_HDR_V3_MIN_API)。これ未満の

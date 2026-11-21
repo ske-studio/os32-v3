@@ -1,4 +1,4 @@
-# KernelAPI v89 仕様書
+# KernelAPI v90 仕様書
 
 外部プログラム (OS32X) がカーネル機能を利用するためのAPIテーブル仕様。
 
@@ -16,8 +16,8 @@
 | 最大プログラムサイズ | 仮想配置で決まる: image・BSS・libc の初期域は 0x80100000 から、exec_heap の予約起点 0x88000000 の手前まで (配置と検査は [09_exec.md](09_exec.md)「Ring3 の USER 写像」) |
 | プログラム専用ヒープ | exec_heap 0x88000000〜 (既定 64KB だけ map、`mem_map` で伸長) と libc の sbrk |
 | プログラム専用スタック | 0x90000000 の直下に可変量 (既定 256KiB、OS32X ヘッダの `stack_size`)、その下に guard 1 ページ |
-| 現在のバージョン | **89** |
-| 合計エントリ数 | **388** (ヘッダ 2 + 関数表の容量 384 (うち実装 298・予約 86) + データフィールド 2)。データ欄は **0x608 に固定** (§4-0) |
+| 現在のバージョン | **90** |
+| 合計エントリ数 | **388** (ヘッダ 2 + 関数表の容量 384 (うち実装 337・予約 47) + データフィールド 2)。データ欄は **0x608 に固定** (§4-0) |
 
 ---
 
@@ -139,6 +139,7 @@ KAPI は append-only で版番号は単調増加。複数の計画が独立に�
 | v85 | **宣言追加 (LAN 操作口 X9)** | `con_sink_capture` (slot 292、offset 0x498)。capture の開始・固定・終了を既存 owner 契約で行う | [設計 §3](decisions/network/LAN_OPERATOR_DESIGN.md) |
 | v87 | **実装 (I/O の Tier C1・C2・L1)** | `io_policy_set` / `io_policy_get` / `io_policy_reset` / `io_pump` (slot 294〜297) | 票 TASK_IO_TIER |
 | v89 | **実装** | 関数表容量 384、実装 298。ABI 世代 2、CRT 実名 os32_kapi_v89。全イメージを再構築する。 |
+| v90 | **実装** | AV HAL の 39 口を slot 298〜336 に追加。関数表容量 384、使用 337、データ開始 0x608、ABI 世代 2。 |
 | v88 | **実装 (段 6c の D2)** | slot の追加なし。`ext2_format` / `ext2_format_at` の `drv` に loop の `0x0600..0x0603` (`OS32_DRV_LOOP(slot)`) を足す。v87 の出荷版以前はこの範囲を拒否する | 本書 [ext2 の loop の drv](#ext2-loop-drv) |
 
 調停 (2026-09-06、同日改訂): GUI (K1〜W2) を先に実装するので **v42 = GUI、v43 = ネットワーク Host Services**
@@ -307,7 +308,7 @@ v62 まではデータ欄 (`sbrk_heap_limit` / `shm_base`) を関数表の**直�
 |---|---|---|
 | 関数表の容量 R | **384** スロット (`KAPI_FUNC_CAPACITY`) | `sdk/kapi.json` の `func_capacity` |
 | データ欄の先頭 | **0x608** = 8 + 4 × R (`KAPI_DATA_FIELDS_OFF`) | `sdk/gen_kapi.py` が生成 |
-| 予約スロット | 298〜383。カーネル実表はすべて 0。ユーザー表はスタブを指し、dispatch が実装数で範囲外を拒否する。 | `exec/exec.c` |
+| 予約スロット | 337〜383。カーネル実表はすべて 0。ユーザー表はスタブを指し、dispatch が実装数で範囲外を拒否する。 | `exec/exec.c` |
 | ユーザー表の配置 | 第 1 頁に表 (0x000〜0x60f) と文字列 (0x610〜0x70f)。第 2 頁にスタブ (0x1000〜0x1bff) と sys_ls shim (0x1c00〜0x1cbf)。両頁とも USER/RO。 | `exec/ring3_str.h` |
 
 関数を足すときは `kapi_reserved[]` が 1 本減るだけで、データ欄は動かない。**関数数が R を
@@ -2181,6 +2182,45 @@ private import 表は `kernel/module/kdebug_imports.def` が正で、317 件
 | 0x4A4 | io_policy_get | `int(void *bytes, unsigned int cap, unsigned int *needed)` |
 | 0x4A8 | io_policy_reset | `int(void)` |
 | 0x4AC | io_pump | `int(unsigned int budget_us)` |
+| 0x4B0 | snd2_dev_count | `int(void)` |
+| 0x4B4 | snd2_dev_info | `int(u32 dev, SND2_DevInfo *o)` |
+| 0x4B8 | snd2_caps | `int(u32 dev, SND2_Caps *o, u32 size)` |
+| 0x4BC | snd2_dsp_unit | `int(u32 dev, u32 unit, SND2_DspUnit *o)` |
+| 0x4C0 | snd2_dsp_param | `int(u32 dev, u32 unit, u32 i, SND2_DspParam *o)` |
+| 0x4C4 | snd2_dsp_insert | `int(u32 stream, u32 unit, const i32 *params, u32 n)` |
+| 0x4C8 | snd2_dsp_process | `int(u32 dev, u32 unit, const i32 *params, u32 n, const void *in, void *out, u32 frames, u32 fmt_index)` |
+| 0x4CC | snd2_stream_open | `int(const SND2_StreamDesc *d, u32 *stream)` |
+| 0x4D0 | snd2_stream_write | `int(u32 stream, const void *buf, u32 bytes)` |
+| 0x4D4 | snd2_stream_start | `int(u32 stream)` |
+| 0x4D8 | snd2_stream_pause | `int(u32 stream)` |
+| 0x4DC | snd2_stream_pos | `int(u32 stream, SND2_Pos *o)` |
+| 0x4E0 | snd2_stream_wait | `int(u32 stream, u32 frame, u32 timeout_ms)` |
+| 0x4E4 | snd2_stream_volume | `int(u32 stream, u32 left, u32 right)` |
+| 0x4E8 | snd2_stream_close | `int(u32 stream, u32 how)` |
+| 0x4EC | av_focus_set | `int(int owner)` |
+| 0x4F0 | av_focus_get | `int(void)` |
+| 0x4F4 | in2_pad_state | `int(u32 slot, IN2_PadState *o)` |
+| 0x4F8 | in2_pad_caps | `int(u32 slot, IN2_PadCaps *o)` |
+| 0x4FC | in2_pad_vibrate | `int(u32 slot, const IN2_Vibration *v)` |
+| 0x500 | in2_dev_count | `int(void)` |
+| 0x504 | in2_dev_info | `int(u32 i, IN2_DevInfo *o)` |
+| 0x508 | in2_read | `int(IN2_Event *out, u32 max)` |
+| 0x50C | in2_key_state | `int(u8 *out)` |
+| 0x510 | in2_mouse_state | `int(IN2_MouseState *o)` |
+| 0x514 | in2_acquire | `int(u32 flags)` |
+| 0x518 | in2_unacquire | `int(void)` |
+| 0x51C | in2_status | `int(IN2_Status *o)` |
+| 0x520 | in2_wm_state | `int(IN2_WmState *o)` |
+| 0x524 | v86s_begin | `int(const V86_Begin *b, u32 *sid)` |
+| 0x528 | v86s_run | `int(u32 sid, const V86_RunIn *in, V86_Exit *ex)` |
+| 0x52C | v86s_fm_drain | `int(u32 sid, SND2_FmEv *out, u32 max, u32 *last_seq)` |
+| 0x530 | v86s_end | `int(u32 sid)` |
+| 0x534 | snd2_chip_caps | `int(u32 dev, SND2_ChipCaps *o, u32 size)` |
+| 0x538 | snd2_chip_open | `int(u32 dev, u32 *h)` |
+| 0x53C | snd2_chip_write | `int(u32 h, const SND2_RegW *w, u32 n)` |
+| 0x540 | snd2_chip_read | `int(u32 h, u32 bank, u32 what, u32 reg)` |
+| 0x544 | snd2_chip_reset | `int(u32 h)` |
+| 0x548 | snd2_chip_close | `int(u32 h)` |
 
 slot 253。kdebug 部品 (`/boot/kdebug.bin`、`KDEBUG=1` のときだけ読む) の ops slot 19
 `dbg_call` へそのまま渡す受け口 (`kernel/module/kdebug_call.c`)。部品が動いていない・slot 19 が
