@@ -95,7 +95,7 @@ KB_INC := $(if $(KB_EXEC),-I$(KB_GEN)/include -I$(KB_GEN)/sdk/include/os32) -I$(
 KB_FLAGS := -DPM_ROOT_FRAME=$(if $(KB_EXEC),1,0) -std=gnu11 $(KB_MACHINE) -fno-builtin -fno-asynchronous-unwind-tables \
  -O2 -Wall -Wextra -Werror -Werror=vla -Werror=implicit-int \
  -Werror=implicit-function-declaration -ffunction-sections -fdata-sections \
- -D__cdecl= -D__KERNEL_BUILD__ $(HOOK_DEFS) -DOS32_FEATURE_LOOP=$(FEATURE_LOOP) -DOS32_FEATURE_USERSHELL=$(FEATURE_USERSHELL) -DKBOOT_NEGATIVE=$(NEGATIVE) -DKBOOT_SHELL=$(KBOOT_SHELL) -DKBOOT_SH=$(KBOOT_SH) -DKBOOT_LINK=$(KBOOT_LINK) -MMD -MP $(KB_INC)
+ -D__cdecl= -D__KERNEL_BUILD__ $(HOOK_DEFS) -DOS32_FEATURE_IDE=$(FEATURE_IDE) -DOS32_FEATURE_LOOP=$(FEATURE_LOOP) -DOS32_FEATURE_USERSHELL=$(FEATURE_USERSHELL) -DKBOOT_NEGATIVE=$(NEGATIVE) -DKBOOT_SHELL=$(KBOOT_SHELL) -DKBOOT_SH=$(KBOOT_SH) -DKBOOT_LINK=$(KBOOT_LINK) -MMD -MP $(KB_INC)
 
 ifeq ($(FEATURE_SQLITE),1)
 include build/sqlite-gen.mk
@@ -239,6 +239,7 @@ $(KB_OUT)/platform/powermac/nic_gem.o $(KB_OUT)/platform/powermac/lan_gem_io.o: 
 ifeq ($(KBOOT_GEM_RX_DIAG),1)
 $(KB_OUT)/platform/powermac/nic_gem.o $(KB_OUT)/platform/powermac/lan_gem_io.o: private KB_TU_FLAGS += -DKBOOT_GEM_RX_DIAG=1
 endif
+$(KB_OUT)/drivers/ata/ide.o: private KB_TU_FLAGS += -Wno-sign-compare
 $(KB_OUT)/lib/lz4.o: KB_TU_FLAGS += -O0
 $(KB_OUT)/kernel/console/console.o: KB_TU_FLAGS = -Wno-sign-compare
 $(KB_OUT)/%.o: %.c $(KB_OUT)/memmap_layout.h build/targets/ppc-powermac.mk build/sources/hooks.mk $(KB_MUT_FILE) $(KB_MUT_EXTRA_FILE) $(KB_MUT_THIRD_FILE)

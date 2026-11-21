@@ -12,3 +12,4 @@ C_PLATFORM_USERSHELL = platform/powermac/shell_loop_ops.c platform/powermac/inpu
 C_PLATFORM_USB = platform/powermac/input_usb.c platform/powermac/input_keymap.c platform/powermac/usb_tree.c platform/powermac/usb_platform.c platform/powermac/usb_boot.c
 C_PLATFORM_LOOP = platform/powermac/loop_boot.c
 C_PLATFORM_CLI = platform/powermac/cli_boot.c
+C_PLATFORM_IDE = platform/powermac/ide_tree.c platform/powermac/ide_boot.c
