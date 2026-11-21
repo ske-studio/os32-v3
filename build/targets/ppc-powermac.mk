@@ -235,6 +235,14 @@ $(KB_OUT)/platform/powermac/usb_platform.o: $(KB_OUT)/config/usb-key-trace.flags
 ifeq ($(KBOOT_USB_KEY_TRACE),1)
 $(KB_OUT)/platform/powermac/usb_platform.o: private KB_TU_FLAGS += -DKBOOT_USB_KEY_TRACE=1
 endif
+$(KB_OUT)/config/gem-rx-diag.flags: ppc-layout-force
+	@mkdir -p $(@D)
+	@echo '$(filter 1,$(KBOOT_GEM_RX_DIAG))' > $@.tmp
+	@if cmp -s $@.tmp $@; then rm -f $@.tmp; else mv $@.tmp $@; fi
+$(KB_OUT)/platform/powermac/nic_gem.o $(KB_OUT)/platform/powermac/lan_gem_io.o: $(KB_OUT)/config/gem-rx-diag.flags
+ifeq ($(KBOOT_GEM_RX_DIAG),1)
+$(KB_OUT)/platform/powermac/nic_gem.o $(KB_OUT)/platform/powermac/lan_gem_io.o: private KB_TU_FLAGS += -DKBOOT_GEM_RX_DIAG=1
+endif
 $(KB_OUT)/lib/lz4.o: KB_TU_FLAGS += -O0
 $(KB_OUT)/kernel/console/console.o: KB_TU_FLAGS = -Wno-sign-compare
 $(KB_OUT)/%.o: %.c $(KB_OUT)/memmap_layout.h build/targets/ppc-powermac.mk build/sources/hooks.mk $(KB_MUT_FILE) $(KB_MUT_EXTRA_FILE) $(KB_MUT_THIRD_FILE)

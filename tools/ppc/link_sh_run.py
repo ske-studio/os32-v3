@@ -137,7 +137,7 @@ P3_STIMULUS
     user_out = work/'user'
     # kb-user recursively uses these command-line variables. Separate object
     # trees ensure no mutant can reuse a normal USER object (or vice versa).
-    opts = ['KBOOT_SH=1', 'KBOOT_LINK=1', 'KB_SH_OUT='+str(user_out),
+    opts = ['KBOOT_GEM_RX_DIAG=1', 'KBOOT_SH=1', 'KBOOT_LINK=1', 'KB_SH_OUT='+str(user_out),
             'PPC_SH_MUT_SRC='+USER, 'PPC_SH_MUT_FILE='+str(user),
             'KB_ROOT_BINS='+str(user_out/'hello.bin')+' '+str(user_out/'fault.bin')+' '+text_fixture(work)]
     for extra_user in ('userland/shell/rshell.c', 'userland/shell/main.c'):
@@ -196,6 +196,26 @@ def overflow_frames(path, offset, ident):
     return events
 
 
+def gem_assessment(previous, current):
+    if not isinstance(previous, dict) or not isinstance(current, dict):
+        return 'insufficient samples'
+    if previous['poll'] == current['poll']:
+        return 'poll drive'
+    def full(v):
+        return v['packet_count'] == 4 and v['kick'] == (v['done'] + 1) & 31
+    if full(previous) and full(current):
+        return 'foreground demux'
+    if current['done'] == previous['done']:
+        if all(v['head'] == v['done'] and v['kick'] != (v['done'] + 1) & 31
+               for v in (previous, current)):
+            return 'QEMU/UDP'
+    elif current['head'] == previous['head']:
+        return 'descriptor'
+    else:
+        return 'demux and link matching'
+    return 'inconclusive'
+
+
 class Session:
     qemu_clock = USB_QEMU_CLOCK
     qmp_type = None  # None = the module-level PumpQMP at start() (tests patch link_sh_run.PumpQMP)
@@ -208,6 +228,7 @@ class Session:
         self.deadline = time.monotonic()+timeout
         self.q = self.p = self.io = self.operator = self.err = self.frames = None
         self.events = []
+        self.overflow_watch = None
         self.started = time.monotonic()
         self.agent_enabled = not late
         self.symbols = {p[2]: int(p[0],16) for line in command([cross('nm'), '-n', elf]).splitlines()
@@ -274,10 +295,28 @@ class Session:
         if self.p.poll() is not None: return
         while select.select([self.io],[],[],0)[0]:
             frame=self.io.receive(); self.frames.write(frame.hex()+'\n')
+            if self.overflow_watch:
+                self.observe_overflow_frame(frame)
             if self.agent_enabled: self.agent.handle(frame,self)
         if self.agent_enabled: self.agent.tick(self)
         for fd in select.select(self.operator.fileno_list(),[],[],0)[0]: self.operator.on_readable(fd)
         self.operator.poll(time.monotonic())
+
+    def observe_overflow_frame(self, frame):
+        watch = self.overflow_watch
+        start = wire.ETH_HDR + wire.LINK_HDR
+        if len(frame) < start or int.from_bytes(frame[12:14], 'big') != wire.LINK_ETHERTYPE:
+            return
+        op, flags, epoch, seq, ack, size, rid, sess = wire.hdr_unpack(frame[wire.ETH_HDR:])
+        if op == wire.OP_REQUEST and not watch['out']:
+            parts = frame[start:start+size].split()
+            if parts[:2] == [b'RSH', b'OUT'] and parts[3:4] == [watch['id']]:
+                watch['out'] = True
+                watch['pending'].append('first-out-ack-wait')
+        if watch['out'] and op == wire.OP_HELLO and flags == wire.HS_SYN:
+            watch['syn'] += 1
+            if watch['syn'] in (2, 3):
+                watch['pending'].append('syn-retry-' + str(watch['syn'] - 1))
 
     def wait(self, predicate, label, seconds=20):
         until=min(self.deadline,time.monotonic()+seconds)
@@ -312,6 +351,16 @@ class Session:
         samples.append(sample)
         path = self.out/'diag.json'
         try:
+            try:
+                raw = self.word('gem_rx_diag', unit='g')
+                current = dict(poll=raw & 65535, packet_count=(raw >> 16) & 7,
+                               head=(raw >> 19) & 31, done=(raw >> 24) & 31, kick=(raw >> 29) & 31)
+                sample['gem_rx_diag'] = current
+                previous = samples[-2].get('gem_rx_diag') if len(samples) > 1 else None
+                sample['assessment'] = gem_assessment(previous, current)
+            except CriterionFailure as exc:
+                sample['gem_rx_diag'] = str(exc)
+                sample['assessment'] = 'unreadable'
             registers = self.q.call('human-monitor-command', {'command-line': 'info registers'})
             for key, pattern in [('pc', 'NIP|PC'), ('msr', 'MSR')]:
                 match = re.search(rf'\b(?:{pattern})\s*[:=]?\s*(?:0x)?([0-9a-f]+)', registers, re.I)
@@ -339,22 +388,27 @@ class Session:
         ended=self.word('p3_end_count')
         # A new agent generation restarts IDs at 1: look only at events after this submit.
         start=len(self.events)
+        if line == 'p3-overflow':
+            now = time.monotonic()
+            until = min(self.deadline, now + seconds)
+            samples = []
+            self.overflow_probe(None, until, 'normal', samples)
         ident=op.submit('cui',line,'accept',timeout_ms=max(20000,seconds*1000))
         def outputs():
             return [e for e in self.events[start:] if e['parts'][:2]==['RSH','OUT'] and e['parts'][3]==ident]
         # Inspect the wire result even when Operator rejects its command echo.
         # Otherwise PRINT duplication would become a generic result timeout.
         if line == 'p3-overflow':
-            now = time.monotonic()
-            until = min(self.deadline, now + seconds)
             span = until - now
             probes = iter([(now + span / 2, 'mid'), (until - min(3, span / 4), 'deadline')])
             pending = next(probes)
-            samples = []
+            self.overflow_watch = dict(id=ident.encode(), out=False, syn=0, pending=[])
             self.frames.flush()
             offset = self.frames.tell()
             def observed_output():
                 nonlocal pending
+                while self.overflow_watch['pending']:
+                    self.overflow_probe(ident, until, self.overflow_watch['pending'].pop(0), samples)
                 if outputs():
                     return True
                 if pending and time.monotonic() >= pending[0]:
@@ -364,6 +418,7 @@ class Session:
             try:
                 self.wait(observed_output, 'OUT '+line, until-time.monotonic())
             finally:
+                self.overflow_watch = None
                 self.frames.flush()
                 frames = overflow_frames(self.out/'frames.log', offset, ident)
                 (self.out/'diag.json').write_text(json.dumps(

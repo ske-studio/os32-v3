@@ -16,11 +16,18 @@ static u32 rd(void *ctx, u32 off)
     return value;
 }
 
+#ifdef KBOOT_GEM_RX_DIAG
+volatile u32 gem_rx_last_kick;
+#endif
+
 static void wr(void *ctx, u32 off, u32 value)
 {
     u32 addr = hw.va + off;
     (void)ctx;
     __asm__ volatile("sync; stwbrx %0,0,%1; eieio" : : "r"(value), "r"(addr) : "memory");
+#ifdef KBOOT_GEM_RX_DIAG
+    if (off == GEM_RX_KICK) gem_rx_last_kick = value;
+#endif
 }
 
 static unsigned long long tb64(void *ctx)
