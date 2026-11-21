@@ -9,6 +9,7 @@ import argparse
 import hashlib
 import json
 import os
+import shlex
 from contextlib import contextmanager
 from pathlib import Path
 import re
@@ -280,7 +281,10 @@ class Session:
             '-serial','file:'+str(self.out/'serial-b.log'),'-monitor','none','-qmp','stdio',*self.reboot_args,
             '-nic','none','-device','sungem,netdev=n0,mac=52:54:00:12:34:56','-netdev',
             f'socket,id=n0,udp=127.0.0.1:{self.io.sock.getsockname()[1]},localaddr=127.0.0.1:{port}',
-            '-usb','-device','usb-kbd,id=kbd',*self.qemu_clock]
+            '-usb','-device','usb-kbd,id=kbd',*self.qemu_clock,
+            # Diagnosis only (e.g. OS32_QEMU_EXTRA="-trace sungem_rx*,file=…"): QEMU's own
+            # documented trace events, never set by CI.
+            *shlex.split(os.environ.get('OS32_QEMU_EXTRA', ''))]
         (self.out/'metadata.json').write_text(json.dumps(dict(command=args,cpu=self.cpu,
             elf_sha256=hashlib.sha256(self.elf.read_bytes()).hexdigest()),indent=2))
         self.err=(self.out/'qemu.stderr').open('w'); self.frames=(self.out/'frames.log').open('w')
