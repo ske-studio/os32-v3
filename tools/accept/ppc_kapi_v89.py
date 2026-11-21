@@ -64,10 +64,10 @@ def fixture(folder, case, gate):
     if case in ('missing-page', 'map-failure'):
         path = 'mm/paging_map.inc'
         if case == 'map-failure':
-            anchor = 'static int prepare_tables(u32 first, u32 count)\n{'
-            edit(path, anchor, anchor + """
-    if (first == MEM_SHM_BASE >> PAGE_SHIFT && count == MEM_SHM_SIZE / PAGE_SIZE)
-        return -1;""")
+            anchor = 'prepare_tables(MEM_SHM_BASE >> PAGE_SHIFT, MEM_SHM_SIZE / PAGE_SIZE)'
+            # The right operand of || runs only after trampoline preparation succeeds.
+            edit(path, anchor, r'(kprintf(7, "V89 inject SHM prepare failure\r\n"), -1)')
+            edit('mm/paging.c', '#include "paging.h"', '#include "paging.h"\n#include "kprintf.h"')
         else:
             anchor = '        set_page_noflush(frame, frame, PAGE_RO | PTE_USER);'
             edit(path, anchor, '        if (i == 1) continue;\n' + anchor)
@@ -177,9 +177,13 @@ def observe(elf, folder, case, cpu):
                 return pc and addr <= int(pc[1], 16) < end
             session.wait(stopped, 'KAPI boot failure stop', 60)
             lines = serial().splitlines()
+            marker = b'V89 inject SHM prepare failure'
+            fatal = b'FATAL kboot KAPI trampoline'
+            require(lines.count(marker) == 1 and lines.count(fatal) == 1 and
+                    lines.index(marker) < lines.index(fatal), 'SHM failure injection before stop')
             require(lines.count(b'V89 user-pages=0') == 1, 'USER PTE after prepare failure')
-            require(lines.count(b'FATAL kboot KAPI trampoline') == 1 and
-                    lines.count(b'V89 entries=0') == 1 and b'V89 enter' not in lines, 'mapping failure diagnostic or user entry')
+            require(lines.count(b'V89 entries=0') == 1 and b'V89 enter' not in lines,
+                    'user entry after mapping failure')
         else:
             session.wait(lambda: b'V89 page=2 ' in serial() and
                          re.search(rb'V89 page=2 .*?\n', serial()), 'KAPI page observations', 60)
