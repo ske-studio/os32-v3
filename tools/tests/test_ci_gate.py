@@ -112,9 +112,10 @@ def suite(tool):
                 (logs / 'check-b.log').write_text('0123456789')
                 (out / 'failed-logs').mkdir()
                 (out / 'failed-logs/stale.log').write_text('old run')
-                tool.keep_failed_logs(out, logs, [
-                    dict(name='check-a', status='pass'), dict(name='check-b', status='fail'),
-                    dict(name='check-c', status='fail'), dict(name='check-d', status='missing')], limit=4)
+                kept = tool.reset_failed_logs(out)
+                tool.keep_failed_log(kept, logs / 'check-a.log', 0, limit=4)
+                tool.keep_failed_log(kept, logs / 'check-b.log', 1, limit=4)
+                tool.keep_failed_log(kept, logs / 'check-c.log', 1, limit=4)
                 self.assertEqual(sorted(p.name for p in (out / 'failed-logs').iterdir()), ['check-b.log'])
                 self.assertEqual((out / 'failed-logs/check-b.log').read_text(), '6789')
 
@@ -148,8 +149,8 @@ MUTANTS = [
     ("return lines, bool(by['fail'] or by['missing'])", "return lines, bool(by['fail'])"),
     ("skipped = [c for c in by['pass'] if c['skips']]", "skipped = []"),
     ("sorted(checks, key=lambda c: -c['seconds'])", "list(checks)"),
-    ("if check['status'] == 'fail' and source.is_file():", "if source.is_file():"),
-    ("(kept / source.name).write_bytes(data[-limit:])", "(kept / source.name).write_bytes(data)"),
+    ("if rc and source.is_file():", "if source.is_file():"),
+    ("handle.seek(max(0, size - limit))", "handle.seek(0)"),
     ("    if kept.exists():\n        shutil.rmtree(kept)\n    kept.mkdir(parents=True)", "    kept.mkdir(parents=True, exist_ok=True)"),
 ]
 
