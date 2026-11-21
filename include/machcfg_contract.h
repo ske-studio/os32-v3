@@ -11,6 +11,7 @@ struct machcfg_seed { struct machcfg defaults; u8 accepts_nap7450; };
 
 struct machcfg_seed platform_machcfg_seed(void);
 void machcfg_begin(struct machcfg_seed seed);
+int machcfg_load_root(void);
 void machcfg_finish(const struct machcfg *values);
 const struct machcfg *machcfg_get(void);
 
