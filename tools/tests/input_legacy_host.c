@@ -80,8 +80,8 @@ static int probe(void) {
         for (int round=0; round<12; round++) {
             int n=round==0 ? 0 : round==1 ? 1 : round==2 ? 128 : 133;
             for (int i=0; i<n; i++) {
-                int key=i==131 ? KEY_STOP : (i & 31);
-                int mods=i==131 ? SHIFT_CTRL : i;
+                int key=1 + (i % 12);
+                int mods=i;
                 old_raw_push(key, 0, mods); legacy_raw_push(key, 0, mods);
                 REQUIRE(kbd_raw_dropped==old_raw_dropped);
             }
@@ -105,4 +105,4 @@ void _start(void) {
     __builtin_unreachable();
 }
 
-int in2_excl_keyboard(void) { return 0; }
+int in2_excl_drop_raw(u8 sc, int br) { (void)sc; (void)br; return 0; }

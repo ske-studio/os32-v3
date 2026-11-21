@@ -1,6 +1,7 @@
 #include "av_contract.h"
 #include "in2_int.h"
 #include "kbd.h"
+#include "keymap.h"
 #include "io.h"
 
 static int wm = 1, caller = 1;
@@ -24,6 +25,17 @@ int legacy_active(void) { return 0; }
 void pointer_move(i16 x, i16 y) { (void)x; (void)y; }
 unsigned int host_arch_if = 0x202U;
 static int unmasked_boundary;
+int snapshot_path = -1;
+static int snapshot_reads;
+int __real_input_key_pressed(u8 sc);
+int __wrap_input_key_pressed(u8 sc)
+{
+    if (snapshot_path >= 0) {
+        if (_irq_enabled()) unmasked_boundary = 1;
+        ++snapshot_reads;
+    }
+    return __real_input_key_pressed(sc);
+}
 
 u32 in2_time_ms(void)
 {
@@ -89,7 +101,7 @@ static int test(void)
     mouse_ext_move(-5, 6, 0);
     mouse_ext_wheel(9);
     in2_reclaim(6);
-    if (in2_ring_pop(&e, &seq)) return 11;
+    if (!lost(IN2_LOST_EXCL) || in2_ring_pop(&e, &seq)) return 11;
     mouse_ext_read(&x, &y);
     if (x || y || mouse_ext_read_wheel()) return 12;
     if (in2_excl_wm_state(&state) || state.excl || state.owner ||
@@ -144,10 +156,180 @@ static int test(void)
     if (in2_excl_wm_state(&state) != OS32_ERR_INVAL) return 15;
     return unmasked_boundary || !_irq_enabled() ? 20 : 0;
 }
-int input_key_pressed(u8 sc) { return sc == 127; }
+volatile u32 tick_count;
+
+static void physical(u8 src, u8 sc, u8 down)
+{
+    unsigned flags = irq_save();
+    InputEvent e = { .src = src, .sc = sc, .down = down, .type = INPUT_EVENT_KEY };
+    input_merge_key(&e, input_held_key(src, sc), INPUT_ORIGIN_NATIVE);
+    irq_restore(flags);
+}
 u8 pointer_buttons_locked(void) { return 3; }
-void km_registry_source_released(u8 src, u16 generation) { (void)src; (void)generation; }
 void input_state_release(u8 src, u16 generation) { (void)src; (void)generation; }
+
+static int held_boundaries(void)
+{
+    kbd_gui_mode = 1;
+    const int a = 0x1d;
+    wm = 1;
+    for (int path = 0; path < 4; ++path) {
+        av_focus_set(10);
+        if (in2_excl_acquire(10, IN2_EXCL_KBD)) return 40;
+        in2_ring_clear();
+        const int wm_keys[] = { KEY_TAB, KEY_CTRL, KEY_GRPH, KEY_STOP };
+        for (unsigned i = 0; i < sizeof(wm_keys)/sizeof(wm_keys[0]); ++i) {
+            legacy_raw_push(wm_keys[i], 0, 0);
+            if (legacy_raw_take() != (wm_keys[i] | KBD_RAW_MAKE)) return 40;
+        }
+        physical(1, a, 1);
+        physical(2, a, 1);
+        if (legacy_raw_take() != -1) return 40;
+        InputEvent event;
+        u16 seq;
+        int makes = 0;
+        while (in2_ring_pop(&event, &seq))
+            if (event.type == INPUT_EVENT_KEY && event.sc == a && event.down) ++makes;
+        if (makes != 2) return 40;
+        snapshot_reads = 0;
+        snapshot_path = path;
+        switch (path) {
+        case 0: in2_excl_acquire(10, IN2_EXCL_MOUSE); break;
+        case 1: in2_excl_unacquire(10); break;
+        case 2: av_focus_set(11); break;
+        case 3: in2_reclaim(10); break;
+        }
+        snapshot_path = -1;
+        if (!snapshot_reads || unmasked_boundary) return 41;
+        physical(1, a, 0);
+        physical(2, a, 1);
+        if (legacy_raw_take() != -1) return 41;
+        /* A break presented to the raw gate alone cannot alter the snapshot. */
+        legacy_raw_push(a, 1, 0);
+        physical(2, a, 1);
+        if (legacy_raw_take() != a || legacy_raw_take() != -1) return 41;
+        /* The last physical break can take the CUI route while no raw
+         * consumer is present. The next GUI make still starts a new press. */
+        if (path == 3) kbd_gui_mode = 0;
+        physical(2, a, 0);
+        if (legacy_raw_take() != (kbd_gui_mode ? a : -1)) return 42;
+        kbd_gui_mode = 1;
+        physical(1, a, 1);
+        if (legacy_raw_take() != (a | KBD_RAW_MAKE)) return 42;
+        physical(1, a, 0);
+        if (legacy_raw_take() != a) return 42;
+    }
+    return input_key_release_gen(128) || in2_excl_drop_raw(128, 0) ? 43 : 0;
+}
+
+static int mapped_hold(void)
+{
+    u16 native_gen, usb_gen;
+    int native = pc98_input_keymap_register(&native_gen);
+    int usb = input_src_register(INPUT_KIND_KBD, INPUT_ORIGIN_USB, &usb_gen);
+    if (native <= 0 || usb <= 0 || km_source_bind(usb, usb_gen, KM_MAP_HID)) return 47;
+    KmKey a = { .src = native, .generation = native_gen, .keycode = 0x1d, .down = 1 };
+    KmKey hid_a = { .src = usb, .generation = usb_gen, .keycode = 4, .down = 1 };
+    if (input_capture_key(&a) || input_capture_key(&hid_a)) return 47;
+    av_focus_set(12);
+    a.down = 0;
+    hid_a.repeat = 1;
+    if (input_capture_key(&a) || input_capture_key(&hid_a) || legacy_raw_take() != -1) return 47;
+    kbd_gui_mode = 0;
+    hid_a.repeat = hid_a.down = 0;
+    if (input_capture_key(&hid_a)) return 47;
+    kbd_gui_mode = 1;
+    a.down = 1;
+    if (input_capture_key(&a) || legacy_raw_take() != (0x1d | KBD_RAW_MAKE)) return 47;
+    input_src_release(native, native_gen);
+    input_src_release(usb, usb_gen);
+    if (legacy_raw_take() != 0x1d || legacy_raw_take() != -1) return 47;
+    return 0;
+}
+
+static int switch_queue(void)
+{
+    const int tab = KEY_TAB | KBD_RAW_MAKE | (SHIFT_GRPH << KBD_RAW_MOD_SHIFT);
+    const int stop = KEY_STOP | KBD_RAW_MAKE | (SHIFT_CTRL << KBD_RAW_MOD_SHIFT);
+    legacy_raw_flush();
+    for (int i = 0; i < 63; ++i) {
+        legacy_raw_push(KEY_TAB, 0, SHIFT_GRPH);
+        legacy_raw_push(1, 0, 0);
+    }
+    legacy_raw_push(KEY_TAB, 0, SHIFT_GRPH); /* both seats unavailable */
+    legacy_raw_push(KEY_STOP, 0, SHIFT_CTRL);
+    if (legacy_raw_take() != tab || legacy_raw_take() != (1 | KBD_RAW_MAKE)) return 44;
+    av_focus_set(13);
+    for (int i = 1; i < 63; ++i)
+        if (legacy_raw_take() != tab || legacy_raw_take() != (1 | KBD_RAW_MAKE)) return 44;
+    if (legacy_raw_take() != stop || legacy_raw_take() != -1) return 44;
+    legacy_raw_push(KEY_TAB, 0, SHIFT_GRPH);
+    if (legacy_raw_take() != tab) return 45;
+    legacy_raw_reset_dropped();
+    for (int i = 0; i < 128; ++i) legacy_raw_push(KEY_CTRL, 0, SHIFT_GRPH);
+    if (legacy_raw_dropped() != 1) return 45;
+    legacy_raw_push(KEY_STOP, 0, SHIFT_CTRL | SHIFT_GRPH);
+    legacy_raw_push(KEY_GRPH, 1, 0);
+    for (int i = 0; i < 126; ++i)
+        if (legacy_raw_take() != (KEY_CTRL | KBD_RAW_MAKE | (SHIFT_GRPH << KBD_RAW_MOD_SHIFT))) return 45;
+    if (legacy_raw_take() != (stop | (SHIFT_GRPH << KBD_RAW_MOD_SHIFT)) ||
+        legacy_raw_take() != KEY_GRPH || legacy_raw_take() != -1) return 45;
+    legacy_raw_push(KEY_TAB, 0, SHIFT_GRPH);
+    legacy_raw_push(KEY_STOP, 0, SHIFT_CTRL);
+    legacy_raw_discard_stop();
+    if (legacy_raw_take() != tab || legacy_raw_take() != (KEY_GRPH | (SHIFT_CTRL << KBD_RAW_MOD_SHIFT)) ||
+        legacy_raw_take() != -1) return 45;
+    av_focus_set(10);
+    in2_excl_acquire(10, IN2_EXCL_KBD);
+    legacy_raw_push(KEY_TAB, 0, SHIFT_GRPH);
+    legacy_raw_push(1, 0, 0);
+    if (legacy_raw_take() != tab || legacy_raw_take() != KEY_GRPH ||
+        legacy_raw_take() != -1) return 45;
+    in2_excl_unacquire(10);
+    return 0;
+}
+
+static int priority_order(void)
+{
+    const int grph = SHIFT_GRPH << KBD_RAW_MOD_SHIFT;
+    const int tab = KEY_TAB | KBD_RAW_MAKE | grph;
+    const int ctrl = KEY_CTRL | KBD_RAW_MAKE | grph;
+    const int stop = KEY_STOP | KBD_RAW_MAKE | grph | (SHIFT_CTRL << KBD_RAW_MOD_SHIFT);
+    /* With both victims present, prefer the newest ordinary key to a TAB
+     * repeat. Their order on readout distinguishes the two choices. */
+    legacy_raw_push(KEY_TAB, 0, SHIFT_GRPH);
+    legacy_raw_push(1, 0, SHIFT_GRPH);
+    legacy_raw_push(2, 0, SHIFT_GRPH);
+    legacy_raw_push(KEY_TAB, 0, SHIFT_GRPH);
+    for (int i = 0; i < 123; ++i) legacy_raw_push(KEY_CTRL, 0, SHIFT_GRPH);
+    legacy_raw_push(KEY_CTRL, 1, SHIFT_GRPH);
+    if (legacy_raw_take() != tab || legacy_raw_take() != (1 | grph | KBD_RAW_MAKE) ||
+        legacy_raw_take() != tab) return 46;
+    legacy_raw_flush();
+    /* A new CTRL removes the newest ordinary item, then a TAB repeat.
+     * A subsequent emergency make removes a modifier after those run out. */
+    legacy_raw_push(KEY_TAB, 0, SHIFT_GRPH);
+    legacy_raw_push(1, 0, SHIFT_GRPH);
+    legacy_raw_push(KEY_TAB, 0, SHIFT_GRPH);
+    for (int i = 0; i < 124; ++i) legacy_raw_push(KEY_CTRL, 0, SHIFT_GRPH);
+    legacy_raw_push(KEY_CTRL, 1, SHIFT_GRPH);
+    legacy_raw_push(KEY_CTRL, 1, SHIFT_GRPH);
+    legacy_raw_push(KEY_STOP, 0, SHIFT_CTRL | SHIFT_GRPH);
+    legacy_raw_push(KEY_GRPH, 1, 0);
+    if (legacy_raw_take() != tab) return 46;
+    for (int i = 0; i < 124; ++i)
+        if (legacy_raw_take() != ctrl) return 46;
+    if (legacy_raw_take() != (KEY_CTRL | grph) || legacy_raw_take() != stop ||
+        legacy_raw_take() != KEY_GRPH || legacy_raw_take() != -1) return 46;
+    for (int i = 0; i < 128; ++i) legacy_raw_push(1, 0, 0);
+    legacy_raw_push(KEY_TAB, 0, SHIFT_GRPH);
+    legacy_raw_push(KEY_TAB, 0, SHIFT_GRPH);
+    legacy_raw_push(KEY_GRPH, 1, 0);
+    kbd_raw_purge_keep();
+    if (legacy_raw_take() != tab || legacy_raw_take() != tab ||
+        legacy_raw_take() != KEY_GRPH || legacy_raw_take() != -1) return 46;
+    return 0;
+}
 
 static int public_api(void)
 {
@@ -187,6 +369,7 @@ static int public_api(void)
     caller = 1;
     if (in2_read(&event, 1) != 1 || event.type != IN2_EV_LOST ||
         event.u.lost.reason != IN2_LOST_FOCUS) return 29;
+    physical(1, 127, 1);
     if (in2_key_state(0) != OS32_ERR_INVAL || in2_key_state(keys) ||
         keys[0] || keys[127] != 1) return 30;
     if (in2_mouse_state(0) != OS32_ERR_INVAL || in2_mouse_state(&mouse) ||
@@ -232,6 +415,10 @@ void _start(void)
     int rc = closed_acquire();
 #else
     int rc = test();
+    if (!rc) rc = held_boundaries();
+    if (!rc) rc = mapped_hold();
+    if (!rc) rc = switch_queue();
+    if (!rc) rc = priority_order();
     if (!rc) rc = public_api();
 #endif
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc));

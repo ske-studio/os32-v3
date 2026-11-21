@@ -409,21 +409,17 @@ static int test(void) {
     CHECK(kbd_raw_buf[KBD_BUF_SIZE-2]==0x123 && kbd_raw_buf[KBD_BUF_SIZE-1]==(stop & ~0x100));
     for(int head=0;head<KBD_BUF_SIZE;head++) {
         kbd_raw_head=kbd_raw_tail=head; kbd_raw_count=kbd_raw_dropped=0;
-        for(int i=0;i<KBD_BUF_SIZE;i++) raw_enqueue(i,0,0);
+        for(int i=0;i<KBD_BUF_SIZE;i++) raw_enqueue(KEY_CTRL,0,0);
         raw_enqueue(42,0,0);
         CHECK(kbd_raw_count==KBD_BUF_SIZE && kbd_raw_dropped==1);
-        // None of these full-ring events may replace the newest entry.
-        const int keys[3]={KEY_STOP,KEY_STOP,KEY_CTRL};
-        const int breaks[3]={0,1,0};
-        const int mods[3]={0,SHIFT_CTRL,SHIFT_CTRL};
-        for(int k=0;k<3;k++) {
-            raw_enqueue(keys[k],breaks[k],mods[k]);
-            CHECK(kbd_raw_count==KBD_BUF_SIZE && kbd_raw_dropped==(u32)(k+2));
-            for(int i=0;i<KBD_BUF_SIZE;i++) CHECK(kbd_raw_buf[(head+i)%KBD_BUF_SIZE]==(i|0x100));
-        }
+        raw_enqueue(KEY_STOP,0,0);
+        raw_enqueue(KEY_STOP,1,SHIFT_CTRL);
+        raw_enqueue(KEY_CTRL,0,SHIFT_CTRL);
+        CHECK(kbd_raw_count==KBD_BUF_SIZE && kbd_raw_dropped==4);
+        for(int i=0;i<KBD_BUF_SIZE;i++) CHECK(kbd_raw_buf[(head+i)%KBD_BUF_SIZE]==(KEY_CTRL|0x100));
         raw_enqueue(KEY_STOP,0,SHIFT_CTRL);
         CHECK(kbd_raw_count==KBD_BUF_SIZE && kbd_raw_dropped==5);
-        for(int i=0;i<KBD_BUF_SIZE-1;i++) CHECK(kbd_raw_buf[(head+i)%KBD_BUF_SIZE]==(i|0x100));
+        for(int i=0;i<KBD_BUF_SIZE-1;i++) CHECK(kbd_raw_buf[(head+i)%KBD_BUF_SIZE]==(KEY_CTRL|0x100));
         CHECK(kbd_raw_buf[(head+KBD_BUF_SIZE-1)%KBD_BUF_SIZE]==stop);
     }
     g_gui_handler=notice; gui_owner_exit(3, EXEC_KIND_ABORTED);
@@ -459,9 +455,13 @@ def run(overrides=None):
     deliver = function(read('input/hal/legacy_keymap.c'), 'input_emit_keymap')
     raw = deliver[deliver.index('    if (kbd_gui_mode) {'):deliver.index('    if (consumed')]
     raw = raw.replace('sc != 0xff && raw_due', '1').replace('sc != 0xff && ', '').replace('physical_mods', 'mods').replace('!down', 'is_break').replace('sc,', 'keycode,').replace('mods', 'kbd_shift_state')
-    code += 'int in2_excl_keyboard(void) { return 0; }\n'
+    code += 'int in2_excl_drop_raw(u8 sc, int br) { (void)sc; (void)br; return 0; }\n'
     code += function(read('input/hal/legacy_ring.c'), 'keep_raw') + '\n'
-    code += function(read('input/hal/legacy_ring.c'), 'legacy_raw_push') + '\n'
+    ring = read('input/hal/legacy_ring.c')
+    code += ring[ring.index('enum raw_priority'):ring.index('void kbd_raw_purge_keep')]
+    code += function(ring, 'make_room') + '\n'
+    code += function(ring, 'append_raw') + '\n'
+    code += function(ring, 'legacy_raw_push') + '\n'
     mode = read('input/hal/legacy_mode.c')
     code += function(mode, 'legacy_stop_filter') + '\n'
     code += 'static void raw_enqueue(int keycode, int is_break, int kbd_shift_state) {\n' + raw + '}\n'
@@ -543,12 +543,12 @@ MUTATIONS.append(('reclaim-shell-request','exec/appslot.c',src,src.replace('    
 src=function((ROOT/'exec/appslot_transition.inc').read_text(),'appslot_stop_request')
 MUTATIONS.append(('request-non-gui','exec/appslot_transition.inc',src,src.replace('a->gui && ','')))
 MUTATIONS.append(('raw-full-loses-stop','input/hal/legacy_ring.c',
-    'if (keycode == KEY_STOP && !is_break && (mods & SHIFT_CTRL)) {',
-    'if (0) {'))
+    'int stop = keycode == KEY_STOP && !is_break && (mods & SHIFT_CTRL);',
+    'int stop = 0;'))
 
 for name, guard in (('raw-full-replaces-break', '!is_break && '),
                     ('raw-full-replaces-without-ctrl', ' && (mods & SHIFT_CTRL)')):
-    old = 'if (keycode == KEY_STOP && !is_break && (mods & SHIFT_CTRL)) {'
+    old = 'int stop = keycode == KEY_STOP && !is_break && (mods & SHIFT_CTRL);'
     assert old.count(guard) == 1
     MUTATIONS.append((name, 'input/hal/legacy_ring.c', old, old.replace(guard, '')))
 
