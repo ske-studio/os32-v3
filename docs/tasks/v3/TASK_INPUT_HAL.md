@@ -1,6 +1,6 @@
 # TASK_INPUT_HAL — 入力の HAL と USB HID の共通化
 
-> 状態: **実装中 (2026-11-15)** — 設計は確定、段 1p・1a・1b は main。詳細設計は [INPUT_HAL_DESIGN](../../decisions/INPUT_HAL_DESIGN.md)。
+> 状態: **実装中 (2026-11-21)** — W[1]〜W[4]・S3x は main。M5・M6・M7[1]〜[3]・S4・S4i は wip、PowerPC の lz4 の後に main に取り込む。詳細設計は [INPUT_HAL_DESIGN](../../decisions/INPUT_HAL_DESIGN.md)。
 > 関係: 票 TASK_AV_HAL (入力の in2・XInput)、票 TASK_ARCH_CTX (実行文脈)、PowerPC の P3 (LAN の SH) はこの票の 1p・1a・1b・4c を前提にする。
 
 ## 0. ユーザー決定 (2026-11-14〜15)
@@ -23,6 +23,7 @@
 | 1p・1a・1b・2a〜2c・3a[n]・3c[n]・3d・4c-pre・4c・4d[n]・5a〜5d | main |
 | 3b・M1・M2 | 追補 2 の S1p・S1h・S0b・S3 に置き換えて main |
 | M0[n] | main |
-| keymap2 | 追補 2 [INPUT_KEYMAP_DESIGN](../../decisions/INPUT_KEYMAP_DESIGN.md) §7。H0〜S3d・S1h・S1ht・S2h は main。本線の S3x・W[1]・M5[1] が実装中 (2026-11-17)。os32powerpc の H-usbp・S2u は実装中、S2a・S1m・S2m・S3m・S3b が続く (4a・4b の後継) |
-| S4・S4i | M7 (M5→M6→M7) の後 |
+| keymap2 | 追補 2 [INPUT_KEYMAP_DESIGN](../../decisions/INPUT_KEYMAP_DESIGN.md) §7。H0〜S3d・S1h・S1ht・S2h は main。本線の W[1]〜W[4]・S3x は main。os32powerpc の H-usbp・S2u は実装中、S2a・S1m・S2m・S3m・S3b が続く (4a・4b の後継) |
+| M5・M6・M7[1]〜[3]・S4・S4i | wip。PowerPC の lz4 の後に main に取り込む。M7[3] は INPUT_BIND_M7_3 (wip/kfill-designs)、S4・S4i は [INPUT_S4_DESIGN](../../decisions/INPUT_S4_DESIGN.md) |
+| U2-x0 | A0z の後に着手 |
 | G[n]・A0z・6a・6b・7a〜7d・U1〜U3g・5e | 未着手 (G は A0z の後、5e は 4b の後継の後) |
