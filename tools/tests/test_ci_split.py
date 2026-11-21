@@ -157,7 +157,8 @@ def workflow_cases(source, setup_source=None):
     assert "printf '%s\\n' \"$packages\" | sha256sum" in key, 'apt cache hashes package list'
     packages = shlex.split(next(line.strip() for line in key.splitlines()
                                if line.strip().startswith('packages=')))[0].split('=', 1)[1].split()
-    assert packages == ('build-essential nasm genisoimage e2fsprogs qemu-user clang libclang-dev '
+    # PowerMac root packaging uses xorriso for the ISO and system liblz4 for HC12.
+    assert packages == ('build-essential nasm genisoimage xorriso liblz4-1 e2fsprogs qemu-user clang libclang-dev '
                         'llvm-dev python3-clang libgmp-dev libmpfr-dev libmpc-dev texinfo bison flex').split(), 'complete host dependencies'
     assert host_step['env'] == {'APT_PACKAGES': '${{ steps.apt-key.outputs.packages }}',
                                  'APT_CACHE_HIT': '${{ steps.apt-cache.outputs.cache-hit }}'}

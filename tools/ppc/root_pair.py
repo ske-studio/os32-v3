@@ -96,16 +96,15 @@ def bind_iso(raw, pair):
     return bytes(image)
 
 
+LZ4 = ctypes.CDLL('liblz4.so.1')
+LZ4.LZ4_versionString.restype = ctypes.c_char_p
+
+
 def compress(raw):
-    # CI's Python wheel can bundle a different liblz4 than the distro one.
-    # Select the system HC encoder explicitly so the same input yields the
-    # same raw block in both environments.
-    lib = ctypes.CDLL('liblz4.so.1')
-    require(lib.LZ4_versionNumber() == 10904, 'root requires liblz4 1.9.4')
-    capacity = lib.LZ4_compressBound(len(raw))
+    capacity = LZ4.LZ4_compressBound(len(raw))
     require(capacity > 0, 'ISO exceeds LZ4 input limit')
     buf = ctypes.create_string_buffer(capacity)
-    count = lib.LZ4_compress_HC(raw, buf, len(raw), capacity, 12)
+    count = LZ4.LZ4_compress_HC(raw, buf, len(raw), capacity, 12)
     require(count > 0, 'LZ4 HC12 compression failed')
     return buf.raw[:count]
 
@@ -146,9 +145,12 @@ def build(iso, output, link):
             path.write_bytes(data)
             final_iso = Path(work)/'root.iso'
             final_iso.write_bytes(raw)
+            version = Path(work)/'root.lz4-version'
+            version.write_text(LZ4.LZ4_versionString().decode('ascii') + '\n')
             # Withdraw the old ELF before either verified output changes.
             output.unlink(missing_ok=True)
             final_iso.replace(output.parent/'root.iso')
+            version.replace(output.parent/version.name)
             path.replace(output)
             return
     raise ValueError(f'root frame {size:#x} exceeds staging capacity {MAX_FRAME:#x}')
