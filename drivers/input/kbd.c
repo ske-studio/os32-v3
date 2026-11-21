@@ -224,7 +224,7 @@ static void kbd_deliver(u8 scancode)
         if (legacy_kbd_push(scancode)) legacy_request_exit();
         return;
     }
-    if (scancode == KEY_STOP && (kbd_shift_state & SHIFT_CTRL) &&
+    if (scancode == KEY_STOP && input_key_pressed(KEY_CTRL) &&
         !(kbd_gui_mode && kbd_stop_suppressed)) ring3_abort_request();
 }
 
