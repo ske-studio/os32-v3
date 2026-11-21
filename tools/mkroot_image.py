@@ -139,7 +139,12 @@ def main():
                     for guest, host in sorted(entries) if args.fixed_dates else entries:
                         target = guest.strip('/').upper()
                         check_collision(target, seen)
-                        dest = staging / target
+                        # Built-in directories already exist with lowercase host names.
+                        # ISO9660 folds case and would rename duplicate directories.
+                        parts = target.split('/')
+                        if len(parts) > 1 and (staging / parts[0].lower()).is_dir():
+                            parts[0] = parts[0].lower()
+                        dest = staging.joinpath(*parts)
                         dest.parent.mkdir(parents=True, exist_ok=True)
                         shutil.copyfile(host, dest)
                 create(staging)

@@ -1,3 +1,4 @@
+#include "platform_machcfg.h"
 #include "ide_boot.h"
 #include "loop_boot.h"
 #include "sqlite_engine.h"
@@ -354,6 +355,17 @@ void platform_boot_machine(void)
     pm_mpic_set_ipi_handler(ipi_handler);
 }
 
+static void apply_machine_config(void)
+{
+    u32 pvr = ppc_read_pvr();
+    struct machcfg_seed seed;
+    ppc_cpu_power_apply(pvr, machcfg_get()->nap7450);
+    machcfg_report("powermac", pvr, pm_machcfg_seed(pvr, &seed));
+    u32 hid = ppc_read_hid0();
+    kprintf(KBOOT_ATTR, "MACHCFG HID0 pvr=0x%x hid0=0x%x nap=%u\r\n",
+            ppc_read_pvr(), hid, (unsigned)!!(hid & PPC_HID_NAP));
+}
+
 /* 局面 2 (EE=1): MPIC の配送と時計の実証・LAN・root・コンソール・入力。 */
 void platform_boot_services(void)
 {
@@ -431,11 +443,18 @@ void platform_boot_services(void)
             dev->fb_full_rc, dev->fb_color_rc);
     /* Stage 4 supplies the expanded ISO after the allocator is online. */
     struct boot_root_image img = {0};
-    if (!info->root_frame_bytes) return;
+    if (!info->root_frame_bytes) {
+        machcfg_finish(0);
+        apply_machine_config();
+        return;
+    }
     u32 owned_before = ledger_owner_pages(LEDGER_OWNER_BOOT);
     int registered = 0;
     int rc = pm_root_image(&img, info->root_frame_bytes);
     if (!rc) rc = pm_root_boot(&img, &registered);
+    if (!rc) machcfg_load_root();
+    else machcfg_finish(0);
+    apply_machine_config();
     u32 pages = MEM_BOOT_STAGING_SIZE / PAGE_SIZE;
     u32 free_before, free_after;
     if (pm_root_release(&img, registered, PM_ROOT_FRAME_BASE / PAGE_SIZE, pages,
@@ -468,6 +487,9 @@ void platform_boot_services(void)
 #endif
         root_ready = 1;
     }
+#else
+    machcfg_finish(0);
+    apply_machine_config();
 #endif
 }
 

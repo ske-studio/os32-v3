@@ -28,10 +28,10 @@ ROOT_CPU := powerpc
 ROOT_MANIFEST ?= build/ppc-ram-root.json
 ROOT_DEPS ?= assets/fonts/shino16.kcgfont assets/fonts/JF-Dot-Shinonome16-LICENSE.txt build/out/unicode.bin $(KB_ROOT_SHELL)
 # Acceptance builds use a private resident binary (including source mutants).
-ifneq ($(KB_SH_OUT),build/out/ppc-user/link-sh)
 KB_ROOT_TEMPLATE := $(ROOT_MANIFEST)
+ifneq ($(KB_SH_OUT),build/out/ppc-user/link-sh)
 override ROOT_MANIFEST := $(KB_OUT)/root-manifest.json
-$(ROOT_MANIFEST): $(KB_ROOT_TEMPLATE) $(KB_ROOT_SHELL) build/targets/ppc-powermac.mk
+$(ROOT_MANIFEST): $(KB_ROOT_TEMPLATE) $(KB_ROOT_SHELL) $(KB_OUT)/root-shell.config build/targets/ppc-powermac.mk
 	@mkdir -p $(@D)
 	python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); d["/sys/shell.bin"]=sys.argv[2]; print(json.dumps(d))' "$<" "$(KB_ROOT_SHELL)" > $@.tmp
 	mv $@.tmp $@
@@ -58,7 +58,7 @@ $(ROOT_ISO): $(KB_ROOT_SHELL) $(KB_OUT)/root-shell.config
 .PHONY: force-root-shell-config
 $(KB_OUT)/root-shell.config: force-root-shell-config
 	@mkdir -p $(@D)
-	@printf '%s\n' '$(ROOT_MANIFEST) $(KB_ROOT_SHELL) $(ROOT_BINS)' > $@.tmp
+	@printf '%s\n' '$(KB_ROOT_TEMPLATE)' '$(ROOT_DEPS)' '$(KB_ROOT_SHELL) $(ROOT_BINS)' > $@.tmp
 	@if cmp -s $@.tmp $@; then rm $@.tmp; else mv $@.tmp $@; fi
 
 # Entry objects first (kernel.ld keeps .text.entry at the image start).

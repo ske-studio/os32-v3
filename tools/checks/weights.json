@@ -493,6 +493,7 @@
     "ppc-kboot-layout": 97,
     "ppc-kcg-guest": 161.170482,
     "ppc-link-sh-run": 882.205222,
+    "ppc-machcfg-guest": 480,
     "ppc-loop-guest": 99.897746,
     "ppc-memstat-guest": 189.764063,
     "ppc-mmu": 89.544934,
