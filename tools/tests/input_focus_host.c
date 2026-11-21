@@ -1,6 +1,6 @@
 #include "av_contract.h"
 #include "in2_int.h"
-#include "kbd.h"
+#include "kbd_contract.h"
 #include "keymap.h"
 #include "io.h"
 
@@ -331,6 +331,34 @@ static int priority_order(void)
     return 0;
 }
 
+/* Ending GRPH or releasing TAB within GRPH closes a repeat group. */
+static int previous_tab_press(int end_grph)
+{
+    const int grph = SHIFT_GRPH << KBD_RAW_MOD_SHIFT;
+    const int tab = KEY_TAB | KBD_RAW_MAKE | grph;
+    const int boundary = end_grph ? KEY_GRPH : KEY_TAB | grph;
+    legacy_raw_flush();
+    legacy_raw_push(KEY_TAB, 0, SHIFT_GRPH);
+    legacy_raw_push(KEY_TAB, 0, SHIFT_GRPH);
+    legacy_raw_push(end_grph ? KEY_GRPH : KEY_TAB, 1, end_grph ? 0 : SHIFT_GRPH);
+    legacy_raw_push(KEY_TAB, 0, SHIFT_GRPH);
+    legacy_raw_push(KEY_TAB, 0, SHIFT_GRPH);
+    for (int i = 0; i < KBD_BUF_SIZE - 6; ++i)
+        legacy_raw_push(KEY_CTRL, 0, SHIFT_GRPH);
+    /* The first replacement takes the current repeat. The second must
+     * leave the earlier press intact even though its repeat is queued. */
+    legacy_raw_push(KEY_CTRL, 1, SHIFT_GRPH);
+    legacy_raw_push(KEY_CTRL, 1, SHIFT_GRPH);
+    legacy_raw_push(KEY_GRPH, 1, 0);
+    if (legacy_raw_take() != tab || legacy_raw_take() != tab ||
+        legacy_raw_take() != boundary || legacy_raw_take() != tab) return 47;
+    for (int i = 0; i < KBD_BUF_SIZE - 6; ++i)
+        if (legacy_raw_take() != (KEY_CTRL | KBD_RAW_MAKE | grph)) return 47;
+    if (legacy_raw_take() != (KEY_CTRL | grph) || legacy_raw_take() != KEY_GRPH ||
+        legacy_raw_take() != -1) return 47;
+    return 0;
+}
+
 static int public_api(void)
 {
     IN2_PadState pad = { .packet = 19 };
@@ -419,6 +447,8 @@ void _start(void)
     if (!rc) rc = mapped_hold();
     if (!rc) rc = switch_queue();
     if (!rc) rc = priority_order();
+    if (!rc) rc = previous_tab_press(1);
+    if (!rc) rc = previous_tab_press(0);
     if (!rc) rc = public_api();
 #endif
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc));

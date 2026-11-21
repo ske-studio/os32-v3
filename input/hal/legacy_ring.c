@@ -131,6 +131,14 @@ void legacy_raw_push(int keycode, int is_break, int mods)
     int start = !switch_pending && grph && keycode == KEY_TAB && !is_break;
     int stop = keycode == KEY_STOP && !is_break && (mods & SHIFT_CTRL);
     int repeat = switch_pending && tab_down && keycode == KEY_TAB && !is_break;
+    /* Once this physical press ends, its queued steps determine an
+     * earlier selection. Later input must not coalesce those repeats. */
+    if (tab_down && (finish || (keycode == KEY_TAB && is_break))) {
+        for (int i = 0; i < kbd_raw_count; ++i) {
+            int slot = raw_slot(i);
+            if (priority[slot] == RAW_REPEAT) priority[slot] = RAW_PROTECTED;
+        }
+    }
     if (keycode == KEY_TAB) tab_down = !is_break;
     if (!grph || finish) tab_down = 0;
     if (finish && stop) {
