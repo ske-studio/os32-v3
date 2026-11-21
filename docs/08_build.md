@@ -1121,7 +1121,7 @@ main へ入れる判定は配布物・検査6本と静的ゲートの `check.yml
 クロス無しの静的ゲートからは実行しない。
 `check.yml` はイベント種別と ref がともに同じ場合に古い実行を取り消す。タグの push では起動しない。手動の起動 (workflow_dispatch) は入力の arch を区別しないので、同じ ref で続けて起こすと最後の 1 本だけが残る (両方を回すなら arch=both)。
 
-main の push は before→HEAD が文書だけなら PowerPC を省く。コードを含む場合は同じ SHA の `wt/int-*` の check の push が成功していれば省き、それ以外は x86 だけの変更でも compile と QEMU 5 本を回す。強制 push・before の欠落時も全部回す。
+main の push は before→HEAD が文書だけなら PowerPC を省く。コードを含む場合は同じ SHA の `wt/int-*` の check の push が成功していれば省き、それ以外は x86 だけの変更でも compile と QEMU 6 本を回す。強制 push・before の欠落時も全部回す。
 
 main への push では `tools/ci/reuse_success.py` が `gh api` と `GITHUB_TOKEN` で
 同じ workflow の枝の push run を調べる (build は `wt/**`、check は統合枝 `wt/int-*` だけ)。SHA の40桁完全一致・workflow ID 一致・
@@ -1156,7 +1156,7 @@ budget は重みの2倍で、超過は警告だけ。未計測の検査は CHECK
 | フォント | IPAex の TTF はリポジトリに無く `tools/fetch_fonts.py` が IPA の公式配布から取る (§8-2)。CI は `OS32_ACCEPT_IPA_LICENSE=1` で非対話に同意し (リポジトリ所有者が同意済みの前提)、取れた ttf を key `ipaex-<zip の SHA-256>` (`fetch_fonts.py --print-zip-sha256`) で `actions/cache` に置く |
 | 文書だけの push | `docs/**`・`*.md`・`.claude/**` だけの push では回さない (`paths-ignore`。文書の検査は `check.yml`)。同じ ref の run は 1 つ (`cancel-in-progress`) なので、**run の途中でその ref へ push すると打ち切られる** |
 | ツールチェーン | `tools/ci/build_cross.sh` (§8-5) で `~/opt/cross` に作り、`actions/cache` で保存。キーは `cross-i386-elf-<OS>-gcc<版>-newlib<版>-<構築入力/builder/inventory名のSHA256>` (`check_nano_inputs.py --cache-key`)。**構築入力・builder・inventory名を変えたときに作り直す**。SDK用ソース/patch・local hash値の変更はキーを変えない。os32 での実測 (2026-09-23): 初回はツールチェーン約 25 分、キャッシュが効けば run 全体で約 2 分 (ubuntu-latest 4 vCPU、キャッシュ 335MB)。os32-v3 での実走はまだ (最初の push で見る) |
-| PowerPC (段1) | check.yml の専用 job `ppc-compile` だけが `ppc-setup` を使い、`tools/ci/build_cross_ppc.sh` で nano newlib 付き toolchain を別キーに保存。`PPC_CROSS_DIR` と `OS32_REQUIRE_PPC=1` を渡し、`check-ppc-compile` で `KBOOT_SH=1` の像を組む (QEMU 不要)。auto は origin/main との merge-base からの差で PPC・共通変更を選び、統合枝は常時実行。手動 arch は auto/x86/ppc/both。PowerPC の検査も変異込みで回す。QEMU でゲストを起動する検査は job `ppc-qemu` が 5 本に割って並べる (`python3 -B tools/ci/gate.py run --env qemu-ppc --shard i/5`、シャードの中は 1 本ずつ。`ppc-compile` とは鎖にしない)。検査ごとの所要は `check-times-<SHA>-ppc-qemu-<i>` に保存する。 |
+| PowerPC (段1) | check.yml の専用 job `ppc-compile` だけが `ppc-setup` を使い、`tools/ci/build_cross_ppc.sh` で nano newlib 付き toolchain を別キーに保存。`PPC_CROSS_DIR` と `OS32_REQUIRE_PPC=1` を渡し、`check-ppc-compile` で `KBOOT_SH=1` の像を組む (QEMU 不要)。auto は origin/main との merge-base からの差で PPC・共通変更を選び、統合枝は常時実行。手動 arch は auto/x86/ppc/both。PowerPC の検査も変異込みで回す。QEMU でゲストを起動する検査は job `ppc-qemu` が 6 本に割って並べる (`python3 -B tools/ci/gate.py run --env qemu-ppc --shard i/6`、シャードの中は 1 本ずつ。`ppc-compile` とは鎖にしない)。検査ごとの所要は `check-times-<SHA>-ppc-qemu-<i>` に保存する。 |
 | Rust | `rust-toolchain.toml` (nightly + rust-src) を `rustup toolchain install` (引数なし) で解決。`target/` のキャッシュは無し (最小構成。遅ければ `Swatinem/rust-cache` を足す) |
 | apt | `build-essential nasm genisoimage e2fsprogs qemu-user clang libclang-dev llvm-dev python3-clang` + ツールチェーン構築の `libgmp-dev libmpfr-dev libmpc-dev texinfo bison flex`。`.deb` を `actions/cache` に保存し、キーは OS の版・arch・runner image の版・パッケージ一覧の SHA-256。miss 時だけ既定ミラーから取得し、復元後は `/var/cache/apt/archives` から `--no-download` で入れる。Host dependencies の上限は 1200 秒、共通準備全体は 90 分。Python は `requirements.txt`。FD イメージは `tools/mkfat12.py` (純 Python) なので mtools は要らない |
 | 上限 | 配布物・各検査シャードとも `timeout-minutes: 150` |

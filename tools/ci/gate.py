@@ -2,7 +2,7 @@
 """CI と手元で同じ入口: 検査の 1 シャードを最後まで回し、結果を表にする (docs/design/tools/ci/gate.md)。
 
     python3 -B tools/ci/gate.py run --shard 0/6 --out <置き場> [--no-mutate]
-    python3 -B tools/ci/gate.py run --env qemu-ppc --shard 0/5 --out <置き場>
+    python3 -B tools/ci/gate.py run --env qemu-ppc --shard 0/6 --out <置き場>
 
 --env を付けると、その環境を要る検査だけをシャードに割り、1 本ずつ順に回す (QEMU で機械を丸ごと
 模擬する検査は、並べて回すと期限に間に合わなくなる)。

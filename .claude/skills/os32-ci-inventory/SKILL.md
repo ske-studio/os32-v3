@@ -16,7 +16,7 @@ description: CI の待ち時間の棚卸し。検査ごとの所要・シャー�
 | 項目 | 値 |
 |---|---|
 | push から最後のジョブが終わるまで | 30〜36 分 (2 回の実測。build の一番遅いシャードが決める) |
-| check の全体 | 17〜22 分 (`ppc-qemu` は 4 本の時の実測 (2026-11-18) で 14〜22 分 (5 本の実測が出たら入れ替える)、`ppc-compile` 4〜7 分、`static-check` 5〜7 分) |
+| check の全体 | 17〜22 分 (`ppc-qemu` は 4 本の時の実測 (2026-11-18) で 14〜22 分、5 本では 20〜27 分 (2026-11-21 の棚卸し)、`ppc-compile` 4〜7 分、`static-check` 5〜7 分) |
 | build の `checks` 6 本 | 11〜36 分 (回ごとに一番遅いシャードが 30 分と 36 分) |
 | QEMU の組の偏り | 1.17 |
 | x86 の組の偏り | 2.76 (揃っていない。票 `docs/tasks/v3/TASK_CI_REWORK.md` の段 S6・S7 が済むまでは既知) |
@@ -62,7 +62,7 @@ gh run view <RUN_ID> --json jobs -q '.jobs[] | "\(.name) \(.conclusion) \(.start
 python3 -B tools/checks/calibrate_weights.py --merge $D/<check の回>    # QEMU の検査の重みだけ更新 (ほかは残す)
 python3 -B tools/checks/calibrate_weights.py $D          # 全部を書き直す (中央値)。x86 は下の注意を読んでから
 for i in 0 1 2 3 4 5; do python3 -B tools/checks/run.py --list --shard $i/6 | wc -w; done     # x86 の割り振り
-for i in 0 1 2 3 4; do python3 -B tools/checks/run.py --list --env qemu-ppc --shard $i/5; done    # QEMU の段の割り振り
+for i in 0 1 2 3 4 5; do python3 -B tools/checks/run.py --list --env qemu-ppc --shard $i/6; done    # QEMU の段の割り振り
 MUTATE=1 make check-check-select-host check-ci-time-inventory-host check-ci-gate-host
 ```
 
@@ -77,7 +77,7 @@ MUTATE=1 make check-check-select-host check-ci-time-inventory-host check-ci-gate
 
 | 状態 | 手当て |
 |---|---|
-| どのシャードも長い (和が均等で、全部が遅い) | シャードの本数を増やす。`build.yml` の行列 (x86 は 6) か `check.yml` の `ppc-qemu` の行列 (5) と、道具に渡す `i/N`、それを固定している試験 (`tools/tests/test_ci_split.py`・`ppc_ci.py`) を同じ変更で直す |
+| どのシャードも長い (和が均等で、全部が遅い) | シャードの本数を増やす。`build.yml` の行列 (x86 は 6) か `check.yml` の `ppc-qemu` の行列 (6) と、道具に渡す `i/N`、それを固定している試験 (`tools/tests/test_ci_split.py`・`ppc_ci.py`) を同じ変更で直す |
 | 1 本の検査が飛び抜けて重い | その検査の変異の本数と 1 本の所要を見る (`MUTATE=1 make check-<名>` を手元で回し、ログの `RED` の行と時刻)。QEMU を 1 本ごとに立ち上げ直す・時間切れを待って検出する変異が重い |
 | QEMU の段の 1 本が長い | `tools/ppc/` の道具の待ち (期限の値・画面を流す行数) を見る。期限を延ばして通す直しはしない |
 | 用意 (道具の導入・クロスコンパイラのビルド) が長い | ジョブのログで `Cache not found` を探す。キャッシュは枝ごとで、枝が読めるのは自分の枝と main の物だけ — main に無いキャッシュは、新しい枝の最初の回で毎回作り直しになる。main で保つジョブ (`check.yml` の `ppc-toolchain-cache`) が要る物が増えていないか見る。用意の行の重複は票 `docs/tasks/v3/TASK_CI_REWORK.md` の段 S2 |

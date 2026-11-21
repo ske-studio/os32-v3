@@ -444,7 +444,7 @@ def routing_cases(build_source, check_source):
     compile_checks = ppc_selection('ppc-compile', 'tools/checks/run.py --run')
     guest = set()
     shards = jobs['ppc-qemu']['strategy']['matrix']['shard']
-    assert len(shards) == 5, 'expected five PPC QEMU shards'
+    assert len(shards) == 6, 'expected six PPC QEMU shards'
     for shard in shards:
         assigned = ppc_selection('ppc-qemu', 'tools/ci/gate.py run', shard)
         assert guest.isdisjoint(assigned), f'duplicate guest checks in shard {shard}'
@@ -524,8 +524,8 @@ def main():
             ('static', 'exit "$rc"', 'exit 0', 'hide apt failure'),
             ('static', 'run: python3 -B tools/ci/gate.py preflight --env static', 'run: "true"', 'omit preflight'),
             ('build-route', ' CHECK_EXCLUDE_ENV=qemu-ppc', '', 'restore qemu checks to build'),
-            ('guest-route', 'shard: [0, 1, 2, 3, 4]', 'shard: [0, 1, 2, 3, 3]', 'repeat guest shard'),
-            ('guest-route', 'matrix.shard }}/5', 'matrix.shard }}/6', 'omit sixth guest shard'),
+            ('guest-route', 'shard: [0, 1, 2, 3, 4, 5]', 'shard: [0, 1, 2, 3, 4, 4]', 'repeat guest shard'),
+            ('guest-route', 'matrix.shard }}/6', 'matrix.shard }}/7', 'omit seventh guest shard'),
             ('guest-route', 'gate.py run --env qemu-ppc', 'gate.py run --env socket', 'leave guest checks unassigned'),
             ('workflow', '      - name: make check\n        timeout-minutes: 60\n',
              '      - name: make check\n', 'remove make check deadline'),
