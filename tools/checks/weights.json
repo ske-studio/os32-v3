@@ -586,6 +586,7 @@
     "ppc-fp-accept-host": 0.199575,
     "ppc-fp-guest": 502.302152,
     "ppc-gfx2-guest": 175.537708,
+    "ppc-kboot-layout": 97,
     "ppc-kcg-guest": 129.075942,
     "ppc-link-sh-flow": 345.684326,
     "ppc-link-sh-run": 345.684326,

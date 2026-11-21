@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Check PowerMac's typed bindings for the absent providers and their complete link dependencies."""
+"""PowerMac typed bindings and link dependencies. ATA_HAL_DESIGN §6-2 P2
+exposes seven raw ATA slots with IDE enabled and keeps geometry absent.
+"""
 # CHECK registration lives in tools/checks/ppc-kapi-binding.py.
 import json
 import os
@@ -239,11 +241,11 @@ def insert_group(helper, mutation, group):
     helper.write_text(text.replace(opening, opening + group))
 
 
-def verify(source, entries):
+def verify(source, entries, extra_present=frozenset()):
     if any('#include "' + header + '"' in source for header in ('gfx_hal.h', 'palette.h')):
         return False
     reference = (ROOT / 'kapi/kapi_generated.c').read_text()
-    for slot in PRESENT_SLOTS | PUBLISHED_GFX:
+    for slot in PRESENT_SLOTS | PUBLISHED_GFX | extra_present:
         wrapper = re.search(r'(?:void|int) __cdecl wrap_' + slot + r'\([^)]*\)\n\{.*?\n\}', reference, re.S)
         if not wrapper or wrapper.group() not in source:
             return False
@@ -278,7 +280,7 @@ def verify(source, entries):
     return bool(re.search(r'void __cdecl wrap_sys_reboot\(void\)\s*\{[^}]*\bsys_reboot\(\);', source))
 
 
-def generate(tmp, mutation=None, *, link=True):
+def generate(tmp, mutation=None, *, link=True, ide=False):
     sdk = tmp / 'sdk'
     sdk.mkdir()
     for name in ('gen_kapi.py', 'kapi_abi_x86.py', 'target_profile.py', 'kapi_target_ppc.py'):
@@ -354,7 +356,7 @@ def generate(tmp, mutation=None, *, link=True):
         generator.write_text(text.replace(old, new))
     out = tmp / 'gen'
     subprocess.run([sys.executable, '-B', str(generator), '--target', 'ppc-powermac',
-                    '--feature-link', str(int(link)), '--out-dir', str(out), str(ROOT / 'sdk/kapi.json')], cwd=ROOT, check=True,
+                    '--feature-ide', str(int(ide)), '--feature-link', str(int(link)), '--out-dir', str(out), str(ROOT / 'sdk/kapi.json')], cwd=ROOT, check=True,
                    stdout=subprocess.DEVNULL)
     return out
 
@@ -452,7 +454,7 @@ def main():
         (tmp / 'normal').mkdir()
         out = generate(tmp / 'normal', link=False)
         (tmp / 'link').mkdir()
-        linked = generate(tmp / 'link')
+        linked = generate(tmp / 'link', ide=True)
         for header in ('os32_kapi_slots.h', 'os32_kapi_generated.h'):
             path = Path('sdk/include/os32') / header
             if any((profile / path).read_bytes() != (ROOT / path).read_bytes() for profile in (out, linked)):
@@ -473,8 +475,23 @@ def main():
             print(('FAIL' if required else 'SKIP') + ' ppc-kapi-binding: unavailable: ' + str(cc))
             return 1 if required else 0
         sfs_slots = {'sfs_begin', 'sfs_end'}
+        ide_slots = {'ide_init', 'ide_drive_present', 'ide_identify', 'ide_get_info',
+                     'ide_read_sector', 'ide_write_sector', 'ide_write_sectors'}
+        ide_providers = {'platform_' + slot for slot in ide_slots}
+        if any(provider + '(' in source for provider in ide_providers):
+            return 1
+        for link, ide in ((True, False), (False, True)):
+            profile = tmp / ('link-only' if link else 'ide-only')
+            profile.mkdir()
+            generated = generate(profile, link=link, ide=ide)
+            present = sfs_slots if link else ide_slots
+            absent = [api for api in entries if api['name'] not in present]
+            if not verify((generated / 'kapi/kapi_generated.c').read_text(), absent, present):
+                print(f'binding verification failed: LINK={int(link)} IDE={int(ide)}')
+                return 1
         linked_source = (linked / 'kapi/kapi_generated.c').read_text()
-        if not verify(linked_source, [api for api in entries if api['name'] not in sfs_slots]):
+        absent = [api for api in entries if api['name'] not in sfs_slots | ide_slots]
+        if not verify(linked_source, absent, ide_slots):
             return 1
         subprocess.run([str(cc), '-std=gnu11', '-Werror=implicit-function-declaration', '-ffreestanding', '-D__KERNEL_BUILD__',
                         '-D__cdecl=', '-I' + str(out / 'include')]
@@ -500,15 +517,15 @@ def main():
         if missing:
             print('missing display or KCG providers:', sorted(missing)); return 1
         sfs_providers = {'platform_serialfs_session_begin', 'platform_serialfs_session_end'}
-        if not sfs_providers <= undefined:
-            print('missing link SFS providers:', sorted(sfs_providers - undefined))
+        if not (sfs_providers | ide_providers) <= undefined:
+            print('missing link or IDE providers:', sorted((sfs_providers | ide_providers) - undefined))
             return 1
         av_providers = {line.split()[1] for line in (ROOT / 'tools/checks/av_wiring.txt').read_text().splitlines()
                         if line and not line.startswith('#') and len(line.split()) == 2}
         if av_providers - undefined:
             print('missing AV providers:', sorted(av_providers - undefined))
             return 1
-        unexpected = undefined - (av_providers | sfs_providers | ALLOWED_UNDEFINED | LOOP_PROVIDERS | GFX2_QUERY_PROVIDERS | DISPLAY_PROVIDERS | KCG_PROVIDERS | DB_PROVIDERS)
+        unexpected = undefined - (av_providers | ide_providers | sfs_providers | ALLOWED_UNDEFINED | LOOP_PROVIDERS | GFX2_QUERY_PROVIDERS | DISPLAY_PROVIDERS | KCG_PROVIDERS | DB_PROVIDERS)
         if unexpected:
             print('unexpected providers:', sorted(unexpected)); return 1
         print('undefined providers:', len(undefined))
