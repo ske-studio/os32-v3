@@ -19,7 +19,6 @@ from build_profile import query
 
 ROOT = Path(__file__).resolve().parents[2]
 OWNERS = {
-    'drivers/sound/fm/fm_module.c': ('SND', 'snd_tick', 'int fm_module_load(void)'),
     'drivers/sound/cs4231/pcm_module.c': ('PCM', 'pcm_tick', 'int pcm_module_load(void)'),
     'drivers/net/ne2000/ne2000.c': ('NE2K', 'ne2k_timer_tick', 'int ne2k_init('),
     'drivers/net/e82557/lan_module.c': ('E82557', 'e82557_tick', 'int lan_module_load(void)'),
@@ -51,7 +50,6 @@ def wiring():
     for rel, boundary in [('drivers/net/ne2000/ne2000.c', 'kmemset(&nic'),
                           ('drivers/net/ne2000/lgy98.c', 'cfg.reg_base'),
                           ('net/nic.c', 'link_init(local_mac)'),
-                          ('drivers/sound/fm/fm_module.c', 'if (fm_handle.generation)'),
                           ('drivers/sound/cs4231/pcm_module.c', 'if (pcm_handle.generation)'),
                           ('drivers/net/e82557/lan_module.c', 'if (lan_handle.generation)')]:
         src = (ROOT / rel).read_text()
@@ -63,7 +61,7 @@ def wiring():
     assert 'tick_register' not in (ROOT / 'net/link.c').read_text()
     assert 'tick_order.h' not in (ROOT / 'kernel/irq/tick.c').read_text()
     assert 'kernel/irq/tick.c' in query(ROOT, config_only=True)['C_KERNEL']
-    print('PASS timer fixture order, six resident owners plus GF slot (owner checked when present), platform boundary', flush=True)
+    print('PASS timer fixture order, resident owners plus GF slot (owner checked when present), platform boundary', flush=True)
 
 
 def main():

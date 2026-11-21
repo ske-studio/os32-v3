@@ -46,7 +46,6 @@ NOOP_ID(exec_font_lease_close_owned)
 NOOP_ID(vfs_close_owned)
 NOOP_ID(pipe_free_owned)
 NOOP_ID(shm_free_owned)
-NOOP_ID(exec_snd_owner_exit)
 NOOP_ID(exec_pcm_reclaim)
 static AppSlot *g_cur_app;
 static int exec_exit_status, g_last_kind, g_last_code, exec_nest_level;

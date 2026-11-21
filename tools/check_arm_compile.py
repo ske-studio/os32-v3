@@ -104,7 +104,6 @@ CORE_INC_KERNEL = [
     "drivers/sound/cs4231/pcm_module.c",
     "drivers/sound/fm/fm_body.c",
     "drivers/sound/fm/fm_module.c",
-    "drivers/sound/fm/snd_engine.c",
     "drivers/video/cirrus/cirrus_body.c",
     "drivers/video/cirrus/cirrus_module.c",
     "drivers/video/geforce/geforce_body.c",

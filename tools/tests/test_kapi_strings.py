@@ -12,7 +12,7 @@ GROUPS = {
     'mount': 'sys_mount sys_umount sys_umount_checked sys_is_mounted vfs_devname',
     'device': 'kcg_load_font loop_attach dev_blk_read dev_blk_write sys_switch_shell',
     'command': 'exec_run exec_start launch_req',
-    'output': 'serial_puts shell_print_utf8 fm_play_mml snd_bgm_play',
+    'output': 'serial_puts shell_print_utf8',
 }
 NULLABLE = {name: 1 for name in (
     'sys_unlink sys_mkdir sys_rmdir sys_chdir sys_open sys_stat '
@@ -76,6 +76,10 @@ def exercise(args, mutant=None):
 
 
 def mutants(args):
+    for retired in ('FM_PLAY_MML', 'SND_BGM_PLAY'):
+        anchor = '[KAPI_SLOT_SHELL_PRINT_UTF8] = {1, 0, KAPI_STRING_CAP},'
+        yield ('strings', anchor, anchor + '\n    [KAPI_SLOT_' + retired +
+               '] = {1, 0, KAPI_STRING_CAP},', retired + ' scanned after retirement')
     yield ('strings', '!arch_kapi_read_block(src, 0, count, &values)',
            '(!arch_kapi_read_block(src, 0, count, &values) && (values.value[0] = 0, 0))',
            'fixed copy failure ignored')

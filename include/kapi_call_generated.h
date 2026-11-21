@@ -3,7 +3,7 @@
 #define OS32_KAPI_CALL_GENERATED_H
 #include "types.h"
 enum kapi_value_kind { KAPI_VALUE_INTEGER, KAPI_VALUE_POINTER };
-#define KAPI_FIXED_MAX 7u
+#define KAPI_FIXED_MAX 8u
 static const u8 kapi_fixed_count[] = {
     0, /* gfx_init */
     0, /* gfx_init_200 */
@@ -303,6 +303,45 @@ static const u8 kapi_fixed_count[] = {
     3, /* io_policy_get */
     0, /* io_policy_reset */
     1, /* io_pump */
+    0, /* snd2_dev_count */
+    2, /* snd2_dev_info */
+    3, /* snd2_caps */
+    3, /* snd2_dsp_unit */
+    4, /* snd2_dsp_param */
+    4, /* snd2_dsp_insert */
+    8, /* snd2_dsp_process */
+    2, /* snd2_stream_open */
+    3, /* snd2_stream_write */
+    1, /* snd2_stream_start */
+    1, /* snd2_stream_pause */
+    2, /* snd2_stream_pos */
+    3, /* snd2_stream_wait */
+    3, /* snd2_stream_volume */
+    2, /* snd2_stream_close */
+    1, /* av_focus_set */
+    0, /* av_focus_get */
+    2, /* in2_pad_state */
+    2, /* in2_pad_caps */
+    2, /* in2_pad_vibrate */
+    0, /* in2_dev_count */
+    2, /* in2_dev_info */
+    2, /* in2_read */
+    1, /* in2_key_state */
+    1, /* in2_mouse_state */
+    1, /* in2_acquire */
+    0, /* in2_unacquire */
+    1, /* in2_status */
+    1, /* in2_wm_state */
+    2, /* v86s_begin */
+    3, /* v86s_run */
+    4, /* v86s_fm_drain */
+    1, /* v86s_end */
+    3, /* snd2_chip_caps */
+    2, /* snd2_chip_open */
+    3, /* snd2_chip_write */
+    4, /* snd2_chip_read */
+    1, /* snd2_chip_reset */
+    1, /* snd2_chip_close */
 };
 static const u8 kapi_fixed_kind[][KAPI_FIXED_MAX] = {
     { 0 }, /* gfx_init */
@@ -603,5 +642,44 @@ static const u8 kapi_fixed_kind[][KAPI_FIXED_MAX] = {
     { KAPI_VALUE_POINTER, KAPI_VALUE_INTEGER, KAPI_VALUE_POINTER }, /* io_policy_get */
     { 0 }, /* io_policy_reset */
     { KAPI_VALUE_INTEGER }, /* io_pump */
+    { 0 }, /* snd2_dev_count */
+    { KAPI_VALUE_INTEGER, KAPI_VALUE_POINTER }, /* snd2_dev_info */
+    { KAPI_VALUE_INTEGER, KAPI_VALUE_POINTER, KAPI_VALUE_INTEGER }, /* snd2_caps */
+    { KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_POINTER }, /* snd2_dsp_unit */
+    { KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_POINTER }, /* snd2_dsp_param */
+    { KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_POINTER, KAPI_VALUE_INTEGER }, /* snd2_dsp_insert */
+    { KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_POINTER, KAPI_VALUE_INTEGER, KAPI_VALUE_POINTER, KAPI_VALUE_POINTER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER }, /* snd2_dsp_process */
+    { KAPI_VALUE_POINTER, KAPI_VALUE_POINTER }, /* snd2_stream_open */
+    { KAPI_VALUE_INTEGER, KAPI_VALUE_POINTER, KAPI_VALUE_INTEGER }, /* snd2_stream_write */
+    { KAPI_VALUE_INTEGER }, /* snd2_stream_start */
+    { KAPI_VALUE_INTEGER }, /* snd2_stream_pause */
+    { KAPI_VALUE_INTEGER, KAPI_VALUE_POINTER }, /* snd2_stream_pos */
+    { KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER }, /* snd2_stream_wait */
+    { KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER }, /* snd2_stream_volume */
+    { KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER }, /* snd2_stream_close */
+    { KAPI_VALUE_INTEGER }, /* av_focus_set */
+    { 0 }, /* av_focus_get */
+    { KAPI_VALUE_INTEGER, KAPI_VALUE_POINTER }, /* in2_pad_state */
+    { KAPI_VALUE_INTEGER, KAPI_VALUE_POINTER }, /* in2_pad_caps */
+    { KAPI_VALUE_INTEGER, KAPI_VALUE_POINTER }, /* in2_pad_vibrate */
+    { 0 }, /* in2_dev_count */
+    { KAPI_VALUE_INTEGER, KAPI_VALUE_POINTER }, /* in2_dev_info */
+    { KAPI_VALUE_POINTER, KAPI_VALUE_INTEGER }, /* in2_read */
+    { KAPI_VALUE_POINTER }, /* in2_key_state */
+    { KAPI_VALUE_POINTER }, /* in2_mouse_state */
+    { KAPI_VALUE_INTEGER }, /* in2_acquire */
+    { 0 }, /* in2_unacquire */
+    { KAPI_VALUE_POINTER }, /* in2_status */
+    { KAPI_VALUE_POINTER }, /* in2_wm_state */
+    { KAPI_VALUE_POINTER, KAPI_VALUE_POINTER }, /* v86s_begin */
+    { KAPI_VALUE_INTEGER, KAPI_VALUE_POINTER, KAPI_VALUE_POINTER }, /* v86s_run */
+    { KAPI_VALUE_INTEGER, KAPI_VALUE_POINTER, KAPI_VALUE_INTEGER, KAPI_VALUE_POINTER }, /* v86s_fm_drain */
+    { KAPI_VALUE_INTEGER }, /* v86s_end */
+    { KAPI_VALUE_INTEGER, KAPI_VALUE_POINTER, KAPI_VALUE_INTEGER }, /* snd2_chip_caps */
+    { KAPI_VALUE_INTEGER, KAPI_VALUE_POINTER }, /* snd2_chip_open */
+    { KAPI_VALUE_INTEGER, KAPI_VALUE_POINTER, KAPI_VALUE_INTEGER }, /* snd2_chip_write */
+    { KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER }, /* snd2_chip_read */
+    { KAPI_VALUE_INTEGER }, /* snd2_chip_reset */
+    { KAPI_VALUE_INTEGER }, /* snd2_chip_close */
 };
 #endif

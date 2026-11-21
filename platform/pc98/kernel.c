@@ -66,7 +66,6 @@
 #include "ime_boot.h"
 #include "fd_redirect.h"
 #include "pipe_buffer.h"
-#include "../../drivers/sound/fm/snd_engine.h"
 #include "../../drivers/sound/fm/fm_module.h"
 #include "../../drivers/sound/cs4231/pcm_module.h"
 #include "../../drivers/net/e82557/lan_module.h"
@@ -256,7 +255,7 @@ void platform_boot_machine(void)
 
     /* サウンドエンジン初期化 */
     tvram_print(9, 4, "SND..", TATTR_GREEN);
-    kprintf(KLOG_ATTR, "[BOOT] snd_init...\n");
+    kprintf(KLOG_ATTR, "[BOOT] fm_module_load...\n");
     int snd_rc = fm_module_load();
     tvram_print(14, 4, snd_rc ? "-- " : "OK ", TATTR_WHITE);
     kprintf(KLOG_ATTR, "[BOOT] snd module rc=%d\n", snd_rc);

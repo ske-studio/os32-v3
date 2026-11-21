@@ -309,6 +309,117 @@
       "kanji",
       "yomi"
     ],
+    "IN2_DevInfo": [
+      "dev",
+      "flags",
+      "kind",
+      "name",
+      "pid",
+      "size",
+      "source",
+      "vid"
+    ],
+    "IN2_Event": [
+      "dev",
+      "flags",
+      "rsv",
+      "seq",
+      "time_ms",
+      "type",
+      "u"
+    ],
+    "IN2_EventAbs": [
+      "x",
+      "y"
+    ],
+    "IN2_EventBtn": [
+      "changed",
+      "down",
+      "rsv"
+    ],
+    "IN2_EventData": [
+      "abs",
+      "btn",
+      "key",
+      "lost",
+      "move",
+      "pad",
+      "wheel"
+    ],
+    "IN2_EventKey": [
+      "down",
+      "mods",
+      "rsv",
+      "sc"
+    ],
+    "IN2_EventLost": [
+      "count",
+      "reason"
+    ],
+    "IN2_EventMove": [
+      "dx",
+      "dy"
+    ],
+    "IN2_EventPad": [
+      "buttons",
+      "changed"
+    ],
+    "IN2_EventWheel": [
+      "delta",
+      "rsv"
+    ],
+    "IN2_Gamepad": [
+      "buttons",
+      "lt",
+      "lx",
+      "ly",
+      "rt",
+      "rx",
+      "ry"
+    ],
+    "IN2_MouseState": [
+      "buttons",
+      "dx",
+      "dy",
+      "wheel"
+    ],
+    "IN2_PadCaps": [
+      "caps",
+      "flags",
+      "map_src",
+      "name",
+      "pid",
+      "rsv",
+      "size",
+      "source",
+      "subtype",
+      "type",
+      "vib",
+      "vid"
+    ],
+    "IN2_PadState": [
+      "packet",
+      "pad",
+      "time_ms"
+    ],
+    "IN2_Status": [
+      "acquired",
+      "dropped",
+      "focus_gen",
+      "focus_owner",
+      "rsv",
+      "size"
+    ],
+    "IN2_Vibration": [
+      "left",
+      "right"
+    ],
+    "IN2_WmState": [
+      "excl",
+      "gen",
+      "owner",
+      "size"
+    ],
     "KbdDiag": [
       "cmd",
       "empty_count",
@@ -343,6 +454,8 @@
       "width"
     ],
     "KernelAPI": [
+      "av_focus_get",
+      "av_focus_set",
       "boot_image_info",
       "boot_token_get",
       "buz_off",
@@ -483,6 +596,18 @@
       "ime_user_delete",
       "ime_user_export",
       "ime_user_list",
+      "in2_acquire",
+      "in2_dev_count",
+      "in2_dev_info",
+      "in2_key_state",
+      "in2_mouse_state",
+      "in2_pad_caps",
+      "in2_pad_state",
+      "in2_pad_vibrate",
+      "in2_read",
+      "in2_status",
+      "in2_unacquire",
+      "in2_wm_state",
       "io_policy_get",
       "io_policy_reset",
       "io_policy_set",
@@ -572,6 +697,27 @@
       "shell_print_utf8",
       "shell_putchar",
       "shm_base",
+      "snd2_caps",
+      "snd2_chip_caps",
+      "snd2_chip_close",
+      "snd2_chip_open",
+      "snd2_chip_read",
+      "snd2_chip_reset",
+      "snd2_chip_write",
+      "snd2_dev_count",
+      "snd2_dev_info",
+      "snd2_dsp_insert",
+      "snd2_dsp_param",
+      "snd2_dsp_process",
+      "snd2_dsp_unit",
+      "snd2_stream_close",
+      "snd2_stream_open",
+      "snd2_stream_pause",
+      "snd2_stream_pos",
+      "snd2_stream_start",
+      "snd2_stream_volume",
+      "snd2_stream_wait",
+      "snd2_stream_write",
       "snd_bgm_is_playing",
       "snd_bgm_play",
       "snd_bgm_set_persist",
@@ -643,6 +789,10 @@
       "v86_disktest",
       "v86_gdc_capture",
       "v86_selftest",
+      "v86s_begin",
+      "v86s_end",
+      "v86s_fm_drain",
+      "v86s_run",
       "version",
       "vfs_devname",
       "vfs_sync"
@@ -807,6 +957,104 @@
       "wday",
       "year"
     ],
+    "SND2_Caps": [
+      "dev",
+      "dsp_units",
+      "fmt",
+      "fmt_count",
+      "hw_3d_streams",
+      "hw_mix_streams",
+      "kind",
+      "latency_min_us",
+      "period_max",
+      "period_min",
+      "reserved",
+      "ring_frames",
+      "rsv_lead",
+      "size",
+      "volume_steps"
+    ],
+    "SND2_ChipCaps": [
+      "adpcm_bytes",
+      "banks",
+      "base_port",
+      "chip",
+      "clock_hz",
+      "dev",
+      "flags",
+      "fm_ch",
+      "id_port",
+      "kind",
+      "reserved",
+      "rhythm_ch",
+      "size",
+      "ssg_ch"
+    ],
+    "SND2_DevInfo": [
+      "dev",
+      "driver",
+      "flags",
+      "kind",
+      "name",
+      "size"
+    ],
+    "SND2_DspParam": [
+      "def",
+      "id",
+      "max",
+      "min",
+      "name"
+    ],
+    "SND2_DspUnit": [
+      "id",
+      "in_fmt_mask",
+      "kind",
+      "max_frames",
+      "modes",
+      "out_fmt_mask",
+      "param_count",
+      "reserved"
+    ],
+    "SND2_FmEv": [
+      "at_us",
+      "bank",
+      "kind",
+      "reg",
+      "seq",
+      "val"
+    ],
+    "SND2_Fmt": [
+      "bits",
+      "channels",
+      "enc",
+      "flags",
+      "rate"
+    ],
+    "SND2_Pos": [
+      "cap",
+      "epoch",
+      "played",
+      "size",
+      "state",
+      "time_ms",
+      "underruns",
+      "written"
+    ],
+    "SND2_RegW": [
+      "bank",
+      "reg",
+      "rsv",
+      "val"
+    ],
+    "SND2_StreamDesc": [
+      "dev",
+      "flags",
+      "fmt",
+      "lead_periods",
+      "period_frames",
+      "reserved",
+      "size"
+    ],
     "SerialDiag": [
       "fe",
       "oe",
@@ -859,6 +1107,38 @@
       "seq",
       "value",
       "width"
+    ],
+    "V86_Begin": [
+      "flags",
+      "path",
+      "second",
+      "size"
+    ],
+    "V86_Exit": [
+      "code",
+      "fifo_n",
+      "guest_us",
+      "nq",
+      "port",
+      "q",
+      "reason",
+      "size",
+      "width"
+    ],
+    "V86_ReadQ": [
+      "bank",
+      "byte",
+      "kind",
+      "reg"
+    ],
+    "V86_RunIn": [
+      "reply",
+      "reply_valid",
+      "rsv",
+      "shadow_seq",
+      "size",
+      "slice_ms",
+      "snd_status"
     ],
     "struct GfxBackend": [
       "bb_base",
