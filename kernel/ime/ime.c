@@ -30,6 +30,7 @@
 #include "fd_redirect.h"
 #include "redir_access.h"
 #include "io.h"
+#include "input/hal/input_context.h"
 extern int ring3_call_from_user(void);
 extern void ring3_abort_check(void);
 
@@ -57,6 +58,29 @@ FepStore *ime_current_store(void) { return &g_ime.store; }
 static int g_ime_reader_owner;
 static int g_ime_cui_redraw;
 static void ime_cancel_input(void);
+
+static void ime_publish_state(void)
+{
+    KbdPolicySnapshot current;
+    if (!services_public) return;
+    if (input_context_snapshot(&current)) {
+        kbd_policy_ime_state(0, 0, 0);
+        return;
+    }
+    int active = g_ime.mode != IME_MODE_OFF &&
+                 (g_ime.rk.preedit[0] || g_ime.kana_len || g_ime.converting);
+    kbd_policy_ime_state(active, current.owner, current.command_gen);
+}
+
+static int ime_take_cancel(void)
+{
+    KbdPolicySnapshot current;
+    if (!services_public || !_irq_enabled() || input_context_snapshot(&current) ||
+        input_ime_cancel_take(&current))
+        return 0;
+    ime_cancel_input();
+    return 1;
+}
 
 #include "ime_render.inc"
 
@@ -149,6 +173,7 @@ void ime_toggle(void)
         candlist_clear();              /* 候補リスト領域を消去 */
         preedit_clear();
     }
+    ime_publish_state();
 }
 
 int ime_is_active(void)
@@ -185,6 +210,7 @@ void ime_set_mode(int mode)
         candlist_clear();              /* 候補リスト領域を消去 */
         preedit_clear();
     }
+    ime_publish_state();
 }
 
 int ime_get_mode(void)
@@ -202,7 +228,7 @@ static void ime_prepare_cui_input(void)
     if (ime_is_active()) preedit_draw();
 }
 
-static int ime_getchar_wait(int interruptible)
+static int ime_getchar_wait(int interruptible, int *cancelled)
 {
     int keydata;
     int result;
@@ -212,6 +238,7 @@ static int ime_getchar_wait(int interruptible)
     ime_prepare_cui_input();
 
     for (;;) {
+        ime_take_cancel();
         keydata = ime_delivery_take();
         if (keydata >= 0) {
             u8 a = (u8)(keydata & 0xFF);
@@ -220,9 +247,14 @@ static int ime_getchar_wait(int interruptible)
         }
 
         keydata = kbd_getkey_wait(interruptible);
-        if (keydata < 0) return -1;
+        int taken = ime_take_cancel();
+        if (keydata < 0) {
+            if (cancelled) *cancelled = taken;
+            return keydata;
+        }
 
         result = ime_cui_process(keydata);
+        ime_publish_state();
         if (result >= 0) {
             u8 a = (u8)(result & 0xFF);
             if (a != 0) return (int)a;
@@ -244,6 +276,7 @@ int ime_trygetchar(void)
     int result;
 
     if (con_sink_is_enabled()) return kbd_trygetchar();
+    ime_take_cancel();
     ime_prepare_cui_input();
 
     keydata = ime_delivery_take();
@@ -258,6 +291,7 @@ int ime_trygetchar(void)
     ime_note_cui_reader();
 
     result = ime_cui_process(keydata);
+    ime_publish_state();
     if (result >= 0) {
         u8 a = (u8)(result & 0xFF);
         if (a != 0) return (int)a;
@@ -284,10 +318,11 @@ int ime_feed_key(int keydata)
     if (!services_public) return keydata;
     int result;
 
+    int cancelled = ime_take_cancel();
     /* WM input-target lifetime boundary: STOP cancels even an unread tail.
      * No dictionary access/learning, so this is also safe in X1. */
     if (keydata >= 0 && ((keydata >> 8) & SCANCODE_KEY) == KEY_STOP) {
-        ime_cancel_input();
+        if (!cancelled) ime_cancel_input();
         return -1;
     }
 
@@ -304,6 +339,7 @@ int ime_feed_key(int keydata)
     }
 
     result = ime_process_key(keydata);
+    ime_publish_state();
     if (result == 1) return ime_commit_take();
     if (result == -1) {
         return keydata;      /* FEP が関与しないキー: 素通り */
@@ -334,7 +370,7 @@ void ime_set_render(void *table)
     if (ime_is_active()) preedit_draw();
 }
 
-static int ime_getkey_wait(int interruptible)
+static int ime_getkey_wait(int interruptible, int *cancelled)
 {
     if (!services_public) return kbd_getkey_wait(interruptible);
     int keydata;
@@ -344,15 +380,21 @@ static int ime_getkey_wait(int interruptible)
     ime_prepare_cui_input();
 
     for (;;) {
+        ime_take_cancel();
         keydata = ime_delivery_take();
         if (keydata >= 0) {
             return keydata;
         }
 
         keydata = kbd_getkey_wait(interruptible);
-        if (keydata < 0) return -1; /* key wait interrupted */
+        int taken = ime_take_cancel();
+        if (keydata < 0) {
+            if (cancelled) *cancelled = taken;
+            return keydata;
+        } /* key wait interrupted */
 
         result = ime_cui_process(keydata);
+        ime_publish_state();
         if (result >= 0) {
             return result;
         }
@@ -366,6 +408,7 @@ int ime_trygetkey(void)
     int keydata;
 
     if (con_sink_is_enabled()) return kbd_trygetkey();
+    ime_take_cancel();
     ime_prepare_cui_input();
 
     keydata = ime_delivery_take();
@@ -378,7 +421,9 @@ int ime_trygetkey(void)
     if (keydata < 0) return -1;
     ime_note_cui_reader();
 
-    return ime_cui_process(keydata);
+    int result = ime_cui_process(keydata);
+    ime_publish_state();
+    return result;
 }
 
 #include "ime_dict_api.inc"
@@ -400,17 +445,19 @@ static void ime_cancel_input(void)
     tvram_set_scroll_reserve(g_ime.mode != IME_MODE_OFF ? 1 : 0);
     /* OFF leaves the last console row to the app; ON keeps the mode visible. */
     if (g_ime.mode != IME_MODE_OFF) preedit_draw();
+    ime_publish_state();
 }
-int ime_getchar(void) { return ime_getchar_wait(0); }
-int ime_getkey(void) { return ime_getkey_wait(0); }
+int ime_getchar(void) { return ime_getchar_wait(0, NULL); }
+int ime_getkey(void) { return ime_getkey_wait(0, NULL); }
 int ime_getchar_kapi(void)
 {
     int c;
     if (!con_sink_is_enabled() && ring3_call_from_user())
         g_ime_reader_owner = res_owner_get();
-    c = ime_getchar_wait(1);
+    int cancelled = 0;
+    c = ime_getchar_wait(1, &cancelled);
     if (c < 0) {
-        if (!con_sink_is_enabled()) ime_cancel_input();
+        if (!cancelled && !con_sink_is_enabled()) ime_cancel_input();
         ring3_abort_check();
     }
     return c;
@@ -420,9 +467,10 @@ int ime_getkey_kapi(void)
     int c;
     if (!con_sink_is_enabled() && ring3_call_from_user())
         g_ime_reader_owner = res_owner_get();
-    c = ime_getkey_wait(1);
+    int cancelled = 0;
+    c = ime_getkey_wait(1, &cancelled);
     if (c < 0) {
-        if (!con_sink_is_enabled()) ime_cancel_input();
+        if (!cancelled && !con_sink_is_enabled()) ime_cancel_input();
         ring3_abort_check();
     }
     return c;

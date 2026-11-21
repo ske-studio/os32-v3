@@ -1,7 +1,16 @@
 #define LEGACY_KEYMAP_SOURCE "legacy_keymap_source.inc"
 #define KBD_MERGE_SOURCE "kbd_merge_source.inc"
+#include "input/hal/input_context.h"
+static KbdPolicySnapshot foreground;
+int input_context_snapshot(KbdPolicySnapshot *out)
+{
+    if (!foreground.owner) return -1;
+    *out = foreground;
+    return 0;
+}
 #include "kbd_capture_fixture_host.h"
 #include "../../input/hal/legacy_ring.c"
+#include "ime_gate_source.inc"
 #include "../../input/hal/legacy_mode.c"
 #include "../../kernel/input_legacy.c"
 #include "../../kernel/input_wait.c"
@@ -168,7 +177,30 @@ static u8 fixture_tvram_attr[25 * 160];
 #define TVRAM_BASE ((uptr)fixture_tvram_text)
 #define TVRAM_ATTR ((uptr)fixture_tvram_attr)
 #include "../../platform/pc98/ime_display.c"
+#ifdef TEST_IME_FG1
+static int scripted, observed_kana, wait_step, capture_step, wait_keys[3], reserve_calls;
+static void count_reserve(int rows) { reserve_calls++; tvram_set_scroll_reserve(rows); }
+static int capture_composition(void)
+{
+    KbdPolicyImeSnapshot destination;
+    input_ime_snapshot(&destination);
+    return input_ime_cancel_capture(&destination);
+}
+static int scripted_wait(int interruptible)
+{
+    if (!scripted) return kbd_getkey_wait(interruptible);
+    if (wait_step == 1) observed_kana = !kstrcmp(ime_suspend_state()->kana_buf, "あ");
+    if (wait_step == capture_step) capture_composition();
+    return wait_step < 3 ? wait_keys[wait_step++] : -1;
+}
+#define kbd_getkey_wait scripted_wait
+#define tvram_set_scroll_reserve count_reserve
+#endif
 #include "ime_source.inc"
+#ifdef TEST_IME_FG1
+#undef kbd_getkey_wait
+#undef tvram_set_scroll_reserve
+#endif
 #include "../../kernel/input_service.c"
 #include "pointer_fixture_host.h"
 #include "port_fixture_host.h"
@@ -743,6 +775,89 @@ static int candidate_boundaries(void)
 
 #include "x11_shared_host_l45.inc"
 
+#ifdef TEST_IME_FG1
+static int fg1_test(void)
+{
+    scripted = 1;
+    foreground = (KbdPolicySnapshot){.owner=1, .exec_gen=7, .command_gen=3};
+    KbdPolicyImeSnapshot state;
+    reset();
+    kbd_policy_ime_state(0, 0, 0);
+    services_public = 0;
+    ime_init();
+    static const IME_Render private_render = {gui_draw_char, gui_draw_wide, gui_clear_row, 0, 0};
+    ime_set_render((void *)&private_render);
+    input_ime_snapshot(&state);
+    CHECK(!state.active && !state.owner, "private init has no destination");
+    services_public = 1;
+    ime_set_mode(IME_MODE_HIRAGANA);
+    CHECK(capture_composition() < 0, "empty ON inactive");
+    ime_feed_key('a');
+    ime_feed_key(KEY_SPACE << 8 | ' ');
+    input_ime_snapshot(&state);
+    CHECK(state.active && state.owner == foreground.owner && state.exec_gen == foreground.exec_gen &&
+          state.command_gen == foreground.command_gen && g_ime.converting, "candidate destination");
+    CHECK(ime_feed_key(KEY_RETURN << 8 | 13) >= 0, "candidate commit");
+    input_ime_snapshot(&state);
+    CHECK(!state.active && g_ime.commit_len > g_ime.commit_pos, "unread UTF-8 tail inactive");
+    foreground.owner = 0;
+    ime_set_mode(IME_MODE_OFF);
+    input_ime_snapshot(&state);
+    CHECK(!state.active && !state.owner, "missing foreground invalidates destination");
+    foreground.owner = 1;
+    for (int api = 0; api < 2; api++) {
+        int (*wait)(void) = api ? ime_getkey_kapi : ime_getchar_kapi;
+        int (*poll)(void) = api ? ime_trygetkey : ime_trygetchar;
+        reset();
+        ime_set_mode(IME_MODE_HIRAGANA);
+        CHECK(capture_composition() < 0, "empty ON inactive");
+        ime_feed_key('k');
+        CHECK(!capture_composition(), "romaji active");
+        _disable();
+        CHECK(poll() < 0 && g_ime.rk.preedit[0], "disabled poll preserves pending");
+        _enable();
+        CHECK(poll() < 0 && !g_ime.rk.preedit[0], "poll cancels");
+        ime_feed_key('a');
+        CHECK(!capture_composition(), "kana active");
+        g_ime.commit_buf[0] = 'X';
+        g_ime.commit_len = 1;
+        wait_step = 0;
+        capture_step = -1;
+        wait_keys[0] = 'k';
+        wait_keys[1] = -7;
+        reserve_calls = 0;
+        CHECK(wait() == -7 && wait_step == 2 && reserve_calls == 2 &&
+              !g_ime.rk.preedit[0], "pre-wait cancel then new input then interrupted wait");
+        ime_feed_key('k');
+        wait_step = capture_step = 0;
+        wait_keys[0] = -7;
+        reserve_calls = 0;
+        CHECK(wait() == -7 && reserve_calls == 1 && !g_ime.rk.preedit[0],
+              "negative wait single cancel");
+        ime_feed_key('k');
+        wait_step = capture_step = 0;
+        wait_keys[0] = 'a';
+        wait_keys[1] = -7;
+        reserve_calls = 0;
+        CHECK(wait() == -7 && reserve_calls == 2 && observed_kana, "returned key after cancel");
+    }
+    ime_feed_key('k');
+    CHECK(!capture_composition(), "GUI pending");
+    reserve_calls = 0;
+    CHECK(ime_feed_key(KEY_STOP << 8) < 0 && reserve_calls == 1, "GUI STOP once");
+    ime_feed_key('k');
+    CHECK(!capture_composition(), "GUI pending");
+    CHECK(ime_feed_key(-1) < 0 && !g_ime.rk.preedit[0], "GUI consumes pending");
+    ime_feed_key('k');
+    for (int i = 0; i < KBD_BUF_SIZE; i++) legacy_cooked_push('x');
+    CHECK(legacy_cooked_pending() == KBD_BUF_SIZE && !capture_composition(), "full queue accepts cancel");
+    CHECK(ime_feed_key(-1) < 0 && !g_ime.rk.preedit[0] && legacy_cooked_pending() == KBD_BUF_SIZE,
+          "full queue independent delivery");
+    legacy_cooked_flush();
+    return 0;
+}
+#endif
+
 void _start(void)
 {
     input_legacy_register(&kbd_legacy_provider);
@@ -757,6 +872,9 @@ void _start(void)
     rc |= lone_n_space();
     rc |= gui_list_clear();
     rc |= candidate_boundaries();
+#ifdef TEST_IME_FG1
+    rc |= fg1_test();
+#endif
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc) : "memory");
     for (;;) {}
 }

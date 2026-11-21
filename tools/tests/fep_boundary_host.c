@@ -3,6 +3,11 @@
  * model an inaccessible/read-only byte, a stale output at copyout and IF explicitly;
  * SQL wrappers model the existing outer run/leave and inject ordinary errors.
  * This does not model #PF/IDT/IRQ hardware. */
+#include "input/hal/input_context.h"
+int input_context_snapshot(KbdPolicySnapshot *out) { (void)out; return -1; }
+void kbd_policy_ime_state(u32 active, u32 owner, u32 gen)
+{ (void)active; (void)owner; (void)gen; }
+int input_ime_cancel_take(const KbdPolicySnapshot *current) { (void)current; return -1; }
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

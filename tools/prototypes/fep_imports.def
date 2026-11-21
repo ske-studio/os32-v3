@@ -3,7 +3,8 @@
   "contracts": [
     "kernel/ime/fep_module.h",
     "kernel/ime/ime_render.h",
-    "sdk/include/os32/os32_kapi_shared.h"
+    "sdk/include/os32/os32_kapi_shared.h",
+    "input/hal/input_context.h"
   ],
   "imports": [
     {
@@ -437,6 +438,24 @@
       "context": "normal",
       "irq": false,
       "source": "fs/vfs.h"
+    },
+    {
+      "symbol": "kbd_policy_ime_state",
+      "context": "normal",
+      "irq": false,
+      "source": "input/hal/input_context.h"
+    },
+    {
+      "symbol": "input_context_snapshot",
+      "context": "normal",
+      "irq": false,
+      "source": "input/hal/input_context.h"
+    },
+    {
+      "symbol": "input_ime_cancel_take",
+      "context": "normal",
+      "irq": false,
+      "source": "input/hal/input_context.h"
     }
   ]
 }

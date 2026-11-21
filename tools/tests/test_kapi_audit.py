@@ -94,7 +94,9 @@ def run(runner, mutation=None, case=0, expected=None):
             elif new == 'probe':
                 old_text, replacement = 'ring3_wait_pending()', '0'
             elif new == 'cleanup':
-                old_text, replacement = 'if (!con_sink_is_enabled()) ime_cancel_input();', ''
+                old_text = ('if (!con_sink_is_enabled())' if old == 'ime_owner_exit' else
+                            'if (!cancelled && !con_sink_is_enabled())') + ' ime_cancel_input();'
+                replacement = ''
             elif new == 'abort':
                 old_text, replacement = 'ring3_abort_check();', ''
             elif new == 'user-guard':

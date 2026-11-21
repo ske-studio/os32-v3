@@ -19,6 +19,7 @@ from test_exec_r1 import function
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SOURCES = {
+    'ime_gate_source.inc': 'input/hal/input_ime_gate.c',
     'kbd_source.inc': 'drivers/input/kbd.c',
     'kbd_merge_source.inc': 'input/hal/kbd_merge.c',
     'legacy_keymap_source.inc': 'input/hal/legacy_keymap.c',
@@ -54,7 +55,7 @@ def exec_sources(sources):
                      'appslot_resume_source', 'appslot_resume_commit', 'appslot_mark_scheduled'))
 
 
-def run(mutation=None):
+def run(mutation=None, fg1=False):
     sources = {name: read_text(ROOT / path) for name, path in SOURCES.items()}
     if mutation:
         name, source, old, new, expected = mutation
@@ -81,7 +82,7 @@ def run(mutation=None):
                         '-ffreestanding', '-fno-pie', '-fno-stack-protector',
                         '-ffunction-sections', '-fdata-sections', '-nostdlib',
                         '-static', '-no-pie', '-Wl,--gc-sections',
-                        *includes, str(ROOT / 'tools/tests/x11_shared_host.c'),
+                        *(['-DTEST_IME_FG1'] if fg1 else []), *includes, str(ROOT / 'tools/tests/x11_shared_host.c'),
                         str(work / 'setjmp.o'),
                         *[str(ROOT / p) for p in ('lib/kstring.c', 'lib/kstring_c.c',
                            'lib/utf8.c', 'kernel/ime/ime_romkana.c')],
@@ -178,8 +179,8 @@ MUTATIONS = [
      'int ime_trygetchar(void)\n{\n    if (!services_public) return kbd_trygetchar();',
      'FAIL MINIMAL scan-only poll returns no character'),
     ('MINIMAL-scan-only-wait', 'ime_source.inc',
-     'static int ime_getchar_wait(int interruptible)\n{',
-     'static int ime_getchar_wait(int interruptible)\n{\n'
+     'static int ime_getchar_wait(int interruptible, int *cancelled)\n{',
+     'static int ime_getchar_wait(int interruptible, int *cancelled)\n{\n'
      '    if (!services_public) return interruptible ? kbd_getchar_kapi() : kbd_getchar();',
      'FAIL MINIMAL wait skips scan-only key'),
     ('IMEIND-RETURN-clear-only', 'ime_convert.inc',
@@ -200,7 +201,7 @@ MUTATIONS = [
      '    g_ime_cui_redraw = table == NULL;', '',
      'FAIL IMECAND CUI mode visible after reload clear'),
     ('IMECAND-no-STOP-cancel', 'ime_source.inc',
-     '        ime_cancel_input();\n        return -1;',
+     '        if (!cancelled) ime_cancel_input();\n        return -1;',
      '        return -1;', 'FAIL IMECAND input lifetime cancels all transient state'),
     ('IMECAND-no-renderer-cancel', 'ime_source.inc',
      '        ime_cancel_input(); /* GUI/CUI input lifetime ends with its renderer. */',

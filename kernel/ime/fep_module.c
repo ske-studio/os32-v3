@@ -17,7 +17,16 @@ extern const u32 fep_kexports[];
 extern const struct module_symbol_contract fep_import_contracts[];
 extern const struct module_symbol_contract fep_export_contracts[];
 
-int fep_services_public(void) { return services_public; }
+static int fep_closed;
+int fep_services_public(void) { return !fep_closed && services_public; }
+
+static void fep_close_input(void)
+{
+    const KbdPolicySnapshot invalid = {0};
+    fep_closed = 1;
+    kbd_policy_ime_state(0, 0, 0);
+    (void)input_ime_cancel_take(&invalid);
+}
 int fep_services_stage(void) { return services_stage; }
 u32 fep_services_boot_fault(void) { return services_boot_fault; }
 u8 fep_kbd_shift_state(void) { return input_shift_state(); }
@@ -83,7 +92,7 @@ static int candidate_valid, init_called;
 
 static const FepModuleApi *public_api(void)
 {
-    return services_public && module_exports(fep_handle) ? &candidate : &stub_api;
+    return fep_services_public() && module_exports(fep_handle) ? &candidate : &stub_api;
 }
 
 /* Boot used to initialize directly linked state here. Module init now does
@@ -162,6 +171,8 @@ static int fep_quiesce(struct module_record *r)
 int fep_module_load(struct module_handle sqlite)
 {
     if (fep_handle.generation) return MODULE_BUSY;
+    /* The loader can roll back internally before returning to this facade. */
+    fep_close_input();
     u32 pair = 0;
     int pair_valid = platform_module_pair(&pair);
     const struct module_request request = {
@@ -179,12 +190,17 @@ int fep_module_load(struct module_handle sqlite)
     int rc = module_load(&request, &fep_handle);
     if (!rc) rc = module_start(fep_handle);
     if (!rc && !module_exports(fep_handle)) rc = MODULE_INIT_FAILED;
+    if (!rc) fep_closed = 0;
     kprintf(KLOG_ATTR, "[fep] module rc=%d pair=%08x pages=%u\n",
             rc, pair, fep_module_pages());
     return rc;
 }
 
-int fep_module_abort(void) { return module_abort(fep_handle); }
+int fep_module_abort(void)
+{
+    fep_close_input();
+    return module_abort(fep_handle);
+}
 u32 fep_module_pages(void)
 {
     struct module_record *r = module_record_get(fep_handle);

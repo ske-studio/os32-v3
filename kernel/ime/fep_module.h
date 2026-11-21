@@ -4,7 +4,7 @@
 #include "ime.h"
 #include "../module/module_runtime.h"
 
-#define FEP_MODULE_OPS_VERSION 4u
+#define FEP_MODULE_OPS_VERSION 5u
 typedef struct {
     int (*boot_abort)(void);
     u32 (*boot_bytes)(void);

@@ -1,5 +1,19 @@
 /* Paired API: exercise the production full-slot validator and private boot relay. */
 #include "kernel/ime/fep_module.c"
+static KbdPolicySnapshot foreground = {.owner=1, .exec_gen=7, .command_gen=3};
+int input_context_snapshot(KbdPolicySnapshot *out) { *out = foreground; return 0; }
+#include "input/hal/input_ime_gate.c"
+static int cleanup_saw_closed;
+static int cleanup_saw_pending;
+int module_abort(struct module_handle h)
+{
+    KbdPolicyImeSnapshot state;
+    (void)h;
+    cleanup_saw_pending = input_ime_cancel_take(&foreground) == 0;
+    input_ime_snapshot(&state);
+    cleanup_saw_closed = !fep_services_public() && !state.active && !state.owner;
+    return 0;
+}
 static FepStore store;
 FepStore *ime_current_store(void) { return &store; }
 u32 fep_store_live_connections(const FepStore *s)
@@ -49,6 +63,16 @@ static int test(void)
     if (body_boot_connections() != 2) return 9;
     store.user_enabled = 0; /* Retained isolated group still counts. */
     if (body_boot_connections() != 2) return 10;
+    kbd_policy_ime_state(1, foreground.owner, foreground.command_gen);
+    KbdPolicyImeSnapshot state;
+    input_ime_snapshot(&state);
+    if (input_ime_cancel_capture(&state) || fep_module_abort() || !cleanup_saw_closed)
+        return 11;
+    if (cleanup_saw_pending) return 13;
+    /* Simulate the next publication with exactly the same owner and generation. */
+    fep_closed = 0;
+    kbd_policy_ime_state(1, foreground.owner, foreground.command_gen);
+    if (!input_ime_cancel_take(&foreground)) return 12;
     return 0;
 }
 void _start(void)
