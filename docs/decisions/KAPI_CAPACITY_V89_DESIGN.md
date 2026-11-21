@@ -1,7 +1,7 @@
 # 公開 KernelAPI 表の拡張と配布世代の切替
 
 > 出所: `~/os32-tmp/run/kapi-cap-design/DESIGN.final.md`
-> 状態: **確定 (2026-11-21)** — KAPI v89 の表の容量と配布世代を確定した。
+> 状態: **現行 (2026-11-21)** — KAPI v89 の表の容量と配布世代。実装は 2026-11-21 に main に入った (10c6a5d3c、CI の check・build success、NP21/W の受入 PASS)。
 
 ## r2→r3 の変更
 
