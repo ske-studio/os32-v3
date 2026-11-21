@@ -5,6 +5,7 @@
 #include "ppc_hpt.h"
 #include "exec_arch.h"
 #include "kernel/irq/irq.h"
+#include "mm/pgalloc.h"
 
 extern void ring3_fault_kill(void);
 static void (*resident_fault)(struct ppc_frame *);
@@ -137,7 +138,12 @@ void ppc_trap_dispatch(struct ppc_frame *f)
             if (fatal_ready && ppc_root_current())
                 ppc_trap_fatal_sink(f, reason);
         }
+        /* Same as the x86 exception stubs (EXC_ENTER): a user trap is an
+         * exception context, so the common kill path defers teardown to the
+         * setjmp landing, which restores the depth and enables interrupts. */
+        kctx_exc_depth++;
         ring3_fault_kill();
+        kctx_exc_depth--;
         reason = f->vector == 0x800 ? PPC_TRAP_FP_UNAVAILABLE :
                  PPC_TRAP_USER | PPC_TRAP_UNSUPPORTED;
     } else if (f->vector == 0x700) {

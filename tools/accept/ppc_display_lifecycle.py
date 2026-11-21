@@ -101,7 +101,8 @@ def observe(elf, folder, case):
                     if mode == 'shutdown':
                         require(after == before, 'shutdown preserves live text console')
                     else:
-                        require(after[:-1] == before and after[-1] != before[-1], mode + ' recovery')
+                        require(after[:-1] == before and after[-1] != before[-1], f'{mode} recovery: {before} -> {after}\n'
+                                + serial.read_bytes()[-2048:].decode(errors='replace'))
                     if mode == 'fault':
                         require(capacity == probe('capacity', 0, b'free tiles '), 'surface recovery')
                     check_echo(mode)

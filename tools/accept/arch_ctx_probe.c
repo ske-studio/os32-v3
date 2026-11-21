@@ -126,8 +126,10 @@ void ctx_syscall(struct arch_syscall *call)
     }
     if (!polled) {
         polled = 1;
+        u32 flags = ppc_irq_save();
+        kmemcpy(&saved, call->native, sizeof(saved));
         sentinel = call->native;
-        kmemcpy(&saved, sentinel, sizeof(saved));
+        ppc_irq_restore(flags);
         u32 first = tick_count, before = decs;
         check(pm_mpic_send_self_ipi(0));
         while ((u32)(tick_count - first) < 20) {

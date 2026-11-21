@@ -338,7 +338,7 @@ def observe(elf, cpu, out, mode):
                                 reports == [SERIAL_RED.get(mode)], 'unexpected mismatch: '+str(reports))
                         return reports[0]
                 require('CTX FAIL' not in text and 'FATAL' not in text,
-                        'unexpected guest failure in '+mode)
+                        f'unexpected guest failure in {mode} on {cpu}\n{text[-2048:]}')
                 candidates = STOP_RED if mode == 'normal' else (mode,) if mode in STOP_RED else ()
                 if candidates and 'CTX BEGIN\n' in text and time.monotonic() >= next_sample:
                     q.call('stop')
