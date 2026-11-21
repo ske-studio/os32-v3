@@ -22,11 +22,6 @@ PROVIDER_GROUPS = {
         'gfx_hardware_scroll',
         'gfx_set_palette',
         'gfx_get_palette',
-        'gfx_get_framebuffer',
-        'gfx_screen_info',
-        'gfx_hw_fill_rect',
-        'gfx_hw_blit',
-        'gfx_stats',
         'gfx_lease_palette',
         'gfx_hw_submit',
         'gfx_hw_get',
@@ -120,9 +115,6 @@ PROVIDER_GROUPS = {
     # OF uses the shared display entry points for resource-free operations.
     'gfx2': (frozenset({
         'gfx2_check_op',
-        'gfx2_mode_set',
-        'gfx2_flip',
-        'gfx2_present',
     }), frozenset([])),
 }
 

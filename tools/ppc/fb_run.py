@@ -14,7 +14,7 @@ import tempfile
 
 from fb_pixel import Font, Terminal, read_ppm, reserved_unchanged
 from kboot_accept import build, mutant_settings
-from kboot_run import ROOT, ROM, require
+from kboot_run import ROOT, ROM, require, serial, validate_root
 from link_sh_run import Session, text_fixture
 from usb_run import before_shell_input
 
@@ -64,7 +64,6 @@ def observe(elf, out, cpu, case):
     try:
         s.agent_enabled = False
         s.start()
-        from kboot_run import serial
         s.wait(lambda: 'protocol=01' in serial(out/'serial-a.log'), 'keyboard enumeration', 60)
         s.key('esc')
         s.agent_enabled = True
@@ -72,6 +71,8 @@ def observe(elf, out, cpu, case):
             s.wait(s.ready, 'RSH READY after consumed ESC', 60)
             check('[Remote shell closed]' in s.screen('preloaded'), 'start-consumed')
         s.close_rshell(preloaded=True)
+        s.wait(lambda: validate_root(serial(out/'serial-a.log'), serial(out/'serial-b.log')),
+               'rd0 registration and page accounting', 60)
         prompt = 'OS32:/$ '
         def finished(text, result):
             # The command is done when its whole result line is on screen

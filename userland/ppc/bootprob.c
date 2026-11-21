@@ -1,5 +1,6 @@
 #include "os32api.h"
 #include <stdio.h>
+#include <string.h>
 
 int main(int argc, char **argv, KernelAPI *api)
 {
@@ -13,6 +14,13 @@ int main(int argc, char **argv, KernelAPI *api)
 
     (void)argc;
     (void)argv;
+    /* ISO9660 primary descriptor, sector 16. Use the original bytes for
+     * the write probe so a faulty writable device preserves the fixture. */
+    static u8 sector[2048];
+    if (api->dev_blk_read("rd0", 16, 1, sector) ||
+        memcmp(sector, "\001CD001\001", 7) ||
+        api->dev_blk_write("rd0", 16, 1, sector) >= 0)
+        return 2;
     int rc = api->boot_image_info(&info);
     if (rc) {
         snprintf(line, sizeof(line), "BOOT info error %d\n", rc);

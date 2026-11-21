@@ -2,6 +2,7 @@
 """Build a plain ISO9660 root image using an installed ISO tool."""
 import argparse
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -59,6 +60,7 @@ def main():
     parser.add_argument('--sys-bin', type=Path)
     parser.add_argument('--manifest', type=Path)
     parser.add_argument('--out', type=Path, required=True)
+    parser.add_argument('--fixed-dates', action='store_true')
     args = parser.parse_args()
     if args.manifest and args.motd is None:
         parser.error('--manifest requires --motd')
@@ -67,6 +69,8 @@ def main():
     if bool(args.plan) != args.fd:
         parser.error('--plan and --fd must be used together')
     tool = shutil.which('genisoimage') or shutil.which('xorriso')
+    if args.fixed_dates:
+        tool = shutil.which('xorriso')
     if tool is None:
         print(('ERROR' if args.plan else 'SKIP') + ': genisoimage or xorriso required', file=sys.stderr)
         return 1 if args.plan else 3
@@ -75,8 +79,12 @@ def main():
         cmd = [tool]
         if Path(tool).name == 'xorriso':
             cmd += ['-as', 'mkisofs', '--norock']
+        if args.fixed_dates:
+            cmd += ['--modification-date=2000010100000000',
+                    '--set_all_file_dates', '2000010100000000']
         cmd += ['-iso-level', '1', '-no-pad', '-o', str(args.out.resolve()), str(staging)]
-        subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        env = dict(os.environ, TZ='UTC', LC_ALL='C') if args.fixed_dates else None
+        subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, env=env)
         size = args.out.stat().st_size
         if size % 2048:
             raise ValueError('ISO size is not a multiple of 2048')
@@ -118,7 +126,7 @@ def main():
                 (staging / 'etc' / 'motd').write_bytes(motd)
                 if args.bin:
                     (staging / 'bin').mkdir()
-                    for app in args.bin:
+                    for app in sorted(args.bin) if args.fixed_dates else args.bin:
                         shutil.copyfile(app, staging / 'bin' / app.name)
                 seen = {'ETC/MOTD'} | {'BIN/' + app.name.upper() for app in args.bin}
                 if args.sys_bin:
@@ -127,7 +135,8 @@ def main():
                     (staging / 'SYS').mkdir()
                     shutil.copyfile(args.sys_bin, staging / target)
                 if args.manifest:
-                    for guest, host in json.loads(args.manifest.read_text(), object_pairs_hook=unique_object).items():
+                    entries = json.loads(args.manifest.read_text(), object_pairs_hook=unique_object).items()
+                    for guest, host in sorted(entries) if args.fixed_dates else entries:
                         target = guest.strip('/').upper()
                         check_collision(target, seen)
                         dest = staging / target

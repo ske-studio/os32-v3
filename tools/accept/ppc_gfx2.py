@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Exercise the nine gfx2 query slots over link-sh RSH on mac99."""
+"""Stage 5c A7/A8: OF fixed mode, INDEX8 shadow transfer and SYSMEM scanout."""
 import argparse
 import hashlib
 import os
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -36,6 +37,45 @@ def absent_bindings(folder, out):
     (out / 'stamp').touch()
 
 
+def drawing(session, evidence, serial, fallback):
+    from fb_pixel import read_ppm
+    from run import require
+    from usb_run import keyboard_actions, rsh_command
+
+    fg = int(re.search(r'FB text ready generation=\d+ fg=(\d+)', serial)[1])
+    require(fg in (0, 255), 'OF palette endpoints')
+    read_log = lambda: (evidence / 'serial-a.log').read_text(errors='replace')
+    session.wait(lambda: 'protocol=01' in read_log(), 'USB keyboard ready')
+    key, _ = keyboard_actions(session.q, read_log, session.wait, evidence)
+
+    def physical_word(address):
+        response = session.q.call('human-monitor-command', {'command-line': f'xp /1wx {address:#x}'})
+        return int(re.search(r':\s*0x([0-9a-fA-F]+)', response)[1], 16)
+
+    def sample():
+        spans = {'b': (700, 700), 'p': (705, 712), 'e': (705, 719),
+                 'm': (700, 724), 'f': (700, 700)}
+        for phase in ('b' if fallback else 'bpemf'):
+            def waiting():
+                base = physical_word(session.symbols['bb_b'])
+                return base and physical_word(base) == 0x50524200 + ord(phase)
+            session.wait(waiting, 'gfx2 checkpoint ' + phase)
+            path = evidence / ('draw-' + phase + '.ppm')
+            session.q.call('screendump', {'filename': str(path)})
+            frame = read_ppm(path)
+            require((frame.width, frame.height) == (800, 600), 'OF dimensions')
+            left, right = spans[phase]
+            for y in range(560, 562):
+                for x in range(700, 724):
+                    want = bytes([255 if left <= x < right else 0]) * 3
+                    require(frame.pixel(x, y) == want, repr((phase, x, y)))
+            key(phase)
+
+    rsh_command(session, f'/bin/gfx2prob.bin draw {fg}',
+                b'GFX2 present counters failed\n' if fallback else b'GFX2 drawing OK\n\n', during=sample)
+    rsh_command(session, 'echo $?', b'24\n' if fallback else b'0\n')
+
+
 def observe(elf, cpu, evidence, case):
     from link_sh_run import Session
     from run import require
@@ -50,7 +90,9 @@ def observe(elf, cpu, evidence, case):
         require('FB text ready' in serial, 'INDEX8 framebuffer console attached')
         body = rsh_command(session, '/bin/gfx2prob.bin')
         status = rsh_command(session, 'echo $?')
-        require((body, status) == EXPECTED[case], repr((case, body, status)))
+        require((body, status) == EXPECTED['normal' if case == 'shadow-fallback' else case], repr((case, body, status)))
+        if case in ('normal', 'shadow-fallback'):
+            drawing(session, evidence, serial, case == 'shadow-fallback')
         session.q.call('quit')
         session.p.wait(timeout=5)
         require(session.p.returncode == 0, 'gfx2 QEMU exit')
@@ -84,7 +126,7 @@ def main():
     options = ['IMAGE=kboot-link-sh', 'KB_SH_OUT=' + str(user),
                'KB_ROOT_BINS=' + ' '.join(bins)]
     images = {}
-    for case in EXPECTED if args.mutate else ('normal',):
+    for case in (*EXPECTED, 'shadow-fallback') if args.mutate else ('normal',):
         folder = work / case
         folder.mkdir()
         kernel = folder / 'kernel'
@@ -93,8 +135,15 @@ def main():
             mutation = mutant_settings(folder, case, 'gfx/v2/enum.c',
                                        '    if (!rc) *out = v;',
                                        '    if (!rc) { v.w++; *out = v; }')
+        elif case == 'shadow-fallback':
+            mutation = mutant_settings(folder, case, 'gfx/v2/display.c',
+                                       'rc = DISPLAY_V2_SHADOW_PUSH(l, t, r - l, b - t);',
+                                       'rc = OS32_ERR_NOSYS;')
         elif case == 'absent':
             absent_bindings(folder, kernel / 'gen')
+        if case != 'normal':
+            iso = str(normal_elf.parent / 'root.iso')
+            mutation.extend(['ROOT_ISO=' + iso, '--old-file=' + iso])
         elf = build(kernel, *options, *mutation, 'kb-user', 'kernel')
         if case == 'normal':
             normal_elf = elf
@@ -108,6 +157,7 @@ def main():
                 observe(elf, cpu, folder / cpu, case)
                 if case != 'normal':
                     observe(normal_elf, cpu, folder / (cpu + '-control'), 'normal')
+    print(f'{len(images)} distinct link-sh ELF images', flush=True)
     return 0
 
 

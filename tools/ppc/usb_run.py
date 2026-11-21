@@ -14,7 +14,7 @@ import time
 
 from kboot_accept import build
 from run import CriterionFailure
-from kboot_run import ROOT, ROM, QMP, command, require, serial, validate, PREFIX
+from kboot_run import ROOT, ROM, QMP, command, require, serial, validate_root as validate, PREFIX
 
 # Keep TB reads and OHCI timers on instruction-counted virtual time. With
 # host-paced TCG, device_add can leave frames stale for >20ms of guest TB.

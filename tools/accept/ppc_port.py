@@ -137,6 +137,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--build-only', action='store_true')
     parser.add_argument('--mutate', action='store_true')
+    parser.add_argument('--case', choices=EXPECTED)
     args = parser.parse_args()
     cross = Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc'))
     if any(not os.access(cross / 'bin' / ('powerpc-elf-' + tool), os.X_OK)
@@ -158,7 +159,8 @@ def main():
     options = ['IMAGE=kboot-link-sh', 'KB_SH_OUT=' + str(user),
                'KB_ROOT_BINS=' + ' '.join(bins)]
     images = {}
-    for case in EXPECTED if args.mutate else ('normal',):
+    cases = EXPECTED if args.mutate else ('normal',)
+    for case in ((args.case,) if args.case else cases):
         folder = work / case
         folder.mkdir()
         kernel = folder / 'kernel'

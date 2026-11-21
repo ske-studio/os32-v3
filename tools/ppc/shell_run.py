@@ -13,7 +13,7 @@ import sys
 import tempfile
 import time
 
-from kboot_run import ROOT, ROM, QMP, command, require, serial, validate, lan
+from kboot_run import ROOT, ROM, QMP, command, require, serial, validate_root as validate, lan
 
 ELF = ROOT / 'build/out/ppc-kboot/shell/PPCKERN.ELF'
 

@@ -157,7 +157,8 @@ def workflow_cases(source, setup_source=None):
     assert "printf '%s\\n' \"$packages\" | sha256sum" in key, 'apt cache hashes package list'
     packages = shlex.split(next(line.strip() for line in key.splitlines()
                                if line.strip().startswith('packages=')))[0].split('=', 1)[1].split()
-    assert packages == ('build-essential nasm genisoimage e2fsprogs qemu-user clang libclang-dev '
+    # PowerMac root packaging uses xorriso for the ISO and system liblz4 for HC12.
+    assert packages == ('build-essential nasm genisoimage xorriso liblz4-1 e2fsprogs qemu-user clang libclang-dev '
                         'llvm-dev python3-clang libgmp-dev libmpfr-dev libmpc-dev texinfo bison flex').split(), 'complete host dependencies'
     assert host_step['env'] == {'APT_PACKAGES': '${{ steps.apt-key.outputs.packages }}',
                                  'APT_CACHE_HIT': '${{ steps.apt-cache.outputs.cache-hit }}'}
@@ -200,6 +201,16 @@ def reuse_gate_cases(workflow, filename, job):
 def scope_cases(source):
     scope = {}
     exec(compile(source, 'ppc_scope.py', 'exec'), scope)
+    select = scope['layout_scope']
+    layout_changes = """
+        arch/ppc/kernel.ld include/memmap.h platform/powermac/platform_kboot_layout.h
+        build/images/kboot-sh.mk build/targets/ppc-powermac.mk tools/mkroot_image.py
+        build/ppc-ram-root.json tools/ppc/root_pair.py
+    """.split()
+    for path in layout_changes:
+        assert select(['docs/notes.md', path]) == (True, path)
+    assert select(None)[0]
+    assert not select(['docs/layout.md', 'kernel/time/timer.c', 'arch/x86/entry.S'])[0]
     decide = scope['decide']
     patterns = yaml.safe_load(WORKFLOW.read_text())[True]['push']['paths-ignore']
     assert set(scope['DOC_PATTERNS']) == set(patterns), 'main docs must match build exclusions'

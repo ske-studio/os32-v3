@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 import tempfile
 from kboot_accept import build, mutant_settings
-from kboot_run import require, serial, validate
+from kboot_run import require, serial, validate_root
 
 CHECK = dict(name='ppc-sh-output', tier=2, budget=900, needs=[],
              covers=['tools/ppc/ppc_sh_output.py', 'userland/ppc/outprobe.c'],
@@ -83,8 +83,8 @@ def link_accept(elf, cpu, out, mutant=False):
                 all(r['drop_records'] == r['drop_bytes'] == 0 for r in s.logs), 'LOG loss/generation')
         require((b'FD1 PROBE\n' in logs) == mutant, 'fd1 LOG routing')
         require(b'KBOOT READY' not in actual, 'kernel READY in OUT')
-        s.wait(lambda: validate(serial(out/'serial-a.log'), serial(out/'serial-b.log')),
-               'serial ALIVE', 10)
+        s.wait(lambda: validate_root(serial(out/'serial-a.log'), serial(out/'serial-b.log')),
+               'rd0 registration and page accounting', 60)
         s.q.call('quit'); s.p.wait(timeout=5)
         require(s.p.returncode == 0, 'QEMU exit')
     finally:

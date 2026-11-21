@@ -8,7 +8,7 @@ import socket
 import tempfile
 
 from kboot_accept import build, mutant_settings
-from kboot_run import require
+from kboot_run import require, serial, validate_root
 
 CHECK = dict(name='ppc-sc', tier=2, budget=900, needs=[],
              covers=['platform/powermac/input_usb.[ch]', 'platform/powermac/input_keymap.c', 'tools/ppc/sc_run.py', 'userland/ppc/nest.c'],
@@ -124,6 +124,8 @@ def link_main(args):
             session = Session(elf, cpu, folder/cpu, 180)
             try:
                 session.start()
+                session.wait(lambda: validate_root(serial(session.out/'serial-a.log'), serial(session.out/'serial-b.log')),
+                             'rd0 registration and page accounting', 60)
                 session.wait(session.ready, 'HELLO to cui READY', 60)
                 require(session.agent.operator.ready['mode'] == 'cui', 'link sh mode')
                 normal = LINK_NEST_EXPECTED
@@ -148,7 +150,6 @@ def link_main(args):
                     generation = session.word('g_shell_service', 8)
                     session.agent.notifier.notify_number(RSHELL, EXECUTE, b'00001000 p3-fault\n')
                     if name == 'fault-break':
-                        from kboot_run import serial
                         session.wait(lambda: '/sys/shell.bin returned ' in serial(session.out/'serial-a.log'),
                                      'resident fault returned', 60)
                         before = len(session.events)

@@ -68,6 +68,7 @@ int of_fb_copy(const u8 *src, u32 pitch, u32 bytes, int x, int y, int w, int h)
             }
         }
     }
+    if (bottom > y) gfx_counters.present_bytes += (end - first) * ((u32)bottom - (u32)y);
     __sync_synchronize();
     return 0;
 }
@@ -79,9 +80,17 @@ static int query(GFX_ScreenInfo *out)
                             .bpp = 8, .format = GFX_FMT_PACKED8};
     return 0;
 }
+int of_fb_present(int x, int y, int w, int h)
+{
+    if (!live) return OS32_ERR_STALE;
+    if (w <= 0 || h <= 0) return OS32_ERR_INVAL;
+    int rc = of_fb_copy(fb.shadow, fb.shadow_pitch, fb.shadow_bytes, x, y, w, h);
+    if (!rc) gfx_counters.commits++;
+    return rc;
+}
 static void present(int x, int y, int w, int h)
 {
-    (void)of_fb_copy(fb.shadow, fb.shadow_pitch, fb.shadow_bytes, x, y, w, h);
+    (void)of_fb_present(x, y, w, h);
 }
 static int set_mode(u32 id) { return !live ? OS32_ERR_STALE : id == 1 ? 0 : OS32_ERR_NOSYS; }
 static void noop(void) { }

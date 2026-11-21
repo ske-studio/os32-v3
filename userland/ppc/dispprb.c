@@ -1,3 +1,5 @@
+/* Stage 5c A5/A6: OF INDEX8 mode, CLIENT surface descriptor and OF
+ * four-byte transfer accounting, including the reserved rows. */
 #include "os32api.h"
 #include "../../include/app_ids.h"
 #include <stdio.h>
@@ -139,6 +141,29 @@ static int present_probe(KernelAPI *api, const char *mode, u8 white)
         return 44;
     u32 pitch = q.desc[0].pitch;
     u8 *shadow = (u8 *)view.planes[0];
+    if (!strcmp(mode, "v1-framebuffer")) {
+        GFX_ScreenInfo info = {0};
+        GFX_Framebuffer fb = {0};
+        GFX_Stats before, after;
+        api->gfx_screen_info(&info);
+        if (info.width != 800 || info.height != 600 || info.bpp != 8 ||
+            info.format != GFX_FMT_PACKED8 || info.lease_mask ||
+            info.lease_first || info.lease_count) return 49;
+        api->gfx_get_framebuffer(&fb);
+        if (!fb.planes[0] || fb.planes[1] || fb.planes[2] || fb.planes[3] ||
+            fb.width != desc.w || fb.height != desc.h || (u32)fb.pitch != pitch)
+            return report(api, "DISPLAY framebuffer failed\n", 50);
+        shadow = fb.planes[0];
+        if (api->gfx_stats(&before)) return 51;
+        api->gfx_present_rect(705, 560, 6, 2);
+        if (api->gfx_stats(&after) || after.present_bytes - before.present_bytes != 16 ||
+            after.commits - before.commits != 1)
+            return report(api, "DISPLAY counters failed\n", 52);
+        before = after;
+        api->gfx_present_rect(705, 0, 6, 1);
+        if (api->gfx_stats(&after) || after.present_bytes != before.present_bytes ||
+            after.commits - before.commits != 1) return 53;
+    }
     for (int y = 560; y < 576; y++)
         memset(shadow + y * pitch + 704, white ^ 255, 96);
     api->gfx_present_rect(704, 560, 96, 16);
@@ -160,7 +185,7 @@ static int present_probe(KernelAPI *api, const char *mode, u8 white)
         api->exec_run("/bin/dispprb.bin v1-child");
         if (api->exec_last_result(&kind, &code) || kind != EXEC_KIND_EXITED || code)
             return 47;
-    } else if (!strcmp(mode, "v1-init")) api->gfx_present_rect(704, 560, 8, 16);
+    } else if (!strcmp(mode, "v1-init") || !strcmp(mode, "v1-framebuffer")) api->gfx_present_rect(704, 560, 8, 16);
     else if (!strcmp(mode, "v1-full")) api->gfx_present();
     else {
         int edge = !strcmp(mode, "v1-edge");

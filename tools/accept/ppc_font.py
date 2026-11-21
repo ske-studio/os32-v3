@@ -70,6 +70,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--build-only', action='store_true')
     parser.add_argument('--mutate', action='store_true')
+    parser.add_argument('--case', choices=CASES)
     args = parser.parse_args()
     cross = Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc'))
     if not os.access(cross / 'bin/powerpc-elf-gcc', os.X_OK):
@@ -83,7 +84,8 @@ def main():
     print(f'evidence={work}', flush=True)
     options = settings(work)
     images = {}
-    for case in CASES if args.mutate else ('normal',):
+    cases = CASES if args.mutate else ('normal',)
+    for case in ((args.case,) if args.case else cases):
         folder = work / case
         folder.mkdir()
         kernel = folder / 'kernel'

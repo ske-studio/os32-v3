@@ -46,6 +46,7 @@ struct pm_kboot_info {
     struct pm_regions ram, available;
     u32 admitted_end, image_first, image_end, hpt_pa, hpt_bytes;
     u32 tb_hz, escc_pa, mpic_pa, mpic_bytes;
+    u32 root_frame_bytes;
     u32 of_calls_at_detach;
     struct pm_kboot_device escc, mpic;
     struct pm_gmac_boot gmac;

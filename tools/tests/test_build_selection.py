@@ -3,6 +3,7 @@
 import argparse
 import json
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -205,7 +206,10 @@ def check_product_selectors():
         assert output.splitlines()[-1] == 'SELECTED='+str(out), selector
         image = subprocess.check_output(['isoinfo', '-i', out/'root.iso',
                                         '-x', '/SYS/SHELL.BIN;1'], cwd=ROOT)
-        link_map = (ROOT/out/'PPCKERN.map').read_bytes()
+        # root_pair links in a fresh staging directory for each publication.
+        link_map = (ROOT/out/'PPCKERN.map').read_text()
+        link_map = re.sub(r'(?m)^(OUTPUT\(' + re.escape(str(ROOT/out)) +
+                          r'/)tmp[^/\s]+(/kernel\.elf elf32-powerpc\))$', r'\1<stage>\2', link_map)
         if canonical_map is None:
             canonical_shell = (ROOT/shell).read_bytes()
             canonical_map = link_map

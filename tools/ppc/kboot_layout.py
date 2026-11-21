@@ -71,8 +71,8 @@ def check_acceptance_controls(work):
 
 
 def report_product(path):
-    from kboot_root_image import verify_embedded
-    elf, load, symbols, layout = linked_image(path)
+    from root_lz4_inventory import measure
+    _, load, symbols, layout = linked_image(path)
     _, _, va, _, raw, memory, _, _ = load
     end, chain = symbols['__kernel_resident_end'], symbols['__kernel_chain_end']
     shell = layout['MEM_SHELL_LOAD_ADDR']
@@ -98,7 +98,8 @@ def report_product(path):
     assert cursor == layout['MEM_POOL_BASE'] == 0x500000
     iso = path.parent/'root.iso'
     contents = iso.read_bytes()
-    root = verify_embedded(elf, load, symbols, contents)
+    measure(path, iso=iso)
+    root = len(contents)
     sectors, = struct.unpack_from('<I', contents, 16 * 2048 + 80)
     assert sectors * 2048 == root
     names = command(['isoinfo', '-i', iso, '-f']).splitlines()
@@ -161,9 +162,7 @@ const unsigned layout[] = {PM_KERNEL_BASE, PM_KERNEL_IMAGE_MAX,
     assert syms['__kernel_resident_end']-base <= budget
     assert syms['__kernel_chain_end'] <= limit == 0x3e0000
     ph = [struct.unpack_from('>8I', elf, hdr[5]+i*hdr[9]) for i in range(hdr[10])]
-    loads = [p for p in ph if p[0] == 1]
-    assert len(loads) == 1
-    p = loads[0]
+    p, = [p for p in ph if p[0] == 1 and p[2] == base]
     assert p[2] == p[3] == base and p[2]+p[5] == syms['__kernel_resident_end']
     assert p[2]+p[4] == syms['__kernel_file_end'] and p[5] > p[4]
     note = next(p for p in ph if p[0] == 4)

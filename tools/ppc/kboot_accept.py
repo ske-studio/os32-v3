@@ -60,7 +60,9 @@ def linked_image(path):
     hdr = struct.unpack_from('>16sHHIIIIIHHHHHH', elf)
     assert hdr[0][:6] == b'\x7fELF\x01\x02' and hdr[2] == 20
     ph = [struct.unpack_from('>8I', elf, hdr[5]+i*hdr[9]) for i in range(hdr[10])]
-    load, = [p for p in ph if p[0] == 1]
+    # With the lz4 root (PPC_ROOT_LZ4_DESIGN) the image has a second, high
+    # PT_LOAD at the staging area; the resident budget is the low one at 1 MiB.
+    load, = [p for p in ph if p[0] == 1 and p[2] == 0x100000]
     # boot-info's CRC case replaces ISO bytes after link, preserving the map.
     map_path = path.with_name('PPCKERN.map') if path.name == 'unverified.elf' else path.with_suffix('.map')
     symbols = {name: int(value, 16) for value, name in re.findall(

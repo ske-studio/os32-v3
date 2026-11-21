@@ -7,7 +7,7 @@ from pathlib import Path
 import tempfile
 
 from kboot_accept import build, mutant_settings
-from kboot_run import require
+from kboot_run import require, serial, validate_root
 from link_sh_run import Session
 from usb_run import rsh_command
 
@@ -52,6 +52,8 @@ def main():
             s = Session(elf, cpu, work/(name+'-'+cpu), 180)
             try:
                 s.start()
+                s.wait(lambda: validate_root(serial(s.out/'serial-a.log'), serial(s.out/'serial-b.log')),
+                       'rd0 registration and page accounting', 60)
                 for child in ('hello', 'hello', 'fault', 'hello'):
                     if child == 'hello':
                         status = 0 if name == 'exit-status' else 7
