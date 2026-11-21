@@ -45,7 +45,8 @@ def observe(elf, directory, cpu, file, value, mounted, nap7450):
         finally:
             proc.kill()
     if mounted is not None:
-        assert (int(root[1]) == 0) == mounted and (not mounted or root[2] == '1'), root[0]
+        expected_rc = 0 if mounted else -9  # VFS_ERR_INVAL for an unregistered filesystem
+        assert int(root[1]) == expected_rc and root[2] == '1', root[0]
     assert 'KBOOT CLOCK hz=' in data and 'KBOOT ALIVE tick_delta=' in data
     pvr, raw, bit = (int(hid[i], 16) for i in (1, 2, 3))
     assert pvr >> 16 == (0x8000 if cpu == '7450' else 0x8001)
@@ -104,6 +105,17 @@ def main():
         file = case if case in ('none', 'big') else 'ok'
         check(case, file, value if file == 'ok' else 0, settings)
         if args.mutate or args.build_only:
+            if case == 'zero':
+                # Start the post-root apply with NAP set, independent of early init.
+                # Both images use the same setup. Only the mutant omits the clear.
+                clear = 'u32 hid = ppc_read_hid0() & ~PPC_HID_NAP;'
+                seed = ('ppc_sync(); ppc_write_hid0(ppc_read_hid0() | PPC_HID_NAP);'
+                        ' ppc_sync(); ppc_isync();\n    ')
+                for name, read, expected in [('seed-nap', clear, 0),
+                                             ('omit-clear', 'u32 hid = ppc_read_hid0();', 1)]:
+                    change = mutant_settings(work, name, 'arch/ppc/kernel_cpu.c',
+                                             clear, seed + read)
+                    check(name, 'ok', 0, settings + change, nap7450=expected)
             if case == 'one':
                 ignore = mutant_settings(work, 'ignore-nap', 'arch/ppc/kernel_cpu.c',
                                          'if (nap7450)', 'if (!nap7450)')
