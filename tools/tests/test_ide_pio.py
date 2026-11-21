@@ -12,8 +12,9 @@ CHECK = dict(name='ide-pio-host', tier=1, budget=4.3,
                      'drivers/ata/ide_addr.c', 'drivers/ata/ide_addr.h',
                      'drivers/ata/ide_multiple.inc', 'drivers/ata/ide_pio.inc', 'drivers/ata/ide_request.inc',
                      'tools/tests/ide_pio_host.c', 'tools/tests/ide_pio_host_multiple.inc', 'tools/tests/ide_hostshim/io.h',
+                     'platform/powermac/ide_compatible.h', 'tools/tests/ide_be_hostshim/kstring.h',
                      'tools/tests/ide_be_hostshim/platform_ide_bus.h', 'tools/tests/test_ide_pio.py', 'tools/tests/kernel_includes.py'], needs=[],
-    basis=['docs/design/drivers/ata/ide.md'],
+    basis=['docs/design/drivers/ata/ide.md', 'docs/ppc/ata.md §2'],
 )
 ROOT = Path(__file__).resolve().parents[2]
 FLAGS = ['-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
@@ -74,6 +75,8 @@ def main(args):
         shutil.copytree(ROOT / 'drivers/ata', be_tree)
         shutil.copy2(ROOT / 'include/ide_bus.h', be_tree)
         shutil.copy2(ROOT / 'tools/tests/ide_be_hostshim/platform_ide_bus.h', be_tree)
+        shutil.copy2(ROOT / 'platform/powermac/ide_compatible.h', be_tree)
+        shutil.copy2(ROOT / 'tools/tests/ide_be_hostshim/kstring.h', be_tree)
         build(be_tree, exe, be=True)
         subprocess.run([str(exe), 'be'], check=True)
         if '--mutate' in args:
@@ -86,6 +89,7 @@ def main(args):
             build(mirror, exe)
             subprocess.run([str(exe)], check=True, stdout=subprocess.DEVNULL)
             be_mutants = [
+                ('compatible-tail', 'ide_compatible.h', 'end < bytes', 'end <= bytes', 'be'),
                 ('identify-order', 'platform_ide_bus.h', 'return __builtin_bswap16(raw_be_data());', 'return raw_be_data();', 'be'),
                 ('sector-read-order', 'platform_ide_bus.h', 'u16 raw = raw_be_data();', 'u16 raw = ide_bus_data_word();', 'be'),
                 ('sector-write-order', 'platform_ide_bus.h', 'outpw(IDE_DATA, __builtin_bswap16(raw))', 'outpw(IDE_DATA, raw)', 'be'),

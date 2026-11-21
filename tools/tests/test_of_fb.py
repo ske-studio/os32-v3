@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Characterization of pre-optimization OF scanout; ppc-offb-fast PACK (2026-11-15).
 
+PPC_KAPI_GFX_REST_DESIGN 5c §2-5, A3 and A8 specify transfer accounting and fixed mode.
 Keep edge-word bytes, clipping and protected rows while accelerating aligned rows.
 """
 import argparse
@@ -30,9 +31,12 @@ CHECK = dict(env=['ppc-cross'], name='of-fb-host', tier=1, needs=[], budget=30, 
     'include/gfx_hal.h', 'include/gfx_hal2.h', 'include/gfx_mode.h',
     'include/display_provider.h', 'platform/powermac/rh_observe.h',
     'arch/ppc/kernel_boot.h', 'kernel/console/console_dual.h'],
-    basis=['PPC_FBCON_DESIGN §2', 'AC-DISPLAY-2'],
+    basis=['PPC_FBCON_DESIGN §2', 'AC-DISPLAY-2', 'PPC_KAPI_GFX_REST_DESIGN 5c §2-5 A3 A8'],
 )
 MUTATIONS = (
+    ('count-commit', BACKEND, 'if (!rc) gfx_counters.commits++;', ''),
+    ('count-bytes', BACKEND, 'gfx_counters.present_bytes += (end - first)', 'gfx_counters.present_bytes += 1u'),
+    ('fixed-mode', V2, 'm->id != 1 ||', ''),
     ('present-owner', SOURCES[2], 'present_owner == appslot_cur()', '1'),
     ('present-generation', SOURCES[2], 'present_generation == a->gen', '1'),
     ('present-reset', SOURCES[2], '{ present_owner = 0; }', '{ }'),

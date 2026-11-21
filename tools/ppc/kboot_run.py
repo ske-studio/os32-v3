@@ -40,15 +40,26 @@ PATTERNS = [
 ]
 
 
-def validate(a, b, complete=False):
+ROOT_PATTERNS = [
+    r'ROOT rc=(-?\d+) registered=([01]) bytes=(\d+) staging_pages=(\d+)',
+    r'ROOT owner_before=(\d+) owner_after=(\d+) free_before=(\d+) free_after=(\d+)',
+]
+
+
+def validate_root(a, b, complete=False):
+    return validate(a, b, complete, root_image=True)
+
+
+def validate(a, b, complete=False, root_image=False):
+    patterns = PATTERNS + ROOT_PATTERNS if root_image else PATTERNS
     require('KBOOT' not in b, 'serial B contains KBOOT')
     require(not re.search(r'FAIL|FATAL|UNSUPPORTED', a+b), 'forbidden diagnostic')
     lines = [line for line in a[:a.rfind('\n')+1].splitlines() if line.startswith('KBOOT ')]
     require(len(lines) == len(set(lines)), 'duplicate/extra milestone')
-    require(len(lines) <= len(PATTERNS), 'duplicate/extra milestone')
+    require(len(lines) <= len(patterns), 'duplicate/extra milestone')
     values = []
     for i, line in enumerate(lines):
-        match = re.fullmatch('KBOOT '+PATTERNS[i], line)
+        match = re.fullmatch('KBOOT '+patterns[i], line)
         require(match is not None, f'milestone {i+1} order/format')
         values.append(match.groups())
     if values:
@@ -61,13 +72,13 @@ def validate(a, b, complete=False):
                 'MMU values')
     if len(values) > 5:
         require(int(values[5][0]) > 0, 'MPIC sources')
-    if len(values) == 9:
+    if len(values) >= len(PATTERNS):
         ticks, us = map(int, values[8])
         require(us >= 2000000, 'ALIVE duration')
         require(abs(ticks*10000-us)*100 <= us*5, 'ALIVE tick/TB mismatch')
     if complete:
-        require(len(values) == 9, 'missing milestone')
-    return len(values) == 9
+        require(len(values) == len(patterns), 'missing milestone')
+    return len(values) == len(patterns)
 
 
 def serial(path):

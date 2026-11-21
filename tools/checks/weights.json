@@ -479,6 +479,7 @@
     "pegc-mode-host": 3.4177,
     "pit-clock-host": 2.799469,
     "platform-memory-host": 2.646895,
+    "ppc-ata-guest": 300,
     "ppc-boot-info-guest": 137.863593,
     "ppc-console-cells": 73.481194,
     "ppc-db-guest": 281.599723,
@@ -623,7 +624,10 @@
     "vmkernel-lz4-host": 5.095719,
     "x11-shared-host": 4.6934425,
     "x87-host": 2.564676,
-    "x87-lifecycle-host": 3.708318
+    "x87-lifecycle-host": 3.708318,
+    "ppc-root-lz4-layout-host": 120,
+    "ppc-root-lz4-layout-run": 120,
+    "ppc-root-pair-host": 2
   },
   "samples": {
     "access-host": 2,

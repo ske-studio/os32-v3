@@ -66,6 +66,8 @@ MUTATIONS = [
      "    } else if (l->kind == PGALLOC_BACKING_FIXED) {\n        if (top + 1 < minimum) goto done;",
      ("minimum_short", 5440)),
     # 同梱域の申告の範囲検査を外す (同梱域の外の申告を受け付けてしまう)。
+    ("staging-unreserved", "mm/memory_boot.c",
+     "if (platform_boot_staging_in_use())", "if (0)", ("staging", 16384)),
     ("bundle-range-blind", "mm/memory_boot.c",
      "    if (first >= end || first < lo || end > hi) return 0;",
      "    if (first >= end) return 0;", ("bundle", 16384)),
@@ -148,6 +150,8 @@ def run_case(case='default', kb=16384, defines=(), mutation=None, compile_only=F
         # 引く (順序 3・5)。CR0 / CR3 を触る arch_cpu.h だけは、ホストでは
         # tools/tests/host_arch/ の実装が先に見つかるようにする。
         cmd += ['-I' + str(d / 'kernel'), '-I' + str(d / 'platform/pc98'), '-I' + str(d), '-I' + str(ROOT / 'tools/tests/host_arch')]
+        builtin = subprocess.check_output(['gcc', '-print-file-name=include'], text=True).strip()
+        cmd += ['-nostdinc', '-isystem', builtin]
         cmd += include_flags(ROOT)
         # physmem.c も写しから組む ("memmap.h" を同じ写しで引かせるため)。
         physmem = d / 'mm/physmem.c'
@@ -328,6 +332,7 @@ class MemoryBoot(unittest.TestCase):
         for kb in (8192, 16384):
             with self.subTest(kb=kb):
                 self.run_case('bundle', kb)
+                self.run_case('staging', kb)
 
     def test_ram_kb_is_the_registered_total_not_the_top(self):
         # K6-RAM decision (2). (top-of-RAM KiB from the detector, real RAM KiB).

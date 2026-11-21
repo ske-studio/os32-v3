@@ -222,3 +222,11 @@ static-check の Check map は 5 分、Host tests は 6 分（検査本体の実
 ## 6. 範囲の外
 
 既存の workflow の書き換え、NP21/W・実機の受入、検査の中身の直し (目印のずれなどは見つけた枝で別のコミットにして直す)。
+
+## 5-9. PowerPC の全部の受入の像の配置の一覧 (2026-11-21、PPC_ROOT_LZ4_DESIGN)
+
+| ジョブ | 回る時 | ふだんの所要 | 上限 |
+|---|---|---|---|
+| `ppc-layout-inventory` (check.yml) | 像の配置に効くファイルを触った push の時だけ (`tools/ci/ppc_scope.py --inventory`。kernel.ld・memmap.h・platform_*_layout.h・build/images・ppc-powermac.mk・root の生成の道具・sdk/kapi.json ほか)。当たらない時は SKIP の理由の行 | 約 31 分 (195 像) | 90 分 |
+
+ふだんは代表の 1 検査 `ppc-root-lz4-layout-host` (製品 5 像・最大の受入 3 像・64 KiB の整列の跳ね) だけが ppc-qemu の組で回り、6 組の重みの和は最大 21 分 19 秒 (本線の了承 2026-11-21)。

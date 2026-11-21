@@ -7,6 +7,8 @@
 #define PM_MEMORY_ADMITTED_END 0x01000000UL
 #define PM_MEMORY_COMPAT_FIRST 0x000a0000UL
 #define PM_MEMORY_COMPAT_END 0x00100000UL
+int platform_boot_staging_in_use(void);
+
 static const struct platform_memory_geometry platform_memory_geometry = {
     PM_MEMORY_LEGACY_END, PM_MEMORY_LEGACY_END, PM_MEMORY_ADMITTED_END,
     PM_MEMORY_ADMITTED_END, PM_MEMORY_ADMITTED_END

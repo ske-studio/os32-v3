@@ -18,9 +18,17 @@ void gfx_policy_scan_changed(void) { policy++; }
 int gfx_fullscreen_owner(void) { return 0; }
 void v1_bridge_rebind(void) {}
 int gfx2_mode_set(u32,u32,u32,u32,u32);
+#ifdef TEST_POWERMAC
+static int gate;
+int display_provider_present_ok(void) { return gate; }
+#endif
 static int test(void) {
  a.be=&be; a.flags=GFX2_AF_ACTIVE; a.heads=1; a.caps.connectors=1; a.gen=5;
  surf.sid=1; surf.usage=GFX2_USE_SCANOUT; surf.fmt=1; surf.w=640; surf.h=480;
+#ifdef TEST_POWERMAC
+ if (gfx2_mode_set(0,0,1,7,1)!=OS32_ERR_BUSY || calls || swaps || policy) return 4;
+ gate=1;
+#endif
  qrc=OS32_ERR_TIMEOUT;
  if (gfx2_mode_set(0,0,1,7,1)!=OS32_ERR_TIMEOUT || calls || swaps || policy || a.gen!=5) return 1;
  qrc=0; mrc=OS32_ERR_IO;
