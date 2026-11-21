@@ -124,6 +124,16 @@ static void append_raw(int keycode, int is_break, int mods, int rank)
     ++kbd_raw_count;
 }
 
+static int has_ctrl_stop(void)
+{
+    for (int i = 0; i < kbd_raw_count; ++i) {
+        u16 raw = kbd_raw_buf[raw_slot(i)];
+        if ((raw & KBD_RAW_KEY_MAKE_MASK) == (KEY_STOP | KBD_RAW_MAKE) &&
+            (raw & (SHIFT_CTRL << KBD_RAW_MOD_SHIFT))) return 1;
+    }
+    return 0;
+}
+
 void legacy_raw_push(int keycode, int is_break, int mods)
 {
     int grph = mods & SHIFT_GRPH;
@@ -134,16 +144,38 @@ void legacy_raw_push(int keycode, int is_break, int mods)
     /* Once this physical press ends, its queued steps determine an
      * earlier selection. Later input must not coalesce those repeats. */
     if (tab_down && (finish || (keycode == KEY_TAB && is_break))) {
+        int kept = 0, first_repeat = -1;
         for (int i = 0; i < kbd_raw_count; ++i) {
-            int slot = raw_slot(i);
-            if (priority[slot] == RAW_REPEAT) priority[slot] = RAW_PROTECTED;
+            int from = raw_slot(i), to = raw_slot(kept);
+            if (priority[from] == RAW_REPEAT) {
+                if (first_repeat >= 0) continue;
+                first_repeat = to;
+            }
+            kbd_raw_buf[to] = kbd_raw_buf[from];
+            priority[to] = priority[from];
+            ++kept;
         }
+        kbd_raw_dropped += kbd_raw_count - kept;
+        kbd_raw_count = kept;
+        kbd_raw_tail = raw_slot(kept);
+        /* Before sealing the repeat, leave seats for both finish and STOP.
+         * make_room can move it or coalesce it under pressure. */
+        if (kbd_raw_count >= KBD_BUF_SIZE - 1 && !has_ctrl_stop())
+            make_room(2, KBD_BUF_SIZE, RAW_PROTECTED);
+        if (first_repeat >= 0)
+            for (int i = 0; i < kbd_raw_count; ++i)
+                if (priority[raw_slot(i)] == RAW_REPEAT) {
+                    priority[raw_slot(i)] = RAW_PROTECTED;
+                    break;
+                }
     }
     if (keycode == KEY_TAB) tab_down = !is_break;
     if (!grph || finish) tab_down = 0;
     if (finish && stop) {
         /* The reserved finish and the emergency request are independent.
          * ABORTED cleanup can remove STOP while preserving the switch. */
+        if (kbd_raw_count >= KBD_BUF_SIZE - 1 && !has_ctrl_stop())
+            make_room(1, KBD_BUF_SIZE - 1, RAW_PROTECTED);
         append_raw(KEY_GRPH, 1, mods & ~SHIFT_GRPH, RAW_PROTECTED);
         switch_pending = finish = 0;
     }
@@ -161,18 +193,8 @@ void legacy_raw_push(int keycode, int is_break, int mods)
     int limit = KBD_BUF_SIZE - (switch_pending && !finish);
     /* The last seat can contain ordinary expendable input or STOP, never
      * a protected switch. Count STOP as already occupying its seat. */
-    if (start && kbd_raw_count + 2 >= KBD_BUF_SIZE) {
-        int has_stop = 0;
-        for (int i = 0; i < kbd_raw_count; ++i) {
-            u16 raw = kbd_raw_buf[raw_slot(i)];
-            if ((raw & KBD_RAW_KEY_MAKE_MASK) == (KEY_STOP | KBD_RAW_MAKE) &&
-                (raw & (SHIFT_CTRL << KBD_RAW_MOD_SHIFT))) {
-                has_stop = 1;
-                break;
-            }
-        }
-        limit -= !has_stop;
-    }
+    if ((start || finish) && kbd_raw_count + 1 + start >= KBD_BUF_SIZE)
+        limit -= !has_ctrl_stop();
     if (!make_room(1 + start, limit, rank)) {
         kbd_raw_dropped++;
         return;

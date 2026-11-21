@@ -279,6 +279,32 @@ static int switch_queue(void)
     legacy_raw_discard_stop();
     if (legacy_raw_take() != tab || legacy_raw_take() != (KEY_GRPH | (SHIFT_CTRL << KBD_RAW_MOD_SHIFT)) ||
         legacy_raw_take() != -1) return 45;
+    for (int combined = 0; combined <= 1; ++combined) {
+        legacy_raw_push(KEY_TAB, 0, SHIFT_GRPH);
+        for (int i = 0; i < KBD_BUF_SIZE - 2; ++i)
+            legacy_raw_push(KEY_TAB, 0, SHIFT_GRPH);
+        if (!combined) legacy_raw_push(KEY_GRPH, 1, 0);
+        legacy_raw_push(KEY_STOP, 0, SHIFT_CTRL);
+        int finish = KEY_GRPH | (combined ? SHIFT_CTRL << KBD_RAW_MOD_SHIFT : 0);
+        if (legacy_raw_take() != tab || legacy_raw_take() != tab ||
+            legacy_raw_take() != finish || legacy_raw_take() != stop ||
+            legacy_raw_take() != -1) return 45;
+    }
+    /* Seal 125 entries, leaving exactly a start, a finish and STOP. */
+    for (int i = 0; i < (KBD_BUF_SIZE - 4) / 2; ++i) {
+        legacy_raw_push(KEY_TAB, 0, SHIFT_GRPH);
+        if (i == 0) legacy_raw_push(KEY_TAB, 0, SHIFT_GRPH);
+        legacy_raw_push(KEY_GRPH, 1, 0);
+    }
+    legacy_raw_push(KEY_TAB, 0, SHIFT_GRPH);
+    legacy_raw_push(KEY_TAB, 0, SHIFT_GRPH);
+    legacy_raw_push(KEY_STOP, 0, SHIFT_CTRL);
+    for (int i = 0; i < (KBD_BUF_SIZE - 4) / 2; ++i) {
+        if (legacy_raw_take() != tab || (i == 0 && legacy_raw_take() != tab) ||
+            legacy_raw_take() != KEY_GRPH) return 45;
+    }
+    if (legacy_raw_take() != tab || legacy_raw_take() != (KEY_GRPH | (SHIFT_CTRL << KBD_RAW_MOD_SHIFT)) ||
+        legacy_raw_take() != stop || legacy_raw_take() != -1) return 45;
     av_focus_set(10);
     in2_excl_acquire(10, IN2_EXCL_KBD);
     legacy_raw_push(KEY_TAB, 0, SHIFT_GRPH);
@@ -354,7 +380,7 @@ static int previous_tab_press(int end_grph)
         legacy_raw_take() != boundary || legacy_raw_take() != tab) return 47;
     for (int i = 0; i < KBD_BUF_SIZE - 6; ++i)
         if (legacy_raw_take() != (KEY_CTRL | KBD_RAW_MAKE | grph)) return 47;
-    if (legacy_raw_take() != (KEY_CTRL | grph) || legacy_raw_take() != KEY_GRPH ||
+    if (legacy_raw_take() != KEY_GRPH ||
         legacy_raw_take() != -1) return 47;
     return 0;
 }
