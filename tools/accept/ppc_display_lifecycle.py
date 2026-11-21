@@ -22,7 +22,7 @@ def image(folder, user, case):
     changes = []
     if case == 'normal':
         changes = ppc_resource_owner.instrument(
-            folder, 'gfx/gfx_core.c', 'if (appslot_gfx_claim(con_sink_is_enabled()) >= 0) {',
+            folder, 'gfx/gfx_core.c', 'if (rc >= 0) {',
             'appslot_gfx_owner()')
     elif case == 'no-return':
         changes = mutant_settings(folder, case, 'gfx/gfx_core.c',

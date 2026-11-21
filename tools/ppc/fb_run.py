@@ -83,11 +83,9 @@ def observe(elf, out, cpu, case):
             lines = [l.rstrip() for l in text.splitlines()]
             rows = [i for i, l in enumerate(lines) if re.fullmatch(result, l)]
             return bool(rows) and any(l.startswith(prompt.rstrip()) for l in lines[rows[-1]+1:])
-        # The reserved top band shows the link status digits; take the
-        # baseline only after the LAN link is up so later shots compare
-        # against the settled band (not a half-drawn boot state).
-        s.wait(lambda: 'LAN STATE state=5 link=1' in serial(out/'serial-a.log'), 'LAN link up before baseline', 60)
-        s.settle(.5)
+        # TIME completes after the HELLO-established digit has been drawn.
+        # Link-up alone precedes both HELLO digits in the reserved band.
+        s.wait(lambda: s.word('pm_link_time_ok') != 0, 'HELLO display before baseline', 60)
         initial, baseline = shot('boot')
         check('[sqlite] static rc=0' not in initial, 'trace-screen')
         local('clear')
