@@ -67,7 +67,7 @@ userland/shell.bin: $(RESIDENT_OUT)/shell.bin
 userland/gshell.bin: $(RESIDENT_OUT)/gshell.bin
 $(RESIDENT_OUT)/%.raw: $(RESIDENT_OUT)/%.elf
 	$(OBJCOPY) -O binary $< $@
-$(RESIDENT_OUT)/%.bin: $(RESIDENT_OUT)/%.raw $(RESIDENT_OUT)/%.elf build/app.conf sdk/mkos32x.py
+$(RESIDENT_OUT)/%.bin: $(RESIDENT_OUT)/%.raw $(RESIDENT_OUT)/%.elf build/app.conf sdk/mkos32x.py sdk/os32x_hdr.py sdk/os32_generations.py
 	@_api=$$(awk '$$1 == "userland/$*" { print $$2 }' build/app.conf); \
 	_opts=""; if [ "$*" = "gshell" ]; then _opts="--gfx"; fi; \
 	python3 sdk/mkos32x.py $< $@ --elf $(RESIDENT_OUT)/$*.elf --api $$_api --heap 0 $$_opts
@@ -309,7 +309,7 @@ userland/tests/ring3_hello.o: userland/tests/ring3_hello.c | $(ABI_CONTRACT_ORDE
 userland/tests/ring3_hello.elf: userland/tests/ring3_hello.o sdk/link/app.ld
 	$(LD) -m elf_i386 -T sdk/link/app.ld -nostdlib --nmagic --gc-sections -o $@ userland/tests/ring3_hello.o
 
-userland/tests/ring3_hello.bin: userland/tests/ring3_hello.elf
+userland/tests/ring3_hello.bin: userland/tests/ring3_hello.elf sdk/mkos32x.py sdk/os32x_hdr.py sdk/os32_generations.py
 	$(OBJCOPY) -O binary $< userland/tests/ring3_hello.raw
 	python3 sdk/mkos32x.py userland/tests/ring3_hello.raw $@ --elf $< --api 39 --ring3
 	@rm -f userland/tests/ring3_hello.raw
@@ -326,7 +326,7 @@ userland/tests/ring3_fault.o: userland/tests/ring3_fault.c | $(ABI_CONTRACT_ORDE
 userland/tests/ring3_fault.elf: userland/tests/ring3_fault.o sdk/link/app.ld
 	$(LD) -m elf_i386 -T sdk/link/app.ld -nostdlib --nmagic --gc-sections -o $@ userland/tests/ring3_fault.o
 
-userland/tests/ring3_fault.bin: userland/tests/ring3_fault.elf
+userland/tests/ring3_fault.bin: userland/tests/ring3_fault.elf sdk/mkos32x.py sdk/os32x_hdr.py sdk/os32_generations.py
 	$(OBJCOPY) -O binary $< userland/tests/ring3_fault.raw
 	python3 sdk/mkos32x.py userland/tests/ring3_fault.raw $@ --elf $< --api 39 --ring3
 	@rm -f userland/tests/ring3_fault.raw
@@ -341,7 +341,7 @@ userland/tests/ring3_guard.o: userland/tests/ring3_guard.c | $(ABI_CONTRACT_ORDE
 userland/tests/ring3_guard.elf: userland/tests/ring3_guard.o sdk/link/app.ld
 	$(LD) -m elf_i386 -T sdk/link/app.ld -nostdlib --nmagic --gc-sections -o $@ userland/tests/ring3_guard.o
 
-userland/tests/ring3_guard.bin: userland/tests/ring3_guard.elf
+userland/tests/ring3_guard.bin: userland/tests/ring3_guard.elf sdk/mkos32x.py sdk/os32x_hdr.py sdk/os32_generations.py
 	$(OBJCOPY) -O binary $< userland/tests/ring3_guard.raw
 	python3 sdk/mkos32x.py userland/tests/ring3_guard.raw $@ --elf $< --api 39
 	@rm -f userland/tests/ring3_guard.raw
@@ -353,7 +353,7 @@ ring3_guard: userland/tests/ring3_guard.bin
 # hello.elf (crt0 リンク済み, 通常ビルド) をそのまま使い、--ring3 を付けた
 # 別名 .bin にする。api->kprintf(%d/%s) / api->magic / api->version /
 # crt0 の sys_exit 往復を CPL=3 で網羅する (T1-T5)。ソースは一切変えない。
-userland/tests/hello_r3.bin: userland/tests/hello.elf
+userland/tests/hello_r3.bin: userland/tests/hello.elf sdk/mkos32x.py sdk/os32x_hdr.py sdk/os32_generations.py
 	$(OBJCOPY) -O binary $< userland/tests/hello_r3.raw
 	python3 sdk/mkos32x.py userland/tests/hello_r3.raw $@ --elf $< --api 39 --ring3
 	@rm -f userland/tests/hello_r3.raw
@@ -585,7 +585,7 @@ userland/system/hsync.elf: lib/crc32_core.inc exec/os32x_hdr.c exec/os32x_hdr.h 
 userland/%.raw: userland/%.elf
 	$(OBJCOPY) -O binary $< $@
 
-userland/%.bin: userland/%.raw userland/%.elf
+userland/%.bin: userland/%.raw userland/%.elf sdk/mkos32x.py sdk/os32x_hdr.py sdk/os32_generations.py
 	@_api=$$(awk '$$1 == "userland/$*" { print $$2 }' build/app.conf); \
 	_heap=$$(awk '$$1 == "userland/$*" { print $$3 }' build/app.conf); \
 	_decl=$$(awk '$$1 == "userland/$*" { print $$4 }' build/app.conf); \
@@ -700,7 +700,7 @@ userland/libos32gui.elf: sdk/link/shlib.ld $(SHLIB_GUI_LIB) $(GFX_OBJ) $(LIBCFG_
 userland/libos32gui.raw: userland/libos32gui.elf
 	$(OBJCOPY) -O binary $< $@
 
-userland/libos32gui.shlib: userland/libos32gui.raw userland/libos32gui.elf tools/mkshlib.py
+userland/libos32gui.shlib: userland/libos32gui.raw userland/libos32gui.elf tools/mkshlib.py sdk/os32x_hdr.py sdk/os32_generations.py
 	python3 tools/mkshlib.py $< $@ --elf userland/libos32gui.elf --api 51
 
 shlib: userland/libos32gui.shlib
@@ -765,9 +765,9 @@ clean-programs: clean-rust clean-gshell
 # T2h: 8MB code/stack/LARGE shapes, keyboard stdin stops, CUI-only headers.
 H5_SHAPE_BINS := $(addprefix userland/tests/,h5_shape_i.bin h5_shape_ii.bin h5_shape_iii.bin)
 userland/tests/h5_shape_i.elf userland/tests/h5_shape_ii.elf userland/tests/h5_shape_iii.elf: userland/tests/h5_shape.inc include/memmap.h
-userland/tests/h5_shape_i.bin userland/tests/h5_shape_iii.bin: userland/tests/%.bin: userland/tests/%.raw userland/tests/%.elf sdk/mkos32x.py
+userland/tests/h5_shape_i.bin userland/tests/h5_shape_iii.bin: userland/tests/%.bin: userland/tests/%.raw userland/tests/%.elf sdk/mkos32x.py sdk/os32x_hdr.py sdk/os32_generations.py
 	python3 sdk/mkos32x.py $< $@ --elf userland/tests/$*.elf --cui-only
-userland/tests/h5_shape_ii.bin: userland/tests/h5_shape_ii.raw userland/tests/h5_shape_ii.elf sdk/mkos32x.py
+userland/tests/h5_shape_ii.bin: userland/tests/h5_shape_ii.raw userland/tests/h5_shape_ii.elf sdk/mkos32x.py sdk/os32x_hdr.py sdk/os32_generations.py
 	python3 sdk/mkos32x.py $< $@ --elf userland/tests/h5_shape_ii.elf --stack $(H2_STACK512_BYTES) --cui-only
 .PHONY: h5-shapes
 h5-shapes: $(H5_SHAPE_BINS)
@@ -778,7 +778,7 @@ userland/tests/h2_stack.elf: userland/tests/h2_stack_probe.h userland/tests/h2_s
 userland/tests/h2_stack512.elf: userland/tests/h2_stack.c userland/tests/h2_stack_probe.h userland/tests/h2_stack_probe.inc include/memmap.h sdk/include/os32/os32_gui_shared.h sdk/link/app.ld $(CRT0_OBJ) | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -DH2_STACK_BYTES=$(H2_STACK512_BYTES) -c $< -o userland/tests/h2_stack512.o
 	$(LD) $(PROGRAM_LDFLAGS) -o $@ $(CRT0_OBJ) userland/tests/h2_stack512.o -lc -lgcc
-userland/tests/h2_stack512.bin: userland/tests/h2_stack512.raw userland/tests/h2_stack512.elf sdk/mkos32x.py
+userland/tests/h2_stack512.bin: userland/tests/h2_stack512.raw userland/tests/h2_stack512.elf sdk/mkos32x.py sdk/os32x_hdr.py sdk/os32_generations.py
 	python3 sdk/mkos32x.py $< $@ --elf userland/tests/h2_stack512.elf --stack $(H2_STACK512_BYTES)
 
 # Explicit opt-in only. .fixture files never enter deploy manifests/packages.

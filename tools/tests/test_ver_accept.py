@@ -4,7 +4,6 @@ V8 owns the full-line oracle; V11 owns equality with the Rust reader/layout.
 This suite reuses V11's snapshots, including FD/HDD/?/none/missing boot info.
 --mutate corrupts an accepted CUI fixture and reruns the same acceptance check.
 """
-from exec_source import exec_source
 import io
 import json
 import re
@@ -116,27 +115,34 @@ def min_api(runner):
     # Real header generation raises low app.conf requests without editing them.
     for requested in (0, 63, 78, version, version + 1):
         blob = header.build_header(0, 0, 1, 0, 0, requested, header.OS32X_APP_LOAD_ADDR,
-                                   0x4b8, code_size=4096)
+                                   header.KAPI_DATA_FIELDS_OFF, code_size=4096)
         assert header.parse_header(blob)['min_api_ver'] == max(requested, version)
-    # Execute the actual exec guard against both kernel generations. This is
-    # the API-version gate only; PM checks complete old/new binaries in guest.
-    source = exec_source(ROOT)
-    guard = re.search(r'else if \((hdr->min_api_ver > KAPI_VERSION)\) reason = '
-                      r'"required KAPI version is newer than kernel";', source)
-    assert guard, 'exec API-version guard changed'
-    fixture = '''
+    fixture = r'''
 #include "support.h"
-static int newer(u32 requested, u32 KAPI_VERSION) {
-    struct { u32 min_api_ver; } value = {requested}, *hdr = &value;
-    return GUARD;
-}
+#include "os32x_hdr.c"
 void _start(void) {
-    CHECK(newer(NEW, OLD)); CHECK(!newer(OLD, NEW)); CHECK(!newer(NEW, NEW));
+    OS32Header h = {0};
+    h.magic = OS32X_MAGIC;
+    h.version = OS32X_HDR_VERSION;
+    h.header_size = OS32X_HDR_SIZE;
+    h.kapi_data_off = KAPI_DATA_FIELDS_OFF;
+    h.kapi_abi_generation = OS32_KAPI_ABI_GENERATION;
+    h.memory_layout_generation = OS32_MEMORY_LAYOUT_GENERATION;
+    h.min_api_ver = KAPI_VERSION;
+    CHECK(os32x_layout_check(&h, sizeof(h), KAPI_DATA_FIELDS_OFF) == OS32X_LAYOUT_OK);
+    h.min_api_ver++;
+    int rc = os32x_layout_check(&h, sizeof(h), KAPI_DATA_FIELDS_OFF);
+    CHECK(rc == OS32X_LAYOUT_MIN_API);
+    CHECK(equal(os32x_layout_reason(rc), "required KAPI version is newer than kernel"));
+    h.shlib_protocol = OS32_SHLIB_PROTOCOL + 1;
+    rc = os32x_layout_check(&h, sizeof(h), KAPI_DATA_FIELDS_OFF);
+    CHECK(rc == OS32X_LAYOUT_PROTOCOL);
+    CHECK(equal(os32x_layout_reason(rc), "shared library protocol mismatch"));
     die(0);
 }
-'''.replace('GUARD', guard[1]).replace('NEW', str(version)).replace('OLD', str(version - 1))
+'''
     assert execute(fixture, runner).returncode == 0
-    print('PASS effective min_api=%d; v%d rejects new / v%d accepts old API requirement' % (version, version - 1, version))
+    print('PASS current header, minimum KAPI and protocol refusal precedence')
 
 
 def main():

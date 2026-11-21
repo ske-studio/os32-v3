@@ -42,14 +42,11 @@ u32 kst_exec_kapi_layout(void)
         view.api->shm_base == 0) {
         bad |= 1u << 0;
     }
-    /* (1) 本物の表の予約スロットは NULL でなく「未実装」 (CPL=0 は NOSYS)。
-     * 関数数 = 容量 (予約 0 本) のとき生成器は kapi_reserved を作らないので、
-     * 参照ごと外す (実装レビュー R1: 300 本目でコンパイルが落ちる)。 */
+    /* (1) 予約口はすべてゼロ。 */
 #if KAPI_FUNC_RESERVED > 0
     for (i = 0; i < (u32)KAPI_FUNC_RESERVED; i++) {
-        if (view.api->kapi_reserved[i] != KDI_ADDR_kapi_reserved_nosys) bad |= 1u << 1;
+        if (view.api->kapi_reserved[i] != 0) bad |= 1u << 1;
     }
-    if (view.api->kapi_reserved[0]() != OS32_ERR_NOSYS) bad |= 1u << 1;
 #endif
     /* (2) トランポリンの予約スロットは int 0x80 のスタブ (CPL=3 は kill) */
     for (i = (u32)KAPI_FUNC_COUNT; i < (u32)KAPI_FUNC_CAPACITY; i++) {
@@ -109,8 +106,8 @@ u32 kst_exec_tramp_user(void)
         bad |= 1u << 0;
     }
     /* スタブの領域と重ならない */
-    if (addr < view.tramp_page + RING3_USTR_STUB_OFF +
-               (u32)KAPI_FUNC_CAPACITY * KAPI_STUB_SIZE) {
+    if (addr < view.tramp_page + sizeof(KernelAPI) ||
+        RING3_USTR_CAP > view.tramp_page + RING3_USTR_STUB_OFF - addr) {
         bad |= 1u << 0;
     }
 

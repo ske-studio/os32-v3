@@ -56,18 +56,18 @@ slot は 0 始まり、追加は末尾だけ。この表を `tools/hwdev_audit.p
 | 32 | pci_cfg_read16 | 260 |
 | 33 | pci_cfg_write32 | 261 |
 | 34 | pci_cfg_write16 | 262 |
-| 35 | gf_production_selected | 308 |
-| 37 | geforce_foundation_ops | 309 |
+| 35 | gf_production_selected | 307 |
+| 37 | geforce_foundation_ops | 308 |
 | 38 | serial_puts_polled | 120 |
 | 39 | sys_time_now | 123 |
-| 40 | geforce_accel_ops | 310 |
-| 41 | gfx_present | 311 |
-| 42 | gf_display_test | 312 |
-| 43 | gf5_test | 313 |
-| 44 | geforce_resource_lookup | 317 |
-| 45 | paging_device_map | 318 |
-| 46 | paging_device_unmap | 319 |
-| 47 | pci_bar_get | 324 |
+| 40 | geforce_accel_ops | 309 |
+| 41 | gfx_present | 310 |
+| 42 | gf_display_test | 311 |
+| 43 | gf5_test | 312 |
+| 44 | geforce_resource_lookup | 316 |
+| 45 | paging_device_map | 317 |
+| 46 | paging_device_unmap | 318 |
+| 47 | pci_bar_get | 323 |
 
 M5 の末尾 3 slot は GeForce production adapter 用に保持する共有宣言。HWDEV の診断オブジェクトには呼出しがないため、`tools/hwdev_audit.py` はこの 3 名だけを未使用でも保持し、それ以外の過不足は従来どおり拒否する。
 

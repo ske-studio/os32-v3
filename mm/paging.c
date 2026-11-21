@@ -204,6 +204,13 @@ static int pg_enabled = 0;
 static u32 live_addrspaces;
 u32 paging_live_addrspaces(void) { return live_addrspaces; }
 static int boot_user_shared_done;
+static u32 boot_user_base, boot_user_pages;
+
+int paging_boot_user_page(u32 frame)
+{
+    return frame >= boot_user_base &&
+           (frame - boot_user_base) / PAGE_SIZE < boot_user_pages;
+}
 /* Intended SHM permissions, recorded by the only post-boot RW-changing API.
  * Auditing must not infer the expected RW bit from the PTE being checked. */
 static u32 shm_audit_ro[BITMAP_WORDS(MEM_SHM_SIZE / PAGE_SIZE)];
@@ -405,7 +412,7 @@ int paging_app_band_selftest(void)
 static u8 memmap_want_at(u32 a, u32 tramp)
 {
     if (paging_sqlite_stack_guard && a == paging_sqlite_stack_guard) return MM_NP;
-    if (tramp && a == tramp) return MM_ROU;     /* exec.c の KAPI 踏み台 */
+    if (tramp == boot_user_base && paging_boot_user_page(a)) return MM_ROU;     /* exec.c の KAPI 踏み台 */
 
     /* コンベンショナルメモリ */
     if (a <= MEM_NULL_GUARD_END) return MM_NP;

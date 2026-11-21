@@ -186,14 +186,25 @@ int paging_device_unmap(u32 owner, u32 rid, u32 first, u32 end)
 }
 
 /* 最初の AS より前、shm_init の後だけ。tramp は exec の静的 BSS。 */
-int paging_boot_user_shared(u32 tramp)
+int paging_boot_user_shared(u32 tramp, u32 pages)
 {
     if (boot_user_shared_done || live_addrspaces || !pg_enabled ||
         (tramp & (PAGE_SIZE - 1)) || tramp < KERNEL_LOAD_ADDR ||
-        tramp >= KHEAP_BASE) return -1;
-    if (paging_map_range(MEM_SHM_BASE, MEM_SHM_BASE + MEM_SHM_SIZE,
-                         MEM_SHM_BASE, PAGE_RW | PTE_USER) != 0 ||
-        paging_set_page(tramp, tramp, PAGE_RO | PTE_USER) != 0) return -1;
+        tramp >= KHEAP_BASE || (pages != 1 && pages != 2) ||
+        pages > (KHEAP_BASE - tramp) / PAGE_SIZE) return -1;
+    /* Prepare both ranges before changing any PTE permissions. */
+    if (prepare_tables(tramp >> PAGE_SHIFT, pages) ||
+        prepare_tables(MEM_SHM_BASE >> PAGE_SHIFT, MEM_SHM_SIZE / PAGE_SIZE))
+        return -1;
+    for (u32 i = 0; i < pages; ++i) {
+        u32 frame = tramp + i * PAGE_SIZE;
+        set_page_noflush(frame, frame, PAGE_RO | PTE_USER);
+    }
+    for (u32 off = 0; off < MEM_SHM_SIZE; off += PAGE_SIZE)
+        set_page_noflush(MEM_SHM_BASE + off, MEM_SHM_BASE + off, PAGE_RW | PTE_USER);
+    arch_mmu_flush_tlb();
+    boot_user_base = tramp;
+    boot_user_pages = pages;
     boot_user_shared_done = 1;
     return 0;
 }

@@ -27,7 +27,7 @@ IMPORTS = (
     'vfs_devname_user', 'vfs_devname', 'kstrcmp', 'path_get_drive_user',
     'path_get_drive', 'path_get_cwd_user', 'path_get_cwd', 'ring3_wm_enter',
     'ring3_wm_leave', 'kdi_get_ring3_in_syscall', 'kdi_set_ring3_in_syscall',
-    'kapi_reserved_nosys', 'kmemset', 'os32x_layout_check',
+    'kmemset', 'os32x_layout_check',
     'kdi_ptr_ring3_ls_start', 'kdi_ptr_ring3_ls_end',
     'kdi_ptr___kernel_resident_end', 'path_set_drive', 'path_init', 'path_set_cwd', 'kstrncpy',
 )
@@ -62,9 +62,6 @@ void _start(void) {
     CHECK(kstrcmp(path_get_drive(), "fdd0") == 0 && kstrcmp(path_get_cwd(), "/path") == 0);
     kdi_selftest_exec_view(&before);
     CHECK(before.tramp_page && before.api == (const KernelAPI *)KAPI_ADDR);
-    CHECK(KDI_ADDR_kapi_reserved_nosys == host_kapi_reserved_nosys);
-    CHECK(KDI_ADDR_kapi_reserved_nosys != kapi_reserved_nosys);
-    CHECK(kapi_reserved_nosys() == OS32_ERR_NOSYS);
     CHECK(ring3_ls_start == host_kdi_ptr_ring3_ls_start());
     CHECK(ring3_ls_end == host_kdi_ptr_ring3_ls_end());
     CHECK(ring3_ls_end - ring3_ls_start > 1);
@@ -92,9 +89,9 @@ void _start(void) {
     CHECK(kst_exec_kapi_layout() == 1);
     tbl[KAPI_DATA_IDX_SHM_BASE] ^= 1;
 #if KAPI_FUNC_RESERVED > 0
-    api->kapi_reserved[0] = kapi_reserved_nosys; /* stub address is not the kernel address */
+    api->kapi_reserved[0] = (void *)1;
     CHECK(kst_exec_kapi_layout() == (1u << 1));
-    api->kapi_reserved[0] = KDI_ADDR_kapi_reserved_nosys;
+    api->kapi_reserved[0] = 0;
     u8 *st = (u8 *)(before.tramp_page + RING3_USTR_STUB_OFF +
                     KAPI_FUNC_COUNT * KAPI_STUB_SIZE);
     st[5] ^= 1;

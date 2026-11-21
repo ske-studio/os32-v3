@@ -21,7 +21,7 @@ from gen_hwdev_contract import decode_layout, elf_order
 
 ROOT = Path(__file__).resolve().parents[2]
 # Independently reviewed order-4 D observation, never an x86 pin.
-PPC_LAYOUT_CRC = 0x17d72be1
+PPC_LAYOUT_CRC = 0x464f7bea
 PROBES = (
     ('type-contract', 'tools/tests/test_type_contract.py'),
     ('record-layout', 'tools/tests/test_record_layout.py'),
@@ -76,7 +76,7 @@ def hwdev_values(tools, profile, env):
     expected = {'size struct gf5': 1776, 'align struct gf5': 8,
                 'offset struct gf5.next_auto': 272, 'offset struct gf5.next_step': 280,
                 'offset struct gf5.next_sensor': 288, 'offset struct gf5.next_toggle': 296,
-                'offset struct gf_production.feature5': 10936}
+                'offset struct gf_production.feature5': 10944}
     for key, value in expected.items():
         assert rows[key] == value, (key, rows[key], value)
     native = (ROOT / 'hwdev/generated/hwdev_layout.txt').read_text()

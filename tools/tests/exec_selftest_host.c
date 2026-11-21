@@ -41,7 +41,6 @@ int kstrcmp(const char *a, const char *b)
     while (*a && *a == *b) { a++; b++; }
     return (u8)*a - (u8)*b;
 }
-i32 __cdecl kapi_reserved_nosys(void) { return OS32_ERR_NOSYS; }
 int kdi_get_ring3_in_syscall(void) { return ring3_in_syscall; }
 void kdi_set_ring3_in_syscall(int v) { ring3_in_syscall = v; }
 const u8 *kdi_ptr_ring3_ls_start(void) { return ring3_ls_start; }
@@ -56,10 +55,6 @@ void host_init(void)
     kapi = (KernelAPI *)KAPI_ADDR;
     kmemset(kapi, 0, sizeof(*kapi));
     kapi->shm_base = MEM_SHM_BASE;
-#if KAPI_FUNC_RESERVED > 0
-    for (u32 i = 0; i < KAPI_FUNC_RESERVED; i++)
-        kapi->kapi_reserved[i] = kapi_reserved_nosys;
-#endif
     ring3_trampoline_init();
 }
 void host_flags_set(u32 flags) { host_flags = flags; }

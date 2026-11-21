@@ -41,9 +41,7 @@ char *kstrncpy(char *dst, const char *src, u32 n)
  * PAGE_SIZE は mm/paging.h だが、ここでは番地の式だけを見たいので
  * 値を持ち込まずに 4096 を使う (i386 の 4KB ページは動かない)。 */
 #define HOST_PAGE_SIZE 4096u
-STATIC_ASSERT(RING3_USTR_OFF >= RING3_USTR_STUB_OFF +
-                                (u32)KAPI_FUNC_CAPACITY * 8u,
-              host_ustr_after_stubs);
+STATIC_ASSERT(RING3_USTR_OFF >= sizeof(KernelAPI), host_ustr_after_table);
 STATIC_ASSERT(RING3_USTR_OFF + RING3_USTR_CAP <= HOST_PAGE_SIZE,
               host_ustr_fits_in_page);
 
@@ -125,9 +123,8 @@ static void case_route(void)
     check((const u8 *)got >= host_page &&
           (const u8 *)got + RING3_USTR_CAP <= host_page + HOST_PAGE_SIZE,
           "1d 写し先はトランポリンページの中に収まる");
-    check((const u8 *)got >= host_page + RING3_USTR_STUB_OFF +
-                             (u32)KAPI_FUNC_CAPACITY * 8u,
-          "1e 写し先は int 0x80 スタブの後ろ (表もスタブも壊さない)");
+    check((const u8 *)got >= host_page + sizeof(KernelAPI),
+          "1e 写し先は表の後ろ");
     check(str_eq(got, "/usr/bin"), "1f 中身は cwd と同じ");
     check(str_eq(host_cwd, "/usr/bin"), "1g 元の cwd は書き換えない");
 }

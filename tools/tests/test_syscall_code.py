@@ -1,6 +1,7 @@
 """H10: real ILP32 syscall emitter, all capacities, page bytes and publication."""
 CHECK = dict(name='syscall-code-host', tier=1,
     covers=['include/syscall_code.h', 'arch/x86/kernel/syscall_code.c',
+            'platform/pc98/kernel_boot_memory.inc', 'platform/powermac/ppc_kernel.c',
             'exec/exec_tramp_init.inc', 'exec/ring3_str.h', 'exec/ring3_ls.h',
             'arch/x86/kernel/ring3_ls.S', 'tools/tests/syscall_code_host.c',
             'tools/tests/test_syscall_code.py', 'tools/tests/host32.py',
@@ -18,16 +19,24 @@ from kernel_layout import linker_flags
 ROOT = Path(__file__).resolve().parents[2]
 CODE = 'arch/x86/kernel/syscall_code.c'
 INIT = 'exec/exec_tramp_init.inc'
+PC98 = 'platform/pc98/kernel_boot_memory.inc'
+PPC = 'platform/powermac/ppc_kernel.c'
 MUTATIONS = (
+    ('pc98-map-failure-ignored', PC98, 'paging_boot_user_shared(exec_tramp_page_addr(), 2) != 0',
+     '(paging_boot_user_shared(exec_tramp_page_addr(), 2), 0)'),
+    ('ppc-boot-continues', PPC, 'if (!shared_user) kboot_stop("KAPI trampoline");',
+     'if (0 && !shared_user) kboot_stop("KAPI trampoline");'),
     ('interrupt-corrupted', CODE, 'st[6] = 0x80;', 'st[6] = 0x81;'),
     ('reserved-stubs-omitted', CODE, 'i < l.stub_count;', 'i < l.stub_count && i < KAPI_FUNC_COUNT;'),
-    ('publish-omitted', INIT, 'arch_syscall_publish(P2V(page), layout.total_bytes);', '(void)page;'),
+    ('publish-omitted', INIT, 'arch_syscall_publish(P2V(page), RING3_TRAMP_BYTES);', '(void)page;'),
+    ('layout-failure-ignored', INIT, 'if (!arch_syscall_layout(KAPI_FUNC_CAPACITY, &layout))',
+     'if (!arch_syscall_layout(KAPI_FUNC_CAPACITY, &layout) && 0)'),
     ('emit-failure-ignored', INIT, 'if (!arch_syscall_emit(', 'if (0 && !arch_syscall_emit('),
 )
 
 
 def execute(changes=None):
-    sources = {p: (ROOT / p).read_text() for p in (CODE, INIT)}
+    sources = {p: (ROOT / p).read_text() for p in (CODE, INIT, PC98, PPC)}
     if changes:
         name, path, old, new = changes
         assert sources[path].count(old) == 1, name
@@ -35,8 +44,17 @@ def execute(changes=None):
     with tempfile.TemporaryDirectory(prefix='syscall-code-') as folder:
         tmp = Path(folder)
         (tmp / 'code.c').write_text(sources[CODE])
-        init = sources[INIT].split('static void ring3_trampoline_init(void)', 1)[1]
-        (tmp / 'trampoline.inc').write_text('static void ring3_trampoline_init(void)' + init)
+        init = sources[INIT].split('int ring3_trampoline_init(void)', 1)[1]
+        (tmp / 'trampoline.inc').write_text('int ring3_trampoline_init(void)' + init)
+        pc = sources[PC98].split('    shm_init();', 1)[1].split('    /*', 1)[0]
+        pm = sources[PPC].split('    shm_init();', 1)[1]
+        pm = pm.split('#if KBOOT_SHELL || KBOOT_SH', 2)
+        boot = 'static void pc98_boot(void) {\n' + pc + 'user_started++;\n}\n'
+        for name, enabled in [('ppc_exec_boot', 1), ('ppc_gate_boot', 0)]:
+            boot += (f'#define KBOOT_SHELL {enabled}\nstatic void {name}(void) {{\n'
+                     + '#if KBOOT_SHELL || KBOOT_SH' + pm[1]
+                     + 'user_started++;\n}\n#undef KBOOT_SHELL\n')
+        (tmp / 'boot.inc').write_text(boot)
         exe = tmp / 'test'
         result = subprocess.run(['gcc', '-m32', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
             '-ffreestanding', '-fno-pie', '-no-pie', '-fno-stack-protector', '-nostdlib', '-static',
@@ -53,7 +71,7 @@ if __name__ == '__main__':
     rc, log = execute()
     print(log, end='')
     assert rc == 0, rc
-    print('PASS: all capacities, unchanged page bytes, emit -> publish -> table; failure unpublished')
+    print('PASS: all capacities, unchanged page bytes, emit -> table -> publish; failure unpublished')
     if '--mutate' in sys.argv:
         for mutation in MUTATIONS:
             rc, log = execute(mutation)

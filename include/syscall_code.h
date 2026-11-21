@@ -1,4 +1,4 @@
-/* Architecture-owned USER syscall code page construction. */
+/* Architecture-owned USER syscall trampoline construction (table page and code page). */
 #ifndef SYSCALL_CODE_H
 #define SYSCALL_CODE_H
 #include "types.h"

@@ -234,10 +234,13 @@ void platform_boot_machine(void)
 #if KBOOT_SHELL || KBOOT_SH
     /* S-B: the shared USER page is exec's KAPI trampoline, as on x86. */
     sys_mem_kb = KBOOT_MEM_KB;
-    int shared_user = paging_boot_user_shared(exec_tramp_page_addr()) == 0;
+    exec_kapi_init();
+    int shared_user = ring3_trampoline_init() == 0 &&
+                      paging_boot_user_shared(exec_tramp_page_addr(), 2) == 0;
 #else
-    int shared_user = paging_boot_user_shared((u32)user_gate) == 0;
+    int shared_user = paging_boot_user_shared((u32)user_gate, 1) == 0;
 #endif
+    if (!shared_user) kboot_stop("KAPI trampoline");
 #if KBOOT_SHELL || KBOOT_SH
     /* The fixed 192 KiB heap cannot hold the 296 KiB resident font. Reserve
      * a separate RAM arena before any heap clients exist; leave KAPI/SHM's

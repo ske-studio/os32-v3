@@ -214,7 +214,7 @@ void _start(void)
      * カーネルでは実行時にしか分からない。ここではカーネル帯の中の 1 ページ
      * を選んで同じ属性で張る。 */
     tramp = KERNEL_LOAD_ADDR + 0x60000UL;
-    CHECK(paging_boot_user_shared(tramp) == 0);
+    CHECK(paging_boot_user_shared(tramp, 2) == 0);
 
 
     {

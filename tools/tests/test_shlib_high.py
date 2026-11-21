@@ -11,6 +11,8 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-Wall', '-Wextra', '-Werror']
 SRC = ROOT / 'tools/tests/shlib_high_host.c'
 MUTATIONS = [
+ ('protocol-misreported-as-min-api', 'if (layout == OS32X_LAYOUT_MIN_API)',
+  'if (oh.min_api_ver > KAPI_VERSION)'),
  ('code-boundary-mismatch', 'oh.code_size != sh->text_pages * PAGE_SIZE', '0'),
 
  ('text-writable', 'g_pages[i], PAGE_RO | PTE_USER)', 'g_pages[i], PAGE_RW | PTE_USER)'),

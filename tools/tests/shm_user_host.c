@@ -309,14 +309,14 @@ void _start(void)
     CHECK(shm_lock(P2V(MEM_SHM_BASE)) == -1, "lock rejects DB reservation");
     CHECK(paging_addrspace_create(&a, 2) == 0, "preboot AS");
     old = entry(MEM_SHM_BASE);
-    CHECK(paging_boot_user_shared(TRAMP) == -1 && entry(MEM_SHM_BASE) == old,
+    CHECK(paging_boot_user_shared(TRAMP, 2) == -1 && entry(MEM_SHM_BASE) == old,
           "boot rejects live AS");
     paging_addrspace_destroy(&a);
-    CHECK(paging_boot_user_shared(TRAMP) == 0, "boot success");
+    CHECK(paging_boot_user_shared(TRAMP, 2) == 0, "boot success");
     CHECK(shm_free(P2V(p)) == 0 && perm(p, 1), "free USER");
     check_reserved();
     check_exhaustion();
-    CHECK(paging_boot_user_shared(TRAMP) == -1, "boot once");
+    CHECK(paging_boot_user_shared(TRAMP, 2) == -1, "boot once");
     CHECK(perm(MEM_SHM_BASE, 1) && perm(TRAMP, 0), "boot attributes");
     CHECK(paging_addrspace_create(&a, 2) == 0, "first AS");
     CHECK(paging_addrspace_create(&b, 3) == 0, "second AS");

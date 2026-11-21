@@ -48,8 +48,8 @@ def generate(out, root=ROOT):
         emit('old-' + kind, bytes(old) + data[H.OS32X_HDR_SIZE:], INPUTS[kind], 'unknown format or flags')
     for name, offset, value, reason in (
         ('unknown-format', 8, H.OS32X_HDR_VERSION + 1, 'unknown format or flags'),
-        ('bad-abi-generation', 48, H.OS32_KAPI_ABI_GENERATION + 1, 'generation or KAPI layout mismatch'),
-        ('bad-memory-generation', 52, H.OS32_MEMORY_LAYOUT_GENERATION + 1, 'generation or KAPI layout mismatch'),
+        ('bad-abi-generation', 48, H.OS32_KAPI_ABI_GENERATION + 1, 'KAPI ABI generation mismatch'),
+        ('bad-memory-generation', 52, H.OS32_MEMORY_LAYOUT_GENERATION + 1, 'memory layout generation mismatch'),
         ('old-cpl0-flag', 12, H.parse_header(controls['app'])['flags'] | 4, 'unknown format or flags'),
     ):
         damaged = bytearray(controls['app'])
@@ -59,13 +59,13 @@ def generate(out, root=ROOT):
         damaged = bytearray(controls[kind])
         struct.pack_into('<I', damaged, 52, H.OS32_MEMORY_LAYOUT_GENERATION - 1)
         emit('prev-memory-generation-' + kind, damaged, INPUTS[kind],
-             'generation or KAPI layout mismatch')
+             'memory layout generation mismatch')
     damaged = bytearray(controls['shell'])
     struct.pack_into('<I', damaged, 48, H.OS32_KAPI_ABI_GENERATION + 1)
-    emit('bad-shell-generation', damaged, INPUTS['shell'], 'generation or KAPI layout mismatch')
+    emit('bad-shell-generation', damaged, INPUTS['shell'], 'KAPI ABI generation mismatch')
     damaged = bytearray(controls['shlib'])
     struct.pack_into('<I', damaged, 56, H.OS32_SHLIB_PROTOCOL + 1)
-    emit('bad-shlib-generation', damaged, INPUTS['shlib'], 'generation or KAPI layout mismatch')
+    emit('bad-shlib-generation', damaged, INPUTS['shlib'], 'shared library protocol mismatch')
     (out / 'manifest.json').write_text(json.dumps(records, indent=2, sort_keys=True) + '\n')
     return records
 

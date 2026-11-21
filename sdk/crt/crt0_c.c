@@ -1,7 +1,7 @@
 #include "os32api.h"
 #include "os32/help.h"
 
-/* 実名は os32_kapi_v63 (生成ヘッダの `#define kapi OS32_KAPI_CRT_SYMBOL`)。
+/* 実名は os32_kapi_v89 (生成ヘッダの `#define kapi OS32_KAPI_CRT_SYMBOL`)。
  * v62 以前にコンパイルした .o は `kapi` を参照したままなので、ここと
  * リンクすると未定義参照で落ちる = 作り直し忘れの検出 (票
  * TASK_KAPI_DATA_FIELDS、ユーザー決裁 2026-09-24)。 */

@@ -127,12 +127,15 @@ const char *path_get_cwd_user(void);
  * ページ表と memmap.h の照合 (paging_memmap_selftest) が期待値に使う —
  * ここは .bss の中なのでビルドごとに動き、定数では書けない。 */
 u32 exec_tramp_page_addr(void);
+void exec_kapi_init(void);
+int ring3_trampoline_init(void);
 
 /* 直前の**入れ子 0 段の**起動 (常駐シェル / gshell の exec_run) が KAPI データ
  * 欄の配置違い (OS32X ヘッダ v3 の kapi_data_off、票 TASK_KAPI_DATA_FIELDS) で
  * 断られたなら 1。0 段の起動に入るたびに 0 へ戻し、シェルから起動したアプリの
  * 拒否では立たない。kernel.c が常駐シェルを断ったときの案内
  * (「/sys を作り直して配備せよ」) に使う。 */
+#define EXEC_REJECT_MIN_API 2
 int exec_layout_rejected(void);
 
 /* ======================================================================== */

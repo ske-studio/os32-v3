@@ -62,7 +62,7 @@ def kernel_order(kernel=None, overrides=None):
         'boot_platform_run(BOOT_CLOCK, &boot);', 'paging_init(mem_kb);',
         'paging_reclaim_conventional();', 'boot_platform_run(BOOT_FONT, &boot);',
         'arch_boot_after_paging()', 'memory_boot_init(mem_kb)', 'shm_init();',
-        'paging_boot_user_shared(exec_tramp_page_addr())', 'dma_pool_init();',
+        'paging_boot_user_shared(exec_tramp_page_addr(), 2)', 'dma_pool_init();',
         'legacy_init();', 'kdebug_load();', 'kdebug.ops.selftest_run();',
         'cd_module_load();',
         'kcg_module_load();', 'kernel_mount_children(boot.root_dev);',

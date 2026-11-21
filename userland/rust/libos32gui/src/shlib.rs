@@ -425,7 +425,7 @@ fn r0(r: client::GuiResult<()>) -> i32 {
 /// **旧カーネルでは断る** (票 TASK_KAPI_DATA_FIELDS、Codex B-R2-1)。v62 以前の
 /// カーネルの shlib ローダはヘッダ v3 の `min_api_ver` / `kapi_data_off` を
 /// 見ないので、このライブラリを載せてしまう。そのカーネルの KernelAPI は
-/// データ欄 (shm_base) が別の位置にあるので、`api->version` が 63 未満なら
+/// データ欄 (shm_base) が別の位置にあるので、`api->version` がビルド時の KAPI 版未満なら
 /// **`os32_init(api)` の前に**返し、旧 KAPI をライブラリに保存しない。
 /// 以後の全エクスポートは [`init_ok`] の門で失敗を返す (旧アプリの `bind()` は
 /// この戻り値を捨てるので、門が無いと NULL の KAPI を辿る)。
@@ -436,7 +436,7 @@ pub extern "C" fn os32gui_shlib_init(api: *mut KernelAPI) -> i32 {
     }
     /* magic / version は全版で 0x00 / 0x04 (配置が変わる前でも読める)。 */
     let ver = unsafe { core::ptr::read_volatile(core::ptr::addr_of!((*api).version)) };
-    if ver < os32api::OS32X_HDR_V3_MIN_API {
+    if ver < os32api::KAPI_VERSION {
         return os32api::gui::proto::OS32_ERR_VERSION;
     }
     os32api::os32_init(api);

@@ -78,7 +78,6 @@
 extern u32 v86_gp_cs;
 extern u32 v86_gp_ip;
 extern volatile int ring3_in_syscall;
-i32 __cdecl kapi_reserved_nosys(void);
 i32 kapi_mem_stat(i32 app_id, void *out, u32 size);
 u32 kdi_get_kctx_irq_depth(void);
 u32 kdi_get_kctx_exc_depth(void);
@@ -151,8 +150,8 @@ void kdi_set_kbd_inject_drop_count(u32 value);
 const u8 *kdi_ptr_ring3_ls_start(void);
 const u8 *kdi_ptr_ring3_ls_end(void);
 u32 *kdi_ptr___kernel_resident_end(void);
-#define KDEBUG_IMPORT_COUNT 328
-#define KDEBUG_ABI_GEN 0x47c1d113u
+#define KDEBUG_IMPORT_COUNT 327
+#define KDEBUG_ABI_GEN 0x25cff984u
 #include "kernel/module/module_image.h"
 extern void (*const kdebug_kexports[])(void);
 extern const struct module_symbol_contract kdebug_import_contracts[];

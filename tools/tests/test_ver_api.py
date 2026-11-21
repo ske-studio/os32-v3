@@ -123,9 +123,10 @@ def generated_layout(runner):
         lines.append('STATIC_ASSERT(__builtin_offsetof(KernelAPI, %s) == %d, off_%s);' %
                      (name, 8+4*i, name))
         lines.append('STATIC_ASSERT(KAPI_SLOT_%s == %d, slot_%s);' % (name.upper(), i, name))
-    lines += ['STATIC_ASSERT(__builtin_offsetof(KernelAPI, sbrk_heap_limit) == 0x4b8, heap_off);',
-              'STATIC_ASSERT(__builtin_offsetof(KernelAPI, shm_base) == 0x4bc, shm_off);',
-              'STATIC_ASSERT(sizeof(KernelAPI) == 0x4c0, table_size);',
+    data_off = 8 + 4 * data["func_capacity"]
+    lines += [f'STATIC_ASSERT(__builtin_offsetof(KernelAPI, sbrk_heap_limit) == {data_off}, heap_off);',
+              f'STATIC_ASSERT(__builtin_offsetof(KernelAPI, shm_base) == {data_off + 4}, shm_off);',
+              f'STATIC_ASSERT(sizeof(KernelAPI) == {data_off + 8}, table_size);',
               'STATIC_ASSERT(OS32X_MIN_API == %d && KAPI_VERSION == %d, api_version);' % (data['version'], data['version'])]
     print('PASS ver API: regeneration exact; frozen 254-slot v78 prefix')
     return '\n'.join(lines)

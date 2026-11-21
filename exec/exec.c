@@ -67,13 +67,12 @@ static KernelAPI *kapi;
 /*  レイアウト (CONTRACTS C3, KernelAPI と同一オフセット):                    */
 /*    0x00 magic / 0x04 version / 0x08+ 表[i]=STUB_BASE+i*8 (予約込みで       */
 /*    KAPI_FUNC_CAPACITY 本) / KAPI_DATA_FIELDS_OFF: データフィールド (値、   */
-/*    v63 から固定) / STUB_BASE: 各 8B スタブ B8<slot>CD80C3                 */
+/*    ABI 世代内で固定) / STUB_BASE: 各 8B スタブ B8<slot>CD80C3                 */
 /* ======================================================================== */
-/* 4KB アライン用に 2 ページ分。 */
-#define EXEC_TRAMP_RAW_PAGES 2
-static u8  ring3_tramp_raw[PAGE_SIZE * EXEC_TRAMP_RAW_PAGES];
+/* 頁境界に揃えた連続 2 頁。 */
+static u8 ring3_tramp_raw[RING3_TRAMP_BYTES] __attribute__((aligned(PAGE_SIZE)));
 static u32 ring3_tramp_page = 0;             /* 4KB 境界に揃えた実アドレス (=物理) */
-static void ring3_trampoline_init(void);
+
 
 /* CPL=3 由来のフォールト/不正 slot でアプリを kill (定義は下方, v2 M1e/M2d) */
 void ring3_fault_kill(void);
@@ -83,20 +82,23 @@ void ring3_abort_kill(void);
 void exec_exit(int status, int kind);
 
 void exec_init(void) {
-    kapi = (KernelAPI *)exec_kapi_table();
     /* アプリ ID の表を空にし、シェル帯 (ID 1) を走っている状態にする。
      * res_owner_set(1) もここで行われる (票 K5 の D3)。 */
     appslot_init();
     /* 起動要求表 (票 T9 D3) も空から始める。 */
     launch_init();
+}
+
+void exec_kapi_init(void)
+{
+    kapi = (KernelAPI *)exec_kapi_table();
 #include "exec_kapi_init.inc"
     /* 共有メモリ先頭アドレスを公開する。
      * MEM_SHM_BASE はカーネルの __bss_end 由来で可変のため、
      * ユーザ空間側がアドレスをハードコードしてはならない。 */
     kapi->shm_base = (u32)MEM_SHM_BASE;
 
-    /* CPL=3 用 KAPI トランポリンページを構築 (paging_init 済みが前提) */
-    ring3_trampoline_init();
+
 }
 
 #include "exec_tramp_init.inc"
@@ -348,7 +350,7 @@ int exec_tvram_read_allowed(void)
 #include "exec_tramp_strings.inc"
 
 /* exec.c では呼ばないが、tools/gen_kdebug_imports.py がこの宣言から型を読む (消すと生成が止まる)。 */
-extern i32 __cdecl kapi_reserved_nosys(void);
+
 
 /* kdebug の exec 自己試験へ写す口 (include/kselftest_probe.h)。 */
 void kdi_selftest_exec_view(struct kselftest_exec_view *out)

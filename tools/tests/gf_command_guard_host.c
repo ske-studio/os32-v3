@@ -67,7 +67,7 @@ static void run(void)
     paging_reclaim_conventional();
     CHECK(!paging_set_not_present(MEM_SHM_GUARD_LO, MEM_SHM_GUARD_LO + PAGE_SIZE - 1));
     CHECK(!paging_set_not_present(MEM_SHM_GUARD_HI, MEM_SHM_GUARD_HI + PAGE_SIZE - 1));
-    CHECK(!paging_boot_user_shared(exec_tramp_page_addr()));
+    CHECK(!paging_boot_user_shared(exec_tramp_page_addr(), 2));
     audit_ok();
     u32 owner;
     CHECK(ledger_owner_new(LEDGER_KIND_AS, 2, "gf-guard", &owner));

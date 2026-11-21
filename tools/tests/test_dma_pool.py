@@ -160,7 +160,7 @@ def boot_gate(tmp):
     exe = d / "dma-boot-host"
     subprocess.run(["gcc", *FLAGS, "-I" + str(d), *INCLUDES,
                     str(ROOT / "tools/tests/dma_boot_host.c"), "-o", str(exe)], check=True)
-    for case in ("ready", "short", "conflict", "nodebug"):
+    for case in ("ready", "short", "conflict", "nodebug", "build-failure", "map-failure"):
         subprocess.run([str(exe), case], check=True)
     # FDC's early boot buffer must stay independent of the pool.
     fdc = "\n".join((ROOT / path).read_text() for path in (

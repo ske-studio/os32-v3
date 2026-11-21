@@ -223,7 +223,7 @@ class MemoryBoot(unittest.TestCase):
 
     def test_kernel_boot_order_and_failstop(self):
         s = kernel_source(ROOT)
-        boot = 'paging_boot_user_shared(exec_tramp_page_addr())'
+        boot = 'paging_boot_user_shared(exec_tramp_page_addr(), 2)'
         self.assertLess(s.index('shm_init();'), s.index(boot))
         self.assertLess(s.index(boot), s.index('kdebug.ops.selftest_run();'))
         gate = 'if (!memory_boot_init(mem_kb))'

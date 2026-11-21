@@ -303,18 +303,18 @@ typedef struct {
     int (__cdecl *io_policy_get)(void *bytes, unsigned int cap, unsigned int *needed);
     int (__cdecl *io_policy_reset)(void);
     int (__cdecl *io_pump)(unsigned int budget_us);
-    /* 予約 (KAPI_FUNC_COUNT..KAPI_FUNC_CAPACITY-1、2 本)。末尾追記はここを削って使う */
-    i32 (__cdecl *kapi_reserved[2])(void);
+    /* 予約 (KAPI_FUNC_COUNT..KAPI_FUNC_CAPACITY-1、86 本)。末尾追記はここを削って使う */
+    i32 (__cdecl *kapi_reserved[86])(void);
     u32 sbrk_heap_limit;  /* newlib _sbrk用ヒープ上限アドレス (exec_runでセットされる) */
     u32 shm_base;  /* 共有メモリ (MEM_SHM_BASE) の先頭アドレス。DB結果受け渡しに使用 (exec_initでセット) */
 } KernelAPI;
 
 #define KAPI_FUNC_COUNT 298
-#define KAPI_FUNC_CAPACITY 300
-#define KAPI_FUNC_RESERVED 2
-#define KAPI_DATA_FIELDS_OFF 0x4B8
-#define KAPI_DATA_IDX_SBRK_HEAP_LIMIT 302
-#define KAPI_DATA_IDX_SHM_BASE 303
+#define KAPI_FUNC_CAPACITY 384
+#define KAPI_FUNC_RESERVED 86
+#define KAPI_DATA_FIELDS_OFF 0x608
+#define KAPI_DATA_IDX_SBRK_HEAP_LIMIT 386
+#define KAPI_DATA_IDX_SHM_BASE 387
 #define OS32_KAPI_LAYOUT_SECTION ".os32_kapi_layout"
 
 /* 配置の刻印 (票 TASK_KAPI_DATA_FIELDS、ヘッダ v3)。ELF の非ロードの
@@ -324,15 +324,15 @@ typedef struct {
  * と、crt0 を使わない試験バイナリ・Rust の os32api。ファイルスコープに
  * `OS32_KAPI_LAYOUT_STAMP();` と書く。フラグ "" = 非 alloc なので平らな
  * バイナリには入らない。 */
-#define OS32_KAPI_LAYOUT_STAMP() __asm__(".pushsection .os32_kapi_layout,\"\",@progbits\n\t.p2align 2\n\t.long 0x4B8\n\t.popsection")
+#define OS32_KAPI_LAYOUT_STAMP() __asm__(".pushsection .os32_kapi_layout,\"\",@progbits\n\t.p2align 2\n\t.long 0x608\n\t.popsection")
 
 /* 作り直し忘れの検出 (ユーザー決裁 2026-09-24)。crt の大域変数 `kapi` の
- * 実名を os32_kapi_v63 にする。v62 以前にコンパイルしたオブジェクトは
+ * 実名を os32_kapi_v89 にする。v62 以前にコンパイルしたオブジェクトは
  * `kapi` を参照したままなので、新しい crt とリンクすると未定義参照で落ちる。
  * カーネル (__KERNEL_BUILD__) は自前の kapi を持つので対象外。 */
 #ifndef __KERNEL_BUILD__
-#define OS32_KAPI_CRT_SYMBOL os32_kapi_v63
-#define kapi os32_kapi_v63
+#define OS32_KAPI_CRT_SYMBOL os32_kapi_v89
+#define kapi os32_kapi_v89
 #endif
 extern const u16 kapi_argsize[KAPI_FUNC_COUNT];
 extern const u16 kapi_argptr[KAPI_FUNC_COUNT];
