@@ -31,17 +31,10 @@ RUNNERS = {
     'p3': ('link_sh_run',),
     'fb': ('fb_run',),
     'sb-serial': ('sb_run', '--serial'),
-    'sc': ('sc_run',),
-    'sc-serial': ('sc_run', '--serial'),
-    'sc-link': ('sc_run', '--link'),
+    'sc': ('sc_run', '--link'),
     'sd': ('sd_run',),
-    'sd-link': ('sd_run', '--link'),
     'sh-output': ('ppc_sh_output',),
-    'sh-output-serial': ('ppc_sh_output', '--serial'),
-    'sh-output-link': ('ppc_sh_output', '--link'),
     'usb': ('usb_run',),
-    'usb-link': ('usb_run', '--link', '--lan'),
-    'usb-legacy': ('usb_run', '--legacy', '--lan'),
 }
 SHELL_RUNNERS = ('sb_run', 'sc_run', 'sd_run', 'usb_run', 'ppc_sh_output')
 # Limiting acceptance cases measured by the complete stage-1 inventory.
@@ -108,161 +101,6 @@ def envelope(rows):
 
 
 
-def shell_images(suite, work, build):
-    """Build the acceptance configurations without invoking their guest drivers."""
-    from kboot_accept import mutant_settings
-    from sb_run import INPUT
-    from kboot_run import require
-
-    work.mkdir(parents=True, exist_ok=True)
-    if suite == 'sb-serial':
-        return sb_images(work, build)
-    if suite.startswith('sc'):
-        return sc_images(suite, work, build)
-    if suite.startswith('usb'):
-        return usb_images(suite, work, build)
-    if suite.startswith('sd'):
-        from sd_run import link_settings
-        if suite == 'sd-link':
-            for case in ('normal', 'no-boot-follow'):
-                folder = work/case
-                folder.mkdir()
-                build(folder/'kernel', *link_settings(folder, case != 'normal'))
-        else:
-            opts = ['KBOOT_SH=1', 'KBOOT_LINK=0']
-            build(work/'product', *opts)
-            folder = work/'no-boot-follow'
-            folder.mkdir()
-            build(folder/'kernel', *opts, *mutant_settings(
-                folder, 'fixed-nonce', 'fs/serialfs/serialfs_persistent.c',
-                'nonce = sfs_crc32(token, sizeof(token));', 'nonce = 0; (void)token;'))
-        return
-
-    source = 'platform/powermac/console_stream.c'
-    def redirect(case):
-        return mutant_settings(work, case, source, '    console_write(buf, size, color);',
-                               '    (void)color; pm_log_write(buf, size);')
-
-    if suite == 'sh-output-link':
-        bins = 'KB_ROOT_BINS=build/out/ppc-user/link-sh/hello.bin build/out/ppc-user/link-sh/fault.bin build/out/ppc-user/link-sh/outprobe.bin'
-        opts = ['KBOOT_SH=1', 'KBOOT_LINK=1', bins]
-        build(work/'link-normal', *opts)
-        build(work/'link-fd1-log', *opts, *redirect('link-fd1-log'))
-        return
-    src = source
-    text = (ROOT / src).read_text()
-    before = '    (void)pm_escc_write(&serial, bytes, len);'
-    require(text.count(before) == 1, 'stream mirror anchor')
-    injected = work / 'console_stream.c'
-    if suite == 'sh-output-serial':
-        # Mark only the probe's stream write; ordinary CLI output stays intact.
-        replacement = ('    if (len == 1 && ((const char *)bytes)[0] == 70)\n'
-                       '        (void)pm_escc_write(&serial, "STREAM ", 7);\n' + before)
-        injected.write_text(text.replace(before, replacement))
-        cli = 'platform/powermac/cli_boot.c'
-        cli_text = (ROOT / cli).read_text()
-        cli_file = work / 'cli_boot.c'
-        commands = INPUT.replace('/bin/hello.bin ok\\n/bin/hello.bin ok\\n/bin/fault.bin\\n/bin/hello.bin ok\\n', '/bin/outprobe.bin\\n')
-        cli_file.write_text(cli_text.replace('enum { CLI_CAT_BYTES', commands+'\nenum { CLI_CAT_BYTES')
-                            .replace('.getkey = pm_terminal_getkey', '.getkey = sb_getkey'))
-    else:
-        injected.write_text(text.replace(before, '    (void)serial;'))
-    bins = 'KB_ROOT_BINS=build/out/ppc-user/hello.bin build/out/ppc-user/fault.bin build/out/ppc-user/outprobe.bin'
-    settings = ['KBOOT_SHELL=1', 'KBOOT_LINK=0', bins,
-                'KB_MUT_EXTRA_SRC='+src, 'KB_MUT_EXTRA_FILE='+str(injected)]
-    if suite == 'sh-output-serial':
-        settings += ['KB_MUT_THIRD_SRC='+cli, 'KB_MUT_THIRD_FILE='+str(cli_file)]
-    build(work/'normal', *settings)
-    build(work/'fd1-log', *settings, *redirect('fd1-log'))
-
-
-def sb_images(work, build):
-    from sb_run import INPUT, mutant_settings
-    source = 'platform/powermac/cli_boot.c'
-    text = (ROOT/source).read_text()
-    injected = work/'cli_boot.c'
-    injected.write_text(text.replace('enum { CLI_CAT_BYTES', INPUT+'\nenum { CLI_CAT_BYTES')
-                        .replace('.getkey = pm_terminal_getkey', '.getkey = sb_getkey'))
-    settings = ['KBOOT_SHELL=1', 'KBOOT_LINK=0', 'KB_MUT_SRC='+source, 'KB_MUT_FILE='+str(injected)]
-    build(work/'normal', *settings)
-    mutations = [
-        ('exit-status', 'arch/ppc/kapi_call.c',
-         'return ppc_kapi_invoke(&api, current_slot, values);',
-         'struct kapi_values changed = *values;\n'
-         '    if (current_slot == (__builtin_offsetof(KernelAPI, sys_exit) - 8) / 4) changed.value[0] = 0;\n'
-         '    return ppc_kapi_invoke(&api, current_slot, &changed);'),
-        ('fault-exit', 'arch/ppc/kernel_trap.c',
-         '        ring3_fault_kill();',
-         '        extern void kapi_sys_exit(int);\n        kapi_sys_exit(0);')]
-    for name, src, before, after in mutations:
-        extra = mutant_settings(work, name, src, before, after)
-        extra = [s.replace('KB_MUT_', 'KB_MUT_EXTRA_') for s in extra]
-        build(work/name, *settings, *extra)
-
-
-def sc_images(suite, work, build):
-    import sc_run
-    from kboot_accept import mutant_settings
-    from link_sh_run import settings as link_settings
-    from sc_run import BINS, INPUT
-
-    def parent_result(folder, prefix):
-        extra = mutant_settings(folder, 'parent-result', 'arch/ppc/kapi_call.c',
-                                'return ppc_kapi_invoke(&api, current_slot, values);',
-                                'static unsigned reads;\n'
-                                '    if (current_slot == (__builtin_offsetof(KernelAPI, exec_last_result) - 8) / 4 && ++reads == 2) return (u32)-1;\n'
-                                '    return ppc_kapi_invoke(&api, current_slot, values);')
-        return [s.replace('KB_MUT_', 'KB_MUT_'+prefix+'_') for s in extra]
-
-    if suite == 'sc-link':
-        for case in ('normal', 'parent-result'):
-            folder = work/case
-            folder.mkdir()
-            opts = link_settings(folder)
-            bins = ' '.join(str(folder/'user'/(name+'.bin')) for name in ('hello', 'fault', 'nest'))
-            opts = ['KB_ROOT_BINS='+bins if opt.startswith('KB_ROOT_BINS=') else opt for opt in opts]
-            if case == 'parent-result':
-                opts.extend(parent_result(folder, 'THIRD'))
-            build(folder/'kernel', *opts)
-        return
-    settings = ['KBOOT_SHELL=1', 'KBOOT_LINK=0', BINS]
-    if suite == 'sc-serial':
-        source = 'platform/powermac/cli_boot.c'
-        text = (ROOT/source).read_text()
-        injected = work/'cli_boot.c'
-        input_text = INPUT.replace('/bin/hello.bin ok\\n/bin/hello.bin ok\\n/bin/fault.bin\\n/bin/hello.bin ok\\n', '/bin/nest.bin\\n')
-        injected.write_text(text.replace('enum { CLI_CAT_BYTES', input_text+'\nenum { CLI_CAT_BYTES')
-                            .replace('.getkey = pm_terminal_getkey', '.getkey = sb_getkey'))
-        settings += ['KB_MUT_SRC='+source, 'KB_MUT_FILE='+str(injected)]
-    build(work/'normal', *settings)
-    if suite == 'sc-serial':
-        build(work/'parent-result', *settings, *parent_result(work, 'EXTRA'))
-    shell = work/'shell'
-    shell.mkdir()
-    with patch.object(sc_run, 'build', build):
-        sc_run.shell_serial(shell, [], suite == 'sc-serial')
-    if suite == 'sc':
-        build(work/'product', 'KBOOT_SH=1', 'KBOOT_LINK=0')
-
-
-def usb_images(suite, work, build):
-    from usb_run import mutation, product_settings, settings
-    cross = 'PPC_CROSS_DIR='+os.environ.get('USB_PPC_CROSS_DIR', os.environ['PPC_CROSS_DIR'])
-    if suite == 'usb-link':
-        opts = ['KBOOT_SH=1', 'KBOOT_LINK=1', cross]
-        build(work/'link-lan-normal', *opts)
-        src, dest = mutation(work, 'no-service')
-        build(work/'link-lan-no-service', *opts, 'KB_MUT_SRC='+src, 'KB_MUT_FILE='+str(dest))
-    elif suite == 'usb-legacy':
-        build(work/'lan-normal', 'KBOOT_SH=1', 'KBOOT_LINK=0', cross)
-    else:
-        for mode in ('normal', 'invert-key', 'no-forward'):
-            build(work/('product-'+mode), cross, *product_settings(work, mode))
-        build(work/'mouse-wait', cross, *product_settings(work, 'mouse-wait', late=True))
-        for mode in ('normal', 'no-service', 'syscall-ee'):
-            build(work/mode, cross, *settings(work, mode))
-
-
 def collect(out, suites, representative=False):
     sys.path[:0] = [str(ROOT / 'tools/accept'), str(ROOT / 'tools/ppc')]
     import kboot_accept
@@ -313,7 +151,7 @@ def collect(out, suites, representative=False):
             make(str(elf))
         case = folder.parent.name if folder.name == 'kernel' else folder.name
         name = suite+'/'+case
-        # S-C builds two different families with a case named "normal".
+        # Disambiguate cases that build multiple image profiles.
         if name in plans:
             name = suite+'/'+image+'/'+case
         plans[name] = dict(args=settings, elf=str(elf), iso=str(iso) if iso else None)
@@ -334,9 +172,6 @@ def collect(out, suites, representative=False):
                 build(folder, 'KBOOT_LINK=0', *kboot_accept.mutant_settings(folder, name, source, old, new))
             continue
         module_name, *extra = RUNNERS.get(suite, ('ppc_'+suite,))
-        if module_name in SHELL_RUNNERS:
-            shell_images(suite, out/suite, build)
-            continue
         if suite == 'p3':
             extra.extend(['--out', str(out/suite)])
         if suite == 'sqlite_stack':
@@ -360,7 +195,7 @@ def collect(out, suites, representative=False):
         if representative:
             extra.extend(['--case', REPRESENTATIVES[suite]])
         with patch.object(kboot_accept, 'build', build), patch.object(
-                sys, 'argv', [module_name, '--build-only', *([] if suite == 'sc' else ['--mutate']), *extra]):
+                sys, 'argv', [module_name, '--build-only', '--mutate', *extra]):
             module = importlib.reload(importlib.import_module(module_name))
             def boot_image(case, elf, iso):
                 name = suite+'/'+case
