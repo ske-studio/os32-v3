@@ -1,6 +1,11 @@
 /* Real console, TVRAM renderer and candidate restoration on host planes. */
 #define main con_sink_fixture_main
 #define _start con_sink_fixture_start
+#include "input/hal/input_context.h"
+int input_context_snapshot(KbdPolicySnapshot *out) { (void)out; return -1; }
+void kbd_policy_ime_state(u32 active, u32 owner, u32 gen)
+{ (void)active; (void)owner; (void)gen; }
+int input_ime_cancel_take(const KbdPolicySnapshot *current) { (void)current; return -1; }
 #include "con_sink_host.c"
 #undef main
 #undef _start

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Native capture against the pinned pre-HAL keyboard; freestanding ILP32."""
 CHECK = dict(name='input-native-host', tier=1, budget=10, needs=[], kind='characterization',
-    covers=['tools/tests/input_s3_differences.tsv', 'docs/decisions/INPUT_BIND_DESIGN.md', 'tools/tests/input_pc98_compat_host.c', 'tools/tests/kernel_includes.py', 'input/hal/legacy_keymap.c', 'input/keymaps/pc98_jp.c', 'input/hal/keymap_registry.c', 'input/hal/keymap_eval.c', 'input/hal/keymap_state.c', 'drivers/input/kbd.c', 'drivers/input/kbd_hal.c', 'drivers/input/*.h',
+    covers=['input/hal/input_context.h', 'tools/tests/input_s3_differences.tsv', 'docs/decisions/INPUT_BIND_DESIGN.md', 'tools/tests/input_pc98_compat_host.c', 'tools/tests/kernel_includes.py', 'input/hal/legacy_keymap.c', 'input/keymaps/pc98_jp.c', 'input/hal/keymap_registry.c', 'input/hal/keymap_eval.c', 'input/hal/keymap_state.c', 'drivers/input/kbd.c', 'drivers/input/kbd_hal.c', 'drivers/input/*.h',
             'input/hal/in2_int.h', 'input/hal/in2_dev.c', 'input/hal/keymap.h', 'input/hal/in2_state.c',
             'input/hal/kbd_merge.c', 'input/hal/in2_ring.c', 'input/hal/legacy_ring.c',
             'input/hal/legacy_mode.c', 'input/hal/mouse_ext.c', 'input/hal/pointer_state.c',
@@ -73,7 +73,7 @@ u32 oracle_dropped(void) { return legacy_raw_dropped() + legacy_cooked_dropped()
         def execute(texts):
             for path,source in texts.items(): (work/Path(path).name).write_text(adapt(source))
             (work/'native_deliver.inc').write_text(function(texts['drivers/input/kbd.c'],'kbd_deliver'))
-            cmd = ['gcc','-m32','-std=gnu11','-Wall','-Wextra','-Werror','-ffreestanding','-fno-pie','-fno-stack-protector','-nostdinc','-nostdlib','-static','-no-pie',
+            cmd = ['gcc','-m32','-std=gnu11','-Wall','-Wextra','-Werror','-ffreestanding', '-ffunction-sections', '-fdata-sections','-fno-pie','-fno-stack-protector','-nostdinc','-nostdlib','-static', '-Wl,--gc-sections','-no-pie',
                    '-I'+str(work),'-I'+str(root/'tools/tests/host_arch'),'-I'+str(root/'input/hal'),*include_flags(root)]
             subprocess.run(cmd+[str(work/Path(p).name) for p in paths[:-1]]+[str(work/'oracle.c'),str(root/'tools/tests/input_native_host.c'),'-o',str(work/'test')], check=True)
             return host32.run([str(work/'test')], runner='qemu').returncode
@@ -84,7 +84,7 @@ u32 oracle_dropped(void) { return legacy_raw_dropped() + legacy_cooked_dropped()
                 ('drivers/input/kbd_hal.c','.sc = scancode & SCANCODE_KEY, .down = !(scancode & SCANCODE_BREAK)', '.sc = scancode & SCANCODE_KEY, .down = !!(scancode & SCANCODE_BREAK)'),
                 ('drivers/input/kbd_hal.c','INPUT_ORIGIN_NATIVE','INPUT_ORIGIN_USB'),
                 ('drivers/input/kbd.c','kbd_hal_capture(scancode);','(void)scancode;'),
-                ('input/hal/legacy_keymap.c','input_emit_legacy_key(sc, 1, mods);','(void)sc; (void)mods;')]:
+                ('input/hal/kbd_merge.c','input_emit_legacy_event(e, old,','if (old && down) return;\n    input_emit_legacy_event(e, old,')]:
                 assert sources[path].count(old_text) == 1, old_text
                 texts = dict(sources); texts[path] = texts[path].replace(old_text,new)
                 rc = execute(texts); assert 0 < rc < 128, (old_text,rc)

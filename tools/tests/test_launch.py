@@ -28,7 +28,7 @@ import tempfile
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
          "-fno-stack-protector", "-Wall", "-Wextra", "-Werror"]
-INCLUDES = include_flags(ROOT)
+INCLUDES = ["-I"+str(ROOT/"tools/tests/host_arch"), *include_flags(ROOT)]
 HOST_SRC = ROOT / "tools/tests/launch_host.c"
 KERNEL_SRC = ROOT / "exec/launch.c"
 

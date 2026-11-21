@@ -90,8 +90,7 @@ void input_native_locks(u8 src, u8 mods);
 void kbd_hal_init(u8 locks);
 void kbd_hal_capture(u8 scancode);
 extern volatile u8 kbd_shift_state;
-void input_emit_legacy_key(u8 sc, u8 down, u8 mods);
-void input_emit_legacy_repeat(u8 sc, u8 mods);
+void input_emit_legacy_event(const InputEvent *event, u8 old, u8 raw_due);
 
 extern volatile int kbd_gui_mode;
 extern volatile int kbd_stop_suppressed;
@@ -99,6 +98,8 @@ void appslot_poll_yield_reset(void);
 int legacy_stop_filter(int keycode, int is_break, int mods);
 
 /* Cooked ring operations; producers and flush callers already hold IRQ exclusion. */
+u32 legacy_cooked_pushed(void);
+u32 legacy_cooked_popped(void);
 void legacy_cooked_push(u16 entry);
 int legacy_cooked_take(void);
 int legacy_cooked_peek(void);
@@ -118,6 +119,9 @@ int legacy_raw_take(void);
 /* Registered at startup and kept resident. A NULL provider or callback means
  * that source/service is absent; callers must not call a NULL pointer. Empty
  * or absent input is -1. peek does not consume a completed key. */
+enum InputReadStep { IR_EMPTY, IR_KEY, IR_RECHECK, IR_INTERRUPTED };
+struct KmKey;
+struct KmEvalResult;
 struct InputLegacyProvider {
     int (*terminal_try)(void);
     int (*inject_try)(void);
@@ -135,12 +139,29 @@ struct InputLegacyProvider {
     int (*wait_pending)(void);
     void (*wait_step)(void); /* foreground work and idle */
     void (*wait_prepare)(void); /* Optional CUI pre-read work; never called in GUI. */
+    /* Optional ordered IME delivery, installed by the resident provider. */
+    int (*capture_ime)(const struct KmKey *, u8, const struct KmEvalResult *);
+    void (*flush_actions)(void);
+    enum InputReadStep (*read_cooked)(int cancel, int *key);
 };
 
 void input_legacy_register(const struct InputLegacyProvider *provider);
 const struct InputLegacyProvider *input_legacy_provider(void);
 
+/* Images without the resident FEP keep the usage classifier only. */
+static inline const struct InputLegacyProvider *input_ime_provider(void)
+{
+#if OS32_HOOK_IME
+    return input_legacy_provider();
+#else
+    return 0;
+#endif
+}
+
 enum { IL_CHAR = 0, IL_KEY = 1, IL_LOCAL_CHAR = 2 };
+enum InputReadStep input_read_cooked(int cancel, int *key);
+int fep_read_try(int *key);
+int fep_read_wait(int interruptible, int *key, u32 *start_tick, int resume);
 int input_legacy_peek(int mode);
 int input_legacy_try(int mode);
 /* Each wait measures its own 30-second capture deadline from entry. FREEZE

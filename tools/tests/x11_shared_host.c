@@ -1,10 +1,19 @@
 #define LEGACY_KEYMAP_SOURCE "legacy_keymap_source.inc"
 #define KBD_MERGE_SOURCE "kbd_merge_source.inc"
+#include "input/hal/input_context.h"
+static KbdPolicySnapshot foreground;
+int input_context_snapshot(KbdPolicySnapshot *out)
+{
+    if (!foreground.owner) return -1;
+    *out = foreground;
+    return 0;
+}
 #include "kbd_capture_fixture_host.h"
 #include "../../input/hal/legacy_ring.c"
+#include "ime_gate_source.inc"
 #include "../../input/hal/legacy_mode.c"
 #include "../../kernel/input_legacy.c"
-#include "../../kernel/input_wait.c"
+#include "wait_source.inc"
 /* X-11: real shared services and keyboard queues, ILP32. Device rendering,
  * dictionary storage and CPU transitions are fixture boundaries. No per-owner
  * IME state: switching owners alone must never manufacture a private copy. */
@@ -19,6 +28,7 @@
 #include "redir_access.h"
 
 int services_public = 1;
+int fep_services_public(void) { return services_public; }
 void geforce_foreground_poll(void) { }
 /* No device callbacks are registered in this boundary fixture. */
 void idle_work_run(void) { }
@@ -168,7 +178,66 @@ static u8 fixture_tvram_attr[25 * 160];
 #define TVRAM_BASE ((uptr)fixture_tvram_text)
 #define TVRAM_ATTR ((uptr)fixture_tvram_attr)
 #include "../../platform/pc98/ime_display.c"
+#ifdef TEST_IME_FG1
+static unsigned publications;
+static void counted_state(u32 active, u32 owner, u32 command_gen)
+{
+    ++publications;
+    kbd_policy_ime_state(active, owner, command_gen);
+}
+#define kbd_policy_ime_state counted_state
+static int scripted, observed_kana, wait_step, capture_step, wait_keys[3], reserve_calls;
+static void count_reserve(int rows) { reserve_calls++; tvram_set_scroll_reserve(rows); }
+static int capture_composition(void)
+{
+    KbdPolicyImeSnapshot destination;
+    input_ime_snapshot(&destination);
+    return input_ime_cancel_capture(&destination);
+}
+static int scripted_wait(int interruptible)
+{
+    if (!scripted) return kbd_getkey_wait(interruptible);
+    if (wait_step == 1) observed_kana = !kstrcmp(ime_suspend_state()->kana_buf, "あ");
+    if (wait_step == capture_step) capture_composition();
+    return wait_step < 3 ? wait_keys[wait_step++] : -1;
+}
+static int scripted_fep_wait(int interruptible, int *key, u32 *start_tick, int resume)
+{
+    if (!scripted) return fep_read_wait(interruptible, key, start_tick, resume);
+    if (scripted == 2) {
+        if (wait_step++ == 0) {
+            *start_tick = 123;
+            return IR_RECHECK;
+        }
+        *key = resume && *start_tick == 123 ? 27 : -1;
+        return *key < 0 ? IR_INTERRUPTED : IR_KEY;
+    }
+    *key = scripted_wait(interruptible);
+    return *key < 0 ? IR_INTERRUPTED : IR_KEY;
+}
+static int scripted_fep_try(int *key)
+{
+    /* The scripted wait/poll fixtures inject a cancellation at a fixed read
+     * boundary. Let the reader's failure to take it reach its assertion. */
+    if (scripted) {
+        *key = kbd_trygetkey();
+        return *key < 0 ? IR_EMPTY : IR_KEY;
+    }
+    return fep_read_try(key);
+}
+#define fep_read_try scripted_fep_try
+#define fep_read_wait scripted_fep_wait
+#define kbd_getkey_wait scripted_wait
+#define tvram_set_scroll_reserve count_reserve
+#endif
 #include "ime_source.inc"
+#ifdef TEST_IME_FG1
+#undef kbd_policy_ime_state
+#undef fep_read_try
+#undef fep_read_wait
+#undef kbd_getkey_wait
+#undef tvram_set_scroll_reserve
+#endif
 #include "../../kernel/input_service.c"
 #include "pointer_fixture_host.h"
 #include "port_fixture_host.h"
@@ -743,6 +812,237 @@ static int candidate_boundaries(void)
 
 #include "x11_shared_host_l45.inc"
 
+#ifdef TEST_IME_FG1
+#include "../../input/keymaps/hid_jp.c"
+static int usage(u8 src, u16 gen, u8 code, int down)
+{
+    KmKey event = {.src=src, .generation=gen, .keycode=code, .down=down};
+    return input_capture_key(&event);
+}
+
+static int absolute_input(void)
+{
+    reset();
+    foreground = (KbdPolicySnapshot){1, 7, 3, INPUT_CONTEXT_RUNNING, 0};
+    u16 gen;
+    int src = input_src_register(INPUT_KIND_KBD, INPUT_ORIGIN_USB, &gen);
+    CHECK(src > 0 && !km_backend_register(&hid_jp_backend) &&
+          !km_source_bind(src, gen, KM_MAP_HID), "HID action source");
+    _enable();
+    usage(src, gen, 0x90, 1); usage(src, gen, 0x90, 0);
+    input_legacy_keymap_set(&pc98_jp_backend);
+    CHECK(ime_trygetkey() < 0 && !ime_is_active(), "table flushes ON");
+    services_public = 0;
+    usage(src, gen, 0x90, 1); usage(src, gen, 0x90, 0);
+    services_public = 1;
+    CHECK(ime_trygetkey() < 0 && !ime_is_active(), "unpublished ON discarded");
+    for (int direct = 0; direct <= 1; ++direct) {
+        pushed = popped = (u32)-1;
+        usage(src, gen, 0x90, 1);
+        usage(src, gen, 0x90, 1);
+        usage(src, gen, 0x90, 0);
+        key(0x1d);
+        usage(src, gen, 0x91, 1);
+        usage(src, gen, 0x91, 0);
+        legacy_cooked_push('b');
+        CHECK(!ime_is_active() && input_legacy_peek(IL_CHAR) == 'a', "peek before ON");
+        _disable();
+        CHECK(ime_trygetkey() == -1 && !ime_is_active(), "masked due defers pop");
+        _enable();
+        foreground.owner = 0;
+        CHECK(ime_trygetkey() == -1 && !ime_is_active(), "missing foreground defers pop");
+        foreground.owner = 1;
+        CHECK(ime_trygetkey() == -1 && ime_is_active() && g_ime.kana_len, "ON before kana");
+        if (direct) CHECK(input_legacy_wait(IL_KEY, 0) == 'b', "public OFF returns b");
+        CHECK(ime_trygetchar() == 0xe3 && ime_trygetchar() == 0x81 &&
+              ime_trygetchar() == 0x82 && !ime_is_active(), "OFF delivers full tail");
+        if (!direct) CHECK(ime_trygetchar() == 'b', "next key after tail");
+        CHECK(ime_trygetkey() == -1, "absolute input drained");
+    }
+    usage(src, gen, 0x91, 1); usage(src, gen, 0x91, 0);
+    usage(src, gen, 0x90, 1); usage(src, gen, 0x90, 0);
+    CHECK(ime_trygetkey() == -1 && ime_is_active(), "ordered OFF ON");
+    key(KEY_STOP);
+    CHECK(input_legacy_try(IL_KEY) == 0x6000, "empty ON passes STOP");
+    ime_feed_key('k');
+    key(0x37);
+    CHECK(!input_ime_cancel_pending() && input_legacy_try(IL_KEY) == 0x3703, "RLDN stays legacy");
+    ++foreground.exec_gen;
+    key(KEY_STOP);
+    CHECK(!input_ime_cancel_pending() && input_legacy_try(IL_KEY) == 0x6000, "old active rejected");
+    ime_feed_key('a');
+    usage(src, gen, 0x48, 1);
+    CHECK(ime_take_cancel(), "held USB STOP");
+    input_src_release(src, gen);
+    u16 replacement;
+    CHECK(input_src_register(INPUT_KIND_KBD, INPUT_ORIGIN_USB, &replacement) == src &&
+          gen != replacement && !km_source_bind(src, replacement, KM_MAP_HID), "reused HID source");
+    gen = replacement;
+    usage(src, gen, 0x48, 1); usage(src, gen, 0x48, 0);
+    CHECK(input_legacy_try(IL_KEY) == 0x6000, "unplug cleared repeat suppression");
+    for (int phase = 0; phase < 3; ++phase) for (int source = 0; source < 2; ++source)
+    for (int etx = 0; etx <= 1; ++etx) {
+        ime_feed_key(phase == 0 ? 'k' : 'a');
+        if (phase == 2) ime_feed_key((KEY_SPACE << 8) | ' ');
+        for (int i = 0; i < KBD_BUF_SIZE; ++i) legacy_cooked_push(0x200+i);
+        u8 native = etx ? 0x2b : KEY_STOP;
+        u8 hid = etx ? 6 : 0x48;
+        if (source) {
+            if (etx) usage(src, gen, 0xe0, 1);
+            usage(src, gen, hid, 1);
+        } else {
+            if (etx) kbd_hal_capture(KEY_CTRL);
+            kbd_hal_capture(native);
+        }
+        CHECK(input_ime_cancel_pending() && ime_take_cancel() && !ime_take_cancel(),
+              "full queue capture cancels once");
+        CHECK(input_legacy_try(IL_KEY) == 0x200, "oldest FIFO byte");
+        if (source) {
+            usage(src, gen, hid, 1); usage(src, gen, hid, 0);
+            if (etx) usage(src, gen, 0xe0, 0);
+        } else {
+            kbd_hal_capture(native); kbd_hal_capture(native | 0x80);
+            if (etx) kbd_hal_capture(KEY_CTRL | 0x80);
+        }
+        for (int i = 1; i < KBD_BUF_SIZE; ++i)
+            CHECK(input_legacy_try(IL_KEY) == 0x200+i, "full queue preserved in order");
+        CHECK(input_legacy_try(IL_KEY) == -1, "full queue drained");
+    }
+    ime_feed_key('k');
+    key(KEY_STOP);
+    int next;
+    u32 start_tick;
+    CHECK(fep_read_wait(1, &next, &start_tick, 0) == IR_RECHECK && ime_take_cancel() &&
+          !ime_take_cancel(), "cancel alone wakes waiter");
+    key(0x1d);
+    CHECK(fep_read_wait(1, &next, &start_tick, 1) == IR_KEY && next == 0x1d61, "wait preserves next key");
+    ime_feed_key('k');
+    kbd_hal_capture(KEY_STOP);
+    CHECK(ime_take_cancel(), "STOP repeat held");
+    input_legacy_keymap_set(0);
+    kbd_hal_capture(KEY_STOP | 0x80);
+    input_legacy_keymap_set(&pc98_jp_backend);
+    key(KEY_STOP);
+    CHECK(input_legacy_try(IL_KEY) == KEY_STOP << 8, "release without a keymap");
+    CHECK(!ime_apply_absolute(INPUT_IME_ON) && ime_is_active(), "idempotent ON");
+    CHECK(!ime_apply_absolute(INPUT_IME_OFF) && !ime_apply_absolute(INPUT_IME_OFF) &&
+          !ime_is_active(), "idempotent OFF");
+    reset();
+    services_boot_fault = SERVICES_FAULT_DICTIONARY;
+    CHECK(ime_apply_absolute(INPUT_IME_ON) == -1 && !ime_is_active(), "failed ON");
+    services_boot_fault = 0;
+    CHECK(!ime_apply_absolute(INPUT_IME_ON) && ime_is_active(), "retry ON");
+    foreground.owner = 0;
+    ime_feed_key('k');
+    key(KEY_STOP);
+    CHECK(!input_ime_cancel_pending() && input_legacy_try(IL_KEY) == 0x6000,
+          "unregistered STOP");
+    usage(src, gen, 0xe0, 1); usage(src, gen, 6, 1);
+    usage(src, gen, 6, 0); usage(src, gen, 0xe0, 0);
+    CHECK(!input_ime_cancel_pending() && (input_legacy_try(IL_KEY) & 0xff) == 3,
+          "unregistered ETX");
+    key(0x35);
+    CHECK(input_legacy_try(IL_KEY) == 0x3500, "unregistered XFER");
+    reset(); ime_toggle(); ime_feed_key('a');
+    ime_feed_key(KEY_SPACE << 8 | ' ');
+    CHECK(g_ime.state == IME_ST_CONVERT && g_ime.result_count > 1 &&
+          !g_ime.candidate_idx, "multiple candidates ready");
+    key(KEY_XFER);
+    CHECK(ime_trygetkey() < 0 && g_ime.state == IME_ST_CANDLIST &&
+          !g_ime.candidate_idx, "first XFER opens list");
+    key(KEY_XFER);
+    CHECK(ime_trygetkey() < 0 && g_ime.candidate_idx == 1, "second XFER selects next");
+    input_src_release(src, gen);
+    return 0;
+}
+
+static int fg1_test(void)
+{
+    scripted = 1;
+    foreground = (KbdPolicySnapshot){.owner=1, .exec_gen=7, .command_gen=3};
+    KbdPolicyImeSnapshot state;
+    reset();
+    kbd_policy_ime_state(0, 0, 0);
+    services_public = 0;
+    publications = 0;
+    ime_init();
+    static const IME_Render private_render = {gui_draw_char, gui_draw_wide, gui_clear_row, 0, 0};
+    ime_set_render((void *)&private_render);
+    input_ime_snapshot(&state);
+    CHECK(!publications && !state.active && !state.owner, "private init has no destination");
+    services_public = 1;
+    ime_set_mode(IME_MODE_HIRAGANA);
+    CHECK(capture_composition() < 0, "empty ON inactive");
+    ime_feed_key('a');
+    ime_feed_key(KEY_SPACE << 8 | ' ');
+    input_ime_snapshot(&state);
+    CHECK(state.active && state.owner == foreground.owner && state.exec_gen == foreground.exec_gen &&
+          state.command_gen == foreground.command_gen && g_ime.converting, "candidate destination");
+    CHECK(ime_feed_key(KEY_RETURN << 8 | 13) >= 0, "candidate commit");
+    input_ime_snapshot(&state);
+    CHECK(!state.active && g_ime.commit_len > g_ime.commit_pos, "unread UTF-8 tail inactive");
+    foreground.owner = 0;
+    ime_set_mode(IME_MODE_OFF);
+    input_ime_snapshot(&state);
+    CHECK(!state.active && !state.owner, "missing foreground invalidates destination");
+    foreground.owner = 1;
+    for (int api = 0; api < 2; api++) {
+        int (*wait)(void) = api ? ime_getkey_kapi : ime_getchar_kapi;
+        int (*poll)(void) = api ? ime_trygetkey : ime_trygetchar;
+        reset();
+        scripted = 2;
+        wait_step = 0;
+        CHECK(wait() == 27 && wait_step == 2, "FEP wait retains deadline");
+        scripted = 1;
+        ime_set_mode(IME_MODE_HIRAGANA);
+        CHECK(capture_composition() < 0, "empty ON inactive");
+        ime_feed_key('k');
+        CHECK(!capture_composition(), "romaji active");
+        _disable();
+        CHECK(poll() < 0 && g_ime.rk.preedit[0], "disabled poll preserves pending");
+        _enable();
+        CHECK(poll() < 0 && !g_ime.rk.preedit[0], "poll cancels");
+        ime_feed_key('a');
+        CHECK(!capture_composition(), "kana active");
+        g_ime.commit_buf[0] = 'X';
+        g_ime.commit_len = 1;
+        wait_step = 0;
+        capture_step = -1;
+        wait_keys[0] = 'k';
+        wait_keys[1] = -7;
+        reserve_calls = 0;
+        CHECK(wait() == -1 && wait_step == 2 && reserve_calls == 2 &&
+              !g_ime.rk.preedit[0], "pre-wait cancel then new input then interrupted wait");
+        ime_feed_key('k');
+        wait_step = capture_step = 0;
+        wait_keys[0] = -7;
+        reserve_calls = 0;
+        CHECK(wait() == -1 && reserve_calls == 1 && !g_ime.rk.preedit[0],
+              "negative wait single cancel");
+        ime_feed_key('k');
+        wait_step = capture_step = 0;
+        wait_keys[0] = 'a';
+        wait_keys[1] = -7;
+        reserve_calls = 0;
+        CHECK(wait() == -1 && reserve_calls == 2 && observed_kana, "returned key after cancel");
+    }
+    ime_feed_key('k');
+    CHECK(!capture_composition(), "GUI pending");
+    reserve_calls = 0;
+    CHECK(ime_feed_key(KEY_STOP << 8) < 0 && reserve_calls == 1, "GUI STOP once");
+    ime_feed_key('k');
+    CHECK(!capture_composition(), "GUI pending");
+    CHECK(ime_feed_key(-1) < 0 && !g_ime.rk.preedit[0], "GUI consumes pending");
+    ime_feed_key('k');
+    for (int i = 0; i < KBD_BUF_SIZE; i++) legacy_cooked_push('x');
+    CHECK(legacy_cooked_pending() == KBD_BUF_SIZE && !capture_composition(), "full queue accepts cancel");
+    CHECK(ime_feed_key(-1) < 0 && !g_ime.rk.preedit[0] && legacy_cooked_pending() == KBD_BUF_SIZE,
+          "full queue independent delivery");
+    legacy_cooked_flush();
+    return 0;
+}
+#endif
+
 void _start(void)
 {
     input_legacy_register(&kbd_legacy_provider);
@@ -757,6 +1057,10 @@ void _start(void)
     rc |= lone_n_space();
     rc |= gui_list_clear();
     rc |= candidate_boundaries();
+#ifdef TEST_IME_FG1
+    rc |= absolute_input();
+    rc |= fg1_test();
+#endif
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc) : "memory");
     for (;;) {}
 }

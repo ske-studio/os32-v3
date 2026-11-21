@@ -1,3 +1,6 @@
+#include "app_ids.h"
+int input_display_restore_lock(unsigned int *flags);
+void appslot_gfx_resource_acquire(int owner);
 #include "gfx2_core_fake.h"
 /* P1 is covered by pegc-mode-host; v1 lifecycle tests fake C1/Y4 and the table. */
 const GfxBackendV2 pegc_backend_v2 = {.abi = GFX_HAL2_ABI};
@@ -978,3 +981,5 @@ int display_provider_bundle_ok(u32 role, u32 backend)
 {
     return role == LEDGER_ROLE_DISPLAY && backend == LEDGER_SF_PC98;
 }
+int input_display_restore_lock(unsigned int *flags) { *flags = 0; return 0; }
+void appslot_gfx_resource_acquire(int owner) { (void)owner; }

@@ -13,7 +13,11 @@
 /* ======================================================================== */
 
 #include "appslot.h"
+#include "io.h"
 #include "exec_surface.h"
+#include "gfx.h"
+#include "gfx_osri_view.h"
+#include "con_sink.h"
 #include "pgalloc.h"       /* §6 ownership/mapping management target sizeof */
 #include "os32_kapi_shared.h"   /* OS32_ERR_* / EXEC_ERR_* */
 #include "fd_redirect.h"       /* T9 §12 T1: リダイレクト表を ID の文脈にする */
@@ -89,6 +93,7 @@ volatile u32 appslot_trim_pages_total;
  * 留まる。static にしないのは kernel.map から emu_read_mem で読むため
  * (fault_kill_count と同じ流儀)。 */
 volatile int g_gfx_owner = GFX_OWNER_WM;
+static u32 gfx_resource_owner, gfx_resource_gen, next_resource_gen;
 
 static AppSlot g_slot[APP_SLOT_COUNT];
 static int g_cur = APP_ID_SHELL;
@@ -127,6 +132,7 @@ void appslot_init(void)
     g_slot[APP_ID_SHELL].depth = 1;
     g_cur = APP_ID_SHELL;
     g_cur_op_is_wait = 0;
+    gfx_resource_owner = gfx_resource_gen = next_resource_gen = 0;
     g_gfx_owner = GFX_OWNER_WM;   /* 画面は WM のもの (票 T8 D1) */
     /* リダイレクトの枠も空から (票 T9 §12 T1)。いまの表は fd_redirect_init
      * が別に空にする — ここで閉じると、まだ生きている FD を横から閉じる。 */
@@ -536,7 +542,12 @@ int appslot_gfx_claim(int gui_mode)
         appslot_abort_request();
         return r;
     }
-    if (r > 0) g_gfx_owner = r;
+    if (r > 0) {
+        unsigned int irq = irq_save();
+        g_gfx_owner = r;
+        appslot_gfx_resource_acquire(r);
+        irq_restore(irq);
+    }
     return 0;
 }
 
@@ -544,13 +555,68 @@ int appslot_gfx_owner(void) { return g_gfx_owner; }
 
 /* Optional resident diagnostic display, absent from standalone appslot hosts. */
 extern void gf_display_owner_exit(int id) __attribute__((weak));
-void appslot_gfx_owner_exit(int id)
+/* Resource generations identify ownership intervals, including failed init. */
+void appslot_gfx_resource_acquire(int owner)
+{
+    unsigned int irq = irq_save();
+    if (++next_resource_gen == 0) ++next_resource_gen;
+    gfx_resource_owner = (u32)owner;
+    gfx_resource_gen = next_resource_gen;
+    irq_restore(irq);
+}
+
+int appslot_gfx_resource_snapshot(int owner, u32 *resource_gen)
+{
+    unsigned int irq = irq_save();
+    int matches = gfx_resource_owner == (u32)owner && gfx_resource_gen != 0;
+    if (matches) *resource_gen = gfx_resource_gen;
+    irq_restore(irq);
+    return matches ? 0 : -1;
+}
+
+/* Called with IRQs disabled; reserve before any heavy cleanup. */
+static void gfx_resource_reserve(int id)
+{
+    if (gfx_resource_owner == (u32)id) {
+        gfx_resource_owner = 0;
+        gfx_resource_gen = 0;
+    }
+}
+
+/* FG1 only: no scheduler, WM pump or display acquisition in this path. */
+static void gfx_owner_cleanup(int id)
 {
     if (gf_display_owner_exit) gf_display_owner_exit(id);
-    if (g_gfx_owner == id) {
-        g_gfx_owner = GFX_OWNER_WM;
-        exec_surface_policy_reeval();
+    unsigned int irq = irq_save();
+    int returned = g_gfx_owner == id;
+    if (returned) g_gfx_owner = GFX_OWNER_WM;
+    irq_restore(irq);
+    if (returned) exec_surface_policy_reeval();
+}
+
+void appslot_gfx_owner_exit(int id)
+{
+    unsigned int irq = irq_save();
+    gfx_resource_reserve(id);
+    irq_restore(irq);
+    gfx_owner_cleanup(id);
+}
+
+int appslot_gfx_owner_exit_if(int owner, u32 resource_gen)
+{
+    if (!_irq_enabled() || kctx_irq_depth || kctx_exc_depth) return -1;
+    unsigned int irq = irq_save();
+    if (!resource_gen || gfx_resource_owner != (u32)owner ||
+        gfx_resource_gen != resource_gen) {
+        irq_restore(irq);
+        return 0;
     }
+    gfx_resource_reserve(owner);
+    irq_restore(irq);
+    gfx_owner_cleanup(owner);
+    if (owner == APP_ID_SHELL && !con_sink_is_enabled() && gfx_is_started())
+        gfx_shutdown();
+    return 1;
 }
 
 #include "appslot_selftest.inc"

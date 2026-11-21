@@ -38,6 +38,11 @@ def run(ctx):
         old[p] = subprocess.check_output(['git', 'show', BASE + ':' + p], cwd=root, text=True)
     # Baseline merge owns its own legacy functions.
     old.pop('input/hal/legacy_keymap.c')
+    header = subprocess.check_output(['git', 'show', BASE + ':input/hal/in2_int.h'],
+                                     cwd=root, text=True)
+    declarations = [line for line in header.splitlines()
+                    if line.startswith('void input_emit_legacy_')]
+    old[MERGE] = '#include "types.h"\n' + '\n'.join(declarations) + '\n' + old[MERGE]
     old[HAL] += '\nvoid input_legacy_keymap_set(const KmBackend *m) { (void)m; }\n'
     with tempfile.TemporaryDirectory(prefix='input-s2x-') as td:
         tmp = Path(td)

@@ -130,6 +130,7 @@ static void exec_restore_context(int id)
 /* ======================================================================== */
 static void exec_reclaim_resources(int id)
 {
+    exec_input_owner_exit(id);
     io_kapi_owner_exit(id); /* IO_KAPI_RECLAIM_COMMON */
     kapi_strings_cleanup_owned(id);
     /* (1) SQLite DB リソース (P5: cleanup_all → cleanup_owned)。
@@ -228,6 +229,7 @@ static void exec_notify_owned(int id, int kind)
         console_printf(KLOG_ATTR, "[gfx] emergency owner=%d restore rc=%d\n", id, restore_rc);
     exec_gfx_owner_exit(id);
     appslot_gfx_owner_exit(id);
+    (void)input_display_restore_drain();
 }
 
 static void exec_reclaim_owned(int id, int kind)

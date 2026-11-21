@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """T_merge: source transitions, shared locks and V86 (freestanding ILP32)."""
-CHECK = dict(name='input-merge-host', tier=1, budget=10, needs=[], covers=['input/hal/legacy_keymap.c', 'input/keymaps/pc98_jp.c', 'input/hal/keymap_registry.c', 'input/hal/keymap_eval.c', 'input/hal/keymap_state.c',
+CHECK = dict(name='input-merge-host', tier=1, budget=10, needs=[], covers=['input/hal/input_context.h', 'input/hal/legacy_keymap.c', 'input/keymaps/pc98_jp.c', 'input/hal/keymap_registry.c', 'input/hal/keymap_eval.c', 'input/hal/keymap_state.c',
     'input/hal/in2_int.h', 'input/hal/in2_dev.c', 'input/hal/keymap.h', 'input/hal/in2_state.c', 'input/hal/mouse_ext.c', 'input/hal/pointer_state.c', 'input/hal/kbd_merge.c', 'input/hal/in2_ring.c',
     'include/types.h', 'include/io.h', 'include/kbd.h', 'include/legacy_guest.h',
     'sdk/include/os32/os32_kapi_shared.h', 'tools/tests/input_merge_host.c',
@@ -25,11 +25,11 @@ def run(ctx):
         (tmp / 'in2_int.h').write_text((ctx.root / 'input/hal/in2_int.h').read_text())
         (tmp / 'io.h').write_text('extern unsigned test_irq;\nstatic inline unsigned irq_save(void) { unsigned f=test_irq; test_irq=0; return f; }\nstatic inline void irq_restore(unsigned f) { test_irq=f; }\n')
         files = [str(tmp / name) for name in names] + [str(ctx.root / 'tools/tests/input_merge_host.c')]
-        flags = ['-std=gnu11', '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-stack-protector',
-                 '-I'+str(tmp), '-I'+str(ctx.root/'include'), '-I'+str(ctx.root/'sdk/include/os32')]
+        flags = ['-std=gnu11', '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-ffunction-sections', '-fdata-sections', '-fno-stack-protector',
+                 '-I'+str(tmp), '-I'+str(ctx.root/'input/hal'), '-I'+str(ctx.root/'include'), '-I'+str(ctx.root/'sdk/include/os32')]
         def build(texts):
             for name, source in zip(names, texts): (tmp / name).write_text(source)
-            subprocess.run(['gcc', '-m32', '-fno-pie', '-nostdlib', '-nostdinc', '-static', '-no-pie'] + flags + files + ['-Wl,--wrap=input_emit_in2', '-o', str(tmp/'test')], check=True)
+            subprocess.run(['gcc', '-m32', '-fno-pie', '-nostdlib', '-nostdinc', '-static', '-Wl,--gc-sections', '-no-pie'] + flags + files + ['-Wl,--wrap=input_emit_in2', '-Wl,--wrap=input_capture_delivery', '-o', str(tmp/'test')], check=True)
             return host32.run([str(tmp/'test')], runner='qemu').returncode
         assert build(sources) == 0
         print('PASS x86 T_merge', flush=True)
@@ -44,13 +44,20 @@ def run(ctx):
         if ctx.mutate:
             for old, new in [
                 ('cnt[sc] += down ? 1 : -1;', 'cnt[sc] += down ? 1 : 0;'),
-                ('if (down || cnt[sc] == 0)', 'if (1)'),
-                ('input_emit_legacy_repeat(sc, kbd_shift_state);', '{ input_emit_in2(e); input_emit_legacy_repeat(sc, kbd_shift_state); }'),
-                ('if (legacy_active()) return;', 'if (0) return;')]:
+                ('if (down || (old && cnt[sc] == 0))', 'if (1)'),
+                ('e->buttons = kbd_shift_state = input_key_mods();\n    }\n    if (down || (old && cnt[sc] == 0))', 'e->buttons = kbd_shift_state = input_key_mods(); if (down) input_emit_in2(e);\n    }\n    if (down || (old && cnt[sc] == 0))'),
+                ('if (legacy_active()) return 1;', 'if (0) return 1;')]:
                 assert sources[2].count(old) == 1, old
                 rc = build(sources[:2] + [sources[2].replace(old, new)] + sources[3:])
                 assert 0 < rc < 128, (old, rc)
                 print('RED runtime: ' + old, flush=True)
+            repeat = '.repeat = event->down && old'
+            index = names.index('legacy_keymap.c')
+            assert sources[index].count(repeat) == 1
+            mutant = sources.copy()
+            mutant[index] = mutant[index].replace(repeat, '.repeat = 0')
+            assert 0 < build(mutant) < 128
+            print('RED runtime: unbound repeat cleared', flush=True)
             # Fault injection at unplug only: make the private bit writable by the mutant.
             decl = 'static u16 cnt[128];\nstatic u8 mechanical[IN2_MAX_DEV], usb_lock;'
             release = 'void input_state_release(u8 src, u16 generation)\n{'

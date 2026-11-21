@@ -1,5 +1,6 @@
 #include "in2_int.h"
 #include "kbd.h"
+#include "keymap.h"
 #include "os32_kapi_shared.h"
 #define T(c) do { if (!(c)) return __LINE__; } while (0)
 static InputEvent events[512];
@@ -14,8 +15,15 @@ void __real_input_emit_in2(const InputEvent *e);
 void __wrap_input_emit_in2(const InputEvent *e)
 { bad_irq |= test_irq; events[n++] = *e; __real_input_emit_in2(e); }
 volatile int kbd_gui_mode = 1;
-static unsigned last_raw_n;
-int legacy_stop_filter(int sc, int br, int mods) { (void)sc; (void)br; (void)mods; return 0; }
+static unsigned last_raw_n, filter_calls;
+static int bad_repeat;
+int __real_input_capture_delivery(const KmKey *key, u8 old, const KmEvalResult *result, u8 raw_due);
+int __wrap_input_capture_delivery(const KmKey *key, u8 old, const KmEvalResult *result, u8 raw_due)
+{
+    if (key->repeat != (old && key->down)) bad_repeat = 1;
+    return __real_input_capture_delivery(key, old, result, raw_due);
+}
+int legacy_stop_filter(int sc, int br, int mods) { ++filter_calls; (void)sc; (void)br; (void)mods; return 0; }
 void legacy_cooked_push(u16 entry) { (void)entry; __builtin_trap(); }
 void legacy_raw_push(int sc, int br, int mods)
 {
@@ -57,8 +65,11 @@ static int probe(void)
     T(events[1].buttons == SHIFT_SHIFT && old_mods[1] == SHIFT_SHIFT);
     T(key(1, KEY_SHIFT, 1) == 0 && n == 2 && k == 2 && repeats == 1);
     input_repeat(2, gen[1], KEY_SHIFT); T(n == 2 && repeats == 2);
+    unsigned before_break = filter_calls;
+    T(!bad_repeat);
     T(key(1, KEY_SHIFT, 0) == 0 && n == 3 && k == 2 && input_key_pressed(KEY_SHIFT));
     T(key(1, KEY_SHIFT, 0) == 0 && n == 3 && k == 2);
+    T(filter_calls == before_break);
     input_repeat(1, gen[0], KEY_SHIFT); T(repeats == 2);
     input_src_release(2, gen[1]);
     T(n == 4 && k == 3 && !input_key_pressed(KEY_SHIFT) && !input_key_mods());

@@ -1,3 +1,4 @@
+#include "input/hal/input_context.h"
 /* GF_FEAT4_DESIGN final 2026-11-04 addendum, A3 wire/session/case0..7.
  * OS32's staged camera protocol has no nouveau equivalent. Hardware work
  * stays behind the borrowed module ops; C2 owns all scan reservations. */
@@ -1025,6 +1026,7 @@ static i32 display_cui(bool enter)
     i32 rc = 0;
     const struct gf4_test_ops *o = geforce_display_ops();
     if (enter) {
+        if (input_display_restore_drain() < 0) return GF4_ESTATE;
         /* A GUI app may have already left through the shared backend. */
         const struct gf4_restore_ops *m = geforce_display_restore_ops();
         if (display_cui_owner && !display_session.valid &&

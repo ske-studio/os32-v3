@@ -13,6 +13,8 @@ static void observed_restore(unsigned int flags);
 #undef irq_save
 #undef irq_restore
 #include "exec/appslot.c"
+#include "input/hal/input_context.c"
+#include "input/hal/input_interrupt.c"
 #include "exec/ring3_str.c"
 volatile u32 kctx_irq_depth, kctx_exc_depth;
 
@@ -24,6 +26,9 @@ void fd_redirect_clear_state(FdRedirectState *state)
 
 static int gui_mode, owner;
 static u32 display_returns;
+static int graphics_active;
+int gfx_is_started(void) { return graphics_active; }
+void gfx_shutdown(void) { graphics_active = 0; }
 void gf_display_owner_exit(int id)
 {
     CHECK(id == APP_ID_SHELL && _irq_enabled());
@@ -92,13 +97,14 @@ static void test(void)
 
     /* Independent expectations from §3/F and existing GUI STOP contract. */
     HWB_TEST("display-return");
-    g_cui_display_abort_pending = 0; display_returns = 0;
+    input_interrupt_init(); appslot_gfx_resource_acquire(APP_ID_SHELL);
+    display_returns = 0; graphics_active = 1;
     exec_cui_display_abort(); CHECK(!display_returns);
     ring3_abort_request(); CHECK(!display_returns);
     kctx_irq_depth = 1;
-    (void)ring3_wait_pending(); CHECK(!display_returns);
+    (void)ring3_wait_pending(); CHECK(!display_returns && graphics_active);
     kctx_irq_depth = 0;
-    (void)ring3_wait_pending(); CHECK(display_returns == 1);
+    (void)ring3_wait_pending(); CHECK(display_returns == 1 && !graphics_active);
     exec_cui_display_abort(); CHECK(display_returns == 1);
     take_check(1); take_check(0); /* independent HW stop request survives */
     same_slots(before);
