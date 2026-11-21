@@ -26,6 +26,9 @@ inline __attribute__((always_inline)) int module_load(const struct module_reques
            q->policy.pair_image_crc != (expected_valid ? 0x89abcdefU : 0));
 }
 
+#ifdef PAIR_FEP
+#include "host_arch/arch_io.h"
+#endif
 #include PAIR_ADAPTER
 
 #if defined(PAIR_FM) || defined(PAIR_PCM) || defined(PAIR_LAN)
@@ -42,6 +45,10 @@ const struct trident_resources *trident_resources_get(void)
     return &resources;
 }
 u32 cpu_loops_per_tick(void) { return 1; }
+#elif defined(PAIR_FEP)
+void input_ime_action_flush(void) {}
+void kbd_policy_ime_state(u32 active, u32 owner, u32 command_gen) {}
+int input_ime_cancel_take(const KbdPolicySnapshot *current) { return 0; }
 #elif defined(PAIR_SQLITE)
 const SqliteModuleApi sqlite_stub_api;
 #elif defined(PAIR_KDEBUG)
