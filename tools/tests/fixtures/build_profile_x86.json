@@ -89,7 +89,7 @@
     "input/keymaps/pc98_jp.c",
     "input/keymaps/hid_jp.c",
     "platform/pc98/input_keymap.c",
-    "input/hal/in2_ring.c",
+    "input/hal/in2_ring.c", "input/hal/in2_export.c",
     "input/hal/in2_excl.c",
     "input/hal/in2_reclaim.c",
     "input/hal/in2_time.c",
