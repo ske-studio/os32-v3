@@ -420,7 +420,6 @@ FPU非依存の整数数学ライブラリ。KernelAPIへの依存なし。純�
 libos32math  (依存なし — 最も基底のライブラリ)
      ↑
      ├── libos32gfx   (math + KAPI)
-     ├── libos32snd   (math + KAPI)
      ├── libos32tilemap (math + gfx)
      └── ゲーム本体    (math + 任意のlib)
 ```

@@ -101,6 +101,11 @@ static void __attribute__((cold)) gui_diag_register(void)
     if (!serial_gate_active()) serial_puts_polled("[gui] register\r\n");
 }
 
+int gui_registered(void)
+{
+    return g_gui_handler != 0;
+}
+
 i32 gui_register(void *handler, void *pump)
 {
     if (res_owner_get() != GUI_SHELL_OWNER || ring3_call_from_user()) {

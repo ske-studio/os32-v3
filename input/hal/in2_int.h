@@ -3,6 +3,8 @@
 
 #include "types.h"
 
+void in2_on_focus(int old, int owner);
+
 #define IN2_MAX_DEV 16
 
 /* Internal native-endian event. Producers zero fields unused by the type. */

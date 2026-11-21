@@ -1,4 +1,11 @@
 #include "av_contract.h"
+#include "in2_int.h"
+
+__attribute__((weak)) void in2_on_focus(int old, int owner)
+{
+    (void)old;
+    (void)owner;
+}
 
 __attribute__((weak)) int in2_pad_state(u32 slot, IN2_PadState *o)
 {

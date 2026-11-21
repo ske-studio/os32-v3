@@ -476,7 +476,7 @@ def main():
             print('missing link SFS providers:', sorted(sfs_providers - undefined))
             return 1
         av_providers = {line.split()[1] for line in (ROOT / 'tools/checks/av_wiring.txt').read_text().splitlines()
-                        if line and not line.startswith('#')}
+                        if line and not line.startswith('#') and len(line.split()) == 2}
         if av_providers - undefined:
             print('missing AV providers:', sorted(av_providers - undefined))
             return 1

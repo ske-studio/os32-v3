@@ -1,3 +1,4 @@
+#include "av_contract.h"
 #include "kernel/idle_work.h"
 #include "exec_legacy.h"
 #include "exec_font_guard.h"

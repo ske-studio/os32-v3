@@ -254,7 +254,9 @@ def main():
             headers = subprocess.check_output(['git', 'ls-files', '*.h'], cwd=ROOT,
                                               text=True).splitlines()
             tree = work / 'overlay'
-            for rel in set(headers) | {HEADER, FIXTURE_H, FIXTURE_C, 'include/ime_boot.h'}:
+            # The implementer's read-only index still lists working-tree deletions.
+            present_headers = {rel for rel in headers if (ROOT / rel).is_file()}
+            for rel in present_headers | {HEADER, FIXTURE_H, FIXTURE_C, 'include/ime_boot.h'}:
                 target = tree / rel
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(ROOT / rel, target)

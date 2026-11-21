@@ -182,6 +182,7 @@ static int stop_discards;
 static void input_discard_stop(void) { stop_discards++; }
 static int ime_clean;
 void exec_ime_owner_exit(int id) { CHECK(id == 2 && cleanup == 6 && teardown == 1); ime_clean = 1; }
+static void av_focus_exec_leave(int id, int parent) { CHECK(id == 2 && parent == cur); }
 static void exec_gui_owner_exit(int id, int kind) {
     CHECK(ime_clean); ime_clean = 0;
     CHECK(kind == (host_wm_kill ? EXEC_KIND_ABORTED : phase == 3 ? EXEC_KIND_EXITED : scheduled_kind));

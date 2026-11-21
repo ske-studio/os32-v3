@@ -45,6 +45,7 @@ extern volatile u32 gui_ime_render_rejected;
 
 /* K2 用: 登録された入力ポンプ (gui_pump) を返す。未登録なら NULL。
  * 実体の型は GuiPump (void (*)(void))。 */
+int gui_registered(void);
 void *gui_get_pump(void);
 
 /* KAPI: 次に起動するシェルのパスをカーネルに記録する (契約 T9、K4 の入口)。

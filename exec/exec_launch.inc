@@ -399,6 +399,7 @@ static int exec_launch(const char *cmdline, int gui_arg)
             /* 暴走判定の起点 (票 T9 §12 S6)。 */
             appslot_mark_scheduled(id, tick_count);
         }
+        av_focus_exec_enter(id);
         exec_nest_level = ctx->depth;
 
         exec_entry_calls++;

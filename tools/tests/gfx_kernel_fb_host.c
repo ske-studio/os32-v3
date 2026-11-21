@@ -220,6 +220,7 @@ static struct addrspace space;
 static u32 payload;
 volatile int ring3_wm_depth;
 int appslot_cur(void) { return 2; }
+void av_focus_exec_leave(int id, int parent) { (void)id; (void)parent; }
 int res_owner_get(void) { return 2; }
 static int host_user = 1, host_gui, host_gfx_owner = 2;
 int ring3_call_from_user(void) { return host_user; }

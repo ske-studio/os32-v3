@@ -15,6 +15,7 @@ IS snd2_stream_wait
 IS snd2_stream_volume
 IS snd2_stream_close
 IA av_focus_set
+IA in2_on_focus internal
 IA av_focus_get
 IA in2_pad_state
 IA in2_pad_caps

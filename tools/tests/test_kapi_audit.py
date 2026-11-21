@@ -21,7 +21,6 @@ for func in ('fm_set_tone', 'fm_note_on', 'fm_note_off', 'ssg_tone', 'ssg_volume
     for bound in ('ch < 0', 'ch >= OPN_CHANNEL_COUNT'):
         MUTATIONS.append((func + ' ' + bound, 1, func, bound))
 MUTATIONS += [
-    ('retired MML invokes target', 3, '    (void)mml;', '    old_mml_target(mml);'),
     ('tone low', 1, 'tone_num >= 0 && ', ''),
     ('tone high', 1, 'tone_num < NUM_TONES', '1'),
     ('serial receive probe', 2, 'if (interruptible && ring3_wait_pending())', 'if (0)'),
@@ -64,6 +63,14 @@ for old, new in (('port_putchar_kapi', 'serial_putchar'),
                  ('ime_getchar_kapi', 'ime_getchar'),
                  ('ime_getkey_kapi', 'ime_getkey')):
     MUTATIONS.append((old + ' public target', 3, old + '(', new + '('))
+
+# raw-wait shares the input, STOP and direct-chip probes. The retired MML
+# wrapper's no-side-effect assertion belongs to the KAPI audit.
+RAW_WAIT_MUTATIONS = tuple(MUTATIONS)
+MUTATIONS += [
+    ('retired MML invokes target', 3, '    (void)mml;', '    old_mml_target(mml);'),
+]
+
 
 def run(runner, mutation=None, case=0, expected=None):
     sources = [read_text(ROOT / p) for p in SOURCES]

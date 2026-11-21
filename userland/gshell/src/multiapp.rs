@@ -165,8 +165,8 @@ pub struct Multi {
     /// いま走っているアプリ ID (0 = WM top-level)。`pick` はこれが 0 の
     /// ときしか選ばない — 走っている本人を「起こす」ことはできない。
     running: i32,
-    /// 直前に `snd_focus` へ渡した owner。同じ値なら呼ばない (G10 の「1 回だけ」)。
-    snd_owner: i32,
+    /// 直前に `av_focus_set` へ渡した owner。同じ値なら呼ばない (G10 の「1 回だけ」)。
+    av_owner: i32,
     /// `exec_start` を呼んでから戻るまで。**起動したてのアプリはまだ表に
     /// 居ない** (表に載る id は `exec_start` の戻り値そのもの) ので、この間だけ
     /// 走っている ID を表へ迎える ([`should_park`] の adopt)。
@@ -204,7 +204,7 @@ impl Multi {
         last_run: 0,
         input_streak: 0,
         running: 0,
-        snd_owner: APP_ID_SHELL,
+        av_owner: -1,
         pending_start: false,
         abort_clear_req: false,
         abort_kill_target: 0,
@@ -340,6 +340,10 @@ pub fn on_owner_exit(id: i32) {
         None => return,
     };
     let mm = m();
+    // カーネルは前景 owner の終了時に机へ戻す。同じ ID の再利用にも再通知する。
+    if mm.av_owner == id {
+        mm.av_owner = -1;
+    }
     mm.injected_keys[i] = false;
     mm.key_wait_checks[i] = false;
     mm.apps[i] = App::NEW;
@@ -1282,30 +1286,27 @@ pub fn kill_for_request(id: i32) -> i32 {
 }
 
 /* ================================================================ */
-/*  音の排他 (決裁 D9-4、受入 G10)                                   */
+/*  AV 前景の通知                                                   */
 /* ================================================================ */
 
-/// フォーカス (= 最前面の可視窓の owner) が変わっていたら `snd_focus` を
+/// フォーカス (= 最前面の可視窓の owner) が変わっていたら `av_focus_set` を
 /// 1 回だけ呼ぶ。**KAPI を呼ぶので X1 からは呼ばない** (契約 T8) —
 /// 呼ぶのは `wm_cycle` の末尾 (X3 と単独ループ) だけ。
-pub fn sync_snd_focus(st: &GuiState) {
-    let f = st.front_owner();
-    /* 窓が 1 枚も無ければ音の所有権はシェル帯へ戻す。 */
-    let target = if f == 0 { APP_ID_SHELL } else { f };
+pub fn sync_av_focus(st: &GuiState) {
+    let target = st.front_owner();
     let mm = m();
-    if target == mm.snd_owner {
+    if target == mm.av_owner {
         return;
     }
-    mm.snd_owner = target;
-    unsafe {
-        (os32api::api().snd_focus)(target);
+    if unsafe { (os32api::api().av_focus_set)(target) } == 0 {
+        mm.av_owner = target;
     }
 }
 
-/// いま `snd_focus` に渡してある owner (試験と診断用)。
+/// いま `av_focus_set` に渡してある owner (試験と診断用)。
 #[allow(dead_code)] /* 試験・診断用 (ゲストからは呼ばない) */
-pub fn snd_owner() -> i32 {
-    m().snd_owner
+pub fn av_owner() -> i32 {
+    m().av_owner
 }
 
 /* ================================================================ */

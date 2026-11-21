@@ -1741,9 +1741,9 @@ fn a_single_app_never_parks_and_keeps_the_old_wm_cycle_halt_loop() {
         "アプリが 1 本なのに exec_park を呼んだ (回帰)"
     );
     /* 空回りで 0 回になったのではないこと: `wm_cycle` が 1 周でも回れば
-     * 末尾の `sync_snd_focus` がフォーカス (owner 2) を音へ渡している。 */
+     * 末尾の `sync_av_focus` がフォーカス (owner 2) をカーネルへ渡している。 */
     assert_eq!(
-        mocks::snd_focus_calls(),
+        mocks::av_focus_calls(),
         vec![2],
         "op_wait のループが 1 周も回っていない (試験が空振り)"
     );
@@ -1782,47 +1782,81 @@ fn op_wait_parks_when_another_app_is_ready() {
     wm::g().inited = false;
 }
 
-/* ---- 票の追加検査 6: フォーカス切替で `snd_focus` は 1 回だけ ----
+/* ---- 票の追加検査 6: フォーカス切替で `av_focus_set` は 1 回だけ ----
  *  決裁 D9-4 / 受入 G10。同じフォーカスのまま何周回しても呼ばない。 */
 #[test]
-fn snd_focus_is_called_once_per_focus_change() {
+fn av_focus_is_called_once_per_focus_change() {
     use crate::{mocks, multiapp, wm};
     mocks::init();
     let shm = mocks::Shm::new();
     let mut st = four_app_state(&shm);
 
-    multiapp::sync_snd_focus(&st); /* 最前面 = owner 5 */
-    assert_eq!(mocks::snd_focus_calls(), vec![5], "初回が違う");
-    multiapp::sync_snd_focus(&st);
-    multiapp::sync_snd_focus(&st);
+    *mocks::AV_FOCUS_RESULT.lock().unwrap() = -1;
+    multiapp::sync_av_focus(&st);
+    assert_eq!(multiapp::av_owner(), -1);
+    *mocks::AV_FOCUS_RESULT.lock().unwrap() = 0;
+    multiapp::sync_av_focus(&st); /* 最前面 = owner 5 */
+    assert_eq!(mocks::av_focus_calls(), vec![5, 5], "初回が違う");
+    multiapp::sync_av_focus(&st);
+    multiapp::sync_av_focus(&st);
     assert_eq!(
-        mocks::snd_focus_calls().len(),
-        1,
-        "フォーカスが動いていないのに snd_focus を呼んだ"
+        mocks::av_focus_calls().len(),
+        2,
+        "フォーカスが動いていないのに av_focus_set を呼んだ"
     );
 
     focus_app(&mut st, 2);
-    multiapp::sync_snd_focus(&st);
+    multiapp::sync_av_focus(&st);
     assert_eq!(
-        mocks::snd_focus_calls(),
-        vec![5, 2],
+        mocks::av_focus_calls(),
+        vec![5, 5, 2],
         "切替のたびに 1 回だけ呼ばれていない"
     );
-    assert_eq!(multiapp::snd_owner(), 2);
+    assert_eq!(multiapp::av_owner(), 2);
+    #[cfg(av_focus_kernel)]
+    assert_eq!(unsafe { mocks::focus_kernel::av_focus_get() }, 2);
 
-    /* 窓が 1 枚も無くなったら音の所有権はシェル帯 (1) へ戻す。 */
+    /* 窓が 1 枚も無くなったら前景は机 (0) へ戻す。 */
     let mut k = 0;
     while k < 4 {
         st.windows[k] = wm::Win::EMPTY;
         k += 1;
     }
     st.z_count = 0;
-    multiapp::sync_snd_focus(&st);
+    multiapp::sync_av_focus(&st);
     assert_eq!(
-        mocks::snd_focus_calls(),
-        vec![5, 2, 1],
-        "最後の窓が消えても音がアプリのままになっている"
+        mocks::av_focus_calls(),
+        vec![5, 5, 2, 0],
+        "最後の窓が消えても前景がアプリのままになっている"
     );
+    #[cfg(av_focus_kernel)]
+    assert_eq!(unsafe { mocks::focus_kernel::av_focus_get() }, 0);
+}
+
+#[test]
+fn reused_foreground_owner_is_notified_again() {
+    use crate::{handler, mocks, multiapp, wm};
+    use os32api::gui::proto::{GuiWinSpec, GUI_OP_OWNER_EXIT};
+
+    let shm = mocks::Shm::new();
+    b5_setup(&shm);
+    multiapp::sync_av_focus(wm::g());
+    #[cfg(av_focus_kernel)]
+    unsafe {
+        mocks::focus_kernel::av_focus_exec_leave(5, 1);
+        assert_eq!(mocks::focus_kernel::av_focus_get(), 0);
+    }
+    assert_eq!(handler::gshell_gui_handler(GUI_OP_OWNER_EXIT, 0, 5), 0);
+
+    multiapp::on_start(5);
+    let spec: GuiWinSpec = unsafe { core::mem::zeroed() };
+    assert!(wm::create_window(wm::g(), 5, &spec) >= 0);
+    multiapp::sync_av_focus(wm::g());
+    multiapp::sync_av_focus(wm::g());
+    assert_eq!(mocks::av_focus_calls(), vec![5, 5]);
+    #[cfg(av_focus_kernel)]
+    assert_eq!(unsafe { mocks::focus_kernel::av_focus_get() }, 5);
+    wm::g().inited = false;
 }
 
 /* ---- 票の追加検査 7: `LAUNCH` は「1 本増やす」(契約 S2 の読み替え) ---- */

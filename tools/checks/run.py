@@ -108,7 +108,7 @@ NOTEST = (
     "input/input_core", "input/input_ctx", "input/input_query", "math/atan2",
     "math/fix16", "math/lerp", "math/random", "math/recip", "math/sqrt", "math/trig",
     "math/vec2", "mgx/mgx_blit", "mgx/mgx_decode", "save/save_core", "save/save_meta",
-    "snd/libos32snd", "ui/libos32ui_core", "ui/microui"))
+    "ui/libos32ui_core", "ui/microui"))
 SHARED_LAYERS = frozenset(("include", "kapi", "mm", "exec", "lib", "platform"))
 OUTSIDE = frozenset(("arm-compile", "gfinit-fixture-host", "e10c-lifecycle",
     "host-agent", "host-lib-host", "net-link-host", "lan-bridge-host"))
