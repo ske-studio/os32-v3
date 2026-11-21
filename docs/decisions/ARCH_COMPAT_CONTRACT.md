@@ -201,6 +201,7 @@ POLICY_DEV §10「x86 に揃える」(ユーザー決定 2026-11-20、動作実�
 | 起動の文脈 | 起動から外部シェルのループ | 常駐 CLI (`kernel/cli/resident_cli.c`、LAN の端末の入口) が起動の文脈で、そこから `sh` を起こす | **未揃え** | 製品シェルの枠と一緒に揃える |
 | 部品の読み込み | FEP・SQLite は module | 初期移植では静的に結線 | 未揃え | 共通 loader の L1 → L2 → FEP → KCG。SQLite は静的のままとし、module への置き換えは任意の B08 とする。 |
 | root と /host | ディスクと共通 VFS | インストール媒体は RO RAM root、/host は link の SFS CALL | 製品媒体は未揃え | HDD の ext2 root を整え、辞書・学習を x86 と同じパスで公開する。 |
+| HDD の区画と起動の区画 | PC-98 の区画表と IPL・ローダ (`platform/pc98/`) | APM の区画表と、Open Firmware が読む起動用の小さな HFS の区画 (ローダとカーネル) | 残す (物理)。**最終の形はユーザー決定 (2026-11-21「最終的にはそうなって」、B05 の案 A)**。途中の段 (TFTP のカーネル + HDD の ext2 の root など) を経てよい | Open Firmware は ext2 を読めず HFS/HFS+・ISO9660・TFTP だけを読む。ext2 の root と hdprep・install の流れは共通 (PPC_ROOT_MOUNT_ALIGN_X86_DESIGN)。G4 の HDD への書き込みと NVRAM の boot-device の書き換えは、その時に中身を確かめて別に承認 ([D2]) |
 | 端末と入力 | TVRAM、PC-98 の鍵盤 | FB の文字端末、USB の HID | 違いを残す (物理) | 装置が違う |
 | KCG の字形の読み出し | CG ROM/CG RAM を `drivers/video/kcg/kcg_module.c` (kcg.mod の提供者の口) が読む | 常駐の KCG1 ファイル (`platform/powermac/kcg.c`) | ANK・漢字の読み出しの転送は共有した (`drivers/video/kcg/kcg_read_provider.inc`、B14 2026-11-20)。字形の出所の違いは残す (物理) | 部品のロードは B08 (module の読み込み) の段で揃える |
 | ATA Data のバイト順 (D8) | LE の 16 bit ポート | BE の窓。IDENTIFY の語はバイト交換し、セクタは媒体の並びを保つ | 残す (物理) | CPU のバイト順が違う。語の値とセクタのバイト列を別の窓口で渡す |

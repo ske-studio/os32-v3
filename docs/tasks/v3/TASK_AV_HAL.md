@@ -1,6 +1,6 @@
 # サウンド・入力の HAL (DirectSound・XInput 相当の土台)
 
-> 状態: **設計中 (2026-11-09)** — 設計は確定・ユーザー承認済み ([AV_HAL_DESIGN](../../decisions/sound/AV_HAL_DESIGN.md))、実装を待つ。前提は HAL v2 の A0 (ユーザーの確認待ち) と、音の段は 1kHz tick の段 B の合格。設計に専念する期間は 2026-11-11 に解除済み。
+> 状態: **計画 (2026-11-21)** — [AV_HAL_DESIGN](../../decisions/sound/AV_HAL_DESIGN.md) はユーザー承認済み。HAL v2 の A0 は main。AV0 は [KAPI v89 の容量拡張](../../decisions/KAPI_CAPACITY_V89_DESIGN.md) (wip) の後に v90 で実装する。詳細は [AV0_V90_ADDENDUM](../../decisions/sound/AV0_V90_ADDENDUM.md)。音の段は 1 kHz tick の段 B の合格後。
 
 ## 0. ユーザー決定 (原文)
 - 承認 (2026-11-14):「推奨: 16 枠に広げ、上限は定数 1 か所 (IN2_MAX_DEV) で持つ」→「OK」。
@@ -16,4 +16,4 @@
 全文は [AV_HAL_DESIGN](../../decisions/sound/AV_HAL_DESIGN.md)。
 - カーネル: 装置の一覧と能力の表・PCM 1 本・位置・DSP の口・FM/PSG チップの口 (追記 2)・前景・入力 (raw 128・独占・パッド 4 台・1ms)。ミキサ無し。
 - HAL ライブラリ libos32snd (userland/lib/snd、旧 libos32snd を置き換え): ミキサ (カーネルの流れの唯一の書き手)・voice・ソフトの FM 合成器・MIDI・本物/ソフトの選び方 (SOFT・FALLDOWN・FAIL)。
-- 段: HAL v2 A0 → AV0 (宣言と MML の廃止) → 入力の段 → 1kHz tick 段 B → 音の段 (S・C) → 合成器の照らし直し → L・V → USB 段 1 の後に P。約 8,600 行。
+- 段: HAL v2 A0・KAPI v89 の容量拡張 → AV0 (宣言と MML の廃止) → 入力の段 → 1kHz tick 段 B → 音の段 (S・C) → 合成器の照らし直し → L・V → USB 段 1 の後に P。約 8,600 行。
