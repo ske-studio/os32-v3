@@ -114,6 +114,13 @@ void fixture_kernel(void) { finish(90); }
 int gf_production_selected(void) { return 0; }
 static void core_function(void) { }
 #ifndef HWDEV_REAL_IMAGE
+static u32 init_calls;
+static int count_init(u32 *exports)
+{
+    (void)exports;
+    init_calls++;
+    return 0;
+}
 static u32 probe_io_calls;
 static void probe_io(u32 id) { CHECK(id == 0); probe_io_calls++; }
 #endif
@@ -168,6 +175,16 @@ void _start(void)
     kdebug.state = KDEBUG_RUNNING;
     kdebug.ops.hwdev_core_get = get_core;
     struct module_handle dep = {0, 1};
+#ifndef HWDEV_REAL_IMAGE
+    if (input[0] == 16) {
+        c->module_id = MODULE_ID_HWDEV;
+        struct module_record body = {.dependency_count = 1, .dependencies = {dep}};
+        u32 exports[3] = {0};
+        CHECK(hwdev_start(&body, (u32)(uptr)count_init, exports) == MODULE_BAD_DEPENDENCY);
+        CHECK(init_calls == 0);
+        finish(0);
+    }
+#endif
     switch (input[0]) {
     case 2: kdebug.state = KDEBUG_OFF; break;
     case 3: dep.generation++; break;
