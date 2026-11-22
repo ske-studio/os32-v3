@@ -46,3 +46,22 @@ int input_src_info(u8 src, u16 generation, u8 *kind, u8 *origin)
     *origin = sources[src - 1].origin;
     return 1;
 }
+
+/* Dense enumeration over live source IDs, including after detach. */
+int input_src_enumerate(u32 index, IN2_DevInfo *out)
+{
+    unsigned f = irq_save();
+    int count = 0;
+    for (int i = 0; i < IN2_MAX_DEV; ++i) {
+        if (!sources[i].used) continue;
+        if (out && (u32)count == index) {
+            *out = (IN2_DevInfo){ .size = sizeof(*out), .dev = i + 1,
+                                  .kind = sources[i].kind, .source = sources[i].origin };
+            irq_restore(f);
+            return 0;
+        }
+        ++count;
+    }
+    irq_restore(f);
+    return out ? OS32_ERR_INVAL : count;
+}

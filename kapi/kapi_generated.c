@@ -3235,7 +3235,7 @@ int __cdecl wrap_in2_dev_info(u32 i, IN2_DevInfo *o)
 int __cdecl wrap_in2_read(IN2_Event *out, u32 max)
 {
     KAPI_HIT(320);
-    if (max > 128) return OS32_ERR_INVAL;
+    if (max > 128 || (u32)out % __alignof__(IN2_Event)) return OS32_ERR_INVAL;
     /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */
     if (!ring3_user_ranges_writable((u32)out, kapi_out_mul(KAPI_OUT_LEN(out, max), 16u),
                                     (u32)0, 0u)) {

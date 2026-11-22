@@ -26,7 +26,12 @@ def run(ctx):
             return host32.run([str(tmp/'test')], runner='qemu', timeout=10).returncode
         assert execute(source) == 0
         if ctx.mutate:
-            for old,new in [('legacy_cooked_flush();', ';'), ('legacy_raw_flush();', ';'),
+            for old,new in [('    legacy_cooked_flush();\n    /* raw', '    /* raw'),
+                            ('        legacy_cooked_flush();', ''),
+                            ('        kbd_raw_purge_keep();\n        legacy_cooked_flush();\n    }\n    irq_restore(flags);',
+                             '        legacy_cooked_flush();\n        irq_restore(flags);\n        kbd_raw_purge_keep();\n        return;\n    }\n    irq_restore(flags);'),
+                            ('        kbd_raw_purge_keep();', ''),
+                            ('        kbd_raw_purge_keep();', '        legacy_raw_flush();'), ('legacy_raw_flush();', ';'),
                             ('legacy_cooked_reset_dropped();', ';'), ('legacy_raw_reset_dropped();', ';'),
                             ('if (next == kbd_gui_mode) return;', 'if (0) return;'),
                             ('kbd_gui_mode = next;\n    kbd_stop_suppressed = 0;', 'kbd_gui_mode = next;'),

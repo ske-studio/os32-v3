@@ -4,7 +4,7 @@ CHECK = dict(name='av-kapi-abi-host', tier=1, needs=['make:all', 'check:x87-life
             'sdk/rust/os32api/src/av.rs', 'sdk/rust/os32api/src/kapi_generated.rs',
             'tools/check_av_portable.py', 'tools/checks/av_wiring.txt',
             'tools/checks/av_no_weak.sh', 'exec/exec_kapi_init.inc',
-            'build/out/kernel.elf', 'kernel/av_focus.c', 'kernel/gui.h', 'include/app_ids.h', 'exec/exec_gui.h', 'exec/exec_hooks.h', 'include/av_contract.h', 'input/hal/*.[ch]', 'sound/hal/*.[ch]',
+            'build/out/kernel.elf', 'kernel/av_focus.c', 'kapi/kapi_in2.c', 'tools/tests/host_arch/**', 'include/io.h', 'platform/pc98/platform_io.h', 'platform/powermac/platform_io.h', 'arch/ppc/ppc_boot.h', 'kernel/gui.h', 'include/app_ids.h', 'exec/exec_gui.h', 'exec/exec_hooks.h', 'include/av_contract.h', 'input/hal/*.[ch]', 'sound/hal/*.[ch]',
             'sdk/include/os32/*.h', 'kapi/kapi_generated.c'],
     basis=['docs/decisions/sound/AV0_V90_ADDENDUM.md §4', 'docs/decisions/sound/AV_HAL_DESIGN.md §4'])
 
@@ -91,6 +91,8 @@ def exercise(root, folder, machine, mutate):
             ['rustc', '-vV'], text=True).splitlines() if line.startswith('host:'))
         linker = sysroot / 'lib/rustlib' / host / 'bin/gcc-ld/ld.lld'
         compiler = ['clang', '--target=powerpc-unknown-linux-gnu', '-fuse-ld=' + str(linker)]
+    platform_includes = (['-Iplatform/pc98'] if machine == 'i386'
+                         else ['-Iplatform/powermac', '-Iarch/ppc'])
     for label, assignments, source, expected in cases:
         (folder / 'av_wrappers.inc').write_text('\n'.join(decl + ['static void av_bind(KernelAPI *kapi) {'] + assignments + ['}']))
         (folder / 'stub.c').write_text(source)
@@ -98,8 +100,9 @@ def exercise(root, folder, machine, mutate):
         binary = folder / 'probe'
         subprocess.run([*compiler, '-std=gnu89', '-ffreestanding', '-nostdlib', '-static', '-O1',
             '-ffunction-sections', '-Wl,--gc-sections', '-Werror=implicit-function-declaration', '-Wno-attributes', '-I' + str(folder),
-            '-Isdk/include/os32', '-Iinclude', '-Isound/hal', '-Iexec', '-Ikernel', '-DOS32_HOOK_GUI=0', folder / 'focus.c', 'tools/tests/av_abi_host.c',
-            rust_obj, folder / 'wrap.c', folder / 'stub.c', 'input/hal/a0_weak.c', folder / 'start.S',
+            '-Itools/tests/host_arch', *platform_includes, '-Iinput/hal', '-Isdk/include/os32', '-Iinclude', '-Isound/hal', '-Iexec', '-Ikernel', '-DOS32_HOOK_GUI=0', folder / 'focus.c', 'tools/tests/av_abi_host.c',
+            rust_obj, folder / 'wrap.c', folder / 'stub.c', '-std=gnu11', 'kapi/kapi_in2.c',
+            *['input/hal/' + unit + '.c' for unit in ('in2_dev', 'in2_export', 'in2_ring', 'in2_excl', 'mouse_ext')], folder / 'start.S',
             '-o', binary], cwd=root, check=True)
         rc = subprocess.run(['qemu-' + ('i386' if machine == 'i386' else 'ppc'), binary]).returncode
         assert rc == expected, (machine, label, rc, expected)
@@ -112,7 +115,7 @@ def run(ctx):
     for row in (ctx.root / 'tools/checks/av_wiring.txt').read_text().splitlines():
         if row and not row.startswith('#'):
             name = row.split()[1]
-            binding = 'T' if name in ('av_focus_set', 'av_focus_get', 'in2_on_focus') else 'W'
+            binding = 'T' if row.split()[0] == 'IA' else 'W'
             assert re.search(r'^[0-9a-f]+ ' + binding + ' ' + name + r'$', symbols, re.M), name
     with tempfile.TemporaryDirectory() as td:
         for machine in ('i386', 'ppc'):
