@@ -68,7 +68,7 @@ ENTRY_MUTATIONS = [
      'st.excl.mouse_baseline = false;', 'excl_mouse_masks'),
     ('show exclusive cursor', 'src/cursor.rs', '!st.excl.cursor_allowed() || ', '', 'excl_mouse_masks'),
     ('keep drag on boundary', 'src/input.rs', 'if st.drag_index >= 0 { wm::drop_drag_frame(st); }', '', 'excl_drag_cancel'),
-    ('process right after left changes focus', 'src/input.rs', 'if front != st.front_id() { st.excl.mouse_baseline = true; return; }',
+    ('process right after left changes focus', 'src/input.rs', 'if front != st.front_id() {\n            st.prev_buttons = 0;\n            st.excl.mouse_baseline = true;\n            return;\n        }',
      '', 'excl_mouse_focus'),
     ('forget successful focus notification requirement', 'src/multiapp.rs',
      'if unsafe { (os32api::api().av_focus_set)(target) } == 0 {', 'if unsafe { (os32api::api().av_focus_set)(target) } <= 0 {',

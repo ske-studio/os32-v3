@@ -2320,6 +2320,11 @@ fn excl_mouse_focus_ends_both_edges() {
     input::capture(&mut st,input::Ctx::Wait);
     assert_eq!(st.front_index(),Some(0));
     assert!(events(&st,0).iter().all(|e| e.kind != GUI_EV_BUTTON));
+    // A mouse-key move before the next physical sample belongs to the new window.
+    input::move_x3(&mut st, r.x + 9, r.y + 8);
+    let masks: Vec<_> = events(&st, 0).iter()
+        .filter(|e| e.kind == GUI_EV_POINTER).map(|e| e.sub).collect();
+    assert_eq!(masks, vec![0]);
 }
 
 #[test]
@@ -2583,4 +2588,116 @@ fn excl_public_acquire_controls_window_delivery() {
     run(&mut st, &tap(SC_A, 0));
     let delivered: Vec<_> = keys(&st, 0).iter().map(|&(down, scan, _, _)| (down, scan)).collect();
     assert_eq!(delivered, [(true, SC_A as u8), (false, SC_A as u8)]);
+}
+
+fn sample_buttons(st: &mut GuiState, buttons: u8, ctx: input::Ctx) {
+    mocks::MOUSE.lock().unwrap().2 = buttons;
+    input::capture(st, ctx);
+}
+
+#[test]
+fn chord_client_click_and_rearm() {
+    for ctx in [input::Ctx::Wait, input::Ctx::Pump] {
+        mocks::init();
+        let shm = mocks::Shm::new();
+        let mut st = one_window(&shm);
+        for mask in [2, 3, 2, 3, 1, 3, 1, 0] {
+            sample_buttons(&mut st, mask, ctx);
+        }
+        assert_eq!(buttons(&st, 0), vec![(true, 2), (false, 2)]);
+        clear_rings(&st);
+        for mask in [1, 0] {
+            sample_buttons(&mut st, mask, ctx);
+        }
+        assert_eq!(buttons(&st, 0), vec![(true, 1), (false, 1)]);
+    }
+}
+
+#[test]
+fn chord_pointer_masks() {
+    for ctx in [input::Ctx::Wait, input::Ctx::Pump] {
+        mocks::init();
+        let shm = mocks::Shm::new();
+        let mut st = one_window(&shm);
+        for mask in [2, 3, 2] {
+            clear_rings(&st);
+            mocks::MOUSE.lock().unwrap().0 += 1;
+            sample_buttons(&mut st, mask, ctx);
+            assert!(!events(&st, 0).iter().any(|e| e.kind == GUI_EV_POINTER));
+            clear_rings(&st);
+            mocks::MOUSE.lock().unwrap().0 += 1;
+            input::capture(&mut st, ctx);
+            let masks: Vec<_> = events(&st, 0).iter()
+                .filter(|e| e.kind == GUI_EV_POINTER).map(|e| e.sub).collect();
+            assert_eq!(masks, vec![mask]);
+        }
+    }
+}
+
+#[test]
+fn chord_desktop_menu() {
+    use crate::startmenu;
+    mocks::init();
+    let shm = mocks::Shm::new();
+    let mut st = one_window(&shm);
+    park_pointer(&mut st, 5, 5);
+    sample_buttons(&mut st, 2, input::Ctx::Wait);
+    assert!(startmenu::is_open());
+    let menu = startmenu::rect();
+    // Refresh closes the menu without queuing a program launch.
+    *mocks::MOUSE.lock().unwrap() = ((menu.x + 5) as i16, (menu.bottom() - 5) as i16, 3);
+    // Wait が先に左押下を観測した場合も項目は作動しない。
+    for mask in [3, 2] {
+        sample_buttons(&mut st, mask, input::Ctx::Wait);
+        assert!(startmenu::is_open());
+    }
+    for mask in [3, 2, 0] {
+        sample_buttons(&mut st, mask, input::Ctx::Pump);
+        input::capture(&mut st, input::Ctx::Wait);
+        assert!(startmenu::is_open());
+    }
+    sample_buttons(&mut st, 1, input::Ctx::Wait);
+    assert!(!startmenu::is_open());
+    sample_buttons(&mut st, 0, input::Ctx::Wait);
+}
+
+#[test]
+fn chord_deferred_titlebar() {
+    mocks::init();
+    let shm = mocks::Shm::new();
+    let mut st = one_window(&shm);
+    let (x, y) = titlebar_point(&st);
+    park_pointer(&mut st, x, y);
+    for mask in [1, 3] {
+        sample_buttons(&mut st, mask, input::Ctx::Pump);
+    }
+    *mocks::MOUSE.lock().unwrap() = (5, 5, 2);
+    input::capture(&mut st, input::Ctx::Pump);
+    input::capture(&mut st, input::Ctx::Wait);
+    assert!(!crate::startmenu::is_open());
+    sample_buttons(&mut st, 0, input::Ctx::Pump);
+    sample_buttons(&mut st, 2, input::Ctx::Wait);
+    assert!(crate::startmenu::is_open());
+    crate::startmenu::close(&mut st);
+}
+
+#[test]
+fn deferred_release_before_focus_change() {
+    mocks::init();
+    let shm = mocks::Shm::new();
+    let mut st = windows(&shm, &[(20, 40, 140, 100), (220, 40, 140, 100)]);
+    st.screen_w = 640;
+    st.screen_h = 480;
+    park_pointer(&mut st, 280, 100);
+    sample_buttons(&mut st, 2, input::Ctx::Wait);
+    let bar = crate::taskbar::rect(&st);
+    *mocks::MOUSE.lock().unwrap() = (40, (bar.y + 1) as i16, 0);
+    input::capture(&mut st, input::Ctx::Pump);
+    assert_eq!(buttons(&st, 1), [(true, 2)]);
+
+    *mocks::MOUSE.lock().unwrap() = (80, 100, 1);
+    input::capture(&mut st, input::Ctx::Wait);
+    assert_eq!(st.front_index(), Some(0));
+    assert_eq!(buttons(&st, 1), [(true, 2), (false, 2)]);
+    assert!(buttons(&st, 0).is_empty());
 }
