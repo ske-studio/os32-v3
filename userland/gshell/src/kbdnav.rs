@@ -28,6 +28,7 @@ use os32api::gui::proto::{GUI_EV_CLOSE, GUI_MAX_WINDOWS};
 /*  スキャンコード (drivers/input/kbd.h) と修飾 (SHIFT_*)                   */
 /* ================================================================ */
 const SC_ESC: u8 = 0x00; /* KEY_ESC */
+use crate::input::SC_GRPH;
 const SC_TAB: u8 = 0x0F; /* KEY_TAB */
 const SC_RETURN: u8 = 0x1C; /* KEY_RETURN */
 const SC_SPACE: u8 = 0x34; /* KEY_SPACE */
@@ -309,7 +310,7 @@ fn context_is_wm(st: &GuiState) -> bool {
 
 /// マウスキーが使うテンキーか (= と , は使わない、票 §1-3)。
 #[inline]
-fn is_mk_pad(scan: u8) -> bool {
+pub(crate) fn is_mk_pad(scan: u8) -> bool {
     matches!(
         scan,
         NP_MINUS
@@ -396,14 +397,19 @@ pub fn pump_delivered_make(st: &mut GuiState, scan: u8) {
 
 /// 修飾キーとして捨てる**前**に見る。消費したら true (カナの raw)。
 /// GRPH が離れたら (break そのもの、または GRPH の無い raw = 取りこぼし)
-/// 切り替えを確定する — その raw 自体は呼び出し側が続けて処理する。
+/// 切り替えを確定した raw はここで消費する。
+pub fn finish_if_released(st: &mut GuiState, scan: u8, down: bool, mods: u32) -> bool {
+    if st.kn.sw_active && (mods & MOD_GRPH == 0 || (scan == SC_GRPH && !down)) {
+        finish_switch(st);
+        return true;
+    }
+    false
+}
+
 pub fn pre(st: &mut GuiState, scan: u8, down: bool, mods: u32) -> bool {
     if down {
         /* 新しい make は古い印を消す (印が残って無関係な break を食わない)。 */
         set_consumed(st, scan, false);
-    }
-    if st.kn.sw_active && (mods & MOD_GRPH) == 0 {
-        finish_switch(st);
     }
     if scan == SC_KANA {
         set_mousekeys(st, (mods & MOD_KANA) != 0);
@@ -492,7 +498,11 @@ fn make(st: &mut GuiState, scan: u8, mods: u32) -> bool {
         return run_shortcut(st, k, (mods & MOD_SHIFT) != 0);
     }
     if st.kn.mk_on && !fullscreen::active() && is_mk_pad(scan) {
-        mousekey(st, scan, mods);
+        if st.excl.open(crate::excl::MOUSE) {
+            mousekey(st, scan, mods);
+        } else {
+            st.held_keys[scan as usize] = true;
+        }
         return true;
     }
     false
@@ -862,8 +872,9 @@ fn mousekey(st: &mut GuiState, scan: u8, mods: u32) {
         NP_PLUS => {
             /* 同じ X3 周期の中で down・up・down・up (ダブルクリックの判定は
              * tick の差で見るので、同じ周期なら差は 0 で必ず入る)。 */
+            let front = st.front_id();
             click(st, BTN_LEFT);
-            click(st, BTN_LEFT);
+            if st.front_id() == front { click(st, BTN_LEFT); }
         }
         NP_0 => {
             if (st.synth_buttons & BTN_LEFT) == 0 {
@@ -884,9 +895,11 @@ fn click(st: &mut GuiState, b: u8) {
         return;
     }
     let (x, y) = (st.mouse_x, st.mouse_y);
+    let front = st.front_id();
     st.synth_buttons |= b;
     input::edge_x3(st, x, y, b, true);
     st.synth_buttons &= !b;
+    if st.front_id() != front { return; }
     let (x, y) = (st.mouse_x, st.mouse_y);
     input::edge_x3(st, x, y, b, false);
 }

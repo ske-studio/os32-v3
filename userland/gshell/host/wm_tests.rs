@@ -3962,6 +3962,7 @@ fn kstop_full_event_ring_drains_raw_and_counts_overflow() {
         let shm = mocks::Shm::new();
         two_app_global(&shm);
         let st = wm::g();
+        multiapp::sync_av_focus(st);
         // Foreground app 3 uses slot 1. Leave fewer than the four reserved events.
         let mut h = slot::read_header(st, 1);
         h.ring_tail = h.ring_head.wrapping_add(GUI_RING_CAPACITY as u16 - 3);
@@ -4044,8 +4045,12 @@ fn kstop_full_ring_preserves_following_input_for_next_foreground() {
                 slot::ring_ptr(st, 0).add((i as usize % GUI_RING_CAPACITY) * 16) as *const GuiEvent) };
             if ev.kind == GUI_EV_KEY { scans.push((ev.sub, ev.payload[0])); }
         }
-        assert_eq!(scans, vec![(1, 0x10), (0, 0x10)]);
-        assert!(ring::pending(st, 0) > 0);
+        if deferred {
+            assert!(scans.is_empty(), "旧前景で退避した通常キー");
+        } else {
+            assert_eq!(scans, vec![(1, 0x10), (0, 0x10)]);
+        }
+        if !deferred { assert!(ring::pending(st, 0) > 0); }
         st.inited = false;
     }
 }
@@ -5010,4 +5015,53 @@ fn g3_wait_same_tick_ctrl_stop() {
     assert!(crate::multiapp::pending_top_level_work());
     assert!(!crate::wm::g().abort_seen);
     crate::wm::g().inited = false;
+}
+
+fn assert_excl_keyboard_sampled() {
+    let log = crate::mocks::INPUT_ORDER.lock().unwrap().clone();
+    assert!(log.contains(&"keyboard"));
+    for (i, entry) in log.iter().enumerate() {
+        if *entry == "keyboard" { assert_eq!(i.checked_sub(1).map(|j| log[j]), Some("observe")); }
+    }
+}
+
+#[test]
+fn excl_direct_standalone() {
+    g3_standalone_halt_tick_and_key();
+    assert_excl_keyboard_sampled();
+}
+
+#[test]
+fn excl_direct_wait() {
+    g3_wait_same_tick_raw_key_cycles();
+    assert_excl_keyboard_sampled();
+}
+
+#[test]
+fn excl_direct_resume() {
+    crate::mocks::init();
+    let mut st = crate::wm::GuiState::NEW;
+    crate::multiapp::resume_one(&mut st);
+    assert_excl_keyboard_sampled();
+}
+
+#[test]
+fn excl_direct_pump() {
+    crate::mocks::init();
+    let st = crate::wm::g();
+    *st = crate::wm::GuiState::NEW;
+    st.inited = true;
+    crate::pump::gshell_gui_pump();
+    st.inited = false;
+    assert_excl_keyboard_sampled();
+}
+
+#[test]
+fn excl_direct_cycle() {
+    crate::mocks::init();
+    let mut st = crate::wm::GuiState::NEW;
+    crate::wm::wm_cycle(&mut st, crate::input::Ctx::Wait);
+    let log = crate::mocks::INPUT_ORDER.lock().unwrap().clone();
+    assert_eq!(log.first(), Some(&"observe"));
+    assert!(log.contains(&"gfx"));
 }

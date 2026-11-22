@@ -414,6 +414,7 @@ impl Timer {
 /*  GuiState — 単一グローバル状態                                    */
 /* ================================================================ */
 pub struct GuiState {
+    pub excl: crate::excl::State,
     pub inited: bool,
     pub screen_w: i32,
     pub screen_h: i32,
@@ -488,6 +489,10 @@ pub struct GuiState {
     /* X4 (ポンプ) で FEP がオンのとき退避する raw 打鍵 (レビュー #4 ②)。FEP の
      * 変換 (辞書検索) は X3 でだけ行う。次の X3 が先頭から取り込む。 */
     pub pending_raw: [i32; 128],
+    pub pending_rank: [u8; 128],
+    pub pending_switch: bool,
+    pub pending_tab: bool,
+    pub held_keys: [bool; 128],
     pub pending_raw_n: usize,
     pub pending_raw_dropped: u32,
     pub inj_lost: u32,
@@ -512,6 +517,7 @@ pub struct GuiState {
 
 impl GuiState {
     pub const NEW: GuiState = GuiState {
+        excl: crate::excl::State::NEW,
         inited: false,
         screen_w: 640,
         screen_h: 400,
@@ -548,6 +554,8 @@ impl GuiState {
         quit: false,
         launch_pending: false,
         pending_raw: [0; 128],
+        pending_rank: [0; 128], pending_switch: false, pending_tab: false,
+        held_keys: [false; 128],
         pending_raw_n: 0,
         pending_raw_dropped: 0,
         inj_lost: 0,
@@ -828,7 +836,7 @@ impl GuiState {
 /// キーボードの移動・サイズの状態 (`kn.kmode`) もここで終わらせる — 残すと、
 /// 同じ添字に後から作られた窓のマウスドラッグが「キーボードの移動中」に見えて
 /// 枠が追従しなかった (代行レビュー P3-A)。
-fn drop_drag_frame(st: &mut GuiState) {
+pub(crate) fn drop_drag_frame(st: &mut GuiState) {
     let f = st.drag_frame;
     st.drag_index = -1;
     st.drag_frame = Rect::EMPTY;
@@ -1199,6 +1207,7 @@ fn deliver_host_notice(st: &mut GuiState) {
 /// その上に FEP が乗る (逆順にすると「描く → 次の周で消される → また描く」で
 /// ちらつく)。
 pub fn wm_cycle(st: &mut GuiState, ctx: input::Ctx) {
+    crate::excl::observe(st);
     let gfx_ok = unsafe { libos32gfx_check() } >= 0;
     if gfx_ok {
         let regen = unsafe { libos32gfx_take_regen() } != 0;
@@ -1287,7 +1296,7 @@ pub fn focus_leaving(st: &mut GuiState, x3: bool) {
     if old == 0 {
         return;
     }
-    if x3 {
+    if x3 && st.excl.open(crate::excl::KBD) {
         fep::commit_to(st, old);
     } else {
         fep::defer_commit(old);

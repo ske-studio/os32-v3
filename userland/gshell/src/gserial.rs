@@ -260,13 +260,16 @@ pub fn deliver(st: &mut GuiState) {
         let n_raw = st.gserial.lengths[0] as usize;
         let n_ev = st.gserial.events[0] as usize;
         if st.pending_raw.len() - st.pending_raw_n < n_raw { break; }
+        if st.pending_switch && st.pending_raw.len() - st.pending_raw_n <= n_raw { break; }
         if !modal::is_open() && !startmenu::is_open() {
             if let Some(t) = input::focus_target(st) {
                 if usize::from(ring::space(st, t.slot)) < 4 + 2 * st.pending_raw_n + n_ev { break; }
             }
         }
-        for i in 0..n_raw { st.pending_raw[st.pending_raw_n+i] = st.gserial.raw[i] as i32; }
-        st.pending_raw_n += n_raw;
+        for i in 0..n_raw {
+            let raw = st.gserial.raw[i] as i32;
+            input::defer_raw(st, raw);
+        }
         let q = &mut st.gserial;
         q.raw.copy_within(n_raw..q.raws, 0); q.raws -= n_raw;
         q.lengths.copy_within(1..q.keys, 0); q.events.copy_within(1..q.keys, 0);
