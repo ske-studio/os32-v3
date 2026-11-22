@@ -11,3 +11,9 @@ entry で照合し、生 ISO の照合後にだけ getter が pair を渡す。
 `MEM_BOOT_STAGING_SIZE` 以下とする。未展開の root がある時は共通の
 `memory_boot_init` が集積域全体を boot 所有者に予約する。展開・検証と登録の試行後、
 恒等写像を保ったまま集積域を池に返す。登録した展開先は rd0 が保持し、登録前の失敗では返す。
+
+PPC の pack は pair 仮値 0 の部品を生成し、root_pair が最終 ELF の pair を結び直す。
+L2 の受入は link-sh の root に二種類の部品を入れ、共通 loader で読み込む。
+先頭頁の返却・上書き後の export、異なる配置での実行、同じ本文頁への別命令の再配置を確認する。
+32 MiB を越えた提供関数へ生成 stub を通してポインタと可変長整数引数を渡し、戻り値を照合する。
+別 ELF 用の部品を入れた媒体は ISO CRC が正しくても init 前に pair 不一致で拒否する。
