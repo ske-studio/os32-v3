@@ -1,6 +1,6 @@
 """Register N01 guest acceptance."""
 CHECK = dict(env=['ppc-cross', 'qemu-ppc'], name='ppc-sc', tier=2, budget=900, needs=['make:ppc-ci-image'],
-             covers=['arch/ppc/exec_enter.S', 'exec/exec.c', 'tools/accept/ppc_shell_flow.inc', 'platform/powermac/shell_loop_ops.c', 'userland/shell/main.c', 'userland/shell/rshell.c', 'tools/ppc/link_diag_run.py', 'tools/ppc/link_run.py', 'tools/host_*.py', 'tools/ppc_link_transport.py', 'tools/remote_transport.py', 'tools/host_agent_config.py','platform/powermac/input_usb.[ch]', 'platform/powermac/input_keymap.c', 'tools/ppc_hostfs.py', 'tools/lanfs_host.py', 'tools/serialfs_host.py', 'tools/lan_bridge.py', 'tools/host_image.py', 'build/core.yaml', 'platform/powermac/input_boot.c', 'platform/powermac/shell_boot.c', 'tools/deploy_manifests.py', 'tools/mkpkg.py', 'userland/deploy.yaml', 'platform/powermac/input_decode.c', 'platform/powermac/console_stream.c', 'platform/powermac/kboot_console.c',
+             covers=['arch/ppc/exec_enter.S', 'exec/exec.c', 'tools/accept/ppc_shell_flow.inc', 'platform/powermac/shell_loop_ops.c', 'userland/shell/main.c', 'userland/shell/rshell.c', 'tools/ppc/link_diag_run.py', 'tools/ppc/link_run.py', 'tools/host_*.py', 'tools/ppc_link_transport.py', 'tools/remote_transport.py', 'tools/host_agent_config.py','platform/powermac/input_usb.[ch]', 'platform/powermac/input_keymap_backend.c', 'tools/ppc_hostfs.py', 'tools/lanfs_host.py', 'tools/serialfs_host.py', 'tools/lan_bridge.py', 'tools/host_image.py', 'build/core.yaml', 'platform/powermac/input_boot.c', 'platform/powermac/shell_boot.c', 'tools/deploy_manifests.py', 'tools/mkpkg.py', 'userland/deploy.yaml', 'platform/powermac/input_decode.c', 'platform/powermac/console_stream.c', 'platform/powermac/kboot_console.c',
                      'tools/ppc/sc_run.py', 'userland/ppc/nest.c',
                      'build/ppc-user.mk', 'build/targets/ppc-powermac.mk',
                      'tools/ppc/sb_run.py', 'tools/ppc/kboot_accept.py',
@@ -23,7 +23,7 @@ CHECK = dict(env=['ppc-cross', 'qemu-ppc'], name='ppc-sc', tier=2, budget=900, n
                      'kernel/console/console.c',
                      'mm/kmalloc.c',
                      'platform/powermac/usb_boot.c',
-                     'platform/powermac/usb_platform.c',
+                     'platform/powermac/usb_platform.c', 'platform/powermac/usb_key_report.c',
                      'tools/host_agent.py',
                      'tools/host_linux.py',
                      'tools/host_notify.py',

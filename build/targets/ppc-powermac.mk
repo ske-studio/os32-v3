@@ -114,6 +114,7 @@ KB_SQLITE_AUDIT := --sqlite-group $(KB_GROUP).o --sqlite-inputs $(KB_HARD)
 KB_SQLITE_INC := -Ilib/sqlite3 -Ilib/softfloat
 KB_KEEP_SQLITE := -Wl,--undefined=sqlite_module_init
 $(KB_OUT)/kernel/sqlite_engine.o $(KB_OUT)/kernel/sqlite_outer.o $(KB_OUT)/kernel/sqlite_static.o $(KB_OUT)/kapi/kapi_db.o: $(SQLITE_GENERATED)
+$(KB_OUT)/input/hal/legacy_ring.o $(KB_OUT)/input/hal/legacy_keymap.o: private KB_TU_FLAGS += -DINPUT_COOKED_MODS=1
 $(KB_OUT)/kernel/sqlite_static.o: private KB_TU_FLAGS += -Ilib/sqlite3
 $(KB_OUT)/kernel/sqlite_outer.o: private KB_TU_FLAGS += -Ilib/sqlite3 -DOS32_SQLITE_STATIC
 # The bundled port hard-codes LITTLEENDIAN in three headers. Select the

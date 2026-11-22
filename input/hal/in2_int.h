@@ -117,6 +117,8 @@ int legacy_stop_filter(int keycode, int is_break, int mods);
 u32 legacy_cooked_pushed(void);
 u32 legacy_cooked_popped(void);
 void legacy_cooked_push(u16 entry);
+void legacy_cooked_push_mods(u16 entry, u8 mods);
+int legacy_cooked_take_mods(u8 *mods);
 int legacy_cooked_take(void);
 int legacy_cooked_peek(void);
 int legacy_cooked_pending(void); /* Number of queued entries. */

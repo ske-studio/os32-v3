@@ -29,8 +29,6 @@ u32 usbp_irq_save(void)
 }
 void usbp_irq_restore(u32 f) { irq_depth=f; }
 int usbp_input_src_alloc(int kind) { return ++sources[kind]; }
-void usbp_input_report(u8 src, const u8 old[32], const u8 now[32])
-{ (void)src; (void)old; (void)now; }
 void usbp_input_usage(u8 src, u8 sc, int down)
 {
     if (!irq_depth || keys >= 32) { bad_dma=1; return; }

@@ -22,7 +22,7 @@ USB_QEMU_CLOCK = ['-icount', 'shift=auto']
 
 CHECK = dict(name='ppc-usb', tier=2, budget=900, needs=['make:kernel'],
              covers=['platform/powermac/console_stream.c', 'platform/powermac/console_log.c',
-                     'platform/powermac/log.c', 'platform/powermac/kboot_log.h', 'platform/powermac/input_usb.c', 'platform/powermac/input_keymap.c', 'platform/powermac/input_usb.h', 'tools/tests/host32.py', 'tools/ppc/usb_run.py', 'platform/powermac/usb*', 'build/targets/ppc-powermac.mk', 'platform/powermac/ppc_kernel.c',
+                     'platform/powermac/log.c', 'platform/powermac/kboot_log.h', 'platform/powermac/input_usb.c', 'platform/powermac/input_keymap_backend.c', 'platform/powermac/input_usb.h', 'tools/tests/host32.py', 'tools/ppc/usb_run.py', 'platform/powermac/usb*', 'build/targets/ppc-powermac.mk', 'platform/powermac/ppc_kernel.c',
                      'platform/powermac/kboot_capture.c', 'drivers/usb/*.[ch]',
                      'include/usb_platform.h', 'include/endian_dma.h',
                      'arch/ppc/arch_endian_dma.h', 'tools/ppc/kboot_accept.py',
@@ -96,12 +96,12 @@ static int usb_probe_input(void)
 
 def mutation(work, mode):
     src = ('arch/ppc/kernel_trap.c' if mode == 'syscall-ee' else
-           'platform/powermac/usb_boot.c' if mode == 'no-service' else 'platform/powermac/usb_platform.c')
+           'platform/powermac/usb_boot.c' if mode == 'no-service' else 'platform/powermac/usb_key_report.c')
     content = (ROOT/src).read_text()
     before, after = {
         'syscall-ee': ('            ppc_enable();', '            /* mutation: no syscall enable */'),
         'no-service': ('    usb_service();', '    /* mutation: omit USB service */'),
-        'invert-key': ('pm_input_usb_key(src, sc, down);', 'pm_input_usb_key(src, sc, !down);'),
+        'invert-key': ('usb_input_usage(src, usage, down, 0);', 'usb_input_usage(src, usage, !down, 0);'),
     }[mode]
     require(content.count(before) == 1, 'unique USB mutation anchor')
     dest = work/(mode+'-'+Path(src).name)
@@ -301,11 +301,11 @@ def product_settings(work, mode, late=False):
     file = work/(mode+'-stream.c'); file.write_text(text)
     opts = ['KBOOT_SH=1', 'KBOOT_LINK=0', 'KBOOT_USB_KEY_TRACE=1', 'KB_MUT_SRC='+src, 'KB_MUT_FILE='+str(file)]
     if mode in ('invert-key', 'no-forward'):
-        src = 'platform/powermac/usb_platform.c'
+        src = 'platform/powermac/usb_key_report.c'
         text = (ROOT/src).read_text()
-        anchor = 'pm_input_usb_key(src, sc, down);'
+        anchor = 'usb_input_usage(src, usage, down, 0);'
         require(text.count(anchor) == 1, 'unique whole callback anchor')
-        text = text.replace(anchor, 'pm_input_usb_key(src, sc, !down);' if mode == 'invert-key'
+        text = text.replace(anchor, 'usb_input_usage(src, usage, !down, 0);' if mode == 'invert-key'
                             else '/* omitted callback forwarding */')
         file = work/(mode+'-platform.c'); file.write_text(text)
         opts += ['KB_MUT_EXTRA_SRC='+src, 'KB_MUT_EXTRA_FILE='+str(file)]

@@ -51,6 +51,15 @@ int input_legacy_peek(int mode) { (void)mode; return -1; }
 u8 platform_fep_key_shift(void) { return 0; }
 int pm_input_usb_take(void) { return 42; }
 int pm_input_usb_peek(void) { return 43; }
+volatile int kbd_gui_mode;
+int kbd_inject_peek(u8 *out) { (void)out; return 0; }
+int kbd_inject_take(u8 *out) { (void)out; return 0; }
+void kbd_set_gui_mode(int on) { kbd_gui_mode = on; }
+void kbd_discard_stop(void) {}
+int legacy_raw_take(void) { return -1; }
+int input_key_pressed(u8 sc) { (void)sc; return 0; }
+u8 input_key_mods(void) { return 0; }
+void pm_input_usb_note_remote(void) {}
 u32 pm_input_usb_dropped(void) { return 0; }
 int platform_clock_read_us(u32 *lo,u32 *hi) { *lo=7; *hi=0; return 0; }
 int con_sink_capture_active(void) { return 1; }
@@ -61,7 +70,7 @@ void idle_wait_step(void) { idle_work_run(); arch_cpu_idle(); }
 void _start(void) {
     pm_input_boot(); CHECK(registered && registered_ops);
     CHECK(!registered->terminal_try && !registered->terminal_peek && !registered->terminal_enabled);
-    CHECK(!registered->inject_try && !registered->inject_peek);
+    CHECK(registered->inject_try && registered->inject_peek);
     CHECK(registered->try_key == pm_input_usb_take && registered->peek_key == pm_input_usb_peek);
     CHECK(registered->try_key()==42 && registered->peek_key()==43);
     CHECK(registered->wait_timeout_ticks()==30000000u && registered->capture_active()); finish(0);

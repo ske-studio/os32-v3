@@ -11,9 +11,7 @@ import host32
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCES = ['input/keymaps/hid_jp.c', 'drivers/usb/hid_kbd.c', 'drivers/usb/hid_kbd_map.c', 'drivers/usb/hid_mouse.c']
-PLATFORM = ['platform/powermac/' + name for name in
-            ('usb_key_report.c', 'input_usb.c', 'input_keymap.c')]
-CHECK = dict(env=['ppc-cross'], name='usb-hid', tier=1, needs=[], budget=10, covers=['platform/powermac/usb_key_report.c', 'platform/powermac/input_usb.c', 'platform/powermac/input_keymap.c', 'platform/powermac/input_usb.h', 'include/kbd.h',
+CHECK = dict(env=['ppc-cross'], name='usb-hid', tier=1, needs=[], budget=10, covers=[
     'drivers/usb/hid_kbd.c', 'drivers/usb/hid_kbd_map.c', 'drivers/usb/hid_mouse.c',
     'input/keymaps/hid_jp.c', 'input/hal/keymap.h',
     'drivers/usb/hid_boot.h', 'drivers/usb/usb_core.h',
@@ -41,12 +39,11 @@ def check(mutate):
             for src in SOURCES:
                 subprocess.run([compiler, *flags, '-ffreestanding', '-c', src,
                                 '-o', str(tmp/'unit.o')], cwd=ROOT, check=True)
-        (tmp/'io.h').write_text('unsigned irq_save(void); void irq_restore(unsigned);\n')
-        host = ['-nostdinc', '-I'+str(tmp), '-Wl,--wrap=usbp_input_usage']
+        host = ['-nostdinc', '-I'+str(tmp)]
         for swap in ([], ['-DUSB_TEST_SWAP']):
             exe = tmp/'hid'
             subprocess.run(['gcc', '-m32', *bare, *host, *flags, *swap, 'tools/tests/usb_hid_host.c',
-                            *SOURCES, *PLATFORM, '-o', str(exe)], cwd=ROOT, check=True)
+                            *SOURCES, '-o', str(exe)], cwd=ROOT, check=True)
             result = host32.run([str(exe)], runner='qemu')
             assert result.returncode == 0, result.returncode
             print('HID runtime OK', swap)
@@ -76,7 +73,7 @@ def check(mutate):
                 dest.write_text(original.replace(anchor, replacement))
                 srcs = [str(dest) if s == rel else s for s in SOURCES]
                 subprocess.run(['gcc', '-m32', *bare, *host, *flags,
-                                'tools/tests/usb_hid_host.c', *srcs, *PLATFORM, '-o', str(tmp/'bad')],
+                                'tools/tests/usb_hid_host.c', *srcs, '-o', str(tmp/'bad')],
                                cwd=ROOT, check=True)
                 result = host32.run([str(tmp/'bad')], runner='qemu')
                 assert result.returncode != 0, anchor

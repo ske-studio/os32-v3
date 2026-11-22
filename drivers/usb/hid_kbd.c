@@ -19,7 +19,6 @@ static void kbd_done(struct usb_xfer *x)
             if (usage && !(usage >= 0xe0 && usage <= 0xe7))
                 now[usage >> 3] |= 1u << (usage & 7);
         }
-        usbp_input_report(s->boot.iface->src, s->prev, now);
         for (unsigned order = 0; order < 3; ++order) {
             for (unsigned i = 0; i < 256; ++i) {
                 unsigned bit = 1u << (i & 7);
