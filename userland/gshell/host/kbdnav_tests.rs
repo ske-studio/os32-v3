@@ -1348,7 +1348,9 @@ fn app_commit_during_drag_keeps_the_live_frame() {
         unsafe { os32api::gfx::gfx_fill_rect(r.x, r.y, r.w, r.h, CLIENT_SENTINEL) };
     }
     assert!(hit_live, "前提: Paint の矩形が今の枠に掛かる配置になっていない");
+    let presents = mocks::present_counts().1;
     assert_eq!(handler::gshell_gui_handler(GUI_OP_COMMIT, 0, 2), 0);
+    assert_eq!(mocks::present_counts().1, presents + 1, "COMMIT must present before returning");
     /* 今の枠の輪郭 (カーソルの下を除く) が全部枠の色のまま */
     let px = mocks::pixels();
     let cr = crate::cursor::rect(g);

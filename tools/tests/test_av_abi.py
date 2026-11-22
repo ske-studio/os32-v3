@@ -1,7 +1,7 @@
 """Exercise the v90 table, foreground transitions and remaining weak providers on both target ABIs."""
 CHECK = dict(name='av-kapi-abi-host', tier=1, needs=['make:all', 'check:x87-lifecycle-host'], budget=120,
     covers=['tools/tests/test_av_abi.py', 'tools/tests/av_abi_host.c', 'tools/tests/av_abi_host.rs',
-            'sdk/rust/os32api/src/av.rs', 'sdk/rust/os32api/src/kapi_generated.rs',
+            'sdk/rust/os32api/src/av.rs', 'sdk/rust/os32api/src/install.rs', 'sdk/rust/os32api/src/kapi_generated.rs',
             'tools/check_av_portable.py', 'tools/checks/av_wiring.txt',
             'tools/checks/av_no_weak.sh', 'exec/exec_kapi_init.inc',
             'build/out/kernel.elf', 'kernel/av_focus.c', 'kapi/kapi_in2.c', 'tools/tests/host_arch/**', 'include/io.h', 'platform/pc98/platform_io.h', 'platform/powermac/platform_io.h', 'platform/pc98/platform_input_caps.h', 'platform/powermac/platform_input_caps.h', 'arch/ppc/ppc_boot.h', 'kernel/gui.h', 'include/app_ids.h', 'exec/exec_gui.h', 'exec/exec_hooks.h', 'include/av_contract.h', 'input/hal/*.[ch]', 'sound/hal/*.[ch]',
@@ -68,7 +68,7 @@ def exercise(root, folder, machine, mutate):
             cases.append((label, bind, defaults, code))
     (folder / 'lib.rs').write_text('#![no_std]\n' + ''.join(
         f'#[path="{root}/sdk/rust/os32api/src/{m}.rs"] pub mod {m};\n'
-        for m in ('av', 'kapi_generated')) + f'#[path="{root}/tools/tests/av_abi_host.rs"] mod probe;\n')
+        for m in ('av', 'install', 'kapi_generated')) + f'#[path="{root}/tools/tests/av_abi_host.rs"] mod probe;\n')
     target = 'i686-unknown-linux-gnu' if machine == 'i386' else 'powerpc-unknown-linux-gnu'
     # The build runner installs rust-src, but has no registry for Cargo's sysroot graph.
     sysroot = Path(subprocess.check_output(['rustc', '--print', 'sysroot'], text=True).strip())

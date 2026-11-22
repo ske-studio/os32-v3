@@ -8,7 +8,7 @@
 ## 何をするか
 
 - システム辞書を読み取り専用 (RO) で、学習 DB を読み書き (RW) で、別々の常駐の group に開く (`FepStore`)。
-- 変換の候補は 2 つの cursor を cost の小さい順に合成して返す。学習は学習接続だけに書く。
+- 変換では学習候補を先に返し、その後にシステム辞書の候補を続ける。学習は学習接続だけに書く。
 - S/M/L の辞書を切り替える。学習 DB は 3 つの辞書で共通 (同じ `dict_id`)。
 - 旧い 1 接続の口 (`ime_dict_open`・`ime_dict_search`・`ime_dict_reopen` ほか `IME_Dict`) はファイルの前半に残っているが、製品の経路はもう通らない (host 試験だけが呼ぶ)。
 
@@ -39,10 +39,10 @@
 ## 検索の合成 (`fep_store_search`)
 
 - 読みが 3 文字以上なら前方一致、2 文字以下なら完全一致の文を使う。
-- system: 完全一致は `cost`、前方一致は完全一致の行だけ `cost-500`。user: `-10000-freq` (常に system より前)。どちらも `ORDER BY cost LIMIT 32`。
-- 2 つの cursor を 1 行ずつ進め、cost の小さい方を採る。同点は user を採る。
-- 採った行の数 (重複・NULL を含む) が `IME_MAX_RESULTS` (32) か `max` に達したら打ち切る。重複は完全な表記で除き、除いた分は補充しない。
-- 結果の欄に収まらない長い表記は、重複の比較のために全体を `kzalloc` で写す。SQLite の TEXT のポインタは次の step・reset で失効するので持ち越さない。
+- 学習候補を先に採り、残りを system の cost 昇順で埋める。system の前方一致は完全一致の行だけ `cost-500` とする。
+- 学習候補は入力した読みと一致するものを優先し、同じ読みでは直近の確定順（`last_ts` 降順）、同順位なら頻度降順、頻度も同じなら表記昇順とする。
+- NULL と完全な表記の重複を除いて最大 32 件を返す。完全一致は 32 行ずつ順位と rowid の続きから補充する。前方一致は学習、system の順に各読み範囲を 1 回走査し、異なる表記の上位候補だけを保持する。学習で枠が埋まれば system は走査しない。
+- SQLite の TEXT のポインタは次の step・reset で失効するため、表記の比較に使う文字列は全長を保持し、表示欄に合わせて切り詰める。
 - 非短縮の罰則: cost が非負で、表記の byte 長が読み以上なら `IME_NONSHORTENING_COST_PENALTY` (300) を足す。
 - 学習側が途中で失敗したら、合成の結果を全部捨て、system だけで検索し直す。system の I/O 失敗は system を回復してから 1 回やり直す。
 
@@ -55,7 +55,7 @@
 
 ## 学習と学習 DB の管理
 
-- `fep_store_learn`: `INSERT … ON CONFLICT(yomi,kanji) DO UPDATE SET freq=freq+1, last_ts=?`。学習が止まっていれば何もしない。
+- `fep_store_learn`: `INSERT … ON CONFLICT(yomi,kanji) DO UPDATE SET freq=freq+excluded.freq, last_ts=excluded.last_ts`。確定時に同じ読みの最大の `last_ts` に 1 を足し、確定順として保存する。64 ビット整数の上限に達した場合は、同じ読みの順位を同じ書き込みで詰め直す。学習が止まっていれば何もしない。
 - `fep_store_user_list`・`_delete`・`_export`・`_clear` (KAPI `ime_user_*`) は学習接続だけに送る。学習が止まっていれば -1。
 - KAPI の入口 (`ime_dict_api.inc`) は呼び手の番地を検査し、結果を内部の staging に置いてから写す (`copy_to_caller`)。
 

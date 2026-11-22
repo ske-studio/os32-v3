@@ -1,3 +1,4 @@
+#include "usb_resident.h"
 #include "boot_token.h"
 #include "kernel_start.h"
 #include "legacy_guest.h"
@@ -264,6 +265,7 @@ void platform_boot_machine(void)
         boot_platform_run(BOOT_NIC_LEGACY, &boot);
     }
 
+    pc98_usb_boot();
     boot_token_init();
 
     /* File-backed settings/FEP I/O needs IRQs; no application exists yet. */
@@ -312,6 +314,7 @@ void platform_boot_services(void)
      * ルートのマウントと自己試験・shlib の読み込みが済み、常駐シェルを
      * exec する直前。溜めるのはここまで (以後の出力は入らない)。ルートが
      * ext2 / FAT でなければ書かない。どこで失敗しても起動は続ける。 */
+    pc98_usb_flush_boot_log();
     bootlog_save();
 }
 

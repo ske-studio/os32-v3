@@ -60,7 +60,7 @@ def read_head(body, status, suffix):
 # Provider-side mutations keep the public probe and its pixel oracle identical.
 PROVIDER = 'platform/powermac/display_provider.c'
 WIDTH = 'return m ? (int)m->width : 0;'
-GATE = ('return present_owner && present_owner == appslot_cur() &&\n'
+GATE = ('return present_owner && present_owner == appslot_present_owner() &&\n'
         '           a && present_generation == a->gen;')
 COPY_ENTRY = 'static int surface_copy(void *c, u32 head, const struct gfx2_surf *s)\n{'
 PRESENT_MUTATIONS = {
@@ -77,7 +77,7 @@ PRESENT_MUTATIONS = {
     'width-768': (PROVIDER, WIDTH, 'return m ? (int)m->width - 32 : 0;'),
     'width-640': (PROVIDER, WIDTH, 'return m ? 640 : 0;'),
     'gate-open': (PROVIDER, GATE, 'return a != 0;'),
-    'owner-unchecked': (PROVIDER, 'present_owner == appslot_cur() &&', ''),
+    'owner-unchecked': (PROVIDER, 'present_owner == appslot_present_owner() &&', ''),
 }
 TARGET_FAILURE = ('platform/powermac/console_text.c', '\n    rc = open_target();',
                   '\n    rc = -1;')

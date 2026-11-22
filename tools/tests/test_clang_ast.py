@@ -266,7 +266,7 @@ if __name__ == '__main__':
         sources = {u['src'] for u in units}
         # Paired module inputs must exist before any real build, including Trident.
         for unit in units:
-            if any('/' + name + '/' in unit['src'] for name in ('geforce', 'trident')):
+            if any('/' + name + '/' in unit['src'] for name in ('geforce', 'trident', 'usb')):
                 source = pathlib.Path(unit['src'])
                 self.assertTrue(source.is_file(), source)
                 # dry_run's generated sources use its absolute temporary BUILD_OUT;
@@ -670,6 +670,8 @@ def main():
                   '    if not cross:\n        return compiler'),
                  ('all modes', 'tools/clang_ast/build.py',
                   '"cirrus", "geforce", "trident"', '"cirrus", "geforce"'),
+                 ('all modes', 'tools/clang_ast/build.py',
+                  '"usb", "lan"', '"lan"'),
                  ('all modes', 'tools/check_p2v.py',
                   'locations.append(first)', 'pass'),
                  ('all modes', 'tools/clang_ast/type_occurrences.cpp',

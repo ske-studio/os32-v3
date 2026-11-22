@@ -321,6 +321,7 @@ UNREACHABLE_STUB(tss_set_esp0);
 
 
 UNREACHABLE_STUB(vfs_close_owned);
+UNREACHABLE_STUB(install_reclaim_owner);
 
 static void check_case(int user, int fault, u32 text)
 {

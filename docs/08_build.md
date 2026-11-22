@@ -42,7 +42,7 @@ SHA-256 を照合。第三者ミラーは使わない。プロキシは `https_p
 
 ### §8-2 ビルドパイプライン
 
-CI は配布物の `artifacts` と検査の `checks` (全部の検査を変異込みで、6 シャード) を並列に実行する。取り方と合格条件の正典は
+CI は配布物の `artifacts` と検査の `checks` (全部の検査を変異込みで、6 シャード) を並列に実行する。PowerPC の QEMU の検査は check の `ppc-qemu` を 10 組に割る (ユーザー決定 2026-11-22「組分けを10組で再構成」、重みは `os32-ci-inventory` で作り直す)。`gfinit-host`・`gf5-host`・`geforce-host` は CI から外した (ユーザー決定 2026-11-22、台帳 DEFERRED_TESTS の CI-DROP-* の行)。取り方と合格条件の正典は
 [§8-6](#8-6-github-actions-での本体ビルド)。
 
 ```

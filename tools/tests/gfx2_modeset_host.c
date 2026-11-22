@@ -1,3 +1,4 @@
+int appslot_gui_present_ok(void) { return 1; }
 #include "gfx2_int.h"
 static struct gfx2_adapter a;
 static struct gfx2_surf surf;

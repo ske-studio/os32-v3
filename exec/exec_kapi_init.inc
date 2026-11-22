@@ -335,9 +335,12 @@ extern int __cdecl wrap_snd2_chip_write(u32 h, const SND2_RegW *w, u32 n);
 extern int __cdecl wrap_snd2_chip_read(u32 h, u32 bank, u32 what, u32 reg);
 extern int __cdecl wrap_snd2_chip_reset(u32 h);
 extern int __cdecl wrap_snd2_chip_close(u32 h);
+extern int __cdecl wrap_install_begin(const InstallPlanV1 *plan, u32 *handle);
+extern int __cdecl wrap_install_rescan(u32 handle);
+extern int __cdecl wrap_install_end(u32 handle, u32 outcome);
 
 kapi->magic = 0x4B415049UL;
-kapi->version = 90;
+kapi->version = 91;
 
     kapi->gfx_init = wrap_gfx_init;
     kapi->gfx_init_200 = wrap_gfx_init_200;
@@ -676,6 +679,9 @@ kapi->version = 90;
     kapi->snd2_chip_read = wrap_snd2_chip_read;
     kapi->snd2_chip_reset = wrap_snd2_chip_reset;
     kapi->snd2_chip_close = wrap_snd2_chip_close;
+    kapi->install_begin = wrap_install_begin;
+    kapi->install_rescan = wrap_install_rescan;
+    kapi->install_end = wrap_install_end;
     {
         u32 _kr;
         for (_kr = 0; _kr < (u32)KAPI_FUNC_RESERVED; _kr++)

@@ -73,3 +73,9 @@ shell (owner 1) の異常終了は、通常文脈の所有者回収で WM 登録
   - `gui_ime_set_render`: 門に落ちたら表も NULL も黙って無視し (戻りは void)、`gui_ime_render_rejected` を数える。アプリの回収では描画先に触らず、gshell (owner 1) の終了で NULL (TVRAM 版) に戻る。
 
 検査: `make check-ring3-guard-host` (`tools/tests/test_ring3_guard.py`) と `kdebug/kselftest/ime_render_gate.inc`。
+
+## 同期 COMMIT の描画主体
+
+子の `gui_call(COMMIT)` は、POLL で発行したクライアント矩形を消費し、重なったドラッグ枠やカーソルを再合成して応答前に present する。カーネルが登録済みハンドラを呼ぶ間だけ、現在のスロットに登録世代を控える。表示側は現登録と一致した区間の描画主体をシェルと判定する。窓の作成と終了時の回収には一貫して子の owner を使う。
+
+通常復帰は外側の印を戻し、WAIT の park と fault の退避は印を消す。シェルの終了・載せ替え・再登録で旧世代は失効する。PC-98 は GUI の画面所有者、PowerMac は公開 init 時の所有者と adapter 世代を照合する。`gshell-host` は二窓が重なる際の応答までの合成と転送を、`gui-present-owner-host` は同期呼び出しとその前後の画素を検査する。

@@ -11,6 +11,7 @@ from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 RESTORE = '        arch_fp_restore(&fp_parent[fp_depth]);\n        ring3_context_restore(&caller_context);\n        _enable();\n        io_syscall_resume(launcher_id, io_parent_depth); /* IO_SYSCALL_PARENT */\n        /* 畳み'
 MUTATIONS = (
+    ('install-owner-exit-omitted', '    install_reclaim_owner(id);', ''),
     ('focus-enter-omitted', 'av_focus_exec_enter(id);', ''),
     ('focus-leave-omitted', 'av_focus_exec_leave(id, res_owner_get());', ''),
     ('focus-fault-omitted', 'av_focus_exec_leave(id, res_owner_get());',

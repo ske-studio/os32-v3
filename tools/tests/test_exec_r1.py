@@ -121,6 +121,7 @@ static int fault_kill_count;
 volatile u32 ring3_wm_fault_count;
 static int g_last_kind, g_last_code;
 static k_jmpbuf g_exit_jmpbuf;
+void appslot_gui_draw_leave(u32 previous) { (void)previous; }
 int appslot_cur(void) { return cur; }
 AppSlot *appslot_get(int id) { return &slots[id]; }
 int appslot_kill_check(int id) { CHECK(id == 2); return 0; }
@@ -175,6 +176,7 @@ void kapi_strings_cleanup_owned(int id) {
 static void exec_db_cleanup_owned(int id) { resource(id, 0); }
 static void fd_redirect_reset_owned(int id) { resource(id, 1); }
 static void vfs_close_owned(int id) { resource(id, 2); }
+static void install_reclaim_owner(int id) { (void)id; }
 static void pipe_free_owned(int id) { resource(id, 3); }
 static void shm_free_owned(int id) { resource(id, 4); }
 static void exec_pcm_reclaim(int id) { resource(id, 5); }

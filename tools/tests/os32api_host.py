@@ -36,6 +36,7 @@ def build(out_dir):
     adapter = (
         f'''#![allow(dead_code)]
 #[path="{SDK / 'av.rs'}"] pub mod av;
+#[path="{SDK / 'install.rs'}"] pub mod install;
 #[path="{SDK / 'kapi_generated.rs'}"] pub mod kapi_generated;
 pub use kapi_generated::*;
 #[path="{SDK / 'gui/mod.rs'}"] pub mod gui;

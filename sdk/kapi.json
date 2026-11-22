@@ -1,6 +1,6 @@
 {
   "generations": {"os32x_format": 5, "kapi_abi": 2, "memory_layout": 4, "shlib_protocol": 2},
-  "version": 90,
+  "version": 91,
   "func_capacity": 384,
   "crt_kapi_symbol": "os32_kapi_v89",
   "data_fields": [
@@ -27,6 +27,7 @@
     "paging.h",
     "clock_service.h",
     "exec.h",
+    "install_management.h",
     "fm_contract.h",
     "av_contract.h",
     "ide_contract.h",
@@ -2091,6 +2092,9 @@
     {"name": "snd2_chip_write", "target": "snd2_chip_write", "ret": "int", "args": ["u32 h", "const SND2_RegW *w", "u32 n"], "in": [{"arg": "w", "len": "n", "unit": 4}], "invalid_length": "n > 256"},
     {"name": "snd2_chip_read", "target": "snd2_chip_read", "ret": "int", "args": ["u32 h", "u32 bank", "u32 what", "u32 reg"]},
     {"name": "snd2_chip_reset", "target": "snd2_chip_reset", "ret": "int", "args": ["u32 h"]},
-    {"name": "snd2_chip_close", "target": "snd2_chip_close", "ret": "int", "args": ["u32 h"]}
+    {"name": "snd2_chip_close", "target": "snd2_chip_close", "ret": "int", "args": ["u32 h"]},
+    {"name": "install_begin", "target": "install_begin", "ret": "int", "args": ["const InstallPlanV1 *plan", "u32 *handle"], "in": [{"arg": "plan", "size": "sizeof(InstallPlanV1)"}], "out": [{"arg": "handle", "size": "sizeof(u32)"}]},
+    {"name": "install_rescan", "target": "install_rescan", "ret": "int", "args": ["u32 handle"]},
+    {"name": "install_end", "target": "install_end", "ret": "int", "args": ["u32 handle", "u32 outcome"]}
   ]
 }

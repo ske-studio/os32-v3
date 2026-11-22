@@ -1,6 +1,6 @@
 """A1 real aggregation and boot call boundary, ILP32/qemu, runtime mutants."""
 CHECK = dict(name='tick-probe-host', tier=4, needs=[], budget=5,
-    covers=['kernel/time/tick_probe.c', 'kernel/time/tick_probe.h',
+    covers=['kernel/time/tick_probe.c', 'kernel/time/tick_probe.h', 'kernel/time/tick_probe_ids.h',
             'net/link_platform.h', 'platform/pc98/platform_link_inline.h', 'platform/pc98/link_platform.c', 'net/link.c', 'net/nic.c', 'drivers/net/ne2000/ne2000.c',
             'drivers/net/ne2000/ne2000_data.inc',
             'platform/pc98/kernel.c', 'tools/tests/tick_probe_host.c',

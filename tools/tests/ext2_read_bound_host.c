@@ -273,7 +273,7 @@ static void case_exec_bss_neighbour(void)
     printf("  R4 exec header pre-read leaves resolved[] intact\n");
 }
 
-/* Both interfaces must stop at a hole and preserve the bytes after it. */
+/* Both interfaces read through holes and propagate mapping and data errors. */
 static void case_hole_and_errors(void)
 {
     u8 buf[3 * EXT2_BLOCK_SIZE];
@@ -288,15 +288,16 @@ static void case_hole_and_errors(void)
             if (kind == 2) { g_read_error = 1; g_error_block = 1; }
             n = stream ? ext2_read_stream(&g_ctx, EXT2_ROOT_INO, buf, sizeof(buf), 0)
                        : ext2_read_file(&g_ctx, EXT2_ROOT_INO, buf, sizeof(buf));
-            CHECK(n == (kind == 0 ? EXT2_BLOCK_SIZE : EXT2_ERR_IO));
+            CHECK(n == (kind == 0 ? (int)sizeof(buf) : EXT2_ERR_IO));
             /* Failed reads return IO; their destination is not a successful prefix.
              * The run builder can discover a bmap error before data I/O. */
             if (kind == 0) {
                 for (i = 0; i < EXT2_BLOCK_SIZE; i++)
                     CHECK(buf[i] == block_byte(100, i));
-                for (; i < sizeof(buf); i++) CHECK(buf[i] == GUARD_BYTE);
+                for (; i < 2 * EXT2_BLOCK_SIZE; i++) CHECK(buf[i] == 0);
+                for (; i < sizeof(buf); i++) CHECK(buf[i] == block_byte(102, i % EXT2_BLOCK_SIZE));
             }
-            CHECK(g_reads == (u32)(kind == 2 ? 2 : kind == 1 ? 0 : 1));
+            CHECK(g_reads == (u32)(kind == 1 ? 0 : 2));
         }
         ctx_reset(sizeof(buf));
         g_inode_error = EXT2_ERR_NOTFOUND;

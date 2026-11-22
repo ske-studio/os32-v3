@@ -11,6 +11,7 @@
 /*                      LBA デバイスには直接委譲する汎用ラッパー             */
 /* ======================================================================== */
 
+#include "install_access.h"
 #include "../../kernel/dev/dev.h"
 #include "os32_kapi_shared.h"
 #include "../block/disk.h"
@@ -182,7 +183,7 @@ static int dev_span_ok(u32 lba, int count)
     return ((u32)count - 1U <= U32_MAX - lba) ? 1 : 0;
 }
 
-int dev_blk_read_lba(Device *dev, u32 lba, int count, void *buf)
+static int dev_read_unmanaged(Device *dev, u32 lba, int count, void *buf)
 {
     int i;
     u8 *p;
@@ -217,7 +218,7 @@ int dev_blk_read_lba(Device *dev, u32 lba, int count, void *buf)
     return 0;
 }
 
-int dev_blk_write_lba(Device *dev, u32 lba, int count, const void *buf)
+static int dev_write_unmanaged(Device *dev, u32 lba, int count, const void *buf)
 {
     int i;
     const u8 *p;
@@ -245,6 +246,44 @@ int dev_blk_write_lba(Device *dev, u32 lba, int count, const void *buf)
         p += dev->sect_size;
     }
     return 0;
+}
+
+static int dev_managed_transfer(Device *dev, u32 lba, int count, void *dst,
+                                const void *src, int writing)
+{
+    const struct install_medium *medium = platform_install_medium();
+    struct install_access access;
+    u32 unit, physical, generation;
+    int mapped = 0, rc;
+    if (medium && dev && count >= 0) {
+        mapped = medium->resolve(dev, lba, count, &unit, &physical, &generation);
+        if (mapped < 0) return mapped;
+        if (mapped) {
+            int handled;
+            if (generation)
+                rc = install_view_io(&access, unit, generation, physical, count, dst, src, &handled);
+            else rc = install_raw_io(&access, unit, physical, count, dst, src, writing, &handled);
+            if (handled) return rc;
+            if (!install_transfer_allowed(&access, physical, count)) {
+                install_complete(&access);
+                return OS32_ERR_STALE;
+            }
+        }
+    }
+    if (writing) rc = dev_write_unmanaged(dev, lba, count, src);
+    else rc = dev_read_unmanaged(dev, lba, count, dst);
+    if (mapped) install_complete(&access);
+    return rc;
+}
+
+int dev_blk_read_lba(Device *dev, u32 lba, int count, void *buf)
+{
+    return dev_managed_transfer(dev, lba, count, buf, 0, 0);
+}
+
+int dev_blk_write_lba(Device *dev, u32 lba, int count, const void *buf)
+{
+    return dev_managed_transfer(dev, lba, count, 0, buf, 1);
 }
 
 /* ======================================================================== */

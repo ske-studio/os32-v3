@@ -296,6 +296,7 @@
     "fs/serialfs/serialfs_session.c",
     "fs/serialfs/serialfs_persistent.c",
     "exec/exec.c",
+    "kernel/dev/install_management.c",
     "exec/shell_service.c",
     "platform/pc98/legacy/v86_call.c",
     "platform/pc98/legacy/guest.c",
@@ -414,7 +415,9 @@
     "platform/pc98/usb_platform.c",
     "drivers/usb/ehci_quiesce.c",
     "drivers/usb/ehci_handoff.c",
-    "platform/pc98/usb_resident.c"
+    "platform/pc98/usb_resident.c",
+    "platform/pc98/usb_load.c",
+    "input/hal/usb_input.c"
   ],
   "ASM_KERNEL": [
     "arch/x86/kernel/kentry.asm",

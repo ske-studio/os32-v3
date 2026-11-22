@@ -36,7 +36,8 @@ static void e82557(void) { record(PC98_TICK_E82557); }
 static void link(void) { record(PC98_TICK_LINK); }
 static void lgy98(void) { record(PC98_TICK_LGY98); }
 static void gf(void) { record(PC98_TICK_GF); }
-static tick_fn callbacks[] = {snd, pcm, ne2k, e82557, link, lgy98, gf};
+static void usb(void) { record(PC98_TICK_USB); }
+static tick_fn callbacks[] = {snd, pcm, ne2k, e82557, link, lgy98, gf, usb};
 static void dispatch(unsigned int expected) {
     count = 0; phase = 0; host_if = 0x2; kctx_irq_depth = 1;
     tick_dispatch(); CHECK(count == expected + 2); CHECK(phase == 2);

@@ -32,9 +32,10 @@ void ohci_kill(struct usb_hc *hc)
     usbp_cfg_cmd(&hc->pci, 0, OHCI_BM);
 }
 
-static int start_fail(struct usb_hc *hc)
+static int start_fail(struct usb_hc *hc, const char *stage)
 {
     u32 i;
+    usbp_log("[usb] %u:%u.%u failed: %s", hc->pci.bus, hc->pci.dev, hc->pci.fn, stage);
     if (hc->started & OHCI_STARTED_BM) {
         usb_hc_dead(hc, USB_WHY_START);
     } else {
@@ -62,7 +63,7 @@ int ohci_start(struct usb_hc *hc)
     hc->state = HC_STARTING;
     hc->started = 0;
     if (usb_dmamem_init(hc) < 0) {
-        start_fail(hc);
+        start_fail(hc, "DMA");
         return -USB_E_NOMEM;
     }
     m = hc->hcpriv;
@@ -82,19 +83,19 @@ int ohci_start(struct usb_hc *hc)
         usbp_udelay(10);
         if (!(ohci_rd(hc, OHCI_COMMAND_STATUS) & OHCI_CMD_HCR)) break;
     }
-    if (i == 10) return start_fail(hc);
+    if (i == 10) return start_fail(hc, "reset");
     ohci_wr(hc, OHCI_HCCA, hc->dma[0].bus);
     ohci_wr(hc, OHCI_CONTROL_HEAD_ED, m->sentinel[1].bus);
     ohci_wr(hc, OHCI_BULK_HEAD_ED, m->sentinel[2].bus);
     if (ohci_rd(hc, OHCI_HCCA) != hc->dma[0].bus ||
         ohci_rd(hc, OHCI_CONTROL_HEAD_ED) != m->sentinel[1].bus ||
         ohci_rd(hc, OHCI_BULK_HEAD_ED) != m->sentinel[2].bus)
-        return start_fail(hc);
+        return start_fail(hc, "schedule readback");
     ohci_wr(hc, OHCI_INTERRUPT_DISABLE, OHCI_INTR_ALL);
     ohci_wr(hc, OHCI_INTERRUPT_ENABLE,
             OHCI_WATCH);
     hc->started |= OHCI_STARTED_BM; /* a failed readback may follow a successful BM write */
-    if (usbp_cfg_cmd(&hc->pci, OHCI_BM, 0) < 0) return start_fail(hc);
+    if (usbp_cfg_cmd(&hc->pci, OHCI_BM, 0) < 0) return start_fail(hc, "bus master");
     ohci_wr(hc, OHCI_CONTROL, OHCI_CTL_CBSR_1_4 | OHCI_CTL_PLE |
             OHCI_CTL_IE | OHCI_CTL_CLE | OHCI_CTL_BLE | OHCI_CTL_OPERATIONAL);
     ohci_wr(hc, OHCI_FM_INTERVAL, ((ohci_rd(hc, OHCI_FM_INTERVAL) ^
@@ -110,10 +111,12 @@ int ohci_start(struct usb_hc *hc)
         usbp_udelay(5000); /* OHCI_READ_DESC_DELAY */
         hc->nports = (u8)(ohci_rd(hc, OHCI_RH_DESCRIPTOR_A) & OHCI_RHA_NDP_MASK);
     }
-    if (!hc->nports || hc->nports > USB_RH_PORTS_MAX) return start_fail(hc);
+    if (!hc->nports || hc->nports > USB_RH_PORTS_MAX) return start_fail(hc, "port count");
     hc->stop_frame = ohci_frame(hc);
     hc->stop_deadline_ms = usbp_ms() + USB_DMA_DELAY_MS;
     hc->state = HC_RUNNING;
+    usbp_log("[usb] ohci %u:%u.%u ports=%u rev=%02x", hc->pci.bus, hc->pci.dev,
+             hc->pci.fn, hc->nports, ohci_rd(hc, OHCI_REVISION) & 0xffu);
     if (hc->has_irq) ohci_wr(hc, OHCI_INTERRUPT_ENABLE, OHCI_INTR_MIE);
     return 0;
 }

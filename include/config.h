@@ -28,6 +28,7 @@
 #define SYS_TRIDENT_MOD       "/boot/trident.mod"
 #define SYS_CIRRUS_MOD        "/boot/cirrus.mod"
 #define SYS_PCM_MOD           "/boot/pcm.mod"
+#define SYS_USB_MOD           "/boot/usb.mod"
 #define SYS_LAN_MOD           "/boot/lan.mod"
 #define SYS_CD_MOD            "/boot/cd.mod"
 #define SYS_KCG_MOD           "/boot/kcg.mod"

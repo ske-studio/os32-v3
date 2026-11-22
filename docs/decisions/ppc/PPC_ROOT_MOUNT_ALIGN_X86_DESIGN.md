@@ -90,7 +90,9 @@ hdprep は owner が APP_ID_SHELL の常駐 CPL0 shell の組込みとして実�
 
 hdprep は owner が APP_ID_SHELL の常駐 CPL0 shell の組込み。両 installer は前景 CUI の通常起動で、loader がロードした実パスを正規化して SYS_DISK_WRITE_PATHS と照合し、当該実行 slot に設定する disk_write_authorized を使う（exec/exec.c、exec/exec_launch.inc、include/config.h）。PPC の利用者呼出しも有効な利用者フレーム・slot・前景を検査する同じ契約に接続する。管理口、公開 raw 書込み、公開整形は exec_disk_write_allowed() を通し、予約 handle は認可済み owner の計画を指す。予約中の公開書込み・整形・管理口は呼出しの都度認可し、現在の owner と予約も照合する。owner 限定 mount のファイル操作も受付時に owner を照合する。受付後はカーネルだけが unit・予約世代・view 世代（該当時）・操作段・方向・許可範囲を保持し、要求と dirty buffer に引き継ぐ。実転送はこの情報と現在の予約状態を照合し、exec_disk_write_allowed() や実行中の利用者フレームには依存しない。段を進める前にその段の遅延書込みを同期・排出する。失効した要求や権限のない要求は転送前に拒否する。
 
-PPC の installer を通常の SDK/startup と IDE 構成でリンクし、導入 ISO の /sbin/install.bin と /sbin/cdinst.bin に収録する。P2 の公開済み raw 操作で IDENTIFY と表を読み、消去拒否時は全 sector を保持する。管理 ABI は本線 KAPI 担当が宣言・生成・dispatch、B05 が機種ハンドラと呼出元を所有する。公開口は int32_t begin(const InstallPlanV1 *plan, uint32_t *handle)、int32_t rescan(uint32_t handle)、int32_t end(uint32_t handle)。begin は元表の識別情報と対象 unit・変更範囲を含む計画をカーネルにコピーして保持し、成功時だけ owner 専用 handle を返す。rescan/end は他 owner・失効済み handle を拒否する。ABI は固定幅の値とサイズ付き計画をコピーして検証し、成功は 0、権限・不正入力・利用中・I/O の各失敗は既存 OS32 エラーで返す。既存 slot の意味を変更せず sdk/kapi.json 末尾追加・版上げ・再生成・clean build を同段に含める。x86 にも公開表・SDK・ABI 依存バイナリの差が生じるため、この差を関数分離と別に記録する。
+PPC の installer を通常の SDK/startup と IDE 構成でリンクし、導入 ISO の /sbin/install.bin と /sbin/cdinst.bin に収録する。P2 の公開済み raw 操作で IDENTIFY と表を読み、消去拒否時は全 sector を保持する。管理 ABI は本線 KAPI 担当が宣言・生成・dispatch、B05 が機種ハンドラと呼出元を所有する。公開口は int32_t begin(const InstallPlanV1 *plan, uint32_t *handle)、int32_t rescan(uint32_t handle)、int32_t end(uint32_t handle, uint32_t outcome)。begin は元表の識別情報と対象 unit・変更範囲を含む計画をカーネルにコピーして保持し、成功時だけ owner 専用 handle を返す。rescan/end は他 owner・失効済み handle を拒否する。ABI は固定幅の値とサイズ付き計画をコピーして検証し、成功は 0、権限・不正入力・利用中・I/O の各失敗は既存 OS32 エラーで返す。既存 slot の意味を変更せず sdk/kapi.json 末尾追加・版上げ・再生成・clean build を同段に含める。x86 にも公開表・SDK・ABI 依存バイナリの差が生じるため、この差を関数分離と別に記録する。
+
+PM 決定（2026-11-22）: end の outcome は OS32_INSTALL_END_COMMIT (0) で同期・再検査後に公開、OS32_INSTALL_END_ABORT (1) で owner 終了と同じ回収を行う。他の値は OS32_ERR_INVAL とし予約を維持する。
 
 begin の前に view 対応表から対象 unit の全論理 mount を調べ、root が対象なら拒否し、既存の子だけ checked unmount する。HFS 全量の読戻し・ファイル検読・同期まで排他を保持する。
 
@@ -133,6 +135,8 @@ x86 は基点と同じツール・設定で kernel、shell、install、cdinst、
 旧見積り 260–600 行は root と導入の接続部分のみ。ローダ・APM/HFS・管理 ABI は各段で別計上する。像のサイズ差は実装後に kernel/FD の空きと PPC の ELF・圧縮 ISO・HFS の使用量を実測する。完了証跡は mac99 と対象 G4 の HDD 単独起動、永続化、上記の負例と x86 回帰。今回は設計稿のためビルド・起動・実機操作は未実施。
 
 ## 7. 未決
+
+PC-98 の区画表・生 loader の範囲を管理 ABI で扱う場合は V2 を設計する。V1 は PC-98 で NOSYS とする。
 
 設計上のユーザー判断は 0 件。G4 の HDD 書込みは内容・対象・変更範囲を確認した時点で個別承認を取る。NVRAM の boot-device 更新も別件として値と復元方法を提示し承認を取る。中間段は一回限りの起動指定で検証できる。
 

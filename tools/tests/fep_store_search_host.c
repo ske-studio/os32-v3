@@ -90,6 +90,13 @@ int main(void)
             "INSERT INTO dict VALUES('か','低',9,-20000);"
             "INSERT INTO dict VALUES('かなか','前',10,800);"
             "INSERT INTO dict VALUES('かなかい','先',11,400);");
+    /* Two pages of one spelling precede enough distinct spellings to fill the list. */
+    char insert[120];
+    for (int i = 0; i < 96; i++) {
+        snprintf(insert, sizeof(insert), "INSERT INTO dict VALUES('scan','word%02d',1,%d)",
+                 i > 64 ? i - 64 : 0, i);
+        sql(db, insert);
+    }
     CHECK(setup_close(db) == SQLITE_OK);
     /* Boot supplies the accepted metadata even when settings reserve less. */
     s.boot_reserve_kb = FEP_DICT_MIN_RESERVE_KB;
@@ -115,11 +122,26 @@ int main(void)
     CHECK(sqlite3_exec(s.system.db, "DELETE FROM dict", 0, 0, 0) == SQLITE_READONLY);
     fep_store_learn(&s, "か", "同");
     CHECK(hits(&s, out) == 3);
-    CHECK(!strcmp(out[0].kanji, "低") && out[0].pos_id == 9);
-    CHECK(!strcmp(out[1].kanji, "同") && out[1].pos_id == 0);
+    CHECK(!strcmp(out[1].kanji, "低") && out[1].pos_id == 9);
+    CHECK(!strcmp(out[0].kanji, "同") && out[0].pos_id == 0);
     CHECK(!strcmp(out[2].kanji, "蚊") && out[2].cost == 310);
     CHECK(fep_store_search(&s, "かなか", out, IME_MAX_RESULTS) == 2);
     CHECK(!strcmp(out[0].kanji, "前") && out[0].cost == 300);
+    for (int i = 0; i < 65; i++) {
+        snprintf(insert, sizeof(insert), "INSERT INTO dict_user VALUES('scan%02d','word00',1,0)", i);
+        sql(s.user.db, insert);
+    }
+    sqlite3_stmt_status(s.system.prefix, SQLITE_STMTSTATUS_RUN, 1);
+    sqlite3_stmt_status(s.user.prefix, SQLITE_STMTSTATUS_RUN, 1);
+    CHECK(fep_store_search(&s, "scan", out, IME_MAX_RESULTS) == IME_MAX_RESULTS);
+    CHECK(sqlite3_stmt_status(s.system.prefix, SQLITE_STMTSTATUS_RUN, 0) == 1);
+    CHECK(sqlite3_stmt_status(s.user.prefix, SQLITE_STMTSTATUS_RUN, 0) == 1);
+    for (int i = 0; i < IME_MAX_RESULTS; i++) {
+        char word[16];
+        snprintf(word, sizeof(word), "word%02d", i);
+        CHECK(!strcmp(out[i].kanji, word) && out[i].pos_id == (i ? 1 : 0));
+    }
+    sql(s.user.db, "DELETE FROM dict_user WHERE kanji='word00'");
     no_borrow(&s.system); no_borrow(&s.user);
     CHECK(fep_store_user_list(&s, "か", entries, 4) == 1);
     CHECK(entries[0].freq == 1 && !strcmp(entries[0].kanji, "同"));
@@ -178,8 +200,7 @@ int main(void)
     CHECK(fep_store_open(&s, FEP_DICT_PATH_M, overlong) == 0);
     CHECK(!s.user_enabled && !s.user.path[0] && hits(&s, out) == 3);
     CHECK(fep_store_close(&s) == 0);
-    /* Full spelling dedup occurs before display truncation and never refills
-     * the merged 32-row limit after removing duplicates. */
+    /* Full spelling dedup occurs before display truncation. Duplicate rows leave room for later spellings. */
     db = 0;
     CHECK(setup_open(FEP_DICT_PATH_M, &db, SQLITE_OPEN_READWRITE, 0) == SQLITE_OK);
     sql(db, "DELETE FROM dict;"
@@ -201,14 +222,15 @@ int main(void)
     CHECK(setup_close(db) == SQLITE_OK);
     CHECK(fep_store_open(&s, FEP_DICT_PATH_M, FEP_USER_PATH) == 0);
     CHECK(fep_store_user_clear(&s) == 0);
-    CHECK(hits(&s, out) == 1 && !strcmp(out[0].kanji, "重"));
+    CHECK(hits(&s, out) == 2 && !strcmp(out[0].kanji, "重"));
     fep_store_learn(&s, "か", "重");
+    CHECK(hits(&s, out) == 2 && !strcmp(out[1].kanji, "外"));
     CHECK(fep_store_close(&s) == 0);
     /* Existing-user RO failure must preserve system conversion and data. */
     fixture_readonly = 1;
     CHECK(fep_store_open(&s, FEP_DICT_PATH_M, FEP_USER_PATH) == 0);
     CHECK(!s.user_enabled && fep_store_live_connections(&s) == 1);
-    CHECK(hits(&s, out) == 1);
+    CHECK(hits(&s, out) == 2);
     fep_store_learn(&s, "か", "書けない");
     CHECK(fep_store_user_list(&s, 0, entries, 4) < 0);
     CHECK(fep_store_close(&s) == 0);
@@ -222,7 +244,7 @@ int main(void)
     /* Missing user on RO media also leaves only system conversion. */
     CHECK(fixture_rm(FEP_USER_PATH) == 0);
     CHECK(fep_store_open(&s, FEP_DICT_PATH_M, FEP_USER_PATH) == 0);
-    CHECK(!s.user_enabled && fep_store_live_connections(&s) == 1 && hits(&s, out) == 1);
+    CHECK(!s.user_enabled && fep_store_live_connections(&s) == 1 && hits(&s, out) == 2);
     CHECK(fep_store_close(&s) == 0);
     fixture_readonly = 0;
     probe_error = OS32_ERR_INVAL;

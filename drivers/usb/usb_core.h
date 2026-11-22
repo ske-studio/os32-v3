@@ -121,11 +121,17 @@ struct usb_hc {
     /* Root ports are 1-based: index = port - 1. */
     struct usb_dev *root_child[USB_RH_PORTS_MAX];
     u8 root_restart[USB_RH_PORTS_MAX];
+    u8 walk_error_logged, scratch_error_logged;
     u8 explored; /* First root-port scan has completed (§4-4-1 P0). */
     struct usb_explore explore;
     struct usb_dma dma[USB_HC_DMA_MAX];
 };
-struct usb_iface { u8 num, alt, src; u8 attached; /* attach succeeded; clear before teardown/gone. */ const struct usb_class *cls; void *sc; };
+struct usb_iface {
+    u8 num, alt, src, attached; /* Clear attached before teardown/gone. */
+    u8 class_code, subclass, protocol;
+    const struct usb_class *cls;
+    void *sc;
+};
 struct usb_free_ctx { u8 step, iface, child_port; };
 struct usb_dev {
     struct usb_hc *hc;

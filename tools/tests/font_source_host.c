@@ -692,6 +692,7 @@ static void lease_owned(void)
 static int reclaim_target = -1, reclaim_mid_ok, reclaim_steps;
 static u32 reclaim_watch;
 static void io_kapi_owner_exit(int owner) { (void)owner; }
+static void install_reclaim_owner(int owner) { (void)owner; }
 void kapi_strings_cleanup_owned(int id) { (void)id; reclaim_steps++; }
 void db_cleanup_owned(int id) { (void)id; reclaim_steps++; }
 void fd_redirect_reset_owned(int id)

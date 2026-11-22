@@ -1,5 +1,6 @@
 /* I3 composes the real I1 lifecycle with C11-C13 and Y1-Y4. Device/VFS edges only. */
 #define _start i1_start
+int appslot_gui_present_ok(void) { return 1; }
 #include "gfx2_i1_host.c"
 #undef _start
 #include "vfs.h"

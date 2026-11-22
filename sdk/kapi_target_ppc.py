@@ -21,18 +21,8 @@ PROVIDER_GROUPS = {
     'surface': (frozenset(), frozenset([])),
     'gfx': (frozenset({
         'gfx_hardware_scroll',
-        'gfx_set_palette',
-        'gfx_get_palette',
-        'gfx_lease_palette',
-        'gfx_hw_submit',
-        'gfx_hw_get',
         'gfx_osri_show',
-    }), frozenset(['gfx_hal.h', 'palette.h'])),
-    'gui': (frozenset({
-        'gui_call',
-        'gui_register',
-        'sys_switch_shell',
-    }), frozenset([])),
+    }), frozenset()),
     'sound': (frozenset({
         'fm_startup_sound',
         'fm_play_mml',

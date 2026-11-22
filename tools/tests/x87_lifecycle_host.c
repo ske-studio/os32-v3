@@ -59,6 +59,7 @@ void vfs_close(int fd) { CHECK(fd==7); }
 u32 paging_current_cr3(void) { return 1; }
 u32 paging_kernel_pd_phys(void) { return 1; }
 void paging_load_cr3(u32 pd) { host_cr3=pd; }
+void appslot_gui_draw_leave(u32 previous) { (void)previous; }
 int appslot_cur(void) { return cur; }
 AppSlot *appslot_at(int id) { CHECK(id>=0 && id<APP_SLOT_COUNT); return &slots[id]; }
 AppSlot *appslot_get(int id) { return appslot_at(id); }
@@ -140,6 +141,8 @@ NOTICE(kbd_inject_owner_exit)
 NOTICE(launch_owner_exit)
 NOTICE(host_owner_exit)
 NOTICE(io_kapi_owner_exit)
+static int reclaimed_disk_owner;
+void install_reclaim_owner(int id) { reclaimed_disk_owner = id; }
 u32 io_syscall_suspend(int owner) { (void)owner; return 0; }
 void io_syscall_resume(int owner, u32 depth) { (void)owner; (void)depth; }
 NOTICE(con_sink_owner_exit)
@@ -151,7 +154,7 @@ static int expected_kind(int id)
     return child_fault && id == 3 ? EXEC_KIND_FAULT : EXEC_KIND_EXITED;
 }
 int gfx_return_emergency(u32 owner,int reason) { CHECK(owner>=1 && owner<=3 && reason==expected_kind(owner)); return 0; }
-void gui_owner_exit(int id,int kind) { CHECK(id>=1 && id<=3 && kind==expected_kind(id)); cleanup_count++; }
+void gui_owner_exit(int id,int kind) { CHECK(id>=1 && id<=3 && kind==expected_kind(id)); CHECK(reclaimed_disk_owner == id); reclaimed_disk_owner = 0; cleanup_count++; }
 int con_sink_is_enabled(void) { return 0; }
 int con_sink_reader_get(void) { CHECK(0); return 0; }
 void con_sink_push_exit(int id) { (void)id; CHECK(0); }

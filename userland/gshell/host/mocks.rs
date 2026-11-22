@@ -196,7 +196,12 @@ unsafe extern "C" fn gfx_shutdown() { GFX_SHUTDOWNS.fetch_add(1, Ordering::SeqCs
 unsafe extern "C" fn dirty(_: i32, _: i32, _: i32, _: i32) {
     DIRTY_RECTS.fetch_add(1, Ordering::SeqCst);
 }
+static PRESENTED: Mutex<Vec<u8>> = Mutex::new(Vec::new());
+pub fn presented_pixel(x: i32, y: i32) -> u8 {
+    lk(&PRESENTED)[y as usize * W + x as usize]
+}
 unsafe extern "C" fn present_dirty() {
+    lk(&PRESENTED).clone_from(&lk(&PIXELS));
     lk(&REGEN_LOG).push("present");
     PRESENTS.fetch_add(1, Ordering::SeqCst);
 }

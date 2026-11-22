@@ -89,6 +89,13 @@ def main():
         user_product = (ROOT / 'kernel/ime/ime_user_store.c').read_text()
         cases = [('normal', product, user_product, '')]
         if args.mutate:
+            old = 'int reset = sqlite3_reset(stmt);\n        int clear = sqlite3_bind_null(stmt, 1);'
+            if product.count(old) != 1:
+                raise RuntimeError('prefix rescan anchor not unique')
+            rescan = ('if (rc == SQLITE_DONE) { sqlite3_reset(stmt); '
+                      'while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {} }\n        ')
+            cases.append(('prefix-rescan', product.replace(old, rescan + old), user_product,
+                          'sqlite3_stmt_status(s.system.prefix, SQLITE_STMTSTATUS_RUN, 0) == 1'))
             if product.count(OLD) != 1:
                 raise RuntimeError('system retry anchor not unique')
             cases.append(('system-only-retry', product.replace(OLD, NEW), user_product,

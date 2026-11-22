@@ -19,7 +19,7 @@ CHECK = dict(name='ext2-read-cache-host', tier=1, budget=4.2,
 )
 ROOT = Path(__file__).resolve().parents[2]
 CASES = ['partial', 'single', 'double', 'run33', 'boundaries', 'full',
-         'contexts', 'ranges', 'write_failures', 'read_failures', 'lifetime', 'updates']
+         'contexts', 'ranges', 'sparse', 'write_failures', 'read_failures', 'lifetime', 'updates']
 FLAGS = ['-std=gnu11', '-m32', '-march=i386', '-ffreestanding', '-fno-pie',
          '-fno-stack-protector', '-nostdlib', '-static', '-O1', '-Wall', '-Wextra',
          '-Werror', '-Wno-unused-parameter', '-Wno-sign-compare', '-D__cdecl=']
@@ -39,6 +39,12 @@ RESET_PATHS = {
 }
 
 MUTANTS = [
+    ('hole-child', 'ext2_inode.c', 'if (ind1_block == 0) return EXT2_OK;',
+     '/* follow block zero */', 'sparse'),
+    ('hole-double', 'ext2_inode.c', 'if (inode->block[EXT2_DIND_BLOCK] == 0) return EXT2_OK;',
+     '/* follow block zero */', 'sparse'),
+    ('hole-single', 'ext2_inode.c', 'if (inode->block[EXT2_IND_BLOCK] == 0) return EXT2_OK;',
+     '/* follow block zero */', 'sparse'),
     ('inode-hit', 'ext2_inode_cache.inc', 'if (enabled && ext2_inode_cache.valid &&',
      'if (0 && enabled && ext2_inode_cache.valid &&', 'partial'),
     ('inode-copy', 'ext2_inode_cache.inc', '*inode = ext2_inode_cache.inode;',
@@ -74,7 +80,7 @@ MUTANTS = [
                    '    u32 sector;\n'
                    '    int ret = EXT2_ERR_IO;\n'
                    '    if (ext2_block_range_lba(ctx, first, blocks, &sector))\n'
-                   '        ret = dev_blk_read_lba(ctx->dev, sector, blocks * EXT2_SECTORS_PER_BLOCK, buf);\n'
+                   '        ret = ext2_device_transfer(ctx, sector, blocks * EXT2_SECTORS_PER_BLOCK, buf, 0);\n'
                    '    if (ret != 0) ext2_read_cache_reset();', 'read_failures'),
     io_reset_mutant('read-reset-sector',
                    'int ext2_read_sector(Ext2Ctx *ctx, u32 block_num, u32 sect, void *buf)\n'
@@ -83,7 +89,7 @@ MUTANTS = [
                    '    int ret = EXT2_ERR_IO;\n'
                    '    if (sect < EXT2_SECTORS_PER_BLOCK &&\n'
                    '        ext2_block_range_lba(ctx, block_num, 1, &sector))\n'
-                   '        ret = dev_blk_read_lba(ctx->dev, sector + sect, 1, buf);\n'
+                   '        ret = ext2_device_transfer(ctx, sector + sect, 1, buf, 0);\n'
                    '    if (ret != 0) ext2_read_cache_reset();', 'read_failures'),
     io_reset_mutant('write-reset-raw',
                    'static int ext2_raw_write_block(Ext2Ctx *ctx, u32 block_num, const void *buf)\n'

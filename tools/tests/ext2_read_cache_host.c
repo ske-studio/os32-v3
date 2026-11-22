@@ -442,13 +442,13 @@ static void case_ranges(void)
     CHECK(ext2_write_inode(&ctx, TEST_INO, &inode) == 0);
     trace_reset(); kmemset(output, 0xee, sizeof(output));
     ret = (u32)ext2_read_stream(&ctx, TEST_INO, output + 1, 5 * EXT2_BLOCK_SIZE, 0);
-    CHECK(ret == 3 * EXT2_BLOCK_SIZE && g_rd_calls == 4);
+    CHECK(ret == 5 * EXT2_BLOCK_SIZE && g_rd_calls == 5);
     CHECK(events[1].lba == block_lba(DATA_FIRST) && events[1].count == 2);
     CHECK(events[2].lba == block_lba(DATA_FIRST + 4) && events[2].count == 2);
     CHECK(events[3].lba == block_lba(DATA_FIRST + 2) && events[3].count == 2);
     for (i = 0; i < ret; i++) {
         u32 phys = i / EXT2_BLOCK_SIZE == 1 ? DATA_FIRST + 4 : DATA_FIRST + i / EXT2_BLOCK_SIZE;
-        CHECK(output[i + 1] == pattern(phys, i % EXT2_BLOCK_SIZE));
+        CHECK(output[i + 1] == (i / EXT2_BLOCK_SIZE == 3 ? 0 : pattern(phys, i % EXT2_BLOCK_SIZE)));
     }
     CHECK(output[0] == 0xee && output[ret + 1] == 0xee);
     /* Size=0, nonregular stream, triple-indirect unsupported. */
@@ -462,6 +462,39 @@ static void case_ranges(void)
                   EXT2_ADDR_PER_BLOCK * EXT2_ADDR_PER_BLOCK + 1) * EXT2_BLOCK_SIZE;
     CHECK(ext2_write_inode(&ctx, TEST_INO, &inode) == 0);
     CHECK(ext2_read_stream(&ctx, TEST_INO, output + 1, 1, inode.size - EXT2_BLOCK_SIZE) == 0);
+}
+static void case_sparse(void)
+{
+    Ext2Inode inode;
+    const u32 bs = EXT2_BLOCK_SIZE;
+    prepare();
+    CHECK(ext2_read_inode(&ctx, TEST_INO, &inode) == 0);
+    inode.size -= 17;
+    inode.block[0] = 0;
+    le32_wr(media_block(SINGLE_TABLE), 0);
+    le32_wr(media_block(LOWER_TABLE), 0);
+    le32_wr(media_block(UPPER_TABLE) + EXT2_BLOCK_PTR_SIZE, 0);
+    kmemset(input, 0, bs);
+    kmemset(input + EXT2_NDIR_BLOCKS * bs, 0, bs);
+    kmemset(input + DOUBLE_START * bs, 0, bs);
+    kmemset(input + (FILE_BLOCKS - 1) * bs, 0, bs);
+    CHECK(ext2_write_inode(&ctx, TEST_INO, &inode) == 0);
+    fail_lba = block_lba(0);
+    kmemset(output, 0xee, sizeof(output));
+    CHECK(ext2_read_file(&ctx, TEST_INO, output + 1, sizeof(input)) == (int)inode.size);
+    bytes_check(0, inode.size);
+    read_check(13, bs);
+    read_check(EXT2_NDIR_BLOCKS * bs - 3, bs + 7);
+    read_check(DOUBLE_START * bs - 3, bs + 7);
+    kmemset(output, 0xee, sizeof(output));
+    CHECK(ext2_read_stream(&ctx, TEST_INO, output + 1, 25, inode.size - 5) == 5);
+    bytes_check(inode.size - 5, 5);
+
+    kmemset(inode.block, 0, sizeof(inode.block));
+    CHECK(ext2_write_inode(&ctx, TEST_INO, &inode) == 0);
+    kmemset(input, 0, sizeof(input));
+    read_check(0, inode.size);
+    CHECK(fail_hits == 0);
 }
 static void case_write_failures(void)
 {
@@ -614,6 +647,7 @@ static void run_case(const char *name)
     else if (!kstrcmp(name, "boundaries")) case_boundaries();
     else if (!kstrcmp(name, "full")) case_full_blocks();
     else if (!kstrcmp(name, "contexts")) case_contexts();
+    else if (!kstrcmp(name, "sparse")) case_sparse();
     else if (!kstrcmp(name, "ranges")) case_ranges();
     else if (!kstrcmp(name, "write_failures")) case_write_failures();
     else if (!kstrcmp(name, "read_failures")) case_read_failures();

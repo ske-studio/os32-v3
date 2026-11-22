@@ -13,6 +13,7 @@ static int diagnostics;
 static GFX_Rect sent[8];
 
 int display_provider_v1_width(void) { width_queries++; return 800; }
+int appslot_gui_present_ok(void) { return allowed; }
 int display_provider_present_ok(void) { return allowed; }
 void gfx_diag_first_present(u32 before) { (void)before; diagnostics++; }
 void gfx_present_diag(void) { diagnostics++; }
@@ -49,12 +50,10 @@ int main(void)
     bb_b = 0;
     if (!check_blocked(&table)) return 2;
     bb_b = &pixel;
-#ifdef TEST_POWERMAC
     int before = diagnostics;
     allowed = 0;
     if (!check_blocked(&table) || diagnostics != before) return 2;
     allowed = 1;
-#endif
     dirty_queue.count = 0;
     prev_dirty.count = 1;
     gfx_add_dirty_rect(0, 1, 32, 1);

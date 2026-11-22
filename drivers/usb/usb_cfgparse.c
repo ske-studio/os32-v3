@@ -28,6 +28,9 @@ int usb_cfg_parse(struct usb_dev *d)
         }
         if (p[1] == USB_DESC_INTERFACE && !p[3]) {
             if (n < USB_DEV_IFACE_MAX && p[4] <= USB_IFACE_EP_MAX) {
+                d->ifs[n].class_code = p[5];
+                d->ifs[n].subclass = p[6];
+                d->ifs[n].protocol = p[7];
                 d->ifs[n].num = p[2]; d->ifs[n].alt = 0; current = n; n++;
             } else usbp_log("usb: interface limit");
         }

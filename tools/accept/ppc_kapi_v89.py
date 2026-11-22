@@ -115,6 +115,11 @@ def fixture(folder, case, gate):
         result = OS32_ERR_INVAL;
         goto syscall_complete;
     }
+    /* Exercise the last stub without invoking an arbitrary future handler. */
+    if (slot == KAPI_FUNC_COUNT - 1) {
+        result = 0x763839;
+        goto syscall_complete;
+    }
 """ + anchor)
         done = '    arch_syscall_result(&call, result);'
         edit('exec/exec_syscall.inc', done, done + '''
@@ -211,8 +216,6 @@ def observe(media, folder, case, cpu):
                 require(b'V89 child read=6 write=0 identity=6\n' in trace, 'child AS permissions or frame')
                 for reason in ('stub immediate', 'stub branch', 'stub entry', 'common sc'):
                     expect(body.strip() != reason.encode(), reason)
-                expect(session.word('v89_boundary') != FIRST_RESERVED - 1,
-                       f'slot {FIRST_RESERVED - 1} rejected')
                 result = re.fullmatch(rb'V89 return=(-?\d+) heap=(\d+) shm=(\d+)\n+', body)
                 require(result and rsh_command(session, 'echo $?') == b'0\n', repr(body))
                 pair = re.search(rb'V89 slot=0 [^\n]+\nV89 slot=297 result=(-?\d+) heap=(\d+) shm=(\d+)\n', trace)
@@ -220,6 +223,10 @@ def observe(media, folder, case, cpu):
                 value, heap, shm = map(int, pair.groups())
                 require(value == -9 and heap and shm and heap != shm, repr(pair.groups()))
                 expect(tuple(map(int, result.groups())) == (value, heap, shm), 'published data')
+                rsh_command(session, '/bin/v89probe.bin last')
+                expect(session.word('v89_boundary') != FIRST_RESERVED - 1,
+                       f'slot {FIRST_RESERVED - 1} rejected')
+                rsh_command(session, 'echo $?', b'0\n')
                 for argument, slot in (('a', FIRST_RESERVED), ('b', LAST_RESERVED)):
                     body = rsh_command(session, '/bin/v89probe.bin ' + argument)
                     boundary = session.word('v89_boundary')

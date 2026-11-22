@@ -12,5 +12,14 @@ C_PLATFORM += fs/ext2/ext2_medium_ide.c
 C_ORDER_TAIL += fs/ext2/ext2_medium_ide.c
 C_PLATFORM += platform/pc98/usb_config.c platform/pc98/usb_platform.c drivers/usb/ehci_quiesce.c drivers/usb/ehci_handoff.c
 C_ORDER_TAIL += platform/pc98/usb_config.c platform/pc98/usb_platform.c drivers/usb/ehci_quiesce.c drivers/usb/ehci_handoff.c
-C_PLATFORM += platform/pc98/usb_resident.c
-C_ORDER_TAIL += platform/pc98/usb_resident.c
+C_PLATFORM += platform/pc98/usb_resident.c platform/pc98/usb_load.c input/hal/usb_input.c
+C_ORDER_TAIL += platform/pc98/usb_resident.c platform/pc98/usb_load.c input/hal/usb_input.c
+# Relocatable USB body; pairing and installation belong to the image rules.
+PC98_USB_BODY_SOURCES = platform/pc98/usb_module.c platform/pc98/usb_module_runtime.c input/keymaps/hid_jp.c $(filter-out drivers/usb/ehci_quiesce.c input/hal/usb_input.c,$(C_COMMON_USB))
+PC98_USB_BODY_OBJECTS = $(addprefix $(BUILD_OUT)/usb/,$(PC98_USB_BODY_SOURCES:.c=.o))
+$(BUILD_OUT)/usb/%.o: %.c
+	@mkdir -p $(@D)
+	$(CC) $(CFLAGS_BASE) -Os $(INC_KERNEL) -c $< -o $@
+$(BUILD_OUT)/usb/usb_module.o: $(PC98_USB_BODY_OBJECTS)
+	$(MODULE_LD) -r -o $@ $(PC98_USB_BODY_OBJECTS)
+-include $(PC98_USB_BODY_OBJECTS:.o=.d)

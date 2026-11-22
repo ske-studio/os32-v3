@@ -1,6 +1,6 @@
 """Exercise the RAM root device with the production device registry."""
 CHECK = dict(name='ram-ro-host', tier=1,
-    covers=['build/core.yaml', 'userland/deploy.yaml', 'tools/deploy_manifests.py', 'tools/mkpkg.py', 'tools/mkfat12.py', 'build/packages.yaml', 'kernel/dev/ram_ro.c', 'kernel/dev/ram_ro.h',
+    covers=['platform/powermac/platform_install_management.h', 'include/install_access.h', 'include/install_medium.h', 'build/core.yaml', 'userland/deploy.yaml', 'tools/deploy_manifests.py', 'tools/mkpkg.py', 'tools/mkfat12.py', 'build/packages.yaml', 'kernel/dev/ram_ro.c', 'kernel/dev/ram_ro.h',
             'tools/tests/ram_ro_host.c','drivers/base/dev.c', 'kernel/dev/dev.h', 'include/boot_root.h',
             'tools/tests/ram_iso_host.c', 'tools/mkroot_image.py', 'fs/isofs/**', 'fs/vfs.c', 'fs/vfs.h', 'fs/vfs_device.h', 'lib/kstring_c.c', 'include/types.h', 'lib/kstring.h', 'sdk/include/os32/os32_kapi_shared.h'],
     needs=['make:all'], budget=5,
@@ -19,9 +19,9 @@ ANCHOR = 'ram->base + lba * RAM_RO_SECTOR_SIZE'
 
 def compile_and_test(source, directory):
     exe = pathlib.Path(directory) / 'test'
-    cmd = ['gcc-13', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
+    cmd = ['gcc-13', '-O1', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
            '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections',
-           '-D__cdecl=', '-I.', '-Iinclude', '-Isdk/include/os32',
+           '-D__cdecl=', '-I.', '-Iinclude', '-Iplatform/powermac', '-Isdk/include/os32',
            str(source), 'drivers/base/dev.c', 'tools/tests/ram_ro_host.c', '-o', str(exe)]
     subprocess.run(cmd, cwd=ROOT, check=True)
     return subprocess.run([str(exe)], cwd=ROOT, check=False).returncode
@@ -39,8 +39,8 @@ def iso_test(directory, mutate):
             raise SystemExit('ISO mutation anchor is not unique')
         source = d / 'iso9660.c'
         source.write_text(original.replace(anchor, "devname[0] = 'c';") if variant else original)
-        cmd = ['gcc-13', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-ffunction-sections',
-               '-fdata-sections', '-Wl,--gc-sections', '-D__cdecl=', '-I.', '-Iinclude',
+        cmd = ['gcc-13', '-O1', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-ffunction-sections',
+               '-fdata-sections', '-Wl,--gc-sections', '-D__cdecl=', '-I.', '-Iinclude', '-Iplatform/powermac',
                '-Isdk/include/os32', '-Ifs', '-Ifs/isofs', '-Ikernel/dev', '-Idrivers/ata', '-Imm', '-Ilib',
                str(source), 'fs/isofs/iso9660_media.c', 'fs/vfs.c', 'drivers/base/dev.c',
                'kernel/dev/ram_ro.c', 'lib/kstring_c.c', 'tools/tests/ram_iso_host.c', '-o', str(d / 'iso-test')]

@@ -23,6 +23,7 @@ import urllib.parse
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
+from tools.module_schema import MODULE_RECORD_CAP
 from tools.np21w_mcp import gui
 from tools.np21w_mcp import gui_desc
 from PIL import Image
@@ -217,7 +218,6 @@ class Http:
 
 # i386 module_record: 15 prefix words, version + 20 exports,
 # 8 two-word dependencies, dependency_count, 6 ref counters, 4 hooks.
-MODULE_RECORD_COUNT = 13
 MODULE_RECORD_STRIDE = (15 + 21 + 8 * 2 + 1 + 6 + 4) * 4
 
 # A real nm -S shape, including local symbols and sizeof(g_slot)=6*64.
@@ -230,7 +230,7 @@ KERNEL_NM = f'''00160001 B __bss_end
 00152008 00000004 b g_count
 0015200c 00000004 B appslot_trim_epoch
 00152010 00000004 T appslot_trim_done
-00180000 {MODULE_RECORD_COUNT * MODULE_RECORD_STRIDE:08x} B module_records
+00180000 {MODULE_RECORD_CAP * MODULE_RECORD_STRIDE:08x} B module_records
 '''
 SHELL_NM = '''00600000 00000004 B gshell_trim_delivered
 00600004 00000004 B gshell_trim_skipped_full
@@ -293,7 +293,7 @@ class GuiTests(unittest.TestCase):
         self.g.screen_text = Mock(return_value={'lines': ['Run: absolute path'], 'ambiguous': []})
         # Core has no g_ime. Model VA0 fep.elf plus a relocated RUNNING FEP
         # record, after other modules, using the actual module_record prefix.
-        self.http.put(MODULE_RECORD_ADDRESS, bytes(MODULE_RECORD_STRIDE * MODULE_RECORD_COUNT))
+        self.http.put(MODULE_RECORD_ADDRESS, bytes(MODULE_RECORD_STRIDE * MODULE_RECORD_CAP))
         self.http.put(MODULE_RECORD_ADDRESS + MODULE_RECORD_STRIDE * 2,
                       struct.pack('<9I', 12, 1, 6, 3, 0x1234, FEP_BASE, 8, 0, FEP_BASE))
         self.http.put(IME_ADDRESS, struct.pack('<I', 0))

@@ -246,7 +246,26 @@ void usbp_udelay(u32 us)
         if (!no_ownership) rput(h, OHCI_CONTROL, rget(h, OHCI_CONTROL) & ~OHCI_CTL_IR);
     }
 }
-void usbp_log(const char *s, ...) { (void)s; }
+static u32 ohci_logs, start_errors;
+static const char *start_reason;
+static int log_equal(const char *a, const char *b)
+{
+    while (*a && *a == *b) { a++; b++; }
+    return *a == *b;
+}
+void usbp_log(const char *s, ...)
+{
+    const char *expected = "[usb] ohci %u:%u.%u ports=%u rev=%02x";
+    if (log_equal(s, expected)) ohci_logs++;
+    if (log_equal(s, "[usb] %u:%u.%u failed: %s")) {
+        __builtin_va_list ap;
+        __builtin_va_start(ap, s);
+        for (unsigned i = 0; i < 3; i++) (void)__builtin_va_arg(ap, unsigned);
+        start_reason = __builtin_va_arg(ap, const char *);
+        __builtin_va_end(ap);
+        start_errors++;
+    }
+}
 
 /* Lists are fetched at frame begin. Processing follows saved links even after
  * unlink, while the same frame's TD writes can finish after stop. */
@@ -421,6 +440,8 @@ static const struct usb_class cls = { .gone = gone };
 
 static void fresh(void)
 {
+    ohci_logs = start_errors = 0;
+    start_reason = "";
     zero(hcs, sizeof(hcs)); zero(regs, sizeof(regs));
     zero(page_state, sizeof(page_state)); zero(retained, sizeof(retained));
     mem_top = mem_frees = page_frees = quarantines = now_us = alloc_count = 0;
@@ -484,19 +505,23 @@ static void startup_pool(void)
     fresh(); page_limit = 3;
     REQUIRE(ohci_start(&hcs[0]) == 0);
     REQUIRE(ohci_start(&hcs[1]) == -USB_E_NOMEM);
+    REQUIRE(ohci_logs == 1 && start_errors == 1 && log_equal(start_reason, "DMA"));
     REQUIRE(hcs[0].state == HC_RUNNING && page_state[0] == 1 && page_state[1] == 1);
     REQUIRE(page_state[2] == 0 && !bad_dma);
     fresh(); no_hcr = 1;
     REQUIRE(ohci_start(&hcs[0]) < 0);
+    REQUIRE(ohci_logs == 0 && start_errors == 1 && log_equal(start_reason, "reset"));
     REQUIRE(hcs[0].state == HC_OFF && page_frees == 2 && !quarantines);
     fresh(); bm_fail = 1;
     REQUIRE(ohci_start(&hcs[0]) < 0);
     REQUIRE(hcs[0].state == HC_DEAD && quarantines == 2 && !page_frees);
+    REQUIRE(start_errors == 1 && log_equal(start_reason, "bus master"));
     fresh(); fail_after_bm = 1;
     REQUIRE(ohci_start(&hcs[0]) < 0);
     REQUIRE(hcs[0].state == HC_DEAD && quarantines == 2 && !page_frees);
+    REQUIRE(start_errors == 1 && log_equal(start_reason, "port count"));
     fresh(); hcs[0].has_irq = 1;
-    REQUIRE(ohci_start(&hcs[0]) == 0);
+    REQUIRE(ohci_start(&hcs[0]) == 0 && !start_errors);
     REQUIRE(!early_mie && (rget(0, OHCI_INTERRUPT_ENABLE) & OHCI_INTR_MIE));
     REQUIRE(ohci_intr_collect(&hcs[0]) == 0); /* shared IRQ belongs to another device */
     rput(0, OHCI_INTERRUPT_STATUS, OHCI_INTR_WDH | OHCI_INTR_RHSC);
