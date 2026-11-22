@@ -10,11 +10,6 @@
 #include "kernel/dev/dev_name.h"
 #include "lib/path.h"
 
-#if OS32_HOOK_IME
-static int dict_ready, learning_enabled;
-int pm_root_dict_ready(void) { return dict_ready; }
-int pm_root_learning_enabled(void) { return learning_enabled; }
-#endif
 
 #if OS32_FEATURE_IDE
 int platform_ext2_vfs_mount(Ext2Ctx *ctx, int drive)
@@ -57,12 +52,6 @@ int pm_root_boot(const struct boot_root_image *image, int *registered)
     rc = path_set_drive(vfs_devname("/"));
 #if OS32_FEATURE_IDE
     if (rc && !image) kprintf(KLOG_ATTR, "HDD root hd0 path rc=%d\r\n", rc);
-#endif
-#if OS32_HOOK_IME
-    if (!rc && image) {
-        dict_ready = vfs_mount("/db", "rd2", "ramfs") == 0;
-        learning_enabled = vfs_mount("/dbu", "rd3", "ramfs") == 0;
-    }
 #endif
 #if PM_LOAD_KDEBUG
     if (!rc) kdebug_load();

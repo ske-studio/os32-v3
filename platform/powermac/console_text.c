@@ -43,11 +43,11 @@ static void text_off(const char *step, int rc)
 
 int pm_console_text_start(void)
 {
+    unicode_file_load();
     int rc = kcg_file_load(SYS_FB_FONT);
     const char *step = "font";
     if (!rc) {
         step = "unicode";
-        unicode_file_load();
         if (!unicode_file_debug_phys()) rc = -1;
     }
     if (!rc) {

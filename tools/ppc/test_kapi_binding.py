@@ -280,7 +280,7 @@ def verify(source, entries, extra_present=frozenset()):
     return bool(re.search(r'void __cdecl wrap_sys_reboot\(void\)\s*\{[^}]*\bsys_reboot\(\);', source))
 
 
-def generate(tmp, mutation=None, *, link=True, ide=False):
+def generate(tmp, mutation=None, *, link=True, ide=False, fep=False):
     sdk = tmp / 'sdk'
     sdk.mkdir()
     for name in ('gen_kapi.py', 'kapi_abi_x86.py', 'target_profile.py', 'kapi_target_ppc.py'):
@@ -358,7 +358,7 @@ def generate(tmp, mutation=None, *, link=True, ide=False):
         generator.write_text(text.replace(old, new))
     out = tmp / 'gen'
     subprocess.run([sys.executable, '-B', str(generator), '--target', 'ppc-powermac',
-                    '--feature-ide', str(int(ide)), '--feature-link', str(int(link)), '--out-dir', str(out), str(ROOT / 'sdk/kapi.json')], cwd=ROOT, check=True,
+                    '--feature-fep', str(int(fep)), '--feature-ide', str(int(ide)), '--feature-link', str(int(link)), '--out-dir', str(out), str(ROOT / 'sdk/kapi.json')], cwd=ROOT, check=True,
                    stdout=subprocess.DEVNULL)
     return out
 
@@ -455,6 +455,13 @@ def main():
         tmp = Path(directory)
         (tmp / 'normal').mkdir()
         out = generate(tmp / 'normal', link=False)
+        ime_slots = {api['name'] for api in entries if api['name'].startswith('ime_')}
+        (tmp / 'fep').mkdir()
+        product = generate(tmp / 'fep', link=False, fep=True)
+        source = (product / 'kapi/kapi_generated.c').read_text()
+        if not verify(source, [api for api in entries if api['name'] not in ime_slots], ime_slots):
+            print('FEP provider bindings differ from the shared ABI')
+            return 1
         (tmp / 'link').mkdir()
         linked = generate(tmp / 'link', ide=True)
         for header in ('os32_kapi_slots.h', 'os32_kapi_generated.h'):

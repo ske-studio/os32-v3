@@ -205,9 +205,9 @@ $(KB_OUT)/memmap_layout.h: include/memmap.h tools/gen_memmap.py
 ifneq ($(KB_EXEC),)
 BUILD_ID_SRC := $(KB_OUT)/build_id.c
 include build/build-id.mk
-$(KB_GEN)/stamp: build/images/$(IMAGE).mk sdk/kapi.json sdk/gen_kapi.py sdk/kapi_abi_x86.py sdk/kapi_target_ppc.py sdk/target_profile.py
+$(KB_GEN)/stamp: $(KB_OUT)/config/source-date.flags build/images/$(IMAGE).mk sdk/kapi.json sdk/gen_kapi.py sdk/kapi_abi_x86.py sdk/kapi_target_ppc.py sdk/target_profile.py
 	@mkdir -p $(KB_GEN)
-	python3 -B sdk/gen_kapi.py --target ppc-powermac --feature-link $(FEATURE_LINK) --feature-ide $(FEATURE_IDE) --out-dir $(KB_GEN)
+	python3 -B sdk/gen_kapi.py --target ppc-powermac --feature-link $(FEATURE_LINK) --feature-ide $(FEATURE_IDE) --feature-fep $(FEATURE_FEP) --out-dir $(KB_GEN)
 	@touch $@
 $(KB_OBJ): $(KB_GEN)/stamp
 $(KB_OUT)/build_id.o: $(BUILD_ID_SRC)
@@ -294,7 +294,7 @@ KB_LINK_COMMAND = $(KB_LINK_PREFIX) $(KB_CC) $(KB_FLAGS) -MF $(KB_ELF).d -no-pie
 audit: $(KB_ELF)
 	@python3 -B tools/ppc/kboot_audit.py --elf $(KB_ELF) --map $(KB_ELF:.ELF=.map) --objects $(KB_OBJ) $(KB_EXTRA) $(KB_SQLITE_AUDIT) --fp-object $(KB_OUT)/arch/ppc/fp_context.o --nm $(KB_NM) --objdump $(KB_OBJDUMP) \
 	 --sources $(filter-out fs/isofs/iso9660.c,$(KB_C)) $(KB_ASM) $(SQLITE_HARD_C) $(if $(KB_VFS),$(KB_VFS).c arch/ppc/sqlite_restore.S) $(if $(KB_MUT_SRC),--mutant $(KB_MUT_SRC) $(KB_MUT_FILE)) $(if $(KB_MUT_EXTRA_SRC),--mutant $(KB_MUT_EXTRA_SRC) $(KB_MUT_EXTRA_FILE)) $(if $(KB_MUT_THIRD_SRC),--mutant $(KB_MUT_THIRD_SRC) $(KB_MUT_THIRD_FILE)) \
-	 -- $(KB_CC) $(KB_FLAGS) $(KB_SQLITE_INC)
+	 -- $(KB_CC) $(KB_FLAGS) $(KB_SQLITE_INC) $(if $(filter 1,$(FEATURE_FEP)),-I$(FEP_OUT))
 
 -include $(KB_OBJ:.o=.d)
 

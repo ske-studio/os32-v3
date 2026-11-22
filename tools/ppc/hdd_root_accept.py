@@ -17,10 +17,12 @@ VIEW = 'platform/powermac/partition_view.c'
 KERNEL = 'platform/powermac/ppc_kernel.c'
 
 
-def disk(work, name):
+def disk(work, name, populate=None):
     directory = work / name
     directory.mkdir()
     (directory / 'identity').write_text(name)
+    if populate:
+        populate(directory)
     fs = work / (name + '.ext2')
     subprocess.run(['mke2fs', '-q', '-t', 'ext2', '-F', '-b', '1024', '-I', '128',
                     '-O', 'none', '-d', directory, fs, str(LENGTH // 2)], check=True)

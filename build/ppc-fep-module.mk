@@ -1,6 +1,15 @@
 FEP_OUT := $(KB_OUT)/fep
 include build/fep-common.mk
 
+ifeq ($(FEATURE_FEP),1)
+KB_EXTRA += $(FEP_OUT)/fep_kexports.o
+$(KB_OUT)/kernel/ime/fep_module.o $(KB_OUT)/platform/powermac/fep_imports.o: $(FEP_GEN)
+$(KB_OUT)/kernel/ime/fep_module.o $(KB_OUT)/platform/powermac/fep_imports.o: private KB_TU_FLAGS += -I$(FEP_OUT)
+$(FEP_OUT)/fep_kexports.o: $(FEP_OUT)/fep_kexports.c $(FEP_GEN) $(KB_GEN)/stamp
+	$(KB_CC) $(KB_FLAGS) -Ilib/sqlite3 -I$(FEP_OUT) -c $< -o $@
+-include $(FEP_OUT)/fep_kexports.d
+endif
+
 # The PowerMac default renderer is headless. Its display provider owns all
 # platform-side code until the framebuffer renderer is enabled.
 PPC_FEP_BODY := $(addprefix $(FEP_OUT)/,$(FEP_BODY_NAMES:=.o))

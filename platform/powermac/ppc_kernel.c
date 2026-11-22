@@ -2,6 +2,8 @@
 #include "ide_boot.h"
 #include "loop_boot.h"
 #include "sqlite_engine.h"
+#include "fep_boot.h"
+#include "platform_module_pair.h"
 #include "boot_token.h"
 /* PowerPC core-ready init (milestone 2, PPC_KBOOT_DESIGN sections 2 and 4).
  *
@@ -76,7 +78,7 @@ int pm_root_image(struct boot_root_image *image, u32 frame_bytes);
 
 int platform_boot_staging_in_use(void)
 {
-#if OS32_FEATURE_IDE
+#if OS32_FEATURE_IDE && !OS32_HOOK_IME
     if (pm_root_unit != -1) return 0;
 #endif
     return ppc_boot_info()->root_frame_bytes != 0;
@@ -193,6 +195,9 @@ static void rh_phy_notify(const struct gem_phy_sample *p, int rc)
 static int lan_log_rc;
 #if KBOOT_SHELL || KBOOT_SH
 static int root_ready;
+#if OS32_HOOK_IME && OS32_FEATURE_IDE
+static int hdd_root_ready;
+#endif
 #endif
 
 #if KBOOT_SHELL_LAYOUT_DIAG
@@ -487,6 +492,18 @@ void platform_boot_services(void)
             kprintf(KBOOT_ATTR, "HDD root hd0 mount/path rc=%d\r\n", rc);
             kboot_stop("hd0 root");
         }
+#if OS32_HOOK_IME
+        /* Validate the embedded pair without registering it as the root. */
+        struct boot_root_image paired_image = {0};
+        if (info->root_frame_bytes) {
+            int pair_rc = pm_root_image(&paired_image, info->root_frame_bytes);
+            u32 before, after;
+            if (pm_root_release(&paired_image, 0, PM_ROOT_FRAME_BASE / PAGE_SIZE,
+                                MEM_BOOT_STAGING_SIZE / PAGE_SIZE, &before, &after))
+                kboot_stop("HDD pair page release");
+            hdd_root_ready = !pair_rc;
+        }
+#endif
         machcfg_load_root();
         apply_machine_config();
     } else
@@ -531,7 +548,13 @@ void platform_boot_run(void)
     if (root_ready) {
 #if OS32_HOOK_KAPI_DB
         /* Keep SQLite boot diagnostics on the registered log streams. */
-        kprintf(KBOOT_ATTR, "[sqlite] static rc=%d\n", sqlite_static_boot());
+        int sql_rc = sqlite_static_boot();
+        kprintf(KBOOT_ATTR, "[sqlite] static rc=%d\n", sql_rc);
+#if OS32_HOOK_IME && OS32_FEATURE_IDE
+        u32 pair;
+        if (!sql_rc && hdd_root_ready && unicode_file_debug_phys() && platform_module_pair(&pair))
+            kprintf(KBOOT_ATTR, "[fep] static rc=%d\n", fep_boot_static());
+#endif
 #endif
         pm_exec_boot();
         shell_loop_run(&pm_shell_loop_ops);
