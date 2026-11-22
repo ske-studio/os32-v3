@@ -6,7 +6,7 @@
 STATIC_ASSERT(sizeof(u32) == 4, module_u32_is_four_bytes);
 STATIC_ASSERT(MI_WORDS * MODULE_WORD_BYTES == MODULE_HEADER_SIZE, module_header_words);
 
-#ifdef __powerpc__
+#if defined(__PPC__) || defined(__powerpc__)
 #include "module_fixup_ppc.inc"
 #define IMAGE_VERSION MODULE_PPC_FORMAT_VERSION
 #define IMAGE_TARGET MODULE_PPC_TARGET_TAG
@@ -46,7 +46,7 @@ static int overlap(u32 a, u32 an, u32 b, u32 bn)
 
 static int in_text(u32 off, const u32 *h)
 {
-#ifdef __powerpc__
+#if IMAGE_VERSION == MODULE_PPC_FORMAT_VERSION
     if (off % MODULE_WORD_BYTES || !within(off - h[MI_TEXT_OFF], MODULE_WORD_BYTES, h[MI_TEXT_SIZE]))
         return 0;
 #endif
@@ -265,7 +265,7 @@ int module_image_relocate(u8 *image, u32 size,
     if (base > U32_MAX - h[MI_MEM_SIZE]) return MODULE_RELOC_INVALID;
     u8 *body = image + h[MI_PAYLOAD_OFF];
     for (u32 i = h[MI_PAYLOAD_SIZE]; i < h[MI_MEM_SIZE]; i++) body[i] = 0;
-#ifdef __powerpc__
+#if IMAGE_VERSION == MODULE_PPC_FORMAT_VERSION
     module_fixup_ppc_apply(body, base, image + h[MI_RELOC_OFF], h[MI_RELOC_COUNT]);
 #else
     for (u32 i = 0; i < h[MI_RELOC_COUNT]; i++) {

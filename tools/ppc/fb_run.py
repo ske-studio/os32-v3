@@ -176,11 +176,12 @@ def main():
     os.environ.setdefault('SOURCE_DATE_EPOCH', '946684800')
     leave = work/'leave.sh'
     leave.write_text('/bin/dispprb.bin leave\necho $?\n')
-    bins = ' '.join((text_fixture(work), str(leave), 'build/out/ppc-user/link-sh/dispprb.bin'))
+    user = work / 'user'
+    bins = ' '.join((text_fixture(work), str(leave), str(user / 'dispprb.bin')))
     seen = set()
     for case in ['normal'] + (list(MUTATIONS) if args.mutate else []):
         opts = mutant_settings(work, case, *MUTATIONS[case]) if case != 'normal' else []
-        elf = build(work/case, 'IMAGE=kboot-link-sh', 'KB_ROOT_BINS='+bins,
+        elf = build(work/case, 'IMAGE=kboot-link-sh', 'KB_ROOT_BINS='+bins, 'KB_SH_OUT='+str(user),
                     *before_shell_input(work), *opts)
         digest = hashlib.sha256(elf.read_bytes()).hexdigest()
         require(digest not in seen, 'distinct framebuffer image')

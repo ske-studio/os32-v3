@@ -10,7 +10,7 @@ from build_fixture import copy_build_tree
 
 ROOT = Path(__file__).resolve().parents[2]
 ENTRIES = ('boot sdk programs libs module modules deploy deploy-kernel kernel-r1 '
-           'sqlite-module-proto kdebug hwdev kernel-link geforce-module deploy-test').split()
+           'sqlite-module-proto hwdev kernel-link geforce-module deploy-test').split()
 
 
 def invoke(root, target):
