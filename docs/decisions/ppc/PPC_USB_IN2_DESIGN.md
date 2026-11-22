@@ -1,5 +1,5 @@
-> 出所: ~/os32-tmp/run/ppc-usb-in2/DESIGN.final.md (設計ラリー 3 回、astra 起草・sol レビュー、決着せずユーザー決定で段を分けた、2026-11-22)。
-> 状態: **確定 (段 A・B・C の CUI、2026-11-22)** — PowerMac の USB の HID を共通の入力の HAL (in2) に。段 C の GUI と段 D は PowerPC の GUI の口の後。末尾の「確定」の節は本文に優先する。
+> 出所: ~/os32-tmp/run/docs-1122c/src/PPC_USB_IN2_DESIGN.md。
+> 状態: **確定 (2026-11-22)** — 段 A・B と段 C の CUI を先行し、段 C の GUI と段 D は GUI KAPI の結線後に進める。末尾の確定の節が本文に優先する。
 
 # PowerMac USB HID を共通入力 HAL に接続する詳細設計 r3
 
@@ -26,7 +26,7 @@
 |寿命|input/hal/in2_dev.c:input_src_release は世代を照合しキー・ボタンを解放|usb_platform.c:usbp_input_src_alloc は種類別に 1..4 を再利用。hid_boot.h の hid_gone・hid_stop から usbp_input_release が私有状態を解放|
 
 - 実物との差① 7d の PowerMac 用 platform_input_caps.h は照合時点にない。② ARCH_COMPAT_CONTRACT §9 の今回消す例外行も未着地。7d の取り込み後に実名を使って変更する。
-- 統合判断1（同じ役目） INPUT_HAL_DESIGN の 4a/4b と INPUT_KEYMAP_DESIGN の S1m/S2a/S2u/S2m/S3m/S3b がこの接続を担当する。同じ作業として実装する。
+- 統合判断1（同じ役目） [INPUT_HAL_DESIGN](../INPUT_HAL_DESIGN.md) の 4a/4b と [INPUT_KEYMAP_DESIGN](../INPUT_KEYMAP_DESIGN.md) の S1m/S2a/S2u/S2m/S3m/S3b がこの接続を担当する。同じ作業として実装する。
 - 判断2（境界） USB は報告の解釈・反復時計・転送寿命、機種は backend 登録と端末、共通層は入力源の世代・押下・キー評価・旧 API と in2 への配送を持つ。
 - 判断3（整合） AC-INPUT-1 の符号・空値・非待機・割込み可能待機を x86 と同じベクトルで検証。物理差は PC-98 sc と HID usage の backend で吸収。input_context.c:input_context_owner_select と in2_excl.c の所有者・焦点規則を両機種で使用する。
 
@@ -91,7 +91,7 @@ clear_usb_slot(kind, handle);
 |platform/powermac/input_boot.c|上記 provider・InputOps を登録。待機、IME・独占中の旧配送を共通ポリシーに従わせる|
 |PPC のビルド入力|下記の像別選択に従う。旧表をリンク対象から除去|
 |platform/powermac/platform_input_caps.h|7d の独占能力を最終段で 0 から 1 へ|
-|docs/decisions/ARCH_COMPAT_CONTRACT.md|AC-INPUT-1 の実装欄と試験を更新し、§9 の PowerMac 独占例外行を削除|
+|[ARCH_COMPAT_CONTRACT](../ARCH_COMPAT_CONTRACT.md)|AC-INPUT-1 の実装欄と試験を更新し、§9 の PowerMac 独占例外行を削除|
 
 A の実装では hid_kbd.c の新 usage 通知を既存の H-usbp で受ける。鍵盤ごとに一報告を単位として変換する。報告境界を H-usbp に渡し、新旧 usage 集合を別々に互換 sc 集合に射影する。群順を保ち、新だけにある sc は make、旧だけにある sc は break、両方にある sc は無通知とする。repeat は保持中の対応 sc の旧 repeat に変換する。gone/stop で枠を初期化する。既存 cooked FIFO をここから駆動し、usb_stack_host.c と test_usb_hid.py も新通知に追従させる。B の 4b・S2m・S3m・S3b で暫定変換を除去し、HAL producer・backend・旧 API consumer を同時に有効化する。test_arch_compat.py の PPC 期待値 14→0、対応 XFAIL・pin・変異を同段で更新する。
 
@@ -139,3 +139,5 @@ A は HID 差分、B は HAL と旧 API の切替をそれぞれビルド可能�
 ## 確定 (2026-11-22、設計ラリー 3 回で決着せず、ユーザー決定「段を分ける」)
 - 段 A (HID の差分と反復)・段 B (HAL と旧い API の切り替え、冷起動の bind、Ctrl+Pause の中断)・段 C の CUI の部分 (常駐シェルから probe、QMP の make/hold/break・移動・クリック・device_del と再追加、7450・7455、Ctrl+C は ETX) を確定して実装に出す。能力 (platform_input_caps.h) は 0 のまま。
 - 段 C の GUI の部分と段 D (独占の有効化、能力を 1 に、ARCH_COMPAT_CONTRACT §9 の行を消す) は、PowerPC の GUI の口 (gui_register・gui_call を実の提供者に結線する段) の後に回す。sol 第 3 回の P1 2 件 (GUI の KAPI の結線・常駐の像の選択の条件) と P2 2 件 (QMP の make と break を分ける同期・前景の移りの同期) はその時の設計に入れる。§9 の行はそれまで残す。
+
+- (2026-11-22、PM) 段 C の GUI の配置は [PPC_GUI_KAPI_DESIGN](PPC_GUI_KAPI_DESIGN.md) の確定 (C-GUI) に揃える: KB_ROOT_SHELL で gshell を /sys/shell.bin に置く形はやめ、/sys/shell.bin と /bin/gshell.bin を分けて C-GUI 専用の構成で /bin/gshell.bin を選ぶ。
