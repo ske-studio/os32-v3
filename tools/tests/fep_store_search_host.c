@@ -115,8 +115,8 @@ int main(void)
     CHECK(sqlite3_exec(s.system.db, "DELETE FROM dict", 0, 0, 0) == SQLITE_READONLY);
     fep_store_learn(&s, "か", "同");
     CHECK(hits(&s, out) == 3);
-    CHECK(!strcmp(out[0].kanji, "低") && out[0].pos_id == 9);
-    CHECK(!strcmp(out[1].kanji, "同") && out[1].pos_id == 0);
+    CHECK(!strcmp(out[1].kanji, "低") && out[1].pos_id == 9);
+    CHECK(!strcmp(out[0].kanji, "同") && out[0].pos_id == 0);
     CHECK(!strcmp(out[2].kanji, "蚊") && out[2].cost == 310);
     CHECK(fep_store_search(&s, "かなか", out, IME_MAX_RESULTS) == 2);
     CHECK(!strcmp(out[0].kanji, "前") && out[0].cost == 300);

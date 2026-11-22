@@ -86,9 +86,9 @@ static const char SQL_PREFIX[] =
 
 static const char SQL_LEARN[] =
     "INSERT INTO dict_user (yomi, kanji, freq, last_ts) "
-    "VALUES (?1, ?2, 1, ?3) "
+    "VALUES (?1, ?2, 1, (SELECT COALESCE(MAX(last_ts),0)+1 FROM dict_user WHERE yomi=?1)) "
     "ON CONFLICT(yomi, kanji) DO UPDATE SET "
-    "freq = freq + 1, last_ts = ?3";
+    "freq = freq + 1, last_ts = excluded.last_ts";
 
 /* ======================================================================== */
 /*  公開API                                                                  */
@@ -394,7 +394,6 @@ static int dict_learn_once(sqlite3_stmt *stmt, const char *yomi, const char *kan
     sqlite3_reset(stmt);
     rc = sqlite3_bind_text(stmt, 1, yomi, -1, SQLITE_STATIC);
     if (rc == SQLITE_OK) rc = sqlite3_bind_text(stmt, 2, kanji, -1, SQLITE_STATIC);
-    if (rc == SQLITE_OK) rc = sqlite3_bind_int(stmt, 3, 0);
     if (rc == SQLITE_OK) rc = sqlite3_step(stmt);
     int reset_rc = sqlite3_reset(stmt);
     int y_rc = sqlite3_bind_null(stmt, 1);
@@ -701,10 +700,11 @@ static const char STORE_PREFIX[] =
     "FROM dict WHERE yomi>=?1 AND yomi<?1 || X'EFBFBF' ORDER BY cost LIMIT 32";
 static const char USER_EXACT[] =
     "SELECT kanji,0,(-10000-freq) AS cost FROM dict_user WHERE yomi=?1 "
-    "ORDER BY cost LIMIT 32";
+    "ORDER BY last_ts DESC, cost LIMIT 32";
 static const char USER_PREFIX[] =
     "SELECT kanji,0,(-10000-freq) AS cost FROM dict_user "
-    "WHERE yomi>=?1 AND yomi<?1 || X'EFBFBF' ORDER BY cost LIMIT 32";
+    "WHERE yomi>=?1 AND yomi<?1 || X'EFBFBF' "
+    "ORDER BY CASE WHEN yomi=?1 THEN last_ts END DESC, cost LIMIT 32";
 
 static int store_prepare(FepConn *c, int user)
 {
@@ -943,8 +943,7 @@ static int store_search_once(FepStore *s, const char *yomi, IME_Result *out,
             if (state[i] != SQLITE_ROW && state[i] != SQLITE_DONE)
                 *failed = is_ioerr(state[i]) ? i + 1 : (i ? 4 : 5);
         if (*failed || (state[0] == SQLITE_DONE && state[1] == SQLITE_DONE)) break;
-        int pick = state[1] == SQLITE_ROW && (state[0] != SQLITE_ROW ||
-            sqlite3_column_int(usr, 2) <= sqlite3_column_int(sys, 2));
+        int pick = state[1] == SQLITE_ROW;
         sqlite3_stmt *stmt = cursors[pick];
         const char *text = (const char *)sqlite3_column_text(stmt, 0);
         taken++; /* LIMIT is applied before duplicate/null removal. */

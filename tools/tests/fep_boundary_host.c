@@ -347,6 +347,29 @@ static void exports(void)
 }
 #include "ime_dict_info_host.inc"
 
+static void convert_kanji(void)
+{
+    kstrncpy(g_ime.kana_buf, "かんじ", sizeof(g_ime.kana_buf));
+    g_ime.kana_len = kstrlen(g_ime.kana_buf);
+    require(ime_input_key(' ', KEY_SPACE) == 0 && g_ime.result_count == 2,
+            "two kanji candidates");
+}
+
+static void confirm_second(const char *word)
+{
+    convert_kanji();
+    require(ime_candidate_key(' ', KEY_SPACE) == 0 &&
+            ime_candidate_key(13, KEY_RETURN) == 1 &&
+            !kstrcmp(g_ime.commit_buf, word), "confirmed second spelling");
+    convert_kanji();
+    require(!kstrcmp(g_ime.results[0].kanji, word), "latest confirmed spelling leads");
+    ime_candidate_key(ASCII_ESC, 0);
+    require(!ime_boot_abort() && !ime_dict_boot(), "reopen learning database");
+    convert_kanji();
+    require(!kstrcmp(g_ime.results[0].kanji, word), "reopened latest spelling leads");
+    ime_candidate_key(ASCII_ESC, 0);
+}
+
 int main(void)
 {
     CHECK(os32_sqlite_init() == SQLITE_OK); fixture_init(); make_dict("/db/fep.db", "蚊");
@@ -366,6 +389,11 @@ int main(void)
     watched = NULL;
     boot_config_rc = OS32_ERR_IO;
     require(ime_dict_boot() == OS32_ERR_IO && !ime_boot_connections(), "boot config failure");
+    sqlite3 *seed = NULL;
+    CHECK(setup_open(FEP_DICT_PATH_M, &seed, SQLITE_OPEN_READWRITE, 0) == SQLITE_OK);
+    CHECK(sqlite3_exec(seed, "INSERT INTO dict VALUES('かんじ','換字',1,10),"
+                             "('かんじ','幹事',1,20)", NULL, NULL, NULL) == SQLITE_OK);
+    CHECK(setup_close(seed) == SQLITE_OK);
     boot_config_rc = 0; boot_path_rc = OS32_ERR_INVAL;
     require(!ime_dict_boot() && ime_boot_connections() == 1 &&
             !g_ime.store.user_enabled, "boot path failure preserves system");
@@ -388,6 +416,12 @@ int main(void)
     require(!kstrcmp(g_ime.commit_buf, "蚊") &&
             ime_user_list_facade("か", out, 64) == 1, "production learning");
     require(!ime_user_export_facade("/db/flow.csv"), "production user export");
+    confirm_second("幹事");
+    convert_kanji();
+    require(ime_candidate_key(13, KEY_RETURN) == 1, "repeat first spelling");
+    confirm_second("換字");
+    confirm_second("幹事");
+    require(!ime_user_delete_facade("かんじ", NULL), "clear order fixture");
     void *user_db = g_ime.store.user.db, *system_db = g_ime.store.system.db;
     g_ime.store.boot_reserve_kb = 0;
     require(ime_switch_dict(2) == OS32_ERR_AGAIN && g_ime.store.system.db == system_db &&

@@ -18,6 +18,9 @@ import host32
 
 ROOT = Path(__file__).resolve().parents[2]
 MUTANTS = [
+    ('ignore-confirm-order', 'kernel/ime/ime_dict.c',
+     'ORDER BY CASE WHEN yomi=?1 THEN last_ts END DESC, cost', 'ORDER BY cost',
+     'latest confirmed spelling leads'),
     ('convert-old-owner', 'kernel/ime/ime_convert.inc',
      'fep_store_search(&g_ime.store,', 'ime_dict_search(&g_ime.dict,', 'production conversion'),
     ('learn-old-owner', 'kernel/ime/ime_convert.inc',
