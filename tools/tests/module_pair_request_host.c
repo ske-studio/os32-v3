@@ -22,14 +22,44 @@ inline __attribute__((always_inline)) int module_load(const struct module_reques
                                                        struct module_handle *out)
 {
     (void)out;
-    finish(getter_calls != 1 || q->policy.img_valid != expected_valid ||
-           q->policy.pair_image_crc != (expected_valid ? 0x89abcdefU : 0));
+    if (getter_calls != 1 || q->policy.img_valid != expected_valid ||
+        q->policy.pair_image_crc != (expected_valid ? 0x89abcdefU : 0)) finish(1);
+#ifdef PAIR_USB
+    *out = (struct module_handle){0};
+    return expected_valid ? 0 : MODULE_NOT_FOUND;
+#else
+    finish(0);
+#endif
 }
 
 #ifdef PAIR_FEP
 #include "host_arch/arch_io.h"
 #endif
 #include PAIR_ADAPTER
+
+#ifdef PAIR_USB
+static int boot_lines, skip_lines, starts, dma_available;
+int memory_boot_dma_available(void) { return dma_available; }
+int module_start(struct module_handle owner)
+{
+    (void)owner;
+    starts++;
+    return MODULE_INIT_FAILED;
+}
+void kprintf(u8 attr, const char *fmt, ...)
+{
+    const char *expected = "[BOOT] usb module rc=%d pair=%08x\n";
+    if (!dma_available) expected = "[BOOT] usb module skipped: DMA unavailable\n";
+    va_list args;
+    va_start(args, fmt);
+    while (*expected && *expected == *fmt) { expected++; fmt++; }
+    if (!dma_available && !*fmt && !*expected && attr == KLOG_ATTR) skip_lines++;
+    if (dma_available && !*fmt && !*expected && attr == KLOG_ATTR &&
+        va_arg(args, int) == (expected_valid ? MODULE_INIT_FAILED : MODULE_NOT_FOUND) &&
+        va_arg(args, u32) == (expected_valid ? 0x89abcdefU : 0)) boot_lines++;
+    va_end(args);
+}
+#endif
 
 #if defined(PAIR_PCM) || defined(PAIR_LAN)
 int tick_register(unsigned int slot, tick_fn fn) { return 0; }
@@ -66,6 +96,14 @@ void _start(void)
 #ifdef PAIR_SQLITE
     sqlite_module_api = &sqlite_stub_api;
 #endif
+#ifdef PAIR_USB
+    pc98_usb_boot();
+    if (getter_calls || starts || boot_lines || skip_lines != 1) finish(3);
+    dma_available = 1;
+    pc98_usb_boot();
+    finish(boot_lines != 1 || skip_lines != 1 || starts != (int)expected_valid);
+#else
     PAIR_ENTRY;
     finish(2);
+#endif
 }

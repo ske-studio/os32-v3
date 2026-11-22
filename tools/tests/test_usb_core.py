@@ -49,6 +49,8 @@ def execute(exe, cases=range(1,36), red=False):
     if not red: assert not failures, failures
     return failures
 MUTATIONS = [
+ ('usb_explore','usbp_log("[usb] root','if (0) usbp_log("[usb] root'),
+ ('usb_enum','usbp_log("[usb] HID','if (0) usbp_log("[usb] HID'),
  ('usb_req','x->deadline_ms = old_deadline;', 'x->deadline_ms = 0; (void)old_deadline;'),
  ('usb_service','f->attached && f->sc && f->cls && f->cls->tick','f->sc && f->cls && f->cls->tick'),
  ('usb_service','f->attached && f->sc && f->cls && f->cls->tick','f->attached && f->cls && f->cls->tick'),
