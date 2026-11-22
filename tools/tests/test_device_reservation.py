@@ -87,6 +87,8 @@ static int g_pci_count;
 @PCI_READER@
 /* platform の ⑥-0 wrapperを実物のまま走らせ、表示に渡った値を控える */
 #include "pci_bind.h"
+#include "pci_resources.h"
+void pc98_usb_reserve(void) {}
 #include "irq.h"
 #define TATTR_WHITE 0
 u32 irq_line_quarantined, irq_storm_masked;
@@ -571,7 +573,9 @@ BODIES['import_pci'] = r'''
     g_pci[2].bar[3] = 0x20A00006UL; g_pci[2].bar[4] = 0x20410000UL;
     /* 0:12.0: 未知のヘッダ型 (0x05) は BAR を読まない */
     g_pci[3].dev = 12; g_pci[3].header = 0x05; g_pci[3].bar[0] = 0x20B00000UL;
-    g_pci_count = 4;
+    g_pci[4] = (struct pci_dev){.vendor=0x1033, .device=0x0035,
+        .fn=1, .bar={0xfffff000}};
+    g_pci_count = 5;
     CHECK(ledger_resource_import_pci() == 4 && host_resources() == 4 && ledger_res_overflow == 0);
     q = &ledger_resources[0];
     CHECK(q->bus == LEDGER_BUS_PCI && q->width_basis == LEDGER_WB_RAW && q->bar == 1);
@@ -798,6 +802,8 @@ MUTATIONS = [
      '        ledger_res_overflow++;\n', ''),
     ('record-map-unchecked', 'mm/pgalloc.c',
      '        rec->map_first > rec->map_end ||\n', ''),
+    ('import-usb-sizing-mask', 'platform/pc98/pci_resources.c',
+     'if (idx == 0 && pc98_usb_bar_width(&d)) continue;', ''),
     ('import-width-verified', 'platform/pc98/pci_resources.c',
      '    r.width_basis = LEDGER_WB_RAW;', '    r.width_basis = LEDGER_WB_SIZING;'),
     ('import-io-bars', 'platform/pc98/pci_resources.c',

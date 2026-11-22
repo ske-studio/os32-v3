@@ -11,6 +11,7 @@
 /*  ため (pgalloc.c を取り込むホスト試験の探索パスを増やさない)。g_pci は    */
 /*  既存の読み口 pci_get (写しを返す) で読む — 列挙の順序も config も触らない。*/
 /* ======================================================================== */
+#include "pci_resources.h"
 #include "../../mm/pgalloc.h"
 #include "../../drivers/pci/pci.h"
 
@@ -45,6 +46,8 @@ u32 ledger_resource_import_pci(void)
             if (k == PCI_BAR_MEM64 && (b + 1 >= nb || d.bar[++b])) continue;
             if (k < PCI_BAR_MEM32 || k > PCI_BAR_MEM64 ||
                 !(raw & PCI_BAR_MEM_ADDR_MASK)) continue;
+            /* USB BAR0 has its own sized record; never import a sizing mask. */
+            if (idx == 0 && pc98_usb_bar_width(&d)) continue;
             r.raw_bar = raw;
             r.decode_first = r.decode_end = (raw & PCI_BAR_MEM_ADDR_MASK) / PAGE_SIZE;
             r.bdf = (u16)(((u32)d.bus << 8) | ((u32)d.dev << 3) | d.fn);
@@ -59,7 +62,6 @@ u32 ledger_resource_import_pci(void)
     return n;
 }
 
-#include "pci_resources.h"
 #include "../../drivers/pci/pci_bind.h"
 #include "../../kernel/irq/irq.h"
 #include "kprintf.h"
@@ -76,6 +78,7 @@ static u8 pc98_pci_line_bits(unsigned int irq)
 
 void pc98_boot_pci_resources(void)
 {
+    pc98_usb_reserve();
     {
         /* 取り込みを先に済ませてから溢れを読む (引数の評価順は決まっていない)。 */
         u32 pci_raw;
