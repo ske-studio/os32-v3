@@ -14,6 +14,8 @@
 - HC の故障は 1 本の入口で、止める → DMA と通常のメモリを再起動まで隔離 → 配下は一括で「無い」 → 再起動まで使わない。
 - 段: 1 = OHCI・列挙・ハブ・HID (boot のキーボード・マウス) を入力へ、2 = EHCI と companion、3 = 大容量 (読みを先に受入)。ゲームパッド (XInput) はサウンド・入力の HAL の段で、USB の段の後。
 
+- [PowerMac の USB HID と共通 in2 の接続](../../decisions/ppc/PPC_USB_IN2_DESIGN.md)
+
 ## 2. 段の状態
 | 段 | 状態 |
 |---|---|

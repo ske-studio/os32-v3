@@ -18,6 +18,8 @@ W9 は子の終了値、シェル終了時の回収、次のシェルの起動�
 
 初期の設計は [PPC_SHELL_DESIGN](../../decisions/ppc/PPC_SHELL_DESIGN.md)、USER ABI は [PPC_SHELL_EXEC_DESIGN](../../decisions/ppc/PPC_SHELL_EXEC_DESIGN.md)、W8 の媒体の検証は [PPC_SHELL_W8_DESIGN](../../decisions/ppc/PPC_SHELL_W8_DESIGN.md) に記録した。
 
+- [製品シェルの枠と切替](../../decisions/ppc/PPC_SHELL_ALIGN_X86_DESIGN.md)
+
 ## 2. 段の状態
 
 | 段 | 状態 |
