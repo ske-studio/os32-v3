@@ -246,7 +246,13 @@ void usbp_udelay(u32 us)
         if (!no_ownership) rput(h, OHCI_CONTROL, rget(h, OHCI_CONTROL) & ~OHCI_CTL_IR);
     }
 }
-void usbp_log(const char *s, ...) { (void)s; }
+static u32 ohci_logs;
+void usbp_log(const char *s, ...)
+{
+    const char *expected = "[usb] ohci %u:%u.%u ports=%u rev=%02x";
+    while (*expected && *expected == *s) { expected++; s++; }
+    if (!*expected && !*s) ohci_logs++;
+}
 
 /* Lists are fetched at frame begin. Processing follows saved links even after
  * unlink, while the same frame's TD writes can finish after stop. */
@@ -421,6 +427,7 @@ static const struct usb_class cls = { .gone = gone };
 
 static void fresh(void)
 {
+    ohci_logs = 0;
     zero(hcs, sizeof(hcs)); zero(regs, sizeof(regs));
     zero(page_state, sizeof(page_state)); zero(retained, sizeof(retained));
     mem_top = mem_frees = page_frees = quarantines = now_us = alloc_count = 0;
@@ -484,10 +491,12 @@ static void startup_pool(void)
     fresh(); page_limit = 3;
     REQUIRE(ohci_start(&hcs[0]) == 0);
     REQUIRE(ohci_start(&hcs[1]) == -USB_E_NOMEM);
+    REQUIRE(ohci_logs == 1);
     REQUIRE(hcs[0].state == HC_RUNNING && page_state[0] == 1 && page_state[1] == 1);
     REQUIRE(page_state[2] == 0 && !bad_dma);
     fresh(); no_hcr = 1;
     REQUIRE(ohci_start(&hcs[0]) < 0);
+    REQUIRE(ohci_logs == 0);
     REQUIRE(hcs[0].state == HC_OFF && page_frees == 2 && !quarantines);
     fresh(); bm_fail = 1;
     REQUIRE(ohci_start(&hcs[0]) < 0);

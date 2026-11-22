@@ -179,6 +179,9 @@ int usb_enum_step(struct usb_walk *w)
             }
             rc = f->cls->attach(d, f);
             if (rc == -USB_E_BUSY) return 0;
+            if (f->cls == &hid_kbd_class || f->cls == &hid_mouse_class)
+                usbp_log("[usb] HID %u:%u.%u addr=%u iface=%u rc=%d", hc->pci.bus,
+                         hc->pci.dev, hc->pci.fn, d->addr, f->num, rc);
             if (rc < 0) { w->attach_failed = 1; return 0; }
             f->attached = 1;
             w->iface++; return 0;

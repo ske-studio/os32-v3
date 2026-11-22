@@ -130,6 +130,10 @@ void usb_explore_step(struct usb_hc *hc)
         if (w->phase == 0) {
             if (!usb_port_op(w, USB_RH_STATUS)) return;
             if (w->error) { e->step = EX_ERR; return; }
+            if (!e->hub && ((w->status & (1u << USB_C_PORT_CONNECTION)) ||
+                            (!hc->explored && (w->status & (1u << USB_PORT_CONNECTION)))))
+                usbp_log("[usb] root %u:%u.%u port=%u connected=%u", hc->pci.bus,
+                         hc->pci.dev, hc->pci.fn, e->port, w->status & 1u);
             if (!(e->hub ? usb_hub_sc(e->hub)->explored : hc->explored)) w->status |= 1u << USB_C_PORT_CONNECTION;
             w->phase = 1;
         }

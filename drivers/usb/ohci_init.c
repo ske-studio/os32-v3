@@ -114,6 +114,8 @@ int ohci_start(struct usb_hc *hc)
     hc->stop_frame = ohci_frame(hc);
     hc->stop_deadline_ms = usbp_ms() + USB_DMA_DELAY_MS;
     hc->state = HC_RUNNING;
+    usbp_log("[usb] ohci %u:%u.%u ports=%u rev=%02x", hc->pci.bus, hc->pci.dev,
+             hc->pci.fn, hc->nports, ohci_rd(hc, OHCI_REVISION) & 0xffu);
     if (hc->has_irq) ohci_wr(hc, OHCI_INTERRUPT_ENABLE, OHCI_INTR_MIE);
     return 0;
 }

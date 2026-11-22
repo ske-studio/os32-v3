@@ -64,7 +64,17 @@ void usbp_dma_sync(struct usb_dma *d, u32 off, u32 len, int dir)
 u32 usbp_ms(void) { return now; }
 u32 usbp_irq_save(void) { u32 old=irq_disabled; irq_disabled=1; return old; }
 void usbp_irq_restore(u32 f) { irq_disabled=f; }
-void usbp_log(const char *fmt, ...) { (void)fmt; }
+static int log_compare(const char *a, const char *b)
+{
+    while (*a && *a == *b) { a++; b++; }
+    return *a - *b;
+}
+static u32 root_logs, hid_logs;
+void usbp_log(const char *fmt, ...)
+{
+    if (log_compare(fmt, "[usb] root %u:%u.%u port=%u connected=%u") == 0) root_logs++;
+    if (log_compare(fmt, "[usb] HID %u:%u.%u addr=%u iface=%u rc=%d") == 0) hid_logs++;
+}
 void usbp_input_release(int kind, u8 src) { (void)kind; (void)src; }
 static struct node *node_for(struct usb_dev *d)
 {
@@ -301,12 +311,14 @@ static int scenario(int c)
         plug(0,1);pump(800);REQUIRE(attached==1);
         nodes[0].conn=0;nodes[0].connect_change=1;hc.needs_explore=1;
         pump(300);REQUIRE(devices()==0 && detached==1 && released==1);REQUIRE(hc.root_child[0]==0);
+        REQUIRE(root_logs == 2 && hid_logs == 1);
         REQUIRE(free_at_frame!=0);REQUIRE(allocation_count-free_count==baseline && dma_count-dma_free_count==dma_base);
     } else if(c==3) { /* F8: reset timeout must disable before next port. */
         plug(0,1);plug(1,2);nodes[0].reset_fail=1;pump(1700);
         REQUIRE(!nodes[0].enabled && devices()==1 && hc.root_child[1]);
     } else if(c==4) { /* F11a, resumable attach. */
         plug(0,3);fail_attach=1;busy_attach=5;pump(1000);
+        REQUIRE(root_logs == 1 && hid_logs == 2);
         REQUIRE(devices()==1 && attached==1 && released==1 && hc.root_child[0]->ctrl.open);
     } else if(c==5) { /* F14: hub children returned before hub itself. */
         pump(10);u32 baseline=allocation_count-free_count;

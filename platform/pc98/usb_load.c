@@ -2,6 +2,12 @@
 #include "usb_imports.h"
 #include "platform_module_pair.h"
 #include "config.h"
+#include "memory_boot.h"
+#include "kprintf.h"
+#include "bootlog.h"
+#include "con_sink.h"
+#include "kstring.h"
+#include <stdarg.h>
 #include "os32_generations.h"
 #include "os32_kapi_shared.h"
 
@@ -22,5 +28,28 @@ int pc98_usb_load(void)
         .lifecycle = {.start = pc98_usb_module_start}
     };
     int rc = module_load(&request, &owner);
-    return rc ? rc : module_start(owner);
+    if (!rc) rc = module_start(owner);
+    kprintf(KLOG_ATTR, "[BOOT] usb module rc=%d pair=%08x\n", rc, pair);
+    return rc;
 }
+
+void pc98_usb_boot(void)
+{
+    if (memory_boot_dma_available()) pc98_usb_load();
+    else kprintf(KLOG_ATTR, "[BOOT] usb module skipped: DMA unavailable\n");
+}
+
+/* The tick runs with interrupts masked. Feed the memory-backed sinks without
+ * rendering text or waiting for the serial port. */
+static void usb_tick_write(const char *buf, u32 len, u8 attr)
+{
+    bootlog_push(buf, len);
+    con_sink_push_print(buf, len, attr);
+}
+
+#define KPRINTF_WRITE usb_tick_write
+#define KPRINTF_PRINT(str, attr) usb_tick_write(str, kstrlen(str), attr)
+#define KPRINTF_PRINT_UTF8 KPRINTF_PRINT
+#define KPRINTF_VNAME pc98_usb_tick_vprintf
+#define KPRINTF_NAME pc98_usb_tick_printf
+#include "../../lib/kprintf_format.inc"
