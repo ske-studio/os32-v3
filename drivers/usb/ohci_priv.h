@@ -59,6 +59,7 @@ void ohci_xfer_close(struct usb_hc *hc, struct usb_xfer *x);
 void ohci_xfer_close_done(struct usb_hc *hc, struct usb_xfer *x);
 u16 ohci_frame(struct usb_hc *hc);
 int ohci_rh_port(struct usb_hc *hc, u8 port, u8 op, u32 *st);
+int ehci_early_quiesce(struct usb_hc *hc, u32 *blocked);
 int ehci_quiesce(struct usb_hc *hc, u32 *why);
 extern const struct usb_hc_ops ohci_ops;
 #endif
