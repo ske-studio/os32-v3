@@ -2318,6 +2318,11 @@ fn excl_mouse_focus_ends_both_edges() {
     input::capture(&mut st,input::Ctx::Wait);
     assert_eq!(st.front_index(),Some(0));
     assert!(events(&st,0).iter().all(|e| e.kind != GUI_EV_BUTTON));
+    // A mouse-key move before the next physical sample belongs to the new window.
+    input::move_x3(&mut st, r.x + 9, r.y + 8);
+    let masks: Vec<_> = events(&st, 0).iter()
+        .filter(|e| e.kind == GUI_EV_POINTER).map(|e| e.sub).collect();
+    assert_eq!(masks, vec![0]);
 }
 
 #[test]
@@ -2581,4 +2586,67 @@ fn excl_public_acquire_controls_window_delivery() {
     run(&mut st, &tap(SC_A, 0));
     let delivered: Vec<_> = keys(&st, 0).iter().map(|&(down, scan, _, _)| (down, scan)).collect();
     assert_eq!(delivered, [(true, SC_A as u8), (false, SC_A as u8)]);
+}
+
+fn sample_buttons(st: &mut GuiState, buttons: u8, ctx: input::Ctx) {
+    mocks::MOUSE.lock().unwrap().2 = buttons;
+    input::capture(st, ctx);
+}
+
+#[test]
+fn chord_client_click_and_rearm() {
+    for ctx in [input::Ctx::Wait, input::Ctx::Pump] {
+        mocks::init();
+        let shm = mocks::Shm::new();
+        let mut st = one_window(&shm);
+        for mask in [2, 3, 2, 3, 1, 3, 1, 0] {
+            sample_buttons(&mut st, mask, ctx);
+        }
+        assert_eq!(buttons(&st, 0), vec![(true, 2), (false, 2)]);
+        clear_rings(&st);
+        for mask in [1, 0] {
+            sample_buttons(&mut st, mask, ctx);
+        }
+        assert_eq!(buttons(&st, 0), vec![(true, 1), (false, 1)]);
+    }
+}
+
+#[test]
+fn chord_pointer_masks() {
+    for ctx in [input::Ctx::Wait, input::Ctx::Pump] {
+        mocks::init();
+        let shm = mocks::Shm::new();
+        let mut st = one_window(&shm);
+        for mask in [2, 3, 2] {
+            sample_buttons(&mut st, mask, ctx);
+            clear_rings(&st);
+            mocks::MOUSE.lock().unwrap().0 += 1;
+            input::capture(&mut st, ctx);
+            let masks: Vec<_> = events(&st, 0).iter()
+                .filter(|e| e.kind == GUI_EV_POINTER).map(|e| e.sub).collect();
+            assert_eq!(masks, vec![mask]);
+        }
+    }
+}
+
+#[test]
+fn chord_desktop_menu() {
+    use crate::startmenu;
+    mocks::init();
+    let shm = mocks::Shm::new();
+    let mut st = one_window(&shm);
+    park_pointer(&mut st, 5, 5);
+    sample_buttons(&mut st, 2, input::Ctx::Wait);
+    assert!(startmenu::is_open());
+    let menu = startmenu::rect();
+    // Refresh closes the menu without queuing a program launch.
+    *mocks::MOUSE.lock().unwrap() = ((menu.x + 5) as i16, (menu.bottom() - 5) as i16, 3);
+    for mask in [3, 2, 0] {
+        sample_buttons(&mut st, mask, input::Ctx::Pump);
+        input::capture(&mut st, input::Ctx::Wait);
+        assert!(startmenu::is_open());
+    }
+    sample_buttons(&mut st, 1, input::Ctx::Wait);
+    assert!(!startmenu::is_open());
+    sample_buttons(&mut st, 0, input::Ctx::Wait);
 }

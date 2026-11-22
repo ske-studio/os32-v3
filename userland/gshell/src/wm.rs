@@ -444,6 +444,8 @@ pub struct GuiState {
     pub mouse_x: i32,
     pub mouse_y: i32,
     pub prev_buttons: u8,
+    /// 実マウスでクリックを開始し、まだ離されていないボタン。
+    pub click_button: u8,
     /// 実マウス (`mouse_poll`) の前回値。マウスキー (票 KBD_NAV §1-3) が
     /// `mouse_x/y` を動かすので、「実マウスが動いたか」はこちらと比べる
     /// (動いたら実マウスの値から続ける = 最後に動いた方が勝つ)。
@@ -536,6 +538,7 @@ impl GuiState {
         mouse_x: 320,
         mouse_y: 200,
         prev_buttons: 0,
+        click_button: 0,
         real_x: 320,
         real_y: 200,
         synth_buttons: 0,

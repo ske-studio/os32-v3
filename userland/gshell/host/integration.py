@@ -89,6 +89,18 @@ def build(gshell: Path, name: str, quiet: bool = False, typical: bool = False) -
 # 票 KBD_NAV (docs/tasks/gui/TASK_KBD_NAV.md) の受け入れ K1 の変異。
 # (名前, ファイル, 置き換え前 (ちょうど 1 か所), 置き換え後, RED になるべき試験の絞り込み)
 MUTATIONS = [
+    ('chord starts client click', 'src/input.rs',
+     'let down_edge = click_button == MOUSE_BTN_LEFT && st.click_button == 0;',
+     'let down_edge = btn & MOUSE_BTN_LEFT != 0 && st.prev_buttons & MOUSE_BTN_LEFT == 0;',
+     'chord_client_click_and_rearm'),
+    ('chord fails to rearm left', 'src/input.rs', 'if btn & MOUSE_BTN_LEFT != 0 { MOUSE_BTN_LEFT }',
+     'if btn & MOUSE_BTN_LEFT != 0 { 0 }', 'chord_client_click_and_rearm'),
+    ('chord loses pointer mask', 'src/input.rs', 'let pbtn = btn | st.synth_buttons;',
+     'let pbtn = click_button | st.synth_buttons;', 'chord_pointer_masks'),
+    ('chord activates desktop menu', 'src/input.rs',
+     'let down_edge = click_button == MOUSE_BTN_LEFT && st.click_button == 0;',
+     'let down_edge = (click_button == MOUSE_BTN_LEFT && st.click_button == 0) || '
+     '(startmenu::is_open() && btn & 1 != 0 && st.prev_buttons & 1 == 0);', 'chord_desktop_menu'),
     ('retain exited foreground', 'src/multiapp.rs',
      'mm.av_owner = -1;', '', 'reused_foreground_owner_is_notified_again'),
     ('record rejected foreground', 'src/multiapp.rs',

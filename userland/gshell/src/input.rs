@@ -762,6 +762,7 @@ fn capture_mouse(st: &mut GuiState, ctx: Ctx, end_batch: bool) {
         st.real_y = st.mouse_y;
         st.excl.mouse_baseline = true;
         st.prev_buttons = 0;
+        st.click_button = 0;
         return;
     }
     /* 位置は**実マウスが動いたときだけ**実マウスの値へ (最後に動いた方が勝つ)。
@@ -779,16 +780,22 @@ fn capture_mouse(st: &mut GuiState, ctx: Ctx, end_batch: bool) {
     if st.excl.mouse_baseline {
         st.excl.held_buttons = mi.buttons;
         st.prev_buttons = 0;
+        st.click_button = 0;
         st.excl.mouse_baseline = false;
         cursor::move_to(st, mx, my);
     }
     st.excl.held_buttons &= mi.buttons;
     let btn = mi.buttons & !st.excl.held_buttons;
-    /* 左右それぞれのエッジ (契約 D4 / W3 §4.2)。右は v1.1 では見ていなかった。 */
-    let down_edge = (btn & MOUSE_BTN_LEFT) != 0 && (st.prev_buttons & MOUSE_BTN_LEFT) == 0;
-    let up_edge = (btn & MOUSE_BTN_LEFT) == 0 && (st.prev_buttons & MOUSE_BTN_LEFT) != 0;
-    let rdown_edge = (btn & MOUSE_BTN_RIGHT) != 0 && (st.prev_buttons & MOUSE_BTN_RIGHT) == 0;
-    let rup_edge = (btn & MOUSE_BTN_RIGHT) == 0 && (st.prev_buttons & MOUSE_BTN_RIGHT) != 0;
+    // 全解放から始まる押下だけがクリックを開始する。同時押しは左を優先。
+    let click_button = if st.prev_buttons == 0 {
+        if btn & MOUSE_BTN_LEFT != 0 { MOUSE_BTN_LEFT } else { btn & MOUSE_BTN_RIGHT }
+    } else {
+        st.click_button & btn
+    };
+    let down_edge = click_button == MOUSE_BTN_LEFT && st.click_button == 0;
+    let up_edge = st.click_button == MOUSE_BTN_LEFT && click_button == 0;
+    let rdown_edge = click_button == MOUSE_BTN_RIGHT && st.click_button == 0;
+    let rup_edge = st.click_button == MOUSE_BTN_RIGHT && click_button == 0;
     /* アプリへ配る `buttons` は実マウスと合成ボタン (マウスキー) の和。 */
     let pbtn = btn | st.synth_buttons;
 
@@ -812,6 +819,7 @@ fn capture_mouse(st: &mut GuiState, ctx: Ctx, end_batch: bool) {
             if rup_edge {
                 edge_x3(st, mx, my, MOUSE_BTN_RIGHT, false);
             }
+            st.click_button = click_button;
             st.prev_buttons = btn;
         }
         return;
@@ -887,6 +895,7 @@ fn capture_mouse(st: &mut GuiState, ctx: Ctx, end_batch: bool) {
             forward_pointer(st, mx, my, pbtn);
         }
     }
+    st.click_button = click_button;
     st.prev_buttons = btn;
 }
 
