@@ -27,13 +27,14 @@ ROOT_ELF_FORMAT := elf32-powerpc
 ROOT_CPU := powerpc
 ROOT_MANIFEST ?= build/ppc-ram-root.json
 ROOT_DEPS ?= assets/fonts/shino16.kcgfont assets/fonts/JF-Dot-Shinonome16-LICENSE.txt build/out/unicode.bin $(KB_ROOT_SHELL)
+KB_ROOT_DIAG := $(if $(filter 1,$(FEATURE_KDEBUG)),$(KB_OUT)/kdebug.bin)
 # Acceptance builds use a private resident binary (including source mutants).
-ifneq ($(KB_SH_OUT),build/out/ppc-user/link-sh)
+ifneq ($(filter-out build/out/ppc-user/link-sh,$(KB_SH_OUT))$(KB_ROOT_DIAG),)
 KB_ROOT_TEMPLATE := $(ROOT_MANIFEST)
 override ROOT_MANIFEST := $(KB_OUT)/root-manifest.json
-$(ROOT_MANIFEST): $(KB_ROOT_TEMPLATE) $(KB_ROOT_SHELL) build/targets/ppc-powermac.mk
+$(ROOT_MANIFEST): $(KB_ROOT_TEMPLATE) $(KB_ROOT_SHELL) $(KB_ROOT_DIAG) $(KB_OUT)/root-shell.config build/targets/ppc-powermac.mk
 	@mkdir -p $(@D)
-	python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); d["/sys/shell.bin"]=sys.argv[2]; print(json.dumps(d))' "$<" "$(KB_ROOT_SHELL)" > $@.tmp
+	python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); d["/sys/shell.bin"]=sys.argv[2]; d.update({"/boot/kdebug.bin":sys.argv[3]} if sys.argv[3] else {}); print(json.dumps(d))' "$<" "$(KB_ROOT_SHELL)" "$(KB_ROOT_DIAG)" > $@.tmp
 	mv $@.tmp $@
 endif
 
@@ -58,7 +59,7 @@ $(ROOT_ISO): $(KB_ROOT_SHELL) $(KB_OUT)/root-shell.config
 .PHONY: force-root-shell-config
 $(KB_OUT)/root-shell.config: force-root-shell-config
 	@mkdir -p $(@D)
-	@printf '%s\n' '$(ROOT_MANIFEST) $(KB_ROOT_SHELL) $(ROOT_BINS)' > $@.tmp
+	@printf '%s\n' '$(ROOT_MANIFEST) $(KB_ROOT_SHELL) $(ROOT_BINS) $(KB_ROOT_DIAG)' > $@.tmp
 	@if cmp -s $@.tmp $@; then rm $@.tmp; else mv $@.tmp $@; fi
 
 # Entry objects first (kernel.ld keeps .text.entry at the image start).
@@ -92,7 +93,7 @@ KB_MACHINE := -mcpu=7450 -m32 -mbig-endian -msoft-float -mno-altivec -msdata=non
 KB_INC := $(if $(KB_EXEC),-I$(KB_GEN)/include -I$(KB_GEN)/sdk/include/os32) -I$(KB_OUT) -I. -Iinclude -Iarch/ppc -Iplatform/powermac -Isdk/include \
  -Isdk/include/os32 -Ikernel -Iinit -Ikernel/console -Ikernel/irq -Ikernel/time \
  -Imm -Ilib $(KB_INC_EXTRA)
-KB_FLAGS := -DPM_ROOT_FRAME=$(if $(KB_EXEC),1,0) -std=gnu11 $(KB_MACHINE) -fno-builtin -fno-asynchronous-unwind-tables \
+KB_FLAGS := -DPM_KDEBUG -DPM_LOAD_KDEBUG=$(FEATURE_KDEBUG) -DPM_ROOT_FRAME=$(if $(KB_EXEC),1,0) -std=gnu11 $(KB_MACHINE) -fno-builtin -fno-asynchronous-unwind-tables \
  -O2 -Wall -Wextra -Werror -Werror=vla -Werror=implicit-int \
  -Werror=implicit-function-declaration -ffunction-sections -fdata-sections \
  -D__cdecl= -D__KERNEL_BUILD__ $(HOOK_DEFS) -DOS32_FEATURE_IDE=$(FEATURE_IDE) -DOS32_FEATURE_LOOP=$(FEATURE_LOOP) -DOS32_FEATURE_USERSHELL=$(FEATURE_USERSHELL) -DKBOOT_NEGATIVE=$(NEGATIVE) -DKBOOT_SHELL=$(KBOOT_SHELL) -DKBOOT_SH=$(KBOOT_SH) -DKBOOT_LINK=$(KBOOT_LINK) -MMD -MP $(KB_INC)
@@ -173,7 +174,7 @@ $(KB_OUT)/config/source-date.flags: ppc-source-date-force
 	@printf '%s\n' '$(KB_CC) $(KB_FLAGS) SOURCE_DATE_EPOCH=$(SOURCE_DATE_EPOCH)' > $@.tmp
 	@if cmp -s $@.tmp $@; then rm -f $@.tmp; else mv $@.tmp $@; fi
 # The exec cleanup hook changes when SQLite is toggled in the same output tree.
-$(KB_OUT)/platform/powermac/ppc_kernel.o $(KB_OUT)/exec/exec.o $(KB_OUT)/kapi/kapi_sysinfo.o: $(KB_OUT)/config/source-date.flags
+$(KB_OUT)/platform/powermac/root_boot.o $(KB_OUT)/platform/powermac/ppc_kernel.o $(KB_OUT)/exec/exec.o $(KB_OUT)/kapi/kapi_sysinfo.o: $(KB_OUT)/config/source-date.flags
 endif
 
 # 共通の置き場のソースは、PowerPC の像にまだ入っていない物 (C_COMMON_PC98_PENDING) も PowerPC の
@@ -289,8 +290,20 @@ kernel-link:
 # The image is compiled only through the kernel target (its flags and output tree).
 kernel-compile:
 	@echo 'unsupported compile-only target ppc-powermac: use kernel' >&2; exit 1
-module modules sdk programs libs boot deploy deploy-kernel kernel-r1 sqlite-module-proto kdebug hwdev:
+module modules sdk programs libs boot deploy deploy-kernel kernel-r1 sqlite-module-proto hwdev:
 	@echo 'unsupported product target ppc-powermac: $@' >&2; exit 1
+.PHONY: kdebug
+kdebug: $(KB_OUT)/kdebug.bin
+
+$(KB_OUT)/diag.o: platform/powermac/module_diag.c
+	@mkdir -p $(@D)
+	$(KB_CC) $(KB_FLAGS) -Ikernel/module -c $< -o $@
+$(KB_OUT)/kdebug.elf: $(KB_OUT)/diag.o build/ppc-module.ld sdk/link/generations.ld
+	$(PPC_CROSS_DIR)/bin/powerpc-elf-ld --emit-relocs -e kdebug_init -T build/ppc-module.ld $< -o $@
+$(KB_OUT)/kdebug.bin: $(KB_OUT)/kdebug.elf platform/powermac/kdebug_imports.json tools/mkmod.py tools/ppc/module_rela.py tools/module_schema.py sdk/kapi.json sdk/include/os32/os32_generations.h
+	python3 -B tools/mkmod.py --target ppc-powermac --elf $< --metadata platform/powermac/kdebug_imports.json --kapi-abi-gen $(shell python3 -c 'import json; print(json.load(open("sdk/kapi.json"))["version"])') --layout-gen $(shell sed -n 's/^\#define OS32_MEMORY_LAYOUT_GENERATION \([0-9]*\).*/\1/p' sdk/include/os32/os32_generations.h) -o $@
+-include $(KB_OUT)/diag.d
+
 %-module deploy-%:
 	@echo 'unsupported product target ppc-powermac: $@' >&2; exit 1
 

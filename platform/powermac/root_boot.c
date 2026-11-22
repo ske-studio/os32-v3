@@ -1,4 +1,5 @@
 #include "root_boot.h"
+#include "kernel/module/module.h"
 #include "fs/vfs_device.h"
 #include "kernel/dev/dev_name.h"
 #include "lib/path.h"
@@ -34,6 +35,9 @@ int pm_root_boot(const struct boot_root_image *image, int *registered)
         dict_ready = vfs_mount("/db", "rd2", "ramfs") == 0;
         learning_enabled = vfs_mount("/dbu", "rd3", "ramfs") == 0;
     }
+#endif
+#if PM_LOAD_KDEBUG
+    if (!rc) kdebug_load();
 #endif
     return rc;
 }

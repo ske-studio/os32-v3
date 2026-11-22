@@ -47,6 +47,9 @@ def fixtures(work, cross):
         f'{{{mkmod.fnv1a(b"initialize")}u,1,0}};\nstatic const u8 probe_code[] = '
         '{' + ','.join(map(str, code)) + '};\n')
     manifest = json.loads((ROOT / 'build/ppc-ram-root.json').read_text())
+    config = work / 'system.cfg'
+    config.write_text('KDEBUG=1\n')
+    manifest['/etc/system.cfg'] = str(config)
     for src in ('kcg_import_stubs.S', 'kcg_import_slots.c'):
         run([*cc, work / src, '-o', work / (src + '.o')])
     for name, value in [('a', 11), ('b', 27)]:
@@ -120,13 +123,16 @@ def main():
         elf = build(work / case, 'IMAGE=kboot-link-sh', 'KB_SH_OUT=' + str(work / 'user'),
                     'KB_MUT_SRC=platform/powermac/ppc_kernel.c', 'KB_MUT_FILE=' + str(probe),
                     'KB_ROOT_TEMPLATE=' + str(manifest), *settings, 'kb-user', 'kernel')
+        cfg = subprocess.check_output(['isoinfo', '-i', elf.parent / 'root.iso',
+                                       '-x', '/ETC/SYSTEM.CFG;1'])
+        assert cfg == b'KDEBUG=1\n', 'paired guest must enable the product diagnostic loader'
         images.append(elf)
-    cases = [('normal', images[0], ['[module] result=0'])]
+    cases = [('normal', images[0], ['[module] diag state=1 list=0 unsupported=2', '[module] result=0'])]
     if args.mutate:
         pairs = [zlib.crc32(root_pair.wire(path.read_bytes())[0]) for path in images]
         cases.extend([('foreign', foreign_image(images[0], pairs[1]),
-                       ['[module] first rc=4 starts=0', '[module] result=4']),
-                      ('bypass', foreign_image(images[1], pairs[0]), ['[module] result=0'])])
+                       ['[module] diag state=4 list=-1 unsupported=-1', '[module] first rc=4 starts=0', '[module] result=4']),
+                      ('bypass', foreign_image(images[1], pairs[0]), ['[module] diag state=1 list=0 unsupported=2', '[module] result=0'])])
     digests = set()
     for case, elf, expected in cases:
         digest = hashlib.sha256(elf.read_bytes()).hexdigest()

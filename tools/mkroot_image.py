@@ -139,7 +139,10 @@ def main():
                     for guest, host in sorted(entries) if args.fixed_dates else entries:
                         target = guest.strip('/').upper()
                         check_collision(target, seen)
-                        dest = staging / target
+                        # Reuse MOTD mode's existing directories on a case-sensitive host.
+                        parts = Path(target).parts
+                        parent = staging / parts[0].lower()
+                        dest = parent.joinpath(*parts[1:]) if parent.is_dir() else staging / target
                         dest.parent.mkdir(parents=True, exist_ok=True)
                         shutil.copyfile(host, dest)
                 create(staging)

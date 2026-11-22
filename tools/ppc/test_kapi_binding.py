@@ -25,7 +25,7 @@ ide_get_info ide_identify ide_init ide_read_sector ide_write_sector
 ide_write_sectors ime_dict_info ime_dict_suspend ime_feed_key ime_get_mode
 ime_getchar ime_is_active ime_set_mode ime_set_render
 ime_switch_dict ime_toggle ime_trygetchar ime_trygetkey ime_user_clear
-ime_user_delete ime_user_export ime_user_list kdebug_call
+ime_user_delete ime_user_export ime_user_list
 np2_check_hostdrv np2_detect
 np2_get_clock np2_get_cpu np2_get_version
 pcm_close pcm_open pcm_set_volume pcm_status pcm_write
@@ -70,7 +70,7 @@ KCG_PROVIDERS = frozenset("platform_kcg_init platform_kcg_set_scale platform_kcg
 LOOP_PROVIDERS = frozenset({"platform_loop_dev_attach", "platform_loop_dev_detach", "platform_loop_dev_status"})
 
 ALLOWED_UNDEFINED = frozenset("""
-platform_pci_count platform_pci_get platform_pci_cfg_read32 kapi_pci_bind_info
+kdebug_call platform_pci_count platform_pci_get platform_pci_cfg_read32 kapi_pci_bind_info
 surface_api_bundle
 boot_image_info
 kapi_sys_ver_info

@@ -3,6 +3,8 @@
 #include "platform_module_pair.h"
 #include "arch_exec_cache.h"
 #include "probe_data.h"
+#include "kernel/module/module.h"
+#include "kdebug/probe_wire.h"
 
 static unsigned probe_starts;
 static int probe_value;
@@ -16,6 +18,14 @@ static int probe_start(struct module_record *record, u32 entry, u32 *exports)
 
 static int probe_modules(void)
 {
+    struct probe_wire wire = {.version = PROBE_VERSION, .size = sizeof(wire),
+                              .action = PROBE_CMD_LIST};
+    int list = kdebug_call(PROBE_OP, &wire, sizeof(wire)) ? -1 : wire.status;
+    wire.action = PROBE_CMD_ARM;
+    int unsupported = kdebug_call(PROBE_OP, &wire, sizeof(wire)) ? -1 : wire.status;
+    kprintf(KBOOT_ATTR, "[module] diag state=%u list=%d unsupported=%d\n",
+            kdebug.state, list, unsupported);
+
     u32 pfn;
     if (!pgalloc_alloc_n_owner(LEDGER_OWNER_BOOT, 1, MEM_POOL_BASE / PAGE_SIZE,
                                pgalloc_limit_pfn(), LEDGER_TOP_DOWN, &pfn)) return -1;
