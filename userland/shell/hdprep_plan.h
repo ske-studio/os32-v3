@@ -51,30 +51,7 @@
 #define HDPREP_E_ARG          (-12) /* NULL */
 #define HDPREP_E_NO_TOTAL     (-13) /* IDENTIFY の総数 (word 60-61) が 0 = 大きさが分からない */
 
-typedef struct {
-    int           ata_present;
-    int           addr_mode;       /* HDPREP_AMODE_* */
-    unsigned long ata_total;       /* IDENTIFY word 60-61 (0 = 申告なし → 断る) */
-    unsigned long ata_cur_cyl;     /* word 54-56 (現在の CHS。CHS_CUR の上限に使う) */
-    unsigned long ata_cur_heads;
-    unsigned long ata_cur_spt;
-    int           bios_queried;
-    int           bios_valid;      /* カーネルの規則 (CF=0・BX=512・CX/DH/DL≠0) */
-    unsigned long bios_cyl;        /* CX */
-    unsigned long bios_heads;      /* DH */
-    unsigned long bios_spt;        /* DL */
-    unsigned long bios_seclen;     /* BX */
-} HdprepGeom;
-
-typedef struct {
-    unsigned long heads, spt;      /* 区画表の CHS に使う BIOS 幾何 */
-    unsigned long cyl_sectors;     /* heads × spt */
-    unsigned long start;           /* 区画の開始 LBA (シリンダ境界) */
-    unsigned long len;             /* 区画の長さ (シリンダの倍数) */
-    unsigned long end_cyl;         /* 終了シリンダ (含む) */
-    unsigned long probe_lba;       /* 書き込みの探り = 区画の最終セクタ */
-    unsigned long disk_limit;      /* 置ける上限 (BIOS 幾何・IDENTIFY の総数・ATA の方式の上限の最小) */
-} HdprepPlan;
+#include "platform_install_layout.h"
 
 /* 幾何の条件 (ATA の有無・総数・BIOS 幾何・BX・I/O の方式)。 */
 int hdprep_check_geom(const HdprepGeom *g);
@@ -94,5 +71,7 @@ int hdprep_plan(const HdprepGeom *g, unsigned long mb, HdprepPlan *out);
 
 /* 判定の短い説明 (英語 1 行、画面に出す)。 */
 const char *hdprep_reason(int code);
+
+int inst_build_pt(unsigned char *sector, const HdprepPlan *plan);
 
 #endif /* HDPREP_PLAN_H */

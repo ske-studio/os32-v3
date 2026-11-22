@@ -29,6 +29,7 @@
 #include "rt/dbgserial.h"
 #include "rt/pkg.h"
 #include "inst_hdd.h"
+#include "include/platform_install_boot.h"
 
 #define CD_MOUNT "/cd0"
 #define HDD_MOUNT "/hd0"
@@ -48,10 +49,6 @@
 /* MINIMAL に無ければ HDD から起動できない物 (段 2-11 の必須の中身) */
 #define PKG_NEED_KERNEL  "/boot/vmkernel.lz4"
 #define PKG_NEED_SHELL   "/sys/shell.bin"
-/* BOOT.PKG の中の名前 (build/packages.yaml の boot:) */
-#define BOOT_IPL_NAME    "boot_hdd.bin"
-#define BOOT_LOADER_NAME "loader_hdd.bin"
-
 /* 色定数 */
 #define COL_TITLE  (0xE1 | 0x40)
 #define COL_NORMAL 0xE1
@@ -220,7 +217,7 @@ int __cdecl main(int argc, char **argv, KernelAPI *_api)
         return 1;
     }
     /* ローダ → IPL (BIOS 幾何) */
-    ret = inst_hdd_write_boot(api, &tgt, boot.ipl, boot.ipl_len,
+    ret = platform_install_write_boot(api, &tgt, boot.ipl, boot.ipl_len,
                               boot.loader, boot.loader_len);
     boot_img_free(&boot);
     if (ret != 0) return 1;

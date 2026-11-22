@@ -396,6 +396,7 @@ static void argv_case(int user, const char *command, const char *bytes,
     kmemset(argv_backing, 0xA5, sizeof(argv_backing));
     kmemset((void *)(MEM_SHELL_STACK_TOP - sizeof(argv_backing)), 0xA5, sizeof(argv_backing));
     launcher_space.pd_phys = 17;
+    slots[3].disk_write_authorized = 1; /* Exercise launches from an authorized parent. */
     slots[3].as = &launcher_space; slots[3].cpl3 = 1;
     slots[3].band_pdes = 1; slots[3].depth = 1;
     kapi = &api; exec_nest_level = x87_entry_depth ? x87_entry_depth : user; ring3_tramp_page = (u32)tramp;
@@ -471,6 +472,14 @@ static void argv_cases(void)
         kmemcpy(long_bytes, long_command, sizeof(long_bytes)); long_bytes[8] = 0;
         argv_case(user, long_command, long_bytes, sizeof(long_bytes), 2, -1, -1);
     }
+    /* The VFS serves identical bytes at each path. The loader must assign
+     * the child's permission from its own image even with an authorized parent. */
+    const char *paths[] = {"/sbin/install.bin", "/sbin/cdinst.bin", "/tmp/install.bin", "/tmp/cdinst.bin"};
+    for (unsigned i = 0; i < sizeof(paths) / sizeof(paths[0]); i++) {
+        argv_case(1, paths[i], paths[i], kstrlen(paths[i]) + 1, 1, -1, -1);
+        CHECK(slots[2].disk_write_authorized == (i < 2));
+        CHECK(slots[3].disk_write_authorized);
+    }
     /* Each character/NUL store, table store, then frame store must abort. */
     for (int at = 0; at < 14; at++)
         argv_case(1, "/fixture ab", "/fixture\0ab", 12, 2, -1, at);
@@ -480,7 +489,7 @@ static void argv_cases(void)
     for (x87_entry_depth = 1; x87_entry_depth <= 2; x87_entry_depth++)
         argv_case(1, "/fixture", "/fixture", 9, 1, -1, -1);
     x87_entry_depth = 0;
-    say("PASS exec argv: 45 launches, quoting/escape/limits/pages, read/store errors, frame and abort\n");
+    say("PASS exec argv: quoting/escape/limits/pages, read/store errors, frame and abort\n");
 }
 static void image_range_tests(void)
 {

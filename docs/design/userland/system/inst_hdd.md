@@ -1,6 +1,12 @@
 # userland/system/inst_hdd.c — 設計
 > 状態: **現行 (2026-11-18)** — 出所: TASK_HDD_INSTALL 段 2 (9〜11・明示の消去 `ERASE`、§1-v3 N4〜N6・R3-1) の契約を今のソースと照らして要約
-ソース: `userland/system/inst_hdd.c`・`userland/system/inst_hdd.h` (`inst_hdd_check`・`inst_hdd_check_media`・`inst_hdd_describe`・`inst_hdd_ask_erase`・`inst_hdd_release`・`inst_hdd_prepare`・`inst_hdd_write_boot`・`inst_hdd_incomplete`・`inst_hdd_getkey`・`inst_hdd_getkey_after_key`)・呼び手 `userland/system/cdinst.c`・`userland/system/install.c`
+ソース: `userland/system/inst_hdd.c`・`userland/system/inst_hdd.h` (`inst_hdd_check`・`inst_hdd_check_media`・`inst_hdd_describe`・`inst_hdd_ask_erase`・`inst_hdd_release`・`inst_hdd_prepare`・`platform_install_write_boot`・`inst_hdd_incomplete`・`inst_hdd_getkey`・`inst_hdd_getkey_after_key`)・呼び手 `userland/system/cdinst.c`・`userland/system/install.c`
+
+機種の口は `include/platform_install_boot.h`、計画の型は各機種の `platform_install_layout.h`。
+PC-98 の `platform_install_target` は hdprep と同じ CHS 計画を作り、`inst_hdd_prepare` はその drive・start・len を整形に渡す。
+`platform_install_partition` が表を書いて検読し、通常マウント後に `platform_install_write_boot` がローダと IPL を順に書く。
+PC-98 の実装は `platform/pc98/install_target.c`。PowerMac は機種側の実装が揃う段で常駐シェルへ登録する。
+
 
 cdinst (CD) と install (FD) が共有する、KAPI で hd0 (= DA 80h だけ、HDD の自動検出はしない) を検査して書く手順。
 純粋な判定は `userland/system/inst_disk.c` と `userland/shell/hdprep_plan.c`。

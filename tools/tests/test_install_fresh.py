@@ -11,7 +11,7 @@
 `--target` は i386-elf-gcc で install.c を単体コンパイル ([C1] GNU11 / -Werror)。
 """
 CHECK = dict(name='install-fresh-host', tier=1,
-    covers=['fs/pc98pt.c', 'fs/ext2/ext2_layout.c', 'tools/tests/install_fresh_host.c', 'userland/shell/hdprep_plan.c', 'userland/system/inst_disk.c', 'userland/system/inst_hdd.c', 'userland/system/install.c'],
+    covers=['platform/pc98/platform_install_layout.h', 'include/platform_install_boot.h', 'platform/pc98/install_geometry.h', 'include/ide_contract.h', 'fs/pc98pt.c', 'fs/ext2/ext2_layout.c', 'tools/tests/install_fresh_host.c', 'userland/shell/hdprep_plan.c', 'platform/pc98/install_plan.c', 'userland/system/inst_disk.c', 'platform/pc98/install_disk.c', 'userland/system/inst_hdd.c', 'platform/pc98/install_target.c', 'userland/system/install.c'],
     needs=[], budget=5.9,
     kind='characterization',
 )
@@ -47,11 +47,11 @@ CASES = [
 ]
 
 INC = ["-I" + str(ROOT / p) for p in
-       ("include", "sdk/include", "sdk/include/os32", "userland/lib")] + ["-I" + str(ROOT)]
+       ("platform/pc98", "include", "sdk/include", "sdk/include/os32", "userland/lib")] + ["-I" + str(ROOT)]
 # 段 2: install.c が繋ぐ共有部 (build/programs.mk の INST_OBJ と同じ顔ぶれ)。
 # 写さずに実物を別の翻訳単位として組む。
-SHARED = ["userland/system/inst_hdd.c", "userland/system/inst_disk.c",
-          "userland/shell/hdprep_plan.c", "fs/pc98pt.c", "fs/ext2/ext2_layout.c"]
+SHARED = ["userland/system/inst_hdd.c", "platform/pc98/install_target.c", "userland/system/inst_disk.c", "platform/pc98/install_disk.c",
+          "userland/shell/hdprep_plan.c", "platform/pc98/install_plan.c", "fs/pc98pt.c", "fs/ext2/ext2_layout.c"]
 
 
 def build(tmp, sanitize, extra=(), root=ROOT):
@@ -77,7 +77,7 @@ TARGET_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
                 "-mno-red-zone", "-fcommon", "-O2", "-Wall", "-Wextra",
                 "-Werror", "-Wno-unused-function",
                 "-D__OS32_USERLAND__",
-                "-I.", "-Iinclude", "-Isdk/include", "-Isdk/include/os32",
+                "-Iplatform/pc98", "-I.", "-Iinclude", "-Isdk/include", "-Isdk/include/os32",
                 "-Iuserland/lib", "-I/usr/local/cross/i386-elf/include"]
 
 # ホストは LP64 (u32 = unsigned long = 8 B) なので 96 / 92 という数そのものは
@@ -85,6 +85,7 @@ TARGET_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
 LAYOUT_ASSERT = """#define main install_main
 #include "userland/system/install.c"
 #undef main
+#include "include/ide_contract.h"
 typedef char ide_info_is_96[(sizeof(IdeInfo) == 96) ? 1 : -1];
 typedef char ide_info_tail_at_92[
     (__builtin_offsetof(IdeInfo, phys_sector_size) == 92) ? 1 : -1];

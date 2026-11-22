@@ -1256,8 +1256,11 @@ static int __cdecl f_vfs_sync(void) { return vfs_sync(); }
  * ext2_layout.c は hdd_pt_fake.h が取り込み済み。ここの段は install_packages と
  * report_missing_packages だけを回す (hd0 の手順の試験は test_hdd_stage2.py) */
 #include "../system/inst_hdd.c"
+#include "platform/pc98/install_target.c"
 #include "../system/inst_disk.c"
+#include "platform/pc98/install_disk.c"
 #include "userland/shell/hdprep_plan.c"   /* -I のリポジトリ根から */
+#include "platform/pc98/install_plan.c"
 
 static void cdinst_setup(const char *set)
 {

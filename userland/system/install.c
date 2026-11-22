@@ -35,7 +35,7 @@
 #include "os32api.h"
 #include "inst_hdd.h"
 
-#define IDE_DRIVE INST_DRIVE
+#include "include/platform_install_boot.h"
 
 /* IOバッファ (ヒープから確保する) */
 static u8 *file_buf;
@@ -53,30 +53,10 @@ typedef struct {
 /* 媒体側の名前 (FDD)。FAT の 8.3 名は大文字で返るので、開くときは媒体の
  * 名前のまま、HDD へ作るときは小文字に正規化する。 */
 #define SRC_KERNEL_LZ4  "/VMKRNL.LZ4"
-#define SRC_BOOT_HDD    "/sys/boot_hdd.bin"
-#define SRC_LOADER_H    "/sys/loader_h.bin"
 #define SRC_SHELL       "/sys/shell.bin"    /* HDD 起動の常駐シェル (cdinst の MINIMAL と同じ必須) */
 #define DST_SHELL       "/hd0/sys/shell.bin"
 #define DST_BOOT_DIR    "/hd0/boot"
 #define DST_KERNEL_LZ4  "/hd0/boot/vmkernel.lz4"
-
-/* I2-1: drivers/ata/ide.h の IdeInfo と**同じ並び** (i386 で 96 B) でなければ
- * ならない。ide_identify はカーネル側の定義で書くので、ここが 92 B のままだと
- * 末尾 phys_sector_size の 2 バイトが呼び手の領域を踏む。drivers/ata/ide.h は
- * カーネル内部ヘッダで外部プログラムからは引けないため写しを置く —
- * ide.h を変えたら必ず一緒に直すこと (userland/shell/cmd_sys.c も同じ写し)。 */
-typedef struct {
-    u32 total_sectors;
-    u16 cylinders;
-    u16 heads;
-    u16 sectors;
-    u32 size_mb;
-    char model[41];
-    char serial[21];
-    char firmware[9];
-    int lba_supported;
-    u16 phys_sector_size;   /* 物理セクタサイズ (SASI=256, IDE=512) */
-} IdeInfo;
 
 static KernelAPI *g_api;
 
@@ -512,7 +492,6 @@ static int read_exact(const char *src, u32 want)
 
 int __cdecl main(int argc, char **argv, KernelAPI *api)
 {
-    static IdeInfo info;
     static RecoverOps rops;
     static InstTarget tgt;
     static InstNeed need;
@@ -547,22 +526,7 @@ int __cdecl main(int argc, char **argv, KernelAPI *api)
         return 1;
     }
 
-    /* IDEの初期化とディスク情報の取得 (表示用。判定は hdd_geom_info) */
-    api->kprintf(KLOG_ATTR, "%s", "Initializing IDE controller...\n");
-    api->ide_init();
-
-    if (!api->ide_drive_present(IDE_DRIVE)) {
-        api->kprintf(0x4F, "%s", "Error: IDE Master Drive (hd0) not found.\n");
-        goto end;
-    }
-
-    if ((ret = api->ide_identify(IDE_DRIVE, &info)) != 0) {
-        api->kprintf(0x4F, "%s", "Error: Could not identify drive.\n");
-        goto end;
-    }
-
-    api->kprintf(ATTR_WHITE, "Target Drive Found: %s\n", info.model);
-    api->kprintf(ATTR_WHITE, "Size: %u MB (%u sectors)\n", info.size_mb, info.total_sectors);
+    if (platform_install_identify(api) != 0) goto end;
 
     /* === Phase 0: 全検査 (承認前 = まだ何も書いていない) ===
      * 媒体の中身 → FD の列挙 → hd0 (幾何・区画表のモード・マウント。表が
@@ -615,7 +579,7 @@ int __cdecl main(int argc, char **argv, KernelAPI *api)
         inst_hdd_incomplete(api, "cannot read /sys/loader_h.bin", -1);
         goto end;
     }
-    if (inst_hdd_write_boot(api, &tgt, ipl_buf, sizes[MEDIA_IPL],
+    if (platform_install_write_boot(api, &tgt, ipl_buf, sizes[MEDIA_IPL],
                             file_buf, sizes[MEDIA_LOADER]) != 0)
         goto end;
 

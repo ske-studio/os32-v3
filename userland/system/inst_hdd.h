@@ -68,8 +68,6 @@
 #define INST_MOUNT        "/hd0"
 
 typedef struct {
-    HddGeom    hg;
-    HdprepGeom g;
     HdprepPlan plan;
     int        mode;          /* INST_MODE_* (erase_needed なら INST_MODE_EMPTY) */
     int        mounts;        /* 検査の時点の dev_mount_count(0) */
@@ -104,9 +102,6 @@ int  inst_hdd_ask_erase(KernelAPI *api, const InstTarget *t);
 int  inst_hdd_release(KernelAPI *api, InstTarget *t);
 /* ext2_format_at → 区画表 → 読み戻し → マウント。失敗は INCOMPLETE */
 int  inst_hdd_prepare(KernelAPI *api, const InstTarget *t);
-int  inst_hdd_write_boot(KernelAPI *api, const InstTarget *t,
-                         const u8 *ipl, u32 ipl_len,
-                         const u8 *loader, u32 loader_len);
 /* 書いた後の失敗の表示 (展開・sync の失敗にも呼び手が使う) */
 void inst_hdd_incomplete(KernelAPI *api, const char *what, int rc);
 
