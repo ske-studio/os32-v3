@@ -118,3 +118,6 @@ ifeq ($(MAKECMDGOALS),)
 $(error 非搭載サービス未実装: use kernel-compile for feature-off configurations)
 endif
 endif
+
+# Compile the PC-98 USB module shell until the module target lands in 1E(g).
+all: $(KERNEL_OBJ_PREFIX)platform/pc98/usb_platform.o
