@@ -31,6 +31,14 @@ u32 ppc_irq_save(void) { return 0; }
 void ppc_irq_restore(u32 flags) { (void)flags; }
 int pm_input_usb_take(void) { return -1; }
 int pm_input_usb_peek(void) { return -1; }
+volatile int kbd_gui_mode;
+int kbd_inject_peek(u8 *out) { (void)out; return 0; }
+int kbd_inject_take(u8 *out) { (void)out; return 0; }
+void kbd_set_gui_mode(int on) { kbd_gui_mode = on; }
+void kbd_discard_stop(void) {}
+int legacy_raw_take(void) { return -1; }
+int input_key_pressed(u8 sc) { (void)sc; return 0; }
+u8 input_key_mods(void) { return 0; }
 u32 pm_input_usb_dropped(void) { return 0; }
 volatile u32 tick_count;
 static u32 clock_us, clock_step;

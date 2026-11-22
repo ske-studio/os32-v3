@@ -95,7 +95,7 @@ void usbp_input_key_repeat(u8 src, u8 sc) {
 
 | scan→キー | 初版の変換仕様 |
 |---|---|
-| 英字 | HID map の26英字を明示表化。小文字を基底に Shift XOR Caps で大文字。Ctrl+英字は1..26、Ctrl-C は現 LAN と同じ ESC |
+| 英字 | HID map の26英字を明示表化。小文字を基底に Shift XOR Caps で大文字。Ctrl+英字は1..26、USB Ctrl-C は PC-98 と同じ cooked 値 0x2b03 |
 | 数字・記号 | 既決 JIS 109 配列。0x01..0x0a=`1234567890`、Shift=`!"#$%&'()` と0キーは出力なし。Caps は記号に影響しない |
 | 記号の残り | 0x0b/0x0c/0x0d は `-^\`→`=~|`、0x1a/0x1b は `@[`→`` `{ ``、0x26/0x27/0x28 は `;:]`→`+*}` |
 | 下段 | 0x30/0x31/0x32/0x33 は `,./\`→`<>?_`。GRPH の状態は保持するが文字選択には使わない |
@@ -153,7 +153,7 @@ void usbp_input_key_repeat(u8 src, u8 sc) {
 | USB 単独で製品 sh | 7450/7455、mac99、-nic none、usb-kbd、KBOOT_SH=1。起動待ち／input の置換なし。QMP send-key で e,c,h,o,spc,h,i,ret を順送し、最初の e が消えないこと、stream の出力行 `hi` と次の `sh> ` | callback 転送削除。scan ログだけ成功しても本受入は失敗 |
 | Shift・Caps | `echo Hi!` を実行、同 report の Shift+A、Caps+A、Caps+Shift+A、Caps+数字を host でも確認 | Shift XOR Caps を Shift のみに、記号面の選択を反転 |
 | 繰り返し | host の仮想時刻と既存 HID 試験で500/30ms、QMP 長押しで複数字・離した後に増えないことを確認 | repeat enqueue を削除／down 判定を削除 |
-| 操作キー | BS で修正した echo、Ctrl-C の行取消、上下履歴、LEFT/RIGHT/HOME/DEL による行編集後の実行結果、USB Enter の CR。peek/try/char の混用で二重消費なし | BS写像変更、特殊キーの各写像削除、Ctrl-C取消削除、peekの消費化 |
+| 操作キー | BS で修正した echo、Ctrl-C 後も入力行を保持して Enter で実行、上下履歴、LEFT/RIGHT/HOME/DEL による行編集後の実行結果、USB Enter の CR。peek/try/char の混用で二重消費なし | BS写像変更、特殊キーの各写像削除、Ctrl-C の ESC 化、peekの消費化 |
 | 複数 src | host で左右Shift統合後のイベント、別srcのShift保持、一方抜去、src再利用。QEMUでも押下中に device_del→再接続 | release の down 消去削除／他srcまで消去 |
 | LAN 併存 | 実 LAN 接続でUSBから echo、USB抜去後LANから echo alive→`alive`。USBなしLANのみで OPEN 前は未起動・OPEN 後の案内と最初のプロンプト、後付けUSB、USB行編集中のLAN取消も確認 | provider の USB 選択削除／LAN 選択削除／起動待ちの無条件解除／非空照会でのキー消費 |
 | 公平性・溢れ | host でLAN連続bytes＋USB、ESC未完＋USB、128件満杯後break/release、drop数・修飾解除・FIFO順を確認 | 満杯で状態更新前return／常時LAN優先 |
