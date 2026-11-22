@@ -16,10 +16,15 @@ int platform_hdprep_partition(KernelAPI *api, const HdprepPlan *plan);
 int platform_install_target(KernelAPI *api, InstTarget *target);
 int platform_install_partition(KernelAPI *api, const InstTarget *target);
 
-int platform_install_check_media(KernelAPI *api, u32 ipl_len, u32 loader_len, u32 kernel_len);
+int platform_install_check_media(KernelAPI *api, const u32 *sizes, u32 kernel_len);
 int platform_install_identify(KernelAPI *api);
-int platform_install_write_boot(KernelAPI *api, const InstTarget *t,
-                                const u8 *ipl, u32 ipl_len,
-                                const u8 *loader, u32 loader_len);
+/* The machine lists required assets in matching directory/package order and
+ * chooses deployment before copying or after destination verification. */
+extern const char *const platform_boot_paths[PLATFORM_BOOT_COUNT];
+extern const char *const platform_boot_entries[PLATFORM_BOOT_COUNT];
+int platform_install_directory_boot(KernelAPI *api, const InstTarget *target,
+                                    const u32 *sizes, u8 *scratch, int capacity);
+int platform_install_package_boot(KernelAPI *api, const InstTarget *target,
+                                  const u8 *const *assets, const u32 *sizes);
 
 #endif

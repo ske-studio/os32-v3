@@ -89,7 +89,7 @@ int  inst_hdd_getkey_after_key(KernelAPI *api);
 
 int  inst_hdd_check(KernelAPI *api, InstTarget *t);
 int  inst_hdd_check_media(KernelAPI *api, const InstTarget *t,
-                          u32 ipl_len, u32 loader_len, u32 kernel_len,
+                          const u32 *asset_sizes, u32 kernel_len,
                           const InstNeed *need);
 void inst_hdd_describe(KernelAPI *api, const InstTarget *t);
 /* y の後: erase_needed なら ERASE の打鍵を求める。0 = 受けた (か不要)。

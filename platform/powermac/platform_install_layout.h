@@ -14,8 +14,7 @@ typedef struct {
     unsigned long len;
 } HdprepPlan;
 
-/* Media names are supplied with the PowerMac installer. */
-extern const char SRC_BOOT_HDD[], SRC_LOADER_H[];
-extern const char BOOT_IPL_NAME[], BOOT_LOADER_NAME[];
+#define PLATFORM_BOOT_COUNT 1
+#define PLATFORM_BOOT_AFTER_FILES 1
 
 #endif

@@ -216,15 +216,25 @@ int platform_install_target(KernelAPI *api, InstTarget *t)
     HdprepGeom geometry;
     int rc;
 
+    t->plan.drive = INST_DRIVE;
+    /* Zero sectors queries authorization without touching the device. Refuse
+     * before umount/sync, ERASE, formatting or any installer file writes. */
+    if (api->ide_write_sectors(t->plan.drive, 0, 0, NULL) != 0) {
+        api->kprintf(ATTR_RED, "%s",
+                     "Disk write not authorized. Nothing was written.\n"
+                     "CUI の前景で /sbin の install または cdinst として起動してください。\n");
+        return -1;
+    }
+
     ih_erased = 0;
     ih_pt_written = 0;
-    rc = api->hdd_geom_info(INST_DRIVE, &hg);
+    rc = api->hdd_geom_info(t->plan.drive, &hg);
     if (rc != 0) {
         api->kprintf(ATTR_RED, "  hdd_geom_info(hd0) = %d\n", rc);
         target_refuse(api, INST_E_GEOM);
         return INST_E_GEOM;
     }
-    platform_install_geometry(&hg, &geometry);
+    platform_install_geometry(t->plan.drive, &hg, &geometry);
     api->kprintf(ATTR_WHITE,
                  "  hd0 BIOS (AH=84h): valid=%d C/H/S=%u/%u/%u len=%u\n",
                  (int)hg.bios_valid, (u32)hg.bios_cyl, (u32)hg.bios_heads,
@@ -271,8 +281,9 @@ int platform_install_target(KernelAPI *api, InstTarget *t)
     return 0;
 }
 
-int platform_install_check_media(KernelAPI *api, u32 ipl_len, u32 loader_len, u32 kernel_len)
+int platform_install_check_media(KernelAPI *api, const u32 *sizes, u32 kernel_len)
 {
+    u32 ipl_len = sizes[0], loader_len = sizes[1];
     int rc = inst_check_boot_files(ipl_len, loader_len, kernel_len);
     if (rc != 0) {
         api->kprintf(ATTR_WHITE, "  sizes: IPL %u, loader %u, vmkernel.lz4 %u bytes\n",
@@ -372,7 +383,7 @@ int platform_install_partition(KernelAPI *api, const InstTarget *t)
     return 0;
 }
 
-int platform_install_write_boot(KernelAPI *api, const InstTarget *t,
+static int write_boot(KernelAPI *api, const InstTarget *t,
                         const u8 *ipl, u32 ipl_len,
                         const u8 *loader, u32 loader_len)
 {
@@ -408,4 +419,38 @@ int platform_install_write_boot(KernelAPI *api, const InstTarget *t,
     api->kprintf(ATTR_GREEN, "  IPL (geometry %u/%u) and loader (%u bytes) written and verified.\n",
                  t->plan.heads, t->plan.spt, loader_len);
     return 0;
+}
+
+const char *const platform_boot_paths[] = {SRC_BOOT_HDD, SRC_LOADER_H};
+const char *const platform_boot_entries[] = {BOOT_IPL_NAME, BOOT_LOADER_NAME};
+
+int platform_install_package_boot(KernelAPI *api, const InstTarget *t,
+                                  const u8 *const *assets, const u32 *sizes)
+{
+    return write_boot(api, t, assets[0], sizes[0], assets[1], sizes[1]);
+}
+
+int platform_install_directory_boot(KernelAPI *api, const InstTarget *t,
+                                    const u32 *sizes, u8 *scratch, int capacity)
+{
+    u8 ipl[INST_IPL_MAX];
+    api->kprintf(ATTR_YELLOW, "%s", "\n[2/3] Writing Boot Sectors...\n");
+    for (int i = 0; i < PLATFORM_BOOT_COUNT; i++) {
+        int fd = api->sys_open(platform_boot_paths[i], KAPI_O_RDONLY);
+        int len = -1;
+        if (fd >= 0) {
+            len = api->sys_read(fd, scratch, capacity);
+            api->sys_close(fd);
+        }
+        if (len < 0 || (u32)len != sizes[i]) {
+            inst_hdd_incomplete(api, i == 0 ? "cannot read /sys/boot_hdd.bin" :
+                                              "cannot read /sys/loader_h.bin", -1);
+            return -1;
+        }
+        if (i == 0) {
+            if (sizes[i] > sizeof(ipl)) return INST_E_ARG;
+            for (u32 n = 0; n < sizes[i]; n++) ipl[n] = scratch[n];
+        }
+    }
+    return write_boot(api, t, ipl, sizes[0], scratch, sizes[1]);
 }

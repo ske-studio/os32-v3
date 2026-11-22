@@ -49,4 +49,7 @@ typedef struct {
 #define SRC_BOOT_HDD    "/sys/boot_hdd.bin"
 #define SRC_LOADER_H    "/sys/loader_h.bin"
 
+#define PLATFORM_BOOT_COUNT 2
+#define PLATFORM_BOOT_AFTER_FILES 0
+
 #endif

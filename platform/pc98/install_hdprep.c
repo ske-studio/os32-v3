@@ -63,7 +63,7 @@ int platform_hdprep_check(KernelAPI *api, HdprepGeom *geometry)
         platform_hdprep_refuse(api, HDPREP_E_ARG);
         return -1;
     }
-    platform_install_geometry(&hg, geometry);
+    platform_install_geometry(HDPREP_DRIVE, &hg, geometry);
 
     api->kprintf(ATTR_CYAN, "%s", "hdprep: target hd0 (IDE drive 0 = BIOS DA 80h)\n");
     api->kprintf(ATTR_WHITE,

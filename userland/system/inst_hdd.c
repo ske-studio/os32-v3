@@ -168,28 +168,19 @@ int inst_hdd_check(KernelAPI *api, InstTarget *t)
     t->erase_code = 0;
     t->umount_hd0 = 0;
 
-    /* Zero sectors queries authorization without touching the device. Refuse
-     * before umount/sync, ERASE, formatting or any installer file writes. */
-    if (api->ide_write_sectors(INST_DRIVE, 0, 0, NULL) != 0) {
-        api->kprintf(ATTR_RED, "%s",
-                     "Disk write not authorized. Nothing was written.\n"
-                     "CUI の前景で /sbin の install または cdinst として起動してください。\n");
-        return -1;
-    }
-
     int rc = platform_install_target(api, t);
     if (rc != 0) return rc;
     return ih_check_mounts(api, t);
 }
 
 int inst_hdd_check_media(KernelAPI *api, const InstTarget *t,
-                         u32 ipl_len, u32 loader_len, u32 kernel_len,
+                         const u32 *asset_sizes, u32 kernel_len,
                          const InstNeed *need)
 {
     InstRoom room;
     int rc;
 
-    rc = platform_install_check_media(api, ipl_len, loader_len, kernel_len);
+    rc = platform_install_check_media(api, asset_sizes, kernel_len);
     if (rc != 0) return rc;
     rc = inst_check_space(t->plan.len, need, &room);   /* 失敗でも room は埋まる */
     api->kprintf(ATTR_WHITE,

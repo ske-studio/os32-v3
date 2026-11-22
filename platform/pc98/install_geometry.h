@@ -3,9 +3,9 @@
 
 #include "include/platform_install_boot.h"
 
-static inline void platform_install_geometry(const HddGeom *hg, HdprepGeom *g)
+static inline void platform_install_geometry(int drive, const HddGeom *hg, HdprepGeom *g)
 {
-    g->drive = HDPREP_DRIVE;
+    g->drive = drive;
     g->ata_present   = hg->ata_present;
     g->addr_mode     = hg->addr_mode;
     g->ata_total     = hg->ata_total;
