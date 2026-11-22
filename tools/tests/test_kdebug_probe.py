@@ -1,6 +1,6 @@
 """KDBG stage B: real capture engine and aperture with fake IO/broker."""
 CHECK = dict(name='probe-host', tier=1, covers=[
-    'kdebug/probe.c', 'kdebug/probe_index.c', 'kdebug/probe_wire.h',
+    'kdebug/probe.c', 'kdebug/probe_index.c', 'kdebug/probe_wire.h', 'kdebug/probe_validate.h',
     'kdebug/hwb_access.c', 'kdebug/hwb_wire.h', 'kdebug/kdebug_window.c',
     'kdebug/kdebug_window.h', 'kdebug/recover.h', 'kdebug/generated/**',
     'include/debug_probe.h', 'kernel/module/module_runtime.h',

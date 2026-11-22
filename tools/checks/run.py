@@ -387,6 +387,8 @@ def compiler_headers(root, sources, inc_dirs):
     return frozenset(found)
 
 PATH_AUDIT_ALLOW = {
+    ("check-ppc-module-guest", "tools/gen_kdebug_imports.py"):
+        "only import signatures and hashes are used; check_nm is an independent PC-98 audit",
     ("check-ppc-kboot-link", "tools/ppc/link_run.py"):
         "recorded fixture predicates only; accept/main never read repository images",
     ("check-ppc-kboot-link", "tools/ppc/run.py"):

@@ -147,7 +147,8 @@ def build(exe):
     aliases = [e['symbol'] for e in [e for e in gen.slots() if e['group'] == 'kernel']
                if e['symbol'] not in ('kprintf', 'kmemset', 'pgalloc_alloc_phys', 'pgalloc_free_n_owner',
                                       'gf_production_selected')]
-    return ['gcc', *FLAGS, *INCLUDES, '-nostdlib', '-static', '-no-pie',
+    builtin = subprocess.check_output(['gcc', '-print-file-name=include'], text=True).strip()
+    return ['gcc', *FLAGS, *INCLUDES, '-nostdinc', '-isystem', builtin, '-nostdlib', '-static', '-no-pie',
             str(ROOT / 'tools/tests/hwdev_module_host.c'), str(ROOT / 'kernel/module/module_runtime.c'),
             str(ROOT / 'kernel/module/module_image.c'),
             *['-Wl,--defsym,' + name + '=fixture_kernel' for name in aliases], '-o', str(exe)]
@@ -170,12 +171,15 @@ def main():
         subprocess.run(build(exe), check=True)
         run(exe, cases)
         if '--mutate' in sys.argv:
-            source = (ROOT / 'hwdev/hwdev_module.c').read_text()
-            for name, old, new in MUTATIONS:
+            mutations = [('hwdev/hwdev_module.c', *mutation) for mutation in MUTATIONS]
+            mutations.append(('platform/powermac/module_diag.c', 'ppc-unsupported-action',
+                              'w->status = PROBE_NOSYS;', 'w->status = PROBE_OK;'))
+            for path, name, old, new in mutations:
+                source = (ROOT / path).read_text()
                 assert source.count(old) == 1, name
                 with tempfile.TemporaryDirectory(prefix='hwdev-mut-') as mt:
                     mexe = Path(mt) / 'host'
-                    mutpar.build_in_tree(ROOT, mt, {'hwdev/hwdev_module.c': source.replace(old, new)},
+                    mutpar.build_in_tree(ROOT, mt, {path: source.replace(old, new)},
                                          [build(mexe)], capture_output=True)
                     try:
                         run(mexe, cases)

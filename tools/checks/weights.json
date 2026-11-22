@@ -611,6 +611,7 @@
     "ppc-shell-layout-guest": 65.390447,
     "ppc-shm-guest": 78.772222,
     "ppc-sqlite-stack-guest": 13.762618,
+    "ppc-module-guest": 120,
     "ppc-sqlite-static-guest": 79.123384,
     "ppc-surface-guest": 166.501603,
     "ppc-sysinfo-guest": 100.161341,

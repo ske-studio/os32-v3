@@ -1,6 +1,7 @@
 """PowerMac two-LOAD verification record and pair."""
 CHECK = dict(name='ppc-root-pair-host', tier=2, budget=30, needs=[], env=['ppc-cross'],
              covers=['tools/checks/ppc_registered.py', 'tools/ppc/test_root_pair.py', 'tools/ppc/root_pair.py',
+                     'arch/ppc/kernel_entry.S', 'arch/ppc/kernel.ld', 'build/targets/ppc-powermac.mk',
                      'build/ppc-root-pair.mk', 'tools/tests/ppc_root_image_host.c',
                      'platform/powermac/root_image.c', 'platform/powermac/root_boot.h',
                      'mm/pgalloc.h', 'lib/crc32.[ch]', 'lib/lz4*', 'tools/ppc/pair_fixture/*', 'tools/ppc/root_lz4_layout.py',

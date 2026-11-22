@@ -174,10 +174,14 @@ ifneq ($(words $(filter 0 1,$(FEATURE_KDEBUG))),1)
 $(error invalid FEATURE_KDEBUG)
 endif
 ifeq ($(FEATURE_KDEBUG),1)
-ifneq ($(ARCH)-$(PLATFORM),x86-pc98)
-$(error unsupported FEATURE_KDEBUG on $(ARCH)-$(PLATFORM))
+ifeq ($(ARCH)-$(PLATFORM),ppc-powermac)
+ifneq ($(FEATURE_EXEC),1)
+$(error FEATURE_KDEBUG requires FEATURE_EXEC)
 endif
+C_FEATURES += kdebug/kdebug_module.c kernel/module/debug_probe.c
+else
 include build/features/kdebug.mk
+endif
 endif
 ifeq ($(FEATURE_V86),1)
 ifneq ($(FEATURE_PC98_DEVICES),1)
