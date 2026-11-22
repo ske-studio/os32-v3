@@ -233,19 +233,17 @@ static int module_boot(void)
     remaining_us += 2;
     periodic();
     if (services != 2) return 34;
+    if (lines) return 39;
     if (no_idle) {
-        if (lines != 1 || first_logs != 1) return 39;
         periodic();
-        if (lines != 2 || event_logs != 1) return 39;
-        periodic();
-        if (lines != 3 || event_logs != 2) return 39;
+        if (lines || idle_log) return 39;
     } else {
-        if (lines || !idle_log) return 39;
+        if (!idle_log) return 39;
         idle_log();
         if (lines != 1 || first_logs != 1) return 39;
-        pc98_usb_flush_boot_log();
-        if (lines != 3 || event_logs != 2) return 39;
     }
+    pc98_usb_flush_boot_log();
+    if (lines != 3 || event_logs != 2) return 39;
     periodic();
     if (lines != 3 || first_logs != 1 || bad) return 39;
     module_hc->isr_pending = 2;
