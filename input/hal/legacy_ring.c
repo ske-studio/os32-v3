@@ -50,7 +50,7 @@ u32 legacy_cooked_dropped(void) { return kbd_dropped; }
 /* 生 make/break イベントリング (レビュー ⑥、GUI の Key down/up 用)。
  * cooked なリング (make のみ、ASCII 化) と別に、全キーの押下/離しを
  * 順序どおり積む。WM (gshell) が kbd_trygetrawkey() で読み、down=1/0 の
- * Key イベントを作る。エントリ = keycode | (down << 8)。満杯なら捨て、
+ * Key イベントを作る。満杯時は WM の操作を優先し、
  * 捨てた数は kbd_raw_dropped に数える (kbd_dropped_count は cooked と合算)。 */
 static volatile u16 kbd_raw_buf[KBD_BUF_SIZE];
 static volatile int kbd_raw_head = 0;
@@ -65,37 +65,146 @@ static int keep_raw(int sc)
     return sc == KEY_STOP || sc == KEY_CTRL || sc == KEY_GRPH || sc == KEY_TAB;
 }
 
+/* A protected pair survives foreground purges even when an ordinary raw
+ * with GRPH clear was the completion. Tags move with their entries. */
+enum raw_priority { RAW_NORMAL, RAW_REPEAT, RAW_WM, RAW_SEALED_REPEAT, RAW_PROTECTED };
+static u8 priority[KBD_BUF_SIZE];
+static int switch_pending, tab_down;
+
+static int raw_slot(int offset)
+{
+    return (kbd_raw_head + offset) % KBD_BUF_SIZE;
+}
+
 void kbd_raw_purge_keep(void)
 {
-    int n = kbd_raw_count;
-    while (n--) {
-        int raw = legacy_raw_take();
-        if (keep_raw(raw & 0xff)) {
-            kbd_raw_buf[kbd_raw_tail] = raw;
-            kbd_raw_tail = (kbd_raw_tail + 1) % KBD_BUF_SIZE;
-            ++kbd_raw_count;
-        }
+    int kept = 0;
+    for (int i = 0; i < kbd_raw_count; ++i) {
+        int from = raw_slot(i);
+        if (!keep_raw(kbd_raw_buf[from] & 0xff) && priority[from] != RAW_PROTECTED)
+            continue;
+        int to = raw_slot(kept++);
+        kbd_raw_buf[to] = kbd_raw_buf[from];
+        priority[to] = priority[from];
     }
+    kbd_raw_tail = raw_slot(kept);
+    kbd_raw_count = kept;
+}
+
+/* Select all victims before modifying the queue. A failed admission
+ * must leave previously accepted starts and their reservations intact. */
+static int make_room(int slots, int limit, int rank)
+{
+    int needed = kbd_raw_count + slots - limit;
+    if (needed <= 0) return 1;
+    int victim[3], n = 0;
+    for (int p = RAW_NORMAL; p < rank && n < needed; ++p)
+        for (int offset = 0; offset < kbd_raw_count && n < needed; ++offset) {
+            /* Preserve recent completed TAB steps when a new switch needs room. */
+            int i = p == RAW_SEALED_REPEAT ? offset : kbd_raw_count - 1 - offset;
+            if (priority[raw_slot(i)] == p) victim[n++] = i;
+        }
+    if (n != needed) return 0;
+    int kept = 0;
+    for (int i = 0; i < kbd_raw_count; ++i) {
+        if (i == victim[0] || (n >= 2 && i == victim[1]) || (n == 3 && i == victim[2])) continue;
+        int to = raw_slot(kept++), from = raw_slot(i);
+        kbd_raw_buf[to] = kbd_raw_buf[from];
+        priority[to] = priority[from];
+    }
+    kbd_raw_count = kept;
+    kbd_raw_tail = raw_slot(kept);
+    kbd_raw_dropped += n;
+    return 1;
+}
+
+static void append_raw(int keycode, int is_break, int mods, int rank)
+{
+    priority[kbd_raw_tail] = rank;
+    kbd_raw_buf[kbd_raw_tail] = (u16)keycode | (is_break ? 0 : KBD_RAW_MAKE)
+        | (u16)((mods & KBD_RAW_MOD_MASK) << KBD_RAW_MOD_SHIFT);
+    kbd_raw_tail = (kbd_raw_tail + 1) % KBD_BUF_SIZE;
+    ++kbd_raw_count;
+}
+
+static int has_ctrl_stop(void)
+{
+    for (int i = 0; i < kbd_raw_count; ++i) {
+        u16 raw = kbd_raw_buf[raw_slot(i)];
+        if ((raw & KBD_RAW_KEY_MAKE_MASK) == (KEY_STOP | KBD_RAW_MAKE) &&
+            (raw & (SHIFT_CTRL << KBD_RAW_MOD_SHIFT))) return 1;
+    }
+    return 0;
 }
 
 void legacy_raw_push(int keycode, int is_break, int mods)
 {
-    if (in2_excl_keyboard() && !keep_raw(keycode)) return;
-    if (kbd_raw_count < KBD_BUF_SIZE) {
-        kbd_raw_buf[kbd_raw_tail] = (u16)keycode
-                                  | (is_break ? 0 : KBD_RAW_MAKE)
-                                  | (u16)((mods & KBD_RAW_MOD_MASK) << KBD_RAW_MOD_SHIFT);
-        kbd_raw_tail = (kbd_raw_tail + 1) % KBD_BUF_SIZE;
-        kbd_raw_count++;
-    } else {
-        /* Keep emergency make even when ordinary input filled the ring.
-         * Replace the newest entry: earlier input order and head stay intact. */
-        if (keycode == KEY_STOP && !is_break && (mods & SHIFT_CTRL)) {
-            int last = (kbd_raw_tail + KBD_BUF_SIZE - 1) % KBD_BUF_SIZE;
-            kbd_raw_buf[last] = KEY_STOP | KBD_RAW_MAKE | (u16)((mods & KBD_RAW_MOD_MASK) << KBD_RAW_MOD_SHIFT);
+    int grph = mods & SHIFT_GRPH;
+    int finish = switch_pending && (!grph || (keycode == KEY_GRPH && is_break));
+    int start = !switch_pending && grph && keycode == KEY_TAB && !is_break;
+    int stop = keycode == KEY_STOP && !is_break && (mods & SHIFT_CTRL);
+    int repeat = switch_pending && tab_down && keycode == KEY_TAB && !is_break;
+    /* Once this physical press ends, its queued steps determine an
+     * earlier selection. Later input must not coalesce those repeats. */
+    if (tab_down && (finish || (keycode == KEY_TAB && is_break))) {
+        int kept = 0, first_repeat = -1;
+        for (int i = 0; i < kbd_raw_count; ++i) {
+            int from = raw_slot(i), to = raw_slot(kept);
+            if (priority[from] == RAW_REPEAT) {
+                if (first_repeat >= 0) continue;
+                first_repeat = to;
+            }
+            kbd_raw_buf[to] = kbd_raw_buf[from];
+            priority[to] = priority[from];
+            ++kept;
         }
-        kbd_raw_dropped++;   /* GUI が resync できるよう必ず数える (レビュー ①) */
+        kbd_raw_dropped += kbd_raw_count - kept;
+        kbd_raw_count = kept;
+        kbd_raw_tail = raw_slot(kept);
+        /* Before sealing the repeat, leave seats for both finish and STOP.
+         * make_room can move it or coalesce it under pressure. */
+        if (kbd_raw_count >= KBD_BUF_SIZE - 1 && !has_ctrl_stop())
+            make_room(2, KBD_BUF_SIZE, RAW_PROTECTED);
+        if (first_repeat >= 0)
+            for (int i = 0; i < kbd_raw_count; ++i)
+                if (priority[raw_slot(i)] == RAW_REPEAT) {
+                    priority[raw_slot(i)] = RAW_SEALED_REPEAT;
+                    break;
+                }
     }
+    if (keycode == KEY_TAB) tab_down = !is_break;
+    if (!grph || finish) tab_down = 0;
+    if (finish && stop) {
+        /* The reserved finish and the emergency request are independent.
+         * ABORTED cleanup can remove STOP while preserving the switch. */
+        if (kbd_raw_count >= KBD_BUF_SIZE - 1 && !has_ctrl_stop())
+            make_room(1, KBD_BUF_SIZE - 1, RAW_PROTECTED);
+        append_raw(KEY_GRPH, 1, mods & ~SHIFT_GRPH, RAW_PROTECTED);
+        switch_pending = finish = 0;
+    }
+    if (in2_excl_drop_raw(keycode, is_break)) {
+        if (!finish) return;
+        /* Signal the observed end of GRPH without exposing the suppressed
+         * key to the WM. The in2 event retains its original scan code. */
+        keycode = KEY_GRPH;
+        is_break = 1;
+        mods &= ~SHIFT_GRPH;
+    }
+    int rank = keep_raw(keycode) ? RAW_WM : RAW_NORMAL;
+    if (repeat) rank = RAW_REPEAT;
+    if (start || finish || stop) rank = RAW_PROTECTED;
+    int limit = KBD_BUF_SIZE - (switch_pending && !finish);
+    /* The last seat can contain ordinary expendable input or STOP, never
+     * a protected switch. Count STOP as already occupying its seat. */
+    if ((start || finish) && kbd_raw_count + 1 + start >= KBD_BUF_SIZE)
+        limit -= !has_ctrl_stop();
+    if (!make_room(1 + start, limit, rank)) {
+        kbd_raw_dropped++;
+        return;
+    }
+    append_raw(keycode, is_break, mods, rank);
+    if (start) switch_pending = 1;
+    if (finish) switch_pending = 0;
 }
 int legacy_raw_take(void)
 {
@@ -112,17 +221,23 @@ void legacy_raw_discard_stop(void)
     int write = read;
     int kept = 0;
     while (n-- > 0) {
+        int from = read;
         u16 raw = kbd_raw_buf[read];
         read = (read + 1) % KBD_BUF_SIZE;
         if ((raw & KBD_RAW_KEY_MAKE_MASK) == (KEY_STOP | KBD_RAW_MAKE) &&
             (raw & (SHIFT_CTRL << KBD_RAW_MOD_SHIFT))) continue;
         kbd_raw_buf[write] = raw;
+        priority[write] = priority[from];
         write = (write + 1) % KBD_BUF_SIZE;
         kept++;
     }
     kbd_raw_tail = write;
     kbd_raw_count = kept;
 }
-void legacy_raw_flush(void) { kbd_raw_head = kbd_raw_tail = kbd_raw_count = 0; }
+void legacy_raw_flush(void)
+{
+    switch_pending = tab_down = 0;
+    kbd_raw_head = kbd_raw_tail = kbd_raw_count = 0;
+}
 void legacy_raw_reset_dropped(void) { kbd_raw_dropped = 0; }
 u32 legacy_raw_dropped(void) { return kbd_raw_dropped; }

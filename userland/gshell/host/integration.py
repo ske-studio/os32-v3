@@ -14,7 +14,10 @@ import subprocess
 import sys
 import tempfile
 ROOT = Path(__file__).resolve().parents[3]
+EXCL_ONLY = '--excl' in sys.argv
 OUT = ROOT / 'userland/gshell/target/gshell-host'
+if EXCL_ONLY:
+    OUT = OUT.with_name('gshell-excl')
 OUT.mkdir(parents=True, exist_ok=True)
 # Other checks in the same shard build and unlink the same mutant names.
 _run_dir = tempfile.TemporaryDirectory(dir=OUT)
@@ -71,6 +74,7 @@ def build(gshell: Path, name: str, quiet: bool = False, typical: bool = False) -
     args = ['rustc', '--edition=2021', '--test', str(rs), '-L', str(OUT), '--extern', 'os32api='+str(OUT/'libos32api.rlib'),
             '-L', 'dependency='+str(FONT_DEPS), '--extern', 'os32_font='+str(FONT_RLIB), '-o', str(exe)]
     args += ['--cfg', 'av_focus_kernel', '-C', 'link-arg=' + str(focus_obj)]
+    args.extend(globals().get('extra_rustc_flags', []))
     if typical:
         args += ['--cfg', 'feature="gf_accel_accept"']
         os.environ['GF_ACCEPT_ID'] = 'host'
@@ -331,7 +335,7 @@ MUTATIONS = [
      '                // Preserve later raw input until STOP changes the foreground.',
      'kstop_full_ring_preserves_following_input_for_next_foreground'),
     ('X3 stops at full ring', 'src/input.rs',
-     'if !space_ok && ctx == Ctx::Pump {', 'if !space_ok {',
+     'if !space_ok && ordinary_pump {', 'if !space_ok {',
      'kstop_full_event_ring_drains_raw_and_counts_overflow'),
     ('full ring loses STOP', 'src/input.rs',
      'if scan == SC_STOP && down && (mods & MOD_CTRL) != 0 {', 'if false {',
@@ -353,7 +357,7 @@ MUTATIONS = [
      'pub fn discard_stop(st: &mut GuiState) {',
      'kstop_aborted_exit_consumes_captured_and_deferred_stop'),
     ('deferred STOP survives abort', 'src/input.rs',
-     '    st.pending_raw_n = kept;', '    let _ = kept;',
+     '        kept += 1;\n    }\n    st.pending_raw_n = kept;', '        kept += 1;\n    }',
      'kstop_aborted_exit_consumes_captured_and_deferred_stop'),
 
     ('switch ignores MRU (Z order only)', 'src/kbdnav.rs',
@@ -401,7 +405,7 @@ MUTATIONS = [
      '        NP_MINUS => click(st, BTN_RIGHT),', '        NP_MINUS => click(st, BTN_LEFT),',
      'k1_4_minus_is_a_right_click'),
     ('plus is a single click', 'src/kbdnav.rs',
-     '            click(st, BTN_LEFT);\n            click(st, BTN_LEFT);', '            click(st, BTN_LEFT);',
+     '            if st.front_id() == front { click(st, BTN_LEFT); }', '',
      'k1_4_plus_is_a_double_click'),
     ('acceleration 12 -> 6', 'src/kbdnav.rs',
      'const MK_ACCEL: [(u32, i32); 3] = [(7, 3), (15, 12), (u32::MAX, 24)];',
@@ -425,7 +429,7 @@ MUTATIONS = [
      '    cursor::move_to(st, x, y);\n    let b',
      'k1_7_drag'),
     ('no FEP commit before a WM focus change', 'src/wm.rs',
-     '    if x3 {\n        fep::commit_to(st, old);\n    } else {', '    if x3 {\n    } else {',
+     '    if x3 && st.excl.open(crate::excl::KBD) {\n        fep::commit_to(st, old);\n    } else {', '    if x3 {\n    } else {',
      'k1_6_'),
     ('the commit goes to the new focus', 'src/fep.rs',
      '    let t = input::target_of(st, win_id);', '    let t = input::focus_target(st);',
@@ -689,8 +693,9 @@ def mutate() -> int:
 
 
 exe = build(ROOT / 'userland/gshell', 'integration')
-run([str(exe), '--test-threads=1'])
-typical_exe = build(ROOT / 'userland/gshell', 'typical-ops', typical=True)
-run([str(typical_exe), '--test-threads=1', 'p0a_'])
+run([str(exe), '--test-threads=1', *(['excl_'] if EXCL_ONLY else [])])
+if not EXCL_ONLY:
+    typical_exe = build(ROOT / 'userland/gshell', 'typical-ops', typical=True)
+    run([str(typical_exe), '--test-threads=1', 'p0a_'])
 if '--mutate' in sys.argv[1:]:
     sys.exit(1 if mutate() else 0)

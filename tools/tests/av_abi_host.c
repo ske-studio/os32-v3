@@ -17,6 +17,7 @@ void in2_on_focus(int old, int owner)
 }
 
 /* Hardware-facing leaves in the ABI probe have no input producers. */
+u32 input_key_release_gen(u8 sc) { (void)sc; return 0; }
 int input_key_pressed(u8 sc) { (void)sc; return 0; }
 u8 pointer_buttons_locked(void) { return 0; }
 u32 in2_time_ms(void) { return 0; }
@@ -164,7 +165,7 @@ int av_abi_probe(void)
         api.in2_mouse_state((IN2_MouseState *)sentinel) != OS32_ERR_BUSY) return 25;
     if (__builtin_offsetof(KernelAPI, in2_acquire) != 1300 ||
         api.in2_acquire != wrap_in2_acquire ||
-        api.in2_acquire(1) != OS32_ERR_NOSYS) return 26;
+        api.in2_acquire(1) != OS32_ERR_BUSY) return 26;
     if (__builtin_offsetof(KernelAPI, in2_unacquire) != 1304 ||
         api.in2_unacquire != wrap_in2_unacquire ||
         api.in2_unacquire() != OS32_ERR_BUSY) return 27;

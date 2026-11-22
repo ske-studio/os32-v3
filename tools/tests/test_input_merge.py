@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """T_merge: source transitions, shared locks and V86 (freestanding ILP32)."""
-CHECK = dict(name='input-merge-host', tier=1, budget=10, needs=[], covers=['input/hal/input_context.h', 'input/hal/legacy_keymap.c', 'input/keymaps/pc98_jp.c', 'input/hal/keymap_registry.c', 'input/hal/keymap_eval.c', 'input/hal/keymap_state.c',
+CHECK = dict(name='input-merge-host', tier=1, budget=10, needs=[], covers=['input/hal/input_context.h', 'input/hal/in2_excl.c', 'include/av_contract.h', 'input/hal/legacy_keymap.c', 'input/keymaps/pc98_jp.c', 'input/hal/keymap_registry.c', 'input/hal/keymap_eval.c', 'input/hal/keymap_state.c',
     'input/hal/in2_int.h', 'input/hal/in2_dev.c', 'input/hal/keymap.h', 'input/hal/in2_state.c', 'input/hal/mouse_ext.c', 'input/hal/pointer_state.c', 'input/hal/kbd_merge.c', 'input/hal/in2_ring.c',
     'include/types.h', 'include/io.h', 'include/kbd.h', 'include/legacy_guest.h',
     'sdk/include/os32/os32_kapi_shared.h', 'tools/tests/input_merge_host.c',
@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def run(ctx):
     names = ['in2_dev.c', 'in2_state.c', 'kbd_merge.c', 'in2_ring.c', 'mouse_ext.c', 'pointer_state.c']
-    names += ['legacy_keymap.c', 'keymap_registry.c', 'keymap_eval.c', 'keymap_state.c']
+    names += ['legacy_keymap.c', 'keymap_registry.c', 'keymap_eval.c', 'keymap_state.c', 'in2_excl.c']
     sources = [(ctx.root / 'input/hal' / name).read_text() for name in names]
     with tempfile.TemporaryDirectory(prefix='input-merge-') as td:
         tmp = Path(td)
@@ -51,6 +51,13 @@ def run(ctx):
                 rc = build(sources[:2] + [sources[2].replace(old, new)] + sources[3:])
                 assert 0 < rc < 128, (old, rc)
                 print('RED runtime: ' + old, flush=True)
+            index = names.index('in2_excl.c')
+            old = 'if (focus || (excl & ~next & IN2_EXCL_KBD))'
+            assert sources[index].count(old) == 1
+            mutant = sources.copy()
+            mutant[index] = mutant[index].replace(old, '(void)focus; if (excl & ~next & IN2_EXCL_KBD)')
+            assert 0 < build(mutant) < 256
+            print('RED runtime: missing owner-change snapshot', flush=True)
             repeat = '.repeat = event->down && old'
             index = names.index('legacy_keymap.c')
             assert sources[index].count(repeat) == 1

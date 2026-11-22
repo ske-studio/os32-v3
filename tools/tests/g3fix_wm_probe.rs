@@ -8,7 +8,11 @@ fn g3fix_order_probe(input: bool) -> i32 {
     // All apps have used their turn (reachable after the arm/focus operations).
     mocks::set_app_state(2, multiapp::APP_STATE_WAIT_POLL);
     if input {
-        // Release of the target key: the app consumed make before malloc.
+        // Deliver and consume the make before malloc so its break is owed to A.
+        mocks::push_rawkeys(&[0x14 | 0x100]);
+        crate::input::capture_keyboard(&mut st, Ctx::Standalone);
+        assert!(multiapp::input_ready(&st, 2));
+        set_input_ready(&mut st, 2, false);
         mocks::push_rawkeys(&[0x14]);
     }
     g2w_pending((1 << 3) | (1 << 4));

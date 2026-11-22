@@ -9,6 +9,7 @@
 #include "input_context.h"
 #endif
 
+static u32 release_gen[128];
 static u16 cnt[128];
 static u8 mechanical[IN2_MAX_DEV], usb_lock;
 /* Sole physical held state, shared by the transitional sc and usage entrances. */
@@ -57,6 +58,17 @@ void input_native_locks(u8 src, u8 mods)
     kbd_shift_state = input_key_mods();
 }
 
+
+u32 input_key_release_gen(u8 sc)
+{
+    return sc < 128 ? release_gen[sc] : 0;
+}
+
+static void update_count(u8 sc, u8 down)
+{
+    cnt[sc] += down ? 1 : -1;
+    if (!down && cnt[sc] == 0) ++release_gen[sc];
+}
 
 int input_key_pressed(u8 sc)
 {
@@ -125,7 +137,7 @@ void input_merge_key(InputEvent *e, u8 old, u8 origin)
         else mechanical[e->src - 1] &= ~bit;
     }
     if (old != down) {
-        cnt[sc] += down ? 1 : -1;
+        update_count(sc, down);
         if (origin == INPUT_ORIGIN_USB) {
             if (down) usb_lock ^= bit;
         }
@@ -175,7 +187,7 @@ int input_capture_key(const KmKey *key)
     }
     set_held(key->src, key->keycode, key->down);
     sc = before.compat_sc;
-    if (sc < 128 && old != key->down) cnt[sc] += key->down ? 1 : -1;
+    if (sc < 128 && old != key->down) update_count(sc, key->down);
     capture_state(&state);
     /* Registered descriptors were validated; selection cannot fail here. */
     (void)km_eval(source.map, key->keycode, &state, &result);

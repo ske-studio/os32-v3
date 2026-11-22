@@ -30,15 +30,21 @@ pub mod gui { pub mod proto { pub const GUI_COLOR_TEXT:u8=1; pub const GUI_COLOR
 mod fullscreen { pub fn active()->bool { false } }
 mod wm {
     use super::cursor::Cursor;
-    pub struct GuiState { pub cursor:Cursor,pub screen_w:i32,pub screen_h:i32 }
+    pub struct Excl { pub mouse_exclusive: bool }
+    impl Excl { pub fn cursor_allowed(&self) -> bool { !self.mouse_exclusive } }
+    pub struct GuiState { pub excl: Excl, pub cursor:Cursor,pub screen_w:i32,pub screen_h:i32 }
     #[derive(Clone,Copy)] pub struct Rect;
     impl Rect { pub fn new(_:i32,_:i32,_:i32,_:i32)->Self { Self } pub fn intersects(&self,_:&Self)->bool { true } }
     pub fn queue_present(_: &mut GuiState,_:Rect) {} pub fn flush_present() {}
 }
 #[path="CURSOR_PATH"] mod cursor;
 #[test] fn cursor_paths() {
-    let mut st=wm::GuiState { cursor:cursor::Cursor::EMPTY, screen_w:100,screen_h:100 };
+    let mut st=wm::GuiState { excl: wm::Excl { mouse_exclusive: true }, cursor:cursor::Cursor::EMPTY, screen_w:100,screen_h:100 };
     st.cursor.x=3; st.cursor.y=4;
+    cursor::show(&mut st);
+    assert!(!st.cursor.shown);
+    assert!(EVENTS.lock().unwrap().is_empty());
+    st.excl.mouse_exclusive = false;
     unsafe { gfx_direct=0; } cursor::show(&mut st); cursor::hide(&mut st);
     let shadow=std::mem::take(&mut *EVENTS.lock().unwrap());
     assert_eq!(shadow.iter().filter(|e|e.0==0).count(),160);

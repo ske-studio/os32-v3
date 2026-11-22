@@ -25,9 +25,11 @@ int __wrap_input_capture_delivery(const KmKey *key, u8 old, const KmEvalResult *
 }
 int legacy_stop_filter(int sc, int br, int mods) { ++filter_calls; (void)sc; (void)br; (void)mods; return 0; }
 void legacy_cooked_push(u16 entry) { (void)entry; __builtin_trap(); }
+void kbd_raw_purge_keep(void) {}
 void legacy_raw_push(int sc, int br, int mods)
 {
     bad_irq |= test_irq;
+    if (in2_excl_drop_raw(sc, br)) return;
     if (last_raw_n == n) ++repeats;
     else { old_sc[k] = sc; old_down[k] = !br; old_mods[k++] = mods; }
     last_raw_n = n;
@@ -146,6 +148,12 @@ static int probe(void)
     T(!input_key_pressed(0x1d) && !input_key_pressed(1));
     T(n == before && k == old_k && repeats == old_r);
     T(!in2_ring_pop(&out, &seq));
+    T(key(1, 0x1d, 1) == 0);
+    in2_excl_focus(1);
+    before = k; old_r = repeats;
+    T(key(1, 0x1d, 1) == 0 && k == before && repeats == old_r);
+    T(key(1, 0x1d, 0) == 0 && k == before + 1);
+    T(key(1, 0x1d, 1) == 0 && k == before + 2);
     return 0;
 }
 #ifndef PPC_COMPILE
