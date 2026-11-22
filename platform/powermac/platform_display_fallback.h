@@ -2,6 +2,8 @@
 #define OS32_DISPLAY_FALLBACK_H
 extern GfxBackend gfx_backend_of_fb;
 #define DISPLAY_FALLBACK_BACKEND (&gfx_backend_of_fb)
+int of_fb_palette(int first, int count, const u8 *rgb);
+#define DISPLAY_SET_PALETTE(be, first, count, rgb) of_fb_palette(first, count, rgb)
 int display_provider_v1_width(void);
 #define DISPLAY_V1_WIDTH (display_provider_v1_width())
 int display_provider_shadow_push(int x, int y, int w, int h);

@@ -88,8 +88,11 @@ int of_fb_copy(const u8 *src, u32 pitch, u32 bytes, int x, int y, int w, int h)
 }
 static int query(GFX_ScreenInfo *out)
 {
-    if (!live) return OS32_ERR_STALE;
     if (!out) return OS32_ERR_INVAL;
+    if (!live) {
+        *out = (GFX_ScreenInfo){0};
+        return OS32_ERR_STALE;
+    }
     *out = (GFX_ScreenInfo){.width = mode.width, .height = mode.height,
                             .lease_first = fb.clut ? 16 : 0, .lease_count = fb.clut ? 240 : 0,
                             .bpp = 8, .format = GFX_FMT_PACKED8};
@@ -109,13 +112,15 @@ static void present(int x, int y, int w, int h)
 }
 static int set_mode(u32 id) { return !live ? OS32_ERR_STALE : id == 1 ? 0 : OS32_ERR_NOSYS; }
 static void noop(void) { }
-static void palette(int first, int count, const u8 *rgb)
+int of_fb_palette(int first, int count, const u8 *rgb)
 {
-    if (!live || !fb.clut || !rgb || first < 0 || first >= 256 ||
-        count <= 0 || count > 256 - first) return;
+    if (!live) return OS32_ERR_STALE;
+    if (!fb.clut) return OS32_ERR_NOSYS;
+    if (!rgb || first < 0 || first >= 256 ||
+        count <= 0 || count > 256 - first) return OS32_ERR_INVAL;
     /* Changing the mapping repaints the shadow, so use the same ownership
      * and generation check as a public present. */
-    if (!fb.palette_allowed || !fb.palette_allowed()) return;
+    if (!fb.palette_allowed || !fb.palette_allowed()) return OS32_ERR_BUSY;
     int changed = 0;
     for (int i = first; i < first + count; i++, rgb += 3) {
         int best = 0, distance = 3 * 255 * 255 + 1;
@@ -132,7 +137,11 @@ static void palette(int first, int count, const u8 *rgb)
         scan_index[i] = best;
         changed = 1;
     }
-    if (changed) (void)of_fb_present(0, 0, fb.width, fb.height);
+    return changed ? of_fb_present(0, 0, fb.width, fb.height) : 0;
+}
+static void palette(int first, int count, const u8 *rgb)
+{
+    (void)of_fb_palette(first, count, rgb);
 }
 GfxBackend gfx_backend_of_fb = {
     .name = "of_fb", .probe = of_fb_ready, .prepare = noop, .init = noop,

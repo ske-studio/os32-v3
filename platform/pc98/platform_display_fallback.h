@@ -2,6 +2,7 @@
 #ifndef OS32_DISPLAY_FALLBACK_H
 #define OS32_DISPLAY_FALLBACK_H
 #define DISPLAY_FALLBACK_BACKEND (&gfx_backend_pc98)
+#define DISPLAY_SET_PALETTE(be, first, count, rgb) ((be)->set_palette(first, count, rgb), 0)
 #define DISPLAY_V1_WIDTH GFX_WIDTH
 int appslot_gui_present_ok(void);
 #define DISPLAY_V1_PRESENT_OK() appslot_gui_present_ok()

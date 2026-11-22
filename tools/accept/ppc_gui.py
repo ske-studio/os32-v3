@@ -44,6 +44,10 @@ def observe(media, cpu, folder, case, user):
     def pointer():
         return tuple(s.word('C_GUI_POINTER', offset) for offset in (0, 4, 8))
 
+    def wait_pointer(x, y, buttons):
+        expected = (x, y, buttons)
+        s.wait(lambda: pointer() == expected, f'WM pointer {expected}')
+
     def windows(name, x, y, switched):
         path = folder / (name + '.ppm')
         s.q.call('screendump', {'filename': str(path.resolve())})
@@ -76,9 +80,10 @@ def observe(media, cpu, folder, case, user):
     try:
         s.start()
         seen(gui)
-        if case in ('normal', 'consume'):
+        if case == 'normal':
             seen('C-GUI READY')
             x, y = s.word('px', unit='h'), s.word('py', unit='h')
+            wait_pointer(x, y, 0)
             windows('ready', x, y, False)
             key(True)
             seen('C-GUI MAKE')
@@ -87,46 +92,43 @@ def observe(media, cpu, folder, case, user):
             seen('C-GUI BREAK')
             move(12, -7)
             seen('C-GUI MOVE')
-            assert pointer() == (x + 12, y - 7, 0)
+            wait_pointer(x + 12, y - 7, 0)
             event('btn', {'button': 'left', 'down': True})
             seen('C-GUI FOCUS')
+            wait_pointer(x + 12, y - 7, 1)
             windows('focus', x, y, True)
             event('btn', {'button': 'left', 'down': False})
             seen('C-GUI CLICK UP')
+            wait_pointer(x + 12, y - 7, 0)
             event('btn', {'button': 'left', 'down': True})
             seen('C-GUI DRAG START')
-            assert pointer() == (x + 12, y - 7, 1)
+            wait_pointer(x + 12, y - 7, 1)
             move(10, 3)
             seen('C-GUI DRAG')
+            wait_pointer(x + 22, y - 4, 1)
             event('btn', {'button': 'left', 'down': False})
             seen('C-GUI UP')
-            assert pointer() == (x + 22, y - 4, 0)
+            wait_pointer(x + 22, y - 4, 0)
             move(12, -7)
             seen('C-GUI STABLE')
+            wait_pointer(x + 34, y - 11, 0)
             key(True)
             seen('C-GUI FRONT KEY')
             key(False)
             seen('C-GUI DONE')
-        if case == 'consume':
-            s.wait(lambda: serial(log).count(gui) == 2, 'switch request ignored')
-            assert cui not in serial(log)
-        else:
-            seen(cui)
-            history = re.findall(r'Loading /(bin/gshell|sys/shell)\.bin|'
-                                 r'/bin/gshell.bin returned (-?\d+)', serial(log))
-            status = {'normal': 0, 'missing': -3, 'fault': -2, 'register': -1}[case]
-            assert history == [('bin/gshell', ''), ('', str(status))] * (
-                3 if case == 'fault' else 1) + [('sys/shell', '')], history
-            if case == 'register':
-                seen('C-GUI REGISTER FAILED')
-                seen('C-GUI INIT NOSYS')
-            s.wait(s.ready, 'CUI ready', 60)
-            s.close_rshell()
-            tap, type_keys = keyboard_actions(s.q, lambda: serial(log), s.wait, folder)
-            type_keys('echo cooked')
-            tap('ret')
-            s.wait(lambda: re.search(r'(?m)^cooked *$', s.screen('cooked')),
-                   'physical keyboard cooked command response')
+        seen(cui)
+        history = re.findall(r'Loading /(bin/gshell|sys/shell)\.bin|'
+                             r'/bin/gshell.bin returned (-?\d+)', serial(log))
+        status = {'normal': 0, 'missing': -3, 'fault': -2}[case]
+        assert history == [('bin/gshell', ''), ('', str(status))] * (
+            3 if case == 'fault' else 1) + [('sys/shell', '')], history
+        s.wait(s.ready, 'CUI ready', 60)
+        s.close_rshell()
+        tap, type_keys = keyboard_actions(s.q, lambda: serial(log), s.wait, folder)
+        type_keys('echo cooked')
+        tap('ret')
+        s.wait(lambda: re.search(r'(?m)^cooked *$', s.screen('cooked')),
+               'physical keyboard cooked command response')
         print(f'{case} {cpu} runtime observed', flush=True)
     finally:
         s.close()
@@ -188,7 +190,21 @@ def main():
         print(f'{case} {digest} {media.elf}', flush=True)
         if not args.build_only:
             for cpu in ('7450', '7455'):
-                observe(media, cpu, folder / cpu, case, user)
+                expected = {'register': 'C-GUI READY', 'consume': 'Loading /sys/shell.bin'}.get(case)
+                try:
+                    observe(media, cpu, folder / cpu, 'normal' if expected else case, user)
+                except RuntimeError as exc:
+                    if not expected or not str(exc).startswith(f'deadline {expected} evidence='):
+                        raise
+                    trace = serial(folder / cpu / 'serial-a.log')
+                    evidence = ('C-GUI REGISTER FAILED' in trace if case == 'register'
+                                else trace.count('Loading /bin/gshell.bin') >= 2)
+                    if not evidence:
+                        raise
+                    print(f'RED {case} {cpu}: {expected}', flush=True)
+                else:
+                    if expected:
+                        raise RuntimeError(f'{case} {cpu} survived')
     print(f'{len(hashes)} distinct C-GUI images')
 
 

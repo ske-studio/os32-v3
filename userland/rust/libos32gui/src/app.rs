@@ -179,7 +179,7 @@ pub fn run_vt(vt: *const AppVTable, this: *mut c_void, ui: &mut Ui) -> GuiResult
         while i < p.count {
             if buf[i].kind == GUI_EV_TRIM {
                 s().trim_batch = true;
-                s().trim_epoch = u32::from_ne_bytes(buf[i].payload[..4].try_into().unwrap());
+                s().trim_epoch = u32::from_le_bytes(buf[i].payload[..4].try_into().unwrap());
                 s().trim_events = s().trim_events.wrapping_add(1);
             } else if buf[i].kind == GUI_EV_FONT {
                 /* font 設定が変わった (T7b-b3 §2-3)。window 0 宛なので dispatch

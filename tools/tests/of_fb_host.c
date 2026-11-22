@@ -14,6 +14,10 @@
 #include "platform/powermac/display_text.h"
 
 GfxCounters gfx_counters;
+GfxBackend *g_backend = &gfx_backend_of_fb;
+static int gfx_started, gfx_current_height;
+#include "gfx/gfx_core_api.inc"
+
 static int allow_palette;
 static int palette_allowed(void) { return allow_palette; }
 static int current_app = 2;
@@ -199,8 +203,13 @@ static void raster(void)
     ram[16] = 5;
     gfx_backend_of_fb.set_palette(5, 1, red);
     EXPECT(screen[20] == saved);
+    gfx_set_palette_hal(5, 15, 0, 0);
+    EXPECT(gfx2_pal[5] == 0 && screen[20] == saved);
+    EXPECT(gfx_lease_palette(16, 1, red) == OS32_ERR_BUSY && gfx2_pal[16] == 0);
     allow_palette = 1;
-    gfx_backend_of_fb.set_palette(5, 1, red);
+    EXPECT(!gfx_lease_palette(16, 1, red) && gfx2_pal[16] == 0xff0000);
+    gfx_set_palette_hal(5, 15, 0, 0);
+    EXPECT(gfx2_pal[5] == 0xff0000);
     palette_get(5, &r, &g, &b);
     EXPECT(r == 15 && g == 0 && b == 0);
     EXPECT(screen[20] == 42 && ram[16] == 5 && screen[21] == ram[17]);

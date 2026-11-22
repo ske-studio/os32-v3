@@ -108,7 +108,7 @@ pub fn ev_simple(kind: u8, sub: u8, window: u32) -> GuiEvent {
 /// T2g: 窓に属さない TRIM。epoch は payload 先頭の LE u32。
 pub fn ev_trim(epoch: u32) -> GuiEvent {
     let mut ev = ev_simple(os32api::gui::proto::GUI_EV_TRIM, 0, 0);
-    ev.payload[..4].copy_from_slice(&epoch.to_ne_bytes());
+    ev.payload[..4].copy_from_slice(&epoch.to_le_bytes());
     ev
 }
 
