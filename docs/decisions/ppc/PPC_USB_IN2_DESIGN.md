@@ -1,4 +1,4 @@
-> 出所: ~/os32-tmp/run/ppc-usb-in2/DESIGN.final.md (設計ラリー 3 回、astra 起草・sol レビュー、決着せずユーザー決定で段を分けた、2026-11-22)。行番号つきの参照は往復の版のまま。
+> 出所: ~/os32-tmp/run/ppc-usb-in2/DESIGN.final.md (設計ラリー 3 回、astra 起草・sol レビュー、決着せずユーザー決定で段を分けた、2026-11-22)。
 > 状態: **確定 (段 A・B・C の CUI、2026-11-22)** — PowerMac の USB の HID を共通の入力の HAL (in2) に。段 C の GUI と段 D は PowerPC の GUI の口の後。末尾の「確定」の節は本文に優先する。
 
 # PowerMac USB HID を共通入力 HAL に接続する詳細設計 r3

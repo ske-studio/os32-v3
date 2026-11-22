@@ -81,9 +81,9 @@ lib/crc32_core.inc と同じ配置で lib に共通 include を置く。boot/lz4
 
 ## 確定 (2026-11-20 夜、sol 第 2 回、PM が反映)
 以下は本文に優先する。
-- **P1 (第 4 段、一時写像の書き込み保護)**: 圧縮の区画の一時写像に**ハードウェアの書き込み保護を求めない** (PM 決定)。理由: 現行の PowerPC の walk は supervisor の store で RW を見ず supervisor の頁を PP=0 にするので、RO の PTE は書き込みを止められない (arch/ppc/pd_walk.c:39–53、arch/ppc/kernel_cpu.c:86–87)。x86 も vmkernel.lz4 の置き場を書き込みから守っていない。シングルタスク・カーネルだけが触る区画なので、守りは**展開の後の CRC の照合** (生の root の CRC、本文の pair の契約) で取る。RO の属性・書き込みの実アクセスの受入・それの変異は本文から外す。写像の除去 (展開の後に一時写像を外す) と、除去の後の読みが失敗することの受入は残す。
-- **P2 (第 3〜4 段、root の無い像)**: RAM の root を持つのは KB_EXEC の像だけ (build/targets/ppc-powermac.mk:15,52–59,219–225)。root の無い像は単一の LOAD と従来の道のまま — 二段の生成・高い LOAD の検証・予約の検査・一時写像はしない。選択は build の側の 1 か所 (KB_EXEC) で決め、ppc_kernel.c の起動の道は root の区画の有無を kboot の情報から読む (機種のマクロを足さない)。root の無い像も受入の像の一覧に入れ、単一の LOAD であることを host の検査で照らす。
-- **P2 (第 4 段、登録の前の失敗)**: pm_root_boot (platform/powermac/root_boot.c:23–30) は boot_root_fs_init の失敗でも登録の前に戻る。展開の入口から boot_root_mount (init/boot_root.c:7–28) まで「rd0 に登録したか」の旗を戻り値で最上位まで返し、初期値は偽。旗が偽なら展開先の頁を返し、真なら rd0 が借りたまま (解放しない)。両方の道を host の試験で照らす。
+- **P1 (第 4 段、一時写像の書き込み保護)**: 圧縮の区画の一時写像に**ハードウェアの書き込み保護を求めない** (PM 決定)。理由: 現行の PowerPC の walk は supervisor の store で RW を見ず supervisor の頁を PP=0 にするので、RO の PTE は書き込みを止められない (arch/ppc/pd_walk.c の ppc_pd_lookup_read、arch/ppc/kernel_cpu.c の ppc_cpu_load_segments・SEG)。x86 も vmkernel.lz4 の置き場を書き込みから守っていない。シングルタスク・カーネルだけが触る区画なので、守りは**展開の後の CRC の照合** (生の root の CRC、本文の pair の契約) で取る。RO の属性・書き込みの実アクセスの受入・それの変異は本文から外す。写像の除去 (展開の後に一時写像を外す) と、除去の後の読みが失敗することの受入は残す。
+- **P2 (第 3〜4 段、root の無い像)**: RAM の root を持つのは KB_EXEC の像だけ (build/targets/ppc-powermac.mk の KB_EXEC・KB_INC_EXTRA・KB_EXTRA)。root の無い像は単一の LOAD と従来の道のまま — 二段の生成・高い LOAD の検証・予約の検査・一時写像はしない。選択は build の側の 1 か所 (KB_EXEC) で決め、ppc_kernel.c の起動の道は root の区画の有無を kboot の情報から読む (機種のマクロを足さない)。root の無い像も受入の像の一覧に入れ、単一の LOAD であることを host の検査で照らす。
+- **P2 (第 4 段、登録の前の失敗)**: pm_root_boot (platform/powermac/root_boot.c の pm_root_boot) は boot_root_fs_init の失敗でも登録の前に戻る。展開の入口から boot_root_mount (init/boot_root.c の boot_root_mount・boot_root_start) まで「rd0 に登録したか」の旗を戻り値で最上位まで返し、初期値は偽。旗が偽なら展開先の頁を返し、真なら rd0 が借りたまま (解放しない)。両方の道を host の試験で照らす。
 - 両 OF の配置と最小の RAM は第 1 段の採用の条件 (第 1 段で解けなければ再レビューへ戻す)。G4 (QuickSilver) の実機の物理の操作はユーザーの承認を得てから (実機ノートへの依頼、[D2])。
 
 ## 本線のレビュー (2026-11-20 夜、本線 PM、可 — 第 1 段から)

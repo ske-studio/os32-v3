@@ -1,4 +1,4 @@
-> 出所: ~/os32-tmp/run/ppc-align-b10/DESIGN.final.md (設計ラリー 3 回、astra 起草・sol レビュー、2026-11-22 確定)。行番号つきの参照は往復の版のまま。
+> 出所: ~/os32-tmp/run/ppc-align-b10/DESIGN.final.md (設計ラリー 3 回、astra 起草・sol レビュー、2026-11-22 確定)。
 > 状態: **確定 (2026-11-22)** — 票 TASK_PPC_ALIGN_X86 の B10 を x86 に寄せる。末尾の「確定」の節は本文に優先する。
 
 # B10　r2→r3 の変更

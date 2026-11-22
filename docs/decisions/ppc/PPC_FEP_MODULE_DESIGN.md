@@ -132,7 +132,7 @@ if (dynamic_sqlite) {
 
 ## 確定 (2026-11-21、sol 第 3 回、PM が反映)
 以下は本文に優先する。sol 第 3 回 (/home/hight/os32-tmp/run/ppc-draft-fep7a/REVIEW.r3.out.md) の「上記を反映すれば可」の残りを、そのまま実装の取り決めとする:
-    - **§2:65–67・§4:122** PPC は quiesce・close が済み、接続と group の解放を確認した場合にだけ `boot_check(0, 0)` で予約を解除する。失敗時は予約を保持して隔離し、静的 SQL を継続する。x86 の呼出順は現行どおり。PPC の試験に quiesce/close 失敗時の予約保持も加える。
-    - **§2:48・§3:86,105** B-P を段3の接続として明記し、HDD root 後に `fep_boot_user_path_set()`・`fep_boot_user_rc_set()` で値と取得結果を load 前に渡す。失敗時は snapshot とともに無効化する。
-    - **§3:84–86・§4:122** 製品選択を `build/sources/hooks.mk`・`build/ppc-fep-module.mk`・静的 SQL 後の起動接続に割り当てる。私有 `ops_version = 5` に常駐側と部品を揃え、B-P の受入は静的 SQL 構成の FEP 境界試験で、load 前の設定引渡しと失敗時の無効化まで観測する。
+    - **§2・§4** PPC は quiesce・close が済み、接続と group の解放を確認した場合にだけ `boot_check(0, 0)` で予約を解除する。失敗時は予約を保持して隔離し、静的 SQL を継続する。x86 の呼出順は現行どおり。PPC の試験に quiesce/close 失敗時の予約保持も加える。
+    - **§2・§3** B-P を段3の接続として明記し、HDD root 後に `fep_boot_user_path_set()`・`fep_boot_user_rc_set()` で値と取得結果を load 前に渡す。失敗時は snapshot とともに無効化する。
+    - **§3・§4** 製品選択を `build/sources/hooks.mk`・`build/ppc-fep-module.mk`・静的 SQL 後の起動接続に割り当てる。私有 `ops_version = 5` に常駐側と部品を揃え、B-P の受入は静的 SQL 構成の FEP 境界試験で、load 前の設定引渡しと失敗時の無効化まで観測する。
 - 本線の INPUT_BIND_M7_3_DESIGN (wip/kfill-designs d53261df1) の PowerPC の担当 B-P の段は、この設計の段 3 の接続として入る (MAINLINE_NOTE.md)。

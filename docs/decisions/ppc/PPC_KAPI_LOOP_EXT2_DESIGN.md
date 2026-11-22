@@ -1,6 +1,6 @@
 # PPC_KAPI_FILL 段 6c の確定設計 (LOOP_EXT2)
 
-> 状態: **確定 (2026-11-20)** — 本線 PM。Fable 起草、sol レビュー 2 回、確定の節を PM が反映 (6c はユーザー決定 U1・U3 も)。出所は本線の機械の ~/os32-tmp/run/kfill-6c/。段の状態は票 TASK_PPC_KAPI_FILL が持つ。行番号つきの参照は往復の版のまま (取り込みの時に直す)。
+> 状態: **確定 (2026-11-20)** — 本線 PM。Fable 起草、sol レビュー 2 回、確定の節を PM が反映 (6c はユーザー決定 U1・U3 も)。出所は本線の機械の ~/os32-tmp/run/kfill-6c/。段の状態は票 TASK_PPC_KAPI_FILL が持つ。
 
 # KAPI の埋め 6c 詳細設計 r2 — loop の転送 (6f 残り) → loop の書込の口 → formatter の自立 → 媒体の口
 
@@ -13,16 +13,16 @@
 | 指摘 | 直し |
 |---|---|
 | P2 F1–F8 | F5・F6 を書き直し、ほかは据え置き |
-| P1 F5 権限 | `exec_disk_write_allowed` は CPL3 では `disk_write_authorized` (ロード元の経路、`exec/exec.c:329-330`・`exec/exec_launch.inc:269`) も要る。受入は常駐シェルか許可済みの経路から回し、権限の拒否 (-1) と読取専用の媒体の拒否を別の項目で見る (§2-3、A4a/A4b) |
+| P1 F5 権限 | `exec_disk_write_allowed` は CPL3 では `disk_write_authorized` (ロード元の経路、`exec/exec.c` の `exec_disk_write_allowed`・`exec/exec_launch.inc` の `exec_launch`) も要る。受入は常駐シェルか許可済みの経路から回し、権限の拒否 (-1) と読取専用の媒体の拒否を別の項目で見る (§2-3、A4a/A4b) |
 | P1 作業域 | formatter は `ext2_g_blk` を使わず自分の `fmt_blk` を持つ (段 N5)。下の ext2 が作業域を潰す場合を host で固定 (A5) |
 | P1 drv の互換 | 型・unit の切り出しをやめる。HD の提供者には**元の drv をそのまま**渡す。loop は `0x0600..0x0603` の完全一致だけ (決定後の段)。両入口の検査の順は今のまま (§2-2) |
-| P2 status・D88 | `loop_dev_status` は attach 済みで 1・それ以外 0 (`loop_dev.c:441-451`)。LBA の書込可否の口 `loop_dev_lba_writable` を足し 512B の D88 を書込前に断る (段 N3)。`Device` の関数は `int lba, int count` |
+| P2 status・D88 | `loop_dev_status` は attach 済みで 1・それ以外 0 (`drivers/block/loop_dev.c` の `loop_dev_status`)。LBA の書込可否の口 `loop_dev_lba_writable` を足し 512B の D88 を書込前に断る (段 N3)。`Device` の関数は `int lba, int count` |
 | P1 M5–M9 の順 | IDE の提供者の追加・ビルドの選択・起動時の登録・formatter の切替を 1 つの動作単位 (段 N7) にした。loop の提供者はリンクと登録を同じ段 (D1) で有効にする |
 | P1 M6 | 持ち主を確定: 作業域・未マウントの I/O = formatter、時刻 = 新 `ext2_time.c` (純移動)、読みのキャッシュの破棄と `ext2_fs_error` = mount 側 (HD の提供者が後始末の口で呼ぶ)。nm は検証 (§2-4、段 N6・N8・N9) |
 | P2 像ごとの対応 | §2-5 に像 × (EXEC・loop・formatter・公開) の表。RAW の標本は `.img` 163840B (320 sector × 512B) |
 | P2 受入 | A3 の変異を A5 の成功系に結んだ。A2・A8 は map・`nm -l`・層の検査 (変異なし)。`ext2_part_host`・`b8_open_host` の追従、PPC の不在の表・link の検査の更新、build_compare の関門を段ごとに書いた |
 | P2 §1-2 | AC-KAPI-1、像ごとの能力の差、両機種で同じ期待値、計画 §2「VFS と同じ仮想装置を選択」との整合を足した |
-| P1 U1 | ramfs は 1 ファイル 32KiB・全体 64KiB (`fs/ramfs/ramfs.h:8-9`、r1 は古い木の値)。推奨を「loop 3 本を先に、ext2 2 本は当面 E」に替えた |
+| P1 U1 | ramfs は 1 ファイル 32KiB・全体 64KiB (`fs/ramfs/ramfs.h` の `RAMFS_FILE_MAX・RAMFS_DATA_MAX`、r1 は古い木の値)。推奨を「loop 3 本を先に、ext2 2 本は当面 E」に替えた |
 | P2 U2・U3 | U2 は PM 決定 (b) で未決から外した。U3 は (a) を推奨のまま、決定後の段へ |
 | PM の指示 | 段表を「ユーザー判断に依らない段 (N・P)」と「U1・U3 の決定の後の段 (D)」に分け、前者だけで受入できる形にした |
 
@@ -30,18 +30,18 @@
 
 ### 1-1 計画の前提と実コードの食い違い (8 件、c8e78d850)
 
-| # | 前提 | 実物 (file:line) | 効き |
+| # | 前提 | 実物 | 効き |
 |---|---|---|---|
-| F1 | 6f の loop の転送は main にある | 無い。c41d5992c は「loop は保留」。`platform/pc98/device_loop.c` と `build/sources/order.mk:5` に残る | 先頭に N1・N2 |
-| F2 | 書込可能な block の契約から format (計画 :77) | lo* の `Device` は `blk_write` が常に 0 (`drivers/block/loop_dev.c:182,338`)。書込は `loop_dev_write_lba` (:386) の直呼びだけ | 接着の `Device` (D1) |
-| F3 | ext2_fmt.c は共通 | IDE 専用: `platform_ide_drive_present` (`fs/ext2/ext2_fmt.c:168,221,248`)、`platform_ide_range_ok` (:176,261)、`platform_disk_geometry_get` (:249)、`ext2_dev_for` = `"hd%d"` (`fs/ext2/ext2_super.c:217`)。選択は `C_COMMON_PC98_PENDING` (`build/sources/common.mk:10`) | 媒体の口 (N7) |
-| F4 | 受入「再 mount」(計画 :264) | mount は HD 専用 (`fs/ext2/ext2_vfs.c:419`) で PC-98 の区画表を読む | PM 決定: 6c は読み戻しまで |
-| F5 | 「attach と書込権限」 | `loop_attach` に呼び手の検査は無い (`sdk/kapi.json:1231-1235`)。媒体の書込可否は `vfs_open(O_RDWR)` の成否 (`loop_dev.c:295-303`)。`ext2_format*` の body は `exec_disk_write_allowed` (前面の CUI、CPL3 は加えて `disk_write_authorized`) | 権限は 3 層 (§2-3) |
-| F6 | PowerMac に書ける媒体がある | `/` = iso9660 on rd0 (読取専用、`init/boot_root.c:11`)。`/tmp` = ramfs、1 ファイル 32KiB・全体 64KiB。ext2 の下限 64 ブロック = 64KiB (`fs/ext2/ext2_layout.h:34`) に届かない。`/host` (serialfs、USERSHELL) の上の成功は未確認 | U1 |
-| F7 | loop は選べば入る | `loop_dev.c` は `build/features/pc98-devices.mk:6`、`loop_dev_init` の呼び手は `platform/pc98/boot.c:124` だけ | N4 |
+| F1 | 6f の loop の転送は main にある | 無い。c41d5992c は「loop は保留」。`platform/pc98/device_loop.c` と `build/sources/order.mk` の `C_ORDER_LEGACY` に残る | 先頭に N1・N2 |
+| F2 | 書込可能な block の契約から format (計画の媒体契約) | lo* の `Device` は `blk_write` が常に 0 (`drivers/block/loop_dev.c` の `loop_dev_init・loop_dev_detach`)。書込は `loop_dev_write_lba` (loop_dev.c) の直呼びだけ | 接着の `Device` (D1) |
+| F3 | ext2_fmt.c は共通 | IDE 専用: `platform_ide_drive_present` (`fs/ext2/ext2_fmt.c` の `ext2_format_range・ext2_format・ext2_format_at`)、`platform_ide_range_ok` (ext2_format_range・ext2_format_at)、`platform_disk_geometry_get` (ext2_format)、`ext2_dev_for` = `"hd%d"` (`fs/ext2/ext2_super.c` の `ext2_dev_for`)。選択は `C_COMMON_PC98_PENDING` (`build/sources/common.mk` の `C_COMMON_PC98_PENDING`) | 媒体の口 (N7) |
+| F4 | 受入「再 mount」(計画の 6c 受入) | mount は HD 専用 (`fs/ext2/ext2_vfs.c` の `ext2_vfs_mount`) で PC-98 の区画表を読む | PM 決定: 6c は読み戻しまで |
+| F5 | 「attach と書込権限」 | `loop_attach` に呼び手の検査は無い (`sdk/kapi.json` の `loop_attach`)。媒体の書込可否は `vfs_open(O_RDWR)` の成否 (`drivers/block/loop_dev.c` の `loop_dev_attach`)。`ext2_format*` の body は `exec_disk_write_allowed` (前面の CUI、CPL3 は加えて `disk_write_authorized`) | 権限は 3 層 (§2-3) |
+| F6 | PowerMac に書ける媒体がある | `/` = iso9660 on rd0 (読取専用、`init/boot_root.c` の `boot_root_mount`)。`/tmp` = ramfs、1 ファイル 32KiB・全体 64KiB。ext2 の下限 64 ブロック = 64KiB (`fs/ext2/ext2_layout.h` の `EXT2L_MIN_BLOCKS`) に届かない。`/host` (serialfs、USERSHELL) の上の成功は未確認 | U1 |
+| F7 | loop は選べば入る | `loop_dev.c` は `build/features/pc98-devices.mk` の `C_FEATURES`、`loop_dev_init` の呼び手は `platform/pc98/boot.c` の `pc98_boot_dev_fs` だけ | N4 |
 | F8 | loop の誤り符号は一意 | FORMAT と UNSUPPORTED が -2、BUSY と WRITE_PROTECTED が -3 (`drivers/block/loop_dev.h`) | 値は変えず、可否は専用の口で見る (N3) |
 
-formatter の外への依存 (r2 で確かめた): `ext2_g_blk` (`ext2_super.c:28`)、`ext2_current_time` (`ext2_super.c:160`)、`ext2_write_block`/`ext2_read_block` (`ext2_super_block_io.inc`) → その中の `ext2_read_cache_reset` (`ext2_inode.c:8`、.inc :27,35,82) と `ext2_fs_error` (`ext2_super.c:48`、.inc :48,55)。`ide_range_ok` は `drive < 0 || drive >= IDE_MAX_DRIVES` を断る (`drivers/ata/ide.c:354-359`)。
+formatter の外への依存 (r2 で確かめた): `ext2_g_blk` (`fs/ext2/ext2_super.c` の `ext2_g_blk`)、`ext2_current_time` (`fs/ext2/ext2_super.c の 設計時の ext2_current_time`)、`ext2_write_block`/`ext2_read_block` (`ext2_super_block_io.inc`) → その中の `ext2_read_cache_reset` (`fs/ext2/ext2_inode.c` の `ext2_read_cache_reset`、.inc のキャッシュ無効化) と `ext2_fs_error` (`fs/ext2/ext2_super.c` の `ext2_fs_error`、.inc の読み書き失敗処理)。`ide_range_ok` は `drive < 0 || drive >= IDE_MAX_DRIVES` を断る (`drivers/ata/ide.c` の `ide_range_ok`)。
 
 ### 1-2 統合の判断 (POLICY_DEV §1)
 
@@ -84,7 +84,7 @@ struct ext2_medium_ops {                 /* 引数 drv は KAPI から来た値�
     int  (*present)(int drv);                           /* 1/0。今の platform_ide_drive_present の位置で呼ぶ */
     int  (*total_sectors)(int drv, u32 *out);           /* 0=成功。format_at だけが、今の geometry 取得の位置で呼ぶ */
     int  (*find_part)(int drv, u32 *start, u32 *len);   /* EXT2_OK / EXT2_ERR_*。format だけが呼ぶ。BIOS の幾何の検査と kprintf を含む */
-    int  (*range_ok)(int drv, u32 lba, u32 count);      /* 1/0。今の 2 か所 (:176, :261) で呼ぶ */
+    int  (*range_ok)(int drv, u32 lba, u32 count);      /* 1/0。今の 2 か所 (ext2_format_range・ext2_format_at) で呼ぶ */
     struct _Device *(*dev)(int drv);                    /* ext2 の I/O が使う装置 */
     void (*after_write)(void);                          /* 0 可。書込 1 回ごとの mount 側の後始末 (HD: 読みのキャッシュの破棄) */
     u32  min_lba;                                       /* format_at の開始の下限 (HD = EXT2_FMT_MIN_LBA) */
@@ -143,10 +143,10 @@ FEATURE_LOOP=0 の像で起動の呼び出しを結ばないため、PowerMac �
 | 段 | 担当 | ファイル | 中身 | 関門 | 順・並列 |
 |---|---|---|---|---|---|
 | N1 | 本線 | `include/loop_contract.h` 新設 (+ `loop_dev.h` の include) | §2-1 の宣言の移動 (新しい 1 本の宣言は N3) | 関数差 0、check_layers 0 | 先頭。N6 と可 |
-| N2 | 本線 | `platform/pc98/device_loop.c` → `kernel/dev/device_loop.c` | 6f-loop の純移動 (SRC_MOVE §3)、order.mk:5 の経路、`dep_dir_a_l04_host` の covers | 関数差 0 | N1 の後 |
+| N2 | 本線 | `platform/pc98/device_loop.c` → `kernel/dev/device_loop.c` | 6f-loop の純移動 (SRC_MOVE §3)、build/sources/order.mk の C_ORDER_LEGACY の経路、`dep_dir_a_l04_host` の covers | 関数差 0 | N1 の後 |
 | N3 | 本線 | `drivers/block/loop_dev.c` | `loop_dev_lba_writable` を足す (既存の関数は触らない) | host `loop_dev_host` に 3 例 | N1 の後 |
 | N4a | 本線 | `build/select.mk` | FEATURE_LOOP (PC-98 既定 1、PowerMac は像ごと §2-5)。持ち主から受け取る | 有効・無効の構成が組める (PM) | 直列 |
-| N4b | 本線 | `build/sources/common.mk` (+ pc98-devices.mk:6 から抜く) | `C_COMMON_LOOP = kernel/dev/device_loop.c drivers/block/loop_dev.c`、x86 のリンク順は order.mk で保つ | 関数差 0、map の順が同じ | N2・N4a の後 |
+| N4b | 本線 | `build/sources/common.mk` (+ build/features/pc98-devices.mk の C_FEATURES から抜く) | `C_COMMON_LOOP = kernel/dev/device_loop.c drivers/block/loop_dev.c`、x86 のリンク順は order.mk で保つ | 関数差 0、map の順が同じ | N2・N4a の後 |
 | N5 | 本線 | `fs/ext2/ext2_fmt.c` (+ `ext2_fmt_*.inc` 3 本) | 作業域を `fmt_blk` に | host A5、**NP21/W** (hdprep → install → 起動) | N7 と直列 (同じファイル) |
 | N6 | 本線 | `fs/ext2/ext2_super.c` → `fs/ext2/ext2_time.c` | `ext2_current_time` の純移動、common.mk は同じ変数のまま | 関数差 0 | N1 と可 |
 | N7 | 本線 | 1 つの動作単位: `include/ext2_medium_contract.h`・`fs/ext2/ext2_medium_ide.c` (新設)・`build/sources/common.mk` (PC98_PENDING に追加)・`platform/pc98/boot.c` (登録 1 行)・`fs/ext2/ext2_fmt.c` (切替) | §2-2。分けると間の版で HD の format が全部落ちるので 1 段 1 ファイルの例外にする。`ext2_part_host`・`b8_open_host` は提供者を組み込み登録を呼ぶ | host A6・A7、**NP21/W** (同上) | N5 の後 |
@@ -179,7 +179,7 @@ NP21/W の受入は直列 (本線の取り決め 3): N5 → N7+N8 の 2 回。
 | A6 | HD の経路が不変: drv 0..3 で書く sector の列と戻り値が N5 の前と同じ。`0x10000`・`0x0600`・-1 は今と同じ値で断り書込 0 回 | host `ext2_part_host`・`b8_open_host` (期待は無変更)、NP21/W | drv を `& 0xFF` してから渡す |
 | A7 | 未登録 (HD の提供者なし) は EXT2_ERR_IO、二重の登録は -1 | host | 表の空きの検査を外す |
 | A8 | HD の書込のたびに読みのキャッシュが破棄される (mount 中の区画の外を format_at した後の読みが古くない) | host (破棄の回数を数える) | `after_write` を呼ばない |
-| A9 (D1) | format_at(0x0600\|slot): 範囲の外の前後 1 sector が不変、superblock が ext2_layout_plan の値。format: 全体・頭打ち | host、NP21/W | start_lba を無視する (計画 :264) |
+| A9 (D1) | format_at(0x0600\|slot): 範囲の外の前後 1 sector が不変、superblock が ext2_layout_plan の値。format: 全体・頭打ち | host、NP21/W | start_lba を無視する (計画の 6c 受入) |
 | A10 | loop だけの像・formatter だけの compile-only で相手の記号を引かない | PM のビルド、nm、層の検査 (変異なし) | — |
 | A11 | 関数差が §3 のとおり | build_compare | — |
 

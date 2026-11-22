@@ -203,6 +203,7 @@ POLICY_DEV §10「x86 に揃える」(ユーザー決定 2026-11-20、動作実�
 | root と /host | ディスクと共通 VFS | インストール媒体は RO RAM root、/host は link の SFS CALL | 製品媒体は未揃え | HDD の ext2 root を整え、辞書・学習を x86 と同じパスで公開する。 |
 | HDD の区画と起動の区画 | PC-98 の区画表と IPL・ローダ (`platform/pc98/`) | APM の区画表と、Open Firmware が読む起動用の小さな HFS の区画 (ローダとカーネル) | 残す (物理)。**最終の形はユーザー決定 (2026-11-21「最終的にはそうなって」、B05 の案 A)**。途中の段 (TFTP のカーネル + HDD の ext2 の root など) を経てよい | Open Firmware は ext2 を読めず HFS/HFS+・ISO9660・TFTP だけを読む。ext2 の root と hdprep・install の流れは共通 (PPC_ROOT_MOUNT_ALIGN_X86_DESIGN)。G4 の HDD への書き込みと NVRAM の boot-device の書き換えは、その時に中身を確かめて別に承認 ([D2]) |
 | 端末と入力 | TVRAM、PC-98 の鍵盤 | FB の文字端末、USB の HID | 違いを残す (物理) | 装置が違う |
+| 入力の独占 (公開の `in2_acquire`) | 7d で有効化 | 公開の acquire は閉じたまま | **未揃え** (PM 決定 2026-11-22、x86 に揃える対象) | PowerPC 担当。USB HID の入力後端を共通の in2 (make/break/repeat・切断・ポインタ) につないだ後、`platform/powermac/platform_input_caps.h` の `IN2_PUBLIC_EXCLUSIVE` を 1 にする。 |
 | KCG の字形の読み出し | CG ROM/CG RAM を `drivers/video/kcg/kcg_module.c` (kcg.mod の提供者の口) が読む | 常駐の KCG1 ファイル (`platform/powermac/kcg.c`) | ANK・漢字の読み出しの転送は共有した (`drivers/video/kcg/kcg_read_provider.inc`、B14 2026-11-20)。字形の出所の違いは残す (物理) | 部品のロードは B08 (module の読み込み) の段で揃える |
 | ATA Data のバイト順 (D8) | LE の 16 bit ポート | BE の窓。IDENTIFY の語はバイト交換し、セクタは媒体の並びを保つ | 残す (物理) | CPU のバイト順が違う。語の値とセクタのバイト列を別の窓口で渡す |
 | BIOS 由来のディスク幾何 (D9) | BIOS の幾何を区画表の位置の決定に使う | BIOS 由来の幾何が無く、`hdd_geom_info` は不在 | 残す (物理) | ファームウェアが違う。PowerMac の ATA はこの幾何による区画探索を行わない |

@@ -1,4 +1,4 @@
-> 出所: 本線の機械の ~/os32-tmp/run/m7-3-design/DESIGN.final.md (astra 起草・sol レビュー 2 回、2026-11-21 確定)。行番号つきの参照は往復の版のまま。
+> 出所: 本線の機械の ~/os32-tmp/run/m7-3-design/DESIGN.final.md (astra 起草・sol レビュー 2 回、2026-11-21 確定)。
 > 状態: **確定 (2026-11-21)** — 入力 INPUT_BIND の M7[3] (IME の接続) と登録 B を今の main の形で書き直す (11-17 の版は外した)。M7[1]・[2] は wip/km-m7-rebase。末尾の「確定」の節は本文に優先する。
 
 # INPUT_BIND 追記案　M7[3] と登録 B
@@ -19,15 +19,15 @@ PowerPC の部品形式と公開順は PPC_MODULE_ALIGN_X86_DESIGN の確定節�
 
 ## 1. 11-17 版との食い違い（3 件）
 
-1. 505fdd1c1 の build/features/pc98-devices.mk:2 は gate を PC-98 装置の列に入れた。
-   gate の持ち主は共通入力で、M5 は 4512a11af の build/sources/common.mk:5 にある。
-   gate も同じ共通列で選び、build/sources/order.mk:5 は x86 のリンク順だけを担う。
-2. 旧 build/ppc-kboot.mk:112 は PowerPC の個別ソース列にも gate を追加した。
-   現行の構成は共通ソースを使う。build/features/fep.mk:2–8 は facade の選択と x86 の pack を区別する。
+1. 505fdd1c1 の build/features/pc98-devices.mk の装置選択規則は gate を PC-98 装置の列に入れた。
+   gate の持ち主は共通入力で、M5 は 4512a11af の build/sources/common.mk の C_COMMON_EXEC にある。
+   gate も同じ共通列で選び、build/sources/order.mk の C_ORDER_LEGACY は x86 のリンク順だけを担う。
+2. 旧 build/ppc-kboot.mk の旧ソース一覧 は PowerPC の個別ソース列にも gate を追加した。
+   現行の構成は共通ソースを使う。build/features/fep.mk の C_FEATURES・MODULE_MK_fep は facade の選択と x86 の pack を区別する。
    L1・L2 の取り込みだけでは PowerMac の FEP は公開されない。PPC 個別列への二重登録を廃する。
-3. 旧 kernel/ime/ime.c:113 の init からの状態公開は、部品の初期化と入力サービス公開の間を区別できない。
-   kernel/ime/fep_module.c:85–91,131–145 は候補を非公開で初期化し、RUNNING と services_public の両方で公開する。
-   kernel/module/module_runtime.c:91–100 は init より前に import を埋める。この時点の関数番地は公開の証明にならない。
+3. 旧 kernel/ime/ime.c の ime_boot_abort の init からの状態公開は、部品の初期化と入力サービス公開の間を区別できない。
+   kernel/ime/fep_module.c の public_api・ime_init・fep_start は候補を非公開で初期化し、RUNNING と services_public の両方で公開する。
+   kernel/module/module_runtime.c の module_load は init より前に import を埋める。この時点の関数番地は公開の証明にならない。
 
 ## 2. 常駐側と部品側の境界
 
