@@ -24,7 +24,9 @@ int hid_kbd_repeatable(u8 usage)
 {
     const KmEntry *entry = &hid_jp_backend.entries[usage];
     const keysym_t void_symbol = 0xf500;
-    return !hid_kbd_norepeat(usage) &&
+    /* Stage A repeats into the legacy FIFO. An unmapped press must leave
+     * the last deliverable key and its deadline alone. */
+    return hid_kbd_sc(usage) < 128 && !hid_kbd_norepeat(usage) &&
            (entry->group1[0] != void_symbol || entry->group1[1] != void_symbol ||
             entry->group2[0] != void_symbol || entry->group2[1] != void_symbol);
 }

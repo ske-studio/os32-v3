@@ -9,7 +9,6 @@ struct hid_boot {
     struct usb_iface *iface;
     u8 stage, stopped, opened, kind;
 };
-u8 hid_kbd_sc(u8 usage);
 /* Generated metadata: norepeat returns 0/1 (1 suppresses repeat).
  * order returns the group number: 0 = modifiers 0xE0..0xE7,
  * 1 = lock (including 0x90/0x91), 2 = remaining usages.

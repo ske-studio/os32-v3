@@ -150,6 +150,24 @@ static int run(void)
     u8 r[8]={0}, mouse[3]={0xfd,0x80,0x7f};
     unsigned n;
     int rc;
+    m->num=1;
+    REQUIRE(!hid_mouse_class.match(&d,k) && !hid_kbd_class.match(&d,m));
+    rc=attach(&d,0,&hid_kbd_class); REQUIRE(!rc);
+    rc=attach(&d,1,&hid_mouse_class); REQUIRE(!rc);
+    REQUIRE(starts==2 && xf[0]->len==8 && xf[1]->len==3);
+    /* Q and A arrive in usage order A,Q but enter the FIFO in sc order Q,A. */
+    r[2]=4; r[3]=0x14; report(0,r,8,USB_X_OK);
+    REQUIRE(nu==2 && usages[0]==4 && usages[1]==0x14);
+    REQUIRE(pm_input_usb_take()==0x1071 && pm_input_usb_take()==0x1d61 && pm_input_usb_take()==-1);
+    r[2]=r[3]=0; report(0,r,8,USB_X_OK);
+    r[2]=4; report(0,r,8,USB_X_OK);
+    REQUIRE(pm_input_usb_take()==0x1d61);
+    clock_ms=100; r[3]=0x68; report(0,r,8,USB_X_OK);
+    REQUIRE(usages[nu-1]==0x68 && pm_input_usb_take()==-1);
+    hid_kbd_class.tick(&d,k,500);
+    REQUIRE(pm_input_usb_take()==0x1d61 && pm_input_usb_take()==-1);
+    r[2]=r[3]=0; report(0,r,8,USB_X_OK);
+    ne=nu=0;
     REQUIRE(hid_kbd_sc(0x2f)==0x1a && hid_kbd_sc(0x30)==0x1b && hid_kbd_sc(0x31)==0x28);
     REQUIRE(hid_kbd_sc(0x87)==0x33 && hid_kbd_sc(0x89)==0x0d);
     REQUIRE(hid_kbd_sc(0x88)==0x72 && hid_kbd_sc(0x8a)==0x35 && hid_kbd_sc(0x8b)==0x51);
@@ -164,11 +182,6 @@ static int run(void)
         REQUIRE(hid_kbd_norepeat(n) == (modifier || lock));
         REQUIRE(hid_kbd_order(n) == (modifier ? 0 : lock ? 1 : 2));
     }
-    m->num=1;
-    REQUIRE(!hid_mouse_class.match(&d,k) && !hid_kbd_class.match(&d,m));
-    rc=attach(&d,0,&hid_kbd_class); REQUIRE(!rc);
-    rc=attach(&d,1,&hid_mouse_class); REQUIRE(!rc);
-    REQUIRE(starts==2 && xf[0]->len==8 && xf[1]->len==3);
     /* Both Shift handovers are silent in the legacy projection. */
     r[0]=2; report(0,r,8,USB_X_OK);
     r[0]=0x20; report(0,r,8,USB_X_OK);

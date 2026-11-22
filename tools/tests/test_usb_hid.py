@@ -52,10 +52,11 @@ def check(mutate):
             print('HID runtime OK', swap)
         if mutate:
             mutations = [
+                ('drivers/usb/hid_kbd_map.c', 'hid_kbd_sc(usage) < 128 && ', ''),
                 ('drivers/usb/hid_kbd.c', 'hid_kbd_order(i) != order', 'hid_kbd_order(i) != 2 - order'),
                 ('drivers/usb/hid_boot.h', 'b->x.short_ok = 1;', 'b->x.short_ok = 0;'),
                 ('drivers/usb/hid_kbd_map.c', 'return hid_jp_backend.compat_sc[usage];',
-                 'return usage == 0x47 ? 0x46 : hid_jp_backend.compat_sc[usage];'),
+                 'return usage == 0x14 ? 0x11 : hid_jp_backend.compat_sc[usage];'),
                 ('drivers/usb/hid_kbd_map.c',
                  'return (bits[usage >> 3] >> (usage & 7)) & 1;', 'return 0 & bits[usage >> 3];'),
                 ('drivers/usb/hid_kbd_map.c',
