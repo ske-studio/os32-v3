@@ -30,6 +30,11 @@ static int event(int type, int dev, int a, int b)
         }
         /* The Enter that launched us may break after main starts. */
         if (e.type == IN2_EV_KEY && e.u.key.sc == 0x1c && !e.u.key.down) continue;
+        if (e.type == IN2_EV_MOVE && e.dev == mouse && e.u.move.dx == 5 &&
+            e.u.move.dy == 0 && (type == IN2_EV_KEY || type == IN2_EV_BUTTON)) {
+            api->serial_puts(type == IN2_EV_KEY ? "IN2 STILL KEY\n" : "IN2 STILL BUTTON\n");
+            continue;
+        }
         if (e.type != type || e.dev != dev) return 0;
         if (type == IN2_EV_KEY) return e.u.key.sc == a && e.u.key.down == b;
         if (type == IN2_EV_MOVE) return e.u.move.dx == a && e.u.move.dy == b;
@@ -75,7 +80,12 @@ static int probe(void)
     if (api->kbd_getkey() != 0x2b03) return 0;
     api->serial_puts("IN2 WAIT\n");
     /* The kernel traces the wait result before syscall exit handles abort. */
-    return api->kbd_getkey() == -1 && api->kbd_trygetkey() == -1;
+    int result = api->kbd_getkey();
+    if (result == 0x1d61) {
+        api->serial_puts("IN2 STILL READING\n");
+        return 1;
+    }
+    return result == -1 && api->kbd_trygetkey() == -1;
 }
 
 int main(int argc, char **argv, KernelAPI *kernel)

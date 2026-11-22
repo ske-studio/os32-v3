@@ -45,6 +45,14 @@ def main():
     user = work/'user'
     opts = ['IMAGE=kboot-link-sh', 'KBOOT_USB_KEY_TRACE=1', 'KB_SH_OUT='+str(user),
             'KB_ROOT_BINS='+str(user/'in2prob.bin')]
+    # Count idle steps reached after an empty interruptible key read.
+    anchor = '        p->wait_step();'
+    observation = mutant_settings(work, 'wait-observer', 'kernel/input_wait.c', anchor,
+        '        extern volatile unsigned in2_wait_steps;\n'
+        '        if (!gui && mode == IL_KEY && interruptible) ++in2_wait_steps;\n' + anchor)
+    with Path(observation[1].split('=', 1)[1]).open('a') as source:
+        source.write('\nvolatile unsigned in2_wait_steps;\n')
+    opts += [item.replace('KB_MUT_', 'KB_MUT_EXTRA_', 1) for item in observation]
     hashes = set()
     for mode in ['normal'] + (list(IN2_MUTATIONS) if args.mutate else []):
         mutation = mutant_settings(work, mode, *IN2_MUTATIONS[mode]) if mode != 'normal' else []

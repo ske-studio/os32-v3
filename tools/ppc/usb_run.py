@@ -861,21 +861,14 @@ def in2_observe(elf, cpu, out, mode):
         s.wait(lambda: ('down=%d usage=%s' % (down, usage)) in serial(log)[offset:],
                'USB '+code+' '+str(down))
 
-    def move():
+    def move(dx=12, dy=-7):
         s.q.call('input-send-event', {'events': [
             {'type': 'rel', 'data': {'axis': axis, 'value': value}}
-            for axis, value in [('x', 12), ('y', -7)]]})
+            for axis, value in [('x', dx), ('y', dy)]]})
 
-    def missing(marker, offset=0):
-        try:
-            ack(marker, offset)
-        except RuntimeError as exc:
-            if not str(exc).startswith('deadline probe '+marker+' evidence='):
-                raise
-            tick = s.word('tick_count')
-            s.wait(lambda: s.word('tick_count') != tick, 'guest still running')
-            return
-        raise RuntimeError('SURVIVED '+mode)
+    def still_waiting(marker, response, offset):
+        ack(response, offset)
+        require('IN2 '+marker not in serial(log)[offset:], 'SURVIVED '+mode)
 
     def run():
         s.wait(s.ready, 'cold RSH ready', 60)
@@ -896,11 +889,14 @@ def in2_observe(elf, cpu, out, mode):
             require(s.word('rshell_active') != 0, 'local ESC was consumed')
             return
         s.close_rshell(preloaded=True)
-        type_line('echo first')
+        type_line('echo fir')
         edge('ctrl', True, 'e0')
         edge('c', True, '06')
         edge('c', False, '06')
         edge('ctrl', False, 'e0')
+        type_line('st')
+        s.wait(lambda: 'OS32:/$ echo first' in s.screen('edited'),
+               'shell appended suffix after consuming Ctrl-C')
         def printed_first():
             return any(row.strip(' \x00') == 'first' for row in s.screen('retained').splitlines())
         require(not printed_first(), 'Ctrl-C prematurely executed the line')
@@ -911,9 +907,11 @@ def in2_observe(elf, cpu, out, mode):
         edge('ret', True, '28')
         edge('ret', False, '28')
         ack('READY')
+        offset = len(serial(log))
         edge('a', True, '04')
         if mode == 'no-key':
-            missing('MAKE')
+            move(5, 0)
+            still_waiting('MAKE', 'STILL KEY', offset)
             return
         ack('MAKE')
         ack('HOLD')
@@ -927,7 +925,8 @@ def in2_observe(elf, cpu, out, mode):
                 'button': 'left', 'down': down}}]})
             s.wait(lambda: ('dx=0 dy=0 b=%d' % down) in serial(log)[offset:], 'USB button')
             if mode == 'no-button':
-                missing(marker)
+                move(5, 0)
+                still_waiting(marker, 'STILL BUTTON', offset)
                 return
             ack(marker)
         s.q.call('device_del', {'id': 'mouse'})
@@ -943,17 +942,21 @@ def in2_observe(elf, cpu, out, mode):
         edge('ctrl', True, 'e0')
         edge('c', True, '06')
         ack('WAIT')
+        steps = s.word('in2_wait_steps')
+        s.wait(lambda: s.word('in2_wait_steps') != steps, 'probe in empty key wait')
         edge('c', False, '06')
         edge('ctrl', False, 'e0')
         edge('ctrl', True, 'e0')
         offset = len(serial(log))
         edge('pause', True, '48')
-        if mode == 'no-abort':
-            missing('INTERRUPTED -1 EMPTY', offset)
-        else:
+        if mode != 'no-abort':
             ack('INTERRUPTED -1 EMPTY', offset)
         edge('pause', False, '48')
         edge('ctrl', False, 'e0')
+        if mode == 'no-abort':
+            edge('a', True, '04')
+            still_waiting('INTERRUPTED -1 EMPTY', 'STILL READING', offset)
+            edge('a', False, '04')
 
     try:
         s.start()
