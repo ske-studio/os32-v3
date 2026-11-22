@@ -89,6 +89,26 @@ def build(gshell: Path, name: str, quiet: bool = False, typical: bool = False) -
 # 票 KBD_NAV (docs/tasks/gui/TASK_KBD_NAV.md) の受け入れ K1 の変異。
 # (名前, ファイル, 置き換え前 (ちょうど 1 か所), 置き換え後, RED になるべき試験の絞り込み)
 MUTATIONS = [
+    ('chord starts client click', 'src/input.rs',
+     'let down_edge = pressed & MOUSE_BTN_LEFT != 0;',
+     'let down_edge = btn & MOUSE_BTN_LEFT != 0 && changed_buttons & MOUSE_BTN_LEFT != 0;',
+     'chord_client_click_and_rearm'),
+    ('chord fails to rearm left', 'src/input.rs', 'if btn & MOUSE_BTN_LEFT != 0 { MOUSE_BTN_LEFT }',
+     'if btn & MOUSE_BTN_LEFT != 0 { 0 }', 'chord_client_click_and_rearm'),
+    ('chord loses pointer mask', 'src/input.rs', 'let pbtn = btn | st.synth_buttons;',
+     'let pbtn = click_button | st.synth_buttons;', 'chord_pointer_masks'),
+    ('chord activates desktop menu', 'src/input.rs',
+     'let down_edge = pressed & MOUSE_BTN_LEFT != 0;',
+     'let down_edge = (pressed & MOUSE_BTN_LEFT != 0) || '
+     '(startmenu::is_open() && btn & 1 != 0 && changed_buttons & 1 != 0);', 'chord_desktop_menu'),
+    ('Pump forgets deferred chord owner', 'src/input.rs', 'if st.prev_buttons == 0 {',
+     'if st.delivered_button == 0 {', 'chord_deferred_titlebar'),
+    ('moving chord edge emits Pointer', 'src/input.rs',
+     'changed_buttons & (MOUSE_BTN_LEFT | MOUSE_BTN_RIGHT) == 0', 'true', 'chord_pointer_masks'),
+    ('focus-changing press drops deferred release', 'src/input.rs',
+     'if released != 0 {\n            edge_x3(st, mx, my, released, false);',
+     'if released != 0 && pressed == 0 {\n            edge_x3(st, mx, my, released, false);',
+     'deferred_release_before_focus_change'),
     ('retain exited foreground', 'src/multiapp.rs',
      'mm.av_owner = -1;', '', 'reused_foreground_owner_is_notified_again'),
     ('record rejected foreground', 'src/multiapp.rs',
