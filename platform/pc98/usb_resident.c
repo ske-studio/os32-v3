@@ -84,7 +84,6 @@ static void usb_tick(void)
             pc98_usb_service_log("[usb] first tick", NULL);
         }
         tick_target();
-        if (!foreground_log) log_drain_one();
     }
 }
 
@@ -109,7 +108,10 @@ int usb_resident_tick_set(void (*service)(void))
         return -USB_E_HC;
     }
     scan_reserve_cnt = arch_tick_budget_cnt(USB_SCAN_RESERVE_US);
-    if (!foreground_log) foreground_log = idle_work_register(log_drain_one) == 0;
+    if (!foreground_log) {
+        foreground_log = idle_work_register(log_drain_one) == 0;
+        if (!foreground_log) kprintf(KLOG_ATTR, "[usb] idle log unavailable, boot flush only\n");
+    }
     head = count = 0;
     first_tick = 1;
     tick_target = service;

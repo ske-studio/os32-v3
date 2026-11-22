@@ -127,8 +127,8 @@ void usb_explore_step(struct usb_hc *hc)
         kmemset(w, 0, sizeof(*w)); w->hc = hc;
         if (usb_dmamem_alloc(hc, USB_CTRL_BUF_SIZE, 16, &w->scratch) < 0) {
             usbp_mem_free(w);
-            if (!hc->walk_error_logged) usbp_log("[usb] %u:%u.%u walk DMA failed", hc->pci.bus, hc->pci.dev, hc->pci.fn);
-            hc->walk_error_logged = 1;
+            if (!hc->scratch_error_logged) usbp_log("[usb] %u:%u.%u walk DMA failed", hc->pci.bus, hc->pci.dev, hc->pci.fn);
+            hc->scratch_error_logged = 1;
             return;
         }
         w->next = walks; walks = w; e->step = EX_X9;
@@ -223,6 +223,8 @@ void usb_explore_step(struct usb_hc *hc)
     case EX_R3: e->step = EX_A0; return;
     case EX_A0:
         e->child = alloc_device(w); usb_enum_reset(w);
+        if (!e->child)
+            usbp_log("[usb] %u:%u.%u port=%u child alloc failed", hc->pci.bus, hc->pci.dev, hc->pci.fn, e->port);
         e->step = e->child ? EX_A1 : EX_ERR; return;
     case EX_RE2:
         e->child->addr = 0; e->child->ep0_mps = 8; w->phase = 0; e->step = EX_RE3; return;

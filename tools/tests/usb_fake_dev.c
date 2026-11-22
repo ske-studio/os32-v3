@@ -12,7 +12,7 @@ static u32 now, frame, freeze, inject, gone, callbacks, attached, detached, rele
 static u32 allocation_count, free_count, dma_count, dma_free_count;
 static u32 fail_attach, busy_attach, address_early, overlap, reset_count;
 static u8 heap[2 * 1024 * 1024];
-static u32 heap_used, fail_walk, fail_scratch;
+static u32 heap_used, fail_walk, fail_scratch, fail_child, child_logs;
 struct allocation { void *ptr; u32 size; u8 freed; };
 static struct allocation allocations[4096];
 static u32 allocations_n;
@@ -34,6 +34,7 @@ void *kmemcpy(void *p, const void *s, u32 n) { u8 *b = p; const u8 *a = s; while
 void *usbp_mem_alloc(u32 n)
 {
     void *p;
+    if (fail_child && n == sizeof(struct usb_dev)) return 0;
     if (fail_walk && n == sizeof(struct usb_walk)) return 0;
     n = (n + 15) & ~15u;
     if (heap_used + n > sizeof(heap) || allocations_n == 4096) return 0;
@@ -95,6 +96,7 @@ void usbp_log(const char *fmt, ...)
     if (!log_compare(fmt, "[usb] %u:%u.%u port=%u reset failed")) reset_logs++;
     if (!log_compare(fmt, "[usb] %u:%u.%u addr=%u device descriptor failed")) descriptor_logs++;
     if (!log_compare(fmt, "[usb] %u:%u.%u addr=%u set config failed")) config_logs++;
+    if (!log_compare(fmt, "[usb] %u:%u.%u port=%u child alloc failed")) child_logs++;
     if (!log_compare(fmt, "[usb] %u:%u.%u walk alloc failed")) walk_logs++;
     if (!log_compare(fmt, "[usb] %u:%u.%u walk DMA failed")) scratch_logs++;
     if (log_compare(fmt, "[usb] root %u:%u.%u port=%u connected=%u") == 0) root_logs++;
@@ -490,7 +492,11 @@ static int scenario(int c)
         fail_scratch = c == 37;
         pump(20);
         REQUIRE(walk_logs == fail_walk && scratch_logs == fail_scratch && !initial_logs);
-        fail_walk = fail_scratch = 0;
+        fail_walk = 0;
+        fail_scratch = 1;
+        pump(20);
+        REQUIRE(walk_logs == (c == 36) && scratch_logs == 1 && !initial_logs);
+        fail_scratch = 0;
         pump(250);
         REQUIRE(initial_logs == 1 && read_mask == 7 && !connected_mask && !root_logs);
     } else if (c == 38) {
@@ -498,7 +504,13 @@ static int scenario(int c)
         pump(1600);
         REQUIRE(initial_logs == 1 && read_mask == 7 && connected_mask == 2);
         REQUIRE(unsupported_logs == 1 && !hid_logs && !reset_logs && !config_logs && !descriptor_logs);
+    } else if (c == 39) {
+        fail_child = 1;
+        plug(0, 3);
+        pump(1600);
+        REQUIRE(child_logs == 1 && !devices() && initial_logs == 1);
     } else return 2;
+    REQUIRE(child_logs == (c == 39));
     return failed;
 }
 int main(int argc,char **argv)

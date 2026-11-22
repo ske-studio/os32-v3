@@ -39,7 +39,7 @@ def build(tmp, swap=False, mutation=None):
     command(['gcc', *FLAGS, *(['-DUSB_TEST_SWAP'] if swap else []), *paths,
              'tools/tests/usb_fake_dev.c', '-o', str(exe)])
     return exe
-def execute(exe, cases=range(1,39), red=False):
+def execute(exe, cases=range(1,40), red=False):
     failures=[]
     for case in cases:
         p=host32.run([str(exe),str(case)],capture_output=True,timeout=20)
@@ -49,10 +49,12 @@ def execute(exe, cases=range(1,39), red=False):
     if not red: assert not failures, failures
     return failures
 MUTATIONS = [
+ ('usb_explore','usbp_log("[usb] %u:%u.%u port=%u child alloc','if (0) usbp_log("[usb] %u:%u.%u port=%u child alloc'),
+ ('usb_explore','if (!hc->scratch_error_logged)', 'if (!hc->walk_error_logged && !hc->scratch_error_logged)'),
  ('usb_explore','usbp_log("[usb] %u:%u.%u initial','if (0) usbp_log("[usb] %u:%u.%u initial'),
  ('usb_explore','usbp_log("[usb] %u:%u.%u port=%u reset','if (0) usbp_log("[usb] %u:%u.%u port=%u reset'),
  ('usb_explore','if (!hc->walk_error_logged) usbp_log("[usb] %u:%u.%u walk alloc','if (0) usbp_log("[usb] %u:%u.%u walk alloc'),
- ('usb_explore','if (!hc->walk_error_logged) usbp_log("[usb] %u:%u.%u walk DMA','if (0) usbp_log("[usb] %u:%u.%u walk DMA'),
+ ('usb_explore','if (!hc->scratch_error_logged) usbp_log("[usb] %u:%u.%u walk DMA','if (0) usbp_log("[usb] %u:%u.%u walk DMA'),
  ('usb_enum','if (!w->descriptor_logged)','if (0)'),
  ('usb_enum','usbp_log(messages[reason],','if (0) usbp_log(messages[reason],'),
  ('usb_enum','usbp_log("[usb] addr=%u iface=%u unsupported','if (0) usbp_log("[usb] addr=%u iface=%u unsupported'),

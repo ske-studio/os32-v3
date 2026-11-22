@@ -43,8 +43,8 @@ def run(ctx):
                 (b'm', 'if (!found) kprintf', 'if (0) kprintf', 37),
                 (b'm', 'stage = "BAR map"', 'stage = "unknown"', 38),
                 (b'r', 'if (!hc->has_irq)\n            kprintf', 'if (0)\n            kprintf', 40),
-                (b'f', 'if (!foreground_log) log_drain_one();',
-                 'if (!foreground_log) { log_drain_one(); log_drain_one(); }', 39),
+                (b'f', '        tick_target();',
+                 '        tick_target(); if (!foreground_log) log_drain_one();', 39),
                 (b'm', 'pc98_usb_service_log("[usb] first tick", NULL);', '(void)0;', 39),
             ])
             cases.extend((b'r', *mutation) for mutation in MUTANTS)
