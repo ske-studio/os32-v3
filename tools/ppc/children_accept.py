@@ -16,7 +16,7 @@ def replace_once(source, old, new):
     return source.replace(old, new)
 
 
-def image(out, user, shell, invert):
+def image(out, user, shell, case):
     kernel = 'platform/powermac/ppc_kernel.c'
     code = (ROOT / kernel).read_text()
     # Register a readable ISO child at the last block-registration step.
@@ -29,10 +29,17 @@ def image(out, user, shell, invert):
         if (dev_register(&child)) kboot_stop("child fixture");
 '''
     source = out / 'kernel.c'
-    source.write_text(replace_once(code, register, register + fixture))
+    code = replace_once(code, register, register + fixture)
+    host = '        (void)pm_hostfs_boot(info->tb_hz);'
+    if case == 'late-children':
+        mount = '        kernel_mount_children(vfs_devname("/"));'
+        code = replace_once(code, mount + '\n', '')
+        code = replace_once(code, host, host + '\n' + mount)
+    probe_host = '        kprintf(7, "CHILD before host child=%d\\r\\n", vfs_is_mounted("/rd1"));'
+    source.write_text(replace_once(code, host, probe_host + '\n' + host))
     header = Path('include/kernel_mount_children.h')
     code = (ROOT / header).read_text()
-    if invert:
+    if case == 'invert-root':
         code = replace_once(code, 'if (match) continue;', 'if (!match) continue;')
     (out / header.name).write_text(code)
 
@@ -84,11 +91,11 @@ def main():
         entry + '\n    int child_fd = api->sys_open("/rd1/sys/shell.bin", 0);'
                 '\n    if (child_fd >= 3) api->sys_close(child_fd);'))
     hashes = set()
-    for case in (('normal', 'invert-root') if args.mutate else ('normal',)):
+    for case in (('normal', 'invert-root', 'late-children') if args.mutate else ('normal',)):
         out = work / case
         out.mkdir()
         invert = case == 'invert-root'
-        elf = image(out, work / 'user', shell, invert)
+        elf = image(out, work / 'user', shell, case)
         digest = hashlib.sha256(elf.read_bytes()).hexdigest()
         assert digest not in hashes, case
         hashes.add(digest)
@@ -98,7 +105,13 @@ def main():
             assert lines.count('CHILD duplicate rd0') == int(invert)
             child = int(not invert)
             assert f'CHILD root=rd0 host=1 child={child} readable={child}' in lines
-            print('RED duplicate root' if invert else 'GREEN child and peerless shell')
+            before_host = int(case == 'normal')
+            assert [line for line in lines if line.startswith('CHILD before host')] == [
+                f'CHILD before host child={before_host}']
+            if case == 'late-children':
+                print('RED child mounted after host')
+            else:
+                print('RED duplicate root' if invert else 'GREEN child and peerless shell')
     print(f'PowerMac children {"build-only" if args.build_only else "runtime"} OK ({len(hashes)} images)')
     return 0
 
