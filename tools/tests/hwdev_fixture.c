@@ -1,8 +1,9 @@
 #include "debug_probe.h"
 struct probe_slot fixture_probe;
 const struct probe_decl fixture_decls[] = {{"fixture.pre", &fixture_probe}};
+volatile u32 fixture_probe_count = 1;
 static i32 get_probe_decls(const struct probe_decl **t, u32 *n)
-{ *t=fixture_decls; *n=1; return 0; }
+{ *t=fixture_decls; *n=fixture_probe_count; return 0; }
 /* Synthetic M2 body: no hardware, allocation, core calls or GF code. */
 #include "hwdev/generated/hwdev_contract.h"
 u32 hwdev_import_slots[HWDEV_IMPORT_COUNT]
@@ -11,6 +12,7 @@ static int call(u32 op, void *req, u32 size, const struct recover_ops *base,
                 struct recover_transport *transport, const struct recover_profile *s0)
 {
     (void)op; (void)req; (void)size; (void)base; (void)transport; (void)s0;
+    PROBE_HIT(fixture_probe);
     return 42;
 }
 static void release(void) { }

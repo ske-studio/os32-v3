@@ -31,7 +31,17 @@ def vk32():
     return bytes(image), crc
 
 
+DEPENDENCY_GUARD = '    if (!core) return MODULE_BAD_DEPENDENCY;\n'
+INIT_BLOCK = """    /* KMOD init checks/copies its export table; initialize only returns RO data. */
+    int (*init)(u32 *) = (int (*)(u32 *))(uptr)entry;
+    if (init(exports)) return MODULE_INIT_FAILED;
+"""
+
 MUTATIONS = [
+    ('dependency-order', DEPENDENCY_GUARD + INIT_BLOCK, INIT_BLOCK + DEPENDENCY_GUARD),
+    ('off-core-access', 'if (kdebug.state != KDEBUG_RUNNING) return 0;',
+     'if (kdebug.state != KDEBUG_RUNNING) { kdebug.ops.hwdev_core_get(); return 0; }'),
+    ('unsupported-registration', 'probe_table, probe_count)', 'probe_table, probe_count ? probe_count : 1)'),
     ('ignore-getter-failure', 'HWDEV_MODULE_OPS_VERSION, pair_valid,', 'HWDEV_MODULE_OPS_VERSION, (pair_valid || 1),'),
     ('probe-registration', 'debug_probe_register(hwdev_handle, probe_table, probe_count)', '0'),
     ('probe-unregister', 'if (debug_probe_unregister(hwdev_handle)) return 0;', '(void)0;'),
@@ -69,6 +79,14 @@ def fixtures(folder):
              ('core-missing-function', 8, 12, image), ('kernel-pair', 9, 4, image),
              ('core-missing-getter', 10, 6, image), ('core-ro-span', 11, 6, image),
              ('getter-failed', 14, 5, image), ('core-version', 12, 6, image), ('core-callback-range', 13, 12, image)]
+
+    cases.append(('wrong-running-dependency', 16, 14, image))
+
+    empty = bytearray(image)
+    struct.pack_into('<I', empty, h[11] + elf.symbol('fixture_probe_count')['value'], 0)
+    struct.pack_into('<I', empty, 128, 0)
+    struct.pack_into('<I', empty, 128, zlib.crc32(empty))
+    cases.append(('no-supported-probes', 15, 0, empty))
 
     def change(label, offset, value, rc=10, seal=True):
         b = bytearray(image)
