@@ -283,6 +283,134 @@
     {
       "artifact": "check-times-a13164157682a3c7aa12322856b2fc3c97d563a7-ppc-qemu-5",
       "sha256": "059a153f49140ee94985c0f21529b4f5cf6e24161bfae10b2ad2f1f8f78d3365"
+    },
+    {
+      "artifact": "check-times-32f4e3c3d3a5a45648868bcbc674cefae439869f-ppc-qemu-0",
+      "sha256": "ee79ff79498f527a8cf360e87aebff304d363c50dbc6142563174c94fef6a98b"
+    },
+    {
+      "artifact": "check-times-32f4e3c3d3a5a45648868bcbc674cefae439869f-ppc-qemu-1",
+      "sha256": "f621eb21d31eddc55a24e348672fa4838af3c481c12919aed1b57cd2acc7eff2"
+    },
+    {
+      "artifact": "check-times-32f4e3c3d3a5a45648868bcbc674cefae439869f-ppc-qemu-2",
+      "sha256": "55afa0cda29a6a6950e3931d9adac58024e876fad88fff505bfa4925ace45595"
+    },
+    {
+      "artifact": "check-times-32f4e3c3d3a5a45648868bcbc674cefae439869f-ppc-qemu-3",
+      "sha256": "2e7c0169974f76fa01e11df3cc929d415d25dfe3f20cb8bc50df0e71e369d166"
+    },
+    {
+      "artifact": "check-times-32f4e3c3d3a5a45648868bcbc674cefae439869f-ppc-qemu-4",
+      "sha256": "3d824f05b446b605c49e4f24778ce75fdbcacaf144a18ac9fa0cc6e63d0a3a60"
+    },
+    {
+      "artifact": "check-times-32f4e3c3d3a5a45648868bcbc674cefae439869f-ppc-qemu-5",
+      "sha256": "63df3065e7eaf89e7b535d2b550f7878a1ebc8a52f897fed87208606ee42d7a7"
+    },
+    {
+      "artifact": "check-times-32f4e3c3d3a5a45648868bcbc674cefae439869f-ppc-qemu-6",
+      "sha256": "8b4953b8d7761e72544c0dcc06eb40b8ee420b10c56a148db8b0fd2080f9aa13"
+    },
+    {
+      "artifact": "check-times-32f4e3c3d3a5a45648868bcbc674cefae439869f-ppc-qemu-7",
+      "sha256": "d702ef18d0d533daddb8e99d2225a2aad36404468d707cf32975d87dbf626644"
+    },
+    {
+      "artifact": "check-times-6e049951369bbace319d859eee12629a033905bb-ppc-qemu-0",
+      "sha256": "4468a30f1f004b883b0021de4346a589f58f3b8e73234173a540700e53054592"
+    },
+    {
+      "artifact": "check-times-6e049951369bbace319d859eee12629a033905bb-ppc-qemu-1",
+      "sha256": "3d41786b1cd5005147e8eca173a40fe51e66f87f96bf14077b2e5a87e0f917a6"
+    },
+    {
+      "artifact": "check-times-6e049951369bbace319d859eee12629a033905bb-ppc-qemu-2",
+      "sha256": "bb126d7d63ac9027a731e79c503e0a2bb2e624150701ebbd0f7b208dcddd37e0"
+    },
+    {
+      "artifact": "check-times-6e049951369bbace319d859eee12629a033905bb-ppc-qemu-3",
+      "sha256": "02324bb5bfb8d8b47242398fa03d90e193f2c9ea28abf001167c063895854950"
+    },
+    {
+      "artifact": "check-times-6e049951369bbace319d859eee12629a033905bb-ppc-qemu-4",
+      "sha256": "b45167e0c52d7e86cb04dc656bdea712f6f4c2fb97666ec71d15fb345d2562c4"
+    },
+    {
+      "artifact": "check-times-6e049951369bbace319d859eee12629a033905bb-ppc-qemu-5",
+      "sha256": "45732c18da2ea794f035d36e4da9feb87cc58964aa6270c13f2cf7c2a3cf850d"
+    },
+    {
+      "artifact": "check-times-6e049951369bbace319d859eee12629a033905bb-ppc-qemu-6",
+      "sha256": "accfc3024042c8784a5d835e14183f5ad65abcab0c528dddd22d4a0490e0e1b4"
+    },
+    {
+      "artifact": "check-times-6e049951369bbace319d859eee12629a033905bb-ppc-qemu-7",
+      "sha256": "34e14f500a152215305dd7d43847773da37bfa18aeb97e95a00b4696909c2ef2"
+    },
+    {
+      "artifact": "check-times-7ab658047e659010410f1fe8d5aeac5401c5b3dd-ppc-qemu-0",
+      "sha256": "200b4cceae6688cc259af33160e9f2444b7982c2c3f698e3816391ef94feb4f8"
+    },
+    {
+      "artifact": "check-times-7ab658047e659010410f1fe8d5aeac5401c5b3dd-ppc-qemu-1",
+      "sha256": "113fe653306200bd160d159d91e305807b71c36b56ed034413e0e89d88bcc831"
+    },
+    {
+      "artifact": "check-times-7ab658047e659010410f1fe8d5aeac5401c5b3dd-ppc-qemu-2",
+      "sha256": "56804802414c318a38478a18ded8206dbb41088425a2d4a12f06747913865976"
+    },
+    {
+      "artifact": "check-times-7ab658047e659010410f1fe8d5aeac5401c5b3dd-ppc-qemu-3",
+      "sha256": "751be7e3d10b57910d84cdac6da0dcc2edd54bf20faab9836410e40dec092596"
+    },
+    {
+      "artifact": "check-times-7ab658047e659010410f1fe8d5aeac5401c5b3dd-ppc-qemu-4",
+      "sha256": "ce3edc51893a25a037c149264d3e8535da336855b9bd767ccc1c7edce7b6472d"
+    },
+    {
+      "artifact": "check-times-7ab658047e659010410f1fe8d5aeac5401c5b3dd-ppc-qemu-5",
+      "sha256": "df489576bf746cf2f32f6239451092699e32a93bf26c6015b7cfa3ac987c13ff"
+    },
+    {
+      "artifact": "check-times-7ab658047e659010410f1fe8d5aeac5401c5b3dd-ppc-qemu-6",
+      "sha256": "d17c8bc7eed6d863c3927beef97769bd6fdbb8c9fe1f9ce0227cac80ec512784"
+    },
+    {
+      "artifact": "check-times-7ab658047e659010410f1fe8d5aeac5401c5b3dd-ppc-qemu-7",
+      "sha256": "c72993e2ff3555814651c62bd5ddfb19a80fe8dfef6376d29bc7ead1eb2c36de"
+    },
+    {
+      "artifact": "check-times-488ee743fe530b45877743577e299db1b8fc9d22-ppc-qemu-0",
+      "sha256": "c8955824ec087ef818fa465463b4507d2030c3a30dbaad3ad00ea9b771d76257"
+    },
+    {
+      "artifact": "check-times-488ee743fe530b45877743577e299db1b8fc9d22-ppc-qemu-1",
+      "sha256": "31d2da54ba7524ea46dba62dabfed0b59498373a4fd169c317aff751d5036780"
+    },
+    {
+      "artifact": "check-times-488ee743fe530b45877743577e299db1b8fc9d22-ppc-qemu-2",
+      "sha256": "18dde0c8d441ac6a90d00f4e9711461e3ced932da4624e1d4c6f2463d884d8ed"
+    },
+    {
+      "artifact": "check-times-488ee743fe530b45877743577e299db1b8fc9d22-ppc-qemu-3",
+      "sha256": "a356a903595d102160d7faf694d3b43e25b0bff62f328788c8f2803174962bbf"
+    },
+    {
+      "artifact": "check-times-488ee743fe530b45877743577e299db1b8fc9d22-ppc-qemu-4",
+      "sha256": "6f25dbf26eb36560311f24861fcd1e0840b8253bc8e7f6783702da16a0b872b6"
+    },
+    {
+      "artifact": "check-times-488ee743fe530b45877743577e299db1b8fc9d22-ppc-qemu-5",
+      "sha256": "a6a684d8fb6df6fe1f2193832916f6214161cf75f4d1b9e830b0eb3cb096e09a"
+    },
+    {
+      "artifact": "check-times-488ee743fe530b45877743577e299db1b8fc9d22-ppc-qemu-6",
+      "sha256": "9f2cd47576aefb5b83c3c582cf63b77b2cb928dd5293624e5931b1ddc8eab6c2"
+    },
+    {
+      "artifact": "check-times-488ee743fe530b45877743577e299db1b8fc9d22-ppc-qemu-7",
+      "sha256": "ecf20a46efa11c6c4bc6d1c1848635ee284e45124fd5582542c1f4ae512de4ba"
     }
   ],
   "seconds": {
@@ -291,7 +419,7 @@
     "appmem-host": 3.172635,
     "appmem-map-host": 5.664773,
     "arch-asm": 706.863658,
-    "arch-ctx-guest": 361.139453,
+    "arch-ctx-guest": 471.558671,
     "b8-open-host": 42.24959,
     "boot-order-host": 2.734105,
     "boot-readers-host": 3.186042,
@@ -572,53 +700,53 @@
     "pegc-mode-host": 3.4177,
     "pit-clock-host": 2.799469,
     "platform-memory-host": 2.646895,
-    "ppc-ata-guest": 163.333539,
-    "ppc-boot-info-guest": 278.653822,
-    "ppc-console-cells": 75.027023,
-    "ppc-db-guest": 228.903681,
-    "ppc-display-guest": 1159.751288,
-    "ppc-display-lifecycle": 124.196051,
-    "ppc-fb": 758.468402,
-    "ppc-font-guest": 105.943672,
-    "ppc-fp-accept-host": 0.199575,
-    "ppc-fp-guest": 502.302152,
-    "ppc-gfx2-guest": 175.537708,
-    "ppc-kapi-v89-guest": 300,
-    "ppc-kboot-layout": 97,
-    "ppc-kcg-guest": 129.075942,
-    "ppc-link-sh-flow": 345.684326,
-    "ppc-link-sh-run": 345.684326,
-    "ppc-loop-guest": 80.775128,
-    "ppc-machcfg-guest": 480,
-    "ppc-memstat-guest": 307.701677,
-    "ppc-mmu": 61.11988,
-    "ppc-module-rela-host": 3,
+    "ppc-ata-guest": 235.608811,
+    "ppc-boot-info-guest": 288.8990505,
+    "ppc-console-cells": 95.786342,
+    "ppc-db-guest": 265.0828255,
+    "ppc-display-guest": 962.247072,
+    "ppc-display-lifecycle": 147.86274650000001,
+    "ppc-fb": 688.2264720000001,
+    "ppc-font-guest": 104.591316,
+    "ppc-fp-accept-host": 0.24063,
+    "ppc-fp-guest": 401.2445305,
+    "ppc-gfx2-guest": 214.61230849999998,
     "ppc-in2-cui": 300,
-    "ppc-mouse-guest": 229.530809,
-    "ppc-path-guest": 110.039788,
-    "ppc-pci-guest": 90.258017,
-    "ppc-port-guest": 105.445902,
-    "ppc-kboot-console": 12.0,
-    "ppc-reset": 222.861345,
-    "ppc-rh-fb": 23.36311,
-    "ppc-root-lz4-layout-host": 38.884942,
+    "ppc-kapi-v89-guest": 220.0083325,
+    "ppc-kboot-console": 4.7306435,
+    "ppc-kboot-layout": 97,
+    "ppc-kcg-guest": 144.1755305,
+    "ppc-link-sh-flow": 393.6015515,
+    "ppc-link-sh-run": 571.8667175,
+    "ppc-loop-guest": 83.86479600000001,
+    "ppc-machcfg-guest": 308.24906599999997,
+    "ppc-memstat-guest": 203.432955,
+    "ppc-mmu": 75.718984,
+    "ppc-module-guest": 111.611608,
+    "ppc-module-rela-host": 3,
+    "ppc-mouse-guest": 216.5213655,
+    "ppc-path-guest": 125.7690265,
+    "ppc-pci-guest": 103.28789,
+    "ppc-port-guest": 140.956182,
+    "ppc-reset": 211.508963,
+    "ppc-rh-fb": 25.982729499999998,
+    "ppc-root-lz4-layout-host": 54.1977495,
     "ppc-root-lz4-layout-run": 120,
     "ppc-root-pair-host": 2,
-    "ppc-rtc-guest": 136.538782,
-    "ppc-sc": 118.795729,
-    "ppc-sd": 177.327036,
-    "ppc-sd-link": 170.335179,
-    "ppc-sfs-guest": 99.931278,
-    "ppc-sh-output": 48.123577,
-    "ppc-shell-layout-guest": 65.390447,
-    "ppc-shm-guest": 78.772222,
-    "ppc-sqlite-stack-guest": 13.762618,
-    "ppc-module-guest": 120,
-    "ppc-sqlite-static-guest": 79.123384,
-    "ppc-surface-guest": 166.501603,
-    "ppc-sysinfo-guest": 100.161341,
-    "ppc-usb": 144.438155,
-    "ppc-ver-guest": 151.197417,
+    "ppc-rtc-guest": 121.0866845,
+    "ppc-sc": 131.801419,
+    "ppc-sd": 184.1762905,
+    "ppc-sd-link": 196.6507445,
+    "ppc-sfs-guest": 227.3398795,
+    "ppc-sh-output": 76.494591,
+    "ppc-shell-layout-guest": 60.0761435,
+    "ppc-shm-guest": 103.470177,
+    "ppc-sqlite-stack-guest": 18.887629,
+    "ppc-sqlite-static-guest": 91.28491700000001,
+    "ppc-surface-guest": 172.946607,
+    "ppc-sysinfo-guest": 149.3137905,
+    "ppc-usb": 183.9568095,
+    "ppc-ver-guest": 179.15981449999998,
     "preflight-host": 4.421956,
     "privileged": 7.8109,
     "probe-host": 4.63924,
@@ -736,7 +864,7 @@
     "appmem-host": 3,
     "appmem-map-host": 3,
     "arch-asm": 3,
-    "arch-ctx-guest": 1,
+    "arch-ctx-guest": 4,
     "b8-open-host": 3,
     "boot-order-host": 3,
     "boot-readers-host": 3,
@@ -1017,45 +1145,49 @@
     "pegc-mode-host": 3,
     "pit-clock-host": 3,
     "platform-memory-host": 3,
-    "ppc-ata-guest": 1,
-    "ppc-boot-info-guest": 1,
-    "ppc-console-cells": 1,
-    "ppc-db-guest": 1,
-    "ppc-display-guest": 1,
-    "ppc-display-lifecycle": 1,
-    "ppc-fb": 1,
-    "ppc-font-guest": 3,
-    "ppc-fp-accept-host": 1,
-    "ppc-fp-guest": 1,
-    "ppc-gfx2-guest": 1,
-    "ppc-kcg-guest": 1,
-    "ppc-link-sh-flow": 1,
-    "ppc-link-sh-run": 3,
-    "ppc-loop-guest": 3,
-    "ppc-memstat-guest": 1,
-    "ppc-mmu": 3,
+    "ppc-ata-guest": 4,
+    "ppc-boot-info-guest": 4,
+    "ppc-console-cells": 4,
+    "ppc-db-guest": 4,
+    "ppc-display-guest": 4,
+    "ppc-display-lifecycle": 4,
+    "ppc-fb": 4,
+    "ppc-font-guest": 4,
+    "ppc-fp-accept-host": 4,
+    "ppc-fp-guest": 4,
+    "ppc-gfx2-guest": 4,
     "ppc-in2-cui": 1,
-    "ppc-mouse-guest": 1,
-    "ppc-path-guest": 1,
-    "ppc-pci-guest": 1,
-    "ppc-port-guest": 1,
-    "ppc-reset": 1,
-    "ppc-rh-fb": 3,
-    "ppc-root-lz4-layout-host": 1,
-    "ppc-rtc-guest": 1,
-    "ppc-sc": 1,
-    "ppc-sd": 1,
-    "ppc-sd-link": 1,
-    "ppc-sfs-guest": 3,
-    "ppc-sh-output": 1,
-    "ppc-shell-layout-guest": 1,
-    "ppc-shm-guest": 1,
-    "ppc-sqlite-stack-guest": 1,
-    "ppc-sqlite-static-guest": 3,
-    "ppc-surface-guest": 1,
-    "ppc-sysinfo-guest": 1,
-    "ppc-usb": 1,
-    "ppc-ver-guest": 1,
+    "ppc-kapi-v89-guest": 4,
+    "ppc-kboot-console": 2,
+    "ppc-kcg-guest": 4,
+    "ppc-link-sh-flow": 4,
+    "ppc-link-sh-run": 4,
+    "ppc-loop-guest": 4,
+    "ppc-machcfg-guest": 4,
+    "ppc-memstat-guest": 4,
+    "ppc-mmu": 4,
+    "ppc-module-guest": 2,
+    "ppc-mouse-guest": 4,
+    "ppc-path-guest": 4,
+    "ppc-pci-guest": 4,
+    "ppc-port-guest": 4,
+    "ppc-reset": 4,
+    "ppc-rh-fb": 4,
+    "ppc-root-lz4-layout-host": 4,
+    "ppc-rtc-guest": 4,
+    "ppc-sc": 4,
+    "ppc-sd": 4,
+    "ppc-sd-link": 4,
+    "ppc-sfs-guest": 4,
+    "ppc-sh-output": 4,
+    "ppc-shell-layout-guest": 4,
+    "ppc-shm-guest": 4,
+    "ppc-sqlite-stack-guest": 4,
+    "ppc-sqlite-static-guest": 4,
+    "ppc-surface-guest": 4,
+    "ppc-sysinfo-guest": 4,
+    "ppc-usb": 4,
+    "ppc-ver-guest": 4,
     "preflight-host": 3,
     "privileged": 3,
     "probe-host": 2,
