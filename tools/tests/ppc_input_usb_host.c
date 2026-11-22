@@ -29,7 +29,6 @@ int ring3_wait_pending(void)
     return 1;
 }
 int legacy_active(void) { return 0; }
-int in2_excl_keyboard(void) { return 0; }
 u32 in2_time_ms(void) { return now; }
 void usbp_log(const char *fmt, ...) { (void)fmt; }
 void appslot_poll_yield_reset(void) {}
@@ -99,6 +98,7 @@ void pm_usb_scan(void)
 static void test(void)
 {
     write_text("START\n");
+    check(!in2_excl_drop_raw(0x1d, 0) && !in2_excl_drop_raw(0x1d, 1), 10);
     check(usbp_input_src_alloc(USBP_INPUT_KBD) < 0 && !input_src_enumerate(0, 0), 10);
     check(usb_input_alloc(USBP_INPUT_KBD) < 0 && !input_src_enumerate(0, 0), 10);
     int mouse = usbp_input_src_alloc(USBP_INPUT_MOUSE);

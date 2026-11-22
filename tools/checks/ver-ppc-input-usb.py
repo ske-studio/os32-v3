@@ -36,7 +36,7 @@ MUTATIONS = [
     ('peek-pumps', 'input_boot.c', '    int key = lan_peek();\n    return key >= 0 ? key : pm_input_usb_peek();', '    pm_terminal_poll();\n    int key = lan_peek();\n    return key >= 0 ? key : pm_input_usb_peek();', 15, 'START\nMAP\nSTATE\nFIFO\n'),
     ('local-char-mode', 'input_boot.c', 'return input_legacy_try(IL_LOCAL_CHAR);', 'return input_legacy_try(IL_CHAR);', 15, 'START\nMAP\nSTATE\nFIFO\n'),
 ]
-HAL = ['usb_input', 'in2_dev', 'in2_state', 'in2_ring', 'keymap_registry', 'keymap_eval',
+HAL = ['usb_input', 'in2_dev', 'in2_excl', 'in2_state', 'in2_ring', 'keymap_registry', 'keymap_eval',
        'keymap_state', 'kbd_merge', 'legacy_keymap', 'legacy_ring', 'legacy_mode',
        'pointer_state', 'mouse_ext']
 PLATFORM = ['input_boot', 'input_usb', 'usb_key_report', 'input_keymap_backend']
