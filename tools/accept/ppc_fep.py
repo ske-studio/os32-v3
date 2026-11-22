@@ -2,23 +2,28 @@
 import argparse
 import hashlib
 import json
-import os
 from pathlib import Path
 import struct
 import subprocess
 import tempfile
 import zlib
 
-from ppc_module import ROOT, build, mkmod, mutant_settings, observe, root_pair, guest_available
+from ppc_module import ROOT, build, foreign_image, mkmod, mutant_settings, observe_lines, root_pair, guest_available
 
 
-def verify_media(elf, module):
+def verify_media(elf, module, symbols):
     wire, record, _, _ = root_pair.wire(elf.read_bytes())
     pair = zlib.crc32(wire)
     assert struct.unpack_from('<I', elf.read_bytes(), record)[0] == pair
     final = subprocess.check_output(['isoinfo', '-i', elf.parent / 'root.iso',
                                      '-x', '/BOOT/FEP.MOD;1'])
     assert final == root_pair.bind_module(module.read_bytes(), pair)
+    header = dict(zip(mkmod.HEADER_FIELDS, struct.unpack_from(
+        '<' + 'I' * len(mkmod.HEADER_FIELDS), final)))
+    assert header['IMPORT_COUNT'] == len(symbols)
+    for i, name in enumerate(symbols):
+        record = struct.unpack_from('<IHHI', final, header['IMPORT_OFF'] + 12 * i)
+        assert record == (mkmod.fnv1a(name.encode()), 1, 1, header['DATA_OFF'] + 4 * i), name
     disk = elf.parent / 'copy.ext2'
     with disk.open('wb') as stream:
         stream.truncate(4 * 1024 * 1024)
@@ -31,15 +36,17 @@ def verify_media(elf, module):
     print(f'{elf}: pair={pair:08x} fep.mod={len(final)} bytes', flush=True)
 
 
-def probe_source(work, directory):
-    metadata = json.loads((directory / 'fep_imports.json').read_text())
+def probe_source(work, directory, symbols):
     elf = mkmod.Elf((directory / 'fep.elf').read_bytes(), 'ppc-powermac')
     data = ['#include "module_runtime.h"', '#include "os32_generations.h"',
             f'#include "{directory}/fep_imports.h"']
     contracts = (directory / 'fep_kexports.c').read_text()
-    data.append(contracts[contracts.index('const struct module_symbol_contract'):])
+    data.append('static const struct module_symbol_contract probe_imports[] = {')
+    data.extend(f'    {{{mkmod.fnv1a(name.encode())}u, 1, 1}},' for name in symbols)
+    data.append('};')
+    data.append(contracts[contracts.index('const struct module_symbol_contract fep_export_contracts'):])
     for label, symbol in [('COPY', 'kmemcpy'), ('PRINT', 'kprintf')]:
-        slot = next(row['index'] for row in metadata['imports'] if row['name'] == symbol)
+        slot = symbols.index(symbol)
         data.extend([f'#define PROBE_{label} {elf.symbol(symbol)["value"]}u',
                      f'#define PROBE_{label}_SLOT {slot}'])
     data.append(f'#define PROBE_KAPI {json.loads((ROOT / "sdk/kapi.json").read_text())["version"]}')
@@ -67,7 +74,10 @@ def main():
     normal_dir = work / 'normal/fep'
     subprocess.run(['make', 'ARCH=ppc', 'PLATFORM=powermac', *common,
                     f'KB_OUT={normal_dir.parent}', normal_dir / 'fep.mod'], check=True)
-    probe = probe_source(work, normal_dir)
+    definition = json.loads((ROOT / 'tools/prototypes/fep_imports.def').read_text())
+    symbols = [row['symbol'] for row in definition['imports']]
+    probe = probe_source(work, normal_dir, symbols)
+    images = {}
     digests = set()
     for case in (['normal', 'bypass'] if args.mutate else ['normal']):
         settings = []
@@ -79,17 +89,33 @@ def main():
                     f'KB_MUT_FILE={probe}', *settings, 'kb-user', 'kernel')
         module = elf.parent / 'fep/fep.mod'
         assert module.read_bytes() == (normal_dir / 'fep.mod').read_bytes()
-        verify_media(elf, module)
+        verify_media(elf, module, symbols)
+        images[case] = elf
+    donor = images.get('bypass') or build(work / 'donor', *common, 'kb-user', 'kernel')
+    normal = images['normal']
+    def pair(path):
+        return zlib.crc32(root_pair.wire(path.read_bytes())[0])
+    cases = [('local', normal), ('foreign', foreign_image(normal, pair(donor)))]
+    if args.mutate:
+        cases.append(('bypass', foreign_image(donor, pair(normal))))
+    for case, elf in cases:
         digest = hashlib.sha256(elf.read_bytes()).hexdigest()
         assert digest not in digests
         digests.add(digest)
         print(case, digest, flush=True)
         if not args.build_only:
             call = '[module] fep 1 2 3 4 5 6 7'
-            expected = ([call, '[module] foreign=0 starts=1', call, '[module] local=0 starts=2']
-                        if case == 'bypass' else
-                        ['[module] foreign=4 starts=0', call, '[module] local=0 starts=1'])
-            observe(elf, work / ('guest-' + case), expected)
+            accepted = [call, '[module] result=0 starts=1']
+            expected = accepted if case == 'local' else ['[module] result=4 starts=0']
+
+            def check(cpu, lines):
+                if lines == expected:
+                    assert case != 'bypass', f'{cpu}: pair bypass survived'
+                else:
+                    assert case == 'bypass' and lines == accepted, (cpu, lines, expected)
+                    print(f'RED {cpu}: foreign FEP started: {lines}', flush=True)
+
+            observe_lines(elf, work / ('guest-' + case), check)
     print(f'{len(digests)} distinct FEP acceptance images')
     return 0
 

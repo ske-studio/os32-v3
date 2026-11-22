@@ -83,6 +83,12 @@ def foreign_image(elf, pair):
 
 
 def observe(elf, folder, expected):
+    def check(cpu, lines):
+        assert lines == expected, (cpu, lines, expected)
+    observe_lines(elf, folder, check)
+
+
+def observe_lines(elf, folder, check):
     from link_sh_run import Session
     folder.mkdir()
     for cpu in ('7450', '7455'):
@@ -92,7 +98,7 @@ def observe(elf, folder, expected):
             session.wait(session.ready, 'module probe READY', 90)
             serial = (session.out / 'serial-a.log').read_text(errors='replace')
             lines = [line[line.index('[module]'):].strip() for line in serial.splitlines() if '[module]' in line]
-            assert lines == expected, (cpu, lines, expected)
+            check(cpu, lines)
         finally:
             session.close()
 
