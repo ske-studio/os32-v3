@@ -881,7 +881,9 @@ def in2_observe(media, cpu, out, mode):
         edge('esc', False, '29')
         if mode == 'no-local':
             rsh_command(s, 'echo alive', b'alive\n')
-            require(s.word('rshell_active') != 0, 'local ESC was consumed')
+            # OUT can reach the host before capture END restores rshell_active.
+            s.wait(lambda: s.word('rshell_active') != 0,
+                   'RSH active after local ESC and echo capture', 10)
             return
         s.close_rshell(preloaded=True)
         type_line('echo fir')
