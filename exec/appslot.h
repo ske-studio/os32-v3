@@ -212,6 +212,14 @@ void appslot_start_commit(int id, int gui, u32 pages);
 void appslot_shell_commit(void);
 
 /* ---- gui_call の文脈 (C4) --------------------------------------------- */
+/* Only the display actor follows the registered WM during its callback.
+ * The slot, resource owner and window owner continue to identify the child. */
+void appslot_gui_registration(int active);
+u32 appslot_gui_draw_enter(void);
+void appslot_gui_draw_leave(u32 previous);
+int appslot_present_owner(void);
+int appslot_gui_present_ok(void);
+
 /* gui_call がハンドラを呼ぶ間だけ現在の op を控える。is_wait=1 で OP_WAIT。 */
 void appslot_gui_op_enter(int is_wait);
 void appslot_gui_op_leave(void);

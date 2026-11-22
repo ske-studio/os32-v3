@@ -21,6 +21,9 @@ extern int res_owner_get(void);
 /* いま処理中の op が OP_WAIT かどうかをカーネルに控えさせる (票 K5 の C4)。
  * exec_park() はこれを見て「OP_WAIT の中からしか譲らない」を強制し、park した
  * フレームに印を立てる。実体は exec/appslot.c (kernel/ は -Iexec 非依存)。 */
+u32 appslot_gui_draw_enter(void);
+void appslot_gui_draw_leave(u32 previous);
+extern void appslot_gui_registration(int active);
 extern void appslot_gui_op_enter(int is_wait);
 extern void appslot_gui_op_leave(void);
 extern i32 exec_trim_done(u32 epoch);
@@ -77,9 +80,11 @@ i32 gui_call(u32 op, u32 arg)
      * (票 K5 の D0/C4)。WM が OP_WAIT の中で exec_park() を呼んだときは
      * longjmp するのでこの関数へは戻ってこない。 */
     appslot_gui_op_enter(op == GUI_OP_WAIT);
+    u32 previous = appslot_gui_draw_enter();
     ring3_wm_enter();
     r = g_gui_handler(op, arg, res_owner_get());
     ring3_wm_leave();
+    appslot_gui_draw_leave(previous);
     appslot_gui_op_leave();
     return r;
 }
@@ -114,6 +119,7 @@ i32 gui_register(void *handler, void *pump)
     if (handler == 0) {
         return OS32_ERR_INVAL;
     }
+    appslot_gui_registration(1);
     g_gui_handler = (GuiHandler)handler;
     g_gui_pump    = pump;   /* K2 の syscall 境界ポンプが呼ぶ (exec/exec.c) */
 
@@ -136,15 +142,18 @@ i32 gui_register(void *handler, void *pump)
 void gui_owner_exit(int owner, int kind)
 {
     if (g_gui_handler != 0) {
+        u32 previous = appslot_gui_draw_enter();
         ring3_wm_enter();
         g_gui_handler(GUI_OP_OWNER_EXIT, (u32)kind, owner);
         ring3_wm_leave();
+        appslot_gui_draw_leave(previous);
     }
     /* WM 自身 (gshell = shell 帯 owner 1) が終了するなら登録を解除する。
      * これをしないと、gshell.bin が抜けて同じシェル帯に shell.bin が
      * 載った後も g_gui_handler / g_gui_pump が旧コードを指したままになり、
      * K2 の syscall 境界ポンプが別コードを呼んでしまう (レビュー ①)。 */
     if (owner == GUI_SHELL_OWNER) {
+        appslot_gui_registration(0);
         g_gui_handler = 0;
         g_gui_pump    = 0;
         /* CUI に戻るのでキーボードを元に戻す (cooked リングを再開)。
@@ -192,9 +201,16 @@ void gui_ime_set_render(void *table)
 /* ======================================================================== */
 /*  gui_get_pump — K2 用: 登録された入力ポンプを返す                         */
 /* ======================================================================== */
+static void gui_run_pump(void)
+{
+    u32 previous = appslot_gui_draw_enter();
+    ((void (*)(void))g_gui_pump)();
+    appslot_gui_draw_leave(previous);
+}
+
 void *gui_get_pump(void)
 {
-    return g_gui_pump;
+    return g_gui_pump ? gui_run_pump : 0;
 }
 
 /* ======================================================================== */
@@ -246,8 +262,10 @@ int gui_take_next_shell(char *out, int cap)
 void gui_display_failed(void)
 {
     if (g_gui_handler) {
+        u32 previous = appslot_gui_draw_enter();
         ring3_wm_enter();
         g_gui_handler(GUI_OP_SESSION_REQUEST, GUI_SESSION_SWITCH_CUI, GUI_SHELL_OWNER);
         ring3_wm_leave();
+        appslot_gui_draw_leave(previous);
     }
 }

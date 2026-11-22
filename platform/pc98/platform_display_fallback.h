@@ -3,7 +3,8 @@
 #define OS32_DISPLAY_FALLBACK_H
 #define DISPLAY_FALLBACK_BACKEND (&gfx_backend_pc98)
 #define DISPLAY_V1_WIDTH GFX_WIDTH
-#define DISPLAY_V1_PRESENT_OK() 1
+int appslot_gui_present_ok(void);
+#define DISPLAY_V1_PRESENT_OK() appslot_gui_present_ok()
 #define DISPLAY_V2_SHADOW_PUSH(x, y, w, h) OS32_ERR_NOSYS
 #define DISPLAY_V1_PUBLIC_INIT_OK() do { } while (0)
 /* PC-98 のテキスト面は別なので、表示を戻す操作は要らない。 */
