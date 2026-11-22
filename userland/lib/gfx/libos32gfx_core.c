@@ -64,9 +64,13 @@ static void bind_ports(void)
 
 static unsigned int gfx_cpl(void)
 {
+#if defined(OS32_CRT_RESIDENT) && defined(OS32_GFX_PACKED_ONLY)
+    return 0;
+#else
     unsigned short cs;
     __asm__ volatile("mov %%cs,%0" : "=r"(cs));
     return cs & 3U;
+#endif
 }
 
 void libos32gfx_detach(void)
@@ -121,6 +125,9 @@ static int gfx_refresh(void)
             gfx_api->gfx_screen_info(&si);
             if (si.format == GFX_FMT_PACKED8) gfx_packed = 1;
         }
+#ifdef OS32_GFX_PACKED_ONLY
+        if (!gfx_packed) goto invalid;
+#endif
         gfx_ready = 1;
         return 0;
     }

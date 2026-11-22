@@ -27,7 +27,10 @@ def check_target(args):
     import target_profile
     target = os.environ.get('OS32_SDK_TARGET', 'x86-pc98')
     try:
-        spec = pathlib.PurePosixPath(target_profile.sdk_values(target)['rust']).name
+        if target == 'ppc-powermac' and os.environ.get('OS32_PPC_RESIDENT') == '1':
+            spec = 'powerpc-os32-none.json'
+        else:
+            spec = pathlib.PurePosixPath(target_profile.sdk_values(target)['rust']).name
     except ValueError as error:
         raise SystemExit('rustc_stamp: ' + str(error))
     # rustc reads `@path` as one argument per line; look inside before it does.
@@ -80,17 +83,19 @@ def main():
         with tempfile.TemporaryDirectory(prefix='os32-rust-') as td:
             tmp = pathlib.Path(td)
             stamp = tmp / 'note'
-            stamp.write_bytes(struct.pack('<4I', *GEN))
-            members = subprocess.check_output(['i386-elf-ar', 't', str(archive)], text=True).splitlines()
+            ppc = os.environ.get('OS32_SDK_TARGET') == 'ppc-powermac'
+            prefix = 'powerpc-elf-' if ppc else 'i386-elf-'
+            stamp.write_bytes(struct.pack('>4I' if ppc else '<4I', *GEN))
+            members = subprocess.check_output([prefix + 'ar', 't', str(archive)], text=True).splitlines()
             for member in members:
-                raw = subprocess.check_output(['i386-elf-ar', 'p', str(archive), member])
+                raw = subprocess.check_output([prefix + 'ar', 'p', str(archive), member])
                 obj = tmp / member
                 obj.write_bytes(raw)
                 if raw.startswith(b'\x7fELF'):
-                    subprocess.run(['i386-elf-objcopy', '--remove-section=.os32_generations',
+                    subprocess.run([prefix + 'objcopy', '--remove-section=.os32_generations',
                                     '--add-section=.os32_generations=' + str(stamp),
                                     '--set-section-flags=.os32_generations=readonly', str(obj)], check=True)
-                    subprocess.run(['i386-elf-ar', 'r', str(archive.resolve()), str(obj)], check=True,
+                    subprocess.run([prefix + 'ar', 'r', str(archive.resolve()), str(obj)], check=True,
                                    stdout=subprocess.DEVNULL)
                 records.append({'member': member, 'sha256': digest(obj), 'native': raw.startswith(b'\x7fELF')})
         archive.with_name(archive.name + '.generations.json').write_text(json.dumps(

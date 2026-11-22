@@ -26,7 +26,12 @@ ROOT_ISO := $(KB_OUT)/root-input.iso
 ROOT_BLOB :=
 ROOT_ISO_FLAGS := --fixed-dates
 ROOT_MOTD := $(KB_OUT)/motd.txt
-ROOT_BINS = $(KB_ROOT_BINS)
+# Only the C-GUI acceptance root boots the resident window manager.
+ifeq ($(PPC_C_GUI),1)
+$(KB_OUT)/platform/powermac/shell_loop_ops.o: private KB_TU_FLAGS += -DOS32_C_GUI=1
+KB_GUI_BINS ?= $(KB_SH_OUT)/gshell.bin
+endif
+ROOT_BINS = $(KB_ROOT_BINS) $(KB_GUI_BINS)
 KB_ROOT_SHELL = $(KB_SH_OUT)/shell.bin
 ROOT_OBJCOPY := $(KB_OBJCOPY)
 ROOT_ELF_FORMAT := elf32-powerpc
@@ -251,6 +256,11 @@ KB_MUT_THIRD_SRC ?=
 KB_MUT_THIRD_FILE ?=
 kb_src = $(if $(and $(KB_MUT_SRC),$(filter $(KB_MUT_SRC),$1)),$(KB_MUT_FILE) -I$(dir $1),$(if $(filter $(KB_MUT_EXTRA_SRC),$1),$(KB_MUT_EXTRA_FILE) -I$(dir $1),$(if $(filter $(KB_MUT_THIRD_SRC),$1),$(KB_MUT_THIRD_FILE) -I$(dir $1),$1)))
 .PHONY: ppc-layout-force
+$(KB_OUT)/config/c-gui.flags: ppc-layout-force
+	@mkdir -p $(@D)
+	@echo '$(filter 1,$(PPC_C_GUI))' > $@.tmp
+	@if cmp -s $@.tmp $@; then rm -f $@.tmp; else mv $@.tmp $@; fi
+$(KB_OUT)/platform/powermac/shell_loop_ops.o: $(KB_OUT)/config/c-gui.flags
 $(KB_OUT)/config/shell-layout.flags: ppc-layout-force
 	@mkdir -p $(@D)
 	@echo '$(filter 1,$(KBOOT_SHELL_LAYOUT_DIAG))' > $@.tmp

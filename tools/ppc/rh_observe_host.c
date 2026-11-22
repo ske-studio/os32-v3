@@ -4,6 +4,7 @@
 #include "kstring.h"
 static u8 guarded[PM_RH_FB_LIMIT + 32];
 static unsigned scenario, synced, writes, translations, color_case, color_calls, color_writes;
+static unsigned clut_writes;
 static void finish(unsigned rc) __attribute__((noreturn));
 static void finish(unsigned rc)
 {
@@ -46,6 +47,7 @@ static int firmware(void *ptr)
             CHECK(v[1] == 8 && a[1] == 3 && a[2] == 4);
             u32 index = v[2];
             CHECK(index == 0 || index == 255);
+            if (index == 0) clut_writes = 0;
             color_calls++;
             if (color_case == 6) return 0; /* exception left catch untouched */
             if (color_case == 7) { v[3] = 0; return -33; } /* CI failure, not method catch */
@@ -57,6 +59,15 @@ static int firmware(void *ptr)
         }
         if (!kstrcmp(ppc_cell_ptr(v[0]), "color!")) {
             CHECK(v[1] == 8 && a[1] == 6 && a[2] == 1);
+            if (color_case < 3 || color_writes >= 2) {
+                unsigned idx = clut_writes++;
+                unsigned value = color_case == 0 ? 255 - idx : idx;
+                CHECK(idx < 256 && v[2] == idx && v[3] == (value & 3) * 85 &&
+                      v[4] == ((value >> 2) & 7) * 255 / 7 &&
+                      v[5] == (value >> 5) * 255 / 7);
+                v[6] = color_case == 8 && idx == 42;
+                return 0;
+            }
             CHECK(color_case >= 3 && color_writes < 2);
             u32 value = color_writes++ ? 255 : 0;
             CHECK(v[2] == value && v[3] == value && v[4] == value && v[5] == value);
@@ -127,7 +138,7 @@ void _start(void)
         if (rc!=PM_RH_FULL_OK) CHECK(!pm_rh_full_framebuffer()->bytes);
     }
     scenario = 12;
-    for (color_case = 0; color_case < 8; color_case++) {
+    for (color_case = 0; color_case < 9; color_case++) {
         CHECK(pm_rh_capture(8) == 1);
         CHECK(pm_rh_full_colors()->rc == PM_RH_COLOR_UNCHECKED);
         color_calls = color_writes = 0;
@@ -141,6 +152,11 @@ void _start(void)
         } else if (color_case == 3 || color_case >= 6) {
             CHECK(c->rc == PM_RH_COLOR_WRITTEN && c->foreground == 255 && c->background == 0);
         } else CHECK(c->rc == (color_case == 2 ? PM_RH_COLOR_EQUAL : PM_RH_COLOR_FAILED));
+        if (color_case == 8) CHECK(!c->clut && clut_writes == 43);
+        else if (c->rc == PM_RH_COLOR_OK || c->rc == PM_RH_COLOR_WRITTEN) {
+            CHECK(c->clut && clut_writes == 256);
+            CHECK(c->clut[c->foreground][0] == 255 && c->clut[c->background][2] == 0);
+        } else CHECK(!c->clut && !clut_writes);
         CHECK(color_writes == (color_case < 3 ? 0 : color_case == 4 ? 1 : 2));
         pm_rh_discard_full();
         CHECK(pm_rh_full_colors()->rc == PM_RH_COLOR_UNCHECKED);

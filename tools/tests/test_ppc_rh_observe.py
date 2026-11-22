@@ -28,7 +28,7 @@ def main():
             ofsrc = work/'ofw.c'; ofsrc.write_text(wrapper)
             exe = work/'host'
             subprocess.run(['gcc','-m32','-std=gnu11','-O2','-ffreestanding',
-                '-fno-builtin','-fno-pie','-no-pie','-nostdlib','-static',
+                '-fno-builtin','-fno-pie','-no-pie','-nostdlib','-nostdinc','-static',
                 '-DKBOOT_LINK='+str(int(link)), '-D__cdecl=','-Iinclude','-Ilib','-Iarch/ppc','-Iplatform/powermac',
                 'tools/ppc/rh_observe_host.c',str(ofsrc),
                 'lib/kstring_c.c',str(src),'-o',str(exe)],cwd=ROOT,check=True)
@@ -46,6 +46,8 @@ def main():
                 assert evaluate(source, ofw.replace(old, new)) == 1, name
                 print('RED runtime exit=1 '+name, flush=True)
             for name, old, new in [
+                ('partial-clut', 'if (ofw_call_method("color!", output, 4, 0, rgb)) return;',
+                 'if (ofw_call_method("color!", output, 4, 0, rgb)) break;'),
                 ('color-write-order', '.foreground = 255, .background = 0', '.foreground = 0, .background = 255'),
                 ('color-write-omitted', 'if (ofw_call_method("color!", output, 4, 0, black) ||\n            ofw_call_method("color!", output, 4, 0, white)) return;', 'if (0) return;'),
                 ('color-order', 'a > b ? 0 : 255', 'a > b ? 255 : 0'),
