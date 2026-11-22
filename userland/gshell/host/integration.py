@@ -352,7 +352,7 @@ MUTATIONS = [
      'pub fn discard_stop(st: &mut GuiState) {',
      'kstop_aborted_exit_consumes_captured_and_deferred_stop'),
     ('deferred STOP survives abort', 'src/input.rs',
-     '    st.pending_raw_n = kept;', '    let _ = kept;',
+     '        kept += 1;\n    }\n    st.pending_raw_n = kept;', '        kept += 1;\n    }',
      'kstop_aborted_exit_consumes_captured_and_deferred_stop'),
 
     ('switch ignores MRU (Z order only)', 'src/kbdnav.rs',

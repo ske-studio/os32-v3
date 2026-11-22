@@ -2039,7 +2039,7 @@ fn excl_old_window_identity_and_independent_rings() {
     mocks::init();
     let shm = mocks::Shm::new();
     let mut st = windows(&shm, &[(10,10,80,60), (110,10,80,60)]);
-    excl::observe(&mut st);
+    input::capture_keyboard(&mut st, input::Ctx::Wait);
     for i in 0..2 {
         let id = st.windows[i].id(i);
         assert!(excl::append(&mut st, i, &ring::ev_key(true, id, 0x1d, 65, 1, 0)));
@@ -2128,11 +2128,18 @@ fn excl_fep_pending_and_flush_wait_for_keyboard() {
     assert!(fep::feed(&mut st, 0x1c,13,0) == fep::Fed::Consumed);
     let next = id(&st, 0);
     assert_eq!(wm::set_focus(&mut st,2,next),0);
+    unsafe extern "C" fn toggle_off() {
+        unsafe extern "C" fn inactive() -> i32 { 0 }
+        (*os32api::api_ptr()).ime_is_active = inactive;
+    }
+    unsafe { (*os32api::api_ptr()).ime_toggle = toggle_off; }
+    fep::request_toggle();
     *mocks::WM_STATE.lock().unwrap() = (1,1,0);
     input::capture_keyboard(&mut st, input::Ctx::Wait);
     assert!(text(&st,0).is_empty() && text(&st,1).is_empty());
     *mocks::WM_STATE.lock().unwrap() = (2,0,0);
     input::capture_keyboard(&mut st, input::Ctx::Wait);
+    assert!(!fep::toggle_pending() && !fep::is_on());
     assert_eq!(text(&st,1), "幹事".as_bytes());
     assert!(text(&st,0).is_empty());
     fep_off();
@@ -2371,6 +2378,7 @@ fn excl_synthetic_mouse_down_needs_fresh_press() {
     let mut st = one_window(&shm);
     st.kn.mk_on = true;
     *mocks::WM_STATE.lock().unwrap() = (1,2,0);
+    run(&mut st, &[]);
     mocks::PRESSED.lock().unwrap()[NP_0 as usize] = true;
     run(&mut st,&[NP_0|DOWN|KANA]);
     assert_eq!(st.synth_buttons,0);
@@ -2465,4 +2473,65 @@ fn excl_owner_change_supersedes_same_owner_purge() {
     assert_eq!(wm::set_focus(&mut st, 2, other), 0);
     run(&mut st, &tap(SC_A, 0));
     assert_eq!(text(&st, 0), b"a");
+}
+
+#[test]
+fn excl_initial_notification_gates_both_contexts() {
+    use crate::{excl, multiapp};
+    mocks::init(); fep_off(); multiapp::reset();
+    let shm = mocks::Shm::new();
+    let mut st = windows(&shm, &[(40,40,400,300)]);
+    *mocks::AV_FOCUS_RESULT.lock().unwrap() = -1;
+    for ctx in [input::Ctx::Pump, input::Ctx::Wait, input::Ctx::Pump] {
+        mocks::push_rawkeys(&[SC_A|DOWN]);
+        input::capture_keyboard(&mut st, ctx);
+        assert!(!st.excl.open(excl::KBD) && !st.excl.open(excl::MOUSE));
+        assert!(events(&st, 0).is_empty());
+    }
+    *mocks::AV_FOCUS_RESULT.lock().unwrap() = 0;
+    mocks::INPUT_ORDER.lock().unwrap().clear();
+    run(&mut st, &[SC_B|DOWN]);
+    assert_eq!(mocks::INPUT_ORDER.lock().unwrap().iter().filter(|s| **s == "observe").count(), 2);
+    assert_eq!(text(&st,0), b"b");
+}
+
+#[test]
+fn excl_held_mouse_key_without_exclusive_repeat() {
+    mocks::init(); fep_off();
+    let shm = mocks::Shm::new();
+    let mut st = one_window(&shm);
+    st.kn.mk_on = true;
+    mocks::PRESSED.lock().unwrap()[NP_0 as usize] = true;
+    run(&mut st,&[NP_0|DOWN|KANA]);
+    assert_eq!(st.synth_buttons,1);
+    *mocks::WM_STATE.lock().unwrap() = (1,2,0);
+    run(&mut st,&[]);
+    assert_eq!(st.synth_buttons,0);
+    *mocks::WM_STATE.lock().unwrap() = (2,0,0);
+    run(&mut st,&[NP_0|DOWN|KANA]);
+    assert_eq!(st.synth_buttons,0);
+    mocks::PRESSED.lock().unwrap()[NP_0 as usize] = false;
+    run(&mut st,&[NP_0|KANA, NP_0|DOWN|KANA]);
+    assert_eq!(st.synth_buttons,1);
+}
+
+#[test]
+fn excl_completed_tab_presses_keep_selection_order() {
+    use crate::input::defer_raw;
+    for tab_break in [true, false] {
+        mocks::init(); fep_off();
+        let shm = mocks::Shm::new();
+        let mut st = windows(&shm,&[(0,0,80,60),(90,0,80,60),(180,0,80,60)]);
+        let tab = SC_TAB|GRPH|DOWN;
+        for raw in [tab, tab, tab] { defer_raw(&mut st,raw); }
+        if tab_break { defer_raw(&mut st,SC_TAB|GRPH); }
+        defer_raw(&mut st,SC_GRPH);
+        defer_raw(&mut st,tab);
+        for _ in 0..128 { defer_raw(&mut st,SC_GRPH|GRPH|DOWN); }
+        defer_raw(&mut st,SC_GRPH);
+        input::capture_keyboard(&mut st,input::Ctx::Wait);
+        assert_eq!(st.front_index(),Some(0));
+        input::capture_keyboard(&mut st,input::Ctx::Wait);
+        assert_eq!(st.front_index(),Some(2));
+    }
 }

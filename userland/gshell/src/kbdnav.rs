@@ -310,7 +310,7 @@ fn context_is_wm(st: &GuiState) -> bool {
 
 /// マウスキーが使うテンキーか (= と , は使わない、票 §1-3)。
 #[inline]
-fn is_mk_pad(scan: u8) -> bool {
+pub(crate) fn is_mk_pad(scan: u8) -> bool {
     matches!(
         scan,
         NP_MINUS

@@ -39,6 +39,7 @@ pub struct State {
     pub observed: u32,
     pub settled: u32,
     queried: bool,
+    focus_confirmed: bool,
     valid: bool,
     pub mouse_baseline: bool,
     pub held_buttons: u8,
@@ -49,7 +50,7 @@ pub struct State {
 
 impl State {
     pub const NEW: Self = Self {
-        sample: None, observed: 0, settled: 0, queried: false, valid: false, mouse_baseline: false, held_buttons: 0, prepared: 0, purge_same_owner: false,
+        sample: None, observed: 0, settled: 0, queried: false, focus_confirmed: false, valid: false, mouse_baseline: false, held_buttons: 0, prepared: 0, purge_same_owner: false,
         delivered: [Delivery::EMPTY; GUI_MAX_WINDOWS],
     };
 
@@ -58,7 +59,7 @@ impl State {
     }
 
     pub fn open(&self, bit: u32) -> bool {
-        self.valid && self.observed == self.settled &&
+        self.valid && self.observed == self.settled && self.focus_confirmed &&
             self.sample.is_some_and(|s| s.flags & bit == 0)
     }
 }
@@ -77,6 +78,7 @@ pub fn observe(st: &mut wm::GuiState) {
             st.excl.purge_same_owner = old.owner == next.owner &&
                 (st.excl.purge_same_owner || old.window != next.window);
         }
+        st.excl.focus_confirmed = crate::multiapp::av_owner() == next.owner;
         st.excl.sample = Some(next);
     }
     if !st.excl.open(MOUSE) && st.cursor.shown {
@@ -173,16 +175,16 @@ pub fn append(st: &mut wm::GuiState, slot: usize, ev: &GuiEvent) -> bool {
 // serves as the frozen retry queue, even across another generation change.
 pub fn settle(st: &mut wm::GuiState) {
     if !st.excl.valid { return; }
+    if !st.excl.focus_confirmed {
+        crate::multiapp::sync_av_focus(st);
+        observe(st);
+        if !st.excl.valid || !st.excl.focus_confirmed { return; }
+    }
     if st.excl.observed == st.excl.settled {
         for i in 0..GUI_MAX_WINDOWS {
             if st.excl.delivered[i].retry_buttons != 0 { release_window(st, i, false); }
         }
         return;
-    }
-    if crate::multiapp::av_owner() != st.front_owner() {
-        crate::multiapp::sync_av_focus(st);
-        observe(st);
-        if !st.excl.valid || crate::multiapp::av_owner() != st.front_owner() { return; }
     }
     if st.excl.prepared != st.excl.observed {
         input::purge_boundary(st, st.excl.purge_same_owner);

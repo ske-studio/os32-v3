@@ -91,6 +91,59 @@ fn stop_raw(raw: i32) -> bool {
     raw & 0x1ff == (0x100 | SC_STOP as i32) && raw & ((MOD_CTRL as i32) << 9) != 0
 }
 
+fn make_room(st: &mut GuiState, needed: usize, rank: u8) -> bool {
+    if needed == 0 { return true; }
+    let mut victims = [false; 128];
+    let mut found = 0;
+    for priority in 0..rank {
+        for i in (0..st.pending_raw_n).rev() {
+            if found < needed && st.pending_rank[i] == priority {
+                victims[i] = true;
+                found += 1;
+            }
+        }
+    }
+    if found < needed {
+        return false;
+    }
+    let mut write = 0;
+    for (i, &remove) in victims[..st.pending_raw_n].iter().enumerate() {
+        if !remove {
+            st.pending_raw[write] = st.pending_raw[i];
+            st.pending_rank[write] = st.pending_rank[i];
+            write += 1;
+        }
+    }
+    st.pending_raw_n = write;
+    st.pending_raw_dropped = st.pending_raw_dropped.saturating_add(found as u32);
+    true
+}
+
+// A completed TAB press contributes at most one queued repeat. Keep its
+// direction and reserve the completion and emergency STOP seats before sealing it.
+fn seal_repeats(st: &mut GuiState) {
+    let mut seen = false;
+    let mut kept = 0;
+    for i in 0..st.pending_raw_n {
+        if st.pending_rank[i] == 1 {
+            if seen { continue; }
+            seen = true;
+        }
+        st.pending_raw[kept] = st.pending_raw[i];
+        st.pending_rank[kept] = st.pending_rank[i];
+        kept += 1;
+    }
+    st.pending_raw_dropped = st.pending_raw_dropped.saturating_add((st.pending_raw_n - kept) as u32);
+    st.pending_raw_n = kept;
+    if seen {
+        let limit = st.pending_raw.len() - 1 - usize::from(!st.pending_raw[..kept].iter().copied().any(stop_raw));
+        make_room(st, kept.saturating_sub(limit), 3);
+        if let Some(rank) = st.pending_rank[..st.pending_raw_n].iter_mut().find(|r| **r == 1) {
+            *rank = 3;
+        }
+    }
+}
+
 // Admit a switch start and reserve its completion together. Evict from
 // the tail within each priority, then compact once to retain event order.
 pub(crate) fn defer_raw(st: &mut GuiState, raw: i32) {
@@ -106,6 +159,9 @@ pub(crate) fn defer_raw(st: &mut GuiState, raw: i32) {
     }
     let start = !st.pending_switch && grph && scan == SC_TAB && down;
     let repeat = st.pending_switch && st.pending_tab && scan == SC_TAB && down;
+    if st.pending_tab && (finish || (scan == SC_TAB && !down)) {
+        seal_repeats(st);
+    }
     if scan == SC_TAB { st.pending_tab = down; }
     if !grph || finish { st.pending_tab = false; }
     let rank = if start || finish || stop_raw(raw) { 3 }
@@ -114,31 +170,9 @@ pub(crate) fn defer_raw(st: &mut GuiState, raw: i32) {
     let reserve_stop = start && !st.pending_raw[..st.pending_raw_n].iter().copied().any(stop_raw);
     let limit = st.pending_raw.len() - usize::from(reserve_finish) - usize::from(reserve_stop);
     let needed = (st.pending_raw_n + 1).saturating_sub(limit);
-    if needed > 0 {
-        let mut victims = [false; 128];
-        let mut found = 0;
-        for priority in 0..rank {
-            for i in (0..st.pending_raw_n).rev() {
-                if found < needed && st.pending_rank[i] == priority {
-                    victims[i] = true;
-                    found += 1;
-                }
-            }
-        }
-        if found < needed {
-            st.pending_raw_dropped = st.pending_raw_dropped.saturating_add(1);
-            return;
-        }
-        let mut write = 0;
-        for (i, &remove) in victims[..st.pending_raw_n].iter().enumerate() {
-            if !remove {
-                st.pending_raw[write] = st.pending_raw[i];
-                st.pending_rank[write] = st.pending_rank[i];
-                write += 1;
-            }
-        }
-        st.pending_raw_n = write;
-        st.pending_raw_dropped = st.pending_raw_dropped.saturating_add(found as u32);
+    if !make_room(st, needed, rank) {
+        st.pending_raw_dropped = st.pending_raw_dropped.saturating_add(1);
+        return;
     }
     st.pending_raw[st.pending_raw_n] = raw;
     st.pending_rank[st.pending_raw_n] = rank;
@@ -316,6 +350,13 @@ fn release_capture(st: &mut GuiState, mx: i32, my: i32, button: u8) -> bool {
 pub fn cancel_capture(st: &mut GuiState) {
     *cap(MOUSE_BTN_LEFT) = Capture::NONE;
     *cap(MOUSE_BTN_RIGHT) = Capture::NONE;
+    if st.kn.mk_on {
+        for (scan, held) in st.held_keys.iter_mut().enumerate() {
+            if kbdnav::is_mk_pad(scan as u8) && unsafe { (os32api::api().kbd_is_pressed)(scan as i32) } > 0 {
+                *held = true;
+            }
+        }
+    }
     st.synth_buttons = 0;
     if st.drag_index >= 0 { wm::drop_drag_frame(st); }
 }
@@ -422,10 +463,10 @@ pub(crate) fn capture_keyboard_observed(st: &mut GuiState, ctx: Ctx) -> bool {
     let mut captured = false;
     /* X4 で見た SHIFT+SPACE をここで実行する (契約 T8: 辞書を開く重い処理は X3)。 */
     if ctx.wm_ui() && st.excl.open(crate::excl::KBD) {
-        fep::apply_pending_toggle(st);
         /* X1 (アプリの set_focus 等) でフォーカスが移ったときの未確定文字を、
          * 次の打鍵より先に元の窓へ確定する (票 KBD_NAV §1-6)。 */
         fep::apply_pending_commit(st);
+        fep::apply_pending_toggle(st);
     }
 
     /* 取りこぼしの差分を dropped に加算 (契約 T3)。 */

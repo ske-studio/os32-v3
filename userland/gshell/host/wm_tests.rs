@@ -3962,6 +3962,7 @@ fn kstop_full_event_ring_drains_raw_and_counts_overflow() {
         let shm = mocks::Shm::new();
         two_app_global(&shm);
         let st = wm::g();
+        multiapp::sync_av_focus(st);
         // Foreground app 3 uses slot 1. Leave fewer than the four reserved events.
         let mut h = slot::read_header(st, 1);
         h.ring_tail = h.ring_head.wrapping_add(GUI_RING_CAPACITY as u16 - 3);

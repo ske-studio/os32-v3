@@ -24,6 +24,14 @@ def mutations():
 
 
 ENTRY_MUTATIONS = [
+    ('toggle before old-window commit', 'src/input.rs',
+     'fep::apply_pending_commit(st);\n        fep::apply_pending_toggle(st);',
+     'fep::apply_pending_toggle(st); fep::apply_pending_commit(st);', 'excl_fep_pending'),
+    ('assume first owner was notified', 'src/excl.rs',
+     'crate::multiapp::av_owner() == next.owner', 'st.excl.sample.is_none() || crate::multiapp::av_owner() == next.owner', 'excl_initial_notification'),
+    ('skip held keypad sample', 'src/input.rs', 'if kbdnav::is_mk_pad(scan as u8)', 'if false && kbdnav::is_mk_pad(scan as u8)', 'excl_held_mouse_key'),
+    ('leave completed repeats evictable', 'src/input.rs', 'seal_repeats(st);', '', 'excl_completed_tab'),
+
     ('fallback leaks into new window', 'src/input.rs',
      'if stop_raw(raw) { st.abort_seen = true; }\n            continue;',
      'if stop_raw(raw) { st.abort_seen = true; }', 'excl_switch_fallback'),
