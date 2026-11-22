@@ -94,7 +94,7 @@ def build(work, mutation=None):
         dest = work / rel
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_text(text)
-    for rel, out in zip(SOURCES, ('pc98_boot_source.inc', 'boot_platform_source.inc', 'boot_display_source.inc', 'emergency_source.inc')):
+    for rel, out in zip(SOURCES[1:], ('boot_platform_source.inc', 'boot_display_source.inc', 'emergency_source.inc')):
         text = (work / rel).read_text()
         (work / out).write_text(re.sub(r'^#include[^\n]*\n', '', text, flags=re.M))
     kernel = (work / 'platform/pc98/kernel.c').read_text()
@@ -106,10 +106,18 @@ def build(work, mutation=None):
         'static void host_root_mount(struct boot_context boot) {\n' +
         kernel[start:end] + '}\n' + child.group())
     exe = work / 'boot'
-    cmd = ['gcc', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-D__cdecl=',
+    flags = ['-std=gnu11', '-Wall', '-Wextra', '-Werror', '-D__cdecl=',
            '-I' + str(work), '-I' + str(work / 'include'), *include_flags(work)]
-    cmd += include_flags(ROOT)
-    subprocess.run([*cmd, str(ROOT / 'tools/tests/dep_dir_d3_boot_host.c'), '-o', str(exe)], check=True)
+    flags += include_flags(ROOT)
+    # Compile boot.c as a separate translation unit with its product headers.
+    # Only privileged I/O crosses into the host event recorder.
+    shim = work / 'host-io'
+    shim.mkdir()
+    (shim / 'io.h').write_text('unsigned int inp(unsigned int);\nvoid _enable(void);\n')
+    boot = Path(SOURCES[0])
+    subprocess.run(['gcc', '-iquote', str(ROOT / boot.parent), '-I' + str(shim),
+                    *flags, str(work / boot), str(ROOT / 'tools/tests/dep_dir_d3_boot_host.c'),
+                    '-o', str(exe)], check=True)
     return exe
 
 
