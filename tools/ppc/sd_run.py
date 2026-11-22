@@ -12,7 +12,7 @@ import subprocess
 import tempfile
 import time
 
-from kboot_accept import build, mutant_settings
+from kboot_accept import build_media, mutant_settings
 from kboot_run import ROM, QMP, command, require, serial, validate_root as validate, lan
 
 CHECK = dict(name='ppc-sd', tier=2, budget=900, needs=[],
@@ -40,7 +40,7 @@ def exact(text, cmd, expected):
 
 
 class Session:
-    def __init__(self, elf, cpu, out, mutation):
+    def __init__(self, media, cpu, out, mutation):
         self.out, self.cpu, self.mutation = out, cpu, mutation
         out.mkdir()
         self.root = out/'saved'; self.root.mkdir()
@@ -59,9 +59,7 @@ class Session:
         self.drop = False
         self.saved = None
         self.p = self.q = None
-        cd = out/'cd'; cd.mkdir(); shutil.copyfile(elf, cd/'PPCKERN.ELF')
-        self.iso = out/'boot.iso'
-        command(['genisoimage', '-quiet', '-hfs', '-r', '-part', '-no-desktop', '-o', self.iso, cd])
+        self.iso = media.iso.resolve()
 
     def pump(self):
         require(self.p.poll() is None, 'QEMU exited before shell result: '+str(self.p.returncode))
@@ -143,8 +141,8 @@ class Session:
         self.transport.sock.close(); self.reservation.close()
 
 
-def accept(elf, cpu, out, mutation='normal'):
-    s = Session(elf, cpu, out, mutation)
+def accept(media, cpu, out, mutation='normal'):
+    s = Session(media, cpu, out, mutation)
     try:
         s.start(1)
         s.check('echo x > '+('/tmp/f' if mutation == 'tmp-target' else '/host/f'))
@@ -281,7 +279,7 @@ def link_large(calls):
                   for req, _ in calls), 'large WRITE frame')
     criterion(any(len(reply) == 1044 for _, reply in calls), '1044B READ frame')
 
-def link_accept(elf, cpu, out, mutation='normal'):
+def link_accept(media, cpu, out, mutation='normal'):
     import link_sh_run as link
     from host_agent import HostAgent, hdr_unpack, OP_HELLO
     import serialfs_host as sfs
@@ -333,7 +331,7 @@ def link_accept(elf, cpu, out, mutation='normal'):
     (root/'ro').write_bytes(b'read only\n')
     s = LinkSession.__new__(LinkSession)
     s.root, s.drop, s.calls, s.old_frames = root, False, [], []
-    LinkSession.__init__(s, elf, cpu, out/'boot1', 300)
+    LinkSession.__init__(s, media, cpu, out/'boot1', 300)
     try:
         s.start(); s.wait(s.ready, 'boot1 READY', 60)
         target = '/tmp/f' if mutation == 'tmp-target' else '/host/rw/f'
@@ -401,8 +399,8 @@ def link_accept(elf, cpu, out, mutation='normal'):
 
 def link_main(args):
     import link_sh_run as link
-    missing = [x for x in (link.cross('gcc'), link.cross('nm'), 'qemu-system-ppc', 'genisoimage') if not shutil.which(x)]
-    if args.build_only: missing = [x for x in missing if x not in ('qemu-system-ppc', 'genisoimage')]
+    missing = [x for x in (link.cross('gcc'), link.cross('nm'), 'qemu-system-ppc', 'genisoimage', 'isoinfo') if not shutil.which(x)]
+    if args.build_only: missing = [x for x in missing if x != 'qemu-system-ppc']
     elif not link.ROM.is_file(): missing.append(str(link.ROM))
     if missing:
         print('SKIP link S-D: unavailable '+', '.join(missing))
@@ -416,20 +414,20 @@ def link_main(args):
     base = Path(tempfile.gettempdir())/'sd-link'; base.mkdir(parents=True, exist_ok=True)
     work = Path(tempfile.mkdtemp(prefix='run-', dir=base)); print('evidence='+str(work), flush=True)
     control = work/'normal'; control.mkdir()
-    elf = build(control/'kernel', *link_settings(control))
-    link.check_map(elf.with_suffix('.map'))
+    media = build_media(control/'kernel', *link_settings(control))
+    link.check_map(media.map)
     cpus = ['7450', '7455'] if args.cpu == 'both' else [args.cpu]
     if not args.build_only:
-        for cpu in cpus: link_accept(elf, cpu, work/cpu)
-        link_accept(elf, cpus[0], work/'first-session', 'first-session')
+        for cpu in cpus: link_accept(media, cpu, work/cpu)
+        link_accept(media, cpus[0], work/'first-session', 'first-session')
     if args.mutate:
         mutant = work/'no-boot-follow'; mutant.mkdir()
-        changed = build(mutant/'kernel', *link_settings(mutant, True))
-        link.check_map(changed.with_suffix('.map'))
-        assert hashlib.sha256(changed.read_bytes()).digest() != hashlib.sha256(elf.read_bytes()).digest()
+        changed = build_media(mutant/'kernel', *link_settings(mutant, True))
+        link.check_map(changed.map)
+        assert hashlib.sha256(changed.elf.read_bytes()).digest() != hashlib.sha256(media.elf.read_bytes()).digest()
         if not args.build_only:
             for name, image, expected in (('no-boot-follow', changed, 'restart write'),
-                                           ('tmp-target', elf, 'restart persistence')):
+                                           ('tmp-target', media, 'restart persistence')):
                 try: link_accept(image, cpus[0], work/(name+'-guest'), name)
                 except link.CriterionFailure as exc:
                     link.require(str(exc) == expected, 'unexpected mutation verdict '+name+': '+str(exc))

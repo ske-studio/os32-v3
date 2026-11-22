@@ -21,8 +21,6 @@ SOURCE = '''/* INPUT_KEYMAP_DESIGN §7 H-usb・H-hid */
     __builtin_types_compatible_p(__typeof__(&(fn)), type), #fn)
 TYPE(usbp_input_usage, void (*)(u8, u8, int));
 TYPE(usbp_input_usage_repeat, void (*)(u8, u8));
-TYPE(usbp_input_key, void (*)(u8, u8, int));
-TYPE(usbp_input_key_repeat, void (*)(u8, u8));
 TYPE(hid_kbd_sc, u8 (*)(u8));
 TYPE(hid_kbd_norepeat, u8 (*)(u8));
 TYPE(hid_kbd_order, u8 (*)(u8));
@@ -35,7 +33,7 @@ def check(mutate):
         probe = tmp / 'probe.c'
         probe.write_text(SOURCE)
         command = ['gcc', '-m32', '-std=gnu11', '-ffreestanding', '-fno-builtin',
-                   '-nostdlib', '-Wall', '-Wextra', '-Werror', '-Wno-unused-function',
+                   '-nostdinc', '-nostdlib', '-Wall', '-Wextra', '-Werror', '-Wno-unused-function',
                    '-I'+str(tmp), '-Iinclude', '-I.', '-fsyntax-only', str(probe)]
         subprocess.run(command, cwd=ROOT, check=True)
         print('GREEN declaration types (no libc, no symbol references)')

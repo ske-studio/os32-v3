@@ -18,6 +18,7 @@
 - [5b の共通 present](../../decisions/ppc/PPC_KAPI_GFX_PRESENT_DESIGN.md)
 - [5c の gfx・gfx2](../../decisions/ppc/PPC_KAPI_GFX_REST_DESIGN.md)
 - [5d のシェル切替要求](../../decisions/ppc/PPC_KAPI_GUI_SWITCH_DESIGN.md)
+- [GUI KAPI の提供者への接続と C-GUI のシェル配置](../../decisions/ppc/PPC_GUI_KAPI_DESIGN.md)
 - [6b の SFS セッション](../../decisions/ppc/PPC_KAPI_SFS_SESSION_DESIGN.md)
 - [6c の loop・ext2](../../decisions/ppc/PPC_KAPI_LOOP_EXT2_DESIGN.md)
 - [7a の IME 公開と入力](../../decisions/ppc/PPC_KAPI_FEP_INPUT_DESIGN.md)

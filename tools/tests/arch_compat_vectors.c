@@ -43,6 +43,14 @@ int kbd_diag(KbdDiag *out) { (void)out; return OS32_ERR_NOSYS; }
 int kbd_diag_log(u32 seq, KbdDiagLogEnt *out, int max)
 { (void)seq; (void)out; (void)max; return OS32_ERR_NOSYS; }
 #else
+volatile int kbd_gui_mode;
+int kbd_inject_peek(u8 *out) { (void)out; return 0; }
+int kbd_inject_take(u8 *out) { (void)out; return 0; }
+void kbd_set_gui_mode(int on) { kbd_gui_mode = on; }
+void kbd_discard_stop(void) {}
+int legacy_raw_take(void) { int c = raw_key; raw_key = -1; return c; }
+int input_key_pressed(u8 sc) { return sc == KEY_CTRL && down; }
+u8 input_key_mods(void) { return mods; }
 static u32 fake_time;
 static int capture;
 int con_sink_capture_active(void) { return capture; }

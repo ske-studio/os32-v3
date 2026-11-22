@@ -57,9 +57,8 @@ static int takeover(struct usb_hc *hc)
     usbp_log("USB TAKEOVER quiet");
     return 0;
 }
-void pm_usb_boot(u32 tb_hz)
+void pm_usb_scan(void)
 {
-    pm_usb_platform_init(tb_hz);
     for (u32 root = 0; root < pm_usb_root_count && !active; root++) {
         pm_usb_root = &pm_usb_roots[root];
         if (paging_map_phys(PPC_BOOT_USB_VA, pm_usb_root->pa + PM_USB_CFG_ADDR_OFFSET, 1, PAGE_RW | PTE_PCD) ||

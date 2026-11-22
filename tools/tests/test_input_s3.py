@@ -32,7 +32,7 @@ def run(ctx):
         assert build(source) == 0
         if ctx.mutate:
             for anchor, replacement in [
-                ('((u16)sc << 8) | byte', 'byte'),
+                ('legacy_cooked_push(((u16)sc << 8) | byte)', 'legacy_cooked_push(byte)'),
                 ('result->sym < 0x80', 'result->sym < 0x100'),
                 ('byte = result->sym & 0x7f', 'byte = 0'),
                 ('result->kind = KM_LEGACY_CONTROL;', 'result->kind = KM_CHAR;'),

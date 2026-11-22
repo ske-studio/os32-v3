@@ -10,7 +10,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT / 'tools'), str(ROOT / 'tools/ppc')]
 import ppc_resource_owner
-from kboot_accept import build
+from kboot_accept import build_media
 from ppc_shm import guest_available
 from run import require
 
@@ -56,11 +56,11 @@ def mutations(folder, edits):
     return settings
 
 
-def observe(elf, cpu, folder, case):
+def observe(media, cpu, folder, case):
     from link_sh_run import Session
     from usb_run import rsh_command
 
-    session = Session(elf, cpu, folder, 240)
+    session = Session(media, cpu, folder, 240)
     try:
         session.start()
         session.wait(session.ready, 'db cui READY', 90)
@@ -133,15 +133,15 @@ def main():
     seen = set()
     for case in cases:
         folder = work / case
-        elf = build(folder / 'kernel', 'IMAGE=kboot-link-sh', 'KB_SH_OUT=' + str(user),
+        media = build_media(folder / 'kernel', 'IMAGE=kboot-link-sh', 'KB_SH_OUT=' + str(user),
                     'KB_ROOT_BINS=' + bins, *settings[case], 'kb-user', 'kernel')
-        digest = hashlib.sha256(elf.read_bytes()).hexdigest()
+        digest = hashlib.sha256(media.elf.read_bytes()).hexdigest()
         require(digest not in seen, repr((case, digest)))
         seen.add(digest)
-        print(f'{case} sha256={digest} {elf}', flush=True)
+        print(f'{case} sha256={digest} {media}', flush=True)
         if not args.build_only:
             for cpu in ('7450', '7455'):
-                observe(elf, cpu, folder / cpu, case)
+                observe(media, cpu, folder / cpu, case)
     print(f'{len(seen)} distinct link-sh images')
     return 0
 
