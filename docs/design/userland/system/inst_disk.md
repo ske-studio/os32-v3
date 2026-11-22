@@ -1,10 +1,8 @@
 # userland/system/inst_disk.c — 設計
 > 状態: **現行 (2026-11-18)** — 出所: TASK_HDD_INSTALL 段 2 (9〜11、§1-v3 N4・N8) の契約を今のソースと照らして要約
-ソース: `userland/system/inst_disk.c`・`userland/system/inst_disk.h` (`inst_classify`・`inst_check_boot_files`・`inst_need_*`・`inst_file_blocks`・`inst_check_space`・`inst_check_path`・`inst_patch_ipl`・`inst_build_pt`)
-
-インストーラ (CD の cdinst と FD の install) が共有する純粋関数: hd0 のモードの判定、媒体の大きさ、展開先の容量、
-パスの検査、IPL と区画表の組み立て。幾何と計画は `userland/shell/hdprep_plan.c`、区画表は `fs/pc98pt.c`、ext2 の配置は
-`fs/ext2/ext2_layout.c` をそのまま組む (写さない)。手順は `userland/system/inst_hdd.c`。
+容量とパスの判定は `userland/system/inst_disk.c`。PC-98 の媒体判定・起動資材の大きさ・IPL 補正は `platform/pc98/install_disk.c`、
+CHS 計画と区画表の生成は hdprep と共用の `platform/pc98/install_plan.c` にある。区画表は `fs/pc98pt.c`、ext2 は
+`fs/ext2/ext2_layout.c` の計算を使う。
 
 ## モード (`inst_classify(lba0, lba1, heads, spt, disk_total, expect_start, &mode)`)
 

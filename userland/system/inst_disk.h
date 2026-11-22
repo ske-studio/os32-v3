@@ -30,16 +30,6 @@
 #include "userland/shell/hdprep_plan.h"   /* HdprepGeom / HdprepPlan / HDPREP_E_* */
 
 /* ---- 媒体の上限 ---------------------------------------------------------- */
-#define INST_IPL_MAX        512UL
-#define INST_LOADER_LBA     2UL
-/* boot/boot_hdd.asm は LBA 2 から 16 セクタ読む (tools/nhd_deploy.py の
- * LOADER_MAX_SECTORS と同じ) */
-#define INST_LOADER_MAX     8192UL
-/* boot/boot_defs.h MAX_IMAGE_SIZE (0x10000〜0x8EFFF)。試験が突き合わせる */
-#define INST_KERNEL_MAX     (508UL * 1024UL)
-/* IPL の中の幾何 (boot/boot_hdd.asm の geo_heads / geo_spt) */
-#define INST_IPL_OFF_HEADS  8
-#define INST_IPL_OFF_SPT    9
 /* 区画の大きさ (hdprep の上限と同じ 256MiB = ext2 32 グループ) */
 #define INST_PART_MB        HDPREP_MAX_MB
 /* fs/ext2/ext2_ctx.h EXT2_MAX_GROUPS。試験が突き合わせる */
@@ -124,10 +114,6 @@ int inst_check_path(const char *path);
 
 /* IPL (512 B) に BIOS 幾何を書き、末尾に 55AA を置く */
 void inst_patch_ipl(unsigned char *ipl, unsigned long heads, unsigned long spt);
-
-/* 区画表 (512 B) を作る: 全部 0 にして項目 0 に OS32 の区画 (標準配置)。
- * 0 = OK / 負 = pc98pt の失敗 (PC98PT_ERR_*) */
-int inst_build_pt(unsigned char *sect, const HdprepPlan *p);
 
 /* 表示用 (英語 1 行) */
 const char *inst_reason(int code);

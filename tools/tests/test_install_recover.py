@@ -140,7 +140,7 @@ def target_compile(tmp):
              "-fno-stack-protector", "-nostdlib", "-mno-red-zone", "-fcommon",
              "-O2", "-Wall", "-Wextra", "-Werror", "-Wno-unused-function",
              "-D__OS32_USERLAND__",
-             "-I.", "-Iinclude", "-Isdk/include", "-Isdk/include/os32",
+             "-Iplatform/pc98", "-I.", "-Iinclude", "-Isdk/include", "-Isdk/include/os32",
              "-Iuserland/lib", "-I/usr/local/cross/i386-elf/include"]
     subprocess.run(["i386-elf-gcc", *flags, "-c", "userland/system/install.c",
                     "-o", str(tmp / "install.o")], check=True, cwd=ROOT)

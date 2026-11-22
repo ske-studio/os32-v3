@@ -318,6 +318,7 @@ static int rec_has_exact(char list[][96], int n, const char *path)
 
 #define main install_main
 #include "../../userland/system/install.c"
+#include "include/ide_contract.h"
 #undef main
 
 /* drivers/ata/ide.h の IdeInfo と同じ並び (i386 では 96 B)。install.c 側の型が
