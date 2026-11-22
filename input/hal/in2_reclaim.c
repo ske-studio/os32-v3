@@ -13,11 +13,10 @@ static void clear_input(void)
 void in2_reclaim(int owner)
 {
     unsigned f = irq_save();
+    int foreground = owner == av_focus_owner();
+    if (foreground) clear_input();
     in2_excl_release(owner);
-    if (owner == av_focus_owner()) {
-        clear_input();
-        in2_reclaim_generation();
-    }
+    if (foreground) in2_reclaim_generation();
     irq_restore(f);
 }
 

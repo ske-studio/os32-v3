@@ -17,6 +17,7 @@ void in2_on_focus(int old, int owner)
 }
 
 /* Hardware-facing leaves in the ABI probe have no input producers. */
+u32 input_key_release_gen(u8 sc) { (void)sc; return 0; }
 int input_key_pressed(u8 sc) { (void)sc; return 0; }
 u8 pointer_buttons_locked(void) { return 0; }
 u32 in2_time_ms(void) { return 0; }

@@ -69,6 +69,11 @@ static int check(void)
                 if (key(src, gen, modifiers[m], 0, 0)) return 11;
         }
     }
+    /* The last mapped A release can occur while GUI raw is disabled. */
+    u32 release = input_key_release_gen(0x1d);
+    if (key(src, gen, 0x1d, 1, 0) || key(usb, usb_gen, 4, 1, 0) ||
+        key(src, gen, 0x1d, 0, 0) || input_key_release_gen(0x1d) != release ||
+        key(usb, usb_gen, 4, 0, 0) || input_key_release_gen(0x1d) != release + 1) return 26;
     /* One held array: duplicate make/repeat cannot increment alias counts. */
     kbd_gui_mode = 1; reset();
     if (key(usb, usb_gen, 0xe1, 1, 0) || key(usb, usb_gen, 0xe5, 1, 0)) return 12;

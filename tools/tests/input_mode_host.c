@@ -96,4 +96,4 @@ void _start(void) {
     __builtin_unreachable();
 }
 
-int in2_excl_keyboard(void) { return 0; }
+int in2_excl_drop_raw(u8 sc, int br) { (void)sc; (void)br; return 0; }
