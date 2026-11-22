@@ -10,3 +10,5 @@ C_PLATFORM += platform/pc98/pit.c platform/pc98/tick_budget.c platform/pc98/pit_
 C_PLATFORM += platform/pc98/module_pair.c platform/pc98/bootinfo_capture.c platform/pc98/bootinfo_geom.c platform/pc98/bootinfo_report.c platform/pc98/bootinfo_check.c platform/pc98/bios_snapshot.c platform/pc98/boot_capture.c
 C_PLATFORM += fs/ext2/ext2_medium_ide.c
 C_ORDER_TAIL += fs/ext2/ext2_medium_ide.c
+C_PLATFORM += platform/pc98/usb_config.c platform/pc98/usb_platform.c drivers/usb/ehci_quiesce.c
+C_ORDER_TAIL += platform/pc98/usb_config.c platform/pc98/usb_platform.c drivers/usb/ehci_quiesce.c

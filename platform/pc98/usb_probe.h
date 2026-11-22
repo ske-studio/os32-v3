@@ -5,4 +5,5 @@
 
 /* Convert one enumerated function for the module probe. On failure out is unchanged. */
 int pc98_usb_ohci_function(const struct pci_dev *dev, struct usb_pci_fn *out);
+void pc98_usb_early_quiesce(void);
 #endif

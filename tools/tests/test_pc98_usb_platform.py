@@ -8,11 +8,17 @@ CHECK = dict(name='pc98-usb-platform-host', tier=1, needs=[], budget=3,
                      'tools/tests/pc98_usb_platform_host.c', 'tools/tests/test_pc98_usb_platform.py',
                      'drivers/pci/pci.h', 'drivers/pci/pci_decode.h', 'drivers/pci/pci_barsize.h',
                      'include/pci_contract.h', 'include/pci_dev_contract.h', 'include/usb_platform.h',
-                     'include/types.h', 'include/callconv.h', 'sdk/include/os32/os32_*.h'],
+                     'drivers/usb/ehci_quiesce.c', 'drivers/usb/*.h', 'include/endian_dma.h',
+                     'arch/x86/arch_endian_dma.h', 'include/kprintf.h', 'include/types.h', 'include/callconv.h', 'sdk/include/os32/os32_*.h'],
              basis=['docs/decisions/usb/USB_DESIGN.md §4-1'])
 MUTATIONS = [
     ('dev->progif != 0x10', '0', 2),
-    ('bar.unassigned ||', '', 3),
+    ('bar.prefetch || bar.unassigned', 'bar.prefetch', 3),
+    ('dev->device != 0x0035', '0', 6),
+    ('polls++ == 500', 'polls++ == 499', 9),
+    ('if (take_ownership(&hc) == 0)', 'if (take_ownership(&hc) <= 0)', 8),
+    ('ptr + EHCI_OS_BYTE', 'ptr', 8),
+    ('if (blocked) blocked_slots', 'if (!blocked) blocked_slots', 11),
     ('.fn = dev->fn', '.fn = 0', 1),
 ]
 
@@ -31,8 +37,8 @@ def run(ctx):
         for source, expected in cases:
             src.write_text(source)
             subprocess.run(['gcc', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
-                            '-I.', '-Iinclude', '-Iplatform/pc98', '-Isdk/include/os32',
-                            src, 'tools/tests/pc98_usb_platform_host.c', '-o', exe],
+                            '-Iarch/x86', '-I.', '-Iinclude', '-Iplatform/pc98', '-Isdk/include/os32',
+                            src, 'drivers/usb/ehci_quiesce.c', 'tools/tests/pc98_usb_platform_host.c', '-o', exe],
                            cwd=root, check=True)
             result = subprocess.run([exe]).returncode
             assert result == expected, (result, expected)
