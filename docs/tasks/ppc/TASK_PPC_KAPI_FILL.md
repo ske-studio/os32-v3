@@ -15,6 +15,15 @@
 - 本線: 共通へ移す段 (C)・口を作る段 (D)・select.mk の縛りを解く段。移す先のファイル名は本線が段の着手で決めて、ここに書き戻す。
 - PowerPC: PowerMac の後端 (B) と PowerPC の公開表 (sdk/kapi_target_ppc.py)。
 
+- [5b の共通 present](../../decisions/ppc/PPC_KAPI_GFX_PRESENT_DESIGN.md)
+- [5c の gfx・gfx2](../../decisions/ppc/PPC_KAPI_GFX_REST_DESIGN.md)
+- [5d のシェル切替要求](../../decisions/ppc/PPC_KAPI_GUI_SWITCH_DESIGN.md)
+- [6b の SFS セッション](../../decisions/ppc/PPC_KAPI_SFS_SESSION_DESIGN.md)
+- [6c の loop・ext2](../../decisions/ppc/PPC_KAPI_LOOP_EXT2_DESIGN.md)
+- [7a の IME 公開と入力](../../decisions/ppc/PPC_KAPI_FEP_INPUT_DESIGN.md)
+- [7a の改訂設計（fep.mod の読み込み）](../../decisions/ppc/PPC_FEP_MODULE_DESIGN.md)
+- [段 8 の ATA block 契約と PowerMac 後端](../../decisions/ppc/ATA_HAL_DESIGN.md)
+
 ## 2. 段の状態
 | 段 | 担当 | 状態 |
 |---|---|---|

@@ -18,6 +18,13 @@
 - 寄せた後に残る違いは ARCH_COMPAT_CONTRACT §9 の行を「残す (理由)」に直すか、行を消す。
 - KAPI の埋めの段と同じファイルを触る行は、埋めの段が main に入ってから取る (衝突させない)。
 
+- [B04 の LAN と前景での poll](../../decisions/ppc/PPC_ALIGN_B04_DESIGN.md)
+- [B07 の製品・受入の起動媒体](../../decisions/ppc/PPC_ALIGN_B07_DESIGN.md)
+- [B10 のログ経路と起動診断](../../decisions/ppc/PPC_ALIGN_B10_DESIGN.md)
+- [B08・C04 の部品読み込み](../../decisions/ppc/PPC_MODULE_ALIGN_X86_DESIGN.md)
+- [RAM root の LZ4 展開](../../decisions/ppc/PPC_ROOT_LZ4_DESIGN.md)
+- [B05 の HDD root と /host の mount](../../decisions/ppc/PPC_ROOT_MOUNT_ALIGN_X86_DESIGN.md)
+
 ## 2. B — 揃えられる 2 重 (重さの軽い順)
 | 順 | ID | 役目 | 重さ (調べの見込み) | 状態 |
 |---|---|---|---|---|
