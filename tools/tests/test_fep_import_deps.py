@@ -44,6 +44,11 @@ def exercise(work, mutation):
                        cwd=work, check=True)
         return json.loads(metadata.read_text())
 
+    query = subprocess.check_output(
+        ['make', '-s', '-f', 'build/fep-common.mk', 'FEP_OUT=out',
+         'ARCH=ppc', 'PLATFORM=powermac',
+         '--eval=query: ; @echo -Iinclude', 'query'], cwd=work, text=True)
+    assert query == '-Iinclude\n' and not metadata.exists(), 'query ran generator'
     before = build()
     (work / 'provider.h').write_text('long sample(int value);\n')
     after = build()
@@ -76,8 +81,11 @@ if __name__ == '__main__':
         for mutant, reason in [
                 ((generator, inputs, "doc['contracts']"), 'stale signature'),
                 ((generator, inputs, 'includes'), 'stale facade'),
-                (('build/fep-common.mk', '$(FEP_GEN) $(FEP_OUT)/fep_imports.d &:',
-                  '$(FEP_GEN) &:'), 'lost depfile')]:
+                (('build/fep-common.mk', '$(FEP_GEN): fep-missing-depfile',
+                  ''), 'lost depfile'),
+                (('build/fep-common.mk', '-include $(wildcard $(FEP_OUT)/fep_imports.d)',
+                  '$(FEP_OUT)/fep_imports.d: $(FEP_GEN)\n-include $(FEP_OUT)/fep_imports.d'),
+                 'query ran generator')]:
             with tempfile.TemporaryDirectory() as directory:
                 try:
                     exercise(Path(directory), mutant)
