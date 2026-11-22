@@ -18,6 +18,9 @@ CHECK = dict(name='gui-present-owner-host', tier=1, needs=[], budget=5,
              basis=['docs/design/kernel/gui.md 同期 COMMIT の描画主体'])
 
 MUTATIONS = [
+    ('pump grant', 'kernel/gui.c', 'return g_gui_pump ? gui_run_pump : 0;', 'return g_gui_pump;'),
+    ('pump return', 'kernel/gui.c', '((void (*)(void))g_gui_pump)();\n    appslot_gui_draw_leave(previous);',
+     '((void (*)(void))g_gui_pump)();'),
     ('normal return', 'kernel/gui.c', '    appslot_gui_draw_leave(previous);\n    appslot_gui_op_leave();',
      '    (void)previous;\n    appslot_gui_op_leave();'),
     ('park', 'exec/appslot_transition.inc', 'appslot_gui_draw_leave(0);', ''),

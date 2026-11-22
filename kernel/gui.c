@@ -201,9 +201,16 @@ void gui_ime_set_render(void *table)
 /* ======================================================================== */
 /*  gui_get_pump — K2 用: 登録された入力ポンプを返す                         */
 /* ======================================================================== */
+static void gui_run_pump(void)
+{
+    u32 previous = appslot_gui_draw_enter();
+    ((void (*)(void))g_gui_pump)();
+    appslot_gui_draw_leave(previous);
+}
+
 void *gui_get_pump(void)
 {
-    return g_gui_pump;
+    return g_gui_pump ? gui_run_pump : 0;
 }
 
 /* ======================================================================== */

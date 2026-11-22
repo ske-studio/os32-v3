@@ -51,6 +51,11 @@ static void require(int ok, int line)
 }
 #define CHECK(test) require((test), __LINE__)
 
+static void cursor_pump(void)
+{
+    CHECK(appslot_cur() == 2 && res_owner_get() == 2);
+    gfx_present_rect(0, 0, 1, 1);
+}
 static int window_owner;
 static i32 handler(u32 op, u32 arg, int child)
 {
@@ -60,6 +65,8 @@ static i32 handler(u32 op, u32 arg, int child)
     }
     CHECK(child == 2 && appslot_cur() == child && res_owner_get() == child);
     if (op == GUI_OP_WAIT) {
+        cursor_pump();
+        if (arg) return 0;
         CHECK(appslot_park_check() == 0);
         appslot_park_commit();
         __builtin_longjmp(landing, 1);
@@ -91,10 +98,15 @@ static void blocked(void)
 void _start(void)
 {
     appslot_init();
-    CHECK(gui_register(handler, 0) == 0);
+    CHECK(gui_register(handler, cursor_pump) == 0);
     appslot_start_commit(2, 1, 0);
     blocked();
     CHECK(gui_call(GUI_OP_COMMIT, 0) == 0 && display == shadow && window_owner == 2);
+    blocked();
+    ((void (*)(void))gui_get_pump())();
+    CHECK(display == shadow);
+    blocked();
+    CHECK(gui_call(GUI_OP_WAIT, 1) == 0 && display == shadow);
     blocked();
     if (!__builtin_setjmp(landing)) gui_call(GUI_OP_WAIT, 0);
     CHECK(appslot_cur() == 1);
