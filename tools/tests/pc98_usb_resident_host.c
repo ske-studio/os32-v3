@@ -1,5 +1,6 @@
 #include "input/hal/keymap.h"
 #include "usb_resident.h"
+#include "kstring.h"
 #include "usb_probe.h"
 #include "input/hal/in2_int.h"
 #include "drivers/usb/ohci_priv.h"
@@ -13,13 +14,14 @@
 #include "tick_order.h"
 #include "kernel/irq/tick_budget.h"
 static tick_fn periodic;
+static int refuse_tick;
 static u32 remaining_us;
 u32 arch_tick_budget_cnt(u32 us) { return us * 2; }
 u32 tick_budget_cnt(u32 us) { return us == IRQ0_SLOT_BUDGET_US ? 77 : 0; }
 int tick_budget_peek(u32 share, u32 tail) { return share == 77 && remaining_us * 2 > tail; }
 int tick_register(unsigned slot, tick_fn fn)
 {
-    if (slot != PC98_TICK_USB || periodic) return -1;
+    if (slot != PC98_TICK_USB || periodic || refuse_tick) return -1;
     periodic = fn;
     return 0;
 }
@@ -77,7 +79,40 @@ u32 pci_cfg_read32(u32 bus, u32 dev, u32 fn, u32 reg)
     if (bus || dev != 13 || reg != PCI_CFG_COMMAND) bad++;
     return stuck_bm && !fn ? PCI_CMD_BUS_MASTER : 0;
 }
-void kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
+static unsigned absent_logs, map_logs, irq_logs, tick_failure_logs;
+void kprintf(u8 attr, const char *fmt, ...)
+{
+    (void)attr;
+    if (!kstrcmp(fmt, "[usb] no OHCI candidate\n")) absent_logs++;
+    if (!kstrcmp(fmt, "[usb] %u:%u.%u IRQ unavailable, polling\n")) irq_logs++;
+    if (!kstrcmp(fmt, "[usb] tick register failed\n")) tick_failure_logs++;
+    if (!kstrcmp(fmt, "[usb] %u:%u.%u failed: %s\n")) {
+        __builtin_va_list ap;
+        __builtin_va_start(ap, fmt);
+        for (unsigned i = 0; i < 3; i++) (void)__builtin_va_arg(ap, unsigned);
+        if (!kstrcmp(__builtin_va_arg(ap, const char *), "BAR map")) map_logs++;
+        __builtin_va_end(ap);
+    }
+}
+
+static void (*idle_log)(void);
+static unsigned first_logs, event_logs, lines;
+static int no_idle;
+int idle_work_register(void (*fn)(void))
+{
+    if (no_idle) return -1;
+    idle_log = fn;
+    return 0;
+}
+void pc98_usb_tick_vprintf(u8 attr, const char *fmt, const u32 *args)
+{
+    (void)attr;
+    if (!kstrcmp(fmt, "\n")) lines++;
+    else if (!kstrcmp(fmt, "[usb] first tick")) first_logs++;
+    else if (!kstrcmp(fmt, "sample %u")) {
+        if (args[0] != ++event_logs) bad++;
+    } else bad++;
+}
 int ehci_early_quiesce(struct usb_hc *hc, u32 *blocked)
 { (void)hc; (void)blocked; bad++; return -1; }
 
@@ -116,13 +151,22 @@ static int start(struct usb_hc *hc)
 {
     starts++;
     if (fail_start) return -USB_E_HC;
+    hc->state = HC_RUNNING;
     if (hc->has_irq != (hc->pci.irq == 5)) bad++;
     return 0;
 }
 static int add(struct usb_hc *hc) { (void)hc; registered++; return fail_register; }
 static void dead(struct usb_hc *hc, u32 why)
-{ if (why != USB_WHY_START) bad++; hc->state = HC_DEAD; }
-static void service(void) { services++; }
+{ if (why != USB_WHY_START && why != USB_WHY_ABORT) bad++; hc->state = HC_DEAD; }
+static void service(void)
+{
+    if (++services == 2) {
+        u32 value = 1;
+        pc98_usb_service_log("sample %u", &value);
+        value++;
+        pc98_usb_service_log("sample %u", &value);
+    }
+}
 
 static struct usb_hc *module_hc;
 static u32 collect(struct usb_hc *hc) { return hc == module_hc ? usb_pending : 0; }
@@ -162,6 +206,7 @@ static int module_boot(void)
     pc98_usb_early_quiesce();
     if (module_start(h) || record.state != MODULE_RUNNING ||
         periodic || maps || starts || services || registered || refs) return 21;
+    if (absent_logs != 1) return 37;
     cards = 1;
     pc98_usb_early_quiesce();
     if (irq_register(5, peer_irq, NULL, IRQ_F_SHARED)) return 22;
@@ -169,6 +214,7 @@ static int module_boot(void)
     fail_map = 1;
     if (module_start(h) != MODULE_INIT_FAILED || record.state != MODULE_ABSENT ||
         reclaimed != 1 || starts || services || bad) return 27;
+    if (map_logs != 1) return 38;
     fail_map = 0;
     relocated();
     fail_start = 1;
@@ -187,6 +233,21 @@ static int module_boot(void)
     remaining_us += 2;
     periodic();
     if (services != 2) return 34;
+    if (no_idle) {
+        if (lines != 1 || first_logs != 1) return 39;
+        periodic();
+        if (lines != 2 || event_logs != 1) return 39;
+        periodic();
+        if (lines != 3 || event_logs != 2) return 39;
+    } else {
+        if (lines || !idle_log) return 39;
+        idle_log();
+        if (lines != 1 || first_logs != 1) return 39;
+        pc98_usb_flush_boot_log();
+        if (lines != 3 || event_logs != 2) return 39;
+    }
+    periodic();
+    if (lines != 3 || first_logs != 1 || bad) return 39;
     module_hc->isr_pending = 2;
     if (handler(5, argument) != IRQ_HANDLED || module_hc->isr_pending != 3) return 23;
     usb_pending = 0;
@@ -254,6 +315,7 @@ static int resident(void)
     if (irq_register(5, peer_irq, NULL, IRQ_F_SHARED)) return 9;
     if (pc98_usb_resident_start(h, &core) != 2 || maps != 4 || starts != 2 ||
         registered != 2 || services != 1 || bad || refs != 1) return 2;
+    if (irq_logs != 1) return 40;
     if (!handler || handler(5, argument) != IRQ_HANDLED) return 3;
     usb_pending = 0;
     if (peer(5, NULL) != IRQ_HANDLED || handler(5, argument) != IRQ_NONE || peer_calls != 1)
@@ -281,8 +343,17 @@ void _start(void)
     __asm__ volatile("int $0x80" : "=a"(bytes) : "0"(3), "b"(0), "c"(&mode), "d"(1) : "memory");
     int rc;
     if (bytes != 1) rc = 32;
+    else if (mode == 't') {
+        struct module_handle h = {1, 7};
+        relocated();
+        cards = refuse_tick = 1;
+        pc98_usb_early_quiesce();
+        irq_register(5, peer_irq, NULL, IRQ_F_SHARED);
+        rc = module_start(h) == MODULE_INIT_FAILED && tick_failure_logs == 1 &&
+             !record.tick_refs && !services && !bad ? 0 : 41;
+    }
     else if (mode == 'q') rc = failed_detach();
-    else if (mode == 'm') rc = module_boot();
+    else if (mode == 'm' || mode == 'f') { no_idle = mode == 'f'; rc = module_boot(); }
     else rc = resident();
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc));
     __builtin_unreachable();

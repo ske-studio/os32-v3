@@ -60,8 +60,7 @@ void usbp_log(const char *fmt, ...)
     va_list args;
     va_start(args, fmt);
     if (usb_busy) {
-        pc98_usb_tick_vprintf(KLOG_ATTR, fmt, (const u32 *)args);
-        pc98_usb_tick_vprintf(KLOG_ATTR, "\n", NULL);
+        pc98_usb_service_log(fmt, (const u32 *)args);
     } else {
         kvprintf(KLOG_ATTR, fmt, (const u32 *)args);
         kprintf(KLOG_ATTR, "\n");

@@ -31,6 +31,7 @@ int usb_walk_request(struct usb_walk *w, struct usb_dev *d, u8 type, u8 req,
 void usb_enum_reset(struct usb_walk *w)
 {
     w->phase = w->desc_phase = w->desc_retry = w->config_retry = 0;
+    w->descriptor_logged = w->config_logged = 0;
     w->iface = w->attach_failed = w->error = 0;
 }
 static int valid_mps(struct usb_dev *d, u8 mps)
@@ -71,9 +72,25 @@ static void cfg_drop(struct usb_walk *w)
     kmemset(d->ifs, 0, sizeof(d->ifs));
     for (u32 i = 0; i < USB_DEV_IFACE_MAX; i++) d->ifs[i].num = 255;
 }
-static void cfg_failed(struct usb_walk *w)
+enum cfg_failure { CFG_BUFFER, CFG_DESCRIPTOR, CFG_SET };
+
+static void cfg_log_failure(struct usb_walk *w, enum cfg_failure reason)
+{
+    static const char *const messages[] = {
+        "[usb] %u:%u.%u addr=%u config buffer failed",
+        "[usb] %u:%u.%u addr=%u config descriptor failed",
+        "[usb] %u:%u.%u addr=%u set config failed"
+    };
+    if (!(w->config_logged & (1u << reason))) {
+        w->config_logged |= 1u << reason;
+        usbp_log(messages[reason], w->hc->pci.bus, w->hc->pci.dev,
+                 w->hc->pci.fn, w->hc->explore.old_addr);
+    }
+}
+static void cfg_failed(struct usb_walk *w, enum cfg_failure reason)
 {
     struct usb_explore *e = &w->hc->explore;
+    cfg_log_failure(w, reason);
     cfg_drop(w); w->phase = 0; w->resource_deadline = 0;
     if (!w->config_retry++) {
         e->ret_step = EX_A5; e->re_retry = 0; e->step = EX_RE1; w->reset_phase = 0;
@@ -101,6 +118,10 @@ int usb_enum_step(struct usb_walk *w)
         rc = device_desc(w);
         if (!rc) return 0;
         if (rc > 0) { e->step = EX_A4; w->phase = 0; return 0; }
+        if (!w->descriptor_logged)
+            usbp_log("[usb] %u:%u.%u addr=%u device descriptor failed", hc->pci.bus,
+                     hc->pci.dev, hc->pci.fn, e->old_addr);
+        w->descriptor_logged = 1;
         if (e->step == EX_A2) {
             e->ret_step = EX_A2; e->re_count = 1; e->re_retry = 0;
             e->step = EX_RE1; w->reset_phase = 0; /* A2 recovery */
@@ -119,37 +140,37 @@ int usb_enum_step(struct usb_walk *w)
                 e->cfgbuf = usbp_mem_alloc(sizeof(*e->cfgbuf));
                 if (!e->cfgbuf) {
                     if (!w->resource_deadline) w->resource_deadline = usbp_ms() + USB_REQUEST_TIMEOUT_MS;
-                    if (usb_due(usbp_ms(), w->resource_deadline)) cfg_failed(w);
+                    if (usb_due(usbp_ms(), w->resource_deadline)) cfg_failed(w, CFG_BUFFER);
                     return 0;
                 }
                 if (usb_dmamem_alloc(hc, USB_CFG_MAX, USB_CFG_MAX, e->cfgbuf) < 0) {
                     usbp_mem_free(e->cfgbuf); e->cfgbuf = 0;
                     if (!w->resource_deadline) w->resource_deadline = usbp_ms() + USB_REQUEST_TIMEOUT_MS;
-                    if (usb_due(usbp_ms(), w->resource_deadline)) cfg_failed(w);
+                    if (usb_due(usbp_ms(), w->resource_deadline)) cfg_failed(w, CFG_BUFFER);
                     return 0;
                 }
             }
             if (!usb_walk_request(w, d, USB_DIR_IN, USB_REQ_GET_DESCRIPTOR,
                                   USB_DESC_CONFIG << 8, 0, 9, e->cfgbuf)) return 0;
-            if (w->error || w->actual != 9 || ((u8 *)e->cfgbuf->va)[1] != USB_DESC_CONFIG) { cfg_failed(w); return 0; }
+            if (w->error || w->actual != 9 || ((u8 *)e->cfgbuf->va)[1] != USB_DESC_CONFIG) { cfg_failed(w, CFG_DESCRIPTOR); return 0; }
             w->cfg_length = le16_rd((u8 *)e->cfgbuf->va + 2);
-            if (w->cfg_length < 9) { cfg_failed(w); return 0; }
+            if (w->cfg_length < 9) { cfg_failed(w, CFG_DESCRIPTOR); return 0; }
             if (w->cfg_length > USB_CFG_MAX) w->cfg_length = USB_CFG_MAX;
             w->phase = 1; return 0;
         }
         if (!usb_walk_request(w, d, USB_DIR_IN, USB_REQ_GET_DESCRIPTOR,
                               USB_DESC_CONFIG << 8, 0, w->cfg_length, e->cfgbuf)) return 0;
-        if (w->error || w->actual != w->cfg_length) { cfg_failed(w); return 0; }
+        if (w->error || w->actual != w->cfg_length) { cfg_failed(w, CFG_DESCRIPTOR); return 0; }
         le16_wr((u8 *)e->cfgbuf->va + 2, w->cfg_length);
         d->cfg = usbp_mem_alloc(w->cfg_length);
-        if (!d->cfg) { cfg_drop(w); e->step = EX_ERR; return 0; }
+        if (!d->cfg) { cfg_log_failure(w, CFG_BUFFER); cfg_drop(w); e->step = EX_ERR; return 0; }
         d->cfg_len = w->cfg_length; kmemcpy(d->cfg, e->cfgbuf->va, d->cfg_len);
         usb_dmamem_free(hc, e->cfgbuf); usbp_mem_free(e->cfgbuf); e->cfgbuf = 0;
-        if (usb_cfg_parse(d) < 0) { cfg_failed(w); return 0; }
+        if (usb_cfg_parse(d) < 0) { cfg_failed(w, CFG_DESCRIPTOR); return 0; }
         w->phase = 0; e->step = EX_A5; return 0;
     case EX_A5:
         if (!usb_walk_request(w, d, 0, USB_REQ_SET_CONFIGURATION, d->cfg[5], 0, 0, 0)) return 0;
-        if (w->error) cfg_failed(w);
+        if (w->error) cfg_failed(w, CFG_SET);
         else { e->step = EX_A6; w->iface = w->phase = 0; }
         return 0;
     case EX_A6:
@@ -175,7 +196,11 @@ int usb_enum_step(struct usb_walk *w)
             if (!f->cls) {
                 for (u32 i = 0; usb_classes[i]; i++)
                     if (usb_classes[i]->match(d, f)) { f->cls = usb_classes[i]; break; }
-                if (!f->cls) { w->iface++; return 0; }
+                if (!f->cls) {
+                    usbp_log("[usb] addr=%u iface=%u unsupported class=%02x subclass=%02x protocol=%02x",
+                             d->addr, f->num, f->class_code, f->subclass, f->protocol);
+                    w->iface++; return 0;
+                }
             }
             rc = f->cls->attach(d, f);
             if (rc == -USB_E_BUSY) return 0;

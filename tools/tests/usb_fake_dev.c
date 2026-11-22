@@ -12,7 +12,7 @@ static u32 now, frame, freeze, inject, gone, callbacks, attached, detached, rele
 static u32 allocation_count, free_count, dma_count, dma_free_count;
 static u32 fail_attach, busy_attach, address_early, overlap, reset_count;
 static u8 heap[2 * 1024 * 1024];
-static u32 heap_used;
+static u32 heap_used, fail_walk, fail_scratch;
 struct allocation { void *ptr; u32 size; u8 freed; };
 static struct allocation allocations[4096];
 static u32 allocations_n;
@@ -34,6 +34,7 @@ void *kmemcpy(void *p, const void *s, u32 n) { u8 *b = p; const u8 *a = s; while
 void *usbp_mem_alloc(u32 n)
 {
     void *p;
+    if (fail_walk && n == sizeof(struct usb_walk)) return 0;
     n = (n + 15) & ~15u;
     if (heap_used + n > sizeof(heap) || allocations_n == 4096) return 0;
     p = heap + heap_used; heap_used += n;
@@ -52,6 +53,7 @@ void usbp_mem_free(void *p)
 int usb_dmamem_alloc(struct usb_hc *h, u32 n, u32 align, struct usb_dma *d)
 {
     (void)h; (void)align;
+    if (fail_scratch) return -USB_E_NOMEM;
     d->va = usbp_mem_alloc(n); if (!d->va) return -USB_E_NOMEM;
     d->size = n; d->bus = (u32)d->va; d->cookie = ++dma_count; return 0;
 }
@@ -69,9 +71,32 @@ static int log_compare(const char *a, const char *b)
     while (*a && *a == *b) { a++; b++; }
     return *a - *b;
 }
-static u32 root_logs, hid_logs;
+static u32 root_logs, hid_logs, initial_logs, read_mask, connected_mask;
+static u32 reset_logs, descriptor_logs, config_logs, unsupported_logs, walk_logs, scratch_logs;
 void usbp_log(const char *fmt, ...)
 {
+    __builtin_va_list ap;
+    __builtin_va_start(ap, fmt);
+    if (!log_compare(fmt, "[usb] %u:%u.%u initial read=%x connected=%x")) {
+        initial_logs++;
+        for (int i = 0; i < 3; i++) (void)__builtin_va_arg(ap, unsigned);
+        read_mask = __builtin_va_arg(ap, unsigned);
+        connected_mask = __builtin_va_arg(ap, unsigned);
+    }
+    if (!log_compare(fmt, "[usb] addr=%u iface=%u unsupported class=%02x subclass=%02x protocol=%02x")) {
+        (void)__builtin_va_arg(ap, unsigned);
+        (void)__builtin_va_arg(ap, unsigned);
+        REQUIRE(__builtin_va_arg(ap, unsigned) == 0xff);
+        REQUIRE(__builtin_va_arg(ap, unsigned) == 1);
+        REQUIRE(__builtin_va_arg(ap, unsigned) == 2);
+        unsupported_logs++;
+    }
+    __builtin_va_end(ap);
+    if (!log_compare(fmt, "[usb] %u:%u.%u port=%u reset failed")) reset_logs++;
+    if (!log_compare(fmt, "[usb] %u:%u.%u addr=%u device descriptor failed")) descriptor_logs++;
+    if (!log_compare(fmt, "[usb] %u:%u.%u addr=%u set config failed")) config_logs++;
+    if (!log_compare(fmt, "[usb] %u:%u.%u walk alloc failed")) walk_logs++;
+    if (!log_compare(fmt, "[usb] %u:%u.%u walk DMA failed")) scratch_logs++;
     if (log_compare(fmt, "[usb] root %u:%u.%u port=%u connected=%u") == 0) root_logs++;
     if (log_compare(fmt, "[usb] HID %u:%u.%u addr=%u iface=%u rc=%d") == 0) hid_logs++;
 }
@@ -153,6 +178,7 @@ static void configuration(struct node *n, u8 *b, u32 len)
     }
     if (n->kind==5 && len>9) b[9]=1;
     if (n->kind==6 && len==512) b[289]=255;
+    if (n->kind==8 && len>=18) { b[14]=0xff; b[16]=2; }
     if (n->kind==7 && len>=34) b[33]=0;
 }
 static void execute_control(struct usb_xfer *x)
@@ -311,10 +337,12 @@ static int scenario(int c)
         plug(0,1);pump(800);REQUIRE(attached==1);
         nodes[0].conn=0;nodes[0].connect_change=1;hc.needs_explore=1;
         pump(300);REQUIRE(devices()==0 && detached==1 && released==1);REQUIRE(hc.root_child[0]==0);
+        REQUIRE(initial_logs == 1 && read_mask == 7);
         REQUIRE(root_logs == 2 && hid_logs == 1);
         REQUIRE(free_at_frame!=0);REQUIRE(allocation_count-free_count==baseline && dma_count-dma_free_count==dma_base);
     } else if(c==3) { /* F8: reset timeout must disable before next port. */
         plug(0,1);plug(1,2);nodes[0].reset_fail=1;pump(1700);
+        REQUIRE(reset_logs == 1);
         REQUIRE(!nodes[0].enabled && devices()==1 && hc.root_child[1]);
     } else if(c==4) { /* F11a, resumable attach. */
         plug(0,3);fail_attach=1;busy_attach=5;pump(1000);
@@ -332,6 +360,7 @@ static int scenario(int c)
         REQUIRE(le16_rd(hc.root_child[0]->cfg+2)==512);
     } else if(c==7) { /* F8c: two SET_CONFIGURATION failures are ignored. */
         plug(0,1);nodes[0].config_fail=1;pump(1600);
+        REQUIRE(config_logs == 1);
         REQUIRE(devices()==1 && attached==0 && !hc.root_child[0]->cfg);
     } else if(c==8) { /* G1: UE suppresses pending completions and release. */
         plug(0,1);pump(800);u32 f=free_count;inject=now+1;pump(20);
@@ -344,6 +373,7 @@ static int scenario(int c)
         REQUIRE(usb_xfer_sync(&x,100)==-USB_E_HC && x.dev==&direct && x.hcpriv && !x.deadline_ms);
     } else if(c==10) { /* F8r: descriptor fallback and re-enumeration. */
         plug(0,1);nodes[0].desc_fail=4;pump(1600);REQUIRE(devices()==1 && attached==1 && nodes[0].resets>=2);
+        REQUIRE(descriptor_logs == 1);
     } else if(c==11) { /* F8l malformed descriptor boundary: no class. */
         plug(0,5);pump(1600);REQUIRE(devices()==1 && !hc.root_child[0]->cfg && attached==0);
     } else if(c==12) { /* G1(g): deadline failure discards another pending done. */
@@ -455,6 +485,19 @@ static int scenario(int c)
         pump(9);REQUIRE(x.state==XS_ACTIVE && now<deadline);
         pump(1);REQUIRE(now==deadline && x.error==USB_X_TIMEOUT && x.state!=XS_ACTIVE);
         pump(2);REQUIRE(usb_xfer_drained(&x) && x.error==USB_X_TIMEOUT);
+    } else if (c == 36 || c == 37) {
+        fail_walk = c == 36;
+        fail_scratch = c == 37;
+        pump(20);
+        REQUIRE(walk_logs == fail_walk && scratch_logs == fail_scratch && !initial_logs);
+        fail_walk = fail_scratch = 0;
+        pump(250);
+        REQUIRE(initial_logs == 1 && read_mask == 7 && !connected_mask && !root_logs);
+    } else if (c == 38) {
+        plug(1, 8);
+        pump(1600);
+        REQUIRE(initial_logs == 1 && read_mask == 7 && connected_mask == 2);
+        REQUIRE(unsupported_logs == 1 && !hid_logs && !reset_logs && !config_logs && !descriptor_logs);
     } else return 2;
     return failed;
 }
