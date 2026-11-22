@@ -352,7 +352,11 @@ fn k1_3_pump_defers_wm_keys_and_the_rest_to_the_next_x3() {
 
     input::capture(&mut st, input::Ctx::Wait);
     assert_eq!(st.front_index(), Some(b), "次の X3 で切り替わらない");
-    assert_eq!(text(&st, b), b"ab".to_vec(), "切り替え後の窓に ab が届かない");
+    assert!(text(&st, b).is_empty());
+    input::capture(&mut st, input::Ctx::Wait);
+    assert!(text(&st, b).is_empty());
+    run(&mut st, &tap(SC_A, 0));
+    assert_eq!(text(&st, b), b"a");
     assert!(text(&st, a).is_empty() && keys(&st, a).is_empty(), "元の窓へ ab が漏れた");
 }
 
@@ -2070,4 +2074,395 @@ fn excl_query_error_closes_both_devices_and_recovers() {
         input::capture_keyboard(&mut st, input::Ctx::Wait);
         assert_eq!((st.excl.open(excl::KBD), st.excl.open(excl::MOUSE)), (keyboard, mouse));
     }
+}
+
+#[test]
+fn excl_zero_pointer_and_button_coordinates() {
+    use crate::{excl, ring};
+    mocks::init();
+    let shm = mocks::Shm::new();
+    let mut st = one_window(&shm);
+    let id = st.front_id();
+    for buttons in [0, 1] {
+        assert!(excl::append(&mut st, 0, &ring::ev_pointer(id, 5, 7, buttons, 0)));
+        assert!(excl::append(&mut st, 0, &ring::ev_button(true, id, 19, 23, 2, 0)));
+        clear_rings(&st);
+        mocks::WM_STATE.lock().unwrap().0 += 1;
+        input::capture_keyboard(&mut st, input::Ctx::Wait);
+        let ev = events(&st, 0);
+        let last = ev.last().unwrap();
+        assert_eq!((last.kind, last.sub, &last.payload[..4]), (GUI_EV_POINTER, 0, &[5,0,7,0][..]));
+        clear_rings(&st);
+    }
+}
+
+#[test]
+fn excl_full_release_retries_without_boundary() {
+    use crate::ring;
+    mocks::init();
+    let shm = mocks::Shm::new();
+    let mut st = one_window(&shm);
+    let client = st.windows[0].client_rect_screen();
+    park_pointer(&mut st, client.x + 4, client.y + 6);
+    let id = st.front_id();
+    *mocks::MOUSE.lock().unwrap() = ((client.x+4) as i16,(client.y+6) as i16,1);
+    input::capture(&mut st, input::Ctx::Wait);
+    assert!(events(&st, 0).iter().any(|e| e.kind == GUI_EV_BUTTON && e.sub == 1));
+    while ring::space(&st, 0) > 0 { ring::append(&mut st, 0, &ring::ev_text(id,[0;8],1,0)); }
+    mocks::MOUSE.lock().unwrap().2 = 0;
+    input::capture(&mut st, input::Ctx::Wait);
+    clear_rings(&st);
+    for _ in 0..2 { input::capture_keyboard(&mut st, input::Ctx::Wait); }
+    let ev = events(&st, 0);
+    assert_eq!(ev.len(), 1);
+    assert_eq!((ev[0].kind,ev[0].sub,ev[0].window), (GUI_EV_BUTTON,0,id));
+}
+
+#[test]
+fn excl_fep_pending_and_flush_wait_for_keyboard() {
+    mocks::init(); fep_off();
+    let shm = mocks::Shm::new();
+    let mut st = windows(&shm, &[(20,20,180,120),(300,20,180,120)]);
+    input::capture_keyboard(&mut st, input::Ctx::Wait);
+    imecand_setup();
+    assert!(fep::feed(&mut st, 0x1c,13,0) == fep::Fed::Consumed);
+    let next = id(&st, 0);
+    assert_eq!(wm::set_focus(&mut st,2,next),0);
+    *mocks::WM_STATE.lock().unwrap() = (1,1,0);
+    input::capture_keyboard(&mut st, input::Ctx::Wait);
+    assert!(text(&st,0).is_empty() && text(&st,1).is_empty());
+    *mocks::WM_STATE.lock().unwrap() = (2,0,0);
+    input::capture_keyboard(&mut st, input::Ctx::Wait);
+    assert_eq!(text(&st,1), "幹事".as_bytes());
+    assert!(text(&st,0).is_empty());
+    fep_off();
+}
+
+#[test]
+fn excl_switch_full_destination_consumes_fallback() {
+    use crate::ring;
+    mocks::init(); fep_off();
+    let shm = mocks::Shm::new();
+    let mut st = windows(&shm, &[(20,20,180,120),(300,20,180,120)]);
+    let id = st.front_id();
+    while ring::space(&st,1) > 0 { ring::append(&mut st,1,&ring::ev_text(id,[0;8],1,0)); }
+    mocks::push_rawkeys(&[SC_TAB|DOWN|GRPH, SC_A|DOWN]);
+    input::capture_keyboard(&mut st,input::Ctx::Wait);
+    assert_eq!(st.front_index(),Some(0));
+    assert!(text(&st,0).is_empty() && keys(&st,0).is_empty());
+}
+
+#[test]
+fn excl_pending_switch_pairs_survive_purge_and_stop() {
+    use crate::input::defer_raw;
+    mocks::init(); fep_off();
+    let shm = mocks::Shm::new();
+    let mut st = windows(&shm, &[(20,20,180,120),(300,20,180,120)]);
+    input::capture_keyboard(&mut st,input::Ctx::Wait);
+    let start = SC_TAB | GRPH | DOWN;
+    for _ in 0..128 { defer_raw(&mut st,SC_A | DOWN); }
+    defer_raw(&mut st,start);
+    for _ in 0..128 { defer_raw(&mut st,SC_A | GRPH | DOWN); }
+    defer_raw(&mut st,SC_B | DOWN);
+    defer_raw(&mut st,start);
+    defer_raw(&mut st,SC_B | DOWN);
+    input::capture_keyboard(&mut st,input::Ctx::Wait);
+    assert_eq!(st.front_index(),Some(0));
+    input::capture_keyboard(&mut st,input::Ctx::Wait);
+    assert_eq!(st.front_index(),Some(1));
+    for _ in 0..80 {
+        defer_raw(&mut st,start);
+        defer_raw(&mut st,SC_GRPH);
+    }
+    assert_eq!(st.pending_raw[..st.pending_raw_n].iter().filter(|&&raw| raw == start).count(),63);
+    defer_raw(&mut st,0x60 | CTRL | DOWN);
+    assert!(st.pending_raw[..st.pending_raw_n].contains(&(0x60 | CTRL | DOWN)));
+}
+
+#[test]
+fn excl_same_owner_holds_until_poll_sees_release() {
+    mocks::init(); fep_off();
+    let shm = mocks::Shm::new();
+    let mut st = windows(&shm,&[(20,20,180,120),(300,20,180,120)]);
+    st.windows[1].owner = st.windows[0].owner;
+    run(&mut st,&[SC_A|DOWN]);
+    clear_rings(&st);
+    let next = id(&st,0);
+    assert_eq!(wm::set_focus(&mut st,2,next),0);
+    mocks::PRESSED.lock().unwrap()[SC_A as usize] = true;
+    run(&mut st,&[SC_B|DOWN,SC_A|DOWN]);
+    run(&mut st,&[SC_A|DOWN]);
+    assert!(text(&st,0).is_empty());
+    mocks::PRESSED.lock().unwrap()[SC_A as usize] = false;
+    input::capture_keyboard(&mut st,input::Ctx::Wait);
+    run(&mut st,&[SC_A|DOWN]);
+    assert_eq!(text(&st,0),b"a");
+}
+
+#[test]
+fn excl_mouse_masks_held_buttons_and_restores_static_cursor() {
+    mocks::init(); fep_off();
+    let shm = mocks::Shm::new();
+    let mut st = one_window(&shm);
+    let r = st.windows[0].client_rect_screen();
+    park_pointer(&mut st,r.x+4,r.y+8);
+    *mocks::WM_STATE.lock().unwrap() = (1,2,0);
+    *mocks::MOUSE.lock().unwrap() = ((r.x+8) as i16,(r.y+8) as i16,2);
+    input::capture(&mut st,input::Ctx::Pump);
+    assert!(!st.cursor.shown);
+    crate::cursor::show(&mut st);
+    assert!(!st.cursor.shown);
+    *mocks::WM_STATE.lock().unwrap() = (2,0,0);
+    input::capture(&mut st,input::Ctx::Wait);
+    assert!(st.cursor.shown);
+    assert_eq!((st.cursor.x,st.cursor.y),(r.x+8,r.y+8));
+    clear_rings(&st);
+    mocks::MOUSE.lock().unwrap().2 = 3;
+    input::capture(&mut st,input::Ctx::Wait);
+    mocks::MOUSE.lock().unwrap().0 += 2;
+    input::capture(&mut st,input::Ctx::Wait);
+    let ev = events(&st,0);
+    assert!(ev.iter().any(|e| e.kind == GUI_EV_BUTTON && e.payload[4] == 1 && e.sub == 1));
+    assert!(ev.iter().any(|e| e.kind == GUI_EV_POINTER && e.sub == 1));
+    assert!(!ev.iter().any(|e| e.kind == GUI_EV_BUTTON && e.payload[4] == 2));
+}
+
+#[test]
+fn excl_deferred_victims_and_reserved_finish() {
+    use crate::input::defer_raw;
+    mocks::init();
+    let shm = mocks::Shm::new();
+    let mut st = one_window(&shm);
+    let start = SC_TAB|DOWN|GRPH;
+    defer_raw(&mut st,start);
+    defer_raw(&mut st,start); // repeat within this TAB press
+    defer_raw(&mut st,SC_A|GRPH);
+    for _ in 0..124 { defer_raw(&mut st,SC_GRPH|GRPH|DOWN); }
+    defer_raw(&mut st,SC_GRPH|GRPH|DOWN);
+    let q = &st.pending_raw[..st.pending_raw_n];
+    assert!(!q.contains(&(SC_A|GRPH)));
+    assert_eq!(q.iter().filter(|&&r| r == start).count(),2);
+    defer_raw(&mut st,SC_GRPH|GRPH|DOWN);
+    let q = &st.pending_raw[..st.pending_raw_n];
+    assert_eq!(q.iter().filter(|&&r| r == start).count(),1);
+    assert_eq!(q.len(),127);
+    // The reader has taken the start. Its completion still owns the last seat.
+    input::capture_keyboard(&mut st,input::Ctx::Wait);
+    for _ in 0..128 { defer_raw(&mut st,SC_A|GRPH|DOWN); }
+    assert_eq!(st.pending_raw_n,127);
+    defer_raw(&mut st,SC_B|DOWN);
+    assert_eq!(st.pending_raw[127],SC_B|DOWN);
+}
+
+#[test]
+fn excl_foreground_failure_and_partial_settlement() {
+    use crate::{excl, multiapp, ring};
+    mocks::init(); fep_off(); multiapp::reset();
+    let shm = mocks::Shm::new();
+    let mut st = windows(&shm,&[(20,20,180,120),(300,20,180,120)]);
+    multiapp::sync_av_focus(&st);
+    input::capture_keyboard(&mut st,input::Ctx::Wait);
+    let old = st.front_id();
+    assert!(excl::append(&mut st,1,&ring::ev_key(true,old,7,0,2,0)));
+    assert!(excl::append(&mut st,1,&ring::ev_key(true,old,8,0,4,0)));
+    while ring::space(&st,1) > 0 { ring::append(&mut st,1,&ring::ev_text(old,[0;8],1,0)); }
+    let next = id(&st,0);
+    assert_eq!(wm::set_focus(&mut st,2,next),0);
+    *mocks::AV_FOCUS_RESULT.lock().unwrap() = -1;
+    for ctx in [input::Ctx::Wait,input::Ctx::Pump] {
+        mocks::push_rawkeys(&[SC_A|DOWN]);
+        input::capture_keyboard(&mut st,ctx);
+        assert_eq!(multiapp::av_owner(),3);
+        assert!(text(&st,0).is_empty());
+    }
+    *mocks::AV_FOCUS_RESULT.lock().unwrap() = 0;
+    let mut h = slot::read_header(&st,1);
+    h.ring_head += 1;
+    slot::write_header(&st,1,&h);
+    input::capture_keyboard(&mut st,input::Ctx::Wait);
+    assert_eq!(multiapp::av_owner(),2);
+    assert!(multiapp::input_ready(&st,3));
+    multiapp::on_start(3);
+    mocks::set_app_state(3,4);
+    assert!(multiapp::resume_one(&mut st));
+    assert_eq!(mocks::resume_calls().last().map(|&(owner,_)| owner),Some(3));
+    let ev = events(&st,1).pop().unwrap();
+    assert_eq!((ev.kind,ev.sub,ev.payload[0]),(GUI_EV_KEY,0,7));
+    assert!(!st.excl.open(excl::KBD));
+    input::discard_stop(&mut st);
+    mocks::WM_STATE.lock().unwrap().0 += 1;
+    clear_rings(&st);
+    input::capture_keyboard(&mut st,input::Ctx::Wait);
+    input::capture_keyboard(&mut st,input::Ctx::Wait);
+    let ev = events(&st,1);
+    assert_eq!(ev.len(),1);
+    assert_eq!((ev[0].window,ev[0].payload[0]),(old,8));
+    assert!(st.excl.open(excl::KBD));
+}
+
+#[test]
+fn excl_mouse_focus_ends_both_edges() {
+    mocks::init(); fep_off();
+    let shm = mocks::Shm::new();
+    let mut st = windows(&shm,&[(20,20,180,120),(300,20,180,120)]);
+    let r = st.windows[0].client_rect_screen();
+    park_pointer(&mut st,r.x+8,r.y+8);
+    mocks::MOUSE.lock().unwrap().2 = 3;
+    input::capture(&mut st,input::Ctx::Wait);
+    assert_eq!(st.front_index(),Some(0));
+    assert!(events(&st,0).iter().all(|e| e.kind != GUI_EV_BUTTON));
+}
+
+#[test]
+fn excl_switch_ends_mouse_batch() {
+    mocks::init(); fep_off();
+    let shm = mocks::Shm::new();
+    let mut st = windows(&shm,&[(20,20,180,120),(300,20,180,120)]);
+    let r = st.windows[1].client_rect_screen();
+    park_pointer(&mut st,r.x+8,r.y+8);
+    mocks::MOUSE.lock().unwrap().2 = 1;
+    mocks::push_rawkeys(&[SC_TAB|GRPH|DOWN,SC_GRPH]);
+    input::capture(&mut st,input::Ctx::Wait);
+    assert_eq!(st.front_index(),Some(0));
+    assert!(events(&st,0).iter().all(|e| e.kind != GUI_EV_BUTTON));
+}
+
+#[test]
+fn excl_drag_cancel_preserves_geometry() {
+    mocks::init(); fep_off();
+    let shm = mocks::Shm::new();
+    let mut st = one_window(&shm);
+    let w = st.windows[0];
+    let r = w.titlebar_rect();
+    park_pointer(&mut st,r.x+5,r.y+3);
+    mocks::MOUSE.lock().unwrap().2 = 1;
+    input::capture(&mut st,input::Ctx::Wait);
+    mocks::MOUSE.lock().unwrap().0 += 20;
+    input::capture(&mut st,input::Ctx::Wait);
+    assert_eq!(st.drag_index,0);
+    *mocks::WM_STATE.lock().unwrap() = (1,2,0);
+    input::capture(&mut st,input::Ctx::Wait);
+    assert_eq!(st.drag_index,-1);
+    assert!(st.drag_frame.is_empty());
+    assert_eq!((st.windows[0].x,st.windows[0].y,st.windows[0].w,st.windows[0].h),(w.x,w.y,w.w,w.h));
+}
+
+#[test]
+fn excl_fullscreen_tab_gated_before_injection() {
+    mocks::init(); fep_off();
+    let shm = mocks::Shm::new();
+    let mut st = one_window(&shm);
+    crate::fullscreen::arm(&[0;48]);
+    mocks::set_screen_owner(3);
+    crate::fullscreen::observe();
+    *mocks::WM_STATE.lock().unwrap() = (1,1,0);
+    run(&mut st,&tap(SC_TAB,0));
+    assert!(mocks::INJECTED.lock().unwrap().is_empty());
+    *mocks::WM_STATE.lock().unwrap() = (2,0,0);
+    run(&mut st,&tap(SC_TAB,0));
+    assert_eq!(*mocks::INJECTED.lock().unwrap(),b"\t");
+    crate::fullscreen::reset();
+}
+
+#[test]
+fn excl_synthetic_mouse_down_needs_fresh_press() {
+    mocks::init(); fep_off();
+    let shm = mocks::Shm::new();
+    let mut st = one_window(&shm);
+    st.kn.mk_on = true;
+    *mocks::WM_STATE.lock().unwrap() = (1,2,0);
+    mocks::PRESSED.lock().unwrap()[NP_0 as usize] = true;
+    run(&mut st,&[NP_0|DOWN|KANA]);
+    assert_eq!(st.synth_buttons,0);
+    *mocks::WM_STATE.lock().unwrap() = (2,0,0);
+    run(&mut st,&[NP_0|DOWN|KANA]);
+    assert_eq!(st.synth_buttons,0);
+    mocks::PRESSED.lock().unwrap()[NP_0 as usize] = false;
+    run(&mut st,&[NP_0|KANA, NP_0|DOWN|KANA]);
+    assert_eq!(st.synth_buttons,1);
+}
+
+#[test]
+fn excl_full_pump_reads_stop_after_completed_switches() {
+    mocks::init(); fep_off();
+    let shm = mocks::Shm::new();
+    let mut st = one_window(&shm);
+    *mocks::WM_STATE.lock().unwrap() = (1,1,0);
+    let start = SC_TAB|GRPH|DOWN;
+    let mut raw = vec![start;1];
+    raw.resize(129,SC_GRPH|GRPH|DOWN);
+    raw.push(SC_A|DOWN);
+    for _ in 0..70 { raw.extend_from_slice(&[start,SC_GRPH]); }
+    raw.push(0x60|CTRL|DOWN);
+    mocks::push_rawkeys(&raw);
+    input::capture_keyboard(&mut st,input::Ctx::Pump);
+    assert!(mocks::RAWKEYS.lock().unwrap().is_empty());
+    input::capture_keyboard(&mut st,input::Ctx::Wait);
+    assert!(st.abort_seen);
+}
+
+#[test]
+fn excl_switch_fallback_has_no_event_in_new_window() {
+    mocks::init();
+    fep_off();
+    let shm = mocks::Shm::new();
+    let mut st = windows(&shm, &[(20, 20, 180, 120), (300, 20, 180, 120)]);
+    run(&mut st, &[SC_TAB | GRPH | DOWN, SC_A | DOWN]);
+    assert_eq!(st.front_index(), Some(0));
+    assert!(text(&st, 0).is_empty() && keys(&st, 0).is_empty());
+}
+
+#[test]
+fn excl_destroy_front_same_owner_discards_old_raw() {
+    mocks::init();
+    fep_off();
+    let shm = mocks::Shm::new();
+    let mut st = windows(&shm, &[(20, 20, 180, 120), (300, 20, 180, 120)]);
+    st.windows[1].owner = st.windows[0].owner;
+    run(&mut st, &[SC_A | DOWN]);
+    clear_rings(&st);
+    let old = st.front_id();
+    assert_eq!(wm::destroy_window(&mut st, 2, old), 0);
+    mocks::PRESSED.lock().unwrap()[SC_A as usize] = true;
+    run(&mut st, &[SC_B | DOWN, SC_A | DOWN]);
+    assert_eq!(st.front_index(), Some(0));
+    assert!(text(&st, 0).is_empty() && keys(&st, 0).is_empty());
+    run(&mut st, &[SC_A, SC_A | DOWN]);
+    assert_eq!(text(&st, 0), b"a");
+}
+
+#[test]
+fn excl_boundary_keeps_one_already_delivered_close() {
+    use os32api::gui::proto::GUI_EV_CLOSE;
+    mocks::init();
+    let shm = mocks::Shm::new();
+    let mut st = one_window(&shm);
+    let r = st.windows[0].close_rect();
+    park_pointer(&mut st, r.x + 2, r.y + 2);
+    mocks::MOUSE.lock().unwrap().2 = 1;
+    input::capture(&mut st, input::Ctx::Wait);
+    *mocks::WM_STATE.lock().unwrap() = (1, 2, 0);
+    input::capture(&mut st, input::Ctx::Wait);
+    *mocks::WM_STATE.lock().unwrap() = (2, 0, 0);
+    input::capture(&mut st, input::Ctx::Wait);
+    mocks::MOUSE.lock().unwrap().2 = 0;
+    input::capture(&mut st, input::Ctx::Wait);
+    assert_eq!(events(&st, 0).iter().filter(|e| e.kind == GUI_EV_CLOSE).count(), 1);
+}
+
+#[test]
+fn excl_owner_change_supersedes_same_owner_purge() {
+    mocks::init();
+    fep_off();
+    let shm = mocks::Shm::new();
+    let mut st = windows(&shm, &[(20,20,80,80), (120,20,80,80), (220,20,80,80)]);
+    st.windows[1].owner = st.windows[2].owner;
+    input::capture_keyboard(&mut st, input::Ctx::Wait);
+    let same = id(&st, 1);
+    assert_eq!(wm::set_focus(&mut st, 4, same), 0);
+    input::capture_keyboard(&mut st, input::Ctx::Pump);
+    let other = id(&st, 0);
+    assert_eq!(wm::set_focus(&mut st, 2, other), 0);
+    run(&mut st, &tap(SC_A, 0));
+    assert_eq!(text(&st, 0), b"a");
 }

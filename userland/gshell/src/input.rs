@@ -52,6 +52,7 @@ pub fn discard_stop(st: &mut GuiState) {
         if raw & 0x1ff == (SC_STOP as i32 | 0x100) && raw & ((MOD_CTRL as i32) << 9) != 0 {
             continue;
         }
+        st.pending_rank[kept] = st.pending_rank[i];
         st.pending_raw[kept] = raw;
         kept += 1;
     }
@@ -67,6 +68,7 @@ const MOD_CTRL: u32 = 0x10;
 /* 修飾キーのスキャンコード (KEY_SHIFT..KEY_CTRL)。Key として配送しない。 */
 const SC_SHIFT: u8 = 0x70;
 const SC_CTRL: u8 = 0x74;
+pub(crate) const SC_GRPH: u8 = 0x73;
 /* WM が単独時に横取りするキー (KEY_ESC / KEY_F1〜F5)。**デバッグ専用**
  * (`crate::DEBUG_SHORTCUTS`、既定 false)。F1〜F4 = `crate::LAUNCH_APPS` の起動、
  * F5 = ファイル選択ダイアログ。製品ではどれも横取りしない。 */
@@ -80,6 +82,92 @@ const SC_SPACE: u8 = 0x34;
 // PIT is 100 Hz (memmap.h PIT_HZ); 50 ticks = 500 ms after ABORTED.
 const STOP_SUPPRESS_TICKS: u32 = 50;
 const SC_STOP: u8 = 0x60; /* STOP キー (kbd.h KEY_STOP)。CTRL+STOP = 強制脱出 (契約 T6) */
+
+fn wm_scan(scan: u8) -> bool {
+    matches!(scan, SC_STOP | SC_CTRL | SC_GRPH | SC_TAB)
+}
+
+fn stop_raw(raw: i32) -> bool {
+    raw & 0x1ff == (0x100 | SC_STOP as i32) && raw & ((MOD_CTRL as i32) << 9) != 0
+}
+
+// Admit a switch start and reserve its completion together. Evict from
+// the tail within each priority, then compact once to retain event order.
+pub(crate) fn defer_raw(st: &mut GuiState, raw: i32) {
+    let scan = (raw & 127) as u8;
+    let down = raw & 256 != 0;
+    let grph = raw & ((MOD_GRPH as i32) << 9) != 0;
+    let finish = st.pending_switch && (!grph || (scan == SC_GRPH && !down));
+    if finish && stop_raw(raw) {
+        // STOP cleanup may remove the interrupt request independently.
+        defer_raw(st, SC_GRPH as i32);
+        defer_raw(st, raw);
+        return;
+    }
+    let start = !st.pending_switch && grph && scan == SC_TAB && down;
+    let repeat = st.pending_switch && st.pending_tab && scan == SC_TAB && down;
+    if scan == SC_TAB { st.pending_tab = down; }
+    if !grph || finish { st.pending_tab = false; }
+    let rank = if start || finish || stop_raw(raw) { 3 }
+        else if repeat { 1 } else if wm_scan(scan) { 2 } else { 0 };
+    let reserve_finish = start || (st.pending_switch && !finish);
+    let reserve_stop = start && !st.pending_raw[..st.pending_raw_n].iter().copied().any(stop_raw);
+    let limit = st.pending_raw.len() - usize::from(reserve_finish) - usize::from(reserve_stop);
+    let needed = (st.pending_raw_n + 1).saturating_sub(limit);
+    if needed > 0 {
+        let mut victims = [false; 128];
+        let mut found = 0;
+        for priority in 0..rank {
+            for i in (0..st.pending_raw_n).rev() {
+                if found < needed && st.pending_rank[i] == priority {
+                    victims[i] = true;
+                    found += 1;
+                }
+            }
+        }
+        if found < needed {
+            st.pending_raw_dropped = st.pending_raw_dropped.saturating_add(1);
+            return;
+        }
+        let mut write = 0;
+        for (i, &remove) in victims[..st.pending_raw_n].iter().enumerate() {
+            if !remove {
+                st.pending_raw[write] = st.pending_raw[i];
+                st.pending_rank[write] = st.pending_rank[i];
+                write += 1;
+            }
+        }
+        st.pending_raw_n = write;
+        st.pending_raw_dropped = st.pending_raw_dropped.saturating_add(found as u32);
+    }
+    st.pending_raw[st.pending_raw_n] = raw;
+    st.pending_rank[st.pending_raw_n] = rank;
+    st.pending_raw_n += 1;
+    if start { st.pending_switch = true; }
+    if finish { st.pending_switch = false; }
+}
+
+pub(crate) fn purge_boundary(st: &mut GuiState, same_owner: bool) {
+    let mut write = 0;
+    for i in 0..st.pending_raw_n {
+        if wm_scan(st.pending_raw[i] as u8 & 127) || st.pending_rank[i] == 3 {
+            st.pending_raw[write] = st.pending_raw[i];
+            st.pending_rank[write] = st.pending_rank[i];
+            write += 1;
+        }
+    }
+    st.pending_raw_n = write;
+    if same_owner {
+        loop {
+            let raw = unsafe { (os32api::api().kbd_trygetrawkey)() };
+            if raw < 0 { break; }
+            if wm_scan(raw as u8 & 127) || (st.pending_switch && raw & ((MOD_GRPH as i32) << 9) == 0) { defer_raw(st, raw); }
+        }
+        for (scan, held) in st.held_keys.iter_mut().enumerate() {
+            *held = !wm_scan(scan as u8) && unsafe { (os32api::api().kbd_is_pressed)(scan as i32) } > 0;
+        }
+    }
+}
 
 /* drivers/input/mouse.h の MOUSE_BTN_*。`GuiEvtButton.button` にもこの値を載せる
  * (契約 D4 の「前面窓のクライアントへ `Button{button=2}`」)。 */
@@ -225,6 +313,13 @@ fn release_capture(st: &mut GuiState, mx: i32, my: i32, button: u8) -> bool {
     crate::excl::append(st, c.slot, &ev)
 }
 
+pub fn cancel_capture(st: &mut GuiState) {
+    *cap(MOUSE_BTN_LEFT) = Capture::NONE;
+    *cap(MOUSE_BTN_RIGHT) = Capture::NONE;
+    st.synth_buttons = 0;
+    if st.drag_index >= 0 { wm::drop_drag_frame(st); }
+}
+
 /// 完全な id の窓への配送先 (窓が消えていれば None)。
 pub fn target_of(st: &GuiState, win_id: u32) -> Option<Target> {
     let index = st.win_by_id(win_id)?;
@@ -274,8 +369,10 @@ pub(crate) fn ascii_key(ch: u8) -> Option<(u8, u32)> {
 /// 入力を取り込みリングへ流す (契約 T3 / T8)。
 pub fn capture(st: &mut GuiState, ctx: Ctx) {
     st.now = unsafe { (os32api::api().get_tick)() };
+    let front = st.front_id();
     capture_keyboard(st, ctx);
-    capture_mouse(st, ctx);
+    let end_batch = st.front_id() != front || st.abort_seen;
+    capture_mouse(st, ctx, end_batch);
 }
 
 /// gshell 単独 (窓が 1 枚も無い) ときに WM が横取りするキー (make のみ)。
@@ -319,9 +416,12 @@ pub(crate) fn capture_keyboard(st: &mut GuiState, ctx: Ctx) -> bool {
 
 pub(crate) fn capture_keyboard_observed(st: &mut GuiState, ctx: Ctx) -> bool {
     if ctx.wm_ui() { crate::excl::settle(st); }
+    for (scan, held) in st.held_keys.iter_mut().enumerate() {
+        if *held && unsafe { (os32api::api().kbd_is_pressed)(scan as i32) } == 0 { *held = false; }
+    }
     let mut captured = false;
     /* X4 で見た SHIFT+SPACE をここで実行する (契約 T8: 辞書を開く重い処理は X3)。 */
-    if ctx.wm_ui() {
+    if ctx.wm_ui() && st.excl.open(crate::excl::KBD) {
         fep::apply_pending_toggle(st);
         /* X1 (アプリの set_focus 等) でフォーカスが移ったときの未確定文字を、
          * 次の打鍵より先に元の窓へ確定する (票 KBD_NAV §1-6)。 */
@@ -339,7 +439,9 @@ pub(crate) fn capture_keyboard_observed(st: &mut GuiState, ctx: Ctx) -> bool {
         }
     }
 
+    let front = st.front_id();
     loop {
+        if st.front_id() != front { break; }
         /* X4 は満杯に近ければ取り込まない。X3 は STOP を探して読み続ける。
          * FEP の確定文字列が続く可能性があるので 4 件分を見る。 */
         let space_ok = if modal::is_open() || startmenu::is_open() {
@@ -352,7 +454,8 @@ pub(crate) fn capture_keyboard_observed(st: &mut GuiState, ctx: Ctx) -> bool {
                 None => true, /* 宛先無し: 取り込んでも捨てるだけなので読む (キューを空ける) */
             }
         };
-        if !space_ok && ctx == Ctx::Pump {
+        let ordinary_pump = ctx == Ctx::Pump && st.excl.open(crate::excl::KBD | crate::excl::MOUSE);
+        if !space_ok && ordinary_pump {
             break;
         }
         /* X4 (ポンプ) で FEP がオンなら変換をここでは行わない (契約 T8: 辞書検索
@@ -367,14 +470,14 @@ pub(crate) fn capture_keyboard_observed(st: &mut GuiState, ctx: Ctx) -> bool {
             && (ui_defer || fep::is_on() || fep::toggle_pending() || st.pending_raw_n > 0);
         /* 通常は満杯ならカーネル側に残す。WM UI 中は読み続け、あふれた
          * 新しい raw を数える。古い退避済み raw の順序は保つ。 */
-        if ctx == Ctx::Pump && !ui_defer && st.pending_raw_n >= st.pending_raw.len() {
-            break;
-        }
+        if ordinary_pump && !ui_defer && st.pending_raw_n == st.pending_raw.len() { break; }
         /* X3 は前の X4 が退避した raw を先に消費する (順序を保つ)。 */
-        let raw = if ctx.wm_ui() && st.pending_raw_n > 0 {
+        let from_pending = ctx.wm_ui() && st.pending_raw_n > 0;
+        let raw = if from_pending {
             let r = st.pending_raw[0];
             let mut q = 1;
             while q < st.pending_raw_n {
+                st.pending_rank[q - 1] = st.pending_rank[q];
                 st.pending_raw[q - 1] = st.pending_raw[q];
                 q += 1;
             }
@@ -406,26 +509,17 @@ pub(crate) fn capture_keyboard_observed(st: &mut GuiState, ctx: Ctx) -> bool {
          * 実行する (票 KBD_NAV §1-4)。X4 で見つけたら FEP と同じく、この raw と
          * 以後を全部退避して次の X3 へ回す (順序を保つ)。 */
         if defer || (ctx == Ctx::Pump && kbdnav::is_wm_raw(st, raw)) {
-            if st.pending_raw_n == st.pending_raw.len() {
-                st.pending_raw_dropped = st.pending_raw_dropped.saturating_add(1);
-            } else {
-                st.pending_raw[st.pending_raw_n] = raw;
-                st.pending_raw_n += 1;
-            }
+            defer_raw(st, raw);
             continue;
         }
-        /* X3 must reach STOP behind undeliverable input. Count every discarded
-         * raw event, without running FEP/WM actions for it. */
-        if !space_ok {
-            if scan == SC_STOP && down && (mods & MOD_CTRL) != 0 {
-                st.abort_seen = true;
-                // Preserve later raw input until STOP changes the foreground.
-                break;
-            } else if let Some(t) = focus_target(st) {
-                ring::add_dropped(st, t.slot, 1);
-                crate::gserial::lost(st);
+        if !from_pending {
+            if mods & MOD_GRPH == 0 || (scan == SC_GRPH && !down) {
+                st.pending_switch = false;
+                st.pending_tab = false;
+            } else if scan == SC_TAB {
+                st.pending_tab = down;
+                st.pending_switch |= down;
             }
-            continue;
         }
         /* X4 まで来た make は WM のキーではない (上で退避していない)。古い印を
          * 消して、対になる break を X4 がそのまま配れるようにする。 */
@@ -435,30 +529,36 @@ pub(crate) fn capture_keyboard_observed(st: &mut GuiState, ctx: Ctx) -> bool {
 
         /* 修飾キーとして捨てる**前**に: カナ (マウスキーの切り替え) と、GRPH+TAB
          * 切り替え中の GRPH の離し (票 KBD_NAV §1-2 / §1-5)。 */
-        if ctx.wm_ui() && kbdnav::pre(st, scan, down, mods) {
+        if ctx.wm_ui() && kbdnav::finish_if_released(st, scan, down, mods) {
+            if stop_raw(raw) { st.abort_seen = true; }
             continue;
         }
-
-        /* 修飾キー自体は Key として配送しない (状態は mods で見る)。 */
-        if scan >= SC_SHIFT && scan <= SC_CTRL {
+        if ctx.wm_ui() && scan == SC_TAB && mods & MOD_GRPH != 0 {
+            kbdnav::on_key(st, scan, down, mods);
             continue;
         }
-        /* CTRL+STOP (契約 T6): カーネルは要求を立てて cooked には配らないが、raw には
-         * 積む。アプリが OP_WAIT で寝ている間はカーネルの判定点 (syscall 入口 /
-         * CPL=3 を割り込んだ IRQ1) を通らないので、WM が待ちを抜けてアプリへ戻し、
-         * syscall の出口で畳ませる (exec.c ring3_syscall_dispatch)。打鍵としては
-         * どこにも配らない (2026-09-06、v1.2 G2 で実測した隙間)。 */
-        if scan == SC_STOP && (mods & MOD_CTRL) != 0 {
-            if down {
-                st.abort_seen = true;
+        if scan == SC_STOP && down && (mods & MOD_CTRL) != 0 {
+            st.abort_seen = true;
+            if !space_ok {
+                // Preserve later raw input until STOP changes the foreground.
+                break;
             }
             continue;
         }
-
-        if !st.excl.open(crate::excl::KBD) {
-            if ctx.wm_ui() && scan == SC_TAB && mods & MOD_GRPH != 0 {
-                kbdnav::on_key(st, scan, down, mods);
+        if st.held_keys[scan as usize] {
+            if !down { st.held_keys[scan as usize] = false; }
+            continue;
+        }
+        if !st.excl.open(crate::excl::KBD) { continue; }
+        if !space_ok {
+            if let Some(t) = focus_target(st) {
+                ring::add_dropped(st, t.slot, 1);
+                crate::gserial::lost(st);
             }
+            continue;
+        }
+        if ctx.wm_ui() && kbdnav::pre(st, scan, down, mods) { continue; }
+        if (SC_SHIFT..=SC_CTRL).contains(&scan) || (scan == SC_STOP && mods & MOD_CTRL != 0) {
             continue;
         }
 
@@ -585,11 +685,11 @@ pub(crate) fn capture_keyboard_observed(st: &mut GuiState, ctx: Ctx) -> bool {
     }
 
     /* FEP の確定文字列を `Text` (8B ずつ、`more`) で流す (契約 U2)。 */
-    fep::flush_text(st);
+    if st.front_id() == front && st.excl.open(crate::excl::KBD) { fep::flush_text(st); }
     captured
 }
 
-fn capture_mouse(st: &mut GuiState, ctx: Ctx) {
+fn capture_mouse(st: &mut GuiState, ctx: Ctx, end_batch: bool) {
     let mut mi = MouseInfo {
         x: 0,
         y: 0,
@@ -610,12 +710,13 @@ fn capture_mouse(st: &mut GuiState, ctx: Ctx) {
      * Start / 窓を含めて無視)。位置と押下だけ同期しておき、復帰した最初の
      * 周期で古いエッジが「クリック」に化けるのを防ぐ。カーソルも描かない
      * (画面はプログラムのもの)。 */
-    if !st.excl.open(crate::excl::MOUSE) || crate::fullscreen::active() {
+    if end_batch || !st.excl.open(crate::excl::MOUSE) || crate::fullscreen::active() {
         st.mouse_x = mi.x as i32;
         st.mouse_y = mi.y as i32;
         st.real_x = st.mouse_x;
         st.real_y = st.mouse_y;
-        st.prev_buttons = mi.buttons;
+        st.excl.mouse_baseline = true;
+        st.prev_buttons = 0;
         return;
     }
     /* 位置は**実マウスが動いたときだけ**実マウスの値へ (最後に動いた方が勝つ)。
@@ -630,7 +731,14 @@ fn capture_mouse(st: &mut GuiState, ctx: Ctx) {
     let moved = mx != st.mouse_x || my != st.mouse_y;
     st.mouse_x = mx;
     st.mouse_y = my;
-    let btn = mi.buttons;
+    if st.excl.mouse_baseline {
+        st.excl.held_buttons = mi.buttons;
+        st.prev_buttons = 0;
+        st.excl.mouse_baseline = false;
+        cursor::move_to(st, mx, my);
+    }
+    st.excl.held_buttons &= mi.buttons;
+    let btn = mi.buttons & !st.excl.held_buttons;
     /* 左右それぞれのエッジ (契約 D4 / W3 §4.2)。右は v1.1 では見ていなかった。 */
     let down_edge = (btn & MOUSE_BTN_LEFT) != 0 && (st.prev_buttons & MOUSE_BTN_LEFT) == 0;
     let up_edge = (btn & MOUSE_BTN_LEFT) == 0 && (st.prev_buttons & MOUSE_BTN_LEFT) != 0;
@@ -673,11 +781,13 @@ fn capture_mouse(st: &mut GuiState, ctx: Ctx) {
             /* カーソルの移動は損傷に含めない (別経路で退避・再描画)。 */
             cursor::move_to(st, mx, my);
         }
+        let front = st.front_id();
         if down_edge {
             edge_x3(st, mx, my, MOUSE_BTN_LEFT, true);
         } else if up_edge {
             edge_x3(st, mx, my, MOUSE_BTN_LEFT, false);
         }
+        if front != st.front_id() { st.excl.mouse_baseline = true; return; }
         if rdown_edge {
             edge_x3(st, mx, my, MOUSE_BTN_RIGHT, true);
         } else if rup_edge {
@@ -873,6 +983,7 @@ fn wm_button_down(st: &mut GuiState, mx: i32, my: i32) {
         st.dirty_screen(vac);
         let new_front = st.windows[idx].id(idx);
         emit_focus_change(st, old_front, new_front);
+        return;
     }
 
     /* 閉じるボタン? */

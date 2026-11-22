@@ -4044,8 +4044,12 @@ fn kstop_full_ring_preserves_following_input_for_next_foreground() {
                 slot::ring_ptr(st, 0).add((i as usize % GUI_RING_CAPACITY) * 16) as *const GuiEvent) };
             if ev.kind == GUI_EV_KEY { scans.push((ev.sub, ev.payload[0])); }
         }
-        assert_eq!(scans, vec![(1, 0x10), (0, 0x10)]);
-        assert!(ring::pending(st, 0) > 0);
+        if deferred {
+            assert!(scans.is_empty(), "旧前景で退避した通常キー");
+        } else {
+            assert_eq!(scans, vec![(1, 0x10), (0, 0x10)]);
+        }
+        if !deferred { assert!(ring::pending(st, 0) > 0); }
         st.inited = false;
     }
 }

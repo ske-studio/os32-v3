@@ -270,6 +270,8 @@ unsafe extern "C" fn ime_idle(key: i32) -> i32 {
 pub static RAWKEYS: Mutex<Vec<i32>> = Mutex::new(Vec::new());
 /// テストが積むカーネル FEP (`ime_feed_key`) の返り値。空なら 0x100 (Pass)。
 pub static IME_SCRIPT: Mutex<Vec<i32>> = Mutex::new(Vec::new());
+pub static PRESSED: Mutex<[bool; 128]> = Mutex::new([false; 128]);
+unsafe extern "C" fn key_pressed(scan: i32) -> i32 { lk(&PRESSED)[scan as usize] as i32 }
 unsafe extern "C" fn raw_key() -> i32 {
     let mut q = lk(&RAWKEYS);
     if q.is_empty() {
@@ -999,6 +1001,7 @@ unsafe extern "C" fn host_notice_serial() -> u32 { HOST_NOTICE_SERIAL.load(Order
 unsafe extern "C" fn time_now_unavailable(_: *mut u32, _: *mut u32) -> i32 { -1 }
 
 pub fn init() {
+    *lk(&PRESSED) = [false; 128];
     lk(&INPUT_ORDER).clear();
     *lk(&WM_STATE) = (0, 0, 0);
     REGEN_RC.store(0, Ordering::SeqCst);
@@ -1020,6 +1023,7 @@ pub fn init() {
     a.sys_time = sys_time;
     a.kbd_dropped_count = dropped_count;
     a.kbd_trygetrawkey = raw_key;
+    a.kbd_is_pressed = key_pressed;
     a.kbd_get_modifiers = kbd_mods;
     KBD_MODS.store(0, Ordering::SeqCst);
     a.mouse_poll = mouse;

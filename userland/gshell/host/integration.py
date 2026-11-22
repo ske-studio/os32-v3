@@ -15,7 +15,9 @@ import sys
 import tempfile
 ROOT = Path(__file__).resolve().parents[3]
 EXCL_ONLY = '--excl' in sys.argv
-OUT = ROOT / 'userland/gshell/target' / ('gshell-excl' if EXCL_ONLY else 'gshell-host')
+OUT = ROOT / 'userland/gshell/target/gshell-host'
+if EXCL_ONLY:
+    OUT = OUT.with_name('gshell-excl')
 OUT.mkdir(parents=True, exist_ok=True)
 def run(args):
     subprocess.run(args, cwd=ROOT, check=True)
@@ -328,7 +330,7 @@ MUTATIONS = [
      '                // Preserve later raw input until STOP changes the foreground.',
      'kstop_full_ring_preserves_following_input_for_next_foreground'),
     ('X3 stops at full ring', 'src/input.rs',
-     'if !space_ok && ctx == Ctx::Pump {', 'if !space_ok {',
+     'if !space_ok && ordinary_pump {', 'if !space_ok {',
      'kstop_full_event_ring_drains_raw_and_counts_overflow'),
     ('full ring loses STOP', 'src/input.rs',
      'if scan == SC_STOP && down && (mods & MOD_CTRL) != 0 {', 'if false {',
@@ -398,7 +400,7 @@ MUTATIONS = [
      '        NP_MINUS => click(st, BTN_RIGHT),', '        NP_MINUS => click(st, BTN_LEFT),',
      'k1_4_minus_is_a_right_click'),
     ('plus is a single click', 'src/kbdnav.rs',
-     '            click(st, BTN_LEFT);\n            click(st, BTN_LEFT);', '            click(st, BTN_LEFT);',
+     '            if st.front_id() == front { click(st, BTN_LEFT); }', '',
      'k1_4_plus_is_a_double_click'),
     ('acceleration 12 -> 6', 'src/kbdnav.rs',
      'const MK_ACCEL: [(u32, i32); 3] = [(7, 3), (15, 12), (u32::MAX, 24)];',
@@ -422,7 +424,7 @@ MUTATIONS = [
      '    cursor::move_to(st, x, y);\n    let b',
      'k1_7_drag'),
     ('no FEP commit before a WM focus change', 'src/wm.rs',
-     '    if x3 {\n        fep::commit_to(st, old);\n    } else {', '    if x3 {\n    } else {',
+     '    if x3 && st.excl.open(crate::excl::KBD) {\n        fep::commit_to(st, old);\n    } else {', '    if x3 {\n    } else {',
      'k1_6_'),
     ('the commit goes to the new focus', 'src/fep.rs',
      '    let t = input::target_of(st, win_id);', '    let t = input::focus_target(st);',
