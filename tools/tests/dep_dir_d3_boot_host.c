@@ -4,7 +4,7 @@
 #include <string.h>
 #include <stdarg.h>
 #include <setjmp.h>
-#include "boot_platform.h"
+#include "boot.h"
 #include "boot_display.h"
 #include "pc98.h"
 #include "text_screen.h"
@@ -58,22 +58,22 @@ void kprintf(u8 attr, const char *fmt, ...)
     va_start(ap, fmt); vsnprintf(line, sizeof(line), fmt, ap); va_end(ap);
     event("L%u:%s;", attr, line);
 }
-static void pc98_d2_bind(void) { event("bind-d2;"); }
-static void pc98_boot_disk_bind(void) { event("bind-disk;"); }
-static void pc98_boot_names_bind(void) { event("bind-names;"); }
-static void dma8237_init(void) { CHECK(!irq_on); event("dma;"); }
-static void kbd_init(void) { CHECK(irq_on); event("kbd;"); }
-static void mouse_init(void) { event("mouse;"); }
-static void _enable(void) { irq_on = 1; event("enable;"); }
+void pc98_d2_bind(void) { event("bind-d2;"); }
+void pc98_boot_disk_bind(void) { event("bind-disk;"); }
+void pc98_boot_names_bind(void) { event("bind-names;"); }
+void dma8237_init(void) { CHECK(!irq_on); event("dma;"); }
+void kbd_init(void) { CHECK(irq_on); event("kbd;"); }
+void mouse_init(void) { event("mouse;"); }
+void _enable(void) { irq_on = 1; event("enable;"); }
 int fdc_init(void) { CHECK(irq_on); event("fdc;"); return failing ? -1 : 0; }
 int fdc_get_last_init_status(u8 *st, u8 *before, u8 *after)
 { *st=0x12; *before=0x34; *after=0x56; event("fdc-status;"); return failing ? -1 : 0; }
 int fdc_set_media_by_daua(int unit, u32 drive)
 { CHECK(unit == 0 && drive == media_drive); event("media;"); return -1; }
-static unsigned int inp(unsigned int port) { CHECK(port == FDC_IO_3MODE); event("inp;"); return media_144 ? FDC_3M_CUR_144 : 0; }
+unsigned int inp(unsigned int port) { CHECK(port == FDC_IO_3MODE); event("inp;"); return media_144 ? FDC_3M_CUR_144 : 0; }
 void dev_init(void) { event("dev;"); }
-static void loop_dev_init(void) { event("loop;"); }
-static void path_init(void) { event("path;"); }
+void loop_dev_init(void) { event("loop;"); }
+void path_init(void) { event("path;"); }
 const struct ext2_medium_ops ext2_medium_loop_ops = {0};
 const struct ext2_medium_ops ext2_medium_ide_ops = {0};
 int ext2_medium_register(int kind, const struct ext2_medium_ops *ops)
@@ -83,9 +83,9 @@ int ext2_medium_register(int kind, const struct ext2_medium_ops *ops)
     event(kind == EXT2_MEDIUM_HD ? "hd;" : "medium-loop;");
     return 0;
 }
-static int ext2_init(void) { event("ext2;"); return failing == 1 ? -1 : VFS_OK; }
-static int fatfs_init(void) { event("fat;"); return failing == 2 ? -1 : VFS_OK; }
-static int hostdrvfs_init(void) { event("hostfs;"); return failing == 3 ? -1 : VFS_OK; }
+int ext2_init(void) { event("ext2;"); return failing == 1 ? -1 : VFS_OK; }
+int fatfs_init(void) { event("fat;"); return failing == 2 ? -1 : VFS_OK; }
+int hostdrvfs_init(void) { event("hostfs;"); return failing == 3 ? -1 : VFS_OK; }
 int serialfs_init(void) { event("serialfs;"); return failing == 4 ? -1 : VFS_OK; }
 const struct SfsSessionFg sfs_session_fg = {0};
 void serialfs_session_set_fg(const struct SfsSessionFg *fg) {
@@ -120,17 +120,17 @@ int dev_name_present(const char *name)
     CHECK(!strcmp(name, "test"));
     return 0;
 }
-static void path_set_device_validator(int (*fn)(const char *))
+void path_set_device_validator(int (*fn)(const char *))
 {
     CHECK(fn == dev_name_present);
     CHECK(fn("test") == 0);
     event("validator;");
 }
-static void pci_init(void) { event("pci;"); }
+void pci_init(void) { event("pci;"); }
 int ide_init(void) { event("ide;"); return disk_count; }
 int ide_drive_present(int d) { event("present%d;", d); return d == 0 || d == 2; }
 void dev_register_hdd(int d) { event("hdd%d;", d); }
-static int hostdrvfs_detect(void) { event("host-detect;"); return host_present; }
+int hostdrvfs_detect(void) { event("host-detect;"); return host_present; }
 int vfs_mount(const char *p, const char *d, const char *f)
 {
     event("mount:%s,%s,%s;", p, d, f);
@@ -139,12 +139,12 @@ int vfs_mount(const char *p, const char *d, const char *f)
     CHECK(!strcmp(p, "/host") && !strcmp(d, "hostdrv") && !strcmp(f, "hostdrv"));
     return mount_fail ? VFS_ERR_IO : VFS_OK;
 }
-static void rtc_init(void) { event("rtc;"); }
-static void kcg_init(void) { event("kcg;"); }
-static void pc98_boot_pci_resources(void) { event("resources;"); }
-static int lgy98_init(void) { event("lgy;"); return -1; }
+void rtc_init(void) { event("rtc;"); }
+void kcg_init(void) { event("kcg;"); }
+void pc98_boot_pci_resources(void) { event("resources;"); }
+int lgy98_init(void) { event("lgy;"); return -1; }
 #include "boot_platform_source.inc"
-#include "pc98_boot_source.inc"
+void pc98_usb_early_quiesce(void) { event("usb-quiesce;"); }
 #include "machcfg_contract.h"
 int machcfg_load_root(void) { return 0; }
 void machcfg_report(const char *machine, u32 cpu_id, int seed_from_cpu)
@@ -193,7 +193,7 @@ int main(void)
     boot_platform_run(BOOT_AUTO_MOUNT, &ctx); expect("host-detect;T32,3,161:HDRV --;");
     boot_platform_run(BOOT_CLOCK, &ctx); expect("T26,3,129:RTC...;rtc;T32,3,225:OK;");
     boot_platform_run(BOOT_FONT, &ctx); expect("kcg;");
-    boot_platform_run(BOOT_PCI_RESOURCES, &ctx); expect("resources;");
+    boot_platform_run(BOOT_PCI_RESOURCES, &ctx); expect("resources;usb-quiesce;");
     boot_platform_run(BOOT_NIC_LEGACY, &ctx); expect("lgy;");
     /* Loader drive is preserved; root uses exact equality, display uses type. */
     for (unsigned drive=0; drive<256; drive++) {
