@@ -15,7 +15,7 @@ ifeq ($(PLATFORM),pc98)
 C_COMMON_PC98_PENDING += $(C_EXT2_FORMATTER)
 endif
 C_COMMON_EXEC += init/shell_loop.c kernel/gui.c kernel/module/module_image.c kernel/module/module_runtime.c
-C_COMMON_COMPILE_ONLY_PPC := kernel/sqlite_engine.c $(C_EXT2_FORMATTER) kernel/dev/device_ide.c drivers/ata/ide_addr.c
+C_COMMON_COMPILE_ONLY_PPC := kernel/fep_boot.c kernel/sqlite_engine.c $(C_EXT2_FORMATTER) kernel/dev/device_ide.c drivers/ata/ide_addr.c
 C_COMMON_COMPILE_ONLY_PPC += input/hal/input_policy.c
 C_COMMON_IDE = kernel/dev/device_ide.c drivers/ata/ide.c drivers/ata/ide_addr.c
 C_COMMON_LOOP = kernel/dev/device_loop.c drivers/block/loop_dev.c

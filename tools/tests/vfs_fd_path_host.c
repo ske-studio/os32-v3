@@ -339,6 +339,10 @@ static void disk_setup(void)
     kstrncpy(cwd, "/", VFS_MAX_PATH);
     ext2_init();
     pc98_boot_names_bind();
+    CHECK(pt_fake_write(g_disk, DISK_BASE_LBA, 136) == 0);
+    CHECK(ext2_vfs_mount(VFS_MOUNT_DEV_ENCODE(VFS_DEV_HD, 0)) == (void *)0);
+    CHECK(vfs_mount("/hd0", "hd0", "ext2") == OS32_ERR_IO);
+    CHECK(pt_fake_write(g_disk, DISK_BASE_LBA, DISK_SECTORS - DISK_BASE_LBA) == 0);
     CHECK(vfs_mount("/hd0", "hd0", "ext2") == VFS_OK);
     g_ec = (Ext2Ctx *)mounts[0].fs_ctx;
     CHECK(g_ec != (Ext2Ctx *)0);

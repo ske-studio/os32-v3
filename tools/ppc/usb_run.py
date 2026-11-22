@@ -835,14 +835,9 @@ def link_lan_accept(media, cpu, out, mode='normal'):
         s.close()
 
 
-def in2_observe(elf, cpu, out, mode):
+def in2_observe(media, cpu, out, mode):
     from link_sh_run import Session
 
-    from boot_media import Media, package
-
-    media = Media(elf, elf.with_suffix('.map'), elf.with_suffix('.iso'))
-    package(elf, media.iso)
-    media.verify()
     s = Session(media, cpu, out, 240)
     s.usb_devices = ('-device', 'usb-kbd,id=kbd', '-device', 'usb-mouse,id=mouse')
     log = out/'serial-a.log'
@@ -935,8 +930,13 @@ def in2_observe(elf, cpu, out, mode):
             s.wait(lambda: 'IN2 STALE BUTTON 1' in serial(log), 'button still held after detach')
             return
         ack('GONE')
+        existing = {entry['index'] for entry in s.q.call('query-mice')}
         s.q.call('device_add', {'driver': 'usb-mouse', 'id': 'mouse2'})
         ack('REATTACHED')
+        # Hotplug can leave mac99's built-in mouse selected for relative events.
+        mouse, = [entry for entry in s.q.call('query-mice')
+                  if entry['index'] not in existing]
+        s.q.call('human-monitor-command', {'command-line': f"mouse_set {mouse['index']}"})
         move()
         ack('CTRL-C')
         edge('ctrl', True, 'e0')

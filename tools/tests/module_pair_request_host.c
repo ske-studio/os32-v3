@@ -46,6 +46,8 @@ const struct trident_resources *trident_resources_get(void)
 }
 u32 cpu_loops_per_tick(void) { return 1; }
 #elif defined(PAIR_FEP)
+int services_public;
+enum services_stage services_stage;
 void input_ime_action_flush(void) {}
 void kbd_policy_ime_state(u32 active, u32 owner, u32 command_gen) {}
 int input_ime_cancel_take(const KbdPolicySnapshot *current) { return 0; }

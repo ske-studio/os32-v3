@@ -9,7 +9,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT/'tools'), str(ROOT/'tools/ppc')]
-from kboot_accept import build, mutant_settings
+from kboot_accept import build_media, mutant_settings
 from ppc_shm import guest_available
 from run import require
 from usb_run import in2_observe
@@ -56,14 +56,14 @@ def main():
     hashes = set()
     for mode in ['normal'] + (list(IN2_MUTATIONS) if args.mutate else []):
         mutation = mutant_settings(work, mode, *IN2_MUTATIONS[mode]) if mode != 'normal' else []
-        elf = build(work/mode, *opts, *mutation, 'kb-user', 'kernel')
-        digest = hashlib.sha256(elf.read_bytes()).hexdigest()
+        media = build_media(work/mode, *opts, *mutation, 'kb-user', 'kernel')
+        digest = hashlib.sha256(media.elf.read_bytes()).hexdigest()
         require(digest not in hashes, 'identical ELF '+mode)
         hashes.add(digest)
         print(mode, digest, flush=True)
         if not args.build_only:
             for cpu in ('7450', '7455'):
-                in2_observe(elf, cpu, work/(mode+'-'+cpu), mode)
+                in2_observe(media, cpu, work/(mode+'-'+cpu), mode)
     print('distinct in2 images='+str(len(hashes)), flush=True)
     return 0
 
