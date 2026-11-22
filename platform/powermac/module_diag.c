@@ -1,6 +1,6 @@
 #include "kernel/module/module.h"
 #include "debug_probe_snapshot.h"
-#include "kdebug/probe_wire.h"
+#include "kdebug/probe_validate.h"
 
 /* The loader resolves this typed slot before publishing dbg_call. */
 struct {
@@ -12,17 +12,10 @@ static i32 diag_call(u32 op, void *buf, u32 size)
     struct probe_wire *w = buf;
     if (op != PROBE_OP) return OS32_ERR_NOSYS;
     if (!w || size != sizeof(*w) || w->version != PROBE_VERSION ||
-        w->size != sizeof(*w)) return OS32_ERR_INVAL;
+        w->size != sizeof(*w) || !wire_valid(w)) return OS32_ERR_INVAL;
     if (w->action != PROBE_CMD_LIST) {
         w->status = PROBE_NOSYS;
         return 0;
-    }
-
-    const u8 *bytes = (const u8 *)w;
-    for (u32 i = __builtin_offsetof(struct probe_wire, flags); i < sizeof(*w); i++) {
-        if (i >= __builtin_offsetof(struct probe_wire, id) &&
-            i < __builtin_offsetof(struct probe_wire, kind)) continue;
-        if (bytes[i]) return OS32_ERR_INVAL;
     }
 
     struct probe_list list;

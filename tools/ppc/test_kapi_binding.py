@@ -243,8 +243,8 @@ def verify(source, entries):
     if any('#include "' + header + '"' in source for header in ('gfx_hal.h', 'palette.h')):
         return False
     reference = (ROOT / 'kapi/kapi_generated.c').read_text()
-    for slot in PRESENT_SLOTS | PUBLISHED_GFX:
-        wrapper = re.search(r'(?:void|int) __cdecl wrap_' + slot + r'\([^)]*\)\n\{.*?\n\}', reference, re.S)
+    for slot in PRESENT_SLOTS | PUBLISHED_GFX | {'kdebug_call'}:
+        wrapper = re.search(r'(?:void|int|i32) __cdecl wrap_' + slot + r'\([^)]*\)\n\{.*?\n\}', reference, re.S)
         if not wrapper or wrapper.group() not in source:
             return False
     for api in entries:
@@ -294,6 +294,8 @@ def generate(tmp, mutation=None, *, link=True):
             'IME_SLOTS = PROVIDER_GROUPS',
             'PROVIDER_GROUPS[' + repr(group) + '] = (frozenset(), frozenset())\nIME_SLOTS = PROVIDER_GROUPS')
         helper.write_text(text)
+    if mutation == 'kdebug-absent':
+        insert_group(helper, mutation, "    'debug_mut': (frozenset({'kdebug_call'}), frozenset()),\n")
     if mutation == 'reboot-absent':
         text = helper.read_text().replace("'buz_on', 'buz_off'", "'buz_on', 'buz_off', 'sys_reboot'")
         helper.write_text(text)
@@ -518,7 +520,7 @@ def main():
             return 1
         if '--mutate' in sys.argv:
             check_planar_link(tmp, cc, dirs)
-            for mutation in ('empty', 'zero', 'group-empty', 'ime-empty', 'reboot-absent', 'slot-swap', 'present-absent', 'gfx2-present-absent', 'check-op-bound', 'pci-absent', 'mem-absent', 'db-absent'):
+            for mutation in ('empty', 'zero', 'group-empty', 'ime-empty', 'reboot-absent', 'kdebug-absent', 'slot-swap', 'present-absent', 'gfx2-present-absent', 'check-op-bound', 'pci-absent', 'mem-absent', 'db-absent'):
                 path = tmp / mutation
                 path.mkdir()
                 mutated = generate(path, mutation, link=False)

@@ -1,3 +1,5 @@
+#include "arch_exec_kapi.h"
+#include "kapi_table.h"
 #include "kstring.h"
 #include "module_runtime.h"
 #include "platform_module_pair.h"
@@ -20,9 +22,11 @@ static int probe_modules(void)
 {
     struct probe_wire wire = {.version = PROBE_VERSION, .size = sizeof(wire),
                               .action = PROBE_CMD_LIST};
-    int list = kdebug_call(PROBE_OP, &wire, sizeof(wire)) ? -1 : wire.status;
-    wire.action = PROBE_CMD_ARM;
-    int unsupported = kdebug_call(PROBE_OP, &wire, sizeof(wire)) ? -1 : wire.status;
+    const KernelAPI *api = (const KernelAPI *)exec_kapi_table();
+    int list = api->kdebug_call(PROBE_OP, &wire, sizeof(wire)) ? -1 : wire.status;
+    wire = (struct probe_wire){.version = PROBE_VERSION, .size = sizeof(wire),
+                               .action = PROBE_CMD_ARM};
+    int unsupported = api->kdebug_call(PROBE_OP, &wire, sizeof(wire)) ? -1 : wire.status;
     kprintf(KBOOT_ATTR, "[module] diag state=%u list=%d unsupported=%d\n",
             kdebug.state, list, unsupported);
 

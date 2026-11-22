@@ -15,6 +15,7 @@ FIX = ROOT / 'tools/tests/ppc_module'
 sys.path[:0] = [str(ROOT / 'tools'), str(ROOT / 'tools/ppc')]
 import mkmod
 import root_pair
+from test_kapi_binding import generate as generate_bindings
 from gen_sqlite_imports import generate
 from kboot_accept import build, mutant_settings
 from ppc_shm import guest_available
@@ -49,7 +50,6 @@ def fixtures(work, cross):
     manifest = json.loads((ROOT / 'build/ppc-ram-root.json').read_text())
     config = work / 'system.cfg'
     config.write_text('KDEBUG=1\n')
-    manifest['/etc/system.cfg'] = str(config)
     for src in ('kcg_import_stubs.S', 'kcg_import_slots.c'):
         run([*cc, work / src, '-o', work / (src + '.o')])
     for name, value in [('a', 11), ('b', 27)]:
@@ -114,15 +114,19 @@ def main():
         anchor, anchor + '\n        kprintf(KBOOT_ATTR, "[module] result=%d\\n", probe_modules());') +
         (FIX / 'probe.inc').read_text())
     images = []
-    for case in (['normal', 'bypass'] if args.mutate else ['normal']):
+    for case in (['normal', 'bypass', 'kdebug-absent'] if args.mutate else ['normal']):
         settings = []
         if case == 'bypass':
             settings = [x.replace('KB_MUT_', 'KB_MUT_EXTRA_', 1) for x in mutant_settings(
                 work, case, 'kernel/module/module_image.c', 'if (h[MI_PAIR_CRC] != policy->pair_image_crc)',
                 'if (0)')]
+        if case == 'kdebug-absent':
+            (work / case).mkdir()
+            generated = generate_bindings(work / case, case)
+            (generated / 'stamp').touch()
         elf = build(work / case, 'IMAGE=kboot-link-sh', 'KB_SH_OUT=' + str(work / 'user'),
                     'KB_MUT_SRC=platform/powermac/ppc_kernel.c', 'KB_MUT_FILE=' + str(probe),
-                    'KB_ROOT_TEMPLATE=' + str(manifest), *settings, 'kb-user', 'kernel')
+                    'ROOT_MANIFEST=' + str(manifest), 'PPC_SYSTEM_CFG=' + str(work / 'system.cfg'), *settings, 'kb-user', 'kernel')
         cfg = subprocess.check_output(['isoinfo', '-i', elf.parent / 'root.iso',
                                        '-x', '/ETC/SYSTEM.CFG;1'])
         assert cfg == b'KDEBUG=1\n', 'paired guest must enable the product diagnostic loader'
@@ -130,6 +134,8 @@ def main():
     cases = [('normal', images[0], ['[module] diag state=1 list=0 unsupported=2', '[module] result=0'])]
     if args.mutate:
         pairs = [zlib.crc32(root_pair.wire(path.read_bytes())[0]) for path in images]
+        cases.append(('kdebug-absent', images[2],
+                      ['[module] diag state=1 list=-1 unsupported=-1', '[module] result=0']))
         cases.extend([('foreign', foreign_image(images[0], pairs[1]),
                        ['[module] diag state=4 list=-1 unsupported=-1', '[module] first rc=4 starts=0', '[module] result=4']),
                       ('bypass', foreign_image(images[1], pairs[0]), ['[module] diag state=1 list=0 unsupported=2', '[module] result=0'])])

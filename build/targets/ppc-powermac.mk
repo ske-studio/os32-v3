@@ -28,13 +28,15 @@ ROOT_CPU := powerpc
 ROOT_MANIFEST ?= build/ppc-ram-root.json
 ROOT_DEPS ?= assets/fonts/shino16.kcgfont assets/fonts/JF-Dot-Shinonome16-LICENSE.txt build/out/unicode.bin $(KB_ROOT_SHELL)
 KB_ROOT_DIAG := $(if $(filter 1,$(FEATURE_KDEBUG)),$(KB_OUT)/kdebug.bin)
+# Set PPC_SYSTEM_CFG to a system.cfg containing KDEBUG=1 for a diagnostic root.
+PPC_SYSTEM_CFG ?=
 # Acceptance builds use a private resident binary (including source mutants).
-ifneq ($(filter-out build/out/ppc-user/link-sh,$(KB_SH_OUT))$(KB_ROOT_DIAG),)
+ifneq ($(filter-out build/out/ppc-user/link-sh,$(KB_SH_OUT))$(KB_ROOT_DIAG)$(PPC_SYSTEM_CFG),)
 KB_ROOT_TEMPLATE := $(ROOT_MANIFEST)
 override ROOT_MANIFEST := $(KB_OUT)/root-manifest.json
-$(ROOT_MANIFEST): $(KB_ROOT_TEMPLATE) $(KB_ROOT_SHELL) $(KB_ROOT_DIAG) $(KB_OUT)/root-shell.config build/targets/ppc-powermac.mk
+$(ROOT_MANIFEST): $(KB_ROOT_TEMPLATE) $(PPC_SYSTEM_CFG) $(KB_ROOT_SHELL) $(KB_ROOT_DIAG) $(KB_OUT)/root-shell.config build/targets/ppc-powermac.mk
 	@mkdir -p $(@D)
-	python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); d["/sys/shell.bin"]=sys.argv[2]; d.update({"/boot/kdebug.bin":sys.argv[3]} if sys.argv[3] else {}); print(json.dumps(d))' "$<" "$(KB_ROOT_SHELL)" "$(KB_ROOT_DIAG)" > $@.tmp
+	python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); d["/sys/shell.bin"]=sys.argv[2]; d.update({"/boot/kdebug.bin":sys.argv[3]} if sys.argv[3] else {}); d.update({"/etc/system.cfg":sys.argv[4]} if sys.argv[4] else {}); print(json.dumps(d))' "$<" "$(KB_ROOT_SHELL)" "$(KB_ROOT_DIAG)" "$(PPC_SYSTEM_CFG)" > $@.tmp
 	mv $@.tmp $@
 endif
 
@@ -59,7 +61,7 @@ $(ROOT_ISO): $(KB_ROOT_SHELL) $(KB_OUT)/root-shell.config
 .PHONY: force-root-shell-config
 $(KB_OUT)/root-shell.config: force-root-shell-config
 	@mkdir -p $(@D)
-	@printf '%s\n' '$(ROOT_MANIFEST) $(KB_ROOT_SHELL) $(ROOT_BINS) $(KB_ROOT_DIAG)' > $@.tmp
+	@printf '%s\n' '$(ROOT_MANIFEST) $(KB_ROOT_TEMPLATE) $(PPC_SYSTEM_CFG) $(KB_ROOT_SHELL) $(ROOT_BINS) $(KB_ROOT_DIAG)' > $@.tmp
 	@if cmp -s $@.tmp $@; then rm $@.tmp; else mv $@.tmp $@; fi
 
 # Entry objects first (kernel.ld keeps .text.entry at the image start).
@@ -298,8 +300,8 @@ kdebug: $(KB_OUT)/kdebug.bin
 $(KB_OUT)/diag.o: platform/powermac/module_diag.c
 	@mkdir -p $(@D)
 	$(KB_CC) $(KB_FLAGS) -Ikernel/module -c $< -o $@
-$(KB_OUT)/kdebug.elf: $(KB_OUT)/diag.o build/ppc-module.ld sdk/link/generations.ld
-	$(PPC_CROSS_DIR)/bin/powerpc-elf-ld --emit-relocs -e kdebug_init -T build/ppc-module.ld $< -o $@
+$(KB_OUT)/kdebug.elf: $(KB_OUT)/diag.o $(KB_OUT)/lib/kstring_c.o build/ppc-module.ld sdk/link/generations.ld
+	$(PPC_CROSS_DIR)/bin/powerpc-elf-ld --emit-relocs --gc-sections -u kdebug_ops -e kdebug_init -T build/ppc-module.ld $(filter %.o,$^) -o $@
 $(KB_OUT)/kdebug.bin: $(KB_OUT)/kdebug.elf platform/powermac/kdebug_imports.json tools/mkmod.py tools/ppc/module_rela.py tools/module_schema.py sdk/kapi.json sdk/include/os32/os32_generations.h
 	python3 -B tools/mkmod.py --target ppc-powermac --elf $< --metadata platform/powermac/kdebug_imports.json --kapi-abi-gen $(shell python3 -c 'import json; print(json.load(open("sdk/kapi.json"))["version"])') --layout-gen $(shell sed -n 's/^\#define OS32_MEMORY_LAYOUT_GENERATION \([0-9]*\).*/\1/p' sdk/include/os32/os32_generations.h) -o $@
 -include $(KB_OUT)/diag.d

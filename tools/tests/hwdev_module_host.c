@@ -264,10 +264,18 @@ void _start(void)
         CHECK(!wire.status && !wire.more && !kstrcmp(wire.name,
               list.count ? "fixture.pre" : ""));
         for (u32 action = PROBE_CMD_ADD; action <= PROBE_CMD_STATUS; action++) {
-            wire.action = action;
+            wire = (struct probe_wire){.version = PROBE_VERSION, .size = sizeof(wire),
+                                       .action = action};
+            if (action == PROBE_CMD_ADD) wire.name[0] = 'a';
+            wire.reserved[0] = 1;
+            CHECK(diag.dbg_call(PROBE_OP, &wire, sizeof(wire)) == OS32_ERR_INVAL);
+            wire.reserved[0] = 0;
             CHECK(!diag.dbg_call(PROBE_OP, &wire, sizeof(wire)));
             CHECK(wire.status == PROBE_NOSYS && !probe_io_calls);
         }
+        wire.status = 0;
+        wire.action = PROBE_CMD_STATUS + 1;
+        CHECK(diag.dbg_call(PROBE_OP, &wire, sizeof(wire)) == OS32_ERR_INVAL);
         CHECK(diag.dbg_call(PROBE_OP + 1, &wire, sizeof(wire)) == OS32_ERR_NOSYS);
         struct probe_attach attachment = {.owner = dep, .callback = probe_io, .count = 1};
         u32 saved_text = c->text;
