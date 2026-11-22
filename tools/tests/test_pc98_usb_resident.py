@@ -39,17 +39,19 @@ def run(ctx):
         cases = [(mode, '', '', 0) for mode in (b'r', b'm', b'f', b'q', b't')]
         if ctx.mutate:
             cases.extend([
+                (b'm', 'scan_pending = 1;', 'scan_pending = 0;', 42),
+                (b'm', 'idle_runs++;\n        run_scan();', 'idle_runs++; irq_restore(flags); run_scan(); flags = irq_save();', 42),
                 (b't', 'kprintf(KLOG_ATTR, "[usb] tick register failed', 'if (0) kprintf(KLOG_ATTR, "[usb] tick register failed', 41),
                 (b'm', 'if (!found) kprintf', 'if (0) kprintf', 37),
                 (b'm', 'stage = "BAR map"', 'stage = "unknown"', 38),
                 (b'r', 'if (!hc->has_irq)\n            kprintf', 'if (0)\n            kprintf', 40),
-                (b'f', '        tick_target();',
-                 '        tick_target(); if (!foreground_log) log_drain_one();', 39),
+                (b'f', '    tick_target();',
+                 '    tick_target(); if (!foreground_log) log_drain_one();', 39),
                 (b'm', 'pc98_usb_service_log("[usb] first tick", NULL);', '(void)0;', 39),
             ])
             cases.extend((b'r', *mutation) for mutation in MUTANTS)
             cases.extend((b'm', *mutation) for mutation in [
-                ('        tick_target();', '        (void)tick_target;', 34),
+                ('    tick_target();', '        (void)tick_target;', 34),
                 ('tick_budget_cnt(IRQ0_SLOT_BUDGET_US), scan_reserve_cnt', 'tick_budget_cnt(IRQ0_SLOT_BUDGET_US), 0', 35),
                 ('active < 0 ? active : 0', 'active', 22),
                 ('found && !active ? -USB_E_HC : active', '(void)found, active', 27),

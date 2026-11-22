@@ -158,8 +158,11 @@ static int start(struct usb_hc *hc)
 static int add(struct usb_hc *hc) { (void)hc; registered++; return fail_register; }
 static void dead(struct usb_hc *hc, u32 why)
 { if (why != USB_WHY_START && why != USB_WHY_ABORT) bad++; hc->state = HC_DEAD; }
+extern int kbd_shim_irq_depth;
+static int require_mask;
 static void service(void)
 {
+    if (require_mask && !kbd_shim_irq_depth) bad++;
     if (++services == 2) {
         u32 value = 1;
         pc98_usb_service_log("sample %u", &value);
@@ -246,6 +249,20 @@ static int module_boot(void)
     if (lines != 3 || event_logs != 2) return 39;
     periodic();
     if (lines != 3 || first_logs != 1 || bad) return 39;
+    if (idle_log) {
+        unsigned before = services;
+        idle_log();
+        if (services != before) return 42;
+        remaining_us = 0;
+        periodic();
+        periodic();
+        if (services != before) return 35;
+        require_mask = 1;
+        idle_log();
+        require_mask = 0;
+        idle_log();
+        if (services != before + 1 || bad) return 42;
+    }
     module_hc->isr_pending = 2;
     if (handler(5, argument) != IRQ_HANDLED || module_hc->isr_pending != 3) return 23;
     usb_pending = 0;
