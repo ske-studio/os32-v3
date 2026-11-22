@@ -127,7 +127,32 @@ void *memset(void *dst, int val, u32 n) { return kmemset(dst, val, n); }
 u32 strlen(const char *s) { return h_strlen(s); }
 int strcmp(const char *a, const char *b) { return kstrcmp(a, b); }
 
-void kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
+static Ext2Ctx g_ctx;
+static int trace_remount, remount_resets;
+static unsigned geometry_logs, capacity_logs, legacy_logs;
+static u32 logged_base, logged_len, logged_blocks;
+static const char *logged_geometry;
+
+void kprintf(u8 attr, const char *fmt, ...)
+{
+    __builtin_va_list ap;
+    __builtin_va_start(ap, fmt);
+    if (kstrcmp(fmt, "[EXT2] hd%d: partition LBA %u +%u (CHS geometry from %s)\n") == 0) {
+        (void)__builtin_va_arg(ap, int);
+        logged_base = __builtin_va_arg(ap, u32);
+        logged_len = __builtin_va_arg(ap, u32);
+        logged_geometry = __builtin_va_arg(ap, const char *);
+        geometry_logs++;
+    } else if (kstrcmp(fmt, "[EXT2] fs (%u blocks) exceeds partition (%u sectors)\n") == 0) {
+        logged_blocks = __builtin_va_arg(ap, u32);
+        CHECK(__builtin_va_arg(ap, u32) == logged_len);
+        capacity_logs++;
+    } else if (kstrcmp(fmt, "[EXT2] hd%d: partition table is in the pre-v64 OS32 layout; "
+                            "migrate it (host: make nhd-migrate-pt) or reinstall\n") == 0) {
+        legacy_logs++;
+    }
+    __builtin_va_end(ap);
+}
 
 void *kzalloc(u32 size) { (void)size; return (void *)0; }
 void kfree(void *p) { (void)p; }
@@ -229,7 +254,11 @@ int dev_blk_write_lba(Device *dev, u32 lba, int count, const void *buf)
     return 0;
 }
 
-int platform_ide_drive_present(int drive) { return (drive & 3) == test_hd_drive; }
+int platform_ide_drive_present(int drive)
+{
+    if (trace_remount) CHECK(remount_resets == 2 && !g_ctx.mounted);
+    return (drive & 3) == test_hd_drive;
+}
 
 /* IDENTIFY は 8/17 と答える (区画表の幾何とは別。F4 の取り違えを見る) */
 int platform_disk_geometry_get(int drive, struct platform_disk_geometry *info)
@@ -274,7 +303,17 @@ int bootinfo_part_geom(int ide_drive, u16 *heads, u16 *spt)
 /* ======================================================================== */
 /*  実物のソース                                                            */
 /* ======================================================================== */
+static void observe_mount_reset(void)
+{
+    if (trace_remount) {
+        CHECK(g_ctx.mounted);
+        remount_resets++;
+    }
+    ext2_read_cache_reset();
+}
+#define ext2_read_cache_reset observe_mount_reset
 #include "../../fs/ext2/ext2_super.c"
+#undef ext2_read_cache_reset
 #include "../../fs/ext2/ext2_time.c"
 #include "../../fs/ext2/ext2_inode.c"
 #include "../../fs/ext2/ext2_dir.c"
@@ -286,7 +325,7 @@ int bootinfo_part_geom(int ide_drive, u16 *heads, u16 *spt)
 /*  足場                                                                    */
 /* ======================================================================== */
 
-static Ext2Ctx g_ctx;
+
 
 static void disk_reset(u16 heads, u16 spt)
 {
@@ -582,11 +621,21 @@ static void case_mount_bounds(void)
 {
     u32 rd0;
 
+    disk_reset(1, 1);
+    pt_write(1632, 3, 1, 1);
+    g_ctx.mounted = 1;
+    trace_remount = 1;
+    CHECK(ext2_mount(&g_ctx, 0) == EXT2_ERR_NOPART);
+    trace_remount = 0;
+    CHECK(g_rd == 1 && geometry_logs == 1 && capacity_logs == 0);
+    CHECK(logged_base == 1632 && logged_len == 3 && !kstrcmp(logged_geometry, "BIOS"));
+
     disk_reset(8, 17);
     CHECK(ext2_format_at(0, 1632, 136u * 200u) == EXT2_OK);
     pt_write(1632, 136u * 100u, 8, 17);          /* 区画を半分に */
     CHECK(ext2_mount(&g_ctx, 0) == EXT2_ERR_NOPART);
     CHECK(!g_ctx.mounted);
+    CHECK(capacity_logs == 1 && logged_blocks == 13600 && logged_len == 13600);
 
     pt_write(1632, 136u * 200u, 8, 17);
     CHECK(ext2_mount(&g_ctx, 0) == EXT2_OK);
@@ -657,6 +706,7 @@ static void case_legacy_hint(void)
     g_disk[512 + 12] = 400u & 0xFFu; g_disk[512 + 13] = (u8)(400u >> 8);
     CHECK(pc98pt_os32_is_legacy(g_disk + 512, 8, 17, DISK_TOTAL) == 1);
     CHECK(ext2_mount(&g_ctx, 0) == EXT2_ERR_NOPART);
+    CHECK(legacy_logs == 1);
     /* 標準配置の表は legacy ではない */
     pt_write(1632, 136u * 100u, 8, 17);
     CHECK(pc98pt_os32_is_legacy(g_disk + 512, 8, 17, DISK_TOTAL) == 0);

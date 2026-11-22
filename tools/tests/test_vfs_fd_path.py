@@ -99,6 +99,8 @@ TARGET_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
 # FDWP の (a) の読み失敗は「窓を捨てない」変異で再現する。
 # STA_PROTECT の変異は再マウントで読みが戻るため、FDC への再試行の数で殺す。
 MUTANTS = [
+    ("mount の失敗値", "fs/vfs.c", "if (!fs_ctx) return VFS_ERR_IO;",
+     "if (!fs_ctx) return VFS_ERR_INVAL;"),
     ("FDWP: 正常対照 (何も変えない)", "drivers/block/fat_diskio.c",
      "    fdd_status |= STA_PROTECT;", "    fdd_status |= STA_PROTECT;"),
     ("FDWP: NW で STA_PROTECT を立てない", "drivers/block/fat_diskio.c",

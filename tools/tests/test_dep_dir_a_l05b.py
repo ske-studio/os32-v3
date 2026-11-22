@@ -21,7 +21,7 @@ COPIES = ('include/callconv.h', 'include/types.h', 'include/config.h', 'include/
           'tools/tests/dep_dir_a_l05b_host.c')
 OLD = 'out->phys_sector_size = info.phys_sector_size;'
 NEW = 'out->phys_sector_size = info.phys_sector_size ^ 1u;'
-FS = ('fs/ext2/ext2_super.c', 'fs/ext2/ext2_medium_ide.c', 'fs/fat/fatfs_vfs.c', 'drivers/block/fat_diskio.c')
+FS = ('fs/ext2/ext2_medium_ide.c', 'fs/fat/fatfs_vfs.c', 'drivers/block/fat_diskio.c')
 
 
 def contracts():
