@@ -4,6 +4,7 @@
 #include "usb_boot.h"
 #include "rh_observe.h"
 #include "via_window.h"
+#include "input/hal/usb_input.h"
 #include "input_usb.h"
 #include "input/hal/in2_int.h"
 #include "mouse_pointer_contract.h"
@@ -20,21 +21,16 @@ struct pm_pci pm_usb_pci;
 const struct pm_usb_root *pm_usb_root;
 static u8 pool[PM_USB_DMA_BYTES] __attribute__((aligned(PM_USB_DMA_BYTES)));
 static u8 used[PM_USB_DMA_BYTES / PM_USB_PAGE];
-static u8 sources[2];
+
 static u32 tb_frequency;
 static struct { u32 bdf, va; int used; } maps[PM_USB_CONTROLLERS];
 void ppc_dcbf_line(void *);
 static PointerOps usb_pointer;
 
-static int usb_mouse_available(void)
-{
-    return sources[1] != 0;
-}
-
 static u8 usb_mouse_snapshot(i16 *dx, i16 *dy, u8 *buttons, i16 *x, i16 *y)
 {
     u32 flags = ppc_irq_save();
-    int present = usb_mouse_available();
+    int present = usb_input_mouse_available();
     if (present) mouse_legacy_snapshot(dx, dy, buttons, x, y);
     ppc_irq_restore(flags);
     return present ? MOUSE_MODE_BUS : MOUSE_MODE_NONE;
@@ -58,7 +54,7 @@ void pm_usb_platform_init(u32 hz)
     mouse_pointer_backend_register(&usb_mouse_backend);
     mouse_pointer_init_position();
     usb_pointer.poll = mouse_poll;
-    usb_pointer.available = usb_mouse_available;
+    usb_pointer.available = usb_input_mouse_available;
     usb_pointer.cursor_show = mouse_cursor_show;
     usb_pointer.bounds = mouse_set_bounds;
     usb_pointer.cursor_mode = mouse_cursor_set_mode;
@@ -197,66 +193,6 @@ void usbp_udelay(u32 us)
     if (us > 100000) us = 100000;
     u64 start = tb(), ticks = ((u64)tb_frequency * us + 999999) / 1000000;
     while (tb() - start < ticks) {}
-}
-int usbp_input_src_alloc(int kind)
-{
-    if ((unsigned)kind > 1) return -1;
-    for (unsigned i = 0; i < 4; i++)
-        if (!(sources[kind] & (1u << i))) { sources[kind] |= 1u << i; return i + 1; }
-    return -1;
-}
-#ifdef KBOOT_USB_KEY_TRACE
-#include "port_service.h"
-/* The acceptance driver synchronizes QMP input with ESCC, independently of LAN. */
-static void key_trace(const char *prefix, u8 src, u8 sc, const char *suffix)
-{
-    static const char hex[] = "0123456789abcdef";
-    while (*prefix) port_putchar_kapi(*prefix++);
-    port_putchar_kapi('0' + src); /* source slots are 1..4 */
-    const char *field = " sc=";
-    while (*field) port_putchar_kapi(*field++);
-    port_putchar_kapi(hex[sc >> 4]);
-    port_putchar_kapi(hex[sc & 15]);
-    while (*suffix) port_putchar_kapi(*suffix++);
-}
-#endif
-
-void usbp_input_key(u8 src, u8 sc, int down)
-{
-    pm_input_usb_key(src, sc, down);
-#ifdef KBOOT_USB_KEY_TRACE
-    key_trace("USB KEY src=", src, sc, down ? " down=1\n" : " down=0\n");
-#endif
-}
-void usbp_input_key_repeat(u8 src, u8 sc)
-{
-    pm_input_usb_repeat(src, sc);
-#ifdef KBOOT_USB_KEY_TRACE
-    key_trace("USB REPEAT src=", src, sc, "\n");
-#endif
-}
-void usbp_input_mouse(u8 src, i16 dx, i16 dy, u8 buttons)
-{
-    if (src < 1 || src > 4 || !(sources[1] & (1u << (src - 1)))) return;
-    /* USB service serializes reports and detach with interrupts masked. */
-    InputEvent event = { .src = src, .buttons = buttons };
-    mouse_ext_move(dx, dy, 0);
-    pointer_button(&event);
-    usbp_log("USB MOUSE src=%u dx=%d dy=%d b=%x", src, dx, dy, buttons);
-}
-void usbp_input_release(int kind, u8 src)
-{
-    if (kind == 0) pm_input_usb_release(src);
-    if (kind == 1 && src >= 1 && src <= 4) {
-        InputEvent release = { .src = src };
-        pointer_button(&release);
-        if (sources[1] == (1u << (src - 1))) {
-            i16 dx, dy;
-            mouse_ext_read_legacy(&dx, &dy);
-        }
-    }
-    usbp_log("USB RELEASE kind=%d src=%u", kind, src);
-    if ((unsigned)kind < 2 && src >= 1 && src <= 4) sources[kind] &= ~(1u << (src - 1));
 }
 void usbp_log(const char *fmt, ...)
 {

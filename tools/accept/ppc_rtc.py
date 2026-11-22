@@ -18,12 +18,12 @@ CASES = ('normal', 'year', 'swap-opcodes', 'rtc-absent')
 MACHINES = {'cuda': 'mac99', 'pmu': 'mac99,via=pmu'}
 
 
-def observe(elf, machine, evidence, case):
+def observe(media, machine, evidence, case):
     from link_sh_run import Session
     from run import require
     from usb_run import rsh_command
 
-    session = Session(elf, '7450', evidence, 240)
+    session = Session(media, '7450', evidence, 240)
     session.machine = MACHINES[machine]
     # MacIO advances its counter with QEMU virtual time. Without icount or
     # pauses, bracket the moment of the RTC read in elapsed monotonic time.
@@ -76,7 +76,7 @@ def main():
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
 
-    from kboot_accept import build, mutant_settings
+    from kboot_accept import build_media, mutant_settings
     from ppc_shm import guest_available
     from test_kapi_binding import generate
 
@@ -111,15 +111,15 @@ def main():
             kernel.mkdir()
             gen = generate(kernel, case)
             (gen / 'stamp').touch()
-        elf = build(kernel, *options, *settings, 'kb-user', 'kernel')
-        digest = hashlib.sha256(elf.read_bytes()).hexdigest()
+        media = build_media(kernel, *options, *settings, 'kb-user', 'kernel')
+        digest = hashlib.sha256(media.elf.read_bytes()).hexdigest()
         if digest in digests:
-            raise RuntimeError(f'{case} ELF is identical to a previous image: {elf}')
+            raise RuntimeError(f'{case} ELF is identical to a previous image: {media}')
         digests.add(digest)
-        print(f'{case} sha256={digest} {elf}', flush=True)
+        print(f'{case} sha256={digest} {media}', flush=True)
         if not args.build_only:
             for machine in MACHINES:
-                observe(elf, machine, folder / machine, case)
+                observe(media, machine, folder / machine, case)
     return 0
 
 

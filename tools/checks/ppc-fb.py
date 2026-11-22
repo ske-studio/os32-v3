@@ -13,7 +13,7 @@ CHECK = dict(env=['ppc-cross', 'qemu-ppc'], name='ppc-fb', tier=2, budget=900, n
         'tools/remote_transport.py',
         'tools/host_agent_config.py',
     'tools/checks/ppc-fb.py', 'tools/ppc/fb_run.py', 'tools/ppc/fb_pixel.py',
-    'tools/ppc/usb_run.py', 'tools/ppc/sd_run.py', 'tools/ppc/kboot_accept.py',
+    'tools/ppc/usb_run.py', 'tools/ppc/sd_run.py', 'tools/ppc/kboot_accept.py', 'tools/ppc/boot_media.py',
     'tools/ppc/kboot_run.py', 'tools/ppc/kboot_mutations.py', 'tools/ppc/run.py',
     'tools/ppc_lan_host.py', 'tools/ppc_hostfs.py', 'tools/lanfs_host.py',
     'tools/serialfs_host.py', 'tools/host_tree_manifest.py', 'tools/host_image.py', 'tools/lan_bridge.py',

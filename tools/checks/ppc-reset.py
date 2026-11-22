@@ -19,13 +19,14 @@ def run_cases(mutate, build_only=False):
     import tempfile
 
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'ppc'))
-    from link_sh_run import ROM, accept_reset, build, cross
+    from link_sh_run import ROM, accept_reset, build_media, cross
     from kboot_accept import mutant_settings
     from test_kapi_binding import generate
 
     required = [cross(tool) for tool in ('gcc', 'nm', 'objdump', 'ld', 'objcopy')]
+    required += ['genisoimage', 'isoinfo']
     if not build_only:
-        required += ['qemu-system-ppc', 'genisoimage']
+        required.append('qemu-system-ppc')
     missing = [tool for tool in required if not shutil.which(tool)]
     if not build_only and not ROM.is_file():
         missing.append(str(ROM))
@@ -48,13 +49,13 @@ def run_cases(mutate, build_only=False):
             return 3
 
     def image(folder, *settings):
-        return build(folder/'kernel', 'IMAGE=kboot-link-sh',
+        return build_media(folder/'kernel', 'IMAGE=kboot-link-sh',
                      'KB_SH_OUT='+str(folder/'user'), *settings)
 
     timeout = 180
-    elf = image(work/'normal')
+    media = image(work/'normal')
     if not build_only:
-        accept_reset(elf, work/'cuda', timeout, 'cuda')
+        accept_reset(media, work/'cuda', timeout, 'cuda')
     if mutate:
         for mutation in ('reboot-absent', 'cuda-reset-byte'):
             folder = work/mutation
@@ -84,9 +85,9 @@ def run_cases(mutate, build_only=False):
             else:
                 accept_reset(mutant, folder/'guest', timeout, 'cuda', mutation)
         if not build_only:
-            accept_reset(elf, work/'cuda-control', timeout, 'cuda')
+            accept_reset(media, work/'cuda-control', timeout, 'cuda')
     if not build_only:
-        accept_reset(elf, work/'pmu', timeout, 'pmu')
+        accept_reset(media, work/'pmu', timeout, 'pmu')
     return 0
 
 

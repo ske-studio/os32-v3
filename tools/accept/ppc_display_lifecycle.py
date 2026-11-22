@@ -10,7 +10,7 @@ import tempfile
 from ppc_display import ROOT, absent_bindings
 import ppc_resource_owner
 from fb_pixel import Font, Terminal, read_ppm
-from kboot_accept import build, mutant_settings
+from kboot_accept import build_media, mutant_settings
 from link_sh_run import Session
 from ppc_shm import guest_available
 from run import require
@@ -41,12 +41,12 @@ def image(folder, user, case):
     elif case == 'absent':
         absent_bindings(folder, kernel / 'gen', case, ('gfx2_surface_create',))
     bins = [str(user / (app + '.bin')) for app in ('hello', 'dispprb')]
-    return build(kernel, 'IMAGE=kboot-link-sh', 'PPC_USER_FLOAT=', 'KB_SH_OUT=' + str(user),
+    return build_media(kernel, 'IMAGE=kboot-link-sh', 'PPC_USER_FLOAT=', 'KB_SH_OUT=' + str(user),
                  'KB_ROOT_BINS=' + ' '.join(bins), *changes, 'kb-user', 'kernel')
 
 
-def observe(elf, folder, case):
-    s = Session(elf, '7450', folder, 240)
+def observe(media, folder, case):
+    s = Session(media, '7450', folder, 240)
     serial = folder / 'serial-a.log'
 
     def generations():
@@ -135,13 +135,13 @@ def main():
     for case in cases:
         folder = work / case
         folder.mkdir()
-        elf = image(folder, work / 'user', case)
-        digest = hashlib.sha256(elf.read_bytes()).hexdigest()
+        media = image(folder, work / 'user', case)
+        digest = hashlib.sha256(media.elf.read_bytes()).hexdigest()
         require(digest not in hashes, 'duplicate image ' + case)
         hashes.add(digest)
-        print(f'{case} sha256={digest} {elf}', flush=True)
+        print(f'{case} sha256={digest} {media}', flush=True)
         if not args.build_only:
-            observe(elf, folder / 'guest', case)
+            observe(media, folder / 'guest', case)
     return 0
 
 

@@ -12,3 +12,5 @@ C_PLATFORM += fs/ext2/ext2_medium_ide.c
 C_ORDER_TAIL += fs/ext2/ext2_medium_ide.c
 C_PLATFORM += platform/pc98/usb_config.c platform/pc98/usb_platform.c drivers/usb/ehci_quiesce.c drivers/usb/ehci_handoff.c
 C_ORDER_TAIL += platform/pc98/usb_config.c platform/pc98/usb_platform.c drivers/usb/ehci_quiesce.c drivers/usb/ehci_handoff.c
+C_PLATFORM += platform/pc98/usb_resident.c
+C_ORDER_TAIL += platform/pc98/usb_resident.c

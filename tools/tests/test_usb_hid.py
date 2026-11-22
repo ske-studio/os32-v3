@@ -39,28 +39,31 @@ def check(mutate):
             for src in SOURCES:
                 subprocess.run([compiler, *flags, '-ffreestanding', '-c', src,
                                 '-o', str(tmp/'unit.o')], cwd=ROOT, check=True)
+        host = ['-nostdinc', '-I'+str(tmp)]
         for swap in ([], ['-DUSB_TEST_SWAP']):
             exe = tmp/'hid'
-            subprocess.run(['gcc', '-m32', *bare, *flags, *swap, 'tools/tests/usb_hid_host.c',
+            subprocess.run(['gcc', '-m32', *bare, *host, *flags, *swap, 'tools/tests/usb_hid_host.c',
                             *SOURCES, '-o', str(exe)], cwd=ROOT, check=True)
             result = host32.run([str(exe)], runner='qemu')
             assert result.returncode == 0, result.returncode
             print('HID runtime OK', swap)
         if mutate:
             mutations = [
-                ('drivers/usb/hid_kbd.c', 'i = (order + 0x70) & 127;', 'i = order;'),
+                ('drivers/usb/hid_kbd_map.c', 'hid_kbd_sc(usage) < 128 && ', ''),
+                ('drivers/usb/hid_kbd.c', 'hid_kbd_order(i) != order', 'hid_kbd_order(i) != 2 - order'),
                 ('drivers/usb/hid_boot.h', 'b->x.short_ok = 1;', 'b->x.short_ok = 0;'),
                 ('drivers/usb/hid_kbd_map.c', 'return hid_jp_backend.compat_sc[usage];',
-                 'return usage == 0x47 ? 0x46 : hid_jp_backend.compat_sc[usage];'),
+                 'return usage == 0x14 ? 0x11 : hid_jp_backend.compat_sc[usage];'),
                 ('drivers/usb/hid_kbd_map.c',
                  'return (bits[usage >> 3] >> (usage & 7)) & 1;', 'return 0 & bits[usage >> 3];'),
                 ('drivers/usb/hid_kbd_map.c',
                  'return (ext->order[usage >> 2] >> ((usage & 3) * 2)) & 3;',
                  'return 0 & ext->order[usage >> 2];'),
-                ('drivers/usb/hid_kbd.c', '!!s->prev[i] != !!now[i]', 's->prev[i] != now[i]'),
+                ('drivers/usb/hid_kbd.c', 's->boot.iface->src, i, down', 's->boot.iface->src, hid_kbd_sc(i), down'),
                 ('drivers/usb/hid_boot.h', 'usbp_input_release(b->kind, b->iface->src);', '(void)b;'),
                 ('drivers/usb/hid_boot.h', 'usbp_input_release(b->kind, f->src);', '(void)b;'),
-                ('drivers/usb/hid_kbd.c', 'usbp_input_key_repeat(f->src, s->repeat);', '(void)f;'),
+                ('drivers/usb/hid_kbd.c', 'usbp_input_usage_repeat(f->src, s->repeat);', '(void)f;'),
+                ('drivers/usb/hid_kbd.c', '(i32)(now - s->deadline) >= 0', '(i32)(now - s->deadline) > 0'),
                 ('drivers/usb/hid_mouse.c', '(i8)r[1], (i8)r[2]', 'r[1], r[2]')]
             for rel, anchor, replacement in mutations:
                 original = (ROOT/rel).read_text()
@@ -69,7 +72,7 @@ def check(mutate):
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 dest.write_text(original.replace(anchor, replacement))
                 srcs = [str(dest) if s == rel else s for s in SOURCES]
-                subprocess.run(['gcc', '-m32', *bare, '-I'+str(tmp), *flags,
+                subprocess.run(['gcc', '-m32', *bare, *host, *flags,
                                 'tools/tests/usb_hid_host.c', *srcs, '-o', str(tmp/'bad')],
                                cwd=ROOT, check=True)
                 result = host32.run([str(tmp/'bad')], runner='qemu')

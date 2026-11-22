@@ -53,7 +53,7 @@ def command(argv):
 
 def build(tmp, tree, swap):
     exe = tmp / 'stack'
-    command(['gcc', '-m32', *FLAGS, '-no-pie', '-nostdlib', '-static',
+    command(['gcc', '-m32', *FLAGS, '-no-pie', '-nostdinc', '-nostdlib', '-static',
              '-Wl,-e,_start', '-Wl,--wrap=usb_dmamem_free',
              '-I' + str(tmp / 'fake-arch'), '-I' + str(tree / 'include'),
              '-I' + str(tree), *(['-DUSB_TEST_SWAP'] if swap else []),

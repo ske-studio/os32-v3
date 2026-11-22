@@ -21,12 +21,12 @@ EXPECTED = {
 }
 
 
-def observe(elf, folder, case, host_root):
+def observe(media, folder, case, host_root):
     from link_sh_run import Session
     from run import require
     from usb_run import rsh_command
 
-    session = Session(elf, '7450', folder / 'guest', 240)
+    session = Session(media, '7450', folder / 'guest', 240)
     try:
         session.agent.file_root = str(host_root)
         session.start()
@@ -49,7 +49,7 @@ def main():
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
 
-    from kboot_accept import build, mutant_settings
+    from kboot_accept import build_media, mutant_settings
     from ppc_shm import guest_available
     from test_kapi_binding import generate
 
@@ -91,16 +91,16 @@ def main():
             profile = folder / 'loop-disabled.mk'
             profile.write_text('include build/images/ppc-flags.mk\noverride FEATURE_LOOP := 0\n')
             settings = ['PPC_FLAGS_MK=' + str(profile)]
-        elf = build(kernel, *options, *settings, 'kb-user', 'kernel')
+        media = build_media(kernel, *options, *settings, 'kb-user', 'kernel')
         if case == 'normal':
             shutil.copyfile(sample, host_root / 'loop.img')
-        digest = hashlib.sha256(elf.read_bytes()).hexdigest()
+        digest = hashlib.sha256(media.elf.read_bytes()).hexdigest()
         if digest in digests:
-            raise RuntimeError(f'{case} ELF is identical to a previous image: {elf}')
+            raise RuntimeError(f'{case} ELF is identical to a previous image: {media}')
         digests.add(digest)
-        print(f'{case} sha256={digest} {elf}', flush=True)
+        print(f'{case} sha256={digest} {media}', flush=True)
         if not args.build_only:
-            observe(elf, folder, case, host_root)
+            observe(media, folder, case, host_root)
     print(f"{len(digests)} distinct loop images")
     return 0
 

@@ -24,6 +24,7 @@ CHECK = dict(name='powermac-reset', tier=1, needs=[], budget=40, env=['ppc-cross
     'lib/kstring.h', 'lib/kstring_c.c', 'lib/kprintf.c', 'lib/divdi3.c',
     'arch/ppc/pd_walk.c', 'platform/powermac/kernel_boot.c',
     'platform/powermac/usb_boot.c', 'platform/powermac/usb_platform.c',
+    'platform/powermac/input_keymap_backend.c', 'input/hal/keymap.h', 'input/hal/usb_input.h',
     'tools/ppc/usb_via_overlap_host.c', 'drivers/usb/usb_core.h',
     'drivers/usb/ohci_regs.h', 'include/endian_dma.h', 'include/usb_platform.h',
     'include/kprintf.h', 'mm/paging.h', 'mm/kmalloc.h', 'kernel/irq/tick.h',
@@ -133,7 +134,8 @@ def usb_cases(folder, mutate):
                     'sdk/include/os32', 'kernel', 'init', 'kernel/console',
                     'kernel/irq', 'kernel/time', 'mm', 'lib')
         sources = ('tools/ppc/usb_via_overlap_host.c', 'platform/powermac/usb_boot.c',
-                   'arch/ppc/pd_walk.c', 'lib/kstring_c.c', 'lib/kprintf.c', 'lib/divdi3.c')
+                   'platform/powermac/input_keymap_backend.c', 'arch/ppc/pd_walk.c',
+                   'lib/kstring_c.c', 'lib/kprintf.c', 'lib/divdi3.c')
         subprocess.run(
             [str(cc), '-mcpu=7450', '-msdata=none', '-msoft-float', '-mno-altivec',
              '-std=gnu11', '-ffreestanding', '-fno-builtin', '-fno-pie',
@@ -170,7 +172,8 @@ def usb_cases(folder, mutate):
 def observe(folder, source):
     (folder / 'via.c').write_text(source)
     exe = folder / 'via_host'
-    host32.build(['gcc', '-m32', '-O2', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
+    builtin_headers = subprocess.check_output(['gcc', '-print-file-name=include'], text=True).strip()
+    host32.build(['gcc', '-nostdinc', '-isystem', builtin_headers, '-m32', '-O2', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
                   '-ffreestanding', '-fno-pie', '-no-pie', '-fno-stack-protector',
                   '-nostdlib', '-static', '-I' + str(folder), '-I' + str(DRIVER),
                   '-I' + str(ROOT / 'include'), str(ROOT / 'tools/tests/via_host.c'),
