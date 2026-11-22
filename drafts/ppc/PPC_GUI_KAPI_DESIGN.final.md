@@ -85,7 +85,7 @@ PowerPC 担当は OF FB と PPC 常駐像・受入用 root を用意し、本線
 - リンク後に readelf で ELF32・PowerPC・big endian・入口と常駐帯を、map で実提供者と CRT を確認する。両 CPU に同一の PPC 成果物を使う。
 - C-GUI 通過後の製品経路では kboot-link-sh を 7450・7455 で各々冷起動。CUI から os32gui を実行し、二つの窓を開く PPC クライアントの gui_call が成功し応答すること、QMP screendump の両矩形の枠・表題字形・背景色を照合する。gshell は register の失敗でも単体動作するためデスクトップ画像だけでは合格にしない。重なり順と前景を変え、dirty 再描画を確認する。GUI から CUI へ戻り再起動し、文字入力と旧 callback の消滅を確認。x86 でも同じ操作列を回す。
 - 7450・7455 の各々で C-GUI 専用構成から二つの失敗試験を別々に冷起動する。どちらも /sys/shell.bin は通常の CUI 像とし、prepare(1) 通過後の Loading /bin/gshell.bin を観測する。欠落試験では /bin/gshell.bin だけを root から除き、読込失敗の次の起動が /sys/shell.bin であることを照合する。fault 試験では /bin/gshell.bin に起動ごとに fault する試験像を置く。切替要求を挟まず同パスの起動と EXEC_ERR_FAULT が 3 回続き、最初の 2 回は再試行、3 回目の直後に /sys/shell.bin が起動することを照合する。各試行で物理キーから入力した CUI コマンドの応答まで確認する。D の HID 独占・焦点変更・解放は USB in2 設計に従う。
-C-GUI は QMP の各入力をゲストの観測応答で区切る。前景 probe が列挙した dev で A make、保持、break を照合し、押下照会が 1→0、WM の raw が make→break、保持中の in2 KEY 反復が 0 件となることを確認する。相対移動 (+12,−7)、左押下、解除は別々に送り、probe の MOVE・BUTTON と WM のポインタ状態を照合する。別窓をクリックし、前景交代の通知後に次のキーが新しい前景へ届くこと、ドラッグ解除後は移動だけで窓が動かないことを確認する。WM 終了後は CUI で物理キーからコマンドを入力し、cooked 入力の復帰を応答で判定する。
+C-GUI は QMP の各入力をゲストの観測応答で区切る。前景 probe が列挙した dev で A make、保持、break を照合し、押下照会が 1→0、WM の raw が make→break、保持中の in2 KEY 反復が 0 件となることを確認する。相対移動 (+12,−7)、左押下、解除は別々に送り、probe の MOVE・BUTTON と WM のポインタ状態を照合する。別窓をクリックし、前景交代の通知後に次のキーが新しい前景へ届くこと、ドラッグ解除後は移動だけで窓が動かないことを確認する。WM から CUI への切り替えを要求して終了した後 (普通の終了だけではループが同じ GUI の像を起動し直す) は CUI で物理キーからコマンドを入力し、cooked 入力の復帰を応答で判定する。
 
 origin/main の 56d7be02d にある kernel/gui.c と kernel/av_focus.c を基準に、次を両機種の公開入口から試す。
 
@@ -103,6 +103,6 @@ origin/main の 56d7be02d にある kernel/gui.c と kernel/av_focus.c を基準
 
 
 ## 確定 (2026-11-22、本線の sol 第 3 回「追記で確定可」、PM が反映)
-- §4: 「WM の終了の後」を「WM から CUI への切り替えを要求して終了した後」と明記した (普通の終了だけでは、シェルのループは同じ GUI の像を起動し直す)。置き換え 0 か所。
+- §4: 「WM の終了の後」を「WM から CUI への切り替えを要求して終了した後」と明記した (普通の終了だけでは、シェルのループは同じ GUI の像を起動し直す)。置き換え 1 か所 (§4 の C-GUI の段落)。
 - USB の in2 の設計 (PPC_USB_IN2_DESIGN) の段 C の GUI の配置は、この設計の C-GUI (KAPI の結線と製品の GUI の有効化の間、/sys/shell.bin と /bin/gshell.bin を分け、C-GUI 専用の構成で /bin/gshell.bin を選ぶ) に揃える。
 - 本線の先行段: 7d の統合、段 1–2 の共有ビルドと PPC の KAPI の生成、x86 での同期 present の要否の判定と要る時の共通の描画の権限・回帰。PowerPC の担当は C-GUI の起動の道を直して両 CPU (7450・7455) で通した後に製品の GUI を有効にする。
