@@ -418,7 +418,8 @@ static int vfs_prefix_same(const char *a, const char *b)
     return 1;
 }
 
-static int vfs_register_mount(const char *prefix, const char *dev_name, const char *fstype)
+static int vfs_register_mount(const char *prefix, const char *dev_name, const char *fstype,
+                              const struct install_access *access)
 {
     int dev_type, dev_id, rc, i, slot;
     VfsOps *ops = (VfsOps *)0;
@@ -466,11 +467,17 @@ static int vfs_register_mount(const char *prefix, const char *dev_name, const ch
     fs_ctx = ops->mount(VFS_MOUNT_DEV_ENCODE(dev_type, dev_id));
     if (!fs_ctx) return VFS_ERR_IO;
 
+    unsigned flags = 0;
+    if (platform_install_medium() && access && install_mount_lock(access, &flags)) {
+        ops->umount(fs_ctx);
+        return OS32_ERR_STALE;
+    }
     slot = -1;
     for (i = 0; i < VFS_MAX_FS; i++) {
         if (!mounts[i].in_use) { slot = i; break; }
     }
     if (slot < 0) {
+        if (platform_install_medium() && access) install_mount_unlock(flags);
         ops->umount(fs_ctx);
         return VFS_ERR_NOSPC;
     }
@@ -487,6 +494,7 @@ static int vfs_register_mount(const char *prefix, const char *dev_name, const ch
     kstrncpy(mounts[slot].dev_name, dev_name, VFS_MAX_DEVNAME);
 
     kstrncpy(cwd, "/", VFS_MAX_PATH);
+    if (platform_install_medium() && access) install_mount_unlock(flags);
     return VFS_OK;
 }
 
@@ -498,7 +506,7 @@ int vfs_mount(const char *prefix, const char *dev_name, const char *fstype)
     u32 unit;
     if (!platform_install_medium() || !dev_name || vfs_dev_parse(dev_name, &type, &id) ||
         type != VFS_DEV_HD || !medium->view_unit(id, &unit))
-        return vfs_register_mount(prefix, dev_name, fstype);
+        return vfs_register_mount(prefix, dev_name, fstype, 0);
     rc = install_admit(&access, unit, INSTALL_MOUNT, 0, 0, 0);
     if (rc) return rc;
     if (access.generation && (!prefix || !fstype || !vfs_prefix_same(prefix, "/hd0") ||
@@ -506,7 +514,7 @@ int vfs_mount(const char *prefix, const char *dev_name, const char *fstype)
         install_complete(&access);
         return VFS_ERR_INVAL;
     }
-    rc = vfs_register_mount(prefix, dev_name, fstype);
+    rc = vfs_register_mount(prefix, dev_name, fstype, access.generation ? &access : 0);
     install_complete(&access);
     return rc;
 }

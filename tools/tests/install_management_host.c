@@ -4,6 +4,11 @@
 #include "crc32.h"
 #include "ide_addr.h"
 #include "dev.h"
+#include "ext2.h"
+#include "ext2_ctx.h"
+void ext2_meta_touch(Ext2Ctx *ctx);
+void ext2_read_cache_reset(void) {}
+void kprintf(u8 level, const char *fmt, ...) { (void)level; (void)fmt; }
 #include "vfs_device.h"
 #include "install_access.h"
 #include "install_management.h"
@@ -11,6 +16,10 @@
 static int owner = 1, authorized = 1, busy, published, corrupt, retry_seen;
 enum { CAPACITY = 24 };
 static u8 disk[CAPACITY][512], saved[sizeof(disk)], table[5][512];
+static int mounted, reclaim_mount, reclaim_sync, view_io_error, registering_view;
+static unsigned irq_depth;
+unsigned test_irq_save(void) { return irq_depth++; }
+void test_irq_restore(unsigned depth) { assert(irq_depth == depth + 1); irq_depth = depth; }
 static int existing, sync_error, flush_pending, fail_restore_write;
 static u8 queued_sector[512];
 static const char serial[20] = "MOCK V1 DISK";
@@ -122,6 +131,11 @@ static int view_unit(unsigned logical, u32 *unit)
 }
 static int resolve(struct _Device *dev, u32 lba, u32 count, u32 *unit, u32 *physical, u32 *gen)
 {
+    if (reclaim_sync && lba == 2 && --reclaim_sync == 0) {
+        install_reclaim_owner(owner);
+        install_retry_recovery();
+        assert(mounted == 1);
+    }
     if (dev == &raw) {
         *unit = 0;
         *physical = lba;
@@ -137,6 +151,7 @@ static int resolve(struct _Device *dev, u32 lba, u32 count, u32 *unit, u32 *phys
 static int read_sector(u32 unit, u32 lba, void *buf)
 {
     assert(!unit && lba < CAPACITY);
+    if (view_io_error && lba == 8) return OS32_ERR_IO;
     memcpy(buf, disk[lba], 512);
     if (corrupt && lba == 2) ((u8 *)buf)[511] ^= 1;
     return 0;
@@ -144,6 +159,7 @@ static int read_sector(u32 unit, u32 lba, void *buf)
 static int write_sector(u32 unit, u32 lba, const void *buf)
 {
     assert(!unit && lba < CAPACITY);
+    if (view_io_error && lba == 8) return OS32_ERR_IO;
     if (fail_restore_write && !authorized && lba == 1) return OS32_ERR_IO;
     memcpy(disk[lba], buf, 512);
     return 0;
@@ -197,8 +213,13 @@ static const struct install_medium backend = {
 const struct install_medium *platform_install_medium(void) { return &backend; }
 int exec_disk_write_allowed(void) { return authorized; }
 int res_owner_get(void) { return owner; }
-static int mounted;
-static void *mount_fs(int dev) { (void)dev; mounted++; return &mounted; }
+static void *mount_fs(int dev)
+{
+    (void)dev;
+    mounted++;
+    if (reclaim_mount) install_reclaim_owner(owner);
+    return &mounted;
+}
 static void unmount_fs(void *ctx) { assert(ctx == &mounted); mounted--; }
 void vfs_fd_invalidate_mount(void *ctx) { assert(ctx == &mounted); }
 int vfs_fd_mount_busy(void *ctx) { assert(ctx == &mounted); return busy; }
@@ -206,6 +227,7 @@ int kstrcmp(const char *a, const char *b) { return strcmp(a, b); }
 int kstrlen(const char *s) { return strlen(s); }
 char *kstrncpy(char *d, const char *s, u32 n)
 {
+    if (registering_view && !strcmp(s, "/hd0")) assert(irq_depth > 0);
     if (strlen(s) >= n) abort();
     return strcpy(d, s);
 }
@@ -355,8 +377,43 @@ int main(int argc, char **argv)
     assert(!install_mount_visible(0));
     owner--;
     assert(install_mount_visible(0));
+    for (int race = 0; race < 4; race++) {
+        if (race == 0) {
+            reclaim_mount = 1;
+            assert(vfs_mount("/hd0", "hd0", "ext2") == OS32_ERR_STALE);
+            reclaim_mount = 0;
+            assert(!mounted);
+        } else if (race == 1) {
+            registering_view = 1;
+            assert(!vfs_mount("/hd0", "hd0", "ext2"));
+            registering_view = 0;
+            Ext2Ctx ctx = { .dev = &view, .mounted = 1, .part_len = 8 };
+            ext2_meta_touch(&ctx);
+            /* Interrupt between the superblock read and its writeback. */
+            reclaim_sync = 2;
+            assert(ext2_sync(&ctx) != 0);
+            assert(!reclaim_sync && mounted);
+        } else {
+            view_io_error = 1;
+            if (race == 2)
+                assert(dev_blk_write_lba(&view, 0, 1, sector) == OS32_ERR_IO);
+            else
+                assert(dev_blk_read_lba(&view, 0, 1, sector) == OS32_ERR_IO);
+            view_io_error = 0;
+            assert(!install_mount_visible(0));
+        }
+        install_retry_recovery();
+        assert(!mounted && !published && !memcmp(saved, disk, 5 * 512));
+        assert(!install_begin(&p, &h) && retry_seen);
+        assert(!install_format_begin(&format, 0, 8, 8));
+        assert(!install_format_finish(&format, 0));
+        assert(!dev_blk_write_lba(&raw, 1, 3, table[1]));
+        assert(!install_rescan(h));
+    }
     view_generation = h;
+    registering_view = 1;
     assert(!vfs_mount("/hd0", "hd0", "ext2"));
+    registering_view = 0;
     assert(!dev_blk_write_lba(&view, 0, 1, sector));
     assert(dev_blk_write_lba(&view, 7, 2, sector) < 0);
     owner++;

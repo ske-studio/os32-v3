@@ -312,7 +312,7 @@ void ext2_unmount(Ext2Ctx *ctx)
 
 int ext2_is_mounted_ctx(Ext2Ctx *ctx) { return ctx->mounted; }
 
-int ext2_sync(Ext2Ctx *ctx)
+static int ext2_sync_metadata(Ext2Ctx *ctx)
 {
     int ret;
     if (!ctx->mounted) return EXT2_ERR_NOMOUNT;
@@ -343,6 +343,17 @@ int ext2_sync(Ext2Ctx *ctx)
     if (platform_install_medium()) install_dirty_finish(ctx);
     ctx->meta_dirty = 0;
     return EXT2_OK;
+}
+
+int ext2_sync(Ext2Ctx *ctx)
+{
+    if (!platform_install_medium() || !ctx->mounted) return ext2_sync_metadata(ctx);
+    struct install_access pin;
+    int pinned = install_sync_pin(ctx->dev, ctx->base_lba, &pin);
+    if (pinned < 0) return EXT2_ERR_IO;
+    int rc = ext2_sync_metadata(ctx);
+    if (pinned) install_complete(&pin);
+    return rc;
 }
 
 /* ======================================================================== */

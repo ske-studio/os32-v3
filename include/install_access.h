@@ -24,6 +24,9 @@ void install_retry_recovery(void);
 int install_mount_visible(u32 unit);
 int install_view_io(struct install_access *a, u32 unit, u32 generation,
                     u32 physical, u32 count, void *dst, const void *src, int *handled);
+int install_mount_lock(const struct install_access *a, unsigned *flags);
+void install_mount_unlock(unsigned flags);
+int install_sync_pin(struct _Device *dev, u32 start, struct install_access *pin);
 void install_dirty_begin(void *ctx, struct _Device *dev, u32 start, u32 sectors);
 void install_dirty_finish(void *ctx);
 int install_dirty_transfer(void *ctx, struct _Device *dev, u32 lba, u32 count,

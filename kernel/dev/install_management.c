@@ -215,13 +215,14 @@ static int restore(struct reservation *r)
     r->state = RECOVERING;
     r->owner = 0;
     r->handle = 0;
+    /* A sync worker can be between two transfers using this metadata record. */
+    if (r->in_flight > r->dirty_count) {
+        irq_restore(flags);
+        return OS32_ERR_BUSY;
+    }
     for (unsigned i = 0; i < VFS_MAX_FS; i++) {
         if (metadata[i].ctx && metadata[i].access.unit == unit)
             install_dirty_finish(metadata[i].ctx);
-    }
-    if (r->in_flight) {
-        irq_restore(flags);
-        return OS32_ERR_BUSY;
     }
     r->state = RESTORING;
     irq_restore(flags);
@@ -422,6 +423,43 @@ int install_mount_visible(u32 unit)
     return r->state == AVAILABLE || (r->state == VIEW && r->owner == res_owner_get());
 }
 
+int install_mount_lock(const struct install_access *a, unsigned *flags)
+{
+    *flags = irq_save();
+    if (install_transfer_allowed(a, 0, 0)) return 0;
+    irq_restore(*flags);
+    return OS32_ERR_STALE;
+}
+
+void install_mount_unlock(unsigned flags)
+{
+    irq_restore(flags);
+}
+
+int install_sync_pin(struct _Device *dev, u32 start, struct install_access *pin)
+{
+    u32 unit, physical, generation;
+    int rc = platform_install_medium()->resolve(dev, start, 1, &unit, &physical, &generation);
+    if (rc != 1) return rc;
+    if (unit >= VFS_DEV_UNIT_MAX) return OS32_ERR_INVAL;
+    struct reservation *r = &units[unit];
+    if (r->state == AVAILABLE) return 0;
+    unsigned flags = irq_save();
+    rc = 0;
+    if (r->state == RECOVERING || r->state == RESTORING || r->state == RAW_ONLY)
+        rc = OS32_ERR_STALE;
+    else if (r->handle) {
+        if (r->handle != generation) rc = OS32_ERR_STALE;
+        else {
+            pin->unit = unit;
+            r->in_flight++;
+            rc = 1;
+        }
+    }
+    irq_restore(flags);
+    return rc;
+}
+
 int install_format_begin(struct install_access *a, u32 unit, u32 start, u32 length)
 {
     if (unit >= VFS_DEV_UNIT_MAX) return OS32_ERR_INVAL;
@@ -492,7 +530,21 @@ static int transfer(const struct install_access *a, u32 physical, u32 count,
             rc = m->read(issued.unit, physical + i, out);
             out += 512;
         }
-        if (rc) break;
+        if (rc) {
+            if (issued.phase == VIEW &&
+                (issued.op == INSTALL_VIEW_READ || issued.op == INSTALL_VIEW_WRITE)) {
+                struct reservation *r = &units[issued.unit];
+                flags = irq_save();
+                if (r->state == VIEW && r->handle == issued.generation) {
+                    /* Idle completes recovery after all callers drop their pins. */
+                    r->state = RECOVERING;
+                    r->owner = 0;
+                    r->handle = 0;
+                }
+                irq_restore(flags);
+            }
+            break;
+        }
     }
     install_complete(&issued);
     return rc;
