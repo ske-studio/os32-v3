@@ -64,10 +64,10 @@ def observe(elf, cpu, folder, expected, resident_end, frame_end):
         session.start()
         def lines():
             return serial.read_text(errors='replace').splitlines() if serial.exists() else []
-        session.wait(lambda: any(line.startswith('KBOOT SHELL-LAYOUT') for line in lines()),
-                     'shell layout', 60)
+        marker = 'KBOOT SHELL-LAYOUT ' + expected
+        session.wait(lambda: marker in lines(), marker, 60)
         output = lines()
-        index = output.index('KBOOT SHELL-LAYOUT ' + expected)
+        index = output.index(marker)
         verify_handoff(output[:index], resident_end, frame_end)
         if not any(line.startswith('KBOOT OF-OFF calls=') for line in output[:index]):
             raise RuntimeError('missing preceding detach milestone')

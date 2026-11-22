@@ -578,13 +578,16 @@ def lan_accept(elf, cpu, out, mode):
         s.close()
 
 
-def rsh_command(s, line, expected=None, during=None):
+def rsh_command(s, line, expected=None, during=None, before_submit=None):
     """Product RSH only: one complete OUT in the submitted generation/ID."""
     op = s.agent.operator
     # After a mid-command re-HELLO the operator has no READY until the guest
     # sends one on the new epoch, even when the re-delivered OUT already
     # arrived (R1/R2). Wait for it rather than submit into "not ready".
-    s.wait(s.ready, 'RSH READY before '+line, 20)
+    s.wait(lambda: s.ready() and op.ready['mode'] == 'cui' and
+           op.ready['state'] != 'running', 'RSH READY before '+line, 20)
+    if before_submit:
+        before_submit()
     generation, session = op.generation, op.session
     start = len(s.events)
     ident = op.submit('cui', line, 'usb-accept', timeout_ms=20000)
@@ -801,12 +804,13 @@ def link_lan_accept(elf, cpu, out, mode='normal'):
         s.drop = False
         s.open_rshell()
         rsh_command(s, 'cat /host/f', b'usb-rpc\n')
-        s.hold_serial_line()
-        text_keys('echo half')
+        def hold_half():
+            s.hold_serial_line()
+            text_keys('echo half')
         def finish_half():
             s.check_deferred('RSH deferred by serial line')
             key('ret')
-        rsh_command(s, 'echo resumed', b'resumed\n', during=finish_half)
+        rsh_command(s, 'echo resumed', b'resumed\n', during=finish_half, before_submit=hold_half)
         screen = s.screen('resumed')
         s.check_serial_rejection(screen, 'echo resumed')
         key('shift')

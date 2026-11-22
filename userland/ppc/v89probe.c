@@ -7,7 +7,7 @@ int main(int argc, char **argv, KernelAPI *api)
     volatile const u32 *table = (volatile const u32 *)api;
     char line[96];
     if (argc == 2) {
-        unsigned slot = argv[1][0] == 'a' ? 298 : 383;
+        unsigned slot = argv[1][0] == 'a' ? KAPI_FUNC_COUNT : KAPI_FUNC_CAPACITY - 1;
         int (*reserved)(void) = (int (*)(void))table[2 + slot];
         int result = reserved();
         snprintf(line, sizeof(line), "V89 slot=%u result=%d\n", slot, result);
@@ -16,9 +16,11 @@ int main(int argc, char **argv, KernelAPI *api)
     }
     u32 base = (u32)api;
     const char *error = 0;
-    for (unsigned slot = 0; slot <= 297; slot += 297) {
+    for (unsigned slot = 0; slot < KAPI_FUNC_CAPACITY; ++slot) {
         u32 entry = base + 0x1000 + 8 * slot;
-        if (table[2 + slot] != entry) { error = "stub entry"; break; }
+        /* sys_ls publishes its private shim instead of the ordinary stub. */
+        u32 target = slot == 12 ? base + 0x1c00 : entry;
+        if (table[2 + slot] != target) { error = "stub entry"; break; }
         volatile const u32 *stub = (volatile const u32 *)entry;
         if (stub[0] != (0x38000000u | slot)) { error = "stub immediate"; break; }
         if (stub[1] != (0x48000000u | ((base + 0x1c08) - (entry + 4)))) {
@@ -34,6 +36,8 @@ int main(int argc, char **argv, KernelAPI *api)
     }
     api->gfx_init();
     int result = api->io_pump(0);
+    /* Exercise v90's last published function with an invalid handle. */
+    (void)api->snd2_chip_close(0);
     snprintf(line, sizeof(line), "V89 return=%d heap=%u shm=%u\n",
              result, (unsigned)table[0x608 / 4], (unsigned)table[0x60c / 4]);
     for (char *p = line; *p; ++p) api->shell_putchar(*p, 7);

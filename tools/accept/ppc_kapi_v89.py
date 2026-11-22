@@ -2,6 +2,7 @@
 """KAPI-V89-PPC — KAPI_CAPACITY_V89_DESIGN §1, §2 and §4 items 4–5, boot mapping and USER ABI."""
 import argparse
 import hashlib
+import json
 import os
 from pathlib import Path
 import re
@@ -15,6 +16,11 @@ from link_sh_run import Session
 from ppc_shm import guest_available
 from run import require
 from usb_run import rsh_command
+
+
+ABI = json.loads((ROOT / 'sdk/kapi.json').read_text())
+FIRST_RESERVED = len(ABI['api'])
+LAST_RESERVED = ABI['func_capacity'] - 1
 
 
 def replace(source, anchor, value):
@@ -98,13 +104,14 @@ def fixture(folder, case, gate):
             check = bound.replace('KAPI_FUNC_COUNT)', 'KAPI_FUNC_COUNT - 1)')
         elif case == 'accept-first':
             check = bound.replace('>=', '>')
-        edit('exec/exec_syscall.inc', bound, check + '\n' +
-             r'        kprintf(7, "V89 rejected=%u\r\n", slot);')
+        edit('exec/exec_syscall.inc', '#define RING3_ARG_WINDOW',
+             'static volatile u32 v89_boundary;\n#define RING3_ARG_WINDOW')
+        edit('exec/exec_syscall.inc', bound, check + '\n        v89_boundary = slot;')
         # Keep reserved slots away from argument metadata even when the tested
         # comparison is relaxed. Only the product rejection emits the marker.
         anchor = '    wrapptr = exec_kapi_table()'
         edit('exec/exec_syscall.inc', anchor, r"""    if (slot >= KAPI_FUNC_COUNT) {
-        kprintf(7, "V89 past-bound=%u\r\n", slot);
+        v89_boundary = ~slot;
         result = OS32_ERR_INVAL;
         goto syscall_complete;
     }
@@ -153,8 +160,8 @@ EXPECTED_RED = {
     'wrong-stub': 'stub immediate',
     'wrong-branch': 'stub branch',
     'wrong-data': 'published data',
-    'reject-last': 'slot 297 rejected',
-    'accept-first': 'slot 298 rejection',
+    'reject-last': f'slot {FIRST_RESERVED - 1} rejected',
+    'accept-first': f'slot {FIRST_RESERVED} rejection',
 }
 
 
@@ -204,20 +211,20 @@ def observe(elf, folder, case, cpu):
                 require(b'V89 child read=6 write=0 identity=6\n' in trace, 'child AS permissions or frame')
                 for reason in ('stub immediate', 'stub branch', 'stub entry', 'common sc'):
                     expect(body.strip() != reason.encode(), reason)
-                expect(b'V89 rejected=297' not in trace.splitlines(), 'slot 297 rejected')
+                expect(session.word('v89_boundary') != FIRST_RESERVED - 1,
+                       f'slot {FIRST_RESERVED - 1} rejected')
                 result = re.fullmatch(rb'V89 return=(-?\d+) heap=(\d+) shm=(\d+)\n+', body)
                 require(result and rsh_command(session, 'echo $?') == b'0\n', repr(body))
                 pair = re.search(rb'V89 slot=0 [^\n]+\nV89 slot=297 result=(-?\d+) heap=(\d+) shm=(\d+)\n', trace)
-                require(pair, 'first and last dispatch results')
+                require(pair, 'gfx_init and io_pump dispatch results')
                 value, heap, shm = map(int, pair.groups())
                 require(value == -9 and heap and shm and heap != shm, repr(pair.groups()))
                 expect(tuple(map(int, result.groups())) == (value, heap, shm), 'published data')
-                for argument, slot in (('a', 298), ('b', 383)):
-                    start = len(serial())
+                for argument, slot in (('a', FIRST_RESERVED), ('b', LAST_RESERVED)):
                     body = rsh_command(session, '/bin/v89probe.bin ' + argument)
-                    lines = serial()[start:].splitlines()
-                    rejected = f'V89 rejected={slot}'.encode() in lines
-                    past_bound = f'V89 past-bound={slot}'.encode() in lines
+                    boundary = session.word('v89_boundary')
+                    rejected = boundary == slot
+                    past_bound = boundary == (slot ^ 0xffffffff)
                     require(rejected or past_bound,
                             f'missing dispatch evidence for slot {slot}')
                     expect(rejected and not past_bound,

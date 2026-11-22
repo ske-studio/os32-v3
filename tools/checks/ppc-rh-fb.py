@@ -1,5 +1,5 @@
 CHECK = dict(env=['ppc-cross', 'qemu-ppc'], name='ppc-rh-fb', tier=2, budget=600, needs=['make:ppc-ci-image', 'make:build/out/memmap_layout.h'], covers=['platform/powermac/kernel_boot.c', 'platform/powermac/via_tree.c',
-    'platform/powermac/via_window.h',
+    'platform/powermac/via_window.h', 'platform/powermac/machcfg.c', 'kernel/machcfg.c',
     'include/memmap.h', 'tools/gen_memmap.py', 'build/kernel.mk',
     'arch/x86/kernel/kentry.asm',
     'boot/loader_fat_new.asm',
