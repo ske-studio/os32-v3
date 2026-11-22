@@ -22,6 +22,7 @@
 #include "../../drivers/ata/ide_addr.c"
 #include "../../fs/ext2/ext2_layout.c"
 #include "../../userland/shell/hdprep_plan.c"
+#include "../../platform/pc98/install_plan.c"
 
 static int failed;
 #define CHECK(x) do { if (!(x)) { \

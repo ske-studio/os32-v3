@@ -49,7 +49,7 @@ BASE_NOAPP = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
               "-fno-stack-protector", "-Wall", 
               "-D__OS32_USERLAND__", '-DFD_ROOT_DEV="%s"' % fd_root_dev()]
 BASE = BASE_NOAPP + ["-DSHELL_AS_APP"]
-INCLUDES = ["-I" + str(ROOT / "sdk/include"), "-I" + str(ROOT / "sdk/include/os32"),
+INCLUDES = ["-I" + str(ROOT / "platform/pc98"), "-I" + str(ROOT / "sdk/include"), "-I" + str(ROOT / "sdk/include/os32"),
             "-I" + str(ROOT / "include"), "-I" + str(ROOT / "userland/shell"),
             # 段 4 で ui.c / rshell.c / cmd_filer.c を取り込んだぶん
             "-I" + str(ROOT / "userland/lib"),

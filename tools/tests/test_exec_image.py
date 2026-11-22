@@ -15,6 +15,9 @@ from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 
 MUTATIONS = (
+    ('child-inherits-disk-authorization', 'source',
+     'ctx->disk_write_authorized = exec_disk_write_path_allowed(resolved);',
+     'ctx->disk_write_authorized = appslot_at(launcher_id)->disk_write_authorized;'),
     ('protocol-misreported-as-min-api', 'source', 'if (lrc == OS32X_LAYOUT_MIN_API)',
      'if (hdr->min_api_ver > KAPI_VERSION)'),
     ('ppc-accepted', 'layout', '!arch_exec_image_accept(hdr->flags)', '0'),

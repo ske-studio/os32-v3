@@ -75,7 +75,13 @@ endif
 
 # === Shell Module ===
 SHELL_SRC = $(wildcard userland/shell/*.c)
-SHELL_OBJ = $(SHELL_SRC:.c=.o)
+INST_HDRS = platform/$(PLATFORM)/platform_install_layout.h include/platform_install_boot.h userland/system/inst_hdd.h userland/system/inst_disk.h \
+            userland/shell/hdprep_plan.h fs/pc98pt.h fs/ext2/ext2_layout.h $(SDK_KAPI_HDR)
+SHELL_INSTALL_OBJ = install_plan.o install_hdprep.o
+SHELL_OBJ = $(SHELL_SRC:.c=.o) $(addprefix userland/shell/,$(SHELL_INSTALL_OBJ))
+
+$(addprefix userland/shell/,$(SHELL_INSTALL_OBJ)): userland/shell/%.o: platform/$(PLATFORM)/%.c $(INST_HDRS) | $(ABI_CONTRACT_ORDER)
+	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
 
 # ヘッダと .inc の明示依存 (B7)。生成済み .d は Makefile の DEPFILES でも読む。
 # 初回ビルドでも常駐側・外部プログラム側に同じ依存を与える。
@@ -119,7 +125,11 @@ $(RESIDENT_OUT)/shell.elf: $(BUILD_OUT)/app_sys.ld $(CRT0_RESIDENT_OBJ) $(SHELL_
 # 一致」なので、出力先もフラグも常駐側とは完全に分ける。
 # 追加 OBJ (FILER_DRAW_OBJ / -los32save) は常駐と同じものをリンクする。
 SH_OBJDIR = userland/shell/sh_obj
-SH_OBJ = $(patsubst userland/shell/%.c,$(SH_OBJDIR)/%.o,$(SHELL_SRC))
+SH_OBJ = $(addprefix $(SH_OBJDIR)/,$(SHELL_INSTALL_OBJ)) $(patsubst userland/shell/%.c,$(SH_OBJDIR)/%.o,$(SHELL_SRC))
+
+$(addprefix $(SH_OBJDIR)/,$(SHELL_INSTALL_OBJ)): $(SH_OBJDIR)/%.o: platform/$(PLATFORM)/%.c $(INST_HDRS) | $(ABI_CONTRACT_ORDER)
+	@mkdir -p $(@D)
+	$(CC) $(PROGRAM_FLAGS) -DSHELL_AS_APP -c $< -o $@
 
 $(SH_OBJDIR)/%.o: userland/shell/%.c $(SHELL_DEPS) | $(ABI_CONTRACT_ORDER)
 	@mkdir -p $(SH_OBJDIR)
@@ -229,8 +239,6 @@ userland/system/cdinst.o: userland/system/cdinst.c userland/lib/rt/pkg.h userlan
 # (fs/pc98pt.c)、幾何と計画 (userland/shell/hdprep_plan.c)、ext2 の配置
 # (fs/ext2/ext2_layout.c) はカーネル・hdprep と同じソースを組む — **写さない**
 # (票 TASK_HDD_INSTALL 段 2-9)。
-INST_HDRS = userland/system/inst_hdd.h userland/system/inst_disk.h \
-            userland/shell/hdprep_plan.h fs/pc98pt.h fs/ext2/ext2_layout.h $(SDK_KAPI_HDR)
 userland/system/inst_disk.o: userland/system/inst_disk.c $(INST_HDRS) | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
 userland/system/inst_hdd.o: userland/system/inst_hdd.c $(INST_HDRS) | $(ABI_CONTRACT_ORDER)
@@ -241,11 +249,24 @@ userland/system/hdprep_plan_inst.o: userland/shell/hdprep_plan.c userland/shell/
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
 userland/system/pc98pt_inst.o: fs/pc98pt.c fs/pc98pt.h | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -Idrivers -c $< -o $@
-INST_OBJ = userland/system/inst_hdd.o userland/system/inst_disk.o \
+userland/system/install_disk.o: platform/$(PLATFORM)/install_disk.c $(INST_HDRS) | $(ABI_CONTRACT_ORDER)
+	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
+
+userland/system/install_target.o: platform/$(PLATFORM)/install_target.c $(INST_HDRS) | $(ABI_CONTRACT_ORDER)
+	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
+
+INST_OBJ = userland/system/install_target.o userland/system/install_disk.o userland/shell/install_plan.o userland/system/inst_hdd.o userland/system/inst_disk.o \
            userland/system/hdprep_plan_inst.o userland/system/pc98pt_inst.o \
            userland/system/ext2_layout_user.o
 
+userland/system/install_target.o: include/ide_contract.h include/types.h
+userland/system/install_target.o userland/shell/install_hdprep.o $(SH_OBJDIR)/install_hdprep.o: platform/$(PLATFORM)/install_geometry.h
 userland/system/cdinst.o: $(INST_HDRS)
+$(INST_OBJ) userland/system/install.elf userland/system/cdinst.o \
+userland/shell/cmd_hdprep.o userland/shell/hdprep_plan.o userland/shell/install_hdprep.o \
+$(addprefix $(SH_OBJDIR)/,cmd_hdprep.o hdprep_plan.o $(SHELL_INSTALL_OBJ)): private PROGRAM_FLAGS += -Iplatform/$(PLATFORM)
+userland/shell/cmd_hdprep.o userland/shell/hdprep_plan.o \
+$(addprefix $(SH_OBJDIR)/,cmd_hdprep.o hdprep_plan.o): $(INST_HDRS)
 userland/system/cdinst.elf: sdk/link/app.ld $(CRT0_OBJ) userland/system/cdinst.o userland/lib/rt/pkg.o $(DBG_OBJ) $(INST_OBJ)
 	$(LD) $(PROGRAM_LDFLAGS) -o $@ $(CRT0_OBJ) userland/system/cdinst.o userland/lib/rt/pkg.o $(DBG_OBJ) $(INST_OBJ) -lc -lgcc
 
