@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFINITION = ROOT / 'tools/prototypes/sqlite_imports.def'
 
 
-def generate(out, definition=DEFINITION, contracts_only=False, module="sqlite", target="x86-pc98"):
+def generate(out, definition=DEFINITION, contracts_only=False, module="sqlite", target="x86-pc98", depfile=None):
     prefix = module.upper()
     doc = json.loads(Path(definition).read_text())
     if doc['schema'] != 1:
@@ -103,6 +103,14 @@ def generate(out, definition=DEFINITION, contracts_only=False, module="sqlite", 
     metadata = dict(module_abi_gen=module_abi, imports=entries)
     if not contracts_only:
         (out / f'{module}_imports.json').write_text(json.dumps(metadata, indent=2) + '\n')
+    if depfile:
+        inputs = sorted(set(includes).union(doc.get('contracts', [])))
+        outputs = [out / f'{module}_{suffix}' for suffix in (
+            'imports.h', 'imports.json', 'import_slots.c', 'import_stubs.S',
+            'provider_types.c', 'kexports.c')]
+        # Empty rules allow a definition update to drop a deleted header.
+        depfile.write_text(' '.join(map(str, outputs)) + ': ' + ' '.join(inputs)
+                           + '\n' + ''.join(f'{path}:\n' for path in inputs))
     return metadata
 
 
@@ -207,6 +215,7 @@ if __name__ == '__main__':
     output = parser.add_mutually_exclusive_group(required=True)
     output.add_argument('--out-dir', type=Path)
     output.add_argument('--static-vfs', type=Path)
+    parser.add_argument('--depfile', type=Path)
     parser.add_argument('--contracts-only', action='store_true')
     parser.add_argument('--module', choices=('sqlite', 'fep', 'cd', 'kcg', 'fm', 'pcm', 'v86', 'lan', 'cirrus', 'geforce', 'trident'), default='sqlite')
     parser.add_argument('--target', choices=('x86-pc98', 'ppc-powermac'), default='x86-pc98')
@@ -215,4 +224,4 @@ if __name__ == '__main__':
         args.static_vfs.write_text(pool_vfs())
         raise SystemExit(0)
     definition = ROOT / f'tools/prototypes/{args.module}_imports.def'
-    generate(args.out_dir, definition, contracts_only=args.contracts_only, module=args.module, target=args.target)
+    generate(args.out_dir, definition, contracts_only=args.contracts_only, module=args.module, target=args.target, depfile=args.depfile)

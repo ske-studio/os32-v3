@@ -48,7 +48,7 @@ $(SQLITE_KEXPORT_OBJ): $(SQLITE_GEN)/sqlite_kexports.c $(SQLITE_GEN)/sqlite_impo
 C_KERNEL_OBJ += $(SQLITE_KEXPORT_OBJ)
 R1_OBJECTS += $(SQLITE_KEXPORT_OBJ)
 $(BUILD_OUT)/kernel.elf $(R1_OUT)/kernel.elf: $(SQLITE_KEXPORT_OBJ)
-$(KERNEL_OBJ_PREFIX)kernel/sqlite_engine.o $(KERNEL_OBJ_PREFIX)kernel/sqlite_outer.o $(R1_OBJ)/kernel/sqlite_engine.o $(R1_OBJ)/kernel/sqlite_outer.o: $(SQLITE_GENERATED)
+$(KERNEL_OBJ_PREFIX)kernel/fep_boot.o $(R1_OBJ)/kernel/fep_boot.o $(KERNEL_OBJ_PREFIX)kernel/sqlite_engine.o $(KERNEL_OBJ_PREFIX)kernel/sqlite_outer.o $(R1_OBJ)/kernel/sqlite_engine.o $(R1_OBJ)/kernel/sqlite_outer.o: $(SQLITE_GENERATED)
 $(SQLITE_PROTO_OUT)/sqlite_module.o: $(SQLITE_GENERATED)
 
 define pack_sqlite

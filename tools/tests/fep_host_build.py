@@ -43,7 +43,7 @@ def prepare(work, probe=None, observe=False):
 
 
 def probe_source():
-    source = (ROOT / 'kernel/sqlite_engine.c').read_text()
+    source = (ROOT / 'kernel/fep_boot.c').read_text()
     source = source[source.index('static int probe_close('):source.index('/* Missing/unreadable reserve settings')]
     # Bind only the outer import seam to the real bundled implementation.
     return (source.replace('os32_sqlite_outer_group_', 'os32_sqlite_group_')

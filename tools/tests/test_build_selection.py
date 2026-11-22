@@ -55,10 +55,11 @@ def check_fep(root):
     for options in (x86, ppc):
         profiles = [query(root, [*options, 'FEATURE_SQLITE=1', f'FEATURE_FEP={enabled}'],
                           config_only=True) for enabled in (0, 1)]
-        unit = 'kernel/ime/fep_module.c'
+        units = {'kernel/fep_boot.c', 'kernel/ime/fep_module.c'}
         off, on = profiles
-        assert unit not in off['C_KERNEL'] and on['C_KERNEL'].count(unit) == 1
-        assert [name for name in on['C_KERNEL'] if name != unit] == off['C_KERNEL']
+        for unit in units:
+            assert unit not in off['C_KERNEL'] and on['C_KERNEL'].count(unit) == 1
+        assert [name for name in on['C_KERNEL'] if name not in units] == off['C_KERNEL']
         for key in ('ASM_KERNEL', 'GAS_KERNEL'):
             assert on[key] == off[key]
         try:
@@ -318,7 +319,7 @@ if __name__ == '__main__':
                      AssertionError, 'negative legacy shell accepted'),
                     ('build/select.mk', '$(error FEATURE_FEP requires FEATURE_SQLITE)', '',
                      AssertionError, 'missing FEP prerequisite'),
-                    ('build/features/fep.mk', 'C_FEATURES += kernel/ime/fep_module.c', '',
+                    ('build/features/fep.mk', 'kernel/ime/fep_module.c', '',
                      AssertionError, 'missing FEP kernel loader'),
                     ('build/select.mk', '$(error FEATURE_SQLITE requires FEATURE_EXEC)', '',
                      AssertionError, 'missing SQLite prerequisite'),

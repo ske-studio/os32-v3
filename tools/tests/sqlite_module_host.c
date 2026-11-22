@@ -5,17 +5,8 @@
 void input_ime_action_flush(void) {}
 void input_context_focus_register(void (*flush)(void)) { (void)flush; }
 int input_context_snapshot(KbdPolicySnapshot *out) { (void)out; return -1; }
-void kbd_policy_ime_state(u32 active, u32 owner, u32 gen)
-{ (void)active; (void)owner; (void)gen; }
-extern int fep_services_public(void);
-static unsigned cancel_takes;
-int input_ime_cancel_take(const KbdPolicySnapshot *current)
-{
-    (void)current;
-    cancel_takes++;
-    return -1;
-}
 #include "sqlite_engine.h"
+#include "fep_boot.h"
 #include "lib/sqlite3/os32_sqlite_config.h"
 #include "module_runtime.h"
 #include "module.h"
@@ -36,6 +27,9 @@ int input_ime_cancel_take(const KbdPolicySnapshot *current)
 #include "kstring.h"
 #include "kprintf.h"
 #include "lib/sqlite3/generated/sqlite_facade.h"
+#ifdef HOST_STATIC_FEP
+#include "lib/sqlite3/generated/sqlite_imports.h"
+#endif
 #include <stdarg.h>
 
 #define IMAGE_CAP (544768U)
@@ -93,10 +87,53 @@ static void number(u32 value)
     while (n) { char text[2] = {digits[--n], 0}; say(text); }
 }
 #define CHECK(x) do { if (!(x)) { say("FAIL " #x "\n"); finish(1); } } while (0)
+static unsigned cancel_takes, rollback_reclaims;
+static int rollback_pending, rollback_inactive;
+void kbd_policy_ime_state(u32 active, u32 owner, u32 gen)
+{
+    if (rollback_pending) {
+        CHECK(!active && !owner && !gen);
+        rollback_inactive = 1;
+    }
+}
+int input_ime_cancel_take(const KbdPolicySnapshot *current)
+{
+    cancel_takes++;
+    if (rollback_pending) {
+        CHECK(rollback_inactive && current && !current->owner && !current->exec_gen &&
+              !current->command_gen && !current->context && !current->flags);
+        rollback_pending = 0;
+    }
+    return -1;
+}
+#ifdef HOST_STATIC_FEP
+#include "kapi_db.h"
+#include "redir_access.h"
+u32 __kernel_resident_end; /* Linker symbol used by KAPI diagnostics. */
+int redir_access_capture(RedirAccess *out)
+{
+    *out = (RedirAccess){.origin = CALLER_TRUSTED};
+    return 1;
+}
+int copy_caller_cstr(const RedirAccess *access, const char *src, char *dst, u32 cap)
+{
+    CHECK(access->origin == CALLER_TRUSTED && kstrlen(src) < cap);
+    kstrncpy(dst, src, cap);
+    return 1;
+}
+int vfs_resolve_path(const char *path, char *out, int cap)
+{
+    (void)path; (void)out; (void)cap;
+    CHECK(0); /* The public DB test opens :memory:. */
+    return -1;
+}
+#endif
 /* Both executable bodies are the paired product images. Only dictionary
  * storage is a RAM DB seeded below; actual FEP SQL/init/close stay in fep.mod.
  * Disk/journal lifetime remains covered by ime_dict_host and VFS fixtures. */
-#define g_ime (*(IME_State *)(uptr)(module_records[1].base + HOST_FEP_STATE))
+/* Static SQL owns no loader slot. Module-backed SQL occupies slot zero. */
+#define FEP_RECORD (module_records[input[0] >= 93 ? 0 : 1])
+#define g_ime (*(IME_State *)(uptr)(FEP_RECORD.base + HOST_FEP_STATE))
 static u8 fep_buffers[2][512];
 static int fep_allocs, fep_frees, learn_unavailable, reserve_clamped;
 typedef struct {
@@ -108,7 +145,7 @@ static u32 unicode_pages;
 volatile u32 tick_count;
 void *kmalloc(u32 n)
 {
-    CHECK(!services_public && n <= sizeof(fep_buffers[0]) && fep_allocs < 2);
+    CHECK(!fep_services_public() && n <= sizeof(fep_buffers[0]) && fep_allocs < 2);
     return fep_buffers[fep_allocs++];
 }
 u32 kmalloc_block_size(void *p)
@@ -136,7 +173,8 @@ int host_fep_group_acquire(int kind, int owner, Os32SqliteGroup *out)
 }
 int host_fep_group_open(const Os32SqliteGroup *group, const char *path, int flags, sqlite3 **out)
 {
-    CHECK(!services_public && services_stage == SERVICES_SETTINGS_CLOSED);
+    CHECK(!fep_services_public());
+    CHECK(services_stage == (input[0] >= 93 ? SERVICES_SQLITE_ONLY : SERVICES_SETTINGS_CLOSED));
     if (input[0] >= 61) {
         FepMeta meta;
         u32 reserve;
@@ -242,9 +280,10 @@ int vfs_stat(const char *path, OS32_Stat *st)
     if (!kstrcmp(path, SYS_SETTINGS_DB))
         return input[0] == 89 ? VFS_ERR_NOTFOUND : VFS_ERR_IO;
     if (!memcmp(path, "/db/fep.db", sizeof("/db/fep.db"))) {
-        CHECK(services_stage == SERVICES_UNICODE && !opens && !fep_opens && !alloc_calls);
+        if (input[0] >= 93) CHECK(services_stage == SERVICES_SQLITE_ONLY && services_public);
+        else CHECK(services_stage == SERVICES_UNICODE && !opens && !fep_opens && !alloc_calls);
         dictionary_stats++;
-        if (input[0] == 55 || (input[0] >= 57 && input[0] <= 60)) return VFS_ERR_NOTFOUND;
+        if (input[0] == 99 || input[0] == 55 || (input[0] >= 57 && input[0] <= 60)) return VFS_ERR_NOTFOUND;
         if (input[0] == 56) return VFS_ERR_IO;
         st->st_size = 1;
         return 0;
@@ -542,6 +581,14 @@ int vfs_open(const char *path, int mode)
         return 5;
     }
     if (!memcmp(path, SYS_FEP_MOD, sizeof(SYS_FEP_MOD))) {
+        if (input[0] >= 93) {
+            char path[OS32_MAX_PATH];
+            FepMeta meta;
+            u32 kb;
+            CHECK(!fep_boot_config_get(&meta, &kb) && kb == 208 && meta.variant == 'M');
+            CHECK(!fep_boot_user_path_get(path, sizeof(path)) && !kstrcmp(path, "unvalidated/../path"));
+            CHECK(FEP_RECORD.dependency_count == 0 && !fep_services_public());
+        }
         fep_opens++;
         return input[0] == 50 ? -1 : 4;
     }
@@ -549,7 +596,21 @@ int vfs_open(const char *path, int mode)
     opens++;
     return input[0] == 1 || (input[0] == 11 || input[0] == 57) ? -1 : 3;
 }
-void vfs_close(int fd) { if (fd == 5) return; if (fd == 4) { CHECK(!fep_closes); fep_closes++; return; } CHECK(fd == 3 && !closes); closes++; }
+void vfs_close(int fd)
+{
+    if (fd == 5) return;
+    if (fd == 4) {
+        if (input[0] == 95) {
+            services_stage = SERVICES_UNICODE;
+            rollback_pending = 1;
+        }
+        CHECK(!fep_closes);
+        fep_closes++;
+        return;
+    }
+    CHECK(fd == 3 && !closes);
+    closes++;
+}
 int vfs_fstat(int fd, OS32_Stat *st)
 {
     CHECK(fd == 3 || fd == 4); st->st_size = fd == 4 ? fep_size : input[1]; return 0;
@@ -587,13 +648,14 @@ int ledger_owner_new(u32 kind, u32 id, const char *name, u32 *out)
 }
 u32 pgalloc_alloc_phys(u32 owner, int n)
 {
-    if (owner == LEDGER_OWNER_KERNEL) {
+    if (owner == LEDGER_OWNER_KERNEL && input[0] < 93) {
         CHECK(n == UNICODE_FILE_PAGES && !unicode_pages);
         if (input[0] == 17) return 0;
         unicode_pages = n;
         return (u32)(uptr)unicode_storage;
     }
-    CHECK((owner == OWNER && owned) || (owner == OWNER + 1 && fep_owned));
+    CHECK((owner == OWNER && owned) || (owner == OWNER + 1 && fep_owned) ||
+          (owner == LEDGER_OWNER_KERNEL && input[0] >= 93));
     CHECK(n > 0);
     alloc_calls++;
     if (input[0] == 13 || (input[0] == 52 && owner == OWNER + 1)) return 0;
@@ -603,11 +665,11 @@ u32 pgalloc_alloc_phys(u32 owner, int n)
     for (int i = 0; i < n; i++) { live[allocated + i] = 1; page_owner[allocated + i] = owner; }
     allocated += n;
     kmemset((void *)(uptr)address, 0xcc, n * PAGE_SIZE);
-    if (alloc_calls == 3) {
+    if (alloc_calls == (input[0] >= 93 ? 2u : 3u)) {
         CHECK(n * PAGE_SIZE == SQLITE_ENGINE_STACK_SIZE + PAGE_SIZE);
         stack_base = address + PAGE_SIZE;
     }
-    if (alloc_calls == 2) {
+    if (alloc_calls == (input[0] >= 93 ? 1u : 2u)) {
         CHECK(n * PAGE_SIZE == SQLITE_MODULE_POOL_SIZE);
         heap_base = address;
     }
@@ -633,6 +695,10 @@ int pgalloc_free_n_owner(u32 owner, u32 pfn, int n)
 }
 int ledger_reclaim_owner(u32 owner, u32 *pages)
 {
+    if (input[0] == 95 && owner == OWNER + 1) {
+        CHECK(!rollback_pending && rollback_inactive && !rollback_reclaims);
+        rollback_reclaims++;
+    }
     if (owner == LEDGER_OWNER_KERNEL) { *pages = unicode_pages; unicode_pages = 0; return 1; }
     CHECK((owner == OWNER || owner == OWNER + 1) && !sqlite_engine_active);
     if (owner == OWNER) CHECK(module_records[1].state == MODULE_ABSENT);
@@ -722,7 +788,7 @@ int host_core_group_open(const Os32SqliteGroup *group, const char *path, int fla
     int rc = os32_sqlite_outer_group_open(group, ":memory:", SQLITE_OPEN_READWRITE, out);
     if (rc) return rc;
     if (settings) {
-        CHECK(!core_headers && !services_public);
+        CHECK(!core_headers && !fep_services_public());
         if (input[0] < 61) { host_seed_settings(*out); return 0; }
         if (input[0] == 90) return 0; /* absent table */
         if (input[0] == 91) {
@@ -786,7 +852,13 @@ u32 host_core_connections(void)
 
 int host_core_boot_check(int live, int reserve)
 {
+    if (input[0] == 98 || (input[0] == 97 && FEP_RECORD.state == MODULE_QUARANTINED))
+        CHECK(live || reserve);
     int rc = os32_sqlite_outer_boot_check(live, reserve);
+    if (input[0] >= 93 && live && reserve) {
+        CHECK(!fep_services_public() && ime_switch_dict(0) == OS32_ERR_NOSYS);
+        if (input[0] == 96 || input[0] == 97) return SQLITE_ERROR;
+    }
     if (input[0] == 86 && services_stage == SERVICES_FEP_INTERNAL_READY && reserve) {
         CHECK(!rc && live == 2 && !services_public);
         return SQLITE_ERROR;
@@ -807,6 +879,7 @@ int host_core_abort(void)
 
 int host_core_close(sqlite3 *db)
 {
+    if (input[0] == 97 && FEP_RECORD.state == MODULE_ROLLING_BACK) return SQLITE_BUSY;
     if (input[0] == 87 && core_probes && !fep_opens) return SQLITE_BUSY;
     return os32_sqlite_close(db);
 }
@@ -1086,6 +1159,50 @@ void _start(void)
     __asm__ volatile("int $0x80" : "=a"(rc) : "0"(125), "b"(pool), "c"(sizeof(pool)), "d"(7) : "memory");
     CHECK(!rc);
     stubs();
+#ifdef HOST_STATIC_FEP
+    if (input[0] >= 93) {
+        extern const u32 sqlite_kexports[];
+        extern unsigned long sqlite_import_slots[];
+        for (u32 i = 0; i < SQLITE_IMPORT_COUNT; ++i) sqlite_import_slots[i] = sqlite_kexports[i];
+        CHECK(!sqlite_static_boot() && services_stage == SERVICES_SQLITE_ONLY && services_public);
+        CHECK(!owned && !opens);
+        if (input[0] == 98) services_boot_fault = SERVICES_FAULT_SETTINGS_CLOSE;
+        int result = fep_boot_static();
+        CHECK(fep_opens == (input[0] != 94 && input[0] < 98));
+        CHECK(fep_allocs == ((input[0] == 93 || input[0] == 96 || input[0] == 97) ? 2 : 0));
+        CHECK(fep_services_public() == (input[0] == 93));
+        CHECK((result == 0) == (input[0] == 93 || input[0] == 99));
+        if (input[0] == 94 || input[0] == 95) {
+            int handle = kapi_db_open(":memory:");
+            CHECK(handle >= 0 && kapi_db_close(handle) == 0);
+            CHECK(services_stage == SERVICES_SQLITE_ONLY);
+        }
+        CHECK(services_public);
+        CHECK(rollback_reclaims == (input[0] == 95));
+        if (result) {
+            char path[OS32_MAX_PATH];
+            FepMeta meta;
+            u32 kb;
+            CHECK(fep_boot_config_get(&meta, &kb) == OS32_ERR_AGAIN);
+            CHECK(fep_boot_user_path_get(path, sizeof(path)) == OS32_ERR_AGAIN);
+            CHECK(ime_switch_dict(0) == OS32_ERR_NOSYS);
+            CHECK(fep_retired == (input[0] == 95 || input[0] == 96));
+            CHECK(((HostBudgetState *)(uptr)heap_base)->reserve ==
+                  (input[0] == 97 ? 208 * 1024u : 0u));
+            if (input[0] == 97) CHECK(result == MODULE_ISOLATED && fep_owned);
+            if (input[0] == 98) CHECK(result == MODULE_ISOLATED);
+        }
+        Os32SqliteGroup group;
+        sqlite3 *db;
+        int rows = 0;
+        CHECK(!os32_sqlite_outer_group_acquire(OS32_SQLITE_EXEC, 1, &group));
+        CHECK(!os32_sqlite_outer_group_open(&group, ":memory:", SQLITE_OPEN_READWRITE, &db));
+        CHECK(!os32_sqlite_exec(db, "SELECT 42", selected, &rows, 0) && rows == 1);
+        CHECK(!os32_sqlite_outer_group_begin_close(&group));
+        CHECK(!os32_sqlite_close(db) && !os32_sqlite_outer_group_finish(&group, SQLITE_OK));
+        say("GREEN core static SQL boundary\n"); finish(0);
+    }
+#endif
     if (input[0] >= 61) core_boot_transaction();
     if ((input[0] >= 10 && input[0] <= 36) || (input[0] >= 50 && input[0] <= 60)) boot_transaction();
     rc = os32_sqlite_start();
@@ -1186,6 +1303,7 @@ void _start(void)
 
 const struct boot_common *boot_common_get(void) {
     static struct boot_common info;
+    if (input[0] == 94 && core_probes) services_public = 0;
     const struct bootinfo *bi = bootinfo_get();
     info.image_valid = bi->img_valid; info.image_crc = bi->img_crc; info.image_size = bi->img_size;
     return &info;
