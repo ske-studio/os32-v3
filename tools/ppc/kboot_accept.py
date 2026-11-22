@@ -18,6 +18,7 @@ import sys
 import tempfile
 import time
 sys.dont_write_bytecode = True
+from boot_media import Media
 from run import ROOT, CriterionFailure
 import kboot_run as meter
 from kboot_mutations import KERNEL_NEGATIVES, KERNEL_MUTATIONS, AUDIT_MUTATIONS
@@ -89,6 +90,13 @@ def build(out, *settings):
     print(f'{elf}: resident_end={symbols["__kernel_resident_end"]:#x} '
           f'chain={symbols["__kernel_chain_end"]:#x}', flush=True)
     return elf
+
+
+def build_media(out, *settings):
+    elf = build(out, *settings, 'iso')
+    media = Media(elf, out/'PPCKERN.map', out/'boot.iso')
+    media.verify()
+    return media
 
 
 def mutant_settings(work, name, source, before, after):

@@ -10,7 +10,7 @@ import subprocess
 import tempfile
 import time
 
-from kboot_accept import build, mutant_settings
+from kboot_accept import build_media, mutant_settings
 from run import ROOT, ROM
 
 BOOT = 'platform/powermac/ide_boot.c'
@@ -86,7 +86,7 @@ void ata_check_wait(void)
         path = 'drivers/base/dev.c'
         settings += mutant_settings(out, case, path, 'ide_read_sectors((int)self->bus_id, (u32)lba,',
                                     'ide_read_sectors((int)self->bus_id, (u32)lba + 1,')
-    return build(out, '-j6', *settings)
+    return build_media(out, '-j6', *settings)
 
 
 def sector(lba):
@@ -100,15 +100,10 @@ def digest(data):
     return f'{h:08x}'
 
 
-def guest(elf, cpu, disk, absent=False):
-    work = elf.parent / (cpu + ('-absent' if absent else ''))
+def guest(media, cpu, disk, absent=False):
+    work = media.elf.parent / (cpu + ('-absent' if absent else ''))
     work.mkdir()
-    cd = work / 'cd'
-    cd.mkdir()
-    shutil.copy(elf, cd)
-    iso = work / 'ata.iso'
-    subprocess.run(['genisoimage', '-quiet', '-hfs', '-r', '-part', '-no-desktop',
-                    '-o', iso, cd], check=True)
+    iso = media.iso.resolve()
     serial = work / 'serial.log'
     args = ['qemu-system-ppc', '-M', 'mac99', '-cpu', cpu, '-m', '128M', '-smp', '1',
             '-accel', 'tcg', '-bios', ROM, '-display', 'none', '-serial', 'file:' + str(serial),
@@ -145,15 +140,15 @@ def main():
     disk.write_bytes(b''.join(sector(i) for i in range(2048)))
     hashes = set()
     for case in ('normal', *(MUTANTS if args.mutate or args.build_only else ())):
-        elf = make_image(work, case)
-        sha = hashlib.sha256(elf.read_bytes()).hexdigest()
+        media = make_image(work, case)
+        sha = hashlib.sha256(media.elf.read_bytes()).hexdigest()
         assert sha not in hashes, case
         hashes.add(sha)
-        print(case, sha, elf, flush=True)
+        print(case, sha, media, flush=True)
         if args.build_only:
             continue
         for cpu in ('7450', '7455'):
-            lines = guest(elf, cpu, disk)
+            lines = guest(media, cpu, disk)
             ident = 'ATA-TEST model=QEMU HARDDISK sectors=2048' in lines
             if case in ('normal', 'bar'):
                 # mac99 probe: BAR0 0x80000000, first ata-3 reg offset 0x20000.
@@ -164,7 +159,7 @@ def main():
                 assert 'ATA-TEST present=1 registered=1' in lines
                 assert ident and all(f'ATA-TEST lba={i} rc=0 hash={digest(sector(i))}' in lines
                                      for i in (0, 1024, 2047)), lines[-8:]
-                assert 'ATA-TEST present=0 registered=0' in guest(elf, cpu, disk, absent=True)
+                assert 'ATA-TEST present=0 registered=0' in guest(media, cpu, disk, absent=True)
             elif case == 'lba':
                 assert ident and f'ATA-TEST lba=0 rc=0 hash={digest(sector(1))}' in lines
             elif case == 'word':

@@ -30,7 +30,7 @@ covers=['exec/exec.c', 'tools/accept/ppc_shell_flow.inc', 'platform/powermac/she
  'build/ppc-user.mk',
  'build/targets/ppc-powermac.mk',
  'tools/ppc/sb_run.py',
- 'tools/ppc/kboot_accept.py',
+ 'tools/ppc/kboot_accept.py', 'tools/ppc/boot_media.py',
  'tools/ppc/kboot_run.py',
  'tools/ppc/run.py',
  'tools/ppc_lan_host.py',

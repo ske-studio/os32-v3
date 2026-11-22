@@ -53,7 +53,7 @@ CHECK = dict(env=['ppc-cross', 'qemu-ppc'], name='ppc-sd', tier=2, budget=900, n
                      'tools/lanfs_host.py',
                      'tools/mkpkg.py',
                      'tools/mkroot_image.py',
-                     'tools/ppc/kboot_accept.py',
+                     'tools/ppc/kboot_accept.py', 'tools/ppc/boot_media.py',
                      'tools/ppc/kboot_mutations.py',
                      'tools/ppc/kboot_run.py',
                      'tools/ppc/run.py',

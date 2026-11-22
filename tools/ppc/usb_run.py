@@ -12,7 +12,7 @@ import subprocess
 import tempfile
 import time
 
-from kboot_accept import build
+from kboot_accept import build_media
 from run import CriterionFailure
 from kboot_run import ROOT, ROM, QMP, command, require, serial, validate_root as validate, PREFIX
 
@@ -140,13 +140,10 @@ def settings(work, mode):
     return result
 
 
-def accept(elf, cpu, out, mode):
+def accept(media, cpu, out, mode):
     while os.getloadavg()[0] >= 4: time.sleep(5)
     out.mkdir()
-    cd = out/'cd'; cd.mkdir()
-    shutil.copyfile(elf, cd/'PPCKERN.ELF')
-    iso = out/'boot.iso'
-    command(['genisoimage', '-quiet', '-hfs', '-r', '-part', '-no-desktop', '-o', iso, cd])
+    iso = media.iso.resolve()
     a, b = out/'serial-a.log', out/'serial-b.log'
     args = ['qemu-system-ppc', *(['-g', '800x600x8'] if os.environ.get('PPC_FB') == '1' else []), '-M', 'mac99', '-cpu', cpu, '-m', '128M', '-smp', '1',
             '-accel', 'tcg', '-bios', str(ROM), '-drive', f'file={iso},media=cdrom,id=bootcd',
@@ -206,7 +203,7 @@ def accept(elf, cpu, out, mode):
                     q.call('stop')
                     regs = q.call('human-monitor-command', {'command-line': 'info registers'})
                     (out/'registers.txt').write_text(regs)
-                    symbols = command([PREFIX+'nm', '-n', elf])
+                    symbols = command([PREFIX+'nm', '-n', media.elf])
                     address = next(int(l.split()[0], 16) for l in symbols.splitlines()
                                    if l.endswith(' usb_accept_stop'))
                     pc = re.search(r'NIP\s+([0-9a-fA-F]+)', regs)
@@ -251,7 +248,7 @@ def accept(elf, cpu, out, mode):
             q.call('stop')
             for label, cmd in [('registers', 'info registers'), ('pci', 'info pci'), ('qtree', 'info qtree')]:
                 (out/(label+'.txt')).write_text(q.call('human-monitor-command', {'command-line': cmd}))
-            symbols = command([PREFIX+'nm', '-n', elf])
+            symbols = command([PREFIX+'nm', '-n', media.elf])
             for name in ['tick_count', 'controllers', 'pm_usb_roots', 'pm_usb_pci', 'usb_busy']:
                 matches = [l for l in symbols.splitlines() if l.endswith(' '+name)]
                 for i, line in enumerate(matches):
@@ -375,13 +372,11 @@ def keyboard_actions(q, read_serial, wait_for, evidence):
     return key, text_keys
 
 
-def product_accept(elf, cpu, out, mode, late=False):
+def product_accept(media, cpu, out, mode, late=False):
     """Real sh/input; late observes three seconds inside the startup wait."""
     while os.getloadavg()[0] >= 4: time.sleep(5)
     out.mkdir()
-    cd = out/'cd'; cd.mkdir(); shutil.copyfile(elf, cd/'PPCKERN.ELF')
-    iso = out/'boot.iso'
-    command(['genisoimage','-quiet','-hfs','-r','-part','-no-desktop','-o',iso,cd])
+    iso = media.iso.resolve()
     a, b = out/'serial-a.log', out/'serial-b.log'
     argv = ['qemu-system-ppc', *(['-g', '800x600x8'] if os.environ.get('PPC_FB') == '1' else []),'-M','mac99','-cpu',cpu,'-m','128M','-smp','1',
             '-accel','tcg','-bios',str(ROM),'-drive',f'file={iso},media=cdrom',
@@ -505,7 +500,7 @@ def product_accept(elf, cpu, out, mode, late=False):
                 try: p.wait(timeout=2)
                 except subprocess.TimeoutExpired: p.kill(); p.wait()
 
-def lan_accept(elf, cpu, out, mode):
+def lan_accept(media, cpu, out, mode):
     while os.getloadavg()[0] >= 4: time.sleep(5)
     # Reuse S-D's real host/transport and FS_REQ drop boundary.
     from sd_run import Session, result
@@ -523,7 +518,7 @@ def lan_accept(elf, cpu, out, mode):
             finally:
                 subprocess.Popen = original
 
-    s = USBSession(elf, cpu, out, mode)
+    s = USBSession(media, cpu, out, mode)
     try:
         (s.root/'f').write_text('usb-rpc\n')
         s.start(1)
@@ -643,7 +638,7 @@ def before_shell_input(work):
     return [item.replace('KB_MUT_', 'KB_MUT_EXTRA_', 1) for item in settings]
 
 
-def link_lan_accept(elf, cpu, out, mode='normal'):
+def link_lan_accept(media, cpu, out, mode='normal'):
     import link_sh_run as link
     from host_agent import HostAgent, hdr_unpack, LINK_HDR, OP_RELEASE
 
@@ -709,7 +704,7 @@ def link_lan_accept(elf, cpu, out, mode='normal'):
     root = out/'saved'; root.mkdir(); (root/'f').write_bytes(b'usb-rpc\n')
     s = UsbLink.__new__(UsbLink)
     s.root, s.drop, s.calls, s.releases = root, False, [], []
-    UsbLink.__init__(s, elf, cpu, out/'guest', 180)
+    UsbLink.__init__(s, media, cpu, out/'guest', 180)
     a, b = s.out/'serial-a.log', s.out/'serial-b.log'
     s.agent_enabled = mode == 'no-service'
     try:
@@ -873,14 +868,14 @@ def main():
             opts += mutant_settings(work, mode, 'platform/powermac/input_boot.c', anchor,
                 'static int try_local_char(void) { static int lost; int ch = input_legacy_try(IL_LOCAL_CHAR); '
                 'if (ch >= 0 && !lost) { lost = 1; return -1; } return ch; }')
-        elf = build(work/mode, *opts)
-        digest = hashlib.sha256(elf.read_bytes()).hexdigest()
+        media = build_media(work/mode, *opts)
+        digest = hashlib.sha256(media.elf.read_bytes()).hexdigest()
         require(digest not in seen, 'distinct USB mutation image')
         seen.add(digest)
         print(mode, digest, flush=True)
         if not args.build_only:
             for cpu in cpus if mode == 'normal' else cpus[:1]:
-                link_lan_accept(elf, cpu, work/(mode+'-'+cpu), mode)
+                link_lan_accept(media, cpu, work/(mode+'-'+cpu), mode)
     return 0
 
 

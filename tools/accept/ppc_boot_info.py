@@ -98,12 +98,12 @@ def negative_image(case, original, target, iso, donor):
     return target
 
 
-def observe(elf, cpu, evidence, case, expected, exit_status):
+def observe(media, cpu, evidence, case, expected, exit_status):
     from link_sh_run import Session
     from run import require
     from usb_run import rsh_command
 
-    session = Session(elf, cpu, evidence, 240)
+    session = Session(media, cpu, evidence, 240)
     try:
         session.start()
         if case in ('foreign-pair', 'overlap'):
@@ -158,6 +158,7 @@ def main(on_image=None):
         print(f'SKIP: PowerPC toolchain unavailable at {cross}')
         return 3
 
+    from boot_media import Media, package
     from kboot_accept import build, mutant_settings
     from ppc_shm import guest_available
 
@@ -242,6 +243,9 @@ def main(on_image=None):
             exit_status = b'1\n'
         else:
             expected = f'BOOT 0 1 {len(iso)} {zlib.crc32(iso):08x}'.encode()
+        media = Media(elf, kernel / 'PPCKERN.map', folder / 'boot.iso')
+        package(media.elf, media.iso)
+        media.verify()
         digest = hashlib.sha256(elf.read_bytes()).hexdigest()
         if digest in images:
             raise RuntimeError(f'{case} ELF is identical to {images[digest]}: {elf}')
@@ -251,7 +255,7 @@ def main(on_image=None):
             on_image(case, elf, kernel / 'root.iso')
         if not args.build_only:
             for cpu in ('7450', '7455'):
-                observe(elf, cpu, folder / cpu, case, expected, exit_status)
+                observe(media, cpu, folder / cpu, case, expected, exit_status)
     print(f'{len(images)} distinct boot-info ELF images')
     return 0
 

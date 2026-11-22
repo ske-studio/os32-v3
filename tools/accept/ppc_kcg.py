@@ -23,12 +23,12 @@ EXPECTED = {
 }
 
 
-def observe(elf, cpu, evidence, case):
+def observe(media, cpu, evidence, case):
     from link_sh_run import Session
     from run import require
     from usb_run import rsh_command
 
-    session = Session(elf, cpu, evidence, 240)
+    session = Session(media, cpu, evidence, 240)
     try:
         session.start()
         session.wait(session.ready, 'KCG cui READY', 60)
@@ -67,7 +67,7 @@ def main():
         print(f'SKIP: PowerPC toolchain unavailable at {cross}')
         return 3
 
-    from kboot_accept import build, mutant_settings
+    from kboot_accept import build_media, mutant_settings
     from ppc_shm import guest_available
 
     if not args.build_only and not guest_available():
@@ -120,15 +120,15 @@ def main():
             from test_kapi_binding import generate
             kernel.mkdir()
             (generate(kernel, 'kcg-absent') / 'stamp').touch()
-        elf = build(kernel, *options, *mutation, 'kb-user', 'kernel')
-        digest = hashlib.sha256(elf.read_bytes()).hexdigest()
+        media = build_media(kernel, *options, *mutation, 'kb-user', 'kernel')
+        digest = hashlib.sha256(media.elf.read_bytes()).hexdigest()
         if digest in images:
-            raise RuntimeError(f'{case} ELF is identical to {images[digest]}: {elf}')
+            raise RuntimeError(f'{case} ELF is identical to {images[digest]}: {media}')
         images[digest] = case
-        print(f'{case} sha256={digest} {elf}', flush=True)
+        print(f'{case} sha256={digest} {media}', flush=True)
         if not args.build_only:
             for cpu in ('7450', '7455'):
-                observe(elf, cpu, folder / cpu, case)
+                observe(media, cpu, folder / cpu, case)
     return 0
 
 

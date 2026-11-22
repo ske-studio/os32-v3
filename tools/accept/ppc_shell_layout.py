@@ -10,7 +10,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT / 'tools'), str(ROOT / 'tools/ppc')]
-from kboot_accept import build, mutant_settings
+from kboot_accept import build, build_media, mutant_settings
 from kboot_layout import report_product
 from link_sh_run import Session
 from ppc_shm import guest_available
@@ -60,8 +60,8 @@ def verify_handoff(lines, resident_end, frame_end):
     assert all(covered(name, hpt, hpt + size) for name in ranges)
 
 
-def observe(elf, cpu, folder, expected, resident_end, frame_end):
-    session = Session(elf, cpu, folder, 90)
+def observe(media, cpu, folder, expected, resident_end, frame_end):
+    session = Session(media, cpu, folder, 90)
     serial = folder / 'serial-a.log'
     try:
         session.start()
@@ -103,20 +103,20 @@ def main():
             anchor = '    shell_layout_report(info);'
             settings = mutant_settings(folder, name, 'platform/powermac/ppc_kernel.c',
                                        anchor, f'    paging_pte_restore({change});\n' + anchor)
-        elf = build(folder / 'kernel', '-j4', 'IMAGE=kboot-link-sh',
+        media = build_media(folder / 'kernel', '-j4', 'IMAGE=kboot-link-sh',
                     'KBOOT_SHELL_LAYOUT_DIAG=1', *settings, 'kernel')
-        resident_end = report_product(elf)
-        data = elf.read_bytes()
+        resident_end = report_product(media.elf)
+        data = media.elf.read_bytes()
         frame, = [p for p in segments(data) if p[0] == 1 and p[3] == STAGING_BASE]
         frame_end = STAGING_BASE + frame[5]
         digest = hashlib.sha256(data).hexdigest()
         if digest in hashes:
-            raise RuntimeError(f'duplicate image {elf}')
+            raise RuntimeError(f'duplicate image {media}')
         hashes.add(digest)
-        print(f'{name} sha256={digest} {elf}', flush=True)
+        print(f'{name} sha256={digest} {media}', flush=True)
         if not args.build_only:
             for cpu in ('7450', '7455'):
-                observe(elf, cpu, folder / cpu, expected, resident_end, frame_end)
+                observe(media, cpu, folder / cpu, expected, resident_end, frame_end)
                 print(f'{"RED" if change else "GREEN"} {cpu} {name} {expected}')
     print(f'PASS distinct images={len(hashes)}')
     return 0
