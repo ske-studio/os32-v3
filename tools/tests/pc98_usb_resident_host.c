@@ -12,9 +12,10 @@
 #include "tick_order.h"
 #include "kernel/irq/tick_budget.h"
 static tick_fn periodic;
-static int budget_ready;
+static u32 remaining_us;
+u32 arch_tick_budget_cnt(u32 us) { return us * 2; }
 u32 tick_budget_cnt(u32 us) { return us == IRQ0_SLOT_BUDGET_US ? 77 : 0; }
-int tick_budget_peek(u32 share, u32 tail) { return share == 77 && !tail && budget_ready; }
+int tick_budget_peek(u32 share, u32 tail) { return share == 77 && remaining_us * 2 > tail; }
 int tick_register(unsigned slot, tick_fn fn)
 {
     if (slot != PC98_TICK_USB || periodic) return -1;
@@ -177,7 +178,10 @@ static int module_boot(void)
     if (!periodic || record.tick_refs != 1) return 33;
     periodic();
     if (services != 1) return 35;
-    budget_ready = 1;
+    remaining_us = 3 * 30 - 1;
+    periodic();
+    if (services != 1) return 35;
+    remaining_us += 2;
     periodic();
     if (services != 2) return 34;
     module_hc->isr_pending = 2;

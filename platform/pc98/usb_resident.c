@@ -7,12 +7,17 @@
 #include "tick_order.h"
 #include "kernel/irq/tick_budget.h"
 
+#include "arch_tick_budget.h"
+
+/* Provisional host model: allow 30 us per HC for completion and port scan. */
+#define USB_SCAN_RESERVE_US (PC98_USB_HCS * 30u)
+static u32 scan_reserve_cnt;
 static struct module_handle tick_owner;
 static void (*tick_target)(void);
 
 static void usb_tick(void)
 {
-    if (tick_target && tick_budget_peek(tick_budget_cnt(IRQ0_SLOT_BUDGET_US), 0))
+    if (tick_target && tick_budget_peek(tick_budget_cnt(IRQ0_SLOT_BUDGET_US), scan_reserve_cnt))
         tick_target();
 }
 
@@ -35,6 +40,7 @@ int usb_resident_tick_set(void (*service)(void))
         module_ref_release(owner, MODULE_REF_TICK);
         return -USB_E_HC;
     }
+    scan_reserve_cnt = arch_tick_budget_cnt(USB_SCAN_RESERVE_US);
     tick_target = service;
     return 0;
 }

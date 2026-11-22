@@ -40,7 +40,7 @@ def run(ctx):
             cases.extend((b'r', *mutation) for mutation in MUTANTS)
             cases.extend((b'm', *mutation) for mutation in [
                 ('        tick_target();', '        (void)tick_target;', 34),
-                ('tick_budget_peek(tick_budget_cnt(IRQ0_SLOT_BUDGET_US), 0)', '1', 35),
+                ('tick_budget_cnt(IRQ0_SLOT_BUDGET_US), scan_reserve_cnt', 'tick_budget_cnt(IRQ0_SLOT_BUDGET_US), 0', 35),
                 ('active < 0 ? active : 0', 'active', 22),
                 ('found && !active ? -USB_E_HC : active', '(void)found, active', 27),
                 ('if (s->id) input_src_release', 'if (!s->id) input_src_release', 29),

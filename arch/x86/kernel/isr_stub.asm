@@ -49,6 +49,7 @@ cpu 386
 ;; T2a R1: broker も kctx_irq_depth を読む。irq_in_irq はその互換名。
 ;; ============================================================
 #ifdef TICK_PROBE
+#include "../../../kernel/time/tick_probe_ids.h"
 extern tick_probe_begin
 extern tick_probe_end
 extern tick_probe_irq_enter
@@ -539,21 +540,21 @@ irq_stub_0:
         jz      .phys_only
 
         ;; Cハンドラを呼び出し
-        TP_BEGIN 1
+        TP_BEGIN TP_TIMER
         call    timer_handler
-        TP_END 1
+        TP_END TP_TIMER
 
         ;; マスタPICにEOI送出 (PC-98: ポート 0x00)
-        TP_BEGIN 9
+        TP_BEGIN TP_EOI
         mov     al, OCW2_EOI
         out     PIC1_CMD, al
-        TP_END 9
+        TP_END TP_EOI
 
-        TP_BEGIN 10
+        TP_BEGIN TP_REFLECT
         V86_REFLECT 0           ;; IRQ0 (タイマ)。既定では INT 08h に落ちる
 
-        TP_END 10
-        TP_BEGIN 11
+        TP_END TP_REFLECT
+        TP_BEGIN TP_TIMEOUT
 
         ;; V86 セッションが長すぎたら畳む。暴走したゲストを無限に
         ;; 走らせないための保険。EOI も反射も済ませた後に判定する。
@@ -562,17 +563,17 @@ irq_stub_0:
         call    v86_tick_and_check_timeout
         test    eax, eax
         jz      .no_timeout
-        TP_END 11
+        TP_END TP_TIMEOUT
         TP_LEAVE 0
         call    v86_exit_to_kernel              ;; longjmp するので戻らない
 .no_timeout:
-        TP_END 11
+        TP_END TP_TIMEOUT
         jmp     .done
 .phys_only:
-        TP_BEGIN 9
+        TP_BEGIN TP_EOI
         mov     al, OCW2_EOI
         out     PIC1_CMD, al
-        TP_END 9
+        TP_END TP_EOI
 .done:
         IRQ_LEAVE
         TP_LEAVE 0

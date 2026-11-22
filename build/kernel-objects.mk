@@ -55,6 +55,8 @@ $(R1_OBJ)/%.o: %.c | $(ABI_CONTRACT_ORDER)
 # Preserve NASM's STT_FILE identity across H2's source move, including R1.
 legacy_asm_input = $(subst /platform/pc98/legacy/v86_entry,/kernel/v86/v86_entry,$(1))
 
+$(R1_OBJ)/arch/x86/kernel/isr_stub.o $(KERNEL_OBJ_PREFIX)arch/x86/kernel/isr_stub.o: kernel/time/tick_probe_ids.h
+
 $(R1_OBJ)/%.o: %.asm sdk/crt/generations.inc arch/x86/kernel/cpu_flags.inc arch/x86/kernel/entry_layout.inc arch/x86/kernel/iret_user.inc
 	@mkdir -p $(@D) $(dir $(call legacy_asm_input,$@.asm))
 	$(LAYOUT_CPP) -traditional-cpp $< -o $(call legacy_asm_input,$@.asm)
