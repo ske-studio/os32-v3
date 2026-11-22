@@ -41,6 +41,7 @@ def run(ctx):
             cases.extend([
                 (b'm', 'scan_pending = 1;', 'scan_pending = 0;', 42),
                 (b'm', 'idle_runs++;\n        run_scan();', 'idle_runs++; irq_restore(flags); run_scan(); flags = irq_save();', 42),
+                (b'm', 'hc->isr_pending |= pending;', 'hc->isr_pending |= pending & ~OHCI_INTR_WDH;', 43),
                 (b't', 'kprintf(KLOG_ATTR, "[usb] tick register failed', 'if (0) kprintf(KLOG_ATTR, "[usb] tick register failed', 41),
                 (b'm', 'if (!found) kprintf', 'if (0) kprintf', 37),
                 (b'm', 'stage = "BAR map"', 'stage = "unknown"', 38),
