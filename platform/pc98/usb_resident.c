@@ -79,3 +79,12 @@ int pc98_usb_resident_start(struct module_handle owner, struct pc98_usb_core *co
     if (active) core->service();
     return active;
 }
+
+/* module_start supplies the validated entry and its owning record. */
+int pc98_usb_module_start(struct module_record *record, u32 entry, u32 *exports)
+{
+    int (*init)(struct module_handle) = (int (*)(struct module_handle))(uptr)entry;
+    struct module_handle owner = {record - module_records, record->generation};
+    (void)exports;
+    return init(owner);
+}
