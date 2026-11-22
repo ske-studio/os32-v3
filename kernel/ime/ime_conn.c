@@ -27,7 +27,7 @@ int fep_conn_close(FepConn *conn)
         }
     }
 #ifndef OS32_SQLITE_DIRECT_TEST
-    if (services_stage < SERVICES_READY &&
+    if ((services_stage < SERVICES_READY || services_stage == SERVICES_SQLITE_ONLY) &&
         services_boot_fault == SERVICES_FAULT_FEP_CLOSE) rc = SQLITE_BUSY;
     else
 #endif

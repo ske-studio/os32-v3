@@ -569,7 +569,7 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
             ('learn-required-MINIMAL', 'ime', '    g_ime.dict_loaded = 1;',
              '    if (!g_ime.store.user_enabled) return -1;\n    g_ime.dict_loaded = 1;', 32),
             ('close-fault-after-ready', 'ime_conn',
-             'services_stage < SERVICES_READY &&\n        ', '', 33)):
+             '(services_stage < SERVICES_READY || services_stage == SERVICES_SQLITE_ONLY) &&\n        ', '', 33)):
             source = (ROOT / ('kernel/ime' if name in ('ime', 'ime_dict', 'ime_conn') else 'kernel') / (name + '.c')).read_text()
             scope = function(source, 'ime_dict_boot' if name == 'ime' else 'fep_conn_close')
             assert scope.count(old) == 1, label

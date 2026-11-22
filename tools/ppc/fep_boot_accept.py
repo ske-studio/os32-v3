@@ -152,8 +152,15 @@ def main():
             trial.mkdir()
             ram = dictionary == 'ram'
             media = None if ram else disk(
-                trial, 'root', lambda d: install(d, out / 'root.iso', dictionary),
-                dense_files=('/boot/fep.mod',))
+                trial, 'root', lambda d: install(d, out / 'root.iso', dictionary))
+            if not ram:
+                module = (trial / 'root/boot/fep.mod').read_bytes()
+                hole = next(i for i in range(0, len(module) - 1023, 1024)
+                            if not any(module[i:i + 1024]))
+                fs = trial / 'root.ext2'
+                assert int(subprocess.check_output(
+                    ['debugfs', '-R', f'bmap /boot/fep.mod {hole // 1024}', fs])) == 0
+                assert subprocess.check_output(['debugfs', '-R', 'cat /boot/fep.mod', fs]) == module
             if args.build_only:
                 continue
             keys = dictionary in ('dictionary', 'missing') and name != 'close-failure'
