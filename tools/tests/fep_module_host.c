@@ -3,6 +3,8 @@
 static KbdPolicySnapshot foreground = {.owner=1, .exec_gen=7, .command_gen=3};
 int input_context_snapshot(KbdPolicySnapshot *out) { *out = foreground; return 0; }
 #include "input/hal/input_ime_gate.c"
+static struct module_record running = {.state = MODULE_RUNNING};
+struct module_record *module_record_get(struct module_handle h) { (void)h; return &running; }
 static int cleanup_saw_closed;
 static int cleanup_saw_pending;
 int module_abort(struct module_handle h)
@@ -51,6 +53,12 @@ static int test(void)
     for (live = 0; live <= 2; live++)
         if (ime_boot_connections() != live) return 4;
     services_public = exported = 1;
+    if (fep_services_public() || ime_is_active()) return 15;
+    fep_closed = 0;
+    exported = 0;
+    if (ime_is_active()) return 16;
+    exported = 1;
+    if (!ime_is_active()) return 17;
     if (ime_boot_connections() != live) return 5;
     store.system.group.generation = 0;
     if (body_boot_connections()) return 6;

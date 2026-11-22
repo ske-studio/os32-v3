@@ -1,5 +1,6 @@
 /* Resident FEP adapter. The implementation and its state live in fep.mod. */
 #include "fep_module.h"
+#include "fep_boot.h"
 #include "fep_imports.h"
 #include "../../fs/fd_redirect.h"
 #include "../sqlite_engine.h"
@@ -18,7 +19,7 @@ extern const u32 fep_kexports[];
 extern const struct module_symbol_contract fep_import_contracts[];
 extern const struct module_symbol_contract fep_export_contracts[];
 
-static int fep_closed;
+static int fep_closed = 1;
 int fep_services_public(void) { return !fep_closed && services_public; }
 
 static void fep_close_input(void)
@@ -178,7 +179,23 @@ static int fep_quiesce(struct module_record *r)
     return 1;
 }
 
+void fep_module_publish(void)
+{
+    input_context_focus_register(input_ime_action_flush);
+    fep_closed = 0;
+}
+
 int fep_module_load(struct module_handle sqlite)
+{
+    return fep_module_load_after_sql(&sqlite);
+}
+
+static int static_sql_ready(void)
+{
+    return services_stage == SERVICES_SQLITE_ONLY && services_public;
+}
+
+int fep_module_load_after_sql(const struct module_handle *sqlite)
 {
     if (fep_handle.generation) return MODULE_BUSY;
     /* The loader can roll back internally before returning to this facade. */
@@ -194,25 +211,31 @@ int fep_module_load(struct module_handle sqlite)
             MODULE_ID_FEP
         },
         .imports = fep_kexports,
-        .dependencies = &sqlite, .dependency_count = 1,
+        .dependencies = sqlite, .dependency_count = sqlite ? 1 : 0,
         .lifecycle = {.start = fep_start, .quiesce = fep_quiesce}
     };
+    if (!sqlite && !static_sql_ready()) return MODULE_BAD_DEPENDENCY;
     int rc = module_load(&request, &fep_handle);
+    if (!rc && !sqlite && !static_sql_ready()) rc = MODULE_BAD_DEPENDENCY;
     if (!rc) rc = module_start(fep_handle);
     if (!rc && !module_exports(fep_handle)) rc = MODULE_INIT_FAILED;
-    if (!rc) {
-        input_context_focus_register(input_ime_action_flush);
-        fep_closed = 0;
-    }
     kprintf(KLOG_ATTR, "[fep] module rc=%d pair=%08x pages=%u\n",
             rc, pair, fep_module_pages());
     return rc;
 }
 
+static int abort_handle(void)
+{
+    /* load/start may already have rolled this handle back internally. */
+    struct module_record *record = module_record_get(fep_handle);
+    if (!record || record->state == MODULE_ABSENT) return 0;
+    if (record->state == MODULE_QUARANTINED) return MODULE_ISOLATED;
+    return module_abort(fep_handle);
+}
 int fep_module_abort(void)
 {
     fep_close_input();
-    return module_abort(fep_handle);
+    return abort_handle();
 }
 u32 fep_module_pages(void)
 {

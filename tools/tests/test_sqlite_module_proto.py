@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """T4c-1: paired product SQLite controls, write-free rejection and mutants."""
 CHECK = dict(name='sqlite-module-proto-host', tier=1,
-    covers=['input/hal/in2_int.h', 'input/hal/input_context.h', 'platform/pc98/module_pair.c', 'include/platform_module_pair.h', 'arch/x86/arch_kernel_fp.h', 'tools/tests/host_arch/arch_kernel_fp.h', 'build/softfloat.mk', 'lib/softfloat/**', 'lib/softfloat_abi.c', 'kernel/ime/ime_display_private.h', 'platform/pc98/platform_ime_render.h', 'platform/pc98/ime_display.c', 'include/ime_control.h', 'include/diag_stack.h', 'arch/*/arch_diag_stack.h', 'platform/pc98/bootinfo_wire.h', 'platform/pc98/bootinfo_native.h', 'drivers/base/dev.c', 'fs/vfs.c', 'Makefile', 'build/config.mk', 'build/sqlite-proto.mk', 'build/sqlite-module.ld', 'tools/gen_sqlite_imports.py', 'tools/gen_kdebug_imports.py', 'tools/sqlite_module_proto.py', 'tools/mkmod.py', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'tools/prototypes/sqlite_imports.def', 'tools/tests/sqlite_module_proto_tdd.md', 'tools/tests/test_module_image.py', 'tools/tests/module_image_host.c', 'tools/tests/test_module_runtime.py', 'tools/tests/module_runtime_host.c', 'tools/tests/sqlite_module_host.c', 'tools/tests/test_mkmod.py', 'tools/tests/host32.py', 'kernel/module/module_image.c', 'kernel/module/module_image.h', 'kernel/module/module_runtime.c', 'kernel/module/module_runtime.h', 'kernel/sqlite_engine.c', 'kernel/sqlite_engine.h', 'kernel/sqlite_engine_body.h', 'mm/paging.h', 'arch/x86/kernel/isr_handlers.c', 'kernel/sqlite_outer.c', 'mm/memory_boot.h', 'kernel/module/module.h', 'kernel/irq/irq.h', 'mm/pgalloc.h', 'include/memmap.h', 'include/bootinfo.h', 'include/config.h', 'kernel/module/module_schema.h', 'mm/kmalloc.h', 'lib/sqlite3/sqlite3.c', 'lib/sqlite3/sqlite3.h', 'lib/sqlite3/os32_sqlite_vfs.c', 'lib/sqlite3/os32_sqlite_module.c', 'lib/sqlite3/generated/sqlite_facade.h', 'lib/sqlite3/generated/sqlite_imports.h', 'lib/sqlite3/generated/sqlite_kexports.c', 'lib/sqlite3/os32_sqlite_outer.h', 'lib/sqlite3/sqlite_stack.asm', 'lib/sqlite3/os32_sqlite_vfs.h', 'lib/sqlite3/os32_sqlite_config.h', 'lib/kstring.c', 'lib/kstring_c.c', 'lib/kstring.h', 'lib/kmath.c', 'lib/divdi3.c', 'fs/vfs.h', 'include/types.h', 'include/kprintf.h', 'include/sys.h', 'sdk/kapi.json', 'sdk/link/generations.ld', 'sdk/include/os32/os32_unit_stamp.h', 'kdebug/generated/kdebug_imports.json', 'build/module.ld', 'kernel/module/kdebug_imports.def', 'kernel/ime/ime.c', 'kernel/ime/ime.h', 'kernel/ime/ime_dict.c', 'kernel/ime/ime_render.h', 'kernel/console/unicode_file.c', 'kernel/console/unicode_file.h', 'lib/sqlite3/os32_sqlite_test.c', 'include/endian_le.h', 'kapi/kapi_sysinfo.c', 'platform/pc98/platform_build_info.h', 'tools/prototypes/fep_imports.def', 'kernel/ime/fep_module.c', 'kernel/ime/fep_module.h', 'kernel/ime/fep_body.c', 'kernel/ime/ime_dict_info.c', 'kernel/ime/ime_conn.c', 'kernel/ime/ime_user_store.c', 'kernel/ime/ime_store.h', 'kernel/ime/ime_suspend.c', 'build/fep-module.mk', 'kernel/ime/ime_romkana.c', 'platform/pc98/ime_render_tvram.c', 'fs/fd_redirect.h', 'lib/utf8.h', 'include/text_screen.h', 'drivers/input/kbd.h', 'drivers/char/serial.h', 'exec/exec.h', 'include/con_sink.h', 'include/redir_access.h', 'build/fep-module.ld', 'build/out/fep/*.o', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'tools/tests/kernel_includes.py'],
+    covers=['input/hal/in2_int.h', 'input/hal/input_context.h', 'platform/pc98/module_pair.c', 'include/platform_module_pair.h', 'arch/x86/arch_kernel_fp.h', 'tools/tests/host_arch/arch_kernel_fp.h', 'build/softfloat.mk', 'lib/softfloat/**', 'lib/softfloat_abi.c', 'kernel/ime/ime_display_private.h', 'platform/pc98/platform_ime_render.h', 'platform/pc98/ime_display.c', 'include/ime_control.h', 'include/diag_stack.h', 'arch/*/arch_diag_stack.h', 'platform/pc98/bootinfo_wire.h', 'platform/pc98/bootinfo_native.h', 'drivers/base/dev.c', 'fs/vfs.c', 'Makefile', 'build/config.mk', 'build/sqlite-proto.mk', 'build/sqlite-module.ld', 'tools/gen_sqlite_imports.py', 'tools/gen_kdebug_imports.py', 'tools/sqlite_module_proto.py', 'tools/mkmod.py', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'tools/prototypes/sqlite_imports.def', 'tools/tests/sqlite_module_proto_tdd.md', 'tools/tests/test_module_image.py', 'tools/tests/module_image_host.c', 'tools/tests/test_module_runtime.py', 'tools/tests/module_runtime_host.c', 'tools/tests/sqlite_module_host.c', 'tools/tests/test_mkmod.py', 'tools/tests/host32.py', 'kernel/module/module_image.c', 'kernel/module/module_image.h', 'kernel/module/module_runtime.c', 'kernel/module/module_runtime.h', 'kernel/sqlite_engine.c', 'kernel/fep_boot.c', 'kernel/fep_boot.h', 'kernel/sqlite_engine.h', 'kernel/sqlite_engine_body.h', 'mm/paging.h', 'arch/x86/kernel/isr_handlers.c', 'kernel/sqlite_outer.c', 'mm/memory_boot.h', 'kernel/module/module.h', 'kernel/irq/irq.h', 'mm/pgalloc.h', 'include/memmap.h', 'include/bootinfo.h', 'include/config.h', 'kernel/module/module_schema.h', 'mm/kmalloc.h', 'lib/sqlite3/sqlite3.c', 'lib/sqlite3/sqlite3.h', 'lib/sqlite3/os32_sqlite_vfs.c', 'lib/sqlite3/os32_sqlite_module.c', 'lib/sqlite3/generated/sqlite_facade.h', 'lib/sqlite3/generated/sqlite_imports.h', 'lib/sqlite3/generated/sqlite_kexports.c', 'lib/sqlite3/os32_sqlite_outer.h', 'lib/sqlite3/sqlite_stack.asm', 'lib/sqlite3/os32_sqlite_vfs.h', 'lib/sqlite3/os32_sqlite_config.h', 'lib/kstring.c', 'lib/kstring_c.c', 'lib/kstring.h', 'lib/kmath.c', 'lib/divdi3.c', 'fs/vfs.h', 'include/types.h', 'include/kprintf.h', 'include/sys.h', 'sdk/kapi.json', 'sdk/link/generations.ld', 'sdk/include/os32/os32_unit_stamp.h', 'kdebug/generated/kdebug_imports.json', 'build/module.ld', 'kernel/module/kdebug_imports.def', 'kernel/ime/ime.c', 'kernel/ime/ime.h', 'kernel/ime/ime_dict.c', 'kernel/ime/ime_render.h', 'kernel/console/unicode_file.c', 'kernel/console/unicode_file.h', 'lib/sqlite3/os32_sqlite_test.c', 'include/endian_le.h', 'kapi/kapi_sysinfo.c', 'platform/pc98/platform_build_info.h', 'tools/prototypes/fep_imports.def', 'kernel/ime/fep_module.c', 'kernel/ime/fep_module.h', 'kernel/ime/fep_body.c', 'kernel/ime/ime_dict_info.c', 'kernel/ime/ime_conn.c', 'kernel/ime/ime_user_store.c', 'kernel/ime/ime_store.h', 'kernel/ime/ime_suspend.c', 'build/fep-module.mk', 'kernel/ime/ime_romkana.c', 'platform/pc98/ime_render_tvram.c', 'fs/fd_redirect.h', 'lib/utf8.h', 'include/text_screen.h', 'drivers/input/kbd.h', 'drivers/char/serial.h', 'exec/exec.h', 'include/con_sink.h', 'include/redir_access.h', 'build/fep-module.ld', 'build/out/fep/*.o', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'tools/tests/kernel_includes.py'],
     needs=['make:sqlite-module-proto'], budget=14.6,
     basis=['[L1]', '[ABI]'],
 )
@@ -251,10 +251,10 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
     (folder / 'fep_module.c').write_bytes((ROOT / 'kernel/ime/fep_module.c').read_bytes())
     smoke = (ROOT / 'lib/sqlite3/os32_sqlite_test.c').read_text()
     (folder / 'sqlite_smoke.c').write_text(smoke)
-    for name in ('sqlite_engine', 'sqlite_outer'):
+    for name in ('sqlite_engine', 'fep_boot', 'sqlite_outer'):
         source = (ROOT / ('kernel/ime' if name in ('ime', 'ime_dict', 'ime_conn') else 'kernel') / (name + '.c')).read_text()
         # RAM storage seam shared with C2/O5; core retains header/SQL ordering.
-        if name == 'sqlite_engine':
+        if name in ('sqlite_engine', 'fep_boot'):
             source = ('extern int host_final_boot_check(int, int);\n') + source.replace(
                 'os32_sqlite_outer_boot_check(ime_boot_connections(), reserve)',
                 'host_final_boot_check(ime_boot_connections(), reserve)')
@@ -320,7 +320,7 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
                     '-I' + str(fep_directory), '-I' + str(ROOT / 'drivers'),
                     '-nostdlib', '-static', '-no-pie',
                     ROOT / 'tools/tests/sqlite_module_host.c',
-                    folder / 'sqlite_engine.c', folder / 'sqlite_outer.c',
+                    folder / 'sqlite_engine.c', folder / 'fep_boot.c', folder / 'sqlite_outer.c',
                     folder / 'sqlite_kexports.c', folder / 'fep_kexports.c', folder / 'fep_module.c',
                     ROOT / 'kernel/module/module_runtime.c',
                     ROOT / 'kernel/module/module_image.c', ROOT / 'kernel/console/unicode_file.c',
@@ -467,6 +467,8 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
         runtime_source = (ROOT / 'kernel/module/module_runtime.c').read_text()
         runtime_path.write_text(runtime_source)
         boot_command = [runtime_path if item == ROOT / 'kernel/module/module_runtime.c' else item for item in command]
+        boot = folder / "fep_boot.c"
+        boot_source = boot.read_text()
         mutations = [
             ('no-dictionary-loads-FEP', path, source,
              'vfs_stat(IME_DICT_PATH, &dictionary) == VFS_ERR_NOTFOUND',
@@ -478,18 +480,18 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
              '    rc = os32_sqlite_start();',
              '    if (no_dictionary) { services_stage = SERVICES_MINIMAL; return; }\n'
              '    rc = os32_sqlite_start();', 55),
-            ('sqlite-only-not-public', path, source,
+            ('sqlite-only-not-public', boot, boot_source,
              '        services_public = 1;', '        services_public = 0;', 55),
-            ('sqlite-only-called-ready', path, source,
+            ('sqlite-only-called-ready', boot, boot_source,
              '        services_stage = SERVICES_SQLITE_ONLY;',
              '        services_stage = SERVICES_READY;', 55),
-            ('reserve-lower-MINIMAL', path, source,
+            ('reserve-lower-MINIMAL', boot, boot_source,
              '*reserve = OS32_SQLITE_FEP_RESERVE_MIN;', '*reserve = -1;', 34),
-            ('reserve-reject-lower', path, source,
-             function(source, 'services_settings'),
-             function(source, 'services_settings').replace('OS32_SQLITE_FEP_RESERVE_MIN',
+            ('reserve-reject-lower', boot, boot_source,
+             function(boot_source, 'services_settings'),
+             function(boot_source, 'services_settings').replace('OS32_SQLITE_FEP_RESERVE_MIN',
                                                           'OS32_SQLITE_FEP_RESERVE'), 20),
-            ('reserve-no-minimum', path, source,
+            ('reserve-no-minimum', boot, boot_source,
              'if (kb < OS32_SQLITE_FEP_RESERVE_MIN / (int)KIB)', 'if (0)', 34),
             ('early-public', path, source,
              '    services_stage = SERVICES_SQLITE_INTERNAL_READY;',
@@ -498,8 +500,8 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
              '    if (!stopped || r->irq_refs || r->tick_refs || r->callback_refs ||\n        r->dma_refs || r->active_refs || r->registration_refs) goto quarantined;',
              '    if (0 && (!stopped || r->irq_refs || r->tick_refs || r->callback_refs ||\n        r->dma_refs || r->active_refs || r->registration_refs)) goto quarantined;', 31),
             ('unicode-reclaim', path, source,
-             '    cleanup_blocked = fep_module_abort() != 0;',
-             '    u32 lost; ledger_reclaim_owner(LEDGER_OWNER_KERNEL, &lost);\n    cleanup_blocked = fep_module_abort() != 0;', 28),
+             '    cleanup_blocked = fep_boot_rollback(&sqlite_handle, rc);',
+             '    u32 lost; ledger_reclaim_owner(LEDGER_OWNER_KERNEL, &lost);\n    cleanup_blocked = fep_boot_rollback(&sqlite_handle, rc);', 28),
         ]
         for label, target, original, old, new, mode in mutations:
             assert original.count(old) == 1, label
@@ -607,7 +609,7 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
         path.write_text(original)
         path = folder / 'sqlite_engine.c'
         original = path.read_text()
-        old = '    cleanup_blocked = fep_module_abort() != 0;'
+        old = '    cleanup_blocked = fep_boot_rollback(&sqlite_handle, rc);'
         assert original.count(old) == 1
         path.write_text(original.replace(old,
             '    u32 lost; ledger_reclaim_owner(module_records[sqlite_handle.slot].owner, &lost);\n' + old))
@@ -616,7 +618,7 @@ def real_runtime_suite(folder, directory, vmkernel, mutate=False, stack_mutate=F
         assert result.returncode == 1 and b'FAIL ' in result.stdout, result
         print('MUTATE fep-dependency-first-free RED (compiled runtime): ' + result.stdout.decode().strip(), flush=True)
         path.write_text(original)
-        old = '    cleanup_blocked = fep_module_abort() != 0;'
+        old = '    cleanup_blocked = fep_boot_rollback(&sqlite_handle, rc);'
         abort = '    int isolated = module_abort(sqlite_handle);'
         assert original.count(old) == original.count(abort) == 1
         path.write_text(original.replace(old, abort + '\n' + old).replace(

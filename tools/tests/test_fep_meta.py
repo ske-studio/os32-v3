@@ -7,7 +7,7 @@ CHECK = dict(name='fep-meta', tier=1, needs=[], budget=25.4, covers=['tools/test
     'tools/tests/sqlite_groups_backend.h', 'tools/tests/host32.py',
     'tools/tests/kernel_includes.py', 'tools/tests/host_arch/**', 'arch/x86/arch_kernel_fp.h',
     'tools/tests/input_fixture_host.h', 'tools/tests/serial_emergency_host.h',
-    'kernel/sqlite_engine.c', 'kernel/sqlite_engine.h', 'kernel/sqlite_engine_body.h', 'kernel/ime/ime*.c',
+    'kernel/fep_boot.c', 'kernel/sqlite_engine.h', 'kernel/sqlite_engine_body.h', 'kernel/ime/ime*.c',
     'kernel/ime/ime*.h', 'kernel/input_service.c', 'kernel/serial_diag.c',
     'lib/sqlite3/**', 'lib/kstring*', 'lib/kmath.c', 'lib/divdi3.c',
     'fs/vfs_fd.c', 'fs/vfs.h', 'include/**',
