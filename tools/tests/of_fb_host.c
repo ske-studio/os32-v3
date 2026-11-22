@@ -14,6 +14,8 @@
 
 GfxCounters gfx_counters;
 static int current_app = 2;
+static int wm_actor;
+int appslot_present_owner(void) { return wm_actor ? wm_actor : current_app; }
 int appslot_cur(void) { return current_app; }
 static int failed;
 #define EXPECT(x) do { if (!(x)) { const char msg[] = "FAIL " #x "\n"; failed = 1; \
@@ -288,10 +290,15 @@ static void provider(void)
     EXPECT(!DISPLAY_V1_PRESENT_OK());
     DISPLAY_V1_PUBLIC_INIT_OK();
     EXPECT(DISPLAY_V1_PRESENT_OK());
+    int initialized_by = current_app;
     current_app++;
     EXPECT(!DISPLAY_V1_PRESENT_OK());
-    current_app--;
+    wm_actor = initialized_by;
+    EXPECT(DISPLAY_V1_PRESENT_OK());
     adapter.gen++;
+    EXPECT(!DISPLAY_V1_PRESENT_OK());
+    wm_actor = 0;
+    current_app--;
     EXPECT(!DISPLAY_V1_PRESENT_OK());
     DISPLAY_V1_PUBLIC_INIT_OK();
     EXPECT(DISPLAY_V1_PRESENT_OK());

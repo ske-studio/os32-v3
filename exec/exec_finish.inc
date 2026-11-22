@@ -391,6 +391,7 @@ static void exec_pending_finish(void)
 
 void exec_fault_recover(void)
 {
+    appslot_gui_draw_leave(0);
     exec_pending_transfer(EXEC_KIND_FAULT);
 }
 

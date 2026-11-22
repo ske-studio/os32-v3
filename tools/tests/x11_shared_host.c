@@ -78,6 +78,9 @@ void appslot_poll_yield_reset(void) {}
 int serial_peekchar(void) { return -1; }
 void ring3_wm_enter(void) { wm_depth++; ring3_wm_depth++; }
 void ring3_wm_leave(void) { wm_depth--; ring3_wm_depth--; }
+u32 appslot_gui_draw_enter(void) { return 0; }
+void appslot_gui_draw_leave(u32 previous) { (void)previous; }
+void appslot_gui_registration(int active) { (void)active; }
 void appslot_gui_op_enter(int wait) { wait_depth = wait ? 1 : 2; }
 void appslot_gui_op_leave(void) { wait_depth = 0; }
 i32 exec_trim_done(u32 epoch) { (void)epoch; return OS32_ERR_INVAL; }

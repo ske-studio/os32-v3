@@ -165,6 +165,7 @@ static int g_pending_id, g_pending_kind, g_longjmp_reason, g_longjmp_id;
 #define APP_STATE_ABORT_PENDING 2
 #define APP_STATE_FAULT_PENDING 3
 #define EXEC_LJ_PENDING 4
+void appslot_gui_draw_leave(u32 previous) { (void)previous; }
 static int appslot_cur(void) { return 2; }
 static AppSlot *appslot_get(int id) { (void)id; return &fault_app; }
 static void ring3_context_clear(void) {}

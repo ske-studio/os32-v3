@@ -100,10 +100,12 @@ fn scroll_protocol_dispatch_commit_and_old_version() {
     let op = handler::lookup(GUI_OP_SCROLL).expect("SCROLL table entry");
     assert_eq!(op(&mut st,3,0,0),OS32_ERR_INVAL);
     assert!(!st.windows[0].issued.is_empty());
-    let presents = mocks::present_counts().1;
+    let (x, y) = st.windows[0].client_origin();
+    mocks::gfx_pixel(x + 8, y + 8, 73);
+    mocks::gfx_pixel(x + 8, y + 24, 19);
     assert_eq!(op(&mut st,2,0,0),0);
     assert!(st.windows[0].issued.is_empty(),"COMMIT before scroll");
-    assert!(mocks::present_counts().1 > presents);
+    assert_eq!(mocks::presented_pixel(x + 8, y + 24), 73, "SCROLL reply must show the copied pixel");
     assert!(!COPIES.lock().unwrap().is_empty());
     st.windows[0].gen += 1;
     assert_eq!(op(&mut st,2,0,0),OS32_ERR_STALE);
