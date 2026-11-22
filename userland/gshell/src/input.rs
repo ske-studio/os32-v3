@@ -746,7 +746,7 @@ fn capture_mouse(st: &mut GuiState, ctx: Ctx, end_batch: bool) {
     unsafe {
         (os32api::api().mouse_poll)(&mut mi as *mut MouseInfo as *mut u8);
     }
-    // Observe physical edges in Pump too; prev_buttons belongs to X3 UI.
+    // Observe physical edges in Pump too.
     if mi.buttons & !st.stop_mouse_buttons != 0 {
         st.stop_suppressed = false;
     }
@@ -763,6 +763,7 @@ fn capture_mouse(st: &mut GuiState, ctx: Ctx, end_batch: bool) {
         st.excl.mouse_baseline = true;
         st.prev_buttons = 0;
         st.click_button = 0;
+        st.delivered_button = 0;
         return;
     }
     /* 位置は**実マウスが動いたときだけ**実マウスの値へ (最後に動いた方が勝つ)。
@@ -781,6 +782,7 @@ fn capture_mouse(st: &mut GuiState, ctx: Ctx, end_batch: bool) {
         st.excl.held_buttons = mi.buttons;
         st.prev_buttons = 0;
         st.click_button = 0;
+        st.delivered_button = 0;
         st.excl.mouse_baseline = false;
         cursor::move_to(st, mx, my);
     }
@@ -792,10 +794,17 @@ fn capture_mouse(st: &mut GuiState, ctx: Ctx, end_batch: bool) {
     } else {
         st.click_button & btn
     };
-    let down_edge = click_button == MOUSE_BTN_LEFT && st.click_button == 0;
-    let up_edge = st.click_button == MOUSE_BTN_LEFT && click_button == 0;
-    let rdown_edge = click_button == MOUSE_BTN_RIGHT && st.click_button == 0;
-    let rup_edge = st.click_button == MOUSE_BTN_RIGHT && click_button == 0;
+    let changed_buttons = btn ^ st.prev_buttons;
+    st.prev_buttons = btn;
+    st.click_button = click_button;
+    let pressed = click_button & !st.delivered_button;
+    let released = st.delivered_button & !click_button;
+    let down_edge = pressed & MOUSE_BTN_LEFT != 0;
+    let up_edge = released & MOUSE_BTN_LEFT != 0;
+    let rdown_edge = pressed & MOUSE_BTN_RIGHT != 0;
+    let rup_edge = released & MOUSE_BTN_RIGHT != 0;
+    let pointer_motion = moved && changed_buttons & (MOUSE_BTN_LEFT | MOUSE_BTN_RIGHT) == 0
+        && pressed == 0 && released == 0;
     /* アプリへ配る `buttons` は実マウスと合成ボタン (マウスキー) の和。 */
     let pbtn = btn | st.synth_buttons;
 
@@ -804,11 +813,7 @@ fn capture_mouse(st: &mut GuiState, ctx: Ctx, end_batch: bool) {
         if moved {
             cursor::move_to(st, mx, my);
         }
-        /* 状態機械を進めるのは X3 だけ (契約 T8)。X4 (ポンプ) では
-         * prev_buttons を**進めない** — 進めると X4 が先に押下を見たとき
-         * 次の X3 に down_edge が立たず、ダイアログのボタンが反応しない
-         * (レビュー #4 ④)。X3 が現在値と prev を比べてエッジを拾う。
-         * エッジの扱いは [`edge_x3`] のモーダル分岐 (マウスキーと共通)。 */
+        // Pump でも物理状態は観測し、モーダルへの配送だけを X3 に保留する。
         if ctx.wm_ui() {
             if down_edge {
                 edge_x3(st, mx, my, MOUSE_BTN_LEFT, true);
@@ -819,8 +824,7 @@ fn capture_mouse(st: &mut GuiState, ctx: Ctx, end_batch: bool) {
             if rup_edge {
                 edge_x3(st, mx, my, MOUSE_BTN_RIGHT, false);
             }
-            st.click_button = click_button;
-            st.prev_buttons = btn;
+            st.delivered_button = click_button;
         }
         return;
     }
@@ -840,13 +844,17 @@ fn capture_mouse(st: &mut GuiState, ctx: Ctx, end_batch: bool) {
         } else if up_edge {
             edge_x3(st, mx, my, MOUSE_BTN_LEFT, false);
         }
-        if front != st.front_id() { st.excl.mouse_baseline = true; return; }
+        if front != st.front_id() {
+            st.prev_buttons = 0;
+            st.excl.mouse_baseline = true;
+            return;
+        }
         if rdown_edge {
             edge_x3(st, mx, my, MOUSE_BTN_RIGHT, true);
         } else if rup_edge {
             edge_x3(st, mx, my, MOUSE_BTN_RIGHT, false);
         }
-        if moved && !down_edge && !up_edge && !rdown_edge && !rup_edge {
+        if pointer_motion {
             /* 移動: フォーカス窓へ Pointer (畳み込み)。
              * **動いたときだけ** — `moved` を見ないと、マウスが止まっていても
              * `wm_cycle` のたびに `Pointer` を 1 件積んでしまう。リングが空だと
@@ -857,20 +865,11 @@ fn capture_mouse(st: &mut GuiState, ctx: Ctx, end_batch: bool) {
             forward_pointer(st, mx, my, pbtn);
         }
     } else {
-        /* ポンプ (X4): 状態機械を進めず、入力の追記とカーソル移動だけ。
-         *
-         * ボタンのエッジは **WM が扱うものなら prev_buttons を進めない**
-         * (モーダルと同じ扱い、レビュー #4 ④ の一般形)。進めてしまうと X4 が
-         * 先に見たエッジは次の X3 に立たず、ドラッグ中の離しは永久に来ず
-         * (枠が残ったまま次の押下まで動き続ける)、タイトルバー / 閉じる /
-         * 背面窓への押下はアプリのクライアントへ誤配される (2026-09-06 に
-         * /api/mouse で実測: 離しが失われ、× を押すと前面化だけ起きた)。
-         * アプリの領分 (前面窓のクライアント / 枠) のエッジだけをここで配る。 */
+        // Pump は前面アプリに配れるエッジだけを処理する。
         if moved {
             cursor::move_to(st, mx, my);
         }
-        /* 左右のどちらかでも WM の領分なら **prev_buttons を進めずに戻る**。
-         * 次の X3 が両方のエッジを derive し直すので二重配送にはならない。 */
+        // WM のエッジは delivered_button を進めず、次の X3 に渡す。
         let hold_l =
             (down_edge || up_edge) && wm_owns_edge(st, mx, my, down_edge, MOUSE_BTN_LEFT);
         let hold_r =
@@ -890,13 +889,12 @@ fn capture_mouse(st: &mut GuiState, ctx: Ctx, end_batch: bool) {
         } else if rup_edge {
             release_capture(st, mx, my, MOUSE_BTN_RIGHT);
         }
-        if moved && !down_edge && !up_edge && !rdown_edge && !rup_edge {
+        if pointer_motion {
             /* X3 と同じ理由で `moved` が要る (上のコメント)。 */
             forward_pointer(st, mx, my, pbtn);
         }
     }
-    st.click_button = click_button;
-    st.prev_buttons = btn;
+    st.delivered_button = click_button;
 }
 
 /// ボタンのエッジ 1 つを X3 で処理する。**実マウスとマウスキーの共通経路**

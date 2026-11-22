@@ -90,17 +90,21 @@ def build(gshell: Path, name: str, quiet: bool = False, typical: bool = False) -
 # (名前, ファイル, 置き換え前 (ちょうど 1 か所), 置き換え後, RED になるべき試験の絞り込み)
 MUTATIONS = [
     ('chord starts client click', 'src/input.rs',
-     'let down_edge = click_button == MOUSE_BTN_LEFT && st.click_button == 0;',
-     'let down_edge = btn & MOUSE_BTN_LEFT != 0 && st.prev_buttons & MOUSE_BTN_LEFT == 0;',
+     'let down_edge = pressed & MOUSE_BTN_LEFT != 0;',
+     'let down_edge = btn & MOUSE_BTN_LEFT != 0 && changed_buttons & MOUSE_BTN_LEFT != 0;',
      'chord_client_click_and_rearm'),
     ('chord fails to rearm left', 'src/input.rs', 'if btn & MOUSE_BTN_LEFT != 0 { MOUSE_BTN_LEFT }',
      'if btn & MOUSE_BTN_LEFT != 0 { 0 }', 'chord_client_click_and_rearm'),
     ('chord loses pointer mask', 'src/input.rs', 'let pbtn = btn | st.synth_buttons;',
      'let pbtn = click_button | st.synth_buttons;', 'chord_pointer_masks'),
     ('chord activates desktop menu', 'src/input.rs',
-     'let down_edge = click_button == MOUSE_BTN_LEFT && st.click_button == 0;',
-     'let down_edge = (click_button == MOUSE_BTN_LEFT && st.click_button == 0) || '
-     '(startmenu::is_open() && btn & 1 != 0 && st.prev_buttons & 1 == 0);', 'chord_desktop_menu'),
+     'let down_edge = pressed & MOUSE_BTN_LEFT != 0;',
+     'let down_edge = (pressed & MOUSE_BTN_LEFT != 0) || '
+     '(startmenu::is_open() && btn & 1 != 0 && changed_buttons & 1 != 0);', 'chord_desktop_menu'),
+    ('Pump forgets deferred chord owner', 'src/input.rs', 'if st.prev_buttons == 0 {',
+     'if st.delivered_button == 0 {', 'chord_deferred_titlebar'),
+    ('moving chord edge emits Pointer', 'src/input.rs',
+     'changed_buttons & (MOUSE_BTN_LEFT | MOUSE_BTN_RIGHT) == 0', 'true', 'chord_pointer_masks'),
     ('retain exited foreground', 'src/multiapp.rs',
      'mm.av_owner = -1;', '', 'reused_foreground_owner_is_notified_again'),
     ('record rejected foreground', 'src/multiapp.rs',

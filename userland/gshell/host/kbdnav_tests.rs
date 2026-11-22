@@ -2618,7 +2618,10 @@ fn chord_pointer_masks() {
         let shm = mocks::Shm::new();
         let mut st = one_window(&shm);
         for mask in [2, 3, 2] {
+            clear_rings(&st);
+            mocks::MOUSE.lock().unwrap().0 += 1;
             sample_buttons(&mut st, mask, ctx);
+            assert!(!events(&st, 0).iter().any(|e| e.kind == GUI_EV_POINTER));
             clear_rings(&st);
             mocks::MOUSE.lock().unwrap().0 += 1;
             input::capture(&mut st, ctx);
@@ -2641,6 +2644,11 @@ fn chord_desktop_menu() {
     let menu = startmenu::rect();
     // Refresh closes the menu without queuing a program launch.
     *mocks::MOUSE.lock().unwrap() = ((menu.x + 5) as i16, (menu.bottom() - 5) as i16, 3);
+    // Wait が先に左押下を観測した場合も項目は作動しない。
+    for mask in [3, 2] {
+        sample_buttons(&mut st, mask, input::Ctx::Wait);
+        assert!(startmenu::is_open());
+    }
     for mask in [3, 2, 0] {
         sample_buttons(&mut st, mask, input::Ctx::Pump);
         input::capture(&mut st, input::Ctx::Wait);
@@ -2649,4 +2657,24 @@ fn chord_desktop_menu() {
     sample_buttons(&mut st, 1, input::Ctx::Wait);
     assert!(!startmenu::is_open());
     sample_buttons(&mut st, 0, input::Ctx::Wait);
+}
+
+#[test]
+fn chord_deferred_titlebar() {
+    mocks::init();
+    let shm = mocks::Shm::new();
+    let mut st = one_window(&shm);
+    let (x, y) = titlebar_point(&st);
+    park_pointer(&mut st, x, y);
+    for mask in [1, 3] {
+        sample_buttons(&mut st, mask, input::Ctx::Pump);
+    }
+    *mocks::MOUSE.lock().unwrap() = (5, 5, 2);
+    input::capture(&mut st, input::Ctx::Pump);
+    input::capture(&mut st, input::Ctx::Wait);
+    assert!(!crate::startmenu::is_open());
+    sample_buttons(&mut st, 0, input::Ctx::Pump);
+    sample_buttons(&mut st, 2, input::Ctx::Wait);
+    assert!(crate::startmenu::is_open());
+    crate::startmenu::close(&mut st);
 }
