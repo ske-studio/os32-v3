@@ -3,6 +3,7 @@
 #include "boot_names.h"
 #include "boot_disk.h"
 #include "pci_resources.h"
+#include "usb_probe.h"
 #include "boot_display.h"
 #include "../../drivers/input/kbd.h"
 #include "../../drivers/input/mouse.h"
@@ -212,6 +213,7 @@ static void pc98_boot_resources(const struct boot_context *ctx)
      * メモリ BAR をここで資源表へ RAW (採取値、予約権限なし) として取り込む。
      * 実機では [pci] の行のメモリ BAR の本数と raw= が一致し ovf=0 のこと。 */
     pc98_boot_pci_resources();
+    pc98_usb_early_quiesce();
 }
 
 static void pc98_boot_nic_legacy(const struct boot_context *ctx)
