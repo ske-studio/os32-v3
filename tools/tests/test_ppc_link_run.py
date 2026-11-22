@@ -30,6 +30,10 @@ def probe(source):
     records = [dict(seq=i, drop_records=0, drop_bytes=0) for i in range(3)]
     body = b'KBOOT OF-CAPTURE\nother boot logs\nLINK HEAP used=123\n'
     assert log(records, body)
+    shell = b'Loading /sys/shell.bin\n'
+    assert log(records, shell, product=True)
+    assert not log(records, body, product=True)
+    assert not log(records, shell)
     assert not log(records, b'KBOOT OF-CAPTURE\n')
     assert not log(records, b'LINK HEAP used=123\nKBOOT OF-CAPTURE\n')
     assert not log(records, body[:-1])
@@ -87,6 +91,7 @@ def probe(source):
 def run(ctx):
     source = (ctx.root / 'tools/ppc/link_run.py').read_text()
     mutations = [
+        ('if product:', 'if False:'),
         ("[r['seq'] for r in logs] == list(range(len(logs)))", 'True'),
         ("r['drop_records'] == r['drop_bytes'] == 0", 'True'),
         ('sum(n - 1 for n in counts.values())', '0'),

@@ -9,6 +9,7 @@ A build failure, QEMU startup failure, timeout or any other verdict is a test
 error (non-zero exit), never a RED. Evidence is kept under $TMPDIR/kboot-accept/.
 """
 import argparse
+import hashlib
 import os
 from pathlib import Path
 import struct
@@ -102,6 +103,7 @@ def mutant_settings(work, name, source, before, after):
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument('--mutate', action='store_true')
+    parser.add_argument('--build-only', action='store_true')
     parser.add_argument('--cpu', choices=['7450', '7455', 'both'], default='both')
     args = parser.parse_args()
     started = time.monotonic()
@@ -110,6 +112,14 @@ def main():
     work = Path(tempfile.mkdtemp(prefix='run-', dir=base))
     cpus = ['7450', '7455'] if args.cpu == 'both' else [args.cpu]
     elf = build(work/'kernel', 'KBOOT_LINK=0')
+    digests = {hashlib.sha256(elf.read_bytes()).digest()}
+    def distinct(image):
+        digest = hashlib.sha256(image.read_bytes()).digest()
+        if digest in digests:
+            raise RuntimeError('duplicate image: '+str(image))
+        digests.add(digest)
+    if args.build_only:
+        cpus = []
     skipped = False
     for cpu in cpus:
         evidence = meter.accept(elf, cpu, 60, work/('normal-'+cpu))
@@ -121,6 +131,7 @@ def main():
         print('GREEN LAN OFF '+cpu, flush=True)
     for name, number in KERNEL_NEGATIVES.items():
         negative = build(work/name, 'KBOOT_LINK=0', 'NEGATIVE='+str(number))
+        distinct(negative)
         for cpu in cpus:
             meter.accept(negative, cpu, 30, work/(name+'-'+cpu), name)
             print('GREEN negative '+name+' '+cpu, flush=True)
@@ -129,6 +140,9 @@ def main():
         for name, source, before, after, expected, evidence_line in KERNEL_MUTATIONS:
             mutant = build(work/('mutant-'+name), 'KBOOT_LINK=0',
                            *mutant_settings(work, name, source, before, after))
+            distinct(mutant)
+            if args.build_only:
+                continue
             guest = work/('mutant-'+name+'-guest')
             try:
                 meter.accept(mutant, '7450', 60, guest)
@@ -155,6 +169,9 @@ def main():
                 raise RuntimeError(f'{name}: audit did not report "{finding}"\n'+output[-1500:])
             print(f'RED audit {name}: {finding}', flush=True)
             red += 1
+    if args.build_only:
+        print(f'{len(digests)} distinct kernel images')
+        return 0
     print(f'PASS kernel acceptance: {len(cpus)} CPU GREEN, {len(KERNEL_NEGATIVES)} negatives, '
           f'{red} product/audit RED, evidence={work} elapsed={time.monotonic()-started:.1f}s')
     if skipped:

@@ -51,6 +51,9 @@ def verify_handoff(lines, resident_end, frame_end):
     assert gap == 0 and covered('available', end, STAGING_BASE)
     assert all(b <= STAGING_BASE or a >= frame_end for a, b in ranges['available'])
     assert covered('available', frame_end, 0xf00000)
+    detach, = [i for i, line in enumerate(lines) if re.fullmatch(r'KBOOT OF-OFF calls=\d+', line)]
+    mmu, = [i for i, line in enumerate(lines) if line.startswith('KBOOT MMU-D ')]
+    assert detach < mmu, 'OF detach must precede the MMU observation'
     pa, size = fields(r'KBOOT MMU-D root=0x[0-9a-fA-F]+ hpt=0x([0-9a-fA-F]+) bytes=(\d+) ram_bat=\d+')
     hpt, size = int(pa, 16), int(size)
     assert size == 0x20000 and hpt % size == 0 and 0x1000000 <= hpt <= 0x2000000 - size
@@ -63,14 +66,13 @@ def observe(elf, cpu, folder, expected, resident_end, frame_end):
     try:
         session.start()
         def lines():
-            return serial.read_text(errors='replace').splitlines() if serial.exists() else []
+            text = serial.read_text(errors='replace') if serial.exists() else ''
+            return text[:text.rfind('\n')+1].splitlines()
         marker = 'KBOOT SHELL-LAYOUT ' + expected
         session.wait(lambda: marker in lines(), marker, 60)
         output = lines()
         index = output.index(marker)
         verify_handoff(output[:index], resident_end, frame_end)
-        if not any(line.startswith('KBOOT OF-OFF calls=') for line in output[:index]):
-            raise RuntimeError('missing preceding detach milestone')
     finally:
         session.close()
 

@@ -6,23 +6,11 @@ from pathlib import Path
 import subprocess
 import tempfile
 
-CHECK = dict(name='ppc-kboot-console', budget=5, needs=[], covers=[
-    'platform/powermac/kboot_console.c', 'platform/powermac/log.c',
-    'platform/powermac/kboot_log.h', 'platform/powermac/escc.c',
-    'platform/powermac/ofw.h', 'platform/powermac/platform_of_layout.h',
-    'arch/ppc/ppc_boot.h', 'include/console.h', 'include/kprintf.h',
-    'include/types.h', 'include/callconv.h', 'lib/kstring.h',
-    'lib/kstring_c.c', 'lib/kprintf.c', 'sdk/include/os32/os32_kapi_shared.h',
-    'sdk/include/os32/os32_kapi_generated.h',
-    'sdk/include/os32/os32_ver_info.h', 'sdk/include/os32/os32_host_notice.h',
-    'sdk/include/os32/os32_generations.h', 'sdk/include/os32/os32_surface.h',
-    'sdk/include/os32/os32_ls.h',
-    'tools/ppc/kboot_console.py', 'tools/ppc/kboot_console_host.c',
-    'build/arch/ppc.mk'])
 ROOT = Path(__file__).resolve().parents[2]
-UNITS = ['platform/powermac/kboot_console.c', 'platform/powermac/log.c',
+UNITS = ['platform/powermac/kboot_console.c', 'platform/powermac/log_printf.c', 'platform/powermac/log.c',
          'platform/powermac/escc.c', 'lib/kprintf.c', 'lib/kstring_c.c']
 MUTATIONS = [
+    ('sink-continuation', 'add_sat(&stats[i].dropped, n);', 'add_sat(&stats[i].dropped, n); return;', 46, 'REACHED sink continuation'),
     ('write-length', 'pm_log_write(buf, size);', 'pm_log_write(buf, size + 1);', 41, 'REACHED write-length'),
     ('string-end', 'kstrlen(str), color', 'kstrlen(str) + 1, color', 42, 'REACHED string-end'),
     ('lf-expansion', 'pm_log_write(buf, size);',
@@ -31,28 +19,60 @@ MUTATIONS = [
      'int console_get_cursor_x(void) { return 0; }', 44, 'REACHED screen-success'),
 ]
 INCLUDES = ['-I' + str(ROOT / p) for p in
-            ('include', 'lib', 'arch/ppc', 'platform/powermac')]
+            ('.', 'include', 'lib', 'arch/ppc', 'platform/powermac')]
 FLAGS = ['-std=gnu11', '-O2', '-ffreestanding', '-fno-builtin', '-fno-pie',
          '-fno-stack-protector', '-Wall', '-Wextra', '-Werror']
 
 
 def exercise(directory, name, before=None, after=None):
-    source = (ROOT / UNITS[0]).read_text()
+    unit = 'platform/powermac/log.c' if name == 'sink-continuation' else UNITS[0]
+    source = (ROOT / unit).read_text()
     if before is not None:
         assert source.count(before) == 1, 'mutation anchor must be unique'
         source = source.replace(before, after, 1)
-    copy = directory / 'kboot_console.c'
+    copy = directory / Path(unit).name
     copy.write_text(source)
     binary = directory / name
-    subprocess.run(['gcc', '-m32', *FLAGS, '-no-pie', '-nostdlib', '-static',
+    subprocess.run(['gcc', '-m32', *compiler_headers('gcc'), *FLAGS, '-no-pie', '-nostdlib', '-static',
                     *INCLUDES, str(copy),
-                    *(str(ROOT / p) for p in UNITS[1:]),
+                    *(str(ROOT / p) for p in UNITS if p != unit),
                     str(ROOT / 'tools/ppc/kboot_console_host.c'), '-o', str(binary)],
                    check=True, timeout=60)
     result = subprocess.run(['qemu-i386', str(binary)], timeout=10, capture_output=True, text=True)
     # Only the specific fixture assertion exit is RED. Signals, timeout,
     # compile errors, and other assertion failures are infrastructure/test errors.
     return result
+
+
+def compiler_headers(cc):
+    headers = subprocess.check_output([cc, '-print-file-name=include'], text=True).strip()
+    return ['-nostdinc', '-isystem', headers]
+
+
+def check_format(directory, mutate):
+    source = (ROOT / 'platform/powermac/log_printf.c').read_text()
+    cases = [('baseline', source, 0)]
+    if mutate:
+        anchor = 'pm_log_write(bytes, n);'
+        assert source.count(anchor) == 1
+        for name, replacement, rc in [
+                ('length', 'pm_log_write(bytes, n + 1);', 51),
+                ('terminal', 'console_write(bytes, n, color);', 52)]:
+            cases.append((name, '#include "console.h"\n' + source.replace(anchor, replacement), rc))
+    cross = Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc')) / 'bin/powerpc-elf-gcc'
+    for cc, runner, abi in [('gcc', 'qemu-i386', ['-no-pie']),
+                            (str(cross), 'qemu-ppc', ['-mcpu=7450', '-msdata=none', '-D__cdecl='])]:
+        for name, adapter, expected in cases:
+            copy = directory / 'adapter.c'
+            copy.write_text(adapter)
+            binary = directory / (runner + '-' + name)
+            subprocess.run([cc, '-m32', *abi, *compiler_headers(cc), *FLAGS, '-nostdlib',
+                            '-static', '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections',
+                            *INCLUDES, str(copy), str(ROOT/'lib/kprintf.c'), str(ROOT/'lib/kstring_c.c'),
+                            str(ROOT/'tools/ppc/kboot_format_host.c'), '-o', str(binary)], check=True)
+            rc = subprocess.run([runner, binary], timeout=10).returncode
+            assert rc == expected, (runner, name, rc, expected)
+            print(runner, name, 'rc', rc)
 
 
 def cross_audit(directory):
@@ -103,6 +123,7 @@ def main():
         target = args.cross_dir or directory
         target.mkdir(parents=True, exist_ok=True)
         cross_audit(target)
+        check_format(directory, args.mutate)
     return 0
 
 

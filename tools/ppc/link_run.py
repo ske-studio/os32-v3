@@ -28,9 +28,11 @@ from host_agent import HostAgent
 from host_operator_socket import OperatorSocket
 PREFIX = str(Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc')) / 'bin/powerpc-elf-')
 
-def log_ready(logs, body):
+def log_ready(logs, body, product=False):
     require([r['seq'] for r in logs] == list(range(len(logs))), 'LOG sequence from zero')
     require(all(r['drop_records'] == r['drop_bytes'] == 0 for r in logs), 'LOG drop')
+    if product:
+        return b"Loading /sys/shell.bin" in body
     start, end = body.find(b'KBOOT OF-CAPTURE'), body.find(b'LINK HEAP used=')
     return 0 <= start < end and b'\n' in body[end:]
 
@@ -76,6 +78,9 @@ def accept(elf, cpu, parent, timeout, require_ack=False, diagnostic=None):
     symbols = {p[2]: int(p[0], 16) for line in
                command([PREFIX+'nm', '-n', elf]).splitlines()
                if len(p := line.split()) == 3}
+    product = 'pm_root_boot' in symbols and 'kboot_ready_tb' not in symbols
+    if not product:
+        require('kboot_ready_tb' in symbols, 'missing diagnostic READY observation')
     for name in ('link_hello_ok', 'pm_link_time_ok', 'alive_state',
                  'reached', 'kmalloc_peak_bytes', 'tick_count'):
         require(name in symbols, 'missing link observation '+name)
@@ -163,7 +168,9 @@ def accept(elf, cpu, parent, timeout, require_ack=False, diagnostic=None):
                     if logs:
                         require(len(logfiles) == 1 and re.fullmatch(r'[0-9a-f]{32}', logfiles[0].stem), 'LOG boot')
                     body = logfiles[0].with_suffix('.log').read_bytes() if logs else b''
-                    ready = log_ready(logs, body)
+                    ready = log_ready(logs, body, product)
+                    if not product:
+                        ready = ready and b'KBOOT ALIVE tick_delta=' in body
                     if diagnostic is not None: ready = diagnostic(agent, out) and ready
                     if agent.established and time.monotonic() >= next_observe:
                         next_observe = time.monotonic() + 0.5
@@ -171,9 +178,15 @@ def accept(elf, cpu, parent, timeout, require_ack=False, diagnostic=None):
                         try:
                             tick = word('tick_count')
                             regs = q.call('human-monitor-command', {'command-line': 'info registers'})
-                            tb = re.search(r'TB\s+([0-9a-fA-F]+)\s+(\d+)', regs)
+                            tb = re.search(r'TB\s+(\d+)\s+(\d+)', regs)
                             require(tb is not None, 'unreadable TB')
-                            samples.append(dict(tick=tick, tb=(int(tb[1], 16) << 32) | int(tb[2])))
+                            now = (int(tb[1]) << 32) | int(tb[2])
+                            samples.append(dict(tick=tick, tb=now))
+                            if ready and not product:
+                                start = (word('kboot_ready_tb') << 32) | word('kboot_ready_tb', 4)
+                                rate = re.search(rb'KBOOT OF-CAPTURE [^\n]*tb_hz=(\d+)', body)
+                                require(rate and int(rate[1]) > 0 and 0 < start <= now - 2*int(rate[1]),
+                                        'link QMP READY duration')
                             hello, done = word('link_hello_ok'), word('pm_link_time_ok')
                             alive, marks = word('alive_state', 8), word('reached')
                             peak = word('kmalloc_peak_bytes')
