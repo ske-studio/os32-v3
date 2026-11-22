@@ -67,6 +67,7 @@ def link_accept(elf, cpu, out, mutant=False, pressure=False):
     s = OutputSession(elf, cpu, out, 120)
     try:
         s.start(); s.wait(s.ready, 'RSH READY', 60)
+        require('Loading /sys/shell.bin' not in s.screen('ready'), 'shell loading on framebuffer at READY')
         if pressure:
             s.wait(lambda: s.retries >= 2, 'foreground LOG retries before command')
         actual = rsh_command(s, '/bin/outprobe.bin')

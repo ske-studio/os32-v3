@@ -40,6 +40,8 @@ PATTERNS = [
 ]
 
 
+PRODUCT_QUIET_STAGES = {pattern.partition(' ')[0] for pattern in PATTERNS}
+
 ROOT_PATTERNS = [
     r'ROOT rc=(-?\d+) registered=([01]) bytes=(\d+) staging_pages=(\d+)',
     r'ROOT owner_before=(\d+) owner_after=(\d+) free_before=(\d+) free_after=(\d+)',
@@ -49,7 +51,11 @@ ROOT_PATTERNS = [
 def validate_root(a, b, complete=False):
     require('KBOOT' not in b, 'serial B contains KBOOT')
     require(not re.search(r'FAIL|FATAL|UNSUPPORTED', a+b), 'forbidden diagnostic')
-    lines = [line for line in a[:a.rfind('\n')+1].splitlines() if line.startswith('KBOOT ROOT')]
+    complete_lines = a[:a.rfind('\n')+1].splitlines()
+    for line in complete_lines:
+        if line.startswith('KBOOT ') and line[6:].partition(' ')[0] in PRODUCT_QUIET_STAGES:
+            raise CriterionFailure('unexpected product diagnostic: '+line)
+    lines = [line for line in complete_lines if line.startswith('KBOOT ROOT')]
     require(len(lines) <= len(ROOT_PATTERNS), 'duplicate ROOT milestone')
     values = []
     for line, pattern in zip(lines, ROOT_PATTERNS):

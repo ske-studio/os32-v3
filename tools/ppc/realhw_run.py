@@ -21,7 +21,7 @@ import urllib.request
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import ppc_lan_host as lan
 from sc_run import EXPECTED, LINK_NEST_EXPECTED, check_shell
-from kboot_run import validate
+from kboot_run import validate_root
 from ppc_link_transport import Host as LinkHost
 from sd_run import exact
 
@@ -124,7 +124,7 @@ def assess_link(case, evidence, pcap, peer, command='', expected=''):
     if len({r['boot'] for r in logs}) != 1:
         raise RuntimeError('LOG boot changed')
     body = b''.join(base64.b64decode(r['text_b64'], validate=True) for r in logs)
-    validate(body.decode('ascii'), '', True)
+    validate_root(body.decode('ascii', errors='replace'), '', complete=True)
     guest = lan.mac(peer)
     hellos, session, last = set(), None, None
     calls, responses, tx0 = set(), {}, 0
