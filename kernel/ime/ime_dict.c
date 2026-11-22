@@ -707,12 +707,12 @@ static const char STORE_EXACT[] =
     "AND (?2 IS NULL OR (COALESCE(cost,0),rowid) > "
     "(SELECT COALESCE(cost,0),rowid FROM dict WHERE rowid=?2)) "
     "ORDER BY COALESCE(cost,0),rowid LIMIT 32";
+/* Prefix cursors stream the indexed reading range. Return both halves of
+ * each integer sort key through the module's 32-bit column_int facade. */
 static const char STORE_PREFIX[] =
-    "SELECT kanji,pos_id,CASE WHEN yomi=?1 THEN cost-500 ELSE cost END AS score,rowid "
-    "FROM dict WHERE yomi>=?1 AND yomi<?1 || X'EFBFBF' AND kanji IS NOT NULL "
-    "AND (?2 IS NULL OR (COALESCE(score,0),rowid) > (SELECT "
-    "COALESCE(CASE WHEN yomi=?1 THEN cost-500 ELSE cost END,0),rowid FROM dict WHERE rowid=?2)) "
-    "ORDER BY COALESCE(score,0),rowid LIMIT 32";
+    "SELECT kanji,pos_id,score,score>>32,score,id>>32,id FROM "
+    "(SELECT kanji,pos_id,CASE WHEN yomi=?1 THEN cost-500 ELSE cost END AS score,rowid AS id "
+    "FROM dict WHERE yomi>=?1 AND yomi<?1 || X'EFBFBF' AND kanji IS NOT NULL)";
 /* Complement turns descending integer timestamps into ascending seek keys. */
 static const char USER_EXACT[] =
     "SELECT kanji,0,-10000-freq,rowid,COALESCE(~last_ts,9223372036854775807) AS rank "
@@ -722,13 +722,10 @@ static const char USER_EXACT[] =
     "FROM dict_user WHERE rowid=?2)) "
     "ORDER BY rank,-COALESCE(freq,0),kanji,rowid LIMIT 32";
 static const char USER_PREFIX[] =
-    "SELECT kanji,0,-10000-freq,rowid,COALESCE(CASE WHEN yomi=?1 THEN ~last_ts END,"
-    "9223372036854775807) AS prefix_rank FROM dict_user "
-    "WHERE yomi>=?1 AND yomi<?1 || X'EFBFBF' AND kanji IS NOT NULL "
-    "AND (?2 IS NULL OR (prefix_rank,-COALESCE(freq,0),kanji,rowid) > "
-    "(SELECT COALESCE(CASE WHEN yomi=?1 THEN ~last_ts END,9223372036854775807),"
-    "-COALESCE(freq,0),kanji,rowid FROM dict_user WHERE rowid=?2)) "
-    "ORDER BY prefix_rank,-COALESCE(freq,0),kanji,rowid LIMIT 32";
+    "SELECT kanji,0,-10000-freq,rank>>32,rank,frequency_key>>32,frequency_key FROM "
+    "(SELECT kanji,freq,COALESCE(CASE WHEN yomi=?1 THEN ~last_ts END,"
+    "9223372036854775807) AS rank,-COALESCE(freq,0) AS frequency_key FROM dict_user "
+    "WHERE yomi>=?1 AND yomi<?1 || X'EFBFBF' AND kanji IS NOT NULL)";
 
 static int store_prepare(FepConn *c, int user)
 {
@@ -943,14 +940,108 @@ static int store_ready(FepStore *s, int user)
     return rc == 0;
 }
 
+typedef struct {
+    long long major, minor;
+    char *text;
+    int cost, pos;
+} PrefixCandidate;
+
+static long long prefix_key(sqlite3_stmt *stmt, int high)
+{
+    return (long long)sqlite3_column_int(stmt, high) * 4294967296LL +
+           (u32)sqlite3_column_int(stmt, high + 1);
+}
+
+static int prefix_before(const PrefixCandidate *a, const PrefixCandidate *b)
+{
+    if (a->major != b->major) return a->major < b->major;
+    if (a->minor != b->minor) return a->minor < b->minor;
+    return kstrcmp(a->text, b->text) < 0;
+}
+
+/* Keep only the best distinct spellings seen so far. A better occurrence
+ * replaces the old spelling. Learned results occupy a fixed leading slice
+ * while the system cursor fills the remaining slots. */
+static int prefix_insert(PrefixCandidate *best, int first, int *count, int max,
+                         sqlite3_stmt *stmt)
+{
+    PrefixCandidate row = {
+        .major = prefix_key(stmt, 3), .minor = prefix_key(stmt, 5),
+        .text = (char *)sqlite3_column_text(stmt, 0),
+        .cost = sqlite3_column_int(stmt, 2), .pos = sqlite3_column_int(stmt, 1)
+    };
+    if (!row.text) return SQLITE_NOMEM;
+    if (*count == max && !prefix_before(&row, &best[max - 1])) return SQLITE_OK;
+    int slot = 0;
+    while (slot < *count && kstrcmp(row.text, best[slot].text)) slot++;
+    if (slot < *count) {
+        if (slot < first || !prefix_before(&row, &best[slot])) return SQLITE_OK;
+        row.text = best[slot].text;
+    } else {
+        u32 bytes = kstrlen(row.text) + 1;
+        char *copy = kzalloc(bytes);
+        if (!copy) return SQLITE_NOMEM;
+        kmemcpy(copy, row.text, bytes);
+        row.text = copy;
+        if (slot == max) kfree(best[--slot].text);
+        else (*count)++;
+    }
+    while (slot > first && prefix_before(&row, &best[slot - 1])) {
+        best[slot] = best[slot - 1];
+        slot--;
+    }
+    best[slot] = row;
+    return SQLITE_OK;
+}
+
+static int store_prefix_once(FepStore *s, const char *yomi, IME_Result *out,
+                             int max, int use_user, int *failed)
+{
+    PrefixCandidate best[IME_MAX_RESULTS];
+    int count = 0, len = (int)kstrlen(yomi);
+    *failed = 0;
+    for (int user = use_user; user >= 0 && count < max; user--) {
+        sqlite3_stmt *stmt = user ? s->user.prefix : s->system.prefix;
+        int first = count;
+        int rc = sqlite3_bind_text(stmt, 1, yomi, len, SQLITE_STATIC);
+        if (rc == SQLITE_OK) {
+            while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
+                rc = prefix_insert(best, first, &count, max, stmt);
+                if (rc != SQLITE_OK) break;
+            }
+        }
+        int reset = sqlite3_reset(stmt);
+        int clear = sqlite3_bind_null(stmt, 1);
+        if (rc == SQLITE_DONE) rc = reset == SQLITE_OK ? clear : reset;
+        if (rc != SQLITE_OK) {
+            *failed = is_ioerr(rc) ? user + 1 : (user ? 4 : 5);
+            break;
+        }
+    }
+    for (int i = 0; i < count; i++) {
+        if (!*failed) {
+            kstrncpy(out[i].kanji, best[i].text, sizeof(out[i].kanji));
+            user_display_copy(out[i].yomi, yomi, sizeof(out[i].yomi));
+            out[i].pos_id = (u16)best[i].pos;
+            int cost = best[i].cost;
+            if (cost >= 0 && kstrlen(out[i].kanji) >= (u32)len)
+                cost += IME_NONSHORTENING_COST_PENALTY;
+            out[i].cost = (u16)cost;
+        }
+        kfree(best[i].text);
+    }
+    return *failed ? 0 : count;
+}
+
 /* Both cursors retain their current SQL row until selected. No pointer from
  * one cursor is used after stepping/resetting that cursor. */
 static int store_search_once(FepStore *s, const char *yomi, IME_Result *out,
                              int max, int use_user, int *failed)
 {
-    int prefix = utf8_strlen((const u8 *)yomi) > 2;
-    sqlite3_stmt *sys = prefix ? s->system.prefix : s->system.exact;
-    sqlite3_stmt *usr = use_user ? (prefix ? s->user.prefix : s->user.exact) : 0;
+    if (utf8_strlen((const u8 *)yomi) > 2)
+        return store_prefix_once(s, yomi, out, max, use_user, failed);
+    sqlite3_stmt *sys = s->system.exact;
+    sqlite3_stmt *usr = use_user ? s->user.exact : 0;
     sqlite3_stmt *cursors[] = { sys, usr };
     int state[] = { SQLITE_DONE, SQLITE_DONE };
     int page_rows[2] = {0};

@@ -22,7 +22,7 @@ MUTANTS = [
      'ORDER BY rank,-COALESCE(freq,0)', 'ORDER BY -COALESCE(freq,0)',
      'latest confirmed spelling leads'),
     ('ignore-confirm-order', 'kernel/ime/ime_dict.c',
-     'ORDER BY prefix_rank,-COALESCE(freq,0)', 'ORDER BY -COALESCE(freq,0)',
+     'CASE WHEN yomi=?1 THEN ~last_ts END', 'CASE WHEN yomi=?1 THEN 0 END',
      'latest confirmed spelling leads'),
     ('convert-old-owner', 'kernel/ime/ime_convert.inc',
      'fep_store_search(&g_ime.store,', 'ime_dict_search(&g_ime.dict,', 'production conversion'),

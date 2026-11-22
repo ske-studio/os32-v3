@@ -90,6 +90,13 @@ int main(void)
             "INSERT INTO dict VALUES('か','低',9,-20000);"
             "INSERT INTO dict VALUES('かなか','前',10,800);"
             "INSERT INTO dict VALUES('かなかい','先',11,400);");
+    /* Two pages of one spelling precede enough distinct spellings to fill the list. */
+    char insert[120];
+    for (int i = 0; i < 96; i++) {
+        snprintf(insert, sizeof(insert), "INSERT INTO dict VALUES('scan','word%02d',1,%d)",
+                 i > 64 ? i - 64 : 0, i);
+        sql(db, insert);
+    }
     CHECK(setup_close(db) == SQLITE_OK);
     /* Boot supplies the accepted metadata even when settings reserve less. */
     s.boot_reserve_kb = FEP_DICT_MIN_RESERVE_KB;
@@ -120,6 +127,21 @@ int main(void)
     CHECK(!strcmp(out[2].kanji, "蚊") && out[2].cost == 310);
     CHECK(fep_store_search(&s, "かなか", out, IME_MAX_RESULTS) == 2);
     CHECK(!strcmp(out[0].kanji, "前") && out[0].cost == 300);
+    for (int i = 0; i < 65; i++) {
+        snprintf(insert, sizeof(insert), "INSERT INTO dict_user VALUES('scan%02d','word00',1,0)", i);
+        sql(s.user.db, insert);
+    }
+    sqlite3_stmt_status(s.system.prefix, SQLITE_STMTSTATUS_RUN, 1);
+    sqlite3_stmt_status(s.user.prefix, SQLITE_STMTSTATUS_RUN, 1);
+    CHECK(fep_store_search(&s, "scan", out, IME_MAX_RESULTS) == IME_MAX_RESULTS);
+    CHECK(sqlite3_stmt_status(s.system.prefix, SQLITE_STMTSTATUS_RUN, 0) == 1);
+    CHECK(sqlite3_stmt_status(s.user.prefix, SQLITE_STMTSTATUS_RUN, 0) == 1);
+    for (int i = 0; i < IME_MAX_RESULTS; i++) {
+        char word[16];
+        snprintf(word, sizeof(word), "word%02d", i);
+        CHECK(!strcmp(out[i].kanji, word) && out[i].pos_id == (i ? 1 : 0));
+    }
+    sql(s.user.db, "DELETE FROM dict_user WHERE kanji='word00'");
     no_borrow(&s.system); no_borrow(&s.user);
     CHECK(fep_store_user_list(&s, "か", entries, 4) == 1);
     CHECK(entries[0].freq == 1 && !strcmp(entries[0].kanji, "同"));
