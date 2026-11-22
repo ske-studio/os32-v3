@@ -1,9 +1,9 @@
 CHECK = dict(name='ppc-module-guest', tier=2, needs=[], budget=1200,
     env=['ppc-cross', 'qemu-ppc', 'socket'], full_only=True,
-    covers=['tools/accept/ppc_module.py', 'tools/accept/ppc_shm.py', 'tools/tests/ppc_module/*',
+    covers=['tools/checks/ppc-module-guest.py', 'tools/accept/ppc_module.py', 'tools/accept/ppc_shm.py', 'tools/tests/ppc_module/*',
             'tools/ppc/**', 'tools/*.py', 'tools/prototypes/sqlite_imports.def', 'Makefile', 'build/**', 'sdk/**', 'arch/ppc/**',
             'platform/powermac/**', 'kernel/**', 'include/**', 'lib/**', 'fs/**', 'mm/**',
-            'drivers/**', 'userland/**', 'net/**', 'kapi/**', 'assets/fonts/**'],
+            'exec/**', 'init/**', 'input/**', 'gfx/**', 'sound/**', 'drivers/**', 'userland/**', 'net/**', 'kapi/**', 'assets/fonts/**'],
     basis=['docs/design/platform/powermac/root_pair.md'],
     env_limit='Requires mac99 QEMU and loopback sockets for link-sh.')
 
