@@ -24,12 +24,12 @@ def exercise(work, mutation):
         dest = work / name
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(ROOT / name, dest)
-    generator = work / 'tools/gen_sqlite_imports.py'
     if mutation:
-        source = generator.read_text()
-        anchor = "set(includes).union(doc.get('contracts', []))"
+        filename, anchor, replacement = mutation
+        path = work / filename
+        source = path.read_text()
         assert source.count(anchor) == 1
-        generator.write_text(source.replace(anchor, mutation))
+        path.write_text(source.replace(anchor, replacement))
     definition = work / 'tools/prototypes/fep_imports.def'
     definition.parent.mkdir()
     definition.write_text(json.dumps(dict(schema=1, contracts=['ops.h'], imports=[
@@ -51,6 +51,10 @@ def exercise(work, mutation):
     (work / 'ops.h').write_text('struct ops { long value; };\n')
     assert build()['module_abi_gen'] != after['module_abi_gen'], 'stale facade'
     assert after['module_abi_gen'] != before['module_abi_gen']
+    (work / 'out/fep_imports.d').unlink()
+    (work / 'provider.h').write_text('short sample(int value);\n')
+    assert build()['imports'][0]['signature'] == 'short sample(int value);', 'lost depfile'
+    assert (work / 'out/fep_imports.d').is_file()
 
 
 def run(ctx):
@@ -67,8 +71,13 @@ if __name__ == '__main__':
     with tempfile.TemporaryDirectory() as directory:
         exercise(Path(directory), None)
     if args.mutate:
-        for mutant, reason in [("doc['contracts']", 'stale signature'),
-                               ('includes', 'stale facade')]:
+        generator = 'tools/gen_sqlite_imports.py'
+        inputs = "set(includes).union(doc.get('contracts', []))"
+        for mutant, reason in [
+                ((generator, inputs, "doc['contracts']"), 'stale signature'),
+                ((generator, inputs, 'includes'), 'stale facade'),
+                (('build/fep-common.mk', '$(FEP_GEN) $(FEP_OUT)/fep_imports.d &:',
+                  '$(FEP_GEN) &:'), 'lost depfile')]:
             with tempfile.TemporaryDirectory() as directory:
                 try:
                     exercise(Path(directory), mutant)
@@ -77,4 +86,4 @@ if __name__ == '__main__':
                         raise
                     print('RED', reason)
                 else:
-                    raise AssertionError('surviving mutant: ' + mutant)
+                    raise AssertionError(f'surviving mutant: {mutant}')
