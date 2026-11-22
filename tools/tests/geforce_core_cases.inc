@@ -83,6 +83,9 @@ static i32 wm_notice(u32 op,u32 arg,int owner)
     wm_pending=1; return 0;
 }
 static i32 (*g_gui_handler)(u32,u32,int)=wm_notice;
+u32 appslot_gui_draw_enter(void) { return 0; }
+void appslot_gui_draw_leave(u32 previous) { (void)previous; }
+void appslot_gui_registration(int active) { (void)active; }
 void ring3_wm_enter(void) {}
 void ring3_wm_leave(void) {}
 #include "geforce_gui_notice.inc"

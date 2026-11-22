@@ -20,6 +20,7 @@ int appslot_park_check(void)
 
 static void appslot_park_finish(AppSlot *a, int state)
 {
+    appslot_gui_draw_leave(0);
     a->in_op_wait = 0;
     a->state = state;
     g_cur_op_is_wait = 0;

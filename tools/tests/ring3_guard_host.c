@@ -63,6 +63,9 @@ void *kmemset(void *dst, int c, u32 n)
 
 /* exec/appslot.c の OP_WAIT の控え — 呼ばれた回数だけ見る。 */
 static int host_op_enter, host_op_leave;
+u32 appslot_gui_draw_enter(void) { return 0; }
+void appslot_gui_draw_leave(u32 previous) { (void)previous; }
+void appslot_gui_registration(int active) { (void)active; }
 void appslot_gui_op_enter(int is_wait) { (void)is_wait; host_op_enter++; }
 void appslot_gui_op_leave(void) { host_op_leave++; }
 static int host_trim_calls;

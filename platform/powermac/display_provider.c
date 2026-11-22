@@ -136,7 +136,7 @@ void display_provider_public_init_ok(void)
 int display_provider_present_ok(void)
 {
     struct gfx2_adapter *a = gfx2_active();
-    return present_owner && present_owner == appslot_cur() &&
+    return present_owner && present_owner == appslot_present_owner() &&
            a && present_generation == a->gen;
 }
 
