@@ -1,4 +1,7 @@
 #include "usb_resident.h"
+#include "usb_probe.h"
+#include "drivers/usb/ohci_priv.h"
+#include "kprintf.h"
 #include "drivers/pci/pci.h"
 #include "drivers/pci/pci_barsize.h"
 #include "drivers/usb/ohci_regs.h"
@@ -6,7 +9,8 @@
 
 static unsigned regs[64], cards, maps, starts, services, registered, refs, bad;
 static int fail_register, refuse_detach;
-static irq_handler_fn handler;
+static unsigned stuck_bm, usb_pending = 1, peer_calls;
+static irq_handler_fn peer, handler;
 static void *argument;
 static struct module_record record = {.owner=17};
 
@@ -47,7 +51,21 @@ int usbp_cfg_cmd(const struct usb_pci_fn *f, u16 set, u16 clear)
         regs[OHCI_COMMAND_STATUS/4] == OHCI_CMD_OCR) return 0;
     return set == PCI_CMD_MEM_ENABLE && !clear ? 0 : -1;
 }
-static int isr(void *arg) { return ((struct usb_hc *)arg)->pci.fn == 0; }
+u32 pci_cfg_read32(u32 bus, u32 dev, u32 fn, u32 reg)
+{
+    if (bus || dev != 13 || reg != PCI_CFG_COMMAND) bad++;
+    return stuck_bm && !fn ? PCI_CMD_BUS_MASTER : 0;
+}
+void kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
+int ehci_early_quiesce(struct usb_hc *hc, u32 *blocked)
+{ (void)hc; (void)blocked; bad++; return -1; }
+static int isr(void *arg) { return usb_pending && ((struct usb_hc *)arg)->pci.fn == 0; }
+static int peer_irq(unsigned irq, void *arg)
+{
+    (void)arg;
+    peer_calls++;
+    return irq == 5 ? IRQ_HANDLED : IRQ_NONE;
+}
 struct module_record *module_record_get(struct module_handle h) { (void)h; return &record; }
 int module_ref_acquire(struct module_handle h, u32 owner, enum module_ref_kind kind, u32 fn)
 {
@@ -61,6 +79,8 @@ int module_ref_release(struct module_handle h, enum module_ref_kind kind)
 int irq_register(unsigned irq, irq_handler_fn fn, void *arg, unsigned flags)
 {
     if (irq != 5 || flags != IRQ_F_SHARED) return -1;
+    if (!peer) { peer = fn; return 0; }
+    if (handler) return -1;
     handler = fn; argument = arg;
     return 0;
 }
@@ -86,11 +106,19 @@ int main(void)
     static const struct usb_hc_ops ops = {.start=start};
     static struct pc98_usb_core core = {.ops=&ops,.isr=isr,.register_hc=add,.dead=dead,.service=service};
     struct module_handle h = {1, 7};
+    pc98_usb_early_quiesce();
     if (pc98_usb_resident_start(h, &core) || maps || starts || refs || services) return 1;
     cards = 2;
-    if (pc98_usb_resident_start(h, &core) != 2 || maps != 2 || starts != 2 ||
+    if (pc98_usb_resident_start(h, &core) || maps) return 7;
+    pc98_usb_early_quiesce();
+    if (maps != 2 || starts || refs) return 8;
+    if (irq_register(5, peer_irq, NULL, IRQ_F_SHARED)) return 9;
+    if (pc98_usb_resident_start(h, &core) != 2 || maps != 4 || starts != 2 ||
         registered != 2 || services != 1 || bad || refs != 1) return 2;
     if (!handler || handler(5, argument) != IRQ_HANDLED) return 3;
+    usb_pending = 0;
+    if (peer(5, NULL) != IRQ_HANDLED || handler(5, argument) != IRQ_NONE || peer_calls != 1)
+        return 10;
     refuse_detach = 1;
     if (!usb_resident_irq_detach(&core.hc[0].pci) || refs != 1) return 4;
     refuse_detach = 0;
@@ -98,5 +126,11 @@ int main(void)
     fail_register = cards = 1;
     if (pc98_usb_resident_start(h, &core) || core.hc[0].state != HC_DEAD ||
         services != 1 || refs || handler || bad) return 6;
+    cards = 2;
+    stuck_bm = 1;
+    fail_register = 0;
+    pc98_usb_early_quiesce();
+    if (pc98_usb_resident_start(h, &core) != 1 || core.hc[0].pci.fn != 1 || refs || bad)
+        return 11;
     return 0;
 }
