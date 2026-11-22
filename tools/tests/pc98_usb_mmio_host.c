@@ -4,7 +4,9 @@
 static struct pci_dev devs[3];
 static struct pci_bar_resource bars[3];
 static unsigned n, resources, reserved, maps, unmaps, diagnostics;
-static int live;
+struct ledger_resource ledger_resources[LEDGER_MAX_RESOURCES];
+struct ledger_owner ledger_owners[LEDGER_MAX_OWNERS];
+static int live, reject_reserve;
 int pci_get(u32 i, void *out)
 {
     if (i >= n) return -1;
@@ -24,16 +26,29 @@ u32 paging_registered_pt(u32 addr) { return 0; }
 int paging_set_page(u32 va, u32 pa, u32 flags) { return flags != 0; }
 int ledger_resource_add(const struct ledger_resource *r, u32 *rid)
 {
-    *rid = resources++;
-    return r->decode_end == r->decode_first + 1;
+    for (u32 i = 0; i < LEDGER_MAX_RESOURCES; i++) {
+        if (ledger_resources[i].bus) continue;
+        if (r->decode_end != r->decode_first + 1) return 0;
+        ledger_resources[i] = *r;
+        *rid = i;
+        resources++;
+        return 1;
+    }
+    return 0;
 }
 int ledger_owner_new(u32 kind, u32 id, const char *name, u32 *owner)
 {
-    *owner = id;
-    return kind == LEDGER_KIND_DEVICE;
+    for (u32 i = LEDGER_OWNER_FIXED_LAST + 1; i < LEDGER_MAX_OWNERS; i++) {
+        if (ledger_owners[i].kind) continue;
+        ledger_owners[i].kind = kind;
+        *owner = i;
+        return kind == LEDGER_KIND_DEVICE;
+    }
+    return 0;
 }
 int ledger_reserve_set(u32 owner, const struct ledger_span *s, u32 nspan)
 {
+    if (reject_reserve) return 0;
     reserved++;
     return nspan == 1 && s->kind == LEDGER_SPAN_MMIO;
 }
@@ -57,7 +72,7 @@ static void device(u32 fn, u16 id, u32 base, u32 len)
     bars[fn] = (struct pci_bar_resource){.raw=base, .base=base, .len=len,
         .kind=PCI_BAR_MEM32};
 }
-#define VERIFY(expr) do { if (!(expr)) return __LINE__; } while (0)
+#define VERIFY(expr) do { if (!(expr)) return 1 + (__LINE__ % 126); } while (0)
 int main(void)
 {
     struct usb_pci_fn a = {.dev=12}, b = {.dev=12, .fn=2};
@@ -101,6 +116,23 @@ int main(void)
     VERIFY(live && maps == 1 && !unmaps);
     usbp_mmio_unmap(&b, 0);
     VERIFY(!live && unmaps == 1);
+    /* Leave one resource slot. First exhaust owners, then refuse a span. */
+    count = 0;
+    for (u32 i = 0; i < LEDGER_MAX_RESOURCES; i++)
+        ledger_resources[i].bus = LEDGER_BUS_PCI;
+    u32 rid = LEDGER_MAX_RESOURCES - 1, owner = LEDGER_MAX_OWNERS - 1;
+    ledger_resources[rid].bus = 0;
+    for (u32 i = LEDGER_OWNER_FIXED_LAST + 1; i <= owner; i++)
+        ledger_owners[i].kind = LEDGER_KIND_DEVICE;
+    VERIFY(pci_mmio_reserve(&devs[0], 256));
+    VERIFY(!count && !ledger_resources[rid].bus);
+    ledger_owners[owner].kind = 0;
+    reject_reserve = 1;
+    VERIFY(pci_mmio_reserve(&devs[0], 256));
+    VERIFY(!count && !ledger_resources[rid].bus && !ledger_owners[owner].kind);
+    reject_reserve = 0;
+    VERIFY(!pci_mmio_reserve(&devs[2], 256));
+    VERIFY(count == 1 && ledger_resources[rid].bus && ledger_owners[owner].kind);
     return 0;
 }
 void _start(void)

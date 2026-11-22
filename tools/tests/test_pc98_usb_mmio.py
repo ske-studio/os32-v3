@@ -19,7 +19,9 @@ CHECK = dict(name='pc98-usb-mmio-host', tier=1, needs=[], budget=15,
 MUTANTS = [('p->users > 1', '0'),
            ('p->users > 1', 'p->users >= 1'),
            ('if (r.base < hi', 'if (0 && r.base < hi'),
-           ('if (bar.unassigned)', 'if (0)')]
+           ('if (bar.unassigned)', 'if (0)'),
+           ('ledger_owners[p->owner] = (struct ledger_owner){0};', '(void)0;'),
+           ('if (error) ledger_resources', 'if (0) ledger_resources')]
 
 
 def run(ctx):

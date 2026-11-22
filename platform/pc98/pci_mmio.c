@@ -71,11 +71,23 @@ static const char *pci_mmio_reserve(const struct pci_dev *d, u32 width)
         struct ledger_resource r = {.raw_bar=bar.raw, .decode_first=first,
             .decode_end=first+1, .bdf=bdf, .vendor=d->vendor, .device=d->device,
             .bus=LEDGER_BUS_PCI, .width_basis=LEDGER_WB_SIZING};
-        if (!ledger_resource_add(&r, &p->rid) ||
-            !ledger_owner_new(LEDGER_KIND_DEVICE, bdf, "usb", &p->owner))
-            return "resource table full";
-        struct ledger_span span = {first, first+1, LEDGER_SPAN_MMIO, p->rid};
-        if (!ledger_reserve_set(p->owner, &span, 1)) return "reservation refused";
+        /* Publish the window only after all three ledger operations succeed. */
+        unsigned int flags = irq_save();
+        const char *error = "resource table full";
+        if (ledger_resource_add(&r, &p->rid)) {
+            if (ledger_owner_new(LEDGER_KIND_DEVICE, bdf, "usb", &p->owner)) {
+                struct ledger_span span = {first, first+1, LEDGER_SPAN_MMIO, p->rid};
+                if (ledger_reserve_set(p->owner, &span, 1)) {
+                    error = 0;
+                } else {
+                    ledger_owners[p->owner] = (struct ledger_owner){0};
+                    error = "reservation refused";
+                }
+            }
+            if (error) ledger_resources[p->rid] = (struct ledger_resource){0};
+        }
+        irq_restore(flags);
+        if (error) return error;
         p->first = first;
     }
     windows[count++] = (struct usb_window){base, width, bdf, p, 0};
