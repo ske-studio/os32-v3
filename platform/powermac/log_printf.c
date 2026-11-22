@@ -1,12 +1,22 @@
-/* exec を持つ像のカーネルの診断の出力 (kprintf・kvprintf)。LAN のログへ出す (console_log.c)。
- * 端末に出す物は console_printf (lib/kprintf.c)。書式の処理は共通の雛形。 */
+/* PowerMac kernel diagnostics use the registered log sinks. */
 #include "kprintf.h"
 #include <stdarg.h>
-#include "console_log.h"
+#include "kboot_log.h"
+#include "kstring.h"
+
+static void pm_diag_write(const char *bytes, u32 n, u8 color)
+{
+    (void)color;
+    pm_log_write(bytes, n);
+}
+static void pm_diag_print(const char *s, u8 color)
+{
+    pm_diag_write(s, kstrlen(s), color);
+}
 
 #define KPRINTF_WRITE pm_diag_write
 #define KPRINTF_PRINT pm_diag_print
-#define KPRINTF_PRINT_UTF8 pm_diag_print_utf8
+#define KPRINTF_PRINT_UTF8 pm_diag_print
 #define KPRINTF_VNAME kvprintf
 #define KPRINTF_NAME kprintf
 #include "lib/kprintf_format.inc"

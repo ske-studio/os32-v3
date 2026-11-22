@@ -6,7 +6,8 @@ CHECK = dict(name='ppc-link-log-host', tier=2, budget=30, needs=[], covers=[
     'tools/tests/ppc_link_log_host.c','include/*.h', 'platform/powermac/*.h', 'arch/ppc/*.h',
             'net/*.h', 'mm/kmalloc.h', 'include/kprintf.h',
             'drivers/net/gem/gem.h', 'sdk/include/os32/*.h',
-            'tools/tests/host32.py'],
+            'tools/tests/host32.py', 'tools/tests/ppc_link_pressure_host.c',
+            'platform/powermac/log.c', 'platform/powermac/lan_log.c', 'platform/powermac/escc.c'],
     basis=['LAN_OPERATOR_DESIGN §5'],
 )
 from pathlib import Path
@@ -36,7 +37,7 @@ def run(ctx):
         for name, text in cases:
             (work / 'link_log.c').write_text(text)
             exe = work / 'probe'
-            cmd = ['gcc', '-m32', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
+            cmd = ['gcc', '-m32', '-nostdinc', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
                    '-fno-pie', '-fno-builtin', '-fno-stack-protector', '-ffunction-sections',
                    '-fdata-sections', '-nostdlib', '-static', '-no-pie',
                    '-Wl,--gc-sections', '-I'+td]
@@ -58,4 +59,9 @@ def run(ctx):
                                        result.stdout.decode().split(), None)
             assert rc == (0 if name == 'baseline' else 10), (name, rc)
             print(('GREEN ' if name == 'baseline' else 'RED runtime ') + name)
+        pressure = ['platform/powermac/'+name for name in ('link_log.c', 'log.c', 'lan_log.c', 'escc.c')]
+        subprocess.run(cmd + pressure + ['tools/tests/ppc_link_pressure_host.c', '-o', str(exe)],
+                       cwd=ctx.root, check=True)
+        assert host32.run([str(exe)], runner='qemu').returncode == 0
+        print('GREEN ESCC delivery, LAN overflow and foreground recovery')
     return 0

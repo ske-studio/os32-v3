@@ -22,6 +22,7 @@
 #include "kernel_start.h"
 #include "kernel_probe.h"
 #include "kboot_info.h"
+#include "kboot_report.h"
 #include "via_window.h"
 #include "kboot_log.h"
 #include "lan_boot.h"
@@ -81,9 +82,6 @@ int platform_boot_staging_in_use(void)
 #endif
 #define KBOOT_MEM_KB 16384U
 #define KBOOT_ATTR 0x07
-
-/* Observation ABI for the acceptance meter (big-endian, always mapped). */
-volatile unsigned long long kboot_ready_tb;
 
 static struct pm_gmac_boot lan_boot;
 static volatile u32 ipi_seen;
@@ -264,11 +262,7 @@ void platform_boot_machine(void)
 
     unsigned long long ram = 0;
     for (u32 i = 0; i < info->ram.count; i++) ram += info->ram.v[i].size;
-    kprintf(KBOOT_ATTR, "KBOOT OF-CAPTURE ram=%u admitted=%u tb_hz=%u\r\n",
-            (u32)ram, info->admitted_end, info->tb_hz);
-    kprintf(KBOOT_ATTR, "KBOOT OF-OFF calls=%u\r\n", info->of_calls_at_detach);
-    kprintf(KBOOT_ATTR, "KBOOT MMU-D root=0x%x hpt=0x%x bytes=%u ram_bat=%u\r\n",
-            arch_mmu_current_root(), info->hpt_pa, info->hpt_bytes, bat_valid());
+    pm_report_handoff(info, (u32)ram, arch_mmu_current_root(), bat_valid());
 
     /* Common mm: allocator/ledger, shared region, kernel heap (x86 order of
      * memory_boot_init -> shm_init; kmalloc is independent of both). */
@@ -325,9 +319,11 @@ void platform_boot_machine(void)
         shm_ok = shm_ok && again == shared && *(volatile u32 *)again == 0 &&
                  shm_free(again) == 0;
     }
-    kprintf(KBOOT_ATTR, "KBOOT MEMORY online=%u heap=%u shm=%u\r\n",
-            (u32)(pgalloc_model_state() == PGALLOC_ONLINE && pgalloc_free_pages() > 0),
-            (u32)heap_ok, (u32)shm_ok);
+    u32 online = pgalloc_model_state() == PGALLOC_ONLINE && pgalloc_free_pages() > 0;
+    if (!online || !heap_ok || !shm_ok || pm_report_successes) {
+        kprintf(KBOOT_ATTR, "KBOOT MEMORY online=%u heap=%u shm=%u\r\n",
+                online, heap_ok, shm_ok);
+    }
 
 #if KBOOT_NEGATIVE == 1
     (void)ppc_probe_read(0x80000);              /* unarmed low-guard fault */
@@ -341,9 +337,11 @@ void platform_boot_machine(void)
     int isi = probe_isi(0x80000);
     int guard = probe_dsi(MEM_STACK_GUARD);     /* kernel stack guard page */
     int flush = probe_flush();
-    kprintf(KBOOT_ATTR, "KBOOT TRAP dsi=%s isi=%s guard=%s flush=%s\r\n",
-            dsi ? "pass" : "bad", isi ? "pass" : "bad",
-            guard ? "pass" : "bad", flush ? "pass" : "bad");
+    if (!dsi || !isi || !guard || !flush || pm_report_successes) {
+        kprintf(KBOOT_ATTR, "KBOOT TRAP dsi=%s isi=%s guard=%s flush=%s\r\n",
+                dsi ? "pass" : "bad", isi ? "pass" : "bad",
+                guard ? "pass" : "bad", flush ? "pass" : "bad");
+    }
 
     /* The decrementer handler must exist before EE is first enabled: a DEC
      * exception left pending by firmware would otherwise be unregistered. */
@@ -366,8 +364,10 @@ void platform_boot_services(void)
                     wait_until(&ipi_seen, 1, info->tb_hz, 200) &&
                     pm_mpic_send_self_ipi(0) &&
                     wait_until(&ipi_seen, 2, info->tb_hz, 200) && ipi_seen == 2;
-    kprintf(KBOOT_ATTR, "KBOOT MPIC sources=%u priority=0 cpu=0 delivery=%s\r\n",
-            pm_mpic_source_count(), delivered ? "pass" : "bad");
+    if (!delivered || pm_report_successes) {
+        kprintf(KBOOT_ATTR, "KBOOT MPIC sources=%u priority=0 cpu=0 delivery=%s\r\n",
+                pm_mpic_source_count(), delivered ? "pass" : "bad");
+    }
 
     if (!wait_until((volatile u32 *)&tick_count, 1, info->tb_hz, 1000))
         kboot_stop("no tick");
@@ -406,7 +406,7 @@ void platform_boot_services(void)
     if (want < 10000 || (unsigned long long)got + 1 < lower ||
         (unsigned long long)got > upper + 1)
         kboot_stop("clock_rate");
-    kprintf(KBOOT_ATTR, "KBOOT CLOCK hz=%u tick=%u us=%u\r\n", OS32_TICK_HZ, ticks, us_lo);
+    pm_report_clock(OS32_TICK_HZ, ticks, us_lo);
 
     pm_pci_enumerate();
     boot_token_init();
@@ -420,15 +420,10 @@ void platform_boot_services(void)
 
     unsigned long long start = tb_now();
     u32 tick0 = tick_count;
-    kboot_ready_tb = start;
-    kprintf(KBOOT_ATTR, "KBOOT READY stage=pre-user\r\n");
+    pm_report_ready(start);
     unsigned long long now;
     do { now = tb_now(); pm_lan_poll(now); } while (now - start < 2ULL * info->tb_hz);
-    u32 tick_delta = tick_count - tick0;
-    unsigned long long delta = now - start;
-    u32 tb_us = (u32)(delta / info->tb_hz * 1000000 + delta % info->tb_hz * 1000000 / info->tb_hz);
-    kprintf(KBOOT_ATTR, "KBOOT ALIVE tick_delta=%u tb_us=%u of_calls_delta=%u\r\n",
-            tick_delta, tb_us, ofw_call_count() - info->of_calls_at_detach);
+    pm_report_alive(now, start, tick0, info);
 #if KBOOT_SHELL || KBOOT_SH
     kprintf(KBOOT_ATTR, "FB full_rc=%d color_rc=%d\r\n",
             dev->fb_full_rc, dev->fb_color_rc);

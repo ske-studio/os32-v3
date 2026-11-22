@@ -597,6 +597,7 @@
     "ppc-path-guest": 110.039788,
     "ppc-pci-guest": 90.258017,
     "ppc-port-guest": 105.445902,
+    "ppc-kboot-console": 12.0,
     "ppc-reset": 222.861345,
     "ppc-rh-fb": 23.36311,
     "ppc-root-lz4-layout-host": 38.884942,

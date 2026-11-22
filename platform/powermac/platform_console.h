@@ -1,13 +1,10 @@
-/* コンソールの機種ごとの方針 (PowerMac)。固定名のヘッダで、共通の lib/kprintf.c・
+/* コンソールの機種ごとの方針 (PowerMac)。固定名のヘッダで、共通の
  * kernel/console/console.c・fs/vfs_fd.c が読む (設計は docs/design/lib/kprintf.md)。 */
 #ifndef PLATFORM_CONSOLE_H
 #define PLATFORM_CONSOLE_H
 
 #include "console.h"
 
-/* exec を持つ像は、カーネルの診断 (kprintf・kvprintf) を LAN のログへ出す (log_printf.c)。
- * 持たない像はコンソール (kboot_console.c がログへ流す)。 */
-#define PLATFORM_KPRINTF_IS_CONSOLE (!(KBOOT_SH || KBOOT_SHELL))
 /* 1 文字の出力 (shell_putchar) も遠隔の鏡へ流す。 */
 #define CONSOLE_PUTCHAR_MIRROR 1
 /* UTF-8 の文字列 (shell_print_utf8) は fd 1 と同じ console_write の道に流す (鏡も 1 回)。 */

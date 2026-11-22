@@ -44,7 +44,7 @@ MUTATIONS = [
 def exercise(directory, source):
     (directory / 'clock.c').write_text(source)
     exe = directory / 'clock-test'
-    subprocess.run(['gcc', '-m32', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
+    subprocess.run(['gcc', '-m32', '-nostdinc', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
                     '-ffreestanding', '-fno-builtin', '-fno-pie', '-no-pie',
                     '-fno-stack-protector', '-nostdlib', '-static', '-D__cdecl=',
                     '-I'+str(directory),
@@ -60,7 +60,7 @@ def exercise(directory, source):
 
 def rate_test(directory, source, mutant=False):
     start = source.index('    u32 want = (u32)((tb1_b - tb0_a)')
-    end = source.index('    kprintf(KBOOT_ATTR, "KBOOT CLOCK', start)
+    end = source.index('    pm_report_clock(', start)
     block = source[start:end]
     old = '(unsigned long long)got + 1 < lower ||\n        (unsigned long long)got > upper + 1'
     if block.count(old) != 1:

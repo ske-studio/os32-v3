@@ -8,8 +8,7 @@
 #include "../sdk/include/os32/os32_kapi_shared.h"
 #include "types.h"
 
-/* kprintf・kvprintf はカーネルの診断の出力。行き先は機種が決める (platform_console.h の
- * PLATFORM_KPRINTF_IS_CONSOLE): PC-98 はコンソール、PowerMac の exec を持つ像は LAN のログ。
+/* kprintf・kvprintf はカーネルの診断の出力。行き先は機種が決める。PC-98 はコンソール、PowerMac は登録済みログへ出す。
  * 端末 (コンソール) に必ず出す物 — ユーザープログラムの出力、利用者への知らせ — は
  * console_printf・console_vprintf を使う。 */
 void __cdecl kprintf(u8 attr, const char *fmt, ...);

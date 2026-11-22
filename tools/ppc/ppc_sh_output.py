@@ -8,11 +8,12 @@ from pathlib import Path
 import tempfile
 from kboot_accept import build, mutant_settings
 from kboot_run import require, serial, validate_root
+from run import CriterionFailure
 
 CHECK = dict(name='ppc-sh-output', tier=2, budget=900, needs=[],
              covers=['tools/ppc/ppc_sh_output.py', 'userland/ppc/outprobe.c'],
              inputs=['build/targets/ppc-powermac.mk', 'build/ppc-user.mk',
-                     'platform/powermac/kboot_console.c', 'platform/powermac/console_stream.c',
+                     'platform/powermac/report_product.c', 'platform/powermac/kboot_console.c', 'platform/powermac/console_stream.c',
                      'fs/vfs_fd.c', 'tools/ppc/kboot_accept.py', 'tools/ppc/kboot_run.py',
                      'tools/ppc/sc_run.py', 'tools/ppc_lan_host.py',
                      'tools/ppc/link_sh_run.py', 'tools/ppc/link_run.py',
@@ -42,13 +43,19 @@ def rsh_command(session, line):
     return body[len(prefix):-1]
 
 
-def link_accept(elf, cpu, out, mutant=False):
+def link_accept(elf, cpu, out, mutant=False, pressure=False):
     import link_sh_run as link
 
     class OutputSession(link.Session):
         def new_agent(self):
             super().new_agent()
             self.logs = []
+            self.retries = 0
+            if pressure:
+                def busy(rid, entry, parts, out):
+                    self.retries += 1
+                    self.agent._answer(rid, entry, 503, b'', None, out)
+                self.agent._service_log = busy
             # Install the in-process LOG observer before QEMU starts. Retain the
             # original logger and operator publisher, including raw payloads.
             publish = self.operator.publish_log
@@ -60,6 +67,8 @@ def link_accept(elf, cpu, out, mutant=False):
     s = OutputSession(elf, cpu, out, 120)
     try:
         s.start(); s.wait(s.ready, 'RSH READY', 60)
+        if pressure:
+            s.wait(lambda: s.retries >= 2, 'foreground LOG retries before command')
         actual = rsh_command(s, '/bin/outprobe.bin')
         # sh prints one '\n' after an external program exits with success
         # (userland/shell/sh_exec.inc run_cmd_report), as on x86.
@@ -72,8 +81,10 @@ def link_accept(elf, cpu, out, mutant=False):
             s.wait(lambda: b'alive\n' in b''.join(r['text'] for r in s.logs), 'alive LOG')
         else:
             require(alive == b'alive\n', 'subsequent command: '+repr(alive))
-        s.wait(lambda: b'KBOOT READY stage=pre-user' in
-               b''.join(r['text'] for r in s.logs), 'kernel LOG READY')
+        if pressure:
+            return
+        s.wait(lambda: b'Loading /sys/shell.bin' in
+               b''.join(r['text'] for r in s.logs), 'shell loading in LOG')
         if mutant:
             s.wait(lambda: b'FD1 PROBE\n' in b''.join(r['text'] for r in s.logs), 'probe LOG')
         s.settle(1)
@@ -82,7 +93,12 @@ def link_accept(elf, cpu, out, mutant=False):
         require(len({r['boot'] for r in s.logs}) == 1 and
                 all(r['drop_records'] == r['drop_bytes'] == 0 for r in s.logs), 'LOG loss/generation')
         require((b'FD1 PROBE\n' in logs) == mutant, 'fd1 LOG routing')
-        require(b'KBOOT READY' not in actual, 'kernel READY in OUT')
+        escc = (out/'serial-a.log').read_bytes()
+        require(b'Loading /sys/shell.bin' in escc, 'shell loading in ESCC')
+        require('Loading /sys/shell.bin' not in s.screen('after-commands'), 'shell loading on framebuffer')
+        for milestone in b'OF-CAPTURE OF-OFF MMU-D MEMORY TRAP MPIC CLOCK READY ALIVE'.split():
+            marker = b'KBOOT ' + milestone + b' '
+            require(marker not in escc and marker not in logs, 'product milestone '+milestone.decode())
         s.wait(lambda: validate_root(serial(out/'serial-a.log'), serial(out/'serial-b.log')),
                'rd0 registration and page accounting', 60)
         s.q.call('quit'); s.p.wait(timeout=5)
@@ -104,10 +120,17 @@ def main():
     user = work/'user'
     bins = ' '.join(str(user/(name+'.bin')) for name in ('hello', 'outprobe'))
     hashes = set()
-    for name in ('normal', 'fd1-log') if args.mutate else ('normal',):
-        mutation = [] if name == 'normal' else mutant_settings(
-            work, name, 'platform/powermac/console_stream.c',
-            '    console_write(buf, size, color);', '    (void)color; pm_log_write(buf, size);')
+    for name in ('normal', 'fd1-log', 'ready-leak') if args.mutate else ('normal',):
+        mutation = []
+        if name == 'fd1-log':
+            mutation = mutant_settings(work, name, 'platform/powermac/console_stream.c',
+                                       '    console_write(buf, size, color);',
+                                       '    (void)color; pm_log_write(buf, size);')
+        if name == 'ready-leak':
+            mutation = mutant_settings(work, name, 'platform/powermac/ppc_kernel.c',
+                                       '    pm_report_ready(start);',
+                                       '    pm_report_ready(start);\n'
+                                       '    kprintf(KBOOT_ATTR, "KBOOT READY stage=pre-user\\r\\n");')
         elf = build(work/name, 'IMAGE=kboot-link-sh', 'KB_SH_OUT='+str(user),
                     'KB_ROOT_BINS='+bins, *mutation, 'kb-user', 'kernel')
         digest = hashlib.sha256(elf.read_bytes()).hexdigest()
@@ -115,7 +138,16 @@ def main():
         hashes.add(digest)
         print(name, digest, flush=True)
         if not args.build_only:
-            link_accept(elf, '7450', work/(name+'-guest'), name != 'normal')
+            try:
+                link_accept(elf, '7450', work/(name+'-guest'), name == 'fd1-log')
+            except CriterionFailure as error:
+                if name != 'ready-leak' or str(error) != 'product milestone READY':
+                    raise
+                print('RED runtime: product milestone READY')
+            else:
+                require(name != 'ready-leak', 'READY leak survived')
+            if name == 'normal':
+                link_accept(elf, '7450', work/'pressure-guest', pressure=True)
     print(f'{len(hashes)} distinct fd1 images')
     return 0
 
