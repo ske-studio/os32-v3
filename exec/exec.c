@@ -1,3 +1,4 @@
+#include "install_management.h"
 #include "av_contract.h"
 #include "kernel/idle_work.h"
 #include "exec_legacy.h"

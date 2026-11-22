@@ -62,9 +62,9 @@ from gen_kdebug_imports import declaration
 # HAL v2 A0: public value records, GfxBackend.v2/v2_mod, gf3_ctx range
 # callback, gf3_surface.dma and gf3_pattern; import declarations unchanged.
 # v87: four I/O slots replace the first four reserved pointers; data offsets fixed.
-REVIEWED_LAYOUT_CRC = 0x2d5b270e
+REVIEWED_LAYOUT_CRC = 0xaff5f6f1
 REVIEWED_IMPORT_DECLARATIONS_SHA = '5572aaf2bc03507e123861472774838a7008894449792789780696b346ccbc9d'
-REVIEWED_INVENTORY_SHA = '105f55e9658426156f9074ae09ced6c1a7f320afa612d38448ca1887c96a1b00'
+REVIEWED_INVENTORY_SHA = 'ecf9f0b230b06169033123c7059dc1040ba8eb8522d56216d08b275cbe349f3b'
 
 
 def import_declarations(root):

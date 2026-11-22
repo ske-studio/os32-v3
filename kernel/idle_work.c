@@ -1,4 +1,5 @@
 #include "idle_work.h"
+#include "install_access.h"
 #include "io.h"
 #include "io_work.h"
 #include "irq.h"
@@ -36,6 +37,7 @@ void idle_work_run(void)
 {
     if (!_irq_enabled()) return;
     if (kctx_irq_depth != 0) return;
+    if (platform_install_medium()) install_retry_recovery();
     (void)io_dispatch(IO_PASS_US);
 }
 

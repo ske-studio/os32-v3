@@ -32,6 +32,7 @@ TYPE_MAP = {
     "os_time_t":       "u32",
     "const char *":    "*const u8",
     "char *":          "*mut u8",
+    "const InstallPlanV1 *": "*const crate::install::InstallPlanV1",
     "const void *":    "*const u8",
     "void *":          "*mut u8",
     "u8 *":            "*mut u8",

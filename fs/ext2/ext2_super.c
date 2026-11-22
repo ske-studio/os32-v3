@@ -9,6 +9,7 @@
 /*    ext2ブロックN → IDEセクタ (N*2)                                      */
 /* ======================================================================== */
 
+#include "install_access.h"
 #include "ext2_priv.h"
 #include "platform_ext2.h"
 #include "kprintf.h"
@@ -88,6 +89,8 @@ int ext2_check_writable(Ext2Ctx *ctx)
  * 次の ext2_sync() が実際にディスクへ書く。 */
 void ext2_meta_touch(Ext2Ctx *ctx)
 {
+    if (platform_install_medium())
+        install_dirty_begin(ctx, ctx->dev, ctx->base_lba, ctx->part_len);
     ctx->meta_dirty = 1;
 }
 
@@ -302,6 +305,7 @@ int ext2_mount(Ext2Ctx *ctx, int ide_drive)
 void ext2_unmount(Ext2Ctx *ctx)
 {
     if (ctx->mounted) ext2_sync(ctx);
+    if (platform_install_medium()) install_dirty_finish(ctx);
     ext2_read_cache_reset();
     ctx->mounted = 0;
 }
@@ -336,6 +340,7 @@ int ext2_sync(Ext2Ctx *ctx)
     if (ret != 0) return ret;
     ret = ext2_write_gd_raw(ctx);
     if (ret != 0) return ret;
+    if (platform_install_medium()) install_dirty_finish(ctx);
     ctx->meta_dirty = 0;
     return EXT2_OK;
 }

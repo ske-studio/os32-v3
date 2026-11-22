@@ -341,8 +341,11 @@
 #define KAPI_SLOT_SND2_CHIP_READ 334
 #define KAPI_SLOT_SND2_CHIP_RESET 335
 #define KAPI_SLOT_SND2_CHIP_CLOSE 336
+#define KAPI_SLOT_INSTALL_BEGIN 337
+#define KAPI_SLOT_INSTALL_RESCAN 338
+#define KAPI_SLOT_INSTALL_END 339
 
-#define KAPI_SLOT_COUNT 337
+#define KAPI_SLOT_COUNT 340
 #define KAPI_FUNC_CAPACITY 384
 #define KAPI_DATA_FIELDS_OFF 0x608
 #define OS32_KAPI_LAYOUT_STAMP() __asm__(".pushsection .os32_kapi_layout,\"\",@progbits\n\t.p2align 2\n\t.long 0x608\n\t.popsection")

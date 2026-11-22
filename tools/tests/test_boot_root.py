@@ -53,7 +53,7 @@ def main():
         for name, modified, frame_source, expected in variants:
             (d / 'boot_root.c').write_text(modified)
             (d / 'root_image.c').write_text(frame_source)
-            cmd = ['gcc-13', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
+            cmd = ['gcc-13', '-O1', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
                    '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections',
                    '-D__cdecl=', '-I.', '-Iinclude', '-Isdk/include/os32', '-Ifs',
                    '-Ifs/isofs', '-Ikernel/dev', '-Idrivers/ata', '-Imm', '-Ilib',

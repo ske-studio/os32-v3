@@ -16,6 +16,18 @@ static int ext2_block_range_lba(const Ext2Ctx *ctx, u32 first, u32 blocks,
     return 1;
 }
 
+static int ext2_device_transfer(Ext2Ctx *ctx, u32 sector, u32 count,
+                                void *dst, const void *src)
+{
+    if (platform_install_medium()) {
+        int handled;
+        int rc = install_dirty_transfer(ctx, ctx->dev, sector, count, dst, src, &handled);
+        if (handled) return rc;
+    }
+    if (src) return dev_blk_write_lba(ctx->dev, sector, count, src);
+    return dev_blk_read_lba(ctx->dev, sector, count, dst);
+}
+
 /* Mount also uses raw I/O before ctx->mounted becomes true. No allocation or
  * retained copy: Device transfers directly into the caller's destination. */
 static int ext2_raw_read_blocks(Ext2Ctx *ctx, u32 first, u32 blocks, void *buf)
@@ -23,7 +35,7 @@ static int ext2_raw_read_blocks(Ext2Ctx *ctx, u32 first, u32 blocks, void *buf)
     u32 sector;
     int ret = EXT2_ERR_IO;
     if (ext2_block_range_lba(ctx, first, blocks, &sector))
-        ret = dev_blk_read_lba(ctx->dev, sector, blocks * EXT2_SECTORS_PER_BLOCK, buf);
+        ret = ext2_device_transfer(ctx, sector, blocks * EXT2_SECTORS_PER_BLOCK, buf, 0);
     if (ret != 0) ext2_read_cache_reset();
     return ret;
 }
@@ -34,7 +46,7 @@ static int ext2_raw_write_block(Ext2Ctx *ctx, u32 block_num, const void *buf)
 
     ext2_read_cache_reset();
     if (!ext2_block_range_lba(ctx, block_num, 1, &sector)) return EXT2_ERR_IO;
-    return dev_blk_write_lba(ctx->dev, sector, EXT2_SECTORS_PER_BLOCK, buf);
+    return ext2_device_transfer(ctx, sector, EXT2_SECTORS_PER_BLOCK, 0, buf);
 }
 
 /* **メタデータ**の I/O。失敗したらエラー状態にする (票 B8 往復 5 / 決裁 2)。
@@ -81,7 +93,7 @@ int ext2_write_data_blocks(Ext2Ctx *ctx, u32 first, u32 blocks, const void *src)
     u32 sector;
     ext2_read_cache_reset();
     if (!ext2_block_range_lba(ctx, first, blocks, &sector)) return EXT2_ERR_IO;
-    return dev_blk_write_lba(ctx->dev, sector, blocks * EXT2_SECTORS_PER_BLOCK, src);
+    return ext2_device_transfer(ctx, sector, blocks * EXT2_SECTORS_PER_BLOCK, 0, src);
 }
 
 /* ---- セクタ 1 本だけの I/O (票 H2 §2-2-1) ----
@@ -101,7 +113,7 @@ int ext2_read_sector(Ext2Ctx *ctx, u32 block_num, u32 sect, void *buf)
     int ret = EXT2_ERR_IO;
     if (sect < EXT2_SECTORS_PER_BLOCK &&
         ext2_block_range_lba(ctx, block_num, 1, &sector))
-        ret = dev_blk_read_lba(ctx->dev, sector + sect, 1, buf);
+        ret = ext2_device_transfer(ctx, sector + sect, 1, buf, 0);
     if (ret != 0) ext2_read_cache_reset();
     return ret;
 }
@@ -112,6 +124,6 @@ int ext2_write_sector(Ext2Ctx *ctx, u32 block_num, u32 sect, const void *buf)
     ext2_read_cache_reset();
     if (sect >= EXT2_SECTORS_PER_BLOCK ||
         !ext2_block_range_lba(ctx, block_num, 1, &sector)) return EXT2_ERR_IO;
-    return dev_blk_write_lba(ctx->dev, sector + sect, 1, buf);
+    return ext2_device_transfer(ctx, sector + sect, 1, 0, buf);
 }
 

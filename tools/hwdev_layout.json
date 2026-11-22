@@ -420,6 +420,28 @@
       "owner",
       "size"
     ],
+    "InstallPlanPartitionV1": [
+      "entry",
+      "sectors",
+      "start_lba",
+      "type"
+    ],
+    "InstallPlanV1": [
+      "boot_hfs",
+      "capacity",
+      "lba0_sectors",
+      "lba0_start",
+      "map",
+      "original_table_crc",
+      "original_table_sectors",
+      "raw_unit",
+      "reserved",
+      "root_ext2",
+      "sector_bytes",
+      "serial_crc",
+      "size",
+      "version"
+    ],
     "KbdDiag": [
       "cmd",
       "empty_count",
@@ -608,6 +630,9 @@
       "in2_status",
       "in2_unacquire",
       "in2_wm_state",
+      "install_begin",
+      "install_end",
+      "install_rescan",
       "io_policy_get",
       "io_policy_reset",
       "io_policy_set",

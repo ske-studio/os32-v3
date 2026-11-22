@@ -1,3 +1,4 @@
+#include "install_access.h"
 #include "ext2_priv.h"
 #include "ext2_layout.h"   /* 大きさの固定点 (票 TASK_HDD_INSTALL N7) */
 #include "ext2_medium_contract.h"
@@ -35,6 +36,7 @@ typedef struct {
     const struct ext2_medium_ops *ops;
     Device *dev;
     u32 base_lba, part_len;
+    const struct install_access *access;
 } FormatIO;
 
 static int fmt_sector(const FormatIO *ctx, u32 block, u32 *sector)
@@ -51,8 +53,11 @@ static int fmt_wr(const FormatIO *ctx, u32 block, const void *buf)
     u32 sector;
     int ret = EXT2_ERR_IO;
     if (ctx->ops->after_write) ctx->ops->after_write();
-    if (fmt_sector(ctx, block, &sector))
-        ret = dev_blk_write_lba(ctx->dev, sector, EXT2_SECTORS_PER_BLOCK, buf);
+    if (fmt_sector(ctx, block, &sector)) {
+        if (platform_install_medium() && ctx->access && ctx->access->generation)
+            ret = install_format_transfer(ctx->access, sector, EXT2_SECTORS_PER_BLOCK, 0, buf);
+        else ret = dev_blk_write_lba(ctx->dev, sector, EXT2_SECTORS_PER_BLOCK, buf);
+    }
     /* ext2_fs_error used to invalidate even for the temporary context. */
     if (ret && ctx->ops->after_write) ctx->ops->after_write();
     return ret;
@@ -62,8 +67,11 @@ static int fmt_rd(const FormatIO *ctx, u32 block, void *buf)
 {
     u32 sector;
     int ret = EXT2_ERR_IO;
-    if (fmt_sector(ctx, block, &sector))
-        ret = dev_blk_read_lba(ctx->dev, sector, EXT2_SECTORS_PER_BLOCK, buf);
+    if (fmt_sector(ctx, block, &sector)) {
+        if (platform_install_medium() && ctx->access && ctx->access->generation)
+            ret = install_format_transfer(ctx->access, sector, EXT2_SECTORS_PER_BLOCK, buf, 0);
+        else ret = dev_blk_read_lba(ctx->dev, sector, EXT2_SECTORS_PER_BLOCK, buf);
+    }
     if (ret && ctx->ops->after_write) {
         ctx->ops->after_write(); /* raw read failure */
         ctx->ops->after_write(); /* ext2_fs_error for the temporary context */
@@ -199,7 +207,7 @@ static inline int fmt_write_root(const FormatIO *ctx, u32 gdt_blocks,
  * 大きさは ext2_layout_plan の固定点 — 最終グループに全メタデータが
  * 収まらなければそのグループを落として計算し直す (N7 / F12)。 */
 static int ext2_format_range(const struct ext2_medium_ops *ops, int ide_drive, u32 base_lba, u32 part_len,
-                             u32 sectors)
+                             u32 sectors, const struct install_access *access)
 {
     int ret;
     Ext2Layout lay;
@@ -218,6 +226,7 @@ static int ext2_format_range(const struct ext2_medium_ops *ops, int ide_drive, u
         return EXT2_ERR_INVAL;
 
     fmt_ctx.ops = ops;
+    fmt_ctx.access = access;
     fmt_ctx.dev = ops->dev(ide_drive);
     if (!fmt_ctx.dev) return EXT2_ERR_IO;
     fmt_ctx.base_lba = base_lba;
@@ -273,7 +282,7 @@ int ext2_format(int ide_drive, u32 total_sectors)
      * (m2)。format_at は大きすぎる範囲を断る (hdprep は上限の内側で計画する)。 */
     if (total_sectors > EXT2L_MAX_SECTORS(EXT2_MAX_GROUPS))
         total_sectors = EXT2L_MAX_SECTORS(EXT2_MAX_GROUPS);
-    return ext2_format_range(ops, ide_drive, start, len, total_sectors);
+    return ext2_format_range(ops, ide_drive, start, len, total_sectors, 0);
 }
 
 int ext2_format_at(int ide_drive, u32 start_lba, u32 length)
@@ -295,5 +304,12 @@ int ext2_format_at(int ide_drive, u32 start_lba, u32 length)
      * 現在の CHS の容量・シリンダ 16 ビット)。最初の書き込みの前に範囲全体で
      * 照合する (Codex C4)。 */
     if (!ops->range_ok(ide_drive, start_lba, length)) return EXT2_ERR_INVAL;
-    return ext2_format_range(ops, ide_drive, start_lba, length, length);
+    if (platform_install_medium() && (unsigned)ide_drive < VFS_DEV_UNIT_MAX) {
+        struct install_access access;
+        int rc = install_format_begin(&access, ide_drive, start_lba, length);
+        if (rc) return rc;
+        rc = ext2_format_range(ops, ide_drive, start_lba, length, length, &access);
+        return install_format_finish(&access, rc);
+    }
+    return ext2_format_range(ops, ide_drive, start_lba, length, length, 0);
 }
