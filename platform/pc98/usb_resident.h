@@ -22,7 +22,9 @@ int usb_resident_irq_attach(struct module_handle owner, const struct usb_pci_fn 
                             int (*isr)(void *), void *arg);
 int usb_resident_irq_detach(const struct usb_pci_fn *f);
 int usb_resident_tick_set(void (*service)(void));
+void pc98_usb_service_log(const char *fmt, const u32 *args);
 void pc98_usb_tick_vprintf(u8 attr, const char *fmt, const u32 *args);
 int pc98_usb_load(void);
+void pc98_usb_flush_boot_log(void);
 void pc98_usb_boot(void);
 #endif

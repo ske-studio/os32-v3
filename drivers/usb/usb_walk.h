@@ -7,7 +7,8 @@ struct usb_walk {
     struct usb_walk *next;
     struct usb_dma scratch;
     u32 status, reset_deadline, poll_deadline, resource_deadline;
-    u16 cfg_length;
+    u16 cfg_length, root_connected, root_read;
+    u8 reset_logged, descriptor_logged, config_logged;
     u8 phase, pending, complete, error, iface, attach_failed, config_retry;
     u8 desc_phase, desc_retry, reset_phase, freeing;
     u32 actual;
