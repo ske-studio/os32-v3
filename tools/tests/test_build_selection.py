@@ -197,6 +197,8 @@ def check_kboot(root):
             ({'IMAGE': 'kboot-core', 'KBOOT_SH': '1'}, [], None),
             ({'IMAGE': ''}, [], None),
             ({'KBOOT_LINK': '0 1'}, [], None),
+            ({}, ['KBOOT_LINK=1 ', 'KBOOT_SH=0'], 'kboot-link'),
+            ({}, ['KBOOT_LINK=1 ', 'KBOOT_SH=0', 'NEGATIVE=1'], None),
             ({}, ['NEGATIVE=1'], None)]:
         result = subprocess.run([*command, *cli, 'kboot-query'], cwd=root, text=True,
                                 env={**os.environ, **env}, capture_output=True)
@@ -310,6 +312,8 @@ if __name__ == '__main__':
                      AssertionError, 'formatter linked into PowerMac'),
                     ('build/images/powermac.mk', 'FEATURE_LOOP = 1', 'FEATURE_LOOP = 0',
                      AssertionError, 'loop disabled on kboot-sh'),
+                    ('build/images/ppc-flags.mk', 'override KBOOT_LINK := $(strip $(KBOOT_LINK))', '',
+                     AssertionError, 'padded link flag bypasses NEGATIVE check'),
                     ('build/images/ppc-flags.mk', '$(error KBOOT_SHELL does not support NEGATIVE)', '',
                      AssertionError, 'negative legacy shell accepted'),
                     ('build/select.mk', '$(error FEATURE_FEP requires FEATURE_SQLITE)', '',

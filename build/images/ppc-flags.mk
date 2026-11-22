@@ -24,6 +24,9 @@ KBOOT_SH ?= 0
 endif
 KBOOT_SHELL ?= 0
 KBOOT_LINK ?= 1
+override KBOOT_LINK := $(strip $(KBOOT_LINK))
+override KBOOT_SH := $(strip $(KBOOT_SH))
+override KBOOT_SHELL := $(strip $(KBOOT_SHELL))
 $(foreach v,KBOOT_LINK KBOOT_SH KBOOT_SHELL,$(if $(and $(filter 1,$(words $($(v)))),$(filter 0 1,$($(v)))),,$(error $(v) must be 0 or 1)))
 ifeq ($(KBOOT_LINK),1)
 ifeq ($(KBOOT_SHELL),1)
