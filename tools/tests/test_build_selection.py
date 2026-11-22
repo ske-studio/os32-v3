@@ -3,6 +3,7 @@
 import argparse
 import json
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -42,7 +43,7 @@ def check_loop(root):
     for image in ('pc98', 'kboot-core', 'kboot-link', 'kboot-shell', 'kboot-sh', 'kboot-link-sh'):
         options = [] if image == 'pc98' else ['ARCH=ppc', 'PLATFORM=powermac']
         units = query(root, [*options, 'IMAGE=' + image], config_only=True)['C_KERNEL']
-        enabled = image in ('pc98', 'kboot-sh', 'kboot-link-sh')
+        enabled = image in ('pc98', 'kboot-shell', 'kboot-sh', 'kboot-link-sh')
         for unit in ('kernel/dev/device_loop.c', 'drivers/block/loop_dev.c'):
             assert units.count(unit) == enabled, (image, unit)
 
@@ -81,9 +82,9 @@ def check(root):
     c = query(root, ['KSTRING_C_SRC=lib/kstring_c.c'])['C_KERNEL']
     assert c.count('lib/kstring_c.c') == 1
     assert c.index('lib/kstring_c.c') == c.index('lib/divdi3.c') + 1
-    # Top-level ARCH=ppc selects the product default image (kboot-link) from the same owner sets.
+    # Top-level ARCH=ppc selects the product default image (kboot-link-sh) from the same owner sets.
     ppc = query(root, ['ARCH=ppc', 'PLATFORM=powermac'], config_only=True)
-    link = json.loads((ROOT / 'tools/tests/fixtures/build_profile_ppc.json').read_text())['link']
+    link = json.loads((ROOT / 'tools/tests/fixtures/build_profile_ppc.json').read_text())['link-sh']
     assert ppc['C_KERNEL'] == link['KB_C'] and ppc['GAS_KERNEL'] == link['KB_ASM'] and not ppc['ASM_KERNEL']
     for enabled in (0, 1):
         profile = query(root, ['ARCH=ppc', 'PLATFORM=powermac', f'FEATURE_KCG={enabled}'], config_only=True)
@@ -114,6 +115,8 @@ KBOOT_QUERY = ('.PHONY: kboot-query\nkboot-query:\n'
                '\t@echo "KB_OUT=$(KB_OUT)"\n\t@echo "KB_VFS=$(KB_VFS)"\n'
                '\t@echo "KB_SQLITE_INC=$(KB_SQLITE_INC)"\n'
                '\t@echo "KB_SQLITE_AUDIT=$(KB_SQLITE_AUDIT)"\n'
+               '\t@echo "KB_EXEC=$(KB_EXEC)"\n\t@echo "KB_ROOT_BINS=$(ROOT_BINS)"\n'
+               '\t@echo "KB_ROOT_DEPS=$(ROOT_DEPS)"\n'
                '\t@echo "KB_PENDING=$(KB_PENDING_OBJ)"\n'
                '\t@echo "KB_MODULES=$(MODULE_FEATURES)"\n')
 
@@ -127,6 +130,17 @@ def copy_kboot_names(root):
             target.touch()
 
 
+def image_selectors(name, image):
+    selectors = [image['flags']]
+    if 'NEGATIVE=1' not in image['flags']:
+        selectors.append(['IMAGE=kboot-' + name])
+        flags = {'core': (0, 0, 0), 'link': (1, 0, 0), 'shell': (0, 0, 1),
+                 'sh': (0, 1, 0), 'link-sh': (1, 1, 0)}
+        selectors.append([f'{flag}={value}' for flag, value in zip(
+            ('KBOOT_LINK', 'KBOOT_SH', 'KBOOT_SHELL'), flags[name])])
+    return selectors
+
+
 def check_kboot(root):
     """Every PowerPC image selects exactly the pinned sources, in owner-set order (no link-order list)."""
     expected = json.loads((ROOT / 'tools/tests/fixtures/build_profile_ppc.json').read_text())
@@ -134,13 +148,18 @@ def check_kboot(root):
     command = ['make', '-s', '-f', 'build/config.mk', '-f', 'build/targets/ppc-powermac.mk', '-f', 'kboot-query.mk',
                'ARCH=ppc', 'PLATFORM=powermac']
     for name, image in expected.items():
-        # 像は旗でも名前でも選べる (build/images/ppc-flags.mk)。NEGATIVE の像は旗だけ。
-        selectors = [image['flags']] + ([] if 'NEGATIVE=1' in image['flags'] else [['IMAGE=kboot-' + name]])
-        for selector in selectors:
+        for selector in image_selectors(name, image):
             out = subprocess.check_output([*command, *selector, 'kboot-query'], cwd=root, text=True,
                                           stderr=subprocess.PIPE)
             actual = dict(line.split('=', 1) for line in out.splitlines() if line.startswith('KB_'))
             assert actual['KB_OUT'] == image['KB_OUT'], (name, selector)
+            enabled = name in ('shell', 'sh', 'link-sh')
+            assert actual['KB_EXEC'] == ('1' if enabled else ''), (name, selector)
+            assert actual['KB_ROOT_BINS'] == '', (name, selector)
+            user = 'build/out/ppc-user' + ('/link-sh' if enabled or name == 'link' else '')
+            assert actual['KB_ROOT_DEPS'].split() == [
+                'assets/fonts/shino16.kcgfont', 'assets/fonts/JF-Dot-Shinonome16-LICENSE.txt',
+                'build/out/unicode.bin', user + '/shell.bin'], (name, selector)
             ext2 = 'fs/ext2/ext2_'
             formatter = {ext2 + stem for stem in ('fmt', 'layout', 'time')}
             pending = set(actual['KB_PENDING'].split())
@@ -149,7 +168,6 @@ def check_kboot(root):
             ide = ext2 + 'medium_ide'
             assert actual['KB_OUT'] + '/' + ide + '.o' not in pending, name
             assert {unit + '.c' for unit in formatter | {ide}}.isdisjoint(actual['KB_C'].split()), name
-            enabled = name in ('shell', 'sh', 'link-sh')
             assert 'sqlite' not in actual['KB_MODULES'].split()
             for key in ('KB_VFS', 'KB_SQLITE_INC', 'KB_SQLITE_AUDIT'):
                 assert bool(actual[key]) == enabled
@@ -162,10 +180,42 @@ def check_kboot(root):
             for key in ('KB_ASM', 'KB_C'):
                 assert actual[key].split() == image[key], (name, key, selector)
     # 名前と旗の両方を与えて食い違えば止まる。合っていれば通る。
+    assert subprocess.run([*command, 'KBOOT_LINK=0', 'KBOOT_SH=0', 'KBOOT_SHELL=1',
+                           'NEGATIVE=1', 'kboot-query'], cwd=root, capture_output=True).returncode != 0
     assert subprocess.run([*command, 'IMAGE=kboot-core', 'KBOOT_SH=1', 'kboot-query'], cwd=root,
                           capture_output=True).returncode != 0
     assert subprocess.run([*command, 'IMAGE=kboot-sh', 'KBOOT_SH=1', 'KBOOT_LINK=0', 'kboot-query'], cwd=root,
                           capture_output=True).returncode == 0
+
+
+def check_product_selectors():
+    # shell, sh and their old flag combinations select the resident link-sh product.
+    # Force ISO generation and linking on each invocation, even with a warm build.
+    out = Path('build/out/ppc-kboot/link-sh')
+    shell = Path('build/out/ppc-user/link-sh/shell.bin')
+    profiles = json.loads((ROOT/'tools/tests/fixtures/build_profile_ppc.json').read_text())
+    selectors = [['IMAGE=kboot-link-sh']]
+    for name in ('shell', 'sh', 'link-sh'):
+        selectors.extend(s for s in image_selectors(name, profiles[name]) if s not in selectors)
+    canonical_map = canonical_shell = None
+    for selector in selectors:
+        command = ['make', '-s', '--no-print-directory', '-f', 'Makefile', '-f', '-',
+                   'ARCH=ppc', 'PLATFORM=powermac', *selector, '-W', str(out/'motd.txt'), 'selection']
+        recipe = '.PHONY: selection\nselection: $(KB_ELF)\n\t@echo SELECTED=$(KB_OUT)\n'
+        output = subprocess.check_output(command, input=recipe, cwd=ROOT, text=True)
+        assert output.splitlines()[-1] == 'SELECTED='+str(out), selector
+        image = subprocess.check_output(['isoinfo', '-i', out/'root.iso',
+                                        '-x', '/SYS/SHELL.BIN;1'], cwd=ROOT)
+        # root_pair links in a fresh staging directory for each publication.
+        link_map = (ROOT/out/'PPCKERN.map').read_text()
+        link_map = re.sub(r'(?m)^(OUTPUT\(' + re.escape(str(ROOT/out)) +
+                          r'/)tmp[^/\s]+(/kernel\.elf elf32-powerpc\))$', r'\1<stage>\2', link_map)
+        if canonical_map is None:
+            canonical_shell = (ROOT/shell).read_bytes()
+            canonical_map = link_map
+        assert image and image == canonical_shell, ('ISO shell', selector)
+        assert link_map == canonical_map, ('kernel map', selector)
+    print('PASS product ISO shell and link map for resident selectors')
 
 
 def check_user_selection(root):
@@ -206,11 +256,16 @@ def check_archives(root):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
+    parser.add_argument('--product-selectors', action='store_true')
     args = parser.parse_args()
+    if args.product_selectors:
+        check_product_selectors()
+        sys.exit(0)
     # Copy only make inputs; compiler and generated products are unnecessary.
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
         copy_build_tree(root)
+        copy_kboot_names(root)
         (root / 'Makefile').write_text('include build/config.mk\n-include build/kernel-objects.mk\ninclude build/kernel.mk\n')
         # No libgcc invocation is allowed by these query-only tests.
         check(root)
@@ -218,7 +273,6 @@ if __name__ == '__main__':
         check_fep(root)
         check_loop(root)
         check_user_selection(root)
-        copy_kboot_names(root)
         check_kboot(root)
         if args.mutate:
             for path, anchor, mutant, expected, label in (
@@ -229,10 +283,10 @@ if __name__ == '__main__':
                      'kernel/sqlite_engine.c', AssertionError, 'formatter omitted from PowerPC compile'),
                     ('build/sources/common.mk', 'C_COMMON_CORE = ', 'C_COMMON_CORE = $(C_EXT2_FORMATTER) ',
                      AssertionError, 'formatter linked into PowerMac'),
-                    ('build/images/kboot-sh.mk', 'FEATURE_LOOP = 1', 'FEATURE_LOOP = 0',
+                    ('build/images/kboot-link-sh.mk', 'FEATURE_LOOP = 1', 'FEATURE_LOOP = 0',
                      AssertionError, 'loop disabled on kboot-sh'),
-                    ('build/images/kboot-shell.mk', 'FEATURE_LOOP = 0', 'FEATURE_LOOP = 1',
-                     AssertionError, 'loop enabled on kboot-shell'),
+                    ('build/images/ppc-flags.mk', '$(error KBOOT_SHELL does not support NEGATIVE)', '',
+                     AssertionError, 'negative legacy shell accepted'),
                     ('build/select.mk', '$(error FEATURE_FEP requires FEATURE_SQLITE)', '',
                      AssertionError, 'missing FEP prerequisite'),
                     ('build/features/fep.mk', 'C_FEATURES += kernel/ime/fep_module.c', '',
@@ -248,14 +302,14 @@ if __name__ == '__main__':
                      AssertionError, 'reordered kboot sources'),
                     ('build/platform/powermac.mk', ' platform/powermac/nic_gem.c', '',
                      AssertionError, 'dropped kboot owner entry'),
-                    ('build/sources/common.mk', 'C_COMMON_CLI = kernel/cli/resident_cli.c',
-                     'C_COMMON_CLI = kernel/cli/resident_cli.c kernel/cli/unordered.c',
+                    ('build/sources/common.mk', 'C_COMMON_EXEC += init/shell_loop.c kernel/gui.c',
+                     'C_COMMON_EXEC += init/shell_loop.c kernel/gui.c kernel/cli/unordered.c',
                      AssertionError, 'kboot source added to an owner set'),
                     ('build/images/kboot-link.mk', 'FEATURE_LINK = 1', 'FEATURE_LINK = 0',
                      AssertionError, 'kboot image feature value'),
                     ('build/images/ppc-flags.mk', 'KBOOT_SH := $(if $(filter kboot-sh kboot-link-sh,$(IMAGE)),1,0)',
                      'KBOOT_SH := 0', subprocess.CalledProcessError, 'image name no longer sets its flags'),
-                    ('build/images/ppc-flags.mk', 'ifneq ($(IMAGE),$(KB_IMAGE))', 'ifneq ($(IMAGE),$(IMAGE))',
+                    ('build/images/ppc-flags.mk', 'ifneq ($(if $(filter kboot-sh kboot-shell,$(IMAGE)),kboot-link-sh,$(IMAGE)),$(KB_IMAGE))', 'ifneq ($(IMAGE),$(IMAGE))',
                      AssertionError, 'image name and flags may disagree')):
                 target = root / path
                 source = target.read_text()

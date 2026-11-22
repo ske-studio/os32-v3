@@ -8,7 +8,7 @@ PPC_FLAGS_MK ?= build/images/ppc-flags.mk
 ifeq ($(ARCH),ppc)
 include $(PPC_FLAGS_MK)
 endif
-IMAGE ?= $(if $(filter powermac,$(PLATFORM)),kboot-link,pc98)
+IMAGE ?= $(if $(filter powermac,$(PLATFORM)),kboot-link-sh,pc98)
 ifeq ($(wildcard build/images/$(IMAGE).mk),)
 $(error unknown IMAGE $(IMAGE))
 endif

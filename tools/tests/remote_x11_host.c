@@ -17,12 +17,30 @@ static int mounted, shell_status, serial_phase, serial_pos, serial_eot;
 static char serial_echo[1024];
 static unsigned int echo_len;
 static int lan_exit, resident_active;
+static int boot_check, boot_remote, boot_runs, init_calls;
+static int queued_key = -1;
+static int uart_available = 1, local_escape, child_status, begin_rc;
+static int port_status(u32 *mode, u32 *baud, u32 *fifo)
+{
+    (void)mode; (void)baud; (void)fifo;
+    return uart_available ? 0 : OS32_ERR_NOSYS;
+}
 int sh_in_sfs;
 void sh_status_set(int n) { shell_status = n; }
+static void boot_init(u32 baud) { CHECK(baud == SYS_SERIAL_BAUD && uart_available); ++init_calls; }
+static void boot_terminal(const char *startup_notice)
+{
+    /* startup from ui.c */
+}
 static void shell_print(u8 attr, const char *fmt, ...)
 {
     char text[256];
     va_list ap; va_start(ap, fmt); vsnprintf(text, sizeof(text), fmt, ap); va_end(ap);
+    if (boot_check) {
+        CHECK(init_calls == uart_available);
+        CHECK(!strcmp(text, "startup") && resident_active == boot_remote && !boot_runs);
+        return;
+    }
     if (active) print(attr, "%s", text);
     else {
         CHECK(echo_len + strlen(text) < sizeof(serial_echo));
@@ -58,10 +76,16 @@ static int serial_get(void)
     if (serial_phase == 1) { CHECK(!pending); serial_phase = 2; serial_pos = 0; }
     return "exit\n"[serial_pos++];
 }
-static int local_get(void) { return -1; }
-static int serial_ok(void) { return 1; }
+static int local_get(void)
+{
+    int key = queued_key;
+    queued_key = -1;
+    return key >= 0 ? key : local_escape ? 27 : -1;
+}
+static int serial_ok(void) { CHECK(uart_available); return 1; }
 static void rs_active(int n)
 {
+    if (boot_check) CHECK(init_calls == uart_available);
     if (!n && lan_exit) {
         CHECK(!active && !handle && begins == ends && body_len == 1 && body[0] == 4);
     }
@@ -72,19 +96,24 @@ static void halt(void) { ++tick; }
 static int is_mounted(const char *p) { CHECK(!strcmp(p, "/host")); return mounted; }
 static const char *cwd(void) { return "/"; }
 static int chdir_fake(const char *p) { (void)p; return 0; }
-static int sfs_begin(void) { CHECK(active && mounted); ++sfs_begins; return 0; }
-static int sfs_end(int n) { CHECK(active && n == 0); ++sfs_ends; return 0; }
+static int sfs_begin(void) { CHECK(active && mounted); ++sfs_begins; return begin_rc; }
+static int sfs_end(int n) { CHECK(active && n == child_status); ++sfs_ends; return 0; }
 void sh_refuse(const char *s, int n) { (void)s; (void)n; }
 int execute_command(const char *line)
 {
     CHECK(line);
+    if (boot_check) {
+        CHECK(boot_remote && !strcmp(line, "rshell"));
+        ++boot_runs;
+        return 0;
+    }
     if (!strncmp(line, "os32gui", 7)) {
         CHECK(!active && !handle && accept_ack); ++gui_runs; return SH_STATUS_ERROR;
     }
     if (!strcmp(line, "echo serial")) {
         CHECK(!active && pending); ++executes; return 0;
     }
-    CHECK(active && !frozen && !handle); ++executes; return 0;
+    CHECK(active && !frozen && !handle); ++executes; return sh_in_sfs ? child_status : 0;
 }
 int main(void)
 {
@@ -97,10 +126,26 @@ int main(void)
     api.con_sink_stat = stat_sink; api.con_sink_read = read_sink;
     api.kprintf = shell_print; api.buz_off = buzz;
     api.serial_trygetchar = serial_get; api.kbd_trygetchar_local = local_get;
+    api.serial_get_status = port_status;
     api.serial_is_initialized = serial_ok; api.serial_putchar = serial_put;
     api.rshell_set_active = rs_active; api.sys_is_mounted = is_mounted;
     api.sys_getcwd = cwd; api.sys_chdir = chdir_fake;
     api.sfs_begin = sfs_begin; api.sfs_end = sfs_end;
+    api.serial_init = boot_init;
+    boot_check = 1;
+    for (int mask = 0; mask < 4; ++mask) {
+        uart_available = mask & 1;
+        api.host_notice_read = (mask & 2) ? read_notice : 0;
+        resident_active = boot_runs = init_calls = 0;
+        boot_remote = mask != 0;
+        int eots_before_start = serial_eot;
+        queued_key = 'e';
+        boot_terminal("startup");
+        CHECK(local_get() == 'e' && local_get() == -1);
+        CHECK(boot_runs == boot_remote && init_calls == uart_available);
+        CHECK(resident_active == boot_remote && serial_eot == eots_before_start);
+    }
+    boot_check = resident_active = 0;
     char *argv[] = { "rshell" };
     CHECK(cmd_rshell_resident(1, argv) == 0);
     CHECK(executes == 2 && serial_eot == 3 && !pending);
@@ -108,7 +153,9 @@ int main(void)
     unsigned int reads = serial_reads;
     for (int i = 0; i < 3; i++) {
         const char *cmd = i == 0 ? "gui" : i == 1 ? "os32gui" : "os32gui -t 30";
+        unsigned int previous = out_count;
         accept_ack = 0; queue(21 + i, cmd); CHECK(rsh_lan_poll() == 1);
+        CHECK(out_count == previous + 2); /* ACCEPT and one final OUT. */
         CHECK(gui_runs == (unsigned int)i + 1 && accept_ack);
         CHECK(!strncmp(request, "RSH OUT ", 8));
         CHECK(body[body_len - 1] == 4 && strstr(body, "os32gui: launch failed"));
@@ -140,6 +187,31 @@ int main(void)
     queue(34, "stale after exit");
     rsh_lan_reset();
     CHECK(!pending);
+    lan_exit = 0;
+    begin_rc = OS32_ERR_BUSY;
+    unsigned int runs = executes;
+    queue(37, "sfs run echo busy"); CHECK(rsh_lan_poll() == 1);
+    CHECK(shell_status == SH_STATUS_ERROR && executes == runs && sfs_ends == 1);
+    begin_rc = 0;
+    child_status = 139;
+    queue(38, "sfs run fault"); CHECK(rsh_lan_poll() == 1);
+    CHECK(shell_status == 139 && sfs_ends == 2 && !sh_in_sfs && !active && begins == ends);
+    local_escape = 1;
+    api.host_notice_read = 0;
+    serial_pos = 0;
+    CHECK(cmd_rshell_resident(1, argv) == 0 && !resident_active);
+    uart_available = 0;
+    reads = serial_reads; eots = serial_eot;
+    CHECK(cmd_rshell_resident(1, argv) == SH_STATUS_ERROR && !resident_active);
+    api.host_notice_read = read_notice;
+    CHECK(cmd_rshell_resident(1, argv) == 0 && !resident_active);
+    CHECK(serial_reads == reads && serial_eot == eots);
+    open_error = OS32_ERR_NOSYS;
+    CHECK(rsh_lan_poll() == OS32_ERR_NOSYS);
+    open_error = 0; next_ready(); notice_error = OS32_ERR_NOSYS;
+    CHECK(rsh_lan_poll() == OS32_ERR_AGAIN);
+    count = ready_count; next_ready();
+    CHECK(rsh_lan_poll() == OS32_ERR_AGAIN && ready_count == count);
     puts("GREEN X11: serial half-line, LAN ownership, ACCEPT/200/END, scope, serial echo/EOT/exit");
     return 0;
 }

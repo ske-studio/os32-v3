@@ -81,7 +81,7 @@ u32 ppc_trap_msr(void) { return trap_msr; }
 u32 ppc_root_current(void) { return 0; }
 void ppc_trap_stop(void) { finish(90); }
 void ppc_trap_fatal_sink(const struct ppc_frame *f, u32 r) { (void)f; (void)r; finish(91); }
-void ring3_fault_kill(void) { finish(92); }
+void ppc_user_fault_kill(void) { finish(92); }
 void exec_syscall_dispatch(struct arch_syscall *call)
 {
     (void)call;

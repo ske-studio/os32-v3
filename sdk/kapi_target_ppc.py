@@ -84,7 +84,6 @@ PROVIDER_GROUPS = {
         'ime_is_active',
         'ime_set_mode',
         'ime_get_mode',
-        'ime_getkey',
         'ime_switch_dict',
         'ime_user_list',
         'ime_user_delete',

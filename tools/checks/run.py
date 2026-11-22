@@ -401,6 +401,8 @@ PATH_AUDIT_ALLOW = {
         "recipe inventory and H5 artifacts use private TemporaryDirectory roots only",
     ("check-type-contract", "tools/build_compare.py"):
         "H5 calls compare on private fixture roots; snapshot/build main is never invoked",
+    ("check-ppc-kboot-layout", "tools/gen_memmap.py"):
+        "--layout-header reads include/memmap.h and returns before artifact checks",
     ("check-target-profile-host", "tools/gen_memmap.py"):
         "unsupported target is rejected before reading layout artifacts",
     "tools/tests/test_build_selection.py": "make fixture has a private build directory",

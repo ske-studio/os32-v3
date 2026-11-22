@@ -8,22 +8,24 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = [
+    ("head-wrap", "(slot + 1) % GEM_RX_RING_COUNT", "(slot + 1) & 31", "H:kick-value"),
+    ("kick-mask", "(g->rx_head + GEM_RX_PUBLISHED) % GEM_RX_RING_COUNT", "(g->rx_head + GEM_RX_PUBLISHED) & 31", "H:kick-value"),
     ('completion-read', 'completion = g->io.read32(g->io.ctx, GEM_RX_COMPLETION);',
      'completion = 0;', 'H:completed-zero'),
     ('completion-ignore', 'while (*budget && g->rx_head != completion)',
      'while ((void)completion, *budget)', 'H:completed-zero'),
     ('completion-off-by-one', 'g->rx_head != completion',
-     '(g->rx_head + 1) % GEM_RING_COUNT != completion', 'H:completed-zero'),
+     '(g->rx_head + 1) % GEM_RX_RING_COUNT != completion', 'H:completed-zero'),
     ('owned', 'if (flags & GEM_RD_OWN)', 'if (!(flags & GEM_RD_OWN))', 'H:completed-zero'),
-    ('producer', '(slot + GEM_RX_PUBLISHED) % GEM_RING_COUNT', 'slot', 'H:golden'),
+    ('producer', '(slot + GEM_RX_PUBLISHED) % GEM_RX_RING_COUNT', 'slot', 'H:golden'),
     ('offset', 'buf[i + 2]', 'buf[i + 0]', 'H:completed-1307'),
     ('crc', '(flags & GEM_RD_BAD_CRC) || ', '', 'H:bad'),
     ('budget', 'u32 b = GEM_RX_SCAN_BUDGET;', 'u32 b = GEM_RX_SCAN_BUDGET + 1;', 'H:A11 budget'),
     ('budget-decrement', '(*budget)--;', '(void)budget;', 'H:some-budget'),
     ('kick-count', 'g->rx_head % 4 == 0', '1', 'H:incomplete'),
-    ('kick-value', '(g->rx_head + GEM_RX_PUBLISHED) & 31', 'g->rx_head', 'H:completed-later'),
+    ('kick-value', '(g->rx_head + GEM_RX_PUBLISHED) % GEM_RX_RING_COUNT', 'g->rx_head', 'H:completed-later'),
     ('postread', 'if (g->io.sync(buf, GEM_BUF_SIZE, DMA_POSTREAD)) return GEM_EIO;', 'if (0) return GEM_EIO;', 'H:buffer-read'),
-    ('kick-off-by-one', '(g->rx_head + GEM_RX_PUBLISHED) & 31', '(g->rx_head + GEM_RX_PUBLISHED + 1) & 31', 'H:completed-later'),
+    ('kick-off-by-one', '(g->rx_head + GEM_RX_PUBLISHED) % GEM_RX_RING_COUNT', '(g->rx_head + GEM_RX_PUBLISHED + 1) % GEM_RX_RING_COUNT', 'H:completed-later'),
     ('desc-postread', 'if (g->io.sync(desc, GEM_DESC_SIZE, DMA_POSTREAD)) return GEM_EIO;', 'if (0) return GEM_EIO;', 'H:desc-read'),
     ('late-postread', 'if (g->io.sync(buf, GEM_BUF_SIZE, DMA_POSTREAD)) return GEM_EIO;', '/* delayed sync */', 'H:buffer-read'),
 ]
@@ -36,7 +38,7 @@ def instrument(source):
 
 def check(source, temp):
     exe = temp / 'test'
-    cmd = ['gcc', '-m32', '-std=gnu11', '-ffreestanding', '-fno-pie', '-no-pie', '-nostdlib', '-static', '-fno-stack-protector', '-Wall', '-Wextra', '-Werror', '-I.', '-Iinclude', '-Idrivers/net/gem', str(source), 'drivers/net/gem/gem_ring.c', 'tools/ppc/lan_p19_fake.c', '-o', str(exe)]
+    cmd = ['gcc', '-m32', '-nostdinc', '-std=gnu11', '-ffreestanding', '-fno-pie', '-no-pie', '-nostdlib', '-static', '-fno-stack-protector', '-Wall', '-Wextra', '-Werror', '-I.', '-Iinclude', '-Idrivers/net/gem', str(source), 'drivers/net/gem/gem_ring.c', 'tools/ppc/lan_p19_fake.c', '-o', str(exe)]
     build = subprocess.run(cmd, cwd=ROOT, text=True, capture_output=True)
     if build.returncode:
         raise RuntimeError('compile: ' + build.stderr)

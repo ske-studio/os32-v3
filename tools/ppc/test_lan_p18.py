@@ -13,15 +13,15 @@ MUTATIONS = [
     ('short-sync', 'g->io.sync(buf, length, DMA_PREWRITE)', 'g->io.sync(buf, 1, DMA_PREWRITE)', 'H:sync-range'),
     ('postwrite', 'g->io.sync(base + GEM_POOL_TX_BUF + g->tx_tail * GEM_BUF_SIZE,\n                       GEM_BUF_SIZE, DMA_POSTWRITE)', '(base != 0 && 0)', 'H:postwrite'),
     ('pad', 'buf[i] = 0;', 'buf[i] = 1;', 'H:sync-pad'),
-    ('kick', 'GEM_TX_KICK, next);', 'GEM_TX_KICK, (next + 1) % GEM_RING_COUNT);', 'H:kick'),
-    ('full', 'g->tx_pending >= 31', 'g->tx_pending >= 32', 'H:full'),
+    ('kick', 'GEM_TX_KICK, next);', 'GEM_TX_KICK, (next + 1) % GEM_TX_RING_COUNT);', 'H:kick'),
+    ('full', 'g->tx_pending >= GEM_TX_RING_COUNT - 1', 'g->tx_pending >= 32', 'H:full'),
     ('overrun', 'if (count > g->tx_pending) return GEM_EIO;', 'if (0) return GEM_EIO;', 'H:overrun'),
     ('timeout', 'g->tx_pending && now - g->tx_started >= (unsigned long long)g->io.tb_hz * 5', '0', 'H:timeout'),
     ('limit', 'budget < 8 ? budget : 8', 'budget', 'H:limit'),
 ]
 def check(source, temp):
     exe = temp / 'test'
-    cmd = ['gcc', '-m32', '-std=gnu11', '-ffreestanding', '-fno-pie', '-no-pie', '-nostdlib', '-static', '-fno-stack-protector', '-Wall', '-Wextra', '-Werror', '-I.', '-Iinclude', '-Idrivers/net/gem', str(source), 'drivers/net/gem/gem_ring.c', 'drivers/net/gem/gem_reset.c', 'tools/ppc/lan_p18_fake.c', '-o', str(exe)]
+    cmd = ['gcc', '-m32', '-nostdinc', '-std=gnu11', '-ffreestanding', '-fno-pie', '-no-pie', '-nostdlib', '-static', '-fno-stack-protector', '-Wall', '-Wextra', '-Werror', '-I.', '-Iinclude', '-Idrivers/net/gem', str(source), 'drivers/net/gem/gem_ring.c', 'drivers/net/gem/gem_reset.c', 'tools/ppc/lan_p18_fake.c', '-o', str(exe)]
     build = subprocess.run(cmd, cwd=ROOT, text=True, capture_output=True)
     if build.returncode:
         raise RuntimeError('compile: ' + build.stderr)

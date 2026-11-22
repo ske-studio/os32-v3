@@ -630,15 +630,17 @@ void shell_run(const char *startup_notice) {
     /* 初期化時に自動シリアル＆rshell開始
      * D2(a): sh.bin では呼ばない。シリアルを初期化すると rshell_active の
      * タイムアウト (kbd_getchar が一定時間でスペースを返す) まで巻き込む。 */
-    g_api->serial_init(SYS_SERIAL_BAUD);
+    int uart = g_api->serial_get_status(0, 0, 0) != OS32_ERR_NOSYS;
+    if (uart) g_api->serial_init(SYS_SERIAL_BAUD);
+    int remote = (uart && g_api->serial_is_initialized()) || g_api->host_notice_read;
     /* 起動案内も rshell と同じ画面・シリアルの経路へ。 */
-    g_api->rshell_set_active(1);
+    if (remote) g_api->rshell_set_active(1);
 #endif
 
     if (startup_notice) g_api->kprintf(ATTR_WHITE, "%s", startup_notice);
 
 #ifndef SHELL_AS_APP
-    (void)execute_command("rshell");
+    if (remote) (void)execute_command("rshell");
 #endif
 
     for (;;) {

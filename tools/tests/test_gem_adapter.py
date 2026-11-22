@@ -29,7 +29,7 @@ def run(ctx):
                     ['.', 'include', 'platform/powermac', 'sdk/include']]
         def exercise(text, good, link=False):
             source.write_text(text)
-            subprocess.run(['gcc', '-m32', '-std=gnu11', '-Wall', '-Wextra',
+            subprocess.run(['gcc', '-m32', '-nostdinc', '-isystem', subprocess.check_output(['gcc', '-print-file-name=include'], text=True).strip(), '-std=gnu11', '-Wall', '-Wextra',
                 '-DKBOOT_LINK='+str(int(link)), '-Werror', '-fno-pie', '-nostdlib', '-static', '-no-pie',
                 *includes, '-DGEM_ADAPTER_SOURCE="' + str(source) + '"',
                 str(ctx.root / 'tools/tests/gem_adapter_host.c'),

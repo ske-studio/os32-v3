@@ -30,7 +30,7 @@ def main():
                 cases.append((name, original.replace(old, new), marker, diagnostic))
         for name, source, marker, diagnostic in cases:
             (path / 'lan_diag.c').write_text(source)
-            cmd = ['gcc', '-m32', '-std=gnu11', '-ffreestanding', '-fno-pie', '-no-pie', '-nostdlib', '-static', '-fno-stack-protector', '-fno-builtin', '-Wall', '-Wextra', '-Werror', '-I'+tmp, '-I.', '-Iplatform/powermac', '-Iarch/ppc', '-Iinclude', 'tools/ppc/lan_p24d_test.c', '-o', str(path/'test')]
+            cmd = ['gcc', '-m32', '-nostdinc', '-std=gnu11', '-ffreestanding', '-fno-pie', '-no-pie', '-nostdlib', '-static', '-fno-stack-protector', '-fno-builtin', '-Wall', '-Wextra', '-Werror', '-I'+tmp, '-I.', '-Iplatform/powermac', '-Iarch/ppc', '-Iinclude', 'tools/ppc/lan_p24d_test.c', '-o', str(path/'test')]
             c = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, timeout=60)
             if c.returncode: raise RuntimeError(name+' compile: '+c.stderr)
             r = subprocess.run(['qemu-i386', str(path/'test')], capture_output=True, text=True, timeout=60)

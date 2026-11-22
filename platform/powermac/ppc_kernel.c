@@ -56,7 +56,7 @@
 #include "console.h"
 #include "text_screen.h"
 #if KBOOT_SH
-#include "shell_boot.h"
+#include "shell_loop_ops.h"
 #include "input_boot.h"
 #include "hostfs.h"
 #include "usb_boot.h"
@@ -64,8 +64,6 @@
 #include "platform/powermac/link_platform.h"
 #include "kernel/idle_work.h"
 #endif
-#else
-#include "cli_boot.h"
 #endif
 #include "exec_boot.h"
 #include "exec.h"
@@ -194,6 +192,58 @@ static int lan_log_rc;
 static int root_ready;
 #endif
 
+#if KBOOT_SHELL_LAYOUT_DIAG
+#include "ppc_pd.h"
+
+static u32 layout_read(u32 pa, void *unused)
+{
+    (void)unused;
+    return *(const u32 *)P2V(pa);
+}
+
+static void report_regions(const char *name, const struct pm_regions *regions)
+{
+    for (unsigned i = 0; i < regions->count; i++) {
+        const struct pm_region *r = &regions->v[i];
+        kprintf(KBOOT_ATTR, "KBOOT OF-RANGE %s %u %u\r\n",
+                name, r->start, r->start + r->size);
+    }
+}
+
+static void shell_layout_report(const struct pm_kboot_info *info)
+{
+    u32 root = arch_mmu_current_root();
+    u32 resident_end = (u32)&__kernel_resident_end;
+    report_regions("reg", &info->ram);
+    report_regions("available", &info->available);
+    kprintf(KBOOT_ATTR, "KBOOT OF-IMAGE end=%u reserved=%u reg=%u available=%u\r\n",
+            resident_end, info->image_end - resident_end, info->ram.count, info->available.count);
+    unsigned image = 0, heap = 0, stack = 0, guard = 0, available = 0;
+    for (u32 va = MEM_SHELL_LOAD_ADDR; va < MEM_SHELL_STACK_TOP; va += PAGE_SIZE) {
+        struct ppc_translation t;
+        u32 end = va + PAGE_SIZE, cursor = va;
+        for (unsigned i = 0; i < info->available.count && cursor < end; i++) {
+            const struct pm_region *r = &info->available.v[i];
+            if (r->start > cursor) break;
+            if (r->start + r->size > cursor) cursor = r->start + r->size;
+        }
+        available += cursor >= end;
+        int mapped = ppc_pd_lookup_read(root, va, 1, 0, &t, layout_read, NULL);
+        if (va == MEM_SHELL_GUARD) {
+            guard = !mapped && !(paging_pte_raw(va) & PTE_PRESENT);
+            continue;
+        }
+        if (!mapped || t.pa != va || t.attr != 0x10 ||
+            !(paging_pte_raw(va) & PTE_RW)) continue;
+        if (va < MEM_SHELL_HEAP_BASE) image++;
+        else if (va < MEM_SHELL_GUARD) heap++;
+        else stack++;
+    }
+    kprintf(KBOOT_ATTR, "KBOOT SHELL-LAYOUT image=%u heap=%u guard=%u stack=%u available=%u\r\n",
+            image, heap, guard, stack, available);
+}
+#endif
+
 /* 局面 1 (EE=0): ログ・共通の mm・トラップの実証・時計・MPIC。 */
 void platform_boot_machine(void)
 {
@@ -232,6 +282,9 @@ void platform_boot_machine(void)
         pm_pci_boot(&pci, lan_boot.bdf);
     }
     if (!memory_boot_init(KBOOT_MEM_KB)) kboot_stop("memory_boot_init");
+#if KBOOT_SHELL_LAYOUT_DIAG
+    shell_layout_report(info);
+#endif
     shm_init();
     /* Same contract as x86 kernel_boot_memory(): shm_free/shm_lock toggle RW
      * on the *shared USER* mapping that paging_boot_user_shared() establishes
@@ -428,17 +481,10 @@ void platform_boot_run(void)
     if (root_ready) {
 #if OS32_HOOK_KAPI_DB
         /* Keep SQLite boot diagnostics on the registered log streams. */
-        int saved_stream_only = pm_log_stream_only;
-        pm_log_stream_only = 1;
         kprintf(KBOOT_ATTR, "[sqlite] static rc=%d\n", sqlite_static_boot());
-        pm_log_stream_only = saved_stream_only;
 #endif
         pm_exec_boot();
-#if KBOOT_SH
-        pm_shell_boot();
-#else
-        pm_cli_boot();
-#endif
+        shell_loop_run(&pm_shell_loop_ops);
     }
 #endif
     for (;;) pm_lan_poll(tb_now());

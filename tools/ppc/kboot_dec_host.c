@@ -16,7 +16,7 @@ u32 ppc_trap_msr(void) { return 0x30; }
 u32 ppc_root_current(void) { return 0; }
 void ppc_trap_stop(void) { __builtin_trap(); }
 void ppc_trap_fatal_sink(const struct ppc_frame *f, u32 r) { (void)f; (void)r; __builtin_trap(); }
-void ring3_fault_kill(void) { __builtin_trap(); }
+void ppc_user_fault_kill(void) { __builtin_trap(); }
 void exec_syscall_dispatch(struct arch_syscall *c) { (void)c; __builtin_trap(); }
 static void handler(struct ppc_frame *unused)
 {

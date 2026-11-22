@@ -5,10 +5,9 @@
 enum {
     APP_LEASES = 3,
     JIS_A = 0x3021,
-    KCG_HEADER_BYTES = 16,
     KCG_JIS_COLUMNS = 94,
     KCG_GLYPH_BYTES = 32,
-    A_OFFSET = KCG_HEADER_BYTES + (0x30 - 0x21) * KCG_JIS_COLUMNS * KCG_GLYPH_BYTES,
+    A_OFFSET = KCG_JIS_COLUMNS * KCG_GLYPH_BYTES,
 };
 
 static int probe(KernelAPI *api, int leave_open)
@@ -23,8 +22,9 @@ static int probe(KernelAPI *api, int leave_open)
     u32 ids[APP_LEASES], size;
     u8 glyph[KCG_GLYPH_BYTES];
 
+    const char *path = leave_open ? SYS_FB_FONT : "/fonts/jisrows.bin";
     for (int i = 0; i < APP_LEASES; ++i) {
-        int rc = api->font_source_open(SYS_FB_FONT, &ids[i], &size);
+        int rc = api->font_source_open(path, &ids[i], &size);
         if (rc == OS32_ERR_NOSYS)
             return 10;
         if (rc != 0)

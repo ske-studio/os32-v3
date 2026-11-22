@@ -17,7 +17,9 @@ static void die(const char *s) { print(s); __asm__ volatile("int $0x80" : : "a"(
 void _start(void) {
     struct gem g = {0}; struct pm_gmac_boot boot = {0}; const struct pm_lan_diag *d;
     const u32 sw[17] = {9,1,2, 3,4, 5,6, 7,8, 9,10, 11,12, 13,14,15,16};
-    const u32 mw[8] = {0,0xf00000,0x1000000,0x20000,0x1100000,0x40000,0x400000,0x30000};
+    /* GEM RX has 128 buffers, including the four unpublished descriptors. */
+    const u32 rx_start = 0x420000, rx_end = rx_start + 128 * 2048;
+    const u32 mw[8] = {0,0xf00000,0x1000000,0x20000,0x1100000,0x40000,0x400000,rx_end - 0x400000};
     u8 expected[256] = {0}; u32 i,j,pa;
     info.admitted_end=mw[1]; info.image_first=mw[2]; info.image_end=mw[2]+mw[3]; info.hpt_pa=mw[4]; info.hpt_bytes=mw[5]; info.tb_hz=0x12345678;
     g.dma.pa=mw[6]; g.dma.bytes=mw[7]; g.phy_id1=1; g.phy_id2=2; g.io.tb=tb;
@@ -27,7 +29,7 @@ void _start(void) {
     for(i=0;i<6;i++) { boot.mac[i]=(u8)(0x20+i); boot.peer_mac[i]=(u8)(0x30+i); }
     d=pm_lan_diag_snapshot(&boot,&g,9,0xb0000000cULL);
     print("reached=range\n");
-    if(d->peek_ok_count!=2 || d->peek_ok[0].base!=0 || d->peek_ok[0].size!=0x420000 || d->peek_ok[1].base!=0x430000 || d->peek_ok[1].size!=0xad0000) die("H:A10 read-range\n");
+    if(d->peek_ok_count!=2 || d->peek_ok[0].base!=0 || d->peek_ok[0].size!=rx_start || d->peek_ok[1].base!=rx_end || d->peek_ok[1].size!=mw[1] - rx_end) die("H:A10 read-range\n");
     print("reached=status\n");
     for(i=0;i<17;i++) if(d->status[i]!=sw[i]) die("H:status\n");
     for(i=0;i<8;i++) if(d->memory[i]!=mw[i]) die("H:memory\n");

@@ -6,16 +6,14 @@ from pathlib import Path
 import re
 import struct
 import subprocess
+import sys
 import tempfile
 import time
 
+from kboot_accept import fixed_layout, linked_image
+
 ROOT = Path(__file__).resolve().parents[2]
-CHECK = dict(name='ppc-kboot-layout', tier=2, budget=60,
-             covers=['arch/ppc/kernel.ld', 'platform/powermac/platform_kboot_layout.h',
-                     'include/memmap.h', 'tools/gen_memmap.py',
-                     'tools/ppc/kboot_layout.py', 'lib/kstring_c.c', 'lib/kstring.h',
-                     'lib/crc32.c', 'lib/crc32_core.inc', 'lib/crc32.h',
-                     'include/types.h'])
+
 
 
 def command(args):
@@ -24,6 +22,96 @@ def command(args):
     if result.returncode:
         raise RuntimeError(result.stderr)
     return result.stdout
+
+
+def acceptance_extent(path):
+    _, _, symbols, _ = linked_image(path)
+    end, chain = symbols['__kernel_resident_end'], symbols['__kernel_chain_end']
+    print(f'{path}: resident_end={end:#x} chain={chain:#x}', flush=True)
+    return end, chain
+
+
+def report_acceptance(paths, label='selected images'):
+    extents = [acceptance_extent(path) for path in paths]
+    print(f'{label} maximum resident_end={max(end for end, _ in extents):#x} '
+          f'chain={max(chain for _, chain in extents):#x}')
+
+
+def acceptance_images(inputs):
+    for path in inputs:
+        if path.is_file():
+            yield path
+            continue
+        # The map belongs to the link, including for boot_info's post-link
+        # ISO mutation. CD staging copies have no map and are not links.
+        maps = sorted(path.rglob('PPCKERN.map'))
+        if not maps:
+            raise ValueError(f'no linked acceptance images under {path}')
+        for link_map in maps:
+            boot_image = link_map.with_name('unverified.elf')
+            yield boot_image if boot_image.is_file() else link_map.with_suffix('.ELF')
+
+
+def check_acceptance_controls(work):
+    # Link the large instrumented RSH image and the font lease regression
+    # with the acceptance recipes, including their real embedded roots.
+    sys.path.insert(0, str(ROOT / 'tools/accept'))
+    from kboot_accept import build
+    import link_sh_run
+    import ppc_font
+
+    images = []
+    for name in ('link-sh', 'font'):
+        folder = work / name
+        folder.mkdir()
+        options = (link_sh_run.settings(folder, observe_flow=True) if name == 'link-sh'
+                   else ppc_font.settings(folder))
+        images.append(build(folder / 'kernel', '-j4', *options, 'kb-user', 'kernel'))
+    report_acceptance(images, 'control images')
+
+
+def report_product(path):
+    from root_lz4_inventory import measure
+    _, load, symbols, layout = linked_image(path)
+    _, _, va, _, raw, memory, _, _ = load
+    end, chain = symbols['__kernel_resident_end'], symbols['__kernel_chain_end']
+    shell = layout['MEM_SHELL_LOAD_ADDR']
+    guard = layout['MEM_SHELL_GUARD']
+    rows = [
+        (va, end, 'kernel PT_LOAD', 'kernel.ld'),
+        (end, chain, 'heap/KAPI/guards/SHM', 'kernel.ld'),
+        (chain, layout['MEM_FIXED_PAGING_GUARD_BASE'], 'chain slack', 'kernel.ld'),
+        (0x3e0000, layout['MEM_FIXED_PAGING_BASE'], 'paging guard', 'memmap.h'),
+        (0x3e1000, layout['MEM_FIXED_PAGING_FRAME_END'], 'page tables', 'memmap.h'),
+        (layout['MEM_STACK_GUARD'], layout['MEM_KSTACK_BASE'], 'kernel guard', 'memmap.h'),
+        (0x3fc000, shell, 'kernel stack', 'memmap.h'),
+        (0x400000, shell + layout['MEM_SHELL_MAX_SIZE'], 'shell image', 'memmap.h'),
+        (0x4a5000, layout['MEM_SHELL_HEAP_BASE'], 'libc headroom', 'memmap.h'),
+        (0x4b5000, guard, 'exec heap', 'memmap.h'),
+        (0x4f5000, guard + layout['MEM_PAGE_SIZE'], 'shell guard', 'paging_boot.inc'),
+        (0x4f6000, layout['MEM_SHELL_STACK_TOP'], 'shell stack', 'memmap.h')]
+    cursor = 0x100000
+    for first, stop, use, basis in rows:
+        assert first == cursor and first <= stop, use
+        print(f'{first:#08x} {stop:#08x} {use:22} {basis}')
+        cursor = stop
+    assert cursor == layout['MEM_POOL_BASE'] == 0x500000
+    iso = path.parent/'root.iso'
+    contents = iso.read_bytes()
+    measure(path, iso=iso)
+    root = len(contents)
+    sectors, = struct.unpack_from('<I', contents, 16 * 2048 + 80)
+    assert sectors * 2048 == root
+    names = command(['isoinfo', '-i', iso, '-f']).splitlines()
+    assert '/SYS/SHELL.BIN;1' in names
+    assert all('/BIN/'+name+'.BIN;1' not in names for name in ('SH', 'HELLO', 'FAULT'))
+    shell_bytes = subprocess.check_output(['isoinfo', '-i', iso, '-x', '/SYS/SHELL.BIN;1'])
+    assert shell_bytes == (ROOT/'build/out/ppc-user/link-sh/shell.bin').read_bytes()
+
+    bss = symbols['__bss_end'] - symbols['__bss_start']
+    print(f'PT_LOAD raw={raw} memory={memory} BSS={bss} root={root} '
+          f'resident_end={end:#x} chain={chain:#x} chain_slack={0x3e0000-chain} ISO_sectors={sectors}')
+    return end
 
 
 def verify(work, script, cc, prefix):
@@ -74,9 +162,7 @@ const unsigned layout[] = {PM_KERNEL_BASE, PM_KERNEL_IMAGE_MAX,
     assert syms['__kernel_resident_end']-base <= budget
     assert syms['__kernel_chain_end'] <= limit == 0x3e0000
     ph = [struct.unpack_from('>8I', elf, hdr[5]+i*hdr[9]) for i in range(hdr[10])]
-    loads = [p for p in ph if p[0] == 1]
-    assert len(loads) == 1
-    p = loads[0]
+    p, = [p for p in ph if p[0] == 1 and p[2] == base]
     assert p[2] == p[3] == base and p[2]+p[5] == syms['__kernel_resident_end']
     assert p[2]+p[4] == syms['__kernel_file_end'] and p[5] > p[4]
     note = next(p for p in ph if p[0] == 4)
@@ -95,18 +181,45 @@ const unsigned layout[] = {PM_KERNEL_BASE, PM_KERNEL_IMAGE_MAX,
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
+    parser.add_argument('--product', type=Path, help='inspect linked PPCKERN.ELF and adjacent map/ISO')
+    parser.add_argument('--acceptance-controls', action='store_true')
+    parser.add_argument('--acceptance', type=Path, nargs='+',
+                        help='inspect actual acceptance ELF files or complete suite output trees')
     args = parser.parse_args()
+    if args.acceptance:
+        report_acceptance(acceptance_images(args.acceptance), 'acceptance')
+        return
+    if args.product:
+        report_product(args.product)
+        return
     prefix = str(Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc')) / 'bin/powerpc-elf-')
     started = time.monotonic()
     with tempfile.TemporaryDirectory(prefix='kboot-layout-', dir=os.environ.get('TMPDIR')) as tmp:
         work = Path(tmp)
         command(['python3', '-B', 'tools/gen_memmap.py', '--layout-header', work/'memmap_layout.h'])
         script = (ROOT/'arch/ppc/kernel.ld').read_text()
+        fixed_layout(work/'memmap_layout.h')
         verify(work, script, prefix+'gcc', prefix)
         destination = Path(os.environ.get('TMPDIR', str(work)))
         (destination/'kboot-layout-readelf.txt').write_text((work/'readelf.txt').read_text())
         print('PASS product link / ELF / note / BSS / stack / ledger / oversize')
+        if args.acceptance_controls:
+            check_acceptance_controls(work)
         if args.mutate:
+            header = (ROOT/'include/memmap.h').read_text()
+            anchor = '#define MEM_SHELL_MAX_SIZE 0x0A5000UL'
+            assert header.count(anchor) == 1
+            (work/'include').mkdir()
+            (work/'include/memmap.h').write_text(header.replace(anchor, anchor.replace('A5000', 'A4000')))
+            mutant = work/'smaller.h'
+            command(['python3', '-B', 'tools/gen_memmap.py', '--root', work, '--layout-header', mutant])
+            try:
+                fixed_layout(mutant)
+            except AssertionError as error:
+                assert str(error) == 'MEM_SHELL_MAX_SIZE'
+                print('RED shell-image-minus-page')
+            else:
+                raise AssertionError('SURVIVED shell-image-minus-page')
             mutations = {
                 'remove-budget-asserts': re.sub(r'    ASSERT\(__kernel_(?:resident_end - __kernel_image_start|chain_end).*?\)\n', '', script, flags=re.S),
                 'shift-base': script.replace('. = PM_KERNEL_BASE;', '. = PM_KERNEL_BASE + PM_KERNEL_PAGE_SIZE;'),

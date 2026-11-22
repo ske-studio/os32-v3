@@ -6,6 +6,7 @@ kernel guard); B1 is enforced by the existing build audit. The FP probe uses
 raw KAPI output; USER startup links the shared newlib closure.
 """
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -156,12 +157,17 @@ def main():
     cpus = ('7450', '7455') if args.cpu == 'both' else (args.cpu,)
     if args.emit_mutants:
         work = args.emit_mutants.resolve(); work.mkdir(parents=True, exist_ok=True)
+    seen = set()
     for name in names:
         folder = work/name; folder.mkdir()
         opts = settings(folder, name)
         (folder/'settings.json').write_text(json.dumps(opts, indent=2))
         if args.emit_mutants: continue
         elf = build(folder/'kernel', *opts)
+        digest = hashlib.sha256(elf.read_bytes()).hexdigest()
+        assert digest not in seen, (name, digest)
+        seen.add(digest)
+        print(name, digest, flush=True)
         if args.build_only: continue
         for cpu in cpus:
             observe(elf, cpu, folder/cpu, name)

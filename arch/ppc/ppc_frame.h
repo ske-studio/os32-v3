@@ -9,6 +9,7 @@
 #define PPC_FRAME_DAR 152
 #define PPC_FRAME_DSISR 156
 #define PPC_FRAME_VECTOR 160
+#define KFRAME_BUSY 164
 #define PPC_FRAME_SIZE 176
 #define PPC_CALL_SIZE 32
 #define PPC_KERNEL_STACK_SIZE 16384
@@ -29,7 +30,11 @@
 struct ppc_vector_image { const void *src; u32 size; };
 struct ppc_frame {
     u32 gpr[32], lr, cr, ctr, xer, srr0, srr1, dar, dsisr, vector;
+    u32 *busy; /* Supervisor trap slot, valid only for a claimed kernel frame. */
 };
+#if __SIZEOF_POINTER__ == 4
+_Static_assert(__builtin_offsetof(struct ppc_frame, busy) == KFRAME_BUSY, "kernel frame busy ABI");
+#endif
 struct ppc_cpu_save { u32 r28, r29, r30, r31, cr, srr0, srr1, dar, dsisr; };
 extern struct ppc_cpu_save ppc_cpu_save;
 extern const struct ppc_vector_image ppc_vectors;

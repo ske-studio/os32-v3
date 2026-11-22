@@ -1,163 +1,72 @@
 #!/usr/bin/env python3
-"""S-B Q1/Q2 through the real CLI, with serial input substitution or LAN."""
+"""Check repeated USER exit and fault recovery through the resident RSH."""
 import argparse
+import hashlib
 import os
 from pathlib import Path
-import re
-import shutil
-import subprocess
 import tempfile
-import time
 
 from kboot_accept import build, mutant_settings
-from kboot_run import ROOT, ROM, QMP, command, require, serial, validate_root as validate, PREFIX
-import shell_run
-
-CHECK = dict(name='ppc-sb', tier=2, budget=900, needs=[],
-             covers=['tools/ppc/sb_run.py', 'tools/ppc/shell_run.py',
-                     'tools/mkroot_image.py', 'build/ppc-user.mk',
-                     'userland/ppc/fault.c'],
-             inputs=['build/targets/ppc-powermac.mk', 'platform/powermac/cli_boot.c',
-                     'arch/ppc/kapi_call.c', 'arch/ppc/kernel_trap.c',
-                     'tools/ppc/kboot_accept.py', 'tools/ppc/kboot_run.py',
-                     'tools/ppc/run.py', 'userland/ppc/hello.c'])
-
-# Substitute only the input device; parsing, exec_run, output and reclamation
-# are the product paths. READY gives the parent time to eject before execution.
-INPUT = r'''
-#include "kprintf.h"
-#include "kernel_tick.h"
-__attribute__((noinline, noreturn)) void sb_done(void)
-{
-    /* MSR[EE]=0 first: a decrementer interrupt must not move the stop PC. */
-    __asm__ volatile("mfmsr 3\n rlwinm 3,3,0,17,15\n mtmsr 3\n isync\n"
-                     ".globl sb_stop\nsb_stop: b sb_stop" ::: "r3", "memory");
-    __builtin_unreachable();
-}
-static int sb_getkey(void)
-{
-    static const char commands[] = "/bin/hello.bin ok\n/bin/hello.bin ok\n/bin/fault.bin\n/bin/hello.bin ok\n";
-    static unsigned int pos;
-    if (!pos) {
-        u32 start = tick_count;
-        kprintf(7, "SB READY\n");
-        while ((u32)(tick_count - start) < 200) pm_terminal_poll();
-    }
-    if (!commands[pos]) {
-        kprintf(7, "SB DONE\n");
-        sb_done();
-    }
-    return commands[pos++];
-}
-'''
-HELLO = '/bin/hello.bin ok\nhello ok\nexit=7\nos32> '
-FAULT = '/bin/fault.bin\nexit=-2\nos32> '
-
-
-def serial_accept(elf, cpu, out, expected):
-    out.mkdir()
-    cd = out/'cd'; cd.mkdir()
-    shutil.copyfile(elf, cd/'PPCKERN.ELF')
-    iso = out/'boot.iso'
-    command(['genisoimage', '-quiet', '-hfs', '-r', '-part', '-no-desktop', '-o', iso, cd])
-    symbols = {p[2]: int(p[0], 16) for line in command([PREFIX+'nm', '-n', elf]).splitlines()
-               if len(p := line.split()) == 3}
-    a, b = out/'serial-a.log', out/'serial-b.log'
-    args = ['qemu-system-ppc', *(['-g', '800x600x8'] if os.environ.get('PPC_FB') == '1' else []), '-M', 'mac99', '-cpu', cpu, '-m', '128M', '-smp', '1',
-            '-accel', 'tcg', '-bios', str(ROM), '-drive', f'file={iso},media=cdrom,id=bootcd',
-            '-boot', 'd', '-prom-env', 'boot-device=cd:,\\PPCKERN.ELF',
-            '-prom-env', 'auto-boot?=true', *(['-display', 'none'] if os.environ.get('PPC_FB') == '1' else ['-nographic']), '-serial', 'file:'+str(a),
-            '-serial', 'file:'+str(b), '-monitor', 'none', '-qmp', 'stdio', '-no-reboot', '-nic', 'none']
-    deadline = time.monotonic()+60
-    q = None
-    ejected = False
-    with (out/'qemu.stderr').open('w') as err:
-        p = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=err, bufsize=0)
-        try:
-            q = QMP(p, deadline)
-            while time.monotonic() < deadline:
-                aa, bb = serial(a).replace('\r', ''), serial(b)
-                validate(aa, bb)
-                if not ejected and 'SB READY\n' in aa:
-                    require('/bin/hello.bin ok' not in aa, 'execution before eject')
-                    q.call('eject', {'device': 'bootcd', 'force': True})
-                    ejected = True
-                if 'SB DONE\n' in aa:
-                    q.call('stop')
-                    regs = q.call('human-monitor-command', {'command-line': 'info registers'})
-                    (out/'registers.txt').write_text(regs)
-                    pc = re.search(r'NIP\s+([0-9a-fA-F]+)', regs)
-                    # Serial bytes precede the local framebuffer redraw. The
-                    # DONE marker is not the stop boundary until that returns.
-                    if not pc or int(pc[1], 16) != symbols['sb_stop']:
-                        q.call('cont')
-                        time.sleep(.01)
-                        continue
-                    validate(aa, bb, True)
-                    require(ejected, 'CD not ejected')
-                    actual = aa.split('SB READY\n', 1)[1]
-                    require(actual == expected+'SB DONE\n', 'Q1/Q2 transcript: '+repr(actual))
-                    print(cpu+' serial: '+repr(actual), flush=True)
-                    q.call('quit'); p.wait(timeout=2)
-                    require(p.returncode == 0, 'QEMU exit')
-                    return
-                time.sleep(0.01)
-            raise RuntimeError('serial acceptance timeout: '+repr(serial(a)))
-        finally:
-            if q: q.close()
-            if p.poll() is None:
-                p.terminate()
-                try: p.wait(timeout=2)
-                except subprocess.TimeoutExpired: p.kill(); p.wait()
+from kboot_run import require, serial, validate_root
+from link_sh_run import Session
+from usb_run import rsh_command
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--cpu', choices=['7450', '7455', 'both'], default='both')
-    parser.add_argument('--serial', action='store_true')
+    parser.add_argument('--build-only', action='store_true')
     parser.add_argument('--mutate', action='store_true')
+    parser.add_argument('--serial', action='store_true')
+    parser.add_argument('--cpu', choices=('both', '7450', '7455'), default='both')
     args = parser.parse_args()
-    cpus = ['7450', '7455'] if args.cpu == 'both' else [args.cpu]
-    if not args.serial:
-        require(not args.mutate, '--mutate requires --serial')
-        skipped = [shell_run.accept(cpu, 60, sb=True) for cpu in cpus]
-        if any(skipped):
-            print('SKIP LAN socket rc=3'); return 3
-        print('PASS S-B LAN Q1/Q2'); return 0
-    base = Path(os.environ['TMPDIR'])/'sb-run'; base.mkdir(exist_ok=True)
-    work = Path(tempfile.mkdtemp(prefix='run-', dir=base))
-    source = 'platform/powermac/cli_boot.c'
-    text = (ROOT/source).read_text()
-    injected = work/'cli_boot.c'
-    injected.write_text(text.replace('enum { CLI_CAT_BYTES', INPUT+'\nenum { CLI_CAT_BYTES')
-                        .replace('.getkey = pm_terminal_getkey', '.getkey = sb_getkey'))
-    settings = ['KBOOT_SHELL=1', 'KBOOT_LINK=0', 'KB_MUT_SRC='+source, 'KB_MUT_FILE='+str(injected)]
-    elf = build(work/'normal', *settings)
-    expected = HELLO+HELLO+FAULT+HELLO
-    for cpu in cpus:
-        serial_accept(elf, cpu, work/('normal-'+cpu), expected)
+    work = Path(tempfile.mkdtemp(prefix='sb-run-', dir=os.environ['TMPDIR']))
+    user = work/'user'
+    bins = ' '.join(str(user/(name+'.bin')) for name in ('hello', 'fault'))
+    cases = [('normal',)]
     if args.mutate:
-        mutations = [
+        cases.extend([
             ('exit-status', 'arch/ppc/kapi_call.c',
              'return ppc_kapi_invoke(&api, current_slot, values);',
              'struct kapi_values changed = *values;\n'
              '    if (current_slot == (__builtin_offsetof(KernelAPI, sys_exit) - 8) / 4) changed.value[0] = 0;\n'
              '    return ppc_kapi_invoke(&api, current_slot, &changed);',
-             expected.replace('exit=7', 'exit=0')),
+            ),
             ('fault-exit', 'arch/ppc/kernel_trap.c',
-             '        ring3_fault_kill();',
+             '        ppc_user_fault_kill();',
              '        extern void kapi_sys_exit(int);\n        kapi_sys_exit(0);',
-             expected.replace('exit=-2', 'exit=0'))]
-        for name, src, before, after, transcript in mutations:
-            extra = mutant_settings(work, name, src, before, after)
-            extra = [s.replace('KB_MUT_', 'KB_MUT_EXTRA_') for s in extra]
-            mutant = build(work/name, 'KBOOT_LINK=0', *settings, *extra)
-            serial_accept(mutant, cpus[0], work/(name+'-guest'), transcript)
-            require(transcript != expected, 'mutation did not change verdict')
-            print('RED '+name+': exact transcript and sb_stop (QEMU rc=0)', flush=True)
-    print('PASS S-B serial Q1/Q2 evidence='+str(work))
-    return 0
+            )
+
+        ])
+    hashes = set()
+    for name, *change in cases:
+        opts = mutant_settings(work, name, *change) if change else []
+        elf = build(work/name, 'IMAGE=kboot-link-sh', 'KB_SH_OUT='+str(user),
+                    'KB_ROOT_BINS='+bins, *opts, 'kb-user', 'kernel')
+        digest = hashlib.sha256(elf.read_bytes()).hexdigest()
+        require(digest not in hashes, 'distinct '+name)
+        hashes.add(digest)
+        print(name, digest, flush=True)
+        if args.build_only:
+            continue
+        for cpu in ('7450', '7455') if args.cpu == 'both' else (args.cpu,):
+            s = Session(elf, cpu, work/(name+'-'+cpu), 180)
+            try:
+                s.start()
+                s.wait(lambda: validate_root(serial(s.out/'serial-a.log'), serial(s.out/'serial-b.log')),
+                       'rd0 registration and page accounting', 60)
+                for child in ('hello', 'hello', 'fault', 'hello'):
+                    if child == 'hello':
+                        status = 0 if name == 'exit-status' else 7
+                        rsh_command(s, '/bin/hello.bin ok', b'hello ok\n' + (b'\n' if status == 0 else b''))
+                    else:
+                        status = 0 if name == 'fault-exit' else 139
+                        rsh_command(s, '/bin/fault.bin')
+                    rsh_command(s, 'echo $?', f'{status}\n'.encode())
+                rsh_command(s, 'echo alive', b'alive\n')
+            finally:
+                s.close()
+    print(f'{len(hashes)} distinct exit/fault images')
 
 
 if __name__ == '__main__':
-    raise SystemExit(main())
+    main()

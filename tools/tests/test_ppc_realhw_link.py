@@ -5,7 +5,7 @@
 nest の試験時計: FINDINGS / realhw_run.py の期限の契約。
 """
 CHECK = dict(name='ppc-realhw-link', tier=1, budget=10, needs=['make:all'],
-             covers=['tools/ppc/realhw_run.py', 'tools/tests/test_ppc_realhw_link.py',
+             covers=['exec/exec.c', 'tools/accept/ppc_shell_flow.inc', 'userland/shell/main.c', 'userland/shell/rshell.c', 'tools/ppc/realhw_run.py', 'tools/tests/test_ppc_realhw_link.py',
                      'tools/ppc/sc_run.py', 'tools/ppc/sd_run.py',
                      'tools/ppc/kboot_run.py', 'tools/ppc/kboot_accept.py',
                      'tools/ppc/kboot_mutations.py', 'tools/ppc/sb_run.py',
@@ -69,7 +69,7 @@ def fixtures(case):
     script = {'capture': [], 'nest': [('/bin/nest.bin',
               b'hello ok\nnest kind=1 code=7 parent=12345\n'*2), ('echo $?', b'5\n')],
               'shell': [('echo x > /tmp/t', b''), ('cat /tmp/t', b'x\n'),
-                        ('cat /tmp/none', b'cat: /tmp/none: No such file or directory\n')],
+                        ('cat /tmp/none', b'cat: /tmp/none: No such file or directory\n'), ('echo $?', b'1\n')],
               'exact': [('cat /host/f', b'file\n')]}[case]
     for line, output in script:
         rsh.append(dict(line=line, result=dict(ok=True, state='done', complete=True,

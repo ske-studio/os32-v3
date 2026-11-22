@@ -7,6 +7,7 @@ link-SH/RSH acceptance on 7450/7455. Only acceptance images contain the probe.
 Runtime RED requires the exact output/status/reason; crashes are errors.
 """
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -45,13 +46,18 @@ def verdict(case, body, status, diagnostic):
 def settings(work, case):
     user = work/'user'
     opts = ['KBOOT_SH=1', 'KBOOT_LINK=1', 'KB_SH_OUT='+str(user),
-            'KB_ROOT_BINS='+' '.join(str(user/(n+'.bin')) for n in
-                                    ('nlprobe','hello'))]
+            'KB_ROOT_BINS='+str(user/'nlprobe.bin')]
     manifest = json.loads((ROOT/'build/ppc-ram-root.json').read_text())
+    # The product manifest supplies /sys/shell.bin.
     manual=work/'hello.1'; manual.write_text('N3-help-found\n')
+    # hello only prints a string. Keep the float formatter in nlprobe, where it is tested.
+    hello = work/'helper/hello.bin'
+    subprocess.run(['make', 'ARCH=ppc', 'PLATFORM=powermac', 'PPC_USER_OUT='+str(hello.parent),
+                    'PPC_USER_FLOAT=', str(hello)], cwd=ROOT, check=True, stdout=subprocess.DEVNULL)
+    opts[-1] += ' '+str(hello)
     manifest['/usr/man/hello.1']=str(manual)
     path=work/'root.json'; path.write_text(json.dumps(manifest))
-    opts += ['ROOT_MANIFEST='+str(path), 'ROOT_DEPS=assets/fonts/shino16.kcgfont assets/fonts/JF-Dot-Shinonome16-LICENSE.txt build/out/unicode.bin '+str(manual)]
+    opts += ['ROOT_MANIFEST='+str(path), 'ROOT_DEPS=assets/fonts/shino16.kcgfont assets/fonts/JF-Dot-Shinonome16-LICENSE.txt build/out/unicode.bin '+str(manual)+' '+str(hello)]
     if case != 'normal':
         _, source, old, new = next(m for m in MUTATIONS if m[0] == case)
         text=(ROOT/source).read_text()
@@ -148,16 +154,21 @@ def main():
     from kboot_accept import build
     from build_nano_target import build as build_nano
     cpus=('7450','7455') if args.cpu == 'both' else (args.cpu,)
+    seen = set()
     for case in cases:
         folder=work/case; folder.mkdir()
         opts=settings(folder,case)
         if case == 'adapter':
             user=folder/'user'
             subprocess.run(['make','ARCH=ppc','PLATFORM=powermac','CROSS_DIR='+str(prefix),
-                'PPC_USER_OUT='+str(user),'PPC_SH_PROFILE=userland/ppc/sh/link_profile.h',
-                str(user/'sh.bin'),str(user/'nlprobe.bin')],cwd=ROOT,check=True)
+                'PPC_USER_OUT='+str(user),
+                str(user/'nlprobe.bin')],cwd=ROOT,check=True)
             build_nano(prefix,user/'nano',adapter=folder/'mutant.c',crt=user/'syscalls.o')
         elf=build(folder/'kernel',*opts)
+        digest = hashlib.sha256(elf.read_bytes()).hexdigest()
+        assert digest not in seen, (case, digest)
+        seen.add(digest)
+        print(case, digest, flush=True)
         if args.build_only: continue
         for cpu in cpus:
             observe(elf,cpu,folder/cpu,case)

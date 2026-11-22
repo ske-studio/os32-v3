@@ -8,6 +8,7 @@ import re
 import tempfile
 
 from ppc_display import ROOT, absent_bindings
+import ppc_resource_owner
 from fb_pixel import Font, Terminal, read_ppm
 from kboot_accept import build, mutant_settings
 from link_sh_run import Session
@@ -19,7 +20,11 @@ from usb_run import rsh_command
 def image(folder, user, case):
     kernel = folder / 'kernel'
     changes = []
-    if case == 'no-return':
+    if case == 'normal':
+        changes = ppc_resource_owner.instrument(
+            folder, 'gfx/gfx_core.c', 'if (rc >= 0) {',
+            'appslot_gfx_owner()')
+    elif case == 'no-return':
         changes = mutant_settings(folder, case, 'gfx/gfx_core.c',
                                   '    display_provider_console_return();', '')
     elif case == 'no-exit':
@@ -36,7 +41,7 @@ def image(folder, user, case):
     elif case == 'absent':
         absent_bindings(folder, kernel / 'gen', case, ('gfx2_surface_create',))
     bins = [str(user / (app + '.bin')) for app in ('hello', 'dispprb')]
-    return build(kernel, 'IMAGE=kboot-link-sh', 'KB_SH_OUT=' + str(user),
+    return build(kernel, 'IMAGE=kboot-link-sh', 'PPC_USER_FLOAT=', 'KB_SH_OUT=' + str(user),
                  'KB_ROOT_BINS=' + ' '.join(bins), *changes, 'kb-user', 'kernel')
 
 
@@ -56,12 +61,10 @@ def observe(elf, folder, case):
 
     def check_echo(mode):
         word = 'restored' + mode
+        s.close_rshell()
         s.keys('echo ' + word + '\n')
         font = Font(ROOT / 'assets/fonts/shino16.kcgfont')
 
-        # Keyboard lines get no prompt on link-sh (the "> " rows mirror RSH
-        # commands), so wait until the output row's glyphs match exactly: the
-        # cursor has then left the row and the frame is fully drawn.
         def output_drawn():
             rows = s.screen(mode).splitlines()
             matches = [row for row, line in enumerate(rows) if line.rstrip() == word]
@@ -72,6 +75,7 @@ def observe(elf, folder, case):
             return pixels.compare_text(matches[-1], 0, word) is None
 
         s.wait(output_drawn, mode + ' keyboard and console pixels')
+        s.open_rshell()
 
     try:
         s.start()
@@ -81,23 +85,31 @@ def observe(elf, folder, case):
             probe('draw', 22, b'tile provider absent')
         elif case == 'any-owner':
             probe('draw', 30, b'child changed generation')
+        elif case == 'no-exit':
+            probe('child-exit', 31, b'child left display active')
         else:
-            modes = {'no-return': ('draw',), 'no-exit': ('leave',)}.get(
-                case, ('shutdown', 'draw', 'leave', 'fault'))
+            modes = {'no-return': ('draw',)}.get(
+                case, ('shutdown', 'draw', 'child-exit', 'leave', 'fault'))
             for mode in modes:
                 if mode == 'fault':
                     capacity = probe('capacity', 0, b'free tiles ')
                 before = generations()
                 probe(mode, 139 if mode == 'fault' else 0,
-                      {'shutdown': b'shutdown only', 'draw': b'tile drawn', 'leave': b'tile left', 'fault': b'tile allocated'}[mode])
+                      {'child-exit': b'child display restored', 'shutdown': b'shutdown only', 'draw': b'tile drawn', 'leave': b'tile left', 'fault': b'tile allocated'}[mode])
                 after = generations()
                 if case == 'normal':
-                    require(after[:-1] == before and after[-1] != before[-1], mode + ' recovery')
+                    if mode == 'shutdown':
+                        require(after == before, 'shutdown preserves live text console')
+                    else:
+                        require(after[:-1] == before and after[-1] != before[-1], f'{mode} recovery: {before} -> {after}\n'
+                                + serial.read_bytes()[-2048:].decode(errors='replace'))
                     if mode == 'fault':
                         require(capacity == probe('capacity', 0, b'free tiles '), 'surface recovery')
                     check_echo(mode)
                 else:
                     require(after == before, case + ' unexpectedly restored')
+        if case == 'normal':
+            ppc_resource_owner.verify(s)
         s.q.call('quit')
         s.p.wait(timeout=5)
         require(s.p.returncode == 0, 'QEMU exit')

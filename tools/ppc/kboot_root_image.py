@@ -20,6 +20,14 @@ def command(args):
                           capture_output=True, text=True).stdout
 
 
+def verify_embedded(elf, load, symbols, iso):
+    start, end = symbols['__root_image_start'], symbols['__root_image_end']
+    _, offset, va, _, filesz, _, _, _ = load
+    assert va <= start < end <= va + filesz, 'root outside file-backed PT_LOAD'
+    assert elf[offset + start-va:offset + end-va] == iso, 'embedded ISO differs'
+    return end - start
+
+
 def verify(work, script, blob):
     (work / 'kernel.ld.in').write_text(script)
     command([PREFIX+'gcc', '-E', '-P', '-x', 'c', '-I'+str(work), '-I.',
@@ -42,6 +50,10 @@ def verify(work, script, blob):
     assert end-start == (4096 if blob else 0), 'root image size'
     assert symbols['__kernel_image_start'] <= start <= end <= symbols['__kernel_resident_end']
     if blob:
+        import struct
+        elf = (work/'kernel.elf').read_bytes()
+        load = struct.unpack_from('>8I', elf, struct.unpack_from('>I', elf, 28)[0])
+        verify_embedded(elf, load, symbols, bytes([0x5a]) * 4096)
         map_text = (work/'PPCKERN.map').read_text()
         assert '.rodata.boot_root' in map_text
         assert f'0x{start:08x}' in map_text

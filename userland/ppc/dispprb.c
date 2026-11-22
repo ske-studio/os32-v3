@@ -46,6 +46,16 @@ static int lifecycle(KernelAPI *api, const char *mode)
         snprintf(line, sizeof(line), "free tiles %u\n", count);
         return report(api, line, 0);
     }
+    if (!strcmp(mode, "child-exit")) {
+        /* Observe owner teardown before the resident shell can restore the screen. */
+        if (api->gfx2_adapter_gen(0, &gen)) return 29;
+        api->exec_run("/bin/dispprb.bin leave");
+        int kind, code;
+        if (api->exec_last_result(&kind, &code) || kind != EXEC_KIND_EXITED || code) return 28;
+        if (api->gfx2_adapter_gen(0, &after)) return 29;
+        if (gen == after) return report(api, "child left display active\n", 31);
+        return report(api, "child display restored\n", 0);
+    }
     if (!strcmp(mode, "shutdown")) {
         api->gfx_shutdown();
         return report(api, "shutdown only\n", 0);

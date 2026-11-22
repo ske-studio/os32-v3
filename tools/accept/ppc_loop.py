@@ -24,46 +24,23 @@ EXPECTED = {
 def observe(elf, folder, case, host_root):
     from link_sh_run import Session
     from run import require
-    from sb_run import serial_accept
     from usb_run import rsh_command
 
-    if case == 'disabled':
-        expected = '/bin/loopprb.bin\n' + EXPECTED[case].decode() + '\nexit=0\nos32> '
-        serial_accept(elf, '7450', folder / 'guest', expected)
-    else:
-        session = Session(elf, '7450', folder / 'guest', 240)
-        try:
-            session.agent.file_root = str(host_root)
-            session.start()
-            session.wait(session.ready, 'loop cui READY', 60)
-            require(session.agent.operator.ready['mode'] == 'cui', 'loop RSH mode')
-            rsh_command(session, '/bin/loopprb.bin', EXPECTED[case] + b'\n\n')
-            rsh_command(session, 'echo $?', b'0\n')
-            session.q.call('quit')
-            session.p.wait(timeout=5)
-            require(session.p.returncode == 0, 'loop QEMU exit')
-        finally:
-            session.close()
+    session = Session(elf, '7450', folder / 'guest', 240)
+    try:
+        session.agent.file_root = str(host_root)
+        session.start()
+        session.wait(session.ready, 'loop cui READY', 60)
+        require(session.agent.operator.ready['mode'] == 'cui', 'loop RSH mode')
+        rsh_command(session, '/bin/loopprb.bin', EXPECTED[case] + b'\n\n')
+        rsh_command(session, 'echo $?', b'0\n')
+        session.q.call('quit')
+        session.p.wait(timeout=5)
+        require(session.p.returncode == 0, 'loop QEMU exit')
+    finally:
+        session.close()
     verdict = 'GREEN' if case in ('normal', 'disabled') else 'RED'
     print(f'{verdict} {case} {EXPECTED[case].decode()}', flush=True)
-
-
-def disabled_settings(folder):
-    from sb_run import INPUT
-
-    # Drive the resident CLI through its normal command dispatcher.
-    commands = INPUT.replace(r'/bin/hello.bin ok\n/bin/hello.bin ok\n/bin/fault.bin\n/bin/hello.bin ok\n',
-                             r'/bin/loopprb.bin\n')
-    source = 'platform/powermac/cli_boot.c'
-    text = (ROOT / source).read_text()
-    anchor = 'enum { CLI_CAT_BYTES'
-    reader = '.getkey = pm_terminal_getkey'
-    if commands == INPUT or text.count(anchor) != 1 or text.count(reader) != 1:
-        raise RuntimeError('disabled CLI input anchors changed')
-    injected = folder / 'cli_boot.c'
-    injected.write_text(text.replace(anchor, commands + '\n' + anchor)
-                        .replace(reader, '.getkey = sb_getkey'))
-    return ['KB_MUT_SRC=' + source, 'KB_MUT_FILE=' + str(injected)]
 
 
 def main():
@@ -96,10 +73,9 @@ def main():
         folder.mkdir()
         kernel = folder / 'kernel'
         disabled = case == 'disabled'
-        user = work / ('cli-user' if disabled else 'sh-user')
-        image = 'kboot-shell' if disabled else 'kboot-link-sh'
-        bins = ' '.join(str(user / name) for name in ('hello.bin', 'fault.bin', 'loopprb.bin'))
-        options = ['IMAGE=' + image, 'KB_SH_OUT=' + str(user), 'KB_ROOT_BINS=' + bins]
+        user = work / 'sh-user'
+        options = ['IMAGE=kboot-link-sh', 'KB_SH_OUT=' + str(user),
+                   'KB_ROOT_BINS=' + str(user / 'loopprb.bin')]
         if case == 'normal':
             # Make generates the RAW fixture before staging it for the read-only hostfs export.
             options.extend(['PPC_LOOP_SAMPLE=' + str(sample), str(sample)])
@@ -111,7 +87,10 @@ def main():
             kernel.mkdir()
             (generate(kernel, case) / 'stamp').touch()
         elif disabled:
-            settings = disabled_settings(folder)
+            # Keep the product shell and select the absent provider in this control only.
+            profile = folder / 'loop-disabled.mk'
+            profile.write_text('include build/images/ppc-flags.mk\noverride FEATURE_LOOP := 0\n')
+            settings = ['PPC_FLAGS_MK=' + str(profile)]
         elf = build(kernel, *options, *settings, 'kb-user', 'kernel')
         if case == 'normal':
             shutil.copyfile(sample, host_root / 'loop.img')

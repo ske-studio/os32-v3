@@ -2,7 +2,7 @@
 """CI と手元で同じ入口: 検査の 1 シャードを最後まで回し、結果を表にする (docs/design/tools/ci/gate.md)。
 
     python3 -B tools/ci/gate.py run --shard 0/6 --out <置き場> [--no-mutate]
-    python3 -B tools/ci/gate.py run --env qemu-ppc --shard 0/6 --out <置き場>
+    python3 -B tools/ci/gate.py run --env qemu-ppc --shard 0/8 --out <置き場>
 
 --env を付けると、その環境を要る検査だけをシャードに割り、1 本ずつ順に回す (QEMU で機械を丸ごと
 模擬する検査は、並べて回すと期限に間に合わなくなる)。
@@ -158,17 +158,20 @@ def render(shard, mutate, checks, logs, tail=TAIL_LINES):
     return lines, bool(by['fail'] or by['missing'])
 
 
-def keep_failed_logs(out, logs_dir, checks, limit=FAILED_LOG_BYTES):
-    """落ちた検査のログだけを <置き場>/failed-logs に残す (末尾 limit バイトまで)。持ち出すのはこれだけ。"""
+def reset_failed_logs(out):
     kept = out / 'failed-logs'
     if kept.exists():
         shutil.rmtree(kept)
     kept.mkdir(parents=True)
-    for check in checks:
-        source = logs_dir / (check['name'] + '.log')
-        if check['status'] == 'fail' and source.is_file():
-            data = source.read_bytes()
-            (kept / source.name).write_bytes(data[-limit:])
+    return kept
+
+
+def keep_failed_log(kept, source, rc, limit=FAILED_LOG_BYTES):
+    if rc and source.is_file():
+        with source.open('rb') as handle:
+            size = handle.seek(0, os.SEEK_END)
+            handle.seek(max(0, size - limit))
+            (kept / source.name).write_bytes(handle.read())
 
 
 def run_each(expected, timed):
@@ -196,6 +199,7 @@ def run(args):
     if logs_dir.exists():
         shutil.rmtree(logs_dir)
     logs_dir.mkdir(parents=True)
+    kept = reset_failed_logs(out)
     for name in ('MAKEFLAGS', 'MFLAGS', 'MAKEOVERRIDES', 'GNUMAKEFLAGS', 'CHECK_ROUTINE'):
         env.pop(name, None)
     if args.no_mutate:
@@ -217,8 +221,10 @@ def run(args):
         os.environ.update(env, MUTATE=mutate)
 
         def timed(name):
-            return check_time.run(times, name, [sys.executable, '-B', 'tools/checks/run.py',
-                                                '--run', name] + selection)
+            rc = check_time.run(times, name, [sys.executable, '-B', 'tools/checks/run.py',
+                                              '--run', name] + selection)
+            keep_failed_log(kept, logs_dir / (name + '.log'), rc)
+            return rc
         previous = os.getcwd()
         os.chdir(ROOT)
         try:
@@ -236,7 +242,9 @@ def run(args):
     logs = {path.stem: path.read_text(errors='replace') for path in sorted(logs_dir.glob('*.log'))}
     checks = classify(expected, rows, logs)
     lines, failed = render(args.shard + (' (%s)' % args.env if args.env else ''), not args.no_mutate, checks, logs)
-    keep_failed_logs(out, logs_dir, checks)
+    if not args.env:
+        for check in checks:
+            keep_failed_log(kept, logs_dir / (check['name'] + '.log'), check['rc'])
     if make.returncode and not failed:
         # 検査は全部通ったのに make が落ちた: 準備か、木が変わっていないことの照合。
         lines += ['', '### make が失敗した (rc=%d)、make.log の末尾' % make.returncode, '', '```']

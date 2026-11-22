@@ -121,4 +121,4 @@ void _start(void) { int rc=main(); __asm__ volatile("movl $1,%%eax; int $0x80" :
 /* The fixture never enters an exec user context. */
 struct arch_syscall;
 void exec_syscall_dispatch(struct arch_syscall *call) { (void)call; }
-void ring3_fault_kill(void) { }
+void ppc_user_fault_kill(void) { }

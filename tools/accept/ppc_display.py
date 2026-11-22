@@ -127,6 +127,9 @@ def present_pixels(s, evidence, case, serial, modes):
                     return base and physical_word(base) == (
                         0x50524200 + ord(phase))
                 s.wait(waiting, f'{mode} checkpoint {phase}')
+                require(s.word('g_cur') == 2 and s.word('cur_res_owner') == 2 and
+                        s.word('exec_nest_level') == 2 and s.word('g_cur_app') != 0,
+                        'running display child owns slot 2')
                 name = f'{mode}-{phase}'
                 path = evidence / (name + '.ppm')
                 if (mode == 'shutdown' and not case.startswith('target-') and
@@ -170,12 +173,15 @@ def present_pixels(s, evidence, case, serial, modes):
 
 def observe(elf, cpu, evidence, case, modes=()):
     from link_sh_run import Session
+    from kboot_run import serial as read_serial, validate_root
     from run import require
     from usb_run import rsh_command
 
     session = Session(elf, cpu, evidence, 240)
     try:
         session.start()
+        session.wait(lambda: validate_root(read_serial(evidence/'serial-a.log'), read_serial(evidence/'serial-b.log')),
+                     'rd0 registration and page accounting', 60)
         session.wait(session.ready, 'display cui READY', 60)
         require(session.agent.operator.ready['mode'] == 'cui', 'display RSH mode')
         serial = (evidence / 'serial-a.log').read_text(errors='replace')
@@ -296,9 +302,8 @@ def main():
     work = Path(tempfile.mkdtemp(prefix='ppc-display-', dir=os.environ.get('TMPDIR') or None)).resolve()
     print('evidence=' + str(work), flush=True)
     user = work / 'user'
-    # This acceptance invokes these probes only. The build also includes sh.
-    bins = [str(user / (app + '.bin')) for app in ('dispprb', 'gfx2prob')]
-    options = ['IMAGE=kboot-link-sh', 'KB_SH_OUT=' + str(user),
+    bins = [str(user / (app + '.bin')) for app in ('hello', 'dispprb', 'gfx2prob')]
+    options = ['IMAGE=kboot-link-sh', 'KBOOT_USB_KEY_TRACE=1', 'PPC_USER_FLOAT=', 'KB_SH_OUT=' + str(user),
                'KB_ROOT_BINS=' + ' '.join(bins)]
     os.environ.setdefault('SOURCE_DATE_EPOCH', '946684800')
     images = {}

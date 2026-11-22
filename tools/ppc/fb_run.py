@@ -1,369 +1,206 @@
 #!/usr/bin/env python3
-"""Real INDEX8 sh acceptance: USB startup, UTF-8 script input and QMP pixels.
+"""Check the resident terminal against the KCG glyphs and the INDEX8 geometry.
 
-All expected positions come from the fixed script, never from the screenshot.
-Recovery follows the display lifecycle contract: owner exit advances the target
-generation and the same KCG1 cells reappear at the same pixel coordinates.
+The first 64 scanlines belong to the boot display. Local command echo follows
+cmd_rshell in userland/shell/rshell.c. Per docs/design/lib/kprintf.md,
+PowerMac kernel diagnostics go to the log sinks. The text-ready diagnostic
+on console restoration must reach serial while staying off the local screen.
 """
 import argparse
 import hashlib
-import json
 import os
-from pathlib import Path
 import re
+from pathlib import Path
 import shutil
-import subprocess
-import sys
 import tempfile
-import time
 
 from fb_pixel import Font, Terminal, read_ppm, reserved_unchanged
 from kboot_accept import build, mutant_settings
-from kboot_run import ROOT, ROM, QMP, command, require, serial, validate_root as validate
+from kboot_run import ROOT, ROM, require, serial, validate_root
+from link_sh_run import Session, text_fixture
+from usb_run import before_shell_input
 
-from usb_run import product_settings, stream_payload, USB_QEMU_CLOCK
 
-
-class VerdictError(RuntimeError):
+class PixelMismatch(AssertionError):
     pass
 
 
-def check(ok, label):
-    if not ok:
-        raise VerdictError(label)
+def check(condition, detail):
+    if not condition:
+        raise PixelMismatch(detail)
 
 
-def accept(elf, cpu, out, mode):
-    out.mkdir()
-    cd = out/'cd'; cd.mkdir(); shutil.copyfile(elf, cd/'PPCKERN.ELF')
-    iso = out/'boot.iso'
-    command(['genisoimage', '-quiet', '-hfs', '-r', '-part', '-no-desktop', '-o', iso, cd])
-    a, b = out/'serial-a.log', out/'serial-b.log'
-    argv = ['qemu-system-ppc', '-g', '800x600x8', '-M', 'mac99', '-cpu', cpu,
-            '-m', '128M', '-smp', '1', '-accel', 'tcg', '-bios', str(ROM),
-            '-drive', f'file={iso},media=cdrom', '-boot', 'd',
-            '-prom-env', 'boot-device=cd:,\\PPCKERN.ELF', '-prom-env', 'auto-boot?=true',
-            '-display', 'none', '-serial', 'file:'+str(a), '-serial', 'file:'+str(b),
-            '-monitor', 'none', '-qmp', 'stdio', '-no-reboot', '-nic', 'none',
-            '-usb', *USB_QEMU_CLOCK]
-    (out/'argv.json').write_text(json.dumps(argv, indent=2))
-    err = (out/'qemu.stderr').open('w')
-    process = subprocess.Popen(argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                               stderr=err, bufsize=0)
-    q = QMP(process, time.monotonic()+60)
-
-    def wait(predicate, seconds, label):
-        # Full framebuffer redraws under TCG can outlast device-only waits.
-        end = time.monotonic()+seconds*3
-        while time.monotonic() < end:
-            validate(serial(a), serial(b))
-            require(process.poll() is None, 'QEMU alive')
-            if predicate(): return
-            time.sleep(.01)
-        raise RuntimeError(label+' timeout; evidence='+str(out))
-    font = Font(ROOT/'assets/fonts/shino16.kcgfont')
-    baseline = None
-    expected = {}
-    # color! endpoints recorded as WRITTEN=4, fg=255/bg=0. QEMU's
-    # display DAC presents these programmed endpoints as black and white.
-    fg, bg = (255, 255, 255), (0, 0, 0)
-
-    def stream():
-        return stream_payload(a.read_bytes().decode('latin1')).encode('latin1').decode('utf-8', errors='replace').replace('\r', '')
-
-    def shot(name, lines=None, cursor=(), *, await_pixels=None):
-        nonlocal baseline
-        q.deadline = time.monotonic()+30
-        path = out/(name+'.ppm')
-        previous, stable = None, 0
-        end = time.monotonic()+10
-        while True:
-            require(time.monotonic() < end, 'frame deadline: '+name)
-            q.call('stop')
-            try:
-                q.call('screendump', {'filename': str(path.resolve())})
-                img = read_ppm(path)
-            finally:
-                q.call('cont')
-            stable = stable+1 if img == previous else 0
-            if await_pixels is not None:
-                if await_pixels(Terminal(img, font, fg, bg, cursor_top=14)):
-                    break
-            elif stable >= 2:
-                break
-            previous = img
-            time.sleep(.1)
-        check((img.width, img.height) == (800, 600), '800x600 geometry')
-        t = Terminal(img, font, fg, bg, cursor_top=14)
-        if baseline is None:
-            baseline = img
-        check(reserved_unchanged(baseline, img), name+': reserved 64 scanlines changed')
-        check(t.unexpected_color() is None, name+': unexpected RGB')
-        if lines is not None:
-            expected[name] = dict(lines=lines, cursor=cursor)
-            (out/'expected.json').write_text(json.dumps(expected, ensure_ascii=False, indent=2))
-            for row in range(33):
-                text = lines[row] if row < len(lines) else ''
-                width = sum(font.glyph(c)[0]//8 for c in text)
-                mismatch = t.compare_text(row, 0, text+' '*(100-width), cursor)
-                check(mismatch is None, name+': '+str(mismatch))
-            check(t.bottom_line(lines[32] if len(lines)>32 else '', cursor) is None,
-                  name+': bottom line')
-        return t
-
-    def key(code):
-        q.deadline = time.monotonic()+30
-        released = serial(a).count('down=0')
-        q.call('send-key', {'keys':[{'type':'qcode','data':code}], 'hold-time':80})
-        wait(lambda: serial(a).count('down=0') > released, 10, 'USB release '+code)
-
-    def usb(text):
-        for c in text:
-            key({'\n': 'ret', ' ': 'spc', '.': 'dot', '/': 'slash'}.get(c, c))
-
-    def usb_command(text, wanted, *, external=False):
-        start = len(stream())
-        previous = stream().count('sh> ')
-        usb(text+'\n')
-        if mode == 'mirror' and text == 'echo hi':
-            # The mutated byte mirror also removes the prompt. fd1 still
-            # supplies an independent positive command-completion boundary;
-            # a missing prompt by timeout is never accepted as RED.
-            wait(lambda: stream()[start:].endswith('hi\n'), 10, 'fd1 echo boundary')
-            shot('mirror-boundary')
-        else:
-            wait(lambda: stream().count('sh> ') >= previous + (1 if previous else 2)
-                 and stream()[start:].endswith('sh> '), 10, 'USB command')
-        block = stream()[start:]
-        banner = ('================================\n OS32 External Shell Started\n'
-                  '================================\nsh> ') if not previous else ''
-        if external:
-            # The shell may add a blank separator after a foreground program.
-            lines = [line for line in block.splitlines() if line]
-            check(lines == [text, *wanted.splitlines(), 'sh> '], 'tile leave/status: '+repr(block))
-            return
-        check(block == banner+text+'\n'+wanted+'sh> ', 'USB exact echo/fd1: '+repr(block))
-
-    def before_open():
-        wait(lambda: 'Press a USB key or connect LAN to start sh\n' in stream(),
-             30, 'waiting message')
-        require('FB text ready' in serial(a), 'real INDEX8 attach')
-        require('FB full_rc=0 color_rc=4' in serial(a), 'color! recorded before detach')
-        match = re.search(r'FB text ready generation=(?:[^\n]*\n)??1 fg=(\d+) bg=(\d+)', serial(a))
-        require(match is not None, 'guest color indices recorded')
-        # The oracle follows the color! contract; swapping the recorded indices
-        # must still disagree with the expected white foreground pixels.
-        (out/'colors.json').write_text(json.dumps(dict(color_rc=4,
-            foreground=int(match[1]), background=int(match[2]),
-            palette={'0': [0, 0, 0], '255': [255, 255, 255]})))
-        t = shot('waiting')
-        check(t.compare_text(1, 0, 'Press a USB key or connect LAN to start sh') is None,
-              'waiting: fixed guide row 1')
-        q.call('device_add', {'driver': 'usb-kbd', 'id': 'kbd'})
-        wait(lambda: 'protocol=01' in serial(a), 10, 'USB HID enumeration')
-        usb_command('echo hi', 'hi\n')
-        usb_command('clear', '\x1b[2J\x1b[H')
-        shot('usb-clear', ['sh> '], [(0, 4)])
-
-    try:
-        before_open()
-        usb_command('clear', '\x1b[2J\x1b[H')
-        shot('clear', ['sh> '], [(0, 4)])
-        cmd = 'source /fb.sh'
-        usb_command(cmd, 'ASCII ｶﾅ 日本語\n')
-        shot('text', ['sh> '+cmd, 'ASCII ｶﾅ 日本語', 'sh> '], [(2, 4)])
-        usb_command('clear', '\x1b[2J\x1b[H')
-        usb('echo ax')
-        wait(lambda: stream().endswith('echo ax'), 10, 'cursor input')
-        t = shot('cursor', ['sh> echo ax'], [(0, 11)])
-        check(t.cursor_positions(0, 0, 'sh> echo ax  ') == [(0, 11)], 'exact inverted cursor')
-        key('backspace')
-        # Cooked redraw sends BS-space-BS; screenshot after the complete redraw.
-        wait(lambda: stream().endswith('\b \b'), 10, 'BS stream redraw')
-        shot('bs', ['sh> echo a'], [(0, 10)])
-        key('ret')
-        wait(lambda: stream().endswith('sh> '), 10, 'BS command prompt')
-        usb_command('clear', '\x1b[2J\x1b[H')
-        # 35 numbered output lines, plus each command echo and prompt: 71
-        # lines total. Scroll leaves command/output pairs 19..34 and the prompt.
-        for i in range(35):
-            usb_command('echo l%02d' % i, 'l%02d\n' % i)
-        lines = []
-        for i in range(19, 35):
-            lines += ['sh> echo l%02d' % i, 'l%02d' % i]
-        lines += ['sh> ']
-        shot('scroll', lines, [(32, 4)])
-        # No NIC: the UTF-8 line enters at the LAN terminal decoder (pm_terminal_feed),
-        # so the result never depends on host sockets. LAN transport is covered by sc/sd.
-        usb_command('clear', '\x1b[2J\x1b[H')
-        usb_command('echo usb', 'usb\n')
-        shot('usb-only', ['sh> echo usb', 'usb', 'sh> '], [(2, 4)])
-        usb_command('clear', '\x1b[2J\x1b[H')
-        shot('lan-clear', ['sh> '], [(0, 4)])
-        text = 'echo 日本語の表示'
-        start = len(stream())
-        key('z')
-        wait(lambda: stream()[start:].endswith('sh> '), 10, 'LAN UTF-8 completion')
-        wanted = text+'\n日本語の表示\nsh> '
-        check(stream()[start:] == wanted, 'ESCC exact UTF-8 echo/result')
-        # Require the result row as a positive control before testing input echo.
-        t = shot('lan-result')
-        check(t.compare_text(1, 0, '日本語の表示') is None, 'UTF-8 fd1 result control')
-        shot('lan-utf8', ['sh> '+text, '日本語の表示', 'sh> '], [(2, 4)])
-        # Display lifecycle contract: leaving the tile returns a new text target.
-        def generations():
-            # Other kprintf lines (e.g. USB KEY) can land inside this one on the
-            # serial log; skip whole interjected lines between '=' and the digits.
-            return re.findall(r'FB text ready generation=(?:[^\n]*\n)??(\d+) fg=', serial(a))
-
-        before = generations()
-        usb_command('source /leave.sh', 'tile left\n0\n', external=True)
-        def generation_advanced():
-            after = generations()
-            return bool(before) and after[:-1] == before and after[-1] != before[-1]
-
-        wait(generation_advanced, 10, 'tile owner exit restores a new generation')
-        usb_command('clear', '\x1b[2J\x1b[H')
-        start = len(stream())
-        key('z')
-        wait(lambda: stream()[start:].endswith('sh> '), 10, 'restored UTF-8 completion')
-        check(stream()[start:] == wanted, 'restored UTF-8 stream')
-        restored = shot('restored', ['sh> '+text, '日本語の表示', 'sh> '], [(2, 4)],
-                        await_pixels=lambda frame: frame.compare_text(0, 0, 'sh> '+text) is None
-                        and frame.compare_text(1, 0, '日本語の表示') is None
-                        and frame.compare_text(2, 0, 'sh>  ', [(2, 4)]) is None)
-        for y in range(t.top + 16, t.top + 32):
-            for x in range(len('日本語の表示') * 16):
-                check(t.image.pixel(x, y) == restored.image.pixel(x, y), 'restored glyph pixels')
-        (out/'stream.txt').write_text(stream())
-        q.call('quit'); process.wait(timeout=2)
-        require(process.returncode == 0, 'QEMU quit rc=0')
-    finally:
-        (out/'stream.txt').write_text(stream())
-        q.close()
-        if process.poll() is None:
-            process.terminate()
-            try: process.wait(timeout=2)
-            except subprocess.TimeoutExpired: process.kill(); process.wait()
-        err.close()
-
-
-MUTATIONS = [
-    ('utf8-bytewise', 'userland/ppc/sh/newlib_runtime.c',
-     '    /* Keep the kernel UTF-8 endpoint: bytewise putchar cannot decode glyphs. */',
-     '    runtime_api.shell_print_utf8 = runtime_print_utf8;'),
-    ('trace-screen', 'platform/powermac/console_log.c',
-     'if (pm_log_stream_only) return;', ''),
-    ('colors', 'platform/powermac/rh_observe.c', '.foreground = 255, .background = 0',
-     '.foreground = 0, .background = 255'),
-    ('top', 'platform/powermac/console_text.c', 'pm_console_attach(&target, &kcg_file_api, PM_RH_FB_ROWS)',
-     'pm_console_attach(&target, &kcg_file_api, 0)'),
-    ('mirror', 'kernel/console/console.c',
-     '    if (CONSOLE_PUTCHAR_MIRROR && (rshell_active || boot_serial_mirror)) con_output_putchar(ch);', ''),
-    ('scroll-minus', 'kernel/console/fbcon.c', 'fbcon_scroll_n(c, rows, 1);', 'fbcon_scroll_n(c, rows - 1, 1);'),
-    ('scroll-plus', 'kernel/console/fbcon.c', 'fbcon_scroll_n(c, rows, 1);', 'fbcon_scroll_n(c, rows + 1, 1);'),
-    ('start-consumed', 'platform/powermac/shell_boot.c',
-     '(void)pm_terminal_trygetkey(); /* Consume the first OPEN cancellation. */',
-     '(void)pm_terminal_trygetkey(); (void)pm_input_usb_take();'),
-]
-
-
-EXPECTED_FAILURE = {
-    'utf8-bytewise': 'lan-utf8: Mismatch(row=0, column=9,',
-    'trace-screen': 'waiting: fixed guide row 1',
-    'colors': 'waiting: fixed guide row 1',
-    'top': 'waiting: fixed guide row 1',
-    'mirror': 'USB exact echo/fd1: '+repr('hi\n'),
-    'scroll-minus': 'scroll: Mismatch(row=0, column=0,',
-    'scroll-plus': 'scroll: Mismatch(row=0, column=10,',
-    'start-consumed': 'USB exact echo/fd1: '+repr(
-        '================================\n OS32 External Shell Started\n'
-        '================================\nsh> cho hi\ncho: command not found\nsh> '),
+MUTATIONS = {
+    'utf8-bytewise': ('kernel/console/console.c', '        cp = dec.codepoint;\n        p += dec.bytes_used;\n        remaining -= dec.bytes_used;',
+                      '        cp = *p;\n        p += dec.bytes_used;\n        remaining -= dec.bytes_used;'),
+    'trace-screen': ('platform/powermac/console_text.c', '\n    kprintf(KBOOT_ATTR, "FB text ready',
+                     '\n    console_printf(KBOOT_ATTR, "FB text ready generation=%u\\n", target.generation);'
+                     '\n    kprintf(KBOOT_ATTR, "FB text ready'),
+    'colors': ('platform/powermac/rh_observe.c', '.foreground = 255, .background = 0',
+               '.foreground = 0, .background = 255'),
+    'top': ('platform/powermac/console_text.c', 'pm_console_attach(&target, &kcg_file_api, PM_RH_FB_ROWS)',
+            'pm_console_attach(&target, &kcg_file_api, 0)'),
+    'scroll-minus': ('kernel/console/fbcon.c', 'fbcon_scroll_n(c, rows, 1);', 'fbcon_scroll_n(c, rows - 1, 1);'),
+    'scroll-plus': ('kernel/console/fbcon.c', 'fbcon_scroll_n(c, rows, 1);', 'fbcon_scroll_n(c, rows + 1, 1);'),
+    'start-consumed': ('platform/powermac/input_boot.c',
+                       'static int try_local_char(void) { return input_legacy_try(IL_LOCAL_CHAR); }',
+                       'static int try_local_char(void) { static int lost; int k = input_legacy_try(IL_LOCAL_CHAR); '
+                       'if (k >= 0 && !lost) { lost = 1; return -1; } return k; }'),
 }
 
 
+def observe(elf, out, cpu, case):
+    s = Session(elf, cpu, out, 600)
+    font = Font(ROOT/'assets/fonts/shino16.kcgfont')
+
+    def shot(name):
+        shadow = s.screen(name)
+        pixels = read_ppm(out/(name+'.ppm'))
+        require((pixels.width, pixels.height) == (800, 600), '800x600 console')
+        return shadow, Terminal(pixels, font, (255, 255, 255), (0, 0, 0), cursor_top=14)
+
+    def local(line):
+        for c in line:
+            s.key({' ': 'spc', '/': 'slash', '.': 'dot'}.get(c, c))
+        s.key('ret')
+
+    try:
+        s.agent_enabled = False
+        s.start()
+        s.wait(lambda: 'protocol=01' in serial(out/'serial-a.log'), 'keyboard enumeration', 60)
+        s.key('esc')
+        s.agent_enabled = True
+        if case == 'start-consumed':
+            s.wait(s.ready, 'RSH READY after consumed ESC', 60)
+            check('[Remote shell closed]' in s.screen('preloaded'), 'start-consumed')
+        s.close_rshell(preloaded=True)
+        s.wait(lambda: validate_root(serial(out/'serial-a.log'), serial(out/'serial-b.log')),
+               'rd0 registration and page accounting', 60)
+        prompt = 'OS32:/$ '
+        def finished(text, result):
+            # The command is done when its whole result line is on screen
+            # and a fresh prompt follows it (no snapshot mid-output).
+            lines = [l.rstrip() for l in text.splitlines()]
+            rows = [i for i, l in enumerate(lines) if re.fullmatch(result, l)]
+            return bool(rows) and any(l.startswith(prompt.rstrip()) for l in lines[rows[-1]+1:])
+        # TIME completes after the HELLO-established digit has been drawn.
+        # Link-up alone precedes both HELLO digits in the reserved band.
+        s.wait(lambda: s.word('pm_link_time_ok') != 0, 'HELLO display before baseline', 60)
+        initial, baseline = shot('boot')
+        check('[sqlite] static rc=0' not in initial, 'trace-screen')
+        local('clear')
+        local('echo first')
+        s.wait(lambda: finished(s.screen('first'), r'first'), 'USB first line', 30)
+        text, pixels = shot('first')
+        check(prompt+'echo first' in text, 'start-consumed')
+        check(pixels.compare_text(0, 0, prompt+'echo first') is None, 'colors/top')
+        check(pixels.compare_text(1, 0, 'first') is None, 'USB output')
+        local('clear')
+        local('cat /bin/sample.txt')
+        s.wait(lambda: finished(s.screen('text'), r'ASCII .+'), 'fd1 output', 30)
+        _, original = shot('text')
+        check(original.compare_text(1, 0, 'ASCII ｶﾅ 日本語') is None, 'utf8-bytewise')
+        check(reserved_unchanged(baseline.image, original.image), 'top')
+        local('clear')
+        for i in range(35):
+            local(f'echo l{i:02d}')
+        # A broken scroll never shows 'l34' followed by a prompt; do not turn
+        # that into a timeout — photograph after the deadline and let the
+        # pixel comparison below decide (positive mismatch evidence).
+        try:
+            s.wait(lambda: finished(s.screen('scroll'), r'l34'), 'USB scroll completion', 30)
+        except RuntimeError:
+            pass
+        _, pixels = shot('scroll')
+        for i in range(19, 35):
+            row = (i - 19) * 2
+            check(pixels.compare_text(row, 0, prompt+f'echo l{i:02d}') is None, 'scroll')
+            check(pixels.compare_text(row+1, 0, f'l{i:02d}') is None, 'scroll')
+        check(reserved_unchanged(baseline.image, pixels.image), 'scroll')
+        local('clear')
+        s.wait(lambda: prompt in s.screen('prompt'), 'local prompt', 30)
+        s.keys('echo ax')
+        edited = prompt + 'echo ax'
+        col = len(edited)
+
+        def cursor_drawn():
+            # shell_putchar updates the cell before it moves the fbcon underline.
+            # Require both in the same stopped frame, including the blank tail.
+            shadow, pixels = shot('cursor')
+            return (shadow.splitlines()[0].startswith(edited)
+                    and pixels.compare_text(0, 0, edited + '  ', ((0, col),)) is None)
+
+        s.wait(cursor_drawn, 'edited command and cursor', 30)
+        s.key('backspace')
+        s.wait(lambda: prompt+'echo a ' in s.screen('backspace'), 'backspace', 30)
+        s.key('ret')
+        s.wait(lambda: finished(s.screen('edited'), r'a'), 'edited result', 30)
+
+        def generations():
+            return re.findall(r'FB text ready generation=(?:[^\n]*\n)??(\d+) fg=', serial(out/'serial-a.log'))
+
+        before = generations()
+        require(bool(before), 'initial text generation')
+        local('source /bin/leave.sh')
+        s.wait(lambda: generations()[:-1] == before and generations()[-1] != before[-1],
+               'tile owner exit restores a new generation', 30)
+        s.wait(lambda: finished(s.screen('leave'), r'0'), 'tile leave status and prompt', 30)
+        check('FB text ready generation=' not in s.screen('leave'), 'trace-screen')
+        local('clear')
+        local('cat /bin/sample.txt')
+
+        def restored():
+            text, frame = shot('restored')
+            return (finished(text, r'ASCII .+') and
+                    frame.compare_text(1, 0, 'ASCII ｶﾅ 日本語') is None)
+
+        s.wait(restored, 'restored UTF-8 result and prompt', 30)
+        _, frame = shot('restored')
+        for y in range(original.top + 16, original.top + 32):
+            for x in range(16 * 12):
+                check(original.image.pixel(x, y) == frame.image.pixel(x, y), 'restored glyph pixels')
+    finally:
+        s.close()
+
+
 def main():
-    p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument('--mutate', action='store_true')
-    p.add_argument('--build-only', action='store_true')
-    p.add_argument('--cpu', choices=['7450', '7455', 'both'], default='both')
-    args = p.parse_args()
-    cross = Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc'))
-    if not (cross/'bin/powerpc-elf-gcc').is_file() or (not args.build_only and (not ROM.is_file() or any(
-            shutil.which(x) is None for x in ['qemu-system-ppc', 'genisoimage']))):
-        missing = 'PPC toolchain' if not (cross/'bin/powerpc-elf-gcc').is_file() else 'QEMU/OpenBIOS/genisoimage'
-        print('SKIP ppc-fb: ' + missing + ' unavailable')
-        return int(os.environ.get('OS32_REQUIRE_PPC') == '1')
-    os.environ['PPC_FB'] = '1'
-    work = Path(tempfile.mkdtemp(prefix='fb-run-', dir=os.environ['TMPDIR']))
-    print('evidence='+str(work), flush=True)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--cpu', choices=['7450', '7455', 'both'], default='both')
+    parser.add_argument('--mutate', action='store_true')
+    parser.add_argument('--build-only', action='store_true')
+    args = parser.parse_args()
+    if not args.build_only and (not ROM.is_file() or not shutil.which('qemu-system-ppc')):
+        print('SKIP ppc-fb: QEMU/OpenBIOS unavailable')
+        return 3
+    work = Path(tempfile.mkdtemp(prefix='fb-run-', dir=os.environ.get('TMPDIR')))
     os.environ.setdefault('SOURCE_DATE_EPOCH', '946684800')
-    digests = set()
-    for mode, source, old, new in [('normal', None, None, None)] + (MUTATIONS if args.mutate else []):
-        script = work/'fb.sh'; script.write_text('echo ASCII ｶﾅ 日本語\n')
-        manifest = json.loads((ROOT/'build/ppc-ram-root.json').read_text())
-        leave = work/'leave.sh'
-        leave.write_text('/bin/dispprb.bin leave\necho $?\n')
-        manifest['/leave.sh'] = str(leave)
-        manifest['/fb.sh'] = str(script)
-        manifest_path = work/'root.json'; manifest_path.write_text(json.dumps(manifest))
-        user = work / ('user-bytewise' if mode == 'utf8-bytewise' else 'user')
-        opts = product_settings(work, mode) + ['KBOOT_LINK=0', 'ROOT_MANIFEST='+str(manifest_path),
-            'KB_SH_OUT='+str(user), 'PPC_USER_OUT='+str(user),
-            'KB_ROOT_BINS='+str(user/'dispprb.bin'),
-            'ROOT_DEPS=assets/fonts/shino16.kcgfont assets/fonts/JF-Dot-Shinonome16-LICENSE.txt build/out/unicode.bin '+str(script)+' '+str(leave)]
-        # Every mode feeds the fixed UTF-8 line at the LAN terminal decoder on USB 'z'.
-        src = 'platform/powermac/input_boot.c'
-        inp = (ROOT/src).read_text()
-        literal = ''.join('\\x%02x' % c for c in 'echo 日本語の表示\n'.encode())
-        helper = ('static int fb_usb(void) { int c = pm_input_usb_take(); '
-                  'if ((c & 0xff) == \'z\') { static const u8 text[] = "'+literal+'"; '
-                  'pm_terminal_feed(text, sizeof(text)-1); return -1; } return c; }\n')
-        anchor = 'pm_input_usb_take()'
-        require(inp.count(anchor) == 1, 'unique FB input boundary')
-        require(inp.count('static PmInputDecoder') == 1, 'unique FB helper insertion')
-        inp = inp.replace(anchor, 'fb_usb()').replace('static PmInputDecoder', helper+'static PmInputDecoder')
-        path = work/(mode+'-input.c'); path.write_text(inp)
-        opts += ['KB_MUT_THIRD_SRC='+src, 'KB_MUT_THIRD_FILE='+str(path)]
-        if mode == 'utf8-bytewise':
-            source_text = (ROOT/source).read_text()
-            require(source_text.count(old) == 1, 'unique UTF-8 reversion anchor')
-            helper = ('static void runtime_print_utf8(const char *text, u8 color) { '
-                      '(void)color; while (*text) runtime_api.shell_putchar(*text++, 0); }\n')
-            require(source_text.count('KernelAPI *sh_runtime_init') == 1, 'unique UTF-8 helper insertion')
-            source_text = source_text.replace('KernelAPI *sh_runtime_init', helper+'KernelAPI *sh_runtime_init').replace(old, new)
-            path = work/'reverted-runtime.c'; path.write_text(source_text)
-            opts += ['PPC_SH_RUNTIME_SRC='+str(path)]
-        elif source:
-            opts += [x.replace('KB_MUT_', 'KB_MUT_EXTRA_') for x in
-                     mutant_settings(work, mode, source, old, new)]
-        elf = build(work/mode, 'PPC_CROSS_DIR='+str(cross), *opts)
-        hashes = {str(path.relative_to(ROOT)) if path.is_relative_to(ROOT) else str(path):
-                  dict(size=path.stat().st_size, sha256=hashlib.sha256(path.read_bytes()).hexdigest())
-                  for path in [elf, script, manifest_path, ROOT/'assets/fonts/shino16.kcgfont',
-                               ROOT/'assets/fonts/JF-Dot-Shinonome16.ttf',
-                               ROOT/'assets/fonts/JF-Dot-Shinonome16-LICENSE.txt',
-                               ROOT/'build/out/unicode.bin']}
-        (work/(mode+'-inputs.json')).write_text(json.dumps(hashes, indent=2))
+    leave = work/'leave.sh'
+    leave.write_text('/bin/dispprb.bin leave\necho $?\n')
+    bins = ' '.join((text_fixture(work), str(leave), 'build/out/ppc-user/link-sh/dispprb.bin'))
+    seen = set()
+    for case in ['normal'] + (list(MUTATIONS) if args.mutate else []):
+        opts = mutant_settings(work, case, *MUTATIONS[case]) if case != 'normal' else []
+        elf = build(work/case, 'IMAGE=kboot-link-sh', 'KB_ROOT_BINS='+bins,
+                    *before_shell_input(work), *opts)
         digest = hashlib.sha256(elf.read_bytes()).hexdigest()
-        require(digest not in digests, 'duplicate FB ELF '+mode)
-        digests.add(digest)
-        print(f'{mode} sha256={digest} {elf}', flush=True)
+        require(digest not in seen, 'distinct framebuffer image')
+        seen.add(digest)
+        print(case, digest, flush=True)
         if args.build_only:
             continue
-        for cpu in (['7450', '7455'] if args.cpu == 'both' else [args.cpu]) if mode == 'normal' else ['7450']:
+        for cpu in (['7450', '7455'] if args.cpu == 'both' else [args.cpu]) if case == 'normal' else ['7450']:
             try:
-                accept(elf, cpu, work/(mode+'-'+cpu), mode)
-            except VerdictError as exc:
-                if mode == 'normal': raise
-                require(str(exc).startswith(EXPECTED_FAILURE[mode]),
-                        f'unexpected failure for {mode}: {exc}')
-                print('RED runtime '+mode+': '+str(exc), flush=True)
+                observe(elf, work/(case+'-'+cpu), cpu, case)
+            except PixelMismatch as exc:
+                reason = {'colors': 'colors/top', 'top': 'colors/top', 'scroll-minus': 'scroll',
+                          'scroll-plus': 'scroll'}.get(case, case)
+                require(case != 'normal' and str(exc) == reason, f'{case}: {exc}')
+                print('RED', case, cpu)
             else:
-                require(mode == 'normal', 'mutant survived: '+mode)
-                print('GREEN INDEX8 pixels '+cpu, flush=True)
+                require(case == 'normal', 'mutation survived: '+case)
+                print('GREEN', case, cpu)
     return 0
 
 
 if __name__ == '__main__':
-    sys.exit(main())
+    raise SystemExit(main())

@@ -1,19 +1,14 @@
 #!/usr/bin/env python3
 """S-C: USER nesting and direct shell acceptance on mac99."""
 import argparse
-import io
+import hashlib
 import os
 from pathlib import Path
-import select
-import shutil
 import socket
-import subprocess
 import tempfile
-import time
 
 from kboot_accept import build, mutant_settings
-from kboot_run import ROOT, ROM, QMP, command, require, serial, validate_root as validate, lan
-from sb_run import INPUT, serial_accept
+from kboot_run import require, serial, validate_root
 
 CHECK = dict(name='ppc-sc', tier=2, budget=900, needs=[],
              covers=['platform/powermac/input_usb.[ch]', 'platform/powermac/input_keymap.c', 'tools/ppc/sc_run.py', 'userland/ppc/nest.c'],
@@ -40,147 +35,6 @@ LINK_NEST_EXPECTED = b'hello ok\nnest kind=1 code=7 parent=12345\n' * 2
 EXPECTED = ('/bin/nest.bin\n' +
             'hello ok\nnest kind=1 code=7 parent=12345\n' * 2 +
             'exit=5\nos32> ')
-BINS = 'KB_ROOT_BINS=' + ' '.join('build/out/ppc-user/'+n+'.bin'
-                                for n in ('hello', 'fault', 'nest'))
-
-
-def lan_accept(elf, cpu, out, shell=False):
-    """Same mac99/UDP terminal transport as S-B; exact N01 transcript."""
-    out.mkdir()
-    try:
-        reservation = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    except PermissionError:
-        return True
-    transport = None
-    p = q = None
-    try:
-        reservation.bind(('127.0.0.1', 0))
-        port = reservation.getsockname()[1]
-        transport = lan.UDP(f'127.0.0.1:0,127.0.0.1:{port}')
-        lines = []
-        host = lan.Host(transport, bytes.fromhex('525400123456'), out/'capture', output=lines.append)
-        display = io.BytesIO()
-        terminal = lan.Terminal(host, display=display, diagnostic=lines.append)
-        cd = out/'cd'; cd.mkdir()
-        shutil.copyfile(elf, cd/'PPCKERN.ELF')
-        iso = out/'boot.iso'
-        command(['genisoimage', '-quiet', '-hfs', '-r', '-part', '-no-desktop', '-o', iso, cd])
-        a, b = out/'serial-a.log', out/'serial-b.log'
-        args = ['qemu-system-ppc', *(['-g', '800x600x8'] if os.environ.get('PPC_FB') == '1' else []), '-M', 'mac99', '-cpu', cpu, '-m', '128M', '-smp', '1',
-                '-accel', 'tcg', '-bios', str(ROM), '-drive', f'file={iso},media=cdrom,id=bootcd',
-                '-boot', 'd', '-prom-env', 'boot-device=cd:,\\PPCKERN.ELF',
-                '-prom-env', 'auto-boot?=true', *(['-display', 'none'] if os.environ.get('PPC_FB') == '1' else ['-nographic']), '-serial', 'file:'+str(a),
-                '-serial', 'file:'+str(b), '-monitor', 'none', '-qmp', 'stdio', '-no-reboot',
-                '-nic', 'none', '-device', 'sungem,netdev=n0,mac=52:54:00:12:34:56',
-                '-netdev', f'socket,id=n0,udp=127.0.0.1:{transport.sock.getsockname()[1]},localaddr=127.0.0.1:{port}']
-        reservation.close()
-        deadline = time.monotonic()+60
-        with (out/'qemu.stderr').open('w') as err:
-            p = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=err, bufsize=0)
-            q = QMP(p, deadline)
-            phase = 0
-            while time.monotonic() < deadline:
-                aa, bb = serial(a), serial(b)
-                ready = validate(aa, bb)
-                while select.select([transport], [], [], 0)[0]:
-                    frame = transport.receive(); host.receive(frame); terminal.receive(frame)
-                host.expire()
-                if phase == 0 and ready and (shell or 'os32> ' in aa) and host.boot:
-                    validate(aa, bb, True)
-                    q.call('eject', {'device': 'bootcd', 'force': True})
-                    if shell:
-                        require('OS32 External Shell Started' not in aa and b'sh> ' not in display.getvalue(),
-                                'LAN-only sh waits for first OPEN')
-                    terminal.open(); phase = 1
-                elif phase == 1 and terminal.connected and (not shell or b'sh> ' in display.getvalue()):
-                    if shell:
-                        require('OS32 External Shell Started' in display.getvalue().decode() and
-                                b'sh> ' in display.getvalue(), 'delayed shell startup')
-                        terminal.send_bytes(COMMANDS.rsplit(b'exit 3\n', 1)[0])
-                    else: terminal.send_bytes(b'/bin/nest.bin\n')
-                    phase = 2
-                elif shell and phase == 2 and b'pipe-ok\n' in display.getvalue().replace(b'\r', b'') and display.getvalue().endswith(b'sh> '):
-                    terminal.send_bytes(b'echo discarded'); phase = 3
-                elif shell and phase == 3 and display.getvalue().endswith(b'echo discarded'):
-                    terminal.open(); phase = 4
-                elif shell and phase == 4 and terminal.connected:
-                    terminal.send_bytes(b'\nexit 3\n'); phase = 5
-                elif shell and phase == 5 and display.getvalue().count(b'OS32 External Shell Started') == 2 and display.getvalue().endswith(b'sh> '):
-                    actual = display.getvalue().decode()
-                    check_shell(actual)
-                    require('\ndiscarded\n' not in actual.replace('\r', ''), 'reconnect failed to cancel line')
-                    require('KBOOT READY' not in actual, 'kernel log leaked to terminal')
-                    require(not any('gap' in x or 'timeout' in x for x in lines), 'terminal loss')
-                    (out/'terminal.log').write_text(actual)
-                    q.call('quit'); p.wait(timeout=2); require(p.returncode == 0, 'QEMU exit')
-                    print(cpu+' LAN S-C PASS', flush=True)
-                    return False
-                elif not shell and phase == 2 and display.getvalue().replace(b'\r', b'').endswith(b'exit=5\nos32> '):
-                    actual = display.getvalue().replace(b'\r', b'').decode()
-                    # The terminal OPEN redraws the prompt first; compare from there.
-                    require(actual.partition('os32> ')[2] == EXPECTED, 'N01 LAN transcript: '+repr(actual))
-                    require(not any('gap' in x or 'timeout' in x for x in lines), 'terminal loss')
-                    q.call('quit'); p.wait(timeout=2)
-                    require(p.returncode == 0, 'QEMU exit')
-                    print(cpu+' LAN: '+repr(actual), flush=True)
-                    return False
-                time.sleep(0.01)
-            raise RuntimeError('N01 LAN timeout: '+repr(display.getvalue()))
-    finally:
-        reservation.close()
-        if q: q.close()
-        if p and p.poll() is None:
-            p.terminate()
-            try: p.wait(timeout=2)
-            except subprocess.TimeoutExpired: p.kill(); p.wait()
-        if transport: transport.sock.close()
-
-
-def nest_main(args):
-    cpus = ['7450', '7455'] if args.cpu == 'both' else [args.cpu]
-    base = Path(os.environ['TMPDIR'])/'sc-run'; base.mkdir(exist_ok=True)
-    work = Path(tempfile.mkdtemp(prefix='run-', dir=base))
-    settings = ['KBOOT_SHELL=1', 'KBOOT_LINK=0', BINS]
-    if args.serial:
-        source = 'platform/powermac/cli_boot.c'
-        text = (ROOT/source).read_text()
-        injected = work/'cli_boot.c'
-        input_text = INPUT.replace('/bin/hello.bin ok\\n/bin/hello.bin ok\\n/bin/fault.bin\\n/bin/hello.bin ok\\n', '/bin/nest.bin\\n')
-        injected.write_text(text.replace('enum { CLI_CAT_BYTES', input_text+'\nenum { CLI_CAT_BYTES')
-                            .replace('.getkey = pm_terminal_getkey', '.getkey = sb_getkey'))
-        settings += ['KB_MUT_SRC='+source, 'KB_MUT_FILE='+str(injected)]
-    elf = build(work/'normal', *settings)
-    skipped = False
-    for cpu in cpus:
-        if args.serial:
-            serial_accept(elf, cpu, work/('normal-'+cpu), EXPECTED)
-        else:
-            skipped |= lan_accept(elf, cpu, work/('lan-'+cpu))
-    if args.mutate:
-        # Lose only the second result read. First child and final CLI return
-        # must still be observed, so unrelated faults/timeouts cannot be RED.
-        extra = mutant_settings(work, 'parent-result', 'arch/ppc/kapi_call.c',
-                                'return ppc_kapi_invoke(&api, current_slot, values);',
-                                'static unsigned reads;\n'
-                                '    if (current_slot == (__builtin_offsetof(KernelAPI, exec_last_result) - 8) / 4 && ++reads == 2) return (u32)-1;\n'
-                                '    return ppc_kapi_invoke(&api, current_slot, values);')
-        extra = [s.replace('KB_MUT_', 'KB_MUT_EXTRA_') for s in extra]
-        mutant = build(work/'parent-result', *settings, *extra)
-        serial_accept(mutant, cpus[0], work/'parent-result-guest',
-                      EXPECTED.replace('nest kind=1 code=7 parent=12345\nexit=5',
-                                       'nest kind=0 code=0 parent=12345\nexit=5'))
-        print('RED parent-result: exact transcript, sb_stop, QEMU rc=0', flush=True)
-    print(('SKIP LAN socket rc=3' if skipped else 'PASS N01')+' evidence='+str(work))
-    return 3 if skipped else 0
-
-
-# The same commands run against the real USER image on both transports.
-COMMANDS = (b'help\necho $PATH\necho $HOME\necho $SHELL\npwd\nls /bin\necho sc-ok > /tmp/sc\ncat /tmp/sc\n'
-            b'cat /nofile > /tmp/e\ncat /tmp/e\n/bin/hello.bin ok\necho $?\n'
-            b'cd /tmp\nset SC_PARENT=kept\n/bin/hello.bin ok\necho $?\npwd\necho $SC_PARENT\n'
-            b'echo again\n\x1b[A\necho echo script-ok > /tmp/test.sh\n'
-            b'source /tmp/test.sh\necho pipe-ok | cat\n'
-            b'echo cancel-me\x03\necho edit-x\x7fok\nexit 3\n')
 
 
 def check_shell(text, fd1=True, restart=True):
@@ -230,145 +84,14 @@ def check_shell(text, fd1=True, restart=True):
     require('\ncancel-me\n' not in text, 'cancelled command executed')
 
 
-def shell_serial(work, cpus, mutate):
-    from kboot_run import PREFIX
-    import re
-    # Substitute the external connection/input boundary; decoder, InputOps,
-    # USER syscalls, parser, exec, pipes, redirects and restart are unchanged.
-    stop = INPUT[INPUT.index('#include "kprintf.h"'):INPUT.index('static int sb_getkey')]
-    boot_src = 'platform/powermac/shell_boot.c'
-    boot = (ROOT/boot_src).read_text()
-    helper = stop + r'''
-static int sc_connected(void)
-{
-    u32 start = tick_count;
-    kprintf(7, "SB READY\n");
-    while ((u32)(tick_count - start) < 200) pm_terminal_poll();
-    return 1;
-}
-'''
-    boot = boot.replace('static void report', helper+'\nstatic void report')
-    require(boot.count('pm_term_connected()') == 1, 'unique SC replacement anchor: pm_term_connected()')
-    boot = boot.replace('pm_term_connected()', 'sc_connected()')
-    require(boot.count('for (;;) pm_terminal_poll();') == 1, 'unique SC replacement anchor: for (;;) pm_terminal_poll();')
-    boot = boot.replace('for (;;) pm_terminal_poll();', 'kprintf(7, "SB DONE\\n"); sb_done();')
-    input_src = 'platform/powermac/input_boot.c'
-    inp = (ROOT/input_src).read_text()
-    literal = ''.join('\\x%02x' % c for c in COMMANDS)
-    feeder = stop.replace('void sb_done', 'static void sc_input_done').replace('sb_stop', 'sc_input_stop')
-    feeder += '\nstatic int sc_byte(void)\n{\n    static const unsigned char commands[] = "'+literal+'";\n'
-    feeder += '''    static u32 pos;
-    if (!commands[pos]) { kprintf(7, "SB DONE\\n"); sc_input_done(); }
-    return commands[pos++];
-}
-'''
-    inp = inp.replace('static PmInputDecoder', feeder+'\nstatic PmInputDecoder')
-    require(inp.count('pm_terminal_trygetkey()') == 1, 'unique SC replacement anchor: pm_terminal_trygetkey()')
-    inp = inp.replace('pm_terminal_trygetkey()', 'sc_byte()')
-    stream_src = 'platform/powermac/console_stream.c'
-    stream = (ROOT/stream_src).read_text()
-    # Tag the stream mirror separately from log writes, even on serial.
-    stream = stream.replace('(void)pm_escc_write(&serial, bytes, len);', r'''
-    char frame[] = "~USBSTREAM:00000000:";
-    static const char hex[] = "0123456789abcdef";
-    for (unsigned i = 0; i < 8; i++) frame[11+i] = hex[(len >> (28-4*i)) & 15];
-    (void)pm_escc_write(&serial, frame, sizeof(frame)-1);
-    (void)pm_escc_write(&serial, bytes, len);''')
-    for name in ['normal'] + (['fd1-log', 'no-restart'] if mutate else []):
-        settings = ['KBOOT_SH=1', 'KBOOT_LINK=0']
-        for slot, src, text in [('', boot_src, boot), ('EXTRA_', input_src, inp),
-                                ('THIRD_', stream_src, stream)]:
-            if name == 'fd1-log' and src == stream_src:
-                text = text.replace('    console_write(buf, size, color);',
-                                    '    (void)color; pm_log_write(buf, size);')
-            if name == 'no-restart' and src == boot_src:
-                anchor = 'if (kind != EXEC_KIND_EXITED) break;'
-                require(text.count(anchor) == 1, 'restart anchor')
-                text = text.replace(anchor, 'break;')
-            file = work/(name+'-'+Path(src).name); file.write_text(text)
-            settings += ['KB_MUT_'+slot+'SRC='+src, 'KB_MUT_'+slot+'FILE='+str(file)]
-        elf = build(work/name, *settings)
-        symbols = command([PREFIX+'nm', '-n', elf])
-        require('resident_cli_run' not in symbols and 'pm_cli_boot' not in symbols, 'CLI in sh image')
-        for cpu in cpus if name == 'normal' else cpus[:1]:
-            out = work/(name+'-'+cpu); out.mkdir()
-            cd = out/'cd'; cd.mkdir(); shutil.copyfile(elf, cd/'PPCKERN.ELF')
-            iso = out/'boot.iso'
-            command(['genisoimage', '-quiet', '-hfs', '-r', '-part', '-no-desktop', '-o', iso, cd])
-            a, b = out/'serial-a.log', out/'serial-b.log'
-            args = ['qemu-system-ppc', *(['-g', '800x600x8'] if os.environ.get('PPC_FB') == '1' else []), '-M', 'mac99', '-cpu', cpu, '-m', '128M', '-smp', '1',
-                    '-accel', 'tcg', '-bios', str(ROM), '-drive', f'file={iso},media=cdrom,id=bootcd',
-                    '-boot', 'd', '-prom-env', 'boot-device=cd:,\\PPCKERN.ELF',
-                    '-prom-env', 'auto-boot?=true', *(['-display', 'none'] if os.environ.get('PPC_FB') == '1' else ['-nographic']), '-serial', 'file:'+str(a),
-                    '-serial', 'file:'+str(b), '-monitor', 'none', '-qmp', 'stdio', '-no-reboot', '-nic', 'none']
-            # The live FB redraws the long transcript as well as streaming it.
-            deadline = time.monotonic()+(180 if os.environ.get('PPC_FB') == '1' else 60)
-            q = None
-            with (out/'qemu.stderr').open('w') as err:
-                p = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=err, bufsize=0)
-                try:
-                    q = QMP(p, deadline); ejected = False
-                    while time.monotonic() < deadline:
-                        aa, bb = serial(a).replace('\r', ''), serial(b)
-                        validate(aa, bb)
-                        if not ejected and 'SB READY\n' in aa:
-                            require('External Shell Started' not in aa, 'sh started before connection')
-                            q.call('eject', {'device': 'bootcd', 'force': True}); ejected = True
-                        if 'SB DONE\n' in aa:
-                            q.call('stop')
-                            regs = q.call('human-monitor-command', {'command-line': 'info registers'})
-                            (out/'registers.txt').write_text(regs)
-                            pc = re.search(r'NIP\s+([0-9a-fA-F]+)', regs)
-                            label = 'sb_stop' if name == 'no-restart' else 'sc_input_stop'
-                            address = next(int(l.split()[0], 16) for l in symbols.splitlines() if l.endswith(' '+label))
-                            if not pc or int(pc[1], 16) != address:
-                                q.call('cont')
-                                time.sleep(.01)
-                                continue
-                            validate(aa, bb, True); require(ejected, 'CD not ejected')
-                            actual = aa.partition('SB READY\n')[2].partition('SB DONE\n')[0]
-                            terminal, pos = '', 0
-                            while match := re.search(r'~USBSTREAM:([0-9a-f]{8}):', actual[pos:]):
-                                start = pos + match.end()
-                                pos = start + int(match[1], 16)
-                                require(pos <= len(actual), 'complete SC stream frame')
-                                terminal += actual[start:pos]
-                            require(('sc-ok\n' in terminal) == (name != 'fd1-log'), 'fd1 stream marker')
-                            # The mutation deliberately routes fd1 to LOG. Keep
-                            # checking its content independently of the channel.
-                            merged = re.sub(r'~USBSTREAM:[0-9a-f]{8}:', '', actual)
-                            check_shell(merged, restart=name != 'no-restart')
-                            q.call('quit'); p.wait(timeout=2); require(p.returncode == 0, 'QEMU exit')
-                            print(('GREEN ' if name == 'normal' else 'RED ')+name+' '+cpu+
-                                  ': exact stop PC, results, QEMU rc=0', flush=True)
-                            break
-                        time.sleep(0.01)
-                    else: raise RuntimeError('SC serial timeout: '+repr(serial(a)))
-                finally:
-                    if q: q.close()
-                    if p.poll() is None:
-                        p.terminate()
-                        try: p.wait(timeout=2)
-                        except subprocess.TimeoutExpired: p.kill(); p.wait()
-
-
 def link_main(args):
     """PPC_P5_REST_DESIGN §2・§5: RSH nesting and shell output contracts."""
-    from link_sh_run import Session, settings, accept, check_map
-    from usb_run import USB_QEMU_CLOCK
-
-    class ScLink(Session):
-        # Keep link_sh's -g 800x600x8, USB keyboard and guest clock together.
-        qemu_clock = USB_QEMU_CLOCK
-
-        def start(self):
-            super().start()
-
+    from link_sh_run import Session, settings, check_map, RSHELL, EXECUTE
     base = Path(os.environ['TMPDIR'])/'sc-run'
     base.mkdir(exist_ok=True)
     work = Path(tempfile.mkdtemp(prefix='link-', dir=base))
     print('evidence='+str(work), flush=True)
-    for kind in (socket.SOCK_DGRAM, socket.SOCK_STREAM):
+    for kind in (() if args.build_only else (socket.SOCK_DGRAM, socket.SOCK_STREAM)):
         try:
             with socket.socket(socket.AF_INET, kind) as probe:
                 probe.bind(('127.0.0.1', 0))
@@ -376,10 +99,11 @@ def link_main(args):
             print('SKIP ppc-sc link socket: '+str(exc))
             return 1 if os.environ.get('OS32_REQUIRE_PPC') == '1' else 3
     cpus = ['7450', '7455'] if args.cpu == 'both' else [args.cpu]
-    for name in ['normal'] + (['parent-result'] if args.mutate else []):
+    hashes = set()
+    for name in ['normal'] + (['parent-result', 'fault-break'] if args.mutate else []):
         folder = work/name; folder.mkdir()
-        opts = settings(folder)
-        bins = ' '.join(str(folder/'user'/(n+'.bin')) for n in ('hello', 'fault', 'nest'))
+        opts = settings(folder, 'fault-break' if name == 'fault-break' else None)
+        bins = ' '.join(str(folder/'user'/(n+'.bin')) for n in ('hello', 'nest'))
         opts = [o if not o.startswith('KB_ROOT_BINS=') else 'KB_ROOT_BINS='+bins for o in opts]
         if name == 'parent-result':
             extra = mutant_settings(folder, name, 'arch/ppc/kapi_call.c',
@@ -388,18 +112,26 @@ def link_main(args):
                 '    if (current_slot == (__builtin_offsetof(KernelAPI, exec_last_result) - 8) / 4 && ++reads == 2) return (u32)-1;\n'
                 '    return ppc_kapi_invoke(&api, current_slot, values);')
             opts += [o.replace('KB_MUT_', 'KB_MUT_THIRD_') for o in extra]
-        elf = build(folder/'kernel', *opts)
+        elf = build(folder/'kernel', *opts, 'kb-user', 'kernel')
         check_map(elf.with_suffix('.map'))
+        digest = hashlib.sha256(elf.read_bytes()).hexdigest()
+        require(digest not in hashes, 'distinct '+name)
+        hashes.add(digest)
+        print(name, digest, flush=True)
+        if args.build_only:
+            continue
         for cpu in cpus if name == 'normal' else cpus[:1]:
-            session = ScLink(elf, cpu, folder/cpu, 180)
+            session = Session(elf, cpu, folder/cpu, 180)
             try:
                 session.start()
+                session.wait(lambda: validate_root(serial(session.out/'serial-a.log'), serial(session.out/'serial-b.log')),
+                             'rd0 registration and page accounting', 60)
                 session.wait(session.ready, 'HELLO to cui READY', 60)
                 require(session.agent.operator.ready['mode'] == 'cui', 'link sh mode')
                 normal = LINK_NEST_EXPECTED
                 expected = normal
                 # Only the second result is corrupted, keeping both children alive.
-                if name != 'normal':
+                if name == 'parent-result':
                     expected = (b'hello ok\nnest kind=1 code=7 parent=12345\n'
                                 b'hello ok\nnest kind=0 code=0 parent=12345\n')
                 result = session.cmd('/bin/nest.bin')
@@ -408,13 +140,29 @@ def link_main(args):
                 session.cmd('echo after-nest', b'after-nest\n')
                 from link_sh_run import check_body
                 check_body('/bin/nest.bin', result['result'], expected)
-                if name == 'normal':
+                if name != 'parent-result':
                     for line, output in (
                         ('echo sc-ok > /tmp/sc', b''), ('cat /tmp/sc', b'sc-ok\n'),
                         ('cat /nofile > /tmp/e', b'cat: /nofile: No such file or directory\n'),
                         ('cat /tmp/e', b''), ('echo pipe-ok | cat', b'pipe-ok\n'),
                         ('/bin/hello.bin ok', b'hello ok\n'), ('echo $?', b'7\n')):
                         session.cmd(line, output)
+                    generation = session.word('g_shell_service', 8)
+                    session.agent.notifier.notify_number(RSHELL, EXECUTE, b'00001000 p3-fault\n')
+                    if name == 'fault-break':
+                        session.wait(lambda: '/sys/shell.bin returned ' in serial(session.out/'serial-a.log'),
+                                     'resident fault returned', 60)
+                        before = len(session.events)
+                        session.agent.notifier.notify_number(RSHELL, EXECUTE, b'00001001 echo afterfault\n')
+                        session.settle(2)
+                        require(session.word('g_shell_service', 8) == generation
+                                and session.word('exec_nest_level') == 0, 'fault stopped restart')
+                        require(not any(e['parts'][:2] == ['RSH', 'OUT'] for e in session.events[before:]),
+                                'command completed after stopped restart')
+                    else:
+                        session.wait(lambda: session.word('g_shell_service', 8) > generation
+                                     and session.ready(), 'next resident generation', 60)
+                        session.cmd('echo afterfault', b'afterfault\n')
                 else:
                     require(result['result'] != b'> /bin/nest.bin\n'+normal+b'\x04',
                             'parent-result survived')
@@ -423,16 +171,8 @@ def link_main(args):
                 require(session.p.returncode == 0, 'QEMU exit')
             finally:
                 session.close()
-        if name == 'normal':
-            # READY, IDs, END, Ctrl-C/line recovery remain P3's acceptance.
-            for cpu in cpus:
-                accept(elf, cpu, folder/(cpu+'-p3'), 900)
-    # Retain the independent old serial nest and fd1-log/no-restart regressions.
-    args.serial = True
-    rc = nest_main(args)
-    serial_work = work/'serial-shell'; serial_work.mkdir()
-    shell_serial(serial_work, cpus, args.mutate)
-    return rc
+    print(f'{len(hashes)} distinct nesting images')
+    return 0
 
 
 def main():
@@ -441,29 +181,9 @@ def main():
     parser.add_argument('--serial', action='store_true')
     parser.add_argument('--link', action='store_true')
     parser.add_argument('--mutate', action='store_true')
+    parser.add_argument('--build-only', action='store_true')
     args = parser.parse_args()
-    if args.mutate and not (args.serial or args.link):
-        parser.error('--mutate requires --serial or --link')
-    cross = Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc'))
-    if not (cross/'bin/powerpc-elf-gcc').is_file() or any(
-            shutil.which(t) is None for t in ('qemu-system-ppc', 'genisoimage')) or not ROM.is_file():
-        print(('FAIL' if os.environ.get('OS32_REQUIRE_PPC') == '1' else 'SKIP')+
-              ' ppc-sc: PPC toolchain/QEMU/OpenBIOS unavailable')
-        return int(os.environ.get('OS32_REQUIRE_PPC') == '1')
-    if args.link:
-        return link_main(args)
-    rc = nest_main(args)
-    cpus = ['7450', '7455'] if args.cpu == 'both' else [args.cpu]
-    work = Path(tempfile.mkdtemp(prefix='shell-', dir=Path(os.environ['TMPDIR'])/'sc-run'))
-    shell_serial(work, cpus, args.mutate)
-    print('PASS S-C serial evidence='+str(work), flush=True)
-    if not args.serial:
-        elf = build(work/'product', 'KBOOT_SH=1', 'KBOOT_LINK=0')
-        symbols = command([str(cross/'bin/powerpc-elf-nm'), elf])
-        require('resident_cli_run' not in symbols and 'pm_cli_boot' not in symbols, 'CLI in product')
-        for cpu in cpus:
-            if lan_accept(elf, cpu, work/('product-'+cpu), shell=True): rc = 3
-    return rc
+    return link_main(args)
 
 
 if __name__ == '__main__':

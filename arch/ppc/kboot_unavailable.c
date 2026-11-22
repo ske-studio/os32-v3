@@ -26,7 +26,7 @@ void exec_syscall_dispatch(struct arch_syscall *call)
     (void)call;
     for (;;) __asm__ volatile("b .");
 }
-void ring3_fault_kill(void)
+void ppc_user_fault_kill(void)
 {
     for (;;) __asm__ volatile("b .");
 }

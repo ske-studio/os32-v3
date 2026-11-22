@@ -1,3 +1,5 @@
+/* PowerMac GEM layout (2026-11-21): OpenBSD gemvar.h RX count,
+ * four reserved descriptors, and OS32 HW2 64 KiB DMA boundaries. */
 #include "platform/powermac/lan_boot.h"
 #include "drivers/net/gem/gem.h"
 #include "mm/paging.h"
@@ -69,7 +71,7 @@ static int test(void) {
     if (ptes!=16) { output("H:pte-count\n"); return 1; }
     for (unsigned i=0; i<ptes; i++)
         if (pte_addresses[i]!=base+i*4096u) { output("H:pte-address\n"); return 1; }
-    if (rc || (d.pa & 65535) || d.bytes!=196608 || d.bus!=d.pa || (u32)d.cpu!=d.pa) { output("H:layout\n"); return 1; }
+    if (rc || (d.pa & 65535) || d.bytes!=393216 || d.bus!=d.pa || (u32)d.cpu!=d.pa) { output("H:layout\n"); return 1; }
     if (lines!=2048 || syncs!=1) { output("H:A4 dma-unpublished\n"); return 1; }
     if (flags!=(PAGE_RW|PTE_PCD)) { output("H:pcd\n"); return 1; }
     if (pm_gmac_dma_init(&b,&d) || maps!=1 || syncs!=1 || lines!=2048) { output("H:N3\n"); return 1; }

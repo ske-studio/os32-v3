@@ -6,7 +6,12 @@
 #include "exec_arch.h"
 #include "kernel/irq/irq.h"
 
-extern void ring3_fault_kill(void);
+static void (*resident_fault)(struct ppc_frame *);
+
+void ppc_trap_set_resident_fault(void (*handler)(struct ppc_frame *))
+{
+    resident_fault = handler;
+}
 static void (*external_handler)(struct ppc_frame *);
 static void (*dec_handler)(struct ppc_frame *);
 static ppc_pd_read_fn table_reader;
@@ -91,6 +96,21 @@ void ppc_trap_dispatch(struct ppc_frame *f)
     int translated = (msr & (PPC_MSR_IR | PPC_MSR_DR | PPC_MSR_EE)) ==
                      (PPC_MSR_IR | PPC_MSR_DR);
     if (!f || !translated) goto fatal;
+    /* Assembly has already tried the HPT spill. Only the supervisor probe
+     * may consume its registered continuation before ordinary dispatch. */
+    int storage_fault = f->vector == PPC_VECTOR_DSI || f->vector == PPC_VECTOR_ISI;
+    if (!(f->srr1 & PPC_MSR_PR) && storage_fault) {
+        reason = fault_reason(f);
+        if (probe.active && f->srr0 == probe.pc &&
+            (f->vector == PPC_VECTOR_ISI ? f->srr0 : f->dar) == probe.va &&
+            (probe.data ? (reason == PPC_TRAP_DSI_MISS ||
+                           reason == PPC_TRAP_DSI_PROTECT ||
+                           reason == PPC_TRAP_DSI_IO) : reason == probe.reason)) {
+            probe.active = 0;
+            f->srr0 = probe.resume;
+            return;
+        }
+    }
     if (f->vector == 0x500 || f->vector == PPC_VECTOR_DEC) {
         /* Extra defensive clearing on entry, beyond the BSD idle examples. */
         f->srr1 &= ~PPC_MSR_POW;
@@ -116,20 +136,12 @@ void ppc_trap_dispatch(struct ppc_frame *f)
             if (fatal_ready && ppc_root_current())
                 ppc_trap_fatal_sink(f, reason);
         }
-        ring3_fault_kill();
+        /* Same as the x86 exception stubs (EXC_ENTER): a user trap is an
+         * exception context, so the common kill path defers teardown to the
+         * setjmp landing, which restores the depth and enables interrupts. */
+        ppc_user_fault_kill();
         reason = f->vector == 0x800 ? PPC_TRAP_FP_UNAVAILABLE :
                  PPC_TRAP_USER | PPC_TRAP_UNSUPPORTED;
-    } else if (f->vector == PPC_VECTOR_DSI || f->vector == PPC_VECTOR_ISI) {
-        reason = fault_reason(f);
-        if (probe.active && f->srr0 == probe.pc &&
-            (f->vector == PPC_VECTOR_ISI ? f->srr0 : f->dar) == probe.va &&
-            (probe.data ? (reason == PPC_TRAP_DSI_MISS ||
-                           reason == PPC_TRAP_DSI_PROTECT ||
-                           reason == PPC_TRAP_DSI_IO) : reason == probe.reason)) {
-            probe.active = 0;
-            f->srr0 = probe.resume;
-            return;
-        }
     } else if (f->vector == 0x700) {
         /* PEM table 6-16: preserve the program exception cause. */
         u32 cause = f->srr1 & 0x001e0000;
@@ -145,6 +157,9 @@ void ppc_trap_dispatch(struct ppc_frame *f)
     } else if (f->vector == 0xc00) {
         reason = PPC_TRAP_SC | PPC_TRAP_UNSUPPORTED;
     }
+    if (!(f->srr1 & PPC_MSR_PR) && !kctx_irq_depth && resident_fault &&
+        (storage_fault || f->vector == 0x600 || f->vector == 0x700))
+        resident_fault(f);
 fatal:
     probe.active = 0;
     if (f && translated && fatal_ready && ppc_root_current())

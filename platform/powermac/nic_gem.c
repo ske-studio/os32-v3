@@ -59,12 +59,36 @@ static int rx(void *frame, u32 cap, u32 *len)
 }
 
 static void mac(u8 *out) { (void)pm_lan_running_gem(out); }
+#ifdef KBOOT_GEM_RX_DIAG
+/* Field           shift   width
+ * poll serial         0      16
+ * packet_count       16       3
+ * rx_head            19       7
+ * RX_COMPLETION      26       7
+ * last RX_KICK       33       7
+ */
+extern volatile u32 gem_rx_last_kick;
+volatile unsigned long long gem_rx_diag;
+static void observe_poll(struct gem *g)
+{
+    static unsigned short serial;
+    u32 done = g ? g->io.read32(g->io.ctx, GEM_RX_COMPLETION) : 0;
+    u32 head = g ? g->rx_head : 0;
+    gem_rx_diag = ++serial | (packet_count << 16) | ((head & 127u) << 19) |
+        ((unsigned long long)(done & 127u) << 26) | ((unsigned long long)(gem_rx_last_kick & 127u) << 33);
+}
+#endif
 static void poll(void)
 {
     struct gem *g = acquired ? pm_lan_running_gem(0) : 0;
-    if (!g) { packet_head = packet_count = 0; return; }
-    if (gem_poll(g, g->io.tb(g->io.ctx), 8u) < 0 ||
-        !pm_lan_running_gem(0)) { packet_head = packet_count = 0; return; }
+    if (!g || gem_poll(g, g->io.tb(g->io.ctx), 8u) < 0 ||
+        !pm_lan_running_gem(0)) {
+        packet_head = packet_count = 0;
+#ifdef KBOOT_GEM_RX_DIAG
+        observe_poll(0);
+#endif
+        return;
+    }
     /* All receive calls share eight descriptor inspections, including bad
      * frames and OWN, while filling the available packet slots. */
     u32 budget = GEM_RX_SCAN_BUDGET;
@@ -74,6 +98,9 @@ static void poll(void)
         packet_len[tail] = n;
         packet_count++;
     }
+#ifdef KBOOT_GEM_RX_DIAG
+    observe_poll(g);
+#endif
 }
 static u32 credit(void)
 {

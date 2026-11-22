@@ -36,11 +36,17 @@ int surface_api_query(u32 role, struct surface_query_result *out)
     extern int probe_copied;
     if (role == 0x102) { probe_watch = out; probe_copied = 0; return 0; }
     if (role == 0x103) { probe_watch = 0; return probe_copied; }
+    static u32 leased_sid = LEDGER_MAX_SURFACES;
+    if (role == 0x104 && leased_sid < LEDGER_MAX_SURFACES)
+        return ledger_surfaces[leased_sid].lease_count;
     if (role == 0x100 || role == 0x101) {
         struct surface_query_source client;
         int rc = gfx_surface_source(LEDGER_ROLE_CLIENT, &client);
         if (rc) return rc;
-        if (role == 0x101) return ledger_surfaces[client.refs[0].sid].lease_count;
+        if (role == 0x101) {
+            leased_sid = client.refs[0].sid;
+            return ledger_surfaces[leased_sid].lease_count;
+        }
         gfx_reinit_surface_roles(0, 0);
         gfx_reinit_surface_roles(1, 0);
         return 0;
@@ -127,7 +133,7 @@ def main():
     work = Path(tempfile.mkdtemp(prefix='ppc-surface-', dir=os.environ.get('TMPDIR') or None)).resolve()
     print('evidence=' + str(work), flush=True)
     user = work / 'user'
-    bins = [str(user / (app + '.bin')) for app in ('hello', 'fault', 'surfprob')]
+    bins = [str(user / 'surfprob.bin')]
     options = ['IMAGE=kboot-link-sh', 'KB_SH_OUT=' + str(user),
                'KB_ROOT_BINS=' + ' '.join(bins)]
     images = {}

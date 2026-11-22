@@ -59,7 +59,7 @@ typedef struct {
     i32 (__cdecl *font_guard_run)(int (*call)(void *), void *ctx);
 } ShellService;
 
-#if defined(__i386__)
+#if defined(__i386__) || (defined(__powerpc__) && __SIZEOF_POINTER__ == 4)
 STATIC_ASSERT(sizeof(ShellService) == SHELL_SERVICE_SIZE, shell_service_size);
 #endif
 

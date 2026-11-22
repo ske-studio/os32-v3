@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PPC P3 A-6: link-SH acceptance; existing HostAgent, RSHELL and QMP only.
+"""Resident shell observations follow shell_service.h, exec_launch.inc and exec_finish.inc.
 
 Evidence is isolated below --out. Socket denial returns 3 (未), never PASS.
 The normal control precedes every mutation. Unexpected timeout/build/QEMU
@@ -9,6 +9,8 @@ import argparse
 import hashlib
 import json
 import os
+import shlex
+from contextlib import contextmanager
 from pathlib import Path
 import re
 import select
@@ -26,6 +28,7 @@ from run import ROM, command, require, CriterionFailure
 from link_run import PumpQMP
 from kboot_accept import build
 from ppc_lan_host import UDP
+import host_agent as wire
 from host_agent import HostAgent
 from host_operator_socket import OperatorSocket
 from host_rshell import RSHELL, EXECUTE
@@ -34,15 +37,17 @@ from usb_run import USB_QEMU_CLOCK
 USER = 'userland/shell/rshell_lan.c'
 SINK = 'kernel/console/con_sink.c'
 HEAP = 'mm/kmalloc.c'
-BOOT = 'platform/powermac/shell_boot.c'
+BOOT = 'platform/powermac/shell_loop_ops.c'
 # 110 lines x 81 bytes = 8910 B, just past the 8 KiB sink; each line scrolls the
 # OF framebuffer (~2.7 s under -icount), so allow ~5 minutes plus margin.
 OVERFLOW_LINES = 110
 OVERFLOW_SECONDS = 480
 # Each anchor is checked against the complete source, before observation hooks.
 MUTATIONS = {
-    'term-wait': (BOOT, '#if !KBOOT_LINK\n    if (pm_console_text_ready())',
-                  '#if KBOOT_LINK\n    if (pm_console_text_ready())', 'autostart'),
+    'command-group': ('userland/shell/main.c', '    shell_cmd_pci_init();', '', 'resident command groups'),
+    'line-buffer': ('userland/shell/main.c', '    setvbuf(stdout, (char *)0, _IOLBF, BUFSIZ);',
+                    '    setvbuf(stdout, (char *)0, _IOFBF, BUFSIZ);', 'line buffering'),
+    'term-wait': (BOOT, '    return gui ? 2 : 0;', '    if (!gui) { for (;;) idle_wait_step(); } return 2;', 'autostart'),
     'ready-retry': (USER, 'if (!attempted || (u32)(g_api->get_tick() - ready_tick) >= RSH_READY_TICKS)',
                     'if (!attempted)', 'ready-retry'),
     'duplicate': (USER, 'if (have_id && id <= last_id) return OS32_ERR_EXIST;',
@@ -55,9 +60,9 @@ MUTATIONS = {
              '    /* END removed */', 'end'),
     'owner': (SINK, '    if (g_reader == id) {',
                '    if (0) {', 'owner'),
-    'fault-break': (BOOT, 'if (kind != EXEC_KIND_EXITED && kind != EXEC_KIND_FAULT) break;',
-                     'if (kind != EXEC_KIND_EXITED) break;', 'fault-restart'),
-    'half-line': (USER, '        if (ln.bytes == 0) {', '        if (1) {', 'half-line'),
+    'fault-break': (BOOT, '    kprintf(0x07, "%s returned %d\\n", path, rc);', '    kprintf(0x07, "%s returned %d\\n", path, rc);\n    if (rc < 0) for (;;) idle_wait_step();', 'fault-restart'),
+    'half-line': ('userland/shell/rshell.c', '    return rsh_getch(from_serial);',
+                  '    (void)rsh_lan_poll(); return rsh_getch(from_serial);', 'half-line'),
 }
 
 
@@ -80,7 +85,13 @@ def check_heap(peak, failures):
     require(0 < peak < 1024*1024 and failures == 0, 'heap')
 
 
-def settings(work, mutation=None):
+def text_fixture(work):
+    text = work/'sample.txt'
+    text.write_text('ASCII ｶﾅ 日本語\n', encoding='utf-8')
+    return str(text.resolve())
+
+
+def settings(work, mutation=None, *, observe_flow=False, overflow="lines"):
     """Private copies add read-only meters and USER-only fault/output stimuli.
 
     The meters do not send new protocol messages or change capture ownership.
@@ -90,21 +101,24 @@ def settings(work, mutation=None):
     if mutation:
         path, before, after, _ = MUTATIONS[mutation]
         sources[path] = replace_once(sources.get(path, (ROOT/path).read_text()), before, after)
-    if mutation == 'term-wait':
-        sources[BOOT] = ('int pm_term_connected(void) { return 0; }\n'
-            'int pm_terminal_trygetkey(void) { return -1; }\n'
-            + sources[BOOT])
-        sources[BOOT] = sources[BOOT].replace('pm_terminal_poll();', 'idle_work_run();')
-    sources[USER] = replace_once(sources[USER], '    (void)execute_command(line);', r'''
+    if overflow == 'cr':
+        stimulus = r'''        for (int i = 0; i < 512; i++)
+            g_api->kprintf(7, "%s", "0123456789abcdef\r");
+        g_api->kprintf(7, "%s", "p3-cr-tail");'''
+    else:
+        stimulus = r'''        for (int i=0; i<P3_OVERFLOW_LINES; i++) g_api->kprintf(7, "%s", "01234567890123456789012345678901234567890123456789012345678901234567890123456789\n");'''.replace('P3_OVERFLOW_LINES', str(OVERFLOW_LINES))
+    sources[USER] = replace_once(sources[USER], '        accepting = rsh_lan_execute(line);', r'''
     /* Acceptance stimuli live only in this generated USER copy. */
     if (!strcmp(line, "p3-fault")) { __asm__ volatile("trap"); }
-    if (!strcmp(line, "p3-output")) {
+    if (!strcmp(line, "p3-buffer")) {
+        printf("buffered line\n");
+    } else if (!strcmp(line, "p3-output")) {
         const char text[] = "FD1 UTF8 \xe3\x81\x82\n";
         g_api->tvram_clear();
         g_api->sys_write(1, text, sizeof(text)-1);
     } else if (!strcmp(line, "p3-overflow")) {
-        for (int i=0; i<P3_OVERFLOW_LINES; i++) g_api->kprintf(7, "%s", "01234567890123456789012345678901234567890123456789012345678901234567890123456789\n");
-    } else (void)execute_command(line);'''.replace('P3_OVERFLOW_LINES', str(OVERFLOW_LINES)))
+P3_STIMULUS
+    } else accepting = rsh_lan_execute(line);'''.replace('P3_STIMULUS', stimulus))
     sources[SINK] = replace_once(sources[SINK], 'int con_sink_capture(unsigned int op)',
         'volatile int p3_freeze_rc;\nvolatile unsigned p3_end_count;\nint con_sink_capture(unsigned int op)')
     # This return belongs to capture, not another sink operation.
@@ -120,18 +134,87 @@ def settings(work, mutation=None):
                                  'volatile unsigned p3_alloc_failures;\nvoid *kmalloc(u32 size)')
     sources[HEAP] = replace_once(sources[HEAP], '    void *p = kheap_alloc(&kernel_heap, size);',
         '    void *p = kheap_alloc(&kernel_heap, size);\n    if (!p && size) p3_alloc_failures++;')
-    user = work/'rshell_lan.c'; user.write_text(sources.pop(USER))
+    user = work/'rshell_lan.c'; user.write_text('#include <stdio.h>\n' + sources.pop(USER))
     user_out = work/'user'
     # kb-user recursively uses these command-line variables. Separate object
     # trees ensure no mutant can reuse a normal USER object (or vice versa).
-    opts = ['KBOOT_SH=1', 'KBOOT_LINK=1', 'KB_SH_OUT='+str(user_out),
+    opts = ['KBOOT_GEM_RX_DIAG=1', 'KBOOT_SH=1', 'KBOOT_LINK=1', 'KB_SH_OUT='+str(user_out),
             'PPC_SH_MUT_SRC='+USER, 'PPC_SH_MUT_FILE='+str(user),
-            'KB_ROOT_BINS='+str(user_out/'hello.bin')+' '+str(user_out/'fault.bin')]
+            'KB_ROOT_BINS='+str(user_out/'hello.bin')+' '+str(user_out/'fault.bin')+' '+text_fixture(work)]
+    for extra_user in ('userland/shell/rshell.c', 'userland/shell/main.c'):
+        if extra_user not in sources: continue
+        source = work/Path(extra_user).name
+        source.write_text(sources.pop(extra_user))
+        opts.extend(['PPC_RES_MUT_SRC='+extra_user, 'PPC_RES_MUT_FILE='+str(source)])
+    if observe_flow:
+        source = 'exec/exec.c'
+        observer = ROOT/'tools/accept/ppc_shell_flow.inc'
+        sources[source] = (ROOT/source).read_text() + '\n#include "'+str(observer)+'"\n'
+        opts.append('KB_KEEP_RESET=-Wl,--wrap=arch_entry_enter,--wrap=ppc_trap_dispatch,--wrap=exec_run')
     require(len(sources) <= 3, 'kernel mutation slots')
     for slot, (path, content) in zip(('', 'EXTRA_', 'THIRD_'), sources.items()):
         dest = work/(Path(path).stem+'-meter.c'); dest.write_text(content)
         opts += ['KB_MUT_'+slot+'SRC='+path, 'KB_MUT_'+slot+'FILE='+str(dest)]
     return opts
+
+
+def overflow_frames(path, offset, ident):
+    events = []
+    tracked = set()
+    with path.open('rb') as stream:
+        position = 0
+        for line in stream:
+            before_submit = position < offset
+            position += len(line)
+            sent = line.startswith(b'> ')
+            frame = bytes.fromhex(line.removeprefix(b'> ').decode())
+            start = wire.ETH_HDR + wire.LINK_HDR
+            if len(frame) < start or int.from_bytes(frame[12:14], 'big') != wire.LINK_ETHERTYPE:
+                continue
+            op, flags, epoch, seq, ack, size, rid, sess = wire.hdr_unpack(frame[wire.ETH_HDR:])
+            if before_submit and op != wire.OP_HELLO:
+                continue
+            payload = frame[start:start+size]
+            key = (sess, epoch, rid)
+            event = dict(op=wire.OPNAME.get(op), direction='host' if sent else 'guest',
+                         sess=sess, epoch=epoch, rid=rid, flags=flags, seq=seq, ack=ack)
+            if op == wire.OP_REQUEST:
+                parts = payload.decode('ascii', 'replace').split()
+                if parts[:2] == ['RSH', 'READY'] or (
+                        parts[:2] == ['RSH', 'OUT'] and parts[3:4] == [ident]):
+                    tracked.add(key)
+                    event['request'] = parts
+                    if parts[:2] == ['RSH', 'OUT'] and len(parts) == 6:
+                        event['declared_length'] = parts[5]
+            if op != wire.OP_HELLO and key not in tracked:
+                continue
+            if op == wire.OP_RESPONSE and len(payload) == 6:
+                event['status'], event['length'] = struct.unpack('<HI', payload)
+            if op == wire.OP_DATA:
+                event['data'] = payload.decode('ascii', 'replace')
+            event['bytes'] = size
+            events.append(event)
+    return events
+
+
+def gem_assessment(previous, current):
+    if not isinstance(previous, dict) or not isinstance(current, dict):
+        return 'insufficient samples'
+    if previous['poll'] == current['poll']:
+        return 'poll drive'
+    def full(v):
+        return v['packet_count'] == 4 and v['kick'] == (v['done'] + 1) & 127
+    if full(previous) and full(current):
+        return 'foreground demux'
+    if current['done'] == previous['done']:
+        if all(v['head'] == v['done'] and v['kick'] != (v['done'] + 1) & 127
+               for v in (previous, current)):
+            return 'QEMU/UDP'
+    elif current['head'] == previous['head']:
+        return 'descriptor'
+    else:
+        return 'demux and link matching'
+    return 'inconclusive'
 
 
 class Session:
@@ -146,6 +229,7 @@ class Session:
         self.deadline = time.monotonic()+timeout
         self.q = self.p = self.io = self.operator = self.err = self.frames = None
         self.events = []
+        self.overflow_watch = None
         self.started = time.monotonic()
         self.agent_enabled = not late
         self.symbols = {p[2]: int(p[0],16) for line in command([cross('nm'), '-n', elf]).splitlines()
@@ -168,6 +252,21 @@ class Session:
     def serial_a_backend(self):
         return 'file:'+str(self.out/'serial-a.log')
 
+    def serial_args(self):
+        return ['-serial', self.serial_a_backend()]
+
+    def close_rshell(self, *, preloaded=False):
+        if not preloaded:
+            self.key('esc')
+        self.wait(lambda: self.word('rshell_active') == 0 and
+                  '[Remote shell closed]' in self.screen('closed'), 'local shell prompt', 30)
+
+    def open_rshell(self):
+        start = len(self.events)
+        self.keys('rshell\n')
+        self.wait(lambda: self.ready() and any(e['parts'][:2] == ['RSH', 'READY']
+                  for e in self.events[start:]), 'new resident RSH READY', 30)
+
     def start(self):
         cd = self.out/'cd'; cd.mkdir(); shutil.copyfile(self.elf, cd/'PPCKERN.ELF')
         iso = self.out/'boot.iso'
@@ -178,11 +277,14 @@ class Session:
         args = ['qemu-system-ppc','-M',self.machine,'-cpu',self.cpu,'-m','128M','-smp','1',
             '-accel','tcg','-bios',str(ROM),'-cdrom',str(iso),'-boot','d',
             '-prom-env','boot-device=cd:,\\PPCKERN.ELF','-prom-env','auto-boot?=true',
-            '-g','800x600x8','-display','none','-serial',self.serial_a_backend(),
+            '-g','800x600x8','-display','none',*self.serial_args(),
             '-serial','file:'+str(self.out/'serial-b.log'),'-monitor','none','-qmp','stdio',*self.reboot_args,
             '-nic','none','-device','sungem,netdev=n0,mac=52:54:00:12:34:56','-netdev',
             f'socket,id=n0,udp=127.0.0.1:{self.io.sock.getsockname()[1]},localaddr=127.0.0.1:{port}',
-            '-usb','-device','usb-kbd,id=kbd',*self.qemu_clock]
+            '-usb','-device','usb-kbd,id=kbd',*self.qemu_clock,
+            # Diagnosis only, never set by CI (trace events go through
+            # OS32_QEMU_TRACE so they share the per-run trace file).
+            *shlex.split(os.environ.get('OS32_QEMU_EXTRA', ''))]
         (self.out/'metadata.json').write_text(json.dumps(dict(command=args,cpu=self.cpu,
             elf_sha256=hashlib.sha256(self.elf.read_bytes()).hexdigest()),indent=2))
         self.err=(self.out/'qemu.stderr').open('w'); self.frames=(self.out/'frames.log').open('w')
@@ -197,10 +299,28 @@ class Session:
         if self.p.poll() is not None: return
         while select.select([self.io],[],[],0)[0]:
             frame=self.io.receive(); self.frames.write(frame.hex()+'\n')
+            if self.overflow_watch:
+                self.observe_overflow_frame(frame)
             if self.agent_enabled: self.agent.handle(frame,self)
         if self.agent_enabled: self.agent.tick(self)
         for fd in select.select(self.operator.fileno_list(),[],[],0)[0]: self.operator.on_readable(fd)
         self.operator.poll(time.monotonic())
+
+    def observe_overflow_frame(self, frame):
+        watch = self.overflow_watch
+        start = wire.ETH_HDR + wire.LINK_HDR
+        if len(frame) < start or int.from_bytes(frame[12:14], 'big') != wire.LINK_ETHERTYPE:
+            return
+        op, flags, epoch, seq, ack, size, rid, sess = wire.hdr_unpack(frame[wire.ETH_HDR:])
+        if op == wire.OP_REQUEST and not watch['out']:
+            parts = frame[start:start+size].split()
+            if parts[:2] == [b'RSH', b'OUT'] and parts[3:4] == [watch['id']]:
+                watch['out'] = True
+                watch['pending'].append('first-out-ack-wait')
+        if watch['out'] and op == wire.OP_HELLO and flags == wire.HS_SYN:
+            watch['syn'] += 1
+            if watch['syn'] in (2, 3):
+                watch['pending'].append('syn-retry-' + str(watch['syn'] - 1))
 
     def wait(self, predicate, label, seconds=20):
         until=min(self.deadline,time.monotonic()+seconds)
@@ -215,34 +335,97 @@ class Session:
         until=time.monotonic()+seconds
         self.wait(lambda: time.monotonic()>=until,'settle',seconds+1)
 
-    def word(self, name, offset=0):
+    def word(self, name, offset=0, unit="w"):
         require(name in self.symbols,'missing symbol '+name)
-        # The monitor reads through the current translation; a sample taken
-        # while the CPU runs with translation off (OF calls, early boot,
-        # exception entry) cannot see kernel VAs. Retry briefly before failing.
-        until=time.monotonic()+2
-        while True:
-            value=self.q.call('human-monitor-command',{'command-line':f'x /1wx 0x{self.symbols[name]+offset:x}'})
-            match=re.search(r':\s*0x([0-9a-fA-F]+)',value)
-            if match is not None or time.monotonic()>=until: break
-            time.sleep(.02)
-        require(match is not None,'unreadable '+name)
+        # Resident ELF symbols are identity-loaded. Read their physical
+        # storage independently of the guest's currently active translation.
+        address = self.symbols[name] + offset
+        command = f'xp /1{unit}x 0x{address:x}'
+        value = self.q.call('human-monitor-command', {'command-line': command})
+        match = re.search(r':\s*0x([0-9a-fA-F]+)', value)
+        require(match is not None, f'unreadable {name} ({command}): {value!r}')
         return int(match[1],16)
 
+    def overflow_probe(self, ident, until, phase, samples):
+        now = time.monotonic()
+        sample = dict(phase=phase, remaining=until-now, vm_remaining=self.deadline-now)
+        samples.append(sample)
+        path = self.out/'diag.json'
+        try:
+            try:
+                raw = self.word('gem_rx_diag', unit='g')
+                current = dict(poll=raw & 65535, packet_count=(raw >> 16) & 7,
+                               head=(raw >> 19) & 127, done=(raw >> 26) & 127, kick=(raw >> 33) & 127)
+                sample['gem_rx_diag'] = current
+                previous = samples[-2].get('gem_rx_diag') if len(samples) > 1 else None
+                sample['assessment'] = gem_assessment(previous, current)
+            except CriterionFailure as exc:
+                sample['gem_rx_diag'] = str(exc)
+                sample['assessment'] = 'unreadable'
+            registers = self.q.call('human-monitor-command', {'command-line': 'info registers'})
+            for key, pattern in [('pc', 'NIP|PC'), ('msr', 'MSR')]:
+                match = re.search(rf'\b(?:{pattern})\s*[:=]?\s*(?:0x)?([0-9a-f]+)', registers, re.I)
+                sample[key] = match[1] if match else registers
+            for name in ('tick_count', 'g_capture', 'con_sink_drop_count', 'p3_freeze_rc',
+                         'p3_end_count', 'link_state', 'link_epoch', 'link_retransmits',
+                         'link_resyncs', 'link_tx_deferred'):
+                if name in self.symbols:
+                    try:
+                        sample[name] = self.word(name, unit='h' if name == 'link_epoch' else 'w')
+                    except CriterionFailure as exc:
+                        sample[name] = str(exc)
+        finally:
+            path.write_text(json.dumps(dict(id=ident, samples=samples), indent=2))
+
     def ready(self):
-        return self.agent.established and self.agent.operator.ready is not None
+        return (self.agent.established and self.agent.operator.ready is not None
+                and self.word('g_shell_service', 8) != 0
+                and self.word('exec_nest_level') == 1 and self.word('cur_res_owner') == 1
+                and self.word('g_cur_app') == 0)
 
     def cmd(self, line, expected=None, seconds=20):
         op=self.agent.operator
+        self.wait(self.ready, 'RSH READY before '+line, seconds)
         ended=self.word('p3_end_count')
         # A new agent generation restarts IDs at 1: look only at events after this submit.
         start=len(self.events)
+        if line == 'p3-overflow':
+            now = time.monotonic()
+            until = min(self.deadline, now + seconds)
+            samples = []
+            self.overflow_probe(None, until, 'normal', samples)
         ident=op.submit('cui',line,'accept',timeout_ms=max(20000,seconds*1000))
         def outputs():
             return [e for e in self.events[start:] if e['parts'][:2]==['RSH','OUT'] and e['parts'][3]==ident]
         # Inspect the wire result even when Operator rejects its command echo.
         # Otherwise PRINT duplication would become a generic result timeout.
-        self.wait(lambda: bool(outputs()),'OUT '+line,seconds)
+        if line == 'p3-overflow':
+            span = until - now
+            probes = iter([(now + span / 2, 'mid'), (until - min(3, span / 4), 'deadline')])
+            pending = next(probes)
+            self.overflow_watch = dict(id=ident.encode(), out=False, syn=0, pending=[])
+            self.frames.flush()
+            offset = self.frames.tell()
+            def observed_output():
+                nonlocal pending
+                while self.overflow_watch['pending']:
+                    self.overflow_probe(ident, until, self.overflow_watch['pending'].pop(0), samples)
+                if outputs():
+                    return True
+                if pending and time.monotonic() >= pending[0]:
+                    self.overflow_probe(ident, until, pending[1], samples)
+                    pending = next(probes, None)
+                return bool(outputs())
+            try:
+                self.wait(observed_output, 'OUT '+line, until-time.monotonic())
+            finally:
+                self.overflow_watch = None
+                self.frames.flush()
+                frames = overflow_frames(self.out/'frames.log', offset, ident)
+                (self.out/'diag.json').write_text(json.dumps(
+                    dict(id=ident, samples=samples, frames=frames), indent=2))
+        else:
+            self.wait(lambda: bool(outputs()),'OUT '+line,seconds)
         if expected is not None: check_body(line,bytes.fromhex(outputs()[0]['body']),expected)
         self.wait(lambda: ident in op.results or (op.pending is not None and
                   op.pending['state'] in ('done','truncated')),'result '+line,seconds)
@@ -252,10 +435,8 @@ class Session:
         events=outputs()
         require(len(events)==1,'one OUT')
         if expected is not None: check_body(line,result['result'],expected)
-        # rshell_set_active is ignored for CPL=3 callers (wrap_rshell_set_active:
-        # ring3_call_from_user), so the APP shell leaves the kernel flag at 0.
         require(self.word('g_capture')==0 and self.word('g_reader')==0xffffffff and
-                self.word('rshell_active')==0 and self.word('boot_serial_mirror')==0 and
+                self.word('rshell_active')==1 and self.word('boot_serial_mirror')==0 and
                 self.word('p3_end_count')==ended+1,'end')
         return result
 
@@ -264,7 +445,8 @@ class Session:
         self.settle(.18)
 
     def keys(self, text):
-        for c in text: self.key('ret' if c=='\n' else 'spc' if c==' ' else c)
+        names={'\n':'ret',' ':'spc','-':'minus','.':'dot','/':'slash'}
+        for c in text: self.key(names.get(c,c))
 
     def screen(self, name):
         # PPC fbcon's cell shadow is the input to the framebuffer renderer.
@@ -299,18 +481,103 @@ def cross(tool):
     return str(Path(os.environ.get('PPC_CROSS_DIR','/home/hight/opt/cross-ppc'))/'bin'/('powerpc-elf-'+tool))
 
 
-def accept(elf,cpu,out,timeout,late=False,verdict=None):
+def flow_point(s, index, expected):
+    words = [s.word('shell_flow', 4*(9*index+field)) for field in range(9)]
+    generation, *fields = words
+    require(generation > 0 and tuple(fields[:5]) == expected,
+            f'resident flow point {index}: {words}')
+    return generation, *fields[5:]
+
+
+class LineSession(Session):
+    uart = None
+
+    def start(self):
+        with socket.socket() as listener:
+            listener.bind(('127.0.0.1', 0))
+            listener.listen(1)
+            listener.settimeout(10)
+            self.serial_port = listener.getsockname()[1]
+            super().start()
+            self.uart, _ = listener.accept()
+
+    def serial_args(self):
+        return ['-chardev', f'socket,id=uart,host=127.0.0.1,port={self.serial_port},'
+                f'logfile={self.out / "serial-a.log"}', '-serial', 'chardev:uart',
+                *self.trace_args()]
+
+    def trace_args(self):
+        # One QEMU trace sink per run: the UART reader always needs
+        # escc_mem_readb_data; diagnosis may add documented events through
+        # OS32_QEMU_TRACE="name,name" (never set by CI). Extra events share the
+        # same per-run file so later options cannot redirect the UART trace.
+        extra = [n for n in os.environ.get('OS32_QEMU_TRACE', '').split(',') if n.strip()]
+        if not extra:
+            return ['-trace', 'enable=escc_mem_readb_data,file='+str(self.out/'uart.trace')]
+        events = self.out/'trace-events'
+        events.write_text('\n'.join(['escc_mem_readb_data', *[n.strip() for n in extra]])+'\n')
+        return ['-trace', 'events='+str(events)+',file='+str(self.out/'uart.trace')]
+
+    def pump(self):
+        super().pump()
+        if self.uart:
+            while select.select([self.uart], [], [], 0)[0]:
+                if not self.uart.recv(65536):
+                    self.uart.close()
+                    self.uart = None
+                    break
+
+    def hold_serial_line(self):
+        trace = self.out/'uart.trace'
+        with trace.open() as stream:
+            stream.seek(0, 2)
+            received = []
+            def consumed():
+                received.extend(int(value) for value in re.findall(
+                    r'escc_mem_readb_data Read channel [Aa], ch (\d+)', stream.read()))
+                return received == [27, 120]
+            self.uart.sendall(b'\x1bx')
+            self.wait(consumed, 'guest read ESC and x from UART A', 10)
+
+    def check_deferred(self, verdict):
+        pending = self.agent.operator.pending
+        self.wait(lambda: pending['execute'].delivery == 'acked', 'guest queued LAN command', 10)
+        self.settle(1)
+        require(pending['state'] == 'running' and pending['result'] is None, verdict)
+
+    def check_serial_rejection(self, screen, command):
+        lines = [line.rstrip() for line in screen.splitlines()]
+        rejected = 'rshell: line with ESC not executed'
+        require(any(rejected in line and any('> '+command in later for later in lines[i+1:])
+                    for i, line in enumerate(lines)), 'serial rejection before '+command)
+
+    def end_serial_line(self):
+        self.uart.sendall(b'\r')
+
+    def close(self):
+        try:
+            super().close()
+        finally:
+            if self.uart:
+                self.uart.close()
+
+
+def accept(elf,cpu,out,timeout,late=False,verdict=None,overflow_mode="lines"):
     # The 7450 non-late VM also runs the overflow observation.
-    s=Session(elf,cpu,out,timeout+(OVERFLOW_SECONDS if cpu=='7450' and not late else 0),late)
+    check_help = verdict in (None, 'resident command groups')
+    check_overflow = cpu == '7450' and not late and verdict in (None, 'freeze-drop')
+    extra = OVERFLOW_SECONDS * (int(check_help) + int(check_overflow))
+    s=LineSession(elf,cpu,out,timeout+extra,late)
     try:
         s.start()
         if late:
-            # The CPL=3 APP shell cannot set rshell_active; a running app slot shows it started.
+            # shell_service_publish follows the resident slot commit.
             def app_started():
                 # Early in boot the kernel VA may not be readable yet: keep waiting.
-                try: return s.word('g_cur_app')!=0
+                try: return (s.word('g_shell_service',8)!=0 and s.word('exec_nest_level')==1 and
+                             s.word('cur_res_owner')==1 and s.word('g_cur_app')==0)
                 except CriterionFailure: return False
-            s.wait(app_started,'APP before delayed agent',60)
+            s.wait(app_started,'resident before delayed agent',60)
             first=s.word('tick_count')
             s.wait(lambda: s.word('tick_count')-first>=300,'late agent wait',30)
             s.agent_enabled=True
@@ -321,6 +588,18 @@ def accept(elf,cpu,out,timeout,late=False,verdict=None):
             require(s.ready(),verdict)
         else: s.wait(s.ready,'HELLO to cui READY',60)
         require(s.agent.operator.ready['mode']=='cui','autostart')
+        # include/config.h and cmd_env.c define the initial resident environment.
+        s.cmd('pwd', b'/\n')
+        s.cmd('echo $PATH', b'/bin:/sbin:/usr/bin\n')
+        s.cmd('echo $HOME', b'/home/user\n')
+        s.cmd('echo $SHELL', b'/shell\n')
+        s.cmd('echo "two words" | cat', b'two words\n')
+        s.cmd('cat /bin/sample.txt > /tmp/rsh', b'')
+        s.cmd('cat /tmp/rsh', 'ASCII ｶﾅ 日本語\n'.encode())
+        if check_help:
+            help_text=s.cmd('help', seconds=OVERFLOW_SECONDS)['result']
+            require(all(name in help_text for name in (b'rshell', b'echo', b'lspci')), 'resident command groups')
+        require(s.cmd('p3-buffer')['result'] == b'> p3-buffer\nbuffered line\n\x04', 'line buffering')
         s.cmd('echo hello',b'hello\n')
         ready_count=lambda: sum(e['parts'][:2]==['RSH','READY'] for e in s.events)
         count=ready_count(); first=s.word('tick_count')
@@ -329,7 +608,19 @@ def accept(elf,cpu,out,timeout,late=False,verdict=None):
         s.cmd('cat /no-such-file')
         failed=s.cmd('echo $?')['result']
         require(re.fullmatch(rb'> echo \$\?\n[1-9][0-9]*\n\x04',failed) is not None,'failure status')
-        s.cmd('exit 3',b''); s.cmd('echo afterexit',b'afterexit\n')
+        if verdict is None:
+            generation, root, api, aux = flow_point(s, 0, (1, 0, 1, 1, 0))
+            require(root == 0 and aux == s.symbols['g_shell_service'] and api == s.symbols['ppc_kapi_table'], 'resident API/aux')
+        s.cmd('/bin/hello.bin ok', b'hello ok\n')
+        s.cmd('echo $?', b'7\n')
+        s.cmd('echo afterexit', b'afterexit\n')
+        if verdict is None:
+            _, child_root, child_api, child_aux = flow_point(s, 1, (2, 1, 2, 2, 2))
+            require(child_root and child_api == s.word('ring3_tramp_page') and child_aux == 0, 'USER API/aux')
+            flow_point(s, 2, (1, 0, 1, 1, 0))
+            s.cmd('/bin/fault.bin')
+            s.cmd('echo $?', b'139\n')
+            flow_point(s, 3, (1, 0, 1, 1, 0))
         # Bypass host line validation: the guest must reject these notices too.
         before=len(s.events); ident=s.agent.operator.next_id-1
         for data in (f'{ident:08x} echo duplicate\n'.encode(),b'00000001 echo old\n',
@@ -343,40 +634,53 @@ def accept(elf,cpu,out,timeout,late=False,verdict=None):
         require('> p3-output' not in screen and 'FD1 UTF8' in screen,'clear/FB')
         require(chr(0x2422) in screen,'UTF8 FB glyph')
         require('KBOOT' not in screen,'LOG mixed into FB')
+        s.close_rshell()
         s.keys('echo usb\n')
         # The last key only queues the line; the APP loop runs it on a later pass.
-        usb_seen=lambda text: '> echo usb' in text and re.search(r'(?m)^usb *$',text)
+        usb_seen=lambda text: 'OS32:/$ echo usb' in text and re.search(r'(?m)^usb *$',text)
         deadline=time.monotonic()+5
         screen=s.screen('usb')
         while not usb_seen(screen) and time.monotonic()<deadline:
             s.settle(.25); screen=s.screen('usb')
         require(usb_seen(screen),'USB line screen')
-        s.keys('echo half')
+        s.open_rshell()
+        s.hold_serial_line()
         op=s.agent.operator; op.submit('cui','echo deferred','accept')
-        s.settle(1)
-        require(op.pending['result'] is None,'half-line')
-        s.key('ret')
+        s.check_deferred('half-line')
+        s.end_serial_line()
         s.wait(lambda: op.pending['state']=='done','deferred command')
         result=op.take_result(); check_body('echo deferred',result['result'],b'deferred\n')
         s.wait(lambda: s.word('g_capture')==0,'deferred END',5)
         screen=s.screen('deferred')
-        require('> echo half' in screen and '> echo deferred' in screen and
-                screen.index('> echo half') < screen.index('> echo deferred'),'USB before LAN')
-        if cpu=='7450' and not late:
+        s.check_serial_rejection(screen, 'echo deferred')
+        if check_overflow:
             # Every overflow line scrolls the OF framebuffer, which is slow under
             # -icount (~2.7 s per scroll in QEMU 8.2), so one VM per run covers it.
             overflow=s.cmd('p3-overflow',seconds=OVERFLOW_SECONDS)
             require(overflow['state']=='truncated' and overflow['drop']>0,'result drop')
+            if overflow_mode == 'cr':
+                require(overflow['result'].endswith(b'0123456789abcdef\rp3-cr-tail\x04'), 'overflow tail')
             require(s.word('p3_freeze_rc')!=0,'freeze-drop')
             s.cmd('echo recovered',b'recovered\n')
-        # A fault in the APP itself is distinct from a child fault.
+        previous=s.word('g_shell_service',8)
         s.agent.notifier.notify_number(RSHELL,EXECUTE,b'00001000 p3-fault\n')
         count=ready_count(); s.settle(4)
         serial=(s.out/'serial-a.log').read_text(errors='replace')
-        require('sh result kind=2' in serial,'USER fault reached')
+        require('/sys/shell.bin returned ' in serial,'resident fault reached')
         require(s.word('g_capture')==0 and s.word('g_reader')==0xffffffff,'owner')
-        require(ready_count()>count,'fault-restart')
+        if verdict == 'fault-restart' and s.word('g_shell_service',8) == previous:
+            before = len(s.events)
+            s.agent.notifier.notify_number(RSHELL, EXECUTE, b'00001001 echo afterfault\n')
+            s.settle(2)
+            require(not any(e['parts'][:2] == ['RSH','OUT'] for e in s.events[before:]),
+                    'command completed after stopped restart')
+        require(ready_count()>count and s.word('g_shell_service',8)>previous,'fault-restart')
         s.cmd('echo afterfault',b'afterfault\n')
+        if verdict is None:
+            flow_point(s, 4, (0, 0, 0, 0, 0))
+            restarted, root, new_api, new_aux = flow_point(s, 5, (1, 0, 1, 1, 0))
+            require(restarted > previous and not root and new_api == api and new_aux == aux,
+                    'new resident generation')
         generation=s.agent.host_generation
         s.new_agent()
         s.wait(s.ready,'new agent generation',30)
@@ -498,13 +802,140 @@ def accept_reset(elf, out, timeout, via, mutation=None):
         s.close()
 
 
+FLOW_CASES = ('root-branch', 'missing-aux', 'restore-root', 'return-target')
+
+
+def flow_settings(folder, case):
+    """Observe child teardown and exercise the selected entry or return decision."""
+    source = (ROOT/'exec/exec.c').read_text()
+    source = 'volatile unsigned shell_flow_error, shell_child_returning, shell_return_target, shell_valid_root;\n' + source
+    guard = 'do { shell_flow_error = %d; for (;;) __asm__ volatile("" ::: "memory"); } while (0);'
+    for fragment in ('exec_launch.inc', 'exec_finish.inc'):
+        text = (ROOT/'exec'/fragment).read_text()
+        if fragment == 'exec_launch.inc':
+            original = 'args.aux = is_shell ? (u32)(uptr)&g_shell_service : 0;'
+            assignment = 'args.aux = 0;' if case == 'missing-aux' else original
+            text = replace_once(text, original, assignment + '\n'
+                '        if (is_shell && args.aux != (u32)(uptr)&g_shell_service) ' + guard % 2)
+        else:
+            anchor = 'appslot_switch_to(parent);'
+            text = replace_once(text, anchor, 'shell_valid_root = 0;\n        shell_return_target = parent;\n'
+                                '        ++shell_child_returning;\n        ' + anchor)
+            # Publish the argument before installing it, while memory is accessible.
+            root = '0' if case == 'restore-root' else 'paging_kernel_pd_phys()'
+            original = 'g_cur_app = 0;\n        paging_load_cr3(paging_kernel_pd_phys());'
+            text = replace_once(text, original, 'g_cur_app = 0;\n'
+                                f'        u32 root = {root};\n'
+                                '        shell_valid_root = root == paging_kernel_pd_phys() ? 1 : 2;\n'
+                                '        paging_load_cr3(root);')
+            if case == 'return-target':
+                text = replace_once(text, 'parent = appslot_return_target(id);', 'parent = id;')
+        (folder/fragment).write_text(text)
+    observer = ROOT/'tools/accept/ppc_shell_flow.inc'
+    (folder/'exec.c').write_text(source + '\n#include "' + str(observer) + '"\n')
+    entry = (ROOT/'arch/ppc/exec_enter.S').read_text()
+    # Record the actual branch before an invalid root can be used by the MMU.
+    branch = 'bne' if case == 'root-branch' else 'beq'
+    entry = replace_once(entry, 'beq .Lresident', branch + ' .Lresident\n'
+                         '    cmpwi 4,0\n    beq .Lwrong_root')
+    entry = replace_once(entry, '.Lresident:\n', '.Lwrong_root:\n'
+                         '    lis 8,shell_flow_error@ha\n    li 9,1\n'
+                         '    stw 9,shell_flow_error@l(8)\n1:  b 1b\n'
+                         '.Lresident:\n    cmpwi 4,0\n    bne .Lwrong_root\n')
+    (folder/'exec_enter.S').write_text(entry)
+    user = folder/'user'
+    return ['IMAGE=kboot-link-sh', 'KB_SH_OUT='+str(user), 'KB_ROOT_BINS='+str(user/'hello.bin'),
+            'KB_MUT_SRC=exec/exec.c', 'KB_MUT_FILE='+str(folder/'exec.c'),
+            'KB_MUT_EXTRA_SRC=arch/ppc/exec_enter.S', 'KB_MUT_EXTRA_FILE='+str(folder/'exec_enter.S'),
+            'KB_KEEP_RESET=-Wl,--wrap=arch_entry_enter,--wrap=ppc_trap_dispatch,--wrap=exec_run']
+
+
+def flow_accept(elf, folder, case):
+    s = Session(elf, '7450', folder, 180)
+    try:
+        s.start()
+        if case in ('control', 'restore-root', 'return-target'):
+            s.wait(s.ready, 'resident before child', 60)
+            flow_point(s, 0, (1, 0, 1, 1, 0))
+            previous = s.word('shell_child_returning')
+            s.agent.operator.submit('cui', '/bin/hello.bin ok', 'flow')
+            # The kernel image is identity-loaded. Sample physical memory so
+            # a broken return root cannot hide the completed child teardown.
+            def physical(name):
+                address = s.symbols[name]
+                result = s.q.call('human-monitor-command', {'command-line': f'xp /1wx 0x{address:x}'})
+                value = re.search(r':\s*0x([0-9a-fA-F]+)', result)
+                return int(value[1], 16) if value else None
+            s.wait(lambda: physical('shell_child_returning') == previous + 1, 'child reached parent restoration', 30)
+            target = physical('shell_return_target')
+            if case == 'return-target':
+                require(target == 2, f'expected child return target 2, got {target}')
+                print('RED flow-return-target: shell_return_target=2', flush=True)
+                return
+            require(target == 1, f'expected shell return target 1, got {target}')
+            valid = 2 if case == 'restore-root' else 1
+            s.wait(lambda: physical('shell_valid_root') == valid, f'parent root decision {valid}', 10)
+            if case == 'restore-root':
+                print('RED flow-restore-root: shell_valid_root=2', flush=True)
+                return
+            start = len(s.events)
+            ident = '00002000'
+            execute = s.agent.notifier.notify_number(RSHELL, EXECUTE, ident.encode()+b' echo next $?\n')
+            s.wait(lambda: execute.delivery == 'acked', 'guest ACK for post-child EXECUTE '+ident, 10)
+            s.settle(20)
+            replies = [bytes.fromhex(e['body']) for e in s.events[start:]
+                       if e['parts'][:2] == ['RSH', 'OUT'] and e['parts'][3] == ident]
+            expected = b'> echo next $?\nnext 7\n\x04'
+            require(expected in replies, 'control command after child return')
+            flow_point(s, 1, (2, 1, 2, 2, 2))
+            flow_point(s, 2, (1, 0, 1, 1, 0))
+            result = s.agent.operator.take_result()
+            check_body('/bin/hello.bin ok', result['result'], b'hello ok\n')
+            require(s.word('shell_flow_error') == 0, 'clean entry and return')
+            return
+        def stopped():
+            try:
+                return s.word('shell_flow_error') == FLOW_CASES.index(case) + 1
+            except CriterionFailure:
+                return False
+        s.wait(stopped, 'specific rejected decision '+case, 60)
+        require(not s.ready(), 'READY after invalid resident entry')
+    finally:
+        s.close()
+
+
+# These protocol mutations exercise the product-shell session alongside its
+# entry/return controls. The remaining mutations follow the transport controls.
+FLOW_MUTATIONS = ('command-group', 'line-buffer', 'ready-retry', 'drop-compare', 'owner')
+
+
 def main():
     ap=argparse.ArgumentParser(description=__doc__)
-    ap.add_argument('--out',type=Path,required=True)
+    ap.add_argument('--out',type=Path)
+    ap.add_argument('--suite', choices=('all', 'run', 'flow'), default='all')
+    ap.add_argument('--list-cases', action='store_true')
     ap.add_argument('--timeout',type=int,default=180)
     ap.add_argument('--mutate',action='store_true')
     ap.add_argument('--build-only',action='store_true')
+    ap.add_argument('--overflow', choices=('lines', 'cr'), default='lines')
     args=ap.parse_args()
+    controls = [(cpu, late) for cpu in ('7450', '7455') for late in (False, True)
+                if args.suite != 'flow']
+    flows = ('control', *FLOW_CASES) if args.mutate else ('control',)
+    if args.suite == 'run':
+        flows = ()
+    mutations = [name for name in MUTATIONS if args.mutate and
+                 (args.suite == 'all' or (name in FLOW_MUTATIONS) == (args.suite == 'flow'))]
+    if args.list_cases:
+        for case in flows:
+            print('flow-' + case)
+        for cpu, late in controls:
+            print(cpu + ('-late' if late else '-normal'))
+        for name in mutations:
+            print(name)
+        return 0
+    if args.out is None:
+        ap.error('--out is required to build or run')
     required=tuple(cross(tool) for tool in ('gcc','nm','objdump','ld','objcopy'))
     if not args.build_only: required+=('qemu-system-ppc','genisoimage')
     missing=[p for p in required if not shutil.which(p)]
@@ -521,30 +952,72 @@ def main():
                 with socket.socket(socket.AF_INET,kind) as probe: probe.bind(('127.0.0.1',0))
         except OSError as exc:
             print('未 ppc-link-sh-run: AF_INET unavailable: '+str(exc)); return 3
-    control=work/'normal'; control.mkdir()
-    elf=build(control/'kernel',*settings(control))
-    check_map(elf.with_suffix('.map'))
+    hashes = set()
+    if controls:
+        control=work/'normal'; control.mkdir()
+        elf=build(control/'kernel',*settings(control, observe_flow=True, overflow=args.overflow))
+        check_map(elf.with_suffix('.map'))
+        digest = hashlib.sha256(elf.read_bytes()).digest()
+        hashes.add(digest)
+        print('normal-'+args.overflow, digest.hex(), flush=True)
+    failures = []
+
+    @contextmanager
+    def record_case(name):
+        try:
+            yield
+        except Exception as exc:
+            failures.append(f'{name}: {exc}')
+            print('FAIL '+failures[-1], flush=True)
+
+    for case in flows:
+        with record_case('flow-'+case):
+            folder = work/('flow-'+case)
+            folder.mkdir()
+            image = build(folder/'kernel', *flow_settings(folder, case), 'kb-user', 'kernel')
+            digest = hashlib.sha256(image.read_bytes()).digest()
+            require(digest not in hashes, 'distinct flow image '+case)
+            hashes.add(digest)
+            print('flow-'+case, digest.hex(), flush=True)
+            if not args.build_only:
+                flow_accept(image, folder/'guest', case)
     if args.build_only:
-        if args.mutate:
-            for name in MUTATIONS:
-                folder=work/name; folder.mkdir()
-                mutant=build(folder/'kernel',*settings(folder,name))
-                check_map(mutant.with_suffix('.map'))
-                print('BUILT mutation '+name,flush=True)
+        if args.mutate and controls:
+            other = 'cr' if args.overflow == 'lines' else 'lines'
+            folder = work/('normal-'+other)
+            folder.mkdir()
+            image = build(folder/'kernel', *settings(folder, observe_flow=True, overflow=other))
+            digest = hashlib.sha256(image.read_bytes()).digest()
+            require(digest not in hashes, 'distinct overflow image '+other)
+            hashes.add(digest)
+            print('normal-'+other, digest.hex(), flush=True)
+        for name in mutations:
+            folder=work/name; folder.mkdir()
+            mutant=build(folder/'kernel',*settings(folder,name,overflow=args.overflow))
+            check_map(mutant.with_suffix('.map'))
+            digest=hashlib.sha256(mutant.read_bytes()).digest()
+            require(digest not in hashes, 'distinct image '+name)
+            hashes.add(digest)
+            print(name, digest.hex(), flush=True)
+        require(not failures, '\n'.join(failures))
+        print(f'Built {len(hashes)} distinct images', flush=True)
         return 0
-    for cpu in ('7450','7455'):
-        for late in (False,True):
-            accept(elf,cpu,work/(cpu+('-late' if late else '-normal')),args.timeout,late)
+    for cpu, late in controls:
+        with record_case(f'{cpu} late={late}'):
+            accept(elf,cpu,work/(cpu+('-late' if late else '-normal')),args.timeout,late,overflow_mode=args.overflow)
             print('GREEN '+cpu+' late='+str(late),flush=True)
     if args.mutate:
-        for name,(_,_,_,expected) in MUTATIONS.items():
-            folder=work/name; folder.mkdir()
-            mutant=build(folder/'kernel',*settings(folder,name))
-            try: accept(mutant,'7450',folder/'guest',args.timeout,verdict=expected)
-            except CriterionFailure as exc:
-                require(str(exc)==expected,'unexpected mutation verdict '+name+': '+str(exc))
-                print('RED '+name+': '+str(exc),flush=True)
-            else: raise RuntimeError('SURVIVED '+name)
+        for name in mutations:
+            expected = MUTATIONS[name][3]
+            with record_case(name):
+                folder=work/name; folder.mkdir()
+                mutant=build(folder/'kernel',*settings(folder,name,overflow=args.overflow))
+                try: accept(mutant,'7450',folder/'guest',args.timeout,verdict=expected,overflow_mode=args.overflow)
+                except CriterionFailure as exc:
+                    require(str(exc)==expected,'unexpected mutation verdict '+name+': '+str(exc))
+                    print('RED '+name+': '+str(exc),flush=True)
+                else: raise RuntimeError('SURVIVED '+name)
+    require(not failures, '\n'.join(failures))
     return 0
 
 
