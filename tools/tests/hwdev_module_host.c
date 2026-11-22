@@ -1,5 +1,8 @@
 #include "debug_probe_snapshot.h"
 #include "bootinfo_native.h"
+#ifndef HWDEV_REAL_IMAGE
+#include "../../platform/powermac/module_diag.c"
+#endif
 /* Actual facade + runtime + validator; synthetic M2 or built GF body. */
 #include "../../hwdev/hwdev_module.c"
 #include "pgalloc.h"
@@ -252,6 +255,28 @@ void _start(void)
         debug_probe_snapshot(&list);
         CHECK(list.count == (input[0] == 15 ? 0U : 1U));
         if (list.count) CHECK(!kstrcmp(list.points[0].name, "fixture.pre"));
+        struct kdebug_ops diag;
+        CHECK(!kdebug_init(&diag));
+        kdebug_import_slots.snapshot = debug_probe_snapshot;
+        struct probe_wire wire = {.version = PROBE_VERSION, .size = sizeof(wire),
+                                  .action = PROBE_CMD_LIST};
+        CHECK(!diag.dbg_call(PROBE_OP, &wire, sizeof(wire)));
+        CHECK(!wire.status && !wire.more && !kstrcmp(wire.name,
+              list.count ? "fixture.pre" : ""));
+        for (u32 action = PROBE_CMD_ADD; action <= PROBE_CMD_STATUS; action++) {
+            wire = (struct probe_wire){.version = PROBE_VERSION, .size = sizeof(wire),
+                                       .action = action};
+            if (action == PROBE_CMD_ADD) wire.name[0] = 'a';
+            wire.reserved[0] = 1;
+            CHECK(diag.dbg_call(PROBE_OP, &wire, sizeof(wire)) == OS32_ERR_INVAL);
+            wire.reserved[0] = 0;
+            CHECK(!diag.dbg_call(PROBE_OP, &wire, sizeof(wire)));
+            CHECK(wire.status == PROBE_NOSYS && !probe_io_calls);
+        }
+        wire.status = 0;
+        wire.action = PROBE_CMD_STATUS + 1;
+        CHECK(diag.dbg_call(PROBE_OP, &wire, sizeof(wire)) == OS32_ERR_INVAL);
+        CHECK(diag.dbg_call(PROBE_OP + 1, &wire, sizeof(wire)) == OS32_ERR_NOSYS);
         struct probe_attach attachment = {.owner = dep, .callback = probe_io, .count = 1};
         u32 saved_text = c->text;
         c->text = (u32)(uptr)probe_io;

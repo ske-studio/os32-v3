@@ -33,6 +33,11 @@ KERNEL_NEGATIVES = {'kernel-dsi': 1, 'kernel-sc': 2}
 # another reason, fails to build, or times out is a test error, never a RED.
 TRAP = r'^KBOOT TRAP dsi=%s isi=%s guard=%s flush=%s$'
 KERNEL_MUTATIONS = (
+    # Publish the observation ABI as usual, omit just the READY record.
+    ('ready-missing', 'platform/powermac/ppc_kernel.c',
+     '    pm_report_ready(start);',
+     '    extern volatile unsigned long long kboot_ready_tb;\n    kboot_ready_tb = start;',
+     'milestone 8 order/format', r'^KBOOT ALIVE tick_delta=\d+ tb_us=\d+ of_calls_delta=0$'),
     ('ipi-masked', 'platform/powermac/mpic.c',
      'write_reg(IPI_VECTOR, PRIORITY_ONE | PM_MPIC_IPI_VECTOR);',
      'write_reg(IPI_VECTOR, MASK | PRIORITY_ONE | PM_MPIC_IPI_VECTOR);',

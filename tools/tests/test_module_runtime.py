@@ -61,6 +61,8 @@ def main():
         def build(source, vfs=ROOT / 'fs/vfs.c', dev=ROOT / 'drivers/base/dev.c',
                   validator=ROOT / 'kernel/module/module_image.c'):
             subprocess.run(['gcc', *FLAGS, '-Werror=vla', '-Wno-unused-parameter', '-DMODULE_CACHE_SPY', '-I' + str(folder), *INCLUDES,
+                            '-nostdinc', '-isystem', subprocess.check_output(
+                                ['gcc', '-print-file-name=include'], text=True).strip(),
                             '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
                             ROOT / 'tools/tests/module_runtime_host.c', source,
                             validator, vfs, dev, '-o', exe], check=True)

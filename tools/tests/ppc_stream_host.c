@@ -26,7 +26,8 @@ void pm_log_write(const char *p, u32 n) { (void)p; log_bytes+=n; serial_bytes+=n
 void pm_terminal_open(void) {}
 void pm_terminal_feed(const u8 *p, u32 n) { (void)p; (void)n; }
 void pm_terminal_line_lost(void) {}
-extern void pm_diag_write(const char *, u32, u8);
+#include "log.inc"
+u8 kprintf_attr_to_pc98(u8 attr) { return attr; }
 void pm_terminal_poll(void)
 {
     struct lan_message m;
@@ -39,12 +40,11 @@ void pm_terminal_poll(void)
         pm_term_tx_complete();
     }
     /* A poll may emit a diagnostic; it must never feed this stream again. */
-    pm_diag_write("diag",4,1);
+    kprintf(1, "diag");
     depth--;
 }
 #include "stream.inc"
 #include "utf8.inc"
-#include "log.inc"
 #include "clear.inc"
 static void finish(int rc)
 { __asm__ volatile("int $0x80" : : "a"(1), "b"(rc)); __builtin_unreachable(); }
@@ -60,7 +60,7 @@ void _start(void)
     CHECK(pm_term_state(&state) && !state.drop_records && !state.drop_bytes);
     CHECK(serial_bytes==12288+log_bytes && boot_serial_mirror==1);
     unsigned before=serial_bytes;
-    rshell_active=1; pm_diag_write("test",4,1);
+    rshell_active=1; kprintf(1, "test");
     CHECK(serial_bytes==before+4 && boot_serial_mirror==1 && rshell_active==1);
     /* clear sends control bytes only to stream and clears the local grid. */
     delivered=0; bad=0;

@@ -25,7 +25,6 @@
 #include <stdarg.h>
 
 #include "console.h"
-#include "platform_console.h"   /* PLATFORM_KPRINTF_IS_CONSOLE (機種ごとの固定名) */
 
 /* ======== 数値→文字列変換 (kprintf.h で公開) ======== */
 
@@ -109,8 +108,4 @@ char kprintf_spec(const char **cursor, int *width, int *left_align,
 #define KPRINTF_NAME console_printf
 #include "kprintf_format.inc"
 
-#if PLATFORM_KPRINTF_IS_CONSOLE
-/* カーネルの診断 (kprintf) もコンソールへ出す機種: 同じ関数の別名にする。 */
-void kvprintf(u8 attr, const char *fmt, const u32 *args) __attribute__((alias("console_vprintf")));
-void __cdecl kprintf(u8 attr, const char *fmt, ...) __attribute__((alias("console_printf")));
-#endif
+#include "platform_kprintf.h"

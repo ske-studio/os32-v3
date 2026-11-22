@@ -1,0 +1,6 @@
+{
+  "module_abi_gen": 1,
+  "imports": [
+    {"index": 0, "name": "debug_probe_snapshot", "kind": 1, "type_ver": 1}
+  ]
+}

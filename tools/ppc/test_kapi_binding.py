@@ -27,7 +27,7 @@ ide_get_info ide_identify ide_init ide_read_sector ide_write_sector
 ide_write_sectors ime_dict_info ime_dict_suspend ime_feed_key ime_get_mode
 ime_getchar ime_is_active ime_set_mode ime_set_render
 ime_switch_dict ime_toggle ime_trygetchar ime_trygetkey ime_user_clear
-ime_user_delete ime_user_export ime_user_list kdebug_call
+ime_user_delete ime_user_export ime_user_list
 np2_check_hostdrv np2_detect
 np2_get_clock np2_get_cpu np2_get_version
 pcm_close pcm_open pcm_set_volume pcm_status pcm_write
@@ -72,7 +72,7 @@ KCG_PROVIDERS = frozenset("platform_kcg_init platform_kcg_set_scale platform_kcg
 LOOP_PROVIDERS = frozenset({"platform_loop_dev_attach", "platform_loop_dev_detach", "platform_loop_dev_status"})
 
 ALLOWED_UNDEFINED = frozenset("""
-platform_pci_count platform_pci_get platform_pci_cfg_read32 kapi_pci_bind_info
+kdebug_call platform_pci_count platform_pci_get platform_pci_cfg_read32 kapi_pci_bind_info
 surface_api_bundle
 boot_image_info
 kapi_sys_ver_info
@@ -245,8 +245,8 @@ def verify(source, entries, extra_present=frozenset()):
     if any('#include "' + header + '"' in source for header in ('gfx_hal.h', 'palette.h')):
         return False
     reference = (ROOT / 'kapi/kapi_generated.c').read_text()
-    for slot in PRESENT_SLOTS | PUBLISHED_GFX | extra_present:
-        wrapper = re.search(r'(?:void|int) __cdecl wrap_' + slot + r'\([^)]*\)\n\{.*?\n\}', reference, re.S)
+    for slot in PRESENT_SLOTS | PUBLISHED_GFX | {'kdebug_call'} | extra_present:
+        wrapper = re.search(r'(?:void|int|i32) __cdecl wrap_' + slot + r'\([^)]*\)\n\{.*?\n\}', reference, re.S)
         if not wrapper or wrapper.group() not in source:
             return False
     for api in entries:
@@ -296,6 +296,8 @@ def generate(tmp, mutation=None, *, link=True, ide=False):
             'IME_SLOTS = PROVIDER_GROUPS',
             'PROVIDER_GROUPS[' + repr(group) + '] = (frozenset(), frozenset())\nIME_SLOTS = PROVIDER_GROUPS')
         helper.write_text(text)
+    if mutation == 'kdebug-absent':
+        insert_group(helper, mutation, "    'debug_mut': (frozenset({'kdebug_call'}), frozenset()),\n")
     if mutation == 'reboot-absent':
         text = helper.read_text().replace("'buz_on', 'buz_off'", "'buz_on', 'buz_off', 'sys_reboot'")
         helper.write_text(text)
@@ -535,7 +537,7 @@ def main():
             return 1
         if '--mutate' in sys.argv:
             check_planar_link(tmp, cc, dirs)
-            for mutation in ('empty', 'zero', 'group-empty', 'ime-empty', 'reboot-absent', 'slot-swap', 'present-absent', 'gfx2-present-absent', 'check-op-bound', 'pci-absent', 'mem-absent', 'db-absent'):
+            for mutation in ('empty', 'zero', 'group-empty', 'ime-empty', 'reboot-absent', 'kdebug-absent', 'slot-swap', 'present-absent', 'gfx2-present-absent', 'check-op-bound', 'pci-absent', 'mem-absent', 'db-absent'):
                 path = tmp / mutation
                 path.mkdir()
                 mutated = generate(path, mutation, link=False)

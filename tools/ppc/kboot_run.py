@@ -40,6 +40,8 @@ PATTERNS = [
 ]
 
 
+PRODUCT_QUIET_STAGES = {pattern.partition(' ')[0] for pattern in PATTERNS}
+
 ROOT_PATTERNS = [
     r'ROOT rc=(-?\d+) registered=([01]) bytes=(\d+) staging_pages=(\d+)',
     r'ROOT owner_before=(\d+) owner_after=(\d+) free_before=(\d+) free_after=(\d+)',
@@ -47,11 +49,33 @@ ROOT_PATTERNS = [
 
 
 def validate_root(a, b, complete=False):
-    return validate(a, b, complete, root_image=True)
+    require('KBOOT' not in b, 'serial B contains KBOOT')
+    require(not re.search(r'FAIL|FATAL|UNSUPPORTED', a+b), 'forbidden diagnostic')
+    complete_lines = a[:a.rfind('\n')+1].splitlines()
+    for line in complete_lines:
+        if line.startswith('KBOOT ') and line[6:].partition(' ')[0] in PRODUCT_QUIET_STAGES:
+            raise CriterionFailure('unexpected product diagnostic: '+line)
+    lines = [line for line in complete_lines if line.startswith('KBOOT ROOT')]
+    require(len(lines) <= len(ROOT_PATTERNS), 'duplicate ROOT milestone')
+    values = []
+    for line, pattern in zip(lines, ROOT_PATTERNS):
+        match = re.fullmatch('KBOOT '+pattern, line)
+        require(match is not None, 'ROOT milestone order/format')
+        values.append(tuple(map(int, match.groups())))
+    if values:
+        rc, registered, size, pages = values[0]
+        require(rc == 0 and registered == 1 and size > 0 and pages > 0, 'rd0 registration')
+    if len(values) == 2:
+        before, after, free_before, free_after = values[1]
+        require(after == before - pages + (size + 4095) // 4096 and
+                free_after - free_before == pages, 'ROOT page accounting')
+        return True
+    require(not complete, 'missing ROOT milestone')
+    return False
 
 
-def validate(a, b, complete=False, root_image=False):
-    patterns = PATTERNS + ROOT_PATTERNS if root_image else PATTERNS
+def validate(a, b, complete=False):
+    patterns = PATTERNS
     require('KBOOT' not in b, 'serial B contains KBOOT')
     require(not re.search(r'FAIL|FATAL|UNSUPPORTED', a+b), 'forbidden diagnostic')
     lines = [line for line in a[:a.rfind('\n')+1].splitlines() if line.startswith('KBOOT ')]
@@ -383,7 +407,7 @@ def accept(elf, cpu, timeout, out, negative=None, lan_off=False, link=False):
                         require(lines.count(contract.fatal) == 1 and
                                 lines.count(contract.reached) == 1 and
                                 lines.index(contract.reached) < lines.index(contract.fatal) and
-                                aa.count('FATAL') == 1 and
+                                aa.count('FATAL') == 1 and not ready_seen and
                                 not re.search(r'FAIL|UNSUPPORTED', aa+bb),
                                 'negative diagnostic/progress')
                         require('KBOOT' not in bb, 'serial B contains KBOOT')

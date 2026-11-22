@@ -734,10 +734,10 @@ def accept_reset(elf, out, timeout, via, mutation=None):
         op = s.agent.operator
         via_ready = re.compile(rf'VIA kind={via} [^\r\n]* rc=ok ')
         s.wait(lambda: s.ready() and op.ready['mode'] == 'cui' and
-               'KBOOT OF-OFF' in s.serial() and via_ready.search(s.serial()),
-               f'{via} VIA, OF-OFF and CUI READY', 60)
+               via_ready.search(s.serial()),
+               f'{via} VIA and CUI READY', 60)
         for line in s.serial().splitlines():
-            if 'KBOOT OF-OFF' in line or f'VIA kind={via} ' in line:
+            if f'VIA kind={via} ' in line:
                 print(line, flush=True)
         s.echo()
         s.wait(lambda: s.word('g_capture') == 0, 'echo capture released')
@@ -746,6 +746,7 @@ def accept_reset(elf, out, timeout, via, mutation=None):
         first_event = len(s.q.events)
         serial_offset = (out/'serial-a.log').stat().st_size
         boot = op.ready['boot']
+        require(s.word('detached') == 1, 'OF detached before reboot')
         ident = op.submit('cui', 'reboot', 'accept', timeout_ms=30000)
         print(f'RSH reboot: id={ident} boot={boot} serial_offset={serial_offset}', flush=True)
 

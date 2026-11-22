@@ -1,6 +1,9 @@
 /* KAPI kdebug_call の受け口 (TASK_KPEEK §2-3)。本体は起動時に読む部品
  * (kdebug.bin の ops slot 19)。部品が無ければ OS32_ERR_NOSYS。 */
 #include "module.h"
+#ifdef PM_KDEBUG
+struct kdebug kdebug;
+#endif
 #ifdef PCM_E4_DIAG
 #include "pcm_e4_diag.h"
 #include "pcm_e4_wire.h"
