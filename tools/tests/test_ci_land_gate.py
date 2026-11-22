@@ -130,7 +130,7 @@ def cli_success():
     sha = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
     endpoints = {}
     for ident, (workflow, names) in enumerate((
-            ('check.yml', ['static-check', 'ppc-compile', 'ppc-layout-inventory'] + [f'ppc-qemu ({i})' for i in range(8)]),
+            ('check.yml', ['static-check', 'ppc-compile', 'ppc-layout-inventory'] + [f'ppc-qemu ({i})' for i in range(10)]),
             ('build.yml', ['artifacts'] + [f'checks ({i})' for i in range(6)])), start=1):
         base = 'repos/repo/actions'
         endpoints[f'{base}/workflows/{workflow}'] = {'id': ident}

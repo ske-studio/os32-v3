@@ -22,9 +22,9 @@ CHECK = dict(name='ppc-link-sh', env=['ppc-cross'], tier=1, needs=[], budget=60,
             'kernel/dev/device_host.c', 'platform/powermac/usb_boot.c',
             'platform/powermac/link_platform.c', 'platform/powermac/link_platform.h',
             'platform/powermac/input_boot.c', 'platform/powermac/console_stream.c',
-            'platform/powermac/console_log.c', 'platform/powermac/shell_loop_ops.c',
+            'platform/powermac/log_printf.c', 'platform/powermac/shell_loop_ops.c',
             'platform/powermac/*.h', 'include/*.h', 'kernel/console/*.h',
-            'init/shell_loop.c', 'lib/kstring_c.c', 'input/hal/in2_int.h', 'exec/exec.h', 'kernel/idle_work.h',
+            'init/shell_loop.c', 'lib/kstring_c.c', 'lib/kprintf.c', 'lib/kprintf_format.inc', 'input/hal/in2_int.h', 'exec/exec.h', 'kernel/idle_work.h',
             'arch/ppc/*.h', 'sdk/include/os32/*.h', 'net/link_platform.h'],
     basis=['LAN_OPERATOR_DESIGN §5/§8 P4c', 'PPC_P3_DESIGN v2 §2/§3; appendix A-1 E5/E6/E7, A-3/A-4'])
 
@@ -51,6 +51,15 @@ int input_legacy_peek(int mode) { (void)mode; return -1; }
 u8 platform_fep_key_shift(void) { return 0; }
 int pm_input_usb_take(void) { return 42; }
 int pm_input_usb_peek(void) { return 43; }
+volatile int kbd_gui_mode;
+int kbd_inject_peek(u8 *out) { (void)out; return 0; }
+int kbd_inject_take(u8 *out) { (void)out; return 0; }
+void kbd_set_gui_mode(int on) { kbd_gui_mode = on; }
+void kbd_discard_stop(void) {}
+int legacy_raw_take(void) { return -1; }
+int input_key_pressed(u8 sc) { (void)sc; return 0; }
+u8 input_key_mods(void) { return 0; }
+void pm_input_usb_note_remote(void) {}
 u32 pm_input_usb_dropped(void) { return 0; }
 int platform_clock_read_us(u32 *lo,u32 *hi) { *lo=7; *hi=0; return 0; }
 int con_sink_capture_active(void) { return 1; }
@@ -61,7 +70,7 @@ void idle_wait_step(void) { idle_work_run(); arch_cpu_idle(); }
 void _start(void) {
     pm_input_boot(); CHECK(registered && registered_ops);
     CHECK(!registered->terminal_try && !registered->terminal_peek && !registered->terminal_enabled);
-    CHECK(!registered->inject_try && !registered->inject_peek);
+    CHECK(registered->inject_try && registered->inject_peek);
     CHECK(registered->try_key == pm_input_usb_take && registered->peek_key == pm_input_usb_peek);
     CHECK(registered->try_key()==42 && registered->peek_key()==43);
     CHECK(registered->wait_timeout_ticks()==30000000u && registered->capture_active()); finish(0);
@@ -87,6 +96,7 @@ void kprintf(u8 c, const char *fmt, ...) { (void)c; (void)fmt; }
 void _start(void) { shell_loop_run(&pm_shell_loop_ops); finish(1); }
 '''
 OUTPUT = r'''
+u8 kprintf_attr_to_pc98(u8 attr) { return attr; }
 static int writes, logs, capture=1, clears;
 int boot_serial_mirror,rshell_active=1;
 void con_output_register(const ConOutputOps *ops) { CHECK(ops->putchar('x')==0); }
@@ -98,19 +108,21 @@ void _start(void) {
     pm_console_stream_init();
     console_stream_write("a",1); CHECK(writes==1);
     pm_fd1_write("b",1,2); CHECK(writes==2);
-    pm_diag_write("log",3,1); CHECK(logs==1 && writes==2);
-    capture=0; pm_diag_write("log",3,1); CHECK(logs==2 && writes==2 && rshell_active==1);
+    kprintf(1, "log"); CHECK(logs==1 && writes==2);
+    capture=0; kprintf(1, "log"); CHECK(logs==2 && writes==2 && rshell_active==1);
     pm_console_clear(); CHECK(clears==1 && writes==2); finish(0);
 }
 '''
 
 def execute(tmp, source, harness):
     (tmp/'test.c').write_text(PREFIX+source+harness)
-    subprocess.run(['gcc','-m32', '-nostdinc', '-std=gnu11','-D__cdecl=','-DKBOOT_SH=1','-DKBOOT_LINK=1',
+    builtin_headers = subprocess.check_output(['gcc', '-print-file-name=include'], text=True).strip()
+    formatter = ['lib/kprintf.c'] if harness == OUTPUT else []
+    subprocess.run(['gcc','-m32', '-nostdinc','-isystem',builtin_headers, '-std=gnu11','-D__cdecl=','-DKBOOT_SH=1','-DKBOOT_LINK=1',
         '-ffreestanding','-fno-builtin','-fno-pie','-no-pie','-nostdlib','-static',
         '-ffunction-sections','-fdata-sections','-Wl,--gc-sections',
         '-I.','-Iinclude','-Ikernel','-Ikernel/console','-Iplatform/powermac','-Iarch/ppc',
-        '-Isdk/include/os32','-Iexec','-Ilib',str(tmp/'test.c'),'lib/kstring_c.c','-o',str(tmp/'test')],cwd=ROOT,check=True)
+        '-Isdk/include/os32','-Iexec','-Ilib',str(tmp/'test.c'),'lib/kstring_c.c',*formatter,'-o',str(tmp/'test')],cwd=ROOT,check=True)
     return host32.run([str(tmp/'test')],runner='qemu',timeout=10).returncode
 
 
@@ -123,6 +135,10 @@ def selection(tmp, mutate):
     original=(ROOT/'build/targets/ppc-powermac.mk').read_text()
     def check(text):
         path=tmp/'image.mk'; path.write_text(text)
+        fields = ['KB_OUT', 'KB_SH_OUT']
+        assert manifest(path, [], fields) == ['build/out/ppc-powermac', 'build/out/ppc-powermac/user']
+        assert manifest(path, ['KBOOT_SH=1'], fields) == ['build/out/ppc-kboot/link-sh', 'build/out/ppc-user/link-sh']
+        assert manifest(path, ['KBOOT_SH=1', 'KB_OUT=private'], fields) == ['private', 'private/user']
         link=manifest(path,['KBOOT_SH=1','KBOOT_LINK=1'],['KB_OUT','ROOT_BINS','KB_C','KB_ROOT_SHELL'])
         assert link[0]=='build/out/ppc-kboot/link-sh'
         assert not link[1].strip() and link[3] == 'build/out/ppc-user/link-sh/shell.bin'
@@ -138,10 +154,8 @@ def selection(tmp, mutate):
         for override in ('FEATURE_LINK=0','IMAGE=kboot-core'):
             assert subprocess.run(['make','-s','ARCH=ppc','PLATFORM=powermac','TARGET_MK='+str(path),'KBOOT_SH=1',override,'-n'],cwd=ROOT,capture_output=True).returncode!=0
     check(original)
-    # Explicit legacy selections must also survive the future link default.
-    check(original.replace('KBOOT_LINK ?= 0', 'KBOOT_LINK ?= 1'))
     if mutate:
-        for old,new in [('link-sh,link','link,link'),('KB_SH_OUT := build/out/ppc-user$(if $(filter 1,$(KBOOT_LINK)),/link-sh)','KB_SH_OUT := build/out/ppc-user'),('KB_C := $(C_KERNEL)','KB_C := $(filter-out platform/powermac/hostfs_link_io.c,$(C_KERNEL)) platform/powermac/hostfs_io.c'),('KB_ROOT_SHELL = $(KB_SH_OUT)/shell.bin','KB_ROOT_SHELL = $(KB_SH_OUT)/sh.bin')]:
+        for old,new in [('KB_OUT ?= build/out/ppc-powermac','KB_OUT ?= build/out/ppc-kboot/link-sh'),('KB_SH_OUT ?= $(KB_OUT)/user','KB_SH_OUT ?= build/out/ppc-user/link-sh'),('KB_C := $(C_KERNEL)','KB_C := $(filter-out platform/powermac/hostfs_link_io.c,$(C_KERNEL)) platform/powermac/hostfs_io.c'),('KB_ROOT_SHELL = $(KB_SH_OUT)/shell.bin','KB_ROOT_SHELL = $(KB_SH_OUT)/sh.bin')]:
             assert original.count(old)==1
             try: check(original.replace(old,new))
             except AssertionError: print('RED selection',old)
@@ -175,7 +189,7 @@ def main():
             ('    shell_print("Cannot load', '    if (0) shell_print("Cannot load'),
             ('rshell_active = 0;', 'rshell_active = 1;'),
             ('rc != EXEC_ERR_FAULT','rc == EXEC_ERR_FAULT')]),
-        ('output',(ROOT/'platform/powermac/console_stream.c').read_text()+(ROOT/'platform/powermac/console_log.c').read_text(),OUTPUT,[
+        ('output',(ROOT/'platform/powermac/console_stream.c').read_text()+(ROOT/'platform/powermac/log_printf.c').read_text(),OUTPUT,[
             ('    pm_log_write(bytes, n);','    pm_log_write(bytes, n); console_write(bytes, n, color);'),
             ('    console_write(bytes, len, 1);','    console_write(bytes, len, 1); console_write(bytes, len, 1);')])]
     with tempfile.TemporaryDirectory(prefix='ppc-link-sh-') as d:

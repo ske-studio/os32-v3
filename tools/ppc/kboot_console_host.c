@@ -6,7 +6,7 @@
 
 static char output[4096];
 static unsigned used, queued_used, calls;
-static int queue_full;
+static int queue_full, serial_blocked;
 static void finish(int status)
 {
     __asm__ volatile("int $0x80" : : "a"(1), "b"(status));
@@ -24,7 +24,7 @@ static void reached(const char *text, unsigned size)
 unsigned ppc_load8(cell address)
 {
     REQUIRE(address == 0xfe300000);
-    return PM_RR0_TX_READY;
+    return serial_blocked ? 0 : PM_RR0_TX_READY;
 }
 void ppc_store8(cell address, unsigned value)
 {
@@ -34,6 +34,11 @@ void ppc_store8(cell address, unsigned value)
 static int queued(void *ctx, const char *bytes, u32 n)
 {
     REQUIRE(ctx == &calls && bytes && n);
+    if (serial_blocked) {
+        REQUIRE(n == 4 && bytes[0] == 'n' && bytes[1] == 'e' && bytes[2] == 'x' && bytes[3] == 't');
+        calls++;
+        return 0;
+    }
     /* The serial sink must finish this exact chunk before the queue sink. */
     REQUIRE(used == queued_used + n);
     for (u32 i = 0; i < n; i++) REQUIRE(output[queued_used + i] == bytes[i]);
@@ -56,6 +61,8 @@ void _start(void)
 {
     int w = 80, h = 25;
     struct pm_log_stats stats;
+    pm_log_write("abc", 3);
+    REQUIRE(!pm_log_get_stats(0, &stats) && !stats.failures && stats.dropped == 3);
     REQUIRE(!pm_log_escc_init(0xfe300000, 0xfe300010));
     REQUIRE(!pm_log_add_sink(&queue));
     /* Embedded NUL, explicit length, and trailing sentinel. */
@@ -98,6 +105,14 @@ void _start(void)
     shell_print("drop", 7);
     EXPECT("drop", 45);
     REQUIRE(!pm_log_get_stats(1, &stats) && stats.failures == 1 && stats.dropped == 4);
-    REQUIRE(!pm_log_get_stats(0, &stats) && !stats.failures && !stats.dropped);
+    REQUIRE(!pm_log_get_stats(0, &stats) && !stats.failures && stats.dropped == 3);
+    unsigned before = calls;
+    serial_blocked = 1;
+    pm_log_write("next", 4);
+    REACHED("REACHED sink continuation");
+    if (calls != before + 1) finish(46);
+    REQUIRE(!pm_log_get_stats(0, &stats) && stats.failures == 1 && stats.dropped == 7);
+    pm_log_write(0, (u32)-1);
+    REQUIRE(!pm_log_get_stats(0, &stats) && stats.failures == 2 && stats.dropped == (u32)-1);
     finish(0);
 }

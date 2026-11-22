@@ -139,9 +139,9 @@ def conformance():
             assert '(void)hwdev_module_load(handle);' in (ROOT/'kdebug/kdebug_module.c').read_text()
         elif row['dependencies']:
             assert row['dependencies'] == (schema.CONSTANTS['ID_SQLITE'],)
-            assert '.dependencies = &sqlite, .dependency_count = 1' in source
+            assert '.dependencies = sqlite, .dependency_count = sqlite ? 1 : 0' in source
             engine = (ROOT / 'kernel/sqlite_engine.c').read_text()
-            assert engine.index('rc = os32_sqlite_start();') < engine.index('rc = fep_module_load(sqlite_handle);')
+            assert engine.index('rc = os32_sqlite_start();') < engine.index('rc = fep_boot_start(&sqlite_handle, no_dictionary, &reserve);')
         else:
             assert '.dependencies =' not in source, row
     # hsync boot enumerates the whole /boot directory; it has no file allowlist.

@@ -5,7 +5,7 @@ from pathlib import Path
 import shutil
 import subprocess
 
-IMAGES = (['KBOOT_SH=0', 'KBOOT_LINK=0'], ['KBOOT_SH=0', 'KBOOT_LINK=1'],
+IMAGES = (['IMAGE=powermac'], ['KBOOT_SH=0', 'KBOOT_LINK=0'], ['KBOOT_SH=0', 'KBOOT_LINK=1'],
           ['KBOOT_SH=1', 'KBOOT_LINK=0'], ['KBOOT_SH=1', 'KBOOT_LINK=1'])
 # 像に入っていない共通のソースのコンパイルだけの関門 (build/targets/ppc-powermac.mk の common-compile)。
 COMMON_COMPILE = ['KBOOT_SH=1', 'KBOOT_LINK=1', 'common-compile']
@@ -21,8 +21,7 @@ def run(root, env=None):
     for key in ('BUILD_OUT', 'KERNEL_CFLAGS', 'INC_KERNEL', 'C_STD',
                 'SQLITE_PROTO_OUT', 'MAKEFLAGS', 'MFLAGS', 'MAKELEVEL'):
         env.pop(key, None)
-    # Every image the PPC acceptance uses, with KBOOT_LINK explicit: the core
-    # (kboot_accept/kboot_run), the link diagnostic, PLN1 SH and link-SH.
+    # Build the product and legacy images so the layer check sees both dependency trees.
     for flags in (*IMAGES, COMMON_COMPILE):
         result = subprocess.call(
             ['make', 'ARCH=ppc', 'PLATFORM=powermac', *flags, 'PPC_CROSS_DIR=' + str(cross)],

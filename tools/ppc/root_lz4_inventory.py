@@ -157,6 +157,14 @@ def collect(out, suites, representative=False):
         plans[name] = dict(args=settings, elf=str(elf), iso=str(iso) if iso else None)
         return elf
 
+    def build_media(folder, *settings):
+        from boot_media import Media, package
+        elf = build(folder, *settings)
+        media = Media(elf, folder/'PPCKERN.map', folder/'boot.iso')
+        package(media.elf, media.iso)
+        media.verify()
+        return media
+
     for suite in suites:
         if suite == 'product':
             for image in sorted((ROOT/'build/images').glob('kboot-*.mk')):
@@ -195,6 +203,7 @@ def collect(out, suites, representative=False):
         if representative:
             extra.extend(['--case', REPRESENTATIVES[suite]])
         with patch.object(kboot_accept, 'build', build), patch.object(
+                kboot_accept, 'build_media', build_media), patch.object(
                 sys, 'argv', [module_name, '--build-only', '--mutate', *extra]):
             module = importlib.reload(importlib.import_module(module_name))
             def boot_image(case, elf, iso):

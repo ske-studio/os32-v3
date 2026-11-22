@@ -11,7 +11,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT / 'tools'), str(ROOT / 'tools/ppc')]
-from kboot_accept import build
+from kboot_accept import build_media
 from link_sh_run import Session
 from ppc_shm import guest_available
 from run import require
@@ -165,8 +165,8 @@ EXPECTED_RED = {
 }
 
 
-def observe(elf, folder, case, cpu):
-    session = Session(elf, cpu, folder, 150)
+def observe(media, folder, case, cpu):
+    session = Session(media, cpu, folder, 150)
     log = folder / 'serial-a.log'
 
     def serial():
@@ -273,14 +273,14 @@ def main():
         gate = case in ('gate', 'gate-count')
         options = ['IMAGE=kboot-core'] if gate else [
             'IMAGE=kboot-link-sh', 'KB_SH_OUT=' + str(user), 'KB_ROOT_BINS=' + bins, 'kb-user']
-        elf = build(folder / 'kernel', *fixture(folder, case, gate), *options, 'kernel')
-        digest = hashlib.sha256(elf.read_bytes()).hexdigest()
+        media = build_media(folder / 'kernel', *fixture(folder, case, gate), *options, 'kernel')
+        digest = hashlib.sha256(media.elf.read_bytes()).hexdigest()
         require(digest not in seen, 'duplicate image ' + case)
         seen.add(digest)
-        print(f'{case} sha256={digest} {elf}', flush=True)
+        print(f'{case} sha256={digest} {media.elf}', flush=True)
         if not args.build_only:
             for cpu in ('7450', '7455'):
-                observe(elf, folder / cpu, case, cpu)
+                observe(media, folder / cpu, case, cpu)
     print(f'{len(seen)} distinct KAPI v89 images')
     return 0
 

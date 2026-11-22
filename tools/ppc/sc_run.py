@@ -7,11 +7,11 @@ from pathlib import Path
 import socket
 import tempfile
 
-from kboot_accept import build, mutant_settings
+from kboot_accept import build_media, mutant_settings
 from kboot_run import require, serial, validate_root
 
 CHECK = dict(name='ppc-sc', tier=2, budget=900, needs=[],
-             covers=['platform/powermac/input_usb.[ch]', 'platform/powermac/input_keymap.c', 'tools/ppc/sc_run.py', 'userland/ppc/nest.c'],
+             covers=['platform/powermac/input_usb.[ch]', 'platform/powermac/input_keymap_backend.c', 'tools/ppc/sc_run.py', 'userland/ppc/nest.c'],
              inputs=['build/ppc-user.mk', 'build/targets/ppc-powermac.mk',
                      'tools/ppc/sb_run.py', 'tools/ppc/kboot_accept.py',
                      'tools/ppc/kboot_run.py', 'tools/ppc/run.py',
@@ -112,16 +112,16 @@ def link_main(args):
                 '    if (current_slot == (__builtin_offsetof(KernelAPI, exec_last_result) - 8) / 4 && ++reads == 2) return (u32)-1;\n'
                 '    return ppc_kapi_invoke(&api, current_slot, values);')
             opts += [o.replace('KB_MUT_', 'KB_MUT_THIRD_') for o in extra]
-        elf = build(folder/'kernel', *opts, 'kb-user', 'kernel')
-        check_map(elf.with_suffix('.map'))
-        digest = hashlib.sha256(elf.read_bytes()).hexdigest()
+        media = build_media(folder/'kernel', *opts, 'kb-user', 'kernel')
+        check_map(media.map)
+        digest = hashlib.sha256(media.elf.read_bytes()).hexdigest()
         require(digest not in hashes, 'distinct '+name)
         hashes.add(digest)
         print(name, digest, flush=True)
         if args.build_only:
             continue
         for cpu in cpus if name == 'normal' else cpus[:1]:
-            session = Session(elf, cpu, folder/cpu, 180)
+            session = Session(media, cpu, folder/cpu, 180)
             try:
                 session.start()
                 session.wait(lambda: validate_root(serial(session.out/'serial-a.log'), serial(session.out/'serial-b.log')),

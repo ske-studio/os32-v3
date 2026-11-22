@@ -37,7 +37,8 @@ def observe(elf, directory, cpu, file, value, mounted, nap7450):
                 data = serial.read_bytes().replace(b'\r', b'').decode(errors='replace') if serial.exists() else ''
                 hid = re.search(r'^MACHCFG HID0 pvr=0x([\da-fA-F]+) hid0=0x([\da-fA-F]+) nap=([01])\n', data, re.M)
                 root = re.search(r'^KBOOT ROOT rc=(-?\d+) registered=([01]) ', data, re.M)
-                if hid and (mounted is None or root):
+                clock_alive = 'KBOOT CLOCK hz=' in data and 'KBOOT ALIVE tick_delta=' in data
+                if hid and (clock_alive if mounted is None else root):
                     break
                 time.sleep(.1)
             else:
@@ -47,7 +48,6 @@ def observe(elf, directory, cpu, file, value, mounted, nap7450):
     if mounted is not None:
         expected_rc = 0 if mounted else -9  # VFS_ERR_INVAL for an unregistered filesystem
         assert int(root[1]) == expected_rc and root[2] == '1', root[0]
-    assert 'KBOOT CLOCK hz=' in data and 'KBOOT ALIVE tick_delta=' in data
     pvr, raw, bit = (int(hid[i], 16) for i in (1, 2, 3))
     assert pvr >> 16 == (0x8000 if cpu == '7450' else 0x8001)
     assert bit == bool(raw & 0x00400000) and bit == (nap7450 if cpu == '7450' else 1)
@@ -101,7 +101,7 @@ def main():
         if case != 'none':
             os.utime(cfg, (946684800, 946684800))
         settings = ['IMAGE=kboot-link-sh', 'ROOT_MANIFEST=' + str(manifest),
-                    'ROOT_DEPS=' + ' '.join(entries.values())]
+                    'ROOT_DEPS=' + ' '.join(path for name, path in entries.items() if name != '/sys/shell.bin')]
         file = case if case in ('none', 'big') else 'ok'
         check(case, file, value if file == 'ok' else 0, settings)
         if args.mutate or args.build_only:

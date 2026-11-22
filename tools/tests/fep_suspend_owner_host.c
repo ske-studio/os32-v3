@@ -3,6 +3,8 @@
 #include "fep_boundary_runtime.h"
 #include "fep_module_source.inc"
 int services_public = 1;
+void input_ime_action_flush(void) {}
+void input_context_focus_register(void (*flush)(void)) { (void)flush; }
 int input_getkey_wait(int interruptible) { (void)interruptible; return -1; }
 int input_getkey(void) { return -1; }
 int input_trygetkey(void) { return -1; }
@@ -23,6 +25,7 @@ int main(void)
 {
     candidate.dict_suspend = body_suspend;
     candidate.owner_exit = body_exit;
+    fep_module_publish();
     require(!ime_dict_suspend(1) && close_calls == 1, "resident dispatch");
     ime_owner_exit(3);
     require(!reopen_calls && exit_calls == 1, "other owner untouched");

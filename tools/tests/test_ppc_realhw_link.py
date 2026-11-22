@@ -40,16 +40,9 @@ PEER = '52:54:00:12:34:56'
 GUEST = bytes.fromhex('525400123456')
 HOST = bytes.fromhex('02005e000001')
 BOOT = '01'*16
-# Existing kboot_run.validate contract, not the implementation's output.
-LOG = (b'KBOOT OF-CAPTURE ram=128 admitted=128 tb_hz=1000\n'
-       b'KBOOT OF-OFF calls=1\n'
-       b'KBOOT MMU-D root=0x1000 hpt=0x2000 bytes=4096 ram_bat=0\n'
-       b'KBOOT MEMORY online=1 heap=1 shm=1\n'
-       b'KBOOT TRAP dsi=pass isi=pass guard=pass flush=pass\n'
-       b'KBOOT MPIC sources=64 priority=0 cpu=0 delivery=pass\n'
-       b'KBOOT CLOCK hz=100 tick=200 us=2000000\n'
-       b'KBOOT READY stage=pre-user\n'
-       b'KBOOT ALIVE tick_delta=200 tb_us=2000000 of_calls_delta=0\n')
+LOG = (b'KBOOT ROOT rc=0 registered=1 bytes=8192 staging_pages=16\r\n'
+       b'KBOOT ROOT owner_before=20 owner_after=6 free_before=40 free_after=56\r\n'
+       b'Loading /sys/shell.bin\r\n')
 
 
 def b64(data):
@@ -125,7 +118,7 @@ def main():
             ('out-drop', lambda e: e['rsh'][0]['result'].update(drop=1), 'incomplete'),
             ('missing-rsh', lambda e: e['rsh'].pop(), 'missing RSH'),
             ('missing-log', lambda e: e['logs'].pop(0), 'sequence'),
-            ('tail-log', lambda e: e['logs'].pop(), 'missing milestone'),
+            ('tail-log', lambda e: e['logs'].pop(), 'missing ROOT milestone'),
             ('missing-drop-report', lambda e: e['logs'][0].pop('drop_records'), 'drop_records'),
             ('log-drop', lambda e: e['logs'][0].update(drop_bytes=1), 'LOG drop'),
             ('boot', lambda e: e['logs'][1].update(boot='02'*16), 'boot changed'),
@@ -138,6 +131,13 @@ def main():
             bad = copy.deepcopy(evidence)
             change(bad)
             rejected(tmp, label, bad, frames, reason)
+        for line in ('KBOOT MPIC sources=64 priority=0 cpu=0 delivery=bad',
+                     'KBOOT MEMORY online=1 heap=0 shm=1',
+                     'KBOOT TRAP dsi=pass isi=pass guard=bad flush=pass',
+                     'KBOOT READY stage=pre-user'):
+            bad = copy.deepcopy(evidence)
+            bad['logs'][1]['text_b64'] = b64(LOG[100:] + line.encode() + b'\r\n')
+            rejected(tmp, 'product diagnostic', bad, frames, line)
         for label, changed, reason in [
                 ('session', frames[:-1]+[(103.9, frame(sess=8))], 'session changed'),
                 ('alive-gap', frames[:-2]+[(103.9, frame())], 'ALIVE gap'),

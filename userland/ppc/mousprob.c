@@ -5,6 +5,14 @@ static int check(KernelAPI *api, const char *command)
 {
     int gone = !strcmp(command, "gone");
     if (api->mouse_available() != !gone) return 1;
+    if (!strcmp(command, "present")) {
+        IN2_Status before, after;
+        if (api->in2_status(&before) || before.acquired ||
+            api->in2_acquire(IN2_EXCL_KBD | IN2_EXCL_MOUSE) != OS32_ERR_NOSYS ||
+            api->in2_status(&after) || after.acquired ||
+            after.focus_owner != before.focus_owner || after.focus_gen != before.focus_gen)
+            return 8;
+    }
     MouseInfo m;
     memset(&m, 0xa5, sizeof(m));
     api->mouse_poll(&m);
@@ -14,6 +22,10 @@ static int check(KernelAPI *api, const char *command)
     if (!strcmp(command, "motion"))
         return m.x == 88 && m.y == 153 && m.dx == 12 && m.dy == -7 &&
                m.buttons == 1 ? 0 : 4;
+    if (!strcmp(command, "reattached")) {
+        if (m.dx || m.dy) return 5;
+        return m.buttons == 1 ? 8 : m.buttons ? 5 : 0;
+    }
     if (gone || !strcmp(command, "present"))
         return m.dx || m.dy || m.buttons ? 5 : 0;
     if (!strcmp(command, "start")) {

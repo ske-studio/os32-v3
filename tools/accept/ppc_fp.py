@@ -78,11 +78,11 @@ def verdict(case, body, status, diagnostic, timeout=False):
     return 'GREEN' if not fault and body.endswith(b'FP-exit=0\n') and status == b'0\n' else 'wrong-reason'
 
 
-def observe(elf, cpu, out, case):
+def observe(media, cpu, out, case):
     from link_sh_run import Session
     from usb_run import rsh_command
     from run import require
-    s = Session(elf, cpu, out, 240)
+    s = Session(media, cpu, out, 240)
     try:
         s.start()
         s.wait(s.ready, 'FP cui READY', 60)
@@ -153,7 +153,7 @@ def main():
         except OSError as exc:
             print(('FAIL' if os.environ.get('OS32_REQUIRE_PPC') == '1' else 'SKIP')+': FP socket '+str(exc))
             return int(os.environ.get('OS32_REQUIRE_PPC') == '1')
-    from kboot_accept import build
+    from kboot_accept import build_media
     cpus = ('7450', '7455') if args.cpu == 'both' else (args.cpu,)
     if args.emit_mutants:
         work = args.emit_mutants.resolve(); work.mkdir(parents=True, exist_ok=True)
@@ -163,17 +163,19 @@ def main():
         opts = settings(folder, name)
         (folder/'settings.json').write_text(json.dumps(opts, indent=2))
         if args.emit_mutants: continue
-        elf = build(folder/'kernel', *opts)
-        digest = hashlib.sha256(elf.read_bytes()).hexdigest()
+        media = build_media(folder/'kernel', *opts)
+        if name == 'normal':
+            normal_media = media
+        digest = hashlib.sha256(media.elf.read_bytes()).hexdigest()
         assert digest not in seen, (name, digest)
         seen.add(digest)
         print(name, digest, flush=True)
         if args.build_only: continue
         for cpu in cpus:
-            observe(elf, cpu, folder/cpu, name)
+            observe(media, cpu, folder/cpu, name)
             # Each mutant has the original image as a following normal control.
             if name not in ('normal', 'F4'):
-                observe(work/'normal/kernel/PPCKERN.ELF', cpu, folder/(cpu+'-control'), 'normal')
+                observe(normal_media, cpu, folder/(cpu+'-control'), 'normal')
     return 0
 
 

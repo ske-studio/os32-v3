@@ -9,6 +9,7 @@ A build failure, QEMU startup failure, timeout or any other verdict is a test
 error (non-zero exit), never a RED. Evidence is kept under $TMPDIR/kboot-accept/.
 """
 import argparse
+import hashlib
 import os
 from pathlib import Path
 import struct
@@ -17,6 +18,7 @@ import sys
 import tempfile
 import time
 sys.dont_write_bytecode = True
+from boot_media import Media
 from run import ROOT, CriterionFailure
 import kboot_run as meter
 from kboot_mutations import KERNEL_NEGATIVES, KERNEL_MUTATIONS, AUDIT_MUTATIONS
@@ -80,6 +82,8 @@ def linked_image(path):
 
 def build(out, *settings):
     """Returns the ELF; make owns the manifest and the undefined/FP/PIT_HZ audits."""
+    if not any('=' not in arg and not arg.startswith('-') for arg in settings):
+        settings += ('kernel',)
     result = make(out, *settings)
     if result.returncode or 'kboot audit OK' not in result.stdout:
         raise RuntimeError('kboot build failed: '+str(out)+'\n'+(result.stdout+result.stderr)[-2000:])
@@ -88,6 +92,13 @@ def build(out, *settings):
     print(f'{elf}: resident_end={symbols["__kernel_resident_end"]:#x} '
           f'chain={symbols["__kernel_chain_end"]:#x}', flush=True)
     return elf
+
+
+def build_media(out, *settings):
+    elf = build(out, *settings, 'iso')
+    media = Media(elf, out/'PPCKERN.map', out/'boot.iso')
+    media.verify()
+    return media
 
 
 def mutant_settings(work, name, source, before, after):
@@ -102,6 +113,7 @@ def mutant_settings(work, name, source, before, after):
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument('--mutate', action='store_true')
+    parser.add_argument('--build-only', action='store_true')
     parser.add_argument('--cpu', choices=['7450', '7455', 'both'], default='both')
     args = parser.parse_args()
     started = time.monotonic()
@@ -110,6 +122,14 @@ def main():
     work = Path(tempfile.mkdtemp(prefix='run-', dir=base))
     cpus = ['7450', '7455'] if args.cpu == 'both' else [args.cpu]
     elf = build(work/'kernel', 'KBOOT_LINK=0')
+    digests = {hashlib.sha256(elf.read_bytes()).digest()}
+    def distinct(image):
+        digest = hashlib.sha256(image.read_bytes()).digest()
+        if digest in digests:
+            raise RuntimeError('duplicate image: '+str(image))
+        digests.add(digest)
+    if args.build_only:
+        cpus = []
     skipped = False
     for cpu in cpus:
         evidence = meter.accept(elf, cpu, 60, work/('normal-'+cpu))
@@ -121,14 +141,30 @@ def main():
         print('GREEN LAN OFF '+cpu, flush=True)
     for name, number in KERNEL_NEGATIVES.items():
         negative = build(work/name, 'KBOOT_LINK=0', 'NEGATIVE='+str(number))
+        distinct(negative)
         for cpu in cpus:
             meter.accept(negative, cpu, 30, work/(name+'-'+cpu), name)
             print('GREEN negative '+name+' '+cpu, flush=True)
     red = 0
     if args.mutate:
+        product = work / 'elf-only'
+        build(product, 'IMAGE=powermac')
+        boot_iso = product / 'boot.iso'
+        if boot_iso.exists():
+            raise RuntimeError('ELF-only build packaged boot.iso')
+        if not args.build_only:
+            # Omitting the kernel goal selects all and violates the ELF-only contract.
+            result = make(product, 'IMAGE=powermac')
+            result.check_returncode()
+            if not boot_iso.is_file():
+                raise RuntimeError('default-goal mutation survived')
+            print('RED default goal packaged boot.iso', flush=True)
         for name, source, before, after, expected, evidence_line in KERNEL_MUTATIONS:
             mutant = build(work/('mutant-'+name), 'KBOOT_LINK=0',
                            *mutant_settings(work, name, source, before, after))
+            distinct(mutant)
+            if args.build_only:
+                continue
             guest = work/('mutant-'+name+'-guest')
             try:
                 meter.accept(mutant, '7450', 60, guest)
@@ -155,6 +191,9 @@ def main():
                 raise RuntimeError(f'{name}: audit did not report "{finding}"\n'+output[-1500:])
             print(f'RED audit {name}: {finding}', flush=True)
             red += 1
+    if args.build_only:
+        print(f'{len(digests)} distinct kernel images')
+        return 0
     print(f'PASS kernel acceptance: {len(cpus)} CPU GREEN, {len(KERNEL_NEGATIVES)} negatives, '
           f'{red} product/audit RED, evidence={work} elapsed={time.monotonic()-started:.1f}s')
     if skipped:

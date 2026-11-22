@@ -35,12 +35,12 @@ def absent_bindings(folder, out, slot='sys_time_now'):
     (out / 'stamp').touch()
 
 
-def observe(elf, cpu, evidence, case, app='infoprob', expected=EXPECTED):
+def observe(media, cpu, evidence, case, app='infoprob', expected=EXPECTED):
     from link_sh_run import Session
     from run import require
     from usb_run import rsh_command
 
-    session = Session(elf, cpu, evidence, 240)
+    session = Session(media, cpu, evidence, 240)
     try:
         session.start()
         session.wait(session.ready, 'sysinfo cui READY', 60)
@@ -78,7 +78,7 @@ def main():
         print(f'SKIP: PowerPC toolchain unavailable at {cross}')
         return 3
 
-    from kboot_accept import build, mutant_settings
+    from kboot_accept import build_media, mutant_settings
     from ppc_shm import guest_available
 
     if not args.build_only and not guest_available():
@@ -128,15 +128,15 @@ def main():
                                        '"platform_mem_stat.h"', f'"{mutated_header}"')
         elif case == 'absent':
             absent_bindings(folder, kernel / 'gen', 'mem_stat' if args.memstat else 'sys_time_now')
-        elf = build(kernel, *options, *mutation, 'kb-user', 'kernel')
-        digest = hashlib.sha256(elf.read_bytes()).hexdigest()
+        media = build_media(kernel, *options, *mutation, 'kb-user', 'kernel')
+        digest = hashlib.sha256(media.elf.read_bytes()).hexdigest()
         if digest in images:
-            raise RuntimeError(f'{case} ELF is identical to {images[digest]}: {elf}')
+            raise RuntimeError(f'{case} ELF is identical to {images[digest]}: {media}')
         images[digest] = case
-        print(f'{case} sha256={digest} {elf}', flush=True)
+        print(f'{case} sha256={digest} {media}', flush=True)
         if not args.build_only:
             for cpu in ('7450', '7455'):
-                observe(elf, cpu, folder / cpu, case, app, expected)
+                observe(media, cpu, folder / cpu, case, app, expected)
     return 0
 
 

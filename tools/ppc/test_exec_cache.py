@@ -39,6 +39,38 @@ def check_asm(dis):
             and re.search(r'\bbne\s+[0-9a-f]+', sequence[1]) is not None)
 
 
+def observe_lines(folder, source):
+    # Run the production loop bounds, recording each privileged instruction.
+    ops = [('dcbst 0,%0', 'd'), ('icbi 0,%0', 'i'), ('sync', 's'), ('sync; isync', 'f')]
+    for instruction, event in ops:
+        operands = ' : : "r"(line) : "memory"' if '%0' in instruction else ' : : : "memory"'
+        anchor = f'__asm__ volatile("{instruction}"{operands});'
+        assert source.count(anchor) == 1
+        address = 'line' if '%0' in instruction else '0'
+        source = source.replace(anchor, f"record('{event}', {address});")
+    probe = folder / 'lines.c'
+    probe.write_text('static void record(char, __UINTPTR_TYPE__);\n' + source + """
+static unsigned position;
+static int bad;
+static const char ops[] = "ddsiif";
+static const unsigned addresses[] = {32, 64, 0, 32, 64, 0};
+static void record(char op, cache_addr_t address)
+{
+    if (position >= sizeof(addresses)/sizeof(*addresses) ||
+        op != ops[position] || address != addresses[position]) bad = 1;
+    ++position;
+}
+int main(void)
+{
+    arch_exec_publish((void *)63, 2);
+    return bad || position != sizeof(ops)-1;
+}
+""")
+    exe = folder / 'lines'
+    require(['gcc', '-Iarch/ppc', '-Iinclude', str(probe), '-o', str(exe)])
+    return subprocess.run([exe], timeout=5).returncode
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
@@ -63,7 +95,14 @@ def main():
         if not check_asm(compile_dis(original)):
             raise RuntimeError('cache instruction sequence or range loops mismatch')
         print('PPC compile, symbols, cache instruction sequence and range loops OK')
+        if observe_lines(d, original) != 0:
+            raise RuntimeError('cache line trace')
         if args.mutate:
+            tail = 'start + bytes - 1'
+            assert original.count(tail) == 1
+            if observe_lines(d, original.replace(tail, 'start + bytes - 2')) != 1:
+                raise RuntimeError('survived: last cache line')
+            print('RED last cache line')
             before = '__asm__ volatile("icbi 0,%0" : : "r"(line) : "memory");'
             if original.count(before) != 1:
                 raise RuntimeError('mutation anchor: icbi')

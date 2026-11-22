@@ -1,6 +1,8 @@
 /* POST_ROOT debug module: validate privately, publish once, retain body only. */
 #include "../kernel/module/module.h"
+#ifndef PM_KDEBUG
 #include "../hwdev/hwdev_module.h"
+#endif
 #include "../kernel/module/module_runtime.h"
 #include "kdebug_imports.h"
 #include "platform_module_pair.h"
@@ -13,7 +15,9 @@
 #include "kprintf.h"
 #include "os32_generations.h"
 
+#ifndef PM_KDEBUG
 struct kdebug kdebug;
+#endif
 STATIC_ASSERT(sizeof(struct kdebug_ops) == (MODULE_OPS_SLOTS + 1) * 4,
               kdebug_ops_wire_size);
 STATIC_ASSERT(MODULE_PAGE_SIZE == PAGE_SIZE, module_page_matches_allocator);
@@ -77,6 +81,8 @@ void kdebug_load(void)
     kdebug.base_pa = record->backing;
     kdebug.pages = record->pages;
     kdebug.state = KDEBUG_RUNNING;
+#ifndef PM_KDEBUG
     (void)hwdev_module_load(handle);
+#endif
     kprintf(KLOG_ATTR, "[kdebug] running pair %08x\n", kdebug.pair_crc);
 }

@@ -26,7 +26,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT/'tools'), str(ROOT/'tools/ppc')]
 from run import ROM, command, require, CriterionFailure
 from link_run import PumpQMP
-from kboot_accept import build
+from kboot_accept import build_media
 from ppc_lan_host import UDP
 import host_agent as wire
 from host_agent import HostAgent
@@ -218,13 +218,14 @@ def gem_assessment(previous, current):
 
 
 class Session:
+    usb_devices = ("-device", "usb-kbd,id=kbd")
     qemu_clock = USB_QEMU_CLOCK
     qmp_type = None  # None = the module-level PumpQMP at start() (tests patch link_sh_run.PumpQMP)
     machine = "mac99"
     reboot_args = ("-no-reboot",)
 
-    def __init__(self, elf, cpu, out, timeout, late=False):
-        self.out, self.elf, self.cpu = out, elf, cpu
+    def __init__(self, media, cpu, out, timeout, late=False):
+        self.out, self.media, self.cpu = out, media, cpu
         out.mkdir()
         self.deadline = time.monotonic()+timeout
         self.q = self.p = self.io = self.operator = self.err = self.frames = None
@@ -232,7 +233,7 @@ class Session:
         self.overflow_watch = None
         self.started = time.monotonic()
         self.agent_enabled = not late
-        self.symbols = {p[2]: int(p[0],16) for line in command([cross('nm'), '-n', elf]).splitlines()
+        self.symbols = {p[2]: int(p[0],16) for line in command([cross('nm'), '-n', media.elf]).splitlines()
                         if len(p := line.split()) == 3}
         self.new_agent()
 
@@ -268,9 +269,7 @@ class Session:
                   for e in self.events[start:]), 'new resident RSH READY', 30)
 
     def start(self):
-        cd = self.out/'cd'; cd.mkdir(); shutil.copyfile(self.elf, cd/'PPCKERN.ELF')
-        iso = self.out/'boot.iso'
-        command(['genisoimage','-quiet','-hfs','-r','-part','-no-desktop','-o',iso,cd])
+        iso = self.media.iso.resolve()
         with socket.socket(socket.AF_INET,socket.SOCK_DGRAM) as reservation:
             reservation.bind(('127.0.0.1',0)); port=reservation.getsockname()[1]
             self.io = UDP(f'127.0.0.1:0,127.0.0.1:{port}')
@@ -281,12 +280,14 @@ class Session:
             '-serial','file:'+str(self.out/'serial-b.log'),'-monitor','none','-qmp','stdio',*self.reboot_args,
             '-nic','none','-device','sungem,netdev=n0,mac=52:54:00:12:34:56','-netdev',
             f'socket,id=n0,udp=127.0.0.1:{self.io.sock.getsockname()[1]},localaddr=127.0.0.1:{port}',
-            '-usb','-device','usb-kbd,id=kbd',*self.qemu_clock,
+            '-usb',*self.usb_devices,*self.qemu_clock,
             # Diagnosis only, never set by CI (trace events go through
             # OS32_QEMU_TRACE so they share the per-run trace file).
             *shlex.split(os.environ.get('OS32_QEMU_EXTRA', ''))]
         (self.out/'metadata.json').write_text(json.dumps(dict(command=args,cpu=self.cpu,
-            elf_sha256=hashlib.sha256(self.elf.read_bytes()).hexdigest()),indent=2))
+            elf=str(self.media.elf), map=str(self.media.map), iso=str(iso),
+            iso_sha256=hashlib.sha256(iso.read_bytes()).hexdigest(),
+            elf_sha256=hashlib.sha256(self.media.elf.read_bytes()).hexdigest()),indent=2))
         self.err=(self.out/'qemu.stderr').open('w'); self.frames=(self.out/'frames.log').open('w')
         self.qemu_started = time.monotonic()
         self.p=subprocess.Popen(args,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=self.err,bufsize=0)
@@ -562,12 +563,12 @@ class LineSession(Session):
                 self.uart.close()
 
 
-def accept(elf,cpu,out,timeout,late=False,verdict=None,overflow_mode="lines"):
+def accept(media,cpu,out,timeout,late=False,verdict=None,overflow_mode="lines"):
     # The 7450 non-late VM also runs the overflow observation.
     check_help = verdict in (None, 'resident command groups')
     check_overflow = cpu == '7450' and not late and verdict in (None, 'freeze-drop')
     extra = OVERFLOW_SECONDS * (int(check_help) + int(check_overflow))
-    s=LineSession(elf,cpu,out,timeout+extra,late)
+    s=LineSession(media,cpu,out,timeout+extra,late)
     try:
         s.start()
         if late:
@@ -724,9 +725,9 @@ class ResetSession(Session):
         check_body('echo x', result['result'], b'x\n')
 
 
-def accept_reset(elf, out, timeout, via, mutation=None):
+def accept_reset(media, out, timeout, via, mutation=None):
     """PPC_RESET_DESIGN §7: real CUI reboot, guest RESET, and a new boot ID."""
-    s = ResetSession(elf, '7450', out, timeout)
+    s = ResetSession(media, '7450', out, timeout)
     if via == 'pmu':
         s.machine = 'mac99,via=pmu'
     try:
@@ -734,10 +735,10 @@ def accept_reset(elf, out, timeout, via, mutation=None):
         op = s.agent.operator
         via_ready = re.compile(rf'VIA kind={via} [^\r\n]* rc=ok ')
         s.wait(lambda: s.ready() and op.ready['mode'] == 'cui' and
-               'KBOOT OF-OFF' in s.serial() and via_ready.search(s.serial()),
-               f'{via} VIA, OF-OFF and CUI READY', 60)
+               via_ready.search(s.serial()),
+               f'{via} VIA and CUI READY', 60)
         for line in s.serial().splitlines():
-            if 'KBOOT OF-OFF' in line or f'VIA kind={via} ' in line:
+            if f'VIA kind={via} ' in line:
                 print(line, flush=True)
         s.echo()
         s.wait(lambda: s.word('g_capture') == 0, 'echo capture released')
@@ -746,6 +747,7 @@ def accept_reset(elf, out, timeout, via, mutation=None):
         first_event = len(s.q.events)
         serial_offset = (out/'serial-a.log').stat().st_size
         boot = op.ready['boot']
+        require(s.word('detached') == 1, 'OF detached before reboot')
         ident = op.submit('cui', 'reboot', 'accept', timeout_ms=30000)
         print(f'RSH reboot: id={ident} boot={boot} serial_offset={serial_offset}', flush=True)
 
@@ -850,8 +852,8 @@ def flow_settings(folder, case):
             'KB_KEEP_RESET=-Wl,--wrap=arch_entry_enter,--wrap=ppc_trap_dispatch,--wrap=exec_run']
 
 
-def flow_accept(elf, folder, case):
-    s = Session(elf, '7450', folder, 180)
+def flow_accept(media, folder, case):
+    s = Session(media, '7450', folder, 180)
     try:
         s.start()
         if case in ('control', 'restore-root', 'return-target'):
@@ -937,7 +939,8 @@ def main():
     if args.out is None:
         ap.error('--out is required to build or run')
     required=tuple(cross(tool) for tool in ('gcc','nm','objdump','ld','objcopy'))
-    if not args.build_only: required+=('qemu-system-ppc','genisoimage')
+    required += ('genisoimage', 'isoinfo')
+    if not args.build_only: required+=('qemu-system-ppc',)
     missing=[p for p in required if not shutil.which(p)]
     if not args.build_only and not ROM.is_file(): missing.append(str(ROM))
     if missing:
@@ -955,9 +958,9 @@ def main():
     hashes = set()
     if controls:
         control=work/'normal'; control.mkdir()
-        elf=build(control/'kernel',*settings(control, observe_flow=True, overflow=args.overflow))
-        check_map(elf.with_suffix('.map'))
-        digest = hashlib.sha256(elf.read_bytes()).digest()
+        media=build_media(control/'kernel',*settings(control, observe_flow=True, overflow=args.overflow))
+        check_map(media.map)
+        digest = hashlib.sha256(media.elf.read_bytes()).digest()
         hashes.add(digest)
         print('normal-'+args.overflow, digest.hex(), flush=True)
     failures = []
@@ -974,8 +977,8 @@ def main():
         with record_case('flow-'+case):
             folder = work/('flow-'+case)
             folder.mkdir()
-            image = build(folder/'kernel', *flow_settings(folder, case), 'kb-user', 'kernel')
-            digest = hashlib.sha256(image.read_bytes()).digest()
+            image = build_media(folder/'kernel', *flow_settings(folder, case), 'kb-user', 'kernel')
+            digest = hashlib.sha256(image.elf.read_bytes()).digest()
             require(digest not in hashes, 'distinct flow image '+case)
             hashes.add(digest)
             print('flow-'+case, digest.hex(), flush=True)
@@ -986,16 +989,16 @@ def main():
             other = 'cr' if args.overflow == 'lines' else 'lines'
             folder = work/('normal-'+other)
             folder.mkdir()
-            image = build(folder/'kernel', *settings(folder, observe_flow=True, overflow=other))
-            digest = hashlib.sha256(image.read_bytes()).digest()
+            image = build_media(folder/'kernel', *settings(folder, observe_flow=True, overflow=other))
+            digest = hashlib.sha256(image.elf.read_bytes()).digest()
             require(digest not in hashes, 'distinct overflow image '+other)
             hashes.add(digest)
             print('normal-'+other, digest.hex(), flush=True)
         for name in mutations:
             folder=work/name; folder.mkdir()
-            mutant=build(folder/'kernel',*settings(folder,name,overflow=args.overflow))
-            check_map(mutant.with_suffix('.map'))
-            digest=hashlib.sha256(mutant.read_bytes()).digest()
+            mutant=build_media(folder/'kernel',*settings(folder,name,overflow=args.overflow))
+            check_map(mutant.map)
+            digest=hashlib.sha256(mutant.elf.read_bytes()).digest()
             require(digest not in hashes, 'distinct image '+name)
             hashes.add(digest)
             print(name, digest.hex(), flush=True)
@@ -1004,14 +1007,14 @@ def main():
         return 0
     for cpu, late in controls:
         with record_case(f'{cpu} late={late}'):
-            accept(elf,cpu,work/(cpu+('-late' if late else '-normal')),args.timeout,late,overflow_mode=args.overflow)
+            accept(media,cpu,work/(cpu+('-late' if late else '-normal')),args.timeout,late,overflow_mode=args.overflow)
             print('GREEN '+cpu+' late='+str(late),flush=True)
     if args.mutate:
         for name in mutations:
             expected = MUTATIONS[name][3]
             with record_case(name):
                 folder=work/name; folder.mkdir()
-                mutant=build(folder/'kernel',*settings(folder,name,overflow=args.overflow))
+                mutant=build_media(folder/'kernel',*settings(folder,name,overflow=args.overflow))
                 try: accept(mutant,'7450',folder/'guest',args.timeout,verdict=expected,overflow_mode=args.overflow)
                 except CriterionFailure as exc:
                     require(str(exc)==expected,'unexpected mutation verdict '+name+': '+str(exc))

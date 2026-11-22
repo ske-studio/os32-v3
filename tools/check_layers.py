@@ -13,7 +13,7 @@ BASELINE = 'tools/layers_baseline.json'
 IMAGES = {
     'x86-pc98': ('x86', 'pc98', ('obj', 'cd', 'cirrus', 'fep', 'fm', 'geforce', 'hwdev', 'kcg',
                                  'kdebug', 'lan', 'pcm', 'sqlite-proto', 'trident', 'v86', 'usb')),
-    'ppc-powermac': ('ppc', 'powermac', ('ppc-kboot',)),
+    'ppc-powermac': ('ppc', 'powermac', ('ppc-kboot', 'ppc-powermac')),
 }
 # 数えない場所: CI (tools/ppc/compile_ci.py の 4 像) が組まない像の置き場 (根の直下の shell・neg*)。
 SKIP_FIRST = {'ppc-kboot': ('shell', 'neg')}
@@ -130,6 +130,7 @@ def measure(root, image):
         base = root / 'build/out' / dep_root
         skip = SKIP_FIRST.get(dep_root, ())
         deps = [dep for dep in sorted(base.rglob('*.d'))
+                if not (dep_root == 'ppc-powermac' and dep.relative_to(base).parts[0] == 'user')
                 if not dep.relative_to(base).parts[0].startswith(skip)]
         if not deps:
             empty.append(dep_root)

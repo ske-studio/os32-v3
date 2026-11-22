@@ -52,7 +52,11 @@ void input_emit_keymap(const KmEvalResult *result, u8 down, u8 raw_due,
     if (result->kind == KM_LEGACY_CONTROL) byte = result->op;
     if (sc == 0xff) sc = 0;
     if (sc == 0 && byte == 0) return;
+#if INPUT_COOKED_MODS
+    legacy_cooked_push_mods(((u16)sc << 8) | byte, physical_mods);
+#else
     legacy_cooked_push(((u16)sc << 8) | byte);
+#endif
 }
 
 /* The unbound sc entrance uses its physical snapshot as local km state.

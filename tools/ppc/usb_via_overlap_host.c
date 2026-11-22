@@ -7,6 +7,8 @@
 #include "kprintf.h"
 #include "tick.h"
 #include "mouse_pointer_contract.h"
+#include "input/hal/keymap.h"
+#include "input/hal/usb_input.h"
 
 #define VIA_FIRST_PA 0x80016000u
 #define VIA_LAST_PA  0x80018000u
@@ -128,6 +130,9 @@ void usb_hc_dead(struct usb_hc *hc, u32 why) { (void)hc; (void)why; quit(99); }
 void usb_service(void) { quit(100); }
 int tick_register(unsigned int slot, tick_fn fn) { (void)slot; (void)fn; return 0; }
 /* The USB mouse wiring (stage 3c) registers PointerOps; this host only drives the OHCI/VIA overlap. */
+const KmBackend hid_jp_backend;
+int km_backend_register(const KmBackend *map) { (void)map; return 0; }
+int usb_input_mouse_available(void) { return 0; }
 const PointerOps empty_pointer;
 u32 ppc_irq_save(void) { return 0; }
 void ppc_irq_restore(u32 flags) { (void)flags; }

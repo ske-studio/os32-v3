@@ -31,9 +31,14 @@ APP+SYSTEM上限 (既定319,488B、予約の増減に追従) を守り、FEP取�
 
 ## 辞書の probe と起動の予約 (DICT_META)
 
-> 出所: DICT_META_DESIGN・TASK_DICT_META (2026-11-18 に要約して移した)。関係するソース: `kernel/sqlite_engine.c` (`services_boot`・`services_settings`・`fep_meta_probe`・`fep_boot_config_get`・`fep_boot_user_path_get`)・`lib/sqlite3/os32_sqlite_vfs.c` (`os32_sqlite_boot_check`)
+> 出所: DICT_META_DESIGN・TASK_DICT_META (2026-11-18 に要約して移した)。関係するソース: `kernel/sqlite_engine.c` (`services_boot`)・`kernel/fep_boot.c` (`services_settings`・`fep_meta_probe`・`fep_boot_config_get`・`fep_boot_user_path_get`)・`lib/sqlite3/os32_sqlite_vfs.c` (`os32_sqlite_boot_check`)
 
 core は FEP 部品を読む前に辞書を検査し、FEP の予約を決めてから FEP を読む。辞書の形式は [システム辞書の形式](../tools/fep_to_sqlite.md)、FEP と共有する型は [ime_store.h の契約](ime/ime_store.md) にある。
+
+静的 SQLite の後続は `kernel/fep_boot.h` の `fep_boot_static()` を使う。呼出側は HDD の ext2 root、Unicode・L1、L2 pair の成立を確認する。
+共通処理は load と start の各直前に `SERVICES_SQLITE_ONLY` と `services_public` を照合し、依存 handle を 0 個にする。PC-98 は RUNNING の SQLite handle を 1 個渡す。
+最終の接続数・予約の検査後に FEP を公開し、facade は RUNNING も照合する。静的構成の失敗時は入力を閉じて pending を失効させ、handle を回収し、設定の写しを無効にする。
+quiesce と接続・group の解放を確認できたときだけ予約を解除する。回収失敗は `MODULE_ISOLATED` を返し、SQL の owner と予約を保持する。
 
 ### 起動の順 (`services_boot`)
 
@@ -44,7 +49,7 @@ core は FEP 部品を読む前に辞書を検査し、FEP の予約を決めて
 3. `fep_meta_probe("/db/fep.db")`。**失敗すると MINIMAL へ戻る** (学習の失敗と違い、起動の辞書の形の誤りは FEP 全体を止める)。
 4. 予約を決める: settings の値 → 辞書の `mem_reserve_kb` (99 KiB 未満は丸める) → 既定 192 KiB の順。
    `os32_sqlite_outer_boot_check(0, reserve)` が容量と課金を照合する。
-5. probe の結果と予約を core の写し (`boot_meta`・`boot_reserve_kb`) に保存してから `fep_module_load`。FEP は初期化で `fep_boot_config_get`・`fep_boot_user_path_get` から写しを受け取る。
+5. probe の結果と予約を core の写し (`boot_meta`・`boot_reserve_kb`) に保存してから `fep_module_load_after_sql`。FEP は初期化で `fep_boot_config_get`・`fep_boot_user_path_get` から写しを受け取る。
 6. FEP の初期化の後、`os32_sqlite_outer_boot_check(ime_boot_connections(), reserve)`。常駐の接続の実数 (学習ありで 2、なしで 1) と一致しなければ MINIMAL。
 7. ここまで済んでから `services_public=1` (アプリの `db_open` を開く)。
 

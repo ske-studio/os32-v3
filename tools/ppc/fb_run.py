@@ -15,7 +15,7 @@ import shutil
 import tempfile
 
 from fb_pixel import Font, Terminal, read_ppm, reserved_unchanged
-from kboot_accept import build, mutant_settings
+from kboot_accept import build_media, mutant_settings
 from kboot_run import ROOT, ROM, require, serial, validate_root
 from link_sh_run import Session, text_fixture
 from usb_run import before_shell_input
@@ -49,8 +49,8 @@ MUTATIONS = {
 }
 
 
-def observe(elf, out, cpu, case):
-    s = Session(elf, cpu, out, 600)
+def observe(media, out, cpu, case):
+    s = Session(media, cpu, out, 600)
     font = Font(ROOT/'assets/fonts/shino16.kcgfont')
 
     def shot(name):
@@ -176,13 +176,14 @@ def main():
     os.environ.setdefault('SOURCE_DATE_EPOCH', '946684800')
     leave = work/'leave.sh'
     leave.write_text('/bin/dispprb.bin leave\necho $?\n')
-    bins = ' '.join((text_fixture(work), str(leave), 'build/out/ppc-user/link-sh/dispprb.bin'))
+    user = work / 'user'
+    bins = ' '.join((text_fixture(work), str(leave), str(user / 'dispprb.bin')))
     seen = set()
     for case in ['normal'] + (list(MUTATIONS) if args.mutate else []):
         opts = mutant_settings(work, case, *MUTATIONS[case]) if case != 'normal' else []
-        elf = build(work/case, 'IMAGE=kboot-link-sh', 'KB_ROOT_BINS='+bins,
+        media = build_media(work/case, 'IMAGE=kboot-link-sh', 'KB_ROOT_BINS='+bins, 'KB_SH_OUT='+str(user),
                     *before_shell_input(work), *opts)
-        digest = hashlib.sha256(elf.read_bytes()).hexdigest()
+        digest = hashlib.sha256(media.elf.read_bytes()).hexdigest()
         require(digest not in seen, 'distinct framebuffer image')
         seen.add(digest)
         print(case, digest, flush=True)
@@ -190,7 +191,7 @@ def main():
             continue
         for cpu in (['7450', '7455'] if args.cpu == 'both' else [args.cpu]) if case == 'normal' else ['7450']:
             try:
-                observe(elf, work/(case+'-'+cpu), cpu, case)
+                observe(media, work/(case+'-'+cpu), cpu, case)
             except PixelMismatch as exc:
                 reason = {'colors': 'colors/top', 'top': 'colors/top', 'scroll-minus': 'scroll',
                           'scroll-plus': 'scroll'}.get(case, case)

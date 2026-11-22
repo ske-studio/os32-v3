@@ -4,6 +4,7 @@ Common exec, caller validation, owner, FD and heap providers remain bound.
 """
 
 PROVIDER_EXTERNS = frozenset({
+    "extern i32 kdebug_call(u32 op, void *buf, u32 size);",
     "extern int kapi_pci_bind_info(u32 idx, void *out);",
     "extern volatile u32 tick_count;",
     "extern void kapi_sys_exit(int status);",
@@ -109,9 +110,6 @@ PROVIDER_GROUPS = {
         'pcm_close',
         'pcm_set_volume',
     }), frozenset(['pcm_contract.h'])),
-    'debug': (frozenset({
-        'kdebug_call',
-    }), frozenset([])),
     # OF uses the shared display entry points for resource-free operations.
     'gfx2': (frozenset({
         'gfx2_check_op',

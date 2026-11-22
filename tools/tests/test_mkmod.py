@@ -147,8 +147,9 @@ def verify_format(codec):
     assert parsed.body({'mem_max': 4096})[0] == bytes(4)
     fmt = codec.select_format(elf, 'ppc-powermac')
     assert (fmt.version, fmt.tag, fmt.reloc_bytes) == (2, 20, 12)
-    image, stats = codec.build(elf, {'imports': [], 'module_abi_gen': 1}, vk32()[0],
+    image, stats = codec.build(elf, {'imports': [], 'module_abi_gen': 1}, None,
                                KAPI, LAYOUT, target='ppc-powermac')
+    assert stats['pair_image_crc'] == 0
     assert stats['reloc_count'] == 1
     assert struct.unpack_from('<III', image, 144) == (0, 1, 0)
     rejected(lambda: codec.select_format(elf, 'x86-pc98'), 'ELF32')
@@ -213,7 +214,7 @@ MUTATIONS = (
     ('wrong-machine', '(2, fmt.machine, 1)', '(2, machine, 1)'),
     ('drop-absolute', 'relocs.append(where)', 'pass'),
     ('keep-pc32', 'if kind == 2:', 'if False:'),
-    ('pair-zero', "pair_crc(vmkernel) if policy['required_flags'] & CONSTANTS['FLAG_PAIR'] else 0", '0'),
+    ('pair-zero', "pair_crc(vmkernel) if paired and target == 'x86-pc98' else 0", '0'),
     ('bad-export-slot', 'fnv1a(encoded), slot, 1, entry', 'fnv1a(encoded), slot - 1, 1, entry'),
 )
 

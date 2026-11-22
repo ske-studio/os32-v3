@@ -319,7 +319,9 @@ def build(elf_data, metadata, vmkernel, kapi_abi_gen, layout_gen, *,
     abi = metadata['module_abi_gen']
     require(all(isinstance(v, int) and 0 <= v <= 0xffffffff
                 for v in (abi, kapi_abi_gen, layout_gen)), 'invalid ABI generation')
-    pair = pair_crc(vmkernel) if policy['required_flags'] & CONSTANTS['FLAG_PAIR'] else 0
+    # PowerMac binds provisional modules after linking the two LOAD segments.
+    paired = policy['required_flags'] & CONSTANTS['FLAG_PAIR']
+    pair = pair_crc(vmkernel) if paired and target == 'x86-pc98' else 0
     header = dict(MAGIC=CONSTANTS['MAGIC'], FORMAT=elf.format.version,
                   HEADER_SIZE=HEADER_SIZE, IMAGE_SIZE=image_size,
                   KAPI=kapi_abi_gen, LAYOUT=layout_gen, ABI=abi, ID=module_id,
@@ -348,13 +350,15 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--elf', type=Path, required=True)
     parser.add_argument('--metadata', type=Path, required=True)
-    parser.add_argument('--vmkernel', type=Path, required=True)
+    parser.add_argument('--vmkernel', type=Path)
     parser.add_argument('--module-id', type=int, default=CONSTANTS['ID_KDEBUG'])
     parser.add_argument('--kapi-abi-gen', type=lambda s: int(s, 0), required=True)
     parser.add_argument('--layout-gen', type=lambda s: int(s, 0), required=True)
     parser.add_argument('-o', '--output', type=Path, required=True)
     parser.add_argument('--target', default='x86-pc98')
     args = parser.parse_args()
+    if args.target == 'x86-pc98' and not args.vmkernel:
+        parser.error('--vmkernel is required for x86-pc98')
     try:
         require_target(args.target, 'module_codec')
         image, stats = build(args.elf.read_bytes(), json.loads(args.metadata.read_text()),

@@ -7,7 +7,7 @@ import host32
 from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 SOURCES = {'stream.inc':'platform/powermac/console_stream.c',
-           'log.inc':'platform/powermac/console_log.c',
+           'log.inc':'platform/powermac/log_printf.c',
            'platform_console.h':'platform/powermac/platform_console.h'}
 MUTANTS = [('UTF-8 byte length','utf8.inc','console_write(utf8_str, kstrlen(utf8_str), color);', 'console_write(utf8_str, 1, color);'),
            ('UTF-8 leaves the stream path','platform_console.h','#define CONSOLE_UTF8_AS_STREAM 1','#define CONSOLE_UTF8_AS_STREAM 0'),('poll removed','stream.inc','    pm_terminal_poll();',''),
@@ -15,13 +15,14 @@ MUTANTS = [('UTF-8 byte length','utf8.inc','console_write(utf8_str, kstrlen(utf8
 def run(tmp, sources):
     for name,text in sources.items(): (tmp/name).write_text(text)
     exe=tmp/'stream'
-    subprocess.run(['gcc','-m32','-nostdinc','-std=gnu11','-ffreestanding','-fno-builtin',
+    builtin_headers = subprocess.check_output(['gcc', '-print-file-name=include'], text=True).strip()
+    subprocess.run(['gcc','-m32','-nostdinc','-isystem',builtin_headers,'-std=gnu11','-ffreestanding','-fno-builtin',
         '-fno-pie','-no-pie','-fno-stack-protector','-nostdlib','-static',
         '-ffunction-sections','-fdata-sections','-Wl,--gc-sections',
         '-D__KERNEL_BUILD__','-I'+str(tmp),'-I'+str(ROOT),
         '-I'+str(ROOT/'platform/powermac'),'-I'+str(ROOT/'arch/ppc'),*include_flags(ROOT),
         str(ROOT/'tools/tests/ppc_stream_host.c'),
-        str(ROOT/'platform/powermac/lan_terminal.c'),str(ROOT/'lib/kstring_c.c'),
+        str(ROOT/'platform/powermac/lan_terminal.c'),str(ROOT/'lib/kstring_c.c'), str(ROOT/'lib/kprintf.c'),
         '-o',str(exe)],check=True)
     return host32.run([str(exe)],runner='qemu').returncode
 
