@@ -32,7 +32,7 @@ pub unsafe extern "C" fn av_rust_probe(api: *const KernelAPI) -> i32 {
     }
     static mut KEYS: [u8; 128] = [0xa5; 128];
     let key_state: unsafe extern "C" fn(*mut u8) -> i32 = (*api).in2_key_state;
-    if key_state(core::ptr::addr_of_mut!(KEYS).cast()) != -10 || KEYS[0] != 0xa5 || KEYS[127] != 0xa5 { return 42; }
+    if key_state(core::ptr::addr_of_mut!(KEYS).cast()) != -17 || KEYS[0] != 0xa5 || KEYS[127] != 0xa5 { return 42; }
     if ((*api).snd2_dsp_process)(1, 2, 3 as *const i32, 4, 5 as *const u8, 6 as *mut u8, 7, 8) != 1 {
         return 43;
     }

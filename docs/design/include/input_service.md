@@ -25,3 +25,5 @@ typedef struct InputOps {
 - `KbdDiag`/`KbdDiagLogEnt` は既存SDK共有型を利用。kbd注入APIはカーネルの既存機構であり、表へ迂回させない。
 
 - 文脈: 転送は協調文脈/KAPI内のみ。IRQは既存driver handlerが同じ状態を更新。getkey_waitのinterruptible・park・ring3_abort_checkの位置は移さない。新たにcli/stiを足さない。
+
+- PC-98 の exec 回収は、親に前景を返す直前に ABORTED の場合だけ `discard_stop` を呼ぶ。CUI では未読の cooked 入力を破棄し、raw には STOP・CTRL・GRPH・TAB の make/break を順序どおり残す。押下中の修飾状態は保持する。通常終了と fault では CUI の先打ちを親が読める。GUI では従来どおり中断に使った CTRL+STOP の make を取り除く。

@@ -33,7 +33,6 @@ VfsOps *vfs_route(const char *path, char *rel_out, int max_rel, void **ctx_out)
 }
 #include "disk_host_source.c"
 #include "generated_host_source.c"
-#include "../../input/hal/a0_weak.c"
 #include "../../sound/hal/a0_weak.c"
 static HostNotice notice_heap[64];
 void *kmemset(void *d, int v, u32 n)
@@ -49,6 +48,17 @@ static int reached, checks;
 static const char *case_name;
 void ring3_fault_kill(void) { __builtin_longjmp(escape, 1); }
 static int touch(void) { reached++; return 7; }
+/* Count entry to the target so the wrapper probes can distinguish a fault
+ * before dispatch from a target that already ran. */
+int in2_pad_state(u32 slot, IN2_PadState *out) { (void)slot; (void)out; return touch(); }
+int in2_pad_caps(u32 slot, IN2_PadCaps *out) { (void)slot; (void)out; return touch(); }
+int in2_pad_vibrate(u32 slot, const IN2_Vibration *v) { (void)slot; (void)v; return touch(); }
+int in2_dev_info(u32 index, IN2_DevInfo *out) { (void)index; (void)out; return touch(); }
+int in2_read(IN2_Event *out, u32 max) { (void)out; (void)max; return touch(); }
+int in2_key_state(u8 *out) { (void)out; return touch(); }
+int in2_mouse_state(IN2_MouseState *out) { (void)out; return touch(); }
+int in2_status(IN2_Status *out) { (void)out; return touch(); }
+int in2_wm_state(IN2_WmState *out) { (void)out; return touch(); }
 int vfs_read_fd(int fd, void *buf, u32 size) { (void)fd; (void)buf; (void)size; return touch(); }
 int vfs_write_fd(int fd, const void *buf, u32 size) { (void)fd; (void)buf; (void)size; return touch(); }
 int platform_np2_get_version(char *buf, int size) { (void)buf; (void)size; return touch(); }
@@ -150,7 +160,7 @@ static void caller_copy_tests(void)
                                        wrap_snd_bgm_play((const char *)bad_mml), touch()));
     named(wrap_snd_bgm_is_playing() == 0, "retired BGM idle");
     named(wrap_snd_focus(1) == OS32_ERR_NOSYS, "retired focus");
-    EXPECT("AV key state tail", 1, (wrap_in2_key_state((u8 *)(tail - 126)), touch()));
+    EXPECT("AV key state tail", 1, wrap_in2_key_state((u8 *)(tail - 126)));
     EXPECT("AV FM sequence tail", 1, (wrap_v86s_fm_drain(0, 0, 0, (u32 *)tail), touch()));
     u32 result;
     struct kapi_arg_source src = {0};
@@ -171,8 +181,12 @@ static void caller_copy_tests(void)
     named(wrap_snd2_dsp_process(0, 0, 0, 17, 0, 0, 0, 0) == OS32_ERR_INVAL, "AV DSP too long");
     named(wrap_snd2_chip_write(0, (SND2_RegW *)va, 256) == OS32_ERR_NOSYS, "AV chip write limit");
     named(wrap_snd2_chip_write(0, 0, 257) == OS32_ERR_INVAL, "AV chip write too long");
-    named(wrap_in2_read((IN2_Event *)va, 128) == OS32_ERR_NOSYS, "AV read maximum");
+    named(wrap_in2_read((IN2_Event *)va, 128) == 7, "AV read maximum");
     named(wrap_v86s_fm_drain(0, 0, 513, 0) == OS32_ERR_INVAL, "AV drain too long");
+    named(wrap_in2_read((IN2_Event *)(va + 1), 1) == OS32_ERR_INVAL, "in2 read alignment");
+    EXPECT("in2 alignment before range", 0,
+           (named(wrap_in2_read((IN2_Event *)tail, 1) == OS32_ERR_INVAL,
+                  "in2 alignment before range"), touch()));
     named(wrap_in2_read(0, 129) == OS32_ERR_INVAL, "AV read limit");
     named(wrap_snd2_dsp_process(0, 0, (const i32 *)va, 16, 0, 0, ~0u, 0) == OS32_ERR_NOSYS,
           "AV DSP target range deferred");
@@ -225,6 +239,14 @@ static void caller_copy_tests(void)
     EXPECT("output tail", 1, wrap_sys_read(1, (void *)tail, 2));
     EXPECT("input good", 0, wrap_sys_write(1, (void *)va, PAGE_SIZE));
     EXPECT("input tail", 1, wrap_sys_write(1, (void *)tail, 2));
+    EXPECT("in2 pad_state tail", 1, wrap_in2_pad_state(0, (IN2_PadState *)tail));
+    EXPECT("in2 pad_caps tail", 1, wrap_in2_pad_caps(0, (IN2_PadCaps *)tail));
+    EXPECT("in2 pad_vibrate tail", 1, wrap_in2_pad_vibrate(0, (IN2_Vibration *)tail));
+    EXPECT("in2 dev_info tail", 1, wrap_in2_dev_info(0, (IN2_DevInfo *)tail));
+    EXPECT("in2 read tail", 1, wrap_in2_read((IN2_Event *)(tail + 1 - __alignof__(IN2_Event)), 1));
+    EXPECT("in2 mouse_state tail", 1, wrap_in2_mouse_state((IN2_MouseState *)tail));
+    EXPECT("in2 status tail", 1, wrap_in2_status((IN2_Status *)tail));
+    EXPECT("in2 wm_state tail", 1, wrap_in2_wm_state((IN2_WmState *)tail));
     EXPECT("input empty NULL", 0, wrap_sys_write(1, 0, 0));
     const u32 invalid[] = {0, 0xA0000, 0x100000, 0xfffffff0U};
     for (u32 i = 0; i < sizeof(invalid) / sizeof(invalid[0]); i++) {

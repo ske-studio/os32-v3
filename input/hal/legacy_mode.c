@@ -87,12 +87,17 @@ void kbd_stop_mouse_sample(u8 buttons)
     irq_restore(flags);
 }
 
-/* Preserve order and all non-STOP input, including modifier/break events. */
+/* ABORTED handoff: the WM consumes raw events, the CUI parent reads cooked input. */
 void kbd_discard_stop(void)
 {
     u32 flags = irq_save();
     kbd_stop_suppressed = kbd_gui_mode;
     kbd_stop_tick = tick_count;
-    legacy_raw_discard_stop();
+    if (kbd_gui_mode) {
+        legacy_raw_discard_stop();
+    } else {
+        kbd_raw_purge_keep();
+        legacy_cooked_flush();
+    }
     irq_restore(flags);
 }

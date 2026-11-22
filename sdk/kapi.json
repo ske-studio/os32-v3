@@ -2075,7 +2075,7 @@
     {"name": "in2_pad_vibrate", "target": "in2_pad_vibrate", "ret": "int", "args": ["u32 slot", "const IN2_Vibration *v"], "in": [{"arg": "v", "size": "sizeof(IN2_Vibration)"}]},
     {"name": "in2_dev_count", "target": "in2_dev_count", "ret": "int", "args": []},
     {"name": "in2_dev_info", "target": "in2_dev_info", "ret": "int", "args": ["u32 i", "IN2_DevInfo *o"], "out": [{"arg": "o", "size": "sizeof(IN2_DevInfo)"}]},
-    {"name": "in2_read", "target": "in2_read", "ret": "int", "args": ["IN2_Event *out", "u32 max"], "out": [{"arg": "out", "len": "max", "unit": 16}], "invalid_length": "max > 128"},
+    {"name": "in2_read", "target": "in2_read", "ret": "int", "args": ["IN2_Event *out", "u32 max"], "out": [{"arg": "out", "len": "max", "unit": 16}], "invalid_length": "max > 128 || (u32)out % __alignof__(IN2_Event)"},
     {"name": "in2_key_state", "target": "in2_key_state", "ret": "int", "args": ["u8 *out"], "out": [{"arg": "out", "size": 128}]},
     {"name": "in2_mouse_state", "target": "in2_mouse_state", "ret": "int", "args": ["IN2_MouseState *o"], "out": [{"arg": "o", "size": "sizeof(IN2_MouseState)"}]},
     {"name": "in2_acquire", "target": "in2_acquire", "ret": "int", "args": ["u32 flags"]},
