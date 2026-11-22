@@ -2678,3 +2678,24 @@ fn chord_deferred_titlebar() {
     assert!(crate::startmenu::is_open());
     crate::startmenu::close(&mut st);
 }
+
+#[test]
+fn deferred_release_before_focus_change() {
+    mocks::init();
+    let shm = mocks::Shm::new();
+    let mut st = windows(&shm, &[(20, 40, 140, 100), (220, 40, 140, 100)]);
+    st.screen_w = 640;
+    st.screen_h = 480;
+    park_pointer(&mut st, 280, 100);
+    sample_buttons(&mut st, 2, input::Ctx::Wait);
+    let bar = crate::taskbar::rect(&st);
+    *mocks::MOUSE.lock().unwrap() = (40, (bar.y + 1) as i16, 0);
+    input::capture(&mut st, input::Ctx::Pump);
+    assert_eq!(buttons(&st, 1), [(true, 2)]);
+
+    *mocks::MOUSE.lock().unwrap() = (80, 100, 1);
+    input::capture(&mut st, input::Ctx::Wait);
+    assert_eq!(st.front_index(), Some(0));
+    assert_eq!(buttons(&st, 1), [(true, 2), (false, 2)]);
+    assert!(buttons(&st, 0).is_empty());
+}

@@ -815,14 +815,11 @@ fn capture_mouse(st: &mut GuiState, ctx: Ctx, end_batch: bool) {
         }
         // Pump でも物理状態は観測し、モーダルへの配送だけを X3 に保留する。
         if ctx.wm_ui() {
+            if released != 0 {
+                edge_x3(st, mx, my, released, false);
+            }
             if down_edge {
                 edge_x3(st, mx, my, MOUSE_BTN_LEFT, true);
-            }
-            if up_edge {
-                edge_x3(st, mx, my, MOUSE_BTN_LEFT, false);
-            }
-            if rup_edge {
-                edge_x3(st, mx, my, MOUSE_BTN_RIGHT, false);
             }
             st.delivered_button = click_button;
         }
@@ -838,21 +835,20 @@ fn capture_mouse(st: &mut GuiState, ctx: Ctx, end_batch: bool) {
             /* カーソルの移動は損傷に含めない (別経路で退避・再描画)。 */
             cursor::move_to(st, mx, my);
         }
+        // 新しい押下で前面が変わる前に、Pump が保留した離しを元の相手に返す。
+        if released != 0 {
+            edge_x3(st, mx, my, released, false);
+        }
         let front = st.front_id();
         if down_edge {
             edge_x3(st, mx, my, MOUSE_BTN_LEFT, true);
-        } else if up_edge {
-            edge_x3(st, mx, my, MOUSE_BTN_LEFT, false);
+        } else if rdown_edge {
+            edge_x3(st, mx, my, MOUSE_BTN_RIGHT, true);
         }
         if front != st.front_id() {
             st.prev_buttons = 0;
             st.excl.mouse_baseline = true;
             return;
-        }
-        if rdown_edge {
-            edge_x3(st, mx, my, MOUSE_BTN_RIGHT, true);
-        } else if rup_edge {
-            edge_x3(st, mx, my, MOUSE_BTN_RIGHT, false);
         }
         if pointer_motion {
             /* 移動: フォーカス窓へ Pointer (畳み込み)。
@@ -879,15 +875,13 @@ fn capture_mouse(st: &mut GuiState, ctx: Ctx, end_batch: bool) {
         }
         /* 離しは X3 と同じく捕捉経由で返す。ここで直接配ると捕捉が残り、
          * 次の無関係な離しが古い相手へ飛ぶ。 */
+        if released != 0 {
+            release_capture(st, mx, my, released);
+        }
         if down_edge {
             forward_button(st, mx, my, MOUSE_BTN_LEFT, true);
-        } else if up_edge {
-            release_capture(st, mx, my, MOUSE_BTN_LEFT);
-        }
-        if rdown_edge {
+        } else if rdown_edge {
             forward_button(st, mx, my, MOUSE_BTN_RIGHT, true);
-        } else if rup_edge {
-            release_capture(st, mx, my, MOUSE_BTN_RIGHT);
         }
         if pointer_motion {
             /* X3 と同じ理由で `moved` が要る (上のコメント)。 */
