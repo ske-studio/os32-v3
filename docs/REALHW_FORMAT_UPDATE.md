@@ -25,12 +25,13 @@ KAPI の版が上がるだけの版、配置の世代 (`memory_layout`) が変�
    | `/sys/lib/libos32gui.shlib` | GUI に要る (古いままだと CUI に落ちる)。シェルまでなら無くてもよい |
 
    ```
-   cp /host/boot/<各ファイル> /boot/<同じ名前>
-   cp /host/sys/shell.bin /sys/shell.bin
-   cp /host/sys/lib/libos32gui.shlib /sys/lib/libos32gui.shlib
+   sfs run cp /host/boot/<各ファイル> /boot/<同じ名前>
+   sfs run cp /host/sys/shell.bin /sys/shell.bin
+   sfs run cp /host/sys/lib/libos32gui.shlib /sys/lib/libos32gui.shlib
    sync
    reboot
    ```
+   実機 (LAN 版 SerialFS) では `/host` が `sfs run` の中でしか見えないので、`cp` は `sfs run cp …` で回す (2026-11-22 の Ra266 の更新で、素の `cp /host/...` は No such file で何も書かなかった)。NP21/W (HostDrv) では素の `cp` でよい。
    `unicode.bin`・`fep.dic`・`splash.osri` は形式に依らないので写さなくてよい (変わっていれば次の hsync が写す)。
 2. 再起動の後の `ver` が新しい Commit・SERVICES_READY であることを確かめる。古いアプリは `rebuild required` で断られる (正しい動き)。
 3. 新しい hsync を配備元から直接動かして全体を同期する (`/sbin/hsync.bin` はまだ古い)。実機は `sfs run /host/sbin/hsync.bin --fep-off`、続けて `sfs run /host/sbin/hsync.bin sys`。errors=0 を確かめる。
