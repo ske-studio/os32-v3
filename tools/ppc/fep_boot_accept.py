@@ -1,6 +1,7 @@
 """Boot the production FEP from a disposable APM/ext2 root."""
 import argparse
 import hashlib
+import json
 import os
 from pathlib import Path
 import shutil
@@ -8,9 +9,11 @@ import struct
 import subprocess
 import sys
 import tempfile
+import time
 
 from ata_accept import guest
-from run import ROM
+from run import QMP, ROM
+from usb_run import keyboard_actions
 from hdd_root_accept import disk
 from kboot_accept import ROOT, build
 from root_pair import HEADER_FIELDS, bind_module
@@ -35,6 +38,51 @@ def install(directory, image, dictionary):
         (directory / 'db/fep.db').write_bytes(b'invalid SQLite database')
     elif dictionary != 'missing':
         create_db([('かな', '仮名', 1, 100)], directory / 'db/fep.db', 0, variant='M')
+
+
+def type_reading(proc, serial, deadline):
+    q = QMP(proc, deadline)
+
+    def read():
+        return serial.read_text(errors='replace') if serial.exists() else ''
+
+    def wait(predicate, label):
+        while proc.poll() is None and time.monotonic() < deadline:
+            if predicate():
+                return
+            time.sleep(.03)
+        raise RuntimeError(f'{label}: {serial}')
+
+    key, type_keys = keyboard_actions(q, read, wait, serial.parent)
+    wait(lambda: 'protocol=01' in read() and 'FEP-TEST remote' in read(), 'resident shell')
+    key('esc')
+    wait(lambda: 'FEP-TEST local' in read(), 'local prompt')
+    type_keys('kana')
+    key('ret')  # Commit the reading. In raw mode this already submits the line.
+    key('ret')  # Submit the committed UTF-8 line.
+
+
+def resident(work, raw):
+    path = 'userland/shell/ui.c'
+    source = (ROOT / path).read_text()
+    edits = [
+        ('if (remote) (void)execute_command("rshell");',
+         'if (remote) { g_api->serial_puts("\\nFEP-TEST remote\\n"); (void)execute_command("rshell"); }'),
+        ('cmd_dropped = 0;\n        sh_mark_drawn',
+         'cmd_dropped = 0;\n        g_api->serial_puts("\\nFEP-TEST local\\n");\n        sh_mark_drawn'),
+        ('(void)execute_command(cmd_buf);',
+         'g_api->serial_puts("\\nFEP-TEST line="); g_api->serial_puts(cmd_buf); '
+         'g_api->serial_puts("\\nFEP-TEST submitted\\n");\n        (void)execute_command(cmd_buf);'),
+    ]
+    if raw:
+        edits.append(('(g_api->ime_getkey())', '(g_api->kbd_getkey())'))
+    for old, new in edits:
+        assert source.count(old) == 1, old
+        source = source.replace(old, new)
+    work.mkdir()
+    file = work / 'ui.c'
+    file.write_text(source)
+    return ['KB_SH_OUT=' + str(work), 'PPC_RES_MUT_SRC=' + path, 'PPC_RES_MUT_FILE=' + str(file)]
 
 
 def main():
@@ -70,9 +118,16 @@ def main():
                'extern void wrap_ime_set_mode(int);\n'
                'extern int wrap_ime_get_mode(void);\n'
                'extern int sqlite_module_ready(void);\n' + product.replace(call, probe + call))
+    manifest = json.loads((ROOT / 'build/ppc-ram-root.json').read_text())
+    database = work / 'fep.db'
+    create_db([('かな', '仮名', 1, 100)], database, 0, variant='M')
+    manifest['/db/fep.db'] = str(database)
+    template = work / 'template.json'
+    template.write_text(json.dumps(manifest))
+    shell = resident(work / 'user', False)
     cases = [('normal', None, None)]
     if args.mutate:
-        cases.append(('skip-hdd', '&& hdd_root_ready &&', '&& !hdd_root_ready &&'))
+        cases.extend([('allow-ram', '&& hdd_root_ready &&', '&&'), ('raw-shell', None, None)])
         cases.append(('close-failure', 'int sql_rc = sqlite_static_boot();',
                       'int sql_rc = sqlite_static_boot(); services_boot_fault = SERVICES_FAULT_FEP_CLOSE;'))
     hashes = set()
@@ -84,23 +139,41 @@ def main():
             assert product.count(old) == 1
         source.write_text(product.replace(old, new) if old else product)
         elf = build(out, '-j6', 'IMAGE=powermac', 'KB_MUT_SRC=' + kernel,
-                    'KB_MUT_FILE=' + str(source), 'KB_SH_OUT=' + str(work / 'user'), 'kernel')
+                    'KB_MUT_FILE=' + str(source), 'KBOOT_USB_KEY_TRACE=1',
+                    'ROOT_MANIFEST=' + str(template),
+                    *(resident(work / 'raw-user', True) if name == 'raw-shell' else shell), 'kernel')
         digest = hashlib.sha256(elf.read_bytes()).hexdigest()
         assert digest not in hashes
         hashes.add(digest)
-        for dictionary in (('dictionary', 'missing', 'corrupt', 'wrong-pair') if name == 'normal' else ('dictionary',)):
+        trials = {'normal': ('dictionary', 'missing', 'corrupt', 'wrong-pair', 'ram'),
+                  'allow-ram': ('ram',)}.get(name, ('dictionary',))
+        for dictionary in trials:
             trial = out / dictionary
             trial.mkdir()
-            media = disk(trial, 'root', lambda d: install(d, out / 'root.iso', dictionary))
+            ram = dictionary == 'ram'
+            media = None if ram else disk(trial, 'root', lambda d: install(d, out / 'root.iso', dictionary))
             if args.build_only:
                 continue
             image = trial / elf.name
             image.hardlink_to(elf)
-            lines = guest(image, '7450', media, done='FEP-TEST done',
-                          bootargs='os32-root=/pci@f2000000/mac-io@c/ata-3@20000/disk@0:3')
+            keys = dictionary in ('dictionary', 'missing') and name != 'close-failure'
+            lines = guest(image, '7450', media, absent=ram, keyboard=type_reading if keys else None,
+                          done='FEP-TEST submitted' if keys else 'FEP-TEST done',
+                          bootargs=None if ram else 'os32-root=/pci@f2000000/mac-io@c/ata-3@20000/disk@0:3')
             report, = [line for line in lines if line.startswith('FEP-TEST ready=')]
             ready = 'ready=1 sql=1 public=1 mode=1' in report
-            assert ready == (dictionary == 'dictionary' and name == 'normal'), report
+            if ram:
+                assert any(line.startswith('KBOOT ROOT rc=0 registered=1') for line in lines)
+                attempted = any(line.startswith('[fep] static rc=') for line in lines)
+                assert attempted == (name == 'allow-ram'), lines
+            if name != 'allow-ram':
+                assert ready == (dictionary == 'dictionary' and name != 'close-failure'), report
+            if keys:
+                observed = next(line for line in lines if line.startswith('FEP-TEST line='))
+                expected = 'かな' if ready and name != 'raw-shell' else 'kana'
+                assert observed == 'FEP-TEST line=' + expected, observed
+                if name == 'raw-shell':
+                    print(name, 'RED', observed, flush=True)
             if not ready:
                 assert 'ready=0 sql=1 public=0 mode=0' in report, report
             pages = int(report.split('pages=')[1])

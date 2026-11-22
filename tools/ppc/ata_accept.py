@@ -154,7 +154,7 @@ def digest(data):
     return f'{h:08x}'
 
 
-def guest(elf, cpu, disk, absent=False, second=None, bootargs=None, done="ATA-TEST done"):
+def guest(elf, cpu, disk, absent=False, second=None, bootargs=None, done="ATA-TEST done", keyboard=None):
     work = elf.parent / (cpu + ('-absent' if absent else ''))
     work.mkdir()
     cd = work / 'cd'
@@ -178,9 +178,15 @@ def guest(elf, cpu, disk, absent=False, second=None, bootargs=None, done="ATA-TE
         args += ['-drive', f'file={work / "second.raw"},format=raw,if=ide,index=1,cache=writethrough']
     if bootargs:
         args += ['-prom-env', r'boot-command=boot cd:,\PPCKERN.ELF ' + bootargs]
-    with (work / 'qemu.log').open('wb') as log, subprocess.Popen(args, stderr=log, stdout=log) as proc:
+    if keyboard:
+        args += ['-usb', '-device', 'usb-kbd', '-icount', 'shift=auto', '-qmp', 'stdio']
+    with (work / 'qemu.log').open('wb') as log, subprocess.Popen(
+            args, stderr=log, stdout=subprocess.PIPE if keyboard else log,
+            stdin=subprocess.PIPE if keyboard else None) as proc:
         try:
             deadline = time.monotonic() + 90
+            if keyboard:
+                keyboard(proc, serial, deadline)
             while proc.poll() is None and time.monotonic() < deadline:
                 lines = serial.read_bytes().decode(errors='replace').splitlines() if serial.exists() else []
                 if done in lines:
