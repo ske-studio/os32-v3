@@ -1,6 +1,6 @@
 """Run the real IRQ0 branch as i386 NASM with host substitutes for I/O and frame."""
 CHECK = dict(name='tick-irq-host', tier=4, needs=[], budget=3,
-    covers=['kernel/time/tick.c', 'kernel/time/tick_clock.h', 'include/kernel_tick.h',
+    covers=['kernel/time/tick.c', 'kernel/time/tick_clock.h', 'kernel/time/tick_probe_ids.h', 'include/kernel_tick.h',
             'sdk/include/os32/os32_kapi_shared.h', 'tools/tests/kernel_includes.py', 'arch/x86/kernel/isr_stub.asm', 'tools/tests/tick_irq_host.c',
             'tools/tests/test_tick_irq.py', 'tools/tests/host32.py'],
     basis=['TICK_1KHZ_DESIGN', 'TICK_ARCH_DESIGN §5-3'],
@@ -21,7 +21,9 @@ def main(mutate=False):
     start = asm.index('        call    tick_clock_step', asm.index('irq_stub_0:'))
     body = asm[start:asm.index('.done:', start)]
     mutants = [('.phys_only EOI', '        out     PIC1_CMD, al', '', True),
-               ('physical V86 reflection', '        TP_BEGIN 9', '        V86_REFLECT 0\n        TP_BEGIN 9', True),
+               ('physical V86 reflection', '        TP_BEGIN TP_EOI', '        V86_REFLECT 0\n        TP_BEGIN TP_EOI', True),
+               ('physical EOI probe', 'TP_END TP_EOI', 'TP_END TP_SLOT7', True),
+               ('logical reflection probe', 'TP_BEGIN TP_REFLECT', 'TP_BEGIN TP_EOI', False),
                ('timer after EOI', 'call    timer_handler', 'nop', False),
                ('timeout exit', '        call    v86_exit_to_kernel', '        nop', False)]
     with tempfile.TemporaryDirectory(prefix='tick-irq-') as td:
@@ -45,7 +47,9 @@ def main(mutate=False):
                       'extern v86_tick_and_check_timeout, v86_exit_to_kernel, frame_flags\n'
                       '%define ISR_IRQ_EFLAGS_OFF 40\n%define EFLAGS_VM 0x20000\n'
                       '%define ABI_WORD_BYTES 4\n%define OCW2_EOI 0x20\n'
-                      '%macro TP_BEGIN 1\n%endmacro\n%macro TP_END 1\n%endmacro\n'
+                      'extern probe_begin, probe_end\n'
+                      '%macro TP_BEGIN 1\n pushad\n push dword %1\n call probe_begin\n add esp,4\n popad\n%endmacro\n'
+                      '%macro TP_END 1\n pushad\n push dword %1\n call probe_end\n add esp,4\n popad\n%endmacro\n'
                       '%macro TP_LEAVE 1\n%endmacro\n' + macro + '\n'
                       'global irq_body\nirq_body:\n' + code + '.done:\n ret\n')
             clock = (ROOT / 'kernel/time/tick.c').read_text()
@@ -61,7 +65,9 @@ def main(mutate=False):
             clock_src = work / 'tick.c'
             clock_src.write_text(clock)
             source = source.replace('[esp + ISR_IRQ_EFLAGS_OFF]', '[frame_flags]')
-            src = work / 'irq.asm'; src.write_text(source)
+            src = work / 'irq.asm'; src.write_text(subprocess.check_output(
+                ['cpp', '-traditional-cpp', '-P', '-include', str(ROOT / 'kernel/time/tick_probe_ids.h'), '-'],
+                input=source, text=True))
             obj = work / 'irq.o'; exe = work / 'irq'
             subprocess.run(['nasm', '-f', 'elf32', str(src), '-o', str(obj)], check=True)
             subprocess.run(['gcc', '-m32', '-march=i386', '-std=gnu11', '-Wall', '-Wextra', '-Werror',

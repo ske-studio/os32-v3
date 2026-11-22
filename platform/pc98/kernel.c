@@ -1,3 +1,4 @@
+#include "usb_resident.h"
 #include "boot_token.h"
 #include "kernel_start.h"
 #include "legacy_guest.h"
@@ -264,6 +265,7 @@ void platform_boot_machine(void)
         boot_platform_run(BOOT_NIC_LEGACY, &boot);
     }
 
+    if (memory_boot_dma_available()) pc98_usb_load();
     boot_token_init();
 
     /* File-backed settings/FEP I/O needs IRQs; no application exists yet. */

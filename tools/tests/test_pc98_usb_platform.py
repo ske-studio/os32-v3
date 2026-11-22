@@ -30,7 +30,8 @@ MUTATIONS = [
 
 def run(ctx):
     root = Path(ctx.root)
-    paths = ['platform/pc98/usb_platform.c', 'drivers/usb/ehci_handoff.c']
+    paths = ['platform/pc98/usb_platform.c', 'drivers/usb/ehci_handoff.c',
+             'platform/pc98/usb_probe.h']
     originals = [(root / path).read_text() for path in paths]
     with tempfile.TemporaryDirectory() as directory:
         sources = [Path(directory) / Path(path).name for path in paths]
@@ -45,7 +46,7 @@ def run(ctx):
                 src.write_text(content)
             subprocess.run(['gcc', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
                             '-Iarch/x86', '-I.', '-Iinclude', '-Iplatform/pc98', '-Isdk/include/os32',
-                            *sources, 'drivers/usb/ehci_quiesce.c', 'tools/tests/pc98_usb_platform_host.c', '-o', exe],
+                            *[src for src in sources if src.suffix == '.c'], 'drivers/usb/ehci_quiesce.c', 'tools/tests/pc98_usb_platform_host.c', '-o', exe],
                            cwd=root, check=True)
             result = subprocess.run([exe]).returncode
             assert result == expected, (result, expected)
