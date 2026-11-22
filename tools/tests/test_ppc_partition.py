@@ -22,9 +22,9 @@ if '--mutate' in sys.argv:
               ('capacity', superblock, 'if (ctx->sb_info.total_blocks > ctx->part_len',
                'if (0 && ctx->sb_info.total_blocks > ctx->part_len', 14),
               ('read-error-reset', block_io,
-               'ret = dev_blk_read_lba(ctx->dev, sector, blocks * EXT2_SECTORS_PER_BLOCK, buf);\n'
+               'ret = ext2_device_transfer(ctx, sector, blocks * EXT2_SECTORS_PER_BLOCK, buf, 0);\n'
                '    if (ret != 0) ext2_read_cache_reset();',
-               'ret = dev_blk_read_lba(ctx->dev, sector, blocks * EXT2_SECTORS_PER_BLOCK, buf);', 17),
+               'ret = ext2_device_transfer(ctx, sector, blocks * EXT2_SECTORS_PER_BLOCK, buf, 0);', 17),
               ('descriptor-error', superblock,
                'ret = ext2_read_block(ctx, gd_block, ext2_g_blk);\n                if (ret != 0) return EXT2_ERR_IO;',
                'ret = ext2_read_block(ctx, gd_block, ext2_g_blk);\n                if (ret != 0) return EXT2_ERR_NOPART;', 16),
