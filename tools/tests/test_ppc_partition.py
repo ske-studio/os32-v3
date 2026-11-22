@@ -8,22 +8,26 @@ import host32
 
 root = Path(__file__).resolve().parents[2]
 view = root / 'platform/powermac/partition_view.c'
-cases = [('normal', None, None, 0)]
+apm = root / 'platform/powermac/apm.c'
+cases = [('normal', view, None, None, 0)]
 if '--mutate' in sys.argv:
-    cases += [('start', 'first + offset', 'offset', 5),
-              ('last', 'count > dev->total_sects - offset', 'count >= dev->total_sects - offset', 6)]
+    cases += [('start', view, 'first + offset', 'offset', 5),
+              ('last', view, 'count > dev->total_sects - offset', 'count >= dev->total_sects - offset', 6),
+              ('early-write', view, '!writable || dev != &view', 'dev != &view', 12),
+              ('type', apm, 'i + 1 == number && kstrncmp', '0 && kstrncmp', 11),
+              ('magic', apm, 'return EXT2_ERR_MAGIC;', 'block[0] = 0;', 10)]
 with tempfile.TemporaryDirectory() as tmp:
-    for name, old, new, expected in cases:
-        source = view.read_text()
+    for name, target, old, new, expected in cases:
+        source = target.read_text()
         if old:
             assert source.count(old) == 1
             source = source.replace(old, new)
-        path = Path(tmp) / 'view.c'
+        path = Path(tmp) / target.name
         path.write_text(source)
         exe = Path(tmp) / 'host'
         subprocess.run(['cc', '-m32', '-nostdinc', '-nostdlib', '-static', '-ffreestanding', '-fno-pie', '-D__cdecl=', '-I.', '-Iinclude', '-Iplatform/powermac',
                         '-Ikernel/dev', '-Ilib', '-Isdk/include/os32', '-Iarch/ppc',
-                        'tools/tests/ppc_partition_host.c', 'platform/powermac/apm.c',
+                        'tools/tests/ppc_partition_host.c', apm if target == view else view,
                         'lib/kstring_c.c', path, '-o', exe], cwd=root, check=True)
         rc = host32.run([exe]).returncode
         assert rc == expected, (name, rc, expected)

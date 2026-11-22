@@ -41,6 +41,11 @@ int pm_apm_root(int unit, u32 capacity, u32 number, struct pm_partition *root)
                 return EXT2_ERR_NOPART;
         parts[i] = (struct pm_partition){start, sectors};
     }
-    *root = parts[number - 1];
+    struct pm_partition selected = parts[number - 1];
+    if (selected.sectors < EXT2_MIN_PART_SECTORS) return EXT2_ERR_NOPART;
+    if (ide_read_sector(unit, selected.start + EXT2_SUPER_LBA, block)) return EXT2_ERR_IO;
+    if (block[EXT2_SB_MAGIC_OFF] != (EXT2_SUPER_MAGIC & 0xff) ||
+        block[EXT2_SB_MAGIC_OFF + 1] != (EXT2_SUPER_MAGIC >> 8)) return EXT2_ERR_MAGIC;
+    *root = selected;
     return EXT2_OK;
 }

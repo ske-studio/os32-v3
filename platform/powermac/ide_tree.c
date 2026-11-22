@@ -100,8 +100,22 @@ static void capture_root(void)
             number = number * 10 + *q - '0';
         }
         if (!number || number > PM_APM_MAX_ENTRIES) return;
+        leaf[7] = 0;
+        int disk = ofw_finddevice(path);
+        if (!disk || disk == -1) return;
+        int controller = ofw_parent(disk);
         *leaf = 0;
-        root_controller = ofw_finddevice(path);
+        if (!controller || controller == -1 || controller != ofw_finddevice(path)) return;
+        int matches = 0;
+        unsigned left = PM_KBOOT_TREE_LIMIT;
+        int child = ofw_child(controller);
+        for (; child && child != -1 && left; child = ofw_peer(child), --left) {
+            if (!value(child, "reg", root_target)) continue;
+            if (child != disk) return;
+            ++matches;
+        }
+        if (child || matches != 1) return;
+        root_controller = controller;
         pm_root_partition = number;
     }
 }

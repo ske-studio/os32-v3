@@ -55,8 +55,15 @@ int main(void)
     disk[3][11] = 23;
     if (pm_apm_root(1, 24, 2, &p) != EXT2_ERR_NOPART) return 3;
     disk[3][11] = 14;
-    if (pm_apm_root(1, 24, 2, &p) || pm_partition_register(1, &p) ||
+    if (pm_partition_register(1, 24, 2) != EXT2_ERR_MAGIC || registered) return 10;
+    disk[10][56] = disk[16][56] = 0x53;
+    disk[10][57] = disk[16][57] = 0xef;
+    if (pm_partition_register(1, 24, 3) != EXT2_ERR_NOPART || registered) return 11;
+    if (pm_partition_register(1, 24, 2) ||
         platform_ext2_resolve(0, &d, &base, &len) || base || len != 4) return 4;
+    kmemset(buf, 42, sizeof(buf));
+    if (!d->blk_write(d, 0, 1, buf)) return 12;
+    pm_partition_enable_writes();
     disk[8][0] = 81;
     disk[11][511] = 119;
     if (d->blk_read_u32(d, 0, 1, buf) || buf[0] != 81) return 5;

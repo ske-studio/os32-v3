@@ -13,9 +13,7 @@ void pm_ide_boot(void)
 int pm_root_select(void)
 {
     IdeInfo info;
-    struct pm_partition part;
     if (pm_root_unit < 0 || ide_get_info(pm_root_unit, &info) || info.phys_sector_size != 512)
         return EXT2_ERR_IO;
-    int rc = pm_apm_root(pm_root_unit, info.total_sectors, pm_root_partition, &part);
-    return rc ? rc : pm_partition_register(pm_root_unit, &part);
+    return pm_partition_register(pm_root_unit, info.total_sectors, pm_root_partition);
 }

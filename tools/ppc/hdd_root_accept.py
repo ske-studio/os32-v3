@@ -52,24 +52,41 @@ def main():
         return 3
     work = Path(tempfile.mkdtemp(prefix='hdd-root-'))
     first, second = disk(work, 'first'), disk(work, 'selected')
-    cases = [('normal', None, None)]
+    tree = 'platform/powermac/ide_tree.c'
+    apm = 'platform/powermac/apm.c'
+    rootarg = 'os32-root=/pci@f2000000/mac-io@c/ata-3@20000/disk@1:3'
+    no_ext2 = work / 'hfs.raw'
+    data = bytearray(second.read_bytes())
+    data[3*512+48:3*512+80] = b'Apple_HFS'.ljust(32, b'\0')
+    no_ext2.write_bytes(data)
+    oversized = work / 'oversized.raw'
+    data = bytearray(second.read_bytes())
+    struct.pack_into('<I', data, START*512 + 1024 + 4, LENGTH // 2 + 1)
+    oversized.write_bytes(data)
+    cases = [('normal', VIEW, None, None)]
     if args.mutate:
-        cases += [('start', 'first + offset', 'offset'),
-                  ('last', 'count > dev->total_sects - offset', 'count >= dev->total_sects - offset')]
+        cases += [('start', VIEW, 'first + offset', 'offset'),
+                  ('last', VIEW, 'count > dev->total_sects - offset', 'count >= dev->total_sects - offset'),
+                  ('type', apm, 'i + 1 == number && kstrncmp', '0 && kstrncmp'),
+                  ('duplicate', tree, 'root_controller = 0; return;', 'return;'),
+                  ('unit', tree, 'previous * 2 + root_target', 'previous * 2 + (1 - root_target)')]
     hashes = set()
-    for name, old, new in cases:
+    for name, target, old, new in cases:
         out = work / name
         out.mkdir()
-        code = (ROOT / KERNEL).read_text()
+        code = '#include "dev.h"\n' + (ROOT / KERNEL).read_text()
         decl = 'void platform_boot_run(void)'
         call = '        pm_exec_boot();'
         assert code.count(decl) == code.count(call) == 1
         probe = (ROOT / 'tools/ppc/hdd_root_diag.c').read_text()
         source = out / 'kernel.c'
+        select = '            kboot_stop("hd0 select");'
+        assert code.count(select) == 1
+        code = code.replace(select, '            kprintf(7, "ROOT-TEST select hd0=%d\\r\\n", dev_find("hd0") != 0);\n' + select)
         source.write_text(code.replace(decl, probe + '\n' + decl).replace(call, '        hdd_root_report();\n' + call))
         settings = ['KB_MUT_EXTRA_SRC=' + KERNEL, 'KB_MUT_EXTRA_FILE=' + str(source)]
         if old:
-            settings += mutant_settings(out, name, VIEW, old, new)
+            settings += mutant_settings(out, name, target, old, new)
         elf = build(out, '-j6', 'IMAGE=kboot-link-sh', *settings)
         digest = hashlib.sha256(elf.read_bytes()).hexdigest()
         assert digest not in hashes
@@ -77,18 +94,50 @@ def main():
         print(name, digest, flush=True)
         if args.build_only:
             continue
-        stop = 'FATAL kboot hd0 root' if name == 'start' else 'ROOT-TEST done'
-        lines = guest(elf, '7450', first, second=second, done=stop,
-                      bootargs='os32-root=/pci@f2000000/mac-io@c/ata-3@20000/disk@1:3')
-        expected = bytearray(second.read_bytes())
-        if name != 'start':
-            assert 'ROOT-TEST dev=hd0 id=selected bytes=8' in lines, lines[-12:]
-            rc = -4 if name == 'last' else 0
-            assert f'ROOT-TEST last={rc} beyond=-4' in lines
-            if not rc:
-                expected[-1024:-512] = bytes([0x73]) * 512
-        assert (out / '7450/disk.raw').read_bytes() == first.read_bytes()
-        assert (out / '7450/second.raw').read_bytes() == expected
+        trials = {
+            'valid': (second, rootarg, 'ROOT-TEST done'),
+            'oversized': (oversized, rootarg, 'FATAL kboot hd0 root'),
+            'hfs': (no_ext2, rootarg, 'FATAL kboot hd0 select'),
+            'wrong-number': (second, rootarg[:-1] + '2', 'FATAL kboot hd0 select'),
+            'duplicate': (second, rootarg + ' ' + rootarg, 'FATAL kboot hd0 select'),
+            'unresolved': (second, rootarg.replace('mac-io@c', 'missing@c'), 'FATAL kboot hd0 select'),
+        }
+        runs = list(trials) if name == 'normal' else [
+            {'type': 'hfs', 'duplicate': 'duplicate'}.get(name, 'valid')]
+        for trial in runs:
+            media, bootargs, stop = trials[trial]
+            wanted = stop
+            if name == 'start':
+                stop = 'FATAL kboot hd0 root'
+            elif name in ('type', 'duplicate'):
+                stop = 'ROOT-TEST done'
+            directory = out / trial
+            directory.mkdir()
+            image = directory / elf.name
+            image.hardlink_to(elf)
+            lines = guest(image, '7450', first, second=media, done=stop, bootargs=bootargs)
+            expected = bytearray(media.read_bytes())
+            if stop == 'ROOT-TEST done':
+                identity = 'first' if name == 'unit' else 'selected'
+                assert f'ROOT-TEST dev=hd0 id={identity} bytes={len(identity)}' in lines
+                if identity == 'selected':
+                    rc = -4 if name == 'last' else 0
+                    assert f'ROOT-TEST last={rc} beyond=-4' in lines
+                    if not rc:
+                        expected[-1024:-512] = bytes([0x73]) * 512
+            elif stop == 'FATAL kboot hd0 root':
+                rc = -13 if trial == 'oversized' else -2
+                assert f'HDD root hd0 ext2_mount rc={rc}' in lines
+                if trial == 'oversized':
+                    assert '[EXT2] fs (4097 blocks) exceeds partition (8192 sectors)' in lines
+            elif stop == 'FATAL kboot hd0 select':
+                assert 'ROOT-TEST select hd0=0' in lines
+                assert not any('ROOT-TEST dev=' in line for line in lines)
+            assert (directory / '7450/disk.raw').read_bytes() == first.read_bytes()
+            assert (directory / '7450/second.raw').read_bytes() == expected
+            if name != 'normal':
+                assert stop != wanted or name in ('unit', 'last')
+                print(name, 'RED', flush=True)
     print(f'HDD root {"build-only" if args.build_only else "runtime"} OK ({len(hashes)} images)')
 
 

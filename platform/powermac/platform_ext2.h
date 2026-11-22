@@ -6,4 +6,7 @@
 /* On success, base and len are measured in sectors of dev. */
 int platform_ext2_resolve(int logical_drive, Device **dev, u32 *base, u32 *len);
 
+#include "fs/ext2/ext2.h"
+int platform_ext2_vfs_mount(Ext2Ctx *ctx, int drive);
+
 #endif

@@ -1,7 +1,8 @@
 #include "root_boot.h"
 #if OS32_FEATURE_IDE
 #include "kprintf.h"
-#include "fs/ext2/ext2.h"
+#include "apm.h"
+#include "platform_ext2.h"
 #endif
 #include "fs/vfs.h"
 #include "kernel/module/module.h"
@@ -13,6 +14,15 @@
 static int dict_ready, learning_enabled;
 int pm_root_dict_ready(void) { return dict_ready; }
 int pm_root_learning_enabled(void) { return learning_enabled; }
+#endif
+
+#if OS32_FEATURE_IDE
+int platform_ext2_vfs_mount(Ext2Ctx *ctx, int drive)
+{
+    int rc = ext2_mount(ctx, drive);
+    if (rc) kprintf(KLOG_ATTR, "HDD root hd%d ext2_mount rc=%d\r\n", drive, rc);
+    return rc;
+}
 #endif
 
 int pm_root_boot(const struct boot_root_image *image, int *registered)
@@ -34,7 +44,7 @@ int pm_root_boot(const struct boot_root_image *image, int *registered)
     if (!image) {
         rc = ext2_init();
         if (!rc) rc = vfs_mount("/", "hd0", "ext2");
-        if (rc) kprintf(KLOG_ATTR, "HDD root hd0 ext2 rc=%d\r\n", rc);
+        if (!rc) pm_partition_enable_writes();
     } else
 #endif
     {
