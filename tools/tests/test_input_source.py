@@ -41,7 +41,10 @@ def run(ctx):
             print('SKIP PowerPC cross compile: toolchain unavailable', flush=True)
             if os.environ.get('OS32_REQUIRE_PPC') == '1': return 1
         if ctx.mutate:
-            full = source.replace('sources[IN2_MAX_DEV]', 'sources[IN2_MAX_DEV + 1]').replace('i < IN2_MAX_DEV', 'i <= IN2_MAX_DEV')
+            slots = 'sources[IN2_MAX_DEV]'
+            limit = 'unsigned int i = 0; i < IN2_MAX_DEV'
+            assert source.count(slots) == source.count(limit) == 1
+            full = source.replace(slots, 'sources[IN2_MAX_DEV + 1]').replace(limit, limit.replace('<', '<='))
             assert build(header, full) == 3
             print('RED runtime: 17th source accepted', flush=True)
             for old, new in [('sources[i].generation++;', '(void)0;'),

@@ -76,3 +76,8 @@ int in2_excl_wm_state(IN2_WmState *out)
     out->owner = acq_owner;
     return 0;
 }
+
+int in2_excl_acquired(int owner)
+{
+    return owner && owner == acq_owner;
+}

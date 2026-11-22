@@ -8,6 +8,7 @@ int in2_excl_acquire(int owner, u32 flags);
 int in2_excl_unacquire(int owner);
 u32 in2_focus_generation(void);
 void in2_reclaim_generation(void);
+int in2_excl_acquired(int owner);
 int in2_excl_keyboard(void);
 int in2_excl_release(int owner);
 void in2_excl_focus(int old);

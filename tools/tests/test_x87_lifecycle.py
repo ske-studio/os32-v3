@@ -66,6 +66,13 @@ if __name__ == '__main__':
     if status != 'pass':
         raise SystemExit(status)
     if '--mutate' in sys.argv:
+        reclaim = '    in2_reclaim(id);'
+        leave = '    av_focus_exec_leave(id, res_owner_get());'
+        assert original.count(reclaim) == original.count(leave) == 1
+        reordered = original.replace(reclaim, '').replace(leave, leave + '\n' + reclaim)
+        status, log = run(reordered)
+        assert status == 'runtime' and 'FAIL: av_focus_get() == owner' in log, log
+        print('focus before input reclaim: runtime RED')
         for name, old, new in MUTATIONS:
             assert original.count(old) == 1, name
             status, log = run(original.replace(old, new))

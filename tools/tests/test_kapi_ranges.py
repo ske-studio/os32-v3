@@ -16,6 +16,7 @@ import test_kapi_out as generator
 
 ROOT = walk.ROOT
 MUTANTS = (
+    ('in2 read alignment', 'generated', ' || (u32)out % __alignof__(IN2_Event)', '', 'in2 read alignment'),
     ('legacy dispatch guard', 'legacy', 'int rc = kapi_v86s_check(slot, args.value);',
      'int rc = 0;', 'AV legacy sequence tail'),
     ('retired FM pointer mask', 'generated', '0x0000,  /* fm_play_mml */', '0x0001,  /* fm_play_mml */', 'retired FM returns'),
@@ -41,6 +42,14 @@ MUTANTS = (
      'if (!ring3_guard_active(ring3_in_syscall, ring3_wm_depth)) return lb == 0;',
      'trusted clock two outputs'),
 )
+
+# Narrow each generated guard to one byte. The first byte is mapped and the
+# complete input/output crosses the page boundary in the corresponding case.
+for name in ('pad_state', 'pad_caps', 'pad_vibrate', 'dev_info', 'read',
+             'key_state', 'mouse_state', 'status', 'wm_state'):
+    case = 'AV key state tail' if name == 'key_state' else 'in2 ' + name + ' tail'
+    MUTANTS += ((name + ' pointer guard', 'in2_guard', 'wrap_in2_' + name + '(',
+                 '1u', case),)
 
 def run(runner, mutant=None, fixture_name="kapi_ranges_host.c"):
     with tempfile.TemporaryDirectory(prefix='kapinull-') as directory:
@@ -88,6 +97,18 @@ def run(runner, mutant=None, fixture_name="kapi_ranges_host.c"):
         sources['memstat'] = mem_stat_source(memstat).replace('i32 kapi_mem_stat(', 'static i32 mem_stat_body(')
         if mutant and not no_out:
             name, key, old, new, expected = mutant
+            if key == 'in2_guard':
+                key = 'generated'
+                assert sources[key].count(old) == 1
+                start = sources[key].index(old)
+                end = sources[key].index('return in2_', start)
+                body = sources[key][start:end]
+                # Keep the address and access direction, narrow the length.
+                guard = next(line for line in body.splitlines() if 'if (!' in line)
+                address_end = guard.index(', ') + 2
+                guard_end = ',' if 'ranges_writable' in guard else ')) {'
+                new = body.replace(guard, guard[:address_end] + new + guard_end)
+                old = body
             assert old in sources[key], name
             sources[key] = sources[key].replace(old, new, 1)
         # Real wrapper translation unit; only device/FS/DB side effects are stubs.

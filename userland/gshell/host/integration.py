@@ -16,6 +16,10 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[3]
 OUT = ROOT / 'userland/gshell/target/gshell-host'
 OUT.mkdir(parents=True, exist_ok=True)
+# Other checks in the same shard build and unlink the same mutant names.
+_run_dir = tempfile.TemporaryDirectory(dir=OUT)
+OUT = Path(_run_dir.name)
+
 def run(args):
     subprocess.run(args, cwd=ROOT, check=True)
 sys.path.insert(0, str(ROOT / 'tools/tests'))
