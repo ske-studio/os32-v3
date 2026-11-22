@@ -37,12 +37,13 @@ KB_ROOT_DIAG := $(if $(filter 1,$(FEATURE_KDEBUG)),$(KB_OUT)/kdebug.bin)
 # Set PPC_SYSTEM_CFG to a system.cfg containing KDEBUG=1 for a diagnostic root.
 PPC_SYSTEM_CFG ?=
 # Acceptance builds use a private resident binary (including source mutants).
+KB_ROOT_FEP := $(if $(KB_EXEC),$(KB_OUT)/fep/fep.mod)
 KB_ROOT_TEMPLATE := $(ROOT_MANIFEST)
-ifneq ($(filter-out build/out/ppc-user/link-sh,$(KB_SH_OUT))$(KB_ROOT_DIAG)$(PPC_SYSTEM_CFG),)
+ifneq ($(filter-out build/out/ppc-user/link-sh,$(KB_SH_OUT))$(KB_ROOT_DIAG)$(KB_ROOT_FEP)$(PPC_SYSTEM_CFG),)
 override ROOT_MANIFEST := $(KB_OUT)/root-manifest.json
-$(ROOT_MANIFEST): $(KB_ROOT_TEMPLATE) $(PPC_SYSTEM_CFG) $(KB_ROOT_SHELL) $(KB_ROOT_DIAG) $(KB_OUT)/root-shell.config build/targets/ppc-powermac.mk
+$(ROOT_MANIFEST): $(KB_ROOT_TEMPLATE) $(PPC_SYSTEM_CFG) $(KB_ROOT_SHELL) $(KB_ROOT_DIAG) $(KB_ROOT_FEP) $(KB_OUT)/root-shell.config build/targets/ppc-powermac.mk
 	@mkdir -p $(@D)
-	python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); d["/sys/shell.bin"]=sys.argv[2]; d.update({"/boot/kdebug.bin":sys.argv[3]} if sys.argv[3] else {}); d.update({"/etc/system.cfg":sys.argv[4]} if sys.argv[4] else {}); print(json.dumps(d))' "$<" "$(KB_ROOT_SHELL)" "$(KB_ROOT_DIAG)" "$(PPC_SYSTEM_CFG)" > $@.tmp
+	python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); d["/sys/shell.bin"]=sys.argv[2]; d.update({"/boot/kdebug.bin":sys.argv[3]} if sys.argv[3] else {}); d.update({"/etc/system.cfg":sys.argv[4]} if sys.argv[4] else {}); d.update({"/boot/fep.mod":sys.argv[5]} if sys.argv[5] else {}); print(json.dumps(d))' "$<" "$(KB_ROOT_SHELL)" "$(KB_ROOT_DIAG)" "$(PPC_SYSTEM_CFG)" "$(KB_ROOT_FEP)" > $@.tmp
 	mv $@.tmp $@
 endif
 
@@ -275,6 +276,7 @@ ifneq ($(KB_EXEC),)
 KB_KEEP_PAIR := -Wl,--undefined=platform_module_pair
 KB_PAIR_TOOL := tools/ppc/root_pair.py
 KB_PAIR_OUTPUT := $(KB_OUT)/root.iso
+include build/ppc-fep-module.mk
 include build/ppc-root-pair.mk
 KB_LINK_PREFIX = python3 -B $(KB_PAIR_TOOL) $(ROOT_ISO) $(KB_ELF) --
 else
