@@ -1,3 +1,4 @@
+#include "debug_probe_snapshot.h"
 #include "bootinfo_native.h"
 /* Actual facade + runtime + validator; synthetic M2 or built GF body. */
 #include "../../hwdev/hwdev_module.c"
@@ -112,7 +113,11 @@ int ledger_owner_retire(u32 owner) { CHECK(owner == 100); live = 0; return 1; }
 void fixture_kernel(void) { finish(90); }
 int gf_production_selected(void) { return 0; }
 static void core_function(void) { }
-static const struct hwdev_core_api *get_core(void) { return &fixture_core; }
+#ifndef HWDEV_REAL_IMAGE
+static u32 probe_io_calls;
+static void probe_io(u32 id) { CHECK(id == 0); probe_io_calls++; }
+#endif
+static const struct hwdev_core_api *get_core(void) { CHECK(kdebug.state == KDEBUG_RUNNING); return &fixture_core; }
 static void read_input(void *p, u32 size)
 {
     while (size) {
@@ -226,7 +231,19 @@ void _start(void)
         CHECK(ops->call(GF_OP_INSPECT, &cold, sizeof(cold), 0, 0, 0) == -1);
         CHECK(hwdev_module_load(dep) == MODULE_BUSY && image_owner.failed && image_owner.cold_latched);
 #else
+        struct probe_list list;
+        debug_probe_snapshot(&list);
+        CHECK(list.count == (input[0] == 15 ? 0U : 1U));
+        if (list.count) CHECK(!kstrcmp(list.points[0].name, "fixture.pre"));
+        struct probe_attach attachment = {.owner = dep, .callback = probe_io, .count = 1};
+        u32 saved_text = c->text;
+        c->text = (u32)(uptr)probe_io;
+        CHECK(debug_probe_control(PROBE_ATTACH, &attachment, sizeof(attachment)) ==
+              (list.count ? 0 : PROBE_ERR_ARG));
         CHECK(ops->call(0, 0, 0, 0, 0, 0) == 42);
+        CHECK(probe_io_calls == list.count);
+        CHECK(!debug_probe_control(PROBE_DETACH, &dep, sizeof(dep)));
+        c->text = saved_text;
         ops->release_work();
 #endif
         struct module_record *r = module_record_get(hwdev_handle);
@@ -245,7 +262,7 @@ void _start(void)
         CHECK(!hwdev_module_ops() && ops->call(0, 0, 0, 0, 0, 0) == -1);
         r->generation--;
         #ifndef HWDEV_REAL_IMAGE
-        CHECK(r->registration_refs == 2);
+        CHECK(r->registration_refs == (input[0] == 15 ? 1U : 2U));
 #else
         CHECK(r->registration_refs == 1);
 #endif

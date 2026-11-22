@@ -1,4 +1,4 @@
-#include "debug_probe.h"
+#include "debug_probe_snapshot.h"
 #include "memmap.h"
 #include "kstring.h"
 #ifdef TICK_PROBE
@@ -173,6 +173,22 @@ static i32 attach(const struct probe_attach *a)
     return 0;
 }
 
+void debug_probe_snapshot(struct probe_list *list)
+{
+    kmemset(list, 0, sizeof(*list));
+    list->epoch = registry_epoch;
+    for (u32 i = 0; i < PROBE_POINT_MAX; i++) {
+        const struct probe_entry *e = &entries[i];
+        struct module_record *r = module_record_get(e->owner);
+        if (!e->slot || !r || r->state != MODULE_RUNNING) continue;
+        struct probe_info *info = &list->points[list->count++];
+        kstrncpy(info->name, e->name, sizeof(info->name));
+        info->owner = e->owner;
+        info->id = i;
+        info->enabled = e->slot->hit != 0;
+    }
+}
+
 i32 debug_probe_control(u32 action, void *arg, u32 size)
 {
 #ifdef TICK_PROBE
@@ -199,19 +215,7 @@ i32 debug_probe_control(u32 action, void *arg, u32 size)
         return 0;
     }
     if (action == PROBE_LIST && size == sizeof(struct probe_list)) {
-        struct probe_list *list = arg;
-        kmemset(list, 0, sizeof(*list));
-        list->epoch = registry_epoch;
-        for (u32 i = 0; i < PROBE_POINT_MAX; i++) {
-            const struct probe_entry *e = &entries[i];
-            struct module_record *r = module_record_get(e->owner);
-            if (!e->slot || !r || r->state != MODULE_RUNNING) continue;
-            struct probe_info *info = &list->points[list->count++];
-            kstrncpy(info->name, e->name, sizeof(info->name));
-            info->owner = e->owner;
-            info->id = i;
-            info->enabled = e->slot->hit != 0;
-        }
+        debug_probe_snapshot(arg);
         return 0;
     }
     return PROBE_ERR_ARG;
