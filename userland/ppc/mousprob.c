@@ -22,6 +22,10 @@ static int check(KernelAPI *api, const char *command)
     if (!strcmp(command, "motion"))
         return m.x == 88 && m.y == 153 && m.dx == 12 && m.dy == -7 &&
                m.buttons == 1 ? 0 : 4;
+    if (!strcmp(command, "reattached")) {
+        if (m.dx || m.dy) return 5;
+        return m.buttons == 1 ? 8 : m.buttons ? 5 : 0;
+    }
     if (gone || !strcmp(command, "present"))
         return m.dx || m.dy || m.buttons ? 5 : 0;
     if (!strcmp(command, "start")) {

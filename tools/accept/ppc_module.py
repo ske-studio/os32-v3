@@ -17,7 +17,8 @@ import mkmod
 import root_pair
 from test_kapi_binding import generate as generate_bindings
 from gen_sqlite_imports import generate
-from kboot_accept import build, mutant_settings
+from boot_media import Media, package
+from kboot_accept import build_media, mutant_settings
 from ppc_shm import guest_available
 
 
@@ -67,7 +68,8 @@ def fixtures(work, cross):
     return path
 
 
-def foreign_image(elf, pair):
+def foreign_image(media, pair):
+    elf = media.elf
     data = bytearray(elf.read_bytes())
     wire, rec, off, frame = root_pair.wire(data)
     own = zlib.crc32(wire)
@@ -79,14 +81,17 @@ def foreign_image(elf, pair):
     struct.pack_into('<4I', data, rec, own, zlib.crc32(iso), len(block), len(iso))
     out = elf.with_name('foreign.elf')
     out.write_bytes(data)
-    return out
+    foreign = Media(out, media.map, out.with_suffix('.iso'))
+    package(out, foreign.iso)
+    foreign.verify()
+    return foreign
 
 
-def observe(elf, folder, expected):
+def observe(media, folder, expected):
     from link_sh_run import Session
     folder.mkdir()
     for cpu in ('7450', '7455'):
-        session = Session(elf, cpu, folder / cpu, 240)
+        session = Session(media, cpu, folder / cpu, 240)
         try:
             session.start()
             session.wait(session.ready, 'module probe READY', 90)
@@ -124,29 +129,29 @@ def main():
             (work / case).mkdir()
             generated = generate_bindings(work / case, case)
             (generated / 'stamp').touch()
-        elf = build(work / case, 'IMAGE=kboot-link-sh', 'KB_SH_OUT=' + str(work / 'user'),
+        media = build_media(work / case, 'IMAGE=kboot-link-sh', 'KB_SH_OUT=' + str(work / 'user'),
                     'KB_MUT_SRC=platform/powermac/ppc_kernel.c', 'KB_MUT_FILE=' + str(probe),
                     'ROOT_MANIFEST=' + str(manifest), 'PPC_SYSTEM_CFG=' + str(work / 'system.cfg'), *settings, 'kb-user', 'kernel')
-        cfg = subprocess.check_output(['isoinfo', '-i', elf.parent / 'root.iso',
+        cfg = subprocess.check_output(['isoinfo', '-i', media.elf.parent / 'root.iso',
                                        '-x', '/ETC/SYSTEM.CFG;1'])
         assert cfg == b'KDEBUG=1\n', 'paired guest must enable the product diagnostic loader'
-        images.append(elf)
+        images.append(media)
     cases = [('normal', images[0], ['[module] diag state=1 list=0 unsupported=2', '[module] result=0'])]
     if args.mutate:
-        pairs = [zlib.crc32(root_pair.wire(path.read_bytes())[0]) for path in images]
+        pairs = [zlib.crc32(root_pair.wire(media.elf.read_bytes())[0]) for media in images]
         cases.append(('kdebug-absent', images[2],
                       ['[module] diag state=1 list=-1 unsupported=-1', '[module] result=0']))
         cases.extend([('foreign', foreign_image(images[0], pairs[1]),
                        ['[module] diag state=4 list=-1 unsupported=-1', '[module] first rc=4 starts=0', '[module] result=4']),
                       ('bypass', foreign_image(images[1], pairs[0]), ['[module] diag state=1 list=0 unsupported=2', '[module] result=0'])])
     digests = set()
-    for case, elf, expected in cases:
-        digest = hashlib.sha256(elf.read_bytes()).hexdigest()
+    for case, media, expected in cases:
+        digest = hashlib.sha256(media.elf.read_bytes()).hexdigest()
         assert digest not in digests
         digests.add(digest)
-        print(case, digest, elf, flush=True)
+        print(case, digest, media.elf, flush=True)
         if not args.build_only:
-            observe(elf, work / ('guest-' + case), expected)
+            observe(media, work / ('guest-' + case), expected)
     print(f'{len(digests)} distinct PowerMac module acceptance images')
     return 0
 

@@ -20,6 +20,7 @@ extern struct pm_pci pm_usb_pci;
 extern const struct pm_usb_root *pm_usb_root;
 void pm_usb_capture(void);
 void pm_usb_boot(u32 tb_hz);
+void pm_usb_scan(void);
 void pm_usb_poll(void);
 void pm_usb_platform_init(u32 tb_hz);
 #endif

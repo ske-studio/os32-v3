@@ -43,12 +43,12 @@ def absent_bindings(folder, out):
     (out / 'stamp').touch()
 
 
-def observe(elf, cpu, evidence, case):
+def observe(media, cpu, evidence, case):
     from link_sh_run import Session
     from run import require
     from usb_run import rsh_command
 
-    session = Session(elf, cpu, evidence, 240)
+    session = Session(media, cpu, evidence, 240)
     try:
         session.start()
         session.wait(session.ready, 'SHM cui READY', 60)
@@ -94,7 +94,7 @@ def main():
         print(('FAIL' if required else 'SKIP') + ': SHM guest tools/socket unavailable')
         return int(required)
 
-    from kboot_accept import build, mutant_settings
+    from kboot_accept import build_media, mutant_settings
 
     work = Path(tempfile.mkdtemp(prefix='ppc-shm-', dir=os.environ.get('TMPDIR')))
     print('evidence=' + str(work), flush=True)
@@ -123,15 +123,15 @@ def main():
         elif case == 'absent':
             absent_bindings(folder, kernel / 'gen')
         # Build the RAM root inputs before linking, including on a fresh tree.
-        elf = build(kernel, *options, *mutation, 'kb-user', 'kernel')
-        digest = hashlib.sha256(elf.read_bytes()).hexdigest()
+        media = build_media(kernel, *options, *mutation, 'kb-user', 'kernel')
+        digest = hashlib.sha256(media.elf.read_bytes()).hexdigest()
         if digest in images:
-            raise RuntimeError(f'{case} image is identical to {images[digest]}: {elf}')
+            raise RuntimeError(f'{case} image is identical to {images[digest]}: {media}')
         images[digest] = case
-        print(f'{case} sha256={digest} {elf}', flush=True)
+        print(f'{case} sha256={digest} {media}', flush=True)
         if not args.build_only:
             for cpu in ('7450', '7455'):
-                observe(elf, cpu, folder / cpu, case)
+                observe(media, cpu, folder / cpu, case)
     return 0
 
 

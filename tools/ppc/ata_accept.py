@@ -11,7 +11,7 @@ import subprocess
 import tempfile
 import time
 
-from kboot_accept import build, mutant_settings
+from kboot_accept import build_media, mutant_settings
 from run import ROOT, ROM
 
 BOOT = 'platform/powermac/ide_boot.c'
@@ -68,7 +68,7 @@ def make_write_image(out, case):
         user = out / 'user'
         settings += ['KB_SH_OUT=' + str(user), 'KB_ROOT_BINS=' + str(user / 'atadeny.bin'),
                      'PPC_RES_MUT_SRC=' + resident, 'PPC_RES_MUT_FILE=' + str(path)]
-    return build(out, '-j6', 'IMAGE=kboot-sh', *settings)
+    return build_media(out, '-j6', 'IMAGE=kboot-sh', *settings)
 
 
 def make_image(work, case):
@@ -139,7 +139,7 @@ void ata_check_wait(void)
         path = 'drivers/base/dev.c'
         settings += mutant_settings(out, case, path, 'ide_read_sectors((int)self->bus_id, (u32)lba,',
                                     'ide_read_sectors((int)self->bus_id, (u32)lba + 1,')
-    return build(out, '-j6', *settings)
+    return build_media(out, '-j6', *settings)
 
 
 def sector(lba):
@@ -153,15 +153,10 @@ def digest(data):
     return f'{h:08x}'
 
 
-def guest(elf, cpu, disk, absent=False):
-    work = elf.parent / (cpu + ('-absent' if absent else ''))
+def guest(media, cpu, disk, absent=False):
+    work = media.elf.parent / (cpu + ('-absent' if absent else ''))
     work.mkdir()
-    cd = work / 'cd'
-    cd.mkdir()
-    shutil.copy(elf, cd)
-    iso = work / 'ata.iso'
-    subprocess.run(['genisoimage', '-quiet', '-hfs', '-r', '-part', '-no-desktop',
-                    '-o', iso, cd], check=True)
+    iso = media.iso.resolve()
     serial = work / 'serial.log'
     args = ['qemu-system-ppc', '-M', 'mac99', '-cpu', cpu, '-m', '128M', '-smp', '1',
             '-accel', 'tcg', '-bios', ROM, '-display', 'none', '-serial', 'file:' + str(serial),
@@ -169,9 +164,9 @@ def guest(elf, cpu, disk, absent=False):
             '-drive', f'file={iso},format=raw,if=ide,index=2,media=cdrom', '-boot', 'd',
             '-prom-env', r'boot-device=cd:,\PPCKERN.ELF', '-prom-env', 'auto-boot?=true']
     if not absent:
-        media = work / 'disk.raw'
-        shutil.copyfile(disk, media)
-        args += ['-drive', f'file={media},format=raw,if=ide,index=0,media=disk,cache=writethrough']
+        guest_disk = work / 'disk.raw'
+        shutil.copyfile(disk, guest_disk)
+        args += ['-drive', f'file={guest_disk},format=raw,if=ide,index=0,media=disk,cache=writethrough']
     with (work / 'qemu.log').open('wb') as log, subprocess.Popen(args, stderr=log, stdout=log) as proc:
         try:
             deadline = time.monotonic() + 90
@@ -203,15 +198,15 @@ def main():
     if args.mutate or args.build_only:
         cases += MUTANTS + WRITE_MUTANTS
     for case in cases:
-        elf = make_image(work, case)
-        sha = hashlib.sha256(elf.read_bytes()).hexdigest()
+        media = make_image(work, case)
+        sha = hashlib.sha256(media.elf.read_bytes()).hexdigest()
         assert sha not in hashes, case
         hashes.add(sha)
-        print(case, sha, elf, flush=True)
+        print(case, sha, media, flush=True)
         if args.build_only:
             continue
         for cpu in ('7450', '7455'):
-            lines = guest(elf, cpu, disk)
+            lines = guest(media, cpu, disk)
             if case in WRITE_CASES:
                 expected = bytearray(disk.read_bytes())
                 if case == 'deny':
@@ -232,7 +227,7 @@ def main():
                         equal = (case != 'write-word' and not (case == 'write-lba' and n == 0)
                                  and not (case == 'write-count' and n == 2))
                         assert f'ATA-TEST read={n} equal={int(equal)}' in lines
-                assert (elf.parent / cpu / 'disk.raw').read_bytes() == expected, case
+                assert (media.elf.parent / cpu / 'disk.raw').read_bytes() == expected, case
                 continue
             ident = 'ATA-TEST model=QEMU HARDDISK sectors=2048' in lines
             if case in ('normal', 'bar'):
@@ -244,7 +239,7 @@ def main():
                 assert 'ATA-TEST present=1 registered=1' in lines
                 assert ident and all(f'ATA-TEST lba={i} rc=0 hash={digest(sector(i))}' in lines
                                      for i in (0, 1024, 2047)), lines[-8:]
-                assert 'ATA-TEST present=0 registered=0' in guest(elf, cpu, disk, absent=True)
+                assert 'ATA-TEST present=0 registered=0' in guest(media, cpu, disk, absent=True)
             elif case == 'lba':
                 assert ident and f'ATA-TEST lba=0 rc=0 hash={digest(sector(1))}' in lines
             elif case == 'word':

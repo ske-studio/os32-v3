@@ -98,12 +98,12 @@ def negative_image(case, original, target, iso, donor):
     return target
 
 
-def observe(elf, cpu, evidence, case, expected, exit_status):
+def observe(media, cpu, evidence, case, expected, exit_status):
     from link_sh_run import Session
     from run import require
     from usb_run import rsh_command
 
-    session = Session(elf, cpu, evidence, 240)
+    session = Session(media, cpu, evidence, 240)
     try:
         session.start()
         if case in ('foreign-pair', 'overlap'):
@@ -124,7 +124,7 @@ def observe(elf, cpu, evidence, case, expected, exit_status):
             status = rsh_command(session, 'echo $?')
             require((body.rstrip(b'\n'), status) == (expected, exit_status),
                     repr((case, body, status)))
-        if case == 'verified' or case in ROOT_FAILURES:
+        if case in ('verified', 'original-packaged') or case in ROOT_FAILURES:
             log = evidence / 'serial-a.log'
             session.wait(lambda: log.exists() and re.search(rb'free_after=\d+\r?\n', log.read_bytes()),
                          'root page accounting', 10)
@@ -134,14 +134,14 @@ def observe(elf, cpu, evidence, case, expected, exit_status):
             require(boot and account, 'missing root observations')
             rc, registered, length, frame = map(int, boot.groups())
             before, after, free_before, free_after = map(int, account.groups())
-            require(frame == free_after - free_before and frame == STAGING_SIZE // PAGE and registered == (case == 'verified'),
+            require(frame == free_after - free_before and frame == STAGING_SIZE // PAGE and registered == (case in ('verified', 'original-packaged')),
                     'root frame or registration')
             require(after == before - frame + registered * ((length + 4095) // 4096),
                     f'root owner pages {before} -> {after}')
         session.q.call('quit')
         session.p.wait(timeout=5)
         require(session.p.returncode == 0, 'boot info QEMU exit')
-        verdict = 'RED' if case in ('false-valid', 'no-write', 'absent') else 'GREEN'
+        verdict = 'RED' if case in ('false-valid', 'no-write', 'absent', 'original-packaged') else 'GREEN'
         print(f'{verdict} {case} {cpu}', flush=True)
     finally:
         session.close()
@@ -158,6 +158,7 @@ def main(on_image=None):
         print(f'SKIP: PowerPC toolchain unavailable at {cross}')
         return 3
 
+    from boot_media import Media, package
     from kboot_accept import build, mutant_settings
     from ppc_shm import guest_available
 
@@ -242,6 +243,27 @@ def main(on_image=None):
             exit_status = b'1\n'
         else:
             expected = f'BOOT 0 1 {len(iso)} {zlib.crc32(iso):08x}'.encode()
+        media = Media(elf, kernel / 'PPCKERN.map', folder / 'boot.iso')
+        package(media.elf, media.iso)
+        media.verify()
+        if args.mutate and case == 'unverified':
+            # Package the pre-CRC-edit ELF, then check the ordinary extraction verdict.
+            original = kernel / 'PPCKERN.ELF'
+            wrong = Media(elf, media.map, folder / 'original.iso')
+            package(original, wrong.iso)
+            try:
+                wrong.verify()
+            except ValueError as exc:
+                print(f'RED original-packaged: {exc}', flush=True)
+            else:
+                raise RuntimeError('pre-edit ELF packaging mutation survived')
+            actual = Media(original, media.map, wrong.iso)
+            actual.verify()
+            if not args.build_only:
+                valid = f'BOOT 0 1 {len(iso)} {zlib.crc32(iso):08x}'.encode()
+                for cpu in ('7450', '7455'):
+                    observe(actual, cpu, folder / ('original-' + cpu),
+                            'original-packaged', valid, exit_status)
         digest = hashlib.sha256(elf.read_bytes()).hexdigest()
         if digest in images:
             raise RuntimeError(f'{case} ELF is identical to {images[digest]}: {elf}')
@@ -251,7 +273,7 @@ def main(on_image=None):
             on_image(case, elf, kernel / 'root.iso')
         if not args.build_only:
             for cpu in ('7450', '7455'):
-                observe(elf, cpu, folder / cpu, case, expected, exit_status)
+                observe(media, cpu, folder / cpu, case, expected, exit_status)
     print(f'{len(images)} distinct boot-info ELF images')
     return 0
 

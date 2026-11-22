@@ -122,6 +122,7 @@ KB_EXTRA += $(KB_GROUP).o
 KB_SQLITE_AUDIT := --sqlite-group $(KB_GROUP).o --sqlite-inputs $(KB_HARD)
 KB_SQLITE_INC := -Ilib/sqlite3 -Ilib/softfloat
 KB_KEEP_SQLITE := -Wl,--undefined=sqlite_module_init
+$(KB_OUT)/input/hal/legacy_ring.o $(KB_OUT)/input/hal/legacy_keymap.o: private KB_TU_FLAGS += -DINPUT_COOKED_MODS=1
 $(KB_OUT)/kernel/fep_boot.o $(KB_OUT)/kernel/sqlite_engine.o $(KB_OUT)/kernel/sqlite_outer.o $(KB_OUT)/kernel/sqlite_static.o $(KB_OUT)/kapi/kapi_db.o: $(SQLITE_GENERATED)
 $(KB_OUT)/kernel/sqlite_static.o: private KB_TU_FLAGS += -Ilib/sqlite3
 $(KB_OUT)/kernel/sqlite_outer.o: private KB_TU_FLAGS += -Ilib/sqlite3 -DOS32_SQLITE_STATIC
@@ -178,6 +179,17 @@ $(KB_OBJ) $(KB_ELF): $(KB_SELECT_MK)
 
 .PHONY: all kernel audit
 all: kernel
+BOOT_ISO := $(KB_OUT)/boot.iso
+ifeq ($(IMAGE),powermac)
+all: iso
+endif
+.PHONY: iso deploy-iso
+iso: audit $(BOOT_ISO)
+$(BOOT_ISO): $(KB_ELF) tools/ppc/boot_media.py build/targets/ppc-powermac.mk | audit
+	python3 -B tools/ppc/boot_media.py "$<" "$@"
+deploy-iso: iso
+	@test -n "$(ISO_DEST)" && test ! -d "$(ISO_DEST)"
+	@set -e; tmp=$$(mktemp "$(ISO_DEST).XXXXXX"); trap 'rm -f "$$tmp"' EXIT; cp "$(BOOT_ISO)" "$$tmp"; mv -f "$$tmp" "$(ISO_DEST)"
 kernel: $(KB_ELF) $(if $(KB_EXEC),$(KB_OUT)/root.iso) audit
 ifneq ($(KB_EXEC),)
 .PHONY: ppc-source-date-force
@@ -192,6 +204,10 @@ endif
 # 共通の置き場のソースは、PowerPC の像にまだ入っていない物 (C_COMMON_PC98_PENDING) も PowerPC の
 # コンパイラを通す。機種の名前 (PC-98 の定数など) を間接に使っていれば、ここで未宣言になって止まる。
 # リンクはしない (像には入れない)。
+FEP_OUT := $(KB_OUT)/gen/fep
+include build/fep-common.mk
+$(KB_OUT)/kernel/ime/fep_module.o: $(FEP_GEN)
+$(KB_OUT)/kernel/ime/fep_module.o: private KB_TU_FLAGS += -I$(FEP_OUT)
 KB_PENDING_OBJ := $(addprefix $(KB_OUT)/,$(patsubst %.c,%.o,$(filter %.c,$(C_COMMON_PC98_PENDING) $(C_COMMON_COMPILE_ONLY_PPC))))
 $(KB_OUT)/kernel/fep_boot.o $(KB_OUT)/kernel/sqlite_engine.o: KB_TU_FLAGS += -Ilib/sqlite3 -Ifs
 $(KB_OUT)/kapi/kapi_db.o: KB_TU_FLAGS += -Ilib/sqlite3
@@ -240,9 +256,9 @@ $(KB_OUT)/config/usb-key-trace.flags: ppc-layout-force
 	@mkdir -p $(@D)
 	@echo '$(filter 1,$(KBOOT_USB_KEY_TRACE))' > $@.tmp
 	@if cmp -s $@.tmp $@; then rm -f $@.tmp; else mv $@.tmp $@; fi
-$(KB_OUT)/platform/powermac/usb_platform.o: $(KB_OUT)/config/usb-key-trace.flags
+$(KB_OUT)/platform/powermac/usb_key_report.o $(KB_OUT)/platform/powermac/input_boot.o: $(KB_OUT)/config/usb-key-trace.flags
 ifeq ($(KBOOT_USB_KEY_TRACE),1)
-$(KB_OUT)/platform/powermac/usb_platform.o: private KB_TU_FLAGS += -DKBOOT_USB_KEY_TRACE=1
+$(KB_OUT)/platform/powermac/usb_key_report.o $(KB_OUT)/platform/powermac/input_boot.o: private KB_TU_FLAGS += -DKBOOT_USB_KEY_TRACE=1
 endif
 $(KB_OUT)/config/gem-rx-diag.flags: ppc-layout-force
 	@mkdir -p $(@D)

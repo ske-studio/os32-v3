@@ -171,13 +171,13 @@ def present_pixels(s, evidence, case, serial, modes):
         rsh_command(s, 'echo $?', b'0\n')
 
 
-def observe(elf, cpu, evidence, case, modes=()):
+def observe(media, cpu, evidence, case, modes=()):
     from link_sh_run import Session
     from kboot_run import serial as read_serial, validate_root
     from run import require
     from usb_run import rsh_command
 
-    session = Session(elf, cpu, evidence, 240)
+    session = Session(media, cpu, evidence, 240)
     try:
         session.start()
         session.wait(lambda: validate_root(read_serial(evidence/'serial-a.log'), read_serial(evidence/'serial-b.log')),
@@ -292,7 +292,7 @@ def main():
         print(f'SKIP: PowerPC toolchain unavailable at {cross}')
         return 3
 
-    from kboot_accept import build, mutant_settings
+    from kboot_accept import build_media, mutant_settings
     from ppc_shm import guest_available
 
     if not args.build_only and not guest_available():
@@ -346,22 +346,22 @@ def main():
                          '\n    if (active) active->head[0].mode_id ^= 1u;')
         # Compare identical RAM-root bytes even when the ISO builder timestamps files.
         if case != 'normal':
-            iso = str(normal_elf.parent / 'root.iso')
+            iso = str(normal_media.elf.parent / 'root.iso')
             mutation.extend(['ROOT_ISO=' + iso, '--old-file=' + iso])
-        elf = build(kernel, *options, *mutation, 'kb-user', 'kernel')
+        media = build_media(kernel, *options, *mutation, 'kb-user', 'kernel')
         if case == 'normal':
-            normal_elf = elf
-        digest = hashlib.sha256(elf.read_bytes()).hexdigest()
+            normal_media = media
+        digest = hashlib.sha256(media.elf.read_bytes()).hexdigest()
         if digest in images:
-            raise RuntimeError(f'{case} ELF is identical to {images[digest]}: {elf}')
+            raise RuntimeError(f'{case} ELF is identical to {images[digest]}: {media}')
         images[digest] = case
-        print(f'{case} sha256={digest} {elf}', flush=True)
+        print(f'{case} sha256={digest} {media}', flush=True)
         if not args.build_only:
             for cpu in ('7450', '7455'):
                 modes = PROBES.get(case, ()) if args.present else ()
-                observe(elf, cpu, folder / cpu, case, modes)
+                observe(media, cpu, folder / cpu, case, modes)
                 if case != 'normal':
-                    observe(normal_elf, cpu, folder / (cpu + '-control'), 'normal', modes)
+                    observe(normal_media, cpu, folder / (cpu + '-control'), 'normal', modes)
     print(f'{len(images)} distinct link-sh ELF images', flush=True)
     return 0
 
