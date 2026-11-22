@@ -54,9 +54,11 @@ static int probe(void)
     if (!event(IN2_EV_KEY, keyboard, 0x1d, 1) || !api->kbd_is_pressed(0x1d) ||
         api->kbd_getkey() != 0x1d61) return 0;
     api->serial_puts("IN2 MAKE\n");
-    if (api->kbd_getkey() != 0x1d61 || api->in2_read(batch, 8) != 0) return 0;
-    api->serial_puts("IN2 HOLD\n");
+    /* The host releases A after the driver traces its first repeat.
+     * The next physical event must be the break, even if already queued. */
+    if (api->kbd_getkey() != 0x1d61) return 0;
     if (!event(IN2_EV_KEY, keyboard, 0x1d, 0) || api->kbd_is_pressed(0x1d)) return 0;
+    api->serial_puts("IN2 HOLD\n");
     while (api->kbd_trygetkey() >= 0) {}
     api->serial_puts("IN2 BREAK\n");
     if (!event(IN2_EV_MOVE, mouse, 12, -7)) return 0;

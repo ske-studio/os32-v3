@@ -908,9 +908,10 @@ def in2_observe(media, cpu, out, mode):
             move(5, 0)
             still_waiting('MAKE', 'STILL KEY', offset)
             return
-        ack('MAKE')
-        ack('HOLD')
+        ack('MAKE', offset)
+        s.wait(lambda: re.search(r'USB REPEAT src=\d+ sc=1d usage=04', serial(log)[offset:]), 'held A repeat')
         edge('a', False, '04')
+        ack('HOLD', offset)
         ack('BREAK')
         move()
         ack('MOVE')
