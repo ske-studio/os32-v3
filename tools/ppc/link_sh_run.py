@@ -218,6 +218,7 @@ def gem_assessment(previous, current):
 
 
 class Session:
+    usb_devices = ("-device", "usb-kbd,id=kbd")
     qemu_clock = USB_QEMU_CLOCK
     qmp_type = None  # None = the module-level PumpQMP at start() (tests patch link_sh_run.PumpQMP)
     machine = "mac99"
@@ -279,7 +280,7 @@ class Session:
             '-serial','file:'+str(self.out/'serial-b.log'),'-monitor','none','-qmp','stdio',*self.reboot_args,
             '-nic','none','-device','sungem,netdev=n0,mac=52:54:00:12:34:56','-netdev',
             f'socket,id=n0,udp=127.0.0.1:{self.io.sock.getsockname()[1]},localaddr=127.0.0.1:{port}',
-            '-usb','-device','usb-kbd,id=kbd',*self.qemu_clock,
+            '-usb',*self.usb_devices,*self.qemu_clock,
             # Diagnosis only, never set by CI (trace events go through
             # OS32_QEMU_TRACE so they share the per-run trace file).
             *shlex.split(os.environ.get('OS32_QEMU_EXTRA', ''))]

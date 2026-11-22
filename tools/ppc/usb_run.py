@@ -22,7 +22,7 @@ USB_QEMU_CLOCK = ['-icount', 'shift=auto']
 
 CHECK = dict(name='ppc-usb', tier=2, budget=900, needs=['make:kernel'],
              covers=['platform/powermac/console_stream.c', 'platform/powermac/log_printf.c',
-                     'platform/powermac/log.c', 'platform/powermac/kboot_log.h', 'platform/powermac/input_usb.c', 'platform/powermac/input_keymap.c', 'platform/powermac/input_usb.h', 'tools/tests/host32.py', 'tools/ppc/usb_run.py', 'platform/powermac/usb*', 'build/targets/ppc-powermac.mk', 'platform/powermac/ppc_kernel.c',
+                     'platform/powermac/log.c', 'platform/powermac/kboot_log.h', 'platform/powermac/input_usb.c', 'platform/powermac/input_keymap_backend.c', 'platform/powermac/input_usb.h', 'tools/tests/host32.py', 'tools/ppc/usb_run.py', 'platform/powermac/usb*', 'build/targets/ppc-powermac.mk', 'platform/powermac/ppc_kernel.c',
                      'platform/powermac/kboot_capture.c', 'drivers/usb/*.[ch]',
                      'include/usb_platform.h', 'include/endian_dma.h',
                      'arch/ppc/arch_endian_dma.h', 'tools/ppc/kboot_accept.py',
@@ -96,12 +96,12 @@ static int usb_probe_input(void)
 
 def mutation(work, mode):
     src = ('arch/ppc/kernel_trap.c' if mode == 'syscall-ee' else
-           'platform/powermac/usb_boot.c' if mode == 'no-service' else 'platform/powermac/usb_platform.c')
+           'platform/powermac/usb_boot.c' if mode == 'no-service' else 'platform/powermac/usb_key_report.c')
     content = (ROOT/src).read_text()
     before, after = {
         'syscall-ee': ('            ppc_enable();', '            /* mutation: no syscall enable */'),
         'no-service': ('    usb_service();', '    /* mutation: omit USB service */'),
-        'invert-key': ('pm_input_usb_key(src, sc, down);', 'pm_input_usb_key(src, sc, !down);'),
+        'invert-key': ('usb_input_usage(src, usage, down, 0);', 'usb_input_usage(src, usage, !down, 0);'),
     }[mode]
     require(content.count(before) == 1, 'unique USB mutation anchor')
     dest = work/(mode+'-'+Path(src).name)
@@ -298,11 +298,11 @@ def product_settings(work, mode, late=False):
     file = work/(mode+'-stream.c'); file.write_text(text)
     opts = ['KBOOT_SH=1', 'KBOOT_LINK=0', 'KBOOT_USB_KEY_TRACE=1', 'KB_MUT_SRC='+src, 'KB_MUT_FILE='+str(file)]
     if mode in ('invert-key', 'no-forward'):
-        src = 'platform/powermac/usb_platform.c'
+        src = 'platform/powermac/usb_key_report.c'
         text = (ROOT/src).read_text()
-        anchor = 'pm_input_usb_key(src, sc, down);'
+        anchor = 'usb_input_usage(src, usage, down, 0);'
         require(text.count(anchor) == 1, 'unique whole callback anchor')
-        text = text.replace(anchor, 'pm_input_usb_key(src, sc, !down);' if mode == 'invert-key'
+        text = text.replace(anchor, 'usb_input_usage(src, usage, !down, 0);' if mode == 'invert-key'
                             else '/* omitted callback forwarding */')
         file = work/(mode+'-platform.c'); file.write_text(text)
         opts += ['KB_MUT_EXTRA_SRC='+src, 'KB_MUT_EXTRA_FILE='+str(file)]
@@ -444,14 +444,14 @@ def product_accept(media, cpu, out, mode, late=False):
                             'invert-key exact shifted result mismatch: '+repr(block))
                 else:
                     execute('echo Hi!', 'Hi!')
-                    # Backspace, cancellation, history and all six cooked edit keys.
+                    # Backspace, Ctrl-C, history and all six cooked edit keys.
                     start = len(output()); text_keys('echo hx'); key('backspace'); key('i'); key('ret')
                     wait_for(lambda: output()[start:].endswith('sh> '), 'backspace prompt')
                     require('hi' in output()[start:].splitlines()[1:], 'backspace result')
                     start=len(output()); prompts=output().count('sh> ')
-                    text_keys('echo cancelled'); key('c', ('ctrl',)); key('ret')
-                    wait_for(lambda: output().count('sh> ') >= prompts+2 and output().endswith('sh> '), 'cancel prompts')
-                    require('cancelled' not in output()[start:].splitlines()[1:], 'Ctrl-C cancellation')
+                    text_keys('echo retained'); key('c', ('ctrl',)); key('ret')
+                    wait_for(lambda: output().count('sh> ') > prompts and output().endswith('sh> '), 'prompt after Ctrl-C and Enter')
+                    require('retained' in output()[start:].splitlines()[1:], 'Ctrl-C retains the command line')
                     execute('echo history', 'history')
                     start=len(output()); key('up'); key('down'); key('up'); key('ret')
                     # DOWN can redraw an empty 'sh> ' before UP/Enter is
@@ -761,8 +761,10 @@ def link_lan_accept(media, cpu, out, mode='normal'):
             print('RED lost-first '+cpu)
             return
         s.close_rshell(preloaded=True)
-        text_keys('echo first'); key('ret')
-        s.wait(lambda: 'OS32:/$ echo first' in s.screen('first-key'), 'first keyboard line', 30)
+        text_keys('echo first'); key('c', ('ctrl',)); key('ret')
+        s.wait(lambda: any(row.strip(' \x00') == 'first'
+                           for row in s.screen('first-key').splitlines()),
+               'Enter executes the line retained across USB Ctrl-C', 30)
         s.open_rshell()
         rsh_command(s, 'echo warm', b'warm\n')
         # Warm /host too (as sd_run.link_accept does): the SFS session starts on
@@ -829,6 +831,140 @@ def link_lan_accept(media, cpu, out, mode='normal'):
         if mode == 'no-service' and not str(exc).startswith('SURVIVED no-service:'):
             raise RuntimeError('wrong-reason no-service: '+str(exc)) from exc
         raise
+    finally:
+        s.close()
+
+
+def in2_observe(elf, cpu, out, mode):
+    from link_sh_run import Session
+
+    from boot_media import Media, package
+
+    media = Media(elf, elf.with_suffix('.map'), elf.with_suffix('.iso'))
+    package(elf, media.iso)
+    media.verify()
+    s = Session(media, cpu, out, 240)
+    s.usb_devices = ('-device', 'usb-kbd,id=kbd', '-device', 'usb-mouse,id=mouse')
+    log = out/'serial-a.log'
+
+    def ack(marker, offset=0):
+        def received():
+            data = serial(log)[offset:]
+            require('IN2 FAIL' not in data, 'foreground probe rejected '+marker)
+            return 'IN2 '+marker in data
+        s.wait(received, 'probe '+marker, 10)
+
+    def edge(code, down, usage):
+        offset = len(serial(log))
+        s.q.call('input-send-event', {'events': [{'type': 'key', 'data': {
+            'down': down, 'key': {'type': 'qcode', 'data': code}}}]})
+        s.wait(lambda: ('down=%d usage=%s' % (down, usage)) in serial(log)[offset:],
+               'USB '+code+' '+str(down))
+
+    def move(dx=12, dy=-7):
+        s.q.call('input-send-event', {'events': [
+            {'type': 'rel', 'data': {'axis': axis, 'value': value}}
+            for axis, value in [('x', dx), ('y', dy)]]})
+
+    def still_waiting(marker, response, offset):
+        ack(response, offset)
+        require('IN2 '+marker not in serial(log)[offset:], 'SURVIVED '+mode)
+
+    def run():
+        s.wait(s.ready, 'cold RSH ready', 60)
+        s.wait(lambda: all(p in serial(log) for p in ('protocol=01', 'protocol=02')),
+               'cold OHCI keyboard and mouse')
+        def type_line(line):
+            punctuation = {' ': ('spc', '2c'), '/': ('slash', '38'),
+                           '.': ('dot', '37'), '2': ('2', '1f')}
+            for char in line:
+                code, usage = punctuation.get(char, (char, f'{ord(char) - ord("a") + 4:02x}'))
+                edge(code, True, usage)
+                edge(code, False, usage)
+
+        edge('esc', True, '29')
+        edge('esc', False, '29')
+        if mode == 'no-local':
+            rsh_command(s, 'echo alive', b'alive\n')
+            require(s.word('rshell_active') != 0, 'local ESC was consumed')
+            return
+        s.close_rshell(preloaded=True)
+        type_line('echo fir')
+        edge('ctrl', True, 'e0')
+        edge('c', True, '06')
+        edge('c', False, '06')
+        edge('ctrl', False, 'e0')
+        type_line('st')
+        s.wait(lambda: 'OS32:/$ echo first' in s.screen('edited'),
+               'shell appended suffix after consuming Ctrl-C')
+        def printed_first():
+            return any(row.strip(' \x00') == 'first' for row in s.screen('retained').splitlines())
+        require(not printed_first(), 'Ctrl-C prematurely executed the line')
+        edge('ret', True, '28')
+        edge('ret', False, '28')
+        s.wait(printed_first, 'Enter executes the retained Ctrl-C line')
+        type_line('/bin/in2prob.bin')
+        edge('ret', True, '28')
+        edge('ret', False, '28')
+        ack('READY')
+        offset = len(serial(log))
+        edge('a', True, '04')
+        if mode == 'no-key':
+            move(5, 0)
+            still_waiting('MAKE', 'STILL KEY', offset)
+            return
+        ack('MAKE')
+        ack('HOLD')
+        edge('a', False, '04')
+        ack('BREAK')
+        move()
+        ack('MOVE')
+        for down, marker in [(True, 'DOWN'), (False, 'UP'), (True, 'HELD')]:
+            offset = len(serial(log))
+            s.q.call('input-send-event', {'events': [{'type': 'btn', 'data': {
+                'button': 'left', 'down': down}}]})
+            s.wait(lambda: ('dx=0 dy=0 b=%d' % down) in serial(log)[offset:], 'USB button')
+            if mode == 'no-button':
+                move(5, 0)
+                still_waiting(marker, 'STILL BUTTON', offset)
+                return
+            ack(marker)
+        s.q.call('device_del', {'id': 'mouse'})
+        s.wait(lambda: 'USB RELEASE kind=1' in serial(log), 'held detach')
+        if mode == 'no-release':
+            s.wait(lambda: 'IN2 STALE BUTTON 1' in serial(log), 'button still held after detach')
+            return
+        ack('GONE')
+        s.q.call('device_add', {'driver': 'usb-mouse', 'id': 'mouse2'})
+        ack('REATTACHED')
+        move()
+        ack('CTRL-C')
+        edge('ctrl', True, 'e0')
+        edge('c', True, '06')
+        ack('WAIT')
+        steps = s.word('in2_wait_steps')
+        s.wait(lambda: s.word('in2_wait_steps') != steps, 'probe in empty key wait')
+        edge('c', False, '06')
+        edge('ctrl', False, 'e0')
+        edge('ctrl', True, 'e0')
+        offset = len(serial(log))
+        edge('pause', True, '48')
+        if mode != 'no-abort':
+            ack('INTERRUPTED -1 EMPTY', offset)
+        edge('pause', False, '48')
+        edge('ctrl', False, 'e0')
+        if mode == 'no-abort':
+            edge('a', True, '04')
+            still_waiting('INTERRUPTED -1 EMPTY', 'STILL READING', offset)
+            edge('a', False, '04')
+
+    try:
+        s.start()
+        run()
+        s.q.call('quit')
+        s.p.wait(timeout=5)
+        require(s.p.returncode == 0, 'QEMU exit')
+        print(('GREEN' if mode == 'normal' else 'RED')+' '+mode+' '+cpu, flush=True)
     finally:
         s.close()
 

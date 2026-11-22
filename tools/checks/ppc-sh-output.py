@@ -26,7 +26,7 @@ CHECK = dict(env=['ppc-cross', 'qemu-ppc'], name='ppc-sh-output', tier=2, budget
                      'kernel/console/console.c',
                      'mm/kmalloc.c',
                      'platform/powermac/usb_boot.c',
-                     'platform/powermac/usb_platform.c',
+                     'platform/powermac/usb_platform.c', 'platform/powermac/usb_key_report.c',
                      'tools/host_agent.py',
                      'tools/host_linux.py',
                      'tools/host_notify.py',

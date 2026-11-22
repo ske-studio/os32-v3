@@ -11,7 +11,7 @@ from kboot_accept import build_media, mutant_settings
 from kboot_run import require, serial, validate_root
 
 CHECK = dict(name='ppc-sc', tier=2, budget=900, needs=[],
-             covers=['platform/powermac/input_usb.[ch]', 'platform/powermac/input_keymap.c', 'tools/ppc/sc_run.py', 'userland/ppc/nest.c'],
+             covers=['platform/powermac/input_usb.[ch]', 'platform/powermac/input_keymap_backend.c', 'tools/ppc/sc_run.py', 'userland/ppc/nest.c'],
              inputs=['build/ppc-user.mk', 'build/targets/ppc-powermac.mk',
                      'tools/ppc/sb_run.py', 'tools/ppc/kboot_accept.py',
                      'tools/ppc/kboot_run.py', 'tools/ppc/run.py',

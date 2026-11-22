@@ -29,7 +29,7 @@ CHECK = dict(name='ppc-sd-meter', env=['ppc-cross'], tier=1, budget=10, needs=['
         'platform/powermac/ofw.c',
         'platform/powermac/shell_boot.c',
         'platform/powermac/usb_boot.c',
-        'platform/powermac/usb_platform.c',
+        'platform/powermac/usb_platform.c', 'platform/powermac/usb_key_report.c',
         'tools/tests/test_ppc_sd_run.py',
         'tools/ppc/sd_run.py',
             'tools/ppc/**', 'tools/*.py', 'userland/shell/rshell_lan.c',

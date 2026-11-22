@@ -177,6 +177,7 @@ int usb_hc_register(struct usb_hc *hc); /* Add to usb_service targets (1E/1P -> 
 void usb_service(void);
 extern const struct usb_class *const usb_classes[]; /* NULL-terminated; defined in 1C. */
 extern const struct usb_class hid_kbd_class, hid_mouse_class;
+u8 hid_kbd_sc(u8 usage);
 void usb_class_tick(u32 now_ms);
 int usb_dmamem_init(struct usb_hc *hc);
 int usb_dmamem_alloc(struct usb_hc *hc, u32 size, u32 align, struct usb_dma *out);

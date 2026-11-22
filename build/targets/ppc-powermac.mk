@@ -123,6 +123,7 @@ KB_SQLITE_AUDIT := --sqlite-group $(KB_GROUP).o --sqlite-inputs $(KB_HARD)
 KB_SQLITE_INC := -Ilib/sqlite3 -Ilib/softfloat
 KB_KEEP_SQLITE := -Wl,--undefined=sqlite_module_init
 $(KB_OUT)/kernel/sqlite_engine.o $(KB_OUT)/kernel/sqlite_outer.o $(KB_OUT)/kernel/sqlite_static.o $(KB_OUT)/kapi/kapi_db.o: $(SQLITE_GENERATED)
+$(KB_OUT)/input/hal/legacy_ring.o $(KB_OUT)/input/hal/legacy_keymap.o: private KB_TU_FLAGS += -DINPUT_COOKED_MODS=1
 $(KB_OUT)/kernel/sqlite_static.o: private KB_TU_FLAGS += -Ilib/sqlite3
 $(KB_OUT)/kernel/sqlite_outer.o: private KB_TU_FLAGS += -Ilib/sqlite3 -DOS32_SQLITE_STATIC
 # The bundled port hard-codes LITTLEENDIAN in three headers. Select the
@@ -251,9 +252,9 @@ $(KB_OUT)/config/usb-key-trace.flags: ppc-layout-force
 	@mkdir -p $(@D)
 	@echo '$(filter 1,$(KBOOT_USB_KEY_TRACE))' > $@.tmp
 	@if cmp -s $@.tmp $@; then rm -f $@.tmp; else mv $@.tmp $@; fi
-$(KB_OUT)/platform/powermac/usb_platform.o: $(KB_OUT)/config/usb-key-trace.flags
+$(KB_OUT)/platform/powermac/usb_key_report.o $(KB_OUT)/platform/powermac/input_boot.o: $(KB_OUT)/config/usb-key-trace.flags
 ifeq ($(KBOOT_USB_KEY_TRACE),1)
-$(KB_OUT)/platform/powermac/usb_platform.o: private KB_TU_FLAGS += -DKBOOT_USB_KEY_TRACE=1
+$(KB_OUT)/platform/powermac/usb_key_report.o $(KB_OUT)/platform/powermac/input_boot.o: private KB_TU_FLAGS += -DKBOOT_USB_KEY_TRACE=1
 endif
 $(KB_OUT)/config/gem-rx-diag.flags: ppc-layout-force
 	@mkdir -p $(@D)
