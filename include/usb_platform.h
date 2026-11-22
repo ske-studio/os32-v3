@@ -46,8 +46,6 @@ enum { USBP_INPUT_KBD, USBP_INPUT_MOUSE };
 int usbp_input_src_alloc(int kind);
 void usbp_input_usage(u8 src, u8 usage, int down);
 void usbp_input_usage_repeat(u8 src, u8 usage);
-void usbp_input_key(u8 src, u8 sc, int down);
-void usbp_input_key_repeat(u8 src, u8 sc);
 void usbp_input_mouse(u8 src, i16 dx, i16 dy, u8 buttons);
 void usbp_input_release(int kind, u8 src);
 /* One-line startup/change diagnostics, also used by usbstat. */

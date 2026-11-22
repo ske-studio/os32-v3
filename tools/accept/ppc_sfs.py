@@ -9,16 +9,16 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT / 'tools'), str(ROOT / 'tools/ppc')]
-from kboot_accept import build, mutant_settings
+from kboot_accept import build_media, mutant_settings
 from test_kapi_binding import generate
 from ppc_shm import guest_available
 
 
-def observe(elf, cpu, folder, case):
+def observe(media, cpu, folder, case):
     from link_sh_run import Session
     from usb_run import rsh_command
 
-    s = Session(elf, cpu, folder, 240)
+    s = Session(media, cpu, folder, 240)
     try:
         share = folder / 'share'
         share.mkdir()
@@ -118,15 +118,15 @@ def main():
             meter.write_text(source.replace(anchor, '(void)owner;'))
         elif case == 'absent':
             (generate(kernel, link=False) / 'stamp').touch()
-        elf = build(kernel, 'IMAGE=kboot-link-sh', 'KB_SH_OUT=' + str(user),
+        media = build_media(kernel, 'IMAGE=kboot-link-sh', 'KB_SH_OUT=' + str(user),
                     'KB_ROOT_BINS=' + bins, *settings, 'kb-user', 'kernel')
-        digest = hashlib.sha256(elf.read_bytes()).hexdigest()
+        digest = hashlib.sha256(media.elf.read_bytes()).hexdigest()
         assert digest not in seen, (case, digest)
         seen.add(digest)
-        print(f'{case} sha256={digest} {elf}', flush=True)
+        print(f'{case} sha256={digest} {media}', flush=True)
         if not args.build_only:
             for cpu in ('7450', '7455'):
-                observe(elf, cpu, folder / cpu, case)
+                observe(media, cpu, folder / cpu, case)
     print(f'{len(seen)} distinct SerialFS probe images')
     return 0
 

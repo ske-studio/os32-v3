@@ -8,9 +8,18 @@ static volatile u32 kbd_dropped;
 static u32 pushed, popped;
 u32 legacy_cooked_pushed(void) { return pushed; }
 u32 legacy_cooked_popped(void) { return popped; }
+#if INPUT_COOKED_MODS
+static u8 cooked_mods[KBD_BUF_SIZE];
+void legacy_cooked_push(u16 entry) { legacy_cooked_push_mods(entry, 0); }
+void legacy_cooked_push_mods(u16 entry, u8 mods)
+#else
 void legacy_cooked_push(u16 entry)
+#endif
 {
     if (kbd_count < KBD_BUF_SIZE) {
+#if INPUT_COOKED_MODS
+        cooked_mods[kbd_tail] = mods;
+#endif
         kbd_buf[kbd_tail] = entry;
         kbd_tail = (kbd_tail + 1) % KBD_BUF_SIZE;
         kbd_count++;
@@ -27,6 +36,16 @@ int legacy_cooked_take(void)
     ++popped;
     return (int)entry;
 }
+#if INPUT_COOKED_MODS
+int legacy_cooked_take_mods(u8 *mods)
+{
+    unsigned flags = irq_save();
+    if (kbd_count) *mods = cooked_mods[kbd_head];
+    int key = legacy_cooked_take();
+    irq_restore(flags);
+    return key;
+}
+#endif
 int legacy_cooked_peek(void)
 {
     u16 entry;

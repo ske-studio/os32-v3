@@ -33,14 +33,14 @@ def absent_bindings(folder, out):
     (out / 'stamp').touch()
 
 
-def observe(elf, cpu, evidence, case):
+def observe(media, cpu, evidence, case):
     from fb_pixel import read_ppm
     from kboot_run import serial
     from link_sh_run import Session
     from run import require
     from usb_run import keyboard_actions, rsh_command
 
-    s = Session(elf, cpu, evidence, 240)
+    s = Session(media, cpu, evidence, 240)
     s.qemu_clock = [*s.qemu_clock, '-device', 'usb-mouse,id=mouse']
     log = evidence / 'serial-a.log'
 
@@ -106,14 +106,9 @@ def observe(elf, cpu, evidence, case):
             s.q.call('device_del', {'id': 'mouse'})
             s.wait(lambda: 'USB RELEASE kind=1' in serial(log), 'held mouse detached')
             probe('gone')
-            require(sample('buttons', 1) == (1 if case == 'drop-release' else 0),
-                    'held left button state after detach')
-        if case == 'normal':
             s.q.call('device_add', {'driver': 'usb-mouse', 'id': 'mouse2'})
             s.wait(lambda: serial(log).count('protocol=02') >= 2, 'mouse reattached')
-            probe('present')
-            require(sample('buttons', 1) == 0 and sample('old_x', 2) == 0 and
-                    sample('old_y', 2) == 0, 'reattach starts released with no stale motion')
+            probe('reattached', 8 if case == 'drop-release' else 0)
         s.q.call('quit')
         s.p.wait(timeout=5)
         require(s.p.returncode == 0, 'QEMU exit')
@@ -133,7 +128,7 @@ def main():
         print(f'SKIP: PowerPC toolchain unavailable at {cross}')
         return 3
 
-    from kboot_accept import build, mutant_settings
+    from kboot_accept import build_media, mutant_settings
     from ppc_shm import guest_available
 
     if not args.build_only and not guest_available():
@@ -163,19 +158,19 @@ def main():
             mutation = mutant_settings(folder, case, 'platform/powermac/ppc_kernel.c',
                                        'if (fb_w && fb_h)', 'if (0)')
         elif case == 'drop-release':
-            mutation = mutant_settings(folder, case, 'platform/powermac/usb_platform.c',
-                                       'pointer_button(&release);', '(void)release;')
+            mutation = mutant_settings(folder, case, 'input/hal/in2_state.c',
+                                       'if (pointer_source_buttons(src)) input_capture(&e);', '')
         elif case == 'absent':
             absent_bindings(folder, kernel / 'gen')
-        elf = build(kernel, *options, *mutation, 'kb-user', 'kernel')
-        digest = hashlib.sha256(elf.read_bytes()).hexdigest()
+        media = build_media(kernel, *options, *mutation, 'kb-user', 'kernel')
+        digest = hashlib.sha256(media.elf.read_bytes()).hexdigest()
         if digest in images:
-            raise RuntimeError(f'{case} ELF is identical to {images[digest]}: {elf}')
+            raise RuntimeError(f'{case} ELF is identical to {images[digest]}: {media}')
         images[digest] = case
-        print(f'{case} sha256={digest} {elf}', flush=True)
+        print(f'{case} sha256={digest} {media}', flush=True)
         if not args.build_only:
             for cpu in ('7450', '7455'):
-                observe(elf, cpu, folder / cpu, case)
+                observe(media, cpu, folder / cpu, case)
     return 0
 
 

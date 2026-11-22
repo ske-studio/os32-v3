@@ -9,7 +9,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT / 'tools'), str(ROOT / 'tools/ppc')]
-from kboot_accept import build, mutant_settings
+from kboot_accept import build_media, mutant_settings
 from ppc_shm import guest_available
 
 
@@ -23,10 +23,10 @@ def probe_source():
             (ROOT / 'tools/tests/ppc_sqlite_static_probe.inc').read_text())
 
 
-def observe(elf, cpu, folder, case):
+def observe(media, cpu, folder, case):
     from link_sh_run import Session
 
-    session = Session(elf, cpu, folder, 240)
+    session = Session(media, cpu, folder, 240)
     try:
         session.start()
         session.wait(session.ready, 'SQLite probe READY', 90)
@@ -84,15 +84,15 @@ def main():
                        '\n    if (sqlite_probe_commit) { sqlite_probe_commit = 0; return VFS_ERR_NOSYS; }')
             extra = mutant_settings(folder, case, 'fs/ramfs/ramfs.c', anchor, failure)
             settings.extend(item.replace('KB_MUT_', 'KB_MUT_EXTRA_', 1) for item in extra)
-        elf = build(kernel, 'IMAGE=kboot-link-sh', 'KB_SH_OUT=' + str(user),
+        media = build_media(kernel, 'IMAGE=kboot-link-sh', 'KB_SH_OUT=' + str(user),
                     *settings, 'kb-user', 'kernel')
-        digest = hashlib.sha256(elf.read_bytes()).hexdigest()
+        digest = hashlib.sha256(media.elf.read_bytes()).hexdigest()
         assert digest not in seen, (case, digest)
         seen.add(digest)
-        print(f'{case} sha256={digest} {elf}', flush=True)
+        print(f'{case} sha256={digest} {media}', flush=True)
         if not args.build_only:
             for cpu in ('7450', '7455'):
-                observe(elf, cpu, folder / cpu, case)
+                observe(media, cpu, folder / cpu, case)
     print(f'{len(seen)} distinct SQLite images')
     return 0
 

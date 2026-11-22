@@ -9,7 +9,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT / 'tools'), str(ROOT / 'tools/ppc')]
-from kboot_accept import build, mutant_settings
+from kboot_accept import build_media, mutant_settings
 from link_sh_run import Session
 from run import require
 from test_kapi_binding import generate
@@ -30,11 +30,11 @@ def image(folder, case):
         kernel.mkdir()
         gen = generate(kernel, case)
         (gen / 'stamp').touch()
-    return build(kernel, *settings)
+    return build_media(kernel, *settings)
 
 
-def observe(elf, out, case, expected):
-    session = Session(elf, '7450', out, 180)
+def observe(media, out, case, expected):
+    session = Session(media, '7450', out, 180)
     try:
         session.start()
         session.wait(session.ready, 'console cell probe CUI READY', 60)
@@ -83,11 +83,11 @@ def main():
         cases += [('scroll-two', 14), ('putchar-absent', 11)]
     for case, expected in cases:
         folder = work / case
-        elf = image(folder, case)
+        media = image(folder, case)
         if args.build_only:
             print(f'BUILT {case}', flush=True)
         else:
-            observe(elf, folder / 'guest', case, expected)
+            observe(media, folder / 'guest', case, expected)
     return 0
 
 

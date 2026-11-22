@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 import tempfile
 
-from kboot_accept import build, mutant_settings
+from kboot_accept import build_media, mutant_settings
 from kboot_run import require, serial, validate_root
 from link_sh_run import Session
 from usb_run import rsh_command
@@ -40,16 +40,16 @@ def main():
     hashes = set()
     for name, *change in cases:
         opts = mutant_settings(work, name, *change) if change else []
-        elf = build(work/name, 'IMAGE=kboot-link-sh', 'KB_SH_OUT='+str(user),
+        media = build_media(work/name, 'IMAGE=kboot-link-sh', 'KB_SH_OUT='+str(user),
                     'KB_ROOT_BINS='+bins, *opts, 'kb-user', 'kernel')
-        digest = hashlib.sha256(elf.read_bytes()).hexdigest()
+        digest = hashlib.sha256(media.elf.read_bytes()).hexdigest()
         require(digest not in hashes, 'distinct '+name)
         hashes.add(digest)
         print(name, digest, flush=True)
         if args.build_only:
             continue
         for cpu in ('7450', '7455') if args.cpu == 'both' else (args.cpu,):
-            s = Session(elf, cpu, work/(name+'-'+cpu), 180)
+            s = Session(media, cpu, work/(name+'-'+cpu), 180)
             try:
                 s.start()
                 s.wait(lambda: validate_root(serial(s.out/'serial-a.log'), serial(s.out/'serial-b.log')),

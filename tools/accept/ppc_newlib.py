@@ -70,11 +70,11 @@ def settings(work, case):
     return opts
 
 
-def observe(elf, cpu, out, case):
+def observe(media, cpu, out, case):
     from link_sh_run import Session
     from usb_run import rsh_command
     from run import require
-    s=Session(elf,cpu,out,240)
+    s=Session(media,cpu,out,240)
     try:
         s.start(); s.wait(s.ready,'newlib cui READY',60)
         require(s.agent.operator.ready['mode'] == 'cui', 'newlib mode')
@@ -151,7 +151,7 @@ def main():
     args.out.mkdir(parents=True,exist_ok=True)
     work=Path(tempfile.mkdtemp(prefix='run-',dir=args.out.resolve()))
     print('evidence='+str(work),flush=True)
-    from kboot_accept import build
+    from kboot_accept import build_media
     from build_nano_target import build as build_nano
     cpus=('7450','7455') if args.cpu == 'both' else (args.cpu,)
     seen = set()
@@ -164,16 +164,18 @@ def main():
                 'PPC_USER_OUT='+str(user),
                 str(user/'nlprobe.bin')],cwd=ROOT,check=True)
             build_nano(prefix,user/'nano',adapter=folder/'mutant.c',crt=user/'syscalls.o')
-        elf=build(folder/'kernel',*opts)
-        digest = hashlib.sha256(elf.read_bytes()).hexdigest()
+        media=build_media(folder/'kernel',*opts)
+        if case == 'normal':
+            normal_media = media
+        digest = hashlib.sha256(media.elf.read_bytes()).hexdigest()
         assert digest not in seen, (case, digest)
         seen.add(digest)
         print(case, digest, flush=True)
         if args.build_only: continue
         for cpu in cpus:
-            observe(elf,cpu,folder/cpu,case)
+            observe(media,cpu,folder/cpu,case)
             if case != 'normal':
-                observe(work/'normal/kernel/PPCKERN.ELF',cpu,folder/(cpu+'-control'),'normal')
+                observe(normal_media,cpu,folder/(cpu+'-control'),'normal')
     return 0
 
 
