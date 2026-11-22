@@ -711,6 +711,7 @@
     "ppc-fp-accept-host": 0.24063,
     "ppc-fp-guest": 401.2445305,
     "ppc-gfx2-guest": 214.61230849999998,
+    "ppc-children-guest": 100,
     "ppc-hdd-root-guest": 150,
     "ppc-kapi-v89-guest": 220.0083325,
     "ppc-kboot-console": 4.7306435,

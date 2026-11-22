@@ -45,6 +45,7 @@
 
 #if KBOOT_SHELL || KBOOT_SH
 #include "root_boot.h"
+#include "kernel_mount_children.h"
 #include "pm_console.h"
 #include "pointer_service.h"
 #include "console_backend.h"
@@ -496,6 +497,7 @@ void platform_boot_services(void)
     }
     {
         pm_loop_boot();
+        kernel_mount_children(vfs_devname("/"));
         (void)pm_console_text_start();
 #if KBOOT_SH
         /* Before pm_usb_boot (mouse_init): the default must precede the cursor. */
