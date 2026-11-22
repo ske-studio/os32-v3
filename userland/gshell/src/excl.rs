@@ -89,13 +89,21 @@ pub fn observe(st: &mut wm::GuiState) {
     }
 }
 
+// Decode the three index bits of a one-hot button mask on the 386.
+fn button_slot(button: u8) -> usize {
+    let bit = button & button.wrapping_neg();
+    usize::from(bit & 0xaa != 0)
+        | (usize::from(bit & 0xcc != 0) << 1)
+        | (usize::from(bit & 0xf0 != 0) << 2)
+}
+
 // A capture can outlive settlement or window destruction. Only a delivered,
 // still-held button has an origin to use for a physical release.
 pub fn button_origin(st: &wm::GuiState, window: u32, button: u8) -> Option<(i32, i32)> {
     let index = st.win_by_id(window)?;
     let rec = &st.excl.delivered[index];
     if rec.window == window && rec.owner == st.windows[index].owner && rec.buttons & button != 0 {
-        Some(rec.origin[button.trailing_zeros() as usize])
+        Some(rec.origin[button_slot(button)])
     } else {
         None
     }
@@ -125,7 +133,7 @@ pub fn append(st: &mut wm::GuiState, slot: usize, ev: &GuiEvent) -> bool {
             let bit = ev.payload[4];
             if bit.count_ones() == 1 && rec.buttons & bit != 0 {
                 rec.retry_buttons |= bit;
-                rec.xy[bit.trailing_zeros() as usize] = (i16::from_le_bytes([ev.payload[0], ev.payload[1]]),
+                rec.xy[button_slot(bit)] = (i16::from_le_bytes([ev.payload[0], ev.payload[1]]),
                     i16::from_le_bytes([ev.payload[2], ev.payload[3]]));
             }
         }

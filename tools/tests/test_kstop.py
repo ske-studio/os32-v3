@@ -461,6 +461,7 @@ def run(overrides=None):
     code += ring[ring.index('enum raw_priority'):ring.index('void kbd_raw_purge_keep')]
     code += function(ring, 'make_room') + '\n'
     code += function(ring, 'append_raw') + '\n'
+    code += function(ring, 'has_ctrl_stop') + '\n'
     code += function(ring, 'legacy_raw_push') + '\n'
     mode = read('input/hal/legacy_mode.c')
     code += function(mode, 'legacy_stop_filter') + '\n'
