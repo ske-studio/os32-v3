@@ -126,6 +126,10 @@ def selection(tmp, mutate):
     original=(ROOT/'build/targets/ppc-powermac.mk').read_text()
     def check(text):
         path=tmp/'image.mk'; path.write_text(text)
+        fields = ['KB_OUT', 'KB_SH_OUT']
+        assert manifest(path, [], fields) == ['build/out/ppc-powermac', 'build/out/ppc-powermac/user']
+        assert manifest(path, ['KBOOT_SH=1'], fields) == ['build/out/ppc-kboot/link-sh', 'build/out/ppc-user/link-sh']
+        assert manifest(path, ['KBOOT_SH=1', 'KB_OUT=private'], fields) == ['private', 'private/user']
         link=manifest(path,['KBOOT_SH=1','KBOOT_LINK=1'],['KB_OUT','ROOT_BINS','KB_C','KB_ROOT_SHELL'])
         assert link[0]=='build/out/ppc-kboot/link-sh'
         assert not link[1].strip() and link[3] == 'build/out/ppc-user/link-sh/shell.bin'
@@ -141,10 +145,8 @@ def selection(tmp, mutate):
         for override in ('FEATURE_LINK=0','IMAGE=kboot-core'):
             assert subprocess.run(['make','-s','ARCH=ppc','PLATFORM=powermac','TARGET_MK='+str(path),'KBOOT_SH=1',override,'-n'],cwd=ROOT,capture_output=True).returncode!=0
     check(original)
-    # Explicit legacy selections must also survive the future link default.
-    check(original.replace('KBOOT_LINK ?= 0', 'KBOOT_LINK ?= 1'))
     if mutate:
-        for old,new in [('link-sh,link','link,link'),('KB_SH_OUT := build/out/ppc-user$(if $(filter 1,$(KBOOT_LINK)),/link-sh)','KB_SH_OUT := build/out/ppc-user'),('KB_C := $(C_KERNEL)','KB_C := $(filter-out platform/powermac/hostfs_link_io.c,$(C_KERNEL)) platform/powermac/hostfs_io.c'),('KB_ROOT_SHELL = $(KB_SH_OUT)/shell.bin','KB_ROOT_SHELL = $(KB_SH_OUT)/sh.bin')]:
+        for old,new in [('KB_OUT ?= build/out/ppc-powermac','KB_OUT ?= build/out/ppc-kboot/link-sh'),('KB_SH_OUT ?= $(KB_OUT)/user','KB_SH_OUT ?= build/out/ppc-user/link-sh'),('KB_C := $(C_KERNEL)','KB_C := $(filter-out platform/powermac/hostfs_link_io.c,$(C_KERNEL)) platform/powermac/hostfs_io.c'),('KB_ROOT_SHELL = $(KB_SH_OUT)/shell.bin','KB_ROOT_SHELL = $(KB_SH_OUT)/sh.bin')]:
             assert original.count(old)==1
             try: check(original.replace(old,new))
             except AssertionError: print('RED selection',old)

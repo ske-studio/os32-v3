@@ -13,7 +13,6 @@ import unittest
 ROOT = Path(__file__).resolve().parents[2]
 TOOL = ROOT / 'tools/check_layers.py'
 OUT = 'build/out'  # 偽の木 (TemporaryDirectory) の中の置き場。実物の成果物は読まない
-GEN = OUT + '/ppc-kboot/sh/gen/'
 
 
 def load(path):
@@ -148,17 +147,24 @@ def suite(tool):
             })
 
         def test_generated_kapi_and_build_headers(self):
-            files = {
-                GEN + 'kapi/kapi_generated.c': inc('wab_xe10.h', 'gen.h'),
-                GEN + 'gen.h': inc('pc98.h'),
-                'include/wab_xe10.h': '', 'include/pc98.h': '',
-            }
-            words = [GEN + 'kapi/kapi_generated.c', 'include/wab_xe10.h',
-                     GEN + 'gen.h', 'include/pc98.h', '/usr/include/x.h']
-            build(self.root, files, {'ppc-kboot/sh/gen/kapi/kapi_generated.d': words})
+            for profile in ('ppc-kboot/sh', 'ppc-powermac'):
+                gen = OUT + '/' + profile + '/gen/'
+                source = gen + 'kapi/kapi_generated.c'
+                dep = profile + '/gen/kapi/kapi_generated.d'
+                words = [source, gen + 'gen.h', 'include/pc98.h', '/usr/include/x.h']
+                build(self.root, {source: inc('gen.h'), gen + 'gen.h': inc('pc98.h'),
+                                  'include/pc98.h': ''}, {dep: words})
+            build(self.root, {'userland/shell/command.c': inc('pc98.h')},
+                  {'ppc-powermac/user/command.d': ['userland/shell/command.c', 'include/pc98.h']})
+            clean = ({}, {'kapi/kapi_generated.c'}, [])
+            self.assertEqual(tool.measure(self.root, 'ppc-powermac'), clean)
+            build(self.root, {source: inc('gen.h', 'wab_xe10.h'), 'include/wab_xe10.h': ''},
+                  {dep: words + ['include/wab_xe10.h']})
             found, units, empty = tool.measure(self.root, 'ppc-powermac')
             self.assertEqual(set(found), {('R6', 'kapi/kapi_generated.c', 'include/wab_xe10.h')})
-            self.assertEqual((units, empty), ({'kapi/kapi_generated.c'}, []))
+            self.assertEqual((units, empty), (clean[1], []))
+            build(self.root, {source: inc('gen.h')}, {dep: words})
+            self.assertEqual(tool.measure(self.root, 'ppc-powermac'), clean)
 
         def run_tool(self, *argv):
             out = io.StringIO()

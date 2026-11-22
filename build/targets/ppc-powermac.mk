@@ -11,15 +11,21 @@ KB_NM := $(PPC_CROSS_DIR)/bin/powerpc-elf-nm
 KB_OBJDUMP := $(PPC_CROSS_DIR)/bin/powerpc-elf-objdump
 KBOOT_TERM ?= lan
 KB_ROOT_BINS ?=
-KB_EXEC := $(filter 1,$(KBOOT_SHELL) $(KBOOT_SH))
-KB_OUT ?= build/out/ppc-kboot$(if $(filter 1,$(KBOOT_LINK)),/$(if $(filter 1,$(KBOOT_SH)),link-sh,link),$(if $(filter 1,$(KBOOT_SHELL)),/shell,$(if $(filter 1,$(KBOOT_SH)),/sh,$(if $(filter-out 0,$(NEGATIVE)),/neg$(NEGATIVE)))))
+KB_EXEC := $(filter 1,$(FEATURE_EXEC))
+KB_C_LEGACY := -DKBOOT_SHELL=$(FEATURE_CLI) -DKBOOT_SH=$(FEATURE_USERSHELL) -DKBOOT_LINK=$(FEATURE_LINK)
+ifeq ($(IMAGE),powermac)
+KB_OUT ?= build/out/ppc-powermac
+else ifeq ($(origin KB_OUT),undefined)
+KB_OUT := build/out/ppc-kboot$(if $(filter kboot-link kboot-link-sh,$(IMAGE)),/$(IMAGE:kboot-%=%),$(if $(filter-out 0,$(NEGATIVE)),/neg$(NEGATIVE)))
+KB_SH_OUT ?= build/out/ppc-user$(if $(filter 1,$(FEATURE_LINK)),/link-sh)
+endif
+KB_SH_OUT ?= $(KB_OUT)/user
 KB_ELF := $(KB_OUT)/PPCKERN.ELF
 
 ROOT_ISO := $(KB_OUT)/root-input.iso
 ROOT_BLOB :=
 ROOT_ISO_FLAGS := --fixed-dates
 ROOT_MOTD := $(KB_OUT)/motd.txt
-KB_SH_OUT := build/out/ppc-user$(if $(filter 1,$(KBOOT_LINK)),/link-sh)
 ROOT_BINS = $(KB_ROOT_BINS)
 KB_ROOT_SHELL = $(KB_SH_OUT)/shell.bin
 ROOT_OBJCOPY := $(KB_OBJCOPY)
@@ -64,7 +70,7 @@ $(KB_OUT)/root-shell.config: force-root-shell-config
 # Entry objects first (kernel.ld keeps .text.entry at the image start).
 KB_ASM := $(GAS_KERNEL)
 KB_C := $(C_KERNEL)
-ifeq ($(KBOOT_LINK),1)
+ifeq ($(FEATURE_LINK),1)
 KB_INC_EXTRA += -Inet
 endif
 ifneq ($(KB_EXEC),)
@@ -95,7 +101,7 @@ KB_INC := $(if $(KB_EXEC),-I$(KB_GEN)/include -I$(KB_GEN)/sdk/include/os32) -I$(
 KB_FLAGS := -DPM_ROOT_FRAME=$(if $(KB_EXEC),1,0) -std=gnu11 $(KB_MACHINE) -fno-builtin -fno-asynchronous-unwind-tables \
  -O2 -Wall -Wextra -Werror -Werror=vla -Werror=implicit-int \
  -Werror=implicit-function-declaration -ffunction-sections -fdata-sections \
- -D__cdecl= -D__KERNEL_BUILD__ $(HOOK_DEFS) -DOS32_FEATURE_IDE=$(FEATURE_IDE) -DOS32_FEATURE_LOOP=$(FEATURE_LOOP) -DOS32_FEATURE_USERSHELL=$(FEATURE_USERSHELL) -DKBOOT_NEGATIVE=$(NEGATIVE) -DKBOOT_SHELL=$(KBOOT_SHELL) -DKBOOT_SH=$(KBOOT_SH) -DKBOOT_LINK=$(KBOOT_LINK) -MMD -MP $(KB_INC)
+ -D__cdecl= -D__KERNEL_BUILD__ $(HOOK_DEFS) -DOS32_FEATURE_IDE=$(FEATURE_IDE) -DOS32_FEATURE_LOOP=$(FEATURE_LOOP) -DOS32_FEATURE_USERSHELL=$(FEATURE_USERSHELL) -DKBOOT_NEGATIVE=$(NEGATIVE) $(KB_C_LEGACY) -MMD -MP $(KB_INC)
 
 ifeq ($(FEATURE_SQLITE),1)
 include build/sqlite-gen.mk
@@ -161,6 +167,10 @@ KB_OBJ := $(addprefix $(KB_OUT)/,$(KB_ASM:.S=.o) $(KB_C:.c=.o))
 # The source lists and link order live in these files: a change there relinks the image.
 KB_SELECT_MK := build/select.mk build/sources/common.mk build/sources/order.mk build/sources/hooks.mk \
  build/arch/ppc-sources.mk build/platform/powermac.mk build/images/$(IMAGE).mk
+KB_SELECT_MK += $(PPC_FLAGS_MK) build/targets/ppc-powermac.mk
+ifeq ($(IMAGE),kboot-link-sh)
+KB_SELECT_MK += build/images/powermac.mk
+endif
 $(KB_OBJ) $(KB_ELF): $(KB_SELECT_MK)
 
 .PHONY: all kernel audit
