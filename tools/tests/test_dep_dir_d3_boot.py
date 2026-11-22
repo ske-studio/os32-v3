@@ -9,7 +9,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCES = ('platform/pc98/boot.c', 'platform/pc98/boot_platform.c', 'platform/pc98/boot_display.c', 'platform/pc98/emergency.c')
-HEADERS = ('include/ide_contract.h', 'platform/pc98/boot_platform.h', 'platform/pc98/boot_display.h', 'include/platform_emergency.h')
+HEADERS = ('include/kernel_mount_children.h', 'include/ide_contract.h', 'platform/pc98/boot_platform.h', 'platform/pc98/boot_display.h', 'include/platform_emergency.h')
 
 
 def kernel_order(kernel=None, overrides=None):
@@ -100,11 +100,9 @@ def build(work, mutation=None):
     kernel = (work / 'platform/pc98/kernel.c').read_text()
     start = kernel.index('    {\n        int rc;', kernel.index('"MOUNT..."'))
     end = kernel.index('    boot_platform_run(BOOT_CLOCK, &boot);', start)
-    child = re.search(r'static inline void kernel_mount_children\(const char \*root_dev\)\n\{.*?\n}\n', kernel, re.S)
-    assert child
     (work / 'kernel_mount_source.inc').write_text(
         'static void host_root_mount(struct boot_context boot) {\n' +
-        kernel[start:end] + '}\n' + child.group())
+        kernel[start:end] + '}\n#include "kernel_mount_children.h"\n')
     exe = work / 'boot'
     flags = ['-std=gnu11', '-Wall', '-Wextra', '-Werror', '-D__cdecl=',
            '-I' + str(work), '-I' + str(work / 'include'), *include_flags(work)]
@@ -193,7 +191,8 @@ def main():
             ('platform/pc98/boot.c',
              'drive == BOOT_DRIVE_FDD || drive == BOOT_DRIVE_FDD_144',
              '(drive & BIOS_DA_TYPE_MASK) == BOOT_DRIVE_FDD || (drive & BIOS_DA_TYPE_MASK) == BOOT_DRIVE_FDD_144'),
-            ('platform/pc98/kernel.c', 'if (match) continue;', 'if (match && 0) continue;'),
+            ('include/kernel_mount_children.h', 'vfs_mount(mnt, dname, "ext2")', 'vfs_mount(mnt, dname, "iso9660")'),
+            ('include/kernel_mount_children.h', 'if (match) continue;', 'if (match && 0) continue;'),
         ):
             with tempfile.TemporaryDirectory(prefix='dep-dir-d3-c-mut-') as td:
                 rc = subprocess.run([str(build(Path(td), mutation))]).returncode

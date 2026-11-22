@@ -12,9 +12,9 @@ CHECK = dict(name='pc98-usb-platform-host', tier=1, needs=[], budget=3,
                      'arch/x86/arch_endian_dma.h', 'include/kprintf.h', 'include/types.h', 'include/callconv.h', 'sdk/include/os32/os32_*.h'],
              basis=['docs/decisions/usb/USB_DESIGN.md §4-1'])
 MUTATIONS = [
-    ('dev->progif != 0x10', '0', 2),
+    ('dev->progif == 0x10', '1', 2),
     ('bar.prefetch || bar.unassigned', 'bar.prefetch', 3),
-    ('dev->device != 0x0035', '0', 6),
+    ('dev->device == 0x0035', '1', 6),
     ('polls++ == 500', 'polls++ == 499', 9),
     ('if (take_ownership(hc) == 0)', 'if (take_ownership(hc) <= 0)', 8),
     ('ptr + EHCI_LEGCTLSTS + 1', 'ptr + EHCI_LEGCTLSTS', 8),

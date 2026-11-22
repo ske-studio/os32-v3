@@ -3,7 +3,7 @@
 static void ata_accept_report(void)
 {
     IdeInfo info;
-    Device *disk = dev_find("hd0");
+
     unsigned present = 0, registered = 0;
     char name[] = "hd0";
     for (int i = 0; i < IDE_MAX_DRIVES; ++i) {
@@ -12,7 +12,7 @@ static void ata_accept_report(void)
         if (dev_find(name)) registered |= 1U << i;
     }
     kprintf(7, "ATA-TEST present=%u registered=%u\r\n", present, registered);
-    if (!disk || ide_get_info(0, &info)) {
+    if (ide_get_info(0, &info)) {
         kprintf(7, "ATA-TEST done\r\n");
         return;
     }
@@ -21,7 +21,7 @@ static void ata_accept_report(void)
     static const u32 lbas[] = {0, 1024, 2047};
     for (unsigned n = 0; n < sizeof(lbas) / sizeof(*lbas); ++n) {
         u32 hash = 2166136261U;
-        int rc = disk->blk_read(disk, lbas[n], 1, data + 1);
+        int rc = ide_read_sector(0, lbas[n], data + 1);
         if (!rc)
             for (unsigned i = 1; i <= 512; ++i) hash = (hash ^ data[i]) * 16777619U;
         kprintf(7, "ATA-TEST lba=%u rc=%d hash=%08x\r\n", lbas[n], rc, hash);

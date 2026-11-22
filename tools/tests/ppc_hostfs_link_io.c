@@ -156,6 +156,10 @@ static int boot_suite(void)
     CHECK(new_fd >= 3);
     CHECK(hellos == 2);
     CHECK(sfs_persistent_generation() == generation + 1);
+    u32 attempts = open_attempts;
+    u8 byte;
+    CHECK(vfs_read_fd(fd, &byte, 1) == VFS_ERR_STALE);
+    CHECK(open_attempts == attempts);
     CHECK(vfs_seek(fd, 0, SEEK_SET) == VFS_ERR_STALE);
     CHECK(vfs_seek(new_fd, 0, SEEK_END) == 2048);
     CHECK(vfs_is_mounted("/host") && borrowed->sid == 7);

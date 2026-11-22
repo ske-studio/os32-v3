@@ -1,4 +1,5 @@
 #include "ext2_priv.h"
+#include "platform_ext2.h"
 #include "kstring.h"
 #include "kmalloc.h"
 
@@ -422,7 +423,7 @@ static void *ext2_vfs_mount(int dev_id)
     if (VFS_MOUNT_DEV_TYPE(dev_id) != VFS_DEV_HD) return (void *)0;
     ec = (Ext2Ctx *)kzalloc(sizeof(Ext2Ctx));
     if (!ec) return (void *)0;
-    if (ext2_mount(ec, VFS_MOUNT_DEV_ID(dev_id)) != EXT2_OK) {
+    if (platform_ext2_vfs_mount(ec, VFS_MOUNT_DEV_ID(dev_id)) != EXT2_OK) {
         kfree(ec);
         return (void *)0;
     }

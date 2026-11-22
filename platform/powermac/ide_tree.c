@@ -2,6 +2,7 @@
 #include "ofw.h"
 #include "kboot_info.h"
 #include "ide_boot.h"
+#include "apm.h"
 #include "ide_compatible.h"
 #include "kstring.h"
 
@@ -61,6 +62,64 @@ static int kauai(int node)
     return id == 0x33 || id == 0x3b || id == 0x43 || id == 0x50 || id == 0x69;
 }
 
+/* TFTP keeps its own /chosen/bootpath. Select the HDD by controller
+ * package, ATA target and one-based APM entry in the explicit bootarg
+ * os32-root=/absolute/controller/path/disk@0:3. */
+int pm_root_unit = -1;
+u32 pm_root_partition;
+static int root_controller, root_target;
+
+static void capture_root(void)
+{
+    char args[PM_KBOOT_PROP_BYTES + 1];
+    int chosen = ofw_finddevice("/chosen");
+    int n = ofw_getprop(chosen, "bootargs", args, sizeof(args) - 1);
+    if (n <= 0) return;
+    if (n >= (int)sizeof(args) - 1) {
+        pm_root_unit = -2;
+        return;
+    }
+    args[n] = 0;
+    for (char *p = args; *p;) {
+        while (*p == ' ' || *p == '\t') ++p;
+        char *token = p;
+        while (*p && *p != ' ' && *p != '\t') ++p;
+        if (*p) *p++ = 0;
+        if (kstrncmp(token, "os32-root=", 10)) continue;
+        if (pm_root_unit != -1) { root_controller = 0; return; }
+        pm_root_unit = -2;
+        char *path = token + 10, *leaf = path;
+        if (*path != '/') return;
+        for (char *q = path; *q; ++q) if (*q == '/') leaf = q;
+        if (kstrncmp(leaf, "/disk@", 6) || (leaf[6] != '0' && leaf[6] != '1') ||
+            leaf[7] != ':') return;
+        root_target = leaf[6] - '0';
+        u32 number = 0;
+        for (char *q = leaf + 8; *q; ++q) {
+            if (*q < '0' || *q > '9' || number > PM_APM_MAX_ENTRIES) return;
+            number = number * 10 + *q - '0';
+        }
+        if (!number || number > PM_APM_MAX_ENTRIES) return;
+        leaf[7] = 0;
+        int disk = ofw_finddevice(path);
+        if (!disk || disk == -1) return;
+        int controller = ofw_parent(disk);
+        *leaf = 0;
+        if (!controller || controller == -1 || controller != ofw_finddevice(path)) return;
+        int matches = 0;
+        unsigned left = PM_KBOOT_TREE_LIMIT;
+        int child = ofw_child(controller);
+        for (; child && child != -1 && left; child = ofw_peer(child), --left) {
+            if (!value(child, "reg", root_target)) continue;
+            if (child != disk) return;
+            ++matches;
+        }
+        if (child || matches != 1) return;
+        root_controller = controller;
+        pm_root_partition = number;
+    }
+}
+
 static void walk(int node, int parent, int macio, unsigned depth, unsigned *left,
                  int *bank, u32 *pa)
 {
@@ -70,6 +129,7 @@ static void walk(int node, int parent, int macio, unsigned depth, unsigned *left
         char name[32] = {0};
         int n = prop(node, "name", name, sizeof(name)-1);
         if (n < 0) name[0] = 0;
+        int previous = *bank;
         if (macio && ata_node(node, name)) {
             cell reg[8];
             int size = prop(node, "reg", reg, sizeof(reg));
@@ -81,12 +141,15 @@ static void walk(int node, int parent, int macio, unsigned depth, unsigned *left
         } else if (kauai(node)) {
             pa[(*bank)++] = bar_window(node, 0x2000, PM_IDE_CTL + 1);
         }
+        if (node == root_controller && *bank != previous && pa[previous])
+            pm_root_unit = previous * 2 + root_target;
         walk(ofw_child(node), node, !kstrcmp(name, "mac-io"), depth + 1, left, bank, pa);
     }
 }
 
 void pm_ide_capture(u32 pa[PM_IDE_BANKS])
 {
+    capture_root();
     unsigned left = PM_KBOOT_TREE_LIMIT;
     int bank = 0;
     int root = ofw_finddevice("/");
