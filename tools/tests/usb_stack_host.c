@@ -18,6 +18,8 @@ void *kmemset(void *p, int v, u32 n) { u8 *b=p; while(n--) *b++=(u8)v; return p;
 void *kmemcpy(void *p, const void *s, u32 n)
 { u8 *b=p; const u8 *a=s; while(n--) *b++=*a++; return p; }
 static void tick(void);
+static int idle_enumeration;
+void usb_stack_idle_step(void);
 u32 usbp_irq_save(void)
 {
     /* sync has no delay hook: advance hardware at each foreground entry. */
@@ -123,7 +125,9 @@ static void tick(void)
         if(rget(h,OHCI_RH_PORT_STATUS(p)) & (1u<<USB_C_PORT_RESET)) {
             selected[h]=(u8)(h ? 4:p); address[h][selected[h]]=0;
         }
-    frame(1); frame(0); usb_service();
+    frame(1); frame(0);
+    if (idle_enumeration) usb_stack_idle_step();
+    else usb_service();
 }
 static void pump(u32 n) { while(n-- && !failure) tick(); }
 static void start(void)
@@ -340,6 +344,7 @@ int main(int argc,char **argv)
 {
     u32 mode=0;
     if(argc>1) for(char *s=argv[1];*s;s++) mode=mode*10u+(u32)(*s-'0');
+    idle_enumeration = mode == 11;
     if(mode==0 || mode==11) topology(mode==11); else if(mode==1) delays(); else fault(mode-2);
     if(!failure) say("usb stack OK\n");
     return failure;
