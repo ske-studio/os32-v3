@@ -1,6 +1,6 @@
 # TASK_TICK_1KHZ — P3 の 1kHz IRQ0 tick
 
-> 状態: **実装中 (2026-11-21)** — 物理 1 kHz・論理 100 Hz の基盤と T1〜T3 は main。段 A は実機 Ra266 と NP21/W で合格 (§2)。段 B の S1 (期限の照合) は実装・レビュー済み (wip/tick-s1)。Ra266 の負荷と遅延の測定が残る。共通の時計の設計は [TICK_ARCH_DESIGN](../../decisions/time/TICK_ARCH_DESIGN.md)。
+> 状態: **実装中 (2026-11-21)** — 物理 1 kHz・論理 100 Hz の基盤と T1〜T3 は main。段 A は実機 Ra266 と NP21/W で合格 (§2)。段 B の S1 (期限の照合) は main (2026-11-21)。Ra266 の製品像の負荷の測り (2026-11-22、main aa32e914a: sleep 10 は 10.46 秒・pcm 58 秒 ×2 の under・rep・resync 0・SerialDiag 0・mmtimetest の Sleep(1) 中央値 1941µs・99% 1956µs、証拠はノートの ~/os32-tmp/evidence/2026-11-22/realhw-aa32e91/) は 11-13 と同じ範囲。LAN の 4MB は 9.63〜9.69 秒で 11-13 (8.72〜8.95 秒) より約 0.8 秒遅い (持越し LAN-4MB-SLOW-1)。共通の時計の設計は [TICK_ARCH_DESIGN](../../decisions/time/TICK_ARCH_DESIGN.md)。
 
 ## 0. ユーザー決定 (原文)
 
