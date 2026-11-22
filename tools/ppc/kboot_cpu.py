@@ -44,7 +44,7 @@ def infrastructure_require(ok, message):
 def host(out, source, mutation=None):
     out.mkdir(parents=True, exist_ok=True)
     flags=['-std=gnu11','-m32','-O2','-ffreestanding','-fno-pie','-no-pie',
-           '-fno-stack-protector','-nostdlib','-static','-ffunction-sections',
+           '-fno-stack-protector','-nostdlib','-nostdinc','-static','-ffunction-sections',
            '-fdata-sections','-Wl,--gc-sections','-DPPC_CPU_HOST_TEST',
            '-DPPC_HPT_HOST_TEST','-D__cdecl=','-Wall','-Wextra','-Werror']
     exe=out/'host'
@@ -183,16 +183,19 @@ def observe(out, elf, cpu, mutation=None):
 
 def main():
     parser=argparse.ArgumentParser(); parser.add_argument('--mutate',action='store_true')
+    parser.add_argument('--host-only', action='store_true')
     a=parser.parse_args()
     out=ROOT/'build/out/ppc/kboot-cpu'
     src=ROOT/'arch/ppc/kernel_cpu.c'
-    host(out/'normal',src); static(out/'normal',src)
-    # The D1 helper renames C2's provider; fixture resolves the renamed symbol.
-    elf=build(out/'normal',src)
-    for cpu in ['7450','7455']: observe(out/'normal'/cpu,elf,cpu)
+    host(out/'normal',src)
+    if not a.host_only:
+        static(out/'normal',src)
+        # The D1 helper renames C2's provider; fixture resolves the renamed symbol.
+        elf=build(out/'normal',src)
+        for cpu in ['7450','7455']: observe(out/'normal'/cpu,elf,cpu)
     if a.mutate:
-        changes=[('ram-bat','    ppc_sync();\n    ppc_isync();\n}\n\nvoid ppc_cpu_load_segments',
-                  '    ppc_bat_set(0, 0x12, 0x1ffe);\n    ppc_sync();\n    ppc_isync();\n}\n\nvoid ppc_cpu_load_segments'),
+        changes=[('ram-bat','CPU_SPR(PPC_SPR_DBAT7U, 0);\n    }',
+                  'CPU_SPR(PPC_SPR_DBAT7U, 0);\n    }\n    ppc_bat_set(0, 0x12, 0x1ffe);'),
                  ('upper-bats','if (version == PPC_PVR_7455 && (hid & PPC_HID_HIGHBAT))',
                   'if (version == PPC_PVR_7450 && (hid & PPC_HID_HIGHBAT))'),
                  ('sr-keys','PPC_SR_KP | ppc_hpt_vsid(n)','0x40000000U | ppc_hpt_vsid(n)'),
@@ -203,6 +206,8 @@ def main():
             dest=out/name; dest.mkdir(parents=True,exist_ok=True)
             mutant=dest/'kernel_cpu.c'; mutant.write_text(text.replace(old,new))
             host(dest,mutant,name)
+            if a.host_only:
+                continue
             elf=build(dest,mutant)
             observe(dest/'7455',elf,'7455',name)
 

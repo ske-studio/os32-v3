@@ -1,4 +1,5 @@
-/* User decision 2026-11-16 and mainline PPC NAP assignment.
+/* MACHCFG_DESIGN §4, §7 and P-R3 (post-configuration HID0).
+ * User decision 2026-11-16 and mainline PPC NAP assignment.
  * ILP32, no libc: real product C with fake privileged operations. */
 #include "ppc_trap.h"
 #include "kernel/irq/irq.h"
@@ -59,6 +60,23 @@ void _start(void)
     reads=writes=order=0; hid=0xa5a5a5a5;
     ppc_cpu_power_init(0x00080000);
     CHECK(reads==0 && writes==0 && order==0 && hid==0xa5a5a5a5, 23);
+    const u32 pvrs[] = {0x80000201, 0x80010201, 0x00080000};
+    for (unsigned i = 0; i < 3; ++i) {
+        for (unsigned ones = 0; ones <= 1; ++ones) {
+            for (u8 nap = 0; nap <= 1; ++nap) {
+                u32 before = ones ? ~0u : 0;
+                reads = writes = order = 0;
+                hid = before;
+                ppc_cpu_power_apply(pvrs[i], nap);
+                if (i == 0) {
+                    CHECK(hid == ((before & ~0x00400000u) | ((u32)nap << 22)), 24);
+                    CHECK(reads == 1 && writes == 1 && order == 1213, 25);
+                } else {
+                    CHECK(hid == before && reads == 0 && writes == 0 && order == 0, 26);
+                }
+            }
+        }
+    }
     ppc_trap_set_handler(0x500, handler);
     ppc_trap_set_handler(PPC_VECTOR_DEC, handler);
     for (u32 v=0; v<2; ++v) {

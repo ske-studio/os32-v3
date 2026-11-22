@@ -24,7 +24,7 @@ $(PPC_USER_OUT)/help.o: sdk/crt/help.c sdk/include/os32/help.h $(SDK_KAPI_HDR) |
 $(PPC_USER_NANO) $(PPC_USER_NANO:.a=.json) &: sdk/allocator/build_nano_target.py sdk/allocator/nano_adapter.c sdk/allocator/nano_adapter.h sdk/allocator/nano_inputs.json tools/check_nano_inputs_target.py tools/check_nano_inputs.py $(PPC_USER_OUT)/syscalls.o
 	python3 -B sdk/allocator/build_nano_target.py --cross-dir $(PPC_CROSS_DIR) $(@D) --crt $(PPC_USER_OUT)/syscalls.o
 
-PPC_USER_APPS := $(addprefix $(PPC_USER_OUT)/,hello fault nest outprobe nlprobe celltest shmprobe infoprob pciprob pathprob dbprob kcgprob bootprob fontprob surfprob sysiprob verprob portprob rtcprob loopprb gfx2prob dispprb mousprob sfsprob)
+PPC_USER_APPS := $(addprefix $(PPC_USER_OUT)/,hello fault nest outprobe nlprobe celltest shmprobe infoprob pciprob pathprob dbprob kcgprob bootprob fontprob surfprob sysiprob verprob portprob rtcprob loopprb gfx2prob dispprb mousprob sfsprob v89probe)
 
 .PHONY: hello ppc-fault ppc-nest
 hello: $(PPC_USER_OUT)/hello.bin
@@ -54,7 +54,10 @@ $(addsuffix .o,$(PPC_USER_APPS)): $(PPC_USER_OUT)/%.o: userland/ppc/%.c | $(PPC_
 $(PPC_USER_OUT)/memstat.o: userland/tests/mem_stat_test.c $(SDK_KAPI_HDR) | $(PPC_USER_OUT)
 	$(CC) $(PPC_USER_FLAGS) -c $< -o $@
 
-PPC_USER_APPS += $(PPC_USER_OUT)/memstat
+$(PPC_USER_OUT)/atadeny.o: tools/ppc/ata_deny.c $(SDK_KAPI_HDR) | $(PPC_USER_OUT)
+	$(CC) $(PPC_USER_FLAGS) -c $< -o $@
+
+PPC_USER_APPS += $(PPC_USER_OUT)/memstat $(PPC_USER_OUT)/atadeny
 $(addsuffix .elf,$(PPC_USER_APPS)): $(PPC_USER_OUT)/%.elf: $(PPC_USER_CRT) $(PPC_USER_OUT)/%.o $(SDK_TARGET_APP_LINK) sdk/link_guard.py sdk/allocator/check_link_target.py $(PPC_USER_NANO) $(PPC_USER_NANO:.a=.json)
 	$(PPC_USER_LINK) -o $@ $(filter %.o,$^) $(PPC_USER_LIBS)
 

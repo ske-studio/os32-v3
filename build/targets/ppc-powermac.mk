@@ -28,10 +28,10 @@ ROOT_CPU := powerpc
 ROOT_MANIFEST ?= build/ppc-ram-root.json
 ROOT_DEPS ?= assets/fonts/shino16.kcgfont assets/fonts/JF-Dot-Shinonome16-LICENSE.txt build/out/unicode.bin $(KB_ROOT_SHELL)
 # Acceptance builds use a private resident binary (including source mutants).
-ifneq ($(KB_SH_OUT),build/out/ppc-user/link-sh)
 KB_ROOT_TEMPLATE := $(ROOT_MANIFEST)
+ifneq ($(KB_SH_OUT),build/out/ppc-user/link-sh)
 override ROOT_MANIFEST := $(KB_OUT)/root-manifest.json
-$(ROOT_MANIFEST): $(KB_ROOT_TEMPLATE) $(KB_ROOT_SHELL) build/targets/ppc-powermac.mk
+$(ROOT_MANIFEST): $(KB_ROOT_TEMPLATE) $(KB_ROOT_SHELL) $(KB_OUT)/root-shell.config build/targets/ppc-powermac.mk
 	@mkdir -p $(@D)
 	python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); d["/sys/shell.bin"]=sys.argv[2]; print(json.dumps(d))' "$<" "$(KB_ROOT_SHELL)" > $@.tmp
 	mv $@.tmp $@
@@ -58,7 +58,7 @@ $(ROOT_ISO): $(KB_ROOT_SHELL) $(KB_OUT)/root-shell.config
 .PHONY: force-root-shell-config
 $(KB_OUT)/root-shell.config: force-root-shell-config
 	@mkdir -p $(@D)
-	@printf '%s\n' '$(ROOT_MANIFEST) $(KB_ROOT_SHELL) $(ROOT_BINS)' > $@.tmp
+	@printf '%s\n' '$(KB_ROOT_TEMPLATE)' '$(ROOT_DEPS)' '$(KB_ROOT_SHELL) $(ROOT_BINS)' > $@.tmp
 	@if cmp -s $@.tmp $@; then rm $@.tmp; else mv $@.tmp $@; fi
 
 # Entry objects first (kernel.ld keeps .text.entry at the image start).
@@ -193,7 +193,7 @@ BUILD_ID_SRC := $(KB_OUT)/build_id.c
 include build/build-id.mk
 $(KB_GEN)/stamp: build/images/$(IMAGE).mk sdk/kapi.json sdk/gen_kapi.py sdk/kapi_abi_x86.py sdk/kapi_target_ppc.py sdk/target_profile.py
 	@mkdir -p $(KB_GEN)
-	python3 -B sdk/gen_kapi.py --target ppc-powermac --feature-link $(FEATURE_LINK) --out-dir $(KB_GEN)
+	python3 -B sdk/gen_kapi.py --target ppc-powermac --feature-link $(FEATURE_LINK) --feature-ide $(FEATURE_IDE) --out-dir $(KB_GEN)
 	@touch $@
 $(KB_OBJ): $(KB_GEN)/stamp
 $(KB_OUT)/build_id.o: $(BUILD_ID_SRC)
