@@ -82,6 +82,8 @@ def linked_image(path):
 
 def build(out, *settings):
     """Returns the ELF; make owns the manifest and the undefined/FP/PIT_HZ audits."""
+    if not any('=' not in arg and not arg.startswith('-') for arg in settings):
+        settings += ('kernel',)
     result = make(out, *settings)
     if result.returncode or 'kboot audit OK' not in result.stdout:
         raise RuntimeError('kboot build failed: '+str(out)+'\n'+(result.stdout+result.stderr)[-2000:])
@@ -145,6 +147,17 @@ def main():
             print('GREEN negative '+name+' '+cpu, flush=True)
     red = 0
     if args.mutate:
+        product = work / 'elf-only'
+        build(product, 'IMAGE=powermac')
+        boot_iso = product / 'boot.iso'
+        if boot_iso.exists():
+            raise RuntimeError('ELF-only build packaged boot.iso')
+        # Omitting the kernel goal selects all and violates the ELF-only contract.
+        result = make(product, 'IMAGE=powermac')
+        result.check_returncode()
+        if not boot_iso.is_file():
+            raise RuntimeError('default-goal mutation survived')
+        print('RED default goal packaged boot.iso', flush=True)
         for name, source, before, after, expected, evidence_line in KERNEL_MUTATIONS:
             mutant = build(work/('mutant-'+name), 'KBOOT_LINK=0',
                            *mutant_settings(work, name, source, before, after))
