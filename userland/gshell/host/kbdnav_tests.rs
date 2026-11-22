@@ -2535,3 +2535,25 @@ fn excl_completed_tab_presses_keep_selection_order() {
         assert_eq!(st.front_index(),Some(2));
     }
 }
+
+#[test]
+fn excl_full_completed_intervals_admit_next_switch() {
+    use crate::input::defer_raw;
+    mocks::init();
+    let shm = mocks::Shm::new();
+    let mut st = one_window(&shm);
+    let tab = SC_TAB | GRPH | DOWN;
+    let stop = 0x60 | CTRL | DOWN;
+    let mut expected = Vec::new();
+    for i in 0..42 {
+        let start = if i % 2 == 0 { tab } else { tab | SHIFT };
+        for raw in [start, start, SC_GRPH] { defer_raw(&mut st, raw); }
+        expected.push(start);
+        if i != 0 { expected.push(start); }
+        expected.push(SC_GRPH);
+    }
+    assert_eq!(st.pending_raw_n, 126);
+    for raw in [tab, SC_GRPH, stop] { defer_raw(&mut st, raw); }
+    expected.extend([tab, SC_GRPH, stop]);
+    assert_eq!(&st.pending_raw[..st.pending_raw_n], expected.as_slice());
+}

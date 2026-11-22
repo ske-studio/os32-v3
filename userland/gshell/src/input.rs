@@ -91,12 +91,16 @@ fn stop_raw(raw: i32) -> bool {
     raw & 0x1ff == (0x100 | SC_STOP as i32) && raw & ((MOD_CTRL as i32) << 9) != 0
 }
 
+const SEALED_REPEAT: u8 = 3;
+const SWITCH_OR_STOP: u8 = 4;
+
 fn make_room(st: &mut GuiState, needed: usize, rank: u8) -> bool {
     if needed == 0 { return true; }
     let mut victims = [false; 128];
     let mut found = 0;
     for priority in 0..rank {
-        for i in (0..st.pending_raw_n).rev() {
+        for offset in 0..st.pending_raw_n {
+            let i = if priority == SEALED_REPEAT { offset } else { st.pending_raw_n - 1 - offset };
             if found < needed && st.pending_rank[i] == priority {
                 victims[i] = true;
                 found += 1;
@@ -137,15 +141,15 @@ fn seal_repeats(st: &mut GuiState) {
     st.pending_raw_n = kept;
     if seen {
         let limit = st.pending_raw.len() - 1 - usize::from(!st.pending_raw[..kept].iter().copied().any(stop_raw));
-        make_room(st, kept.saturating_sub(limit), 3);
+        make_room(st, kept.saturating_sub(limit), SWITCH_OR_STOP);
         if let Some(rank) = st.pending_rank[..st.pending_raw_n].iter_mut().find(|r| **r == 1) {
-            *rank = 3;
+            *rank = SEALED_REPEAT;
         }
     }
 }
 
 // Admit a switch start and reserve its completion together. Evict from
-// the tail within each priority, then compact once to retain event order.
+// the oldest sealed press first among sealed repeats; compaction retains event order.
 pub(crate) fn defer_raw(st: &mut GuiState, raw: i32) {
     let scan = (raw & 127) as u8;
     let down = raw & 256 != 0;
@@ -164,7 +168,7 @@ pub(crate) fn defer_raw(st: &mut GuiState, raw: i32) {
     }
     if scan == SC_TAB { st.pending_tab = down; }
     if !grph || finish { st.pending_tab = false; }
-    let rank = if start || finish || stop_raw(raw) { 3 }
+    let rank = if start || finish || stop_raw(raw) { SWITCH_OR_STOP }
         else if repeat { 1 } else if wm_scan(scan) { 2 } else { 0 };
     let reserve_finish = start || (st.pending_switch && !finish);
     let reserve_stop = start && !st.pending_raw[..st.pending_raw_n].iter().copied().any(stop_raw);
@@ -184,7 +188,7 @@ pub(crate) fn defer_raw(st: &mut GuiState, raw: i32) {
 pub(crate) fn purge_boundary(st: &mut GuiState, same_owner: bool) {
     let mut write = 0;
     for i in 0..st.pending_raw_n {
-        if wm_scan(st.pending_raw[i] as u8 & 127) || st.pending_rank[i] == 3 {
+        if wm_scan(st.pending_raw[i] as u8 & 127) || st.pending_rank[i] == SWITCH_OR_STOP {
             st.pending_raw[write] = st.pending_raw[i];
             st.pending_rank[write] = st.pending_rank[i];
             write += 1;

@@ -32,6 +32,9 @@ ENTRY_MUTATIONS = [
     ('skip held keypad sample', 'src/input.rs', 'if kbdnav::is_mk_pad(scan as u8)', 'if false && kbdnav::is_mk_pad(scan as u8)', 'excl_held_mouse_key'),
     ('leave completed repeats evictable', 'src/input.rs', 'seal_repeats(st);', '', 'excl_completed_tab'),
 
+    ('protect sealed repeats like starts', 'src/input.rs', '*rank = SEALED_REPEAT;', '*rank = SWITCH_OR_STOP;', 'excl_full_completed'),
+    ('discard newest sealed repeat', 'src/input.rs', 'priority == SEALED_REPEAT', 'false', 'excl_full_completed'),
+
     ('fallback leaks into new window', 'src/input.rs',
      'if stop_raw(raw) { st.abort_seen = true; }\n            continue;',
      'if stop_raw(raw) { st.abort_seen = true; }', 'excl_switch_fallback'),
@@ -55,7 +58,7 @@ ENTRY_MUTATIONS = [
     ('forget finish reservation', 'src/input.rs', 'let reserve_finish = start || (st.pending_switch && !finish);',
      'let reserve_finish = false;', 'excl_deferred'),
     ('borrow STOP seat', 'src/input.rs', '- usize::from(reserve_stop)', '', 'excl_pending_switch'),
-    ('purge protected ordinary finish', 'src/input.rs', ' || st.pending_rank[i] == 3', '', 'excl_pending_switch'),
+    ('purge protected ordinary finish', 'src/input.rs', ' || st.pending_rank[i] == SWITCH_OR_STOP', '', 'excl_pending_switch'),
     ('skip same owner raw cleanup', 'src/input.rs', 'if same_owner {', 'if false {', 'excl_same_owner'),
     ('skip physical key resync', 'src/input.rs', 'if *held && unsafe', 'if false && *held && unsafe', 'excl_same_owner'),
     ('expose physical pointer mask', 'src/input.rs', 'let pbtn = btn | st.synth_buttons;', 'let pbtn = mi.buttons | st.synth_buttons;', 'excl_mouse_masks'),
