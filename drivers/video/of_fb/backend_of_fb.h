@@ -2,12 +2,14 @@
 #define OS32_BACKEND_OF_FB_H
 #include "gfx_hal.h"
 /* Platform supplies a validated full-screen alias and a ledger CLIENT shadow.
- * INDEX8 is the Apple OF palette (white 0, black 255). No OF calls here. */
+ * clut holds the boot-programmed physical RGB values, or NULL for text only. */
 struct of_fb_desc {
     volatile u8 *display;
     u8 *shadow;
     u32 width, height, pitch, bytes, shadow_pitch, shadow_bytes;
     u32 protected_rows;
+    const u8 (*clut)[3];
+    int (*palette_allowed)(void);
 };
 extern GfxBackend gfx_backend_of_fb;
 extern const struct GfxBackendV2 of_fb_v2;

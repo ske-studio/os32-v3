@@ -1,9 +1,12 @@
 #include "backend_of_fb.h"
 #include "kstring.h"
+#include "gfx/palette.h"
 
 static struct of_fb_desc fb;
 static GfxMode mode;
 static int live;
+static u8 scan_index[256];
+static int remapped;
 
 int of_fb_ready(void) { return live; }
 void of_fb_unbind(void)
@@ -27,6 +30,8 @@ int of_fb_bind(const struct of_fb_desc *d)
         d->shadow_pitch < d->width || d->height > d->bytes / d->pitch ||
         d->height > d->shadow_bytes / d->shadow_pitch) return OS32_ERR_INVAL;
     fb = *d;
+    for (int i = 0; i < 256; i++) scan_index[i] = i;
+    remapped = 0;
     mode = (GfxMode){.width = d->width, .height = d->height,
                     .format = GFX_FMT_PACKED8, .pitch = d->shadow_pitch};
     gfx_backend_of_fb.bb_base = d->shadow;
@@ -57,7 +62,16 @@ int of_fb_copy(const u8 *src, u32 pitch, u32 bytes, int x, int y, int w, int h)
         /* Include adjacent shadow pixels at the two edge words. Native loads
          * and stores preserve the byte order on both endian CPUs. bind ensures
          * display and its pitch are word aligned; source rows need not be. */
-        if (!((u32)source & 3)) {
+        if (remapped) {
+            for (u32 i = 0; i < words; i++) {
+                u32 word = 0;
+                for (unsigned j = 0; j < sizeof(word); j++) {
+                    unsigned shift = __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__ ? 3 - j : j;
+                    word |= (u32)scan_index[*source++] << (8 * shift);
+                }
+                dest[i] = word;
+            }
+        } else if (!((u32)source & 3)) {
             const u32 *aligned = (const u32 *)source;
             for (u32 i = 0; i < words; i++) dest[i] = aligned[i];
         } else {
@@ -77,6 +91,7 @@ static int query(GFX_ScreenInfo *out)
     if (!live) return OS32_ERR_STALE;
     if (!out) return OS32_ERR_INVAL;
     *out = (GFX_ScreenInfo){.width = mode.width, .height = mode.height,
+                            .lease_first = fb.clut ? 16 : 0, .lease_count = fb.clut ? 240 : 0,
                             .bpp = 8, .format = GFX_FMT_PACKED8};
     return 0;
 }
@@ -95,7 +110,30 @@ static void present(int x, int y, int w, int h)
 static int set_mode(u32 id) { return !live ? OS32_ERR_STALE : id == 1 ? 0 : OS32_ERR_NOSYS; }
 static void noop(void) { }
 static void palette(int first, int count, const u8 *rgb)
-{ (void)first; (void)count; (void)rgb; }
+{
+    if (!live || !fb.clut || !rgb || first < 0 || first >= 256 ||
+        count <= 0 || count > 256 - first) return;
+    /* Changing the mapping repaints the shadow, so use the same ownership
+     * and generation check as a public present. */
+    if (!fb.palette_allowed || !fb.palette_allowed()) return;
+    int changed = 0;
+    for (int i = first; i < first + count; i++, rgb += 3) {
+        int best = 0, distance = 3 * 255 * 255 + 1;
+        for (int j = 0; j < 256; j++) {
+            int r = (rgb[0] & 15) * 17 - fb.clut[j][0];
+            int g = (rgb[1] & 15) * 17 - fb.clut[j][1];
+            int b = (rgb[2] & 15) * 17 - fb.clut[j][2];
+            int d = r*r + g*g + b*b;
+            if (d < distance) { best = j; distance = d; }
+        }
+        palette_shadow_set(i, rgb[0], rgb[1], rgb[2]);
+        if (scan_index[i] == best) continue;
+        remapped += (best != i) - (scan_index[i] != i);
+        scan_index[i] = best;
+        changed = 1;
+    }
+    if (changed) (void)of_fb_present(0, 0, fb.width, fb.height);
+}
 GfxBackend gfx_backend_of_fb = {
     .name = "of_fb", .probe = of_fb_ready, .prepare = noop, .init = noop,
     .query = query, .shutdown = of_fb_unbind, .enter = noop, .leave = noop,

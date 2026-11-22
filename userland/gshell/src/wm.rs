@@ -1204,6 +1204,10 @@ fn deliver_host_notice(st: &mut GuiState) {
     }
 }
 
+#[cfg(feature = "c_gui_accept")]
+#[no_mangle]
+static mut C_GUI_POINTER: [i32; 3] = [0; 3];
+
 /// WM の 1 周: 入力取り込み → パレットのリース調停 → FEP の配置 →
 /// クローム/デスクトップの present → FEP の描画。
 /// 文脈は [`input::Ctx`] (X3 = Wait / Standalone、X4 = Pump)。
@@ -1260,6 +1264,11 @@ pub fn wm_cycle(st: &mut GuiState, ctx: input::Ctx) {
     if ctx != input::Ctx::Pump { gf_accept::finish(); }
     #[cfg(feature = "gf_accel_accept")]
     if ctx != input::Ctx::Pump && st.ops.active { if gfx_ok { flush_present(); } crate::typical_ops::on_cycle_end(st); }
+    #[cfg(feature = "c_gui_accept")]
+    unsafe {
+        core::ptr::write_volatile(&raw mut C_GUI_POINTER,
+                                  [st.mouse_x, st.mouse_y, st.prev_buttons as i32]);
+    }
 }
 
 /* ================================================================ */

@@ -112,6 +112,20 @@ static void capture_colors(void)
     colors = (struct pm_rh_colors){.rc = PM_RH_COLOR_OK,
         .foreground = a > b ? 0 : 255, .background = a > b ? 255 : 0};
 }
+/* IEEE 1275 display color! takes (r g b index). Keep both terminal
+ * endpoints in their existing order while programming an RGB332 cube. */
+static void install_clut(void)
+{
+    static u8 clut[256][3];
+    for (unsigned i = 0; i < 256; i++) {
+        unsigned v = colors.foreground == 255 ? i : 255 - i;
+        cell rgb[4] = {(v >> 5) * 255 / 7, ((v >> 2) & 7) * 255 / 7,
+                       (v & 3) * 85, i};
+        if (ofw_call_method("color!", output, 4, 0, rgb)) return;
+        for (unsigned c = 0; c < 3; c++) clut[i][c] = rgb[c];
+    }
+    colors.clut = clut;
+}
 const struct pm_rh_colors *pm_rh_full_colors(void) { return &colors; }
 int pm_rh_capture_full(void)
 {
@@ -131,7 +145,11 @@ int pm_rh_capture_full(void)
         if (!translate(fb_mmu, fb_va - offset + off, &next) || next != base + off)
             return PM_RH_FULL_TRANSLATE;
     }
-    if (fb.depth == 8) capture_colors();
+    if (fb.depth == 8) {
+        capture_colors();
+        if (colors.rc == PM_RH_COLOR_OK || colors.rc == PM_RH_COLOR_WRITTEN)
+            install_clut();
+    }
     full_fb = fb;
     full_fb.bytes = bytes;
     return PM_RH_FULL_OK;

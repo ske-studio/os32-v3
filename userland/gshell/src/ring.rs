@@ -94,10 +94,10 @@ fn payload_zero() -> [u8; 8] {
 
 fn payload_rect(r: GuiRect16) -> [u8; 8] {
     let mut p = [0u8; 8];
-    p[0..2].copy_from_slice(&r.x.to_le_bytes());
-    p[2..4].copy_from_slice(&r.y.to_le_bytes());
-    p[4..6].copy_from_slice(&r.w.to_le_bytes());
-    p[6..8].copy_from_slice(&r.h.to_le_bytes());
+    p[0..2].copy_from_slice(&r.x.to_ne_bytes());
+    p[2..4].copy_from_slice(&r.y.to_ne_bytes());
+    p[4..6].copy_from_slice(&r.w.to_ne_bytes());
+    p[6..8].copy_from_slice(&r.h.to_ne_bytes());
     p
 }
 
@@ -108,7 +108,7 @@ pub fn ev_simple(kind: u8, sub: u8, window: u32) -> GuiEvent {
 /// T2g: 窓に属さない TRIM。epoch は payload 先頭の LE u32。
 pub fn ev_trim(epoch: u32) -> GuiEvent {
     let mut ev = ev_simple(os32api::gui::proto::GUI_EV_TRIM, 0, 0);
-    ev.payload[..4].copy_from_slice(&epoch.to_le_bytes());
+    ev.payload[..4].copy_from_slice(&epoch.to_ne_bytes());
     ev
 }
 
@@ -130,15 +130,15 @@ pub fn ev_text(window: u32, utf8: [u8; 8], sub: u8, serial: u16) -> GuiEvent {
 
 pub fn ev_pointer(window: u32, x: i16, y: i16, buttons: u8, serial: u16) -> GuiEvent {
     let mut p = [0u8; 8];
-    p[0..2].copy_from_slice(&x.to_le_bytes());
-    p[2..4].copy_from_slice(&y.to_le_bytes());
+    p[0..2].copy_from_slice(&x.to_ne_bytes());
+    p[2..4].copy_from_slice(&y.to_ne_bytes());
     GuiEvent { kind: GUI_EV_POINTER, sub: buttons, serial, window, payload: p }
 }
 
 pub fn ev_button(down: bool, window: u32, x: i16, y: i16, button: u8, serial: u16) -> GuiEvent {
     let mut p = [0u8; 8];
-    p[0..2].copy_from_slice(&x.to_le_bytes());
-    p[2..4].copy_from_slice(&y.to_le_bytes());
+    p[0..2].copy_from_slice(&x.to_ne_bytes());
+    p[2..4].copy_from_slice(&y.to_ne_bytes());
     p[4] = button;
     GuiEvent { kind: os32api::gui::proto::GUI_EV_BUTTON, sub: down as u8, serial, window, payload: p }
 }
@@ -150,7 +150,7 @@ pub fn ev_timer(window: u32, id: u8) -> GuiEvent {
 /// `Modal{dialog, result}` (契約 U4 / U2)。`window` は親ウィンドウ。
 pub fn ev_modal(window: u32, dialog: u16, result: i16) -> GuiEvent {
     let mut p = [0u8; 8];
-    p[0..2].copy_from_slice(&dialog.to_le_bytes());
-    p[2..4].copy_from_slice(&result.to_le_bytes());
+    p[0..2].copy_from_slice(&dialog.to_ne_bytes());
+    p[2..4].copy_from_slice(&result.to_ne_bytes());
     GuiEvent { kind: os32api::gui::proto::GUI_EV_MODAL, sub: 0, serial: 0, window, payload: p }
 }

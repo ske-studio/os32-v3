@@ -724,6 +724,7 @@
     "ppc-mmu": 75.718984,
     "ppc-module-guest": 111.611608,
     "ppc-module-rela-host": 3,
+    "ppc-gui-guest": 460,
     "ppc-mouse-guest": 216.5213655,
     "ppc-path-guest": 125.7690265,
     "ppc-pci-guest": 103.28789,

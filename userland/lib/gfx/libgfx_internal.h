@@ -3,6 +3,18 @@
 
 #include "libos32gfx.h"
 
+#ifdef OS32_GFX_PACKED_ONLY
+/* OF exposes a single packed shadow. Planar primitives are unreachable. */
+#define gfx_packed 1
+static inline void _memset_d(void *dst, unsigned int value, unsigned int words)
+{
+    u8 *out = dst;
+    while (words--) {
+        __builtin_memcpy(out, &value, sizeof(value));
+        out += sizeof(value);
+    }
+}
+#else
 static inline void _memcpy_w(void *dst, const void *src, unsigned int words) {
     __asm__ volatile("rep movsw" : "+D"(dst), "+S"(src), "+c"(words) : : "memory");
 }
@@ -18,6 +30,8 @@ static inline void _memset_w(void *dst, unsigned int val16, unsigned int words) 
 static inline void _memset_d(void *dst, unsigned int val32, unsigned int dwords) {
     __asm__ volatile("rep stosl" : "+D"(dst), "+c"(dwords) : "a"(val32) : "memory");
 }
+
+#endif
 
 /* ------------------------------------------------------------------------ */
 /*  パックド 8bpp (PEGC) 共通ヘルパ — 票 H2b                                  */
