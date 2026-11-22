@@ -15,6 +15,7 @@ u8 hid_kbd_sc(u8 usage);
  * 1 = lock (including 0x90/0x91), 2 = remaining usages.
  * Emit groups in that order, with usages ascending within each group. */
 u8 hid_kbd_norepeat(u8 usage);
+int hid_kbd_repeatable(u8 usage);
 u8 hid_kbd_order(u8 usage);
 static const u8 *hid_endpoint(struct usb_dev *d, struct usb_iface *f, u8 proto)
 {

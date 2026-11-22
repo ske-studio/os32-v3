@@ -44,6 +44,8 @@ void usbp_irq_restore(u32 f);
 enum { USBP_INPUT_KBD, USBP_INPUT_MOUSE };
 /* Input calls require IF=0. Sources 1..4; exhausted allocation returns <0. */
 int usbp_input_src_alloc(int kind);
+/* Synchronous report boundary before ordered usage transitions. */
+void usbp_input_report(u8 src, const u8 old[32], const u8 now[32]);
 void usbp_input_usage(u8 src, u8 usage, int down);
 void usbp_input_usage_repeat(u8 src, u8 usage);
 void usbp_input_key(u8 src, u8 sc, int down);

@@ -5,7 +5,7 @@
 static u8 address[2][7], selected[2], setup_bytes[2][128][8];
 static u8 report[7][2][8], ready[7][2], sources[2];
 static u32 hub_ports[4], keys, releases, mice, callbacks, irq_depth;
-static u8 key_sc[32], key_down[32], key_src[32];
+static u8 key_usage[32], key_down[32], key_src[32];
 static i16 mouse_dx, mouse_dy;
 static u32 sync_fault, sync_round, gone[4], hub_reports;
 static struct usb_dev probe;
@@ -29,12 +29,14 @@ u32 usbp_irq_save(void)
 }
 void usbp_irq_restore(u32 f) { irq_depth=f; }
 int usbp_input_src_alloc(int kind) { return ++sources[kind]; }
-void usbp_input_key(u8 src, u8 sc, int down)
+void usbp_input_report(u8 src, const u8 old[32], const u8 now[32])
+{ (void)src; (void)old; (void)now; }
+void usbp_input_usage(u8 src, u8 sc, int down)
 {
     if (!irq_depth || keys >= 32) { bad_dma=1; return; }
-    key_src[keys]=src; key_sc[keys]=sc; key_down[keys++]=(u8)down;
+    key_src[keys]=src; key_usage[keys]=sc; key_down[keys++]=(u8)down;
 }
-void usbp_input_key_repeat(u8 src, u8 sc) { (void)src; (void)sc; }
+void usbp_input_usage_repeat(u8 src, u8 sc) { (void)src; (void)sc; }
 void usbp_input_mouse(u8 src, i16 dx, i16 dy, u8 b)
 { (void)src; (void)b; ++mice; mouse_dx=dx; mouse_dy=dy; }
 void usbp_input_release(int kind, u8 src) { (void)kind; (void)src; ++releases; }
@@ -228,13 +230,13 @@ static void topology(u32 natural)
     REQUIRE(hub_reports==1 && hub->intr.state==XS_ACTIVE && hcs[1].needs_explore);
     /* A5: both shifts -> one shift, then release + A. Modifier goes first. */
     report[1][0][0]=0x22; report[1][0][2]=4; ready[1][0]=1; pump(2);
-    REQUIRE(keys==2 && key_sc[0]==0x70 && key_down[0] && key_sc[1]==0x1d && key_down[1]);
-    report[1][0][0]=0x20; ready[1][0]=1; pump(2); REQUIRE(keys==2);
+    REQUIRE(keys==3 && key_usage[0]==0xe1 && key_down[0] && key_usage[1]==0xe5 && key_down[1] && key_usage[2]==4 && key_down[2]);
+    report[1][0][0]=0x20; ready[1][0]=1; pump(2); REQUIRE(keys==4 && key_usage[3]==0xe1 && !key_down[3]);
     report[1][0][0]=0; report[1][0][2]=5; ready[1][0]=1; pump(2);
-    REQUIRE(keys==5 && key_sc[2]==0x70 && !key_down[2] && key_src[0]==key_src[2]);
+    REQUIRE(keys==7 && key_usage[4]==0xe5 && !key_down[4] && key_src[0]==key_src[4]);
     report[3][0][2]=4; ready[3][0]=1;
     report[3][1][1]=0xfe; report[3][1][2]=3; ready[3][1]=1; pump(2);
-    REQUIRE(keys==6 && mice==1 && mouse_dx==-2 && mouse_dy==3);
+    REQUIRE(keys==8 && mice==1 && mouse_dx==-2 && mouse_dy==3);
     rel=releases;
     for(u32 p=1;p<=3;p++) rput(0,OHCI_RH_PORT_STATUS(p),OHCI_PORT_CSC);
     rput(1,OHCI_RH_PORT_STATUS(1),OHCI_PORT_CSC); pump(1600);

@@ -19,3 +19,12 @@ u8 hid_kbd_order(u8 usage)
     const KmHidExtensions *ext = hid_jp_backend.extensions;
     return (ext->order[usage >> 2] >> ((usage & 3) * 2)) & 3;
 }
+
+int hid_kbd_repeatable(u8 usage)
+{
+    const KmEntry *entry = &hid_jp_backend.entries[usage];
+    const keysym_t void_symbol = 0xf500;
+    return !hid_kbd_norepeat(usage) &&
+           (entry->group1[0] != void_symbol || entry->group1[1] != void_symbol ||
+            entry->group2[0] != void_symbol || entry->group2[1] != void_symbol);
+}
