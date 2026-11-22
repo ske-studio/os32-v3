@@ -414,7 +414,9 @@
     "platform/pc98/usb_platform.c",
     "drivers/usb/ehci_quiesce.c",
     "drivers/usb/ehci_handoff.c",
-    "platform/pc98/usb_resident.c"
+    "platform/pc98/usb_resident.c",
+    "platform/pc98/usb_load.c",
+    "input/hal/usb_input.c"
   ],
   "ASM_KERNEL": [
     "arch/x86/kernel/kentry.asm",

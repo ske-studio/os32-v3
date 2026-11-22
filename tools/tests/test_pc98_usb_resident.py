@@ -11,11 +11,11 @@ PLATFORM = 'platform/pc98/usb_platform.c'
 BODY = 'platform/pc98/usb_module.c'
 HAL = ['in2_dev', 'in2_state', 'in2_ring', 'kbd_merge', 'pointer_state', 'mouse_ext',
        'legacy_keymap', 'keymap_registry', 'keymap_eval', 'keymap_state']
-SUPPORT = ['kernel/module/module_runtime.c', 'lib/kstring_c.c',
+SUPPORT = ['input/keymaps/hid_jp.c', 'kernel/module/module_runtime.c', 'lib/kstring_c.c',
            *[f'input/hal/{name}.c' for name in HAL]]
 HOST = 'tools/tests/pc98_usb_resident_host.c'
 CHECK = dict(name='pc98-usb-resident-host', tier=1, needs=[], budget=16,
-             covers=['kernel/module/module_runtime.c', 'lib/kstring_c.c', 'input/hal/*.c', 'tools/tests/kernel_includes.py', 'tools/tests/host32.py', 'tools/tests/kbd_hostshim/io.h', 'lib/*.h', 'mm/*.h', 'fs/*.h', 'platform/pc98/usb_module.c', 'input/hal/*.h', 'platform/pc98/usb_resident.c', 'tools/tests/pc98_usb_resident_host.c', 'platform/pc98/usb_platform.c', 'platform/pc98/usb*.h',
+             covers=['input/keymaps/hid_jp.c', 'kernel/module/module_runtime.c', 'lib/kstring_c.c', 'input/hal/*.c', 'tools/tests/kernel_includes.py', 'tools/tests/host32.py', 'tools/tests/kbd_hostshim/io.h', 'lib/*.h', 'mm/*.h', 'fs/*.h', 'platform/pc98/usb_module.c', 'input/hal/*.h', 'platform/pc98/usb_resident.c', 'tools/tests/pc98_usb_resident_host.c', 'platform/pc98/usb_platform.c', 'platform/pc98/usb*.h',
                      'platform/pc98/tick_order.h', 'kernel/irq/*.h', 'kernel/module/*.h',
                      'drivers/pci/*.h', 'drivers/usb/*.h', 'include/*.h', 'arch/x86/*.h',
                      'sdk/include/os32/*.h', 'tools/tests/test_pc98_usb_resident.py'],
@@ -31,9 +31,10 @@ MUTANTS = [('if (active) core->service()', 'core->service()', 1),
 
 def run(ctx):
     root = Path(ctx.root)
-    originals = [(root / path).read_text() for path in (SOURCE, PLATFORM, BODY)]
+    paths = (SOURCE, PLATFORM, BODY, 'input/hal/usb_input.c')
+    originals = [(root / path).read_text() for path in paths]
     with tempfile.TemporaryDirectory() as tmp:
-        sources = [Path(tmp) / Path(path).name for path in (SOURCE, PLATFORM, BODY)]
+        sources = [Path(tmp) / Path(path).name for path in paths]
         exe = Path(tmp) / 'host'
         cases = [(mode, '', '', 0) for mode in (b'r', b'm', b'q')]
         if ctx.mutate:
@@ -43,10 +44,11 @@ def run(ctx):
                 ('tick_budget_cnt(IRQ0_SLOT_BUDGET_US), scan_reserve_cnt', 'tick_budget_cnt(IRQ0_SLOT_BUDGET_US), 0', 35),
                 ('active < 0 ? active : 0', 'active', 22),
                 ('found && !active ? -USB_E_HC : active', '(void)found, active', 27),
-                ('if (s->id) input_src_release', 'if (!s->id) input_src_release', 29),
+                ('input_src_release(s->src, s->generation);', '(void)s;', 29),
                 ('isr_pending |= pending', 'isr_pending = pending', 23),
                 ('return pending ?', 'return hc->isr_pending ?', 24),
-                ('e.buttons = buttons', 'e.buttons = !buttons', 26)])
+                ('*s = (struct usb_source){0};', '*s = (struct usb_source){0}; i16 x, y; mouse_ext_read_legacy(&x, &y);', 36),
+                ('e.buttons = buttons', 'e.buttons = 0 * buttons', 26)])
         for mode, old, new, expected in cases:
             if old:
                 assert sum(source.count(old) for source in originals) == 1, old
@@ -55,7 +57,7 @@ def run(ctx):
             subprocess.run(['gcc', '-m32', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
                             '-ffreestanding', '-ffunction-sections', '-fdata-sections',
                             '-fno-pie', '-no-pie', '-nostdlib', '-static', '-Wl,--gc-sections',
-                            '-Itools/tests/kbd_hostshim', '-I.', *include_flags(root),
+                            '-Iinput/hal', '-Itools/tests/kbd_hostshim', '-I.', *include_flags(root),
                             *sources, *SUPPORT, HOST, '-o', exe], cwd=root, check=True)
             result = host32.run([str(exe)], input=mode).returncode
             assert result == expected, (old, result, expected)

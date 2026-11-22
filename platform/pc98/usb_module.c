@@ -1,7 +1,7 @@
 /* PC-98 usb.mod body. Controllers and their IRQ targets live for the boot. */
 #include "usb_resident.h"
 #include "drivers/usb/ohci_priv.h"
-#include "input/hal/in2_int.h"
+#include "input/hal/usb_input.h"
 
 struct module_handle pc98_usb_module_owner;
 
@@ -29,75 +29,27 @@ const struct {
     int (*initialize)(struct module_handle);
 } usb_module_ops = {1, usb_module_init};
 
-/* HID gives each kind its own short source number. in2 assigns a shared
- * device ID and generation, both required for delivery and removal. */
-static struct usb_input_source {
-    u8 id;
-    u16 generation;
-} keyboards[USB_KBD_MAX], mice[USB_MOUSE_MAX];
-
 int usbp_input_src_alloc(int kind)
 {
-    struct usb_input_source *slots;
-    unsigned count;
-    u8 input_kind;
-    if (kind == USBP_INPUT_KBD) {
-        slots = keyboards;
-        count = USB_KBD_MAX;
-        input_kind = INPUT_KIND_KBD;
-    } else if (kind == USBP_INPUT_MOUSE) {
-        slots = mice;
-        count = USB_MOUSE_MAX;
-        input_kind = INPUT_KIND_MOUSE;
-    } else return -1;
-    for (unsigned i = 0; i < count; i++) {
-        if (slots[i].id) continue;
-        int id = input_src_register(input_kind, INPUT_ORIGIN_USB, &slots[i].generation);
-        if (id <= 0) return -1;
-        slots[i].id = id;
-        return i + 1;
-    }
-    return -1;
+    return usb_input_alloc(kind);
 }
 
-void usbp_input_release(int kind, u8 src)
+void usbp_input_usage(u8 src, u8 usage, int down)
 {
-    struct usb_input_source *s;
-    if (kind == USBP_INPUT_KBD && src && src <= USB_KBD_MAX)
-        s = &keyboards[src - 1];
-    else if (kind == USBP_INPUT_MOUSE && src && src <= USB_MOUSE_MAX)
-        s = &mice[src - 1];
-    else return;
-    if (s->id) input_src_release(s->id, s->generation);
-    s->id = 0;
+    usb_input_usage(src, usage, down, 0);
 }
 
-void usbp_input_key(u8 src, u8 sc, int down)
+void usbp_input_usage_repeat(u8 src, u8 usage)
 {
-    struct usb_input_source s = keyboards[src - 1];
-    InputEvent e = {.type = INPUT_EVENT_KEY, .src = s.id, .generation = s.generation,
-                    .sc = sc, .down = down, .time_ms = in2_time_ms()};
-    input_capture(&e);
+    usb_input_usage(src, usage, 1, 1);
 }
 
-void usbp_input_key_repeat(u8 src, u8 sc)
+void usbp_input_mouse(u8 handle, i16 dx, i16 dy, u8 buttons)
 {
-    struct usb_input_source s = keyboards[src - 1];
-    input_repeat(s.id, s.generation, sc);
+    usb_input_mouse(handle, dx, dy, buttons);
 }
 
-void usbp_input_mouse(u8 src, i16 dx, i16 dy, u8 buttons)
+void usbp_input_release(int kind, u8 handle)
 {
-    struct usb_input_source s = mice[src - 1];
-    InputEvent e = {.src = s.id, .generation = s.generation, .time_ms = in2_time_ms()};
-    if (dx || dy) {
-        e.type = INPUT_EVENT_MOVE;
-        e.x = dx;
-        e.y = dy;
-        input_capture(&e);
-    }
-    e.type = INPUT_EVENT_BUTTON;
-    e.x = e.y = 0;
-    e.buttons = buttons;
-    input_capture(&e);
+    usb_input_release(kind, handle);
 }
