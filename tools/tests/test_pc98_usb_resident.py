@@ -16,7 +16,7 @@ SUPPORT = ['input/keymaps/hid_jp.c', 'kernel/module/module_runtime.c', 'lib/kstr
 HOST = 'tools/tests/pc98_usb_resident_host.c'
 CHECK = dict(name='pc98-usb-resident-host', tier=1, needs=[], budget=16,
              covers=['input/keymaps/hid_jp.c', 'kernel/module/module_runtime.c', 'lib/kstring_c.c', 'input/hal/*.c', 'tools/tests/kernel_includes.py', 'tools/tests/host32.py', 'tools/tests/kbd_hostshim/io.h', 'lib/*.h', 'mm/*.h', 'fs/*.h', 'platform/pc98/usb_module.c', 'input/hal/*.h', 'platform/pc98/usb_resident.c', 'tools/tests/pc98_usb_resident_host.c', 'platform/pc98/usb_platform.c', 'platform/pc98/usb*.h',
-                     'platform/pc98/tick_order.h', 'kernel/irq/*.h', 'kernel/module/*.h',
+                     'platform/pc98/tick_order.h', 'kernel/idle_work.h', 'kernel/irq/*.h', 'kernel/module/*.h',
                      'drivers/pci/*.h', 'drivers/usb/*.h', 'include/*.h', 'arch/x86/*.h',
                      'sdk/include/os32/*.h', 'tools/tests/test_pc98_usb_resident.py'],
              basis=['docs/decisions/usb/USB_DESIGN.md §4-1, §7-3'])
@@ -36,8 +36,17 @@ def run(ctx):
     with tempfile.TemporaryDirectory() as tmp:
         sources = [Path(tmp) / Path(path).name for path in paths]
         exe = Path(tmp) / 'host'
-        cases = [(mode, '', '', 0) for mode in (b'r', b'm', b'q')]
+        cases = [(mode, '', '', 0) for mode in (b'r', b'm', b'f', b'q', b't')]
         if ctx.mutate:
+            cases.extend([
+                (b't', 'kprintf(KLOG_ATTR, "[usb] tick register failed', 'if (0) kprintf(KLOG_ATTR, "[usb] tick register failed', 41),
+                (b'm', 'if (!found) kprintf', 'if (0) kprintf', 37),
+                (b'm', 'stage = "BAR map"', 'stage = "unknown"', 38),
+                (b'r', 'if (!hc->has_irq)\n            kprintf', 'if (0)\n            kprintf', 40),
+                (b'f', '        tick_target();',
+                 '        tick_target(); if (!foreground_log) log_drain_one();', 39),
+                (b'm', 'pc98_usb_service_log("[usb] first tick", NULL);', '(void)0;', 39),
+            ])
             cases.extend((b'r', *mutation) for mutation in MUTANTS)
             cases.extend((b'm', *mutation) for mutation in [
                 ('        tick_target();', '        (void)tick_target;', 34),

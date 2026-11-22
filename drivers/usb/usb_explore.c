@@ -49,7 +49,12 @@ static void next_port(struct usb_walk *w, int descend)
     for (;;) {
         u8 n = e->hub ? usb_hub_sc(e->hub)->nports : w->hc->nports;
         if (e->port <= n) { e->step = EX_P0; return; }
-        if (!e->hub) { w->hc->explored = 1; e->step = EX_X9; return; }
+        if (!e->hub) {
+            if (!w->hc->explored)
+                usbp_log("[usb] %u:%u.%u initial read=%x connected=%x", w->hc->pci.bus,
+                         w->hc->pci.dev, w->hc->pci.fn, w->root_read, w->root_connected);
+            w->hc->explored = 1; e->step = EX_X9; return;
+        }
         usb_hub_sc(e->hub)->explored = 1;
         e->port = e->hub->port + 1; e->hub = e->hub->parent;
     }
@@ -114,9 +119,18 @@ void usb_explore_step(struct usb_hc *hc)
     for (w = walks; w && w->hc != hc; w = w->next) {}
     if (!w) {
         w = usbp_mem_alloc(sizeof(*w));
-        if (!w) return;
+        if (!w) {
+            if (!hc->walk_error_logged) usbp_log("[usb] %u:%u.%u walk alloc failed", hc->pci.bus, hc->pci.dev, hc->pci.fn);
+            hc->walk_error_logged = 1;
+            return;
+        }
         kmemset(w, 0, sizeof(*w)); w->hc = hc;
-        if (usb_dmamem_alloc(hc, USB_CTRL_BUF_SIZE, 16, &w->scratch) < 0) { usbp_mem_free(w); return; }
+        if (usb_dmamem_alloc(hc, USB_CTRL_BUF_SIZE, 16, &w->scratch) < 0) {
+            usbp_mem_free(w);
+            if (!hc->scratch_error_logged) usbp_log("[usb] %u:%u.%u walk DMA failed", hc->pci.bus, hc->pci.dev, hc->pci.fn);
+            hc->scratch_error_logged = 1;
+            return;
+        }
         w->next = walks; walks = w; e->step = EX_X9;
     }
     switch (e->step) {
@@ -130,6 +144,15 @@ void usb_explore_step(struct usb_hc *hc)
         if (w->phase == 0) {
             if (!usb_port_op(w, USB_RH_STATUS)) return;
             if (w->error) { e->step = EX_ERR; return; }
+            if (!e->hub && !hc->explored) {
+                u16 bit = 1u << (e->port - 1);
+                w->root_read |= bit;
+                if (w->status & 1) w->root_connected |= bit;
+            }
+            if (!e->hub && ((w->status & (1u << USB_C_PORT_CONNECTION)) ||
+                            (!hc->explored && (w->status & (1u << USB_PORT_CONNECTION)))))
+                usbp_log("[usb] root %u:%u.%u port=%u connected=%u", hc->pci.bus,
+                         hc->pci.dev, hc->pci.fn, e->port, w->status & 1u);
             if (!(e->hub ? usb_hub_sc(e->hub)->explored : hc->explored)) w->status |= 1u << USB_C_PORT_CONNECTION;
             w->phase = 1;
         }
@@ -167,6 +190,7 @@ void usb_explore_step(struct usb_hc *hc)
         if (w->error) { e->step = EX_ERR; return; }
         if (!(w->status & (1u << USB_PORT_CONNECTION))) { next_port(w, 0); return; }
         if (!(w->status & (1u << USB_PORT_POWER))) usbp_log("usb: connected port without power");
+        w->reset_logged = 0;
         e->deadline_ms = usbp_ms() + 300; e->step = EX_R1; return;
     case EX_R1:
         if (!usb_due(usbp_ms(), e->deadline_ms)) return;
@@ -176,6 +200,9 @@ void usb_explore_step(struct usb_hc *hc)
         rc = reset_port(w);
         if (!rc) return;
         if (rc < 0) {
+            if (!w->reset_logged)
+                usbp_log("[usb] %u:%u.%u port=%u reset failed", hc->pci.bus, hc->pci.dev, hc->pci.fn, e->port);
+            w->reset_logged = 1;
             w->reset_phase = 0;
             if (e->step == EX_RE1 && !e->re_retry++) { e->deadline_ms = usbp_ms() + 500; e->step = EX_RE_WAIT; }
             else if (e->step == EX_RE1 && e->ret_step == EX_A2 && e->re_count++ < 2) {
@@ -196,6 +223,8 @@ void usb_explore_step(struct usb_hc *hc)
     case EX_R3: e->step = EX_A0; return;
     case EX_A0:
         e->child = alloc_device(w); usb_enum_reset(w);
+        if (!e->child)
+            usbp_log("[usb] %u:%u.%u port=%u child alloc failed", hc->pci.bus, hc->pci.dev, hc->pci.fn, e->port);
         e->step = e->child ? EX_A1 : EX_ERR; return;
     case EX_RE2:
         e->child->addr = 0; e->child->ep0_mps = 8; w->phase = 0; e->step = EX_RE3; return;

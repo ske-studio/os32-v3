@@ -1,5 +1,8 @@
 #include "usb_resident.h"
 #include "usb_probe.h"
+#include "kprintf.h"
+#include "idle_work.h"
+#include "io.h"
 #include "drivers/pci/pci.h"
 #include "kernel/irq/irq.h"
 
@@ -15,10 +18,73 @@ static u32 scan_reserve_cnt;
 static struct module_handle tick_owner;
 static void (*tick_target)(void);
 
+/* The USB tick reference pins the module while events are pending. Its
+ * format strings are literals. Service diagnostics use at most six numeric
+ * arguments, and producers run with interrupts masked on this machine. */
+#define USB_LOG_CAPACITY 32u
+static struct usb_log_event {
+    const char *fmt;
+    u32 args[6];
+} events[USB_LOG_CAPACITY];
+static unsigned head, count;
+static int first_tick, foreground_log;
+
+static void print_line(const char *fmt, const u32 *args)
+{
+    pc98_usb_tick_vprintf(KLOG_ATTR, fmt, args);
+    pc98_usb_tick_vprintf(KLOG_ATTR, "\n", NULL);
+}
+
+void pc98_usb_service_log(const char *fmt, const u32 *args)
+{
+    if (!tick_target) {
+        print_line(fmt, args);
+        return;
+    }
+    if (count == USB_LOG_CAPACITY) return;
+    struct usb_log_event *event = &events[(head + count) % USB_LOG_CAPACITY];
+    unsigned n = 0;
+    for (const char *p = fmt; *p; p++) {
+        if (*p != '%') continue;
+        if (p[1] == '%') { p++; continue; }
+        if (n == sizeof(event->args) / sizeof(event->args[0])) return;
+        event->args[n] = args[n];
+        n++;
+    }
+    event->fmt = fmt;
+    count++;
+}
+
+static void log_drain_one(void)
+{
+    u32 flags = irq_save();
+    if (!count) {
+        irq_restore(flags);
+        return;
+    }
+    struct usb_log_event event = events[head];
+    head = (head + 1) % USB_LOG_CAPACITY;
+    count--;
+    irq_restore(flags);
+    print_line(event.fmt, event.args);
+}
+
+/* Include already observed events in the boot snapshot even before idle. */
+void pc98_usb_flush_boot_log(void)
+{
+    unsigned pending = count;
+    while (pending--) log_drain_one();
+}
+
 static void usb_tick(void)
 {
-    if (tick_target && tick_budget_peek(tick_budget_cnt(IRQ0_SLOT_BUDGET_US), scan_reserve_cnt))
+    if (tick_target && tick_budget_peek(tick_budget_cnt(IRQ0_SLOT_BUDGET_US), scan_reserve_cnt)) {
+        if (first_tick) {
+            first_tick = 0;
+            pc98_usb_service_log("[usb] first tick", NULL);
+        }
         tick_target();
+    }
 }
 
 int usb_resident_tick_set(void (*service)(void))
@@ -28,6 +94,7 @@ int usb_resident_tick_set(void (*service)(void))
     if (!service) {
         if (tick_target) {
             tick_target = NULL;
+            head = count = 0; /* Discard literals before releasing the owner. */
             module_ref_release(owner, MODULE_REF_TICK);
         }
         return 0;
@@ -41,6 +108,12 @@ int usb_resident_tick_set(void (*service)(void))
         return -USB_E_HC;
     }
     scan_reserve_cnt = arch_tick_budget_cnt(USB_SCAN_RESERVE_US);
+    if (!foreground_log) {
+        foreground_log = idle_work_register(log_drain_one) == 0;
+        if (!foreground_log) kprintf(KLOG_ATTR, "[usb] idle log unavailable, boot flush only\n");
+    }
+    head = count = 0;
+    first_tick = 1;
     tick_target = service;
     return 0;
 }
@@ -104,25 +177,36 @@ int pc98_usb_resident_start(struct module_handle owner, struct pc98_usb_core *co
         struct usb_hc *hc = &core->hc[used];
         if (!pc98_usb_is_ohci(&dev)) continue;
         found = 1;
-        if (!pc98_usb_ohci_quiet(i) || pc98_usb_ohci_function(&dev, &hc->pci)) continue;
-        if (usbp_mmio_map(&hc->pci, 0, &hc->regs)) continue;
+        const char *stage = NULL;
+        if (!pc98_usb_ohci_quiet(i)) stage = "quiesce";
+        else if (pc98_usb_ohci_function(&dev, &hc->pci)) stage = "PCI/BAR";
+        else if (usbp_mmio_map(&hc->pci, 0, &hc->regs)) stage = "BAR map";
+        if (stage) {
+            kprintf(KLOG_ATTR, "[usb] %u:%u.%u failed: %s\n", dev.bus, dev.dev, dev.fn, stage);
+            continue;
+        }
         hc->ops = core->ops;
         hc->has_irq = !usb_resident_irq_attach(owner, &hc->pci, core->isr, hc);
+        if (!hc->has_irq)
+            kprintf(KLOG_ATTR, "[usb] %u:%u.%u IRQ unavailable, polling\n", dev.bus, dev.dev, dev.fn);
         if (!hc->ops->start(hc)) {
             if (!core->register_hc(hc)) {
                 active++;
                 used++;
                 continue;
             }
+            kprintf(KLOG_ATTR, "[usb] %u:%u.%u HC register failed\n", dev.bus, dev.dev, dev.fn);
             core->dead(hc, USB_WHY_START);
         }
         if (hc->has_irq) usb_resident_irq_detach(&hc->pci);
         /* Keep failed HC storage too: quarantine or failed detach can retain it. */
         used++;
     }
+    if (!found) kprintf(KLOG_ATTR, "[usb] no OHCI candidate\n");
     if (active && !tick_target) tick_owner = owner;
     if (active && (owner.slot != tick_owner.slot || owner.generation != tick_owner.generation ||
                    usb_resident_tick_set(core->service))) {
+        kprintf(KLOG_ATTR, "[usb] tick register failed\n");
         for (unsigned i = 0; i < used; i++) {
             struct usb_hc *hc = &core->hc[i];
             if (hc->state == HC_RUNNING) core->dead(hc, USB_WHY_ABORT);

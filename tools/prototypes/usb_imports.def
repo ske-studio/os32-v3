@@ -132,6 +132,12 @@
       "source": "include/usb_platform.h",
       "context": "normal",
       "irq": false
+    },
+    {
+      "symbol": "pc98_usb_service_log",
+      "source": "platform/pc98/usb_resident.h",
+      "context": "normal",
+      "irq": true
     }
   ]
 }

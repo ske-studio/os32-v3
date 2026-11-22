@@ -39,7 +39,7 @@ def build(tmp, swap=False, mutation=None):
     command(['gcc', *FLAGS, *(['-DUSB_TEST_SWAP'] if swap else []), *paths,
              'tools/tests/usb_fake_dev.c', '-o', str(exe)])
     return exe
-def execute(exe, cases=range(1,36), red=False):
+def execute(exe, cases=range(1,40), red=False):
     failures=[]
     for case in cases:
         p=host32.run([str(exe),str(case)],capture_output=True,timeout=20)
@@ -49,6 +49,17 @@ def execute(exe, cases=range(1,36), red=False):
     if not red: assert not failures, failures
     return failures
 MUTATIONS = [
+ ('usb_explore','usbp_log("[usb] %u:%u.%u port=%u child alloc','if (0) usbp_log("[usb] %u:%u.%u port=%u child alloc'),
+ ('usb_explore','if (!hc->scratch_error_logged)', 'if (!hc->walk_error_logged && !hc->scratch_error_logged)'),
+ ('usb_explore','usbp_log("[usb] %u:%u.%u initial','if (0) usbp_log("[usb] %u:%u.%u initial'),
+ ('usb_explore','usbp_log("[usb] %u:%u.%u port=%u reset','if (0) usbp_log("[usb] %u:%u.%u port=%u reset'),
+ ('usb_explore','if (!hc->walk_error_logged) usbp_log("[usb] %u:%u.%u walk alloc','if (0) usbp_log("[usb] %u:%u.%u walk alloc'),
+ ('usb_explore','if (!hc->scratch_error_logged) usbp_log("[usb] %u:%u.%u walk DMA','if (0) usbp_log("[usb] %u:%u.%u walk DMA'),
+ ('usb_enum','if (!w->descriptor_logged)','if (0)'),
+ ('usb_enum','usbp_log(messages[reason],','if (0) usbp_log(messages[reason],'),
+ ('usb_enum','usbp_log("[usb] addr=%u iface=%u unsupported','if (0) usbp_log("[usb] addr=%u iface=%u unsupported'),
+ ('usb_explore','usbp_log("[usb] root','if (0) usbp_log("[usb] root'),
+ ('usb_enum','usbp_log("[usb] HID','if (0) usbp_log("[usb] HID'),
  ('usb_req','x->deadline_ms = old_deadline;', 'x->deadline_ms = 0; (void)old_deadline;'),
  ('usb_service','f->attached && f->sc && f->cls && f->cls->tick','f->sc && f->cls && f->cls->tick'),
  ('usb_service','f->attached && f->sc && f->cls && f->cls->tick','f->attached && f->cls && f->cls->tick'),
@@ -79,7 +90,7 @@ MUTATIONS = [
  ('usb_enum','e->deadline_ms = usbp_ms() + 10;', 'e->deadline_ms = usbp_ms();'),
  ('usb_explore','e->step = e->child ? EX_A1 : EX_ERR;', 'e->step = e->child ? EX_A2 : EX_ERR;'),
  ('usb_explore','if (!usb_port_op(w, USB_RH_CLEAR_ENABLE)) return;', 'if (0) return;'),
- ('usb_enum','if (w->error) cfg_failed(w);', 'if (w->error) e->step = EX_ERR;'),
+ ('usb_enum','if (w->error) cfg_failed(w, CFG_SET);', 'if (w->error) e->step = EX_ERR;'),
  ('usb_enum','le16_wr((u8 *)e->cfgbuf->va + 2, w->cfg_length);', '(void)w->cfg_length;'),
  ('usb_enum','if (rc == -USB_E_BUSY) return 0;', 'if (rc == -USB_E_BUSY) { w->iface++; return 0; }'),
  ('usb_enum','if (rc < 0) { w->attach_failed = 1; return 0; }', 'if (rc < 0) { e->step = EX_ERR; return 0; }'),

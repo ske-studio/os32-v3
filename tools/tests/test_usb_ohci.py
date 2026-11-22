@@ -27,6 +27,8 @@ CHECK = dict(name='usb-ohci', tier=1, needs=[], budget=20,
 # F9/F9d and G1 service-side mutations exercise the minimal core stand-in;
 # real 1C integration remains the PM's explicitly separate gate.
 MUTATIONS = [
+    ('failure-log', 'ohci_init.c', 'usbp_log("[usb] %u:%u.%u failed', 'if (0) usbp_log("[usb] %u:%u.%u failed'),
+    ('start-log', 'ohci_init.c', 'usbp_log("[usb] ohci', 'if (0) usbp_log("[usb] ohci'),
     ('R1', 'ohci_init.c', '            OHCI_WATCH);', '            OHCI_WATCH | (hc->has_irq ? OHCI_INTR_MIE : 0));'),
     ('A1-stop', 'ohci_init.c', '    ohci_wr(hc, OHCI_CONTROL, OHCI_CTL_RESET); ohci_wr(hc, OHCI_COMMAND_STATUS, OHCI_CMD_HCR);', '    /* stop writes removed */'),
     ('A3', 'ohci_init.c', '    tree_init(hc);', '    if (0) tree_init(hc);'),

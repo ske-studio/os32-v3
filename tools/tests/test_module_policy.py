@@ -94,6 +94,17 @@ def check_pair_request(stem, adapter):
                 mutant.write_text(source.replace(old, old + '\n    ' + change))
                 exercise(mutant, expected)
                 print(f'RED {stem} {change}')
+            if stem == 'usb':
+                anchor = 'kprintf(KLOG_ATTR, "[BOOT] usb module rc='
+                assert source.count(anchor) == 1
+                mutant.write_text(source.replace(anchor, 'if (0) ' + anchor))
+                exercise(mutant, (1, 1))
+                print('RED usb boot result omitted')
+                anchor = 'else kprintf(KLOG_ATTR, "[BOOT] usb module skipped: DMA unavailable\\n");'
+                assert source.count(anchor) == 1
+                mutant.write_text(source.replace(anchor, ''))
+                exercise(mutant, (3, 3))
+                print('RED usb DMA skip omitted')
 
 
 def conformance():

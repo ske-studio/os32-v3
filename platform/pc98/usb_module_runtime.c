@@ -1,6 +1,7 @@
 /* Platform services linked into usb.mod. A live or quarantined DMA page
  * pins its module even on a controller serviced entirely by polling. */
 #include "usb_resident.h"
+#include "drivers/usb/usb_internal.h"
 #include "mm/dma_pool.h"
 #include "mm/kmalloc.h"
 #include "input/hal/in2_int.h"
@@ -58,7 +59,11 @@ void usbp_log(const char *fmt, ...)
      * matching the resident kvprintf interface. */
     va_list args;
     va_start(args, fmt);
-    kvprintf(KLOG_ATTR, fmt, (const u32 *)args);
+    if (usb_busy) {
+        pc98_usb_service_log(fmt, (const u32 *)args);
+    } else {
+        kvprintf(KLOG_ATTR, fmt, (const u32 *)args);
+        kprintf(KLOG_ATTR, "\n");
+    }
     va_end(args);
-    kprintf(KLOG_ATTR, "\n");
 }
