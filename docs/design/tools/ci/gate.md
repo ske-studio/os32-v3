@@ -83,7 +83,7 @@ SKIP の行は挙げるだけで落とさない: 試験が自分の出力とし�
 |---|---|---|
 | check.yml `static-check` | `make check-<名>` を手で並べる | クロスコンパイラ無しで回る検査に CHECK の `env` で印を付け、`gate.py run` に環境の絞り込みを足して一覧を登録から取る (G4)。static の事前確認は §3-1 |
 | check.yml `ppc-compile` | `run.py --run all`、`ppc_scope.py` のパスの一覧 | `gate.py run --env ppc-cross` に替える (G2・G3)。PowerPC を回すかどうかの判定は、パスの一覧ではなく所有者集合 (`build/select.mk`) から引く |
-| check.yml `ppc-qemu` | 2026-11-18 に `gate.py run --env qemu-ppc --shard i/4` の 4 分割にし、`needs` の鎖を外した (G2・G3・G10)。2026-11-21 のユーザー決定で 5 分割から i/6 の 6 分割に変更 (各段 20〜27 分、30 分での時間切れが 3 回)。2026-11-22 に 8 分割 (i/8) に変更。検査ごとの所要を成果物 `check-times-<SHA>-ppc-qemu-<i>` に出す | 残りは `ppc_scope.py` のパスの一覧と、用意の行の重複 |
+| check.yml `ppc-qemu` | 2026-11-18 に `gate.py run --env qemu-ppc --shard i/4` の 4 分割にし、`needs` の鎖を外した (G2・G3・G10)。2026-11-21 のユーザー決定で 5 分割から i/6 の 6 分割に変更 (各段 20〜27 分、30 分での時間切れが 3 回)。2026-11-22 に 8 分割を経て 10 分割 (i/10) に変更。検査ごとの所要を成果物 `check-times-<SHA>-ppc-qemu-<i>` に出す | 残りは `ppc_scope.py` のパスの一覧と、用意の行の重複 |
 | build.yml `checks` (6 シャード) | `make -k check CHECK_SHARD=…` (全部の検査を変異込み、2026-11-18 から) | `gate.py run --shard …` に替えると、表・検査ごとのログ・回っていない検査の検出が付く (G2・G3)。`gate-setup` にすると PowerPC の検査が SKIP にならない (G5・G6) |
 | 用意 | apt の行が 4 か所 | `gate-setup` に寄せる (G5) |
 
@@ -229,15 +229,17 @@ static-check の Check map は 5 分、Host tests は 6 分（検査本体の実
 |---|---|---|---|
 | `ppc-layout-inventory` (check.yml) | 像の配置に効くファイルを触った push の時だけ (`tools/ci/ppc_scope.py --inventory`。kernel.ld・memmap.h・platform_*_layout.h・build/images・ppc-powermac.mk・root の生成の道具・sdk/kapi.json ほか)。当たらない時は SKIP の理由の行 | 約 31 分 (195 像) | 90 分 |
 
-ふだんは代表の 1 検査 `ppc-root-lz4-layout-host` (製品 5 像・最大の受入 3 像・64 KiB の整列の跳ね) だけが ppc-qemu の組で回る。2026-11-22 の 8 組の割り振りと、11-21 の重みによる所要の見積もりは次のとおり。
+ふだんは代表の 1 検査 `ppc-root-lz4-layout-host` (製品 5 像・最大の受入 3 像・64 KiB の整列の跳ね) だけが ppc-qemu の組で回る。2026-11-22 の 10 組の割り振りと、同日の 8 組の実測 4 回の中央値による所要の見積もりは次のとおり。
 
 | 組 | 検査 | 重みの和 (秒) |
 |---|---|---:|
-| 0/8 | `ppc-display-guest` | 1159.751288 |
-| 1/8 | `ppc-fb`、`ppc-sysinfo-guest`、`ppc-shell-layout-guest` | 924.02019 |
-| 2/8 | `ppc-fp-guest`、`ppc-sd-link`、`ppc-kcg-guest`、`ppc-shm-guest`、`ppc-root-lz4-layout-host` | 919.370437 |
-| 3/8 | `arch-ctx-guest`、`ppc-gfx2-guest`、`ppc-usb`、`ppc-sc`、`ppc-sqlite-static-guest`、`ppc-mmu` | 940.154309 |
-| 4/8 | `ppc-link-sh-flow`、`ppc-reset`、`ppc-rtc-guest`、`ppc-port-guest`、`ppc-console-cells`、`ppc-rh-fb` | 908.920488 |
-| 5/8 | `ppc-link-sh-run`、`ppc-sd`、`ppc-ata-guest`、`ppc-path-guest`、`ppc-pci-guest`、`ppc-sqlite-stack-guest` | 900.405324 |
-| 6/8 | `ppc-memstat-guest`、`ppc-db-guest`、`ppc-ver-guest`、`ppc-font-guest`、`ppc-sfs-guest`、`ppc-fp-accept-host` | 893.8773 |
-| 7/8 | `ppc-boot-info-guest`、`ppc-mouse-guest`、`ppc-surface-guest`、`ppc-display-lifecycle`、`ppc-loop-guest`、`ppc-sh-output` | 927.78099 |
+| 0/10 | `ppc-display-guest` | 962.2 |
+| 1/10 | `ppc-fb`、`ppc-module-guest`、`ppc-mmu` | 875.6 |
+| 2/10 | `ppc-link-sh-run`、`ppc-sysinfo-guest`、`ppc-shm-guest`、`ppc-rh-fb`、`ppc-kboot-console` | 855.4 |
+| 3/10 | `arch-ctx-guest`、`ppc-sd`、`ppc-port-guest`、`ppc-sh-output` | 873.2 |
+| 4/10 | `ppc-fp-guest`、`ppc-memstat-guest`、`ppc-display-lifecycle`、`ppc-console-cells`、`ppc-sqlite-stack-guest` | 867.2 |
+| 5/10 | `ppc-link-sh-flow`、`ppc-reset`、`ppc-kcg-guest`、`ppc-pci-guest`、`ppc-fp-accept-host` | 852.8 |
+| 6/10 | `ppc-machcfg-guest`、`ppc-gfx2-guest`、`ppc-surface-guest`、`ppc-font-guest`、`ppc-shell-layout-guest` | 860.5 |
+| 7/10 | `ppc-boot-info-guest`、`ppc-mouse-guest`、`ppc-ver-guest`、`ppc-rtc-guest`、`ppc-root-lz4-layout-host` | 859.9 |
+| 8/10 | `ppc-db-guest`、`ppc-kapi-v89-guest`、`ppc-usb`、`ppc-path-guest`、`ppc-loop-guest` | 878.7 |
+| 9/10 | `ppc-ata-guest`、`ppc-sfs-guest`、`ppc-sd-link`、`ppc-sc`、`ppc-sqlite-static-guest` | 882.7 |

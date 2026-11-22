@@ -18,7 +18,7 @@
   python3 -B tools/tests/test_dma_pool.py --mutate   # 否定側
 """
 CHECK = dict(name='dma-pool-host', tier=1,
-    covers=['platform/pc98/boot_capture.c', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'drivers/dma/dma8237_math.c', 'mm/dma_pool.c', 'mm/dma_pool_math.c', 'tools/tests/dma_pool_host.c', 'tools/tests/dma_boot_host.c', 'platform/pc98/kernel.c', 'mm/dma_pool.h', 'include/memmap.h', 'drivers/block/fdc.c', 'drivers/block/fdc_io.inc', 'drivers/block/fdc_seek_reset.inc', 'drivers/block/fdc_transfer.inc', 'drivers/block/fdc.h', 'kdebug/kselftest.c', 'kdebug/kselftest/**', 'mm/pgalloc.h', 'kernel/module/module.h', 'kernel/sqlite_engine.h', 'kernel/sqlite_engine_body.h', 'kernel/dev/dev.h', 'fs/vfs.h', 'include/pc98.h', 'platform/pc98/boot_platform.h', 'platform/pc98/boot_platform.c', 'platform/pc98/boot_display.h', 'platform/pc98/boot_display.c', 'platform/pc98/boot.h', 'platform/pc98/boot.c', 'include/dma_contract.h', 'lib/dma_contract.c', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py'],
+    covers=['include/kernel_mount_children.h', 'platform/pc98/boot_capture.c', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'drivers/dma/dma8237_math.c', 'mm/dma_pool.c', 'mm/dma_pool_math.c', 'tools/tests/dma_pool_host.c', 'tools/tests/dma_boot_host.c', 'platform/pc98/kernel.c', 'mm/dma_pool.h', 'include/memmap.h', 'drivers/block/fdc.c', 'drivers/block/fdc_io.inc', 'drivers/block/fdc_seek_reset.inc', 'drivers/block/fdc_transfer.inc', 'drivers/block/fdc.h', 'kdebug/kselftest.c', 'kdebug/kselftest/**', 'mm/pgalloc.h', 'kernel/module/module.h', 'kernel/sqlite_engine.h', 'kernel/sqlite_engine_body.h', 'kernel/dev/dev.h', 'fs/vfs.h', 'include/pc98.h', 'platform/pc98/boot_platform.h', 'platform/pc98/boot_platform.c', 'platform/pc98/boot_display.h', 'platform/pc98/boot_display.c', 'platform/pc98/boot.h', 'platform/pc98/boot.c', 'include/dma_contract.h', 'lib/dma_contract.c', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py'],
     needs=[], budget=3.3,
     basis=['[HW2]', '[C5]'],
 )
@@ -138,14 +138,11 @@ def boot_gate(tmp):
     start = kernel.index('    if (!memory_boot_init(mem_kb))')
     end = kernel.index('    /* FDリダイレクト初期化', start)
     gate = '    struct boot_context boot = {0};\n' + kernel[start:end].replace('for (;;) { _stop(); }', 'longjmp(halt, 1);')
-    mount_helper = re.search(
-        r"static inline void kernel_mount_children\(const char \*root_dev\)\n\{.*?\n}\n",
-        kernel, re.S).group()
     lan_helper = re.search(
         r"static void kernel_boot_lan\(struct boot_context \*boot\)\n\{.*?\n}\n",
         kernel, re.S).group()
     (d / "kernel_dma_gate.c").write_text(
-        '#include "kprintf.h"\n' + mount_helper + lan_helper +
+        '#include "kprintf.h"\n#include "kernel_mount_children.h"\n' + lan_helper +
         'static void host_kernel_dma(u32 mem_kb) {\n' + gate + '\n}\n')
     selftests = (ROOT / "kdebug/kselftest.c").read_text()
     helper = re.search(r"static int selftest_dma_available\(void\).*?\n}\n", selftests, re.S).group()
