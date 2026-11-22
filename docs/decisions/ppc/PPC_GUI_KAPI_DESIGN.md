@@ -107,5 +107,5 @@ origin/main の 56d7be02d にある kernel/gui.c と kernel/av_focus.c を基準
 
 ## 確定 (2026-11-22、本線の sol 第 3 回「追記で確定可」、PM が反映)
 - §4: 「WM の終了の後」を「WM から CUI への切り替えを要求して終了した後」と明記した (普通の終了だけでは、シェルのループは同じ GUI の像を起動し直す)。置き換え 1 か所 (§4 の C-GUI の段落)。
-- USB の in2 の設計 ([PPC_USB_IN2_DESIGN](PPC_USB_IN2_DESIGN.md)) の段 C の GUI の配置は、この設計の C-GUI (KAPI の結線と製品の GUI の有効化の間、/sys/shell.bin と /bin/gshell.bin を分け、C-GUI 専用の構成で /bin/gshell.bin を選ぶ) に揃える。
+- USB の in2 の設計 (PPC_USB_IN2_DESIGN) の段 C の GUI の配置は、この設計の C-GUI (KAPI の結線と製品の GUI の有効化の間、/sys/shell.bin と /bin/gshell.bin を分け、C-GUI 専用の構成で /bin/gshell.bin を選ぶ) に揃える。
 - 本線の先行段: 7d の統合、段 1–2 の共有ビルドと PPC の KAPI の生成、x86 での同期 present の要否の判定と要る時の共通の描画の権限・回帰。PowerPC の担当は C-GUI の起動の道を直して両 CPU (7450・7455) で通した後に製品の GUI を有効にする。
