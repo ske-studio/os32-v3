@@ -13,7 +13,7 @@ CHECK = dict(name='sqlite-product-sql', tier=1, needs=[], budget=21.2,
             'assets/settings/defaults.tsv',
             'lib/sqlite3/sqlite3.c', 'lib/sqlite3/sqlite3.h',
             'lib/sqlite3/os32_sqlite_config.h', 'userland/**',
-            'kernel/sqlite_engine.c', 'kernel/ime/ime_*.c', 'kapi/kapi_db.c'],
+            'kernel/fep_boot.c', 'kernel/ime/ime_*.c', 'kapi/kapi_db.c'],
     kind='characterization',
 )
 import argparse
@@ -51,7 +51,7 @@ def literals(source):
 def collect(mutant=None):
     paths = sorted(set(ROOT.glob('userland/**/*.[ch]')) |
                    set(ROOT.glob('kernel/ime/ime_*.c')) |
-                   {ROOT / 'kernel/sqlite_engine.c', ROOT / 'kapi/kapi_db.c'})
+                   {ROOT / 'kernel/fep_boot.c', ROOT / 'kapi/kapi_db.c'})
     rows = []
     for path in paths:
         source = path.read_text()
@@ -95,7 +95,7 @@ def collect(mutant=None):
     assert any(ANCHOR in s or 'CAST(tval AS BLOB)' in s for _, _, s in rows)
     required = {'userland/system/hsync.c', 'userland/lib/cfg/cfg_init.c',
                 'userland/lib/cfg/libos32cfg.c', 'userland/lib/cfg/cfg_enum.c',
-                'kernel/sqlite_engine.c', 'kernel/ime/ime_dict.c',
+                'kernel/fep_boot.c', 'kernel/ime/ime_dict.c',
                 'kernel/ime/ime_dict_info.c', 'kernel/ime/ime_user_store.c',
                 'kapi/kapi_db.c', 'userland/tests/db_v50_test.c',
                 'userland/tests/db_test.c', 'userland/tests/dbq.c',
@@ -191,7 +191,7 @@ def check_sql(engine, rows):
                 ddl = [s for s in cfg_ddl if 'CREATE TABLE settings' in s] + ime_ddl
             for schema in ddl:
                 engine.prepare(db, schema, execute=True)
-            if '/ime_' in path or path in ('kernel/sqlite_engine.c', 'userland/tests/fep_meta_test.c'):
+            if '/ime_' in path or path in ('kernel/fep_boot.c', 'userland/tests/fep_meta_test.c'):
                 engine.prepare(db, 'CREATE TABLE dict(yomi TEXT,kanji TEXT,pos_id INTEGER,cost INTEGER)', execute=True)
             if not sql.startswith('CREATE '):
                 try:
