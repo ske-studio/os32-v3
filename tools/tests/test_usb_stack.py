@@ -9,6 +9,7 @@ import sys
 import tempfile
 import time
 
+from kernel_includes import include_flags
 import host32
 import test_usb_ohci
 import test_usb_core
@@ -18,6 +19,9 @@ SOURCES = test_usb_ohci.SOURCES + [s + '.c' for s in test_usb_core.SOURCES] + [
     'hid_kbd.c', 'hid_kbd_map.c', 'hid_mouse.c']
 SOURCES = ['drivers/usb/' + s for s in SOURCES] + ['input/keymaps/hid_jp.c']
 CHECK = dict(env=['ppc-cross'], name='usb-stack', tier=1, needs=[], budget=60, covers=[
+    'tools/tests/usb_stack_idle_host.c', 'tools/tests/kernel_includes.py', 'tools/tests/kbd_hostshim/io.h',
+    'platform/pc98/usb_resident.c', 'platform/pc98/*.h', 'kernel/*.h', 'kernel/irq/*.h',
+    'kernel/module/*.h', 'drivers/pci/*.h', 'arch/x86/*.h', 'include/*.h', 'sdk/include/os32/*.h',
     'drivers/usb/*.[ch]', 'input/keymaps/hid_jp.c', 'input/hal/keymap.h', 'include/usb_platform.h', 'include/types.h',
     'include/callconv.h', 'include/endian_le.h', 'include/endian_dma.h',
     'arch/*/arch_endian_dma.h', 'lib/kstring.h',
@@ -53,7 +57,11 @@ def command(argv):
 
 def build(tmp, tree, swap):
     exe = tmp / 'stack'
-    command(['gcc', '-m32', *FLAGS, '-no-pie', '-nostdinc', '-nostdlib', '-static',
+    adapter = tmp / 'idle.o'
+    command(['gcc', '-m32', *FLAGS, '-ffunction-sections', '-fdata-sections',
+             '-Itools/tests/kbd_hostshim', '-I.', *include_flags(ROOT),
+             '-c', 'tools/tests/usb_stack_idle_host.c', '-o', str(adapter)])
+    command(['gcc', '-m32', *FLAGS, str(adapter), '-Wl,--gc-sections', '-no-pie', '-nostdinc', '-nostdlib', '-static',
              '-Wl,-e,_start', '-Wl,--wrap=usb_dmamem_free',
              '-I' + str(tmp / 'fake-arch'), '-I' + str(tree / 'include'),
              '-I' + str(tree), *(['-DUSB_TEST_SWAP'] if swap else []),

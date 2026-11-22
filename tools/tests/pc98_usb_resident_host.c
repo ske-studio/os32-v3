@@ -158,8 +158,11 @@ static int start(struct usb_hc *hc)
 static int add(struct usb_hc *hc) { (void)hc; registered++; return fail_register; }
 static void dead(struct usb_hc *hc, u32 why)
 { if (why != USB_WHY_START && why != USB_WHY_ABORT) bad++; hc->state = HC_DEAD; }
+extern int kbd_shim_irq_depth;
+static int require_mask;
 static void service(void)
 {
+    if (require_mask && !kbd_shim_irq_depth) bad++;
     if (++services == 2) {
         u32 value = 1;
         pc98_usb_service_log("sample %u", &value);
@@ -172,7 +175,15 @@ static struct usb_hc *module_hc;
 static u32 collect(struct usb_hc *hc) { return hc == module_hc ? usb_pending : 0; }
 const struct usb_hc_ops ohci_ops = {.start = start, .intr_collect = collect};
 int usb_hc_register(struct usb_hc *hc) { module_hc = hc; return add(hc); }
-void usb_service(void) { service(); }
+static unsigned completions;
+void usb_service(void)
+{
+    service();
+    if (module_hc->isr_pending & OHCI_INTR_WDH) {
+        module_hc->isr_pending &= ~OHCI_INTR_WDH;
+        completions++;
+    }
+}
 void usb_hc_dead(struct usb_hc *hc, u32 why) { dead(hc, why); }
 
 int kbd_shim_irq_depth;
@@ -197,6 +208,29 @@ static void relocated(void)
         .text = (uptr)&__executable_start, .text_size = (uptr)&etext - (uptr)&__executable_start,
         .backing = 8192, .pages = 2, .prefix_pages = 1
     };
+}
+
+static int completion_order(int idle_first)
+{
+    unsigned before = services, delivered = completions;
+    remaining_us = 0;
+    periodic();
+    usb_pending = OHCI_INTR_WDH;
+    if (handler(5, argument) != IRQ_HANDLED || services != before ||
+        completions != delivered || module_hc->isr_pending != OHCI_INTR_WDH) return 43;
+    usb_pending = 0;
+    remaining_us = 91;
+    if (idle_first) idle_log();
+    else periodic();
+    if (services != before + 1 || completions != delivered + 1 ||
+        module_hc->isr_pending) return 44;
+    idle_log();
+    if (services != before + 1 || completions != delivered + 1) return 45;
+    if (idle_first) {
+        periodic(); /* A new admitted tick has its own scan. */
+        if (services != before + 2 || completions != delivered + 1) return 46;
+    }
+    return 0;
 }
 
 static int module_boot(void)
@@ -246,6 +280,24 @@ static int module_boot(void)
     if (lines != 3 || event_logs != 2) return 39;
     periodic();
     if (lines != 3 || first_logs != 1 || bad) return 39;
+    if (idle_log) {
+        unsigned before = services;
+        idle_log();
+        if (services != before) return 42;
+        remaining_us = 0;
+        periodic();
+        periodic();
+        if (services != before) return 35;
+        require_mask = 1;
+        idle_log();
+        require_mask = 0;
+        idle_log();
+        if (services != before + 1 || bad) return 42;
+        int rc = completion_order(0);
+        if (!rc) rc = completion_order(1);
+        if (rc) return rc;
+        usb_pending = 1;
+    }
     module_hc->isr_pending = 2;
     if (handler(5, argument) != IRQ_HANDLED || module_hc->isr_pending != 3) return 23;
     usb_pending = 0;
