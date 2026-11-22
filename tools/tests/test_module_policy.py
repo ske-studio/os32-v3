@@ -1,10 +1,11 @@
 """T5c-6 table validation and conformance of existing policy consumers."""
 CHECK = dict(name='module-policy-host', tier=1,
-    covers=['tools/tests/host_arch/arch_io.h', 'drivers/video/geforce/geforce_module.c', 'hwdev/hwdev_module.c', 'tools/tests/module_pair_request_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'include/platform_module_pair.h', 'exec/os32x_hdr.c', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'kernel/module/module_schema.h', 'include/config.h', 'build/core.yaml', 'platform/pc98/kernel.c', 'kernel/sqlite_engine.c', 'userland/system/hsync.c', 'userland/shell/ui.c', 'kdebug/kdebug_module.c', 'kernel/ime/fep_module.c', 'drivers/ata/cd_module.c', 'drivers/video/kcg/kcg_module.c', 'drivers/sound/fm/fm_module.c', 'drivers/sound/cs4231/pcm_module.c', 'platform/pc98/legacy/v86_module.c', 'drivers/net/e82557/lan_module.c', 'drivers/video/cirrus/cirrus_module.c', 'drivers/video/trident/trident_module.c', 'build/kernel.*', 'build/out/*'],
+    covers=['tools/prototypes/usb_imports.def', 'build/out/usb/usb_imports.json', 'tools/tests/host_arch/arch_io.h', 'drivers/video/geforce/geforce_module.c', 'hwdev/hwdev_module.c', 'tools/tests/module_pair_request_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'include/platform_module_pair.h', 'exec/os32x_hdr.c', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'kernel/module/module_schema.h', 'include/config.h', 'build/core.yaml', 'platform/pc98/kernel.c', 'platform/pc98/usb_load.c', 'kernel/sqlite_engine.c', 'userland/system/hsync.c', 'userland/shell/ui.c', 'kdebug/kdebug_module.c', 'kernel/ime/fep_module.c', 'drivers/ata/cd_module.c', 'drivers/video/kcg/kcg_module.c', 'drivers/sound/fm/fm_module.c', 'drivers/sound/cs4231/pcm_module.c', 'platform/pc98/legacy/v86_module.c', 'drivers/net/e82557/lan_module.c', 'drivers/video/cirrus/cirrus_module.c', 'drivers/video/trident/trident_module.c', 'build/kernel.*', 'build/out/*'],
     needs=['make:all'], budget=4.3,
     kind='characterization',
 )
 
+import json
 import copy
 import os
 import struct
@@ -56,15 +57,15 @@ def fixtures(validator=schema.validate_components):
             bad[2]['dependencies'] = (2, 2)
         assert rejected(bad, validator), change
     extra = copy.deepcopy(rows[0])
-    extra.update(module_id=14, name='EXTRA', path='/boot/extra.mod', dependencies=())
-    assert rejected((*rows, extra), validator), 'fourteenth ID accepted'
+    extra.update(module_id=len(rows) + 1, name='EXTRA', path='/boot/extra.mod', dependencies=())
+    assert rejected((*rows, extra), validator), 'excess ID accepted'
 
 
 def check_pair_request(stem, adapter):
     # HWDEV needs a live kdebug dependency and uses its own real runtime fixture.
     if stem == 'hwdev':
         return
-    entry = {'sqlite': 'os32_sqlite_start()', 'kdebug': 'kdebug_load()',
+    entry = {'usb': 'pc98_usb_load()', 'sqlite': 'os32_sqlite_start()', 'kdebug': 'kdebug_load()',
              'fep': 'fep_module_load((struct module_handle){0})'}.get(stem, stem + '_module_load()')
     with tempfile.TemporaryDirectory(prefix='pair-request-') as tmp:
         exe = Path(tmp) / 'adapter'
@@ -101,6 +102,11 @@ def conformance():
     deployed = yaml.safe_load((ROOT / 'build/core.yaml').read_text())['filesystem']['files']
     assert schema.MODULE_FORMATS['x86-pc98'] == (1, 3, 1, 0, 4)
     assert schema.MODULE_FORMATS['ppc-powermac'] == (2, 20, 2, 20, 12)
+    # The installed body must publish every typed function in its build contract.
+    usb_def = json.loads((ROOT / 'tools/prototypes/usb_imports.def').read_text())
+    usb_meta = json.loads((ROOT / 'build/out/usb/usb_imports.json').read_text())
+    assert [row['symbol'] for row in usb_def['imports']] == [
+        row['name'] for row in usb_meta['imports']]
     distributed = schema.COMPONENTS
     expected = [row['path'].split('/')[-1] for row in distributed]
     build = (ROOT / 'build/kernel.mk').read_text()
@@ -108,13 +114,13 @@ def conformance():
     assert [Path(name).name for name in paired] == expected, 'paired build list'
     actual = [row for row in deployed if row['guest'].endswith(('.mod', '/kdebug.bin'))]
     assert sorted((row['host'], row['guest'], row['tags']) for row in actual) == sorted(
-        ('build/out/' + name, row['path'], ['gui'] if row['name'] == 'TRIDENT' else ['core'])
+        ('build/out/' + name, row['path'], ['programs'] if row['name'] == 'USB' else ['gui'] if row['name'] == 'TRIDENT' else ['core'])
         for name, row in zip(expected, distributed)), 'module distribution list'
     for row in schema.COMPONENTS:
         stem = row['path'].split('/')[-1].split('.')[0]
-        adapter = {'sqlite': 'sqlite_engine'}.get(stem, stem + '_module')
+        adapter = {'sqlite': 'sqlite_engine', 'usb': 'usb_load'}.get(stem, stem + '_module')
         directory = {
-            'kdebug_module': 'kdebug', 'hwdev_module': 'hwdev',
+            'usb_load': 'platform/pc98', 'kdebug_module': 'kdebug', 'hwdev_module': 'hwdev',
             'fep_module': 'kernel/ime', 'v86_module': 'platform/pc98/legacy',
             'cd_module': 'drivers/ata', 'lan_module': 'drivers/net/e82557',
             'pcm_module': 'drivers/sound/cs4231', 'fm_module': 'drivers/sound/fm',
@@ -165,8 +171,8 @@ def main():
         try:
             fixtures(namespace['validate_components'])
         except AssertionError as exc:
-            assert str(exc) == 'fourteenth ID accepted', exc
-            print('MUTATE capacity-check-removed RED (compiled Python, runtime fourteenth ID)')
+            assert str(exc) == 'excess ID accepted', exc
+            print('MUTATE capacity-check-removed RED (compiled Python, runtime excess ID)')
         else:
             raise AssertionError('capacity mutant survived')
 

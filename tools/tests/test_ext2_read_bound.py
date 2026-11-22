@@ -46,8 +46,8 @@ if __name__ == "__main__":
             mutants = [
                 ("stream-type", file_source, "if ((inode.mode & EXT2_S_IFMT) != EXT2_S_IFREG) return EXT2_ERR_ISDIR;\n\n    if (offset >= inode.size)",
                  "if (0) return EXT2_ERR_ISDIR;\n\n    if (offset >= inode.size)", "stream_ranges"),
-                ("stream-hole", run_source, "if (phys == 0) break;\n\n        to_copy = EXT2_BLOCK_SIZE - byte_in_blk;",
-                 "if (phys == 0) return EXT2_ERR_IO;\n\n        to_copy = EXT2_BLOCK_SIZE - byte_in_blk;", "hole_and_errors"),
+                ("stream-hole", run_source, "ext2_mem_zero(&dst[total_read], to_copy);",
+                 "(void)dst;", "hole_and_errors"),
                 ("file-error", run_source, "if (ret != 0) return EXT2_ERR_IO;\n                if (next == 0",
                  "if (ret != 0) return (int)total_read;\n                if (next == 0", "hole_and_errors"),
             ]

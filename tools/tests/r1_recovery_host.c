@@ -75,6 +75,7 @@ volatile u32 exec_stop_count;
 static void *jump[5];
 static int transferred, finished, last_kind;
 static int expect_parent_poison;
+void appslot_gui_draw_leave(u32 previous) { (void)previous; }
 int appslot_cur(void) { return g_cur; }
 void res_owner_set(int id) { res_owner=id; }
 int res_owner_get(void) { return res_owner; }

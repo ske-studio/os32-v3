@@ -52,7 +52,7 @@ static void link_timers(void) { tp_host_clock += stage_duration * 3; }
 static void link_tx_round(void) { tp_host_clock += stage_duration * 4; }
 static void link_notify_tick(unsigned int t) { (void)t; tp_host_clock += stage_duration * 5; }
 #include TP_LINK
-#define TICK_SLOT_COUNT 7
+#define TICK_SLOT_COUNT 8
 #define ARCH_TICK_BUDGET_FIRST_SLOT 2
 struct test_slot { void (*fn)(void); };
 static struct test_slot slots[TICK_SLOT_COUNT];
@@ -144,9 +144,10 @@ void _start(void)
     CHECK(s->device[0][TP_TX][TP_IRQ5_CTX].full.worst == 19);
     CHECK(s->device[0][TP_TX][TP_IRQ5_CTX].bytes == 42 && s->lost == 0);
     start();
-    slots[2].fn = slot_work; slots[3].fn = slot_work; slots[4].fn = slot_work;
+    slots[2].fn = slot_work; slots[3].fn = slot_work; slots[4].fn = slot_work; slots[7].fn = slot_work;
     tick_dispatch(); s = stop();
-    CHECK(s->extra[0][TP_BUDGET].count == 1 && s->extra[0][TP_BUDGET].worst == 38);
+    CHECK(s->extra[0][TP_BUDGET].count == 1 && s->extra[0][TP_BUDGET].worst == 48);
+    CHECK(s->bank[0][TP_SLOT7].count == 1 && !s->bank[0][TP_EOI].count);
     start();
     tick_probe_irq_enter(0); tick_probe_irq_leave(0);
     tp_host_clock += (1ULL << 22); tick_probe_irq_enter(0); tick_probe_irq_leave(0);

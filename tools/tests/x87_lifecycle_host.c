@@ -59,6 +59,7 @@ void vfs_close(int fd) { CHECK(fd==7); }
 u32 paging_current_cr3(void) { return 1; }
 u32 paging_kernel_pd_phys(void) { return 1; }
 void paging_load_cr3(u32 pd) { host_cr3=pd; }
+void appslot_gui_draw_leave(u32 previous) { (void)previous; }
 int appslot_cur(void) { return cur; }
 AppSlot *appslot_at(int id) { CHECK(id>=0 && id<APP_SLOT_COUNT); return &slots[id]; }
 AppSlot *appslot_get(int id) { return appslot_at(id); }

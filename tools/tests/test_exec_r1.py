@@ -121,6 +121,7 @@ static int fault_kill_count;
 volatile u32 ring3_wm_fault_count;
 static int g_last_kind, g_last_code;
 static k_jmpbuf g_exit_jmpbuf;
+void appslot_gui_draw_leave(u32 previous) { (void)previous; }
 int appslot_cur(void) { return cur; }
 AppSlot *appslot_get(int id) { return &slots[id]; }
 int appslot_kill_check(int id) { CHECK(id == 2); return 0; }

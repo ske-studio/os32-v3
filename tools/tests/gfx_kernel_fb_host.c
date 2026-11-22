@@ -1,3 +1,4 @@
+int appslot_gui_present_ok(void) { return 1; }
 #include "app_ids.h"
 int input_display_restore_lock(unsigned int *flags);
 void appslot_gfx_resource_acquire(int owner);

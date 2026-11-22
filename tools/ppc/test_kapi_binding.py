@@ -20,9 +20,8 @@ from kapi_target_ppc import ABSENT_PROVIDER_SLOTS, absent_result
 EXPECTED_ABSENT_SLOTS = frozenset("""
 buz_off buz_on ext2_format ext2_format_at fm_note_off fm_note_on
 fm_play_mml fm_set_tone_num fm_startup_sound
-gfx2_check_op gfx_get_palette gfx_hardware_scroll gfx_hw_get gfx_hw_submit
-gfx_lease_palette gfx_osri_show gfx_set_palette
-gui_call gui_register hdd_geom_info ide_drive_present
+gfx2_check_op gfx_hardware_scroll gfx_osri_show
+hdd_geom_info ide_drive_present
 ide_get_info ide_identify ide_init ide_read_sector ide_write_sector
 ide_write_sectors ime_dict_info ime_dict_suspend ime_feed_key ime_get_mode
 ime_getchar ime_is_active ime_set_mode ime_set_render
@@ -35,7 +34,6 @@ sfs_begin
 sfs_end snd_bgm_is_playing snd_bgm_play snd_bgm_set_persist snd_bgm_stop
 snd_focus snd_se_play snd_se_play_raw snd_set_master ssg_all_off ssg_tone
 ssg_volume
-sys_switch_shell
 v86_boot v86_boot2 v86_disktest
 v86_gdc_capture v86_selftest
 """.split())
@@ -44,7 +42,10 @@ v86_gdc_capture v86_selftest
 PUBLISHED_GFX = frozenset("""
 gfx_get_framebuffer gfx_screen_info gfx_hw_fill_rect gfx_hw_blit gfx_stats
 gfx2_mode_set gfx2_flip gfx2_present
+gfx_hw_get gfx_hw_submit gfx_lease_palette
 """.split())
+
+GUI_SLOTS = frozenset({'gui_call', 'gui_register', 'sys_switch_shell'})
 
 PRESENT_SLOTS = frozenset("""
 gfx_init_200 gfx_present gfx_present_rect gfx_add_dirty_rect
@@ -57,8 +58,8 @@ gfx2_caps gfx2_head_info gfx2_connector_info
 gfx2_connector_edid gfx2_mode_count gfx2_mode_get
 """.split())
 
-DISPLAY_PROVIDERS = PUBLISHED_GFX | frozenset("""
-gfx_kapi_init_200 gfx_kapi_init gfx_shutdown gfx2_surface_create gfx2_surface_free gfx2_surface_desc
+DISPLAY_PROVIDERS = GUI_SLOTS | PUBLISHED_GFX | frozenset("""
+gfx_set_palette_hal palette_get gfx_kapi_init_200 gfx_kapi_init gfx_shutdown gfx2_surface_create gfx2_surface_free gfx2_surface_desc
 gfx2_screen_surface gfx2_lock gfx2_unlock gfx2_submit gfx2_fence_query gfx2_fence_wait gfx2_cursor_image
 gfx_screen_owner gfx2_vblank_wait gfx2_palette gfx2_gamma
 gfx2_cursor_move gfx2_cursor_show gfx2_dpms
@@ -243,10 +244,10 @@ def insert_group(helper, mutation, group):
 
 
 def verify(source, entries, extra_present=frozenset()):
-    if any('#include "' + header + '"' in source for header in ('gfx_hal.h', 'palette.h')):
+    if any('#include "' + header + '"' not in source for header in ('gfx_hal.h', 'palette.h')):
         return False
     reference = (ROOT / 'kapi/kapi_generated.c').read_text()
-    for slot in PRESENT_SLOTS | PUBLISHED_GFX | {'kdebug_call'} | extra_present:
+    for slot in PRESENT_SLOTS | GUI_SLOTS | PUBLISHED_GFX | {'kdebug_call', 'gfx_set_palette', 'gfx_get_palette'} | extra_present:
         wrapper = re.search(r'(?:void|int|i32) __cdecl wrap_' + slot + r'\([^)]*\)\n\{.*?\n\}', reference, re.S)
         if not wrapper or wrapper.group() not in source:
             return False

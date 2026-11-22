@@ -1,3 +1,4 @@
+#include "input/hal/in2_int.h"
 #include "input/hal/usb_input.h"
 #include "usb_platform.h"
 #include "drivers/usb/usb_core.h"
@@ -37,4 +38,20 @@ void usbp_input_usage_repeat(u8 src, u8 usage)
 #ifdef KBOOT_USB_KEY_TRACE
     key_trace("USB REPEAT src=", src, hid_kbd_sc(usage), usage, "");
 #endif
+}
+
+void usbp_input_mouse(u8 handle, i16 dx, i16 dy, u8 buttons)
+{
+    if (usb_input_mouse(handle, dx, dy, buttons))
+        usbp_log("USB MOUSE src=%u dx=%d dy=%d b=%x", handle, dx, dy, buttons);
+}
+
+void usbp_input_release(int kind, u8 handle)
+{
+    if (!usb_input_release(kind, handle)) return;
+    if (kind == USBP_INPUT_MOUSE && !usb_input_mouse_available()) {
+        i16 x, y;
+        mouse_ext_read_legacy(&x, &y);
+    }
+    usbp_log("USB RELEASE kind=%d src=%u", kind, handle);
 }

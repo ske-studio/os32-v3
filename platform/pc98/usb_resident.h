@@ -15,9 +15,12 @@ struct pc98_usb_core {
 };
 
 /* Foreground module start, after PCI reservation and EHCI handoff. */
+int pc98_usb_module_start(struct module_record *record, u32 entry, u32 *exports);
+int usb_module_init(struct module_handle owner);
 int pc98_usb_resident_start(struct module_handle owner, struct pc98_usb_core *core);
 int usb_resident_irq_attach(struct module_handle owner, const struct usb_pci_fn *f,
                             int (*isr)(void *), void *arg);
 int usb_resident_irq_detach(const struct usb_pci_fn *f);
 int usb_resident_tick_set(void (*service)(void));
+int pc98_usb_load(void);
 #endif

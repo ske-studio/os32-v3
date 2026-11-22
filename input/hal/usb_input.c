@@ -54,10 +54,10 @@ int usb_input_mouse_available(void)
     return 0;
 }
 
-void usbp_input_mouse(u8 handle, i16 dx, i16 dy, u8 buttons)
+int usb_input_mouse(u8 handle, i16 dx, i16 dy, u8 buttons)
 {
     struct usb_source *s = lookup(USBP_INPUT_MOUSE, handle);
-    if (!s) return;
+    if (!s) return 0;
     InputEvent e = { .src = s->src, .generation = s->generation, .time_ms = in2_time_ms(),
                      .type = INPUT_EVENT_MOVE, .x = dx, .y = dy };
     if (dx || dy) input_capture(&e);
@@ -65,18 +65,14 @@ void usbp_input_mouse(u8 handle, i16 dx, i16 dy, u8 buttons)
     e.x = e.y = 0;
     e.buttons = buttons & 7;
     input_capture(&e);
-    usbp_log("USB MOUSE src=%u dx=%d dy=%d b=%x", handle, dx, dy, buttons);
+    return 1;
 }
 
-void usbp_input_release(int kind, u8 handle)
+int usb_input_release(int kind, u8 handle)
 {
     struct usb_source *s = lookup(kind, handle);
-    if (!s) return;
+    if (!s) return 0;
     input_src_release(s->src, s->generation);
     *s = (struct usb_source){0};
-    if (kind == USBP_INPUT_MOUSE && !usb_input_mouse_available()) {
-        i16 x, y;
-        mouse_ext_read_legacy(&x, &y);
-    }
-    usbp_log("USB RELEASE kind=%d src=%u", kind, handle);
+    return 1;
 }

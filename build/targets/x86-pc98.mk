@@ -4,6 +4,7 @@ include build/kernel-objects.mk
 include build/kernel.mk
 # Feature files declare paths early; include product rules only here.
 include $(foreach feature,$(filter $(MODULE_FEATURES),$(MODULE_ORDER_LEGACY)),$(MODULE_MK_$(feature)))
+include build/usb-module.mk
 include build/libs.mk
 include build/programs.mk
 include build/deploy.mk

@@ -103,6 +103,48 @@ static int g_cur = APP_ID_SHELL;
  * アプリへのコールバック経路を作らない) ので 1 本で足りる。 */
 static int g_cur_op_is_wait = 0;
 
+/* A shell replacement or a new registration ends every previous grant. */
+static u32 gui_generation;
+static u32 registered_generation;
+static u32 handler_generation[APP_SLOT_COUNT];
+
+void appslot_gui_registration(int active)
+{
+    if (++gui_generation == 0) ++gui_generation;
+    registered_generation = active ? gui_generation : 0;
+}
+
+u32 appslot_gui_draw_enter(void)
+{
+    AppSlot *slot = appslot_get(g_cur);
+    if (!slot) return 0;
+    u32 previous = handler_generation[g_cur];
+    handler_generation[g_cur] = registered_generation;
+    return previous;
+}
+
+void appslot_gui_draw_leave(u32 previous)
+{
+    AppSlot *slot = appslot_get(g_cur);
+    if (slot) handler_generation[g_cur] = previous;
+}
+
+int appslot_present_owner(void)
+{
+    AppSlot *slot = appslot_get(g_cur);
+    if (slot && registered_generation &&
+        handler_generation[g_cur] == registered_generation)
+        return APP_ID_SHELL;
+    return g_cur;
+}
+
+int appslot_gui_present_ok(void)
+{
+    AppSlot *slot = appslot_get(g_cur);
+    if (!registered_generation && (!slot || !slot->gui)) return 1;
+    return appslot_present_owner() == g_gfx_owner;
+}
+
 /* ポーリング型 yield (票 T8 §7 D8) の間引き: 最後に譲った PIT tick。
  * 「前回の譲りから tick が進んでいる」ときだけ譲る = 100Hz なので 10ms に
  * 1 回まで。表全体で 1 語 — 走っているアプリは常に 1 本なので、スロット
@@ -123,6 +165,7 @@ void appslot_init(void)
     int i;
 
     /* GUI セッションを跨いで古い tick を引きずらない (票 T8 D8)。 */
+    appslot_gui_registration(0);
     g_poll_last_tick = 0;
     for (i = 0; i < APP_SLOT_COUNT; i++) {
         slot_zero(&g_slot[i]);
@@ -273,6 +316,7 @@ void appslot_shell_commit(void)
 {
     AppSlot *a = &g_slot[APP_ID_SHELL];
     a->state = APP_STATE_RUNNING;
+    appslot_gui_registration(0);
     a->parent = 0;
     a->depth = 1;
     a->gui = 0;
@@ -330,6 +374,7 @@ u32 appslot_reclaim(int id)
      * その後 vfs_close_owned が同じ FD をもう一度閉じていた)。
      * バッファ型の枠に FD は無く、バッファ自体は pipe_free_owned が返す。 */
     fd_redirect_clear_state(&g_redir[id]);
+    handler_generation[id] = 0;
     slot_zero(a);
     appslot_reclaim_count++;
     appslot_last_reclaim_id = id;

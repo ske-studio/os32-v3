@@ -6,7 +6,7 @@
 #include "generated/kdebug_import_macros.h"
 static const char *const names[TP_METRICS] = {
     "irq0", "timer", "slot0", "slot1", "slot2", "slot3", "slot4",
-    "slot5", "slot6", "eoi", "reflect", "timeout", "short", "interval",
+    "slot5", "slot6", "slot7", "eoi", "reflect", "timeout", "short", "interval",
     "if0-resident", "irq1-delay", "irq10-delay"
 };
 static void cycles(const char *name, unsigned long long value)

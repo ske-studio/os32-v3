@@ -1,3 +1,4 @@
+int appslot_gui_present_ok(void) { return 1; }
 #include "gfx2_int.h"
 struct gfx2_surf gfx2_surfs[GFX2_MAX_SURFACES];
 static struct gfx2_adapter adapter;

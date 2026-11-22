@@ -51,6 +51,7 @@ static u16 tv_storage[TVRAM_COLS * TVRAM_ROWS_30 * 2];
 static void boundary(void);
 static void exec_stop_mark(void) { CHECK(0, "unexpected teardown stop"); }
 static void ring3_context_clear(void) { kctx_irq_depth = kctx_exc_depth = 0; }
+void appslot_gui_draw_leave(u32 previous) { (void)previous; }
 int appslot_cur(void) { return 2; }
 AppSlot *appslot_get(int id) { (void)id; return &app; }
 int appslot_abort_admit(int gui, u32 tick) { (void)gui; (void)tick; return 1; }

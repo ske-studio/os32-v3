@@ -1,3 +1,4 @@
+int appslot_gui_present_ok(void) { return 1; }
 #include "gfx2_bridge_fake.h"
 #define OS32_SQLITE_DIRECT_TEST 1
 /* Module availability is provided by the host fixture. */
