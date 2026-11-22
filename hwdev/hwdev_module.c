@@ -16,11 +16,18 @@ static int contains(u32 base, u32 size, u32 address, u32 bytes)
     return address >= base && address - base <= size && bytes <= size - (address - base);
 }
 
+static struct module_record *running_kdebug(struct module_handle handle)
+{
+    struct module_record *core = module_record_get(handle);
+    if (!core || core->module_id != MODULE_ID_KDEBUG || !module_exports(handle)) return 0;
+    return core;
+}
+
 static const struct hwdev_ops *current_ops(void)
 {
     struct module_record *r = module_record_get(hwdev_handle);
     if (!r || !module_exports(hwdev_handle) || r->dependency_count != 1 ||
-        !module_exports(r->dependencies[0])) return 0;
+        !running_kdebug(r->dependencies[0])) return 0;
     return published;
 }
 
@@ -55,6 +62,9 @@ static int hwdev_detach(struct module_record *r)
 
 static int hwdev_start(struct module_record *r, u32 entry, u32 *exports)
 {
+    if (r->dependency_count != 1) return MODULE_BAD_DEPENDENCY;
+    struct module_record *core = running_kdebug(r->dependencies[0]);
+    if (!core) return MODULE_BAD_DEPENDENCY;
     /* KMOD init checks/copies its export table; initialize only returns RO data. */
     int (*init)(u32 *) = (int (*)(u32 *))(uptr)entry;
     if (init(exports)) return MODULE_INIT_FAILED;
@@ -65,9 +75,6 @@ static int hwdev_start(struct module_record *r, u32 entry, u32 *exports)
     if (!initialize || initialize(&m, &ops)) return MODULE_INIT_FAILED;
     if (!contains(r->ro, r->ro_size, (u32)(uptr)m, sizeof(*m)) ||
         !contains(r->ro, r->ro_size, (u32)(uptr)ops, sizeof(*ops))) return MODULE_INIT_FAILED;
-    struct module_record *core = module_record_get(r->dependencies[0]);
-    if (!core || !module_exports(r->dependencies[0]) || core->module_id != MODULE_ID_KDEBUG)
-        return MODULE_BAD_DEPENDENCY;
     if (m->identity.abi != HWDEV_ABI || m->identity.size != sizeof(m->identity) ||
         m->identity.kind != HWDEV_KIND_GF6200 ||
         m->identity.profile_version != RECOVER_PROFILE_VERSION ||
@@ -97,8 +104,8 @@ int hwdev_module_load(struct module_handle core_handle)
     /* F9: no lookup, logging, allocation or start when KDEBUG is not running. */
     if (kdebug.state != KDEBUG_RUNNING) return 0;
     if (hwdev_handle.generation) return MODULE_BUSY;
-    struct module_record *core = module_record_get(core_handle);
-    if (!core || !module_exports(core_handle) || core->module_id != MODULE_ID_KDEBUG)
+    struct module_record *core = running_kdebug(core_handle);
+    if (!core)
         return MODULE_BAD_DEPENDENCY;
     if (!kdebug.ops.hwdev_core_get) return MODULE_ABI_MISMATCH;
     core_api = kdebug.ops.hwdev_core_get();
