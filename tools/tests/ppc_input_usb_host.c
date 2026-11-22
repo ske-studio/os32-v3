@@ -1,5 +1,6 @@
 /* Freestanding AC-INPUT-1 vectors over the production registry, HAL and provider. */
 #include "input_usb.h"
+#include "usb_boot.h"
 #include "kbd.h"
 #include "keymap.h"
 #include "usb_input.h"
@@ -19,8 +20,14 @@ static u32 now;
 int con_sink_capture_active(void) { return 0; }
 static int aborted, inject = -1, wait_phase;
 volatile u32 tick_count;
-void ring3_abort_request(void) { aborted = 1; }
-int ring3_wait_pending(void) { return aborted; }
+void ring3_abort_request(void) { ++aborted; }
+static int pending_queries;
+int ring3_wait_pending(void)
+{
+    if (wait_phase != 2 || kbd_gui_mode) return 0;
+    ++pending_queries;
+    return 1;
+}
 int legacy_active(void) { return 0; }
 int in2_excl_keyboard(void) { return 0; }
 u32 in2_time_ms(void) { return now; }
@@ -82,6 +89,13 @@ static void compare_keyboards(int usb, u8 native, u16 generation)
     kbd_set_gui_mode(0);
 }
 
+void pm_usb_platform_init(u32 hz) { (void)hz; }
+void pm_usb_scan(void)
+{
+    check(usbp_input_src_alloc(USBP_INPUT_KBD) == 1, 10);
+    tap(1, 4);
+}
+
 static void test(void)
 {
     write_text("START\n");
@@ -89,8 +103,9 @@ static void test(void)
     check(usb_input_alloc(USBP_INPUT_KBD) < 0 && !input_src_enumerate(0, 0), 10);
     int mouse = usbp_input_src_alloc(USBP_INPUT_MOUSE);
     check(mouse == 1 && input_src_enumerate(0, 0) == 1, 10);
-    pm_input_keymap_boot();
-    for (int i = 1; i <= 4; ++i) check(usbp_input_src_alloc(USBP_INPUT_KBD) == i, 10);
+    pm_usb_boot(1000000);
+    check(pm_input_usb_take() == 0x1d61, 10);
+    for (int i = 2; i <= 4; ++i) check(usbp_input_src_alloc(USBP_INPUT_KBD) == i, 10);
     check(usbp_input_src_alloc(USBP_INPUT_KBD) < 0 && input_src_enumerate(0, 0) == 5, 10);
     int second = usbp_input_src_alloc(USBP_INPUT_MOUSE);
     IN2_DevInfo info;
@@ -212,7 +227,7 @@ static void test(void)
     input_legacy_register(saved);
     write_text("WAIT\n");
     wait_phase = 1;
-    check(ops->getkey_wait(1) < 0 && aborted && pm_input_usb_peek() < 0, 16);
+    check(ops->getkey_wait(1) == -1 && pending_queries == 1 && aborted == 1 && pm_input_usb_peek() < 0, 16);
     aborted = 0;
     usbp_input_usage(1, 0x48, 0);
     usbp_input_usage(1, 0xe0, 0);

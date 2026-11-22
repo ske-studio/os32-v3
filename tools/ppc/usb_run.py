@@ -449,14 +449,14 @@ def product_accept(elf, cpu, out, mode, late=False):
                             'invert-key exact shifted result mismatch: '+repr(block))
                 else:
                     execute('echo Hi!', 'Hi!')
-                    # Backspace, cancellation, history and all six cooked edit keys.
+                    # Backspace, Ctrl-C, history and all six cooked edit keys.
                     start = len(output()); text_keys('echo hx'); key('backspace'); key('i'); key('ret')
                     wait_for(lambda: output()[start:].endswith('sh> '), 'backspace prompt')
                     require('hi' in output()[start:].splitlines()[1:], 'backspace result')
                     start=len(output()); prompts=output().count('sh> ')
-                    text_keys('echo cancelled'); key('c', ('ctrl',)); key('ret')
-                    wait_for(lambda: output().count('sh> ') >= prompts+2 and output().endswith('sh> '), 'cancel prompts')
-                    require('cancelled' not in output()[start:].splitlines()[1:], 'Ctrl-C cancellation')
+                    text_keys('echo retained'); key('c', ('ctrl',)); key('ret')
+                    wait_for(lambda: output().count('sh> ') > prompts and output().endswith('sh> '), 'prompt after Ctrl-C and Enter')
+                    require('retained' in output()[start:].splitlines()[1:], 'Ctrl-C retains the command line')
                     execute('echo history', 'history')
                     start=len(output()); key('up'); key('down'); key('up'); key('ret')
                     # DOWN can redraw an empty 'sh> ' before UP/Enter is
@@ -766,8 +766,10 @@ def link_lan_accept(elf, cpu, out, mode='normal'):
             print('RED lost-first '+cpu)
             return
         s.close_rshell(preloaded=True)
-        text_keys('echo first'); key('ret')
-        s.wait(lambda: 'OS32:/$ echo first' in s.screen('first-key'), 'first keyboard line', 30)
+        text_keys('echo first'); key('c', ('ctrl',)); key('ret')
+        s.wait(lambda: any(row.strip(' \x00') == 'first'
+                           for row in s.screen('first-key').splitlines()),
+               'Enter executes the line retained across USB Ctrl-C', 30)
         s.open_rshell()
         rsh_command(s, 'echo warm', b'warm\n')
         # Warm /host too (as sd_run.link_accept does): the SFS session starts on

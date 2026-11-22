@@ -7,7 +7,7 @@ import tempfile
 
 CHECK = dict(name='ppc-input-usb-host', tier=1, budget=60, needs=[],
     covers=['platform/powermac/input_usb.[ch]', 'platform/powermac/input_keymap_backend.c', 'platform/powermac/usb_key_report.c', 'input/hal/*.c', 'input/hal/*.h', 'input/keymaps/*.c', 'include/**', 'sdk/include/os32/**', 'tools/tests/host_arch/**', 'platform/powermac/platform_io.h',
-            'platform/powermac/input_boot.c', 'tools/tests/ppc_input_usb_host.c',
+            'platform/powermac/usb_boot.h', 'arch/ppc/kernel_boot.h', 'platform/powermac/input_boot.c', 'tools/tests/ppc_input_usb_host.c',
             'tools/checks/ver-ppc-input-usb.py','platform/powermac/input_boot.h', 'platform/powermac/input_decode.c',
             'include/types.h', 'include/kbd.h', 'include/input_service.h', 'include/clock_source.h',
             'platform/powermac/lan_boot.h', 'kernel/cli/resident_cli.h',
@@ -21,10 +21,11 @@ sys.path.insert(0, str(ROOT/'tools/tests'))
 import host32
 
 MUTATIONS = [
+    ('cold-bind', 'input_keymap_backend.c', '    pm_input_keymap_boot();', '', 10, 'START\n'),
     ('rollback', 'usb_input.c', 'input_src_release(src, gen);', '(void)gen;', 10, 'START\n'),
     ('move-sign', 'usb_input.c', '.x = dx, .y = dy', '.x = (u8)dx, .y = dy', 10, 'START\n'),
     ('live-mods', 'legacy_ring.c', '*mods = cooked_mods[kbd_head]', '*mods = input_key_mods()', 12, 'START\nMAP\n'),
-    ('abort', 'usb_input.c', ')) ring3_abort_request();', ')) (void)0;', -1, 'START\nMAP\nSTATE\nFIFO\n'),
+    ('abort', 'usb_input.c', ')) ring3_abort_request();', ')) (void)0;', 16, 'START\nMAP\nSTATE\nFIFO\nWAIT\n'),
     ('peek-consumes', 'input_boot.c', 'if (lan_lookahead >= 0) return lan_lookahead;', 'if (lan_lookahead >= 0) { int key = lan_lookahead; lan_lookahead = -1; return key; }', 15, 'START\nMAP\nSTATE\nFIFO\n'),
     ('lan-first', 'input_boot.c', 'int key = lan_peek();\n    if (key >= 0)', 'int usb = pm_input_usb_take(); if (usb >= 0) return usb;\n    int key = lan_peek();\n    if (key >= 0)', 15, 'START\nMAP\nSTATE\nFIFO\n'),
     ('no-usb', 'input_boot.c', 'return pm_input_usb_take();', 'return -1;', 15, 'START\nMAP\nSTATE\nFIFO\n'),
@@ -61,12 +62,7 @@ def main(mutate=False):
                 '-DHOST_ARCH_SHARED_IF','-DINPUT_COOKED_MODS=1','-ffunction-sections','-fdata-sections','-Wl,--gc-sections','-Itools/tests/host_arch','-Iinput/hal','-Iinclude','-Iarch/ppc','-Iplatform/powermac','-Isdk/include/os32','-Idrivers/input','-I.',
                 str(ROOT/'tools/tests/ppc_input_usb_host.c'),*[str(work/n) for n in sources],
                 'platform/powermac/input_decode.c','kernel/input_legacy.c','kernel/input_wait.c','input/keymaps/hid_jp.c','input/keymaps/pc98_jp.c','-o',str(exe)], cwd=ROOT, check=True)
-            try:
-                result = host32.run([str(exe)], runner='qemu', capture_output=True, text=True, timeout=10)
-            except subprocess.TimeoutExpired as error:
-                if name != 'abort' or error.output != b'START\nMAP\nSTATE\nFIFO\nWAIT\n': raise
-                print('RED runtime: interruptible wait timed out', flush=True)
-                continue
+            result = host32.run([str(exe)], runner='qemu', capture_output=True, text=True, timeout=10)
             marker = reached + ('FAIL\n' if expected else '')
             if result.returncode != expected or result.stdout != marker:
                 raise RuntimeError(f'{name}: rc={result.returncode} output={result.stdout!r}, expected={expected}/{marker!r}')

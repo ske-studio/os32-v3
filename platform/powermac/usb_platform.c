@@ -50,7 +50,6 @@ static const MousePointerBackend usb_mouse_backend = {
 void pm_usb_platform_init(u32 hz)
 {
     tb_frequency = hz;
-    pm_input_keymap_boot();
     usb_pointer = empty_pointer;
     mouse_pointer_backend_register(&usb_mouse_backend);
     mouse_pointer_init_position();

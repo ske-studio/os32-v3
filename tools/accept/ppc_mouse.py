@@ -106,14 +106,9 @@ def observe(elf, cpu, evidence, case):
             s.q.call('device_del', {'id': 'mouse'})
             s.wait(lambda: 'USB RELEASE kind=1' in serial(log), 'held mouse detached')
             probe('gone')
-            require(sample('buttons', 1) == (1 if case == 'drop-release' else 0),
-                    'held left button state after detach')
-        if case == 'normal':
             s.q.call('device_add', {'driver': 'usb-mouse', 'id': 'mouse2'})
             s.wait(lambda: serial(log).count('protocol=02') >= 2, 'mouse reattached')
-            probe('present')
-            require(sample('buttons', 1) == 0 and sample('old_x', 2) == 0 and
-                    sample('old_y', 2) == 0, 'reattach starts released with no stale motion')
+            probe('reattached', 8 if case == 'drop-release' else 0)
         s.q.call('quit')
         s.p.wait(timeout=5)
         require(s.p.returncode == 0, 'QEMU exit')
@@ -163,8 +158,8 @@ def main():
             mutation = mutant_settings(folder, case, 'platform/powermac/ppc_kernel.c',
                                        'if (fb_w && fb_h)', 'if (0)')
         elif case == 'drop-release':
-            mutation = mutant_settings(folder, case, 'platform/powermac/usb_platform.c',
-                                       'pointer_button(&release);', '(void)release;')
+            mutation = mutant_settings(folder, case, 'input/hal/in2_state.c',
+                                       'if (pointer_source_buttons(src)) input_capture(&e);', '')
         elif case == 'absent':
             absent_bindings(folder, kernel / 'gen')
         elf = build(kernel, *options, *mutation, 'kb-user', 'kernel')

@@ -1,4 +1,5 @@
 #include "input_usb.h"
+#include "usb_boot.h"
 #include "input/hal/keymap.h"
 #include "input/hal/usb_input.h"
 #include "usb_platform.h"
@@ -10,6 +11,13 @@ void pm_input_keymap_boot(void)
     keyboard_ready = km_backend_register(&hid_jp_backend) == 0;
     if (!keyboard_ready)
         usbp_log("USB HID keymap registration failed");
+}
+
+void pm_usb_boot(u32 tb_hz)
+{
+    pm_usb_platform_init(tb_hz);
+    pm_input_keymap_boot();
+    pm_usb_scan();
 }
 
 int usbp_input_src_alloc(int kind)
