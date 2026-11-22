@@ -197,7 +197,8 @@ def main():
                     if not expected or not str(exc).startswith(f'deadline {expected} evidence='):
                         raise
                     trace = serial(folder / cpu / 'serial-a.log')
-                    evidence = ('C-GUI REGISTER FAILED' in trace if case == 'register'
+                    evidence = ('C-GUI INIT NOSYS' in trace.partition('C-GUI REGISTER FAILED')[2]
+                                if case == 'register'
                                 else trace.count('Loading /bin/gshell.bin') >= 2)
                     if not evidence:
                         raise
