@@ -45,6 +45,8 @@ OFF の起動は `ver` の Image CRC と `boot.log` で到達を確認する。
 `boot.new` の残存は保存途中で止まった印であり、完全なログの証拠ではない。
 保存・世代交代の詳細は [bootlog の設計](design/init/bootlog.md#落とし穴)、配備の詳細は [nhd_deploy の設計](design/tools/nhd_deploy.md#落とし穴)。
 
+PC-98 の USB を追うには、`/etc/system.cfg` に `USBDIAG=1` を設定して再起動する。起動後のポート・HID の行は CUI に随時表示する。周期処理の回数は設定に関係なく、CUI の `ver` の `USB tick` と `USB scan` で採取時点の値を読める。GUI 使用中も採取するには `BOOTSERIAL=1` を併用し、起動前から 9600 bps のシリアル端末で記録する。
+
 ## §3. 仮説の提示と検証プロセス
 
 観測・仮説・修正後の報告は [run-os32「観測と調査」](../.claude/skills/run-os32/SKILL.md#観測と調査)。

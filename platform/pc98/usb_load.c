@@ -6,6 +6,9 @@
 #include "kprintf.h"
 #include "bootlog.h"
 #include "con_sink.h"
+#include "console.h"
+#include "sysconfig.h"
+#include "io.h"
 #include "kstring.h"
 #include <stdarg.h>
 #include "os32_generations.h"
@@ -33,16 +36,23 @@ int pc98_usb_load(void)
     return rc;
 }
 
+static int pc98_usb_live_log;
+
 void pc98_usb_boot(void)
 {
+    pc98_usb_live_log = sysconfig_get_int(SYS_SYSTEM_CFG, "USBDIAG", 0) == 1;
     if (memory_boot_dma_available()) pc98_usb_load();
     else kprintf(KLOG_ATTR, "[BOOT] usb module skipped: DMA unavailable\n");
 }
 
-/* The tick runs with interrupts masked. Feed the memory-backed sinks without
- * rendering text or waiting for the serial port. */
+/* Live output uses the normal console and its configured serial mirror.
+ * Keep masked and early output on memory-backed sinks. */
 static void usb_tick_write(const char *buf, u32 len, u8 attr)
 {
+    if (pc98_usb_live_log && !bootlog_is_active() && _irq_enabled()) {
+        console_write(buf, len, attr);
+        return;
+    }
     bootlog_push(buf, len);
     con_sink_push_print(buf, len, attr);
 }

@@ -21,6 +21,7 @@ static void pc98_ver_collect(VerSnapshot *s)
     s->pit_input = diag.timer_input;
     s->irq_master_vector = diag.irq_master_vector;
     s->irq_slave_vector = diag.irq_slave_vector;
+    pc98_usb_tick_counts(&s->usb);
     s->pcm_present = pcm_present();
     services_ver_state(&s->services);
 }
@@ -84,6 +85,16 @@ static void __attribute__((cold)) pc98_ver_devices(const VerSnapshot *s, OS32_Ve
     ver_text(&b, "OPN configured; PCM=");
     ver_text(&b, s->pcm_present ? "CS4231-family" : "none");
     ver_end(&b);
+    if (s->usb.reach || s->usb.idle) {
+        b = ver_line(out, VER_DEVICE, "USB tick");
+        ver_text(&b, "reach="); ver_number(&b, s->usb.reach, 0);
+        ver_text(&b, " deny="); ver_number(&b, s->usb.deny, 0);
+        ver_end(&b);
+        b = ver_line(out, VER_DEVICE, "USB scan");
+        ver_text(&b, "run="); ver_number(&b, s->usb.run, 0);
+        ver_text(&b, " idle="); ver_number(&b, s->usb.idle, 0);
+        ver_end(&b);
+    }
     b = ver_line(out, VER_DEVICE, "GFX");
     ver_gfx_value(&b, s, backend);
     ver_end(&b);
