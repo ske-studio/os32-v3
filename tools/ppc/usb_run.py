@@ -840,6 +840,132 @@ def link_lan_accept(elf, cpu, out, mode='normal'):
         s.close()
 
 
+def in2_observe(elf, cpu, out, mode):
+    from link_sh_run import Session
+
+    s = Session(elf, cpu, out, 240)
+    s.usb_devices = ('-device', 'usb-kbd,id=kbd', '-device', 'usb-mouse,id=mouse')
+    log = out/'serial-a.log'
+
+    def ack(marker, offset=0):
+        def received():
+            data = serial(log)[offset:]
+            require('IN2 FAIL' not in data, 'foreground probe rejected '+marker)
+            return 'IN2 '+marker in data
+        s.wait(received, 'probe '+marker, 10)
+
+    def edge(code, down, usage):
+        offset = len(serial(log))
+        s.q.call('input-send-event', {'events': [{'type': 'key', 'data': {
+            'down': down, 'key': {'type': 'qcode', 'data': code}}}]})
+        s.wait(lambda: ('down=%d usage=%s' % (down, usage)) in serial(log)[offset:],
+               'USB '+code+' '+str(down))
+
+    def move():
+        s.q.call('input-send-event', {'events': [
+            {'type': 'rel', 'data': {'axis': axis, 'value': value}}
+            for axis, value in [('x', 12), ('y', -7)]]})
+
+    def missing(marker, offset=0):
+        try:
+            ack(marker, offset)
+        except RuntimeError as exc:
+            if not str(exc).startswith('deadline probe '+marker+' evidence='):
+                raise
+            tick = s.word('tick_count')
+            s.wait(lambda: s.word('tick_count') != tick, 'guest still running')
+            return
+        raise RuntimeError('SURVIVED '+mode)
+
+    def run():
+        s.wait(s.ready, 'cold RSH ready', 60)
+        s.wait(lambda: all(p in serial(log) for p in ('protocol=01', 'protocol=02')),
+               'cold OHCI keyboard and mouse')
+        def type_line(line):
+            punctuation = {' ': ('spc', '2c'), '/': ('slash', '38'),
+                           '.': ('dot', '37'), '2': ('2', '1f')}
+            for char in line:
+                code, usage = punctuation.get(char, (char, f'{ord(char) - ord("a") + 4:02x}'))
+                edge(code, True, usage)
+                edge(code, False, usage)
+
+        edge('esc', True, '29')
+        edge('esc', False, '29')
+        if mode == 'no-local':
+            rsh_command(s, 'echo alive', b'alive\n')
+            require(s.word('rshell_active') != 0, 'local ESC was consumed')
+            return
+        s.close_rshell(preloaded=True)
+        type_line('echo first')
+        edge('ctrl', True, 'e0')
+        edge('c', True, '06')
+        edge('c', False, '06')
+        edge('ctrl', False, 'e0')
+        def printed_first():
+            return any(row.strip(' \x00') == 'first' for row in s.screen('retained').splitlines())
+        require(not printed_first(), 'Ctrl-C prematurely executed the line')
+        edge('ret', True, '28')
+        edge('ret', False, '28')
+        s.wait(printed_first, 'Enter executes the retained Ctrl-C line')
+        type_line('/bin/in2prob.bin')
+        edge('ret', True, '28')
+        edge('ret', False, '28')
+        ack('READY')
+        edge('a', True, '04')
+        if mode == 'no-key':
+            missing('MAKE')
+            return
+        ack('MAKE')
+        ack('HOLD')
+        edge('a', False, '04')
+        ack('BREAK')
+        move()
+        ack('MOVE')
+        for down, marker in [(True, 'DOWN'), (False, 'UP'), (True, 'HELD')]:
+            offset = len(serial(log))
+            s.q.call('input-send-event', {'events': [{'type': 'btn', 'data': {
+                'button': 'left', 'down': down}}]})
+            s.wait(lambda: ('dx=0 dy=0 b=%d' % down) in serial(log)[offset:], 'USB button')
+            if mode == 'no-button':
+                missing(marker)
+                return
+            ack(marker)
+        s.q.call('device_del', {'id': 'mouse'})
+        s.wait(lambda: 'USB RELEASE kind=1' in serial(log), 'held detach')
+        if mode == 'no-release':
+            s.wait(lambda: 'IN2 STALE BUTTON 1' in serial(log), 'button still held after detach')
+            return
+        ack('GONE')
+        s.q.call('device_add', {'driver': 'usb-mouse', 'id': 'mouse2'})
+        ack('REATTACHED')
+        move()
+        ack('CTRL-C')
+        edge('ctrl', True, 'e0')
+        edge('c', True, '06')
+        ack('WAIT')
+        edge('c', False, '06')
+        edge('ctrl', False, 'e0')
+        edge('ctrl', True, 'e0')
+        offset = len(serial(log))
+        edge('pause', True, '48')
+        if mode == 'no-abort':
+            missing('INTERRUPTED -1 EMPTY', offset)
+        else:
+            ack('INTERRUPTED -1 EMPTY', offset)
+        edge('pause', False, '48')
+        edge('ctrl', False, 'e0')
+
+    try:
+        s.start()
+        run()
+        s.q.call('quit')
+        s.p.wait(timeout=5)
+        require(s.p.returncode == 0, 'QEMU exit')
+        print(('GREEN' if mode == 'normal' else 'RED')+' '+mode+' '+cpu, flush=True)
+    finally:
+        s.close()
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--cpu', choices=['7450', '7455', 'both'], default='both')

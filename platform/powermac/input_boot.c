@@ -3,6 +3,9 @@
 #include "input_usb.h"
 #include "kbd_inject.h"
 #include "kbd_contract.h"
+#ifdef KBOOT_USB_KEY_TRACE
+#include "port_service.h"
+#endif
 #include "input_service.h"
 #include "clock_source.h"
 #include "lan_boot.h"
@@ -90,7 +93,19 @@ static int try_char(void) { return input_legacy_try(IL_CHAR); }
 static int character(void) { return input_legacy_wait(IL_CHAR, 0); }
 static int wait_key(int interruptible) { return input_legacy_wait(IL_KEY, interruptible); }
 static int character_kapi(void) { return input_legacy_wait(IL_CHAR, 1); }
-static int key_kapi(void) { return input_legacy_wait(IL_KEY, 1); }
+static int key_kapi(void)
+{
+    int key = input_legacy_wait(IL_KEY, 1);
+#ifdef KBOOT_USB_KEY_TRACE
+    /* A pending CUI abort can unwind the app at syscall exit. Observe the
+     * actual wait result and FIFO here, while that app still owns the call. */
+    if (key == -1 && pm_input_usb_peek() == -1) {
+        const char *message = "IN2 INTERRUPTED -1 EMPTY\n";
+        while (*message) port_putchar_kapi(*message++);
+    }
+#endif
+    return key;
+}
 /* Busy pollers (e.g. a CUI script checking for ESC) never halt, so advance the
  * foreground work once per peek; idle_work_run refuses EE=0, IRQ and re-entry. */
 static int peek_key(void)

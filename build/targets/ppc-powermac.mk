@@ -228,9 +228,9 @@ $(KB_OUT)/config/usb-key-trace.flags: ppc-layout-force
 	@mkdir -p $(@D)
 	@echo '$(filter 1,$(KBOOT_USB_KEY_TRACE))' > $@.tmp
 	@if cmp -s $@.tmp $@; then rm -f $@.tmp; else mv $@.tmp $@; fi
-$(KB_OUT)/platform/powermac/usb_key_report.o: $(KB_OUT)/config/usb-key-trace.flags
+$(KB_OUT)/platform/powermac/usb_key_report.o $(KB_OUT)/platform/powermac/input_boot.o: $(KB_OUT)/config/usb-key-trace.flags
 ifeq ($(KBOOT_USB_KEY_TRACE),1)
-$(KB_OUT)/platform/powermac/usb_key_report.o: private KB_TU_FLAGS += -DKBOOT_USB_KEY_TRACE=1
+$(KB_OUT)/platform/powermac/usb_key_report.o $(KB_OUT)/platform/powermac/input_boot.o: private KB_TU_FLAGS += -DKBOOT_USB_KEY_TRACE=1
 endif
 $(KB_OUT)/config/gem-rx-diag.flags: ppc-layout-force
 	@mkdir -p $(@D)
