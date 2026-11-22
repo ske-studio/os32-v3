@@ -296,6 +296,7 @@
     "fs/serialfs/serialfs_session.c",
     "fs/serialfs/serialfs_persistent.c",
     "exec/exec.c",
+    "kernel/dev/install_management.c",
     "exec/shell_service.c",
     "platform/pc98/legacy/v86_call.c",
     "platform/pc98/legacy/guest.c",

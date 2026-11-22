@@ -342,6 +342,9 @@ static const u8 kapi_fixed_count[] = {
     4, /* snd2_chip_read */
     1, /* snd2_chip_reset */
     1, /* snd2_chip_close */
+    2, /* install_begin */
+    1, /* install_rescan */
+    2, /* install_end */
 };
 static const u8 kapi_fixed_kind[][KAPI_FIXED_MAX] = {
     { 0 }, /* gfx_init */
@@ -681,5 +684,8 @@ static const u8 kapi_fixed_kind[][KAPI_FIXED_MAX] = {
     { KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER }, /* snd2_chip_read */
     { KAPI_VALUE_INTEGER }, /* snd2_chip_reset */
     { KAPI_VALUE_INTEGER }, /* snd2_chip_close */
+    { KAPI_VALUE_POINTER, KAPI_VALUE_POINTER }, /* install_begin */
+    { KAPI_VALUE_INTEGER }, /* install_rescan */
+    { KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER }, /* install_end */
 };
 #endif

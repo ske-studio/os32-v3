@@ -80,7 +80,7 @@ MUTANTS = [
                    '    u32 sector;\n'
                    '    int ret = EXT2_ERR_IO;\n'
                    '    if (ext2_block_range_lba(ctx, first, blocks, &sector))\n'
-                   '        ret = dev_blk_read_lba(ctx->dev, sector, blocks * EXT2_SECTORS_PER_BLOCK, buf);\n'
+                   '        ret = ext2_device_transfer(ctx, sector, blocks * EXT2_SECTORS_PER_BLOCK, buf, 0);\n'
                    '    if (ret != 0) ext2_read_cache_reset();', 'read_failures'),
     io_reset_mutant('read-reset-sector',
                    'int ext2_read_sector(Ext2Ctx *ctx, u32 block_num, u32 sect, void *buf)\n'
@@ -89,7 +89,7 @@ MUTANTS = [
                    '    int ret = EXT2_ERR_IO;\n'
                    '    if (sect < EXT2_SECTORS_PER_BLOCK &&\n'
                    '        ext2_block_range_lba(ctx, block_num, 1, &sector))\n'
-                   '        ret = dev_blk_read_lba(ctx->dev, sector + sect, 1, buf);\n'
+                   '        ret = ext2_device_transfer(ctx, sector + sect, 1, buf, 0);\n'
                    '    if (ret != 0) ext2_read_cache_reset();', 'read_failures'),
     io_reset_mutant('write-reset-raw',
                    'static int ext2_raw_write_block(Ext2Ctx *ctx, u32 block_num, const void *buf)\n'

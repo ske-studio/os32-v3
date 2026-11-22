@@ -386,6 +386,11 @@ int vfs_resolve_path(const char *input, char *output, int out_size);
 /* (fs_ctx, ino) の開いた FD に失効の印を付ける */
 void vfs_fd_invalidate_ino(void *fs_ctx, u32 ino);
 /* そのマウントの全 FD に失効の印を付け、fs_ctx を外す (umount の前に呼ぶ) */
+int vfs_fd_mount_busy(void *ctx);
+int vfs_install_visible(void *ctx);
+void vfs_install_discard(u32 unit);
+int vfs_install_precheck(u32 unit);
+int vfs_install_detach(u32 unit);
 void vfs_fd_invalidate_mount(void *fs_ctx);
 /* rel_old / rel_new (同じマウントの相対名、rel_new は NULL 可) の rename が
  * 開いている SQLite DB・そのジャーナル・それらの祖先に当たるなら 1 */

@@ -25,11 +25,11 @@ MUTANTS = [
     ('overflow-start', 'if (relative > U32_MAX - ctx->base_lba) return 0;', ''),
     ('overflow-end', 'if (sectors - 1 > U32_MAX - *sector) return 0;', '(void)sectors;'),
     ('read-count', 'sector, blocks * EXT2_SECTORS_PER_BLOCK, buf', 'sector, 1, buf'),
-    ('write-count', 'sector, blocks * EXT2_SECTORS_PER_BLOCK, src', 'sector, 1, src'),
+    ('write-count', 'sector, blocks * EXT2_SECTORS_PER_BLOCK, 0, src', 'sector, 1, 0, src'),
     ('data-error-state', 'return ext2_raw_read_blocks(ctx, first, blocks, dst);',
      'int ret = ext2_raw_read_blocks(ctx, first, blocks, dst); if (ret) ext2_fs_error(ctx); return ret;'),
-    ('partial-error', 'return dev_blk_write_lba(ctx->dev, sector, blocks * EXT2_SECTORS_PER_BLOCK, src);',
-     '(void)dev_blk_write_lba(ctx->dev, sector, blocks * EXT2_SECTORS_PER_BLOCK, src); return 0;'),
+    ('partial-error', 'return ext2_device_transfer(ctx, sector, blocks * EXT2_SECTORS_PER_BLOCK, 0, src);',
+     '(void)ext2_device_transfer(ctx, sector, blocks * EXT2_SECTORS_PER_BLOCK, 0, src); return 0;'),
 ]
 
 

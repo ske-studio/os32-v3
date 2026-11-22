@@ -44,7 +44,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def verify(directory):
     header = (directory / 'fep_imports.h').read_text()
-    assert '#define FEP_MODULE_ABI_GEN 0xa97d3c97u' in header, 'FEP contract fingerprint'
+    assert '#define FEP_MODULE_ABI_GEN 0x89760553u' in header, 'FEP contract fingerprint'
 
 
 def main():

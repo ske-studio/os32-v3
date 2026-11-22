@@ -8,6 +8,7 @@
 /*  各ディスパッチ関数がFSドライバにコンテキストを渡す。                     */
 /* ======================================================================== */
 
+#include "install_access.h"
 #include "vfs_device.h"
 #include "vfs.h"
 #include "os32_kapi_shared.h" /* O_RDONLY, SEEK_SET 等 */
@@ -321,6 +322,11 @@ static MountPoint *vfs_find_mount(const char *path, const char **out_relpath)
     }
 
     if (best_idx >= 0) {
+        const struct install_medium *medium = platform_install_medium();
+        u32 unit;
+        if (platform_install_medium() && mounts[best_idx].dev_type == VFS_DEV_HD &&
+            medium->view_unit(mounts[best_idx].dev_id, &unit) &&
+            !install_mount_visible(unit)) return 0;
         if (out_relpath) {
             *out_relpath = path + best_len;
             if (**out_relpath == '/') (*out_relpath)++; 
@@ -412,7 +418,8 @@ static int vfs_prefix_same(const char *a, const char *b)
     return 1;
 }
 
-int vfs_mount(const char *prefix, const char *dev_name, const char *fstype)
+static int vfs_register_mount(const char *prefix, const char *dev_name, const char *fstype,
+                              const struct install_access *access)
 {
     int dev_type, dev_id, rc, i, slot;
     VfsOps *ops = (VfsOps *)0;
@@ -460,11 +467,17 @@ int vfs_mount(const char *prefix, const char *dev_name, const char *fstype)
     fs_ctx = ops->mount(VFS_MOUNT_DEV_ENCODE(dev_type, dev_id));
     if (!fs_ctx) return VFS_ERR_IO;
 
+    unsigned flags = 0;
+    if (platform_install_medium() && access && install_mount_lock(access, &flags)) {
+        ops->umount(fs_ctx);
+        return OS32_ERR_STALE;
+    }
     slot = -1;
     for (i = 0; i < VFS_MAX_FS; i++) {
         if (!mounts[i].in_use) { slot = i; break; }
     }
     if (slot < 0) {
+        if (platform_install_medium() && access) install_mount_unlock(flags);
         ops->umount(fs_ctx);
         return VFS_ERR_NOSPC;
     }
@@ -481,7 +494,94 @@ int vfs_mount(const char *prefix, const char *dev_name, const char *fstype)
     kstrncpy(mounts[slot].dev_name, dev_name, VFS_MAX_DEVNAME);
 
     kstrncpy(cwd, "/", VFS_MAX_PATH);
+    if (platform_install_medium() && access) install_mount_unlock(flags);
     return VFS_OK;
+}
+
+int vfs_mount(const char *prefix, const char *dev_name, const char *fstype)
+{
+    const struct install_medium *medium = platform_install_medium();
+    struct install_access access;
+    int type, id, rc;
+    u32 unit;
+    if (!platform_install_medium() || !dev_name || vfs_dev_parse(dev_name, &type, &id) ||
+        type != VFS_DEV_HD || !medium->view_unit(id, &unit))
+        return vfs_register_mount(prefix, dev_name, fstype, 0);
+    rc = install_admit(&access, unit, INSTALL_MOUNT, 0, 0, 0);
+    if (rc) return rc;
+    if (access.generation && (!prefix || !fstype || !vfs_prefix_same(prefix, "/hd0") ||
+        kstrcmp(fstype, "ext2") || kstrcmp(dev_name, "hd0"))) {
+        install_complete(&access);
+        return VFS_ERR_INVAL;
+    }
+    rc = vfs_register_mount(prefix, dev_name, fstype, access.generation ? &access : 0);
+    install_complete(&access);
+    return rc;
+}
+
+int vfs_install_visible(void *ctx)
+{
+    const struct install_medium *medium = platform_install_medium();
+    if (!platform_install_medium()) return 1;
+    for (int i = 0; i < VFS_MAX_FS; i++) {
+        MountPoint *mp = &mounts[i];
+        u32 unit;
+        if (mp->in_use && mp->fs_ctx == ctx && mp->dev_type == VFS_DEV_HD &&
+            medium->view_unit(mp->dev_id, &unit))
+            return install_mount_visible(unit);
+    }
+    return 1;
+}
+
+void vfs_install_discard(u32 unit)
+{
+    if (!platform_install_medium()) return;
+    const struct install_medium *medium = platform_install_medium();
+    for (int i = 0; i < VFS_MAX_FS; i++) {
+        MountPoint *mp = &mounts[i];
+        u32 raw;
+        if (!mp->in_use || mp->dev_type != VFS_DEV_HD ||
+            !medium->view_unit(mp->dev_id, &raw) || raw != unit) continue;
+        vfs_fd_invalidate_mount(mp->fs_ctx);
+        mp->ops->umount(mp->fs_ctx);
+        mp->in_use = 0;
+        mp->fs_ctx = 0;
+        mp->ops = 0;
+    }
+}
+
+static int vfs_umount_checked_internal(const char *prefix, int management);
+
+int vfs_install_precheck(u32 unit)
+{
+    if (!platform_install_medium()) return 0;
+    const struct install_medium *medium = platform_install_medium();
+    u32 raw;
+    for (int i = 0; i < VFS_MAX_FS; i++) {
+        MountPoint *mp = &mounts[i];
+        if (!mp->in_use || mp->dev_type != VFS_DEV_HD ||
+            !medium->view_unit(mp->dev_id, &raw) || raw != unit) continue;
+        if (!kstrcmp(mp->prefix, "/") || vfs_fd_mount_busy(mp->fs_ctx))
+            return VFS_ERR_BUSY;
+    }
+    return 0;
+}
+
+int vfs_install_detach(u32 unit)
+{
+    if (!platform_install_medium()) return 0;
+    const struct install_medium *medium = platform_install_medium();
+    u32 raw;
+    int rc = vfs_install_precheck(unit);
+    if (rc) return rc;
+    for (int i = 0; i < VFS_MAX_FS; i++) {
+        MountPoint *mp = &mounts[i];
+        if (!mp->in_use || mp->dev_type != VFS_DEV_HD ||
+            !medium->view_unit(mp->dev_id, &raw) || raw != unit) continue;
+        int rc = vfs_umount_checked_internal(mp->prefix, 1);
+        if (rc) return rc;
+    }
+    return 0;
 }
 
 void vfs_umount(const char *prefix)
@@ -489,6 +589,7 @@ void vfs_umount(const char *prefix)
     int i;
     for (i = 0; i < VFS_MAX_FS; i++) {
         if (mounts[i].in_use && kstrcmp(mounts[i].prefix, prefix) == 0) {
+            if (platform_install_medium() && !vfs_install_visible(mounts[i].fs_ctx)) return;
             /* そのマウントの FD 全部に失効の印を付けてから fs_ctx を解放する
              * (票 TASK_VFS_FD_PATH)。印を先に見るので、以後の read / write /
              * fstat / seek が解放済みの fs_ctx を触らない。 */
@@ -502,7 +603,7 @@ void vfs_umount(const char *prefix)
     }
 }
 
-int vfs_umount_checked(const char *prefix)
+static int vfs_umount_checked_internal(const char *prefix, int management)
 {
     int i, rc;
 
@@ -510,6 +611,8 @@ int vfs_umount_checked(const char *prefix)
     for (i = 0; i < VFS_MAX_FS; i++) {
         if (!mounts[i].in_use || kstrcmp(mounts[i].prefix, prefix) != 0)
             continue;
+        if (platform_install_medium() && !management && !vfs_install_visible(mounts[i].fs_ctx))
+            return VFS_ERR_BUSY;
         /* ルートを外すと以後のパスが全部行き先を失う (シェル・ライブラリも)。 */
         if (mounts[i].prefix[0] == '/' && mounts[i].prefix[1] == '\0')
             return VFS_ERR_BUSY;
@@ -528,6 +631,11 @@ int vfs_umount_checked(const char *prefix)
         return VFS_OK;
     }
     return VFS_ERR_NOTFOUND;
+}
+
+int vfs_umount_checked(const char *prefix)
+{
+    return vfs_umount_checked_internal(prefix, 0);
 }
 
 int vfs_dev_mount_count(int drive)

@@ -176,6 +176,7 @@ void kapi_strings_cleanup_owned(int id) {
 static void exec_db_cleanup_owned(int id) { resource(id, 0); }
 static void fd_redirect_reset_owned(int id) { resource(id, 1); }
 static void vfs_close_owned(int id) { resource(id, 2); }
+static void install_reclaim_owner(int id) { (void)id; }
 static void pipe_free_owned(int id) { resource(id, 3); }
 static void shm_free_owned(int id) { resource(id, 4); }
 static void exec_pcm_reclaim(int id) { resource(id, 5); }

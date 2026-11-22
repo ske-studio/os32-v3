@@ -7,6 +7,7 @@
 #include "vfs.h"
 
 static void io_kapi_owner_exit(int owner) { (void)owner; }
+void install_reclaim_owner(int owner) { (void)owner; }
 
 static char heap[KAPI_STRING_ARGS][KAPI_STRING_CAP];
 static int allocated[KAPI_STRING_ARGS], allocation_count, allocation_fail;

@@ -1,4 +1,4 @@
-# KernelAPI v90 仕様書
+# KernelAPI v91 仕様書
 
 外部プログラム (OS32X) がカーネル機能を利用するためのAPIテーブル仕様。
 
@@ -16,8 +16,8 @@
 | 最大プログラムサイズ | 仮想配置で決まる: image・BSS・libc の初期域は 0x80100000 から、exec_heap の予約起点 0x88000000 の手前まで (配置と検査は [09_exec.md](09_exec.md)「Ring3 の USER 写像」) |
 | プログラム専用ヒープ | exec_heap 0x88000000〜 (既定 64KB だけ map、`mem_map` で伸長) と libc の sbrk |
 | プログラム専用スタック | 0x90000000 の直下に可変量 (既定 256KiB、OS32X ヘッダの `stack_size`)、その下に guard 1 ページ |
-| 現在のバージョン | **90** |
-| 合計エントリ数 | **388** (ヘッダ 2 + 関数表の容量 384 (うち実装 337・予約 47) + データフィールド 2)。データ欄は **0x608 に固定** (§4-0) |
+| 現在のバージョン | **91** |
+| 合計エントリ数 | **388** (ヘッダ 2 + 関数表の容量 384 (うち実装 340・予約 44) + データフィールド 2)。データ欄は **0x608 に固定** (§4-0) |
 
 ---
 
@@ -140,6 +140,7 @@ KAPI は append-only で版番号は単調増加。複数の計画が独立に�
 | v87 | **実装 (I/O の Tier C1・C2・L1)** | `io_policy_set` / `io_policy_get` / `io_policy_reset` / `io_pump` (slot 294〜297) | 票 TASK_IO_TIER |
 | v89 | **実装** | 関数表容量 384、実装 298。ABI 世代 2、CRT 実名 os32_kapi_v89。全イメージを再構築する。 |
 | v90 | **実装** | AV HAL の 39 口を slot 298〜336 に追加。関数表容量 384、使用 337、データ開始 0x608、ABI 世代 2。 |
+| v91 | **宣言追加** | 導入管理の install_begin / install_rescan / install_end (slot 337〜339)。 | B05 §5 |
 | v88 | **実装 (段 6c の D2)** | slot の追加なし。`ext2_format` / `ext2_format_at` の `drv` に loop の `0x0600..0x0603` (`OS32_DRV_LOOP(slot)`) を足す。v87 の出荷版以前はこの範囲を拒否する | 本書 [ext2 の loop の drv](#ext2-loop-drv) |
 
 調停 (2026-09-06、同日改訂): GUI (K1〜W2) を先に実装するので **v42 = GUI、v43 = ネットワーク Host Services**
@@ -161,6 +162,17 @@ KAPI は append-only で版番号は単調増加。複数の計画が独立に�
 同じ票で既存の **-11 `STALE`** を VFS の FD にも使う (unlink・置き換え rename・umount で失効した FD の
 read / write / fstat / seek)。版数は据え置き。
 Host Services (2026-11-05) は **-18 `HOSTDOWN`** (ホストに届かない・応答が無い・NIC 未 bind) と **-19 `TIMEOUT`** (SDK host_call の全体期限) を取り、番号の追加だけなので KAPI 版数は据え置く。
+
+### 導入管理 (v91)
+
+`install_begin(plan, handle)` は前景のディスク書込み認可を検査し、128 バイトの
+`InstallPlanV1` をコピーする。成功時だけ owner 専用の handle を書く。
+`install_rescan(handle)` は予約内で表を検読し、同じ世代の owner 限定 view を返り値 0 で利用可能にする。
+`install_end(handle, OS32_INSTALL_END_COMMIT)` は同期・再検査して公開し、
+`OS32_INSTALL_END_ABORT` は原本を復元して全バイトを照合する。未知の outcome は
+`OS32_ERR_INVAL` を返し、予約を維持する。PC-98 の V1 と PowerMac の段 3 接続前は
+認可済みの begin が `OS32_ERR_NOSYS` を返す。配置・予約・回収の契約は
+[B05 §5](decisions/ppc/PPC_ROOT_MOUNT_ALIGN_X86_DESIGN.md#5-共通-install-と排他) に従う。
 
 ### 生ディスク書込みの授権 (KAPI-DISK-AUTH)
 
@@ -308,7 +320,7 @@ v62 まではデータ欄 (`sbrk_heap_limit` / `shm_base`) を関数表の**直�
 |---|---|---|
 | 関数表の容量 R | **384** スロット (`KAPI_FUNC_CAPACITY`) | `sdk/kapi.json` の `func_capacity` |
 | データ欄の先頭 | **0x608** = 8 + 4 × R (`KAPI_DATA_FIELDS_OFF`) | `sdk/gen_kapi.py` が生成 |
-| 予約スロット | 337〜383。カーネル実表はすべて 0。ユーザー表はスタブを指し、dispatch が実装数で範囲外を拒否する。 | `exec/exec.c` |
+| 予約スロット | 340〜383。カーネル実表はすべて 0。ユーザー表はスタブを指し、dispatch が実装数で範囲外を拒否する。 | `exec/exec.c` |
 | ユーザー表の配置 | 第 1 頁に表 (0x000〜0x60f) と文字列 (0x610〜0x70f)。第 2 頁にスタブ (0x1000〜0x1bff) と sys_ls shim (0x1c00〜0x1cbf)。両頁とも USER/RO。 | `exec/ring3_str.h` |
 
 関数を足すときは `kapi_reserved[]` が 1 本減るだけで、データ欄は動かない。**関数数が R を
@@ -2221,6 +2233,9 @@ private import 表は `kernel/module/kdebug_imports.def` が正で、317 件
 | 0x540 | snd2_chip_read | `int(u32 h, u32 bank, u32 what, u32 reg)` |
 | 0x544 | snd2_chip_reset | `int(u32 h)` |
 | 0x548 | snd2_chip_close | `int(u32 h)` |
+| 0x54c | install_begin | `int(const InstallPlanV1 *plan, u32 *handle)` |
+| 0x550 | install_rescan | `int(u32 handle)` |
+| 0x554 | install_end | `int(u32 handle, u32 outcome)` |
 
 slot 253。kdebug 部品 (`/boot/kdebug.bin`、`KDEBUG=1` のときだけ読む) の ops slot 19
 `dbg_call` へそのまま渡す受け口 (`kernel/module/kdebug_call.c`)。部品が動いていない・slot 19 が

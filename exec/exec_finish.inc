@@ -130,6 +130,7 @@ static void exec_restore_context(int id)
 /* ======================================================================== */
 static void exec_reclaim_resources(int id)
 {
+    install_reclaim_owner(id); /* Stop new disk work before closing the owner's files. */
     exec_input_owner_exit(id);
     io_kapi_owner_exit(id); /* IO_KAPI_RECLAIM_COMMON */
     kapi_strings_cleanup_owned(id);

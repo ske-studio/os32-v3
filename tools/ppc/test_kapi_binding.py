@@ -73,6 +73,7 @@ KCG_PROVIDERS = frozenset("platform_kcg_init platform_kcg_set_scale platform_kcg
 LOOP_PROVIDERS = frozenset({"platform_loop_dev_attach", "platform_loop_dev_detach", "platform_loop_dev_status"})
 
 ALLOWED_UNDEFINED = frozenset("""
+install_begin install_rescan install_end
 kdebug_call platform_pci_count platform_pci_get platform_pci_cfg_read32 kapi_pci_bind_info
 surface_api_bundle
 boot_image_info

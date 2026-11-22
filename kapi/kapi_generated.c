@@ -11,6 +11,7 @@
 #include "paging.h"
 #include "clock_service.h"
 #include "exec.h"
+#include "install_management.h"
 #include "fm_contract.h"
 #include "av_contract.h"
 #include "ide_contract.h"
@@ -68,7 +69,7 @@ extern int kapi_osri_show(const char *path, u32 duration_ms);
 #include "kapi_profile.h"
 
 #ifdef KAPI_PROFILE
-volatile u32 kapi_hits[337];
+volatile u32 kapi_hits[340];
 #endif
 
 /* 各スロットの cdecl 引数バイト数 (固定分)。int 0x80 ディスパッチャが
@@ -411,6 +412,9 @@ const u16 kapi_argsize[KAPI_FUNC_COUNT] = {
     16,  /* snd2_chip_read */
     4,  /* snd2_chip_reset */
     4,  /* snd2_chip_close */
+    8,  /* install_begin */
+    4,  /* install_rescan */
+    8,  /* install_end */
 };
 
 /* 各スロットの固定引数のうち早期検査するポインタのビットマスク (bit k = 引数 k)。
@@ -753,6 +757,9 @@ const u16 kapi_argptr[KAPI_FUNC_COUNT] = {
     0x0000,  /* snd2_chip_read */
     0x0000,  /* snd2_chip_reset */
     0x0000,  /* snd2_chip_close */
+    0x0000,  /* install_begin */
+    0x0000,  /* install_rescan */
+    0x0000,  /* install_end */
 };
 
 /* ---- 出力ポインタの書き込み可検査 (票 TASK_KAPI_OUTPUT_GUARD) --------
@@ -3398,5 +3405,32 @@ int __cdecl wrap_snd2_chip_close(u32 h)
 {
     KAPI_HIT(336);
     return snd2_chip_close(h);
+}
+
+int __cdecl wrap_install_begin(const InstallPlanV1 *plan, u32 *handle)
+{
+    KAPI_HIT(337);
+    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */
+    if (!ring3_user_ranges_writable((u32)handle, KAPI_OUT_LEN(handle, sizeof(u32)),
+                                    (u32)0, 0u)) {
+        ring3_fault_kill();   /* 戻らない */
+    }
+    /* 入力の全範囲を B1 で検査 (USER/read)。 */
+    if (!kapi_in_range((u32)plan, KAPI_OUT_LEN(plan, sizeof(InstallPlanV1)))) {
+        ring3_fault_kill();
+    }
+    return install_begin(plan, handle);
+}
+
+int __cdecl wrap_install_rescan(u32 handle)
+{
+    KAPI_HIT(338);
+    return install_rescan(handle);
+}
+
+int __cdecl wrap_install_end(u32 handle, u32 outcome)
+{
+    KAPI_HIT(339);
+    return install_end(handle, outcome);
 }
 

@@ -6,6 +6,7 @@
 /* ======================================================================== */
 
 #include "vfs.h"
+#include "platform_install_management.h"
 #include "fd_redirect.h"
 #include "os32_kapi_shared.h" /* O_RDONLY, SEEK_SET 等 */
 #include "console.h"
@@ -54,6 +55,14 @@ typedef struct {
 
 static VfsFile open_files[VFS_MAX_OPEN_FILES];
 
+int vfs_fd_mount_busy(void *ctx)
+{
+    for (int i = VFS_FIRST_FILE_FD; i < VFS_MAX_OPEN_FILES; i++)
+        if (open_files[i].in_use && !open_files[i].stale && open_files[i].fs_ctx == ctx)
+            return 1;
+    return 0;
+}
+
 /* font FD の予算 (vfs.h、値は T7b-a6 の実測)。FD 0〜2 は標準入出力の予約 */
 STATIC_ASSERT(VFS_FONT_FD_MAX_APP_TOTAL + VFS_FONT_FD_MAX_SHELL +
               VFS_FONT_FD_RESERVED <= VFS_MAX_OPEN_FILES - VFS_FIRST_FILE_FD,
@@ -80,6 +89,7 @@ static int fd_resource_check(VfsFile *f)
 {
     u32 generation;
     int rc;
+    if (platform_install_medium() && !vfs_install_visible(f->fs_ctx)) return VFS_ERR_BUSY;
     if (f->stale) return VFS_ERR_STALE;
     if (!f->ops->resource_check) return VFS_OK;
     rc = f->ops->resource_check(f->fs_ctx, &generation);
