@@ -59,6 +59,10 @@ def run(ctx):
             ('legacy_ring.c', 'finish || (keycode == KEY_TAB && is_break)', 'finish'),
             ('legacy_ring.c', 'if (first_repeat >= 0) continue;', '(void)first_repeat;'),
             ('legacy_ring.c', 'make_room(2, KBD_BUF_SIZE, RAW_PROTECTED);', '(void)0;'),
+            ('legacy_ring.c', '= RAW_SEALED_REPEAT;', '= RAW_PROTECTED;'),
+            ('legacy_ring.c', 'p == RAW_SEALED_REPEAT ? offset', '0 ? offset'),
+            ('kbd_merge.c', 'if (!legacy_active()) input_emit_in2(e);',
+             'if (!legacy_active() && !(in2_excl_keyboard() && sc == KEY_CTRL)) input_emit_in2(e);'),
             ('legacy_ring.c', 'if (repeat) rank = RAW_REPEAT;', 'if (repeat) rank = RAW_WM;'),
             ('legacy_ring.c', 'if (n != needed) return 0;', 'if (n != needed || slots == 2) return 0;'),
             ('legacy_ring.c', 'limit -= !has_ctrl_stop();', 'limit -= 0;'),
@@ -140,6 +144,6 @@ def run(ctx):
                     '-Wl,--wrap=in2_on_focus', '-Wl,--wrap=input_key_pressed', *objects.values(), '-o', binary],
                     cwd=ctx.root, check=True)
                 rc = subprocess.run(['qemu-i386', binary]).returncode
-                assert (0 < rc <= 47) if name else rc == 0, (name, old, rc)
+                assert (0 < rc <= 49) if name else rc == 0, (name, old, rc)
                 print('RED runtime' if name else 'PASS', machine, name, old.splitlines()[0] if old else '', flush=True)
     return 0

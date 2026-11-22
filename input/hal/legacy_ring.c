@@ -67,7 +67,7 @@ static int keep_raw(int sc)
 
 /* A protected pair survives foreground purges even when an ordinary raw
  * with GRPH clear was the completion. Tags move with their entries. */
-enum raw_priority { RAW_NORMAL, RAW_REPEAT, RAW_WM, RAW_PROTECTED };
+enum raw_priority { RAW_NORMAL, RAW_REPEAT, RAW_WM, RAW_SEALED_REPEAT, RAW_PROTECTED };
 static u8 priority[KBD_BUF_SIZE];
 static int switch_pending, tab_down;
 
@@ -99,8 +99,11 @@ static int make_room(int slots, int limit, int rank)
     if (needed <= 0) return 1;
     int victim[3], n = 0;
     for (int p = RAW_NORMAL; p < rank && n < needed; ++p)
-        for (int i = kbd_raw_count - 1; i >= 0 && n < needed; --i)
+        for (int offset = 0; offset < kbd_raw_count && n < needed; ++offset) {
+            /* Preserve recent completed TAB steps when a new switch needs room. */
+            int i = p == RAW_SEALED_REPEAT ? offset : kbd_raw_count - 1 - offset;
             if (priority[raw_slot(i)] == p) victim[n++] = i;
+        }
     if (n != needed) return 0;
     int kept = 0;
     for (int i = 0; i < kbd_raw_count; ++i) {
@@ -165,7 +168,7 @@ void legacy_raw_push(int keycode, int is_break, int mods)
         if (first_repeat >= 0)
             for (int i = 0; i < kbd_raw_count; ++i)
                 if (priority[raw_slot(i)] == RAW_REPEAT) {
-                    priority[raw_slot(i)] = RAW_PROTECTED;
+                    priority[raw_slot(i)] = RAW_SEALED_REPEAT;
                     break;
                 }
     }

@@ -315,6 +315,27 @@ static int switch_queue(void)
     return 0;
 }
 
+static int sealed_repeat_pressure(void)
+{
+    const int tab = KEY_TAB | KBD_RAW_MAKE | (SHIFT_GRPH << KBD_RAW_MOD_SHIFT);
+    const int groups = (KBD_BUF_SIZE - 2) / 3;
+    for (int i = 0; i < groups; ++i) {
+        legacy_raw_push(KEY_TAB, 0, SHIFT_GRPH);
+        legacy_raw_push(KEY_TAB, 0, SHIFT_GRPH);
+        legacy_raw_push(KEY_GRPH, 1, 0);
+    }
+    legacy_raw_push(KEY_TAB, 0, SHIFT_GRPH);
+    legacy_raw_push(KEY_GRPH, 1, 0);
+    legacy_raw_push(KEY_STOP, 0, SHIFT_CTRL);
+    for (int i = 0; i <= groups; ++i) {
+        if (legacy_raw_take() != tab) return 48;
+        if (i > 0 && i < groups && legacy_raw_take() != tab) return 48;
+        if (legacy_raw_take() != KEY_GRPH) return 48;
+    }
+    int stop = KEY_STOP | KBD_RAW_MAKE | (SHIFT_CTRL << KBD_RAW_MOD_SHIFT);
+    return legacy_raw_take() == stop && legacy_raw_take() == -1 ? 0 : 48;
+}
+
 static int priority_order(void)
 {
     const int grph = SHIFT_GRPH << KBD_RAW_MOD_SHIFT;
@@ -453,6 +474,55 @@ static int public_api(void)
     if (in2_wm_state(&state) != OS32_ERR_INVAL) return 36;
     return 0;
 }
+static int public_lost(int reason)
+{
+    IN2_Event e;
+    return in2_read(&e, 1) == 1 && e.type == IN2_EV_LOST && e.u.lost.reason == reason;
+}
+
+/* Compare both consumers of each physical edge at the HAL / WM boundary. */
+static int delivery_edge(int sc, int down, int mods, int visible)
+{
+    IN2_Event e[2];
+    physical(1, sc, down);
+    int raw = sc | (down ? KBD_RAW_MAKE : 0) | (mods << KBD_RAW_MOD_SHIFT);
+    return in2_read(e, 2) == 1 && e[0].type == IN2_EV_KEY && e[0].dev == 1 &&
+           e[0].u.key.sc == sc && e[0].u.key.down == down && e[0].u.key.mods == mods &&
+           legacy_raw_take() == (visible ? raw : -1) && legacy_raw_take() == -1;
+}
+
+static int public_delivery(void)
+{
+    const int a = 0x1d;
+    wm = kbd_gui_mode = 1;
+    for (int path = 0; path < 3; ++path) {
+        if (av_focus_set(++caller) || !public_lost(IN2_LOST_FOCUS) ||
+            !public_lost(IN2_LOST_EXCL) || in2_acquire(IN2_EXCL_KBD) ||
+            !public_lost(IN2_LOST_EXCL)) return 49;
+        if (!delivery_edge(a, 1, 0, 0) || !delivery_edge(KEY_CTRL, 1, SHIFT_CTRL, 1))
+            return 49;
+        if (path == 0) {
+            if (in2_unacquire()) return 49;
+        } else if (path == 1) {
+            if (av_focus_set(++caller) || !public_lost(IN2_LOST_FOCUS)) return 49;
+        } else {
+            /* Queue the actual CTRL+STOP make for ABORTED reclamation. */
+            physical(1, KEY_STOP, 1);
+            in2_reclaim(caller);
+            legacy_raw_discard_stop();
+        }
+        if (!public_lost(IN2_LOST_EXCL)) return 49;
+        if (path == 2 && !delivery_edge(KEY_STOP, 0, SHIFT_CTRL, 1)) return 49;
+        if (!delivery_edge(KEY_CTRL, 0, 0, 1)) return 49;
+        physical(1, a, 1); /* held repeat across the boundary */
+        IN2_Event e;
+        if (in2_read(&e, 1) || legacy_raw_take() != -1 ||
+            !delivery_edge(a, 0, 0, 1) || !delivery_edge(a, 1, 0, 1) ||
+            !delivery_edge(a, 0, 0, 1)) return 49;
+    }
+    return 0;
+}
+
 static int closed_acquire(void)
 {
     IN2_WmState before, after;
@@ -480,10 +550,12 @@ void _start(void)
     if (!rc) rc = held_boundaries();
     if (!rc) rc = mapped_hold();
     if (!rc) rc = switch_queue();
+    if (!rc) rc = sealed_repeat_pressure();
     if (!rc) rc = priority_order();
     if (!rc) rc = previous_tab_press(1);
     if (!rc) rc = previous_tab_press(0);
     if (!rc) rc = public_api();
+    if (!rc) rc = public_delivery();
 #endif
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc));
     __builtin_unreachable();
