@@ -6,6 +6,11 @@ int main(int argc, char **argv, KernelAPI *api)
 {
     volatile const u32 *table = (volatile const u32 *)api;
     char line[96];
+    if (argc == 2 && argv[1][0] == 'l') {
+        int (*last)(void) = (int (*)(void))table[2 + KAPI_FUNC_COUNT - 1];
+        /* The fixture returns a sentinel after the real range check. */
+        return last() == 0x763839 ? 0 : 1;
+    }
     if (argc == 2) {
         unsigned slot = argv[1][0] == 'a' ? KAPI_FUNC_COUNT : KAPI_FUNC_CAPACITY - 1;
         int (*reserved)(void) = (int (*)(void))table[2 + slot];
@@ -36,8 +41,6 @@ int main(int argc, char **argv, KernelAPI *api)
     }
     api->gfx_init();
     int result = api->io_pump(0);
-    /* Exercise v90's last published function with an invalid handle. */
-    (void)api->snd2_chip_close(0);
     snprintf(line, sizeof(line), "V89 return=%d heap=%u shm=%u\n",
              result, (unsigned)table[0x608 / 4], (unsigned)table[0x60c / 4]);
     for (char *p = line; *p; ++p) api->shell_putchar(*p, 7);
