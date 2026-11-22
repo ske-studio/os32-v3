@@ -35,7 +35,7 @@
 #include "os32api.h"
 #include "inst_hdd.h"
 
-#define IDE_DRIVE INST_DRIVE
+#include "include/platform_install_boot.h"
 
 /* IOバッファ (ヒープから確保する) */
 static u8 *file_buf;
@@ -53,30 +53,10 @@ typedef struct {
 /* 媒体側の名前 (FDD)。FAT の 8.3 名は大文字で返るので、開くときは媒体の
  * 名前のまま、HDD へ作るときは小文字に正規化する。 */
 #define SRC_KERNEL_LZ4  "/VMKRNL.LZ4"
-#define SRC_BOOT_HDD    "/sys/boot_hdd.bin"
-#define SRC_LOADER_H    "/sys/loader_h.bin"
 #define SRC_SHELL       "/sys/shell.bin"    /* HDD 起動の常駐シェル (cdinst の MINIMAL と同じ必須) */
 #define DST_SHELL       "/hd0/sys/shell.bin"
 #define DST_BOOT_DIR    "/hd0/boot"
 #define DST_KERNEL_LZ4  "/hd0/boot/vmkernel.lz4"
-
-/* I2-1: drivers/ata/ide.h の IdeInfo と**同じ並び** (i386 で 96 B) でなければ
- * ならない。ide_identify はカーネル側の定義で書くので、ここが 92 B のままだと
- * 末尾 phys_sector_size の 2 バイトが呼び手の領域を踏む。drivers/ata/ide.h は
- * カーネル内部ヘッダで外部プログラムからは引けないため写しを置く —
- * ide.h を変えたら必ず一緒に直すこと (userland/shell/cmd_sys.c も同じ写し)。 */
-typedef struct {
-    u32 total_sectors;
-    u16 cylinders;
-    u16 heads;
-    u16 sectors;
-    u32 size_mb;
-    char model[41];
-    char serial[21];
-    char firmware[9];
-    int lba_supported;
-    u16 phys_sector_size;   /* 物理セクタサイズ (SASI=256, IDE=512) */
-} IdeInfo;
 
 static KernelAPI *g_api;
 
@@ -228,15 +208,6 @@ static int copy_file(const char *src, const char *dst) {
     g_api->sys_close(fd_src);
     g_api->sys_close(fd_dst);
     return rc != 0 ? rc : total;
-}
-
-static int read_file_to_buf(const char *path, int max_size) {
-    int fd = g_api->sys_open(path, KAPI_O_RDONLY);
-    int len;
-    if (fd < 0) return fd;
-    len = g_api->sys_read(fd, file_buf, max_size);
-    g_api->sys_close(fd);
-    return len;
 }
 
 /* ======== 安全ロック ======== */
@@ -440,31 +411,29 @@ static const RecoverOps recover_kapi_ops = {
  * 戻り値 0 = 揃っている。sizes[] に大きさ (VMKRNL.LZ4 / IPL / ローダ / shell の
  * 順) を返す。大きさの上限は inst_hdd_check_media が見る (段 2-11、N8)。 */
 #define MEDIA_KERNEL 0
-#define MEDIA_IPL    1
-#define MEDIA_LOADER 2
-#define MEDIA_SHELL  3
-#define MEDIA_COUNT  4
+#define MEDIA_BOOT   1
+#define MEDIA_SHELL  (MEDIA_BOOT + PLATFORM_BOOT_COUNT)
+#define MEDIA_COUNT  (MEDIA_SHELL + 1)
 static int precheck_media(u32 *sizes)
 {
-    static const char *const need[MEDIA_COUNT] = {
-        SRC_KERNEL_LZ4, SRC_BOOT_HDD, SRC_LOADER_H, SRC_SHELL
-    };
     OS32_Stat st;
     int i, rc;
 
     for (i = 0; i < MEDIA_COUNT; i++) {
+        const char *path = i == MEDIA_KERNEL ? SRC_KERNEL_LZ4 :
+                           i == MEDIA_SHELL ? SRC_SHELL : platform_boot_paths[i - MEDIA_BOOT];
         sizes[i] = 0;
-        rc = g_api->sys_stat(need[i], &st);
+        rc = g_api->sys_stat(path, &st);
         if (rc != 0) {
-            g_api->kprintf(0x4F, "Error: Missing %s (stat %d)\n", need[i], rc);
+            g_api->kprintf(0x4F, "Error: Missing %s (stat %d)\n", path, rc);
             return -1;
         }
         if ((st.st_mode & OS_S_IFMT) != OS_S_IFREG) {
-            g_api->kprintf(0x4F, "Error: %s is not a regular file\n", need[i]);
+            g_api->kprintf(0x4F, "Error: %s is not a regular file\n", path);
             return -1;
         }
         if (st.st_size == 0) {
-            g_api->kprintf(0x4F, "Error: Empty %s\n", need[i]);
+            g_api->kprintf(0x4F, "Error: Empty %s\n", path);
             return -1;
         }
         sizes[i] = st.st_size;
@@ -499,24 +468,11 @@ static int measure_need(u32 lz4_size, InstNeed *need)
     return fails;
 }
 
-/* src を丸ごと file_buf に読む。長さが want と違えば負 (途中で読めない・
- * stat と中身が食い違う)。 */
-static int read_exact(const char *src, u32 want)
-{
-    int len;
-    if (want > FILE_BUF_SIZE) return -1;
-    len = read_file_to_buf(src, FILE_BUF_SIZE);
-    if (len < 0 || (u32)len != want) return -1;
-    return len;
-}
-
 int __cdecl main(int argc, char **argv, KernelAPI *api)
 {
-    static IdeInfo info;
     static RecoverOps rops;
     static InstTarget tgt;
     static InstNeed need;
-    static u8 ipl_buf[512];
     int ret, i;
     int rc = 1;                 /* 失敗を既定にする (票 S3I2-I §1) */
     u32 sizes[MEDIA_COUNT];
@@ -547,22 +503,7 @@ int __cdecl main(int argc, char **argv, KernelAPI *api)
         return 1;
     }
 
-    /* IDEの初期化とディスク情報の取得 (表示用。判定は hdd_geom_info) */
-    api->kprintf(KLOG_ATTR, "%s", "Initializing IDE controller...\n");
-    api->ide_init();
-
-    if (!api->ide_drive_present(IDE_DRIVE)) {
-        api->kprintf(0x4F, "%s", "Error: IDE Master Drive (hd0) not found.\n");
-        goto end;
-    }
-
-    if ((ret = api->ide_identify(IDE_DRIVE, &info)) != 0) {
-        api->kprintf(0x4F, "%s", "Error: Could not identify drive.\n");
-        goto end;
-    }
-
-    api->kprintf(ATTR_WHITE, "Target Drive Found: %s\n", info.model);
-    api->kprintf(ATTR_WHITE, "Size: %u MB (%u sectors)\n", info.size_mb, info.total_sectors);
+    if (platform_install_identify(api) != 0) goto end;
 
     /* === Phase 0: 全検査 (承認前 = まだ何も書いていない) ===
      * 媒体の中身 → FD の列挙 → hd0 (幾何・区画表のモード・マウント。表が
@@ -579,7 +520,7 @@ int __cdecl main(int argc, char **argv, KernelAPI *api)
         goto end;
     }
     if (inst_hdd_check(api, &tgt) != 0) goto end;
-    if (inst_hdd_check_media(api, &tgt, sizes[MEDIA_IPL], sizes[MEDIA_LOADER],
+    if (inst_hdd_check_media(api, &tgt, &sizes[MEDIA_BOOT],
                              sizes[MEDIA_KERNEL], &need) != 0)
         goto end;
 
@@ -604,19 +545,8 @@ int __cdecl main(int argc, char **argv, KernelAPI *api)
     if (inst_hdd_release(api, &tgt) != 0) goto end;
     if (inst_hdd_prepare(api, &tgt) != 0) goto end;
 
-    /* === Phase 2: ローダ (LBA 2〜) → IPL (LBA 0) === */
-    api->kprintf(ATTR_YELLOW, "%s", "\n[2/3] Writing Boot Sectors...\n");
-    if (read_exact(SRC_BOOT_HDD, sizes[MEDIA_IPL]) < 0) {
-        inst_hdd_incomplete(api, "cannot read /sys/boot_hdd.bin", -1);
-        goto end;
-    }
-    for (i = 0; i < 512; i++) ipl_buf[i] = (i < (int)sizes[MEDIA_IPL]) ? file_buf[i] : 0;
-    if (read_exact(SRC_LOADER_H, sizes[MEDIA_LOADER]) < 0) {
-        inst_hdd_incomplete(api, "cannot read /sys/loader_h.bin", -1);
-        goto end;
-    }
-    if (inst_hdd_write_boot(api, &tgt, ipl_buf, sizes[MEDIA_IPL],
-                            file_buf, sizes[MEDIA_LOADER]) != 0)
+    if (!PLATFORM_BOOT_AFTER_FILES &&
+        platform_install_directory_boot(api, &tgt, &sizes[MEDIA_BOOT], file_buf, FILE_BUF_SIZE) != 0)
         goto end;
 
     /* === Phase 3: ファイルコピー === */
@@ -673,6 +603,10 @@ int __cdecl main(int argc, char **argv, KernelAPI *api)
             goto end;
         }
     }
+
+    if (PLATFORM_BOOT_AFTER_FILES &&
+        platform_install_directory_boot(api, &tgt, &sizes[MEDIA_BOOT], file_buf, FILE_BUF_SIZE) != 0)
+        goto end;
 
     /* ファイルシステム同期 */
     api->kprintf(ATTR_CYAN, "%s", "  Syncing filesystem...\n");

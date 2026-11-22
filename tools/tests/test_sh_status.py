@@ -43,7 +43,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 BASE = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
         "-fno-stack-protector", "-Wall", 
         "-D__OS32_USERLAND__"]
-INCLUDES = ["-I" + str(ROOT / "sdk/include"), "-I" + str(ROOT / "sdk/include/os32"),
+INCLUDES = ["-I" + str(ROOT / "platform/pc98"), "-I" + str(ROOT / "sdk/include"), "-I" + str(ROOT / "sdk/include/os32"),
             "-I" + str(ROOT / "include"), "-I" + str(ROOT / "userland/shell"),
             "-I" + str(ROOT / "userland/lib"),
             # cmd_pci.c が "drivers/pci/pci_decode.h" を引く (実ビルドの

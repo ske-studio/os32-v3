@@ -1256,8 +1256,11 @@ static int __cdecl f_vfs_sync(void) { return vfs_sync(); }
  * ext2_layout.c は hdd_pt_fake.h が取り込み済み。ここの段は install_packages と
  * report_missing_packages だけを回す (hd0 の手順の試験は test_hdd_stage2.py) */
 #include "../system/inst_hdd.c"
+#include "platform/pc98/install_target.c"
 #include "../system/inst_disk.c"
+#include "platform/pc98/install_disk.c"
 #include "userland/shell/hdprep_plan.c"   /* -I のリポジトリ根から */
+#include "platform/pc98/install_plan.c"
 
 static void cdinst_setup(const char *set)
 {
@@ -1289,7 +1292,7 @@ static void case_cdinst(void)
     /* A: NORMAL が格納パス 124 バイトで PATH TOO LONG → そこで止まる。
      * DEBUG は展開しない、完了は表示しない */
     cdinst_setup("A_");
-    EQ(install_packages('3'), PKG_ERR_TOOLONG);
+    EQ(install_packages('3', NULL, NULL), PKG_ERR_TOOLONG);
     CHECK(exists("/good/a.txt"));             /* MINIMAL は済んでいる */
     CHECK(!exists("/full"));
     CHECK(!g_complete_seen);
@@ -1298,33 +1301,33 @@ static void case_cdinst(void)
      * 1 本目は済み、DEBUG へは進まない、完了は表示しない */
     cdinst_setup("B_");
     EQ(vfs_mkdir("/hd0/clash"), VFS_OK);
-    EQ(install_packages('3'), PKG_ERR_IO);
+    EQ(install_packages('3', NULL, NULL), PKG_ERR_IO);
     CHECK(exists("/n/a.txt"));
     CHECK(!exists("/full"));
     CHECK(!g_complete_seen);
 
     /* D: MINIMAL の失敗 (従来から止まる) — NORMAL へ進まない */
     cdinst_setup("D_");
-    EQ(install_packages('2'), PKG_ERR_TOOLONG);
+    EQ(install_packages('2', NULL, NULL), PKG_ERR_TOOLONG);
     CHECK(!exists("/n"));
     CHECK(!g_complete_seen);
 
     /* E: Full を選んだのに DEBUG が媒体に無い → 飛ばさず失敗、完了は表示しない */
     cdinst_setup("E_");
-    EQ(install_packages('3'), PKG_ERR_IO);
+    EQ(install_packages('3', NULL, NULL), PKG_ERR_IO);
     CHECK(exists("/n/a.txt"));
     CHECK(!g_complete_seen);
 
     /* F: GUI (MINIMAL → GUI → NORMAL の 2 段目) の失敗 → NORMAL へ進まない */
     cdinst_setup("F_");
-    EQ(install_packages('2'), PKG_ERR_TOOLONG);
+    EQ(install_packages('2', NULL, NULL), PKG_ERR_TOOLONG);
     CHECK(exists("/good/a.txt"));
     CHECK(!exists("/n"));
     CHECK(!g_complete_seen);
 
     /* G: Normal を選んだのに GUI が媒体に無い → 飛ばさず失敗 */
     cdinst_setup("G_");
-    EQ(install_packages('2'), PKG_ERR_IO);
+    EQ(install_packages('2', NULL, NULL), PKG_ERR_IO);
     CHECK(!exists("/n"));
     CHECK(!g_complete_seen);
     /* 欠けたパッケージは HDD を消す前に名前で知らせる (往復 2 の minor) */
@@ -1336,13 +1339,13 @@ static void case_cdinst(void)
 
     /* H: Minimal は GUI を展開しない (CUI のみ) */
     cdinst_setup("C_");
-    EQ(install_packages('1'), PKG_OK);
+    EQ(install_packages('1', NULL, NULL), PKG_OK);
     CHECK(exists("/good/a.txt") && !exists("/g") && !exists("/n"));
     CHECK(g_complete_seen);
 
     /* C: 全部通れば完了を表示する。NORMAL は 2 本に分かれていて両方展開する */
     cdinst_setup("C_");
-    EQ(install_packages('3'), PKG_OK);
+    EQ(install_packages('3', NULL, NULL), PKG_OK);
     CHECK(exists("/good/a.txt") && exists("/g/a.txt") && exists("/n/a.txt")
           && exists("/n2/b.txt") && exists("/full/f.txt"));
     CHECK(g_complete_seen);

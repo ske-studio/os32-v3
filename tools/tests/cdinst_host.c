@@ -456,9 +456,12 @@ static int __cdecl f_serial_trygetchar(void) { return keys_serial ? keys_next() 
 #include "../../userland/system/cdinst.c"
 #undef main
 #include "../../userland/system/inst_hdd.c"
+#include "../../platform/pc98/install_target.c"
 #include "../../userland/system/inst_disk.c"
+#include "../../platform/pc98/install_disk.c"
 #include "../../userland/lib/rt/pkg.c"
 #include "../../userland/shell/hdprep_plan.c"
+#include "../../platform/pc98/install_plan.c"
 #include "../../fs/pc98pt.c"
 #include "../../fs/ext2/ext2_layout.c"
 
