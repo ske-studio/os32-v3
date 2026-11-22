@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """DICT_META C2/O5: actual relocated SQLite, core boot and probe lifetime."""
 CHECK = dict(name='fep-core-boot', tier=1, needs=['make:sqlite-module-proto'], budget=12.8,
-    covers=['input/hal/in2_int.h', 'input/hal/input_context.h', 'platform/pc98/module_pair.c', 'include/platform_module_pair.h', 'arch/x86/arch_kernel_fp.h', 'tools/tests/host_arch/arch_kernel_fp.h', 'kernel/ime/ime_display_private.h', 'platform/pc98/platform_ime_render.h', 'platform/pc98/ime_display.c', 'include/ime_control.h', 'platform/pc98/bootinfo_wire.h', 'platform/pc98/bootinfo_native.h', 'drivers/base/dev.c', 'fs/vfs.c', 'Makefile', 'build/config.mk', 'build/sqlite-proto.mk', 'build/sqlite-module.ld', 'tools/gen_sqlite_imports.py', 'tools/gen_kdebug_imports.py', 'tools/sqlite_module_proto.py', 'tools/mkmod.py', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'tools/prototypes/sqlite_imports.def', 'tools/tests/sqlite_module_proto_tdd.md', 'tools/tests/test_module_image.py', 'tools/tests/module_image_host.c', 'tools/tests/test_module_runtime.py', 'tools/tests/module_runtime_host.c', 'tools/tests/sqlite_module_host.c', 'tools/tests/test_mkmod.py', 'tools/tests/host32.py', 'kernel/module/module_image.c', 'kernel/module/module_image.h', 'kernel/module/module_runtime.c', 'kernel/module/module_runtime.h', 'kernel/sqlite_engine.c', 'kernel/fep_boot.c', 'kernel/fep_boot.h', 'kernel/sqlite_static.c', 'build/out/sqlite-proto/**', 'kernel/sqlite_engine.h', 'kernel/sqlite_engine_body.h', 'mm/paging.h', 'arch/x86/kernel/isr_handlers.c', 'kernel/sqlite_outer.c', 'mm/memory_boot.h', 'kernel/module/module.h', 'kernel/irq/irq.h', 'mm/pgalloc.h', 'include/memmap.h', 'include/bootinfo.h', 'include/config.h', 'kernel/module/module_schema.h', 'mm/kmalloc.h', 'lib/sqlite3/sqlite3.c', 'lib/sqlite3/sqlite3.h', 'lib/sqlite3/os32_sqlite_vfs.c', 'lib/sqlite3/os32_sqlite_module.c', 'lib/sqlite3/generated/sqlite_facade.h', 'lib/sqlite3/generated/sqlite_imports.h', 'lib/sqlite3/generated/sqlite_kexports.c', 'lib/sqlite3/os32_sqlite_outer.h', 'lib/sqlite3/sqlite_stack.asm', 'lib/sqlite3/os32_sqlite_vfs.h', 'lib/sqlite3/os32_sqlite_config.h', 'lib/kstring.c', 'lib/kstring_c.c', 'lib/kstring.h', 'lib/kmath.c', 'lib/divdi3.c', 'fs/vfs.h', 'include/types.h', 'include/kprintf.h', 'include/sys.h', 'sdk/kapi.json', 'sdk/link/generations.ld', 'sdk/include/os32/os32_unit_stamp.h', 'kdebug/generated/kdebug_imports.json', 'build/module.ld', 'kernel/module/kdebug_imports.def', 'kernel/ime/ime.c', 'kernel/ime/ime.h', 'include/ime_boot.h', 'kernel/ime/ime_dict.c', 'kernel/ime/ime_render.h', 'kernel/console/unicode_file.c', 'kernel/console/unicode_file.h', 'lib/sqlite3/os32_sqlite_test.c', 'include/endian_le.h', 'kapi/kapi_sysinfo.c', 'platform/pc98/platform_build_info.h', 'tools/prototypes/fep_imports.def', 'kernel/ime/fep_module.c', 'kernel/ime/fep_module.h', 'kernel/ime/fep_body.c', 'kernel/ime/ime_dict_info.c', 'kernel/ime/ime_conn.c', 'kernel/ime/ime_store.h', 'kernel/ime/ime_suspend.c', 'build/fep-module.mk', 'kernel/ime/ime_romkana.c', 'platform/pc98/ime_render_tvram.c', 'fs/fd_redirect.h', 'lib/utf8.h', 'include/text_screen.h', 'drivers/input/kbd.h', 'drivers/char/serial.h', 'exec/exec.h', 'include/con_sink.h', 'include/redir_access.h', 'build/fep-module.ld', 'build/out/fep/*.o', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'tools/tests/kernel_includes.py', 'tools/tests/test_fep_core_boot.py', 'tools/tests/test_sqlite_module_proto.py'],
+    covers=['input/hal/in2_int.h', 'input/hal/input_context.h', 'platform/pc98/module_pair.c', 'include/platform_module_pair.h', 'arch/x86/arch_kernel_fp.h', 'tools/tests/host_arch/arch_kernel_fp.h', 'kernel/ime/ime_display_private.h', 'platform/pc98/platform_ime_render.h', 'platform/pc98/ime_display.c', 'include/ime_control.h', 'platform/pc98/bootinfo_wire.h', 'platform/pc98/bootinfo_native.h', 'drivers/base/dev.c', 'fs/vfs.c', 'Makefile', 'build/config.mk', 'build/sqlite-proto.mk', 'build/sqlite-module.ld', 'tools/gen_sqlite_imports.py', 'tools/gen_kdebug_imports.py', 'tools/sqlite_module_proto.py', 'tools/mkmod.py', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'tools/prototypes/sqlite_imports.def', 'tools/tests/sqlite_module_proto_tdd.md', 'tools/tests/test_module_image.py', 'tools/tests/module_image_host.c', 'tools/tests/test_module_runtime.py', 'tools/tests/module_runtime_host.c', 'tools/tests/sqlite_module_host.c', 'tools/tests/test_mkmod.py', 'tools/tests/host32.py', 'kernel/module/module_image.c', 'kernel/module/module_image.h', 'kernel/module/module_runtime.c', 'kernel/module/module_runtime.h', 'kernel/sqlite_engine.c', 'kernel/fep_boot.c', 'kernel/fep_boot.h', 'kernel/sqlite_static.c', 'build/out/sqlite-proto/**', 'kernel/sqlite_engine.h', 'kernel/sqlite_engine_body.h', 'mm/paging.h', 'arch/x86/kernel/isr_handlers.c', 'kernel/sqlite_outer.c', 'mm/memory_boot.h', 'kernel/module/module.h', 'kernel/irq/irq.h', 'mm/pgalloc.h', 'include/memmap.h', 'include/bootinfo.h', 'include/config.h', 'kernel/module/module_schema.h', 'mm/kmalloc.h', 'lib/sqlite3/sqlite3.c', 'lib/sqlite3/sqlite3.h', 'lib/sqlite3/os32_sqlite_vfs.c', 'lib/sqlite3/os32_sqlite_module.c', 'lib/sqlite3/generated/sqlite_facade.h', 'lib/sqlite3/generated/sqlite_imports.h', 'lib/sqlite3/generated/sqlite_kexports.c', 'lib/sqlite3/os32_sqlite_outer.h', 'lib/sqlite3/sqlite_stack.asm', 'lib/sqlite3/os32_sqlite_vfs.h', 'lib/sqlite3/os32_sqlite_config.h', 'lib/kstring.c', 'lib/kstring_c.c', 'lib/kstring.h', 'lib/kmath.c', 'lib/divdi3.c', 'fs/vfs.h', 'include/types.h', 'include/kprintf.h', 'include/sys.h', 'sdk/kapi.json', 'sdk/link/generations.ld', 'sdk/include/os32/os32_unit_stamp.h', 'kdebug/generated/kdebug_imports.json', 'build/module.ld', 'kernel/module/kdebug_imports.def', 'kernel/ime/ime.c', 'kernel/ime/ime.h', 'include/ime_boot.h', 'kernel/ime/ime_dict.c', 'kernel/ime/ime_render.h', 'kernel/console/unicode_file.c', 'kernel/console/unicode_file.h', 'lib/sqlite3/os32_sqlite_test.c', 'include/endian_le.h', 'kapi/kapi_sysinfo.c', 'kapi/kapi_db*', 'sdk/include/os32/os32_kapi_slots.h', 'platform/pc98/platform_build_info.h', 'tools/prototypes/fep_imports.def', 'kernel/ime/fep_module.c', 'kernel/ime/fep_module.h', 'kernel/ime/fep_body.c', 'kernel/ime/ime_dict_info.c', 'kernel/ime/ime_conn.c', 'kernel/ime/ime_store.h', 'kernel/ime/ime_suspend.c', 'build/fep-module.mk', 'kernel/ime/ime_romkana.c', 'platform/pc98/ime_render_tvram.c', 'fs/fd_redirect.h', 'lib/utf8.h', 'include/text_screen.h', 'drivers/input/kbd.h', 'drivers/char/serial.h', 'exec/exec.h', 'include/con_sink.h', 'include/redir_access.h', 'build/fep-module.ld', 'build/out/fep/*.o', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'tools/tests/kernel_includes.py', 'tools/tests/test_fep_core_boot.py', 'tools/tests/test_sqlite_module_proto.py'],
     basis=['docs/design/kernel/sqlite_engine.md 起動の順', 'docs/design/kernel/sqlite_engine.md fep_meta_probe の契約'],
 )
 import argparse
@@ -116,7 +116,8 @@ def build(folder, directory):
     command = ['gcc', *RUNTIME_FLAGS, '-DHOST_STATIC_FEP', '-Werror=vla', '-I' + str(folder), *RUNTIME_INCLUDES,
                     '-I' + str(ROOT / 'lib/sqlite3'), '-I' + str(generated),
                     '-I' + str(fep_directory), '-I' + str(ROOT / 'drivers'),
-                    '-nostdlib', '-static', '-no-pie',
+                    '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
+                    ROOT / 'kapi/kapi_db.c',
                     ROOT / 'tools/tests/sqlite_module_host.c',
                     folder / 'sqlite_engine.c', folder / 'fep_boot.c', folder / 'sqlite_outer.c',
                     folder / 'sqlite_kexports.c', folder / 'fep_kexports.c', folder / 'fep_module.c',
@@ -127,6 +128,8 @@ def build(folder, directory):
     return exe, command
 
 MUTATIONS = [
+    ('static-no-sql-republish', '        services_stage = SERVICES_SQLITE_ONLY;\n        services_public = 1;\n    }',
+     '        services_stage = SERVICES_SQLITE_ONLY;\n    }', 94),
     ('static-early-public', '    rc = fep_module_load_after_sql(sqlite);',
      '    rc = fep_module_load_after_sql(sqlite); fep_module_publish();', 96),
     ('static-release-isolated', 'if (!sqlite && (blocked || failure == MODULE_ISOLATED)) return 1;',
@@ -190,11 +193,20 @@ def main():
             path.write_text(product)
             path = folder / 'fep_module.c'
             product = path.read_text()
-            for label, old, mode in (
-                    ('load-without-ready', '    if (!sqlite && !static_sql_ready()) return MODULE_BAD_DEPENDENCY;', 94),
-                    ('start-without-ready', '    if (!rc && !sqlite && !static_sql_ready()) rc = MODULE_BAD_DEPENDENCY;', 95)):
+            for label, old, new, mode in (
+                    ('load-without-ready', '    if (!sqlite && !static_sql_ready()) return MODULE_BAD_DEPENDENCY;', '', 94),
+                    ('start-without-ready', '    if (!rc && !sqlite && !static_sql_ready()) rc = MODULE_BAD_DEPENDENCY;', '', 95),
+                    ('rollback-no-inactive', '    kbd_policy_ime_state(0, 0, 0);', '', 95),
+                    ('rollback-nonzero-snapshot', 'const KbdPolicySnapshot invalid = {0};',
+                     'const KbdPolicySnapshot invalid = {.flags = 1};', 95),
+                    ('rollback-no-take', '(void)input_ime_cancel_take(&invalid);', '(void)invalid;', 95),
+                    ('rollback-reclaim-first', '    fep_close_input();\n    return abort_handle();',
+                     '    int rc = abort_handle();\n    fep_close_input();\n    return rc;', 95),
+                    ('rollback-double-reclaim', '    return abort_handle();',
+                     '    u32 pages; ledger_reclaim_owner(module_record_get(fep_handle)->owner, &pages);\n'
+                     '    return abort_handle();', 95)):
                 assert product.count(old) == 1
-                path.write_text(product.replace(old, ''))
+                path.write_text(product.replace(old, new))
                 subprocess.run(command, check=True, capture_output=True)
                 result = run_case(mode)
                 assert result.returncode == 1 and b'FAIL ' in result.stdout, (label, result)

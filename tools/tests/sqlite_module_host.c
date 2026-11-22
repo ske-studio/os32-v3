@@ -5,16 +5,6 @@
 void input_ime_action_flush(void) {}
 void input_context_focus_register(void (*flush)(void)) { (void)flush; }
 int input_context_snapshot(KbdPolicySnapshot *out) { (void)out; return -1; }
-void kbd_policy_ime_state(u32 active, u32 owner, u32 gen)
-{ (void)active; (void)owner; (void)gen; }
-extern int fep_services_public(void);
-static unsigned cancel_takes;
-int input_ime_cancel_take(const KbdPolicySnapshot *current)
-{
-    (void)current;
-    cancel_takes++;
-    return -1;
-}
 #include "sqlite_engine.h"
 #include "fep_boot.h"
 #include "lib/sqlite3/os32_sqlite_config.h"
@@ -97,6 +87,47 @@ static void number(u32 value)
     while (n) { char text[2] = {digits[--n], 0}; say(text); }
 }
 #define CHECK(x) do { if (!(x)) { say("FAIL " #x "\n"); finish(1); } } while (0)
+static unsigned cancel_takes, rollback_reclaims;
+static int rollback_pending, rollback_inactive;
+void kbd_policy_ime_state(u32 active, u32 owner, u32 gen)
+{
+    if (rollback_pending) {
+        CHECK(!active && !owner && !gen);
+        rollback_inactive = 1;
+    }
+}
+int input_ime_cancel_take(const KbdPolicySnapshot *current)
+{
+    cancel_takes++;
+    if (rollback_pending) {
+        CHECK(rollback_inactive && current && !current->owner && !current->exec_gen &&
+              !current->command_gen && !current->context && !current->flags);
+        rollback_pending = 0;
+    }
+    return -1;
+}
+#ifdef HOST_STATIC_FEP
+#include "kapi_db.h"
+#include "redir_access.h"
+u32 __kernel_resident_end; /* Linker symbol used by KAPI diagnostics. */
+int redir_access_capture(RedirAccess *out)
+{
+    *out = (RedirAccess){.origin = CALLER_TRUSTED};
+    return 1;
+}
+int copy_caller_cstr(const RedirAccess *access, const char *src, char *dst, u32 cap)
+{
+    CHECK(access->origin == CALLER_TRUSTED && kstrlen(src) < cap);
+    kstrncpy(dst, src, cap);
+    return 1;
+}
+int vfs_resolve_path(const char *path, char *out, int cap)
+{
+    (void)path; (void)out; (void)cap;
+    CHECK(0); /* The public DB test opens :memory:. */
+    return -1;
+}
+#endif
 /* Both executable bodies are the paired product images. Only dictionary
  * storage is a RAM DB seeded below; actual FEP SQL/init/close stay in fep.mod.
  * Disk/journal lifetime remains covered by ime_dict_host and VFS fixtures. */
@@ -569,7 +600,10 @@ void vfs_close(int fd)
 {
     if (fd == 5) return;
     if (fd == 4) {
-        if (input[0] == 95) services_stage = SERVICES_UNICODE;
+        if (input[0] == 95) {
+            services_stage = SERVICES_UNICODE;
+            rollback_pending = 1;
+        }
         CHECK(!fep_closes);
         fep_closes++;
         return;
@@ -661,6 +695,10 @@ int pgalloc_free_n_owner(u32 owner, u32 pfn, int n)
 }
 int ledger_reclaim_owner(u32 owner, u32 *pages)
 {
+    if (input[0] == 95 && owner == OWNER + 1) {
+        CHECK(!rollback_pending && rollback_inactive && !rollback_reclaims);
+        rollback_reclaims++;
+    }
     if (owner == LEDGER_OWNER_KERNEL) { *pages = unicode_pages; unicode_pages = 0; return 1; }
     CHECK((owner == OWNER || owner == OWNER + 1) && !sqlite_engine_active);
     if (owner == OWNER) CHECK(module_records[1].state == MODULE_ABSENT);
@@ -1134,7 +1172,13 @@ void _start(void)
         CHECK(fep_allocs == ((input[0] == 93 || input[0] == 96 || input[0] == 97) ? 2 : 0));
         CHECK(fep_services_public() == (input[0] == 93));
         CHECK((result == 0) == (input[0] == 93 || input[0] == 99));
-        CHECK(services_public == (input[0] != 94));
+        if (input[0] == 94 || input[0] == 95) {
+            int handle = kapi_db_open(":memory:");
+            CHECK(handle >= 0 && kapi_db_close(handle) == 0);
+            CHECK(services_stage == SERVICES_SQLITE_ONLY);
+        }
+        CHECK(services_public);
+        CHECK(rollback_reclaims == (input[0] == 95));
         if (result) {
             char path[OS32_MAX_PATH];
             FepMeta meta;

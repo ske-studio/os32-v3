@@ -334,6 +334,10 @@ int fep_boot_static(void)
     attempted = 1;
     int missing = vfs_stat(IME_DICT_PATH, &dictionary) == VFS_ERR_NOTFOUND;
     int rc = fep_boot_start(0, missing, &reserve);
-    if (rc && fep_boot_rollback(0, rc)) return MODULE_ISOLATED;
+    if (rc) {
+        if (fep_boot_rollback(0, rc) || !sqlite_module_ready()) return MODULE_ISOLATED;
+        services_stage = SERVICES_SQLITE_ONLY;
+        services_public = 1;
+    }
     return rc;
 }
