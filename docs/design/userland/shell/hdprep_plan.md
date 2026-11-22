@@ -1,6 +1,6 @@
 # userland/shell/hdprep_plan.c — 設計
 > 状態: **現行 (2026-11-18)** — 出所: TASK_HDD_INSTALL 段 1 (§1-v3 N4〜N6) の契約を今のソースと照らして要約
-ソース: `userland/shell/hdprep_plan.c`・`userland/shell/hdprep_plan.h` (`hdprep_check_geom`・`hdprep_check_disk`・`hdprep_check_mounts`・`hdprep_parse_mb`・`hdprep_plan`・`hdprep_reason`)・手順 `userland/shell/cmd_hdprep.c`
+`userland/shell/cmd_hdprep.c` が確認と整形を担当する。サイズとマウントの判定は `userland/shell/hdprep_plan.c`、PC-98 の幾何・空ディスク検査・計画・区画表生成は `platform/pc98/install_plan.c`、セクタの書込みと照合は `platform/pc98/install_hdprep.c` にある。
 
 hd0 (DA 80h) に OS32 の置き場 (区画 + ext2) を作るときの「断る条件」と「計画」の純粋関数。シェルの `hdprep` と
 インストーラ (`userland/system/inst_hdd.c`) が同じものを使う。I/O は呼び手 (KAPI) が行う。
@@ -41,4 +41,4 @@ hdprep は**空のディスク専用**で、`--force` は無い。
 ## 確かめ
 
 `make check-hdd-stage1-host` (`tools/tests/test_hdd_stage1.py`) のケース `hdprep_geom`・`hdprep_disk`・`hdprep_mounts`・`hdprep_plan`。
-`cmd_hdprep.c` (KAPI を呼ぶ側) はホストでは回していない。
+`make check-hdprep-command-host MUTATE=1` は登録された実コマンドをメモリ媒体に対して実行する。空ディスク検査と確認拒否で全セクタが等しいこと、試し書きの照合失敗で整形前に止まること、成功時の試し書き・整形・表更新・マウント検読の順を確認する。

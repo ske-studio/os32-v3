@@ -29,6 +29,7 @@
 #include "rt/dbgserial.h"
 #include "rt/pkg.h"
 #include "inst_hdd.h"
+#include "include/platform_install_boot.h"
 
 #define CD_MOUNT "/cd0"
 #define HDD_MOUNT "/hd0"
@@ -48,10 +49,6 @@
 /* MINIMAL に無ければ HDD から起動できない物 (段 2-11 の必須の中身) */
 #define PKG_NEED_KERNEL  "/boot/vmkernel.lz4"
 #define PKG_NEED_SHELL   "/sys/shell.bin"
-/* BOOT.PKG の中の名前 (build/packages.yaml の boot:) */
-#define BOOT_IPL_NAME    "boot_hdd.bin"
-#define BOOT_LOADER_NAME "loader_hdd.bin"
-
 /* 色定数 */
 #define COL_TITLE  (0xE1 | 0x40)
 #define COL_NORMAL 0xE1
@@ -64,10 +61,8 @@ static KernelAPI *api;
 
 typedef struct {
     u8        *data;            /* BOOT.PKG のデータ部 (mem_alloc) */
-    const u8  *ipl;
-    u32        ipl_len;
-    const u8  *loader;
-    u32        loader_len;
+    const u8 *assets[PLATFORM_BOOT_COUNT];
+    u32 sizes[PLATFORM_BOOT_COUNT];
 } BootImg;
 
 /* 展開の前に作るディレクトリ (親が先)。新しく作った ext2 なのでどれも作れる
@@ -90,7 +85,7 @@ static int pkg_series_count(const char *base);
 static int report_missing_packages(int choice);
 static void boot_img_free(BootImg *b);
 static int preflight(int choice, BootImg *b, InstTarget *t);
-static int install_packages(int choice);
+static int install_packages(int choice, const InstTarget *target, const BootImg *boot);
 
 int __cdecl main(int argc, char **argv, KernelAPI *_api)
 {
@@ -219,11 +214,11 @@ int __cdecl main(int argc, char **argv, KernelAPI *_api)
         boot_img_free(&boot);
         return 1;
     }
-    /* ローダ → IPL (BIOS 幾何) */
-    ret = inst_hdd_write_boot(api, &tgt, boot.ipl, boot.ipl_len,
-                              boot.loader, boot.loader_len);
-    boot_img_free(&boot);
-    if (ret != 0) return 1;
+    if (!PLATFORM_BOOT_AFTER_FILES) {
+        ret = platform_install_package_boot(api, &tgt, boot.assets, boot.sizes);
+        boot_img_free(&boot);
+        if (ret != 0) return 1;
+    }
 
     /* ディレクトリ構造を作成 */
     print(COL_CYAN, "  Creating directories...");
@@ -231,6 +226,7 @@ int __cdecl main(int argc, char **argv, KernelAPI *_api)
         int mr = api->sys_mkdir(init_dirs[i]);
         if (mr != 0) {
             api->kprintf(COL_RED, "\n    mkdir %s failed (rc=%d)\n", init_dirs[i], mr);
+            if (PLATFORM_BOOT_AFTER_FILES) boot_img_free(&boot);
             inst_hdd_incomplete(api, "cannot create the directories", mr);
             return 1;
         }
@@ -239,7 +235,8 @@ int __cdecl main(int argc, char **argv, KernelAPI *_api)
 
     /* パッケージの展開・同期・完了表示。展開の後の必須の実物は install_packages が
      * 完了を出す前に見る (required_on_hd0) */
-    ret = install_packages(choice);
+    ret = install_packages(choice, &tgt, &boot);
+    if (PLATFORM_BOOT_AFTER_FILES) boot_img_free(&boot);
     if (ret != PKG_OK) inst_hdd_incomplete(api, "package installation failed", ret);
     return ret == PKG_OK ? 0 : 1;
 }
@@ -369,10 +366,10 @@ static int load_boot_pkg(BootImg *b)
     int ret, i, rd, fd;
 
     b->data = 0;
-    b->ipl = 0;
-    b->loader = 0;
-    b->ipl_len = 0;
-    b->loader_len = 0;
+    for (i = 0; i < PLATFORM_BOOT_COUNT; i++) {
+        b->assets[i] = 0;
+        b->sizes[i] = 0;
+    }
 
     ret = pkg_parse(api, PKG_BOOT, &info);
     if (ret != PKG_OK) {
@@ -419,18 +416,18 @@ static int load_boot_pkg(BootImg *b)
             boot_img_free(b);
             return PKG_ERR_CORRUPT;
         }
-        if (str_endswith(ent->path, BOOT_IPL_NAME)) {
-            b->ipl = b->data + offset;
-            b->ipl_len = ent->size;
-        } else if (str_endswith(ent->path, BOOT_LOADER_NAME)) {
-            b->loader = b->data + offset;
-            b->loader_len = ent->size;
+        for (int j = 0; j < PLATFORM_BOOT_COUNT; j++) {
+            if (str_endswith(ent->path, platform_boot_entries[j])) {
+                b->assets[j] = b->data + offset;
+                b->sizes[j] = ent->size;
+                break;
+            }
         }
         offset += ent->size;
     }
-    if (!b->ipl || !b->loader) {
-        api->kprintf(COL_RED, "  BOOT.PKG lacks %s\n",
-                     !b->ipl ? BOOT_IPL_NAME : BOOT_LOADER_NAME);
+    for (i = 0; i < PLATFORM_BOOT_COUNT; i++) {
+        if (b->assets[i]) continue;
+        api->kprintf(COL_RED, "  BOOT.PKG lacks %s\n", platform_boot_entries[i]);
         boot_img_free(b);
         return PKG_ERR_CORRUPT;
     }
@@ -705,7 +702,7 @@ static int required_on_hd0(void)
     return 1;
 }
 
-static int install_packages(int choice)
+static int install_packages(int choice, const InstTarget *target, const BootImg *boot)
 {
     int ret;
 
@@ -737,6 +734,11 @@ static int install_packages(int choice)
     if (g_final_kernel != 0 && !required_on_hd0()) {
         println(COL_RED, "Installation aborted. The HDD is incomplete.");
         return PKG_ERR_CORRUPT;
+    }
+
+    if (PLATFORM_BOOT_AFTER_FILES) {
+        ret = platform_install_package_boot(api, target, boot->assets, boot->sizes);
+        if (ret != 0) return ret;
     }
 
     /* ファイルシステムをディスクに同期 */
@@ -780,7 +782,7 @@ static int preflight(int choice, BootImg *b, InstTarget *t)
         return -1;
     }
     if (inst_hdd_check(api, t) != 0 ||
-        inst_hdd_check_media(api, t, b->ipl_len, b->loader_len, kernel_len, &need) != 0) {
+        inst_hdd_check_media(api, t, b->sizes, kernel_len, &need) != 0) {
         boot_img_free(b);
         return -1;
     }
