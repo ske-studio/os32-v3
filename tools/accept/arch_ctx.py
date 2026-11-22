@@ -319,11 +319,11 @@ def observe(elf, cpu, out, mode):
             q = QMP(p, deadline)
             next_sample = 0
             while time.monotonic() < deadline:
-                text = serial(a).replace('\r', '')
+                text = serial(a).replace('\r', '').rpartition('\n')[0] + '\n'
                 if mode.startswith('outside-') and 'FATAL' in text:
                     vector = '300' if mode == 'outside-dsi' else '700'
                     require('CTX outside '+vector in text and 'FATAL trap vector=0x'+vector in text,
-                            'unexpected outside fault')
+                            f'unexpected outside fault in {mode} on {cpu}\n{text[-2048:]}')
                     q.call('stop')
                     regs = q.call('human-monitor-command', {'command-line':'info registers'})
                     pc = re.search(r'NIP\s+([0-9a-fA-F]+)', regs)

@@ -459,7 +459,7 @@ def main():
         (tmp / 'fep').mkdir()
         product = generate(tmp / 'fep', link=False, fep=True)
         source = (product / 'kapi/kapi_generated.c').read_text()
-        if not verify(source, [api for api in entries if api['name'] not in ime_slots], ime_slots):
+        if not verify(source, [api for api in entries if api['name'] not in ime_slots], ime_slots | {'ime_getkey'}):
             print('FEP provider bindings differ from the shared ABI')
             return 1
         (tmp / 'link').mkdir()

@@ -34,6 +34,7 @@ args = parser.parse_args()
 CHECK_ONLY = args.check_only
 JSON_PATH = args.json
 TARGET = args.target
+FEATURE_FEP = args.feature_fep
 if TARGET == "ppc-powermac":
     from kapi_target_ppc import PROVIDER_EXTERNS, absent_providers, absent_result
     ABSENT_PROVIDER_SLOTS, ABSENT_PROVIDER_INCLUDES = absent_providers(
@@ -722,7 +723,7 @@ for slot, api in enumerate(data["api"]):
     else:
         target = api.get("target", name)
         # Match the resident FEP adapter when no FEP module is available.
-        if TARGET == "ppc-powermac" and name == "ime_getkey":
+        if TARGET == "ppc-powermac" and not FEATURE_FEP and name == "ime_getkey":
             target = "input_getkey_kapi"
         arg_names = get_arg_names(api.get("args", []))
         args_call = ", ".join(arg_names)
