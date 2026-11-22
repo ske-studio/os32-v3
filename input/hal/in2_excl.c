@@ -1,6 +1,7 @@
 #include "in2_int.h"
 #include "av_contract.h"
 #include "io.h"
+#include "kbd.h"
 
 static int acq_owner;
 static volatile u32 excl;
@@ -11,8 +12,28 @@ int in2_excl_keyboard(void)
     return !!(excl & IN2_EXCL_KBD);
 }
 
-static void boundary(void)
+static u8 valid[128];
+static u32 saved_gen[128];
+
+int in2_excl_drop_raw(u8 sc, int is_break)
 {
+    if (sc >= 128 || sc == KEY_STOP || sc == KEY_CTRL ||
+        sc == KEY_GRPH || sc == KEY_TAB) return 0;
+    return in2_excl_keyboard() ||
+           (!is_break && valid[sc] && saved_gen[sc] == input_key_release_gen(sc));
+}
+
+/* The caller holds IRQ exclusion through the snapshot, purge and LOST event. */
+static void transition(int owner, u32 next, int focus)
+{
+    if (focus || (excl & ~next & IN2_EXCL_KBD)) {
+        for (unsigned sc = 0; sc < 128; ++sc) {
+            valid[sc] = input_key_pressed(sc);
+            saved_gen[sc] = input_key_release_gen(sc);
+        }
+    }
+    acq_owner = owner;
+    excl = next;
     ++gen;
     kbd_raw_purge_keep();
     in2_ring_lost(IN2_LOST_EXCL);
@@ -24,9 +45,7 @@ int in2_excl_acquire(int owner, u32 flags)
     if (!owner || owner != av_focus_owner()) return OS32_ERR_BUSY;
     unsigned f = irq_save();
     if (owner != acq_owner || flags != excl) {
-        acq_owner = owner;
-        excl = flags;
-        boundary();
+        transition(owner, flags, 0);
         ++focus_gen;
     }
     irq_restore(f);
@@ -45,15 +64,14 @@ int in2_excl_unacquire(int owner)
 int in2_excl_release(int owner)
 {
     if (!acq_owner || acq_owner != owner) return 0;
-    acq_owner = 0;
-    excl = 0;
-    boundary();
+    transition(0, 0, 0);
     return 1;
 }
 
 void in2_excl_focus(int old)
 {
-    if (!in2_excl_release(old)) boundary();
+    if (acq_owner == old) transition(0, 0, 1);
+    else transition(acq_owner, excl, 1);
     ++focus_gen;
 }
 

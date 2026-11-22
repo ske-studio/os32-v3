@@ -1,6 +1,7 @@
 #include "av_contract.h"
 #include "../input/hal/in2_export.h"
 #include "io.h"
+#include "platform_input_caps.h"
 
 extern int res_owner_get(void);
 
@@ -75,11 +76,6 @@ int in2_mouse_state(IN2_MouseState *o)
     irq_restore(f);
     return 0;
 }
-
-/* Enable with the 7d gshell exclusive-input handling. */
-#ifndef IN2_PUBLIC_EXCLUSIVE
-#define IN2_PUBLIC_EXCLUSIVE 0
-#endif
 
 int in2_acquire(u32 flags)
 {

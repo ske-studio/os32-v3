@@ -4,7 +4,7 @@ CHECK = dict(name='av-kapi-abi-host', tier=1, needs=['make:all', 'check:x87-life
             'sdk/rust/os32api/src/av.rs', 'sdk/rust/os32api/src/kapi_generated.rs',
             'tools/check_av_portable.py', 'tools/checks/av_wiring.txt',
             'tools/checks/av_no_weak.sh', 'exec/exec_kapi_init.inc',
-            'build/out/kernel.elf', 'kernel/av_focus.c', 'kapi/kapi_in2.c', 'tools/tests/host_arch/**', 'include/io.h', 'platform/pc98/platform_io.h', 'platform/powermac/platform_io.h', 'arch/ppc/ppc_boot.h', 'kernel/gui.h', 'include/app_ids.h', 'exec/exec_gui.h', 'exec/exec_hooks.h', 'include/av_contract.h', 'input/hal/*.[ch]', 'sound/hal/*.[ch]',
+            'build/out/kernel.elf', 'kernel/av_focus.c', 'kapi/kapi_in2.c', 'tools/tests/host_arch/**', 'include/io.h', 'platform/pc98/platform_io.h', 'platform/powermac/platform_io.h', 'platform/pc98/platform_input_caps.h', 'platform/powermac/platform_input_caps.h', 'arch/ppc/ppc_boot.h', 'kernel/gui.h', 'include/app_ids.h', 'exec/exec_gui.h', 'exec/exec_hooks.h', 'include/av_contract.h', 'input/hal/*.[ch]', 'sound/hal/*.[ch]',
             'sdk/include/os32/*.h', 'kapi/kapi_generated.c'],
     basis=['docs/decisions/sound/AV0_V90_ADDENDUM.md §4', 'docs/decisions/sound/AV_HAL_DESIGN.md §4'])
 
@@ -100,7 +100,7 @@ def exercise(root, folder, machine, mutate):
         binary = folder / 'probe'
         subprocess.run([*compiler, '-std=gnu89', '-ffreestanding', '-nostdlib', '-static', '-O1',
             '-ffunction-sections', '-Wl,--gc-sections', '-Werror=implicit-function-declaration', '-Wno-attributes', '-I' + str(folder),
-            '-Itools/tests/host_arch', *platform_includes, '-Iinput/hal', '-Isdk/include/os32', '-Iinclude', '-Isound/hal', '-Iexec', '-Ikernel', '-DOS32_HOOK_GUI=0', folder / 'focus.c', 'tools/tests/av_abi_host.c',
+            '-Itools/tests/host_arch', *platform_includes, '-Iinput/hal', '-Isdk/include/os32', '-Iinclude', '-Isound/hal', '-Iexec', '-Ikernel', '-DOS32_HOOK_GUI=0', '-DIN2_PUBLIC_EXCLUSIVE=1', folder / 'focus.c', 'tools/tests/av_abi_host.c',
             rust_obj, folder / 'wrap.c', folder / 'stub.c', '-std=gnu11', 'kapi/kapi_in2.c',
             *['input/hal/' + unit + '.c' for unit in ('in2_dev', 'in2_export', 'in2_ring', 'in2_excl', 'mouse_ext')], folder / 'start.S',
             '-o', binary], cwd=root, check=True)

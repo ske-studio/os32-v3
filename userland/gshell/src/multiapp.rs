@@ -1291,7 +1291,7 @@ pub fn kill_for_request(id: i32) -> i32 {
 
 /// フォーカス (= 最前面の可視窓の owner) が変わっていたら `av_focus_set` を
 /// 1 回だけ呼ぶ。**KAPI を呼ぶので X1 からは呼ばない** (契約 T8) —
-/// 呼ぶのは `wm_cycle` の末尾 (X3 と単独ループ) だけ。
+/// X3 の境目を清算するときと、WM 周期の末尾で照合する。
 pub fn sync_av_focus(st: &GuiState) {
     let target = st.front_owner();
     let mm = m();

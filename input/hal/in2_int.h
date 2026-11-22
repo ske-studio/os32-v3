@@ -10,6 +10,8 @@ u32 in2_focus_generation(void);
 void in2_reclaim_generation(void);
 int in2_excl_acquired(int owner);
 int in2_excl_keyboard(void);
+int in2_excl_drop_raw(u8 sc, int is_break);
+u32 input_key_release_gen(u8 sc);
 int in2_excl_release(int owner);
 void in2_excl_focus(int old);
 void in2_ring_clear(void);

@@ -68,7 +68,9 @@ def run(ctx):
         print('MEASURE capture: 2 snapshots: 32 state visits + 32 boot-lock visits with 16 live sources; 0 key scans')
         if ctx.mutate:
             for path, anchor, replacement in [
-                ('input/hal/kbd_merge.c', 'if (sc < 128 && old != key->down) cnt[sc] += key->down ? 1 : -1;', 'if (sc < 128 && old != key->down) cnt[sc] += key->down ? 1 : 0;'),
+                ('input/hal/kbd_merge.c', 'if (!down && cnt[sc] == 0)', 'if (!down)'),
+                ('input/hal/kbd_merge.c', '++release_gen[sc];', '(void)sc;'),
+                ('input/hal/kbd_merge.c', 'if (sc < 128 && old != key->down) update_count(sc, key->down);', 'if (sc < 128 && old != key->down) if (key->down) update_count(sc, 1);'),
                 ('input/hal/kbd_merge.c', 'if (legacy_active()) return 1;', 'if (0) return 1;'),
                 ('input/hal/keymap_registry.c', '    km_release_keys(src, generation);', '    (void)src;'),
                 ('input/hal/kbd_merge.c', 'old = input_held_key(key->src, key->keycode);', 'old = 0;')]:

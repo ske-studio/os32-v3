@@ -711,6 +711,7 @@ fn acceptance_external_transfer() {
     st.windows[0].used = true; st.windows[0].owner = 2;
     st.windows[0].x = 40; st.windows[0].y = 40;
     st.windows[0].w = 320; st.windows[0].h = 240;
+    multiapp::sync_av_focus(st);
     let pump = std::env::var("GFA_PATH").unwrap() == "pump";
     // No transfer, including guarded Pump calls and empty COMMITs, yields no sample.
     if pump {

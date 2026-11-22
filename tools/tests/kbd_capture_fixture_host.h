@@ -25,5 +25,5 @@ void mouse_ext_move(i16 x, i16 y, int m) { (void)x; (void)y; (void)m; __builtin_
 int pc98_input_keymap_register(u16 *generation)
 { (void)generation; return OS32_ERR_INVAL; }
 
-int in2_excl_keyboard(void) { return 0; }
+int in2_excl_drop_raw(u8 sc, int br) { (void)sc; (void)br; return 0; }
 void mouse_ext_wheel(i16 delta) { (void)delta; __builtin_trap(); }

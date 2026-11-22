@@ -67,7 +67,20 @@ static int probe(void)
         /* Full legacy queues still update state; CTRL+STOP retained at raw tail. */
         for (int i = 0; i < 140; i++) T(!step(0x1d));
         T(!step(KEY_CTRL) && !step(KEY_STOP) && !step(KEY_STOP | 128));
-        T(!step(KEY_CTRL | 128) && !step(0x9d) && !rings());
+        T(!step(KEY_CTRL | 128) && !step(0x9d));
+        if (gui) {
+            /* The pre-7d oracle kept only the emergency make. The new
+             * raw queue also preserves the surrounding WM transitions. */
+            int ctrl = SHIFT_CTRL << KBD_RAW_MOD_SHIFT;
+            const int tail[] = { KEY_CTRL | KBD_RAW_MAKE | ctrl,
+                KEY_STOP | KBD_RAW_MAKE | ctrl, KEY_STOP | ctrl, KEY_CTRL };
+            for (int i = 0; i < KBD_BUF_SIZE; ++i) {
+                int old = i == KBD_BUF_SIZE - 1 ? tail[1] : (0x1d | KBD_RAW_MAKE);
+                int next = i < KBD_BUF_SIZE - 4 ? (0x1d | KBD_RAW_MAKE) : tail[i - (KBD_BUF_SIZE - 4)];
+                T(oracle_raw() == old && legacy_raw_take() == next);
+            }
+        }
+        T(!rings());
         if (gui) {
             T(!step(KEY_CTRL) && !step(KEY_STOP));
             oracle_discard(); kbd_discard_stop();
@@ -108,4 +121,4 @@ void bootlog_push(const char *s, u32 n) { (void)s; (void)n; }
 int pc98_input_keymap_register(u16 *generation)
 { (void)generation; return -1; }
 
-int in2_excl_keyboard(void) { return 0; }
+int in2_excl_drop_raw(u8 sc, int br) { (void)sc; (void)br; return 0; }

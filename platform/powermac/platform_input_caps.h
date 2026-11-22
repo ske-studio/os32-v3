@@ -1,0 +1,8 @@
+#ifndef OS32_PLATFORM_INPUT_CAPS_H
+#define OS32_PLATFORM_INPUT_CAPS_H
+
+#ifndef IN2_PUBLIC_EXCLUSIVE
+#define IN2_PUBLIC_EXCLUSIVE 0
+#endif
+
+#endif

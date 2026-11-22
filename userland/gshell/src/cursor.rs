@@ -82,7 +82,7 @@ fn on_screen(st: &GuiState, px: i32, py: i32) -> bool {
 pub fn show(st: &mut GuiState) {
     /* 全画面 GFX 中は画面を持っていない (票 T8 D4a)。復帰の `composite_full` が
      * 描き直す (そのときは門が開いている)。 */
-    if crate::fullscreen::active() {
+    if !st.excl.cursor_allowed() || crate::fullscreen::active() {
         return;
     }
     if st.cursor.shown {
