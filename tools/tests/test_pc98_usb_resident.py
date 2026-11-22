@@ -16,7 +16,7 @@ SUPPORT = ['kernel/module/module_runtime.c', 'lib/kstring_c.c',
 HOST = 'tools/tests/pc98_usb_resident_host.c'
 CHECK = dict(name='pc98-usb-resident-host', tier=1, needs=[], budget=16,
              covers=['kernel/module/module_runtime.c', 'lib/kstring_c.c', 'input/hal/*.c', 'tools/tests/kernel_includes.py', 'tools/tests/host32.py', 'tools/tests/kbd_hostshim/io.h', 'lib/*.h', 'mm/*.h', 'fs/*.h', 'platform/pc98/usb_module.c', 'input/hal/*.h', 'platform/pc98/usb_resident.c', 'tools/tests/pc98_usb_resident_host.c', 'platform/pc98/usb_platform.c', 'platform/pc98/usb*.h',
-                     'kernel/irq/*.h', 'kernel/module/*.h',
+                     'platform/pc98/tick_order.h', 'kernel/irq/*.h', 'kernel/module/*.h',
                      'drivers/pci/*.h', 'drivers/usb/*.h', 'include/*.h', 'arch/x86/*.h',
                      'sdk/include/os32/*.h', 'tools/tests/test_pc98_usb_resident.py'],
              basis=['docs/decisions/usb/USB_DESIGN.md §4-1, §7-3'])
@@ -39,6 +39,8 @@ def run(ctx):
         if ctx.mutate:
             cases.extend((b'r', *mutation) for mutation in MUTANTS)
             cases.extend((b'm', *mutation) for mutation in [
+                ('        tick_target();', '        (void)tick_target;', 34),
+                ('tick_budget_peek(tick_budget_cnt(IRQ0_SLOT_BUDGET_US), 0)', '1', 35),
                 ('active < 0 ? active : 0', 'active', 22),
                 ('found && !active ? -USB_E_HC : active', '(void)found, active', 27),
                 ('if (s->id) input_src_release', 'if (!s->id) input_src_release', 29),

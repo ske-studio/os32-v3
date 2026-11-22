@@ -208,7 +208,7 @@ if __name__ == '__main__':
     output.add_argument('--out-dir', type=Path)
     output.add_argument('--static-vfs', type=Path)
     parser.add_argument('--contracts-only', action='store_true')
-    parser.add_argument('--module', choices=('sqlite', 'fep', 'cd', 'kcg', 'fm', 'pcm', 'v86', 'lan', 'cirrus', 'geforce', 'trident'), default='sqlite')
+    parser.add_argument('--module', choices=('sqlite', 'fep', 'cd', 'kcg', 'fm', 'pcm', 'v86', 'lan', 'cirrus', 'geforce', 'trident', 'usb'), default='sqlite')
     parser.add_argument('--target', choices=('x86-pc98', 'ppc-powermac'), default='x86-pc98')
     args = parser.parse_args()
     if args.static_vfs:

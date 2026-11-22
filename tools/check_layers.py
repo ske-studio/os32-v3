@@ -12,7 +12,7 @@ BASELINE = 'tools/layers_baseline.json'
 # 像の名前 -> (arch, platform, build/out の下の .d の根)
 IMAGES = {
     'x86-pc98': ('x86', 'pc98', ('obj', 'cd', 'cirrus', 'fep', 'fm', 'geforce', 'hwdev', 'kcg',
-                                 'kdebug', 'lan', 'pcm', 'sqlite-proto', 'trident', 'v86')),
+                                 'kdebug', 'lan', 'pcm', 'sqlite-proto', 'trident', 'v86', 'usb')),
     'ppc-powermac': ('ppc', 'powermac', ('ppc-kboot',)),
 }
 # 数えない場所: CI (tools/ppc/compile_ci.py の 4 像) が組まない像の置き場 (根の直下の shell・neg*)。

@@ -45,8 +45,9 @@
 #define MODULE_ID_HWDEV 11U
 #define MODULE_ID_GEFORCE 12U
 #define MODULE_ID_TRIDENT 13U
+#define MODULE_ID_USB 14U
 #define MODULE_RUNTIME_SLOTS 20U
-#define MODULE_RECORD_CAP 13U
+#define MODULE_RECORD_CAP 14U
 #define MODULE_REQUIRED_PATHS { "/boot/sqlite.mod", "/boot/fep.mod" }
 
 /* Compatibility names for the existing KDEBUG contracts. */
@@ -278,6 +279,20 @@ enum module_field {
         .mem_max = 65536U, \
         .reloc_max = 2048U, \
         .export_max = 4U, \
+        .load_span_max = 81920U, \
+    }, \
+    { \
+        .module_id = 14U, \
+        .phase = 2U, \
+        .required_flags = 1U, \
+        .allowed_flags = 1U, \
+        .stop_allowed = 0U, \
+        .ops_version = 1U, \
+        .ops_slots = 1U, \
+        .image_max = 65536U, \
+        .mem_max = 65536U, \
+        .reloc_max = 2048U, \
+        .export_max = 1U, \
         .load_span_max = 81920U, \
     }, \
 }

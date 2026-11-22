@@ -8,6 +8,20 @@
 #include "drivers/usb/ohci_regs.h"
 #include "kernel/irq/irq.h"
 
+#include "kernel/irq/tick.h"
+#include "tick_order.h"
+#include "kernel/irq/tick_budget.h"
+static tick_fn periodic;
+static int budget_ready;
+u32 tick_budget_cnt(u32 us) { return us == IRQ0_SLOT_BUDGET_US ? 77 : 0; }
+int tick_budget_peek(u32 share, u32 tail) { return share == 77 && !tail && budget_ready; }
+int tick_register(unsigned slot, tick_fn fn)
+{
+    if (slot != PC98_TICK_USB || periodic) return -1;
+    periodic = fn;
+    return 0;
+}
+
 static unsigned regs[64], cards, maps, starts, services, registered, bad;
 static int fail_register, refuse_detach;
 static unsigned stuck_bm, usb_pending = 1, peer_calls;
@@ -143,7 +157,7 @@ static int module_boot(void)
     relocated();
     pc98_usb_early_quiesce();
     if (module_start(h) || record.state != MODULE_RUNNING ||
-        maps || starts || services || registered || refs) return 21;
+        periodic || maps || starts || services || registered || refs) return 21;
     cards = 1;
     pc98_usb_early_quiesce();
     if (irq_register(5, peer_irq, NULL, IRQ_F_SHARED)) return 22;
@@ -160,6 +174,12 @@ static int module_boot(void)
     relocated();
     if (module_start(h) || record.state != MODULE_RUNNING ||
         starts != 2 || services != 1 || registered != 1 || !handler || refs != 1 || bad) return 22;
+    if (!periodic || record.tick_refs != 1) return 33;
+    periodic();
+    if (services != 1) return 35;
+    budget_ready = 1;
+    periodic();
+    if (services != 2) return 34;
     module_hc->isr_pending = 2;
     if (handler(5, argument) != IRQ_HANDLED || module_hc->isr_pending != 3) return 23;
     usb_pending = 0;

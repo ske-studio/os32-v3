@@ -51,7 +51,7 @@ CONSTANTS = dict(
 # Consecutive section/table descriptors are (offset, size/count) word pairs.
 PAIR_STRIDE = HEADER_FIELDS.index('RO_OFF') - HEADER_FIELDS.index('TEXT_OFF')
 # Preserve existing IDs; GF_DRIVER P5 appends GEFORCE.
-MODULE_RECORD_CAP = 13
+MODULE_RECORD_CAP = 14
 KDEBUG_OPS_NAMES = (
     'selftest_run', 'selftest_post_exec', 'selftest_post_unicode',
     'selftest_post_probe', 'crt_diag_bootlog', 'gcap_capture',
@@ -224,6 +224,14 @@ COMPONENTS = (
          init_symbol='trident_module_init', imports_symbol='trident_import_slots',
          ops_symbol='trident_module_ops', ops_names=('initialize', 'prepare', 'restore', 'get_probe_decls')),
 
+    dict(name='USB', path='/boot/usb.mod', dependencies=(), required=False,
+         module_id=14, phase=CONSTANTS['PHASE_POST_ROOT'],
+         required_flags=CONSTANTS['FLAG_PAIR'], allowed_flags=CONSTANTS['FLAG_PAIR'],
+         stop_allowed=0, ops_version=1, ops_slots=1,
+         image_max=65536, mem_max=65536, load_span_max=81920,
+         reloc_max=2048, export_max=1,
+         init_symbol='usb_module_init', imports_symbol='usb_import_slots',
+         ops_symbol='usb_module_ops', ops_names=('initialize',)),
 )
 
 

@@ -3,6 +3,42 @@
 #include "drivers/pci/pci.h"
 #include "kernel/irq/irq.h"
 
+#include "kernel/irq/tick.h"
+#include "tick_order.h"
+#include "kernel/irq/tick_budget.h"
+
+static struct module_handle tick_owner;
+static void (*tick_target)(void);
+
+static void usb_tick(void)
+{
+    if (tick_target && tick_budget_peek(tick_budget_cnt(IRQ0_SLOT_BUDGET_US), 0))
+        tick_target();
+}
+
+int usb_resident_tick_set(void (*service)(void))
+{
+    struct module_handle owner = tick_owner;
+    struct module_record *r = module_record_get(owner);
+    if (!service) {
+        if (tick_target) {
+            tick_target = NULL;
+            module_ref_release(owner, MODULE_REF_TICK);
+        }
+        return 0;
+    }
+    if (tick_target == service && r && r->tick_refs) return 0;
+    if (tick_target || !r ||
+        !module_ref_acquire(owner, r->owner, MODULE_REF_TICK, (uptr)service))
+        return -USB_E_HC;
+    if (tick_register(PC98_TICK_USB, usb_tick)) {
+        module_ref_release(owner, MODULE_REF_TICK);
+        return -USB_E_HC;
+    }
+    tick_target = service;
+    return 0;
+}
+
 static struct usb_irq_slot {
     struct module_handle owner;
     struct usb_pci_fn pci;
@@ -77,6 +113,15 @@ int pc98_usb_resident_start(struct module_handle owner, struct pc98_usb_core *co
         if (hc->has_irq) usb_resident_irq_detach(&hc->pci);
         /* Keep failed HC storage too: quarantine or failed detach can retain it. */
         used++;
+    }
+    if (active && !tick_target) tick_owner = owner;
+    if (active && (owner.slot != tick_owner.slot || owner.generation != tick_owner.generation ||
+                   usb_resident_tick_set(core->service))) {
+        for (unsigned i = 0; i < used; i++) {
+            struct usb_hc *hc = &core->hc[i];
+            if (hc->state == HC_RUNNING) core->dead(hc, USB_WHY_ABORT);
+        }
+        return -USB_E_HC;
     }
     if (active) core->service();
     return found && !active ? -USB_E_HC : active;
