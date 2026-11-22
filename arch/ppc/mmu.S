@@ -155,6 +155,7 @@ ppc_enable:
     mtmsr 3
     isync
     blr
+.pushsection .text.ppc_irq,"ax",@progbits
 .globl ppc_irq_save
 ppc_irq_save:
     mfmsr 3
@@ -181,6 +182,7 @@ ppc_irq_enabled:
     srwi 3,3,15
     andi. 3,3,1
     blr
+.popsection
 .globl ppc_tlb_flush_all
 ppc_tlb_flush_all:
     sync

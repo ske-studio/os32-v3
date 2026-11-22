@@ -88,6 +88,12 @@ def foreign_image(media, pair):
 
 
 def observe(media, folder, expected):
+    def check(cpu, lines):
+        assert lines == expected, (cpu, lines, expected)
+    observe_lines(media, folder, check)
+
+
+def observe_lines(media, folder, check):
     from link_sh_run import Session
     folder.mkdir()
     for cpu in ('7450', '7455'):
@@ -97,7 +103,7 @@ def observe(media, folder, expected):
             session.wait(session.ready, 'module probe READY', 90)
             serial = (session.out / 'serial-a.log').read_text(errors='replace')
             lines = [line[line.index('[module]'):].strip() for line in serial.splitlines() if '[module]' in line]
-            assert lines == expected, (cpu, lines, expected)
+            check(cpu, lines)
         finally:
             session.close()
 
@@ -127,8 +133,11 @@ def main():
                 'if (0)')]
         if case == 'kdebug-absent':
             (work / case).mkdir()
-            generated = generate_bindings(work / case, case)
-            (generated / 'stamp').touch()
+            generated = generate_bindings(work / case, case, ide=True, fep=True)
+            # Keep make from regenerating the mutated bindings when it creates source-date.flags.
+            stamp = generated / 'stamp'
+            stamp.touch()
+            settings.append('--old-file=' + str(stamp))
         media = build_media(work / case, 'IMAGE=kboot-link-sh', 'KB_SH_OUT=' + str(work / 'user'),
                     'KB_MUT_SRC=platform/powermac/ppc_kernel.c', 'KB_MUT_FILE=' + str(probe),
                     'ROOT_MANIFEST=' + str(manifest), 'PPC_SYSTEM_CFG=' + str(work / 'system.cfg'), *settings, 'kb-user', 'kernel')

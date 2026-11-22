@@ -57,9 +57,14 @@ def check_fep(root):
                           config_only=True) for enabled in (0, 1)]
         units = {'kernel/fep_boot.c', 'kernel/ime/fep_module.c'}
         off, on = profiles
+        absent = 'exec/absent/exec_ime.c'
+        if options == ppc:
+            units.add('platform/powermac/fep_imports.c')
+            assert off['C_KERNEL'].count(absent) == 1 and absent not in on['C_KERNEL']
         for unit in units:
             assert unit not in off['C_KERNEL'] and on['C_KERNEL'].count(unit) == 1
-        assert [name for name in on['C_KERNEL'] if name not in units] == off['C_KERNEL']
+        assert [name for name in on['C_KERNEL'] if name not in units] == [name for name in off['C_KERNEL']
+                                                            if options != ppc or name != absent]
         for key in ('ASM_KERNEL', 'GAS_KERNEL'):
             assert on[key] == off[key]
         try:
@@ -174,6 +179,8 @@ def check_kboot(root):
             ext2 = 'fs/ext2/ext2_'
             formatter = {ext2 + stem for stem in ('fmt', 'layout', 'time')}
             pending = set(actual['KB_PENDING'].split())
+            if enabled:
+                formatter.remove(ext2 + 'time')  # shared by mount and format
             for unit in formatter:
                 assert actual['KB_OUT'] + '/' + unit + '.o' in pending, (name, unit)
             ide = ext2 + 'medium_ide'

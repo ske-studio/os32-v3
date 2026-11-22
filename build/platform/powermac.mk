@@ -2,6 +2,7 @@ SUPPORTED_ARCH = ppc
 DEFAULT_FEATURE_VALUE = 0
 FEATURE_KDEBUG ?= $(FEATURE_EXEC)
 FEATURE_SQLITE ?= $(FEATURE_EXEC)
+FEATURE_FEP ?= $(FEATURE_SQLITE)
 FEATURE_KCG ?= $(FEATURE_EXEC)
 # kboot の像の持ち物 (像の機能ごと)。共通の場所の物のうち、今は PowerPC の像だけが組む物も持つ。
 C_PLATFORM_CORE = platform/powermac/rh_observe.c platform/powermac/ofw.c platform/powermac/escc.c platform/powermac/escc_tree.c platform/powermac/kboot_capture.c platform/powermac/via_tree.c platform/powermac/system.c drivers/macintosh/via.c platform/powermac/boot_token_powermac.c platform/powermac/gmac_tree.c platform/powermac/gmac_clock.c platform/powermac/kboot_reserve.c platform/powermac/memory.c platform/powermac/mpic_tree.c platform/powermac/mpic.c platform/powermac/clock.c platform/powermac/tick_budget.c platform/powermac/log.c platform/powermac/pci_config.c platform/powermac/gmac_dma.c platform/powermac/lan_gem_io.c platform/powermac/lan_log.c platform/powermac/lan_monitor.c platform/powermac/lan_diag.c platform/powermac/lan_service.c platform/powermac/ppc_kernel.c drivers/net/gem/gem_reset.c drivers/net/gem/gem_phy.c drivers/net/gem/gem_ring.c drivers/net/gem/gem_mac.c drivers/net/gem/gem_tx.c drivers/net/gem/gem_rx.c
@@ -21,3 +22,5 @@ C_PLATFORM_USB = platform/powermac/usb_key_report.c platform/powermac/input_usb.
 C_PLATFORM_LOOP = platform/powermac/loop_boot.c
 C_PLATFORM_CLI = platform/powermac/cli_boot.c
 C_PLATFORM_IDE = platform/powermac/ide_tree.c platform/powermac/ide_boot.c
+C_PLATFORM_IDE += platform/powermac/apm.c platform/powermac/partition_view.c
+C_PLATFORM_IDE += fs/ext2/ext2_super.c fs/ext2/ext2_inode.c fs/ext2/ext2_dir.c fs/ext2/ext2_file.c fs/ext2/ext2_vfs.c fs/ext2/ext2_time.c

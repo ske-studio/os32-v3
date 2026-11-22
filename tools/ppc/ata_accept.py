@@ -79,7 +79,7 @@ def make_image(work, case):
     source = (ROOT / BOOT).read_text()
     diag = (ROOT / 'tools/ppc/ata_accept_diag.c').read_text()
     source = source.replace('void pm_ide_boot(void)', diag + '\nvoid pm_ide_boot(void)')
-    end = 'if (ide_drive_present(i)) dev_register_hdd(i);'
+    end = '    ide_init();'
     assert source.count(end) == 1
     boot = out / 'boot.c'
     source = source.replace(end, end + '\n    ata_accept_report();')
@@ -136,9 +136,10 @@ void ata_check_wait(void)
 }
 """)
     if case == 'lba':
-        path = 'drivers/base/dev.c'
-        settings += mutant_settings(out, case, path, 'ide_read_sectors((int)self->bus_id, (u32)lba,',
-                                    'ide_read_sectors((int)self->bus_id, (u32)lba + 1,')
+        path = 'drivers/ata/ide_addr.c'
+        before = 'out->sect_num = (u8)(lba & 0xFFUL);'
+        settings += mutant_settings(out, case, path, before,
+                                    'out->sect_num = (u8)((lba + 1) & 0xFFUL);')
     return build_media(out, '-j6', *settings)
 
 
@@ -153,8 +154,8 @@ def digest(data):
     return f'{h:08x}'
 
 
-def guest(media, cpu, disk, absent=False):
-    work = media.elf.parent / (cpu + ('-absent' if absent else ''))
+def guest(media, cpu, disk, absent=False, second=None, bootargs=None, done="ATA-TEST done", keyboard=None, directory=None):
+    work = (directory or media.elf.parent) / (cpu + ('-absent' if absent else ''))
     work.mkdir()
     iso = media.iso.resolve()
     serial = work / 'serial.log'
@@ -167,12 +168,23 @@ def guest(media, cpu, disk, absent=False):
         guest_disk = work / 'disk.raw'
         shutil.copyfile(disk, guest_disk)
         args += ['-drive', f'file={guest_disk},format=raw,if=ide,index=0,media=disk,cache=writethrough']
-    with (work / 'qemu.log').open('wb') as log, subprocess.Popen(args, stderr=log, stdout=log) as proc:
+    if second:
+        shutil.copyfile(second, work / 'second.raw')
+        args += ['-drive', f'file={work / "second.raw"},format=raw,if=ide,index=1,cache=writethrough']
+    if bootargs:
+        args += ['-prom-env', r'boot-command=boot cd:,\PPCKERN.ELF ' + bootargs]
+    if keyboard:
+        args += ['-usb', '-device', 'usb-kbd', '-icount', 'shift=auto', '-qmp', 'stdio']
+    with (work / 'qemu.log').open('wb') as log, subprocess.Popen(
+            args, stderr=log, stdout=subprocess.PIPE if keyboard else log,
+            stdin=subprocess.PIPE if keyboard else None) as proc:
         try:
             deadline = time.monotonic() + 90
+            if keyboard:
+                keyboard(proc, serial, deadline)
             while proc.poll() is None and time.monotonic() < deadline:
                 lines = serial.read_bytes().decode(errors='replace').splitlines() if serial.exists() else []
-                if 'ATA-TEST done' in lines:
+                if done in lines:
                     return lines
                 time.sleep(.15)
             raise RuntimeError(f'guest stopped or timed out: {serial}')
@@ -236,7 +248,7 @@ def main():
                 assert f'ATA-TEST pa={expected}' in lines
             if case == 'normal':
                 assert 'ATA-TEST wait reads=2 rc=0' in lines
-                assert 'ATA-TEST present=1 registered=1' in lines
+                assert 'ATA-TEST present=1 registered=0' in lines
                 assert ident and all(f'ATA-TEST lba={i} rc=0 hash={digest(sector(i))}' in lines
                                      for i in (0, 1024, 2047)), lines[-8:]
                 assert 'ATA-TEST present=0 registered=0' in guest(media, cpu, disk, absent=True)

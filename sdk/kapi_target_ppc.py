@@ -120,7 +120,18 @@ IME_SLOTS = PROVIDER_GROUPS['ime'][0]
 ABSENT_PROVIDER_SLOTS = frozenset().union(*(slots for slots, _ in PROVIDER_GROUPS.values()))
 ABSENT_PROVIDER_INCLUDES = frozenset().union(*(includes for _, includes in PROVIDER_GROUPS.values()))
 
-# Queries of absent capabilities; IME retains the F10 NOSYS contract.
+def absent_providers(*, link, ide, fep):
+    slots = ABSENT_PROVIDER_SLOTS
+    headers = ABSENT_PROVIDER_INCLUDES
+    for enabled, group in ((link, 'serialfs'), (ide, 'ide'), (fep, 'ime')):
+        if enabled:
+            provided, includes = PROVIDER_GROUPS[group]
+            slots -= provided
+            headers -= includes
+    return slots, headers
+
+
+# Queries of absent capabilities.
 ZERO_SLOTS = frozenset({
     'np2_detect',
     'np2_check_hostdrv',

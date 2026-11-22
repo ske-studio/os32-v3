@@ -2,6 +2,8 @@
 #include "ide_boot.h"
 #include "loop_boot.h"
 #include "sqlite_engine.h"
+#include "fep_boot.h"
+#include "platform_module_pair.h"
 #include "boot_token.h"
 /* PowerPC core-ready init (milestone 2, PPC_KBOOT_DESIGN sections 2 and 4).
  *
@@ -45,6 +47,7 @@
 
 #if KBOOT_SHELL || KBOOT_SH
 #include "root_boot.h"
+#include "kernel_mount_children.h"
 #include "pm_console.h"
 #include "pointer_service.h"
 #include "console_backend.h"
@@ -75,6 +78,9 @@ int pm_root_image(struct boot_root_image *image, u32 frame_bytes);
 
 int platform_boot_staging_in_use(void)
 {
+#if OS32_FEATURE_IDE && !OS32_HOOK_IME
+    if (pm_root_unit != -1) return 0;
+#endif
     return ppc_boot_info()->root_frame_bytes != 0;
 }
 
@@ -189,6 +195,9 @@ static void rh_phy_notify(const struct gem_phy_sample *p, int rc)
 static int lan_log_rc;
 #if KBOOT_SHELL || KBOOT_SH
 static int root_ready;
+#if OS32_HOOK_IME && OS32_FEATURE_IDE
+static int hdd_root_ready;
+#endif
 #endif
 
 #if KBOOT_SHELL_LAYOUT_DIAG
@@ -368,6 +377,35 @@ static void apply_machine_config(void)
 }
 
 /* 局面 2 (EE=1): MPIC の配送と時計の実証・LAN・root・コンソール・入力。 */
+#if KBOOT_SHELL || KBOOT_SH
+static int start_media_root(const struct pm_kboot_info *info)
+{
+    struct boot_root_image img = {0};
+    if (!info->root_frame_bytes) {
+        machcfg_finish(0);
+        apply_machine_config();
+        return 0;
+    }
+    u32 owned_before = ledger_owner_pages(LEDGER_OWNER_BOOT);
+    int registered = 0;
+    int rc = pm_root_image(&img, info->root_frame_bytes);
+    if (!rc) rc = pm_root_boot(&img, &registered);
+    if (!rc) machcfg_load_root();
+    else machcfg_finish(0);
+    apply_machine_config();
+    u32 pages = MEM_BOOT_STAGING_SIZE / PAGE_SIZE;
+    u32 free_before, free_after;
+    if (pm_root_release(&img, registered, PM_ROOT_FRAME_BASE / PAGE_SIZE, pages,
+                        &free_before, &free_after))
+        kboot_stop("root page release");
+    kprintf(KBOOT_ATTR, "KBOOT ROOT rc=%d registered=%d bytes=%u staging_pages=%u\r\n",
+            rc, registered, img.bytes, pages);
+    kprintf(KBOOT_ATTR, "KBOOT ROOT owner_before=%u owner_after=%u free_before=%u free_after=%u\r\n",
+            owned_before, ledger_owner_pages(LEDGER_OWNER_BOOT), free_before, free_after);
+    return !rc;
+}
+#endif
+
 void platform_boot_services(void)
 {
     const struct ppc_boot_devices *dev = ppc_boot_devices();
@@ -439,32 +477,44 @@ void platform_boot_services(void)
 #if KBOOT_SHELL || KBOOT_SH
     kprintf(KBOOT_ATTR, "FB full_rc=%d color_rc=%d\r\n",
             dev->fb_full_rc, dev->fb_color_rc);
-    /* Stage 4 supplies the expanded ISO after the allocator is online. */
-    struct boot_root_image img = {0};
-    if (!info->root_frame_bytes) {
-        machcfg_finish(0);
-        apply_machine_config();
-        return;
-    }
-    u32 owned_before = ledger_owner_pages(LEDGER_OWNER_BOOT);
-    int registered = 0;
-    int rc = pm_root_image(&img, info->root_frame_bytes);
-    if (!rc) rc = pm_root_boot(&img, &registered);
-    if (!rc) machcfg_load_root();
-    else machcfg_finish(0);
-    apply_machine_config();
-    u32 pages = MEM_BOOT_STAGING_SIZE / PAGE_SIZE;
-    u32 free_before, free_after;
-    if (pm_root_release(&img, registered, PM_ROOT_FRAME_BASE / PAGE_SIZE, pages,
-                        &free_before, &free_after))
-        kboot_stop("root page release");
-    kprintf(KBOOT_ATTR, "KBOOT ROOT rc=%d registered=%d bytes=%u staging_pages=%u\r\n",
-            rc, registered, img.bytes, pages);
-    kprintf(KBOOT_ATTR, "KBOOT ROOT owner_before=%u owner_after=%u free_before=%u free_after=%u\r\n",
-            owned_before, ledger_owner_pages(LEDGER_OWNER_BOOT), free_before, free_after);
-    if (!rc) {
-        pm_loop_boot();
+#if OS32_FEATURE_IDE
+    if (pm_root_unit != -1) {
+        int registered;
         pm_ide_boot();
+        int rc = pm_root_select();
+        if (rc) {
+            kprintf(KBOOT_ATTR, "HDD root unit=%d partition=%u select rc=%d\r\n",
+                    pm_root_unit, pm_root_partition, rc);
+            kboot_stop("hd0 select");
+        }
+        rc = pm_root_boot(0, &registered);
+        if (rc) {
+            kprintf(KBOOT_ATTR, "HDD root hd0 mount/path rc=%d\r\n", rc);
+            kboot_stop("hd0 root");
+        }
+#if OS32_HOOK_IME
+        /* Validate the embedded pair without registering it as the root. */
+        struct boot_root_image paired_image = {0};
+        if (info->root_frame_bytes) {
+            int pair_rc = pm_root_image(&paired_image, info->root_frame_bytes);
+            u32 before, after;
+            if (pm_root_release(&paired_image, 0, PM_ROOT_FRAME_BASE / PAGE_SIZE,
+                                MEM_BOOT_STAGING_SIZE / PAGE_SIZE, &before, &after))
+                kboot_stop("HDD pair page release");
+            hdd_root_ready = !pair_rc;
+        }
+#endif
+        machcfg_load_root();
+        apply_machine_config();
+    } else
+#endif
+    {
+        if (!start_media_root(info)) return;
+        pm_ide_boot();
+    }
+    {
+        pm_loop_boot();
+        kernel_mount_children(vfs_devname("/"));
         (void)pm_console_text_start();
 #if KBOOT_SH
         /* Before pm_usb_boot (mouse_init): the default must precede the cursor. */
@@ -498,7 +548,13 @@ void platform_boot_run(void)
     if (root_ready) {
 #if OS32_HOOK_KAPI_DB
         /* Keep SQLite boot diagnostics on the registered log streams. */
-        kprintf(KBOOT_ATTR, "[sqlite] static rc=%d\n", sqlite_static_boot());
+        int sql_rc = sqlite_static_boot();
+        kprintf(KBOOT_ATTR, "[sqlite] static rc=%d\n", sql_rc);
+#if OS32_HOOK_IME && OS32_FEATURE_IDE
+        u32 pair;
+        if (!sql_rc && hdd_root_ready && unicode_file_debug_phys() && platform_module_pair(&pair))
+            kprintf(KBOOT_ATTR, "[fep] static rc=%d\n", fep_boot_static());
+#endif
 #endif
         pm_exec_boot();
         shell_loop_run(&pm_shell_loop_ops);

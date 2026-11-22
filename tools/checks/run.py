@@ -387,6 +387,8 @@ def compiler_headers(root, sources, inc_dirs):
     return frozenset(found)
 
 PATH_AUDIT_ALLOW = {
+    ("check-ppc-fep-import", "tools/gen_kdebug_imports.py"):
+        "module observation helper imports the generator; the PC-98 check_nm path is unused",
     ("check-ppc-module-guest", "tools/gen_kdebug_imports.py"):
         "only import signatures and hashes are used; check_nm is an independent PC-98 audit",
     ("check-ppc-kboot-link", "tools/ppc/link_run.py"):

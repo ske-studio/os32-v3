@@ -6,3 +6,6 @@ ifeq ($(ARCH),x86)
 MODULE_FEATURES += fep
 MODULE_MK_fep = build/fep-module.mk
 endif
+ifeq ($(ARCH),ppc)
+C_FEATURES += platform/powermac/fep_imports.c
+endif
