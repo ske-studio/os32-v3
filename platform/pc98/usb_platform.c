@@ -7,12 +7,6 @@
 static u16 blocked_slots[PCI_MAX_DEVS];
 static unsigned blocked_count;
 
-static int is_ohci(const struct pci_dev *dev)
-{
-    return dev->vendor == 0x1033 && dev->device == 0x0035 &&
-           dev->class == 0x0c && dev->subclass == 0x03 && dev->progif == 0x10;
-}
-
 static int ohci_resource(const struct pci_dev *dev, struct usb_pci_fn *out)
 {
     struct pci_bar_resource bar;
@@ -31,7 +25,7 @@ static int ohci_resource(const struct pci_dev *dev, struct usb_pci_fn *out)
 
 int pc98_usb_ohci_function(const struct pci_dev *dev, struct usb_pci_fn *out)
 {
-    if (!is_ohci(dev)) return -1;
+    if (!pc98_usb_is_ohci(dev)) return -1;
 
     for (unsigned i = 0; i < blocked_count; ++i)
         if (blocked_slots[i] == ((dev->bus << 8) | dev->dev)) return -1;
@@ -125,7 +119,7 @@ void pc98_usb_early_quiesce(void)
     /* Stop even companions whose EHCI routing prevents a later start. */
     for (u32 i = 0; pci_get(i, &dev) == 0; ++i) {
         ohci_quiet[i] = 0;
-        if (!is_ohci(&dev)) continue;
+        if (!pc98_usb_is_ohci(&dev)) continue;
         struct usb_hc hc = {.pci = {.bus=dev.bus, .dev=dev.dev, .fn=dev.fn}};
         if (!ohci_resource(&dev, &hc.pci) && !usbp_mmio_map(&hc.pci, 0, &hc.regs)) {
             ohci_quiet[i] = takeover(&hc) == 0;

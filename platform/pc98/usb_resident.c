@@ -57,9 +57,11 @@ int pc98_usb_resident_start(struct module_handle owner, struct pc98_usb_core *co
 {
     struct pci_dev dev;
     unsigned used = 0;
-    int active = 0;
+    int active = 0, found = 0;
     for (u32 i = 0; used < PC98_USB_HCS && !pci_get(i, &dev); i++) {
         struct usb_hc *hc = &core->hc[used];
+        if (!pc98_usb_is_ohci(&dev)) continue;
+        found = 1;
         if (!pc98_usb_ohci_quiet(i) || pc98_usb_ohci_function(&dev, &hc->pci)) continue;
         if (usbp_mmio_map(&hc->pci, 0, &hc->regs)) continue;
         hc->ops = core->ops;
@@ -77,7 +79,7 @@ int pc98_usb_resident_start(struct module_handle owner, struct pc98_usb_core *co
         used++;
     }
     if (active) core->service();
-    return active;
+    return found && !active ? -USB_E_HC : active;
 }
 
 /* module_start supplies the validated entry and its owning record. */
