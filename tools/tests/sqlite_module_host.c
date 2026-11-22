@@ -197,8 +197,8 @@ int host_fep_prepare(sqlite3 *db, const char *sql, int n, sqlite3_stmt **out, co
 {
     /* Fail after exact prepare, or only learning prepare. These failures pass
      * through the real module's partial-init cleanup / learning fallback. */
-    if ((input[0] == 18 && !memcmp(sql, "SELECT kanji,pos_id,CASE", sizeof("SELECT kanji,pos_id,CASE") - 1) &&
-         g_ime.store.system.exact) ||
+    if ((input[0] == 18 && db == g_ime.store.system.db &&
+         g_ime.store.system.exact && !g_ime.store.system.prefix) ||
         (input[0] == 32 && !memcmp(sql, "INSERT INTO dict_user", 21)))
         return os32_sqlite_prepare_v2(db, "SELECT FROM", -1, out, tail);
     return os32_sqlite_prepare_v2(db, sql, n, out, tail);
