@@ -1,7 +1,7 @@
 # USB body and typed imports, paired separately with each PC-98 kernel.
 USB_OUT := $(BUILD_OUT)/usb
 USB_GEN := $(addprefix $(USB_OUT)/,usb_imports.h usb_imports.json usb_import_slots.c usb_import_stubs.S usb_provider_types.c usb_kexports.c)
-USB_DEF_SOURCES := mm/dma_pool.h input/hal/in2_int.h mm/kmalloc.h lib/kstring.h include/kprintf.h kernel/module/module_runtime.h platform/pc98/usb_resident.h include/usb_platform.h drivers/usb/usb_core.h
+USB_DEF_SOURCES := input/hal/usb_input.h mm/dma_pool.h input/hal/in2_int.h mm/kmalloc.h lib/kstring.h include/kprintf.h kernel/module/module_runtime.h platform/pc98/usb_resident.h include/usb_platform.h drivers/usb/usb_core.h
 $(USB_GEN) &: tools/gen_sqlite_imports.py tools/gen_kdebug_imports.py tools/module_schema.py tools/prototypes/usb_imports.def $(USB_DEF_SOURCES)
 	python3 tools/gen_sqlite_imports.py --module usb --out-dir $(USB_OUT)
 

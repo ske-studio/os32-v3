@@ -18,7 +18,7 @@ from usb_run import in2_observe
 IN2_MUTATIONS = {
     'no-key': ('input/hal/usb_input.c', 'if (!input_capture_key(&key) && pause',
                'if (usage != 0x04 && !input_capture_key(&key) && pause'),
-    'no-button': ('input/hal/usb_input.c', '    input_capture(&e);\n    usbp_log', '    usbp_log'),
+    'no-button': ('input/hal/usb_input.c', '    input_capture(&e);\n    return 1;', '    return 1;'),
     'no-local': ('platform/powermac/input_boot.c', 'return input_legacy_try(IL_LOCAL_CHAR);',
                  'return -1;'),
     'no-abort': ('input/hal/usb_input.c', 'ring3_abort_request();', '(void)0;'),

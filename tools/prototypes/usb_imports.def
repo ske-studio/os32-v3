@@ -32,30 +32,6 @@
       "irq": true
     },
     {
-      "symbol": "input_capture",
-      "source": "input/hal/in2_int.h",
-      "context": "normal",
-      "irq": true
-    },
-    {
-      "symbol": "input_repeat",
-      "source": "input/hal/in2_int.h",
-      "context": "normal",
-      "irq": true
-    },
-    {
-      "symbol": "input_src_register",
-      "source": "input/hal/in2_int.h",
-      "context": "normal",
-      "irq": true
-    },
-    {
-      "symbol": "input_src_release",
-      "source": "input/hal/in2_int.h",
-      "context": "normal",
-      "irq": true
-    },
-    {
       "symbol": "kfree",
       "source": "mm/kmalloc.h",
       "context": "normal",
@@ -114,6 +90,30 @@
       "source": "platform/pc98/usb_resident.h",
       "context": "normal",
       "irq": false
+    },
+    {
+      "symbol": "usb_input_alloc",
+      "source": "input/hal/usb_input.h",
+      "context": "normal",
+      "irq": true
+    },
+    {
+      "symbol": "usb_input_mouse",
+      "source": "input/hal/usb_input.h",
+      "context": "normal",
+      "irq": true
+    },
+    {
+      "symbol": "usb_input_release",
+      "source": "input/hal/usb_input.h",
+      "context": "normal",
+      "irq": true
+    },
+    {
+      "symbol": "usb_input_usage",
+      "source": "input/hal/usb_input.h",
+      "context": "normal",
+      "irq": true
     },
     {
       "symbol": "usbp_cfg_cmd",

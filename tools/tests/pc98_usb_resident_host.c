@@ -1,3 +1,4 @@
+#include "input/hal/keymap.h"
 #include "usb_resident.h"
 #include "usb_probe.h"
 #include "input/hal/in2_int.h"
@@ -132,6 +133,8 @@ void usb_hc_dead(struct usb_hc *hc, u32 why) { dead(hc, why); }
 
 int kbd_shim_irq_depth;
 volatile int kbd_gui_mode = 1;
+volatile int kbd_stop_suppressed;
+void ring3_abort_request(void) { bad++; }
 static unsigned raw;
 int legacy_active(void) { return 0; }
 u32 in2_time_ms(void) { return 55; }
@@ -188,10 +191,11 @@ static int module_boot(void)
     if (handler(5, argument) != IRQ_HANDLED || module_hc->isr_pending != 3) return 23;
     usb_pending = 0;
     if (handler(5, argument) != IRQ_NONE || module_hc->isr_pending != 3) return 24;
+    if (km_backend_register(&hid_jp_backend)) return 25;
     int k = usbp_input_src_alloc(USBP_INPUT_KBD), m = usbp_input_src_alloc(USBP_INPUT_MOUSE);
     if (k != 1 || m != 1) return 25;
-    usbp_input_key(k, 33, 1);
-    usbp_input_key_repeat(k, 33);
+    usbp_input_usage(k, 0x0a, 1);
+    usbp_input_usage_repeat(k, 0x0a);
     usbp_input_mouse(m, -4, 7, 5);
     InputEvent key, move, button, up;
     u16 seq;
@@ -206,9 +210,12 @@ static int module_boot(void)
         up.type != INPUT_EVENT_KEY || up.sc != 33 || up.down || up.src != key.src ||
         !in2_ring_pop(&up, &seq) || up.type != INPUT_EVENT_BUTTON || up.buttons ||
         up.sc != 5 || up.src != button.src) return 29;
+    i16 dx, dy;
+    mouse_ext_read_legacy(&dx, &dy);
+    if (dx != -4 || dy != 7) return 36;
     if (usbp_input_src_alloc(USBP_INPUT_KBD) != k || usbp_input_src_alloc(USBP_INPUT_MOUSE) != m)
         return 30;
-    usbp_input_key(k, 33, 1);
+    usbp_input_usage(k, 0x0a, 1);
     usbp_input_mouse(m, 0, 0, 5);
     button.sc = 0; /* Capture computes the changed-button mask on delivery. */
     if (!in2_ring_pop(&up, &seq) || up.src != key.src || up.generation == key.generation ||
