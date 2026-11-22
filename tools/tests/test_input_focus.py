@@ -1,12 +1,14 @@
 """Foreground ownership and IRQ raw delivery, using the product F1 and input HAL."""
 CHECK = dict(name='input-focus-host', tier=1, needs=[], budget=15,
     covers=['tools/tests/test_input_focus.py', 'tools/tests/input_focus_host.c',
+            'platform/*/platform_input_caps.h', 'build/targets/ppc-powermac.mk', 'build/config.mk',
             'platform/pc98/platform_io.h', 'tools/tests/host_arch/**', 'include/**', 'exec/exec_gui.h', 'exec/exec_hooks.h',
             'kernel/av_focus.c', 'kapi/kapi_in2.c', 'input/hal/*.[ch]', 'input/keymaps/*.c', 'platform/pc98/input_keymap.c', 'sdk/include/os32/**'],
-    basis=['docs/decisions/sound/AV_HAL_DESIGN.md §5-3, §5-6'])
+    basis=['docs/decisions/INPUT_HAL_DESIGN.md 7d', 'docs/decisions/sound/AV_HAL_DESIGN.md §5-3, §5-6'])
 from pathlib import Path
 import subprocess
 import tempfile
+import os
 
 
 def run(ctx):
@@ -89,23 +91,33 @@ def run(ctx):
         ])
     with tempfile.TemporaryDirectory() as td:
         folder = Path(td)
-        gate = '    if (!IN2_PUBLIC_EXCLUSIVE) return OS32_ERR_NOSYS;'
-        closed = [('', '', '')]
-        if ctx.mutate:
-            closed.append(('kapi_in2.c', gate, ''))
-        compile_flags = ['gcc', '-m32', '-DHOST_ARCH_SHARED_IF', '-ffreestanding',
+        common = ['gcc', '-m32', '-DHOST_ARCH_SHARED_IF', '-ffreestanding',
             '-DOS32_HOOK_GUI=0', '-fno-pie', '-ffunction-sections', '-Werror=implicit-function-declaration',
-            '-Itools/tests/host_arch', '-I.', '-Ikapi', '-Iinput/hal', '-Iinclude', '-Iexec',
-            '-Iplatform/pc98', '-Ikernel', '-Isdk/include/os32']
+            '-Itools/tests/host_arch', '-Iinput/hal']
         binary = folder / 'test'
-        for flag, variants in [('-DTEST_CLOSED_ACQUIRE', closed),
-                               ('-DIN2_PUBLIC_EXCLUSIVE=1', [('', '', ''), *cases])]:
+        for arch, machine, flags, mutations in [
+                ('x86', 'pc98', ['-DIN2_PUBLIC_EXCLUSIVE=1'], cases),
+                ('x86', 'pc98', [], []),
+                ('ppc', 'powermac', ['-DTEST_CLOSED_ACQUIRE'], [])]:
+            include_var = 'INC_KERNEL' if arch == 'x86' else 'KB_INC'
+            query = 'input-focus-paths: ; @echo $(filter -Iarch/% -Iplatform/%,$(' + include_var + '))'
+            dirs = subprocess.check_output(['make', '-s', '--no-print-directory', f'ARCH={arch}',
+                f'PLATFORM={machine}', 'KBOOT_SH=1', 'KBOOT_LINK=1', '--eval=' + query,
+                'input-focus-paths'], cwd=ctx.root, env={**os.environ, 'MAKEFLAGS': ''}, text=True)
+            compile_flags = [*common, *flags, *dirs.split(), '-I.', '-Ikapi', '-Iinclude',
+                             '-Iexec', '-Ikernel', '-Isdk/include/os32']
+            variants = [('', '', ''), *mutations]
+            header = 'platform_input_caps.h'
+            if ctx.mutate and '-DIN2_PUBLIC_EXCLUSIVE=1' not in flags:
+                value = int(machine == 'pc98')
+                variants.append((header, f'#define IN2_PUBLIC_EXCLUSIVE {value}',
+                                 f'#define IN2_PUBLIC_EXCLUSIVE {1 - value}'))
             units = {}
-            paths = {}
+            paths = {header: ctx.root / 'platform' / machine / header}
             for path in [*sources, 'tools/tests/input_focus_host.c']:
                 source = ctx.root / path
                 obj = folder / (source.stem + '.o')
-                subprocess.run([*compile_flags, flag, '-c', source, '-o', obj], cwd=ctx.root, check=True)
+                subprocess.run([*compile_flags, '-c', source, '-o', obj], cwd=ctx.root, check=True)
                 units[source.name] = obj
                 paths[source.name] = source
             for name, old, new in variants:
@@ -115,13 +127,19 @@ def run(ctx):
                     assert text.count(old) == 1, old
                     source = folder / name
                     source.write_text(text.replace(old, new))
-                    objects[name] = folder / 'mutant.o'
-                    subprocess.run([*compile_flags, flag, '-c', source, '-o', objects[name]],
+                    target = name
+                    extra = []
+                    if name == header:
+                        target = 'kapi_in2.c'
+                        source = paths[target]
+                        extra = ['-I' + str(folder)]
+                    objects[target] = folder / 'mutant.o'
+                    subprocess.run([compile_flags[0], *extra, *compile_flags[1:], '-c', source, '-o', objects[target]],
                                    cwd=ctx.root, check=True)
                 subprocess.run(['gcc', '-m32', '-no-pie', '-nostdlib', '-static', '-Wl,--gc-sections',
                     '-Wl,--wrap=in2_on_focus', '-Wl,--wrap=input_key_pressed', *objects.values(), '-o', binary],
                     cwd=ctx.root, check=True)
                 rc = subprocess.run(['qemu-i386', binary]).returncode
                 assert (0 < rc <= 47) if name else rc == 0, (name, old, rc)
-                print('RED runtime' if name else 'PASS', name, old.splitlines()[0] if old else '', flush=True)
+                print('RED runtime' if name else 'PASS', machine, name, old.splitlines()[0] if old else '', flush=True)
     return 0

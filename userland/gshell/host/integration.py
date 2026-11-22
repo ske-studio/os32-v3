@@ -70,6 +70,7 @@ def build(gshell: Path, name: str, quiet: bool = False, typical: bool = False) -
     args = ['rustc', '--edition=2021', '--test', str(rs), '-L', str(OUT), '--extern', 'os32api='+str(OUT/'libos32api.rlib'),
             '-L', 'dependency='+str(FONT_DEPS), '--extern', 'os32_font='+str(FONT_RLIB), '-o', str(exe)]
     args += ['--cfg', 'av_focus_kernel', '-C', 'link-arg=' + str(focus_obj)]
+    args.extend(globals().get('extra_rustc_flags', []))
     if typical:
         args += ['--cfg', 'feature="gf_accel_accept"']
         os.environ['GF_ACCEPT_ID'] = 'host'

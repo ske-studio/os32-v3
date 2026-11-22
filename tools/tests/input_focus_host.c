@@ -432,6 +432,14 @@ static int public_api(void)
     if (in2_status(0) != OS32_ERR_INVAL || in2_status(&status) || status.focus_owner != 1 ||
         status.size != sizeof(status) || status.acquired || status.dropped != in2_ring_dropped()) return 32;
     u32 gen = status.focus_gen;
+    if (in2_acquire(IN2_EXCL_KBD)) return 33;
+    legacy_raw_push(2, 0, 0);
+    legacy_raw_push(KEY_STOP, 0, SHIFT_CTRL);
+    if (legacy_raw_take() != (KEY_STOP | KBD_RAW_MAKE | (SHIFT_CTRL << KBD_RAW_MOD_SHIFT)) ||
+        legacy_raw_take() != -1 || in2_unacquire()) return 33;
+    legacy_raw_push(2, 0, 0);
+    if (legacy_raw_take() != (2 | KBD_RAW_MAKE)) return 33;
+    gen += 2;
     if (in2_acquire(4) != OS32_ERR_INVAL || in2_acquire(2) || in2_status(&status) ||
         !status.acquired || status.focus_gen != gen + 1) return 33;
     caller = 9;

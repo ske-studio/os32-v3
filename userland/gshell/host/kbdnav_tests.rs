@@ -2557,3 +2557,28 @@ fn excl_full_completed_intervals_admit_next_switch() {
     expected.extend([tab, SC_GRPH, stop]);
     assert_eq!(&st.pending_raw[..st.pending_raw_n], expected.as_slice());
 }
+
+#[cfg(public_input_kernel)]
+#[test]
+fn excl_public_acquire_controls_window_delivery() {
+    extern "C" {
+        fn in2_acquire(flags: std::os::raw::c_ulong) -> i32;
+        fn in2_unacquire() -> i32;
+        fn host_public_wm_state(out: *mut os32api::av::IN2_WmState) -> i32;
+    }
+    mocks::init();
+    fep_off();
+    let shm = mocks::Shm::new();
+    let mut st = one_window(&shm);
+    unsafe {
+        (*os32api::api_ptr()).in2_wm_state = host_public_wm_state;
+        assert_eq!(mocks::focus_kernel::av_focus_set(2), 0);
+        assert_eq!(in2_acquire(1), 0);
+    }
+    run(&mut st, &tap(SC_A, 0));
+    assert!(keys(&st, 0).is_empty());
+    assert_eq!(unsafe { in2_unacquire() }, 0);
+    run(&mut st, &tap(SC_A, 0));
+    let delivered: Vec<_> = keys(&st, 0).iter().map(|&(down, scan, _, _)| (down, scan)).collect();
+    assert_eq!(delivered, [(true, SC_A as u8), (false, SC_A as u8)]);
+}

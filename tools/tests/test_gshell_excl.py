@@ -1,11 +1,13 @@
 """Run stage B against the gshell host ABI and real window rings."""
 from pathlib import Path
 import runpy
+import subprocess
+import tempfile
 import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 CHECK = dict(name='gshell-excl-host', tier=1,
-    covers=['kernel/av_focus.c', 'include/av_contract.h', 'exec/exec_gui.h', 'exec/exec_hooks.h', 'input/hal/in2_int.h', 'include/app_ids.h', 'include/callconv.h', 'include/abi.h', 'arch/x86/arch_abi.h', 'userland/gshell/**', 'sdk/rust/os32api/**', 'sdk/rust/os32api/src/ls.rs', 'tools/tests/os32api_host.py', 'exec/shell_service.h', 'userland/lib/font/**', 'sdk/include/os32/os32_kapi_shared.h', 'tools/fetch_fonts.py', 'tools/tests/g16_fixture.py', 'tools/gen_g16.py', 'tools/g16/**', 'assets/ipadic/*.csv', 'tools/tests/test_gshell_excl.py', 'sdk/include/os32/**', 'include/remote_control.h', 'net/link.h', 'assets/fonts/**'],
+    covers=['kapi/kapi_in2.c', 'input/hal/*.h', 'input/hal/in2_excl.c', 'platform/pc98/platform_input_caps.h', 'platform/pc98/platform_io.h', 'tools/tests/host_arch/**', 'include/**', 'kernel/av_focus.c', 'include/av_contract.h', 'exec/exec_gui.h', 'exec/exec_hooks.h', 'input/hal/in2_int.h', 'include/app_ids.h', 'include/callconv.h', 'include/abi.h', 'arch/x86/arch_abi.h', 'userland/gshell/**', 'sdk/rust/os32api/**', 'sdk/rust/os32api/src/ls.rs', 'tools/tests/os32api_host.py', 'exec/shell_service.h', 'userland/lib/font/**', 'sdk/include/os32/os32_kapi_shared.h', 'tools/fetch_fonts.py', 'tools/tests/g16_fixture.py', 'tools/gen_g16.py', 'tools/g16/**', 'assets/ipadic/*.csv', 'tools/tests/test_gshell_excl.py', 'sdk/include/os32/**', 'include/remote_control.h', 'net/link.h', 'assets/fonts/**'],
     needs=[], budget=12.5,
     basis=['docs/decisions/sound/AV_HAL_DESIGN.md §5-3, G1', 'docs/decisions/INPUT_HAL_DESIGN.md 7d'],
 )
@@ -100,10 +102,22 @@ ENTRY_MUTATIONS = [
 ]
 
 def run(ctx):
+    with tempfile.TemporaryDirectory() as temporary:
+        flags = ['--cfg', 'public_input_kernel']
+        for source in ('kapi/kapi_in2.c', 'input/hal/in2_excl.c', 'userland/gshell/host/input_fixture.c'):
+            obj = Path(temporary) / (Path(source).stem + '.o')
+            subprocess.run(['cc', '-std=gnu11', '-ffunction-sections', '-Wno-attributes',
+                '-Itools/tests/host_arch', '-Iinput/hal', '-Iinclude', '-Iplatform/pc98',
+                '-Isdk/include/os32', '-c', source, '-o', obj], cwd=ROOT, check=True)
+            flags.extend(['-C', 'link-arg=' + str(obj)])
+        return run_host(ctx, flags)
+
+
+def run_host(ctx, flags):
     argv = sys.argv
     try:
         sys.argv = [str(ROOT / 'userland/gshell/host/integration.py'), '--excl']
-        host = runpy.run_path(sys.argv[0])
+        host = runpy.run_path(sys.argv[0], init_globals={'extra_rustc_flags': flags})
         if ctx.mutate:
             host['MUTATIONS'][:] = mutations()
             return int(bool(host['mutate']()))
