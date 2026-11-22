@@ -573,6 +573,7 @@
     "pit-clock-host": 2.799469,
     "platform-memory-host": 2.646895,
     "ppc-ata-guest": 163.333539,
+    "ppc-hdd-root-guest": 150,
     "ppc-boot-info-guest": 278.653822,
     "ppc-console-cells": 75.027023,
     "ppc-db-guest": 228.903681,

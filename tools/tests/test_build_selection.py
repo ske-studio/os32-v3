@@ -174,6 +174,8 @@ def check_kboot(root):
             ext2 = 'fs/ext2/ext2_'
             formatter = {ext2 + stem for stem in ('fmt', 'layout', 'time')}
             pending = set(actual['KB_PENDING'].split())
+            if enabled:
+                formatter.remove(ext2 + 'time')  # shared by mount and format
             for unit in formatter:
                 assert actual['KB_OUT'] + '/' + unit + '.o' in pending, (name, unit)
             ide = ext2 + 'medium_ide'
