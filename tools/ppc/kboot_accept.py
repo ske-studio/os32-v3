@@ -152,12 +152,13 @@ def main():
         boot_iso = product / 'boot.iso'
         if boot_iso.exists():
             raise RuntimeError('ELF-only build packaged boot.iso')
-        # Omitting the kernel goal selects all and violates the ELF-only contract.
-        result = make(product, 'IMAGE=powermac')
-        result.check_returncode()
-        if not boot_iso.is_file():
-            raise RuntimeError('default-goal mutation survived')
-        print('RED default goal packaged boot.iso', flush=True)
+        if not args.build_only:
+            # Omitting the kernel goal selects all and violates the ELF-only contract.
+            result = make(product, 'IMAGE=powermac')
+            result.check_returncode()
+            if not boot_iso.is_file():
+                raise RuntimeError('default-goal mutation survived')
+            print('RED default goal packaged boot.iso', flush=True)
         for name, source, before, after, expected, evidence_line in KERNEL_MUTATIONS:
             mutant = build(work/('mutant-'+name), 'KBOOT_LINK=0',
                            *mutant_settings(work, name, source, before, after))
