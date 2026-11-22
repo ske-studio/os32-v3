@@ -6,7 +6,7 @@ import json
 import os
 from pathlib import Path
 import tempfile
-from kboot_accept import build, mutant_settings
+from kboot_accept import build_media, mutant_settings
 from kboot_run import require, serial, validate_root
 from run import CriterionFailure
 
@@ -43,7 +43,7 @@ def rsh_command(session, line):
     return body[len(prefix):-1]
 
 
-def link_accept(elf, cpu, out, mutant=False, pressure=False):
+def link_accept(media, cpu, out, mutant=False, pressure=False):
     import link_sh_run as link
 
     class OutputSession(link.Session):
@@ -64,7 +64,7 @@ def link_accept(elf, cpu, out, mutant=False, pressure=False):
                 publish(record)
             self.operator.publish_log = observed
 
-    s = OutputSession(elf, cpu, out, 120)
+    s = OutputSession(media, cpu, out, 120)
     try:
         s.start(); s.wait(s.ready, 'RSH READY', 60)
         require('Loading /sys/shell.bin' not in s.screen('ready'), 'shell loading on framebuffer at READY')
@@ -132,15 +132,15 @@ def main():
                                        '    pm_report_ready(start);',
                                        '    pm_report_ready(start);\n'
                                        '    kprintf(KBOOT_ATTR, "KBOOT READY stage=pre-user\\r\\n");')
-        elf = build(work/name, 'IMAGE=kboot-link-sh', 'KB_SH_OUT='+str(user),
+        media = build_media(work/name, 'IMAGE=kboot-link-sh', 'KB_SH_OUT='+str(user),
                     'KB_ROOT_BINS='+bins, *mutation, 'kb-user', 'kernel')
-        digest = hashlib.sha256(elf.read_bytes()).hexdigest()
+        digest = hashlib.sha256(media.elf.read_bytes()).hexdigest()
         require(digest not in hashes, 'distinct '+name)
         hashes.add(digest)
         print(name, digest, flush=True)
         if not args.build_only:
             try:
-                link_accept(elf, '7450', work/(name+'-guest'), name == 'fd1-log')
+                link_accept(media, '7450', work/(name+'-guest'), name == 'fd1-log')
             except CriterionFailure as error:
                 if name != 'ready-leak' or str(error) != 'product milestone READY':
                     raise
@@ -148,7 +148,7 @@ def main():
             else:
                 require(name != 'ready-leak', 'READY leak survived')
             if name == 'normal':
-                link_accept(elf, '7450', work/'pressure-guest', pressure=True)
+                link_accept(media, '7450', work/'pressure-guest', pressure=True)
     print(f'{len(hashes)} distinct fd1 images')
     return 0
 

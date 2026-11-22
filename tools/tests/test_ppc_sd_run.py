@@ -83,9 +83,12 @@ def main():
                  '<LinkSession>', 'exec'), scope)
     for session, expected in ((link.Session, True), (scope['LinkSession'], False)):
         obj = session.__new__(session)
-        obj.elf, obj.cpu = Path(__file__), '7450'
+        from boot_media import Media
+        obj.cpu = '7450'
         with tempfile.TemporaryDirectory() as folder:
             obj.out = Path(folder)
+            obj.media = Media(Path(__file__), Path(__file__), obj.out / 'boot.iso')
+            obj.media.iso.write_bytes(b'boot image')
             with patch.object(link.socket, 'socket') as sock, patch.object(link, 'UDP') as udp, \
                  patch.object(link, 'command'), patch.object(link.subprocess, 'Popen') as popen, \
                  patch.object(link, 'PumpQMP'):
@@ -94,6 +97,7 @@ def main():
                 obj.deadline = 0
                 obj.start()
                 args = popen.call_args.args[0]
+                assert args[args.index('-cdrom') + 1] == str(obj.media.iso)
                 assert ('-icount' in args) == expected
                 obj.err.close(); obj.frames.close()
     path, before, after = meter.LINK_NONCE

@@ -6,7 +6,7 @@ CHECK = dict(env=['ppc-cross', 'qemu-ppc'], name='ppc-sh-output', tier=2, budget
                      'platform/powermac/report_product.c', 'platform/powermac/kboot_console.c', 'platform/powermac/console_stream.c',
                      'fs/vfs_fd.c',
                      'build/ppc-user.mk', 'build/targets/ppc-powermac.mk',
-                     'tools/ppc/sb_run.py', 'tools/ppc/kboot_accept.py',
+                     'tools/ppc/sb_run.py', 'tools/ppc/kboot_accept.py', 'tools/ppc/boot_media.py',
                      'tools/ppc/kboot_run.py', 'tools/ppc/run.py',
                      'tools/ppc_lan_host.py', 'tools/mkroot_image.py',
                      'platform/powermac/cli_boot.c', 'arch/ppc/exec_context.c',

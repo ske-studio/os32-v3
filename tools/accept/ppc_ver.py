@@ -10,16 +10,16 @@ import zlib
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT / 'tools'), str(ROOT / 'tools/ppc')]
-from kboot_accept import build, mutant_settings
+from kboot_accept import build_media, mutant_settings
 from test_kapi_binding import generate
 from ppc_shm import guest_available
 
 
-def observe(elf, cpu, folder, case):
+def observe(media, cpu, folder, case):
     from link_sh_run import Session
     from usb_run import rsh_command
 
-    s = Session(elf, cpu, folder, 240)
+    s = Session(media, cpu, folder, 240)
     try:
         s.start()
         s.wait(s.ready, 'version probe READY', 60)
@@ -41,7 +41,7 @@ def observe(elf, cpu, folder, case):
                              '257 SER: ESCC baud=9600',
                              '257 GFX: OF-fb 800x600x8 bpp; (active|GUI target)',
                              r'258 API: v[1-9]\d*', '258 Build: .+', '258 Commit: .+'])
-            iso = (elf.parent / 'root.iso').read_bytes()
+            iso = (media.elf.parent / 'root.iso').read_bytes()
             size, crc = len(iso), zlib.crc32(iso)
             if case == 'ignore-crc':
                 expected.append(r'258 Root image CRC: 00000000 \(0 bytes\)')
@@ -98,15 +98,15 @@ def main():
                                        '    pm_ver_note_pvr(pvr);', '')
         elif case == 'absent':
             (generate(kernel, 'ver-absent') / 'stamp').touch()
-        elf = build(kernel, 'IMAGE=kboot-link-sh', 'KB_SH_OUT=' + str(user),
+        media = build_media(kernel, 'IMAGE=kboot-link-sh', 'KB_SH_OUT=' + str(user),
                     'KB_ROOT_BINS=' + bins, *settings, 'kb-user', 'kernel')
-        digest = hashlib.sha256(elf.read_bytes()).hexdigest()
+        digest = hashlib.sha256(media.elf.read_bytes()).hexdigest()
         assert digest not in seen, (case, digest)
         seen.add(digest)
-        print(f'{case} sha256={digest} {elf}', flush=True)
+        print(f'{case} sha256={digest} {media}', flush=True)
         if not args.build_only:
             for cpu in ('7450', '7455'):
-                observe(elf, cpu, folder / cpu, case)
+                observe(media, cpu, folder / cpu, case)
     print(f'{len(seen)} distinct version probe images')
     return 0
 
