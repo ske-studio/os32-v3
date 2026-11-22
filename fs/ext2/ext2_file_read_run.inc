@@ -21,12 +21,16 @@ static int ext2_read_inode_range(Ext2Ctx *ctx, const Ext2Inode *inode,
         /* 読込失敗は途中までのバイト数にせず、I/O エラーを返す (票 B8)。 */
         ret = ext2_bmap(ctx, inode, bi, &phys);
         if (ret != 0) return EXT2_ERR_IO;
-        if (phys == 0) break;
 
         to_copy = EXT2_BLOCK_SIZE - byte_in_blk;
         if (to_copy > remaining) to_copy = remaining;
 
-        if (byte_in_blk == 0 && to_copy == EXT2_BLOCK_SIZE) {
+        if (phys == 0) {
+            /* bmap also returns zero beyond the supported double-indirect range. */
+            if (bi >= EXT2_NDIR_BLOCKS + EXT2_ADDR_PER_BLOCK +
+                      EXT2_ADDR_PER_BLOCK * EXT2_ADDR_PER_BLOCK) break;
+            ext2_mem_zero(&dst[total_read], to_copy);
+        } else if (byte_in_blk == 0 && to_copy == EXT2_BLOCK_SIZE) {
             /* EOF, holes and partial blocks never enter a run. */
             while (blocks < remaining / EXT2_BLOCK_SIZE &&
                    blocks < EXT2_DATA_RUN_MAX_BLOCKS) {
