@@ -178,8 +178,7 @@ int main(void)
     CHECK(fep_store_open(&s, FEP_DICT_PATH_M, overlong) == 0);
     CHECK(!s.user_enabled && !s.user.path[0] && hits(&s, out) == 3);
     CHECK(fep_store_close(&s) == 0);
-    /* Full spelling dedup occurs before display truncation and never refills
-     * the merged 32-row limit after removing duplicates. */
+    /* Full spelling dedup occurs before display truncation. Duplicate rows leave room for later spellings. */
     db = 0;
     CHECK(setup_open(FEP_DICT_PATH_M, &db, SQLITE_OPEN_READWRITE, 0) == SQLITE_OK);
     sql(db, "DELETE FROM dict;"
@@ -201,14 +200,15 @@ int main(void)
     CHECK(setup_close(db) == SQLITE_OK);
     CHECK(fep_store_open(&s, FEP_DICT_PATH_M, FEP_USER_PATH) == 0);
     CHECK(fep_store_user_clear(&s) == 0);
-    CHECK(hits(&s, out) == 1 && !strcmp(out[0].kanji, "重"));
+    CHECK(hits(&s, out) == 2 && !strcmp(out[0].kanji, "重"));
     fep_store_learn(&s, "か", "重");
+    CHECK(hits(&s, out) == 2 && !strcmp(out[1].kanji, "外"));
     CHECK(fep_store_close(&s) == 0);
     /* Existing-user RO failure must preserve system conversion and data. */
     fixture_readonly = 1;
     CHECK(fep_store_open(&s, FEP_DICT_PATH_M, FEP_USER_PATH) == 0);
     CHECK(!s.user_enabled && fep_store_live_connections(&s) == 1);
-    CHECK(hits(&s, out) == 1);
+    CHECK(hits(&s, out) == 2);
     fep_store_learn(&s, "か", "書けない");
     CHECK(fep_store_user_list(&s, 0, entries, 4) < 0);
     CHECK(fep_store_close(&s) == 0);
@@ -222,7 +222,7 @@ int main(void)
     /* Missing user on RO media also leaves only system conversion. */
     CHECK(fixture_rm(FEP_USER_PATH) == 0);
     CHECK(fep_store_open(&s, FEP_DICT_PATH_M, FEP_USER_PATH) == 0);
-    CHECK(!s.user_enabled && fep_store_live_connections(&s) == 1 && hits(&s, out) == 1);
+    CHECK(!s.user_enabled && fep_store_live_connections(&s) == 1 && hits(&s, out) == 2);
     CHECK(fep_store_close(&s) == 0);
     fixture_readonly = 0;
     probe_error = OS32_ERR_INVAL;

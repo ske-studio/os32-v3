@@ -86,9 +86,16 @@ static const char SQL_PREFIX[] =
 
 static const char SQL_LEARN[] =
     "INSERT INTO dict_user (yomi, kanji, freq, last_ts) "
-    "VALUES (?1, ?2, 1, (SELECT COALESCE(MAX(last_ts),0)+1 FROM dict_user WHERE yomi=?1)) "
+    "SELECT ?1, ?2, 1, CASE WHEN MAX(last_ts)>=9223372036854775807 "
+    "THEN COUNT(*)+1 ELSE COALESCE(MAX(last_ts),0)+1 END FROM dict_user WHERE yomi=?1 "
+    /* At saturation, compact older ranks in the same atomic write. The
+     * number of earlier rows preserves ties and leaves the new rank highest. */
+    "UNION ALL SELECT ?1, u.kanji, 0, (SELECT COUNT(*) FROM dict_user AS older "
+    "WHERE older.yomi=?1 AND older.last_ts<u.last_ts) FROM dict_user AS u "
+    "WHERE (SELECT MAX(last_ts) FROM dict_user WHERE yomi=?1)>=9223372036854775807 "
+    "AND u.yomi=?1 AND u.kanji<>?2 "
     "ON CONFLICT(yomi, kanji) DO UPDATE SET "
-    "freq = freq + 1, last_ts = excluded.last_ts";
+    "freq = freq + excluded.freq, last_ts = excluded.last_ts";
 
 /* ======================================================================== */
 /*  公開API                                                                  */
@@ -693,18 +700,35 @@ int ime_user_clear(IME_Dict *dict)
 
 /* DICT_META stage I. The legacy entry points above remain until J/K bind
  * their facades to FepStore; they do not share handles or layout casts. */
+/* Seek past the last row of a full page. LIMIT bounds SQLite's sort heap
+ * even when a reading matches thousands of duplicate spellings. */
 static const char STORE_EXACT[] =
-    "SELECT kanji,pos_id,cost FROM dict WHERE yomi=?1 ORDER BY cost LIMIT 32";
+    "SELECT kanji,pos_id,cost,rowid FROM dict WHERE yomi=?1 AND kanji IS NOT NULL "
+    "AND (?2 IS NULL OR (COALESCE(cost,0),rowid) > "
+    "(SELECT COALESCE(cost,0),rowid FROM dict WHERE rowid=?2)) "
+    "ORDER BY COALESCE(cost,0),rowid LIMIT 32";
 static const char STORE_PREFIX[] =
-    "SELECT kanji,pos_id,CASE WHEN yomi=?1 THEN cost-500 ELSE cost END AS cost "
-    "FROM dict WHERE yomi>=?1 AND yomi<?1 || X'EFBFBF' ORDER BY cost LIMIT 32";
+    "SELECT kanji,pos_id,CASE WHEN yomi=?1 THEN cost-500 ELSE cost END AS score,rowid "
+    "FROM dict WHERE yomi>=?1 AND yomi<?1 || X'EFBFBF' AND kanji IS NOT NULL "
+    "AND (?2 IS NULL OR (COALESCE(score,0),rowid) > (SELECT "
+    "COALESCE(CASE WHEN yomi=?1 THEN cost-500 ELSE cost END,0),rowid FROM dict WHERE rowid=?2)) "
+    "ORDER BY COALESCE(score,0),rowid LIMIT 32";
+/* Complement turns descending integer timestamps into ascending seek keys. */
 static const char USER_EXACT[] =
-    "SELECT kanji,0,(-10000-freq) AS cost FROM dict_user WHERE yomi=?1 "
-    "ORDER BY last_ts DESC, cost LIMIT 32";
+    "SELECT kanji,0,-10000-freq,rowid,COALESCE(~last_ts,9223372036854775807) AS rank "
+    "FROM dict_user WHERE yomi=?1 AND kanji IS NOT NULL "
+    "AND (?2 IS NULL OR (rank,-COALESCE(freq,0),kanji,rowid) > "
+    "(SELECT COALESCE(~last_ts,9223372036854775807),-COALESCE(freq,0),kanji,rowid "
+    "FROM dict_user WHERE rowid=?2)) "
+    "ORDER BY rank,-COALESCE(freq,0),kanji,rowid LIMIT 32";
 static const char USER_PREFIX[] =
-    "SELECT kanji,0,(-10000-freq) AS cost FROM dict_user "
-    "WHERE yomi>=?1 AND yomi<?1 || X'EFBFBF' "
-    "ORDER BY CASE WHEN yomi=?1 THEN last_ts END DESC, cost LIMIT 32";
+    "SELECT kanji,0,-10000-freq,rowid,COALESCE(CASE WHEN yomi=?1 THEN ~last_ts END,"
+    "9223372036854775807) AS prefix_rank FROM dict_user "
+    "WHERE yomi>=?1 AND yomi<?1 || X'EFBFBF' AND kanji IS NOT NULL "
+    "AND (?2 IS NULL OR (prefix_rank,-COALESCE(freq,0),kanji,rowid) > "
+    "(SELECT COALESCE(CASE WHEN yomi=?1 THEN ~last_ts END,9223372036854775807),"
+    "-COALESCE(freq,0),kanji,rowid FROM dict_user WHERE rowid=?2)) "
+    "ORDER BY prefix_rank,-COALESCE(freq,0),kanji,rowid LIMIT 32";
 
 static int store_prepare(FepConn *c, int user)
 {
@@ -929,8 +953,9 @@ static int store_search_once(FepStore *s, const char *yomi, IME_Result *out,
     sqlite3_stmt *usr = use_user ? (prefix ? s->user.prefix : s->user.exact) : 0;
     sqlite3_stmt *cursors[] = { sys, usr };
     int state[] = { SQLITE_DONE, SQLITE_DONE };
+    int page_rows[2] = {0};
     char *full[IME_MAX_RESULTS] = {0};
-    int count = 0, taken = 0, len = (int)kstrlen(yomi);
+    int count = 0, len = (int)kstrlen(yomi);
     *failed = 0;
     for (int i = 0; i < 2; i++) {
         if (!cursors[i]) continue;
@@ -938,7 +963,7 @@ static int store_search_once(FepStore *s, const char *yomi, IME_Result *out,
         if (rc == SQLITE_OK) rc = sqlite3_bind_text(cursors[i], 1, yomi, len, SQLITE_STATIC);
         state[i] = rc == SQLITE_OK ? sqlite3_step(cursors[i]) : rc;
     }
-    while (taken < IME_MAX_RESULTS && count < max) {
+    while (count < max) {
         for (int i = 0; i < 2; i++)
             if (state[i] != SQLITE_ROW && state[i] != SQLITE_DONE)
                 *failed = is_ioerr(state[i]) ? i + 1 : (i ? 4 : 5);
@@ -946,7 +971,6 @@ static int store_search_once(FepStore *s, const char *yomi, IME_Result *out,
         int pick = state[1] == SQLITE_ROW;
         sqlite3_stmt *stmt = cursors[pick];
         const char *text = (const char *)sqlite3_column_text(stmt, 0);
-        taken++; /* LIMIT is applied before duplicate/null removal. */
         if (text) {
             int duplicate = 0;
             for (int i = 0; i < count; i++)
@@ -970,14 +994,26 @@ static int store_search_once(FepStore *s, const char *yomi, IME_Result *out,
                 count++;
             }
         }
-        /* Do not fetch row 33, but inspect every step we actually perform. */
-        if (taken < IME_MAX_RESULTS && count < max) state[pick] = sqlite3_step(stmt);
+        if (count == max) break;
+        if (++page_rows[pick] == IME_MAX_RESULTS) {
+            /* Decimal text preserves the full SQLite rowid across reset. */
+            char last[21];
+            const char *id = (const char *)sqlite3_column_text(stmt, 3);
+            if (!id) { *failed = 3; break; }
+            kstrncpy(last, id, sizeof(last));
+            int rc = sqlite3_reset(stmt);
+            if (rc == SQLITE_OK) rc = sqlite3_bind_text(stmt, 2, last, -1, SQLITE_TRANSIENT);
+            if (rc != SQLITE_OK) { state[pick] = rc; continue; }
+            page_rows[pick] = 0;
+        }
+        state[pick] = sqlite3_step(stmt);
     }
     for (int i = 0; i < IME_MAX_RESULTS; i++) if (full[i]) kfree(full[i]);
     for (int i = 0; i < 2; i++) {
         if (!cursors[i]) continue;
         int reset = sqlite3_reset(cursors[i]);
         int clear = sqlite3_bind_null(cursors[i], 1);
+        if (clear == SQLITE_OK) clear = sqlite3_bind_null(cursors[i], 2);
         if (reset != SQLITE_OK || clear != SQLITE_OK) {
             int rc = reset != SQLITE_OK ? reset : clear;
             *failed = is_ioerr(rc) ? i + 1 : (i ? 4 : 5);

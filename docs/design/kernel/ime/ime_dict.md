@@ -40,8 +40,8 @@
 
 - 読みが 3 文字以上なら前方一致、2 文字以下なら完全一致の文を使う。
 - 学習候補を先に採り、残りを system の cost 昇順で埋める。system の前方一致は完全一致の行だけ `cost-500` とする。
-- 学習候補は入力した読みと一致するものを優先し、同じ読みでは直近の確定順（`last_ts` 降順）、同順位なら頻度順とする。両方の検索に 32 行の上限がある。
-- 採った行の数 (重複・NULL を含む) が `IME_MAX_RESULTS` (32) か `max` に達したら打ち切る。重複は完全な表記で除き、除いた分は補充しない。
+- 学習候補は入力した読みと一致するものを優先し、同じ読みでは直近の確定順（`last_ts` 降順）、同順位なら頻度降順、頻度も同じなら表記昇順とする。
+- NULL と完全な表記の重複を除き、候補が `max` 件（最大 32 件）に達するか、両方の検索が尽きたら打ち切る。ソート用メモリを抑えるため、各カーソルは 32 行ずつ取得し、空きがあれば直前の行の順位と rowid を使って次のページに進む。
 - 結果の欄に収まらない長い表記は、重複の比較のために全体を `kzalloc` で写す。SQLite の TEXT のポインタは次の step・reset で失効するので持ち越さない。
 - 非短縮の罰則: cost が非負で、表記の byte 長が読み以上なら `IME_NONSHORTENING_COST_PENALTY` (300) を足す。
 - 学習側が途中で失敗したら、合成の結果を全部捨て、system だけで検索し直す。system の I/O 失敗は system を回復してから 1 回やり直す。
@@ -55,8 +55,8 @@
 
 ## 学習と学習 DB の管理
 
-- `fep_store_learn`: `INSERT … ON CONFLICT(yomi,kanji) DO UPDATE SET freq=freq+1, last_ts=excluded.last_ts`。確定時に同じ読みの最大の `last_ts` に 1 を足し、確定順として保存する。学習が止まっていれば何もしない。
-- `fep_store_user_list`・`_delete`・`_export`・`_clear` (KAPI `ime_user_*`) は学習接続だけに送る。確定時に同じ読みの最大の `last_ts` に 1 を足し、確定順として保存する。学習が止まっていれば -1。
+- `fep_store_learn`: `INSERT … ON CONFLICT(yomi,kanji) DO UPDATE SET freq=freq+excluded.freq, last_ts=excluded.last_ts`。確定時に同じ読みの最大の `last_ts` に 1 を足し、確定順として保存する。64 ビット整数の上限に達した場合は、同じ読みの順位を同じ書き込みで詰め直す。学習が止まっていれば何もしない。
+- `fep_store_user_list`・`_delete`・`_export`・`_clear` (KAPI `ime_user_*`) は学習接続だけに送る。学習が止まっていれば -1。
 - KAPI の入口 (`ime_dict_api.inc`) は呼び手の番地を検査し、結果を内部の staging に置いてから写す (`copy_to_caller`)。
 
 ## 停止と再開 (`ime_dict_suspend`、KAPI、`hsync --fep-off`)
