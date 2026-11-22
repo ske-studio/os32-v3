@@ -119,7 +119,7 @@ def main():
         elif case == 'absent':
             from test_kapi_binding import generate
             kernel.mkdir()
-            (generate(kernel, 'kcg-absent') / 'stamp').touch()
+            (generate(kernel, 'kcg-absent', ide=True, fep=True) / 'mutant.stamp').touch()
         media = build_media(kernel, *options, *mutation, 'kb-user', 'kernel')
         digest = hashlib.sha256(media.elf.read_bytes()).hexdigest()
         if digest in images:

@@ -28,8 +28,8 @@ def image(folder, case):
                                     'fbcon_scroll_n(c, rows, 2);')
     if case == 'putchar-absent':
         kernel.mkdir()
-        gen = generate(kernel, case)
-        (gen / 'stamp').touch()
+        gen = generate(kernel, case, ide=True, fep=True)
+        (gen / 'mutant.stamp').touch()
     return build_media(kernel, *settings)
 
 

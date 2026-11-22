@@ -38,9 +38,10 @@ def absent_bindings(folder, out):
     launcher = ('import runpy, sys; import kapi_target_ppc; '
                 'sys.path.insert(0, "sdk"); runpy.run_path(sys.argv.pop(1), run_name="__main__")')
     subprocess.run([sys.executable, '-B', '-c', launcher, str(generator),
-                    '--target', 'ppc-powermac', '--out-dir', str(out)],
+                    '--target', 'ppc-powermac', '--feature-link', '1', '--feature-ide', '1',
+                    '--feature-fep', '1', '--out-dir', str(out)],
                    cwd=ROOT, env=env, check=True)
-    (out / 'stamp').touch()
+    (out / 'mutant.stamp').touch()
 
 
 def observe(media, cpu, evidence, case):

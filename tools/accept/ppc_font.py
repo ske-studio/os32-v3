@@ -97,8 +97,8 @@ def main():
                 'if (offset >= f->size || len > f->size - offset) return VFS_ERR_INVAL;')
         elif case == 'font-absent':
             kernel.mkdir()
-            gen = generate(kernel, case)
-            (gen / 'stamp').touch()
+            gen = generate(kernel, case, ide=True, fep=True)
+            (gen / 'mutant.stamp').touch()
         media = build_media(kernel, *options, *mutation, 'kb-user', 'kernel')
         digest = hashlib.sha256(media.elf.read_bytes()).hexdigest()
         if digest in images:

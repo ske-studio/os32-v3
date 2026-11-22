@@ -117,8 +117,8 @@ def main():
         elif case == 'absent':
             from test_kapi_binding import generate
             kernel.mkdir()
-            generate(folder, 'pci-absent').rename(kernel / 'gen')
-            (kernel / 'gen/stamp').touch()
+            generate(folder, 'pci-absent', ide=True, fep=True).rename(kernel / 'gen')
+            (kernel / 'gen/mutant.stamp').touch()
         media = build_media(kernel, *options, *mutation, 'kb-user', 'kernel')
         digest = hashlib.sha256(media.elf.read_bytes()).hexdigest()
         if digest in images:

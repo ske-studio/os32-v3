@@ -85,7 +85,7 @@ def main():
                                        '*out_total = s->total_lba;', '*out_total = s->total_lba + 1;')
         elif case == 'loop-absent':
             kernel.mkdir()
-            (generate(kernel, case) / 'stamp').touch()
+            (generate(kernel, case, ide=True, fep=True) / 'mutant.stamp').touch()
         elif disabled:
             # Keep the product shell and select the absent provider in this control only.
             profile = folder / 'loop-disabled.mk'

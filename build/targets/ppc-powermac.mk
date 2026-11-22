@@ -221,10 +221,16 @@ $(KB_OUT)/memmap_layout.h: include/memmap.h tools/gen_memmap.py
 ifneq ($(KB_EXEC),)
 BUILD_ID_SRC := $(KB_OUT)/build_id.c
 include build/build-id.mk
+# Acceptance fixtures supply a complete generated binding tree.
+ifneq ($(wildcard $(KB_GEN)/mutant.stamp),)
+$(KB_GEN)/stamp: $(KB_GEN)/mutant.stamp
+	@touch $@
+else
 $(KB_GEN)/stamp: $(KB_OUT)/config/source-date.flags build/images/$(IMAGE).mk sdk/kapi.json sdk/gen_kapi.py sdk/kapi_abi_x86.py sdk/kapi_target_ppc.py sdk/target_profile.py
 	@mkdir -p $(KB_GEN)
 	python3 -B sdk/gen_kapi.py --target ppc-powermac --feature-link $(FEATURE_LINK) --feature-ide $(FEATURE_IDE) --feature-fep $(FEATURE_FEP) --out-dir $(KB_GEN)
 	@touch $@
+endif
 $(KB_OBJ): $(KB_GEN)/stamp
 $(KB_OUT)/build_id.o: $(BUILD_ID_SRC)
 	@mkdir -p $(dir $@)

@@ -92,7 +92,7 @@ def main():
     args = parser.parse_args()
     cross = Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc'))
     if not (cross / 'bin/powerpc-elf-gcc').is_file() or not all(
-            shutil.which(tool) for tool in ('isoinfo', 'genisoimage', 'mke2fs')) or (
+            shutil.which(tool) for tool in ('isoinfo', 'genisoimage', 'mke2fs', 'debugfs')) or (
             not args.build_only and (not ROM.is_file() or not shutil.which('qemu-system-ppc'))):
         print('SKIP: PowerPC toolchain or HDD acceptance tools unavailable')
         return 3
@@ -151,7 +151,9 @@ def main():
             trial = out / dictionary
             trial.mkdir()
             ram = dictionary == 'ram'
-            media = None if ram else disk(trial, 'root', lambda d: install(d, out / 'root.iso', dictionary))
+            media = None if ram else disk(
+                trial, 'root', lambda d: install(d, out / 'root.iso', dictionary),
+                dense_files=('/boot/fep.mod',))
             if args.build_only:
                 continue
             keys = dictionary in ('dictionary', 'missing') and name != 'close-failure'
@@ -165,7 +167,9 @@ def main():
                 attempted = any(line.startswith('[fep] static rc=') for line in lines)
                 assert attempted == (name == 'allow-ram'), lines
             if name != 'allow-ram':
-                assert ready == (dictionary == 'dictionary' and name != 'close-failure'), report
+                assert ready == (dictionary == 'dictionary' and name != 'close-failure'), (
+                    name, dictionary, [line for line in lines if line.startswith(
+                        ('HDD root', 'KBOOT ROOT', '[unicode]', '[services]', '[fep]', '[IME]', 'FEP-TEST'))])
             if keys:
                 observed = next(line for line in lines if line.startswith('FEP-TEST line='))
                 expected = 'かな' if ready and name != 'raw-shell' else 'kana'

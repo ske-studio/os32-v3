@@ -17,7 +17,7 @@ VIEW = 'platform/powermac/partition_view.c'
 KERNEL = 'platform/powermac/ppc_kernel.c'
 
 
-def disk(work, name, populate=None):
+def disk(work, name, populate=None, *, dense_files=()):
     directory = work / name
     directory.mkdir()
     (directory / 'identity').write_text(name)
@@ -26,6 +26,17 @@ def disk(work, name, populate=None):
     fs = work / (name + '.ext2')
     subprocess.run(['mke2fs', '-q', '-t', 'ext2', '-F', '-b', '1024', '-I', '128',
                     '-O', 'none', '-d', directory, fs, str(LENGTH // 2)], check=True)
+    # mke2fs -d skips all-zero blocks. OS32's ext2 reader stops at a hole.
+    for path in dense_files:
+        contents = (directory / path.lstrip('/')).read_bytes()
+        last = (len(contents) - 1) // 1024
+        subprocess.run(['debugfs', '-w', '-R', f'fallocate {path} 0 {last}', fs], check=True)
+        for offset in range(0, len(contents), 1024):
+            if not any(contents[offset:offset + 1024]):
+                block = subprocess.check_output(
+                    ['debugfs', '-R', f'bmap {path} {offset // 1024}', fs])
+                assert int(block) > 0, (path, offset)
+        assert subprocess.check_output(['debugfs', '-R', f'cat {path}', fs]) == contents, path
     raw = bytearray([0xa5]) * ((START + LENGTH + 1) * 512)
     struct.pack_into('>HHI', raw, 0, 0x4552, 512, len(raw) // 512)
     for i, (start, size, kind) in enumerate(((1, 8, 'Apple_partition_map'),

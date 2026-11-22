@@ -117,7 +117,7 @@ def main():
             assert source.count(anchor) == 1
             meter.write_text(source.replace(anchor, '(void)owner;'))
         elif case == 'absent':
-            (generate(kernel, link=False) / 'stamp').touch()
+            (generate(kernel, link=False, ide=True, fep=True) / 'mutant.stamp').touch()
         media = build_media(kernel, 'IMAGE=kboot-link-sh', 'KB_SH_OUT=' + str(user),
                     'KB_ROOT_BINS=' + bins, *settings, 'kb-user', 'kernel')
         digest = hashlib.sha256(media.elf.read_bytes()).hexdigest()

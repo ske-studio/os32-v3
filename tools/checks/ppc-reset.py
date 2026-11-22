@@ -64,8 +64,8 @@ def run_cases(mutate, build_only=False):
                 # Use the normal generator with the existing private SDK copy.
                 kernel = folder/'kernel'
                 kernel.mkdir()
-                gen = generate(kernel, mutation)
-                (gen/'stamp').touch()
+                gen = generate(kernel, mutation, ide=True, fep=True)
+                (gen/'mutant.stamp').touch()
                 settings = []
             else:
                 settings = mutant_settings(folder, mutation, 'drivers/macintosh/via.c',

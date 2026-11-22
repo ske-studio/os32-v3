@@ -97,7 +97,7 @@ def main():
             settings = mutant_settings(folder, case, 'platform/powermac/kernel_boot.c',
                                        '    pm_ver_note_pvr(pvr);', '')
         elif case == 'absent':
-            (generate(kernel, 'ver-absent') / 'stamp').touch()
+            (generate(kernel, 'ver-absent', ide=True, fep=True) / 'mutant.stamp').touch()
         media = build_media(kernel, 'IMAGE=kboot-link-sh', 'KB_SH_OUT=' + str(user),
                     'KB_ROOT_BINS=' + bins, *settings, 'kb-user', 'kernel')
         digest = hashlib.sha256(media.elf.read_bytes()).hexdigest()

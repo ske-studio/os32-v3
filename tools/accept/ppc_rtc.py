@@ -109,8 +109,8 @@ def main():
                                        'PMU_READ_RTC = 0x03, CUDA_GET_TIME = 0x38')
         elif case == 'rtc-absent':
             kernel.mkdir()
-            gen = generate(kernel, case)
-            (gen / 'stamp').touch()
+            gen = generate(kernel, case, ide=True, fep=True)
+            (gen / 'mutant.stamp').touch()
         media = build_media(kernel, *options, *settings, 'kb-user', 'kernel')
         digest = hashlib.sha256(media.elf.read_bytes()).hexdigest()
         if digest in digests:
