@@ -52,6 +52,7 @@
 #define IDE_CMD_READ_MULTIPLE  0xC4
 #define IDE_CMD_WRITE_MULTIPLE 0xC5
 #define IDE_CMD_SET_MULTIPLE   0xC6
+#define IDE_CMD_FLUSH_CACHE 0xE7
 #define IDE_CMD_IDENTIFY   0xEC   /* IDENTIFY DEVICE */
 
 #define IDE_TIMEOUT_LOOP   1000000 /* BSY/DRQ待ちループカウント (長い) */
@@ -98,5 +99,11 @@ int ide_read_sectors(int drive, u32 lba, u32 count, void *buf);
 
 /* そのドライブのセクタ指定の方式 (IDE_AMODE_*、drivers/ata/ide_addr.h)。 */
 int ide_addr_mode_of(int drive);
+
+int ide_install_identify(u32 unit, IdeInfo *info, char serial[IDE_SERIAL_LEN]);
+int ide_install_read(u32 unit, u32 lba, void *sector);
+int ide_install_read_many(u32 unit, u32 lba, u32 count, void *sectors);
+int ide_install_write(u32 unit, u32 lba, const void *sector);
+int ide_install_flush(u32 unit);
 
 #endif /* IDE_H */

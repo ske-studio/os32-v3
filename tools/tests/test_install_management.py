@@ -13,6 +13,10 @@ CHECK = dict(name='install-management-host', tier=1, needs=[], budget=4,
     basis=['docs/decisions/ppc/PPC_ROOT_MOUNT_ALIGN_X86_DESIGN.md §5–6'])
 
 MUTATIONS = [
+    ('r->owner != res_owner_get() || start !=', '0 || start !='),
+    ('|| start != r->plan.root_ext2.start_lba', '|| 0'),
+    ('length != r->plan.root_ext2.sectors ||', '0 ||'),
+    ('struct reservation *r = &units[unit];\n    unsigned flags = irq_save();\n    if (platform_install_medium()', 'struct reservation *r = &units[0];\n    unsigned flags = irq_save();\n    if (platform_install_medium()'),
     ('if (platform_install_medium() || r->state != AVAILABLE) {',
      'if (r->state != AVAILABLE) {'),
     ('if (install_transfer_allowed(a, 0, 0)) return 0;', 'if (a) return 0;'),

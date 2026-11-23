@@ -251,3 +251,23 @@ qemu-system-ppc -M mac99 \
 - DBDMA と PCI IDE バスマスタでは記述子・終了状態が異なる。count 上限と [HW2](../CONSTRAINTS.md#hw2-dma-の-64kb-境界) の境界制約は別に効く。
 - ATA status、DBDMA ACTIVE/DEAD、MPIC の IRQ source はそれぞれ異なる情報を持つ。
 - [PPC KAPI 補完計画](../decisions/ppc/PPC_KAPI_FILL_DESIGN.md)の ide 行と段 8 は、実 ATA 媒体の識別と sector 範囲・書込み権限を共通窓口の条件とする。
+
+## 導入媒体からの HD 整形
+
+IDE 構成の常駐 CUI は `hdprep` を登録し、ISO は `/sbin/install.bin` と
+`/sbin/cdinst.bin` を収録する。三入口とも通常の exec の呼出元認可を使う。
+`hdprep` の空ディスク計画は IDENTIFY に応答する HDD が一台のときに作る。
+APM 用に LBA 1 から 63 sector、次に起動 HFS 用に 8 MiB を予約し、その後に
+指定サイズと空き容量に収まる ext2 を置く。
+
+カーネルは確認後に元表と媒体識別を再読し、予約世代・owner・raw unit・ext2
+の開始と全長が揃った要求だけを formatter に渡す。既存 APM の場合は変更する
+entry を保存し、rescan と完了時に保存区画を含む表全体を検読する。公開前の
+hd0 は予約 owner だけが使える。世代ごとの Device 記述子は再利用せず、
+古いポインタへの I/O を失効扱いにする。
+
+書戻しには ATA FLUSH CACHE (E7h) を使う。IDENTIFY の論理 sector が 512
+バイトを超える装置は固定長 PIO の対象から外す。
+[Seagate SV35 Series Product Manual](https://www.seagate.com/support/disc/manuals/ata/100415205a.pdf)
+・[FreeBSD ata_all.c](https://github.com/freebsd/freebsd-src/blob/main/sys/cam/ata/ata_all.c)
+・[FreeBSD ata_da.c](https://github.com/freebsd/freebsd-src/blob/main/sys/cam/ata/ata_da.c)

@@ -27,6 +27,7 @@ ROOT_BLOB :=
 ROOT_ISO_FLAGS := --fixed-dates
 ROOT_MOTD := $(KB_OUT)/motd.txt
 ROOT_BINS = $(KB_ROOT_BINS)
+KB_INSTALLERS := $(if $(filter 1,$(FEATURE_IDE)),$(addprefix $(KB_SH_OUT)/,install.bin cdinst.bin))
 KB_ROOT_SHELL = $(KB_SH_OUT)/shell.bin
 ROOT_OBJCOPY := $(KB_OBJCOPY)
 ROOT_ELF_FORMAT := elf32-powerpc
@@ -39,11 +40,11 @@ PPC_SYSTEM_CFG ?=
 # Acceptance builds use a private resident binary (including source mutants).
 KB_ROOT_FEP := $(if $(KB_EXEC),$(KB_OUT)/fep/fep.mod)
 KB_ROOT_TEMPLATE := $(ROOT_MANIFEST)
-ifneq ($(filter-out build/out/ppc-user/link-sh,$(KB_SH_OUT))$(KB_ROOT_DIAG)$(KB_ROOT_FEP)$(PPC_SYSTEM_CFG),)
+ifneq ($(filter-out build/out/ppc-user/link-sh,$(KB_SH_OUT))$(KB_ROOT_DIAG)$(KB_ROOT_FEP)$(KB_INSTALLERS)$(PPC_SYSTEM_CFG),)
 override ROOT_MANIFEST := $(KB_OUT)/root-manifest.json
-$(ROOT_MANIFEST): $(KB_ROOT_TEMPLATE) $(PPC_SYSTEM_CFG) $(KB_ROOT_SHELL) $(KB_ROOT_DIAG) $(KB_ROOT_FEP) $(KB_OUT)/root-shell.config build/targets/ppc-powermac.mk
+$(ROOT_MANIFEST): $(KB_ROOT_TEMPLATE) $(PPC_SYSTEM_CFG) $(KB_ROOT_SHELL) $(KB_INSTALLERS) $(KB_ROOT_DIAG) $(KB_ROOT_FEP) $(KB_OUT)/root-shell.config build/targets/ppc-powermac.mk
 	@mkdir -p $(@D)
-	python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); d["/sys/shell.bin"]=sys.argv[2]; d.update({"/boot/kdebug.bin":sys.argv[3]} if sys.argv[3] else {}); d.update({"/etc/system.cfg":sys.argv[4]} if sys.argv[4] else {}); d.update({"/boot/fep.mod":sys.argv[5]} if sys.argv[5] else {}); print(json.dumps(d))' "$<" "$(KB_ROOT_SHELL)" "$(KB_ROOT_DIAG)" "$(PPC_SYSTEM_CFG)" "$(KB_ROOT_FEP)" > $@.tmp
+	python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); d["/sys/shell.bin"]=sys.argv[2]; d.update({"/boot/kdebug.bin":sys.argv[3]} if sys.argv[3] else {}); d.update({"/etc/system.cfg":sys.argv[4]} if sys.argv[4] else {}); d.update({"/boot/fep.mod":sys.argv[5]} if sys.argv[5] else {}); d.update({"/sbin/"+p.rsplit("/",1)[-1]:p for p in sys.argv[6:]}); print(json.dumps(d))' "$<" "$(KB_ROOT_SHELL)" "$(KB_ROOT_DIAG)" "$(PPC_SYSTEM_CFG)" "$(KB_ROOT_FEP)" $(KB_INSTALLERS) > $@.tmp
 	mv $@.tmp $@
 endif
 
@@ -351,10 +352,10 @@ include build/ppc-user.mk
 # 替えて同じ Makefile を呼ぶ (呼ばれた側は置き場が一致するので、そのまま組む)。
 .PHONY: kb-user
 ifeq ($(KB_SH_OUT),$(PPC_USER_OUT))
-kb-user: $(ROOT_BINS) $(KB_ROOT_SHELL)
+kb-user: $(ROOT_BINS) $(KB_ROOT_SHELL) $(KB_INSTALLERS)
 else
 kb-user:
-	$(MAKE) ARCH=ppc PLATFORM=powermac PPC_USER_OUT=$(KB_SH_OUT) $(ROOT_BINS) $(KB_ROOT_SHELL)
+	$(MAKE) ARCH=ppc PLATFORM=powermac IMAGE=$(IMAGE) PPC_USER_OUT=$(KB_SH_OUT) $(ROOT_BINS) $(KB_ROOT_SHELL) $(KB_INSTALLERS)
 
-$(ROOT_BINS) $(KB_ROOT_SHELL): kb-user
+$(ROOT_BINS) $(KB_ROOT_SHELL) $(KB_INSTALLERS): kb-user
 endif

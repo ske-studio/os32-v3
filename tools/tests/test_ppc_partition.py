@@ -15,10 +15,10 @@ cases = [('normal', view, None, None, 0)]
 if '--mutate' in sys.argv:
     cases += [('start', view, 'first + offset', 'offset', 5),
               ('last', view, 'count > dev->total_sects - offset', 'count >= dev->total_sects - offset', 6),
-              ('early-write', view, '!writable || dev != &view', 'dev != &view', 12),
-              ('write-then-error', view, 'if (!writable || dev != &view)',
+              ('early-write', view, '!writable || dev != current', 'dev != current', 12),
+              ('write-then-error', view, 'if (!writable || dev != current)',
                'if (!writable) ide_write_sectors(dev->bus_id, first + offset, count, buf);\n'
-               '    if (!writable || dev != &view)', 13),
+               '    if (!writable || dev != current)', 13),
               ('capacity', superblock, 'if (ctx->sb_info.total_blocks > ctx->part_len',
                'if (0 && ctx->sb_info.total_blocks > ctx->part_len', 14),
               ('read-error-reset', block_io,
@@ -31,6 +31,9 @@ if '--mutate' in sys.argv:
               ('type', apm, 'i + 1 == number && kstrncmp', '0 && kstrncmp', 11),
               ('magic', apm, 'return EXT2_ERR_MAGIC;', 'block[0] = 0;', 10)]
 with tempfile.TemporaryDirectory() as tmp:
+    # This fixture exercises boot-time views before installation begins.
+    (Path(tmp) / 'platform_install_management.h').write_text(
+        '#include "install_medium.h"\n#define platform_install_medium() ((const struct install_medium *)0)\n')
     for name, target, old, new, expected in cases:
         source = target.read_text()
         if old:
@@ -50,7 +53,7 @@ with tempfile.TemporaryDirectory() as tmp:
             sources[sources.index(target)] = path
         exe = Path(tmp) / 'host'
         subprocess.run(['cc', '-m32', '-nostdinc', '-nostdlib', '-static', '-ffreestanding', '-fno-pie', '-ffunction-sections', '-fdata-sections',
-                        '-Wl,--gc-sections', '-DOS32_FEATURE_IDE=1', '-Ifs/ext2', '-D__cdecl=', '-I.', '-Iinclude', '-Iplatform/powermac',
+                        '-Wl,--gc-sections', '-DOS32_FEATURE_IDE=1', '-Ifs/ext2', '-D__cdecl=', '-I.', '-I'+tmp, '-Imm', '-Iinclude', '-Iplatform/powermac',
                         '-Ikernel/dev', '-Ilib', '-Isdk/include/os32', '-Iarch/ppc',
                         'tools/tests/ppc_partition_host.c', *sources, 'platform/powermac/root_boot.c',
                         'lib/kstring_c.c', '-o', exe], cwd=root, check=True)

@@ -715,6 +715,7 @@
     "ppc-fp-guest": 401.2445305,
     "ppc-gfx2-guest": 214.61230849999998,
     "ppc-hdd-root-guest": 150,
+    "ppc-install-guest": 500,
     "ppc-in2-cui": 300,
     "ppc-kapi-v89-guest": 220.0083325,
     "ppc-kboot-console": 4.7306435,

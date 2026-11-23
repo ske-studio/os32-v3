@@ -325,7 +325,13 @@ int main(int argc, char **argv)
     assert(install_end(h, OS32_INSTALL_END_ABORT) < 0);
     owner--;
     assert(!memcmp(saved, disk, sizeof(disk)));
+    owner++;
+    assert(install_format_begin(&format, 0, 8, 8) < 0);
+    owner--;
+    assert(install_format_begin(&format, 1, 8, 8) < 0);
+    assert(install_format_begin(&format, 0, 9, 8) < 0);
     assert(install_format_begin(&format, 0, 8, 7) < 0);
+    assert(!memcmp(saved, disk, sizeof(disk)));
     assert(!install_format_begin(&format, 0, 8, 8));
     assert(install_admit(&a, 0, INSTALL_WRITE, 15, 1, sector) < 0);
     authorized = 0;

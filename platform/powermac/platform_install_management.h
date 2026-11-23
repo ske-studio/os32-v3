@@ -3,7 +3,10 @@
 
 #include "install_medium.h"
 
-/* No V1 installation provider for this machine yet. */
+#if OS32_FEATURE_IDE
+const struct install_medium *platform_install_medium(void);
+#else
 #define platform_install_medium() ((const struct install_medium *)0)
+#endif
 
 #endif

@@ -179,9 +179,15 @@ static int cmd_hdprep(int argc, char **argv)
     /* ---- 8. 通常のマウントで確認 ---- */
     if (hp_verify_mount() != 0) return SH_STATUS_ERROR;
 
+#ifdef PLATFORM_HDPREP_FINISH
+    if (PLATFORM_HDPREP_FINISH(g_api, 1)) return SH_STATUS_ERROR;
+    g_api->kprintf(ATTR_GREEN, "hdprep: verified ext2 at LBA %u (%u sectors)\n",
+                   p.start, p.len);
+#else
     g_api->kprintf(ATTR_GREEN,
                    "hdprep: done. /hd0 = ext2 at LBA %u (%u sectors). "
                    "It is mounted at boot from now on.\n", p.start, p.len);
+#endif
     return SH_STATUS_OK;
 }
 

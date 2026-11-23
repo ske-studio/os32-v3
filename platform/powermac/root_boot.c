@@ -44,6 +44,9 @@ int pm_root_boot(const struct boot_root_image *image, int *registered)
 #endif
     {
         rc = boot_root_fs_init();
+#if OS32_FEATURE_IDE
+        if (!rc) rc = ext2_init();
+#endif
         if (!rc) rc = boot_root_start_registered(image, registered);
     }
     if (rc) return rc;
