@@ -1,3 +1,6 @@
+#if PM_PRODUCT_BOOT
+#include "product_boot.h"
+#endif
 #include "apm.h"
 #include "platform_ext2.h"
 #include "drivers/ata/ide.h"
@@ -41,6 +44,10 @@ int pm_partition_register(int unit, u32 capacity, u32 number)
     struct pm_partition part;
     int rc = pm_apm_root(unit, capacity, number, &part);
     if (rc) return rc;
+#if PM_PRODUCT_BOOT
+    if (number != pm_expected_plan.root_partition || part.start != pm_expected_plan.root_start ||
+        part.sectors != pm_expected_plan.root_sectors) return EXT2_ERR_INVAL;
+#endif
     first = part.start;
     view.bus_id = unit;
     view.total_sects = part.sectors;

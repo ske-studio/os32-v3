@@ -1,3 +1,6 @@
+#if PM_PRODUCT_BOOT
+#include "product_boot.h"
+#endif
 /* Apple Developer Note and BSD controller IDs/registers: docs/ppc/ata.md §§1–3. */
 #include "ofw.h"
 #include "kboot_info.h"
@@ -72,8 +75,22 @@ static int root_controller, root_target;
 static void capture_root(void)
 {
     char args[PM_KBOOT_PROP_BYTES + 1];
+#if PM_PRODUCT_BOOT
+    const char *path = pm_product_handoff.path;
+    unsigned len = kstrlen(path);
+    if (len + 15 >= sizeof(args)) { pm_root_unit = -2; return; }
+    kstrcpy(args, "os32-root=");
+    kstrcpy(args + 10, path);
+    int n = 10 + len;
+    args[n++] = ':';
+    unsigned number = pm_product_handoff.plan.root_partition;
+    if (number >= 100) args[n++] = '0' + number / 100;
+    if (number >= 10) args[n++] = '0' + number / 10 % 10;
+    args[n++] = '0' + number % 10;
+#else
     int chosen = ofw_finddevice("/chosen");
     int n = ofw_getprop(chosen, "bootargs", args, sizeof(args) - 1);
+#endif
     if (n <= 0) return;
     if (n >= (int)sizeof(args) - 1) {
         pm_root_unit = -2;

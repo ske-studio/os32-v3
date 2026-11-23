@@ -182,12 +182,13 @@ $(KB_OBJ) $(KB_ELF): $(KB_SELECT_MK)
 all: kernel
 BOOT_ISO := $(KB_OUT)/boot.iso
 ifeq ($(IMAGE),powermac)
+include build/ppc-install-boot.mk
 all: iso
 endif
 .PHONY: iso deploy-iso
 iso: audit $(BOOT_ISO)
 $(BOOT_ISO): $(KB_ELF) tools/ppc/boot_media.py build/targets/ppc-powermac.mk | audit
-	python3 -B tools/ppc/boot_media.py "$<" "$@"
+	python3 -B tools/ppc/boot_media.py "$(KB_ELF)" "$@" $(HD_MEDIA_ARGS)
 deploy-iso: iso
 	@test -n "$(ISO_DEST)" && test ! -d "$(ISO_DEST)"
 	@set -e; tmp=$$(mktemp "$(ISO_DEST).XXXXXX"); trap 'rm -f "$$tmp"' EXIT; cp "$(BOOT_ISO)" "$$tmp"; mv -f "$$tmp" "$(ISO_DEST)"
