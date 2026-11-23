@@ -23,7 +23,7 @@
 |1|platform/powermac/platform_hwb.h:6 の POINT は常に 0、同 :11 の check と :19–28 の phys/block は NOSYS|印と不変表の slot につなぐ。I/O の NOSYS は仕様通り。|
 |2|platform/powermac/platform_hwb_addr.h:4 は絶対番地のみ成功。kdebug/hwb_wire.h:23 に 8 はあるが 7 がない|PPC の 7 のみ追加。絶対番地の sentinel を維持。|
 |3|build/targets/ppc-powermac.mk:347 のリンクは diag.o と kstring_c.o。module_diag.c:10 は LIST 入口、kdebug_imports.h:4 は一枠|PPC モジュールに共通検証器と型付き輸入を組む。|
-|4|sdk/kapi_target_ppc.py:7 は kdebug_call の宣言。build/select.mk:166 は HWDEV の選択条件、:176–184 が選択先で、hwb_access のオブジェクト列ではない|配送は module_diag、リンクは PPC の所有者に置く。公開 SDK は既存のまま使う。|
+|4|sdk/kapi_target_ppc.py:7 は kdebug_call の宣言。build/select.mk の HWDEV の選択条件の後に FEATURE_KDEBUG の分岐 (kdebug の選択先) があり、そこは hwb_access のオブジェクト列ではない|配送は module_diag、リンクは PPC の所有者に置く。公開 SDK は既存のまま使う。|
 |5|platform/powermac/pci_config.c:35,52 は target_bdf と dword に限定。usb_platform.c:125 の byte write は dword RMW、platform_hwb_pci.h:4–19 は NOSYS|橋を共有し、実幅を取引の引数にする。|
 |6|platform/powermac/kboot_capture.c:157 の tree は選択した装置を保存|全 PCI 部分木を OF の利用中に捕捉する。|
 |7|arch/ppc/kernel_trap.c:60,92 は一命令・一 DAR。連続 store の各要素に対応する枠がない|既存の単発枠を拡張し、範囲と方向を照合。|
