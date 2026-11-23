@@ -11,6 +11,7 @@
 |---|---|
 | 手本は他の OS で動いた実績のある正解として、手順・順序・状態の持ち方をそのまま移す。BSD/MIT の著作権表示を残し、メーカー資料と手本の file:line を設計に挙げる。 | [CONSTRAINTS の HW3](CONSTRAINTS.md#hw3-新しいハードウェアの実装はライセンス上参照しやすい既存の実装資料を参照してから設計する)。GPL のコード・構造は写さない。 |
 | 手本に無い状態・手順・検査を足さない。不具合は調べの版より先に手本と 1 手順ずつ比べ、外れた所を直す。 | Trident の全域 VERIFY は実物 2MiB の後ろを壊し、2 回目の初期化で白い矩形になった。 |
+| **装置のレジスタの実物は、ドライバに記録を足した調べの版を作る前に、HW-BASIC の台本で読む** (`hw run <台本>.hwb`、実機では `sfs run hw run -o /host/logs/<名> …`。設計 [HW_BASIC_DESIGN](decisions/realhw/HW_BASIC_DESIGN.md)、手本 `userland/tests/hw/hpt370_probe.hwb`)。PCI の構成空間・BAR・MMIO・ポートの状態を直に読み、手本と仕様の手順と照らしてから、ドライバを書く・直す。台本の頭に出典 (メーカー資料・仕様・BSD/MIT の file:関数) を書く。本線・PowerPC の両方の開発で守る (ユーザー指示 2026-11-23「PCIデバイス開発時に使う様にドキュメント化してなかったか」「PowerPC 側の開発陣にもこれを守らせるように」)。 | PC-98 の USB (OHCI) でマウスが見えない件を、HW-BASIC を使わず調べの版の入れ直しで 4 回追った (2026-11-23)。原因はポートごとの給電 (RhDescriptorA の PSM=1) の未対応で、レジスタを読めば 1 回で分かった。 |
 | 手本の暗黙の前提も移す。整列・上限・format/class の組合せ・bind/idle の順・失敗後の復帰を、作る側と受け取る境目で守る。手本より厳しい条件は独自に足さない。 | GeForce の源の無い時計の 0 を誤りにすると save が -509。読戻しと PLL 計算値の厳密一致も手本に無い。 |
 
 設計と依頼の流れは PORT_FLOW、[os32-design-rally](../.claude/skills/os32-design-rally/SKILL.md)・[os32-delegate](../.claude/skills/os32-delegate/SKILL.md) に従う。
