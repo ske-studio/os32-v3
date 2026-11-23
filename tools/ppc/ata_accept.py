@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import tempfile
 import time
+import zlib
 
 from kboot_accept import build_media, mutant_settings
 from run import ROOT, ROM
@@ -40,7 +41,8 @@ def make_write_image(out, case):
         header = (ROOT / BUS).read_text()
         word = '((u16)p[0] << 8) | p[1]'
         assert header.count(word) == 1
-        (out / 'platform_ide_bus.h').write_text(header.replace(word, '((u16)p[1] << 8) | p[0]'))
+        (out / 'platform_ide_bus.h').write_text('extern int ata_payload_phase;\n' +
+            header.replace(word, '(ata_payload_phase ? ((u16)p[1] << 8) | p[0] : '+word+')'))
     if case in ('write-lba', 'write-count'):
         device = 'kernel/dev/device_ide.c'
         before, after = (('ide_write_sector(drv, lba,', 'ide_write_sector(drv, lba + 1,')
@@ -205,6 +207,10 @@ def main():
     work = Path(tempfile.mkdtemp(prefix='ata-accept-'))
     disk = work / 'disk.raw'
     disk.write_bytes(b''.join(sector(i) for i in range(2048)))
+    write_disk = work / 'install.raw'
+    root_start = 16448
+    with write_disk.open('wb') as stream:
+        stream.truncate((root_start + 4000) * 512)
     hashes = set()
     cases = ('normal', 'write', 'deny')
     if args.mutate or args.build_only:
@@ -218,28 +224,36 @@ def main():
         if args.build_only:
             continue
         for cpu in ('7450', '7455'):
-            lines = guest(media, cpu, disk)
+            medium = write_disk if case in WRITE_CASES and case != 'deny' else disk
+            lines = guest(media, cpu, medium)
             if case in WRITE_CASES:
-                expected = bytearray(disk.read_bytes())
+                expected = bytearray(medium.read_bytes())
+                actual = (media.elf.parent / cpu / 'disk.raw').read_bytes()
                 if case == 'deny':
+                    assert 'ATA-TEST unreserved=-17,-17' in lines
                     assert 'ATA-TEST child=73 provider_calls=0' in lines, lines[-10:]
                 else:
-                    range_rc = 0 if case == 'write-count' else -4
+                    metadata = actual[:2048] + actual[root_start*512:]
+                    assert f'ATA-TEST metadata={zlib.crc32(metadata):08x}' in lines
+                    expected[:2048] = actual[:2048]
+                    expected[root_start*512:] = actual[root_start*512:]
+                    assert 'ATA-TEST end=0' in lines
+                    range_rc = 0 if case == 'write-count' else -17
                     assert f'ATA-TEST writes=0,0 range={range_rc}' in lines, lines[-10:]
                     payload = bytes((i * 37 + (i >> 8) + 13) & 255 for i in range(1024))
                     if case == 'write-word':
                         payload = bytes(payload[i ^ 1] for i in range(1024))
-                    first = 33 if case == 'write-lba' else 32
+                    first = 97 if case == 'write-lba' else 96
                     count = 1 if case == 'write-count' else 2
                     expected[first*512:(first+1)*512] = payload[:512]
                     expected[64*512:(64+count)*512] = payload[:count*512]
                     if case == 'write-count':
-                        expected[-512:] = payload[:512]
+                        expected[(root_start-1)*512:root_start*512] = payload[:512]
                     for n in range(3):
                         equal = (case != 'write-word' and not (case == 'write-lba' and n == 0)
                                  and not (case == 'write-count' and n == 2))
                         assert f'ATA-TEST read={n} equal={int(equal)}' in lines
-                assert (media.elf.parent / cpu / 'disk.raw').read_bytes() == expected, case
+                assert actual == expected, case
                 continue
             ident = 'ATA-TEST model=QEMU HARDDISK sectors=2048' in lines
             if case in ('normal', 'bar'):

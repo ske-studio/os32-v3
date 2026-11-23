@@ -22,7 +22,7 @@ def run(ctx):
                'fs/ext2/ext2_dir.c']
     cases = [('normal', None, None, 0)]
     if ctx.mutate:
-        cases += [('raw', 'op != INSTALL_WRITE || !m || !m->requires_raw_reservation', '1', 28),
+        cases += [('raw', '!raw_write || !m || !m->requires_raw_reservation', '1', 28),
                   ('hfs', 'p->boot_hfs.sectors != PM_HFS_SECTORS', '0', 29),
                   ('preserved', 'i < tables[p->raw_unit].count', 'i+1 < tables[p->raw_unit].count', 26),
                   ('nonempty', 'if (block[j*512+k])', 'if (0)', 2),

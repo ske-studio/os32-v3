@@ -358,7 +358,8 @@ int install_admit(struct install_access *a, u32 unit, enum install_op op,
     unsigned flags = irq_save();
     int rc = OS32_ERR_BUSY;
     const struct install_medium *m = platform_install_medium();
-    if ((r->state == AVAILABLE && (op != INSTALL_WRITE || !m || !m->requires_raw_reservation)) ||
+    int raw_write = op == INSTALL_WRITE || op == INSTALL_CHS_WRITE;
+    if ((r->state == AVAILABLE && (!raw_write || !m || !m->requires_raw_reservation)) ||
         (r->state == RAW_ONLY && op == INSTALL_READ))
         rc = 0;
     else if ((r->state == ACTIVE || r->state == FORMATTING || r->state == TABLE_READY || r->state == VIEW) && r->owner == res_owner_get()) {

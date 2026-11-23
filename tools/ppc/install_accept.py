@@ -1,6 +1,7 @@
 """Exercise the three foreground disk entry points from an ISO and a blank IDE disk."""
 import argparse
 import hashlib
+import re
 from pathlib import Path
 import tempfile
 
@@ -99,13 +100,14 @@ def runtime(media, out):
         s.keys('hdprep 8\n')
         s.wait(lambda: "Type 'yes'" in s.screen('confirm'), 'hdprep confirmation', 30)
         s.keys('yes\n')
-        s.wait(lambda: 'Range checks start=' in s.screen('range'), 'range results', 120)
-        report = s.screen('range')
+        result = re.compile(r'Range checks start=([01]) length=([01])')
+        s.wait(lambda: result.search(s.screen('range')), 'range results', 120)
+        start, length = result.search(s.screen('range')).groups()
         assert s.word('install_banners') == 4
         unchanged = disk.read_bytes() == original
         require_case(s.word('owner_accepted') == 0, 'owner')
-        require_case('Range checks start=0' in report, 'start')
-        require_case('length=0' in report, 'length')
+        require_case(start == '0', 'start')
+        require_case(length == '0', 'length')
         assert unchanged
         s.key('ret')
         s.wait(lambda: 'hdprep: verified ext2' in s.screen('verified'), 'mount/write/read/end', 90)

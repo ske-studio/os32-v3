@@ -13,6 +13,7 @@ CHECK = dict(name='install-management-host', tier=1, needs=[], budget=4,
     basis=['docs/decisions/ppc/PPC_ROOT_MOUNT_ALIGN_X86_DESIGN.md §5–6'])
 
 MUTATIONS = [
+    (' || op == INSTALL_CHS_WRITE', ''),
     ('r->owner != res_owner_get() || start !=', '0 || start !='),
     ('|| start != r->plan.root_ext2.start_lba', '|| 0'),
     ('length != r->plan.root_ext2.sectors ||', '0 ||'),

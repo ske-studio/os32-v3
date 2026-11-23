@@ -5,7 +5,7 @@
 
 /* Pin the unit across an accepted synchronous operation. Deferred operations
  * retain this record until completion, including across worker context switches. */
-enum install_op { INSTALL_READ, INSTALL_WRITE, INSTALL_MOUNT, INSTALL_VIEW_READ, INSTALL_VIEW_WRITE, INSTALL_CHS, INSTALL_FORMAT };
+enum install_op { INSTALL_READ, INSTALL_WRITE, INSTALL_MOUNT, INSTALL_VIEW_READ, INSTALL_VIEW_WRITE, INSTALL_CHS, INSTALL_FORMAT, INSTALL_CHS_WRITE };
 struct install_access {
     u32 unit, generation, lba, count, epoch, phase;
     enum install_op op;

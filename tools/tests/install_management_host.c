@@ -205,7 +205,7 @@ static int rescan(const InstallPlanV1 *p, u32 gen)
 }
 static void invalidate(u32 unit) { assert(!unit); }
 static void publish(u32 unit) { assert(!unit); ++published; }
-static const struct install_medium backend = {
+static struct install_medium backend = {
     .identify = identify, .validate = validate, .changed_lba = locate, .check_table = check_table,
     .view_unit = view_unit, .resolve = resolve, .read = read_sector, .write = write_sector, .sync = sync_disk, .drain = sync_disk,
     .rescan = rescan, .verify = verify, .invalidate = invalidate, .publish = publish
@@ -276,6 +276,14 @@ int main(int argc, char **argv)
     existing = argc == 2 && !strcmp(argv[1], "existing");
     setup_media(&p);
     setup_mounts();
+    backend.requires_raw_reservation = 1;
+    memcpy(saved, disk, sizeof(disk));
+    int chs = ide_write_sector_chs(0, 0, 0, 7, sector);
+    assert(!memcmp(saved, disk, sizeof(disk)));
+    assert(chs == OS32_ERR_BUSY);
+    assert(!ide_read_sector_chs(0, 0, 0, 7, sector));
+    sector[0] = 93;
+    backend.requires_raw_reservation = 0;
     assert(install_format_begin(&format, 0, 8, 8) < 0);
     assert(!dev_blk_write_lba(&raw, 6, 1, sector));
     assert(!memcmp(disk[6], sector, 512));
