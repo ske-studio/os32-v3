@@ -41,11 +41,6 @@ v86_boot v86_boot2 v86_disktest
 v86_gdc_capture v86_selftest
 """.split())
 
-RETIRED_SOUND = frozenset("""
-fm_startup_sound fm_play_mml snd_bgm_play snd_bgm_stop snd_bgm_set_persist
-snd_se_play snd_se_play_raw snd_set_master snd_bgm_is_playing snd_focus
-""".split())
-
 # PPC_KAPI_FILL stage 5c, A11. Each wrapper calls the provider of the same name.
 PUBLISHED_GFX = frozenset("""
 gfx_hardware_scroll
@@ -256,7 +251,7 @@ def verify(source, entries, extra_present=frozenset()):
     if any('#include "' + header + '"' not in source for header in ('gfx_hal.h', 'palette.h')):
         return False
     reference = (ROOT / 'kapi/kapi_generated.c').read_text()
-    for slot in RETIRED_SOUND | PRESENT_SLOTS | GUI_SLOTS | PUBLISHED_GFX | {'kdebug_call', 'gfx_set_palette', 'gfx_get_palette'} | extra_present:
+    for slot in PRESENT_SLOTS | GUI_SLOTS | PUBLISHED_GFX | {'kdebug_call', 'gfx_set_palette', 'gfx_get_palette'} | extra_present:
         wrapper = re.search(r'(?:void|int|i32) __cdecl wrap_' + slot + r'\([^)]*\)\n\{.*?\n\}', reference, re.S)
         if not wrapper or wrapper.group() not in source:
             return False
@@ -385,7 +380,7 @@ def generate(tmp, mutation=None, *, link=True, ide=False, fep=False):
     return out
 
 
-def absent_db(out, cc, dirs):
+def run_binding_probe(out, cc, dirs):
     obj = out / 'absent.o'
     flags = ['-ffreestanding', '-D__KERNEL_BUILD__', '-D__cdecl=', '-I' + str(out / 'include')]
     subprocess.run([cc, *flags, *['-I' + str(ROOT / d) for d in dirs],
@@ -397,6 +392,16 @@ def absent_db(out, cc, dirs):
     # Run the DB wrappers and the output guard with the Linux/PPC exit syscall.
     probe = out / 'probe.c'
     probe.write_text('''#include "os32_kapi_shared.h"
+extern void wrap_fm_startup_sound(void);
+extern void wrap_fm_play_mml(const char *);
+extern void wrap_snd_bgm_play(const char *);
+extern void wrap_snd_bgm_stop(void);
+extern void wrap_snd_bgm_set_persist(int);
+extern void wrap_snd_se_play(int);
+extern void wrap_snd_se_play_raw(int, int, int);
+extern void wrap_snd_set_master(int);
+extern int wrap_snd_bgm_is_playing(void);
+extern i32 wrap_snd_focus(int);
 extern const char *wrap_db_last_error(int);
 extern u32 wrap_db_mem_used(void);
 extern int wrap_db_open(const char *);
@@ -429,6 +434,16 @@ void _start(void)
              wrap_db_mem_used() != 0 ? 11 :
              wrap_db_open("db") != OS32_ERR_NOSYS ? 12 : 0;
     if (rc) finish(rc);
+    wrap_fm_startup_sound();
+    wrap_fm_play_mml("c");
+    wrap_snd_bgm_play("c");
+    wrap_snd_bgm_set_persist(1);
+    wrap_snd_se_play(1);
+    wrap_snd_se_play_raw(60, 2, 1);
+    wrap_snd_set_master(1);
+    wrap_snd_bgm_stop();
+    if (wrap_snd_bgm_is_playing() != 0) finish(19);
+    if (wrap_snd_focus(1) != OS32_ERR_NOSYS) finish(20);
     if (wrap_ime_getkey() != 0x2b65) finish(18);
     if (wrap_mem_stat(-1, &output, sizeof(output)) != 7) finish(16);
     user_call = 1;
@@ -564,23 +579,23 @@ def main():
         if unexpected:
             print('unexpected providers:', sorted(unexpected)); return 1
         print('undefined providers:', len(undefined))
-        result = absent_db(out, cc, dirs)
+        result = run_binding_probe(out, cc, dirs)
         if result != 0:
-            print('absent DB probe failed:', result)
+            print('binding probe failed:', result)
             return 1
         if '--mutate' in sys.argv:
             check_planar_link(tmp, cc, dirs)
-            for mutation in ('retired-focus-result', 'empty', 'zero', 'group-empty', 'ime-empty', 'reboot-absent', 'kdebug-absent', 'slot-swap', 'scroll-type', 'scroll-absent', 'present-absent', 'gfx2-present-absent', 'check-op-absent', 'pci-absent', 'mem-absent', 'db-absent'):
+            for mutation in ('empty', 'zero', 'group-empty', 'ime-empty', 'reboot-absent', 'kdebug-absent', 'slot-swap', 'scroll-type', 'scroll-absent', 'present-absent', 'gfx2-present-absent', 'check-op-absent', 'pci-absent', 'mem-absent', 'db-absent'):
                 path = tmp / mutation
                 path.mkdir()
                 mutated = generate(path, mutation, link=False)
                 if verify((mutated / 'kapi/kapi_generated.c').read_text(), entries):
                     print(mutation + ': SURVIVED'); return 1
                 print(mutation + ': RED')
-            for mutation, expected in [('db-null-nosys', 10), ('db-hook-inverted', 'provider reference')]:
+            for mutation, expected in [('retired-focus-result', 20), ('db-null-nosys', 10), ('db-hook-inverted', 'provider reference')]:
                 path = tmp / mutation
                 path.mkdir()
-                result = absent_db(generate(path, mutation), cc, dirs)
+                result = run_binding_probe(generate(path, mutation), cc, dirs)
                 if result != expected:
                     print(mutation, 'expected', expected, 'got', result)
                     return 1
