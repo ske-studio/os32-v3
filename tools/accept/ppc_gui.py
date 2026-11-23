@@ -228,7 +228,7 @@ def observe(media, cpu, folder, case, user, mutation=None):
             ordered(r'USB RELEASE kind=1 src=\d+\b', 'mouse release')
             if mutation == 'no-release':
                 seen('C-GUI detach buttons=1')
-                wait_pointer(x + 34, y - 11, 1)
+                wait_pointer(x + 34, y - 11, 0)
             seen('C-GUI GONE')
             wait_pointer(x + 34, y - 11, 0)
             s.wait(lambda: state(4) == 0xffffffff, 'released drag')
