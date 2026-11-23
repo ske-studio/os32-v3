@@ -1,9 +1,9 @@
-"""Cold-boot the three PC-98 disks on Windows with NP21/W input and a COM1 log."""
+"""Cold-boot the three PC-98 disks from WSL through the NP21/W HTTP interface."""
 import argparse
-import ctypes
-from ctypes import wintypes
+from contextlib import contextmanager
 import json
-from pathlib import Path
+import os
+from pathlib import Path, PureWindowsPath
 import re
 import shutil
 import subprocess
@@ -11,73 +11,61 @@ import sys
 import tempfile
 import time
 from urllib.parse import urlencode
-from urllib.request import urlopen
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import np21w_ctl
+from in2_gui_mutations import PC98_MUTATIONS, D_FAILURES
 from np21w_ini import transform
 from np21w_mcp import np21w_client as emu
 from in2_gui_trial import run_trial
 
 
-def window(pid):
-    handles = []
-    user = ctypes.windll.user32
-    callback = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
-
-    @callback
-    def collect(hwnd, unused):
-        owner = wintypes.DWORD()
-        user.GetWindowThreadProcessId(hwnd, ctypes.byref(owner))
-        if owner.value == pid and user.IsWindowVisible(hwnd) and user.GetWindowTextLengthW(hwnd):
-            handles.append(hwnd)
-        return True
-
-    user.EnumWindows(collect, 0)
-    return handles[0] if handles else None
+class ObservedMutation(Exception):
+    pass
 
 
 class Session:
-    def __init__(self, process, serial, previous, port):
-        self.base = f"http://127.0.0.1:{port}"
-        self.proc = process
-        self.serial = serial
-        self.previous = previous
+    def __init__(self, pid, base, mutant):
+        self.pid = pid
+        self.base = base
+        self.mutant = mutant
+        self.history = ''
         self.offset = 0
         self.bounds = None
 
     def confirm_instance(self):
         try:
-            info = json.loads(emu.get('/api/instance', base=self.base, urlopen=urlopen, timeout=2))
+            info = json.loads(emu.get('/api/instance', base=self.base, timeout=2))
         except emu.EmuError:
             return False
-        if int(info['pid']) != self.proc.pid:
-            raise RuntimeError(f'{self.base} belongs to PID {info["pid"]}, expected {self.proc.pid}')
+        if int(info['pid']) != self.pid:
+            raise RuntimeError(f'{self.base} belongs to PID {info["pid"]}, expected {self.pid}')
         return True
 
     def require_instance(self):
         if not self.confirm_instance():
-            raise RuntimeError(f'Cannot verify PID {self.proc.pid} at {self.base}')
+            raise RuntimeError(f'Cannot verify PID {self.pid} at {self.base}')
 
     def post(self, path, body):
         self.require_instance()
-        return emu.post(path, body, base=self.base, urlopen=urlopen)
+        status, payload, _ = emu.post(path, body, base=self.base, response=True)
+        if status != 200 or not json.loads(payload).get('ok'):
+            raise RuntimeError(f'{path} rejected {body!r} (HTTP {status}): {payload!r}')
 
     def screen(self):
         self.require_instance()
-        data = emu.get('/api/tvram', base=self.base, urlopen=urlopen)
+        data = emu.get('/api/tvram', base=self.base)
         return [line.strip() for line in json.loads(data)['lines']]
 
     def trace(self):
-        data = self.serial.read_bytes() if self.serial.exists() else b''
-        if self.previous and not data.startswith(self.previous):
-            self.previous = b''
-        return data[len(self.previous):].decode('latin1')
+        self.require_instance()
+        data = json.loads(emu.get('/api/serial/read', base=self.base))
+        self.history += bytes.fromhex(data['hex']).decode('latin1')
+        return self.history
 
     def wait(self, predicate, label):
         deadline = time.monotonic() + 90
         while time.monotonic() < deadline:
-            if self.proc.poll() is not None:
-                raise RuntimeError('NP21/W exited before ' + label)
             result = predicate()
             if result:
                 return result
@@ -85,21 +73,31 @@ class Session:
         raise TimeoutError(label)
 
     def wait_match(self, pattern):
-        return self.wait(lambda: re.search(pattern, self.trace()[self.offset:]), pattern)
+        def match():
+            trace = self.trace()
+            if self.mutant in D_FAILURES and self.mutant != 'drop-tab':
+                previous, failure = D_FAILURES[self.mutant]
+                if failure in trace.partition(previous)[2]:
+                    raise ObservedMutation(failure)
+            found = re.search(pattern, trace[self.offset:])
+            if self.mutant == 'no-release' and found and found[0].startswith('D-GUI exit RELEASED '):
+                # P -> no foreground -> Q adds two focus transitions. Reclaim
+                # should have added its own exclusive release before both.
+                previous = re.search(r'D-GUI exit-P EXIT [^\r\n]+ gen=(\d+)', trace)
+                if previous and int(found[5]) == int(previous[1]) + 2:
+                    raise ObservedMutation('exit generation advanced only for the two focus changes')
+            return found
+        return self.wait(match, pattern)
 
     def seen(self, marker):
+        if self.mutant == 'drop-tab' and marker in ('D-GUI RAW 15 1', 'D-GUI RAW 15 0'):
+            return
         self.wait_match(re.escape(marker))
 
     def key(self, name, down):
-        # Windows scan codes; the probe checks the translated PC-98 scan.
-        vk, scan = {'a': (0x41, 0x1e), 'pause': (0x13, 0x45), 'ctrl': (0x11, 0x1d),
-                    'alt': (0x12, 0x38), 'tab': (9, 0x0f)}[name]
-        hwnd = self.wait(lambda: window(self.proc.pid), 'NP21/W window')
+        scan = {'a': 0x1d, 'pause': 0x60, 'ctrl': 0x74, 'alt': 0x73, 'tab': 0x0f}[name]
         self.offset = len(self.trace())
-        param = 1 | (scan << 16) | (0 if down else 3 << 30)
-        if not ctypes.windll.user32.PostMessageW(wintypes.HWND(hwnd), 0x100 if down else 0x101,
-                                                  vk, wintypes.LPARAM(param)):
-            raise ctypes.WinError()
+        self.post('/api/key', urlencode({'scan': scan, 'down': int(down)}))
 
     def mouse(self, **args):
         self.offset = len(self.trace())
@@ -123,56 +121,93 @@ class Session:
         self.mouse(ax=absolute(self.x, width), ay=absolute(self.y, height))
 
 
+@contextmanager
+def cold_boot(paths, ini, base, mutant):
+    ctl = [sys.executable, str(Path(np21w_ctl.__file__))]
+    env = dict(os.environ, NP21W_DIR=paths.wsl, NP21W_AIDEBUG_URL=base)
+    start = subprocess.run([*ctl, 'start', '--ini', ini.name, '--alive', '0'],
+                           env=env, stdout=subprocess.PIPE, text=True)
+    print(start.stdout, end='', flush=True)
+    pid = re.search(r'^started .*? pid=(\d+) ', start.stdout, re.M)
+    if not pid:
+        start.check_returncode()
+        raise RuntimeError('np21w_ctl start did not report a PID')
+    s = Session(int(pid[1]), base, mutant)
+    try:
+        start.check_returncode()
+        s.wait(s.confirm_instance, 'NP21/W HTTP instance')
+        yield s
+    finally:
+        # If startup failed or the port changed owners, target only our PID.
+        try:
+            verified = s.confirm_instance()
+        except RuntimeError:
+            verified = False
+        stop = ['stop'] if verified else ['stop', '--pid', pid[1]]
+        subprocess.run([*ctl, *stop], env=env, check=True)
+
+
 def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    for name in ['exe', 'ini', 'serial']:
-        parser.add_argument('--' + name, required=True, type=Path)
+    parser = argparse.ArgumentParser(
+        description=__doc__, epilog='NP21/W must support scan/down on /api/key '
+        '(tools/accept/np21w_key_edge.patch).')
+    parser.add_argument('--ini', required=True, type=Path, help='source slot ini (WSL path)')
     parser.add_argument('--images', type=Path, default=Path('build/out/pc98-in2-gui'))
+    parser.add_argument('--mutant', choices=PC98_MUTATIONS)
     args = parser.parse_args()
-    exe = args.exe.resolve()
-    for role in ['explicit', 'focus', 'exit']:
-        with tempfile.TemporaryDirectory(dir=exe.parent) as tmp:
+    paths = np21w_ctl.paths_from_env()
+    original = args.ini.read_bytes()
+    port = int(np21w_ctl.parse_ini(original, ['aidbport']).get('AIDBPORT', 8025))
+    base = f'http://127.0.0.1:{port}'
+    roles = [PC98_MUTATIONS[args.mutant][0]] if args.mutant else ['explicit', 'focus', 'exit']
+    for role in roles:
+        with tempfile.TemporaryDirectory(dir=paths.wsl, prefix='in2-') as tmp:
             work = Path(tmp)
             image = work / (role + '.nhd')
-            shutil.copyfile(args.images / image.name, image)
-            ini = work / 'in2.ini'
-            raw, _ = transform(args.ini.read_bytes(), {'HDD1FILE': str(image), 'FDD1FILE': '',
-                                                      'FDD2FILE': '', 'E_RESUME': 'false'})
-            ini.write_bytes(raw)
-            port = ctypes.windll.kernel32.GetPrivateProfileIntW(
-                "NekoProject21", "aidbport", 8025, str(ini))
-            previous = args.serial.read_bytes() if args.serial.exists() else b''
-            process = subprocess.Popen([str(exe), '/i' + str(ini)], cwd=exe.parent)
-            s = Session(process, args.serial, previous, port)
-            try:
-                s.wait(s.confirm_instance, 'NP21/W HTTP instance')
-                s.seen('[boot] exec /bin/gshell.bin')
-                mode = s.wait_match(r'D-GUI (?:relative|seamless (\d+) (\d+))\r?\n')
-                if mode[1]:
-                    s.bounds = tuple(map(int, mode.groups()))
-                    s.x, s.y = (extent // 2 for extent in s.bounds)
-                    s.move(0, 0)
-                    # FRONT may already have arrived if NP21/W started centered.
-                    s.offset = 0
-                run_trial(s, role)
-                s.seen("C-GUI completed " + role)
-                s.wait(lambda: 'Remote shell active (ESC to exit)' in s.screen(), 'CUI remote shell')
-                s.post('/api/key', 'seq=ESC')
-                s.wait(lambda: 'sh>' in s.screen(), 'cooked shell prompt')
-                command = 'echo cooked'
-                for i in range(0, len(command), 4):
-                    s.post('/api/key', urlencode({'text': command[i:i + 4]}))
-                    prefix = 'sh> ' + command[:i + 4]
-                    s.wait(lambda: any(prefix in line for line in s.screen()), prefix)
-                s.post('/api/key', 'seq=ENTER')
-                s.wait(lambda: 'cooked' in s.screen(),
-                       'cooked shell response')
-                print(role, 'DONE', flush=True)
-            finally:
-                hwnd = window(process.pid)
-                if hwnd:
-                    ctypes.windll.user32.PostMessageW(wintypes.HWND(hwnd), 0x10, 0, 0)
-                process.wait(timeout=30)
+            shutil.copyfile(args.images / (args.mutant or '') / image.name, image)
+            win_image = paths.win_of(str(PureWindowsPath(work.name, image.name)))
+            raw, _ = transform(original, {'HDD1FILE': win_image, 'FDD1FILE': '',
+                                          'FDD2FILE': '', 'E_RESUME': 'false'})
+            with tempfile.NamedTemporaryFile(dir=paths.wsl, prefix='in2-', suffix='.ini') as ini:
+                ini.write(raw)
+                ini.flush()
+                with cold_boot(paths, Path(ini.name), base, args.mutant) as s:
+                    try:
+                        trial(s, role)
+                    except ObservedMutation as exc:
+                        print(f'RED {args.mutant}: {exc}', flush=True)
+                    else:
+                        if args.mutant:
+                            raise RuntimeError(f'{args.mutant} survived')
+
+
+def trial(s, role):
+    s.seen('[boot] exec /bin/gshell.bin')
+    mode = s.wait_match(r'D-GUI (?:relative|seamless (\d+) (\d+))\r?\n')
+    if mode[1]:
+        s.bounds = tuple(map(int, mode.groups()))
+        s.x, s.y = (extent // 2 for extent in s.bounds)
+        s.move(0, 0)
+        # FRONT may already have arrived if NP21/W started centered.
+        s.offset = 0
+    run_trial(s, role)
+    s.seen("C-GUI completed " + role)
+    if s.mutant == 'drop-tab':
+        trace = s.trace().partition('D-GUI explicit RESUMED')[2]
+        if all(f'D-GUI RAW 15 {down}' not in trace for down in (1, 0)):
+            raise ObservedMutation('WM received neither TAB edge')
+    s.wait(lambda: 'Remote shell active (ESC to exit)' in s.screen(), 'CUI remote shell')
+    s.post('/api/key', 'seq=ESC')
+    s.wait(lambda: 'sh>' in s.screen(), 'cooked shell prompt')
+    command = 'echo cooked'
+    for i in range(0, len(command), 4):
+        s.post('/api/key', urlencode({'text': command[i:i + 4]}))
+        prefix = 'sh> ' + command[:i + 4]
+        s.wait(lambda: any(prefix in line for line in s.screen()), prefix)
+    s.post('/api/key', 'seq=ENTER')
+    s.wait(lambda: 'cooked' in s.screen(),
+           'cooked shell response')
+    print(role, 'DONE', flush=True)
 
 
 if __name__ == '__main__':

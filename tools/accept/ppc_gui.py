@@ -21,6 +21,7 @@ from fb_pixel import read_ppm
 from link_sh_run import Session
 from usb_run import keyboard_actions
 from ppc_in2_cui import IN2_MUTATIONS
+from in2_gui_mutations import D_MUTATIONS, D_FAILURES
 from in2_gui_trial import run_trial
 
 
@@ -30,34 +31,6 @@ FAILURE_MARKERS = {
     'select': 'Loading /bin/gshell.bin', 'no-key': 'C-GUI MAKE',
     'no-button': 'C-GUI BUTTON DOWN', 'no-focus': 'C-GUI FOCUS',
     'no-drag-end': 'C-GUI UP', 'no-release': 'C-GUI GONE',
-}
-
-
-D_MUTATIONS = {
-    'closed': ('explicit', 'kapi/kapi_in2.c', '#include "platform_input_caps.h"',
-               '#define IN2_PUBLIC_EXCLUSIVE 0\n#include "platform_input_caps.h"'),
-    'background': ('explicit', 'input/hal/in2_excl.c',
-                   'if (!owner || owner != av_focus_owner()) return OS32_ERR_BUSY;\n    unsigned f = irq_save();\n    if (owner != acq_owner',
-                   'unsigned f = irq_save();\n    if (owner != acq_owner'),
-    'drop-tab': ('explicit', 'input/hal/in2_excl.c', ' || sc == KEY_TAB', ''),
-    'release-lost': ('explicit', 'input/hal/in2_excl.c', '    in2_ring_lost(IN2_LOST_EXCL);',
-                     '    if (focus || owner) in2_ring_lost(IN2_LOST_EXCL);'),
-    'keep-owner': ('focus', 'input/hal/in2_excl.c', 'if (acq_owner == old) transition(0, 0, 1);',
-                   'if (acq_owner == old) transition(acq_owner, excl, 1);'),
-    'keep-capture': ('explicit',),
-    'keep-left': ('focus',),
-    'keep-right': ('exit',),
-}
-
-D_FAILURES = {
-    'closed': ('D-GUI explicit HELD', 'C-GUI foreground acquire rc=-10'),
-    'background': ('D-GUI busy-Q BACKGROUND', 'C-GUI background acquire rc=0'),
-    'drop-tab': ('D-GUI exclusive KEY 15 1', 'D-GUI RAW 15 1'),
-    'release-lost': ('D-GUI exclusive UP', 'C-GUI missing release LOST_EXCL='),
-    'keep-owner': ('D-GUI focus-Q FOREGROUND EXCLUSIVE', 'C-GUI foreground flags=3'),
-    'keep-capture': ('D-GUI explicit HELD', 'C-GUI residual drag='),
-    'keep-left': ('D-GUI focus HELD', 'C-GUI residual left='),
-    'keep-right': ('D-GUI exit-P HELD', 'C-GUI residual right='),
 }
 
 

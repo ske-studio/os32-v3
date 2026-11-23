@@ -1,0 +1,26 @@
+--- a/src/win9x/aidebug/aidebug_api.cpp
++++ b/src/win9x/aidebug/aidebug_api.cpp
+@@ -1212,6 +1212,23 @@ static void handle_key(const std::string &body, AidResponse &out)
+ 		hold_ms = 5000;
+ 	}
+ 
++	/* One PC-98 make or break, for clients synchronizing on guest input. */
++	std::string scan = form_get(body, "scan", "");
++	std::string down = form_get(body, "down", "");
++	if (!scan.empty() || !down.empty()) {
++		if (!seq.empty() || !text.empty() || scan.empty() || scan.size() > 3 ||
++		    scan.find_first_not_of("0123456789") != std::string::npos ||
++		    strtol(scan.c_str(), NULL, 10) > 127 || (down != "0" && down != "1")) {
++			set_error(out, 400, "need decimal scan=0..127 and down=0 or 1");
++			return;
++		}
++		CORE_LOCK_OR_RETURN(out);
++		inject_key((int)strtol(scan.c_str(), NULL, 10), down == "0");
++		core_unlock();
++		ok_json(out);
++		return;
++	}
++
+ 	if (seq.empty() && text.empty()) {
+ 		set_error(out, 400, "need seq= or text=");
+ 		return;
