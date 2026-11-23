@@ -1,5 +1,8 @@
 /* C-GUI acceptance client. Advance only on actual foreground and WM events. */
 #include <stdio.h>
+#ifdef C_GUI_ACCEPT
+#include <string.h>
+#endif
 #include "os32api.h"
 #include "os32/os32_gui_shared.h"
 
@@ -40,13 +43,38 @@ static int wait_devices(int *kb, int *mouse)
     }
 }
 
-static int next_input(int kind, int dev, int a, int b)
+#ifdef C_GUI_ACCEPT
+static int probe_owner, probe_window;
+#endif
+
+static int next_input(int step, int kind, int dev, int a, int b)
 {
+#ifdef C_GUI_ACCEPT
+    u32 last_empty = api->get_tick();
+#endif
     for (;;) {
         IN2_Event e;
         int n = api->in2_read(&e, 1);
         if (n < 0) return 0;
-        if (!n) { api->gui_call(GUI_OP_WAIT, 1); continue; }
+        if (!n) {
+#ifdef C_GUI_ACCEPT
+            u32 now = api->get_tick();
+            if ((step == 2 || step == 6) && now - last_empty >= 25) {
+                last_empty = now;
+                api->serial_puts(step == 2 ? "C-GUI empty op=2\n" : "C-GUI empty op=6\n");
+            }
+#endif
+            api->gui_call(GUI_OP_WAIT, 1);
+            continue;
+        }
+#ifdef C_GUI_ACCEPT
+        char line[128];
+        snprintf(line, sizeof(line), "C-GUI normal op=%d owner=%d window=%d dev=%u type=%u\n",
+                 step, probe_owner, probe_window, (unsigned)e.dev, (unsigned)e.type);
+        api->serial_puts(line);
+#else
+        (void)step;
+#endif
         if (e.dev != dev || e.type != kind) return 0;
         if (kind == IN2_EV_KEY) return e.u.key.sc == a && e.u.key.down == b;
         if (kind == IN2_EV_MOVE) return e.u.move.dx == a && e.u.move.dy == b;
@@ -78,7 +106,11 @@ static int window(const char *name, int x, int y)
 
 int main(int argc, char **argv, KernelAPI *kernel)
 {
+#ifdef C_GUI_ACCEPT
+    if (argc != 2 || strcmp(argv[1], "normal")) return 1;
+#else
     (void)argc; (void)argv;
+#endif
     api = kernel;
     int slot = api->gui_call(GUI_OP_INIT, GUI_PROTO_VERSION);
     if (slot == OS32_ERR_NOSYS) api->serial_puts("C-GUI INIT NOSYS\n");
@@ -110,8 +142,18 @@ int main(int argc, char **argv, KernelAPI *kernel)
     rc = api->in2_status(&before);
     if (rc) return failed("in2_status before", rc, 4);
     if (before.acquired) return failed("before.acquired", before.acquired, 4);
+#ifdef C_GUI_ACCEPT
+    api->serial_puts("C-GUI acquire before\n");
+    rc = api->gui_call(GUI_OP_WAIT, 2);
+    if (rc < 0) return failed("WAIT before acquire", rc, 4);
+#endif
     rc = api->in2_acquire(3);
     if (rc != OS32_ERR_NOSYS) return failed("in2_acquire", rc, 4);
+#ifdef C_GUI_ACCEPT
+    api->serial_puts("C-GUI acquire after\n");
+    rc = api->gui_call(GUI_OP_WAIT, 2);
+    if (rc < 0) return failed("WAIT after acquire", rc, 4);
+#endif
     rc = api->in2_status(&after);
     if (rc) return failed("in2_status after", rc, 4);
     if (after.acquired) return failed("after.acquired", after.acquired, 4);
@@ -122,41 +164,105 @@ int main(int argc, char **argv, KernelAPI *kernel)
     int count;
     do { count = api->in2_read(queued, 8); } while (count > 0);
     if (count < 0) return failed("in2_read", count, 4);
+#ifdef C_GUI_ACCEPT
+    probe_owner = before.focus_owner;
+    probe_window = right;
+    char ids[100];
+    snprintf(ids, sizeof(ids), "C-GUI normal P=%u Q=%u owner=%u kb=%d mouse=%d\n",
+             (unsigned)right, (unsigned)left, (unsigned)before.focus_owner, kb, mouse);
+    api->serial_puts(ids);
+#endif
     api->serial_puts("C-GUI READY\n");
-    if (!next_input(IN2_EV_KEY, kb, 0x1d, 1) || !api->kbd_is_pressed(0x1d) ||
+    if (!next_input(2, IN2_EV_KEY, kb, 0x1d, 1) || !api->kbd_is_pressed(0x1d) ||
         !wm_event(GUI_EV_KEY, 1, right)) return 5;
     api->serial_puts("C-GUI MAKE\n");
-    if (!next_input(IN2_EV_KEY, kb, 0x1d, 0) || api->kbd_is_pressed(0x1d) ||
+    if (!next_input(4, IN2_EV_KEY, kb, 0x1d, 0) || api->kbd_is_pressed(0x1d) ||
         !wm_event(GUI_EV_KEY, 0, right)) return 6;
     api->serial_puts("C-GUI BREAK\n");
-    if (!next_input(IN2_EV_MOVE, mouse, 12, -7)) return 7;
+    if (!next_input(5, IN2_EV_MOVE, mouse, 12, -7)) return 7;
     api->gui_call(GUI_OP_WAIT, 1);
     api->serial_puts("C-GUI MOVE\n");
-    if (!next_input(IN2_EV_BUTTON, mouse, 1, 1) || !wm_event(GUI_EV_FOCUS, 1, left)) return 8;
+#ifdef C_GUI_ACCEPT
+    /* Give the foreground reader its turn before a WAIT can process the focus click. */
+    IN2_MouseState state;
+    do {
+        if (api->in2_mouse_state(&state)) return 8;
+        if (!state.buttons) api->sys_halt();
+    } while (!state.buttons);
+#endif
+    if (!next_input(6, IN2_EV_BUTTON, mouse, 1, 1)) return 8;
+#ifdef C_GUI_ACCEPT
+    api->serial_puts("C-GUI BUTTON DOWN\n");
+#endif
+    if (!wm_event(GUI_EV_FOCUS, 1, left)) return 8;
+#ifdef C_GUI_ACCEPT
+    probe_window = left;
+#endif
     api->serial_puts("C-GUI FOCUS\n");
-    if (!next_input(IN2_EV_BUTTON, mouse, 0, 1)) return 9;
+    if (!next_input(8, IN2_EV_BUTTON, mouse, 0, 1)) return 9;
     api->gui_call(GUI_OP_WAIT, 1);
     api->serial_puts("C-GUI CLICK UP\n");
-    if (!next_input(IN2_EV_BUTTON, mouse, 1, 1)) return 9;
+    if (!next_input(9, IN2_EV_BUTTON, mouse, 1, 1)) return 9;
     api->gui_call(GUI_OP_WAIT, 1);
     api->serial_puts("C-GUI DRAG START\n");
-    if (!next_input(IN2_EV_MOVE, mouse, 10, 3)) return 9;
+    if (!next_input(10, IN2_EV_MOVE, mouse, 10, 3)) return 9;
     api->gui_call(GUI_OP_WAIT, 1);
+#ifdef C_GUI_ACCEPT
+    if (api->gui_call(GUI_OP_WIN_CLIENT_RECT, left) ||
+        response->rect.x != original.x || response->rect.y != original.y) return 9;
+#endif
     api->serial_puts("C-GUI DRAG\n");
-    if (!next_input(IN2_EV_BUTTON, mouse, 0, 1)) return 10;
+    if (!next_input(11, IN2_EV_BUTTON, mouse, 0, 1)) return 10;
     api->gui_call(GUI_OP_WAIT, 1);
     if (api->gui_call(GUI_OP_WIN_CLIENT_RECT, left)) return 11;
     GuiRect16 released = response->rect;
-    if (released.x != original.x + 10 || released.y != original.y + 3) return 11;
+    if (released.x != original.x + 10 || released.y != original.y + 3) {
+#ifdef C_GUI_ACCEPT
+        snprintf(ids, sizeof(ids), "C-GUI unexpected released rect dx=%d dy=%d\n",
+                 released.x - original.x, released.y - original.y);
+        api->serial_puts(ids);
+#endif
+        return 11;
+    }
     api->serial_puts("C-GUI UP\n");
-    if (!next_input(IN2_EV_MOVE, mouse, 12, -7)) return 12;
+    if (!next_input(12, IN2_EV_MOVE, mouse, 12, -7)) return 12;
     api->gui_call(GUI_OP_WAIT, 1);
     if (api->gui_call(GUI_OP_WIN_CLIENT_RECT, left) ||
         released.x != response->rect.x || released.y != response->rect.y) return 13;
     api->serial_puts("C-GUI STABLE\n");
-    if (!next_input(IN2_EV_KEY, kb, 0x1d, 1) || !wm_event(GUI_EV_KEY, 1, left)) return 14;
+    if (!next_input(13, IN2_EV_KEY, kb, 0x1d, 1) || !wm_event(GUI_EV_KEY, 1, left)) return 14;
     api->serial_puts("C-GUI FRONT KEY\n");
-    if (!next_input(IN2_EV_KEY, kb, 0x1d, 0) || !wm_event(GUI_EV_KEY, 0, left)) return 15;
+    if (!next_input(13, IN2_EV_KEY, kb, 0x1d, 0) || !wm_event(GUI_EV_KEY, 0, left)) return 15;
+#ifdef C_GUI_ACCEPT
+    api->serial_puts("C-GUI FRONT BREAK\n");
+    if (!next_input(13, IN2_EV_BUTTON, mouse, 1, 1)) return 16;
+    api->gui_call(GUI_OP_WAIT, 1);
+    api->serial_puts("C-GUI HELD\n");
+    while (api->mouse_available()) api->gui_call(GUI_OP_WAIT, 1);
+    IN2_DevInfo remaining;
+    if (api->in2_dev_count() != 1 || api->in2_dev_info(0, &remaining) ||
+        remaining.kind != IN2_DEV_KBD || remaining.dev != kb) return 17;
+    if (api->in2_mouse_state(&state)) return 17;
+    if (state.buttons) {
+        api->gui_call(GUI_OP_WAIT, 1);
+        failed("detach buttons", state.buttons, 17);
+        do {
+            api->gui_call(GUI_OP_WAIT, 1);
+            if (api->in2_mouse_state(&state)) return 17;
+        } while (state.buttons);
+        return 17;
+    }
+    if (!next_input(13, IN2_EV_BUTTON, mouse, 0, 1)) return 17;
+    api->gui_call(GUI_OP_WAIT, 1);
+    api->serial_puts("C-GUI GONE\n");
+    if (wait_devices(&kb, &mouse) || api->in2_dev_count() != 2) return 18;
+    snprintf(ids, sizeof(ids), "C-GUI re-enumerated kb=%d mouse=%d\n", kb, mouse);
+    api->serial_puts(ids);
+    api->serial_puts("C-GUI REATTACHED\n");
+    if (!next_input(13, IN2_EV_MOVE, mouse, 12, -7)) return 19;
+    api->gui_call(GUI_OP_WAIT, 1);
+    api->serial_puts("C-GUI FINAL MOVE\n");
+#endif
     api->serial_puts("C-GUI DONE\n");
     return 0;
 }

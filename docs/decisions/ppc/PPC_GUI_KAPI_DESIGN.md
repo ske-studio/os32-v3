@@ -100,6 +100,18 @@ origin/main の 56d7be02d にある kernel/gui.c と kernel/av_focus.c を基準
 
 - 変異は一つずつ実行。register を absent に戻すと最初の子の call が失敗、consume を飛ばすと CUI のまま、CLUT の一要素を恒等に戻すと指定色の画素が不一致、世代比較を外すと旧世代拒否の host 試験が失敗、owner 比較を外すと別 owner の転送で FB が変化する。それぞれ実行時 RED を必須とする。
 
+### 4.1 C-GUI 入力の受入（7450・7455）
+
+| 操作 | ゲストで確認する値 | 単独変異の失敗点 |
+|---|---|---|
+| P 前景で acquire(3) | NOSYS。前後の WAIT で WM の窓 P・子 owner・独占 0・取得 owner 0・世代が同じ | register 欠落は INIT NOSYS の後 READY 不達、CUI 固定は GUI 起動不達 |
+| A make・保持・break | P の同一鍵盤で各 edge 1 件、pressed は 1→0、WM raw と USB REPEAT | KEY capture 欠落は USB make 後も P が空読み |
+| 移動 (+12,−7)、左押下、解除 | P の MOVE と BUTTON、Q への前景交代、WM 物理/実効は 1/0 → 0/0 | BUTTON capture 欠落は物理押下後も P が空読み。前景更新欠落は Q の FOCUS 不達 |
+| タイトル押下、移動 (+10,+3)、解除、移動 (+12,−7) | ドラッグ枠が動き、解除時だけ確定矩形が (+10,+3) 移る | ドラッグ終了欠落は解除後の矩形不一致 |
+| 手順 13 の A make・break | A の GUI_EV_KEY の enqueue 成功差分は Q の make・break が各 +1、P は各 +0。GUI_EV_TEXT は集計外 | |
+| 左保持で抜去し再追加 | RELEASE → 元マウスの DETACH → 公開列挙から消失、ボタン・ドラッグ解除。追加後は USB DEV（mouse）→ 公開再列挙 → 新マウスの MOVE と WM の (+12,−7) | 解放欠落は抜去後もボタン保持 |
+| CUI 切替 | probe 終了後 CUI を起動し、物理鍵盤で cooked 応答 | consume 欠落は GUI 再起動 |
+
 ## 5. 未決
 
 ユーザー判断を要する項目は 0 件。設計時点ではビルド・ゲスト実行・容量実測を行っていない。

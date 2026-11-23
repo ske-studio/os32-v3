@@ -235,7 +235,7 @@ pub extern "C" fn main(_argc: i32, _argv: *const *const u8, api: *mut KernelAPI)
         #[cfg(feature = "c_gui_accept")]
         if _registered != 0 {
             gserial::reply_to(false, b"!", format_args!("C-GUI REGISTER FAILED rc={}", _registered));
-            (a.exec_run)(b"/bin/guiprob.bin\0".as_ptr());
+            (a.exec_run)(concat!("/bin/guiprob.bin ", env!("PPC_GUI_TRIAL"), "\0").as_ptr());
             return -1;
         }
     }
@@ -288,7 +288,7 @@ pub extern "C" fn main(_argc: i32, _argv: *const *const u8, api: *mut KernelAPI)
     #[cfg(feature = "c_gui_accept")]
     unsafe {
         let a = os32api::api();
-        let rc = (a.exec_run)(b"/bin/guiprob.bin\0".as_ptr());
+        let rc = (a.exec_run)(concat!("/bin/guiprob.bin ", env!("PPC_GUI_TRIAL"), "\0").as_ptr());
         if rc != 0 {
             gserial::reply_to(false, b"!", format_args!("C-GUI PROBE FAILED exec_run={}", rc));
             return -1;
