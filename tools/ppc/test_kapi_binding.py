@@ -21,7 +21,7 @@ from kapi_target_ppc import ABSENT_PROVIDER_SLOTS, absent_result
 EXPECTED_ABSENT_SLOTS = frozenset("""
 buz_off buz_on ext2_format ext2_format_at fm_note_off fm_note_on
 fm_play_mml fm_set_tone_num fm_startup_sound
-gfx2_check_op gfx_osri_show
+gfx_osri_show
 hdd_geom_info ide_drive_present
 ide_get_info ide_identify ide_init ide_read_sector ide_write_sector
 ide_write_sectors ime_dict_info ime_dict_suspend ime_feed_key ime_get_mode
@@ -43,7 +43,7 @@ v86_gdc_capture v86_selftest
 PUBLISHED_GFX = frozenset("""
 gfx_hardware_scroll
 gfx_get_framebuffer gfx_screen_info gfx_hw_fill_rect gfx_hw_blit gfx_stats
-gfx2_mode_set gfx2_flip gfx2_present
+gfx2_mode_set gfx2_flip gfx2_present gfx2_check_op
 gfx_hw_get gfx_hw_submit gfx_lease_palette
 """.split())
 
@@ -314,14 +314,10 @@ def generate(tmp, mutation=None, *, link=True, ide=False, fep=False):
         helper.write_text(text.replace(old, "'buz_on', 'tvram_putchar_at'"))
     if mutation == 'gfx2-present-absent':
         insert_group(helper, mutation, "    'present_mut': (frozenset({'gfx2_present'}), frozenset()),\n")
-    if mutation == 'check-op-bound':
-        anchor = "        'gfx2_check_op',\n"
-        source = helper.read_text()
-        if source.count(anchor) != 1:
-            raise RuntimeError('check-op-bound: expected one absent slot')
-        helper.write_text(source.replace(anchor, ''))
     if mutation == 'scroll-absent':
         insert_group(helper, mutation, "    'scroll_mut': (frozenset({'gfx_hardware_scroll'}), frozenset()),\n")
+    if mutation == 'check-op-absent':
+        insert_group(helper, mutation, "    'check_op_mut': (frozenset({'gfx2_check_op'}), frozenset()),\n")
     if mutation == 'present-absent':
         insert_group(helper, mutation, "    'present_mut': (frozenset({'gfx_present'}), frozenset()),\n")
     if mutation == 'putchar-absent':
@@ -562,7 +558,7 @@ def main():
             return 1
         if '--mutate' in sys.argv:
             check_planar_link(tmp, cc, dirs)
-            for mutation in ('empty', 'zero', 'group-empty', 'ime-empty', 'reboot-absent', 'kdebug-absent', 'slot-swap', 'scroll-type', 'scroll-absent', 'present-absent', 'gfx2-present-absent', 'check-op-bound', 'pci-absent', 'mem-absent', 'db-absent'):
+            for mutation in ('empty', 'zero', 'group-empty', 'ime-empty', 'reboot-absent', 'kdebug-absent', 'slot-swap', 'scroll-type', 'scroll-absent', 'present-absent', 'gfx2-present-absent', 'check-op-absent', 'pci-absent', 'mem-absent', 'db-absent'):
                 path = tmp / mutation
                 path.mkdir()
                 mutated = generate(path, mutation, link=False)

@@ -101,7 +101,6 @@ PROVIDER_GROUPS = {
     }), frozenset(['pcm_contract.h'])),
     # OF uses the shared display entry points for resource-free operations.
     'gfx2': (frozenset({
-        'gfx2_check_op',
     }), frozenset([])),
 }
 
