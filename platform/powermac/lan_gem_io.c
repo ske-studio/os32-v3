@@ -46,12 +46,12 @@ static int master(void *ctx)
 {
     u32 command;
     (void)ctx;
-    if (pm_pci_read32(&hw.pci, hw.pci.target_bdf, PCI_COMMAND, &command))
+    if (pm_pci_access(&hw.pci, hw.pci.target_bdf, PCI_COMMAND, 2, 0, &command))
         return GEM_EIO;
     command = (command & 0xffffu) | PCI_MASTER;
     if (pm_pci_write32(&hw.pci, hw.pci.target_bdf, PCI_COMMAND, command))
         return GEM_EIO;
-    if (pm_pci_read32(&hw.pci, hw.pci.target_bdf, PCI_COMMAND, &command))
+    if (pm_pci_access(&hw.pci, hw.pci.target_bdf, PCI_COMMAND, 2, 0, &command))
         return GEM_EIO;
     return (command & PCI_MASTER) ? GEM_OK : GEM_EIO;
 }
@@ -60,8 +60,8 @@ int pm_lan_gem_io(const struct pm_gmac_boot *b, struct gem_io *out)
 {
     const struct ppc_boot_devices *dev = ppc_boot_devices();
     hw.va = dev->gmac_va;
-    hw.pci = (struct pm_pci){dev->pci_addr_va, dev->pci_data_va,
-                             b->bus_first, b->bus_last, b->bdf};
+    hw.pci = (struct pm_pci){b->bus_first, b->bus_last, b->bdf, pm_bridge_lookup(b->root_node)};
+    if (!hw.pci.bridge) return GEM_EIO;
     *out = (struct gem_io){ .ctx = &hw, .read32 = rd, .write32 = wr,
         .tb = tb64, .tb_hz = ppc_boot_info()->tb_hz,
         .sync = pm_gmac_dma_sync, .master_enable = master };

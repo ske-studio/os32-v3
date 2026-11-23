@@ -3,26 +3,11 @@
 #include "diag_slots.h"
 #include "hwb_resource.h"
 #include "exec/exec_hwb.h"
+#include "lan_boot.h"
 #define KDEBUG_IMPORT_COUNT 8U
 #define KDEBUG_ABI_GEN 1U
 
 /* Later platform stages supply the resource and transaction backends. */
-static u32 pm_hwb_cfg_read(u32 bdf, u32 offset, u32 width, u32 *value)
-{
-    (void)bdf;
-    (void)offset;
-    (void)width;
-    (void)value;
-    return HW_NOSYS;
-}
-static u32 pm_hwb_cfg_write(u32 bdf, u32 offset, u32 width, u32 value)
-{
-    (void)bdf;
-    (void)offset;
-    (void)width;
-    (void)value;
-    return HW_NOSYS;
-}
 static u32 pm_hwb_block(struct hw_block_req *block)
 {
     (void)block;
