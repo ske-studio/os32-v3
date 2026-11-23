@@ -224,8 +224,8 @@ def observe(media, cpu, folder, case, user, mutation=None):
             wait_pointer(x + 34, y - 11, 1)
             offset = len(serial(log))
             s.q.call('device_del', {'id': 'mouse'})
-            ordered(r'USB RELEASE kind=1 src=\d+\b', 'mouse release')
             ordered(rf'USB DETACH addr={mouse_addr}\b', 'original mouse detached')
+            ordered(r'USB RELEASE kind=1 src=\d+\b', 'mouse release')
             if mutation == 'no-release':
                 seen('C-GUI detach buttons=1')
                 wait_pointer(x + 34, y - 11, 1)
