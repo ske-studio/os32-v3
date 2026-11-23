@@ -27,7 +27,8 @@ static struct usb_log_event {
     u32 args[6];
 } events[USB_LOG_CAPACITY];
 static unsigned head, count;
-static int first_tick, foreground_log;
+static int first_tick, foreground_log, scan_pending;
+static u32 tick_reach, tick_deny, tick_runs, idle_runs;
 
 static void print_line(const char *fmt, const u32 *args)
 {
@@ -72,19 +73,49 @@ static void log_drain_one(void)
 /* Include already observed events in the boot snapshot even before idle. */
 void pc98_usb_flush_boot_log(void)
 {
+    u32 flags = irq_save();
     unsigned pending = count;
+    u32 reach = tick_reach, deny = tick_deny, run = tick_runs, idle = idle_runs;
+    irq_restore(flags);
     while (pending--) log_drain_one();
+    kprintf(KLOG_ATTR, "[usb] tick reach=%u deny=%u run=%u idle=%u\n",
+            reach, deny, run, idle);
+}
+
+/* Both callers hold the IRQ mask through the claim and service. The OHCI
+ * handler either published isr_pending already or collects after restore. */
+static void run_scan(void)
+{
+    scan_pending = 0;
+    if (first_tick) {
+        first_tick = 0;
+        pc98_usb_service_log("[usb] first tick", NULL);
+    }
+    tick_target();
+}
+
+static void usb_idle(void)
+{
+    u32 flags = irq_save();
+    if (scan_pending && tick_target) {
+        idle_runs++;
+        run_scan();
+    }
+    irq_restore(flags);
+    log_drain_one();
 }
 
 static void usb_tick(void)
 {
-    if (tick_target && tick_budget_peek(tick_budget_cnt(IRQ0_SLOT_BUDGET_US), scan_reserve_cnt)) {
-        if (first_tick) {
-            first_tick = 0;
-            pc98_usb_service_log("[usb] first tick", NULL);
-        }
-        tick_target();
+    if (!tick_target) return;
+    tick_reach++;
+    if (!tick_budget_peek(tick_budget_cnt(IRQ0_SLOT_BUDGET_US), scan_reserve_cnt)) {
+        tick_deny++;
+        scan_pending = 1;
+        return;
     }
+    tick_runs++;
+    run_scan();
 }
 
 int usb_resident_tick_set(void (*service)(void))
@@ -94,6 +125,7 @@ int usb_resident_tick_set(void (*service)(void))
     if (!service) {
         if (tick_target) {
             tick_target = NULL;
+            scan_pending = 0;
             head = count = 0; /* Discard literals before releasing the owner. */
             module_ref_release(owner, MODULE_REF_TICK);
         }
@@ -109,8 +141,8 @@ int usb_resident_tick_set(void (*service)(void))
     }
     scan_reserve_cnt = arch_tick_budget_cnt(USB_SCAN_RESERVE_US);
     if (!foreground_log) {
-        foreground_log = idle_work_register(log_drain_one) == 0;
-        if (!foreground_log) kprintf(KLOG_ATTR, "[usb] idle log unavailable, boot flush only\n");
+        foreground_log = idle_work_register(usb_idle) == 0;
+        if (!foreground_log) kprintf(KLOG_ATTR, "[usb] idle unavailable, budgeted tick only\n");
     }
     head = count = 0;
     first_tick = 1;
