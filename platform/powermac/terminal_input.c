@@ -1,5 +1,9 @@
 /* Foreground-only LAN input for the resident CLI. */
 #include "lan_boot.h"
+#include "platform_hwb_session.h"
+#if PLATFORM_HWB_SESSION
+void ring3_abort_request(void);
+#endif
 #if KBOOT_SH
 #include "usb_boot.h"
 #include "kernel/idle_work.h"
@@ -28,6 +32,12 @@ void pm_terminal_feed(const u8 *bytes, u32 len)
 {
     for (u32 i = 0; i < len; ++i) {
         u8 c = bytes[i];
+#if PLATFORM_HWB_SESSION
+        if (c == 3 && resident_cui_hw_active()) {
+            ring3_abort_request();
+            continue;
+        }
+#endif
         if (discard) {
             if (c == '\n') discard = 0;
             continue;

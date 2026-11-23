@@ -701,6 +701,7 @@
     "pit-clock-host": 2.799469,
     "platform-memory-host": 2.646895,
     "ppc-ata-guest": 235.608811,
+    "ppc-hwb-commands": 300.0,
     "ppc-hwb-guest": 160.0,
     "ppc-boot-info-guest": 288.8990505,
     "ppc-children-guest": 100,

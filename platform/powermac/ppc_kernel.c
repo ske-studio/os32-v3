@@ -25,6 +25,7 @@
 #include "kernel_start.h"
 #include "kernel_probe.h"
 #include "hwb_window.h"
+#include "hwb_resource.h"
 #include "kboot_info.h"
 #include "kboot_report.h"
 #include "via_window.h"
@@ -288,6 +289,9 @@ void platform_boot_machine(void)
     }
     if (!memory_boot_init(KBOOT_MEM_KB)) kboot_stop("memory_boot_init");
     pm_hwb_window_init();
+#if PM_LOAD_KDEBUG
+    pm_hwb_resource_init(info);
+#endif
 #if KBOOT_SHELL_LAYOUT_DIAG
     shell_layout_report(info);
 #endif

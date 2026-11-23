@@ -1,10 +1,29 @@
 /* Abort requests, safe-point checks and GUI input pumping. Included by exec.c. */
 #include "exec_hwb.h"
+#include "platform_hwb_session.h"
 #include "exec_wait_contract.h"
 #include "input/hal/input_context.h"
 
 /* HW_BASIC_DESIGN §3/F: IRQ1 sets this only for the CUI shell. */
 static volatile u32 g_hwb_abort_pending = 0;
+#if PLATFORM_HWB_SESSION
+static int hwb_active;
+
+int resident_cui_hw_active(void)
+{
+    return hwb_active && appslot_cur() == APP_ID_SHELL && !con_sink_is_enabled();
+}
+
+int exec_hwb_session(unsigned int op)
+{
+    if (appslot_cur() != APP_ID_SHELL) return OS32_ERR_INVAL;
+    if (op == PLATFORM_HWB_ENTER && (con_sink_is_enabled() || hwb_active))
+        return OS32_ERR_INVAL;
+    hwb_active = op == PLATFORM_HWB_ENTER;
+    return 0;
+}
+#endif
+
 /* IRQ records the ownership interval; only FG1 may reclaim it. */
 static void exec_cui_display_abort(void)
 {
@@ -26,6 +45,9 @@ static void exec_input_owner_exit(int id)
     }
     if (id == APP_ID_SHELL) {
         unsigned int irq = irq_save();
+#if PLATFORM_HWB_SESSION
+        hwb_active = 0;
+#endif
         g_hwb_abort_pending = 0;
         irq_restore(irq);
     }

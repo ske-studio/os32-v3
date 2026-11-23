@@ -1,0 +1,18 @@
+# OpenHCI Specification for USB 1.0a section 7.1.1, HcRevision at BAR0 + 0.
+# FreeBSD sys/dev/usb/controller/ohci.c:ohci_dumpregs reads OHCI_REVISION.
+# https://www.cs.usfca.edu/~cruse/cs698s10/hcir1_0a.pdf
+# https://cgit.freebsd.org/src/tree/sys/dev/usb/controller/ohci.c
+device d = id 106b:003f
+pciread32 d 0 -> v
+print "CFG_OFFSET" 0
+print "CFG_VALUE" v
+pciread32 d 8 -> v
+print "CFG_OFFSET" 8
+print "CFG_VALUE" v
+pciread32 d 0x10 -> v
+print "CFG_OFFSET" 0x10
+print "CFG_VALUE" v
+window regs = bar d 0
+mmioread32 regs + 0 -> v
+print "HC_REVISION" v
+end

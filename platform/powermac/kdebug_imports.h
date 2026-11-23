@@ -1,6 +1,7 @@
 #ifndef PM_KDEBUG_IMPORTS_H
 #define PM_KDEBUG_IMPORTS_H
 #include "diag_slots.h"
+#include "hwb_resource.h"
 #include "exec/exec_hwb.h"
 #define KDEBUG_IMPORT_COUNT 8U
 #define KDEBUG_ABI_GEN 1U
@@ -22,32 +23,9 @@ static u32 pm_hwb_cfg_write(u32 bdf, u32 offset, u32 width, u32 value)
     (void)value;
     return HW_NOSYS;
 }
-static u32 pm_hwb_bar(u32 bdf, u32 bar, u32 space, u32 base, u32 offset, u32 bytes, u32 *addr)
-{
-    (void)bdf;
-    (void)bar;
-    (void)space;
-    (void)base;
-    (void)offset;
-    (void)bytes;
-    (void)addr;
-    return HW_NOSYS;
-}
-static u32 pm_hwb_phys(struct hw_req *req)
-{
-    (void)req;
-    return HW_NOSYS;
-}
 static u32 pm_hwb_block(struct hw_block_req *block)
 {
     (void)block;
-    return HW_NOSYS;
-}
-static u32 pm_hwb_phys_check(u32 addr, u32 width, u32 bytes)
-{
-    (void)addr;
-    (void)width;
-    (void)bytes;
     return HW_NOSYS;
 }
 static const struct pm_diag_slots kdebug_kexports[] = {{

@@ -1,6 +1,7 @@
 /* KAPI kdebug_call の受け口 (TASK_KPEEK §2-3)。本体は起動時に読む部品
  * (kdebug.bin の ops slot 19)。部品が無ければ OS32_ERR_NOSYS。 */
 #include "module.h"
+#include "platform_hwb_session.h"
 #ifdef PM_KDEBUG
 struct kdebug kdebug;
 #endif
@@ -19,6 +20,10 @@ i32 kdebug_call(u32 op, void *buf, u32 size)
         if (buf || size) return OS32_ERR_INVAL;
         return pcm_e4_run();
     }
+#endif
+#if PLATFORM_HWB_SESSION
+    if (op == PLATFORM_HWB_ENTER || op == PLATFORM_HWB_LEAVE)
+        return buf || size ? OS32_ERR_INVAL : exec_hwb_session(op);
 #endif
     return kdebug.ops.dbg_call ? kdebug.ops.dbg_call(op, buf, size)
                                : OS32_ERR_NOSYS;
