@@ -21,7 +21,7 @@ from kapi_target_ppc import ABSENT_PROVIDER_SLOTS, absent_result
 EXPECTED_ABSENT_SLOTS = frozenset("""
 buz_off buz_on ext2_format ext2_format_at fm_note_off fm_note_on
 fm_play_mml fm_set_tone_num fm_startup_sound
-gfx2_check_op gfx_osri_show
+gfx2_check_op
 hdd_geom_info ide_drive_present
 ide_get_info ide_identify ide_init ide_read_sector ide_write_sector
 ide_write_sectors ime_dict_info ime_dict_suspend ime_feed_key ime_get_mode
@@ -61,7 +61,7 @@ gfx2_connector_edid gfx2_mode_count gfx2_mode_get
 """.split())
 
 DISPLAY_PROVIDERS = GUI_SLOTS | PUBLISHED_GFX | frozenset("""
-gfx_set_palette_hal palette_get gfx_kapi_init_200 gfx_kapi_init gfx_shutdown gfx2_surface_create gfx2_surface_free gfx2_surface_desc
+kapi_osri_show gfx_set_palette_hal palette_get gfx_kapi_init_200 gfx_kapi_init gfx_shutdown gfx2_surface_create gfx2_surface_free gfx2_surface_desc
 gfx2_screen_surface gfx2_lock gfx2_unlock gfx2_submit gfx2_fence_query gfx2_fence_wait gfx2_cursor_image
 gfx_screen_owner gfx2_vblank_wait gfx2_palette gfx2_gamma
 gfx2_cursor_move gfx2_cursor_show gfx2_dpms
@@ -249,7 +249,7 @@ def verify(source, entries, extra_present=frozenset()):
     if any('#include "' + header + '"' not in source for header in ('gfx_hal.h', 'palette.h')):
         return False
     reference = (ROOT / 'kapi/kapi_generated.c').read_text()
-    for slot in PRESENT_SLOTS | GUI_SLOTS | PUBLISHED_GFX | {'kdebug_call', 'gfx_set_palette', 'gfx_get_palette'} | extra_present:
+    for slot in PRESENT_SLOTS | GUI_SLOTS | PUBLISHED_GFX | {'gfx_osri_show', 'kdebug_call', 'gfx_set_palette', 'gfx_get_palette'} | extra_present:
         wrapper = re.search(r'(?:void|int|i32) __cdecl wrap_' + slot + r'\([^)]*\)\n\{.*?\n\}', reference, re.S)
         if not wrapper or wrapper.group() not in source:
             return False
@@ -295,11 +295,13 @@ def generate(tmp, mutation=None, *, link=True, ide=False, fep=False):
         text = helper.read_text().replace('ABSENT_PROVIDER_SLOTS = frozenset().union(*(slots for slots, _ in PROVIDER_GROUPS.values()))', 'ABSENT_PROVIDER_SLOTS = frozenset()')
         helper.write_text(text)
     if mutation in ('group-empty', 'ime-empty'):
-        group = 'gfx' if mutation == 'group-empty' else 'ime'
+        group = 'sys' if mutation == 'group-empty' else 'ime'
         text = helper.read_text().replace(
             'IME_SLOTS = PROVIDER_GROUPS',
             'PROVIDER_GROUPS[' + repr(group) + '] = (frozenset(), frozenset())\nIME_SLOTS = PROVIDER_GROUPS')
         helper.write_text(text)
+    if mutation == 'osri-absent':
+        insert_group(helper, mutation, "    'osri_mut': (frozenset({'gfx_osri_show'}), frozenset()),\n")
     if mutation == 'kdebug-absent':
         insert_group(helper, mutation, "    'debug_mut': (frozenset({'kdebug_call'}), frozenset()),\n")
     if mutation == 'reboot-absent':
@@ -562,7 +564,7 @@ def main():
             return 1
         if '--mutate' in sys.argv:
             check_planar_link(tmp, cc, dirs)
-            for mutation in ('empty', 'zero', 'group-empty', 'ime-empty', 'reboot-absent', 'kdebug-absent', 'slot-swap', 'scroll-type', 'scroll-absent', 'present-absent', 'gfx2-present-absent', 'check-op-bound', 'pci-absent', 'mem-absent', 'db-absent'):
+            for mutation in ('empty', 'zero', 'group-empty', 'ime-empty', 'reboot-absent', 'kdebug-absent', 'osri-absent', 'slot-swap', 'scroll-type', 'scroll-absent', 'present-absent', 'gfx2-present-absent', 'check-op-bound', 'pci-absent', 'mem-absent', 'db-absent'):
                 path = tmp / mutation
                 path.mkdir()
                 mutated = generate(path, mutation, link=False)

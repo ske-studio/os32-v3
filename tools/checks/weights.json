@@ -708,6 +708,7 @@
     "ppc-console-cells": 95.786342,
     "ppc-db-guest": 265.0828255,
     "ppc-display-guest": 962.247072,
+    "ppc-osri-guest": 220.0,
     "ppc-display-lifecycle": 147.86274650000001,
     "ppc-fb": 688.2264720000001,
     "ppc-fep-boot-guest": 180,

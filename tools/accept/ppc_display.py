@@ -5,6 +5,8 @@ import hashlib
 import os
 from pathlib import Path
 import re
+import struct
+import zlib
 import subprocess
 import sys
 import tempfile
@@ -202,7 +204,44 @@ def present_pixels(s, evidence, case, serial, modes):
         rsh_command(s, 'echo $?', b'0\n')
 
 
-def observe(media, cpu, evidence, case, modes=()):
+def observe_osri(session, evidence, case):
+    """KAPI_SPEC §4-16: same valid input for normal, absent and swapped slots."""
+    from run import require
+    from usb_run import rsh_command
+
+    expected = b'OSRI NOSYS\n' if case != 'normal' else b'OSRI DONE\n'
+    rsh_command(session, '/bin/dispprb.bin osri', expected)
+    rsh_command(session, 'echo $?', b'0\n')
+    if case != 'normal':
+        return
+    from fb_pixel import read_ppm
+    from usb_run import keyboard_actions
+    read_log = lambda: (evidence / 'serial-a.log').read_text(errors='replace')
+    session.wait(lambda: 'protocol=01' in read_log(), 'OSRI USB keyboard')
+    key, _ = keyboard_actions(session.q, read_log, session.wait, evidence)
+
+    def fixed_pixels():
+        session.wait(lambda: session.word('osri_visible') == 1, 'fixed OSRI visible')
+        start = session.word('tick_count')
+        session.wait(lambda: (session.word('tick_count') - start) % 2**32 >= 4,
+                     'fixed image beyond 1 ms request')
+        path = evidence / 'osri-fixed.ppm'
+        session.q.call('screendump', {'filename': str(path)})
+        image = read_ppm(path)
+        for y in (64, 65, 463):
+            for x in (0, 1, 7, 8, 639):
+                color = bytes([255 if x % 8 == 0 else 0]) * 3
+                require(image.pixel(x, y) == color, f'fixed OSRI pixel {x},{y}')
+        key('esc')
+
+    rsh_command(session, '/bin/dispprb.bin osri-fixed', b'OSRI ESC\n', during=fixed_pixels)
+    rsh_command(session, 'echo $?', b'0\n')
+    fault = rsh_command(session, '/bin/dispprb.bin osri-fault')
+    require(b'[Process crashed]' in fault, 'OSRI caller fault')
+    rsh_command(session, 'echo $?', b'139\n')
+
+
+def observe(media, cpu, evidence, case, modes=(), osri=False):
     from link_sh_run import Session
     from kboot_run import serial as read_serial, validate_root
     from run import require
@@ -217,6 +256,13 @@ def observe(media, cpu, evidence, case, modes=()):
         require(session.agent.operator.ready['mode'] == 'cui', 'display RSH mode')
         serial = (evidence / 'serial-a.log').read_text(errors='replace')
         require('FB text ready' in serial, 'INDEX8 framebuffer console attached')
+        if osri:
+            observe_osri(session, evidence, case)
+            session.q.call('quit')
+            session.p.wait(timeout=5)
+            require(session.p.returncode == 0, 'OSRI QEMU exit')
+            print(('GREEN ' if case == 'normal' else 'RED ') + case + ' ' + cpu, flush=True)
+            return
         body = rsh_command(session, '/bin/dispprb.bin')
         status = rsh_command(session, 'echo $?')
         if case in EXPECTED:
@@ -310,11 +356,27 @@ def observe(media, cpu, evidence, case, modes=()):
         session.close()
 
 
+def osri_fixture(path, fixed=False):
+    """OSRI v2 layout in gfx/gfx_osri.h, one palette update on row 1."""
+    size = 128096 if fixed else 128096 + 8
+    data = bytearray(size)
+    struct.pack_into('<4s4H2BH6I4H', data, 0, b'OSRI', 2, 64, 640, 400,
+                     4, 1, 0, size, 64, 96, 128000, 128096, int(not fixed), 8, 0, 1, 0)
+    struct.pack_into('<H', data, 66, 0xfff)
+    data[96:96 + 32000] = bytes([0x80]) * 32000
+    if not fixed:
+        struct.pack_into('<HBBHH', data, 128096, 1, 0, 0, 0xfff, 0)
+    struct.pack_into('<I', data, 48, zlib.crc32(data))
+    path.write_bytes(data)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--build-only', action='store_true')
     parser.add_argument('--mutate', action='store_true')
-    parser.add_argument('--present', action='store_true', help='exercise public drawing and display recovery')
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument('--osri', action='store_true', help='exercise slot 257 and OF scanout')
+    group.add_argument('--present', action='store_true', help='exercise public drawing and display recovery')
     parser.add_argument('--case', action='append', help='build selected mutation and its normal control')
     args = parser.parse_args()
     cross = Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc'))
@@ -334,6 +396,12 @@ def main():
     print('evidence=' + str(work), flush=True)
     user = work / 'user'
     bins = [str(user / (app + '.bin')) for app in ('hello', 'dispprb', 'gfx2prob')]
+    if args.osri:
+        fixture = work / 'rows.osr'
+        osri_fixture(fixture)
+        fixed = work / 'fixed.osr'
+        osri_fixture(fixed, fixed=True)
+        bins.extend(map(str, (fixture, fixed)))
     options = ['IMAGE=kboot-link-sh', 'KBOOT_USB_KEY_TRACE=1', 'PPC_USER_FLOAT=', 'KB_SH_OUT=' + str(user),
                'KB_ROOT_BINS=' + ' '.join(bins)]
     os.environ.setdefault('SOURCE_DATE_EPOCH', '946684800')
@@ -342,6 +410,8 @@ def main():
     if args.present and args.mutate:
         cases += ('framebuffer-absent', *PRESENT_MUTATIONS, 'target-failure', 'target-gate-open')
         cases += ('init-absent', 'lease-kept')
+    if args.osri:
+        cases = ('normal', 'osri-absent', 'osri-slot-swap') if args.mutate else ('normal',)
     if args.case:
         unknown = set(args.case) - set(cases)
         if unknown:
@@ -353,11 +423,22 @@ def main():
         kernel = folder / 'kernel'
         if case in ABSENT:
             absent_bindings(folder, kernel / 'gen', case)
+        if case == 'osri-absent':
+            absent_bindings(folder, kernel / 'gen', case, ('gfx_osri_show',))
         if case == 'init-absent':
             absent_bindings(folder, kernel / 'gen', case, ('gfx_init_200',))
         if case == 'framebuffer-absent':
             absent_bindings(folder, kernel / 'gen', case, ('gfx_get_framebuffer',))
         mutation = []
+        if case == 'osri-slot-swap':
+            init = (ROOT / 'exec/exec_kapi_init.inc').read_text()
+            for slot, other in [('gfx_osri_show', 'sys_set_mtime'), ('sys_set_mtime', 'gfx_osri_show')]:
+                assignment = f'kapi->{slot} = wrap_{slot};'
+                assert init.count(assignment) == 1
+                init = init.replace(assignment, f'kapi->{slot} = wrap_{other};')
+            (folder / 'swapped_init.inc').write_text(init)
+            mutation = mutant_settings(folder, case, 'exec/exec.c',
+                                       '#include "exec_kapi_init.inc"', '#include "swapped_init.inc"')
         if case in PRESENT_MUTATIONS:
             mutation = mutant_settings(folder, case, *PRESENT_MUTATIONS[case])
         if case in ('target-failure', 'target-gate-open'):
@@ -390,9 +471,9 @@ def main():
         if not args.build_only:
             for cpu in ('7450', '7455'):
                 modes = PROBES.get(case, ()) if args.present else ()
-                observe(media, cpu, folder / cpu, case, modes)
+                observe(media, cpu, folder / cpu, case, modes, args.osri)
                 if case != 'normal':
-                    observe(normal_media, cpu, folder / (cpu + '-control'), 'normal', modes)
+                    observe(normal_media, cpu, folder / (cpu + '-control'), 'normal', modes, args.osri)
     print(f'{len(images)} distinct link-sh ELF images', flush=True)
     return 0
 

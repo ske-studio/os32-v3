@@ -1,3 +1,4 @@
+/* OSRI contract §3: gate, mount, PCM in short-circuit order before hook lookup. */
 #include "gfx2_bridge_fake.h"
 /* Real entry/loader/service/backend/control; deterministic scan and OS stubs. */
 #define _start raster_original_start
@@ -55,9 +56,10 @@ int con_sink_is_enabled(void) { return gui; }
 int appslot_gfx_owner(void) { return owner; }
 int appslot_stop_pending(void) { return stop_pending; }
 AppSlot *appslot_get(int id) { REQUIRE(id == 2); return &slot; }
-int serial_gate_active(void) { return gate; }
-int serialfs_is_mounted(void) { return mounted; }
-int pcm_state(void) { return pcm; }
+static int query_order;
+int serial_gate_active(void) { query_order = 1; return gate; }
+int serialfs_is_mounted(void) { REQUIRE(query_order == 1); query_order = 12; return mounted; }
+int pcm_state(void) { REQUIRE(query_order == 12); query_order = 123; return pcm; }
 void ring3_fault_kill(void) { kills++; }
 int caller_access_get(struct caller_access *c)
 { *c = (struct caller_access){ .origin = CALLER_USER, .app_id = 2 }; return 1; }
@@ -233,6 +235,15 @@ static void entry_and_failures(void)
     reset(1); file_size--; REQUIRE(show(1000) == OS32_ERR_IO && !commits);
     reset(1); file_data=wire_bad_crc; file_size=sizeof(wire_bad_crc);
     REQUIRE(show(1000) == OS32_ERR_INVAL && !commits);
+    for (int flags = 0; flags < 4; ++flags) {
+        reset(1); g_backend = 0; gate = flags & 1; mounted = flags & 2;
+        REQUIRE(kapi_osri_show(user_path, 1) == (flags ? OS32_ERR_BUSY : OS32_ERR_NOSYS));
+        REQUIRE(query_order == (gate ? 1 : mounted ? 12 : 123));
+    }
+    for (int state = PCM_ST_OPENING; state <= PCM_ST_FAULTED; ++state) {
+        reset(1); g_backend = 0; pcm = state;
+        REQUIRE(kapi_osri_show(user_path, 1) == OS32_ERR_BUSY && !opened);
+    }
     for (int fault=0; fault<7; fault++) {
         reset(1);
         if (fault==0) started=0;
@@ -253,6 +264,10 @@ static void entry_and_failures(void)
     reset(1); raster.dynamic_ok=0; REQUIRE(show(1) == OS32_ERR_NOSYS && !commits);
     reset(1); raster.mode=SPLASH_RASTER_31K+1;
     REQUIRE(show(1000) == OS32_ERR_NOSYS && !commits);
+    reset(1); file_data=wire_trailing; file_size=sizeof(wire_trailing);
+    REQUIRE(show(1000) == OS32_ERR_INVAL && !commits);
+    reset(1); file_data=wire_within; file_size=sizeof(wire_within);
+    REQUIRE(show(1000) == GFX_OSRI_SHOW_DONE && commits == 1);
     reset(1); file_data=wire_budget; file_size=sizeof(wire_budget);
     REQUIRE(show(1000) == OS32_ERR_NOSYS && !commits);
     reset(1); gui=1; owner=2; reenter=1;
@@ -273,8 +288,8 @@ static void deadlines(void)
     reset(1); frame_mode=PL_FRAME_NO_SYNC;
     REQUIRE(show(1000) == OS32_ERR_AGAIN && frame_calls == 1);
     reset(1); load_ticks=101;
-    REQUIRE(show(1000) == OS32_ERR_AGAIN && !frame_calls);
-    reset(1); REQUIRE(show(1) == OS32_ERR_AGAIN && !frame_calls);
+    REQUIRE(show(1000) == OS32_ERR_AGAIN && commits == 1 && !frame_calls);
+    reset(1); REQUIRE(show(1) == OS32_ERR_AGAIN && commits == 1 && !frame_calls);
     reset(1); tick_count=0xfffffff0u; frame_tick_step=1;
     REQUIRE(show(1000) == 0 && frame_calls == 70 && tick_count == 54);
     reset(1); keys[0]=OSRI_ESC_ASCII; key_count=1;

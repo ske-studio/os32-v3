@@ -5,6 +5,8 @@ from pathlib import Path
 import re
 import subprocess
 import tempfile
+import struct
+import zlib
 import host32
 from kernel_includes import include_flags
 from test_splash_wire import osri
@@ -20,6 +22,17 @@ SOURCES = ['tools/tests/gfx2_bridge_fake.h', 'tools/tests/osri_view_host.c', 'to
            'lib/le_internal.h', 'lib/crc32_core.inc']
 # Each tuple's last member names the runtime assertion group it must kill.
 MUTATIONS = (
+    ('skip first expired present', 'drivers/video/pc98/backend_pc98_osri.c',
+     '    struct PlV2Plan *plan = 0;',
+     '    if (image->count && (unsigned long long)(tick_count - ctl->start) * PL_RUN_TICK_US >= '
+     '(unsigned long long)ctl->duration_ms * 1000) return OS32_ERR_AGAIN;\n    struct PlV2Plan *plan = 0;',
+     'deadlines'),
+    ('PCM running only', 'gfx/gfx_osri_view.c', 'pcm_state() != PCM_ST_CLOSED',
+     'pcm_state() == PCM_ST_RUNNING', 'entry_and_failures'),
+    ('serial gate omitted', 'gfx/gfx_osri_view.c', 'serial_gate_active() ||',
+     '(0 && serial_gate_active()) ||', 'entry_and_failures'),
+    ('inverted time limit', 'kapi/kapi_osri.c', 'duration_ms > GFX_OSRI_SHOW_MAX_MS',
+     'duration_ms <= GFX_OSRI_SHOW_MAX_MS', 'entry_and_failures'),
     ('omit copy', 'kapi/kapi_osri.c',
      '!copy_caller_bytes(&caller, path + i, copy + i, 1)',
      '(copy[i] = path[i], 0)', 'entry_and_failures'),
@@ -56,6 +69,22 @@ MUTATIONS = (
      'if (poll && poll(ctx)) { /* continue visible scan */ }', 'boundaries_and_fixed'),
 )
 
+def wire_inputs(work):
+    """Same v2 row, 31 OUTs with one component per color or 32 with the last green."""
+    budget = osri(2)
+    within = bytearray(budget)
+    struct.pack_into('<H', within, len(within) - 4, 1)
+    struct.pack_into('<I', within, 48, 0)
+    struct.pack_into('<I', within, 48, zlib.crc32(within))
+    bad = bytearray(osri(True))
+    bad[96] ^= 1
+    data = [('fixed', osri()), ('events', osri(True)), ('budget', budget),
+            ('within', within), ('bad_crc', bad), ('trailing', osri(True) + b'X')]
+    (work / 'wire_data.h').write_text('\n'.join(
+        'static const unsigned char wire_' + name + '[] = {' + ','.join(map(str, value)) + '};'
+        for name, value in data))
+
+
 def execute(mutation=None):
     with tempfile.TemporaryDirectory(prefix='osri-view-') as td:
         work = Path(td)
@@ -70,12 +99,7 @@ def execute(mutation=None):
                 source = source.replace('static unsigned int inp(unsigned int port)\n{',
                                         'static unsigned int inp(unsigned int port)\n{\n    advance();')
             dst.write_text(source)
-        data = [('fixed', osri()), ('events', osri(True)), ('budget', osri(2))]
-        bad = bytearray(osri(True)); bad[96] ^= 1
-        data.append(('bad_crc', bad))
-        (work/'wire_data.h').write_text('\n'.join(
-            'static const unsigned char wire_'+name+'[] = {' + ','.join(map(str, value)) + '};'
-            for name, value in data))
+        wire_inputs(work)
         cc = str(Path(os.environ['CROSS_DIR'])/'bin/i386-elf-gcc')
         exe = work/'view'
         subprocess.run([cc, '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
@@ -87,6 +111,42 @@ def execute(mutation=None):
         if result.returncode:
             print('runtime rc=', result.returncode, result.stderr.decode(), flush=True)
         return result.returncode
+
+def powermac_view(mutate):
+    """DESIGN.final §3: bind before VFS, private planes, CLI Esc."""
+    view = ROOT / 'platform/powermac/osri_view.c'
+    platform = (ROOT / 'platform/powermac/platform_osri.h').read_text()
+    variants = [('CLI', view.read_text(), platform, 0, 0),
+                ('user shell', view.read_text(), platform, 1, 0)]
+    if mutate:
+        anchor = 'if (generation != of_fb_osri_generation())'
+        assert view.read_text().count(anchor) == 1
+        variants.append(('ignore load rebind', view.read_text().replace(anchor, 'if (!generation)'), platform, 0, 1))
+        anchor = '    osri_active = 0;'
+        assert view.read_text().count(anchor) == 1
+        variants.append(('clear borrowed packed CLIENT', view.read_text().replace(
+            anchor, '    client.planes[0][0] = 0;\n' + anchor), platform, 0, 1))
+        anchor = 'platform_osri_pcm_busy(void) { return 0; }'
+        assert platform.count(anchor) == 1
+        variants.append(('require audio provider', view.read_text(),
+                         platform.replace(anchor, anchor.replace('return 0', 'return 1')), 1, 1))
+    with tempfile.TemporaryDirectory() as td:
+        work = Path(td)
+        wire_inputs(work)
+        cc = Path(os.environ['CROSS_DIR']) / 'bin/i386-elf-gcc'
+        for name, source, header, usershell, expected in variants:
+            (work / 'platform_osri.h').write_text(header)
+            tmp_view = work / 'view.c'
+            tmp_view.write_text(source)
+            exe = work / 'test'
+            subprocess.run([str(cc), '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
+                '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib', '-nostdinc',
+                '-D__KERNEL_BUILD__', '-DKBOOT_SH=' + str(usershell), '-I' + str(work),
+                '-I' + str(ROOT / 'platform/powermac'), '-I' + str(ROOT), *include_flags(ROOT), str(tmp_view),
+                str(ROOT / 'gfx/gfx_osri.c'), str(ROOT / 'tools/tests/powermac_osri_host.c'),
+                '-lgcc', '-o', str(exe)], check=True)
+            assert host32.run([str(exe)], runner='qemu').returncode == expected, name
+            print(('RED ' if expected else 'GREEN ') + 'PowerMac view ' + name, flush=True)
 
 def no_division():
     with tempfile.TemporaryDirectory(prefix='osri-symbols-') as td:
@@ -104,6 +164,7 @@ def main():
     p=argparse.ArgumentParser(); p.add_argument('--mutate', action='store_true'); args=p.parse_args()
     assert execute() == 0
     print('GREEN A1/A2/A4/A5 entry, faults, error classification, ownership, cleanup, deadlines, input and IF boundary', flush=True)
+    powermac_view(args.mutate)
     no_division()
     if args.mutate:
         for mutation in MUTATIONS:
