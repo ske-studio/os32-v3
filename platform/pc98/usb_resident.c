@@ -218,7 +218,7 @@ int pc98_usb_resident_start(struct module_handle owner, struct pc98_usb_core *co
         if (!pc98_usb_is_ohci(&dev)) continue;
         found = 1;
         const char *stage = NULL;
-        if (!pc98_usb_ohci_quiet(i)) stage = "quiesce";
+        if (!pc98_usb_ohci_quiet(i, &hc->firmware)) stage = "quiesce";
         else if (pc98_usb_ohci_function(&dev, &hc->pci)) stage = "PCI/BAR";
         else if (usbp_mmio_map(&hc->pci, 0, &hc->regs)) stage = "BAR map";
         if (stage) {

@@ -2,6 +2,16 @@
 #define OHCI_PRIV_H
 #include "drivers/usb/usb_core.h"
 #include "drivers/usb/ohci_regs.h"
+/* NetBSD dev/usb/ohci.c:ohci_init saves these before resetting the bus. */
+static inline struct ohci_firmware ohci_firmware_read(volatile u8 *regs, u32 control)
+{
+    return (struct ohci_firmware){
+        .rha = mmio_rd32_le(regs + OHCI_RH_DESCRIPTOR_A),
+        .fi = OHCI_FMI_FI(mmio_rd32_le(regs + OHCI_FM_INTERVAL)),
+        .rwc = !!(control & OHCI_CTL_RWC), .valid = 1
+    };
+}
+
 #define OHCI_TREE_EDS 63u
 #define OHCI_SENTINEL_EDS 3u
 #define OHCI_FIXED_BYTES 1312u

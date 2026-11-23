@@ -73,6 +73,7 @@ static int log_compare(const char *a, const char *b)
     return *a - *b;
 }
 static u32 root_logs, hid_logs, initial_logs, read_mask, connected_mask;
+static u32 reset_fault;
 static u32 reset_logs, descriptor_logs, config_logs, unsupported_logs, walk_logs, scratch_logs;
 void usbp_log(const char *fmt, ...)
 {
@@ -110,7 +111,7 @@ static struct node *node_for(struct usb_dev *d)
 }
 static u32 port_status(struct node *n)
 {
-    return n->conn | ((u32)n->enabled << 1) | ((u32)n->power << 8) |
+    return ((reset_fault == 1 && n->resets) ? (1u << USB_PORT_RESET) : 0) | n->conn | ((u32)n->enabled << 1) | ((u32)n->power << 8) |
         ((u32)n->connect_change << 16) | ((u32)n->enable_change << 17) |
         ((u32)n->reset_change << 20);
 }
@@ -118,12 +119,15 @@ static void port_act(struct node *n, u8 op)
 {
     switch (op) {
     case USB_RH_RESET:
-        reset_count++; n->resets++; n->addr = 0; n->enabled = 1;
-        n->reset_change = !n->reset_fail && !(n->re_fail && n->resets == 2); n->resets_at = now;
+        reset_count++; n->resets++; n->addr = 0; n->enabled = reset_fault != 2;
+        n->reset_change |= !n->reset_fail && !(n->re_fail && n->resets == 2); n->resets_at = now;
         for (u32 i=0;i<8;i++) if (&nodes[i] != n && nodes[i].conn && nodes[i].enabled && !nodes[i].addr) overlap++;
         break;
     case USB_RH_CLEAR_CONNECT: n->connect_change = 0; break;
-    case USB_RH_CLEAR_RESET: n->reset_change = 0; break;
+    case USB_RH_CLEAR_RESET:
+        n->reset_change = 0;
+        if (reset_fault == 3) n->conn = 0;
+        break;
     case USB_RH_CLEAR_ENABLE: n->enabled = 0; break;
     case USB_RH_SET_ENABLE: n->enabled = 1; break;
     case USB_RH_CLEAR_ENABLE_CHANGE: n->enable_change = 0; break;
@@ -410,7 +414,7 @@ static int scenario(int c)
         REQUIRE(devices()==3 && nodes[0].resets==1 && nodes[1].resets==1);
     } else if(c==21) { /* F8v: disconnect while old child is being freed. */
         plug(0,1);pump(800);nodes[0].connect_change=1;hc.needs_explore=1;pump(5);nodes[0].conn=0;pump(800);
-        REQUIRE(devices()==0 && nodes[0].resets==1);
+        REQUIRE(devices()==0 && nodes[0].resets==1 && !reset_logs);
     } else if(c==22) { /* F8v: fresh status after reset triggers one repeat. */
         plug(0,1);swap_on_reset=1;pump(1600);REQUIRE(devices()==1 && nodes[0].resets==2 && attached==1);
     } else if(c==23) { /* F8l: retrieve 300 bytes, not only nine. */
@@ -509,6 +513,23 @@ static int scenario(int c)
         plug(0, 3);
         pump(1600);
         REQUIRE(child_logs == 1 && !devices() && initial_logs == 1);
+    } else if (c >= 40 && c <= 43) {
+        plug(0, 1);
+        reset_fault = c - 39;
+        nodes[0].reset_change = 1;
+        nodes[0].reset_fail = c == 43;
+        pump(1200);
+        REQUIRE(reset_logs == 1 && !devices());
+        REQUIRE(nodes[0].resets == (c == 42 ? 0 : 1));
+    } else if (c == 44 || c == 45) {
+        plug(0, 4);
+        pump(1200);
+        REQUIRE(devices() == 1);
+        reset_fault = c - 43; /* External hub reports PRSC with PRS set or PES clear. */
+        plug(4, 1);
+        hc.needs_explore = 1;
+        pump(1600);
+        REQUIRE(nodes[4].resets && devices() == 2 && attached == 1 && !reset_logs);
     } else return 2;
     REQUIRE(child_logs == (c == 39));
     return failed;

@@ -138,8 +138,11 @@ static void start(void)
     page_limit=NPAGES;
     for(u32 h=0;h<2;h++) {
         hcs[h].regs=regs[h]; hcs[h].ops=&ohci_ops;
-        rput(h,OHCI_FM_INTERVAL,11999); rput(h,OHCI_RH_DESCRIPTOR_A,h ? 1:3);
-        REQUIRE(!ohci_start(&hcs[h])); REQUIRE(!usb_hc_register(&hcs[h]));
+        rput(h,OHCI_FM_INTERVAL,11999); rput(h,OHCI_RH_DESCRIPTOR_A,h ? 1 : (3 | OHCI_RHA_PSM | (10u << 24)));
+        rput(h,OHCI_RH_DESCRIPTOR_B,h ? 0 : 0x000e0000u);
+        REQUIRE(!ohci_start(&hcs[h]));
+        if (!h) REQUIRE(now_us - last_power_us >= 20000u);
+        REQUIRE(!usb_hc_register(&hcs[h]));
     }
 }
 static u32 dev_count(u32 h)
@@ -155,7 +158,11 @@ static u32 blocks(u32 h)
 }
 static void connect_all(void)
 {
-    for(u32 p=1;p<=3;p++) rput(0,OHCI_RH_PORT_STATUS(p),OHCI_PORT_CCS|OHCI_PORT_CSC|OHCI_PORT_PPS);
+    for(u32 p=1;p<=3;p++) {
+        u32 status = rget(0,OHCI_RH_PORT_STATUS(p));
+        if (status & OHCI_PORT_PPS)
+            rput(0,OHCI_RH_PORT_STATUS(p),status|OHCI_PORT_CCS|OHCI_PORT_CSC);
+    }
     rput(1,OHCI_RH_PORT_STATUS(1),OHCI_PORT_CCS|OHCI_PORT_CSC|OHCI_PORT_PPS);
     hub_ports[0]=hub_ports[1]=1u|(1u<<USB_C_PORT_CONNECTION);
     pump(3200);

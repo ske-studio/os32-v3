@@ -14,7 +14,10 @@ static u32 mem_top, mem_frees, page_frees, quarantines, now_us;
 static u8 page_state[NPAGES];
 static u32 page_limit, bad_boundary, fail_mem, bm_fail, fail_after_bm;
 static u32 writes, early_mie, gone_count, notifications, status_count;
-static u32 data_bytes;
+static u32 lose_settings, ir_warnings, port_reports, report_time;
+static u32 port_masks[4];
+static const char *power_warning;
+static u32 data_bytes, last_power_us;
 static u32 alloc_off[512], alloc_size[512], alloc_count;
 static u8 alloc_freed[512];
 static u32 held_bus[MAX_HELD], held_next[MAX_HELD], held_count;
@@ -123,7 +126,7 @@ void mmio_wr32_le(volatile void *p, u32 v)
         old &= ~(v & 0x1f0000u);
         if (v & OHCI_PORT_CCS) { if (!no_pes) old &= ~OHCI_PORT_PES; }
         if (v & OHCI_PORT_PES) old |= OHCI_PORT_PES;
-        if (v & OHCI_PORT_PPS) old |= OHCI_PORT_PPS;
+        if (v & OHCI_PORT_PPS) { old |= OHCI_PORT_PPS; last_power_us = now_us; }
         if (v & OHCI_PORT_PRS) {
 #ifdef USB_STACK
             ++port_reset_writes[h];
@@ -134,6 +137,11 @@ void mmio_wr32_le(volatile void *p, u32 v)
         }
         rput((u32)h, off, old);
     } else {
+        if (lose_settings && off == OHCI_CONTROL && !(v & OHCI_CTL_HCFS_MASK)) {
+            rput(h, OHCI_FM_INTERVAL, 11999);
+            rput(h, OHCI_RH_DESCRIPTOR_A, 3);
+        }
+        if (off == OHCI_RH_STATUS && v == OHCI_RHS_LPSC) last_power_us = now_us;
         rput((u32)h, off, v);
         if (off == OHCI_CONTROL && (v & OHCI_CTL_HCFS_MASK) == OHCI_CTL_OPERATIONAL) {
             struct ohci_hcca *hcca = bus_va(rget((u32)h, OHCI_HCCA));
@@ -255,7 +263,18 @@ static int log_equal(const char *a, const char *b)
 }
 void usbp_log(const char *s, ...)
 {
-    const char *expected = "[usb] ohci %u:%u.%u ports=%u rev=%02x";
+    const char *expected = "[usb] ohci %u:%u.%u ports=%u rev=%02x rha=%08x rhb=%08x";
+    if (log_equal(s, "[usb] %u:%u.%u warning: IR remains after OCR, forcing reset")) ir_warnings++;
+    if (log_equal(s, "[usb] %u:%u.%u ports(bit0=port1) pps=%x oci=%x ccs=%x lsda=%x%s")) {
+        __builtin_va_list ap;
+        __builtin_va_start(ap, s);
+        for (u32 i = 0; i < 3; ++i) (void)__builtin_va_arg(ap, unsigned);
+        for (u32 i = 0; i < 4; ++i) port_masks[i] = __builtin_va_arg(ap, unsigned);
+        power_warning = __builtin_va_arg(ap, const char *);
+        __builtin_va_end(ap);
+        port_reports++;
+        report_time = now_us;
+    }
     if (log_equal(s, expected)) ohci_logs++;
     if (log_equal(s, "[usb] %u:%u.%u failed: %s")) {
         __builtin_va_list ap;
@@ -440,6 +459,7 @@ static const struct usb_class cls = { .gone = gone };
 
 static void fresh(void)
 {
+    lose_settings = ir_warnings = port_reports = last_power_us = 0;
     ohci_logs = start_errors = 0;
     start_reason = "";
     zero(hcs, sizeof(hcs)); zero(regs, sizeof(regs));
@@ -672,8 +692,50 @@ static void periodic(void)
 }
 static void root_ports(void)
 {
+    static const u32 saved_fi[] = {0, 209, 11992, 11993, 12005, 12006, 0x3fff};
+    static const u32 expected_fi[] = {11999, 11999, 11999, 11993, 12005, 11999, 11999};
+    for (u32 i = 0; i < sizeof(saved_fi) / sizeof(saved_fi[0]); ++i) {
+        fresh();
+        lose_settings = 1;
+        rput(0, OHCI_FM_INTERVAL, saved_fi[i]);
+        REQUIRE(!ohci_start(&hcs[0]));
+        u32 interval = rget(0, OHCI_FM_INTERVAL);
+        REQUIRE(OHCI_FMI_FI(interval) == expected_fi[i]);
+        REQUIRE(OHCI_FMI_FSMPS(interval) == (expected_fi[i] - 210) * 6 / 7);
+    }
     u32 st;
     fresh(); REQUIRE(ohci_start(&hcs[0]) == 0);
+    REQUIRE(rget(0, OHCI_RH_STATUS) == OHCI_RHS_LPSC);
+    REQUIRE(!rget(0, OHCI_RH_PORT_STATUS(1)));
+    fresh();
+    rput(0, OHCI_RH_DESCRIPTOR_A, 3 | OHCI_RHA_NPS | OHCI_RHA_PSM);
+    rput(0, OHCI_RH_DESCRIPTOR_B, 0xffff0000u);
+    for (u32 port = 1; port <= 3; ++port)
+        rput(0, OHCI_RH_PORT_STATUS(port), OHCI_PORT_PPS);
+    rput(0, OHCI_CONTROL, OHCI_CTL_IR);
+    REQUIRE(!ohci_start(&hcs[0]));
+    REQUIRE(!rget(0, OHCI_RH_STATUS) && !last_power_us);
+    REQUIRE(port_reports == 1 && port_masks[0] == 7 && !*power_warning && !ir_warnings);
+    fresh();
+    lose_settings = no_ownership = 1;
+    rput(0, OHCI_CONTROL, OHCI_CTL_IR | OHCI_CTL_RWC);
+    rput(0, OHCI_FM_INTERVAL, 12000);
+    rput(0, OHCI_RH_PORT_STATUS(2), OHCI_PORT_POCI);
+    rput(0, OHCI_RH_PORT_STATUS(3), OHCI_PORT_CCS | OHCI_PORT_LSDA);
+    rput(0, OHCI_RH_DESCRIPTOR_A, 3 | OHCI_RHA_PSM | (75u << 24));
+    rput(0, OHCI_RH_DESCRIPTOR_B, 0x000a0000u);
+    REQUIRE(!ohci_start(&hcs[0]));
+    REQUIRE(rget(0, OHCI_RH_STATUS) == OHCI_RHS_LPSC);
+    REQUIRE(rget(0, OHCI_RH_PORT_STATUS(1)) == OHCI_PORT_PPS);
+    REQUIRE(rget(0, OHCI_RH_PORT_STATUS(2)) == OHCI_PORT_POCI);
+    REQUIRE(rget(0, OHCI_RH_PORT_STATUS(3)) == (OHCI_PORT_PPS | OHCI_PORT_CCS | OHCI_PORT_LSDA));
+    REQUIRE(port_reports == 1 && report_time - last_power_us >= 150000u);
+    REQUIRE(port_masks[0] == 5 && port_masks[1] == 2 && port_masks[2] == 4 && port_masks[3] == 4);
+    REQUIRE(log_equal(power_warning, " warning: port power off") && ir_warnings == 1);
+    REQUIRE(rget(0, OHCI_CONTROL) & OHCI_CTL_RWC);
+    REQUIRE(OHCI_FMI_FI(rget(0, OHCI_FM_INTERVAL)) == 12000);
+    REQUIRE(OHCI_FMI_FSMPS(rget(0, OHCI_FM_INTERVAL)) == (12000 - 210) * 6 / 7);
+    REQUIRE(now_us - last_power_us >= 150000u);
     REQUIRE(ohci_rh_port(&hcs[0], 0, USB_RH_STATUS, &st) == -USB_E_INVAL);
     REQUIRE(ohci_rh_port(&hcs[0], 4, USB_RH_STATUS, &st) == -USB_E_INVAL);
     rput(0, OHCI_RH_PORT_STATUS(1), OHCI_PORT_CCS | OHCI_PORT_CSC);
