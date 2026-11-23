@@ -52,7 +52,7 @@ $(addsuffix .o,$(PPC_USER_APPS)): $(PPC_USER_OUT)/%.o: userland/ppc/%.c | $(PPC_
 	$(CC) $(PPC_USER_FLAGS) -c $< -o $@
 
 PPC_GUIPROB := $(PPC_USER_OUT)/$(if $(filter 1,$(PPC_C_GUI)),c-gui/)guiprob
-$(PPC_GUIPROB).o: userland/ppc/guiprob.c build/ppc-user.mk | $(PPC_USER_OUT)
+$(PPC_GUIPROB).o: userland/ppc/guiprob.c userland/ppc/guiprob_exclusive.h build/ppc-user.mk | $(PPC_USER_OUT)
 	@mkdir -p $(@D)
 	$(CC) $(PPC_USER_FLAGS) $(if $(filter 1,$(PPC_C_GUI)),-DC_GUI_ACCEPT) -c $< -o $@
 
@@ -128,7 +128,7 @@ $(PPC_GUI_OBJ): $(PPC_RES_DIR)/%.o: %.c build/ppc-user.mk $(SDK_KAPI_HDR)
 PPC_GUI_LIB := $(PPC_RES_DIR)/cargo/powerpc-os32-none/release/libgshell.a
 .PHONY: ppc-gshell-cargo
 PPC_GSHELL_DIR ?= userland/gshell
-PPC_GUI_TRIAL ?= normal
+PPC_GUI_TRIAL ?= d-input
 $(PPC_GUI_LIB): ppc-gshell-cargo
 	cd $(PPC_GSHELL_DIR) && PPC_GUI_TRIAL="$(PPC_GUI_TRIAL)" PATH="$(PPC_CROSS_DIR)/bin:$$PATH" OS32_PPC_RESIDENT=1 OS32_SDK_TARGET=$(SDK_TARGET) RUSTC_WRAPPER=$(CURDIR)/sdk/rustc_stamp.py cargo build --release $(if $(filter 1,$(PPC_C_GUI)),--features c_gui_accept) --target ../../sdk/rust/powerpc-os32-none.json --target-dir $(abspath $(PPC_RES_DIR)/cargo)
 

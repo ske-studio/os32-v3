@@ -2,7 +2,7 @@
 #define OS32_PLATFORM_INPUT_CAPS_H
 
 #ifndef IN2_PUBLIC_EXCLUSIVE
-#define IN2_PUBLIC_EXCLUSIVE 0
+#define IN2_PUBLIC_EXCLUSIVE 1
 #endif
 
 #endif

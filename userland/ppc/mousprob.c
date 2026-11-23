@@ -8,9 +8,10 @@ static int check(KernelAPI *api, const char *command)
     if (!strcmp(command, "present")) {
         IN2_Status before, after;
         if (api->in2_status(&before) || before.acquired ||
-            api->in2_acquire(IN2_EXCL_KBD | IN2_EXCL_MOUSE) != OS32_ERR_NOSYS ||
+            api->in2_acquire(IN2_EXCL_KBD | IN2_EXCL_MOUSE) ||
+            api->in2_status(&after) || !after.acquired || api->in2_unacquire() ||
             api->in2_status(&after) || after.acquired ||
-            after.focus_owner != before.focus_owner || after.focus_gen != before.focus_gen)
+            after.focus_owner != before.focus_owner || after.focus_gen != before.focus_gen + 2)
             return 8;
     }
     MouseInfo m;

@@ -8,7 +8,6 @@ local emu_agent orchestration are integrated. See os32-emu-config/SKILL.md.
 """
 import argparse
 from contextlib import contextmanager
-import fcntl
 import hashlib
 import json
 import os
@@ -446,6 +445,7 @@ def prepare(snapshot, output, changes):
     fsynced and verified before prepared.bin is atomically published. Receipt
     is published last; incomplete bundles cannot be restored by this tool.
     """
+    import fcntl
     original = read_snapshot(snapshot)
     candidate, _ = transform(original, changes)
     name = 'np21w-offline-' + uuid.uuid4().hex
@@ -475,6 +475,7 @@ def restore(bundle, apply=False):
     provenance. No receipt-specified paths or shell commands are accepted.
     This is not a live restore API or a stopped-emulator assertion.
     """
+    import fcntl
     with _directory(bundle) as fd:
         fcntl.flock(fd, fcntl.LOCK_EX)
         try:

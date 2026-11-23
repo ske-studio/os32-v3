@@ -95,14 +95,15 @@ def run(ctx):
         ])
     with tempfile.TemporaryDirectory() as td:
         folder = Path(td)
-        common = ['gcc', '-m32', '-DHOST_ARCH_SHARED_IF', '-ffreestanding',
+        common = ['gcc', '-m32', '-DHOST_ARCH_SHARED_IF', '-ffreestanding', '-nostdinc',
+            '-isystem', subprocess.check_output(['gcc', '-print-file-name=include'], text=True).strip(),
             '-DOS32_HOOK_GUI=0', '-fno-pie', '-ffunction-sections', '-Werror=implicit-function-declaration',
             '-Itools/tests/host_arch', '-Iinput/hal']
         binary = folder / 'test'
         for arch, machine, flags, mutations in [
                 ('x86', 'pc98', ['-DIN2_PUBLIC_EXCLUSIVE=1'], cases),
                 ('x86', 'pc98', [], []),
-                ('ppc', 'powermac', ['-DTEST_CLOSED_ACQUIRE'], [])]:
+                ('ppc', 'powermac', [], [])]:
             include_var = 'INC_KERNEL' if arch == 'x86' else 'KB_INC'
             query = 'input-focus-paths: ; @echo $(filter -Iarch/% -Iplatform/%,$(' + include_var + '))'
             dirs = subprocess.check_output(['make', '-s', '--no-print-directory', f'ARCH={arch}',
@@ -113,9 +114,8 @@ def run(ctx):
             variants = [('', '', ''), *mutations]
             header = 'platform_input_caps.h'
             if ctx.mutate and '-DIN2_PUBLIC_EXCLUSIVE=1' not in flags:
-                value = int(machine == 'pc98')
-                variants.append((header, f'#define IN2_PUBLIC_EXCLUSIVE {value}',
-                                 f'#define IN2_PUBLIC_EXCLUSIVE {1 - value}'))
+                variants.append((header, '#define IN2_PUBLIC_EXCLUSIVE 1',
+                                 '#define IN2_PUBLIC_EXCLUSIVE 0'))
             units = {}
             paths = {header: ctx.root / 'platform' / machine / header}
             for path in [*sources, 'tools/tests/input_focus_host.c']:
@@ -145,5 +145,7 @@ def run(ctx):
                     cwd=ctx.root, check=True)
                 rc = subprocess.run(['qemu-i386', binary]).returncode
                 assert (0 < rc <= 49) if name else rc == 0, (name, old, rc)
+                if name == 'in2_reclaim.c' and old.strip() == 'in2_excl_release(owner);':
+                    assert rc == 11, ('first LOST_EXCL after reclaim', rc)
                 print('RED runtime' if name else 'PASS', machine, name, old.splitlines()[0] if old else '', flush=True)
     return 0

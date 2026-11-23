@@ -45,6 +45,16 @@ static int wait_devices(int *kb, int *mouse)
 
 #ifdef C_GUI_ACCEPT
 static int probe_owner, probe_window;
+static const char *trial_name;
+static int seamless_dev;
+
+static int seamless_sample(const IN2_Event *e)
+{
+    return seamless_dev && e->dev == seamless_dev &&
+        (e->type == IN2_EV_ABS ||
+         (e->type == IN2_EV_MOVE && !e->u.move.dx && !e->u.move.dy));
+}
+
 #endif
 
 static int next_input(int step, int kind, int dev, int a, int b)
@@ -68,9 +78,10 @@ static int next_input(int step, int kind, int dev, int a, int b)
             continue;
         }
 #ifdef C_GUI_ACCEPT
+        if (seamless_sample(&e)) continue;
         char line[128];
-        snprintf(line, sizeof(line), "C-GUI normal op=%d owner=%d window=%d dev=%u type=%u\n",
-                 step, probe_owner, probe_window, (unsigned)e.dev, (unsigned)e.type);
+        snprintf(line, sizeof(line), "C-GUI %s op=%d owner=%d window=%d dev=%u type=%u\n",
+                 trial_name, step, probe_owner, probe_window, (unsigned)e.dev, (unsigned)e.type);
         api->serial_puts(line);
 #else
         (void)step;
@@ -104,10 +115,15 @@ static int window(const char *name, int x, int y)
     return api->gui_call(GUI_OP_WIN_CREATE, 0);
 }
 
+#ifdef C_GUI_ACCEPT
+#include "guiprob_exclusive.h"
+#endif
+
 int main(int argc, char **argv, KernelAPI *kernel)
 {
 #ifdef C_GUI_ACCEPT
-    if (argc != 2 || strcmp(argv[1], "normal")) return 1;
+    if (argc != 2) return 1;
+    trial_name = strcmp(argv[1], "d-input") ? argv[1] : "normal";
 #else
     (void)argc; (void)argv;
 #endif
@@ -121,6 +137,9 @@ int main(int argc, char **argv, KernelAPI *kernel)
     request = (void *)(base + GUI_SLOT_REQ_OFF);
     response = (void *)(base + GUI_SLOT_RESP_OFF);
 
+#ifdef C_GUI_ACCEPT
+    if (strcmp(argv[1], "d-input")) return exclusive_trial(argv[1]);
+#endif
     int kb, mouse;
     int rc = wait_devices(&kb, &mouse);
     if (rc) return rc;
@@ -147,23 +166,34 @@ int main(int argc, char **argv, KernelAPI *kernel)
     rc = api->gui_call(GUI_OP_WAIT, 2);
     if (rc < 0) return failed("WAIT before acquire", rc, 4);
 #endif
+    IN2_Event queued[8];
+    int count;
+    do { count = api->in2_read(queued, 8); } while (count > 0);
+    if (count < 0) return failed("in2_read", count, 4);
     rc = api->in2_acquire(3);
-    if (rc != OS32_ERR_NOSYS) return failed("in2_acquire", rc, 4);
+    if (rc) return failed("in2_acquire", rc, 4);
+    if (api->in2_read(queued, 1) != 1 || queued[0].type != IN2_EV_LOST ||
+        queued[0].u.lost.reason != IN2_LOST_EXCL) return failed("acquire LOST", 0, 4);
 #ifdef C_GUI_ACCEPT
     api->serial_puts("C-GUI acquire after\n");
     rc = api->gui_call(GUI_OP_WAIT, 2);
     if (rc < 0) return failed("WAIT after acquire", rc, 4);
+#endif
+    rc = api->in2_unacquire();
+    if (rc) return failed("in2_unacquire", rc, 4);
+    if (api->in2_read(queued, 1) != 1 || queued[0].type != IN2_EV_LOST ||
+        queued[0].u.lost.reason != IN2_LOST_EXCL) return failed("release LOST", 0, 4);
+#ifdef C_GUI_ACCEPT
+    api->serial_puts("C-GUI acquire released\n");
+    rc = api->gui_call(GUI_OP_WAIT, 2);
+    if (rc < 0) return failed("WAIT after release", rc, 4);
 #endif
     rc = api->in2_status(&after);
     if (rc) return failed("in2_status after", rc, 4);
     if (after.acquired) return failed("after.acquired", after.acquired, 4);
     if (!before.focus_owner || before.focus_owner != after.focus_owner)
         return failed("focus_owner", after.focus_owner, 4);
-    if (before.focus_gen != after.focus_gen) return failed("focus_gen", after.focus_gen, 4);
-    IN2_Event queued[8];
-    int count;
-    do { count = api->in2_read(queued, 8); } while (count > 0);
-    if (count < 0) return failed("in2_read", count, 4);
+    if (before.focus_gen + 2 != after.focus_gen) return failed("focus_gen", after.focus_gen, 4);
 #ifdef C_GUI_ACCEPT
     probe_owner = before.focus_owner;
     probe_window = right;

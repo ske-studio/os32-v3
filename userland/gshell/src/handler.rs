@@ -447,12 +447,12 @@ fn op_wait(st: &mut GuiState, owner: i32, slot_no: usize, arg: u32) -> i32 {
         }
     }
     #[cfg(feature = "c_gui_accept")]
-    if timeout == 2 {
-        // The probe brackets acquire with two-tick WAIT calls.
+    if timeout == 2 || timeout == 3 {
+        // Two ticks requests a serial sample. Three returns the completed cycle to the probe.
         let mut sample = os32api::av::IN2_WmState { size: 0, gen: 0, excl: 0, owner: 0 };
         let rc = unsafe { (os32api::api().in2_wm_state)(&mut sample) };
-        crate::gserial::reply_to(false, b"!", format_args!("C-GUI WM sample {} {} {} {} {} {}",
-            rc, st.front_id(), st.front_owner(), sample.excl, sample.owner, sample.gen));
+        report_accept_sample(st, slot_no, owner, timeout,
+                             rc, sample);
     }
     ring::pending(st, slot_no) as i32
 }
@@ -782,4 +782,20 @@ fn op_timer_set(st: &mut GuiState, owner: i32, slot_no: usize, _arg: u32) -> i32
 fn op_timer_kill(st: &mut GuiState, owner: i32, slot_no: usize, _arg: u32) -> i32 {
     let req: reqs::GuiReqTimerKill = unsafe { slot::read_req(st, slot_no) };
     timer::kill(st, owner, req.window, req.timer_id)
+}
+
+#[cfg(feature = "c_gui_accept")]
+fn report_accept_sample(st: &GuiState, slot_no: usize, owner: i32, timeout: u32,
+                        rc: i32, sample: os32api::av::IN2_WmState) {
+    if timeout == 2 {
+        crate::gserial::reply_to(false, b"!", format_args!("C-GUI WM sample {} {} {} {} {} {}",
+            rc, st.front_id(), st.front_owner(), sample.excl, sample.owner, sample.gen));
+    } else {
+        slot::write_resp(st, slot_no, [rc, st.front_id() as i32, st.front_owner(),
+            sample.owner as i32, sample.excl as i32, sample.gen as i32, st.drag_index,
+            input::captured_window(1), input::captured_window(2), st.synth_buttons as i32,
+            st.drag_frame.is_empty() as i32,
+            crate::excl::DELIVERIES.load(core::sync::atomic::Ordering::Relaxed) as i32, owner,
+            (st.excl.observed == st.excl.settled) as i32]);
+    }
 }
