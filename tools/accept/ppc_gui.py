@@ -127,7 +127,11 @@ def observe(media, cpu, folder, case, user):
         assert history == [('bin/gshell', ''), ('', str(status))] * (
             3 if case == 'fault' else 1) + [('sys/shell', '')], history
         s.wait(s.ready, 'CUI ready', 60)
+        # Closing rshell observes the ESC press. Its USB release can arrive later.
+        esc_start = len(serial(log))
         s.close_rshell()
+        s.wait(lambda: 'USB KEY src=1 sc=00 down=0 usage=29' in serial(log)[esc_start:],
+               'USB Escape release before cooked input')
         tap, type_keys = keyboard_actions(s.q, lambda: serial(log), s.wait, folder)
         type_keys('echo cooked')
         tap('ret')
