@@ -57,7 +57,7 @@ static int start_fail(struct usb_hc *hc, const char *stage)
 
 int ohci_start(struct usb_hc *hc)
 {
-    u32 i, fi, desca;
+    u32 i, fi, desca = 0, descb;
     struct ohci_dmamem *m;
     if (hc->state == HC_DEAD) return -USB_E_HC;
     hc->state = HC_STARTING;
@@ -101,22 +101,34 @@ int ohci_start(struct usb_hc *hc)
     ohci_wr(hc, OHCI_FM_INTERVAL, ((ohci_rd(hc, OHCI_FM_INTERVAL) ^
             0x80000000u) & 0x80000000u) | (((fi - 210u) * 6u / 7u) << 16) | fi);
     ohci_wr(hc, OHCI_PERIODIC_START, fi * 9u / 10u);
-    desca = ohci_rd(hc, OHCI_RH_DESCRIPTOR_A);
-    ohci_wr(hc, OHCI_RH_DESCRIPTOR_A, desca | OHCI_RHA_NOCP);
-    ohci_wr(hc, OHCI_RH_STATUS, OHCI_RHS_LPSC);
-    usbp_udelay(5000); /* FreeBSD OHCI_ENABLE_POWER_DELAY = 5ms */
-    ohci_wr(hc, OHCI_RH_DESCRIPTOR_A, desca);
     hc->nports = 0;
     for (i = 0; i < 10 && !hc->nports; ++i) {
         usbp_udelay(5000); /* OHCI_READ_DESC_DELAY */
-        hc->nports = (u8)(ohci_rd(hc, OHCI_RH_DESCRIPTOR_A) & OHCI_RHA_NDP_MASK);
+        desca = ohci_rd(hc, OHCI_RH_DESCRIPTOR_A);
+        hc->nports = (u8)(desca & OHCI_RHA_NDP_MASK);
     }
     if (!hc->nports || hc->nports > USB_RH_PORTS_MAX) return start_fail(hc, "port count");
+    descb = ohci_rd(hc, OHCI_RH_DESCRIPTOR_B);
+    if (!(desca & OHCI_RHA_NPS)) {
+        /* OpenHCI 1.0a §7.4.1-4: PPCM bit 1 describes port 1.
+         * Ports outside PPCM share the global switch even in individual mode. */
+        u32 individual = (desca & OHCI_RHA_PSM) ? descb >> 16 : 0;
+        u32 ports = (2u << hc->nports) - 2u;
+        ohci_wr(hc, OHCI_RH_DESCRIPTOR_A, desca | OHCI_RHA_NOCP);
+        if (ports & ~individual) ohci_wr(hc, OHCI_RH_STATUS, OHCI_RHS_LPSC);
+        for (i = 1; i <= hc->nports; ++i)
+            if (individual & (1u << i))
+                ohci_wr(hc, OHCI_RH_PORT_STATUS(i), OHCI_PORT_PPS);
+        usbp_udelay(5000); /* FreeBSD OHCI_ENABLE_POWER_DELAY quirk */
+        ohci_wr(hc, OHCI_RH_DESCRIPTOR_A, desca);
+        /* The platform delay may cap long calls. Wait in POTPGT units. */
+        for (i = 0; i < (desca >> 24); ++i) usbp_udelay(2000);
+    }
     hc->stop_frame = ohci_frame(hc);
     hc->stop_deadline_ms = usbp_ms() + USB_DMA_DELAY_MS;
     hc->state = HC_RUNNING;
-    usbp_log("[usb] ohci %u:%u.%u ports=%u rev=%02x", hc->pci.bus, hc->pci.dev,
-             hc->pci.fn, hc->nports, ohci_rd(hc, OHCI_REVISION) & 0xffu);
+    usbp_log("[usb] ohci %u:%u.%u ports=%u rev=%02x rha=%08x rhb=%08x", hc->pci.bus, hc->pci.dev,
+             hc->pci.fn, hc->nports, ohci_rd(hc, OHCI_REVISION) & 0xffu, desca, descb);
     if (hc->has_irq) ohci_wr(hc, OHCI_INTERRUPT_ENABLE, OHCI_INTR_MIE);
     return 0;
 }

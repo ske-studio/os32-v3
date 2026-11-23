@@ -14,7 +14,7 @@ static u32 mem_top, mem_frees, page_frees, quarantines, now_us;
 static u8 page_state[NPAGES];
 static u32 page_limit, bad_boundary, fail_mem, bm_fail, fail_after_bm;
 static u32 writes, early_mie, gone_count, notifications, status_count;
-static u32 data_bytes;
+static u32 data_bytes, last_power_us;
 static u32 alloc_off[512], alloc_size[512], alloc_count;
 static u8 alloc_freed[512];
 static u32 held_bus[MAX_HELD], held_next[MAX_HELD], held_count;
@@ -123,7 +123,7 @@ void mmio_wr32_le(volatile void *p, u32 v)
         old &= ~(v & 0x1f0000u);
         if (v & OHCI_PORT_CCS) { if (!no_pes) old &= ~OHCI_PORT_PES; }
         if (v & OHCI_PORT_PES) old |= OHCI_PORT_PES;
-        if (v & OHCI_PORT_PPS) old |= OHCI_PORT_PPS;
+        if (v & OHCI_PORT_PPS) { old |= OHCI_PORT_PPS; last_power_us = now_us; }
         if (v & OHCI_PORT_PRS) {
 #ifdef USB_STACK
             ++port_reset_writes[h];
@@ -134,6 +134,7 @@ void mmio_wr32_le(volatile void *p, u32 v)
         }
         rput((u32)h, off, old);
     } else {
+        if (off == OHCI_RH_STATUS && v == OHCI_RHS_LPSC) last_power_us = now_us;
         rput((u32)h, off, v);
         if (off == OHCI_CONTROL && (v & OHCI_CTL_HCFS_MASK) == OHCI_CTL_OPERATIONAL) {
             struct ohci_hcca *hcca = bus_va(rget((u32)h, OHCI_HCCA));
@@ -255,7 +256,7 @@ static int log_equal(const char *a, const char *b)
 }
 void usbp_log(const char *s, ...)
 {
-    const char *expected = "[usb] ohci %u:%u.%u ports=%u rev=%02x";
+    const char *expected = "[usb] ohci %u:%u.%u ports=%u rev=%02x rha=%08x rhb=%08x";
     if (log_equal(s, expected)) ohci_logs++;
     if (log_equal(s, "[usb] %u:%u.%u failed: %s")) {
         __builtin_va_list ap;
@@ -674,6 +675,22 @@ static void root_ports(void)
 {
     u32 st;
     fresh(); REQUIRE(ohci_start(&hcs[0]) == 0);
+    REQUIRE(rget(0, OHCI_RH_STATUS) == OHCI_RHS_LPSC);
+    REQUIRE(!rget(0, OHCI_RH_PORT_STATUS(1)));
+    fresh();
+    rput(0, OHCI_RH_DESCRIPTOR_A, 3 | OHCI_RHA_NPS | OHCI_RHA_PSM);
+    rput(0, OHCI_RH_DESCRIPTOR_B, 0xffff0000u);
+    REQUIRE(!ohci_start(&hcs[0]));
+    REQUIRE(!rget(0, OHCI_RH_STATUS) && !rget(0, OHCI_RH_PORT_STATUS(1)));
+    fresh();
+    rput(0, OHCI_RH_DESCRIPTOR_A, 3 | OHCI_RHA_PSM | (75u << 24));
+    rput(0, OHCI_RH_DESCRIPTOR_B, 0x000a0000u);
+    REQUIRE(!ohci_start(&hcs[0]));
+    REQUIRE(rget(0, OHCI_RH_STATUS) == OHCI_RHS_LPSC);
+    REQUIRE(rget(0, OHCI_RH_PORT_STATUS(1)) == OHCI_PORT_PPS);
+    REQUIRE(!rget(0, OHCI_RH_PORT_STATUS(2)));
+    REQUIRE(rget(0, OHCI_RH_PORT_STATUS(3)) == OHCI_PORT_PPS);
+    REQUIRE(now_us - last_power_us >= 150000u);
     REQUIRE(ohci_rh_port(&hcs[0], 0, USB_RH_STATUS, &st) == -USB_E_INVAL);
     REQUIRE(ohci_rh_port(&hcs[0], 4, USB_RH_STATUS, &st) == -USB_E_INVAL);
     rput(0, OHCI_RH_PORT_STATUS(1), OHCI_PORT_CCS | OHCI_PORT_CSC);
