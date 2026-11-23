@@ -275,6 +275,8 @@ int main(int argc, char **argv, KernelAPI *api)
             api->gfx_osri_show(path, 0) != OS32_ERR_INVAL ||
             api->gfx_osri_show(path, GFX_OSRI_SHOW_MAX_MS + 1) != OS32_ERR_INVAL)
             return report(api, "OSRI failed\n", 53);
+        /* Hold the terminal still until the host samples the restored scanout. */
+        while ((api->kbd_getkey() & 0xff) != 'r') {}
         return report(api, "OSRI DONE\n", 0);
     }
     if ((argc == 2 || argc == 3) && !strncmp(argv[1], "v1-", 3))

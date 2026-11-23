@@ -223,28 +223,45 @@ def observe_osri(session, evidence, case):
         session.wait(lambda: session.word('osri_visible') == 1 and pixels_match(),
                      'dynamic OSRI row palette update')
 
-    expected = b'OSRI NOSYS\n' if case != 'normal' else b'OSRI DONE\n'
-    rsh_command(session, '/bin/dispprb.bin osri', expected,
-                during=rows_visible if case == 'normal' else None)
-    rsh_command(session, 'echo $?', b'0\n')
-    if case != 'normal':
+    if case in ('osri-absent', 'osri-slot-swap'):
+        rsh_command(session, '/bin/dispprb.bin osri', b'OSRI NOSYS\n')
+        rsh_command(session, 'echo $?', b'0\n')
         return
-    marker = 'osri-terminal-ready'
-    rsh_command(session, 'echo ' + marker, marker.encode() + b'\n')
 
-    def restored():
-        rows = session.screen('osri-terminal').splitlines()
-        terminal = Terminal(read_ppm(evidence / 'osri-terminal.ppm'),
-                            Font(ROOT / 'assets/fonts/shino16.kcgfont'),
-                            bytes([255]) * 3, bytes(3), cursor_top=14)
-        return any(terminal.compare_text(i, row.index(marker), marker) is None
-                   for i, row in enumerate(rows) if marker in row)
-
-    session.wait(restored, 'terminal glyphs after dynamic OSRI')
     from usb_run import keyboard_actions
     read_log = lambda: (evidence / 'serial-a.log').read_text(errors='replace')
     session.wait(lambda: 'protocol=01' in read_log(), 'OSRI USB keyboard')
     key, _ = keyboard_actions(session.q, read_log, session.wait, evidence)
+
+    marker = 'osri-terminal-ready'
+    rsh_command(session, 'clear')
+    rsh_command(session, 'echo ' + marker, marker.encode() + b'\n')
+    before = session.screen('osri-before').splitlines()
+    row = next(i for i, line in enumerate(before) if marker in line)
+    column = before[row].index(marker)
+    require(row < 25 and column + len(marker) <= 80, 'marker inside 640x400 OSRI')
+    font = Font(ROOT / 'assets/fonts/shino16.kcgfont')
+
+    def glyphs(name):
+        image = read_ppm(evidence / (name + '.ppm'))
+        terminal = Terminal(image, font, bytes([255]) * 3, bytes(3))
+        return terminal.compare_text(row, column, marker) is None
+
+    require(glyphs('osri-before'), 'marker glyphs before OSRI')
+
+    def check_restore():
+        rows_visible()
+        require(not glyphs('osri-rows'), 'OSRI covered marker glyphs')
+        session.wait(lambda: session.word('osri_active') == 0, 'dynamic OSRI returned')
+        session.q.call('screendump', {'filename': str(evidence / 'osri-after.ppm')})
+        require(glyphs('osri-after') == (case != 'osri-restore-skipped'),
+                'marker glyphs at original position after OSRI')
+        key('r')
+
+    rsh_command(session, '/bin/dispprb.bin osri', b'OSRI DONE\n', during=check_restore)
+    rsh_command(session, 'echo $?', b'0\n')
+    if case == 'osri-restore-skipped':
+        return
 
     def fixed_pixels():
         session.wait(lambda: session.word('osri_visible') == 1, 'fixed OSRI visible')
@@ -437,7 +454,7 @@ def main():
         cases += ('framebuffer-absent', *PRESENT_MUTATIONS, 'target-failure', 'target-gate-open')
         cases += ('init-absent', 'lease-kept')
     if args.osri:
-        cases = ('normal', 'osri-absent', 'osri-slot-swap') if args.mutate else ('normal',)
+        cases = ('normal', 'osri-absent', 'osri-slot-swap', 'osri-restore-skipped') if args.mutate else ('normal',)
     if args.case:
         unknown = set(args.case) - set(cases)
         if unknown:
@@ -465,6 +482,12 @@ def main():
             (folder / 'swapped_init.inc').write_text(init)
             mutation = mutant_settings(folder, case, 'exec/exec.c',
                                        '#include "exec_kapi_init.inc"', '#include "swapped_init.inc"')
+        if case == 'osri-restore-skipped':
+            # transfer() in this include copies the saved terminal rows back.
+            include = '#include "of_fb_osri.inc"'
+            mutation = mutant_settings(folder, case, 'drivers/video/of_fb/backend_of_fb.c',
+                                       include, '#define transfer(...) ((void)src)\n' + include +
+                                       '\n#undef transfer')
         if case in PRESENT_MUTATIONS:
             mutation = mutant_settings(folder, case, *PRESENT_MUTATIONS[case])
         if case in ('target-failure', 'target-gate-open'):
