@@ -733,7 +733,7 @@ pub(crate) fn capture_keyboard_observed(st: &mut GuiState, ctx: Ctx) -> bool {
             utf8[0] = ch;
             let s2 = next_serial(st, t.slot);
             let evt = ring::ev_text(t.win_id, utf8, 1, s2);
-            ring::append(st, t.slot, &evt);
+            crate::excl::append_delivery(st, t.slot, &evt);
         }
     }
 

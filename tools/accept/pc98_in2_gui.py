@@ -11,6 +11,7 @@ import sys
 import tempfile
 import time
 from urllib.parse import urlencode
+from urllib.request import urlopen
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from np21w_ini import transform
@@ -36,12 +37,29 @@ def window(pid):
 
 
 class Session:
-    def __init__(self, process, serial, previous):
+    def __init__(self, process, serial, previous, port):
+        self.base = f"http://127.0.0.1:{port}"
         self.proc = process
         self.serial = serial
         self.previous = previous
         self.offset = 0
         self.bounds = None
+
+    def confirm_instance(self):
+        try:
+            info = json.loads(emu.get('/api/instance', base=self.base, urlopen=urlopen, timeout=2))
+        except emu.EmuError:
+            return False
+        if int(info['pid']) != self.proc.pid:
+            raise RuntimeError(f'{self.base} belongs to PID {info["pid"]}, expected {self.proc.pid}')
+        return True
+
+    def post(self, path, body):
+        return emu.post(path, body, base=self.base, urlopen=urlopen)
+
+    def screen(self):
+        data = emu.get('/api/tvram', base=self.base, urlopen=urlopen)
+        return [line.strip() for line in json.loads(data)['lines']]
 
     def trace(self):
         data = self.serial.read_bytes() if self.serial.exists() else b''
@@ -79,7 +97,7 @@ class Session:
 
     def mouse(self, **args):
         self.offset = len(self.trace())
-        emu.post('/api/mouse', urlencode(args))
+        self.post('/api/mouse', urlencode(args))
 
     def button(self, name, down):
         self.mouse(btn={'left': 1, 'right': 2}[name] if down else 0)
@@ -115,10 +133,13 @@ def main():
             raw, _ = transform(args.ini.read_bytes(), {'HDD1FILE': str(image), 'FDD1FILE': '',
                                                       'FDD2FILE': '', 'E_RESUME': 'false'})
             ini.write_bytes(raw)
+            port = ctypes.windll.kernel32.GetPrivateProfileIntW(
+                "NekoProject21", "aidbport", 8025, str(ini))
             previous = args.serial.read_bytes() if args.serial.exists() else b''
             process = subprocess.Popen([str(exe), '/i' + str(ini)], cwd=exe.parent)
-            s = Session(process, args.serial, previous)
+            s = Session(process, args.serial, previous, port)
             try:
+                s.wait(s.confirm_instance, 'NP21/W HTTP instance')
                 s.seen('[boot] exec /bin/gshell.bin')
                 mode = s.wait_match(r'D-GUI (?:relative|seamless (\d+) (\d+))\r?\n')
                 if mode[1]:
@@ -129,18 +150,16 @@ def main():
                     s.offset = 0
                 run_trial(s, role)
                 s.seen("C-GUI completed " + role)
-                def screen():
-                    return [line.strip() for line in json.loads(emu.get('/api/tvram'))['lines']]
-                s.wait(lambda: 'Remote shell active (ESC to exit)' in screen(), 'CUI remote shell')
-                emu.post('/api/key', 'seq=ESC')
-                s.wait(lambda: 'sh>' in screen(), 'cooked shell prompt')
+                s.wait(lambda: 'Remote shell active (ESC to exit)' in s.screen(), 'CUI remote shell')
+                s.post('/api/key', 'seq=ESC')
+                s.wait(lambda: 'sh>' in s.screen(), 'cooked shell prompt')
                 command = 'echo cooked'
                 for i in range(0, len(command), 4):
-                    emu.post('/api/key', urlencode({'text': command[i:i + 4]}))
+                    s.post('/api/key', urlencode({'text': command[i:i + 4]}))
                     prefix = 'sh> ' + command[:i + 4]
-                    s.wait(lambda: any(prefix in line for line in screen()), prefix)
-                emu.post('/api/key', 'seq=ENTER')
-                s.wait(lambda: 'cooked' in [l.strip() for l in json.loads(emu.get('/api/tvram'))['lines']],
+                    s.wait(lambda: any(prefix in line for line in s.screen()), prefix)
+                s.post('/api/key', 'seq=ENTER')
+                s.wait(lambda: 'cooked' in s.screen(),
                        'cooked shell response')
                 print(role, 'DONE', flush=True)
             finally:

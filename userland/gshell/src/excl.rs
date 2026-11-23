@@ -251,10 +251,10 @@ fn release_window(st: &mut wm::GuiState, i: usize, boundary: bool) -> bool {
 pub(crate) static DELIVERIES: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
 
 #[cfg(not(feature = "c_gui_accept"))]
-use crate::ring::append as append_delivery;
+pub(crate) use crate::ring::append as append_delivery;
 
 #[cfg(feature = "c_gui_accept")]
-fn append_delivery(st: &wm::GuiState, slot: usize, ev: &GuiEvent) -> bool {
+pub(crate) fn append_delivery(st: &wm::GuiState, slot: usize, ev: &GuiEvent) -> bool {
     let accepted = ring::append(st, slot, ev);
     if accepted { DELIVERIES.fetch_add(1, core::sync::atomic::Ordering::Relaxed); }
     accepted

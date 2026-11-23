@@ -300,6 +300,10 @@ def observe(media, cpu, folder, case, user, mutation=None):
                     return match()
 
                 def seen(self, marker):
+                    # Defer the mutant's TAB observations until the guest has completed
+                    # the trial. A timeout cannot establish a missing WM delivery.
+                    if mutation == 'drop-tab' and marker in ('D-GUI RAW 15 1', 'D-GUI RAW 15 0'):
+                        return
                     self.wait_match(re.escape(marker))
 
                 def key(self, code, down):
@@ -312,6 +316,10 @@ def observe(media, cpu, folder, case, user, mutation=None):
             trial.move = move
             run_trial(trial, case)
             seen("C-GUI completed " + case)
+            if mutation == 'drop-tab':
+                trace = serial(log).partition('D-GUI explicit RESUMED')[2]
+                if all(f'D-GUI RAW 15 {down}' not in trace for down in (1, 0)):
+                    raise RuntimeError('observed mutation drop-tab')
         seen(cui)
         history = re.findall(r'Loading /(bin/gshell|sys/shell)\.bin|'
                              r'/bin/gshell.bin returned (-?\d+)', serial(log))
@@ -440,8 +448,7 @@ def main():
                         if prev not in trace:
                             raise
                         if case == 'drop-tab':
-                            if (failure in trace.partition('D-GUI explicit RESUMED')[2] or
-                                    not str(exc).startswith('deadline ' + re.escape(failure) + ' evidence=')):
+                            if str(exc) != 'observed mutation drop-tab':
                                 raise
                         elif str(exc) != 'observed mutation ' + case or failure not in trace.partition(prev)[2]:
                             raise
