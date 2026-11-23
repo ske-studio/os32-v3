@@ -179,10 +179,14 @@ def main():
             win_image = paths.win_of(str(PureWindowsPath(work.name, image.name)))
             raw, _ = transform(original, {'HDD1FILE': win_image, 'FDD1FILE': '',
                                           'FDD2FILE': '', 'E_RESUME': 'false'})
-            with tempfile.NamedTemporaryFile(dir=paths.wsl, prefix='in2-', suffix='.ini') as ini:
-                ini.write(raw)
-                ini.flush()
-                with cold_boot(paths, Path(ini.name), base, args.mutant, args.exe) as s:
+            # NP21/W cannot read an ini that WSL still holds open on drvfs; it then
+            # boots with defaults and no aidebug. Write, close, and only then start.
+            fd, name = tempfile.mkstemp(dir=paths.wsl, prefix='in2-', suffix='.ini')
+            ini = Path(name)
+            try:
+                with os.fdopen(fd, 'wb') as f:
+                    f.write(raw)
+                with cold_boot(paths, ini, base, args.mutant, args.exe) as s:
                     try:
                         trial(s, role)
                     except ObservedMutation as exc:
@@ -190,6 +194,8 @@ def main():
                     else:
                         if args.mutant:
                             raise RuntimeError(f'{args.mutant} survived')
+            finally:
+                ini.unlink(missing_ok=True)
 
 
 def trial(s, role):
