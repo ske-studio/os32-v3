@@ -1,4 +1,5 @@
 /* C-GUI acceptance client. Advance only on actual foreground and WM events. */
+#include <stdio.h>
 #include "os32api.h"
 #include "os32/os32_gui_shared.h"
 
@@ -7,6 +8,37 @@ static volatile GuiSlotHeader *header;
 static volatile GuiEvent *ring;
 static volatile GuiWinSpec *request;
 static volatile GuiRespRect *response;
+
+static int failed(const char *call, int value, int stage)
+{
+    char line[96];
+    snprintf(line, sizeof(line), "C-GUI %s=%d\n", call, value);
+    api->serial_puts(line);
+    return stage;
+}
+
+/* USB discovery continues after the resident shell starts. */
+static int wait_devices(int *kb, int *mouse)
+{
+    u32 start = api->get_tick();
+    for (;;) {
+        *kb = *mouse = 0;
+        int count = api->in2_dev_count();
+        if (count < 0) return failed("in2_dev_count", count, 3);
+        for (int i = 0; i < count; i++) {
+            IN2_DevInfo dev;
+            int rc = api->in2_dev_info(i, &dev);
+            if (rc) return failed("in2_dev_info", rc, 3);
+            if (dev.kind == IN2_DEV_KBD) *kb = dev.dev;
+            if (dev.kind == IN2_DEV_MOUSE) *mouse = dev.dev;
+        }
+        if (*kb && *mouse) return 0;
+        if (api->get_tick() - start >= 1000)
+            return failed(*kb ? "missing mouse, in2_dev_count" :
+                                "missing keyboard, in2_dev_count", count, 4);
+        api->sys_halt();
+    }
+}
 
 static int next_input(int kind, int dev, int a, int b)
 {
@@ -50,39 +82,46 @@ int main(int argc, char **argv, KernelAPI *kernel)
     api = kernel;
     int slot = api->gui_call(GUI_OP_INIT, GUI_PROTO_VERSION);
     if (slot == OS32_ERR_NOSYS) api->serial_puts("C-GUI INIT NOSYS\n");
-    if (slot < 0 || slot >= GUI_SLOT_MAX) return 1;
+    if (slot < 0 || slot >= GUI_SLOT_MAX) return failed("INIT", slot, 1);
     u8 *base = (u8 *)api->shm_base + GUI_SHM_OFFSET + slot * GUI_SLOT_SIZE;
     header = (void *)base;
     ring = (void *)(base + GUI_SLOT_RING_OFF);
     request = (void *)(base + GUI_SLOT_REQ_OFF);
     response = (void *)(base + GUI_SLOT_RESP_OFF);
 
+    int kb, mouse;
+    int rc = wait_devices(&kb, &mouse);
+    if (rc) return rc;
     MouseInfo pos;
     api->mouse_poll(&pos);
     int left = window("First", pos.x - 30, pos.y - 16);
+    if (left < 0) return failed("WIN_CREATE First", left, 2);
     int right = window("Second", pos.x + 160, pos.y + 40);
-    if (left < 0 || right < 0 || left == right) return 2;
+    if (right < 0 || right == left) return failed("WIN_CREATE Second", right, 2);
     /* WAIT runs the registered WM cycle, including focus selection and input settling. */
-    for (int i = 0; i < 2; i++)
-        if (api->gui_call(GUI_OP_WAIT, 1) < 0) return 3;
-    if (api->gui_call(GUI_OP_WIN_CLIENT_RECT, left)) return 3;
-    GuiRect16 original = response->rect;
-    int kb = 0, mouse = 0;
-    for (int i = 0; i < api->in2_dev_count(); i++) {
-        IN2_DevInfo dev;
-        if (api->in2_dev_info(i, &dev)) return 3;
-        if (dev.kind == IN2_DEV_KBD) kb = dev.dev;
-        if (dev.kind == IN2_DEV_MOUSE) mouse = dev.dev;
+    for (int i = 0; i < 2; i++) {
+        rc = api->gui_call(GUI_OP_WAIT, 1);
+        if (rc < 0) return failed("WAIT", rc, 3);
     }
+    rc = api->gui_call(GUI_OP_WIN_CLIENT_RECT, left);
+    if (rc) return failed("WIN_CLIENT_RECT", rc, 3);
+    GuiRect16 original = response->rect;
     IN2_Status before, after;
-    if (!kb || !mouse || api->in2_status(&before) || before.acquired ||
-        api->in2_acquire(3) != OS32_ERR_NOSYS || api->in2_status(&after) ||
-        after.acquired || before.focus_owner != after.focus_owner ||
-        before.focus_gen != after.focus_gen) return 4;
+    rc = api->in2_status(&before);
+    if (rc) return failed("in2_status before", rc, 4);
+    if (before.acquired) return failed("before.acquired", before.acquired, 4);
+    rc = api->in2_acquire(3);
+    if (rc != OS32_ERR_NOSYS) return failed("in2_acquire", rc, 4);
+    rc = api->in2_status(&after);
+    if (rc) return failed("in2_status after", rc, 4);
+    if (after.acquired) return failed("after.acquired", after.acquired, 4);
+    if (!before.focus_owner || before.focus_owner != after.focus_owner)
+        return failed("focus_owner", after.focus_owner, 4);
+    if (before.focus_gen != after.focus_gen) return failed("focus_gen", after.focus_gen, 4);
     IN2_Event queued[8];
     int count;
     do { count = api->in2_read(queued, 8); } while (count > 0);
-    if (count < 0 || !before.focus_owner) return 4;
+    if (count < 0) return failed("in2_read", count, 4);
     api->serial_puts("C-GUI READY\n");
     if (!next_input(IN2_EV_KEY, kb, 0x1d, 1) || !api->kbd_is_pressed(0x1d) ||
         !wm_event(GUI_EV_KEY, 1, right)) return 5;

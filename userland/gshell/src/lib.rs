@@ -234,7 +234,7 @@ pub extern "C" fn main(_argc: i32, _argv: *const *const u8, api: *mut KernelAPI)
         );
         #[cfg(feature = "c_gui_accept")]
         if _registered != 0 {
-            (a.serial_puts)(b"C-GUI REGISTER FAILED\n\0".as_ptr());
+            gserial::reply_to(false, b"!", format_args!("C-GUI REGISTER FAILED rc={}", _registered));
             (a.exec_run)(b"/bin/guiprob.bin\0".as_ptr());
             return -1;
         }
@@ -243,8 +243,9 @@ pub extern "C" fn main(_argc: i32, _argv: *const *const u8, api: *mut KernelAPI)
     unsafe {
         let a = os32api::api();
         let mut state = os32api::av::IN2_WmState { size: 0, gen: 0, excl: 0, owner: 0 };
-        if (a.in2_wm_state)(&mut state) != 0 || state.excl != 0 {
-            (a.serial_puts)(b"C-GUI WM STATE FAILED\n\0".as_ptr());
+        let rc = (a.in2_wm_state)(&mut state);
+        if rc != 0 || state.excl != 0 {
+            gserial::reply_to(false, b"!", format_args!("C-GUI WM STATE FAILED rc={} excl={}", rc, state.excl));
             return -1;
         }
     }
@@ -287,8 +288,9 @@ pub extern "C" fn main(_argc: i32, _argv: *const *const u8, api: *mut KernelAPI)
     #[cfg(feature = "c_gui_accept")]
     unsafe {
         let a = os32api::api();
-        if (a.exec_run)(b"/bin/guiprob.bin\0".as_ptr()) != 0 {
-            (a.serial_puts)(b"C-GUI PROBE FAILED\n\0".as_ptr());
+        let rc = (a.exec_run)(b"/bin/guiprob.bin\0".as_ptr());
+        if rc != 0 {
+            gserial::reply_to(false, b"!", format_args!("C-GUI PROBE FAILED exec_run={}", rc));
             return -1;
         }
         // The acceptance root is read-only. Use the WM's existing quit handoff.
