@@ -79,6 +79,7 @@
 #include "../../arch/x86/kernel/double_fault.h"
 #include "kapi_db.h"
 #include "bootlog.h"
+#include "idle_work.h"
 #include "../../kernel/module/module.h"
 
 #define SHELL_RELOAD_DELAY 10
@@ -314,6 +315,7 @@ void platform_boot_services(void)
      * ルートのマウントと自己試験・shlib の読み込みが済み、常駐シェルを
      * exec する直前。溜めるのはここまで (以後の出力は入らない)。ルートが
      * ext2 / FAT でなければ書かない。どこで失敗しても起動は続ける。 */
+    idle_work_run();
     pc98_usb_flush_boot_log();
     bootlog_save();
 }

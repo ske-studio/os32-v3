@@ -41,6 +41,11 @@ int ring3_wait_pending(void) { return 0; }
 void ring3_abort_check(void) { __builtin_trap(); }
 static const PortOps test_port = { .get_status = fake_port_status };
 
+void pc98_usb_tick_counts(struct usb_tick_counts *out)
+{
+    *out = (struct usb_tick_counts){381, 381, 0, 0};
+}
+
 int pcm_present(void) { calls[3]++; return pcm; }
 int gfx_ver_state(GFX_ScreenInfo *out, u32 *k, u32 *a)
 {
@@ -96,6 +101,7 @@ static void snapshot(void)
     CHECK(s->pit_hz == saved_pit.hz && s->pit_input == saved_pit.clk_hz);
     CHECK(s->ser_ready == (u32)(serial_rc >= 0));
     CHECK(s->ser_mode == mode && s->ser_baud == baud && s->ser_fifo == fifo);
+    CHECK(s->usb.reach == 381 && s->usb.deny == 381 && !s->usb.run && !s->usb.idle);
     CHECK(s->pcm_present == (u32)pcm);
     CHECK(s->gfx_kind == (gfx_rc ? GFX_VER_UNKNOWN : kind));
     CHECK(s->gfx_active == (gfx_rc ? 0 : active));
