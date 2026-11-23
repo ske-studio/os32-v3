@@ -14,7 +14,7 @@ block_io = superblock.with_name('ext2_super_block_io.inc')
 cases = [('normal', view, None, None, 0), ('product', view, None, None, 0)]
 if '--mutate' in sys.argv:
     cases += [('product-unlock', view, '#if !PM_PRODUCT_BOOT', '#if 1', 18),
-              ('product-publish', view, '#if PM_PRODUCT_BOOT\n    (void)unit;', '#if 0\n    (void)unit;', 19),
+              ('product-publish', view, 'writable = 0; /* Published', 'writable = 1; /* Published', 19),
               ('start', view, 'first + offset', 'offset', 5),
               ('last', view, 'count > dev->total_sects - offset', 'count >= dev->total_sects - offset', 6),
               ('early-write', view, '!writable || dev != current', 'dev != current', 12),

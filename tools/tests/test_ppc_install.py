@@ -25,6 +25,8 @@ def run(ctx):
     cases = [('normal', None, None, 0)]
     if ctx.mutate:
         cases += [('raw', '!raw_write || !m || !m->requires_raw_reservation', '1', 28),
+                  ('view-auth', 'op == INSTALL_VIEW_READ || exec_disk_write_allowed()', '1', 49),
+                  ('early-boot', '!PLATFORM_INSTALL_STAGED_BOOT || boot', '1', 48),
                   ('hfs', 'p->boot_hfs.sectors != PM_HFS_SECTORS', '0', 29),
                   ('preserved', 'i < tables[p->raw_unit].count', 'i+1 < tables[p->raw_unit].count', 26),
                   ('nonempty', 'if (block[j*512+k])', 'if (0)', 2),
@@ -47,7 +49,7 @@ def run(ctx):
         for name, old, new, expected in cases:
             files = sources.copy()
             if old:
-                index = {'reservation': 3, 'raw': 2, 'hfs-end': 2, 'overlap': -1, 'path-probe': -1,
+                index = {'reservation': 3, 'raw': 2, 'early-boot': 2, 'view-auth': 2, 'hfs-end': 2, 'overlap': -1, 'path-probe': -1,
                          'deploy-length': -1, 'deploy-readback': -1}.get(name, 0)
                 src = ctx.root/files[index]
                 body = src.read_text()

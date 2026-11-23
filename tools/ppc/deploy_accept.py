@@ -14,8 +14,8 @@ from root_lz4_layout import segments
 
 MANAGEMENT = 'kernel/dev/install_management.c'
 MUTATIONS = {
-    'restore': ('rc = m->write(unit, s->lba, s->bytes);',
-                'rc = s->lba == 1 ? 0 : m->write(unit, s->lba, s->bytes);'),
+    'restore': ('rc = m->write(unit, s->lba, 1, s->bytes);',
+                'rc = s->lba == 1 ? 0 : m->write(unit, s->lba, 1, s->bytes);'),
     'publish': ('r->state = AVAILABLE;\n    irq_restore(flags);\n    if (old)',
                 'r->state = RAW_ONLY;\n    irq_restore(flags);\n    if (old)'),
 }
@@ -29,7 +29,7 @@ def build(out, case):
     out.mkdir()
     # Simulate I/O failure at two points on successive reservations. The first
     # fails before the DDR changes, the second after the first APM entry.
-    anchor = '            rc = m->write(issued.unit, physical + i, in);'
+    anchor = '        rc = m->write(issued.unit, physical, count, in);'
     source = (ROOT / MANAGEMENT).read_text()
     assert source.count(anchor) == 1
     if case in MUTATIONS:
@@ -38,14 +38,13 @@ def build(out, case):
         source = source.replace(before, after)
     fixture = out / 'install_management.c'
     fixture.write_text('volatile unsigned deploy_io_faults;\n' + source.replace(anchor, '''
-            if (issued.phase == TABLE_READY &&
-                ((deploy_io_faults == 0 && physical + i == 0) ||
-                 (deploy_io_faults == 1 && physical + i == 2))) {
-                ++deploy_io_faults;
-                rc = OS32_ERR_IO;
-                break;
-            }
-''' + anchor))
+        if (issued.phase == TABLE_READY &&
+            ((deploy_io_faults == 0 && physical == 0) ||
+             (deploy_io_faults == 1 && physical == 2))) {
+            ++deploy_io_faults;
+            rc = OS32_ERR_IO;
+        } else {
+    ''' + anchor + '\n        }'))
     settings = ['KB_MUT_SRC=' + MANAGEMENT, 'KB_MUT_FILE=' + str(fixture)]
     return build_media(out, '-j6', 'IMAGE=powermac', *settings)
 

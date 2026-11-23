@@ -353,6 +353,8 @@ int platform_install_package_boot(KernelAPI *api, const InstTarget *t,
     for (unsigned i = 0; i < 5; ++i) pm_put_word(plan+i*4, values[i]);
     int rc = api->vfs_sync();
     if (rc) return rc;
+    rc = api->sys_umount_checked("/hd0");
+    if (rc && rc != OS32_ERR_NOTFOUND) return rc;
     u32 count = p->boot_hfs.sectors;
     for (unsigned pass = 0; pass < 2; ++pass) {
         u32 crc = crc32_core_update(CRC32_INIT, desc+12, 8);

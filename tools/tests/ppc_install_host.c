@@ -147,7 +147,15 @@ static int read_file(int fd, void *out, u32 count)
 }
 static void close_file(int fd) { opened[fd] = 0; }
 
+static int unmount_for_api(const char *path)
+{
+    if (kstrcmp(path, "/hd0") || !mounted.mounted) return OS32_ERR_NOTFOUND;
+    int rc = vfs_install_detach(UNIT);
+    return rc ? rc : install_view_detached(UNIT);
+}
+
 static KernelAPI api = {
+    .sys_umount_checked = unmount_for_api,
     .ide_identify = identify_for_api, .ide_drive_present = selected_drive,
     .ide_read_sector = read_for_api, .ide_write_sector = write_for_api,
     .ide_write_sectors = write_many_for_api,
@@ -343,6 +351,11 @@ static int exercise(void)
     if (disk[START+2][56] != 0x53 || disk[START+2][57] != 0xef) return 11;
     if (platform_hdprep_partition(&api,&plan)) return 12;
     if (install_rescan(handle) || ext2_mount(&mounted,0)) return 13;
+    kmemcpy(before,disk,sizeof(disk));
+    if (!ide_write_sectors(UNIT,PM_HFS_START,1,sectors) || memcmp(before,disk,sizeof(disk))) return 48;
+    allowed = 0;
+    if (!dev_blk_write_lba(dev_find("hd0"),LENGTH-1,1,sectors) || memcmp(before,disk,sizeof(disk))) return 49;
+    allowed = 1;
     /* A request crossing either HFS edge must leave the whole disk intact. */
     kmemcpy(before, disk, sizeof(disk));
     if (!ide_write_sectors(UNIT,PM_HFS_START-1,2,sectors) ||
@@ -357,6 +370,8 @@ static int exercise(void)
         memcmp(output,payload,sizeof(output))) return 15;
     int deployed = deploy(&p);
     if (deployed) return deployed;
+    kmemcpy(before,disk,sizeof(disk));
+    if (!ide_write_sectors(UNIT,START-1,2,sectors) || memcmp(before,disk,sizeof(disk))) return 36;
     if (install_end(handle,OS32_INSTALL_END_COMMIT) || mounted.mounted) return 16;
     Device *registered = dev_find("hd0");
     if (!registered || ext2_mount(&mounted,0) || ext2_lookup(&mounted,"/marker",&ino) ||
@@ -365,10 +380,10 @@ static int exercise(void)
     u32 unit,physical,generation;
     if (m->resolve(registered,2,1,&unit,&physical,&generation) != 1 ||
         unit != UNIT || physical != START+2 || generation != handle) return 14;
-    /* The same sector is writable through the published partition only. */
+    /* Both the published view and its raw alias are read-only. */
     u32 last = LENGTH-1;
-    if (dev_blk_write_lba(registered,last,1,sectors) ||
-        memcmp(disk[START+last],sectors,512)) return 30;
+    kmemcpy(before,disk,sizeof(disk));
+    if (!dev_blk_write_lba(registered,last,1,sectors) || memcmp(before,disk,sizeof(disk))) return 30;
     kmemcpy(before,disk,sizeof(disk));
     if (!ide_write_sectors(UNIT,START+last,1,sectors+512) ||
         memcmp(before,disk,sizeof(disk))) return 31;

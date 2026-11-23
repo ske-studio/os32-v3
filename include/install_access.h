@@ -3,6 +3,10 @@
 
 #include "platform_install_management.h"
 
+#ifndef PLATFORM_INSTALL_STAGED_BOOT
+#define PLATFORM_INSTALL_STAGED_BOOT 0
+#endif
+
 /* Pin the unit across an accepted synchronous operation. Deferred operations
  * retain this record until completion, including across worker context switches. */
 enum install_op { INSTALL_READ, INSTALL_WRITE, INSTALL_MOUNT, INSTALL_VIEW_READ, INSTALL_VIEW_WRITE, INSTALL_CHS, INSTALL_FORMAT, INSTALL_CHS_WRITE };
@@ -21,6 +25,7 @@ int install_format_transfer(const struct install_access *a, u32 physical, u32 co
                             void *dst, const void *src);
 int install_format_finish(struct install_access *a, int rc);
 void install_retry_recovery(void);
+int install_view_detached(u32 unit);
 int install_mount_visible(u32 unit);
 int install_view_io(struct install_access *a, u32 unit, u32 generation,
                     u32 physical, u32 count, void *dst, const void *src, int *handled);

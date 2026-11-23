@@ -68,6 +68,7 @@ static void ata_write_report(int child)
     }
     u32 handle = 0;
     if (prepare_disk(api, &handle)) return;
+    if (api->sys_mount("/hd0", "hd0", "ext2") || api->sys_umount_checked("/hd0")) return;
     ata_payload_phase = 1;
     for (unsigned i = 0; i < 1024; ++i)
         payload[1+i] = i * 37 + (i >> 8) + 13;

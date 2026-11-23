@@ -140,11 +140,7 @@ int pm_install_bind(const InstallPlanV1 *p, u32 generation)
 
 void pm_install_publish(u32 unit)
 {
-#if PM_PRODUCT_BOOT
     (void)unit;
-    writable = 0;
-#else
-    writable = current && current->bus_id == (int)unit;
-#endif
+    writable = 0; /* Published installation views are read-only. */
 }
 #endif
