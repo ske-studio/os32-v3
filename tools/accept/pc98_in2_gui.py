@@ -54,10 +54,16 @@ class Session:
             raise RuntimeError(f'{self.base} belongs to PID {info["pid"]}, expected {self.proc.pid}')
         return True
 
+    def require_instance(self):
+        if not self.confirm_instance():
+            raise RuntimeError(f'Cannot verify PID {self.proc.pid} at {self.base}')
+
     def post(self, path, body):
+        self.require_instance()
         return emu.post(path, body, base=self.base, urlopen=urlopen)
 
     def screen(self):
+        self.require_instance()
         data = emu.get('/api/tvram', base=self.base, urlopen=urlopen)
         return [line.strip() for line in json.loads(data)['lines']]
 
