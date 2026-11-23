@@ -108,6 +108,7 @@ struct lan_message {
     u8 type, payload[256];
 };
 
+int pm_gmac_known(void);
 int pm_gmac_capture(struct pm_gmac_boot *out);
 int pm_gmac_clock(const struct pm_gmac_boot *b, u32 clock_va);
 void pm_gmac_boot_id(struct pm_gmac_boot *b, u64 tb, u32 pvr);

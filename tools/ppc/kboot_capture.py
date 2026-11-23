@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Standalone ILP32 product-code OF snapshot test; outside make check."""
+"""HWOP_COMMON_DESIGN §2.3. ILP32 product-code OF snapshot test."""
 import argparse
 import os
 from pathlib import Path
@@ -11,14 +11,6 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tools/tests'))
 import host32
 
-CHECK = dict(name='ppc-kboot-capture', tier=2, budget=60,
-             covers=['platform/powermac/via_tree.c', 'platform/powermac/via_window.h',
-                     'include/memmap.h', 'platform/powermac/kboot_capture.c', 'platform/powermac/kboot_info.h',
-                     'tools/ppc/kboot_capture.py', 'tools/ppc/kboot_capture_fake.c',
-                     'platform/powermac/ofw.h', 'platform/powermac/platform_of_layout.h',
-                     'arch/ppc/ppc_boot.h', 'arch/ppc/ppc_pmap.h', 'arch/ppc/ppc_oea.h',
-                     'include/types.h', 'include/callconv.h', 'lib/kstring.h',
-                     'lib/kstring_c.c', 'tools/tests/host32.py'])
 MUTATIONS = [
     ('compatible-only-mpic', 'compatible(node,"chrp,open-pic") || compatible(node,"open-pic") ||\n            compatible(node,"openpic")', '0'),
     ('machine-identity', 'dest->machine=PM_KBOOT_MACHINE_KEYLARGO;', 'dest->machine=PM_KBOOT_MACHINE_UNKNOWN;'),
@@ -38,11 +30,11 @@ MUTATIONS = [
 ]
 
 
-def exercise(directory, source, expected=None, *, cases=range(34), via_source=None):
+def exercise(directory, source, expected=None, *, cases=(*range(34), 42, 43, 44, 45, 46, 47, 48), via_source=None):
     exe = directory / 'capture'
     argv = ['gcc', '-std=gnu11', '-m32', '-O2', '-Wall', '-Wextra', '-Werror',
             '-ffreestanding', '-fno-builtin', '-fno-pie', '-no-pie', '-fno-stack-protector',
-            '-nostdlib', '-static', '-D__cdecl=',
+            '-nostdinc', '-nostdlib', '-static', '-D__cdecl=',
             *['-I'+str(ROOT / p) for p in ('platform/powermac', 'arch/ppc', 'include', 'lib')],
             str(source), str(ROOT / 'platform/powermac/gmac_tree.c'), str(via_source or ROOT / 'platform/powermac/via_tree.c'), str(ROOT / 'tools/ppc/kboot_capture_fake.c'),
             str(ROOT / 'lib/kstring_c.c'), '-o', str(exe)]
@@ -68,8 +60,23 @@ def main():
         failures = exercise(directory, product)
         if failures:
             raise RuntimeError(f'baseline failures: {failures}')
-        print('GREEN: 34 firmware-tree cases (ILP32 product code)')
+        print('GREEN: 41 firmware-tree cases (ILP32 product code)')
         if args.mutate:
+            capture = (product.parent / 'pci_capture.inc').read_text()
+            anchor = 'b->parent = parent;'
+            assert capture.count(anchor) == 1
+            (directory / 'pci_capture.inc').write_text(capture.replace(anchor, 'b->parent = parent < 0 ? -1 : 0;'))
+            copied = directory / product.name
+            copied.write_text(product.read_text())
+            failures = exercise(directory, copied, (42, 45, b'reached=A1\nOHCI parent interval mismatch\n'), cases=(42,))
+            assert failures and failures[0][0] == 42
+            print('RED: nested-parent: translated OHCI interval')
+            anchor = 'if (*base < child || bytes-1 > child + (size-1) - *base) return 0;'
+            assert capture.count(anchor) == 1
+            (directory / 'pci_capture.inc').write_text(capture.replace(anchor, anchor.replace('return 0;', 'continue;')))
+            exercise(directory, copied, (48, 46, b'reached=A1\npartial overlap accepted\n'), cases=(48,))
+            print('RED: partial overlap accepted')
+            (directory / 'pci_capture.inc').unlink()
             text = product.read_text()
             for name, old, new in MUTATIONS:
                 if text.count(old) != 1:

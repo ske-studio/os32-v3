@@ -250,6 +250,8 @@ static int boot_walk_valid(u32 root)
         absent(root, platform_memory_geometry.system_first,
                     platform_memory_geometry.system_end);
 }
+#include "pci_hosts.inc"
+
 void ppc_boot_load_root(u32 root)
 {
     if (boot_info && !boot_root_ready) {
@@ -296,6 +298,7 @@ void ppc_boot_load_root(u32 root)
             else *leaf(root, a->va & PTE_FRAME_MASK) = 0;
         }
 #endif
+        install_pci_hosts(root);
         if (!boot_walk_valid(root)) ppc_boot_walk_stop();
         boot_root_ready = 1;
     }
