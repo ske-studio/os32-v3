@@ -1,4 +1,4 @@
-"""PowerMac HW_OP §5 stages 4/5a/5b. mac99 OHCI, CUI stop and port results."""
+"""PowerMac HW_OP §5 stages 4/5a/5b/7d. mac99 OHCI, CUI stop and port results."""
 import argparse
 import hashlib
 import json
@@ -34,7 +34,7 @@ def build(work, mode):
     settings = []
     if mode == 'native-read':
         settings = mutant_settings(work, mode, 'platform/powermac/hwb_resource.c',
-            'req->width, 1, 0, 1, 0,', 'req->width, 0, 0, 1, 0,')
+            'req->width, r->little, store, 1, 0,', 'req->width, 0, store, 1, 0,')
     if mode == 'port-ok':
         settings = mutant_settings(work, mode, 'kdebug/hwb_access.c',
             'req->status = platform_hwb_io(req);', 'req->status = HW_OK;')
@@ -184,6 +184,9 @@ def main():
                     observe(media, work/(mode+'-'+op+'-guest'), mode, op)
             else:
                 observe(media, work/(mode+'-guest'), mode)
+                if mode == 'normal':
+                    from link_sh_run import accept_reset
+                    accept_reset(media, work/'normal-reset', 180, 'cuda')
     print(f'{len(hashes)} distinct HW command images')
 
 

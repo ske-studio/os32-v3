@@ -15,4 +15,15 @@ static inline u32 platform_hwb_bar(u32 bdf, u32 bar, u32 space, u32 base, u32 of
     return q.req.status;
 }
 
+static inline u32 platform_hwb_fill_check(u32 addr, u32 width, u32 bytes)
+{
+    struct hw_range_req q = {
+        .req = {.version=HW_VERSION, .action=HW_PHYS_CHECK, .space=HW_PHYS,
+                .width=width, .addr=addr},
+        .bytes=bytes
+    };
+    if (g_api->kdebug_call(HW_OP, &q, sizeof(q))) return HW_NOSYS;
+    return q.req.status;
+}
+
 #endif

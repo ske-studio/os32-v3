@@ -300,6 +300,8 @@ static enum hwb_rc he_execute(struct hwb_state *s, const struct hwb_instruction 
         return HWB_OK;
     }
     case HWB_FILL:
+        rc = (enum hwb_rc)platform_hwb_fill_check(r->addr, i->width, r->count * i->width);
+        if (rc) return rc;
         for (u32 n = 0; n < r->count; n++) {
             rc = he_point(s, 0); if (rc) return rc;
             a = r->value;

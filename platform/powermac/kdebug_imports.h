@@ -7,12 +7,6 @@
 #define KDEBUG_IMPORT_COUNT 8U
 #define KDEBUG_ABI_GEN 1U
 
-/* Later platform stages supply the resource and transaction backends. */
-static u32 pm_hwb_block(struct hw_block_req *block)
-{
-    (void)block;
-    return HW_NOSYS;
-}
 static const struct pm_diag_slots kdebug_kexports[] = {{
     .snapshot = debug_probe_snapshot,
     .abort_take = exec_hwb_abort_take,
