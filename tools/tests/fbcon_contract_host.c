@@ -18,6 +18,24 @@ static void finish(int rc)
 #define REQUIRE(e) do { if (!(e)) { const char msg[] = "FAIL " #e "\n"; \
     __asm__ volatile("int $0x80" : : "a"(4), "b"(1), "c"(msg), "d"(sizeof(msg)-1) : "memory"); finish(1); } } while (0)
 static u8 heap[4096], screen[4096] __attribute__((aligned(4))), shadow[4096];
+static u8 frame[PAGE_SIZE] __attribute__((aligned(PAGE_SIZE)));
+int vram_scroll_y;
+
+u32 pgalloc_arena_end(void) { return V2P(frame) / PAGE_SIZE + 1; }
+int pgalloc_alloc_n_owner(u32 owner, int n, u32 first, u32 end, u32 flags, u32 *out)
+{
+    u32 pfn = V2P(frame) / PAGE_SIZE;
+    REQUIRE(owner == LEDGER_OWNER_KERNEL && n == 1 && first <= pfn && pfn < end);
+    REQUIRE(flags == LEDGER_TOP_DOWN);
+    *out = pfn;
+    return 1;
+}
+int pgalloc_free_n_owner(u32 owner, u32 pfn, int n)
+{
+    REQUIRE(owner == LEDGER_OWNER_KERNEL && n == 1 && pfn == V2P(frame) / PAGE_SIZE);
+    return 1;
+}
+
 static u8 snapshot[16384];
 static struct gfx_console_target target;
 static struct gfx2_rect expected;

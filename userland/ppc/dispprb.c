@@ -1,5 +1,6 @@
 /* Stage 5c A5/A6: OF INDEX8 mode, CLIENT surface descriptor and OF
- * four-byte transfer accounting, including the reserved rows. */
+ * four-byte transfer accounting, including the reserved rows. Scroll follows
+ * the circular scanout contract in docs/KAPI_SPEC.md (gfx_hardware_scroll). */
 #include "os32api.h"
 #include "../../include/app_ids.h"
 #include <stdio.h>
@@ -119,6 +120,10 @@ static int present_probe(KernelAPI *api, const char *mode, u8 white)
     OS32_LeaseView view;
     GFX2_SurfaceDesc desc;
     u32 sid = 0xa5a5a5a5, app, owner, generation;
+    if (!strcmp(mode, "v1-scroll-child")) {
+        api->gfx_hardware_scroll(1);
+        return 0;
+    }
     int child = !strcmp(mode, "v1-child");
     if (api->caller_identity(&app, &owner, &generation)) return 40;
     if (child) {
@@ -141,6 +146,52 @@ static int present_probe(KernelAPI *api, const char *mode, u8 white)
         return 44;
     u32 pitch = q.desc[0].pitch;
     u8 *shadow = (u8 *)view.planes[0];
+    if (!strcmp(mode, "v1-scroll") || !strcmp(mode, "v1-scroll-restore")) {
+        for (int y = 0; y < 600; y++)
+            memset(shadow + y * pitch + 704, y % 7 == 1 || y % 7 == 4 ? white : white ^ 255, 4);
+        api->gfx_present_rect(704, 0, 4, 600);
+        checkpoint(api, shadow, 'b');
+        api->gfx_hardware_scroll(1);
+        checkpoint(api, shadow, 'u');
+        memset(shadow + 300 * pitch + 704, white, 4);
+        api->gfx_present_rect(705, 300, 1, 1);
+        checkpoint(api, shadow, 'p');
+        api->gfx_hardware_scroll(-1);
+        checkpoint(api, shadow, 'd');
+        api->exec_run("/bin/dispprb.bin v1-scroll-child");
+        int kind, code;
+        if (api->exec_last_result(&kind, &code) || kind != EXEC_KIND_EXITED || code) return 54;
+        checkpoint(api, shadow, 'c');
+        if (!strcmp(mode, "v1-scroll")) return api->surface_unlease(view.token) ? 48 : 0;
+        GFX_Stats before, after;
+        if (api->gfx_stats(&before)) return 55;
+        u32 start = api->get_tick();
+        for (int i = 0; i < 4; i++) api->gfx_hardware_scroll(1);
+        u32 elapsed = api->get_tick() - start;
+        if (api->gfx_stats(&after)) return 55;
+        if (api->surface_unlease(view.token)) return 48;
+        api->gfx_shutdown();
+        api->gfx_hardware_scroll(1);
+        if (api->surface_query(OS32_SURFACE_CLIENT, &q) || q.count != 1 ||
+            api->surface_lease(OS32_SURFACE_CLIENT, &q.desc[0].ref, OS32_SURFACE_RW, &view))
+            return 46;
+        checkpoint(api, (u8 *)view.planes[0], 't');
+        if (api->surface_unlease(view.token)) return 48;
+        api->gfx_init();
+        if (api->surface_query(OS32_SURFACE_CLIENT, &q) || q.count != 1 ||
+            api->surface_lease(OS32_SURFACE_CLIENT, &q.desc[0].ref, OS32_SURFACE_RW, &view))
+            return 46;
+        shadow = (u8 *)view.planes[0];
+        memset(shadow + 65 * q.desc[0].pitch + 704, white, 4);
+        memset(shadow + 66 * q.desc[0].pitch + 704, white ^ 255, 4);
+        api->gfx_present_rect(704, 65, 4, 2);
+        checkpoint(api, shadow, 'r');
+        char timing[96];
+        snprintf(timing, sizeof(timing), "DISPLAY scroll 4 calls ticks=%lu bytes=%lu\n",
+                 (unsigned long)elapsed, (unsigned long)(after.present_bytes - before.present_bytes));
+        report(api, timing, 0);
+        return api->surface_unlease(view.token) ? 48 : 0;
+    }
     if (!strcmp(mode, "v1-framebuffer")) {
         GFX_ScreenInfo info = {0};
         GFX_Framebuffer fb = {0};

@@ -601,6 +601,10 @@ VFS パスの NULL=cwd、`sys_redirect_fd` の NULL 拒否の戻り値、`sys_mo
 | 0x230 | mouse_cursor_show | `void(void)` |
 | 0x234 | mouse_cursor_hide | `void(void)` |
 
+PowerMac の `gfx_hardware_scroll(lines)` は最後に提示した INDEX8 像を論理行単位で循環表示する。正数で上、負数で下へ移り、端を越えた行は反対端に現れる。
+物理先頭の保護帯は固定し、未提示の CLIENT の変更は表示しない。初期化前と提示権の失効後は画面も原点も保持する。
+OF には vblank 同期がなく、転送中の画面が見えることがある。
+
 `kprintf` (0x28) の attr は PC-98 流の `ATTR_*` か、ログ行の `KLOG_ATTR` (0x07、PC/AT 流。入口で PC-98 の属性に読み替える)。
 
 ### DB API (v29-v31)
