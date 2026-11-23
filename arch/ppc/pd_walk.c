@@ -8,6 +8,7 @@
 /* HPT low-word encodings, distinct from the software table bit namespace. */
 enum {
     PD_PP_SUPERVISOR = 0, PD_PP_USER_RO = 1, PD_PP_USER_RW = 2,
+    PD_PP_READ_ONLY = 3,
     PD_W = 0x40, PD_I = 0x20, PD_M = 0x10, PD_G = 0x08
 };
 
@@ -42,8 +43,12 @@ int ppc_pd_lookup_read(u32 root, u32 va, int store, int user,
         return 0;
 
     u32 pp = PD_PP_SUPERVISOR;
-    if (effective & PTE_USER)
+    if (va - PPC_HWB_WINDOW_VA < 2 * PAGE_SIZE) {
+        if (user || (store && !(effective & PTE_RW))) return 0;
+        if (!(effective & PTE_RW)) pp = PD_PP_READ_ONLY;
+    } else if (effective & PTE_USER) {
         pp = (effective & PTE_RW) ? PD_PP_USER_RW : PD_PP_USER_RO;
+    }
     u32 cache = PD_M;
     if (pte & PTE_PCD)
         cache = PD_I | PD_G;
