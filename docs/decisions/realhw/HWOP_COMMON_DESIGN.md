@@ -130,3 +130,6 @@ block はループ前に一度、実ストアの PC とマップ済み VA 区間
 ## PM の確定 (2026-11-23、往復 3 回の後)
 - sol 第 3 回の残り 1 件 (P1、§2.2・§2.4・§3.6) は争点でなく足りない手順なので、PM が本書に取り込んで確定とする: 共用の構成の取引が DSI をエラーに変えるようになる段で、`pm_gmac_early_quiesce` (platform/powermac/pci_config.c) は GEM の停止の確かめ中に構成の取引 (Command の読み・bus master の解除の書き込み) が失敗したら起動の側へ負の値を返し、呼び出し (platform/powermac/ppc_kernel.c) は `memory_boot_init` に進まない。受入に、読み・解除の書き込みのそれぞれへ障害を注入して `memory_boot_init` に到達しないことを足す。
 - 段の担当: 本線 = 共通の HW_OP と x86 の後端の分離 (x86 の生成物の差 0)。PowerPC = PowerMac の後端 (UniNorth の構成の取引・OF の資源の表・物理の窓・DSI の回復・橋の隔離の共有・GEM の early quiesce の負の値)。
+
+## PM の追記 (2026-11-23、本線の段の取り込みの時)
+- 本線の段の完了の条件「x86 の生成物の差 0」を改める: sol のレビュー (第 1 回 P1・P2) で、後端が最初の書き込みの前に全区間を検査できるよう fill/block の count の確定と BAR の全区間の受け渡しを BAR の変換の前に移すことと、abort_take・phys_check の口と action 8 の配送を本線の段で持つことになった。これで x86 の shell (hwb_exec)・kdebug (hwb_access)・hwdev の対の値と配布の像に差が出る (vmkernel は同じ)。x86 の振る舞いの変化は 2 つだけ: 不正な count は BAR の PCI の読みより先に拒否 (読みの順とログが変わる)、正常な 44 バイトの action 8 は INVAL から HW_NOSYS。既存の台本・試験はこの差を前提にしていない (sol 第 2 回)。PowerMac の後端はこの口の上に作る。

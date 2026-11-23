@@ -20,7 +20,7 @@
 #define HW_BDF_DEV(bdf) (((u32)(bdf) >> HW_BDF_DEV_SHIFT) & HW_BDF_DEV_MASK)
 #define HW_BDF_FN(bdf) ((u32)(bdf) & HW_BDF_FN_MASK)
 
-enum hw_action { HW_READ = 1, HW_WRITE = 2, HW_POINT = 3, HW_BLOCK32 = 4, HW_BLOCK8 = 5, HW_BLOCK16 = 6 };
+enum hw_action { HW_READ = 1, HW_WRITE = 2, HW_POINT = 3, HW_BLOCK32 = 4, HW_BLOCK8 = 5, HW_BLOCK16 = 6, HW_PHYS_CHECK = 8 };
 #define HW_IS_BLOCK(action) ((action) == HW_BLOCK32 || (action) == HW_BLOCK8 || (action) == HW_BLOCK16)
 #define HW_BLOCK_WIDTH(action) ((action) == HW_BLOCK8 ? 1U : (action) == HW_BLOCK16 ? 2U : 4U)
 enum hw_space { HW_PCI = 1, HW_IO = 2, HW_PHYS = 3 };
@@ -41,6 +41,12 @@ struct hw_block_req {
     u32 count, increment;
 };
 STATIC_ASSERT(sizeof(struct hw_block_req) == HW_BLOCK_REQ_BYTES, hw_block_is_40);
+#define HW_RANGE_REQ_BYTES 44U
+struct hw_range_req {
+    struct hw_req req;
+    u32 bar, offset, bytes;
+};
+STATIC_ASSERT(sizeof(struct hw_range_req) == HW_RANGE_REQ_BYTES, hw_range_is_44);
 #ifdef __KERNEL_BUILD__
 /* Private dbg_call entry: validate size/version before access. Return 0 on
  * accepted request, OS32_ERR_INVAL on bad wire, OS32_ERR_NOSYS if unavailable.

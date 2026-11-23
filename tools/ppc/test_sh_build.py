@@ -40,9 +40,10 @@ def main():
         for name in ('build', 'sdk', 'userland', 'include', 'drivers', 'fs', 'lib', 'kdebug', 'hwdev', 'tools'):
             shutil.copytree(ROOT / name, root / name,
                             ignore=shutil.ignore_patterns('out', '*.o', '*.d', '*.bin', '*.elf', '*.raw', 'target'))
-        layout = Path('platform/powermac/platform_install_layout.h')
-        (root / layout.parent).mkdir(parents=True)
-        shutil.copy(ROOT / layout, root / layout)
+        powermac = Path('platform/powermac')
+        (root / powermac).mkdir(parents=True)
+        for header in (ROOT / powermac).glob('*.h'):
+            shutil.copy(header, root / powermac)
         (root / 'net').mkdir()
         for name in ('host_mailbox.h', 'link.h'):
             shutil.copy(ROOT / 'net' / name, root / 'net' / name)
