@@ -139,8 +139,8 @@ def make_image(work, case):
         instrumented = polling.replace('ide_bus_alt()', '(probe ? '
                                        '(++reads == 1 ? IDE_ST_BSY : 0) : ide_bus_alt())')
         if case == 'wait':
-            assert instrumented.count('int timeout = IDE_TIMEOUT_BSY;') == 1
-            instrumented = instrumented.replace('int timeout = IDE_TIMEOUT_BSY;', 'int timeout = 1;')
+            assert instrumented.count('while (ide_wait_pending(&wait))') == 1
+            instrumented = instrumented.replace('while (ide_wait_pending(&wait))', 'while ((!probe || reads == 0) && ide_wait_pending(&wait))')
         settings += mutant_settings(out, case, DRIVER, polling,
                                     'static unsigned probe, reads;\n' + instrumented + """
 void ata_check_wait(void)

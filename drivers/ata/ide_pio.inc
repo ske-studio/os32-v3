@@ -10,8 +10,8 @@ static void ide_pio_settle(void)
  * error-associated DRQ without publishing that sector to the caller. */
 static int ide_pio_wait_phase(u8 *status)
 {
-    int timeout = IDE_TIMEOUT_LOOP;
-    while (timeout-- > 0) {
+    IdeWait wait = ide_wait_start(IDE_EARLY_PHASE_POLLS);
+    while (ide_wait_pending(&wait)) {
         u8 st = ide_bus_alt();
         if (st & IDE_ST_BSY) continue;
         *status = st;
@@ -23,8 +23,8 @@ static int ide_pio_wait_phase(u8 *status)
 
 static int ide_pio_finish(void)
 {
-    int timeout = IDE_TIMEOUT_BSY;
-    while (timeout-- > 0) {
+    IdeWait wait = ide_wait_start(IDE_EARLY_BSY_POLLS);
+    while (ide_wait_pending(&wait)) {
         /* Regular status also acknowledges the command's interrupt. */
         u8 st = ide_bus_in(IDE_REG_STATUS);
         if (st & IDE_ST_BSY) continue;

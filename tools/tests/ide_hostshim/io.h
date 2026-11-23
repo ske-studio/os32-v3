@@ -4,4 +4,5 @@ unsigned int inp(unsigned int port);
 void outp(unsigned int port, unsigned int value);
 unsigned int inpw(unsigned int port);
 void outpw(unsigned int port, unsigned int value);
+static inline int _irq_enabled(void) { return 1; }
 #endif

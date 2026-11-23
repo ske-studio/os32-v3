@@ -13,6 +13,8 @@
 #include "ide_bus.h"
 #include "kprintf.h"
 #include "memmap.h"
+#include "tick_clock.h"
+#include "io.h"
 
 /* ドライブ検出フラグ (4ドライブ対応)
  * drive 0 = バンク0 Master (NP21/W IDE #0)
@@ -41,11 +43,32 @@ static void ide_select_bank(int bank)
     ide_bus_select(bank);
 }
 
+/* NetBSD ata_wdc.c ATA_DELAY: 10 seconds for drive I/O. */
+typedef struct {
+    u32 start_ms;
+    u32 early_polls;
+} IdeWait;
+
+static IdeWait ide_wait_start(u32 early_polls)
+{
+    u32 start = tick_clock_ms();
+    return (IdeWait){ start, (start && _irq_enabled()) ? 0 : early_polls + 1 };
+}
+
+static int ide_wait_pending(IdeWait *wait)
+{
+    u32 elapsed = tick_clock_ms() - wait->start_ms;
+    /* Boot or IRQ-masked I/O can see a stationary clock. Once the
+     * first tick arrives only elapsed time bounds this wait. */
+    if (wait->early_polls && elapsed == 0) return --wait->early_polls != 0;
+    return elapsed < IDE_IO_TIMEOUT_MS;
+}
+
 /* ステータス待ち (BSY=0になるまで) */
 static int ide_wait_bsy(void)
 {
-    int timeout = IDE_TIMEOUT_BSY;
-    while (timeout-- > 0) {
+    IdeWait wait = ide_wait_start(IDE_EARLY_BSY_POLLS);
+    while (ide_wait_pending(&wait)) {
         u8 st = ide_bus_alt();
         if (!(st & IDE_ST_BSY)) return IDE_OK;
     }
@@ -55,15 +78,15 @@ static int ide_wait_bsy(void)
 /* DRQ待ち: BSYが落ちてDRQが立つまで */
 static int ide_wait_drq(void)
 {
-    int timeout = IDE_TIMEOUT_LOOP;
-    u8 st;
+    IdeWait wait = ide_wait_start(IDE_EARLY_PHASE_POLLS);
+    u8 st = IDE_ST_BSY;
 
     /* まずBSYが落ちるのを待つ */
-    while (timeout-- > 0) {
+    while (ide_wait_pending(&wait)) {
         st = ide_bus_alt();
         if (!(st & IDE_ST_BSY)) break;
     }
-    if (timeout <= 0) return IDE_ERR_TIMEOUT;
+    if (st & IDE_ST_BSY) return IDE_ERR_TIMEOUT;
 
     /* DRQチェック */
     st = ide_bus_alt();
@@ -71,8 +94,8 @@ static int ide_wait_drq(void)
     if (st & IDE_ST_DRQ) return IDE_OK;
 
     /* DRQが来るまで追加待ち */
-    timeout = IDE_TIMEOUT_BSY;
-    while (timeout-- > 0) {
+    wait = ide_wait_start(IDE_EARLY_BSY_POLLS);
+    while (ide_wait_pending(&wait)) {
         st = ide_bus_alt();
         if (st & IDE_ST_DRQ) return IDE_OK;
         if (st & IDE_ST_ERR) return IDE_ERR_IO;

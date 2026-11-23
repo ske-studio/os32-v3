@@ -7,7 +7,7 @@ import tempfile
 from kernel_includes import include_flags
 
 CHECK = dict(name='ide-pio-host', tier=1, budget=4.3,
-             covers=['include/ide_bus.h', 'platform/pc98/platform_ide_bus.h', 'platform/pc98/platform_ide_ports.h',
+             covers=['kernel/time/tick_clock.h', 'include/ide_bus.h', 'platform/pc98/platform_ide_bus.h', 'platform/pc98/platform_ide_ports.h',
                      'drivers/ata/ide.c', 'drivers/ata/ide.h',
                      'drivers/ata/ide_addr.c', 'drivers/ata/ide_addr.h',
                      'drivers/ata/ide_multiple.inc', 'drivers/ata/ide_pio.inc', 'drivers/ata/ide_request.inc',
@@ -20,6 +20,8 @@ ROOT = Path(__file__).resolve().parents[2]
 FLAGS = ['-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
          '-Wno-sign-compare', '-D__cdecl=']
 MUTANTS = [
+    ('poll-limit', 'ide.c', 'wait->early_polls && elapsed == 0', 'wait->early_polls', 'deadlines'),
+    ('ignore-deadline', 'ide.c', 'return elapsed < IDE_IO_TIMEOUT_MS;', 'return 1;', 'deadlines'),
     ('multiple-opcode', 'ide_pio.inc', 'ide_bus_out(IDE_REG_STATUS, multiple > 1',
      'ide_bus_out(IDE_REG_STATUS, multiple > IDE_COMMAND_MAX_SECTORS', 'multiple'),
     ('multiple-phase', 'ide_pio.inc', 'u32 n = sectors - done < multiple ? sectors - done : multiple;',

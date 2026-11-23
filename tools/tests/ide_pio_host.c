@@ -48,12 +48,20 @@ static u16 pattern(u32 lba, unsigned w)
     return (u16)((lba * 193u + w * 71u + seed) ^ (w << 8));
 }
 
+static unsigned polls, polls_per_ms = 1, release_poll;
+u32 tick_clock_ms(void) { return polls / polls_per_ms; }
+
 void irq_disable(unsigned int irq) { (void)irq; }
 void kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
 
 unsigned int inp(unsigned int port)
 {
     CHECK_MAPPED();
+    ++polls;
+    if (release_poll) {
+        CHECK(polls <= release_poll);
+        if (polls == release_poll) { pre_busy = 0; release_poll = 0; }
+    }
     CHECK(port == IDE_ALT_STATUS || port == IDE_STATUS);
     if (identify_error) return IDE_ST_ERR;
     if (identifying) return IDE_ST_DRQ;
@@ -348,6 +356,25 @@ static void errors(void)
     }
 }
 
+static void deadlines(void)
+{
+    configure(IDE_AMODE_LBA28, 0, 1000);
+    polls_per_ms = 256;
+    polls = 0;
+    pre_busy = 1;
+    release_poll = 1500000;
+    CHECK(request(0, 19, 1) == IDE_OK);
+    reset_io();
+    polls = 0;
+    pre_busy = 1;
+    release_poll = 11000 * polls_per_ms;
+    CHECK(request(0, 19, 1) == IDE_ERR_TIMEOUT);
+    CHECK(tick_clock_ms() == 10000);
+    release_poll = 0;
+    polls_per_ms = 1;
+    reset_io();
+}
+
 #include "ide_pio_host_multiple.inc"
 
 #ifdef TEST_BE_BUS
@@ -414,6 +441,7 @@ int main(int argc, char **argv)
     if (argc == 1 || !strcmp(argv[1], "multiple-identify")) multiple_identify();
     if (argc == 1 || !strcmp(argv[1], "multiple-setup")) multiple_setup_errors();
     if (argc == 1 || !strcmp(argv[1], "multiple-lifecycle")) multiple_lifecycle();
+    if (argc == 1 || !strcmp(argv[1], "deadlines")) deadlines();
     puts("ide_pio: PASS");
     return 0;
 }

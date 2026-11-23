@@ -40,3 +40,28 @@ GPL 実装は参照していない。
 
 失敗時の READ 出力は未定義、WRITE は途中まで媒体を変更し得る。
 成功セクタ数や自動再試行は追加しない。全範囲の検査と途中 I/O 失敗は別の契約。
+
+## ATA 状態待ちの期限
+
+各待ちは共通の `tick_clock_ms()` の差が 10,000 ms に達すると時間切れになる。
+NetBSD のドライブ I/O 用 ATA_DELAY と同じ値を用いる。
+[NetBSD ata_wdc.c](https://github.com/NetBSD/src/blob/trunk/sys/dev/ata/ata_wdc.c)
+
+| ファイル | 関数 | 待つ状態 |
+|---|---|---|
+| drivers/ata/ide.c | ide_wait_bsy | 発行前・IDENTIFY 後の BSY 解除 |
+| drivers/ata/ide.c | ide_wait_drq | IDENTIFY の BSY 解除、次に DRQ の成立（2 ループ） |
+| drivers/ata/ide_pio.inc | ide_pio_wait_phase | データ相の BSY 解除と DRQ 成立 |
+| drivers/ata/ide_pio.inc | ide_pio_finish | 終了相の BSY・DRQ 解除。SET MULTIPLE も共用 |
+
+独立した DRDY 待ちはない。PC-98 は割込許可後、PowerMac は DEC の起動後に IDE を検出する。
+最初の tick の前や割込禁止中に時計が進まない場合は、従来の 50 万回（IDENTIFY の先頭と
+PIO データ相は 100 万回）まで状態を読む。待機中に tick が進めば時刻の期限を使う。
+
+装置選択とデータ相の 400 ns は ide.c の ide_select_drive、ide_pio.inc の
+ide_pio_settle が代替ステータスの空読みで確保する。メーカーのステータス遷移の
+規定は [Quantum Fireball Plus AS §6.5](https://www.seagate.com/staticfiles/maxtor/en_us/documentation/manuals/Fireball_Plus_AS_Product_Manual.pdf)。
+ATAPI は atapi.c の atapi_wait_clear（atapi_wait_bsy・atapi_wait_idle が共用）と
+atapi_wait_drq が atapi_poll_delay の遅延時間を積算する。atapi_settle は 400 ns、
+atapi_delay_us は長い遅延の分割、atapi_capacity_ready は媒体準備の再試行を担う。
+atapi_packet_read は各 DRQ 相で atapi_wait_bsy を使い、atapi_read10 は媒体交換時の再試行を制限する。
