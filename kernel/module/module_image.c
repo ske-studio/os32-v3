@@ -1,3 +1,4 @@
+#define MODULE_SCHEMA_IMPORT_VALIDATION
 #include "le_internal.h"
 /* KMOD v1: bounded, read-only validation of the container and body offsets. */
 #include "module_image.h"
@@ -187,7 +188,7 @@ int module_image_validate(const u8 *image, u32 size,
             get16(rec + MODULE_IMPORT_VERSION_OFF) != want->version ||
             !want->version || hash != want->name_hash ||
             !check_name(names, h[MI_NAMES_SIZE], &name_pos, hash) ||
-            (IMAGE_VERSION == MODULE_PPC_FORMAT_VERSION && component->positional_imports &&
+            (IMAGE_VERSION == MODULE_PPC_FORMAT_VERSION && module_positional_imports(policy->module_id) &&
              slot != h[MI_DATA_OFF] + i * MODULE_WORD_BYTES) ||
             slot % MODULE_WORD_BYTES || slot < h[MI_DATA_OFF] ||
             !within(slot - h[MI_DATA_OFF], MODULE_WORD_BYTES, h[MI_DATA_SIZE]))

@@ -63,7 +63,7 @@ KDEBUG_OPS_NAMES = (
 POLICY_FIELDS = (
     'module_id', 'phase', 'required_flags', 'allowed_flags', 'stop_allowed',
     'ops_version', 'ops_slots', 'image_max', 'mem_max',
-    'reloc_max', 'export_max', 'load_span_max', 'positional_imports',
+    'reloc_max', 'export_max', 'load_span_max',
 )
 COMPONENTS = (
     dict(

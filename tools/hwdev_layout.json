@@ -2728,7 +2728,6 @@
       "ops_slots",
       "ops_version",
       "phase",
-      "positional_imports",
       "reloc_max",
       "required_flags",
       "stop_allowed"

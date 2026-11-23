@@ -29,7 +29,6 @@ struct module_component_policy {
     u32 module_id, phase, required_flags, allowed_flags, stop_allowed;
     u32 ops_version, ops_slots, image_max, mem_max;
     u32 reloc_max, export_max, load_span_max;
-    u32 positional_imports;
 };
 struct module_image_policy {
     u32 kapi_abi_gen, layout_gen, module_abi_gen, pair_image_crc;
