@@ -92,7 +92,11 @@ struct pm_gmac_boot {
     u32 dma_cpu_base, dma_bus_base, dma_bytes, profile;
     u32 override_flags;
 };
-struct pm_pci { u32 addr_va, data_va, bus_first, bus_last, target_bdf; };
+#include "pci_capture.h"
+struct pm_pci { u32 bus_first, bus_last, target_bdf; struct pm_bridge_state *bridge; };
+u32 pm_pci_access(const struct pm_pci *, u32 bdf, u32 reg, u32 width, int write, u32 *value);
+u32 pm_hwb_cfg_read(u32 bdf, u32 offset, u32 width, u32 *value);
+u32 pm_hwb_cfg_write(u32 bdf, u32 offset, u32 width, u32 value);
 struct lan_header {
     u8 boot_id[16], host_nonce[16];
     u64 seq, drop_records, drop_bytes;

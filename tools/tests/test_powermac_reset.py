@@ -23,6 +23,8 @@ CHECK = dict(name='powermac-reset', tier=1, needs=[], budget=40, env=['ppc-cross
     'platform/powermac/*.h', 'arch/ppc/*.h', 'include/memmap.h',
     'lib/kstring.h', 'lib/kstring_c.c', 'lib/kprintf.c', 'lib/divdi3.c',
     'arch/ppc/pd_walk.c', 'platform/powermac/kernel_boot.c',
+    'platform/powermac/pci_config.c', 'platform/powermac/pci_backend.c',
+    'platform/powermac/lan_gem_io.c', 'platform/powermac/pci_hosts.inc',
     'platform/powermac/usb_boot.c', 'platform/powermac/usb_platform.c',
     'platform/powermac/input_keymap_backend.c', 'input/hal/keymap.h', 'input/hal/usb_input.h',
     'tools/ppc/usb_via_overlap_host.c', 'drivers/usb/usb_core.h',
@@ -104,8 +106,10 @@ def of_cases(folder, mutate):
 
 USB_CASES = ('VIA first page', 'VIA last page', 'page before VIA', 'page after VIA',
              'unpublished VIA', 'config write cleanup', 'second root config address',
-             'second root config data')
+             'second root config data', 'HW_OP §5 6b saved USB root')
 USB_MUTATIONS = (
+    ('usb-ignore-root', 'usb_platform.c',
+     'maps[slot].root == f->root && maps[slot].pa == pa', '1', 8, 106),
     ('usb-bus-instead-of-pa', 'usb_platform.c',
      'pm_via_phys_overlap(pa, PM_USB_PAGE)', 'pm_via_phys_overlap(bus, PM_USB_PAGE)', 0, 31),
     ('usb-miss-last-via-page', 'kernel_boot.c',
@@ -135,13 +139,15 @@ def usb_cases(folder, mutate):
                     'kernel/irq', 'kernel/time', 'mm', 'lib')
         sources = ('tools/ppc/usb_via_overlap_host.c', 'platform/powermac/usb_boot.c',
                    'platform/powermac/input_keymap_backend.c', 'arch/ppc/pd_walk.c',
+                   'platform/powermac/pci_config.c', 'platform/powermac/pci_backend.c',
+                   'platform/powermac/lan_gem_io.c',
                    'lib/kstring_c.c', 'lib/kprintf.c', 'lib/divdi3.c')
         subprocess.run(
             [str(cc), '-mcpu=7450', '-msdata=none', '-msoft-float', '-mno-altivec',
              '-std=gnu11', '-ffreestanding', '-fno-builtin', '-fno-pie',
              '-fno-stack-protector', '-nostdlib', '-static', '-O2', '-Wall', '-Wextra',
              '-Werror', '-ffunction-sections', '-fdata-sections', '-D__cdecl=',
-             '-D__KERNEL_BUILD__', '-DKBOOT_SH=1', '-DKBOOT_LINK=1', '-I' + str(folder),
+             '-DPM_PCI_FAKE_LANE', '-DPM_PCI_FAKE_MMIO', '-D__KERNEL_BUILD__', '-DKBOOT_SH=1', '-DKBOOT_LINK=1', '-I' + str(folder),
              *['-I' + str(ROOT / p) for p in includes], str(usb_platform),
              *[str(ROOT / p) for p in sources],
              '-Wl,--gc-sections,--wrap=usbp_mmio_map,--wrap=usbp_cfg_read32', '-o', str(exe)],

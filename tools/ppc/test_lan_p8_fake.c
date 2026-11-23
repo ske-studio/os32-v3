@@ -1,4 +1,5 @@
 #include "lan_boot.h"
+static struct pm_bridge_state fixture_bridge = {.addr_va=0x1000, .data_va=0x2000};
 static u32 events[128], n, addr, last_addr, id = 0x0021106b, cmd = 0xa5a50004, sticky;
 static void event(u32 x) { events[n++] = x; }
 static u32 reg_for(u32 va) { return (addr & 0xf8u) | (va - 0x2000u); }
@@ -21,16 +22,16 @@ static void emit(const char *s, u32 len) { __asm__ volatile("int $0x80" : : "a"(
 #define CHECK(x, c) do { emit("reach " #c "\n", sizeof("reach " #c "\n")-1); if (!(x)) { emit("fail " #c "\n", sizeof("fail " #c "\n")-1); die(c); } } while (0)
 void _start(void)
 {
-    struct pm_pci p = {0x1000, 0x2000, 0, 2, 11u << 11};
+    struct pm_pci p = {0, 2, 11u << 11, &fixture_bridge};
     struct pm_gmac_boot b = {0}; u32 v;
     CHECK(pm_pci_read32(&p,p.target_bdf,4,&v)==0 && v==cmd, 10);
     CHECK(last_addr == ((1u << 11) | 4) && n==7 && events[0]==1 && events[1]==2 && events[2]==3 && events[3]==4 && events[4]==5 && events[5]==6 && events[6]==7, 11);
     n=0; CHECK(pm_pci_write32(&p,p.target_bdf,4,0xffff0000)==0 && cmd==0xa5a50000, 12);
     CHECK(last_addr == ((1u << 11) | 4) && n==7 && events[0]==1 && events[1]==2 && events[2]==3 && events[3]==4 && events[4]==5 && events[5]==6 && events[6]==7, 22);
-    n=0; CHECK(pm_pci_read32(&p,p.target_bdf+0x100,0,&v)==LAN_EINVAL && pm_pci_read32(&p,p.target_bdf,256,&v)==LAN_EINVAL && pm_pci_read32(&p,p.target_bdf,2,&v)==LAN_EINVAL && n==0, 13);
-    p.target_bdf=10u<<11; CHECK(pm_pci_read32(&p,p.target_bdf,0,&v)==LAN_EINVAL && n==0,19);
-    p.target_bdf=3u<<16; CHECK(pm_pci_read32(&p,p.target_bdf,0,&v)==LAN_EINVAL && n==0,20);
-    p.bus_first=1; p.target_bdf=11u<<11; CHECK(pm_pci_read32(&p,p.target_bdf,0,&v)==LAN_EINVAL && n==0,21); p.bus_first=0;
+    n=0; CHECK(pm_pci_read32(&p,p.target_bdf+0x100,0,&v)==0 && pm_pci_read32(&p,p.target_bdf,256,&v)==LAN_EINVAL && pm_pci_read32(&p,p.target_bdf,2,&v)==LAN_EINVAL && n==7, 13);
+    p.target_bdf=10u<<11; CHECK(pm_pci_read32(&p,p.target_bdf,0,&v)==0 && v==U32_MAX && n==9,19);
+    p.target_bdf=3u<<16; CHECK(pm_pci_read32(&p,p.target_bdf,0,&v)==0 && v==U32_MAX && n==11,20);
+    p.bus_first=1; p.target_bdf=11u<<11; CHECK(pm_pci_read32(&p,p.target_bdf,0,&v)==0 && v==U32_MAX && n==13,21); p.bus_first=0;
     p.target_bdf=(1u<<16)|(2u<<11); n=0; CHECK(pm_pci_read32(&p,p.target_bdf,0,&v)==0 && last_addr == ((1u<<16)|(2u<<11)|1u),14);
     p.target_bdf=11u<<11; b.node=1; b.profile=PM_GMAC_PROFILE_UNINORTH; b.bdf=p.target_bdf; b.vendor_device=id;
     pm_gmac_quiesce_setup(0,&p); n=0; CHECK(pm_gmac_early_quiesce()==0 && n==0,15);
@@ -41,3 +42,5 @@ void _start(void)
 }
 
 int pm_gmac_clock(const struct pm_gmac_boot *b, u32 va) { (void)b; (void)va; return LAN_EUNSUPPORTED; }
+
+#include "pci_fake_lane.h"

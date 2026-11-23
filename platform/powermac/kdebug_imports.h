@@ -6,22 +6,7 @@
 #define KDEBUG_ABI_GEN 1U
 
 /* Later platform stages supply the resource and transaction backends. */
-static u32 pm_hwb_cfg_read(u32 bdf, u32 offset, u32 width, u32 *value)
-{
-    (void)bdf;
-    (void)offset;
-    (void)width;
-    (void)value;
-    return HW_NOSYS;
-}
-static u32 pm_hwb_cfg_write(u32 bdf, u32 offset, u32 width, u32 value)
-{
-    (void)bdf;
-    (void)offset;
-    (void)width;
-    (void)value;
-    return HW_NOSYS;
-}
+#include "lan_boot.h"
 static u32 pm_hwb_bar(u32 bdf, u32 bar, u32 space, u32 base, u32 offset, u32 bytes, u32 *addr)
 {
     (void)bdf;
