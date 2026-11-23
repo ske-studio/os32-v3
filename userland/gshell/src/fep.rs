@@ -321,7 +321,7 @@ pub fn install() {
     /* カーネル FEP の描画先を GFX 版の関数表へ (K 依頼 2 = ime_set_render)。 */
     unsafe { (os32api::api().ime_set_render)(table as *mut u8) };
     let f = state();
-    f.on = unsafe { (os32api::api().ime_is_active)() } != 0;
+    f.on = unsafe { (os32api::api().ime_is_active)() } > 0;
     refresh_indicator(f);
 }
 
@@ -619,7 +619,7 @@ pub fn apply_pending_commit(st: &mut GuiState) {
 
 /// `ime_is_active()` を写し取り、変化していたらモード表示を作り直す。
 fn sync_mode(st: &mut GuiState) {
-    let on = unsafe { (os32api::api().ime_is_active)() } != 0;
+    let on = unsafe { (os32api::api().ime_is_active)() } > 0;
     let _ = st;
     let f = state();
     if on == f.on {

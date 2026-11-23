@@ -61,7 +61,8 @@ def read_head(body, status, suffix):
 PROVIDER = 'platform/powermac/display_provider.c'
 WIDTH = 'return m ? (int)m->width : 0;'
 GATE = ('return present_owner && present_owner == appslot_present_owner() &&\n'
-        '           a && present_generation == a->gen;')
+        '           a && a->kind == GFX2_KIND_OF_FB && a->state == GFX2_AD_OK &&\n'
+        '           of_fb_ready() && present_generation == a->gen;')
 COPY_ENTRY = 'static int surface_copy(void *c, u32 head, const struct gfx2_surf *s)\n{'
 PRESENT_MUTATIONS = {
     # Scope the misplaced gate to redraws by a running app. Boot and target

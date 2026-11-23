@@ -133,8 +133,8 @@ pub fn append(st: &mut wm::GuiState, slot: usize, ev: &GuiEvent) -> bool {
             let bit = ev.payload[4];
             if bit.count_ones() == 1 && rec.buttons & bit != 0 {
                 rec.retry_buttons |= bit;
-                rec.xy[button_slot(bit)] = (i16::from_le_bytes([ev.payload[0], ev.payload[1]]),
-                    i16::from_le_bytes([ev.payload[2], ev.payload[3]]));
+                rec.xy[button_slot(bit)] = (i16::from_ne_bytes([ev.payload[0], ev.payload[1]]),
+                    i16::from_ne_bytes([ev.payload[2], ev.payload[3]]));
             }
         }
         return false;
@@ -152,8 +152,8 @@ pub fn append(st: &mut wm::GuiState, slot: usize, ev: &GuiEvent) -> bool {
             rec.keys[scan / 8] &= !bit;
         }
     } else {
-        let xy = (i16::from_le_bytes([ev.payload[0], ev.payload[1]]),
-                  i16::from_le_bytes([ev.payload[2], ev.payload[3]]));
+        let xy = (i16::from_ne_bytes([ev.payload[0], ev.payload[1]]),
+                  i16::from_ne_bytes([ev.payload[2], ev.payload[3]]));
         let previously_down = rec.buttons;
         if ev.kind == GUI_EV_POINTER {
             rec.buttons = ev.sub;

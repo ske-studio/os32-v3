@@ -5,6 +5,7 @@
 #include "drivers/video/of_fb/backend_of_fb.h"
 #include "gfx/v2/gfx2_int.h"
 #include "rh_observe.h"
+#include "kselftest.h"
 #include "arch/ppc/kernel_boot.h"
 #include "physmem.h"
 #include "paging.h"
@@ -101,6 +102,7 @@ void display_provider_boot_reserve(int pref, void (*bind_client)(void))
     sf.cache = LEDGER_CACHE_UC; sf.perm_max = LEDGER_PERM_NONE;
     if (!ledger_surface_create(&sf, 0)) return;
     saved = (struct of_fb_desc){.display = (volatile u8 *)dev->fb_va,
+        .clut = pm_rh_full_colors()->clut, .palette_allowed = display_provider_present_ok,
         .shadow = P2V(pfn * PAGE_SIZE), .width = fb->width, .height = fb->height,
         .pitch = fb->stride, .bytes = bytes, .shadow_pitch = fb->stride,
         .shadow_bytes = pages * PAGE_SIZE, .protected_rows = fb->height < PM_RH_FB_ROWS ? fb->height : PM_RH_FB_ROWS};
@@ -137,7 +139,8 @@ int display_provider_present_ok(void)
 {
     struct gfx2_adapter *a = gfx2_active();
     return present_owner && present_owner == appslot_present_owner() &&
-           a && present_generation == a->gen;
+           a && a->kind == GFX2_KIND_OF_FB && a->state == GFX2_AD_OK &&
+           of_fb_ready() && present_generation == a->gen;
 }
 
 int display_provider_shadow_push(int x, int y, int w, int h)
@@ -160,3 +163,9 @@ void gfx_planar_present_raster(GFX_RasterPalTable *t) { (void)t; }
 void gfx_present_diag(void) { }
 int display_provider_restore_fallback(GfxBackend *b) { (void)b; return 0; }
 u32 display_provider_ver_kind(const GfxBackend *b) { (void)b; return GFX_VER_UNKNOWN; }
+
+/* The GUI ownership handoff audits the physical ledger on PowerMac. */
+int kselftest_run_audit(const char *tag)
+{
+    return !ledger_selfcheck(tag);
+}
