@@ -10,7 +10,8 @@ CHECK = dict(name='hwb-scripts-host', tier=1, budget=35.0, needs=[], covers=[
     'tools/tests/kernel_includes.py', 'tools/tests/mutpar.py',
     'userland/tests/hw/trident_mode.hwb', 'userland/shell/hwb_exec.c',
     'userland/shell/hwb_log.c', 'tools/tests/hwb_scripts_host.c',
-    'userland/tests/hw/gf_regs.hwb', 'userland/tests/hw/hpt370_probe.hwb', 'userland/tests/hw/gf_palette.hwb', 'userland/tests/hw/tri_w32.hwb', 'userland/tests/hw/tri_burst.hwb', 'userland/tests/hw/tri_burst2.hwb', 'userland/tests/hw/tri_burst3.hwb', 'userland/tests/hw/tri_burst4.hwb', 'userland/tests/hw/tri_burst5.hwb', 'userland/tests/hw/tri_burst6.hwb'],
+    'userland/tests/hw/gf_regs.hwb', 'userland/tests/hw/hpt370_probe.hwb', 'userland/tests/hw/gf_palette.hwb', 'userland/tests/hw/tri_w32.hwb', 'userland/tests/hw/tri_burst.hwb', 'userland/tests/hw/tri_burst2.hwb', 'userland/tests/hw/tri_burst3.hwb', 'userland/tests/hw/tri_burst4.hwb', 'userland/tests/hw/tri_burst5.hwb', 'userland/tests/hw/tri_burst6.hwb',
+    'userland/tests/hw/ohci_probe.hwb'],
     basis=['HW_BASIC_DESIGN §7'],
     env_limit='偽I/Oでparserと記録順を確認するが、実GDC/Tridentの復元とFAC writeの効果は保証しない。',
 )
@@ -28,8 +29,11 @@ FILES = [
     'userland/tests/hw/np21w_tvram.hwb', 'userland/tests/hw/np21w_nopci.hwb',
     'userland/tests/hw/np21w_loop.hwb', 'userland/tests/hw/np21w_poll.hwb',
     'userland/tests/hw/np21w_wait.hwb', 'userland/tests/hw/trident_mode.hwb',
-    'userland/tests/hw/gf_regs.hwb', 'userland/tests/hw/hpt370_probe.hwb', 'userland/tests/hw/gf_palette.hwb', 'userland/tests/hw/tri_w32.hwb', 'userland/tests/hw/tri_burst.hwb', 'userland/tests/hw/tri_burst2.hwb', 'userland/tests/hw/tri_burst3.hwb', 'userland/tests/hw/tri_burst4.hwb', 'userland/tests/hw/tri_burst5.hwb', 'userland/tests/hw/tri_burst6.hwb']
-MUTATIONS = [('enable-fac', FILES[0], 'iowrite8 port 0xFAC 2',
+    'userland/tests/hw/gf_regs.hwb', 'userland/tests/hw/hpt370_probe.hwb', 'userland/tests/hw/gf_palette.hwb', 'userland/tests/hw/tri_w32.hwb', 'userland/tests/hw/tri_burst.hwb', 'userland/tests/hw/tri_burst2.hwb', 'userland/tests/hw/tri_burst3.hwb', 'userland/tests/hw/tri_burst4.hwb', 'userland/tests/hw/tri_burst5.hwb', 'userland/tests/hw/tri_burst6.hwb',
+    'userland/tests/hw/ohci_probe.hwb']
+MUTATIONS = [('ohci-write', 'userland/tests/hw/ohci_probe.hwb', ' label done',
+              ' label done\n pciwrite16 d 4 0', 'ohci-read-only'),
+             ('enable-fac', FILES[0], 'iowrite8 port 0xFAC 2',
               'iowrite8 port 0xFAC 0', 'enable-fac'),
              ('gdc-restore', FILES[1], 'iowrite8 port 0x68 0x0F',
               'iowrite8 port 0x68 0x0E', 'gdc-restore')]
@@ -58,6 +62,17 @@ void _start(void) {
         u32 len = 0; while (scripts[n][len]) len++;
         CHECK(hwb_parse(&p, scripts[n], len, &line) == HWB_OK);
         CHECK(line == 0);
+    }
+    /* Inspect subroutines after END as well as the entry point. */
+    const char *usb = scripts[''' + str(FILES.index('userland/tests/hw/ohci_probe.hwb')) + r'''];
+    n = 0; while (usb[n]) n++;
+    CHECK(hwb_parse(&p, usb, n, &line) == HWB_OK);
+    HWB_TEST("ohci-read-only");
+    for (u32 pc = 0; pc < p.source_bytes; pc++) {
+        if (!(p.starts[pc / 8] & (1U << (pc % 8)))) continue;
+        struct hwb_instruction i;
+        CHECK(hwb_parse_instruction(&p, pc, &i) == HWB_OK);
+        CHECK(i.op != HWB_WRITE && i.op != HWB_FILL && i.op != HWB_BLOCK32 && i.op != HWB_PROBE);
     }
     n = 0; while (scripts[0][n]) n++;
     CHECK(hwb_parse(&p, scripts[0], n, &line) == HWB_OK);

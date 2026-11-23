@@ -282,6 +282,23 @@ static void scripts(void)
                 struct hwbf_pci *g = hwbf_add_pci(&bus, HW_BDF(0,13,0), 0x10de, 0x0221);
                 g->config[0x13] = 0x24;
             }
+            if (hwbf_equal(script->name, "ohci_probe.hwb")) {
+                for (u32 fn = 0; fn < 3; fn++) {
+                    struct hwbf_pci *usb = hwbf_add_pci(&bus, HW_BDF(0,13,fn),
+                                                        0x1033, fn == 2 ? 0xe0 : 0x35);
+                    usb->config[4] = 2;
+                    usb->config[0x13] = 0x20 + fn;
+                    u32 base = (0x20U + fn) << 24;
+                    if (fn < 2) {
+                        *hwbf_byte(&bus, HW_PHYS, base + 0x48) = fn + 1;
+                    } else {
+                        *hwbf_byte(&bus, HW_PHYS, base) = 0x20;
+                        *hwbf_byte(&bus, HW_PHYS, base + 4) = 3;
+                        *hwbf_byte(&bus, HW_PHYS, base + 9) = 0x60;
+                        usb->config[0x60] = 1;
+                    }
+                }
+            }
             if (hwbf_equal(script->name, "hpt370_probe.hwb")) {
                 /* Ra266 HighPoint 0:12.0 (RA266 §1-1): no drive attached, status reads 0. */
                 struct hwbf_pci *h = hwbf_add_pci(&bus, HW_BDF(0,12,0), 0x1103, 0x0004);

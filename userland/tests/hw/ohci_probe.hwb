@@ -1,0 +1,145 @@
+# Ra266 I-O DATA 1394US2G-PCI. Read-only snapshot; BDF device numbers are decimal.
+# OpenHCI 1.0a section 7.4 (HcRhPortStatus); EHCI 1.0 sections 2.2, 2.3, 4.2 and Appendix B.
+# Renesas uPD720101 USB 2.0 Host Controller Data Sheet, block diagram (two OHCI companions).
+# FreeBSD sys/dev/usb/controller/{ohci,ehci}.c: ohci_roothub_exec, ehci_roothub_exec (BSD-2-Clause).
+# Register        Bit     Field   Meaning when set
+# HcRhPortStatus   0      CCS     Device connected
+#                  1      PES     Port enabled
+#                  2      PSS     Port suspended
+#                  3      POCI    Overcurrent
+#                  4      PRS     Port resetting
+#                  8      PPS     Port powered
+#                  9      LSDA    Low-speed device attached
+#                 16      CSC     Connection changed
+# PORTSC           0      CCS     Device connected
+#               11:10     LS      Line status: 0 SE0, 1 K, 2 J, 3 undefined
+#                 13      PO      Companion owns port (0 = EHCI)
+ device d = bdf 0:13.0
+ print "PCI_FUNCTION" 0
+ let want = 0x00351033
+ call function
+ device d = bdf 0:13.1
+ print "PCI_FUNCTION" 1
+ call function
+ device d = bdf 0:13.2
+ print "PCI_FUNCTION" 2
+ let want = 0x00E01033
+ call function
+ end
+
+ label function
+ pciread32 d 0 -> id
+ print "PCI_ID" id
+ if id != want goto wrong_device
+ let off = 0
+ label config
+ pciread32 d off -> v
+ print "CFG_OFFSET" off
+ print "CFG_VALUE" v
+ let off = off + 4
+ if off != 0x80 goto config
+ pciread16 d 4 -> cmd
+ print "PCI_COMMAND" cmd
+ pciread16 d 6 -> v
+ print "PCI_STATUS" v
+ pciread8 d 0x3c -> v
+ print "PCI_INTERRUPT_LINE" v
+ pciread32 d 0x10 -> v
+ print "PCI_BAR0" v
+ if (cmd & 2) == 0 goto no_mmio
+ if (v & 0xfffffff0) == 0 goto no_mmio
+ if (v & 1) != 0 goto no_mmio
+ window w = bar d 0
+ if want == 0x00E01033 goto ehci
+ mmioread32 w + 0x00 -> v
+ print "HcRevision" v
+ mmioread32 w + 0x04 -> v
+ print "HcControl" v
+ mmioread32 w + 0x08 -> v
+ print "HcCommandStatus" v
+ mmioread32 w + 0x0c -> v
+ print "HcInterruptStatus" v
+ mmioread32 w + 0x10 -> v
+ print "HcInterruptEnable" v
+ mmioread32 w + 0x34 -> v
+ print "HcFmInterval" v
+ mmioread32 w + 0x3c -> v
+ print "HcFmNumber" v
+ mmioread32 w + 0x48 -> v
+ print "HcRhDescriptorA" v
+ let n = v & 255
+ print "NDP" n
+ mmioread32 w + 0x4c -> v
+ print "HcRhDescriptorB" v
+ mmioread32 w + 0x50 -> v
+ print "HcRhStatus" v
+ let off = 0x54
+ let port = 0
+ label ohci_port
+ if port == n goto done
+ let port = port + 1
+ print "OHCI_PORT" port
+ mmioread32 w + off -> v
+ print "HcRhPortStatus" v
+ let off = off + 4
+ goto ohci_port
+
+ label ehci
+ mmioread32 w + 0 -> v
+ let op = v & 255
+ print "CAPLENGTH" op
+ mmioread32 w + 4 -> v
+ print "HCSPARAMS" v
+ let n = v & 15
+ print "N_PORTS" n
+ print "N_CC" (v >> 12) & 15
+ print "N_PCC" (v >> 8) & 15
+ print "PPC" (v >> 4) & 1
+ mmioread32 w + 8 -> v
+ print "HCCPARAMS" v
+ let cap = (v >> 8) & 255
+ print "EECP" cap
+ let hops = 48
+ label extended
+ if cap == 0 goto operational
+ if (cap & 0xc0) == 0 goto bad_cap
+ if (cap & 3) != 0 goto bad_cap
+ if hops == 0 goto bad_cap
+ pciread32 d cap -> v
+ if (v & 255) == 1 goto legacy
+ let cap = (v >> 8) & 255
+ let hops = hops - 1
+ goto extended
+ label bad_cap
+ log "Invalid extended capability chain"
+ goto operational
+ label legacy
+ print "USBLEGSUP" v
+ print "BIOS_OWNED" (v >> 16) & 1
+ print "OS_OWNED" (v >> 24) & 1
+ label operational
+ if (op & 3) != 0 goto no_mmio
+ if (op >> 4) == 0 goto no_mmio
+ mmioread32 w + op -> v
+ print "USBCMD" v
+ mmioread32 w + (op + 4) -> v
+ print "USBSTS" v
+ mmioread32 w + (op + 0x40) -> v
+ print "CONFIGFLAG" v
+ let off = op + 0x44
+ let port = 0
+ label ehci_port
+ if port == n goto done
+ let port = port + 1
+ print "EHCI_PORT" port
+ mmioread32 w + off -> v
+ print "PORTSC" v
+ let off = off + 4
+ goto ehci_port
+ label no_mmio
+ log "MMIO unavailable"
+ return
+ label wrong_device
+ log "Unexpected PCI ID"
+ label done
+ return
