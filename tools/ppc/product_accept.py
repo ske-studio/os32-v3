@@ -137,23 +137,36 @@ def firmware(raw, expected, volume_size):
                 result = s.command('cr ." MDB " sector l@ 10 rshift . cr')
                 if not re.search(rb'(?m)^MDB 4244 ', result):
                     raise RuntimeError(f'invalid firmware MDB: {result!r}')
-            s.command(': checksum 0 -rot bounds ?do 21 * i c@ + ffffffff and loop ;')
-            s.command('0 value buf 0 value size 0 value fh')
-            s.command(': read-fork buf size " read" fh $call-method . ;')
-            s.command(': report read-fork buf size checksum u. ;')
-            s.command(': probe cr ." RESULT " fh if report else ." MISSING" then cr ;')
+            s.command('4000 constant chunk 0 value buf 0 value fh 0 value sum32')
+            s.command(': checksum sum32 -rot bounds ?do 21 * i c@ + ffffffff and loop to sum32 ;')
+            s.command(': read-chunk buf chunk " read" fh $call-method ;')
+            s.command(': probe read-chunk dup 0> over chunk <= and if dup buf swap checksum then '
+                      'cr ." RESULT " . sum32 u. cr ;')
             for name, content in expected.items():
                 length = len(content)
-                s.command(f'{length:x} to size size alloc-mem to buf')
-                s.command(f'" hd:2,\\{name}" open-dev to fh')
-                result = s.command('probe')
-                match = re.search(rb'(?m)^RESULT (MISSING|[0-9a-fA-F ]+)[\r\n]', result)
-                if not match:
-                    raise RuntimeError(f'no firmware result for {name}: {result!r}')
+                result = s.command(f'" hd:2,\\{name}" open-dev to fh cr ." OPEN " fh 0<> . cr')
+                if re.search(rb'(?m)^OPEN 0 ', result):
+                    return False
+                if not re.search(rb'(?m)^OPEN (?:-1|[fF]+) ', result):
+                    raise RuntimeError(f'no firmware handle result for {name}: {result!r}')
+                s.command('chunk alloc-mem to buf 0 to sum32')
+                total = 0
+                while total <= length:
+                    result = s.command('probe')
+                    match = re.search(rb'(?m)^RESULT ([0-9a-fA-F]+) ([0-9a-fA-F]+) ', result)
+                    if not match:
+                        raise RuntimeError(f'invalid firmware read for {name}: {result!r}')
+                    count, checksum = (int(value, 16) for value in match.groups())
+                    if count > 0x4000:
+                        raise RuntimeError(f'invalid firmware read length for {name}: {count}')
+                    total += count
+                    if count == 0:
+                        break
+                s.command('fh close-dev buf chunk free-mem')
                 wanted = 0
                 for value in content:
                     wanted = (wanted*33 + value) & 0xffffffff
-                if match[1] == b'MISSING' or [int(x, 16) for x in match[1].split()] != [length, wanted]:
+                if (total, checksum) != (length, wanted):
                     return False
             return True
         finally:
