@@ -1,7 +1,10 @@
-/* Expectations: PPC_RESET_DESIGN 確定後の追記, §2 and §7.
+/* Expectations: PPC_RESET_DESIGN 確定後の追記, §2 and §7, and HW_OP §5 6b.
  * Linux/PPC user-mode fixture, with real platform code and fake hardware. */
 #include <kernel_boot.c>
 #include "drivers/usb/ohci_regs.h"
+#include "drivers/net/gem/gem.h"
+#include "pci_config_contract.h"
+#include "kdebug/hwb_wire.h"
 #include "drivers/usb/usb_core.h"
 #include "endian_dma.h"
 #include "kprintf.h"
@@ -18,16 +21,48 @@
 
 enum scenario {
     FIRST_PAGE, LAST_PAGE, BEFORE_VIA, AFTER_VIA, VIA_UNPUBLISHED,
-    CFG_WRITE_FAIL, CFG_ADDR_OVERLAP, CFG_DATA_OVERLAP
+    CFG_WRITE_FAIL, CFG_ADDR_OVERLAP, CFG_DATA_OVERLAP, TWO_ROOTS
 };
 static enum scenario scenario;
+static struct usb_pci_fn saved_controller;
+static u32 mapped_pa[PM_USB_CONTROLLERS];
 static u32 first_pa, ohci_maps, unmaps, skips, cfg_writes[2], command[2], starts, registrations;
 static u32 regs[PM_USB_PAGE / sizeof(u32)];
 static u32 directory[PAGE_SIZE / sizeof(u32)] __attribute__((aligned(PAGE_SIZE)));
 static u32 table[PAGE_SIZE / sizeof(u32)] __attribute__((aligned(PAGE_SIZE)));
 static const struct pm_kboot_info info;
-struct pm_usb_root pm_usb_roots[PM_USB_ROOTS];
-u32 pm_usb_root_count;
+#include <usb_tree.c>
+
+/* The PPC fixture stores OF cells in firmware byte order. */
+int ofw_finddevice(const char *path) { return kstrcmp(path, "/") ? -1 : 1; }
+int ofw_child(int node) { return node == 1 ? 2 : 0; }
+int ofw_peer(int node) { return node == 2 ? 3 : 0; }
+int ofw_getprop(int node, const char *name, void *buf, unsigned cap)
+{
+    const u32 ac = 1, bus_range[] = {0, 0};
+    const u32 reg[] = {node == 2 ? 0xf2000000u : 0xf4000000u, PM_USB_DMA_WINDOW};
+    const u32 ranges[] = {2u << 24, 0, PCI_BASE,
+                          CPU_BASE + (node == 3 ? PM_USB_PAGE : 0), 0, 0x100000};
+    const struct { const char *name; const void *data; unsigned size; } props[] = {
+        {"#address-cells", &ac, sizeof(ac)}, {"device_type", "pci", 4},
+        {"compatible", "uni-north", 10}, {"reg", reg, sizeof(reg)},
+        {"bus-range", bus_range, sizeof(bus_range)}, {"ranges", ranges, sizeof(ranges)}
+    };
+    for (unsigned i = 0; i < sizeof(props) / sizeof(props[0]); ++i) {
+        if ((node == 1) != (i == 0) || kstrcmp(name, props[i].name)) continue;
+        if (buf && cap < props[i].size) return -1;
+        if (buf) kmemcpy(buf, props[i].data, props[i].size);
+        return props[i].size;
+    }
+    return -1;
+}
+
+int ofw_call(const char *name, unsigned ni, unsigned no, cell *args)
+{
+    if (kstrcmp(name, "getproplen") || ni != 2 || no != 1) return -1;
+    args[2] = ofw_getprop(args[0], (const char *)args[1], NULL, 0);
+    return 0;
+}
 
 static __attribute__((noreturn)) void quit(int status)
 {
@@ -43,7 +78,8 @@ int paging_map_phys(u32 va, u32 pa, u32 pages, u32 flags)
 {
     if (pages != 1 || flags != (PAGE_RW | PTE_PCD)) quit(91);
     if (va >= PPC_BOOT_USB_VA + 2 * PM_USB_PAGE) {
-        if (pa != first_pa && pa != NEXT_PA) quit(92);
+        mapped_pa[(va - PPC_BOOT_USB_VA) / PM_USB_PAGE - 2] = pa;
+        if (scenario != TWO_ROOTS && pa != first_pa && pa != NEXT_PA) quit(92);
         ohci_maps++;
     }
     return 0;
@@ -62,12 +98,13 @@ int __wrap_usbp_mmio_map(const struct usb_pci_fn *f, u32 bar, volatile void **va
 {
     int rc = __real_usbp_mmio_map(f, bar, va);
     if (!rc) {
-        if ((u32)*va != PPC_BOOT_USB_VA + 2 * PM_USB_PAGE) quit(94);
+        if (scenario != TWO_ROOTS && (u32)*va != PPC_BOOT_USB_VA + 2 * PM_USB_PAGE) quit(94);
         *va = regs;
     }
     return rc;
 }
 
+u32 __real_usbp_cfg_read32(const struct usb_pci_fn *, u32);
 u32 __wrap_usbp_cfg_read32(const struct usb_pci_fn *f, u32 reg)
 {
     if (f->fn || f->dev < 11 || f->dev > 12) return 0xffffffffu;
@@ -82,26 +119,62 @@ u32 __wrap_usbp_cfg_read32(const struct usb_pci_fn *f, u32 reg)
     }
 }
 
-int pm_pci_read32(struct pm_pci *pci, u32 bdf, u32 reg, u32 *value)
+static u32 selected[2], lane_calls;
+static int fail_deselect;
+int pm_fake_lane(u32 va, u32 width, int write, u32 *value)
 {
-    (void)pci;
-    u32 dev = (bdf >> 11) & 31;
-    if (reg != 4 || dev < 11 || dev > 12) quit(104);
-    *value = command[dev - 11];
-    return 0;
-}
-
-int pm_pci_write32(struct pm_pci *pci, u32 bdf, u32 reg, u32 value)
-{
-    (void)pci;
-    u32 dev = (bdf >> 11) & 31;
-    if (reg != 4 || value != 2 || dev < 11 || dev > 12) quit(95);
+    lane_calls++;
+    unsigned host = va >= 0x3000;
+    va -= host * 0x2000;
+    if (va == 0x1000 && width == 4) {
+        if (write && !*value && fail_deselect) return 1;
+        if (write) selected[host] = *value;
+        else *value = 0;
+        return 0;
+    }
+    if (va == 0x2000 && !write && width == 4) {
+        *value = host ? 0x0019106b : 0x0021106b;
+        return 0;
+    }
+    if (width != 2 || va != 0x2004) quit(104);
+    u32 dev = selected[host] >> 12 ? 12 : 11;
+    if (scenario == TWO_ROOTS && registrations >= 2 && host) quit(105);
+    if (!write) { *value = command[dev - 11]; return 0; }
+    if (*value != 2) quit(95);
     if (dev == 11 && (scenario == FIRST_PAGE || scenario == LAST_PAGE)) quit(31);
     if (!ohci_maps) quit(96);
     cfg_writes[dev - 11]++;
-    if (scenario == CFG_WRITE_FAIL && dev == 11) return -1;
-    command[dev - 11] = value;
+    if (scenario == CFG_WRITE_FAIL && dev == 11) return 1;
+    command[dev - 11] = *value;
     return 0;
+}
+
+u32 pm_pci_mmio_read32(u32 va) { (void)va; quit(109); }
+int pm_gmac_clock(const struct pm_gmac_boot *b, u32 va) { (void)b; (void)va; return 0; }
+int pm_gmac_dma_sync(void *p, u32 n, enum dma_sync op)
+{ (void)p; (void)n; (void)op; return 0; }
+
+/* HW_OP §5 6b. Bind every consumer before the failed deselect. */
+static void isolation_case(void)
+{
+    struct pm_pci pci = pm_usb_roots[0].pci;
+    pci.target_bdf = 11u << 11;
+    struct pm_gmac_boot gem = {.node=1, .root_node=2, .bdf=pci.target_bdf,
+        .vendor_device=0x0021106b, .profile=PM_GMAC_PROFILE_UNINORTH};
+    struct gem_io io;
+    u32 value;
+    pm_pci_boot(&pci, pci.target_bdf);
+    pm_gmac_quiesce_setup(&gem, &pci);
+    if (pm_lan_gem_io(&gem, &io)) quit(107);
+    fail_deselect = 1;
+    if (pm_hwb_cfg_read(pci.target_bdf >> 8, 0, 4, &value) != HW_IO_ERROR) quit(107);
+    fail_deselect = 0;
+    lane_calls = 0;
+    if (io.master_enable(io.ctx) != GEM_EIO || pm_gmac_early_quiesce() != LAN_EIO ||
+        pci_config_read32(0,11,0,0) != U32_MAX || usbp_cfg_cmd(&saved_controller,2,4) == 0 ||
+        pm_hwb_cfg_write(pci.target_bdf >> 8,0,4,0) != HW_IO_ERROR || lane_calls) quit(107);
+    pci.bridge = pm_bridge_lookup(3);
+    if (pm_pci_read32(&pci,pci.target_bdf,0,&value) || !lane_calls) quit(108);
 }
 
 void kvprintf(u8 attr, const char *fmt, const u32 *args)
@@ -125,7 +198,7 @@ static int start(struct usb_hc *hc)
 }
 const struct usb_hc_ops ohci_ops = { .start = start };
 
-int usb_hc_register(struct usb_hc *hc) { (void)hc; registrations++; return 0; }
+int usb_hc_register(struct usb_hc *hc) { if (!registrations) saved_controller = hc->pci; registrations++; return 0; }
 void usb_hc_dead(struct usb_hc *hc, u32 why) { (void)hc; (void)why; quit(99); }
 void usb_service(void) { quit(100); }
 int tick_register(unsigned int slot, tick_fn fn) { (void)slot; (void)fn; return 0; }
@@ -154,14 +227,19 @@ void entry(const u32 *stack)
     scenario = *(const char *)stack[2] - '0';
     const u32 test_pa[] = { VIA_FIRST_PA, VIA_LAST_PA, VIA_FIRST_PA - PM_USB_PAGE,
                             VIA_LAST_PA + PM_USB_PAGE, VIA_FIRST_PA, NEXT_PA - PM_USB_PAGE };
-    pm_usb_root_count = 2;
-    pm_usb_roots[0] = (struct pm_usb_root){
-        .pa = 0xf2000000u, .nwin = 1,
-        .win = {{2, PCI_BASE, CPU_BASE, 0x100000u}},
-    };
-    pm_usb_roots[1].pa = 0xf4000000u;
-    if (scenario == CFG_ADDR_OVERLAP) pm_usb_roots[1].pa = 0x7f816000u;
-    if (scenario == CFG_DATA_OVERLAP) pm_usb_roots[1].pa = 0x7f418000u;
+    if (scenario == TWO_ROOTS) {
+        pm_usb_capture();
+        if (pm_usb_root_count != 2) quit(106);
+    } else {
+        pm_usb_root_count = 2;
+        pm_usb_roots[0] = (struct pm_usb_root){
+            .host_id = 2, .pa = 0xf2000000u, .nwin = 1,
+            .win = {{2, PCI_BASE, CPU_BASE, 0x100000u}},
+        };
+        pm_usb_roots[1].pa = 0xf4000000u;
+        if (scenario == CFG_ADDR_OVERLAP) pm_usb_roots[1].pa = 0x7f816000u;
+        if (scenario == CFG_DATA_OVERLAP) pm_usb_roots[1].pa = 0x7f418000u;
+    }
 
     boot_info = &info;
     struct pm_via_boot via = {
@@ -178,8 +256,23 @@ void entry(const u32 *stack)
         via_window = (struct pm_via_window){ .va = via_alias.va };
     struct pm_via_window saved = *pm_via_window();
 
-    first_pa = test_pa[scenario];
+    pm_bridge_register(2, 0x1000, 0x2000);
+    if (scenario == TWO_ROOTS) {
+        pm_bridge_register(3, 0x3000, 0x4000);
+        first_pa = NEXT_PA;
+    } else first_pa = test_pa[scenario];
     pm_usb_boot(1000);
+    if (scenario == TWO_ROOTS) {
+        volatile void *va;
+        if (registrations != 2 || saved_controller.root != pm_usb_roots ||
+            __real_usbp_cfg_read32(&saved_controller, 0) != 0x0021106b ||
+            usbp_cfg_cmd(&saved_controller, 2, 4) ||
+            __real_usbp_mmio_map(&saved_controller, 0, &va) ||
+            (u32)va != PPC_BOOT_USB_VA + 2 * PM_USB_PAGE || ohci_maps != 2 ||
+            mapped_pa[0] != first_pa || mapped_pa[1] != first_pa + PM_USB_PAGE) quit(106);
+        isolation_case();
+        quit(0);
+    }
     int collides = scenario == FIRST_PAGE || scenario == LAST_PAGE;
     int cfg_fail = scenario == CFG_WRITE_FAIL;
     if (skips != (u32)collides || ohci_maps != 1u + cfg_fail ||

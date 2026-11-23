@@ -25,6 +25,7 @@
 #include "kernel_start.h"
 #include "kernel_probe.h"
 #include "hwb_window.h"
+#include "hwb_resource.h"
 #include "kboot_info.h"
 #include "kboot_report.h"
 #include "via_window.h"
@@ -105,6 +106,8 @@ static void kboot_stop(const char *why)
     kprintf(KBOOT_ATTR, "FATAL kboot %s\r\n", why);
     arch_cpu_stop();
 }
+
+#include "pci_boot_memory.inc"
 
 static unsigned long long tb_now(void)
 {
@@ -279,15 +282,11 @@ void platform_boot_machine(void)
      * memory_boot_init -> shm_init; kmalloc is independent of both). */
     lan_boot = info->gmac;
     pm_lan_phy_observer(rh_phy_notify);
-    if (dev->gmac_ready) {
-        struct pm_pci pci = {dev->pci_addr_va, dev->pci_data_va,
-                             lan_boot.bus_first, lan_boot.bus_last, lan_boot.bdf};
-        (void)pm_gmac_quiesce_setup_rh(&lan_boot, &pci, dev->clock_va);
-        if (pm_gmac_early_quiesce() < 0) kboot_stop("gmac_quiesce");
-        pm_pci_boot(&pci, lan_boot.bdf);
-    }
-    if (!memory_boot_init(KBOOT_MEM_KB)) kboot_stop("memory_boot_init");
+    pci_boot_memory(info, dev);
     pm_hwb_window_init();
+#if PM_LOAD_KDEBUG
+    pm_hwb_resource_init(info);
+#endif
 #if KBOOT_SHELL_LAYOUT_DIAG
     shell_layout_report(info);
 #endif

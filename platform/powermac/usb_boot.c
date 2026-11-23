@@ -64,18 +64,17 @@ static int takeover(struct usb_hc *hc)
 }
 void pm_usb_scan(void)
 {
-    for (u32 root = 0; root < pm_usb_root_count && !active; root++) {
-        pm_usb_root = &pm_usb_roots[root];
-        if (paging_map_phys(PPC_BOOT_USB_VA, pm_usb_root->pa + PM_USB_CFG_ADDR_OFFSET, 1, PAGE_RW | PTE_PCD) ||
-            paging_map_phys(PPC_BOOT_USB_VA + PM_USB_PAGE, pm_usb_root->pa + PM_USB_CFG_DATA_OFFSET, 1, PAGE_RW | PTE_PCD)) continue;
-        pm_usb_pci = (struct pm_pci){PPC_BOOT_USB_VA, PPC_BOOT_USB_VA + PM_USB_PAGE,
-                                    pm_usb_root->first, pm_usb_root->last, 0};
+    for (u32 root = 0; root < pm_usb_root_count && count < PM_USB_CONTROLLERS; root++) {
+        struct pm_usb_root *pm_usb_root = &pm_usb_roots[root];
+        pm_usb_root->pci = (struct pm_pci){pm_usb_root->first, pm_usb_root->last, 0,
+                                          pm_bridge_lookup(pm_usb_root->host_id)};
+        if (!pm_usb_root->pci.bridge) continue;
         for (u32 bus = pm_usb_root->first; bus <= pm_usb_root->last; bus++)
             for (u32 dev = bus == pm_usb_root->first ? 11 : 0; dev < 32; dev++)
                 for (u32 fn = 0; fn < 8 && count < PM_USB_CONTROLLERS; fn++) {
                     struct usb_hc *hc = &controllers[count];
-                    hc->pci = (struct usb_pci_fn){.bus = bus, .dev = dev, .fn = fn};
-                    struct usb_pci_fn first = {.bus = bus, .dev = dev, .fn = 0};
+                    hc->pci = (struct usb_pci_fn){.root = pm_usb_root, .bus = bus, .dev = dev, .fn = fn};
+                    struct usb_pci_fn first = {.root = pm_usb_root, .bus = bus, .dev = dev, .fn = 0};
                     if (fn && !(usbp_cfg_read32(&first, 0x0c) & 0x00800000u)) break;
                     u32 id = usbp_cfg_read32(&hc->pci, 0);
                     if ((id & 0xffff) == 0xffff) { if (!fn) break; continue; }
