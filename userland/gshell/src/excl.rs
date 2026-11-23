@@ -126,7 +126,7 @@ pub fn append(st: &mut wm::GuiState, slot: usize, ev: &GuiEvent) -> bool {
     if rec.window == ev.window && rec.owner == owner && rec.retry_buttons != 0 && device == MOUSE && !(ev.kind == GUI_EV_BUTTON && ev.sub == 0) {
         return false;
     }
-    let accepted = ring::append(st, slot, ev);
+    let accepted = append_delivery(st, slot, ev);
     if !accepted {
         if ev.kind == GUI_EV_BUTTON && ev.sub == 0 && rec.window == ev.window && rec.owner == owner {
             let rec = &mut st.excl.delivered[index];
@@ -245,4 +245,17 @@ fn release_window(st: &mut wm::GuiState, i: usize, boundary: bool) -> bool {
     }
     st.excl.delivered[i] = Delivery::EMPTY;
     true
+}
+
+#[cfg(feature = "c_gui_accept")]
+pub(crate) static DELIVERIES: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
+
+#[cfg(not(feature = "c_gui_accept"))]
+use crate::ring::append as append_delivery;
+
+#[cfg(feature = "c_gui_accept")]
+fn append_delivery(st: &wm::GuiState, slot: usize, ev: &GuiEvent) -> bool {
+    let accepted = ring::append(st, slot, ev);
+    if accepted { DELIVERIES.fetch_add(1, core::sync::atomic::Ordering::Relaxed); }
+    accepted
 }

@@ -2342,6 +2342,26 @@ fn excl_switch_ends_mouse_batch() {
 }
 
 #[test]
+fn excl_client_capture_cleared_before_physical_up() {
+    for button in [1, 2] {
+        mocks::init();
+        fep_off();
+        let shm = mocks::Shm::new();
+        let mut st = one_window(&shm);
+        let id = st.front_id();
+        mocks::MOUSE.lock().unwrap().2 = button;
+        input::capture(&mut st, input::Ctx::Wait);
+        assert!(events(&st, 0).iter().any(|e| e.kind == GUI_EV_BUTTON &&
+            e.window == id && e.sub == 1 && e.payload[4] == button));
+        assert_eq!(input::captured_window(button), id as i32);
+        *mocks::WM_STATE.lock().unwrap() = (1, 3, 0);
+        input::capture(&mut st, input::Ctx::Wait);
+        assert_eq!(input::captured_window(button), 0);
+        assert_eq!(mocks::MOUSE.lock().unwrap().2, button);
+    }
+}
+
+#[test]
 fn excl_drag_cancel_preserves_geometry() {
     mocks::init(); fep_off();
     let shm = mocks::Shm::new();

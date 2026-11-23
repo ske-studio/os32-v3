@@ -539,8 +539,8 @@ pub(crate) fn capture_keyboard_observed(st: &mut GuiState, ctx: Ctx) -> bool {
         let down = ((raw >> 8) & 1) != 0;
         let mods = ((raw >> 9) & 0x7F) as u32;
         #[cfg(feature = "c_gui_accept")]
-        if scan == 0x1d {
-            crate::gserial::reply_to(false, b"!", format_args!("C-GUI RAW {}", down as u8));
+        if scan == 0x1d || wm_scan(scan) {
+            report_accept_raw(scan, down);
         }
         /* Mirror kbd.c for WM-deferred raw as well. Inspect before defer and
          * overflow handling, so Pump/FEP and full event rings obey the same
@@ -1442,3 +1442,18 @@ pub fn draw_live_frame(st: &mut GuiState, extra: &[Rect]) {
 #[cfg(test)]
 #[path = "../host/wm_tests.rs"]
 mod tests;
+
+#[cfg(any(test, feature = "c_gui_accept"))]
+pub(crate) fn captured_window(button: u8) -> i32 {
+    let c = *cap(button);
+    if c.active { c.win_id as i32 } else { 0 }
+}
+
+#[cfg(feature = "c_gui_accept")]
+fn report_accept_raw(scan: u8, down: bool) {
+    if scan == 0x1d {
+        crate::gserial::reply_to(false, b"!", format_args!("C-GUI RAW {}", down as u8));
+    } else {
+        crate::gserial::reply_to(false, b"!", format_args!("D-GUI RAW {} {}", scan, down as u8));
+    }
+}

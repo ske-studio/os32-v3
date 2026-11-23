@@ -293,7 +293,7 @@ pub extern "C" fn main(_argc: i32, _argv: *const *const u8, api: *mut KernelAPI)
             gserial::reply_to(false, b"!", format_args!("C-GUI PROBE FAILED exec_run={}", rc));
             return -1;
         }
-        // The acceptance root is read-only. Use the WM's existing quit handoff.
+        gserial::reply_to(false, b"!", format_args!("C-GUI completed {}", env!("PPC_GUI_TRIAL")));
         st.quit = true;
     }
     run_standalone(st)
