@@ -13,6 +13,8 @@
 #include "ide_bus.h"
 #include "kprintf.h"
 #include "memmap.h"
+#include "tick_clock.h"
+#include "io.h"
 
 /* ドライブ検出フラグ (4ドライブ対応)
  * drive 0 = バンク0 Master (NP21/W IDE #0)
@@ -41,12 +43,34 @@ static void ide_select_bank(int bank)
     ide_bus_select(bank);
 }
 
-/* ステータス待ち (BSY=0になるまで) */
-static int ide_wait_bsy(void)
+/* NetBSD ata_wdc.c ATA_DELAY: 10 seconds for drive I/O. */
+typedef struct {
+    u32 start_ms;
+    u32 early_polls;
+} IdeWait;
+
+static IdeWait ide_wait_start(u32 early_polls)
 {
-    int timeout = IDE_TIMEOUT_BSY;
-    while (timeout-- > 0) {
+    u32 start = tick_clock_ms();
+    return (IdeWait){ start, (start && _irq_enabled()) ? 0 : early_polls + 1 };
+}
+
+static int ide_wait_pending(IdeWait *wait, u32 limit_ms)
+{
+    u32 elapsed = tick_clock_ms() - wait->start_ms;
+    /* Boot or IRQ-masked I/O can see a stationary clock. Once the
+     * first tick arrives only elapsed time bounds this wait. */
+    if (wait->early_polls && elapsed == 0) return --wait->early_polls != 0;
+    return elapsed < limit_ms;
+}
+
+/* ステータス待ち (BSY=0になるまで) */
+static int ide_wait_bsy(u32 limit_ms)
+{
+    IdeWait wait = ide_wait_start(IDE_EARLY_BSY_POLLS);
+    while (ide_wait_pending(&wait, limit_ms)) {
         u8 st = ide_bus_alt();
+        if (limit_ms != IDE_IO_TIMEOUT_MS && st == IDE_BUS_OPEN8) return IDE_ERR_NO_DRIVE;
         if (!(st & IDE_ST_BSY)) return IDE_OK;
     }
     return IDE_ERR_TIMEOUT;
@@ -55,27 +79,26 @@ static int ide_wait_bsy(void)
 /* DRQ待ち: BSYが落ちてDRQが立つまで */
 static int ide_wait_drq(void)
 {
-    int timeout = IDE_TIMEOUT_LOOP;
-    u8 st;
+    IdeWait wait = ide_wait_start(IDE_EARLY_PHASE_POLLS);
+    u8 st = IDE_ST_BSY;
 
     /* まずBSYが落ちるのを待つ */
-    while (timeout-- > 0) {
+    while (ide_wait_pending(&wait, IDE_PROBE_BSY_MS)) {
         st = ide_bus_alt();
+        if (st == IDE_BUS_OPEN8) return IDE_ERR_NO_DRIVE;
         if (!(st & IDE_ST_BSY)) break;
     }
-    if (timeout <= 0) return IDE_ERR_TIMEOUT;
+    if (st & IDE_ST_BSY) return IDE_ERR_TIMEOUT;
 
-    /* DRQチェック */
-    st = ide_bus_alt();
-    if (st & IDE_ST_ERR) return IDE_ERR_IO;
-    if (st & IDE_ST_DRQ) return IDE_OK;
-
-    /* DRQが来るまで追加待ち */
-    timeout = IDE_TIMEOUT_BSY;
-    while (timeout-- > 0) {
+    /* FreeBSD ata_wait allows 50 ms for the requested status bits. */
+    wait = ide_wait_start(IDE_EARLY_BSY_POLLS);
+    while (ide_wait_pending(&wait, IDE_PROBE_DRQ_MS)) {
         st = ide_bus_alt();
-        if (st & IDE_ST_DRQ) return IDE_OK;
-        if (st & IDE_ST_ERR) return IDE_ERR_IO;
+        if (st == 0 || st == 0x7f || st == IDE_BUS_OPEN8) return IDE_ERR_NO_DRIVE;
+        if (!(st & IDE_ST_BSY)) {
+            if (st & IDE_ST_ERR) return IDE_ERR_IO;
+            if (st & IDE_ST_DRQ) return IDE_OK;
+        }
     }
     return IDE_ERR_TIMEOUT;
 }
@@ -120,7 +143,7 @@ static void ide_chs_addr(int drive, u16 cyl, u8 head, u8 sect, IdeAddr *a)
 }
 
 static void ide_pio_settle(void);
-static int ide_pio_finish(void);
+static int ide_pio_finish(u32 limit_ms);
 #include "ide_multiple.inc"
 #include "ide_pio.inc"
 
@@ -175,8 +198,8 @@ int ide_init(void)
             int idx = bank * IDE_DRIVES_PER_BANK + drv;
             if (!drive_present[idx]) continue;
             ide_select_drive(idx);
-            if (ide_wait_bsy() != IDE_OK) break;
-            if (ide_multiple_prepare(idx) != IDE_OK) break;
+            if (ide_wait_bsy(IDE_PROBE_BSY_MS) != IDE_OK) break;
+            if (ide_multiple_prepare(idx, IDE_PROBE_BSY_MS) != IDE_OK) break;
         }
     }
 
@@ -195,11 +218,14 @@ int ide_identify(int drive, IdeInfo *info)
      * 書き換える。KAPI の ide_identify (シェルの `ide N`) が一時的に失敗しても、
      * 起動時に得た値で読み書きが続けられる。起動時の初期値は 0 (valid = 0)。 */
     ide_select_drive(drive & (IDE_MAX_DRIVES - 1));
-    ret = ide_wait_bsy();
+    ret = ide_wait_bsy(IDE_SPINUP_MS);
     if (ret != IDE_OK) return ret;
 
     /* IDENTIFYコマンド発行 */
     ide_bus_out(IDE_REG_STATUS, IDE_CMD_IDENTIFY);
+
+    /* Allow command status to settle before interpreting an empty-bus value. */
+    for (i = 0; i < IDE_SEL_SETTLE; i++) ide_bus_alt();
 
     /* DRQ待ち */
     ret = ide_wait_drq();
@@ -215,7 +241,7 @@ int ide_identify(int drive, IdeInfo *info)
 
     /* IRQクリア: Statusレジスタ読み出し */
     { u8 st = ide_bus_in(IDE_REG_STATUS); (void)st; }
-    ide_wait_bsy();
+    ide_wait_bsy(IDE_PROBE_BSY_MS);
 
 #if OS32_FEATURE_IDE
     /* ATA IDENTIFY word 106. The PIO path transfers 256 words per sector.
@@ -398,12 +424,12 @@ int ide_install_flush(u32 unit)
 {
     if (unit >= IDE_MAX_DRIVES || !drive_present[unit]) return IDE_ERR_NO_DRIVE;
     ide_select_drive(unit);
-    int rc = ide_wait_bsy();
+    int rc = ide_wait_bsy(IDE_IO_TIMEOUT_MS);
     if (rc) return rc;
     /* Seagate SV35 Series Product Manual 100415205A, supported commands.
      * FreeBSD sys/cam/ata/ata_da.c, BIO_FLUSH. */
     ide_bus_out(IDE_REG_STATUS, IDE_CMD_FLUSH_CACHE);
     ide_pio_settle();
-    return ide_pio_finish();
+    return ide_pio_finish(IDE_IO_TIMEOUT_MS);
 }
 #endif
