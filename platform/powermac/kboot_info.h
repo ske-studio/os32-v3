@@ -1,6 +1,7 @@
 #ifndef OS32_POWERMAC_KBOOT_INFO_H
 #define OS32_POWERMAC_KBOOT_INFO_H
 #include "ofw.h"
+#include "pci_capture.h"
 #include "lan_boot.h"
 #include "ppc_pmap.h"
 #include "ppc_trap.h"   /* PM_DEC_HZ */
@@ -49,6 +50,7 @@ struct pm_kboot_info {
     u32 root_frame_bytes;
     u32 of_calls_at_detach;
     struct pm_kboot_device escc, mpic;
+    struct pm_pci_capture pci;
     struct pm_gmac_boot gmac;
     int gmac_rc;
     struct pm_via_boot via;

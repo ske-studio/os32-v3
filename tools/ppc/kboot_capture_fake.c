@@ -1,6 +1,8 @@
-/* Actual kboot_capture.c with an ILP32, libc-free firmware tree fake. */
+/* HWOP_COMMON_DESIGN §2.3: retain every PCI bridge and assignment after OF detach.
+ * Actual kboot_capture.c with an ILP32, libc-free firmware tree fake. */
 #include "kboot_info.h"
 #include "kstring.h"
+static unsigned bad_gmac_bridge;
 static unsigned scenario, ac, sc, mac, expected_stop, wrote, lan_fail;
 static void emit(const char *s) { __asm__ volatile("int $0x80" : : "a"(4), "b"(1), "c"(s), "d"(kstrlen(s)) : "memory"); }
 static unsigned char reg[PM_KBOOT_PROP_BYTES], avail[PM_KBOOT_PROP_BYTES];
@@ -24,13 +26,46 @@ static void tuple(unsigned char *p, unsigned a, unsigned s, unsigned start, unsi
 static int prop(int node, const char *name, unsigned char *p)
 {
     unsigned n=0;
+    if (scenario >= 42 && node >= 20) {
+        const unsigned mem = 0x02000000;
+        if (node==20 && !kstrcmp(name,"compatible")) { kmemcpy(p,"uni-north",10); return 10; }
+        if (node==20 && !kstrcmp(name,"reg")) { put(p,0xe0000000); put(p+4,0x2000000); return 8; }
+        if (node <= 22) {
+            if (!kstrcmp(name,"device_type")) { kmemcpy(p,"pci",4); return 4; }
+            if (!kstrcmp(name,"#address-cells")) { put(p,3); return 4; }
+            if (!kstrcmp(name,"#size-cells")) { put(p,node==21?1:2); return 4; }
+            if (!kstrcmp(name,"bus-range")) { put(p,node-20); put(p+4,3); return 8; }
+            if (!kstrcmp(name,"ranges")) {
+                unsigned child = node==20?0x3000:node==21?0x2000:0x1000;
+                unsigned v[]={mem,0,child,mem,0,child+0x1000,0,0x1000};
+                unsigned count=8;
+                if (node==20) { v[3]=0x80000000; v[4]=0; v[5]=0x1000; count=6; }
+                if (node==21) { v[1]=1; v[6]=0x1000; count=7; }
+                if (node==22) v[4]=1;
+                for (unsigned i=0;i<count;i++) put(p+i*4,v[i]);
+                return count*4;
+            }
+        }
+        if (node==40) {
+            if (!kstrcmp(name,"vendor-id")) { put(p,0x106b); return 4; }
+            if (!kstrcmp(name,"device-id")) { put(p,0x003f); return 4; }
+            if (!kstrcmp(name,"class-code")) { put(p,0x0c0310); return 4; }
+            if (!kstrcmp(name,"compatible")) { kmemcpy(p,"usb-ohci",9); return 9; }
+            if (!kstrcmp(name,"assigned-addresses")) {
+                unsigned v[]={mem|0x20110,0,0x1100,0,0x100};
+                for (unsigned i=0;i<5;i++) put(p+i*4,v[i]);
+                return 20;
+            }
+        }
+        return -1;
+    }
     if (node==-17) node=1;
     if (scenario==24 && (node==11 || node==12)) {
         if (!kstrcmp(name,"compatible")) { const char *s=node==11?"uni-north":"gmac"; do { p[n]=s[n]; } while (s[n++]); return n; }
         if (node==11 && !kstrcmp(name,"#address-cells")) { put(p,3); return 4; }
         if (node==11 && !kstrcmp(name,"#size-cells")) { put(p,2); return 4; }
         if (node==11 && !kstrcmp(name,"reg")) { put(p,0xf2000000); put(p+4,0x2000000); return 8; }
-        if (node==11 && !kstrcmp(name,"bus-range")) { put(p,0); put(p+4,0); return 8; }
+        if (node==11 && !kstrcmp(name,"bus-range")) { put(p,0); put(p+4,0); return bad_gmac_bridge ? 4 : 8; }
         if (node==11 && !kstrcmp(name,"ranges")) { for (n=0;n<48;n++) p[n]=0; put(p,0x01000000); put(p+12,0xf2000000); put(p+20,0x800000); put(p+24,0x02000000); put(p+32,0x80000000); put(p+36,0x80000000); put(p+44,0x10000000); return 48; }
         if (node==12 && !kstrcmp(name,"vendor-id")) { put(p,0x106b); return 4; }
         if (node==12 && !kstrcmp(name,"device-id")) { put(p,0x21); return 4; }
@@ -141,11 +176,12 @@ int ofw_setup(struct ofw_env *e) { e->out=9; return 0; }
 int ofw_finddevice(const char *s) { return !kstrcmp(s,PM_ROOT)?(scenario==18?-17:1):!kstrcmp(s,"/cpus")?8:2; }
 int ofw_parent(int n)
 {
+    if (scenario>=42 && n>=20) return n==20?1:n<=22?n-1:22;
     if (n==-17) n=1;
     return n==12?11:n==11?1:n==1?0:n==6?5:n==5||n==7||n==13||n==14?9:n==9?4:n==3 && scenario!=22?8:scenario==18?-17:1;
 }
-int ofw_child(int n) { if (n==13 && scenario==34) return -1; return n==11?12:n==1||n==-17?2:n==4?9:n==9?5:n==5?6:n==8 && scenario!=22?3:0; }
-int ofw_peer(int n) { if (n==13 && scenario==35) return -1; return n==2?(scenario==22?3:8):n==8?4:n==3 && scenario==22?4:n==4 && scenario==23?10:n==4 && scenario==24?11:n==5?7:n==7 && scenario>=26 && scenario!=33?13:n==13 && scenario==28?14:0; }
+int ofw_child(int n) { if (scenario>=42 && n>=20) return n<=22?n+1:0; if (n==13 && scenario==34) return -1; return n==11?12:n==1||n==-17?2:n==4?9:n==9?5:n==5?6:n==8 && scenario!=22?3:0; }
+int ofw_peer(int n) { if (scenario>=42 && n==4) return 20; if (scenario>=42 && n>=23) return n<(scenario==42?40:140)?n+1:0; if (n==13 && scenario==35) return -1; return n==2?(scenario==22?3:8):n==8?4:n==3 && scenario==22?4:n==4 && scenario==23?10:n==4 && scenario==24?11:n==5?7:n==7 && scenario>=26 && scenario!=33?13:n==13 && scenario==28?14:0; }
 int ofw_package_to_path(int n, char *p, unsigned cap)
 {
     if (n==-17) n=1;
@@ -197,8 +233,35 @@ static void test(void)
     emit("reached=A1\n");
     const struct pm_kboot_info *p=pm_kboot_capture(0);
     REQUIRE(!expected_stop);
+    if (bad_gmac_bridge) {
+        REQUIRE(p->pci.gmac_known && p->gmac_rc==LAN_EINVAL && !p->gmac.node);
+        quit(0);
+    }
     if (p->gmac_rc!=(scenario==24?LAN_OK:LAN_ENODEV)) { emit("H:A1 gmac-rc\n"); quit(42); }
     if (scenario==24 && !(p->gmac.bar_pa==0x82200000 && p->gmac.mac[0]==0x52 && p->gmac.mac[5]==0x56)) { emit("H:A1 gmac-data\n"); quit(43); }
+    if (scenario>=42) {
+        const struct pm_pci_capture *c=&p->pci;
+        REQUIRE(c->bridges==3 && c->ranges==3 && c->assigned==1);
+        REQUIRE(c->bridge[0].supported && c->bridge[0].id==20 && c->bridge[0].parent==-1 &&
+                c->bridge[0].cfg_pa==0xe0000000 && c->bridge[0].first==0 && c->bridge[0].last==3);
+        const struct pm_of_assignment *a=&c->assignment[0];
+        const struct pm_of_function *f=&c->function[a->function];
+        REQUIRE(f->vendor==0x106b && f->device==0x3f && f->class_code==0x0c0310);
+        REQUIRE(!kstrcmp(f->compatible,"usb-ohci") && a->hi==0x02020110 && a->bytes==0x100);
+        REQUIRE(c->range[1].base==0x100002000ULL && c->range[2].parent_base==0x100002000ULL);
+        unsigned long long pa=a->base;
+        for (int bridge=f->bridge; bridge>=0; bridge=c->bridge[bridge].parent) {
+            const struct pm_of_range *r=&c->range[bridge];
+            if (r->bridge!=bridge || pa<r->base || pa-r->base>=r->bytes) {
+                emit("OHCI parent interval mismatch\n"); quit(45);
+            }
+            pa=r->parent_base+(pa-r->base);
+        }
+        REQUIRE(pa==0x80000100);
+        REQUIRE(c->bridge[0].incomplete==(scenario==43));
+        if (scenario==43) REQUIRE(c->functions==PM_PCI_FUNCTIONS);
+        quit(0);
+    }
     if (scenario>=26) {
         const int expected[]={0,0,PM_VIA_AMBIGUOUS,PM_VIA_BAD_PROPERTY,
                               PM_VIA_BAD_ADDRESS,PM_VIA_BAD_ADDRESS,
@@ -259,6 +322,7 @@ void entry(unsigned *stack)
         const char *p=(const char *)stack[2];
         while (*p) scenario=scenario*10+(*p++-'0');
     }
+    if (scenario==44) { scenario=24; bad_gmac_bridge=1; }
     test();
 }
 __asm__(".global _start\n_start:\n mov %esp,%eax\n push %eax\n call entry\n");

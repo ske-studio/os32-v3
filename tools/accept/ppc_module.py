@@ -125,12 +125,20 @@ def main():
         anchor, anchor + '\n        kprintf(KBOOT_ATTR, "[module] result=%d\\n", probe_modules());') +
         (FIX / 'probe.inc').read_text())
     images = []
-    for case in (['normal', 'bypass', 'kdebug-absent'] if args.mutate else ['normal']):
+    for case in (['normal', 'bypass', 'kdebug-absent', 'slot7-hash', 'missing-file'] if args.mutate else ['normal']):
         settings = []
         if case == 'bypass':
             settings = [x.replace('KB_MUT_', 'KB_MUT_EXTRA_', 1) for x in mutant_settings(
                 work, case, 'kernel/module/module_image.c', 'if (h[MI_PAIR_CRC] != policy->pair_image_crc)',
                 'if (0)')]
+        if case == 'slot7-hash':
+            meta = json.loads((ROOT / 'platform/powermac/kdebug_imports.json').read_text())
+            meta['imports'][7]['name'] += '_bad'
+            path = work / 'slot7.json'
+            path.write_text(json.dumps(meta))
+            settings = ['KB_DIAG_METADATA=' + str(path)]
+        if case == 'missing-file':
+            settings = ['KB_ROOT_DIAG=']
         if case == 'kdebug-absent':
             (work / case).mkdir()
             generated = generate_bindings(work / case, case, ide=True, fep=True)
@@ -150,6 +158,10 @@ def main():
         cases.extend([('foreign', foreign_image(images[0], pairs[1]),
                        ['[module] diag state=4 list=-1 unsupported=-1', '[module] first rc=4 starts=0', '[module] result=4']),
                       ('bypass', foreign_image(images[1], pairs[0]), ['[module] diag state=1 list=0 unsupported=2', '[module] result=0'])])
+        cases.append(('missing-file', images[4],
+                      ['[module] diag state=2 list=-1 unsupported=-1', '[module] result=0']))
+        cases.append(('slot7-hash', images[3],
+                      ['[module] diag state=12 list=-1 unsupported=-1', '[module] result=0']))
     digests = set()
     for case, media, expected in cases:
         digest = hashlib.sha256(media.elf.read_bytes()).hexdigest()
@@ -157,6 +169,8 @@ def main():
         digests.add(digest)
         print(case, digest, media.elf, flush=True)
         if not args.build_only:
+            point_rc = 0 if case in ('normal', 'bypass') else -10  # OS32_ERR_NOSYS
+            expected = [f'[module] point rc={point_rc} status=0 value=0', *expected]
             observe(media, work / ('guest-' + case), expected)
     print(f'{len(digests)} distinct PowerMac module acceptance images')
     return 0
