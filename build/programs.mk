@@ -131,6 +131,7 @@ $(addprefix $(SH_OBJDIR)/,$(SHELL_INSTALL_OBJ)): $(SH_OBJDIR)/%.o: platform/$(PL
 	@mkdir -p $(@D)
 	$(CC) $(PROGRAM_FLAGS) -DSHELL_AS_APP -c $< -o $@
 
+userland/shell/hwb_exec.o $(SH_OBJDIR)/hwb_exec.o: private PROGRAM_FLAGS += -Iplatform/$(PLATFORM)
 $(SH_OBJDIR)/%.o: userland/shell/%.c $(SHELL_DEPS) | $(ABI_CONTRACT_ORDER)
 	@mkdir -p $(SH_OBJDIR)
 	$(CC) $(PROGRAM_FLAGS) -DSHELL_AS_APP -Iuserland/shell $(INC_libos32filer) -c $< -o $@

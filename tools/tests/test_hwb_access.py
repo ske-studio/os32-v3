@@ -1,6 +1,6 @@
 """HW_BASIC_DESIGN §§3/7: real access/window/dispatch, libc-free ILP32."""
 CHECK = dict(name='hwb-access-host', tier=1, covers=[
-    'kdebug/hwb_access.c', 'kdebug/hwb_wire.h', 'kdebug/kdebug_main.c', 'kdebug/tri_command_wire.h', 'kdebug/trident_command_test.h',
+    'kdebug/hwb_access.c', 'platform/pc98/platform_hwb.h', 'include/pci_hwb_contract.h', 'kdebug/hwb_wire.h', 'kdebug/kdebug_main.c', 'kdebug/tri_command_wire.h', 'kdebug/trident_command_test.h',
     'kdebug/kdebug_window.c', 'kdebug/kdebug_window.h', 'kdebug/recover.h',
     'drivers/pci/pci_hwb.h', 'exec/exec_hwb.h', 'include/io.h',
     'include/types.h', 'include/memmap.h', 'mm/paging.h',
@@ -51,13 +51,13 @@ DISPATCH_PREFIX = '''static i32 recovery_call(u32 op, void *buf, u32 size)
         !(op == KDEBUG_OP_RECOVER_VIRTUAL && recover_virtual_allowed(req))) return -1;
 '''
 MUTATIONS = [
-    ('block8-store', 'kdebug/hwb_access.c', 'cld; rep stosb', 'cld', 'block-narrow'),
-    ('block16-store', 'kdebug/hwb_access.c', 'cld; rep stosw', 'cld', 'block-narrow'),
-    ('block8-inc', 'kdebug/hwb_access.c', '1: stosb; incl %%eax;', '1: stosb; nop;', 'block-narrow'),
-    ('block16-inc', 'kdebug/hwb_access.c', '1: stosw; incl %%eax;', '1: stosw; nop;', 'block-narrow'),
-    ('block-fixed-count', 'kdebug/hwb_access.c', 'u32 count = block->count, value = req->value;',
+    ('block8-store', 'platform/pc98/platform_hwb.h', 'cld; rep stosb', 'cld', 'block-narrow'),
+    ('block16-store', 'platform/pc98/platform_hwb.h', 'cld; rep stosw', 'cld', 'block-narrow'),
+    ('block8-inc', 'platform/pc98/platform_hwb.h', '1: stosb; incl %%eax;', '1: stosb; nop;', 'block-narrow'),
+    ('block16-inc', 'platform/pc98/platform_hwb.h', '1: stosw; incl %%eax;', '1: stosw; nop;', 'block-narrow'),
+    ('block-fixed-count', 'platform/pc98/platform_hwb.h', 'u32 count = block->count, value = req->value;',
      'u32 count = 1, value = req->value;', 'block32'),
-    ('block-fixed-value', 'kdebug/hwb_access.c', '} else if (!block->increment) {',
+    ('block-fixed-value', 'platform/pc98/platform_hwb.h', '} else if (!block->increment) {',
      '} else if (1) {', 'block32'),
     ('block-alignment', 'kdebug/hwb_access.c', '(req->addr & (req->width - 1U)) || block->count',
      '0 || block->count', 'block-narrow'),
@@ -67,14 +67,14 @@ MUTATIONS = [
      DISPATCH_PREFIX.replace('    if (op == HW_OP) return hwb_access(buf, size);\n', '') +
      '    if (op == HW_OP) return hwb_access(buf, size);\n',
      'paused'),
-    ('cleanup', 'kdebug/hwb_access.c',
+    ('cleanup', 'platform/pc98/platform_hwb.h',
      'if (recover_window_cleanup(&window)) status = HW_WINDOW;\n    if (!write',
      'if (window.failed && recover_window_cleanup(&window)) status = HW_WINDOW;\n    if (!write',
      'window'),
-    ('phys-write', 'kdebug/hwb_access.c',
+    ('phys-write', 'platform/pc98/platform_hwb.h',
      'write ? window.ops->store(window.opaque, va, req->width, value) :',
      'write ? 0 :', 'phys-write'),
-    ('readback', 'kdebug/hwb_access.c',
+    ('readback', 'platform/pc98/platform_hwb.h',
      '        status = rc ? HW_IO_ERROR : HW_OK;',
      '        if (write) rc |= window.ops->load(window.opaque, va, req->width, &value);\n'
      '        status = rc ? HW_IO_ERROR : HW_OK;', 'write-only'),

@@ -4739,7 +4739,7 @@
     {
       "index": 313,
       "symbol": "pci_hwb_read",
-      "source": "drivers/pci/pci_hwb.h",
+      "source": "include/pci_hwb_contract.h",
       "kind": 1,
       "stage": "S6",
       "context_safe": false,
@@ -4755,7 +4755,7 @@
     {
       "index": 314,
       "symbol": "pci_hwb_write",
-      "source": "drivers/pci/pci_hwb.h",
+      "source": "include/pci_hwb_contract.h",
       "kind": 1,
       "stage": "S6",
       "context_safe": false,
