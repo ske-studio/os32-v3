@@ -70,7 +70,7 @@
 | gfx2_present | **本線の共通の口が要る** | §2-3 | 食い違い 3 |
 | gfx2_check_op | 公開 | 通常ラッパー → gfx2_check_op | 本線 PM 11-23 の判断で照会と実行を一致させて公開。INDEX8 宛ての ALPHA は NOSUPPORT、submit は NOSYS。 |
 
-**公開 8 本 (gfx 5・gfx2 3)、不在 8 本 (gfx 7・gfx2 1)**。パレットの 3 本と gfx2_check_op の不在は **PM 決定**。PROVIDER_GROUPS['gfx'] のヘッダ除外 (gfx_hal.h・palette.h) は残す (使うのは E の物だけ)。
+**公開 9 本 (gfx 5・gfx2 4)、不在 7 本 (gfx 7)** (5c の時点は公開 8・不在 8。gfx2_check_op は本線 PM 11-23 の判断で公開)。パレットの 3 本の不在は **PM 決定**。PROVIDER_GROUPS['gfx'] のヘッダ除外 (gfx_hal.h・palette.h) は残す (使うのは E の物だけ)。
 
 ### 2-2. パレットの分担 (PM 決定: 5c では作らない。後で DAC の票が立った時の形)
 
