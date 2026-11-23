@@ -1,4 +1,4 @@
-/* Expectations: PPC_RESET_DESIGN 確定後の追記, §2 and §7.
+/* Expectations: PPC_RESET_DESIGN 確定後の追記, §2 and §7, and HW_OP §5 6b.
  * Linux/PPC user-mode fixture, with real platform code and fake hardware. */
 #include <kernel_boot.c>
 #include "drivers/usb/ohci_regs.h"
@@ -31,8 +31,38 @@ static u32 regs[PM_USB_PAGE / sizeof(u32)];
 static u32 directory[PAGE_SIZE / sizeof(u32)] __attribute__((aligned(PAGE_SIZE)));
 static u32 table[PAGE_SIZE / sizeof(u32)] __attribute__((aligned(PAGE_SIZE)));
 static const struct pm_kboot_info info;
-struct pm_usb_root pm_usb_roots[PM_USB_ROOTS];
-u32 pm_usb_root_count;
+#include <usb_tree.c>
+
+/* The PPC fixture stores OF cells in firmware byte order. */
+int ofw_finddevice(const char *path) { return kstrcmp(path, "/") ? -1 : 1; }
+int ofw_child(int node) { return node == 1 ? 2 : 0; }
+int ofw_peer(int node) { return node == 2 ? 3 : 0; }
+int ofw_getprop(int node, const char *name, void *buf, unsigned cap)
+{
+    const u32 ac = 1, bus_range[] = {0, 0};
+    const u32 reg[] = {node == 2 ? 0xf2000000u : 0xf4000000u, PM_USB_DMA_WINDOW};
+    const u32 ranges[] = {2u << 24, 0, PCI_BASE,
+                          CPU_BASE + (node == 3 ? PM_USB_PAGE : 0), 0, 0x100000};
+    const struct { const char *name; const void *data; unsigned size; } props[] = {
+        {"#address-cells", &ac, sizeof(ac)}, {"device_type", "pci", 4},
+        {"compatible", "uni-north", 10}, {"reg", reg, sizeof(reg)},
+        {"bus-range", bus_range, sizeof(bus_range)}, {"ranges", ranges, sizeof(ranges)}
+    };
+    for (unsigned i = 0; i < sizeof(props) / sizeof(props[0]); ++i) {
+        if ((node == 1) != (i == 0) || kstrcmp(name, props[i].name)) continue;
+        if (buf && cap < props[i].size) return -1;
+        if (buf) kmemcpy(buf, props[i].data, props[i].size);
+        return props[i].size;
+    }
+    return -1;
+}
+
+int ofw_call(const char *name, unsigned ni, unsigned no, cell *args)
+{
+    if (kstrcmp(name, "getproplen") || ni != 2 || no != 1) return -1;
+    args[2] = ofw_getprop(args[0], (const char *)args[1], NULL, 0);
+    return 0;
+}
 
 static __attribute__((noreturn)) void quit(int status)
 {
@@ -197,14 +227,19 @@ void entry(const u32 *stack)
     scenario = *(const char *)stack[2] - '0';
     const u32 test_pa[] = { VIA_FIRST_PA, VIA_LAST_PA, VIA_FIRST_PA - PM_USB_PAGE,
                             VIA_LAST_PA + PM_USB_PAGE, VIA_FIRST_PA, NEXT_PA - PM_USB_PAGE };
-    pm_usb_root_count = 2;
-    pm_usb_roots[0] = (struct pm_usb_root){
-        .host_id = 2, .pa = 0xf2000000u, .nwin = 1,
-        .win = {{2, PCI_BASE, CPU_BASE, 0x100000u}},
-    };
-    pm_usb_roots[1].pa = 0xf4000000u;
-    if (scenario == CFG_ADDR_OVERLAP) pm_usb_roots[1].pa = 0x7f816000u;
-    if (scenario == CFG_DATA_OVERLAP) pm_usb_roots[1].pa = 0x7f418000u;
+    if (scenario == TWO_ROOTS) {
+        pm_usb_capture();
+        if (pm_usb_root_count != 2) quit(106);
+    } else {
+        pm_usb_root_count = 2;
+        pm_usb_roots[0] = (struct pm_usb_root){
+            .host_id = 2, .pa = 0xf2000000u, .nwin = 1,
+            .win = {{2, PCI_BASE, CPU_BASE, 0x100000u}},
+        };
+        pm_usb_roots[1].pa = 0xf4000000u;
+        if (scenario == CFG_ADDR_OVERLAP) pm_usb_roots[1].pa = 0x7f816000u;
+        if (scenario == CFG_DATA_OVERLAP) pm_usb_roots[1].pa = 0x7f418000u;
+    }
 
     boot_info = &info;
     struct pm_via_boot via = {
@@ -223,9 +258,6 @@ void entry(const u32 *stack)
 
     pm_bridge_register(2, 0x1000, 0x2000);
     if (scenario == TWO_ROOTS) {
-        pm_usb_roots[1] = pm_usb_roots[0];
-        pm_usb_roots[1].host_id = 3;
-        pm_usb_roots[1].win[0].cpu_base += PM_USB_PAGE;
         pm_bridge_register(3, 0x3000, 0x4000);
         first_pa = NEXT_PA;
     } else first_pa = test_pa[scenario];

@@ -40,6 +40,13 @@ int pm_fake_lane(u32 va, u32 width, int write, u32 *value);
 #define access_lane pm_fake_lane
 #endif
 
+static int selectable(const struct pm_pci *p, u32 bdf)
+{
+    u32 bus = bdf >> 16, dev = (bdf >> 11) & 31;
+    return bus >= p->bus_first && bus <= p->bus_last &&
+           (bus != p->bus_first || dev >= 11);
+}
+
 u32 pm_pci_access(const struct pm_pci *p, u32 bdf, u32 reg, u32 width,
                   int write, u32 *value)
 {
@@ -53,7 +60,7 @@ u32 pm_pci_access(const struct pm_pci *p, u32 bdf, u32 reg, u32 width,
     struct pm_bridge_state *bridge = p->bridge;
     u32 flags = ppc_irq_save(), rc = HW_IO_ERROR;
     if (bridge->busy || bridge->isolated) goto end;
-    if (bus < p->bus_first || bus > p->bus_last || (bus == p->bus_first && dev < 11)) {
+    if (!selectable(p, bdf)) {
         if (!write) *value = U32_MAX >> ((4 - width) * 8);
         rc = HW_OK;
         goto end;
@@ -120,7 +127,7 @@ int pm_gmac_early_quiesce(void)
     if (!b || !b->node || b->profile != PM_GMAC_PROFILE_UNINORTH ||
         b->vendor_device != GMAC_ID)
         return 0;
-    if (saved_pci.target_bdf != b->bdf) return LAN_EIO;
+    if (saved_pci.target_bdf != b->bdf || !selectable(&saved_pci, b->bdf)) return LAN_EIO;
     if (b->clock.valid) {
         rh.clock_rc = pm_gmac_clock(b, saved_clock_va);
         if (rh.clock_rc) return LAN_EIO;

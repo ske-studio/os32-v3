@@ -25,7 +25,7 @@ CHECK = dict(name='powermac-reset', tier=1, needs=[], budget=40, env=['ppc-cross
     'arch/ppc/pd_walk.c', 'platform/powermac/kernel_boot.c',
     'platform/powermac/pci_config.c', 'platform/powermac/pci_backend.c',
     'platform/powermac/lan_gem_io.c', 'platform/powermac/pci_hosts.inc',
-    'platform/powermac/usb_boot.c', 'platform/powermac/usb_platform.c',
+    'platform/powermac/usb_boot.c', 'platform/powermac/usb_platform.c', 'platform/powermac/usb_tree.c',
     'platform/powermac/input_keymap_backend.c', 'input/hal/keymap.h', 'input/hal/usb_input.h',
     'tools/ppc/usb_via_overlap_host.c', 'drivers/usb/usb_core.h',
     'drivers/usb/ohci_regs.h', 'include/endian_dma.h', 'include/usb_platform.h',
@@ -108,6 +108,8 @@ USB_CASES = ('VIA first page', 'VIA last page', 'page before VIA', 'page after V
              'unpublished VIA', 'config write cleanup', 'second root config address',
              'second root config data', 'HW_OP §5 6b saved USB root')
 USB_MUTATIONS = (
+    ('usb-swapped-OF-host', 'usb_tree.c', '.host_id = node',
+     '.host_id = node == 2 ? 3 : 2', 8, 106),
     ('usb-ignore-root', 'usb_platform.c',
      'maps[slot].root == f->root && maps[slot].pa == pa', '1', 8, 106),
     ('usb-bus-instead-of-pa', 'usb_platform.c',

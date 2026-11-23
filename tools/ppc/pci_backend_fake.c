@@ -55,6 +55,7 @@ void __cdecl kprintf(u8 attr, const char *fmt, ...)
 }
 
 static int stage, fail_at, accesses, stop_count, memory_calls;
+static u32 gem_id, gem_command;
 static int fault_command_read, fault_command_write;
 static struct pm_bridge_state second = {.addr_va=0x3000, .data_va=0x4000};
 struct pm_bridge_state *pm_bridge_lookup(int id)
@@ -68,7 +69,11 @@ static int fake_instruction(u32 va, u32 width, int write, u32 *value)
     if (va == 0x2004 && width == 2 &&
         (write ? fault_command_write : fault_command_read)) { ppc_trap_onfault_clear(); return 1; }
     u32 mask = U32_MAX >> ((4 - width) * 8);
-    if (write) pm_pci_mmio_write32(va, __builtin_bswap32(*value & mask));
+    if (gem_id && va == 0x2000 && !write) *value = gem_id;
+    else if (gem_id && va == 0x2004 && width == 2) {
+        if (write) gem_command = *value;
+        else *value = gem_command;
+    } else if (write) pm_pci_mmio_write32(va, __builtin_bswap32(*value & mask));
     else if (va == 0x1000) *value = 0xdeadbeef; /* posted-write flush only */
     else *value = __builtin_bswap32(pm_pci_mmio_read32(va)) & mask;
     return 0;
@@ -93,7 +98,12 @@ FAKE_INSN(write16le, 2, 1)
 FAKE_INSN(read32le, 4, 0)
 FAKE_INSN(write32le, 4, 1)
 
-static int memory_boot_init(u32 kb) { (void)kb; memory_calls++; return 1; }
+static int memory_boot_init(u32 kb)
+{
+    (void)kb;
+    memory_calls++;
+    return !(gem_command & 4);
+}
 static void *stop_env[5];
 static void kboot_stop(const char *why)
 { (void)why; stop_count++; __builtin_longjmp(stop_env, 1); }
@@ -154,13 +164,20 @@ static int bridge_cases(void)
     info.gmac.root_node = 99;
     if (!boot_case(1)) return 28;
     info.gmac.root_node = 1;
-    data = info.gmac.vendor_device;
+    accesses = 0;
+    info.gmac.bdf = tag | (1u << 16);
+    if (!boot_case(1) || accesses) return 32;
+    info.gmac.bdf = 10u << 11;
+    if (!boot_case(1) || accesses) return 33;
+    info.gmac.bdf = tag;
+    gem_id = info.gmac.vendor_device;
+    gem_command = 6;
     fault_command_read = 1;
     if (!boot_case(1)) return 29;
     fault_command_read = 0; fault_command_write = 1;
     if (!boot_case(1)) return 30;
     fault_command_write = 0;
-    if (!boot_case(0)) return 31;
+    if (!boot_case(0) || gem_command != 2) return 31;
     return 0;
 }
 
@@ -224,6 +241,10 @@ static int test(void)
             pci_bind_info_get(i, &bind) || bind.reason != PCI_BIND_NO_DRIVER)
             return 13;
     }
+    previous = reads;
+    u32 value;
+    if (pm_hwb_cfg_read(12u << 3, 0, 4, &value) || value != 0x1234abcd ||
+        reads != previous + 1 || last_address != (1u << 12)) return 34;
     tree = 0;
     return bridge_cases();
 }

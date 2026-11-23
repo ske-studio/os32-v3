@@ -50,6 +50,10 @@ def run(ctx):
         check(0, {})
         if ctx.mutate:
             for label, name, old, new, expected in [
+                ('target_bdf restriction', 'pci_config.c', 'if (!p || !p->bridge)',
+                 'if (!p || !p->bridge || bdf != p->target_bdf)', 34),
+                ('GEM selectable', 'pci_config.c', ' || !selectable(&saved_pci, b->bdf)', '', 32),
+                ('GEM master clear', 'pci_config.c', 'command & ~PCI_MASTER', 'command', 31),
                 ('command status mask', 'pci_config.c', 'reg == PCI_COMMAND ? 2 : 4',
                  '4', 9),
                 ('command only', 'pci_backend.c', 'if (reg == 4)', 'if (1)', 8),
@@ -65,5 +69,5 @@ def run(ctx):
             ]:
                 check(expected, {name: (old, new)})
                 print(f'RED {label} (assertion {expected})')
-    print('PowerMac PCI backend OK' + (' (10 runtime mutants RED)' if ctx.mutate else ''))
+    print('PowerMac PCI backend OK' + (' (13 runtime mutants RED)' if ctx.mutate else ''))
     return 0
