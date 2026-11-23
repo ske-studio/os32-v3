@@ -1,7 +1,7 @@
 # HW-BASIC の共通の HW_OP と機種の後端 — 確定設計
 
 > 出所: ~/os32-tmp/run/hwop-common-design/DESIGN.final.md (astra 起草、sol レビュー 3 回、PM が確定 2026-11-23)。
-> 状態: **現行 (2026-11-23)** — 段の状態は票 [TASK_HW_BASIC](../../tasks/realhw/TASK_HW_BASIC.md) が持つ。
+> 状態: **現行 (2026-11-23)** — 段の状態は票 TASK_HW_BASIC が持つ。
 
 # HW-BASIC の HW_OP を PC-98 と PowerMac で共有する設計案
 
@@ -27,12 +27,12 @@
 
 | 役目 | x86 の実コードと動作 | PowerMac の現状 |
 |---|---|---|
-| 入口 | userland/shell/cmd_hw.c:163 shell_cmd_hw → hwb_exec.c の hwb_load / hwb_step。hw_find_id は pci_count / pci_get、BDF 指定はシェルで組み立てる。 | resident shell に同じソースが入る。PM の調査では最初の POINT が通らない。 |
-| 特権呼出し | cmd_hw.c:42 hw_access → kapi/kapi_generated.c の wrap_kdebug_call → kernel/module/kdebug_call.c:15 kdebug_call → ops.dbg_call → kdebug/kdebug_main.c:134 recovery_call の HW_OP 分岐 → kdebug/hwb_access.c の hwb_access。 | platform/powermac/module_diag.c の diag_call は現在 PROBE_OP の LIST のみ。HW_OP を同じ hwb_access に渡し、LIST は既存経路を使う。 |
-| PCI | hwb_exec.c:86 he_access → hwb_access → drivers/pci/pci_hwb.c の pci_hwb_read/write → access_cfg。IRQ 保存、CF8 保存、2 パターンで機構確認、アドレス選択、CFC + lane で指定幅の取引、CF8・IRQ 復元。 | platform/powermac/pci_config.c:52 transaction は UniNorth の Type 0/1 と LE の 32 ビット取引。pci_backend.c の pci_config_write16 は Command 用。PC-98 でも platform/pc98/pci_config.c の列挙用口と HW-BASIC の E7 は別経路。 |
-| BAR | hwb_exec.c:97 he_bar が利用の都度 header type と BAR を実読。型別の本数、64 ビット BAR の対と上位、空間を検証し属性をマスク。he_address が offset を足し、末端・整列を検査してログ番地にする。 | OF の PCI バス番地と CPU 物理番地が異なり得る。生の pciread の答えは両機種とも構成値。 |
-| PHYS / IO | hwb_access.c の hwb_phys / hwb_block / hwb_io。kdebug/kdebug_window.c:66 kdebug_window_begin と recover_window_cleanup が peek・recovery と所有権を共有。kdebug/kpeek.c の kpeek_mmio もこの窓を使う。kpeek_call は別 op の配送先。 | 既存の装置別マップはあるが HW_OP の一時窓は未接続。PC-98 のポート空間に相当する資源は無い。 |
-| 中止と記録 | hwb_exec.c:80 he_point → cmd_hw.c:63 hw_point → HW_POINT → exec_hwb_abort_take。hwb_step・he_wait_poll・fill 内の判定、hwb_log.c の begin/end/poll/finish → cmd_hw.c の hw_line / hw_log_flush が端末と -o を扱う。 | exec の印とログ整形を共有し、入力から中止要求を立てる部分とモジュールの型付き import を接続する。 |
+| 入口 | userland/shell/cmd_hw.c shell_cmd_hw → hwb_exec.c の hwb_load / hwb_step。hw_find_id は pci_count / pci_get、BDF 指定はシェルで組み立てる。 | resident shell に同じソースが入る。PM の調査では最初の POINT が通らない。 |
+| 特権呼出し | cmd_hw.c hw_access → kapi/kapi_generated.c の wrap_kdebug_call → kernel/module/kdebug_call.c kdebug_call → ops.dbg_call → kdebug/kdebug_main.c recovery_call の HW_OP 分岐 → kdebug/hwb_access.c の hwb_access。 | platform/powermac/module_diag.c の diag_call は現在 PROBE_OP の LIST のみ。HW_OP を同じ hwb_access に渡し、LIST は既存経路を使う。 |
+| PCI | hwb_exec.c he_access → hwb_access → drivers/pci/pci_hwb.c の pci_hwb_read/write → access_cfg。IRQ 保存、CF8 保存、2 パターンで機構確認、アドレス選択、CFC + lane で指定幅の取引、CF8・IRQ 復元。 | platform/powermac/pci_config.c transaction は UniNorth の Type 0/1 と LE の 32 ビット取引。pci_backend.c の pci_config_write16 は Command 用。PC-98 でも platform/pc98/pci_config.c の列挙用口と HW-BASIC の E7 は別経路。 |
+| BAR | hwb_exec.c he_bar が利用の都度 header type と BAR を実読。型別の本数、64 ビット BAR の対と上位、空間を検証し属性をマスク。he_address が offset を足し、末端・整列を検査してログ番地にする。 | OF の PCI バス番地と CPU 物理番地が異なり得る。生の pciread の答えは両機種とも構成値。 |
+| PHYS / IO | hwb_access.c の hwb_phys / hwb_block / hwb_io。kdebug/kdebug_window.c kdebug_window_begin と recover_window_cleanup が peek・recovery と所有権を共有。kdebug/kpeek.c の kpeek_mmio もこの窓を使う。kpeek_call は別 op の配送先。 | 既存の装置別マップはあるが HW_OP の一時窓は未接続。PC-98 のポート空間に相当する資源は無い。 |
+| 中止と記録 | hwb_exec.c he_point → cmd_hw.c hw_point → HW_POINT → exec_hwb_abort_take。hwb_step・he_wait_poll・fill 内の判定、hwb_log.c の begin/end/poll/finish → cmd_hw.c の hw_line / hw_log_flush が端末と -o を扱う。 | exec の印とログ整形を共有し、入力から中止要求を立てる部分とモジュールの型付き import を接続する。 |
 
 ## 2. 共通の契約と後端
 
