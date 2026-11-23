@@ -276,6 +276,7 @@ int main(int argc, char **argv)
     existing = argc == 2 && !strcmp(argv[1], "existing");
     setup_media(&p);
     setup_mounts();
+    assert(install_format_begin(&format, 0, 8, 8) < 0);
     assert(!dev_blk_write_lba(&raw, 6, 1, sector));
     assert(!memcmp(disk[6], sector, 512));
     assert(!ide_write_sector(0, 7, sector));

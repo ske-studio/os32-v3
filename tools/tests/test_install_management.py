@@ -13,6 +13,8 @@ CHECK = dict(name='install-management-host', tier=1, needs=[], budget=4,
     basis=['docs/decisions/ppc/PPC_ROOT_MOUNT_ALIGN_X86_DESIGN.md §5–6'])
 
 MUTATIONS = [
+    ('if (platform_install_medium() || r->state != AVAILABLE) {',
+     'if (r->state != AVAILABLE) {'),
     ('if (install_transfer_allowed(a, 0, 0)) return 0;', 'if (a) return 0;'),
     ('if (install_transfer_allowed(a, 0, 0)) return 0;',
      'if (install_transfer_allowed(a, 0, 0)) { irq_restore(*flags); return 0; }'),

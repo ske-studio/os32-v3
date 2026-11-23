@@ -465,7 +465,7 @@ int install_format_begin(struct install_access *a, u32 unit, u32 start, u32 leng
     if (unit >= VFS_DEV_UNIT_MAX) return OS32_ERR_INVAL;
     struct reservation *r = &units[unit];
     unsigned flags = irq_save();
-    if (r->state != AVAILABLE) {
+    if (platform_install_medium() || r->state != AVAILABLE) {
         if (r->state != ACTIVE || !exec_disk_write_allowed() ||
             r->owner != res_owner_get() || start != r->plan.root_ext2.start_lba ||
             length != r->plan.root_ext2.sectors || r->in_flight) {
