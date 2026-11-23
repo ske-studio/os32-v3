@@ -287,6 +287,10 @@ $(KB_OUT)/platform/powermac/nic_gem.o $(KB_OUT)/platform/powermac/lan_gem_io.o: 
 ifeq ($(KBOOT_GEM_RX_DIAG),1)
 $(KB_OUT)/platform/powermac/nic_gem.o $(KB_OUT)/platform/powermac/lan_gem_io.o: private KB_TU_FLAGS += -DKBOOT_GEM_RX_DIAG=1
 endif
+ifeq ($(IMAGE),powermac)
+$(KB_OUT)/platform/powermac/ide_tree.o: private KB_TU_FLAGS += -DPM_INSTALL_MEDIA=1
+endif
+
 $(KB_OUT)/drivers/ata/ide.o: private KB_TU_FLAGS += -Wno-sign-compare
 $(KB_OUT)/lib/lz4.o: KB_TU_FLAGS += -O0
 $(KB_OUT)/kernel/console/console.o: KB_TU_FLAGS = -Wno-sign-compare

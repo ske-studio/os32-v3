@@ -62,9 +62,7 @@ int pm_partition_register(int unit, u32 capacity, u32 number)
 
 void pm_partition_enable_writes(void)
 {
-#if !PM_PRODUCT_BOOT
-    writable = dev_find(view.name) == current;
-#endif
+    writable = current == &view && dev_find(view.name) == &view;
 }
 
 int platform_ext2_resolve(int logical_drive, Device **dev, u32 *base, u32 *len)

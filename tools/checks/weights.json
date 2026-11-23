@@ -716,6 +716,7 @@
     "ppc-gfx2-guest": 214.61230849999998,
     "ppc-hdd-root-guest": 150,
     "ppc-install-guest": 500,
+    "ppc-of-hdd-run": 540,
     "ppc-deploy-guest": 950,
     "ppc-product-boot-guest": 120,
     "ppc-in2-cui": 300,

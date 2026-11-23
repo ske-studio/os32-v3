@@ -5,7 +5,7 @@ CHECK = dict(name='ppc-deploy-guest', tier=2, needs=['make:ppc-ci-image'], budge
             'Makefile', 'build/**', 'sdk/**', 'mm/**', 'exec/**', 'arch/ppc/**',
             'platform/powermac/**', 'include/**', 'init/**', 'kernel/**',
             'kapi/**', 'lib/**', 'fs/**', 'drivers/**', 'input/**', 'net/**',
-            'gfx/**', 'assets/fonts/**'],
+            'gfx/**', 'assets/fonts/**', 'assets/ipadic/**', 'assets/joyo_kanji.txt'],
     basis=['docs/decisions/ppc/PPC_ROOT_MOUNT_ALIGN_X86_DESIGN.md §4–6'],
     env_limit='Requires OpenBIOS, genisoimage and mac99 QEMU.')
 

@@ -115,7 +115,9 @@ int main(void)
     if (memcmp(saved, disk, sizeof(disk))) return 13;
     pm_partition_enable_writes();
 #if PM_PRODUCT_BOOT
-    if (!d->blk_write(d, 0, 1, buf) || memcmp(saved, disk, sizeof(disk))) return 18;
+    kmemset(saved + 8 * 512, 42, 512);
+    if (d->blk_write(d, 0, 1, buf) || memcmp(saved, disk, sizeof(disk))) return 18;
+    kmemset(buf, 99, 512);
     pm_install_publish(d->bus_id);
     if (!d->blk_write(d, 0, 1, buf) || memcmp(saved, disk, sizeof(disk))) return 19;
     return 0;

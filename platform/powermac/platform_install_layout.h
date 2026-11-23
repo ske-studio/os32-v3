@@ -28,6 +28,7 @@ typedef struct {
 /* The selected raw ATA unit is exported as the single hd0 partition view. */
 #define PLATFORM_INSTALL_LOGICAL_DRIVE 0
 #define PLATFORM_BOOT_COUNT 2
+#define PLATFORM_INSTALL_DICTIONARY "/cd0/FEP.DB"
 #define PLATFORM_INSTALL_ROOT_FILE "/sys/unicode.bin"
 #define PLATFORM_INSTALL_CHECK_DIRECTORY pm_install_check_directory
 #define PLATFORM_INSTALL_STREAM_PACKAGE pm_install_stage_package

@@ -90,6 +90,9 @@ static void capture_root(void)
     if (number >= 100) args[n++] = '0' + number / 100;
     if (number >= 10) args[n++] = '0' + number / 10 % 10;
     args[n++] = '0' + number % 10;
+#elif PM_INSTALL_MEDIA
+    /* Installer media always uses its embedded root, even with stale NVRAM. */
+    int n = 0;
 #else
     int chosen = ofw_finddevice("/chosen");
     int n = ofw_getprop(chosen, "bootargs", args, sizeof(args) - 1);

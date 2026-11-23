@@ -29,6 +29,15 @@ void powermac_boot(ppc_ci ci)
     int n = ofw_getprop(ofw_finddevice("/chosen"), "bootpath", path, sizeof(path));
     if (n <= 0 || n >= (int)sizeof(path)) return;
     path[n] = 0;
+    int output;
+    int console = ofw_getprop(ofw_finddevice("/chosen"), "stdout", &output, sizeof(output))
+        == sizeof(output);
+    if (console) {
+        static const char prefix[] = "OS32 HDD loader: ";
+        ofw_write(output, prefix, sizeof(prefix)-1);
+        ofw_write(output, path, kstrlen(path));
+        ofw_write(output, "\r\n", 2);
+    }
     char *sep = path;
     while (*sep && *sep != ':') ++sep;
     if (*sep != ':' || sep == path) return;
@@ -53,7 +62,12 @@ void powermac_boot(ppc_ci ci)
         unsigned version, entry, phoff, shoff, flags;
         unsigned short ehsize, phsize, phnum, shsize, shnum, shstr;
     } header;
-    if (file == -1 || !read_at(file, 0, &header, sizeof(header))) return;
+    if (file == -1) {
+        static const char missing[] = "HDD loader cannot open PRODUCT.ELF\r\n";
+        if (console) ofw_write(output, missing, sizeof(missing)-1);
+        return;
+    }
+    if (!read_at(file, 0, &header, sizeof(header))) return;
     if (memcmp(header.ident, "\177ELF\1\2\1", 7) || header.type != 2 ||
         header.machine != 20 || header.version != 1 || header.ehsize != sizeof(header) ||
         header.phsize != 32 || header.phnum != 2 || header.phoff > 4096 ||
