@@ -140,7 +140,7 @@ def firmware(raw, expected, volume_size):
             s.command(': checksum 0 -rot bounds ?do 21 * i c@ + ffffffff and loop ;')
             s.command('0 value buf 0 value size 0 value fh')
             s.command(': read-fork buf size " read" fh $call-method . ;')
-            s.command(': report read-fork buf size checksum . ;')
+            s.command(': report read-fork buf size checksum u. ;')
             s.command(': probe cr ." RESULT " fh if report else ." MISSING" then cr ;')
             for name, content in expected.items():
                 length = len(content)

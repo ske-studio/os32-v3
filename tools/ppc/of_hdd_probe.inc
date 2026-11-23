@@ -22,13 +22,8 @@
         int fd = g_api->sys_open("/etc/of-value", KAPI_O_RDONLY);
         if (fd < 0 || g_api->sys_read(fd, value, 8) != 8) return 1;
         g_api->sys_close(fd);
-        IME_UserEntry rows[4];
-        int n = g_api->ime_user_list("ねこ", rows, 4);
-        g_api->kprintf(7, "learn list=%d\n", n);
-        int freq = 0;
-        for (int i = 0; i < n; ++i)
-            if (!strcmp(rows[i].kanji, "猫")) freq = rows[i].freq;
-        g_api->kprintf(7, "root=%s child=%d value=%s learned=%d\n",
-            g_api->vfs_devname("/"), g_api->sys_is_mounted("/hd0"), value, freq);
+        int learned = g_api->exec_run("/bin/learnprb.bin");
+        g_api->kprintf(7, "root=%s child=%d value=%s probe=%d\n",
+            g_api->vfs_devname("/"), g_api->sys_is_mounted("/hd0"), value, learned);
         return 0;
     }

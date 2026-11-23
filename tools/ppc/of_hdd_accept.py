@@ -154,7 +154,7 @@ def boot(media, out, first, raw, case, mutant):
             def persisted():
                 nonlocal state
                 state = s.screen('state')
-                return re.search(r'root=hd0 child=0 value=selected learned=1(?:\s|$)', state)
+                return re.search(r'root=hd0 child=0 value=selected probe=73(?:\s|$)', state)
             try:
                 s.wait(persisted, 'mounted root, persisted value and learned candidate', 45)
             finally:
@@ -203,6 +203,7 @@ def main():
                 settings = mutant_settings(out, variant, 'platform/powermac/ide_tree.c',
                                            '#elif PM_INSTALL_MEDIA', '#elif 0')
             media = build_media(out, '-j6', 'IMAGE=powermac', 'KBOOT_USB_KEY_TRACE=1',
+                                'KB_ROOT_BINS='+str(work/'user/learnprb.bin'),
                                 'KB_SH_OUT='+str(work/'user'), 'PPC_RES_MUT_SRC='+source,
                                 'PPC_RES_MUT_FILE='+str(fixture), 'KB_MUT_EXTRA_SRC='+device,
                                 'KB_MUT_EXTRA_FILE='+str(counter), *settings)
