@@ -47,6 +47,8 @@ PROVIDER_GROUPS = {
     }), frozenset()),
     'geometry': (frozenset({'hdd_geom_info'}), frozenset()),
     'ide': (frozenset({
+        'ext2_format',
+        'ext2_format_at',
         'ide_init',
         'ide_drive_present',
         'ide_identify',
@@ -54,11 +56,7 @@ PROVIDER_GROUPS = {
         'ide_get_info',
         'ide_write_sector',
         'ide_write_sectors',
-    }), frozenset(['ide_contract.h'])),
-    'ext2': (frozenset({
-        'ext2_format',
-        'ext2_format_at',
-    }), frozenset(['ext2.h'])),
+    }), frozenset(['ide_contract.h', 'ext2.h'])),
     'serialfs': (frozenset({
         'sfs_begin',
         'sfs_end',

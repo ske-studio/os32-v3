@@ -36,6 +36,9 @@
 #include "inst_hdd.h"
 
 #include "include/platform_install_boot.h"
+#ifdef OS32_VERIFY_INSTALLED_FILES
+#include "inst_verify.h"
+#endif
 
 /* IOバッファ (ヒープから確保する) */
 static u8 *file_buf;
@@ -52,7 +55,11 @@ typedef struct {
 
 /* 媒体側の名前 (FDD)。FAT の 8.3 名は大文字で返るので、開くときは媒体の
  * 名前のまま、HDD へ作るときは小文字に正規化する。 */
+#ifdef PLATFORM_INSTALL_ROOT_FILE
+#define SRC_KERNEL_LZ4 PLATFORM_INSTALL_ROOT_FILE
+#else
 #define SRC_KERNEL_LZ4  "/VMKRNL.LZ4"
+#endif
 #define SRC_SHELL       "/sys/shell.bin"    /* HDD 起動の常駐シェル (cdinst の MINIMAL と同じ必須) */
 #define DST_SHELL       "/hd0/sys/shell.bin"
 #define DST_BOOT_DIR    "/hd0/boot"
@@ -136,10 +143,13 @@ static void str_cat_lower(char *dst, const char *src) {
     *dst = '\0';
 }
 
+#ifndef PLATFORM_INSTALL_ROOT_FILE
 static int str_eq_lower(const char *s, const char *lower) {
     while (*s && lower_c(*s) == *lower) { s++; lower++; }
     return lower_c(*s) == *lower;
 }
+
+#endif
 
 static int str_endswith_ci(const char *s, const char *suffix) {
     int slen = str_len(s);
@@ -182,6 +192,9 @@ static void ls_cb(const DirEntry_Ext *entry, void *ctx) {
 static int copy_file(const char *src, const char *dst) {
     int fd_src, fd_dst;
     int read_len;
+#ifdef OS32_VERIFY_INSTALLED_FILES
+    u32 crc = CRC32_INIT;
+#endif
     int total = 0;
     int rc = 0;
 
@@ -202,11 +215,17 @@ static int copy_file(const char *src, const char *dst) {
             rc = -3;
             break;
         }
+#ifdef OS32_VERIFY_INSTALLED_FILES
+        crc = crc32_core_update(crc, file_buf, read_len);
+#endif
         total += read_len;
     }
 
     g_api->sys_close(fd_src);
     g_api->sys_close(fd_dst);
+#ifdef OS32_VERIFY_INSTALLED_FILES
+    if (!rc && inst_verify_file(g_api, dst, crc, total)) rc = -5;
+#endif
     return rc != 0 ? rc : total;
 }
 
@@ -243,6 +262,7 @@ static int confirm_install(void) {
  *   hdd が /boot/ … : ファイルとしては写さない。ブート領域へ書く (boot_hdd /
  *                     loader) か、Phase 3 で別に写す (vmkernel.lz4)
  *   それ以外         : その正規名で写す */
+#ifndef PLATFORM_INSTALL_ROOT_FILE
 typedef struct {
     const char *fd;     /* FD 上のパス (小文字で書く。比較は大小文字を無視) */
     const char *hdd;    /* HDD (配備マニフェスト) の正規名 */
@@ -285,6 +305,8 @@ static int fd_map_to_hdd(const char *src_path, char *hdd_out)
     }
     return 0;
 }
+
+#endif
 
 /* FDDのsrc_dir配下のファイル/ディレクトリを /hd0/dst_dir 配下にコピー。
  * 戻り値は **失敗の件数** (0 = 全部成功)。sys_ls の負 (列挙途中の I/O
@@ -337,9 +359,12 @@ static int copy_directory(const char *src_dir, const char *dst_dir, int depth,
         /* 宛先パス構築: /hd0 + dst_dir + / + 小文字にした名前。FD だけの物は
          * 写さず、fd.rename の物は正規名へ (上の表) */
         {
-            int m = (fl.types[i] == OS32_FILE_TYPE_DIR) ? 0
+            int m = 0;
+#ifndef PLATFORM_INSTALL_ROOT_FILE
+            m = (fl.types[i] == OS32_FILE_TYPE_DIR) ? 0
                                                         : fd_map_to_hdd(src_path, dst_path);
             if (m < 0) continue;
+#endif
             if (m == 0) {
                 str_cpy(dst_path, "/hd0");
                 str_cat(dst_path, dst_dir);
@@ -444,6 +469,9 @@ static int precheck_media(u32 *sizes)
 /* HDD に最初に作るディレクトリ (親が先)。1 つでも作れなければインストールは
  * 未完成 (往復 1 の B1)。 */
 static const char *const init_dirs[] = {
+#ifdef PLATFORM_INSTALL_ROOT_FILE
+    "/hd0/fonts", "/hd0/db",
+#endif
     DST_BOOT_DIR,
     "/hd0/sys", "/hd0/bin", "/hd0/sbin", "/hd0/etc",
     "/hd0/usr", "/hd0/usr/bin", "/hd0/usr/man",
@@ -452,17 +480,46 @@ static const char *const init_dirs[] = {
 #define INIT_DIRS ((int)(sizeof(init_dirs) / sizeof(init_dirs[0])))
 
 /* FD から写すディレクトリ (媒体の名前 → /hd0 の下の名前) */
-static const char *const copy_dirs[] = { "/boot", "/sys", "/bin", "/sbin", "/etc" };
+static const char *const copy_dirs[] = {
+    "/boot", "/sys",
+#ifndef PLATFORM_INSTALL_ROOT_FILE
+    "/bin",
+#endif
+    "/sbin", "/etc",
+#ifdef PLATFORM_INSTALL_ROOT_FILE
+    "/fonts",
+#endif
+};
 #define COPY_DIRS ((int)(sizeof(copy_dirs) / sizeof(copy_dirs[0])))
 
 /* 展開先に要る量を**書く前に**数える。列挙の失敗は失敗の件数で返す。 */
+#ifdef PLATFORM_INSTALL_ROOT_FILE
+static int copy_optional_bin(InstNeed *need)
+{
+    OS32_Stat st;
+    int rc = g_api->sys_stat("/bin", &st);
+    if (rc == OS32_ERR_NOTFOUND) return 0;
+    if (rc || (st.st_mode & OS_S_IFMT) != OS_S_IFDIR) return 1;
+    return copy_directory("/bin", "/bin", 0, need);
+}
+#endif
+
 static int measure_need(u32 lz4_size, InstNeed *need)
 {
     int i, fails = 0;
 
     inst_need_init(need);
     for (i = 0; i < INIT_DIRS; i++) inst_need_dir(need);
+#ifndef PLATFORM_INSTALL_ROOT_FILE
     inst_need_file(need, lz4_size);
+#else
+    (void)lz4_size;
+    OS32_Stat dict;
+    if (g_api->sys_stat(PLATFORM_INSTALL_DICTIONARY, &dict) ||
+        (dict.st_mode & OS_S_IFMT) != OS_S_IFREG || !dict.st_size) return 1;
+    inst_need_file(need, dict.st_size);
+    fails += copy_optional_bin(need);
+#endif
     for (i = 0; i < COPY_DIRS; i++)
         fails += copy_directory(copy_dirs[i], copy_dirs[i], 0, need);
     return fails;
@@ -476,7 +533,9 @@ int __cdecl main(int argc, char **argv, KernelAPI *api)
     int ret, i;
     int rc = 1;                 /* 失敗を既定にする (票 S3I2-I §1) */
     u32 sizes[MEDIA_COUNT];
+#ifndef PLATFORM_INSTALL_ROOT_FILE
     int copied;
+#endif
 
     g_api = api;
 
@@ -514,6 +573,12 @@ int __cdecl main(int argc, char **argv, KernelAPI *api)
                      "Nothing was written; use a complete install floppy.\n");
         goto end;
     }
+#ifdef PLATFORM_INSTALL_CHECK_DIRECTORY
+    if (PLATFORM_INSTALL_CHECK_DIRECTORY(api, &sizes[MEDIA_BOOT])) {
+        api->kprintf(ATTR_RED, "%s", "Invalid PowerMac boot media. Nothing was written.\n");
+        goto end;
+    }
+#endif
     if (measure_need(sizes[MEDIA_KERNEL], &need) != 0) {
         api->kprintf(0x4F, "%s",
                      "Error: cannot list the floppy. Nothing was written.\n");
@@ -566,6 +631,7 @@ int __cdecl main(int argc, char **argv, KernelAPI *api)
 
     /* 圧縮カーネル → /hd0/boot/vmkernel.lz4 (128KB バッファで反復コピー)。
      * ローダ v3 がここを読む。長さが合わなければ失敗。 */
+#ifndef PLATFORM_INSTALL_ROOT_FILE
     copied = copy_file(SRC_KERNEL_LZ4, DST_KERNEL_LZ4);
     if (copied < 0 || (u32)copied != sizes[MEDIA_KERNEL]) {
         api->kprintf(0x4F, "  [FAIL] %s -> %s (code: %d, want %u bytes)\n",
@@ -575,9 +641,15 @@ int __cdecl main(int argc, char **argv, KernelAPI *api)
     }
     api->kprintf(0x0A, "  vmkernel.lz4 -> /boot (%d bytes)\n", copied);
 
+#endif
+
     /* FDDのサブディレクトリ構造をそのままHDDにコピー (宛先の名前は小文字)。
      * /etc は profile を写さない、settings.db は seed */
     ret = 0;
+#ifdef PLATFORM_INSTALL_ROOT_FILE
+    ret += copy_file(PLATFORM_INSTALL_DICTIONARY, "/hd0/db/fep.db") <= 0;
+    ret += copy_optional_bin(0);
+#endif
     for (i = 0; i < COPY_DIRS; i++) {
         api->kprintf(ATTR_CYAN, "  Copying %s/ ...\n", copy_dirs[i]);
         ret += copy_directory(copy_dirs[i], copy_dirs[i], 0, 0);
@@ -617,6 +689,9 @@ int __cdecl main(int argc, char **argv, KernelAPI *api)
         goto end;
     }
 
+#ifdef PLATFORM_HDPREP_FINISH
+    if (PLATFORM_HDPREP_FINISH(api, 1)) goto end;
+#endif
     api->kprintf(0x7E, "%s", "\n========================================\n");
     api->kprintf(ATTR_CYAN, "%s", " OS32 Installation complete!            \n");
     api->kprintf(ATTR_CYAN, "%s", " Remove the Floppy Disk and reboot.     \n");
@@ -624,6 +699,10 @@ int __cdecl main(int argc, char **argv, KernelAPI *api)
     rc = 0;
 
 end:
+#ifdef PLATFORM_INSTALL_RELEASE_ASSETS
+    PLATFORM_INSTALL_RELEASE_ASSETS(api);
+    if (rc) PLATFORM_HDPREP_FINISH(api, 0);
+#endif
     api->mem_free(file_buf);
     file_buf = 0;
     if (rc != 0)

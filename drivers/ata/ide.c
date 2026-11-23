@@ -24,6 +24,9 @@
 #define IDE_SASI_HEADS_SMALL  4
 #define IDE_SASI_HEADS_MEDIUM 6
 #define IDE_SASI_HEADS_LARGE  8
+#if OS32_FEATURE_IDE
+static char identify_serial[IDE_MAX_DRIVES][IDE_SERIAL_LEN];
+#endif
 static int drive_present[IDE_MAX_DRIVES] = { 0, 0, 0, 0 };
 static IdeInfo drive_info[IDE_MAX_DRIVES];
 /* IdeInfo に無い IDENTIFY の語 (word 53-56 ほか)。IdeInfo は KAPI の並びなので
@@ -214,6 +217,11 @@ int ide_identify(int drive, IdeInfo *info)
     { u8 st = ide_bus_in(IDE_REG_STATUS); (void)st; }
     ide_wait_bsy();
 
+#if OS32_FEATURE_IDE
+    /* ATA IDENTIFY word 106. The PIO path transfers 256 words per sector.
+     * FreeBSD sys/cam/ata/ata_all.c, ata_logical_sector_size(). */
+    if ((buf[106] & 0xd000) == 0x5000) return IDE_ERR_RANGE;
+#endif
     /* 幾何の生の語。I/O の指定の方式 (LBA28 / 現在の CHS / 既定の CHS) は
      * drivers/ata/ide_addr.c がこの値から決める (票 TASK_HDD_INSTALL 段 1)。 */
     {
@@ -245,6 +253,9 @@ int ide_identify(int drive, IdeInfo *info)
      * SPT=33, Heads∈{4,6,8} → SASI 256B/セクタ形式 (HDI)
      * NP21/WはSASI形式HDIをIDE経由で提供するが、
      * 内部LBAは256Bセクタ単位のまま */
+#if OS32_FEATURE_IDE
+    info->phys_sector_size = SYS_HDD_SECTOR_SIZE;
+#else
     if (info->sectors == IDE_SASI_SPT &&
         (info->heads == IDE_SASI_HEADS_SMALL || info->heads == IDE_SASI_HEADS_MEDIUM || info->heads == IDE_SASI_HEADS_LARGE)) {
         info->phys_sector_size = SASI_SECTOR_BYTES;
@@ -252,6 +263,7 @@ int ide_identify(int drive, IdeInfo *info)
         info->phys_sector_size = SYS_HDD_SECTOR_SIZE;
     }
 
+#endif
     ide_multiple_identify(drive & (IDE_MAX_DRIVES - 1), buf,
                           info->phys_sector_size);
 
@@ -277,6 +289,9 @@ int ide_identify(int drive, IdeInfo *info)
         info->serial[i * 2]     = (char)(buf[IDE_ID_SERIAL_WORD + i] >> 8);
         info->serial[i * 2 + 1] = (char)(buf[IDE_ID_SERIAL_WORD + i] & 0xFF);
     }
+#if OS32_FEATURE_IDE
+    __builtin_memcpy(identify_serial[drive & (IDE_MAX_DRIVES-1)], info->serial, IDE_SERIAL_LEN);
+#endif
     info->serial[IDE_SERIAL_LEN] = '\0';
     for (i = IDE_SERIAL_LEN - 1; i >= 0 && info->serial[i] == ' '; i--) {
         info->serial[i] = '\0';
@@ -349,3 +364,46 @@ int ide_range_ok(int drive, u32 lba, u32 count)
 }
 
 #include "ide_request.inc"
+
+#if OS32_FEATURE_IDE
+/* Reservation callbacks have already passed admission. Do not enter public
+ * dispatch again while the unit is being prepared or recovered. */
+int ide_install_identify(u32 unit, IdeInfo *info, char serial[IDE_SERIAL_LEN])
+{
+    if (unit >= IDE_MAX_DRIVES) return IDE_ERR_RANGE;
+    int rc = ide_identify(unit, info);
+    if (!rc) __builtin_memcpy(serial, identify_serial[unit], IDE_SERIAL_LEN);
+    return rc;
+}
+
+int ide_install_read(u32 unit, u32 lba, void *sector)
+{
+    if (unit >= IDE_MAX_DRIVES) return IDE_ERR_RANGE;
+    return ide_read_one(unit, lba, sector);
+}
+
+int ide_install_read_many(u32 unit, u32 lba, u32 count, void *sectors)
+{
+    if (unit >= IDE_MAX_DRIVES) return IDE_ERR_RANGE;
+    return ide_request(unit, lba, count, sectors, 0);
+}
+
+int ide_install_write(u32 unit, u32 lba, u32 count, const void *sectors)
+{
+    if (unit >= IDE_MAX_DRIVES) return IDE_ERR_RANGE;
+    return ide_request(unit, lba, count, 0, sectors);
+}
+
+int ide_install_flush(u32 unit)
+{
+    if (unit >= IDE_MAX_DRIVES || !drive_present[unit]) return IDE_ERR_NO_DRIVE;
+    ide_select_drive(unit);
+    int rc = ide_wait_bsy();
+    if (rc) return rc;
+    /* Seagate SV35 Series Product Manual 100415205A, supported commands.
+     * FreeBSD sys/cam/ata/ata_da.c, BIO_FLUSH. */
+    ide_bus_out(IDE_REG_STATUS, IDE_CMD_FLUSH_CACHE);
+    ide_pio_settle();
+    return ide_pio_finish();
+}
+#endif

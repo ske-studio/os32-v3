@@ -124,6 +124,10 @@ def main():
     manifest['/db/fep.db'] = str(database)
     template = work / 'template.json'
     template.write_text(json.dumps(manifest))
+    # This diagnostic selects a fixture HDD to exercise dictionary loading.
+    tree = 'platform/powermac/ide_tree.c'
+    diagnostic_tree = work / 'ide_tree.c'
+    diagnostic_tree.write_text(f'#undef PM_INSTALL_MEDIA\n#include "{tree}"\n')
     shell = resident(work / 'user', False)
     cases = [('normal', None, None)]
     if args.mutate:
@@ -140,6 +144,7 @@ def main():
         source.write_text(product.replace(old, new) if old else product)
         boot = build_media(out, '-j6', 'IMAGE=powermac', 'KB_MUT_SRC=' + kernel,
                     'KB_MUT_FILE=' + str(source), 'KBOOT_USB_KEY_TRACE=1',
+                    'KB_MUT_EXTRA_SRC=' + tree, 'KB_MUT_EXTRA_FILE=' + str(diagnostic_tree),
                     'ROOT_MANIFEST=' + str(template),
                     *(resident(work / 'raw-user', True) if name == 'raw-shell' else shell), 'kernel')
         digest = hashlib.sha256(boot.elf.read_bytes()).hexdigest()

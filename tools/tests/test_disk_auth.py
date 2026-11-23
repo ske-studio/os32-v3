@@ -20,6 +20,8 @@ MUTANTS = (
      'wrap_ide_write_sector(0, 0, buf) == expected'),
     ('any nonempty path', 'disk', 'kstrcmp(absolute, paths[i]) == 0',
      'absolute[0] != 0', 'wrap_ide_write_sector(0, 0, buf) == expected'),
+    ('cdinst excluded', 'disk', 'i < sizeof(paths) / sizeof(paths[0])', 'i < 1',
+     'wrap_ide_write_sector(0, 0, buf) == expected'),
     ('TRUSTED denied', 'disk', 'appslot_cur() == APP_ID_SHELL && !slot->cpl3',
      '0 && !slot->cpl3', 'wrap_ide_write_sector(0, 0, buf) == expected'),
 )

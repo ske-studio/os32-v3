@@ -60,3 +60,17 @@ cdinst (CD) と install (FD) が共有する、KAPI で hd0 (= DA 80h だけ、H
 `make check-hdd-stage2-host` (`tools/tests/test_hdd_stage2.py`) の `cdinst_host.c` と `install_fresh_host.c` のケース
 (`modes`・`preflight`・`incomplete`・`erase`・`erase_fail`・`erase_mount`・`keys` ほか)。贋の鍵は長さ付きのバイト列 (NUL も
 1 バイト) で、鍵を渡すたびに write・format・umount が 0 回であることを見る。
+
+## PowerMac の導入媒体と完了条件
+
+ディレクトリ導入は媒体起動時の `/` から製品ファイルを取り、`/cd0` から
+`BOOT.HFS` と `PLAN.BIN` を読む。パッケージ導入では同じ組を `BOOT.PKG` から、
+製品ファイルを選択したパッケージから読む。PowerMac の `MINIMAL.PKG` は
+対応する `ROOT.ISO` のファイルを収める。
+
+両入口は確認の前に HFS 全体を検査する。予約取得後は hdprep と同じ計画で
+ext2 を整形し、変更対象の APM エントリを書いて再認識する。`/hd0` の
+製品ファイルを読み戻してから、HFS 内のローダと製品 ELF に同じ区画番号・範囲を
+ビッグエンディアンで記入する。起動区画の全 sector を再読して照合し、同期と
+予約の正常終了を経て hd0 を公開する。中断後は復元済みの表で新たに計画して
+確認を取り直す。参照は [PowerMac の確定設計 §4–6](../../../decisions/ppc/PPC_ROOT_MOUNT_ALIGN_X86_DESIGN.md)。
