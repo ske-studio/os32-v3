@@ -39,7 +39,7 @@ def build(tmp, swap=False, mutation=None):
     command(['gcc', *FLAGS, *(['-DUSB_TEST_SWAP'] if swap else []), *paths,
              'tools/tests/usb_fake_dev.c', '-o', str(exe)])
     return exe
-def execute(exe, cases=range(1,44), red=False):
+def execute(exe, cases=range(1,46), red=False):
     failures=[]
     for case in cases:
         p=host32.run([str(exe),str(case)],capture_output=True,timeout=20)
@@ -49,8 +49,10 @@ def execute(exe, cases=range(1,44), red=False):
     if not red: assert not failures, failures
     return failures
 MUTATIONS = [
- ('usb_explore', 'if ((w->status & (1u << USB_PORT_RESET)) ||', 'if ('),
- ('usb_explore', 'if (!(w->status & (1u << USB_PORT_ENABLE))) return -1;', '(void)w;'),
+    ('usb_explore', '(!e->hub && (w->status & (1u << USB_PORT_RESET)))', '(w->status & (1u << USB_PORT_RESET))'),
+    ('usb_explore', '!e->hub && !(w->status & (1u << USB_PORT_ENABLE))', '!(w->status & (1u << USB_PORT_ENABLE))'),
+ ('usb_explore', 'if ((!e->hub && (w->status & (1u << USB_PORT_RESET))) ||', 'if ('),
+ ('usb_explore', 'if (!e->hub && !(w->status & (1u << USB_PORT_ENABLE))) return -1;', '(void)w;'),
  ('usb_explore', 'w->error || !(w->status & (1u << USB_PORT_CONNECTION))', 'w->error'),
  ('usb_explore', 'if (w->reset_phase == 0) {', 'if (w->reset_phase == 0) w->reset_phase = 1;\n    if (w->reset_phase == 0) {'),
  ('usb_explore','usbp_log("[usb] %u:%u.%u port=%u child alloc','if (0) usbp_log("[usb] %u:%u.%u port=%u child alloc'),

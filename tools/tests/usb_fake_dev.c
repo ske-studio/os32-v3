@@ -521,6 +521,15 @@ static int scenario(int c)
         pump(1200);
         REQUIRE(reset_logs == 1 && !devices());
         REQUIRE(nodes[0].resets == (c == 42 ? 0 : 1));
+    } else if (c == 44 || c == 45) {
+        plug(0, 4);
+        pump(1200);
+        REQUIRE(devices() == 1);
+        reset_fault = c - 43; /* External hub reports PRSC with PRS set or PES clear. */
+        plug(4, 1);
+        hc.needs_explore = 1;
+        pump(1600);
+        REQUIRE(nodes[4].resets && devices() == 2 && attached == 1 && !reset_logs);
     } else return 2;
     REQUIRE(child_logs == (c == 39));
     return failed;

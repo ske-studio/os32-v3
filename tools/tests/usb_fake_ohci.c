@@ -692,6 +692,17 @@ static void periodic(void)
 }
 static void root_ports(void)
 {
+    static const u32 saved_fi[] = {0, 209, 11992, 11993, 12005, 12006, 0x3fff};
+    static const u32 expected_fi[] = {11999, 11999, 11999, 11993, 12005, 11999, 11999};
+    for (u32 i = 0; i < sizeof(saved_fi) / sizeof(saved_fi[0]); ++i) {
+        fresh();
+        lose_settings = 1;
+        rput(0, OHCI_FM_INTERVAL, saved_fi[i]);
+        REQUIRE(!ohci_start(&hcs[0]));
+        u32 interval = rget(0, OHCI_FM_INTERVAL);
+        REQUIRE(OHCI_FMI_FI(interval) == expected_fi[i]);
+        REQUIRE(OHCI_FMI_FSMPS(interval) == (expected_fi[i] - 210) * 6 / 7);
+    }
     u32 st;
     fresh(); REQUIRE(ohci_start(&hcs[0]) == 0);
     REQUIRE(rget(0, OHCI_RH_STATUS) == OHCI_RHS_LPSC);
@@ -708,7 +719,7 @@ static void root_ports(void)
     fresh();
     lose_settings = no_ownership = 1;
     rput(0, OHCI_CONTROL, OHCI_CTL_IR | OHCI_CTL_RWC);
-    rput(0, OHCI_FM_INTERVAL, 11799);
+    rput(0, OHCI_FM_INTERVAL, 12000);
     rput(0, OHCI_RH_PORT_STATUS(2), OHCI_PORT_POCI);
     rput(0, OHCI_RH_PORT_STATUS(3), OHCI_PORT_CCS | OHCI_PORT_LSDA);
     rput(0, OHCI_RH_DESCRIPTOR_A, 3 | OHCI_RHA_PSM | (75u << 24));
@@ -722,8 +733,8 @@ static void root_ports(void)
     REQUIRE(port_masks[0] == 5 && port_masks[1] == 2 && port_masks[2] == 4 && port_masks[3] == 4);
     REQUIRE(log_equal(power_warning, " warning: port power off") && ir_warnings == 1);
     REQUIRE(rget(0, OHCI_CONTROL) & OHCI_CTL_RWC);
-    REQUIRE(OHCI_FMI_FI(rget(0, OHCI_FM_INTERVAL)) == 11799);
-    REQUIRE(OHCI_FMI_FSMPS(rget(0, OHCI_FM_INTERVAL)) == (11799 - 210) * 6 / 7);
+    REQUIRE(OHCI_FMI_FI(rget(0, OHCI_FM_INTERVAL)) == 12000);
+    REQUIRE(OHCI_FMI_FSMPS(rget(0, OHCI_FM_INTERVAL)) == (12000 - 210) * 6 / 7);
     REQUIRE(now_us - last_power_us >= 150000u);
     REQUIRE(ohci_rh_port(&hcs[0], 0, USB_RH_STATUS, &st) == -USB_E_INVAL);
     REQUIRE(ohci_rh_port(&hcs[0], 4, USB_RH_STATUS, &st) == -USB_E_INVAL);

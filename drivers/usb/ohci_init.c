@@ -90,7 +90,6 @@ int ohci_start(struct usb_hc *hc)
     struct ohci_firmware saved = hc->firmware;
     if (!saved.valid) saved = ohci_firmware_read(hc->regs, control);
     u32 rwc = saved.rwc ? OHCI_CTL_RWC : 0;
-    fi = saved.fi;
     if (control & OHCI_CTL_IR) {
         ohci_wr(hc, OHCI_COMMAND_STATUS, OHCI_CMD_OCR);
         for (i = 0; i < 100; ++i) {
@@ -110,6 +109,11 @@ int ohci_start(struct usb_hc *hc)
         if (!(ohci_rd(hc, OHCI_COMMAND_STATUS) & OHCI_CMD_HCR)) break;
     }
     if (i == 10) return start_fail(hc, "reset");
+    /* OpenHCI 6.3.1, USB 2.0 7.1.12: 12,000 +/- 6 bit times, FI = length - 1. */
+    fi = saved.fi;
+    if (fi < 11993u || fi > 12005u)
+        fi = OHCI_FMI_FI(ohci_rd(hc, OHCI_FM_INTERVAL));
+    if (fi < 11993u || fi > 12005u) fi = 11999u;
     ohci_wr(hc, OHCI_HCCA, hc->dma[0].bus);
     ohci_wr(hc, OHCI_CONTROL_HEAD_ED, m->sentinel[1].bus);
     ohci_wr(hc, OHCI_BULK_HEAD_ED, m->sentinel[2].bus);
@@ -160,7 +164,7 @@ int ohci_start(struct usb_hc *hc)
     usbp_log("[usb] ohci %u:%u.%u ports=%u rev=%02x rha=%08x rhb=%08x", hc->pci.bus, hc->pci.dev,
              hc->pci.fn, hc->nports, ohci_rd(hc, OHCI_REVISION) & 0xffu, desca, descb);
     usbp_log("[usb] %u:%u.%u saved fi=%x rha=%08x rwc=%u used fi=%x rha=%08x rwc=%u",
-             hc->pci.bus, hc->pci.dev, hc->pci.fn, fi, saved.rha, !!rwc,
+             hc->pci.bus, hc->pci.dev, hc->pci.fn, saved.fi, saved.rha, !!rwc,
              OHCI_FMI_FI(ohci_rd(hc, OHCI_FM_INTERVAL)), desca,
              !!(ohci_rd(hc, OHCI_CONTROL) & OHCI_CTL_RWC));
     log_power(hc);

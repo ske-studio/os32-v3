@@ -29,6 +29,7 @@ CHECK = dict(name='usb-ohci', tier=1, needs=[], budget=20,
 MUTATIONS = [
     ('port-report', 'ohci_init.c', '    log_power(hc);', '    if (0) log_power(hc);'),
     ('firmware-fi', 'ohci_init.c', 'fi = saved.fi;', 'fi = 11999;'),
+    ('invalid-fi', 'ohci_init.c', 'fi = OHCI_FMI_FI(ohci_rd(hc, OHCI_FM_INTERVAL));', 'fi = 12000u;'),
     ('firmware-rwc', 'ohci_init.c', 'rwc | OHCI_CTL_IE', 'OHCI_CTL_IE'),
     ('firmware-rha', 'ohci_init.c', 'ohci_wr(hc, OHCI_RH_DESCRIPTOR_A, saved.rha);', '(void)saved.rha;'),
     ('ownership-warning', 'ohci_init.c', 'if (i == 100)', 'if (0)'),

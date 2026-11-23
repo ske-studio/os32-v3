@@ -84,10 +84,10 @@ static int reset_port(struct usb_walk *w)
         if (!usb_port_op(w, USB_RH_STATUS)) return 0;
         if (w->error) return -1;
         w->poll_deadline = usbp_ms() + 10;
-        if ((w->status & (1u << USB_PORT_RESET)) || !(w->status & (1u << USB_C_PORT_RESET))) {
+        if ((!e->hub && (w->status & (1u << USB_PORT_RESET))) || !(w->status & (1u << USB_C_PORT_RESET))) {
             return usb_due(usbp_ms(), w->reset_deadline) ? -1 : 0;
         }
-        if (!(w->status & (1u << USB_PORT_ENABLE))) return -1;
+        if (!e->hub && !(w->status & (1u << USB_PORT_ENABLE))) return -1;
         w->reset_phase = 4;
     }
     if (w->reset_phase == 4) {
