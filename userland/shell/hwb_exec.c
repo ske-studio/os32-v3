@@ -7,6 +7,7 @@
 #define HE_BAR_COUNT 6U
 #define HE_BRIDGE_BARS 2U
 #define HE_CARDBUS_BARS 1U
+#include "platform_hwb_addr.h"
 
 /* Process-wide IDs keep interactive records separate from a suspended run. */
 static u32 he_run_serial;
@@ -137,6 +138,7 @@ static enum hwb_rc he_address(struct hwb_state *s, const struct hwb_instruction 
 {
     const struct hwb_address *a = &i->address;
     u32 offset, base = 0;
+    u32 bdf = 0, bar_number = HE_BAR_COUNT;
     enum hwb_rc rc = hwb_eval(s, a->offset, &offset);
     if (rc) return rc;
     if (a->kind == HWB_ADDR_PCI || a->kind == HWB_ADDR_BAR || a->kind == HWB_ADDR_WINDOW) {
@@ -153,10 +155,13 @@ static enum hwb_rc he_address(struct hwb_state *s, const struct hwb_instruction 
             } else { rc = hwb_eval(s, a->bar, &bar); if (rc) return rc; }
             rc = he_bar(s, (u32)slot, bar, i->space, &base);
             if (rc) return rc;
+            bdf = s->vars[slot].value;
+            bar_number = bar;
         }
     }
     if (offset > U32_MAX - base) return HWB_ARG;
-    r->addr = base + offset;
+    u32 status = platform_hwb_bar(bdf, bar_number, i->space, base, offset, i->width, &r->addr);
+    if (status != HW_OK) return (enum hwb_rc)status;
     u32 limit = i->space == HW_PCI ? HW_PCI_CONFIG_BYTES - 1U :
                 i->space == HW_IO ? U16_MAX : U32_MAX;
     if (r->addr > limit || i->width - 1U > limit - r->addr) return HWB_ARG;
