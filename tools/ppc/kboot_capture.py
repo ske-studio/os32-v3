@@ -30,7 +30,7 @@ MUTATIONS = [
 ]
 
 
-def exercise(directory, source, expected=None, *, cases=(*range(34), 42, 43, 44), via_source=None):
+def exercise(directory, source, expected=None, *, cases=(*range(34), 42, 43, 44, 45, 46, 47), via_source=None):
     exe = directory / 'capture'
     argv = ['gcc', '-std=gnu11', '-m32', '-O2', '-Wall', '-Wextra', '-Werror',
             '-ffreestanding', '-fno-builtin', '-fno-pie', '-no-pie', '-fno-stack-protector',
@@ -60,7 +60,7 @@ def main():
         failures = exercise(directory, product)
         if failures:
             raise RuntimeError(f'baseline failures: {failures}')
-        print('GREEN: 37 firmware-tree cases (ILP32 product code)')
+        print('GREEN: 40 firmware-tree cases (ILP32 product code)')
         if args.mutate:
             capture = (product.parent / 'pci_capture.inc').read_text()
             anchor = 'b->parent = parent;'

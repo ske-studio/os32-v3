@@ -37,16 +37,28 @@ static u32 *leaf(u32 root, u32 va)
 
 static int test(void)
 {
-    info.pci.bridges = 3;
+    info.pci.bridges = 7;
     for (unsigned i = 0; i < 3; i++)
         info.pci.bridge[i] = (struct pm_of_bridge){.supported=1, .parent=-1,
             .id=10+i, .cfg_pa=0xe0000000+i*0x1000000};
+    /* Same page under different IDs, and one host's data page at another's
+     * address page. Include the GMAC fast path in the conflicting pair. */
+    const u32 bases[] = {0xd0000000, 0xd0000004, 0xc0000000, 0xc0400000};
+    for (unsigned i = 0; i < 4; i++)
+        info.pci.bridge[3+i] = (struct pm_of_bridge){.supported=1, .parent=-1,
+            .id=13+i, .cfg_pa=bases[i]};
+    boot_devices.gmac_ready = 1;
+    info.gmac.root_node = 13;
+    info.gmac.root_pa = bases[0];
+    gmac_alias[1].va = 4;
+    gmac_alias[2].va = 8;
     fail_pa = 0xe2c00000;
     install_pci_hosts(1);
     struct pm_bridge_state *a = pm_bridge_lookup(10), *b = pm_bridge_lookup(11);
     if (!a || !b || a == b || a->addr_va == b->addr_va || pm_bridge_lookup(12) ||
         count != 4 || installed[0].pa != 0xe0800000 || installed[1].pa != 0xe0c00000 ||
         installed[2].pa != 0xe1800000 || installed[3].pa != 0xe1c00000) return 1;
+    for (int id = 13; id <= 16; id++) if (pm_bridge_lookup(id)) return 4;
     a->isolated = 1;
     u32 va = a->addr_va;
     if (pm_bridge_register(10, 8, 16) != a || a->addr_va != va || !a->isolated || b->isolated)

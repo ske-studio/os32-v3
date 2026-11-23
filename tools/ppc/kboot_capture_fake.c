@@ -26,11 +26,23 @@ static void tuple(unsigned char *p, unsigned a, unsigned s, unsigned start, unsi
 static int prop(int node, const char *name, unsigned char *p)
 {
     unsigned n=0;
+    if (scenario == 45 && node == 19) {
+        if (!kstrcmp(name,"#address-cells") || !kstrcmp(name,"#size-cells")) {
+            put(p,1); return 4;
+        }
+        if (!kstrcmp(name,"ranges")) {
+            put(p,0x80000000); put(p+4,0x60000000); put(p+8,0x70000000); return 12;
+        }
+        return -1;
+    }
     if (scenario >= 42 && node >= 20) {
         const unsigned mem = 0x02000000;
-        if (node==20 && !kstrcmp(name,"compatible")) { kmemcpy(p,"uni-north",10); return 10; }
+        if (node==20 && !kstrcmp(name,"compatible")) { kmemcpy(p,"uni-north",10); return scenario==46?9:10; }
         if (node==20 && !kstrcmp(name,"reg")) { put(p,0xe0000000); put(p+4,0x2000000); return 8; }
         if (node <= 22) {
+            if (node==21 && !kstrcmp(name,"class-code")) { put(p,0x060400); return 4; }
+            if (node==21 && !kstrcmp(name,"device_type")) return -1;
+            if (scenario==47 && node==21 && !kstrcmp(name,"ranges")) return -1;
             if (!kstrcmp(name,"device_type")) { kmemcpy(p,"pci",4); return 4; }
             if (!kstrcmp(name,"#address-cells")) { put(p,3); return 4; }
             if (!kstrcmp(name,"#size-cells")) { put(p,node==21?1:2); return 4; }
@@ -176,12 +188,13 @@ int ofw_setup(struct ofw_env *e) { e->out=9; return 0; }
 int ofw_finddevice(const char *s) { return !kstrcmp(s,PM_ROOT)?(scenario==18?-17:1):!kstrcmp(s,"/cpus")?8:2; }
 int ofw_parent(int n)
 {
+    if (scenario==45 && n==20) return 19;
     if (scenario>=42 && n>=20) return n==20?1:n<=22?n-1:22;
     if (n==-17) n=1;
     return n==12?11:n==11?1:n==1?0:n==6?5:n==5||n==7||n==13||n==14?9:n==9?4:n==3 && scenario!=22?8:scenario==18?-17:1;
 }
-int ofw_child(int n) { if (scenario>=42 && n>=20) return n<=22?n+1:0; if (n==13 && scenario==34) return -1; return n==11?12:n==1||n==-17?2:n==4?9:n==9?5:n==5?6:n==8 && scenario!=22?3:0; }
-int ofw_peer(int n) { if (scenario>=42 && n==4) return 20; if (scenario>=42 && n>=23) return n<(scenario==42?40:140)?n+1:0; if (n==13 && scenario==35) return -1; return n==2?(scenario==22?3:8):n==8?4:n==3 && scenario==22?4:n==4 && scenario==23?10:n==4 && scenario==24?11:n==5?7:n==7 && scenario>=26 && scenario!=33?13:n==13 && scenario==28?14:0; }
+int ofw_child(int n) { if (scenario==45 && n==19) return 20; if (scenario>=42 && n>=20) return n<=22?n+1:0; if (n==13 && scenario==34) return -1; return n==11?12:n==1||n==-17?2:n==4?9:n==9?5:n==5?6:n==8 && scenario!=22?3:0; }
+int ofw_peer(int n) { if (scenario==46 && n==8) return 20; if (scenario==46 && n==20) return 4; if (scenario==46 && n==4) return 0; if (scenario>=42 && n==4) return scenario==45?19:20; if (scenario>=42 && n>=23) return n<(scenario==43?140:40)?n+1:0; if (n==13 && scenario==35) return -1; return n==2?(scenario==22?3:8):n==8?4:n==3 && scenario==22?4:n==4 && scenario==23?10:n==4 && scenario==24?11:n==5?7:n==7 && scenario>=26 && scenario!=33?13:n==13 && scenario==28?14:0; }
 int ofw_package_to_path(int n, char *p, unsigned cap)
 {
     if (n==-17) n=1;
@@ -237,13 +250,20 @@ static void test(void)
         REQUIRE(p->pci.gmac_known && p->gmac_rc==LAN_EINVAL && !p->gmac.node);
         quit(0);
     }
-    if (p->gmac_rc!=(scenario==24?LAN_OK:LAN_ENODEV)) { emit("H:A1 gmac-rc\n"); quit(42); }
+    int expected_gmac_rc = scenario==24 ? LAN_OK : scenario==46 ? LAN_EINVAL : LAN_ENODEV;
+    if (p->gmac_rc!=expected_gmac_rc) { emit("H:A1 gmac-rc\n"); quit(42); }
     if (scenario==24 && !(p->gmac.bar_pa==0x82200000 && p->gmac.mac[0]==0x52 && p->gmac.mac[5]==0x56)) { emit("H:A1 gmac-data\n"); quit(43); }
     if (scenario>=42) {
         const struct pm_pci_capture *c=&p->pci;
+        if (scenario==47) {
+            REQUIRE(c->bridges==3 && c->bridge[1].parent==0 &&
+                    c->bridge[1].incomplete && c->bridge[0].incomplete);
+            quit(0);
+        }
         REQUIRE(c->bridges==3 && c->ranges==3 && c->assigned==1);
+        if (scenario==46) { REQUIRE(!c->bridge[0].supported && c->bridge[0].incomplete); quit(0); }
         REQUIRE(c->bridge[0].supported && c->bridge[0].id==20 && c->bridge[0].parent==-1 &&
-                c->bridge[0].cfg_pa==0xe0000000 && c->bridge[0].first==0 && c->bridge[0].last==3);
+                c->bridge[0].cfg_pa==(scenario==45?0xc0000000:0xe0000000) && c->bridge[0].first==0 && c->bridge[0].last==3);
         const struct pm_of_assignment *a=&c->assignment[0];
         const struct pm_of_function *f=&c->function[a->function];
         REQUIRE(f->vendor==0x106b && f->device==0x3f && f->class_code==0x0c0310);
@@ -257,7 +277,7 @@ static void test(void)
             }
             pa=r->parent_base+(pa-r->base);
         }
-        REQUIRE(pa==0x80000100);
+        REQUIRE(pa==(scenario==45?0x60000100:0x80000100));
         REQUIRE(c->bridge[0].incomplete==(scenario==43));
         if (scenario==43) REQUIRE(c->functions==PM_PCI_FUNCTIONS);
         quit(0);

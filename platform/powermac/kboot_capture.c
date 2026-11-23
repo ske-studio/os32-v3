@@ -155,6 +155,15 @@ static void device(int node, struct pm_kboot_device *dest)
 }
 #include "pci_capture.inc"
 
+static int mpic_compatible(int node, int is_bridge, int parent)
+{
+    if (is_bridge)
+        return pci_compatible(node, "chrp,open-pic", parent) ||
+            pci_compatible(node, "open-pic", parent) || pci_compatible(node, "openpic", parent);
+    return compatible(node,"chrp,open-pic") || compatible(node,"open-pic") ||
+            compatible(node,"openpic");
+}
+
 /* Bounded preorder walk: also bounds malformed peer/child cycles. */
 static void tree(int node, unsigned depth, int parent_bridge)
 {
@@ -174,14 +183,15 @@ static void tree(int node, unsigned depth, int parent_bridge)
         }
         if (!info.escc.count && named(node,"name","ch-a") &&
             named(ofw_parent(node),"name","escc")) device(node,&info.escc);
-        if (!info.mpic.count && (named(node,"device_type","open-pic") ||
-            named(node,"name","open-pic") ||
-            compatible(node,"chrp,open-pic") || compatible(node,"open-pic") ||
-            compatible(node,"openpic"))) device(node,&info.mpic);
+        int is_bridge = named(node, "device_type", "pci") ||
+            (parent_bridge >= 0 && (pci_scalar(node, "class-code", parent_bridge, 0) >> 8) == 0x0604);
         int child_bridge = -1;
         if (parent_bridge >= 0) pci_function(node, parent_bridge);
         if (parent_bridge == -2) child_bridge = -2;
-        else if (named(node, "device_type", "pci")) child_bridge = pci_bridge(node, parent_bridge);
+        else if (is_bridge) child_bridge = pci_bridge(node, parent_bridge);
+        if (!info.mpic.count && (named(node,"device_type","open-pic") ||
+            named(node,"name","open-pic") ||
+            mpic_compatible(node, is_bridge, child_bridge))) device(node,&info.mpic);
         int child = ofw_child(node);
         if (child == -1 && child_bridge >= 0) pci_incomplete(child_bridge);
         tree(child, depth+1, child_bridge);

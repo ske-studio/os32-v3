@@ -36,12 +36,26 @@ static int cfg_alias_safe(u32 root, const struct ppc_boot_alias *a)
     return 1;
 }
 
+static int cfg_pages_shared(const struct pm_pci_capture *c, const struct pm_of_bridge *b)
+{
+    u32 base = b->cfg_pa & PTE_FRAME_MASK;
+    for (unsigned i = 0; i < c->bridges; i++) {
+        const struct pm_of_bridge *other = &c->bridge[i];
+        if (!other->supported || other->parent >= 0 || other->id == b->id) continue;
+        u32 peer = other->cfg_pa & PTE_FRAME_MASK;
+        /* Both hosts use pages at base + 8 MiB and base + 12 MiB. */
+        if (base == peer || (base > peer ? base-peer : peer-base) == 0x400000) return 1;
+    }
+    return 0;
+}
+
 static void install_pci_hosts(u32 root)
 {
     const struct pm_pci_capture *c = &boot_info->pci;
     for (unsigned i = 0; i < c->bridges; i++) {
         const struct pm_of_bridge *b = &c->bridge[i];
-        if (!b->supported || b->incomplete || b->parent >= 0 || pm_bridge_lookup(b->id)) continue;
+        if (!b->supported || b->incomplete || b->parent >= 0 ||
+            cfg_pages_shared(c, b) || pm_bridge_lookup(b->id)) continue;
         if (boot_devices.gmac_ready && (u32)b->id == boot_info->gmac.root_node &&
             b->cfg_pa == boot_info->gmac.root_pa && gmac_walk_valid(root)) {
             pm_bridge_register(b->id, gmac_alias[1].va, gmac_alias[2].va);

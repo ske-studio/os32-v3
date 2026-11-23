@@ -37,6 +37,58 @@ static u64 pci_number(const u8 *p, unsigned cells)
     return cells == 2 ? ((u64)be32(p) << 32) | be32(p + 4) : be32(p);
 }
 
+static int pci_compatible(int node, const char *value, int bridge)
+{
+    int n = pci_property(node, "compatible", bridge);
+    if (n < 0) return 0;
+    if (!n || property[n-1]) { pci_incomplete(bridge); return 0; }
+    int found = 0;
+    for (int pos = 0; pos < n;) {
+        const char *token = (const char *)property + pos;
+        if (!*token) { pci_incomplete(bridge); return 0; }
+        if (!kstrcmp(token, value)) found = 1;
+        pos += kstrlen(token) + 1;
+    }
+    return found;
+}
+
+/* Translate a whole contiguous interval at every enclosing non-PCI bus. */
+static int pci_cpu_interval(int bus, unsigned ac, unsigned sc, u64 *base, u64 bytes,
+                            int bridge)
+{
+    int root = ofw_finddevice("/");
+    if (!bytes || bytes-1 > ~(u64)0 - *base) return 0;
+    for (unsigned depth = 0; bus != root; depth++) {
+        if (ac == 1 && (*base > U32_MAX || bytes-1 > U32_MAX-*base)) return 0;
+        int up = ofw_parent(bus);
+        if (!up || up == -1 || depth >= PM_KBOOT_ANCESTORS) return 0;
+        unsigned pac = pci_scalar(up, "#address-cells", bridge, 2);
+        unsigned psc = pci_scalar(up, "#size-cells", bridge, 1);
+        if (pac < 1 || pac > 2 || sc < 1 || sc > 2) return 0;
+        unsigned stride = (ac + pac + sc) * 4;
+        int n = pci_property(bus, "ranges", bridge);
+        if (n < 0 || (unsigned)n % stride) return 0;
+        u64 translated = *base;
+        int found = 0;
+        for (unsigned pos = 0; pos < (unsigned)n; pos += stride) {
+            const u8 *p = property + pos;
+            u64 child = pci_number(p, ac), parent = pci_number(p + ac*4, pac);
+            u64 size = pci_number(p + (ac+pac)*4, sc);
+            if (!size || size-1 > ~(u64)0-child || size-1 > ~(u64)0-parent) return 0;
+            if (*base < child || *base-child >= size || bytes > size-(*base-child)) continue;
+            if (found++) return 0;
+            translated = parent + (*base-child);
+        }
+        if ((n && !found) || (pac == 1 && (translated > U32_MAX ||
+            bytes-1 > U32_MAX-translated))) return 0;
+        *base = translated;
+        bus = up;
+        ac = pac;
+        sc = psc;
+    }
+    return *base <= U32_MAX && bytes-1 <= U32_MAX-*base;
+}
+
 static void pci_function(int node, int parent)
 {
     struct pm_pci_capture *c = &info.pci;
@@ -98,17 +150,18 @@ static int pci_bridge(int node, int parent)
     int n = pci_property(node, "bus-range", index);
     if (n == 8) { b->first = be32(property); b->last = be32(property+4); }
     if (n != 8 || b->last > 255 || b->first > b->last) pci_incomplete(index);
-    else if (parent < 0 && up == ofw_finddevice("/") && compatible(node, "uni-north")) {
+    else if (parent < 0 && pci_compatible(node, "uni-north", index)) {
         n = pci_property(node, "reg", index);
         unsigned stride = (b->parent_ac + b->parent_sc) * 4;
         if (n > 0 && !((unsigned)n % stride)) {
             u64 pa = pci_number(property, b->parent_ac);
             u64 len = pci_number(property + b->parent_ac*4, b->parent_sc);
-            if (!(pa & 3) && pa <= U32_MAX && len >= 0xc00008 && len-1 <= U32_MAX-pa) {
+            if (len >= 0xc00008 && pci_cpu_interval(up, b->parent_ac, b->parent_sc,
+                                                    &pa, len, index) && !(pa & 3)) {
                 b->cfg_pa = pa;
                 b->supported = 1;
-            }
-        }
+            } else pci_incomplete(index);
+        } else pci_incomplete(index);
     }
     n = pci_property(node, "ranges", index);
     unsigned stride = (3 + b->parent_ac + b->sc) * 4;
@@ -123,8 +176,16 @@ static int pci_bridge(int node, int parent)
             pci_incomplete(index);
             break;
         }
-        c->range[c->ranges++] = (struct pm_of_range){index, (be32(p)>>24)&3,
-            pci ? (be32(up_addr)>>24)&3 : 0, base, pa, bytes};
+        unsigned space = (be32(p)>>24)&3, parent_space = pci ? (be32(up_addr)>>24)&3 : 0;
+        if (!pci && up != ofw_finddevice("/")) {
+            if (!pci_cpu_interval(up, b->parent_ac, b->parent_sc, &pa, bytes, index) ||
+                pci_property(node, "ranges", index) != n) {
+                pci_incomplete(index);
+                break;
+            }
+        }
+        c->range[c->ranges++] = (struct pm_of_range){index, space,
+            parent_space, base, pa, bytes};
     }
     return index;
 }
