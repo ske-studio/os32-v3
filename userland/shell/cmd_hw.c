@@ -1,5 +1,6 @@
 /* HW_BASIC_DESIGN §§2-5,7: shell adapters and heap-owned load lifetime. */
 #include "shell.h"
+#include "platform_hwb_session.h"
 #include "hwb.h"
 #include "pci_dev_contract.h"
 
@@ -160,7 +161,21 @@ static int hw_initial(const char *arg, char *name, u32 *value)
     *value = v;
     return 0;
 }
+#ifdef PLATFORM_HWB_ENTER
+static int shell_cmd_hw_body(int argc, char **argv);
 int shell_cmd_hw(int argc, char **argv)
+{
+    int entered = g_api->version >= HWB_KAPI_MIN && g_api->kdebug_call &&
+                  g_api->kdebug_call(PLATFORM_HWB_ENTER, 0, 0) == 0;
+    int rc = shell_cmd_hw_body(argc, argv);
+    if (entered) g_api->kdebug_call(PLATFORM_HWB_LEAVE, 0, 0);
+    return rc;
+}
+
+static int shell_cmd_hw_body(int argc, char **argv)
+#else
+int shell_cmd_hw(int argc, char **argv)
+#endif
 {
     if (argc < 2) return HWB_EXIT_ARG;
     if (g_api->version < HWB_KAPI_MIN || !g_api->kdebug_call) {

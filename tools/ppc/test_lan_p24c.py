@@ -25,8 +25,10 @@ static struct pm_kboot_info info = { .tb_hz=12345 };
 const struct ppc_boot_devices *ppc_boot_devices(void) { return &dev; }
 const struct pm_kboot_info *ppc_boot_info(void) { return &info; }
 int pm_gmac_dma_sync(void *p, u32 n, enum dma_sync op) { (void)p; (void)n; (void)op; return 0; }
-int pm_pci_read32(struct pm_pci *p, u32 b, u32 r, u32 *v) {
-    if (p->addr_va != 0x456000 || p->data_va != 0x457000 || p->bus_first != 2 || p->bus_last != 9 || p->target_bdf != 0x234 || b != 0x234 || r != 4) return -1;
+static struct pm_bridge_state bridge;
+struct pm_bridge_state *pm_bridge_lookup(int id) { return id == 9 ? &bridge : 0; }
+u32 pm_pci_access(const struct pm_pci *p, u32 b, u32 r, u32 width, int write, u32 *v) {
+    if (p->bridge != &bridge || width != 2 || write || p->bus_first != 2 || p->bus_last != 9 || p->target_bdf != 0x234 || b != 0x234 || r != 4) return -1;
     ++reads; if (mode == 1 || (mode == 3 && reads == 2)) return -1;
     *v = reads == 1 ? 0xabcd0121 : (mode == 4 ? 0 : 4); return 0;
 }
@@ -34,7 +36,7 @@ int pm_pci_write32(struct pm_pci *p, u32 b, u32 r, u32 v) {
     (void)p; (void)b; (void)r; ++writes; written=v; return mode == 2 ? -1 : 0;
 }
 static int test(void) {
-    struct pm_gmac_boot b = { .bus_first=2, .bus_last=9, .bdf=0x234 };
+    struct pm_gmac_boot b = { .root_node=9, .bus_first=2, .bus_last=9, .bdf=0x234 };
     struct gem_io io;
     if (pm_lan_gem_io(&b, &io) || io.tb_hz != 12345 || io.sync != pm_gmac_dma_sync || !io.ctx || !io.read32 || !io.write32 || !io.tb) return 10;
     for (mode=0; mode<5; ++mode) {
@@ -88,7 +90,7 @@ def main():
             return require([str(PPC / 'powerpc-elf-objdump'), '-d', str(obj)])
         obj = cross(original)
         symbols = set(re.findall(r'\bU\s+(\w+)', require([str(PPC / 'powerpc-elf-nm'), '-u', str(obj)])))
-        expected = {'pm_gmac_dma_sync', 'ppc_boot_info', 'ppc_boot_devices', 'pm_pci_read32', 'pm_pci_write32'}
+        expected = {'pm_gmac_dma_sync', 'ppc_boot_info', 'ppc_boot_devices', 'pm_pci_access', 'pm_bridge_lookup', 'pm_pci_write32'}
         if symbols != expected: raise RuntimeError(f'unexpected undefined symbols: {symbols}')
         dis = assembly(obj)
         def check_asm(text):
@@ -105,7 +107,7 @@ def main():
             src = re.sub(r'__asm__ volatile\("mftb %0" : "=r"\(lo\)\);', 'lo = 0;', src)
             f = d / 'host.c'; f.write_text(src + '\n' + HARNESS)
             exe = d / 'host'
-            require(['gcc', '-m32', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-pie', '-no-pie', '-nostdlib', '-static', '-I.', '-Iinclude', '-Iplatform/powermac', '-Iarch/ppc', '-Isdk/include', '-Isdk/include/os32', str(f), '-o', str(exe)])
+            require(['gcc', '-m32', '-nostdinc', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-pie', '-no-pie', '-nostdlib', '-static', '-I.', '-Iinclude', '-Iplatform/powermac', '-Iarch/ppc', '-Isdk/include', '-Isdk/include/os32', str(f), '-o', str(exe)])
             return invoke(['qemu-i386', str(exe)]).returncode
         if host(original) != 0: raise RuntimeError('host baseline failed')
         print('host PCI cases OK')

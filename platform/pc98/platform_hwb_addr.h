@@ -11,4 +11,10 @@ static inline u32 platform_hwb_bar(u32 bdf, u32 bar, u32 space, u32 base, u32 of
     return HW_OK;
 }
 
+static inline u32 platform_hwb_fill_check(u32 addr, u32 width, u32 bytes)
+{
+    (void)addr; (void)width; (void)bytes;
+    return HW_OK;
+}
+
 #endif

@@ -12,7 +12,7 @@ import host32
 
 CHECK = dict(name='ppc-lan-rh2', tier=2, budget=60, needs=[],
     covers=['tools/tests/test_ppc_lan_rh2.py',
-            'platform/powermac/gmac_tree.c', 'platform/powermac/pci_config.c',
+            'platform/powermac/gmac_tree.c', 'tools/ppc/pci_fake_lane.h', 'platform/powermac/pci_config.c',
             'platform/powermac/gmac_clock.c', 'drivers/net/gem/gem_phy.c',
             'platform/powermac/lan_boot.h',
             'platform/powermac/ofw.h', 'arch/ppc/*.h', 'drivers/net/gem/gem.h',
@@ -22,7 +22,7 @@ CHECK = dict(name='ppc-lan-rh2', tier=2, budget=60, needs=[],
     basis=['PPC_LAN_MARKS_DESIGN', 'PPC_LAN_DESIGN §3'],
     env_limit='模型でOF captureとPCI順序を確認するが、実OFとPCI busの障害は再現しない。',
 )
-FLAGS = ['gcc', '-m32', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
+FLAGS = ['gcc', '-m32', '-nostdinc', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
          '-ffreestanding', '-fno-builtin', '-fno-pie', '-no-pie', '-nostdlib',
          '-static', '-fno-stack-protector', '-D__cdecl=',
          *['-I'+str(ROOT / p) for p in ('.', 'include', 'lib', 'arch/ppc',
@@ -37,7 +37,7 @@ def main():
         def tree_case(text, cases, red=False):
             src = d / 'gmac_tree.c'; src.write_text(text)
             exe = d / 'tree'
-            subprocess.run(FLAGS + ['-DRH2_TREE', '-DPM_PCI_FAKE_MMIO',
+            subprocess.run(FLAGS + ['-DRH2_TREE', '-DPM_PCI_FAKE_MMIO', '-DPM_PCI_FAKE_LANE',
                 '-DPM_GMAC_CLOCK_FAKE', str(src),
                 *[str(ROOT / p) for p in ('platform/powermac/pci_config.c',
                   'platform/powermac/gmac_clock.c', 'lib/kstring_c.c',

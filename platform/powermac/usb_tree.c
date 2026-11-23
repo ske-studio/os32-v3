@@ -33,7 +33,7 @@ void pm_usb_capture(void)
     if (get(root, "#address-cells") == 4) ac = word(prop);
     if (ac < 1 || ac > 2) return;
     for (int node = ofw_child(root); node && node != -1; node = ofw_peer(node)) {
-        struct pm_usb_root r = {0};
+        struct pm_usb_root r = {.host_id = node};
         int n = get(node, "device_type");
         if (n < 3 || kstrncmp((char *)prop, "pci", 3) || !uninorth(node)) continue;
         /* UniNorth host bridges have a 16MB register aperture. */

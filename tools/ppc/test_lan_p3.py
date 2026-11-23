@@ -34,9 +34,9 @@ MUTATIONS = [
 
 def exercise(source, directory, case=None):
     exe = directory / 'capture'
-    subprocess.run(['gcc', '-std=gnu11', '-m32', '-O2', '-Wall', '-Wextra', '-Werror',
+    subprocess.run(['gcc', '-std=gnu11', '-m32', '-nostdinc', '-O2', '-Wall', '-Wextra', '-Werror',
                     '-ffreestanding', '-fno-builtin', '-fno-pie', '-no-pie',
-                    '-fno-stack-protector', '-nostdlib', '-static', '-D__cdecl=', '-DPM_PCI_FAKE_MMIO',
+                    '-fno-stack-protector', '-nostdlib', '-static', '-D__cdecl=', '-DPM_PCI_FAKE_MMIO', '-DPM_PCI_FAKE_LANE',
                     '-I'+str(ROOT), *['-I'+str(ROOT / p) for p in ('platform/powermac', 'arch/ppc', 'include', 'lib')],
                     str(source), str(ROOT / 'platform/powermac/pci_config.c'),
                     str(ROOT / 'tools/ppc/lan_p3_fake.c'),
