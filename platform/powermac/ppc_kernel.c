@@ -379,6 +379,7 @@ static void apply_machine_config(void)
 
 /* 局面 2 (EE=1): MPIC の配送と時計の実証・LAN・root・コンソール・入力。 */
 #if KBOOT_SHELL || KBOOT_SH
+#if !PM_PRODUCT_BOOT
 static int start_media_root(const struct pm_kboot_info *info)
 {
     struct boot_root_image img = {0};
@@ -405,6 +406,7 @@ static int start_media_root(const struct pm_kboot_info *info)
             owned_before, ledger_owner_pages(LEDGER_OWNER_BOOT), free_before, free_after);
     return !rc;
 }
+#endif
 #endif
 
 void platform_boot_services(void)
@@ -494,6 +496,9 @@ void platform_boot_services(void)
             kboot_stop("hd0 root");
         }
 #if OS32_HOOK_IME
+#if PM_PRODUCT_BOOT
+        hdd_root_ready = 1;
+#else
         /* Validate the embedded pair without registering it as the root. */
         struct boot_root_image paired_image = {0};
         if (info->root_frame_bytes) {
@@ -505,12 +510,17 @@ void platform_boot_services(void)
             hdd_root_ready = !pair_rc;
         }
 #endif
+#endif
         machcfg_load_root();
         apply_machine_config();
     } else
 #endif
     {
+#if PM_PRODUCT_BOOT
+        kboot_stop("HDD boot path");
+#else
         if (!start_media_root(info)) return;
+#endif
         pm_ide_boot();
     }
     {

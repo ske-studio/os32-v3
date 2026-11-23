@@ -41,9 +41,7 @@ def main():
             shutil.copytree(ROOT / name, root / name,
                             ignore=shutil.ignore_patterns('out', '*.o', '*.d', '*.bin', '*.elf', '*.raw', 'target'))
         powermac = Path('platform/powermac')
-        (root / powermac).mkdir(parents=True)
-        for header in (ROOT / powermac).glob('*.h'):
-            shutil.copy(header, root / powermac)
+        shutil.copytree(ROOT / powermac, root / powermac)
         (root / 'net').mkdir()
         for name in ('host_mailbox.h', 'link.h'):
             shutil.copy(ROOT / 'net' / name, root / 'net' / name)

@@ -1,3 +1,6 @@
+#if PM_PRODUCT_BOOT
+#include "product_boot.h"
+#endif
 /* Apple Developer Note and BSD controller IDs/registers: docs/ppc/ata.md §§1–3. */
 #include "ofw.h"
 #include "kboot_info.h"
@@ -68,12 +71,32 @@ static int kauai(int node)
 int pm_root_unit = -1;
 u32 pm_root_partition;
 static int root_controller, root_target;
+static int cd_controller;
+int pm_cd_bank = -1;
+int pm_cd_target;
 
 static void capture_root(void)
 {
     char args[PM_KBOOT_PROP_BYTES + 1];
+#if PM_PRODUCT_BOOT
+    const char *path = pm_product_handoff.path;
+    unsigned len = kstrlen(path);
+    if (len + 15 >= sizeof(args)) { pm_root_unit = -2; return; }
+    kstrcpy(args, "os32-root=");
+    kstrcpy(args + 10, path);
+    int n = 10 + len;
+    args[n++] = ':';
+    unsigned number = pm_product_handoff.plan.root_partition;
+    if (number >= 100) args[n++] = '0' + number / 100;
+    if (number >= 10) args[n++] = '0' + number / 10 % 10;
+    args[n++] = '0' + number % 10;
+#elif PM_INSTALL_MEDIA
+    /* Installer media always uses its embedded root, even with stale NVRAM. */
+    int n = 0;
+#else
     int chosen = ofw_finddevice("/chosen");
     int n = ofw_getprop(chosen, "bootargs", args, sizeof(args) - 1);
+#endif
     if (n <= 0) return;
     if (n >= (int)sizeof(args) - 1) {
         pm_root_unit = -2;
@@ -141,6 +164,8 @@ static void walk(int node, int parent, int macio, unsigned depth, unsigned *left
         } else if (kauai(node)) {
             pa[(*bank)++] = bar_window(node, 0x2000, PM_IDE_CTL + 1);
         }
+        if (node == cd_controller && *bank != previous && pa[previous])
+            pm_cd_bank = previous;
         if (node == root_controller && *bank != previous && pa[previous])
             pm_root_unit = previous * 2 + root_target;
         walk(ofw_child(node), node, !kstrcmp(name, "mac-io"), depth + 1, left, bank, pa);
@@ -149,6 +174,14 @@ static void walk(int node, int parent, int macio, unsigned depth, unsigned *left
 
 void pm_ide_capture(u32 pa[PM_IDE_BANKS])
 {
+    int cd = ofw_finddevice("cd");
+    if (cd && cd != -1) {
+        cell target;
+        if (prop(cd, "reg", &target, sizeof(target)) == sizeof(target) && target < 2) {
+            cd_controller = ofw_parent(cd);
+            pm_cd_target = target;
+        }
+    }
     capture_root();
     unsigned left = PM_KBOOT_TREE_LIMIT;
     int bank = 0;

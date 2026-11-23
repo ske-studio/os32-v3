@@ -14,12 +14,9 @@
 /* ======================================================================== */
 
 #include "atapi.h"
-#include "platform_ide_ports.h"
-
-#include "io.h"
-#include "pc98.h"
+#include "ide_bus.h"
+#include "platform_atapi_bus.h"
 #include "kprintf.h"
-#include "cpu_calibrate.h"   /* cpu_delay_us / CPU_DELAY_US_MAX (INC_KERNEL で通す。build/kernel.mk) */
 #define ATAPI_DRIVE_COUNT     2
 #define ATAPI_PRESENT_SLAVE   0x02
 #define ATAPI_PIO_BCL_MIN     2
@@ -77,13 +74,13 @@ static int s_dead_noted = 0;
  * 行う — バスが BSY の装置を選んでいるかもしれないときに DRV_HEAD を書かない */
 static void atapi_select_bank(int bank)
 {
-    outp(IDE_BANK1, (unsigned)(bank ? 0x01 : 0x00));
+    ide_bus_select(bank ? ATAPI_CONTROLLER : 0);
 }
 
 /* ALT_STATUS を 1 回読む。診断の行のために最後の値を覚える */
 static u8 atapi_status(void)
 {
-    u8 st = (u8)inp(IDE_ALT_STATUS);
+    u8 st = (u8)ide_bus_alt();
     s_diag_st = st;
     return st;
 }
@@ -93,7 +90,7 @@ static void atapi_poll_delay(u32 *waited)
 {
     u32 us = (*waited < ATAPI_FAST_POLLS * ATAPI_FAST_POLL_US)
              ? ATAPI_FAST_POLL_US : ATAPI_POLL_US;
-    cpu_delay_us(us);
+    atapi_bus_delay(us);
     *waited += us;
 }
 
@@ -142,7 +139,7 @@ static int atapi_wait_drq(void)
  *印なら世代を進める。 */
 static void atapi_note_error(void)
 {
-    s_diag_err = (u8)inp(IDE_ERROR);
+    s_diag_err = (u8)ide_bus_in(IDE_REG_ERROR);
     s_last_sense = (u8)(s_diag_err >> ATAPI_ERR_SENSE_SHIFT);
     if (s_last_sense == ATAPI_SK_UNIT_ATTENTION
         || s_last_sense == ATAPI_SK_NOT_READY) {
@@ -158,7 +155,7 @@ static void atapi_note_error(void)
 static void atapi_settle(void)
 {
     int i;
-    for (i = 0; i < IDE_SEL_SETTLE; i++) (void)inp(IDE_ALT_STATUS);
+    for (i = 0; i < IDE_SEL_SETTLE; i++) (void)ide_bus_alt();
 }
 
 /* 12バイトCDBを0クリア */
@@ -168,15 +165,15 @@ static void atapi_clear_cdb(u8 *cdb)
     for (i = 0; i < ATAPI_CDB_BYTES; i++) cdb[i] = 0;
 }
 
-/* us だけ待つ。cpu_delay_us は 1 回で CPU_DELAY_US_MAX (100ms) までしか待たず、
- * それより長い指定を黙って丸めるので、CPU_DELAY_US_MAX 以下の塊に分けて呼ぶ。
+/* us だけ待つ。cpu_delay_us は 1 回で ATAPI_DELAY_MAX (100ms) までしか待たず、
+ * それより長い指定を黙って丸めるので、ATAPI_DELAY_MAX 以下の塊に分けて呼ぶ。
  * atapi_init は cpu_calibrate の後に走る。tick_count で待たないのは、PIT の
  * 割り込みが来ている (IF=1) ことを前提にできないから — cpu_delay_us は割り込み禁止区間でも待てる */
 static void atapi_delay_us(u32 us)
 {
     while (us > 0) {
-        u32 d = (us > CPU_DELAY_US_MAX) ? CPU_DELAY_US_MAX : us;
-        cpu_delay_us(d);
+        u32 d = (us > ATAPI_DELAY_MAX) ? ATAPI_DELAY_MAX : us;
+        atapi_bus_delay(d);
         us -= d;
     }
 }
@@ -244,10 +241,10 @@ static int atapi_bus_dead_fail(void)
  * 期限切れならバスが死んだ印 (s_bus_dead) を立てる */
 static int atapi_srst(void)
 {
-    ide_multiple_reset_bank(1);
-    outp(IDE_DEV_CTRL, IDE_NIEN | IDE_SRST);
-    cpu_delay_us(ATAPI_SRST_HOLD_US);
-    outp(IDE_DEV_CTRL, IDE_NIEN);
+    ide_multiple_reset_bank(ATAPI_CONTROLLER);
+    ide_bus_ctl(IDE_NIEN | IDE_SRST);
+    atapi_bus_delay(ATAPI_SRST_HOLD_US);
+    ide_bus_ctl(IDE_NIEN);
     s_cursel = 0x00;
     s_stats.soft_resets++;
     atapi_delay_us(ATAPI_SRST_SETTLE_US);
@@ -275,12 +272,12 @@ static int atapi_srst(void)
 static int atapi_recover(void)
 {
     atapi_note("DEVICE RESET (BSY/DRQ past the limit twice)", 0, 0, 0);
-    outp(IDE_COMMAND, ATAPI_CMD_DEVICE_RESET);
+    ide_bus_out(IDE_REG_STATUS, ATAPI_CMD_DEVICE_RESET);
     s_stats.dev_resets++;
     atapi_settle();
     if (atapi_wait_idle() == ATAPI_OK) return ATAPI_OK;
     if (atapi_srst() != ATAPI_OK) return ATAPI_ERR_TIMEOUT;
-    outp(IDE_DRV_HEAD, s_drvsel);
+    ide_bus_out(IDE_REG_DRV_HEAD, s_drvsel);
     s_cursel = s_drvsel;
     atapi_settle();
     return atapi_wait_idle();
@@ -303,7 +300,7 @@ static int atapi_select_device(void)
         if (atapi_wait_idle() != ATAPI_OK
             && atapi_recover() != ATAPI_OK) return ATAPI_ERR_TIMEOUT;
     }
-    outp(IDE_DRV_HEAD, s_drvsel);
+    ide_bus_out(IDE_REG_DRV_HEAD, s_drvsel);
     s_cursel = s_drvsel;
     atapi_settle();
     if (atapi_wait_idle() != ATAPI_OK) {
@@ -334,10 +331,10 @@ static int atapi_send_cdb(const u8 *cdb, u32 bcl)
     ret = atapi_select_device();
     if (ret != ATAPI_OK) return ret;
 
-    outp(IDE_FEATURES, 0x00);
-    outp(IDE_CYL_LO, (unsigned)(bcl & 0xFF));
-    outp(IDE_CYL_HI, (unsigned)((bcl >> 8) & 0xFF));
-    outp(IDE_COMMAND, ATAPI_CMD_PACKET);
+    ide_bus_out(IDE_REG_ERROR, 0x00);
+    ide_bus_out(IDE_REG_CYL_LO, (unsigned)(bcl & 0xFF));
+    ide_bus_out(IDE_REG_CYL_HI, (unsigned)((bcl >> 8) & 0xFF));
+    ide_bus_out(IDE_REG_STATUS, ATAPI_CMD_PACKET);
 
     ret = atapi_wait_drq();
     if (ret == ATAPI_ERR_IO) atapi_note_error();
@@ -363,7 +360,7 @@ static int atapi_packet_nodata(const u8 *cdb)
 
     /* エラーチェック */
     {
-        u8 st = (u8)inp(IDE_STATUS);
+        u8 st = (u8)ide_bus_in(IDE_REG_STATUS);
         s_diag_st = st;
         if (st & IDE_ST_ERR) {
             atapi_note_error();
@@ -421,7 +418,7 @@ static int atapi_packet_read(const u8 *cdb, void *buf, u32 buf_size,
         }
 
         /* ステータス確認 */
-        st = (u8)inp(IDE_STATUS);
+        st = (u8)ide_bus_in(IDE_REG_STATUS);
         s_diag_st = st;
         if (st & IDE_ST_ERR) {
             s_diag_got = total_read;
@@ -433,7 +430,7 @@ static int atapi_packet_read(const u8 *cdb, void *buf, u32 buf_size,
         if (!(st & IDE_ST_DRQ)) break;
 
         /* CylHi:CylLo から転送バイト数を取得 */
-        xfer_size = (u16)inp(IDE_CYL_LO) | ((u16)inp(IDE_CYL_HI) << 8);
+        xfer_size = (u16)ide_bus_in(IDE_REG_CYL_LO) | ((u16)ide_bus_in(IDE_REG_CYL_HI) << 8);
         if (xfer_size == 0) break;
 
         total_read = atapi_pio_read(p, buf_size, total_read, xfer_size);
@@ -441,7 +438,7 @@ static int atapi_packet_read(const u8 *cdb, void *buf, u32 buf_size,
     }
 
     /* IRQクリア */
-    { u8 st = (u8)inp(IDE_STATUS); (void)st; }
+    { u8 st = (u8)ide_bus_in(IDE_REG_STATUS); (void)st; }
 
     s_diag_got = total_read;
     if (actual) *actual = total_read;
@@ -459,15 +456,15 @@ static int atapi_probe_sig(u8 sel)
 {
     u8 cl, ch;
 
-    outp(IDE_DRV_HEAD, sel);
+    ide_bus_out(IDE_REG_DRV_HEAD, sel);
     s_cursel = sel;
     atapi_settle();
     if (atapi_status() == ATAPI_ST_FLOAT) return 0;
     if (atapi_wait_bsy() != ATAPI_OK) return 0;   /* 上限は ATAPI_INIT_TIMEOUT_US */
 
     /* NP21/W ideio.c: ATAPI デバイスはリセット後 CylLo=0x14, CylHi=0xEB */
-    cl = (u8)inp(IDE_CYL_LO);
-    ch = (u8)inp(IDE_CYL_HI);
+    cl = (u8)ide_bus_in(IDE_REG_CYL_LO);
+    ch = (u8)ide_bus_in(IDE_REG_CYL_HI);
     return (cl == ATAPI_SIG_CYL_LO && ch == ATAPI_SIG_CYL_HI) ? 1 : 0;
 }
 
@@ -613,14 +610,14 @@ int atapi_init(void)
     atapi_select_bank(1);
 
     /* 割り込み無効 (ポーリングモード) */
-    outp(IDE_DEV_CTRL, IDE_NIEN);
+    ide_bus_ctl(IDE_NIEN);
 
     /* マスターとスレーブの両方を見る (2026-09-26: NP21/W の ide3 = セカンダリの
      * スレーブに ISO を付けると、マスターの空の CD ドライブだけを見ていて
      * 1 セクタも読めなかった) */
     s_present_mask = 0;
     for (i = 0; i < ATAPI_DRIVE_COUNT; i++) {
-        if (atapi_probe_sig(sels[i])) {
+        if (ATAPI_PROBE_TARGET(i) && atapi_probe_sig(sels[i])) {
             found[n++] = sels[i];
             s_present_mask |= (u8)(1 << i);
         }
@@ -631,7 +628,7 @@ int atapi_init(void)
          * マスターが BSY のまま (31 秒) なら諦める (BSY の装置が選ばれている
          * あいだは DRV_HEAD を書いても届かない) */
         for (i = 0; i < ATAPI_DRIVE_COUNT; i++) {
-            if (atapi_probe_sig(sels[i])) {
+            if (ATAPI_PROBE_TARGET(i) && atapi_probe_sig(sels[i])) {
                 found[n++] = sels[i];
                 s_present_mask |= (u8)(1 << i);
             }

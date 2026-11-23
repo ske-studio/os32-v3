@@ -102,14 +102,14 @@ int ide_write_sectors(int drive, u32 lba, u32 count, const void *buf)
 }
 
 static int ide_chs_request(int drive, u16 cyl, u8 head, u8 sect, void *dst,
-                           const void *src)
+                           const void *src, enum install_op op)
 {
     struct install_access access;
     IdeAddr a;
     int rc;
     drive &= IDE_MAX_DRIVES - 1;
     if (platform_install_medium()) {
-        rc = install_admit(&access, drive, INSTALL_CHS, 0, 0, 0);
+        rc = install_admit(&access, drive, op, 0, 0, 0);
         if (rc) return rc;
     }
     ide_chs_addr(drive, cyl, head, sect, &a);
@@ -120,10 +120,10 @@ static int ide_chs_request(int drive, u16 cyl, u8 head, u8 sect, void *dst,
 
 int ide_read_sector_chs(int drive, u16 cyl, u8 head, u8 sect, void *buf)
 {
-    return ide_chs_request(drive, cyl, head, sect, buf, 0);
+    return ide_chs_request(drive, cyl, head, sect, buf, 0, INSTALL_CHS);
 }
 
 int ide_write_sector_chs(int drive, u16 cyl, u8 head, u8 sect, const void *buf)
 {
-    return ide_chs_request(drive, cyl, head, sect, 0, buf);
+    return ide_chs_request(drive, cyl, head, sect, 0, buf, INSTALL_CHS_WRITE);
 }

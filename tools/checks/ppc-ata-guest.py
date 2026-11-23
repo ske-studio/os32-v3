@@ -6,7 +6,7 @@ CHECK = dict(name='ppc-ata-guest', tier=2, needs=['make:ppc-ci-image'], budget=1
             'platform/powermac/**', 'include/**', 'init/**', 'kernel/**',
             'kapi/**', 'lib/**', 'fs/**', 'drivers/**', 'input/**', 'net/**',
             'gfx/**', 'assets/fonts/**'],
-    basis=['docs/ppc/ata.md §3; ATA IDENTIFY words 27–46 and 60–61'],
+    basis=['docs/ppc/ata.md §3; ATA IDENTIFY words 27–46 and 60–61; B05 の段 3 の安全の決まり (11-23 PM)'],
     env_limit='Requires OpenBIOS, genisoimage and mac99 QEMU.')
 
 

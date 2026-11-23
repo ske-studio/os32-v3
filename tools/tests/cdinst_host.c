@@ -2093,6 +2093,16 @@ static void case_exit_status(void)
 int os32_main(int argc, char **argv)
 {
     const char *c = argc > 1 ? argv[1] : "";
+    if (h_strcmp(c, "boot-order") == 0) {
+        setup();
+        inj_stat_wrong = "/hd0/sys/shell.bin";
+        CHECK(run() != 0);
+        if (disk[0][510] == 0x55 && disk[0][511] == 0xaa) return 51;
+        setup();
+        CHECK(run() == 0);
+        CHECK(disk[0][510] == 0x55 && disk[0][511] == 0xaa);
+        return 0;
+    }
     if (h_strcmp(c, "ok817") == 0) case_ok817();
     else if (h_strcmp(c, "ok1663") == 0) case_ok1663();
     else if (h_strcmp(c, "modes") == 0) case_modes();
