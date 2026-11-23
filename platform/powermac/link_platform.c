@@ -38,6 +38,27 @@ int link_platform_tick_register(void (*fn)(void))
 #if KBOOT_SH
 #include "platform/powermac/link_platform.h"
 #include "usb_boot.h"
+#include "platform_hwb_session.h"
+#if PLATFORM_HWB_SESSION
+#include "remote_control.h"
+#include "terminal_fifo.inc"
+
+/* Link-SH owns the PPC control mailbox. Link NOTIFY validates the peer,
+ * generation and sequence before queueing a terminal notification. */
+static void terminal_receive(void)
+{
+    struct HostAlive alive;
+    HostNotice notice;
+    host_alive_snapshot(&alive);
+    if (!link_hello_ok || !alive.valid ||
+        host_mailbox_stage(alive.host_generation, REMOTE_SVC_PPC_DIAG, &notice))
+        return;
+    host_mailbox_commit(alive.host_generation, notice.serial);
+    if (notice.kind == REMOTE_NOTIFY_HW_STOP && notice.length == 1 &&
+        notice.data[0] == 3 && resident_cui_hw_active())
+        pm_terminal_feed(notice.data, notice.length);
+}
+#endif
 
 
 void pm_link_service_once(void)
@@ -54,6 +75,9 @@ void pm_link_service_once(void)
         __asm__ volatile("mftbu %0" : "=r"(again));
     } while (hi != again);
     pm_lan_poll(((u64)hi << 32) | lo);
+#if PLATFORM_HWB_SESSION
+    terminal_receive();
+#endif
     running = 0;
 }
 #endif

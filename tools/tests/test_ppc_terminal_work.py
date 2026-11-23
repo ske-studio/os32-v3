@@ -4,7 +4,7 @@ CHECK = dict(name='ppc-terminal-work', env=['ppc-cross'], tier=1, needs=[], budg
     covers=['tools/tests/idle_io_sources.py', 'kernel/io_work.[ch]',
             'kernel/io_clock.h', 'kernel/io_policy.[ch]', 'exec/appslot.h',
             'tools/tests/test_ppc_terminal_work.py', 'tools/tests/host32.py',
-            'platform/powermac/terminal_input.c',
+            'platform/powermac/terminal_fifo.inc', 'platform/powermac/terminal_input.c',
             'platform/powermac/lan_boot.h', 'platform/powermac/usb_boot.h',
             'platform/powermac/usb_boot.c', 'platform/powermac/lan_service.c',
             'platform/powermac/ppc_kernel.c', 'build/targets/ppc-powermac.mk', 'net/nic.c', 'net/link.c', 'kernel/idle_work.c',

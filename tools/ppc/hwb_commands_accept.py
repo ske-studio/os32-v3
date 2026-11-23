@@ -2,6 +2,7 @@
 import argparse
 import hashlib
 import json
+from itertools import product
 import os
 from pathlib import Path
 import re
@@ -19,10 +20,10 @@ def build(work, mode):
     poll = work/'poll.hwb'
     poll.write_text('device d = id 106b:003f\npoll 32 pci d 0 0xffff 0 10000000 1000 -> x\nend\n')
     manifest['/hw/poll.hwb'] = str(poll)
-    for op in ('wait', 'poll'):
-        reload_script = work/f'{op}.sh'
-        reload_script.write_text(f'hw load /hw/{op}.hwb\necho loaded-{op} $?\n')
-        manifest[f'/hw/{op}.sh'] = str(reload_script)
+    for op, via in product(('wait', 'poll'), ('lan', 'usb')):
+        reload_script = work/f'{via}{op}.sh'
+        reload_script.write_text(f'hw load /hw/{op}.hwb\necho loaded-{via}-{op} $?\n')
+        manifest[f'/hw/{via}{op}.sh'] = str(reload_script)
     for bits in (8, 16, 32):
         for op in ('read', 'write'):
             manifest[f'/hw/{op}{bits}.hwb'] = str(SCRIPTS/f'mac99/port_{op}{bits}.hwb')
@@ -42,12 +43,11 @@ def build(work, mode):
     abort = (ROOT/'exec/exec_abort.inc').read_text()
     mark = '    return !!pending;'
     assert abort.count(mark) == 1
-    abort = 'volatile u32 hw_points[3];\n' + abort.replace(mark, '''
-    if (pending || hw_points[0]) {
-        if (hw_points[0] < 2) {
-            hw_points[1 + hw_points[0]] = !!pending;
-            ++hw_points[0];
-        }
+    abort = 'volatile u32 hw_points[9];\n' + abort.replace(mark, '''
+    u32 n = hw_points[0];
+    if (n < 8 && ((n & 1) || pending)) {
+        hw_points[1 + n] = !!pending;
+        hw_points[0] = n + 1;
     }
 ''' + mark)
     if mode == 'sticky':
@@ -84,7 +84,7 @@ def ohci(s, mode):
     assert (read & 255 == rev) == (mode != 'native-read')
 
 
-def observe(media, directory, mode):
+def observe(media, directory, mode, sticky_op=None):
     from link_sh_run import Session
     from usb_run import rsh_command
     s = Session(media, '7450', directory, 300)
@@ -103,26 +103,47 @@ def observe(media, directory, mode):
                     assert rsh_command(s, 'echo $?').strip() == (b'0' if mode == 'port-ok' else b'3')
         if mode in ('normal', 'sticky'):
             s.close_rshell()
-            for op in ('wait', 'poll'):
+            runs = set()
+            cases = [(op, via) for via in ('lan', 'usb') for op in ('wait', 'poll')]
+            if mode == 'sticky':
+                cases = [(sticky_op, 'lan')]
+            for index, (op, via) in enumerate(cases):
+                before = 2 * index
+                assert s.word('hw_points') == before
                 s.keys(f'hw run /hw/{op}.hwb\n')
-                s.wait(lambda: s.word('hwb_active') and f'op={op}' in s.screen('running'),
-                       'active '+op)
+
+                def started():
+                    if s.word('hwb_active'):
+                        found = re.findall(rf'HW run=(\d+) seq=[^\n]* op={op}\b',
+                                           s.screen('running'))
+                        runs.update(found)
+                    return len(runs) > index
+
+                s.wait(started, 'active '+op)
+                ident = max(runs, key=int)
                 s.key('e')
-                s.q.call('send-key', {'keys': [{'type':'qcode','data':'ctrl'},
-                                               {'type':'qcode','data':'pause'}]})
-                s.wait(lambda: not s.word('hwb_active') and 'op=end rc=ABORT' in s.screen('stop'),
-                       op+' abort result')
-                s.keys(f'cho retained-{op}\n')
-                s.wait(lambda: any(row.strip(' \x00') == 'retained-'+op for row in
+                if via == 'lan':
+                    from host_rshell import PPC_DIAG
+                    s.agent.notifier.notify_number(PPC_DIAG, 3, b'\x03')
+                else:
+                    s.q.call('send-key', {'keys': [{'type':'qcode','data':'ctrl'},
+                                                   {'type':'qcode','data':'pause'}]})
+                end = f'HW run={ident} op=end rc=ABORT'
+                def returned():
+                    screen = s.screen('stop')
+                    return (not s.word('hwb_active') and end in screen and
+                            re.search(r'(?:OS32:[^\n]*\$|sh>)', screen.split(end, 1)[1]))
+                s.wait(returned, op+' abort and prompt')
+                label = f'retained-{via}-{op}'
+                s.keys(f'cho {label}\n')
+                s.wait(lambda: any(row.strip(' \x00') == label for row in
                                    s.screen('retained').splitlines()), 'queued ordinary input')
-                s.keys(f'source /hw/{op}.sh\n')
-                s.wait(lambda: s.word('hw_points') == 2 and not s.word('hwb_active') and
-                       any(row.strip(' \x00') == f'loaded-{op} 0' for row in
+                s.keys(f'source /hw/{via}{op}.sh\n')
+                s.wait(lambda: s.word('hw_points') == before + 2 and not s.word('hwb_active') and
+                       any(row.strip(' \x00') == f'loaded-{via}-{op} 0' for row in
                            s.screen('reload').splitlines()), 'successful reload and second POINT')
-                assert s.word('hw_points', 4) == 1
-                assert s.word('hw_points', 8) == int(mode == 'sticky')
-                if mode == 'sticky':
-                    break
+                assert s.word('hw_points', 4 * (before + 1)) == 1
+                assert s.word('hw_points', 4 * (before + 2)) == int(mode == 'sticky')
         else:
             s.wait(s.ready, 'next shell prompt')
     finally:
@@ -144,7 +165,11 @@ def main():
         hashes.add(digest)
         print(mode, digest, flush=True)
         if not args.build_only:
-            observe(media, work/(mode+'-guest'), mode)
+            if mode == 'sticky':
+                for op in ('wait', 'poll'):
+                    observe(media, work/(mode+'-'+op+'-guest'), mode, op)
+            else:
+                observe(media, work/(mode+'-guest'), mode)
     print(f'{len(hashes)} distinct HW command images')
 
 

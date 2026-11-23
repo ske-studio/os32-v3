@@ -14,7 +14,7 @@ CHECK = dict(name='ppc-hwb-session', tier=1, needs=[], budget=6,
         'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py', 'build/config.mk',
         'tools/tests/test_exec_hwb_abort.py', 'tools/tests/ppc_hwb_session_host.c',
         'kernel/module/kdebug_call.c', 'kernel/module/*.h',
-        'platform/powermac/platform_hwb_session.h', 'platform/powermac/terminal_input.c',
+        'platform/powermac/platform_hwb_session.h', 'platform/powermac/terminal_fifo.inc', 'platform/powermac/terminal_input.c',
         'platform/powermac/lan_boot.h', 'platform/powermac/usb_boot.h',
         'kernel/idle_work.h', 'kernel/cli/resident_cli.h', 'arch/ppc/kernel_boot.h'],
     basis=['docs/decisions/realhw/HWOP_COMMON_DESIGN.md §2.2'])

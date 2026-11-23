@@ -20,6 +20,8 @@ CHECK = dict(name='ppc-link-sh', env=['ppc-cross'], tier=1, needs=[], budget=60,
             'platform/powermac/hostfs_link_peer.c',
             'net/host_mailbox.c', 'net/link.c', 'net/nic.c',
             'kernel/dev/device_host.c', 'platform/powermac/usb_boot.c',
+            'platform/powermac/terminal_fifo.inc', 'kernel/cli/resident_cli.h',
+            'net/host_mailbox.h', 'net/link.h', 'net/nic.h',
             'platform/powermac/link_platform.c', 'platform/powermac/link_platform.h',
             'platform/powermac/input_boot.c', 'platform/powermac/console_stream.c',
             'platform/powermac/log_printf.c', 'platform/powermac/shell_loop_ops.c',
@@ -35,10 +37,42 @@ static void finish(int rc) { __asm__ volatile("int $0x80" : : "a"(1), "b"(rc)); 
 #define CHECK(x) do { if (!(x)) finish(1); } while (0)
 '''
 WORK = r'''
-static int usb, lan, recurse;
+static int usb, lan, recurse, active, stops, queued;
+static HostNotice incoming;
+u32 link_hello_ok = 1;
+void host_alive_snapshot(struct HostAlive *out)
+{
+    *out = (struct HostAlive){.valid=1, .host_generation=17};
+}
+int host_mailbox_stage(u32 generation, u32 service, HostNotice *out)
+{
+    CHECK(generation == 17 && service == REMOTE_SVC_PPC_DIAG);
+    if (!queued) return OS32_ERR_AGAIN;
+    *out = incoming;
+    return 0;
+}
+void host_mailbox_commit(u32 generation, u32 serial)
+{
+    CHECK(queued && generation == 17 && serial == incoming.serial);
+    queued = 0;
+}
+int resident_cui_hw_active(void) { return active; }
+void ring3_abort_request(void) { ++stops; }
 void pm_usb_poll(void) { usb++; if (!recurse) { recurse=1; pm_link_service_once(); } }
 void pm_lan_poll(u64 now) { CHECK(now == 0x100000002ULL); lan++; }
-void _start(void) { pm_link_service_once(); CHECK(usb==1 && lan==1); pm_link_service_once(); CHECK(usb==2 && lan==2); finish(0); }
+void _start(void) {
+    incoming = (HostNotice){.kind=REMOTE_NOTIFY_HW_STOP, .length=1, .serial=1, .data={3}};
+    queued = 1;
+    pm_link_service_once();
+    CHECK(usb == 1 && lan == 1 && !stops && !queued);
+    active = queued = 1;
+    ++incoming.serial;
+    pm_link_service_once();
+    pm_link_service_once();
+    CHECK(usb == 3 && lan == 3 && stops == 1 && !queued);
+    CHECK(pm_terminal_trygetkey() < 0);
+    finish(0);
+}
 '''
 PROVIDER = r'''
 static const struct InputLegacyProvider *registered;
@@ -177,9 +211,10 @@ def main():
     registration=boot[boot.index('#if KBOOT_LINK\n        int work_rc'):]
     registration=registration[:registration.index('        if (work_rc)')]
     work += '\n#include "kernel/idle_work.h"\nint idle_work_register(void (*fn)(void)) { CHECK(fn==pm_link_service_once); return 0; }\nstatic void registration(void) {\n'+registration+'CHECK(work_rc==0); }\n'
-    cases=[('work',work,WORK.replace('void _start(void) {','void _start(void) { registration();'),[
+    cases=[('work','#define PM_LOAD_KDEBUG 1\n'+work,WORK.replace('void _start(void) {','void _start(void) { registration();'),[
         ('    if (running) return;','    (void)running;'),
         ('    pm_usb_poll();','    ;'),
+        ('    terminal_receive();','    ;'),
         ('    pm_lan_poll(((u64)hi << 32) | lo);','    (void)lo;'),
         ('int work_rc = idle_work_register(pm_link_service_once);','int work_rc = -1;')]),
         ('provider',(ROOT/'platform/powermac/input_boot.c').read_text(),PROVIDER,[

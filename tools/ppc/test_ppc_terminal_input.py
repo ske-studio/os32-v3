@@ -59,7 +59,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    source = (ROOT / 'platform/powermac/terminal_input.c').read_text()
+    source = (ROOT / 'platform/powermac/terminal_fifo.inc').read_text()
     old = "        if (discard) {\n            if (c == '\\n') discard = 0;\n            continue;\n        }"
     if source.count(old) != 1:
         raise RuntimeError('mutation anchor is not unique')
