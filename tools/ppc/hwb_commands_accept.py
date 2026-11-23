@@ -59,6 +59,16 @@ def build(work, mode):
     observation = mutant_settings(work, 'observe-'+mode, 'exec/exec.c',
                                  '#include "exec_abort.inc"', f'#include "{inc}"')
     settings.extend(arg.replace('KB_MUT_', 'KB_MUT_EXTRA_', 1) for arg in observation)
+    signature = 'u32 pm_hwb_cfg_read(u32 bdf, u32 offset, u32 width, u32 *value)'
+    reads = mutant_settings(work, 'observe-pci-'+mode, 'platform/powermac/pci_backend.c',
+        signature + '\n{ return pm_pci_access(&root, bdf << 8, offset, width, 0, value); }',
+        'volatile u32 hw_pci_reads;\n' + signature + """
+{
+    u32 rc = pm_pci_access(&root, bdf << 8, offset, width, 0, value);
+    if (!rc && offset == 0 && width == 4 && *value == 0x003f106b) hw_pci_reads++;
+    return rc;
+}""")
+    settings.extend(arg.replace('KB_MUT_', 'KB_MUT_THIRD_', 1) for arg in reads)
     return build_media(work/mode, '-j4', 'IMAGE=kboot-link-sh', 'FEATURE_KDEBUG=1',
                        'KB_SH_OUT='+str(work/'user'), 'ROOT_MANIFEST='+str(manifest_path),
                        'PPC_SYSTEM_CFG='+str(cfg), *settings)
@@ -121,6 +131,10 @@ def observe(media, directory, mode, sticky_op=None):
 
                 s.wait(started, 'active '+op)
                 ident = max(runs, key=int)
+                if op == 'poll':
+                    reads = s.word('hw_pci_reads')
+                    s.wait(lambda: s.word('hw_pci_reads') != reads,
+                           'completed OHCI configuration read during poll')
                 s.key('e')
                 if via == 'lan':
                     from host_rshell import PPC_DIAG

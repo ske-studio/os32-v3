@@ -32,6 +32,7 @@ CHECK = dict(name='ppc-link-sh', env=['ppc-cross'], tier=1, needs=[], budget=60,
 
 PREFIX = r'''
 #include "types.h"
+#include "net/link_platform.h"
 #include "os32_kapi_shared.h"
 static void finish(int rc) { __asm__ volatile("int $0x80" : : "a"(1), "b"(rc)); for (;;) {} }
 #define CHECK(x) do { if (!(x)) finish(1); } while (0)
@@ -39,6 +40,8 @@ static void finish(int rc) { __asm__ volatile("int $0x80" : : "a"(1), "b"(rc)); 
 WORK = r'''
 static int usb, lan, recurse, active, stops, queued;
 static HostNotice incoming;
+u32 link_platform_lock(void) { return 0; }
+void link_platform_unlock(u32 saved) { (void)saved; }
 u32 link_hello_ok = 1;
 void host_alive_snapshot(struct HostAlive *out)
 {
@@ -46,7 +49,8 @@ void host_alive_snapshot(struct HostAlive *out)
 }
 int host_mailbox_stage(u32 generation, u32 service, HostNotice *out)
 {
-    CHECK(generation == 17 && service == REMOTE_SVC_PPC_DIAG);
+    CHECK(service == REMOTE_SVC_PPC_DIAG);
+    if (generation != 17) return OS32_ERR_STALE;
     if (!queued) return OS32_ERR_AGAIN;
     *out = incoming;
     return 0;
@@ -62,6 +66,13 @@ void pm_usb_poll(void) { usb++; if (!recurse) { recurse=1; pm_link_service_once(
 void pm_lan_poll(u64 now) { CHECK(now == 0x100000002ULL); lan++; }
 void _start(void) {
     incoming = (HostNotice){.kind=REMOTE_NOTIFY_HW_STOP, .length=1, .serial=1, .data={3}};
+    active = queued = 1;
+    link_platform_session(18);
+    terminal_receive();
+    CHECK(!stops && queued);
+    link_platform_session(17);
+    CHECK(!queued && !stops);
+    active = 0;
     queued = 1;
     pm_link_service_once();
     CHECK(usb == 1 && lan == 1 && !stops && !queued);
@@ -215,6 +226,8 @@ def main():
         ('    if (running) return;','    (void)running;'),
         ('    pm_usb_poll();','    ;'),
         ('    terminal_receive();','    ;'),
+        ('alive.host_generation != terminal_generation ||',''),
+        ('while (generation &&','while (0 && generation &&'),
         ('    pm_lan_poll(((u64)hi << 32) | lo);','    (void)lo;'),
         ('int work_rc = idle_work_register(pm_link_service_once);','int work_rc = -1;')]),
         ('provider',(ROOT/'platform/powermac/input_boot.c').read_text(),PROVIDER,[

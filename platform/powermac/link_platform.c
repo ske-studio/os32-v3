@@ -45,12 +45,24 @@ int link_platform_tick_register(void (*fn)(void))
 
 /* Link-SH owns the PPC control mailbox. Link NOTIFY validates the peer,
  * generation and sequence before queueing a terminal notification. */
+static u32 terminal_generation;
+
+void link_platform_session(u32 generation)
+{
+    HostNotice notice;
+    terminal_generation = generation;
+    /* A reconnect may reuse the generation. Drain its old control queue
+     * before NOTIFY reception resumes in the newly established session. */
+    while (generation && !host_mailbox_stage(generation, REMOTE_SVC_PPC_DIAG, &notice))
+        host_mailbox_commit(generation, notice.serial);
+}
+
 static void terminal_receive(void)
 {
     struct HostAlive alive;
     HostNotice notice;
     host_alive_snapshot(&alive);
-    if (!link_hello_ok || !alive.valid ||
+    if (!link_hello_ok || !alive.valid || alive.host_generation != terminal_generation ||
         host_mailbox_stage(alive.host_generation, REMOTE_SVC_PPC_DIAG, &notice))
         return;
     host_mailbox_commit(alive.host_generation, notice.serial);
@@ -76,7 +88,9 @@ void pm_link_service_once(void)
     } while (hi != again);
     pm_lan_poll(((u64)hi << 32) | lo);
 #if PLATFORM_HWB_SESSION
+    u32 saved = link_platform_lock();
     terminal_receive();
+    link_platform_unlock(saved);
 #endif
     running = 0;
 }
