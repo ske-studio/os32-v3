@@ -31,6 +31,7 @@ static int check(struct gfx2_adapter *a, const struct gfx2_exec *ex, u32 *how, i
     *how = GFX2_HOW_NOSUPPORT;
     if ((ex->src && sf == GFX2_FMT_PLANAR4) || (ex->dst && df == GFX2_FMT_PLANAR4) ||
         (ex->src && ex->dst && sf != GFX2_FMT_INDEX8 && df == GFX2_FMT_INDEX8) ||
+        (op->op == GFX2_OP_ALPHA && df == GFX2_FMT_INDEX8) ||
         (ex->dst && df >= GFX2_FMT_YUY2) ||
         (ex->src && sf >= GFX2_FMT_YUY2 && op->op != GFX2_OP_STRETCH) ||
         (op->op == GFX2_OP_STRETCH && (op->flags & GFX2_F_FILTER) && df == GFX2_FMT_INDEX8))

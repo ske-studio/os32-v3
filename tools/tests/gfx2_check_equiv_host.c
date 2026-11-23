@@ -1,16 +1,19 @@
-/* Exercise the shape query and submit on CPU-visible INDEX8 surfaces. */
+/* Mainline PM 11-23 and OUT.md, final regression cases 1-3 (PEGC and OF). */
 #define _start i1_start
 #include "gfx2_i1_host.c"
 #undef _start
+
+#include "../../drivers/video/of_fb/backend_of_fb.h"
+
+extern const GfxBackendV2 pegc_backend_v2;
+GfxBackend gfx_backend_pegc;
+GfxCounters gfx_counters;
 
 static u8 pixels[3][2], data[8];
 static struct gfx2_adapter *adapter = &gfx2_adapters[0];
 int ring3_call_from_user(void) { return 0; }
 int ring3_user_range_ok(u32 p, u32 n) { return p && n; }
 int ring3_user_range_writable(u32 p, u32 n) { return p && n; }
-static int no_alloc(void *ctx, struct gfx2_surf *s)
-{ (void)ctx; (void)s; return OS32_ERR_NOSYS; }
-
 static u32 query(const GFX2_Op *op)
 {
     u32 how;
@@ -79,18 +82,13 @@ static void exercise(struct gfx2_surf *dst)
     CHECK(query(&filter) == GFX2_HOW_NOSUPPORT);
     CHECK(submit(&filter, 1) == OS32_ERR_NOSYS && dst->kva[0]==21 && dst->kva[1]==22);
     GFX2_Op alpha = {.op=GFX2_OP_ALPHA,.src=src,.dst=d,.sw=2,.dw=2,.sh=1,.dh=1,.fg={.x=255}};
-    CHECK(query(&alpha) == GFX2_HOW_SW);
+    CHECK(query(&alpha) == GFX2_HOW_NOSUPPORT);
     CHECK(submit(&alpha, 1) == OS32_ERR_NOSYS && dst->kva[0]==21 && dst->kva[1]==22);
 }
 
 void _start(void)
 {
     as.pd_phys=1; as.owner=7;
-    be=gfx2_v1_shim; be.alloc=no_alloc;
-    *adapter=(struct gfx2_adapter){.be=&be,.v1=&v1,.kind=GFX2_KIND_OF_FB,
-                                  .heads=1,.flags=GFX2_AF_ACTIVE};
-    GfxSyncCtx ctx={.used=1,.cfg={.mode=GFXSYNC_SHADOW}};
-    CHECK(!gfx2_sync_publish(adapter->kind, 0, &ctx));
     for (u32 i=0; i<3; i++)
         gfx2_surfs[i+1]=(struct gfx2_surf){.sid=i+1,.owner=as.owner,.w=2,.h=1,.pitch=2,
             .fmt=GFX2_FMT_INDEX8,.state=GFX2_ST_IDLE,.pool=GFX2_POOL_SYSMEM,.kva=pixels[i]};
@@ -98,8 +96,17 @@ void _start(void)
     gfx2_surfs[3].flags=GFX2_SF_ALIAS;
     gfx2_surfs[3].owner=GFX2_OWNER_SCREEN;
     pixels[0][0]=7; pixels[0][1]=8;
-    exercise(&gfx2_surfs[2]);
-    exercise(&gfx2_surfs[3]);
-    SAY("GREEN INDEX8 SYSMEM and SHADOW DISPLAY, including ALPHA mismatch");
+    const GfxBackendV2 *backends[] = {&pegc_backend_v2, &of_fb_v2};
+    const u32 kinds[] = {GFX2_KIND_PEGC, GFX2_KIND_OF_FB};
+    for (u32 i = 0; i < 2; ++i) {
+        *adapter = (struct gfx2_adapter){.be=backends[i], .ctx=backends[i]->ctx,
+            .v1=backends[i]->ctx, .kind=kinds[i], .heads=1, .flags=GFX2_AF_ACTIVE};
+        GfxSyncCtx ctx = {.used=1, .cfg={.mode=GFXSYNC_SHADOW}};
+        CHECK(!gfx2_sync_publish(adapter->kind, 0, &ctx));
+        exercise(&gfx2_surfs[2]);
+        exercise(&gfx2_surfs[3]);
+        CHECK(!gfx2_sync_publish(adapter->kind, 0, NULL));
+    }
+    SAY("GREEN PEGC and OF INDEX8 SYSMEM and SHADOW DISPLAY");
     die(0);
 }
