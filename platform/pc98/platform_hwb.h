@@ -6,6 +6,21 @@
 #include "io.h"
 #include "kdebug/generated/kdebug_import_macros.h"
 
+#include "exec/exec_hwb.h"
+
+static inline u32 platform_hwb_abort_take(void)
+{
+    return exec_hwb_abort_take();
+}
+
+static inline u32 platform_hwb_phys_check(u32 addr, u32 width, u32 bytes)
+{
+    (void)addr;
+    (void)width;
+    (void)bytes;
+    return HW_NOSYS;
+}
+
 static inline u32 platform_hwb_phys(struct hw_req *req)
 {
     struct recover_window window;

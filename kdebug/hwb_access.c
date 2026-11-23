@@ -2,7 +2,6 @@
 #include "hwb_wire.h"
 #include "os32_kapi_shared.h"
 #include "pci_hwb_contract.h"
-#include "exec/exec_hwb.h"
 #include "platform_hwb.h"
 
 static u32 hwb_block(struct hw_block_req *block)
@@ -19,8 +18,20 @@ static u32 hwb_block(struct hw_block_req *block)
 i32 hwb_access(void *buf, u32 size)
 {
     struct hw_req *req = buf;
-    if (!req || size < HW_REQ_BYTES || req->version != HW_VERSION ||
-        size != (HW_IS_BLOCK(req->action) ? HW_BLOCK_REQ_BYTES : HW_REQ_BYTES))
+    if (!req || size < HW_REQ_BYTES || req->version != HW_VERSION) return OS32_ERR_INVAL;
+    if (req->action == HW_PHYS_CHECK) {
+        if (size != HW_RANGE_REQ_BYTES) return OS32_ERR_INVAL;
+        struct hw_range_req *range = buf;
+        u32 width = req->width, bytes = range->bytes;
+        if (req->space != HW_PHYS || (width != 1 && width != 2 && width != 4) ||
+            req->bdf || range->bar || range->offset || req->value || req->status ||
+            (req->addr & (width - 1U)) || !bytes || (bytes & (width - 1U)) ||
+            bytes - 1U > U32_MAX - req->addr) req->status = HW_ARG;
+        else req->status = platform_hwb_phys_check(req->addr, width, bytes);
+        req->value = 0;
+        return 0;
+    }
+    if (size != (HW_IS_BLOCK(req->action) ? HW_BLOCK_REQ_BYTES : HW_REQ_BYTES))
         return OS32_ERR_INVAL;
     if (HW_IS_BLOCK(req->action)) {
         req->status = hwb_block(buf);
@@ -32,7 +43,7 @@ i32 hwb_access(void *buf, u32 size)
     if (status) return 0;
     if (req->action == HW_POINT) {
         if (req->space || req->width || req->bdf || req->addr || value) return 0;
-        req->value = exec_hwb_abort_take();
+        req->value = platform_hwb_abort_take();
         req->status = HW_OK;
         return 0;
     }

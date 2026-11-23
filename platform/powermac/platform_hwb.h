@@ -3,6 +3,19 @@
 
 #include "kdebug/hwb_wire.h"
 
+static inline u32 platform_hwb_abort_take(void)
+{
+    return 0;
+}
+
+static inline u32 platform_hwb_phys_check(u32 addr, u32 width, u32 bytes)
+{
+    (void)addr;
+    (void)width;
+    (void)bytes;
+    return HW_NOSYS;
+}
+
 static inline u32 platform_hwb_phys(struct hw_req *req)
 {
     (void)req;
