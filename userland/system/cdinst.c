@@ -768,6 +768,10 @@ static int install_packages(int choice, const InstTarget *target, const BootImg 
         return PKG_ERR_CORRUPT;
     }
 
+#if PLATFORM_BOOT_AFTER_FILES
+    ret = pm_install_files_verified(api);
+    if (ret) return ret;
+#endif
     if (PLATFORM_BOOT_AFTER_FILES) {
         ret = platform_install_package_boot(api, target, boot->assets, boot->sizes);
         if (ret != 0) return ret;

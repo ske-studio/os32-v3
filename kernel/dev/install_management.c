@@ -31,6 +31,7 @@ static struct reservation units[VFS_DEV_UNIT_MAX];
 static u32 last_handle;
 #if PLATFORM_INSTALL_STAGED_BOOT
 /* Handles are never reused, including after rollback or publication. */
+static u32 verified_generation[VFS_DEV_UNIT_MAX];
 static u32 boot_generation[VFS_DEV_UNIT_MAX];
 
 int install_view_detached(u32 unit)
@@ -43,7 +44,7 @@ int install_view_detached(u32 unit)
         unsigned flags = irq_save();
         if (!rc && !install_transfer_allowed(&pin, 0, 0)) rc = OS32_ERR_STALE;
         if (!rc && units[unit].in_flight != 1) rc = OS32_ERR_BUSY;
-        if (!rc) boot_generation[unit] = pin.generation;
+        if (!rc && verified_generation[unit] == pin.generation) boot_generation[unit] = pin.generation;
         irq_restore(flags);
     }
     install_complete(&pin);
@@ -358,6 +359,20 @@ int install_rescan(u32 handle)
 
 int install_end(u32 handle, u32 outcome)
 {
+#if PLATFORM_INSTALL_STAGED_BOOT
+    if (outcome == INSTALL_FILES_VERIFIED) {
+        if (!exec_disk_write_allowed()) return OS32_ERR_INVAL;
+        unsigned flags = irq_save();
+        struct reservation *r = lookup(handle);
+        int rc = OS32_ERR_STALE;
+        if (r && r->state == VIEW) {
+            verified_generation[r->plan.raw_unit] = handle;
+            rc = 0;
+        }
+        irq_restore(flags);
+        return rc;
+    }
+#endif
     if (!exec_disk_write_allowed() ||
         (outcome != OS32_INSTALL_END_COMMIT && outcome != OS32_INSTALL_END_ABORT))
         return OS32_ERR_INVAL;

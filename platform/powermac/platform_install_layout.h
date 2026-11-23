@@ -35,6 +35,7 @@ typedef struct {
 int pm_install_check_directory(KernelAPI *api, const u32 *sizes);
 int pm_install_stage_package(KernelAPI *api, const char *path, const u32 *offsets, const u32 *sizes);
 void pm_install_release_assets(KernelAPI *api);
+int pm_install_files_verified(KernelAPI *api);
 #define PLATFORM_BOOT_AFTER_FILES 1
 
 #endif

@@ -361,6 +361,11 @@ static int exercise(void)
     if (!ide_write_sectors(UNIT,PM_HFS_START-1,2,sectors) ||
         !ide_write_sectors(UNIT,START-1,2,sectors) ||
         memcmp(before,disk,sizeof(disk))) return 36;
+    if (unmount_for_api("/hd0")) return 50;
+    int early = ide_write_sectors(UNIT,PM_HFS_START,1,sectors);
+    if (memcmp(before+PM_HFS_START*512,disk[PM_HFS_START],PM_HFS_SECTORS*512) || !early)
+        return 51;
+    if (ext2_mount(&mounted,0)) return 52;
     static const char payload[] = "PowerMac reserved view";
     char output[sizeof(payload)];
     u32 ino;
@@ -368,6 +373,7 @@ static int exercise(void)
         ext2_lookup(&mounted,"/marker",&ino) ||
         ext2_read_file(&mounted,ino,output,sizeof(output)) != sizeof(output) ||
         memcmp(output,payload,sizeof(output))) return 15;
+    if (pm_install_files_verified(&api)) return 53;
     int deployed = deploy(&p);
     if (deployed) return deployed;
     kmemcpy(before,disk,sizeof(disk));

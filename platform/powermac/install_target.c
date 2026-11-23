@@ -1,10 +1,16 @@
 #include "include/platform_install_boot.h"
 #include "include/ide_contract.h"
 #include "install_apm.h"
+#include "install_management.h"
 #include "apm.h"
 #include "lib/crc32_core.inc"
 
 static u32 handle;
+
+int pm_install_files_verified(KernelAPI *api)
+{
+    return api->install_end(handle, INSTALL_FILES_VERIFIED);
+}
 
 static u32 map_word(const u8 *p)
 {
