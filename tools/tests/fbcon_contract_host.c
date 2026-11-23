@@ -11,12 +11,7 @@
 
 /* This contract drives ordinary console flips with no borrowed OSRI image. */
 #include "gfx2_bridge_fake.h"
-volatile u32 tick_count;
-const struct gfx_kernel_fb *pm_osri_decoded(unsigned long long *generation)
-{ *generation = 0; return 0; }
-int gfx_osri_poll_abort(int caller) { (void)caller; return 0; }
-int pm_osri_key(void) { return -1; }
-void idle_wait_step(void) { }
+#include "of_fb_osri_fake.h"
 static void finish(int rc) __attribute__((noreturn));
 static void finish(int rc)
 {

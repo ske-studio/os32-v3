@@ -267,7 +267,7 @@ int main(int argc, char **argv, KernelAPI *api)
     }
     if (argc == 2 && !strcmp(argv[1], "osri")) {
         const char *path = "/bin/rows.osr";
-        api->gfx_init();
+        /* The CUI already has a live scanout. gfx_init would clear its marker. */
         int rc = api->gfx_osri_show(path, 2000);
         if (rc == OS32_ERR_NOSYS) return report(api, "OSRI NOSYS\n", 0);
         if (rc != GFX_OSRI_SHOW_DONE ||

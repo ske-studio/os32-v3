@@ -5,6 +5,11 @@
 
 #include "../../drivers/video/of_fb/backend_of_fb.h"
 
+#include "of_fb_osri_fake.h"
+
+void *kmalloc(u32 n) { (void)n; return 0; }
+void kfree(void *p) { (void)p; }
+
 extern const GfxBackendV2 pegc_backend_v2;
 GfxBackend gfx_backend_pegc;
 GfxCounters gfx_counters;
