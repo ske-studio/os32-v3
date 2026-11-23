@@ -24,6 +24,7 @@
 #include "kernel_boot.h"
 #include "kernel_start.h"
 #include "kernel_probe.h"
+#include "hwb_window.h"
 #include "kboot_info.h"
 #include "kboot_report.h"
 #include "via_window.h"
@@ -286,6 +287,7 @@ void platform_boot_machine(void)
         pm_pci_boot(&pci, lan_boot.bdf);
     }
     if (!memory_boot_init(KBOOT_MEM_KB)) kboot_stop("memory_boot_init");
+    pm_hwb_window_init();
 #if KBOOT_SHELL_LAYOUT_DIAG
     shell_layout_report(info);
 #endif

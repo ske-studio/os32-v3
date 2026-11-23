@@ -350,11 +350,12 @@ kdebug: $(KB_OUT)/kdebug.bin
 $(KB_OUT)/diag.o: platform/powermac/module_diag.c
 	@mkdir -p $(@D)
 	$(KB_CC) $(KB_FLAGS) -Ikernel/module -c $< -o $@
-$(KB_OUT)/kdebug.elf: $(KB_OUT)/diag.o $(KB_OUT)/lib/kstring_c.o build/ppc-module.ld sdk/link/generations.ld
+$(KB_OUT)/kdebug.elf: $(KB_OUT)/diag.o $(KB_OUT)/kdebug/hwb_access.o $(KB_OUT)/drivers/pci/pci_hwb.o $(KB_OUT)/lib/kstring_c.o build/ppc-module.ld sdk/link/generations.ld
 	$(PPC_CROSS_DIR)/bin/powerpc-elf-ld --emit-relocs --gc-sections -u kdebug_ops -e kdebug_init -T build/ppc-module.ld $(filter %.o,$^) -o $@
-$(KB_OUT)/kdebug.bin: $(KB_OUT)/kdebug.elf platform/powermac/kdebug_imports.json tools/mkmod.py tools/ppc/module_rela.py tools/module_schema.py sdk/kapi.json sdk/include/os32/os32_generations.h
-	python3 -B tools/mkmod.py --target ppc-powermac --elf $< --metadata platform/powermac/kdebug_imports.json --kapi-abi-gen $(shell python3 -c 'import json; print(json.load(open("sdk/kapi.json"))["version"])') --layout-gen $(shell sed -n 's/^\#define OS32_MEMORY_LAYOUT_GENERATION \([0-9]*\).*/\1/p' sdk/include/os32/os32_generations.h) -o $@
--include $(KB_OUT)/diag.d
+KB_DIAG_METADATA ?= platform/powermac/kdebug_imports.json
+$(KB_OUT)/kdebug.bin: $(KB_OUT)/kdebug.elf $(KB_DIAG_METADATA) tools/mkmod.py tools/ppc/module_rela.py tools/module_schema.py sdk/kapi.json sdk/include/os32/os32_generations.h
+	python3 -B tools/mkmod.py --target ppc-powermac --elf $< --metadata $(KB_DIAG_METADATA) --kapi-abi-gen $(shell python3 -c 'import json; print(json.load(open("sdk/kapi.json"))["version"])') --layout-gen $(shell sed -n 's/^\#define OS32_MEMORY_LAYOUT_GENERATION \([0-9]*\).*/\1/p' sdk/include/os32/os32_generations.h) -o $@
+-include $(KB_OUT)/diag.d $(KB_OUT)/kdebug/hwb_access.d $(KB_OUT)/drivers/pci/pci_hwb.d
 
 %-module deploy-%:
 	@echo 'unsupported product target ppc-powermac: $@' >&2; exit 1

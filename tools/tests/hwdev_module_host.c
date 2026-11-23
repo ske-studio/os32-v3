@@ -2,6 +2,12 @@
 #include "bootinfo_native.h"
 #ifndef HWDEV_REAL_IMAGE
 #include "../../platform/powermac/module_diag.c"
+/* This fixture exercises PROBE, including rejection of unsupported actions. */
+i32 hwb_access(void *buf, u32 size)
+{
+    (void)buf; (void)size;
+    return OS32_ERR_NOSYS;
+}
 #endif
 /* Actual facade + runtime + validator; synthetic M2 or built GF body. */
 #include "../../hwdev/hwdev_module.c"

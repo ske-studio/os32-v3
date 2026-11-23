@@ -3,29 +3,26 @@
 
 #include "kdebug/hwb_wire.h"
 
+#include "diag_slots.h"
+
 static inline u32 platform_hwb_abort_take(void)
 {
-    return 0;
+    return kdebug_import_slots.abort_take();
 }
 
 static inline u32 platform_hwb_phys_check(u32 addr, u32 width, u32 bytes)
 {
-    (void)addr;
-    (void)width;
-    (void)bytes;
-    return HW_NOSYS;
+    return kdebug_import_slots.phys_check(addr, width, bytes);
 }
 
 static inline u32 platform_hwb_phys(struct hw_req *req)
 {
-    (void)req;
-    return HW_NOSYS;
+    return kdebug_import_slots.phys(req);
 }
 
 static inline u32 platform_hwb_block(struct hw_block_req *block)
 {
-    (void)block;
-    return HW_NOSYS;
+    return kdebug_import_slots.block(block);
 }
 
 static inline u32 platform_hwb_io(struct hw_req *req)

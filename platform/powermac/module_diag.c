@@ -2,14 +2,29 @@
 #include "debug_probe_snapshot.h"
 #include "kdebug/probe_validate.h"
 
-/* The loader resolves this typed slot before publishing dbg_call. */
-struct {
-    void (*snapshot)(struct probe_list *);
-} kdebug_import_slots __attribute__((section(".data.kdebug_import_slots")));
+#include "diag_slots.h"
+
+struct pm_diag_slots kdebug_import_slots __attribute__((section(".data.kdebug_import_slots")));
 
 static i32 diag_call(u32 op, void *buf, u32 size)
 {
     struct probe_wire *w = buf;
+    if (op == HW_OP) {
+        struct hw_req *req = buf;
+        if (req && size >= HW_REQ_BYTES && req->version == HW_VERSION && req->action == 7) {
+            if (size != HW_RANGE_REQ_BYTES) return OS32_ERR_INVAL;
+            struct hw_range_req *range = buf;
+            u32 pa = 0;
+            if (req->width != 1 || req->bdf > HW_BDF_MASK || range->bar >= 6 ||
+                (req->space != HW_IO && req->space != HW_PHYS) || !range->bytes ||
+                req->value || req->status) req->status = HW_ARG;
+            else req->status = kdebug_import_slots.bar(req->bdf, range->bar, req->space,
+                req->addr, range->offset, range->bytes, &pa);
+            req->value = req->status == HW_OK ? pa : 0;
+            return 0;
+        }
+        return hwb_access(buf, size);
+    }
     if (op != PROBE_OP) return OS32_ERR_NOSYS;
     if (!w || size != sizeof(*w) || w->version != PROBE_VERSION ||
         w->size != sizeof(*w) || !wire_valid(w)) return OS32_ERR_INVAL;

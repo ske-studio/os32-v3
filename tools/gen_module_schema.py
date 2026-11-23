@@ -37,7 +37,12 @@ def render():
         lines.append('    { \\')
         lines += [f'        .{field} = {policy[field]}U, \\' for field in POLICY_FIELDS]
         lines.append('    }, \\')
-    lines += ['}', '', '#endif', '']
+    positional = [f'id == MODULE_ID_{row["name"]}' for row in COMPONENTS
+                  if row['positional_imports']]
+    # Shared HWDEV declarations feed its ABI CRC; the loader helper is private.
+    lines += ['}', '', '#ifdef MODULE_SCHEMA_IMPORT_VALIDATION',
+              'static inline int module_positional_imports(u32 id)', '{',
+              '    return ' + (' || '.join(positional) or '0') + ';', '}', '#endif', '', '#endif', '']
     return '\n'.join(lines)
 
 

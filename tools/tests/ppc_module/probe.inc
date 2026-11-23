@@ -1,3 +1,5 @@
+/* HWOP_COMMON_DESIGN §2.1: LIST and POINT use the published typed imports. */
+#include "kdebug/hwb_wire.h"
 #include "arch_exec_kapi.h"
 #include "kapi_table.h"
 #include "kstring.h"
@@ -66,6 +68,9 @@ static int probe_modules(void)
     wire = (struct probe_wire){.version = PROBE_VERSION, .size = sizeof(wire),
                                .action = PROBE_CMD_ARM};
     int unsupported = api->kdebug_call(PROBE_OP, &wire, sizeof(wire)) ? -1 : wire.status;
+    struct hw_req point = {.version=HW_VERSION, .action=HW_POINT};
+    int point_rc = api->kdebug_call(HW_OP, &point, sizeof(point));
+    kprintf(KBOOT_ATTR, "[module] point rc=%d status=%u value=%u\n", point_rc, point.status, point.value);
     kprintf(KBOOT_ATTR, "[module] diag state=%u list=%d unsupported=%d\n",
             kdebug.state, list, unsupported);
 

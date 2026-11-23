@@ -4,7 +4,7 @@ CHECK = dict(name='ppc-module-guest', tier=2, needs=[], budget=1200,
             'tools/ppc/**', 'tools/*.py', 'tools/prototypes/sqlite_imports.def', 'Makefile', 'build/**', 'sdk/**', 'arch/ppc/**',
             'kdebug/**', 'platform/powermac/**', 'kernel/**', 'include/**', 'lib/**', 'fs/**', 'mm/**',
             'exec/**', 'init/**', 'input/**', 'gfx/**', 'sound/**', 'drivers/**', 'userland/**', 'net/**', 'kapi/**', 'assets/fonts/**'],
-    basis=['docs/design/platform/powermac/root_pair.md'],
+    basis=['docs/decisions/realhw/HWOP_COMMON_DESIGN.md §2.1', 'docs/design/platform/powermac/root_pair.md'],
     env_limit='Requires mac99 QEMU and loopback sockets for link-sh.')
 
 
