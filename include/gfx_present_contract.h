@@ -13,5 +13,7 @@ void gfx_planar_present_raster(GFX_RasterPalTable *table);
 
 /* present 後の診断。診断のない機種では空で定義する。 */
 void gfx_present_diag(void);
+extern int vram_scroll_y;
+static inline void gfx_scroll_reset_origin(void) { vram_scroll_y = 0; }
 
 #endif

@@ -18,11 +18,11 @@ ROOT = Path(__file__).resolve().parents[2]
 BACKEND = 'drivers/video/of_fb/backend_of_fb.c'
 V2 = 'drivers/video/of_fb/of_fb_v2.c'
 SOURCES = [BACKEND, V2, 'platform/powermac/display_provider.c',
-           'platform/powermac/display_dual.c', 'platform/powermac/display.c']
+           'platform/powermac/display_dual.c', 'platform/powermac/display.c', 'gfx/gfx_scroll.c']
 CHECK = dict(env=['ppc-cross'], name='of-fb-host', tier=1, needs=[], budget=30, covers=[
     'drivers/video/of_fb/backend_of_fb.c', 'drivers/video/of_fb/of_fb_v2.c',
     'platform/powermac/display_provider.c', 'platform/powermac/display_dual.c',
-    'platform/powermac/display.c', 'drivers/video/of_fb/backend_of_fb.h',
+    'gfx/gfx_scroll.c', 'platform/powermac/display.c', 'drivers/video/of_fb/backend_of_fb.h',
     'platform/powermac/platform_display_fallback.h', 'tools/tests/of_fb_host.c',
     'tools/tests/test_of_fb.py', 'tools/tests/host32.py',
     'tools/tests/kernel_includes.py', 'tools/tests/mutpar.py',
@@ -67,12 +67,18 @@ MUTATIONS = (
      'u32 display_provider_display_records(u32 backend) { return backend + 1; }'),
     ('fallback-mode', 'platform/powermac/display_provider.c',
      '    fn(&gfx_backend_unsupported, legacy200);', '    (void)0;'),
-    ('pitch', BACKEND, 'row * fb.pitch + first', 'row * pitch + first'),
+    ('pitch', BACKEND, 'dest_row * fb.pitch + first', 'dest_row * (src ? pitch : fb.width) + first'),
     ('aligned-last-word', BACKEND, 'i < words; i++) dest[i] = aligned[i]',
      'i + 1 < words; i++) dest[i] = aligned[i]'),
     ('surface-connect', V2, 'return surface_copy(c, head, s);\n}\nstatic int shim_flip', '(void)head; (void)s; return 0;\n}\nstatic int shim_flip'),
     ('bound', BACKEND, 'if (right > fb.width) right = fb.width;', 'if (right > fb.width) right = fb.width + 4;'),
-    ('protected-band', BACKEND, 'if (y < (int)fb.protected_rows) y = fb.protected_rows;', 'if (y < 0) y = 0;'),
+    ('protected-band', BACKEND, 'if ((u32)dest_row < fb.protected_rows) continue;', 'if (row < fb.protected_rows) continue;'),
+    ('packed-enter', SOURCES[2], 'if (of_fb_ready() && gfx_is_started()) of_fb_reset_frame();', ''),
+    ('clut-origin', BACKEND, 'if (changed) {', 'if (changed) { origin = 0;'),
+    ('scroll-sign', BACKEND, '(int)row - origin', '((int)row + origin) % (int)fb.height'),
+    ('scroll-shadow', BACKEND, 'origin = y;\n    transfer(0, 0,',
+     'origin = y;\n    transfer(fb.shadow, fb.shadow_pitch,'),
+    ('origin-sync', BACKEND, 'gfx_scroll_reset_origin();', ''),
     ('lost', V2, '!a || a->state != GFX2_AD_OK || !of_fb_ready()', '!a || !of_fb_ready()'),
 )
 
@@ -89,6 +95,7 @@ def observe(folder, mutation=None):
                '-ffreestanding', '-fno-builtin', '-fno-pie', '-no-pie', '-fno-stack-protector',
                '-nostdlib', '-nostdinc', '-static', '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections',
                '-I' + str(ROOT / 'platform/powermac'), '-I' + str(ROOT), *include_flags(ROOT),
+               '-I' + str(ROOT / 'arch/ppc'),
                str(ROOT / 'tools/tests/of_fb_host.c'),
                *(str(ROOT / path) for path in SOURCES),
                str(ROOT / 'gfx/palette.c'), str(ROOT / 'gfx/v2/palette_state.c'), str(ROOT / 'gfx/v2/backend_reg.c'), str(ROOT / 'gfx/v2/caps.c'), str(ROOT / 'gfx/v2/enum.c'), '-o', str(exe)]
@@ -119,10 +126,10 @@ def cross(folder):
                 '-o', str(folder / (profile + '-' + Path(path).stem + '.o'))], check=True)
     disasm = subprocess.check_output([str(cc.with_name('powerpc-elf-objdump')), '-d',
         str(folder / 'sh-backend_of_fb.o')], text=True)
-    copy = disasm.split('<of_fb_copy>:', 1)[1].split('\n\n', 1)[0]
+    copy = disasm.split('<transfer>:', 1)[1].split('\n\n', 1)[0]
     assert not re.search(r'\b(?:stb|stbx|stbu|sth|sthx|sthu)\b', copy), copy
     assert re.search(r'\bstw(?:x)?\b', copy) and re.search(r'\b(?:hwsync|sync)\b', copy), copy
-    print('GREEN PPC -c default/shell/sh (5 units each), word stores + sync', flush=True)
+    print('GREEN PPC -c default/shell/sh (6 units each), word stores + sync', flush=True)
 
 
 def main():

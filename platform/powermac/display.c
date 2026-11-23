@@ -1,6 +1,7 @@
 /* OF keeps its firmware mode and CLUT. Legacy planar ports have no
  * equivalent on PowerMac; packed output is owned by backend_of_fb. */
 #include "display_restore.h"
+#include "drivers/video/of_fb/backend_of_fb.h"
 #include "pm_console.h"
 #include "display_text.h"
 
@@ -12,10 +13,9 @@ void display_palette4_write(int index, u8 r, u8 g, u8 b)
     (void)b;
 }
 
-/* Scrolling is performed in the console shadow. */
 void display_scroll(int y, int height, int flip, int page)
 {
-    (void)y;
+    of_fb_scroll(y);
     (void)height;
     (void)flip;
     (void)page;

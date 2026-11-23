@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """PowerMac typed bindings and link dependencies. ATA_HAL_DESIGN §6-2 P2
 exposes seven raw ATA slots with IDE enabled and keeps geometry absent.
+Scroll uses the existing signed row count (docs/KAPI_SPEC.md, gfx_hardware_scroll).
 """
 # CHECK registration lives in tools/checks/ppc-kapi-binding.py.
 import json
@@ -20,7 +21,7 @@ from kapi_target_ppc import ABSENT_PROVIDER_SLOTS, absent_result
 EXPECTED_ABSENT_SLOTS = frozenset("""
 buz_off buz_on ext2_format ext2_format_at fm_note_off fm_note_on
 fm_play_mml fm_set_tone_num fm_startup_sound
-gfx2_check_op gfx_hardware_scroll gfx_osri_show
+gfx2_check_op gfx_osri_show
 hdd_geom_info ide_drive_present
 ide_get_info ide_identify ide_init ide_read_sector ide_write_sector
 ide_write_sectors ime_dict_info ime_dict_suspend ime_feed_key ime_get_mode
@@ -40,6 +41,7 @@ v86_gdc_capture v86_selftest
 
 # PPC_KAPI_FILL stage 5c, A11. Each wrapper calls the provider of the same name.
 PUBLISHED_GFX = frozenset("""
+gfx_hardware_scroll
 gfx_get_framebuffer gfx_screen_info gfx_hw_fill_rect gfx_hw_blit gfx_stats
 gfx2_mode_set gfx2_flip gfx2_present
 gfx_hw_get gfx_hw_submit gfx_lease_palette
@@ -318,6 +320,8 @@ def generate(tmp, mutation=None, *, link=True, ide=False, fep=False):
         if source.count(anchor) != 1:
             raise RuntimeError('check-op-bound: expected one absent slot')
         helper.write_text(source.replace(anchor, ''))
+    if mutation == 'scroll-absent':
+        insert_group(helper, mutation, "    'scroll_mut': (frozenset({'gfx_hardware_scroll'}), frozenset()),\n")
     if mutation == 'present-absent':
         insert_group(helper, mutation, "    'present_mut': (frozenset({'gfx_present'}), frozenset()),\n")
     if mutation == 'putchar-absent':
@@ -358,9 +362,17 @@ def generate(tmp, mutation=None, *, link=True, ide=False, fep=False):
         if text.count(old) != 1:
             raise RuntimeError(mutation + ': expected one generator anchor')
         generator.write_text(text.replace(old, new))
+    schema = ROOT / 'sdk/kapi.json'
+    if mutation == 'scroll-type':
+        data = json.loads(schema.read_text())
+        slot = next(api for api in data['api'] if api['name'] == 'gfx_hardware_scroll')
+        assert slot['args'] == ['int lines']
+        slot['args'] = ['unsigned int lines']
+        schema = tmp / 'kapi.json'
+        schema.write_text(json.dumps(data))
     out = tmp / 'gen'
     subprocess.run([sys.executable, '-B', str(generator), '--target', 'ppc-powermac',
-                    '--feature-fep', str(int(fep)), '--feature-ide', str(int(ide)), '--feature-link', str(int(link)), '--out-dir', str(out), str(ROOT / 'sdk/kapi.json')], cwd=ROOT, check=True,
+                    '--feature-fep', str(int(fep)), '--feature-ide', str(int(ide)), '--feature-link', str(int(link)), '--out-dir', str(out), str(schema)], cwd=ROOT, check=True,
                    stdout=subprocess.DEVNULL)
     return out
 
@@ -466,9 +478,13 @@ def main():
             return 1
         (tmp / 'link').mkdir()
         linked = generate(tmp / 'link', ide=True)
-        for header in ('os32_kapi_slots.h', 'os32_kapi_generated.h'):
+        x86 = tmp / 'x86'
+        subprocess.run([sys.executable, '-B', str(ROOT / 'sdk/gen_kapi.py'),
+                        '--target', 'x86-pc98', '--out-dir', str(x86), str(ROOT / 'sdk/kapi.json')],
+                       cwd=ROOT, check=True, stdout=subprocess.DEVNULL)
+        for header in ('os32_kapi_slots.h', 'os32_kapi_generated.h', 'os32_generations.h'):
             path = Path('sdk/include/os32') / header
-            if any((profile / path).read_bytes() != (ROOT / path).read_bytes() for profile in (out, linked)):
+            if any((profile / path).read_bytes() != (ROOT / path).read_bytes() for profile in (x86, out, linked)):
                 print('target ABI mismatch:', header)
                 return 1
         source = (out / 'kapi/kapi_generated.c').read_text()
@@ -546,7 +562,7 @@ def main():
             return 1
         if '--mutate' in sys.argv:
             check_planar_link(tmp, cc, dirs)
-            for mutation in ('empty', 'zero', 'group-empty', 'ime-empty', 'reboot-absent', 'kdebug-absent', 'slot-swap', 'present-absent', 'gfx2-present-absent', 'check-op-bound', 'pci-absent', 'mem-absent', 'db-absent'):
+            for mutation in ('empty', 'zero', 'group-empty', 'ime-empty', 'reboot-absent', 'kdebug-absent', 'slot-swap', 'scroll-type', 'scroll-absent', 'present-absent', 'gfx2-present-absent', 'check-op-bound', 'pci-absent', 'mem-absent', 'db-absent'):
                 path = tmp / mutation
                 path.mkdir()
                 mutated = generate(path, mutation, link=False)

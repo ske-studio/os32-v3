@@ -1,5 +1,7 @@
 #include "backend_of_fb.h"
 #include "kstring.h"
+#include "pgalloc.h"
+#include "gfx_present_contract.h"
 #include "gfx/palette.h"
 
 static struct of_fb_desc fb;
@@ -7,11 +9,39 @@ static GfxMode mode;
 static int live;
 static u8 scan_index[256];
 static int remapped;
+/* Private logical INDEX8 image. Keep this full frame outside the kernel heap
+ * shared with the resident font and its decompression buffer. */
+static u8 *saved;
+static unsigned saved_pages;
+static int origin;
+static void transfer(const u8 *src, u32 pitch, int x, int y, int w, int h);
+
+static void reset_origin(void)
+{
+    origin = 0;
+    gfx_scroll_reset_origin();
+}
+
+void of_fb_reset_frame(void)
+{
+    reset_origin();
+    kmemset(saved, 0, fb.width * fb.height);
+    transfer(0, 0, 0, 0, fb.width, fb.height);
+}
+
+void of_fb_scroll(int y)
+{
+    if (!live || origin == y) return;
+    origin = y;
+    transfer(0, 0, 0, 0, fb.width, fb.height);
+}
 
 int of_fb_ready(void) { return live; }
 void of_fb_unbind(void)
 {
     live = 0;
+    if (saved) pgalloc_free_n_owner(LEDGER_OWNER_KERNEL, V2P(saved) / PAGE_SIZE, saved_pages);
+    saved = 0;
     fb = (struct of_fb_desc){0};
     gfx_backend_of_fb.bb_base = 0;
     gfx_backend_of_fb.bb_size = 0;
@@ -29,6 +59,12 @@ int of_fb_bind(const struct of_fb_desc *d)
         (d->pitch & 3) || d->pitch < d->width ||
         d->shadow_pitch < d->width || d->height > d->bytes / d->pitch ||
         d->height > d->shadow_bytes / d->shadow_pitch) return OS32_ERR_INVAL;
+    /* Both dimensions are bounded to 16 bits above. */
+    u32 pfn;
+    saved_pages = 1 + (d->width * d->height - 1) / PAGE_SIZE;
+    if (!pgalloc_alloc_n_owner(LEDGER_OWNER_KERNEL, saved_pages, MEM_POOL_BASE / PAGE_SIZE,
+            pgalloc_arena_end(), LEDGER_TOP_DOWN, &pfn)) return OS32_ERR_NOSPC;
+    saved = P2V(pfn * PAGE_SIZE);
     fb = *d;
     for (int i = 0; i < 256; i++) scan_index[i] = i;
     remapped = 0;
@@ -38,26 +74,37 @@ int of_fb_bind(const struct of_fb_desc *d)
     gfx_backend_of_fb.bb_pitch = d->shadow_pitch;
     gfx_backend_of_fb.bb_size = d->shadow_bytes;
     gfx_backend_of_fb.mode_count = 1;
+    of_fb_reset_frame();
     live = 1;
     return 0;
 }
-int of_fb_copy(const u8 *src, u32 pitch, u32 bytes, int x, int y, int w, int h)
+static int validate_source(const u8 *src, u32 pitch, u32 bytes)
 {
     if (!live) return OS32_ERR_STALE;
     if (!src || src == fb.display || pitch < fb.width ||
         fb.height > bytes / pitch) return OS32_ERR_INVAL;
-    if (w <= 0 || h <= 0 || x >= (int)fb.width || y >= (int)fb.height) return 0;
+    return 0;
+}
+
+static void transfer(const u8 *src, u32 pitch, int x, int y, int w, int h)
+{
+    if (w <= 0 || h <= 0 || x >= (int)fb.width || y >= (int)fb.height) return;
     /* Clip without signed overflow for arbitrary v1 rectangles. */
     long long right = (long long)x + w, bottom = (long long)y + h;
-    if (right <= 0 || bottom <= 0) return 0;
+    if (right <= 0 || bottom <= 0) return;
     if (x < 0) x = 0;
-    if (y < (int)fb.protected_rows) y = fb.protected_rows;
+    if (y < 0) y = 0;
     if (right > fb.width) right = fb.width;
     if (bottom > fb.height) bottom = fb.height;
     u32 first = (u32)x & ~3u, end = ((u32)right + 3) & ~3u;
     for (u32 row = y; row < (u32)bottom; row++) {
-        const u8 *source = src + row * pitch + first;
-        volatile u32 *dest = (volatile u32 *)(fb.display + row * fb.pitch + first);
+        u8 *indices = saved + row * fb.width + first;
+        if (src) kmemcpy(indices, src + row * pitch + first, end - first);
+        int dest_row = (int)row - origin;
+        if (dest_row < 0) dest_row += fb.height;
+        if ((u32)dest_row < fb.protected_rows) continue;
+        const u8 *source = indices;
+        volatile u32 *dest = (volatile u32 *)(fb.display + dest_row * fb.pitch + first);
         u32 words = (end - first) / sizeof(u32);
         /* Include adjacent shadow pixels at the two edge words. Native loads
          * and stores preserve the byte order on both endian CPUs. bind ensures
@@ -81,9 +128,25 @@ int of_fb_copy(const u8 *src, u32 pitch, u32 bytes, int x, int y, int w, int h)
                 dest[i] = word;
             }
         }
+        gfx_counters.present_bytes += (end - first);
     }
-    if (bottom > y) gfx_counters.present_bytes += (end - first) * ((u32)bottom - (u32)y);
     __sync_synchronize();
+}
+
+int of_fb_copy(const u8 *src, u32 pitch, u32 bytes, int x, int y, int w, int h)
+{
+    int rc = validate_source(src, pitch, bytes);
+    if (rc) return rc;
+    transfer(src, pitch, x, y, w, h);
+    return 0;
+}
+
+int of_fb_replace(const u8 *src, u32 pitch, u32 bytes)
+{
+    int rc = validate_source(src, pitch, bytes);
+    if (rc) return rc;
+    reset_origin();
+    transfer(src, pitch, 0, 0, fb.width, fb.height);
     return 0;
 }
 static int query(GFX_ScreenInfo *out)
@@ -118,7 +181,7 @@ int of_fb_palette(int first, int count, const u8 *rgb)
     if (!fb.clut) return OS32_ERR_NOSYS;
     if (!rgb || first < 0 || first >= 256 ||
         count <= 0 || count > 256 - first) return OS32_ERR_INVAL;
-    /* Changing the mapping repaints the shadow, so use the same ownership
+    /* Changing the mapping repaints the committed image, so use the same ownership
      * and generation check as a public present. */
     if (!fb.palette_allowed || !fb.palette_allowed()) return OS32_ERR_BUSY;
     int changed = 0;
@@ -137,7 +200,11 @@ int of_fb_palette(int first, int count, const u8 *rgb)
         scan_index[i] = best;
         changed = 1;
     }
-    return changed ? of_fb_present(0, 0, fb.width, fb.height) : 0;
+    if (changed) {
+        transfer(0, 0, 0, 0, fb.width, fb.height);
+        gfx_counters.commits++;
+    }
+    return 0;
 }
 static void palette(int first, int count, const u8 *rgb)
 {

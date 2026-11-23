@@ -20,7 +20,6 @@ PROVIDER_GROUPS = {
     'sys': (frozenset({'buz_on', 'buz_off'}), frozenset([])),
     'surface': (frozenset(), frozenset([])),
     'gfx': (frozenset({
-        'gfx_hardware_scroll',
         'gfx_osri_show',
     }), frozenset()),
     'sound': (frozenset({
