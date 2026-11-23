@@ -11,6 +11,7 @@
 
 unsigned ata_write_provider_calls;
 int ata_payload_phase;
+unsigned ata_write_commands;
 
 enum { ROOT_LENGTH = 4000, WRITE_CAPACITY = PM_ROOT_START + ROOT_LENGTH };
 
@@ -71,7 +72,9 @@ static void ata_write_report(int child)
     for (unsigned i = 0; i < 1024; ++i)
         payload[1+i] = i * 37 + (i >> 8) + 13;
     int one = api->ide_write_sector(0, 96, payload + 1);
+    ata_write_commands = 0;
     int many = api->ide_write_sectors(0, 64, 2, payload + 1);
+    kprintf(7, "ATA-TEST commands=%u\r\n", ata_write_commands);
     int range = api->ide_write_sectors(0, PM_ROOT_START-1, 2, payload + 1);
     kprintf(7, "ATA-TEST writes=%d,%d range=%d\r\n", one, many, range);
     for (unsigned n = 0; n < 3; ++n) {

@@ -62,10 +62,10 @@ int ide_install_read_many(u32 u, u32 lba, u32 n, void *out)
     return 0;
 }
 int ide_install_read(u32 u, u32 lba, void *out) { return ide_install_read_many(u,lba,1,out); }
-int ide_install_write(u32 u, u32 lba, const void *in)
+int ide_install_write(u32 u, u32 lba, u32 count, const void *in)
 {
-    if (u != UNIT || !ide_range_ok(u,lba,1)) return -1;
-    kmemcpy(disk[lba], in, 512);
+    if (u != UNIT || !ide_range_ok(u,lba,count)) return -1;
+    kmemcpy(disk[lba], in, count * 512);
     ++writes;
     return 0;
 }
@@ -78,8 +78,7 @@ int ide_write_sectors(int u, u32 lba, u32 n, const void *in)
     int rc = install_raw_io(&a,u,lba,n,0,in,1,&handled);
     if (handled) return rc;
     install_complete(&a);
-    for (u32 i = 0; i < n; ++i) if (ide_install_write(u,lba+i,(const u8 *)in+i*512)) return -1;
-    return 0;
+    return ide_install_write(u,lba,n,in);
 }
 void kprintf(u8 color, const char *format, ...) { (void)color; (void)format; }
 u32 ext2_current_time(void) { return 0; }

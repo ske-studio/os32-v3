@@ -24,7 +24,7 @@ MUTATIONS = [
     ('if (install_transfer_allowed(a, 0, 0)) return 0;',
      'if (install_transfer_allowed(a, 0, 0)) { irq_restore(*flags); return 0; }'),
     ('pin->unit = unit;\n            r->in_flight++;\n            rc = 1;', 'pin->unit = unit; rc = 0;'),
-    ('if (issued.phase == VIEW &&', 'if (0 && issued.phase == VIEW &&'),
+    ('if (rc && issued.phase == VIEW &&', 'if (0 && issued.phase == VIEW &&'),
     ('r->owner == res_owner_get()) {\n        const InstallPlanV1', '1) {\n        const InstallPlanV1'),
     ('count <= length - (lba - start)', 'count <= length - (lba - start) + 1'),
     ('if (outcome == OS32_INSTALL_END_COMMIT) return inspect(handle, 1);',

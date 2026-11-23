@@ -388,10 +388,10 @@ int ide_install_read_many(u32 unit, u32 lba, u32 count, void *sectors)
     return ide_request(unit, lba, count, sectors, 0);
 }
 
-int ide_install_write(u32 unit, u32 lba, const void *sector)
+int ide_install_write(u32 unit, u32 lba, u32 count, const void *sectors)
 {
     if (unit >= IDE_MAX_DRIVES) return IDE_ERR_RANGE;
-    return ide_write_one(unit, lba, sector);
+    return ide_request(unit, lba, count, 0, sectors);
 }
 
 int ide_install_flush(u32 unit)
