@@ -106,6 +106,12 @@ struct usb_hc_ops {
     u16 (*frame)(struct usb_hc *);
     int (*rh_port)(struct usb_hc *, u8 port, u8 op, u32 *st);
 };
+/* Firmware values captured by early OHCI handoff, before the first bus reset. */
+struct ohci_firmware {
+    u32 rha;
+    u16 fi;
+    u8 rwc, valid;
+};
 struct usb_hc {
     const struct usb_hc_ops *ops;
     volatile void *regs;
@@ -125,6 +131,7 @@ struct usb_hc {
     u8 explored; /* First root-port scan has completed (§4-4-1 P0). */
     struct usb_explore explore;
     struct usb_dma dma[USB_HC_DMA_MAX];
+    struct ohci_firmware firmware;
 };
 struct usb_iface {
     u8 num, alt, src, attached; /* Clear attached before teardown/gone. */

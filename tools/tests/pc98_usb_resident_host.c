@@ -56,7 +56,9 @@ int usbp_mmio_map(const struct usb_pci_fn *f, u32 bar, volatile void **va)
     if (f->dev != 13 || bar) bad++;
     maps++;
     if (fail_map) return -1;
-    regs[OHCI_CONTROL/4] = OHCI_CTL_IR;
+    regs[OHCI_CONTROL/4] = OHCI_CTL_IR | OHCI_CTL_RWC;
+    regs[OHCI_FM_INTERVAL/4] = 11801 + f->fn;
+    regs[OHCI_RH_DESCRIPTOR_A/4] = OHCI_RHA_PSM | (3 - f->fn);
     regs[OHCI_COMMAND_STATUS/4] = regs[OHCI_INTERRUPT_DISABLE/4] = 0;
     *va = regs;
     return 0;
@@ -70,7 +72,7 @@ void usbp_udelay(u32 us)
 int usbp_cfg_cmd(const struct usb_pci_fn *f, u16 set, u16 clear)
 {
     (void)f;
-    if (clear == PCI_CMD_BUS_MASTER && regs[OHCI_CONTROL/4] == OHCI_CTL_RESET &&
+    if (clear == PCI_CMD_BUS_MASTER && regs[OHCI_CONTROL/4] == (OHCI_CTL_RWC | OHCI_CTL_RESET) &&
         regs[OHCI_INTERRUPT_DISABLE/4] == (unsigned)OHCI_INTR_ALL &&
         regs[OHCI_COMMAND_STATUS/4] == OHCI_CMD_OCR) return 0;
     return set == PCI_CMD_MEM_ENABLE && !clear ? 0 : -1;
@@ -151,6 +153,9 @@ int irq_unregister(unsigned irq, irq_handler_fn fn, void *arg)
 static int start(struct usb_hc *hc)
 {
     starts++;
+    if (!hc->firmware.valid || !hc->firmware.rwc ||
+        hc->firmware.fi != 11801 + hc->pci.fn ||
+        hc->firmware.rha != (OHCI_RHA_PSM | (3u - hc->pci.fn))) bad++;
     if (fail_start) return -USB_E_HC;
     hc->state = HC_RUNNING;
     if (hc->has_irq != (hc->pci.irq == 5)) bad++;
