@@ -10,7 +10,13 @@ ifeq ($(wildcard $(FEP_OUT)/fep_imports.d),)
 $(FEP_GEN): fep-missing-depfile
 endif
 
-$(FEP_GEN) &: tools/gen_sqlite_imports.py tools/gen_kdebug_imports.py tools/module_schema.py sdk/kapi.json tools/prototypes/fep_imports.def build/fep-common.mk
+FEP_GEN_INPUTS := tools/gen_sqlite_imports.py tools/gen_kdebug_imports.py tools/module_schema.py sdk/kapi.json tools/prototypes/fep_imports.def build/fep-common.mk
+# CI restores build/out from caches with fresh mtimes, so a stale generated
+# header can look newer than its inputs. Key the outputs on the inputs' content.
+FEP_GEN_SUM := $(shell cat $(FEP_GEN_INPUTS) 2>/dev/null | sha256sum | cut -c1-16)
+$(FEP_OUT)/fep_inputs.$(FEP_GEN_SUM):
+	@mkdir -p $(@D) && rm -f $(@D)/fep_inputs.* && touch $@
+$(FEP_GEN) &: $(FEP_GEN_INPUTS) $(FEP_OUT)/fep_inputs.$(FEP_GEN_SUM)
 	python3 tools/gen_sqlite_imports.py --module fep --target $(ARCH)-$(PLATFORM) --out-dir $(FEP_OUT) --depfile $(FEP_OUT)/fep_imports.d
 
 -include $(wildcard $(FEP_OUT)/fep_imports.d)
