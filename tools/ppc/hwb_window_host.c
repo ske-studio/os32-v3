@@ -6,6 +6,7 @@
 #include "kdebug/hwb_wire.h"
 
 static u32 leaves[2], effective[2], irq = PPC_MSR_EE;
+static int stale_restore;
 static u32 writes, calls, stores, fail_at, order[8], guard, phys[4];
 static void quit(u32 rc) __attribute__((noreturn));
 static void quit(u32 rc)
@@ -28,6 +29,7 @@ int paging_pte_restore(u32 va, u32 raw)
     order[writes++] = i;
     leaves[i] = raw;
     if (writes == fail_at) return -1;
+    if (writes == 3 && stale_restore && fail_at == 0) return 0;
     effective[i] = raw;
     return 0;
 }
@@ -75,8 +77,10 @@ void _start(void)
     REQUIRE(pm_hwb_window_transfer(0xaffc,4,0,1,3,1,&v) == HW_OK);
     REQUIRE(calls==1 && stores==3 && phys[0]==15 && phys[1]==16 && phys[2]==17);
     writes = 0;
-    fail_at = 3;
+    stale_restore = STALE_RESTORE;
+    fail_at = stale_restore ? 0 : 3;
     REQUIRE(pm_hwb_window_transfer(0xaffc,4,0,1,3,1,&v) == HW_WINDOW);
+    REQUIRE(!leaves[0] && !leaves[1] && irq == PPC_MSR_EE);
     REQUIRE(writes==6 && order[2]==1 && order[3]==0 && !effective[0] && !effective[1]);
     REQUIRE(pm_hwb_window_transfer(0xaffc,4,0,1,3,1,&v) == HW_WINDOW);
     REQUIRE(calls==2 && stores==6 && writes==6 && irq == PPC_MSR_EE);

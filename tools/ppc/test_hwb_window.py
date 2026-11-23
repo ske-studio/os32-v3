@@ -10,13 +10,13 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def host(work, source, expected):
+def host(work, source, expected, stale=False):
     path = work / 'window.c'
     path.write_text(source)
     exe = work / 'host'
     subprocess.run(['gcc', '-m32', '-nostdlib', '-nostdinc', '-ffreestanding',
                     '-static', '-fno-pie', '-no-pie', '-O2', '-Wall', '-Werror',
-                    '-I.', '-Iinclude', '-Iarch/ppc', '-Iplatform/powermac',
+                    f'-DSTALE_RESTORE={int(stale)}', '-I.', '-Iinclude', '-Iarch/ppc', '-Iplatform/powermac',
                     path, 'tools/ppc/hwb_window_host.c', '-o', exe], cwd=ROOT, check=True)
     rc = subprocess.run(['qemu-i386', exe]).returncode
     assert rc == expected, (rc, expected)
@@ -52,6 +52,7 @@ def main():
         subprocess.run(['qemu-i386', exe], check=True)
         labels(work)
         host(work, source, 0)
+        host(work, source, 0, stale=True)
         if args.mutate:
             anchor = 'if (!install(va, raw)) goto cleanup;'
             assert source.count(anchor) == 1
@@ -64,6 +65,13 @@ def main():
             expected, = (i for i,line in enumerate(lines,1) if 'REQUIRE(!calls && !stores' in line)
             host(work, source.replace(anchor, anchor + '\n' + early), expected)
             print('RED store before second map')
+            anchor = '!install(PPC_HWB_WINDOW_VA + used * PAGE_SIZE, saved[used])'
+            assert source.count(anchor) == 1
+            unchecked = anchor.replace('!install', 'paging_pte_restore')
+            start, = (i for i,line in enumerate(lines) if 'fail_at = stale_restore' in line)
+            assert '== HW_WINDOW' in lines[start + 1]
+            host(work, source.replace(anchor, unchecked), start + 2, stale=True)
+            print('RED stale translation after successful restore')
     print('PPC transfer labels and host window transactions PASS')
 
 

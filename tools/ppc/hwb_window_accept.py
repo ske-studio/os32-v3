@@ -26,8 +26,9 @@ def build(out, mutant):
     injection = '''
     extern volatile u32 hwb_inject;
     if (hwb_inject) {
+        u32 page = hwb_inject - 1;
         hwb_inject = 0;
-        if (paging_pte_restore(PPC_HWB_WINDOW_VA + PAGE_SIZE, 0)) arch_cpu_stop();
+        if (paging_pte_restore(PPC_HWB_WINDOW_VA + page * PAGE_SIZE, 0)) arch_cpu_stop();
     }
 '''
     source = substitute(source, point, injection + point)
@@ -39,10 +40,10 @@ def build(out, mutant):
     source = (ROOT / trap).read_text()
     point = '            f->srr0 = probe.resume;'
     source = substitute(source, point, '''            if (probe.data == PROBE_TRANSFER) {
-                extern volatile u32 hwb_observed[];
-                hwb_observed[9] = f->srr0;
-                hwb_observed[10] = f->dar;
-                hwb_observed[11] = probe.resume;
+                extern volatile u32 hwb_case, hwb_observed[3][13];
+                hwb_observed[hwb_case][9] = f->srr0;
+                hwb_observed[hwb_case][10] = f->dar;
+                hwb_observed[hwb_case][11] = probe.resume;
             }
 ''' + point)
     (out / 'trap.c').write_text(source)
@@ -59,11 +60,16 @@ def observe(media, out, mutant):
     try:
         s.start()
         s.wait(s.ready, 'shell prompt after DSI cleanup', 60)
-        expected = [0 if mutant else 4, 0, 0, 0, 17, 91, 91, 0, 17,
-                    s.symbols['ppc_hwb_write32_insn'], 0xfe401000,
-                    s.symbols['ppc_hwb_write32_resume']]
-        actual = [s.word('hwb_observed', i*4) for i in range(len(expected))]
-        assert actual == expected, (actual, expected)
+        for case, op in enumerate(('write32', 'read32', 'write32')):
+            block = case == 0
+            first = 17 if block else 91
+            expected = [0 if mutant else 4, 0, 0, 0, first, 91, 91, 0, first,
+                        s.symbols[f'ppc_hwb_{op}_insn'],
+                        0xfe401000 if block else 0xfe400ffc,
+                        s.symbols[f'ppc_hwb_{op}_resume'], 0 if case == 1 else 17]
+            actual = [s.word('hwb_observed', (case * 13 + i) * 4)
+                      for i in range(len(expected))]
+            assert actual == expected, (op, actual, expected)
         assert rsh_command(s, 'echo hwb-ready').strip() == b'hwb-ready'
         s.wait(s.ready, 'next shell prompt')
     finally:
