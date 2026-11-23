@@ -357,7 +357,9 @@ int install_admit(struct install_access *a, u32 unit, enum install_op op,
     struct reservation *r = &units[unit];
     unsigned flags = irq_save();
     int rc = OS32_ERR_BUSY;
-    if (r->state == AVAILABLE || (r->state == RAW_ONLY && op == INSTALL_READ))
+    const struct install_medium *m = platform_install_medium();
+    if ((r->state == AVAILABLE && (op != INSTALL_WRITE || !m || !m->requires_raw_reservation)) ||
+        (r->state == RAW_ONLY && op == INSTALL_READ))
         rc = 0;
     else if ((r->state == ACTIVE || r->state == FORMATTING || r->state == TABLE_READY || r->state == VIEW) && r->owner == res_owner_get()) {
         const InstallPlanV1 *p = &r->plan;

@@ -9,7 +9,7 @@
 #include "lib/crc32.h"
 #include "kstring.h"
 
-enum { UNIT = 1, SECTORS = 4096, START = 64, LENGTH = 4000 };
+enum { UNIT = 1, SECTORS = PM_ROOT_START+4032, START = PM_ROOT_START, LENGTH = 4000 };
 static u8 disk[SECTORS][512], before[sizeof(disk)], pool[256*1024];
 static u32 used, writes;
 static int owner = 1, allowed = 1;
@@ -132,8 +132,8 @@ static int existing_apm(InstallPlanV1 p, Device *old_view, u32 previous)
 static int exercise(void)
 {
     InstallPlanV1 p = {.version=1, .size=128, .raw_unit=UNIT, .sector_bytes=512,
-        .capacity=SECTORS, .original_table_sectors=2, .map={1,1,3,1},
-        .boot_hfs={2,4,60,2}, .root_ext2={3,START,LENGTH,3}, .lba0_sectors=1};
+        .capacity=SECTORS, .original_table_sectors=2, .map={1,1,PM_MAP_SECTORS,1},
+        .boot_hfs={2,PM_HFS_START,PM_HFS_SECTORS,2}, .root_ext2={3,START,LENGTH,3}, .lba0_sectors=1};
     u32 handle = 0;
     struct install_identity id;
     const struct install_medium *m = platform_install_medium();
@@ -141,6 +141,14 @@ static int exercise(void)
     p.serial_crc = id.serial_crc;
     p.original_table_crc = crc32_calc(disk,1024);
     pm_format_register();
+    u8 sectors[1024] = {91};
+    int single = ide_write_sectors(UNIT,1,1,sectors);
+    int multi = ide_write_sectors(UNIT,START,2,sectors);
+    int format = ext2_format_at(UNIT,START,LENGTH);
+    if (memcmp(before,disk,sizeof(disk)) || writes || !single || !multi || !format) return 28;
+    p.boot_hfs.sectors = 60;
+    if (!install_begin(&p,&handle) || handle || writes) return 29;
+    p.boot_hfs.sectors = PM_HFS_SECTORS;
     disk[SECTORS-1][500] = 43;
     if (!install_begin(&p,&handle) || handle || writes) return 2;
     disk[SECTORS-1][500] = 0;
@@ -181,6 +189,13 @@ static int exercise(void)
     u32 unit,physical,generation;
     if (m->resolve(registered,2,1,&unit,&physical,&generation) != 1 ||
         unit != UNIT || physical != START+2 || generation != handle) return 14;
+    /* The same sector is writable through the published partition only. */
+    u32 last = LENGTH-1;
+    if (dev_blk_write_lba(registered,last,1,sectors) ||
+        memcmp(disk[START+last],sectors,512)) return 30;
+    kmemcpy(before,disk,sizeof(disk));
+    if (!ide_write_sectors(UNIT,START+last,1,sectors+512) ||
+        memcmp(before,disk,sizeof(disk))) return 31;
     return existing_apm(p,registered,handle);
 }
 void _start(void)

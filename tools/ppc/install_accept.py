@@ -68,7 +68,16 @@ def build(out, case):
     return build_media(out, '-j8', *settings)
 
 
-def runtime(media, out, case):
+class RejectedMutation(AssertionError):
+    pass
+
+
+def require_case(condition, label):
+    if not condition:
+        raise RejectedMutation(label)
+
+
+def runtime(media, out):
     disk = out/'blank.raw'
     with disk.open('wb') as f:
         f.truncate(20 * 1024 * 1024)
@@ -85,19 +94,19 @@ def runtime(media, out, case):
             s.wait(lambda: s.word('install_banners') == i and s.word('exec_nest_level') == 1,
                    'installer returned '+path, 30)
             assert s.word('install_kind') == kind
-            assert s.word('install_auth') == int(i < 3 or case == 'path')
+            require_case(s.word('install_auth') == int(i < 3), 'path')
             assert disk.read_bytes() == original
         s.keys('hdprep 8\n')
         s.wait(lambda: "Type 'yes'" in s.screen('confirm'), 'hdprep confirmation', 30)
         s.keys('yes\n')
-        expected = f"Range checks start={int(case == 'start')} length={int(case == 'length')}"
-        s.wait(lambda: expected in s.screen('range'), expected, 120)
+        s.wait(lambda: 'Range checks start=' in s.screen('range'), 'range results', 120)
+        report = s.screen('range')
         assert s.word('install_banners') == 4
-        assert s.word('owner_accepted') == int(case == 'owner')
-        if case in ('start', 'length', 'owner'):
-            assert disk.read_bytes() != original
-            return
-        assert disk.read_bytes() == original
+        unchanged = disk.read_bytes() == original
+        require_case(s.word('owner_accepted') == 0, 'owner')
+        require_case('Range checks start=0' in report, 'start')
+        require_case('length=0' in report, 'length')
+        assert unchanged
         s.key('ret')
         s.wait(lambda: 'hdprep: verified ext2' in s.screen('verified'), 'mount/write/read/end', 90)
         data = disk.read_bytes()
@@ -123,7 +132,14 @@ def main():
             hashes.add(digest)
             print(case, digest, flush=True)
             if not args.build_only:
-                runtime(media, out, case)
+                try:
+                    runtime(media, out)
+                except RejectedMutation as error:
+                    if str(error) != case:
+                        raise
+                    print(case, 'runtime RED', flush=True)
+                else:
+                    assert case == 'normal', f'{case} survived'
     print(f'PPC install {"build-only" if args.build_only else "runtime"} OK ({len(hashes)} images)')
 
 

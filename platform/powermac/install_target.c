@@ -33,7 +33,7 @@ static int inspect(KernelAPI *api, HdprepGeom *g)
         .capacity = info.total_sectors, .sector_bytes = 512, .original_table_sectors = 2,
         .original_table_crc = crc32_core_final(crc),
         .serial_crc = crc32_core_final(crc32_core_update(CRC32_INIT, info.serial, IDE_SERIAL_LEN)),
-        .map = {1, 1, 63, 1}, .boot_hfs = {2, 64, 16384, 2}, .lba0_sectors = 1
+        .map = {1, 1, PM_MAP_SECTORS, 1}, .boot_hfs = {2, PM_HFS_START, PM_HFS_SECTORS, 2}, .lba0_sectors = 1
     };
     return 0;
 }

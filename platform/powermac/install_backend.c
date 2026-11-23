@@ -125,6 +125,10 @@ static int validate(const InstallPlanV1 *p, int retry, u32 *changed)
     if (t->sector) kfree(t->sector);
     *t = (struct approved_table){0};
     int fresh = p->original_table_sectors == 2;
+    if (fresh && (p->map.sectors != PM_MAP_SECTORS || p->boot_hfs.entry != 2 ||
+                  p->boot_hfs.start_lba != PM_HFS_START || p->boot_hfs.sectors != PM_HFS_SECTORS ||
+                  p->root_ext2.start_lba != PM_ROOT_START || p->root_ext2.entry != 3))
+        return OS32_ERR_INVAL;
     t->count = fresh ? 4 : p->original_table_sectors;
     if (p->boot_hfs.entry >= t->count || p->root_ext2.entry >= t->count ||
         t->count-1 > p->map.sectors || p->lba0_sectors != (u32)fresh)
@@ -245,6 +249,7 @@ void pm_format_register(void)
 const struct install_medium *platform_install_medium(void)
 {
     static const struct install_medium ops = {
+        .requires_raw_reservation = 1, .is_view = pm_install_is_view,
         .identify = identify, .validate = validate, .changed_lba = changed_lba,
         .check_table = check_table, .view_unit = pm_install_view_unit,
         .resolve = pm_install_resolve, .read = ide_install_read, .write = ide_install_write,

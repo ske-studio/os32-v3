@@ -28,7 +28,16 @@ static int view_write(Device *dev, int offset, int count, const void *buf)
     u32 lba;
     if (!writable || dev != current) return IDE_ERR_RANGE;
     int rc = view_lba(dev, (u32)offset, count, &lba);
-    return rc ? rc : ide_write_sectors(dev->bus_id, lba, count, buf);
+    if (rc) return rc;
+#if OS32_FEATURE_IDE
+    for (int i = 0; i < count; ++i) {
+        rc = ide_install_write(dev->bus_id, lba+i, (const u8 *)buf+i*512);
+        if (rc) return rc;
+    }
+    return 0;
+#else
+    return ide_write_sectors(dev->bus_id, lba, count, buf);
+#endif
 }
 
 static Device view = {
@@ -73,6 +82,11 @@ int pm_install_view_unit(unsigned logical, u32 *unit)
     if (logical || !current || dev_find("hd0") != current) return 0;
     *unit = current->bus_id;
     return 1;
+}
+
+int pm_install_is_view(Device *dev)
+{
+    return dev == current;
 }
 
 int pm_install_resolve(Device *dev, u32 lba, u32 count, u32 *unit,

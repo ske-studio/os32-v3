@@ -260,7 +260,7 @@ static int dev_managed_transfer(Device *dev, u32 lba, int count, void *dst,
         if (mapped < 0) return mapped;
         if (mapped) {
             int handled;
-            if (generation)
+            if (generation || (medium->is_view && medium->is_view(dev)))
                 rc = install_view_io(&access, unit, generation, physical, count, dst, src, &handled);
             else rc = install_raw_io(&access, unit, physical, count, dst, src, writing, &handled);
             if (handled) return rc;

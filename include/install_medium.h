@@ -39,6 +39,8 @@ struct install_medium {
     void (*invalidate)(u32 unit);
     /* Publish the already verified view. IRQs are masked; no I/O or waits. */
     void (*publish)(u32 unit);
+    int requires_raw_reservation;
+    int (*is_view)(struct _Device *);
 };
 
 #endif

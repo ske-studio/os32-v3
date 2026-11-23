@@ -5,6 +5,7 @@
 #include "dev.h"
 
 int pm_install_view_unit(unsigned logical, u32 *unit);
+int pm_install_is_view(Device *);
 int pm_install_resolve(Device *, u32, u32, u32 *, u32 *, u32 *);
 int pm_install_bind(const InstallPlanV1 *, u32 generation);
 void pm_install_invalidate(u32 unit);

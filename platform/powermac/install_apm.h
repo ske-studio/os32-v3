@@ -4,6 +4,9 @@
 /* TN1189 block-zero driver descriptor and 512-byte partition map entries. */
 #include "os32_kapi_shared.h"
 
+enum { PM_MAP_SECTORS = 63, PM_HFS_START = 1 + PM_MAP_SECTORS,
+       PM_HFS_SECTORS = 8 * 2048, PM_ROOT_START = PM_HFS_START + PM_HFS_SECTORS };
+
 static inline void pm_put_word(u8 *p, u32 v)
 {
     p[0] = v >> 24;

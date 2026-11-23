@@ -22,7 +22,9 @@ def run(ctx):
                'fs/ext2/ext2_dir.c']
     cases = [('normal', None, None, 0)]
     if ctx.mutate:
-        cases += [('preserved', 'i < tables[p->raw_unit].count', 'i+1 < tables[p->raw_unit].count', 26),
+        cases += [('raw', 'op != INSTALL_WRITE || !m || !m->requires_raw_reservation', '1', 28),
+                  ('hfs', 'p->boot_hfs.sectors != PM_HFS_SECTORS', '0', 29),
+                  ('preserved', 'i < tables[p->raw_unit].count', 'i+1 < tables[p->raw_unit].count', 26),
                   ('nonempty', 'if (block[j*512+k])', 'if (0)', 2),
                   ('reservation', 'if (platform_install_medium() && (unsigned)ide_drive < VFS_DEV_UNIT_MAX) {\n        struct install_access',
                    'if (0) {\n        struct install_access', 9)]
@@ -37,7 +39,7 @@ def run(ctx):
         for name, old, new, expected in cases:
             files = sources.copy()
             if old:
-                index = 3 if name == 'reservation' else 0
+                index = {'reservation': 3, 'raw': 2}.get(name, 0)
                 src = ctx.root/files[index]
                 body = src.read_text()
                 assert body.count(old) == 1
