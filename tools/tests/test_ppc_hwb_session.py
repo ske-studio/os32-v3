@@ -25,6 +25,15 @@ MUTATIONS = [('sticky', 'exec/exec_abort.inc',
               'u32 pending = g_hwb_abort_pending;\n    g_hwb_abort_pending = 0;',
               'u32 pending = g_hwb_abort_pending;', 'take-clear')]
 
+# Each omission leaves one shell exit dirty. A consumed keyboard stop and
+# an unread terminal stop exercise both values of the pending bit at exit.
+for name, keep_active in (
+        ('fault-exit', 'g_last_kind == EXEC_KIND_FAULT'),
+        ('ctrl-stop-exit', 'g_last_kind == EXEC_KIND_EXITED && !g_hwb_abort_pending'),
+        ('terminal-exit', 'g_hwb_abort_pending')):
+    MUTATIONS.append((name, 'exec/exec_abort.inc', '        hwb_active = 0;',
+                      f'        if (!({keep_active})) hwb_active = 0;', name))
+
 if __name__ == '__main__':
     hwb_host.verify(FIXTURE, flags=SESSION_FLAGS)
     if '--mutate' in sys.argv:
