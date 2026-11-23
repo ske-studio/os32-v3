@@ -282,7 +282,7 @@ static void scripts(void)
                 struct hwbf_pci *g = hwbf_add_pci(&bus, HW_BDF(0,13,0), 0x10de, 0x0221);
                 g->config[0x13] = 0x24;
             }
-            if (hwbf_equal(script->name, "ohci_probe.hwb")) {
+            if (hwbf_equal(script->name, "ohci_probe.hwb") || hwbf_equal(script->name, "ohci_sched_probe.hwb")) {
                 for (u32 fn = 0; fn < 3; fn++) {
                     struct hwbf_pci *usb = hwbf_add_pci(&bus, HW_BDF(0,13,fn),
                                                         0x1033, fn == 2 ? 0xe0 : 0x35);
@@ -298,6 +298,19 @@ static void scripts(void)
                         usb->config[0x60] = 1;
                     }
                 }
+            }
+            if (hwbf_equal(script->name, "ohci_sched_probe.hwb")) {
+                /* Companion 1: HCCA -> ED with one pending TD and a cyclic NextED. */
+                const u32 pool = 0x007f0000;
+                *hwbf_byte(&bus, HW_PHYS, 0x21000018 + 2) = 0x7f;
+                *hwbf_byte(&bus, HW_PHYS, pool + 1) = 1;
+                *hwbf_byte(&bus, HW_PHYS, pool + 2) = 0x7f;
+                for (u32 offset = 4; offset <= 12; offset += 4) {
+                    *hwbf_byte(&bus, HW_PHYS, pool + 0x100 + offset + 1) =
+                        offset == 4 ? 3 : offset == 8 ? 2 : 1;
+                    *hwbf_byte(&bus, HW_PHYS, pool + 0x100 + offset + 2) = 0x7f;
+                }
+                *hwbf_byte(&bus, HW_PHYS, pool + 0x200 + 4) = 0x54;
             }
             if (hwbf_equal(script->name, "hpt370_probe.hwb")) {
                 /* Ra266 HighPoint 0:12.0 (RA266 §1-1): no drive attached, status reads 0. */
@@ -315,6 +328,10 @@ static void scripts(void)
             if (hwbf_equal(script->name, "np21w_loop.hwb")) { bus.point_at = 8; expected = 130; }
             const char *arg = mode == 1 ? "mode=1" : mode == 2 ? "mode=2" : 0;
             CHECK(command("run", script->name, arg) == expected && !live);
+            if (hwbf_equal(script->name, "ohci_sched_probe.hwb")) {
+                CHECK(scalar("slot") == 4 && scalar("count") == 1);
+                CHECK(scalar("td") == 0x007f0200 && scalar("cbp") == 0x54);
+            }
             if (hwbf_equal(script->name, "tri_w32.hwb")) {
                 CHECK(scalar("same") == 1);
                 for (u32 n = 0; n < 32; n++)

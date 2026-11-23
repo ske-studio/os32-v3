@@ -1,0 +1,111 @@
+# Ra266, NEC uPD720101 OHCI. OpenHCI 1.0a sections 4.2 (ED), 4.3 (TD),
+# 4.4 (HCCA), 7 (registers); FreeBSD sys/dev/usb/controller/{ohcireg.h,ohci.h}.
+# Live sample: the controller and usb.mod may advance a queue between reads.
+# PeriodCurrentED and DoneHead can both be zero between transfers.
+# ED: FA[6:0], EN[10:7], S[13] low speed, K[14] skip, F[15] isochronous,
+# MPS[26:16]. HeadP[0] halted, [1] toggle carry. HeadP == TailP: empty queue
+# (compare aligned pointers). General TD: CC[31:28], DI[23:21].
+# PC-98 usb.mod uses the 64 KiB DMA pool at 0x007f0000 (include/memmap.h).
+ dim seen 8
+ device d = bdf 0:13.0
+ print "PCI_FUNCTION" 0
+ call snapshot
+ device d = bdf 0:13.1
+ print "PCI_FUNCTION" 1
+ call snapshot
+ end
+
+ label snapshot
+ pciread32 d 0 -> id
+ if id != 0x00351033 goto wrong
+ pciread16 d 4 -> cmd
+ if (cmd & 2) == 0 goto unavailable
+ pciread32 d 0x10 -> bar
+ if (bar & 1) != 0 goto unavailable
+ if (bar & 0xfffffff0) == 0 goto unavailable
+ window w = bar d 0
+ mmioread32 w + 0x18 -> hcca
+ print "HcHCCA" hcca
+ mmioread32 w + 0x1c -> v
+ print "HcPeriodCurrentED" v
+ mmioread32 w + 0x20 -> v
+ print "HcControlHeadED" v
+ mmioread32 w + 0x24 -> v
+ print "HcControlCurrentED" v
+ mmioread32 w + 0x28 -> v
+ print "HcBulkHeadED" v
+ mmioread32 w + 0x30 -> v
+ print "HcDoneHead" v
+ if (hcca & 0xffff00ff) != 0x007f0000 goto no_hcca
+ let slot = 0
+ let count = 0
+ label entry
+ mmioread32 phys (hcca + (slot << 2)) -> ed
+ print "HCCA_SLOT" slot
+ print "InterruptTableED" ed
+ label chain
+ if ed == 0 goto next_slot
+ if (ed & 0xffff000f) != 0x007f0000 goto bad_ed
+ if count == 8 goto next_slot
+ let i = 0
+ label visited
+ if i == count goto inspect
+ if seen[i] == ed goto next_slot
+ let i = i + 1
+ goto visited
+ label inspect
+ let seen[count] = ed
+ let count = count + 1
+ print "ED_ADDRESS" ed
+ mmioread32 phys ed -> flags
+ mmioread32 phys (ed + 4) -> tail
+ mmioread32 phys (ed + 8) -> head
+ mmioread32 phys (ed + 12) -> next
+ print "ED_FLAGS" flags
+ print "FA" flags & 127
+ print "EN" (flags >> 7) & 15
+ print "S" (flags >> 13) & 1
+ print "MPS" (flags >> 16) & 2047
+ print "TailP" tail
+ print "HeadP" head
+ print "Halted" head & 1
+ print "ToggleCarry" (head >> 1) & 1
+ print "NextED" next
+ let td = head & 0xfffffff0
+ if td == 0 goto advance
+ if td == (tail & 0xfffffff0) goto advance
+ if (flags & 0x8000) != 0 goto advance
+ if (td & 0xffff0000) != 0x007f0000 goto bad_td
+ print "TD_ADDRESS" td
+ mmioread32 phys td -> flags
+ mmioread32 phys (td + 4) -> cbp
+ mmioread32 phys (td + 8) -> link
+ mmioread32 phys (td + 12) -> be
+ print "TD_FLAGS" flags
+ print "CC" flags >> 28
+ print "DI" (flags >> 21) & 7
+ print "CurrentBufferPointer" cbp
+ print "NextTD" link
+ print "BufferEnd" be
+ label advance
+ let ed = next
+ goto chain
+ label bad_td
+ log "TD outside DMA pool"
+ goto advance
+ label bad_ed
+ log "Invalid ED pointer"
+ label next_slot
+ let slot = slot + 1
+ if slot != 4 goto entry
+ print "ED_COUNT" count
+ return
+ label no_hcca
+ log "HCCA unset, unaligned or outside DMA pool"
+ return
+ label unavailable
+ log "MMIO unavailable"
+ return
+ label wrong
+ log "Unexpected PCI ID"
+ return
