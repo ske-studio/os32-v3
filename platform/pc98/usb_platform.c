@@ -77,16 +77,22 @@ disable:
 
 static u8 ohci_quiet[PCI_MAX_DEVS];
 
-int pc98_usb_ohci_quiet(u32 index)
+static struct ohci_firmware firmware[PCI_MAX_DEVS];
+
+int pc98_usb_ohci_quiet(u32 index, struct ohci_firmware *saved)
 {
-    return index < PCI_MAX_DEVS && ohci_quiet[index];
+    if (index >= PCI_MAX_DEVS || !ohci_quiet[index]) return 0;
+    *saved = firmware[index];
+    return 1;
 }
 
 static int takeover(struct usb_hc *hc)
 {
     volatile u8 *regs = hc->regs;
     if (usbp_cfg_cmd(&hc->pci, PCI_CMD_MEM_ENABLE, 0)) return -1;
-    if (mmio_rd32_le(regs + OHCI_CONTROL) & OHCI_CTL_IR) {
+    u32 ctl = mmio_rd32_le(regs + OHCI_CONTROL);
+    hc->firmware = ohci_firmware_read(regs, ctl);
+    if (ctl & OHCI_CTL_IR) {
         mmio_wr32_le(regs + OHCI_COMMAND_STATUS, OHCI_CMD_OCR);
         for (unsigned i = 0; i < 100; i++) {
             usbp_udelay(1000);
@@ -94,8 +100,13 @@ static int takeover(struct usb_hc *hc)
         }
     }
     int owned = !(mmio_rd32_le(regs + OHCI_CONTROL) & OHCI_CTL_IR);
+    /* FreeBSD controller/ohci.c:ohci_controller_init */
+    if (!owned)
+        kprintf(KLOG_ATTR, "[usb] %u:%u.%u warning: IR remains after OCR\n",
+                hc->pci.bus, hc->pci.dev, hc->pci.fn);
     mmio_wr32_le(regs + OHCI_INTERRUPT_DISABLE, OHCI_INTR_ALL);
-    mmio_wr32_le(regs + OHCI_CONTROL, OHCI_CTL_RESET);
+    /* NetBSD dev/usb/ohci.c:ohci_init preserves firmware RWC. */
+    mmio_wr32_le(regs + OHCI_CONTROL, (ctl & OHCI_CTL_RWC) | OHCI_CTL_RESET);
     usbp_udelay(100000);
     if (usbp_cfg_cmd(&hc->pci, 0, PCI_CMD_BUS_MASTER)) return -1;
     return owned && !(usbp_cfg_read32(&hc->pci, PCI_CFG_COMMAND) & PCI_CMD_BUS_MASTER) &&
@@ -123,6 +134,7 @@ void pc98_usb_early_quiesce(void)
         struct usb_hc hc = {.pci = {.bus=dev.bus, .dev=dev.dev, .fn=dev.fn}};
         if (!ohci_resource(&dev, &hc.pci) && !usbp_mmio_map(&hc.pci, 0, &hc.regs)) {
             ohci_quiet[i] = takeover(&hc) == 0;
+            firmware[i] = hc.firmware;
             usbp_mmio_unmap(&hc.pci, 0);
         }
         if (!ohci_quiet[i]) {

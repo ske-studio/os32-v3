@@ -39,6 +39,7 @@ def run(ctx):
         cases = [(mode, '', '', 0) for mode in (b'r', b'm', b'f', b'q', b't')]
         if ctx.mutate:
             cases.extend([
+                (b'm', 'firmware[i] = hc.firmware;', 'firmware[i].valid = 0;', 28),
                 (b'm', '{tick_reach, tick_deny, tick_runs, idle_runs}', '{tick_runs, tick_deny, tick_runs, idle_runs}', 47),
                 (b'm', 'scan_pending = 1;', 'scan_pending = 0;', 42),
                 (b'm', 'idle_runs++;\n        run_scan();', 'idle_runs++; irq_restore(flags); run_scan(); flags = irq_save();', 42),

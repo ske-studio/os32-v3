@@ -55,6 +55,23 @@ static int start_fail(struct usb_hc *hc, const char *stage)
     return -USB_E_HC;
 }
 
+/* FreeBSD controller/ohci.c:ohci_roothub_exec reads each port's status. */
+static void log_power(struct usb_hc *hc)
+{
+    u32 pps = 0, oci = 0, ccs = 0, lsda = 0;
+    for (u32 port = 1; port <= hc->nports; ++port) {
+        u32 bit = 1u << (port - 1);
+        u32 status = ohci_rd(hc, OHCI_RH_PORT_STATUS(port));
+        if (status & OHCI_PORT_PPS) pps |= bit;
+        if (status & OHCI_PORT_POCI) oci |= bit;
+        if (status & OHCI_PORT_CCS) ccs |= bit;
+        if (status & OHCI_PORT_LSDA) lsda |= bit;
+    }
+    usbp_log("[usb] %u:%u.%u ports(bit0=port1) pps=%x oci=%x ccs=%x lsda=%x%s",
+             hc->pci.bus, hc->pci.dev, hc->pci.fn, pps, oci, ccs, lsda,
+             pps == (1u << hc->nports) - 1 ? "" : " warning: port power off");
+}
+
 int ohci_start(struct usb_hc *hc)
 {
     u32 i, fi, desca = 0, descb;
@@ -68,16 +85,25 @@ int ohci_start(struct usb_hc *hc)
     }
     m = hc->hcpriv;
     tree_init(hc);
-    if (ohci_rd(hc, OHCI_CONTROL) & OHCI_CTL_IR) {
+    /* NetBSD dev/usb/ohci.c:ohci_init saves firmware settings before reset. */
+    u32 control = ohci_rd(hc, OHCI_CONTROL);
+    struct ohci_firmware saved = hc->firmware;
+    if (!saved.valid) saved = ohci_firmware_read(hc->regs, control);
+    u32 rwc = saved.rwc ? OHCI_CTL_RWC : 0;
+    fi = saved.fi;
+    if (control & OHCI_CTL_IR) {
         ohci_wr(hc, OHCI_COMMAND_STATUS, OHCI_CMD_OCR);
         for (i = 0; i < 100; ++i) {
             usbp_udelay(1000);
             if (!(ohci_rd(hc, OHCI_CONTROL) & OHCI_CTL_IR)) break;
         }
+        /* FreeBSD controller/ohci.c:ohci_controller_init continues with reset. */
+        if (i == 100)
+            usbp_log("[usb] %u:%u.%u warning: IR remains after OCR, forcing reset",
+                     hc->pci.bus, hc->pci.dev, hc->pci.fn);
     }
-    ohci_wr(hc, OHCI_CONTROL, OHCI_CTL_RESET);
+    ohci_wr(hc, OHCI_CONTROL, rwc | OHCI_CTL_RESET);
     usbp_udelay(100000);
-    fi = OHCI_FMI_FI(ohci_rd(hc, OHCI_FM_INTERVAL));
     ohci_wr(hc, OHCI_COMMAND_STATUS, OHCI_CMD_HCR);
     for (i = 0; i < 10; ++i) {
         usbp_udelay(10);
@@ -97,7 +123,7 @@ int ohci_start(struct usb_hc *hc)
     hc->started |= OHCI_STARTED_BM; /* a failed readback may follow a successful BM write */
     if (usbp_cfg_cmd(&hc->pci, OHCI_BM, 0) < 0) return start_fail(hc, "bus master");
     ohci_wr(hc, OHCI_CONTROL, OHCI_CTL_CBSR_1_4 | OHCI_CTL_PLE |
-            OHCI_CTL_IE | OHCI_CTL_CLE | OHCI_CTL_BLE | OHCI_CTL_OPERATIONAL);
+            rwc | OHCI_CTL_IE | OHCI_CTL_CLE | OHCI_CTL_BLE | OHCI_CTL_OPERATIONAL);
     ohci_wr(hc, OHCI_FM_INTERVAL, ((ohci_rd(hc, OHCI_FM_INTERVAL) ^
             0x80000000u) & 0x80000000u) | (((fi - 210u) * 6u / 7u) << 16) | fi);
     ohci_wr(hc, OHCI_PERIODIC_START, fi * 9u / 10u);
@@ -108,6 +134,10 @@ int ohci_start(struct usb_hc *hc)
         hc->nports = (u8)(desca & OHCI_RHA_NDP_MASK);
     }
     if (!hc->nports || hc->nports > USB_RH_PORTS_MAX) return start_fail(hc, "port count");
+    if ((saved.rha & OHCI_RHA_NDP_MASK) == hc->nports && saved.rha != desca) {
+        ohci_wr(hc, OHCI_RH_DESCRIPTOR_A, saved.rha);
+        desca = ohci_rd(hc, OHCI_RH_DESCRIPTOR_A);
+    }
     descb = ohci_rd(hc, OHCI_RH_DESCRIPTOR_B);
     if (!(desca & OHCI_RHA_NPS)) {
         /* OpenHCI 1.0a §7.4.1-4: PPCM bit 1 describes port 1.
@@ -129,6 +159,11 @@ int ohci_start(struct usb_hc *hc)
     hc->state = HC_RUNNING;
     usbp_log("[usb] ohci %u:%u.%u ports=%u rev=%02x rha=%08x rhb=%08x", hc->pci.bus, hc->pci.dev,
              hc->pci.fn, hc->nports, ohci_rd(hc, OHCI_REVISION) & 0xffu, desca, descb);
+    usbp_log("[usb] %u:%u.%u saved fi=%x rha=%08x rwc=%u used fi=%x rha=%08x rwc=%u",
+             hc->pci.bus, hc->pci.dev, hc->pci.fn, fi, saved.rha, !!rwc,
+             OHCI_FMI_FI(ohci_rd(hc, OHCI_FM_INTERVAL)), desca,
+             !!(ohci_rd(hc, OHCI_CONTROL) & OHCI_CTL_RWC));
+    log_power(hc);
     if (hc->has_irq) ohci_wr(hc, OHCI_INTERRUPT_ENABLE, OHCI_INTR_MIE);
     return 0;
 }

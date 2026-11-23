@@ -41,6 +41,7 @@
 #define OHCI_CTL_OPERATIONAL (2u << 6)
 #define OHCI_CTL_SUSPEND (3u << 6)
 #define OHCI_CTL_IR (1u << 8)
+#define OHCI_CTL_RWC (1u << 9)
 #define OHCI_CMD_HCR 1u
 #define OHCI_CMD_CLF 2u
 #define OHCI_CMD_BLF 4u

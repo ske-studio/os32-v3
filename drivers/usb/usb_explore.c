@@ -62,25 +62,38 @@ static void next_port(struct usb_walk *w, int descend)
 static int reset_port(struct usb_walk *w)
 {
     struct usb_explore *e = &w->hc->explore;
+    /* NetBSD dev/usb/ohci.c:ohci_roothub_ctrl waits for PRS to clear. */
+    if (e->hub && w->reset_phase == 0) w->reset_phase = 2;
     if (w->reset_phase == 0) {
-        if (!usb_port_op(w, USB_RH_RESET)) return 0;
+        if (!usb_port_op(w, USB_RH_CLEAR_RESET)) return 0;
         if (w->error) return -1;
-        w->reset_deadline = usbp_ms() + 50; w->poll_deadline = usbp_ms() + 10; w->reset_phase = 1; return 0;
+        w->reset_phase = 1;
     }
     if (w->reset_phase == 1) {
+        if (!usb_port_op(w, USB_RH_STATUS)) return 0;
+        if (w->error || !(w->status & (1u << USB_PORT_CONNECTION))) return -1;
+        w->reset_phase = 2;
+    }
+    if (w->reset_phase == 2) {
+        if (!usb_port_op(w, USB_RH_RESET)) return 0;
+        if (w->error) return -1;
+        w->reset_deadline = usbp_ms() + 50; w->poll_deadline = usbp_ms() + 10; w->reset_phase = 3; return 0;
+    }
+    if (w->reset_phase == 3) {
         if (!usb_due(usbp_ms(), w->poll_deadline)) return 0;
         if (!usb_port_op(w, USB_RH_STATUS)) return 0;
         if (w->error) return -1;
         w->poll_deadline = usbp_ms() + 10;
-        if (!(w->status & (1u << USB_C_PORT_RESET))) {
+        if ((w->status & (1u << USB_PORT_RESET)) || !(w->status & (1u << USB_C_PORT_RESET))) {
             return usb_due(usbp_ms(), w->reset_deadline) ? -1 : 0;
         }
-        w->reset_phase = 2;
+        if (!(w->status & (1u << USB_PORT_ENABLE))) return -1;
+        w->reset_phase = 4;
     }
-    if (w->reset_phase == 2) {
+    if (w->reset_phase == 4) {
         if (!usb_port_op(w, USB_RH_CLEAR_RESET)) return 0;
         if (w->error) return -1;
-        e->deadline_ms = usbp_ms() + 20; w->reset_phase = 3; return 0;
+        e->deadline_ms = usbp_ms() + 20; w->reset_phase = 5; return 0;
     }
     if (!usb_due(usbp_ms(), e->deadline_ms)) return 0;
     w->reset_phase = 0; return 1;

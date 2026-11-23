@@ -3,7 +3,7 @@
  * IRQ-less OHCI: MIE stays clear; the 100Hz resident slot runs usb_service. */
 #include "usb_boot.h"
 #include "drivers/usb/usb_core.h"
-#include "drivers/usb/ohci_regs.h"
+#include "drivers/usb/ohci_priv.h"
 #include "endian_dma.h"
 #include "mm/paging.h"
 #include "kstring.h"
@@ -42,16 +42,21 @@ static int takeover(struct usb_hc *hc)
 {
     volatile u8 *r = hc->regs;
     u32 ctl = mmio_rd32_le(r + OHCI_CONTROL);
+    hc->firmware = ohci_firmware_read(r, ctl);
     if (ctl & OHCI_CTL_IR) {
         mmio_wr32_le(r + OHCI_COMMAND_STATUS, OHCI_CMD_OCR);
         for (u32 i = 0; i < 100; i++) {
             usbp_udelay(1000);
             if (!(mmio_rd32_le(r + OHCI_CONTROL) & OHCI_CTL_IR)) break;
         }
-        /* FreeBSD falls back to reset if firmware did not respond. */
+        /* FreeBSD controller/ohci.c:ohci_controller_init */
+        if (mmio_rd32_le(r + OHCI_CONTROL) & OHCI_CTL_IR)
+            usbp_log("[usb] %u:%u.%u warning: IR remains after OCR, forcing reset",
+                     hc->pci.bus, hc->pci.dev, hc->pci.fn);
     }
     mmio_wr32_le(r + OHCI_INTERRUPT_DISABLE, OHCI_INTR_ALL);
-    mmio_wr32_le(r + OHCI_CONTROL, OHCI_CTL_RESET);
+    /* NetBSD dev/usb/ohci.c:ohci_init preserves firmware RWC. */
+    mmio_wr32_le(r + OHCI_CONTROL, (ctl & OHCI_CTL_RWC) | OHCI_CTL_RESET);
     usbp_udelay(100000);
     if (usbp_cfg_cmd(&hc->pci, 2, 4)) return -1;
     usbp_log("USB TAKEOVER quiet");
