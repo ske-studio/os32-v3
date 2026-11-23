@@ -160,6 +160,16 @@ def observe(media, cpu, folder, case, user, mutation=None):
         if mutation == 'register':
             seen('C-GUI REGISTER FAILED')
             seen('C-GUI INIT NOSYS')
+        if case in ('normal', 'explicit', 'focus', 'exit'):
+            # IN2 publishes the mouse before HID starts its interrupt transfer.
+            # Preserve the serial offset: FRONT may already be in the log.
+            mouse_dev = r'USB DEV addr=(\d+) vid:pid=0627:0001 class=03 subclass=01 protocol=02'
+            def mouse_attached():
+                trace = serial(log)
+                dev = re.search(mouse_dev, trace)
+                return dev and re.search(rf'\[usb\] HID \d+:\d+\.\d+ addr={dev[1]} iface=0 rc=0\r?\n',
+                                         trace[dev.end():])
+            s.wait(mouse_attached, 'USB mouse interrupt transfer ready')
         if case == 'normal':
             seen('C-GUI READY')
             x, y = s.word('px', unit='h'), s.word('py', unit='h')
@@ -174,7 +184,6 @@ def observe(media, cpu, folder, case, user, mutation=None):
             assert tuple(map(int, before[:5])) == (0, p, owner, 0, 0)
             assert tuple(map(int, acquired)) == (0, p, owner, 3, owner, generation + 1)
             assert tuple(map(int, released)) == (0, p, owner, 0, 0, generation + 2)
-            mouse_dev = r'USB DEV addr=(\d+) vid:pid=0627:0001 class=03 subclass=01 protocol=02'
             mouse_addr = re.search(mouse_dev, serial(log))[1]
 
             def state(index):
