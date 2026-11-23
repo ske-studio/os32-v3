@@ -21,11 +21,13 @@ class Media:
             raise ValueError(f'{self.iso}: PPCKERN.ELF differs from {self.elf}')
 
 
-def package(elf, iso):
+def package(elf, iso, *assets):
     with tempfile.TemporaryDirectory(dir=iso.parent) as tmp:
         cd = Path(tmp) / 'cd'
         cd.mkdir()
         shutil.copyfile(elf, cd / 'PPCKERN.ELF')
+        for asset in assets:
+            shutil.copyfile(asset, cd / asset.name)
         image = Path(tmp) / 'boot.iso'
         subprocess.run(['genisoimage', '-quiet', '-hfs', '-r', '-part', '-no-desktop',
                         '-o', image, cd], check=True)

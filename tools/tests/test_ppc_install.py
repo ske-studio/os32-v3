@@ -3,10 +3,12 @@ from pathlib import Path
 import subprocess
 import tempfile
 
-CHECK = dict(name='ppc-install-host', tier=1, needs=[], budget=8,
+CHECK = dict(name='ppc-install-host', tier=1, needs=[], budget=35,
              covers=['tools/tests/test_ppc_install.py', 'tools/tests/ppc_install_host.c',
                      'tools/tests/host32.py', 'tools/tests/cc_cache.py', 'platform/powermac/install*',
                      'platform/powermac/partition_view.c', 'platform/powermac/apm.h',
+                     'platform/powermac/platform_install_layout.h', 'userland/system/inst_*.h',
+                     'userland/shell/hdprep_plan.h',
                      'platform/powermac/platform_ext2.h', 'platform/powermac/platform_install_management.h',
                      'kernel/dev/**', 'fs/ext2/**', 'include/**', 'lib/kstring*', 'lib/crc32*',
                      'drivers/ata/ide.h', 'drivers/block/disk.h', 'drivers/block/fdc.h', 'drivers/base/dev.c', 'mm/kmalloc.h', 'sdk/include/**', 'fs/*.h'],
@@ -19,13 +21,19 @@ def run(ctx):
                'kernel/dev/install_management.c', 'fs/ext2/ext2_fmt.c', 'fs/ext2/ext2_layout.c',
                'tools/tests/ppc_install_host.c', 'lib/kstring_c.c', 'lib/crc32.c', 'drivers/base/dev.c',
                'fs/ext2/ext2_super.c', 'fs/ext2/ext2_file.c', 'fs/ext2/ext2_inode.c',
-               'fs/ext2/ext2_dir.c']
+               'fs/ext2/ext2_dir.c', 'platform/powermac/install_target.c']
     cases = [('normal', None, None, 0)]
     if ctx.mutate:
         cases += [('raw', '!raw_write || !m || !m->requires_raw_reservation', '1', 28),
                   ('hfs', 'p->boot_hfs.sectors != PM_HFS_SECTORS', '0', 29),
                   ('preserved', 'i < tables[p->raw_unit].count', 'i+1 < tables[p->raw_unit].count', 26),
                   ('nonempty', 'if (block[j*512+k])', 'if (0)', 2),
+                  ('deploy-length', 'sizes[0]/512 != p->boot_hfs.sectors', '0', 40),
+                  ('deploy-readback', '!same(check, sector, sizeof(check))', '0', 42),
+                  ('path-probe', 'if (!rc && api->ide_write_sectors(g.drive, 0, 0, 0))', 'if (0)', 39),
+                  ('overlap', 'start < seen[j].start + seen[j].sectors', '0', 33),
+                  ('hfs-end', 'count <= length - (lba - start)', 'count <= length - (lba - start) + 1', 36),
+                  ('retry', 'if (retry && ((lba', 'if (0 && ((lba', 35),
                   ('reservation', 'if (platform_install_medium() && (unsigned)ide_drive < VFS_DEV_UNIT_MAX) {\n        struct install_access',
                    'if (0) {\n        struct install_access', 9)]
     with tempfile.TemporaryDirectory() as directory:
@@ -39,14 +47,15 @@ def run(ctx):
         for name, old, new, expected in cases:
             files = sources.copy()
             if old:
-                index = {'reservation': 3, 'raw': 2}.get(name, 0)
+                index = {'reservation': 3, 'raw': 2, 'hfs-end': 2, 'overlap': -1, 'path-probe': -1,
+                         'deploy-length': -1, 'deploy-readback': -1}.get(name, 0)
                 src = ctx.root/files[index]
                 body = src.read_text()
                 assert body.count(old) == 1
                 files[index] = tmp/src.name
                 files[index].write_text(body.replace(old,new))
             exe = tmp/'host'
-            subprocess.run(['cc', '-std=gnu11', '-m32', '-nostdinc', '-nostdlib', '-static',
+            subprocess.run(['cc', '-O2', '-std=gnu11', '-m32', '-nostdinc', '-nostdlib', '-static',
                             '-ffreestanding', '-fno-pie', '-fno-builtin', '-ffunction-sections',
                             '-fdata-sections', '-Wl,--gc-sections', '-D__cdecl=', '-DOS32_FEATURE_IDE=1',
                             '-I'+directory, '-I.', '-Iinclude', '-Iplatform/powermac', '-Ikernel/dev',

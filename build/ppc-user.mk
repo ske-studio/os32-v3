@@ -71,6 +71,7 @@ PPC_INST_DIR := $(PPC_USER_OUT)/installer
 PPC_INST_SRC := platform/powermac/install_target.c userland/system/inst_hdd.c userland/system/inst_disk.c userland/shell/hdprep_plan.c fs/ext2/ext2_layout.c
 PPC_INST_COMMON := $(addprefix $(PPC_INST_DIR)/,$(PPC_INST_SRC:.c=.o))
 PPC_INST_EXTRA := userland/system/install.c userland/system/cdinst.c userland/lib/rt/pkg.c userland/lib/rt/dbgserial.c
+$(PPC_INST_DIR)/userland/system/install.o $(PPC_INST_DIR)/userland/lib/rt/pkg.o: private PPC_USER_FLAGS += -DOS32_VERIFY_INSTALLED_FILES
 $(PPC_INST_COMMON) $(addprefix $(PPC_INST_DIR)/,$(PPC_INST_EXTRA:.c=.o)): $(PPC_INST_DIR)/%.o: %.c build/ppc-user.mk
 	@mkdir -p $(@D)
 	$(CC) $(PPC_USER_FLAGS) -DOS32_FEATURE_IDE=1 -Iplatform/powermac -I. -Iinclude -Iuserland/lib -Iuserland/lib/rt -Iuserland/system -c $< -o $@

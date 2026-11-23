@@ -1,5 +1,6 @@
 /* Real PowerMac provider, formatter and reservation manager over a RAM disk. */
 #include "install_management.h"
+#include "include/platform_install_boot.h"
 #include "install_access.h"
 #include "install_backend.h"
 #include "install_apm.h"
@@ -9,10 +10,10 @@
 #include "lib/crc32.h"
 #include "kstring.h"
 
-enum { UNIT = 1, SECTORS = PM_ROOT_START+4032, START = PM_ROOT_START, LENGTH = 4000 };
-static u8 disk[SECTORS][512], before[sizeof(disk)], pool[256*1024];
+enum { UNIT = 1, SECTORS = PM_ROOT_START+16416, START = PM_ROOT_START, LENGTH = 16384 };
+static u8 disk[SECTORS][512], before[sizeof(disk)], pool[1024*1024];
 static u32 used, writes;
-static int owner = 1, allowed = 1;
+static int owner = 1, allowed = 1, corrupt_read = -1, syncs;
 static Ext2Ctx mounted;
 void *kmalloc(u32 size)
 {
@@ -83,12 +84,143 @@ int ide_write_sectors(int u, u32 lba, u32 n, const void *in)
 void kprintf(u8 color, const char *format, ...) { (void)color; (void)format; }
 u32 ext2_current_time(void) { return 0; }
 
+static int identify_for_api(int unit, void *info) { return ide_identify(unit,info); }
+static int selected_drive(int unit) { return unit == UNIT; }
+static int read_for_api(int unit, u32 lba, void *buf)
+{
+    int rc = ide_install_read(unit,lba,buf);
+    if (!rc && lba == (u32)corrupt_read) ((u8 *)buf)[17] ^= 1;
+    return rc;
+}
+static int sync_for_api(void) { ++syncs; return 0; }
+static u32 last_begin;
+static int begin_for_api(const InstallPlanV1 *plan,u32 *handle)
+{
+    int rc = install_begin(plan,handle);
+    if (!rc) last_begin = *handle;
+    return rc;
+}
+static int write_for_api(int unit, u32 lba, const void *buf)
+{
+    return ide_write_sectors(unit,lba,1,buf);
+}
+static int write_many_for_api(int unit, u32 lba, u32 count, const void *buf)
+{
+    if (!allowed || !count) return allowed ? 0 : OS32_ERR_INVAL;
+    return ide_write_sectors(unit,lba,count,buf);
+}
+
+/* VFS fixtures expose the same template as files and as payloads at
+ * unaligned BOOT.PKG offsets. Short reads exercise streaming on both paths. */
+enum { HFS_BYTES = PM_HFS_SECTORS*512, BUNDLE_BASE = 43, DESCRIPTOR_BASE = BUNDLE_BASE+HFS_BYTES+7 };
+static u8 template[HFS_BYTES], boot_desc[20], bundle[DESCRIPTOR_BASE+20];
+static const u8 *file_data[] = {template,boot_desc,bundle};
+static const u32 file_size[] = {sizeof(template),sizeof(boot_desc),sizeof(bundle)};
+static int opened[3];
+static u32 position[3];
+static int open_file(const char *path, int mode)
+{
+    const char *names[] = {platform_boot_paths[0],platform_boot_paths[1],"/BOOT.PKG"};
+    for (int i = 0; !mode && i < 3; ++i) {
+        if (!kstrcmp(path,names[i]) && !opened[i]) {
+            opened[i] = 1;
+            position[i] = 0;
+            return i;
+        }
+    }
+    return -1;
+}
+static int seek_file(int fd, int offset, int whence)
+{
+    if (fd < 0 || fd > 2 || !opened[fd] || whence || (u32)offset > file_size[fd]) return -1;
+    position[fd] = offset;
+    return offset;
+}
+static int read_file(int fd, void *out, u32 count)
+{
+    if (fd < 0 || fd > 2 || !opened[fd]) return -1;
+    u32 left = file_size[fd]-position[fd];
+    if (count > left) count = left;
+    if (count > 341) count = 341;
+    kmemcpy(out,file_data[fd]+position[fd],count);
+    position[fd] += count;
+    return count;
+}
+static void close_file(int fd) { opened[fd] = 0; }
+
+static KernelAPI api = {
+    .ide_identify = identify_for_api, .ide_drive_present = selected_drive,
+    .ide_read_sector = read_for_api, .ide_write_sector = write_for_api,
+    .ide_write_sectors = write_many_for_api,
+    .install_begin = begin_for_api, .install_end = install_end, .install_rescan = install_rescan,
+    .vfs_sync = sync_for_api, .kprintf = kprintf,
+    .sys_open = open_file, .sys_read = read_file, .sys_lseek = seek_file, .sys_close = close_file
+};
+
+/* Independent expected bytes include a configuration field crossing a
+ * sector boundary. The kernel's reservation protects the real RAM image. */
+static int deploy(const InstallPlanV1 *approved)
+{
+    enum { LOADER_SLOT = 2044, PRODUCT_SLOT = 2560 };
+    static u8 expected[HFS_BYTES];
+    const u32 sizes[] = {sizeof(template),sizeof(boot_desc)};
+    const u32 offsets[] = {BUNDLE_BASE,DESCRIPTOR_BASE};
+    InstTarget target = {.plan = {.media = *approved}};
+    template[1024] = template[HFS_BYTES-1024] = 'B';
+    template[1025] = template[HFS_BYTES-1023] = 'D';
+    template[HFS_BYTES-1] = 0xa7;
+    pm_put_word(boot_desc,0x504d4231);
+    pm_put_word(boot_desc+4,HFS_BYTES);
+    pm_put_word(boot_desc+12,LOADER_SLOT);
+    pm_put_word(boot_desc+16,PRODUCT_SLOT);
+    kmemcpy(bundle,boot_desc+12,8);
+    kmemcpy(bundle+8,template,HFS_BYTES);
+    pm_put_word(boot_desc+8,crc32_calc(bundle,HFS_BYTES+8));
+    target.plan.media.boot_hfs.sectors = HFS_BYTES/512-1;
+    kmemcpy(before,disk,sizeof(disk));
+    boot_desc[8] ^= 1;
+    if (!pm_install_check_directory(&api,sizes) ||
+        memcmp(before,disk,sizeof(disk))) return 41;
+    boot_desc[8] ^= 1;
+    boot_desc[15] ^= 4; /* Still aligned and zero, but no longer the configured ELF field. */
+    if (!pm_install_check_directory(&api,sizes) ||
+        memcmp(before,disk,sizeof(disk))) return 47;
+    boot_desc[15] ^= 4;
+    if (pm_install_check_directory(&api,sizes) ||
+        !platform_install_directory_boot(&api,&target,sizes,0,0) ||
+        memcmp(before,disk,sizeof(disk))) return 40;
+    target.plan.media.boot_hfs.sectors++;
+    u32 start = approved->boot_hfs.start_lba;
+    corrupt_read = start+HFS_BYTES/512-1;
+    if (!platform_install_directory_boot(&api,&target,sizes,0,0)) return 42;
+    corrupt_read = -1;
+    if (platform_install_directory_boot(&api,&target,sizes,0,0) || !syncs) return 43;
+    pm_install_release_assets(&api);
+    kmemcpy(expected,template,HFS_BYTES);
+    const u32 words[] = {2,3,START,LENGTH,3};
+    for (unsigned i = 0; i < 5; ++i) {
+        pm_put_word(expected+LOADER_SLOT+i*4,words[i]);
+        pm_put_word(expected+PRODUCT_SLOT+i*4,words[i]);
+    }
+    if (memcmp(disk[start],expected,HFS_BYTES)) return 44;
+    kmemcpy(bundle+BUNDLE_BASE,template,HFS_BYTES);
+    kmemcpy(bundle+DESCRIPTOR_BASE,boot_desc,sizeof(boot_desc));
+    kmemset(disk[start],0x5a,HFS_BYTES);
+    if (pm_install_stage_package(&api,"/BOOT.PKG",offsets,sizes) ||
+        platform_install_package_boot(&api,&target,0,sizes)) return 45;
+    pm_install_release_assets(&api);
+    if (opened[0] || opened[1] || opened[2] ||
+        memcmp(disk[start],expected,HFS_BYTES) || memcmp(before,disk,start*512) ||
+        memcmp(before+start*512+HFS_BYTES, disk[start+HFS_BYTES/512],
+               sizeof(disk)-start*512-HFS_BYTES)) return 46;
+    return 0;
+}
+
 static int existing_apm(InstallPlanV1 p, Device *old_view, u32 previous)
 {
     const struct install_medium *m = platform_install_medium();
     p.map.sectors = 4;
-    p.boot_hfs.start_lba++;
-    p.boot_hfs.sectors--;
+    p.boot_hfs.start_lba--;
     p.lba0_sectors = 0;
     p.original_table_sectors = 5;
     pm_apm_entry(disk[1],4,&p.map);
@@ -126,6 +258,25 @@ static int existing_apm(InstallPlanV1 p, Device *old_view, u32 previous)
     disk[4][20] ^= 1;
     if (install_end(handle,OS32_INSTALL_END_COMMIT) || disk[keep.start_lba][37] != 91)
         return 27;
+    /* Replan from the actual table. A foreign entry occupies the tail and
+     * must survive both rejecting an overlap and reusing the OS32 entries. */
+    HdprepGeom geometry;
+    kmemcpy(before, disk, sizeof(disk));
+    if (platform_hdprep_check(&api, &geometry) ||
+        geometry.media.original_table_crc != crc32_calc(disk,5*512) ||
+        geometry.media.root_ext2.start_lba != START ||
+        memcmp(before,disk,sizeof(disk))) return 32;
+    InstTarget target;
+    if (platform_install_target(&api,&target) || target.plan.start != START ||
+        target.plan.len != LENGTH || inst_hdd_release(&api,&target) ||
+        ext2_format_at(UNIT,target.plan.start,target.plan.len) ||
+        platform_install_partition(&api,&target) || pm_hdprep_finish(&api,1) ||
+        memcmp(before,disk,START*512) ||
+        memcmp(before+(START+LENGTH)*512,disk[START+LENGTH],32*512))
+        return 37;
+    pm_put_word(disk[4]+8, START+LENGTH-1);
+    kmemcpy(before, disk, sizeof(disk));
+    if (!platform_hdprep_check(&api, &geometry) || memcmp(before,disk,sizeof(disk))) return 33;
     return 0;
 }
 
@@ -140,6 +291,16 @@ static int exercise(void)
     if (m->identify(UNIT,&id)) return 1;
     p.serial_crc = id.serial_crc;
     p.original_table_crc = crc32_calc(disk,1024);
+    HdprepGeom geometry;
+    HdprepPlan plan;
+    if (platform_hdprep_check(&api,&geometry) || hdprep_plan(&geometry,8,&plan) ||
+        memcmp(&plan.media,&p,sizeof(p)) || writes || memcmp(before,disk,sizeof(disk)))
+        return 38;
+    allowed = 0;
+    InstTarget target;
+    if (!platform_install_target(&api,&target) || writes || memcmp(before,disk,sizeof(disk)))
+        return 39;
+    allowed = 1;
     pm_format_register();
     u8 sectors[1024] = {91};
     int single = ide_write_sectors(UNIT,1,1,sectors);
@@ -163,17 +324,31 @@ static int exercise(void)
     if (ext2_format_at(UNIT,START,LENGTH) || !writes) return 9;
     if (memcmp(before,disk,START*512) || memcmp(before+(START+LENGTH)*512,
         disk[START+LENGTH],(SECTORS-START-LENGTH)*512)) return 10;
-    if (disk[START+2][56] != 0x53 || disk[START+2][57] != 0xef) return 11;
-    u8 s[512];
-    pm_apm_header(s,SECTORS);
-    const InstallPlanPartitionV1 *parts[] = {&p.map,&p.boot_hfs,&p.root_ext2};
-    for (unsigned i = 0; i < 4; ++i) {
-        if (i) pm_apm_entry(s,3,parts[i-1]);
-        struct install_access a;
-        int handled;
-        if (install_raw_io(&a,UNIT,i,1,0,s,1,&handled) || !handled) return 12;
+    /* Interrupt first before the initial APM write, then with a partial APM.
+     * Replan after each restoration; the normal begin rechecks the media. */
+    for (int partial = 0; partial <= 1; ++partial) {
+        u8 header[512];
+        pm_apm_header(header, SECTORS);
+        if (partial && write_for_api(UNIT,0,header)) return 34;
+        u32 old = handle;
+        install_reclaim_owner(owner);
+        HdprepGeom geometry;
+        if (dev_find("hd0") || memcmp(before,disk,4*512) ||
+            platform_hdprep_check(&api,&geometry) ||
+            geometry.media.original_table_crc != p.original_table_crc ||
+            hdprep_plan(&geometry,8,&plan) || platform_hdprep_probe(&api,&plan) ||
+            last_begin == old || ext2_format_at(UNIT,START,LENGTH))
+            return 35;
+        handle = last_begin;
     }
+    if (disk[START+2][56] != 0x53 || disk[START+2][57] != 0xef) return 11;
+    if (platform_hdprep_partition(&api,&plan)) return 12;
     if (install_rescan(handle) || ext2_mount(&mounted,0)) return 13;
+    /* A request crossing either HFS edge must leave the whole disk intact. */
+    kmemcpy(before, disk, sizeof(disk));
+    if (!ide_write_sectors(UNIT,PM_HFS_START-1,2,sectors) ||
+        !ide_write_sectors(UNIT,START-1,2,sectors) ||
+        memcmp(before,disk,sizeof(disk))) return 36;
     static const char payload[] = "PowerMac reserved view";
     char output[sizeof(payload)];
     u32 ino;
@@ -181,6 +356,8 @@ static int exercise(void)
         ext2_lookup(&mounted,"/marker",&ino) ||
         ext2_read_file(&mounted,ino,output,sizeof(output)) != sizeof(output) ||
         memcmp(output,payload,sizeof(output))) return 15;
+    int deployed = deploy(&p);
+    if (deployed) return deployed;
     if (install_end(handle,OS32_INSTALL_END_COMMIT) || mounted.mounted) return 16;
     Device *registered = dev_find("hd0");
     if (!registered || ext2_mount(&mounted,0) || ext2_lookup(&mounted,"/marker",&ino) ||

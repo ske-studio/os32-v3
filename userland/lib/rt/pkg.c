@@ -6,6 +6,9 @@
 /* ======================================================================== */
 
 #include "pkg.h"
+#ifdef OS32_VERIFY_INSTALLED_FILES
+#include "inst_verify.h"
+#endif
 #include <string.h>  /* memcpy, memset from newlib */
 
 /* 無圧縮の展開で 1 回に読む大きさ。CD (ISO 9660) では 1 回の読みがそのまま
@@ -144,6 +147,13 @@ int pkg_parse(KernelAPI *api, const char *path, PkgInfo *info)
         return PKG_ERR_IO;
     }
 
+#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+    info->header.kapi_ver = __builtin_bswap16(info->header.kapi_ver);
+    info->header.entry_count = __builtin_bswap16(info->header.entry_count);
+    info->header.orig_size = __builtin_bswap32(info->header.orig_size);
+    info->header.comp_size = __builtin_bswap32(info->header.comp_size);
+#endif
+
     /* マジック検証 */
     if (info->header.magic[0] != PKG_MAGIC_0 ||
         info->header.magic[1] != PKG_MAGIC_1 ||
@@ -275,6 +285,9 @@ int pkg_extract(KernelAPI *api, const char *path, const PkgInfo *info)
             const PkgEntry *ent = &info->entries[i];
             int wfd;
             u32 remains = ent->size;
+#ifdef OS32_VERIFY_INSTALLED_FILES
+            u32 crc = CRC32_INIT;
+#endif
 
             if (ent->type != PKG_TYPE_FILE) continue;
 
@@ -291,10 +304,19 @@ int pkg_extract(KernelAPI *api, const char *path, const PkgInfo *info)
                 int r = api->sys_read(fd, tbuf, (int)req);
                 if (r <= 0) break;
                 if (api->sys_write(wfd, tbuf, r) != r) break;
+#ifdef OS32_VERIFY_INSTALLED_FILES
+                crc = crc32_core_update(crc, tbuf, r);
+#endif
                 remains -= (u32)r;
                 pos += (u32)r;
             }
             api->sys_close(wfd);
+#ifdef OS32_VERIFY_INSTALLED_FILES
+            if (!remains && inst_verify_file(api, ent->path, crc, ent->size)) {
+                result = PKG_ERR_IO;
+                break;
+            }
+#endif
             if (remains > 0) { result = PKG_ERR_IO; break; }
         }
         api->sys_close(fd);
@@ -365,6 +387,13 @@ int pkg_extract(KernelAPI *api, const char *path, const PkgInfo *info)
             }
             api->sys_close(wfd);
 
+#ifdef OS32_VERIFY_INSTALLED_FILES
+            u32 crc = crc32_core_update(CRC32_INIT, data_buf+offset, ent->size);
+            if (inst_verify_file(api, ent->path, crc, ent->size)) {
+                api->mem_free(data_buf);
+                return PKG_ERR_IO;
+            }
+#endif
             offset += ent->size;
         }
     }

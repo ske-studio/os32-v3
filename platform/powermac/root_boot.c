@@ -24,6 +24,7 @@ int pm_root_boot(const struct boot_root_image *image, int *registered)
 {
     static const struct vfs_device_name names[] = {
 #if OS32_FEATURE_IDE
+        {"cd", VFS_NAME_DIGIT_PREFIX, VFS_DEV_CD, 0, 1},
         {"hd", VFS_NAME_DIGIT_PREFIX, VFS_DEV_HD, 0, 1},
 #endif
         {"rd", VFS_NAME_DIGIT_PREFIX, VFS_DEV_RAM, 0, 4},

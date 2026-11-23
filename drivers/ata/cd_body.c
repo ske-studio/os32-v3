@@ -1,5 +1,5 @@
 /* ATAPI and ISO9660 are one body: no cross-module media-generation pointer. */
-#include "cd_module.h"
+#include "cd_body.h"
 #include "atapi.h"
 #include "iso9660.h"
 #include "kprintf.h"

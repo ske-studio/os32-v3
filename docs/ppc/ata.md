@@ -271,3 +271,12 @@ hd0 は予約 owner だけが使える。世代ごとの Device 記述子は再�
 [Seagate SV35 Series Product Manual](https://www.seagate.com/support/disc/manuals/ata/100415205a.pdf)
 ・[FreeBSD ata_all.c](https://github.com/freebsd/freebsd-src/blob/main/sys/cam/ata/ata_all.c)
 ・[FreeBSD ata_da.c](https://github.com/freebsd/freebsd-src/blob/main/sys/cam/ata/ata_da.c)
+
+## 導入 CD の読取り
+
+媒体起動時は OF の `cd` の親を、HDD と同じ手順で取得した制御器の窓に対応させる。
+OF 切離し後はその窓で ATAPI の PACKET と READ(10) を実行する。コマンドと
+応答のバイト順は IDE bus のストリーム転送が保つ。容量を取得した CD を
+`cd0` として登録し、子マウントの処理が `/cd0` に iso9660 をマウントする。
+結線は §1 の Apple Developer Note、窓とレジスタ幅は §3 の NetBSD
+`sys/arch/macppc/dev/wdc_obio.c` を参照。

@@ -5,6 +5,12 @@
 #include "kprintf.h"
 #include "kstring.h"
 
+#if PM_PRODUCT_BOOT
+#include "product_boot.h"
+#include "install_backend.h"
+const volatile struct pm_boot_plan pm_expected_plan = {3, 2, 8, 6, 0};
+#endif
+
 static u8 disk[24][512], saved[sizeof(disk)];
 static Device *registered;
 static int fail_sector = -1;
@@ -108,6 +114,12 @@ int main(void)
     if (!d->blk_write(d, 0, 1, buf)) return 12;
     if (memcmp(saved, disk, sizeof(disk))) return 13;
     pm_partition_enable_writes();
+#if PM_PRODUCT_BOOT
+    if (!d->blk_write(d, 0, 1, buf) || memcmp(saved, disk, sizeof(disk))) return 18;
+    pm_install_publish(d->bus_id);
+    if (!d->blk_write(d, 0, 1, buf) || memcmp(saved, disk, sizeof(disk))) return 19;
+    return 0;
+#endif
     disk[8][0] = 81;
     disk[13][511] = 119;
     if (d->blk_read_u32(d, 0, 1, buf) || buf[0] != 81) return 5;

@@ -2,6 +2,9 @@
  * Apple TN1189, "How the ROM Loads SCSI and ATA Drivers".
  * FreeBSD sys/geom/part/g_part_apm.c, g_part_apm_probe/read. */
 #include "apm.h"
+#if PM_PRODUCT_BOOT
+#include "product_boot.h"
+#endif
 #include "ide_contract.h"
 #include "fs/ext2/ext2.h"
 #include "kstring.h"
@@ -31,6 +34,11 @@ int pm_apm_root(int unit, u32 capacity, u32 number, struct pm_partition *root)
         u32 start = apm_word(block + 8), sectors = apm_word(block + 12);
         if (!start || !sectors || start >= capacity || sectors > capacity - start)
             return EXT2_ERR_NOPART;
+#if PM_PRODUCT_BOOT
+        if (pm_expected_plan.boot_partition == i+1 &&
+            kstrncmp((char *)block+48, "Apple_HFS", 32)) return EXT2_ERR_NOPART;
+        if (pm_expected_plan.boot_partition > count) return EXT2_ERR_NOPART;
+#endif
         int is_map = !kstrncmp((char *)block + 48, "Apple_partition_map", 32);
         if (is_map != (i == 0) || (is_map && (start != 1 || sectors < count)))
             return EXT2_ERR_NOPART;

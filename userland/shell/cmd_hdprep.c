@@ -128,7 +128,7 @@ static int cmd_hdprep(int argc, char **argv)
     /* ---- 1. マウント ---- */
     rootdev = g_api->vfs_devname("/");
     root_hd0 = (rootdev && hp_streq(rootdev, HDPREP_DEV)) ? 1 : 0;
-    mounts = g_api->dev_mount_count(g.drive);
+    mounts = g_api->dev_mount_count(HDPREP_MOUNT_DRIVE(g.drive));
     rc = hdprep_check_mounts(mounts, root_hd0);
     if (rc < 0) { platform_hdprep_refuse(g_api, rc); return SH_STATUS_ERROR; }
 
@@ -158,7 +158,7 @@ static int cmd_hdprep(int argc, char **argv)
                 return SH_STATUS_ERROR;
             }
         }
-        if (g_api->dev_mount_count(p.drive) != 0) {
+        if (g_api->dev_mount_count(HDPREP_MOUNT_DRIVE(p.drive)) != 0) {
             platform_hdprep_refuse(g_api, HDPREP_E_STILL_MOUNTED);
             return SH_STATUS_ERROR;
         }
