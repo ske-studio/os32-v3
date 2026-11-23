@@ -38,7 +38,7 @@ static int translate(const struct pm_pci_capture *c, int bridge, unsigned space,
     return 1;
 }
 
-void pm_hwb_resource_init(const struct pm_kboot_info *info)
+void pm_hwb_resource_init(const struct pm_kboot_info *info, int gmac_verified)
 {
     const struct pm_pci_capture *c = &info->pci;
     int root = -1;
@@ -65,7 +65,7 @@ void pm_hwb_resource_init(const struct pm_kboot_info *info)
         if (bar0 && HW_BDF_BUS(bdf) >= bridge->first && HW_BDF_BUS(bdf) <= bridge->last &&
             space == 2 && a->base <= U32_MAX && !(pa & 3) && f->vendor == 0x106b) {
             if (f->device == 0x003f && f->class_code == 0x0c0310) length = 4;
-            if (f->device == 0x0021 && info->gmac.profile == PM_GMAC_PROFILE_UNINORTH &&
+            if (gmac_verified && f->device == 0x0021 && info->gmac.profile == PM_GMAC_PROFILE_UNINORTH &&
                 info->gmac.node == (u32)f->id && info->gmac.vendor_device == 0x0021106b &&
                 info->gmac.root_node == (u32)c->bridge[root].id &&
                 info->gmac.bdf == bdf << 8 && info->gmac.bar_pa == pa &&

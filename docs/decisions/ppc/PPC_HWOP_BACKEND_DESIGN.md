@@ -16,22 +16,22 @@
 # 1. 実物の確認
 
 照合版はローカルの origin/main（801af974b）。fetch は読取り専用、リモート照会は名前解決不可のため、それ以降の更新は未確認。
-以下の参照はこの版に固定する。表の一行を食い違い一件と数える。接続済みの本線を再実装しない。
+以下の行番号はこの版に固定する。表の一行を食い違い一件と数える。接続済みの本線を再実装しない。
 
 |件|確定設計を適用するときの差|実装への帰結|
 |---|---|---|
-|1|platform/powermac/platform_hwb.h（platform_hwb_abort_take） の POINT は常に 0、同 platform_hwb_phys_check の check と platform_hwb_phys / platform_hwb_block の phys/block は NOSYS|印と不変表の slot につなぐ。I/O の NOSYS は仕様通り。|
-|2|platform/powermac/platform_hwb_addr.h（platform_hwb_bar） は絶対番地のみ成功。kdebug/hwb_wire.h（enum hw_action） に 8 はあるが 7 がない|PPC の 7 のみ追加。絶対番地の sentinel を維持。|
-|3|build/targets/ppc-powermac.mk（kdebug.elf） のリンクは diag.o と kstring_c.o。module_diag.c（diag_call） は LIST 入口、kdebug_imports.h（KDEBUG_IMPORT_COUNT） は一枠|PPC モジュールに共通検証器と型付き輸入を組む。|
-|4|sdk/kapi_target_ppc.py（kdebug_call） は kdebug_call の宣言。build/select.mk（HWDEV の選択条件） は HWDEV の選択条件、HWDEV の選択先 が選択先で、hwb_access のオブジェクト列ではない|配送は module_diag、リンクは PPC の所有者に置く。公開 SDK は既存のまま使う。|
-|5|platform/powermac/pci_config.c（pm_pci_read32 / pm_pci_write32） は target_bdf と dword に限定。usb_platform.c（usbp_cfg_write8） の byte write は dword RMW、platform_hwb_pci.h（platform_hwb_cfg_read / platform_hwb_cfg_write） は NOSYS|橋を共有し、実幅を取引の引数にする。|
-|6|platform/powermac/kboot_capture.c（tree） の tree は選択した装置を保存|全 PCI 部分木を OF の利用中に捕捉する。|
-|7|arch/ppc/kernel_trap.c（ppc_trap_onfault_data / ppc_trap_dispatch） は一命令・一 DAR。連続 store の各要素に対応する枠がない|既存の単発枠を拡張し、範囲と方向を照合。|
-|8|platform/powermac/pci_config.c（pm_gmac_early_quiesce） の停止処理は Command 読み・解除書込み失敗で 0。ppc_kernel.c（pm_gmac_early_quiesce 呼出し） は負値で停止し memory_boot_init 呼出し のメモリ初期化を避ける|提供側を修正し、既存の呼出しで memory_boot_init 到達回数を測る。|
-|9|platform/powermac/input_decode.c（pm_input_decode） は端末の CANCEL と 03 を ESC に畳む|意味を失う前に、常駐 CUI 宛ての中止要求を取り出す。|
+|1|platform/powermac/platform_hwb.h:6 の POINT は常に 0、同 :11 の check と :19–28 の phys/block は NOSYS|印と不変表の slot につなぐ。I/O の NOSYS は仕様通り。|
+|2|platform/powermac/platform_hwb_addr.h:4 は絶対番地のみ成功。kdebug/hwb_wire.h:23 に 8 はあるが 7 がない|PPC の 7 のみ追加。絶対番地の sentinel を維持。|
+|3|build/targets/ppc-powermac.mk:347 のリンクは diag.o と kstring_c.o。module_diag.c:10 は LIST 入口、kdebug_imports.h:4 は一枠|PPC モジュールに共通検証器と型付き輸入を組む。|
+|4|sdk/kapi_target_ppc.py:7 は kdebug_call の宣言。build/select.mk:166 は HWDEV の選択条件、:176–184 が選択先で、hwb_access のオブジェクト列ではない|配送は module_diag、リンクは PPC の所有者に置く。公開 SDK は既存のまま使う。|
+|5|platform/powermac/pci_config.c:35,52 は target_bdf と dword に限定。usb_platform.c:125 の byte write は dword RMW、platform_hwb_pci.h:4–19 は NOSYS|橋を共有し、実幅を取引の引数にする。|
+|6|platform/powermac/kboot_capture.c:157 の tree は選択した装置を保存|全 PCI 部分木を OF の利用中に捕捉する。|
+|7|arch/ppc/kernel_trap.c:60,92 は一命令・一 DAR。連続 store の各要素に対応する枠がない|既存の単発枠を拡張し、範囲と方向を照合。|
+|8|platform/powermac/pci_config.c:110,117 の停止処理は Command 読み・解除書込み失敗で 0。ppc_kernel.c:285 は負値で停止し :288 のメモリ初期化を避ける|提供側を修正し、既存の呼出しで memory_boot_init 到達回数を測る。|
+|9|platform/powermac/input_decode.c:14 は端末の CANCEL と 03 を ESC に畳む|意味を失う前に、常駐 CUI 宛ての中止要求を取り出す。|
 
-- GEM と列挙は同じ transaction を呼ぶ。lan_gem_io.c（master） の master と pci_config.c（pm_gmac_quiesce_setup） の保存コピーは同じ橋を参照する。GEM の MAC レジスタ操作はドライバ所有。
-- USB も同じ transaction を呼ぶ。usb_platform.c（usbp_cfg_read32） 以降の構成 read の既存の失敗値、Command の set/clear と明示的な確認は入口で保つ。
+- GEM と列挙は同じ transaction を呼ぶ。lan_gem_io.c:45 の master と pci_config.c:81 の保存コピーは同じ橋を参照する。GEM の MAC レジスタ操作はドライバ所有。
+- USB も同じ transaction を呼ぶ。usb_platform.c:111 以降の構成 read の既存の失敗値、Command の set/clear と明示的な確認は入口で保つ。
 - BAR と raw phys は同じ資源表、単発と block は同じ一時窓を使う。常設の USB DMA・GEM マップには一時窓の所有権を渡さない。
 
 # 2. 共通設計 §4 の回答
@@ -40,11 +40,11 @@
 |---|---|
 |端末入力|端末受信キューへ投入する際、CUI の常駐シェル宛ての受信バイト 03 を ring3_abort_request に一度配送。待ち中も協調 yield の受信サービスが進むことを試験する。|
 |通常の編集|HW 実行中だけ停止文字を消費する場合は実行期間を明示して囲む。通常編集は従来の ESC も渡せる。入力全体を POINT で読み捨てない。|
-|USB 入力|input/hal/usb_input.c（usb_input_usage） の停止通知と同じ exec 入口。押下を一回だけ数え、離鍵・リピートで次の台本へ持ち越さない。|
-|印の所有|exec/exec_abort.inc（ring3_abort_request） の CUI/shell 判定が印を立てる。同 exec_hwb_abort_take が IRQ 保存下で交換。ロード冒頭の POINT が旧印を捨てる。|
+|USB 入力|input/hal/usb_input.c:47 の停止通知と同じ exec 入口。押下を一回だけ数え、離鍵・リピートで次の台本へ持ち越さない。|
+|印の所有|exec/exec_abort.inc:83 の CUI/shell 判定が印を立てる。同 :34 が IRQ 保存下で交換。ロード冒頭の POINT が旧印を捨てる。|
 |観測|wait・poll・fill の既存の点で ABORT。中止が来た後の要素を発行しない。block は一要求として完結。|
 
-待機中は wait/poll → sys_yield → idle_work_run → terminal_service_once → pm_terminal_poll → pm_lan_poll → pm_terminal_feed と進める。PPC の待機サービスは arch/ppc/exec_kapi.c（ppc_kapi_wait_once）。POINT はキューを読まない。
+待機中は wait/poll → sys_yield → idle_work_run → terminal_service_once → pm_terminal_poll → pm_lan_poll → pm_terminal_feed と進める。PPC の待機サービスは arch/ppc/exec_kapi.c:15。POINT はキューを読まない。
 ```c
 /* feed の discard・容量検査後。HW 実行期間は全終了経路で閉じる。 */
 if (c == 3 && resident_cui_hw_active()) { ring3_abort_request(); continue; }
@@ -60,9 +60,9 @@ exec は enter 時に既存の CUI/shell 所有者を確認し active=1、leave 
 区間は BAR0 先頭からの半開区間とし、割当サイズとの共通部分だけを有効にする。
 
 - mac99 の Apple OHCI は 106b:003f、class/prog-if 0c0310、LE、[0x00,0x04) の HcRevision。台本は自然整列した 32 bit read 一回。列挙で実際の BDF を選ぶ。[mac99 の列挙記録](https://boxes-of-tat.blogspot.com/2022/05/linux-for-powerpc-on-qemu-mac99-system.html)
-- G4 は既存の UniNorth GMAC プロファイルと 106b:0021 の一致時、LE、[0x6030,0x6038) の TX_CONFIG/RX_CONFIG。根拠は gmac_tree.c（pm_gmac_capture） の ID、pci_config.c（pm_gmac_early_quiesce） の実読、lan_gem_io.c（rd） の逆順ロード、drivers/net/gem/gem.h（GEM_MAC_TX_CONFIG / GEM_MAC_RX_CONFIG）。実機装着の新規観測はない。
-- いずれも資源登録は番地と順序の記述。両登録とも整列 32 bit 単発 read のみ許可し、write/block と他幅は WINDOW。GMAC 台本には OpenBSD sys/dev/ic/gemreg.h のレジスタ定義と lan_gem_io.c（rd） の LE アクセスを記す。未知の ID に class のみで範囲を開かない。
-- OF の判読は PCI Bus Binding to IEEE 1275 v2.1 の assigned-addresses、ranges に従う。PCI 空間と装置レジスタの順序は別に決める。mac99 の HcRevision の根拠は OpenHCI Specification for USB Release 1.0a §7.1.1。台本冒頭に仕様と参照実装を記す（docs/POLICY_PCIDEV.md §1）。
+- G4 は既存の UniNorth GMAC プロファイルと 106b:0021 の一致時、LE、[0x6030,0x6038) の TX_CONFIG/RX_CONFIG。根拠は gmac_tree.c:164–175 の ID、pci_config.c:113–114 の実読、lan_gem_io.c:11 の逆順ロード、drivers/net/gem/gem.h:64。実機装着の新規観測はない。
+- いずれも資源登録は番地と順序の記述。両登録とも整列 32 bit 単発 read のみ許可し、write/block と他幅は WINDOW。GMAC 台本には OpenBSD sys/dev/ic/gemreg.h のレジスタ定義と lan_gem_io.c:11 の LE アクセスを記す。未知の ID に class のみで範囲を開かない。
+- OF の判読は PCI Bus Binding to IEEE 1275 v2.1 の assigned-addresses、ranges に従う。PCI 空間と装置レジスタの順序は別に決める。mac99 の HcRevision の根拠は OpenHCI Specification for USB Release 1.0a §7.1.1。台本冒頭に仕様と参照実装を記す（docs/POLICY_PCIDEV.md:8）。
 - 橋エラーの判別根拠は MPC7450 RISC Microprocessor Family User’s Manual Rev 3.1、例外一覧の machine check 0x200（TEA/MCP）と DSI 0x300。SRR0/DAR の単発 DSI 回復を 0x200 に転用しない。非同期 machine check は当該構成取引に帰属できないので通常の fatal 経路。全 1 応答、既に立った PCI Status の sticky bit から障害を推測しない。
 - 初版 UniNorth では取引に帰属する独立のエラーラッチを資料から確認できていない。存在を仮定したレジスタ読出し・W1C 消去は行わない。選択・解除の readback は書込みの flush として必ず実行する。
 - 窓と Type 0/1 の手本は NetBSD uninorth_conf_read/write、tag 配送は OpenBSD pci_machdep.c。NetBSD の差分にある badaddr は保護アクセスの例。指定版の行番号、UniNorth の無応答・転送異常の通知方式は未確認、QEMU と実機で観測。[NetBSD の変更記録](https://www.mail-archive.com/source-changes-full%40netbsd.org/msg47458.html)
@@ -95,7 +95,7 @@ exec は enter 時に既存の CUI/shell 所有者を確認し active=1、leave 
 struct hw_range_req q = {{HW_VERSION,7,space,1,bdf,base,0,0},bar,offset,bytes};
 rc = kdebug_call(HW_OP,&q,sizeof q);
 /* kernel: 型付き定数表 exports の sizeof == 32、各欄の位置を静的検査 */
-request.imports = (const u32 *)&exports; /* kdebug/kdebug_module.c kdebug_load */
+request.imports = (const u32 *)&exports; /* kdebug/kdebug_module.c:57–62 */
 /* module */
 if (op == HW_OP && valid_prefix(buf,size) && req->action == 7) {
     if (size != sizeof(struct hw_range_req)) return OS32_ERR_INVAL;
@@ -108,8 +108,8 @@ if (op == HW_OP && valid_prefix(buf,size) && req->action == 7) {
 if (op == HW_OP) return hwb_access(buf,size);
 ```
 
-- 8 は共通 hwb_access.c（hwb_access） のまま。未使用欄、幅、整列、正の幅倍数、末尾を検査。slot 7 は検索一回、窓とバスへのアクセスはゼロ。
-- PCI は drivers/pci/pci_hwb.c（pci_hwb_read / pci_hwb_write） の共通検査を通す。PPC モジュールに同 TU をリンクし、platform_hwb_pci.h から slot 2/3 へ。
+- 8 は共通 hwb_access.c:22 のまま。未使用欄、幅、整列、正の幅倍数、末尾を検査。slot 7 は検索一回、窓とバスへのアクセスはゼロ。
+- PCI は drivers/pci/pci_hwb.c:17 の共通検査を通す。PPC モジュールに同 TU をリンクし、platform_hwb_pci.h から slot 2/3 へ。
 - 有効なポート操作は call=0/status=HW_NOSYS。READ 失敗の value=0、WRITE の value は保存する。部品無しの call=OS32_ERR_NOSYS と区別。
 
 ## 橋の登録と取引

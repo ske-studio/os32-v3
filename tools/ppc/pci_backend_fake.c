@@ -198,7 +198,11 @@ static int bridge_cases(void)
     fault_command_read = 0; fault_command_write = 1;
     if (!boot_case(1)) return 30;
     fault_command_write = 0;
-    if (!boot_case(0) || gem_command != 2) return 31;
+    if (!boot_case(0) || gem_command != 2 || !pm_gmac_rh_sample()->valid) return 31;
+    gem_id++;
+    fault_command_read = 1;
+    if (!boot_case(0) || pm_gmac_rh_sample()->valid) return 42;
+    fault_command_read = 0;
     return 0;
 }
 

@@ -7,57 +7,45 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def fill(work, mutate):
-    (work/'shell.h').write_text(
-        'struct fill_api { int (*kdebug_call)(u32,void *,u32); };\n'
-        'static struct fill_api *g_api;\n')
-    path = Path('userland/shell/hwb_exec.c')
-    source = (ROOT/path).read_text()
-    anchor = 'platform_hwb_fill_check(r->addr, i->width, r->count * i->width)'
-    assert source.count(anchor) == 1
-    (work/path).parent.mkdir(parents=True)
-    for narrow in ([False, True] if mutate else [False]):
-        (work/path).write_text(source.replace(anchor, anchor.replace('r->count * ', ''))
-                               if narrow else source)
-        subprocess.run(['gcc', '-m32', '-O2', '-ffreestanding', '-fno-builtin', '-march=i386',
-                        '-fno-pie', '-no-pie', '-nostdinc', '-nostdlib', '-static',
-                        '-I'+str(work), '-I.', '-Iinclude', '-Iplatform/powermac',
-                        '-Iuserland/shell', '-Isdk/include/os32',
-                        'tools/ppc/hwb_fill_host.c', '-o', work/'fill'], cwd=ROOT, check=True)
-        result = subprocess.run(['qemu-i386', work/'fill'], capture_output=True, timeout=10)
-        if narrow:
-            assert result.returncode == 1 and b'FAIL:fill-last-element: !bus.bus_accesses' in result.stdout
-            print('RED fill checks only the first element')
-        else:
-            assert result.returncode == 0, result.stdout
-
-
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    source = (ROOT / 'kdebug/hwb_access.c').read_text()
-    cases = [('normal', source, 0)]
+    cases = [('normal', None, None, None, 0)]
     if args.mutate:
-        for name, old, new, rc in [
-                ('check-reads', 'platform_hwb_phys_check(req->addr, width, bytes)',
-                 'platform_hwb_phys(&(struct hw_req){.action=HW_READ, .width=width, .addr=req->addr})', 17),
-                ('port-ok', 'platform_hwb_io(req)', 'HW_OK', 13)]:
-            assert source.count(old) == 1
-            cases.append((name, source.replace(old, new), rc))
-    with tempfile.TemporaryDirectory() as tmp:
-        work = Path(tmp)
-        fill(work, args.mutate)
-        (work/'kdebug').mkdir()
-        for name, code, expected in cases:
-            (work/'kdebug/hwb_access.c').write_text(code)
-            subprocess.run(['gcc', '-m32', '-O2', '-ffreestanding', '-fno-pie', '-no-pie',
-                            '-nostdinc', '-nostdlib', '-static', '-I'+tmp, '-I.', '-Iinclude',
-                            '-Iarch/ppc', '-Ikernel/module', '-Ikdebug', '-Isdk/include/os32', '-Iplatform/powermac',
-                            'tools/ppc/hwb_requests_host.c', '-o', work/'test'], cwd=ROOT, check=True)
-            rc = subprocess.run(['qemu-i386', work/'test'], timeout=10).returncode
-            assert rc == expected, (name, rc, expected)
-            print(name, rc)
+        cases += [
+            ('check-reads', 'kdebug/hwb_access.c', 'platform_hwb_phys_check(req->addr, width, bytes)',
+             'platform_hwb_phys(&(struct hw_req){.action=HW_READ, .width=width, .addr=req->addr})', 17),
+            ('port-ok', 'kdebug/hwb_access.c', 'platform_hwb_io(req)', 'HW_OK', 13),
+            ('short-fill-request', 'userland/shell/hwb_exec.c', 'r->count * i->width)',
+             'i->width)', 1),
+            ('short-fill-lookup', 'platform/powermac/hwb_resource.c', 'allows(lookup(addr, bytes)',
+             'allows(lookup(addr, width)', 1),
+            ('unverified-gmac', 'platform/powermac/hwb_resource.c', 'gmac_verified && f->device',
+             'f->device', 29),
+        ]
+    for name, path, old, new, expected in cases:
+        with tempfile.TemporaryDirectory() as tmp:
+            work = Path(tmp)
+            (work/'shell.h').write_text(
+                'struct fill_api { int (*kdebug_call)(u32,void *,u32); };\n'
+                'static struct fill_api *g_api;\n')
+            if path:
+                source = (ROOT/path).read_text()
+                assert source.count(old) == 1, name
+                (work/path).parent.mkdir(parents=True)
+                (work/path).write_text(source.replace(old, new))
+            subprocess.run(['gcc', '-m32', '-O2', '-ffreestanding', '-fno-builtin', '-march=i386',
+                            '-fno-pie', '-no-pie', '-nostdinc', '-nostdlib', '-static',
+                            '-I'+tmp, '-I.', '-Iinclude', '-Iarch/ppc', '-Ikernel/module',
+                            '-Ikdebug', '-Isdk/include/os32', '-Iplatform/powermac', '-Iuserland/shell',
+                            'tools/ppc/hwb_fill_host.c', 'tools/ppc/hwb_requests_host.c',
+                            '-o', work/'test'], cwd=ROOT, check=True)
+            result = subprocess.run(['qemu-i386', work/'test'], capture_output=True, timeout=10)
+            assert result.returncode == expected, (name, result.returncode, result.stdout)
+            if expected == 1:
+                assert b'FAIL:fill-last-element: fill_stores() == 0' in result.stdout
+            print(name, 'RED' if expected else 'PASS')
     print("PowerMac request, range and fill tests PASS")
 
 

@@ -103,7 +103,7 @@ static int exercise(void)
     pci->ranges = 2;
     pci->range[0] = (struct pm_of_range){1, 2, 2, 0x3000, 0x4000, 0x100};
     pci->range[1] = (struct pm_of_range){0, 2, 0, 0x4000, 0x1000, 0x100};
-    pm_hwb_resource_init(&info);
+    pm_hwb_resource_init(&info, 0);
     for (unsigned size = 0; size <= sizeof(valid)+1; ++size) {
         if (size == sizeof(valid)) continue;
         if (hwb_access(&valid, size) != OS32_ERR_INVAL || checks || accesses) return 10;
@@ -152,23 +152,23 @@ static int exercise(void)
     if (pm_hwb_block(&block) != HW_WINDOW || pm_hwb_phys(&write) != HW_WINDOW ||
         windows != 1 || stores) return 28;
     pci->assignment[0].bytes = 4;
-    pm_hwb_resource_init(&info);
+    pm_hwb_resource_init(&info, 0);
     if (pm_hwb_bar(0x5a, 0, HW_PHYS, 0x3000, 0, 4, &pa) ||
         pm_hwb_bar(0x5a, 0, HW_PHYS, 0x3000, 0, 8, &pa) != HW_ARG ||
         pm_hwb_bar(0x5a, 0, HW_PHYS, 0x3004, 0, 4, &pa) != HW_WINDOW) return 18;
     pci->range[1].bytes = 3;
-    pm_hwb_resource_init(&info);
+    pm_hwb_resource_init(&info, 0);
     if (pm_hwb_phys_check(pa, 4, 4) != HW_WINDOW) return 19;
     pci->range[1].bytes = 0x100;
     pci->function[0].device++;
-    pm_hwb_resource_init(&info);
+    pm_hwb_resource_init(&info, 0);
     if (pm_hwb_phys_check(pa, 4, 4) != HW_WINDOW) return 20;
     pci->function[0].device--;
     pci->function[1] = (struct pm_of_function){.bridge=0};
     pci->functions++;
     pci->assignment[1] = (struct pm_of_assignment){1, 0x02006010, 0x4002, 4};
     pci->assigned++;
-    pm_hwb_resource_init(&info);
+    pm_hwb_resource_init(&info, 0);
     if (pm_hwb_phys(&read) != HW_WINDOW || windows != 1) return 16;
     pci->assigned = 1;
     pci->assignment[0].bytes = pci->range[0].bytes = pci->range[1].bytes = 0x6038;
@@ -176,7 +176,11 @@ static int exercise(void)
     pci->function[0].device = 0x21;
     info.gmac = (struct pm_gmac_boot){.profile=PM_GMAC_PROFILE_UNINORTH, .node=7,
         .vendor_device=0x0021106b, .root_node=42, .bdf=0x5a00, .bar_pa=0x1000, .bar_bus=0x3000};
-    pm_hwb_resource_init(&info);
+    pm_hwb_resource_init(&info, 0);
+    read.addr = 0x7030;
+    if (pm_hwb_phys(&read) != HW_WINDOW || windows != 1 ||
+        pm_hwb_bar(0x5a, 0, HW_PHYS, 0x3000, 0x6030, 4, &pa) != HW_WINDOW) return 29;
+    pm_hwb_resource_init(&info, 1);
     for (u32 off = 0x6030; off <= 0x6034; off += 4)
         if (pm_hwb_bar(0x5a, 0, HW_PHYS, 0x3000, off, 4, &pa) || pa != 0x1000+off)
             return 21;
@@ -184,9 +188,32 @@ static int exercise(void)
         pm_hwb_phys_check(pa-4, 4, 8) != HW_WINDOW) return 22;
     return memory_cases();
 }
+void test_fill(void);
+
+int fill_dispatch(u32 op, void *buf, u32 size)
+{
+    return op == HW_OP ? hwb_access(buf, size) : OS32_ERR_INVAL;
+}
+
+void setup_fill_window(void)
+{
+    resource_count = 1;
+    resources[0] = (struct hwb_assignment){.pa=0x1000, .bytes=4, .reg_bytes=4,
+                                           .little=1, .writable=1, .widths=2};
+    stores = 0;
+}
+
+unsigned fill_stores(void) { return stores; }
+int fill_contents_ok(void)
+{
+    return backing[0] == 0x34 && backing[1] == 0x12 &&
+           backing[2] == 0x34 && backing[3] == 0x12;
+}
+
 void _start(void)
 {
     int rc = exercise();
+    if (!rc) test_fill();
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc));
     __builtin_unreachable();
 }
