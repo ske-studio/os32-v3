@@ -39,8 +39,17 @@ def main():
         start, = struct.unpack_from('>I', data, entry+8)
         whole = data[:start*512+len(volume)]
         exercise(product_media.partition, whole, volume, entry)
+        hdd = product_media.hdd_volume(volume)
+        assert hdd[-1024:-512] == volume[1024:1536]
         if '--mutate' in sys.argv:
             source = Path(product_media.__file__).read_text()
+            anchor = 'hybrid[1024:1536] + bytes(512)'
+            assert source.count(anchor) == 1
+            namespace = {'__name__': 'mutated_product_media'}
+            exec(compile(source.replace(anchor, 'bytes(512) + hybrid[1024:1536]'),
+                         str(image), 'exec'), namespace)
+            assert namespace['hdd_volume'](volume)[-1024:-512] != volume[1024:1536]
+            print('misplaced alternate MDB RED')
             # Each mutant must admit a malformed fixture through the production parser.
             for before, after in [('first*512 + blocks*block_size != len(volume)', 'False'),
                                   ('len(volume) != sectors*512', 'False')]:

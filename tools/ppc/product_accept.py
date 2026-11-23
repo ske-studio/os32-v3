@@ -94,7 +94,7 @@ class FirmwareSession:
         return self.wait()
 
 
-def firmware(raw, expected):
+def firmware(raw, expected, volume_size):
     cmd = ['qemu-system-ppc', '-M', 'mac99', '-cpu', '7450', '-m', '128M', '-nographic',
            '-bios', ROM, '-monitor', 'none', '-serial', 'stdio', '-prom-env', 'auto-boot?=false',
            '-drive', f'file={raw},format=raw,if=ide,index=0,snapshot=on']
@@ -104,6 +104,26 @@ def firmware(raw, expected):
             s = FirmwareSession(process)
             s.wait()
             s.command('hex')
+            # Read the APM through the whole-disk OF handle. File reads alone
+            # can succeed even if the advertised partition ends a sector early.
+            s.command('" hd:0" open-dev value drive')
+            s.command('200 alloc-mem value sector')
+            s.command(': sector@ 200 * 0 " seek" drive $call-method if abort then '
+                      'sector 200 " read" drive $call-method 200 <> if abort then ;')
+            s.command(': be32@ dup c@ 18 lshift over 1+ c@ 10 lshift or '
+                      'over 2 + c@ 8 lshift or swap 3 + c@ or ;')
+            result = s.command('2 sector@ cr ." MAP " sector 8 + be32@ . '
+                               'sector c + be32@ . cr')
+            match = re.search(rb'(?m)^MAP ([0-9a-fA-F]+) ([0-9a-fA-F]+) ', result)
+            if not match:
+                raise RuntimeError(f'no firmware partition result: {result!r}')
+            first, count = (int(value, 16) for value in match.groups())
+            if count * 512 != volume_size:
+                return False
+            for lba in (first + 2, first + count - 2):
+                result = s.command(f'{lba:x} sector@ cr ." MDB " sector be32@ 10 rshift . cr')
+                if not re.search(rb'(?m)^MDB 4244 ', result):
+                    raise RuntimeError(f'invalid firmware MDB: {result!r}')
             s.command(': checksum 0 -rot bounds ?do 21 * i c@ + ffffffff and loop ;')
             for name, content in expected.items():
                 length = len(content)
@@ -146,7 +166,7 @@ def main():
     files = catalog(volume)
     cases = [('normal', None)]
     if args.mutate:
-        cases.append(('media-load', None))
+        cases.extend((case, None) for case in ('media-load', 'short', 'long'))
         for name in FILES:
             cases.extend([(name+'-path', files[name][0]), (name+'-contents', files[name][1])])
     with tempfile.TemporaryDirectory() as directory:
@@ -163,11 +183,18 @@ def main():
                 copy = hfs.read_bytes()
             raw = disk(copy)
             start, count = struct.unpack_from('>II', raw, 1032)
-            assert start*512+count*512 == len(raw) and count*512 == len(copy)
-            payload = raw[start*512:]
+            assert copy[-1024:-512] == copy[1024:1536]
+            if case in ('short', 'long'):
+                count += 1 if case == 'long' else -1
+                struct.pack_into('>I', raw, 1036, count)
+                struct.pack_into('>I', raw, 1108, count)
+                if case == 'long':
+                    raw.extend(bytes(512))
+                    struct.pack_into('>I', raw, 4, len(raw)//512)
+            payload = raw[start*512:(start+count)*512]
             entries = catalog(payload)
             forks = {name: payload[start:start+size] for name, (_, start, size) in entries.items()}
-            matches = all(forks.get(name) == content for name, content in expected.items())
+            matches = len(payload) == len(copy) and all(forks.get(name) == content for name, content in expected.items())
             assert matches == (case == 'normal'), case
             if case in ('normal', 'media-load'):
                 try:
@@ -182,7 +209,7 @@ def main():
             path = Path(directory)/(case+'.raw')
             path.write_bytes(raw)
             if not args.build_only:
-                assert firmware(path, expected) == matches
+                assert firmware(path, expected, len(copy)) == matches
             print(case, digest, flush=True)
     print('PASS product install media' + (' (build only)' if args.build_only else ''))
 

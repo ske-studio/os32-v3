@@ -11,9 +11,10 @@ view = root / 'platform/powermac/partition_view.c'
 apm = root / 'platform/powermac/apm.c'
 superblock = root / 'fs/ext2/ext2_super.c'
 block_io = superblock.with_name('ext2_super_block_io.inc')
-cases = [('normal', view, None, None, 0)]
+cases = [('normal', view, None, None, 0), ('product', view, None, None, 0)]
 if '--mutate' in sys.argv:
-    cases += [('start', view, 'first + offset', 'offset', 5),
+    cases += [('product-unlock', view, '#if !PM_PRODUCT_BOOT', '#if 1', 18),
+              ('start', view, 'first + offset', 'offset', 5),
               ('last', view, 'count > dev->total_sects - offset', 'count >= dev->total_sects - offset', 6),
               ('early-write', view, '!writable || dev != &view', 'dev != &view', 12),
               ('write-then-error', view, 'if (!writable || dev != &view)',
@@ -50,7 +51,7 @@ with tempfile.TemporaryDirectory() as tmp:
             sources[sources.index(target)] = path
         exe = Path(tmp) / 'host'
         subprocess.run(['cc', '-m32', '-nostdinc', '-nostdlib', '-static', '-ffreestanding', '-fno-pie', '-ffunction-sections', '-fdata-sections',
-                        '-Wl,--gc-sections', '-DOS32_FEATURE_IDE=1', '-Ifs/ext2', '-D__cdecl=', '-I.', '-Iinclude', '-Iplatform/powermac',
+                        '-Wl,--gc-sections', '-DPM_PRODUCT_BOOT=' + str(int(name.startswith('product'))), '-DOS32_FEATURE_IDE=1', '-Ifs/ext2', '-D__cdecl=', '-I.', '-Iinclude', '-Iplatform/powermac',
                         '-Ikernel/dev', '-Ilib', '-Isdk/include/os32', '-Iarch/ppc',
                         'tools/tests/ppc_partition_host.c', *sources, 'platform/powermac/root_boot.c',
                         'lib/kstring_c.c', '-o', exe], cwd=root, check=True)

@@ -39,6 +39,14 @@ def partition(image):
     return matches[0]
 
 
+def hdd_volume(hybrid):
+    # Apple, Inside Macintosh: Files, ch. 2, "Master Directory Block":
+    # the alternate MDB occupies the next-to-last 512-byte logical block.
+    # genisoimage's allocation area extends to the end of its CD partition.
+    # Append the two reserved HDD sectors outside that allocation area.
+    return hybrid + hybrid[1024:1536] + bytes(512)
+
+
 def build_volume(output, loader, product):
     with tempfile.TemporaryDirectory(dir=output.parent) as tmp:
         cd = Path(tmp) / 'cd'
@@ -49,7 +57,7 @@ def build_volume(output, loader, product):
         subprocess.run(['genisoimage', '-quiet', '-hfs', '-part', '-no-desktop',
                         '-V', 'OS32BOOT', '-o', disk, cd], check=True)
         volume = Path(tmp) / 'volume'
-        volume.write_bytes(partition(disk.read_bytes()))
+        volume.write_bytes(hdd_volume(partition(disk.read_bytes())))
         volume.replace(output)
 
 

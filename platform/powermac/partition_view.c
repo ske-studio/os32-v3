@@ -56,7 +56,10 @@ int pm_partition_register(int unit, u32 capacity, u32 number)
 
 void pm_partition_enable_writes(void)
 {
+    /* Stage 3a has no installer reservation authorizing a product write. */
+#if !PM_PRODUCT_BOOT
     writable = dev_find(view.name) == &view;
+#endif
 }
 
 int platform_ext2_resolve(int logical_drive, Device **dev, u32 *base, u32 *len)
