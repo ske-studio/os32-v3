@@ -153,12 +153,26 @@ static void device(int node, struct pm_kboot_device *dest)
         node=v->parent;
     }
 }
+#include "pci_capture.inc"
+
+static int mpic_compatible(int node, int is_bridge, int parent)
+{
+    if (is_bridge)
+        return pci_compatible(node, "chrp,open-pic", parent) ||
+            pci_compatible(node, "open-pic", parent) || pci_compatible(node, "openpic", parent);
+    return compatible(node,"chrp,open-pic") || compatible(node,"open-pic") ||
+            compatible(node,"openpic");
+}
+
 /* Bounded preorder walk: also bounds malformed peer/child cycles. */
-static void tree(int node, unsigned depth)
+static void tree(int node, unsigned depth, int parent_bridge)
 {
     while (node!=0 && node!=-1) {
-        if (++visited>PM_KBOOT_TREE_LIMIT || depth>=PM_KBOOT_ANCESTORS)
-            fail("FAIL:KBOOT:TREE-LIMIT\r\n");
+        if (++visited>PM_KBOOT_TREE_LIMIT || depth>=PM_KBOOT_ANCESTORS) {
+            if (parent_bridge == -1) fail("FAIL:KBOOT:TREE-LIMIT\r\n");
+            pci_incomplete(parent_bridge);
+            return;
+        }
         if (!info.tb_hz && ofw_parent(node)==ofw_finddevice("/cpus") &&
             named(node,"device_type","cpu")) {
             int n=read_property(node,"timebase-frequency");
@@ -169,12 +183,20 @@ static void tree(int node, unsigned depth)
         }
         if (!info.escc.count && named(node,"name","ch-a") &&
             named(ofw_parent(node),"name","escc")) device(node,&info.escc);
+        int is_bridge = named(node, "device_type", "pci") ||
+            (parent_bridge >= 0 && (pci_scalar(node, "class-code", parent_bridge, 0) >> 8) == 0x0604);
+        int child_bridge = -1;
+        if (parent_bridge >= 0) pci_function(node, parent_bridge);
+        if (parent_bridge == -2) child_bridge = -2;
+        else if (is_bridge) child_bridge = pci_bridge(node, parent_bridge);
         if (!info.mpic.count && (named(node,"device_type","open-pic") ||
             named(node,"name","open-pic") ||
-            compatible(node,"chrp,open-pic") || compatible(node,"open-pic") ||
-            compatible(node,"openpic"))) device(node,&info.mpic);
-        tree(ofw_child(node),depth+1);
+            mpic_compatible(node, is_bridge, child_bridge))) device(node,&info.mpic);
+        int child = ofw_child(node);
+        if (child == -1 && child_bridge >= 0) pci_incomplete(child_bridge);
+        tree(child, depth+1, child_bridge);
         node=ofw_peer(node);
+        if (node == -1 && parent_bridge >= 0) pci_incomplete(parent_bridge);
     }
 }
 const struct pm_kboot_info *pm_kboot_capture(ppc_ci ci)
@@ -197,10 +219,11 @@ const struct pm_kboot_info *pm_kboot_capture(ppc_ci ci)
     memory(mem,"reg",ac,sc,&info.ram);
     int mac=macrisc(root);
     memory(mem,"available",mac?1:ac,mac?1:sc,&info.available);
-    tree(ofw_child(root),0);
+    tree(ofw_child(root),0,-1);
     if (!info.tb_hz || !info.escc.count || !info.mpic.count)
         fail("FAIL:KBOOT:REQUIRED-NODE\r\n");
     info.gmac_rc = pm_gmac_capture(&info.gmac);
+    info.pci.gmac_known |= pm_gmac_known();
     pm_via_capture(root, &info.via);
 #if KBOOT_SH
     pm_usb_capture();

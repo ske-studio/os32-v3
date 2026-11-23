@@ -1,6 +1,13 @@
 {
   "module_abi_gen": 1,
   "imports": [
-    {"index": 0, "name": "debug_probe_snapshot", "kind": 1, "type_ver": 1}
+    {"index": 0, "name": "debug_probe_snapshot", "kind": 1, "type_ver": 1},
+    {"index": 1, "name": "exec_hwb_abort_take", "kind": 1, "type_ver": 1},
+    {"index": 2, "name": "pm_hwb_cfg_read", "kind": 1, "type_ver": 1},
+    {"index": 3, "name": "pm_hwb_cfg_write", "kind": 1, "type_ver": 1},
+    {"index": 4, "name": "pm_hwb_bar", "kind": 1, "type_ver": 1},
+    {"index": 5, "name": "pm_hwb_phys", "kind": 1, "type_ver": 1},
+    {"index": 6, "name": "pm_hwb_block", "kind": 1, "type_ver": 1},
+    {"index": 7, "name": "pm_hwb_phys_check", "kind": 1, "type_ver": 1}
   ]
 }

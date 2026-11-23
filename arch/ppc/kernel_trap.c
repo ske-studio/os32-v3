@@ -17,7 +17,11 @@ static void (*dec_handler)(struct ppc_frame *);
 static ppc_pd_read_fn table_reader;
 static void *table_context;
 static int fatal_ready;
-static struct { u32 pc, va, reason, resume; int active, data; } probe;
+enum { PROBE_TRANSFER = 2 };
+static struct {
+    u32 pc, va, reason, resume, last, width;
+    int active, data, store;
+} probe;
 #ifdef PPC_TRAP_HOST_TEST
 u32 ppc_trap_msr(void);
 void ppc_trap_stop(void) __attribute__((noreturn));
@@ -65,6 +69,28 @@ int ppc_trap_onfault_data(u32 pc, u32 va, u32 resume)
     probe.active = 1;
     return 1;
 }
+int ppc_trap_onfault_transfer(u32 pc, u32 first, u32 last, u32 width,
+                              int store, u32 resume)
+{
+    if ((width != 1 && width != 2 && width != 4) || last < first ||
+        ((first | last) & (width - 1)) || (ppc_trap_msr() & PPC_MSR_EE) ||
+        !ppc_trap_onfault_data(pc, first, resume))
+        return 0;
+    probe.last = last;
+    probe.width = width;
+    probe.store = !!store;
+    probe.data = PROBE_TRANSFER;
+    return 1;
+}
+
+static int probe_address_matches(const struct ppc_frame *f)
+{
+    if (probe.data != PROBE_TRANSFER)
+        return (f->vector == PPC_VECTOR_ISI ? f->srr0 : f->dar) == probe.va;
+    return f->vector == PPC_VECTOR_DSI && f->dar >= probe.va &&
+           f->dar <= probe.last && !((f->dar - probe.va) & (probe.width - 1)) &&
+           !!(f->dsisr & PPC_DSISR_STORE) == probe.store;
+}
 static u32 fault_reason(const struct ppc_frame *f)
 {
     struct ppc_translation t;
@@ -102,7 +128,7 @@ void ppc_trap_dispatch(struct ppc_frame *f)
     if (!(f->srr1 & PPC_MSR_PR) && storage_fault) {
         reason = fault_reason(f);
         if (probe.active && f->srr0 == probe.pc &&
-            (f->vector == PPC_VECTOR_ISI ? f->srr0 : f->dar) == probe.va &&
+            probe_address_matches(f) &&
             (probe.data ? (reason == PPC_TRAP_DSI_MISS ||
                            reason == PPC_TRAP_DSI_PROTECT ||
                            reason == PPC_TRAP_DSI_IO) : reason == probe.reason)) {

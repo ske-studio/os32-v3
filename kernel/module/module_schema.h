@@ -297,4 +297,11 @@ enum module_field {
     }, \
 }
 
+#ifdef MODULE_SCHEMA_IMPORT_VALIDATION
+static inline int module_positional_imports(u32 id)
+{
+    return id == MODULE_ID_KDEBUG;
+}
+#endif
+
 #endif

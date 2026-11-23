@@ -323,3 +323,4 @@ int paging_pte_restore(u32 virt_addr, u32 raw)
     return 0;
 }
 
+#include "platform_paging_window.h"

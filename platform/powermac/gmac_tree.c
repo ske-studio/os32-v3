@@ -123,6 +123,12 @@ void pm_gmac_boot_id(struct pm_gmac_boot *b, u64 tb, u32 pvr)
     for (unsigned i=0;i<6;i++) b->boot_id[8+i]=b->mac[i];
     b->boot_id[14]=(u8)(pvr>>8); b->boot_id[15]=(u8)pvr;
 }
+/* Identification survives failure to decode the bridge, BAR or clock. */
+int pm_gmac_known(void)
+{
+    return found != 0;
+}
+
 int pm_gmac_capture(struct pm_gmac_boot *out)
 {
     if (!out) return LAN_EINVAL;
