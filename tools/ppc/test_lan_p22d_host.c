@@ -1,3 +1,4 @@
+/* PowerMac HW_OP design §5, 6a: exact instruction and aligned DAR range. */
 #include "ppc_trap.h"
 /* Fixture owns IRQ context storage; no shared product definition. */
 volatile u32 kctx_irq_depth;
@@ -41,6 +42,23 @@ int main(void) {
     CHECK(!ppc_trap_onfault_data(0x104,0x104,0x204)); ppc_trap_dispatch(&f); CHECK(f.srr0==0x200);
     mark(25); f.srr0=0x100; fatal(&f,PPC_TRAP_DSI_MISS);
     mark(26); CHECK(!ppc_trap_onfault_data(0x101,0x100,0x200));
+    for (u32 store=0; store<=1; ++store) {
+        f.dsisr=PPC_DSISR_MISS | (store ? PPC_DSISR_STORE : 0);
+        for (u32 dar=0x100; dar<=0x10c; dar+=4) {
+            mark(30); f.srr0=0x100; f.dar=dar;
+            CHECK(ppc_trap_onfault_transfer(0x100,0x100,0x108,4,store,0x200));
+            if (dar==0x10c) fatal(&f,PPC_TRAP_DSI_MISS);
+            else { ppc_trap_dispatch(&f); CHECK(f.srr0==0x200); }
+        }
+        const u32 pc[] = {0x104,0x100,0x100};
+        const u32 address[] = {0x100,0x102,0x100};
+        for (u32 i=0;i<3;i++) {
+            mark(31); f.srr0=pc[i]; f.dar=address[i];
+            if (i==2) f.dsisr ^= PPC_DSISR_STORE;
+            CHECK(ppc_trap_onfault_transfer(0x100,0x100,0x108,4,store,0x200));
+            fatal(&f,PPC_TRAP_DSI_MISS);
+        }
+    }
     return 0;
 }
 void _start(void) { int r=main(); __asm__ volatile("int $0x80" : : "a"(1),"b"(r)); __builtin_unreachable(); }
