@@ -538,6 +538,10 @@ pub(crate) fn capture_keyboard_observed(st: &mut GuiState, ctx: Ctx) -> bool {
         let scan = (raw & 0x7F) as u8;
         let down = ((raw >> 8) & 1) != 0;
         let mods = ((raw >> 9) & 0x7F) as u32;
+        #[cfg(feature = "c_gui_accept")]
+        if scan == 0x1d {
+            crate::gserial::reply_to(false, b"!", format_args!("C-GUI RAW {}", down as u8));
+        }
         /* Mirror kbd.c for WM-deferred raw as well. Inspect before defer and
          * overflow handling, so Pump/FEP and full event rings obey the same
          * boundary. Breaks and modifier makes never start a new operation. */
@@ -716,7 +720,11 @@ pub(crate) fn capture_keyboard_observed(st: &mut GuiState, ctx: Ctx) -> bool {
         };
         let serial = next_serial(st, t.slot);
         let ev = ring::ev_key(down, t.win_id, scan, ch, mods as u8, serial);
-        crate::excl::append(st, t.slot, &ev);
+        let _delivered = crate::excl::append(st, t.slot, &ev);
+        #[cfg(feature = "c_gui_accept")]
+        if _delivered && scan == 0x1d {
+            crate::gserial::reply_to(false, b"!", format_args!("C-GUI KEY {} {}", t.win_id, down as u8));
+        }
 
         /* 印字可能キーは Text も配送 (契約 U2a。FEP が消費していれば上で
          * continue しているので二重にはならない)。 */

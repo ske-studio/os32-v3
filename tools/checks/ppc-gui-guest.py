@@ -1,12 +1,12 @@
 CHECK = dict(name='ppc-gui-guest', tier=2, needs=[], budget=1200,
     env=['ppc-cross', 'qemu-ppc', 'socket'], full_only=True,
-    covers=['tools/checks/ppc-gui-guest.py', 'tools/accept/ppc_gui.py', 'tools/accept/ppc_shm.py',
+    covers=['tools/checks/ppc-gui-guest.py', 'tools/accept/ppc_gui.py', 'tools/accept/ppc_in2_cui.py', 'tools/accept/ppc_shm.py',
             'tools/ppc/**', 'tools/*.py', 'userland/gshell/**', 'userland/lib/**', 'userland/ppc/**', 'userland/shell/**',
             'Makefile', 'build/**', 'sdk/**', 'mm/**', 'exec/**', 'arch/ppc/**',
             'platform/powermac/**', 'include/**', 'init/**', 'kernel/**',
             'kapi/**', 'lib/**', 'fs/**', 'drivers/**', 'input/**', 'net/**',
             'gfx/**', 'assets/fonts/**'],
-    basis=['docs/decisions/ppc/PPC_GUI_KAPI_DESIGN.md §4'],
+    basis=['docs/decisions/ppc/PPC_GUI_KAPI_DESIGN.md §4・§4.1'],
     env_limit='Requires mac99 QEMU and loopback UDP/TCP for link-sh RSH.')
 
 

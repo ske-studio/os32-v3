@@ -1206,7 +1206,7 @@ fn deliver_host_notice(st: &mut GuiState) {
 
 #[cfg(feature = "c_gui_accept")]
 #[no_mangle]
-static mut C_GUI_POINTER: [i32; 4] = [0; 4];
+static mut C_GUI_POINTER: [i32; 11] = [0; 11];
 
 /// WM の 1 周: 入力取り込み → パレットのリース調停 → FEP の配置 →
 /// クローム/デスクトップの present → FEP の描画。
@@ -1266,8 +1266,16 @@ pub fn wm_cycle(st: &mut GuiState, ctx: input::Ctx) {
     if ctx != input::Ctx::Pump && st.ops.active { if gfx_ok { flush_present(); } crate::typical_ops::on_cycle_end(st); }
     #[cfg(feature = "c_gui_accept")]
     unsafe {
+        let previous = core::ptr::read_volatile(&raw const C_GUI_POINTER);
+        if (previous[0], previous[1]) != (st.mouse_x, st.mouse_y) {
+            crate::gserial::reply_to(false, b"!", format_args!("C-GUI POINTER {} {} {} {}",
+                st.mouse_x, st.mouse_y, st.stop_mouse_buttons, st.prev_buttons));
+        }
         core::ptr::write_volatile(&raw mut C_GUI_POINTER,
-                                  [st.mouse_x, st.mouse_y, st.stop_mouse_buttons as i32, st.prev_buttons as i32]);
+                                  [st.mouse_x, st.mouse_y, st.stop_mouse_buttons as i32, st.prev_buttons as i32,
+                                   st.drag_index, st.drag_frame.x, st.drag_frame.y, st.front_id() as i32,
+                                   st.front_owner(), st.excl.open(crate::excl::KBD) as i32,
+                                   st.excl.open(crate::excl::MOUSE) as i32]);
     }
 }
 
