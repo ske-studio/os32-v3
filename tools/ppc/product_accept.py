@@ -96,6 +96,8 @@ class FirmwareSession:
         if re.search(rb'undefined word|exception|stack underflow|stack overflow|not found',
                      reply, re.I):
             raise RuntimeError(f'Open Firmware failed: {line!r}: {reply!r}')
+        if not re.search(rb'\bok\r?\n0 > $', reply):
+            raise RuntimeError(f'Open Firmware did not acknowledge {line!r}: {reply!r}')
         return reply
 
 
@@ -121,10 +123,9 @@ def firmware(raw, expected, volume_size):
                 if not re.search(rb'(?m)^IO 0 200 ', result):
                     raise RuntimeError(f'firmware sector {lba} read failed: {result!r}')
             read_sector(2)
-            s.command(': be32@ dup c@ 18 lshift over 1+ c@ 10 lshift or '
-                      'over 2 + c@ 8 lshift or swap 3 + c@ or ;')
-            result = s.command('cr ." MAP " sector 8 + be32@ . '
-                               'sector c + be32@ . cr')
+            # IEEE 1275 l@ fetches an aligned quadlet on this big-endian target.
+            result = s.command('cr ." MAP " sector 8 + l@ . '
+                               'sector c + l@ . cr')
             match = re.search(rb'(?m)^MAP ([0-9a-fA-F]+) ([0-9a-fA-F]+) ', result)
             if not match:
                 raise RuntimeError(f'no firmware partition result: {result!r}')
@@ -133,17 +134,19 @@ def firmware(raw, expected, volume_size):
                 return False
             for lba in (first + 2, first + count - 2):
                 read_sector(lba)
-                result = s.command('cr ." MDB " sector be32@ 10 rshift . cr')
+                result = s.command('cr ." MDB " sector l@ 10 rshift . cr')
                 if not re.search(rb'(?m)^MDB 4244 ', result):
                     raise RuntimeError(f'invalid firmware MDB: {result!r}')
             s.command(': checksum 0 -rot bounds ?do 21 * i c@ + ffffffff and loop ;')
+            s.command('0 value buf 0 value size 0 value fh')
+            s.command(': read-fork buf size " read" fh $call-method . ;')
+            s.command(': report read-fork buf size checksum . ;')
+            s.command(': probe cr ." RESULT " fh if report else ." MISSING" then cr ;')
             for name, content in expected.items():
                 length = len(content)
-                s.command(f'{length:x} alloc-mem value buf')
-                s.command(f'" hd:2,\\{name}" open-dev value fh')
-                result = s.command(f': probe cr ." RESULT " fh if buf {length:x} " read" '
-                                   f'fh $call-method . buf {length:x} checksum . '
-                                   'else ." MISSING" then cr ; probe')
+                s.command(f'{length:x} to size size alloc-mem to buf')
+                s.command(f'" hd:2,\\{name}" open-dev to fh')
+                result = s.command('probe')
                 match = re.search(rb'(?m)^RESULT (MISSING|[0-9a-fA-F ]+)[\r\n]', result)
                 if not match:
                     raise RuntimeError(f'no firmware result for {name}: {result!r}')

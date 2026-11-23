@@ -2,8 +2,7 @@
  * OF note format: OpenBSD macppc/stand/ofwmagic.S:37-69.
  * The PT_LOAD owns BSS, ledger and the OF-time stack; never claim it twice. */
 #if PM_PRODUCT_BOOT
-#define PM_PRODUCT_LINKER
-#include "platform/powermac/product_boot.h"
+#include "platform/powermac/platform_handoff_layout.h"
 #endif
 #define PM_KBOOT_LINKER
 #include "platform/powermac/platform_kboot_layout.h"

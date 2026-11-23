@@ -3,7 +3,7 @@
  * No firmware calls or MSR changes belong before the later capture stage. */
 #include "kernel_entry.h"
 #if PM_PRODUCT_BOOT
-#include "product_boot.h"
+#include "platform_handoff_layout.h"
 #endif
     .section .text.entry,"ax",@progbits
     .balign 4

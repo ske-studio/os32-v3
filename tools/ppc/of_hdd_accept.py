@@ -40,13 +40,14 @@ def install(media, out):
         s.start()
         s.wait(s.ready, 'installer shell', 90)
         s.close_rshell()
-        s.keys('/sbin/cdinst.bin\n')
-        s.wait(lambda: 'Select [0-3]' in s.screen('menu'), 'package menu', 60)
+        s.keys('clear\n/sbin/cdinst.bin\n')
+        s.wait(lambda: 'Select [0-3]' in s.screen('menu') and s.word('exec_nest_level') > 1, 'package menu', 60)
         s.key('1')
-        s.wait(lambda: '[y/N]' in s.screen('confirm'), 'target confirmation', 90)
+        s.wait(lambda: '[y/N]' in s.screen('confirm') and s.word('exec_nest_level') > 1, 'target confirmation', 90)
         s.key('y')
-        s.wait(lambda: s.word('exec_nest_level') == 1 and 'Installation Complete' in
-               s.screen('installed'), 'committed installation', 240)
+        s.wait(lambda: s.word('exec_nest_level') == 1, 'installer returned', 240)
+        screen = s.screen('committed')
+        assert 'Installation Complete' in screen, screen
     finally:
         s.close()
     verify_disk(raw, out, media)
