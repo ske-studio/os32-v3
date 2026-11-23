@@ -19,7 +19,7 @@ SOURCES = test_usb_ohci.SOURCES + [s + '.c' for s in test_usb_core.SOURCES] + [
     'hid_kbd.c', 'hid_kbd_map.c', 'hid_mouse.c']
 SOURCES = ['drivers/usb/' + s for s in SOURCES] + ['input/keymaps/hid_jp.c']
 CHECK = dict(env=['ppc-cross'], name='usb-stack', tier=1, needs=[], budget=60, covers=[
-    'tools/tests/usb_stack_idle_host.c', 'tools/tests/kernel_includes.py', 'tools/tests/kbd_hostshim/io.h',
+    'platform/pc98/platform_ver.h', 'kernel/ver_info.h', 'kernel/sqlite_engine.h', 'tools/tests/usb_stack_idle_host.c', 'tools/tests/kernel_includes.py', 'tools/tests/kbd_hostshim/io.h',
     'platform/pc98/usb_resident.c', 'platform/pc98/*.h', 'kernel/*.h', 'kernel/irq/*.h',
     'kernel/module/*.h', 'drivers/pci/*.h', 'arch/x86/*.h', 'include/*.h', 'sdk/include/os32/*.h',
     'drivers/usb/*.[ch]', 'input/keymaps/hid_jp.c', 'input/hal/keymap.h', 'include/usb_platform.h', 'include/types.h',

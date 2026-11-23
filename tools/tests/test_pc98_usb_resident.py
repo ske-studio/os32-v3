@@ -16,7 +16,7 @@ SUPPORT = ['input/keymaps/hid_jp.c', 'kernel/module/module_runtime.c', 'lib/kstr
 HOST = 'tools/tests/pc98_usb_resident_host.c'
 CHECK = dict(name='pc98-usb-resident-host', tier=1, needs=[], budget=16,
              covers=['input/keymaps/hid_jp.c', 'kernel/module/module_runtime.c', 'lib/kstring_c.c', 'input/hal/*.c', 'tools/tests/kernel_includes.py', 'tools/tests/host32.py', 'tools/tests/kbd_hostshim/io.h', 'lib/*.h', 'mm/*.h', 'fs/*.h', 'platform/pc98/usb_module.c', 'input/hal/*.h', 'platform/pc98/usb_resident.c', 'tools/tests/pc98_usb_resident_host.c', 'platform/pc98/usb_platform.c', 'platform/pc98/usb*.h',
-                     'platform/pc98/tick_order.h', 'kernel/idle_work.h', 'kernel/irq/*.h', 'kernel/module/*.h',
+                     'platform/pc98/tick_order.h', 'platform/pc98/platform_ver.h', 'kernel/ver_info.h', 'kernel/sqlite_engine.h', 'kernel/idle_work.h', 'kernel/irq/*.h', 'kernel/module/*.h',
                      'drivers/pci/*.h', 'drivers/usb/*.h', 'include/*.h', 'arch/x86/*.h',
                      'sdk/include/os32/*.h', 'tools/tests/test_pc98_usb_resident.py'],
              basis=['docs/decisions/usb/USB_DESIGN.md §4-1, §7-3'])
@@ -39,6 +39,7 @@ def run(ctx):
         cases = [(mode, '', '', 0) for mode in (b'r', b'm', b'f', b'q', b't')]
         if ctx.mutate:
             cases.extend([
+                (b'm', '{tick_reach, tick_deny, tick_runs, idle_runs}', '{tick_runs, tick_deny, tick_runs, idle_runs}', 47),
                 (b'm', 'scan_pending = 1;', 'scan_pending = 0;', 42),
                 (b'm', 'idle_runs++;\n        run_scan();', 'idle_runs++; irq_restore(flags); run_scan(); flags = irq_save();', 42),
                 (b'm', 'hc->isr_pending |= pending;', 'hc->isr_pending |= pending & ~OHCI_INTR_WDH;', 43),

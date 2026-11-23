@@ -42,7 +42,7 @@ FIT("sqlite stack high-water=4294967295 of 4294967295");
 FIT("services: SSSSSSSSSSSSSSSSSSSSSSS public=4294967295");
 FIT("SER: not initialized");
 FIT("sqlite stack high-water: unknown");
-STATIC_ASSERT(16 <= OS32_VER_LINES, maximum_row_count);
+STATIC_ASSERT(18 <= OS32_VER_LINES, maximum_row_count);
 STATIC_ASSERT(sizeof(((VerSnapshot *)0)->build)-1 == 31, build_width);
 STATIC_ASSERT(BOOT_IMAGE_COMMIT_MAX-1 == 23, commit_width);
 STATIC_ASSERT(SERVICES_VER_STATE_TEXT-1 == 23, services_width);
@@ -167,6 +167,11 @@ void _start(void)
         CHECK(report.lines[i].kind == expected[i].kind);
         line(i, expected[i].text);
     }
+    s.usb = (struct usb_tick_counts){381, 381, 0, 0};
+    formatted(18);
+    line(7, "USB tick: reach=381 deny=381");
+    line(8, "USB scan: run=0 idle=0");
+    s.usb = (struct usb_tick_counts){0};
     s.boot.crc_valid = 0; formatted(16);
     line(11, "Image CRC: none (loader did not record)");
     s.boot.crc_valid = 1;

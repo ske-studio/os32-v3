@@ -1,5 +1,6 @@
 #include "input/hal/keymap.h"
 #include "usb_resident.h"
+#include "platform_ver.h"
 #include "kstring.h"
 #include "usb_probe.h"
 #include "input/hal/in2_int.h"
@@ -264,6 +265,9 @@ static int module_boot(void)
     remaining_us = 3 * 30 - 1;
     periodic();
     if (services != 1) return 35;
+    struct usb_tick_counts counts;
+    pc98_usb_tick_counts(&counts);
+    if (counts.reach != 2 || counts.deny != 2 || counts.run || counts.idle) return 47;
     remaining_us += 2;
     periodic();
     if (services != 2) return 34;

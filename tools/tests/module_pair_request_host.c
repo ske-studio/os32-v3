@@ -39,6 +39,11 @@ inline __attribute__((always_inline)) int module_load(const struct module_reques
 
 #ifdef PAIR_USB
 static int boot_lines, skip_lines, starts, dma_available;
+int sysconfig_get_int(const char *path, const char *key, int def)
+{
+    if (def != 0) finish(4);
+    return def;
+}
 int memory_boot_dma_available(void) { return dma_available; }
 int module_start(struct module_handle owner)
 {
@@ -97,8 +102,9 @@ void _start(void)
     sqlite_module_api = &sqlite_stub_api;
 #endif
 #ifdef PAIR_USB
+    pc98_usb_live_log = 1;
     pc98_usb_boot();
-    if (getter_calls || starts || boot_lines || skip_lines != 1) finish(3);
+    if (pc98_usb_live_log || getter_calls || starts || boot_lines || skip_lines != 1) finish(3);
     dma_available = 1;
     pc98_usb_boot();
     finish(boot_lines != 1 || skip_lines != 1 || starts != (int)expected_valid);

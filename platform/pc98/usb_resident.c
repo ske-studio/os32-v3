@@ -2,6 +2,7 @@
 #include "usb_probe.h"
 #include "kprintf.h"
 #include "idle_work.h"
+#include "platform_ver.h"
 #include "io.h"
 #include "drivers/pci/pci.h"
 #include "kernel/irq/irq.h"
@@ -68,6 +69,13 @@ static void log_drain_one(void)
     count--;
     irq_restore(flags);
     print_line(event.fmt, event.args);
+}
+
+void pc98_usb_tick_counts(struct usb_tick_counts *out)
+{
+    u32 flags = irq_save();
+    *out = (struct usb_tick_counts){tick_reach, tick_deny, tick_runs, idle_runs};
+    irq_restore(flags);
 }
 
 /* Include already observed events in the boot snapshot even before idle. */
