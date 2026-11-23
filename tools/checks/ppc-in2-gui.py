@@ -1,6 +1,7 @@
 CHECK = dict(name='ppc-in2-gui', tier=2, needs=[], budget=1200,
     env=['ppc-cross', 'qemu-ppc', 'socket'], full_only=True,
-    covers=['tools/checks/ppc-in2-gui.py', 'tools/accept/ppc_gui.py', 'tools/accept/in2_gui_trial.py', 'tools/accept/ppc_in2_cui.py', 'tools/accept/ppc_shm.py',
+    covers=['tools/checks/ppc-in2-gui.py', 'tools/accept/ppc_gui.py', 'tools/accept/in2_gui_trial.py',
+            'tools/accept/in2_gui_mutations.py', 'tools/accept/ppc_in2_cui.py', 'tools/accept/ppc_shm.py',
             'tools/ppc/**', 'tools/*.py', 'userland/gshell/**', 'userland/lib/**', 'userland/ppc/**', 'userland/shell/**',
             'Makefile', 'build/**', 'sdk/**', 'mm/**', 'exec/**', 'arch/ppc/**',
             'platform/powermac/**', 'include/**', 'init/**', 'kernel/**',

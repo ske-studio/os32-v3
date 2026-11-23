@@ -9,6 +9,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tools'))
+from in2_gui_mutations import PC98_MUTATIONS
 from build_compare import snapshot
 from mk_blank_nhd import create
 from nhd_deploy import update_partition_table
@@ -40,13 +41,26 @@ def disk(tree, stage, output, work):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--out', required=True, type=Path)
-    out = parser.parse_args().out.resolve()
+    parser.add_argument('--mutant', choices=PC98_MUTATIONS)
+    args = parser.parse_args()
+    out = args.out.resolve()
+    if args.mutant:
+        out /= args.mutant
     out.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(dir=out) as tmp:
         work = Path(tmp)
         tree = work / 'source'
         snapshot(ROOT, 'HEAD', tree)
         shutil.copytree(ROOT / 'assets/fonts', tree / 'assets/fonts', dirs_exist_ok=True)
+        roles = ['explicit', 'focus', 'exit']
+        if args.mutant:
+            role, filename, old, new = PC98_MUTATIONS[args.mutant]
+            path = tree / filename
+            source = path.read_text()
+            if source.count(old) != 1:
+                raise ValueError(f'{args.mutant}: expected one mutation anchor in {filename}')
+            path.write_text(source.replace(old, new))
+            roles = [role]
         env = dict(os.environ, OS32_BUILD_COMMIT='pc98-in2-d')
         def make(*goals):
             subprocess.run(['make', *goals], cwd=tree, env=env, check=True)
@@ -66,7 +80,7 @@ def main():
         for name in ['JF-Dot-Shinonome16.ttf', 'JF-Dot-Shinonome16.g16', 'Inconsolata-Regular.ttf',
                      'JF-Dot-Shinonome16-LICENSE.txt', 'Inconsolata-OFL.txt']:
             shutil.copy2(tree / 'assets/fonts' / name, stage / 'data')
-        for role in ['explicit', 'focus', 'exit']:
+        for role in roles:
             env['PPC_GUI_TRIAL'] = role
             make('gshell', 'GSHELL_FEATURES=c_gui_accept')
             shell = tree / 'userland/gshell.bin'
