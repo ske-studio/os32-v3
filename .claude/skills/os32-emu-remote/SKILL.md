@@ -60,6 +60,7 @@ description: NP21/W の受入 (エミュレータの試験) を、別の機械�
 - 1 回目の `hsync` は出力が途中で切れることがある (`[aidebug: timeout waiting for EOT]`)。2 回目の `copied=0 errors=0` で揃ったと見る (本線の機械でも同じ)。
 - 自前ビルドの NP21/W は署名が無い。Windows の Smart App Control が On だと起動できない (CodeIntegrity 3077)。
 - NP21/W の ai-debug 版を更新したら、本線の `~/np21w-src` で組んだ exe を ssh で `C:\np21w` に置き、pc98emu に枠の立て直しを頼む。
+  - **ssh (pc98emu、192.168.1.23:2222) がつながらない時** (2026-11-24 は時間切れ): 本線で組んだ exe を非公開のリポジトリ `ske-studio/np21w` の pre-release に添付し、pc98emu が `gh release download <tag> -R ske-studio/np21w` で取って sha256 を照らし、**別名** (例 `C:\np21w\np21x64w-keyedge.exe`) で置いて使い捨ての枠にだけ `--exe` で使う (ユーザー承認 2026-11-24「非公開 release に置く」)。pc98emu の機械には NP21/W を組む道具 (VS Build Tools・yasm・nasm) が無い。受入の台本は `np21w_ctl.py start/stop` に同じ `--exe` を渡す。一時の ini は書いて閉じてから渡す (開いたままの一時の ini は drvfs 越しに NP21/W が読めず aidebug 無しで上がる、依頼 48)。
 - **複数の枠と `tools/np21w_ctl.py` (2026-11-19 の 2 本同時の試し、直すまでの決まり)**:
   - `stop` は `/api/quit` が通った後も、同じ exe の**ほかの枠のプロセスまで強制終了する** (前に応答が無い時の救済も同じ)。2 本目を止めて 1 本目が落ちた。**2 本以上動いている間は `np21w_ctl.py stop` を使わない** — 止める枠の `/api/instance` の `instance_id` を付けて `/api/quit` を送る。
   - `start` は同じ exe のプロセスが 1 つでも生きていると起動を断る。2 本目以降は Windows の `Start-Process C:\np21w\np21x64w.exe -ArgumentList '/iC:\np21w\np21x64w-iN.ini' -WorkingDirectory C:\np21w` で起こし、`NP21W_AIDEBUG_URL` を付けた `np21w_ctl.py wait-ready` で待つ (これは枠ごとに動く)。
