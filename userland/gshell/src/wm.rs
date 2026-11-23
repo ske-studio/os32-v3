@@ -1206,7 +1206,7 @@ fn deliver_host_notice(st: &mut GuiState) {
 
 #[cfg(feature = "c_gui_accept")]
 #[no_mangle]
-static mut C_GUI_POINTER: [i32; 3] = [0; 3];
+static mut C_GUI_POINTER: [i32; 4] = [0; 4];
 
 /// WM の 1 周: 入力取り込み → パレットのリース調停 → FEP の配置 →
 /// クローム/デスクトップの present → FEP の描画。
@@ -1267,7 +1267,7 @@ pub fn wm_cycle(st: &mut GuiState, ctx: input::Ctx) {
     #[cfg(feature = "c_gui_accept")]
     unsafe {
         core::ptr::write_volatile(&raw mut C_GUI_POINTER,
-                                  [st.mouse_x, st.mouse_y, st.prev_buttons as i32]);
+                                  [st.mouse_x, st.mouse_y, st.stop_mouse_buttons as i32, st.prev_buttons as i32]);
     }
 }
 

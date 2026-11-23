@@ -45,10 +45,10 @@ def observe(media, cpu, folder, case, user):
     s.symbols['C_GUI_POINTER'] = int(re.search(r'^(\w+) \w C_GUI_POINTER$', symbols, re.M)[1], 16)
 
     def pointer():
-        return tuple(s.word('C_GUI_POINTER', offset) for offset in (0, 4, 8))
+        return tuple(s.word('C_GUI_POINTER', offset) for offset in (0, 4, 8, 12))
 
-    def wait_pointer(x, y, buttons):
-        expected = (x, y, buttons)
+    def wait_pointer(x, y, buttons, *, effective=None):
+        expected = (x, y, buttons, buttons if effective is None else effective)
         s.wait(lambda: pointer() == expected, f'WM pointer {expected}')
 
     def windows(name, x, y, switched):
@@ -98,7 +98,8 @@ def observe(media, cpu, folder, case, user):
             wait_pointer(x + 12, y - 7, 0)
             event('btn', {'button': 'left', 'down': True})
             seen('C-GUI FOCUS')
-            wait_pointer(x + 12, y - 7, 1)
+            # The WM masks the held focus click until release.
+            wait_pointer(x + 12, y - 7, 1, effective=0)
             windows('focus', x, y, True)
             event('btn', {'button': 'left', 'down': False})
             seen('C-GUI CLICK UP')
