@@ -37,18 +37,27 @@ def make_write_image(out, case):
     kernel_copy.write_text(source.replace(anchor, '\n'.join((anchor, call,
                            '        kprintf(7, "ATA-TEST done\\r\\n");'))))
     settings = ['KB_MUT_EXTRA_SRC=' + kernel, 'KB_MUT_EXTRA_FILE=' + str(kernel_copy)]
+    header = (ROOT / BUS).read_text()
+    store = 'if (ide_window) ppc_store8(ide_window + 16 * reg, v);'
+    assert header.count(store) == 1
+    header = header.replace(store, 'if (ide_window && reg == IDE_REG_STATUS && '
+                            '(v == IDE_CMD_WRITE || v == IDE_CMD_WRITE_MULTIPLE)) '
+                            '++ata_write_commands;\n    ' + store)
     if case == 'write-word':
-        header = (ROOT / BUS).read_text()
         word = '((u16)p[0] << 8) | p[1]'
         assert header.count(word) == 1
-        (out / 'platform_ide_bus.h').write_text('extern int ata_payload_phase;\n' +
-            header.replace(word, '(ata_payload_phase ? ((u16)p[1] << 8) | p[0] : '+word+')'))
-    if case in ('write-lba', 'write-count'):
-        device = 'kernel/dev/device_ide.c'
-        before, after = (('ide_write_sector(drv, lba,', 'ide_write_sector(drv, lba + 1,')
-                         if case == 'write-lba' else
-                         ('ide_write_sectors(drv, lba, cnt,', 'ide_write_sectors(drv, lba, cnt > 1 ? cnt - 1 : cnt,'))
-        settings += mutant_settings(out, case, device, before, after)
+        header = header.replace(word, '(ata_payload_phase ? ((u16)p[1] << 8) | p[0] : '+word+')')
+    (out / 'platform_ide_bus.h').write_text(
+        '#include "drivers/ata/ide.h"\nextern unsigned ata_write_commands;\n'
+        'extern int ata_payload_phase;\n' + header)
+    if case == 'write-lba':
+        settings += mutant_settings(out, case, 'kernel/dev/device_ide.c',
+                                    'ide_write_sector(drv, lba,', 'ide_write_sector(drv, lba + 1,')
+    if case == 'write-count':
+        settings += mutant_settings(out, case, DRIVER, 'return ide_request(unit, lba, count, 0, sectors);',
+                                    'for (u32 i = 0; i < count; ++i) {\n'
+                                    '        int rc = ide_request(unit, lba+i, 1, 0, (const u8 *)sectors+i*512);\n'
+                                    '        if (rc) return rc;\n    }\n    return 0;')
     if case == 'deny':
         device = 'kernel/dev/device_ide.c'
         provider = (ROOT / device).read_text()
@@ -238,20 +247,17 @@ def main():
                     expected[:2048] = actual[:2048]
                     expected[root_start*512:] = actual[root_start*512:]
                     assert 'ATA-TEST end=0' in lines
-                    range_rc = 0 if case == 'write-count' else -17
-                    assert f'ATA-TEST writes=0,0 range={range_rc}' in lines, lines[-10:]
+                    assert 'ATA-TEST writes=0,0 range=-17' in lines, lines[-10:]
+                    commands = 2 if case == 'write-count' else 1
+                    assert f'ATA-TEST commands={commands}' in lines, lines[-10:]
                     payload = bytes((i * 37 + (i >> 8) + 13) & 255 for i in range(1024))
                     if case == 'write-word':
                         payload = bytes(payload[i ^ 1] for i in range(1024))
                     first = 97 if case == 'write-lba' else 96
-                    count = 1 if case == 'write-count' else 2
                     expected[first*512:(first+1)*512] = payload[:512]
-                    expected[64*512:(64+count)*512] = payload[:count*512]
-                    if case == 'write-count':
-                        expected[(root_start-1)*512:root_start*512] = payload[:512]
+                    expected[64*512:66*512] = payload
                     for n in range(3):
-                        equal = (case != 'write-word' and not (case == 'write-lba' and n == 0)
-                                 and not (case == 'write-count' and n == 2))
+                        equal = case != 'write-word' and not (case == 'write-lba' and n == 0)
                         assert f'ATA-TEST read={n} equal={int(equal)}' in lines
                 assert actual == expected, case
                 continue

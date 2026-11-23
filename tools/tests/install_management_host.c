@@ -156,12 +156,13 @@ static int read_sector(u32 unit, u32 lba, void *buf)
     if (corrupt && lba == 2) ((u8 *)buf)[511] ^= 1;
     return 0;
 }
-static int write_sector(u32 unit, u32 lba, const void *buf)
+static int write_sector(u32 unit, u32 lba, u32 count, const void *buf)
 {
     assert(!unit && lba < CAPACITY);
     if (view_io_error && lba == 8) return OS32_ERR_IO;
     if (fail_restore_write && !authorized && lba == 1) return OS32_ERR_IO;
-    memcpy(disk[lba], buf, 512);
+    assert(count <= CAPACITY - lba);
+    memcpy(disk[lba], buf, count * 512);
     return 0;
 }
 /* Test the public single/multiple-sector and CHS entry points with only the

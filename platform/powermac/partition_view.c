@@ -30,11 +30,7 @@ static int view_write(Device *dev, int offset, int count, const void *buf)
     int rc = view_lba(dev, (u32)offset, count, &lba);
     if (rc) return rc;
 #if OS32_FEATURE_IDE
-    for (int i = 0; i < count; ++i) {
-        rc = ide_install_write(dev->bus_id, lba+i, (const u8 *)buf+i*512);
-        if (rc) return rc;
-    }
-    return 0;
+    return ide_install_write(dev->bus_id, lba, count, buf);
 #else
     return ide_write_sectors(dev->bus_id, lba, count, buf);
 #endif

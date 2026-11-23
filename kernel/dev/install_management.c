@@ -237,7 +237,7 @@ static int restore(struct reservation *r)
     }
     for (i = 0; r->table_dirty && i < r->count; i++) {
         struct original_sector *s = &r->original[i];
-        rc = m->write(unit, s->lba, s->bytes);
+        rc = m->write(unit, s->lba, 1, s->bytes);
         if (rc) goto quarantine;
     }
     rc = m->sync(unit);
@@ -521,33 +521,30 @@ static int transfer(const struct install_access *a, u32 physical, u32 count,
     units[issued.unit].in_flight++;
     irq_restore(flags);
     int rc = 0;
-    for (u32 i = 0; i < count; i++) {
-        if (!install_transfer_allowed(&issued, physical + i, 1)) {
-            rc = OS32_ERR_STALE;
-            break;
-        }
-        if (in) {
-            rc = m->write(issued.unit, physical + i, in);
-            in += 512;
-        } else {
+    if (in && count) {
+        rc = m->write(issued.unit, physical, count, in);
+    } else {
+        for (u32 i = 0; i < count; i++) {
+            if (!install_transfer_allowed(&issued, physical + i, 1)) {
+                install_complete(&issued);
+                return OS32_ERR_STALE;
+            }
             rc = m->read(issued.unit, physical + i, out);
+            if (rc) break;
             out += 512;
         }
-        if (rc) {
-            if (issued.phase == VIEW &&
-                (issued.op == INSTALL_VIEW_READ || issued.op == INSTALL_VIEW_WRITE)) {
-                struct reservation *r = &units[issued.unit];
-                flags = irq_save();
-                if (r->state == VIEW && r->handle == issued.generation) {
-                    /* Idle completes recovery after all callers drop their pins. */
-                    r->state = RECOVERING;
-                    r->owner = 0;
-                    r->handle = 0;
-                }
-                irq_restore(flags);
-            }
-            break;
+    }
+    if (rc && issued.phase == VIEW &&
+        (issued.op == INSTALL_VIEW_READ || issued.op == INSTALL_VIEW_WRITE)) {
+        struct reservation *r = &units[issued.unit];
+        flags = irq_save();
+        if (r->state == VIEW && r->handle == issued.generation) {
+            /* Idle completes recovery after all callers drop their pins. */
+            r->state = RECOVERING;
+            r->owner = 0;
+            r->handle = 0;
         }
+        irq_restore(flags);
     }
     install_complete(&issued);
     return rc;

@@ -103,7 +103,7 @@ int ide_addr_mode_of(int drive);
 int ide_install_identify(u32 unit, IdeInfo *info, char serial[IDE_SERIAL_LEN]);
 int ide_install_read(u32 unit, u32 lba, void *sector);
 int ide_install_read_many(u32 unit, u32 lba, u32 count, void *sectors);
-int ide_install_write(u32 unit, u32 lba, const void *sector);
+int ide_install_write(u32 unit, u32 lba, u32 count, const void *sectors);
 int ide_install_flush(u32 unit);
 
 #endif /* IDE_H */

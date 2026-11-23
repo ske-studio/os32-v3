@@ -64,9 +64,9 @@ int ide_write_sectors(int unit, u32 lba, u32 count, const void *buf)
     return 0;
 }
 
-int ide_install_write(u32 unit, u32 lba, const void *buf)
+int ide_install_write(u32 unit, u32 lba, u32 count, const void *buf)
 {
-    return ide_write_sectors(unit, lba, 1, buf);
+    return ide_write_sectors(unit, lba, count, buf);
 }
 
 int dev_register(Device *dev) { registered = dev; return 0; }

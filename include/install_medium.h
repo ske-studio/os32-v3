@@ -26,7 +26,7 @@ struct install_medium {
     int (*resolve)(struct _Device *, u32 lba, u32 count, u32 *unit,
                    u32 *physical, u32 *generation);
     int (*read)(u32 unit, u32 lba, void *sector);
-    int (*write)(u32 unit, u32 lba, const void *sector);
+    int (*write)(u32 unit, u32 lba, u32 count, const void *sectors);
     /* Wait for issued transfers and flush old dirty buffers with their saved
      * admission records. Return BUSY when an active reference cannot drain. */
     int (*drain)(u32 unit);
