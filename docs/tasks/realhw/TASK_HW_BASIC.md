@@ -1,6 +1,7 @@
 # TASK_HW_BASIC — ハードウェア調査の道具 HW-BASIC (汎用、許可リストなし)
 
 > 状態: **実装中 (2026-11-05)** — 設計 ([HW_BASIC_DESIGN](../../decisions/realhw/HW_BASIC_DESIGN.md)) どおりの実装は main (a9819c78、CI で取り込み)。実機 Ra266 で `hw run /test/hw/trident.hwb` の mode=0/1/2 を流し、止まらずに通った (結果は TASK_TRIDENT_DRIVER §2-1 の 11-05)。次の段: `mmiofill` の追加 (TRIDENT_V6_DESIGN の段 2a、wt/trident-2a で実装中)。
+> **2026-11-23**: PowerMac でも使えるように、共通の HW_OP と機種の後端を分ける設計 [HWOP_COMMON_DESIGN](../../decisions/realhw/HWOP_COMMON_DESIGN.md) を確定 (本線 = 共通と x86 の後端の分離、PowerPC = PowerMac の後端)。PCI 装置の開発でまず HW-BASIC を使う決まりは [POLICY_PCIDEV](../../POLICY_PCIDEV.md) §1。
 
 名前付き採取点の確定設計: [KDBG_PROBE_DESIGN](../../decisions/realhw/KDBG_PROBE_DESIGN.md)。
 
