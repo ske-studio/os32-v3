@@ -49,11 +49,24 @@ static int probe_owner, probe_window;
 
 static int next_input(int step, int kind, int dev, int a, int b)
 {
+#ifdef C_GUI_ACCEPT
+    u32 last_empty = api->get_tick();
+#endif
     for (;;) {
         IN2_Event e;
         int n = api->in2_read(&e, 1);
         if (n < 0) return 0;
-        if (!n) { api->gui_call(GUI_OP_WAIT, 1); continue; }
+        if (!n) {
+#ifdef C_GUI_ACCEPT
+            u32 now = api->get_tick();
+            if ((step == 2 || step == 6) && now - last_empty >= 25) {
+                last_empty = now;
+                api->serial_puts(step == 2 ? "C-GUI empty op=2\n" : "C-GUI empty op=6\n");
+            }
+#endif
+            api->gui_call(GUI_OP_WAIT, 1);
+            continue;
+        }
 #ifdef C_GUI_ACCEPT
         char line[128];
         snprintf(line, sizeof(line), "C-GUI normal op=%d owner=%d window=%d dev=%u type=%u\n",
@@ -129,8 +142,18 @@ int main(int argc, char **argv, KernelAPI *kernel)
     rc = api->in2_status(&before);
     if (rc) return failed("in2_status before", rc, 4);
     if (before.acquired) return failed("before.acquired", before.acquired, 4);
+#ifdef C_GUI_ACCEPT
+    api->serial_puts("C-GUI acquire before\n");
+    rc = api->gui_call(GUI_OP_WAIT, 2);
+    if (rc < 0) return failed("WAIT before acquire", rc, 4);
+#endif
     rc = api->in2_acquire(3);
     if (rc != OS32_ERR_NOSYS) return failed("in2_acquire", rc, 4);
+#ifdef C_GUI_ACCEPT
+    api->serial_puts("C-GUI acquire after\n");
+    rc = api->gui_call(GUI_OP_WAIT, 2);
+    if (rc < 0) return failed("WAIT after acquire", rc, 4);
+#endif
     rc = api->in2_status(&after);
     if (rc) return failed("in2_status after", rc, 4);
     if (after.acquired) return failed("after.acquired", after.acquired, 4);

@@ -6,7 +6,7 @@ CHECK = dict(name='ppc-gui-guest', tier=2, needs=[], budget=1200,
             'platform/powermac/**', 'include/**', 'init/**', 'kernel/**',
             'kapi/**', 'lib/**', 'fs/**', 'drivers/**', 'input/**', 'net/**',
             'gfx/**', 'assets/fonts/**'],
-    basis=['docs/decisions/ppc/PPC_GUI_KAPI_DESIGN.md §4'],
+    basis=['docs/decisions/ppc/PPC_GUI_KAPI_DESIGN.md §4・§4.1'],
     env_limit='Requires mac99 QEMU and loopback UDP/TCP for link-sh RSH.')
 
 

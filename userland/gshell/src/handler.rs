@@ -446,6 +446,14 @@ fn op_wait(st: &mut GuiState, owner: i32, slot_no: usize, arg: u32) -> i32 {
             if crate::cycle_due(st.now) || input::capture_keyboard(st, input::Ctx::Wait) { break; }
         }
     }
+    #[cfg(feature = "c_gui_accept")]
+    if timeout == 2 {
+        // The probe brackets acquire with two-tick WAIT calls.
+        let mut sample = os32api::av::IN2_WmState { size: 0, gen: 0, excl: 0, owner: 0 };
+        let rc = unsafe { (os32api::api().in2_wm_state)(&mut sample) };
+        crate::gserial::reply_to(false, b"!", format_args!("C-GUI WM sample {} {} {} {} {} {}",
+            rc, st.front_id(), st.front_owner(), sample.excl, sample.owner, sample.gen));
+    }
     ring::pending(st, slot_no) as i32
 }
 

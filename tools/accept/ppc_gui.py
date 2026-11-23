@@ -97,7 +97,38 @@ def observe(media, cpu, folder, case, user, mutation=None):
 
     def seen(marker):
         timeout = 15 if marker == FAILURE_MARKERS.get(mutation) else 60
-        s.wait(lambda: marker in serial(log)[offset:], marker, timeout)
+        reader_step = {'no-key': 2, 'no-button': 6}.get(mutation)
+        if reader_step is None or marker != FAILURE_MARKERS[mutation]:
+            s.wait(lambda: marker in serial(log)[offset:], marker, timeout)
+            return
+
+        def reader_log():
+            trace = serial(log)[offset:]
+            if any(s in trace for s in ('C-GUI PROBE FAILED', ' returned ', 'Loading /')):
+                raise AssertionError(f'probe exited during op={reader_step}')
+            return trace
+
+        try:
+            s.wait(lambda: marker in reader_log(), marker, timeout)
+        except RuntimeError as exc:
+            if not str(exc).startswith(f'deadline {marker} evidence='):
+                raise
+            end = len(reader_log())
+            empty = f'C-GUI empty op={reader_step}\n'
+            s.wait(lambda: reader_log()[end:].replace('\r', '').count(empty) >= 2,
+                   f'continued empty reads op={reader_step}')
+            assert marker not in reader_log()
+            raise
+
+    def ordered(pattern, label):
+        nonlocal offset
+        def found():
+            nonlocal offset
+            match = re.search(pattern, serial(log)[offset:])
+            if match:
+                offset += match.end()
+            return match
+        s.wait(found, label)
 
     def event(kind, data):
         nonlocal offset
@@ -131,6 +162,13 @@ def observe(media, cpu, folder, case, user, mutation=None):
             ids = re.search(r'C-GUI normal P=(\d+) Q=(\d+) owner=(\d+) kb=(\d+) mouse=(\d+)', serial(log))
             p, q, owner, kb, mouse = map(int, ids.groups())
             assert p != q and owner and kb and mouse and kb != mouse
+            before, after = re.findall(
+                r'C-GUI acquire (?:before|after)\r?\n.*?C-GUI WM sample (-?\d+) (\d+) (\d+) (\d+) (\d+) (\d+)',
+                serial(log), re.S)
+            assert before == after and tuple(map(int, before[:5])) == (0, p, owner, 0, 0)
+            mouse_dev = r'USB DEV addr=(\d+) vid:pid=0627:0001 class=03 subclass=01 protocol=02'
+            mouse_addr = re.search(mouse_dev, serial(log))[1]
+
             def state(index):
                 return s.word('C_GUI_POINTER', 4 * index)
             s.wait(lambda: (state(7), state(8), state(9), state(10)) == (p, owner, 1, 1),
@@ -186,7 +224,8 @@ def observe(media, cpu, folder, case, user, mutation=None):
             wait_pointer(x + 34, y - 11, 1)
             offset = len(serial(log))
             s.q.call('device_del', {'id': 'mouse'})
-            seen('USB RELEASE kind=1')
+            ordered(r'USB RELEASE kind=1 src=\d+\b', 'mouse release')
+            ordered(rf'USB DETACH addr={mouse_addr}\b', 'original mouse detached')
             if mutation == 'no-release':
                 seen('C-GUI detach buttons=1')
                 wait_pointer(x + 34, y - 11, 1)
@@ -196,6 +235,8 @@ def observe(media, cpu, folder, case, user, mutation=None):
             existing = {entry['index'] for entry in s.q.call('query-mice')}
             offset = len(serial(log))
             s.q.call('device_add', {'driver': 'usb-mouse', 'id': 'mouse2'})
+            ordered(mouse_dev, 'added USB mouse')
+            ordered(rf'C-GUI re-enumerated kb={kb} mouse=\d+\b', 'probe enumerated mouse')
             seen('C-GUI REATTACHED')
             new_mouse, = [item for item in s.q.call('query-mice') if item['index'] not in existing]
             s.q.call('human-monitor-command', {'command-line': f"mouse_set {new_mouse['index']}"})
@@ -250,7 +291,7 @@ def main():
         kernel = folder / 'kernel'
         user = folder / 'user' if case in ('no-focus', 'no-drag-end') else work / 'user'
         options = ['IMAGE=kboot-link-sh', 'PPC_C_GUI=1', 'KBOOT_USB_KEY_TRACE=1',
-                   'KB_SH_OUT=' + str(user), 'KB_ROOT_BINS=' + str(user / 'guiprob.bin')]
+                   'KB_SH_OUT=' + str(user), 'KB_ROOT_BINS=' + str(user / 'c-gui/guiprob.bin')]
         if case in ('no-focus', 'no-drag-end'):
             options += [wm_mutant(folder, case)]
         if case == 'no-button':
@@ -282,7 +323,7 @@ def main():
         def payload(path):
             return subprocess.check_output(['isoinfo', '-i', kernel / 'root.iso', '-x', path])
 
-        assert payload('/BIN/GUIPROB.BIN;1') == (user / 'guiprob.bin').read_bytes()
+        assert payload('/BIN/GUIPROB.BIN;1') == (user / 'c-gui/guiprob.bin').read_bytes()
         assert payload('/SYS/SHELL.BIN;1') == (user / 'shell.bin').read_bytes()
         gui_image = payload('/BIN/GSHELL.BIN;1')
         if case == 'missing':
