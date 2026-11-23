@@ -24,7 +24,7 @@ CHECK = dict(env=['ppc-cross'], name='of-fb-host', tier=1, needs=[], budget=30, 
     'drivers/video/of_fb/of_fb_osri.inc', 'gfx/gfx_osri.h', 'gfx/gfx_osri_view.h',
     'gfx/osri_profile.h', 'kernel/idle_work.h', 'include/kernel_tick.h', 'mm/kmalloc.h',
     'platform/powermac/display_provider.c', 'platform/powermac/display_dual.c',
-    'gfx/gfx_scroll.c', 'platform/powermac/display.c', 'drivers/video/of_fb/backend_of_fb.h',
+    'include/redir_access.h', 'gfx/v2/display.c', 'gfx/gfx_scroll.c', 'platform/powermac/display.c', 'drivers/video/of_fb/backend_of_fb.h',
     'platform/powermac/platform_display_fallback.h', 'tools/tests/of_fb_host.c',
     'tools/tests/test_of_fb.py', 'tools/tests/host32.py',
     'tools/tests/kernel_includes.py', 'tools/tests/mutpar.py',
@@ -108,7 +108,7 @@ def observe(folder, mutation=None):
                '-nostdlib', '-nostdinc', '-static', '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections',
                '-I' + str(ROOT / 'platform/powermac'), '-I' + str(ROOT), *include_flags(ROOT),
                '-I' + str(ROOT / 'arch/ppc'),
-               str(ROOT / 'tools/tests/of_fb_host.c'),
+               str(ROOT / 'tools/tests/of_fb_host.c'), str(ROOT / 'gfx/v2/display.c'),
                *(str(ROOT / path) for path in SOURCES),
                str(ROOT / 'gfx/palette.c'), str(ROOT / 'gfx/v2/palette_state.c'), str(ROOT / 'gfx/v2/backend_reg.c'), str(ROOT / 'gfx/v2/caps.c'), str(ROOT / 'gfx/v2/enum.c'), '-o', str(exe)]
     build_in_tree(ROOT, folder, edits, [command])

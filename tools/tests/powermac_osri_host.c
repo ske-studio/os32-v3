@@ -19,7 +19,7 @@ static void finish(int code)
 
 static struct OsriImage store;
 static u8 pixels[OSRI_PIXELS_BYTES], shadow[648 * 402];
-static int allocations, fail_alloc, live, gate, started = 1, rebind, shown;
+static int allocations, fail_alloc, live, started = 1, rebind, shown;
 static int gui, key, raw, stop;
 static AppSlot slot;
 static u32 offset, size;
@@ -31,12 +31,11 @@ int con_sink_is_enabled(void) { return gui; }
 int appslot_gfx_owner(void) { return 3; }
 int appslot_stop_pending(void) { return stop; }
 AppSlot *appslot_get(int caller) { CHECK(caller == 3); return &slot; }
-int serial_gate_active(void) { return gate; }
+void pm_log_write(const char *s, u32 n) { (void)s; (void)n; }
+u32 kstrlen(const char *s) { u32 n = 0; while (s[n]) ++n; return n; }
 unsigned long long of_fb_osri_generation(void) { return generation; }
 int input_trygetkey(void) { CHECK(!gui); return key; }
 int input_trygetrawkey(void) { CHECK(gui); return raw; }
-int pm_terminal_trygetkey(void) { return key; }
-void pm_terminal_poll(void) { }
 void *kmalloc(u32 n)
 {
     if (++allocations == fail_alloc) return 0;
@@ -94,10 +93,8 @@ void _start(void)
     shadow[0] = 73;
     wire = wire_budget;
     size = sizeof(wire_budget);
-    gate = 1;
     g_backend = 0;
-    CHECK(call() == OS32_ERR_BUSY);
-    gate = 0; started = 0;
+    started = 0;
     CHECK(call() == OS32_ERR_BUSY);
     started = 1;
     CHECK(call() == OS32_ERR_NOSYS);
@@ -126,11 +123,9 @@ void _start(void)
     CHECK(!gfx_osri_poll_abort(3));
     key = 27; CHECK(pm_osri_key() == 0);
     key = 'x'; CHECK(pm_osri_key() == 1);
-#if KBOOT_SH
     gui = 1; raw = KEY_ESC;
     CHECK(pm_osri_key() == 2);
     raw = KEY_ESC | KBD_RAW_MAKE; CHECK(pm_osri_key() == 0);
     raw = KEY_SPACE | KBD_RAW_MAKE; CHECK(pm_osri_key() == 1);
-#endif
     finish(0);
 }

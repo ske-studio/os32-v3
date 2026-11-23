@@ -13,7 +13,7 @@ from test_splash_wire import osri
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCES = ['tools/tests/gfx2_bridge_fake.h', 'tools/tests/osri_view_host.c', 'tools/tests/splash_raster_host.c',
-           'gfx/gfx_osri.c', 'gfx/gfx_osri_view.c', 'gfx/gfx_osri_view.h', 'gfx/gfx_internal.h',
+           'platform/pc98/platform_osri.h', 'gfx/gfx_osri_view_internal.h', 'gfx/gfx_osri.c', 'gfx/gfx_osri_view.c', 'gfx/gfx_osri_view.h', 'gfx/gfx_internal.h',
            'exec/appslot.h', 'exec/exec.h',
            'kapi/kapi_osri.c', 'drivers/video/pc98/backend_pc98.c', 'drivers/video/pc98/backend_pc98_osri.c',
            'drivers/video/pc98/splash_raster.c', 'drivers/video/pc98/splash_raster_play.c',
@@ -27,9 +27,9 @@ MUTATIONS = (
      '    if (image->count && (unsigned long long)(tick_count - ctl->start) * PL_RUN_TICK_US >= '
      '(unsigned long long)ctl->duration_ms * 1000) return OS32_ERR_AGAIN;\n    struct PlV2Plan *plan = 0;',
      'deadlines'),
-    ('PCM running only', 'gfx/gfx_osri_view.c', 'pcm_state() != PCM_ST_CLOSED',
+    ('PCM running only', 'platform/pc98/platform_osri.h', 'pcm_state() != PCM_ST_CLOSED',
      'pcm_state() == PCM_ST_RUNNING', 'entry_and_failures'),
-    ('serial gate omitted', 'gfx/gfx_osri_view.c', 'serial_gate_active() ||',
+    ('serial gate omitted', 'gfx/gfx_osri_view_internal.h', 'serial_gate_active() ||',
      '(0 && serial_gate_active()) ||', 'entry_and_failures'),
     ('inverted time limit', 'kapi/kapi_osri.c', 'duration_ms > GFX_OSRI_SHOW_MAX_MS',
      'duration_ms <= GFX_OSRI_SHOW_MAX_MS', 'entry_and_failures'),
@@ -52,11 +52,11 @@ MUTATIONS = (
      'if (0 && (key & 0xff) == OSRI_ESC_ASCII) return 1;', 'deadlines'),
     ('GUI inject only', 'drivers/video/pc98/backend_pc98_osri.c',
      'int gui = con_sink_is_enabled();', 'int gui = 0;', 'gui_input'),
-    ('ignore stop pending', 'gfx/gfx_osri_view.c',
+    ('ignore stop pending', 'gfx/gfx_osri_view_internal.h',
      '|| appslot_stop_pending()', '|| (0 && appslot_stop_pending())', 'gui_input'),
-    ('omit owner', 'gfx/gfx_osri_view.c',
-     '(con_sink_is_enabled() && caller != appslot_gfx_owner())',
-     '(0 && con_sink_is_enabled() && caller != appslot_gfx_owner())', 'entry_and_failures'),
+    ('omit owner', 'gfx/gfx_osri_view_internal.h',
+     '(con_sink_is_enabled() && (caller) != appslot_gfx_owner())',
+     '(0 && con_sink_is_enabled() && (caller) != appslot_gfx_owner())', 'entry_and_failures'),
     ('omit route', 'drivers/video/pc98/backend_pc98_osri.c',
      '(image->count && pl_run_timing(state))',
      '(0 && image->count && pl_run_timing(state))', 'entry_and_failures'),
@@ -105,7 +105,7 @@ def execute(mutation=None):
         subprocess.run([cc, '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
             '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib', '-D__KERNEL_BUILD__',
             '-I'+str(work), '-I'+str(work/'gfx'), '-I'+str(work/'drivers/video/pc98'),
-            *include_flags(ROOT), '-I'+str(ROOT/'drivers/video/pc98'),
+            '-I'+str(work/'platform/pc98'), *include_flags(ROOT), '-I'+str(ROOT/'drivers/video/pc98'),
             str(work/'tools/tests/osri_view_host.c'), '-lgcc', '-o', str(exe)], check=True)
         result = host32.run([str(exe)], runner='qemu', capture_output=True)
         if result.returncode:
@@ -113,36 +113,37 @@ def execute(mutation=None):
         return result.returncode
 
 def powermac_view(mutate):
-    """DESIGN.final §3: bind before VFS, private planes, CLI Esc."""
+    """DESIGN.final §3: bind before VFS, private planes, user shell input."""
     view = ROOT / 'platform/powermac/osri_view.c'
     platform = (ROOT / 'platform/powermac/platform_osri.h').read_text()
-    variants = [('CLI', view.read_text(), platform, 0, 0),
-                ('user shell', view.read_text(), platform, 1, 0)]
+    variants = [('user shell', view.read_text(), platform, 0)]
     if mutate:
         anchor = 'if (generation != of_fb_osri_generation())'
         assert view.read_text().count(anchor) == 1
-        variants.append(('ignore load rebind', view.read_text().replace(anchor, 'if (!generation)'), platform, 0, 1))
+        variants.append(('ignore load rebind', view.read_text().replace(anchor, 'if (!generation)'), platform, 1))
         anchor = '    osri_active = 0;'
         assert view.read_text().count(anchor) == 1
         variants.append(('clear borrowed packed CLIENT', view.read_text().replace(
-            anchor, '    client.planes[0][0] = 0;\n' + anchor), platform, 0, 1))
+            anchor, '    client.planes[0][0] = 0;\n' + anchor), platform, 1))
         anchor = 'platform_osri_pcm_busy(void) { return 0; }'
         assert platform.count(anchor) == 1
         variants.append(('require audio provider', view.read_text(),
-                         platform.replace(anchor, anchor.replace('return 0', 'return 1')), 1, 1))
+                         platform.replace(anchor, anchor.replace('return 0', 'return 1')), 1))
     with tempfile.TemporaryDirectory() as td:
         work = Path(td)
         wire_inputs(work)
         cc = Path(os.environ['CROSS_DIR']) / 'bin/i386-elf-gcc'
-        for name, source, header, usershell, expected in variants:
+        for name, source, header, expected in variants:
             (work / 'platform_osri.h').write_text(header)
             tmp_view = work / 'view.c'
             tmp_view.write_text(source)
             exe = work / 'test'
             subprocess.run([str(cc), '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
                 '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib', '-nostdinc',
-                '-D__KERNEL_BUILD__', '-DKBOOT_SH=' + str(usershell), '-I' + str(work),
-                '-I' + str(ROOT / 'platform/powermac'), '-I' + str(ROOT), *include_flags(ROOT), str(tmp_view),
+                '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections', '-DKBOOT_LINK=1',
+                '-D__KERNEL_BUILD__', '-DKBOOT_SH=1', '-I' + str(work),
+                '-I' + str(ROOT / 'platform/powermac'), '-I' + str(ROOT), *include_flags(ROOT), '-I' + str(ROOT / 'arch/ppc'), str(tmp_view),
+                str(ROOT / 'kernel/serial_diag.c'), str(ROOT / 'platform/powermac/console_stream.c'),
                 str(ROOT / 'gfx/gfx_osri.c'), str(ROOT / 'tools/tests/powermac_osri_host.c'),
                 '-lgcc', '-o', str(exe)], check=True)
             assert host32.run([str(exe)], runner='qemu').returncode == expected, name

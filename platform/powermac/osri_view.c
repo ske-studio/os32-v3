@@ -7,7 +7,6 @@
 #include "kernel_tick.h"
 #include "input_service.h"
 #include "kbd.h"
-#include "lan_boot.h"
 static const struct gfx_kernel_fb *published;
 static unsigned long long generation;
 
@@ -20,7 +19,7 @@ const struct gfx_kernel_fb *pm_osri_decoded(unsigned long long *bound)
 int gfx_osri_view(const char *path, u32 duration_ms, int caller)
 {
     struct gfx_kernel_fb client;
-    if (osri_view_busy(caller)) return OS32_ERR_BUSY;
+    if (OSRI_VIEW_BUSY(caller)) return OS32_ERR_BUSY;
     if (!g_backend || !g_backend->osri_show || gfx_kernel_framebuffer(&client) ||
         client.format != GFX_BB_PACKED8 || client.width < GFX_WIDTH ||
         client.height < GFX_HEIGHT || client.pitch < client.width ||
@@ -54,7 +53,6 @@ int gfx_osri_view(const char *path, u32 duration_ms, int caller)
 /* -1 empty, 0 Esc, 1 key press, 2 release (consume without extending). */
 int pm_osri_key(void)
 {
-#if KBOOT_SH
     if (con_sink_is_enabled()) {
         int raw = input_trygetrawkey();
         if (raw < 0) return -1;
@@ -62,9 +60,5 @@ int pm_osri_key(void)
         return (raw & KBD_RAW_KEY_MAKE_MASK) != (KEY_ESC | KBD_RAW_MAKE);
     }
     int key = input_trygetkey();
-#else
-    pm_terminal_poll();
-    int key = pm_terminal_trygetkey();
-#endif
     return key < 0 ? -1 : (key & 255) != 27;
 }

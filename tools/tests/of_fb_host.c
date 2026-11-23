@@ -6,6 +6,7 @@
 #include "drivers/video/of_fb/backend_of_fb.h"
 #include "gfx/v2/gfx2_int.h"
 #include "display_provider.h"
+#include "redir_access.h"
 #include "kernel/console/console_dual.h"
 #include "platform/powermac/rh_observe.h"
 #include "arch/ppc/kernel_boot.h"
@@ -56,7 +57,23 @@ int ledger_owner_new(u32 kind, u32 parent, const char *name, u32 *out)
 void kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
 int gfx2_heap_init(struct gfx2_heap *h, u32 base, u32 size)
 { (void)h; EXPECT(!base && !size); return 0; }
-void gfx2_head_detach(struct gfx2_adapter *a, u32 h) { (void)a; (void)h; }
+struct gfx2_surf gfx2_surfs[GFX2_MAX_SURFACES];
+i32 gfx_screen_owner(void) { return current_app; }
+int caller_access_get_user(struct caller_access *c)
+{ *c = (struct caller_access){ .app_id = current_app, .owner = current_app }; return 1; }
+struct gfx2_surf *gfx2_surf_get(u32 sid, u32 owner, int *rc)
+{
+    EXPECT(sid == 1 && owner == (u32)current_app);
+    *rc = 0;
+    return &gfx2_surfs[1];
+}
+int gfx2_surf_quiesce(struct gfx2_surf *s, u32 dl)
+{ EXPECT(s == &gfx2_surfs[1] && !dl); return 0; }
+void gfx2_scan_ref_get(struct gfx2_surf *s) { EXPECT(s == &gfx2_surfs[1]); }
+void gfx2_scan_ref_put(struct gfx2_surf *s) { EXPECT(s == &gfx2_surfs[1]); }
+void gfx2_scan_ref_swap(struct gfx2_adapter *a, u32 h, struct gfx2_surf *s)
+{ a->head[h].scan_sid = s ? s->sid : 0; }
+void gfx_policy_scan_changed(void) { }
 void gfx2_adapter_recovered(struct gfx2_adapter *a) { a->state = GFX2_AD_OK; }
 void v1_bridge_rebind(void) { }
 /* P6: OF enter stops the text terminal through display_text_hide; no terminal is attached here. */
@@ -525,7 +542,12 @@ void idle_wait_step(void)
     if (flip) {
         static u8 surface[644 * 402];
         surface[644] = 45;
-        EXPECT(!of_fb_replace(surface, 644, sizeof(surface)));
+        gfx2_surfs[1] = (struct gfx2_surf){ .sid = 1, .state = GFX2_ST_IDLE,
+            .w = 640, .h = 402, .pitch = 644, .bytes = sizeof(surface),
+            .usage = GFX2_USE_SCANOUT, .fmt = GFX2_FMT_INDEX8,
+            .pool = GFX2_POOL_SYSMEM, .kva = surface };
+        DISPLAY_V1_PUBLIC_INIT_OK();
+        EXPECT(!gfx2_flip(0, 0, 1, 0, 0) && adapter.head[0].scan_sid == 1);
         EXPECT(osri_screen[648] == 250);
     }
     if (replace_bind) {

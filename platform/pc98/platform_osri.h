@@ -4,7 +4,7 @@
 #include "pcm_contract.h"
 #include "../../fs/serialfs/serialfs.h"
 
-static inline int platform_osri_mount_busy(void) { return serialfs_is_mounted(); }
-static inline int platform_osri_pcm_busy(void) { return pcm_state() != PCM_ST_CLOSED; }
+#define platform_osri_mount_busy() serialfs_is_mounted()
+#define platform_osri_pcm_busy() (pcm_state() != PCM_ST_CLOSED)
 
 #endif

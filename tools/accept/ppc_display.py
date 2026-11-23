@@ -209,12 +209,38 @@ def observe_osri(session, evidence, case):
     from run import require
     from usb_run import rsh_command
 
+    from fb_pixel import Font, Terminal, read_ppm
+
+    def rows_visible():
+        session.wait(lambda: session.word('osri_visible') == 1, 'dynamic OSRI visible')
+        def pixels_match():
+            path = evidence / 'osri-rows.ppm'
+            session.q.call('screendump', {'filename': str(path)})
+            image = read_ppm(path)
+            return all(image.pixel(x, y) == bytes([255 if y > 64 or x % 8 == 0 else 0]) * 3
+                       for y in (64, 65, 463) for x in (0, 1, 7, 8, 639))
+
+        session.wait(lambda: session.word('osri_visible') == 1 and pixels_match(),
+                     'dynamic OSRI row palette update')
+
     expected = b'OSRI NOSYS\n' if case != 'normal' else b'OSRI DONE\n'
-    rsh_command(session, '/bin/dispprb.bin osri', expected)
+    rsh_command(session, '/bin/dispprb.bin osri', expected,
+                during=rows_visible if case == 'normal' else None)
     rsh_command(session, 'echo $?', b'0\n')
     if case != 'normal':
         return
-    from fb_pixel import read_ppm
+    marker = 'osri-terminal-ready'
+    rsh_command(session, 'echo ' + marker, marker.encode() + b'\n')
+
+    def restored():
+        rows = session.screen('osri-terminal').splitlines()
+        terminal = Terminal(read_ppm(evidence / 'osri-terminal.ppm'),
+                            Font(ROOT / 'assets/fonts/shino16.kcgfont'),
+                            bytes([255]) * 3, bytes(3), cursor_top=14)
+        return any(terminal.compare_text(i, row.index(marker), marker) is None
+                   for i, row in enumerate(rows) if marker in row)
+
+    session.wait(restored, 'terminal glyphs after dynamic OSRI')
     from usb_run import keyboard_actions
     read_log = lambda: (evidence / 'serial-a.log').read_text(errors='replace')
     session.wait(lambda: 'protocol=01' in read_log(), 'OSRI USB keyboard')
