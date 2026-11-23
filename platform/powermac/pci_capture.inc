@@ -75,7 +75,8 @@ static int pci_cpu_interval(int bus, unsigned ac, unsigned sc, u64 *base, u64 by
             u64 child = pci_number(p, ac), parent = pci_number(p + ac*4, pac);
             u64 size = pci_number(p + (ac+pac)*4, sc);
             if (!size || size-1 > ~(u64)0-child || size-1 > ~(u64)0-parent) return 0;
-            if (*base < child || *base-child >= size || bytes > size-(*base-child)) continue;
+            if (child > *base + (bytes-1) || *base > child + (size-1)) continue;
+            if (*base < child || bytes-1 > child + (size-1) - *base) return 0;
             if (found++) return 0;
             translated = parent + (*base-child);
         }

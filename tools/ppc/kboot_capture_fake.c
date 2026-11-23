@@ -23,15 +23,22 @@ static void tuple(unsigned char *p, unsigned a, unsigned s, unsigned start, unsi
     for (unsigned i=0; i<(a+s)*4; i++) p[i]=0;
     put(p+(a-1)*4,start); put(p+(a+s-1)*4,size);
 }
+static int has_parent_bus(void) { return scenario==45 || scenario==48; }
+
 static int prop(int node, const char *name, unsigned char *p)
 {
     unsigned n=0;
-    if (scenario == 45 && node == 19) {
+    if (has_parent_bus() && node == 19) {
         if (!kstrcmp(name,"#address-cells") || !kstrcmp(name,"#size-cells")) {
             put(p,1); return 4;
         }
         if (!kstrcmp(name,"ranges")) {
-            put(p,0x80000000); put(p+4,0x60000000); put(p+8,0x70000000); return 12;
+            put(p,0x80000000); put(p+4,0x60000000); put(p+8,0x70000000);
+            if (scenario==48) {
+                put(p+12,0x80000800); put(p+16,0x70000800); put(p+20,0x800);
+                return 24;
+            }
+            return 12;
         }
         return -1;
     }
@@ -188,13 +195,13 @@ int ofw_setup(struct ofw_env *e) { e->out=9; return 0; }
 int ofw_finddevice(const char *s) { return !kstrcmp(s,PM_ROOT)?(scenario==18?-17:1):!kstrcmp(s,"/cpus")?8:2; }
 int ofw_parent(int n)
 {
-    if (scenario==45 && n==20) return 19;
+    if (has_parent_bus() && n==20) return 19;
     if (scenario>=42 && n>=20) return n==20?1:n<=22?n-1:22;
     if (n==-17) n=1;
     return n==12?11:n==11?1:n==1?0:n==6?5:n==5||n==7||n==13||n==14?9:n==9?4:n==3 && scenario!=22?8:scenario==18?-17:1;
 }
-int ofw_child(int n) { if (scenario==45 && n==19) return 20; if (scenario>=42 && n>=20) return n<=22?n+1:0; if (n==13 && scenario==34) return -1; return n==11?12:n==1||n==-17?2:n==4?9:n==9?5:n==5?6:n==8 && scenario!=22?3:0; }
-int ofw_peer(int n) { if (scenario==46 && n==8) return 20; if (scenario==46 && n==20) return 4; if (scenario==46 && n==4) return 0; if (scenario>=42 && n==4) return scenario==45?19:20; if (scenario>=42 && n>=23) return n<(scenario==43?140:40)?n+1:0; if (n==13 && scenario==35) return -1; return n==2?(scenario==22?3:8):n==8?4:n==3 && scenario==22?4:n==4 && scenario==23?10:n==4 && scenario==24?11:n==5?7:n==7 && scenario>=26 && scenario!=33?13:n==13 && scenario==28?14:0; }
+int ofw_child(int n) { if (has_parent_bus() && n==19) return 20; if (scenario>=42 && n>=20) return n<=22?n+1:0; if (n==13 && scenario==34) return -1; return n==11?12:n==1||n==-17?2:n==4?9:n==9?5:n==5?6:n==8 && scenario!=22?3:0; }
+int ofw_peer(int n) { if (scenario==46 && n==8) return 20; if (scenario==46 && n==20) return 4; if (scenario==46 && n==4) return 0; if (scenario>=42 && n==4) return has_parent_bus()?19:20; if (scenario>=42 && n>=23) return n<(scenario==43?140:40)?n+1:0; if (n==13 && scenario==35) return -1; return n==2?(scenario==22?3:8):n==8?4:n==3 && scenario==22?4:n==4 && scenario==23?10:n==4 && scenario==24?11:n==5?7:n==7 && scenario>=26 && scenario!=33?13:n==13 && scenario==28?14:0; }
 int ofw_package_to_path(int n, char *p, unsigned cap)
 {
     if (n==-17) n=1;
@@ -255,6 +262,11 @@ static void test(void)
     if (scenario==24 && !(p->gmac.bar_pa==0x82200000 && p->gmac.mac[0]==0x52 && p->gmac.mac[5]==0x56)) { emit("H:A1 gmac-data\n"); quit(43); }
     if (scenario>=42) {
         const struct pm_pci_capture *c=&p->pci;
+        if (scenario==48) {
+            REQUIRE(c->bridges==3 && c->bridge[0].id==20);
+            if (!c->bridge[0].incomplete) { emit("partial overlap accepted\n"); quit(46); }
+            quit(0);
+        }
         if (scenario==47) {
             REQUIRE(c->bridges==3 && c->bridge[1].parent==0 &&
                     c->bridge[1].incomplete && c->bridge[0].incomplete);

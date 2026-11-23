@@ -30,7 +30,7 @@ MUTATIONS = [
 ]
 
 
-def exercise(directory, source, expected=None, *, cases=(*range(34), 42, 43, 44, 45, 46, 47), via_source=None):
+def exercise(directory, source, expected=None, *, cases=(*range(34), 42, 43, 44, 45, 46, 47, 48), via_source=None):
     exe = directory / 'capture'
     argv = ['gcc', '-std=gnu11', '-m32', '-O2', '-Wall', '-Wextra', '-Werror',
             '-ffreestanding', '-fno-builtin', '-fno-pie', '-no-pie', '-fno-stack-protector',
@@ -60,7 +60,7 @@ def main():
         failures = exercise(directory, product)
         if failures:
             raise RuntimeError(f'baseline failures: {failures}')
-        print('GREEN: 40 firmware-tree cases (ILP32 product code)')
+        print('GREEN: 41 firmware-tree cases (ILP32 product code)')
         if args.mutate:
             capture = (product.parent / 'pci_capture.inc').read_text()
             anchor = 'b->parent = parent;'
@@ -71,6 +71,11 @@ def main():
             failures = exercise(directory, copied, (42, 45, b'reached=A1\nOHCI parent interval mismatch\n'), cases=(42,))
             assert failures and failures[0][0] == 42
             print('RED: nested-parent: translated OHCI interval')
+            anchor = 'if (*base < child || bytes-1 > child + (size-1) - *base) return 0;'
+            assert capture.count(anchor) == 1
+            (directory / 'pci_capture.inc').write_text(capture.replace(anchor, anchor.replace('return 0;', 'continue;')))
+            exercise(directory, copied, (48, 46, b'reached=A1\npartial overlap accepted\n'), cases=(48,))
+            print('RED: partial overlap accepted')
             (directory / 'pci_capture.inc').unlink()
             text = product.read_text()
             for name, old, new in MUTATIONS:
