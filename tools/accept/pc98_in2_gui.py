@@ -198,6 +198,9 @@ def main():
                 ini.unlink(missing_ok=True)
 
 
+PC98_PROMPT = 'OS32:/$'
+
+
 def trial(s, role):
     s.seen('[boot] exec /bin/gshell.bin')
     mode = s.wait_match(r'D-GUI (?:relative|seamless (\d+) (\d+))\r?\n')
@@ -215,14 +218,15 @@ def trial(s, role):
             raise ObservedMutation('WM received neither TAB edge')
     s.wait(lambda: 'Remote shell active (ESC to exit)' in s.screen(), 'CUI remote shell')
     s.post('/api/key', 'seq=ESC')
-    s.wait(lambda: 'sh>' in s.screen(), 'cooked shell prompt')
+    # PC-98 returns to the resident CPL0 shell, whose prompt is the cwd form.
+    s.wait(lambda: any(line.startswith(PC98_PROMPT) for line in s.screen()), 'cooked shell prompt')
     command = 'echo cooked'
     for i in range(0, len(command), 4):
         s.post('/api/key', urlencode({'text': command[i:i + 4]}))
-        prefix = 'sh> ' + command[:i + 4]
+        prefix = PC98_PROMPT + ' ' + command[:i + 4]
         s.wait(lambda: any(prefix in line for line in s.screen()), prefix)
     s.post('/api/key', 'seq=ENTER')
-    s.wait(lambda: 'cooked' in s.screen(),
+    s.wait(lambda: any(line == 'cooked' for line in s.screen()),
            'cooked shell response')
     print(role, 'DONE', flush=True)
 
