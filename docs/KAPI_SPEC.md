@@ -601,6 +601,10 @@ VFS パスの NULL=cwd、`sys_redirect_fd` の NULL 拒否の戻り値、`sys_mo
 | 0x230 | mouse_cursor_show | `void(void)` |
 | 0x234 | mouse_cursor_hide | `void(void)` |
 
+PowerMac の `gfx_hardware_scroll(lines)` は最後に提示した INDEX8 像を論理行単位で循環表示する。正数で上、負数で下へ移り、端を越えた行は反対端に現れる。
+物理先頭の保護帯は固定し、未提示の CLIENT の変更は表示しない。初期化前と提示権の失効後は画面も原点も保持する。
+OF には vblank 同期がなく、転送中の画面が見えることがある。
+
 `kprintf` (0x28) の attr は PC-98 流の `ATTR_*` か、ログ行の `KLOG_ATTR` (0x07、PC/AT 流。入口で PC-98 の属性に読み替える)。
 
 ### DB API (v29-v31)
@@ -2236,6 +2240,8 @@ private import 表は `kernel/module/kdebug_imports.def` が正で、317 件
 | 0x54c | install_begin | `int(const InstallPlanV1 *plan, u32 *handle)` |
 | 0x550 | install_rescan | `int(u32 handle)` |
 | 0x554 | install_end | `int(u32 handle, u32 outcome)` |
+
+- `gfx2_check_op` と `gfx2_submit` は同じ規則に従う (照会が可と答えた操作は実行も通る)。**INDEX8 宛ての ALPHA は照会で 0/NOSUPPORT、実行で `OS32_ERR_NOSYS` (何も描かない)** — 以前は照会が SW で可・実行で NOSYS の不一致が x86 (PEGC) にもあった (GFX2-ALPHA-INDEX8-1、PowerPC の調べで見つけた、直しは 39d87fb53、NP21/W 依頼 47 で x86 の回帰なし、2026-11-24)。
 
 slot 253。kdebug 部品 (`/boot/kdebug.bin`、`KDEBUG=1` のときだけ読む) の ops slot 19
 `dbg_call` へそのまま渡す受け口 (`kernel/module/kdebug_call.c`)。部品が動いていない・slot 19 が

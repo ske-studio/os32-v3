@@ -1,3 +1,4 @@
+/* Scroll expectations: docs/KAPI_SPEC.md, gfx_hardware_scroll, and DESIGN.final §4. */
 /* PPC_KAPI_GFX_REST_DESIGN 5c §2-5, A3 and A8: transfer accounting and fixed mode. */
 /* Expectations: characterization of the original word-copy behavior and
  * ppc-offb-fast PACK (2026-11-15): alignment must not change any output byte. */
@@ -15,9 +16,16 @@
 
 GfxCounters gfx_counters;
 GfxBackend *g_backend = &gfx_backend_of_fb;
-static int gfx_started, gfx_current_height;
+static int gfx_started;
+int gfx_current_height, gfx_flip_enabled, gfx_display_page;
+u8 *bb_b;
 #include "gfx/gfx_core_api.inc"
 
+/* DESIGN.final §2/§4: only committed logical rows may reach scanout. */
+static u8 frame_storage[8192] __attribute__((aligned(4096)));
+extern int vram_scroll_y;
+int gfx_is_started(void) { return gfx_started; }
+static unsigned frame_pages;
 static int allow_palette;
 static int palette_allowed(void) { return allow_palette; }
 static int current_app = 2;
@@ -68,10 +76,24 @@ int ledger_resource_set_map(u32 id, u32 first, u32 end)
 { EXPECT(id == 0 && first < end); return 1; }
 u32 pgalloc_arena_end(void) { return 0x10000; }
 int pgalloc_alloc_n_owner(u32 owner, int n, u32 first, u32 end, u32 flags, u32 *out)
-{ (void)first; (void)end; EXPECT(owner == LEDGER_OWNER_BOOT && n == 2 && flags == LEDGER_TOP_DOWN);
+{
+  if (owner == LEDGER_OWNER_KERNEL) {
+      EXPECT(!frame_pages && n > 0);
+      if ((unsigned)n > sizeof(frame_storage) / PAGE_SIZE) return 0;
+      frame_pages = n;
+      *out = (u32)frame_storage / PAGE_SIZE;
+      return 1;
+  }
+  (void)first; (void)end; EXPECT(owner == LEDGER_OWNER_BOOT && n == 2 && flags == LEDGER_TOP_DOWN);
   alloc_calls++; *out = (u32)ram / PAGE_SIZE; return 1; }
 int pgalloc_free_n_owner(u32 owner, u32 pfn, int n)
-{ (void)owner; (void)pfn; (void)n; return 1; }
+{
+    if (owner == LEDGER_OWNER_KERNEL) {
+        EXPECT(pfn == (u32)frame_storage / PAGE_SIZE && (unsigned)n == frame_pages);
+        frame_pages = 0;
+    }
+    return 1;
+}
 int ledger_surface_create(const struct ledger_surface *sf, u32 *sid)
 {
     (void)sid;
@@ -173,7 +195,7 @@ static void raster(void)
     EXPECT(of_fb_present(0, 1, 0, 1) == OS32_ERR_INVAL);
     EXPECT(of_fb_copy(0, 16, 64, 0, 1, 1, 1) == OS32_ERR_INVAL);
     EXPECT(gfx_counters.present_bytes == 8 && gfx_counters.commits == 2);
-    for (u32 i = 0; i < 80; i++) EXPECT(screen[i] == (i >= 20 && i < 28 ? ram[16+i-20] : 0xa5));
+    for (u32 i = 0; i < 80; i++) EXPECT(screen[i] == (i >= 20 && i < 28 ? ram[16+i-20] : i >= 20 && i % 20 < 12 ? 0 : 0xa5));
     gfx_backend_of_fb.present_rect(-3, -2, 100, 100);
     for (u32 y = 0; y < 4; y++) for (u32 x = 0; x < 20; x++)
         EXPECT(screen[y*20+x] == (y && x < 12 ? ram[y*16+x] : 0xa5));
@@ -206,6 +228,7 @@ static void raster(void)
     gfx_set_palette_hal(5, 15, 0, 0);
     EXPECT(gfx2_pal[5] == 0 && screen[20] == saved);
     EXPECT(gfx_lease_palette(16, 1, red) == OS32_ERR_BUSY && gfx2_pal[16] == 0);
+    EXPECT(!of_fb_present(0, 1, 4, 1));
     allow_palette = 1;
     EXPECT(!gfx_lease_palette(16, 1, red) && gfx2_pal[16] == 0xff0000);
     gfx_set_palette_hal(5, 15, 0, 0);
@@ -214,6 +237,26 @@ static void raster(void)
     EXPECT(r == 15 && g == 0 && b == 0);
     EXPECT(screen[20] == 42 && ram[16] == 5 && screen[21] == ram[17]);
     EXPECT(screen[0] == 0xa5 && screen[32] == 0xa5);
+    ram[16] = 97; /* uncommitted */
+    gfx_counters = (GfxCounters){0};
+    of_fb_scroll(3);
+    EXPECT(screen[40] == 42 && gfx_counters.present_bytes == 36 && !gfx_counters.commits);
+    of_fb_scroll(3);
+    EXPECT(gfx_counters.present_bytes == 36);
+    ram[0] = 5;
+    ram[1] = 81;
+    EXPECT(!of_fb_present(0, 0, 1, 1) && screen[20] == 42);
+    EXPECT(gfx_counters.present_bytes == 40 && gfx_counters.commits == 1);
+    const u8 black[3] = {0, 0, 0};
+    EXPECT(!of_fb_palette(5, 1, black) && screen[40] == 0 && screen[20] == 0);
+    EXPECT(screen[21] == 81 && gfx_counters.present_bytes == 76 && gfx_counters.commits == 2);
+    EXPECT(!of_fb_palette(5, 1, black));
+    EXPECT(gfx_counters.present_bytes == 76 && gfx_counters.commits == 2);
+    vram_scroll_y = 3;
+    EXPECT(of_fb_replace(ram, 8, 64) == OS32_ERR_INVAL && vram_scroll_y == 3);
+    EXPECT(gfx_counters.present_bytes == 76 && gfx_counters.commits == 2);
+    EXPECT(!of_fb_replace(ram, 16, 64) && !vram_scroll_y && screen[20] == 97);
+    EXPECT(gfx_counters.present_bytes == 112 && gfx_counters.commits == 2);
     d.clut = 0;
     d.pitch = 8; EXPECT(of_fb_bind(&d) == OS32_ERR_INVAL && !of_fb_ready());
     d.pitch = 20; d.bytes = 79; EXPECT(of_fb_bind(&d) == OS32_ERR_INVAL);
@@ -238,9 +281,13 @@ static void raster(void)
     struct gfx2_surf s = {.sid = 5, .state = GFX2_ST_IDLE, .w = 12, .h = 4,
         .fmt = GFX2_FMT_INDEX8, .pool = GFX2_POOL_SYSMEM, .pitch = 16, .bytes = 64, .kva = pixels};
     for (u32 i = 0; i < sizeof(pixels); i++) pixels[i] = (u8)(i+3);
+    vram_scroll_y = 2; of_fb_scroll(2);
     EXPECT(!adapter.be->mode_set(adapter.ctx, 0, 1, &m, &s));
+    EXPECT(!vram_scroll_y);
     EXPECT(screen[20] == pixels[16] && screen[0] == 0xa5 && screen[32] == 0xa5);
+    vram_scroll_y = 3; of_fb_scroll(3);
     pixels[16] = 55; EXPECT(!adapter.be->flip(adapter.ctx, 0, &s, 0, 0) && screen[20] == 55);
+    EXPECT(!vram_scroll_y);
     EXPECT(adapter.be->flip(adapter.ctx, 0, &s, GFX2_FLIP_VBLANK, 0) == OS32_ERR_NOSYS);
     m.id++; EXPECT(adapter.be->mode_set(adapter.ctx, 0, 1, &m, &s) == OS32_ERR_NOSYS); m.id--;
     m.h++; EXPECT(adapter.be->mode_set(adapter.ctx, 0, 1, &m, &s) == OS32_ERR_NOSYS); m.h--;
@@ -261,6 +308,72 @@ static void raster(void)
     EXPECT(!adapter.be->fence_state(adapter.ctx, &done, &fail) && !done && !fail);
     EXPECT(adapter.be->fence_wait(adapter.ctx, 1, 0) == OS32_ERR_NOSYS);
     of_fb_unbind();
+}
+/* Compare the entire firmware mapping, including both guards and every pitch gap. */
+static void scanout(const u8 *expected, unsigned offset)
+{
+    for (unsigned y = 0; y < 72; y++)
+        for (unsigned x = 0; x < 96; x++) {
+            u8 color = y < 64 || x >= 80 ? 0xa5 : expected[((y + offset) % 72) * 80 + x];
+            EXPECT(screen[4 + y * 96 + x] == color);
+        }
+    EXPECT(screen[3] == 0xa5 && screen[4 + 72 * 96] == 0xa5);
+}
+
+static void scroll_frames(void)
+{
+    static u8 expected[72 * 80];
+    const int deltas[] = {1, -2, 72, -72, -2147483647-1, 2147483647};
+    gfx_current_height = 72;
+    bb_b = ram;
+    gfx_started = 1;
+    DISPLAY_V1_PUBLIC_INIT_OK();
+    for (int pass = 0; pass < 4; pass++) {
+        if (pass < 2) {
+            gfx_backend_of_fb.shutdown();
+            kmemset(screen, 0xa5, sizeof(screen));
+            gfx_backend_of_fb.prepare();
+            gfx_backend_of_fb.init();
+            DISPLAY_V1_PUBLIC_INIT_OK();
+        } else {
+            gfx_counters = (GfxCounters){0};
+            gfx_backend_of_fb.enter();
+            EXPECT(!gfx_counters.commits && gfx_counters.present_bytes == 640);
+        }
+        kmemset(expected, 0, sizeof(expected));
+        scanout(expected, 0);
+        unsigned offset = 0;
+        if (pass % 2 == 0) {
+            gfx_hardware_scroll(1);
+            offset = 1;
+            scanout(expected, offset);
+        }
+        /* The rounded edge word straddles the physical wrap between rows. */
+        for (unsigned y = 0; y < 2; y++)
+            for (unsigned x = 0; x < 8; x++)
+                expected[y * 80 + x] = ram[y * 96 + x] = 0x80 + y + x;
+        gfx_counters = (GfxCounters){0};
+        EXPECT(!of_fb_present(3, 0, 2, 2));
+        scanout(expected, offset);
+        EXPECT(gfx_counters.commits == 1 && gfx_counters.present_bytes == offset * 8);
+        EXPECT(!of_fb_present(81, 0, 3, 1));
+        EXPECT(gfx_counters.commits == 2 && gfx_counters.present_bytes == offset * 8);
+        for (unsigned y = 0; y < 72; y++)
+            for (unsigned x = 0; x < 80; x++)
+                expected[y * 80 + x] = ram[y * 96 + x] = 1 + y + x;
+        EXPECT(!of_fb_present(0, 0, 80, 72));
+        kmemset(ram, 0xee, 72 * 96);
+        for (unsigned i = 0; i < sizeof(deltas) / sizeof(deltas[0]); i++) {
+            unsigned magnitude = deltas[i] < 0 ? 0u - (unsigned)deltas[i] : (unsigned)deltas[i];
+            unsigned step = magnitude % 72;
+            offset = (offset + (deltas[i] < 0 ? 72 - step : step)) % 72;
+            gfx_counters = (GfxCounters){0};
+            gfx_hardware_scroll(deltas[i]);
+            scanout(expected, offset);
+            EXPECT(!gfx_counters.commits && gfx_counters.present_bytes == (step ? 640u : 0u));
+        }
+    }
+    gfx_started = 0;
 }
 static void provider(void)
 {
@@ -285,12 +398,21 @@ static void provider(void)
     firmware.pa += 4; devices.fb_va += 4;
     display_provider_each(each, &n); EXPECT(n == 0);
     EXPECT(display_dual_outputs(&out, 1) == 1 && !out.live && out.role == CON_OUT_TEXT);
+    vram_scroll_y = 3;
     display_provider_boot_reserve(0, bind_client);
     EXPECT(of_fb_ready() && reg_count == 2 && bind_calls == 1 && reserve_calls == 1);
     EXPECT(display_provider_ledger(&gfx_backend_of_fb) == LEDGER_SF_OF_FB);
     EXPECT(display_provider_select(0, 0, selected) == &gfx_backend_of_fb);
     display_provider_each(each, &n); EXPECT(n == 1);
     gfx_backend_of_fb.init(); EXPECT(sync.used);
+    gfx_started = 1;
+    gfx_current_height = 72;
+    gfx_counters = (GfxCounters){0};
+    kmemset(screen, 0xa5, sizeof(screen));
+    gfx_backend_of_fb.enter();
+    EXPECT(!vram_scroll_y && !gfx_counters.commits && gfx_counters.present_bytes == 640);
+    static const u8 blank[72 * 80];
+    scanout(blank, 0);
     EXPECT(display_provider_client_before_init(&gfx_backend_of_fb));
     EXPECT(!display_provider_idle_safe(0));
     kmemset(screen, 0xa5, sizeof(screen));
@@ -334,6 +456,7 @@ static void provider(void)
     EXPECT(!DISPLAY_V1_PRESENT_OK());
     DISPLAY_V1_PUBLIC_INIT_OK();
     EXPECT(DISPLAY_V1_PRESENT_OK());
+    scroll_frames();
     display_provider_raster_reset();
     EXPECT(!DISPLAY_V1_PRESENT_OK());
     gfx_backend_of_fb.shutdown(); EXPECT(!of_fb_ready() && !sync.used);

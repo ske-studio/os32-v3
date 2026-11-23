@@ -7,6 +7,7 @@ int of_fb_palette(int first, int count, const u8 *rgb);
 int display_provider_v1_width(void);
 #define DISPLAY_V1_WIDTH (display_provider_v1_width())
 int display_provider_shadow_push(int x, int y, int w, int h);
+#define DISPLAY_SCROLL_OK() DISPLAY_V1_PRESENT_OK()
 #define DISPLAY_V2_SHADOW_PUSH(x, y, w, h) display_provider_shadow_push(x, y, w, h)
 int display_provider_present_ok(void);
 void display_provider_public_init_ok(void);

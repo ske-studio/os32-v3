@@ -59,14 +59,14 @@ static int shim_enum_mode(void *c, u32 head, u32 fmt, u32 i, GFX2_ModeInfo *out)
 static int surface_copy(void *c, u32 head, const struct gfx2_surf *s)
 {
     struct gfx2_adapter *a = adapter_for(c);
-    const GfxMode *m = gfx_backend_mode(a->v1);
     if (!a || a->state != GFX2_AD_OK || !of_fb_ready()) return OS32_ERR_STALE;
+    const GfxMode *m = gfx_backend_mode(a->v1);
     if (head || !s || !m || s->adapter != a->index ||
         s->state == GFX2_ST_LOST || s->state == GFX2_ST_FREE ||
         s->pool != GFX2_POOL_SYSMEM || !s->kva ||
         s->fmt != GFX2_FMT_INDEX8 || s->w != m->width || s->h != m->height)
         return OS32_ERR_INVAL;
-    return of_fb_copy(s->kva, s->pitch, s->bytes, 0, 0, s->w, s->h);
+    return of_fb_replace(s->kva, s->pitch, s->bytes);
 }
 static int shim_mode_set(void *c, u32 head, u32 cm,
                          const GFX2_ModeInfo *m, const struct gfx2_surf *s)

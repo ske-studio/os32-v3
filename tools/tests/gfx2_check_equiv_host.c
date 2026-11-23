@@ -8,6 +8,7 @@
 extern const GfxBackendV2 pegc_backend_v2;
 GfxBackend gfx_backend_pegc;
 GfxCounters gfx_counters;
+int vram_scroll_y;
 
 static u8 pixels[3][2], data[8];
 static struct gfx2_adapter *adapter = &gfx2_adapters[0];
