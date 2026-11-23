@@ -486,7 +486,7 @@ def main():
             print(('FAIL' if required else 'SKIP') + ' ppc-kapi-binding: unavailable: ' + str(cc))
             return 1 if required else 0
         sfs_slots = {'sfs_begin', 'sfs_end'}
-        ide_slots = {'ide_init', 'ide_drive_present', 'ide_identify', 'ide_get_info',
+        ide_slots = {'ext2_format', 'ext2_format_at', 'ide_init', 'ide_drive_present', 'ide_identify', 'ide_get_info',
                      'ide_read_sector', 'ide_write_sector', 'ide_write_sectors'}
         ide_providers = {'platform_' + slot for slot in ide_slots}
         if any(provider + '(' in source for provider in ide_providers):

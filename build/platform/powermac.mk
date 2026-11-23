@@ -23,4 +23,4 @@ C_PLATFORM_LOOP = platform/powermac/loop_boot.c
 C_PLATFORM_CLI = platform/powermac/cli_boot.c
 C_PLATFORM_IDE = platform/powermac/ide_tree.c platform/powermac/ide_boot.c
 C_PLATFORM_IDE += platform/powermac/apm.c platform/powermac/partition_view.c
-C_PLATFORM_IDE += fs/ext2/ext2_super.c fs/ext2/ext2_inode.c fs/ext2/ext2_dir.c fs/ext2/ext2_file.c fs/ext2/ext2_vfs.c fs/ext2/ext2_time.c
+C_PLATFORM_IDE += fs/ext2/ext2_super.c fs/ext2/ext2_inode.c fs/ext2/ext2_dir.c fs/ext2/ext2_file.c fs/ext2/ext2_vfs.c $(C_EXT2_FORMATTER)
