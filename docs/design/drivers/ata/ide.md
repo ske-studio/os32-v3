@@ -43,9 +43,11 @@ GPL 実装は参照していない。
 
 ## ATA 状態待ちの期限
 
-各待ちは共通の `tick_clock_ms()` の差が 10,000 ms に達すると時間切れになる。
+通常 I/O の各待ちは共通の `tick_clock_ms()` の差が 10,000 ms に達すると時間切れになる。
 NetBSD のドライブ I/O 用 ATA_DELAY と同じ値を用いる。
 [NetBSD ata_wdc.c](https://github.com/NetBSD/src/blob/trunk/sys/dev/ata/ata_wdc.c)
+
+探査・IDENTIFY は BSY 解除を最大 1 秒、解除後の DRQ を最大 50 ms 待つ。IDENTIFY 発行後は 400 ns の整定を待ち、0x00・0x7F・0xFF を未装着として扱う。選択前の 0x00 ではバンクを除外しない。検出直後の SET MULTIPLE 完了待ちにも 1 秒を用いる。コマンド発行後の整定は [NetBSD wdc.c](https://github.com/NetBSD/src/blob/trunk/sys/dev/ic/wdc.c) にも記載がある。期限の根拠は [FreeBSD ata_wait](https://github.com/freebsd/freebsd-src/blob/main/sys/dev/ata/ata-lowlevel.c)。
 
 | ファイル | 関数 | 待つ状態 |
 |---|---|---|

@@ -55,6 +55,8 @@
 #define IDE_CMD_FLUSH_CACHE 0xE7
 #define IDE_CMD_IDENTIFY   0xEC   /* IDENTIFY DEVICE */
 
+#define IDE_PROBE_BSY_MS       1000
+#define IDE_PROBE_DRQ_MS       50
 #define IDE_IO_TIMEOUT_MS 10000u
 #define IDE_EARLY_PHASE_POLLS   1000000 /* BSY/DRQ待ちループカウント (長い) */
 #define IDE_EARLY_BSY_POLLS    500000  /* 一般的なBSY等のループカウント */

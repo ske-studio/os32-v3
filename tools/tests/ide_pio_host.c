@@ -49,7 +49,10 @@ static u16 pattern(u32 lba, unsigned w)
 }
 
 static unsigned polls, polls_per_ms = 1, release_poll;
-u32 tick_clock_ms(void) { return polls / polls_per_ms; }
+static u32 clock_base;
+static int irq_enabled = 1, empty_status = -1;
+int _irq_enabled(void) { return irq_enabled; }
+u32 tick_clock_ms(void) { return clock_base + (irq_enabled ? polls / polls_per_ms : 0); }
 
 void irq_disable(unsigned int irq) { (void)irq; }
 void kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
@@ -63,6 +66,7 @@ unsigned int inp(unsigned int port)
         if (polls == release_poll) { pre_busy = 0; release_poll = 0; }
     }
     CHECK(port == IDE_ALT_STATUS || port == IDE_STATUS);
+    if (empty_status >= 0 && !(present_mask & (1u << selected()))) return empty_status;
     if (identify_error) return IDE_ST_ERR;
     if (identifying) return IDE_ST_DRQ;
     if (setting) {
@@ -372,6 +376,37 @@ static void deadlines(void)
     CHECK(tick_clock_ms() == 10000);
     release_poll = 0;
     polls_per_ms = 1;
+    /* Wrap the product clock type, including on LP64 test hosts. */
+    clock_base = (u32)-4096;
+    polls = 0;
+    pre_busy = 1;
+    release_poll = 11000;
+    CHECK(request(0, 19, 1) == IDE_ERR_TIMEOUT);
+    CHECK(polls == IDE_SEL_SETTLE + 10000);
+    polls = 0;
+    irq_enabled = 0;
+    release_poll = IDE_EARLY_BSY_POLLS + 100;
+    CHECK(request(0, 19, 1) == IDE_ERR_TIMEOUT);
+    CHECK(polls == IDE_SEL_SETTLE + 500000);
+    release_poll = clock_base = 0;
+    irq_enabled = 1;
+    const int empty[] = { 0xff, 0, 0x7f };
+    for (unsigned i = 0; i < sizeof(empty) / sizeof(empty[0]); i++) {
+        empty_status = empty[i];
+        polls = 0;
+        configure(IDE_AMODE_LBA28, 0, 1000);
+        CHECK(ide_drive_present(0) && polls < 100);
+    }
+    IdeInfo info;
+    empty_status = IDE_ST_BSY;
+    polls = 0;
+    CHECK(ide_identify(1, &info) == IDE_ERR_TIMEOUT);
+    CHECK(polls == IDE_SEL_SETTLE + 1000);
+    empty_status = IDE_ST_DRDY;
+    polls = 0;
+    CHECK(ide_identify(1, &info) == IDE_ERR_NO_DRIVE);
+    CHECK(polls == 2 * IDE_SEL_SETTLE + 2 + 50);
+    empty_status = -1;
     reset_io();
 }
 
