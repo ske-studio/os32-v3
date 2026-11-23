@@ -70,7 +70,7 @@ static int ide_wait_bsy(u32 limit_ms)
     IdeWait wait = ide_wait_start(IDE_EARLY_BSY_POLLS);
     while (ide_wait_pending(&wait, limit_ms)) {
         u8 st = ide_bus_alt();
-        if (limit_ms == IDE_PROBE_BSY_MS && st == IDE_BUS_OPEN8) return IDE_ERR_NO_DRIVE;
+        if (limit_ms != IDE_IO_TIMEOUT_MS && st == IDE_BUS_OPEN8) return IDE_ERR_NO_DRIVE;
         if (!(st & IDE_ST_BSY)) return IDE_OK;
     }
     return IDE_ERR_TIMEOUT;
@@ -218,7 +218,7 @@ int ide_identify(int drive, IdeInfo *info)
      * 書き換える。KAPI の ide_identify (シェルの `ide N`) が一時的に失敗しても、
      * 起動時に得た値で読み書きが続けられる。起動時の初期値は 0 (valid = 0)。 */
     ide_select_drive(drive & (IDE_MAX_DRIVES - 1));
-    ret = ide_wait_bsy(IDE_PROBE_BSY_MS);
+    ret = ide_wait_bsy(IDE_SPINUP_MS);
     if (ret != IDE_OK) return ret;
 
     /* IDENTIFYコマンド発行 */

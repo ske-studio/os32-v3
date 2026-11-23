@@ -47,7 +47,7 @@ GPL 実装は参照していない。
 NetBSD のドライブ I/O 用 ATA_DELAY と同じ値を用いる。
 [NetBSD ata_wdc.c](https://github.com/NetBSD/src/blob/trunk/sys/dev/ata/ata_wdc.c)
 
-探査・IDENTIFY は BSY 解除を最大 1 秒、解除後の DRQ を最大 50 ms 待つ。IDENTIFY 発行後は 400 ns の整定を待ち、0x00・0x7F・0xFF を未装着として扱う。選択前の 0x00 ではバンクを除外しない。検出直後の SET MULTIPLE 完了待ちにも 1 秒を用いる。コマンド発行後の整定は [NetBSD wdc.c](https://github.com/NetBSD/src/blob/trunk/sys/dev/ic/wdc.c) にも記載がある。期限の根拠は [FreeBSD ata_wait](https://github.com/freebsd/freebsd-src/blob/main/sys/dev/ata/ata-lowlevel.c)。
+選択後、IDENTIFY 発行前の BSY 解除はスピンアップを考慮して最大 31 秒待つ（[NetBSD wdc.c の ATA 規格上限の説明](https://github.com/NetBSD/src/blob/trunk/sys/dev/ic/wdc.c)）。0xFF は直ちに除外する。IDENTIFY 発行後は BSY 解除を最大 1 秒、解除後の DRQ を最大 50 ms 待つ。IDENTIFY 発行後は 400 ns の整定を待ち、0x00・0x7F・0xFF を未装着として扱う。選択前の 0x00 ではバンクを除外しない。検出直後の SET MULTIPLE 完了待ちにも 1 秒を用いる。コマンド発行後の整定は [NetBSD wdc.c](https://github.com/NetBSD/src/blob/trunk/sys/dev/ic/wdc.c) にも記載がある。期限の根拠は [FreeBSD ata_wait](https://github.com/freebsd/freebsd-src/blob/main/sys/dev/ata/ata-lowlevel.c)。
 
 | ファイル | 関数 | 待つ状態 |
 |---|---|---|

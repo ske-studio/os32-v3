@@ -397,11 +397,17 @@ static void deadlines(void)
         configure(IDE_AMODE_LBA28, 0, 1000);
         CHECK(ide_drive_present(0) && polls < 100);
     }
+    /* One present master takes six seconds to spin up during boot. */
+    polls = 0;
+    pre_busy = 1;
+    release_poll = 6000;
+    CHECK(ide_init() == 1 && ide_drive_present(0));
+    CHECK(polls >= 6000 && polls < 6100);
     IdeInfo info;
     empty_status = IDE_ST_BSY;
     polls = 0;
     CHECK(ide_identify(1, &info) == IDE_ERR_TIMEOUT);
-    CHECK(polls == IDE_SEL_SETTLE + 1000);
+    CHECK(polls == IDE_SEL_SETTLE + 31000);
     empty_status = IDE_ST_DRDY;
     polls = 0;
     CHECK(ide_identify(1, &info) == IDE_ERR_NO_DRIVE);

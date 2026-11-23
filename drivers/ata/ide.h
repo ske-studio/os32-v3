@@ -55,6 +55,7 @@
 #define IDE_CMD_FLUSH_CACHE 0xE7
 #define IDE_CMD_IDENTIFY   0xEC   /* IDENTIFY DEVICE */
 
+#define IDE_SPINUP_MS          31000
 #define IDE_PROBE_BSY_MS       1000
 #define IDE_PROBE_DRQ_MS       50
 #define IDE_IO_TIMEOUT_MS 10000u
