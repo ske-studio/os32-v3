@@ -352,9 +352,15 @@ int platform_install_package_boot(KernelAPI *api, const InstTarget *t,
                           p->root_ext2.sectors, p->root_ext2.type};
     for (unsigned i = 0; i < 5; ++i) pm_put_word(plan+i*4, values[i]);
     int rc = api->vfs_sync();
-    if (rc) return rc;
+    if (rc) {
+        api->kprintf(0x41, "BOOT.HFS sync rc=%d\n", rc);
+        return rc;
+    }
     rc = api->sys_umount_checked("/hd0");
-    if (rc && rc != OS32_ERR_NOTFOUND) return rc;
+    if (rc && rc != OS32_ERR_NOTFOUND) {
+        api->kprintf(0x41, "BOOT.HFS unmount rc=%d\n", rc);
+        return rc;
+    }
     u32 count = p->boot_hfs.sectors;
     for (unsigned pass = 0; pass < 2; ++pass) {
         u32 crc = crc32_core_update(CRC32_INIT, desc+12, 8);
@@ -364,7 +370,10 @@ int platform_install_package_boot(KernelAPI *api, const InstTarget *t,
             if (!within) {
                 u32 n = sizes[0]-off < sizeof(block) ? sizes[0]-off : sizeof(block);
                 rc = read_source(api, &staged, off, block, n);
-                if (rc) return rc;
+                if (rc) {
+                    api->kprintf(0x41, "BOOT.HFS source offset %u rc=%d\n", off, rc);
+                    return rc;
+                }
                 crc = crc32_core_update(crc, block, n);
             }
             u8 *sector = block+within;
@@ -378,11 +387,20 @@ int platform_install_package_boot(KernelAPI *api, const InstTarget *t,
             if (!pass) rc = api->ide_write_sector(p->raw_unit, lba, sector);
             else {
                 rc = api->ide_read_sector(p->raw_unit, lba, check);
-                if (!rc && !same(check, sector, sizeof(check))) rc = OS32_ERR_IO;
+                if (!rc && !same(check, sector, sizeof(check))) {
+                    api->kprintf(0x41, "BOOT.HFS readback mismatch LBA %u\n", lba);
+                    return OS32_ERR_IO;
+                }
             }
-            if (rc) return rc;
+            if (rc) {
+                api->kprintf(0x41, "BOOT.HFS %s LBA %u rc=%d\n", pass ? "read" : "write", lba, rc);
+                return rc;
+            }
         }
-        if (crc32_core_final(crc) != map_word(desc+8)) return OS32_ERR_IO;
+        if (crc32_core_final(crc) != map_word(desc+8)) {
+            api->kprintf(0x41, "BOOT.HFS source CRC mismatch pass %u\n", pass);
+            return OS32_ERR_IO;
+        }
     }
     return 0;
 }
