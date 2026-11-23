@@ -268,14 +268,18 @@ class Session:
         self.wait(lambda: self.ready() and any(e['parts'][:2] == ['RSH', 'READY']
                   for e in self.events[start:]), 'new resident RSH READY', 30)
 
+    def boot_args(self):
+        return ['-cdrom', str(self.media.iso.resolve()), '-boot', 'd',
+                '-prom-env', 'boot-device=cd:,\\PPCKERN.ELF']
+
     def start(self):
         iso = self.media.iso.resolve()
         with socket.socket(socket.AF_INET,socket.SOCK_DGRAM) as reservation:
             reservation.bind(('127.0.0.1',0)); port=reservation.getsockname()[1]
             self.io = UDP(f'127.0.0.1:0,127.0.0.1:{port}')
         args = ['qemu-system-ppc','-M',self.machine,'-cpu',self.cpu,'-m','128M','-smp','1',
-            '-accel','tcg','-bios',str(ROM),'-cdrom',str(iso),'-boot','d',
-            '-prom-env','boot-device=cd:,\\PPCKERN.ELF','-prom-env','auto-boot?=true',
+            '-accel','tcg','-bios',str(ROM),*self.boot_args(),
+            '-prom-env','auto-boot?=true',
             '-g','800x600x8','-display','none',*self.serial_args(),
             '-serial','file:'+str(self.out/'serial-b.log'),'-monitor','none','-qmp','stdio',*self.reboot_args,
             '-nic','none','-device','sungem,netdev=n0,mac=52:54:00:12:34:56','-netdev',

@@ -69,6 +69,7 @@ def main():
     if args.mutate:
         cases += [('start', VIEW, 'first + offset', 'offset'),
                   ('last', VIEW, 'count > dev->total_sects - offset', 'count >= dev->total_sects - offset'),
+                  ('resolve-last', VIEW, 'count > dev->total_sects-lba', 'count >= dev->total_sects-lba'),
                   ('type', apm, 'i + 1 == number && kstrncmp', '0 && kstrncmp'),
                   ('duplicate', tree, 'root_controller = 0; return;', 'return;'),
                   ('unit', tree, 'previous * 2 + root_target', 'previous * 2 + (1 - root_target)')]
@@ -121,7 +122,7 @@ def main():
                 identity = 'first' if name == 'unit' else 'selected'
                 assert f'ROOT-TEST dev=hd0 id={identity} bytes={len(identity)}' in lines
                 if identity == 'selected':
-                    rc = -4 if name == 'last' else 0
+                    rc = -4 if name in ('last', 'resolve-last') else 0
                     assert f'ROOT-TEST last={rc} beyond=-4' in lines
                     if not rc:
                         expected[-1024:-512] = bytes([0x73]) * 512
@@ -136,7 +137,7 @@ def main():
             assert (directory / '7450/disk.raw').read_bytes() == first.read_bytes()
             assert (directory / '7450/second.raw').read_bytes() == expected
             if name != 'normal':
-                assert stop != wanted or name in ('unit', 'last')
+                assert stop != wanted or name in ('unit', 'last', 'resolve-last')
                 print(name, 'RED', flush=True)
     print(f'HDD root {"build-only" if args.build_only else "runtime"} OK ({len(hashes)} images)')
 

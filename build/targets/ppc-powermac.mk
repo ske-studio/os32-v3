@@ -32,6 +32,7 @@ $(KB_OUT)/platform/powermac/shell_loop_ops.o: private KB_TU_FLAGS += -DOS32_C_GU
 KB_GUI_BINS ?= $(KB_SH_OUT)/gshell.bin
 endif
 ROOT_BINS = $(strip $(KB_ROOT_BINS) $(KB_GUI_BINS))
+KB_INSTALLERS := $(if $(filter 1,$(FEATURE_IDE)),$(addprefix $(KB_SH_OUT)/,install.bin cdinst.bin))
 KB_ROOT_SHELL = $(KB_SH_OUT)/shell.bin
 ROOT_OBJCOPY := $(KB_OBJCOPY)
 ROOT_ELF_FORMAT := elf32-powerpc
@@ -44,11 +45,11 @@ PPC_SYSTEM_CFG ?=
 # Acceptance builds use a private resident binary (including source mutants).
 KB_ROOT_FEP := $(if $(KB_EXEC),$(KB_OUT)/fep/fep.mod)
 KB_ROOT_TEMPLATE := $(ROOT_MANIFEST)
-ifneq ($(filter-out build/out/ppc-user/link-sh,$(KB_SH_OUT))$(KB_ROOT_DIAG)$(KB_ROOT_FEP)$(PPC_SYSTEM_CFG),)
+ifneq ($(filter-out build/out/ppc-user/link-sh,$(KB_SH_OUT))$(KB_ROOT_DIAG)$(KB_ROOT_FEP)$(KB_INSTALLERS)$(PPC_SYSTEM_CFG),)
 override ROOT_MANIFEST := $(KB_OUT)/root-manifest.json
-$(ROOT_MANIFEST): $(KB_ROOT_TEMPLATE) $(PPC_SYSTEM_CFG) $(KB_ROOT_SHELL) $(KB_ROOT_DIAG) $(KB_ROOT_FEP) $(KB_OUT)/root-shell.config build/targets/ppc-powermac.mk
+$(ROOT_MANIFEST): $(KB_ROOT_TEMPLATE) $(PPC_SYSTEM_CFG) $(KB_ROOT_SHELL) $(KB_INSTALLERS) $(KB_ROOT_DIAG) $(KB_ROOT_FEP) $(KB_OUT)/root-shell.config build/targets/ppc-powermac.mk
 	@mkdir -p $(@D)
-	python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); d["/sys/shell.bin"]=sys.argv[2]; d.update({"/boot/kdebug.bin":sys.argv[3]} if sys.argv[3] else {}); d.update({"/etc/system.cfg":sys.argv[4]} if sys.argv[4] else {}); d.update({"/boot/fep.mod":sys.argv[5]} if sys.argv[5] else {}); print(json.dumps(d))' "$<" "$(KB_ROOT_SHELL)" "$(KB_ROOT_DIAG)" "$(PPC_SYSTEM_CFG)" "$(KB_ROOT_FEP)" > $@.tmp
+	python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); d["/sys/shell.bin"]=sys.argv[2]; d.update({"/boot/kdebug.bin":sys.argv[3]} if sys.argv[3] else {}); d.update({"/etc/system.cfg":sys.argv[4]} if sys.argv[4] else {}); d.update({"/boot/fep.mod":sys.argv[5]} if sys.argv[5] else {}); d.update({"/sbin/"+p.rsplit("/",1)[-1]:p for p in sys.argv[6:]}); print(json.dumps(d))' "$<" "$(KB_ROOT_SHELL)" "$(KB_ROOT_DIAG)" "$(PPC_SYSTEM_CFG)" "$(KB_ROOT_FEP)" $(KB_INSTALLERS) > $@.tmp
 	mv $@.tmp $@
 endif
 
@@ -187,12 +188,13 @@ $(KB_OBJ) $(KB_ELF): $(KB_SELECT_MK)
 all: kernel
 BOOT_ISO := $(KB_OUT)/boot.iso
 ifeq ($(IMAGE),powermac)
+include build/ppc-install-boot.mk
 all: iso
 endif
 .PHONY: iso deploy-iso
 iso: audit $(BOOT_ISO)
 $(BOOT_ISO): $(KB_ELF) tools/ppc/boot_media.py build/targets/ppc-powermac.mk | audit
-	python3 -B tools/ppc/boot_media.py "$<" "$@"
+	python3 -B tools/ppc/boot_media.py "$(KB_ELF)" "$@" $(HD_MEDIA_ARGS)
 deploy-iso: iso
 	@test -n "$(ISO_DEST)" && test ! -d "$(ISO_DEST)"
 	@set -e; tmp=$$(mktemp "$(ISO_DEST).XXXXXX"); trap 'rm -f "$$tmp"' EXIT; cp "$(BOOT_ISO)" "$$tmp"; mv -f "$$tmp" "$(ISO_DEST)"
@@ -285,6 +287,10 @@ $(KB_OUT)/platform/powermac/nic_gem.o $(KB_OUT)/platform/powermac/lan_gem_io.o: 
 ifeq ($(KBOOT_GEM_RX_DIAG),1)
 $(KB_OUT)/platform/powermac/nic_gem.o $(KB_OUT)/platform/powermac/lan_gem_io.o: private KB_TU_FLAGS += -DKBOOT_GEM_RX_DIAG=1
 endif
+ifeq ($(IMAGE),powermac)
+$(KB_OUT)/platform/powermac/ide_tree.o: private KB_TU_FLAGS += -DPM_INSTALL_MEDIA=1
+endif
+
 $(KB_OUT)/drivers/ata/ide.o: private KB_TU_FLAGS += -Wno-sign-compare
 $(KB_OUT)/lib/lz4.o: KB_TU_FLAGS += -O0
 $(KB_OUT)/kernel/console/console.o: KB_TU_FLAGS = -Wno-sign-compare
@@ -362,10 +368,10 @@ include build/ppc-user.mk
 # 替えて同じ Makefile を呼ぶ (呼ばれた側は置き場が一致するので、そのまま組む)。
 .PHONY: kb-user
 ifeq ($(KB_SH_OUT),$(PPC_USER_OUT))
-kb-user: $(ROOT_BINS) $(KB_ROOT_SHELL)
+kb-user: $(ROOT_BINS) $(KB_ROOT_SHELL) $(KB_INSTALLERS)
 else
 kb-user:
-	$(MAKE) ARCH=ppc PLATFORM=powermac PPC_USER_OUT=$(KB_SH_OUT) $(ROOT_BINS) $(KB_ROOT_SHELL)
+	$(MAKE) ARCH=ppc PLATFORM=powermac IMAGE=$(IMAGE) PPC_USER_OUT=$(KB_SH_OUT) $(ROOT_BINS) $(KB_ROOT_SHELL) $(KB_INSTALLERS)
 
-$(ROOT_BINS) $(KB_ROOT_SHELL): kb-user
+$(ROOT_BINS) $(KB_ROOT_SHELL) $(KB_INSTALLERS): kb-user
 endif

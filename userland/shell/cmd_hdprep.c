@@ -128,7 +128,7 @@ static int cmd_hdprep(int argc, char **argv)
     /* ---- 1. マウント ---- */
     rootdev = g_api->vfs_devname("/");
     root_hd0 = (rootdev && hp_streq(rootdev, HDPREP_DEV)) ? 1 : 0;
-    mounts = g_api->dev_mount_count(g.drive);
+    mounts = g_api->dev_mount_count(HDPREP_MOUNT_DRIVE(g.drive));
     rc = hdprep_check_mounts(mounts, root_hd0);
     if (rc < 0) { platform_hdprep_refuse(g_api, rc); return SH_STATUS_ERROR; }
 
@@ -158,7 +158,7 @@ static int cmd_hdprep(int argc, char **argv)
                 return SH_STATUS_ERROR;
             }
         }
-        if (g_api->dev_mount_count(p.drive) != 0) {
+        if (g_api->dev_mount_count(HDPREP_MOUNT_DRIVE(p.drive)) != 0) {
             platform_hdprep_refuse(g_api, HDPREP_E_STILL_MOUNTED);
             return SH_STATUS_ERROR;
         }
@@ -179,9 +179,15 @@ static int cmd_hdprep(int argc, char **argv)
     /* ---- 8. 通常のマウントで確認 ---- */
     if (hp_verify_mount() != 0) return SH_STATUS_ERROR;
 
+#ifdef PLATFORM_HDPREP_FINISH
+    if (PLATFORM_HDPREP_FINISH(g_api, 1)) return SH_STATUS_ERROR;
+    g_api->kprintf(ATTR_GREEN, "hdprep: verified ext2 at LBA %u (%u sectors)\n",
+                   p.start, p.len);
+#else
     g_api->kprintf(ATTR_GREEN,
                    "hdprep: done. /hd0 = ext2 at LBA %u (%u sectors). "
                    "It is mounted at boot from now on.\n", p.start, p.len);
+#endif
     return SH_STATUS_OK;
 }
 

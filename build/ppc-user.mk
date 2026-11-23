@@ -62,7 +62,10 @@ $(PPC_USER_OUT)/memstat.o: userland/tests/mem_stat_test.c $(SDK_KAPI_HDR) | $(PP
 $(PPC_USER_OUT)/atadeny.o: tools/ppc/ata_deny.c $(SDK_KAPI_HDR) | $(PPC_USER_OUT)
 	$(CC) $(PPC_USER_FLAGS) -c $< -o $@
 
-PPC_USER_APPS += $(PPC_GUIPROB) $(PPC_USER_OUT)/memstat $(PPC_USER_OUT)/atadeny
+$(PPC_USER_OUT)/learnprb.o: tools/ppc/learn_probe.c $(SDK_KAPI_HDR) | $(PPC_USER_OUT)
+	$(CC) $(PPC_USER_FLAGS) -c $< -o $@
+
+PPC_USER_APPS += $(PPC_GUIPROB) $(PPC_USER_OUT)/memstat $(PPC_USER_OUT)/atadeny $(PPC_USER_OUT)/learnprb
 $(addsuffix .elf,$(PPC_USER_APPS)): $(PPC_USER_OUT)/%.elf: $(PPC_USER_CRT) $(PPC_USER_OUT)/%.o $(SDK_TARGET_APP_LINK) sdk/link_guard.py sdk/allocator/check_link_target.py $(PPC_USER_NANO) $(PPC_USER_NANO:.a=.json)
 	$(PPC_USER_LINK) -o $@ $(filter %.o,$^) $(PPC_USER_LIBS)
 
@@ -71,6 +74,28 @@ $(addsuffix .raw,$(PPC_USER_APPS)): $(PPC_USER_OUT)/%.raw: $(PPC_USER_OUT)/%.elf
 
 $(addsuffix .bin,$(PPC_USER_APPS)): $(PPC_USER_OUT)/%.bin: $(PPC_USER_OUT)/%.raw $(PPC_USER_OUT)/%.elf sdk/mkos32x.py sdk/os32x_hdr.py sdk/os32_generations.py
 	python3 sdk/mkos32x.py $< $@ --target $(SDK_TARGET) --elf $(PPC_USER_OUT)/$*.elf
+
+PPC_INST_DIR := $(PPC_USER_OUT)/installer
+PPC_INST_SRC := platform/powermac/install_target.c userland/system/inst_hdd.c userland/system/inst_disk.c userland/shell/hdprep_plan.c fs/ext2/ext2_layout.c
+PPC_INST_COMMON := $(addprefix $(PPC_INST_DIR)/,$(PPC_INST_SRC:.c=.o))
+PPC_INST_EXTRA := userland/system/install.c userland/system/cdinst.c userland/lib/rt/pkg.c userland/lib/rt/dbgserial.c
+$(PPC_INST_DIR)/userland/system/install.o $(PPC_INST_DIR)/userland/lib/rt/pkg.o: private PPC_USER_FLAGS += -DOS32_VERIFY_INSTALLED_FILES
+$(PPC_INST_COMMON) $(addprefix $(PPC_INST_DIR)/,$(PPC_INST_EXTRA:.c=.o)): $(PPC_INST_DIR)/%.o: %.c build/ppc-user.mk $(PPC_INST_MUT_FILE)
+	@mkdir -p $(@D)
+	$(CC) $(PPC_USER_FLAGS) -DOS32_FEATURE_IDE=1 -Iplatform/powermac -I. -Iinclude -Iuserland/lib -Iuserland/lib/rt -Iuserland/system -c $(if $(filter $<,$(PPC_INST_MUT_SRC)),$(PPC_INST_MUT_FILE),$<) -o $@
+
+$(PPC_USER_OUT)/install.elf: $(PPC_INST_DIR)/userland/system/install.o
+$(PPC_USER_OUT)/cdinst.elf: $(PPC_INST_DIR)/userland/system/cdinst.o $(PPC_INST_DIR)/userland/lib/rt/pkg.o $(PPC_INST_DIR)/userland/lib/rt/dbgserial.o
+$(addprefix $(PPC_USER_OUT)/,install.elf cdinst.elf): $(PPC_USER_CRT) $(PPC_INST_COMMON) $(SDK_TARGET_APP_LINK) $(PPC_USER_NANO)
+	$(PPC_USER_LINK) -o $@ $(filter %.o,$^) $(PPC_USER_LIBS)
+
+$(addprefix $(PPC_USER_OUT)/,install.raw cdinst.raw): $(PPC_USER_OUT)/%.raw: $(PPC_USER_OUT)/%.elf
+	$(OBJCOPY) -O binary $< $@
+
+$(addprefix $(PPC_USER_OUT)/,install.bin cdinst.bin): $(PPC_USER_OUT)/%.bin: $(PPC_USER_OUT)/%.raw $(PPC_USER_OUT)/%.elf
+	python3 sdk/mkos32x.py $< $@ --target $(SDK_TARGET) --elf $(PPC_USER_OUT)/$*.elf
+
+-include $(wildcard $(PPC_INST_DIR)/*/*/*.d $(PPC_INST_DIR)/*/*/*/*.d)
 
 # ISO 9660 level 1 root: bin names must be 8.3 (tools/mkroot_image.py). Acceptance-only target: no addition to PPC_USER_APPS or default ROOT_BINS.
 $(PPC_USER_OUT)/fp_probe.o: userland/ppc/fp_probe_main.c | $(PPC_USER_OUT)
@@ -94,10 +119,11 @@ PPC_RES_DIR := $(PPC_USER_OUT)/resident
 PPC_RES_SRC := $(wildcard userland/shell/*.c userland/lib/save/*.c) \
  drivers/pci/pci_decode.c fs/pc98pt.c userland/lib/filer/filer_draw.c \
  userland/lib/filer/filer_core.c sdk/crt/syscalls.c sdk/allocator/nano_adapter.c
+PPC_RES_SRC += $(if $(filter 1,$(FEATURE_IDE)),platform/powermac/install_target.c)
 PPC_RES_OBJ := $(addprefix $(PPC_RES_DIR)/,$(PPC_RES_SRC:.c=.o))
 $(PPC_RES_OBJ): $(PPC_RES_DIR)/%.o: %.c build/ppc-user.mk $(SDK_KAPI_HDR) $(PPC_SH_MUT_FILE) $(PPC_RES_MUT_FILE)
 	@mkdir -p $(@D)
-	$(CC) $(PPC_USER_FLAGS) -DOS32_CRT_RESIDENT -Iplatform/powermac -I. -Iinclude -Iuserland/lib -Iuserland/shell -Iuserland/lib/filer -Iuserland/lib/gfx -Iuserland/lib/save -Idrivers -c $(if $(filter $<,$(PPC_RES_MUT_SRC)),$(PPC_RES_MUT_FILE),$(if $(filter $<,$(PPC_SH_MUT_SRC)),$(PPC_SH_MUT_FILE),$<)) -o $@
+	$(CC) $(PPC_USER_FLAGS) -DOS32_CRT_RESIDENT -DOS32_FEATURE_IDE=$(FEATURE_IDE) -Iplatform/powermac -I. -Iinclude -Iuserland/lib -Iuserland/shell -Iuserland/lib/filer -Iuserland/lib/gfx -Iuserland/lib/save -Idrivers -c $(if $(filter $<,$(PPC_RES_MUT_SRC)),$(PPC_RES_MUT_FILE),$(if $(filter $<,$(PPC_SH_MUT_SRC)),$(PPC_SH_MUT_FILE),$<)) -o $@
 
 $(PPC_RES_DIR)/memmap_layout.h: include/memmap.h tools/gen_memmap.py
 	@mkdir -p $(@D)

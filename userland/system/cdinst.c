@@ -47,7 +47,11 @@
 #define PKG_PATH_BUF     32
 
 /* MINIMAL に無ければ HDD から起動できない物 (段 2-11 の必須の中身) */
+#ifdef PLATFORM_INSTALL_ROOT_FILE
+#define PKG_NEED_KERNEL PLATFORM_INSTALL_ROOT_FILE
+#else
 #define PKG_NEED_KERNEL  "/boot/vmkernel.lz4"
+#endif
 #define PKG_NEED_SHELL   "/sys/shell.bin"
 /* 色定数 */
 #define COL_TITLE  (0xE1 | 0x40)
@@ -329,7 +333,11 @@ static int str_endswith(const char *s, const char *suffix)
 
     for (p = s; *p; p++) slen++;
     for (p = suffix; *p; p++) suflen++;
+#ifdef PLATFORM_INSTALL_STREAM_PACKAGE
+    if (suflen != slen) return 0;
+#else
     if (suflen > slen) return 0;
+#endif
 
     p = s + slen - suflen;
     while (*suffix) {
@@ -352,6 +360,10 @@ static int str_endswith(const char *s, const char *suffix)
 
 static void boot_img_free(BootImg *b)
 {
+#ifdef PLATFORM_INSTALL_RELEASE_ASSETS
+    PLATFORM_INSTALL_RELEASE_ASSETS(api);
+    PLATFORM_HDPREP_FINISH(api, 0);
+#endif
     if (b->data) api->mem_free(b->data);
     b->data = 0;
 }
@@ -363,7 +375,12 @@ static int load_boot_pkg(BootImg *b)
 {
     static PkgInfo info;
     u32 comp_size, offset;
-    int ret, i, rd, fd;
+    int ret, i;
+#ifdef PLATFORM_INSTALL_STREAM_PACKAGE
+    u32 positions[PLATFORM_BOOT_COUNT] = {0};
+#else
+    int rd, fd;
+#endif
 
     b->data = 0;
     for (i = 0; i < PLATFORM_BOOT_COUNT; i++) {
@@ -391,6 +408,7 @@ static int load_boot_pkg(BootImg *b)
         return PKG_ERR_CORRUPT;
     }
     if (!pkg_data_ok(PKG_BOOT, &info)) return PKG_ERR_CORRUPT;
+#ifndef PLATFORM_INSTALL_STREAM_PACKAGE
     b->data = (u8 *)api->mem_alloc(comp_size);
     if (!b->data) {
         println(COL_RED, "  out of memory (BOOT.PKG)");
@@ -407,6 +425,7 @@ static int load_boot_pkg(BootImg *b)
         return PKG_ERR_IO;
     }
 
+#endif
     offset = 0;
     for (i = 0; i < info.entry_count; i++) {
         const PkgEntry *ent = &info.entries[i];
@@ -418,7 +437,12 @@ static int load_boot_pkg(BootImg *b)
         }
         for (int j = 0; j < PLATFORM_BOOT_COUNT; j++) {
             if (str_endswith(ent->path, platform_boot_entries[j])) {
+#ifdef PLATFORM_INSTALL_STREAM_PACKAGE
+                if (!ent->size || b->sizes[j]) return PKG_ERR_CORRUPT;
+                positions[j] = info.data_offset + offset;
+#else
                 b->assets[j] = b->data + offset;
+#endif
                 b->sizes[j] = ent->size;
                 break;
             }
@@ -426,12 +450,20 @@ static int load_boot_pkg(BootImg *b)
         offset += ent->size;
     }
     for (i = 0; i < PLATFORM_BOOT_COUNT; i++) {
+#ifdef PLATFORM_INSTALL_STREAM_PACKAGE
+        if (b->sizes[i]) continue;
+#else
         if (b->assets[i]) continue;
+#endif
         api->kprintf(COL_RED, "  BOOT.PKG lacks %s\n", platform_boot_entries[i]);
         boot_img_free(b);
         return PKG_ERR_CORRUPT;
     }
+#ifdef PLATFORM_INSTALL_STREAM_PACKAGE
+    return PLATFORM_INSTALL_STREAM_PACKAGE(api, PKG_BOOT, positions, b->sizes);
+#else
     return 0;
+#endif
 }
 
 /* ======================================================================== */
@@ -754,6 +786,9 @@ static int install_packages(int choice, const InstTarget *target, const BootImg 
         println(COL_GREEN, " OK");
     }
 
+#ifdef PLATFORM_HDPREP_FINISH
+    if (PLATFORM_HDPREP_FINISH(api, 1)) return PKG_ERR_IO;
+#endif
     /* 完了 */
     print(COL_NORMAL, "\n");
     println(COL_GREEN, "=== Installation Complete ===");

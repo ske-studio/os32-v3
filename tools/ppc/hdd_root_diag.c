@@ -12,6 +12,7 @@ static void hdd_root_report(void)
         u8 data[1024];
         kmemset(data, 0x73, sizeof(data));
         int last = dev_blk_write_lba(dev, dev->total_sects - 1, 1, data);
+        kmemset(data, 0xa9, sizeof(data));
         int beyond = dev_blk_write_lba(dev, dev->total_sects - 1, 2, data);
         kprintf(7, "ROOT-TEST last=%d beyond=%d\r\n", last, beyond);
     }
