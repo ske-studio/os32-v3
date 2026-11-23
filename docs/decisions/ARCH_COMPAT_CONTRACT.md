@@ -207,6 +207,7 @@ POLICY_DEV §10「x86 に揃える」(ユーザー決定 2026-11-20、動作実�
 | KCG の字形の読み出し | CG ROM/CG RAM を `drivers/video/kcg/kcg_module.c` (kcg.mod の提供者の口) が読む | 常駐の KCG1 ファイル (`platform/powermac/kcg.c`) | ANK・漢字の読み出しの転送は共有した (`drivers/video/kcg/kcg_read_provider.inc`、B14 2026-11-20)。字形の出所の違いは残す (物理) | 部品のロードは B08 (module の読み込み) の段で揃える |
 | ATA Data のバイト順 (D8) | LE の 16 bit ポート | BE の窓。IDENTIFY の語はバイト交換し、セクタは媒体の並びを保つ | 残す (物理) | CPU のバイト順が違う。語の値とセクタのバイト列を別の窓口で渡す |
 | BIOS 由来のディスク幾何 (D9) | BIOS の幾何を区画表の位置の決定に使う | BIOS 由来の幾何が無く、`hdd_geom_info` は不在 | 残す (物理) | ファームウェアが違う。PowerMac の ATA はこの幾何による区画探索を行わない |
+| 旧 FM・SSG の 6 欄 | PC-98 の OPN で FM・SSG を操作する | PowerMac では不在 | 残す (物理) | 新しい音声 API で両機種共通の FM・SSG 合成を提供する予定。[AV0・v90 の決定](sound/AV0_V90_ADDENDUM.md) |
 | KAPI の不在 | 全部ある | 型ごとの不在 (`sdk/kapi_target_ppc.py`) | 埋めている途中 | PPC KAPI の埋め (PPC_KAPI_FILL_DESIGN) |
 
 ## 確定 (2026-11-14、Opus 5.5 第 2 回は「確定してよい」、P3 の 4 件を PM が反映)

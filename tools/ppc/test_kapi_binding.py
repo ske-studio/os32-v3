@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """PowerMac typed bindings and link dependencies. ATA_HAL_DESIGN §6-2 P2
 exposes seven raw ATA slots with IDE enabled and keeps geometry absent.
+AV0_V90_ADDENDUM and the x86 retired wrappers define the ten sound slots.
+ARCH_COMPAT_CONTRACT §9 keeps the six OPN slots absent. PCM awaits tick B and a backend.
 Scroll uses the existing signed row count (docs/KAPI_SPEC.md, gfx_hardware_scroll).
 """
 # CHECK registration lives in tools/checks/ppc-kapi-binding.py.
@@ -20,7 +22,7 @@ from kapi_target_ppc import ABSENT_PROVIDER_SLOTS, absent_result
 # Expected absent slots after the 11-19 PowerPC stages (port 7・clock・surface 4・console_font 4・gfx2 queries 9; PPC_KAPI_FILL_DESIGN §4 item 10).
 EXPECTED_ABSENT_SLOTS = frozenset("""
 buz_off buz_on ext2_format ext2_format_at fm_note_off fm_note_on
-fm_play_mml fm_set_tone_num fm_startup_sound
+fm_set_tone_num
 gfx_osri_show
 hdd_geom_info ide_drive_present
 ide_get_info ide_identify ide_init ide_read_sector ide_write_sector
@@ -32,11 +34,16 @@ np2_check_hostdrv np2_detect
 np2_get_clock np2_get_cpu np2_get_version
 pcm_close pcm_open pcm_set_volume pcm_status pcm_write
 sfs_begin
-sfs_end snd_bgm_is_playing snd_bgm_play snd_bgm_set_persist snd_bgm_stop
-snd_focus snd_se_play snd_se_play_raw snd_set_master ssg_all_off ssg_tone
+sfs_end
+ssg_all_off ssg_tone
 ssg_volume
 v86_boot v86_boot2 v86_disktest
 v86_gdc_capture v86_selftest
+""".split())
+
+RETIRED_SOUND = frozenset("""
+fm_startup_sound fm_play_mml snd_bgm_play snd_bgm_stop snd_bgm_set_persist
+snd_se_play snd_se_play_raw snd_set_master snd_bgm_is_playing snd_focus
 """.split())
 
 # PPC_KAPI_FILL stage 5c, A11. Each wrapper calls the provider of the same name.
@@ -249,7 +256,7 @@ def verify(source, entries, extra_present=frozenset()):
     if any('#include "' + header + '"' not in source for header in ('gfx_hal.h', 'palette.h')):
         return False
     reference = (ROOT / 'kapi/kapi_generated.c').read_text()
-    for slot in PRESENT_SLOTS | GUI_SLOTS | PUBLISHED_GFX | {'kdebug_call', 'gfx_set_palette', 'gfx_get_palette'} | extra_present:
+    for slot in RETIRED_SOUND | PRESENT_SLOTS | GUI_SLOTS | PUBLISHED_GFX | {'kdebug_call', 'gfx_set_palette', 'gfx_get_palette'} | extra_present:
         wrapper = re.search(r'(?:void|int|i32) __cdecl wrap_' + slot + r'\([^)]*\)\n\{.*?\n\}', reference, re.S)
         if not wrapper or wrapper.group() not in source:
             return False
@@ -291,6 +298,11 @@ def generate(tmp, mutation=None, *, link=True, ide=False, fep=False):
         shutil.copy(ROOT / 'sdk' / name, sdk / name)
     helper = sdk / 'kapi_target_ppc.py'
     generator = sdk / 'gen_kapi.py'
+    if mutation == 'retired-focus-result':
+        anchor = 'result = api["retired"]["result"]'
+        text = generator.read_text()
+        assert text.count(anchor) == 1
+        generator.write_text(text.replace(anchor, anchor + '\n        if name == "snd_focus": result = 0'))
     if mutation == 'empty':
         text = helper.read_text().replace('ABSENT_PROVIDER_SLOTS = frozenset().union(*(slots for slots, _ in PROVIDER_GROUPS.values()))', 'ABSENT_PROVIDER_SLOTS = frozenset()')
         helper.write_text(text)
@@ -558,7 +570,7 @@ def main():
             return 1
         if '--mutate' in sys.argv:
             check_planar_link(tmp, cc, dirs)
-            for mutation in ('empty', 'zero', 'group-empty', 'ime-empty', 'reboot-absent', 'kdebug-absent', 'slot-swap', 'scroll-type', 'scroll-absent', 'present-absent', 'gfx2-present-absent', 'check-op-absent', 'pci-absent', 'mem-absent', 'db-absent'):
+            for mutation in ('retired-focus-result', 'empty', 'zero', 'group-empty', 'ime-empty', 'reboot-absent', 'kdebug-absent', 'slot-swap', 'scroll-type', 'scroll-absent', 'present-absent', 'gfx2-present-absent', 'check-op-absent', 'pci-absent', 'mem-absent', 'db-absent'):
                 path = tmp / mutation
                 path.mkdir()
                 mutated = generate(path, mutation, link=False)
