@@ -133,6 +133,9 @@ def observe(media, cpu, folder, case, user):
         s.wait(lambda: re.search(r'(?m)^cooked *$', s.screen('cooked')),
                'physical keyboard cooked command response')
         print(f'{case} {cpu} runtime observed', flush=True)
+    except (RuntimeError, AssertionError):
+        print(f'{cpu} {case} serial tail:\n{serial(log)[-8192:]}', flush=True)
+        raise
     finally:
         s.close()
 

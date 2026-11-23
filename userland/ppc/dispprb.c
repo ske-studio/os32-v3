@@ -148,7 +148,7 @@ static int present_probe(KernelAPI *api, const char *mode, u8 white)
         api->gfx_screen_info(&info);
         if (info.width != 800 || info.height != 600 || info.bpp != 8 ||
             info.format != GFX_FMT_PACKED8 || info.lease_mask ||
-            info.lease_first || info.lease_count) return 49;
+            info.lease_first != 16 || info.lease_count != 240) return 49;
         api->gfx_get_framebuffer(&fb);
         if (!fb.planes[0] || fb.planes[1] || fb.planes[2] || fb.planes[3] ||
             fb.width != desc.w || fb.height != desc.h || (u32)fb.pitch != pitch)
