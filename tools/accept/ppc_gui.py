@@ -9,11 +9,13 @@ import struct
 import subprocess
 import sys
 import tempfile
+import zlib
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT / 'tools'), str(ROOT / 'tools/ppc')]
 from kboot_accept import build_media, mutant_settings
 from kboot_run import serial
+import root_pair
 from fb_pixel import read_ppm
 from link_sh_run import Session
 from usb_run import keyboard_actions
@@ -28,9 +30,10 @@ def without_register(folder, out):
     subprocess.run([sys.executable, '-B', '-c',
                     'import runpy,sys,kapi_target_ppc; sys.path.insert(0,"sdk"); '
                     'runpy.run_path(sys.argv.pop(1),run_name="__main__")',
-                    'sdk/gen_kapi.py', '--target', 'ppc-powermac', '--out-dir', str(out)],
+                    'sdk/gen_kapi.py', '--target', 'ppc-powermac', '--feature-link', '1', '--feature-ide', '1',
+                    '--feature-fep', '1', '--out-dir', str(out)],
                    cwd=ROOT, env=dict(os.environ, PYTHONPATH=str(folder)), check=True)
-    (out / 'stamp').touch()
+    (out / 'mutant.stamp').touch()
 
 
 def observe(media, cpu, folder, case, user):
@@ -183,7 +186,11 @@ def main():
             assert not gui_image
         else:
             assert gui_image == (fault if case == 'fault' else user / 'gshell.bin').read_bytes()
-        digest = hashlib.sha256(media.elf.read_bytes()).hexdigest()
+        elf = media.elf.read_bytes()
+        wire, _, _, _ = root_pair.wire(elf)
+        fep = (kernel / 'fep/fep.mod').read_bytes()
+        assert payload('/BOOT/FEP.MOD;1') == root_pair.bind_module(fep, zlib.crc32(wire))
+        digest = hashlib.sha256(elf).hexdigest()
         if digest in hashes:
             raise RuntimeError(f'duplicate {case} image')
         hashes.add(digest)

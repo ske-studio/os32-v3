@@ -31,7 +31,7 @@ ifeq ($(PPC_C_GUI),1)
 $(KB_OUT)/platform/powermac/shell_loop_ops.o: private KB_TU_FLAGS += -DOS32_C_GUI=1
 KB_GUI_BINS ?= $(KB_SH_OUT)/gshell.bin
 endif
-ROOT_BINS = $(KB_ROOT_BINS) $(KB_GUI_BINS)
+ROOT_BINS = $(strip $(KB_ROOT_BINS) $(KB_GUI_BINS))
 KB_ROOT_SHELL = $(KB_SH_OUT)/shell.bin
 ROOT_OBJCOPY := $(KB_OBJCOPY)
 ROOT_ELF_FORMAT := elf32-powerpc
