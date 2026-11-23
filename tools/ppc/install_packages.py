@@ -7,7 +7,7 @@ import tempfile
 import zlib
 
 
-def installer_packages(volume_path, root_iso, loader, product, cd, scratch):
+def installer_packages(volume_path, root_iso, loader, product, dictionary, cd, scratch):
     # Both installers consume the same paired distribution. The ELF symbols
     # are translated to offsets in the actual HFS data forks at build time.
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -35,11 +35,13 @@ def installer_packages(volume_path, root_iso, loader, product, cd, scratch):
     (cd/'BOOT.PKG').write_bytes(build_pkg('BOOT', 1, [('/boot/plan.bin', desc),
                                  ('/boot/boot.hfs', volume_path)], False, version))
     listing = subprocess.check_output(['isoinfo', '-i', root_iso, '-f'], text=True)
-    files = []
+    files = [('/db/fep.db', dictionary)]
     for path in listing.splitlines():
         if not path.endswith(';1'):
             continue
         dest = path[:-2].rstrip('.').lower()
+        if dest == '/db/fep.db':
+            continue
         local = scratch / dest.lstrip('/')
         local.parent.mkdir(parents=True, exist_ok=True)
         with local.open('wb') as out:
@@ -49,9 +51,9 @@ def installer_packages(volume_path, root_iso, loader, product, cd, scratch):
 
 
 if __name__ == '__main__':
-    volume, root, loader, product = map(Path, sys.argv[1:])
+    volume, root, loader, product, dictionary = map(Path, sys.argv[1:])
     with tempfile.TemporaryDirectory(dir=volume.parent) as tmp:
         work = Path(tmp)
-        installer_packages(volume, root, loader, product, work, work/'root')
+        installer_packages(volume, root, loader, product, dictionary, work, work/'root')
         for name in ('PLAN.BIN', 'BOOT.PKG', 'MINIMAL.PKG'):
             (work/name).replace(volume.parent/name)

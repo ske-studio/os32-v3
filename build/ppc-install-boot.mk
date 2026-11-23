@@ -6,9 +6,9 @@ HD_SPECIAL := platform/powermac/apm.o arch/ppc/kernel_entry.o platform/powermac/
 HD_SHARED := $(filter-out $(addprefix $(KB_OUT)/,$(HD_SPECIAL) platform/powermac/module_pair.o),$(KB_OBJ))
 HD_OBJECTS := $(addprefix $(HD_DIR)/,$(HD_SPECIAL) platform/powermac/product_boot.o)
 HD_FLAGS := $(filter-out -DPM_ROOT_FRAME=%,$(KB_FLAGS)) -DPM_PRODUCT_BOOT=1 -DPM_ROOT_FRAME=0
-$(HD_DIR)/%.o: %.c $(KB_GEN)/stamp $(KB_OUT)/memmap_layout.h $(KB_SELECT_MK) build/ppc-install-boot.mk
+$(HD_DIR)/%.o: %.c $(HD_MUT_FILE) $(KB_GEN)/stamp $(KB_OUT)/memmap_layout.h $(KB_SELECT_MK) build/ppc-install-boot.mk
 	@mkdir -p $(@D)
-	$(KB_CC) $(HD_FLAGS) -c $< -o $@
+	$(KB_CC) $(HD_FLAGS) -c $(if $(filter $<,$(HD_MUT_SRC)),$(HD_MUT_FILE),$<) -o $@
 $(HD_DIR)/%.o: %.S $(KB_OUT)/memmap_layout.h build/ppc-install-boot.mk
 	@mkdir -p $(@D)
 	$(KB_CC) $(HD_FLAGS) -c $< -o $@
@@ -30,7 +30,13 @@ $(HD_DIR)/LOADER.ELF: $(HD_LOADER) $(HD_DIR)/loader.ld $(addprefix $(KB_OUT)/,pl
 	$(KB_CC) $(KB_MACHINE) -no-pie -Wl,--gc-sections,-T,$(HD_DIR)/loader.ld $(filter %.o,$^) -o $@
 $(HD_DIR)/BOOT.HFS: $(HD_DIR)/LOADER.ELF $(HD_DIR)/PRODUCT.ELF tools/ppc/product_media.py
 	python3 -B tools/ppc/product_media.py hfs $@ $(filter %.ELF,$^)
-HD_MEDIA_FILES := $(HD_DIR)/BOOT.HFS $(KB_OUT)/root.iso $(HD_DIR)/LOADER.ELF $(HD_DIR)/PRODUCT.ELF
+# The installed dictionary exceeds the compressed RAM-root staging budget.
+# Ship the same M dictionary as the PC-98 distribution on the outer CD.
+$(HD_DIR)/FEP.DB: tools/fep_to_sqlite.py $(wildcard assets/ipadic/*.csv) assets/ipadic/COPYING assets/joyo_kanji.txt
+	@mkdir -p $(@D)
+	python3 -B tools/fep_to_sqlite.py -i assets/ipadic -o $@.tmp
+	mv $@.tmp $@
+HD_MEDIA_FILES := $(HD_DIR)/BOOT.HFS $(KB_OUT)/root.iso $(HD_DIR)/LOADER.ELF $(HD_DIR)/PRODUCT.ELF $(HD_DIR)/FEP.DB
 HD_PACKAGES := $(addprefix $(HD_DIR)/,PLAN.BIN BOOT.PKG MINIMAL.PKG)
 $(HD_PACKAGES) &: $(HD_MEDIA_FILES) tools/ppc/install_packages.py tools/mkpkg.py tools/mkmod.py tools/module_schema.py sdk/include/os32/os32_kapi_shared.h
 	python3 -B tools/ppc/install_packages.py $(HD_MEDIA_FILES)

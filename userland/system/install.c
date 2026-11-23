@@ -470,7 +470,7 @@ static int precheck_media(u32 *sizes)
  * 未完成 (往復 1 の B1)。 */
 static const char *const init_dirs[] = {
 #ifdef PLATFORM_INSTALL_ROOT_FILE
-    "/hd0/fonts",
+    "/hd0/fonts", "/hd0/db",
 #endif
     DST_BOOT_DIR,
     "/hd0/sys", "/hd0/bin", "/hd0/sbin", "/hd0/etc",
@@ -514,6 +514,10 @@ static int measure_need(u32 lz4_size, InstNeed *need)
     inst_need_file(need, lz4_size);
 #else
     (void)lz4_size;
+    OS32_Stat dict;
+    if (g_api->sys_stat(PLATFORM_INSTALL_DICTIONARY, &dict) ||
+        (dict.st_mode & OS_S_IFMT) != OS_S_IFREG || !dict.st_size) return 1;
+    inst_need_file(need, dict.st_size);
     fails += copy_optional_bin(need);
 #endif
     for (i = 0; i < COPY_DIRS; i++)
@@ -643,6 +647,7 @@ int __cdecl main(int argc, char **argv, KernelAPI *api)
      * /etc は profile を写さない、settings.db は seed */
     ret = 0;
 #ifdef PLATFORM_INSTALL_ROOT_FILE
+    ret += copy_file(PLATFORM_INSTALL_DICTIONARY, "/hd0/db/fep.db") <= 0;
     ret += copy_optional_bin(0);
 #endif
     for (i = 0; i < COPY_DIRS; i++) {

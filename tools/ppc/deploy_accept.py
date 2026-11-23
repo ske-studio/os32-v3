@@ -85,6 +85,7 @@ def check_media(media, out):
     copies = root_files(out/'root.iso')
     assert {'/sbin/install.bin', '/sbin/cdinst.bin', '/sys/shell.bin', '/boot/fep.mod',
             '/sys/unicode.bin', '/fonts/shino16.kcg'} <= copies.keys()
+    copies['/db/fep.db'] = extract(media.iso, 'FEP.DB')
     assert package('MINIMAL.PKG') == copies
 
 
@@ -129,7 +130,9 @@ def verify_disk(raw, out, media):
     assert volume == expected
     partition = raw.with_suffix('.ext2')
     partition.write_bytes(data[start*512:(start+size)*512])
-    for path, source in root_files(out/'root.iso').items():
+    files = root_files(out/'root.iso')
+    files['/db/fep.db'] = extract(media.iso, 'FEP.DB')
+    for path, source in files.items():
         installed = subprocess.check_output(['debugfs', '-R', 'cat '+path, partition])
         assert installed == source, path
 
