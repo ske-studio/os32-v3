@@ -150,8 +150,7 @@ static void close_file(int fd) { opened[fd] = 0; }
 static int unmount_for_api(const char *path)
 {
     if (kstrcmp(path, "/hd0") || !mounted.mounted) return OS32_ERR_NOTFOUND;
-    int rc = vfs_install_detach(UNIT);
-    return rc ? rc : install_view_detached(UNIT);
+    return vfs_install_detach(UNIT);
 }
 
 static KernelAPI api = {
@@ -351,8 +350,10 @@ static int exercise(void)
     if (disk[START+2][56] != 0x53 || disk[START+2][57] != 0xef) return 11;
     if (platform_hdprep_partition(&api,&plan)) return 12;
     if (install_rescan(handle) || ext2_mount(&mounted,0)) return 13;
+    if (install_end(handle, 2) != OS32_ERR_INVAL ||
+        ide_write_sectors(UNIT,PM_HFS_START,1,sectors) ||
+        memcmp(disk[PM_HFS_START],sectors,512)) return 48;
     kmemcpy(before,disk,sizeof(disk));
-    if (!ide_write_sectors(UNIT,PM_HFS_START,1,sectors) || memcmp(before,disk,sizeof(disk))) return 48;
     allowed = 0;
     if (!dev_blk_write_lba(dev_find("hd0"),LENGTH-1,1,sectors) || memcmp(before,disk,sizeof(disk))) return 49;
     allowed = 1;
@@ -361,11 +362,6 @@ static int exercise(void)
     if (!ide_write_sectors(UNIT,PM_HFS_START-1,2,sectors) ||
         !ide_write_sectors(UNIT,START-1,2,sectors) ||
         memcmp(before,disk,sizeof(disk))) return 36;
-    if (unmount_for_api("/hd0")) return 50;
-    int early = ide_write_sectors(UNIT,PM_HFS_START,1,sectors);
-    if (memcmp(before+PM_HFS_START*512,disk[PM_HFS_START],PM_HFS_SECTORS*512) || !early)
-        return 51;
-    if (ext2_mount(&mounted,0)) return 52;
     static const char payload[] = "PowerMac reserved view";
     char output[sizeof(payload)];
     u32 ino;
@@ -373,7 +369,6 @@ static int exercise(void)
         ext2_lookup(&mounted,"/marker",&ino) ||
         ext2_read_file(&mounted,ino,output,sizeof(output)) != sizeof(output) ||
         memcmp(output,payload,sizeof(output))) return 15;
-    if (pm_install_files_verified(&api)) return 53;
     int deployed = deploy(&p);
     if (deployed) return deployed;
     kmemcpy(before,disk,sizeof(disk));

@@ -3,8 +3,8 @@
 
 #include "platform_install_management.h"
 
-#ifndef PLATFORM_INSTALL_STAGED_BOOT
-#define PLATFORM_INSTALL_STAGED_BOOT 0
+#ifndef PLATFORM_INSTALL_VIEW_WRITE_AUTH
+#define PLATFORM_INSTALL_VIEW_WRITE_AUTH 0
 #endif
 
 /* Pin the unit across an accepted synchronous operation. Deferred operations
@@ -25,7 +25,6 @@ int install_format_transfer(const struct install_access *a, u32 physical, u32 co
                             void *dst, const void *src);
 int install_format_finish(struct install_access *a, int rc);
 void install_retry_recovery(void);
-int install_view_detached(u32 unit);
 int install_mount_visible(u32 unit);
 int install_view_io(struct install_access *a, u32 unit, u32 generation,
                     u32 physical, u32 count, void *dst, const void *src, int *handled);

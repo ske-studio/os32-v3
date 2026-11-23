@@ -72,9 +72,9 @@ PPC_INST_SRC := platform/powermac/install_target.c userland/system/inst_hdd.c us
 PPC_INST_COMMON := $(addprefix $(PPC_INST_DIR)/,$(PPC_INST_SRC:.c=.o))
 PPC_INST_EXTRA := userland/system/install.c userland/system/cdinst.c userland/lib/rt/pkg.c userland/lib/rt/dbgserial.c
 $(PPC_INST_DIR)/userland/system/install.o $(PPC_INST_DIR)/userland/lib/rt/pkg.o: private PPC_USER_FLAGS += -DOS32_VERIFY_INSTALLED_FILES
-$(PPC_INST_COMMON) $(addprefix $(PPC_INST_DIR)/,$(PPC_INST_EXTRA:.c=.o)): $(PPC_INST_DIR)/%.o: %.c build/ppc-user.mk
+$(PPC_INST_COMMON) $(addprefix $(PPC_INST_DIR)/,$(PPC_INST_EXTRA:.c=.o)): $(PPC_INST_DIR)/%.o: %.c build/ppc-user.mk $(PPC_INST_MUT_FILE)
 	@mkdir -p $(@D)
-	$(CC) $(PPC_USER_FLAGS) -DOS32_FEATURE_IDE=1 -Iplatform/powermac -I. -Iinclude -Iuserland/lib -Iuserland/lib/rt -Iuserland/system -c $< -o $@
+	$(CC) $(PPC_USER_FLAGS) -DOS32_FEATURE_IDE=1 -Iplatform/powermac -I. -Iinclude -Iuserland/lib -Iuserland/lib/rt -Iuserland/system -c $(if $(filter $<,$(PPC_INST_MUT_SRC)),$(PPC_INST_MUT_FILE),$<) -o $@
 
 $(PPC_USER_OUT)/install.elf: $(PPC_INST_DIR)/userland/system/install.o
 $(PPC_USER_OUT)/cdinst.elf: $(PPC_INST_DIR)/userland/system/cdinst.o $(PPC_INST_DIR)/userland/lib/rt/pkg.o $(PPC_INST_DIR)/userland/lib/rt/dbgserial.o

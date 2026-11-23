@@ -21,6 +21,9 @@ MUTATIONS = {
 }
 
 
+ORDER_CASES = {'early-install': 'install', 'early-cdinst': 'cdinst'}
+
+
 class MutationDetected(Exception):
     pass
 
@@ -46,6 +49,14 @@ def build(out, case):
         } else {
     ''' + anchor + '\n        }'))
     settings = ['KB_MUT_SRC=' + MANAGEMENT, 'KB_MUT_FILE=' + str(fixture)]
+    if case in ORDER_CASES:
+        path = 'userland/system/' + ORDER_CASES[case] + '.c'
+        text = (ROOT / path).read_text()
+        early = 'if (!PLATFORM_BOOT_AFTER_FILES'
+        assert text.count(early) == 1
+        mutant = out / Path(path).name
+        mutant.write_text(text.replace(early, 'if (1'))
+        settings += ['PPC_INST_MUT_SRC=' + path, 'PPC_INST_MUT_FILE=' + str(mutant)]
     return build_media(out, '-j6', 'IMAGE=powermac', *settings)
 
 
@@ -164,7 +175,14 @@ def runtime(media, out, entry, case):
                    'interrupted install stays private', 30)
         confirm('y')
         success = 'Installation complete!' if entry == 'install' else 'Installation Complete'
-        assert success in s.screen('committed')
+        screen = s.screen('committed')
+        if success not in screen and case in ORDER_CASES:
+            # Early deployment unmounts /hd0 before the first mkdir. Its HFS
+            # signature survives reservation rollback on the disposable disk.
+            offset = 64 * 512 + 1024
+            if disk.read_bytes()[offset:offset+2] == b'BD':
+                raise MutationDetected(case)
+        assert success in screen
         s.keys('clear\nmount /hd0 hd0 ext2\nls /hd0/sys\n')
         def listed():
             listing = s.screen('published')
@@ -184,7 +202,7 @@ def main():
     args = parser.parse_args()
     hashes = set()
     with tempfile.TemporaryDirectory(prefix='ppc-deploy-') as directory:
-        for case in ['normal'] + (list(MUTATIONS) if args.mutate else []):
+        for case in ['normal'] + ([*MUTATIONS, *ORDER_CASES] if args.mutate else []):
             out = Path(directory)/case
             media = build(out, case)
             check_media(media, out)
@@ -194,7 +212,7 @@ def main():
             print(case, digest, flush=True)
             if args.build_only:
                 continue
-            for entry in ('install', 'cdinst') if case == 'normal' else ('install',):
+            for entry in ('install', 'cdinst') if case == 'normal' else (ORDER_CASES.get(case, 'install'),):
                 try:
                     runtime(media, out, entry, case)
                 except MutationDetected as error:

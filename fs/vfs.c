@@ -623,16 +623,11 @@ static int vfs_umount_checked_internal(const char *prefix, int management)
             rc = mounts[i].ops->sync(mounts[i].fs_ctx);
             if (rc < 0) return rc;
         }
-        const struct install_medium *medium = platform_install_medium();
-        u32 unit;
-        int finish_view = PLATFORM_INSTALL_STAGED_BOOT && medium && !management &&
-            mounts[i].dev_type == VFS_DEV_HD && medium->view_unit(mounts[i].dev_id, &unit);
         vfs_fd_invalidate_mount(mounts[i].fs_ctx);
         mounts[i].ops->umount(mounts[i].fs_ctx);
         mounts[i].in_use = 0;
         mounts[i].fs_ctx = (void *)0;
         mounts[i].ops = 0;
-        if (finish_view) return install_view_detached(unit);
         return VFS_OK;
     }
     return VFS_ERR_NOTFOUND;

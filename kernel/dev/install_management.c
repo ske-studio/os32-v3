@@ -29,28 +29,6 @@ struct reservation {
 };
 static struct reservation units[VFS_DEV_UNIT_MAX];
 static u32 last_handle;
-#if PLATFORM_INSTALL_STAGED_BOOT
-/* Handles are never reused, including after rollback or publication. */
-static u32 verified_generation[VFS_DEV_UNIT_MAX];
-static u32 boot_generation[VFS_DEV_UNIT_MAX];
-
-int install_view_detached(u32 unit)
-{
-    struct install_access pin;
-    int rc = install_admit(&pin, unit, INSTALL_MOUNT, 0, 0, 0);
-    if (rc) return rc;
-    if (pin.generation) {
-        rc = platform_install_medium()->sync(unit);
-        unsigned flags = irq_save();
-        if (!rc && !install_transfer_allowed(&pin, 0, 0)) rc = OS32_ERR_STALE;
-        if (!rc && units[unit].in_flight != 1) rc = OS32_ERR_BUSY;
-        if (!rc && verified_generation[unit] == pin.generation) boot_generation[unit] = pin.generation;
-        irq_restore(flags);
-    }
-    install_complete(&pin);
-    return rc;
-}
-#endif
 
 /* At most one outstanding metadata writeback per mounted ext2 context. */
 struct pending_metadata {
@@ -359,20 +337,6 @@ int install_rescan(u32 handle)
 
 int install_end(u32 handle, u32 outcome)
 {
-#if PLATFORM_INSTALL_STAGED_BOOT
-    if (outcome == INSTALL_FILES_VERIFIED) {
-        if (!exec_disk_write_allowed()) return OS32_ERR_INVAL;
-        unsigned flags = irq_save();
-        struct reservation *r = lookup(handle);
-        int rc = OS32_ERR_STALE;
-        if (r && r->state == VIEW) {
-            verified_generation[r->plan.raw_unit] = handle;
-            rc = 0;
-        }
-        irq_restore(flags);
-        return rc;
-    }
-#endif
     if (!exec_disk_write_allowed() ||
         (outcome != OS32_INSTALL_END_COMMIT && outcome != OS32_INSTALL_END_ABORT))
         return OS32_ERR_INVAL;
@@ -400,22 +364,17 @@ int install_admit(struct install_access *a, u32 unit, enum install_op op,
         rc = 0;
     else if ((r->state == ACTIVE || r->state == FORMATTING || r->state == TABLE_READY || r->state == VIEW) && r->owner == res_owner_get()) {
         const InstallPlanV1 *p = &r->plan;
-        int boot = 0;
-#if PLATFORM_INSTALL_STAGED_BOOT
-        boot = boot_generation[unit] == r->handle;
-#endif
         if (op == INSTALL_MOUNT)
-            rc = r->state == VIEW && !boot ? 0 : OS32_ERR_BUSY;
+            rc = r->state == VIEW ? 0 : OS32_ERR_BUSY;
         else if ((op == INSTALL_VIEW_READ || op == INSTALL_VIEW_WRITE) &&
-                 r->state == VIEW && !boot &&
-                 (!PLATFORM_INSTALL_STAGED_BOOT || op == INSTALL_VIEW_READ || exec_disk_write_allowed()) &&
+                 r->state == VIEW &&
+                 (!PLATFORM_INSTALL_VIEW_WRITE_AUTH || op == INSTALL_VIEW_READ || exec_disk_write_allowed()) &&
                  within(p->root_ext2.start_lba, p->root_ext2.sectors, lba, count))
             rc = 0;
         else if (within(0, p->capacity, lba, count)) {
             if (op == INSTALL_READ) rc = 0;
             else if (op == INSTALL_WRITE && exec_disk_write_allowed()) {
-                if (r->state == VIEW && (!PLATFORM_INSTALL_STAGED_BOOT || boot) &&
-                    within(p->boot_hfs.start_lba, p->boot_hfs.sectors, lba, count))
+                if (r->state == VIEW && within(p->boot_hfs.start_lba, p->boot_hfs.sectors, lba, count))
                     rc = 0;
                 else if (r->state == TABLE_READY && bytes &&
                          (within(p->map.start_lba, p->map.sectors, lba, count) ||

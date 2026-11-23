@@ -671,9 +671,6 @@ int __cdecl main(int argc, char **argv, KernelAPI *api)
         }
     }
 
-#if PLATFORM_BOOT_AFTER_FILES
-    if (pm_install_files_verified(api)) goto end;
-#endif
     if (PLATFORM_BOOT_AFTER_FILES &&
         platform_install_directory_boot(api, &tgt, &sizes[MEDIA_BOOT], file_buf, FILE_BUF_SIZE) != 0)
         goto end;
