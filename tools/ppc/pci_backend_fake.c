@@ -1,4 +1,4 @@
-/* Expected behavior follows HW_OP §5 3b/6b/6c and R3-P1/P3. */
+/* Expected behavior follows HW_OP §5 3b/6b/6c/7a and HWOP_COMMON_DESIGN §3 config-read table and R3-P1/P3. */
 #include "kboot_info.h"
 #include "ppc_trap.h"
 #include "kernel_boot.h"
@@ -61,10 +61,31 @@ static struct pm_bridge_state second = {.addr_va=0x3000, .data_va=0x4000};
 struct pm_bridge_state *pm_bridge_lookup(int id)
 { return id == 1 ? &fixture_bridge : id == 2 ? &second : NULL; }
 
+/* A PCI Command/Status register pair with write-one-to-clear Status. */
+static u8 lanes[8];
+static unsigned attempted, lane_width;
+static int use_lanes, fault_lane;
 static int fake_instruction(u32 va, u32 width, int write, u32 *value)
 {
     accesses++;
     if (++stage == fail_at) { ppc_trap_onfault_clear(); return 1; }
+    if (use_lanes && va >= 0x2000 && va < 0x2008) {
+        unsigned off = va - 0x2000;
+        attempted++;
+        lane_width = width;
+        if (fault_lane || off + width > sizeof(lanes)) {
+            ppc_trap_onfault_clear();
+            return 1;
+        }
+        if (!write) *value = 0;
+        for (unsigned i = 0; i < width; ++i) {
+            u8 byte = *value >> (8 * i);
+            if (!write) *value |= (u32)lanes[off+i] << (8*i);
+            else if (off+i >= 6) lanes[off+i] &= ~byte;
+            else lanes[off+i] = byte;
+        }
+        return 0;
+    }
     if (va == 0x3000 || va == 0x4000) va -= 0x2000;
     if (va == 0x2004 && width == 2 &&
         (write ? fault_command_write : fault_command_read)) { ppc_trap_onfault_clear(); return 1; }
@@ -177,7 +198,59 @@ static int bridge_cases(void)
     fault_command_read = 0; fault_command_write = 1;
     if (!boot_case(1)) return 30;
     fault_command_write = 0;
-    if (!boot_case(0) || gem_command != 2) return 31;
+    if (!boot_case(0) || gem_command != 2 || !pm_gmac_rh_sample()->valid) return 31;
+    gem_id++;
+    fault_command_read = 1;
+    if (!boot_case(0) || pm_gmac_rh_sample()->valid) return 42;
+    fault_command_read = 0;
+    return 0;
+}
+
+static int width_cases(void)
+{
+    struct pm_pci bridge = {0, 1, 0, &fixture_bridge};
+    use_lanes = 1;
+    for (unsigned bus = 0; bus <= 1; ++bus) {
+        u32 tag = bus << 16 | 12 << 11 | 3 << 8;
+        for (unsigned width = 1; width <= 4; width *= 2) {
+            u32 mask = U32_MAX >> ((4-width)*8);
+            for (unsigned off = 0; off < 8; off += width) {
+                u32 expected = 0, value = 0;
+                for (unsigned i = 0; i < 8; ++i) lanes[i] = 0xa0+i;
+                for (unsigned i = 0; i < width; ++i)
+                    expected |= (u32)(0xa0+off+i) << (8*i);
+                attempted = 0;
+                u32 select = (bus ? tag | 1 : (1u<<12) | (3<<8)) | (off & ~3u);
+                if (pm_pci_access(&bridge,tag,off,width,0,&value) || value != expected ||
+                    attempted != 1 || lane_width != width || last_address != select || address)
+                    return 35;
+                value = 0x12345678;
+                if (pm_pci_access(&bridge,tag,off,width,1,&value)) return 36;
+                for (unsigned i = 0; i < 8; ++i) {
+                    u8 byte = 0xa0+i;
+                    if (i >= off && i < off+width) {
+                        u8 written = value >> ((i-off)*8);
+                        byte = i < 6 ? written : byte & ~written;
+                    }
+                    if (lanes[i] != byte) return 36;
+                }
+                if (attempted != 2 || lane_width != width) return 37;
+            }
+            for (unsigned i = 0; i < 8; ++i) lanes[i] = 255;
+            u32 value = 42;
+            accesses = attempted = 0;
+            if (pm_pci_access(&bridge,0,0,width,0,&value) || value != mask ||
+                pm_pci_access(&bridge,0,0,width,1,&value) || accesses) return 38;
+            if (pm_pci_access(NULL,tag,0,width,0,&value) != HW_NOSYS || value || accesses)
+                return 39;
+            if (pm_pci_access(&bridge,tag,0,width,0,&value) || value != mask ||
+                attempted != 1 || lane_width != width || accesses != 5 || address) return 40;
+            fault_lane = 1;
+            if (pm_pci_access(&bridge,tag,0,width,0,&value) != HW_IO_ERROR || value ||
+                attempted != 2 || lane_width != width || accesses != 10 || address) return 41;
+            fault_lane = 0;
+        }
+    }
     return 0;
 }
 
@@ -246,12 +319,14 @@ static int test(void)
     if (pm_hwb_cfg_read(12u << 3, 0, 4, &value) || value != 0x1234abcd ||
         reads != previous + 1 || last_address != (1u << 12)) return 34;
     tree = 0;
-    return bridge_cases();
+    int rc = bridge_cases();
+    gem_id = 0;
+    return rc ? rc : width_cases();
 }
 
 void _start(void)
 {
-    int result = test();
+    int result = WIDTHS_ONLY ? width_cases() : test();
     __asm__ volatile("int $0x80" : : "a"(1), "b"(result));
     __builtin_unreachable();
 }

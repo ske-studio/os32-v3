@@ -25,7 +25,7 @@ def run(ctx):
                for name in ('pci_backend.c', 'pci_config.c')}
     with tempfile.TemporaryDirectory() as tmp:
         exe = Path(tmp) / 'test'
-        def check(expected, replacements):
+        def check(expected, replacements, widths_only=False):
             for name, source in sources.items():
                 if name in replacements:
                     old, new = replacements[name]
@@ -36,7 +36,7 @@ def run(ctx):
             subprocess.run(['gcc', '-m32', '-std=gnu11', '-O2', '-Wall', '-Wextra',
                             '-Werror', '-ffreestanding', '-nostdlib', '-no-pie', '-static',
                             '-nostdinc', '-isystem', builtin, '-ffunction-sections',
-                             '-Wl,--gc-sections', '-DPM_PCI_FAKE_MMIO', '-DPPC_TRAP_HOST_TEST',
+                             f'-DWIDTHS_ONLY={int(widths_only)}', '-Wl,--gc-sections', '-DPM_PCI_FAKE_MMIO', '-DPPC_TRAP_HOST_TEST',
                             '-I.', '-Iinclude', '-Ilib', '-Iplatform/powermac', '-Iarch/ppc',
                             '-Isdk/include/os32', 'tools/ppc/pci_backend_fake.c',
                             'arch/ppc/kernel_trap.c', 'drivers/pci/pci.c', 'drivers/pci/pci_decode.c', 'drivers/pci/pci_barsize.c',
@@ -48,6 +48,18 @@ def run(ctx):
                 raise RuntimeError(f'expected assertion {expected}, got {rc}')
 
         check(0, {})
+        if ctx.mutate:
+            anchor = 'u32 flags = ppc_irq_save(), rc = HW_IO_ERROR;'
+            rmw = """if (write && width == 2 && reg == 4) {
+                u32 word;
+                u32 rc = pm_pci_access(p,bdf,reg,4,0,&word);
+                if (rc) return rc;
+                word = (word & 0xffff0000u) | (tmp & 0xffff);
+                return pm_pci_access(p,bdf,reg,4,1,&word);
+            }"""
+            check(0, {}, widths_only=True)
+            check(36, {'pci_config.c': (anchor, rmw + anchor)}, widths_only=True)
+            print('RED halfword RMW clears adjacent W1C status')
         if ctx.mutate:
             for label, name, old, new, expected in [
                 ('target_bdf restriction', 'pci_config.c', 'if (!p || !p->bridge)',
@@ -69,5 +81,5 @@ def run(ctx):
             ]:
                 check(expected, {name: (old, new)})
                 print(f'RED {label} (assertion {expected})')
-    print('PowerMac PCI backend OK' + (' (13 runtime mutants RED)' if ctx.mutate else ''))
+    print('PowerMac PCI backend OK' + (' (14 runtime mutants RED)' if ctx.mutate else ''))
     return 0

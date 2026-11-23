@@ -285,7 +285,7 @@ void platform_boot_machine(void)
     pci_boot_memory(info, dev);
     pm_hwb_window_init();
 #if PM_LOAD_KDEBUG
-    pm_hwb_resource_init(info);
+    pm_hwb_resource_init(info, pm_gmac_rh_sample()->valid);
 #endif
 #if KBOOT_SHELL_LAYOUT_DIAG
     shell_layout_report(info);
