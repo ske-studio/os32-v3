@@ -278,6 +278,10 @@ int ext2_format(int ide_drive, u32 total_sectors)
      * 「総数 - 1632」を渡すが、区画はシリンダ単位で切り下げてある。 */
     ret = ops->find_part(ide_drive, &start, &len);
     if (ret != EXT2_OK) return ret;
+    if (platform_install_medium() && (unsigned)ide_drive < VFS_DEV_UNIT_MAX) {
+        if (total_sectors != len) return EXT2_ERR_INVAL;
+        return ext2_format_at(ide_drive, start, len);
+    }
     /* 区画が 32 グループ (256MiB) より大きければ、上限の大きさへ頭打ちにする
      * (m2)。format_at は大きすぎる範囲を断る (hdprep は上限の内側で計画する)。 */
     if (total_sectors > EXT2L_MAX_SECTORS(EXT2_MAX_GROUPS))

@@ -2202,6 +2202,17 @@ static void case_erase_mount(void)
 int main(int argc, char **argv)
 {
     if (argc != 2 && !(argc == 4 && !strcmp(argv[1], "fdset"))) return 2;
+    if (strcmp(argv[1], "boot-order") == 0) {
+        setup();
+        inj_stat_big = "/hd0/sys/shell.bin";
+        inj_stat_big_extra = 1;
+        CHECK(run() != 0);
+        if (disk[0][510] == 0x55 && disk[0][511] == 0xaa) return 51;
+        setup();
+        CHECK(run() == 0);
+        CHECK(disk[0][510] == 0x55 && disk[0][511] == 0xaa);
+        return 0;
+    }
     if (!strcmp(argv[1], "nokernel")) case_nokernel();
     else if (!strcmp(argv[1], "vmkernel")) case_vmkernel();
     else if (!strcmp(argv[1], "lower")) case_lower();

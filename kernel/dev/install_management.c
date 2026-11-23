@@ -237,7 +237,7 @@ static int restore(struct reservation *r)
     }
     for (i = 0; r->table_dirty && i < r->count; i++) {
         struct original_sector *s = &r->original[i];
-        rc = m->write(unit, s->lba, s->bytes);
+        rc = m->write(unit, s->lba, 1, s->bytes);
         if (rc) goto quarantine;
     }
     rc = m->sync(unit);
@@ -357,7 +357,10 @@ int install_admit(struct install_access *a, u32 unit, enum install_op op,
     struct reservation *r = &units[unit];
     unsigned flags = irq_save();
     int rc = OS32_ERR_BUSY;
-    if (r->state == AVAILABLE || (r->state == RAW_ONLY && op == INSTALL_READ))
+    const struct install_medium *m = platform_install_medium();
+    int raw_write = op == INSTALL_WRITE || op == INSTALL_CHS_WRITE;
+    if ((r->state == AVAILABLE && (!raw_write || !m || !m->requires_raw_reservation)) ||
+        (r->state == RAW_ONLY && op == INSTALL_READ))
         rc = 0;
     else if ((r->state == ACTIVE || r->state == FORMATTING || r->state == TABLE_READY || r->state == VIEW) && r->owner == res_owner_get()) {
         const InstallPlanV1 *p = &r->plan;
@@ -365,6 +368,7 @@ int install_admit(struct install_access *a, u32 unit, enum install_op op,
             rc = r->state == VIEW ? 0 : OS32_ERR_BUSY;
         else if ((op == INSTALL_VIEW_READ || op == INSTALL_VIEW_WRITE) &&
                  r->state == VIEW &&
+                 (!PLATFORM_INSTALL_VIEW_WRITE_AUTH || op == INSTALL_VIEW_READ || exec_disk_write_allowed()) &&
                  within(p->root_ext2.start_lba, p->root_ext2.sectors, lba, count))
             rc = 0;
         else if (within(0, p->capacity, lba, count)) {
@@ -465,7 +469,7 @@ int install_format_begin(struct install_access *a, u32 unit, u32 start, u32 leng
     if (unit >= VFS_DEV_UNIT_MAX) return OS32_ERR_INVAL;
     struct reservation *r = &units[unit];
     unsigned flags = irq_save();
-    if (r->state != AVAILABLE) {
+    if (platform_install_medium() || r->state != AVAILABLE) {
         if (r->state != ACTIVE || !exec_disk_write_allowed() ||
             r->owner != res_owner_get() || start != r->plan.root_ext2.start_lba ||
             length != r->plan.root_ext2.sectors || r->in_flight) {
@@ -518,33 +522,30 @@ static int transfer(const struct install_access *a, u32 physical, u32 count,
     units[issued.unit].in_flight++;
     irq_restore(flags);
     int rc = 0;
-    for (u32 i = 0; i < count; i++) {
-        if (!install_transfer_allowed(&issued, physical + i, 1)) {
-            rc = OS32_ERR_STALE;
-            break;
-        }
-        if (in) {
-            rc = m->write(issued.unit, physical + i, in);
-            in += 512;
-        } else {
+    if (in && count) {
+        rc = m->write(issued.unit, physical, count, in);
+    } else {
+        for (u32 i = 0; i < count; i++) {
+            if (!install_transfer_allowed(&issued, physical + i, 1)) {
+                install_complete(&issued);
+                return OS32_ERR_STALE;
+            }
             rc = m->read(issued.unit, physical + i, out);
+            if (rc) break;
             out += 512;
         }
-        if (rc) {
-            if (issued.phase == VIEW &&
-                (issued.op == INSTALL_VIEW_READ || issued.op == INSTALL_VIEW_WRITE)) {
-                struct reservation *r = &units[issued.unit];
-                flags = irq_save();
-                if (r->state == VIEW && r->handle == issued.generation) {
-                    /* Idle completes recovery after all callers drop their pins. */
-                    r->state = RECOVERING;
-                    r->owner = 0;
-                    r->handle = 0;
-                }
-                irq_restore(flags);
-            }
-            break;
+    }
+    if (rc && issued.phase == VIEW &&
+        (issued.op == INSTALL_VIEW_READ || issued.op == INSTALL_VIEW_WRITE)) {
+        struct reservation *r = &units[issued.unit];
+        flags = irq_save();
+        if (r->state == VIEW && r->handle == issued.generation) {
+            /* Idle completes recovery after all callers drop their pins. */
+            r->state = RECOVERING;
+            r->owner = 0;
+            r->handle = 0;
         }
+        irq_restore(flags);
     }
     install_complete(&issued);
     return rc;

@@ -179,13 +179,14 @@ def check_kboot(root):
             ext2 = 'fs/ext2/ext2_'
             formatter = {ext2 + stem for stem in ('fmt', 'layout', 'time')}
             pending = set(actual['KB_PENDING'].split())
-            if enabled:
-                formatter.remove(ext2 + 'time')  # shared by mount and format
             for unit in formatter:
                 assert actual['KB_OUT'] + '/' + unit + '.o' in pending, (name, unit)
             ide = ext2 + 'medium_ide'
             assert actual['KB_OUT'] + '/' + ide + '.o' not in pending, name
-            assert {unit + '.c' for unit in formatter | {ide}}.isdisjoint(actual['KB_C'].split()), name
+            linked = actual['KB_C'].split()
+            for unit in formatter:
+                assert linked.count(unit + '.c') == int(enabled), (name, unit)
+            assert ide + '.c' not in linked, name
             assert 'sqlite' not in actual['KB_MODULES'].split()
             for key in ('KB_VFS', 'KB_SQLITE_INC', 'KB_SQLITE_AUDIT'):
                 assert bool(actual[key]) == enabled
@@ -317,7 +318,7 @@ if __name__ == '__main__':
                     ('build/sources/common.mk', 'kernel/sqlite_engine.c $(C_EXT2_FORMATTER)',
                      'kernel/sqlite_engine.c', AssertionError, 'formatter omitted from PowerPC compile'),
                     ('build/sources/common.mk', 'C_COMMON_CORE = ', 'C_COMMON_CORE = $(C_EXT2_FORMATTER) ',
-                     AssertionError, 'formatter linked into PowerMac'),
+                     AssertionError, 'formatter linked into IDE-less PowerMac'),
                     ('build/images/powermac.mk', 'FEATURE_LOOP = 1', 'FEATURE_LOOP = 0',
                      AssertionError, 'loop disabled on kboot-sh'),
                     ('build/images/ppc-flags.mk', 'override KBOOT_LINK := $(strip $(KBOOT_LINK))', '',

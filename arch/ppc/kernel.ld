@@ -1,6 +1,10 @@
 /* CPP input: generate memmap_layout.h with tools/gen_memmap.py first.
  * OF note format: OpenBSD macppc/stand/ofwmagic.S:37-69.
  * The PT_LOAD owns BSS, ledger and the OF-time stack; never claim it twice. */
+#if PM_PRODUCT_BOOT
+#define PM_PRODUCT_LINKER
+#include "platform/powermac/product_boot.h"
+#endif
 #define PM_KBOOT_LINKER
 #include "platform/powermac/platform_kboot_layout.h"
 OUTPUT_FORMAT("elf32-powerpc")
@@ -18,6 +22,12 @@ SECTIONS
 {
     . = PM_KERNEL_BASE;
     __kernel_image_start = .;
+#if PM_PRODUCT_BOOT
+    .entry : { KEEP(*(.text.entry)) } :image
+    . = PM_KERNEL_BASE + PM_HANDOFF_OFFSET;
+    .handoff : { KEEP(*(.product.handoff)) } :image
+    .product_plan : { KEEP(*(.product.plan)) } :image
+#endif
     .text : { KEEP(*(.text.entry)) *(.text .text.*) } :image
 #if PM_ROOT_FRAME
     .root_record ALIGN(4) (READONLY) : {

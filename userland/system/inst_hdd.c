@@ -31,7 +31,11 @@ static int ih_check_mounts(KernelAPI *api, InstTarget *t)
 
     rootdev = api->vfs_devname("/");
     root_hd0 = (rootdev && ih_streq(rootdev, INST_DEV)) ? 1 : 0;
+#ifdef PLATFORM_INSTALL_LOGICAL_DRIVE
+    t->mounts = api->dev_mount_count(PLATFORM_INSTALL_LOGICAL_DRIVE);
+#else
     t->mounts = api->dev_mount_count(t->plan.drive);
+#endif
     rc = hdprep_check_mounts(t->mounts, root_hd0);
     if (rc < 0) { ih_refuse(api, rc); return rc; }
     t->umount_hd0 = 0;

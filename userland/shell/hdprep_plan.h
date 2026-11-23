@@ -53,6 +53,12 @@
 
 #include "platform_install_layout.h"
 
+#ifdef PLATFORM_INSTALL_LOGICAL_DRIVE
+#define HDPREP_MOUNT_DRIVE(raw) PLATFORM_INSTALL_LOGICAL_DRIVE
+#else
+#define HDPREP_MOUNT_DRIVE(raw) (raw)
+#endif
+
 /* 幾何の条件 (ATA の有無・総数・BIOS 幾何・BX・I/O の方式)。 */
 int hdprep_check_geom(const HdprepGeom *g);
 
