@@ -4988,7 +4988,7 @@ offset	struct ledger_surface.role	39
 member_size	struct ledger_surface.role	1
 offset	struct ledger_surface.width	30
 member_size	struct ledger_surface.width	2
-size	struct module_component_policy	48
+size	struct module_component_policy	52
 align	struct module_component_policy	4
 offset	struct module_component_policy.allowed_flags	12
 member_size	struct module_component_policy.allowed_flags	4
@@ -5008,6 +5008,8 @@ offset	struct module_component_policy.ops_version	20
 member_size	struct module_component_policy.ops_version	4
 offset	struct module_component_policy.phase	4
 member_size	struct module_component_policy.phase	4
+offset	struct module_component_policy.positional_imports	48
+member_size	struct module_component_policy.positional_imports	4
 offset	struct module_component_policy.reloc_max	36
 member_size	struct module_component_policy.reloc_max	4
 offset	struct module_component_policy.required_flags	8

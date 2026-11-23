@@ -112,6 +112,7 @@ enum module_field {
         .reloc_max = 16384U, \
         .export_max = 64U, \
         .load_span_max = 524288U, \
+        .positional_imports = 1U, \
     }, \
     { \
         .module_id = 2U, \
@@ -126,6 +127,7 @@ enum module_field {
         .reloc_max = 4096U, \
         .export_max = 1U, \
         .load_span_max = 544768U, \
+        .positional_imports = 0U, \
     }, \
     { \
         .module_id = 3U, \
@@ -140,6 +142,7 @@ enum module_field {
         .reloc_max = 2048U, \
         .export_max = 1U, \
         .load_span_max = 81920U, \
+        .positional_imports = 0U, \
     }, \
     { \
         .module_id = 4U, \
@@ -154,6 +157,7 @@ enum module_field {
         .reloc_max = 2048U, \
         .export_max = 1U, \
         .load_span_max = 81920U, \
+        .positional_imports = 0U, \
     }, \
     { \
         .module_id = 5U, \
@@ -168,6 +172,7 @@ enum module_field {
         .reloc_max = 256U, \
         .export_max = 1U, \
         .load_span_max = 86016U, \
+        .positional_imports = 0U, \
     }, \
     { \
         .module_id = 6U, \
@@ -182,6 +187,7 @@ enum module_field {
         .reloc_max = 2048U, \
         .export_max = 1U, \
         .load_span_max = 81920U, \
+        .positional_imports = 0U, \
     }, \
     { \
         .module_id = 7U, \
@@ -196,6 +202,7 @@ enum module_field {
         .reloc_max = 2048U, \
         .export_max = 1U, \
         .load_span_max = 81920U, \
+        .positional_imports = 0U, \
     }, \
     { \
         .module_id = 8U, \
@@ -210,6 +217,7 @@ enum module_field {
         .reloc_max = 2048U, \
         .export_max = 1U, \
         .load_span_max = 81920U, \
+        .positional_imports = 0U, \
     }, \
     { \
         .module_id = 9U, \
@@ -224,6 +232,7 @@ enum module_field {
         .reloc_max = 2048U, \
         .export_max = 1U, \
         .load_span_max = 81920U, \
+        .positional_imports = 0U, \
     }, \
     { \
         .module_id = 10U, \
@@ -238,6 +247,7 @@ enum module_field {
         .reloc_max = 2048U, \
         .export_max = 1U, \
         .load_span_max = 81920U, \
+        .positional_imports = 0U, \
     }, \
     { \
         .module_id = 11U, \
@@ -252,6 +262,7 @@ enum module_field {
         .reloc_max = 16384U, \
         .export_max = 2U, \
         .load_span_max = 327680U, \
+        .positional_imports = 0U, \
     }, \
     { \
         .module_id = 12U, \
@@ -266,6 +277,7 @@ enum module_field {
         .reloc_max = 8192U, \
         .export_max = 2U, \
         .load_span_max = 458752U, \
+        .positional_imports = 0U, \
     }, \
     { \
         .module_id = 13U, \
@@ -280,6 +292,7 @@ enum module_field {
         .reloc_max = 2048U, \
         .export_max = 4U, \
         .load_span_max = 81920U, \
+        .positional_imports = 0U, \
     }, \
     { \
         .module_id = 14U, \
@@ -294,6 +307,7 @@ enum module_field {
         .reloc_max = 2048U, \
         .export_max = 1U, \
         .load_span_max = 81920U, \
+        .positional_imports = 0U, \
     }, \
 }
 

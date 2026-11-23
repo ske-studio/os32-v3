@@ -118,6 +118,7 @@ def conformance():
     usb_meta = json.loads((ROOT / 'build/out/usb/usb_imports.json').read_text())
     assert [row['symbol'] for row in usb_def['imports']] == [
         row['name'] for row in usb_meta['imports']]
+    assert all(row['positional_imports'] == (row['name'] == 'KDEBUG') for row in schema.COMPONENTS)
     distributed = schema.COMPONENTS
     expected = [row['path'].split('/')[-1] for row in distributed]
     build = (ROOT / 'build/kernel.mk').read_text()

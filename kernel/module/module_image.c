@@ -187,7 +187,7 @@ int module_image_validate(const u8 *image, u32 size,
             get16(rec + MODULE_IMPORT_VERSION_OFF) != want->version ||
             !want->version || hash != want->name_hash ||
             !check_name(names, h[MI_NAMES_SIZE], &name_pos, hash) ||
-            (IMAGE_VERSION == MODULE_PPC_FORMAT_VERSION && policy->module_id == MODULE_ID_KDEBUG &&
+            (IMAGE_VERSION == MODULE_PPC_FORMAT_VERSION && component->positional_imports &&
              slot != h[MI_DATA_OFF] + i * MODULE_WORD_BYTES) ||
             slot % MODULE_WORD_BYTES || slot < h[MI_DATA_OFF] ||
             !within(slot - h[MI_DATA_OFF], MODULE_WORD_BYTES, h[MI_DATA_SIZE]))
