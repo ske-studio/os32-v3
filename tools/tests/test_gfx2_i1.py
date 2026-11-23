@@ -38,7 +38,7 @@ MUTATIONS = [
     ('sw-dispatch', 'gfx/v2/sw_table.c', '[GFX2_OP_FILL] = gfx2_sw_fill,', '[GFX2_OP_FILL] = gfx2_sw_copy,'),
 ]
 
-def observe(work, mutation=None, fixture="gfx2_i1_host.c", extra=(), stage=None):
+def observe(work, mutation=None, fixture="gfx2_i1_host.c", extra=(), stage=None, native=(), cflags=()):
     # Read includes through the same source view used by existing MM fixtures.
     overrides = {}
     if mutation:
@@ -75,12 +75,12 @@ def observe(work, mutation=None, fixture="gfx2_i1_host.c", extra=(), stage=None)
     cmd = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-O1', '-Wall', '-Wextra',
            '-Werror', '-ffreestanding', '-fno-builtin', '-fno-pie', '-no-pie',
            '-fno-stack-protector', '-ffunction-sections', '-fdata-sections',
-           '-nostdlib', '-static', '-DPHYSMEM_HOST_TEST=1', '-Wl,--gc-sections',
+           *cflags, '-nostdlib', '-static', '-DPHYSMEM_HOST_TEST=1', '-Wl,--gc-sections',
            *linker_flags(), '-I' + str(work),
            '-I' + str(ROOT / 'tools/tests/host_arch'), '-I' + str(ROOT / 'gfx/v2'),
            '-I' + str(ROOT / 'gfx/sync'), '-I' + str(ROOT / 'userland/lib/gfx/v2'),
            *include_flags(ROOT), str(ROOT / 'tools/tests' / fixture),
-           *sources, str(ROOT / 'mm/physmem.c'), str(ROOT / 'lib/kstring_c.c'),
+           *sources, *(str(ROOT / path) for path in native), str(ROOT / 'mm/physmem.c'), str(ROOT / 'lib/kstring_c.c'),
            str(ROOT / 'lib/dma_contract.c'), '-o', str(exe)]
     subprocess.run(cmd, check=True)
     result = host32.run([str(exe)], runner='qemu', text=True, capture_output=True, timeout=60)

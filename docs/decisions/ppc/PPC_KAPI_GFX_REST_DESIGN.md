@@ -1,5 +1,5 @@
 > 出所: ~/os32-tmp/run/kfill-5c/DESIGN.final.md (設計ラリー 3 回、起草 Fable・レビュー sol、2026-11-20 確定)
-> 状態: **現行 (2026-11-20)** — 段 5c の確定設計。末尾の「確定」の節は本文に優先する
+> 段 5c の確定設計 (2026-11-20)。gfx2_check_op は 11-23 の本線 PM 判断で公開した (§2 の公開表)。この判断は末尾を含む 5c 当時の公開保留を更新する。
 
 # PPC_KAPI_FILL 段 5c の確定設計 (gfx の残り 12 本と gfx2 の 4 本)
 
@@ -68,7 +68,7 @@
 | gfx_osri_show | **E** | 欠如の答え (NOSYS) | §1-2 の末尾。x86 の依存でなく、PLANAR4 固定と pcm・serial の依存 |
 | gfx2_mode_set・gfx2_flip | **本線の共通の口が要る** (門 1 行ずつ) | 固定モード 1 個・INDEX8・SYSMEM の scanout を全面で写す。VBLANK 付きの flip は NOSYS。公開のセッションの外は BUSY | 本体と shim は既にある。面の取得がアダプタ世代を見ないので門が要る (§2-3) |
 | gfx2_present | **本線の共通の口が要る** | §2-3 | 食い違い 3 |
-| gfx2_check_op | **E (5c では不在、PM 決定)** | 欠如の答え (NOSYS) | §2-4: INDEX8 同士の ALPHA で答えと実行が合わない。規則は変えないので公開を保留 |
+| gfx2_check_op | 公開 | 通常ラッパー → gfx2_check_op | 本線 PM 11-23 の判断で照会と実行を一致させて公開。INDEX8 宛ての ALPHA は NOSUPPORT、submit は NOSYS。 |
 
 **公開 8 本 (gfx 5・gfx2 3)、不在 8 本 (gfx 7・gfx2 1)**。パレットの 3 本と gfx2_check_op の不在は **PM 決定**。PROVIDER_GROUPS['gfx'] のヘッダ除外 (gfx_hal.h・palette.h) は残す (使うのは E の物だけ)。
 
