@@ -1,4 +1,5 @@
 #include "lan_boot.h"
+static struct pm_bridge_state fixture_bridge = {.addr_va=0x1000, .data_va=0x2000};
 #include "ofw.h"
 #include "kstring.h"
 static unsigned scenario;
@@ -106,7 +107,7 @@ void entry(unsigned *stack)
     if (scenario >= 26) {
         if (rc) { diagnostic(1001); quit(1); }
         if (b.clock.valid != (scenario == 26)) { diagnostic(1003); quit(1); }
-        struct pm_pci p = {0x1000,0x2000,b.bus_first,b.bus_last,b.bdf};
+        struct pm_pci p = {b.bus_first, b.bus_last, b.bdf, &fixture_bridge};
         if (pm_gmac_quiesce_setup_rh(&b, &p, 0x3000) || pm_gmac_early_quiesce()) { diagnostic(1003); quit(1); }
         const struct pm_gmac_rh_sample *q = pm_gmac_rh_sample();
         if (clock_calls != (scenario == 26) || bad_order || command != 3 ||
@@ -121,7 +122,7 @@ void entry(unsigned *stack)
     if (rc!=expected[scenario]) { diagnostic(1001); quit(1); }
     if (rc) { const u8 *v=(const u8 *)&b; for (unsigned i=0;i<sizeof(b);i++) REQUIRE(!v[i]); quit(0); }
     REQUIRE(b.bar_pa==0x82200000 && b.bar_bytes==0x200000 && b.root_pa==0xf2000000 && b.nwin==2 && !b.bus_first && !b.bus_last);
-    struct pm_pci pci={0x1000,0x2000,b.bus_first,b.bus_last,b.bdf}; u32 id;
+    struct pm_pci pci={b.bus_first, b.bus_last, b.bdf, &fixture_bridge}; u32 id;
     REQUIRE(b.bdf==0x7800 && pm_pci_read32(&pci,b.bdf,0,&id)==0 && id==b.vendor_device);
     REQUIRE(b.mac[0]==0x52 && b.mac[5]==0x56);
     if (b.peer_mac[0]!=(scenario==11?2:255)) { diagnostic(1002); quit(1); }
@@ -136,3 +137,5 @@ __asm__(".global _start\n_start:\n mov %esp,%eax\n push %eax\n call entry\n");
 #ifndef RH2_TREE
 int pm_gmac_clock(const struct pm_gmac_boot *b, u32 va) { (void)b; (void)va; return LAN_EUNSUPPORTED; }
 #endif
+
+#include "pci_fake_lane.h"

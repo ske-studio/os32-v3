@@ -17,13 +17,15 @@
 #include "kprintf.h"
 #include <stdarg.h>
 
-struct pm_pci pm_usb_pci;
-const struct pm_usb_root *pm_usb_root;
 static u8 pool[PM_USB_DMA_BYTES] __attribute__((aligned(PM_USB_DMA_BYTES)));
 static u8 used[PM_USB_DMA_BYTES / PM_USB_PAGE];
 
 static u32 tb_frequency;
-static struct { u32 bdf, va; int used; } maps[PM_USB_CONTROLLERS];
+static struct {
+    const struct pm_usb_root *root;
+    u32 bdf, va, pa;
+    int used;
+} maps[PM_USB_CONTROLLERS];
 void ppc_dcbf_line(void *);
 static PointerOps usb_pointer;
 
@@ -112,33 +114,31 @@ static u32 bdf(const struct usb_pci_fn *f)
 { return ((u32)f->bus << 16) | ((u32)f->dev << 11) | ((u32)f->fn << 8); }
 u32 usbp_cfg_read32(const struct usb_pci_fn *f, u32 reg)
 {
-    u32 value = ~0u;
-    struct pm_pci p = pm_usb_pci; p.target_bdf = bdf(f);
-    (void)pm_pci_read32(&p, p.target_bdf, reg, &value);
+    u32 value;
+    if (!f->root || pm_pci_access(&f->root->pci, bdf(f), reg, 4, 0, &value))
+        return U32_MAX;
     return value;
-}
-static int cfg_write(const struct usb_pci_fn *f, u32 reg, u32 value)
-{
-    struct pm_pci p = pm_usb_pci; p.target_bdf = bdf(f);
-    return pm_pci_write32(&p, p.target_bdf, reg, value);
 }
 int usbp_cfg_write8(const struct usb_pci_fn *f, u32 reg, u8 value)
 {
-    u32 shift = (reg & 3) * 8, old = usbp_cfg_read32(f, reg & ~3u);
-    return cfg_write(f, reg & ~3u, (old & ~(255u << shift)) | ((u32)value << shift));
+    u32 word = value;
+    return !f->root || pm_pci_access(&f->root->pci, bdf(f), reg, 1, 1, &word) ? -1 : 0;
 }
 int usbp_cfg_cmd(const struct usb_pci_fn *f, u16 set, u16 clear)
 {
-    u32 want = ((usbp_cfg_read32(f, 4) & 0xffffu) | set) & ~(u32)clear;
-    if (cfg_write(f, 4, want)) return -1;
-    return (usbp_cfg_read32(f, 4) & 0xffffu) == want ? 0 : -1;
+    u32 command, actual;
+    if (!f->root || pm_pci_access(&f->root->pci, bdf(f), 4, 2, 0, &command)) return -1;
+    command = (command | set) & ~clear;
+    if (pm_pci_access(&f->root->pci, bdf(f), 4, 2, 1, &command) ||
+        pm_pci_access(&f->root->pci, bdf(f), 4, 2, 0, &actual)) return -1;
+    return ((actual ^ command) & (set | clear)) ? -1 : 0;
 }
 int usbp_mmio_map(const struct usb_pci_fn *f, u32 bar, volatile void **va)
 {
-    if (!pm_usb_root || bar || !va || !f->bar_size[0]) return -1;
+    if (!f->root || bar || !va || !f->bar_size[0]) return -1;
     u32 bus = f->bar_base[0];
-    for (u32 i = 0; i < pm_usb_root->nwin; i++) {
-        const struct pm_pci_window *w = &pm_usb_root->win[i];
+    for (u32 i = 0; i < f->root->nwin; i++) {
+        const struct pm_pci_window *w = &f->root->win[i];
         if (w->ss != 2 || bus < w->pci_base || bus - w->pci_base >= w->bytes ||
             PM_USB_PAGE > w->bytes - (bus - w->pci_base)) continue;
         u32 pa = w->cpu_base + bus - w->pci_base;
@@ -150,12 +150,20 @@ int usbp_mmio_map(const struct usb_pci_fn *f, u32 bar, volatile void **va)
         }
         u32 slot;
         for (slot = 0; slot < PM_USB_CONTROLLERS; slot++)
-            if (maps[slot].used && maps[slot].bdf == bdf(f)) { *va = (volatile void *)maps[slot].va; return 0; }
+            if (maps[slot].used && maps[slot].bdf == bdf(f) &&
+                maps[slot].root == f->root && maps[slot].pa == pa) {
+                *va = (volatile void *)maps[slot].va;
+                return 0;
+            }
         for (slot = 0; slot < PM_USB_CONTROLLERS && maps[slot].used; slot++) {}
         if (slot == PM_USB_CONTROLLERS) return -1;
         u32 address = PPC_BOOT_USB_VA + (2 + slot) * PM_USB_PAGE;
         if (paging_map_phys(address, pa, 1, PAGE_RW | PTE_PCD)) return -1;
-        maps[slot].used = 1; maps[slot].bdf = bdf(f); maps[slot].va = address;
+        maps[slot].root = f->root;
+        maps[slot].pa = pa;
+        maps[slot].bdf = bdf(f);
+        maps[slot].va = address;
+        maps[slot].used = 1;
         *va = (volatile void *)address;
         usbp_log("USB OHCI BAR0 bdf=%02x:%02x.%u pa=%08x",
                  f->bus, f->dev, f->fn, pa);
@@ -167,7 +175,7 @@ void usbp_mmio_unmap(const struct usb_pci_fn *f, u32 bar)
 {
     if (bar) return;
     for (u32 i = 0; i < PM_USB_CONTROLLERS; i++)
-        if (maps[i].used && maps[i].bdf == bdf(f)) {
+        if (maps[i].used && maps[i].root == f->root && maps[i].bdf == bdf(f)) {
             (void)paging_set_not_present(maps[i].va, maps[i].va + PM_USB_PAGE - 1);
             maps[i].used = 0;
         }

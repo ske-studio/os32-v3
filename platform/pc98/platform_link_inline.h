@@ -48,4 +48,5 @@ static inline int pc98_link_platform_tick_register(void (*fn)(void))
 #define link_platform_unlock pc98_link_platform_unlock
 #define link_platform_idle pc98_link_platform_idle
 
+static inline void link_platform_session(u32 generation) { (void)generation; }
 #endif

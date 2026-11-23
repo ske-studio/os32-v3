@@ -1,4 +1,4 @@
-/* PowerMac HW_OP design §5, 5c. Model effective page translations separately
+/* PowerMac HW_OP design §5, 5c/7b. Model effective page translations separately
  * from the raw leaves. Count accesses before and after injected failures. */
 #include "hwb_window.h"
 #include "ppc_trap.h"
@@ -6,7 +6,8 @@
 #include "kdebug/hwb_wire.h"
 
 static u32 leaves[2], effective[2], irq = PPC_MSR_EE;
-static int stale_restore;
+static int stale_restore, byte_model;
+static u8 memory[16];
 static u32 writes, calls, stores, fail_at, order[8], guard, phys[4];
 static void quit(u32 rc) __attribute__((noreturn));
 static void quit(u32 rc)
@@ -44,7 +45,7 @@ int ppc_pd_lookup_read(u32 root, u32 va, int store, int user,
 }
 int ppc_trap_onfault_transfer(u32 pc, u32 start, u32 end, u32 width, int store, u32 resume)
 {
-    REQUIRE(pc && resume && !irq && end >= start && width == 4 && store);
+    REQUIRE(pc && resume && !irq && end >= start && (byte_model || (width == 4 && store)));
     if (guard) return 0;
     guard = 1;
     return 1;
@@ -57,14 +58,58 @@ static int transfer(u32 va, u32 value, u32 count, u32 increment)
     for (u32 i = 0; i < count; ++i) { phys[i] = value; stores++; value += increment; }
     return 0;
 }
-#define LABELS(n) char ppc_hwb_##n##_insn[4], ppc_hwb_##n##_resume[4]; \
-    int ppc_hwb_##n(u32 v,u32 a,u32 c,u32 d) { return transfer(v,a,c,d); }
-LABELS(read8) LABELS(read16) LABELS(read16le) LABELS(read32) LABELS(read32le)
-LABELS(write8) LABELS(write16) LABELS(write16le) LABELS(write32) LABELS(write32le)
+static int instruction(u32 va, u32 operand, u32 count, u32 inc,
+                       unsigned width, int little, int store)
+{
+    if (!byte_model) return transfer(va, operand, count, inc);
+    REQUIRE(guard && !irq && va == PPC_HWB_WINDOW_VA);
+    u32 value = 0;
+    for (u32 i = 0; i < count; ++i, operand += inc) {
+        for (u32 j = 0; j < width; ++j) {
+            unsigned shift = 8 * (little ? j : width-1-j);
+            if (store) memory[i*width+j] = operand >> shift;
+            else value |= (u32)memory[j] << shift;
+        }
+    }
+    if (!store) *(u32 *)operand = value;
+    return 0;
+}
+#define LABELS(n,w,le,wr) char ppc_hwb_##n##_insn[4], ppc_hwb_##n##_resume[4]; \
+    int ppc_hwb_##n(u32 v,u32 a,u32 c,u32 d) { return instruction(v,a,c,d,w,le,wr); }
+LABELS(read8,1,0,0) LABELS(read16,2,0,0) LABELS(read16le,2,1,0)
+LABELS(read32,4,0,0) LABELS(read32le,4,1,0)
+LABELS(write8,1,0,1) LABELS(write16,2,0,1) LABELS(write16le,2,1,1)
+LABELS(write32,4,0,1) LABELS(write32le,4,1,1)
+
+static void byte_cases(void)
+{
+    byte_model = 1;
+    for (int le = 0; le <= 1; ++le) {
+        for (unsigned w = 1; w <= 4; w *= 2) {
+            for (unsigned count = 1; count <= 3; count += 2) {
+                u32 v = 0x1234fffe;
+                for (unsigned j = 0; j < sizeof(memory); ++j) memory[j] = 0x55;
+                writes = 0;
+                REQUIRE(pm_hwb_window_transfer(0xa000,w,le,1,count,1,&v) == HW_OK);
+                for (unsigned j = 0; j < count*w; ++j) {
+                    unsigned shift = 8*(le ? j%w : w-1-j%w);
+                    REQUIRE(memory[j] == (u8)((v+j/w) >> shift));
+                }
+                REQUIRE(memory[count*w] == 0x55);
+                writes = 0;
+                REQUIRE(pm_hwb_window_transfer(0xa000,w,le,0,1,0,&v) == HW_OK);
+                REQUIRE(v == (0x1234fffe & (~0u >> ((4-w)*8))));
+            }
+        }
+    }
+    byte_model = 0;
+    writes = 0;
+}
 void _start(void)
 {
     u32 v = 15;
     pm_hwb_window_init();
+    byte_cases();
     leaves[0] = effective[0] = 0x12345010;
     leaves[1] = effective[1] = 0xabcde011;
     fail_at = 2;

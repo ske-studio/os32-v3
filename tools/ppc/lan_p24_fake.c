@@ -338,3 +338,7 @@ void _start(void) {
     scenario(); __asm__ volatile("int $0x80"::"a"(1),"b"(0)); __builtin_unreachable(); }
 
 const struct pm_gmac_rh_sample *pm_gmac_rh_sample(void) { static const struct pm_gmac_rh_sample q; return &q; }
+
+struct pm_bridge_state *pm_bridge_lookup(int id) { (void)id; static struct pm_bridge_state b; return &b; }
+u32 pm_pci_access(const struct pm_pci *p,u32 bdf,u32 reg,u32 width,int write,u32 *v)
+{ (void)p; (void)bdf; if (reg!=4 || width!=2 || write) return 1; *v=0; return 0; }

@@ -11,7 +11,7 @@ import host32
 
 ROOT = Path(__file__).resolve().parents[2]
 CHECK = dict(name='ppc-sh-input', tier=1, budget=60, needs=[],
-             covers=['platform/powermac/input_usb.h', 'tools/tests/host32.py', 'platform/powermac/terminal_input.c', 'platform/powermac/input_boot.c', 'platform/powermac/input_boot.h',
+             covers=['platform/powermac/input_usb.h', 'tools/tests/host32.py', 'platform/powermac/terminal_fifo.inc', 'platform/powermac/terminal_input.c', 'platform/powermac/input_boot.c', 'platform/powermac/input_boot.h',
                      'platform/powermac/input_decode.c', 'kernel/input_legacy.c', 'kernel/input_wait.c'],
              inputs=['tools/tests/ppc_sh_input.py', 'platform/powermac/terminal_input.c',
                      'platform/powermac/lan_boot.h', 'kernel/cli/resident_cli.h',

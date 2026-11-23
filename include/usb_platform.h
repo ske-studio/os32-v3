@@ -1,10 +1,16 @@
 #ifndef USB_PLATFORM_H
 #define USB_PLATFORM_H
 #include "types.h"
+#if __has_include("platform_usb_identity.h")
+#include "platform_usb_identity.h"
+#else
+#define USB_PLATFORM_ROOT
+#endif
 /* PCI identity and measured BAR resources, supplied by the platform. */
 struct usb_pci_fn {
     u8 bus, dev, fn, irq;
     u16 vendor, device;
+    USB_PLATFORM_ROOT
     u32 bar_base[6], bar_size[6];
 };
 struct usb_dma { u32 bus; void *va; u32 size, cookie; };

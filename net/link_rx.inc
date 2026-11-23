@@ -69,6 +69,7 @@ static void link_on_hello(const u8 *src, u8 flags, u16 epoch, u32 seq, u32 ack,
         link_notify_session(sess, epoch, extended,
             extended ? le_read32(pl + LINK_HELLO_ES_HOST_GEN_OFF) : 0,
             extended ? le_read16(pl + LINK_HELLO_ES_ALIVE_OFF) : 0);
+        link_platform_session(extended ? le_read32(pl + LINK_HELLO_ES_HOST_GEN_OFF) : 0);
         link_state = LINK_S_UP;
         link_hs_due = 0;
         link_hello_ok = 1;

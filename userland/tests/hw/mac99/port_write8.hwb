@@ -1,0 +1,3 @@
+# PowerMac HW_OP design section 5 5b. The port operation terminates with NOSYS.
+iowrite8 port 0x80 0
+end

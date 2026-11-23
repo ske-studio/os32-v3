@@ -218,14 +218,13 @@ int pm_lan_start(const struct pm_gmac_boot *boot)
         kprintf(0x07, "RH CLOCK rc=%d\r\n", q->clock_rc);
         off(q->clock_rc); return q->clock_rc;
     }
-    const struct ppc_boot_devices *dev = ppc_boot_devices();
-    struct pm_pci pci = {dev->pci_addr_va, dev->pci_data_va,
-                         boot->bus_first, boot->bus_last, boot->bdf};
+    struct pm_pci pci = {boot->bus_first, boot->bus_last, boot->bdf,
+                         pm_bridge_lookup(boot->root_node)};
     u32 id, command;
     int r;
     if (boot->vendor_device != 0x0021106bu ||
         pm_pci_read32(&pci, boot->bdf, 0, &id) || id != boot->vendor_device ||
-        pm_pci_read32(&pci, boot->bdf, 4, &command) || (command & 4)) {
+        pm_pci_access(&pci, boot->bdf, 4, 2, 0, &command) || (command & 4)) {
         off(LAN_ENODEV); return LAN_ENODEV;
     }
     rh_logged = 0;
