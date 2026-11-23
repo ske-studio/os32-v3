@@ -89,14 +89,23 @@ class FirmwareSession:
                     return reply
         raise TimeoutError("Open Firmware prompt")
 
-    def command(self, line):
+    def exchange(self, line):
         self.process.stdin.write((line+'\r').encode())
-        reply = self.wait()
+        return self.wait()
+
+    def command(self, line, ack='ok'):
+        # IEEE 1275-1994 lists a 128-character console buffer. CI accepted
+        # the 73-byte checksum definition but truncated the longer probe.
+        size = len(line.encode('ascii'))
+        if size > 73 or not line.isprintable():
+            raise ValueError(f'invalid OF input line ({size} bytes): {line!r}')
+        print(f'OF line | {size:2} | {ack:8} | {line}', flush=True)
+        reply = self.exchange(line)
         print(f'OF {line!r} -> {bytes(reply)!r}', flush=True)
         if re.search(rb'undefined word|exception|stack underflow|stack overflow|not found',
                      reply, re.I):
             raise RuntimeError(f'Open Firmware failed: {line!r}: {reply!r}')
-        if not re.search(rb'\bok\r?\n0 > $', reply):
+        if not re.search(rb'\b' + ack.encode() + rb'\r?\n0 > $', reply):
             raise RuntimeError(f'Open Firmware did not acknowledge {line!r}: {reply!r}')
         return reply
 
@@ -110,67 +119,109 @@ def firmware(raw, expected, volume_size):
         try:
             s = FirmwareSession(process)
             s.wait()
-            s.command('hex')
-            # Read the APM through the whole-disk OF handle. File reads alone
-            # can succeed even if the advertised partition ends a sector early.
-            s.command('" hd:0" open-dev value drive')
-            s.command('200 alloc-mem value sector')
-            s.command(': seek-sector 200 * 0 " seek" drive $call-method ;')
-            s.command(': read-sector sector 200 " read" drive $call-method ;')
-            s.command(': sector@ seek-sector read-sector ;')
-            def read_sector(lba):
-                result = s.command(f'cr ." IO " {lba:x} sector@ swap . . cr')
-                if not re.search(rb'(?m)^IO 0 200 ', result):
-                    raise RuntimeError(f'firmware sector {lba} read failed: {result!r}')
-            read_sector(2)
-            # IEEE 1275 l@ fetches an aligned quadlet on this big-endian target.
-            result = s.command('cr ." MAP " sector 8 + l@ . '
-                               'sector c + l@ . cr')
-            match = re.search(rb'(?m)^MAP ([0-9a-fA-F]+) ([0-9a-fA-F]+) ', result)
-            if not match:
-                raise RuntimeError(f'no firmware partition result: {result!r}')
-            first, count = (int(value, 16) for value in match.groups())
-            if count * 512 != volume_size:
-                return False
-            for lba in (first + 2, first + count - 2):
-                read_sector(lba)
-                result = s.command('cr ." MDB " sector l@ 10 rshift . cr')
-                if not re.search(rb'(?m)^MDB 4244 ', result):
-                    raise RuntimeError(f'invalid firmware MDB: {result!r}')
-            s.command('4000 constant chunk 0 value buf 0 value fh 0 value sum32')
-            s.command(': checksum sum32 -rot bounds ?do 21 * i c@ + ffffffff and loop to sum32 ;')
-            s.command(': read-chunk buf chunk " read" fh $call-method ;')
-            s.command(': probe read-chunk dup 0> over chunk <= and if dup buf swap checksum then '
-                      'cr ." RESULT " . sum32 u. cr ;')
-            for name, content in expected.items():
-                length = len(content)
-                result = s.command(f'" hd:2,\\{name}" open-dev to fh cr ." OPEN " fh 0<> . cr')
-                if re.search(rb'(?m)^OPEN 0 ', result):
-                    return False
-                if not re.search(rb'(?m)^OPEN (?:-1|[fF]+) ', result):
-                    raise RuntimeError(f'no firmware handle result for {name}: {result!r}')
-                s.command('chunk alloc-mem to buf 0 to sum32')
-                total = 0
-                while total <= length:
-                    result = s.command('probe')
-                    match = re.search(rb'(?m)^RESULT ([0-9a-fA-F]+) ([0-9a-fA-F]+) ', result)
-                    if not match:
-                        raise RuntimeError(f'invalid firmware read for {name}: {result!r}')
-                    count, checksum = (int(value, 16) for value in match.groups())
-                    if count > 0x4000:
-                        raise RuntimeError(f'invalid firmware read length for {name}: {count}')
-                    total += count
-                    if count == 0:
-                        break
-                s.command('fh close-dev buf chunk free-mem')
-                wanted = 0
-                for value in content:
-                    wanted = (wanted*33 + value) & 0xffffffff
-                if (total, checksum) != (length, wanted):
-                    return False
-            return True
+            return inspect_media(s, expected, volume_size)
         finally:
             process.kill()
+
+
+def inspect_media(s, expected, volume_size):
+    s.command('hex')
+    # Read the APM through the whole-disk OF handle. File reads alone
+    # can succeed even if the advertised partition ends a sector early.
+    s.command('" hd:0" open-dev value drive')
+    s.command('200 alloc-mem value sector')
+    s.command(': seek-sector 200 * 0 " seek" drive $call-method ;')
+    s.command(': read-sector sector 200 " read" drive $call-method ;')
+    s.command(': sector@ seek-sector read-sector ;')
+    def read_sector(lba):
+        result = s.command(f'cr ." IO " {lba:x} sector@ swap . . cr')
+        if not re.search(rb'(?m)^IO 0 200 ', result):
+            raise RuntimeError(f'firmware sector {lba} read failed: {result!r}')
+    read_sector(2)
+    # IEEE 1275 l@ fetches an aligned quadlet on this big-endian target.
+    result = s.command('cr ." MAP " sector 8 + l@ . '
+                       'sector c + l@ . cr')
+    match = re.search(rb'(?m)^MAP ([0-9a-fA-F]+) ([0-9a-fA-F]+) ', result)
+    if not match:
+        raise RuntimeError(f'no firmware partition result: {result!r}')
+    first, count = (int(value, 16) for value in match.groups())
+    if count * 512 != volume_size:
+        return False
+    for lba in (first + 2, first + count - 2):
+        read_sector(lba)
+        result = s.command('cr ." MDB " sector l@ 10 rshift . cr')
+        if not re.search(rb'(?m)^MDB 4244 ', result):
+            raise RuntimeError(f'invalid firmware MDB: {result!r}')
+    s.command('4000 constant chunk 0 value buf 0 value fh 0 value sum32')
+    s.command(': checksum sum32 -rot bounds ?do 21 * i c@ + ffffffff and loop to sum32 ;')
+    s.command(': read-chunk buf chunk " read" fh $call-method ;')
+    s.command(': probe read-chunk dup 0> over chunk <= and', 'compiled')
+    s.command('if dup buf swap checksum then cr ." RESULT " . sum32 u. cr ;')
+    for name, content in expected.items():
+        length = len(content)
+        result = s.command(f'" hd:2,\\{name}" open-dev to fh cr ." OPEN " fh 0<> . cr')
+        if re.search(rb'(?m)^OPEN 0 ', result):
+            return False
+        if not re.search(rb'(?m)^OPEN (?:-1|[fF]+) ', result):
+            raise RuntimeError(f'no firmware handle result for {name}: {result!r}')
+        s.command('chunk alloc-mem to buf 0 to sum32')
+        total = 0
+        while total <= length:
+            result = s.command('probe')
+            match = re.search(rb'(?m)^RESULT ([0-9a-fA-F]+) ([0-9a-fA-F]+) ', result)
+            if not match:
+                raise RuntimeError(f'invalid firmware read for {name}: {result!r}')
+            count, checksum = (int(value, 16) for value in match.groups())
+            if count > 0x4000:
+                raise RuntimeError(f'invalid firmware read length for {name}: {count}')
+            total += count
+            if count == 0:
+                break
+        s.command('fh close-dev buf chunk free-mem')
+        wanted = 0
+        for value in content:
+            wanted = (wanted*33 + value) & 0xffffffff
+        if (total, checksum) != (length, wanted):
+            return False
+    return True
+
+
+class HostSession(FirmwareSession):
+    """Model serial replies and media reads for the shared acceptance script."""
+    def __init__(self, raw, forks):
+        self.raw = raw
+        self.forks = forks
+        self.compiling = False
+
+    def exchange(self, line):
+        words = line.split()
+        if words[0] == ':':
+            self.compiling = True
+        if words[-1] == ';':
+            self.compiling = False
+        output = ''
+        if 'sector@' in words and 'IO' in words:
+            offset = int(words[words.index('sector@') - 1], 16) * 512
+            self.sector = self.raw[offset:offset + 512]
+            output = f'IO 0 {len(self.sector):x} '
+        elif 'MAP' in words:
+            first, count = struct.unpack_from('>II', self.sector, 8)
+            output = f'MAP {first:x} {count:x} '
+        elif 'MDB' in words:
+            output = f'MDB {integer(self.sector, 0, 2):x} '
+        elif 'OPEN' in words:
+            name = line.split("\\", 1)[1].split('"', 1)[0]
+            self.content = self.forks.get(name)
+            self.offset = self.checksum = 0
+            output = 'OPEN 0 ' if self.content is None else 'OPEN -1 '
+        elif line == 'probe':
+            chunk = self.content[self.offset:self.offset + 0x4000]
+            self.offset += len(chunk)
+            for byte in chunk:
+                self.checksum = (33 * self.checksum + byte) & 0xffffffff
+            output = f'RESULT {len(chunk):x} {self.checksum:x} '
+        ack = 'compiled' if self.compiling else 'ok'
+        return f'{line} \r\n{output}\r\n {ack}\r\n0 > '.encode()
 
 
 def main():
@@ -236,7 +287,9 @@ def main():
             hashes.add(digest)
             path = Path(directory)/(case+'.raw')
             path.write_bytes(raw)
-            if not args.build_only:
+            if args.build_only:
+                assert inspect_media(HostSession(raw, forks), expected, len(copy)) == matches
+            else:
                 assert firmware(path, expected, len(copy)) == matches
             print(case, digest, flush=True)
     print('PASS product install media' + (' (build only)' if args.build_only else ''))
