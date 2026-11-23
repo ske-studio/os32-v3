@@ -1,4 +1,5 @@
 #include "display_provider.h"
+#include "gfx/gfx_osri_view.h"
 #include "display_restore.h"
 #include "gfx_present_contract.h"
 #include "exec/appslot.h"
@@ -18,6 +19,11 @@ static GfxSyncCtx *sync_ctx;
 static void prepare(void)
 {
     if (!of_fb_ready() && saved.display) (void)of_fb_bind(&saved);
+}
+static void enter(void)
+{
+    display_text_hide();
+    if (of_fb_ready() && gfx_is_started()) of_fb_reset_frame();
 }
 static void shutdown(void)
 {
@@ -108,7 +114,7 @@ void display_provider_boot_reserve(int pref, void (*bind_client)(void))
         .shadow_bytes = pages * PAGE_SIZE, .protected_rows = fb->height < PM_RH_FB_ROWS ? fb->height : PM_RH_FB_ROWS};
     gfx_backend_of_fb.prepare = prepare;
     gfx_backend_of_fb.init = init;
-    gfx_backend_of_fb.enter = display_text_hide;
+    gfx_backend_of_fb.enter = enter;
     gfx_backend_of_fb.shutdown = shutdown;
     (void)of_fb_bind(&saved);
 }

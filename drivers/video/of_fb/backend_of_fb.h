@@ -13,6 +13,9 @@ struct of_fb_desc {
 };
 extern GfxBackend gfx_backend_of_fb;
 extern const struct GfxBackendV2 of_fb_v2;
+void of_fb_reset_frame(void);
+void of_fb_scroll(int y);
+int of_fb_replace(const u8 *src, u32 pitch, u32 bytes);
 int of_fb_bind(const struct of_fb_desc *d);
 int of_fb_ready(void);
 void of_fb_unbind(void);

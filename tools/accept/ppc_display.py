@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PowerMac display acceptance. Stage 5c expects fixed OF geometry, word-rounded transfers and CUI redraw after shutdown."""
+"""PowerMac display acceptance. Stage 5c and docs/KAPI_SPEC.md specify OF geometry, circular scanout, word-rounded transfers and CUI redraw."""
 import argparse
 import hashlib
 import os
@@ -65,6 +65,8 @@ GATE = ('return present_owner && present_owner == appslot_present_owner() &&\n'
         '           of_fb_ready() && present_generation == a->gen;')
 COPY_ENTRY = 'static int surface_copy(void *c, u32 head, const struct gfx2_surf *s)\n{'
 PRESENT_MUTATIONS = {
+    'scroll-off': ('platform/powermac/display.c', 'of_fb_scroll(y);', '(void)y;'),
+    'scroll-owner': ('gfx/gfx_scroll.c', 'if (!DISPLAY_SCROLL_OK()) return;', ''),
     # Scope the misplaced gate to redraws by a running app. Boot and target
     # acquisition must succeed for the glyph comparison to exercise a flip.
     'redraw-gated': ('drivers/video/of_fb/of_fb_v2.c', COPY_ENTRY,
@@ -74,7 +76,7 @@ PRESENT_MUTATIONS = {
     'count-commit': ('drivers/video/of_fb/backend_of_fb.c',
                      'if (!rc) gfx_counters.commits++;', '(void)rc;'),
     'count-bytes': ('drivers/video/of_fb/backend_of_fb.c',
-                    'if (bottom > y) gfx_counters.present_bytes +=', 'if (0) gfx_counters.present_bytes +='),
+                    'gfx_counters.present_bytes += (end - first);', '(void)end;'),
     'width-768': (PROVIDER, WIDTH, 'return m ? (int)m->width - 32 : 0;'),
     'width-640': (PROVIDER, WIDTH, 'return m ? 640 : 0;'),
     'gate-open': (PROVIDER, GATE, 'return a != 0;'),
@@ -82,12 +84,12 @@ PRESENT_MUTATIONS = {
 }
 TARGET_FAILURE = ('platform/powermac/console_text.c', '\n    rc = open_target();',
                   '\n    rc = -1;')
-PROBES = {'redraw-gated': ('shutdown',), 'width-768': ('edge',), 'width-640': ('dirty', 'full'),
+PROBES = {'scroll-off': ('scroll',), 'scroll-owner': ('scroll',), 'redraw-gated': ('shutdown',), 'width-768': ('edge',), 'width-640': ('dirty', 'full'),
           'gate-open': ('shutdown',), 'target-failure': ('shutdown',),
           'target-gate-open': ('shutdown',), 'owner-unchecked': ('owner',),
           'framebuffer-absent': ('framebuffer',), 'count-bytes': ('framebuffer',),
           'count-commit': ('framebuffer',), 'init-absent': ('init',), 'lease-kept': ('shutdown',), 'normal': ('edge', 'dirty', 'full', 'init',
-                                                'owner', 'shutdown', 'framebuffer')}
+                                                'owner', 'shutdown', 'framebuffer', 'scroll', 'scroll-restore')}
 
 
 def present_pixels(s, evidence, case, serial, modes):
@@ -110,8 +112,9 @@ def present_pixels(s, evidence, case, serial, modes):
     key, _ = keyboard_actions(s.q, read_log, s.wait, evidence)
     black, white = bytes(3), bytes([255]) * 3
     gate_open = case in ('gate-open', 'target-gate-open')
-    for mode in modes:
-        line = f'/bin/dispprb.bin v1-{mode} {fg}'
+    for probe in modes:
+        mode = 'scroll' if probe == 'scroll-restore' else probe
+        line = f'/bin/dispprb.bin v1-{probe} {fg}'
         if case in ('framebuffer-absent', 'count-commit', 'count-bytes'):
             missing = case == 'framebuffer-absent'
             rsh_command(s, line, b'DISPLAY framebuffer failed\n' if missing else b'DISPLAY counters failed\n')
@@ -123,7 +126,8 @@ def present_pixels(s, evidence, case, serial, modes):
             continue
 
         def sample():
-            for phase in ('b', 'e'):
+            phases = {'scroll-restore': 'bupdctr', 'scroll': 'bupdc'}.get(probe, 'be')
+            for phase in phases:
                 def waiting():
                     base = physical_word(s.symbols['bb_b'])
                     return base and physical_word(base) == (
@@ -132,10 +136,10 @@ def present_pixels(s, evidence, case, serial, modes):
                 require(s.word('g_cur') == 2 and s.word('cur_res_owner') == 2 and
                         s.word('exec_nest_level') == 2 and s.word('g_cur_app') != 0,
                         'running display child owns slot 2')
-                name = f'{mode}-{phase}'
+                name = f'{probe}-{phase}'
                 path = evidence / (name + '.ppm')
-                if (mode == 'shutdown' and not case.startswith('target-') and
-                        (phase == 'b' or not gate_open)):
+                if ((mode == 'shutdown' and not case.startswith('target-') and
+                     (phase == 'b' or not gate_open)) or (mode == 'scroll' and phase == 't')):
                     rows = s.screen(name).splitlines()
                     prefix = '> ' + line
                     row = next(i for i, text in enumerate(rows) if text.startswith(prefix))
@@ -146,6 +150,27 @@ def present_pixels(s, evidence, case, serial, modes):
                     s.q.call('screendump', {'filename': str(path)})
                 frame = read_ppm(path)
                 require((frame.width, frame.height) == (800, 600), 'OF dimensions')
+                if mode == 'scroll':
+                    if phase == 'b':
+                        protected = [frame.pixel(704, y) for y in range(64)]
+                    require(protected == [frame.pixel(704, y) for y in range(64)], 'physical protected band')
+                    if phase in 'tr':
+                        if phase == 'r':
+                            require(frame.pixel(704, 65) == white and frame.pixel(704, 66) == black,
+                                    'reinitialized logical rows 65 and 66')
+                        key(phase)
+                        continue
+                    offset = int((phase in 'up' and case != 'scroll-off') or
+                                 (phase == 'c' and case == 'scroll-owner'))
+                    for y in (64, 65, 299, 300, 598, 599):
+                        row = (y + offset) % 600
+                        bright = row % 7 in (1, 4)
+                        if phase in 'pdc' and row == 300:
+                            bright = True
+                        require(frame.pixel(704, y) == (white if bright else black),
+                                repr((case, phase, y, row)))
+                    key(phase)
+                    continue
                 spans = {'edge': (768, 800), 'dirty': (704, 768), 'full': (704, 800),
                          'init': (704, 712), 'framebuffer': (704, 712)}
                 left, right = spans.get(mode, (704, 704))
@@ -169,7 +194,11 @@ def present_pixels(s, evidence, case, serial, modes):
                 key(phase)
 
         start = len(read_log())
-        rsh_command(s, line, during=sample)
+        payload = rsh_command(s, line, during=sample)
+        if probe == 'scroll-restore':
+            timing = re.search(rb'DISPLAY scroll 4 calls ticks=(\d+) bytes=(\d+)', payload)
+            require(timing and int(timing[2]) == 4 * 800 * (600 - 64), 'four scroll transfers')
+            (evidence / 'scroll-time.txt').write_bytes(timing[0] + b'\n')
         rsh_command(s, 'echo $?', b'0\n')
 
 
