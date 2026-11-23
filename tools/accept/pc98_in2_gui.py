@@ -122,10 +122,11 @@ class Session:
 
 
 @contextmanager
-def cold_boot(paths, ini, base, mutant):
+def cold_boot(paths, ini, base, mutant, exe=None):
     ctl = [sys.executable, str(Path(np21w_ctl.__file__))]
     env = dict(os.environ, NP21W_DIR=paths.wsl, NP21W_AIDEBUG_URL=base)
-    start = subprocess.run([*ctl, 'start', '--ini', ini.name, '--alive', '0'],
+    exe_args = ['--exe', exe] if exe else []
+    start = subprocess.run([*ctl, 'start', '--ini', ini.name, '--alive', '0', *exe_args],
                            env=env, stdout=subprocess.PIPE, text=True)
     print(start.stdout, end='', flush=True)
     pid = re.search(r'^started .*? pid=(\d+) ', start.stdout, re.M)
@@ -136,6 +137,14 @@ def cold_boot(paths, ini, base, mutant):
     try:
         start.check_returncode()
         s.wait(s.confirm_instance, 'NP21/W HTTP instance')
+        # The key-edge build accepts one make/break per POST; the stock build
+        # answers 400 to scan/down. Probe with ESC (scan 0) before the guest runs.
+        try:
+            s.post('/api/key', urlencode({'scan': 0, 'down': 1}))
+            s.post('/api/key', urlencode({'scan': 0, 'down': 0}))
+        except RuntimeError as err:
+            raise RuntimeError('NP21/W lacks scan/down on /api/key; pass --exe with '
+                               'the key-edge build') from err
         yield s
     finally:
         # If startup failed or the port changed owners, target only our PID.
@@ -143,7 +152,7 @@ def cold_boot(paths, ini, base, mutant):
             verified = s.confirm_instance()
         except RuntimeError:
             verified = False
-        stop = ['stop'] if verified else ['stop', '--pid', pid[1]]
+        stop = (['stop'] if verified else ['stop', '--pid', pid[1]]) + exe_args
         subprocess.run([*ctl, *stop], env=env, check=True)
 
 
@@ -154,6 +163,8 @@ def main():
     parser.add_argument('--ini', required=True, type=Path, help='source slot ini (WSL path)')
     parser.add_argument('--images', type=Path, default=Path('build/out/pc98-in2-gui'))
     parser.add_argument('--mutant', choices=PC98_MUTATIONS)
+    parser.add_argument('--exe', help='NP21/W exe name under NP21W_DIR with scan/down '
+                        '(e.g. np21x64w-keyedge.exe); default is np21w_ctl\'s')
     args = parser.parse_args()
     paths = np21w_ctl.paths_from_env()
     original = args.ini.read_bytes()
@@ -171,7 +182,7 @@ def main():
             with tempfile.NamedTemporaryFile(dir=paths.wsl, prefix='in2-', suffix='.ini') as ini:
                 ini.write(raw)
                 ini.flush()
-                with cold_boot(paths, Path(ini.name), base, args.mutant) as s:
+                with cold_boot(paths, Path(ini.name), base, args.mutant, args.exe) as s:
                     try:
                         trial(s, role)
                     except ObservedMutation as exc:
