@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Characterize INDEX8 check_op and submit with the OF framebuffer capabilities."""
+"""Characterize INDEX8 check_op and submit on PEGC and OF framebuffer backends."""
 import argparse
 from pathlib import Path
 import tempfile
@@ -9,7 +9,11 @@ EXTRA = sorted(str(path.relative_to(ROOT)) for path in (ROOT / 'gfx/v2').glob('s
                if path.name != 'sw_table.c')
 EXTRA += ['gfx/v2/check_op.c', 'gfx/v2/submit.c', 'gfx/v2/format.c',
           'gfx/sync/sync_bind.c', 'lib/divdi3.c']
+NATIVE = ['drivers/video/pc98/pegc_v2.c', 'drivers/video/of_fb/of_fb_v2.c',
+          'drivers/video/of_fb/backend_of_fb.c']
 MUTATIONS = [
+    ('alpha capability', 'gfx/v2/check_op.c',
+     '(op->op == GFX2_OP_ALPHA && df == GFX2_FMT_INDEX8)', '0'),
     ('shadow dispatch', 'gfx/v2/check_op.c',
      'shadow(a, ex->dst)) {\n        *how = GFX2_HOW_SW;',
      'shadow(a, ex->dst)) {\n        *how = GFX2_HOW_HW;'),
@@ -23,4 +27,5 @@ if __name__ == '__main__':
     args = parser.parse_args()
     for mutation in [None, *(MUTATIONS if args.mutate else [])]:
         with tempfile.TemporaryDirectory() as work:
-            observe(Path(work), mutation, fixture='gfx2_check_equiv_host.c', extra=EXTRA)
+            observe(Path(work), mutation, fixture='gfx2_check_equiv_host.c', extra=EXTRA,
+                    native=NATIVE, cflags=('-nostdinc',))
