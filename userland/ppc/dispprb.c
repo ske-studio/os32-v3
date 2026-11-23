@@ -255,6 +255,30 @@ int main(int argc, char **argv, KernelAPI *api)
     static const u16 gamma[768] = {0};
     GFX2_HeadInfo before, after;
 
+    if (argc == 2 && !strcmp(argv[1], "osri-fault")) {
+        api->gfx_osri_show((const char *)1, 1);
+        return report(api, "OSRI fault returned\n", 55);
+    }
+    if (argc == 2 && !strcmp(argv[1], "osri-fixed")) {
+        api->gfx_init();
+        int rc = api->gfx_osri_show("/bin/fixed.osr", 1);
+        return rc == GFX_OSRI_SHOW_CANCELLED ? report(api, "OSRI ESC\n", 0)
+                                            : report(api, "OSRI fixed failed\n", 54);
+    }
+    if (argc == 2 && !strcmp(argv[1], "osri")) {
+        const char *path = "/bin/rows.osr";
+        api->gfx_init();
+        int rc = api->gfx_osri_show(path, 2000);
+        if (rc == OS32_ERR_NOSYS) return report(api, "OSRI NOSYS\n", 0);
+        if (rc != GFX_OSRI_SHOW_DONE ||
+            api->gfx_osri_show("", 1) != OS32_ERR_INVAL ||
+            api->gfx_osri_show(path, 0) != OS32_ERR_INVAL ||
+            api->gfx_osri_show(path, GFX_OSRI_SHOW_MAX_MS + 1) != OS32_ERR_INVAL)
+            return report(api, "OSRI failed\n", 53);
+        /* Hold the terminal still until the host samples the restored scanout. */
+        while ((api->kbd_getkey() & 0xff) != 'r') {}
+        return report(api, "OSRI DONE\n", 0);
+    }
     if ((argc == 2 || argc == 3) && !strncmp(argv[1], "v1-", 3))
         return present_probe(api, argv[1], argc == 3 && !strcmp(argv[2], "255") ? 255 : 0);
     if (argc == 2 && strcmp(argv[1], "head")) return lifecycle(api, argv[1]);

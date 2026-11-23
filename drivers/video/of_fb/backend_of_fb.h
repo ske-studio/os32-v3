@@ -22,4 +22,7 @@ void of_fb_unbind(void);
 int of_fb_present(int x, int y, int w, int h);
 int of_fb_copy(const u8 *src, u32 pitch, u32 bytes,
                int x, int y, int w, int h);
+unsigned long long of_fb_osri_generation(void);
+const struct gfx_kernel_fb *pm_osri_decoded(unsigned long long *bound);
+int pm_osri_key(void);
 #endif
