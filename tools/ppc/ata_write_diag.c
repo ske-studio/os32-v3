@@ -32,7 +32,8 @@ static int prepare_disk(const KernelAPI *api, u32 *handle)
     pm_apm_entry(table[1], 3, &p.map);
     pm_apm_entry(table[2], 3, &p.boot_hfs);
     pm_apm_entry(table[3], 3, &p.root_ext2);
-    if (ide_write_sectors(0, 0, 4, table) || api->install_rescan(*handle)) return -1;
+    if (ide_write_sectors(0, 0, 1, table[0]) ||
+        ide_write_sectors(0, 1, 3, table[1]) || api->install_rescan(*handle)) return -1;
 
     /* Host checks the formatted regions against their pre-payload CRC. */
     static u8 block[16*512];
@@ -45,7 +46,7 @@ static int prepare_disk(const KernelAPI *api, u32 *handle)
     return 0;
 }
 
-static void ata_write_report(int child)
+void ata_write_report(int child)
 {
     const KernelAPI *api = (const KernelAPI *)exec_kapi_table();
     IdeInfo id;
@@ -62,7 +63,7 @@ static void ata_write_report(int child)
         int many = api->ide_write_sectors(0, 64, 2, payload + 1);
         kprintf(7, "ATA-TEST unreserved=%d,%d\r\n", one, many);
         ata_write_provider_calls = 0;
-        int status = api->exec_run("/sys/shell.bin");
+        int status = api->exec_run("/bin/atadeny.bin");
         kprintf(7, "ATA-TEST child=%d provider_calls=%u\r\n", status, ata_write_provider_calls);
         return;
     }

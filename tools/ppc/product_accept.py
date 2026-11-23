@@ -91,7 +91,12 @@ class FirmwareSession:
 
     def command(self, line):
         self.process.stdin.write((line+'\r').encode())
-        return self.wait()
+        reply = self.wait()
+        print(f'OF {line!r} -> {bytes(reply)!r}', flush=True)
+        if re.search(rb'undefined word|exception|stack underflow|stack overflow|not found',
+                     reply, re.I):
+            raise RuntimeError(f'Open Firmware failed: {line!r}: {reply!r}')
+        return reply
 
 
 def firmware(raw, expected, volume_size):
@@ -108,11 +113,17 @@ def firmware(raw, expected, volume_size):
             # can succeed even if the advertised partition ends a sector early.
             s.command('" hd:0" open-dev value drive')
             s.command('200 alloc-mem value sector')
-            s.command(': sector@ 200 * 0 " seek" drive $call-method if abort then '
-                      'sector 200 " read" drive $call-method 200 <> if abort then ;')
+            s.command(': seek-sector 200 * 0 " seek" drive $call-method ;')
+            s.command(': read-sector sector 200 " read" drive $call-method ;')
+            s.command(': sector@ seek-sector read-sector ;')
+            def read_sector(lba):
+                result = s.command(f'cr ." IO " {lba:x} sector@ swap . . cr')
+                if not re.search(rb'(?m)^IO 0 200 ', result):
+                    raise RuntimeError(f'firmware sector {lba} read failed: {result!r}')
+            read_sector(2)
             s.command(': be32@ dup c@ 18 lshift over 1+ c@ 10 lshift or '
                       'over 2 + c@ 8 lshift or swap 3 + c@ or ;')
-            result = s.command('2 sector@ cr ." MAP " sector 8 + be32@ . '
+            result = s.command('cr ." MAP " sector 8 + be32@ . '
                                'sector c + be32@ . cr')
             match = re.search(rb'(?m)^MAP ([0-9a-fA-F]+) ([0-9a-fA-F]+) ', result)
             if not match:
@@ -121,7 +132,8 @@ def firmware(raw, expected, volume_size):
             if count * 512 != volume_size:
                 return False
             for lba in (first + 2, first + count - 2):
-                result = s.command(f'{lba:x} sector@ cr ." MDB " sector be32@ 10 rshift . cr')
+                read_sector(lba)
+                result = s.command('cr ." MDB " sector be32@ 10 rshift . cr')
                 if not re.search(rb'(?m)^MDB 4244 ', result):
                     raise RuntimeError(f'invalid firmware MDB: {result!r}')
             s.command(': checksum 0 -rot bounds ?do 21 * i c@ + ffffffff and loop ;')

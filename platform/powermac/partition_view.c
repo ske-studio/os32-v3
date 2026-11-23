@@ -97,7 +97,7 @@ int pm_install_resolve(Device *dev, u32 lba, u32 count, u32 *unit,
 {
     if (!dev || dev->bus_type != DEV_BUS_IDE) return 0;
     if (dev->blk_read_u32 == view_read && dev != current) return OS32_ERR_STALE;
-    if (lba > dev->total_sects || count > dev->total_sects-lba) return OS32_ERR_INVAL;
+    if (lba > dev->total_sects || count > dev->total_sects-lba) return IDE_ERR_RANGE;
     *unit = dev->bus_id;
     *physical = dev == current ? first+lba : lba;
     *generation = dev == current ? view_generation : 0;

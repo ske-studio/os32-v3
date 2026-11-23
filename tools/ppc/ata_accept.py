@@ -32,11 +32,27 @@ def make_write_image(out, case):
     anchor = '        pm_exec_boot();'
     assert source.count(entry) == source.count(anchor) == 1
     source = source.replace(entry, diag + '\n' + entry)
-    call = f'        ata_write_report({int(case == "deny")});'
+    # Run the fixture at the resident shell entry, with its normal owner and slot.
     kernel_copy = out / 'boot.c'
-    kernel_copy.write_text(source.replace(anchor, '\n'.join((anchor, call,
-                           '        kprintf(7, "ATA-TEST done\\r\\n");'))))
-    settings = ['KB_MUT_EXTRA_SRC=' + kernel, 'KB_MUT_EXTRA_FILE=' + str(kernel_copy)]
+    kernel_copy.write_text(source.replace(anchor, anchor + '\n'
+                           '        exec_run("/sys/shell.bin");\n'
+                           '        kprintf(7, "ATA-TEST done\\r\\n");'))
+    resident = 'userland/shell/main.c'
+    entry = 'int main(int argc, char **argv, KernelAPI *api)\n{'
+    launcher = (ROOT / resident).read_text()
+    assert launcher.count(entry) == 1
+    path = out / 'launcher.c'
+    path.write_text(launcher.replace(entry, entry + '\n    api->ide_init();\n    return 0;'))
+    user = out / 'user'
+    settings = ['KB_MUT_EXTRA_SRC=' + kernel, 'KB_MUT_EXTRA_FILE=' + str(kernel_copy),
+                'KB_SH_OUT=' + str(user), 'PPC_RES_MUT_SRC=' + resident,
+                'PPC_RES_MUT_FILE=' + str(path)]
+    device = 'kernel/dev/device_ide.c'
+    provider = (ROOT / device).read_text()
+    init = '    (void)ide_init();'
+    assert provider.count(init) == 1
+    provider = provider.replace(init, '    extern void ata_write_report(int);\n'
+                                f'    ata_write_report({int(case == "deny")});')
     header = (ROOT / BUS).read_text()
     store = 'if (ide_window) ppc_store8(ide_window + 16 * reg, v);'
     assert header.count(store) == 1
@@ -51,34 +67,23 @@ def make_write_image(out, case):
         '#include "drivers/ata/ide.h"\nextern unsigned ata_write_commands;\n'
         'extern int ata_payload_phase;\n' + header)
     if case == 'write-lba':
-        settings += mutant_settings(out, case, 'kernel/dev/device_ide.c',
-                                    'ide_write_sector(drv, lba,', 'ide_write_sector(drv, lba + 1,')
+        anchor = 'ide_write_sector(drv, lba,'
+        assert provider.count(anchor) == 1
+        provider = provider.replace(anchor, 'ide_write_sector(drv, lba + 1,')
     if case == 'write-count':
         settings += mutant_settings(out, case, DRIVER, 'return ide_request(unit, lba, count, 0, sectors);',
                                     'for (u32 i = 0; i < count; ++i) {\n'
                                     '        int rc = ide_request(unit, lba+i, 1, 0, (const u8 *)sectors+i*512);\n'
                                     '        if (rc) return rc;\n    }\n    return 0;')
     if case == 'deny':
-        device = 'kernel/dev/device_ide.c'
-        provider = (ROOT / device).read_text()
         for name in ('ide_write_sector', 'ide_write_sectors'):
             call = '    return ' + name + '('
             assert provider.count(call) == 1
             provider = provider.replace(call, '    ++ata_write_provider_calls;\n' + call)
-        path = out / 'device_ide.c'
-        path.write_text('extern unsigned ata_write_provider_calls;\n' + provider)
-        settings += ['KB_MUT_SRC=' + device, 'KB_MUT_FILE=' + str(path)]
-        # Depth zero must first load a resident image in the shell band.
-        # Its exec_run then gives the probe an ordinary USER child slot.
-        resident = 'userland/shell/main.c'
-        entry = 'int main(int argc, char **argv, KernelAPI *api)\n{'
-        launcher = (ROOT / resident).read_text()
-        assert launcher.count(entry) == 1
-        path = out / 'launcher.c'
-        path.write_text(launcher.replace(entry, entry + '\n    return api->exec_run("/bin/atadeny.bin");'))
-        user = out / 'user'
-        settings += ['KB_SH_OUT=' + str(user), 'KB_ROOT_BINS=' + str(user / 'atadeny.bin'),
-                     'PPC_RES_MUT_SRC=' + resident, 'PPC_RES_MUT_FILE=' + str(path)]
+        settings.append('KB_ROOT_BINS=' + str(user / 'atadeny.bin'))
+    path = out / 'device_ide.c'
+    path.write_text('extern unsigned ata_write_provider_calls;\n' + provider)
+    settings += ['KB_MUT_THIRD_SRC=' + device, 'KB_MUT_THIRD_FILE=' + str(path)]
     return build_media(out, '-j6', 'IMAGE=kboot-sh', *settings)
 
 

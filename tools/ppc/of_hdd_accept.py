@@ -12,6 +12,8 @@ from hdd_root_accept import disk as other_disk
 from kboot_accept import build_media, mutant_settings
 from link_sh_run import ROOT, Session
 from product_accept import catalog
+from usb_run import keyboard_actions
+from kboot_run import serial
 
 DEVICE = '/pci@f2000000/mac-io@c/ata-3@20000/disk@'
 
@@ -51,14 +53,14 @@ def install(media, out):
     return raw
 
 
-def stale_bootargs(media, out, raw, mutant):
+def stale_bootargs(media, out, raw, expect_stale):
     before = raw.read_bytes()
     s = Session(media, '7450', out/'cd-stale', 150)
     s.usb_devices += ('-prom-env', r'boot-command=boot cd:,\PPCKERN.ELF os32-root=' + DEVICE + '0:3')
     attach(s, 0, raw)
     try:
         s.start()
-        if mutant:
+        if expect_stale:
             s.wait(lambda: s.word('of_hd0_registrations') == 1, 'stale root selected', 90)
         else:
             s.wait(s.ready, 'installer shell on media root', 90)
@@ -66,7 +68,7 @@ def stale_bootargs(media, out, raw, mutant):
             assert s.word('of_hd0_registrations') == 0
     finally:
         s.close()
-    if not mutant:
+    if not expect_stale:
         assert raw.read_bytes() == before
 
 
@@ -139,10 +141,23 @@ def boot(media, out, first, raw, case, mutant):
         else:
             s.wait(s.ready, 'resident HDD shell', 90)
             assert s.word('of_hd0_registrations') == 1
+            log = s.out/'serial-a.log'
+            start = len(serial(log))
             s.close_rshell()
-            s.keys('tick '+case+'\n')
-            s.wait(lambda: 'root=hd0 child=0 value=selected learned=1' in s.screen('state'),
-                   'mounted root, persisted value and learned candidate', 45)
+            s.wait(lambda: 'USB KEY src=1 sc=00 down=0 usage=29' in serial(log)[start:],
+                   'USB Escape release')
+            tap, type_keys = keyboard_actions(s.q, lambda: serial(log), s.wait, s.out)
+            type_keys('tick '+case)
+            tap('ret')
+            state = ''
+            def persisted():
+                nonlocal state
+                state = s.screen('state')
+                return re.search(r'root=hd0 child=0 value=selected learned=1(?:\s|$)', state)
+            try:
+                s.wait(persisted, 'mounted root, persisted value and learned candidate', 45)
+            finally:
+                print(f'{case} guest screen:\n{state}', flush=True)
             return
         assert not any(e['parts'][:2] == ['RSH', 'READY'] for e in s.events)
         assert s.word('exec_nest_level') == 0
@@ -173,7 +188,10 @@ def main():
         counter = work/'dev.c'
         counter.write_text('volatile unsigned of_hd0_registrations;\n' + registrations.replace(
             anchor, '    if (!kstrcmp(dev->name, "hd0")) ++of_hd0_registrations;\n' + anchor))
-        for variant in (['normal', 'no-number-check', 'stale-root'] if args.mutate else ['normal']):
+        variants = ['normal']
+        if args.mutate:
+            variants.extend(['no-number-check', 'stale-root'])
+        for variant in variants:
             mutant = variant == 'no-number-check'
             out = work/variant
             out.mkdir()
@@ -183,21 +201,29 @@ def main():
             if variant == 'stale-root':
                 settings = mutant_settings(out, variant, 'platform/powermac/ide_tree.c',
                                            '#elif PM_INSTALL_MEDIA', '#elif 0')
-            media = build_media(out, '-j6', 'IMAGE=powermac',
+            media = build_media(out, '-j6', 'IMAGE=powermac', 'KBOOT_USB_KEY_TRACE=1',
                                 'KB_SH_OUT='+str(work/'user'), 'PPC_RES_MUT_SRC='+source,
                                 'PPC_RES_MUT_FILE='+str(fixture), 'KB_MUT_EXTRA_SRC='+device,
                                 'KB_MUT_EXTRA_FILE='+str(counter), *settings)
-            digest = hashlib.sha256(extract(media.iso, 'PRODUCT.ELF')).hexdigest()
-            assert digest not in hashes
-            hashes.add(digest)
-            print(out.name, digest, flush=True)
+            cd = hashlib.sha256(media.elf.read_bytes()).hexdigest()
+            hdd = hashlib.sha256(extract(media.iso, 'PRODUCT.ELF')).hexdigest()
+            if variant == 'normal':
+                normal_cd, normal_hdd = cd, hdd
+            elif variant == 'stale-root':
+                assert cd != normal_cd
+            else:
+                assert hdd != normal_hdd
+            assert (cd, hdd) not in hashes
+            hashes.add((cd, hdd))
+            print(out.name, cd, hdd, flush=True)
             if args.build_only:
                 continue
-            if not mutant:
-                stale_bootargs(media, out, first, variant == 'stale-root')
-                if variant == 'stale-root':
-                    print('stale CD bootargs runtime RED')
-                    continue
+            if variant == 'normal':
+                stale_bootargs(media, out, first, False)
+            elif variant == 'stale-root':
+                stale_bootargs(media, out, first, True)
+                print('stale CD bootargs runtime RED')
+                continue
             raw = install(media, out)
             for case in (['partition'] if mutant else ['save', 'read', 'missing', 'corrupt', 'oversized', 'partition']):
                 path = raw if case in ('save', 'read') else control(raw, media, case)
