@@ -17,6 +17,6 @@ FEP_GEN_SUM := $(shell cat $(FEP_GEN_INPUTS) 2>/dev/null | sha256sum | cut -c1-1
 $(FEP_OUT)/fep_inputs.$(FEP_GEN_SUM):
 	@mkdir -p $(@D) && rm -f $(@D)/fep_inputs.* && touch $@
 $(FEP_GEN) &: $(FEP_GEN_INPUTS) $(FEP_OUT)/fep_inputs.$(FEP_GEN_SUM)
-	python3 tools/gen_sqlite_imports.py --module fep --target $(ARCH)-$(PLATFORM) --out-dir $(FEP_OUT) --depfile $(FEP_OUT)/fep_imports.d
+	python3 tools/gen_sqlite_imports.py --module fep --target $(ARCH)-$(PLATFORM) --out-dir $(@D) --depfile $(@D)/fep_imports.d
 
 -include $(wildcard $(FEP_OUT)/fep_imports.d)
