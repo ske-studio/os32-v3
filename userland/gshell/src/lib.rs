@@ -228,10 +228,26 @@ pub extern "C" fn main(_argc: i32, _argv: *const *const u8, api: *mut KernelAPI)
      * 失敗 (シェル帯以外から起動された等) でも単独 WM としては動く。 */
     unsafe {
         let a = os32api::api();
-        (a.gui_register)(
+        let _registered = (a.gui_register)(
             handler::gshell_gui_handler as *const () as *mut u8,
             pump::gshell_gui_pump as *const () as *mut u8,
         );
+        #[cfg(feature = "c_gui_accept")]
+        if _registered != 0 {
+            gserial::reply_to(false, b"!", format_args!("C-GUI REGISTER FAILED rc={}", _registered));
+            (a.exec_run)(b"/bin/guiprob.bin\0".as_ptr());
+            return -1;
+        }
+    }
+    #[cfg(feature = "c_gui_accept")]
+    unsafe {
+        let a = os32api::api();
+        let mut state = os32api::av::IN2_WmState { size: 0, gen: 0, excl: 0, owner: 0 };
+        let rc = (a.in2_wm_state)(&mut state);
+        if rc != 0 || state.excl != 0 {
+            gserial::reply_to(false, b"!", format_args!("C-GUI WM STATE FAILED rc={} excl={}", rc, state.excl));
+            return -1;
+        }
     }
     /* b2③ fixture: 通常文脈 (gui_register の後) で shell lease を開く。 */
     #[cfg(feature = "r1_fixture")]
@@ -269,6 +285,17 @@ pub extern "C" fn main(_argc: i32, _argv: *const *const u8, api: *mut KernelAPI)
     font::announce(st);
 
     /* ---- 単独ループ (契約 T8: アプリが居ないときは gshell が X3 を回す) ---- */
+    #[cfg(feature = "c_gui_accept")]
+    unsafe {
+        let a = os32api::api();
+        let rc = (a.exec_run)(b"/bin/guiprob.bin\0".as_ptr());
+        if rc != 0 {
+            gserial::reply_to(false, b"!", format_args!("C-GUI PROBE FAILED exec_run={}", rc));
+            return -1;
+        }
+        // The acceptance root is read-only. Use the WM's existing quit handoff.
+        st.quit = true;
+    }
     run_standalone(st)
 }
 

@@ -6,7 +6,7 @@ pub fn shortcut(scan: u8, mods: u32) -> bool {
     scan == 0x6b && mods & 0x19 == 0x18
 }
 fn word(out: &[u8], offset: usize) -> u32 {
-    u32::from_le_bytes(out[offset..offset + 4].try_into().unwrap())
+    u32::from_ne_bytes(out[offset..offset + 4].try_into().unwrap())
 }
 pub fn dump_with(mut emit: impl FnMut(core::fmt::Arguments<'_>)) {
     for id in multiapp::APP_ID_MIN..=multiapp::APP_ID_MAX {
@@ -68,7 +68,7 @@ mod tests {
         let mut stat = [0u8; super::MEMSTAT_SIZE];
         for (offset, value) in [(36, 262144u32), (132, (20440 << 16) | 3544),
                                 (136, 45176), (140, 131656)] {
-            stat[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
+            stat[offset..offset + 4].copy_from_slice(&value.to_ne_bytes());
         }
         let mut lines = std::string::String::new();
         super::emit_resident([20, 40, 150000], &stat, |args| {

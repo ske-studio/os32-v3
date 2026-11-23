@@ -69,6 +69,7 @@ void gfx_add_dirty_rect(int x,int y,int w,int h)
 { (void)x; (void)y; (void)w; (void)h; REQUIRE(0); }
 void gfx_present_dirty(void) { REQUIRE(0); }
 void palette_set(int i,u8 r,u8 g,u8 b) { (void)i; (void)r; (void)g; (void)b; REQUIRE(0); }
+void palette_shadow_set(int i,u8 r,u8 g,u8 b) { (void)i; (void)r; (void)g; (void)b; REQUIRE(0); }
 
 static void setup(void)
 {

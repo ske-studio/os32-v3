@@ -10,9 +10,16 @@
 #include "arch/ppc/kernel_boot.h"
 #include "kstring.h"
 #include "paging.h"
+#include "gfx/palette.h"
 #include "platform/powermac/display_text.h"
 
 GfxCounters gfx_counters;
+GfxBackend *g_backend = &gfx_backend_of_fb;
+static int gfx_started, gfx_current_height;
+#include "gfx/gfx_core_api.inc"
+
+static int allow_palette;
+static int palette_allowed(void) { return allow_palette; }
 static int current_app = 2;
 static int wm_actor;
 int appslot_present_owner(void) { return wm_actor ? wm_actor : current_app; }
@@ -186,6 +193,28 @@ static void raster(void)
     EXPECT(!gfx_backend_of_fb.set_mode(1) && gfx_backend_of_fb.set_mode(2) == OS32_ERR_NOSYS);
     gfx_backend_of_fb.set_palette(0, 256, pixels);
     EXPECT(screen[20] == saved);
+    static const u8 clut[256][3] = {[42] = {255, 0, 0}};
+    const u8 red[3] = {15, 0, 0};
+    u8 r, g, b;
+    d.clut = clut;
+    d.palette_allowed = palette_allowed;
+    EXPECT(!of_fb_bind(&d));
+    EXPECT(!gfx_backend_of_fb.query(&info) && info.lease_first == 16 && info.lease_count == 240);
+    ram[16] = 5;
+    gfx_backend_of_fb.set_palette(5, 1, red);
+    EXPECT(screen[20] == saved);
+    gfx_set_palette_hal(5, 15, 0, 0);
+    EXPECT(gfx2_pal[5] == 0 && screen[20] == saved);
+    EXPECT(gfx_lease_palette(16, 1, red) == OS32_ERR_BUSY && gfx2_pal[16] == 0);
+    allow_palette = 1;
+    EXPECT(!gfx_lease_palette(16, 1, red) && gfx2_pal[16] == 0xff0000);
+    gfx_set_palette_hal(5, 15, 0, 0);
+    EXPECT(gfx2_pal[5] == 0xff0000);
+    palette_get(5, &r, &g, &b);
+    EXPECT(r == 15 && g == 0 && b == 0);
+    EXPECT(screen[20] == 42 && ram[16] == 5 && screen[21] == ram[17]);
+    EXPECT(screen[0] == 0xa5 && screen[32] == 0xa5);
+    d.clut = 0;
     d.pitch = 8; EXPECT(of_fb_bind(&d) == OS32_ERR_INVAL && !of_fb_ready());
     d.pitch = 20; d.bytes = 79; EXPECT(of_fb_bind(&d) == OS32_ERR_INVAL);
     d.bytes = 80; d.display = screen + 1; EXPECT(of_fb_bind(&d) == OS32_ERR_INVAL);
@@ -290,6 +319,9 @@ static void provider(void)
     EXPECT(!DISPLAY_V1_PRESENT_OK());
     DISPLAY_V1_PUBLIC_INIT_OK();
     EXPECT(DISPLAY_V1_PRESENT_OK());
+    adapter.state = GFX2_AD_LOST;
+    EXPECT(!DISPLAY_V1_PRESENT_OK());
+    adapter.state = GFX2_AD_OK;
     int initialized_by = current_app;
     current_app++;
     EXPECT(!DISPLAY_V1_PRESENT_OK());

@@ -28,7 +28,7 @@ pub(crate) fn stat(id: i32) -> Option<[u8; MEMSTAT_SIZE]> {
 }
 
 fn word(out: &[u8; MEMSTAT_SIZE], offset: usize) -> u32 {
-    u32::from_le_bytes([out[offset], out[offset + 1], out[offset + 2], out[offset + 3]])
+    u32::from_ne_bytes([out[offset], out[offset + 1], out[offset + 2], out[offset + 3]])
 }
 
 pub fn deliver(st: &GuiState) {

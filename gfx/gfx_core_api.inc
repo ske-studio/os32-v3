@@ -48,7 +48,7 @@ void __cdecl gfx_set_palette_hal(int idx, u8 r, u8 g, u8 b)
     u8 rgb[GFX_RGB_COMPONENTS];
     rgb[GFX_RGB_R] = r; rgb[GFX_RGB_G] = g; rgb[GFX_RGB_B] = b;
     if (g_backend && g_backend->set_palette) {
-        g_backend->set_palette(idx, 1, rgb);
+        if (DISPLAY_SET_PALETTE(g_backend, idx, 1, rgb)) return;
     } else {
         palette_set(idx, r, g, b);   /* 保険 */
     }
@@ -142,7 +142,8 @@ int __cdecl gfx_lease_palette(int first, int count, const u8 *rgb)
         }
     }
 
-    g_backend->set_palette(first, count, rgb);
+    int rc = DISPLAY_SET_PALETTE(g_backend, first, count, rgb);
+    if (rc) return rc;
     gfx2_pal_set_v1(first, count, rgb);
     return 0;
 }

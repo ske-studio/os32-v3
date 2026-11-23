@@ -3,13 +3,32 @@
 #include "kernel/idle_work.h"
 #include "kprintf.h"
 
+#ifdef OS32_C_GUI
+#include "drivers/video/of_fb/backend_of_fb.h"
+#include "kernel/console/font_source_kcg.h"
+#include "rh_observe.h"
+#endif
+
 static int gui_default(void)
 {
+#ifdef OS32_C_GUI
+    return 1;
+#else
     return 0;
+#endif
 }
 
 static int prepare(int gui)
 {
+#ifdef OS32_C_GUI
+    if (gui && pm_rh_full_colors()->clut && kcg_file_ready()) {
+        gfx_prepare_backend();
+        if (of_fb_ready() && g_backend == &gfx_backend_of_fb) {
+            gfx_client_to_gshell();
+            return 0;
+        }
+    }
+#endif
     return gui ? 2 : 0;
 }
 

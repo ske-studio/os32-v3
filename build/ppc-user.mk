@@ -51,13 +51,16 @@ $(PPC_USER_OUT)/fontprob.o: include/config.h
 $(addsuffix .o,$(PPC_USER_APPS)): $(PPC_USER_OUT)/%.o: userland/ppc/%.c | $(PPC_USER_OUT)
 	$(CC) $(PPC_USER_FLAGS) -c $< -o $@
 
+$(PPC_USER_OUT)/guiprob.o: userland/ppc/guiprob.c | $(PPC_USER_OUT)
+	$(CC) $(PPC_USER_FLAGS) -c $< -o $@
+
 $(PPC_USER_OUT)/memstat.o: userland/tests/mem_stat_test.c $(SDK_KAPI_HDR) | $(PPC_USER_OUT)
 	$(CC) $(PPC_USER_FLAGS) -c $< -o $@
 
 $(PPC_USER_OUT)/atadeny.o: tools/ppc/ata_deny.c $(SDK_KAPI_HDR) | $(PPC_USER_OUT)
 	$(CC) $(PPC_USER_FLAGS) -c $< -o $@
 
-PPC_USER_APPS += $(PPC_USER_OUT)/memstat $(PPC_USER_OUT)/atadeny
+PPC_USER_APPS += $(PPC_USER_OUT)/guiprob $(PPC_USER_OUT)/memstat $(PPC_USER_OUT)/atadeny
 $(addsuffix .elf,$(PPC_USER_APPS)): $(PPC_USER_OUT)/%.elf: $(PPC_USER_CRT) $(PPC_USER_OUT)/%.o $(SDK_TARGET_APP_LINK) sdk/link_guard.py sdk/allocator/check_link_target.py $(PPC_USER_NANO) $(PPC_USER_NANO:.a=.json)
 	$(PPC_USER_LINK) -o $@ $(filter %.o,$^) $(PPC_USER_LIBS)
 
@@ -136,6 +139,31 @@ $(PPC_USER_OUT)/shell.raw: $(PPC_USER_OUT)/shell.elf
 $(PPC_USER_OUT)/shell.bin: $(PPC_USER_OUT)/shell.raw $(PPC_USER_OUT)/shell.elf sdk/mkos32x.py
 	python3 sdk/mkos32x.py $< $@ --target $(SDK_TARGET) --elf $(PPC_USER_OUT)/shell.elf --heap 0
 
+# The acceptance GUI uses the same resident CRT and fixed heap as the C shell.
+PPC_GUI_SRC := $(wildcard userland/lib/gfx/*.c userland/lib/gfx/draw/*.c userland/lib/gfx/text/*.c userland/lib/cfg/*.c) lib/utf8.c
+PPC_GUI_OBJ := $(addprefix $(PPC_RES_DIR)/,$(PPC_GUI_SRC:.c=.o))
+$(PPC_GUI_OBJ): $(PPC_RES_DIR)/%.o: %.c build/ppc-user.mk $(SDK_KAPI_HDR)
+	@mkdir -p $(@D)
+	$(CC) $(PPC_USER_FLAGS) -ffunction-sections -fdata-sections -DOS32_CRT_RESIDENT -DOS32_GFX_PACKED_ONLY -I. -Iinclude -Iuserland/lib -Iuserland/lib/gfx -Iuserland/lib/cfg -Iuserland/lib/math -c $< -o $@
+
+PPC_GUI_LIB := $(PPC_RES_DIR)/cargo/powerpc-os32-none/release/libgshell.a
+.PHONY: ppc-gshell-cargo
+$(PPC_GUI_LIB): ppc-gshell-cargo
+	cd userland/gshell && PATH="$(PPC_CROSS_DIR)/bin:$$PATH" OS32_PPC_RESIDENT=1 OS32_SDK_TARGET=$(SDK_TARGET) RUSTC_WRAPPER=$(CURDIR)/sdk/rustc_stamp.py cargo build --release $(if $(filter 1,$(PPC_C_GUI)),--features c_gui_accept) --target ../../sdk/rust/powerpc-os32-none.json --target-dir $(abspath $(PPC_RES_DIR)/cargo)
+
+	@if ! test -f $(@D)/.c-gui-mode || [ "$$(cat $(@D)/.c-gui-mode)" != "[$(PPC_C_GUI)]" ]; then \
+		echo "[$(PPC_C_GUI)]" > $(@D)/.c-gui-mode; touch "$@"; fi
+
+$(PPC_USER_OUT)/gshell.elf: $(filter-out $(PPC_USER_OUT)/syscalls.o,$(PPC_USER_CRT)) $(PPC_RES_DIR)/sdk/crt/syscalls.o $(PPC_RES_DIR)/sdk/allocator/nano_adapter.o $(PPC_GUI_OBJ) $(PPC_GUI_LIB) $(PPC_RES_DIR)/app_sys.ld
+	$(PPC_GUARDED_LD) -m $(SDK_TARGET_ELF_EMULATION) --no-undefined --gc-sections -z noexecstack -T $(PPC_RES_DIR)/app_sys.ld -Map=$(@:.elf=.map) -o $@ $(filter %.o %.a,$^) -L$(dir $(PPC_USER_LIBC)) -L$(dir $(PPC_USER_LIBGCC)) -lc -lgcc
+
+$(PPC_USER_OUT)/gshell.raw: $(PPC_USER_OUT)/gshell.elf
+	$(OBJCOPY) -O binary $< $@
+
+$(PPC_USER_OUT)/gshell.bin: $(PPC_USER_OUT)/gshell.raw $(PPC_USER_OUT)/gshell.elf sdk/mkos32x.py
+	python3 sdk/mkos32x.py $< $@ --target $(SDK_TARGET) --elf $(PPC_USER_OUT)/gshell.elf --heap 0 --gfx
+
+-include $(PPC_GUI_OBJ:.o=.d)
 -include $(PPC_RES_OBJ:.o=.d)
 
 # The shell uses a private profile and object tree, isolated from x86 artifacts.

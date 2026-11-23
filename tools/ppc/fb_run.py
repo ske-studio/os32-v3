@@ -36,8 +36,8 @@ MUTATIONS = {
     'trace-screen': ('platform/powermac/console_text.c', '\n    kprintf(KBOOT_ATTR, "FB text ready',
                      '\n    console_printf(KBOOT_ATTR, "FB text ready generation=%u\\n", target.generation);'
                      '\n    kprintf(KBOOT_ATTR, "FB text ready'),
-    'colors': ('platform/powermac/rh_observe.c', '.foreground = 255, .background = 0',
-               '.foreground = 0, .background = 255'),
+    'colors': ('platform/powermac/console_text.c', 'pm_console_set_colors(colors->foreground, colors->background);',
+               'pm_console_set_colors(colors->background, colors->foreground);'),
     'top': ('platform/powermac/console_text.c', 'pm_console_attach(&target, &kcg_file_api, PM_RH_FB_ROWS)',
             'pm_console_attach(&target, &kcg_file_api, 0)'),
     'scroll-minus': ('kernel/console/fbcon.c', 'fbcon_scroll_n(c, rows, 1);', 'fbcon_scroll_n(c, rows - 1, 1);'),
