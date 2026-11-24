@@ -11,14 +11,17 @@
 #ifndef FM_ADAPTER
 #define FM_ADAPTER "../../drivers/sound/fm/fm_module.c"
 #endif
+static int load_fixture(const struct module_request *q, struct module_handle *out);
+#define module_load load_fixture
 #include FM_ADAPTER
+#undef module_load
 #include "tick_order.h"
 #include "../../kernel/irq/tick.c"
 volatile u32 kctx_irq_depth;
 const u32 fm_kexports[] = {0};
 const struct module_symbol_contract fm_import_contracts[] = {{0}};
 const struct module_symbol_contract fm_export_contracts[] = {{0}};
-const struct bootinfo *bootinfo_get(void) { finish(2); }
+const struct bootinfo *bootinfo_get(void) { static const struct bootinfo bi; return &bi; }
 void __cdecl kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
 
 
@@ -59,6 +62,22 @@ static int init_fm(FmModuleApi *out)
     out->fm_note_on = body_note;
     return 0;
 }
+/* Use the synthetic image contract and host entry points with the requested
+ * adapter lifecycle. The runtime still loads, starts and reclaims the image. */
+static int load_fixture(const struct module_request *q, struct module_handle *out)
+{
+    struct module_request fixture = request();
+    fixture.lifecycle = q->lifecycle;
+    int rc = module_load(&fixture, out);
+    if (rc) return rc;
+    struct module_record *r = module_record_get(*out);
+    r->init = (u32)(uptr)init_fm;
+    /* Explicit host seam: candidate code is host text, rather than body bytes.
+     * Product-image checks separately validate the real relocated facade. */
+    r->text = (u32)(uptr)body_tick & ~(PAGE_SIZE - 1);
+    r->text_size = 16 * PAGE_SIZE;
+    return 0;
+}
 static int start_then_fail(struct module_record *r, u32 entry, u32 *ops)
 {
     int rc = fm_start(r, entry, ops);
@@ -88,13 +107,8 @@ void _start(void)
     /* Facade stubs must be harmless before load. */
     fm_note_on(0, 60); tick_dispatch();
     CHECK(!ticks && !public_calls);
-    CHECK(!module_load(&q, &fm_handle));
+    CHECK(!load_fixture(&q, &fm_handle));
     struct module_record *r = module_record_get(fm_handle);
-    r->init = (u32)(uptr)init_fm;
-    /* Explicit host seam: candidate code is host text, rather than body bytes.
-     * Product-image checks separately validate the real relocated facade. */
-    r->text = (u32)(uptr)body_tick & ~(PAGE_SIZE - 1);
-    r->text_size = 16 * PAGE_SIZE;
     int rc = module_start(fm_handle);
     if (mode == 1 || mode == 3) {
         CHECK(rc == MODULE_INIT_FAILED);
@@ -122,9 +136,16 @@ void _start(void)
         CHECK(rc == MODULE_ISOLATED && r->state == MODULE_QUARANTINED);
         CHECK(returned == before && mask[0] == 2 && live[0] && !retired);
         CHECK(fm_module_abort() == MODULE_ISOLATED);
+        CHECK(fm_module_load() == MODULE_BUSY);
     } else {
         CHECK(!rc && r->state == MODULE_ABSENT);
+        empty();
+        CHECK(!candidate_valid);
+        CHECK(!fm_module_load());
+        fm_note_on(0, 60);
+        CHECK(public_calls == 2 && acquired);
         CHECK(!fm_module_abort());
+        CHECK(detached == 2 && !acquired);
         empty();
     }
     finish(0);

@@ -134,6 +134,7 @@ def main():
                 print('MUTATE RED ' + old, flush=True)
             source = SOURCE.read_text()
             for label, old, new, modes in (
+                ('reload-after-detach', 'fm_handle = (struct module_handle){0};', '(void)fm_handle;', [0]),
                 ('implicit', 'snd2_chip_implicit(res_owner_get()) == 0', '1', [0]),
                 ('detach', '!candidate_valid || candidate.detach()', '1', [4]),
                 ('tick-ref', '    candidate_valid = 1;',

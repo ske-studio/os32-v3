@@ -99,6 +99,15 @@ static int fm_detach(struct module_record *r)
     return !candidate_valid || candidate.detach();
 }
 
+static void forget_absent_module(void)
+{
+    struct module_record *r = module_record_get(fm_handle);
+    if (!r || r->state == MODULE_ABSENT) {
+        candidate_valid = 0;
+        fm_handle = (struct module_handle){0};
+    }
+}
+
 int fm_module_load(void)
 {
     if (fm_handle.generation) return MODULE_BUSY;
@@ -118,8 +127,14 @@ int fm_module_load(void)
     int rc = module_load(&request, &fm_handle);
     if (!rc) rc = module_start(fm_handle);
     if (!rc && !module_exports(fm_handle)) rc = MODULE_INIT_FAILED;
+    if (rc) forget_absent_module();
     kprintf(KLOG_ATTR, "[fm] module rc=%d pair=%08x\n", rc, pair);
     return rc;
 }
 
-int fm_module_abort(void) { return module_abort(fm_handle); }
+int fm_module_abort(void)
+{
+    int rc = module_abort(fm_handle);
+    if (!rc) forget_absent_module();
+    return rc;
+}
