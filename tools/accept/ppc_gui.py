@@ -21,6 +21,8 @@ from fb_pixel import read_ppm
 from link_sh_run import Session
 from usb_run import keyboard_actions
 from ppc_in2_cui import IN2_MUTATIONS
+from in2_gui_mutations import D_MUTATIONS, D_FAILURES
+from in2_gui_trial import run_trial
 
 
 # Each mutant must reach the preceding observation on this boot.
@@ -53,7 +55,10 @@ def wm_mutant(folder, case):
     for name in ('sdk', 'exec', 'include', 'net', 'userland/lib', 'rust-toolchain.toml'):
         (folder / name).symlink_to(ROOT / name)
     source = crate / 'src/input.rs'
-    if case == 'no-focus':
+    if case in ('keep-capture', 'keep-left', 'keep-right'):
+        source = crate / 'src/excl.rs'
+        before, after = 'input::cancel_capture(st);', ''
+    elif case == 'no-focus':
         before = 'let old_front = st.front_id();\n    if changed {\n        st.bring_to_front(idx);'
         after = before.replace('st.bring_to_front(idx);', 'return;')
     else:
@@ -155,6 +160,21 @@ def observe(media, cpu, folder, case, user, mutation=None):
         if mutation == 'register':
             seen('C-GUI REGISTER FAILED')
             seen('C-GUI INIT NOSYS')
+        if case in ('normal', 'explicit', 'focus', 'exit'):
+            # IN2 publishes the mouse before HID starts its interrupt transfer.
+            # Preserve the serial offset: FRONT may already be in the log.
+            mouse_dev = r'USB DEV addr=(\d+) vid:pid=0627:0001 class=03 subclass=01 protocol=02'
+            def mouse_attached():
+                trace = serial(log)
+                dev = re.search(mouse_dev, trace)
+                return dev and re.search(rf'\[usb\] HID \d+:\d+\.\d+ addr={dev[1]} iface=0 rc=0\r?\n',
+                                         trace[dev.end():])
+            s.wait(mouse_attached, 'USB mouse interrupt transfer ready')
+            # mac99 also has an ADB mouse. Wait for QMP to route the first
+            # button edge to the HID mouse after the guest starts polling it.
+            s.wait(lambda: any(mouse['current'] and mouse['name'] == 'QEMU HID Mouse'
+                               for mouse in s.q.call('query-mice')),
+                   'USB HID mouse selected for input')
         if case == 'normal':
             seen('C-GUI READY')
             x, y = s.word('px', unit='h'), s.word('py', unit='h')
@@ -162,11 +182,13 @@ def observe(media, cpu, folder, case, user, mutation=None):
             ids = re.search(r'C-GUI normal P=(\d+) Q=(\d+) owner=(\d+) kb=(\d+) mouse=(\d+)', serial(log))
             p, q, owner, kb, mouse = map(int, ids.groups())
             assert p != q and owner and kb and mouse and kb != mouse
-            before, after = re.findall(
-                r'C-GUI acquire (?:before|after)\r?\n.*?C-GUI WM sample (-?\d+) (\d+) (\d+) (\d+) (\d+) (\d+)',
+            before, acquired, released = re.findall(
+                r'C-GUI acquire (?:before|after|released)\r?\n.*?C-GUI WM sample (-?\d+) (\d+) (\d+) (\d+) (\d+) (\d+)',
                 serial(log), re.S)
-            assert before == after and tuple(map(int, before[:5])) == (0, p, owner, 0, 0)
-            mouse_dev = r'USB DEV addr=(\d+) vid:pid=0627:0001 class=03 subclass=01 protocol=02'
+            generation = int(before[5])
+            assert tuple(map(int, before[:5])) == (0, p, owner, 0, 0)
+            assert tuple(map(int, acquired)) == (0, p, owner, 3, owner, generation + 1)
+            assert tuple(map(int, released)) == (0, p, owner, 0, 0, generation + 2)
             mouse_addr = re.search(mouse_dev, serial(log))[1]
 
             def state(index):
@@ -244,10 +266,51 @@ def observe(media, cpu, folder, case, user, mutation=None):
             seen('C-GUI FINAL MOVE')
             seen(f'C-GUI POINTER {x + 46} {y - 18} 0 0')
             seen('C-GUI DONE')
+        if case in ('explicit', 'focus', 'exit'):
+            class Trial:
+                def trace(self):
+                    return serial(log)
+
+                @property
+                def offset(self):
+                    return offset
+
+                def wait_match(self, pattern):
+                    def match():
+                        trace = self.trace()
+                        if mutation in D_FAILURES and mutation != 'drop-tab':
+                            previous, failure = D_FAILURES[mutation]
+                            if previous in trace and failure in trace.partition(previous)[2]:
+                                raise RuntimeError('observed mutation ' + mutation)
+                        return re.search(pattern, trace[offset:])
+                    s.wait(match, pattern)
+                    return match()
+
+                def seen(self, marker):
+                    # Defer the mutant's TAB observations until the guest has completed
+                    # the trial. A timeout cannot establish a missing WM delivery.
+                    if mutation == 'drop-tab' and marker in ('D-GUI RAW 15 1', 'D-GUI RAW 15 0'):
+                        return
+                    self.wait_match(re.escape(marker))
+
+                def key(self, code, down):
+                    event('key', {'down': down, 'key': {'type': 'qcode', 'data': code}})
+
+                def button(self, name, down):
+                    event('btn', {'button': name, 'down': down})
+
+            trial = Trial()
+            trial.move = move
+            run_trial(trial, case)
+            seen("C-GUI completed " + case)
+            if mutation == 'drop-tab':
+                trace = serial(log).partition('D-GUI explicit RESUMED')[2]
+                if all(f'D-GUI RAW 15 {down}' not in trace for down in (1, 0)):
+                    raise RuntimeError('observed mutation drop-tab')
         seen(cui)
         history = re.findall(r'Loading /(bin/gshell|sys/shell)\.bin|'
                              r'/bin/gshell.bin returned (-?\d+)', serial(log))
-        status = {'normal': 0, 'missing': -3, 'fault': -2}[case]
+        status = {'missing': -3, 'fault': -2}.get(case, 0)
         assert history == [('bin/gshell', ''), ('', str(status))] * (
             3 if case == 'fault' else 1) + [('sys/shell', '')], history
         s.wait(s.ready, 'CUI ready', 60)
@@ -273,6 +336,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--build-only', action='store_true')
     parser.add_argument('--mutate', action='store_true')
+    parser.add_argument('--suite', choices=['all', 'c', 'd'], default='all')
     args = parser.parse_args()
     if not args.build_only:
         from ppc_shm import guest_available
@@ -281,18 +345,35 @@ def main():
             return 3
     os.environ.setdefault('SOURCE_DATE_EPOCH', '946684800')
     work = Path(tempfile.mkdtemp(prefix='ppc-gui-')).resolve()
-    cases = ['normal', 'missing', 'fault']
-    if args.mutate:
-        cases.extend(FAILURE_MARKERS)
+    cases = []
+    if args.suite != 'd':
+        cases += ['normal', 'missing', 'fault']
+        if args.mutate:
+            cases.extend(FAILURE_MARKERS)
+    if args.suite != 'c':
+        cases += ['explicit', 'focus', 'exit']
+        if args.mutate:
+            cases.extend(D_MUTATIONS)
     hashes = set()
     for case in cases:
         folder = work / case
         folder.mkdir()
         kernel = folder / 'kernel'
-        user = folder / 'user' if case in ('no-focus', 'no-drag-end') else work / 'user'
+        trial_name = D_MUTATIONS[case][0] if case in D_MUTATIONS else case
+        wm_mutations = ('no-focus', 'no-drag-end', 'keep-capture', 'keep-left', 'keep-right')
+        if case in wm_mutations:
+            user = folder / 'user'
+        elif trial_name in ('explicit', 'focus', 'exit'):
+            user = work / ('user-' + trial_name)
+        else:
+            user = work / 'user'
         options = ['IMAGE=kboot-link-sh', 'PPC_C_GUI=1', 'KBOOT_USB_KEY_TRACE=1',
                    'KB_SH_OUT=' + str(user), 'KB_ROOT_BINS=' + str(user / 'c-gui/guiprob.bin')]
-        if case in ('no-focus', 'no-drag-end'):
+        if trial_name in ('explicit', 'focus', 'exit'):
+            options += ['PPC_GUI_TRIAL=' + trial_name]
+        if case in D_MUTATIONS and len(D_MUTATIONS[case]) > 1:
+            options += mutant_settings(folder, case, *D_MUTATIONS[case][1:])
+        if case in wm_mutations:
             options += [wm_mutant(folder, case)]
         if case == 'no-button':
             options += mutant_settings(folder, case, 'input/hal/in2_state.c',
@@ -330,6 +411,9 @@ def main():
             assert not gui_image
         else:
             assert gui_image == (fault if case == 'fault' else user / 'gshell.bin').read_bytes()
+        if case not in ('missing', 'fault'):
+            role = trial_name if trial_name in ('explicit', 'focus', 'exit') else 'd-input'
+            assert ('/bin/guiprob.bin ' + role + '\0').encode() in gui_image
         elf = media.elf.read_bytes()
         wire, _, _, _ = root_pair.wire(elf)
         fep = (kernel / 'fep/fep.mod').read_bytes()
@@ -343,8 +427,20 @@ def main():
             for cpu in ('7450', '7455'):
                 expected = FAILURE_MARKERS.get(case)
                 try:
-                    observe(media, cpu, folder / cpu, 'normal' if expected else case, user, case)
+                    observe(media, cpu, folder / cpu, 'normal' if expected else trial_name, user, case)
                 except RuntimeError as exc:
+                    if case in D_FAILURES:
+                        prev, failure = D_FAILURES[case]
+                        trace = serial(folder / cpu / 'serial-a.log')
+                        if prev not in trace:
+                            raise
+                        if case == 'drop-tab':
+                            if str(exc) != 'observed mutation drop-tab':
+                                raise
+                        elif str(exc) != 'observed mutation ' + case or failure not in trace.partition(prev)[2]:
+                            raise
+                        print(f'RED {case} {cpu}: {failure}', flush=True)
+                        continue
                     if not expected or not str(exc).startswith(f'deadline {expected} evidence='):
                         raise
                     trace = serial(folder / cpu / 'serial-a.log')
@@ -361,7 +457,7 @@ def main():
                         raise
                     print(f'RED {case} {cpu}: {expected}', flush=True)
                 else:
-                    if expected:
+                    if expected or case in D_FAILURES:
                         raise RuntimeError(f'{case} {cpu} survived')
     print(f'{len(hashes)} distinct C-GUI images')
 
