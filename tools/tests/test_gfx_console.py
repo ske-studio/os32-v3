@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Console target: real HAL surface lifetime and synchronous scanout contract."""
 CHECK = dict(name='gfx-console-host', tier=1, needs=[], budget=20,
-    covers=['gfx/gfx_console.c', 'gfx/gfx_console.h', 'gfx/v2/surface.c',
+    covers=['tools/tests/of_fb_osri_fake.h', 'gfx/gfx_console.c', 'gfx/gfx_console.h', 'gfx/v2/surface.c',
             'gfx/v2/gfx2_int.h', 'include/gfx_hal.h', 'include/gfx_hal2.h',
             'include/gfx_sync.h', 'include/types.h', 'include/memmap.h',
             'include/gfx_mode.h', 'include/gfx_format.h', 'include/callconv.h',

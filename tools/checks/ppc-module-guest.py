@@ -15,6 +15,7 @@ def run(ctx):
     for key in ('BUILD_OUT', 'KERNEL_CFLAGS', 'INC_KERNEL', 'C_STD', 'SQLITE_PROTO_OUT',
                 'MAKEFLAGS', 'MFLAGS', 'MAKELEVEL'):
         env.pop(key, None)
+    subprocess.run(['python3', '-B', 'tools/tests/ppc_module/test_serial.py'], cwd=ctx.root, check=True)
     rc = subprocess.call(['python3', '-B', 'tools/accept/ppc_module.py'] +
                          (['--mutate'] if ctx.mutate else []), cwd=ctx.root, env=env)
     return 0 if rc == 3 and env.get('OS32_REQUIRE_PPC') != '1' else rc

@@ -3,6 +3,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import struct
 import subprocess
@@ -93,6 +94,27 @@ def observe(media, folder, expected):
     observe_lines(media, folder, check)
 
 
+def module_lines(serial):
+    lines = []
+    pending = ''
+    for line in serial.splitlines():
+        if not pending:
+            start = line.find('[module]')
+            if start < 0:
+                continue
+            line = line[start:]
+        # A tagged interrupt writes its own newline before the probe resumes.
+        interrupt = re.search(r'\[(?!module\])[\w.-]+\][ \t]', line)
+        if interrupt:
+            pending += line[:interrupt.start()]
+        else:
+            lines.append((pending + line).strip())
+            pending = ''
+    if pending:
+        lines.append(pending.strip())
+    return lines
+
+
 def observe_lines(media, folder, check):
     from link_sh_run import Session
     folder.mkdir()
@@ -102,8 +124,7 @@ def observe_lines(media, folder, check):
             session.start()
             session.wait(session.ready, 'module probe READY', 90)
             serial = (session.out / 'serial-a.log').read_text(errors='replace')
-            lines = [line[line.index('[module]'):].strip() for line in serial.splitlines() if '[module]' in line]
-            check(cpu, lines)
+            check(cpu, module_lines(serial))
         finally:
             session.close()
 

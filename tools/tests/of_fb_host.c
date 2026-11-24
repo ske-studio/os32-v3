@@ -6,6 +6,7 @@
 #include "drivers/video/of_fb/backend_of_fb.h"
 #include "gfx/v2/gfx2_int.h"
 #include "display_provider.h"
+#include "redir_access.h"
 #include "kernel/console/console_dual.h"
 #include "platform/powermac/rh_observe.h"
 #include "arch/ppc/kernel_boot.h"
@@ -22,7 +23,7 @@ u8 *bb_b;
 #include "gfx/gfx_core_api.inc"
 
 /* DESIGN.final §2/§4: only committed logical rows may reach scanout. */
-static u8 frame_storage[8192] __attribute__((aligned(4096)));
+static u8 frame_storage[64 * PAGE_SIZE] __attribute__((aligned(4096)));
 extern int vram_scroll_y;
 int gfx_is_started(void) { return gfx_started; }
 static unsigned frame_pages;
@@ -56,7 +57,23 @@ int ledger_owner_new(u32 kind, u32 parent, const char *name, u32 *out)
 void kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
 int gfx2_heap_init(struct gfx2_heap *h, u32 base, u32 size)
 { (void)h; EXPECT(!base && !size); return 0; }
-void gfx2_head_detach(struct gfx2_adapter *a, u32 h) { (void)a; (void)h; }
+struct gfx2_surf gfx2_surfs[GFX2_MAX_SURFACES];
+i32 gfx_screen_owner(void) { return current_app; }
+int caller_access_get_user(struct caller_access *c)
+{ *c = (struct caller_access){ .app_id = current_app, .owner = current_app }; return 1; }
+struct gfx2_surf *gfx2_surf_get(u32 sid, u32 owner, int *rc)
+{
+    EXPECT(sid == 1 && owner == (u32)current_app);
+    *rc = 0;
+    return &gfx2_surfs[1];
+}
+int gfx2_surf_quiesce(struct gfx2_surf *s, u32 dl)
+{ EXPECT(s == &gfx2_surfs[1] && !dl); return 0; }
+void gfx2_scan_ref_get(struct gfx2_surf *s) { EXPECT(s == &gfx2_surfs[1]); }
+void gfx2_scan_ref_put(struct gfx2_surf *s) { EXPECT(s == &gfx2_surfs[1]); }
+void gfx2_scan_ref_swap(struct gfx2_adapter *a, u32 h, struct gfx2_surf *s)
+{ a->head[h].scan_sid = s ? s->sid : 0; }
+void gfx_policy_scan_changed(void) { }
 void gfx2_adapter_recovered(struct gfx2_adapter *a) { a->state = GFX2_AD_OK; }
 void v1_bridge_rebind(void) { }
 /* P6: OF enter stops the text terminal through display_text_hide; no terminal is attached here. */
@@ -468,9 +485,140 @@ static void provider(void)
     EXPECT(!DISPLAY_V1_PRESENT_OK());
     EXPECT(display_provider_init_failed(&gfx_backend_of_fb) < 0 && !of_fb_ready());
 }
+/* OSRI contract, DESIGN.final §4. Observe native scanout at the wait boundary. */
+#include "gfx/gfx_osri.h"
+#include "gfx/gfx_osri_view.h"
+static u8 osri_screen[648 * 402] __attribute__((aligned(4)));
+static u8 osri_client[644 * 402], packed[GFX_WIDTH * GFX_HEIGHT];
+static u8 planes[4][GFX_PLANE_SZ], clut[256][3];
+static struct gfx_kernel_fb decoded;
+static const struct of_fb_desc desc = {
+    osri_screen, osri_client, 640, 402, 648, sizeof(osri_screen),
+    644, sizeof(osri_client), 1, clut, palette_allowed
+};
+static unsigned long long bound;
+static int expire_begin, expire_end, fail_display_bridge, restore_busy;
+static int replace_bind, waits, bridges, keys, extend, sent, flip, abort_wait;
+volatile u32 tick_count;
+void *kmalloc(u32 n) { EXPECT(n == sizeof(packed)); return packed; }
+void kfree(void *p) { EXPECT(p == packed); }
+const struct gfx_kernel_fb *pm_osri_decoded(unsigned long long *value)
+{ *value = bound; return &decoded; }
+int pm_osri_key(void)
+{
+    if (waits == 1 && extend && !sent++) return 1;
+    return waits >= 2 && (keys || extend) ? 0 : -1;
+}
+int gfx_osri_poll_abort(int caller) { EXPECT(caller == 3); return waits && abort_wait; }
+int v1_bridge_begin(u32 role, u32 access)
+{
+    EXPECT(role == (bridges ? GFX2_ROLE_DISPLAY : GFX2_ROLE_CLIENT));
+    EXPECT(access == (bridges ? GFX2_CPU_W : GFX2_CPU_R));
+    if (bridges && waits && restore_busy) {
+        restore_busy = 0;
+        return OS32_ERR_BUSY;
+    }
+    if (bridges && fail_display_bridge) return OS32_ERR_BUSY;
+    if (bridges && expire_begin) tick_count += 4;
+    ++bridges;
+    return 0;
+}
+void v1_bridge_end(u32 role, u32 access, u32 fence)
+{
+    if (bridges == 2 && expire_end) tick_count += 4;
+    --bridges;
+    EXPECT(role == (bridges ? GFX2_ROLE_DISPLAY : GFX2_ROLE_CLIENT));
+    EXPECT(access == (bridges ? GFX2_CPU_W : GFX2_CPU_R) && !fence);
+}
+void idle_wait_step(void)
+{
+    EXPECT(!bridges);
+    EXPECT(osri_screen[648] == 250 && osri_screen[649] == 251);
+    EXPECT(osri_screen[650] == 252 && osri_screen[651] == 253);
+    EXPECT(osri_screen[656] == 250 && osri_screen[647] == 17);
+    EXPECT(osri_screen[1296] == (keys ? 250 : 254));
+    osri_client[644] = 12;
+    EXPECT(!of_fb_present(0, 1, 1, 1) && osri_screen[648] == 250);
+    if (flip) {
+        static u8 surface[644 * 402];
+        surface[644] = 45;
+        gfx2_surfs[1] = (struct gfx2_surf){ .sid = 1, .state = GFX2_ST_IDLE,
+            .w = 640, .h = 402, .pitch = 644, .bytes = sizeof(surface),
+            .usage = GFX2_USE_SCANOUT, .fmt = GFX2_FMT_INDEX8,
+            .pool = GFX2_POOL_SYSMEM, .kva = surface };
+        DISPLAY_V1_PUBLIC_INIT_OK();
+        EXPECT(!gfx2_flip(0, 0, 1, 0, 0) && adapter.head[0].scan_sid == 1);
+        EXPECT(osri_screen[648] == 250);
+    }
+    if (replace_bind) {
+        EXPECT(!of_fb_bind(&desc));
+        osri_screen[648] = 19;
+    }
+    ++waits;
+    tick_count += 3;
+}
+static void osri(void)
+{
+    static struct OsriImage image;
+    for (unsigned p = 0; p < 4; ++p) {
+        decoded.planes[p] = planes[p];
+        planes[p][0] = 128 >> p;
+        image.pal[1 << p] = p + 1;
+        clut[250 + p][2] = (p + 1) * 17;
+    }
+    planes[0][1] = planes[0][80] = 128;
+    clut[254][0] = clut[255][0] = 255;
+    image.event[0] = (struct OsriEvent){.line = 1, .index = 1, .rgb444 = 0xf00};
+    for (int test = 0; test < 7; ++test) {
+        kmemset(osri_screen, 17, sizeof(osri_screen));
+        EXPECT(!of_fb_bind(&desc));
+        /* The best physical indices are outside the logical mapping. */
+        allow_palette = 1;
+        const u8 black[3] = {0, 0, 0};
+        EXPECT(!of_fb_palette(250, 1, black));
+        osri_client[644 + 10] = 29;
+        bound = of_fb_osri_generation();
+        EXPECT(bound);
+        waits = tick_count = 0;
+        replace_bind = test == 2;
+        keys = test == 1;
+        extend = test == 3;
+        flip = test == 4;
+        abort_wait = test == 5;
+        restore_busy = test == 6;
+        sent = 0;
+        image.count = !keys;
+        struct OsriViewRun run = {3, 0, 20};
+        int rc = gfx_backend_of_fb.osri_show(&image, &run);
+        EXPECT(rc == (replace_bind ? OS32_ERR_IO : (keys || extend || abort_wait) ? GFX_OSRI_SHOW_CANCELLED : GFX_OSRI_SHOW_DONE));
+        EXPECT(waits == (keys || extend || test == 6 ? 2 : 1) && !bridges);
+        EXPECT(osri_screen[648] == (replace_bind ? 19 : flip ? 45 : 12));
+        EXPECT(osri_screen[648 + 10] == (replace_bind || flip ? 0 : 29));
+        of_fb_unbind();
+    }
+    /* No scanout if our frame has expired at acquisition. If expiration
+     * happens during transfer, the committed source must be restored. */
+    for (int test = 0; test < 3; ++test) {
+        EXPECT(!of_fb_bind(&desc));
+        bound = of_fb_osri_generation();
+        expire_begin = test == 0;
+        expire_end = test == 1;
+        fail_display_bridge = test == 2;
+        image.count = 1;
+        tick_count = waits = bridges = 0;
+        u32 before = gfx_counters.present_bytes;
+        struct OsriViewRun run = {3, 0, 20};
+        EXPECT(gfx_backend_of_fb.osri_show(&image, &run) ==
+               (fail_display_bridge ? OS32_ERR_BUSY : OS32_ERR_AGAIN));
+        EXPECT(!waits && !bridges && gfx_counters.present_bytes - before ==
+               (expire_end ? 2u * GFX_WIDTH * GFX_HEIGHT : 0u));
+        of_fb_unbind();
+    }
+
+}
 void _start(void)
 {
-    copy_characterization(); raster(); provider();
+    copy_characterization(); raster(); provider(); osri();
     __asm__ volatile("int $0x80" : : "a"(1), "b"(failed) : "memory");
     __builtin_unreachable();
 }

@@ -4,6 +4,7 @@ Common exec, caller validation, owner, FD and heap providers remain bound.
 """
 
 PROVIDER_EXTERNS = frozenset({
+    "extern int kapi_osri_show(const char *path, u32 duration_ms);",
     "extern i32 kdebug_call(u32 op, void *buf, u32 size);",
     "extern int kapi_pci_bind_info(u32 idx, void *out);",
     "extern volatile u32 tick_count;",
@@ -19,26 +20,13 @@ PROVIDER_EXTERNS = frozenset({
 PROVIDER_GROUPS = {
     'sys': (frozenset({'buz_on', 'buz_off'}), frozenset([])),
     'surface': (frozenset(), frozenset([])),
-    'gfx': (frozenset({
-        'gfx_osri_show',
-    }), frozenset()),
     'sound': (frozenset({
-        'fm_startup_sound',
-        'fm_play_mml',
-        'snd_bgm_play',
-        'snd_bgm_stop',
-        'snd_bgm_is_playing',
-        'snd_se_play',
-        'snd_se_play_raw',
-        'snd_set_master',
-        'snd_bgm_set_persist',
         'fm_note_on',
         'fm_note_off',
         'fm_set_tone_num',
         'ssg_tone',
         'ssg_volume',
         'ssg_all_off',
-        'snd_focus',
     }), frozenset(['fm_contract.h', 'snd_engine.h'])),
     'platform': (frozenset({
         'np2_detect',
@@ -122,7 +110,6 @@ ZERO_SLOTS = frozenset({
     'np2_detect',
     'np2_check_hostdrv',
     'ide_drive_present',
-    'snd_bgm_is_playing',
     'gfx2_adapter_count',
     'unicode_to_jis',
 })

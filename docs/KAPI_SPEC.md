@@ -1761,6 +1761,11 @@ ver / About 用に、実行中カーネルの版・装置の保存値・識別�
   `duration_ms` は 1〜`GFX_OSRI_SHOW_MAX_MS` (動的画像の初期枠、Esc 以外のキーで締切を
   max(今の締切, 今 + `GFX_OSRI_SHOW_EXTEND_MS`) へ延長、固定の画像は Esc まで)。戻り = 0 (枠の終わり) /
   1 (Esc・CTRL+STOP) / `INVAL` / `NOTFOUND` / `IO` / `NOSPC` / `NOSYS` (非対応の表示経路) / `BUSY` / `AGAIN`。
+  PowerMac の powermac・kboot-sh・kboot-link-sh 像は v1/v2 の共通検証後、保護行直下に 640×400 の画像を表示する。
+  行ごとのパレット更新を適用し、RGB444 を各成分 17 倍した RGB8 と固定 CLUT 全 256 色の
+  RGB 二乗距離が最小の物理索引を選ぶ。同距離は小さい索引を優先する。
+  PC-98 は行のラスタ出力予算超過で NOSYS を返す。OF は同じ行を描画できる。
+  OF の有効域不足・CLUT 不在は NOSYS、ロード中または表示中の再 bind は IO。常駐 /host と表示は併用できる。
   正典は [OSRI_VIEWER_DESIGN](decisions/gui/OSRI_VIEWER_DESIGN.md) §3。ビューアーのアプリは GeForce の後。
 
 ### §4-17 Host Services 通知 (v82)

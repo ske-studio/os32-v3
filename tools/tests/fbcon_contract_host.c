@@ -9,6 +9,9 @@
 #include "platform/powermac/rh_observe.h"
 #include "gfx/palette.h"
 
+/* This contract drives ordinary console flips with no borrowed OSRI image. */
+#include "gfx2_bridge_fake.h"
+#include "of_fb_osri_fake.h"
 static void finish(int rc) __attribute__((noreturn));
 static void finish(int rc)
 {
