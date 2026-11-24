@@ -7,7 +7,7 @@ from host32 import run as host_run
 from kernel_includes import include_flags
 
 CHECK = dict(name='snd2-stream-host', tier=4, needs=[], budget=3,
-             covers=['kernel/time/tick_probe.h', 'kernel/time/tick_probe_ids.h', 'tools/tests/snd2_v1_host.c', 'include/pcm_contract.h', 'sound/hal/snd2_v1.c', 'kapi/kapi_snd2.c', 'exec/exec.h', 'include/user_read_contract.h', 'include/memmap.h', 'sound/hal/snd2.h', 'sound/hal/snd2_stream.c', 'sound/hal/snd2_caps.c',
+             covers=['sound/hal/snd2_refill_diag.h', 'kernel/time/tick_probe.h', 'kernel/time/tick_probe_ids.h', 'tools/tests/snd2_v1_host.c', 'include/pcm_contract.h', 'sound/hal/snd2_v1.c', 'kapi/kapi_snd2.c', 'exec/exec.h', 'include/user_read_contract.h', 'include/memmap.h', 'sound/hal/snd2.h', 'sound/hal/snd2_stream.c', 'sound/hal/snd2_caps.c',
                      'sound/hal/snd2_reg.c', 'kernel/time/tick_clock.h', 'include/kernel_tick.h',
                      'include/io.h', 'sound/hal/snd2_seg.c', 'sound/hal/snd2_stg.c',
                      'sound/hal/snd2_int.h', 'sound/hal/snd2_ring_math.h',

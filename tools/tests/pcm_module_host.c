@@ -87,6 +87,7 @@ int pcm_codec_open(u32 rate, u32 period, void (*advance)(void), u8 **out)
     return body_open(rate);
 }
 int pcm_codec_start(void) { return 0; }
+void pcm_codec_counters(u32 *pi, u32 *ticks, u32 *max_us) { *pi = *ticks = *max_us = 0; }
 int pcm_codec_pos(u32 *frame) { *frame = 0; return 0; }
 int pcm_codec_ack(void) { return 1; }
 int pcm_codec_stop(void) { return 0; }

@@ -1,3 +1,4 @@
+#include "sound/hal/snd2_refill_diag.h"
 /* Exercise the paired body and resident stream core through their normal entries. */
 #define PCM_HOST_HEAP_BYTES (8192U * PCM_FRAME_BYTES)
 #define main original_pcm_main
@@ -69,9 +70,14 @@ int main(int argc, char **argv)
     dev_reg[PCM_I_ALTSTAT] = PCM_ALT_PI;
     CHECK(pcm_irq(PCM_IRQ, 0) == IRQ_HANDLED && !dev_reg[PCM_I_ALTSTAT]);
     CHECK(snd2_device(info.dev)->stream.last_hw == 40);
+    sim_now_us += 1999;
     sim_set_pos(80);
     api.tick();
     CHECK(snd2_device(info.dev)->stream.last_hw == 80);
+    CHECK(!snd2_caps(info.dev | SND2_CAPS_REFILL, &caps, sizeof(caps)));
+    CHECK(caps.reserved[SND2_DIAG_PI] == 1 && caps.reserved[SND2_DIAG_TICK] == 1);
+    CHECK(caps.reserved[SND2_DIAG_MAX_US] == 1999 && caps.reserved[SND2_DIAG_DMA_STEP] == 40);
+    CHECK(!caps.reserved[SND2_DIAG_MIN_STG] && caps.reserved[SND2_DIAG_FRAME] == ~0U);
     sim_set_pos(10);  /* Backward within the period: stop, prove and re-prime. */
     sim_setup_fail = 1;
     api.tick();

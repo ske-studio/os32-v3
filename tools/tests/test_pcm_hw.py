@@ -14,6 +14,8 @@ CHECK = dict(name='pcm-hw-host', tier=4, needs=[], budget=6,
              basis=['docs/decisions/sound/AV_HAL_DESIGN.md §3・§12 S9・§13-2'])
 
 MUTATIONS = [
+    ('pcm_cs4231.c', '++hal_ticks;', '++hal_pi;'),
+    ('pcm_cs4231.c', 'hal_max_us = now - hal_last_us;', 'hal_max_us = 0;'),
     ('pcm_cs4231.c', 'if (s_in_advance) {', 'if (0) {'),
     ('pcm_cs4231.c', 'if (irq_unregister(PCM_IRQ, pcm_irq, 0) != 0)',
      'if (irq_unregister(PCM_IRQ, pcm_irq, 0) != 0 && 0)'),
@@ -21,8 +23,8 @@ MUTATIONS = [
     ('pcm_hw.c', 'attenuation(right)', 'attenuation(left) + 0 * right'),
     ('pcm_cs4231.c', '(u8)((s_hal_period - 1) >> 8)', '(u8)(s_hal_period >> 8)'),
     ('pcm_cs4231.c', 'if (!pcm_codec_ack()) return IRQ_NONE;', 'if (!pcm_codec_ack()) return IRQ_HANDLED;'),
-    ('pcm_cs4231.c', 'if (!s_claimed && !s_mce_busy) pcm_hal_advance();',
-     'if (!s_claimed && g_pcm.state == PCM_ST_OPEN) pcm_hal_advance();'),
+    ('pcm_cs4231.c', 'if (!s_claimed && !s_mce_busy) pcm_hal_advance(PCM_FROM_TICK);',
+     'if (!s_claimed && g_pcm.state == PCM_ST_OPEN) pcm_hal_advance(PCM_FROM_TICK);'),
     ('pcm_cs4231.c', 'if (!pcm_abort_proven()) {', 'if (pcm_abort_proven() && 0) {'),
     ('pcm_cs4231.c', '        s_claimed = 1;\n        return OS32_ERR_IO;',
      '        return OS32_ERR_IO;'),

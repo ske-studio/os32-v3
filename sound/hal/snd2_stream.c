@@ -1,3 +1,4 @@
+#include "snd2_refill_diag.h"
 #include "snd2.h"
 #include "io.h"
 #include "kernel/time/tick_clock.h"
@@ -110,6 +111,7 @@ int snd2_open_mode(const SND2_StreamDesc *desc, u32 *id, int v1)
     kmemset(s, 0, sizeof(*s));
     s->gen = gen;
     s->fmt = desc->fmt;
+    s->min_stg = ~0U;
     s->period = period;
     s->margin = period / 2 < 512 ? period / 2 : 512;
     s->nseg = d->caps.ring_frames / period;
@@ -226,6 +228,30 @@ int snd2_stream_start(u32 id)
         }
     }
     stream_unlock(flags);
+    return rc;
+}
+
+int snd2_refill_caps(Snd2Device *d, SND2_Caps *out)
+{
+    unsigned flags = irq_save();
+    Snd2Stream *s = &d->stream;
+    SND2_Caps snapshot = {0};
+    int rc = s->owner && s->owner == res_owner_get() && !s->closing
+           ? d->be->caps(d->ctx, &snapshot) : OS32_ERR_STALE;
+    if (!rc) {
+        snapshot.reserved[SND2_DIAG_MIN_STG] = s->min_stg;
+        snapshot.reserved[SND2_DIAG_FRAME] = s->underruns ? s->gap_frame : ~0U;
+        snapshot.reserved[SND2_DIAG_SEG_N] = s->underruns ? s->gap_n : ~0U;
+        snapshot.reserved[SND2_DIAG_NEXT_FIRST] = s->underruns ? s->gap_next : ~0U;
+        snapshot.reserved[SND2_DIAG_EVENT_STG] = s->gap_stg;
+        snapshot.reserved[SND2_DIAG_REFILL_TRIED] = s->gap_tried;
+        snapshot.reserved[SND2_DIAG_DMA_STEP] = s->max_dma_step;
+    }
+    irq_restore(flags);
+    if (!rc) {
+        *out = d->caps;
+        kmemcpy(out->reserved, snapshot.reserved, sizeof(out->reserved));
+    }
     return rc;
 }
 

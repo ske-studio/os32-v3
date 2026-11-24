@@ -89,9 +89,21 @@ static int empty_period_then_refill(void)
     for (u32 i = 0; i < 256; ++i)
         REQUIRE(!ring[1024 + i] && ring[1280 + i] == samples[1024 + i]);
     REQUIRE(snd2_seg_observe(s, 1, 1280, 30) == 0);
+    REQUIRE(s->gap_frame == 1024 && !s->gap_n && s->gap_next == 1024);
+    REQUIRE(s->max_dma_step == 1024 && !s->gap_stg && !s->gap_tried);
     REQUIRE(s->played == 1024 && s->underruns == 1 && !s->epoch);
     REQUIRE(snd2_seg_observe(s, 1, 1536, 35) == 0);
     REQUIRE(s->played == 1280 && s->underruns == 1);
+    /* Same waveform, but here advance kept running while the writer slept. */
+    setup(256, 3, 1024, 0);
+    write_frames(0, 1024);
+    snd2_seg_prime(s);
+    for (u32 hw = 128; hw <= 1024; hw += 128)
+        REQUIRE(!snd2_seg_observe(s, 1, hw, hw / 44));
+    write_frames(1024, 256);
+    REQUIRE(!snd2_seg_observe(s, 1, 1025, 24));
+    REQUIRE(!snd2_seg_observe(s, 1, 1280, 30));
+    REQUIRE(s->underruns == 1 && s->gap_tried && !s->gap_n && s->gap_next == 1024);
     return 0;
 }
 

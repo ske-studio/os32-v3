@@ -1,4 +1,5 @@
 #include "snd2.h"
+int snd2_refill_caps(Snd2Device *d, SND2_Caps *out) { (void)d; (void)out; return -1; }
 
 static int fail_stop, stops, owner = 7, caps_result, units;
 static u32 ring_frames = 4096, period_min = 257, second_rate = 48000;

@@ -11,12 +11,17 @@ static void clear_segment(Snd2Stream *s, u32 seg)
 {
     kmemset(segment(s, seg), 0, s->period * snd2_frame_bytes(s));
     s->seg_n[seg] = 0;
+    s->refill_tried &= ~(1U << seg);
 }
 
 static void append(Snd2Stream *s, u32 seg)
 {
     u32 used = s->seg_n[seg];
     u32 n = s->written - s->copied;
+    if (s->state == SND2_ST_RUN && used < s->period) {
+        s->refill_tried |= 1U << seg;
+        if (n < s->min_stg) s->min_stg = n;
+    }
     if (n > s->period - used) n = s->period - used;
     if (!n) return;
     if (!used) s->seg_first[seg] = s->copied;
@@ -95,14 +100,25 @@ int snd2_seg_observe(Snd2Stream *s, int have_pos, u32 hw, u32 now)
     }
     if (hw != s->last_hw) s->last_progress_ms = now;
     s->last_obs_ms = now;
+    u32 step = (hw + ring - s->last_hw) % ring;
+    if (step > s->max_dma_step) s->max_dma_step = step;
     s->last_hw = hw;
     for (; prev != p; prev = (prev + 1) % s->nseg) {
         u32 n = s->seg_n[prev];
         s->played += n;
         if (n) s->had_data = 1;
         if (s->state == SND2_ST_RUN && !s->paused && s->had_data &&
-            n < s->period)
+            n < s->period) {
+            if (!s->underruns) {
+                u32 next = (prev + 1) % s->nseg;
+                s->gap_tried = (s->refill_tried >> prev) & 1U;
+                s->gap_frame = s->played;
+                s->gap_n = n;
+                s->gap_next = s->seg_n[next] ? s->seg_first[next] : ~0U;
+                s->gap_stg = s->written - s->copied;
+            }
             ++s->underruns;
+        }
         clear_segment(s, prev);
     }
     if (!s->paused) {

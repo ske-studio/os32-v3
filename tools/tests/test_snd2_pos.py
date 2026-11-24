@@ -7,7 +7,7 @@ from host32 import run as host_run
 from kernel_includes import include_flags
 
 CHECK = dict(name='snd2-pos-host', tier=4, needs=[], budget=3,
-             covers=['sound/hal/snd2.h', 'sound/hal/snd2_stream.c', 'sound/hal/snd2_pos.c',
+             covers=['sound/hal/snd2_refill_diag.h', 'sound/hal/snd2.h', 'sound/hal/snd2_stream.c', 'sound/hal/snd2_pos.c',
                      'kernel/time/tick_clock.h', 'include/kernel_tick.h',
                      'include/io.h', 'sound/hal/snd2_seg.c', 'sound/hal/snd2_stg.c',
                      'sound/hal/snd2_int.h', 'sound/hal/snd2_ring_math.h',
