@@ -101,7 +101,7 @@ int snd2_seg_observe(Snd2Stream *s, int have_pos, u32 hw, u32 now)
         s->played += n;
         if (n) s->had_data = 1;
         if (s->state == SND2_ST_RUN && !s->paused && s->had_data &&
-            n < s->period && s->played == s->copied)
+            n < s->period)
             ++s->underruns;
         clear_segment(s, prev);
     }

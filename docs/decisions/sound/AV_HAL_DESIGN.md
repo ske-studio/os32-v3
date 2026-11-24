@@ -225,7 +225,7 @@ int snd2_dsp_process(u32 dev, u32 unit, const i32 *params, u32 n,
 ```
 - 書いてよい区間: 再生中の区間 `p = hw / period` は書かない。`p+1` は `hw % period < period − margin` の時だけ (margin = min(512, period/2)、今の REFILL_MARGIN と同じ考え)。`p+1 .. p+lead` の範囲。
 - 写す規則: 実データは区間の順に詰める。「最初の満ちていない区間」にだけ追補し (末尾の 0 を上書き)、満ちたら次へ。1 回の advance で写すのは最大 `lead × period` frame (CS4231 の低遅延で 768 frame = 3KB、v1 で 2048 frame = 8KB、今の半面の写しと同じ上限)。ステージングの折り返しは `pcm_split` で 2 回に分ける。
-- 区間が過ぎた時 (advance が p の変化を見た時、過ぎた区間ごとに): `played += seg_n[s]`、RUN かつ未 pause かつ `seg_n[s] < period` かつ後ろにまだ実データが無かった → `underruns++`。その区間を 0 埋めして `seg_n=0`。
+- 区間が過ぎた時 (advance が p の変化を見た時、過ぎた区間ごとに): `played += seg_n[s]`、RUN かつ未 pause かつ `seg_n[s] < period` かつ実データを一度でも再生した (この区間を含む) → `underruns++`。その区間を 0 埋めして `seg_n=0`。
 - 途中の位置: `played_now = played + min(hw % period, seg_n[p])` (pos の問い合わせだけ。無音は数えない → **played ≤ written を常に保つ**)。
 - 連続性を失った時 (今の `pcm_cont` の偽・watchdog・観測の間隔がリング 1 周を超えた、R3-P1-1): 今の RS_STOP → RS_RESTART の 2 段のまま、順を次に固定する。(1) **止める**: `hw_stop` (IF=0、上限つき)。(2) **止まった証拠**が無ければリングにもカーソルにも触らず `snd2_teardown` (DMA の隔離・FAULTED)。(3) 証拠があれば: `epoch++`、リング全体を 0 埋め・全区間 `seg_n=0`、**`copied = played`** に巻き戻し (ステージングは played まで捨てないので失わない)。(4) **元の状態を保って**再始動 (R4-P1-1): RUN・DRAIN は §3-4-1 と同じ充填で `hw_start`。PAUSE はリングを無音のまま (実データを写さず `copied = played`) `hw_start` し、状態は PAUSE のまま。実データは明示の start (再開) の後の advance から写す。IDLE では DMA が止まっているので起きない。played は失った区間の分を数えない (鳴ったか分からない物は「鳴っていない」)。DMA が走っている間にリングを書かない。
 - 補充の担い手: PI (区間ごと) と論理 tick の両方から `snd2_advance(dev)`。段 B の後は物理 1kHz からも。**段 B の前は period ≥ 1024 だけを開く** (S4 の前提、§12)。

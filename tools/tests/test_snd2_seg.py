@@ -22,6 +22,7 @@ MUTATIONS = [
     ('seg', 'last_progress_ms >= revolution_ms', 'last_progress_ms > revolution_ms'),
     ('seg', 'if (!n) return;', 'if (!n || used) return;'),
     ('seg', 's->played += n;', 's->played += s->period;'),
+    ('seg', 'n < s->period)', 'n < s->period && s->played == s->copied)'),
     ('seg', 's->copied = s->played;\n    s->last_hw', 's->last_hw'),
     ('seg', 's->period - s->margin', 's->period'),
     ('seg', 'i <= s->lead; ++i)\n', 'i < s->lead; ++i)\n'),
