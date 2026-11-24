@@ -71,3 +71,18 @@ OPNA::LoadRhythmSample の FileIO とメモリ確保は移植対象外。C 側�
 | fmgen_opna.cpp:1846,2105 | OPNB専用で製品から除外。oracleに含む場合はホストのみ |
 
 pは0/1/2、レジスタ2Dh/2Eh/2Fhによる選択。すべての表にキー・長さ・hash・元式の丸めを保存し、ゲストでの再計算を不要にする。clippyに加えfloat型/定数と最終命令の検査も行う。
+
+## 段 B の整数表と状態
+
+元 C++ をホストで実行する方式を採用した。元の libm 呼出しと整数変換の順序を
+保持し、独立した近似式の丸め差を避ける。生成は
+`python3 tools/gen_opna_tables.py`。独立した NP21/W の sound/fmgen ディレクトリを
+`--source` に渡せる。`--check --mutate` は Rust 配列を実行時に列挙して
+元の C++ の値と全バイト比較し、SINE の先頭値の 1 bit 反転も検出する。
+tables.manifest に整数幅、要素数、little-endian の SHA-256 を記す。
+配列順は元の C++ の行優先順。P0/P1/P2 は 7987200 Hz・44100 Hz の分周設定。
+生成器・C++・libm は Cargo の入力に含まれず、Rust 側には整数だけを格納する。
+
+state.rs の Adpcm は NP21/W の CPU ストリームに必要な 65536 byte FIFO を持つ。
+これは 256 KiB の借用 RAM と独立しており、固定状態だけで設計の概算 16–32 KiB
+を超える。FIFO の境界と BRDY の挙動を維持するため元の容量を採用した。

@@ -39,3 +39,7 @@ OS32 での適用
 条件 4: 同じディレクトリに fmgen_readme.txt と kai・np2・np21w の
 各 readme を原文のまま添付した。配布像に組み込む段では 4 原文と
 本文を /sys/licenses/fmgen/ に同梱する。
+
+段 B はホストで元の初期化を実行し整数配列に変換した。固定状態を Rust で
+定義し、元の RAM と波形の所有ポインタを C からの借用に変更した。比較用に
+fmgen_types.h、fmgen_headers.h、fmgen_misc.h、fmgen_file.h も無改変で添付した。
