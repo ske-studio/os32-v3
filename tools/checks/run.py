@@ -81,6 +81,7 @@ NOTEST = (
     ('sample/runner.vbz', ()),
     ('sample/runner8.vbz', ()),
     ('sample/runner_hb.vbz', ()),
+    ('tools/accept/np21w_key_edge.patch', ()),  # Applied to the external NP21/W acceptance machine.
     ('tools/audit_cast_align.sh', ()),
     ('tools/create_fat12_d88.sh', ()),
     ('tools/emu_agent/mcp_server.py', ()),
