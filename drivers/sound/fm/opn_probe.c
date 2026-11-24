@@ -19,20 +19,24 @@ static int ready_status(void)
     return -1;
 }
 
-static int write_reg(uchar reg, uchar value)
+static int write_reg(uchar reg, uchar value, int cleanup)
 {
-    if (ready_status() < 0)
+    int before = ready_status();
+    if (before < 0 && !cleanup)
         return 0;
     outp(OPN_ADDR, reg);
-    io_wait_n(6);
+    int after = ready_status();
+    if (after < 0 && !cleanup)
+        return 0;
+    io_wait_n(20);
     outp(OPN_DATA, value);
     io_wait_n(20);
-    return 1;
+    return before >= 0 && after >= 0;
 }
 
 static int stop_and_clear(void)
 {
-    return write_reg(OPN_REG_TIMER_CTRL, OPN_TIMER_STOP) && ready_status() == 0;
+    return write_reg(OPN_REG_TIMER_CTRL, OPN_TIMER_STOP, 0) && ready_status() == 0;
 }
 
 static int timer_b_rose(void)
@@ -49,7 +53,7 @@ static int timer_b_rose(void)
     return 0;
 }
 
-enum opn_probe_result opn_probe(void)
+enum opn_probe_result opn_probe(unsigned char irq_shadow)
 {
     /* An open bus also has BUSY set. Distinguish repeated FF before polling. */
     unsigned first = inp(OPN_STATUS);
@@ -63,6 +67,8 @@ enum opn_probe_result opn_probe(void)
 
     outp(OPN_ADDR, 0xff);
     io_wait_n(6);
+    if (ready_status() < 0)
+        return OPN_PROBE_UNKNOWN;
     unsigned id = inp(OPN_DATA);
     if (inp(OPN_DATA) != id || !stop_and_clear())
         return OPN_PROBE_UNKNOWN;
@@ -70,10 +76,16 @@ enum opn_probe_result opn_probe(void)
         return OPN_PROBE_OPNA;
 
     /* Shortest period. Verify a fresh transition, then stop even on timeout. */
-    int rose = write_reg(OPN_REG_TIMER_B, 0xff) &&
-               write_reg(OPN_REG_TIMER_CTRL, TIMER_B_START_ENABLE) &&
+    if (!write_reg(OPN_REG_TIMER_B, 0xff, 0) ||
+        !write_reg(0x29, irq_shadow & ~0x03, 0))
+        return OPN_PROBE_UNKNOWN;
+
+    int rose = write_reg(OPN_REG_TIMER_CTRL, TIMER_B_START_ENABLE, 0) &&
                timer_b_rose();
-    if (!stop_and_clear() || !rose)
+    int stopped = write_reg(OPN_REG_TIMER_CTRL, OPN_TIMER_STOP, 1);
+    int cleared = ready_status() == 0;
+    int restored = write_reg(0x29, irq_shadow, 1);
+    if (!stopped || !cleared || !restored || !rose)
         return OPN_PROBE_UNKNOWN;
     return OPN_PROBE_OPN;
 }

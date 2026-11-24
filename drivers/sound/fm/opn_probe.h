@@ -11,7 +11,12 @@ enum opn_probe_result {
     OPN_PROBE_ABSENT, OPN_PROBE_UNKNOWN, OPN_PROBE_OPN, OPN_PROBE_OPNA
 };
 
-/* Quiet initialization only. Caller owns the ports and timer state. */
-enum opn_probe_result opn_probe(void);
+/* Quiet initialization destroys prior timer state. Caller owns the ports,
+ * masks the FM IRQ at the interrupt controller before entry, and supplies
+ * the current OPNA 29h write shadow (ignored by a YM2203). After starting B
+ * we attempt stop/reset and shadow restoration even on bus failure. UNKNOWN
+ * cannot confirm containment: keep the IRQ masked until hardware recovery.
+ * On success, clear any pending IRQ before restoring the caller's IRQ mask. */
+enum opn_probe_result opn_probe(unsigned char irq_shadow);
 
 #endif
