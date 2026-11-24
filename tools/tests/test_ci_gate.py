@@ -10,6 +10,7 @@ from unittest.mock import patch
 import argparse
 import importlib.util
 import io
+import os
 from pathlib import Path
 import sys
 import tempfile
@@ -150,6 +151,20 @@ def suite(tool):
                 log.write_text('RuntimeError: guest stopped or timed out: %s evidence=%s\n' % (ata / 'serial.log', ata))
                 self.assertEqual(tool.keep_evidence(out / 'kept5', log), 4)
                 self.assertEqual((out / 'kept5/check-ppc-usb/serial.log').read_text(), 'ATA')
+                scratch = out / 'scratch'
+                done = scratch / 'tool-a/case-1'
+                hung = scratch / 'tool-a/case-2'
+                done.mkdir(parents=True)
+                hung.mkdir(parents=True)
+                (done / 'serial.log').write_text('early')
+                os.utime(done / 'serial.log', ns=(1, 1))
+                (hung / 'serial.log').write_text('late!')
+                log.write_text('RuntimeError: deadline queued ordinary input\n')
+                self.assertEqual(tool.keep_evidence(out / 'kept6', log, limit=5, scratch=scratch), 5)
+                self.assertTrue((out / 'kept6/check-ppc-usb/tool-a/case-2/serial.log').is_file())
+                self.assertEqual((out / 'kept6/check-ppc-usb/tool-a/case-2/serial.log').read_text(), 'late!')
+                self.assertFalse((out / 'kept6/check-ppc-usb/tool-a/case-1/serial.log').exists())
+                self.assertEqual(tool.keep_evidence(out / 'kept7', log), 0)
 
         def test_render_verdict(self):
             def verdict(checks):
@@ -189,6 +204,8 @@ MUTANTS = [
     ("take = min(size, per_file, limit - total)", "take = min(size, per_file)"),
     ("if not source.is_file() or not EVIDENCE_NAMES.search(source.name):", "if not source.is_file():"),
     ("handle.seek(size - take)", "handle.seek(0)"),
+    ("    if base is None or not base.is_dir():\n        base = scratch\n", ""),
+    ("sorted(base.rglob('*'), key=lambda path: (-path.stat().st_mtime_ns, str(path)))", "sorted(base.rglob('*'))"),
 ]
 
 

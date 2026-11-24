@@ -51,7 +51,7 @@ gh run view <run> --json jobs -q '.jobs[] | "\(.name) \(.conclusion) \(.startedA
 |---|---|
 | build の `checks (i)` | `jid=$(gh run view <run> --json jobs -q '.jobs[] \| select(.name=="checks (i)") \| .databaseId')`、`gh api repos/<owner>/<repo>/actions/jobs/$jid/logs > log`、`grep -n '\*\*\* \[.*check-' log` (検査の名前)、その行の 30 行前までが失敗の本文 |
 | check の `static-check`・`ppc-compile` | 同じくジョブ単位でログを取り、`grep -n 'Traceback\|##\[error\]' log`。最初の失敗で止まるので、後ろの検査は回っていない |
-| check の `ppc-qemu (i)` | ジョブの要約の表 (失敗・回っていない・遅い検査)。ログは `gh run download <run> -n ppc-qemu-failed-<i> -D <置き場>` → `results.json` と `failed-logs/<検査>.log` |
+| check の `ppc-qemu (i)` | ジョブの要約の表 (失敗・回っていない・遅い検査)。ログは `gh run download <run> -n ppc-qemu-failed-<i> -D <置き場>` → `results.json` と `failed-logs/<検査>.log`、ゲストの証拠は `failed-logs/evidence/<検査>/` |
 | sep の `checks` (手動) | `gh run download <run> -n sep-checks-<i> -D <置き場>` → `results.json` の `status: fail` の行と `failed-logs/<検査>.log` |
 
 - `gh run view --log-failed` が空を返す事がある。ジョブ単位の API (`actions/jobs/<id>/logs`) で取る。

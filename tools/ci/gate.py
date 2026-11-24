@@ -179,15 +179,20 @@ def keep_failed_log(kept, source, rc, limit=FAILED_LOG_BYTES):
             (kept / source.name).write_bytes(handle.read())
 
 
-def keep_evidence(kept, log, limit=EVIDENCE_CHECK_BYTES, per_file=EVIDENCE_FILE_BYTES):
-    """落ちた検査のログの最後の evidence=<dir> から、小さな証拠を kept/<検査>/ に写す。写した合計のバイト数を返す。"""
+def keep_evidence(kept, log, limit=EVIDENCE_CHECK_BYTES, per_file=EVIDENCE_FILE_BYTES, scratch=None):
+    """落ちた検査のログの最後の evidence=<dir> から、小さな証拠を kept/<検査>/ に写す。写した合計のバイト数を返す。
+
+    evidence= を出さない道具は、検査ごとの一時の置き場 scratch (TMPDIR) から拾う。新しい物から写す
+    (落ちたゲストは最後に動いた物なので、先に済んだ場合の記録で上限を使い切らない)。"""
     paths = re.findall(r'evidence=(\S+)', log.read_text(errors='replace')) if log.is_file() else []
     base = Path(paths[-1]) if paths else None
+    if base is None or not base.is_dir():
+        base = scratch
     if base is None or not base.is_dir():
         return 0
     target = kept / log.stem
     total = 0
-    for source in sorted(base.rglob('*')):
+    for source in sorted(base.rglob('*'), key=lambda path: (-path.stat().st_mtime_ns, str(path))):
         if total >= limit:
             break
         if not source.is_file() or not EVIDENCE_NAMES.search(source.name):
@@ -251,11 +256,23 @@ def run(args):
         os.environ.update(env, MUTATE=mutate)
 
         def timed(name):
-            rc = check_time.run(times, name, [sys.executable, '-B', 'tools/checks/run.py',
-                                              '--run', name] + selection)
+            # 検査ごとに一時の置き場を分け、evidence= を出さない道具の証拠も落ちた時に拾えるようにする。
+            scratch = Path(os.environ.get('RUNNER_TEMP') or '/tmp') / 'os32-ck' / name
+            shutil.rmtree(scratch, ignore_errors=True)
+            scratch.mkdir(parents=True)
+            saved = os.environ.get('TMPDIR')
+            os.environ['TMPDIR'] = str(scratch)
+            try:
+                rc = check_time.run(times, name, [sys.executable, '-B', 'tools/checks/run.py',
+                                                  '--run', name] + selection)
+            finally:
+                if saved is None:
+                    del os.environ['TMPDIR']
+                else:
+                    os.environ['TMPDIR'] = saved
             keep_failed_log(kept, logs_dir / (name + '.log'), rc)
             if rc:
-                keep_evidence(kept / 'evidence', logs_dir / (name + '.log'))
+                keep_evidence(kept / 'evidence', logs_dir / (name + '.log'), scratch=scratch)
             return rc
         previous = os.getcwd()
         os.chdir(ROOT)
