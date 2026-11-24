@@ -268,13 +268,14 @@ typedef struct Snd2Stream {          /* sound/hal/snd2_int.h。書くのは soun
     u32 gen; u8 state, paused, v1, closing; int owner;   /* 前景の文脈が書く */
     SND2_Fmt fmt; u32 period, nseg, lead, cap, margin;   /* open で決め、閉じるまで不変 */
     u32 written;                     /* 前景が IF=0 の短い区間で publish */
-    u32 played, copied, epoch, underruns;                /* advance (IF=0) だけが書く */
-    u32 seg_first[16]; u16 seg_n[16];                    /* advance だけ */
+    u32 played, epoch, underruns;    /* advance (IF=0) だけが書く */
+    u32 copied;                      /* advance と publish の直後の補充 (どちらも IF=0) が書く — §3-4 */
+    u32 seg_first[16]; u16 seg_n[16];                    /* advance と publish の直後の補充 (IF=0) */
     u8 *stg; u32 stg_frames;         /* ステージング 8192 frame = 32KB (kmalloc、DMA しない) */
     u8 *ring; u32 last_hw, last_obs_ms;                  /* ring は backend が渡す DMA の面 */
 } Snd2Stream;
 ```
-- write の検査の順: 番号 (STALE) → 持ち主 (INVAL) → 状態 (§3-3) → buf の NULL (INVAL) → `bytes / frame_bytes` (0 なら 0)。受ける量 = `min(frames, cap − (written − played), stg の空き)`。ステージングへの写しは IF=1、`written += n` だけ IF=0。部分受理は正の byte 数、満杯は 0。
+- write の検査の順: 番号 (STALE) → 持ち主 (INVAL) → 状態 (§3-3) → buf の NULL (INVAL) → `bytes / frame_bytes` (0 なら 0)。受ける量 = `min(frames, cap − (written − played), stg の空き)`。ステージングへの写しは IF=1、`written += n` と §3-4 の publish の直後の補充 (DMA の位置の読み 1 回と最大 1 区間の ring への写し) が IF=0。部分受理は正の byte 数、満杯は 0。
 - open の検査の順 (R2-P2-2): desc の size → dev (範囲・PRESENT・FAULTED なら IO) → fmt が caps の表にある → period (0 は既定、2 の冪で `period_min ≤ period ≤ period_max`、段 B の前は ≥ 1024) → lead (0 は 1、`1 ≤ lead ≤ ring_frames/period − 1`) → `cap = (lead+1) × period` (≤ ring_frames ≤ 4096 なので溢れない) → 持ち主 (BUSY)。v1 だけは cap = 8192 (ステージングの大きさ) の例外。
 - **公開の位置は 1 つ** (R2-P2-1): IF=0 で `played_now = played + min(hw % period, seg_n[p])` と `epoch` を組で写し取る (snapshot)。pos はこの played_now を `played` として返し、wait も同じ関数で比べる (pos で届いた frame の wait が TIMEOUT にならない)。`done(f) = (i32)(played_now − f) >= 0`。距離: `written − played ≤ cap ≤ 8192` なので比べは常に < 2^31。
 - wait (同じ snapshot で比べる): `(i32)(frame − written) > 0` は INVAL (まだ書いていない frame を待つとシングルタスクでは終わらない)。結果: 0 = 届いた / TIMEOUT / STALE (待ちの間に閉じた・回収) / IO (FAULTED)。未到達で PAUSE または中断要求 (abort・GUI STOP) があれば直ちに TIMEOUT で syscall の出口へ戻る。GUI のアプリは WAIT_POLL へ park し、WM が resume したら元の開始時刻で同じ wait を再実行する。CUI の wait は割り込み禁止で snapshot を確認し、未到達ならそのまま不可分の割り込み許可・休止に入る。PI または物理 tick の退役はその IRQ から戻った直後に再確認する。他の IRQ でも条件と期限を再確認する。
