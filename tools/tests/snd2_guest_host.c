@@ -1,18 +1,31 @@
 /* Execute the guest's acceptance verdict against controlled PCM observations. */
 #include "os32api.h"
 #include <string.h>
+#include <stdarg.h>
 #define main snd2_guest_main
 #include "guest.inc"
 #undef main
 
 enum scenario { NORMAL, NO_CHANGE, DOUBLE_CHANGE, NO_CONTINUATION, NO_AFTER, NO_KEY };
 static enum scenario scene;
-static int latency_run;
+static int latency_run, wave_run, diagnostic, inject_delay;
+static u32 retired, elapsed_us, reported_us, gaps, waits, time_reads;
+
 static u32 cursor, tick, marker, requests;
+
+/* One simulated interrupt per period while the foreground writer sleeps. */
+static void consume_period(void)
+{
+    elapsed_us += 5805;
+    if (cursor - retired >= PERIOD) retired += PERIOD;
+    else ++gaps;
+}
+
 
 static int caps(u32 dev, SND2_Caps *out, u32 size)
 {
     (void)size;
+    if ((dev & SND2_CAPS_REFILL) && !diagnostic) return -1;
     *out = (SND2_Caps){.dev = dev, .fmt_count = 1};
     out->fmt[0].rate = 44100;
     out->fmt[0].enc = SND2_ENC_S16LE;
@@ -28,6 +41,20 @@ static int open_stream(const SND2_StreamDesc *desc, u32 *h)
 static int write_stream(u32 h, const void *buf, u32 bytes)
 {
     (void)h;
+    if (wave_run) {
+        u32 free = FRAMES - (cursor - retired);
+        if (bytes > free * 4) bytes = free * 4;
+        if (bytes > 128 * 4) bytes = 128 * 4; /* Exercise scratch suffixes. */
+        const short *pcm = buf;
+        for (u32 i = 0; i < bytes / 4; ++i) {
+            u32 frame = cursor + i;
+            int mark = frame % PERIOD ? 0 : 10000 + frame / PERIOD % 16000;
+            if (pcm[2*i+1] != mark) return -1;
+            /* First table entry of each half-cycle is zero. */
+            u32 phase = (frame % 441 * 1000) % 44100;
+            if ((pcm[2*i] == 0) != ((phase * 32 / 44100) % 16 == 0)) return -1;
+        }
+    }
     if (((const short *)buf)[1] == -23456) {
         /* The tagged sample must survive a full queue and a partial write. */
         if (++requests == 1) return 0;
@@ -49,12 +76,19 @@ static int position(u32 h, SND2_Pos *p)
         if (scene == NO_CONTINUATION && cursor < 44100 * 30) p->epoch = 7;
     }
     p->time_ms = tick;
-    p->underruns = 0;
+    p->underruns = gaps;
     return 0;
 }
 static int wait_stream(u32 h, u32 f, u32 ms)
 {
-    (void)h; (void)f; (void)ms;
+    (void)h; (void)ms;
+    if (wave_run && f != 44100 * 30 - PERIOD) {
+        if (f != retired + PERIOD) return -1;
+        ++waits;
+        do { consume_period(); } while (retired < f);
+        if (inject_delay && waits == 1)
+            for (int i = 0; i < 4; ++i) consume_period();
+    }
     return 0;
 }
 static int start_stream(u32 h) { (void)h; return 0; }
@@ -67,9 +101,17 @@ static int key(void)
     if (scene == NO_CONTINUATION && cursor < 44100 * 30) return -1;
     return 'a';
 }
-static int clock_us(u32 *lo, u32 *hi) { *lo = tick; *hi = 0; return 0; }
-static i32 yield_cpu(void) { return 0; }
-static void report(u8 color, const char *fmt, ...) { (void)color; (void)fmt; }
+static int clock_us(u32 *lo, u32 *hi) { ++time_reads; *lo = wave_run ? elapsed_us : tick; *hi = 0; return 0; }
+static i32 yield_cpu(void) { if (wave_run) consume_period(); return 0; }
+static void report(u8 color, const char *fmt, ...) {
+    (void)color;
+    if (!strcmp(fmt, "max_writer_us=%u\n")) {
+        va_list args;
+        va_start(args, fmt);
+        reported_us = va_arg(args, u32);
+        va_end(args);
+    }
+}
 
 int main(void)
 {
@@ -89,7 +131,20 @@ int main(void)
     if (playback(&api, 0, "latency") || marker != 1 || requests != 2) return 1;
     scene = NO_KEY;
     cursor = 0;
-    return playback(&api, 0, "latency") == 0;
+    if (!playback(&api, 0, "latency")) return 1;
+    wave_run = 1;
+    for (int run = 0; run < 3; ++run) {
+        diagnostic = run > 0;
+        inject_delay = run == 2;
+        elapsed_us = 0xfffff000U;
+        cursor = retired = gaps = waits = reported_us = time_reads = 0;
+        int rc = playback(&api, 0, "wave");
+        if (rc != (inject_delay ? 6 : 0) || gaps != (u32)inject_delay || !waits)
+            return 1;
+        if (reported_us != (diagnostic ? (inject_delay ? 5 : 1) * 5805U : 0) ||
+            (!diagnostic && time_reads)) return 1;
+    }
+    return 0;
 }
 
 int strcmp(const char *a, const char *b)
