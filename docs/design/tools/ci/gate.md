@@ -83,7 +83,7 @@ SKIP の行は挙げるだけで落とさない: 試験が自分の出力とし�
 |---|---|---|
 | check.yml `static-check` | `make check-<名>` を手で並べる | クロスコンパイラ無しで回る検査に CHECK の `env` で印を付け、`gate.py run` に環境の絞り込みを足して一覧を登録から取る (G4)。static の事前確認は §3-1 |
 | check.yml `ppc-compile` | `run.py --run all`、`ppc_scope.py` のパスの一覧 | `gate.py run --env ppc-cross` に替える (G2・G3)。PowerPC を回すかどうかの判定は、パスの一覧ではなく所有者集合 (`build/select.mk`) から引く |
-| check.yml `ppc-qemu` | 2026-11-18 に `gate.py run --env qemu-ppc --shard i/4` の 4 分割にし、`needs` の鎖を外した (G2・G3・G10)。2026-11-21 のユーザー決定で 5 分割から i/6 の 6 分割に変更 (各段 20〜27 分、30 分での時間切れが 3 回)。2026-11-22 に 8 分割を経て 10 分割 (i/10) に変更。検査ごとの所要を成果物 `check-times-<SHA>-ppc-qemu-<i>` に出す | 残りは `ppc_scope.py` のパスの一覧と、用意の行の重複 |
+| check.yml `ppc-qemu` | 2026-11-18 に `gate.py run --env qemu-ppc --shard i/4` の 4 分割にし、`needs` の鎖を外した (G2・G3・G10)。2026-11-21 のユーザー決定で 5 分割から i/6 の 6 分割に変更 (各段 20〜27 分、30 分での時間切れが 3 回)。2026-11-22 に 8 分割を経て 10 分割 (i/10) に変更。2026-11-24 のユーザー決定「20組に」で 20 分割 (i/20)、上限は 30 分のまま (§5-10)。検査ごとの所要を成果物 `check-times-<SHA>-ppc-qemu-<i>` に出す | 残りは `ppc_scope.py` のパスの一覧と、用意の行の重複 |
 | build.yml `checks` (6 シャード) | `make -k check CHECK_SHARD=…` (全部の検査を変異込み、2026-11-18 から) | `gate.py run --shard …` に替えると、表・検査ごとのログ・回っていない検査の検出が付く (G2・G3)。`gate-setup` にすると PowerPC の検査が SKIP にならない (G5・G6) |
 | 用意 | apt の行が 4 か所 | `gate-setup` に寄せる (G5) |
 

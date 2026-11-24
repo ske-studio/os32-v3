@@ -91,13 +91,13 @@ def wiring():
         # 変異の試験が QEMU を起動するので、ppc-qemu と同じ gate-setup の 1 行だけ (apt の行をジョブに書かない)。
         assert [s.get('uses') for s in job_steps if s.get('uses', '').startswith('./.github/actions/')] == ['./.github/actions/gate-setup']
         assert 'apt-get' not in runs
-    # QEMU の検査は 10 本に割って並べ、手本の道具 (tools/ci/gate.py) の 1 行で回す (変異込みが既定)。
-    command = 'python3 -B tools/ci/gate.py run --env qemu-ppc --shard ${{ matrix.shard }}/10 --out "$RUNNER_TEMP/gate"'
+    # QEMU の検査は 20 本に割って並べ、手本の道具 (tools/ci/gate.py) の 1 行で回す (変異込みが既定)。
+    command = 'python3 -B tools/ci/gate.py run --env qemu-ppc --shard ${{ matrix.shard }}/20 --out "$RUNNER_TEMP/gate"'
     for flow, routine, mutate in ((workflow, False, 1),):
         job = flow['jobs']['ppc-qemu']
         # ppc-compile の成果物は読まないので鎖にしない (docs/POLICY_CI.md G2)。
         assert 'needs' not in job
-        assert job['strategy'] == {'fail-fast': False, 'matrix': {'shard': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]}}
+        assert job['strategy'] == {'fail-fast': False, 'matrix': {'shard': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]}}
         assert job['timeout-minutes'] >= 60
         # The failure-only diagnostics step prints qemu.stderr; it is not part of the run.
         guest = [s for s in job['steps'] if s.get('name') != 'PPC QEMU diagnostics']
