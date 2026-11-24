@@ -4,11 +4,13 @@
 
 int snd2_caps(u32 dev, SND2_Caps *out, u32 size)
 {
+#ifdef SND2_REFILL_DIAG
     if (dev & SND2_CAPS_REFILL) {
         Snd2Device *active = snd2_device(dev & ~SND2_CAPS_REFILL);
         if (!active || !out || size != sizeof(*out)) return OS32_ERR_INVAL;
         return snd2_refill_caps(active, out);
     }
+#endif
     Snd2Device *d = snd2_device(dev);
     if (!d || !out || !size || (size & 3) || size > sizeof(*out))
         return OS32_ERR_INVAL;

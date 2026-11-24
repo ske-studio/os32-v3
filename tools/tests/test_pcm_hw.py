@@ -51,7 +51,7 @@ def run(ctx):
             (work / 'test.c').write_text((ROOT / 'tools/tests/pcm_hw_host.c').read_text())
             exe = work / 'test'
             core = [ROOT / f'sound/hal/snd2_{unit}.c' for unit in ('reg', 'caps', 'stream', 'stg', 'seg')]
-            subprocess.run(['gcc', *FLAGS, *INCLUDES, '-I' + str(ROOT), str(work / 'test.c'),
+            subprocess.run(['gcc', '-DSND2_REFILL_DIAG', *FLAGS, *INCLUDES, '-I' + str(ROOT), str(work / 'test.c'),
                             str(work / 'pcm_hw.c'), driver / 'pcm_body.c', *core, '-o', exe], check=True)
             if not mutation:
                 subprocess.run(['qemu-x86_64', exe, 'resync-fault'], check=True, timeout=10)

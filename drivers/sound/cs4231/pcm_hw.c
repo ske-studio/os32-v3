@@ -21,11 +21,13 @@ static int caps(void *ctx, SND2_Caps *out)
         .period_min = 256, .period_max = PCM_HALF_FRAMES,
         .ring_frames = PCM_RING_FRAMES, .volume_steps = PCM_DA_ATT_MAX + 1
     };
+#ifdef SND2_REFILL_DIAG
     u32 pi, ticks, max_us;
     pcm_codec_counters(&pi, &ticks, &max_us);
     out->reserved[SND2_DIAG_PI] = pi;
     out->reserved[SND2_DIAG_TICK] = ticks;
     out->reserved[SND2_DIAG_MAX_US] = max_us;
+#endif
     return 0;
 }
 

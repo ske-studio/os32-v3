@@ -18,6 +18,7 @@ CHECK = dict(name='snd2-seg-host', tier=4, needs=[], budget=3,
 ROOT = Path(__file__).resolve().parents[2]
 HAL = ROOT / 'sound/hal'
 MUTATIONS = [
+    ('seg', '!(s->resume_silence & (1U << prev)) && ', ''),
     ('seg', 's->gap_next = s->seg_n[next] ? s->seg_first[next] : ~0U;',
      's->gap_next = next;'),
     ('seg', 'last_obs_ms >= revolution_ms', 'last_obs_ms > revolution_ms'),
@@ -48,7 +49,7 @@ def verify(work, mutation=None):
         path.write_text(source)
         sources.append(path)
     exe = work / 'test'
-    subprocess.run(['gcc', '-m32', '-march=i386', '-std=gnu11', '-Wall', '-Wextra',
+    subprocess.run(['gcc', '-DSND2_REFILL_DIAG', '-m32', '-march=i386', '-std=gnu11', '-Wall', '-Wextra',
                     '-Werror', '-O2', '-ffreestanding', '-fno-pie', '-fno-stack-protector',
                     '-nostdlib', '-static', '-no-pie', '-D__cdecl=', '-I' + str(HAL),
                     *include_flags(ROOT), *sources, ROOT / 'tools/tests/snd2_seg_host.c',

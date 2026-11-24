@@ -71,8 +71,9 @@ static int append_and_pause(void)
     REQUIRE(!ring[768] && ring[767] == 256 && s->copied == 256);
     REQUIRE(snd2_seg_observe(s, 1, 600, 14) == 0 && snd2_seg_played_now(s) == 88);
     REQUIRE(snd2_seg_observe(s, 1, 768, 18) == 0 && s->played == 256 && !s->underruns);
-    s->paused = 0;
+    snd2_seg_resume(s);
     REQUIRE(snd2_seg_observe(s, 1, 769, 18) == 0 && ring[1024] == 257);
+    REQUIRE(!snd2_seg_observe(s, 1, 1024, 24) && !s->underruns);
     return 0;
 }
 
@@ -117,7 +118,7 @@ static int margins_and_loss(void)
     REQUIRE(snd2_seg_observe(s, 1, 128, 3) == 0 && s->copied == 100 && !ring[256]);
     snd2_seg_pause(s);
     REQUIRE(s->copied == 100 && snd2_seg_played_now(s) == 100);
-    s->paused = 0;
+    snd2_seg_resume(s);
     REQUIRE(snd2_seg_observe(s, 1, 256, 6) == 0 && s->played == 100);
     REQUIRE(s->underruns == 1 && s->copied == 600);
     REQUIRE(snd2_seg_observe(s, 1, 300, 7) == 0);

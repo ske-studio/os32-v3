@@ -111,7 +111,9 @@ int snd2_open_mode(const SND2_StreamDesc *desc, u32 *id, int v1)
     kmemset(s, 0, sizeof(*s));
     s->gen = gen;
     s->fmt = desc->fmt;
+#ifdef SND2_REFILL_DIAG
     s->min_stg = ~0U;
+#endif
     s->period = period;
     s->margin = period / 2 < 512 ? period / 2 : 512;
     s->nseg = d->caps.ring_frames / period;
@@ -223,7 +225,7 @@ int snd2_stream_start(u32 id)
         }
         if (s->state == SND2_ST_DRAIN) rc = OS32_ERR_INVAL;
         else {
-            s->paused = 0;
+            snd2_seg_resume(s);
             s->state = SND2_ST_RUN;
         }
     }
@@ -231,6 +233,7 @@ int snd2_stream_start(u32 id)
     return rc;
 }
 
+#ifdef SND2_REFILL_DIAG
 int snd2_refill_caps(Snd2Device *d, SND2_Caps *out)
 {
     unsigned flags = irq_save();
@@ -254,6 +257,7 @@ int snd2_refill_caps(Snd2Device *d, SND2_Caps *out)
     }
     return rc;
 }
+#endif
 
 void snd2_advance(u32 dev)
 {
