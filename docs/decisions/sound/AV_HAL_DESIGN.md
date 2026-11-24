@@ -981,7 +981,7 @@ int snd2_chip_register(const SndChipBackend *be, void *c, const SND2_DevInfo *i)
 ### 7. 段・試験・変異
 | 段 | ファイル | 呼ぶ | 書く共有の状態 | 行 | I | 前提 |
 |---|---|---|---|---|---|---|
-| C0 | drivers/sound/fm/opn_probe.c (SYNTH §6 の probe、0188h だけ。fm.h に bank1・A460h・クロック。29h・分周は資料で確かめ本書に追記) | inp/outp | 検出の結果 | 180 | IS | R0b |
+| C0 | drivers/sound/fm/opn_probe.c・opn_probe.h (SYNTH §6 の probe、0188h だけ。fm.h に bank1・A460h・クロック。29h・分周は資料で確かめ本書に追記) | inp/outp | 検出の結果 | 180 | IS | R0b |
 | C1 | drivers/sound/fm/opn_chip.c (SndChipBackend: 扱いの表・bank1・read・open/close・静止の列。opn_write_checked を bank つきに) | C0 | 装置の内部 | 240 | IS | C0 |
 | C2 | sound/hal/snd2_chip.c (登録・owner・gen・implicit・FAULTED・reclaim の FM の行、CPU 非依存) | be->* | `snd2_chips[]` | 170 | IS | S1 |
 | C3 | kapi/kapi_snd2_chip.c | C2 | — | 120 | IS | C2・AV0 |
@@ -1013,6 +1013,7 @@ int snd2_chip_register(const SndChipBackend *be, void *c, const SND2_DevInfo *i)
 | 書きの適用の時点: t=100 の reset と t=50 の load が保留の時、t=80 の read は load だけ反映し flag の時刻は load の時点から、t=100 以降は reset が効く・同じ at_us の 2 件は積んだ順 | sndl_fmtime_host | 適用の前に模型を進めない / at_us > r も反映 / 同時刻を後ろから |
 | write の n=257・4n の溢れ | kapi_audit_host | 上限を外す |
 - NP21/W: SNDboard を 26K・86・無しの 3 構成 (ini は --live-apply + restore) で probe・caps、/api/sound で HW の書きが鳴る、V86 の HW で FM のゲーム 1 本、86 + `--fm=soft` で SOFT。実機 Ra266: 不在の記録、fm_note_on 100 回の時間 (10ms × 回でない)、sndl_chip が SOFT。シリアルで判定。
+- C0 で資料を確かめた結果 (2026-11-24、Bible 2-13_FM音源・UNDOCUMENTED io_sound・Yamaha YM2608 Application Manual・BSD-3 の ymfm、GPL は見ない): OPNA の 29h は D7 が SCH (6ch の許可)、D1 が Timer B、D0 が Timer A の IRQ の出力の許可。HAL は D1:D0 を落として D7 を含む残りを保つ。27h の flag の許可と stop/reset は別の機能なので、IRQ を抑えてもタイマの flag は polling できる。既定のプリスケーラでは 26K の 3,993,600 / 72 と 86 の 7,987,200 / 144 がともに 55,466⅔ Hz で、同じ BLOCK と F-number が同じ音程を与える (72・144 は FM 全体の実効の分周、2Dh の選択値そのものではない)。SSG は別の計算で、既定の実効の入力クロックが等しい。probe の宣言は `drivers/sound/fm/opn_probe.h` (fm.h に置くと FM の部品の ABI の識別値が変わるため)。Timer B を始めた後は BUSY の固着でも停止と 29h の戻しを試み、戻せなければ UNKNOWN・contained=0 を返して呼び手が IRQ の mask を保つ。
 - 足す行 約 1,350 (§11 の計に足す)。1,000 行を超えるファイルは無い。
 
 ### 8. 決定 (PM 決定、推奨の (a))
