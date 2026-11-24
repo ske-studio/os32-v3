@@ -30,10 +30,12 @@ int tick_probe_call(void *buf, unsigned int size)
     struct tp_control c = {((struct tp_request *)buf)->action, 0};
     int rc = debug_probe_control(TP_CONTROL, &c, sizeof(c));
     if (rc) { kprintf(7, "tickprobe: stop before start/show\n"); return rc; }
-    if (!c.snapshot) { kprintf(7, "tickprobe: started (100Hz)\n"); return 0; }
+    if (!c.snapshot) { kprintf(7, "tickprobe: started\n"); return 0; }
     const struct tp_snapshot *s = c.snapshot;
     kprintf(7, "tickprobe: stopped TSC=%s observation_lost=%u\n",
             s->available ? "raw cycles" : "unmeasured", s->lost);
+    if (s->s1_mode)
+        kprintf(7, "s1-mode=%u notifications=%u\n", s->s1_mode, s->s1_notifications);
     if (!s->available) return 0;
     cycles("empty-cost", s->empty_cost);
     cycles("splash-enter", s->splash_enter);
