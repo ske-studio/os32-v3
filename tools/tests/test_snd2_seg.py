@@ -18,6 +18,8 @@ CHECK = dict(name='snd2-seg-host', tier=4, needs=[], budget=3,
 ROOT = Path(__file__).resolve().parents[2]
 HAL = ROOT / 'sound/hal'
 MUTATIONS = [
+    ('seg', 'last_obs_ms >= revolution_ms', 'last_obs_ms > revolution_ms'),
+    ('seg', 'last_progress_ms >= revolution_ms', 'last_progress_ms > revolution_ms'),
     ('seg', 'if (!n) return;', 'if (!n || used) return;'),
     ('seg', 's->played += n;', 's->played += s->period;'),
     ('seg', 's->copied = s->played;\n    s->last_hw', 's->last_hw'),

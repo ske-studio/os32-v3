@@ -124,6 +124,24 @@ static int drain_and_late_observations(void)
     return 0;
 }
 
+static int revolution_boundary(void)
+{
+    Snd2Stream *s = &stream;
+    setup(256, 3, 1024, 0);
+    /* A new position after a gap could already include a full revolution. */
+    REQUIRE(snd2_seg_observe(s, 1, 256, 92) < 0 && !s->last_hw);
+    REQUIRE(snd2_seg_observe(s, 1, 0, 91) == 0);
+    REQUIRE(snd2_seg_observe(s, 1, 0, 92) < 0);
+
+    s->fmt.rate = 32000; /* 4096 frames span exactly 128 ms. */
+    snd2_seg_reset(s, 0);
+    REQUIRE(snd2_seg_observe(s, 1, 256, 127) == 0);
+    REQUIRE(snd2_seg_observe(s, 1, 512, 255) < 0);
+    s->fmt.rate = 0;
+    REQUIRE(snd2_seg_observe(s, 1, 512, 128) < 0);
+    return 0;
+}
+
 static int capacity_and_wrap(void)
 {
     Snd2Stream *s = &stream;
@@ -155,7 +173,7 @@ void _start(void)
 {
     for (u32 i = 0; i < SND2_STG_FRAMES; ++i) samples[i] = i + 1;
     int rc = append_and_pause() || margins_and_loss() ||
-             drain_and_late_observations() || capacity_and_wrap();
+             drain_and_late_observations() || revolution_boundary() || capacity_and_wrap();
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc));
     __builtin_unreachable();
 }

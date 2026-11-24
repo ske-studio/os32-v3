@@ -76,11 +76,13 @@ u32 snd2_seg_played_now(const Snd2Stream *s)
 int snd2_seg_observe(Snd2Stream *s, int have_pos, u32 hw, u32 now)
 {
     u32 ring = s->period * s->nseg;
+    if (!s->fmt.rate) return -1;
+    /* Integer timestamps can hide a full turn at its rounded-down duration. */
     u32 revolution_ms = ring * 1000U / s->fmt.rate;
     u32 prev = s->last_hw / s->period;
-    if (now - s->last_obs_ms > revolution_ms) return -1;
+    if (now - s->last_obs_ms >= revolution_ms) return -1;
     if (!have_pos || hw == s->last_hw) {
-        if (now - s->last_progress_ms > revolution_ms) return -1;
+        if (now - s->last_progress_ms >= revolution_ms) return -1;
         if (!have_pos) return 0;
     }
     if (hw >= ring) return -1;
