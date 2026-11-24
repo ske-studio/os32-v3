@@ -8,12 +8,18 @@ typedef struct {
     SND2_DevInfo info;
     SND2_Caps caps;
     Snd2Stream stream;
+    u8 writing; /* A foreground copy still holds the staging allocation. */
 } Snd2Device;
 
 Snd2Device *snd2_device(u32 dev);
 void snd2_fault(Snd2Device *d);
 int snd2_validate_open(const SND2_StreamDesc *desc, int v1,
                        u32 *period, u32 *lead, u32 *cap);
+
+/* hw_start returns zero on success, this value for a proven pre-DMA
+ * failure, and a negative error when stop proof must be obtained. */
+#define SND2_START_STOPPED 1
+int snd2_open_mode(const SND2_StreamDesc *desc, u32 *stream, int v1);
 
 /* S5 supplies these adapters to its single teardown and handle/owner checks. */
 void snd2_teardown_device(Snd2Device *d);
