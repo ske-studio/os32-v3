@@ -76,7 +76,8 @@ static void release(void *ctx, int leak)
     leaked = leak;
     snd2_advance(0);
 }
-static int volume(void *ctx, u32 l, u32 r) { (void)ctx; return l == 64 && !r ? 0 : -1; }
+static u32 volume_left, volume_right;
+static int volume(void *ctx, u32 l, u32 r) { (void)ctx; volume_left = l; volume_right = r; return 0; }
 static const SndBackend backend = {
     .abi = SND_HAL2_ABI, .caps = caps, .hw_open = hw_open, .hw_start = start,
     .hw_pos = pos, .hw_ack = ack, .hw_stop = stop, .hw_release = release,
@@ -123,8 +124,12 @@ static int matrix(void)
     return 0;
 }
 
+#include "snd2_v1_host.c"
+
 static int probe(void)
 {
+    CHECK(!v1_contract());
+    now = hw = start_calls = stops = releases = freed = yields = 0;
     desc = (SND2_StreamDesc){.size=sizeof(desc), .fmt={44100,16,2,0,0},
                              .period_frames=256, .lead_periods=3};
     SND2_DevInfo info = {.kind=SND2_KIND_PCM_OUT};
