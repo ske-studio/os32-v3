@@ -1,0 +1,13 @@
+# Apple Power Mac G4 Developer Note (July 2001), Sound Circuitry, pp. 28-29.
+# OpenBSD pci/pcidevs: Apple KeyLargo. i2s.c 1.39: channel and GPIO roles.
+# PCI configuration inventory only until the board profile has been verified.
+device d = id 106b:0022
+pciread32 d 0 -> ident
+print "PCI_ID" ident
+pciread16 d 4 -> cmd
+print "PCI_COMMAND" cmd
+pciread32 d 8 -> cls
+print "PCI_CLASS_REV" cls
+pciread32 d 0x10 -> barval
+print "BAR0" barval
+end
