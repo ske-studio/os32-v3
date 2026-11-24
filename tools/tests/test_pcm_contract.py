@@ -5,7 +5,7 @@ Only module publication, user-range validation and device I/O are host seams.
 # 期待の出所: 現状記録 (characterization、2026-11-14)。設計の約束ではなく、AV_HAL へ移る前の今の PCM の振る舞いを写した基準。
 # AV_HAL §3 (共通の stream の状態・snd2_v1 bridge) で意図して変える振る舞い (満杯での自動開始の閾値など) は、設計の決定に合わせて期待を直してよい。
 CHECK = dict(name='pcm-contract-host', tier=1,
-    covers=['tools/tests/test_pcm_contract.py', 'tools/tests/pcm_contract_host.c',
+    covers=['sound/hal/snd2_ring_math.h', 'tools/tests/test_pcm_contract.py', 'tools/tests/pcm_contract_host.c',
             'tools/tests/pcm_cs4231_host.c', 'tools/tests/pcm_hostshim/io.h',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
             'drivers/sound/cs4231/*', 'include/pcm_contract.h', 'include/types.h',

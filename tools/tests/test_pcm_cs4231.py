@@ -21,7 +21,7 @@
   python3 -B tools/tests/test_pcm_cs4231.py --mutate   # 否定側 (変異が RED か)
 """
 CHECK = dict(name='pcm-cs4231-host', tier=1,
-    covers=['include/time_units.h', 'kernel/time/tick_clock.h', 'drivers/sound/cs4231/pcm_cs4231.c', 'drivers/sound/cs4231/pcm_refill.h', 'drivers/sound/cs4231/pcm_cs4231_math.c', 'tools/tests/pcm_cs4231_host.c', 'tools/tests/mutpar.py', 'include/pcm_contract.h', 'tools/tests/kernel_includes.py'],
+    covers=['sound/hal/snd2_ring_math.h', 'include/time_units.h', 'kernel/time/tick_clock.h', 'drivers/sound/cs4231/pcm_cs4231.c', 'drivers/sound/cs4231/pcm_refill.h', 'drivers/sound/cs4231/pcm_cs4231_math.c', 'tools/tests/pcm_cs4231_host.c', 'tools/tests/mutpar.py', 'include/pcm_contract.h', 'tools/tests/kernel_includes.py'],
     needs=[], budget=3.5,
     kind='characterization',
     pins=['AV_HAL_DESIGN'],
@@ -81,13 +81,11 @@ MUTATIONS = [
      "    OP(PCM_OP_DEADLINE, 0, PCM_STOP_TICKS),\n",
      "期限を毎 tick 入れ直す (待ちがいつまでも切れない)"),
     # --- 連続性と補充 ---
-    (r"    if \(p1 >= p0\) return PCM_CONT_SAME;\n"
-     r"    return PCM_CONT_LOST;",
-     "    (void)p0; (void)p1; return PCM_CONT_SAME;",
-     "同じ半分で戻った観測 (1 周 = 2 境界) を「境界なし」と読む"),
-    (r"    if \(h0 != h1\) return PCM_CONT_SWITCH;",
-     "    if (h0 != h1) return (p1 >= p0) ? PCM_CONT_SWITCH : PCM_CONT_LOST;",
-     "1 → 0 の折り返し (p が戻って見える) を喪失と読む"),
+    (r"if \(snd2_backtracked\(h0, p0, h1, p1\)\)", "if (0 && snd2_backtracked(h0, p0, h1, p1))",
+     "同じ半分で戻った観測を見逃す"),
+    (r"return h0 == h1 \? PCM_CONT_SAME : PCM_CONT_SWITCH;",
+     "return h0 == h1 ? PCM_CONT_SAME : (p1 >= p0 ? PCM_CONT_SWITCH : PCM_CONT_LOST);",
+     "1 → 0 の折り返しを喪失と読む"),
     (r"    return \(end - p1\) >= PCM_REFILL_MARGIN;",
      "    (void)end; return 1;",
      "補充の余裕を見ない (書いている最中に装置が追い越して古い音が出る)"),
@@ -135,12 +133,12 @@ MUTATIONS = [
      "位置が進まなくても番犬の基準を進める (止まった装置を見逃す)"),
     # --- ステージング ---
     (r"u32 pcm_stg_free\(const struct pcm_stg \*s\)\n\{\n"
-     r"    return PCM_STG_FRAMES - s->staged;\n\}",
+     r"    return snd2_room\(PCM_STG_FRAMES, s->staged\);\n\}",
      "u32 pcm_stg_free(const struct pcm_stg *s)\n{\n"
      "    return (s->w >= s->r) ? (PCM_STG_FRAMES - (s->w - s->r))\n"
      "                          : (s->r - s->w);\n}",
      "空きを w/r の差で出す (4096 消費した直後の空きが 0 に見える)"),
-    (r"    head = PCM_STG_FRAMES - off;\n    if \(n < head\) head = n;",
+    (r"    head = snd2_prefix\(PCM_STG_FRAMES, off, n\);",
      "    (void)off; head = n;",
      "物理末尾を跨ぐ写しを 2 分割しない (先頭へ回り込むぶんを踏み外す)"),
     # --- pcm_start の配り方 ---
