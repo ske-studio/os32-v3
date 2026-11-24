@@ -1,3 +1,6 @@
+#ifdef SND2_WRITER_DIAG
+#include "snd_writer_probe.h"
+#endif
 #include "snd2.h"
 #include "io.h"
 #include "exec_wait_contract.h"
@@ -35,6 +38,9 @@ int snd2_stream_wait(u32 id, u32 frame, u32 timeout_ms)
     SND2_Pos pos;
     u32 begin = exec_wait_begin(tick_clock_ms());
     int park = exec_wait_can_park();
+#ifdef SND2_WRITER_DIAG
+    sw_cancel();
+#endif
     for (;;) {
         unsigned saved = irq_save();
         int rc = snapshot_locked(id, &pos);
@@ -51,12 +57,19 @@ int snd2_stream_wait(u32 id, u32 frame, u32 timeout_ms)
                 else {
                     /* Interrupts stay masked from the snapshot through the
                      * atomic enable-and-halt. Any IRQ can change the result. */
+#ifdef SND2_WRITER_DIAG
+                    sw_sleep();
+#endif
                     _idle();
                     irq_restore(saved);
                     continue;
                 }
             }
         }
+#ifdef SND2_WRITER_DIAG
+        if (!rc) sw_ready();
+        else sw_cancel();
+#endif
         irq_restore(saved);
         return rc;
     }

@@ -175,7 +175,15 @@ pcm-e4-diag-image: $(BUILD_OUT)/vmkernel.lz4 $(KERNEL_PAIRED_MODULES)
 .PHONY: kernel-tick-probe tick-probe-image
 kernel-tick-probe:
 	$(MAKE) BUILD_OUT=$(BUILD_OUT)/tick-probe TICK_PROBE_BUILD=1 tick-probe-image
-tick-probe-image: $(BUILD_OUT)/vmkernel.lz4 $(KERNEL_PAIRED_MODULES) $(BUILD_OUT)/tickprobe.bin
+tick-probe-image: $(BUILD_OUT)/vmkernel.lz4 $(KERNEL_PAIRED_MODULES) $(BUILD_OUT)/tickprobe.bin $(BUILD_OUT)/snd2_test.bin
+
+$(BUILD_OUT)/snd2_test.elf: userland/tests/snd2_test.c include/snd_writer_probe.h sound/hal/snd2_refill_diag.h sdk/link/app.ld $(CRT0_OBJ) $(BUILD_OUT)/lib/libos32nano.a
+	$(CC) $(PROGRAM_FLAGS) -DSND2_WRITER_DIAG -c $< -o $(BUILD_OUT)/snd2_test.o
+	$(LD) $(PROGRAM_LDFLAGS) -o $@ $(CRT0_OBJ) $(BUILD_OUT)/snd2_test.o -lc -lgcc
+$(BUILD_OUT)/snd2_test.raw: $(BUILD_OUT)/snd2_test.elf
+	$(OBJCOPY) -O binary $< $@
+$(BUILD_OUT)/snd2_test.bin: $(BUILD_OUT)/snd2_test.raw $(BUILD_OUT)/snd2_test.elf
+	python3 sdk/mkos32x.py $< $@ --elf $(BUILD_OUT)/snd2_test.elf --api 91
 
 $(BUILD_OUT)/tickprobe.elf: userland/diag/tickprobe.c kernel/time/tick_probe.h sdk/link/app.ld $(CRT0_OBJ) $(BUILD_OUT)/lib/libos32nano.a
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $(BUILD_OUT)/tickprobe.o
