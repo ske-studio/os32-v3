@@ -7,10 +7,11 @@ extern "C" {
 
 /* Internal ABI: 32-bit int/unsigned int, 8-bit unsigned char.
  * The caller provides exclusive, non-overlapping storage. OPNA_STATE_BYTES
- * and OPNA_STATE_ALIGN will be generated from the target's Rust layout.
+ * and OPNA_STATE_ALIGN describe the target Rust layout.
  * New ADPCM RAM is zeroed by the caller and remains valid throughout use.
  * Return 0 on success or an OS32 error. Invalid inputs leave state intact.
  */
+#include "opna_layout.h"
 #define OPNA_ADPCM_BYTES 0x40000u
 #define OPNA_MAX_FRAMES 256u
 
@@ -34,7 +35,7 @@ int opna_next_event(void *state, unsigned int *delta_us);
  * Mix FM, SSG, ADPCM, rhythm in order, saturate once. No timer advance. */
 int opna_render(void *state, unsigned char *out_s16le, unsigned int frames);
 
-/* Private split timer. Count in normal context, queue a CSM event on
+/* Private split timer. Initialize standalone timer storage to zero. Count in normal context, queue a CSM event on
  * expiry in CSM mode, apply it at the corresponding audio frame. */
 int opna_timer_write(void *timer_state, unsigned int reg, unsigned int value);
 int opna_timer_count(void *timer_state, unsigned int delta_us, unsigned int *event);

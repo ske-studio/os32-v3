@@ -119,3 +119,4 @@ ifeq ($(MAKECMDGOALS),)
 $(error 非搭載サービス未実装: use kernel-compile for feature-off configurations)
 endif
 endif
+include build/os32snd.mk

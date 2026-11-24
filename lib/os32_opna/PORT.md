@@ -46,8 +46,8 @@ fd5c165e4f240de65e2f58fb6994f1d5441772b3b572dd8a1b6a106ff568f2ee  upstream/fmgen
 | `OPNA` — GetReg, OPNA, ~OPNA, Init, Reset, SetRate, SetReg | `src/registers.rs` |
 | `OPNABase` — FMMix, MixSubSL, MixSubS, Mix6 | 済 `src/channel.rs` (AudioState::fm_mix) |
 | `OPNA` — RhythmMix, SetVolumeRhythmTotal, SetVolumeRhythm | 済 `src/rhythm.rs`（mix/volume、音量は全体・各声に適用） |
-| `OPNA` — SetVolumeADPCM | 済 `src/adpcm.rs`（段 D で段 B の直した ADPCM_GAIN = 0 dB の 65536 を使う形に揃える） |
-| `OPNA` — Mix | `src/lib.rs` |
+| `OPNA` — SetVolumeADPCM | 済 `src/adpcm.rs`（整数表 ADPCM_GAIN の 0 dB 係数を使う） |
+| `OPNA` — Mix | `src/lib.rs`（opna_render） |
 | `PSG` — PSG, ~PSG, Reset, MakeNoiseTable, SetChannelMask, MakeEnvelopTable, SetReg, StoreSample, Mix | 済 `src/psg.rs` の init/reset/set_channel_mask/set_reg/mix。段 B のノイズ・振幅・波形表を参照し、位相は u32 の折返し、4 倍サンプルの和は i32 のゼロ方向除算。 |
 | `PSG` — SetClock, SetVolume | 済 `src/psg.rs` の set_clock と段 B の 0 dB 表。クロック変更時だけノイズ増分を半減。 |
 
@@ -87,6 +87,13 @@ state.rs の Adpcm は NP21/W の CPU ストリームに必要な 65536 byte FIF
 これは 256 KiB の借用 RAM と独立しており、固定状態だけで設計の概算 16–32 KiB
 を超える。FIFO の境界と BRDY の挙動を維持するため元の容量を採用した。
 
-| `OPNABase` — FMMix, MixSubSL, MixSubS, Mix6 | 済 `src/channel.rs` (AudioState::fm_mix) |
-| `OPNA` — RhythmMix, SetVolumeRhythmTotal, SetVolumeRhythm | 済 `src/rhythm.rs`（mix/volume、音量は全体・各声に適用） |
-| `OPNA` — SetVolumeADPCM | 済 `src/adpcm.rs`（段 D で段 B の直した ADPCM_GAIN = 0 dB の 65536 を使う形に揃える） |
+## 段 D の結合
+
+`make opna-staticlib` でユーザー空間用 PIC archive を作る。CPU は i386 で
+core/compiler_builtins にも同じ SDK target を適用する。libos32snd の最終リンクは L5 が担当する。
+同じ target の Rust オブジェクトから状態の寸法・整列・timer offset を読み、ホストと合わせて
+opna_layout.h を照合する。再生成は make が表示する gen_opna_layout.py に --write を付ける。
+
+timer の期限で ch3 を key-off → key-on し、render 内では timer を進めない。
+リズムの固定小数点は元の u32 位置を維持し、rate × 1024 は u64 で計算してから除算する。
+最終フレームを越える加算は波形の終端で止める。

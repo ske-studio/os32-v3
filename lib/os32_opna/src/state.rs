@@ -148,7 +148,6 @@ pub struct AudioState {
     pub am_level: u32,
     pub pm_level: u32,
     pub pm_value: i32,
-    pub stereo_scratch: [i32; 512],
 }
 
 /// Combined state for the standalone oracle wrapper.
@@ -156,5 +155,5 @@ pub struct AudioState {
 pub struct OpnaState {
     pub audio: AudioState,
     pub timer: TimerState,
+    pub stereo_scratch: [i32; 512],
 }
-

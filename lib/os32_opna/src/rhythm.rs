@@ -14,7 +14,7 @@ pub fn install(s: &mut AudioState, ch: usize, samples: *const u8, frames: u32, r
     v.samples_s16le = samples;
     v.frames = frames;
     v.source_rate = rate;
-    v.step = rate.wrapping_mul(1024) / 44100;
+    v.step = ((u64::from(rate) * 1024) / 44100) as u32;
     v.position = frames * 1024;
     s.rhythm_ready = u8::from(s.rhythm.iter().all(|v| !v.samples_s16le.is_null()));
     true
@@ -73,7 +73,7 @@ pub unsafe fn mix(s: &mut AudioState, dest: &mut [i32]) {
             let ptr = v.samples_s16le.add((v.position / 1024) as usize * 2);
             let pcm = i16::from_le_bytes([*ptr, *ptr.add(1)]);
             let sample = i32::from(pcm).wrapping_mul(gain) >> 12;
-            v.position = v.position.wrapping_add(v.step);
+            v.position = v.position.saturating_add(v.step).min(v.frames * 1024);
             if pan & 2 != 0 {
                 frame[0] = frame[0].wrapping_add(sample);
             }

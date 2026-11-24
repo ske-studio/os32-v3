@@ -119,15 +119,15 @@ fn compare_mix() {
         audio.timer_control_shadow = if mode & 1 != 0 { 0xc0 } else { 0 };
         audio.reg22 = if mode & 2 != 0 { 8 } else { 0 };
         audio.reg29 = if mode & 4 != 0 { 0x80 } else { 0 };
-        audio.stereo_scratch.fill(0);
-        audio.fm_mix(256);
+        let mut samples = [0; 512];
+        audio.fm_mix(&mut samples);
         let mut expected = [0; 512];
         unsafe {
             mix_block(mode, expected.as_mut_ptr());
         }
         for (i, value) in expected.iter().enumerate() {
             assert_eq!(
-                audio.stereo_scratch[i],
+                samples[i],
                 *value,
                 "mix mode={mode} frame={} side={}",
                 i / 2,

@@ -130,9 +130,9 @@ impl Channel {
 
 impl crate::state::AudioState {
     /// Add FM to the interleaved mix accumulator for this render block.
-    pub fn fm_mix(&mut self, frames: usize) {
+    pub fn fm_mix(&mut self, stereo_scratch: &mut [i32]) {
         use crate::tables::{FM_GAIN, OPNA_AM, OPNA_PM};
-        assert!(frames <= self.stereo_scratch.len() / 2);
+        let frames = stereo_scratch.len() / 2;
         if frames == 0 {
             return;
         }
@@ -158,7 +158,7 @@ impl crate::state::AudioState {
             return;
         }
         let use_lfo = self.reg22 & 8 != 0 && active & 0xaaa != 0;
-        for stereo in self.stereo_scratch[..frames * 2].chunks_exact_mut(2) {
+        for stereo in stereo_scratch.chunks_exact_mut(2) {
             if use_lfo {
                 let index = ((self.lfo_count >> 15) & 255) as usize;
                 self.pm_level = OPNA_PM[index] as u32;

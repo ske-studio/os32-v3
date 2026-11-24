@@ -1,5 +1,8 @@
 //! OPNA ADPCM-B. The register dispatcher supplies the caller-owned RAM.
-use crate::{state::AudioState, tables::ADPCM_BASE};
+use crate::{
+    state::AudioState,
+    tables::{ADPCM_BASE, ADPCM_GAIN},
+};
 pub type Ram = [u8; 0x40000];
 
 /// Called once on zeroed storage.
@@ -170,7 +173,7 @@ pub fn write(s: &mut AudioState, ram: &mut Ram, reg: u16, data: u8) {
         }
         0x10b => {
             a.level = i32::from(data);
-            a.volume = (65536 * a.level) >> 12;
+            a.volume = (ADPCM_GAIN[0] * a.level) >> 12;
         }
         0x110 if data & 0x80 != 0 => s.status = 0,
         0x110 => s.status_mask = !u32::from(data & 31),
