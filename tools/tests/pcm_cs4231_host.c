@@ -210,12 +210,15 @@ int dma_mark_leaked(const struct dma_buf *b)
 }
 
 /* ---- KHEAP の模型 (ステージング) ---------------------------------------- */
-static u8  heap_mem[PCM_STG_BYTES];
+#ifndef PCM_HOST_HEAP_BYTES
+#define PCM_HOST_HEAP_BYTES PCM_STG_BYTES
+#endif
+static u8 heap_mem[PCM_HOST_HEAP_BYTES];
 static int heap_used, heap_freed, heap_fail;
 
 void *kmalloc(u32 size)
 {
-    if (heap_fail || heap_used || size != PCM_STG_BYTES) return (void *)0;
+    if (heap_fail || heap_used || size != sizeof(heap_mem)) return (void *)0;
     heap_used = 1;
     return heap_mem;
 }
