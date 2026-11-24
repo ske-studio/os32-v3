@@ -210,12 +210,15 @@ int dma_mark_leaked(const struct dma_buf *b)
 }
 
 /* ---- KHEAP の模型 (ステージング) ---------------------------------------- */
-static u8  heap_mem[PCM_STG_BYTES];
+#ifndef PCM_HOST_HEAP_BYTES
+#define PCM_HOST_HEAP_BYTES PCM_STG_BYTES
+#endif
+static u8 heap_mem[PCM_HOST_HEAP_BYTES];
 static int heap_used, heap_freed, heap_fail;
 
 void *kmalloc(u32 size)
 {
-    if (heap_fail || heap_used || size != PCM_STG_BYTES) return (void *)0;
+    if (heap_fail || heap_used || size != sizeof(heap_mem)) return (void *)0;
     heap_used = 1;
     return heap_mem;
 }
@@ -229,14 +232,14 @@ void kfree(void *ptr)
 
 /* ---- 割り込みの模型 ----------------------------------------------------- */
 static int sim_irq_registered;
-static int sim_irq_fail;
+static int sim_irq_fail, sim_irq_context, sim_unregister_fail;
 static u32 sim_irq_reg_calls, sim_irq_unreg_calls;
 
 int irq_register(unsigned int irq, irq_handler_fn fn, void *arg, unsigned int flags)
 {
     (void)fn; (void)arg;
     sim_irq_reg_calls++;
-    if (sim_irq_fail) return IRQ_ERR_BUSY;
+    if (sim_irq_fail || sim_irq_registered) return IRQ_ERR_BUSY;
     if (irq != PCM_IRQ || flags != IRQ_F_SHARED) return IRQ_ERR_INVAL;
     sim_irq_registered = 1;
     return 0;
@@ -246,6 +249,8 @@ int irq_unregister(unsigned int irq, irq_handler_fn fn, void *arg)
 {
     CHECK(irq == PCM_IRQ && fn && !arg);
     sim_irq_unreg_calls++;
+    if (sim_irq_context) return IRQ_ERR_CTX;
+    if (sim_unregister_fail) return IRQ_ERR_BUSY;
     sim_irq_registered = 0;
     return 0;
 }

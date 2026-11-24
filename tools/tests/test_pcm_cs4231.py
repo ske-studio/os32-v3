@@ -21,7 +21,7 @@
   python3 -B tools/tests/test_pcm_cs4231.py --mutate   # 否定側 (変異が RED か)
 """
 CHECK = dict(name='pcm-cs4231-host', tier=1,
-    covers=['sound/hal/snd2_ring_math.h', 'include/time_units.h', 'kernel/time/tick_clock.h', 'drivers/sound/cs4231/pcm_cs4231.c', 'drivers/sound/cs4231/pcm_refill.h', 'drivers/sound/cs4231/pcm_cs4231_math.c', 'tools/tests/pcm_cs4231_host.c', 'tools/tests/mutpar.py', 'include/pcm_contract.h', 'tools/tests/kernel_includes.py'],
+    covers=['drivers/sound/cs4231/pcm_hw.h', 'sound/hal/snd2_ring_math.h', 'include/time_units.h', 'kernel/time/tick_clock.h', 'drivers/sound/cs4231/pcm_cs4231.c', 'drivers/sound/cs4231/pcm_refill.h', 'drivers/sound/cs4231/pcm_cs4231_math.c', 'tools/tests/pcm_cs4231_host.c', 'tools/tests/mutpar.py', 'include/pcm_contract.h', 'tools/tests/kernel_includes.py'],
     needs=[], budget=3.5,
     kind='characterization',
     pins=['AV_HAL_DESIGN'],
@@ -236,8 +236,8 @@ def host_build(tmp, source_text=None, driver_text=None):
         (mut / "pcm_cs4231.h").write_text(
             (ROOT / "drivers/sound/cs4231/pcm_cs4231.h").read_text(encoding="utf-8"),
             encoding="utf-8")
-        (mut / "pcm_refill.h").write_text(
-            (ROOT / "drivers/sound/cs4231/pcm_refill.h").read_text(), encoding="utf-8")
+        for name in ("pcm_refill.h", "pcm_hw.h"):
+            (mut / name).write_text((ROOT / DRIVER).with_name(name).read_text(), encoding="utf-8")
         shim = src_dir / "harness.c"
         shim.write_text(
             HARNESS.read_text(encoding="utf-8")

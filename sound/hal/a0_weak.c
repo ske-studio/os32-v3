@@ -189,3 +189,24 @@ __attribute__((weak)) int snd2_chip_close(u32 h)
     (void)h;
     return OS32_ERR_NOSYS;
 }
+
+/* Paired PCM module imports before IS links the resident stream core. */
+__attribute__((weak)) int snd2_register(const SndBackend *be, void *ctx,
+                                        const SND2_DevInfo *info)
+{
+    (void)be;
+    (void)ctx;
+    (void)info;
+    return OS32_ERR_NOSYS;
+}
+
+__attribute__((weak)) int snd2_unregister(u32 dev)
+{
+    (void)dev;
+    return OS32_ERR_NOSYS;
+}
+
+__attribute__((weak)) void snd2_advance(u32 dev)
+{
+    (void)dev;
+}

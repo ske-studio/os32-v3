@@ -1,4 +1,5 @@
 #include "pcm_module.h"
+#include "pcm_hw.h"
 
 int pcm_module_init(PcmModuleApi *out)
 {
@@ -12,10 +13,10 @@ int pcm_module_init(PcmModuleApi *out)
         .state = pcm_state,
         .present = pcm_present,
         .reclaim = pcm_reclaim,
-        .tick = pcm_tick, .quiet = pcm_module_quiet
+        .tick = pcm_tick, .quiet = pcm_hw_quiet
     };
     pcm_init();
-    return 0;
+    return pcm_present() ? pcm_hw_register() : 0;
 }
 
 const struct {

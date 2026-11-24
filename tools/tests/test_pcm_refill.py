@@ -1,6 +1,6 @@
 """T3: libc-free production driver/math, DMA deadlines and refill origin."""
 CHECK = dict(name='pcm-refill-host', tier=4, covers=['sound/hal/snd2_ring_math.h',
-    'drivers/sound/cs4231/pcm_refill.h',
+    'drivers/sound/cs4231/pcm_refill.h', 'drivers/sound/cs4231/pcm_hw.h',
     'drivers/sound/cs4231/pcm_cs4231.c',
     'drivers/sound/cs4231/pcm_cs4231.h',
     'drivers/sound/cs4231/pcm_cs4231_math.c',
@@ -21,7 +21,7 @@ from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 DRIVER = 'drivers/sound/cs4231/pcm_cs4231.c'
 HEADER = 'drivers/sound/cs4231/pcm_refill.h'
-INPUTS = (DRIVER, HEADER, 'drivers/sound/cs4231/pcm_cs4231.h',
+INPUTS = (DRIVER, HEADER, 'drivers/sound/cs4231/pcm_hw.h', 'drivers/sound/cs4231/pcm_cs4231.h',
           'drivers/sound/cs4231/pcm_cs4231_math.c')
 MUTATIONS = (
     (HEADER, 'return distance <= pcm_refill_threshold(rate);',
