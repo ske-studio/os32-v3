@@ -8,6 +8,8 @@
 struct opn_chip {
     enum opn_probe_result model;
     u8 shared_irq, saved_id;
+    /* Platform refreshes the 29h write shadow after external ownership. */
+    u8 irq_shadow;
 };
 
 extern const SndChipBackend opn_chip_backend;

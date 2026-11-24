@@ -46,6 +46,7 @@ def main():
                     ('                continue;', '                return i;', 3),
                     ('        if (w[i].bank >= count)', '        if (i == 0 && w[i].bank >= count)', 1),
                     ('count == 1 && c->shared_irq', 'count == 1', 6),
+                    ('c->irq_shadow & ~3u', 'c->irq_shadow', 9),
                     ('bank * 4 + ch', 'ch', 9),
                     ('return ready() ? 0 : OS32_ERR_IO', 'return 0', 17)]:
                 body = source.read_text()

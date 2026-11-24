@@ -58,6 +58,8 @@ static int chip_write(void *ctx, const SND2_RegW *w, u32 n)
         }
         if (!opn_write_checked(w[i].bank, reg, value))
             return i;
+        if (!w[i].bank && reg == 0x29 && count == 2)
+            c->irq_shadow = value;
     }
     return n;
 }
@@ -124,6 +126,12 @@ static int chip_open(void *ctx)
     if (banks(c) == 2) {
         c->saved_id = inp(OPNA_ID_PORT);
         outp(OPNA_ID_PORT, c->saved_id | 1);
+        u8 masked = c->irq_shadow & ~3u;
+        if (!opn_write_checked(0, 0x29, masked)) {
+            chip_close(c);
+            return OS32_ERR_IO;
+        }
+        c->irq_shadow = masked;
     }
     int rc = chip_quiet(c);
     if (rc < 0)

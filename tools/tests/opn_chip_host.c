@@ -53,6 +53,7 @@ static int next(int *i, int b, int r, int val)
 static int quiet_trace(int banks)
 {
     int i = 0;
+    if (banks == 2 && !next(&i, 0, 0x29, 0xa4)) return 0;
     for (int ch = 0; ch < banks * 3; ++ch)
         if (!next(&i, 0, 0x28, ch < 3 ? ch : ch + 1)) return 0;
     for (int b = 0; b < banks; ++b)
@@ -89,10 +90,14 @@ static int cases(void)
         caps.flags != SND2_CHF_PROBED || caps.clock_hz != 3993600) return 8;
     c.model = OPN_PROBE_OPNA;
     writes = 0;
+    regs[0][0x29] = c.irq_shadow = 0xa7; /* previous owner enabled both IRQs */
     if (be->open(&c) || !quiet_trace(2) || id != 0xcb) return 9;
+    control.val = 0x0f;
+    if (be->write(&c,&control,1) != 1 || timer != 0x0f ||
+        regs[0][0x29] != 0xa4 || c.irq_shadow != 0xa4) return 19;
     if (be->caps(&c,&caps) || caps.clock_hz != 7987200 || caps.fm_ch != 6 ||
         caps.banks != 2 || caps.flags != 13 || caps.adpcm_bytes) return 10;
-    if (be->write(&c,w,5) != 5 || regs[0][0x29] != 0xfc) return 11;
+    if (be->write(&c,w,5) != 5 || regs[0][0x29] != 0xfc || c.irq_shadow != 0xfc) return 11;
     if (be->read(&c,1,1,0) != 0x48 || be->read(&c,1,2,7) != 0xc3 ||
         be->read(&c,0,2,7) != 0xb5) return 12;
     int before = inputs;
