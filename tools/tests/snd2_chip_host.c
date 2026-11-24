@@ -36,6 +36,7 @@ int probe(void)
     owner++;
     EXPECT(snd2_chip_implicit(owner) == OS32_ERR_BUSY);
     EXPECT(snd2_chip_close(h) == OS32_ERR_BUSY);
+    EXPECT(snd2_chip_write(h, w, 1) == OS32_ERR_INVAL && writes == 0);
     snd2_chip_reclaim(owner);
     owner--;
     EXPECT(snd2_chip_reset(h) == 0 && quiets == 1 && closes == 0);
@@ -52,6 +53,7 @@ int probe(void)
     snd2_chip_reclaim(owner);
     EXPECT(closes == 1 && quiets == 2 && snd2_chip_close(old) == OS32_ERR_STALE);
     EXPECT(snd2_chip_open(dev, &h) == 0 && snd2_chip_reset(old) == OS32_ERR_STALE);
+    EXPECT(snd2_chip_write(old, w, 1) == OS32_ERR_INVAL && writes == 1);
     EXPECT(snd2_chip_unregister(dev) == 0 && closes == 2);
     EXPECT(snd2_chip_dev_info(0, &di) == OS32_ERR_INVAL);
     for (int fail = 0; fail < 7; ++fail) {
@@ -74,6 +76,7 @@ int probe(void)
             if (fail == 4) {
                 short_write = 1;
                 EXPECT(snd2_chip_write(h, w, 2) == 1);
+                EXPECT(snd2_chip_write(h, w, 1) == OS32_ERR_IO && writes == 2);
             }
             if (fail == 6)
                 snd2_chip_fault(dev);

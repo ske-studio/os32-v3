@@ -10,6 +10,8 @@ CHECK = dict(name='snd2-chip-host', tier=1, needs=[], budget=3,
     basis=['docs/decisions/sound/AV_HAL_DESIGN.md FM の確定版 §2, §5, §7'])
 
 MUTATIONS = [
+    ('chip', 'rc == OS32_ERR_STALE || rc == OS32_ERR_BUSY', 'rc == OS32_ERR_BUSY'),
+    ('chip', 'rc == OS32_ERR_STALE || rc == OS32_ERR_BUSY', 'rc == OS32_ERR_STALE'),
     ('chip', 'c->info.flags |= SND2_DEV_FAULTED;', 'c->info.flags |= 0;'),
     ('chip', 'c->gen + 1', 'c->gen + 0'),
     ('chip', 'return c->be->quiet(c->ctx) < 0', '++c->gen; return c->be->quiet(c->ctx) < 0'),

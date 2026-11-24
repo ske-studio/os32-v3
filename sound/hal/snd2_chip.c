@@ -142,6 +142,8 @@ int snd2_chip_write(u32 h, const SND2_RegW *w, u32 n)
 {
     Chip *c;
     int rc = ready(h, &c);
+    if (rc == OS32_ERR_STALE || rc == OS32_ERR_BUSY)
+        return OS32_ERR_INVAL;
     if (rc)
         return rc;
     if (n > 256 || (n && !w))
