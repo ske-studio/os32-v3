@@ -170,6 +170,11 @@ def observe(media, cpu, folder, case, user, mutation=None):
                 return dev and re.search(rf'\[usb\] HID \d+:\d+\.\d+ addr={dev[1]} iface=0 rc=0\r?\n',
                                          trace[dev.end():])
             s.wait(mouse_attached, 'USB mouse interrupt transfer ready')
+            # mac99 also has an ADB mouse. Wait for QMP to route the first
+            # button edge to the HID mouse after the guest starts polling it.
+            s.wait(lambda: any(mouse['current'] and mouse['name'] == 'QEMU HID Mouse'
+                               for mouse in s.q.call('query-mice')),
+                   'USB HID mouse selected for input')
         if case == 'normal':
             seen('C-GUI READY')
             x, y = s.word('px', unit='h'), s.word('py', unit='h')
