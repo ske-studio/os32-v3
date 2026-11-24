@@ -48,8 +48,8 @@ fd5c165e4f240de65e2f58fb6994f1d5441772b3b572dd8a1b6a106ff568f2ee  upstream/fmgen
 | `OPNA` — RhythmMix, SetVolumeRhythmTotal, SetVolumeRhythm | `src/rhythm.rs` |
 | `OPNA` — SetVolumeADPCM | `src/adpcm.rs` |
 | `OPNA` — Mix | `src/lib.rs` |
-| `PSG` — PSG, ~PSG, Reset, MakeNoiseTable, SetChannelMask, MakeEnvelopTable, SetReg, StoreSample, Mix | `src/psg.rs` |
-| `PSG` — SetClock, SetVolume | `src/tables.rs` |
+| `PSG` — PSG, ~PSG, Reset, MakeNoiseTable, SetChannelMask, MakeEnvelopTable, SetReg, StoreSample, Mix | 済 `src/psg.rs` の init/reset/set_channel_mask/set_reg/mix。段 B のノイズ・振幅・波形表を参照し、位相は u32 の折返し、4 倍サンプルの和は i32 のゼロ方向除算。 |
+| `PSG` — SetClock, SetVolume | 済 `src/psg.rs` の set_clock と段 B の 0 dB 表。クロック変更時だけノイズ増分を半減。 |
 
 OPNA::LoadRhythmSample の FileIO とメモリ確保は移植対象外。C 側が読み込んだ波形を opna_rhythm で借用する。
 
