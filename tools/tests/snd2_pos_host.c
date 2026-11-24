@@ -4,6 +4,7 @@
 #define CHECK(e) do { if (!(e)) return 1; } while (0)
 static Snd2Device device;
 static unsigned locked;
+static int probing_pos;
 static u32 now, yields;
 static int action, error, owner = 1;
 enum { TICK, ADVANCE, CLOSE, FAULT };
@@ -13,7 +14,11 @@ void irq_restore(unsigned prev) { locked = prev; }
 int res_owner_get(void) { if (!locked) error = 1; return owner; }
 Snd2Device *snd2_device(u32 dev) { return dev ? 0 : &device; }
 void snd2_fault(Snd2Device *d) { (void)d; error = 1; }
-u32 tick_clock_ms(void) { return now; }
+u32 tick_clock_ms(void)
+{
+    if (probing_pos && !locked) error = 1;
+    return now;
+}
 void kfree(void *ptr) { (void)ptr; }
 void *kmemset(void *p, int c, u32 n) { for (u32 i = 0; i < n; ++i) ((u8 *)p)[i] = c; return p; }
 void *kmemcpy(void *p, const void *s, u32 n)
@@ -53,7 +58,10 @@ static int probe(void)
     SND2_Pos pos;
     for (int state = SND2_ST_IDLE; state <= SND2_ST_DRAIN; ++state) {
         s->state = state;
+        probing_pos = 1;
         CHECK(!snd2_stream_pos(0, &pos));
+        probing_pos = 0;
+        CHECK(!error);
         CHECK(pos.size == sizeof(pos) && pos.state == (u32)state && pos.played == 0);
         CHECK(pos.written == 5 && pos.cap == 512 && pos.underruns == 3);
         CHECK(pos.epoch == 7 && pos.time_ms == now);

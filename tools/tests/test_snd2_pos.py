@@ -24,6 +24,9 @@ MUTATIONS = [
     ('pos', 'pos.played - frame', 'snd2_device(id & 15U)->stream.played - frame'),
     ('pos', 'pos.time_ms - begin >=', 'pos.time_ms - begin >'),
     ('pos', '.epoch = s->epoch', '.epoch = 0'),
+    ('pos', '    irq_restore(flags);', '',
+     'int rc = snd2_owned_device(id, &d);',
+     'int rc = snd2_owned_device(id, &d);\n    irq_restore(flags);'),
 ]
 
 
@@ -34,9 +37,9 @@ def verify(work, mutation=None):
         path = work / f'snd2_{unit}.c'
         source = (HAL / path.name).read_text()
         if mutation and mutation[0] == unit:
-            _, old, new = mutation
-            assert source.count(old) == 1, mutation
-            source = source.replace(old, new)
+            for old, new in zip(mutation[1::2], mutation[2::2], strict=True):
+                assert source.count(old) == 1, mutation
+                source = source.replace(old, new)
         path.write_text(source)
         sources.append(path)
     exe = work / 'test'
