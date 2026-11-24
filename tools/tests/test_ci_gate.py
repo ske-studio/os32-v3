@@ -142,6 +142,14 @@ def suite(tool):
                 self.assertEqual(tool.keep_evidence(out / 'kept3', out / 'missing.log'), 0)
                 log.write_text('no evidence line\n')
                 self.assertEqual(tool.keep_evidence(out / 'kept4', log), 0)
+                ata = out / 'ata-accept-x/lba/7455'
+                ata.mkdir(parents=True)
+                (ata / 'serial.log').write_text('ATA')
+                (ata / 'qemu.log').write_text('Q')
+                (ata / 'disk.raw').write_bytes(b'd' * 8)
+                log.write_text('RuntimeError: guest stopped or timed out: %s evidence=%s\n' % (ata / 'serial.log', ata))
+                self.assertEqual(tool.keep_evidence(out / 'kept5', log), 4)
+                self.assertEqual((out / 'kept5/check-ppc-usb/serial.log').read_text(), 'ATA')
 
         def test_render_verdict(self):
             def verdict(checks):

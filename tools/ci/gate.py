@@ -27,7 +27,7 @@ SLOWEST = 10
 FAILED_LOG_BYTES = 4 << 20
 # 落ちた検査がログに書いた証拠の置き場 (evidence=<dir>) から小さな文字の証拠だけを写す (11-24、本線 PM 了承)。
 # ゲストのシリアル・UART のトレース・画面・QEMU の stderr。1 ファイルは末尾だけ、1 検査の合計にも上限。
-EVIDENCE_NAMES = re.compile(r'(?:serial-[ab]\.log|uart\.trace|screen[\w.-]*\.txt|qemu\.stderr|events\.json|frames\.log)$')
+EVIDENCE_NAMES = re.compile(r'(?:serial(?:-[ab])?\.log|qemu\.log|uart\.trace|screen[\w.-]*\.txt|qemu\.stderr|events\.json|frames\.log)$')
 EVIDENCE_FILE_BYTES = 512 << 10
 EVIDENCE_CHECK_BYTES = 4 << 20
 # この検査の束が要る道具。足りない物は全部まとめて挙げ、検査を始める前に止める

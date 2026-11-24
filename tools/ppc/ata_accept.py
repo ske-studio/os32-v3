@@ -205,7 +205,7 @@ def guest(media, cpu, disk, absent=False, second=None, bootargs=None, done="ATA-
                 if done in lines:
                     return lines
                 time.sleep(.15)
-            raise RuntimeError(f'guest stopped or timed out: {serial}')
+            raise RuntimeError(f'guest stopped or timed out: {serial} evidence={work}')
         finally:
             proc.kill()
 
