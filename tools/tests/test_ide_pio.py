@@ -7,7 +7,7 @@ import tempfile
 from kernel_includes import include_flags
 
 CHECK = dict(name='ide-pio-host', tier=1, budget=4.3,
-             covers=['include/ide_bus.h', 'platform/pc98/platform_ide_bus.h', 'platform/pc98/platform_ide_ports.h',
+             covers=['kernel/time/tick_clock.h', 'include/ide_bus.h', 'platform/pc98/platform_ide_bus.h', 'platform/pc98/platform_ide_ports.h',
                      'drivers/ata/ide.c', 'drivers/ata/ide.h',
                      'drivers/ata/ide_addr.c', 'drivers/ata/ide_addr.h',
                      'drivers/ata/ide_multiple.inc', 'drivers/ata/ide_pio.inc', 'drivers/ata/ide_request.inc',
@@ -20,6 +20,20 @@ ROOT = Path(__file__).resolve().parents[2]
 FLAGS = ['-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
          '-Wno-sign-compare', '-D__cdecl=']
 MUTANTS = [
+    ('poll-limit', 'ide.c', 'wait->early_polls && elapsed == 0', 'wait->early_polls', 'deadlines'),
+    ('ignore-deadline', 'ide.c', 'return elapsed < limit_ms;', '(void)limit_ms; return 1;', 'deadlines'),
+    ('zero-device', 'ide.c', 'st == 0 || st == 0x7f', 'st == 0x7f', 'deadlines'),
+    ('floating-drq', 'ide.c', 'if (st == 0 || st == 0x7f',
+     'if (st == 0x7f) return IDE_OK;\n        if (st == 0 || st == 0x7f', 'deadlines'),
+    ('open-device', 'ide.c', 'limit_ms != IDE_IO_TIMEOUT_MS && st == IDE_BUS_OPEN8',
+     '0', 'deadlines'),
+    ('short-spinup', 'ide.c', 'ret = ide_wait_bsy(IDE_SPINUP_MS);',
+     'ret = ide_wait_bsy(IDE_PROBE_BSY_MS);', 'deadlines'),
+    ('probe-drq-deadline', 'ide.c', 'ide_wait_pending(&wait, IDE_PROBE_DRQ_MS)',
+     'ide_wait_pending(&wait, IDE_IO_TIMEOUT_MS)', 'deadlines'),
+    ('masked-clock', 'ide.c', 'start && _irq_enabled()', 'start', 'deadlines'),
+    ('wrapped-clock', 'ide.c', 'elapsed < limit_ms',
+     'tick_clock_ms() < wait->start_ms + limit_ms', 'deadlines'),
     ('multiple-opcode', 'ide_pio.inc', 'ide_bus_out(IDE_REG_STATUS, multiple > 1',
      'ide_bus_out(IDE_REG_STATUS, multiple > IDE_COMMAND_MAX_SECTORS', 'multiple'),
     ('multiple-phase', 'ide_pio.inc', 'u32 n = sectors - done < multiple ? sectors - done : multiple;',

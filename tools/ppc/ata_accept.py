@@ -130,8 +130,9 @@ def make_image(work, case):
         settings += ['KB_MUT_THIRD_SRC=' + TREE, 'KB_MUT_THIRD_FILE=' + str(path)]
     if case in ('normal', 'wait'):
         # Feed BSY then ready to the actual polling loop during the diagnostic.
-        before = 'static int ide_wait_bsy(void)'
+        before = 'static int ide_wait_bsy(u32 limit_ms)'
         driver = (ROOT / DRIVER).read_text()
+        assert driver.count(before) == 1
         start = driver.index(before)
         stop = driver.index('\n}', start) + 2
         polling = driver[start:stop]
@@ -139,14 +140,15 @@ def make_image(work, case):
         instrumented = polling.replace('ide_bus_alt()', '(probe ? '
                                        '(++reads == 1 ? IDE_ST_BSY : 0) : ide_bus_alt())')
         if case == 'wait':
-            assert instrumented.count('int timeout = IDE_TIMEOUT_BSY;') == 1
-            instrumented = instrumented.replace('int timeout = IDE_TIMEOUT_BSY;', 'int timeout = 1;')
+            pending = 'ide_wait_pending(&wait, limit_ms)'
+            assert instrumented.count(pending) == 1
+            instrumented = instrumented.replace(pending, '(!probe || reads == 0) && ' + pending)
         settings += mutant_settings(out, case, DRIVER, polling,
                                     'static unsigned probe, reads;\n' + instrumented + """
 void ata_check_wait(void)
 {
     probe = 1;
-    int rc = ide_wait_bsy();
+    int rc = ide_wait_bsy(IDE_IO_TIMEOUT_MS);
     probe = 0;
     kprintf(7, "ATA-TEST wait reads=%u rc=%d\\r\\n", reads, rc);
 }

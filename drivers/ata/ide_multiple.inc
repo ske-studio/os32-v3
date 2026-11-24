@@ -47,7 +47,7 @@ void ide_multiple_reset_bank(int bank)
 }
 
 /* Drive is already selected and its bounded BSY wait has completed. */
-static int ide_multiple_prepare(int drive)
+static int ide_multiple_prepare(int drive, u32 limit_ms)
 {
     u8 st;
     int ret;
@@ -64,7 +64,7 @@ static int ide_multiple_prepare(int drive)
     ide_bus_out(IDE_REG_SECT_CNT, drive_multiple[drive].max);
     ide_bus_out(IDE_REG_STATUS, IDE_CMD_SET_MULTIPLE);
     ide_pio_settle();
-    ret = ide_pio_finish();
+    ret = ide_pio_finish(limit_ms);
     if (ret == IDE_OK) {
         drive_multiple[drive].active = drive_multiple[drive].max;
         return IDE_OK;
