@@ -119,6 +119,30 @@ def suite(tool):
                 self.assertEqual(sorted(p.name for p in (out / 'failed-logs').iterdir()), ['check-b.log'])
                 self.assertEqual((out / 'failed-logs/check-b.log').read_text(), '6789')
 
+        def test_keep_evidence(self):
+            with tempfile.TemporaryDirectory(prefix='os32-ci-gate-') as directory:
+                out = Path(directory)
+                guest = out / 'work/normal-7455'
+                (guest / 'agent-0').mkdir(parents=True)
+                (guest / 'serial-a.log').write_text('0123456789')
+                (guest / 'agent-0/screen-x.txt').write_text('screen')
+                (guest / 'PPCKERN.ELF').write_bytes(b'x' * 64)
+                old = out / 'old'
+                old.mkdir()
+                (old / 'serial-a.log').write_text('stale')
+                log = out / 'check-ppc-usb.log'
+                log.write_text('evidence=%s\nRuntimeError: deadline evidence=%s\n' % (old, guest))
+                kept = out / 'kept'
+                self.assertEqual(tool.keep_evidence(kept, log, limit=100, per_file=4), 8)
+                target = kept / 'check-ppc-usb'
+                self.assertEqual((target / 'serial-a.log').read_text(), '6789')
+                self.assertEqual((target / 'agent-0/screen-x.txt').read_text(), 'reen')
+                self.assertFalse((target / 'PPCKERN.ELF').exists())
+                self.assertEqual(tool.keep_evidence(out / 'kept2', log, limit=5, per_file=4), 5)
+                self.assertEqual(tool.keep_evidence(out / 'kept3', out / 'missing.log'), 0)
+                log.write_text('no evidence line\n')
+                self.assertEqual(tool.keep_evidence(out / 'kept4', log), 0)
+
         def test_render_verdict(self):
             def verdict(checks):
                 return tool.render('0/1', False, checks, {})[1]
@@ -152,6 +176,11 @@ MUTANTS = [
     ("if rc and source.is_file():", "if source.is_file():"),
     ("handle.seek(max(0, size - limit))", "handle.seek(0)"),
     ("    if kept.exists():\n        shutil.rmtree(kept)\n    kept.mkdir(parents=True)", "    kept.mkdir(parents=True, exist_ok=True)"),
+    ("base = Path(paths[-1]) if paths else None", "base = Path(paths[0]) if paths else None"),
+    ("take = min(size, per_file, limit - total)", "take = min(size, limit - total)"),
+    ("take = min(size, per_file, limit - total)", "take = min(size, per_file)"),
+    ("if not source.is_file() or not EVIDENCE_NAMES.search(source.name):", "if not source.is_file():"),
+    ("handle.seek(size - take)", "handle.seek(0)"),
 ]
 
 
