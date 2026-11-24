@@ -15,7 +15,10 @@ def run(ctx):
     source = (ctx.root / 'userland/tests/snd2_test.c').read_text()
     mutants = [
         ('index += step;', 'index += step + 1;'),
-        ('written - FRAMES + PERIOD', 'written - FRAMES + 2 * PERIOD'),
+        ('written - FRAMES + (frames - sent)', 'written - FRAMES + PERIOD'),
+        ('target = (target + PERIOD - 1) / PERIOD * PERIOD;', ''),
+        ('if (full_waits > 1) target += PERIOD;', ''),
+        ('++full_waits > PERIOD', '0'),
         ('max_writer_us = now - prev_us', 'max_writer_us = 0'),
         ('pos.epoch != previous.epoch + 1U', '0'),
         ('pos.played <= recovered.played', 'pos.played < recovered.played'),
