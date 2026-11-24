@@ -1,4 +1,4 @@
-#include "fm.h"
+#include "opn_probe.h"
 
 /* Model only the two bank-zero ports. Unexpected accesses fail the case. */
 enum scenario {

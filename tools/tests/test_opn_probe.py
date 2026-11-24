@@ -9,6 +9,7 @@ import host32
 
 CHECK = dict(name='opn-probe-host', tier=1, needs=[], budget=2,
     covers=['drivers/sound/fm/opn_probe.c', 'drivers/sound/fm/fm.h',
+            'drivers/sound/fm/opn_probe.h',
             'include/fm_contract.h', 'include/types.h', 'include/callconv.h',
             'tools/tests/test_opn_probe.py', 'tools/tests/opn_probe_host.c',
             'tools/tests/pcm_hostshim/io.h', 'tools/tests/host32.py'],

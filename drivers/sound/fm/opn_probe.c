@@ -1,4 +1,5 @@
 /* PC-98 0188h probe (SYNTH_OPNA_DESIGN §6). Bank 1 may not exist. */
+#include "opn_probe.h"
 #include "fm.h"
 #include "io.h"
 
