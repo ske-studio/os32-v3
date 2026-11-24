@@ -33,7 +33,7 @@ int snd2_owned_device(u32 id, Snd2Device **out)
 
 /* Enter locked. Consume the caller's saved flags before releasing resources.
  * A failed resync stop supplies its proof result directly (never retry it). */
-static void teardown(Snd2Device *d, unsigned flags, int stop_failed, int opened)
+static int teardown(Snd2Device *d, unsigned flags, int stop_failed, int opened)
 {
     Snd2Stream *s = &d->stream;
     s->closing = 1;
@@ -52,6 +52,7 @@ static void teardown(Snd2Device *d, unsigned flags, int stop_failed, int opened)
     s->closing = d->writing;
     if (!leak) s->state = SND2_ST_IDLE;
     irq_restore(flags);
+    return leak ? OS32_ERR_IO : 0;
 }
 
 void snd2_teardown_device(Snd2Device *d)
@@ -279,8 +280,7 @@ int snd2_stream_close(u32 id, u32 how)
     Snd2Stream *s = &d->stream;
     if (how == SND2_CLOSE_ABORT || s->state == SND2_ST_FAULTED ||
         (s->state == SND2_ST_IDLE && s->written == s->played)) {
-        teardown(d, flags, 0, 1);
-        return 0;
+        return teardown(d, flags, 0, 1);
     }
     if (s->state == SND2_ST_DRAIN) {
         irq_restore(flags);
@@ -305,13 +305,13 @@ int snd2_stream_close(u32 id, u32 how)
     for (;;) {
         flags = irq_save();
         if (s->gen != gen || s->closing) {
-            rc = s->owner || s->played != s->written ? OS32_ERR_IO : 0;
+            rc = s->state == SND2_ST_FAULTED || s->owner || s->played != s->written ? OS32_ERR_IO : 0;
             break;
         }
         if (s->state != SND2_ST_DRAIN || tick_clock_ms() - begin >= timeout) {
             rc = s->played == s->written ? 0 : OS32_ERR_IO;
-            teardown(d, flags, 0, 1);
-            return rc;
+            int stop_rc = teardown(d, flags, 0, 1);
+            return stop_rc ? stop_rc : rc;
         }
         irq_restore(flags);
         exec_sys_yield();

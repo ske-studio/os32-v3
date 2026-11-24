@@ -18,6 +18,11 @@ CHECK = dict(name='pcm-refill-host', tier=4, needs=[], budget=3,
 ROOT = Path(__file__).resolve().parents[2]
 HAL = ROOT / 'sound/hal'
 MUTATIONS = [
+    ('seg', 'if (!have_pos) return 0;', 'if (!have_pos) hw = s->last_hw;'),
+    ('seg', 'if (!s->paused) {', 'if (!s->paused && s->state != SND2_ST_DRAIN) {'),
+    ('seg', 'if (hw != s->last_hw) s->last_progress_ms',
+     'if (hw == s->last_hw) s->copied -= s->seg_n[(p + 1) % s->nseg];\n'
+     '    if (hw != s->last_hw) s->last_progress_ms'),
     ('seg', 'hw % s->period >=', 'hw % s->period >'),
     ('seg', 'i == 1 && inside_margin', 'i == 2 && inside_margin'),
     ('seg', 's->copied = s->played;\n    s->last_hw', 's->last_hw'),

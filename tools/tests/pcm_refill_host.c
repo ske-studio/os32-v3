@@ -3,8 +3,11 @@
 
 #define REQUIRE(x) do { if (!(x)) return 1; } while (0)
 
+static u32 copies;
+
 void *kmemcpy(void *dst, const void *src, u32 bytes)
 {
+    ++copies;
     for (u32 i = 0; i < bytes; ++i) ((u8 *)dst)[i] = ((const u8 *)src)[i];
     return dst;
 }
@@ -15,11 +18,11 @@ void *kmemset(void *dst, int value, u32 bytes)
     return dst;
 }
 
-static int verify(u32 rate, u32 p)
+static int verify(u32 rate, u32 p, int state)
 {
     static u32 dma[4096], staging[8192];
     Snd2Stream s = {
-        .fmt = {rate, 16, 2, SND2_ENC_S16LE, 0}, .state = SND2_ST_RUN,
+        .fmt = {rate, 16, 2, SND2_ENC_S16LE, 0}, .state = state,
         .period = 2048, .lead = 1, .nseg = 2, .margin = 512,
         .ring = (u8 *)dma, .stg = (u8 *)staging, .stg_frames = 8192
     };
@@ -31,7 +34,16 @@ static int verify(u32 rate, u32 p)
     /* Last safe frame and first protected frame, in either half. */
     u32 next = (p + 2048) % 4096;
     s.written += 17;
+    /* A failed DMA read leaves pending samples queued for a valid position. */
+    u32 before = copies;
+    REQUIRE(!snd2_seg_observe(&s, 0, next, 2));
+    REQUIRE(copies == before && s.last_hw == p && s.played == p &&
+            s.copied == p + 2048 && !dma[next]);
     REQUIRE(!snd2_seg_observe(&s, 1, p + 1535, 2));
+    /* IRQ and tick observe the same DMA position after the first refill. */
+    before = copies;
+    REQUIRE(!snd2_seg_observe(&s, 1, p + 1535, 3));
+    REQUIRE(copies == before && s.played == p && s.copied == p + 2065);
     REQUIRE(dma[next + 16] == p + 2065 && !dma[next + 17]);
     s.written += 23;
     REQUIRE(!snd2_seg_observe(&s, 1, p + 1536, 3));
@@ -52,8 +64,10 @@ static int verify(u32 rate, u32 p)
 
 void _start(void)
 {
-    int rc = verify(44100, 0) || verify(44100, 2048) ||
-             verify(22050, 0) || verify(22050, 2048);
+    int rc = 0;
+    for (u32 rate = 22050; rate <= 44100; rate *= 2)
+        for (u32 p = 0; p < 4096; p += 2048)
+            rc |= verify(rate, p, SND2_ST_RUN) || verify(rate, p, SND2_ST_DRAIN);
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc));
     __builtin_unreachable();
 }
