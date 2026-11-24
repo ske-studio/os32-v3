@@ -14,7 +14,7 @@ $(OPNA_ARCHIVE): $(wildcard lib/os32_opna/src/*.rs) lib/os32_opna/Cargo.toml lib
 	    --manifest-path lib/os32_opna/Cargo.toml --target "$(OPNA_TARGET)"
 
 SND_DIR := userland/lib/snd
-SND_OBJ := $(SND_DIR)/mix.o $(SND_DIR)/panic.o
+SND_OBJ := $(SND_DIR)/mix.o $(SND_DIR)/panic.o $(SND_DIR)/render.o
 ALL_LIB_OBJ += $(SND_OBJ)
 # L2/L3 call these private interfaces inside the shared library.
 SND_INTERNAL := opna_init opna_reset opna_write opna_read opna_status opna_rhythm \
@@ -28,14 +28,14 @@ $(SND_DIR)/header.o: $(SND_DIR)/header.asm $(SND_DIR)/entries.inc sdk/crt/genera
 	nasm -f elf32 $< -o $@
 
 userland/libos32snd.elf: $(SND_DIR)/header.o $(SND_OBJ) $(OPNA_ARCHIVE) sdk/link/shlib.ld build/os32snd.mk
-	$(LD) -m elf_i386 -T sdk/link/shlib.ld --nmagic --gc-sections \
+	$(LD) -m elf_i386 --defsym=__os32_sound_image=1 -T sdk/link/shlib.ld --nmagic --gc-sections \
 	    $(addprefix -u ,$(SND_INTERNAL)) -o $@ $(filter %.o %.a,$^) \
 	    $(shell $(CC) -print-libgcc-file-name)
 
 userland/libos32snd.raw: userland/libos32snd.elf
 	$(OBJCOPY) -O binary $< $@
 
-userland/libos32snd.shlib: userland/libos32snd.raw userland/libos32snd.elf tools/mkshlib.py sdk/os32x_hdr.py sdk/os32_generations.py $(SND_DIR)/entries.inc tools/check_isa386.py tools/check_privileged.py
+userland/libos32snd.shlib: userland/libos32snd.raw userland/libos32snd.elf tools/mkshlib.py sdk/os32x_hdr.py sdk/os32_generations.py $(SND_DIR)/entries.inc sdk/include/os32/os32_sndl_table.h tools/check_isa386.py tools/check_privileged.py
 	python3 tools/check_isa386.py --integer-only userland/libos32snd.elf
 	python3 tools/mkshlib.py $< $@ --elf userland/libos32snd.elf --entries $(SND_DIR)/entries.inc
 

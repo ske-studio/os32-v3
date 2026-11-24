@@ -226,6 +226,11 @@ void _start(void)
 }
 
 int as_va_to_pa_read(u32 pd,u32 va,u32 *pa) { (void)pd; *pa=va; return 0; }
+int appslot_start_reserve(int gui) { return appslot_start_admit(gui, 0, 0); }
+void appslot_start_release(int id) { (void)id; }
+int shlib_sound_acquire(int (*cancelled)(void)) { (void)cancelled; return -1; }
+int shlib_sound_attach(struct addrspace *as) { (void)as; return -1; }
+u32 shlib_sound_data_pages(void) { return 0; }
 int shlib_loaded(void) { return 0; }
 u32 shlib_data_pages(void) { return 0; }
 

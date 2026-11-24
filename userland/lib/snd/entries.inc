@@ -6,3 +6,5 @@ SND_ENTRY sndl_voice_stop
 SND_ENTRY sndl_voice_reset
 SND_ENTRY sndl_voice_delete
 SND_ENTRY sndl_voice_done
+SND_ENTRY sndl_init
+SND_ENTRY sndl_render

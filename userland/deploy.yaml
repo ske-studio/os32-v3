@@ -237,6 +237,9 @@ filesystem:
       guest: /usr/bin/
       tags: [test]
     # --- T2h h2 stack preparation, default 256KiB / explicit 512KiB ---
+    - host: userland/tests/sndl_test.bin
+      guest: /usr/bin/
+      tags: [test]
     - host: userland/tests/h2_stack.bin
       guest: /usr/bin/
       tags: [test]

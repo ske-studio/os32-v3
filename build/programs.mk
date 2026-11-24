@@ -405,6 +405,7 @@ endef
 
 # --- テストプログラム登録 ---
 
+$(eval $(call DEFINE_TEST,sndl_test,$$(LIBDIR)/libos32sndl.a,,userland/tests))
 $(eval $(call DEFINE_TEST,mmtimetest,$$(LIBMMTIME_OBJ),$$(INC_libmmtime),userland/diag))
 
 $(eval $(call DEFINE_TEST,gfx2_i2,$$(GFX_OBJ),$$(INC_libos32gfx),userland/tests))

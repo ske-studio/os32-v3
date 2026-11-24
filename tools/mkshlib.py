@@ -46,6 +46,7 @@ OS32_SHLIB_ENTRY_OFF = 32
 OS32_SHLIB_MAX_FUNC = (OS32_SHLIB_HDR_SIZE - OS32_SHLIB_ENTRY_OFF) // 4
 
 MEM_SHLIB_BASE = 0x80000000
+MEM_SHLIB_SND_BASE = 0x80080000
 PAGE = 4096
 
 SHLIB_RS = os.path.join(REPO, 'userland', 'rust', 'libos32gui', 'src', 'shlib.rs')
@@ -174,10 +175,30 @@ def die(msg):
     sys.exit(1)
 
 
+def sound_table(path):
+    with open(path, encoding='ascii') as f:
+        entries = [line.split()[1] for line in f if line.startswith('SND_ENTRY ')]
+    if not 0 < len(entries) <= OS32_SHLIB_MAX_FUNC or len(set(entries)) != len(entries):
+        die("invalid sound entry table")
+    with open(os.path.join(REPO, 'sdk/include/os32/os32_sndl_table.h'), encoding='ascii') as f:
+        source = f.read()
+    stub = re.findall(r'^    SNDL_E_([A-Z_]+),$', source, re.M)
+    if entries != ['sndl_' + name.lower() for name in stub]:
+        die("sound SDK and library entry order differ")
+    version = re.search(r'^#define SNDL_TABLE_VERSION (\d+)$', source, re.M)
+    if not version:
+        die("missing sound SDK table version")
+    return entries, int(version[1]), len(entries)
+
+
 def main():
     argv = sys.argv[1:]
     if not argv or argv[0] == '--check':
-        sys.exit(0 if check_table() else 1)
+        if not check_table():
+            sys.exit(1)
+        _, version, count = sound_table(os.path.join(REPO, 'userland/lib/snd/entries.inc'))
+        print(f"  mkshlib: sound table OK ({count} entries, version={version})")
+        return
     if len(argv) < 2:
         print(__doc__)
         sys.exit(1)
@@ -192,10 +213,7 @@ def main():
             elf_path = argv[i + 1]
             i += 2
         elif argv[i] == '--entries' and i + 1 < len(argv):
-            with open(argv[i + 1], encoding='ascii') as f:
-                entries = [line.split()[1] for line in f if line.startswith('SND_ENTRY ')]
-            if not 0 < len(entries) <= OS32_SHLIB_MAX_FUNC or len(set(entries)) != len(entries):
-                die("invalid sound entry table")
+            entries = argv[i + 1]
             i += 2
         elif argv[i] == '--api' and i + 1 < len(argv):
             min_api = int(argv[i + 1], 0)
@@ -205,7 +223,7 @@ def main():
     if not elf_path:
         die("--elf <lib.elf> が要ります (ページ数と BSS をここから求めます)")
 
-    checked = check_table() if entries is None else (entries, 1, len(entries))
+    checked = check_table() if entries is None else sound_table(entries)
     if checked is None:
         sys.exit(1)
     names, want_version, want_nfunc = checked
@@ -227,13 +245,16 @@ def main():
             "(sdk/link/shlib.ld でリンクしていますか)")
     if data_start % PAGE or data_end % PAGE:
         die(f"data 範囲がページ境界にありません: {data_start:#x}..{data_end:#x}")
+    base = MEM_SHLIB_BASE if entries is None else MEM_SHLIB_SND_BASE
+    if data_end < data_start or data_end > H.OS32X_APP_LOAD_ADDR or base + len(raw) > H.OS32X_APP_LOAD_ADDR:
+        die("shared image exceeds slot")
     hdr_addr = elf.symbols.get('__os32_shlib_header')
-    if hdr_addr is not None and hdr_addr != MEM_SHLIB_BASE:
-        die(f"ヘッダが {hdr_addr:#x} にあります (期待 {MEM_SHLIB_BASE:#x})")
+    if hdr_addr != base:
+        die(f"ヘッダが {hdr_addr!r} にあります (期待 {base:#x})")
 
-    text_pages = (data_start - MEM_SHLIB_BASE) // PAGE
+    text_pages = (data_start - base) // PAGE
     data_pages = (data_end - data_start) // PAGE
-    if text_pages <= 0 or data_start - MEM_SHLIB_BASE > len(raw):
+    if text_pages <= 0 or data_start - base > len(raw):
         die("invalid shlib code range")
 
     # --- 先頭 32B の検算 / 穴埋め ---
@@ -269,7 +290,7 @@ def main():
             bad.append(f"#{i} {sym}: ELF にシンボルがありません")
         elif got != want:
             bad.append(f"#{i} {sym}: entry={got:#x} だがシンボルは {want:#x}")
-        elif not (MEM_SHLIB_BASE + PAGE <= got < data_start):
+        elif not (base + PAGE <= got < data_start):
             bad.append(f"#{i} {sym}: {got:#x} が共有 .text の外です")
     if bad:
         print("mkshlib: ジャンプ表の中身が壊れています —", file=sys.stderr)
@@ -278,19 +299,19 @@ def main():
         sys.exit(1)
 
     # --- 本文 (.text/.rodata/.data) が data_end を越えていないか ---
-    image_end = MEM_SHLIB_BASE + len(raw)
+    image_end = base + len(raw)
     if image_end > data_end:
         die(f"生イメージが data 範囲を越えています ({image_end:#x} > {data_end:#x})")
 
     # --- OS32X ヘッダ v5 (エントリは使わない: 入口はジャンプ表) ---
-    #   load_addr     = MEM_SHLIB_BASE (カーネルは見ないが v2 の欄として正しく埋める)
+    #   load_addr     = base (カーネルは見ないが v2 の欄として正しく埋める)
     #   kapi_data_off = os32api の刻印 (票 TASK_KAPI_DATA_FIELDS)
     bss = elf.bss_size()
     try:
         kapi_data_off = H.read_kapi_layout(elf)
         H.check_raw_matches_elf(elf, raw_as_read, in_path)
         header = H.build_header(OS32X_FLAG_SHLIB, 0, len(raw), bss, 0,
-                                min_api, MEM_SHLIB_BASE, kapi_data_off, data_start - MEM_SHLIB_BASE, shlib_protocol=H.OS32_SHLIB_PROTOCOL)
+                                min_api, base, kapi_data_off, data_start - base, shlib_protocol=H.OS32_SHLIB_PROTOCOL)
     except H.HeaderError as e:
         die(str(e))
     with open(out_path, 'wb') as f:

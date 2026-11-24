@@ -95,6 +95,9 @@ volatile u32 appslot_trim_pages_total;
 volatile int g_gfx_owner = GFX_OWNER_WM;
 static u32 gfx_resource_owner, gfx_resource_gen, next_resource_gen;
 
+/* A launch owns its ID before its context becomes visible to callers. */
+static unsigned int launch_reservations;
+
 static AppSlot g_slot[APP_SLOT_COUNT];
 static int g_cur = APP_ID_SHELL;
 
@@ -165,6 +168,7 @@ void appslot_init(void)
     int i;
 
     /* GUI セッションを跨いで古い tick を引きずらない (票 T8 D8)。 */
+    launch_reservations = 0;
     appslot_gui_registration(0);
     g_poll_last_tick = 0;
     for (i = 0; i < APP_SLOT_COUNT; i++) {
@@ -247,7 +251,7 @@ int appslot_alloc_id(void)
 {
     int i;
     for (i = APP_ID_MIN; i <= APP_ID_MAX; i++) {
-        if (g_slot[i].state == APP_STATE_FREE) return i;
+        if (g_slot[i].state == APP_STATE_FREE && !(launch_reservations & (1u << i))) return i;
     }
     return 0;
 }
@@ -284,12 +288,31 @@ int appslot_start_admit(int gui, u32 pages, u32 free_pages)
     return id;
 }
 
+int appslot_start_reserve(int gui)
+{
+    unsigned int irq = irq_save();
+    int id = appslot_start_admit(gui, 0, 0);
+    if (id > 0) launch_reservations |= 1u << id;
+    irq_restore(irq);
+    return id;
+}
+
+void appslot_start_release(int id)
+{
+    unsigned int irq = irq_save();
+    if (id >= APP_ID_MIN && id <= APP_ID_MAX && (launch_reservations & (1u << id))) {
+        slot_zero(&g_slot[id]);
+        launch_reservations &= ~(1u << id);
+    }
+    irq_restore(irq);
+}
+
 void appslot_start_commit(int id, int gui, u32 pages)
 {
     AppSlot *a = appslot_at(id);
     AppSlot *parent = appslot_at(g_cur);
     if (!a) return;
-    a->state = APP_STATE_RUNNING;
+    unsigned irq = irq_save();
     a->parent = g_cur;
     a->depth = (parent ? parent->depth : 1) + 1;
     a->gui = gui;
@@ -305,8 +328,11 @@ void appslot_start_commit(int id, int gui, u32 pages)
     a->last_kernel_tick = 0;
     a->trim_pending = 0;
     a->trim_epoch = 0;
+    a->state = APP_STATE_RUNNING;
+    launch_reservations &= ~(1u << id);
     g_cur = id;
     res_owner_set(id);
+    irq_restore(irq);
     /* 初回 entry は「生存アプリの集合が変わる瞬間」で、生存アプリ間の
      * 実行切替ではない (D0)。受入 G7 が数える switch とは別勘定にする。 */
     ring3_transition_count++;

@@ -331,22 +331,22 @@ static void host_start(void)
         shared[idx] &= ~PTE_RW;
     }
     /* Real shlib registry: exact page, live ledger, RO input only. */
-    g_loaded = 1; g_text_pages = 2;
-    g_pages[0] = pgalloc_alloc_phys(LEDGER_OWNER_SHLIB, 1);
-    g_pages[1] = pgalloc_alloc_phys(LEDGER_OWNER_SHLIB, 1);
-    pt[0] = g_pages[0] | PAGE_RO | PTE_USER;
-    probe(MEM_SHLIB_BASE, 0, 1, g_pages[0]);
+    gui.loaded = 1; gui.text_pages = 2;
+    gui.pages[0] = pgalloc_alloc_phys(LEDGER_OWNER_SHLIB, 1);
+    gui.pages[1] = pgalloc_alloc_phys(LEDGER_OWNER_SHLIB, 1);
+    pt[0] = gui.pages[0] | PAGE_RO | PTE_USER;
+    probe(MEM_SHLIB_BASE, 0, 1, gui.pages[0]);
     probe(MEM_SHLIB_BASE, 1, 0, 0);
     pt[0] |= PTE_RW; probe(MEM_SHLIB_BASE, 1, 0, 0);
-    CHECK(ledger_transfer(g_pages[0] / PAGE_SIZE, 1, LEDGER_OWNER_SHLIB, other));
+    CHECK(ledger_transfer(gui.pages[0] / PAGE_SIZE, 1, LEDGER_OWNER_SHLIB, other));
     probe(MEM_SHLIB_BASE, 0, 0, 0);
-    CHECK(ledger_transfer(g_pages[0] / PAGE_SIZE, 1, other, LEDGER_OWNER_SHLIB));
+    CHECK(ledger_transfer(gui.pages[0] / PAGE_SIZE, 1, other, LEDGER_OWNER_SHLIB));
     /* A registered data original is not shared read payload. */
-    g_pages[2] = pgalloc_alloc_phys(LEDGER_OWNER_SHLIB, 1);
-    pt[2] = g_pages[2] | PAGE_RO | PTE_USER;
+    gui.pages[2] = pgalloc_alloc_phys(LEDGER_OWNER_SHLIB, 1);
+    pt[2] = gui.pages[2] | PAGE_RO | PTE_USER;
     probe(MEM_SHLIB_BASE + 2 * PAGE_SIZE, 0, 0, 0);
     pt[2] = 0;
-    pt[0] = g_pages[1] | PAGE_RO | PTE_USER;
+    pt[0] = gui.pages[1] | PAGE_RO | PTE_USER;
     probe(MEM_SHLIB_BASE, 0, 0, 0);
     /* RAM lease: exact surface generation/backing, even when closing. */
     {

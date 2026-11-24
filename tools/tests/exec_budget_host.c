@@ -5,15 +5,15 @@
 #include "exec.h"
 static AppSlot slots[APP_SLOT_COUNT];
 static u32 parent_heap = 73, saved_heap, restores, admits;
-static u32 extra_pages, need_seen;
+static u32 extra_pages;
 static int fail_kheap;
 AppSlot *appslot_at(int id) { return &slots[id]; }
 static int g_cur = APP_ID_SHELL;
 int appslot_alloc_id(void) { return 2; }
 #include "budget_admit.inc"
-static int budget_admit(int gui, u32 pages, u32 free_pages) {
-    admits++; need_seen = pages;
-    return appslot_start_admit(gui, pages, free_pages);
+static int budget_reserve(int gui) {
+    admits++;
+    return appslot_start_admit(gui, 0, 0);
 }
 static void shell_print(const char *s, u8 attr) { (void)s; (void)attr; }
 static void shell_print_dec(u32 n, u8 attr) { (void)n; (void)attr; }
@@ -28,9 +28,11 @@ static int exec_launch_abort(int launcher, int id, int rc) {
 }
 static void *budget_kmalloc(u32 bytes) { return fail_kheap ? 0 : kmalloc(bytes); }
 u32 shlib_data_pages(void) { return extra_pages; }
-static u32 g_loaded, g_text_pages, g_data_pages, g_data_vaddr;
-static u32 g_pages[5];
+#include "config.h"
 #include "budget_shlib.inc"
+int ring3_wait_pending(void) { return 0; }
+int shlib_sound_acquire(int (*cancelled)(void)) { (void)cancelled; return -1; }
+void appslot_start_release(int id) { (void)id; }
 static KernelAPI api, *kapi = &api;
 #include "budget_launch.inc"
 
@@ -64,14 +66,15 @@ static void unchanged_failure(u32 heap_bytes, int exhaust) {
 static void launch_case(u32 image, u32 requested, u32 stack, u32 extra, u32 expected_heap) {
     u32 free = pgalloc_free_pages();
     extra_pages = extra;
-    g_loaded = extra != 0; g_text_pages = g_loaded; g_data_pages = extra;
-    g_data_vaddr = MEM_SHLIB_BASE + PAGE_SIZE;
-    for (u32 i = 0; i < 5; i++) g_pages[i] = MEM_PHYS_EXEC_FLOOR;
+    gui.loaded = extra != 0; gui.text_pages = gui.loaded; gui.data_pages = extra;
+    gui.data_vaddr = MEM_SHLIB_BASE + PAGE_SIZE;
+    for (u32 i = 0; i < 5; i++) gui.pages[i] = MEM_PHYS_EXEC_FLOOR;
     CHECK(budget_launch(0, image, requested, stack) == 2);
     AppSlot *a = &slots[2];
+    if (image == GUI_IMAGE_BYTES && extra == 4) CHECK(a->pages == GUI_NEED_PAGES);
     CHECK(a->exec_heap_size == expected_heap);
     CHECK(a->sbrk_heap_limit == PAGE_ALIGN_UP(MEM_EXEC_LOAD_ADDR + image) + PAGE_SIZE);
-    CHECK(free - pgalloc_free_pages() == a->pages && a->pages == need_seen);
+    CHECK(free - pgalloc_free_pages() == a->pages);
     CHECK(a->as->appmem.e[0].kind == APPMEM_LIBC_INITIAL &&
           a->as->appmem.e[0].end - a->as->appmem.e[0].base == PAGE_SIZE);
     CHECK(a->as->appmem.e[1].kind == APPMEM_EXEC_INITIAL &&
@@ -104,7 +107,7 @@ void _start(void) {
      * The request still fits VA; admission must reject its physical budget. */
     u32 available = pgalloc_free_pages(), before_admits = admits;
     unchanged_failure((available + 1) * PAGE_SIZE, 0);
-    CHECK(admits == before_admits + 1 && need_seen > available);
+    CHECK(admits == before_admits);
     unchanged_failure(0, 1);
     const u32 resident[] = {0, 1, MEM_SHELL_EXEC_HEAP_SIZE};
     const u32 limit = MEM_SHELL_HEAP_BASE;
@@ -142,10 +145,10 @@ void _start(void) {
                                 PHYSMEM_LEGACY_MAX_PFN, LEDGER_BOTTOM_UP, &held));
     CHECK(pgalloc_free_pages() == 768);
     launch_case(GUI_IMAGE_BYTES, 0, 0, 4, MEM_EXEC_HEAP_MIN);
-    CHECK(need_seen == GUI_NEED_PAGES && need_seen <= 768);
+    CHECK(GUI_NEED_PAGES <= 768);
     CHECK(pgalloc_free_n_owner(LEDGER_OWNER_KERNEL, held, reserve));
     /* Each partial image/heap/stack allocation failure goes through actual abort. */
-    extra_pages = 0; g_loaded = 0;
+    extra_pages = 0; gui.loaded = 0;
     for (u32 i = 1; i <= 2 + 16 + 64; i++) {
         app_fail_at = i; app_alloc_calls = 0;
         CHECK(budget_launch(0, PAGE_SIZE, 0, 0) == EXEC_ERR_NOMEM);

@@ -457,7 +457,11 @@ MIRRORS = (
     ("sdk/link/app_sys.ld", r"__os32_shell_load_addr = (0x[0-9A-Fa-f]+);", "MEM_SHELL_LOAD_ADDR"),
     ("tools/mkshlib.py", r"MEM_SHLIB_BASE = (0x[0-9A-Fa-f]+)", "MEM_SHLIB_BASE"),
     ("sdk/link/app.ld", r"\. = (0x[0-9A-Fa-f]+);", "MEM_EXEC_LOAD_ADDR"),
-    ("sdk/link/shlib.ld", r"\. = (0x[0-9A-Fa-f]+);", "MEM_SHLIB_BASE"),
+    ("sdk/link/shlib.ld", r"ASSERT\(__shlib_data_end <= (0x[0-9A-Fa-f]+)", "MEM_SHLIB_END"),
+    ("sdk/link/shlib.ld", r"__os32_sound_image\) \? (0x[0-9A-Fa-f]+)", "MEM_SHLIB_SND_BASE"),
+    ("sdk/include/os32/os32_sndl_table.h", r"SNDL_BASE (0x[0-9A-Fa-f]+)", "MEM_SHLIB_SND_BASE"),
+    ("tools/mkshlib.py", r"MEM_SHLIB_SND_BASE = (0x[0-9A-Fa-f]+)", "MEM_SHLIB_SND_BASE"),
+    ("sdk/link/shlib.ld", r"__os32_sound_image\) \? 0x[0-9A-Fa-f]+ : (0x[0-9A-Fa-f]+);", "MEM_SHLIB_BASE"),
     ("sdk/rust/os32api/src/gui/stub.rs", r"MEM_SHLIB_BASE: u32 = (0x[0-9A-Fa-f_]+);", "MEM_SHLIB_BASE"),
 
     ("build/os32.ld", r"^\s*MEM_FIXED_PAGING_BASE\s*=\s*(0x[0-9A-Fa-f]+)\s*;", "MEM_FIXED_PAGING_BASE"),

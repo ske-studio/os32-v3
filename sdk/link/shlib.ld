@@ -20,7 +20,8 @@ __os32_abi_2_mem_4_fmt_5 = 0;
 ENTRY(__os32_shlib_header)
 SECTIONS
 {
-    . = 0x80000000;
+    . = DEFINED(__os32_sound_image) ? 0x80080000 : 0x80000000;
+    __shlib_base = .;
 
     /* --- 先頭ページ: ヘッダ + ジャンプ表 (ちょうど 4KB に切り上げる) --- */
     .shlib_hdr : {
@@ -64,8 +65,10 @@ SECTIONS
     _end = .;
 
     /* ヘッダに埋める値 (絶対シンボル)。 */
-    __shlib_text_pages = ABSOLUTE((__shlib_data_start - 0x80000000) / 4096);
+    __shlib_text_pages = ABSOLUTE((__shlib_data_start - __shlib_base) / 4096);
     __shlib_data_pages = ABSOLUTE((__shlib_data_end - __shlib_data_start) / 4096);
+
+    ASSERT(__shlib_data_end <= 0x80100000, "shared image exceeds application boundary")
 
     /* KAPI データ欄の配置の刻印 (票 TASK_KAPI_DATA_FIELDS、ヘッダ v3)。
      * shlib は crt0 を持たないので os32api (Rust) の刻印がここに入る。

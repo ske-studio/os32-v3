@@ -11,20 +11,27 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-Wall', '-Wextra', '-Werror']
 SRC = ROOT / 'tools/tests/shlib_high_host.c'
 MUTATIONS = [
+ ('waiter-republishes', '        return waiter.result;', '        if (!waiter.result) kmemcpy(&sound, &sound, sizeof(sound));\n        return waiter.result;'),
+ ('sound-boundary-equal', 'gui.data_pages > (sound.base', 'gui.data_pages >= (sound.base'),
+ ('sound-boundary-ignored', 'gui.text_pages + gui.data_pages >', 'gui.text_pages + gui.data_pages + 256 <'),
+ ('sound-table-short', 'sh->nfunc < SNDL_V1_MIN_ENTRIES', 'sh->nfunc < 1'),
+ ('sound-private-original', 'phys, PAGE_RW | PTE_USER)', 'image->base == MEM_SHLIB_SND_BASE ? image->pages[image->text_pages + i] : phys, PAGE_RW | PTE_USER)'),
+ ('partial-pt-leak', '    paging_addrspace_drop_empty_pt(as, image->base);', ''),
+
  ('protocol-misreported-as-min-api', 'if (layout == OS32X_LAYOUT_MIN_API)',
   'if (oh.min_api_ver > KAPI_VERSION)'),
  ('code-boundary-mismatch', 'oh.code_size != sh->text_pages * PAGE_SIZE', '0'),
 
- ('text-writable', 'g_pages[i], PAGE_RO | PTE_USER)', 'g_pages[i], PAGE_RW | PTE_USER)'),
- ('no-original-cleanup', 'if (g_pages[i]) pgalloc_free_n_owner', 'if (0) pgalloc_free_n_owner'),
+ ('text-writable', 'image->pages[i], PAGE_RO | PTE_USER)', 'image->pages[i], PAGE_RW | PTE_USER)'),
+ ('no-original-cleanup', 'if (image->pages[i]) pgalloc_free_n_owner', 'if (0) pgalloc_free_n_owner'),
  ('no-attach-rollback', '    shlib_addrspace_detach(as);', '    (void)as;'),
- ('no-private-copy', '        kmemcpy(P2V(phys), P2V(g_pages[g_text_pages + i]), PAGE_SIZE);', '        kmemset(P2V(phys), 0, PAGE_SIZE);'),
+ ('no-private-copy', '        kmemcpy(P2V(phys), P2V(image->pages[image->text_pages + i]), PAGE_SIZE);', '        kmemset(P2V(phys), 0, PAGE_SIZE);'),
 ]
 def run(mutation=None):
     source = (ROOT / 'mm/shlib.c').read_text()
     if mutation:
         _, old, new = mutation
-        if old not in source:
+        if source.count(old) != 1:
             raise SystemExit('変異 %s の当て先が見つからない' % mutation[0])
         source = source.replace(old, new, 1)
     with tempfile.TemporaryDirectory(prefix='os32-app-bb-') as tmp:
@@ -40,8 +47,8 @@ def run(mutation=None):
         includes = include_flags(ROOT) + ['-I' + str(tmp)]
         host_includes = ['-I' + str(ROOT / 'tools/tests/host_arch')] + includes
         exe = tmp / 'app_bb_overlap'
-        cmd = ['gcc', *linker_flags(), *FLAGS, '-DPHYSMEM_HOST_TEST=1', '-nostdlib', '-static', '-no-pie',
-               *host_includes, str(SRC), str(ROOT / 'mm/physmem.c'), str(ROOT / 'exec/os32x_hdr.c'), '-o', str(exe)]
+        cmd = ['gcc', *linker_flags(), *FLAGS, '-DPHYSMEM_HOST_TEST=1', '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections', '-nostdlib', '-static', '-no-pie',
+               *host_includes, str(SRC), str(ROOT / 'mm/physmem.c'), str(ROOT / 'exec/os32x_hdr.c'), str(ROOT / 'exec/appslot.c'), '-o', str(exe)]
         build = subprocess.run(cmd, capture_output=bool(mutation))
         if build.returncode != 0:
             if mutation:

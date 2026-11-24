@@ -15,6 +15,11 @@ from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 
 MUTATIONS = (
+    ('shared-header-buffer', 'source', '    u8 hdrbuf[OS32X_HDR_SIZE];', '    static u8 hdrbuf[OS32X_HDR_SIZE];'),
+    ('shared-resolved-path', 'source', '    char resolved[VFS_MAX_PATH];', '    static char resolved[VFS_MAX_PATH];'),
+    ('no-sound-acquire', 'source', 'int rc = exec_sound_acquire(ring3_wait_pending);', 'int rc = 0;'),
+    ('ignore-zero-free', 'source', 'if (need_pages > pgalloc_free_pages())', 'if (pgalloc_free_pages() && need_pages > pgalloc_free_pages())'),
+    ('missing-gui-dependency', 'source', '(hdr->flags & OS32X_FLAG_WITH_GUI)) && !exec_shlib_loaded()', '0) && !exec_shlib_loaded()'),
     ('child-inherits-disk-authorization', 'source',
      'ctx->disk_write_authorized = exec_disk_write_path_allowed(resolved);',
      'ctx->disk_write_authorized = appslot_at(launcher_id)->disk_write_authorized;'),

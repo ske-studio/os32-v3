@@ -456,6 +456,21 @@ XInput は in2_pad_* をそのまま / DI8 のキーボードは in2_key_state�
 
 状態はすべてアプリの中。カーネルの口は os32_snd2.h (と §9 の V86 の口) だけを使う。シングルタスクなので、ライブラリの中に排他は置かない (呼ぶのはアプリの 1 本の流れだけ)。
 
+### x86 アプリからの読み込み（LD1〜LD4）
+
+SDK の `<os32/sndl.h>` を読み、`-los32sndl` をリンクする。スタブを参照した ELF に `__os32_snd_dependency` が残り、pack が OS32X v5 の依存印を刻む。最初の呼出しでスタブが SLIB の magic、共通 protocol、音表の版と長さを確認し、そのアプリの KernelAPI を init へ渡す。
+
+| 必須の共有像 | 新規 flags | shlib_protocol |
+|---|---|---:|
+| なし | 0 | 0 |
+| GUI | 0 | 2 |
+| 音 | SND（0x0080） | 2 |
+| GUI と音 | SND と WITH_GUI（0x0100） | 2 |
+
+音の最初の要求で exec は `/sys/lib/libos32snd.shlib` を読む。音枠は `0x80080000` から `0x80100000` の直前まで。ロード済み GUI が 128 頁を超える場合は音のファイルを開く前に拒否する。GUI 単独では従来どおり 256 頁まで使用できる。音の RO 原本は常駐し、data/BSS は利用する AS ごとに複製する。exec は原本公開後の空き頁を確認してから起動 ID を予約する。PowerPC は音依存を入口前に拒否する。
+
+音表 v1 の番号 0〜7 は voice の new、submit、set、play、stop、reset、delete、done、8 は init、9 は render。`sndl_render(pcm, frames, rate)` は 1〜1024 frame を指定レートのステレオ s16le として呼び手のバッファへ書く。この経路の完了はメモリへの描画完了を表す。`sndl_test` はモノラルの正負 2 サンプルから左右 4 サンプルを照合する。装置への転送と実再生位置は §7-1・§7-3 の対象。
+
 ### 7-1. 開始と pump (R2-P1-3)
 ```c
 /* userland/lib/snd/libos32snd.h (C89) */

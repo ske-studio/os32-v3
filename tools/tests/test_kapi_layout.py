@@ -265,6 +265,24 @@ def case_mkos32x(tmp):
           "本文は .raw そのまま (刻印は平らなバイナリに入らない)")
     check(h.get("load_addr") == 0x80100000, "load_addr は ELF の .text")
 
+    for gui, snd in ((False, False), (True, False), (False, True), (True, True)):
+        marks = [name for enabled, name in ((gui, "__os32_shlib_dependency"),
+                                            (snd, "__os32_snd_dependency")) if enabled]
+        asm = "\n".join(f".globl {name}\n.set {name}, 1" for name in marks)
+        dep_elf, dep_raw = build_elf(tmp, f"dependency{int(gui)}{int(snd)}", extra_asm=asm)
+        dep_out = dep_elf.with_suffix(".bin")
+        result = mkos32x(dep_raw, dep_out, dep_elf)
+        check(result.returncode == 0, f"pack GUI={gui}, SND={snd}")
+        if result.returncode:
+            continue
+        actual = H.parse_header(dep_out.read_bytes())
+        expected = H.OS32X_FLAG_RING3 | H.OS32X_FLAG_SND if snd else 0
+        if snd and gui:
+            expected |= H.OS32X_FLAG_WITH_GUI
+        check(actual["flags"] == expected and
+              actual["shlib_protocol"] == (H.OS32_SHLIB_PROTOCOL if marks else 0),
+              f"dependency bits GUI={gui}, SND={snd}")
+
     compat_out = tmp / "compat72.bin"
     r = mkos32x(raw, compat_out, elf, api=72, opts=['--compat-api'])
     check(r.returncode == 0 and H.parse_header(compat_out.read_bytes())["min_api_ver"] == 72,

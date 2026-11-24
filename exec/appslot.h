@@ -202,6 +202,8 @@ int appslot_cui_only_admit(int gui, u32 hdr_flags);
  *         OS32_ERR_FULL (池が尽きた) / EXEC_ERR_NOMEM (物理が足りない)。
  * pages は要求する物理ページ数、free_pages は今の空き (呼び出し側が pgalloc
  * に聞いて渡す)。free_pages == 0 は「勘定しない」の合図 (CPL=0 の子)。 */
+int appslot_start_reserve(int gui);
+void appslot_start_release(int id);
 int appslot_start_admit(int gui, u32 pages, u32 free_pages);
 
 /* admit した ID を実際に走らせる (初回 entry の直前)。ring3_transition_count++。 */

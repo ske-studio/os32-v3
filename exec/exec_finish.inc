@@ -254,11 +254,10 @@ static int exec_launch_abort(int launcher_id, int id, int status)
 {
     AppSlot *a = appslot_at(id);
     if (a) {
-        /* スロットはまだ commit していない (state は FREE のまま) ので、
-         * 返すのはアプリの物理とアドレス空間だけ。回収カウンタも動かさない。 */
         paging_load_cr3(paging_kernel_pd_phys());
         exec_teardown_app(a);
         a->pages = 0;
+        appslot_start_release(id);
     }
     exec_restore_context(launcher_id);
     return status;
