@@ -28,9 +28,14 @@ int snd2_register(const SndBackend *be, void *ctx, const SND2_DevInfo *info)
         return rc;
     if (!caps.fmt_count || caps.fmt_count > SND2_MAX_FMT ||
         !caps.period_min || caps.period_min > caps.period_max ||
-        caps.period_max > caps.ring_frames / 2 || caps.ring_frames > 4096 ||
+        caps.period_max > caps.ring_frames / 2 || caps.ring_frames > SND2_MAX_RING_FRAMES ||
         (caps.dsp_units && !be->dsp_unit))
         return OS32_ERR_INVAL;
+
+    for (u32 i = 0; i < caps.fmt_count; ++i) {
+        if (!caps.fmt[i].rate)
+            return OS32_ERR_INVAL;
+    }
 
     Snd2Device *d = &snd2_devs[dev];
     d->info = *info;

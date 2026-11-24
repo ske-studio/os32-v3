@@ -10,9 +10,14 @@ CHECK = dict(name='snd2-reg-host', tier=1, needs=[], budget=3,
     basis=['docs/decisions/sound/AV_HAL_DESIGN.md §3, §13-2'])
 
 MUTATIONS = [
+    ('reg', 'if (!caps.fmt[i].rate)', 'if (!caps.fmt[0].rate)'),
+    ('reg', 'caps.ring_frames > SND2_MAX_RING_FRAMES', 'caps.ring_frames > SND2_MAX_RING_FRAMES + 1'),
+    ('reg', '#define SND2_MAX_DEV 16', '#define SND2_MAX_DEV 15'),
+    ('reg', 'return OS32_ERR_FULL;', 'return OS32_ERR_INVAL;'),
+    ('caps', 'p < c->period_min', 'p + 1 < c->period_min'),
     ('reg', 'd->info.flags |= SND2_DEV_FAULTED;', 'd->info.flags |= 0;'),
     ('caps', 'l >= c->ring_frames / p', 'l > c->ring_frames / p'),
-    ('caps', 'v1 ? 8192', 'v1 ? 4096'),
+    ('caps', 'v1 ? SND2_STG_FRAMES', 'v1 ? 4096'),
     ('dsp', 'frames > info.max_frames', 'frames >= info.max_frames'),
     ('dsp', 'i >= info.param_count', 'i > info.param_count'),
 ]
@@ -46,5 +51,5 @@ def run(ctx):
             if (case is None and rc != 0) or (case and not 0 < rc < 126):
                 raise RuntimeError(f'{case}: probe exited {rc}')
             if case:
-                print(f'RED {case[1]} (assertion at line {rc})')
+                print(f'RED {case[1]} (probe assertion offset {rc})')
     return 0

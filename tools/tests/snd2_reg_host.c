@@ -1,14 +1,17 @@
 #include "snd2.h"
 
 static int fail_stop, stops, owner = 7, caps_result, units;
+static u32 ring_frames = 4096, period_min = 257, second_rate = 48000;
 static SND2_Fmt fmt = {44100, 16, 2, SND2_ENC_S16LE, 0};
 static int caps(void *ctx, SND2_Caps *c)
 {
-    c->fmt_count = 1;
+    c->fmt_count = 2;
+    c->fmt[1] = fmt;
+    c->fmt[1].rate = second_rate;
     c->fmt[0] = fmt;
-    c->period_min = 256;
+    c->period_min = period_min;
     c->period_max = 2048;
-    c->ring_frames = 4096;
+    c->ring_frames = ring_frames;
     c->dsp_units = units;
     return caps_result;
 }
@@ -55,7 +58,8 @@ static int insert(void *c, u32 u, const i32 *p, u32 n) { return 10 + u; }
 static int process(void *c, u32 u, const i32 *p, u32 n, const void *in,
                    void *out, u32 frames, u32 fi) { return frames; }
 
-#define REQUIRE(x) do { if (!(x)) return __LINE__; } while (0)
+#define REQUIRE(x) do { if (!(x)) return __LINE__ - PROBE_LINE; } while (0)
+enum { PROBE_LINE = __LINE__ };
 int probe(void)
 {
     SndBackend be = {.abi=SND_HAL2_ABI, .caps=caps, .hw_open=open_hw,
@@ -66,6 +70,12 @@ int probe(void)
     caps_result = OS32_ERR_IO;
     REQUIRE(snd2_register(&be, 0, &info) == OS32_ERR_IO && !snd2_dev_count());
     caps_result = 0;
+    second_rate = 0;
+    REQUIRE(snd2_register(&be, 0, &info) == OS32_ERR_INVAL && !snd2_dev_count());
+    second_rate = 48000;
+    ring_frames = 4097;
+    REQUIRE(snd2_register(&be, 0, &info) == OS32_ERR_INVAL && !snd2_dev_count());
+    ring_frames = 4096;
     int dev = snd2_register(&be, 0, &info);
     REQUIRE(dev == 0 && snd2_dev_count() == 1);
     SND2_Caps c = {.dev=99};
@@ -77,6 +87,10 @@ int probe(void)
     REQUIRE(!snd2_validate_open(&desc, 0, &p,&l,&cap) && p==2048 && l==1 && cap==4096);
     REQUIRE(!snd2_validate_open(&desc, 1, &p,&l,&cap) && cap==8192);
     desc.period_frames = 256;
+    REQUIRE(snd2_validate_open(&desc, 0, &p,&l,&cap) == OS32_ERR_INVAL);
+    REQUIRE(!snd2_unregister(dev));
+    period_min = 256;
+    REQUIRE(snd2_register(&be, 0, &info) == dev);
     desc.lead_periods = 15;
     REQUIRE(!snd2_validate_open(&desc, 0, &p,&l,&cap) && cap==4096);
     desc.lead_periods = 16;
@@ -113,6 +127,9 @@ int probe(void)
     REQUIRE(snd2_dsp_process(dev,1,0,0,&a,&c,5,0)==OS32_ERR_INVAL);
     REQUIRE(snd2_dsp_process(dev,1,0,0,&a,&c,4,32)==OS32_ERR_INVAL);
     REQUIRE(snd2_dsp_process(dev,1,&a.min,2,&a,&c,4,0)==OS32_ERR_INVAL);
+    for (int slot = 2; slot < 16; ++slot)
+        REQUIRE(snd2_register(&be, 0, &info) == slot);
+    REQUIRE(snd2_register(&be, 0, &info) == OS32_ERR_FULL && snd2_dev_count() == 16);
     fail_stop = 1;
     REQUIRE(snd2_unregister(dev)==OS32_ERR_BUSY && stops==2);
     REQUIRE(snd2_unregister(dev)==OS32_ERR_BUSY && stops==2);

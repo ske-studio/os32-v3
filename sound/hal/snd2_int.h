@@ -3,15 +3,19 @@
 #include "av_contract.h"
 
 #define SND_HAL2_ABI 1
+#define SND2_MAX_RING_FRAMES 4096U
+#define SND2_MAX_SEGMENTS 16U
 typedef struct Snd2Stream {          /* sound/hal/snd2_int.h。書くのは sound/hal だけ */
     u32 gen; u8 state, paused, v1, closing; int owner;   /* 前景の文脈が書く */
     SND2_Fmt fmt; u32 period, nseg, lead, cap, margin;   /* open で決め、閉じるまで不変 */
     u32 written;                     /* 前景が IF=0 の短い区間で publish */
     u32 played, copied, epoch, underruns;                /* advance (IF=0) だけが書く */
-    u32 seg_first[16]; u16 seg_n[16];                    /* advance だけ */
+    u32 seg_first[SND2_MAX_SEGMENTS]; u16 seg_n[SND2_MAX_SEGMENTS];                    /* advance だけ */
     u8 *stg; u32 stg_frames;         /* ステージング 8192 frame = 32KB (kmalloc、DMA しない) */
     u8 *ring; u32 last_hw, last_obs_ms;                  /* ring は backend が渡す DMA の面 */
 } Snd2Stream;
+
+#define SND2_STG_FRAMES 8192U
 typedef struct SndBackend {          /* sound/hal/snd2_int.h、SND_HAL2_ABI 1 */
     u32 abi;
     int  (*caps)(void *ctx, SND2_Caps *o);
