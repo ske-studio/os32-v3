@@ -5,7 +5,7 @@
 static u32 now, hw, id, samples[1024], storage[8192], ring[4096], deadline;
 static int owner = 2, stops, releases, leaked, starts, error, stop_error;
 static int interrupted, in_copy, freed, alloc_error, open_error, pos_error;
-static int yields, drain_progress;
+static int yields, drain_progress, start_calls;
 static SND2_StreamDesc desc;
 unsigned locked;
 unsigned irq_save(void) { unsigned prev = locked; locked = 1; return prev; }
@@ -14,7 +14,8 @@ int res_owner_get(void) { return owner; }
 u32 tick_clock_ms(void) { return now; }
 i32 exec_sys_yield(void)
 {
-    if (locked) error = 1;
+    Snd2Stream *s = &snd2_device(0)->stream;
+    if (locked || s->state != SND2_ST_DRAIN || s->paused) error = 1;
     ++yields;
     now += 10;
     if (drain_progress) {
@@ -58,7 +59,7 @@ static int hw_open(void *ctx, const SND2_Fmt *fmt, u32 p, u8 **out)
     *out = (u8 *)ring;
     return open_error;
 }
-static int start(void *ctx) { (void)ctx; if (!locked) error = 1; return starts; }
+static int start(void *ctx) { (void)ctx; if (!locked) error = 1; ++start_calls; return starts; }
 static int pos(void *ctx, u32 *p) { (void)ctx; *p = hw; return pos_error; }
 static int ack(void *ctx) { (void)ctx; return 1; }
 static int stop(void *ctx)
@@ -91,6 +92,7 @@ static int matrix(void)
             s->state = state;
             s->paused = state == SND2_ST_PAUSE;
             if (state == 5) snd2_reclaim(owner);
+            int before = yields;
             int rc;
             switch (op) {
             case 0: rc = snd2_stream_write(id, samples, 4); break;
@@ -107,6 +109,14 @@ static int matrix(void)
                      (state == SND2_ST_IDLE && op == 2)) want = OS32_ERR_INVAL;
             else if (!op) want = 4;
             CHECK(rc == want);
+            if (op == 3 && (state == SND2_ST_RUN || state == SND2_ST_PAUSE))
+                CHECK(yields > before);
+            int next = state;
+            if (!rc && (op == 4 || (op == 3 && state != SND2_ST_DRAIN)))
+                next = 5;
+            else if (!rc && op == 1) next = SND2_ST_RUN;
+            else if (!rc && op == 2) next = SND2_ST_PAUSE;
+            CHECK((s->owner ? s->state : 5) == next);
             snd2_reclaim(owner);
         }
     }
@@ -120,6 +130,35 @@ static int probe(void)
     SND2_DevInfo info = {.kind=SND2_KIND_PCM_OUT};
     CHECK(!snd2_register(&backend, 0, &info));
     CHECK(!matrix());
+    Snd2Stream *stream = &snd2_device(0)->stream;
+    for (int paused = 0; paused <= 1; ++paused) {
+        CHECK(!snd2_stream_open(&desc, &id));
+        CHECK(snd2_stream_write(id, samples, 4) == 4);
+        CHECK(!snd2_stream_start(id));
+        now += 100;
+        starts = SND2_START_STOPPED;
+        if (paused) CHECK(snd2_stream_pause(id) == OS32_ERR_IO);
+        else snd2_advance(0);
+        CHECK(stream->state == (paused ? SND2_ST_PAUSE : SND2_ST_RUN));
+        CHECK(!stream->copied && !stream->played);
+        starts = 0;
+        int calls = start_calls;
+        snd2_advance(0);
+        CHECK(start_calls == calls + 1);
+        CHECK(stream->copied == (paused ? 0U : 1U) && stream->epoch == 1);
+        CHECK(!snd2_stream_close(id, SND2_CLOSE_ABORT));
+    }
+    CHECK(!snd2_stream_open(&desc, &id));
+    CHECK(snd2_stream_write(id, samples, 4) == 4);
+    CHECK(!snd2_stream_start(id));
+    now += 100;
+    starts = SND2_START_STOPPED;
+    drain_progress = 1;
+    CHECK(snd2_stream_close(id, 0) == OS32_ERR_IO);
+    CHECK(!stream->owner && !stream->played);
+    drain_progress = 0;
+    starts = 0;
+    hw = 0;
     alloc_error = 1;
     CHECK(snd2_stream_open(&desc, &id) == OS32_ERR_NOSPC);
     alloc_error = 0;
@@ -168,7 +207,7 @@ static int probe(void)
     CHECK(!snd2_stream_open(&desc, &id));
     CHECK(snd2_stream_write(id, samples, 4) == 4);
     deadline = now + 60; /* ceil(4 periods / 44100 / 10ms) + 3 ticks */
-    CHECK(!snd2_stream_close(id, 0) && now == deadline && !s->owner);
+    CHECK(snd2_stream_close(id, 0) == OS32_ERR_IO && now == deadline && !s->owner);
     CHECK(!snd2_stream_open(&desc, &id));
     starts = -1;
     CHECK(snd2_stream_start(id) == OS32_ERR_IO && !s->owner && !leaked);

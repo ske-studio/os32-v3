@@ -23,10 +23,15 @@ MUTATIONS = [
     ('stream', 's->state == SND2_ST_DRAIN || !buf', '!buf'),
     ('stream', 'hw_release(d->ctx, leak)', 'hw_release(d->ctx, 0)'),
     ('stream', '++s->gen;', '/* stale generation */'),
-    ('stream', 'snd2_seg_reset(s, tick_clock_ms());\n        s->paused', 's->paused'),
+    ('stream', 'snd2_seg_reset(s, tick_clock_ms());\n        if (resync)', 'if (resync)'),
     ('stream', 'if (d->be->hw_stop(d->ctx) < 0) {\n                    teardown',
      'snd2_seg_reset(s, now);\n                if (d->be->hw_stop(d->ctx) < 0) {\n                    teardown'),
     ('stream', 'snd2_seg_resync(s, now);', 's->paused = 0; snd2_seg_resync(s, now);'),
+    ('stream', 'if (resync) s->restart_pending = 1;', 'if (resync) s->state = SND2_ST_IDLE;'),
+    ('stream', 's->paused = 0;\n            s->state = SND2_ST_RUN;', 's->paused = 0;'),
+    ('stream', 'snd2_seg_pause(&d->stream);\n            d->stream.state = SND2_ST_PAUSE;',
+     'snd2_seg_pause(&d->stream);'),
+    ('stream', 'rc = s->played == s->written ? 0 : OS32_ERR_IO;', 'rc = 0;'),
     ('stream', 'if (!d->writing) snd2_stg_free(s);', 'snd2_stg_free(s);'),
 ]
 

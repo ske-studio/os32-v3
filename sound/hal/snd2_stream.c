@@ -148,14 +148,15 @@ int snd2_stream_write(u32 id, const void *buf, u32 bytes)
 }
 
 /* Enter locked and restore flags on every path. */
-static int start_hw(Snd2Device *d, unsigned flags)
+static int start_hw(Snd2Device *d, unsigned flags, int resync)
 {
     Snd2Stream *s = &d->stream;
+    s->restart_pending = 0;
     int rc = d->be->hw_start(d->ctx);
     if (rc == SND2_START_STOPPED) {
         snd2_seg_reset(s, tick_clock_ms());
-        s->paused = 0;
-        s->state = SND2_ST_IDLE;
+        if (resync) s->restart_pending = 1;
+        else s->state = SND2_ST_IDLE;
     } else if (rc) {
         teardown(d, flags, 0, 1);
         return OS32_ERR_IO;
@@ -175,7 +176,7 @@ int snd2_stream_start(u32 id)
             snd2_seg_reset(s, tick_clock_ms());
             snd2_seg_prime(s);
             s->state = SND2_ST_RUN;
-            return start_hw(d, flags);
+            return start_hw(d, flags, 0);
         }
         if (s->state == SND2_ST_DRAIN) rc = OS32_ERR_INVAL;
         else {
@@ -196,6 +197,12 @@ void snd2_advance(u32 dev)
         if (s->state == SND2_ST_RUN || s->state == SND2_ST_PAUSE ||
             s->state == SND2_ST_DRAIN) {
             u32 hw = 0, now = tick_clock_ms();
+            if (s->restart_pending) {
+                snd2_seg_reset(s, now);
+                if (!s->paused) snd2_seg_prime(s);
+                (void)start_hw(d, flags, 1);
+                return;
+            }
             int valid = d->be->hw_pos(d->ctx, &hw) >= 0;
             if (snd2_seg_observe(s, valid, hw, now) < 0) {
                 if (d->be->hw_stop(d->ctx) < 0) {
@@ -203,7 +210,7 @@ void snd2_advance(u32 dev)
                     return;
                 }
                 snd2_seg_resync(s, now);
-                (void)start_hw(d, flags);
+                (void)start_hw(d, flags, 1);
                 return;
             }
             if (s->state == SND2_ST_DRAIN && s->played == s->written) {
@@ -223,7 +230,10 @@ int snd2_stream_pause(u32 id)
     if (!rc && d->stream.state == SND2_ST_RUN) {
         /* A failed position read cannot identify the DMA-protected segments. */
         u32 hw;
-        if (d->be->hw_pos(d->ctx, &hw) < 0) rc = OS32_ERR_IO;
+        if (d->stream.restart_pending) {
+            d->stream.paused = 1;
+            d->stream.state = SND2_ST_PAUSE;
+        } else if (d->be->hw_pos(d->ctx, &hw) < 0) rc = OS32_ERR_IO;
         else if (snd2_seg_observe(&d->stream, 1, hw, tick_clock_ms()) < 0) {
             if (d->be->hw_stop(d->ctx) < 0) {
                 teardown(d, flags, 1, 1);
@@ -232,7 +242,7 @@ int snd2_stream_pause(u32 id)
             d->stream.paused = 1;
             d->stream.state = SND2_ST_PAUSE;
             snd2_seg_resync(&d->stream, tick_clock_ms());
-            return start_hw(d, flags);
+            return start_hw(d, flags, 1);
         } else {
             snd2_seg_pause(&d->stream);
             d->stream.state = SND2_ST_PAUSE;
@@ -294,14 +304,18 @@ int snd2_stream_close(u32 id, u32 how)
     irq_restore(flags);
     for (;;) {
         flags = irq_save();
-        if (s->gen != gen || s->closing) break;
+        if (s->gen != gen || s->closing) {
+            rc = s->owner || s->played != s->written ? OS32_ERR_IO : 0;
+            break;
+        }
         if (s->state != SND2_ST_DRAIN || tick_clock_ms() - begin >= timeout) {
+            rc = s->played == s->written ? 0 : OS32_ERR_IO;
             teardown(d, flags, 0, 1);
-            return 0;
+            return rc;
         }
         irq_restore(flags);
         exec_sys_yield();
     }
     irq_restore(flags);
-    return 0;
+    return rc;
 }
