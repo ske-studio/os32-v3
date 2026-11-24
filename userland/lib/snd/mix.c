@@ -122,7 +122,7 @@ int sndl_voice_submit(unsigned long id, const void *pcm, unsigned long bytes,
 int sndl_voice_set(unsigned long id, unsigned long hz, signed long vol, signed long pan)
 {
     Voice *v = lookup(id);
-    if (!v || !hz || vol < -10000 || vol > 0 || pan < -10000 || pan > 10000)
+    if (!v || !hz || hz > UINT32_MAX || vol < -10000 || vol > 0 || pan < -10000 || pan > 10000)
         return -1;
     v->hz = hz;
     v->left = gain(-vol + (pan > 0 ? pan : 0));
@@ -240,13 +240,9 @@ static int sample(const uint8_t *p, unsigned bits)
     return (int)(raw ^ 32768u) - 32768;
 }
 
-static void render_voice(Voice *v, int32_t *out, uint32_t frames, uint32_t rate,
+static void render_voice(Voice *v, int32_t *out, uint32_t frames, uint32_t step,
                          SndlMixRecord record, void *ctx)
 {
-    uint64_t ratio = ((uint64_t)v->hz << 16) / rate;
-    uint32_t step = ratio > UINT32_MAX ? UINT32_MAX : (uint32_t)ratio;
-    if (!step)
-        step = 1;
     unsigned width = v->fmt.bits / 8;
     unsigned stride = width * v->fmt.channels;
     for (uint32_t off = 0; off < frames && v->head;) {
@@ -287,14 +283,25 @@ static void render_voice(Voice *v, int32_t *out, uint32_t frames, uint32_t rate,
     }
 }
 
-void sndl_mix_render(int32_t *out, uint32_t frames, uint32_t rate,
+int sndl_mix_render(int32_t *out, uint32_t frames, uint32_t rate,
                      SndlMixRecord record, void *ctx)
 {
     if (!rate || !out || !record || frames > 1024)
-        return;
+        return -1;
+    /* Validate the whole block before recording or advancing any voice. */
+    uint32_t steps[SNDL_VOICE_MAX];
+    for (unsigned i = 0; i < SNDL_VOICE_MAX; ++i) {
+        if (!voices[i].playing)
+            continue;
+        uint64_t scaled = (uint64_t)voices[i].hz << 16;
+        if (scaled < rate || scaled > (uint64_t)UINT32_MAX * rate)
+            return -1;
+        steps[i] = scaled / rate;
+    }
     for (unsigned i = 0; i < SNDL_VOICE_MAX; ++i)
         if (voices[i].playing)
-            render_voice(&voices[i], out, frames, rate, record, ctx);
+            render_voice(&voices[i], out, frames, steps[i], record, ctx);
+    return 0;
 }
 
 void sndl_mix_finish(const int32_t *stereo, int16_t *out, uint32_t frames)

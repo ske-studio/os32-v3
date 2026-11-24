@@ -30,7 +30,8 @@ typedef int (*SndlMixRecord)(void *ctx, const SndlMixSpan *span);
 
 /* Accumulate into a caller-cleared interleaved stereo block. Clip only after
  * every input (including a synthesizer) has contributed. */
-void sndl_mix_render(int32_t *stereo, uint32_t frames, uint32_t rate,
+/* Return -1 before any output or voice change on an invalid argument or step. */
+int sndl_mix_render(int32_t *stereo, uint32_t frames, uint32_t rate,
                      SndlMixRecord record, void *ctx);
 void sndl_mix_finish(const int32_t *stereo, int16_t *out, uint32_t frames);
 void sndl_mix_played(uint32_t voice, uint32_t buf_id);

@@ -14,12 +14,45 @@ static void render(int16_t *out, unsigned n, unsigned rate)
 {
     int32_t acc[32] = {0};
     assert(n <= 16);
-    sndl_mix_render(acc, n, rate, accept, NULL);
+    assert(!sndl_mix_render(acc, n, rate, accept, NULL));
     sndl_mix_finish(acc, out, n);
+}
+
+static SndlMixSpan last_span;
+
+static int capture(void *ctx, const SndlMixSpan *span)
+{
+    last_span = *span;
+    return accept(ctx, span);
+}
+
+static void ratio_bounds(void)
+{
+    SND2_Fmt fmt = {65536, 8, 1, SND2_ENC_U8, 0};
+    const uint8_t pcm[] = {129, 130};
+    unsigned long a, b, buf;
+    int32_t acc[2] = {0};
+    assert(!sndl_voice_new(&fmt, &a) && !sndl_voice_new(&fmt, &b));
+    assert(!sndl_voice_submit(a, pcm, sizeof(pcm), SNDL_LOOP, &buf));
+    assert(!sndl_voice_submit(b, pcm, sizeof(pcm), SNDL_LOOP, &buf));
+    assert(!sndl_voice_play(a) && !sndl_voice_play(b));
+    assert(!sndl_voice_set(b, 1, 0, 0));
+    assert(!sndl_mix_render(acc, 1, 65536, capture, NULL));
+    assert(last_span.voice == b && last_span.step16 == 1);
+    uint32_t before = calls;
+    assert(sndl_mix_render(acc, 1, 65537, capture, NULL) == -1);
+    assert(!sndl_voice_set(b, UINT32_MAX, 0, 0));
+    assert(sndl_mix_render(acc, 1, 65535, capture, NULL) == -1);
+    assert(calls == before && acc[0] == 512 && acc[1] == 512);
+    assert(!sndl_mix_render(acc, 1, 65536, capture, NULL));
+    assert(last_span.step16 == UINT32_MAX && last_span.phase16 == 1);
+    assert(acc[0] == 1280 && acc[1] == 1280);
+    assert(!sndl_voice_delete(a) && !sndl_voice_delete(b));
 }
 
 int main(void)
 {
+    ratio_bounds();
     SND2_Fmt fmt = {4, 8, 1, SND2_ENC_U8, 0};
     unsigned long v, b, id, how, frame;
     const uint8_t pcm[] = {129, 130, 131};

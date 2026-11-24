@@ -8,6 +8,13 @@ CHECK = dict(name='sndl-mix-host', tier=1, needs=[], budget=6,
              basis=['docs/decisions/sound/AV_HAL_DESIGN.md §7-2, §12'])
 
 MUTATIONS = [
+    ('lower ratio limit', 'scaled < rate', 'scaled <= rate'),
+    ('upper ratio limit', 'scaled > (uint64_t)', 'scaled >= (uint64_t)'),
+    ('clamp underflow', 'if (scaled < rate ||',
+     'if (scaled < rate) scaled = rate;\n        if (scaled < rate ||'),
+    ('clamp overflow', 'if (scaled < rate ||',
+     'if (scaled > (uint64_t)UINT32_MAX * rate) scaled = (uint64_t)UINT32_MAX * rate;\n'
+     '        if (scaled < rate ||'),
     ('upper saturation', 's > 32767 ? 32767', 's > 32767 ? 0'),
     ('phase', 'v->phase = pos & (ONE - 1)', 'v->phase = 0'),
     ('gain', 'attenuation % 100', '0'),
