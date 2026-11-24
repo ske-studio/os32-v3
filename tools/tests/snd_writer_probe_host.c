@@ -31,11 +31,13 @@ int main(void)
     now += 8;
     sw_point(SW_DISPLAY);
     sw_exit();
-    now += 9980;
+    now += 9970;
+    sw_point(SW_IDLE);
+    now += 10;
     sw_write();
     sw_snapshot(out);
     if (out[SW_WAIT_EXIT] != 10002 || out[SW_EXIT_WRITE] != 9980 ||
-        out[SW_TOTAL] != 10022 || out[SW_WORK] != (SW_GFX | (SW_GFX << 8)) ||
+        out[SW_TOTAL] != 10022 || out[SW_WORK] != (SW_GFX | (SW_GFX << SW_WAIT_SHIFT) | (SW_IDLE << SW_WRITE_SHIFT)) ||
         out[SW_WORK_US] != 10000 || out[SW_JUMPS] != 1 ||
         out[SW_PAIRS] != 2 || out[SW_WAKE_IRQ] != 10 || out[SW_WAKE_US] != 50)
         return 1;

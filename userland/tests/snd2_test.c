@@ -133,10 +133,13 @@ static int playback(KernelAPI *api, u32 dev, const char *mode)
             "other/user", "display_restore", "gfx_poll", "abort_check",
             "park_stop", "io_end", "gui_pump", "idle_work"
         };
-        unsigned which = v[SW_WORK] & 0xff, exit_work = v[SW_WORK] >> 8;
-        api->kprintf(7, "wait_exit_us=%u exit_write_us=%u ready_write_us=%u pairs=%u exit_work=%s\n",
+        unsigned which = v[SW_WORK] & SW_WORK_BYTE;
+        unsigned exit_work = (v[SW_WORK] >> SW_WAIT_SHIFT) & SW_WORK_BYTE;
+        unsigned write_work = (v[SW_WORK] >> SW_WRITE_SHIFT) & SW_WORK_BYTE;
+        api->kprintf(7, "wait_exit_us=%u exit_write_us=%u ready_write_us=%u pairs=%u exit_work=%s write_work=%s\n",
                      v[SW_WAIT_EXIT], v[SW_EXIT_WRITE], v[SW_TOTAL], v[SW_PAIRS],
-                     exit_work < sizeof(work)/sizeof(work[0]) ? work[exit_work] : "unknown");
+                     exit_work < sizeof(work)/sizeof(work[0]) ? work[exit_work] : "unknown",
+                     write_work < sizeof(work)/sizeof(work[0]) ? work[write_work] : "unknown");
         api->kprintf(7, "worst_work=%s work_us=%u tsc_gaps_10ms=%u wake_irq=%u wake_ready_us=%u\n",
                      which < sizeof(work)/sizeof(work[0]) ? work[which] : "unknown",
                      v[SW_WORK_US], v[SW_JUMPS], v[SW_WAKE_IRQ], v[SW_WAKE_US]);

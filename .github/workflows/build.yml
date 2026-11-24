@@ -185,10 +185,11 @@ jobs:
           export HOSTDRV_DIR="$RUNNER_TEMP/s1-hostdrv"
           mv build/out "$RUNNER_TEMP/product-out"
           mkdir -p "$HOSTDRV_DIR"
-          make -j"$(nproc)" TICK_PROBE_BUILD=1 all build/out/tickprobe.bin build/out/snd2_test.bin
+          make -j"$(nproc)" TICK_PROBE_BUILD=1 all build/out/tickprobe.bin build/out/snd2_test_diag.bin
           python3 tools/hostdrv_deploy.py sync
           mkdir -p "$HOSTDRV_DIR/tick"
-          cp build/out/tickprobe.bin build/out/snd2_test.bin "$HOSTDRV_DIR/tick/"
+          cp build/out/tickprobe.bin "$HOSTDRV_DIR/tick/"
+          cp build/out/snd2_test_diag.bin "$HOSTDRV_DIR/tick/snd2_test.bin"
           (cd "$HOSTDRV_DIR" && find . -type f -print0 | sort -z | xargs -0 sha256sum) > "$RUNNER_TEMP/s1-sums"
           cp "$RUNNER_TEMP/s1-sums" "$HOSTDRV_DIR/SHA256SUMS"
           tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/tick-s1-hostdrv.tar.gz" s1-hostdrv
