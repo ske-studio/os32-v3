@@ -44,9 +44,28 @@ static int pos(void *c, u32 *p) { return 0; }
 static int ok(void *c) { return 0; }
 static void release(void *c, int leak) {}
 static int volume(void *c, u32 l, u32 r) { return 0; }
+static u32 max_frames = 4, readable, writable;
+static int processes;
+static void *fault_env[5];
+void ring3_fault_kill(void) { __builtin_longjmp(fault_env, 1); }
+int ring3_user_range_ok(u32 addr, u32 bytes) { return addr == 100 && bytes <= readable; }
+int ring3_user_ranges_writable(u32 addr, u32 bytes, u32 other, u32 len)
+{
+    return addr == 200 && bytes <= writable && !other && !len;
+}
+int snd2_chip_dev_info(u32 index, SND2_DevInfo *out)
+{
+    if (index || !out) return OS32_ERR_INVAL;
+    out->dev = 19;
+    return 0;
+}
+static int audio(u32 frames)
+{
+    return kapi_snd2_dsp_process(0, 1, 0, 0, (void *)100, (void *)200, frames, 0);
+}
 static int unit(void *c, u32 u, SND2_DspUnit *o)
 {
-    *o = (SND2_DspUnit){u, 1, 3, 1, 1, 1, 4, 0};
+    *o = (SND2_DspUnit){u, 1, 3, 1, 1, 1, max_frames, 0};
     return 0;
 }
 static int param(void *c, u32 u, u32 i, SND2_DspParam *o)
@@ -56,7 +75,7 @@ static int param(void *c, u32 u, u32 i, SND2_DspParam *o)
 }
 static int insert(void *c, u32 u, const i32 *p, u32 n) { return 10 + u; }
 static int process(void *c, u32 u, const i32 *p, u32 n, const void *in,
-                   void *out, u32 frames, u32 fi) { return frames; }
+                   void *out, u32 frames, u32 fi) { ++processes; return frames; }
 
 #define REQUIRE(x) do { if (!(x)) return __LINE__ - PROBE_LINE; } while (0)
 enum { PROBE_LINE = __LINE__ };
@@ -127,6 +146,21 @@ int probe(void)
     REQUIRE(snd2_dsp_process(dev,1,0,0,&a,&c,5,0)==OS32_ERR_INVAL);
     REQUIRE(snd2_dsp_process(dev,1,0,0,&a,&c,4,32)==OS32_ERR_INVAL);
     REQUIRE(snd2_dsp_process(dev,1,&a.min,2,&a,&c,4,0)==OS32_ERR_INVAL);
+    REQUIRE(kapi_snd2_dev_count() == 3);
+    REQUIRE(!kapi_snd2_dev_info(1, &info) && info.dev == (u32)second);
+    REQUIRE(!kapi_snd2_dev_info(2, &info) && info.dev == 19);
+    info.kind = SND2_KIND_PCM_OUT;
+    readable = writable = 16;
+    REQUIRE(audio(4) == 4);
+    int before = processes;
+    max_frames = ~0U;
+    REQUIRE(audio(0x40000000U) == OS32_ERR_INVAL && processes == before);
+    readable = 15;
+    if (!__builtin_setjmp(fault_env)) { audio(4); return 98; }
+    readable = 16;
+    writable = 15;
+    if (!__builtin_setjmp(fault_env)) { audio(4); return 99; }
+    REQUIRE(processes == before);
     for (int slot = 2; slot < 16; ++slot)
         REQUIRE(snd2_register(&be, 0, &info) == slot);
     REQUIRE(snd2_register(&be, 0, &info) == OS32_ERR_FULL && snd2_dev_count() == 16);

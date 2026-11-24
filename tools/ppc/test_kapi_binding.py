@@ -32,6 +32,10 @@ ime_user_delete ime_user_export ime_user_list
 np2_check_hostdrv np2_detect
 np2_get_clock np2_get_cpu np2_get_version
 pcm_close pcm_open pcm_set_volume pcm_status pcm_write
+snd2_dev_count snd2_dev_info snd2_caps snd2_dsp_unit snd2_dsp_param
+snd2_dsp_insert snd2_dsp_process snd2_stream_open snd2_stream_write snd2_stream_start
+snd2_stream_pause snd2_stream_pos snd2_stream_wait snd2_stream_volume snd2_stream_close
+snd2_chip_caps snd2_chip_open snd2_chip_write snd2_chip_read snd2_chip_reset snd2_chip_close
 sfs_begin
 sfs_end
 ssg_all_off ssg_tone
@@ -352,6 +356,11 @@ def generate(tmp, mutation=None, *, link=True, ide=False, fep=False):
         insert_group(helper, mutation, "    'db': (frozenset({'db_step'}), frozenset()),\n")
     if mutation == 'pci-absent':
         insert_group(helper, mutation, "    'pci': (frozenset({'pci_get'}), frozenset()),\n")
+    if mutation == 'absent-sound-count':
+        anchor = "ZERO_SLOTS = frozenset({\n    'snd2_dev_count',"
+        text = helper.read_text()
+        assert text.count(anchor) == 1
+        helper.write_text(text.replace(anchor, "ZERO_SLOTS = frozenset({"))
     if mutation == 'zero':
         text = generator.read_text().replace('{absent_result(api)};', '0;')
         generator.write_text(text)
@@ -393,6 +402,8 @@ def run_binding_probe(out, cc, dirs):
     # Run the DB wrappers and the output guard with the Linux/PPC exit syscall.
     probe = out / 'probe.c'
     probe.write_text('''#include "os32_kapi_shared.h"
+extern int wrap_snd2_dev_count(void);
+extern int wrap_snd2_chip_open(u32, u32 *);
 extern void wrap_fm_startup_sound(void);
 extern void wrap_fm_play_mml(const char *);
 extern void wrap_snd_bgm_play(const char *);
@@ -435,6 +446,7 @@ void _start(void)
              wrap_db_mem_used() != 0 ? 11 :
              wrap_db_open("db") != OS32_ERR_NOSYS ? 12 : 0;
     if (rc) finish(rc);
+    if (wrap_snd2_dev_count() || wrap_snd2_chip_open(0, &output) != OS32_ERR_NOSYS || output) finish(21);
     wrap_fm_startup_sound();
     wrap_fm_play_mml("c");
     wrap_snd_bgm_play("c");
@@ -573,6 +585,7 @@ def main():
             return 1
         av_providers = {line.split()[1] for line in (ROOT / 'tools/checks/av_wiring.txt').read_text().splitlines()
                         if line and not line.startswith('#') and len(line.split()) == 2}
+        av_providers -= EXPECTED_ABSENT_SLOTS
         if av_providers - undefined:
             print('missing AV providers:', sorted(av_providers - undefined))
             return 1
@@ -593,7 +606,7 @@ def main():
                 if verify((mutated / 'kapi/kapi_generated.c').read_text(), entries):
                     print(mutation + ': SURVIVED'); return 1
                 print(mutation + ': RED')
-            for mutation, expected in [('retired-focus-result', 20), ('db-null-nosys', 10), ('db-hook-inverted', 'provider reference')]:
+            for mutation, expected in [('absent-sound-count', 21), ('retired-focus-result', 20), ('db-null-nosys', 10), ('db-hook-inverted', 'provider reference')]:
                 path = tmp / mutation
                 path.mkdir()
                 result = run_binding_probe(generate(path, mutation), cc, dirs)

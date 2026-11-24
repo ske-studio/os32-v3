@@ -39,6 +39,10 @@ IS snd2_chip_write
 IS snd2_chip_read
 IS snd2_chip_reset
 IS snd2_chip_close
+IS kapi_snd2_dev_count internal
+IS kapi_snd2_dev_info internal
+IS kapi_snd2_dsp_process internal
+IS kapi_snd2_stream_write internal
 IS snd2_register internal
 IS snd2_unregister internal
 IS snd2_advance internal

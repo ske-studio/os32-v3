@@ -47,8 +47,8 @@ def exercise(root, folder, machine, mutate):
     cases = [('', bind, defaults, 0)]
     if mutate:
         cases += [('adjacent providers', [s.replace('= wrap_snd2_stream_start;', '= wrap_snd2_stream_pause;') for s in bind], defaults, 10),
-                  ('successful stub', bind, change_stub('snd2_dev_count', 'return OS32_ERR_NOSYS;', 'return 0;'), 1),
-                  ('modified output', bind, change_stub('snd2_dev_info', '(void)o;', '((u8 *)o)[0] = 0;'), 40)]
+                  ('successful stub', bind, change_stub('kapi_snd2_dev_count', 'return OS32_ERR_NOSYS;', 'return 0;'), 1),
+                  ('modified output', bind, change_stub('kapi_snd2_dev_info', '(void)o;', '((u8 *)o)[0] = 0;'), 40)]
     focus = (root / 'kernel/av_focus.c').read_text()
     focus_cases = {}
     if mutate:
@@ -111,13 +111,13 @@ def exercise(root, folder, machine, mutate):
 
 def run(ctx):
     subprocess.run(['python3', '-B', 'tools/check_av_portable.py'], cwd=ctx.root, check=True)
-    subprocess.run(['sh', 'tools/checks/av_no_weak.sh', 'IS', 'build/out/kernel.elf', 'snd2_chip_'],
+    subprocess.run(['sh', 'tools/checks/av_no_weak.sh', 'IS', 'build/out/kernel.elf'],
                    cwd=ctx.root, check=True)
     symbols = subprocess.check_output(['nm', '-g', '--defined-only', ctx.root / 'build/out/kernel.elf'], text=True)
     for row in (ctx.root / 'tools/checks/av_wiring.txt').read_text().splitlines():
         if row and not row.startswith('#'):
             name = row.split()[1]
-            binding = 'T' if (row.split()[0] == 'IA' or name.startswith('snd2_chip_')) else 'W'
+            binding = 'T' if (row.split()[0] in ('IA', 'IS')) else 'W'
             assert re.search(r'^[0-9a-f]+ ' + binding + ' ' + name + r'$', symbols, re.M), name
     with tempfile.TemporaryDirectory() as td:
         for machine in ('i386', 'ppc'):
