@@ -243,3 +243,16 @@ static-check の Check map は 5 分、Host tests は 6 分（検査本体の実
 | 7/10 | `ppc-boot-info-guest`、`ppc-mouse-guest`、`ppc-ver-guest`、`ppc-rtc-guest`、`ppc-root-lz4-layout-host` | 859.9 |
 | 8/10 | `ppc-db-guest`、`ppc-kapi-v89-guest`、`ppc-usb`、`ppc-path-guest`、`ppc-loop-guest` | 878.7 |
 | 9/10 | `ppc-ata-guest`、`ppc-sfs-guest`、`ppc-sd-link`、`ppc-sc`、`ppc-sqlite-static-guest` | 882.7 |
+
+## 5-10. PowerPC の QEMU の組の重みの作り直し (2026-11-24、本線 PM の決定 (c))
+
+上限は組ごとに 30 分のまま (用意 約 3 分を含む)。合格の線は各組 28 分以内 (本線 PM)。標本は `calibrate_weights.py --merge` に、int-ppc-1123h・1123a・1123i の check の 6 回分の `check-times` の中央値。
+
+| 回 | 重み | 組の実時間 (用意込み) | 結果 |
+|---|---|---|---|
+| 1123h 8232174fa (前) | 11-22 の重み | 最長 29 分 15 秒 (組 2) | 上限の際 |
+| 1123i 79a554797 | 作り直し 1 回目 (見込み 22.1〜22.3 分) | 18〜29 分 (組 5・8 が 29 分) | 線を越えた |
+| 1123i b5b03dc79 | 同上 | 16〜26 分、組 3 は 30 分で打ち切り (`ppc-deploy-guest` 840 秒・`ppc-kapi-v89-guest` 444 秒・`ppc-gfx2-guest` 295 秒、重みは 624・250・193) | 打ち切り |
+| 1123i 7cbf23c48 | 作り直し 2 回目 (見込み 21.9〜22.4 分) | 19〜27 分 | 通過 |
+
+同じ検査が回ごとに 4〜8 割伸びる (`ppc-deploy-guest` の標本は 562〜840 秒)。見込み 22 分 + 用意 3 分では、上限までの余裕は 5 分ほど。再び 28 分を越えたら、組の数か上限の見直しを本線 PM からユーザーに上げる。
