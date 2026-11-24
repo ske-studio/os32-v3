@@ -571,6 +571,246 @@
     {
       "artifact": "check-times-946c4d8df1b18300c44f56a7e5ea504870715604-ppc-qemu-9",
       "sha256": "49e4abf47f2238d050e215554327689af1017ef9dd6b5454f41b3d3eb34d0b25"
+    },
+    {
+      "artifact": "check-times-330a32bb20dbb5a2109c0a1b850a48d60146131b-ppc-qemu-0",
+      "sha256": "51a07ec4ad1ad76fc9d43f93566c5ebb3b8a7287d0f34770bc03035cd8802d51"
+    },
+    {
+      "artifact": "check-times-330a32bb20dbb5a2109c0a1b850a48d60146131b-ppc-qemu-1",
+      "sha256": "552474be59f6c7080a2c58941f702180562efbe113c39776c776de01cf8bacde"
+    },
+    {
+      "artifact": "check-times-330a32bb20dbb5a2109c0a1b850a48d60146131b-ppc-qemu-2",
+      "sha256": "e8ed8a6ee7d9d13c9b8f8c020fff70f9fb26cea84906a6f4fa74318176adadcc"
+    },
+    {
+      "artifact": "check-times-330a32bb20dbb5a2109c0a1b850a48d60146131b-ppc-qemu-3",
+      "sha256": "35efdb1be1d26044f316b3befba56bfa30a6eb059e2df5d865df6a5001ace5ca"
+    },
+    {
+      "artifact": "check-times-330a32bb20dbb5a2109c0a1b850a48d60146131b-ppc-qemu-4",
+      "sha256": "f0793b8f52177041bb258aee759e4152cb54f871f91fbd07f75dbfedb55b4cd9"
+    },
+    {
+      "artifact": "check-times-330a32bb20dbb5a2109c0a1b850a48d60146131b-ppc-qemu-5",
+      "sha256": "57240de679a489b33980aab76c5a44933675bb5f3d2e898c5ff790772d25a7f3"
+    },
+    {
+      "artifact": "check-times-330a32bb20dbb5a2109c0a1b850a48d60146131b-ppc-qemu-6",
+      "sha256": "3f4962fc232a3b331b84c7d2e4b2c9c84c51372cfd4e7d5856c7751455a634f7"
+    },
+    {
+      "artifact": "check-times-330a32bb20dbb5a2109c0a1b850a48d60146131b-ppc-qemu-7",
+      "sha256": "9d6ce1497946d5f8eafd2cf2dc74499b3feaa9431f81869c1ca894e0631a44e2"
+    },
+    {
+      "artifact": "check-times-330a32bb20dbb5a2109c0a1b850a48d60146131b-ppc-qemu-8",
+      "sha256": "2aefe54bf64e31181c78e60d36da1ffdbc4c60cb766602afe72ce3452803b5ad"
+    },
+    {
+      "artifact": "check-times-330a32bb20dbb5a2109c0a1b850a48d60146131b-ppc-qemu-9",
+      "sha256": "8fae87a4db6a8f3f64b751125d00a334c603edf56c5d3ede31b8e10d0573aae0"
+    },
+    {
+      "artifact": "check-times-024c62bf8f13fd10f86e85ed72e4b3f7d11f3d2f-ppc-qemu-0",
+      "sha256": "5b165e586653616788f01add9eda79c66e78543fcd5e0b68b87730f702675000"
+    },
+    {
+      "artifact": "check-times-024c62bf8f13fd10f86e85ed72e4b3f7d11f3d2f-ppc-qemu-1",
+      "sha256": "2b61c7d22912fc1b1272b2c941a9a79637c7b8c4665aa20b71b819f1576434bf"
+    },
+    {
+      "artifact": "check-times-024c62bf8f13fd10f86e85ed72e4b3f7d11f3d2f-ppc-qemu-2",
+      "sha256": "f8c2cd767ba6b7faeebc1a2c12aaafe46102e4ff89b2fdd4b19926e1203a8c14"
+    },
+    {
+      "artifact": "check-times-024c62bf8f13fd10f86e85ed72e4b3f7d11f3d2f-ppc-qemu-3",
+      "sha256": "6677c6baed412d5eedefed5524c34d69907e7915afab6af1121b4936b74fd49f"
+    },
+    {
+      "artifact": "check-times-024c62bf8f13fd10f86e85ed72e4b3f7d11f3d2f-ppc-qemu-4",
+      "sha256": "d93e6298d26d8fdb3462cb59e1e70741eb699ab9ffb8756d4a228b4c097c9dee"
+    },
+    {
+      "artifact": "check-times-024c62bf8f13fd10f86e85ed72e4b3f7d11f3d2f-ppc-qemu-5",
+      "sha256": "110f4adf1fee1d41ea26f45745c1f43486205c4587577a569c3a97c0f8f1899d"
+    },
+    {
+      "artifact": "check-times-024c62bf8f13fd10f86e85ed72e4b3f7d11f3d2f-ppc-qemu-6",
+      "sha256": "a21ee8e4cc7160a0241836667f6c1f9fc3cfdc373eb097d9076f140e6e99c56a"
+    },
+    {
+      "artifact": "check-times-024c62bf8f13fd10f86e85ed72e4b3f7d11f3d2f-ppc-qemu-7",
+      "sha256": "462932b662ed2cfbe51fa30a7e2a7eff0505535d87dfd5a5ab00479cdccd6940"
+    },
+    {
+      "artifact": "check-times-024c62bf8f13fd10f86e85ed72e4b3f7d11f3d2f-ppc-qemu-8",
+      "sha256": "8964fec0ea07628ecf8d1caaa17e021926382df1c6749795291eae63d60d6de7"
+    },
+    {
+      "artifact": "check-times-024c62bf8f13fd10f86e85ed72e4b3f7d11f3d2f-ppc-qemu-9",
+      "sha256": "572f5f62295700f02c66047f0b774c46302c25d64129907b7b9d40e7fa086ba4"
+    },
+    {
+      "artifact": "check-times-8232174fa567a21af4a726883f7c6f1eb3a132b4-ppc-qemu-0",
+      "sha256": "cc68b980ce016780ef4235e3ca5c583550b3663a0e0f5202f57bf11c55025010"
+    },
+    {
+      "artifact": "check-times-8232174fa567a21af4a726883f7c6f1eb3a132b4-ppc-qemu-1",
+      "sha256": "ba34af49a03dbebe08856a6db3af8e7431316f6f6f966c61b583b981bad67ebc"
+    },
+    {
+      "artifact": "check-times-8232174fa567a21af4a726883f7c6f1eb3a132b4-ppc-qemu-2",
+      "sha256": "16ff2a0f8515448d5b7f2e2c511ff04cee0b1e678234f285d62cefe6805dbbe0"
+    },
+    {
+      "artifact": "check-times-8232174fa567a21af4a726883f7c6f1eb3a132b4-ppc-qemu-3",
+      "sha256": "6850c631d89783896a4f48033e84054884c5bacd19ebf22c3969da5516601746"
+    },
+    {
+      "artifact": "check-times-8232174fa567a21af4a726883f7c6f1eb3a132b4-ppc-qemu-4",
+      "sha256": "470601d445e7adb33566d671b1093cf744d01e2d51ff5ba914670f7a2dea1d73"
+    },
+    {
+      "artifact": "check-times-8232174fa567a21af4a726883f7c6f1eb3a132b4-ppc-qemu-5",
+      "sha256": "0dc9798dbaeaca9df341211aa444caa0d5e45b1e2ce0ba199fb962bf70516803"
+    },
+    {
+      "artifact": "check-times-8232174fa567a21af4a726883f7c6f1eb3a132b4-ppc-qemu-6",
+      "sha256": "9b73926d3084ce733f72c4997a04e7f645aaa571e782b57e1b66a9e9cefe9617"
+    },
+    {
+      "artifact": "check-times-8232174fa567a21af4a726883f7c6f1eb3a132b4-ppc-qemu-7",
+      "sha256": "f2a8099c14886930fb95cf5b85c157b9e6c470ce983a2ac1c6117a9ae12bfcdb"
+    },
+    {
+      "artifact": "check-times-8232174fa567a21af4a726883f7c6f1eb3a132b4-ppc-qemu-8",
+      "sha256": "8539e27308239e5dd0e4dcf6b54d8d626b292d2244f79d1fc5a29f021a39136c"
+    },
+    {
+      "artifact": "check-times-8232174fa567a21af4a726883f7c6f1eb3a132b4-ppc-qemu-9",
+      "sha256": "191910dd3ceb9c92343f52511b5c8d28c44a8b8b8114d8df54f07d55d250702f"
+    },
+    {
+      "artifact": "check-times-946c4d8df1b18300c44f56a7e5ea504870715604-ppc-qemu-0",
+      "sha256": "39822179b260c80a762dcadf11f7268a7797b6bed02bbbe565b478431253607d"
+    },
+    {
+      "artifact": "check-times-946c4d8df1b18300c44f56a7e5ea504870715604-ppc-qemu-1",
+      "sha256": "9c350b74ab3e67038456d4cb9031d8dec977d9c20c16e2d5ea16b8540f9a2480"
+    },
+    {
+      "artifact": "check-times-946c4d8df1b18300c44f56a7e5ea504870715604-ppc-qemu-2",
+      "sha256": "2a43113a4ef55a4823b8fa33c9bf981a72681ab25b2cdcc92c7ad2f4aa4c0f42"
+    },
+    {
+      "artifact": "check-times-946c4d8df1b18300c44f56a7e5ea504870715604-ppc-qemu-3",
+      "sha256": "14cd0ec50d2c91beb30179c3ad6a5a2e748b13a0cec126ce19d71b8e02ed7439"
+    },
+    {
+      "artifact": "check-times-946c4d8df1b18300c44f56a7e5ea504870715604-ppc-qemu-4",
+      "sha256": "8ca3e43078af8679ff8f22d695ffa2a3f6a0280314068ede8d008dfd81ad5d2f"
+    },
+    {
+      "artifact": "check-times-946c4d8df1b18300c44f56a7e5ea504870715604-ppc-qemu-5",
+      "sha256": "6bd780943ba78e5566dcd34f7216789f2ae1dde4570270b4f0ac0a6a81a6a242"
+    },
+    {
+      "artifact": "check-times-946c4d8df1b18300c44f56a7e5ea504870715604-ppc-qemu-6",
+      "sha256": "3210c4b8b4ab9ff4d228f1cdaff7bec9a6ecb86a1f0b506e61a6de3e1678be02"
+    },
+    {
+      "artifact": "check-times-946c4d8df1b18300c44f56a7e5ea504870715604-ppc-qemu-7",
+      "sha256": "867772437af8ca75b42e3d6ec4d4abc89813d2bd57c173208248967e23fdcb7b"
+    },
+    {
+      "artifact": "check-times-946c4d8df1b18300c44f56a7e5ea504870715604-ppc-qemu-8",
+      "sha256": "e675dc73dc68c353013194216e56fd9d22919eef85d6817460ba7f340cedb3f2"
+    },
+    {
+      "artifact": "check-times-946c4d8df1b18300c44f56a7e5ea504870715604-ppc-qemu-9",
+      "sha256": "49e4abf47f2238d050e215554327689af1017ef9dd6b5454f41b3d3eb34d0b25"
+    },
+    {
+      "artifact": "check-times-79a554797787e5fb65c9537cd6608328002e6b09-ppc-qemu-0",
+      "sha256": "68e3e7641aaeebbed2abe3f688e0e1cfb52d19918252a34db29d3a99233a96d9"
+    },
+    {
+      "artifact": "check-times-79a554797787e5fb65c9537cd6608328002e6b09-ppc-qemu-1",
+      "sha256": "6d15be53b409210d917aee80befe55ab271cdac302393a9ce3913fb3eba8ef62"
+    },
+    {
+      "artifact": "check-times-79a554797787e5fb65c9537cd6608328002e6b09-ppc-qemu-2",
+      "sha256": "1e0c87d44ab67697df5f0181cdd1c90605707cb67da420e3f02fbfb464fe9423"
+    },
+    {
+      "artifact": "check-times-79a554797787e5fb65c9537cd6608328002e6b09-ppc-qemu-3",
+      "sha256": "67cb379099a04a599eb495ad0c2ee3f73489dceb7872f0d06d4b7830add67e3c"
+    },
+    {
+      "artifact": "check-times-79a554797787e5fb65c9537cd6608328002e6b09-ppc-qemu-4",
+      "sha256": "ae940bf58ffc5e8144fa96d505c4816e9e6628578052e90701f71d75da207991"
+    },
+    {
+      "artifact": "check-times-79a554797787e5fb65c9537cd6608328002e6b09-ppc-qemu-5",
+      "sha256": "7ab347d97bd12c0a569bf4b6934825a8ff77c6c43ffe83d92626b9aa0bd840c6"
+    },
+    {
+      "artifact": "check-times-79a554797787e5fb65c9537cd6608328002e6b09-ppc-qemu-6",
+      "sha256": "068ee7d0bcddd19a16361cf29111f25389cad662dfc759b0f5aaab6cce282cc7"
+    },
+    {
+      "artifact": "check-times-79a554797787e5fb65c9537cd6608328002e6b09-ppc-qemu-7",
+      "sha256": "3a4acfe2b3e658a576f6b49703f5a81449ae96598e74709e701aaf72dc5fff0f"
+    },
+    {
+      "artifact": "check-times-79a554797787e5fb65c9537cd6608328002e6b09-ppc-qemu-8",
+      "sha256": "4e170f4ca8612ea3aa66cb3a23a83cdc10d8654e26d031a421606e444625189a"
+    },
+    {
+      "artifact": "check-times-79a554797787e5fb65c9537cd6608328002e6b09-ppc-qemu-9",
+      "sha256": "1aa22657cbe12adac54150a3bec6d840c9b22a0ae062aa5cc94d4e087f4e4a68"
+    },
+    {
+      "artifact": "check-times-b5b03dc797834211d19716ad904850aedd46f850-ppc-qemu-0",
+      "sha256": "72b951e35f5a15f39d884374dfa8235460bc130b133e77b5d9745432751a3982"
+    },
+    {
+      "artifact": "check-times-b5b03dc797834211d19716ad904850aedd46f850-ppc-qemu-1",
+      "sha256": "3f912c6a04338ea6114954b5302fc27a5ca6bfff2418ebe1efc5af295ae2bf94"
+    },
+    {
+      "artifact": "check-times-b5b03dc797834211d19716ad904850aedd46f850-ppc-qemu-2",
+      "sha256": "4bd762472c6caa9cfe71c407b0fce8439cf0b7a7d4ae56c34f33a8497bb47530"
+    },
+    {
+      "artifact": "check-times-b5b03dc797834211d19716ad904850aedd46f850-ppc-qemu-3",
+      "sha256": "f5ce5eb4c32547e368f9d6ac594dbecf7b6cd42dda1747c9e99c4f3bfae48df2"
+    },
+    {
+      "artifact": "check-times-b5b03dc797834211d19716ad904850aedd46f850-ppc-qemu-4",
+      "sha256": "4ea0aa61c14e1a9bf4fbe74d8ea2ae2c642bb99e14c7bfd7db4a07626e108773"
+    },
+    {
+      "artifact": "check-times-b5b03dc797834211d19716ad904850aedd46f850-ppc-qemu-5",
+      "sha256": "cda4ebd66f9e48e837459c5bf2f1b9ea0c72d1ceb42b715c8c5ef2e1e629f75e"
+    },
+    {
+      "artifact": "check-times-b5b03dc797834211d19716ad904850aedd46f850-ppc-qemu-6",
+      "sha256": "49cd8e3e3bc2d3d57f35c81d1affbafd9f1941ccc561457d0594ec715468a390"
+    },
+    {
+      "artifact": "check-times-b5b03dc797834211d19716ad904850aedd46f850-ppc-qemu-7",
+      "sha256": "c267c420261b6d75e88798f2a7e2d4da87ab53bb710aea433c1fd952e2450147"
+    },
+    {
+      "artifact": "check-times-b5b03dc797834211d19716ad904850aedd46f850-ppc-qemu-8",
+      "sha256": "a14f0126fdde577730ccb0bd9007fefd3d9d1ca515bef7a28145bb4aa2ef9f04"
+    },
+    {
+      "artifact": "check-times-b5b03dc797834211d19716ad904850aedd46f850-ppc-qemu-9",
+      "sha256": "6210e46e6c2e72fd0d702e1d8ecf6d4579fc790e74ba444d709274e90fb318bd"
     }
   ],
   "seconds": {
@@ -862,64 +1102,64 @@
     "platform-memory-host": 2.646895,
     "ppc-ata-guest": 304.834622,
     "ppc-boot-info-guest": 366.7832785,
-    "ppc-children-guest": 77.073293,
-    "ppc-console-cells": 89.7977545,
-    "ppc-db-guest": 291.9313785,
+    "ppc-children-guest": 87.250316,
+    "ppc-console-cells": 90.07705250000001,
+    "ppc-db-guest": 288.36224749999997,
     "ppc-deploy-guest": 624.439335,
-    "ppc-display-guest": 1180.7950885,
-    "ppc-display-lifecycle": 180.67447149999998,
+    "ppc-display-guest": 1068.8495309999998,
+    "ppc-display-lifecycle": 172.0867465,
     "ppc-fb": 756.1646860000001,
-    "ppc-fep-boot-guest": 128.9787425,
-    "ppc-fep-import": 79.694817,
+    "ppc-fep-boot-guest": 130.9328565,
+    "ppc-fep-import": 85.05637150000001,
     "ppc-font-guest": 109.97276049999999,
     "ppc-fp-accept-host": 0.2855445,
-    "ppc-fp-guest": 422.08389,
-    "ppc-gfx2-guest": 193.354852,
-    "ppc-gui-guest": 691.551279,
-    "ppc-hdd-root-guest": 251.739701,
+    "ppc-fp-guest": 452.25176,
+    "ppc-gfx2-guest": 193.4815555,
+    "ppc-gui-guest": 672.6600275000001,
+    "ppc-hdd-root-guest": 236.887317,
     "ppc-hwb-commands": 240.3585335,
     "ppc-hwb-guest": 85.349999,
     "ppc-in2-cui": 246.0727995,
-    "ppc-in2-gui": 427.749145,
-    "ppc-install-guest": 307.754123,
+    "ppc-in2-gui": 489.802665,
+    "ppc-install-guest": 293.1223255,
     "ppc-kapi-v89-guest": 249.738583,
-    "ppc-kboot-console": 3.6734805,
+    "ppc-kboot-console": 4.288142000000001,
     "ppc-kboot-layout": 97,
     "ppc-kcg-guest": 172.58322800000002,
     "ppc-link-sh-flow": 376.8911645,
     "ppc-link-sh-run": 582.6776725,
-    "ppc-loop-guest": 127.3620325,
+    "ppc-loop-guest": 119.72179650000001,
     "ppc-machcfg-guest": 233.663414,
-    "ppc-memstat-guest": 252.13876649999997,
-    "ppc-mmu": 97.4057555,
-    "ppc-module-guest": 178.892216,
+    "ppc-memstat-guest": 249.12146,
+    "ppc-mmu": 97.220493,
+    "ppc-module-guest": 207.335537,
     "ppc-module-rela-host": 3,
     "ppc-mouse-guest": 183.81409200000002,
-    "ppc-of-hdd-run": 297.43383,
-    "ppc-osri-guest": 240.356473,
-    "ppc-path-guest": 116.222297,
-    "ppc-pci-guest": 125.335375,
-    "ppc-port-guest": 121.1832125,
-    "ppc-product-boot-guest": 50.5741515,
+    "ppc-of-hdd-run": 280.167048,
+    "ppc-osri-guest": 225.349307,
+    "ppc-path-guest": 120.77896899999999,
+    "ppc-pci-guest": 124.183998,
+    "ppc-port-guest": 128.211323,
+    "ppc-product-boot-guest": 58.5609805,
     "ppc-reset": 218.650168,
     "ppc-rh-fb": 32.37044,
-    "ppc-root-lz4-layout-host": 73.2230705,
+    "ppc-root-lz4-layout-host": 68.856195,
     "ppc-root-lz4-layout-run": 120,
     "ppc-root-pair-host": 2,
-    "ppc-rtc-guest": 144.08247699999998,
+    "ppc-rtc-guest": 144.034739,
     "ppc-sc": 152.22623099999998,
     "ppc-sd": 190.36969249999999,
     "ppc-sd-link": 220.5379565,
-    "ppc-sfs-guest": 228.1445685,
-    "ppc-sh-output": 99.7876115,
-    "ppc-shell-layout-guest": 95.73784649999999,
-    "ppc-shm-guest": 109.22876049999999,
-    "ppc-sqlite-stack-guest": 18.747549,
-    "ppc-sqlite-static-guest": 98.62322850000001,
+    "ppc-sfs-guest": 250.87563699999998,
+    "ppc-sh-output": 101.25616099999999,
+    "ppc-shell-layout-guest": 93.576978,
+    "ppc-shm-guest": 93.73437799999999,
+    "ppc-sqlite-stack-guest": 17.930164,
+    "ppc-sqlite-static-guest": 91.453591,
     "ppc-surface-guest": 174.160256,
     "ppc-sysinfo-guest": 132.62583899999998,
-    "ppc-usb": 179.564297,
-    "ppc-ver-guest": 209.5058755,
+    "ppc-usb": 180.0315915,
+    "ppc-ver-guest": 207.1293645,
     "preflight-host": 4.421956,
     "privileged": 7.8109,
     "probe-host": 4.63924,
@@ -1037,7 +1277,7 @@
     "appmem-host": 3,
     "appmem-map-host": 3,
     "arch-asm": 3,
-    "arch-ctx-guest": 4,
+    "arch-ctx-guest": 6,
     "b8-open-host": 3,
     "boot-order-host": 3,
     "boot-readers-host": 3,
@@ -1318,62 +1558,62 @@
     "pegc-mode-host": 3,
     "pit-clock-host": 3,
     "platform-memory-host": 3,
-    "ppc-ata-guest": 3,
-    "ppc-boot-info-guest": 4,
-    "ppc-children-guest": 4,
-    "ppc-console-cells": 4,
-    "ppc-db-guest": 4,
-    "ppc-deploy-guest": 4,
-    "ppc-display-guest": 4,
-    "ppc-display-lifecycle": 4,
-    "ppc-fb": 4,
-    "ppc-fep-boot-guest": 4,
-    "ppc-fep-import": 4,
-    "ppc-font-guest": 4,
-    "ppc-fp-accept-host": 4,
-    "ppc-fp-guest": 4,
-    "ppc-gfx2-guest": 4,
-    "ppc-gui-guest": 4,
-    "ppc-hdd-root-guest": 4,
-    "ppc-hwb-commands": 4,
-    "ppc-hwb-guest": 4,
-    "ppc-in2-cui": 4,
-    "ppc-in2-gui": 2,
-    "ppc-install-guest": 4,
-    "ppc-kapi-v89-guest": 4,
-    "ppc-kboot-console": 4,
-    "ppc-kcg-guest": 4,
-    "ppc-link-sh-flow": 4,
-    "ppc-link-sh-run": 4,
-    "ppc-loop-guest": 4,
-    "ppc-machcfg-guest": 4,
-    "ppc-memstat-guest": 4,
-    "ppc-mmu": 4,
-    "ppc-module-guest": 3,
-    "ppc-mouse-guest": 4,
-    "ppc-of-hdd-run": 4,
-    "ppc-osri-guest": 1,
-    "ppc-path-guest": 4,
-    "ppc-pci-guest": 4,
-    "ppc-port-guest": 4,
-    "ppc-product-boot-guest": 4,
-    "ppc-reset": 4,
-    "ppc-rh-fb": 3,
-    "ppc-root-lz4-layout-host": 4,
-    "ppc-rtc-guest": 4,
-    "ppc-sc": 4,
-    "ppc-sd": 4,
-    "ppc-sd-link": 4,
-    "ppc-sfs-guest": 4,
-    "ppc-sh-output": 4,
-    "ppc-shell-layout-guest": 4,
-    "ppc-shm-guest": 4,
-    "ppc-sqlite-stack-guest": 4,
-    "ppc-sqlite-static-guest": 4,
-    "ppc-surface-guest": 4,
-    "ppc-sysinfo-guest": 4,
-    "ppc-usb": 4,
-    "ppc-ver-guest": 4,
+    "ppc-ata-guest": 5,
+    "ppc-boot-info-guest": 6,
+    "ppc-children-guest": 6,
+    "ppc-console-cells": 6,
+    "ppc-db-guest": 6,
+    "ppc-deploy-guest": 6,
+    "ppc-display-guest": 6,
+    "ppc-display-lifecycle": 6,
+    "ppc-fb": 6,
+    "ppc-fep-boot-guest": 6,
+    "ppc-fep-import": 6,
+    "ppc-font-guest": 6,
+    "ppc-fp-accept-host": 6,
+    "ppc-fp-guest": 6,
+    "ppc-gfx2-guest": 6,
+    "ppc-gui-guest": 6,
+    "ppc-hdd-root-guest": 6,
+    "ppc-hwb-commands": 6,
+    "ppc-hwb-guest": 6,
+    "ppc-in2-cui": 6,
+    "ppc-in2-gui": 3,
+    "ppc-install-guest": 6,
+    "ppc-kapi-v89-guest": 6,
+    "ppc-kboot-console": 6,
+    "ppc-kcg-guest": 6,
+    "ppc-link-sh-flow": 6,
+    "ppc-link-sh-run": 6,
+    "ppc-loop-guest": 6,
+    "ppc-machcfg-guest": 6,
+    "ppc-memstat-guest": 6,
+    "ppc-mmu": 6,
+    "ppc-module-guest": 5,
+    "ppc-mouse-guest": 6,
+    "ppc-of-hdd-run": 6,
+    "ppc-osri-guest": 3,
+    "ppc-path-guest": 6,
+    "ppc-pci-guest": 6,
+    "ppc-port-guest": 6,
+    "ppc-product-boot-guest": 6,
+    "ppc-reset": 6,
+    "ppc-rh-fb": 5,
+    "ppc-root-lz4-layout-host": 6,
+    "ppc-rtc-guest": 6,
+    "ppc-sc": 6,
+    "ppc-sd": 6,
+    "ppc-sd-link": 6,
+    "ppc-sfs-guest": 6,
+    "ppc-sh-output": 6,
+    "ppc-shell-layout-guest": 5,
+    "ppc-shm-guest": 6,
+    "ppc-sqlite-stack-guest": 5,
+    "ppc-sqlite-static-guest": 5,
+    "ppc-surface-guest": 6,
+    "ppc-sysinfo-guest": 6,
+    "ppc-usb": 6,
+    "ppc-ver-guest": 6,
     "preflight-host": 3,
     "privileged": 3,
     "probe-host": 2,
