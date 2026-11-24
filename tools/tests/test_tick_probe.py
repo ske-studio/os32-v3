@@ -61,6 +61,7 @@ def main():
             assert run(original.replace(hist_shift, '0'), boundary) == 1
             print('RED runtime exit=1 interval histogram upper bound', flush=True)
             mutants = [
+                ('fixture callback', '    s1_notify();', '    (void)now_ms;', False),
                 ('rearm', '    snd_wake_arm(1000);', '    snd_wake_arm(0);', False),
                 ('worst', 'if (d > s->worst) s->worst = d;', 's->worst = d;', False),
                 ('histogram', 's->hist[bin]++;', 's->hist[0]++;', False),

@@ -15,7 +15,8 @@ static unsigned int delay;
 static void (*notify)(void);
 static int snd_wake_register(void (*fn)(void)) { notify = fn; return 0; }
 static int snd_wake_arm(unsigned int us) { delay = us; return 0; }
-static int tick_fast_set(void (*fn)(unsigned int)) { (void)fn; notify = 0; return 0; }
+static void (*fast)(unsigned int);
+static int tick_fast_set(void (*fn)(unsigned int)) { fast = fn; notify = 0; return 0; }
 #include TP_SOURCE
 static void fail(void)
 {
@@ -70,10 +71,10 @@ static void slot_work(void) { tp_host_clock += 10; }
 void _start(void)
 {
     tick_probe_boot(); stop();
-    for (unsigned int mode = TP_S1_IDLE; mode <= TP_S1_DUE; mode++) {
+    for (unsigned int mode = TP_S1_IDLE; mode <= TP_S1_FIXTURE; mode++) {
         struct tp_control c = {mode, 0};
         CHECK(tick_probe_control(&c) == 0);
-        CHECK(!!notify == (mode != TP_S1_IDLE));
+        CHECK(!!notify == (mode == TP_S1_WAIT || mode == TP_S1_DUE));
         if (mode == TP_S1_WAIT) CHECK(delay == 300000000u);
         if (mode == TP_S1_DUE) {
             CHECK(delay == 1000);
@@ -81,8 +82,14 @@ void _start(void)
             notify();
             CHECK(delay == 1000);
         }
-        CHECK(stop()->s1_notifications == (mode == TP_S1_DUE));
-        CHECK(!delay && !notify);
+        CHECK(!!fast == (mode == TP_S1_FIXTURE));
+        if (mode == TP_S1_FIXTURE) {
+            CHECK(!delay);
+            fast(1);
+            CHECK(delay == 1000);
+        }
+        CHECK(stop()->s1_notifications == (mode >= TP_S1_DUE));
+        CHECK(!delay && !notify && !fast);
     }
     start();
     for (unsigned int i = 0; i < 99; i++) sample(TP_SLOT0, 32);

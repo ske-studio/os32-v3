@@ -43,7 +43,7 @@ struct tp_device_mark tick_probe_device_start(void);
 void tick_probe_device_end(unsigned int id, struct tp_device_mark m, unsigned int bytes);
 void tick_probe_pio_begin(void);
 void tick_probe_pio_end(void);
-enum { TP_S1_IDLE = 4, TP_S1_WAIT, TP_S1_DUE };
+enum { TP_S1_IDLE = 4, TP_S1_WAIT, TP_S1_DUE, TP_S1_FIXTURE };
 struct tp_request { unsigned int action; }; /* 1=start, 2=stop, 3=show */
 struct tp_control { unsigned int action; const struct tp_snapshot *snapshot; };
 void tick_probe_boot(void);

@@ -295,10 +295,17 @@ static void s1_notify(void)
     snd_wake_arm(1000); /* One expiry per millisecond, including rearm cost. */
 }
 
+/* Control for the callback work alone, once per raw tick. */
+static void s1_fixture(unsigned int now_ms)
+{
+    (void)now_ms;
+    s1_notify();
+}
+
 int tick_probe_control(struct tp_control *c)
 {
     /* Caller is cooperative, IF=1. Freeze with a tiny raw CLI section. */
-    int s1 = c->action >= TP_S1_IDLE && c->action <= TP_S1_DUE;
+    int s1 = c->action >= TP_S1_IDLE && c->action <= TP_S1_FIXTURE;
     if (c->action == 1 || s1) {
         if (data.running) return -1;
         unsigned int available = data.available;
@@ -314,12 +321,13 @@ int tick_probe_control(struct tp_control *c)
         if (s1) {
             if (!available) return -1;
             unsigned int flags = irq_save();
-            int rc = snd_wake_register(s1_notify);
+            int rc = c->action == TP_S1_FIXTURE ? tick_fast_set(s1_fixture) :
+                     snd_wake_register(s1_notify);
             if (!rc) {
                 data.s1_mode = c->action;
                 if (c->action == TP_S1_IDLE)
                     tick_fast_set(0);
-                else
+                else if (c->action != TP_S1_FIXTURE)
                     snd_wake_arm(c->action == TP_S1_WAIT ? 300000000u : 1000u);
                 window = now();
                 data.running = 1;
