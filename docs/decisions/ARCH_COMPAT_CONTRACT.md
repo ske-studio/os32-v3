@@ -1,5 +1,7 @@
 # ARCH_COMPAT_CONTRACT — アーキテクチャ間の互換契約
 
+> 起動の骨格を共通の層へ (機種依存の分離のやり直しの ①、ユーザー決定 2026-11-24、設計まで): [ARCH_BOOT_SKELETON_DESIGN.md](ARCH_BOOT_SKELETON_DESIGN.md)。
+
 > 2026-11-20 の見直しで x86 の形に改めた ([DESIGN_X86_AUDIT](ppc/DESIGN_X86_AUDIT.md))。
 
 > 状態: **確定 (2026-11-14)** — アーキ間の互換契約の正典 (ユーザーの提案「最大公約数と最小公倍数の互換層」、astra 起草・Opus 5.5 の独立レビュー 2 回・PowerPC PM の見直し)。契約の確定と実装の適合は分け、適合は §4 の各項目と W3 で更新する。
