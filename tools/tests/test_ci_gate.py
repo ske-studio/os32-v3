@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """tools/ci/gate.py: 道具の事前確認・結果の表・回っていない検査を失敗に数えること (検査は回さない)。"""
 CHECK = dict(name='ci-gate-host', tier=1, needs=[], budget=5,
-    covers=['tools/ci/gate.py', 'tools/tests/test_ci_gate.py', 'tools/checks/run.py', 'tools/check_time.py',
+    covers=['tools/ci/gate.py', 'tools/ppc/keep_tmp.py', 'tools/tests/test_ci_gate.py', 'tools/checks/run.py', 'tools/check_time.py',
             '.github/actions/gate-setup/action.yml', '.github/workflows/sep.yml', '.github/workflows/check.yml'],
     basis=['CI_GATE_DESIGN §2', 'CI_GATE_DESIGN §3'],
 )
@@ -11,6 +11,7 @@ import argparse
 import importlib.util
 import io
 import os
+import shutil
 from pathlib import Path
 import sys
 import tempfile
@@ -119,6 +120,24 @@ def suite(tool):
                 tool.keep_failed_log(kept, logs / 'check-c.log', 1, limit=4)
                 self.assertEqual(sorted(p.name for p in (out / 'failed-logs').iterdir()), ['check-b.log'])
                 self.assertEqual((out / 'failed-logs/check-b.log').read_text(), '6789')
+
+        def test_keep_tmp(self):
+            sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'ppc'))
+            import keep_tmp
+            saved = os.environ.pop('OS32_KEEP_TMP', None)
+            try:
+                with keep_tmp.temporary_directory(prefix='os32-keep-') as gone:
+                    pass
+                self.assertFalse(Path(gone).exists())
+                os.environ['OS32_KEEP_TMP'] = '1'
+                with keep_tmp.temporary_directory(prefix='os32-keep-') as kept:
+                    (Path(kept) / 'serial.log').write_text('x')
+                self.assertTrue((Path(kept) / 'serial.log').is_file())
+                shutil.rmtree(kept)
+            finally:
+                os.environ.pop('OS32_KEEP_TMP', None)
+                if saved is not None:
+                    os.environ['OS32_KEEP_TMP'] = saved
 
         def test_keep_evidence(self):
             with tempfile.TemporaryDirectory(prefix='os32-ci-gate-') as directory:

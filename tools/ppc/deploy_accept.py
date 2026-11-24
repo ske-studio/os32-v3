@@ -4,7 +4,7 @@ import hashlib
 from pathlib import Path
 import struct
 import subprocess
-import tempfile
+import keep_tmp
 
 from kboot_accept import build_media
 from link_sh_run import ROOT, Session, cross
@@ -204,7 +204,7 @@ def main():
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
     hashes = set()
-    with tempfile.TemporaryDirectory(prefix='ppc-deploy-') as directory:
+    with keep_tmp.temporary_directory(prefix='ppc-deploy-') as directory:
         for case in ['normal'] + ([*MUTATIONS, *ORDER_CASES] if args.mutate else []):
             out = Path(directory)/case
             media = build(out, case)

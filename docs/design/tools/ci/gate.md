@@ -51,7 +51,7 @@ static-setup の最後の `gate.py preflight --env static` はホストの道具
 2. このシャードの検査の名前を `tools/checks/run.py --list --shard` から取る (G4)。
 3. `make -k -jN check CHECK_SHARD=… MUTATE=1` (`--no-mutate` なら `check-fast`、`MUTATE=0`) を、`CHECK_LOG_DIR=<置き場>/logs`・`CHECK_TIMES=<置き場>/check_times.tsv`・`OS32_REQUIRE_PPC=1` で回す。前提の準備・並列・順序は make の今の仕組みのまま (検査の走らせ方をもう 1 つ作らない)。
 4. `check_times.tsv` (検査・秒・終了コード) と検査ごとのログから表を作る: 通過・失敗・回っていない・SKIP の行がある。
-5. `<置き場>/results.json`、`<置き場>/failed-logs/` (落ちた検査のログの末尾 4 MiB)、`--env` の回では落ちた検査のゲストの証拠 `failed-logs/evidence/<検査>/` (シリアル・qemu.log・画面など、1 ファイル 512 KiB・1 検査 4 MiB まで、新しい物から。ログの最後の `evidence=<dir>` から、無ければ検査ごとの一時の置き場 `$RUNNER_TEMP/os32-ck/<検査>` (検査の TMPDIR) から。`TemporaryDirectory` で消す道具の物は残らない)、画面と `$GITHUB_STEP_SUMMARY` に表。失敗か、回っていない検査が 1 本でもあれば終了コード 1。検査は全部通ったのに make が落ちた時 (前提の準備、木が変わっていないことの照合) も 1。
+5. `<置き場>/results.json`、`<置き場>/failed-logs/` (落ちた検査のログの末尾 4 MiB)、`--env` の回では落ちた検査のゲストの証拠 `failed-logs/evidence/<検査>/` (シリアル・qemu.log・画面など、1 ファイル 512 KiB・1 検査 4 MiB まで、新しい物から。ログの最後の `evidence=<dir>` から、無ければ検査ごとの一時の置き場 `$RUNNER_TEMP/os32-ck/<検査>` (検査の TMPDIR) から。同じ回では OS32_KEEP_TMP=1 を立て、QEMU の受入の道具は一時の置き場を `tools/ppc/keep_tmp.py` の `temporary_directory` で作って消さない)、画面と `$GITHUB_STEP_SUMMARY` に表。失敗か、回っていない検査が 1 本でもあれば終了コード 1。検査は全部通ったのに make が落ちた時 (前提の準備、木が変わっていないことの照合) も 1。
 
 `--env <環境>` を付けた時は、その環境を要る検査 (`run.py --list --env`) だけをシャードに割り、手順 3 の make の代わりに、検査を 1 本ずつ順に `tools/checks/run.py --run <検査> --env <環境>` で回す (`run_each`)。1 本落ちても残りを回し、所要は同じ `check_times.tsv` に足す。QEMU で機械を丸ごと模擬する検査は、並べて回すと期限に間に合わなくなるので、シャードの中は直列にする。check.yml の `ppc-qemu` がこの入口を使う。
 

@@ -5,7 +5,7 @@ import hashlib
 import re
 from pathlib import Path
 import struct
-import tempfile
+import keep_tmp
 
 from deploy_accept import extract, verify_disk
 from hdd_root_accept import disk as other_disk
@@ -172,7 +172,7 @@ def main():
     parser.add_argument('--build-only', action='store_true')
     args = parser.parse_args()
     hashes = set()
-    with tempfile.TemporaryDirectory(prefix='of-hdd-') as tmp:
+    with keep_tmp.temporary_directory(prefix='of-hdd-') as tmp:
         work = Path(tmp)
         first = other_disk(work, 'first')
         source = 'userland/shell/cmd_base.c'

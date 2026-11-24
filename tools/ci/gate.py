@@ -262,10 +262,12 @@ def run(args):
             scratch.mkdir(parents=True)
             saved = os.environ.get('TMPDIR')
             os.environ['TMPDIR'] = str(scratch)
+            os.environ['OS32_KEEP_TMP'] = '1'
             try:
                 rc = check_time.run(times, name, [sys.executable, '-B', 'tools/checks/run.py',
                                                   '--run', name] + selection)
             finally:
+                os.environ.pop('OS32_KEEP_TMP', None)
                 if saved is None:
                     del os.environ['TMPDIR']
                 else:
