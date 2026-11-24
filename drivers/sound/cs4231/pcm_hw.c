@@ -84,7 +84,7 @@ int pcm_hw_register(void)
         .name = "CS4231", .driver = "cs4231"
     };
     dev = snd2_register(&backend, 0, &info);
-    return dev >= 0 || dev == OS32_ERR_NOSYS ? 0 : dev;
+    return dev >= 0 ? 0 : dev;
 }
 
 int pcm_hw_quiet(void)

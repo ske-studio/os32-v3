@@ -56,7 +56,6 @@ typedef struct SndBackend {          /* sound/hal/snd2_int.h、SND_HAL2_ABI 1 */
 int  snd2_register(const SndBackend *be, void *ctx, const SND2_DevInfo *info);  /* 戻り dev */
 int  snd2_unregister(u32 dev);       /* 流れがあれば teardown。FAULTED なら BUSY を返し ctx を解放させない */
 void snd2_advance(u32 dev);          /* IRQ・tick から */
-void snd2_reclaim(int owner);        /* exec の (6b) */
 typedef struct SndChipBackend { u32 abi;                                  /* sound/hal/snd2_int.h */
     int (*caps)(void *c, SND2_ChipCaps *o);  int (*open)(void *c);  int (*close)(void *c);   /* open: A460h 保存・bit0=1・静止 */
     int (*write)(void *c, const SND2_RegW *w, u32 n);  int (*read)(void *c, u32 bank, u32 what, u32 reg);
@@ -66,5 +65,4 @@ int snd2_chip_register(const SndChipBackend *be, void *c, const SND2_DevInfo *i)
 int snd2_chip_dev_info(u32 index, SND2_DevInfo *out);
 void snd2_chip_fault(u32 dev);
 int snd2_chip_implicit(int owner);
-void snd2_chip_reclaim(int owner);
 #endif

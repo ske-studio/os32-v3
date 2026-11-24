@@ -156,10 +156,9 @@ static void exec_reclaim_resources(int id)
     pipe_free_owned(id);
     /* (5) 共有メモリ (P3: 所有者付きになった) */
     shm_free_owned(id);
-    /* (6b) PCM: この ID が鳴らしていれば待たずに止めて資源を返す
-     * (票 TASK_PCM_CS4231 §2-1「所有と回収」)。保存した owner と id だけを
-     * 照合する — 現在 owner に依存せず、私有ページ返却の前に止める。 */
-    exec_pcm_reclaim(id);
+    /* (6b) Stop playback and release the exiting owner's chip handles. */
+    snd2_reclaim(id);
+    snd2_chip_reclaim(id);
     in2_reclaim(id); /* (6c) Before focus moves to the parent. */
 }
 

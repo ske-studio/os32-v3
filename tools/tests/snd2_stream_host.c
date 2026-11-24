@@ -248,7 +248,15 @@ static int probe(void)
     s = &snd2_device(desc.dev)->stream;
     CHECK(s->played == 1 && !s->owner && leaked && pcm_open(44100) == OS32_ERR_IO);
     desc.dev = snd2_register(&backend, 0, &info);
+    /* A v2 drain can finish from advance. A failed stop there must
+     * reach the foreground even after all submitted frames played. */
     CHECK(desc.dev == 2 && !snd2_stream_open(&desc, &id));
+    hw = 0;
+    CHECK(snd2_stream_write(id, samples, 4) == 4);
+    CHECK(snd2_stream_close(id, SND2_CLOSE_DRAIN) == OS32_ERR_IO);
+    CHECK(snd2_device(desc.dev)->stream.played == 1 && leaked);
+    desc.dev = snd2_register(&backend, 0, &info);
+    CHECK(desc.dev == 3 && !snd2_stream_open(&desc, &id));
     CHECK(snd2_stream_close(id, SND2_CLOSE_ABORT) == OS32_ERR_IO);
     CHECK(snd2_stream_start(id) == OS32_ERR_STALE && leaked);
     return error || locked;

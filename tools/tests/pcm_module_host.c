@@ -11,6 +11,7 @@
 #ifndef PCM_ADAPTER
 #define PCM_ADAPTER "../../drivers/sound/cs4231/pcm_module.c"
 #endif
+#include "pcm_hw.h"
 #include PCM_ADAPTER
 #include "../../kernel/irq/tick.c"
 volatile u32 kctx_irq_depth;
@@ -69,7 +70,30 @@ static int body_open(u32 rate)
     CHECK(!pcm_module_irq_register(body_irq_line, body_irq, 0, IRQ_F_SHARED));
     return 0;
 }
-static int body_quiet(void)
+/* The module publishes the real CS4231 backend. The fixture supplies the
+ * codec calls and retains its DMA/IRQ failure injection below. */
+static u8 stream_ring[PCM_RING_BYTES], staging[32768];
+int pcm_shim_irq_depth;
+void pcm_shim_if_on(void) { }
+int res_owner_get(void) { return 1; }
+u32 tick_clock_ms(void) { return ticks * 10; }
+i32 exec_sys_yield(void) { return 0; }
+void *kmalloc(u32 n) { return n == sizeof(staging) ? staging : 0; }
+void kfree(void *ptr) { CHECK(ptr == staging); }
+int pcm_codec_open(u32 rate, u32 period, void (*advance)(void), u8 **out)
+{
+    CHECK(period == PCM_HALF_FRAMES && advance);
+    *out = stream_ring;
+    return body_open(rate);
+}
+int pcm_codec_start(void) { return 0; }
+int pcm_codec_pos(u32 *frame) { *frame = 0; return 0; }
+int pcm_codec_ack(void) { return 1; }
+int pcm_codec_stop(void) { return 0; }
+void pcm_codec_release(int leak) { CHECK(!leak); }
+void pcm_codec_finish_release(void) { }
+void pcm_codec_volume(u8 left, u8 right) { (void)left; (void)right; }
+int pcm_module_quiet(void)
 {
     /* Modes 4/5 leave IRQ cleanup to the resident detach path. */
     if (irq_target && mode != 4 && mode != 5)
@@ -85,9 +109,9 @@ static int init_pcm(PcmModuleApi *out)
     for (u32 i = 0; i < PCM_MODULE_API_SLOTS; i++) entries[i] = (u32)(uptr)body_tick;
     kmemcpy(out, entries, sizeof(entries));
     out->tick = body_tick;
-    out->quiet = body_quiet;
+    out->quiet = pcm_hw_quiet;
     out->open = body_open;
-    return 0;
+    return mode == 1 || mode == 3 ? 0 : pcm_hw_register();
 }
 static int start_then_fail(struct module_record *r, u32 entry, u32 *ops)
 {

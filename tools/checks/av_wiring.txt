@@ -50,3 +50,5 @@ IS snd2_chip_register internal
 IS snd2_chip_unregister internal
 IS snd2_chip_implicit internal
 IS snd2_chip_fault internal
+IS snd2_reclaim internal
+IS snd2_chip_reclaim internal

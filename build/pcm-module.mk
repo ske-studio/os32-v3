@@ -37,10 +37,3 @@ $(BUILD_OUT)/pcm.mod: $(PCM_OUT)/pcm.elf $(PCM_OUT)/pcm_imports.json $(PCM_OUT)/
 $(R1_OUT)/pcm.mod: $(PCM_OUT)/pcm.elf $(PCM_OUT)/pcm_imports.json $(PCM_OUT)/pcm_provider_types.o $(R1_OUT)/vmkernel.lz4 tools/mkmod.py sdk/target_profile.py tools/module_schema.py sdk/kapi.json build/pcm-module.mk
 	$(call pack_pcm,$(R1_OUT)/vmkernel.lz4)
 -include $(PCM_OBJS:.o=.d) $(PCM_OUT)/pcm_kexports.d $(PCM_OUT)/pcm_provider_types.d
-
-# Resident PC-98 PCM registry, stream core and public sound adapters.
-SND2_CORE := $(addprefix sound/hal/snd2_,reg.o caps.o dsp.o stream.o pos.o seg.o stg.o) kapi/kapi_snd2.o kapi/kapi_snd2_chip.o
-C_KERNEL_OBJ += $(addprefix $(KERNEL_OBJ_PREFIX),$(SND2_CORE))
-R1_OBJECTS += $(addprefix $(R1_OBJ)/,$(SND2_CORE))
-$(BUILD_OUT)/kernel.elf: $(addprefix $(KERNEL_OBJ_PREFIX),$(SND2_CORE))
-$(R1_OUT)/kernel.elf: $(addprefix $(R1_OBJ)/,$(SND2_CORE))

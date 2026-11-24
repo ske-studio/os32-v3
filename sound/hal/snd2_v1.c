@@ -83,3 +83,8 @@ int pcm_close(void)
     if (!owned()) return OS32_ERR_INVAL;
     return snd2_stream_close(stream_id, SND2_CLOSE_DRAIN);
 }
+
+void pcm_reclaim(int owner)
+{
+    snd2_reclaim(owner);
+}

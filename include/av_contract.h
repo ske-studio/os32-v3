@@ -23,6 +23,8 @@ int av_focus_is_wm(void);
 int av_focus_set(int owner);
 int av_focus_get(void);
 int av_focus_owner(void);
+void snd2_reclaim(int owner);
+void snd2_chip_reclaim(int owner);
 void in2_reclaim(int owner);
 void av_focus_exec_enter(int id);
 void av_focus_exec_leave(int id, int parent);

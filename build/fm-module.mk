@@ -18,12 +18,9 @@ $(FM_OUT)/fm_import_stubs.o: $(FM_OUT)/fm_import_stubs.S build/config.mk build/f
 $(FM_OUT)/fm.elf: $(FM_OBJS) build/fm-module.ld sdk/link/generations.ld
 	$(MODULE_LD) $(MODULE_LDFLAGS) --emit-relocs -T build/fm-module.ld -Map=$(FM_OUT)/fm.map $(FM_OBJS) -o $@
 
-$(KERNEL_OBJ_PREFIX)sound/hal/a0_weak.o $(R1_OBJ)/sound/hal/a0_weak.o: private CFLAGS_BASE += -DOS32_FM_CHIP_PROVIDER
-$(KERNEL_OBJ_PREFIX)sound/hal/a0_weak.o $(R1_OBJ)/sound/hal/a0_weak.o: build/fm-module.mk
-
 # Kernel and R1 both publish exactly the generated function contracts.
-C_KERNEL_OBJ += $(KERNEL_OBJ_PREFIX)sound/hal/snd2_chip.o $(FM_OUT)/fm_kexports.o
-R1_OBJECTS += $(R1_OBJ)/sound/hal/snd2_chip.o $(FM_OUT)/fm_kexports.o
+C_KERNEL_OBJ += $(FM_OUT)/fm_kexports.o
+R1_OBJECTS += $(FM_OUT)/fm_kexports.o
 $(BUILD_OUT)/kernel.elf $(R1_OUT)/kernel.elf: $(FM_OUT)/fm_kexports.o
 $(KERNEL_OBJ_PREFIX)drivers/sound/fm/fm_module.o $(R1_OBJ)/drivers/sound/fm/fm_module.o: $(FM_GEN)
 $(KERNEL_OBJ_PREFIX)drivers/sound/fm/fm_module.o $(R1_OBJ)/drivers/sound/fm/fm_module.o: private CFLAGS_BASE += -I$(FM_OUT)
@@ -36,6 +33,3 @@ $(BUILD_OUT)/fm.mod: $(FM_OUT)/fm.elf $(FM_OUT)/fm_imports.json $(FM_OUT)/fm_pro
 $(R1_OUT)/fm.mod: $(FM_OUT)/fm.elf $(FM_OUT)/fm_imports.json $(FM_OUT)/fm_provider_types.o $(R1_OUT)/vmkernel.lz4 tools/mkmod.py sdk/target_profile.py tools/module_schema.py sdk/kapi.json build/fm-module.mk
 	$(call pack_fm,$(R1_OUT)/vmkernel.lz4)
 -include $(FM_OBJS:.o=.d) $(FM_OUT)/fm_kexports.d $(FM_OUT)/fm_provider_types.d
-
-$(BUILD_OUT)/kernel.elf: $(KERNEL_OBJ_PREFIX)sound/hal/snd2_chip.o
-$(R1_OUT)/kernel.elf: $(R1_OBJ)/sound/hal/snd2_chip.o

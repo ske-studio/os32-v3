@@ -232,7 +232,9 @@ void snd2_advance(u32 dev)
                 (void)start_hw(d, flags, 1);
                 return;
             }
-            if (s->state == SND2_ST_DRAIN && s->played == s->written) {
+            /* v1 close must return with IRQ and DMA released. Its caller
+             * finishes the drain outside the device advance callback. */
+            if (!s->v1 && s->state == SND2_ST_DRAIN && s->played == s->written) {
                 teardown(d, flags, 0, 1);
                 return;
             }
@@ -326,7 +328,8 @@ int snd2_stream_close(u32 id, u32 how)
             rc = s->state == SND2_ST_FAULTED || s->owner || s->played != s->written ? OS32_ERR_IO : 0;
             break;
         }
-        if (s->state != SND2_ST_DRAIN || tick_clock_ms() - begin >= timeout) {
+        if (s->state != SND2_ST_DRAIN || (s->v1 && s->played == s->written) ||
+            tick_clock_ms() - begin >= timeout) {
             rc = s->played == s->written ? 0 : OS32_ERR_IO;
             int stop_rc = teardown(d, flags, 0, 1);
             return stop_rc ? stop_rc : rc;
