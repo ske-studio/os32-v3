@@ -19,7 +19,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 
 def function(s, name):
     import re
-    m = re.search(r'^(?:static )?(?:void|int|i32) (?:__cdecl )?' + name + r'\([^;{}]*\)\n\{', s, re.M)
+    m = re.search(r'^(?:static )?(?:void|int|unsigned int|i32) (?:__cdecl )?' + name + r'\([^;{}]*\)\n\{', s, re.M)
     if not m:
         raise ValueError(name)
     return s[m.start():s.index('\n}', m.end()) + 2]
@@ -412,7 +412,7 @@ static int test(void) {
     CHECK(__builtin_offsetof(AppSlot, trim_pending) == 204);
     CHECK(__builtin_offsetof(AppSlot, trim_epoch) == 204 + sizeof(int));
     CHECK(sizeof(VfsStdinRead) == 16);
-    CHECK(sizeof(AppSlot) == 204 + sizeof(int) + sizeof(u32) + sizeof(VfsStdinRead) + sizeof(struct arch_fp_context) + sizeof(struct arch_entry_context));
+    CHECK(sizeof(AppSlot) == 204 + sizeof(int) + sizeof(u32) + sizeof(VfsStdinRead) + sizeof(struct arch_fp_context) + sizeof(struct arch_entry_context) + sizeof(slots[0].wait_restart) + sizeof(slots[0].wait_begin));
     CHECK(sizeof(RedirAccess) == 24 && sizeof(CallerAccessFrame) == 28);
     CHECK(sizeof(FdRedirect) == 52 && sizeof(FdRedirectState) == 156);
     CHECK(sizeof(Ring3CallContext) == 48);   /* T7b-b2 S3b: wm_shell_gen を足した */
@@ -554,6 +554,12 @@ void ring3_resume(const u32 *frame, u32 pd, void *tss) {
     for (int i = 0; i < APP_FRAME_WORDS; i++) child_frame[i] = frame[i];
     child_frame[8] = 0x1002; child_frame[7] = KAPI_SLOT_SYS_READ;
     g_cur_frame = &child_view; ring3_in_syscall = 1;
+    if (expected_eax == KAPI_SLOT_SND2_STREAM_WAIT) {
+        child_frame[7] = expected_eax;
+        CHECK(exec_wait_begin(91) == 15 && !slots[2].wait_restart);
+        CHECK(exec_wait_can_park());
+        exec_wait_park(15);
+    }
     exec_park_kbd(); CHECK(0);
 }
 '''
@@ -606,6 +612,15 @@ static void test_stdin_resume(void) {
     }
     resume_src = APP_RESUME_SRC_POLL; key_count = expected_keys = 0; expected_eax = (u32)-1;
     CHECK(exec_resume(2, 999) == 2);
+    resume_src = APP_RESUME_SRC_YIELD;
+    expected_eax = HOST_FRAME(a->frame)[7] = KAPI_SLOT_SND2_STREAM_WAIT;
+    expected_eip = 0x1000;
+    a->wait_restart = 1;
+    a->wait_begin = 15;
+    for (int i = 0; i < 2; ++i) {
+        CHECK(exec_resume(2, 999) == 2);
+        CHECK(a->wait_restart && a->wait_begin == 15);
+    }
     stdin_resume_test = 0;
 }
 '''
@@ -620,7 +635,7 @@ def run(source=None, irq=None, provider=None, ring=None):
     names = ('exec_reclaim_resources', 'exec_notify_owned', 'exec_reclaim_owned',
              'ring3_context_save', 'ring3_context_clear', 'ring3_context_restore',
              'ring3_wm_enter', 'ring3_wm_leave', 'exec_syscall_dispatch',
-             'exec_park_transfer', 'exec_park', 'exec_park_kbd', 'exec_park_poll', 'exec_sys_yield', 'exec_park_stop',
+             'exec_park_transfer', 'exec_wait_begin', 'exec_wait_can_park', 'exec_wait_park', 'exec_park', 'exec_park_kbd', 'exec_park_poll', 'exec_sys_yield', 'exec_park_stop',
              'exec_finish', 'exec_exit', 'kapi_sys_exit', 'exec_last_result', 'exec_pending_transfer', 'exec_pending_finish',
              'exec_kill_one', 'exec_kill', 'exec_fault_recover', 'ring3_kill_kind', 'ring3_fault_kill', 'ring3_abort_kill')
     context = source[source.index('typedef struct {\n    CallerAccessFrame caller;'):source.index('} Ring3CallContext;') + len('} Ring3CallContext;')]
@@ -721,6 +736,8 @@ MUTATIONS = (
      '        exec_pending_finish();\n        (void)fp_depth;\n        ring3_context_restore(&caller_context);\n        _enable();\n        if (g_longjmp_reason'),
     ('stdin-wrong-call', '        arch_syscall_slot(g_cur_frame) != KAPI_SLOT_SYS_READ ||', ''),
     ('stdin-WM-state', '!ring3_in_syscall || ring3_wm_depth || !g_cur_frame ||', '!ring3_in_syscall || !g_cur_frame ||'),
+    ('wait-no-rewind', '        arch_user_restart(&a->frame);', '        (void)a;'),
+    ('wait-deadline-reset', 'return a->wait_begin;', 'return now;'),
     ('stdin-no-rewind', '    if (restart_stdin) arch_user_restart(&a->frame);', ''),
     ('stdin-consume', '            if (!kbd_inject_peek_for((int)app_id, &ch)) return OS32_ERR_AGAIN;',
      '            if (!kbd_inject_take_for((int)app_id, &ch)) return OS32_ERR_AGAIN;'),

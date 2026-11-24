@@ -14,6 +14,7 @@ CHECK = dict(name='pcm-hw-host', tier=4, needs=[], budget=6,
              basis=['docs/decisions/sound/AV_HAL_DESIGN.md §3・§12 S9・§13-2'])
 
 MUTATIONS = [
+    ('pcm_hw.c', 'if (!rc) pcm_module_refill_tick(dev);', 'if (!rc) pcm_module_refill_tick(-1);'),
     ('pcm_cs4231.c', '++hal_ticks;', '++hal_pi;'),
     ('pcm_cs4231.c', 'hal_max_us = now - hal_last_us;', 'hal_max_us = 0;'),
     ('pcm_cs4231.c', 'if (s_in_advance) {', 'if (0) {'),

@@ -123,6 +123,32 @@ int exec_park_poll(u32 now_tick)
     return 0;
 }
 
+unsigned int exec_wait_begin(unsigned int now)
+{
+    AppSlot *a = appslot_get(appslot_cur());
+    if (a && a->wait_restart && ring3_call_from_user()) {
+        a->wait_restart = 0;
+        return a->wait_begin;
+    }
+    return now;
+}
+
+int exec_wait_can_park(void)
+{
+    return ring3_call_from_user() && g_cur_frame &&
+           arch_syscall_slot(g_cur_frame) == KAPI_SLOT_SND2_STREAM_WAIT &&
+           g_cur_app && g_cur_app->gui &&
+           g_cur_app->cpl3 && !exec_font_guard_active() && con_sink_is_enabled() &&
+           appslot_park_yield_check() == 0 && appslot_get(appslot_cur()) == g_cur_app;
+}
+
+void exec_wait_park(unsigned int begin)
+{
+    g_cur_app->wait_restart = 1;
+    g_cur_app->wait_begin = begin;
+    exec_park_transfer(appslot_cur(), g_cur_app, g_cur_frame, appslot_park_yield_commit);
+}
+
 /* ======================================================================== */
 /*  exec_sys_yield — 明示的な譲り (第 4 の park 点、KAPI v49 sys_yield、D5)  */
 /*                                                                          */
@@ -212,7 +238,9 @@ i32 exec_resume(i32 app_id, i32 wait_ret)
     if (!a->cpl3 || !a->as->pd_phys) return OS32_ERR_INVAL;
     src = appslot_resume_source((int)app_id);
     restart_stdin = src == APP_RESUME_SRC_KBD && a->stdin_read.active;
-    if (src == APP_RESUME_SRC_KEEP) {
+    if (src == APP_RESUME_SRC_YIELD && a->wait_restart) {
+        arch_user_restart(&a->frame);
+    } else if (src == APP_RESUME_SRC_KEEP) {
         /* STOP parked a completed syscall; do not overwrite EAX or read keys. */
     } else if (src == APP_RESUME_SRC_YIELD) {
         /* 票 T9 D5: 明示的な譲り (sys_yield) は **注入リングを読まない**。

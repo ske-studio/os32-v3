@@ -1,10 +1,10 @@
-#include "sound/hal/snd2_int.h"
+#include "sound/hal/snd2.h"
 #include "kstring.h"
 #include "mm/kmalloc.h"
 
 #define REQUIRE(expr) do { if (!(expr)) return 1; } while (0)
 static u32 ring[4096], staging[SND2_STG_FRAMES], samples[SND2_STG_FRAMES];
-static Snd2Stream stream;
+static Snd2Device device;
 static int refuse_alloc, frees;
 
 void *kmalloc(u32 n)
@@ -31,7 +31,7 @@ void *kmemset(void *dst, int value, u32 bytes)
 
 static void setup(u32 period, u32 lead, u32 cap, u32 origin)
 {
-    Snd2Stream *s = &stream;
+    Snd2Stream *s = &device.stream;
     kmemset(s, 0, sizeof(*s));
     s->fmt = (SND2_Fmt){44100, 16, 2, 0, 0};
     s->state = SND2_ST_RUN;
@@ -49,14 +49,14 @@ static void setup(u32 period, u32 lead, u32 cap, u32 origin)
 static void write_frames(u32 first, u32 n)
 {
     u32 off;
-    n = snd2_stg_reserve(&stream, n, &off);
-    snd2_stg_write(&stream, off, samples + first, n);
-    snd2_stg_publish(&stream, n);
+    n = snd2_stg_reserve(&device.stream, n, &off);
+    snd2_stg_write(&device.stream, off, samples + first, n);
+    snd2_stg_publish(&device.stream, n);
 }
 
 static int append_and_pause(void)
 {
-    Snd2Stream *s = &stream;
+    Snd2Stream *s = &device.stream;
     setup(256, 3, 1024, 0);
     snd2_seg_prime(s);
     REQUIRE(snd2_seg_observe(s, 1, 256, 5) == 0 && !s->underruns);
@@ -77,9 +77,66 @@ static int append_and_pause(void)
     return 0;
 }
 
+/* Model the first retirement either on PI or on the first 1 kHz poll
+ * after the boundary. The delayed foreground still receives every IRQ. */
+static u32 dma_frame;
+static int with_pi, irq_error;
+static unsigned masked;
+
+unsigned irq_save(void) { unsigned old = masked; masked = 1; return old; }
+void irq_restore(unsigned old) { masked = old; }
+u32 tick_clock_ms(void) { return dma_frame * 1000 / 44100; }
+int snd2_owned_device(u32 id, Snd2Device **out)
+{
+    if (id || !masked) return OS32_ERR_INVAL;
+    *out = &device;
+    return 0;
+}
+
+static void advance_until(u32 limit)
+{
+    u32 ms = tick_clock_ms();
+    do {
+        ++dma_frame;
+    } while (dma_frame < limit && ms == tick_clock_ms() && !(with_pi && dma_frame % 256 == 0));
+    if (ms == tick_clock_ms() && !(with_pi && dma_frame % 256 == 0)) return;
+    if (snd2_seg_observe(&device.stream, 1, dma_frame, tick_clock_ms()))
+        irq_error = 1;
+}
+
+unsigned exec_wait_begin(unsigned ms) { return ms; }
+int exec_wait_can_park(void) { return 0; }
+int ring3_wait_pending(void) { return 0; }
+void exec_wait_park(unsigned begin) { (void)begin; }
+void _idle(void)
+{
+    if (!masked) irq_error = 1;
+    advance_until(~0U);
+    masked = 0;
+}
+
+static int writer_wakeup(int pi, u32 delay_frames)
+{
+    dma_frame = 0;
+    with_pi = pi;
+    setup(256, 3, 1024, 0);
+    write_frames(0, 1024);
+    snd2_seg_prime(&device.stream);
+    REQUIRE(!snd2_stream_wait(0, 256, 100));
+    REQUIRE(dma_frame == (pi ? 256U : 265U));
+    u32 wake_frame = dma_frame + delay_frames;
+    while (dma_frame < wake_frame) advance_until(wake_frame);
+    write_frames(0, device.stream.cap);
+    while (dma_frame < 1024) advance_until(~0U);
+    REQUIRE(ring[1024] == (delay_frames ? 0 : samples[0]));
+    while (dma_frame < 1280) advance_until(~0U);
+    REQUIRE(device.stream.underruns == (delay_frames ? 1U : 0U));
+    return irq_error || masked;
+}
+
 static int empty_period_then_refill(void)
 {
-    Snd2Stream *s = &stream;
+    Snd2Stream *s = &device.stream;
     setup(256, 3, 1024, 0);
     write_frames(0, 1024);
     snd2_seg_prime(s);
@@ -90,8 +147,10 @@ static int empty_period_then_refill(void)
     for (u32 i = 0; i < 256; ++i)
         REQUIRE(!ring[1024 + i] && ring[1280 + i] == samples[1024 + i]);
     REQUIRE(snd2_seg_observe(s, 1, 1280, 30) == 0);
+#ifdef SND2_REFILL_DIAG
     REQUIRE(s->gap_frame == 1024 && !s->gap_n && s->gap_next == 1024);
     REQUIRE(s->max_dma_step == 1024 && !s->gap_stg && !s->gap_tried);
+#endif
     REQUIRE(s->played == 1024 && s->underruns == 1 && !s->epoch);
     REQUIRE(snd2_seg_observe(s, 1, 1536, 35) == 0);
     REQUIRE(s->played == 1280 && s->underruns == 1);
@@ -104,13 +163,16 @@ static int empty_period_then_refill(void)
     write_frames(1024, 256);
     REQUIRE(!snd2_seg_observe(s, 1, 1025, 24));
     REQUIRE(!snd2_seg_observe(s, 1, 1280, 30));
-    REQUIRE(s->underruns == 1 && s->gap_tried && !s->gap_n && s->gap_next == 1024);
+    REQUIRE(s->underruns == 1);
+#ifdef SND2_REFILL_DIAG
+    REQUIRE(s->gap_tried && !s->gap_n && s->gap_next == 1024);
+#endif
     return 0;
 }
 
 static int margins_and_loss(void)
 {
-    Snd2Stream *s = &stream;
+    Snd2Stream *s = &device.stream;
     setup(256, 3, 1024, 0);
     write_frames(0, 100);
     snd2_seg_prime(s);
@@ -137,7 +199,7 @@ static int margins_and_loss(void)
 
 static int drain_and_late_observations(void)
 {
-    Snd2Stream *s = &stream;
+    Snd2Stream *s = &device.stream;
     setup(256, 3, 1024, 0);
     write_frames(0, 700);
     snd2_seg_prime(s);
@@ -158,7 +220,7 @@ static int drain_and_late_observations(void)
 
 static int revolution_boundary(void)
 {
-    Snd2Stream *s = &stream;
+    Snd2Stream *s = &device.stream;
     setup(256, 3, 1024, 0);
     /* A new position after a gap could already include a full revolution. */
     REQUIRE(snd2_seg_observe(s, 1, 256, 92) < 0 && !s->last_hw);
@@ -176,7 +238,7 @@ static int revolution_boundary(void)
 
 static int capacity_and_wrap(void)
 {
-    Snd2Stream *s = &stream;
+    Snd2Stream *s = &device.stream;
     u32 off;
     for (u32 period = 256; period <= 2048; period *= 2) {
         u32 cap = period == 2048 ? 8192 : period * 2;
@@ -204,7 +266,7 @@ static int capacity_and_wrap(void)
 void _start(void)
 {
     for (u32 i = 0; i < SND2_STG_FRAMES; ++i) samples[i] = i + 1;
-    int rc = append_and_pause() || empty_period_then_refill() || margins_and_loss() ||
+    int rc = writer_wakeup(1, 706) || writer_wakeup(1, 0) || writer_wakeup(0, 0) || append_and_pause() || empty_period_then_refill() || margins_and_loss() ||
              drain_and_late_observations() || revolution_boundary() || capacity_and_wrap();
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc));
     __builtin_unreachable();

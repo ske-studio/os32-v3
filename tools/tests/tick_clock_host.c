@@ -16,14 +16,20 @@ static void other(u32 now)
     seen_ms = now;
 }
 
+static unsigned pcm_calls;
+static void pcm(void) { ++pcm_calls; }
+
 static int deadlines(void)
 {
     CHECK(tick_clock_config(1, 1000) == 0);
+    tick_pcm_set(pcm);
     for (unsigned i = 1; i < 10; ++i)
         CHECK(tick_clock_step() == 0);
     CHECK(tick_fast_set(other) == 0);
     CHECK(snd_wake_register(mark) == OS32_ERR_BUSY);
     CHECK(tick_clock_step() == TICK_STEP_JIFFY && seen_ms == 10);
+    CHECK(pcm_calls == 9);
+    tick_pcm_set(0);
     CHECK(tick_fast_set(0) == 0 && snd_wake_register(mark) == 0);
     ms_now = 0xfffffffeu;
     CHECK(snd_wake_arm(2001) == 0);

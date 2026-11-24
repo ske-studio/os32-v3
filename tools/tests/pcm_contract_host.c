@@ -33,6 +33,7 @@ int strcmp(const char *a, const char *b)
 #include "fixture.c"
 #undef main
 #include "pcm_hw.h"
+void pcm_module_refill_tick(int active) { (void)active; }
 u32 tick_clock_ms(void) { return (u32)sim_now_us / 1000; }
 #define KAPI_HIT(slot) ((void)(slot))
 #define KAPI_OUT_LEN(p, n) ((p) ? (n) : 0)

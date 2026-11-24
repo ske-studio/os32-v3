@@ -142,6 +142,12 @@
       "source": "sound/hal/snd2_int.h",
       "context": "normal",
       "irq": true
+    },
+    {
+      "symbol": "pcm_module_refill_tick",
+      "source": "drivers/sound/cs4231/pcm_module.h",
+      "context": "normal",
+      "irq": true
     }
   ]
 }
