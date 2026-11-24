@@ -76,6 +76,37 @@ static int append_and_pause(void)
     return 0;
 }
 
+static int empty_period_then_refill(void)
+{
+    Snd2Stream *s = &stream;
+    setup(256, 3, 1024, 0);
+    write_frames(0, 1024);
+    snd2_seg_prime(s);
+    /* A delayed observation lands in the first unprimed segment. */
+    REQUIRE(snd2_seg_observe(s, 1, 1024, 24) == 0);
+    write_frames(1024, 256);
+    REQUIRE(snd2_seg_observe(s, 1, 1025, 24) == 0);
+    for (u32 i = 0; i < 256; ++i)
+        REQUIRE(!ring[1024 + i] && ring[1280 + i] == samples[1024 + i]);
+    REQUIRE(snd2_seg_observe(s, 1, 1280, 30) == 0);
+    REQUIRE(s->gap_frame == 1024 && !s->gap_n && s->gap_next == 1024);
+    REQUIRE(s->max_dma_step == 1024 && !s->gap_stg && !s->gap_tried);
+    REQUIRE(s->played == 1024 && s->underruns == 1 && !s->epoch);
+    REQUIRE(snd2_seg_observe(s, 1, 1536, 35) == 0);
+    REQUIRE(s->played == 1280 && s->underruns == 1);
+    /* Same waveform, but here advance kept running while the writer slept. */
+    setup(256, 3, 1024, 0);
+    write_frames(0, 1024);
+    snd2_seg_prime(s);
+    for (u32 hw = 128; hw <= 1024; hw += 128)
+        REQUIRE(!snd2_seg_observe(s, 1, hw, hw / 44));
+    write_frames(1024, 256);
+    REQUIRE(!snd2_seg_observe(s, 1, 1025, 24));
+    REQUIRE(!snd2_seg_observe(s, 1, 1280, 30));
+    REQUIRE(s->underruns == 1 && s->gap_tried && !s->gap_n && s->gap_next == 1024);
+    return 0;
+}
+
 static int margins_and_loss(void)
 {
     Snd2Stream *s = &stream;
@@ -172,7 +203,7 @@ static int capacity_and_wrap(void)
 void _start(void)
 {
     for (u32 i = 0; i < SND2_STG_FRAMES; ++i) samples[i] = i + 1;
-    int rc = append_and_pause() || margins_and_loss() ||
+    int rc = append_and_pause() || empty_period_then_refill() || margins_and_loss() ||
              drain_and_late_observations() || revolution_boundary() || capacity_and_wrap();
     __asm__ volatile("int $0x80" : : "a"(1), "b"(rc));
     __builtin_unreachable();

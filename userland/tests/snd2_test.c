@@ -1,3 +1,4 @@
+#include "../../sound/hal/snd2_refill_diag.h"
 #include "os32api.h"
 #include <string.h>
 
@@ -93,6 +94,17 @@ static int playback(KernelAPI *api, u32 dev, const char *mode)
         pos.played < total - PERIOD || pos.played > pos.written) return 6;
     api->kprintf(7, "written=%u played=%u underruns=%u epoch=%u\n",
                  pos.written, pos.played, pos.underruns, pos.epoch);
+    if (!strcmp(mode, "wave") || !strcmp(mode, "stall")) {
+        if (api->snd2_caps(dev | SND2_CAPS_REFILL, &caps, sizeof(caps))) return 6;
+        const unsigned long *v = caps.reserved;
+        api->kprintf(7, "pi=%u tick=%u max_advance_us=%u max_dma_frames=%u min_stg=%u\n",
+                     v[SND2_DIAG_PI], v[SND2_DIAG_TICK], v[SND2_DIAG_MAX_US],
+                     v[SND2_DIAG_DMA_STEP], v[SND2_DIAG_MIN_STG]);
+        if (pos.underruns)
+            api->kprintf(7, "gap_frame=%u seg_n=%u next_first=%u event_stg=%u refill_tried=%u\n",
+                         v[SND2_DIAG_FRAME], v[SND2_DIAG_SEG_N],
+                         v[SND2_DIAG_NEXT_FIRST], v[SND2_DIAG_EVENT_STG], v[SND2_DIAG_REFILL_TRIED]);
+    }
     if (!strcmp(mode, "wave") && pos.underruns) return 6;
     if (epoch_test && changed)
         api->kprintf(7, "epoch before=%u played=%u ms=%u after=%u played=%u ms=%u\n",
