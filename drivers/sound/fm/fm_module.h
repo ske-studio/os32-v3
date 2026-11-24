@@ -18,8 +18,10 @@ typedef struct {
     void (*ssg_mixer)(uchar mask);
     void (*ssg_all_off)(void);
     int (*quiet)(void);
+    int (*attach)(void (*fault)(u32));
+    int (*detach)(void);
 } FmModuleApi;
-#define FM_MODULE_API_SLOTS 13u
+#define FM_MODULE_API_SLOTS 15u
 int fm_module_load(void);
 int fm_module_abort(void);
 #endif

@@ -146,6 +146,7 @@ __attribute__((weak)) int v86s_end(u32 sid)
     return OS32_ERR_NOSYS;
 }
 
+#ifndef OS32_FM_CHIP_PROVIDER
 __attribute__((weak)) int snd2_chip_caps(u32 dev, SND2_ChipCaps *o, u32 size)
 {
     (void)dev;
@@ -189,6 +190,7 @@ __attribute__((weak)) int snd2_chip_close(u32 h)
     (void)h;
     return OS32_ERR_NOSYS;
 }
+#endif
 
 /* Paired PCM module imports before IS links the resident stream core. */
 __attribute__((weak)) int snd2_register(const SndBackend *be, void *ctx,

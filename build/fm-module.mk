@@ -1,15 +1,15 @@
 # T5c-2a: reuse T4 function imports, VA0 packing and paired distribution.
 FM_OUT := $(BUILD_OUT)/fm
 FM_GEN := $(addprefix $(FM_OUT)/,fm_imports.h fm_imports.json fm_import_slots.c fm_import_stubs.S fm_provider_types.c fm_kexports.c)
-FM_DEF_SOURCES := include/fm_contract.h drivers/sound/fm/fm_module.h drivers/sound/fm/fm.h
+FM_DEF_SOURCES := include/fm_contract.h drivers/sound/fm/fm_module.h drivers/sound/fm/fm.h sound/hal/snd2_int.h
 $(FM_GEN) &: tools/gen_sqlite_imports.py tools/gen_kdebug_imports.py tools/prototypes/fm_imports.def $(FM_DEF_SOURCES)
 	python3 tools/gen_sqlite_imports.py --module fm --out-dir $(FM_OUT)
 
-FM_OBJS := $(addprefix $(FM_OUT)/,fm_body.o fm.o fm_import_slots.o fm_import_stubs.o)
+FM_OBJS := $(addprefix $(FM_OUT)/,fm_body.o fm.o opn_probe.o opn_chip.o fm_import_slots.o fm_import_stubs.o)
 FM_INC := $(INC_KERNEL) -I. -I$(FM_OUT)
 $(FM_OUT)/fm_body.o: drivers/sound/fm/fm_body.c $(FM_GEN) build/config.mk build/fm-module.mk
 	$(CC) $(CFLAGS_BASE) -Os -DOS32_FM_MODULE $(FM_INC) -c $< -o $@
-$(FM_OUT)/fm.o: drivers/sound/fm/fm.c $(FM_GEN) build/config.mk build/fm-module.mk
+$(FM_OUT)/fm.o $(FM_OUT)/opn_chip.o $(FM_OUT)/opn_probe.o: $(FM_OUT)/%.o: drivers/sound/fm/%.c $(FM_GEN) build/config.mk build/fm-module.mk
 	$(CC) $(CFLAGS_BASE) -Os -DOS32_FM_MODULE $(FM_INC) -c $< -o $@
 $(FM_OUT)/fm_import_slots.o $(FM_OUT)/fm_provider_types.o $(FM_OUT)/fm_kexports.o: $(FM_OUT)/%.o: $(FM_OUT)/%.c $(FM_GEN) build/config.mk build/fm-module.mk
 	$(CC) $(CFLAGS_BASE) -Os -Werror $(FM_INC) -c $< -o $@
@@ -18,9 +18,12 @@ $(FM_OUT)/fm_import_stubs.o: $(FM_OUT)/fm_import_stubs.S build/config.mk build/f
 $(FM_OUT)/fm.elf: $(FM_OBJS) build/fm-module.ld sdk/link/generations.ld
 	$(MODULE_LD) $(MODULE_LDFLAGS) --emit-relocs -T build/fm-module.ld -Map=$(FM_OUT)/fm.map $(FM_OBJS) -o $@
 
+$(KERNEL_OBJ_PREFIX)sound/hal/a0_weak.o $(R1_OBJ)/sound/hal/a0_weak.o: private CFLAGS_BASE += -DOS32_FM_CHIP_PROVIDER
+$(KERNEL_OBJ_PREFIX)sound/hal/a0_weak.o $(R1_OBJ)/sound/hal/a0_weak.o: build/fm-module.mk
+
 # Kernel and R1 both publish exactly the generated function contracts.
-C_KERNEL_OBJ += $(FM_OUT)/fm_kexports.o
-R1_OBJECTS += $(FM_OUT)/fm_kexports.o
+C_KERNEL_OBJ += $(KERNEL_OBJ_PREFIX)sound/hal/snd2_chip.o $(FM_OUT)/fm_kexports.o
+R1_OBJECTS += $(R1_OBJ)/sound/hal/snd2_chip.o $(FM_OUT)/fm_kexports.o
 $(BUILD_OUT)/kernel.elf $(R1_OUT)/kernel.elf: $(FM_OUT)/fm_kexports.o
 $(KERNEL_OBJ_PREFIX)drivers/sound/fm/fm_module.o $(R1_OBJ)/drivers/sound/fm/fm_module.o: $(FM_GEN)
 $(KERNEL_OBJ_PREFIX)drivers/sound/fm/fm_module.o $(R1_OBJ)/drivers/sound/fm/fm_module.o: private CFLAGS_BASE += -I$(FM_OUT)
@@ -33,3 +36,6 @@ $(BUILD_OUT)/fm.mod: $(FM_OUT)/fm.elf $(FM_OUT)/fm_imports.json $(FM_OUT)/fm_pro
 $(R1_OUT)/fm.mod: $(FM_OUT)/fm.elf $(FM_OUT)/fm_imports.json $(FM_OUT)/fm_provider_types.o $(R1_OUT)/vmkernel.lz4 tools/mkmod.py sdk/target_profile.py tools/module_schema.py sdk/kapi.json build/fm-module.mk
 	$(call pack_fm,$(R1_OUT)/vmkernel.lz4)
 -include $(FM_OBJS:.o=.d) $(FM_OUT)/fm_kexports.d $(FM_OUT)/fm_provider_types.d
+
+$(BUILD_OUT)/kernel.elf: $(KERNEL_OBJ_PREFIX)sound/hal/snd2_chip.o
+$(R1_OUT)/kernel.elf: $(R1_OBJ)/sound/hal/snd2_chip.o
