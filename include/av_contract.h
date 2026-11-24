@@ -49,6 +49,11 @@ int snd2_chip_read(u32 h, u32 bank, u32 what, u32 reg);
 int snd2_chip_reset(u32 h);
 int snd2_chip_close(u32 h);
 
+int kapi_snd2_dev_count(void);
+int kapi_snd2_dev_info(u32 dev, SND2_DevInfo *o);
+int kapi_snd2_stream_write(u32 stream, const void *buf, u32 bytes);
+int kapi_snd2_dsp_process(u32 dev, u32 unit, const i32 *params, u32 n, const void *in, void *out, u32 frames, u32 fmt_index);
+
 int kapi_v86s_check(u32 slot, const u32 *words);
 
 #endif

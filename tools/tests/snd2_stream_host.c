@@ -83,6 +83,15 @@ static const SndBackend backend = {
     .hw_volume = volume
 };
 
+static u32 checked;
+int ring3_user_range_ok(u32 addr, u32 n)
+{
+    if (addr != (u32)samples || locked) error = 1;
+    checked = n;
+    return 1;
+}
+void ring3_fault_kill(void) { __builtin_trap(); }
+
 static int matrix(void)
 {
     for (int state = 0; state < 6; ++state) {
@@ -181,7 +190,8 @@ static int probe(void)
     CHECK(snd2_stream_write(id, 0, 0) == OS32_ERR_INVAL);
     CHECK(!snd2_stream_write(id, samples, 3));
     samples[0] = 123;
-    CHECK(snd2_stream_write(id, samples, sizeof(samples)+4) == sizeof(samples));
+    CHECK(kapi_snd2_stream_write(id, samples, sizeof(samples)+4) == sizeof(samples));
+    CHECK(checked == sizeof(samples));
     CHECK(!snd2_stream_write(id, samples, 4));
     int n = stops;
     starts = SND2_START_STOPPED;

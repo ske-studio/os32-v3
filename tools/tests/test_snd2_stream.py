@@ -7,7 +7,7 @@ from host32 import run as host_run
 from kernel_includes import include_flags
 
 CHECK = dict(name='snd2-stream-host', tier=4, needs=[], budget=3,
-             covers=['sound/hal/snd2.h', 'sound/hal/snd2_stream.c', 'sound/hal/snd2_caps.c',
+             covers=['kapi/kapi_snd2.c', 'exec/exec.h', 'include/user_read_contract.h', 'include/memmap.h', 'sound/hal/snd2.h', 'sound/hal/snd2_stream.c', 'sound/hal/snd2_caps.c',
                      'sound/hal/snd2_reg.c', 'kernel/time/tick_clock.h', 'include/kernel_tick.h',
                      'include/io.h', 'sound/hal/snd2_seg.c', 'sound/hal/snd2_stg.c',
                      'sound/hal/snd2_int.h', 'sound/hal/snd2_ring_math.h',
@@ -20,6 +20,7 @@ CHECK = dict(name='snd2-stream-host', tier=4, needs=[], budget=3,
 ROOT = Path(__file__).resolve().parents[2]
 HAL = ROOT / 'sound/hal'
 MUTATIONS = [
+    ('stream', 'check(buf, n * stride);', 'check(buf, bytes);'),
     ('stream', 's->state == SND2_ST_DRAIN || !buf', '!buf'),
     ('stream', 'hw_release(d->ctx, leak)', 'hw_release(d->ctx, 0)'),
     ('stream', '++s->gen;', '/* stale generation */'),
@@ -51,8 +52,8 @@ def verify(work, mutation=None):
     exe = work / 'test'
     subprocess.run(['gcc', '-m32', '-march=i386', '-std=gnu11', '-Wall', '-Wextra',
                     '-Werror', '-O2', '-ffreestanding', '-fno-pie', '-fno-stack-protector',
-                    '-nostdlib', '-static', '-no-pie', '-D__cdecl=', '-I' + str(work), '-I' + str(HAL),
-                    *include_flags(ROOT), *sources, ROOT / 'tools/tests/snd2_stream_host.c',
+                    '-ffunction-sections', '-Wl,--gc-sections', '-nostdlib', '-static', '-no-pie', '-D__cdecl=', '-I' + str(work), '-I' + str(HAL),
+                    *include_flags(ROOT), *sources, ROOT / 'kapi/kapi_snd2.c', ROOT / 'tools/tests/snd2_stream_host.c',
                     '-o', exe], check=True)
     return host_run([str(exe)], cwd=work, timeout=3).returncode
 

@@ -117,6 +117,12 @@ int snd2_stream_open(const SND2_StreamDesc *desc, u32 *id)
 
 int snd2_stream_write(u32 id, const void *buf, u32 bytes)
 {
+    return snd2_write_checked(id, buf, bytes, 0);
+}
+
+int snd2_write_checked(u32 id, const void *buf, u32 bytes,
+                       void (*check)(const void *, u32))
+{
     Snd2Device *d;
     unsigned flags = irq_save();
     int rc = snd2_owned_device(id, &d);
@@ -127,6 +133,18 @@ int snd2_stream_write(u32 id, const void *buf, u32 bytes)
             u32 off, stride = snd2_frame_bytes(s);
             u32 n = snd2_stg_reserve(s, bytes / stride, &off);
             if (n) {
+                /* A range fault can exit the caller. Leave teardown free to
+                 * reclaim staging until the copy actually begins. */
+                if (check) {
+                    irq_restore(flags);
+                    check(buf, n * stride);
+                    flags = irq_save();
+                    rc = snd2_owned_device(id, &d);
+                    if (rc) {
+                        irq_restore(flags);
+                        return rc;
+                    }
+                }
                 d->writing = 1;
                 irq_restore(flags);
                 snd2_stg_write(s, off, buf, n);

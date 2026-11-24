@@ -1,11 +1,11 @@
 #include "snd2_int.h"
 
-__attribute__((weak)) int snd2_dev_count(void)
+__attribute__((weak)) int kapi_snd2_dev_count(void)
 {
     return OS32_ERR_NOSYS;
 }
 
-__attribute__((weak)) int snd2_dev_info(u32 dev, SND2_DevInfo *o)
+__attribute__((weak)) int kapi_snd2_dev_info(u32 dev, SND2_DevInfo *o)
 {
     (void)dev;
     (void)o;
@@ -46,7 +46,7 @@ __attribute__((weak)) int snd2_dsp_insert(u32 stream, u32 unit, const i32 *param
     return OS32_ERR_NOSYS;
 }
 
-__attribute__((weak)) int snd2_dsp_process(u32 dev, u32 unit, const i32 *params, u32 n, const void *in, void *out, u32 frames, u32 fmt_index)
+__attribute__((weak)) int kapi_snd2_dsp_process(u32 dev, u32 unit, const i32 *params, u32 n, const void *in, void *out, u32 frames, u32 fmt_index)
 {
     (void)dev;
     (void)unit;
@@ -66,7 +66,7 @@ __attribute__((weak)) int snd2_stream_open(const SND2_StreamDesc *d, u32 *stream
     return OS32_ERR_NOSYS;
 }
 
-__attribute__((weak)) int snd2_stream_write(u32 stream, const void *buf, u32 bytes)
+__attribute__((weak)) int kapi_snd2_stream_write(u32 stream, const void *buf, u32 bytes)
 {
     (void)stream;
     (void)buf;
