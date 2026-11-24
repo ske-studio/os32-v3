@@ -1,3 +1,6 @@
+#ifdef SND2_WRITER_DIAG
+#include "snd_writer_probe.h"
+#endif
 #include "../../sound/hal/snd2_refill_diag.h"
 #include "os32api.h"
 #include <string.h>
@@ -125,6 +128,19 @@ static int playback(KernelAPI *api, u32 dev, const char *mode)
     if (diag &&
         !api->snd2_caps(dev | SND2_CAPS_REFILL, &caps, sizeof(caps))) {
         const unsigned long *v = caps.reserved;
+#ifdef SND2_WRITER_DIAG
+        static const char *const work[] = {
+            "other/user", "display_restore", "gfx_poll", "abort_check",
+            "park_stop", "io_end", "gui_pump", "idle_work"
+        };
+        unsigned which = v[SW_WORK] & 0xff, exit_work = v[SW_WORK] >> 8;
+        api->kprintf(7, "wait_exit_us=%u exit_write_us=%u ready_write_us=%u pairs=%u exit_work=%s\n",
+                     v[SW_WAIT_EXIT], v[SW_EXIT_WRITE], v[SW_TOTAL], v[SW_PAIRS],
+                     exit_work < sizeof(work)/sizeof(work[0]) ? work[exit_work] : "unknown");
+        api->kprintf(7, "worst_work=%s work_us=%u tsc_gaps_10ms=%u wake_irq=%u wake_ready_us=%u\n",
+                     which < sizeof(work)/sizeof(work[0]) ? work[which] : "unknown",
+                     v[SW_WORK_US], v[SW_JUMPS], v[SW_WAKE_IRQ], v[SW_WAKE_US]);
+#endif
         api->kprintf(7, "max_writer_us=%u\n", max_writer_us);
         api->kprintf(7, "pi=%u tick=%u max_advance_us=%u max_dma_frames=%u min_stg=%u\n",
                      v[SND2_DIAG_PI], v[SND2_DIAG_TICK], v[SND2_DIAG_MAX_US],

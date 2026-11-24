@@ -1,3 +1,6 @@
+#ifdef SND2_WRITER_DIAG
+#include "snd_writer_probe.h"
+#endif
 #include "snd2_refill_diag.h"
 #include "snd2.h"
 #include "io.h"
@@ -113,6 +116,9 @@ int snd2_open_mode(const SND2_StreamDesc *desc, u32 *id, int v1)
     s->fmt = desc->fmt;
 #ifdef SND2_REFILL_DIAG
     s->min_stg = ~0U;
+#ifdef SND2_WRITER_DIAG
+    sw_reset();
+#endif
 #endif
     s->period = period;
     s->margin = period / 2 < 512 ? period / 2 : 512;
@@ -242,6 +248,9 @@ int snd2_refill_caps(Snd2Device *d, SND2_Caps *out)
     int rc = s->owner && s->owner == res_owner_get() && !s->closing
            ? d->be->caps(d->ctx, &snapshot) : OS32_ERR_STALE;
     if (!rc) {
+#ifdef SND2_WRITER_DIAG
+        sw_snapshot(snapshot.reserved);
+#endif
         snapshot.reserved[SND2_DIAG_MIN_STG] = s->min_stg;
         snapshot.reserved[SND2_DIAG_FRAME] = s->underruns ? s->gap_frame : ~0U;
         snapshot.reserved[SND2_DIAG_SEG_N] = s->underruns ? s->gap_n : ~0U;
