@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """PowerMac typed bindings and link dependencies. ATA_HAL_DESIGN §6-2 P2
 exposes seven raw ATA slots with IDE enabled and keeps geometry absent.
+AV0_V90_ADDENDUM and the x86 retired wrappers define the ten sound slots.
+ARCH_COMPAT_CONTRACT §9 keeps the six OPN slots absent. PCM awaits tick B and a backend.
 Scroll uses the existing signed row count (docs/KAPI_SPEC.md, gfx_hardware_scroll).
 """
 # CHECK registration lives in tools/checks/ppc-kapi-binding.py.
@@ -20,7 +22,7 @@ from kapi_target_ppc import ABSENT_PROVIDER_SLOTS, absent_result
 # Expected absent slots after the 11-19 PowerPC stages (port 7・clock・surface 4・console_font 4・gfx2 queries 9; PPC_KAPI_FILL_DESIGN §4 item 10).
 EXPECTED_ABSENT_SLOTS = frozenset("""
 buz_off buz_on ext2_format ext2_format_at fm_note_off fm_note_on
-fm_play_mml fm_set_tone_num fm_startup_sound
+fm_set_tone_num
 hdd_geom_info ide_drive_present
 ide_get_info ide_identify ide_init ide_read_sector ide_write_sector
 ide_write_sectors ime_dict_info ime_dict_suspend ime_feed_key ime_get_mode
@@ -31,8 +33,8 @@ np2_check_hostdrv np2_detect
 np2_get_clock np2_get_cpu np2_get_version
 pcm_close pcm_open pcm_set_volume pcm_status pcm_write
 sfs_begin
-sfs_end snd_bgm_is_playing snd_bgm_play snd_bgm_set_persist snd_bgm_stop
-snd_focus snd_se_play snd_se_play_raw snd_set_master ssg_all_off ssg_tone
+sfs_end
+ssg_all_off ssg_tone
 ssg_volume
 v86_boot v86_boot2 v86_disktest
 v86_gdc_capture v86_selftest
@@ -290,6 +292,11 @@ def generate(tmp, mutation=None, *, link=True, ide=False, fep=False):
         shutil.copy(ROOT / 'sdk' / name, sdk / name)
     helper = sdk / 'kapi_target_ppc.py'
     generator = sdk / 'gen_kapi.py'
+    if mutation == 'retired-focus-result':
+        anchor = 'result = api["retired"]["result"]'
+        text = generator.read_text()
+        assert text.count(anchor) == 1
+        generator.write_text(text.replace(anchor, anchor + '\n        if name == "snd_focus": result = 0'))
     if mutation == 'empty':
         text = helper.read_text().replace('ABSENT_PROVIDER_SLOTS = frozenset().union(*(slots for slots, _ in PROVIDER_GROUPS.values()))', 'ABSENT_PROVIDER_SLOTS = frozenset()')
         helper.write_text(text)
@@ -374,7 +381,7 @@ def generate(tmp, mutation=None, *, link=True, ide=False, fep=False):
     return out
 
 
-def absent_db(out, cc, dirs):
+def run_binding_probe(out, cc, dirs):
     obj = out / 'absent.o'
     flags = ['-ffreestanding', '-D__KERNEL_BUILD__', '-D__cdecl=', '-I' + str(out / 'include')]
     subprocess.run([cc, *flags, *['-I' + str(ROOT / d) for d in dirs],
@@ -386,6 +393,16 @@ def absent_db(out, cc, dirs):
     # Run the DB wrappers and the output guard with the Linux/PPC exit syscall.
     probe = out / 'probe.c'
     probe.write_text('''#include "os32_kapi_shared.h"
+extern void wrap_fm_startup_sound(void);
+extern void wrap_fm_play_mml(const char *);
+extern void wrap_snd_bgm_play(const char *);
+extern void wrap_snd_bgm_stop(void);
+extern void wrap_snd_bgm_set_persist(int);
+extern void wrap_snd_se_play(int);
+extern void wrap_snd_se_play_raw(int, int, int);
+extern void wrap_snd_set_master(int);
+extern int wrap_snd_bgm_is_playing(void);
+extern i32 wrap_snd_focus(int);
 extern const char *wrap_db_last_error(int);
 extern u32 wrap_db_mem_used(void);
 extern int wrap_db_open(const char *);
@@ -418,6 +435,16 @@ void _start(void)
              wrap_db_mem_used() != 0 ? 11 :
              wrap_db_open("db") != OS32_ERR_NOSYS ? 12 : 0;
     if (rc) finish(rc);
+    wrap_fm_startup_sound();
+    wrap_fm_play_mml("c");
+    wrap_snd_bgm_play("c");
+    wrap_snd_bgm_set_persist(1);
+    wrap_snd_se_play(1);
+    wrap_snd_se_play_raw(60, 2, 1);
+    wrap_snd_set_master(1);
+    wrap_snd_bgm_stop();
+    if (wrap_snd_bgm_is_playing() != 0) finish(19);
+    if (wrap_snd_focus(1) != OS32_ERR_NOSYS) finish(20);
     if (wrap_ime_getkey() != 0x2b65) finish(18);
     if (wrap_mem_stat(-1, &output, sizeof(output)) != 7) finish(16);
     user_call = 1;
@@ -553,9 +580,9 @@ def main():
         if unexpected:
             print('unexpected providers:', sorted(unexpected)); return 1
         print('undefined providers:', len(undefined))
-        result = absent_db(out, cc, dirs)
+        result = run_binding_probe(out, cc, dirs)
         if result != 0:
-            print('absent DB probe failed:', result)
+            print('binding probe failed:', result)
             return 1
         if '--mutate' in sys.argv:
             check_planar_link(tmp, cc, dirs)
@@ -566,10 +593,10 @@ def main():
                 if verify((mutated / 'kapi/kapi_generated.c').read_text(), entries):
                     print(mutation + ': SURVIVED'); return 1
                 print(mutation + ': RED')
-            for mutation, expected in [('db-null-nosys', 10), ('db-hook-inverted', 'provider reference')]:
+            for mutation, expected in [('retired-focus-result', 20), ('db-null-nosys', 10), ('db-hook-inverted', 'provider reference')]:
                 path = tmp / mutation
                 path.mkdir()
-                result = absent_db(generate(path, mutation), cc, dirs)
+                result = run_binding_probe(generate(path, mutation), cc, dirs)
                 if result != expected:
                     print(mutation, 'expected', expected, 'got', result)
                     return 1
