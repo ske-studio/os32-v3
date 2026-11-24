@@ -125,7 +125,7 @@ RECOVERY_MUTANTS = [
     ('commit-loses-abort', 'exec/appslot.c', '    a->parked_from_wait = 0;      /* 印は 1 回きり (3 つの park 点すべてで) */',
      '    a->abort_req = 0;\n    a->parked_from_wait = 0;', 'FAIL !forbid_app_pd'),
     ('resume-abort', 'exec/exec.c', '    g_cur_app = a;\n    ring3_abort_check();', '    g_cur_app = a;', 'FAIL !forbid_app_pd'),
-    ('syscall-abort', 'exec/exec.c', '    ring3_abort_check();\n    exec_park_stop(&call);', '    exec_park_stop(&call);', 'FAIL 0'),
+    ('syscall-abort', 'exec/exec.c', '    /* --- 出口でも CTRL+STOP を見る (契約 T6、v1.2 G2 で実測した隙間) --- */\n    ring3_abort_check();', '    /* --- 出口でも CTRL+STOP を見る (契約 T6、v1.2 G2 で実測した隙間) --- */', 'FAIL 0'),
     ('quarantine-account', 'exec/exec.c', '    exec_as_leftover_pages += ledger_owner_pages(a->as->owner);', '    /* omitted */', 'FAIL ledger_owner_pages(owner)==pages'),
     ('quarantine-pages', 'exec/exec.c', '    exec_as_leftover_pages += ledger_owner_pages(a->as->owner);',
      '    u32 lost; ledger_reclaim_owner(a->as->owner, &lost);', 'FAIL ledger_owner_pages(owner)==pages'),
