@@ -77,6 +77,10 @@ static int playback(KernelAPI *api, u32 dev, const char *mode)
             /* played can advance inside a period before retirement frees space. */
             if (written < FRAMES || ++full_waits > PERIOD) return 3;
             u32 target = written - FRAMES + (frames - sent);
+            target = (target + PERIOD - 1) / PERIOD * PERIOD;
+            /* A short retirement can put even an aligned played target
+             * inside the next segment. Block on its successor on retry. */
+            if (full_waits > 1) target += PERIOD;
             if (api->snd2_stream_wait(h, target, 1000)) return 3;
             continue;
         }

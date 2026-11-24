@@ -12,7 +12,7 @@ static int latency_run, wave_run, diagnostic, inject_delay;
 static u32 retired, elapsed_us, reported_us, gaps, waits, time_reads;
 
 static u32 cursor, tick, marker, requests;
-static int partial_run, stuck;
+static int partial_run, stuck, mid_period;
 static u32 public_played, pending_frames, immediate;
 
 /* One simulated interrupt per period while the foreground writer sleeps. */
@@ -86,19 +86,28 @@ static int wait_stream(u32 h, u32 f, u32 ms)
 {
     (void)h; (void)ms;
     if (wave_run && f != 44100 * 30 - PERIOD) {
-        if (f != retired + pending_frames) return -1;
+        u32 needed = retired + pending_frames;
+        /* At the final short write DMA can reach the unrounded target
+         * before retirement. An already satisfied wait advances no time. */
+        if (!partial_run && needed % PERIOD) {
+            public_played = needed;
+            mid_period = 1;
+            if (f <= public_played) return 0;
+        }
+        if (f < needed || (f - needed >= PERIOD &&
+                           !(partial_run && immediate && f == needed + PERIOD))) return -1;
         if (partial_run) {
             ++waits;
             if (waits == 1) {
                 /* A half-filled segment retires, then DMA enters its successor. */
                 retired += PERIOD / 2;
                 public_played = retired + PERIOD / 2;
-            } else if (public_played >= f) {
+            } else if (public_played >= f || stuck) {
                 /* Playback position satisfies wait while the queue is still full. */
                 if (++immediate > PERIOD + 1) return -1;
-                if (!stuck) retired += PERIOD;
+                /* An immediately satisfied wait does not retire a segment. */
             } else {
-                retired += PERIOD;
+                do { retired += PERIOD; } while (retired < f);
                 public_played = retired;
             }
             return 0;
@@ -153,6 +162,7 @@ int main(void)
     if (!playback(&api, 0, "latency")) return 1;
     wave_run = 1;
     for (int run = 0; run < 3; ++run) {
+        mid_period = 0;
         diagnostic = run > 0;
         inject_delay = run == 2;
         elapsed_us = 0xfffff000U;
@@ -160,6 +170,7 @@ int main(void)
         int rc = playback(&api, 0, "wave");
         if (rc != (inject_delay ? 6 : 0) || gaps != (u32)inject_delay || !waits)
             return 1;
+        if (!inject_delay && !mid_period) return 1;
         if (reported_us != (diagnostic ? (inject_delay ? 5 : 1) * 5805U : 0) ||
             (!diagnostic && time_reads)) return 1;
     }
