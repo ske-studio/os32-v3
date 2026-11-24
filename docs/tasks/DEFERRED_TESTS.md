@@ -39,7 +39,6 @@
 | INPUT-S4-CANCEL | 実機で S4 の取消が届くことを確認 | 実機の配送確認は U2-x0 に依る | TASK_INPUT_HAL の U2-x0 の後 |
 | USB-LANG | USB 鍵盤で LANG1・LANG2 の実際の HID report を採取して確認 | 実機での採取は USB の段 1E に依る | TASK_USB の 1E の後 |
 | KAPI-V89-PPC | PowerPC ゲストで 1 頁・2 頁の写像、失敗時の停止、先頭・末尾のスタブの往復を確認 | ppc-kapi-v89-guest を追加。ゲスト実行と範囲外の 298・383 で子だけが fault 終了し親が継続することの確認待ち | KAPI v89 の PowerPC の後続段 |
-| TICK-S1-RA266 | 負荷と遅延を Ra266 で測る。未登録・登録済みで期限待ち・期限到達の各条件で IRQ0 の最悪時間を取り、登録による 60 秒間の最悪時間の増分が 2 µs 以下か確認 | S1 は実装・レビュー済み、実機測定が残る | TASK_TICK_1KHZ 段 B の S1 受入 |
 | INPUT-KM-DEAD | accent/dead keyの保留状態と合成の実装・試験 | H0bレビュー3のPM決定。既定PC98表にaccentなし、延期中はdead/accentを登録・交換で拒否 | INPUT_KEYMAP_DESIGN H0bのW/S3で所有者・世代・flushと試験を確定し、拒否解除前に検証 |
 | PPC-USB-RH | PowerMac 実機の USB キーボードから製品 sh への入力・修飾・行編集・抜去 | 実装段は QEMU mac99 と host のみ | PowerMac USB 入力の実機受入時に検証する。QEMU の合格を実機の合格に数えない |
 | PPC-NEWLIB-HEAP-RECLAIM | 子が fault・正常終了で持った heap の物理ページが回収されたか、親から mem_stat の phys_free_pages の前後を比較する | PowerPC の mem_stat は KAPI の提供者がない (PPC_KAPI_FILL_DESIGN の 2c) | 2c で mem_stat が PowerPC に入った後、受入に足して通ったら削る |
