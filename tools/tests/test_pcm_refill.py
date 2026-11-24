@@ -1,5 +1,5 @@
 """T3: libc-free production driver/math, DMA deadlines and refill origin."""
-CHECK = dict(name='pcm-refill-host', tier=4, covers=[
+CHECK = dict(name='pcm-refill-host', tier=4, covers=['sound/hal/snd2_ring_math.h',
     'drivers/sound/cs4231/pcm_refill.h',
     'drivers/sound/cs4231/pcm_cs4231.c',
     'drivers/sound/cs4231/pcm_cs4231.h',

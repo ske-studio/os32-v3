@@ -3,15 +3,38 @@
 #include "av_contract.h"
 
 #define SND_HAL2_ABI 1
+#define SND2_MAX_RING_FRAMES 4096U
+#define SND2_MAX_SEGMENTS 16U
 typedef struct Snd2Stream {          /* sound/hal/snd2_int.h。書くのは sound/hal だけ */
     u32 gen; u8 state, paused, v1, closing; int owner;   /* 前景の文脈が書く */
     SND2_Fmt fmt; u32 period, nseg, lead, cap, margin;   /* open で決め、閉じるまで不変 */
     u32 written;                     /* 前景が IF=0 の短い区間で publish */
     u32 played, copied, epoch, underruns;                /* advance (IF=0) だけが書く */
-    u32 seg_first[16]; u16 seg_n[16];                    /* advance だけ */
+    u32 seg_first[SND2_MAX_SEGMENTS]; u16 seg_n[SND2_MAX_SEGMENTS];                    /* advance だけ */
     u8 *stg; u32 stg_frames;         /* ステージング 8192 frame = 32KB (kmalloc、DMA しない) */
     u8 *ring; u32 last_hw, last_obs_ms;                  /* ring は backend が渡す DMA の面 */
+    u32 last_progress_ms;
+    u8 restart_pending;              /* DMA proven stopped during resync */
+    u8 had_data;                     /* distinguishes a silent start from starvation */
 } Snd2Stream;
+
+#define SND2_STG_FRAMES 8192U
+int snd2_stg_alloc(Snd2Stream *s);
+void snd2_stg_free(Snd2Stream *s);
+/* Reserve under the IRQ lock. Copy outside the lock, then publish under it. */
+u32 snd2_stg_reserve(const Snd2Stream *s, u32 frames, u32 *off);
+void snd2_stg_write(Snd2Stream *s, u32 off, const void *src, u32 frames);
+void snd2_stg_publish(Snd2Stream *s, u32 frames);
+void snd2_stg_read(const Snd2Stream *s, u32 first, void *dst, u32 frames);
+u32 snd2_frame_bytes(const Snd2Stream *s);
+/* reset/prime require stopped DMA. resync advances the epoch after stop proof. */
+void snd2_seg_reset(Snd2Stream *s, u32 now);
+void snd2_seg_prime(Snd2Stream *s);
+void snd2_seg_resync(Snd2Stream *s, u32 now);
+void snd2_seg_pause(Snd2Stream *s);
+u32 snd2_seg_played_now(const Snd2Stream *s);
+/* Negative means continuity lost: stop before changing the ring. */
+int snd2_seg_observe(Snd2Stream *s, int have_pos, u32 hw, u32 now);
 typedef struct SndBackend {          /* sound/hal/snd2_int.h、SND_HAL2_ABI 1 */
     u32 abi;
     int  (*caps)(void *ctx, SND2_Caps *o);
@@ -39,4 +62,8 @@ typedef struct SndChipBackend { u32 abi;                                  /* sou
     int (*quiet)(void *c);   /* 静止の列。0 = 証拠あり */
 } SndChipBackend;
 int snd2_chip_register(const SndChipBackend *be, void *c, const SND2_DevInfo *i);  int snd2_chip_unregister(u32 dev);
+int snd2_chip_dev_info(u32 index, SND2_DevInfo *out);
+void snd2_chip_fault(u32 dev);
+int snd2_chip_implicit(int owner);
+void snd2_chip_reclaim(int owner);
 #endif

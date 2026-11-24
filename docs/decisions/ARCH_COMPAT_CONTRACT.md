@@ -1,6 +1,6 @@
 # ARCH_COMPAT_CONTRACT — アーキテクチャ間の互換契約
 
-> 起動の骨格を共通の層へ (機種依存の分離のやり直しの ①、ユーザー決定 2026-11-24、設計まで): [ARCH_BOOT_SKELETON_DESIGN.md](ARCH_BOOT_SKELETON_DESIGN.md)。
+> 起動の骨格を共通の層へ (機種依存の分離のやり直しの ①、ユーザー決定 2026-11-24、設計まで): [ARCH_BOOT_SKELETON_DESIGN.md](ARCH_BOOT_SKELETON_DESIGN.md)。KAPI の表と配置を機種ごとに分ける (②、設計まで): [ARCH_KAPI_SPLIT_DESIGN.md](ARCH_KAPI_SPLIT_DESIGN.md)。
 
 > 2026-11-20 の見直しで x86 の形に改めた ([DESIGN_X86_AUDIT](ppc/DESIGN_X86_AUDIT.md))。
 

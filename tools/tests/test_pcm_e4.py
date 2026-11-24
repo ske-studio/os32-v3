@@ -45,7 +45,7 @@ def main(mutate):
             # A private copy keeps source paths (including relative includes)
             # real; no mutation ever touches the working tree.
             tree = tmp / 'tree'
-            for directory in ('tools/tests', 'kernel', 'drivers', 'arch',
+            for directory in ('tools/tests', 'kernel', 'drivers', 'sound', 'arch',
                               'include', 'platform', 'sdk/include', 'mm', 'lib', 'build/arch', 'build/sources', 'build/platform', 'build/features'):
                 shutil.copytree(ROOT / directory, tree / directory,
                                 ignore=shutil.ignore_patterns('out', '__pycache__', '*.o', '*.d'))

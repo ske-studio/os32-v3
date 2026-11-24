@@ -12,6 +12,7 @@
 /* ======================================================================== */
 
 #include "pcm_cs4231.h"
+#include "sound/hal/snd2_ring_math.h"
 
 #define PCM_WATCHDOG_HALVES 2U
 #define PCM_DRAIN_EXTRA_HALVES 3U
@@ -109,9 +110,8 @@ u32 pcm_pos_frames(u32 bytes_left)
 /* ------------------------------------------------------------------------ */
 int pcm_cont(u32 h0, u32 p0, u32 h1, u32 p1)
 {
-    if (h0 != h1) return PCM_CONT_SWITCH;
-    if (p1 >= p0) return PCM_CONT_SAME;
-    return PCM_CONT_LOST;          /* 同じ半分で戻った = 1 周 (2 境界) */
+    if (snd2_backtracked(h0, p0, h1, p1)) return PCM_CONT_LOST;
+    return h0 == h1 ? PCM_CONT_SAME : PCM_CONT_SWITCH;
 }
 
 /* 現在位置からその半分の末尾まで REFILL_MARGIN 以上あるか。
@@ -164,17 +164,12 @@ void pcm_start_plan(u32 staged, u32 *n0, u32 *n1, u32 *last_half,
 /* ======================================================================== */
 u32 pcm_stg_free(const struct pcm_stg *s)
 {
-    return PCM_STG_FRAMES - s->staged;
+    return snd2_room(PCM_STG_FRAMES, s->staged);
 }
 
 u32 pcm_stg_reserve(const struct pcm_stg *s, u32 frames, u32 *off)
 {
-    u32 room;
-
-    room = pcm_stg_free(s);
-    if (frames > room) frames = room;
-    *off = s->w;
-    return frames;
+    return snd2_window(s->w, PCM_STG_FRAMES, pcm_stg_free(s), frames, off);
 }
 
 void pcm_stg_publish(struct pcm_stg *s, u32 frames)
@@ -185,8 +180,7 @@ void pcm_stg_publish(struct pcm_stg *s, u32 frames)
 
 u32 pcm_stg_consume(struct pcm_stg *s, u32 frames, u32 *off)
 {
-    if (frames > s->staged) frames = s->staged;
-    *off = s->r;
+    frames = snd2_window(s->r, PCM_STG_FRAMES, s->staged, frames, off);
     s->r = (s->r + frames) % PCM_STG_FRAMES;
     s->staged -= frames;
     return frames;
@@ -197,8 +191,7 @@ void pcm_split(u32 off, u32 n, u32 *n1, u32 *n2)
 {
     u32 head;
 
-    head = PCM_STG_FRAMES - off;
-    if (n < head) head = n;
+    head = snd2_prefix(PCM_STG_FRAMES, off, n);
     *n1 = head;
     *n2 = n - head;
 }
