@@ -14,10 +14,13 @@ CHECK = dict(name='snd2-guest-host', tier=4, needs=[], budget=3,
 def run(ctx):
     source = (ctx.root / 'userland/tests/snd2_test.c').read_text()
     mutants = [
+        ('index += step;', 'index += step + 1;'),
+        ('written - FRAMES + PERIOD', 'written - FRAMES + 2 * PERIOD'),
+        ('max_writer_us = now - prev_us', 'max_writer_us = 0'),
         ('pos.epoch != previous.epoch + 1U', '0'),
         ('pos.played <= recovered.played', 'pos.played < recovered.played'),
         ('!changed || pos.epoch', '0 || pos.epoch'),
-        ('samples[1] = -23456;', 'samples[1] = 0;'),
+        ('samples[2*sent+1] = -23456;', 'samples[2*sent+1] = 0;'),
         ('if (!marked || pos.underruns)', 'if (pos.underruns)'),
     ]
     with tempfile.TemporaryDirectory() as td:
