@@ -15,9 +15,12 @@ typedef struct Snd2Stream {          /* sound/hal/snd2_int.h。書くのは soun
     u8 *ring; u32 last_hw, last_obs_ms;                  /* ring は backend が渡す DMA の面 */
     u32 repeats; /* observations that show DMA may have repeated ring data */
     u32 last_progress_ms;
+#ifdef SND2_REFILL_DIAG
     u32 refill_tried, gap_tried; /* per-ring-slot bits and first underrun evidence */
     u32 min_stg, gap_frame, gap_n, gap_next, gap_stg, max_dma_step;
+#endif
     u8 restart_pending;              /* DMA proven stopped during resync */
+    u16 resume_silence; /* protected empty slots at resume, cleared on retirement */
     u8 had_data;                     /* distinguishes a silent start from starvation */
 } Snd2Stream;
 
@@ -34,6 +37,7 @@ u32 snd2_frame_bytes(const Snd2Stream *s);
 void snd2_seg_reset(Snd2Stream *s, u32 now);
 void snd2_seg_prime(Snd2Stream *s);
 void snd2_seg_resync(Snd2Stream *s, u32 now);
+void snd2_seg_resume(Snd2Stream *s);
 void snd2_seg_pause(Snd2Stream *s);
 u32 snd2_seg_played_now(const Snd2Stream *s);
 /* Negative means continuity lost: stop before changing the ring. */

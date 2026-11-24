@@ -486,6 +486,7 @@ static int pcm_advance(enum pcm_advance_origin origin)
     return handled ? IRQ_HANDLED : IRQ_NONE;
 }
 
+#ifdef SND2_REFILL_DIAG
 static u32 hal_pi, hal_ticks, hal_max_us, hal_last_us;
 
 void pcm_codec_counters(u32 *pi, u32 *ticks, u32 *max_us)
@@ -494,10 +495,12 @@ void pcm_codec_counters(u32 *pi, u32 *ticks, u32 *max_us)
     *ticks = hal_ticks;
     *max_us = hal_max_us;
 }
+#endif
 
 static void pcm_hal_advance(enum pcm_advance_origin origin)
 {
     ++s_in_advance;
+#ifdef SND2_REFILL_DIAG
     if (g_pcm.state == PCM_ST_RUNNING) {
         u32 now = pcm_now();
         if ((hal_ticks || hal_pi) && now - hal_last_us > hal_max_us)
@@ -506,6 +509,9 @@ static void pcm_hal_advance(enum pcm_advance_origin origin)
         if (origin == PCM_FROM_TICK) ++hal_ticks;
         else ++hal_pi;
     }
+#else
+    (void)origin;
+#endif
     s_hal_advance();
     --s_in_advance;
 }
@@ -645,7 +651,9 @@ static int pcm_open_device(u32 rate, u32 period, void (*advance)(void))
 
     /* 巻き戻しも pcm_release を通るので、**1 度だけ**の錠を先に外す。 */
     s_hal_period = period;
+#ifdef SND2_REFILL_DIAG
     hal_pi = hal_ticks = hal_max_us = 0;
+#endif
     s_hal_advance = advance;
     g_pcm.finalized = 0;
     g_pcm.state = PCM_ST_OPENING;

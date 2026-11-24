@@ -12,7 +12,9 @@ typedef struct {
 } Snd2Device;
 
 Snd2Device *snd2_device(u32 dev);
+#ifdef SND2_REFILL_DIAG
 int snd2_refill_caps(Snd2Device *d, SND2_Caps *out);
+#endif
 void snd2_fault(Snd2Device *d);
 int snd2_validate_open(const SND2_StreamDesc *desc, int v1,
                        u32 *period, u32 *lead, u32 *cap);
