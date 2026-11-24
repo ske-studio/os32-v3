@@ -3,6 +3,7 @@
 The fixture was captured from 466010d7; the import review pin was refreshed
 for GF5's appended gf5_test contracts (see generations() for the recipe).
 On 2026-11-24, sound HAL C4 added FM chip imports and S9 added PCM registration and advance imports.
+On 2026-11-25, PCM appended pcm_module_refill_tick for the 1 kHz refill callback.
 LAN's snapshot follows the hostsvc declaration stage 2 append-only extension.
 To refresh apis in fixtures/dep_dir_a/l01.json, review the header/design diff,
 strip /* comments */ from each typedef body and collapse whitespace for body;
