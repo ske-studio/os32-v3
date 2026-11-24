@@ -4,6 +4,7 @@ Common exec, caller validation, owner, FD and heap providers remain bound.
 """
 
 PROVIDER_EXTERNS = frozenset({
+    "extern int kapi_osri_show(const char *path, u32 duration_ms);",
     "extern i32 kdebug_call(u32 op, void *buf, u32 size);",
     "extern int kapi_pci_bind_info(u32 idx, void *out);",
     "extern volatile u32 tick_count;",
@@ -19,9 +20,6 @@ PROVIDER_EXTERNS = frozenset({
 PROVIDER_GROUPS = {
     'sys': (frozenset({'buz_on', 'buz_off'}), frozenset([])),
     'surface': (frozenset(), frozenset([])),
-    'gfx': (frozenset({
-        'gfx_osri_show',
-    }), frozenset()),
     'sound': (frozenset({
         'fm_note_on',
         'fm_note_off',

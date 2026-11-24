@@ -15,7 +15,7 @@ import zlib
 ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT / 'tools'), str(ROOT / 'tools/ppc')]
 from kboot_accept import build_media, mutant_settings
-from kboot_run import serial
+from kboot_run import serial as raw_serial
 import root_pair
 from fb_pixel import read_ppm
 from link_sh_run import Session
@@ -23,6 +23,15 @@ from usb_run import keyboard_actions
 from ppc_in2_cui import IN2_MUTATIONS
 from in2_gui_mutations import D_MUTATIONS, D_FAILURES
 from in2_gui_trial import run_trial
+
+
+# A tagged kernel line ("[usb] ...\n") can be written while the probe is in the middle of a line.
+# Remove such a line where it does not begin a line, so the probe's line reads whole again.
+INTERLEAVED = re.compile(r'(?<=[^\n])\[[\w.-]+\][ \t][^\n]*\n')
+
+
+def serial(path):
+    return INTERLEAVED.sub('', raw_serial(path))
 
 
 # Each mutant must reach the preceding observation on this boot.
