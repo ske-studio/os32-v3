@@ -4,7 +4,7 @@
 
 static struct {
     unsigned long result[SW_PAIRS + 1];
-    u32 ready, exit, previous, work, longest, exit_work, jumps;
+    u32 ready, exit, previous, work, longest, exit_longest, exit_work, jumps;
     unsigned phase;
 } trace;
 static volatile unsigned sleeping, wake_irq;
@@ -81,6 +81,8 @@ void sw_exit(void)
 {
     if (trace.phase != 1) return;
     trace.exit_work = trace.work;
+    trace.exit_longest = trace.longest;
+    trace.work = trace.longest = 0;
     trace.exit = trace.previous;
     trace.phase = 2;
 }
@@ -93,12 +95,21 @@ void sw_write(void)
     u32 first = trace.exit - trace.ready, second = trace.previous - trace.exit;
     if (first > trace.result[SW_WAIT_EXIT]) {
         trace.result[SW_WAIT_EXIT] = first;
-        trace.result[SW_WORK] = (trace.result[SW_WORK] & 0xff) | (trace.exit_work << 8);
+        trace.result[SW_WORK] = (trace.result[SW_WORK] & ~(SW_WORK_BYTE << SW_WAIT_SHIFT))
+                              | (trace.exit_work << SW_WAIT_SHIFT);
     }
-    if (second > trace.result[SW_EXIT_WRITE]) trace.result[SW_EXIT_WRITE] = second;
+    if (second > trace.result[SW_EXIT_WRITE]) {
+        trace.result[SW_EXIT_WRITE] = second;
+        trace.result[SW_WORK] = (trace.result[SW_WORK] & ~(SW_WORK_BYTE << SW_WRITE_SHIFT))
+                              | (trace.work << SW_WRITE_SHIFT);
+    }
     if (first + second > trace.result[SW_TOTAL]) {
         trace.result[SW_TOTAL] = first + second;
-        trace.result[SW_WORK] = (trace.result[SW_WORK] & ~0xffU) | trace.work;
+        if (trace.exit_longest >= trace.longest) {
+            trace.longest = trace.exit_longest;
+            trace.work = trace.exit_work;
+        }
+        trace.result[SW_WORK] = (trace.result[SW_WORK] & ~SW_WORK_BYTE) | trace.work;
         trace.result[SW_WORK_US] = trace.longest;
     }
     trace.result[SW_JUMPS] += trace.jumps;

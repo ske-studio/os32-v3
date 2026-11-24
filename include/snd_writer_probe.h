@@ -9,6 +9,11 @@ enum {
 enum { SW_OTHER, SW_DISPLAY, SW_GFX, SW_ABORT, SW_PARK, SW_IO_END,
        SW_GUI, SW_IDLE };
 
+/* SW_WORK holds the total, wait-to-exit and exit-to-write winners in bytes 0..2. */
+#define SW_WORK_BYTE 0xffU
+#define SW_WAIT_SHIFT 8
+#define SW_WRITE_SHIFT 16
+
 #ifdef SND2_WRITER_DIAG
 void sw_reset(void);
 void sw_sleep(void);
