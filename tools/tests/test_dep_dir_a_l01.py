@@ -2,6 +2,7 @@
 
 The fixture was captured from 466010d7; the import review pin was refreshed
 for GF5's appended gf5_test contracts (see generations() for the recipe).
+On 2026-11-24, sound HAL C4 added FM chip imports and S9 added PCM registration and advance imports.
 LAN's snapshot follows the hostsvc declaration stage 2 append-only extension.
 To refresh apis in fixtures/dep_dir_a/l01.json, review the header/design diff,
 strip /* comments */ from each typedef body and collapse whitespace for body;
@@ -109,10 +110,7 @@ def generations(folder, fixture):
         # hash json.dumps([{k:v for k,v in e.items() if k != 'source'}
         #                 for e in metadata['imports']], sort_keys=True).encode()
         # with SHA256 after reviewing .def/generated import changes.
-        if name == 'fm':
-            assert [e['name'] for e in rows] == ['snd2_chip_register', 'snd2_chip_unregister', 'snd2_chip_implicit']
-        else:
-            assert hashlib.sha256(json.dumps(rows, sort_keys=True).encode()).hexdigest() == fixture['imports_sha256'][name]
+        assert hashlib.sha256(json.dumps(rows, sort_keys=True).encode()).hexdigest() == fixture['imports_sha256'][name]
         old = fixture['old_generations'][name]
         current = metadata['module_abi_gen']
         assert old != current

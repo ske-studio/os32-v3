@@ -32,9 +32,7 @@ def absent_bindings(folder, out):
         'serial_is_initialized', 'serial_get_status',
     }), frozenset(['port_service.h'])),
 """ + anchor + "\n        'sys_set_mtime',"
-    zero_anchor = "    'np2_detect',\n"
-    # np2_detect also appears in the platform slot set with deeper indentation.
-    zero_anchor = 'ZERO_SLOTS = frozenset({\n' + zero_anchor
+    zero_anchor = 'ZERO_SLOTS = frozenset({\n'
     if source.count(zero_anchor) != 1:
         raise RuntimeError('absent port zero mutation anchor must be unique')
     (folder / 'kapi_target_ppc.py').write_text(

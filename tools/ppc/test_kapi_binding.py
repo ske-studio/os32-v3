@@ -357,10 +357,9 @@ def generate(tmp, mutation=None, *, link=True, ide=False, fep=False):
     if mutation == 'pci-absent':
         insert_group(helper, mutation, "    'pci': (frozenset({'pci_get'}), frozenset()),\n")
     if mutation == 'absent-sound-count':
-        anchor = "ZERO_SLOTS = frozenset({\n    'snd2_dev_count',"
-        text = helper.read_text()
-        assert text.count(anchor) == 1
-        helper.write_text(text.replace(anchor, "ZERO_SLOTS = frozenset({"))
+        text, count = re.subn(r"^    'snd2_dev_count',\n", "", helper.read_text(), flags=re.M)
+        assert count == 1
+        helper.write_text(text)
     if mutation == 'zero':
         text = generator.read_text().replace('{absent_result(api)};', '0;')
         generator.write_text(text)
