@@ -38,6 +38,7 @@ static int playback(KernelAPI *api, u32 dev, const char *mode)
     u32 mark_frame = 0, write_lo = 0, write_hi = 0;
     SND2_Pos previous = {0}, recovered = {0};
     int armed = 0, changed = 0;
+    unsigned full_waits = 0;
     while (written < total) {
         if (diag && written >= FRAMES) {
             u32 now, hi;
@@ -73,10 +74,13 @@ static int playback(KernelAPI *api, u32 dev, const char *mode)
         int n = api->snd2_stream_write(h, samples + 2*sent, (frames - sent) * 4);
         if (n < 0 || (n & 3) || (u32)n > (frames - sent) * 4) return 3;
         if (!n) {
-            if (written < FRAMES ||
-                api->snd2_stream_wait(h, written - FRAMES + PERIOD, 1000)) return 3;
+            /* played can advance inside a period before retirement frees space. */
+            if (written < FRAMES || ++full_waits > PERIOD) return 3;
+            u32 target = written - FRAMES + (frames - sent);
+            if (api->snd2_stream_wait(h, target, 1000)) return 3;
             continue;
         }
+        full_waits = 0;
         if (mark_pending) {
             mark_frame = written;
             marked = 1;
