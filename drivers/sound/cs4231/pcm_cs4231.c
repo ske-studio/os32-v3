@@ -64,6 +64,10 @@ static int  s_owner;
 static u32 s_hal_period;
 static void (*s_hal_advance)(void);
 static int  s_irq_reg;
+/* advance runs from IRQ10 or the timer IRQ. Only foreground may detach. */
+static volatile int s_in_advance;
+static volatile int s_release_pending;
+static int s_release_leak;
 static int  s_present;             /* 起動時の検出 */
 static u8   s_version;             /* I25 の V2-0 (シフト前) */
 static volatile int s_mce_busy;    /* MCE の列の途中 */
@@ -482,6 +486,13 @@ static int pcm_advance(enum pcm_advance_origin origin)
     return handled ? IRQ_HANDLED : IRQ_NONE;
 }
 
+static void pcm_hal_advance(void)
+{
+    ++s_in_advance;
+    s_hal_advance();
+    --s_in_advance;
+}
+
 static int pcm_irq(unsigned int irq, void *arg)
 {
     (void)irq; (void)arg;
@@ -489,7 +500,7 @@ static int pcm_irq(unsigned int irq, void *arg)
         if (s_claimed || s_mce_busy || g_pcm.state != PCM_ST_RUNNING)
             return IRQ_NONE;
         if (!pcm_codec_ack()) return IRQ_NONE;
-        s_hal_advance();
+        pcm_hal_advance();
         return IRQ_HANDLED;
     }
     return pcm_advance(PCM_FROM_IRQ10);
@@ -498,7 +509,7 @@ static int pcm_irq(unsigned int irq, void *arg)
 void pcm_tick(void)
 {
     if (s_hal_advance) {
-        if (!s_claimed && !s_mce_busy) s_hal_advance();
+        if (!s_claimed && !s_mce_busy) pcm_hal_advance();
         return;
     }
     (void)pcm_advance(PCM_FROM_TICK);
@@ -549,13 +560,18 @@ int pcm_present(void) { return s_present; }
 static void pcm_release(int leak)
 {
     if (g_pcm.finalized) return;
-    g_pcm.finalized = 1;
     s_claimed = 1;              /* 以後 advance は装置にもリングにも触らない */
 
     if (s_irq_reg) {
-        irq_unregister(PCM_IRQ, pcm_irq, 0);
+        if (irq_unregister(PCM_IRQ, pcm_irq, 0) != 0) {
+            s_release_leak = leak;
+            s_release_pending = 1;
+            return;
+        }
         s_irq_reg = 0;
     }
+    g_pcm.finalized = 1;
+    s_release_pending = 0;
     /* **ステージングは必ず kfree してよい** — 装置が触らないメモリなので、
      * リングが「止まった証拠」を取れなかった (leak) かどうかと独立。 */
     if (s_stg) kfree(s_stg);
@@ -573,6 +589,11 @@ static void pcm_release(int leak)
     s_owner = 0;
     s_hal_advance = 0;
     s_mce_busy = 0;
+}
+
+void pcm_codec_finish_release(void)
+{
+    if (s_release_pending) pcm_release(s_release_leak);
 }
 
 static int pcm_owner_ok(void)
@@ -598,6 +619,8 @@ static int pcm_open_device(u32 rate, u32 period, void (*advance)(void))
     u8 fmt = 0;
     int rc;
 
+    pcm_codec_finish_release();
+    if (s_release_pending) return PCM_ERR_BUSY;
     if (s_fault_sticky) return OS32_ERR_IO;
     if (g_pcm.state != PCM_ST_CLOSED) return PCM_ERR_BUSY;
     if (pcm_fmt_for_rate(rate, &fmt) != 0) return OS32_ERR_INVAL;
@@ -916,6 +939,7 @@ int pcm_codec_ack(void)
 
 int pcm_codec_stop(void)
 {
+    if (s_release_pending) return s_release_leak ? OS32_ERR_IO : 0;
     if (!s_hal_advance || g_pcm.state == PCM_ST_OPEN) return 0;
     if (!pcm_abort_proven()) {
         /* teardown restores IF before release. Block the shared IRQ now. */
@@ -928,7 +952,14 @@ int pcm_codec_stop(void)
 
 void pcm_codec_release(int leak)
 {
-    if (s_hal_advance) pcm_release(leak);
+    if (!s_hal_advance || s_release_pending) return;
+    if (s_in_advance) {
+        s_claimed = 1;
+        s_release_leak = leak;
+        s_release_pending = 1;
+        return;
+    }
+    pcm_release(leak);
 }
 
 void pcm_codec_volume(u8 left, u8 right)

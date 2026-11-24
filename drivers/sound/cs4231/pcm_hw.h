@@ -8,6 +8,7 @@ int pcm_codec_pos(u32 *frame);
 int pcm_codec_ack(void);
 int pcm_codec_stop(void);
 void pcm_codec_release(int leak);
+void pcm_codec_finish_release(void);
 void pcm_codec_volume(u8 left, u8 right);
 int pcm_hw_register(void);
 int pcm_hw_quiet(void);

@@ -89,6 +89,7 @@ int pcm_hw_register(void)
 
 int pcm_hw_quiet(void)
 {
+    pcm_codec_finish_release();
     if (dev >= 0) {
         if (snd2_unregister((u32)dev) < 0) return 0;
         dev = -1;

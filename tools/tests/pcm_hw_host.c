@@ -8,7 +8,18 @@
 
 int pcm_module_init(PcmModuleApi *out);
 u32 tick_clock_ms(void) { return (u32)(sim_now_us / 1000); }
-i32 exec_sys_yield(void) { return 0; }
+i32 exec_sys_yield(void)
+{
+    u32 before = sim_irq_unreg_calls;
+    sim_set_pos(512);
+    dev_reg[PCM_I_ALTSTAT] = PCM_ALT_PI;
+    sim_irq_context = 1;
+    CHECK(pcm_irq(PCM_IRQ, 0) == IRQ_HANDLED);
+    sim_irq_context = 0;
+    CHECK(sim_irq_unreg_calls == before);
+    sim_now_us += 100000;
+    return 0;
+}
 
 static void irq_after_failed_stop(void)
 {
@@ -17,8 +28,9 @@ static void irq_after_failed_stop(void)
     CHECK(IO_ACCESSES == before);
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
+    (void)argv;
     PcmModuleApi api;
     SND2_Caps caps;
     SND2_DevInfo info;
@@ -69,10 +81,34 @@ int main(void)
     CHECK(!sim_masked && !snd2_device(info.dev)->stream.restart_pending);
     CHECK(dev_reg[PCM_I_BASE_LO] == 255 && dev_reg[PCM_I_BASE_HI] == 1);
     CHECK(!memcmp(pool_mem[0], data, sizeof(data)));
+    CHECK(!snd2_stream_close(id, SND2_CLOSE_DRAIN));
+    CHECK(sim_masked && sim_irq_registered && pool_used[0]);
+    sim_unregister_fail = 1;
+    CHECK(snd2_stream_open(&desc, &id) == OS32_ERR_BUSY);
+    CHECK(sim_irq_registered && pool_used[0]);
+    sim_unregister_fail = 0;
+    CHECK(!snd2_stream_open(&desc, &id));
+    CHECK(pool_freed[0] == 1 && sim_irq_registered);
     CHECK(api.quiet() && !snd2_dev_count());
-    CHECK(sim_masked && !sim_irq_registered && !heap_used && pool_freed[0] == 1);
+    CHECK(sim_masked && !sim_irq_registered && !heap_used && pool_freed[0] == 2);
     CHECK(!pcm_module_init(&api));
     CHECK(!snd2_stream_open(&desc, &id) && !snd2_stream_start(id));
+    if (argc > 1) {
+        /* A timer IRQ loses position continuity and cannot prove a stop. */
+        sim_now_us += 1000000;
+        dev_init_busy = 1;
+        sim_tick_per_read = 1;
+        u32 before = sim_irq_unreg_calls;
+        sim_irq_context = 1;
+        api.tick();
+        sim_irq_context = 0;
+        CHECK(sim_irq_unreg_calls == before && sim_irq_registered && pool_used[0]);
+        CHECK(snd2_stream_open(&desc, &id) == OS32_ERR_IO);
+        CHECK(!api.quiet() && snd2_dev_count() == 1);
+        CHECK(pool_leaked[0] == 1 && pool_used[0] && !sim_irq_registered);
+        CHECK(api.open(PCM_RATE_44100) == OS32_ERR_IO);
+        return failed != 0;
+    }
     sim_tick_per_read = 1;
     dev_init_busy = 1;
     isr_site = SITE_IF_ON;

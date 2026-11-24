@@ -14,12 +14,15 @@ CHECK = dict(name='pcm-hw-host', tier=4, needs=[], budget=6,
              basis=['docs/decisions/sound/AV_HAL_DESIGN.md §3・§12 S9・§13-2'])
 
 MUTATIONS = [
+    ('pcm_cs4231.c', 'if (s_in_advance) {', 'if (0) {'),
+    ('pcm_cs4231.c', 'if (irq_unregister(PCM_IRQ, pcm_irq, 0) != 0)',
+     'if (irq_unregister(PCM_IRQ, pcm_irq, 0) != 0 && 0)'),
     ('pcm_hw.c', '.volume_steps = PCM_DA_ATT_MAX + 1', '.volume_steps = PCM_DA_ATT_MAX'),
     ('pcm_hw.c', 'attenuation(right)', 'attenuation(left) + 0 * right'),
     ('pcm_cs4231.c', '(u8)((s_hal_period - 1) >> 8)', '(u8)(s_hal_period >> 8)'),
     ('pcm_cs4231.c', 'if (!pcm_codec_ack()) return IRQ_NONE;', 'if (!pcm_codec_ack()) return IRQ_HANDLED;'),
-    ('pcm_cs4231.c', 'if (!s_claimed && !s_mce_busy) s_hal_advance();',
-     'if (!s_claimed && g_pcm.state == PCM_ST_OPEN) s_hal_advance();'),
+    ('pcm_cs4231.c', 'if (!s_claimed && !s_mce_busy) pcm_hal_advance();',
+     'if (!s_claimed && g_pcm.state == PCM_ST_OPEN) pcm_hal_advance();'),
     ('pcm_cs4231.c', 'if (!pcm_abort_proven()) {', 'if (pcm_abort_proven() && 0) {'),
     ('pcm_cs4231.c', '        s_claimed = 1;\n        return OS32_ERR_IO;',
      '        return OS32_ERR_IO;'),
@@ -48,6 +51,8 @@ def run(ctx):
             core = [ROOT / f'sound/hal/snd2_{unit}.c' for unit in ('reg', 'caps', 'stream', 'stg', 'seg')]
             subprocess.run(['gcc', *FLAGS, *INCLUDES, '-I' + str(ROOT), str(work / 'test.c'),
                             str(work / 'pcm_hw.c'), driver / 'pcm_body.c', *core, '-o', exe], check=True)
+            if not mutation:
+                subprocess.run(['qemu-x86_64', exe, 'resync-fault'], check=True, timeout=10)
             result = subprocess.run(['qemu-x86_64', exe], capture_output=True, timeout=10)
             if result.returncode != int(bool(mutation)) or (mutation and b'FAIL ' not in result.stderr):
                 raise AssertionError((mutation, result))
