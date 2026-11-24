@@ -10,8 +10,8 @@ static void ide_pio_settle(void)
  * error-associated DRQ without publishing that sector to the caller. */
 static int ide_pio_wait_phase(u8 *status)
 {
-    int timeout = IDE_TIMEOUT_LOOP;
-    while (timeout-- > 0) {
+    IdeWait wait = ide_wait_start(IDE_EARLY_PHASE_POLLS);
+    while (ide_wait_pending(&wait, IDE_IO_TIMEOUT_MS)) {
         u8 st = ide_bus_alt();
         if (st & IDE_ST_BSY) continue;
         *status = st;
@@ -21,10 +21,10 @@ static int ide_pio_wait_phase(u8 *status)
     return IDE_ERR_TIMEOUT;
 }
 
-static int ide_pio_finish(void)
+static int ide_pio_finish(u32 limit_ms)
 {
-    int timeout = IDE_TIMEOUT_BSY;
-    while (timeout-- > 0) {
+    IdeWait wait = ide_wait_start(IDE_EARLY_BSY_POLLS);
+    while (ide_wait_pending(&wait, limit_ms)) {
         /* Regular status also acknowledges the command's interrupt. */
         u8 st = ide_bus_in(IDE_REG_STATUS);
         if (st & IDE_ST_BSY) continue;
@@ -44,9 +44,9 @@ static int ide_pio_command(int drive, const IdeAddr *a, u32 sectors,
 
     if (!drive_present[drive]) return IDE_ERR_NO_DRIVE;
     ide_select_drive(drive);
-    ret = ide_wait_bsy();
+    ret = ide_wait_bsy(IDE_IO_TIMEOUT_MS);
     if (ret != IDE_OK) return ret;
-    ret = ide_multiple_prepare(drive);
+    ret = ide_multiple_prepare(drive, IDE_IO_TIMEOUT_MS);
     if (ret != IDE_OK) return ret;
     multiple = drive_multiple[drive].active;
     if (multiple <= 1) multiple = 1;
@@ -82,5 +82,5 @@ static int ide_pio_command(int drive, const IdeAddr *a, u32 sectors,
         /* Let the previous DRQ phase retire before sampling the next status. */
         ide_pio_settle();
     }
-    return ide_pio_finish();
+    return ide_pio_finish(IDE_IO_TIMEOUT_MS);
 }
