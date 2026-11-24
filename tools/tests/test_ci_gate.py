@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """tools/ci/gate.py: 道具の事前確認・結果の表・回っていない検査を失敗に数えること (検査は回さない)。"""
 CHECK = dict(name='ci-gate-host', tier=1, needs=[], budget=5,
-    covers=['tools/ci/gate.py', 'tools/tests/test_ci_gate.py', 'tools/checks/run.py', 'tools/check_time.py',
+    covers=['tools/ci/gate.py', 'tools/ppc/keep_tmp.py', 'tools/tests/test_ci_gate.py', 'tools/checks/run.py', 'tools/check_time.py',
             '.github/actions/gate-setup/action.yml', '.github/workflows/sep.yml', '.github/workflows/check.yml'],
     basis=['CI_GATE_DESIGN §2', 'CI_GATE_DESIGN §3'],
 )
@@ -10,6 +10,8 @@ from unittest.mock import patch
 import argparse
 import importlib.util
 import io
+import os
+import shutil
 from pathlib import Path
 import sys
 import tempfile
@@ -119,6 +121,24 @@ def suite(tool):
                 self.assertEqual(sorted(p.name for p in (out / 'failed-logs').iterdir()), ['check-b.log'])
                 self.assertEqual((out / 'failed-logs/check-b.log').read_text(), '6789')
 
+        def test_keep_tmp(self):
+            sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'ppc'))
+            import keep_tmp
+            saved = os.environ.pop('OS32_KEEP_TMP', None)
+            try:
+                with keep_tmp.temporary_directory(prefix='os32-keep-') as gone:
+                    pass
+                self.assertFalse(Path(gone).exists())
+                os.environ['OS32_KEEP_TMP'] = '1'
+                with keep_tmp.temporary_directory(prefix='os32-keep-') as kept:
+                    (Path(kept) / 'serial.log').write_text('x')
+                self.assertTrue((Path(kept) / 'serial.log').is_file())
+                shutil.rmtree(kept)
+            finally:
+                os.environ.pop('OS32_KEEP_TMP', None)
+                if saved is not None:
+                    os.environ['OS32_KEEP_TMP'] = saved
+
         def test_keep_evidence(self):
             with tempfile.TemporaryDirectory(prefix='os32-ci-gate-') as directory:
                 out = Path(directory)
@@ -142,6 +162,28 @@ def suite(tool):
                 self.assertEqual(tool.keep_evidence(out / 'kept3', out / 'missing.log'), 0)
                 log.write_text('no evidence line\n')
                 self.assertEqual(tool.keep_evidence(out / 'kept4', log), 0)
+                ata = out / 'ata-accept-x/lba/7455'
+                ata.mkdir(parents=True)
+                (ata / 'serial.log').write_text('ATA')
+                (ata / 'qemu.log').write_text('Q')
+                (ata / 'disk.raw').write_bytes(b'd' * 8)
+                log.write_text('RuntimeError: guest stopped or timed out: %s evidence=%s\n' % (ata / 'serial.log', ata))
+                self.assertEqual(tool.keep_evidence(out / 'kept5', log), 4)
+                self.assertEqual((out / 'kept5/check-ppc-usb/serial.log').read_text(), 'ATA')
+                scratch = out / 'scratch'
+                done = scratch / 'tool-a/case-1'
+                hung = scratch / 'tool-a/case-2'
+                done.mkdir(parents=True)
+                hung.mkdir(parents=True)
+                (done / 'serial.log').write_text('early')
+                os.utime(done / 'serial.log', ns=(1, 1))
+                (hung / 'serial.log').write_text('late!')
+                log.write_text('RuntimeError: deadline queued ordinary input\n')
+                self.assertEqual(tool.keep_evidence(out / 'kept6', log, limit=5, scratch=scratch), 5)
+                self.assertTrue((out / 'kept6/check-ppc-usb/tool-a/case-2/serial.log').is_file())
+                self.assertEqual((out / 'kept6/check-ppc-usb/tool-a/case-2/serial.log').read_text(), 'late!')
+                self.assertFalse((out / 'kept6/check-ppc-usb/tool-a/case-1/serial.log').exists())
+                self.assertEqual(tool.keep_evidence(out / 'kept7', log), 0)
 
         def test_render_verdict(self):
             def verdict(checks):
@@ -181,6 +223,8 @@ MUTANTS = [
     ("take = min(size, per_file, limit - total)", "take = min(size, per_file)"),
     ("if not source.is_file() or not EVIDENCE_NAMES.search(source.name):", "if not source.is_file():"),
     ("handle.seek(size - take)", "handle.seek(0)"),
+    ("    if base is None or not base.is_dir():\n        base = scratch\n", ""),
+    ("sorted(base.rglob('*'), key=lambda path: (-path.stat().st_mtime_ns, str(path)))", "sorted(base.rglob('*'))"),
 ]
 
 

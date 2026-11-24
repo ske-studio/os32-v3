@@ -8,7 +8,7 @@ import re
 from pathlib import Path
 import struct
 import subprocess
-import tempfile
+import keep_tmp
 
 from product_media import build_volume, product_load
 from lan_probe import PROMPT, ROM
@@ -248,7 +248,7 @@ def main():
         cases.extend((case, None) for case in ('media-load', 'short', 'long'))
         for name in FILES:
             cases.extend([(name+'-path', files[name][0]), (name+'-contents', files[name][1])])
-    with tempfile.TemporaryDirectory() as directory:
+    with keep_tmp.temporary_directory() as directory:
         hashes = set()
         for case, offset in cases:
             copy = bytearray(volume)

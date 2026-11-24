@@ -8,7 +8,7 @@ import re
 import struct
 import subprocess
 import sys
-import tempfile
+import keep_tmp
 import time
 
 from kboot_accept import fixed_layout, linked_image
@@ -201,7 +201,7 @@ def main():
         return
     prefix = str(Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc')) / 'bin/powerpc-elf-')
     started = time.monotonic()
-    with tempfile.TemporaryDirectory(prefix='kboot-layout-', dir=os.environ.get('TMPDIR')) as tmp:
+    with keep_tmp.temporary_directory(prefix='kboot-layout-', dir=os.environ.get('TMPDIR')) as tmp:
         work = Path(tmp)
         command(['python3', '-B', 'tools/gen_memmap.py', '--layout-header', work/'memmap_layout.h'])
         script = (ROOT/'arch/ppc/kernel.ld').read_text()

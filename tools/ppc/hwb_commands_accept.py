@@ -171,6 +171,7 @@ def main():
     args = parser.parse_args()
     os.environ.setdefault('SOURCE_DATE_EPOCH', '946684800')
     work = Path(tempfile.mkdtemp(prefix='hw-commands-')).resolve()
+    print('evidence='+str(work), flush=True)
     hashes = set()
     for mode in ['normal'] + (['native-read', 'sticky', 'port-ok'] if args.mutate else []):
         media = build(work, mode)
