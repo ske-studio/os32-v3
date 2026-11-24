@@ -1335,7 +1335,7 @@ pub static FM_GAIN: [i32; 1] = [
     16384,
 ];
 pub static ADPCM_GAIN: [i32; 1] = [
-    0,
+    65536,
 ];
 pub static ADPCM_BASE: [u32; 1] = [
     10303,

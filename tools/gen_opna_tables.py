@@ -10,16 +10,19 @@ CORE = ROOT / 'lib/os32_opna'
 TABLES = CORE / 'src/tables.rs'
 
 
-def extract(source, work):
+ADAPTER = ROOT / 'tools/gen_opna_tables.cpp'
+
+
+def build_extractor(source, work, adapter):
     # fmgen_types.h defines the needed integer aliases itself.
     (work / 'compiler.h').touch()
     binary = work / 'extract'
     subprocess.run(['g++', '-std=c++17', '-DSUPPORT_FMGEN', '-DMAX_PATH=260',
                     '-I', work, '-I', source, '-ffunction-sections', '-fdata-sections',
-                    '-Wl,--gc-sections', ROOT / 'tools/gen_opna_tables.cpp',
+                    '-Wl,--gc-sections', adapter,
                     *(source / f'fmgen_{name}.cpp' for name in ('fmgen', 'opna', 'psg', 'fmtimer')),
                     '-o', binary], check=True)
-    return subprocess.check_output([binary], text=True).splitlines()
+    return binary
 
 
 def main():
@@ -35,7 +38,8 @@ def main():
         harness = ['mod tables;', 'use std::io::{self, Write};',
                    'fn main() { let mut out = io::BufWriter::new(io::stdout().lock());']
         expected = bytearray()
-        for line in extract(args.source, work):
+        binary = build_extractor(args.source, work, ADAPTER)
+        for line in subprocess.check_output([binary], text=True).splitlines():
             name, kind, *digits = line.split()
             data = b''.join(int(x).to_bytes(int(kind[1:]) // 8, 'little',
                                             signed=kind.startswith('i')) for x in digits)
@@ -70,6 +74,18 @@ def main():
             if count != 1 or compare(mutated):
                 raise SystemExit('SINE mutation failed')
             print('RED: SINE[0] differs from fmgen')
+            anchor = 'const auto gain = chip.adpcmvol;'
+            adapter = ADAPTER.read_text()
+            if adapter.count(anchor) != 1:
+                raise SystemExit('ADPCM gain mutation point changed')
+            mutant = work / 'mutant.cpp'
+            mutant.write_text(adapter.replace(anchor, 'const auto gain = chip.adpcmvolume;'))
+            binary = build_extractor(args.source, work, mutant)
+            result = subprocess.run([binary], stdout=subprocess.DEVNULL,
+                                    stderr=subprocess.PIPE, text=True)
+            if result.returncode != 1 or result.stderr.strip() != 'ADPCM gain/level mismatch':
+                raise SystemExit('ADPCM gain mutation failed')
+            print('RED: register-scaled ADPCM volume fails the 0 dB gain check')
 
 
 if __name__ == '__main__':

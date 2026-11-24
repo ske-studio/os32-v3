@@ -60,7 +60,17 @@ int main() {
     emit("PSG_NOISE", PSG::noisetable);
     emit("PSG_ENVELOPE", PSG::enveloptable);
     emit("FM_GAIN", chip.fmvolume);
-    emit("ADPCM_GAIN", chip.adpcmvolume);
+    const auto gain = chip.adpcmvol;
+    emit("ADPCM_GAIN", gain);
+    // At 0 dB the gain is unity in Q16. Register 0x10b scales the output.
+    for (unsigned level : {0u, 1u, 128u, 255u}) {
+        chip.SetReg(0x10b, level);
+        if (gain != 65536 || chip.adpcmvol != gain ||
+            chip.adpcmvolume != (gain * static_cast<int>(level)) / 4096) {
+            std::fputs("ADPCM gain/level mismatch\n", stderr);
+            return 1;
+        }
+    }
     emit("ADPCM_BASE", chip.adplbase);
     for (unsigned p = 0; p < 3; ++p) {
         chip.SetPrescaler(p);
