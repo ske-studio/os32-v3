@@ -7,7 +7,7 @@ from host32 import run as host_run
 from kernel_includes import include_flags
 
 CHECK = dict(name='snd2-seg-host', tier=4, needs=[], budget=3,
-             covers=['sound/hal/snd2.h', 'sound/hal/snd2_pos.c', 'include/io.h',
+             covers=['include/exec_wait_contract.h', 'sound/hal/snd2.h', 'sound/hal/snd2_pos.c', 'include/io.h',
                      'kernel/time/tick_clock.h', 'include/kernel_tick.h', 'sound/hal/snd2_seg.c', 'sound/hal/snd2_stg.c',
                      'sound/hal/snd2_int.h', 'sound/hal/snd2_ring_math.h',
                      'include/av_contract.h', 'lib/kstring.h', 'mm/kmalloc.h', 'include/types.h',

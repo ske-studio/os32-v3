@@ -7,7 +7,7 @@ from host32 import run as host_run
 from kernel_includes import include_flags
 
 CHECK = dict(name='snd2-pos-host', tier=4, needs=[], budget=3,
-             covers=['sound/hal/snd2_refill_diag.h', 'sound/hal/snd2.h', 'sound/hal/snd2_stream.c', 'sound/hal/snd2_pos.c',
+             covers=['include/exec_wait_contract.h', 'sound/hal/snd2_refill_diag.h', 'sound/hal/snd2.h', 'sound/hal/snd2_stream.c', 'sound/hal/snd2_pos.c',
                      'kernel/time/tick_clock.h', 'include/kernel_tick.h',
                      'include/io.h', 'sound/hal/snd2_seg.c', 'sound/hal/snd2_stg.c',
                      'sound/hal/snd2_int.h', 'sound/hal/snd2_ring_math.h',
@@ -20,6 +20,9 @@ CHECK = dict(name='snd2-pos-host', tier=4, needs=[], budget=3,
 ROOT = Path(__file__).resolve().parents[2]
 HAL = ROOT / 'sound/hal'
 MUTATIONS = [
+    ('pos', 'ring3_wait_pending() ||', ''),
+    ('pos', 'pos.state == SND2_ST_PAUSE ||', ''),
+    ('pos', 'else if (park)', 'else if (park && 0)'),
     ('pos', '                    _idle();', '                    irq_restore(saved); _idle();'),
     ('pos', '(frame - pos.written) > 0', '(frame - pos.written) < 0'),
     ('pos', 'pos.played - frame', 'snd2_device(id & 15U)->stream.played - frame'),

@@ -1,6 +1,7 @@
 #include "../../../kernel/irq/tick.h"
 #include "tick_order.h"
 #include "tick_clock.h"
+#include "platform/pc98/tsc_clock.h"
 #include "sound/hal/snd2.h"
 _Static_assert(PC98_TICK_COUNT <= TICK_SLOT_COUNT, "PC98 tick slots exceed table");
 /* Resident facade and IRQ/tick/DMA references, using the T5c-0 record. */
@@ -28,18 +29,27 @@ static unsigned int irq_line;
 
 static const Snd2Stream *refill_stream;
 
+/* Earliest possible boundary from a verified DMA movement. A PIT IRQ
+ * count cannot bound elapsed time while interrupts were masked. */
+static unsigned long long refill_due_us;
+
 static void pcm_between_jiffies(void)
 {
     const Snd2Stream *s = refill_stream;
-    if (s->written == s->copied) {
-        /* Neither supported CS4231 rate can consume 64 frames in 1 ms.
-         * Round down so the first possible retirement still reads DMA.
-         * Use the last movement time in case the DMA counter stood still. */
-        u32 remaining = s->period - (s->last_hw & (s->period - 1));
-        if (tick_clock_ms() - s->last_progress_ms < remaining / 64U)
-            return;
-    }
+    u32 lo, hi, previous = s->last_hw;
+    int timed = pc98_tsc_read_us(&lo, &hi) == 0;
+    unsigned long long now = timed ? ((unsigned long long)hi << 32) | lo : 0;
+    if (s->written == s->copied && timed && now < refill_due_us)
+        return;
+
+    refill_due_us = 0;
     tick_target();
+    if (timed && refill_stream == s && s->last_hw != previous) {
+        u32 remaining = s->period - (s->last_hw & (s->period - 1));
+        /* Start the interval before sampling DMA. Even 44.1 kHz takes
+         * over 22 us per frame; allow one frame already in progress. */
+        refill_due_us = now + (remaining - 1) * 22U;
+    }
 }
 
 /* The module tick reference pins tick_target. The registry retains the
@@ -47,6 +57,7 @@ static void pcm_between_jiffies(void)
 void pcm_module_refill_tick(int dev)
 {
     Snd2Device *d = dev >= 0 ? snd2_device((u32)dev) : 0;
+    refill_due_us = 0;
     refill_stream = d ? &d->stream : 0;
     tick_pcm_set(refill_stream && tick_target ? pcm_between_jiffies : 0);
 }

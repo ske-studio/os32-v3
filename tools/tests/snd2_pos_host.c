@@ -7,8 +7,16 @@ static unsigned locked;
 static int probing_pos;
 static u32 now, wakes;
 static int action, error, owner = 1;
-enum { TICK, ADVANCE, CLOSE, FAULT, EDGE };
-static int pending_pi;
+enum { TICK, ADVANCE, CLOSE, FAULT, EDGE, STOP };
+static int pending_pi, stop_requested, parks;
+unsigned exec_wait_begin(unsigned ms) { return ms; }
+int exec_wait_can_park(void) { return parks != 0; }
+int ring3_wait_pending(void) { return stop_requested; }
+void exec_wait_park(unsigned begin)
+{
+    if (locked || begin != now || ++parks > 2) error = 1;
+    stop_requested = 1;
+}
 
 unsigned irq_save(void) { unsigned prev = locked; locked = 1; return prev; }
 void irq_restore(unsigned prev)
@@ -50,6 +58,7 @@ void _idle(void)
     }
     ++now;
     ++wakes;
+    if (action == STOP) stop_requested = 1;
     if (action == ADVANCE) ++device.stream.last_hw;
     if (action == CLOSE && snd2_stream_close(0, SND2_CLOSE_ABORT)) error = 1;
     if (action == FAULT) device.stream.state = SND2_ST_FAULTED;
@@ -103,6 +112,16 @@ static int probe(void)
     s->played = 0;
     s->written = s->seg_n[0] = 2;
     s->last_hw = 0;
+    s->state = SND2_ST_PAUSE;
+    u32 prior = wakes;
+    CHECK(snd2_stream_wait(s->gen << 4, 1, 100) == OS32_ERR_TIMEOUT && wakes == prior);
+    s->state = SND2_ST_RUN;
+    action = STOP;
+    CHECK(snd2_stream_wait(s->gen << 4, 1, 100) == OS32_ERR_TIMEOUT && wakes == prior + 1);
+    stop_requested = 0;
+    parks = 1;
+    CHECK(snd2_stream_wait(s->gen << 4, 1, 100) == OS32_ERR_TIMEOUT && parks == 2);
+    parks = stop_requested = 0;
     action = EDGE;
     u32 before = now;
     CHECK(!snd2_stream_wait(s->gen << 4, 1, 5) && now == before);

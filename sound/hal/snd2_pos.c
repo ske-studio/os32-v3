@@ -1,5 +1,6 @@
 #include "snd2.h"
 #include "io.h"
+#include "exec_wait_contract.h"
 #include "kernel/time/tick_clock.h"
 
 static int snapshot_locked(u32 id, SND2_Pos *out)
@@ -32,14 +33,21 @@ int snd2_stream_pos(u32 id, SND2_Pos *out)
 int snd2_stream_wait(u32 id, u32 frame, u32 timeout_ms)
 {
     SND2_Pos pos;
-    u32 begin = tick_clock_ms();
+    u32 begin = exec_wait_begin(tick_clock_ms());
+    int park = exec_wait_can_park();
     for (;;) {
         unsigned saved = irq_save();
         int rc = snapshot_locked(id, &pos);
         if (!rc) {
             if ((i32)(frame - pos.written) > 0) rc = OS32_ERR_INVAL;
             else if ((i32)(pos.played - frame) < 0) {
-                if (pos.time_ms - begin >= timeout_ms) rc = OS32_ERR_TIMEOUT;
+                if (pos.state == SND2_ST_PAUSE || ring3_wait_pending() ||
+                    pos.time_ms - begin >= timeout_ms) rc = OS32_ERR_TIMEOUT;
+                else if (park) {
+                    irq_restore(saved);
+                    exec_wait_park(begin);
+                    continue;
+                }
                 else {
                     /* Interrupts stay masked from the snapshot through the
                      * atomic enable-and-halt. Any IRQ can change the result. */

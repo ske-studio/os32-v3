@@ -104,6 +104,10 @@ static void advance_until(u32 limit)
         irq_error = 1;
 }
 
+unsigned exec_wait_begin(unsigned ms) { return ms; }
+int exec_wait_can_park(void) { return 0; }
+int ring3_wait_pending(void) { return 0; }
+void exec_wait_park(unsigned begin) { (void)begin; }
 void _idle(void)
 {
     if (!masked) irq_error = 1;
