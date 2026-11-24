@@ -7,7 +7,7 @@ import host32
 
 CHECK = dict(name='snd2-guest-host', tier=4, needs=[], budget=3,
              covers=['tools/tests/host32.py', 'tools/tests/test_snd2_guest.py', 'tools/tests/snd2_guest_host.c',
-                     'userland/tests/snd2_test.c', 'sdk/include/os32/*.h'],
+                     'userland/tests/snd2_test.c', 'sound/hal/snd2_refill_diag.h', 'sdk/include/os32/*.h'],
              basis=['docs/decisions/sound/AV_HAL_DESIGN.md §13-3'])
 
 
@@ -29,6 +29,9 @@ def run(ctx):
                 old, new = mutation
                 assert source.count(old) == 1
                 guest = source.replace(old, new)
+            # snd2_test.c reaches the diagnostic header relative to userland/tests/.
+            guest = guest.replace('#include "../../sound/hal/snd2_refill_diag.h"',
+                                  '#include "' + str(ctx.root / 'sound/hal/snd2_refill_diag.h') + '"')
             (work / 'guest.inc').write_text(guest)
             exe = work / 'guest'
             subprocess.run(['gcc', '-m32', '-static', '-ffreestanding', '-fno-pie', '-no-pie',
