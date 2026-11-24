@@ -228,7 +228,7 @@ int snd2_dsp_process(u32 dev, u32 unit, const i32 *params, u32 n,
 - 区間が過ぎた時 (advance が p の変化を見た時、過ぎた区間ごとに): `played += seg_n[s]`、RUN かつ未 pause かつ `seg_n[s] < period` かつ実データを一度でも再生した (この区間を含む) → `underruns++`。その区間を 0 埋めして `seg_n=0`。
 - 途中の位置: `played_now = played + min(hw % period, seg_n[p])` (pos の問い合わせだけ。無音は数えない → **played ≤ written を常に保つ**)。
 - 連続性を失った時 (今の `pcm_cont` の偽・watchdog・観測の間隔がリング 1 周を超えた、R3-P1-1): 今の RS_STOP → RS_RESTART の 2 段のまま、順を次に固定する。(1) **止める**: `hw_stop` (IF=0、上限つき)。(2) **止まった証拠**が無ければリングにもカーソルにも触らず `snd2_teardown` (DMA の隔離・FAULTED)。(3) 証拠があれば: `epoch++`、リング全体を 0 埋め・全区間 `seg_n=0`、**`copied = played`** に巻き戻し (ステージングは played まで捨てないので失わない)。(4) **元の状態を保って**再始動 (R4-P1-1): RUN・DRAIN は §3-4-1 と同じ充填で `hw_start`。PAUSE はリングを無音のまま (実データを写さず `copied = played`) `hw_start` し、状態は PAUSE のまま。実データは明示の start (再開) の後の advance から写す。IDLE では DMA が止まっているので起きない。played は失った区間の分を数えない (鳴ったか分からない物は「鳴っていない」)。DMA が走っている間にリングを書かない。
-- 補充の担い手: PI (区間ごと) と論理 tick の両方から `snd2_advance(dev)`。段 B の後は物理 1kHz からも。**段 B の前は period ≥ 1024 だけを開く** (S4 の前提、§12)。
+- 補充の担い手: PI (区間ごと) と論理 tick の両方から `snd2_advance(dev)`。段 B の物理 1kHz では、CS4231 の再生中、論理 tick の間の IRQ0 でも同じ補充を呼ぶ。新しい staging がなく、前回の DMA 位置から次の境界までの距離が CS4231 の最大レートでもまだ進めない距離なら、物理 tick は DMA を読まずに戻る。論理 tick の回は従来の PCM slot が担当する。**段 B の前は period ≥ 1024 だけを開く** (S4 の前提、§12)。
 - 遅延: `cap = (lead+1) × period` (v2)。低遅延 period 256・lead 3 → cap 1024 frame = 23.2ms @44.1k。既定 period 2048・lead 1 → 4096 frame (92.9ms)。
 
 | 設定 | period | lead | cap (最悪の遅延 @44.1k) | IRQ の間隔 |
@@ -276,7 +276,7 @@ typedef struct Snd2Stream {          /* sound/hal/snd2_int.h。書くのは soun
 - write の検査の順: 番号 (STALE) → 持ち主 (INVAL) → 状態 (§3-3) → buf の NULL (INVAL) → `bytes / frame_bytes` (0 なら 0)。受ける量 = `min(frames, cap − (written − played), stg の空き)`。ステージングへの写しは IF=1、`written += n` だけ IF=0。部分受理は正の byte 数、満杯は 0。
 - open の検査の順 (R2-P2-2): desc の size → dev (範囲・PRESENT・FAULTED なら IO) → fmt が caps の表にある → period (0 は既定、2 の冪で `period_min ≤ period ≤ period_max`、段 B の前は ≥ 1024) → lead (0 は 1、`1 ≤ lead ≤ ring_frames/period − 1`) → `cap = (lead+1) × period` (≤ ring_frames ≤ 4096 なので溢れない) → 持ち主 (BUSY)。v1 だけは cap = 8192 (ステージングの大きさ) の例外。
 - **公開の位置は 1 つ** (R2-P2-1): IF=0 で `played_now = played + min(hw % period, seg_n[p])` と `epoch` を組で写し取る (snapshot)。pos はこの played_now を `played` として返し、wait も同じ関数で比べる (pos で届いた frame の wait が TIMEOUT にならない)。`done(f) = (i32)(played_now − f) >= 0`。距離: `written − played ≤ cap ≤ 8192` なので比べは常に < 2^31。
-- wait (同じ snapshot で比べる): `(i32)(frame − written) > 0` は INVAL (まだ書いていない frame を待つとシングルタスクでは終わらない)。結果: 0 = 届いた / TIMEOUT / STALE (待ちの間に閉じた・回収) / IO (FAULTED)。待ちは sys_yield を回して played を見るだけ (起こす旗は持たない)。
+- wait (同じ snapshot で比べる): `(i32)(frame − written) > 0` は INVAL (まだ書いていない frame を待つとシングルタスクでは終わらない)。結果: 0 = 届いた / TIMEOUT / STALE (待ちの間に閉じた・回収) / IO (FAULTED)。前景の wait は割り込み禁止で snapshot を確認し、未到達ならそのまま不可分の割り込み許可・休止に入る。PI または物理 tick の退役はその IRQ から戻った直後に再確認する。他の IRQ でも条件と期限を再確認する。
 - epoch が変わったら互換層は位置の対応を取り直す (WAVEHDR の完了は played で判定するので、失った区間の分は遅れて完了する)。
 
 ### 3-6. v1 (pcm_*) の統合 (P1-4)

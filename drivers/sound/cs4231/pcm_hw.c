@@ -40,7 +40,9 @@ static int hw_open(void *ctx, const SND2_Fmt *fmt, u32 period, u8 **ring)
 static int hw_start(void *ctx)
 {
     (void)ctx;
-    return pcm_codec_start();
+    int rc = pcm_codec_start();
+    if (!rc) pcm_module_refill_tick(dev);
+    return rc;
 }
 
 static int hw_pos(void *ctx, u32 *frame)
@@ -58,6 +60,7 @@ static int hw_ack(void *ctx)
 static int hw_stop(void *ctx)
 {
     (void)ctx;
+    pcm_module_refill_tick(-1);
     return pcm_codec_stop();
 }
 

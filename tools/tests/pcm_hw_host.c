@@ -7,6 +7,9 @@
 #include "sound/hal/snd2.h"
 #include "pcm_module.h"
 
+static int physical_tick_active;
+void pcm_module_refill_tick(int dev) { physical_tick_active = dev >= 0; }
+
 int pcm_module_init(PcmModuleApi *out);
 u32 tick_clock_ms(void) { return (u32)(sim_now_us / 1000); }
 i32 exec_sys_yield(void)
@@ -63,7 +66,7 @@ int main(int argc, char **argv)
     CHECK(!snd2_device(info.dev)->stream.copied);
     sim_setup_fail = 0;
     CHECK(!snd2_stream_start(id) && !sim_masked && (dev_reg[PCM_I_IFACE] & PCM_IFACE_PEN));
-    CHECK(!memcmp(pool_mem[0], data, sizeof(data)));
+    CHECK(physical_tick_active && !memcmp(pool_mem[0], data, sizeof(data)));
     sim_set_pos(40);
     CHECK(pcm_irq(PCM_IRQ, 0) == IRQ_NONE);
     CHECK(snd2_device(info.dev)->stream.last_hw == 0);
@@ -88,7 +91,7 @@ int main(int argc, char **argv)
     CHECK(dev_reg[PCM_I_BASE_LO] == 255 && dev_reg[PCM_I_BASE_HI] == 1);
     CHECK(!memcmp(pool_mem[0], data, sizeof(data)));
     CHECK(!snd2_stream_close(id, SND2_CLOSE_DRAIN));
-    CHECK(sim_masked && sim_irq_registered && pool_used[0]);
+    CHECK(!physical_tick_active && sim_masked && sim_irq_registered && pool_used[0]);
     sim_unregister_fail = 1;
     CHECK(snd2_stream_open(&desc, &id) == OS32_ERR_BUSY);
     CHECK(sim_irq_registered && pool_used[0]);

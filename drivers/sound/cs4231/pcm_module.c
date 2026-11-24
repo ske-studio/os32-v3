@@ -1,5 +1,7 @@
 #include "../../../kernel/irq/tick.h"
 #include "tick_order.h"
+#include "tick_clock.h"
+#include "sound/hal/snd2.h"
 _Static_assert(PC98_TICK_COUNT <= TICK_SLOT_COUNT, "PC98 tick slots exceed table");
 /* Resident facade and IRQ/tick/DMA references, using the T5c-0 record. */
 #include "pcm_module.h"
@@ -23,6 +25,31 @@ static int candidate_valid;
 static void (*tick_target)(void);
 static irq_handler_fn irq_target;
 static unsigned int irq_line;
+
+static const Snd2Stream *refill_stream;
+
+static void pcm_between_jiffies(void)
+{
+    const Snd2Stream *s = refill_stream;
+    if (s->written == s->copied) {
+        /* Neither supported CS4231 rate can consume 64 frames in 1 ms.
+         * Round down so the first possible retirement still reads DMA.
+         * Use the last movement time in case the DMA counter stood still. */
+        u32 remaining = s->period - (s->last_hw & (s->period - 1));
+        if (tick_clock_ms() - s->last_progress_ms < remaining / 64U)
+            return;
+    }
+    tick_target();
+}
+
+/* The module tick reference pins tick_target. The registry retains the
+ * stream until stop; detach also removes the hook before dropping the ref. */
+void pcm_module_refill_tick(int dev)
+{
+    Snd2Device *d = dev >= 0 ? snd2_device((u32)dev) : 0;
+    refill_stream = d ? &d->stream : 0;
+    tick_pcm_set(refill_stream && tick_target ? pcm_between_jiffies : 0);
+}
 
 void pcm_tick(void)
 {
@@ -133,6 +160,7 @@ static int pcm_detach(struct module_record *r)
     (void)r;
     unsigned int flags = irq_save();
     if (tick_target) {
+        pcm_module_refill_tick(-1);
         tick_target = 0;
         module_ref_release(pcm_handle, MODULE_REF_TICK);
     }

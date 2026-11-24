@@ -149,6 +149,8 @@ def main():
         if '--mutate' in sys.argv or '--prepare' in sys.argv:
             source = SOURCE.read_text()
             for label, old, new, modes in (
+                ('physical-advance', '    tick_target();', '    (void)tick_target;', [0]),
+                ('physical-publication', 'if (s->written == s->copied)', 'if (1)', [0]),
                 ('tick-detach', 'tick_target = 0;', '/* omitted tick detach */', [1]),
                 ('irq-detach', 'irq_target = 0;', '/* omitted IRQ detach */', [1]),
                 ('irq-line', 'irq_line = irq;', 'irq_line = irq ^ 1U;', [4]),

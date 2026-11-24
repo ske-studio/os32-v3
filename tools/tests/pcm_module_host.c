@@ -76,6 +76,8 @@ static u8 stream_ring[PCM_RING_BYTES], staging[32768];
 int pcm_shim_irq_depth;
 void pcm_shim_if_on(void) { }
 int res_owner_get(void) { return 1; }
+static void (*physical_tick)(void);
+void tick_pcm_set(void (*fn)(void)) { physical_tick = fn; }
 u32 tick_clock_ms(void) { return ticks * 10; }
 i32 exec_sys_yield(void) { return 0; }
 void *kmalloc(u32 n) { return n == sizeof(staging) ? staging : 0; }
@@ -202,9 +204,25 @@ void _start(void)
     }
     CHECK(pcm_open(PCM_RATE_44100 + 1) == PCM_ERR_BUSY);
     CHECK(ticks == 1 && public_calls == 1 && r->dma_refs == 1 && r->irq_refs == 1);
+    CHECK(!physical_tick);
+    pcm_module_refill_tick(0);
+    CHECK(physical_tick);
+    Snd2Stream *s = &snd2_device(0)->stream;
+    s->last_hw = 0;
+    s->last_progress_ms = tick_clock_ms();
+    physical_tick();
+    CHECK(ticks == 1); /* No staging or possible retirement. */
+    s->written++;
+    physical_tick();
+    CHECK(ticks == 2); /* Publication overrides the time estimate. */
+    s->written--;
+    s->last_hw = s->period - 32;
+    physical_tick();
+    CHECK(ticks == 3); /* A boundary is possible before the next tick. */
     u32 before = returned;
     if (mode == 5) unregister_error = IRQ_ERR_BUSY;
     rc = pcm_module_abort();
+    CHECK(!physical_tick);
     if (mode == 5) {
         CHECK(rc == MODULE_ISOLATED && r->state == MODULE_QUARANTINED);
         CHECK(irq_target == body_irq && irq_line == body_irq_line && irq_live && r->irq_refs == 1);
@@ -215,7 +233,7 @@ void _start(void)
     }
     CHECK(!tick_target && !r->tick_refs && !irq_target && !r->irq_refs && !irq_live);
     CHECK(!irq_line);
-    tick_dispatch(); CHECK(ticks == 1);
+    tick_dispatch(); CHECK(ticks == 3);
     CHECK(pcm_open(PCM_RATE_44100) == OS32_ERR_NOSYS);
     if (mode == 2) {
         CHECK(rc == MODULE_ISOLATED && r->state == MODULE_QUARANTINED);

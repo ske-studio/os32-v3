@@ -17,6 +17,7 @@ from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
+    ('if (!result && pcm_fn) pcm_fn();', '(void)pcm_fn;'),
     ('(i32)(now - due_ms) >= 0', 'now >= due_ms'),
     ('(i32)(now - due_ms) >= 0', '(i32)(now - due_ms) > 0'),
     ('armed = 0;\n        wake_notify', 'wake_notify'),

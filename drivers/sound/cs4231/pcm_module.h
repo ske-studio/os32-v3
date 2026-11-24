@@ -20,6 +20,7 @@ typedef struct {
     int (*quiet)(void);
 } PcmModuleApi;
 #define PCM_MODULE_API_SLOTS 11u
+void pcm_module_refill_tick(int dev);
 int pcm_module_load(void);
 int pcm_module_abort(void);
 int pcm_module_quiet(void);
