@@ -41,6 +41,7 @@ void snd2_seg_resume(Snd2Stream *s);
 void snd2_seg_pause(Snd2Stream *s);
 u32 snd2_seg_played_now(const Snd2Stream *s);
 /* Negative means continuity lost: stop before changing the ring. */
+void snd2_seg_after_publish(Snd2Stream *s, u32 hw, u32 now);
 int snd2_seg_observe(Snd2Stream *s, int have_pos, u32 hw, u32 now);
 typedef struct SndBackend {          /* sound/hal/snd2_int.h、SND_HAL2_ABI 1 */
     u32 abi;

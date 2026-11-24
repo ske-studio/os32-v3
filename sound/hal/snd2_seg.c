@@ -100,6 +100,29 @@ u32 snd2_seg_played_now(const Snd2Stream *s)
     return s->played + (offset < n ? offset : n);
 }
 
+static void refill(Snd2Stream *s, u32 p, u32 hw, int one_segment)
+{
+    for (u32 i = 1; i <= s->lead; ++i) {
+        u32 seg = (p + i) % s->nseg;
+        /* Publish cannot reuse a segment before advance retires it. */
+        if (one_segment && seg == s->last_hw / s->period) break;
+        if (s->seg_n[seg] == s->period) continue;
+        if (i == 1 && inside_margin(s, hw)) break;
+        append(s, seg);
+        if (one_segment) break;
+    }
+}
+
+void snd2_seg_after_publish(Snd2Stream *s, u32 hw, u32 now)
+{
+    /* Leave retirement and ambiguous samples to advance. */
+    u32 p = hw / s->period;
+    if (p >= s->nseg || snd2_backtracked(s->last_hw / s->period, s->last_hw, p, hw) ||
+        now - s->last_progress_ms >= s->period * s->nseg * 1000U / s->fmt.rate)
+        return;
+    refill(s, p, hw, 1);
+}
+
 int snd2_seg_observe(Snd2Stream *s, int have_pos, u32 hw, u32 now)
 {
     u32 ring = s->period * s->nseg;
@@ -147,13 +170,6 @@ int snd2_seg_observe(Snd2Stream *s, int have_pos, u32 hw, u32 now)
         }
         clear_segment(s, prev);
     }
-    if (!s->paused) {
-        for (u32 i = 1; i <= s->lead; ++i) {
-            u32 seg = (p + i) % s->nseg;
-            if (i == 1 && inside_margin(s, hw) && s->seg_n[seg] < s->period)
-                break;
-            append(s, seg);
-        }
-    }
+    if (!s->paused) refill(s, p, hw, 0);
     return 0;
 }

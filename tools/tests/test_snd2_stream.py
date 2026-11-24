@@ -20,6 +20,9 @@ CHECK = dict(name='snd2-stream-host', tier=4, needs=[], budget=3,
 ROOT = Path(__file__).resolve().parents[2]
 HAL = ROOT / 'sound/hal'
 MUTATIONS = [
+    ('stream', 'snd2_seg_after_publish(s, hw, tick_clock_ms());', '(void)hw;'),
+    ('seg', 'refill(s, p, hw, 1);',
+     'u32 before = s->copied; refill(s, p, hw, 1); s->copied = before;'),
     ('stream', 'return leak ? OS32_ERR_IO : 0;', 'return 0;'),
     ('stream', 'rc = s->state == SND2_ST_FAULTED || s->owner', 'rc = s->owner'),
     ('v1', '>= 4096', '>= 4095'),

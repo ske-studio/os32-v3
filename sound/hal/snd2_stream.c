@@ -163,6 +163,7 @@ int snd2_write_checked(u32 id, const void *buf, u32 bytes,
         Snd2Stream *s = &d->stream;
         if (s->state == SND2_ST_DRAIN || !buf) rc = OS32_ERR_INVAL;
         else {
+            u32 epoch = s->epoch;
             u32 off, stride = snd2_frame_bytes(s);
             u32 n = snd2_stg_reserve(s, bytes / stride, &off);
             if (n) {
@@ -189,6 +190,10 @@ int snd2_write_checked(u32 id, const void *buf, u32 bytes,
                     rc = OS32_ERR_STALE;
                 } else {
                     snd2_stg_publish(s, n);
+                    u32 hw;
+                    if (s->state == SND2_ST_RUN && !s->restart_pending &&
+                        s->epoch == epoch && d->be->hw_pos(d->ctx, &hw) >= 0)
+                        snd2_seg_after_publish(s, hw, tick_clock_ms());
                     rc = n * stride;
                 }
             }
