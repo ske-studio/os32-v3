@@ -33,8 +33,8 @@ fd5c165e4f240de65e2f58fb6994f1d5441772b3b572dd8a1b6a106ff568f2ee  upstream/fmgen
 | `Chip` — Chip, SetAML, SetPML | `src/state.rs` |
 | `Chip` — SetRatio, MakeTable | `src/tables.rs` |
 | `Operator` — MakeTable | `src/tables.rs` |
-| `Operator` — Operator, Reset, SetDPBN, LogToLin, EGCalc, EGStep, PGCalc, PGCalcL, Calc, CalcL, CalcN, CalcFB, CalcFBL, Prepare, ShiftPhase, SetFNum, EGUpdate, SetEGRate, ResetFB, KeyOn, KeyOff, IsOn, SetDT, SetDT2, SetMULTI, SetTL, SetAR, SetDR, SetSR, SetSL, SetRR, SetKS, SetSSGEC, SetAMON, Mute, SetMS | `src/operator.rs` |
-| `Channel4` — Channel4, Reset, Prepare, SetFNum, SetKCKF, KeyControl, SetAlgorithm, Calc, CalcL, CalcN, CalcLN, SetType, SetFB, SetMS, Mute, Refresh, SetChip | `src/channel.rs` |
+| `Operator` — Operator, Reset, SetDPBN, LogToLin, EGCalc, EGStep, PGCalc, PGCalcL, Calc, CalcL, CalcN, CalcFB, CalcFBL, Prepare, ShiftPhase, SetFNum, EGUpdate, SetEGRate, ResetFB, KeyOn, KeyOff, IsOn, SetDT, SetDT2, SetMULTI, SetTL, SetAR, SetDR, SetSR, SetSL, SetRR, SetKS, SetSSGEC, SetAMON, Mute, SetMS | 済 `src/operator.rs` (key / shift_phase / step_envelope / tone / calc / feedback / noise) |
+| `Channel4` — Channel4, Reset, Prepare, SetFNum, SetKCKF, KeyControl, SetAlgorithm, Calc, CalcL, CalcN, CalcLN, SetType, SetFB, SetMS, Mute, Refresh, SetChip | 済 `src/channel.rs` (prepare / calc / calc_noise / key_control) |
 | `Channel4` — MakeTable | `src/tables.rs` |
 | `Timer` — SetTimerControl, SetTimerA, SetTimerB, Count, GetNextEvent, Reset | `src/timer.rs` |
 | `Timer` — SetTimerBase | `src/tables.rs` |
@@ -44,7 +44,7 @@ fd5c165e4f240de65e2f58fb6994f1d5441772b3b572dd8a1b6a106ff568f2ee  upstream/fmgen
 | `OPNABase` — MakeTable2 | `src/tables.rs` |
 | `OPNABase` — SetADPCMBReg, DecodeADPCMBSample, ResetCPUADPCM, WriteCPUADPCM, ReadCPUADPCMN, DecodeADPCMB, ADPCMBMix | `src/adpcm.rs` |
 | `OPNA` — GetReg, OPNA, ~OPNA, Init, Reset, SetRate, SetReg | `src/registers.rs` |
-| `OPNABase` — FMMix, MixSubSL, MixSubS, Mix6 | `src/channel.rs` |
+| `OPNABase` — FMMix, MixSubSL, MixSubS, Mix6 | 済 `src/channel.rs` (AudioState::fm_mix) |
 | `OPNA` — RhythmMix, SetVolumeRhythmTotal, SetVolumeRhythm | `src/rhythm.rs` |
 | `OPNA` — SetVolumeADPCM | `src/adpcm.rs` |
 | `OPNA` — Mix | `src/lib.rs` |
@@ -86,3 +86,14 @@ tables.manifest に整数幅、要素数、little-endian の SHA-256 を記す�
 state.rs の Adpcm は NP21/W の CPU ストリームに必要な 65536 byte FIFO を持つ。
 これは 256 KiB の借用 RAM と独立しており、固定状態だけで設計の概算 16–32 KiB
 を超える。FIFO の境界と BRDY の挙動を維持するため元の容量を採用した。
+
+## 段 C の FM
+
+位相は u32 の回り込み、PM 積は i32 の回り込みと算術右シフト。
+CalcFB は前回値、CalcFBL は今回値を返す。Clock は分周表を参照し、
+SetChip のポインタと SetType は OPNA 固定の typeN と引数で表現する。
+ゼロ初期化した状態に reset を適用し、設定後の prepare でレートを更新する。
+通常音の key-on 後、発音中に SSG を有効化すると原本の ssg_phase は −1 で
+Prepare の表の範囲 assertion に反する。この場合だけ最初の形（phase 0）を参照する。
+fm_mix は最大256フレームを stereo_scratch に加算する。段 D の呼出側が
+各ブロックの先頭で累積領域をゼロにし、最終 PCM 変換を行う。
