@@ -6,6 +6,7 @@ include build/kernel.mk
 include $(foreach feature,$(filter $(MODULE_FEATURES),$(MODULE_ORDER_LEGACY)),$(MODULE_MK_$(feature)))
 include build/usb-module.mk
 include build/libs.mk
+include build/os32snd.mk
 include build/programs.mk
 include build/deploy.mk
 include build/image.mk
@@ -119,4 +120,3 @@ ifeq ($(MAKECMDGOALS),)
 $(error 非搭載サービス未実装: use kernel-compile for feature-off configurations)
 endif
 endif
-include build/os32snd.mk

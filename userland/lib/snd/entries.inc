@@ -1,0 +1,8 @@
+SND_ENTRY sndl_voice_new
+SND_ENTRY sndl_voice_submit
+SND_ENTRY sndl_voice_set
+SND_ENTRY sndl_voice_play
+SND_ENTRY sndl_voice_stop
+SND_ENTRY sndl_voice_reset
+SND_ENTRY sndl_voice_delete
+SND_ENTRY sndl_voice_done

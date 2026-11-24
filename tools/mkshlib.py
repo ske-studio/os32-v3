@@ -184,11 +184,18 @@ def main():
 
     in_path, out_path = argv[0], argv[1]
     elf_path = None
+    entries = None
     min_api = 1
     i = 2
     while i < len(argv):
         if argv[i] == '--elf' and i + 1 < len(argv):
             elf_path = argv[i + 1]
+            i += 2
+        elif argv[i] == '--entries' and i + 1 < len(argv):
+            with open(argv[i + 1], encoding='ascii') as f:
+                entries = [line.split()[1] for line in f if line.startswith('SND_ENTRY ')]
+            if not 0 < len(entries) <= OS32_SHLIB_MAX_FUNC or len(set(entries)) != len(entries):
+                die("invalid sound entry table")
             i += 2
         elif argv[i] == '--api' and i + 1 < len(argv):
             min_api = int(argv[i + 1], 0)
@@ -198,7 +205,7 @@ def main():
     if not elf_path:
         die("--elf <lib.elf> が要ります (ページ数と BSS をここから求めます)")
 
-    checked = check_table()
+    checked = check_table() if entries is None else (entries, 1, len(entries))
     if checked is None:
         sys.exit(1)
     names, want_version, want_nfunc = checked

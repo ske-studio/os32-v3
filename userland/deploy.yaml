@@ -58,6 +58,24 @@ filesystem:
     - host: userland/libos32gui.shlib
       guest: /sys/lib/libos32gui.shlib
       tags: [gui]
+    - host: userland/libos32snd.shlib
+      guest: /sys/lib/libos32snd.shlib
+      tags: [programs]
+    - host: lib/os32_opna/README.OS32
+      guest: /sys/licenses/fmgen/README.OS32
+      tags: [docs]
+    - host: lib/os32_opna/fmgen_readme.txt
+      guest: /sys/licenses/fmgen/fmgen_readme.txt
+      tags: [docs]
+    - host: lib/os32_opna/fmgen_readme_kai.txt
+      guest: /sys/licenses/fmgen/fmgen_readme_kai.txt
+      tags: [docs]
+    - host: lib/os32_opna/fmgen_readme_np2.txt
+      guest: /sys/licenses/fmgen/fmgen_readme_np2.txt
+      tags: [docs]
+    - host: lib/os32_opna/fmgen_readme_np21w.txt
+      guest: /sys/licenses/fmgen/fmgen_readme_np21w.txt
+      tags: [docs]
     # --- システム管理プログラム → /sbin/ ---
     - host: userland/system/install.bin
       guest: /sbin/
