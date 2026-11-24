@@ -33,6 +33,7 @@ VfsOps *vfs_route(const char *path, char *rel_out, int max_rel, void **ctx_out)
 }
 #include "disk_host_source.c"
 #include "generated_host_source.c"
+#include "av_sound_stubs.c"
 #include "../../sound/hal/a0_weak.c"
 static HostNotice notice_heap[64];
 void *kmemset(void *d, int v, u32 n)

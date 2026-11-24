@@ -68,6 +68,13 @@ int snd2_dsp_insert(u32 stream, u32 unit, const i32 *params, u32 n)
 int snd2_dsp_process(u32 dev, u32 unit, const i32 *params, u32 n,
                      const void *in, void *out, u32 frames, u32 fi)
 {
+    return snd2_process_checked(dev, unit, params, n, in, out, frames, fi, 0);
+}
+
+int snd2_process_checked(u32 dev, u32 unit, const i32 *params, u32 n,
+                         const void *in, void *out, u32 frames, u32 fi,
+                         int (*check)(const void *, void *, u32, const SND2_Fmt *))
+{
     Snd2Device *d = snd2_device(dev);
     SND2_DspUnit info;
     int rc = unit_info(d, unit, &info);
@@ -79,5 +86,7 @@ int snd2_dsp_process(u32 dev, u32 unit, const i32 *params, u32 n,
         return OS32_ERR_INVAL;
     if (!d->be->dsp_process)
         return OS32_ERR_NOSYS;
+    if (check && !check(in, out, frames, &d->caps.fmt[fi]))
+        return OS32_ERR_INVAL;
     return d->be->dsp_process(d->ctx, unit, params, n, in, out, frames, fi);
 }

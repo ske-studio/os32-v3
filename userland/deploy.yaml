@@ -334,6 +334,9 @@ filesystem:
     - host: userland/tests/av_test.bin
       guest: /usr/bin/
       tags: [test]
+    - host: userland/tests/snd2_test.bin
+      guest: /usr/bin/
+      tags: [test]
     - host: userland/tests/pcm_play.bin
       guest: /usr/bin/
       tags: [test]

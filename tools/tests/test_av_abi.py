@@ -1,6 +1,6 @@
 """Exercise the v90 table, foreground transitions and remaining weak providers on both target ABIs."""
 CHECK = dict(name='av-kapi-abi-host', tier=1, needs=['make:all', 'check:x87-lifecycle-host'], budget=120,
-    covers=['tools/tests/test_av_abi.py', 'tools/tests/av_abi_host.c', 'tools/tests/av_abi_host.rs',
+    covers=['tools/tests/av_sound_stubs.c', 'tools/tests/test_av_abi.py', 'tools/tests/av_abi_host.c', 'tools/tests/av_abi_host.rs',
             'sdk/rust/os32api/src/av.rs', 'sdk/rust/os32api/src/install.rs', 'sdk/rust/os32api/src/kapi_generated.rs',
             'tools/check_av_portable.py', 'tools/checks/av_wiring.txt',
             'tools/checks/av_no_weak.sh', 'exec/exec_kapi_init.inc',
@@ -29,7 +29,7 @@ def exercise(root, folder, machine, mutate):
     bodies = [re.search(r'int __cdecl wrap_' + n + r'\([^\n]*\)\n\{.*?\n\}', wrappers, re.S)[0]
               for n in names]
     guards = wrappers[wrappers.index('#define KAPI_OUT_LEN'):wrappers.index('int kapi_v86s_check')]
-    defaults = (root / 'sound/hal/a0_weak.c').read_text()
+    defaults = (root / 'tools/tests/av_sound_stubs.c').read_text() + (root / 'sound/hal/a0_weak.c').read_text()
     exit_code = ('mov %eax,%ebx; mov $1,%eax; int $0x80' if machine == 'i386'
                  else 'li 0,1; sc')
     call = 'call av_abi_probe' if machine == 'i386' else 'bl av_abi_probe'
@@ -39,7 +39,7 @@ def exercise(root, folder, machine, mutate):
         'int ring3_user_range_ok(u32 a,u32 n){return 1;}\n'
         'void ring3_fault_kill(void){__builtin_trap();}\n' + guards + '\n'.join(bodies))
     def change_stub(name, old, new):
-        body = re.search(r'__attribute__\(\(weak\)\) int ' + name +
+        body = re.search(r'int ' + name +
                          r'\([^)]*\)\n\{[^}]*\}', defaults)[0]
         assert defaults.count(body) == 1 and body.count(old) == 1
         return defaults.replace(body, body.replace(old, new))
@@ -47,8 +47,8 @@ def exercise(root, folder, machine, mutate):
     cases = [('', bind, defaults, 0)]
     if mutate:
         cases += [('adjacent providers', [s.replace('= wrap_snd2_stream_start;', '= wrap_snd2_stream_pause;') for s in bind], defaults, 10),
-                  ('successful stub', bind, change_stub('snd2_dev_count', 'return OS32_ERR_NOSYS;', 'return 0;'), 1),
-                  ('modified output', bind, change_stub('snd2_dev_info', '(void)o;', '((u8 *)o)[0] = 0;'), 40)]
+                  ('successful stub', bind, change_stub('v86s_end', 'return OS32_ERR_NOSYS;', 'return 0;'), 33),
+                  ('modified output', bind, change_stub('v86s_begin', '(void)sid;', '((u8 *)sid)[0] = 0;'), 40)]
     focus = (root / 'kernel/av_focus.c').read_text()
     focus_cases = {}
     if mutate:
@@ -100,7 +100,7 @@ def exercise(root, folder, machine, mutate):
         binary = folder / 'probe'
         subprocess.run([*compiler, '-std=gnu89', '-ffreestanding', '-nostdlib', '-static', '-O1',
             '-ffunction-sections', '-Wl,--gc-sections', '-Werror=implicit-function-declaration', '-Wno-attributes', '-I' + str(folder),
-            '-Itools/tests/host_arch', *platform_includes, '-Iinput/hal', '-Isdk/include/os32', '-Iinclude', '-Isound/hal', '-Iexec', '-Ikernel', '-DOS32_HOOK_GUI=0', '-DIN2_PUBLIC_EXCLUSIVE=1', folder / 'focus.c', 'tools/tests/av_abi_host.c',
+            '-I.', '-Itools/tests/host_arch', *platform_includes, '-Iinput/hal', '-Isdk/include/os32', '-Iinclude', '-Isound/hal', '-Iexec', '-Ikernel', '-DOS32_HOOK_GUI=0', '-DIN2_PUBLIC_EXCLUSIVE=1', folder / 'focus.c', 'tools/tests/av_abi_host.c',
             rust_obj, folder / 'wrap.c', folder / 'stub.c', '-std=gnu11', 'kapi/kapi_in2.c',
             *['input/hal/' + unit + '.c' for unit in ('in2_dev', 'in2_export', 'in2_ring', 'in2_excl', 'mouse_ext')], folder / 'start.S',
             '-o', binary], cwd=root, check=True)
@@ -111,11 +111,13 @@ def exercise(root, folder, machine, mutate):
 
 def run(ctx):
     subprocess.run(['python3', '-B', 'tools/check_av_portable.py'], cwd=ctx.root, check=True)
+    subprocess.run(['sh', 'tools/checks/av_no_weak.sh', 'IS', 'build/out/kernel.elf'],
+                   cwd=ctx.root, check=True)
     symbols = subprocess.check_output(['nm', '-g', '--defined-only', ctx.root / 'build/out/kernel.elf'], text=True)
     for row in (ctx.root / 'tools/checks/av_wiring.txt').read_text().splitlines():
         if row and not row.startswith('#'):
             name = row.split()[1]
-            binding = 'T' if row.split()[0] == 'IA' else 'W'
+            binding = 'T' if (row.split()[0] in ('IA', 'IS')) else 'W'
             assert re.search(r'^[0-9a-f]+ ' + binding + ' ' + name + r'$', symbols, re.M), name
     with tempfile.TemporaryDirectory() as td:
         for machine in ('i386', 'ppc'):

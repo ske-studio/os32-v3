@@ -13,6 +13,7 @@ typedef struct Snd2Stream {          /* sound/hal/snd2_int.h。書くのは soun
     u32 seg_first[SND2_MAX_SEGMENTS]; u16 seg_n[SND2_MAX_SEGMENTS];                    /* advance だけ */
     u8 *stg; u32 stg_frames;         /* ステージング 8192 frame = 32KB (kmalloc、DMA しない) */
     u8 *ring; u32 last_hw, last_obs_ms;                  /* ring は backend が渡す DMA の面 */
+    u32 repeats; /* observations that show DMA may have repeated ring data */
     u32 last_progress_ms;
     u8 restart_pending;              /* DMA proven stopped during resync */
     u8 had_data;                     /* distinguishes a silent start from starvation */
@@ -55,7 +56,6 @@ typedef struct SndBackend {          /* sound/hal/snd2_int.h、SND_HAL2_ABI 1 */
 int  snd2_register(const SndBackend *be, void *ctx, const SND2_DevInfo *info);  /* 戻り dev */
 int  snd2_unregister(u32 dev);       /* 流れがあれば teardown。FAULTED なら BUSY を返し ctx を解放させない */
 void snd2_advance(u32 dev);          /* IRQ・tick から */
-void snd2_reclaim(int owner);        /* exec の (6b) */
 typedef struct SndChipBackend { u32 abi;                                  /* sound/hal/snd2_int.h */
     int (*caps)(void *c, SND2_ChipCaps *o);  int (*open)(void *c);  int (*close)(void *c);   /* open: A460h 保存・bit0=1・静止 */
     int (*write)(void *c, const SND2_RegW *w, u32 n);  int (*read)(void *c, u32 bank, u32 what, u32 reg);
@@ -65,5 +65,4 @@ int snd2_chip_register(const SndChipBackend *be, void *c, const SND2_DevInfo *i)
 int snd2_chip_dev_info(u32 index, SND2_DevInfo *out);
 void snd2_chip_fault(u32 dev);
 int snd2_chip_implicit(int owner);
-void snd2_chip_reclaim(int owner);
 #endif

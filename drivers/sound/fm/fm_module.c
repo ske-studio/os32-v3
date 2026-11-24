@@ -15,6 +15,13 @@ extern const struct module_symbol_contract fm_export_contracts[];
 static struct module_handle fm_handle;
 static FmModuleApi candidate;
 static int candidate_valid;
+extern int res_owner_get(void);
+
+static int legacy_ready(void)
+{
+    return module_exports(fm_handle) && snd2_chip_implicit(res_owner_get()) == 0;
+}
+
 void opn_write(uchar reg, uchar val)
 {
     if (module_exports(fm_handle)) candidate.opn_write(reg, val);
@@ -29,15 +36,15 @@ void fm_set_tone(int ch, const uchar *tone_data)
 }
 void fm_set_tone_num(int ch, int tone_num)
 {
-    if (module_exports(fm_handle)) candidate.fm_set_tone_num(ch, tone_num);
+    if (legacy_ready()) candidate.fm_set_tone_num(ch, tone_num);
 }
 void fm_note_on(int ch, int note)
 {
-    if (module_exports(fm_handle)) candidate.fm_note_on(ch, note);
+    if (legacy_ready()) candidate.fm_note_on(ch, note);
 }
 void fm_note_off(int ch)
 {
-    if (module_exports(fm_handle)) candidate.fm_note_off(ch);
+    if (legacy_ready()) candidate.fm_note_off(ch);
 }
 void fm_all_off(void)
 {
@@ -45,11 +52,11 @@ void fm_all_off(void)
 }
 void ssg_tone(int ch, u16 period)
 {
-    if (module_exports(fm_handle)) candidate.ssg_tone(ch, period);
+    if (legacy_ready()) candidate.ssg_tone(ch, period);
 }
 void ssg_volume(int ch, uchar vol)
 {
-    if (module_exports(fm_handle)) candidate.ssg_volume(ch, vol);
+    if (legacy_ready()) candidate.ssg_volume(ch, vol);
 }
 void ssg_noise(uchar period)
 {
@@ -61,13 +68,15 @@ void ssg_mixer(uchar mask)
 }
 void ssg_all_off(void)
 {
-    if (module_exports(fm_handle)) candidate.ssg_all_off();
+    if (legacy_ready()) candidate.ssg_all_off();
 }
 static int fm_start(struct module_record *r, u32 entry, u32 *exports)
 {
     (void)exports;
     int (*init)(FmModuleApi *) = (int (*)(FmModuleApi *))(uptr)entry;
+    candidate_valid = 0;
     int rc = init(&candidate);
+    if (rc) return rc;
     u32 entries[FM_MODULE_API_SLOTS];
     STATIC_ASSERT(sizeof(candidate) == sizeof(entries), fm_facade_size);
     kmemcpy(entries, &candidate, sizeof(entries));
@@ -75,13 +84,28 @@ static int fm_start(struct module_record *r, u32 entry, u32 *exports)
         if (!module_text_contains(r, entries[i]))
             return MODULE_INIT_FAILED;
     candidate_valid = 1;
-    return rc;
+    return candidate.attach(snd2_chip_fault);
 }
 
 static int fm_quiesce(struct module_record *r)
 {
     (void)r;
     return candidate_valid && candidate.quiet();
+}
+
+static int fm_detach(struct module_record *r)
+{
+    (void)r;
+    return !candidate_valid || candidate.detach();
+}
+
+static void forget_absent_module(void)
+{
+    struct module_record *r = module_record_get(fm_handle);
+    if (!r || r->state == MODULE_ABSENT) {
+        candidate_valid = 0;
+        fm_handle = (struct module_handle){0};
+    }
 }
 
 int fm_module_load(void)
@@ -98,13 +122,19 @@ int fm_module_load(void)
             MODULE_ID_FM
         },
         .imports = fm_kexports,
-        .lifecycle = {.start = fm_start, .quiesce = fm_quiesce}
+        .lifecycle = {.start = fm_start, .quiesce = fm_quiesce, .detach = fm_detach}
     };
     int rc = module_load(&request, &fm_handle);
     if (!rc) rc = module_start(fm_handle);
     if (!rc && !module_exports(fm_handle)) rc = MODULE_INIT_FAILED;
+    if (rc) forget_absent_module();
     kprintf(KLOG_ATTR, "[fm] module rc=%d pair=%08x\n", rc, pair);
     return rc;
 }
 
-int fm_module_abort(void) { return module_abort(fm_handle); }
+int fm_module_abort(void)
+{
+    int rc = module_abort(fm_handle);
+    if (!rc) forget_absent_module();
+    return rc;
+}

@@ -24,4 +24,9 @@ int snd2_open_mode(const SND2_StreamDesc *desc, u32 *stream, int v1);
 /* S5 supplies these adapters to its single teardown and handle/owner checks. */
 void snd2_teardown_device(Snd2Device *d);
 int snd2_owned_device(u32 stream, Snd2Device **out);
+int snd2_write_checked(u32 id, const void *buf, u32 bytes,
+                       void (*check)(const void *, u32));
+int snd2_process_checked(u32 dev, u32 unit, const i32 *params, u32 n,
+                         const void *in, void *out, u32 frames, u32 fi,
+                         int (*check)(const void *, void *, u32, const SND2_Fmt *));
 #endif

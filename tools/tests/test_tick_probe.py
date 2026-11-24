@@ -12,7 +12,7 @@ CHECK = dict(name='tick-probe-host', tier=4, needs=[], budget=5,
             'platform/pc98/pit.c', 'arch/x86/kernel/mtrr_wc.c',
             'drivers/net/e82557/e82557.c',
             'tools/tests/host32.py'],
-    basis=['TICK_1KHZ_DESIGN'],
+    basis=['TICK_1KHZ_DESIGN', 'docs/decisions/sound/AV_HAL_DESIGN.md §13-3'],
 )
 import os
 from pathlib import Path
@@ -61,6 +61,8 @@ def main():
             assert run(original.replace(hist_shift, '0'), boundary) == 1
             print('RED runtime exit=1 interval histogram upper bound', flush=True)
             mutants = [
+                ('PCM IRQ10 enclosure', 'if (irq == 10) tick_probe_extra_end(TP_PCM_IRQ10);', '', False),
+                ('sound outer span', 'if (sound_depth) sound_metric = metric;', '(void)metric;', False),
                 ('fixture callback', '    s1_notify();', '    (void)now_ms;', False),
                 ('rearm', '    snd_wake_arm(1000);', '    snd_wake_arm(0);', False),
                 ('worst', 'if (d > s->worst) s->worst = d;', 's->worst = d;', False),

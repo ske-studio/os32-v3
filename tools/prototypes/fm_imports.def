@@ -5,5 +5,27 @@
     "drivers/sound/fm/fm_module.h",
     "drivers/sound/fm/fm.h"
   ],
-  "imports": []
+  "imports": [
+    {
+      "symbol": "snd2_chip_register",
+      "source": "sound/hal/snd2_int.h",
+      "context": "normal",
+      "irq": false,
+      "declaration": "int snd2_chip_register(const SndChipBackend *be, void *c, const SND2_DevInfo *i);"
+    },
+    {
+      "symbol": "snd2_chip_unregister",
+      "source": "sound/hal/snd2_int.h",
+      "context": "normal",
+      "irq": false,
+      "declaration": "int snd2_chip_unregister(u32 dev);"
+    },
+    {
+      "symbol": "snd2_chip_implicit",
+      "source": "sound/hal/snd2_int.h",
+      "context": "normal",
+      "irq": false,
+      "declaration": "int snd2_chip_implicit(int owner);"
+    }
+  ]
 }

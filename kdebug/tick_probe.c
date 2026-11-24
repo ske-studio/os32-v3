@@ -56,7 +56,8 @@ int tick_probe_call(void *buf, unsigned int size)
         kprintf(7, "interval-over-2^22=%u (bins start at 2^8)\n", s->bank[bank][TP_INTERVAL].hist[15]);
         for (unsigned int id = 0; id < TP_EXTRA_COUNT; id++) {
             const struct tp_stat *v = &s->extra[bank][id];
-            kprintf(7, "%s count=%u ", (const char *const[]){"mtrr-wc", "irq3", "irq5", "slot-budget", "pit-read"}[id], v->count);
+            kprintf(7, "%s count=%u ", (const char *const[]){"mtrr-wc", "irq3", "irq5", "slot-budget", "pit-read",
+                "snd-other", "snd-start", "snd-pause", "snd-advance", "snd-resync", "snd-teardown", "irq10"}[id], v->count);
             cycles("worst", v->worst); cycles("total", v->total);
             if (id == TP_PIT && v->count) cycles("average", average(v->total, v->count));
             kprintf(7, "\n");

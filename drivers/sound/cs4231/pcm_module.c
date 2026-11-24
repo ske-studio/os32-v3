@@ -32,37 +32,6 @@ void pcm_tick(void)
 #endif
 }
 
-int pcm_open(u32 rate)
-{
-    if (module_exports(pcm_handle)) return candidate.open(rate);
-    if (rate != PCM_RATE_44100 && rate != PCM_RATE_22050) return OS32_ERR_INVAL;
-    return OS32_ERR_NOSYS;
-}
-int pcm_write_check(void)
-{
-    if (module_exports(pcm_handle)) return candidate.write_check();
-    return OS32_ERR_INVAL;
-}
-int pcm_write(const void *buf, u32 bytes)
-{
-    if (module_exports(pcm_handle)) return candidate.write(buf, bytes);
-    return OS32_ERR_INVAL;
-}
-int pcm_status(u32 *free_bytes, u32 *counters)
-{
-    if (module_exports(pcm_handle)) return candidate.status(free_bytes, counters);
-    return OS32_ERR_INVAL;
-}
-int pcm_close(void)
-{
-    if (module_exports(pcm_handle)) return candidate.close();
-    return OS32_ERR_INVAL;
-}
-int pcm_set_volume(u32 percent)
-{
-    if (module_exports(pcm_handle)) return candidate.set_volume(percent);
-    return OS32_ERR_INVAL;
-}
 int pcm_state(void)
 {
     if (module_exports(pcm_handle)) return candidate.state();
@@ -72,10 +41,6 @@ int pcm_present(void)
 {
     if (module_exports(pcm_handle)) return candidate.present();
     return 0;
-}
-void pcm_reclaim(int owner)
-{
-    if (module_exports(pcm_handle)) candidate.reclaim(owner);
 }
 
 int pcm_module_irq_register(unsigned int irq, irq_handler_fn fn, void *arg, unsigned int flags)

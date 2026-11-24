@@ -2,7 +2,7 @@
 Port I/O and relocated init are explicit host seams; no hardware claim.
 """
 CHECK = dict(name='pcm-module-host', tier=1,
-    covers=['sound/hal/snd2_ring_math.h', 'platform/pc98/module_pair.c', 'include/platform_module_pair.h', 'platform/pc98/bootinfo_wire.h', 'platform/pc98/bootinfo_native.h', 'kernel/irq/tick.c', 'kernel/irq/tick.h', 'platform/pc98/tick_order.h', 'include/time_units.h', 'kernel/module/module_runtime.c', 'kernel/module/module_runtime.h', 'kernel/module/module_image.c', 'kernel/module/module_image.h', 'kernel/module/module_schema.h', 'mm/pgalloc.h', 'include/types.h', 'include/memmap.h', 'fs/vfs.c', 'fs/vfs.h', 'drivers/base/dev.c', 'kernel/dev/dev.h', 'drivers/block/disk.h', 'drivers/ata/atapi.h', 'drivers/block/fdc.h', 'include/console.h', 'include/kbd.h', 'drivers/input/kbd.h', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'lib/kstring.h', 'tools/tests/module_runtime_host.c', 'tools/tests/test_module_runtime.py', 'tools/tests/module_runtime_tdd.md', 'tools/tests/test_module_image.py', 'tools/tests/module_image_host.c', 'tools/tests/host32.py', 'drivers/sound/cs4231/pcm_module.c', 'drivers/sound/cs4231/pcm_module.h', 'drivers/sound/cs4231/pcm_body.c', 'include/config.h', 'sdk/include/os32/os32_generations.h', 'include/bootinfo.h', 'tools/prototypes/pcm_imports.def', 'tools/gen_sqlite_imports.py', 'tools/tests/pcm_module_host.c', 'build/pcm-module.ld', 'kernel/time/tick_clock.h', 'drivers/sound/cs4231/pcm_cs4231.c', 'drivers/sound/cs4231/pcm_cs4231_math.c', 'drivers/sound/cs4231/pcm_cs4231.h', 'kernel/irq/irq.h', 'kernel/irq/irq_math.h', 'mm/dma_pool.h', 'drivers/dma/dma8237.h', 'mm/kmalloc.h', 'include/sys.h', 'include/kprintf.h', 'tools/tests/pcm_module_playback_host.c', 'tools/tests/pcm_cs4231_host.c', 'tools/tests/test_pcm_cs4231.py', 'tools/tests/pcm_hostshim/io.h', 'tools/tests/mutpar.py', 'kernel/module/kdebug_imports.def', 'tools/mkmod.py', 'tools/gen_kdebug_imports.py', 'sdk/kapi.json', 'build/out/pcm/*', 'build/out/pcm.mod', 'build/out/vmkernel.lz4', 'build/out/kernel.elf', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'include/pcm_contract.h', 'include/dma_contract.h', 'tools/tests/kernel_includes.py', 'lib/sqlite3/os32_sqlite_vfs.c', 'tools/prototypes/sqlite_imports.def'],
+    covers=['sound/hal/*.[ch]', 'drivers/sound/cs4231/pcm_hw.c', 'sound/hal/snd2_seg.c', 'sound/hal/snd2_stg.c', 'drivers/sound/cs4231/pcm_hw.h', 'sound/hal/snd2_int.h', 'sdk/include/os32/os32_snd2.h', 'sound/hal/snd2_ring_math.h', 'platform/pc98/module_pair.c', 'include/platform_module_pair.h', 'platform/pc98/bootinfo_wire.h', 'platform/pc98/bootinfo_native.h', 'kernel/irq/tick.c', 'kernel/irq/tick.h', 'platform/pc98/tick_order.h', 'include/time_units.h', 'kernel/module/module_runtime.c', 'kernel/module/module_runtime.h', 'kernel/module/module_image.c', 'kernel/module/module_image.h', 'kernel/module/module_schema.h', 'mm/pgalloc.h', 'include/types.h', 'include/memmap.h', 'fs/vfs.c', 'fs/vfs.h', 'drivers/base/dev.c', 'kernel/dev/dev.h', 'drivers/block/disk.h', 'drivers/ata/atapi.h', 'drivers/block/fdc.h', 'include/console.h', 'include/kbd.h', 'drivers/input/kbd.h', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'lib/kstring.h', 'tools/tests/module_runtime_host.c', 'tools/tests/test_module_runtime.py', 'tools/tests/module_runtime_tdd.md', 'tools/tests/test_module_image.py', 'tools/tests/module_image_host.c', 'tools/tests/host32.py', 'drivers/sound/cs4231/pcm_module.c', 'drivers/sound/cs4231/pcm_module.h', 'drivers/sound/cs4231/pcm_body.c', 'include/config.h', 'sdk/include/os32/os32_generations.h', 'include/bootinfo.h', 'tools/prototypes/pcm_imports.def', 'tools/gen_sqlite_imports.py', 'tools/tests/pcm_module_host.c', 'build/pcm-module.ld', 'kernel/time/tick_clock.h', 'drivers/sound/cs4231/pcm_cs4231.c', 'drivers/sound/cs4231/pcm_cs4231_math.c', 'drivers/sound/cs4231/pcm_cs4231.h', 'kernel/irq/irq.h', 'kernel/irq/irq_math.h', 'mm/dma_pool.h', 'drivers/dma/dma8237.h', 'mm/kmalloc.h', 'include/sys.h', 'include/kprintf.h', 'tools/tests/pcm_module_playback_host.c', 'tools/tests/pcm_cs4231_host.c', 'tools/tests/test_pcm_cs4231.py', 'tools/tests/pcm_hostshim/io.h', 'tools/tests/mutpar.py', 'kernel/module/kdebug_imports.def', 'tools/mkmod.py', 'tools/gen_kdebug_imports.py', 'sdk/kapi.json', 'build/out/pcm/*', 'build/out/pcm.mod', 'build/out/vmkernel.lz4', 'build/out/kernel.elf', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'include/pcm_contract.h', 'include/dma_contract.h', 'tools/tests/kernel_includes.py', 'lib/sqlite3/os32_sqlite_vfs.c', 'tools/prototypes/sqlite_imports.def'],
     needs=['make:all'], budget=5.8,
     kind='characterization',
 )
@@ -84,7 +84,7 @@ def driver_checks(folder, omit_evidence):
     from test_pcm_cs4231 import FLAGS as PCM_FLAGS, INCLUDES as PCM_INCLUDES
     driver = (ROOT / 'drivers/sound/cs4231/pcm_cs4231.c').read_text()
     if omit_evidence:
-        old = "evid = ((inp(PCM_PORT_R0) & PCM_R0_INIT) == 0 &&\n                (cs_read(PCM_I_IFACE) & PCM_IFACE_PEN) == 0);"
+        old = "evid = pcm_abort_proven();"
         assert driver.count(old) == 1
         driver = driver.replace(old, 'evid = 1; /* omit DMA stop evidence */')
     source = folder / 'pcm-driver.c'
@@ -119,12 +119,19 @@ def main():
         folder = Path(td)
         product_image(folder)
         exe = folder / 'pcm-module'
+        hal_objects = []
+        for unit in ('reg', 'caps', 'stream', 'pos', 'v1', 'seg', 'stg'):
+            obj = folder / (unit + '.o')
+            subprocess.run(['gcc', *FLAGS, '-Itools/tests/pcm_hostshim', *INCLUDES, '-c',
+                            ROOT / f'sound/hal/snd2_{unit}.c', '-o', obj], check=True)
+            hal_objects.append(obj)
         def build(source):
             subprocess.run(['gcc', *FLAGS, '-Wno-unused-parameter', *INCLUDES,
                             '-I' + str(ROOT / 'build/out/pcm'),
                             '-DPCM_ADAPTER="' + str(source) + '"',
                             '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
                             ROOT / 'tools/tests/pcm_module_host.c',
+                            ROOT / 'drivers/sound/cs4231/pcm_hw.c', *hal_objects,
                             ROOT / 'kernel/module/module_runtime.c', ROOT / 'kernel/module/module_image.c',
                             ROOT / 'fs/vfs.c', ROOT / 'drivers/base/dev.c', '-o', exe], check=True)
         def run(modes, expected=0):

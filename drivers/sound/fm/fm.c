@@ -39,6 +39,13 @@
  * いる場合で、無期限スピンだとカーネルがハングする。 */
 #define OPN_BUSY_TIMEOUT  10000UL
 
+static int opn_ready(void)
+{
+    for (u32 i = 0; i < OPN_BUSY_TIMEOUT; ++i)
+        if (!(inp(OPN_STATUS) & OPN_BUSY)) return 1;
+    return 0;
+}
+
 static uchar ssg_mixer_state = SSG_MIXER_ALL_OFF;
 
 /* OPNレジスタ書込み
@@ -52,14 +59,9 @@ static uchar ssg_mixer_state = SSG_MIXER_ALL_OFF;
 static int opn_write_checked(uchar reg, uchar val)
 {
     unsigned int flags;
-    u32 guard;
-
     flags = irq_save();
 
-    /* BUSY待ち (タイムアウト付き) */
-    guard = OPN_BUSY_TIMEOUT;
-    while ((inp(OPN_STATUS) & OPN_BUSY) && --guard != 0);
-    if (guard == 0) {
+    if (!opn_ready()) {
         /* 音源が応答しない。書いても捨てられるだけなので諦める */
         irq_restore(flags);
         return 0;
@@ -71,6 +73,10 @@ static int opn_write_checked(uchar reg, uchar val)
     /* ウェイト: 約 3.6μs */
     io_wait_n(OPN_ADDR_WAIT_COUNT);
 
+    if (!opn_ready()) {
+        irq_restore(flags);
+        return 0;
+    }
     /* データ送信 */
     outp(OPN_DATA, val);
     if (reg == SSG_REG_MIXER) ssg_mixer_state = val;
@@ -95,10 +101,9 @@ int fm_quiet(void)
         ok &= opn_write_checked((uchar)(SSG_REG_VOL_A + ch), 0);
     }
     ok &= opn_write_checked(SSG_REG_MIXER, SSG_MIXER_ALL_OFF | SSG_MIXER_IO_FLAG);
-    u32 guard = OPN_BUSY_TIMEOUT;
-    while ((inp(OPN_STATUS) & OPN_BUSY) && --guard != 0);
+    ok &= opn_ready();
     irq_restore(flags);
-    return ok && guard != 0;
+    return ok;
 }
 
 /* OPN初期化 — snddrv/src/opn.c opn_init() 移植 */
@@ -222,6 +227,18 @@ static const u16 fnumber_table[FM_SEMITONES_PER_OCTAVE] = {
     1165   /* B   */
 };
 
+/* The resident facade already acquired this device for the current owner. */
+void (*fm_write_failed)(void);
+int (*fm_read_mixer)(void);
+
+static int legacy_write(uchar reg, uchar val)
+{
+    if (opn_write_checked(reg, val))
+        return 1;
+    if (fm_write_failed) fm_write_failed();
+    return 0;
+}
+
 /* FM音色設定 — snddrv fm_set_tone() 移植 */
 void fm_set_tone(int ch, const uchar *tone_data)
 {
@@ -232,14 +249,14 @@ void fm_set_tone(int ch, const uchar *tone_data)
 
     for (s = 0; s < OPN_OPERATOR_COUNT; s++) {
         int ofs = slot_offset[s];
-        opn_write(OPN_REG_DT_ML + ofs + ch, tone_data[s]);       /* DT/ML */
-        opn_write(OPN_REG_TL    + ofs + ch, tone_data[FM_TONE_TL_OFF + s]);   /* TL */
-        opn_write(OPN_REG_KS_AR + ofs + ch, tone_data[FM_TONE_KS_AR_OFF + s]);   /* KS/AR */
-        opn_write(OPN_REG_DR    + ofs + ch, tone_data[FM_TONE_DR_OFF + s]);  /* DR */
-        opn_write(OPN_REG_SR    + ofs + ch, tone_data[FM_TONE_SR_OFF + s]);  /* SR */
-        opn_write(OPN_REG_SL_RR + ofs + ch, tone_data[FM_TONE_SL_RR_OFF + s]);  /* SL/RR */
+        if (!legacy_write(OPN_REG_DT_ML + ofs + ch, tone_data[s])) return;       /* DT/ML */
+        if (!legacy_write(OPN_REG_TL    + ofs + ch, tone_data[FM_TONE_TL_OFF + s])) return;   /* TL */
+        if (!legacy_write(OPN_REG_KS_AR + ofs + ch, tone_data[FM_TONE_KS_AR_OFF + s])) return;   /* KS/AR */
+        if (!legacy_write(OPN_REG_DR    + ofs + ch, tone_data[FM_TONE_DR_OFF + s])) return;  /* DR */
+        if (!legacy_write(OPN_REG_SR    + ofs + ch, tone_data[FM_TONE_SR_OFF + s])) return;  /* SR */
+        if (!legacy_write(OPN_REG_SL_RR + ofs + ch, tone_data[FM_TONE_SL_RR_OFF + s])) return;  /* SL/RR */
     }
-    opn_write(OPN_REG_FB_CON + ch, tone_data[FM_TONE_FB_CON_OFF]);               /* FB/CON */
+    if (!legacy_write(OPN_REG_FB_CON + ch, tone_data[FM_TONE_FB_CON_OFF])) return;               /* FB/CON */
 }
 
 /* FM音色設定 (番号指定) */
@@ -266,11 +283,11 @@ void fm_note_on(int ch, int note)
     fnum = fnumber_table[key];
 
     /* F-Number上位(+Block)を先に書く (PC9800Bible指定) */
-    opn_write(OPN_REG_FNUM_HI + ch, (uchar)((block << OPN_BLOCK_SHIFT) | ((fnum >> 8) & OPN_FNUM_HI_MASK)));
-    opn_write(OPN_REG_FNUM_LO + ch, (uchar)(fnum & 0xFF));
+    if (!legacy_write(OPN_REG_FNUM_HI + ch, (uchar)((block << OPN_BLOCK_SHIFT) | ((fnum >> 8) & OPN_FNUM_HI_MASK)))) return;
+    if (!legacy_write(OPN_REG_FNUM_LO + ch, (uchar)(fnum & 0xFF))) return;
 
     /* Key-ON: 全4スロットON */
-    opn_write(OPN_REG_KEY_ONOFF, (uchar)(OPN_KEY_ALL_SLOTS | ch));
+    (void)legacy_write(OPN_REG_KEY_ONOFF, (uchar)(OPN_KEY_ALL_SLOTS | ch));
 }
 
 /* FM Key-OFF */
@@ -278,7 +295,7 @@ void fm_note_off(int ch)
 {
     if (ch < 0 || ch >= OPN_CHANNEL_COUNT) return;
 
-    opn_write(OPN_REG_KEY_ONOFF, (uchar)(0x00 | ch));
+    (void)legacy_write(OPN_REG_KEY_ONOFF, (uchar)(0x00 | ch));
 }
 
 /* FM全チャンネルKey-OFF */
@@ -299,36 +316,53 @@ void ssg_tone(int ch, u16 period)
 
     uchar lo_reg = (uchar)(ch * SSG_TONE_REG_STRIDE);
     uchar hi_reg = (uchar)(ch * SSG_TONE_REG_STRIDE + 1);
-    opn_write(lo_reg, (uchar)(period & 0xFF));
-    opn_write(hi_reg, (uchar)((period >> 8) & SSG_PERIOD_HI_MASK));
+    if (!legacy_write(lo_reg, (uchar)(period & 0xFF))) return;
+    (void)legacy_write(hi_reg, (uchar)((period >> 8) & SSG_PERIOD_HI_MASK));
+}
+
+static int volume_checked(int ch, uchar vol)
+{
+    unsigned int flags = irq_save();
+    int ok = 1;
+    vol &= SSG_VOLUME_MASK;
+    /* HAL quiet and raw register writes can also change the mixer. */
+    if (vol && fm_read_mixer) {
+        int mixer = fm_read_mixer();
+        if (mixer < 0) {
+            fm_write_failed();
+            irq_restore(flags);
+            return 0;
+        }
+        ssg_mixer_state = (uchar)mixer;
+    }
+    if (vol && (ssg_mixer_state & (1u << ch)))
+        ok = legacy_write(SSG_REG_MIXER,
+                          (ssg_mixer_state & ~(1u << ch)) | SSG_MIXER_IO_FLAG);
+    if (ok)
+        ok = legacy_write(SSG_REG_VOL_A + (uchar)ch, vol);
+    irq_restore(flags);
+    return ok;
 }
 
 void ssg_volume(int ch, uchar vol)
 {
     if (ch < 0 || ch >= OPN_CHANNEL_COUNT) return;
-
-    unsigned int flags = irq_save();
-    vol &= SSG_VOLUME_MASK;
-    if (vol && (ssg_mixer_state & (1u << ch)))
-        ssg_mixer((uchar)(ssg_mixer_state & ~(1u << ch)));
-    opn_write(SSG_REG_VOL_A + (uchar)ch, vol);
-    irq_restore(flags);
+    (void)volume_checked(ch, vol);
 }
 
 void ssg_noise(uchar period)
 {
-    opn_write(SSG_REG_NOISE, period & SSG_NOISE_MASK);
+    (void)legacy_write(SSG_REG_NOISE, period & SSG_NOISE_MASK);
 }
 
 void ssg_mixer(uchar mask)
 {
-    opn_write(SSG_REG_MIXER, mask | SSG_MIXER_IO_FLAG);
+    (void)legacy_write(SSG_REG_MIXER, mask | SSG_MIXER_IO_FLAG);
 }
 
 void ssg_all_off(void)
 {
-    ssg_volume(0, 0);
-    ssg_volume(1, 0);
-    ssg_volume(2, 0);
+    for (int ch = 0; ch < OPN_CHANNEL_COUNT; ++ch)
+        if (!volume_checked(ch, 0)) return;
     ssg_mixer(SSG_MIXER_ALL_OFF);
 }
