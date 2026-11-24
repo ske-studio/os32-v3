@@ -154,6 +154,30 @@ static int matrix(void)
 
 #include "snd2_v1_host.c"
 
+static int publish_replay(void)
+{
+    const u32 positions[] = {128, 512, 896, 1024, 1280, 1536};
+    Snd2Stream *s = &snd2_device(0)->stream;
+    CHECK(!snd2_stream_open(&desc, &id));
+    for (u32 j = 0; j < 1024; ++j) samples[j] = j + 1;
+    CHECK(snd2_stream_write(id, samples, sizeof(samples)) == sizeof(samples));
+    CHECK(!snd2_stream_start(id));
+    for (u32 i = 0; i < sizeof(positions)/sizeof(positions[0]); ++i) {
+        hw = positions[i];
+        now = hw * 1000 / 44100;
+        snd2_advance(0);
+        while (s->written - s->played + 256 <= s->cap) {
+            for (u32 j = 0; j < 256; ++j) samples[j] = s->written + j + 1;
+            CHECK(snd2_stream_write(id, samples, 1024) == 1024);
+        }
+    }
+    CHECK(s->underruns == 0);
+    CHECK(s->copied == s->written);
+    for (u32 j = hw; j < s->copied; ++j) CHECK(ring[j] == j + 1);
+    hw = 0;
+    return snd2_stream_close(id, SND2_CLOSE_ABORT);
+}
+
 static int probe(void)
 {
     CHECK(!v1_contract());
@@ -162,6 +186,7 @@ static int probe(void)
                              .period_frames=256, .lead_periods=3};
     SND2_DevInfo info = {.kind=SND2_KIND_PCM_OUT};
     CHECK(!snd2_register(&backend, 0, &info));
+    CHECK(!publish_replay());
     CHECK(!matrix());
     Snd2Stream *stream = &snd2_device(0)->stream;
     for (int paused = 0; paused <= 1; ++paused) {
