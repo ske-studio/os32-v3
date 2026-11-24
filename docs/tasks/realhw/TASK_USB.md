@@ -1,6 +1,6 @@
 # USB の土台 (PCI の USB カード NEC uPD720101)
 
-> 状態: **実装中 (2026-11-13)** — 設計は確定 ([USB_DESIGN](../../decisions/usb/USB_DESIGN.md))。段 1 の共通の部品と PowerMac の殻は os32powerpc が 1A から着手、PC-98 の側 (1D の入力の側と 1E) は本線。
+> 状態: **実装中 (2026-11-24)** — 設計は確定 ([USB_DESIGN](../../decisions/usb/USB_DESIGN.md))。段 1 の共通の部品と PowerMac の殻は os32powerpc (PowerPC の in2 の段 D まで main)。PC-98 の段 1E の (a)〜(g) は main。**PC-98 の段 1E は受入済み (ユーザー決定 2026-11-24「とりあえず、これで受け入れして」)**。実機 Ra266 (main 2b705d0) で USB のマウス (I-O DATA 1394US2G-PCI の一番上のポート = 0:13.1 port 1、低速) の移動・左クリック (Start のメニュー) を確かめた (2026-11-24 11:32、カメラ)、左ボタンを押したまま抜いて挿し直しても正常に戻る (ユーザーの目視 2026-11-24「正常に戻っているようです」)**。そこまでに直した物: ポートごとの給電 (RhDescriptorA の PSM=1)・BSD に揃えた初期化・tick の予算で見送った見回りの idle への繰り越し・起動の記録と ver の USB の数。観測は HW-BASIC の台本 userland/tests/hw/ohci_probe.hwb・ohci_sched_probe.hwb。受入の外に残した物: (h) usb_stat_get (KAPI、別の段で起こす)、台帳の USB-TICK-BUDGET-1・USB-IDLE-LATENCY-1 (実機の IRQ0 の最大・入力の遅れの測り)。
 
 ## 0. ユーザー決定 (原文)
 - 2026-11-13 「USB の段 1 を os32powerpc に任せてよいですか？」→「任せる (推奨)」(本線のユーザー)、PowerPC の側でも「受けて良い」 — 段 1 の共通の部品 (drivers/usb/) は PowerPC の PM が QEMU mac99 の内蔵 OHCI で先に通し、PC-98 の結線と Ra266 の実機の受入は本線。
