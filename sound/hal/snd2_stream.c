@@ -3,6 +3,27 @@
 #include "kernel/time/tick_clock.h"
 #include "kstring.h"
 
+/* Include time spent in backend calls even when an IRQ entered with IF clear. */
+#ifdef TICK_PROBE
+#include "kernel/time/tick_probe.h"
+static unsigned stream_lock(unsigned metric)
+{
+    unsigned flags = irq_save();
+    tick_probe_sound_begin(metric);
+    return flags;
+}
+static void stream_unlock(unsigned flags)
+{
+    tick_probe_sound_end();
+    irq_restore(flags);
+}
+#define stream_metric(metric) tick_probe_sound_metric(metric)
+#else
+#define stream_lock(metric) irq_save()
+#define stream_unlock(flags) irq_restore(flags)
+#define stream_metric(metric) ((void)0)
+#endif
+
 extern int res_owner_get(void);
 extern i32 exec_sys_yield(void);
 
@@ -36,32 +57,33 @@ int snd2_owned_device(u32 id, Snd2Device **out)
 static int teardown(Snd2Device *d, unsigned flags, int stop_failed, int opened)
 {
     Snd2Stream *s = &d->stream;
+    stream_metric(TP_SND_TEARDOWN);
     s->closing = 1;
     int leak = stop_failed || (opened && d->be->hw_stop(d->ctx) < 0);
     if (leak) {
         s->state = SND2_ST_FAULTED;
         snd2_fault(d);
     }
-    irq_restore(flags);
+    stream_unlock(flags);
     if (opened) d->be->hw_release(d->ctx, leak);
     if (!d->writing) snd2_stg_free(s);
-    flags = irq_save();
+    flags = stream_lock(TP_SND_TEARDOWN);
     s->ring = 0;
     ++s->gen;
     s->owner = 0;
     s->closing = d->writing;
     if (!leak) s->state = SND2_ST_IDLE;
-    irq_restore(flags);
+    stream_unlock(flags);
     return leak ? OS32_ERR_IO : 0;
 }
 
 void snd2_teardown_device(Snd2Device *d)
 {
-    unsigned flags = irq_save();
+    unsigned flags = stream_lock(TP_SND_OTHER);
     if (d->stream.owner && !d->stream.closing)
         teardown(d, flags, 0, 1);
     else
-        irq_restore(flags);
+        stream_unlock(flags);
 }
 
 void snd2_reclaim(int owner)
@@ -98,12 +120,12 @@ int snd2_open_mode(const SND2_StreamDesc *desc, u32 *id, int v1)
     s->closing = 1;
     rc = snd2_stg_alloc(s);
     if (rc < 0) {
-        teardown(d, irq_save(), 0, 0);
+        teardown(d, stream_lock(TP_SND_OTHER), 0, 0);
         return rc;
     }
     rc = d->be->hw_open(d->ctx, &s->fmt, period, &s->ring);
     if (rc < 0 || !s->ring) {
-        teardown(d, irq_save(), 0, 1);
+        teardown(d, stream_lock(TP_SND_OTHER), 0, 1);
         return rc < 0 ? rc : OS32_ERR_IO;
     }
     s->closing = 0;
@@ -125,7 +147,7 @@ int snd2_write_checked(u32 id, const void *buf, u32 bytes,
                        void (*check)(const void *, u32))
 {
     Snd2Device *d;
-    unsigned flags = irq_save();
+    unsigned flags = stream_lock(TP_SND_OTHER);
     int rc = snd2_owned_device(id, &d);
     if (!rc) {
         Snd2Stream *s = &d->stream;
@@ -137,19 +159,19 @@ int snd2_write_checked(u32 id, const void *buf, u32 bytes,
                 /* A range fault can exit the caller. Leave teardown free to
                  * reclaim staging until the copy actually begins. */
                 if (check) {
-                    irq_restore(flags);
+                    stream_unlock(flags);
                     check(buf, n * stride);
-                    flags = irq_save();
+                    flags = stream_lock(TP_SND_OTHER);
                     rc = snd2_owned_device(id, &d);
                     if (rc) {
-                        irq_restore(flags);
+                        stream_unlock(flags);
                         return rc;
                     }
                 }
                 d->writing = 1;
-                irq_restore(flags);
+                stream_unlock(flags);
                 snd2_stg_write(s, off, buf, n);
-                flags = irq_save();
+                flags = stream_lock(TP_SND_OTHER);
                 d->writing = 0;
                 if (s->closing) {
                     snd2_stg_free(s);
@@ -162,7 +184,7 @@ int snd2_write_checked(u32 id, const void *buf, u32 bytes,
             }
         }
     }
-    irq_restore(flags);
+    stream_unlock(flags);
     return rc;
 }
 
@@ -180,14 +202,14 @@ static int start_hw(Snd2Device *d, unsigned flags, int resync)
         teardown(d, flags, 0, 1);
         return OS32_ERR_IO;
     }
-    irq_restore(flags);
+    stream_unlock(flags);
     return rc ? OS32_ERR_IO : 0;
 }
 
 int snd2_stream_start(u32 id)
 {
     Snd2Device *d;
-    unsigned flags = irq_save();
+    unsigned flags = stream_lock(TP_SND_START);
     int rc = snd2_owned_device(id, &d);
     if (!rc) {
         Snd2Stream *s = &d->stream;
@@ -203,20 +225,21 @@ int snd2_stream_start(u32 id)
             s->state = SND2_ST_RUN;
         }
     }
-    irq_restore(flags);
+    stream_unlock(flags);
     return rc;
 }
 
 void snd2_advance(u32 dev)
 {
     Snd2Device *d = snd2_device(dev);
-    unsigned flags = irq_save();
+    unsigned flags = stream_lock(TP_SND_ADVANCE);
     if (d && d->stream.owner && !d->stream.closing) {
         Snd2Stream *s = &d->stream;
         if (s->state == SND2_ST_RUN || s->state == SND2_ST_PAUSE ||
             s->state == SND2_ST_DRAIN) {
             u32 hw = 0, now = tick_clock_ms();
             if (s->restart_pending) {
+                stream_metric(TP_SND_RESYNC);
                 snd2_seg_reset(s, now);
                 if (!s->paused) snd2_seg_prime(s);
                 (void)start_hw(d, flags, 1);
@@ -224,6 +247,7 @@ void snd2_advance(u32 dev)
             }
             int valid = d->be->hw_pos(d->ctx, &hw) >= 0;
             if (snd2_seg_observe(s, valid, hw, now) < 0) {
+                stream_metric(TP_SND_RESYNC);
                 if (d->be->hw_stop(d->ctx) < 0) {
                     teardown(d, flags, 1, 1);
                     return;
@@ -240,13 +264,13 @@ void snd2_advance(u32 dev)
             }
         }
     }
-    irq_restore(flags);
+    stream_unlock(flags);
 }
 
 int snd2_stream_pause(u32 id)
 {
     Snd2Device *d;
-    unsigned flags = irq_save();
+    unsigned flags = stream_lock(TP_SND_PAUSE);
     int rc = snd2_owned_device(id, &d);
     if (!rc && d->stream.state == SND2_ST_RUN) {
         /* A failed position read cannot identify the DMA-protected segments. */
@@ -269,32 +293,32 @@ int snd2_stream_pause(u32 id)
             d->stream.state = SND2_ST_PAUSE;
         }
     } else if (!rc && d->stream.state != SND2_ST_PAUSE) rc = OS32_ERR_INVAL;
-    irq_restore(flags);
+    stream_unlock(flags);
     return rc;
 }
 
 int snd2_stream_volume(u32 id, u32 left, u32 right)
 {
     Snd2Device *d;
-    unsigned flags = irq_save();
+    unsigned flags = stream_lock(TP_SND_OTHER);
     int rc = snd2_owned_device(id, &d);
     if (!rc) {
         if (left > d->caps.volume_steps || right > d->caps.volume_steps)
             rc = OS32_ERR_INVAL;
         else rc = d->be->hw_volume(d->ctx, left, right);
     }
-    irq_restore(flags);
+    stream_unlock(flags);
     return rc;
 }
 
 int snd2_stream_close(u32 id, u32 how)
 {
     Snd2Device *d;
-    unsigned flags = irq_save();
+    unsigned flags = stream_lock(TP_SND_OTHER);
     int rc = lookup(id, &d);
     if (!rc && how > SND2_CLOSE_ABORT) rc = OS32_ERR_INVAL;
     if (rc) {
-        irq_restore(flags);
+        stream_unlock(flags);
         return rc;
     }
     Snd2Stream *s = &d->stream;
@@ -303,13 +327,13 @@ int snd2_stream_close(u32 id, u32 how)
         return teardown(d, flags, 0, 1);
     }
     if (s->state == SND2_ST_DRAIN) {
-        irq_restore(flags);
+        stream_unlock(flags);
         return 0;
     }
     if (s->state == SND2_ST_IDLE) {
         rc = snd2_stream_start(id);
         if (rc) {
-            irq_restore(flags);
+            stream_unlock(flags);
             return rc;
         }
     }
@@ -321,9 +345,9 @@ int snd2_stream_close(u32 id, u32 how)
     u32 ms = ((periods + 3) * s->period * 1000U - 1) / s->fmt.rate + 1;
     u32 timeout = ((ms + 9) / 10 + 3) * 10;
     u32 begin = tick_clock_ms(), gen = s->gen;
-    irq_restore(flags);
+    stream_unlock(flags);
     for (;;) {
-        flags = irq_save();
+        flags = stream_lock(TP_SND_OTHER);
         if (s->gen != gen || s->closing) {
             rc = s->state == SND2_ST_FAULTED || s->owner || s->played != s->written ? OS32_ERR_IO : 0;
             break;
@@ -334,9 +358,9 @@ int snd2_stream_close(u32 id, u32 how)
             int stop_rc = teardown(d, flags, 0, 1);
             return stop_rc ? stop_rc : rc;
         }
-        irq_restore(flags);
+        stream_unlock(flags);
         exec_sys_yield();
     }
-    irq_restore(flags);
+    stream_unlock(flags);
     return rc;
 }

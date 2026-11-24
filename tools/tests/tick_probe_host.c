@@ -173,6 +173,16 @@ void _start(void)
     CHECK(s->device[0][TP_TX][TP_IRQ5_CTX].full.worst == 19);
     CHECK(s->device[0][TP_TX][TP_IRQ5_CTX].bytes == 42 && s->lost == 0);
     start();
+    tick_probe_irq_enter(10); tp_host_clock += 3;
+    tick_probe_sound_begin(TP_SND_ADVANCE); tp_host_clock += 13;
+    tick_probe_sound_begin(TP_SND_OTHER); tp_host_clock += 17;
+    tick_probe_sound_metric(TP_SND_RESYNC);
+    tick_probe_sound_end(); tp_host_clock += 19; tick_probe_sound_end();
+    tp_host_clock += 5; tick_probe_irq_leave(10);
+    s = stop();
+    CHECK(s->extra[0][TP_PCM_IRQ10].worst == 57);
+    CHECK(s->extra[0][TP_SND_RESYNC].count == 1 && s->extra[0][TP_SND_RESYNC].worst == 49);
+    start();
     slots[2].fn = slot_work; slots[3].fn = slot_work; slots[4].fn = slot_work; slots[7].fn = slot_work;
     tick_dispatch(); s = stop();
     CHECK(s->extra[0][TP_BUDGET].count == 1 && s->extra[0][TP_BUDGET].worst == 48);

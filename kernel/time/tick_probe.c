@@ -80,6 +80,30 @@ unsigned long long tick_probe_p99(const struct tp_stat *s)
 {
     return p99_shift(s, 0);
 }
+/* Stream locks can nest (close starts an idle stream). Keep the outer span
+ * when its work changes from advance to resync or teardown. */
+static unsigned int sound_depth, sound_metric;
+static struct tp_mark sound_mark;
+void tick_probe_sound_begin(unsigned int metric)
+{
+    if (!data.running) return;
+    if (sound_depth++ == 0) {
+        sound_metric = metric;
+        sound_mark = mark();
+    }
+}
+void tick_probe_sound_metric(unsigned int metric)
+{
+    if (sound_depth) sound_metric = metric;
+}
+void tick_probe_sound_end(void)
+{
+    if (!sound_depth || --sound_depth) return;
+    unsigned long long end = now();
+    unsigned int bank = sound_mark.splash || splash || sound_mark.epoch != epoch;
+    if (end < sound_mark.t) data.lost++;
+    else add_stat(&data.extra[bank][sound_metric], end - sound_mark.t);
+}
 void tick_probe_extra_begin(unsigned int id)
 {
     if (!data.running) return;
@@ -122,6 +146,7 @@ void tick_probe_end(unsigned int id)
 void tick_probe_irq_enter(unsigned int irq)
 {
     if (!data.running) return;
+    if (irq == 10) tick_probe_extra_begin(TP_PCM_IRQ10);
     if (irq == 5) irq5_active = 1;
     if (irq == 3 || irq == 5) tick_probe_extra_begin(irq == 3 ? TP_IRQ3 : TP_IRQ5);
     if (irq == 0) {
@@ -138,6 +163,7 @@ void tick_probe_irq_enter(unsigned int irq)
 }
 void tick_probe_irq_leave(unsigned int irq)
 {
+    if (irq == 10) tick_probe_extra_end(TP_PCM_IRQ10);
     if (irq == 3 || irq == 5) {
         tick_probe_extra_end(irq == 3 ? TP_IRQ3 : TP_IRQ5);
         if (irq == 5) irq5_active = 0;

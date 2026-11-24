@@ -8,6 +8,25 @@ static int interrupted, in_copy, freed, alloc_error, open_error, pos_error;
 static int yields, drain_progress, start_calls;
 static SND2_StreamDesc desc;
 unsigned locked;
+#ifdef TICK_PROBE
+#include "kernel/time/tick_probe.h"
+static unsigned probe_depth, metric, measured[TP_EXTRA_COUNT];
+void tick_probe_sound_begin(unsigned id)
+{
+    if (!locked) error = 1;
+    if (probe_depth++ == 0) metric = id;
+}
+void tick_probe_sound_metric(unsigned id)
+{
+    if (!locked || !probe_depth) error = 1;
+    metric = id;
+}
+void tick_probe_sound_end(void)
+{
+    if (!locked || !probe_depth) { error = 1; return; }
+    if (--probe_depth == 0) measured[metric]++;
+}
+#endif
 unsigned irq_save(void) { unsigned prev = locked; locked = 1; return prev; }
 void irq_restore(unsigned prev) { locked = prev; }
 int res_owner_get(void) { return owner; }
@@ -259,6 +278,11 @@ static int probe(void)
     CHECK(desc.dev == 3 && !snd2_stream_open(&desc, &id));
     CHECK(snd2_stream_close(id, SND2_CLOSE_ABORT) == OS32_ERR_IO);
     CHECK(snd2_stream_start(id) == OS32_ERR_STALE && leaked);
+#ifdef TICK_PROBE
+    CHECK(!probe_depth && measured[TP_SND_START] && measured[TP_SND_PAUSE] &&
+          measured[TP_SND_ADVANCE] && measured[TP_SND_RESYNC] &&
+          measured[TP_SND_TEARDOWN] && measured[TP_SND_OTHER]);
+#endif
     return error || locked;
 }
 void _start(void)
