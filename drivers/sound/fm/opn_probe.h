@@ -15,8 +15,10 @@ enum opn_probe_result {
  * masks the FM IRQ at the interrupt controller before entry, and supplies
  * the current OPNA 29h write shadow (ignored by a YM2203). After starting B
  * we attempt stop/reset and shadow restoration even on bus failure. UNKNOWN
- * cannot confirm containment: keep the IRQ masked until hardware recovery.
+ * with *contained == 0 means cleanup is unconfirmed: keep the IRQ masked
+ * until hardware recovery. The required output tracks timer/IRQ changes
+ * made by this probe only.
  * On success, clear any pending IRQ before restoring the caller's IRQ mask. */
-enum opn_probe_result opn_probe(unsigned char irq_shadow);
+enum opn_probe_result opn_probe(unsigned char irq_shadow, int *contained);
 
 #endif

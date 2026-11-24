@@ -42,8 +42,8 @@ def main():
                     ('|| !rose', '|| (rose && 0)', 8),
                     ('int cleared = ready_status() == 0', 'int cleared = ready_status() >= 0', 10),
                     ('inp(OPN_DATA) != id', '(inp(OPN_DATA), 0)', 5),
-                    ('OPN_TIMER_STOP, 1', 'OPN_TIMER_STOP, 0', 12),
-                    ('0x29, irq_shadow, 1', '0x29, irq_shadow, 0', 12),
+                    ('if (!stopped)', 'if (0)', 15),
+                    ('if (after < 0)', 'if ((void)after, 0)', 14),
                     ('int after = ready_status()', 'int after = 0', 6),
                     ('io_wait_n(20);\n    outp', 'io_wait_n(6);\n    outp', 6)]:
                 body = source.read_text()
