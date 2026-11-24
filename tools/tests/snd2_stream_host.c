@@ -14,13 +14,13 @@ int res_owner_get(void) { return owner; }
 u32 tick_clock_ms(void) { return now; }
 i32 exec_sys_yield(void)
 {
-    Snd2Stream *s = &snd2_device(0)->stream;
+    Snd2Stream *s = &snd2_device(desc.dev)->stream;
     if (locked || s->state != SND2_ST_DRAIN || s->paused) error = 1;
     ++yields;
     now += 10;
     if (drain_progress) {
         hw = (hw + 256) % 4096;
-        snd2_advance(0);
+        snd2_advance(desc.dev);
     }
     return 0;
 }
@@ -65,7 +65,7 @@ static int ack(void *ctx) { (void)ctx; return 1; }
 static int stop(void *ctx)
 {
     (void)ctx;
-    if (!locked || (stop_error && ring[0] != 123)) error = 1;
+    if (!locked || (interrupted && stop_error && ring[0] != 123)) error = 1;
     ++stops;
     return stop_error;
 }
@@ -76,7 +76,8 @@ static void release(void *ctx, int leak)
     leaked = leak;
     snd2_advance(0);
 }
-static int volume(void *ctx, u32 l, u32 r) { (void)ctx; return l == 64 && !r ? 0 : -1; }
+static u32 volume_left, volume_right;
+static int volume(void *ctx, u32 l, u32 r) { (void)ctx; volume_left = l; volume_right = r; return 0; }
 static const SndBackend backend = {
     .abi = SND_HAL2_ABI, .caps = caps, .hw_open = hw_open, .hw_start = start,
     .hw_pos = pos, .hw_ack = ack, .hw_stop = stop, .hw_release = release,
@@ -123,9 +124,13 @@ static int matrix(void)
     return 0;
 }
 
+#include "snd2_v1_host.c"
+
 static int probe(void)
 {
-    desc = (SND2_StreamDesc){.size=sizeof(desc), .fmt={44100,16,2,0,0},
+    CHECK(!v1_contract());
+    now = hw = start_calls = stops = releases = freed = yields = 0;
+    desc = (SND2_StreamDesc){.size=sizeof(desc), .fmt={44100,16,2,SND2_ENC_S16LE,0},
                              .period_frames=256, .lead_periods=3};
     SND2_DevInfo info = {.kind=SND2_KIND_PCM_OUT};
     CHECK(!snd2_register(&backend, 0, &info));
@@ -223,6 +228,19 @@ static int probe(void)
     CHECK(freed == n+1 && leaked && !s->epoch && ring[0] == 123);
     CHECK(snd2_stream_open(&desc, &id) == OS32_ERR_IO);
     CHECK(snd2_unregister(0) == OS32_ERR_BUSY);
+    interrupted = 0;
+    info.flags = SND2_DEV_DEFAULT;
+    desc.dev = snd2_register(&backend, 0, &info);
+    CHECK(desc.dev == 1 && !pcm_open(44100));
+    hw = 0;
+    drain_progress = 1;
+    CHECK(pcm_write(samples, 4) == 4 && pcm_close() == OS32_ERR_IO);
+    s = &snd2_device(desc.dev)->stream;
+    CHECK(s->played == 1 && !s->owner && leaked && pcm_open(44100) == OS32_ERR_IO);
+    desc.dev = snd2_register(&backend, 0, &info);
+    CHECK(desc.dev == 2 && !snd2_stream_open(&desc, &id));
+    CHECK(snd2_stream_close(id, SND2_CLOSE_ABORT) == OS32_ERR_IO);
+    CHECK(snd2_stream_start(id) == OS32_ERR_STALE && leaked);
     return error || locked;
 }
 void _start(void)

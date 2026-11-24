@@ -87,9 +87,12 @@ int snd2_seg_observe(Snd2Stream *s, int have_pos, u32 hw, u32 now)
     }
     if (hw >= ring) return -1;
     u32 p = hw / s->period;
-    if (snd2_backtracked(prev, s->last_hw, p, hw)) return -1;
     /* Retiring the old segment would clear the protected next segment. */
-    if (prev == (p + 1) % s->nseg && inside_margin(s, hw)) return -1;
+    if (snd2_backtracked(prev, s->last_hw, p, hw) ||
+        (prev == (p + 1) % s->nseg && inside_margin(s, hw))) {
+        ++s->repeats;
+        return -1;
+    }
     if (hw != s->last_hw) s->last_progress_ms = now;
     s->last_obs_ms = now;
     s->last_hw = hw;

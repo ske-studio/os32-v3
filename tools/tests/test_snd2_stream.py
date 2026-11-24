@@ -7,7 +7,7 @@ from host32 import run as host_run
 from kernel_includes import include_flags
 
 CHECK = dict(name='snd2-stream-host', tier=4, needs=[], budget=3,
-             covers=['sound/hal/snd2.h', 'sound/hal/snd2_stream.c', 'sound/hal/snd2_caps.c',
+             covers=['tools/tests/snd2_v1_host.c', 'include/pcm_contract.h', 'sound/hal/snd2_v1.c', 'sound/hal/snd2.h', 'sound/hal/snd2_stream.c', 'sound/hal/snd2_caps.c',
                      'sound/hal/snd2_reg.c', 'kernel/time/tick_clock.h', 'include/kernel_tick.h',
                      'include/io.h', 'sound/hal/snd2_seg.c', 'sound/hal/snd2_stg.c',
                      'sound/hal/snd2_int.h', 'sound/hal/snd2_ring_math.h',
@@ -15,11 +15,18 @@ CHECK = dict(name='snd2-stream-host', tier=4, needs=[], budget=3,
                      'sdk/include/os32/*.h', 'tools/tests/snd2_stream_host.c',
                      'tools/tests/test_snd2_stream.py', 'tools/tests/host32.py',
                      'tools/tests/kernel_includes.py', 'build/config.mk'],
-             basis=['docs/decisions/sound/AV_HAL_DESIGN.md §3-4・§3-5・§13-2'])
+             basis=['docs/decisions/sound/AV_HAL_DESIGN.md §3-4・§3-5・§3-6・§13-2'])
 
 ROOT = Path(__file__).resolve().parents[2]
 HAL = ROOT / 'sound/hal'
 MUTATIONS = [
+    ('stream', 'return leak ? OS32_ERR_IO : 0;', 'return 0;'),
+    ('stream', 'rc = s->state == SND2_ST_FAULTED || s->owner', 'rc = s->owner'),
+    ('v1', '>= 4096', '>= 4095'),
+    ('v1', 's->written - s->played))', 's->written - s->copied))'),
+    ('v1', 'PCM_CNT_REP_SHIFT)', 'PCM_CNT_UND_SHIFT)'),
+    ('v1', 'SND2_CLOSE_DRAIN', 'SND2_CLOSE_ABORT'),
+    ('stream', '((ms + 9) / 10 + 3)', '(ms / 10 + 3)'),
     ('stream', 's->state == SND2_ST_DRAIN || !buf', '!buf'),
     ('stream', 'hw_release(d->ctx, leak)', 'hw_release(d->ctx, 0)'),
     ('stream', '++s->gen;', '/* stale generation */'),
@@ -39,7 +46,7 @@ MUTATIONS = [
 def verify(work, mutation=None):
     sources = []
     (work / 'io.h').write_text('unsigned irq_save(void); void irq_restore(unsigned);\n')
-    for unit in ('stream', 'reg', 'caps', 'seg', 'stg'):
+    for unit in ('v1', 'stream', 'reg', 'caps', 'seg', 'stg'):
         path = work / f'snd2_{unit}.c'
         source = (HAL / path.name).read_text()
         if mutation and mutation[0] == unit:

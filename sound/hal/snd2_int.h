@@ -13,6 +13,7 @@ typedef struct Snd2Stream {          /* sound/hal/snd2_int.h。書くのは soun
     u32 seg_first[SND2_MAX_SEGMENTS]; u16 seg_n[SND2_MAX_SEGMENTS];                    /* advance だけ */
     u8 *stg; u32 stg_frames;         /* ステージング 8192 frame = 32KB (kmalloc、DMA しない) */
     u8 *ring; u32 last_hw, last_obs_ms;                  /* ring は backend が渡す DMA の面 */
+    u32 repeats; /* observations that show DMA may have repeated ring data */
     u32 last_progress_ms;
     u8 restart_pending;              /* DMA proven stopped during resync */
     u8 had_data;                     /* distinguishes a silent start from starvation */

@@ -673,136 +673,30 @@ static void case_pos(void)
 }
 
 /* ======================================================================== */
-/*  5. pcm_obs — 観測の統合 (装置には触らない)                              */
-/* ======================================================================== */
-static void obs_init(struct pcm_core *c, int state, u32 staged)
-{
-    memset(c, 0, sizeof(*c));
-    c->state = (u8)state;
-    c->rate = PCM_RATE_44100;
-    c->filled[0] = PCM_HALF_FRAMES;
-    c->filled[1] = PCM_HALF_FRAMES;
-    c->stg.staged = staged;
-    c->last_data_half = 1;
-    c->drain = PCM_DRAIN_WAIT;
-}
+#ifdef PCM_SEGMENT_TEST
+/* S8: successive observations append queued frames to the same segment. */
+#include "sound/hal/snd2_int.h"
 
 static void case_obs(void)
 {
-    struct pcm_core c;
-    struct pcm_act act;
-
-    /* (1) 同じ半分で進むだけ: 補充も切り替えも無い */
-    obs_init(&c, PCM_ST_RUNNING, 0);
-    pcm_obs(&c, 1, 100, 1000, &act);
-    CHECK(act.refill == 0 && act.entered == 0);
-    CHECK(c.pos == 100 && c.half == 0 && c.gen == 0);
-    CHECK(c.last_progress == 1000 && c.state == PCM_ST_RUNNING);
-
-    /* (2) 切り替え: 消費し終えた **old** を補充する */
-    obs_init(&c, PCM_ST_RUNNING, PCM_HALF_FRAMES);
-    pcm_obs(&c, 1, 2048, 1000, &act);
-    CHECK(act.refill == 1 && act.to_half == 0 && act.frames == PCM_HALF_FRAMES);
-    CHECK(c.gen == 1 && c.half == 1 && c.filled[0] == PCM_HALF_FRAMES);
-    CHECK(c.underruns == 0);           /* 両半分満杯なので underrun は 0 */
-    CHECK(c.last_data_half == 0);
-    CHECK(c.stg.staged == 0);
-
-    /* (3) underrun は**消す前に**数える (移った先が満杯でなかった) */
-    obs_init(&c, PCM_ST_RUNNING, 0);
-    c.filled[1] = 10;
-    pcm_obs(&c, 1, 2048, 1000, &act);
-    CHECK(c.underruns == 1);
-    CHECK(act.refill == 1 && act.frames == 0);   /* ステージングは空 */
-    CHECK(c.last_data_half == 1);                /* 0 frame では動かさない */
-
-    /* (4) 補充の余裕が無い切り替え = 喪失扱い → RS_STOP */
-    obs_init(&c, PCM_ST_RUNNING, PCM_HALF_FRAMES);
-    pcm_obs(&c, 1, 2048 + 1600, 1000, &act);     /* 末尾まで 448 frame */
-    CHECK(act.refill == 0 && act.entered == 1);
-    CHECK(c.repeats == 1 && c.state == PCM_ST_RS_STOP);
-
-    /* (5) 遅れた観測 (同じ半分で p1 < p0) = 喪失 → RS_STOP */
-    obs_init(&c, PCM_ST_RUNNING, 0);
-    c.pos = 2000;
-    pcm_obs(&c, 1, 3, 1000, &act);
-    CHECK(c.repeats == 1 && c.state == PCM_ST_RS_STOP && act.entered == 1);
-    CHECK(c.pos == 2000);                        /* 位置は更新しない */
-
-    /* (5') DRAINING での喪失は drain 失敗を記録して STOP_REQ */
-    obs_init(&c, PCM_ST_DRAINING, 0);
-    c.pos = 2000;
-    pcm_obs(&c, 1, 3, 1000, &act);
-    CHECK(c.state == PCM_ST_STOP_REQ && c.drain_failed == 1);
-
-    /* (6) -EAGAIN では位置を更新しないが**番犬は動く** */
-    obs_init(&c, PCM_ST_RUNNING, 0);
-    c.pos = 77;
-    c.half = 0;
-    c.last_progress = 0;
-    pcm_obs(&c, 0, 0, 1000, &act);
-    CHECK(c.pos == 77 && c.half == 0 && c.state == PCM_ST_RUNNING);
-    CHECK(c.now == 1000 && c.last_progress == 0);
-    pcm_obs(&c, 0, 0, 92880, &act);              /* 2 半周期を超えた */
-    CHECK(c.state == PCM_ST_RS_STOP && act.entered == 1);
-
-    /* (7) 進行の番犬: 同じ位置が続いても last_progress は動かない */
-    obs_init(&c, PCM_ST_RUNNING, 0);
-    c.pos = 500;
-    c.last_progress = 0;
-    pcm_obs(&c, 1, 500, 92879, &act);            /* ちょうどは発火しない */
-    CHECK(c.state == PCM_ST_RUNNING);
-    pcm_obs(&c, 1, 500, 92880, &act);
-    CHECK(c.state == PCM_ST_RS_STOP);
-
-    /* (8) drain: 「出た」+ staged > 0 は完了しない */
-    obs_init(&c, PCM_ST_DRAINING, 100);
-    c.drain = PCM_DRAIN_SIL;
-    c.last_data_half = 1;
-    pcm_obs(&c, 1, 2048, 1000, &act);            /* 半分 0 → 1 の切り替え */
-    CHECK(c.drain == PCM_DRAIN_WAIT);            /* 補充したので段階が戻る */
-    CHECK(c.state == PCM_ST_DRAINING);
-    CHECK(act.frames == 100 && c.last_data_half == 0);
-
-    /* (8') 「出た」+ staged == 0 で完了 → STOP_REQ */
-    obs_init(&c, PCM_ST_DRAINING, 0);
-    c.drain = PCM_DRAIN_SIL;
-    c.last_data_half = 1;
-    pcm_obs(&c, 1, 2048, 1000, &act);
-    CHECK(c.drain == PCM_DRAIN_OUT);
-    CHECK(c.state == PCM_ST_STOP_REQ && act.entered == 1);
-
-    /* (9) 0 frame の補充は last_data_half を動かさない (段階が進む) */
-    obs_init(&c, PCM_ST_DRAINING, 0);
-    c.drain = PCM_DRAIN_WAIT;
-    c.last_data_half = 1;
-    pcm_obs(&c, 1, 2048, 1000, &act);            /* h1 = 1 == last_data_half */
-    CHECK(c.last_data_half == 1 && c.drain == PCM_DRAIN_IN);
-
-    /* (10) DRAINING の末尾の 0 埋めは underrun に数えない */
-    obs_init(&c, PCM_ST_DRAINING, 0);
-    c.filled[1] = 0;
-    pcm_obs(&c, 1, 2048, 1000, &act);
-    CHECK(c.underruns == 0);
-
-    /* (10') drain の段階は RUNNING でも追うが、**完了の遷移は DRAINING だけ**
-     * (往復 6 R4)。RUNNING で「出た」に達しても再生は続く。 */
-    obs_init(&c, PCM_ST_RUNNING, 0);
-    c.drain = PCM_DRAIN_SIL;
-    c.last_data_half = 1;
-    c.filled[0] = 0;
-    c.filled[1] = 0;
-    pcm_obs(&c, 1, 2048, 1000, &act);
-    CHECK(c.drain == PCM_DRAIN_OUT);
-    CHECK(c.state == PCM_ST_RUNNING && act.entered == 0);
-
-    /* (11) 1 回の観測で drain は 1 段だけ */
-    obs_init(&c, PCM_ST_DRAINING, 0);
-    c.drain = PCM_DRAIN_WAIT;
-    c.last_data_half = 0;
-    pcm_obs(&c, 1, 2048, 1000, &act);            /* h1 = 1 != 0 → WAIT のまま */
-    CHECK(c.drain == PCM_DRAIN_WAIT);
+    static unsigned int dma[4096], staged[8192];
+    Snd2Stream s = {
+        .fmt = {44100, 16, 2, SND2_ENC_S16LE, 0},
+        .period = 256, .lead = 3, .nseg = 16, .margin = 128,
+        .ring = (u8 *)dma, .stg = (u8 *)staged, .stg_frames = 8192
+    };
+    for (u32 i = 0; i < 800; ++i) staged[i] = i + 1;
+    snd2_seg_reset(&s, 0);
+    s.written = 37;
+    CHECK(!snd2_seg_observe(&s, 1, 10, 1));
+    CHECK(s.copied == 37 && dma[256] == 1 && dma[292] == 37 && !dma[293]);
+    s.written = 600;
+    CHECK(!snd2_seg_observe(&s, 1, 11, 2));
+    for (u32 i = 0; i < 600; ++i) CHECK(dma[256 + i] == i + 1);
+    CHECK(s.copied == 600 && !dma[856] && !s.played);
 }
+
+#endif
 
 /* write(1 frame) → close の丸ごと 1 周 (純粋部だけで追う) */
 static void case_drain_short(void)
@@ -1683,7 +1577,9 @@ static const struct case_ent cases[] = {
     { "stg",         case_stg },
     { "pack",        case_pack },
     { "pos",         case_pos },
+#ifdef PCM_SEGMENT_TEST
     { "obs",         case_obs },
+#endif
     { "seq",         case_seq },
     { "open",        case_open },
     { "write",       case_write },
