@@ -36,17 +36,17 @@ fd5c165e4f240de65e2f58fb6994f1d5441772b3b572dd8a1b6a106ff568f2ee  upstream/fmgen
 | `Operator` — Operator, Reset, SetDPBN, LogToLin, EGCalc, EGStep, PGCalc, PGCalcL, Calc, CalcL, CalcN, CalcFB, CalcFBL, Prepare, ShiftPhase, SetFNum, EGUpdate, SetEGRate, ResetFB, KeyOn, KeyOff, IsOn, SetDT, SetDT2, SetMULTI, SetTL, SetAR, SetDR, SetSR, SetSL, SetRR, SetKS, SetSSGEC, SetAMON, Mute, SetMS | `src/operator.rs` |
 | `Channel4` — Channel4, Reset, Prepare, SetFNum, SetKCKF, KeyControl, SetAlgorithm, Calc, CalcL, CalcN, CalcLN, SetType, SetFB, SetMS, Mute, Refresh, SetChip | `src/channel.rs` |
 | `Channel4` — MakeTable | `src/tables.rs` |
-| `Timer` — SetTimerControl, SetTimerA, SetTimerB, Count, GetNextEvent, Reset | `src/timer.rs` |
+| `Timer` — SetTimerControl, SetTimerA, SetTimerB, Count, GetNextEvent, Reset | 済 `src/timer.rs`（write/count/next_event/reset） |
 | `Timer` — SetTimerBase | `src/tables.rs` |
 | `OPNBase` — OPNBase, SetParameter, Reset, SetPrescaler, Init, TimerA | `src/registers.rs` |
 | `OPNBase` — SetVolumeFM | `src/tables.rs` |
 | `OPNABase` — OPNABase, ~OPNABase, Init, Reset, SetRate, SetChannelMask, SetReg, SetStatus, ResetStatus, UpdateStatus, WriteRAM, ReadRAM, ReadRAMN, ReadStatusEx, BuildLFOTable, LFO | `src/registers.rs` |
 | `OPNABase` — MakeTable2 | `src/tables.rs` |
-| `OPNABase` — SetADPCMBReg, DecodeADPCMBSample, ResetCPUADPCM, WriteCPUADPCM, ReadCPUADPCMN, DecodeADPCMB, ADPCMBMix | `src/adpcm.rs` |
+| `OPNABase` — SetADPCMBReg, DecodeADPCMBSample, ResetCPUADPCM, WriteCPUADPCM, ReadCPUADPCMN, DecodeADPCMB, ADPCMBMix | 済 `src/adpcm.rs`（write/next_sample/decode/advance/mix） |
 | `OPNA` — GetReg, OPNA, ~OPNA, Init, Reset, SetRate, SetReg | `src/registers.rs` |
 | `OPNABase` — FMMix, MixSubSL, MixSubS, Mix6 | `src/channel.rs` |
-| `OPNA` — RhythmMix, SetVolumeRhythmTotal, SetVolumeRhythm | `src/rhythm.rs` |
-| `OPNA` — SetVolumeADPCM | `src/adpcm.rs` |
+| `OPNA` — RhythmMix, SetVolumeRhythmTotal, SetVolumeRhythm | 済 `src/rhythm.rs`（mix/volume、音量は全体・各声に適用） |
+| `OPNA` — SetVolumeADPCM | 済 `src/adpcm.rs`（固定 0 dB の 65536 × level >> 12。段 B の ADPCM_GAIN は level=0 適用後の値） |
 | `OPNA` — Mix | `src/lib.rs` |
 | `PSG` — PSG, ~PSG, Reset, MakeNoiseTable, SetChannelMask, MakeEnvelopTable, SetReg, StoreSample, Mix | `src/psg.rs` |
 | `PSG` — SetClock, SetVolume | `src/tables.rs` |
@@ -86,3 +86,12 @@ tables.manifest に整数幅、要素数、little-endian の SHA-256 を記す�
 state.rs の Adpcm は NP21/W の CPU ストリームに必要な 65536 byte FIFO を持つ。
 これは 256 KiB の借用 RAM と独立しており、固定状態だけで設計の概算 16–32 KiB
 を超える。FIFO の境界と BRDY の挙動を維持するため元の容量を採用した。
+
+段 C の ADPCM RAM 転送・遅延読出し・拡張 status は adpcm.rs の
+transfer/read/status_ex に移植済。timer.rs の count は A/B の期限をビットで返し、
+csm_due は A 期限時点の CSM を判定する。段 D が channel 3 の key off/on を接続する。
+停止時の next_event は内部 ABI に従い u32::MAX。元の Count の正の周期までの
+反復加算は同値な剰余で計算する。reset は OPNA::Reset が直接変更する状態を戻し、
+OPNABase::SetReg（非 virtual）を経由して再設定されないリズム音量・ADPCM レジスタを保持する。
+リズムの rate × 1024 は u32、PCM と gain の積は i32 の wrapping、符号付き右シフト。
+`MUTATE=1 make check-opna-parts` が PCM・status・RAM・timer の列を原本と比較する。
