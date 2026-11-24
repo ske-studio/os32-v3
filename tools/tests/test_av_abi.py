@@ -111,11 +111,13 @@ def exercise(root, folder, machine, mutate):
 
 def run(ctx):
     subprocess.run(['python3', '-B', 'tools/check_av_portable.py'], cwd=ctx.root, check=True)
+    subprocess.run(['sh', 'tools/checks/av_no_weak.sh', 'IS', 'build/out/kernel.elf', 'snd2_chip_'],
+                   cwd=ctx.root, check=True)
     symbols = subprocess.check_output(['nm', '-g', '--defined-only', ctx.root / 'build/out/kernel.elf'], text=True)
     for row in (ctx.root / 'tools/checks/av_wiring.txt').read_text().splitlines():
         if row and not row.startswith('#'):
             name = row.split()[1]
-            binding = 'T' if row.split()[0] == 'IA' else 'W'
+            binding = 'T' if (row.split()[0] == 'IA' or name.startswith('snd2_chip_')) else 'W'
             assert re.search(r'^[0-9a-f]+ ' + binding + ' ' + name + r'$', symbols, re.M), name
     with tempfile.TemporaryDirectory() as td:
         for machine in ('i386', 'ppc'):

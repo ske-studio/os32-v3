@@ -39,3 +39,7 @@ IS snd2_chip_write
 IS snd2_chip_read
 IS snd2_chip_reset
 IS snd2_chip_close
+IS snd2_chip_register internal
+IS snd2_chip_unregister internal
+IS snd2_chip_implicit internal
+IS snd2_chip_fault internal

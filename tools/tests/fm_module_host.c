@@ -23,6 +23,23 @@ void __cdecl kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
 
 
 static u32 ticks, silence, mode, public_calls;
+static int acquired, deny, detached;
+int res_owner_get(void) { return 7; }
+int snd2_chip_implicit(int owner) { CHECK(owner == 7); return deny || !acquired ? -1 : 0; }
+void snd2_chip_fault(u32 dev) { (void)dev; }
+static int body_attach(void (*fault)(u32))
+{
+    CHECK(fault == snd2_chip_fault);
+    acquired = 1;
+    return 0;
+}
+static int body_detach(void)
+{
+    detached++;
+    if (mode == 4) return 0;
+    acquired = 0;
+    return 1;
+}
 static void body_tick(void) { ticks++; }
 static int body_quiet(void)
 {
@@ -36,6 +53,8 @@ static int init_fm(FmModuleApi *out)
     u32 entries[FM_MODULE_API_SLOTS];
     for (u32 i = 0; i < FM_MODULE_API_SLOTS; i++) entries[i] = (u32)(uptr)body_tick;
     kmemcpy(out, entries, sizeof(entries));
+    out->attach = body_attach;
+    out->detach = body_detach;
     out->quiet = body_quiet;
     out->fm_note_on = body_note;
     return 0;
@@ -65,7 +84,7 @@ void _start(void)
     kmemcpy(&exports[4].name_hash, file + 164, 4);
     exports[4].version = 1;
     struct module_request q = request();
-    q.lifecycle = (struct module_lifecycle){.start = start_then_fail, .quiesce = fm_quiesce};
+    q.lifecycle = (struct module_lifecycle){.start = start_then_fail, .quiesce = fm_quiesce, .detach = fm_detach};
     /* Facade stubs must be harmless before load. */
     fm_note_on(0, 60); tick_dispatch();
     CHECK(!ticks && !public_calls);
@@ -86,6 +105,11 @@ void _start(void)
         empty(); finish(0);
     }
     CHECK(!rc && !r->tick_refs);
+    deny = 1;
+    fm_note_on(0, 60); fm_note_off(0); fm_set_tone_num(0, 1);
+    ssg_volume(0, 1); ssg_tone(0, 1); ssg_all_off();
+    CHECK(!ticks && !public_calls);
+    deny = 0;
     tick_dispatch(); fm_note_on(0, 60);
     CHECK(!ticks && public_calls == 1);
     u32 before = returned;
@@ -93,7 +117,8 @@ void _start(void)
     CHECK(!r->tick_refs && silence == 1);
     tick_dispatch(); fm_note_on(0, 60);
     CHECK(!ticks && public_calls == 1);
-    if (mode == 2) {
+    CHECK(detached == 1);
+    if (mode == 2 || mode == 4) {
         CHECK(rc == MODULE_ISOLATED && r->state == MODULE_QUARANTINED);
         CHECK(returned == before && mask[0] == 2 && live[0] && !retired);
         CHECK(fm_module_abort() == MODULE_ISOLATED);
