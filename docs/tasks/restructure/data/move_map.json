@@ -3769,27 +3769,27 @@
   },
   {
     "from": "kdebug/generated/kdebug_import_macros.h",
-    "to": "sys/kern/kdebug/generated/kdebug_import_macros.h"
+    "to": "sys/platform/pc98/kdebug/generated/kdebug_import_macros.h"
   },
   {
     "from": "kdebug/generated/kdebug_import_slots.c",
-    "to": "sys/kern/kdebug/generated/kdebug_import_slots.c"
+    "to": "sys/platform/pc98/kdebug/generated/kdebug_import_slots.c"
   },
   {
     "from": "kdebug/generated/kdebug_import_stubs.S",
-    "to": "sys/kern/kdebug/generated/kdebug_import_stubs.S"
+    "to": "sys/arch/x86/kdebug/generated/kdebug_import_stubs.S"
   },
   {
     "from": "kdebug/generated/kdebug_imports.h",
-    "to": "sys/kern/kdebug/generated/kdebug_imports.h"
+    "to": "sys/platform/pc98/kdebug/generated/kdebug_imports.h"
   },
   {
     "from": "kdebug/generated/kdebug_imports.json",
-    "to": "sys/kern/kdebug/generated/kdebug_imports.json"
+    "to": "sys/platform/pc98/kdebug/generated/kdebug_imports.json"
   },
   {
     "from": "kdebug/generated/kdebug_kexports.c",
-    "to": "sys/kern/kdebug/generated/kdebug_kexports.c"
+    "to": "sys/platform/pc98/kdebug/generated/kdebug_kexports.c"
   },
   {
     "from": "kdebug/generated/recover_gf_tables.inc",
@@ -4057,11 +4057,11 @@
   },
   {
     "from": "kdebug/kdebug_window.c",
-    "to": "sys/kern/kdebug/kdebug_window.c"
+    "to": "sys/arch/x86/kdebug/kdebug_window.c"
   },
   {
     "from": "kdebug/kdebug_window.h",
-    "to": "sys/kern/kdebug/kdebug_window.h"
+    "to": "sys/arch/x86/kdebug/kdebug_window.h"
   },
   {
     "from": "kdebug/kpeek.c",
@@ -4081,7 +4081,7 @@
   },
   {
     "from": "kdebug/kselftest/app_band_pde.inc",
-    "to": "sys/kern/kdebug/kselftest/app_band_pde.inc"
+    "to": "sys/arch/x86/kdebug/kselftest/app_band_pde.inc"
   },
   {
     "from": "kdebug/kselftest/appmem.inc",
@@ -4097,7 +4097,7 @@
   },
   {
     "from": "kdebug/kselftest/caller_boot.inc",
-    "to": "sys/kern/kdebug/kselftest/caller_boot.inc"
+    "to": "sys/arch/x86/kdebug/kselftest/caller_boot.inc"
   },
   {
     "from": "kdebug/kselftest/con_sink_render_gate.inc",
@@ -4109,7 +4109,7 @@
   },
   {
     "from": "kdebug/kselftest/dma8237.inc",
-    "to": "sys/kern/kdebug/kselftest/dma8237.inc"
+    "to": "sys/dev/dma/kdebug/kselftest/dma8237.inc"
   },
   {
     "from": "kdebug/kselftest/dma_pool.inc",
@@ -4129,7 +4129,7 @@
   },
   {
     "from": "kdebug/kselftest/h4_backing.inc",
-    "to": "sys/kern/kdebug/kselftest/h4_backing.inc"
+    "to": "sys/arch/x86/kdebug/kselftest/h4_backing.inc"
   },
   {
     "from": "kdebug/kselftest/heap.inc",
@@ -4141,15 +4141,15 @@
   },
   {
     "from": "kdebug/kselftest/irq_dynamic.inc",
-    "to": "sys/kern/kdebug/kselftest/irq_dynamic.inc"
+    "to": "sys/platform/pc98/kdebug/kselftest/irq_dynamic.inc"
   },
   {
     "from": "kdebug/kselftest/kapi_layout.inc",
-    "to": "sys/kern/kdebug/kselftest/kapi_layout.inc"
+    "to": "sys/arch/x86/kdebug/kselftest/kapi_layout.inc"
   },
   {
     "from": "kdebug/kselftest/kbd_cmd.inc",
-    "to": "sys/kern/kdebug/kselftest/kbd_cmd.inc"
+    "to": "sys/platform/pc98/kdebug/kselftest/kbd_cmd.inc"
   },
   {
     "from": "kdebug/kselftest/kbd_inject.inc",
@@ -4157,7 +4157,7 @@
   },
   {
     "from": "kdebug/kselftest/kcg_display_return.inc",
-    "to": "sys/kern/kdebug/kselftest/kcg_display_return.inc"
+    "to": "sys/platform/pc98/kdebug/kselftest/kcg_display_return.inc"
   },
   {
     "from": "kdebug/kselftest/kprintf.inc",
@@ -4169,11 +4169,11 @@
   },
   {
     "from": "kdebug/kselftest/ledger.inc",
-    "to": "sys/kern/kdebug/kselftest/ledger.inc"
+    "to": "sys/arch/x86/kdebug/kselftest/ledger.inc"
   },
   {
     "from": "kdebug/kselftest/map_user_keep.inc",
-    "to": "sys/kern/kdebug/kselftest/map_user_keep.inc"
+    "to": "sys/arch/x86/kdebug/kselftest/map_user_keep.inc"
   },
   {
     "from": "kdebug/kselftest/mem.inc",
@@ -4181,11 +4181,11 @@
   },
   {
     "from": "kdebug/kselftest/memmap.inc",
-    "to": "sys/kern/kdebug/kselftest/memmap.inc"
+    "to": "sys/platform/pc98/kdebug/kselftest/memmap.inc"
   },
   {
     "from": "kdebug/kselftest/memmap_pool_user.inc",
-    "to": "sys/kern/kdebug/kselftest/memmap_pool_user.inc"
+    "to": "sys/arch/x86/kdebug/kselftest/memmap_pool_user.inc"
   },
   {
     "from": "kdebug/kselftest/pcm.inc",
@@ -4201,7 +4201,7 @@
   },
   {
     "from": "kdebug/kselftest/ring3_pd.inc",
-    "to": "sys/kern/kdebug/kselftest/ring3_pd.inc"
+    "to": "sys/arch/x86/kdebug/kselftest/ring3_pd.inc"
   },
   {
     "from": "kdebug/kselftest/ring3_wm_guard.inc",
@@ -4221,7 +4221,7 @@
   },
   {
     "from": "kdebug/kselftest/tramp_user_str.inc",
-    "to": "sys/kern/kdebug/kselftest/tramp_user_str.inc"
+    "to": "sys/arch/x86/kdebug/kselftest/tramp_user_str.inc"
   },
   {
     "from": "kdebug/kselftest/utoa.inc",
@@ -4237,7 +4237,7 @@
   },
   {
     "from": "kdebug/probe.c",
-    "to": "sys/kern/kdebug/probe.c"
+    "to": "sys/dev/char/kdebug/probe.c"
   },
   {
     "from": "kdebug/probe_index.c",
@@ -4257,7 +4257,7 @@
   },
   {
     "from": "kdebug/recover.h",
-    "to": "sys/kern/kdebug/recover.h"
+    "to": "sys/dev/video/geforce/diag/recover.h"
   },
   {
     "from": "kdebug/recover_cleanup.h",
@@ -4269,15 +4269,15 @@
   },
   {
     "from": "kdebug/recover_common/log.inc",
-    "to": "sys/kern/kdebug/recover_common/log.inc"
+    "to": "sys/dev/video/geforce/diag/recover_common/log.inc"
   },
   {
     "from": "kdebug/recover_common/s0.inc",
-    "to": "sys/kern/kdebug/recover_common/s0.inc"
+    "to": "sys/dev/video/geforce/diag/recover_common/s0.inc"
   },
   {
     "from": "kdebug/recover_common/session.inc",
-    "to": "sys/kern/kdebug/recover_common/session.inc"
+    "to": "sys/dev/video/geforce/diag/recover_common/session.inc"
   },
   {
     "from": "kdebug/recover_diag.h",
@@ -4309,7 +4309,7 @@
   },
   {
     "from": "kdebug/recover_plan/access.inc",
-    "to": "sys/kern/kdebug/recover_plan/access.inc"
+    "to": "sys/dev/video/geforce/diag/recover_plan/access.inc"
   },
   {
     "from": "kdebug/recover_plan/access_idle_read.inc",
@@ -4321,7 +4321,7 @@
   },
   {
     "from": "kdebug/recover_plan/bind.inc",
-    "to": "sys/kern/kdebug/recover_plan/bind.inc"
+    "to": "sys/dev/video/geforce/diag/recover_plan/bind.inc"
   },
   {
     "from": "kdebug/recover_plan/profile.inc",
@@ -4329,7 +4329,7 @@
   },
   {
     "from": "kdebug/recover_plan/step.inc",
-    "to": "sys/kern/kdebug/recover_plan/step.inc"
+    "to": "sys/dev/video/geforce/diag/recover_plan/step.inc"
   },
   {
     "from": "kdebug/recover_profile.c",
@@ -4349,7 +4349,7 @@
   },
   {
     "from": "kdebug/selftest_exec.c",
-    "to": "sys/kern/kdebug/selftest_exec.c"
+    "to": "sys/arch/x86/kdebug/selftest_exec.c"
   },
   {
     "from": "kdebug/selftest_internal.h",
@@ -4361,7 +4361,7 @@
   },
   {
     "from": "kdebug/selftest_lease.c",
-    "to": "sys/kern/kdebug/selftest_lease.c"
+    "to": "sys/arch/x86/kdebug/selftest_lease.c"
   },
   {
     "from": "kdebug/tick_probe.c",

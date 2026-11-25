@@ -2240,12 +2240,12 @@ kapi/kapi_sysinfo.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/bu
 kapi/range_internal.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
 kdebug/crt_diag.c	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf。所属判断=機種固有実装：PEGC のポート・BIOS ワークを扱う CRT 診断	—	機種固有実装
 kdebug/crt_diag.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf。所属判断=機種固有実装：PEGC のポート・BIOS ワークを扱う CRT 診断	—	機種固有実装
-kdebug/generated/kdebug_import_macros.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	デバイス固有実装
-kdebug/generated/kdebug_import_slots.c	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	デバイス固有実装
-kdebug/generated/kdebug_import_stubs.S	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	デバイス固有実装
-kdebug/generated/kdebug_imports.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	デバイス固有実装
-kdebug/generated/kdebug_imports.json	P1-1	製品	製品実装・同梱ファイル：kdebug/generated	—	デバイス固有実装
-kdebug/generated/kdebug_kexports.c	P1-1	製品	P0-1 で像の入力を確認：pc98	—	デバイス固有実装
+kdebug/generated/kdebug_import_macros.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf。所属判断=機種固有実装：PC-98 の BIOS・V86・PEGC を含む KDEBUG_GENERATED の輸入・公開表	—	機種固有実装
+kdebug/generated/kdebug_import_slots.c	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf。所属判断=機種固有実装：PC-98 の BIOS・V86・PEGC を含む KDEBUG_GENERATED の輸入・公開表	—	機種固有実装
+kdebug/generated/kdebug_import_stubs.S	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf。所属判断=CPU固有実装：.code32 の i386 cdecl 間接ジャンプ	—	CPU固有実装
+kdebug/generated/kdebug_imports.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf。所属判断=機種固有実装：PC-98 の BIOS・V86・PEGC を含む KDEBUG_GENERATED の輸入・公開表	—	機種固有実装
+kdebug/generated/kdebug_imports.json	P1-1	製品	製品実装・同梱ファイル：kdebug/generated。所属判断=機種固有実装：PC-98 の BIOS・V86・PEGC を含む KDEBUG_GENERATED の輸入・公開表	—	機種固有実装
+kdebug/generated/kdebug_kexports.c	P1-1	製品	P0-1 で像の入力を確認：pc98。所属判断=機種固有実装：PC-98 の BIOS・V86・PEGC を含む KDEBUG_GENERATED の輸入・公開表	—	機種固有実装
 kdebug/generated/recover_gf_tables.inc	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/hwdev/hwdev.elf	—	デバイス固有実装
 kdebug/gf5_test.c	P1-1	製品	P0-1 で像の入力を確認：pc98	—	デバイス固有実装
 kdebug/gf5_test.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/hwdev/hwdev.elf	—	デバイス固有実装
@@ -2312,17 +2312,17 @@ kdebug/hwb_access.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/bu
 kdebug/hwb_wire.h	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-kboot/PPCKERN.ELF	—	デバイス固有実装
 kdebug/kdebug_main.c	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf。所属判断=機種固有実装：PC-98 の V86・画面診断を組み込む入口	—	機種固有実装
 kdebug/kdebug_module.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	デバイス固有実装
-kdebug/kdebug_window.c	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	デバイス固有実装
-kdebug/kdebug_window.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/geforce/geforce.elf	—	デバイス固有実装
+kdebug/kdebug_window.c	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf。所属判断=CPU固有実装：paging_pte_raw・paging_pte_restore と PTE_PCD で窓を張る	—	CPU固有実装
+kdebug/kdebug_window.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/geforce/geforce.elf。所属判断=CPU固有実装：x86 の PTE を退避・復元する窓の入口	—	CPU固有実装
 kdebug/kpeek.c	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf。所属判断=機種固有実装：PC-98 の VRAM・装置予約域を除外するメモリ診断	—	機種固有実装
 kdebug/kpeek.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/hwdev/hwdev.elf。所属判断=機種固有実装：PC-98 の VRAM・装置予約域を除外するメモリ診断	—	機種固有実装
 kdebug/kselftest.c	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース。所属判断=機種固有実装：PC-98 の V86・画面診断を組み込む入口	—	機種固有実装
 kdebug/kselftest/abort_admit.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/app_band_pde.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
+kdebug/kselftest/app_band_pde.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース。所属判断=CPU固有実装：アプリ帯の PDE の配置を検査	—	CPU固有実装
 kdebug/kselftest/appmem.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
 kdebug/kselftest/bootinfo.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース。所属判断=機種固有実装：PC-98 のシステムクロックに対する PIT の設定を照合	—	機種固有実装
 kdebug/kselftest/bootlog.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/caller_boot.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
+kdebug/kselftest/caller_boot.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース。所属判断=CPU固有実装：CR3 と PTE_USER で呼出元の番地空間を構築	—	CPU固有実装
 kdebug/kselftest/con_sink_render_gate.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
 kdebug/kselftest/cpu_calibrate.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
 kdebug/kselftest/dma8237.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
@@ -2330,30 +2330,30 @@ kdebug/kselftest/dma_pool.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）�
 kdebug/kselftest/fd_redirect_access_guard.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
 kdebug/kselftest/gfx_ledger.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
 kdebug/kselftest/gfx_owner.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/h4_backing.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
+kdebug/kselftest/h4_backing.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース。所属判断=CPU固有実装：PTE_USER を指定して試験用ページを張る	—	CPU固有実装
 kdebug/kselftest/heap.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
 kdebug/kselftest/ime_render_gate.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/irq_dynamic.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/kapi_layout.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/kbd_cmd.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
+kdebug/kselftest/irq_dynamic.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース。所属判断=機種固有実装：PC-98 の PIC1_DATA・PIC1_CMD と int 0x23 で IRQ3 の配線を検査	—	機種固有実装
+kdebug/kselftest/kapi_layout.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース。所属判断=CPU固有実装：kst_exec_kapi_layout で x86 の踏み台命令列を検査	—	CPU固有実装
+kdebug/kselftest/kbd_cmd.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース。所属判断=機種固有実装：PC-98 BIOS が使う 8251 のコマンド語と DTR を照合	—	機種固有実装
 kdebug/kselftest/kbd_inject.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/kcg_display_return.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
+kdebug/kselftest/kcg_display_return.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース。所属判断=機種固有実装：KCG ROM・V86・PC-98 の表示ポートとページ属性を検査	—	機種固有実装
 kdebug/kselftest/kprintf.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
 kdebug/kselftest/kprintf_attr.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース。所属判断=機種固有実装：PC-98 テキスト VRAM の色属性を照合	—	機種固有実装
-kdebug/kselftest/ledger.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/map_user_keep.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
+kdebug/kselftest/ledger.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース。所属判断=CPU固有実装：PDE_COUNT からページディレクトリの大きさを計算	—	CPU固有実装
+kdebug/kselftest/map_user_keep.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース。所属判断=CPU固有実装：共有ページ表の PDE/PTE が保たれることを検査	—	CPU固有実装
 kdebug/kselftest/mem.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/memmap.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/memmap_pool_user.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
+kdebug/kselftest/memmap.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース。所属判断=機種固有実装：V86 セッションと低位メモリのページ属性を照合	—	機種固有実装
+kdebug/kselftest/memmap_pool_user.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース。所属判断=CPU固有実装：ページ表の USER ビットを反転して検査	—	CPU固有実装
 kdebug/kselftest/pcm.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
 kdebug/kselftest/pit_setup.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース。所属判断=機種固有実装：PC-98 のシステムクロックに対する PIT の設定を照合	—	機種固有実装
 kdebug/kselftest/pool_model.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/ring3_pd.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
+kdebug/kselftest/ring3_pd.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース。所属判断=CPU固有実装：ページディレクトリの複製と CR3 の復帰を検査	—	CPU固有実装
 kdebug/kselftest/ring3_wm_guard.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
 kdebug/kselftest/slack_cycle.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
 kdebug/kselftest/str.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
 kdebug/kselftest/time_now.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/tramp_user_str.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
+kdebug/kselftest/tramp_user_str.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース。所属判断=CPU固有実装：kst_exec_tramp_user で CPL3 踏み台の権限を検査	—	CPU固有実装
 kdebug/kselftest/utoa.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
 kdebug/nic_trace.c	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf。所属判断=機種固有実装：PC-98 の bootinfo_native を使う NIC 診断	—	機種固有実装
 kdebug/nic_trace.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf。所属判断=機種固有実装：PC-98 の bootinfo_native を使う NIC 診断	—	機種固有実装
@@ -2385,10 +2385,10 @@ kdebug/recover_profile.c	P1-1	製品	P0-1 で像の入力を確認：pc98/build/
 kdebug/recover_virtual.c	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	デバイス固有実装
 kdebug/recover_virtual.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	デバイス固有実装
 kdebug/recover_wire.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	デバイス固有実装
-kdebug/selftest_exec.c	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	デバイス固有実装
+kdebug/selftest_exec.c	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf。所属判断=CPU固有実装：int 0x80 の命令列と PTE_USER を検査	—	CPU固有実装
 kdebug/selftest_internal.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	デバイス固有実装
 kdebug/selftest_kbd_inject.c	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	デバイス固有実装
-kdebug/selftest_lease.c	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	デバイス固有実装
+kdebug/selftest_lease.c	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf。所属判断=CPU固有実装：paging_current_cr3 と PDE/PTE の実体を検査	—	CPU固有実装
 kdebug/tick_probe.c	P1-1	製品	製品実装・同梱ファイル：kdebug	—	デバイス固有実装
 kdebug/tri_command_wire.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	デバイス固有実装
 kdebug/trident_command_test.c	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	デバイス固有実装

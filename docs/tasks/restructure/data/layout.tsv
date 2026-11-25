@@ -1110,12 +1110,12 @@ kapi/kapi_sysinfo.h	sys/kapi/kapi_sysinfo.h	仕様 §3.2：kapi の責任を引�
 kapi/range_internal.h	sys/kapi/range_internal.h	仕様 §3.2：kapi の責任を引き継ぐ
 kdebug/crt_diag.c	sys/platform/pc98/kdebug/crt_diag.c	D-3：機種固有実装：PEGC のポート・BIOS ワークを扱う CRT 診断
 kdebug/crt_diag.h	sys/platform/pc98/kdebug/crt_diag.h	D-3：機種固有実装：PEGC のポート・BIOS ワークを扱う CRT 診断
-kdebug/generated/kdebug_import_macros.h	sys/kern/kdebug/generated/kdebug_import_macros.h	D-3：build/kdebug.mk で組む診断モジュール
-kdebug/generated/kdebug_import_slots.c	sys/kern/kdebug/generated/kdebug_import_slots.c	D-3：build/kdebug.mk で組む診断モジュール
-kdebug/generated/kdebug_import_stubs.S	sys/kern/kdebug/generated/kdebug_import_stubs.S	D-3：build/kdebug.mk で組む診断モジュール
-kdebug/generated/kdebug_imports.h	sys/kern/kdebug/generated/kdebug_imports.h	D-3：build/kdebug.mk で組む診断モジュール
-kdebug/generated/kdebug_imports.json	sys/kern/kdebug/generated/kdebug_imports.json	D-3：build/kdebug.mk で組む診断モジュール
-kdebug/generated/kdebug_kexports.c	sys/kern/kdebug/generated/kdebug_kexports.c	D-3：build/kdebug.mk で組む診断モジュール
+kdebug/generated/kdebug_import_macros.h	sys/platform/pc98/kdebug/generated/kdebug_import_macros.h	D-3：機種固有実装：PC-98 の BIOS・V86・PEGC を含む KDEBUG_GENERATED の輸入・公開表
+kdebug/generated/kdebug_import_slots.c	sys/platform/pc98/kdebug/generated/kdebug_import_slots.c	D-3：機種固有実装：PC-98 の BIOS・V86・PEGC を含む KDEBUG_GENERATED の輸入・公開表
+kdebug/generated/kdebug_import_stubs.S	sys/arch/x86/kdebug/generated/kdebug_import_stubs.S	D-3：CPU固有実装：.code32 の i386 cdecl 間接ジャンプ
+kdebug/generated/kdebug_imports.h	sys/platform/pc98/kdebug/generated/kdebug_imports.h	D-3：機種固有実装：PC-98 の BIOS・V86・PEGC を含む KDEBUG_GENERATED の輸入・公開表
+kdebug/generated/kdebug_imports.json	sys/platform/pc98/kdebug/generated/kdebug_imports.json	D-3：機種固有実装：PC-98 の BIOS・V86・PEGC を含む KDEBUG_GENERATED の輸入・公開表
+kdebug/generated/kdebug_kexports.c	sys/platform/pc98/kdebug/generated/kdebug_kexports.c	D-3：機種固有実装：PC-98 の BIOS・V86・PEGC を含む KDEBUG_GENERATED の輸入・公開表
 kdebug/generated/recover_gf_tables.inc	sys/dev/video/geforce/diag/generated/recover_gf_tables.inc	移すだけ：kdebug/generated/recover_gf_tables.inc:6 rules_small — kdebug/recover_gf.cが取り込むGF復旧規則の生成表。
 kdebug/gf5_test.c	sys/dev/video/geforce/diag/gf5_test.c	移すだけ：kdebug/gf5_test.c:558 gf5_test — sessionからGF5診断操作と引数を復号し実行する。 境界照合 GF_ROM_BIT_ONLY。上記の実装と固有宣言は候補先の所有者の内部で使用する。
 kdebug/gf5_test.h	sys/dev/video/geforce/diag/gf5_test.h	移すだけ：kdebug/gf5_test.h:5 gf5_test — GF5の同期診断入口をsession引数で宣言する。
@@ -1182,62 +1182,62 @@ kdebug/hwb_access.c	sys/kern/kdebug/hwb_access.c	D-3：build/kdebug.mk で組む
 kdebug/hwb_wire.h	sys/kern/kdebug/hwb_wire.h	D-3：build/kdebug.mk で組む診断モジュール
 kdebug/kdebug_main.c	sys/platform/pc98/kdebug/kdebug_main.c	D-3：機種固有実装：PC-98 の V86・画面診断を組み込む入口
 kdebug/kdebug_module.c	sys/kern/kdebug/kdebug_module.c	D-3：build/kdebug.mk で組む診断モジュール
-kdebug/kdebug_window.c	sys/kern/kdebug/kdebug_window.c	D-3：build/kdebug.mk で組む診断モジュール
-kdebug/kdebug_window.h	sys/kern/kdebug/kdebug_window.h	D-3：build/kdebug.mk で組む診断モジュール
+kdebug/kdebug_window.c	sys/arch/x86/kdebug/kdebug_window.c	D-3：CPU固有実装：paging_pte_raw・paging_pte_restore と PTE_PCD で窓を張る
+kdebug/kdebug_window.h	sys/arch/x86/kdebug/kdebug_window.h	D-3：CPU固有実装：x86 の PTE を退避・復元する窓の入口
 kdebug/kpeek.c	sys/platform/pc98/kdebug/kpeek.c	D-3：機種固有実装：PC-98 の VRAM・装置予約域を除外するメモリ診断
 kdebug/kpeek.h	sys/platform/pc98/kdebug/kpeek.h	D-3：機種固有実装：PC-98 の VRAM・装置予約域を除外するメモリ診断
 kdebug/kselftest.c	sys/platform/pc98/kdebug/kselftest.c	D-3：機種固有実装：PC-98 の V86・画面診断を組み込む入口
 kdebug/kselftest/abort_admit.inc	sys/kern/kdebug/kselftest/abort_admit.inc	D-3：build/kdebug.mk で組む診断モジュール
-kdebug/kselftest/app_band_pde.inc	sys/kern/kdebug/kselftest/app_band_pde.inc	D-3：build/kdebug.mk で組む診断モジュール
+kdebug/kselftest/app_band_pde.inc	sys/arch/x86/kdebug/kselftest/app_band_pde.inc	D-3：CPU固有実装：アプリ帯の PDE の配置を検査
 kdebug/kselftest/appmem.inc	sys/kern/kdebug/kselftest/appmem.inc	D-3：build/kdebug.mk で組む診断モジュール
 kdebug/kselftest/bootinfo.inc	sys/platform/pc98/kdebug/kselftest/bootinfo.inc	D-3：機種固有実装：PC-98 のシステムクロックに対する PIT の設定を照合
 kdebug/kselftest/bootlog.inc	sys/kern/kdebug/kselftest/bootlog.inc	D-3：build/kdebug.mk で組む診断モジュール
-kdebug/kselftest/caller_boot.inc	sys/kern/kdebug/kselftest/caller_boot.inc	D-3：build/kdebug.mk で組む診断モジュール
+kdebug/kselftest/caller_boot.inc	sys/arch/x86/kdebug/kselftest/caller_boot.inc	D-3：CPU固有実装：CR3 と PTE_USER で呼出元の番地空間を構築
 kdebug/kselftest/con_sink_render_gate.inc	sys/kern/kdebug/kselftest/con_sink_render_gate.inc	D-3：build/kdebug.mk で組む診断モジュール
 kdebug/kselftest/cpu_calibrate.inc	sys/kern/kdebug/kselftest/cpu_calibrate.inc	D-3：build/kdebug.mk で組む診断モジュール
-kdebug/kselftest/dma8237.inc	sys/kern/kdebug/kselftest/dma8237.inc	D-3：build/kdebug.mk で組む診断モジュール
+kdebug/kselftest/dma8237.inc	sys/dev/dma/kdebug/kselftest/dma8237.inc	D-3：dma8237_ready と DMA チャネルのマスクを検査
 kdebug/kselftest/dma_pool.inc	sys/kern/kdebug/kselftest/dma_pool.inc	D-3：build/kdebug.mk で組む診断モジュール
 kdebug/kselftest/fd_redirect_access_guard.inc	sys/kern/kdebug/kselftest/fd_redirect_access_guard.inc	D-3：build/kdebug.mk で組む診断モジュール
 kdebug/kselftest/gfx_ledger.inc	sys/platform/pc98/kselftest/gfx_ledger.inc	移すだけ：kdebug/kselftest/gfx_ledger.inc:27 PC-98 の GVRAM 各面・PEGC・Cirrus の台帳と x86 ページ表のキャッシュ属性を検査する。 境界照合 LEDGER_SF_PC98。PC-98 の VRAM の x86 キャッシュ属性そのものを検査する機種専用試験。
 kdebug/kselftest/gfx_owner.inc	sys/kern/kselftest/gfx_owner.inc	移すだけ：kdebug/kselftest/gfx_owner.inc:8 appslot_gfx_owner_selftest の結果から、画面所有の移譲・返却とアプリ属性による拒否を検査する。
-kdebug/kselftest/h4_backing.inc	sys/kern/kdebug/kselftest/h4_backing.inc	D-3：build/kdebug.mk で組む診断モジュール
+kdebug/kselftest/h4_backing.inc	sys/arch/x86/kdebug/kselftest/h4_backing.inc	D-3：CPU固有実装：PTE_USER を指定して試験用ページを張る
 kdebug/kselftest/heap.inc	sys/kern/kdebug/kselftest/heap.inc	D-3：build/kdebug.mk で組む診断モジュール
 kdebug/kselftest/ime_render_gate.inc	sys/kern/kdebug/kselftest/ime_render_gate.inc	D-3：build/kdebug.mk で組む診断モジュール
-kdebug/kselftest/irq_dynamic.inc	sys/kern/kdebug/kselftest/irq_dynamic.inc	D-3：build/kdebug.mk で組む診断モジュール
-kdebug/kselftest/kapi_layout.inc	sys/kern/kdebug/kselftest/kapi_layout.inc	D-3：build/kdebug.mk で組む診断モジュール
-kdebug/kselftest/kbd_cmd.inc	sys/kern/kdebug/kselftest/kbd_cmd.inc	D-3：build/kdebug.mk で組む診断モジュール
+kdebug/kselftest/irq_dynamic.inc	sys/platform/pc98/kdebug/kselftest/irq_dynamic.inc	D-3：機種固有実装：PC-98 の PIC1_DATA・PIC1_CMD と int 0x23 で IRQ3 の配線を検査
+kdebug/kselftest/kapi_layout.inc	sys/arch/x86/kdebug/kselftest/kapi_layout.inc	D-3：CPU固有実装：kst_exec_kapi_layout で x86 の踏み台命令列を検査
+kdebug/kselftest/kbd_cmd.inc	sys/platform/pc98/kdebug/kselftest/kbd_cmd.inc	D-3：機種固有実装：PC-98 BIOS が使う 8251 のコマンド語と DTR を照合
 kdebug/kselftest/kbd_inject.inc	sys/kern/kdebug/kselftest/kbd_inject.inc	D-3：build/kdebug.mk で組む診断モジュール
-kdebug/kselftest/kcg_display_return.inc	sys/kern/kdebug/kselftest/kcg_display_return.inc	D-3：build/kdebug.mk で組む診断モジュール
+kdebug/kselftest/kcg_display_return.inc	sys/platform/pc98/kdebug/kselftest/kcg_display_return.inc	D-3：機種固有実装：KCG ROM・V86・PC-98 の表示ポートとページ属性を検査
 kdebug/kselftest/kprintf.inc	sys/kern/kdebug/kselftest/kprintf.inc	D-3：build/kdebug.mk で組む診断モジュール
 kdebug/kselftest/kprintf_attr.inc	sys/platform/pc98/kdebug/kselftest/kprintf_attr.inc	D-3：機種固有実装：PC-98 テキスト VRAM の色属性を照合
-kdebug/kselftest/ledger.inc	sys/kern/kdebug/kselftest/ledger.inc	D-3：build/kdebug.mk で組む診断モジュール
-kdebug/kselftest/map_user_keep.inc	sys/kern/kdebug/kselftest/map_user_keep.inc	D-3：build/kdebug.mk で組む診断モジュール
+kdebug/kselftest/ledger.inc	sys/arch/x86/kdebug/kselftest/ledger.inc	D-3：CPU固有実装：PDE_COUNT からページディレクトリの大きさを計算
+kdebug/kselftest/map_user_keep.inc	sys/arch/x86/kdebug/kselftest/map_user_keep.inc	D-3：CPU固有実装：共有ページ表の PDE/PTE が保たれることを検査
 kdebug/kselftest/mem.inc	sys/kern/kdebug/kselftest/mem.inc	D-3：build/kdebug.mk で組む診断モジュール
-kdebug/kselftest/memmap.inc	sys/kern/kdebug/kselftest/memmap.inc	D-3：build/kdebug.mk で組む診断モジュール
-kdebug/kselftest/memmap_pool_user.inc	sys/kern/kdebug/kselftest/memmap_pool_user.inc	D-3：build/kdebug.mk で組む診断モジュール
+kdebug/kselftest/memmap.inc	sys/platform/pc98/kdebug/kselftest/memmap.inc	D-3：機種固有実装：V86 セッションと低位メモリのページ属性を照合
+kdebug/kselftest/memmap_pool_user.inc	sys/arch/x86/kdebug/kselftest/memmap_pool_user.inc	D-3：CPU固有実装：ページ表の USER ビットを反転して検査
 kdebug/kselftest/pcm.inc	sys/kern/kdebug/kselftest/pcm.inc	D-3：build/kdebug.mk で組む診断モジュール
 kdebug/kselftest/pit_setup.inc	sys/platform/pc98/kdebug/kselftest/pit_setup.inc	D-3：機種固有実装：PC-98 のシステムクロックに対する PIT の設定を照合
 kdebug/kselftest/pool_model.inc	sys/kern/kdebug/kselftest/pool_model.inc	D-3：build/kdebug.mk で組む診断モジュール
-kdebug/kselftest/ring3_pd.inc	sys/kern/kdebug/kselftest/ring3_pd.inc	D-3：build/kdebug.mk で組む診断モジュール
+kdebug/kselftest/ring3_pd.inc	sys/arch/x86/kdebug/kselftest/ring3_pd.inc	D-3：CPU固有実装：ページディレクトリの複製と CR3 の復帰を検査
 kdebug/kselftest/ring3_wm_guard.inc	sys/kern/kdebug/kselftest/ring3_wm_guard.inc	D-3：build/kdebug.mk で組む診断モジュール
 kdebug/kselftest/slack_cycle.inc	sys/kern/kdebug/kselftest/slack_cycle.inc	D-3：build/kdebug.mk で組む診断モジュール
 kdebug/kselftest/str.inc	sys/kern/kdebug/kselftest/str.inc	D-3：build/kdebug.mk で組む診断モジュール
 kdebug/kselftest/time_now.inc	sys/kern/kdebug/kselftest/time_now.inc	D-3：build/kdebug.mk で組む診断モジュール
-kdebug/kselftest/tramp_user_str.inc	sys/kern/kdebug/kselftest/tramp_user_str.inc	D-3：build/kdebug.mk で組む診断モジュール
+kdebug/kselftest/tramp_user_str.inc	sys/arch/x86/kdebug/kselftest/tramp_user_str.inc	D-3：CPU固有実装：kst_exec_tramp_user で CPL3 踏み台の権限を検査
 kdebug/kselftest/utoa.inc	sys/kern/kdebug/kselftest/utoa.inc	D-3：build/kdebug.mk で組む診断モジュール
 kdebug/nic_trace.c	sys/platform/pc98/kdebug/nic_trace.c	D-3：機種固有実装：PC-98 の bootinfo_native を使う NIC 診断
 kdebug/nic_trace.h	sys/platform/pc98/kdebug/nic_trace.h	D-3：機種固有実装：PC-98 の bootinfo_native を使う NIC 診断
-kdebug/probe.c	sys/kern/kdebug/probe.c	D-3：build/kdebug.mk で組む診断モジュール
+kdebug/probe.c	sys/dev/char/kdebug/probe.c	D-3：serial_get_setup と serial_gate_active でシリアル診断を制御
 kdebug/probe_index.c	sys/kern/kdebug/probe_index.c	D-3：build/kdebug.mk で組む診断モジュール
 kdebug/probe_validate.h	sys/kern/kdebug/probe_validate.h	D-3：build/kdebug.mk で組む診断モジュール
 kdebug/probe_wire.h	sys/kern/kdebug/probe_wire.h	D-3：build/kdebug.mk で組む診断モジュール
 kdebug/recover.c	sys/platform/pc98/kdebug/recover.c	D-3：機種固有実装：PC-98 の I/O と画面・タイマ復旧の処理
-kdebug/recover.h	sys/kern/kdebug/recover.h	D-3：build/kdebug.mk で組む診断モジュール
+kdebug/recover.h	sys/dev/video/geforce/diag/recover.h	D-3：NV44A の BAR0 レジスタ配置を定義
 kdebug/recover_cleanup.h	sys/platform/pc98/kdebug/recover_cleanup.h	D-3：機種固有実装：PC-98 の I/O と画面・タイマ復旧の処理
 kdebug/recover_common/clock.inc	sys/kern/kdebug/recover_common/clock.inc	D-3：build/kdebug.mk で組む診断モジュール
-kdebug/recover_common/log.inc	sys/kern/kdebug/recover_common/log.inc	D-3：build/kdebug.mk で組む診断モジュール
-kdebug/recover_common/s0.inc	sys/kern/kdebug/recover_common/s0.inc	D-3：build/kdebug.mk で組む診断モジュール
-kdebug/recover_common/session.inc	sys/kern/kdebug/recover_common/session.inc	D-3：build/kdebug.mk で組む診断モジュール
+kdebug/recover_common/log.inc	sys/dev/video/geforce/diag/recover_common/log.inc	D-3：gf_bus_record_at と GF_MODE_VRAM_OFFSET で記録
+kdebug/recover_common/s0.inc	sys/dev/video/geforce/diag/recover_common/s0.inc	D-3：REC_GF_ENGINE_STOP に従いエンジンを停止
+kdebug/recover_common/session.inc	sys/dev/video/geforce/diag/recover_common/session.inc	D-3：RECOVER_GF_DEVICE と GeForce の BAR・DAC を照合
 kdebug/recover_diag.h	sys/kern/kdebug/recover_diag.h	D-3：build/kdebug.mk で組む診断モジュール
 kdebug/recover_gf.c	sys/dev/video/geforce/recover_gf.c	移すだけ：kdebug/recover_gf.c:267 GF 固有の復旧規則・対象の表を所有者の計画バッファへ展開する。 境界照合 GF_QUIESCE_REC。上記の実装と固有宣言は候補先の所有者の内部で使用する。
 kdebug/recover_gf.h	sys/dev/video/geforce/recover_gf.h	移すだけ：kdebug/recover_gf.h:77 GF の復旧プロファイルと BAR サイズ測定・準備計画を外部参照用に宣言する。
@@ -1245,20 +1245,20 @@ kdebug/recover_gf_c.h	sys/dev/video/geforce/recover_gf_c.h	移すだけ：kdebug
 kdebug/recover_gf_expand.h	sys/dev/video/geforce/recover_gf_expand.h	移すだけ：kdebug/recover_gf_expand.h:7 GF の復旧プロファイルを gfinit_plan のバッファへ展開する入口を宣言する。
 kdebug/recover_gf_locate.c	sys/dev/video/geforce/recover_gf_locate.c	移すだけ：kdebug/recover_gf_locate.c:5 pci_locate_fn0 で対象 GF を探して結果を保持し、未検出時のデバイス番号も決める。 境界照合 gf_loc。上記の実装と固有宣言は候補先の所有者の内部で使用する。
 kdebug/recover_gf_stage/c.inc	sys/dev/video/geforce/recover_gf_stage/c.inc	移すだけ：kdebug/recover_gf_stage/c.inc:11 recover_safe_point(。復旧セッションの中断確認を装置側に置く。 境界照合 GF_MODE_VRAM_BAR。上記の実装と固有宣言は候補先の所有者の内部で使用する。
-kdebug/recover_plan/access.inc	sys/kern/kdebug/recover_plan/access.inc	D-3：build/kdebug.mk で組む診断モジュール
+kdebug/recover_plan/access.inc	sys/dev/video/geforce/diag/recover_plan/access.inc	D-3：recover_gf_runner_access と gf_bus_record を使用
 kdebug/recover_plan/access_idle_read.inc	sys/kern/kdebug/recover_plan/access_idle_read.inc	D-3：build/kdebug.mk で組む診断モジュール
 kdebug/recover_plan/access_saved_matches.inc	sys/kern/kdebug/recover_plan/access_saved_matches.inc	D-3：build/kdebug.mk で組む診断モジュール
-kdebug/recover_plan/bind.inc	sys/kern/kdebug/recover_plan/bind.inc	D-3：build/kdebug.mk で組む診断モジュール
+kdebug/recover_plan/bind.inc	sys/dev/video/geforce/diag/recover_plan/bind.inc	D-3：GeForce の DAC・AR・VRAM の設定値を検証
 kdebug/recover_plan/profile.inc	sys/platform/pc98/kdebug/recover_plan/profile.inc	D-3：機種固有実装：PC-98 の I/O と画面・タイマ復旧の処理
-kdebug/recover_plan/step.inc	sys/kern/kdebug/recover_plan/step.inc	D-3：build/kdebug.mk で組む診断モジュール
+kdebug/recover_plan/step.inc	sys/dev/video/geforce/diag/recover_plan/step.inc	D-3：GeForce のゼロ化対象に zero_guards を適用
 kdebug/recover_profile.c	sys/platform/pc98/kdebug/recover_profile.c	D-3：機種固有実装：PC-98 の I/O と画面・タイマ復旧の処理
 kdebug/recover_virtual.c	sys/kern/kdebug/recover_virtual.c	D-3：build/kdebug.mk で組む診断モジュール
 kdebug/recover_virtual.h	sys/kern/kdebug/recover_virtual.h	D-3：build/kdebug.mk で組む診断モジュール
 kdebug/recover_wire.h	sys/kern/kdebug/recover_wire.h	D-3：build/kdebug.mk で組む診断モジュール
-kdebug/selftest_exec.c	sys/kern/kdebug/selftest_exec.c	D-3：build/kdebug.mk で組む診断モジュール
+kdebug/selftest_exec.c	sys/arch/x86/kdebug/selftest_exec.c	D-3：CPU固有実装：int 0x80 の命令列と PTE_USER を検査
 kdebug/selftest_internal.h	sys/kern/kdebug/selftest_internal.h	D-3：build/kdebug.mk で組む診断モジュール
 kdebug/selftest_kbd_inject.c	sys/kern/kdebug/selftest_kbd_inject.c	D-3：build/kdebug.mk で組む診断モジュール
-kdebug/selftest_lease.c	sys/kern/kdebug/selftest_lease.c	D-3：build/kdebug.mk で組む診断モジュール
+kdebug/selftest_lease.c	sys/arch/x86/kdebug/selftest_lease.c	D-3：CPU固有実装：paging_current_cr3 と PDE/PTE の実体を検査
 kdebug/tick_probe.c	sys/kern/kdebug/tick_probe.c	D-3：build/kdebug.mk で組む診断モジュール
 kdebug/tri_command_wire.h	sys/dev/video/trident/diag/tri_command_wire.h	D-3：Trident のコマンド診断とその通信形式
 kdebug/trident_command_test.c	sys/dev/video/trident/diag/trident_command_test.c	D-3：Trident のコマンド診断とその通信形式

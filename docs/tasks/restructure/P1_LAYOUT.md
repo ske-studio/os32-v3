@@ -6,7 +6,7 @@ P1 の A1 で判断する対象は[配置台帳](data/layout.tsv)の各ファイ
 |---|---|
 | D-1 | kernel の共通処理を sys/kern/ に置き、mm・exec・init の下位を保つ。初期化と実行形式の責任を引き続きディレクトリで判別できる。 |
 | D-2 | GeForce の三系統を sys/dev/video/geforce/ にまとめる。細分と同名ファイルの置き分けは P1-3 の行き先を採用し、依存を分ける行は P8 に送る。 |
-| D-3 | build/kdebug.mk の KDEBUG_OBJS に入る kselftest とその入力を製品として残す。診断モジュールを sys/kern/kdebug/ に置き、PC-98 の BIOS・PEGC・V86 に依存する診断は sys/platform/pc98/kdebug/、Trident 診断は装置の下に置く。HAL 表にある行はその判断を採る。 |
+| D-3 | build/kdebug.mk の KDEBUG_OBJS に入る kselftest とその入力を製品として残す。共通の診断は sys/kern/kdebug/、CR3・PDE/PTE・i386 命令に依存する診断とスタブは sys/arch/x86/kdebug/ に置く。PC-98 の BIOS・PEGC・V86 に依存する診断は sys/platform/pc98/kdebug/、Trident・8237・シリアルドライバに直接依存する診断は各装置の下に置く。HAL 表にある行はその判断を採る。 |
 | D-4 | P1-3 の分野別契約・共通処理と追加契約ヘッダ3本を sys/hal/ に置く。sys/gfx/・sys/sound/ は将来の置き場。[HAL の配置案](../../design/build/hal_layout.md) |
 | D-5 | kstring 系と kprintf 系を sys/kern/ に置く。前者のゲスト比較ビルドも同じソースを参照する。ライブラリ独自の共有処理や第三者の配布単位は lib/ に保つ。 |
 | D-6 | build/images/ と build/features/ の選択宣言を sys/conf/images/ と sys/conf/features/ に置く。コンパイルとリンクの規則は build/ が持つ。 |
@@ -34,6 +34,8 @@ include/diag_stack.h は SQLite のトレース構成、include/snd_writer_probe
 | P2-3 | build/sdk.mk の CHECK_REGISTRATION | Make の解析時に旧 tools/checks/run.py --make が走る。製品ビルドをこの登録から切り離し、旧ランナーを外した状態で Make が解析できることを確かめる。 |
 | P3 | build/programs.mk の C_TESTS | wildcard userland/tests/*.c と filter-out、個別規則を userland/diag/ に合わせ、移動前後の ELF・BIN の集合を照合する。 |
 | P3 | build/ppc-user.mk の atadeny.o・learnprb.o | 明示したソースを userland/diag/ に変更し、両方の BIN が生成されることを確かめる。 |
+
+P3 では build/kdebug.mk の生成先・オブジェクト規則・ヘッダ探索と kselftest.c の相対 include を台帳に合わせる。KDEBUG_GENERATED のうち i386 スタブと PC-98 の輸入表は出力先が分かれる。
 
 ## 再生成と照合
 
