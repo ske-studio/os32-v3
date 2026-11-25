@@ -3,7 +3,7 @@
 CHECK = dict(name='ci-split-host', tier=0,
              covers=['.github/workflows/check.yml', '.github/workflows/build.yml',
                      '.github/actions/build-setup/action.yml', '.github/actions/static-setup/action.yml', 'tools/ci/build_cross.sh', 'tools/fetch_fonts.py',
-                     'tools/ci/gate.py', 'tools/check_time.py', 'tools/ci/ppc_scope.py', 'tools/ci/build_cross_ppc.sh', '.github/actions/ppc-setup/action.yml', 'tools/ci_fetch.sh', 'tools/ci/reuse_success.py', 'tools/checks/weights.json',
+                     'tools/ci/gate.py', 'tools/check_time.py', 'tools/ci/ppc_scope.py', 'docs/design/hwdev/hwdev_imports.md', 'tools/ci/build_cross_ppc.sh', '.github/actions/ppc-setup/action.yml', 'tools/ci_fetch.sh', 'tools/ci/reuse_success.py', 'tools/checks/weights.json',
                      'tools/checks/run.py', 'build/sdk.mk', 'tools/tests/test_ci_split.py',
                      'CLAUDE.md', 'README.md', 'docs/INDEX.md'],
              needs=[], budget=5.3,
