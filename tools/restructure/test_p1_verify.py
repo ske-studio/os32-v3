@@ -87,6 +87,61 @@ def exercise(module, root, tree):
     check([product, runner, *footer[:-1]], 1, ['母数外 不足: tools/restructure/inventory.py'])
 
 
+def hal_fixture(root):
+    # Use a separate index so the scope fixture still describes its own tree.
+    root.mkdir()
+    subprocess.run(['git', 'init', '-q'], cwd=root, check=True)
+    files = {'gfx/opaque.c': 'int marker;',
+             'hwdev/gf/unit.c': 'int gf_unit(void) { return 1; }',
+             'fs/use.inc': 'int use(void) { return gf_unit(); }'}
+    for path, source in files.items():
+        dest = root / path
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(source)
+    subprocess.run(['git', 'add', '.'], cwd=root, check=True)
+    for name, path in zip(('hal', 'geforce', 'p8'), files):
+        (root / f'{name}.tsv').write_text('file\t根拠\n' + path + '\tfixture\n')
+    return subprocess.check_output(['git', 'write-tree'], cwd=root, text=True).strip()
+
+
+def exercise_hal(module, root, tree):
+    module.ROOT = root
+    expected = {'gfx/opaque.c', 'hwdev/gf/unit.c', 'fs/use.inc'}
+    assert module.hal_targets(tree) == expected
+    assert module.hal_table_targets(root) == expected
+    table = root / 'hal_map.tsv'
+    header = ['パス', '役割', '移設', '行き先の候補', '根拠']
+    row = ['gfx.c', '振り分け', '移すだけ', 'sys/hal/gfx/', 'gfx.c の flip が委譲する']
+    pending = ['gpu.c', 'バックエンド', '未確定', 'sys/dev/', 'gpu.c の probe を A1 で確認']
+
+    sources = {'gfx.c': '/* cpuid */ void flip(void) {}'}
+    def check(rows, status, *messages):
+        with table.open('w', newline='', encoding='utf-8') as stream:
+            csv.writer(stream, delimiter='\t').writerows([header, *rows])
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            result = module.verify_hal(table, {'gfx.c', 'gpu.c'}, sources)
+        assert result == status, output.getvalue()
+        for message in messages:
+            assert message in output.getvalue(), message
+
+    check([row, pending], 0, 'A1 HAL\tgpu.c', '未確定 1')
+    check([row, row], 1, '不足: gpu.c', '重複: gfx.c')
+    check([row, ['other.c', *pending[1:]]], 1, '不足: gpu.c', '余分: other.c')
+    check([row, [pending[0], pending[1], 'P8', 'sys/hal/', '根拠']], 1, '装置固有')
+    check([row, ['gpu.c', '契約', '移すだけ', row[3], '入口を宣言']], 1, '衝突')
+    check([row[:-1] + [' '], pending], 1, 'HAL 必須欄が空')
+    check([row[:2] + ['候補'] + row[3:], pending], 1, '移設判断が不正')
+
+    for code in ('int flags = PTE_PCD;', 'kbd_trygetkey();', 'id == NET_NIC_E82557',
+                 'extern struct ops ext2_medium_loop_ops;', '__asm__("nop");'):
+        sources['gfx.c'] = code
+        check([row, pending], 1, '移すだけの境界根拠がない')
+        check([row[:2] + ['P8'] + row[3:], pending], 0, 'P8 1')
+    sources['gfx.c'] = 'pte_write();'
+    check([row[:-1] + ['境界照合 pte_write。GPU の GART 表を更新する。'], pending], 0)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
@@ -95,9 +150,23 @@ def main():
     with tempfile.TemporaryDirectory() as folder:
         root = Path(folder)
         tree = fixture(root)
+        hal_root = root / 'hal-fixture'
+        hal_tree = hal_fixture(hal_root)
         exercise(verify, root, tree)
+        exercise_hal(verify, hal_root, hal_tree)
         if args.mutate:
             for anchor, replacement in (
+                ('{r[1] for r in hal}', 'set()'),
+                ('{r[0] for r in calls}', 'set()'),
+                ('{r[0] for r in geforce}', 'set()'),
+                ("('hal.tsv', 'geforce.tsv', 'p8.tsv')", "('hal.tsv', 'geforce.tsv')"),
+                ("if symbol and f'境界照合 {symbol}。' not in reason:", 'if False:'),
+                ('if dest in destinations:', 'if False:'),
+                ("compare('HAL', paths, expected, issues)", 'pass'),
+                ('if any(not cell.strip() for cell in row):', 'if False:'),
+                ('for path, reason in sorted(pending):', 'for path, reason in []:'),
+                ("elif 'sys/hal/' in dest and role not in HAL_ROLES:", 'elif False:'),
+                ('if move not in (', 'if False and move not in ('),
                 ('if header_kind and ownership != header_kind:', 'if False:'),
                 ('if evidence - {ownership}:', 'if False:'),
                 ('evidence.update(members.get(path, ()))', 'pass'),
@@ -121,11 +190,12 @@ def main():
                      mutant.__dict__)
                 try:
                     exercise(mutant, root, tree)
+                    exercise_hal(mutant, hal_root, hal_tree)
                 except AssertionError:
                     print('RED', anchor)
                 else:
                     raise AssertionError('surviving mutation: ' + anchor)
-    print('OK: P1 scope ledger contract')
+    print('OK: P1 scope and HAL ledger contracts')
 
 
 if __name__ == '__main__':
