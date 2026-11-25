@@ -1,6 +1,6 @@
 # 新しい検査の登録と結果
 
-> 状態: P1-5 起草済み (sol のレビュー待ち)。
+> 状態: P1-5 確定 (2026-11-26、sol 確定可)。
 
 候補 SHA の `tests/registry.toml` を正本とする。TOML は標準の tomllib でコードを実行せずに表と配列を読める。1 契約が 1 個の `[[check]]` に対応し、本体のパスは所属と ID から決まる。[検査の書き方](tests_v2.md)
 
@@ -41,6 +41,8 @@ mutations = [{ id = "ppc_core_missing_iso", config = "core", when = "after_build
 ```
 
 実行器は本体を起動する前に environment の前提を検査する。linux-ppc-cross では make・Python・媒体生成ツールと PowerPC クロスコンパイラ・binutils が実行でき、対象の newlib のヘッダと libc.a が読めることを確認する。不足なら実行器が対象の行に不足名と ERROR（終了値 2）を記録する。前提が揃って製品のコンパイル・リンクに失敗した場合や必須出力が欠けた場合は、本体が FAIL（終了値 1）を返す。make の依存は各構成の ARCH・PLATFORM・機能指定で展開する。所属・像の選択は候補版の[所有の入口](../../build/ownership.md)に従う。lint は表の必須欄・型、ID、構成と変異の参照、本体の所在、出所の実ファイルと節を確認する。例えば needs を省くと失敗し、spec.path が現行の棚に無い文書を指しても失敗する。空配列と欠落は区別する。
+
+手元では作業木のルートで `python3 -B -m tests.infra.ci lint` と `python3 -B -m tests.infra.ci run` を実行する。run は取り込み候補の全構成を実行し、`--mutate` 付きでは合格した構成に登録の操作を加える。after_build の remove は通常ファイルを 1 つ削除、append は末尾に 1 バイト追加、replace は old が 1 回だけある場合に new に置換する。各操作後は同じ verify を呼ぶ。
 
 ## 計画から集計まで
 
