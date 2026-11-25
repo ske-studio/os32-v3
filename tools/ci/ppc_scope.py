@@ -61,10 +61,12 @@ X86 = ('arch/x86/', 'platform/pc98/')
 
 
 DOC_PATTERNS = ('docs/**', '**.md', '.claude/**')
+# 文書でも生成の道具が読む物 (PPC の check_layout が使う HWDEV の契約の生成器の入力) は文書扱いにしない (sol 2026-11-26)。
+GENERATOR_DOCS = ('docs/design/hwdev/hwdev_imports.md',)
 
 
 def restructure_only(paths):
-    return all(any(fnmatch.fnmatchcase(path, pattern) for pattern in DOC_PATTERNS)
+    return all(path not in GENERATOR_DOCS and any(fnmatch.fnmatchcase(path, pattern) for pattern in DOC_PATTERNS)
                or path.startswith('tools/restructure/')
                or (os.path.dirname(path) == 'tools/checks'
                    and fnmatch.fnmatchcase(os.path.basename(path), 'restructure_*.py'))
