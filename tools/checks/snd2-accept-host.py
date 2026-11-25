@@ -81,6 +81,7 @@ def run(ctx):
     verifier = scripts / 'verify_wave.py'
     source = verifier.read_text()
     changes = [('start if saw_boot_rate else stop', 'start'), ('end-start', '0'), ('(left,right)==expected', 'right == expected[1]')]
+    changes.append(('if 10000 <= right <=', 'if False and 10000 <= right <='))
     with tempfile.TemporaryDirectory() as td:
         directory = Path(td)
         latency_capture(scripts / 'latency.py', directory, ctx.mutate)
@@ -118,6 +119,11 @@ def run(ctx):
             (directory / '01.json').unlink()
             window('0.json', 8000, 0, [(0, 0)])
             window('1.json', 44100, 10, samples[:300])
+            window('2.json', 44100, 266, samples[256:] + [(0, 0)] * 8)
+            good = good and matches()
+            for replay in (samples[-1:], samples[256:], samples):
+                window('2.json', 44100, 266, samples[256:] + [(0, 0)] + replay)
+                good = good and not matches()
             damaged = samples[256:]
             damaged[-1] = (1, damaged[-1][1])
             window('2.json', 44100, 266, damaged)

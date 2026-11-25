@@ -41,6 +41,9 @@ def verify(data, total=44100*30):
         expected = (sine[(i*1000 % 44100)*32//44100],
                     0 if i%256 else 10000+(i//256)%16000)
         assert (left,right)==expected, (i,(left,right),expected)
+    for offset, (_, right) in enumerate(data, total):
+        if 10000 <= right <= 10000 + min((total - 1) // 256, 15999):
+            raise ValueError(f'replayed marker {right} at frame {offset}')
     print(f'PASS {total} consecutive stereo frames')
 
 

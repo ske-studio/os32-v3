@@ -8,7 +8,7 @@
 
 enum scenario { NORMAL, NO_CHANGE, DOUBLE_CHANGE, NO_CONTINUATION, NO_AFTER, NO_KEY };
 static enum scenario scene;
-static u32 latency_us = 29999;
+static u32 latency_us = 29409;
 static int latency_run, wave_run, diagnostic, inject_delay;
 #ifdef SND2_WRITER_DIAG
 static unsigned gap_requests;
@@ -201,7 +201,7 @@ int main(void)
     cursor = 0;
     if (playback(&api, 0, "latency", 3, 30) || marker != 1 || requests != 2) return 1;
     cursor = requests = marker = 0;
-    latency_us = 30000;
+    latency_us = 29410;
     if (!playback(&api, 0, "latency", 3, 30)) return 1;
     scene = NO_KEY;
     cursor = 0;

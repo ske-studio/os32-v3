@@ -197,7 +197,13 @@ static int playback(KernelAPI *api, u32 dev, const char *mode, u32 lead, u32 sec
                      mark_frame, write_hi, write_lo);
         api->kprintf(7, "dma_upper_us_hi=%u dma_upper_us_lo=%u\n",
                      (u32)(upper_us >> 32), (u32)upper_us);
-        if (upper_us >= 30000) return 13;
+        /* Crystal CS4231A DS139PP2, FIFOs (pp. 14-15) and Digital Filter
+           Characteristics (p. 6): 16 FIFO samples + 10 periods for PCM. */
+        u32 codec_us = ((16U + 10U) * 1000000U + desc.fmt.rate - 1) / desc.fmt.rate;
+        unsigned long long output_upper_us = upper_us + codec_us;
+        api->kprintf(7, "output_upper_us_hi=%u output_upper_us_lo=%u\n",
+                     (u32)(output_upper_us >> 32), (u32)output_upper_us);
+        if (output_upper_us >= 30000) return 13;
     }
     if (long_run) return api->snd2_stream_close(h, SND2_CLOSE_DRAIN);
     if (!strcmp(mode, "exit")) return 0;

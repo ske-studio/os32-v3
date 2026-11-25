@@ -28,7 +28,8 @@ def run(ctx):
         ('!changed || pos.epoch', '0 || pos.epoch'),
         ('samples[2*sent+1] = -23456;', 'samples[2*sent+1] = 0;'),
         ('pos.played > mark_frame', 'pos.played >= mark_frame'),
-        ('upper_us >= 30000', 'upper_us > 30000'),
+        ('output_upper_us >= 30000', 'output_upper_us > 30000'),
+        ('upper_us + codec_us', 'upper_us'),
         ('!observed || pos.underruns', 'pos.underruns'),
     ]
     with tempfile.TemporaryDirectory() as td:
