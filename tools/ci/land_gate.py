@@ -82,15 +82,26 @@ def verdict(runs, jobs, expected):
     for run in runs:
         key = number(run['id']), number(run['run_attempt'])
         success = set()
+        collapsed = set()
         seen = set()
         for job in jobs[key]:
             name = job['name']
             if name in seen or number(job['run_id']) != key[0] or number(job['run_attempt']) != key[1]:
                 raise ValueError(f'{key}: duplicate or unrelated job {name}')
             seen.add(name)
+            if job['status'] != 'completed':
+                continue
             allowed_skip = expected.get(name, False) and job['conclusion'] == 'skipped'
-            if (job['conclusion'] == 'success' or allowed_skip) and job['status'] == 'completed':
+            if job['conclusion'] == 'success' or allowed_skip:
                 success.add(name)
+            elif job['conclusion'] == 'skipped' and name not in expected:
+                collapsed.add(name)
+        # A job-level if can skip the matrix before any named shard exists.
+        for parent in collapsed:
+            shards = {label for label, conditional in expected.items()
+                      if conditional and label.partition(' (')[0] == parent}
+            if shards.isdisjoint(seen):
+                success.update(shards)
         missing = expected.keys() - success
         if not missing:
             return []

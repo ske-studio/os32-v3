@@ -66,6 +66,12 @@ def check(source):
         names = ['static-check', 'worker (0)', 'worker (1)'] if ident == 1 else ['artifact']
         jobs = [dict(id=i+1, run_id=10, run_attempt=2, status='completed', name=n,
                      conclusion='success') for i, n in enumerate(names)]
+        if ident == 1 and scenario.startswith('collapsed'):
+            jobs = jobs[:1] + [dict(jobs[1], name='worker', conclusion='skipped')]
+            if scenario == 'collapsed success':
+                jobs[-1]['conclusion'] = 'success'
+            if scenario == 'collapsed partial':
+                jobs.append(dict(jobs[-1], id=3, name='worker (0)', conclusion='failure'))
         if sha == M:
             jobs = jobs[:1] if ident == 1 else []
         if ident == 1 and sha == G and scenario != 'conditional missing':
@@ -95,16 +101,17 @@ def check(source):
         assert args[:2] == ('git', 'show') and args[2].split(':')[0] in (G, M)
         if args[2].endswith('build.yml'):
             return b'jobs: {artifact: {}}'
-        return b"jobs: {static-check: {}, worker: {strategy: {matrix: {n: [0, 1]}}}, optional: {if: false}, cache: {if: \"github.ref == 'refs/heads/main'\"}}"
+        conditional = b'if: false, ' if scenario.startswith('collapsed') and scenario != 'collapsed required' else b''
+        return b"jobs: {static-check: {}, worker: {" + conditional + b"strategy: {matrix: {n: [0, 1]}}}, optional: {if: false}, cache: {if: \"github.ref == 'refs/heads/main'\"}}"
 
     with patch.object(tool, 'command', command), patch.object(tool, 'api', api), patch.dict(
             os.environ, GITHUB_REPOSITORY='repo'), contextlib.redirect_stderr(io.StringIO()):
-        for scenario in ('', 'via', 'head_repository', 'head_sha', 'workflow_id', 'event', 'status',
+        for scenario in ('', 'via', 'collapsed', 'collapsed required', 'collapsed success', 'collapsed partial', 'head_repository', 'head_sha', 'workflow_id', 'event', 'status',
                          'conclusion', 'head_branch', 'missing', 'skipped', 'cancelled', 'attempt',
                          'unrelated', 'running job', 'conditional missing', 'conditional failure', 'page', 'api', 'code', 'docs missing'):
             args = [M, '--via', G] if scenario in ('via', 'code', 'docs missing') else [G]
             with patch.object(sys, 'argv', ['land_gate.py', *args]):
-                assert tool.main() == int(scenario not in ('', 'via')), scenario
+                assert tool.main() == int(scenario not in ('', 'via', 'collapsed')), scenario
 
 
 MUTANTS = [
@@ -113,7 +120,10 @@ MUTANTS = [
     ("run['event'] == 'push'", 'True'), ("run['head_branch'].startswith(prefix)", 'True'),
     ("run['status'] == 'completed'", 'True'), ("run['conclusion'] == 'success'", 'True'),
     ("number(job['run_attempt']) != key[1]", 'False'), ("number(job['run_id']) != key[0]", 'False'),
-    ("job['conclusion'] == 'success'", 'True'), ("job['status'] == 'completed'", 'True'),
+    ("job['conclusion'] == 'success'", 'True'), ("job['status'] != 'completed'", 'False'),
+    ('if conditional and label.partition', 'if label.partition'),
+    ('success.update(shards)', 'pass'),
+    ('if shards.isdisjoint(seen):', 'if True:'),
     ('if not missing:', 'if success:'), ("str(job.get('if', ''))", "''"),
     ("names[label] = 'if' in job", 'names[label] = False'),
     ("and job['conclusion'] == 'skipped'", ''),
@@ -130,7 +140,7 @@ def cli_success():
     sha = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
     endpoints = {}
     for ident, (workflow, names) in enumerate((
-            ('check.yml', ['static-check', 'ppc-compile', 'ppc-layout-inventory'] + [f'ppc-qemu ({i})' for i in range(20)]),
+            ('check.yml', ['static-check', 'ppc-scope', 'ppc-compile', 'ppc-layout-inventory'] + [f'ppc-qemu ({i})' for i in range(20)]),
             ('build.yml', ['artifacts'] + [f'checks ({i})' for i in range(6)])), start=1):
         base = 'repos/repo/actions'
         endpoints[f'{base}/workflows/{workflow}'] = {'id': ident}

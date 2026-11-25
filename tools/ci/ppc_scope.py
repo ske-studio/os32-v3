@@ -61,6 +61,16 @@ X86 = ('arch/x86/', 'platform/pc98/')
 
 
 DOC_PATTERNS = ('docs/**', '**.md', '.claude/**')
+# 文書でも生成の道具が読む物 (PPC の check_layout が使う HWDEV の契約の生成器の入力) は文書扱いにしない (sol 2026-11-26)。
+GENERATOR_DOCS = ('docs/design/hwdev/hwdev_imports.md',)
+
+
+def restructure_only(paths):
+    return all(path not in GENERATOR_DOCS and any(fnmatch.fnmatchcase(path, pattern) for pattern in DOC_PATTERNS)
+               or path.startswith('tools/restructure/')
+               or (os.path.dirname(path) == 'tools/checks'
+                   and fnmatch.fnmatchcase(os.path.basename(path), 'restructure_*.py'))
+               for path in paths)
 
 
 def decide(paths, ref, arch='auto', before_paths=None):
@@ -73,9 +83,11 @@ def decide(paths, ref, arch='auto', before_paths=None):
     if ref == 'refs/heads/main':
         if before_paths is None:
             return 'ppc', 'main: before unavailable'
-        if all(any(fnmatch.fnmatchcase(p, pattern) for pattern in DOC_PATTERNS) for p in before_paths):
-            return 'skip', 'main: documentation only'
+        if restructure_only(before_paths):
+            return 'skip', 'main: documentation or restructure tools only'
         return 'ppc', 'main: code changed'
+    if paths and restructure_only(paths):
+        return 'skip', 'documentation or restructure tools only'
     if ref.removeprefix('refs/heads/').startswith('wt/int-'):
         return 'ppc', 'integration branch: ' + ref
     for path in paths:

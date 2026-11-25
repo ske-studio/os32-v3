@@ -220,6 +220,14 @@ def scope_cases(source):
         assert decide([], 'refs/heads/main', before_paths=paths)[0] == expected, str(paths)
     assert decide(['arch/x86/a.c'], 'wt/stage')[0] == 'skip', 'stage scope'
     assert decide([], 'wt/int-test')[0] == 'ppc', 'integration scope'
+    restructure = ['docs/tasks/restructure/data/input.json', 'README.md', '.claude/config',
+                   'tools/restructure/sub/tool.py', 'tools/checks/restructure_scan.py']
+    for ref in ('refs/heads/main', 'wt/int-test', 'wt/stage'):
+        for extra, expected in (([], 'skip'), (['kernel/a.c'], 'ppc'),
+                                (['tools/checks/restructure_sub/test.py'], 'ppc'),
+                                (['docs/design/hwdev/hwdev_imports.md'], 'ppc')):
+            delta = restructure + extra
+            assert decide(delta, ref, before_paths=delta)[0] == expected, (ref, delta)
     env = dict(GITHUB_EVENT_NAME='push', GITHUB_REF='refs/heads/main', PUSH_BEFORE=SHA)
     for names, forced, ancestor, expected, reuse in (
             (b'arch/x86/a.c\0', 'false', 0, 'ppc', 'true'),
@@ -529,6 +537,9 @@ def main():
     print('ci-split: workflow and fetch cases GREEN', flush=True)
     if '--mutate' in sys.argv:
         mutations = [
+            ('scope', 'paths and restructure_only(paths)', 'False', 'run restructure-only branch'),
+            ('scope', 'restructure_only(before_paths)', 'False', 'run restructure-only main push'),
+            ('scope', 'path not in GENERATOR_DOCS and ', '', 'treat generator-read docs as documentation'),
             ('scope', "if ref == 'refs/heads/main':", 'if False:', 'remove main scope'),
             ('scope', "and os.environ.get('PUSH_FORCED') != 'true'", '', 'ignore forced push'),
             ('scope', ", '.claude/**'", '', 'drop skill docs'),
